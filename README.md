@@ -90,10 +90,10 @@ Save data, settings and the radio list live in `%APPDATA%\AirXpress`.
 
 ## Building
 
-### Visual Studio 2022 (MSVC)
+### Visual Studio 2022 or newer (MSVC)
 
 ```
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake -S . -B build -A x64
 cmake --build build --config Release
 build\Release\AirXpress.exe
 ```
