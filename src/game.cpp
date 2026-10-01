@@ -127,7 +127,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
   takeoffAnnounced = false; touchedDown = false; touchdownFpm = 0; stillTimer = 0;
   engineAutoStarted = false; startDelay = 1.2f;
-  particles.clear();
+  particles.clear(); bursts.clear(); trail.clear(); trailT = 0;
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
   approachMinAgl = 1e9f;
@@ -244,7 +244,6 @@ void Game::flightControls(float dt) {
   }
   if (plane.apOn && (key('W') || key(K_UP))) plane.apAlt += 0;
   if (in.pressed['L']) { landingLight = !landingLight; toast(landingLight ? "Landing lights ON" : "Landing lights OFF"); }
-  if (in.pressed['M']) { showMinimap = !showMinimap; toast(showMinimap ? "Minimap shown" : "Minimap hidden"); }
   if (in.pressed['I'] && !plane.engineRunning && plane.fuel > 0) { plane.starterTime = 0.01f; toast("Engine start"); }
   // time acceleration
   if (in.pressed['T']) {
@@ -257,6 +256,17 @@ void Game::flightControls(float dt) {
 void Game::spawn(vec3 p, vec3 v, float life, float size, float grow, vec3 col, float alpha, int kind, float drag, float buoy) {
   if (particles.size() > 3000) return;
   particles.push_back({p, v, life, life, size, grow, col, alpha, kind, drag, buoy});
+}
+
+// checkpoint gate i: centre and half-extent axes (gate faces along the leg leading to it)
+bool Game::ringGeom(int i, vec3& c, vec3& ax, vec3& ay) const {
+  if (i < 0 || i >= (int)contract.wps.size()) return false;
+  const Waypoint& w = contract.wps[i];
+  c = vec3(w.x, w.alt, w.z);
+  vec3 prev = i == 0 ? g_world.airports[contract.from].pos() : vec3(contract.wps[i - 1].x, contract.wps[i - 1].alt, contract.wps[i - 1].z);
+  vec3 nd = normalize(vec3(c.x - prev.x, 0, c.z - prev.z) + vec3(0.001f, 0, 0));
+  ax = normalize(cross(nd, vec3(0, 1, 0))) * 90.f; ay = vec3(0, 90.f, 0);
+  return true;
 }
 
 void Game::updateFlight(float dt) {
@@ -364,11 +374,41 @@ void Game::updateFlight(float dt) {
   if (!plane.onGround && plane.gLoad > 1.7f && (wx.precip > 0 || plane.pos.y > wx.cloudBase - 300.f)) {
     for (int s = -1; s <= 1; s += 2) spawn(plane.pos + plane.q.rotate(vec3(s * plane.spec->span * 0.5f, plane.spec->wingY * plane.spec->fusRad, plane.spec->wingZ + 0.6f)), plane.vel * 0.9f, 0.5f, 0.25f, 0.4f, vec3(1, 1, 1), 0.35f, SPR_SMOKE, 3.f, 0.f);
   }
+  // GPS breadcrumb trail
+  trailT += dt;
+  if (trailT > 2.f && !plane.onGround) { trailT = 0; trail.push_back(vec2(plane.pos.x, plane.pos.z)); if (trail.size() > 500) trail.erase(trail.begin()); }
   // waypoints
   if (wpIndex < (int)contract.wps.size()) {
     const Waypoint& w = contract.wps[wpIndex];
     vec3 wp(w.x, w.alt, w.z);
+    vec3 gc, gx, gy;
+    if (ringGeom(wpIndex, gc, gx, gy)) {
+      // energy sparks drifting around the active gate's rim
+      sparkAccum += dt * 70.f;
+      Rng& r = sparkRng;
+      while (sparkAccum >= 1.f) {
+        sparkAccum -= 1.f;
+        float a = r.range(0, 6.2832f), rr = r.range(0.8f, 0.92f);
+        vec3 radial = gx * (cosf(a) / 90.f) + gy * (sinf(a) / 90.f);
+        vec3 tang = gx * (-sinf(a) / 90.f) + gy * (cosf(a) / 90.f);
+        vec3 nrm = normalize(cross(gx, gy));
+        spawn(gc + radial * (rr * 90.f), tang * r.range(6.f, 16.f) + radial * r.range(-8.f, 2.f) + nrm * r.range(-4.f, 4.f), r.range(0.8f, 1.6f), r.range(2.5f, 5.f), -1.5f,
+              vec3(0.3f, 1.f, 0.6f) * r.range(2.f, 4.f), 1.f, SPR_SPARK, 0.6f, 0.f);
+      }
+    }
     if (length(plane.pos - wp) < 110.f) {
+      // gate burst: shockwave + a shower of sparks flung outward
+      if (ringGeom(wpIndex, gc, gx, gy)) {
+        bursts.push_back({gc, gx, gy, vec3(0.3f, 1.f, 0.6f), 0.f});
+        Rng& r = sparkRng;
+        for (int k = 0; k < 160; k++) {
+          float a = r.range(0, 6.2832f);
+          vec3 radial = gx * (cosf(a) / 90.f) + gy * (sinf(a) / 90.f);
+          vec3 nrm = normalize(cross(gx, gy));
+          spawn(gc + radial * 78.f, radial * r.range(30.f, 90.f) + nrm * r.range(-25.f, 25.f) + plane.vel * 0.3f, r.range(0.8f, 1.8f), r.range(3.f, 6.f), -1.5f,
+                (k % 3 ? vec3(0.4f, 1.f, 0.7f) : vec3(1.f, 1.f, 0.8f)) * r.range(2.f, 5.f), 1.f, SPR_SPARK, 1.4f, -3.f);
+        }
+      }
       wpIndex++;
       g_audio.trigger(SFX_CHIME);
       toast(wpIndex < (int)contract.wps.size() ? fmt("Checkpoint %d of %d", wpIndex, (int)contract.wps.size()) : "All checkpoints passed!", vec3(0.5f, 1, 0.7f));
@@ -416,7 +456,8 @@ void Game::updateCamera(float dt) {
     toast(names[camMode]);
     if (camMode == 3) camPos = plane.pos + normalize(vec3(plane.vel.x, 0, plane.vel.z) + vec3(0.01f, 0, 0)) * 350.f + plane.right() * 40.f + vec3(0, 12, 0);
   }
-  if (in.wheel != 0) camZoom = clampf(camZoom * powf(0.88f, in.wheel), 0.35f, 4.f);
+  if (in.wheel != 0 && showMap) gpsRangeTarget = clampf(gpsRangeTarget * powf(0.8f, in.wheel), 1500.f, 40000.f);
+  else if (in.wheel != 0) camZoom = clampf(camZoom * powf(0.88f, in.wheel), 0.35f, 4.f);
   bool drag = in.mDown[1] || (camMode == 2 && in.mDown[0]);
   if (drag) { camYaw -= in.mdx * 0.005f * set.mouseSens; camPitch = clampf(camPitch + in.mdy * 0.004f * set.mouseSens, -1.3f, 1.4f); }
   if (in.pad) { float rx = fabsf(in.rx) > 0.2f ? in.rx : 0, ry = fabsf(in.ry) > 0.2f ? in.ry : 0; camYaw -= rx * 2.f * dt; camPitch = clampf(camPitch + ry * 1.5f * dt, -1.3f, 1.4f); }
@@ -450,6 +491,7 @@ void Game::updateCamera(float dt) {
 
 // ------------------------------------------------------------------ particles
 void Game::updateParticles(float dt) {
+  for (size_t i = 0; i < bursts.size();) { bursts[i].t += dt; if (bursts[i].t > 0.9f) { bursts[i] = bursts.back(); bursts.pop_back(); } else i++; }
   for (size_t i = 0; i < particles.size();) {
     Particle& p = particles[i];
     p.life -= dt;
@@ -634,15 +676,30 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     if (landingLight && plane.engineRunning && camMode != 1)
       bill(add, plane.pos + plane.q.rotate(vec3(s.engLayout == 0 ? -s.span * 0.25f : 0, s.engLayout == 0 ? s.wingY * s.fusRad : -s.fusRad * 0.6f, s.engLayout == 0 ? s.wingZ - s.chord * 0.5f : -0.35f * s.fusLen)), ls * 1.8f,
            vec3(1.f, 0.95f, 0.85f) * (1.f + 4.f * night), 1, SPR_GLOW, 0.3f);
-    // waypoint rings
+    // checkpoint gates: the active one spins, breathes and shows a moving breadcrumb trail to the next gate
     for (int i = wpIndex; i < (int)contract.wps.size() && i < wpIndex + 3; i++) {
-      const Waypoint& w = contract.wps[i];
-      vec3 c(w.x, w.alt, w.z);
-      vec3 prev = i == 0 ? g_world.airports[contract.from].pos() : vec3(contract.wps[i - 1].x, contract.wps[i - 1].alt, contract.wps[i - 1].z);
-      vec3 nd = normalize(vec3(c.x - prev.x, 0, c.z - prev.z) + vec3(0.001f, 0, 0));
-      vec3 ax = normalize(cross(nd, vec3(0, 1, 0))) * 90.f, ay = vec3(0, 90.f, 0);
-      vec3 col = i == wpIndex ? vec3(0.2f, 1.f, 0.45f) * 2.f : vec3(1.f, 0.4f, 1.f) * 0.9f;
-      quadAx(add, c, ax, ay, col, 1.f, SPR_RING, 5.f);
+      vec3 c, ax, ay;
+      ringGeom(i, c, ax, ay);
+      bool act = i == wpIndex;
+      float br = act ? 1.f + 0.035f * sinf(t * 2.6f) : 0.85f;
+      vec3 col = act ? vec3(0.2f, 1.f, 0.5f) * 2.2f : vec3(0.85f, 0.4f, 1.f) * 1.1f;
+      quadAx(add, c, ax * br, ay * br, col, act ? 1.f : 0.55f, SPR_RING, 5.f);
+      if (act) quadAx(add, c, ax * 1.25f, ay * 1.25f, col * 0.35f, 0.2f, SPR_SHOCK, 5.f);   // faint outer halo
+      vec3 c2, ax2, ay2;
+      if (act && ringGeom(i + 1, c2, ax2, ay2)) {
+        float len = length(c2 - c);
+        int n = std::min(14, std::max(3, (int)(len / 180.f)));
+        for (int k = 0; k < n; k++) {
+          float f = (k + fmodf(t * 0.8f, 1.f)) / n;
+          float fade = sinf(f * 3.14159f);
+          bill(add, c + (c2 - c) * f, std::max(9.f, length(c + (c2 - c) * f - fp.camPos) * 0.012f), vec3(0.85f, 0.4f, 1.f) * 3.f * fade, 1.f, SPR_SPARK, 5.f);
+        }
+      }
+    }
+    for (const RingBurst& b : bursts) {
+      float k = b.t / 0.9f, s = 1.f + 2.2f * (1.f - (1.f - k) * (1.f - k));
+      quadAx(add, b.c, b.ax * s, b.ay * s, b.col * 3.f, (1.f - k) * (1.f - k), SPR_SHOCK, 5.f);
+      if (k < 0.35f) bill(add, b.c, 90.f * (0.5f + k * 3.f), b.col * 2.f * (1.f - k / 0.35f), 1.f, SPR_GLOW, 5.f);
     }
   }
   // particles
@@ -653,7 +710,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     const Particle& p = *o.second;
     float fade = clampf(p.life / p.maxLife, 0, 1);
     float a = p.alpha * (p.kind == SPR_FIRE ? fade : fade * smoothstepf(0.f, 0.15f, 1.f - fade + 0.15f));
-    if (p.kind == SPR_FIRE) bill(add, p.p, p.size, p.col, a, SPR_FIRE, 1.f);
+    if (p.kind == SPR_FIRE || p.kind == SPR_SPARK) bill(add, p.p, std::max(p.size, 0.05f), p.col, p.kind == SPR_SPARK ? fade : a, p.kind, 1.f);
     else bill(alpha, p.p, p.size, p.col, a, p.kind, 1.f);
   }
   // precipitation around the camera
@@ -690,7 +747,7 @@ void Game::feedAudio() {
   AudioParams ap;
   ap.master = set.master; ap.engineVol = set.engineVol; ap.sfxVol = set.sfxVol;
   static bool muffled = false;
-  if (in.pressed['U'] || (in.buttonsPressed & PAD_LS)) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
+  if (in.pressed['M'] || (in.buttonsPressed & PAD_LS)) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
   ap.muffled = muffled;
   if (screen == SCR_FLIGHT && plane.spec && !crashed) {
     const AircraftSpec& s = *plane.spec;
@@ -738,7 +795,8 @@ void Game::update(float dt) {
   radio.poll();
   if (screen == SCR_FLIGHT) {
     if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_START)) { if (showMap) showMap = false; else if (showRadio) showRadio = false; else { paused = !paused; settingsFromPause = false; } }
-    if (in.pressed['N'] || in.pressed[K_TAB]) showMap = !showMap;
+    if (in.pressed['N']) { showMap = !showMap; g_audio.trigger(SFX_CLICK); }
+    if (in.pressed[K_TAB]) { showMinimap = !showMinimap; toast(showMinimap ? "Minimap shown" : "Minimap hidden"); }
     if (in.pressed['H']) hudOn = !hudOn;
     if (!paused) {
       updateFlight(dt);
@@ -762,10 +820,11 @@ void Game::render() {
   buildSprites(fp, a, b);
   g_ren.renderScene(fp, a, b);
   g_ren.uiBegin();
+  uiDt = clampf(realTime - uiLastT, 0.f, 0.1f); uiLastT = realTime;
   switch (screen) {
     case SCR_MENU: drawMenu(); break;
     case SCR_HUB: drawHub(); break;
-    case SCR_FLIGHT: drawHud(fp); if (showMap) drawMapOverlay(); if (paused) drawPause(); break;
+    case SCR_FLIGHT: drawHud(fp); drawMapOverlay(); if (paused) drawPause(); break;
     case SCR_DEBRIEF: drawDebrief(); break;
   }
   drawToasts();
@@ -777,6 +836,7 @@ void Game::debugScene(const std::string& name) {
   career.newGame(); career.license = LIC_ATP;
   if (name == "menu") { screen = SCR_MENU; realTime = 20; return; }
   if (name == "hub") { screen = SCR_HUB; realTime = 20; return; }
+  if (name.size() == 4 && name.compare(0, 3, "hub") == 0) { screen = SCR_HUB; hubTab = name[3] - '0'; realTime = 20; return; }
   Contract c = g_story[0];
   int spec = 0;
   if (name.size() == 3 && name[0] == 'm') {
@@ -842,8 +902,29 @@ void Game::debugScene(const std::string& name) {
     camQ = plane.q;
     if (name == "cockpit") camMode = 1;
   }
+  if (name == "rings" || name == "ringburst") {
+    vec3 c, ax, ay; ringGeom(0, c, ax, ay);
+    vec3 nd = normalize(cross(vec3(0, 1, 0), ax));
+    float dist = name == "rings" ? 420.f : 160.f;
+    float hdg = atan2f(nd.x, -nd.z) / DEG;
+    plane.reset(&kAircraft[0], c - nd * dist - vec3(0, 12, 0), hdg, kAircraft[0].maxFuel, 100, true, kAircraft[0].cruise);
+    takeoffAnnounced = true; camQ = plane.q; hint.clear(); toasts.clear(); botControl = true;
+    plane.ctl = Controls(); plane.ctl.throttle = 0.7f;
+    for (int i = 0; i < 30; i++) updateCamera(0.1f);
+    for (int i = 0; i < (name == "rings" ? 60 : 42); i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    return;
+  }
   if (name == "top") { camMode = 2; camYaw = 0.3f; camPitch = 1.35f; camZoom = 4.f; }
   if (name == "orbit") { camMode = 2; camYaw = 2.3f; camPitch = 0.25f; camZoom = 0.6f; timeOfDay = 9.0f; }
   for (int i = 0; i < 30; i++) updateCamera(0.1f);
   if (name == "hud") hint = contract.hints.size() ? contract.hints[2] : "";
+  if (name == "gps" || name == "pause" || name == "minimap") {
+    plane.reset(&kAircraft[1], vec3(-4000, 600, 9000), 40, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
+    takeoffAnnounced = true; camQ = plane.q; hint.clear(); toasts.clear();
+    for (int i = 0; i < 60; i++) trail.push_back(vec2(-4000 - sinf(40 * DEG) * i * 110.f + sinf(i * 0.1f) * 300.f, 9000 + cosf(40 * DEG) * i * 110.f));
+    if (name == "gps") { showMap = true; uiAnim[0x6e61u] = 1.f; }
+    if (name == "pause") paused = true;
+    if (name == "minimap") showMinimap = true;
+    for (int i = 0; i < 30; i++) updateCamera(0.1f);
+  }
 }

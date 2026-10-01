@@ -52,6 +52,12 @@ vec4 maskAt(vec2 p){
   vec4 c = texelFetch(uMask, clamp(i+ivec2(0,1), ivec2(0), mx), 0), d = texelFetch(uMask, clamp(i+ivec2(1,1), ivec2(0), mx), 0);
   return (a*(1.0-t.x)+b*t.x)*(1.0-t.y) + (c*(1.0-t.x)+d*t.x)*t.y;
 }
+float forestAt(vec2 p){
+  vec2 f = (p + WH)/MTEX - 0.5; vec2 fl = floor(f); ivec2 i = ivec2(fl); vec2 t = f - fl; ivec2 mx = ivec2(MASKN-1);
+  float a = texelFetch(uRoadId, clamp(i, ivec2(0), mx), 0).g, b = texelFetch(uRoadId, clamp(i+ivec2(1,0), ivec2(0), mx), 0).g;
+  float c = texelFetch(uRoadId, clamp(i+ivec2(0,1), ivec2(0), mx), 0).g, d = texelFetch(uRoadId, clamp(i+ivec2(1,1), ivec2(0), mx), 0).g;
+  return ((a*(1.0-t.x)+b*t.x)*(1.0-t.y) + (c*(1.0-t.x)+d*t.x)*t.y)*0.875;
+}
 vec4 maskTexel(vec2 p){ return texelFetch(uMask, clamp(ivec2(floor((p + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0); }
 float groundH(vec2 p, int oct){ vec4 b = baseAt(p); return b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct); }
 // kinds: 1 conifer, 2 broadleaf, 3 palm, 4 rock, 5 sea stack
@@ -73,7 +79,7 @@ float coverH(vec2 p, float g, vec4 b, out int kind){
   }
   float lush = b.z, cold = b.w, amp = b.y;
   float roadD = m.x*80.0, town = m.y, farm = m.w;
-  float fn = fbm2(p/1400.0 + vec2(3.1, 0.0), 3);
+  float fn = forestAt(p);
   float treeline = smoothstep(1500.0 - cold*900.0, 1100.0 - cold*700.0, g);
   float fd = smoothstep(0.42 - 0.1*lush, 0.5 - 0.1*lush, fn)*treeline;
   fd = max(fd, 0.04*treeline);
@@ -124,7 +130,8 @@ float coverH(vec2 p, float g, vec4 b, out int kind){
 float terrainHF(vec2 p, int oct, float fade, float rayY){
   vec4 b = baseAt(p);
   float g = b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct);
-  if (fade <= 0.001 || (b.y < 0.01 && g > 0.5) || rayY - g > 60.0) return g;
+  // trees <= 18 m and rocks <= 7 m above land, sea stacks <= 44 m: above that the cover cannot be hit
+  if (fade <= 0.001 || (b.y < 0.01 && g > 0.5) || rayY - g > (g < 0.3 ? 46.0 : 19.0)) return g;
   int k;
   return g + fade*coverH(p, g, b, k);
 }
@@ -793,28 +800,49 @@ R"(    return col;
 // Split in two constants: MSVC limits a concatenated string literal to 64 KB.
 static const char* kRaytraceFS2 = R"(// ---------------------------------------------------------------- terrain (+ trees, rocks, sea stacks)
 float coverFade(float t){ return smoothstep(4500.0, 2500.0, t); }
+uniform sampler2D uHMax;  // conservative max height per cell, mip L = 256>>L cells per side
+const int HMAXN = 256; const int HMAXL = 5;
+// Ray march the heightfield. Cells the ray passes entirely above (per the max-height mip chain) are skipped,
+// which keeps grazing rays over lowlands from running out of steps (they used to fall through to the sea).
 float traceTerrain(vec3 ro, vec3 rd, float tmax){
   float t = 1.0;
   if (ro.y > uMaxH) { if (rd.y >= 0.0) return -1.0; t = max(t, (ro.y - uMaxH)/(-rd.y)); }
-  float lt = t, ldh = 0.0;
+  float lt = t, ldh = 0.0; bool skipped = true;
   int maxSteps = uQuality > 1 ? 360 : (uQuality > 0 ? 270 : 190);
+  vec2 ird = vec2(abs(rd.x) > 1e-6 ? 1.0/rd.x : 1e9, abs(rd.z) > 1e-6 ? 1.0/rd.z : 1e9);
   for (int i=0;i<360;i++){
     if (i >= maxSteps || t > tmax) break;
     vec3 p = ro + rd*t;
     if (p.y > uMaxH && rd.y > 0.0) return -1.0;
+    bool sk = false;
+    for (int L = HMAXL - 1; L >= 0; L--) {
+      int n = HMAXN >> L; float cs = 2.0*WH/float(n);
+      ivec2 ci = clamp(ivec2(floor((p.xz + WH)/cs)), ivec2(0), ivec2(n - 1));
+      float mh = texelFetch(uHMax, ci, L).r;
+      if (p.y <= mh) continue;
+      vec2 c0 = vec2(ci)*cs - WH;
+      vec2 te2 = (mix(c0, c0 + cs, step(0.0, rd.xz)) - ro.xz)*ird;
+      float te = min(te2.x, te2.y);
+      float ty = rd.y < 0.0 ? (mh - ro.y)/rd.y : 1e9;
+      float tn = min(te + 0.05 + t*1e-5, ty);
+      if (tn > t + 0.01) { t = tn; sk = true; break; }
+    }
+    if (sk) { skipped = true; continue; }
     int oct = t < 1500.0 ? 7 : (t < 6000.0 ? 6 : 5);
     float fade = coverFade(t);
     float h = terrainHF(p.xz, oct, fade, p.y);
     float dh = p.y - h;
     if (dh < 0.0015*t) {
-      if (i == 0) return t;
+      if (skipped) return t;
       return lt + (t - lt) * ldh / max(ldh - dh, 1e-4);
     }
-    lt = t; ldh = dh;
+    skipped = false; lt = t; ldh = dh;
     // trees and boulders are steep: take shorter steps close to the canopy
-    float k = (fade > 0.0 && dh < 70.0) ? 0.3 : 0.42;
+    float k = (fade > 0.0 && dh < 50.0) ? 0.3 : (t > 4500.0 ? 0.6 : 0.42);
     t += max(dh*k, 0.2 + 0.0015*t);
   }
+  // out of steps while skimming just above the ground: count it as a hit rather than showing the sea through hills
+  if (t <= tmax) { vec3 p = ro + rd*t; if (p.y - terrainHF(p.xz, 5, 0.0, p.y) < 0.02*t) return t; }
   return -1.0;
 }
 float terrainShadow(vec3 ro, vec3 rd, float camT){
@@ -1144,7 +1172,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
   wSnow = max(wSnow, uSnow*smoothstep(0.6, 0.35, slope)*step(1.0, p.y));
   float wRock = smoothstep(0.32, 0.5, slope + (n2-0.5)*0.15);
   float wSand = smoothstep(4.5 + 3.0*hNoise, 1.0, p.y) * (1.0 - wRock);
-  float forestN = fbm2(p.xz/1400.0 + vec2(3.1, 0.0), 3);
+  float forestN = forestAt(p.xz);
   float wForest = smoothstep(0.42 - lush*0.1, 0.5 - lush*0.1, forestN) * smoothstep(0.35, 0.2, slope) * smoothstep(4.0, 9.0, p.y) * smoothstep(1500.0 - cold*900.0, 1100.0 - cold*700.0, p.y);
   float wDirt = smoothstep(0.55, 0.7, n2) * (1.0 - wForest) * 0.6;
   vec4 gr = matSample(p.xz, M_GRASS, 6.0, nTS); vec3 nG = nTS;
@@ -1740,7 +1768,7 @@ void main(){ vUV = aUV; vCol = aCol; vKind = aKind; vWorld = aPos; vDist = lengt
 static const char* kSpriteFS = R"(#version 330 core
 in vec2 vUV; in vec4 vCol; in float vDist; in vec2 vKind; in vec3 vWorld;
 out vec4 oColor;
-uniform sampler2D uDepth; uniform vec2 uRes; uniform vec3 uSunDir; uniform vec3 uSunCol; uniform vec3 uAmb; uniform float uFogB;
+uniform sampler2D uDepth; uniform vec2 uRes; uniform vec3 uSunDir; uniform vec3 uSunCol; uniform vec3 uAmb; uniform float uFogB; uniform float uTime;
 void main(){
   float sceneT = texture(uDepth, gl_FragCoord.xy/uRes).r;
   int kind = int(vKind.x + 0.5);
@@ -1756,12 +1784,29 @@ void main(){
   } else if (kind == 1) { // additive glow light
     float a = (exp(-r2*6.0) + 0.15*exp(-r2*1.5) - 0.0335)*(1.0 - smoothstep(0.6, 1.0, r2)); a = max(a, 0.0);
     o = vec4(vCol.rgb*a*vCol.a, 0.0);
-  } else if (kind == 2) { // waypoint ring
+  } else if (kind == 2) { // checkpoint gate: segmented counter-rotating bands, sweeping highlight, inward pulses
+    float r = sqrt(r2), ang = atan(c.y, c.x), act = vCol.a, T = uTime;
+    float rim = smoothstep(0.03, 0.0, abs(r - 0.86)) + 0.45*exp(-abs(r - 0.86)*22.0);
+    float outer = smoothstep(0.022, 0.0, abs(r - 0.935))*step(0.38, fract(ang*12.0/6.2832 + T*0.22));
+    float inner = smoothstep(0.014, 0.0, abs(r - 0.77))*step(0.55, fract(ang*36.0/6.2832 - T*0.45))*0.8;
+    float sweep = pow(max(cos(ang - T*2.4), 0.0), 18.0)*smoothstep(0.12, 0.0, abs(r - 0.86))*1.8;
+    float sweep2 = pow(max(cos(ang + T*1.7 + 3.1416), 0.0), 30.0)*smoothstep(0.05, 0.0, abs(r - 0.935))*1.2;
+    float pw = fract(T*0.55);
+    float pulse = smoothstep(0.025, 0.0, abs(r - mix(0.84, 0.15, pw)))*(1.0 - pw)*0.7;
+    float ticks = smoothstep(0.03, 0.0, abs(r - 0.70))*step(0.9, fract(ang*4.0/6.2832 + 0.125))*1.2;
+    float film = 0.07*smoothstep(0.86, 0.3, r)*(0.55 + 0.45*sin(r*34.0 - T*5.0));
+    float a = rim*1.25 + outer + inner + (sweep + sweep2 + pulse + ticks + film)*act;
+    a *= 1.0 - smoothstep(0.97, 1.0, r);
+    o = vec4(vCol.rgb*a*(0.35 + 0.65*act), 0.0);
+  } else if (kind == 6) { // expanding shockwave / halo ring
     float r = sqrt(r2);
-    float a = smoothstep(0.08, 0.0, abs(r - 0.88)) + 0.25*smoothstep(0.25, 0.0, abs(r - 0.88));
-    float chev = step(0.75, r)*step(r, 1.0)*step(0.5, fract(atan(c.y,c.x)*8.0/6.2831));
-    a *= 1.0 - smoothstep(0.96, 1.0, r);
-    o = vec4(vCol.rgb*(a + chev*0.2)*vCol.a, 0.0);
+    float a = smoothstep(0.05, 0.0, abs(r - 0.88)) + 0.4*exp(-abs(r - 0.88)*12.0);
+    a *= 1.0 - smoothstep(0.97, 1.0, r);
+    o = vec4(vCol.rgb*a*vCol.a, 0.0);
+  } else if (kind == 7) { // spark: hot core with a small cross flare
+    float a = exp(-r2*14.0) + 0.5*exp(-abs(c.x)*22.0)*exp(-c.y*c.y*3.0) + 0.5*exp(-abs(c.y)*22.0)*exp(-c.x*c.x*3.0);
+    a = max(a - 0.02, 0.0)*(1.0 - smoothstep(0.7, 1.0, r2));
+    o = vec4(vCol.rgb*a*vCol.a, 0.0);
   } else if (kind == 3) { // rain streak
     float a = smoothstep(1.0, 0.0, abs(c.x)) * smoothstep(1.0, 0.6, abs(c.y));
     o = vec4(vCol.rgb*(uAmb*2.0 + 0.1), vCol.a*a);
@@ -1774,7 +1819,7 @@ void main(){
   }
   float fog = exp(-vDist*uFogB*0.5);
   o.rgb *= fog; o.a *= mix(1.0, fog, 0.5);
-  o.a *= soft; if (kind == 1 || kind == 2 || kind == 4) o.rgb *= soft;
+  o.a *= soft; if (kind == 1 || kind == 2 || kind == 4 || kind == 6 || kind == 7) o.rgb *= soft;
   oColor = o;
 }
 )";
@@ -1857,13 +1902,14 @@ void main(){
 
 // ------------------------------------------------------------------------------------------------
 static const char* kUIVS = R"(#version 330 core
-layout(location=0) in vec2 aPos; layout(location=1) in vec2 aUV; layout(location=2) in vec4 aCol; layout(location=3) in vec3 aMode;
-uniform vec2 uScreen; out vec2 vUV; out vec4 vCol; out float vMode; out vec2 vHalf;
-void main(){ vUV = aUV; vCol = aCol; vMode = aMode.x; vHalf = aMode.yz; gl_Position = vec4(aPos.x/uScreen.x*2.0-1.0, 1.0-aPos.y/uScreen.y*2.0, 0.0, 1.0); }
+layout(location=0) in vec2 aPos; layout(location=1) in vec2 aUV; layout(location=2) in vec4 aCol; layout(location=3) in vec4 aMode;
+uniform vec2 uScreen; out vec2 vUV; out vec4 vCol; out float vMode; out vec2 vHalf; out float vP;
+void main(){ vUV = aUV; vCol = aCol; vMode = aMode.x; vHalf = aMode.yz; vP = aMode.w; gl_Position = vec4(aPos.x/uScreen.x*2.0-1.0, 1.0-aPos.y/uScreen.y*2.0, 0.0, 1.0); }
 )";
 static const char* kUIFS = R"(#version 330 core
-in vec2 vUV; in vec4 vCol; in float vMode; in vec2 vHalf; out vec4 oColor;
+in vec2 vUV; in vec4 vCol; in float vMode; in vec2 vHalf; in float vP; out vec4 oColor;
 uniform sampler2D uFont; uniform sampler2D uImg;
+float sdRR(vec2 p, vec2 h, float r){ vec2 q = abs(p) - h + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
 void main(){
   if (vMode < 0.5) { oColor = vCol; }
   else if (vMode < 1.5) {
@@ -1875,7 +1921,9 @@ void main(){
     float d = texture(uFont, vUV).r;  // soft shadow for text
     oColor = vec4(0.0, 0.0, 0.0, vCol.a*smoothstep(0.25, 0.55, d)*0.6);
   } else if (vMode < 3.5) { oColor = texture(uImg, vUV)*vCol; }
-  else { float r = (vMode - 4.0)*1000.0; vec2 q = abs(vUV) - vHalf + r; float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
-    oColor = vec4(vCol.rgb, vCol.a*clamp(0.5 - d, 0.0, 1.0)); }
+  else if (vMode < 5.0) { float d = sdRR(vUV, vHalf, (vMode - 4.0)*1000.0); oColor = vec4(vCol.rgb, vCol.a*clamp(0.5 - d, 0.0, 1.0)); }
+  else if (vMode < 6.0) { float d = sdRR(vUV, vHalf, (vMode - 5.0)*1000.0); oColor = vec4(vCol.rgb, vCol.a*clamp(0.5*vP + 0.5 - abs(d + 0.5*vP), 0.0, 1.0)); }
+  else { float d = sdRR(vUV, vHalf, (vMode - 6.0)*1000.0); float k = clamp(1.0 - max(d, 0.0)/max(vP, 1.0), 0.0, 1.0);
+    oColor = vec4(vCol.rgb, vCol.a*k*k*step(0.0, d)); }
 }
 )";

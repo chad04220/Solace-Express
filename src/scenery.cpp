@@ -101,14 +101,16 @@ extern float airportInfluence(float x, float z);
 void World::bakeMask() {
   initRoads();
   mask.assign((size_t)MASK_N * MASK_N * 4, 0);
-  roadId.assign((size_t)MASK_N * MASK_N, 0);
+  roadId.assign((size_t)MASK_N * MASK_N * 2, 0);
   for (int j = 0; j < MASK_N; j++)
     for (int i = 0; i < MASK_N; i++) {
       float x = -WORLD_HALF + (i + 0.5f) * MASK_TEXEL, z = -WORLD_HALF + (j + 0.5f) * MASK_TEXEL;
       float b[4]; sampleBase(x, z, b);
       int seg = -1;
       float rd = roadDistance(x, z, &seg);
-      roadId[(size_t)j * MASK_N + i] = (uint8_t)(seg + 1);
+      roadId[((size_t)j * MASK_N + i) * 2] = (uint8_t)(seg + 1);
+      // forest-patch noise baked once instead of evaluating 3 octaves of value noise at every ray-march step
+      roadId[((size_t)j * MASK_N + i) * 2 + 1] = (uint8_t)lroundf(clampf(coverFbm(x / 1400.f + 3.1f, z / 1400.f, 3) / 0.875f, 0, 1) * 255.f);
       float dens = 0, urban = 0;
       for (int k = 0; k < kNumTowns; k++) {
         const Town& t = kTowns[k];
@@ -158,6 +160,16 @@ void World::maskTexel(float x, float z, float out[4]) const {
   for (int c = 0; c < 4; c++) out[c] = mask[((size_t)j * MASK_N + i) * 4 + c] / 255.f;
 }
 
+float World::forestAt(float x, float z) const {
+  float fx = (x + WORLD_HALF) / MASK_TEXEL - 0.5f, fz = (z + WORLD_HALF) / MASK_TEXEL - 0.5f;
+  float flx = floorf(fx), flz = floorf(fz);
+  int i0 = (int)flx, j0 = (int)flz;
+  float tx = fx - flx, tz = fz - flz;
+  auto at = [&](int i, int j) { i = std::clamp(i, 0, MASK_N - 1); j = std::clamp(j, 0, MASK_N - 1); return roadId[((size_t)j * MASK_N + i) * 2 + 1] / 255.f; };
+  float a = at(i0, j0), b = at(i0 + 1, j0), c = at(i0, j0 + 1), d = at(i0 + 1, j0 + 1);
+  return ((a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz) * 0.875f;
+}
+
 float World::groundHeight(float x, float z, int octaves) const {
   float b[4]; sampleBase(x, z, b);
   if (b[1] < 0.01f) return b[0];
@@ -185,7 +197,7 @@ float World::cover(float x, float z, float g, const float b[4], int* kindOut) co
   float lush = b[2], cold = b[3], amp = b[1];
   float roadD = m[0] * ROAD_RANGE, town = m[1], farm = m[3];
   // ---- trees
-  float fn = coverFbm(x / 1400.f + 3.1f, z / 1400.f, 3);
+  float fn = forestAt(x, z);
   float treeline = smoothstepf(1500.f - cold * 900.f, 1100.f - cold * 700.f, g);
   float fd = smoothstepf(0.42f - 0.1f * lush, 0.5f - 0.1f * lush, fn) * treeline;
   fd = std::max(fd, 0.04f * treeline);

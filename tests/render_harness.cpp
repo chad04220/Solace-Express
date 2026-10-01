@@ -1,3 +1,4 @@
+#include <chrono>
 // Development harness: renders test frames on Linux (Xvfb + Mesa) to validate shaders and visuals.
 #include <X11/Xlib.h>
 #include <dlfcn.h>
@@ -46,6 +47,13 @@ int main(int argc, char** argv) {
   game.debugScene(scene);
   for (int i = 0; i < 3; i++) { game.update(1.f / 30.f); game.render(); }
   glFinish();
+  if (getenv("BENCH")) {
+    auto t0 = std::chrono::steady_clock::now();
+    int frames = atoi(getenv("BENCH"));
+    for (int i = 0; i < frames; i++) game.render();
+    glFinish();
+    printf("bench: %.1f ms/frame\n", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / frames);
+  }
   std::string out = "/tmp/claude-0/sp/shot_" + scene + ".ppm";
   g_ren.screenshot(out.c_str());
   printf("wrote %s\n", out.c_str());

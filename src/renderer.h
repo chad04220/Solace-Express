@@ -5,7 +5,7 @@
 #include "world.h"
 
 struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft; };
-enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5 };
+enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7 };
 
 struct PlaneVisual {
   bool on = false;
@@ -27,7 +27,7 @@ struct FrameParams {
   float exposure = 1.0f, rainLens = 0, fade = 1, vignette = 0.6f;
 };
 
-struct UIVert { float x, y, u, v, r, g, b, a, mode, hx, hy; };
+struct UIVert { float x, y, u, v, r, g, b, a, mode, hx, hy, p; };
 
 class Renderer {
 public:
@@ -48,6 +48,9 @@ public:
   void uiBegin();
   void rect(float x, float y, float w, float h, vec3 c, float a = 1.0f, float radius = 0.0f);
   void line(float x0, float y0, float x1, float y1, float th, vec3 c, float a = 1.0f);
+  void rectGrad(float x, float y, float w, float h, vec3 top, vec3 bottom, float a = 1.0f, float radius = 0.0f);
+  void rectOutline(float x, float y, float w, float h, vec3 c, float a, float radius, float thickness);
+  void glow(float x, float y, float w, float h, vec3 c, float a, float radius, float soft);  // soft halo around a rounded rect
   float text(float x, float y, float size, const std::string& s, vec3 c, float a = 1.0f, int align = 0, bool shadow = true);
   float textWidth(const std::string& s, float size) const;
   void image(GLuint tex, float x, float y, float w, float h, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1, float a = 1.0f);
@@ -58,7 +61,7 @@ public:
 private:
   GLuint progRT = 0, progSprite = 0, progBright = 0, progBlur = 0, progPost = 0, progUI = 0;
   GLuint vaoEmpty = 0, vaoSprite = 0, vboSprite = 0, vaoUI = 0, vboUI = 0;
-  GLuint texHM = 0, texAlb = 0, texNrm = 0, texFont = 0, texMask = 0, texRoadId = 0, texData = 0;
+  GLuint texHM = 0, texAlb = 0, texNrm = 0, texFont = 0, texMask = 0, texRoadId = 0, texData = 0, texHMax = 0;
   struct V4 { float x, y, z, w; };
   std::vector<V4> townB, townY;
   GLuint fboScene = 0, texColor = 0, texDepth = 0, fboSprite = 0;

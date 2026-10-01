@@ -221,12 +221,12 @@ void Renderer::genMaterials() {
 }
 
 void Renderer::genMinimap() {
-  const int N = 512;
+  const int N = 1024;
   std::vector<uint8_t> img((size_t)N * N * 4);
   for (int j = 0; j < N; j++) for (int i = 0; i < N; i++) {
     float x = -WORLD_HALF + (i + 0.5f) * 2 * WORLD_HALF / N, z = -WORLD_HALF + (j + 0.5f) * 2 * WORLD_HALF / N;
-    float h = g_world.height(x, z, 5);
-    float hx = g_world.height(x + 120, z, 5) - h;
+    float h = g_world.groundHeight(x, z, 5);
+    float hx = g_world.groundHeight(x + 80, z, 5) - h;
     float b[4]; g_world.sampleBase(x, z, b);
     vec3 c;
     if (h < 0) { float d = clampf(-h / 60.f, 0, 1); c = lerp(vec3(0.20f, 0.55f, 0.62f), vec3(0.05f, 0.16f, 0.30f), d); }
@@ -279,7 +279,7 @@ bool Renderer::init(int w, int h) {
   glEnableVertexAttribArray(0); glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(UIVert), (void*)0);
   glEnableVertexAttribArray(1); glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(UIVert), (void*)8);
   glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(UIVert), (void*)16);
-  glEnableVertexAttribArray(3); glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(UIVert), (void*)32);
+  glEnableVertexAttribArray(3); glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(UIVert), (void*)32);
   glBindVertexArray(0);
 
   // heightmap
@@ -293,10 +293,17 @@ bool Renderer::init(int w, int h) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glGenTextures(1, &texRoadId); glBindTexture(GL_TEXTURE_2D, texRoadId);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, MASK_N, MASK_N, 0, GL_RED, GL_UNSIGNED_BYTE, g_world.roadId.data());
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, MASK_N, MASK_N, 0, GL_RG, GL_UNSIGNED_BYTE, g_world.roadId.data());
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+  // max-height mip chain: lets the terrain ray march skip cells it flies over
+  glGenTextures(1, &texHMax); glBindTexture(GL_TEXTURE_2D, texHMax);
+  for (int L = 0; L < HMAX_LEVELS; L++) glTexImage2D(GL_TEXTURE_2D, L, GL_R32F, HMAX_N >> L, HMAX_N >> L, 0, GL_RED, GL_FLOAT, g_world.hmax[L].data());
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, HMAX_LEVELS - 1);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glBindTexture(GL_TEXTURE_2D, texHM);
   // town bounding volumes for the building ray tracer
   for (int k = 0; k < kNumTowns && k < 24; k++) {
@@ -414,6 +421,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D_ARRAY, texNrm); glUniform1i(U(p, "uNrm"), 2);
   glActiveTexture(GL_TEXTURE0 + 3); glBindTexture(GL_TEXTURE_2D, texMask); glUniform1i(U(p, "uMask"), 3);
   glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadId"), 4);
+  glActiveTexture(GL_TEXTURE0 + 6); glBindTexture(GL_TEXTURE_2D, texHMax); glUniform1i(U(p, "uHMax"), 6);
   glUniform2f(U(p, "uRes"), (float)rw, (float)rh);
   glUniform3f(U(p, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
   float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};
@@ -484,6 +492,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   float amb = 0.08f + 0.35f * clampf(fp.sunDir.y + 0.1f, 0, 1);
   glUniform3f(U(progSprite, "uAmb"), amb * 0.8f, amb * 0.9f, amb * 1.1f);
   glUniform1f(U(progSprite, "uFogB"), fp.fogB);
+  glUniform1f(U(progSprite, "uTime"), fp.time);
   glBindVertexArray(vaoSprite);
   glBindBuffer(GL_ARRAY_BUFFER, vboSprite);
   if (!alphaSprites.empty()) {
@@ -538,9 +547,10 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
 // ------------------------------------------------------------------ UI
 void Renderer::uiBegin() { ui.clear(); curImg = 0; }
 
-static void quad(std::vector<UIVert>& v, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, vec3 c, float a, float mode, float hx = 0, float hy = 0) {
-  UIVert q[4] = {{x0, y0, u0, v0, c.x, c.y, c.z, a, mode, hx, hy}, {x1, y0, u1, v0, c.x, c.y, c.z, a, mode, hx, hy},
-                 {x1, y1, u1, v1, c.x, c.y, c.z, a, mode, hx, hy}, {x0, y1, u0, v1, c.x, c.y, c.z, a, mode, hx, hy}};
+static void quad(std::vector<UIVert>& v, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, vec3 c, float a, float mode, float hx = 0, float hy = 0, float p = 0, const vec3* c2 = nullptr) {
+  vec3 b = c2 ? *c2 : c;
+  UIVert q[4] = {{x0, y0, u0, v0, c.x, c.y, c.z, a, mode, hx, hy, p}, {x1, y0, u1, v0, c.x, c.y, c.z, a, mode, hx, hy, p},
+                 {x1, y1, u1, v1, b.x, b.y, b.z, a, mode, hx, hy, p}, {x0, y1, u0, v1, b.x, b.y, b.z, a, mode, hx, hy, p}};
   v.push_back(q[0]); v.push_back(q[1]); v.push_back(q[2]); v.push_back(q[0]); v.push_back(q[2]); v.push_back(q[3]);
 }
 
@@ -549,12 +559,27 @@ void Renderer::rect(float x, float y, float w, float h, vec3 c, float a, float r
   quad(ui, x, y, x + w, y + h, -w * 0.5f, -h * 0.5f, w * 0.5f, h * 0.5f, c, a, 4 + std::min(radius, std::min(w, h) * 0.5f) * 0.001f, w * 0.5f, h * 0.5f);
 }
 
+void Renderer::rectGrad(float x, float y, float w, float h, vec3 top, vec3 bottom, float a, float radius) {
+  float r = std::min(std::max(radius, 0.f), std::min(w, h) * 0.5f);
+  quad(ui, x, y, x + w, y + h, -w * 0.5f, -h * 0.5f, w * 0.5f, h * 0.5f, top, a, 4 + r * 0.001f, w * 0.5f, h * 0.5f, 0, &bottom);
+}
+
+void Renderer::rectOutline(float x, float y, float w, float h, vec3 c, float a, float radius, float th) {
+  float r = std::min(std::max(radius, 0.f), std::min(w, h) * 0.5f);
+  quad(ui, x - 1, y - 1, x + w + 1, y + h + 1, -w * 0.5f - 1, -h * 0.5f - 1, w * 0.5f + 1, h * 0.5f + 1, c, a, 5 + r * 0.001f, w * 0.5f, h * 0.5f, th);
+}
+
+void Renderer::glow(float x, float y, float w, float h, vec3 c, float a, float radius, float soft) {
+  float r = std::min(std::max(radius, 0.f), std::min(w, h) * 0.5f);
+  quad(ui, x - soft, y - soft, x + w + soft, y + h + soft, -w * 0.5f - soft, -h * 0.5f - soft, w * 0.5f + soft, h * 0.5f + soft, c, a, 6 + r * 0.001f, w * 0.5f, h * 0.5f, soft);
+}
+
 void Renderer::line(float x0, float y0, float x1, float y1, float th, vec3 c, float a) {
   float dx = x1 - x0, dy = y1 - y0, l = sqrtf(dx * dx + dy * dy);
   if (l < 1e-3f) return;
   float nx = -dy / l * th * 0.5f, ny = dx / l * th * 0.5f;
-  UIVert q[4] = {{x0 + nx, y0 + ny, 0, 0, c.x, c.y, c.z, a, 0, 0, 0}, {x1 + nx, y1 + ny, 0, 0, c.x, c.y, c.z, a, 0, 0, 0},
-                 {x1 - nx, y1 - ny, 0, 0, c.x, c.y, c.z, a, 0, 0, 0}, {x0 - nx, y0 - ny, 0, 0, c.x, c.y, c.z, a, 0, 0, 0}};
+  UIVert q[4] = {{x0 + nx, y0 + ny, 0, 0, c.x, c.y, c.z, a, 0, 0, 0, 0}, {x1 + nx, y1 + ny, 0, 0, c.x, c.y, c.z, a, 0, 0, 0, 0},
+                 {x1 - nx, y1 - ny, 0, 0, c.x, c.y, c.z, a, 0, 0, 0, 0}, {x0 - nx, y0 - ny, 0, 0, c.x, c.y, c.z, a, 0, 0, 0, 0}};
   ui.push_back(q[0]); ui.push_back(q[1]); ui.push_back(q[2]); ui.push_back(q[0]); ui.push_back(q[2]); ui.push_back(q[3]);
 }
 

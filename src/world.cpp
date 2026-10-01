@@ -207,6 +207,7 @@ void World::build() {
       computeTexel(x, z, &hm[((size_t)j * HM_N + i) * 4]);
     }
   bakeMask();
+  buildHMax();
   // Airport structures in runway-local frame (x = across, z = along runway); see Box kinds in world.h
   boxes.clear();
   for (int ai = 0; ai < (int)airports.size(); ai++) {
@@ -238,6 +239,46 @@ void World::build() {
 int World::findAirport(const char* code) const {
   for (size_t i = 0; i < airports.size(); i++) if (!strcmp(airports[i].code, code)) return (int)i;
   return -1;
+}
+
+// Upper bound of the rendered terrain (ground + detail + trees/rocks/sea stacks) per cell, so the ray marcher can
+// skip whole cells it passes above. Conservative: per-texel max of the base layer over the bilinear footprint, the
+// detail fbm sampled densely with 6 octaves plus the bound of all finer octaves (sum of their amplitudes).
+void World::buildHMax() {
+  const int TPC = HM_N / HMAX_N;  // texels per cell
+  const float cs = 2.f * WORLD_HALF / HMAX_N;
+  hmax[0].assign((size_t)HMAX_N * HMAX_N, 0.f);
+  for (int cj = 0; cj < HMAX_N; cj++)
+    for (int ci = 0; ci < HMAX_N; ci++) {
+      float b0 = -1e9f, b1 = 0.f, gmin = 1e9f;
+      for (int j = cj * TPC - 1; j <= cj * TPC + TPC; j++)
+        for (int i = ci * TPC - 1; i <= ci * TPC + TPC; i++) {
+          const float* h = &hm[((size_t)std::clamp(j, 0, HM_N - 1) * HM_N + std::clamp(i, 0, HM_N - 1)) * 4];
+          b0 = std::max(b0, h[0]); b1 = std::max(b1, h[1]); gmin = std::min(gmin, h[0] - 2.f * h[1]);
+        }
+      float fmax = -2.f;
+      if (b1 >= 0.01f) {
+        const int S = 12;
+        float x0 = -WORLD_HALF + ci * cs, z0 = -WORLD_HALF + cj * cs;
+        for (int sj = 0; sj <= S; sj++)
+          for (int si = 0; si <= S; si++)
+            fmax = std::max(fmax, terrainFbm((x0 + cs * si / S) / DETAIL_SCALE, (z0 + cs * sj / S) / DETAIL_SCALE, 6));
+        fmax += 0.12f;  // finer octaves (<= 1/32) + sampling error of octaves up to 6
+      }
+      float top = b0 + b1 * std::max(fmax, 0.f);
+      float coverMax = gmin < 0.5f ? 46.f : 20.f;  // sea stacks only grow from shallow water; trees <= 18 m
+      hmax[0][(size_t)cj * HMAX_N + ci] = std::max(top, 0.f) + coverMax;
+    }
+  for (int L = 1; L < HMAX_LEVELS; L++) {
+    int n = HMAX_N >> L, pn = n * 2;
+    hmax[L].assign((size_t)n * n, 0.f);
+    for (int j = 0; j < n; j++)
+      for (int i = 0; i < n; i++) {
+        const std::vector<float>& P = hmax[L - 1];
+        hmax[L][(size_t)j * n + i] = std::max(std::max(P[(size_t)(2 * j) * pn + 2 * i], P[(size_t)(2 * j) * pn + 2 * i + 1]),
+                                              std::max(P[(size_t)(2 * j + 1) * pn + 2 * i], P[(size_t)(2 * j + 1) * pn + 2 * i + 1]));
+      }
+  }
 }
 
 void World::sampleBase(float x, float z, float out[4]) const {

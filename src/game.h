@@ -1,6 +1,7 @@
 // Air Xpress - game state, flight session, cameras, effects, UI
 #pragma once
 #include "common.h"
+#include <unordered_map>
 #include "world.h"
 #include "aircraft.h"
 #include "career.h"
@@ -99,6 +100,11 @@ private:
 
   // effects
   std::vector<Particle> particles;
+  struct RingBurst { vec3 c, ax, ay, col; float t; };
+  std::vector<RingBurst> bursts;   // checkpoint shockwaves
+  float sparkAccum = 0;
+  Rng sparkRng{77};
+  bool ringGeom(int i, vec3& c, vec3& ax, vec3& ay) const;
   std::vector<vec3> rainDrops;
   float dustAccum = 0;
 
@@ -145,6 +151,16 @@ private:
   bool button(float x, float y, float w, float h, const std::string& label, bool enabled = true, bool highlight = false);
   bool hovered(float x, float y, float w, float h) const;
   void panel(float x, float y, float w, float h, float a = 0.78f);
+  void hudPanel(float x, float y, float w, float h, float a = 1.f);
+  void header(float x, float y, float w, const std::string& label);
+  void card(float x, float y, float w, float h, bool sel, bool hov, vec3 accent);
+  float anim(uint32_t id, float target, float rate);
+  std::unordered_map<uint32_t, float> uiAnim;
+  float uiDt = 0.016f, uiLastT = 0;
+  // GPS moving map
+  float gpsRange = 12000.f, gpsRangeTarget = 12000.f;
+  std::vector<vec2> trail; float trailT = 0;
+  void drawGps();
   void drawMenu();
   void drawHub();
   void drawHubContracts(float x, float y, float w, float h);

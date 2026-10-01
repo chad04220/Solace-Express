@@ -34,6 +34,7 @@ typedef ptrdiff_t GLsizeiptr; typedef ptrdiff_t GLintptr; typedef unsigned char 
 #define GL_TEXTURE_WRAP_S 0x2802
 #define GL_TEXTURE_WRAP_T 0x2803
 #define GL_NEAREST 0x2600
+#define GL_NEAREST_MIPMAP_NEAREST 0x2700
 #define GL_LINEAR 0x2601
 #define GL_LINEAR_MIPMAP_LINEAR 0x2703
 #define GL_REPEAT 0x2901
@@ -44,6 +45,10 @@ typedef ptrdiff_t GLsizeiptr; typedef ptrdiff_t GLintptr; typedef unsigned char 
 #define GL_RGBA 0x1908
 #define GL_R8 0x8229
 #define GL_R32F 0x822E
+#define GL_RG8 0x822B
+#define GL_RG 0x8227
+#define GL_TEXTURE_BASE_LEVEL 0x813C
+#define GL_TEXTURE_MAX_LEVEL 0x813D
 #define GL_RGBA8 0x8058
 #define GL_RGBA16F 0x881A
 #define GL_RGBA32F 0x8814

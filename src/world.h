@@ -6,6 +6,8 @@ static const float WORLD_HALF = 40000.0f;  // map spans [-40km, 40km] on x and z
 static const int HM_N = 1024;              // base heightmap resolution
 static const float HM_TEXEL = 2.0f * WORLD_HALF / HM_N;
 static const float DETAIL_SCALE = 2200.0f; // wavelength of the procedural detail layer
+static const int HMAX_N = 256;             // conservative max-height grid for ray-march skipping (mip chain)
+static const int HMAX_LEVELS = 5;
 
 enum Surface { SURF_ASPHALT = 0, SURF_GRASS, SURF_GRAVEL, SURF_SNOW, SURF_SAND };
 inline const char* surfaceName(int s) { static const char* n[] = {"Asphalt", "Grass", "Gravel", "Snow", "Sand"}; return n[s]; }
@@ -45,12 +47,15 @@ public:
   std::vector<Airport> airports;
   std::vector<Box> boxes;
   std::vector<float> hm;     // RGBA per texel: base height, detail amplitude, lushness, coldness
-  std::vector<uint8_t> roadId; // nearest road segment + 1 per mask texel (shader computes exact road edges)
+  std::vector<uint8_t> roadId; // RG8 per mask texel: nearest road segment + 1 (shader computes exact road edges), baked forest noise
   std::vector<uint8_t> mask; // RGBA8: road distance, building density, urbanness, farmland / sea-stack flag
+  std::vector<float> hmax[HMAX_LEVELS];   // upper bound of terrain + cover per cell, level L has HMAX_N>>L cells per side
   void build();
+  void buildHMax();
   void bakeMask();
   void sampleMask(float x, float z, float out[4]) const;   // manual bilinear (matches shader)
   void maskTexel(float x, float z, float out[4]) const;    // nearest texel (matches shader texelFetch)
+  float forestAt(float x, float z) const;                  // baked forest-patch noise, manual bilinear (matches shader)
   float groundHeight(float x, float z, int octaves = 8) const;          // terrain without trees/rocks
   float cover(float x, float z, float ground, const float base[4], int* kind) const;  // tree / rock height above ground
   bool lotAt(int i, int j, Lot& out) const;                 // procedural building on a town lot

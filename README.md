@@ -15,7 +15,7 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 
 ## Features
 
-- **Ray-traced renderer.** Every pixel is traced on the GPU: an eroded heightfield over 80 × 80 km, an ocean with Fresnel reflections, volumetric clouds, soft terrain and aircraft shadows, an analytic sky with golden hour and night, and SDF aircraft with moving flaps, ailerons, elevator, rudder, gear and props.
+- **Ray-traced renderer.** Every pixel is traced on the GPU: an eroded heightfield over 80 × 80 km, an ocean with Fresnel reflections, volumetric clouds, soft terrain and aircraft shadows, an analytic sky with golden hour and night, and SDF aircraft with moving flaps, ailerons, elevator, rudder, gear and props. A conservative max-height mip pyramid lets terrain rays skip empty air in big jumps, and the forest-patch noise is baked into a texture shared by the GPU and the collision code, so dense foliage stays cheap without changing how it looks.
 - **Detailed aircraft.** Each of the 7 aircraft is hand-built. Fuselages are shaped from 8 cross-sections, and wings and tails are tapered airfoil sections with sweep, dihedral and winglets. Flaps (with rearward Fowler travel), ailerons, elevators and rudders are separate hinged parts. You'll also see wing struts, STOL slats, engine cowls, exhaust stacks, turboprop and jet nacelles with fan faces, a cargo pod, wheel fairings, tundra tyres, twin-wheel retracting gear, a steerable nose wheel, antennas, nav lights and liveries with window frames.
 - **3D cockpits.** You sit in a real cockpit with live gauges (airspeed, attitude, altimeter, turn coordinator, heading, VSI, RPM/N1, fuel) or glass PFD/ND screens on the jet and airliner. The yokes, rudder pedals and throttle levers move with your inputs, and sunlight falls through the window openings.
 - **Correct control movement.** Every control surface, plus the nose or tail wheel, moves in the same direction as the input and the aircraft's actual response. A test (`tests/flight_test.cpp`) checks this for every aircraft.
@@ -24,6 +24,9 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 - **PBR materials.** 25 tileable PBR texture sets (albedo, roughness, normal, height, AO) are generated at startup. They cover terrain, buildings (concrete, clay tiles, slate, plaster, brick, corrugated metal), vegetation (leaves, needles, crops, wheat) and aircraft (paint, brushed metal, tyre rubber, cockpit plastic, seat fabric, leather, carpet). They're lit with GGX/Cook-Torrance shading, triplanar on cliffs, and darken and get glossier in the rain.
 - **Effects.** Tyre smoke, dust and snow spray from unpaved strips, prop-wash dust, wingtip vapour, engine-start smoke puffs, crash fire and smoke, rain streaks, snowfall, raindrops on the lens, lightning, bloom and lens flare. Lighting includes runway edge, threshold and approach lights, working **PAPI** lights, plus nav, strobe, beacon and landing lights that light the terrain.
 - **Engine sound.** All audio is synthesised in real time. Piston engines are modelled one cylinder at a time: each firing excites exhaust resonators, and slight differences between cylinders give the uneven idle and crank-rate rumble. On top of that is a prop blade-pass buzz and whoosh. Twins run two engines slightly out of sync so they beat against each other. Turboprops and jets get their own whine, roar and buzz-saw models. The cockpit view filters the sound, and you'll also hear a starter motor, wind, runway seams, tyre chirps, stall horn or stick shaker, gear and flap motors, rain and thunder.
+- **GPS moving map (N).** An animated, north-up moving map centred on your aircraft. It shows the route with flowing dashes, checkpoint markers, runways drawn to scale, your breadcrumb trail, predicted position at 1, 2 and 5 minutes, a fuel-range ring and a radar sweep. A side panel lists next waypoint, distance, bearing, ETE, ETA, route remaining, ground speed and track, fuel range against the remaining route, destination runway and wind, and the nearest airport.
+- **Checkpoint gates.** Animated holographic gates with counter-rotating segmented rims, sweeping highlights, inward pulses and sparks drifting around the rim. A trail of moving lights leads to the next gate, and flying through one sets off a shockwave and a shower of sparks.
+- **Clean glass UI.** Menus and HUD panels use a consistent glass style with cyan accents and corner brackets. Buttons, cards, tabs and sliders respond to the mouse with animated glow, sheen and press feedback.
 - **Muffle button (M).** A headset-style noise filter that turns down engine, wind and rolling noise for relaxed cruising.
 - **Live internet radio (R).** Streams MP3/AAC stations through Windows Media Foundation. You can add your own stations.
 - **Flight model.** Six degrees of freedom with stall and wing drop, flaps, ground effect, prop wash, density altitude, wind shear near the ground, gusts and turbulence, spring-damper gear with steering and brakes, and taildragger handling. Includes an autopilot (heading and altitude hold) and time acceleration in cruise.
@@ -62,10 +65,10 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 | Right mouse drag, wheel | Look around, zoom | Right stick |
 | L | Landing lights | |
 | I | Engine restart | |
-| **U** | **Muffle engine noise** | Left-stick click |
-| M | Toggle minimap (hidden by default) | |
+| **M** | **Muffle engine noise** | Left-stick click |
+| Tab | Toggle minimap (hidden by default) | |
 | **R** | **Internet radio** | |
-| N / Tab | Map | |
+| **N** | **GPS moving map** (mouse wheel or the on-map buttons zoom) | |
 | H | Toggle HUD | |
 | Esc | Pause menu (restart, settings, abandon) | Start |
 | F11 / Alt+Enter | Fullscreen | |
