@@ -743,7 +743,7 @@ void Game::drawDebrief() {
     py += 48 * s;
   }
   auto row = [&](const std::string& k, const std::string& v) { g_ren.text(px, py, 16 * s, k, C_DIM, 1); g_ren.text(px + 230 * s, py, 16 * s, v, C_TEXT, 1); py += 24 * s; };
-  if (touchedDown) row("Touchdown", fmt("%.0f fpm", touchdownFpm));
+  if (result.landed) row("Touchdown", fmt("%.0f fpm", touchdownFpm));
   row("Flight time", fmt("%d:%02d", (int)flightClock / 60, (int)flightClock % 60));
   row("Max G", fmt("%.2f", plane.maxG));
   row("Max bank", fmt("%.0f deg", result.maxBank));

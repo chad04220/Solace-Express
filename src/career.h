@@ -32,6 +32,7 @@ struct OwnedPlane { int spec; int location; float fuel; float condition; };
 struct FlightResult {
   bool success = false;
   std::string failReason;
+  bool landed = false;          // flight ended on the ground after a touchdown
   float touchdownFpm = 0, maxG = 1, minG = 1, maxBank = 0, flightMin = 0;
   bool late = false;
   float centerlineErr = 0;

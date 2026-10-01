@@ -146,7 +146,8 @@ void Game::endFlight(bool success, const std::string& reason) {
   result.fuelUsedKg = std::max(0.f, fuelStart - plane.fuel);
   result.touchdownFpm = touchdownFpm;
   result.late = contract.timeLimitMin > 0 && flightClock / 60.f > contract.timeLimitMin;
-  if (contract.type == CT_LESSON && success && contract.wps.size() && contract.to == contract.from && !touchedDown) result.touchdownFpm = 0;
+  result.landed = touchedDown && plane.onGround;
+  if (!result.landed) result.touchdownFpm = 0;
   Contract c = contract;
   if (c.type == CT_FERRY) { c.story = false; }
   payout = career.settle(c, specIdx, source, result, &stars);
@@ -718,7 +719,10 @@ void Game::update(float dt) {
     if (cooldown <= 0) {
       float sc = g_ren.renderScale;
       if (avg > 1.f / 38.f && sc > 0.42f) sc = std::max(0.4f, sc - 0.05f);
-      else if (avg < 1.f / 56.f && sc < set.renderScale - 0.01f) sc = std::min(set.renderScale, sc + 0.05f);
+      // the cockpit is mostly close-up detail: allow full resolution there when the GPU keeps up
+      float target = (screen == SCR_FLIGHT && camMode == 1) ? std::max(set.renderScale, 1.0f) : set.renderScale;
+      if (sc > target + 0.01f) sc = target;
+      else if (avg < 1.f / 56.f && sc < target - 0.01f) sc = std::min(target, sc + 0.05f);
       if (sc != g_ren.renderScale) { g_ren.renderScale = sc; g_ren.resize(g_ren.W, g_ren.H); cooldown = 2.f; }
       else cooldown = 0.5f;
     }
@@ -814,6 +818,17 @@ void Game::debugScene(const std::string& name) {
   startFlight(c, spec, Career::SRC_OWNED);
   realTime = 10;
   plane.starterTime = 0.01f; plane.engineRunning = true; plane.rpm = 1000; engineAutoStarted = true;
+  {
+    float px, pz, agl, hdg; char cm = 'c';
+    if (sscanf(name.c_str(), "at_%f_%f_%f_%f_%c", &px, &pz, &agl, &hdg, &cm) >= 4) {
+      plane.reset(&kAircraft[1], vec3(px, std::max(g_world.height(px, pz), 0.f) + agl, pz), hdg, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
+      takeoffAnnounced = true; camQ = plane.q; hudOn = false; hint.clear(); toasts.clear();
+      if (cm == 'k') camMode = 1;
+      if (cm == 'f') { camMode = 3; botControl = true; camPos = plane.pos + vec3(0, 40, 0) - plane.forward() * 60.f; }
+      for (int i = 0; i < 30; i++) updateCamera(0.1f);
+      return;
+    }
+  }
   if (name == "air" || name == "sunset" || name == "mountain" || name == "cockpit" || name == "jet" || name == "storm" || name == "snow" || name == "hud") {
     vec3 p(-4000, 600, 9000); float hdg = 40;
     if (name == "sunset") { timeOfDay = 18.2f; p = vec3(-26000, 300, 14000); hdg = 270; }

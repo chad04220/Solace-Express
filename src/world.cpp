@@ -1,5 +1,6 @@
 // Air Xpress - hand-designed archipelago "The Solace Islands"
 #include "world.h"
+#include "scenery.h"
 
 World g_world;
 
@@ -155,6 +156,7 @@ static void computeTexel(float x, float z, float out[4]) {
     if (c.h > 2000) ch -= 260.f * powf(smoothstepf(700.f, 0.f, d), 2.f);  // crater
     h += ch; amp += ch * 0.25f;
   }
+  sceneryBaseMod(x, z, h, amp);
   for (const Airport& a : kAirports) {
     float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
     float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
@@ -178,6 +180,24 @@ static void computeTexel(float x, float z, float out[4]) {
   out[0] = h; out[1] = amp; out[2] = lush; out[3] = cold;
 }
 
+// 0..1: how strongly a point belongs to an airport's flattened grounds or approach funnel
+float airportInfluence(float x, float z) {
+  float best = 0;
+  for (const Airport& a : kAirports) {
+    float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
+    float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
+    float d = u - a.length * 0.5f;
+    if (d > 0 && d < 7000) {
+      float halfw = 250.f + 0.18f * d;
+      best = std::max(best, (1.f - smoothstepf(halfw, halfw + 900.f, v)) * (1.f - smoothstepf(5000.f, 7000.f, d)));
+    }
+    float hu = a.length * 0.5f + 260.f, hv = a.size == 2 ? 420.f : 240.f;
+    float du = std::max(0.f, u - hu), dv = std::max(0.f, v - hv);
+    best = std::max(best, 1.f - smoothstepf(0.f, 550.f, sqrtf(du * du + dv * dv)));
+  }
+  return best;
+}
+
 void World::build() {
   airports.assign(std::begin(kAirports), std::end(kAirports));
   hm.resize((size_t)HM_N * HM_N * 4);
@@ -186,7 +206,8 @@ void World::build() {
       float x = -WORLD_HALF + (i + 0.5f) * HM_TEXEL, z = -WORLD_HALF + (j + 0.5f) * HM_TEXEL;
       computeTexel(x, z, &hm[((size_t)j * HM_N + i) * 4]);
     }
-  // Airport buildings in runway-local frame (x = across, z = along runway)
+  bakeMask();
+  // Airport structures in runway-local frame (x = across, z = along runway); see Box kinds in world.h
   boxes.clear();
   for (int ai = 0; ai < (int)airports.size(); ai++) {
     const Airport& a = airports[ai];
@@ -195,15 +216,21 @@ void World::build() {
     float off = a.width * 0.5f + (a.size == 2 ? 170.f : 85.f);
     int nh = a.size == 0 ? 1 : (a.size == 1 ? 3 : 5);
     for (int k = 0; k < nh; k++) {
-      float along = (k - (nh - 1) * 0.5f) * 55.f - a.length * 0.12f;
-      float hw = r.range(14, 22), hd = r.range(12, 18), hh = r.range(6, 10) * (a.size == 0 ? 0.7f : 1.f);
+      float along = (k - (nh - 1) * 0.5f) * 58.f - a.length * 0.12f;
+      float hw = r.range(16, 24), hd = r.range(14, 20), hh = r.range(7, 11) * (a.size == 0 ? 0.65f : 1.f);
       boxes.push_back({vec3(side * (off + hd), hh, along), vec3(hd, hh, hw), ai, 0});
     }
     if (a.size >= 1) {
-      boxes.push_back({vec3(side * (off + 10), 14.f, a.length * 0.08f), vec3(3.5f, 14.f, 3.5f), ai, 1});
-      boxes.push_back({vec3(side * (off + 35), 6.f, a.length * 0.18f + 30.f), vec3(25.f, 6.f, a.size == 2 ? 120.f : 40.f), ai, 2});
+      float th = a.size == 2 ? 20.f : 13.f;
+      boxes.push_back({vec3(side * (off + 12), th, a.length * 0.08f), vec3(3.2f, th, 3.2f), ai, 1});
+      boxes.push_back({vec3(side * (off + 40), 7.f, a.length * 0.18f + 30.f), vec3(26.f, 7.f, a.size == 2 ? 120.f : 40.f), ai, 2});
+      boxes.push_back({vec3(side * (off + 30), 4.f, -a.length * 0.12f - 120.f), vec3(4.f, 4.f, 4.f), ai, 4});
+      if (a.size == 2) {
+        boxes.push_back({vec3(side * (off + 30), 4.f, -a.length * 0.12f - 135.f), vec3(4.f, 4.f, 4.f), ai, 4});
+        boxes.push_back({vec3(side * (off + 70), 10.f, -a.length * 0.12f - 60.f), vec3(5.f, 10.f, 5.f), ai, 5});
+      }
     } else {
-      boxes.push_back({vec3(side * (off + 6), 3.f, a.length * 0.2f), vec3(5.f, 3.f, 4.f), ai, 3});
+      boxes.push_back({vec3(side * (off + 8), 3.5f, a.length * 0.2f), vec3(5.f, 3.5f, 4.f), ai, 3});
     }
   }
 }
@@ -227,8 +254,9 @@ void World::sampleBase(float x, float z, float out[4]) const {
 
 float World::height(float x, float z, int octaves) const {
   float b[4]; sampleBase(x, z, b);
-  if (b[1] < 0.01f) return b[0];
-  return b[0] + b[1] * terrainFbm(x / DETAIL_SCALE, z / DETAIL_SCALE, octaves);
+  float g = b[1] < 0.01f ? b[0] : b[0] + b[1] * terrainFbm(x / DETAIL_SCALE, z / DETAIL_SCALE, octaves);
+  if (b[1] < 0.01f && g > 0.5f) return g;   // airport grounds: bare
+  return g + cover(x, z, g, b, nullptr);
 }
 
 vec3 World::normal(float x, float z) const {

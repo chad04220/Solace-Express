@@ -1,5 +1,6 @@
 // Air Xpress - aircraft roster and 6-DOF flight model
 #include "aircraft.h"
+#include "scenery.h"
 
 // clang-format off
 const AircraftSpec kAircraft[] = {
@@ -251,6 +252,8 @@ void Plane::substep(float dt, const Weather& wx, float time) {
         ev.crashed = true;
         ev.crashReason = c.kind == 3 ? (wheels ? "Prop/nose strike" : "Belly landing - gear was up") : c.kind == 5 ? "Wingtip struck the ground" : c.kind == 6 ? "Belly landing - gear was up" : "Struck terrain";
         if (!onGround && altAgl > 3) ev.crashReason = "Flew into terrain";
+        { float bb[4]; g_world.sampleBase(pw.x, pw.z, bb); float gg = g_world.groundHeight(pw.x, pw.z, 7); int ck = 0;
+          if (g_world.cover(pw.x, pw.z, gg, bb, &ck) > 0.5f) ev.crashReason = ck <= COV_PALM ? "Crashed into trees" : "Hit a rock formation"; }
         return;
       }
     }
@@ -313,6 +316,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
       ev.crashed = true; ev.crashReason = "Collided with a building"; return;
     }
   }
+  if (altAgl < 90.f && g_world.hitsBuilding(pos, s.span * 0.3f)) { ev.crashed = true; ev.crashReason = "Collided with a building"; return; }
 
   // ---------------- integrate
   vec3 Fworld = q.rotate(F) + Fw + vec3(0, -m * G0, 0);

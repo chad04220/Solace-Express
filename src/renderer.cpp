@@ -2,6 +2,7 @@
 #include "renderer.h"
 #include "shaders.h"
 #include "font_data.h"
+#include "scenery.h"
 #include <unordered_map>
 
 Renderer g_ren;
@@ -62,7 +63,7 @@ static float pworley(float u, float v, int P, int seed, float* id = nullptr) {
 }
 
 void Renderer::genMaterials() {
-  const int L = 8;
+  const int L = 25;
   std::vector<uint8_t> alb((size_t)TS * TS * 4 * L), nrm((size_t)TS * TS * 4 * L);
   std::vector<float> hgt((size_t)TS * TS);
   for (int l = 0; l < L; l++) {
@@ -109,17 +110,92 @@ void Renderer::genMaterials() {
           float peb = 1.f - smoothstepf(0.2f, 0.6f, w);
           c = lerp(vec3(0.33f, 0.30f, 0.27f), vec3(0.58f, 0.54f, 0.48f), id) * (0.6f + 0.4f * peb);
           h = peb; rough = 0.9f; break; }
-        default: {  // dirt
+        case 7: {  // dirt
           float n = pfbm(u, v, 4, 5, 81), g = pnoise(u * 200, v * 200, 200, 82);
           c = lerp(vec3(0.25f, 0.18f, 0.11f), vec3(0.42f, 0.32f, 0.20f), n) * (0.9f + 0.2f * g);
           h = n * 0.7f + g * 0.3f; rough = 0.95f; break; }
+        case 8: {  // concrete
+          float n = pfbm(u, v, 4, 5, 91), agg = pnoise(u * 300, v * 300, 300, 92), st = pfbm(u, v, 2, 3, 93);
+          float b = 0.52f + 0.1f * n + 0.05f * agg - 0.08f * smoothstepf(0.55f, 0.75f, st);
+          c = vec3(b, b * 0.99f, b * 0.96f); h = agg * 0.5f + n * 0.5f; rough = 0.78f + 0.1f * agg; break; }
+        case 9: {  // clay roof tiles (rows of curved tiles, staggered)
+          float rv = v * 14.f, row = floorf(rv), fv = rv - row;
+          float cu = u * 20.f + (fmodf(row, 2.f) ? 0.5f : 0.f), fu = cu - floorf(cu);
+          float prof = sinf(fu * PI);
+          float id = hash2i((int)floorf(cu), (int)row);
+          c = lerp(vec3(0.55f, 0.22f, 0.12f), vec3(0.72f, 0.36f, 0.2f), id) * (0.65f + 0.35f * prof) * (0.75f + 0.25f * smoothstepf(0.f, 0.25f, fv));
+          h = prof * 0.6f + fv * 0.4f; rough = 0.7f; break; }
+        case 10: {  // slate roof
+          float rv = v * 18.f, row = floorf(rv), fv = rv - row;
+          float cu = u * 12.f + (fmodf(row, 2.f) ? 0.5f : 0.f), fu = cu - floorf(cu);
+          float id = hash2i((int)floorf(cu) + 7, (int)row);
+          float gap = smoothstepf(0.f, 0.04f, fu) * smoothstepf(1.f, 0.96f, fu);
+          c = lerp(vec3(0.16f, 0.17f, 0.2f), vec3(0.28f, 0.29f, 0.33f), id) * (0.5f + 0.5f * gap) * (0.85f + 0.15f * fv);
+          h = fv * 0.6f + gap * 0.4f; rough = 0.55f + 0.2f * id; break; }
+        case 11: {  // plaster / render
+          float n = pfbm(u, v, 3, 5, 111), f = pnoise(u * 250, v * 250, 250, 112), st = pfbm(u, v, 2, 4, 113);
+          float b = 0.86f + 0.06f * n + 0.03f * f - 0.1f * smoothstepf(0.6f, 0.8f, st) * smoothstepf(0.6f, 0.0f, v);
+          c = vec3(b, b * 0.98f, b * 0.95f); h = n * 0.5f + f * 0.5f; rough = 0.9f; break; }
+        case 12: {  // brick
+          float rv = v * 24.f, row = floorf(rv), fv = rv - row;
+          float cu = u * 12.f + (fmodf(row, 2.f) ? 0.5f : 0.f), fu = cu - floorf(cu);
+          float mortar = (fv < 0.12f || fu < 0.05f) ? 1.f : 0.f;
+          float id = hash2i((int)floorf(cu) + 3, (int)row + 11), n = pnoise(u * 200, v * 200, 200, 121);
+          c = mortar > 0.5f ? vec3(0.62f, 0.6f, 0.56f) : lerp(vec3(0.45f, 0.18f, 0.12f), vec3(0.62f, 0.3f, 0.2f), id) * (0.85f + 0.3f * n);
+          h = mortar > 0.5f ? 0.f : 0.7f + 0.3f * n; rough = 0.85f; break; }
+        case 13: {  // broadleaf foliage clusters
+          float id; float w = pworley(u, v, 22, 131, &id); float w2 = pworley(u, v, 60, 132);
+          float leaf = 1.f - smoothstepf(0.f, 0.7f, w2);
+          c = lerp(vec3(0.07f, 0.16f, 0.04f), vec3(0.22f, 0.4f, 0.1f), leaf * (0.5f + 0.5f * id)) * (0.6f + 0.6f * (1.f - w));
+          h = (1.f - w) * 0.6f + leaf * 0.4f; rough = 0.75f; break; }
+        case 14: {  // conifer needles
+          float s1 = pnoise(u * 160, v * 40, 160, 141), s2 = pnoise(u * 40, v * 160, 40, 142), n = pfbm(u, v, 8, 3, 143);
+          c = lerp(vec3(0.04f, 0.1f, 0.06f), vec3(0.12f, 0.24f, 0.13f), s1 * s2 + 0.3f * n);
+          h = s1 * s2 * 0.7f + n * 0.3f; rough = 0.85f; break; }
+        case 15: {  // aircraft paint: white with fine orange peel
+          float op = pnoise(u * 180, v * 180, 180, 151), n = pfbm(u, v, 4, 3, 152);
+          c = vec3(0.97f - 0.02f * n); h = op * 0.15f; rough = 0.18f + 0.06f * op; break; }
+        case 16: {  // brushed metal
+          float br = pnoise(u * 400, v * 6, 400, 161), n = pfbm(u, v, 4, 4, 162);
+          c = vec3(0.62f + 0.08f * br + 0.05f * n); h = br * 0.1f; rough = 0.25f + 0.12f * br; break; }
+        case 17: {  // tyre rubber with tread grooves
+          float g = fabsf(sinf(u * PI * 24.f)) < 0.2f ? 1.f : 0.f, n = pnoise(u * 300, v * 300, 300, 171);
+          c = vec3(0.04f + 0.015f * n) * (1.f - 0.4f * g); h = 1.f - g; rough = 0.92f; break; }
+        case 18: {  // cockpit plastic with leather-like grain
+          float id; float w = pworley(u, v, 80, 181, &id);
+          c = vec3(0.1f + 0.02f * id); h = smoothstepf(0.f, 0.5f, w) * 0.5f; rough = 0.55f + 0.1f * w; break; }
+        case 19: {  // seat fabric weave
+          float wx = sinf(u * PI * 160.f), wy = sinf(v * PI * 160.f);
+          float weave = ((int)floorf(u * 80.f) + (int)floorf(v * 80.f)) & 1 ? wx : wy;
+          float n = pfbm(u, v, 4, 3, 191);
+          c = lerp(vec3(0.12f, 0.14f, 0.2f), vec3(0.2f, 0.22f, 0.3f), 0.5f + 0.4f * weave) * (0.9f + 0.2f * n);
+          h = 0.5f + 0.5f * weave; rough = 1.0f; break; }
+        case 20: {  // carpet
+          float n = pnoise(u * 350, v * 350, 350, 201), m = pfbm(u, v, 4, 3, 202);
+          c = vec3(0.09f, 0.09f, 0.1f) * (0.75f + 0.5f * n) * (0.9f + 0.2f * m); h = n; rough = 1.0f; break; }
+        case 21: {  // leather
+          float id; float w = pworley(u, v, 40, 211, &id); float n = pfbm(u, v, 4, 4, 212);
+          c = lerp(vec3(0.25f, 0.14f, 0.07f), vec3(0.4f, 0.24f, 0.13f), n) * (0.85f + 0.15f * smoothstepf(0.f, 0.4f, w));
+          h = smoothstepf(0.f, 0.4f, w); rough = 0.5f; break; }
+        case 22: {  // corrugated metal sheeting
+          float r = 0.5f + 0.5f * sinf(u * PI * 2.f * 40.f), n = pfbm(u, v, 3, 4, 221), st = pfbm(u, v, 2, 3, 222);
+          c = vec3(0.6f + 0.1f * n) * (0.85f + 0.15f * r) - vec3(0.12f, 0.1f, 0.05f) * smoothstepf(0.6f, 0.8f, st);
+          h = r; rough = 0.4f + 0.2f * n; break; }
+        case 23: {  // crop rows (green)
+          float rows = 0.5f + 0.5f * sinf(u * PI * 2.f * 24.f), n = pfbm(u, v, 16, 3, 231);
+          c = lerp(vec3(0.3f, 0.22f, 0.12f), vec3(0.2f, 0.45f, 0.1f), smoothstepf(0.3f, 0.7f, rows) * (0.7f + 0.3f * n));
+          h = rows; rough = 0.9f; break; }
+        default: {  // wheat
+          float s1 = pnoise(u * 300, v * 30, 300, 241), n = pfbm(u, v, 4, 4, 242);
+          c = lerp(vec3(0.62f, 0.5f, 0.22f), vec3(0.82f, 0.7f, 0.38f), s1 * 0.6f + n * 0.4f);
+          h = s1; rough = 0.85f; break; }
       }
       hgt[(size_t)y * TS + x] = h;
       size_t o = (((size_t)l * TS + y) * TS + x) * 4;
       alb[o + 0] = (uint8_t)(sqrtf(clampf(c.x, 0, 1)) * 255); alb[o + 1] = (uint8_t)(sqrtf(clampf(c.y, 0, 1)) * 255);
       alb[o + 2] = (uint8_t)(sqrtf(clampf(c.z, 0, 1)) * 255); alb[o + 3] = (uint8_t)(clampf(rough, 0, 1) * 255);
     }
-    float strength = (l == 1 ? 6.f : l == 2 ? 5.f : l == 6 ? 4.f : 2.5f);
+    float strength = (l == 1 || l == 13 ? 6.f : l == 2 || l == 9 || l == 10 || l == 12 ? 5.f : l == 6 || l == 22 ? 4.f : l == 15 || l == 16 ? 0.8f : 2.5f);
     for (int y = 0; y < TS; y++) for (int x = 0; x < TS; x++) {
       auto H = [&](int i, int j) { return hgt[(size_t)((j + TS) % TS) * TS + (i + TS) % TS]; };
       float dx = (H(x + 1, y) - H(x - 1, y)) * strength, dy = (H(x, y + 1) - H(x, y - 1)) * strength;
@@ -162,6 +238,10 @@ void Renderer::genMinimap() {
       c = c * shade;
       if (h < 4) c = lerp(c, vec3(0.85f, 0.80f, 0.62f), 0.6f);
     }
+    float mk[4]; g_world.sampleMask(x, z, mk);
+    if (h > 0 && mk[1] > 0.05f) c = lerp(c, vec3(0.78f, 0.72f, 0.66f), smoothstepf(0.05f, 0.4f, mk[1]));
+    if (h > 0 && mk[3] > 0.2f) c = lerp(c, vec3(0.62f, 0.62f, 0.32f), mk[3] * 0.35f);
+    if (mk[0] * ROAD_RANGE < 14.f) c = vec3(0.35f, 0.33f, 0.3f);
     if (g_world.onRunway(x, z, 40) >= 0) c = vec3(0.12f, 0.12f, 0.14f);
     size_t o = ((size_t)j * N + i) * 4;
     img[o] = (uint8_t)(clampf(c.x, 0, 1) * 255); img[o + 1] = (uint8_t)(clampf(c.y, 0, 1) * 255); img[o + 2] = (uint8_t)(clampf(c.z, 0, 1) * 255); img[o + 3] = 255;
@@ -177,7 +257,7 @@ void Renderer::genMinimap() {
 
 bool Renderer::init(int w, int h) {
   std::string vsFS = kFullscreenVS;
-  std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS;
+  std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2;
   progRT = program(vsFS, rt, error);
   if (!progRT) { error = "Ray tracer shader: " + error; return false; }
   progSprite = program(kSpriteVS, kSpriteFS, error);
@@ -205,6 +285,43 @@ bool Renderer::init(int w, int h) {
   // heightmap
   glGenTextures(1, &texHM); glBindTexture(GL_TEXTURE_2D, texHM);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, HM_N, HM_N, 0, GL_RGBA, GL_FLOAT, g_world.hm.data());
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glGenTextures(1, &texMask); glBindTexture(GL_TEXTURE_2D, texMask);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, MASK_N, MASK_N, 0, GL_RGBA, GL_UNSIGNED_BYTE, g_world.mask.data());
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glGenTextures(1, &texRoadId); glBindTexture(GL_TEXTURE_2D, texRoadId);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, MASK_N, MASK_N, 0, GL_RED, GL_UNSIGNED_BYTE, g_world.roadId.data());
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+  glBindTexture(GL_TEXTURE_2D, texHM);
+  // town bounding volumes for the building ray tracer
+  for (int k = 0; k < kNumTowns && k < 24; k++) {
+    const Town& t = kTowns[k];
+    float gmin = 1e9f, gmax = -1e9f;
+    for (float dz = -t.r; dz <= t.r; dz += t.r / 8.f)
+      for (float dx = -t.r; dx <= t.r; dx += t.r / 8.f) { float g = g_world.groundHeight(t.x + dx, t.z + dz, 5); gmin = std::min(gmin, g); gmax = std::max(gmax, g); }
+    float hmax = t.kind == 2 ? 75.f : t.kind == 1 ? 45.f : 20.f;
+    townB.push_back({t.x - t.r - 30.f, t.z - t.r - 30.f, t.x + t.r + 30.f, t.z + t.r + 30.f});
+    townY.push_back({std::max(gmin, 0.f) - 3.f, gmax + hmax + 30.f, 0, 0});
+  }
+  {
+    std::vector<V4> d(384, V4{0, 0, 0, 0});
+    for (int i = 0; i < (int)g_roads.size() && i < 64; i++) d[i] = {g_roads[i].ax, g_roads[i].az, g_roads[i].bx, g_roads[i].bz};
+    for (int i = 0; i < (int)g_world.boxes.size() && i < 128; i++) {
+      const Box& b = g_world.boxes[i];
+      d[64 + i] = {b.c.x, b.c.y, b.c.z, (float)b.airport};
+      d[192 + i] = {b.h.x, b.h.y, b.h.z, (float)b.kind};
+    }
+    for (int i = 0; i < (int)townB.size(); i++) { d[320 + i] = townB[i]; d[352 + i] = townY[i]; }
+    glGenTextures(1, &texData); glBindTexture(GL_TEXTURE_2D, texData);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 384, 1, 0, GL_RGBA, GL_FLOAT, d.data());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  }
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   maxH = 0;
@@ -295,6 +412,8 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(U(p, "uAlb"), 1);
   glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D_ARRAY, texNrm); glUniform1i(U(p, "uNrm"), 2);
+  glActiveTexture(GL_TEXTURE0 + 3); glBindTexture(GL_TEXTURE_2D, texMask); glUniform1i(U(p, "uMask"), 3);
+  glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadId"), 4);
   glUniform2f(U(p, "uRes"), (float)rw, (float)rh);
   glUniform3f(U(p, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
   float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};
@@ -326,15 +445,9 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     }
     glUniform1i(U(p, "uApCount"), n);
     glUniform4fv(U(p, "uAp"), n, ap); glUniform4fv(U(p, "uApDim"), n, dim);
-    int nb = std::min(64, (int)g_world.boxes.size());
-    std::vector<float> bc(nb * 4), bh2(nb * 4);
-    for (int i = 0; i < nb; i++) {
-      const Box& b = g_world.boxes[i];
-      bc[i * 4] = b.c.x; bc[i * 4 + 1] = b.c.y; bc[i * 4 + 2] = b.c.z; bc[i * 4 + 3] = (float)b.airport;
-      bh2[i * 4] = b.h.x; bh2[i * 4 + 1] = b.h.y; bh2[i * 4 + 2] = b.h.z; bh2[i * 4 + 3] = (float)b.kind;
-    }
-    glUniform1i(U(p, "uBoxCount"), nb);
-    if (nb) { glUniform4fv(U(p, "uBoxC"), nb, bc.data()); glUniform4fv(U(p, "uBoxH"), nb, bh2.data()); }
+    glUniform1i(U(p, "uBoxCount"), std::min(128, (int)g_world.boxes.size()));
+    glUniform1i(U(p, "uTownCount"), (int)townB.size());
+    glActiveTexture(GL_TEXTURE0 + 5); glBindTexture(GL_TEXTURE_2D, texData); glUniform1i(U(p, "uData"), 5);
   }
   const PlaneVisual& pv = fp.plane;
   glUniform1i(U(p, "uPlaneOn"), pv.on ? 1 : 0);

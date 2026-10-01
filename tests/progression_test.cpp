@@ -35,7 +35,7 @@ int main() {
       if (c.money < kAircraft[best].price) { long sh = kAircraft[best].price - c.money; grind += sh; printf("  .. grind $%ld to buy %s\n", sh, kAircraft[best].name); c.money = kAircraft[best].price; }
       std::string m; c.buy(best, &m);
     }
-    FlightResult r; r.success = true; r.touchdownFpm = 250; r.flightMin = 8;
+    FlightResult r; r.success = true; r.landed = k.id != "L1"; r.touchdownFpm = 250; r.flightMin = 8;
     int stars; auto src = c.canFly(k, best);
     auto lines = c.settle(k, best, src, r, &stars);
     int net = 0; for (auto& l : lines) net += l.amount;

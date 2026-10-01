@@ -28,7 +28,8 @@ struct Airport {
   int rwyNumber(bool reverse) const { int n = (int)lroundf(wrapDeg360(heading + (reverse ? 180 : 0)) / 10.0f); return n == 0 ? 36 : n; }
 };
 
-struct Box { vec3 c, h; int airport; int kind; };  // centre, half extent in runway frame; kind 0 hangar 1 tower 2 terminal 3 house
+struct Box { vec3 c, h; int airport; int kind; };  // kind 0 hangar 1 tower 2 terminal 3 shed 4 fuel tank 5 radome
+struct Lot;  // procedural town building (scenery.h)
 
 struct Weather {
   float windFrom = 270, windSpeed = 3, gust = 0, turbulence = 0.1f;
@@ -44,9 +45,18 @@ public:
   std::vector<Airport> airports;
   std::vector<Box> boxes;
   std::vector<float> hm;     // RGBA per texel: base height, detail amplitude, lushness, coldness
+  std::vector<uint8_t> roadId; // nearest road segment + 1 per mask texel (shader computes exact road edges)
+  std::vector<uint8_t> mask; // RGBA8: road distance, building density, urbanness, farmland / sea-stack flag
   void build();
+  void bakeMask();
+  void sampleMask(float x, float z, float out[4]) const;   // manual bilinear (matches shader)
+  void maskTexel(float x, float z, float out[4]) const;    // nearest texel (matches shader texelFetch)
+  float groundHeight(float x, float z, int octaves = 8) const;          // terrain without trees/rocks
+  float cover(float x, float z, float ground, const float base[4], int* kind) const;  // tree / rock height above ground
+  bool lotAt(int i, int j, Lot& out) const;                 // procedural building on a town lot
+  bool hitsBuilding(vec3 p, float radius) const;
   int findAirport(const char* code) const;
-  // Terrain height (m) at world position. octaves controls detail fidelity.
+  // Terrain height (m) at world position including trees and rocks. octaves controls detail fidelity.
   float height(float x, float z, int octaves = 8) const;
   vec3 normal(float x, float z) const;
   // Base layer sample (manual bilinear, matches the shader exactly)

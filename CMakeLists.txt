@@ -7,7 +7,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 set(CORE_SOURCES
-  src/world.cpp src/aircraft.cpp src/career.cpp)
+  src/world.cpp src/scenery.cpp src/aircraft.cpp src/career.cpp)
 set(GAME_SOURCES
   ${CORE_SOURCES} src/game.cpp src/game_ui.cpp src/renderer.cpp src/gl.cpp src/audio.cpp src/models.cpp)
 

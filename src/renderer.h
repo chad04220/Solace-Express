@@ -58,7 +58,9 @@ public:
 private:
   GLuint progRT = 0, progSprite = 0, progBright = 0, progBlur = 0, progPost = 0, progUI = 0;
   GLuint vaoEmpty = 0, vaoSprite = 0, vboSprite = 0, vaoUI = 0, vboUI = 0;
-  GLuint texHM = 0, texAlb = 0, texNrm = 0, texFont = 0;
+  GLuint texHM = 0, texAlb = 0, texNrm = 0, texFont = 0, texMask = 0, texRoadId = 0, texData = 0;
+  struct V4 { float x, y, z, w; };
+  std::vector<V4> townB, townY;
   GLuint fboScene = 0, texColor = 0, texDepth = 0, fboSprite = 0;
   GLuint fboBloom[2] = {0, 0}, texBloom[2] = {0, 0};
   int rw = 0, rh = 0, bw = 0, bh = 0;

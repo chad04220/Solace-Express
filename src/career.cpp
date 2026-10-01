@@ -307,17 +307,19 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
     }
     reputation = std::max(0, reputation - 1);
   } else {
-    landings++;
     float fpm = fabsf(r.touchdownFpm);
-    bestLandingFpm = std::min(bestLandingFpm, fpm);
+    if (r.landed) { landings++; bestLandingFpm = std::min(bestLandingFpm, fpm); }
     float mult = 1.f; int st = 3;
     if (c.payout > 0) L.push_back({"Contract payment", c.payout});
-    if (fpm < 150) { L.push_back({"Butter landing bonus", c.payout / 10}); }
-    else if (fpm > 600) { L.push_back({"Hard landing", -c.payout / 5}); st--; }
-    else if (fpm > 350) { L.push_back({"Firm landing", -c.payout / 20}); }
+    // landing quality only counts when the flight actually ended with a touchdown
+    if (r.landed) {
+      if (fpm < 150) { L.push_back({"Butter landing bonus", c.payout / 10}); }
+      else if (fpm > 600) { L.push_back({"Hard landing", -c.payout / 5}); st--; }
+      else if (fpm > 350) { L.push_back({"Firm landing", -c.payout / 20}); }
+    }
     if (r.late) { L.push_back({"Late delivery", -c.payout / 2}); st--; }
     if (c.pax > 0 && (r.maxBank > 45 || r.maxG > 1.9f || r.minG < 0.2f)) { L.push_back({"Passenger discomfort", -c.payout * 15 / 100}); st--; }
-    if (c.fragile && (r.maxG > 2.0f || r.minG < 0.0f || fpm > 400)) { L.push_back({"Fragile cargo damaged", -c.payout * 4 / 10}); st--; }
+    if (c.fragile && (r.maxG > 2.0f || r.minG < 0.0f || (r.landed && fpm > 400))) { L.push_back({"Fragile cargo damaged", -c.payout * 4 / 10}); st--; }
     (void)mult;
     *stars = std::max(1, st);
     reputation += *stars;
