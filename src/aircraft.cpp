@@ -9,31 +9,31 @@ const AircraftSpec kAircraft[] = {
   {"kestrel", "Kestrel T2", "Two-seat trainer", ENG_PISTON, 1, 4, 2, 750, 2600, 530, 70, 120, 1, 14.9f, 10.1f, 1.5f,
    0.30f, 4.8f, 1.45f, 0.55f, 0.030f, 0.004f, 0.045f, 0.75f, 82000, 22, 25, 30, 50, 45, 400, false, false, false,
    900, 1300, 1900, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 18000, 120,
-   7.3f, 0.62f, 0.75f, -0.4f, 0, 0, vec3(0.92f, 0.92f, 0.95f), vec3(0.85f, 0.12f, 0.10f)},
+   7.3f, 0.62f, 1.19f, -0.92f, 0, 0, vec3(0.92f, 0.92f, 0.95f), vec3(0.85f, 0.12f, 0.10f)},
   {"wren", "Wren 180", "Four-seat tourer", ENG_PISTON, 1, 6, 2, 700, 2700, 820, 110, 320, 3, 16.2f, 11.0f, 1.5f,
    0.30f, 4.9f, 1.50f, 0.65f, 0.028f, 0.004f, 0.050f, 0.76f, 135000, 23, 28, 33, 60, 70, 450, false, false, false,
    1500, 2000, 3000, 0.40f, 0.058f, 0.060f, LIC_PPL, 30000, 250,
-   8.3f, 0.68f, 0.82f, -0.4f, 0, 0, vec3(0.95f, 0.95f, 0.92f), vec3(0.10f, 0.30f, 0.70f)},
+   8.3f, 0.68f, 1.18f, -1.07f, 0, 0, vec3(0.95f, 0.95f, 0.92f), vec3(0.10f, 0.30f, 0.70f)},
   {"bush", "Bushmaster STOL", "Backcountry taildragger", ENG_PISTON, 1, 6, 3, 700, 2700, 760, 120, 480, 4, 21.5f, 12.4f, 1.75f,
    0.35f, 5.0f, 1.85f, 0.95f, 0.034f, 0.006f, 0.070f, 0.74f, 220000, 18, 18, 24, 55, 60, 220, true, true, false,
    1500, 2100, 3200, 0.42f, 0.065f, 0.070f, LIC_CPL, 40000, 450,
-   8.0f, 0.70f, 0.85f, -0.6f, 0, 0, vec3(0.95f, 0.75f, 0.10f), vec3(0.12f, 0.12f, 0.12f)},
+   8.0f, 0.70f, 1.17f, -1.05f, 0, 0, vec3(0.95f, 0.75f, 0.10f), vec3(0.12f, 0.12f, 0.12f)},
   {"islander", "Islander Twin", "Nine-seat utility twin", ENG_PISTON, 2, 6, 2, 700, 2700, 1750, 260, 900, 9, 30.2f, 14.9f, 2.05f,
    0.32f, 4.9f, 1.55f, 0.70f, 0.036f, 0.006f, 0.060f, 0.76f, 195000, 22, 26, 31, 65, 90, 420, true, false, false,
    9000, 9500, 17000, 0.40f, 0.055f, 0.060f, LIC_CPL, 85000, 900,
-   10.9f, 0.85f, 0.95f, -0.5f, 1, 0, vec3(0.96f, 0.96f, 0.96f), vec3(0.05f, 0.55f, 0.45f)},
+   10.9f, 0.85f, 1.12f, -1.38f, 1, 0, vec3(0.96f, 0.96f, 0.96f), vec3(0.05f, 0.55f, 0.45f)},
   {"pelican", "Pelican Caravan", "Single turboprop hauler", ENG_TURBOPROP, 1, 0, 3, 1100, 1900, 2150, 420, 1400, 12, 25.9f, 15.9f, 1.95f,
    0.32f, 5.0f, 1.60f, 0.90f, 0.030f, 0.005f, 0.060f, 0.78f, 540000, 30, 31, 38, 85, 130, 550, true, false, false,
    12000, 14000, 24000, 0.40f, 0.052f, 0.060f, LIC_CPL, 120000, 1600,
-   11.5f, 0.92f, 1.0f, -0.6f, 0, 0, vec3(0.95f, 0.95f, 0.95f), vec3(0.85f, 0.45f, 0.05f)},
+   11.5f, 0.92f, 1.09f, -1.83f, 0, 0, vec3(0.95f, 0.95f, 0.95f), vec3(0.85f, 0.45f, 0.05f)},
   {"meridian", "Meridian Q400", "Regional turboprop airliner", ENG_TURBOPROP, 2, 0, 4, 900, 1300, 12000, 1500, 4500, 40, 54.0f, 27.4f, 2.1f,
    0.30f, 5.2f, 1.50f, 0.80f, 0.026f, 0.010f, 0.060f, 0.80f, 1800000, 40, 52, 60, 140, 170, 1100, false, false, true,
    180000, 300000, 450000, 0.40f, 0.048f, 0.055f, LIC_ATP, 600000, 8000,
-   26.0f, 1.35f, 1.25f, -1.0f, 1, 1, vec3(0.96f, 0.96f, 0.98f), vec3(0.08f, 0.18f, 0.45f)},
+   26.0f, 1.35f, 0.93f, -0.38f, 1, 1, vec3(0.96f, 0.96f, 0.98f), vec3(0.08f, 0.18f, 0.45f)},
   {"starling", "Starling 500 Jet", "Light business jet", ENG_JET, 2, 0, 0, 0, 0, 4600, 1100, 700, 7, 30.0f, 15.9f, 2.0f,
    0.25f, 5.0f, 1.40f, 0.75f, 0.022f, 0.012f, 0.070f, 0.80f, 15000, 0, 55, 62, 200, 260, 1250, false, false, true,
    30000, 60000, 85000, 0.42f, 0.050f, 0.055f, LIC_ATP, 260000, 0,
-   14.0f, 0.95f, -0.75f, 0.2f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f)},
+   14.0f, 0.95f, -0.58f, 1.0f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f)},
 };
 // clang-format on
 const int kNumAircraft = sizeof(kAircraft) / sizeof(kAircraft[0]);
@@ -69,12 +69,13 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
     vel = vec3(); engineRunning = false; starterTime = 0;
     pos.y = g_world.height(pos.x, pos.z, 7) + gearHeight() + (s->taildragger ? 0.25f : 0.05f);
     onGround = wasOnGround = true; ctl.brake = 1;
-    if (s->taildragger) q = q * quat::axisAngle(vec3(1, 0, 0), 11.f * DEG);
+    if (s->taildragger) q = q * quat::axisAngle(vec3(1, 0, 0), atanf(0.2f) - 0.005f);  // sit on mains + tail wheel
   }
 }
 
 float Plane::gearHeight() const {
   const AircraftSpec& s = *spec;
+  if (s.taildragger) return s.fusRad * 1.0f + 0.45f;
   return s.fusRad * 1.3f + (s.engineType == ENG_JET || s.engines == 2 ? 0.75f : 0.55f);
 }
 
@@ -217,14 +218,14 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   if (wheels) {
     if (s.taildragger) {
       cs.push_back({vec3(-track, -gh, -0.10f * L), 0}); cs.push_back({vec3(track, -gh, -0.10f * L), 1});
-      cs.push_back({vec3(0, -R - 0.05f, 0.45f * L), 2});
+      cs.push_back({vec3(0, -gh + 0.11f * L, 0.45f * L), 2});  // tail wheel: 11.3 deg ground attitude
     } else {
       cs.push_back({vec3(-track, -gh, 0.04f * L), 0}); cs.push_back({vec3(track, -gh, 0.04f * L), 1});
       cs.push_back({vec3(0, -gh, -0.36f * L), 2});
     }
   }
   cs.push_back({vec3(0, -R, -0.45f * L), 3});           // nose / prop
-  cs.push_back({vec3(0, -R * 0.6f, 0.48f * L), 4});     // tail
+  cs.push_back({s.taildragger ? vec3(0, -gh + 0.11f * L + 0.25f, 0.45f * L) : vec3(0, -R * 0.6f, 0.48f * L), 4});  // tail
   cs.push_back({vec3(-s.span * 0.5f, s.wingY * R, s.wingZ), 5});
   cs.push_back({vec3(s.span * 0.5f, s.wingY * R, s.wingZ), 5});
   cs.push_back({vec3(0, -R, 0), 6});                    // belly

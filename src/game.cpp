@@ -1,5 +1,6 @@
 // Air Xpress - game flow, flight session, cameras, particles, lights, audio feed
 #include "game.h"
+#include "models.h"
 
 // ------------------------------------------------------------------ settings / save
 static std::string joinPath(const std::string& d, const char* f) { return d.empty() ? std::string(f) : d + "/" + f; }
@@ -121,7 +122,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   paused = false; showMap = false; landed = completed = crashed = false;
   result = FlightResult();
   timeAccel = 1; camMode = camMode == 1 ? 1 : 0; camYaw = 0; camPitch = 0.12f; camZoom = 1;
-  lookYaw = lookPitch = 0;
+  lookYaw = 0; lookPitch = -0.13f;
   camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 3, 15));
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
   takeoffAnnounced = false; touchedDown = false; touchdownFpm = 0; stillTimer = 0;
@@ -408,7 +409,7 @@ void Game::updateFlight(float dt) {
 void Game::updateCamera(float dt) {
   if (!plane.spec) return;
   if (in.pressed['C'] || (in.buttonsPressed & PAD_BACK)) {
-    camMode = (camMode + 1) % 4; camYaw = 0; camPitch = 0.12f; lookYaw = lookPitch = 0;
+    camMode = (camMode + 1) % 4; camYaw = 0; camPitch = 0.12f; lookYaw = 0; lookPitch = -0.13f;
     static const char* names[] = {"Chase camera", "Cockpit view", "Orbit camera", "Flyby camera"};
     toast(names[camMode]);
     if (camMode == 3) camPos = plane.pos + normalize(vec3(plane.vel.x, 0, plane.vel.z) + vec3(0.01f, 0, 0)) * 350.f + plane.right() * 40.f + vec3(0, 12, 0);
@@ -432,14 +433,14 @@ void Game::updateCamera(float dt) {
     camPos = plane.pos + orbit.rotate(vec3(0, 0, dist)) + vec3(0, s.fusRad * 0.6f, 0);
   } else if (camMode == 1) {
     if (drag || in.pad) { lookYaw = camYaw; lookPitch = camPitch - 0.12f; }
-    else { lookYaw = approach(lookYaw, 0, 2.f, dt); lookPitch = approach(lookPitch, 0, 2.f, dt); camYaw = lookYaw; camPitch = lookPitch + 0.12f; }
-    camPos = plane.pos + plane.q.rotate(vec3(s.engines == 2 && s.pax > 10 ? -0.45f : -0.28f * s.fusRad, 0.78f * s.fusRad, -0.27f * s.fusLen));
+    else { lookYaw = approach(lookYaw, 0, 2.f, dt); lookPitch = approach(lookPitch, -0.13f, 2.f, dt); camYaw = lookYaw; camPitch = lookPitch + 0.12f; }
+    camPos = plane.pos + plane.q.rotate(kModels[plane.spec - kAircraft].eye);
   } else if (camMode == 2) {
     float dist = (size * 1.4f + 8.f) * camZoom;
     quat orbit = quat::axisAngle(vec3(0, 1, 0), camYaw) * quat::axisAngle(vec3(1, 0, 0), -camPitch);
     camPos = plane.pos + orbit.rotate(vec3(0, 0, dist));
   } else {
-    if (length(camPos - plane.pos) > 700.f) camPos = plane.pos + normalize(vec3(plane.vel.x, 0, plane.vel.z) + vec3(0.01f, 0, 0)) * 400.f + plane.right() * 45.f + vec3(0, 8, 0);
+    if (!botControl && length(camPos - plane.pos) > 700.f) camPos = plane.pos + normalize(vec3(plane.vel.x, 0, plane.vel.z) + vec3(0.01f, 0, 0)) * 400.f + plane.right() * 45.f + vec3(0, 8, 0);
   }
   float gh = std::max(g_world.height(camPos.x, camPos.z, 6), 0.f) + 1.5f;
   if (camPos.y < gh) camPos.y = gh;
@@ -462,29 +463,28 @@ void Game::updateParticles(float dt) {
 // ------------------------------------------------------------------ frame assembly
 static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bool inside) {
   const AircraftSpec& s = *p.spec;
+  int idx = (int)(p.spec - kAircraft);
+  const ModelDef& md = kModels[idx];
   pv.on = true;
   pv.pos = p.pos;
   vec3 r = p.right(), u = p.up(), b = p.q.rotate(vec3(0, 0, 1));
   float m[9] = {r.x, r.y, r.z, u.x, u.y, u.z, b.x, b.y, b.z};
   memcpy(pv.rot, m, sizeof(m));
-  pv.A[0] = s.fusLen; pv.A[1] = s.fusRad; pv.A[2] = s.span; pv.A[3] = s.chord;
-  pv.B[0] = s.wingY; pv.B[1] = s.wingZ; pv.B[2] = (float)s.engLayout; pv.B[3] = (float)s.tail;
-  pv.C[0] = p.gear; pv.C[1] = p.flaps; pv.C[2] = p.ctl.roll; pv.C[3] = clampf(p.ctl.pitch + p.ctl.trim * 0.3f, -1, 1);
+  packModel(s, idx, p.gearHeight(), pv.M);
+  // nose/tail wheel steering: same angle the physics applies to the wheel (geometry angle in the x-z plane)
+  float spd = length(p.vel);
+  float steer = p.ctl.yaw * 0.45f * smoothstepf(30.f, 4.f, spd);
+  if (s.taildragger) steer = -steer;
+  pv.PS[0] = p.gear; pv.PS[1] = p.flaps; pv.PS[2] = steer; pv.PS[3] = inside ? 1.f : 0.f;
+  pv.Ctl[0] = clampf(p.ctl.pitch + p.ctl.trim * 0.3f, -1, 1); pv.Ctl[1] = clampf(p.ctl.roll, -1, 1); pv.Ctl[2] = clampf(p.ctl.yaw, -1, 1); pv.Ctl[3] = p.ctl.throttle;
   float blur = s.engineType == ENG_JET ? 1.f : smoothstepf(250.f, 700.f, p.rpm);
-  pv.D[0] = p.ctl.yaw; pv.D[1] = propAngle; pv.D[2] = blur; pv.D[3] = inside ? 1.f : 0.f;
-  pv.E[0] = s.taildragger ? 1.f : 0.f; pv.E[1] = p.gearHeight(); pv.E[2] = (float)std::max(s.blades, 2); pv.E[3] = 0;
+  pv.Pr[0] = propAngle; pv.Pr[1] = blur; pv.Pr[2] = (float)std::max(s.blades, 2); pv.Pr[3] = 0;
+  pv.I0[0] = p.ias * MS_TO_KT; pv.I0[1] = p.pos.y * M_TO_FT; pv.I0[2] = p.heading(); pv.I0[3] = p.vel.y * 196.85f;
+  pv.I1[0] = p.pitchDeg(); pv.I1[1] = p.bankDeg();
+  pv.I1[2] = s.engineType == ENG_PISTON ? p.rpm / std::max(s.maxRpm, 1.f) : p.n1 / 100.f; pv.I1[3] = p.fuel / std::max(s.maxFuel, 1.f);
+  pv.I2[0] = -p.q.rotate(p.w).y / DEG; pv.I2[1] = p.beta / DEG; pv.I2[2] = p.flaps; pv.I2[3] = p.gear;
   pv.colBase = s.colBase; pv.colStripe = s.colStripe;
-  pv.propCount = 0;
-  float R = s.fusRad, L = s.fusLen;
-  if (s.engLayout == 0) {
-    pv.prop[0][0] = 0; pv.prop[0][1] = -0.05f * R; pv.prop[0][2] = -0.5f * L - 0.25f; pv.prop[0][3] = 0.85f + R * 0.55f; pv.propCount = 1;
-  } else if (s.engLayout == 1) {
-    for (int i = 0; i < 2; i++) {
-      pv.prop[i][0] = (i ? 1.f : -1.f) * s.span * 0.5f * 0.32f; pv.prop[i][1] = s.wingY * R - 0.15f * R;
-      pv.prop[i][2] = s.wingZ - s.chord * 1.15f - 0.3f; pv.prop[i][3] = 1.0f + R * 0.5f;
-    }
-    pv.propCount = 2;
-  }
+  pv.propCount = modelProps(md, pv.prop);
 }
 
 FrameParams Game::buildFrame() {
@@ -507,8 +507,8 @@ FrameParams Game::buildFrame() {
     fp.camBack = -fwd;
     fp.camRight = normalize(cross(fwd, upRef));
     fp.camUp = cross(fp.camRight, fwd);
-    fp.fovY = (camMode == 1 ? 68.f : 55.f) * DEG;
-    if (camMode == 3) fp.fovY = clampf(2.f * atanf(std::max(plane.spec->span, plane.spec->fusLen) * 1.5f / length(plane.pos - camPos)), 4.f * DEG, 60.f * DEG);
+    fp.fovY = (camMode == 1 ? 74.f : 55.f) * DEG;
+    if (camMode == 3) fp.fovY = clampf(2.f * atanf(std::max(plane.spec->span, plane.spec->fusLen) * (botControl ? 0.42f : 1.5f) / length(plane.pos - camPos)), 4.f * DEG, 60.f * DEG);
     if (camMode == 1) fp.fovY /= std::min(camZoom, 1.4f) > 0 ? 1.f : 1.f;
     fp.landLight = landingLight && plane.engineRunning ? (0.3f + 0.7f * fp.night) : 0.f;
     fp.landLightPos = plane.pos + plane.forward() * (plane.spec->fusLen * 0.4f);
@@ -618,12 +618,14 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     float dcam = length(plane.pos - fp.camPos);
     float ls = std::max(0.25f, dcam * 0.002f);
     float navI = 0.6f + 2.5f * night;
-    vec3 lt = plane.pos + plane.q.rotate(vec3(-s.span * 0.5f, s.wingY * s.fusRad, s.wingZ)), rtp = plane.pos + plane.q.rotate(vec3(s.span * 0.5f, s.wingY * s.fusRad, s.wingZ));
+    const ModelDef& md = kModels[plane.spec - kAircraft];
+    vec3 tip = modelWingTip(md);
+    vec3 lt = plane.pos + plane.q.rotate(vec3(-tip.x, tip.y, tip.z)), rtp = plane.pos + plane.q.rotate(tip);
     if (camMode != 1) {
       bill(add, lt, ls, vec3(1.f, 0.1f, 0.05f) * navI, 1, SPR_GLOW, 0.3f);
       bill(add, rtp, ls, vec3(0.1f, 1.f, 0.2f) * navI, 1, SPR_GLOW, 0.3f);
-      bill(add, plane.pos + plane.q.rotate(vec3(0, s.fusRad * 0.5f, s.fusLen * 0.5f)), ls, vec3(1.f) * navI, 1, SPR_GLOW, 0.3f);
-      if (plane.engineRunning && fmodf(t, 1.0f) < 0.12f) bill(add, plane.pos + plane.q.rotate(vec3(0, s.fusRad * 1.05f, 0.1f * s.fusLen)), ls * 1.6f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night), 1, SPR_GLOW, 0.3f);
+      bill(add, plane.pos + plane.q.rotate(modelTailTip(md)), ls, vec3(1.f) * navI, 1, SPR_GLOW, 0.3f);
+      if (plane.engineRunning && fmodf(t, 1.0f) < 0.12f) bill(add, plane.pos + plane.q.rotate(modelFinTop(md) + vec3(0, 0.06f, 0)), ls * 1.6f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night), 1, SPR_GLOW, 0.3f);
       float st = fmodf(t, 1.3f);
       if (!plane.onGround && (st < 0.05f || (st > 0.12f && st < 0.16f))) { bill(add, lt, ls * 3.f, vec3(4.f), 1, SPR_GLOW, 0.3f); bill(add, rtp, ls * 3.f, vec3(4.f), 1, SPR_GLOW, 0.3f); }
     }
@@ -772,6 +774,39 @@ void Game::debugScene(const std::string& name) {
   if (name == "hub") { screen = SCR_HUB; realTime = 20; return; }
   Contract c = g_story[0];
   int spec = 0;
+  if (name.size() == 3 && name[0] == 'm') {
+    // model inspection: m<aircraft><view>  views: e = exterior 3/4 front, r = controls deflected from behind,
+    // c = cockpit, g = on the ground, s = side, d = cockpit with controls deflected
+    spec = name[1] - '0'; char v = name[2];
+    c.wx = Weather(); c.wx.cloudCover = 0.25f; c.wx.timeOfDay = 10.5f; c.wx.windSpeed = 0; c.wx.turbulence = 0;
+    startFlight(c, spec, Career::SRC_OWNED);
+    realTime = 10; engineAutoStarted = true;
+    const AircraftSpec& s = kAircraft[spec];
+    if (v != 'g') { plane.reset(&s, vec3(-6000, 700, 16000), 0, s.maxFuel, 100, true, (v == 'r' || v == 'd' || v == 'b') ? s.vref * 1.3f : s.cruise); plane.gear = 1; plane.ctl.gearDown = true; }
+    else { plane.starterTime = 0.01f; plane.engineRunning = true; plane.rpm = 900; plane.n1 = 60; }
+    takeoffAnnounced = true;
+    float size = std::max(s.fusLen, s.span);
+    camMode = 2; camZoom = (v == 'g' ? 0.6f : 0.42f);
+    camYaw = 3.14159f - 0.75f; camPitch = 0.18f;
+    if (v == 'r' || v == 'd' || v == 'b') { botControl = true; plane.ctl.roll = 1; plane.ctl.pitch = 1; plane.ctl.yaw = 1; plane.ctl.flaps = v == 'b' ? 0.f : 1.f; plane.flaps = plane.ctl.flaps; camYaw = v == 'b' ? 0.f : -0.55f; camPitch = v == 'b' ? 0.22f : 0.35f; if (v == 'b') camZoom = 0.3f; }
+    if (v == 's') { camYaw = 1.5708f; camPitch = 0.05f; }
+    if (v == 'c' || v == 'd') { camMode = 1; lookYaw = 0; lookPitch = v == 'd' ? -0.45f : -0.13f; }
+    if (v == 'y' || v == 'p' || v == 'a') {
+      botControl = true; plane.ctl = Controls(); plane.ctl.throttle = 0.6f;
+      if (v == 'y') plane.ctl.yaw = 1; if (v == 'p') plane.ctl.pitch = 1; if (v == 'a') plane.ctl.roll = 1;
+      camMode = 3;
+      vec3 off = v == 'y' ? vec3(0, size * 1.6f, size * 0.9f) : v == 'p' ? vec3(size * 1.5f, 0.3f, 0) : vec3(0, size * 0.25f, size * 1.8f);
+      hint.clear(); toasts.clear(); hudOn = false;
+      camPos = plane.pos + off;
+      return;
+    }
+    (void)size;
+    hint.clear(); toasts.clear(); hudOn = false;
+    camPos = plane.pos;
+    updateCamera(0.016f);
+    if (v == 'd') { lookPitch = -0.35f; }
+    return;
+  }
   if (name == "storm") { c = g_story[g_story.size() - 1]; spec = 5; }
   if (name == "jet") { c = g_story[g_story.size() - 4]; spec = 6; }
   if (name == "night") { c = g_story[11]; c.wx.timeOfDay = 21.5f; spec = 1; }

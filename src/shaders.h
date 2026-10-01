@@ -107,7 +107,7 @@ uniform int uApCount; uniform vec4 uAp[16]; uniform vec4 uApDim[16];
 uniform int uBoxCount; uniform vec4 uBoxC[64]; uniform vec4 uBoxH[64];
 // aircraft
 uniform int uPlaneOn; uniform vec3 uPlanePos; uniform mat3 uPlaneRot;
-uniform vec4 uPA; uniform vec4 uPB; uniform vec4 uPC; uniform vec4 uPD; uniform vec4 uPE;
+uniform vec4 uM[24]; uniform vec4 uPS; uniform vec4 uCtl; uniform vec4 uPr; uniform vec4 uI0; uniform vec4 uI1; uniform vec4 uI2;
 uniform vec3 uColBase; uniform vec3 uColStripe;
 uniform vec4 uProp[2]; uniform int uPropCount;
 uniform vec3 uLandLightPos; uniform vec3 uLandLightDir; uniform float uLandLight;
@@ -129,100 +129,337 @@ float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2){
 float sdCylX(vec3 p, float r, float h){ vec2 d = abs(vec2(length(p.yz), p.x)) - vec2(r,h); return min(max(d.x,d.y),0.0) + length(max(d,0.0)); }
 mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }
 
-// ---------------------------------------------------------------- aircraft SDF (body frame: +x right, +y up, -z forward)
+// ---------------------------------------------------------------- aircraft (body frame: +x right, +y up, +z aft)
+// uM[] layout is written by packModel() in models.cpp.
+// Rotation helper: rot2(v, a) rotates v counter-clockwise by a. To rotate GEOMETRY by A we query with rot2(p, -A).
+vec2 rot2(vec2 v, float a){ float c = cos(a), s = sin(a); return vec2(c*v.x - s*v.y, s*v.x + c*v.y); }
+float smin(float a, float b, float k){ float h = clamp(0.5 + 0.5*(b - a)/k, 0.0, 1.0); return mix(b, a, h) - k*h*(1.0 - h); }
 vec2 opU(vec2 a, vec2 b){ return a.x < b.x ? a : b; }
+float sdUnevenCapsule2(vec2 p, float r1, float r2, float h){
+  p.x = abs(p.x); float b = (r1 - r2)/h; float a = sqrt(max(1.0 - b*b, 1e-4)); float k = dot(p, vec2(-b, a));
+  if (k < 0.0) return length(p) - r1;
+  if (k > a*h) return length(p - vec2(0.0, h)) - r2;
+  return dot(p, vec2(a, b)) - r1;
+}
+float sdEllipsoid(vec3 p, vec3 r){ float k0 = length(p/r); float k1 = length(p/(r*r)); return k0*(k0 - 1.0)/max(k1, 1e-5); }
+float sdRoundCylX(vec3 p, float r, float h, float rr){ vec2 d = vec2(length(p.yz) - r + rr, abs(p.x) - h + rr); return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - rr; }
+
+// fuselage cross-section (half width, half height, centre y) at body z
+vec3 fusSection(float z){
+  z = clamp(z, uM[1].x, uM[8].x);
+  vec4 a = uM[1], b = uM[2];
+  for (int i = 1; i < 8; i++) { a = uM[i]; b = uM[i+1]; if (z <= b.x) break; }
+  float t = clamp((z - a.x)/max(b.x - a.x, 1e-3), 0.0, 1.0); t = t*t*(3.0 - 2.0*t);
+  return mix(a.yzw, b.yzw, t);
+}
+float sdFuselage(vec3 p){
+  vec3 sec = fusSection(p.z);
+  vec2 q = vec2(p.x, p.y - sec.z);
+  float rnd = uM[15].z;
+  float m = min(sec.x, sec.y);
+  float dEll = (length(q/sec.xy) - 1.0)*m;
+  float r = m*mix(0.3, 1.0, rnd);
+  vec2 d = abs(q) - sec.xy + r;
+  float dRR = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r;
+  float d2 = mix(dRR, dEll, rnd);
+  float dz = max(uM[1].x - p.z, p.z - uM[8].x);
+  return dz > 0.0 ? length(vec2(max(d2, 0.0), dz)) : d2;
+}
+
+// Tapered airfoil panel. s = spanwise (>= 0 from root), c = chordwise from root LE (aft +), t = thickness axis.
+// cutC: chordwise position (relative to local LE, as chord fraction) behind which the panel is trimmed when s in [cut0, cut1].
+float sdPanel(float s, float c, float t, float span, float rc, float tc, float sweep, float th, float cutF, float cut0, float cut1){
+  float k = clamp(s/span, 0.0, 1.0);
+  float ch = mix(rc, tc, k); float le = sweep*k;
+  float r1 = th*ch*0.5, r2 = max(0.004*ch, 0.005);
+  float d2 = sdUnevenCapsule2(vec2(t, c - le - r1), r1, r2, max(ch - r1 - r2, 0.01));
+  if (s > cut0 && s < cut1) d2 = max(d2, c - le - ch*cutF);
+  float ds = s - span;
+  float d = length(max(vec2(d2, ds), 0.0)) + min(max(d2, ds), 0.0);
+  return max(d, -s - 0.02);
+}
+// Hinged control surface behind the hinge line. defl = geometry rotation (radians) in the (t, c) plane.
+float sdSurface(float s, float c, float t, float span, float rc, float tc, float sweep, float th, float hingeF, float s0, float s1, float defl, float slide){
+  float k = clamp(s/span, 0.0, 1.0);
+  float ch = mix(rc, tc, k); float le = sweep*k;
+  vec2 q = vec2(t, c - (le + ch*hingeF + 0.008 + slide*ch));
+  q = rot2(q, -defl);
+  float len = ch*(1.0 - hingeF) - 0.01;
+  float halfT = max(th*ch*0.5*(0.42 - 0.38*clamp(q.y/len, 0.0, 1.0)), 0.004);
+  vec3 b = vec3(max(s0 - s, s - s1), abs(q.x) - halfT, max(-q.y, q.y - len));
+  return length(max(b, 0.0)) + min(max(b.x, max(b.y, b.z)), 0.0) - 0.003;
+}
+
 vec2 mapPlane(vec3 p){
-  float L = uPA.x, R = uPA.y, span = uPA.z, chord = uPA.w;
-  float wy = uPB.x*R, wz = uPB.y; int lay = int(uPB.z); int ttail = int(uPB.w);
-  float gear = uPC.x, flaps = uPC.y, ail = uPC.z, elev = uPC.w;
-  float rud = uPD.x; float inside = uPD.w;
-  float tdrag = uPE.x; float gh = uPE.y;
-  // fuselage
-  float nr = lay==2 ? 0.18 : 0.42;
-  float f = sdRoundCone(p, vec3(0.0,-0.05*R,-0.5*L), vec3(0.0,0.0,-0.28*L), R*nr, R);
-  f = min(f, sdRoundCone(p, vec3(0.0,0.0,-0.28*L), vec3(0.0,0.0,0.12*L), R, R*0.98));
-  f = min(f, sdRoundCone(p, vec3(0.0,0.0,0.12*L), vec3(0.0,0.42*R,0.5*L), R*0.98, R*0.2));
-  if (inside > 0.5) f = max(f, p.z + 0.34*L);
+  float L = uM[0].x; int gtype = int(uM[0].y + 0.5); int eng = int(uM[0].z + 0.5); float R = uM[0].w;
+  float gear = uPS.x, flaps = uPS.y, steer = uPS.z, inside = uPS.w;
+  float cPitch = uCtl.x, cRoll = uCtl.y, cYaw = uCtl.z, cThr = uCtl.w;
+  // ---------------- fuselage (hollow with window openings in cockpit view)
+  float f = sdFuselage(p);
   vec2 res = vec2(f, 1.0);
-  // wings (tapered, dihedral) with flaps and ailerons
-  vec3 q = p; q.x = abs(q.x);
-  float halfSpan = span*0.5;
-  float taper = 1.0 - 0.35*clamp(q.x/halfSpan, 0.0, 1.0);
-  q.y -= wy + q.x*(uPB.x > 0.0 ? 0.015 : 0.06);
-  q.z -= wz;
-  float th = 0.055*chord;
-  float wing = sdRoundBox(vec3(q.x - halfSpan*0.5, q.y, q.z/taper + chord*0.12), vec3(halfSpan*0.5, th, chord*0.38), th*0.9)*taper;
-  // control surfaces: hinge at trailing edge of main box
-  float sgn = p.x > 0.0 ? 1.0 : -1.0;
-  vec3 h = vec3(q.x, q.y, q.z/taper - chord*0.26);
-  float aDef = -ail*sgn*0.35, fDef = flaps*0.6;
-  vec3 ha = h; ha.yz = rot(aDef)*ha.yz;
-  float aileron = sdBox(vec3(ha.x - halfSpan*0.78, ha.y, ha.z - chord*0.11), vec3(halfSpan*0.2, th*0.5, chord*0.11))*taper;
-  vec3 hf = h; hf.yz = rot(fDef)*hf.yz;
-  float flap = sdBox(vec3(hf.x - halfSpan*0.35, hf.y, hf.z - chord*0.11), vec3(halfSpan*0.22, th*0.5, chord*0.11))*taper;
-  float wingAll = min(wing, min(aileron, flap));
-  if (inside > 0.5) wingAll = max(wingAll, R*2.4 - abs(p.x));
-  res = opU(res, vec2(wingAll, 2.0));
-  // tail
-  float finH = R*1.25 + L*0.04;
-  float tz = 0.43*L;
-  vec3 fp = p - vec3(0.0, R*0.3, tz);
-  fp.z -= fp.y*0.55;
-  float fin = sdRoundBox(fp - vec3(0.0, finH*0.5, 0.0), vec3(0.04*chord, finH*0.5, chord*0.38), 0.03*chord);
-  vec3 rp = fp - vec3(0.0, finH*0.5, chord*0.38); rp.xz = rot(rud*0.4)*rp.xz;
-  fin = min(fin, sdBox(rp - vec3(0.0,0.0,chord*0.14), vec3(0.03*chord, finH*0.45, chord*0.14)));
-  res = opU(res, vec2(fin, 3.0));
-  float sy = ttail==1 ? R*0.3 + finH : R*0.35;
-  float sz = ttail==1 ? tz + finH*0.55 + chord*0.05 : tz + chord*0.1;
-  vec3 sp = p - vec3(0.0, sy, sz); sp.x = abs(sp.x);
-  float hsp = span*0.19;
-  float stab = sdRoundBox(sp - vec3(hsp*0.5, 0.0, -chord*0.05), vec3(hsp*0.5, 0.035*chord, chord*0.24), 0.03*chord);
-  vec3 ep = sp - vec3(0.0, 0.0, chord*0.19); ep.yz = rot(-elev*0.4)*ep.yz;
-  stab = min(stab, sdBox(ep - vec3(hsp*0.5, 0.0, chord*0.1), vec3(hsp*0.48, 0.025*chord, chord*0.1)));
-  res = opU(res, vec2(stab, 1.0));
-  // engines
-  if (lay == 0) {
-    res = opU(res, vec2(sdRoundCone(p, vec3(0.0,-0.05*R,-0.5*L-0.28), vec3(0.0,-0.05*R,-0.5*L+0.05), 0.04, R*0.28), 4.0));
-  } else if (lay == 1) {
-    vec3 np = p; np.x = abs(np.x) - halfSpan*0.32; np.y -= wy - 0.15*R;
-    float nac = sdRoundCone(np, vec3(0.0,0.0,wz - chord*1.15), vec3(0.0,0.0,wz + chord*0.7), R*0.36, R*0.2);
-    res = opU(res, vec2(nac, 1.0));
-    res = opU(res, vec2(sdRoundCone(np, vec3(0.0,0.0,wz - chord*1.15 - 0.35), vec3(0.0,0.0,wz - chord*1.1), 0.04, R*0.2), 4.0));
-  } else {
-    vec3 np = p; np.x = abs(np.x) - (R + 0.55); np.y -= R*0.35;
-    float nac = sdRoundCone(np, vec3(0.0,0.0,0.16*L), vec3(0.0,0.0,0.34*L), 0.5, 0.4);
-    nac = max(nac, -sdCapsule(np, vec3(0.0,0.0,0.14*L), vec3(0.0,0.0,0.15*L), 0.38));
-    float pylon = sdBox(p - vec3(sign(p.x)*(R*0.6+0.2), R*0.35, 0.26*L), vec3(0.45, 0.06, 0.6));
-    res = opU(res, vec2(min(nac, pylon), 5.0));
+  if (inside > 0.5) {
+    // hollow cabin with real window openings
+    vec4 E = uM[22]; vec4 WS = uM[23]; vec3 sec = fusSection(p.z);
+    float shell = abs(f + 0.03) - 0.03;
+    float holeWs = sdBox(p - vec3(0.0, WS.z + 1.0, 0.5*(WS.x + WS.y)), vec3(sec.x*1.25, 1.0, 0.5*(WS.y - WS.x)));
+    float post = uM[21].z > 1.5 ? min(abs(p.x) - 0.03, abs(abs(p.x) - abs(E.x) - 0.42) - 0.035) : abs(p.x) - 0.025;
+    holeWs = max(holeWs, -post);
+    float sideTop = sec.z + sec.y*0.78;
+    float holeSide = sdBox(p - vec3(0.0, 0.5*(WS.z - 0.12 + sideTop), 0.5*(WS.y + WS.w)), vec3(5.0, 0.5*(sideTop - WS.z + 0.12), 0.5*(WS.w - WS.y)));
+    holeSide = max(holeSide, 0.3 - abs(p.x));
+    holeSide = max(holeSide, -(abs(p.z - WS.y - 0.04) - 0.025));
+    shell = max(shell, -min(holeWs, holeSide));
+    res = vec2(shell, 11.0);
   }
-  // landing gear
-  if (gear > 0.02) {
-    float retr = (1.0 - gear) * (gh - R*0.7);
-    float wr = 0.22 + R*0.12;
-    float track = max(1.2, span*0.13);
-    float mz = tdrag > 0.5 ? -0.10*L : 0.04*L;
-    vec3 wp = vec3(track, -gh + wr + retr, mz);
-    vec3 gp = p; gp.x = abs(gp.x);
-    float strut = sdCapsule(gp, vec3(R*0.5, -R*0.6, mz), wp, 0.06);
-    float wheel = sdCylX(gp - wp, wr, 0.09);
-    if (tdrag < 0.5) {
-      vec3 nw = vec3(0.0, -gh + wr*0.85 + retr, -0.36*L);
-      strut = min(strut, sdCapsule(p, vec3(0.0, -R*0.5, -0.36*L), nw, 0.05));
-      wheel = min(wheel, sdCylX(p - nw, wr*0.85, 0.07));
-    } else {
-      vec3 tw = vec3(0.0, -R - 0.05 + 0.12, 0.45*L);
-      wheel = min(wheel, sdCylX(p - tw, 0.12, 0.04));
+  // ---------------- main wing with flaps and ailerons
+  {
+    vec4 W0 = uM[9], W1 = uM[10], W2 = uM[11];
+    float span = W0.x, rc = W0.y, tc = W0.z, sw = W0.w, th = W1.w;
+    float s = abs(p.x);
+    float t = p.y - (W1.x + s*W1.z);
+    float c = p.z - W1.y;
+    float sgn = p.x > 0.0 ? 1.0 : -1.0;
+    float fus0 = 0.55*R, flapEnd = span*W2.w, ailEnd = span*0.94;
+    float wing = sdPanel(s, c, t, span, rc, tc, sw, th, 0.74, fus0, ailEnd);
+    float flap = sdSurface(s, c, t, span, rc, tc, sw, th, 0.74, fus0, flapEnd, flaps*0.62, flaps*0.1);
+    // right aileron TE goes UP for right roll; left goes down
+    float ail = sdSurface(s, c, t, span, rc, tc, sw, th, 0.74, flapEnd + 0.03, ailEnd, -cRoll*sgn*0.33, 0.0);
+    float wd = min(wing, min(flap, ail));
+    if (W2.z > 0.01) {  // winglet
+      float wl = sdPanel(t - 0.02, c - sw - tc*0.15, s - span + 0.05, W2.z, tc*0.85, tc*0.4, 0.55, 0.09, 1.0, 0.0, 0.0);
+      wd = smin(wd, wl, 0.08);
     }
-    res = opU(res, vec2(strut, 4.0));
-    res = opU(res, vec2(wheel, 6.0));
+    if (uM[15].w > 0.5) {  // leading-edge slats (STOL)
+      float sl = sdPanel(s, c + 0.09, t + 0.03, span*0.95, rc*0.16, tc*0.16, sw, 0.5, 1.0, 0.0, 0.0);
+      wd = min(wd, max(sl, fus0 + 0.4 - s));
+    }
+    float fd = res.x;
+    if (inside > 0.5) { wd = max(wd, -f); res.x = min(res.x, wd); }
+    else res.x = smin(res.x, wd, 0.06*R);
+    if (wd < fd) res.y = 2.0;
+    // lift struts
+    if (W2.x > 0.5) {
+      vec3 sec = fusSection(p.z);
+      float k = clamp(W2.y/span, 0.0, 1.0); float ch = mix(rc, tc, k); float le = sw*k;
+      vec3 top1 = vec3(W2.y, W1.x + W2.y*W1.z - th*ch*0.4, W1.y + le + ch*0.25);
+      vec3 base = vec3(0.6*R, -0.35*R, W1.y + rc*0.35);
+      vec3 ap = vec3(abs(p.x), p.y, p.z);
+      float st = sdCapsule(ap, base, top1, 0.035);
+      if (uM[15].w > 0.5) st = min(st, sdCapsule(ap, base, top1 + vec3(0.0, 0.0, ch*0.45), 0.03));
+      res = opU(res, vec2(st, 8.0));
+    }
+  }
+  // ---------------- tail
+  {
+    vec4 V0 = uM[14], V1 = uM[15];
+    float s = p.y - V1.x, c = p.z - V1.y, t = p.x;
+    float h = V0.x;
+    float hasT = uM[13].w;
+    float rud0 = hasT > 0.5 ? 0.05 : 0.08*h;
+    float fin = sdPanel(s, c, t, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97);
+    // right rudder (yaw +) swings the trailing edge to the right (+x)
+    float rud = sdSurface(s, c, t, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97, -cYaw*0.42, 0.0);
+    float tail = min(fin, rud);
+    vec4 H0 = uM[12], H1 = uM[13];
+    float hs = abs(p.x), ht = p.y - (H1.x + hs*H1.z), hc = p.z - H1.y;
+    float stab = sdPanel(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98);
+    // pulling back (pitch +) raises the elevator trailing edge
+    float elev = sdSurface(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98, -cPitch*0.4, 0.0);
+    tail = min(tail, min(stab, elev));
+    if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + H0.y*0.45), vec3(0.18, 0.2, H0.y*0.55)), 0.08);
+    float d = smin(res.x, tail, 0.12*R);
+    res = vec2(d, tail < res.x ? 3.0 : res.y);
+  }
+  // ---------------- engines
+  {
+    vec4 N0 = uM[16], N1 = uM[17];
+    vec4 S0 = uM[1];
+    if (eng <= 1) {
+      float sr = N1.y;
+      float spin = sdRoundCone(p, vec3(0.0, S0.w, S0.x - sr*2.3), vec3(0.0, S0.w, S0.x + 0.05), 0.015, sr);
+      res = opU(res, vec2(spin, 16.0));
+      if (eng == 0) {
+        vec3 sec = fusSection(S0.x + 0.9);
+        float ex = sdCapsule(vec3(abs(p.x), p.y, p.z), vec3(0.12, sec.z - sec.y*0.85, S0.x + 0.9), vec3(0.16, sec.z - sec.y - 0.06, S0.x + 1.15), 0.035);
+        res = opU(res, vec2(ex, 17.0));
+      } else {
+        vec3 sec = fusSection(S0.x + 1.2);
+        vec3 ap = vec3(abs(p.x), p.y, p.z);
+        float ex = sdCapsule(ap, vec3(sec.x*0.85, sec.z + 0.05, S0.x + 1.15), vec3(sec.x + 0.22, sec.z + 0.12, S0.x + 1.5), 0.085);
+        ex = max(ex, -sdCapsule(ap, vec3(sec.x*0.85, sec.z + 0.05, S0.x + 1.15), vec3(sec.x + 0.4, sec.z + 0.14, S0.x + 1.6), 0.06));
+        res = opU(res, vec2(ex, 17.0));
+        float lip = sdCapsule(p, vec3(-0.12, S0.w - 0.32, S0.x + 0.45), vec3(0.12, S0.w - 0.32, S0.x + 0.45), 0.07);
+        res.x = smin(res.x, lip, 0.08);
+      }
+    } else if (eng <= 3) {
+      vec3 np = vec3(abs(p.x) - N0.x, p.y - N0.y, p.z);
+      float nr = N0.z, z0 = N0.w, len = N1.x;
+      float wingY = uM[10].x + N0.x*uM[10].z;
+      float nac = sdRoundCone(np, vec3(0.0, 0.0, z0), vec3(0.0, 0.02, z0 + len*0.3), nr*0.72, nr);
+      nac = smin(nac, sdRoundCone(np, vec3(0.0, 0.02, z0 + len*0.3), vec3(0.0, wingY - N0.y - nr*0.25, z0 + len), nr, nr*0.35), 0.1);
+      if (eng == 3) {
+        nac = smin(nac, sdEllipsoid(np - vec3(0.0, -nr*0.75, z0 + 0.45), vec3(nr*0.35, nr*0.22, 0.5)), 0.08);
+        float ex = sdCapsule(np, vec3(nr*0.8, 0.1, z0 + len*0.35), vec3(nr*1.05, 0.15, z0 + len*0.5), 0.09);
+        res = opU(res, vec2(ex, 17.0));
+      }
+      res = opU(res, vec2(nac, 5.0));
+      float sr = N1.y;
+      res = opU(res, vec2(sdRoundCone(np, vec3(0.0, 0.0, z0 - sr*2.3), vec3(0.0, 0.0, z0 + 0.05), 0.015, sr), 16.0));
+    } else {
+      vec3 np = vec3(abs(p.x) - N0.x, p.y - N0.y, p.z - N0.w);
+      float nr = N0.z, len = N1.x;
+      float nac = sdRoundCone(np, vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, len), nr, nr*0.78);
+)"
+R"(      float inlet = sdCapsule(np, vec3(0.0, 0.0, -0.4), vec3(0.0, 0.0, 0.18), nr*0.82);
+      nac = max(nac, -inlet);
+      res = opU(res, vec2(nac, 5.0));
+      float fan = sdCapsule(np, vec3(0.0, 0.0, 0.2), vec3(0.0, 0.0, 0.3), nr*0.83);
+      res = opU(res, vec2(fan, 21.0));
+      float cone = sdRoundCone(np, vec3(0.0, 0.0, len - 0.25), vec3(0.0, 0.0, len + 0.3), nr*0.5, 0.04);
+      res = opU(res, vec2(cone, 17.0));
+      vec3 sec = fusSection(N0.w + len*0.5);
+      float px0 = sec.x*0.7, px1 = N0.x - nr*0.8;
+      float pylon = sdRoundBox(vec3(abs(p.x) - 0.5*(px0 + px1), p.y - N0.y, p.z - N0.w - len*0.5), vec3(0.5*(px1 - px0) + 0.05, 0.06, len*0.28), 0.04);
+      res.x = smin(res.x, pylon, 0.1);
+    }
+  }
+  // ---------------- cargo pod
+  if (uM[17].w > 0.5) {
+    vec3 sec = fusSection(-0.5);
+    float pod = sdRoundBox(p - vec3(0.0, sec.z - sec.y - 0.18, -0.4), vec3(0.42, 0.2, 2.6), 0.17);
+    pod = smin(pod, sdEllipsoid(p - vec3(0.0, sec.z - sec.y - 0.2, -3.0), vec3(0.42, 0.22, 0.8)), 0.2);
+    res.x = smin(res.x, pod, 0.12);
+  }
+  // ---------------- landing gear
+  if (gear > 0.02) {
+    vec4 G0 = uM[18], G1 = uM[19];
+    float track = G0.x, wr = G0.y, mz = G0.z, nz = G0.w, gh = G1.x, tz = G1.y;
+    bool retract = gtype >= 3;
+    float up = retract ? (1.0 - gear) : 0.0;
+    vec3 ap = vec3(abs(p.x), p.y, p.z);
+    float wy = -gh + wr;
+    float lift = up*(gh - R*0.6);
+    vec3 wc = vec3(track, wy + lift, mz);
+    vec3 secM = fusSection(mz);
+    float legs, tyres, spats = 1e5;
+    if (gtype == 0) {
+      legs = sdCapsule(ap, vec3(secM.x*0.75, secM.z - secM.y*0.8, mz), wc + vec3(-0.06, 0.04, 0.0), 0.03);
+      tyres = sdRoundCylX(ap - wc, wr, 0.065, 0.04);
+      float sp = sdEllipsoid(ap - wc - vec3(0.0, 0.04, 0.06), vec3(0.1, wr*1.05, wr*1.9));
+      spats = max(sp, -(ap.y - (wc.y - wr*0.5)));
+    } else if (gtype == 1) {
+      legs = sdCapsule(ap, vec3(secM.x*0.7, secM.z - secM.y*0.85, mz), wc + vec3(-0.08, 0.06, 0.0), 0.045);
+      tyres = sdRoundCylX(ap - wc, wr, 0.09, 0.05);
+      tyres = min(tyres, sdRoundCylX(ap - wc - vec3(0.06, 0.0, 0.0), wr*0.45, 0.04, 0.02));
+    } else if (gtype == 2) {
+      legs = min(sdCapsule(ap, vec3(secM.x*0.8, secM.z - secM.y*0.8, mz - 0.35), wc, 0.03), sdCapsule(ap, vec3(secM.x*0.8, secM.z - secM.y*0.8, mz + 0.3), wc, 0.03));
+      tyres = sdRoundCylX(ap - wc, wr, 0.14, 0.09);
+    } else if (gtype == 3) {
+      vec3 top = vec3(track, uM[16].y - uM[16].z*0.6, mz);
+      legs = sdCapsule(ap, top, vec3(track, wc.y + 0.05, mz), 0.09);
+      legs = min(legs, sdCapsule(ap, vec3(track - 0.25, wc.y, mz), vec3(track + 0.25, wc.y, mz), 0.05));
+      tyres = min(sdRoundCylX(ap - wc - vec3(0.22, 0.0, 0.0), wr, 0.11, 0.06), sdRoundCylX(ap - wc + vec3(0.22, 0.0, 0.0), wr, 0.11, 0.06));
+    } else {
+      float wyy = uM[10].x + track*uM[10].z;
+      legs = sdCapsule(ap, vec3(track, wyy - 0.1 + lift*0.2, mz), wc + vec3(0.0, 0.05, 0.0), 0.06);
+      tyres = sdRoundCylX(ap - wc, wr, 0.1, 0.05);
+    }
+    // nose / tail wheel (nose wheel steers with the rudder pedals)
+    if (G1.z < 0.5) {
+      vec3 secN = fusSection(nz);
+      float nwr = gtype == 3 ? wr*0.75 : wr*0.85;
+      vec3 piv = vec3(0.0, 0.0, nz);
+      vec3 q = p - piv; q.xz = rot2(q.xz, -steer);  // geometry rotated by the steering angle
+      vec3 nc = vec3(0.0, -gh + nwr + lift, 0.0);
+      float nl = sdCapsule(q, vec3(0.0, secN.z - secN.y*0.7, -0.05), nc + vec3(0.0, nwr*0.9, 0.0), gtype >= 3 ? 0.07 : 0.035);
+      nl = min(nl, sdCapsule(vec3(abs(q.x), q.yz), vec3(0.06 + (gtype == 3 ? 0.15 : 0.0), nc.y + nwr*0.9, 0.0), vec3(0.06 + (gtype == 3 ? 0.15 : 0.0), nc.y, 0.0), 0.02));
+      float nt = gtype == 3 ? min(sdRoundCylX(q - nc - vec3(0.15, 0.0, 0.0), nwr, 0.07, 0.04), sdRoundCylX(q - nc + vec3(0.15, 0.0, 0.0), nwr, 0.07, 0.04))
+                            : sdRoundCylX(q - nc, nwr, 0.055, 0.035);
+      if (gtype == 0) { float sp = sdEllipsoid(q - nc - vec3(0.0, 0.05, 0.06), vec3(0.1, nwr*1.12, nwr*2.2)); spats = min(spats, max(sp, -(q.y - (nc.y - nwr*0.5)))); }
+      legs = min(legs, nl); tyres = min(tyres, nt);
+    } else {
+      vec3 q = p - vec3(0.0, 0.0, tz); q.xz = rot2(q.xz, -steer);
+      vec3 tsec = fusSection(tz - 0.3);
+      vec3 tc = vec3(0.0, -gh + 0.11*L + 0.1, 0.0);
+      legs = min(legs, sdCapsule(q, vec3(0.0, tsec.z - tsec.y*0.6, -0.3), tc + vec3(0.0, 0.03, -0.05), 0.02));
+      tyres = min(tyres, sdRoundCylX(q - tc, 0.1, 0.035, 0.02));
+    }
+    if (retract && gear < 0.06) { legs = 1e5; tyres = 1e5; }
+    res = opU(res, vec2(legs, 8.0));
+    res = opU(res, vec2(tyres, 6.0));
+    res = opU(res, vec2(spats, 1.0));
+  }
+  // ---------------- small details: nav lights, beacon, antennas, pitot
+  {
+    vec4 W0 = uM[9], W1 = uM[10];
+    vec3 tip = vec3(W0.x + 0.02, W1.x + W0.x*W1.z, W1.y + W0.w + W0.z*0.25);
+    res = opU(res, vec2(length(vec3(abs(p.x), p.y, p.z) - tip) - 0.045, 18.0));
+    vec4 V0 = uM[14], V1 = uM[15];
+    res = opU(res, vec2(length(p - vec3(0.0, V1.x + V0.x + 0.04, V1.y + V0.w + V0.z*0.4)) - 0.05, 19.0));
+    vec3 sec = fusSection(0.2);
+    float ant = sdRoundBox(p - vec3(0.0, sec.z + sec.y + 0.11, 0.2), vec3(0.006, 0.12, 0.05), 0.004);
+    res = opU(res, vec2(ant, 13.0));
+  }
+  // ---------------- cockpit interior (only rendered from inside)
+  if (inside > 0.5) {
+    vec4 E = uM[22]; float pz = uM[21].w, phw = E.w; int ck = int(uM[21].z + 0.5);
+    float panel = sdRoundBox(p - vec3(0.0, E.y - 0.36, pz), vec3(phw, 0.24, 0.045), 0.015);
+    res = opU(res, vec2(panel, 10.0));
+    vec4 WSg = uM[23];
+    float gz0 = min(WSg.x - 0.05, pz - 0.2);
+    float glare = sdRoundBox(p - vec3(0.0, E.y - 0.1, 0.5*(gz0 + pz + 0.06)), vec3(phw*0.97, 0.022, 0.5*(pz + 0.06 - gz0)), 0.018);
+    res = opU(res, vec2(glare, 14.0));
+    float floor_ = sdBox(p - vec3(0.0, E.y - 1.08, E.z), vec3(phw, 0.02, 1.6));
+    res = opU(res, vec2(floor_, 11.0));
+    // seats
+    vec3 sp = vec3(abs(p.x) - abs(E.x), p.y, p.z);
+    float seat = sdRoundBox(sp - vec3(0.0, E.y - 0.8, E.z + 0.05), vec3(0.21, 0.06, 0.24), 0.05);
+    vec3 bp = sp - vec3(0.0, E.y - 0.4, E.z + 0.37); bp.yz = rot2(bp.yz, 0.18);
+    seat = min(seat, sdRoundBox(bp, vec3(0.2, 0.36, 0.055), 0.05));
+    seat = min(seat, sdRoundBox(sp - vec3(0.0, E.y + 0.08, E.z + 0.47), vec3(0.11, 0.08, 0.05), 0.04));
+    res = opU(res, vec2(seat, 12.0));
+    // control yokes: pull moves toward the pilot, roll right turns the yoke clockwise
+    float pull = cPitch*0.075;
+    vec3 yp = vec3(abs(p.x) - abs(E.x), p.y - (E.y - 0.43), p.z - pz);
+    float col = sdCapsule(yp, vec3(0.0, 0.0, 0.02), vec3(0.0, 0.0, 0.2 + pull), 0.018);
+    vec3 hp = yp - vec3(0.0, 0.0, 0.22 + pull);
+    hp.xy = rot2(hp.xy, cRoll*0.75);
+    float yoke = min(col, sdCapsule(hp, vec3(-0.1, 0.0, 0.0), vec3(0.1, 0.0, 0.0), 0.015));
+    yoke = min(yoke, sdCapsule(vec3(abs(hp.x), hp.yz), vec3(0.1, 0.0, 0.0), vec3(0.125, 0.085, 0.0), 0.018));
+    yoke = min(yoke, sdRoundBox(hp, vec3(0.04, 0.025, 0.025), 0.01));
+    res = opU(res, vec2(yoke, 13.0));
+    // rudder pedals: right rudder pushes the right pedal forward
+    vec3 pp = vec3(p.x - sign(p.x)*abs(E.x), p.y - (E.y - 0.98), p.z - pz - 0.2);
+    float side = sign(pp.x);
+    pp.z += side*cYaw*0.06;
+    pp.x = abs(pp.x) - 0.1;
+    pp.yz = rot2(pp.yz, 0.5);
+    res = opU(res, vec2(sdRoundBox(pp, vec3(0.04, 0.075, 0.012), 0.008), 13.0));
+    // throttle
+    if (ck == 0) {
+      float zt = pz + 0.05 + 0.1*(1.0 - cThr);
+      float thr = min(sdCapsule(p, vec3(0.0, E.y - 0.5, pz + 0.04), vec3(0.0, E.y - 0.5, zt), 0.006), length(p - vec3(0.0, E.y - 0.5, zt)) - 0.022);
+      res = opU(res, vec2(thr, 13.0));
+    } else {
+      float ped = sdRoundBox(p - vec3(0.0, E.y - 0.78, pz + 0.3), vec3(0.11, 0.22, 0.3), 0.03);
+      res = opU(res, vec2(ped, 10.0));
+      float a = mix(-0.55, 0.6, cThr);
+      vec3 piv = vec3(0.0, E.y - 0.56, pz + 0.38);
+      vec3 tip = piv + vec3(0.0, 0.14*cos(a), -0.14*sin(a));
+      vec3 lp2 = vec3(abs(p.x) - 0.035, p.y, p.z);
+      float lev = min(sdCapsule(lp2, piv, tip, 0.008), sdRoundBox(lp2 - tip, vec3(0.025, 0.012, 0.018), 0.008));
+      res = opU(res, vec2(lev, 13.0));
+    }
+    if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y + 0.36, E.z - 0.2), vec3(0.22, 0.03, 0.3), 0.02), 14.0));
+    float compass = sdRoundBox(p - vec3(0.0, E.y - 0.05, pz - 0.05), vec3(0.04, 0.03, 0.03), 0.01);
+    res = opU(res, vec2(compass, 13.0));
   }
   return res;
 }
-vec3 planeNormal(vec3 p){ const vec2 k = vec2(1,-1); float e = 0.004;
+vec3 planeNormal(vec3 p){ const vec2 k = vec2(1,-1); float e = 0.0025;
   return normalize(k.xyy*mapPlane(p+k.xyy*e).x + k.yyx*mapPlane(p+k.yyx*e).x + k.yxy*mapPlane(p+k.yxy*e).x + k.xxx*mapPlane(p+k.xxx*e).x); }
 
-float planeBound(){ return max(uPA.x, uPA.z)*0.55 + 1.0; }
-// returns t and material in body space
+float planeBound(){ return max(uM[0].x, uM[9].x*2.0)*0.55 + 1.5; }
 vec2 tracePlane(vec3 ro, vec3 rd, float tmax){
   if (uPlaneOn == 0) return vec2(-1.0);
   vec3 oc = ro - uPlanePos; float br = planeBound();
@@ -233,10 +470,12 @@ vec2 tracePlane(vec3 ro, vec3 rd, float tmax){
   mat3 inv = transpose(uPlaneRot);
   vec3 lo = inv*(ro - uPlanePos), ld = inv*rd;
   float t = t0;
-  for (int i=0;i<110;i++){
+  int steps = uPS.w > 0.5 ? 160 : 120;
+  for (int i=0;i<160;i++){
+    if (i >= steps) break;
     vec2 d = mapPlane(lo + ld*t);
-    if (d.x < 0.002*max(1.0,t*0.02)) return vec2(t, d.y);
-    t += d.x*0.9;
+    if (d.x < 0.0015*max(1.0, t*0.03)) return vec2(t, d.y);
+    t += d.x*0.8;
     if (t > t1) break;
   }
   return vec2(-1.0);
@@ -249,14 +488,197 @@ float planeShadow(vec3 ro, vec3 rd){
   h = sqrt(h); float t = max(-b-h, 0.0), t1 = -b+h;
   mat3 inv = transpose(uPlaneRot); vec3 lo = inv*(ro - uPlanePos), ld = inv*rd;
   float res = 1.0;
-  for (int i=0;i<48;i++){
+  for (int i=0;i<56;i++){
     float d = mapPlane(lo + ld*t).x;
     res = min(res, 10.0*d/max(t,0.1));
     if (res < 0.01) return 0.0;
-    t += clamp(d, 0.05, 2.0);
+    t += clamp(d, 0.03, 2.0);
     if (t > t1) break;
   }
   return clamp(res, 0.0, 1.0);
+}
+
+// ---------------------------------------------------------------- cockpit instruments (drawn on the panel face)
+vec3 dialFace(vec2 d, float r, out bool inside){
+  float rr = length(d)/r; inside = rr < 1.0;
+  if (rr > 1.12) return vec3(-1.0);
+  if (rr > 1.0) return vec3(0.18, 0.18, 0.19);
+  return vec3(0.015);
+}
+float needle(vec2 d, float r, float ang, float len, float w){
+  vec2 nv = vec2(sin(ang), cos(ang));
+  float along = dot(d, nv)/r, perp = abs(d.x*nv.y - d.y*nv.x)/r;
+  return step(-0.12, along)*step(along, len)*step(perp, w*(1.0 - along*0.6));
+}
+float ticks(vec2 d, float r, float n, float a0, float a1, float inner){
+  float a = atan(d.x, d.y); float rr = length(d)/r;
+  if (a < a0 || a > a1 || rr < inner || rr > 0.95) return 0.0;
+  float f = fract((a - a0)/(a1 - a0)*n + 0.5);
+  return step(abs(f - 0.5), 0.07);
+}
+// Returns instrument colour (emissive) for a point on the panel face; q relative to the pilot's panel centre.
+vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
+  vec3 col = vec3(-1.0);
+  float ias = uI0.x, alt = uI0.y, hdg = uI0.z, vs = uI0.w;
+  float pitch = uI1.x, bank = uI1.y, engF = uI1.z, fuel = uI1.w;
+  if (ck == 2) {
+    // glass cockpit: PFD and navigation display
+    vec2 pd = q - vec2(-0.07, 0.0);
+    if (abs(pd.x) < 0.085 && abs(pd.y) < 0.075) {
+      float b = bank*0.01745;
+      float hz = dot(pd, vec2(-sin(b), cos(b))) + pitch*0.0022;
+      col = hz > 0.0 ? vec3(0.12, 0.35, 0.8) : vec3(0.45, 0.28, 0.12);
+      for (int i = -2; i <= 2; i++) { if (i == 0) continue; float ly = hz - float(i)*0.022; if (abs(ly) < 0.0012 && abs(dot(pd, vec2(cos(b), sin(b)))) < 0.018) col = vec3(1.0); }
+      if (abs(hz) < 0.001) col = vec3(1.0);
+      if (abs(pd.y) < 0.003 && abs(pd.x) > 0.008 && abs(pd.x) < 0.03) col = vec3(1.0, 0.8, 0.1);
+      // speed / altitude tapes with scrolling ticks
+      if (pd.x < -0.06) { col = vec3(0.12); float tk = fract((pd.y*400.0 + ias)/10.0); if (tk < 0.08 && pd.x > -0.068) col = vec3(0.9); if (abs(pd.y) < 0.006) col = vec3(0.0, 0.9, 0.4); }
+)"
+R"(      if (pd.x > 0.06) { col = vec3(0.12); float tk = fract((pd.y*4000.0 + alt)/100.0); if (tk < 0.08 && pd.x < 0.068) col = vec3(0.9); if (abs(pd.y) < 0.006) col = vec3(0.0, 0.9, 0.4); }
+      if (pd.y < -0.064) { col = vec3(0.1); float tk = fract((pd.x*600.0 + hdg)/10.0); if (tk < 0.1) col = vec3(0.8); if (abs(pd.x) < 0.002) col = vec3(1.0, 0.9, 0.2); }
+      return col*1.4;
+    }
+    vec2 nd = q - vec2(0.12, 0.0);
+    if (abs(nd.x) < 0.075 && abs(nd.y) < 0.075) {
+      col = vec3(0.01, 0.015, 0.02);
+      vec2 c = nd + vec2(0.0, 0.045);
+      float rr = length(c);
+      float a = atan(c.x, c.y)*57.2958 + hdg;
+      if (rr > 0.085 && rr < 0.09 && c.y > 0.0) col = vec3(0.85);
+      if (rr > 0.078 && rr < 0.09 && c.y > 0.0 && fract(a/10.0) < 0.06) col = vec3(0.85);
+      if (abs(c.x) < 0.0015 && c.y > 0.0 && c.y < 0.09) col = vec3(1.0, 0.3, 1.0);
+      if (abs(c.x) < 0.008 && abs(c.y) < 0.008) col = vec3(1.0, 0.9, 0.2);
+      // engine strip
+      if (nd.y < -0.06 && abs(nd.x) < 0.07) { col = vec3(0.05); if (nd.x + 0.07 < engF*0.14) col = vec3(0.1, 0.8, 0.3); }
+      return col*1.4;
+    }
+    return col;
+  }
+  float r = 0.038;
+  bool inD;
+  // Airspeed
+  vec2 d = q - vec2(-0.095, 0.045);
+  vec3 c = dialFace(d, r, inD);
+  if (c.x >= 0.0) {
+    if (inD) {
+      float a = atan(d.x, d.y); float rr = length(d)/r;
+      float vmax = 200.0;
+      float g0 = -2.6 + 45.0/vmax*5.2, g1 = -2.6 + 115.0/vmax*5.2;
+      if (rr > 0.86 && rr < 0.95 && a > g0 && a < g1) c = vec3(0.1, 0.7, 0.2);
+      if (rr > 0.86 && rr < 0.95 && a > g1 && a < g1 + 0.6) c = vec3(0.9, 0.8, 0.1);
+      c += vec3(0.85)*ticks(d, r, 20.0, -2.6, 2.6, 0.78);
+      c = mix(c, vec3(0.95), needle(d, r, -2.6 + clamp(ias, 0.0, vmax)/vmax*5.2, 0.85, 0.05));
+    }
+    return c;
+  }
+  // Attitude
+  d = q - vec2(0.0, 0.045);
+  c = dialFace(d, r, inD);
+  if (c.x >= 0.0) {
+    if (inD) {
+      float b = bank*0.01745;
+      float hz = dot(d, vec2(-sin(b), cos(b))) + pitch*0.0012;
+      c = hz > 0.0 ? vec3(0.15, 0.4, 0.85) : vec3(0.5, 0.3, 0.12);
+      if (abs(hz) < 0.0009) c = vec3(1.0);
+      for (int i = -2; i <= 2; i++) { if (i == 0) continue; if (abs(hz - float(i)*0.012) < 0.0007 && abs(dot(d, vec2(cos(b), sin(b)))) < 0.01) c = vec3(1.0); }
+      if (abs(d.y) < 0.0018 && abs(d.x) > 0.006 && abs(d.x) < 0.02) c = vec3(1.0, 0.6, 0.0);
+      if (length(d) < 0.002) c = vec3(1.0, 0.6, 0.0);
+      c += vec3(0.85)*ticks(d, r, 6.0, -1.05, 1.05, 0.85);
+    }
+    return c;
+  }
+  // Altimeter
+  d = q - vec2(0.095, 0.045);
+  c = dialFace(d, r, inD);
+  if (c.x >= 0.0) {
+    if (inD) {
+      c += vec3(0.85)*ticks(d, r, 50.0, -3.1416, 3.1416, 0.85);
+      c += vec3(0.85)*ticks(d, r, 10.0, -3.1416, 3.1416, 0.74);
+      c = mix(c, vec3(0.95), needle(d, r, alt/1000.0*6.2832, 0.88, 0.04));
+      c = mix(c, vec3(0.95), needle(d, r, alt/10000.0*6.2832, 0.55, 0.08));
+    }
+    return c;
+  }
+  // Turn coordinator
+  d = q - vec2(-0.095, -0.05);
+  c = dialFace(d, r, inD);
+  if (c.x >= 0.0) {
+    if (inD) {
+      vec2 dd = rot2(d, clamp(uI2.x/3.0, -1.5, 1.5)*0.26);
+      if (abs(dd.y) < 0.0025 && abs(dd.x) < 0.026) c = vec3(0.95);
+      if (abs(dd.x) < 0.003 && dd.y > 0.0 && dd.y < 0.008) c = vec3(0.95);
+      vec2 bc = vec2(clamp(-uI2.y*0.0015, -0.016, 0.016), -0.022);
+      if (abs(d.y + 0.022) < 0.005 && abs(d.x) < 0.02) c = vec3(0.25);
+      if (length(d - bc) < 0.0045) c = vec3(0.02);
+      if (abs(abs(d.x) - 0.006) < 0.0007 && abs(d.y + 0.022) < 0.005) c = vec3(0.9);
+    }
+    return c;
+  }
+  // Heading indicator (rotating card)
+  d = q - vec2(0.0, -0.05);
+  c = dialFace(d, r, inD);
+  if (c.x >= 0.0) {
+    if (inD) {
+      float a = atan(d.x, d.y)*57.2958 + hdg; float rr = length(d)/r;
+      float f = fract(a/10.0);
+      if (rr > 0.8 && rr < 0.95 && (f < 0.07 || f > 0.93)) c = vec3(0.85);
+      float f3 = fract(a/30.0);
+      if (rr > 0.66 && rr < 0.95 && (f3 < 0.025 || f3 > 0.975)) c = vec3(0.95);
+      if (rr > 0.6 && rr < 0.95 && (fract(a/360.0) < 0.012 || fract(a/360.0) > 0.988)) c = vec3(1.0, 0.25, 0.1);
+      if (abs(d.x) < 0.0015 && d.y > 0.0 && rr < 0.6) c = vec3(1.0, 0.6, 0.0);
+      if (abs(d.y) < 0.0015 && abs(d.x) < 0.01) c = vec3(1.0, 0.6, 0.0);
+    }
+    return c;
+  }
+  // Vertical speed
+  d = q - vec2(0.095, -0.05);
+  c = dialFace(d, r, inD);
+  if (c.x >= 0.0) {
+    if (inD) {
+      c += vec3(0.85)*ticks(d, r, 8.0, -1.5708 - 2.97, -1.5708 + 2.97, 0.8);
+      c = mix(c, vec3(0.95), needle(d, r, -1.5708 + clamp(vs/2000.0, -1.0, 1.0)*2.97, 0.85, 0.05));
+    }
+    return c;
+  }
+  // engine: RPM / N1 and fuel
+  int engines = ck == 1 ? 2 : 1;
+  for (int e = 0; e < 2; e++) {
+    if (e >= engines) break;
+    d = q - vec2(0.2 + float(e)*0.085, 0.045);
+    c = dialFace(d, r*0.85, inD);
+    if (c.x >= 0.0) {
+      if (inD) {
+        float rr = length(d)/(r*0.85); float a = atan(d.x, d.y);
+        if (rr > 0.84 && rr < 0.95 && a > 0.9 && a < 1.7) c = vec3(0.1, 0.7, 0.2);
+        if (rr > 0.84 && rr < 0.95 && a > 1.7 && a < 1.8) c = vec3(0.9, 0.1, 0.1);
+        c += vec3(0.85)*ticks(d, r*0.85, 10.0, -2.36, 2.36, 0.8);
+        c = mix(c, vec3(0.95), needle(d, r*0.85, -2.36 + clamp(engF, 0.0, 1.1)*4.2, 0.85, 0.05));
+      }
+      return c;
+    }
+  }
+  d = q - vec2(0.2, -0.05);
+  c = dialFace(d, r*0.7, inD);
+  if (c.x >= 0.0) {
+    if (inD) {
+      c += vec3(0.85)*ticks(d, r*0.7, 4.0, -1.2, 1.2, 0.75);
+      float rr = length(d)/(r*0.7); float a = atan(d.x, d.y);
+      if (rr > 0.8 && rr < 0.95 && a < -0.85) c = vec3(0.9, 0.1, 0.1);
+      c = mix(c, vec3(0.95), needle(d, r*0.7, -1.2 + fuel*2.4, 0.85, 0.06));
+    }
+    return c;
+  }
+  // radio stack / annunciators (centre)
+  vec2 rs = q - vec2(0.33, 0.0);
+  if (abs(rs.x) < 0.07 && abs(rs.y) < 0.09) {
+    float row = floor((rs.y + 0.09)/0.045);
+    vec2 cell = vec2(rs.x, mod(rs.y + 0.09, 0.045) - 0.0225);
+    col = vec3(0.04);
+    if (abs(cell.y) < 0.008 && abs(cell.x) < 0.045) col = vec3(0.05, 0.6, 0.25)*(0.6 + 0.4*step(0.5, fract(cell.x*60.0 + row)));
+    if (abs(cell.y) < 0.006 && abs(cell.x - 0.058) < 0.006) col = vec3(0.3);
+    return col;
+  }
+  return col;
 }
 
 // ---------------------------------------------------------------- terrain
@@ -355,8 +777,7 @@ vec4 traceClouds(vec3 ro, vec3 rd, float tmax, float jitter){
 }
 float cloudShadow(vec3 p){
   if (uCloudCover < 0.05) return 1.0;
-)"
-R"(  vec3 c = p + uSunDir * ((uCloudBase + 500.0 - p.y)/max(uSunDir.y, 0.1));
+  vec3 c = p + uSunDir * ((uCloudBase + 500.0 - p.y)/max(uSunDir.y, 0.1));
   float d = cloudDensity(vec3(c.x, uCloudBase + 400.0, c.z), 0);
   return mix(1.0, 0.25, smoothstep(0.0, 0.5, d));
 }
@@ -403,7 +824,8 @@ int airportAt(vec2 p, out vec2 uv){
   return -1;
 }
 
-void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw){
+)"
+R"(void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw){
   vec4 d = uApDim[ai]; float len = d.x, wid = d.y; int surf = int(d.z); int size = int(d.w);
   onRw = false;
   float u = uv.x, v = uv.y;
@@ -591,8 +1013,7 @@ vec2 traceBoxes(vec3 ro, vec3 rd, float tmax, out vec3 nOut, out float kind, out
     vec3 nl = -sign(ld)*step(t1.yzx, t1.xyz)*step(t1.zxy, t1.xyz);
     // back to world
     nOut = vec3(nl.x*c + nl.z*s, nl.y, nl.x*s - nl.z*c);
-)"
-R"(    localHit = lo + ld*tN;
+    localHit = lo + ld*tN;
   }
   return res;
 }
@@ -641,7 +1062,8 @@ void main(){
       vec3 refl = skyColor(r);
       // reflected clouds (cheap)
       if (uCloudCover > 0.05 && uQuality > 0) { vec4 cl = traceClouds(p, r, 30000.0, 0.5); refl = refl*cl.a + cl.rgb; }
-      float sh = sunVis > 0.0 ? terrainShadow(p + vec3(0,1,0), uSunDir) * cloudShadow(p) : 0.0;
+)"
+R"(      float sh = sunVis > 0.0 ? terrainShadow(p + vec3(0,1,0), uSunDir) * cloudShadow(p) : 0.0;
       vec4 base = baseAt(p.xz);
       vec3 deep = mix(vec3(0.004,0.03,0.06), vec3(0.003,0.02,0.035), base.w);
       vec3 shallow = mix(vec3(0.02,0.16,0.17), vec3(0.03,0.30,0.29), base.z) * (1.0 - 0.7*base.w);
@@ -678,30 +1100,93 @@ void main(){
       vec3 ln = planeNormal(lp);
       vec3 n = uPlaneRot*ln;
       int mid = int(ph.y + 0.5);
+      if (mid == 11) { vec3 sc = fusSection(lp.z); vec3 rad = vec3(lp.x, lp.y - sc.z, 0.0); if (dot(ln, rad) > 0.55*length(rad) && lp.y > uM[22].y - 0.9) mid = 1; }
       Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
-      float L = uPA.x, R = uPA.y;
       m.alb = uColBase; m.rough = 0.28;
-      if (mid == 1 || mid == 3) {
-        // cheatline stripe & tail colour
-        if (mid == 1 && abs(lp.x) > R*0.3 && lp.y > -0.12*R && lp.y < 0.12*R && lp.z > -0.42*L) m.alb = uColStripe;
-        if (mid == 3 && lp.y > R*1.0) m.alb = uColStripe;
-        // windshield
-        if (mid == 1 && lp.z > -0.36*L && lp.z < -0.22*L && lp.y > 0.22*R && abs(lp.x) < R*0.95) { m.alb = vec3(0.02,0.03,0.04); m.rough = 0.04; m.metal = 0.3; }
-        // cabin windows
-        float wz = fract((lp.z + 0.4)/0.95);
-        if (mid == 1 && lp.z > -0.22*L && lp.z < 0.12*L && lp.y > 0.12*R && lp.y < 0.45*R && wz > 0.3 && wz < 0.7 && abs(lp.x) > R*0.5) { m.alb = vec3(0.03); m.rough = 0.05;
-          m.emit = vec3(1.0,0.85,0.6)*uNight*0.5; }
+      bool interior = mid >= 10 && mid <= 14;
+      vec3 sec = fusSection(lp.z);
+      vec4 WS = uM[23]; vec4 E = uM[22];
+      int ck = int(uM[21].z + 0.5);
+      if (mid == 1) {
+        float yr = (lp.y - sec.z)/sec.y;
+        bool body = lp.z > uM[1].x + 0.05 && lp.z < uM[8].x - 0.05 && abs(lp.x) < sec.x + 0.05 && abs(yr) < 1.05;
+        if (body) {
+          if (yr > -0.22 && yr < 0.0 && lp.z > uM[2].x) m.alb = uColStripe;
+          if (yr > 0.06 && yr < 0.11 && lp.z > uM[2].x) m.alb = mix(uColStripe, vec3(1.0), 0.35);
+          if (yr < -0.72) m.alb = mix(uColBase, vec3(0.62, 0.64, 0.66), 0.5);
+          if (fract(lp.z/0.85) < 0.01) m.alb *= 0.8;
+          float post = ck == 2 ? min(abs(lp.x) - 0.03, abs(abs(lp.x) - abs(E.x) - 0.42) - 0.035) : abs(lp.x) - 0.025;
+          bool ws = lp.z > WS.x && lp.z < WS.y && lp.y > WS.z;
+          float sideTop = sec.z + sec.y*0.78;
+          bool sideW = lp.z > WS.y && lp.z < WS.w && lp.y > WS.z - 0.12 && lp.y < sideTop && abs(lp.x) > 0.3 && abs(lp.z - WS.y - 0.04) > 0.025;
+          bool frame = (ws && post <= 0.0) || (lp.z > WS.x - 0.03 && lp.z < WS.w + 0.03 && lp.y > WS.z - 0.15 && lp.y < sideTop + 0.03 && abs(lp.x) > 0.3 && !sideW && lp.z > WS.y);
+          if ((ws && post > 0.0) || sideW) { m.alb = vec3(0.012, 0.016, 0.02); m.rough = 0.03; m.metal = 0.2; }
+          else if (frame) m.alb *= 0.55;
+          int nw = int(uM[20].x + 0.5);
+          if (nw > 0 && abs(lp.x) > sec.x*0.4 && lp.z > uM[20].y && lp.z < uM[20].z) {
+            float pw = (uM[20].z - uM[20].y)/float(nw);
+            vec2 wq = vec2(mod(lp.z - uM[20].y, pw) - pw*0.5, lp.y - (sec.z + uM[20].w));
+            vec2 hs = uM[21].xy; float rr = min(hs.x, hs.y)*0.7;
+            vec2 dq = abs(wq) - hs + rr; float wd = length(max(dq, 0.0)) + min(max(dq.x, dq.y), 0.0) - rr;
+            if (wd < 0.0) { m.alb = vec3(0.02, 0.025, 0.03); m.rough = 0.05; m.emit = vec3(1.0, 0.85, 0.6)*uNight*0.5; }
+            else if (wd < 0.022) m.alb *= 0.7;
+          }
+          if (ck == 2 && lp.z < WS.x && lp.z > WS.x - 2.0 && yr > 0.2) { m.alb = vec3(0.02); m.rough = 0.85; }
+          if (int(uM[0].z + 0.5) == 0 && lp.z < uM[1].x + 0.3 && ln.z < -0.4 && abs(lp.x) > 0.11 && abs(lp.x) < sec.x*0.8 && abs(yr + 0.15) < 0.35) m.alb = vec3(0.02);
+          if (int(uM[0].z + 0.5) == 1 && lp.z < uM[1].x + 0.7 && lp.y < sec.z - sec.y*0.45 && ln.z < -0.3) m.alb = vec3(0.02);
+        }
       } else if (mid == 2) {
-        m.alb = uColBase*0.97;
-        if (abs(lp.x) > uPA.z*0.46) m.alb = uColStripe;
-      } else if (mid == 4) { m.alb = vec3(0.25); m.metal = 0.9; m.rough = 0.3; }
-      else if (mid == 5) { m.alb = vec3(0.75,0.76,0.78); m.metal = 0.8; m.rough = 0.25; }
-      else if (mid == 6) { m.alb = vec3(0.03); m.rough = 0.85; }
-      float sh = sunVis > 0.0 ? planeShadow(p + n*0.03, uSunDir) * terrainShadow(p, uSunDir) * cloudShadow(p) : 0.0;
-      col = shadeSurface(p, n, rd, m, sh);
-      // clear-coat sparkle
-      vec3 h = normalize(-rd + uSunDir);
-      col += uSunCol*pow(max(dot(n,h),0.0), 400.0)*sh*4.0*float(mid <= 3);
+        float s = abs(lp.x); float k = clamp(s/uM[9].x, 0.0, 1.0);
+        float ch = mix(uM[9].y, uM[9].z, k); float le = uM[9].w*k;
+        float cc = (lp.z - uM[10].y - le)/ch;
+        m.alb = uColBase*0.98;
+        if (s > uM[9].x*0.9) m.alb = uColStripe;
+        if (uM[19].w > 0.5 && cc < 0.045) { m.alb = vec3(0.06); m.rough = 0.6; }
+        if (fract(s/0.8) < 0.01 && cc > 0.05) m.alb *= 0.86;
+        if (uM[11].x > 0.5 && s < 1.6 && ln.y > 0.5 && cc < 0.7) m.alb *= 0.9;
+      } else if (mid == 3) {
+        m.alb = uColBase;
+        float tailTop = uM[15].x + uM[14].x;
+        if (lp.y > uM[15].x + uM[14].x*0.5 && abs(lp.x) < 0.25) m.alb = uColStripe;
+        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
+      } else if (mid == 5) {
+        m.alb = uColBase*0.96; m.rough = 0.3;
+        if (int(uM[0].z + 0.5) == 4 && lp.z < uM[16].w + 0.3) { m.alb = vec3(0.85); m.metal = 1.0; m.rough = 0.18; }
+      } else if (mid == 6) { m.alb = vec3(0.025); m.rough = 0.85; }
+      else if (mid == 8) { m.alb = uM[11].x > 0.5 && length(lp.xz) > 1.2 && lp.y > -0.3 ? uColBase*0.95 : vec3(0.6, 0.61, 0.63); m.metal = 0.5; m.rough = 0.35; }
+      else if (mid == 10) {
+        m.alb = vec3(0.075); m.rough = 0.6;
+        if (ln.z > 0.6) {
+          bool pilot = lp.x*E.x >= 0.0;
+          vec2 q = vec2(pilot ? lp.x - E.x : lp.x + E.x, lp.y - (E.y - 0.32));
+          if (!pilot && ck == 0) q.x = lp.x + E.x - 0.33 + 0.33;
+          vec3 ic = drawInstruments(q, ck, pilot);
+          if (ic.x >= 0.0) { m.alb = ic*0.25; m.emit = ic*(0.3 + 0.6*uNight); m.rough = 0.12; }
+        }
+      }
+      else if (mid == 11) { m.alb = lp.y < E.y - 1.0 ? vec3(0.08, 0.08, 0.09) : vec3(0.5, 0.49, 0.46); m.rough = 0.85; }
+      else if (mid == 12) { m.alb = vec3(0.09, 0.1, 0.14)*(0.9 + 0.2*step(0.5, fract(lp.y*12.0))); m.rough = 1.0; }
+      else if (mid == 13) { m.alb = vec3(0.035); m.rough = 0.4; }
+      else if (mid == 14) { m.alb = vec3(0.018); m.rough = 0.95; }
+      else if (mid == 16) { m.alb = uM[0].x > 9.0 ? uColBase*0.9 : uColStripe; m.metal = 0.5; m.rough = 0.2; }
+      else if (mid == 17) { m.alb = vec3(0.09, 0.075, 0.06); m.metal = 0.7; m.rough = 0.55; }
+      else if (mid == 18) { m.alb = vec3(0.1); m.emit = (lp.x < 0.0 ? vec3(1.0, 0.05, 0.02) : vec3(0.05, 1.0, 0.15))*(0.5 + 2.0*uNight); m.rough = 0.1; }
+      else if (mid == 19) { m.alb = vec3(0.3, 0.02, 0.02); m.emit = vec3(1.0, 0.05, 0.02)*step(0.88, fract(uTime))*3.0; m.rough = 0.1; }
+      else if (mid == 21) {
+        vec2 fq = vec2(abs(lp.x) - uM[16].x, lp.y - uM[16].y);
+        float bl = step(0.5, fract(atan(fq.y, fq.x)*22.0/6.2832 + length(fq)*2.0));
+        m.alb = mix(vec3(0.04), vec3(0.22), bl); m.metal = 0.9; m.rough = 0.3;
+        if (length(fq) < uM[16].z*0.25) m.alb = vec3(0.05);
+      }
+      float sh = sunVis > 0.0 ? planeShadow(p + n*0.02, uSunDir) * terrainShadow(p, uSunDir) * cloudShadow(p) : 0.0;
+      if (interior) {
+        vec3 v = -rd;
+        col = pbr(n, v, uSunDir, m.alb, m.rough, m.metal, uSunCol*sh*3.2) + m.alb*(ambientLight(n)*0.45 + ambientLight(vec3(0.0,1.0,0.0))*0.25) + m.emit;
+      } else {
+        col = shadeSurface(p, n, rd, m, sh);
+        vec3 h = normalize(-rd + uSunDir);
+        col += uSunCol*pow(max(dot(n, h), 0.0), 400.0)*sh*3.0*float(mid <= 5);
+      }
     }
     col = applyFog(col, ro, rd, t);
   }
@@ -718,8 +1203,8 @@ void main(){
       vec3 hp = lo + ld*tp - pr.xyz;
       float r = length(hp.xy);
       if (r > pr.w) continue;
-      float blades = uPE.z; float blur = uPD.z;
-      float ang = atan(hp.y, hp.x) - uPD.y;
+      float blades = uPr.z; float blur = uPr.y;
+      float ang = atan(hp.y, hp.x) - uPr.x;
       float bl = smoothstep(0.86, 0.95, cos(blades*ang*0.5*2.0)) * smoothstep(pr.w, pr.w*0.9, r);
       float a = mix(bl, 0.10 + 0.08*smoothstep(0.6, 1.0, cos(blades*ang)) + 0.25*smoothstep(pr.w*0.95, pr.w, r), blur);
       vec3 pc = vec3(0.04)*(uSunCol*max(uSunDir.y,0.0) + 0.2) + vec3(0.6,0.6,0.1)*smoothstep(pr.w*0.9, pr.w, r)*0.3;

@@ -8,10 +8,15 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 |---|---|
 | ![Main menu](docs/menu.jpg) | ![Mountains](docs/mountain.jpg) |
 | ![Storm run](docs/storm.jpg) | ![Business jet over Kaleo](docs/jet.jpg) |
+| ![Bushmaster STOL](docs/bushmaster.jpg) | ![Islander cockpit](docs/cockpit.jpg) |
+| ![Meridian Q400](docs/meridian.jpg) | ![Starling 500](docs/starling.jpg) |
 
 ## Features
 
 - **Ray-traced renderer.** Every pixel is traced on the GPU: an eroded heightfield over 80 × 80 km, an ocean with Fresnel reflections, volumetric clouds, soft terrain and aircraft shadows, an analytic sky with golden hour and night, and SDF aircraft with moving flaps, ailerons, elevator, rudder, gear and props.
+- **Detailed aircraft.** Each of the 7 aircraft is hand-built. Fuselages are shaped from 8 cross-sections, and wings and tails are tapered airfoil sections with sweep, dihedral and winglets. Flaps (with rearward Fowler travel), ailerons, elevators and rudders are separate hinged parts. You'll also see wing struts, STOL slats, engine cowls, exhaust stacks, turboprop and jet nacelles with fan faces, a cargo pod, wheel fairings, tundra tyres, twin-wheel retracting gear, a steerable nose wheel, antennas, nav lights and liveries with window frames.
+- **3D cockpits.** You sit in a real cockpit with live gauges (airspeed, attitude, altimeter, turn coordinator, heading, VSI, RPM/N1, fuel) or glass PFD/ND screens on the jet and airliner. The yokes, rudder pedals and throttle levers move with your inputs, and sunlight falls through the window openings.
+- **Correct control movement.** Every control surface, plus the nose or tail wheel, moves in the same direction as the input and the aircraft's actual response. A test (`tests/flight_test.cpp`) checks this for every aircraft.
 - **PBR materials.** Eight tileable PBR texture sets (albedo, roughness, normal, height, AO) are generated at startup: grass, forest canopy, rock, sand, snow, asphalt, gravel and dirt. They're lit with GGX/Cook-Torrance shading, triplanar on cliffs, and darken and get glossier in the rain.
 - **Effects.** Tyre smoke, dust and snow spray from unpaved strips, prop-wash dust, wingtip vapour, engine-start smoke puffs, crash fire and smoke, rain streaks, snowfall, raindrops on the lens, lightning, bloom and lens flare. Lighting includes runway edge, threshold and approach lights, working **PAPI** lights, plus nav, strobe, beacon and landing lights that light the terrain.
 - **Engine sound.** All audio is synthesised in real time. Piston engines are modelled one cylinder at a time: each firing excites exhaust resonators, and slight differences between cylinders give the uneven idle and crank-rate rumble. On top of that is a prop blade-pass buzz and whoosh. Twins run two engines slightly out of sync so they beat against each other. Turboprops and jets get their own whine, roar and buzz-saw models. The cockpit view filters the sound, and you'll also hear a starter motor, wind, runway seams, tyre chirps, stall horn or stick shaker, gear and flap motors, rain and thunder.

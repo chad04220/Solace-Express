@@ -551,12 +551,8 @@ void Game::drawHud(const FrameParams& fp) {
   (void)fp;
   if (!plane.spec) return;
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
-  // cockpit glareshield
-  if (camMode == 1 && !crashed) {
-    g_ren.rect(0, H - 250 * s, W, 250 * s, vec3(0.03f, 0.03f, 0.035f), 0.96f);
-    g_ren.rect(0, H - 254 * s, W, 6 * s, vec3(0.1f, 0.1f, 0.11f), 1);
-  }
-  if (!hudOn && camMode != 1) { drawToasts(); return; }
+  if (!hudOn) { drawToasts(); return; }
+  const AircraftSpec& spc = *plane.spec;
   // mission bar
   const Airport& d = dest();
   vec3 target = wpIndex < (int)contract.wps.size() ? vec3(contract.wps[wpIndex].x, contract.wps[wpIndex].alt, contract.wps[wpIndex].z) : d.pos();
@@ -581,6 +577,7 @@ void Game::drawHud(const FrameParams& fp) {
   g_ren.line(ac.x - dv.x * al, ac.y - dv.y * al, ac.x + dv.x * al, ac.y + dv.y * al, 5 * s, mag, 0.95f);
   g_ren.line(ac.x + dv.x * al, ac.y + dv.y * al, ac.x + dv.x * al * 0.3f + pv.x * al * 0.6f, ac.y + dv.y * al * 0.3f + pv.y * al * 0.6f, 5 * s, mag, 0.95f);
   g_ren.line(ac.x + dv.x * al, ac.y + dv.y * al, ac.x + dv.x * al * 0.3f - pv.x * al * 0.6f, ac.y + dv.y * al * 0.3f - pv.y * al * 0.6f, 5 * s, mag, 0.95f);
+  if (camMode != 1) {
   // PFD
   float pfd = 210 * s;
   float px = 110 * s, py = H - pfd - 60 * s;
@@ -644,6 +641,18 @@ void Game::drawHud(const FrameParams& fp) {
   if (plane.apOn) st += fmt("AP %03.0f/%s ", plane.apHeading, fmtAlt(plane.apAlt).c_str());
   if (landingLight) st += "LDG LT";
   g_ren.text(ex + 14 * s, ty, 13 * s, st, C_ACCENT, 1);
+  } else {
+    // cockpit view: the 3D panel carries the instruments; add a compact readout strip
+    std::string ro = fmt("IAS %s   ALT %s   HDG %03.0f   VS %+.0f   THR %.0f%%   FLAPS %.0f%%   %s   FUEL %.0f%%", fmtSpeed(plane.ias).c_str(), fmtAlt(plane.pos.y).c_str(),
+                         plane.heading(), plane.vel.y * 196.85f, plane.ctl.throttle * 100, plane.flaps * 100,
+                         !plane.spec->retract ? "GEAR FIXED" : plane.gear > 0.99f ? "GEAR DOWN" : plane.gear < 0.01f ? "GEAR UP" : "GEAR TRANSIT",
+                         plane.fuel / plane.spec->maxFuel * 100);
+    if (plane.apOn) ro += "   AP";
+    if (plane.ctl.brake > 0.5f) ro += "   BRAKE";
+    float tw = g_ren.textWidth(ro, 15 * s) + 30 * s;
+    g_ren.rect(W * 0.5f - tw * 0.5f, H - 44 * s, tw, 30 * s, vec3(0, 0, 0), 0.5f, 8 * s);
+    g_ren.text(W * 0.5f, H - 38 * s, 15 * s, ro, C_TEXT, 0.95f, 1);
+  }
   // minimap
   float mm = 210 * s;
   float range = clampf(dist * 1.3f, 3000.f, 20000.f);
@@ -654,7 +663,7 @@ void Game::drawHud(const FrameParams& fp) {
   if (plane.stallWarn > 0.8f && !plane.onGround && flash) { g_ren.text(W * 0.5f, wy, 44 * s, "STALL", C_BAD, 1, 1); wy += 52 * s; }
   bool nearDest = length(plane.pos - d.pos()) < 4000.f;
   if (!plane.onGround && plane.agl() < 120 && plane.vel.y < -7.f && flash) { g_ren.text(W * 0.5f, wy, 40 * s, "PULL UP", C_BAD, 1, 1); wy += 48 * s; }
-  if (sp.retract && plane.gear < 0.99f && !plane.onGround && plane.agl() < 200 && nearDest && plane.ias < sp.vref * 1.5f && flash) { g_ren.text(W * 0.5f, wy, 36 * s, "GEAR!", C_ACCENT, 1, 1); wy += 44 * s; }
+  if (spc.retract && plane.gear < 0.99f && !plane.onGround && plane.agl() < 200 && nearDest && plane.ias < spc.vref * 1.5f && flash) { g_ren.text(W * 0.5f, wy, 36 * s, "GEAR!", C_ACCENT, 1, 1); wy += 44 * s; }
   if (!plane.engineRunning && engineAutoStarted && plane.starterTime <= 0 && flash) g_ren.text(W * 0.5f, wy, 26 * s, "ENGINE OFF - press I to restart", C_BAD, 1, 1);
   // instructor hint
   if (set.showHints && !hint.empty() && !crashed) {

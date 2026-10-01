@@ -10,7 +10,8 @@ enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_F
 struct PlaneVisual {
   bool on = false;
   vec3 pos; float rot[9];  // body->world, column-major
-  float A[4], B[4], C[4], D[4], E[4];
+  float M[24 * 4];          // model geometry (models.cpp packModel)
+  float PS[4], Ctl[4], Pr[4], I0[4], I1[4], I2[4];  // state, controls, prop, instruments
   vec3 colBase, colStripe;
   float prop[2][4]; int propCount = 0;
 };

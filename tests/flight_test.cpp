@@ -39,6 +39,23 @@ int main() {
            s.name, p.cd0Value(), liftoffDist, vLift, s.runwayM, climbVs, cruiseV, s.cruise, cruiseAlpha, vStall, p.rangeLeftKm(), p.ev.crashed ? p.ev.crashReason.c_str() : "");
     if (p.ev.crashed || liftoffDist < 0 || liftoffDist > s.runwayM * 0.9f) fails++;
   }
+  // Control-direction check: each input must move the aircraft the way its control surface animates
+  // (roll +1 = right aileron up -> right bank, pitch +1 = elevator TE up -> nose up, yaw +1 = rudder TE right -> nose right)
+  for (int ai = 0; ai < kNumAircraft; ai++) {
+    const AircraftSpec& s = kAircraft[ai];
+    for (int axis = 0; axis < 3; axis++) {
+      Plane p; p.reset(&s, vec3(0, 1500, 0), 90, s.maxFuel * 0.5f, 0, true, s.cruise * 0.9f);
+      float h0 = p.heading(), b0 = p.bankDeg(), pt0 = p.pitchDeg();
+      for (float t = 0; t < 1.0f; t += 1.f / 120.f) {
+        p.ctl.roll = axis == 0 ? 1.f : 0.f; p.ctl.pitch = axis == 1 ? 0.6f : 0.f; p.ctl.yaw = axis == 2 ? 1.f : 0.f;
+        p.step(1.f / 120.f, wx, t);
+      }
+      float d = axis == 0 ? p.bankDeg() - b0 : axis == 1 ? p.pitchDeg() - pt0 : wrapAngle((p.heading() - h0) * DEG) / DEG;
+      bool ok = d > (axis == 2 ? 0.3f : 1.0f);
+      if (!ok) { printf("CONTROL DIRECTION FAIL %s axis %d delta %.2f\n", s.name, axis, d); fails++; }
+    }
+  }
+  printf("control directions checked\n");
   printf("%d failures\n", fails);
   return fails ? 1 : 0;
 }

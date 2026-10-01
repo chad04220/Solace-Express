@@ -341,8 +341,9 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   if (pv.on) {
     glUniform3f(U(p, "uPlanePos"), pv.pos.x, pv.pos.y, pv.pos.z);
     glUniformMatrix3fv(U(p, "uPlaneRot"), 1, GL_FALSE, pv.rot);
-    glUniform4fv(U(p, "uPA"), 1, pv.A); glUniform4fv(U(p, "uPB"), 1, pv.B); glUniform4fv(U(p, "uPC"), 1, pv.C);
-    glUniform4fv(U(p, "uPD"), 1, pv.D); glUniform4fv(U(p, "uPE"), 1, pv.E);
+    glUniform4fv(U(p, "uM"), 24, pv.M);
+    glUniform4fv(U(p, "uPS"), 1, pv.PS); glUniform4fv(U(p, "uCtl"), 1, pv.Ctl); glUniform4fv(U(p, "uPr"), 1, pv.Pr);
+    glUniform4fv(U(p, "uI0"), 1, pv.I0); glUniform4fv(U(p, "uI1"), 1, pv.I1); glUniform4fv(U(p, "uI2"), 1, pv.I2);
     glUniform3f(U(p, "uColBase"), pv.colBase.x, pv.colBase.y, pv.colBase.z);
     glUniform3f(U(p, "uColStripe"), pv.colStripe.x, pv.colStripe.y, pv.colStripe.z);
     glUniform1i(U(p, "uPropCount"), pv.propCount);
