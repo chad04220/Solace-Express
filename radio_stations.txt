@@ -1,0 +1,11 @@
+# Air Xpress internet radio stations
+# One per line:  Name|URL   (MP3 or AAC HTTP/HTTPS streams)
+# The game copies this list to %APPDATA%\AirXpress\radio_stations.txt on first run - edit that copy to add your own.
+SomaFM Groove Salad (ambient)|https://ice1.somafm.com/groovesalad-128-mp3
+SomaFM Drone Zone|https://ice1.somafm.com/dronezone-128-mp3
+SomaFM Secret Agent|https://ice1.somafm.com/secretagent-128-mp3
+SomaFM Lush|https://ice1.somafm.com/lush-128-mp3
+SomaFM Indie Pop Rocks|https://ice1.somafm.com/indiepop-128-mp3
+Radio Paradise (eclectic)|https://stream.radioparadise.com/mp3-128
+Radio Paradise Mellow|https://stream.radioparadise.com/mellow-128
+KEXP Seattle|https://kexp-mp3-128.streamguys1.com/kexp128.mp3

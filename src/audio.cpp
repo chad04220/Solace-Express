@@ -38,7 +38,7 @@ struct Noise {
 struct Smooth { float v = 0; inline float p(float target, float k) { v += (target - v) * k; return v; } };
 
 struct PistonVoice {
-  float phase = 0, propPhase = 0; int lastK = -1;
+  float phase = 0, propPhase = 0, starterPh = 0; int lastK = -1;
   float cylBias[8], cylTime[8];
   Biquad res[4], crackLP, mech;
   float noiseEnv = 0, popEnv = 0;
@@ -63,7 +63,7 @@ struct PistonVoice {
       int ci = k % cyl;
       if (running) {
         float irregular = 1.f + (nz.w() * 0.5f) * (0.25f * smoothstepf(1400.f, 650.f, rpm));
-        float amp = (0.30f + 0.70f * load) * cylBias[ci] * irregular;
+        float amp = (0.48f + 0.52f * load) * cylBias[ci] * irregular;
         exc = amp;
         noiseEnv = amp * (0.6f + 0.4f * load);
       } else if (cranking) {
@@ -88,6 +88,12 @@ struct PistonVoice {
     float y = res[0].p(x) * 1.0f + res[1].p(x) * 0.75f + res[2].p(x) * 0.42f + res[3].p(x) * (0.10f + 0.12f * load);
     y += mech.p(n) * 0.012f * (rpm / 2600.f) * (running ? 1.f : 0.3f);
     eng = tanhf(y * 1.6f) * 0.8f;
+    if (cranking && !running) {
+      // starter motor: geared whine that sags on each compression stroke
+      starterPh += (340.f + 60.f * sinf(phase * PI * cyl)) / sr; starterPh -= floorf(starterPh);
+      float saw = starterPh * 2.f - 1.f;
+      eng += (saw * 0.6f + sinf(2 * PI * starterPh * 2.f) * 0.3f) * 0.09f * (0.7f + 0.3f * cosf(phase * PI * cyl));
+    }
     // propeller
     float bps = propRpm / 60.f * blades;
     propPhase += bps / sr; if (propPhase > 1.f) propPhase -= 1.f;
@@ -121,8 +127,8 @@ struct TurbineVoice {
     ph1 += f1 / sr; ph2 += f1 * 1.47f / sr; ph3 += (jet ? f1 * 0.5f : f1 * 2.03f) / sr;
     ph1 -= floorf(ph1); ph2 -= floorf(ph2); ph3 -= floorf(ph3);
     float whine = sinf(2 * PI * ph1) * 0.6f + sinf(2 * PI * ph2) * 0.25f + sinf(2 * PI * ph3) * 0.2f;
-    float whineAmp = (jet ? 0.10f : 0.07f) * smoothstepf(5.f, 60.f, n1) * (1.f - 0.4f * spool * (jet ? 1.f : 0.f));
-    float roar = roarLP2.p(roarLP.p(n)) * (jet ? (0.15f + 1.2f * powf(spool, 1.5f)) : (0.08f + 0.25f * spool));
+    float whineAmp = (jet ? 0.16f : 0.035f) * smoothstepf(5.f, 60.f, n1) * (1.f - 0.4f * spool * (jet ? 1.f : 0.f));
+    float roar = roarLP2.p(roarLP.p(n)) * (jet ? (0.35f + 0.75f * powf(spool, 1.5f)) : (0.12f + 0.25f * spool));
     float rum = rumble.p(n) * (jet ? 1.6f * spool : 0.6f * spool);
     float hs = hiss.p(n) * 0.06f * nn;
     float buzzsaw = 0;
@@ -296,7 +302,7 @@ void AudioEngine::render(float* out, int frames) {
       float n = I.nz.w();
       float windAmp = clampf(air / 70.f, 0, 1.6f); windAmp *= windAmp;
       float gust = 1.f + P.turbulence * 0.6f * sinf(I.motorPh * 0.0007f);
-      float wind = (I.windBP.p(n) * 0.5f + I.windLP.p(n) * 0.12f) * windAmp * gust * lerpf(1.0f, 0.55f, inter);
+      float wind = (I.windBP.p(n) * 0.35f + I.windLP.p(n) * 0.09f) * windAmp * gust * lerpf(1.0f, 0.55f, inter);
       float gearR = I.gearRumble.p(I.nz.w()) * (P.gearDown * 0.4f + P.flaps * 0.5f) * windAmp * 0.6f;
       // rolling
       float roll = 0;

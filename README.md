@@ -1,0 +1,132 @@
+# Air Xpress
+
+A pilot-career flight game for Windows with a real-time **GPU ray-traced** world. You start as a student with a permit, earn your licences, rent small planes to haul cargo, rent bigger ones to fly passengers, then buy your own aircraft for longer, harder contracts: mountain strips, glaciers, volcano fields, night storms and finally your own airline.
+
+![Sunset over Port Verde](docs/sunset.jpg)
+
+| | |
+|---|---|
+| ![Main menu](docs/menu.jpg) | ![Mountains](docs/mountain.jpg) |
+| ![Storm run](docs/storm.jpg) | ![Business jet over Kaleo](docs/jet.jpg) |
+
+## Features
+
+- **Ray-traced renderer.** Every pixel is traced on the GPU: an eroded heightfield over 80 × 80 km, an ocean with Fresnel reflections, volumetric clouds, soft terrain and aircraft shadows, an analytic sky with golden hour and night, and SDF aircraft with moving flaps, ailerons, elevator, rudder, gear and props.
+- **PBR materials.** Eight tileable PBR texture sets (albedo, roughness, normal, height, AO) are generated at startup: grass, forest canopy, rock, sand, snow, asphalt, gravel and dirt. They're lit with GGX/Cook-Torrance shading, triplanar on cliffs, and darken and get glossier in the rain.
+- **Effects.** Tyre smoke, dust and snow spray from unpaved strips, prop-wash dust, wingtip vapour, engine-start smoke puffs, crash fire and smoke, rain streaks, snowfall, raindrops on the lens, lightning, bloom and lens flare. Lighting includes runway edge, threshold and approach lights, working **PAPI** lights, plus nav, strobe, beacon and landing lights that light the terrain.
+- **Engine sound.** All audio is synthesised in real time. Piston engines are modelled one cylinder at a time: each firing excites exhaust resonators, and slight differences between cylinders give the uneven idle and crank-rate rumble. On top of that is a prop blade-pass buzz and whoosh. Twins run two engines slightly out of sync so they beat against each other. Turboprops and jets get their own whine, roar and buzz-saw models. The cockpit view filters the sound, and you'll also hear a starter motor, wind, runway seams, tyre chirps, stall horn or stick shaker, gear and flap motors, rain and thunder.
+- **Muffle button (M).** A headset-style noise filter that turns down engine, wind and rolling noise for relaxed cruising.
+- **Live internet radio (R).** Streams MP3/AAC stations through Windows Media Foundation. You can add your own stations.
+- **Flight model.** Six degrees of freedom with stall and wing drop, flaps, ground effect, prop wash, density altitude, wind shear near the ground, gusts and turbulence, spring-damper gear with steering and brakes, and taildragger handling. Includes an autopilot (heading and altitude hold) and time acceleration in cruise.
+- **Hand-designed world.** "The Solace Islands" has 16 airports on 5 islands: a flight-school field, grass farm strips, a rock in the sea, international hubs, a 5,400 ft gravel mountain pass, a volcano research strip, a glacier snow runway, a fjord town and a remote resort isle. Every approach has a cleared glide corridor.
+- **Career.** There are 4 lessons and 27 story contracts in 5 chapters (Student → PPL → CPL → Owner-operator → ATP), plus endless freelance jobs. Work includes cargo, passengers, fragile loads, medevac with deadlines, VIP charters and a scenic tour. You're scored on landing softness, passenger comfort (bank and G), deadlines and fragile-cargo handling. You can rent at any airport, buy and sell 7 aircraft, and pay for ferry flights and positioning tickets.
+- **No softlocks.** The campaign is checked automatically (`tests/progression_test.cpp`). Every contract is flown with an aircraft you can rent or afford, fuel range (with reserve), runway length (corrected for elevation), surface type and deadlines all fit, and the money curve needs only light freelancing or selling an old plane. Rentals never require cash up front, and if you're broke you get free courtesy rides.
+
+## Aircraft
+
+| Aircraft | Type | Seats / Cargo | Range | Runway | Licence |
+|---|---|---|---|---|---|
+| Kestrel T2 | 2-seat trainer (4-cyl) | 1 / 120 kg | 45 km | 400 m | Student |
+| Wren 180 | 4-seat tourer (6-cyl) | 3 / 320 kg | 70 km | 450 m | PPL |
+| Bushmaster STOL | Taildragger bush plane | 4 / 480 kg | 60 km | 220 m, gravel/snow | CPL |
+| Islander Twin | Twin-piston utility | 9 / 900 kg | 90 km | 420 m, gravel/snow | CPL |
+| Pelican Caravan | Single turboprop | 12 / 1,400 kg | 130 km | 550 m, gravel/snow | CPL |
+| Meridian Q400 | Twin-turboprop airliner | 40 / 4,500 kg | 170 km | 1,100 m paved | ATP |
+| Starling 500 | Twin-jet business jet | 7 / 700 kg | 260 km | 1,250 m paved | ATP |
+
+## Controls
+
+| Key | Action | Gamepad |
+|---|---|---|
+| W / S or ↑ / ↓ | Pitch down / up | Left stick |
+| A / D or ← / → | Roll | Left stick |
+| Q / E | Rudder / nosewheel | LB / RB |
+| Shift / Ctrl, PgUp / PgDn, 1–9, 0 | Throttle | RT / LT |
+| F / V | Flaps down / up | B / X |
+| G | Landing gear (retractable aircraft) | Y |
+| B | Parking brake | |
+| Space | Wheel brakes | A |
+| [ / ] | Elevator trim | D-pad ↑ / ↓ |
+| Z | Autopilot (A/D steers heading) | Right-stick click |
+| T | Time acceleration ×1 / ×2 / ×4 (cruise only) | |
+| C | Camera: chase, cockpit, orbit, flyby | Back |
+| Right mouse drag, wheel | Look around, zoom | Right stick |
+| L | Landing lights | |
+| I | Engine restart | |
+| **M** | **Muffle engine noise** | Left-stick click |
+| **R** | **Internet radio** | |
+| N / Tab | Map | |
+| H | Toggle HUD | |
+| Esc | Pause menu (restart, settings, abandon) | Start |
+| F11 / Alt+Enter | Fullscreen | |
+
+Menus use the mouse.
+
+## Flying tips
+
+- Fly the green rings in the lessons. The magenta HUD arrow always points at your next objective.
+- On approach the HUD shows a glidepath (G/S) and localiser guide. The PAPI lights by the runway show **two white and two red** when you're on a 3° glidepath.
+- A touchdown under 150 fpm earns a "butter" bonus. Over 600 fpm costs you, and over about 900 fpm collapses the gear.
+- High and hot airfields need more runway. Summit Pass (5,400 ft) only works in a STOL aircraft.
+- Check the range shown on the engine panel before long crossings.
+
+## Internet radio
+
+Press **R** in flight, or use the **Radio** button in the hub. Stations come from `%APPDATA%\AirXpress\radio_stations.txt`, which is created on first run. Add one line per station:
+
+```
+My Station|https://example.com/stream.mp3
+```
+
+Any MP3 or AAC stream over HTTP or HTTPS that Windows Media Foundation can play will work.
+
+## System requirements
+
+- Windows 10 or 11, 64-bit
+- A GPU with OpenGL 3.3 (anything from roughly 2012 on). A mid-range GPU from the last 5–6 years is recommended for 1080p.
+- **Dynamic resolution** lowers the internal ray-tracing resolution automatically to stay above about 40 fps. You can also set the resolution scale and Low/Medium/High quality in Settings.
+
+Save data, settings and the radio list live in `%APPDATA%\AirXpress`.
+
+## Building
+
+### Visual Studio 2022 (MSVC)
+
+```
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+build\Release\AirXpress.exe
+```
+
+### MinGW-w64 (on Windows, or cross-compiling from Linux)
+
+```
+cmake -S . -B build-win -DCMAKE_TOOLCHAIN_FILE=cmake-mingw.cmake   # omit the toolchain file on Windows
+cmake --build build-win -j
+```
+
+The GitHub Actions workflow (`.github/workflows/build.yml`) builds with MSVC, runs the tests, and uploads `AirXpress-windows-x64` as an artifact on every push. Pushing a `v*` tag attaches a zip to a GitHub Release.
+
+There are no third-party dependencies to install. The game only uses Win32, OpenGL, WinMM, XInput (loaded at runtime) and Media Foundation.
+
+### Tests
+
+```
+ctest --test-dir build -C Release      # flight model + campaign progression
+```
+
+`tests/gameplay_test.cpp` (Linux dev build) flies Lesson 1 and a full approach and landing through the real game loop. `tests/render_harness.cpp` renders test frames headlessly with Mesa so you can check the shaders.
+
+## Project layout
+
+```
+src/world.*        hand-designed archipelago, terrain function shared by CPU and GPU, airports
+src/aircraft.*     7 aircraft specs + 6-DOF flight model, gear contacts, autopilot
+src/career.*       licences, story campaign, freelance generator, economy, save/load
+src/shaders.h      GLSL: ray tracer (terrain/water/clouds/aircraft SDF/buildings), sprites, post, UI
+src/renderer.*     GL pipeline, procedural PBR texture synthesis, bloom/tonemap, SDF text UI
+src/audio.*        procedural audio engine (engines, environment, effects, UI)
+src/game*.cpp      game flow, flight session, cameras, particles, lights, HUD and menus
+src/platform_win32.cpp, src/radio_win.cpp   Win32 window/input/audio output, Media Foundation radio
+tools/gen_font.py  regenerates the embedded SDF font atlas
+```

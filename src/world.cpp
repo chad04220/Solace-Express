@@ -161,7 +161,7 @@ static void computeTexel(float x, float z, float out[4]) {
     // Approach funnel: keep terrain below a glide corridor off both runway ends
     float d = u - a.length * 0.5f;
     if (d > 0 && d < 7000) {
-      float slope = a.elev > 600 ? 0.10f : 0.045f;
+      float slope = a.elev > 600 ? 0.045f : 0.032f;
       float halfw = 250.f + 0.18f * d;
       float wc = (1.f - smoothstepf(halfw, halfw + 900.f, v)) * (1.f - smoothstepf(5000.f, 7000.f, d));
       float cap = a.elev + 10.f + slope * d;

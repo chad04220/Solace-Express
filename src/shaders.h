@@ -355,7 +355,8 @@ vec4 traceClouds(vec3 ro, vec3 rd, float tmax, float jitter){
 }
 float cloudShadow(vec3 p){
   if (uCloudCover < 0.05) return 1.0;
-  vec3 c = p + uSunDir * ((uCloudBase + 500.0 - p.y)/max(uSunDir.y, 0.1));
+)"
+R"(  vec3 c = p + uSunDir * ((uCloudBase + 500.0 - p.y)/max(uSunDir.y, 0.1));
   float d = cloudDensity(vec3(c.x, uCloudBase + 400.0, c.z), 0);
   return mix(1.0, 0.25, smoothstep(0.0, 0.5, d));
 }
@@ -590,7 +591,8 @@ vec2 traceBoxes(vec3 ro, vec3 rd, float tmax, out vec3 nOut, out float kind, out
     vec3 nl = -sign(ld)*step(t1.yzx, t1.xyz)*step(t1.zxy, t1.xyz);
     // back to world
     nOut = vec3(nl.x*c + nl.z*s, nl.y, nl.x*s - nl.z*c);
-    localHit = lo + ld*tN;
+)"
+R"(    localHit = lo + ld*tN;
   }
   return res;
 }

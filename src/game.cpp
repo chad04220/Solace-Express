@@ -216,7 +216,7 @@ void Game::flightControls(float dt) {
   c.trim = clampf(c.trim + tr * 0.35f * dt, -1, 1);
   // flaps
   if (in.pressed['F'] || (in.buttonsPressed & PAD_B)) { flapNotch = std::min(1.f, flapNotch + 1.f / 3.f); toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1)); }
-  if (in.pressed['V'] || (in.buttonsPressed & PAD_X && false)) { flapNotch = std::max(0.f, flapNotch - 1.f / 3.f); toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1)); }
+  if (in.pressed['V'] || (in.buttonsPressed & PAD_X)) { flapNotch = std::max(0.f, flapNotch - 1.f / 3.f); toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1)); }
   c.flaps = flapNotch;
   // gear
   if ((in.pressed['G'] || (in.buttonsPressed & PAD_Y)) && plane.spec->retract) {
@@ -258,7 +258,7 @@ void Game::spawn(vec3 p, vec3 v, float life, float size, float grow, vec3 col, f
 
 void Game::updateFlight(float dt) {
   if (paused) return;
-  flightControls(dt);
+  if (!botControl) flightControls(dt);
   // automatic engine start sequence after the scene fades in
   if (!engineAutoStarted && !contract.startAirborne) {
     startDelay -= dt;
@@ -497,7 +497,7 @@ FrameParams Game::buildFrame() {
   fp.storm = wx.storm ? 1.f : 0.f; fp.lightning = lightning;
   fp.windOff = cloudOff;
   fp.exposure = 1.0f + fp.night * 0.8f;
-  if (screen == SCR_FLIGHT && plane.spec) {
+  if ((screen == SCR_FLIGHT || screen == SCR_DEBRIEF) && plane.spec) {
     fillPlaneVisual(fp.plane, plane, propAngle, camMode == 1);
     vec3 fwd = camMode == 1 ? plane.q.rotate(quat::axisAngle(vec3(0, 1, 0), lookYaw).rotate(quat::axisAngle(vec3(1, 0, 0), lookPitch).rotate(vec3(0, 0, -1))))
                             : normalize(plane.pos + vec3(0, plane.spec->fusRad * 0.3f, 0) - camPos);
@@ -708,6 +708,19 @@ void Game::feedAudio() {
 
 // ------------------------------------------------------------------ main update / render
 void Game::update(float dt) {
+  // dynamic resolution: keep the ray tracer above ~40 fps on slower GPUs
+  if (!headless && g_ren.ok) {
+    static float avg = 1.f / 60.f, cooldown = 3.f;
+    avg = lerpf(avg, dt, 0.05f);
+    cooldown -= dt;
+    if (cooldown <= 0) {
+      float sc = g_ren.renderScale;
+      if (avg > 1.f / 38.f && sc > 0.42f) sc = std::max(0.4f, sc - 0.05f);
+      else if (avg < 1.f / 56.f && sc < set.renderScale - 0.01f) sc = std::min(set.renderScale, sc + 0.05f);
+      if (sc != g_ren.renderScale) { g_ren.renderScale = sc; g_ren.resize(g_ren.W, g_ren.H); cooldown = 2.f; }
+      else cooldown = 0.5f;
+    }
+  }
   dt = std::min(dt, 0.05f);
   realTime += dt;
   for (auto& t : toasts) t.t += dt;
@@ -728,7 +741,7 @@ void Game::update(float dt) {
         propAngle = fmodf(propAngle + rps * 2 * PI * dt * (plane.rpm < 400 ? 1.f : 0.0f) + (plane.rpm >= 400 ? dt * 3.f : 0.f), 2 * PI * 100);
       }
     }
-  } else {
+  } else if (screen != SCR_DEBRIEF) {
     wx = Weather(); wx.cloudCover = 0.35f; wx.cloudBase = 1500; wx.visibility = 45000; wx.windSpeed = 4;
     timeOfDay = screen == SCR_MENU ? 17.3f : 15.8f;
     cloudOff = cloudOff + vec2(dt * 8.f, dt * 3.f);

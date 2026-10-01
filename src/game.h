@@ -38,7 +38,9 @@ enum GameScreen { SCR_MENU = 0, SCR_HUB, SCR_FLIGHT, SCR_DEBRIEF };
 enum HubTab { TAB_CONTRACTS = 0, TAB_HANGAR, TAB_LOGBOOK, TAB_SETTINGS };
 
 class Game {
+  friend struct GameTest;
 public:
+  bool botControl = false;  // tests drive plane.ctl directly
   Input in;
   bool quit = false;
   bool wantFullscreenToggle = false;
