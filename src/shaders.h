@@ -367,7 +367,8 @@ vec2 mapPlane(vec3 p){
     if (eng <= 1) {
       float sr = N1.y;
       float spin = sdRoundCone(p, vec3(0.0, S0.w, S0.x - sr*2.3), vec3(0.0, S0.w, S0.x + 0.05), 0.015, sr);
-      res = opU(res, vec2(spin, 16.0));
+)"
+R"(      res = opU(res, vec2(spin, 16.0));
       if (eng == 0) {
         vec3 sec = fusSection(S0.x + 0.9);
         float ex = sdCapsule(vec3(abs(p.x), p.y, p.z), vec3(0.12, sec.z - sec.y*0.85, S0.x + 0.9), vec3(0.16, sec.z - sec.y - 0.06, S0.x + 1.15), 0.035);
@@ -390,8 +391,7 @@ vec2 mapPlane(vec3 p){
       if (eng == 3) {
         nac = smin(nac, sdEllipsoid(np - vec3(0.0, -nr*0.75, z0 + 0.45), vec3(nr*0.35, nr*0.22, 0.5)), 0.08);
         float ex = sdCapsule(np, vec3(nr*0.8, 0.1, z0 + len*0.35), vec3(nr*1.05, 0.15, z0 + len*0.5), 0.09);
-)"
-R"(        res = opU(res, vec2(ex, 17.0));
+        res = opU(res, vec2(ex, 17.0));
       }
       res = opU(res, vec2(nac, 5.0));
       float sr = N1.y;
@@ -546,7 +546,8 @@ R"(        res = opU(res, vec2(ex, 17.0));
     float sw = 0.032; float cell = clamp(floor(swp.x/sw + 0.5), -12.0, 12.0);
     swp.x -= cell*sw;
     float sws = sdRoundBox(swp - vec3(0.0, 0.0, 0.01), vec3(0.006, 0.012, 0.012), 0.003);
-    sws = max(sws, abs(p.x) - phw*0.85);
+)"
+R"(    sws = max(sws, abs(p.x) - phw*0.85);
     res = opU(res, vec2(sws, 13.0));
     // armrests / door panels
     vec3 secA = fusSection(E.z);
@@ -617,8 +618,7 @@ float needle(vec2 d, float r, float ang, float len, float w){
   float along = dot(d, nv)/r, perp = abs(d.x*nv.y - d.y*nv.x)/r;
   return step(-0.12, along)*step(along, len)*step(perp, w*(1.0 - along*0.6));
 }
-)"
-R"(float ticks(vec2 d, float r, float n, float a0, float a1, float inner){
+float ticks(vec2 d, float r, float n, float a0, float a1, float inner){
   float a = atan(d.x, d.y); float rr = length(d)/r;
   if (a < a0 || a > a1 || rr < inner || rr > 0.95) return 0.0;
   float f = fract((a - a0)/(a1 - a0)*n + 0.5);
@@ -783,7 +783,8 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
     col = vec3(0.04);
     if (abs(cell.y) < 0.008 && abs(cell.x) < 0.045) col = vec3(0.05, 0.6, 0.25)*(0.6 + 0.4*step(0.5, fract(cell.x*60.0 + row)));
     if (abs(cell.y) < 0.006 && abs(cell.x - 0.058) < 0.006) col = vec3(0.3);
-    return col;
+)"
+R"(    return col;
   }
   return col;
 }
@@ -904,7 +905,7 @@ vec3 pbr(vec3 n, vec3 v, vec3 l, vec3 alb, float rough, float metal, vec3 lightC
   float a = rough*rough, a2 = a*a; float dd = nh*nh*(a2-1.0)+1.0; float D = a2/(PI*dd*dd);
   float k = (rough+1.0)*(rough+1.0)/8.0; float G = nv/(nv*(1.0-k)+k) * nl/(nl*(1.0-k)+k);
   vec3 f0 = mix(vec3(0.04), alb, metal); vec3 F = fresnelSchlick(vh, f0);
-  vec3 spec = D*G*F/(4.0*nv*max(nl,1e-3)+1e-3);
+  vec3 spec = min(D*G*F/(4.0*nv*max(nl,1e-3)+1e-3), vec3(60.0));  // bounded: tiny glossy parts must not overflow fp16
   vec3 kd = (1.0-F)*(1.0-metal);
   return (kd*alb/PI + spec)*lightCol*nl;
 }
@@ -1017,7 +1018,8 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bo
       return;
     }
     if (abs(u) < len*0.5 + 120.0 && abs(v) < wid*0.5 + 60.0) {
-      vec4 t = matSample(pw.xz, M_GRASS, 5.0, nTS);
+)"
+R"(      vec4 t = matSample(pw.xz, M_GRASS, 5.0, nTS);
       float stripe = step(0.5, fract(u/18.0));
       m.alb = t.rgb*(0.85 + 0.15*stripe)*vec3(0.95,1.05,0.9); m.rough = 0.9; m.nrm = nTS;
     }
@@ -1041,8 +1043,7 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bo
     if (abs(v) < 0.45 && fract(u/50.0) < 0.6 && au < hl - 70.0) paint = 1.0;
     if (abs(abs(v) - (wid*0.5 - 1.0)) < 0.45) paint = 1.0;
     if (au > hl - 50.0 && au < hl - 12.0 && abs(v) < wid*0.5 - 3.0 && fract((v + wid*0.5)/3.6) < 0.5) paint = 1.0;
-)"
-R"(    if (au > hl - 380.0 && au < hl - 320.0 && abs(abs(v) - wid*0.25) < 2.5) paint = 1.0;
+    if (au > hl - 380.0 && au < hl - 320.0 && abs(abs(v) - wid*0.25) < 2.5) paint = 1.0;
     if (au > hl - 300.0 && au < hl - 150.0 && fract(au/75.0) < 0.3 && abs(abs(v) - wid*0.22) < 2.5 && wid > 25.0) paint = 1.0;
     // runway designators, readable from the approach end
     float hdg = uAp[ai].w*57.29578;
@@ -1182,7 +1183,8 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
     m.alb = mix(m.alb, c, townW); m.rough = mix(m.rough, tx.a, townW); m.nrm = mix(m.nrm, nTS, townW);
     // street lamps pools at night
     vec2 corner = vec2(sx, sz) - 13.0;
-    m.emit += vec3(1.0, 0.75, 0.4)*smoothstep(8.0, 0.0, length(corner))*uNight*0.35*townW;
+)"
+R"(    m.emit += vec3(1.0, 0.75, 0.4)*smoothstep(8.0, 0.0, length(corner))*uNight*0.35*townW;
   }
   // ---- roads (exact geometry from the baked segment ids)
   if (msk.x < 0.25) {
@@ -1239,8 +1241,7 @@ Mat buildingMaterial(vec3 p, vec3 n, vec4 info){
     if (win > 0.5) { m.alb = vec3(0.05, 0.07, 0.09); m.rough = 0.08; m.metal = 0.3; }
     else if (step(0.12, fx)*step(fx, 0.88)*step(0.2, fy)*step(fy, 0.77) > 0.5) m.alb = vec3(0.92);   // window frames
   }
-)"
-R"(  float lit = step(0.55, hash1(floor(u/2.6)*7.13 + floor((info.z - p.y)/floorH)*3.71 + seed*91.0));
+  float lit = step(0.55, hash1(floor(u/2.6)*7.13 + floor((info.z - p.y)/floorH)*3.71 + seed*91.0));
   m.emit = win*lit*vec3(1.0, 0.82, 0.55)*uNight*1.6;
   m.alb *= 1.0 - 0.25*uWet;
   return m;
@@ -1384,7 +1385,8 @@ float traceTowns(vec3 ro, vec3 rd, float tmax, out vec3 nOut, out vec4 info){
   for (int i = 0; i < 24; i++) {
     if (i >= uTownCount) break;
     vec4 TB = dataAt(320 + i), TY = dataAt(352 + i);
-    vec3 nb; vec2 tb = iBox(ro, rd, vec3(TB.x, TY.x, TB.y), vec3(TB.z, TY.y, TB.w), nb);
+)"
+R"(    vec3 nb; vec2 tb = iBox(ro, rd, vec3(TB.x, TY.x, TB.y), vec3(TB.z, TY.y, TB.w), nb);
     float t0 = max(tb.x, 0.0), t1 = min(tb.y, best > 0.0 ? best : limit);
     if (t0 >= t1) continue;
     vec3 p0 = ro + rd*(t0 + 0.01);
@@ -1477,8 +1479,7 @@ vec2 traceBoxes(vec3 ro, vec3 rd, float tmax, out vec3 nOut, out float kind, out
 
 void main(){
   vec2 ndc = vUV*2.0 - 1.0;
-)"
-R"(  vec3 rd = normalize(uCamRot * vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, -1.0));
+  vec3 rd = normalize(uCamRot * vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, -1.0));
   vec3 ro = uCamPos;
   float jitter = hash1(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)) + fract(uTime)*7.0);
   float tmax = 80000.0;
@@ -1568,7 +1569,8 @@ R"(  vec3 rd = normalize(uCamRot * vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, 
           if (abs(bn.y) < 0.3 && fract(lh.z/2.5) > 0.6 && lh.y > -H.y*0.5 && lh.y < 0.0) { m.alb = vec3(0.05); m.rough = 0.08; m.emit = vec3(1.0,0.8,0.5)*uNight*1.5; }
         } else if (k == 4) { // fuel tank
           vec4 tx = triSample(lh, nn, M_METAL, 3.0, nTS); m.alb = tx.rgb*vec3(0.95); m.rough = 0.35; m.metal = 0.6; m.nrm = nTS;
-          if (abs(lh.y) < 0.5) m.alb = vec3(0.8, 0.15, 0.1);
+)"
+R"(          if (abs(lh.y) < 0.5) m.alb = vec3(0.8, 0.15, 0.1);
         } else {             // radar dome on a pylon
           m.alb = vec3(0.92); m.rough = 0.5;
           if (lh.y < 0.0) { vec4 tx = triSample(lh, nn, M_METAL, 2.0, nTS); m.alb = tx.rgb*0.7; m.metal = 0.6; m.nrm = nTS; }
@@ -1661,8 +1663,7 @@ R"(  vec3 rd = normalize(uCamRot * vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, 
       else if (mid == 16) { m.alb = uM[0].x > 9.0 ? uColBase*0.9 : uColStripe; m.metal = 0.5; m.rough = 0.2; }
       else if (mid == 17) { m.alb = vec3(0.09, 0.075, 0.06); m.metal = 0.7; m.rough = 0.55; }
       else if (mid == 18) { m.alb = vec3(0.1); m.emit = (lp.x < 0.0 ? vec3(1.0, 0.05, 0.02) : vec3(0.05, 1.0, 0.15))*(0.5 + 2.0*uNight); m.rough = 0.1; }
-)"
-R"(      else if (mid == 19) { m.alb = vec3(0.3, 0.02, 0.02); m.emit = vec3(1.0, 0.05, 0.02)*step(0.88, fract(uTime))*3.0; m.rough = 0.1; }
+      else if (mid == 19) { m.alb = vec3(0.3, 0.02, 0.02); m.emit = vec3(1.0, 0.05, 0.02)*step(0.88, fract(uTime))*3.0; m.rough = 0.1; }
       else if (mid == 21) {
         vec2 fq = vec2(abs(lp.x) - uM[16].x, lp.y - uM[16].y);
         float bl = step(0.5, fract(atan(fq.y, fq.x)*22.0/6.2832 + length(fq)*2.0));
@@ -1722,8 +1723,8 @@ R"(      else if (mid == 19) { m.alb = vec3(0.3, 0.02, 0.02); m.emit = vec3(1.0,
   // clouds
   vec4 cl = traceClouds(ro, rd, t, jitter);
   col = col*cl.a + cl.rgb;
-  if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
-  oColor = vec4(col, 1.0);
+  if (any(isnan(col)) || any(isinf(col)) || !(col.r + col.g + col.b < 1e7)) col = vec3(0.0);
+  oColor = vec4(clamp(col, vec3(0.0), vec3(3e4)), 1.0);
   oDepth = t;
 }
 )";
@@ -1753,12 +1754,13 @@ void main(){
     float l = 0.55 + 0.45*max(dot(n, normalize(uSunDir + vec3(0,0.3,0))), 0.0);
     o = vec4(vCol.rgb*(uSunCol*l*1.2*max(uSunDir.y+0.1,0.0) + uAmb), vCol.a*a);
   } else if (kind == 1) { // additive glow light
-    float a = exp(-r2*6.0) + 0.15*exp(-r2*1.5);
+    float a = (exp(-r2*6.0) + 0.15*exp(-r2*1.5) - 0.0335)*(1.0 - smoothstep(0.6, 1.0, r2)); a = max(a, 0.0);
     o = vec4(vCol.rgb*a*vCol.a, 0.0);
   } else if (kind == 2) { // waypoint ring
     float r = sqrt(r2);
     float a = smoothstep(0.08, 0.0, abs(r - 0.88)) + 0.25*smoothstep(0.25, 0.0, abs(r - 0.88));
     float chev = step(0.75, r)*step(r, 1.0)*step(0.5, fract(atan(c.y,c.x)*8.0/6.2831));
+    a *= 1.0 - smoothstep(0.96, 1.0, r);
     o = vec4(vCol.rgb*(a + chev*0.2)*vCol.a, 0.0);
   } else if (kind == 3) { // rain streak
     float a = smoothstep(1.0, 0.0, abs(c.x)) * smoothstep(1.0, 0.6, abs(c.y));
@@ -1784,7 +1786,9 @@ void main(){
   vec3 c = vec3(0.0);
   for (int i=-1;i<=1;i++) for (int j=-1;j<=1;j++) c += texture(uTex, vUV + vec2(i,j)*uTexel).rgb;
   c /= 9.0;
+  c = clamp(c, vec3(0.0), vec3(3e4));
   float l = dot(c, vec3(0.2126,0.7152,0.0722));
+  if (!(l >= 0.0 && l < 1e6)) { oColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
   oColor = vec4(c*smoothstep(1.2, 4.0, l)/max(l,1e-3)*min(l, 40.0)*0.25, 1.0);
 }
 )";

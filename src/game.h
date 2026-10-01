@@ -71,7 +71,7 @@ private:
   float timeOfDay = 12;
   int wpIndex = 0;
   float flightClock = 0, crashTimer = 0, endTimer = 0;
-  bool paused = false, showMap = false, showRadio = false, hudOn = true;
+  bool paused = false, showMap = false, showRadio = false, hudOn = true, showMinimap = false;
   bool landed = false, completed = false, crashed = false;
   FlightResult result;
   float fuelStart = 0;

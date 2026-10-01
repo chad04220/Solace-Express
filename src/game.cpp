@@ -244,6 +244,7 @@ void Game::flightControls(float dt) {
   }
   if (plane.apOn && (key('W') || key(K_UP))) plane.apAlt += 0;
   if (in.pressed['L']) { landingLight = !landingLight; toast(landingLight ? "Landing lights ON" : "Landing lights OFF"); }
+  if (in.pressed['M']) { showMinimap = !showMinimap; toast(showMinimap ? "Minimap shown" : "Minimap hidden"); }
   if (in.pressed['I'] && !plane.engineRunning && plane.fuel > 0) { plane.starterTime = 0.01f; toast("Engine start"); }
   // time acceleration
   if (in.pressed['T']) {
@@ -689,7 +690,7 @@ void Game::feedAudio() {
   AudioParams ap;
   ap.master = set.master; ap.engineVol = set.engineVol; ap.sfxVol = set.sfxVol;
   static bool muffled = false;
-  if (in.pressed['M'] || (in.buttonsPressed & PAD_LS)) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
+  if (in.pressed['U'] || (in.buttonsPressed & PAD_LS)) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
   ap.muffled = muffled;
   if (screen == SCR_FLIGHT && plane.spec && !crashed) {
     const AircraftSpec& s = *plane.spec;

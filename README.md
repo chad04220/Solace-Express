@@ -62,7 +62,8 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 | Right mouse drag, wheel | Look around, zoom | Right stick |
 | L | Landing lights | |
 | I | Engine restart | |
-| **M** | **Muffle engine noise** | Left-stick click |
+| **U** | **Muffle engine noise** | Left-stick click |
+| M | Toggle minimap (hidden by default) | |
 | **R** | **Internet radio** | |
 | N / Tab | Map | |
 | H | Toggle HUD | |
