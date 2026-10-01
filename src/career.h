@@ -1,0 +1,77 @@
+// Air Xpress - career: licenses, contracts, fleet, money, save/load
+#pragma once
+#include "common.h"
+#include "world.h"
+#include "aircraft.h"
+
+enum ContractType { CT_LESSON = 0, CT_CARGO, CT_PAX, CT_MEDEVAC, CT_VIP, CT_TOUR, CT_FERRY };
+inline const char* contractTypeName(int t) { static const char* n[] = {"Lesson", "Cargo", "Passengers", "Medevac", "VIP Charter", "Scenic Tour", "Free Flight"}; return n[t]; }
+
+struct Waypoint { float x, z, alt; };  // alt = metres MSL (ring centre)
+
+struct Contract {
+  std::string id, title, brief;
+  int chapter = 0, type = CT_CARGO;
+  int from = 0, to = 0;
+  int cargoKg = 0, pax = 0;
+  int payout = 0;
+  float timeLimitMin = 0;
+  int minLicense = LIC_STUDENT;
+  bool ownedOnly = false, fragile = false;
+  int grantLicense = -1;
+  int forceAircraft = -1;      // lessons use a specific aircraft (free)
+  Weather wx;
+  std::vector<Waypoint> wps;
+  std::vector<std::string> hints;  // lesson hints by phase (see Game::phase)
+  bool startAirborne = false;
+  bool story = false;
+};
+
+struct OwnedPlane { int spec; int location; float fuel; float condition; };
+
+struct FlightResult {
+  bool success = false;
+  std::string failReason;
+  float touchdownFpm = 0, maxG = 1, minG = 1, maxBank = 0, flightMin = 0;
+  bool late = false;
+  float centerlineErr = 0;
+  float fuelUsedKg = 0;
+};
+
+struct PayoutLine { std::string label; int amount; };
+
+class Career {
+public:
+  int money = 600;
+  int license = LIC_STUDENT;
+  int reputation = 0;
+  int location = 0;
+  int storyIndex = 0;          // next story contract
+  int flights = 0, landings = 0, crashes = 0;
+  float hours = 0, bestLandingFpm = 9999;
+  std::vector<OwnedPlane> fleet;
+  std::vector<Contract> board;  // freelance jobs at current location
+  uint32_t boardSeed = 1;
+  bool finished = false;
+
+  void newGame();
+  const Contract* nextStory() const;
+  void refreshBoard();
+  // Which aircraft can fly a contract and how it would be sourced
+  enum Source { SRC_NONE = 0, SRC_LESSON, SRC_RENT, SRC_OWNED };
+  Source canFly(const Contract& c, int specIdx, std::string* why = nullptr) const;
+  int ownedIndexFor(int specIdx) const;
+  // Settle a finished flight; returns lines for the debrief
+  std::vector<PayoutLine> settle(const Contract& c, int specIdx, Source src, const FlightResult& r, int* stars);
+  bool buy(int specIdx, std::string* msg);
+  bool sell(int fleetIdx, std::string* msg);
+  int positioningCost(const Contract& c) const;
+  int ferryCost(const Contract& c, int specIdx) const;
+  bool save(const std::string& path) const;
+  bool load(const std::string& path);
+};
+
+extern std::vector<Contract> g_story;
+void buildStory();
+bool surfaceOK(const AircraftSpec& s, int surface);
+bool runwayOK(const AircraftSpec& s, const Airport& a);
