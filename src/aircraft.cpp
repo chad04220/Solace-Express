@@ -238,11 +238,14 @@ void Plane::substep(float dt, const Weather& wx, float time) {
       if (fabsf(ctl.roll) < 0.05f) wd.z += hover * 2.2f * bankDeg() * DEG;
     }
     // g limiter: keep the angle of attack inside +60 / -25 g; vectored thrust holds the nose up to 60 deg past the stall
-    if (V > 20.f && !onGround) {
+    // Only in wing-borne flight: when hovering or pedal-turning the airflow can come from the side or behind, and
+    // limiting on that "angle of attack" used to command violent pitch-ups during hover turns
+    float wingBorne = (1.f - hover) * smoothstepf(25.f, 45.f, V) * smoothstepf(80.f * DEG, 60.f * DEG, fabsf(alpha)) * smoothstepf(60.f * DEG, 35.f * DEG, fabsf(beta));
+    if (wingBorne > 0.f && !onGround) {
       float qS = 0.5f * density * V * V * s.wingArea, W = m * G0;
       float aHi = std::min((60.f * W / qS - s.CL0) / s.CLa, 60.f * DEG);
       float aLo = std::max((-25.f * W / qS - s.CL0) / s.CLa, -35.f * DEG);
-      wd.x = clampf(wd.x, (aLo - alpha) * 12.f - 0.4f, (aHi - alpha) * 12.f + 0.4f);
+      wd.x += (clampf(wd.x, (aLo - alpha) * 12.f - 0.4f, (aHi - alpha) * 12.f + 0.4f) - wd.x) * wingBorne;
     }
     float ms0 = m / s.emptyMass, k = onGround ? 4.f : 9.f, kp = onGround ? 4.f : 18.f;   // stiffer pitch loop: snap reversals
     vec3 Ii(s.Iyy * ms0, s.Izz * ms0, s.Ixx * ms0);

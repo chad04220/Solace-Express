@@ -70,6 +70,19 @@ int main() {
     for (int i = 0; i < 30 * 240 && !p.ev.crashed; i++) { p.ctl.throttle = clampf(0.5f + (500 - p.pos.y) * 0.01f - p.vel.y * 0.05f, 0, 1); p.step(1 / 240.f, calm, i / 240.f); }
     ok = !p.ev.crashed && fabsf(p.pos.y - 500) < 25 && length(p.vel) < 2.f && fabsf(p.bankDeg()) < 2.f;
     printf("XR-9 hover: alt %.0f m, drift %.1f m/s, throttle %.2f %s\n", p.pos.y, length(p.vel), p.ctl.throttle, ok ? "ok" : "FAIL"); fails += !ok;
+    // pedal turn in the hover while still drifting at 35 m/s: the airflow sweeps round to the side and behind, which
+    // must not upset the attitude hold (the g limiter used to read reversed flow as a huge angle of attack)
+    for (float drift : {0.f, 35.f, 60.f}) {
+      p.reset(&s, vec3(0, 500, 0), 90, s.maxFuel, 85, true, 0); p.vel = p.forward() * drift; p.ctl.flaps = 1; p.flaps = p.nozzle = 1; p.ctl.yaw = 1;
+      float worst = 0;
+      for (int i = 0; i < 20 * 240 && !p.ev.crashed; i++) {
+        p.ctl.throttle = clampf(0.5f + (500 - p.pos.y) * 0.01f - p.vel.y * 0.05f, 0, 1);
+        p.step(1 / 240.f, calm, i / 240.f);
+        worst = std::max(worst, std::max(fabsf(p.pitchDeg()), fabsf(p.bankDeg())));
+      }
+      ok = !p.ev.crashed && worst < 5.f && fabsf(p.w.y) > 1.f;
+      printf("XR-9 hover pedal turn drifting %.0f m/s: worst attitude excursion %.1f deg %s\n", drift, worst, ok ? "ok" : "FAIL"); fails += !ok;
+    }
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.pitch = 1;
     float gmax = 0;
     for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); gmax = std::max(gmax, p.gLoad); }

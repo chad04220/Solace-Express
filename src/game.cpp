@@ -518,8 +518,10 @@ void Game::updateCamera(float dt) {
   if (in.wheel != 0 && showMap) gpsRangeTarget = clampf(gpsRangeTarget * powf(0.8f, in.wheel), 1500.f, 40000.f);
   else if (in.wheel != 0 && !showRadio) camZoom = clampf(camZoom * powf(0.88f, in.wheel), 0.35f, 4.f);
   bool drag = in.mDown[1] || (camMode == 2 && in.mDown[0]);
-  if (drag) { camYaw -= in.mdx * 0.005f * set.mouseSens; camPitch = clampf(camPitch + in.mdy * 0.004f * set.mouseSens, -1.3f, 1.4f); }
-  if (in.pad) { float rx = fabsf(in.rx) > 0.2f ? in.rx : 0, ry = fabsf(in.ry) > 0.2f ? in.ry : 0; camYaw -= rx * 2.f * dt; camPitch = clampf(camPitch + ry * 1.5f * dt, -1.3f, 1.4f); }
+  // chase and orbit cameras use reversed pitch: stick up / drag up swings the camera down so the view tilts up
+  float pitchDir = (camMode == 0 || camMode == 2) ? -1.f : 1.f;
+  if (drag) { camYaw -= in.mdx * 0.005f * set.mouseSens; camPitch = clampf(camPitch + pitchDir * in.mdy * 0.004f * set.mouseSens, -1.3f, 1.4f); }
+  if (in.pad) { float rx = fabsf(in.rx) > 0.2f ? in.rx : 0, ry = fabsf(in.ry) > 0.2f ? in.ry : 0; camYaw -= rx * 2.f * dt; camPitch = clampf(camPitch + pitchDir * ry * 1.5f * dt, -1.3f, 1.4f); }
   const AircraftSpec& s = *plane.spec;
   float size = std::max(s.fusLen, s.span);
   if (camMode == 0) {
@@ -785,9 +787,19 @@ void Game::updateWreck(float dt) {
       vec3 jp = w.c + w.q.rotate(vec3((rand() % 100 - 50) * 0.01f * w.H.x, 0, (rand() % 100 - 50) * 0.01f * w.H.z));
       spawn(jp, vec3(0, 2.f + (rand() % 100) * 0.02f, 0), 0.7f, 0.45f + 0.5f * heat, 0.8f, vec3(1.f, 0.42f, 0.1f) * 0.55f, 1.f, SPR_FIRE, 0.5f, 1.f);
     }
-    if (rand() % 100 < (int)(heat * 22)) spawn(w.c + vec3(0, 2.5f, 0), vec3((rand() % 100 - 50) * 0.02f, 3.5f, (rand() % 100 - 50) * 0.02f) + plane.windVel * 0.5f, 7.f, 1.5f, 2.5f, wet ? vec3(0.8f) : vec3(0.1f, 0.095f, 0.09f), 0.45f, SPR_SMOKE, 0.25f, 1.5f);
+    bool sunk = wet && w.c.y < -1.5f;
+    if (!sunk && rand() % 100 < (int)(heat * 22)) spawn(w.c + vec3(0, 2.5f, 0), vec3((rand() % 100 - 50) * 0.02f, 3.5f, (rand() % 100 - 50) * 0.02f) + plane.windVel * 0.5f, 7.f, 1.5f, 2.5f, wet ? vec3(0.8f) : vec3(0.1f, 0.095f, 0.09f), 0.45f, SPR_SMOKE, 0.25f, 1.5f);
     if (w.rest) continue;
-    w.v.y -= G * dt;
+    if (wet && w.c.y < 0.3f) {
+      // in the sea: heavy drag, a short float on trapped air, then the piece sinks out of sight to the seabed
+      float floatT = 1.f + 1.5f * w.fire;
+      float vy = crashTimer < floatT ? (-0.35f - w.c.y) * 2.f : -2.2f - 1.2f * w.fire;
+      w.v.x *= expf(-1.5f * dt); w.v.z *= expf(-1.5f * dt);
+      w.v.y += (vy - w.v.y) * std::min(1.f, 3.f * dt);
+      w.w = w.w * expf(-1.2f * dt);
+      if (crashTimer > floatT && w.c.y > -12.f && rand() % 100 < 25)   // air escaping as it goes down
+        spawn(vec3(w.c.x + (rand() % 100 - 50) * 0.03f, 0.05f, w.c.z + (rand() % 100 - 50) * 0.03f), vec3(0, 0.6f, 0), 0.9f, 0.35f, 1.5f, vec3(0.9f, 0.95f, 1.f), 0.45f, SPR_SMOKE, 1.f, 0.f);
+    } else w.v.y -= G * dt;
     w.v = w.v * expf(-0.08f * dt);
     w.c += w.v * dt;
     float wl = length(w.w);
@@ -798,7 +810,6 @@ void Game::updateWreck(float dt) {
       vec3 cl((k & 1) ? w.H.x : -w.H.x, (k & 2) ? w.H.y : -w.H.y, (k & 4) ? w.H.z : -w.H.z);
       vec3 cw = w.c + w.q.rotate(cl * 0.85f);
       float g = wreckGround(cw.x, cw.z);
-      if (g < 0) g = -0.6f * std::min(crashTimer * 0.4f, 1.f) - 0.2f;   // floats briefly, then settles low in the water
       if (g - cw.y > pen) { pen = g - cw.y; hitArm = cw - w.c; }
     }
     if (pen > 0) {
@@ -816,7 +827,11 @@ void Game::updateWreck(float dt) {
     float wl = length(d.w);
     if (wl > 1e-4f) { d.q = quat::axisAngle(d.w, wl * dt) * d.q; d.q.normalize(); }
     float g = wreckGround(d.p.x, d.p.z);
-    if (g < 0) { if (d.p.y < -0.2f) { d.v = d.v * 0.5f; d.p.y = -0.2f; d.rest = true; } continue; }
+    if (g < 0 && d.p.y < 0.f) {   // fragments in the sea flutter down to the seabed
+      d.v = d.v * expf(-4.f * dt); d.v.y = std::max(d.v.y, -0.9f - d.size); d.w = d.w * expf(-1.f * dt);
+      if (d.p.y < g + d.size * 0.15f) { d.p.y = g + d.size * 0.15f; d.rest = true; }
+      continue;
+    }
     if (d.p.y < g + d.size * 0.15f) {
       d.p.y = g + d.size * 0.15f;
       d.v.y = fabsf(d.v.y) * 0.25f; d.v.x *= 0.6f; d.v.z *= 0.6f; d.w = d.w * 0.6f;
@@ -1201,7 +1216,9 @@ void Game::update(float dt) {
         propAngle = fmodf(propAngle + rps * 2 * PI * dt * (plane.rpm < 400 ? 1.f : 0.0f) + (plane.rpm >= 400 ? dt * 3.f : 0.f), 2 * PI * 100);
       }
     }
-  } else if (screen != SCR_DEBRIEF) {
+  } else if (screen == SCR_DEBRIEF) {
+    if (crashed) { crashTimer += dt; updateWreck(dt); updateParticles(dt); }   // the wreck keeps settling/sinking behind the results
+  } else {
     wx = Weather(); wx.cloudCover = 0.35f; wx.cloudBase = 1500; wx.visibility = 45000; wx.windSpeed = 4;
     timeOfDay = screen == SCR_MENU ? 17.3f : 15.8f;
     cloudOff = cloudOff + vec2(dt * 8.f, dt * 3.f);
@@ -1352,6 +1369,25 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
     for (int i = 0; i < (name == "rings" ? 60 : 42); i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     return;
+  }
+  if (name == "seacrash") {  // ditches into deep sea: the wreck must float briefly, then sink to the seabed
+    float gx = 0, gz = 0;
+    for (int i = 0; i < 4000 && g_world.height(gx, gz) > -25.f; i++) { gx = -30000.f + (i % 63) * 1000.f; gz = -30000.f + (i / 63) * 1000.f; }
+    plane.reset(&kAircraft[1], vec3(gx, 50.f, gz), 30, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
+    plane.q = plane.q * quat::axisAngle(vec3(1, 0, 0), -0.6f);
+    plane.vel = plane.q.rotate(vec3(0, 0, -kAircraft[1].cruise));
+    takeoffAnnounced = true; camQ = plane.q; hint.clear(); toasts.clear(); botControl = true; hudOn = false;
+    for (int i = 0; i < 600 && !crashed; i++) { realTime += 1 / 60.f; update(1 / 60.f); }
+    float hiW = -1e9f, hiD = -1e9f;
+    for (int i = 0; i < 60 * 40; i++) {
+      realTime += 1 / 60.f; update(1 / 60.f);
+      if (i == 60 * 2) { for (auto& w : wreck) hiW = std::max(hiW, w.c.y); }
+    }
+    float topW = -1e9f; for (auto& w : wreck) topW = std::max(topW, w.c.y);
+    for (auto& d : debris) hiD = std::max(hiD, d.p.y);
+    printf("seacrash: seabed %.0f m, highest piece %.1f m at 2 s, %.1f m at 40 s, highest fragment %.1f m %s\n", g_world.height(gx, gz), hiW, topW, hiD,
+           crashed && hiW > -2.f && topW < -3.f && hiD < -3.f ? "ok" : "FAIL");
+    toasts.clear(); return;
   }
   if (name.compare(0, 5, "crash") == 0) {
     // flies into a field nose-down, then advances the wreck simulation by the given number of tenths of a second

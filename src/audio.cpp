@@ -218,7 +218,7 @@ struct ResearchVoice {
   }
 };
 
-struct OneShot { int type; float t; float intensity; float ph; float ph2; Biquad f1, f2; Noise nz; bool active; };
+struct OneShot { int type; float t; float intensity; float ph; float ph2; Biquad f1, f2, f3, f4; Noise nz; bool active; };
 }  // namespace
 
 struct AudioEngine::Impl {
@@ -263,7 +263,7 @@ static void startShot(OneShot& s, int type, float inten, float sr) {
     case SFX_TOUCHDOWN: s.f1.set(BP, 1700, 1.4f, sr); s.f2.set(LP, 90, 0.8f, sr); break;
     case SFX_CRASH: s.f1.set(LP, 900, 0.7f, sr); s.f2.set(BP, 2500, 1.0f, sr); break;
     case SFX_THUNDER: s.f1.set(LP, 160, 0.7f, sr); s.f2.set(LP, 60, 0.7f, sr); break;
-    case SFX_BOOM: s.f1.set(LP, 2200, 0.7f, sr); s.f2.set(LP, 70, 0.8f, sr); break;
+    case SFX_BOOM: s.f1.set(LP, 240, 0.7f, sr); s.f2.set(LP, 75, 0.8f, sr); s.f3.set(HP, 26, 0.7f, sr); s.f4.set(HP, 26, 0.7f, sr); break;
     case SFX_CASH: s.f1.set(BP, 5000, 2.0f, sr); break;
     case SFX_GEAR_CLUNK: s.f1.set(LP, 300, 1.0f, sr); break;
     default: break;
@@ -300,12 +300,17 @@ static bool runShot(OneShot& s, float sr, float& out) {
     case SFX_THUNDER: {
       float env = smoothstepf(0, 0.15f, t) * expf(-t * 0.7f) * (0.6f + 0.4f * sinf(t * 7.f) * sinf(t * 2.3f));
       v = (s.f1.p(s.nz.w()) * 3.f + s.f2.p(s.nz.w()) * 4.f) * env * s.intensity; alive = t < 6.f; break; }
-    case SFX_BOOM: {  // sonic boom: the classic double crack (bow and tail shocks) and a rolling low tail
-      auto nwave = [&](float t0) { float tt = t - t0; if (tt < 0 || tt > 0.03f) return 0.f; return (1.f - 2.f * tt / 0.03f) * smoothstepf(0, 0.0015f, tt); };
-      float crack = nwave(0.0f) * 1.4f + nwave(0.14f) * 1.2f;
-      float body = s.f1.p(crack * 3.f + s.nz.w() * expf(-t * 18.f) * 0.4f);
-      float tail = s.f2.p(s.nz.w()) * 5.f * expf(-t * 1.6f) * smoothstepf(0.0f, 0.05f, t);
-      v = (body * 1.2f + tail) * s.intensity; alive = t < 3.5f; break; }
+    case SFX_BOOM: {  // sonic boom: a deep double "ba-boom" (long bow and tail shock N-waves, low-passed) and a rolling rumble
+      auto nwave = [&](float t0, float len) { float tt = t - t0; if (tt < 0 || tt > len) return 0.f; return (1.f - 2.f * tt / len) * smoothstepf(0, 0.012f, tt) * smoothstepf(len, len - 0.01f, tt); };
+      float shock = nwave(0.0f, 0.08f) + nwave(0.19f, 0.08f) * 0.85f;
+      float body = s.f1.p(shock * 3.5f + s.nz.w() * expf(-t * 8.f) * 0.12f);
+      auto thump = [&](float t0, float f, float a) { float tt = t - t0; if (tt < 0) return 0.f;
+        float ph = 2 * PI * (f - 6.f * tt) * tt;
+        return a * (sinf(ph) + 0.45f * sinf(2.f * ph) * expf(-tt * 4.f)) * expf(-tt * 2.4f) * smoothstepf(0, 0.025f, tt); };
+      float sub = thump(0.f, 36.f, 0.9f) + thump(0.19f, 31.f, 0.75f);
+      float rumble = s.f2.p(s.nz.w()) * 7.f * expf(-t * 0.9f) * smoothstepf(0.05f, 0.4f, t);
+      v = s.f4.p(s.f3.p(body * 2.6f + sub * 0.8f + rumble)) * s.intensity;   // 24 dB/oct high-pass: no wasted infrasound
+      alive = t < 5.f; break; }
     default: alive = false;
   }
   s.t += dt;
