@@ -268,14 +268,14 @@ void Game::flightControls(float dt) {
   if (in.pressed['V'] || (in.buttonsPressed & PAD_X)) { flapNotch = std::max(0.f, flapNotch - 1.f / 3.f); flapToast(); }
   c.flaps = flapNotch;
   // gear
-  if ((in.pressed['G'] || (in.buttonsPressed & PAD_Y)) && plane.spec->retract) {
+  if ((in.pressed['G'] || (in.buttonsPressed & (PAD_Y | PAD_RIGHT))) && plane.spec->retract) {
     if (plane.onGround && c.gearDown) toast("Gear lever is locked on the ground", vec3(1, 0.6f, 0.4f));
     else { c.gearDown = !c.gearDown; toast(c.gearDown ? "Gear down" : "Gear up", vec3(0.8f, 1, 0.8f)); }
   }
   // brakes: B = parking brake toggle, Space = wheel brakes
   static bool parking = true;
   if (flightClock < 0.05f) parking = true;
-  if (in.pressed['B']) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
+  if (in.pressed['B'] || (in.buttonsPressed & PAD_LEFT)) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
   float wb = key(K_SPACE) ? 1.f : 0.f;
   if (in.pad && (in.buttons & PAD_A)) wb = 1.f;
   if (wb > 0 && parking && plane.onGround && length(plane.vel) > 2.f) parking = false;
@@ -302,7 +302,7 @@ void Game::flightControls(float dt) {
 
 void Game::spawn(vec3 p, vec3 v, float life, float size, float grow, vec3 col, float alpha, int kind, float drag, float buoy) {
   if (particles.size() > 3000) return;
-  particles.push_back({p, v, life, life, size, grow, col, alpha, kind, drag, buoy});
+  particles.push_back({p, v, life, life, size, grow, col, alpha, kind, drag, buoy, false});
 }
 
 // checkpoint gate i: centre and half-extent axes (gate faces along the leg leading to it)
@@ -416,9 +416,18 @@ void Game::updateFlight(float dt) {
   }
   // wingtip vapour in humid air under g
   if (!plane.onGround && plane.gLoad > 1.7f && (wx.precip > 0 || plane.pos.y > wx.cloudBase - 300.f)) {
-    for (int s = -1; s <= 1; s += 2) spawn(plane.pos + plane.q.rotate(vec3(s * plane.spec->span * 0.5f, plane.spec->wingY * plane.spec->fusRad, plane.spec->wingZ + 0.6f)), plane.vel * 0.9f, 0.5f, 0.25f, 0.4f, vec3(1, 1, 1), 0.35f, SPR_SMOKE, 3.f, 0.f);
+    // emitted at the real wingtips and spread back along the path flown this frame; the vapour stays in the air
+    // mass (it used to be launched at 90% of the aircraft's speed, which carried it out ahead of the wingtips)
+    vec3 tip = modelWingTip(kModels[plane.spec - kAircraft]);
+    int n = (int)clampf(length(plane.vel) * simDt / 0.45f, 1.f, 16.f);   // ~0.45 m spacing: a continuous streak
+    for (int s = -1; s <= 1; s += 2)
+      for (int k = 0; k < n; k++) {
+        vec3 tp = plane.pos + plane.q.rotate(vec3(s * tip.x, tip.y, tip.z + 0.3f)) - plane.vel * (simDt * (float)k / n);
+        spawn(tp, plane.vel * 0.04f + plane.windVel, 0.5f, 0.42f, 1.4f, vec3(1, 1, 1), 0.2f, SPR_SMOKE, 1.f, 0.f);
+        if (!particles.empty()) particles.back().instant = true;
+      }
   }
-  if (plane.spec->special) jetEffects(dt);
+  if (plane.spec->special) jetEffects(simDt);
   // GPS breadcrumb trail
   trailT += dt;
   if (trailT > 2.f && !plane.onGround) { trailT = 0; trail.push_back(vec2(plane.pos.x, plane.pos.z)); if (trail.size() > 500) trail.erase(trail.begin()); }
@@ -621,10 +630,10 @@ void Game::jetEffects(float dt) {
     int n = ab > 0.05f ? 3 : (thr > 0.4f ? 1 : 0);
     for (int i = 0; i < n; i++) {
       float k = (rand() % 100) * 0.01f;
-      spawn(ex + exDir * k * 2.f, plane.vel + exDir * (40.f + 40.f * ab), 0.06f + 0.06f * ab, 0.45f + 0.35f * ab, -2.f,
+      spawn(ex + exDir * k * 2.f - plane.vel * dt, plane.vel + exDir * (40.f + 40.f * ab), 0.06f + 0.06f * ab, 0.45f + 0.35f * ab, -2.f,
             ab > 0.05f ? vec3(1.f, 0.55f + 0.2f * k, 0.25f) * (0.7f + ab) : vec3(0.5f, 0.6f, 1.f) * 0.5f, 1.f, SPR_FIRE, 0.f, 0.f);
     }
-    if (ab > 0.3f && rand() % 2 == 0) for (int d = 1; d <= 3; d++) spawn(ex + exDir * (d * 1.6f), plane.vel, 0.05f, 0.35f - d * 0.06f, 0.f, vec3(1.f, 0.8f, 0.6f) * 1.5f, 1.f, SPR_SPARK, 0.f, 0.f);
+    if (ab > 0.3f && rand() % 2 == 0) for (int d = 1; d <= 3; d++) spawn(ex + exDir * (d * 1.6f) - plane.vel * dt, plane.vel, 0.05f, 0.35f - d * 0.06f, 0.f, vec3(1.f, 0.8f, 0.6f) * 1.5f, 1.f, SPR_SPARK, 0.f, 0.f);
   }
   // hover downwash: dust or spray blown out in a ring under the jet
   float agl = plane.agl();
@@ -646,7 +655,7 @@ void Game::jetEffects(float dt) {
     vec3 r = plane.right(), u = plane.up();
     for (int i = 0; i < 10; i++) {
       float ang = (rand() % 628) * 0.01f, rad = 2.2f + (rand() % 100) * 0.03f;
-      spawn(c + (r * cosf(ang) + u * sinf(ang) * 0.6f) * rad, plane.vel * 0.97f, 0.25f, 0.8f, 2.f, vec3(1.f), 0.35f, SPR_SMOKE, 0.f, 0.f);
+      spawn(c + (r * cosf(ang) + u * sinf(ang) * 0.6f) * rad - plane.vel * (0.97f * dt), plane.vel * 0.97f, 0.25f, 0.8f, 2.f, vec3(1.f), 0.35f, SPR_SMOKE, 0.f, 0.f);
     }
   }
   if (prevMach < 1.f && M >= 1.f && !plane.onGround) {
@@ -656,7 +665,6 @@ void Game::jetEffects(float dt) {
     bursts.push_back({plane.pos, r * 25.f, u * 25.f, vec3(0.7f, 0.85f, 1.f), 0.f});
   }
   prevMach = M;
-  (void)dt;
 }
 
 // ------------------------------------------------------------------ crash wreckage
@@ -1033,7 +1041,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
   for (auto& o : order) {
     const Particle& p = *o.second;
     float fade = clampf(p.life / p.maxLife, 0, 1);
-    float a = p.alpha * (p.kind == SPR_FIRE ? fade : fade * smoothstepf(0.f, 0.15f, 1.f - fade + 0.15f));
+    float a = p.alpha * (p.kind == SPR_FIRE || p.instant ? fade : fade * smoothstepf(0.f, 0.15f, 1.f - fade + 0.15f));
     if (p.kind == SPR_FIRE || p.kind == SPR_SPARK) bill(add, p.p, std::max(p.size, 0.05f), p.col, p.kind == SPR_SPARK ? fade : a, p.kind, 1.f);
     else bill(alpha, p.p, p.size, p.col, a, p.kind, 1.f);
   }
@@ -1171,6 +1179,14 @@ void Game::debugScene(const std::string& name) {
   career.newGame(); career.license = LIC_ATP;
   if (name == "menu") { screen = SCR_MENU; realTime = 20; return; }
   if (name == "hub") { screen = SCR_HUB; realTime = 20; return; }
+  if (name == "vapour") {  // XR-9 pulling g near the cloud base: wingtip vapour must trail behind the tips
+    resAirborne = true; realTime = 20; launchResearch(); wx.cloudBase = 300; wx.cloudCover = 0.2f;
+    plane.vel = plane.forward() * 280.f; plane.ctl.throttle = 0.9f; botControl = true; plane.ctl.pitch = 0.6f; plane.ctl.gearDown = false; plane.gear = 0;
+    for (int i = 0; i < 40; i++) { realTime += 1 / 60.f; update(1 / 60.f); }
+    camMode = 2; camYaw = 1.2f; camPitch = 0.25f; camZoom = 1.2f; for (int i = 0; i < 5; i++) updateCamera(0.1f); toasts.clear();
+    { int ni = 0; float dmin = 1e9f; for (auto& q : particles) if (q.instant) { ni++; dmin = std::min(dmin, length(q.p - plane.pos)); } printf("vapour: %d trail particles, nearest %.1f m from the CG, g=%.1f\n", ni, dmin, plane.gLoad); }
+    return;
+  }
   if (name == "pad") {  // gamepad menu navigation self-test
     auto frame = [&](unsigned btn) { in.pad = true; in.buttonsPressed = btn & ~in.buttons; in.buttons = btn; realTime += 1 / 30.f; update(1 / 30.f); render(); in.endFrame(); };
     screen = SCR_MENU; realTime = 20;

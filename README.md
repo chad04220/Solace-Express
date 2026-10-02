@@ -56,8 +56,8 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 | Q / E | Rudder / nosewheel | LB / RB |
 | Shift / Ctrl, PgUp / PgDn, 1–9, 0 | Throttle | RT / LT |
 | F / V | Flaps down / up | B / X |
-| G | Landing gear (retractable aircraft) | Y |
-| B | Parking brake | |
+| G | Landing gear (retractable aircraft) | Y or D-pad → |
+| B | Parking brake (set / release) | D-pad ← |
 | Space | Wheel brakes | A |
 | [ / ] | Elevator trim | D-pad ↑ / ↓ |
 | Z | Autopilot (A/D steers heading) | Right-stick click |
