@@ -267,6 +267,9 @@ static void startShot(OneShot& s, int type, float inten, float sr) {
     case SFX_CASH: s.f1.set(BP, 5000, 2.0f, sr); break;
     case SFX_UFO_ZOOM: s.f1.set(BP, 1800, 0.8f, sr); break;
     case SFX_FLYBY: s.f1.set(BP, 2200, 0.7f, sr); s.f2.set(LP, 320, 0.7f, sr); s.f3.set(BP, 900, 0.9f, sr); break;
+    case SFX_LASER: s.f1.set(BP, 3200, 1.2f, sr); break;
+    case SFX_PLASMA: s.f1.set(LP, 180, 0.7f, sr); s.f2.set(LP, 60, 0.8f, sr); s.f3.set(HP, 26, 0.7f, sr); s.f4.set(BP, 1400, 0.8f, sr); break;
+    case SFX_CLOAK: s.f1.set(BP, 2500, 0.6f, sr); break;
     case SFX_GEAR_CLUNK: s.f1.set(LP, 300, 1.0f, sr); break;
     default: break;
   }
@@ -339,6 +342,26 @@ static bool runShot(OneShot& s, float sr, float& out) {
       float hiss = s.f1.p(s.nz.w()) * (x < 0 ? 1.4f : 0.6f), roar = s.f2.p(s.nz.w()) * 3.2f, mid = s.f3.p(s.nz.w()) * 1.1f;
       float whine = (sinf(s.ph) * 0.05f + sinf(s.ph2) * 0.03f) * (x < 0.2f ? 1.f : 0.5f);
       v = (hiss + roar + mid + whine) * env * 0.55f * s.intensity; alive = t < 4.5f; break; }
+    case SFX_LASER: {        // pulse laser: a bright descending zap over a crackle of discharge
+      float f = 2600.f * expf(-t * 18.f) + 380.f;
+      s.ph += 2 * PI * f * dt; s.ph2 += 2 * PI * f * 1.51f * dt;
+      float env = smoothstepf(0.f, 0.004f, t) * expf(-t * 22.f);
+      float sq = sinf(s.ph) > 0 ? 1.f : -1.f;
+      v = (sq * 0.35f + sinf(s.ph2) * 0.4f + s.f1.p(s.nz.w()) * 0.6f * expf(-t * 40.f)) * env * 0.32f * s.intensity; alive = t < 0.3f; break; }
+    case SFX_PLASMA: {       // dark-energy detonation: an inhaled rising whine, then a deep implosion-thump and a long rolling roar
+      float suck = smoothstepf(0.f, 0.35f, t) * smoothstepf(0.45f, 0.38f, t);
+      float fw = 200.f + 2400.f * smoothstepf(0.f, 0.42f, t);
+      s.ph += 2 * PI * fw * dt;
+      float whine = sinf(s.ph) * suck * 0.12f + s.f4.p(s.nz.w()) * suck * 0.5f;
+      float tt = t - 0.42f;
+      float thump = tt > 0 ? sinf(2 * PI * (42.f - 10.f * tt) * tt) * expf(-tt * 3.f) * smoothstepf(0.f, 0.02f, tt) : 0.f;
+      float roar = tt > 0 ? (s.f1.p(s.nz.w()) * 5.f + s.f2.p(s.nz.w()) * 7.f) * expf(-tt * 0.7f) * smoothstepf(0.f, 0.08f, tt) : 0.f;
+      v = (whine + s.f3.p(thump * 1.4f + roar)) * s.intensity; alive = t < 6.f; break; }
+    case SFX_CLOAK: {        // cloak: a shimmering, phasing sweep
+      float env = smoothstepf(0.f, 0.15f, t) * smoothstepf(1.4f, 0.6f, t);
+      float f = (s.intensity > 0.85f ? 300.f + 900.f * t : 1200.f - 700.f * t);
+      s.ph += 2 * PI * f * dt; s.ph2 += 2 * PI * f * 1.007f * dt;
+      v = ((sinf(s.ph) + sinf(s.ph2)) * 0.08f * (0.6f + 0.4f * sinf(t * 40.f)) + s.f1.p(s.nz.w()) * 0.25f) * env; alive = t < 1.5f; break; }
     default: alive = false;
   }
   s.t += dt;

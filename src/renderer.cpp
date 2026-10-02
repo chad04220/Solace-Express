@@ -258,7 +258,7 @@ void Renderer::genMinimap() {
 
 bool Renderer::init(int w, int h) {
   std::string vsFS = kFullscreenVS;
-  std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceFS3;
+  std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceFS3 + kRaytraceWraith;
   progRT = program(vsFS, rt, error);
   if (!progRT) { error = "Ray tracer shader: " + error; return false; }
   progSprite = program(kSpriteVS, kSpriteFS, error);
@@ -564,12 +564,21 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     }
     glUniform1i(U(p, "uDebN"), wv.debris);
     if (wv.debris > 0) { glUniform4fv(U(p, "uDeb"), wv.debris, &wv.deb[0][0]); glUniform4fv(U(p, "uDebQ"), wv.debris, &wv.debQ[0][0]); }
-    glUniform4fv(U(p, "uCrater"), 1, wv.crater);
+    glUniform1i(U(p, "uCraterN"), wv.craterN);
+    if (wv.craterN > 0) glUniform4fv(U(p, "uCrater"), wv.craterN, &wv.crater[0][0]);
   }
   glUniform3f(U(p, "uLandLightPos"), fp.landLightPos.x, fp.landLightPos.y, fp.landLightPos.z);
   glUniform3f(U(p, "uLandLightDir"), fp.landLightDir.x, fp.landLightDir.y, fp.landLightDir.z);
   glUniform1f(U(p, "uLandLight"), fp.landLight);
   glUniform4fv(U(p, "uFlame"), 1, pv.flame);
+  glUniform4fv(U(p, "uWr"), 7, &pv.wr[0][0]);
+  {
+    const FxVisual& fx = fp.fx;
+    glUniform1i(U(p, "uFxBeams"), fx.beams); glUniform1i(U(p, "uFxBombs"), fx.bombs); glUniform1i(U(p, "uFxBlasts"), fx.blasts);
+    if (fx.beams) { glUniform4fv(U(p, "uBeamA"), fx.beams, &fx.beamA[0][0]); glUniform4fv(U(p, "uBeamB"), fx.beams, &fx.beamB[0][0]); }
+    if (fx.bombs) glUniform4fv(U(p, "uBombs"), fx.bombs, &fx.bomb[0][0]);
+    if (fx.blasts) { glUniform4fv(U(p, "uBlast"), fx.blasts, &fx.blast[0][0]); glUniform4fv(U(p, "uBlastI"), fx.blasts, &fx.blastI[0][0]); }
+  }
   glUniform3f(U(p, "uFlameLP"), fp.flameLightPos.x, fp.flameLightPos.y, fp.flameLightPos.z);
   glUniform3f(U(p, "uFlameLI"), fp.flameLight.x, fp.flameLight.y, fp.flameLight.z);
   glBindVertexArray(vaoEmpty);

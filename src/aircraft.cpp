@@ -45,7 +45,7 @@ const AircraftSpec kAircraft[] = {
   {"xr11", "XR-11 Wraith", "Stealth aerobatic research model", ENG_JET, 4, 0, 0, 0, 0, 10500, 3000, 0, 0, 52.0f, 12.4f, 5.2f,
    0.03f, 3.4f, 1.60f, 0.0f, 0.012f, 0.010f, 0.0f, 0.72f, 62000, 0, 60, 70, 480, 5000, 200, true, false, true,
    30000, 80000, 100000, 0.90f, 0.090f, 0.070f, LIC_STUDENT, 0, 0,
-   16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.15f, 0.16f, 0.18f), vec3(0.72f, 0.3f, 1.0f), 2},
+   16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.075f, 0.08f, 0.09f), vec3(0.72f, 0.3f, 1.0f), 2},
 };
 // clang-format on
 const int kNumAircraft = sizeof(kAircraft) / sizeof(kAircraft[0]) - 2;  // the research craft are not part of the career
@@ -408,7 +408,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
 // speed and low power the controls really do go soft.
 namespace {
 struct PodCmd { float diff[4], dp[4], dy[4], dt[4]; };
-void podForces(const PodCmd& c, float tilt, float Tp, vec3& F, vec3& Tq, float* outTilt, float* outYaw, float* outThr) {
+void podForces(const PodCmd& c, float tilt, float Tp, vec3& F, vec3& Tq, float* outTilt, float* outYaw, float* outThr, float* outVane = nullptr) {
   F = vec3(0, 0, 0); Tq = vec3(0, 0, 0);
   for (int i = 0; i < 4; i++) {
     float a = tilt + c.dp[i] + c.dt[i], y = c.dy[i];
@@ -416,7 +416,7 @@ void podForces(const PodCmd& c, float tilt, float Tp, vec3& F, vec3& Tq, float* 
     float T = Tp * (1.f + c.diff[i]);
     vec3 f = d * T;
     F += f; Tq += cross(kWraithPods[i], f);
-    if (outTilt) { outTilt[i] = a; outYaw[i] = y; outThr[i] = T; }
+    if (outTilt) { outTilt[i] = tilt + c.dt[i]; outYaw[i] = y; outThr[i] = T; outVane[i] = c.dp[i]; }
   }
 }
 // virtual control k (0..5) at unit strength u -> per-pod commands
@@ -442,8 +442,9 @@ void Plane::wraithThrust(vec3& F, vec3& T, float Tp, vec3 wd, vec3 Taero, vec3 s
   vec3 tDes(I.x * kp * (wd.x - w.x), I.y * k * (wd.y - w.y), I.z * k * (wd.z - w.z));
   vec3 need = tDes - Taero;   // cancel the airframe's own moments too
   // 1) control surfaces: elevons (pitch, roll) and ruddervators (yaw)
-  vec3 u(surfMax.x > 1.f ? clampf(need.x / surfMax.x, -1.f, 1.f) : 0.f, surfMax.y > 1.f ? clampf(need.y / surfMax.y, -1.f, 1.f) : 0.f,
-         surfMax.z > 1.f ? clampf(need.z / surfMax.z, -1.f, 1.f) : 0.f);
+  // (below ~15 m/s the surfaces have nothing to work with: they stay faired instead of flailing at full throw)
+  auto alloc = [](float n, float mx) { return mx > 3e4f ? clampf(n / mx, -1.f, 1.f) * smoothstepf(3e4f, 1.5e5f, mx) : 0.f; };
+  vec3 u(alloc(need.x, surfMax.x), alloc(need.y, surfMax.y), alloc(need.z, surfMax.z));
   vec3 tSurf(u.x * surfMax.x, u.y * surfMax.y, u.z * surfMax.z);
   surf = vec3(u.x, -u.y, -u.z);   // as stick-style deflections: pitch up, yaw right, roll right
   // 2) thrust: base forces at the commanded tilt, then the pod controls for the remainder (bounded least squares)
@@ -490,7 +491,7 @@ void Plane::wraithThrust(vec3& F, vec3& T, float Tp, vec3 wd, vec3 Taero, vec3 s
   PodCmd c = {};
   for (int kk = 0; kk < 6; kk++) applyVirtual(c, kk, uv[kk]);
   vec3 Fp, Tpq;
-  podForces(c, tilt, Tp, Fp, Tpq, podTilt, podYaw, podThr);
+  podForces(c, tilt, Tp, Fp, Tpq, podTilt, podYaw, podThr, podVane);
   float Tfull = s.power * 2.1f;
   for (int i = 0; i < 4; i++) podThr[i] /= Tfull;
   fanAngle = fmodf(fanAngle + (6.f + 90.f * engineSpool) * dt, 2 * PI * 64.f);

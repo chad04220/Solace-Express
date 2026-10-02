@@ -115,10 +115,28 @@ private:
   bool airBreak = false;
   float gTunnel = 0;
   Traffic traffic;
-  bool dbgCam = false; vec3 dbgCamPos, dbgCamLook;
+  bool dbgCam = false, dbgFollow = false; vec3 dbgCamPos, dbgCamLook, dbgFollowOff;
   // UFO encounter: pulls up alongside, opens its hatch on two dancing aliens, laughs, waves and zooms off
   struct Ufo { bool on = false; float t = 0, next = 0, side = 1, hatch = 0, laugh = 0, wave = 0; vec3 pos, fwd, right, up; bool sfxLaugh = false, sfxZoom = false; };
   float escortSummon = 0; bool escortLatch = false;   // O + P held: the Spectre display pair
+  // XR-11 Wraith systems: cloak, retracting laser turrets, bomb bay and the dark-energy weapons in the world
+  struct WraithState {
+    bool cloakOn = false; float stealth = 0, front = -12.f;        // cloak: strength 0..1 and the wavefront along the craft (body z)
+    bool armed = false; float lasers = 0;                          // turrets deployed 0..1
+    float laserCD = 0, laserGlow = 0; int laserSide = 0;
+    float bay = 0, bayHold = 0, bombLoaded = 1; int bombQueue = 0;  // bomb bay doors, bomb in the cradle 0..1, pending drops
+    struct Bolt { vec3 a, b; float life; };
+    struct Bomb { vec3 p, v; float t; };
+    struct Blast { vec3 p; float R, age, dur; bool water; };
+    struct Crater { float x, z, R, D; };
+    std::vector<Bolt> bolts; std::vector<Bomb> bombs; std::vector<Blast> blasts; std::vector<Crater> craters;
+    int kills = 0;
+  } wraith;
+  void wraithControls(float dt);
+  void updateWraith(float dt);
+  void wraithVisual(FrameParams& fp);
+  void fireLaser();
+  void detonate(vec3 p, bool water);
   float ufoSummon = 0;          // J + K held while flying summons the UFO after a second
   Ufo ufo;
   void startUfo();
@@ -191,7 +209,7 @@ private:
   void drawGps();
   // hidden Confidential Research Model menu (U + I on the main menu) and free XR-9 flights
   bool researchFlight = false;
-  int resAirport = 0, resWx = 0; bool resAirborne = true; float resTime = 12.f, resOpened = 0;
+  int resAirport = 0, resWx = 0, resCraft = kResearchJet; bool resAirborne = true; float resTime = 12.f, resOpened = 0;
   float prevMach = 0, prevAB = 0;
   // gamepad-driven menu cursor (left stick moves, A clicks, B backs out)
   float padCursorT = -100.f; bool padHoldA = false;

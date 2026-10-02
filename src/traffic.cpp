@@ -558,6 +558,25 @@ void Traffic::escMark() {
   }
 }
 
+int Traffic::rayHit(vec3 a, vec3 d, float len, float& tHit) const {
+  int best = -1; tHit = len;
+  for (int i = 0; i < (int)craft.size(); i++) {
+    const TrafficCraft& c = craft[i];
+    if (!c.alive || c.role == TrafficCraft::ESCORT) continue;
+    float r = std::max(kAircraft[c.spec].span, kAircraft[c.spec].fusLen) * 0.45f;
+    float t = dot(c.pos - a, d);
+    if (t < 0 || t > tHit) continue;
+    if (length(c.pos - (a + d * t)) < r) { tHit = t; best = i; }
+  }
+  return best;
+}
+
+int Traffic::destroyNear(vec3 c, float R, std::vector<vec3>& where) {
+  int n = 0;
+  for (auto& k : craft) if (k.alive && k.role != TrafficCraft::ESCORT && length(k.pos - c) < R) { k.alive = false; where.push_back(k.pos); n++; }
+  return n;
+}
+
 void Traffic::dismissEscort() {
   if (count(TrafficCraft::ESCORT) == 0 || escAct == ESC_LEAVE) return;
   escAct = ESC_LEAVE; escT = 0; escMark();

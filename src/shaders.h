@@ -14,9 +14,12 @@ const int HMN = 1024;
 const float TEXEL = 78.125;
 const float PI = 3.14159265;
 uniform sampler2D uHM;
-uniform vec4 uCrater;  // impact crater: x, z, radius, depth (radius 0 = none)
-float craterH(vec2 p){ if (uCrater.z <= 0.0) return 0.0; float d = length(p - uCrater.xy)/uCrater.z; if (d > 1.8) return 0.0;
-  return -uCrater.w*max(1.0 - d*d, 0.0) + 0.22*uCrater.w*exp(-(d - 1.0)*(d - 1.0)*14.0); }
+uniform vec4 uCrater[8]; uniform int uCraterN;  // impact craters: x, z, radius, depth (negative depth: dark-energy blast)
+int craterAt(vec2 p, float k){ for (int i = 0; i < 8; i++) { if (i >= uCraterN) break; if (length(p - uCrater[i].xy) < uCrater[i].z*k) return i; } return -1; }
+float craterH(vec2 p){ float h = 0.0;
+  for (int i = 0; i < 8; i++) { if (i >= uCraterN) break; vec4 c = uCrater[i]; float d = length(p - c.xy)/c.z; if (d > 1.8) continue; float D = abs(c.w);
+    h += -D*max(1.0 - d*d, 0.0) + 0.22*D*exp(-(d - 1.0)*(d - 1.0)*14.0); }
+  return h; }
 float hash2i(ivec2 p){ uint h = uint(p.x)*0x8da6b343u + uint(p.y)*0xd8163841u; h ^= h>>13; h *= 0x5bd1e995u; h ^= h>>15; return float(h & 0xFFFFFFu)/16777216.0; }
 float hash1(float n){ return fract(sin(n)*43758.5453); }
 float hash3(vec3 p){ p = fract(p*0.3183099+0.1); p*=17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
@@ -92,7 +95,7 @@ float coverH(vec2 p, float g, vec4 b, out int kind){
     if (hash2i(ivec2(c.x*3+11, c.y*5-7)) < fd*0.9*SCENERY_DENSITY) {
       vec2 j = vec2(hash2i(c+ivec2(101,-31)), hash2i(c+ivec2(-57,77))) - 0.5;
       vec2 cc = (vec2(c) + 0.5 + j*0.3)*10.0;
-      if (uCrater.z > 0.0 && length(cc - uCrater.xy) < uCrater.z*1.7) return best;  // flattened by the impact
+      if (uCraterN > 0 && craterAt(cc, 1.7) >= 0) return best;  // flattened by the impact
       float sp = hash2i(ivec2(c.x*13+1, c.y*7+3)), hv = hash2i(c+ivec2(-3,19));
       bool conifer = cold > 0.45 || g > 650.0 || sp < 0.18;
       bool palm = !conifer && lush > 0.85 && g < 70.0 && sp > 0.35;
@@ -134,7 +137,7 @@ float coverH(vec2 p, float g, vec4 b, out int kind){
 float terrainHF(vec2 p, int oct, float fade, float rayY){
   vec4 b = baseAt(p);
   float g = b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct);
-  if (uCrater.z > 0.0 && g > 0.3) { float cd = length(p - uCrater.xy)/uCrater.z; if (cd < 1.8) g += craterH(p); }
+  if (uCraterN > 0 && g > 0.3) g += craterH(p);
   // trees <= 18 m and rocks <= 7 m above land, sea stacks <= 44 m: above that the cover cannot be hit
   if (fade <= 0.001 || (b.y < 0.01 && g > 0.5) || rayY - g > (g < 0.3 ? 46.0 : 19.0)) return g;
   int k;
@@ -217,6 +220,10 @@ uniform vec4 uM[24]; uniform vec4 uPS; uniform vec4 uCtl; uniform vec4 uPr; unif
 uniform vec3 uColBase; uniform vec3 uColStripe;
 uniform vec4 uProp[2]; uniform int uPropCount;
 uniform vec3 uLandLightPos; uniform vec3 uLandLightDir; uniform float uLandLight;
+uniform vec4 uWr[7];   // XR-11 Wraith animation and weapons state (see mapWraith)
+uniform int uFxBeams; uniform vec4 uBeamA[2]; uniform vec4 uBeamB[2];   // laser bolts: start + radius, end + intensity
+uniform int uFxBombs; uniform vec4 uBombs[8];                           // dark-energy bombs in flight: centre + radius
+uniform int uFxBlasts; uniform vec4 uBlast[6]; uniform vec4 uBlastI[6]; // detonations: centre + radius, age 0..1 + intensity
 uniform vec4 uFlame; uniform vec3 uFlameLP; uniform vec3 uFlameLI;  // research jet exhaust: spool, reheat, vector angle, mach | light pos, radiance
 // Per-aircraft data the SDF and its shading read: your aircraft (uniforms) or a traffic aircraft (uTraffic row k:
 // texels 0-23 model, 24 position + bound radius, 25-27 rotation columns, 28 state, 29 controls, 30 base colour + prop
@@ -484,8 +491,10 @@ vec2 mapJet(vec3 p){
   }
   return res;
 }
+vec2 mapWraith(vec3 p);
 vec2 mapPlane(vec3 p){
   if (int(gM[0].z + 0.5) == 5) return mapJet(p);
+  if (int(gM[0].z + 0.5) == 6) return mapWraith(p);
   float L = gM[0].x; int gtype = int(gM[0].y + 0.5); int eng = int(gM[0].z + 0.5); float R = gM[0].w;
   float gear = gPS.x, flaps = gPS.y, steer = gPS.z, inside = gPS.w;
   float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z, cThr = gCtl.w;
@@ -856,7 +865,7 @@ vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
   mat3 inv = transpose(gPR);
   vec3 lo = gPC + inv*(ro - gPP), ld = inv*rd;
   float t = t0;
-  bool jet = int(gM[0].z + 0.5) == 5;   // XR-9: thin flattened shapes need finer steps
+  bool jet = int(gM[0].z + 0.5) >= 5;   // XR-9 / XR-11: thin flattened shapes need finer steps
   int steps = gPS.w > 0.5 || jet ? 200 : 120;
   float relax = jet ? 0.65 : 0.8;
   for (int i=0;i<200;i++){
@@ -940,7 +949,7 @@ float planeShadow(vec3 ro, vec3 rd){
   if (uWreck == 0) { pieceXf(-1); res = pieceShadow(ro, rd, planeBound()); }
   else for (int i = 0; i < 5; i++) { if (i >= uWreck) break; pieceXf(i); res = min(res, pieceShadow(ro, rd, length(uPcH[i]) + 0.3)); }
   gPI = keep; gPP = kP; gPR = kR; gPC = kC;
-  return res;
+  return mix(res, 1.0, uWr[4].w*0.88);   // a cloaked XR-11 barely darkens the ground
 }
 vec3 dialFace(vec2 d, float r, out bool inside){
   float rr = length(d)/r; inside = rr < 1.0;
@@ -1590,9 +1599,17 @@ R"(  vec3 grassTint = mix(vec3(0.75,0.85,0.45), vec3(0.55,0.95,0.45), lush) * mi
   vec2 auv; int ai = airportAt(p.xz, auv);
   if (ai >= 0) { bool onRw, paved; runwayMaterial(ai, auv, m, p, onRw, paved); }
   // ---- impact crater: churned earth, scorched blast ring, smouldering embers in the pit
-  if (uCrater.z > 0.0) {
-    float cd = length(p.xz - uCrater.xy)/uCrater.z;
-    if (cd < 2.6) {
+  int ci = uCraterN > 0 ? craterAt(p.xz, 2.6) : -1;
+  if (ci >= 0) {
+    vec4 cr = uCrater[ci]; float cd = length(p.xz - cr.xy)/cr.z;
+    if (cr.w < 0.0) {   // dark-energy crater: fused black glass, violet embers glowing in the cracks
+      float nz = vnoise(p.xz*0.5) + 0.5*vnoise(p.xz*2.3);
+      float glass = smoothstep(1.3, 0.6, cd*(0.85 + 0.3*nz)), scorch = smoothstep(2.6, 1.0, cd*(0.8 + 0.35*nz));
+      m.alb = mix(m.alb, vec3(0.012, 0.01, 0.016), max(scorch*0.9, glass));
+      m.rough = mix(m.rough, 0.08, glass); m.metal = mix(m.metal, 0.3, glass); m.nrm = mix(m.nrm, vec3(0,0,1), glass*0.8);
+      float crack = pow(clamp(1.0 - abs(vnoise(p.xz*1.3 + 7.0) - 0.5)*7.0, 0.0, 1.0), 4.0);
+      m.emit += vec3(0.6, 0.2, 1.0)*crack*glass*(1.5 + sin(uTime*2.0 + nz*6.0));
+    } else if (cd < 2.6) {
       float nz = vnoise(p.xz*0.35) + 0.5*vnoise(p.xz*1.7);
       float scorch = smoothstep(2.6, 1.1, cd*(0.8 + 0.35*nz));
       vec3 dirt = mix(vec3(0.16, 0.12, 0.09), vec3(0.08, 0.065, 0.05), nz*0.7);
@@ -2311,6 +2328,10 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float jit){
   acc *= (0.25 + 0.75*sp)*(0.9 + 0.1*sin(uTime*63.0));
   return acc/(1.0 + max(acc.r, max(acc.g, acc.b))*0.2);   // hue-preserving roll-off: looking down the plume stays amber
 }
+void shadeWraith(inout Mat m, int mid, vec3 lp, vec3 ln, float t);
+vec3 wraithPlumes(vec3 ro, vec3 rd, float tmax, float jit);
+vec3 cloakSkin(vec3 world, vec3 n, vec3 rd, vec3 lp, float front);
+vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t);
 vec3 jetPlumes(vec3 ro, vec3 rd, float tmax, float jit){
   if (gFlame.x < 0.02) return vec3(0.0);
   mat3 inv = transpose(uPlaneRot);
@@ -2340,12 +2361,24 @@ void main(){
   // window) needs nothing from outside, so only rays leaving through the windows trace the world.
   bool pod = false, cockpitView = uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0; vec2 h0 = vec2(-1.0);
   if (cockpitView) {
-    bool jet = int(gM[0].z + 0.5) == 5;
+    bool jet = int(gM[0].z + 0.5) >= 5;
     h0 = tracePlane(ro, rd, jet ? 6.0 : planeBound()*2.0);
     if (h0.x > 0.0) {
       int id0 = int(h0.y + 0.5);
       if (jet && id0 >= 41 && id0 <= 43) { onScr = true; scrId = id0; scrL = transpose(uPlaneRot)*(ro + rd*h0.x - uPlanePos); }
       else { pod = true; tmax = h0.x + 0.05; }
+    }
+  }
+  // XR-11 cloak: a pixel on the cloaked craft sees the world behind it along a slightly bent ray
+  bool cloak = false; vec3 ckN = vec3(0.0), ckLp = vec3(0.0), rd0 = rd; float ckT = 0.0;
+  if (uWr[4].w > 0.001 && uPlaneOn == 1 && uWreck == 0 && !cockpitView && int(gM[0].z + 0.5) == 6) {
+    vec2 hc = tracePlane(ro, rd, tmax);
+    if (hc.x > 0.0) {
+      vec3 hp = ro + rd*hc.x; ckLp = transpose(uPlaneRot)*(hp - uPlanePos);
+      if (ckLp.z < uWr[6].y) {
+        cloak = true; ckT = hc.x; ckN = uPlaneRot*planeNormal(ckLp);
+        ro = hp + rd*0.05; rd = normalize(rd - (ckN - rd*dot(ckN, rd))*0.07);
+      }
     }
   }
   float tT = pod ? -1.0 : traceTerrain(ro, rd, tmax);
@@ -2354,7 +2387,7 @@ void main(){
   vec2 bh = pod ? vec2(-1.0) : traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
   int trafK = -1; vec2 trafH = vec2(-1.0);
   if (!pod && uTrafficN > 0) { trafH = traceTraffic(ro, rd, tmax, trafK); loadMain(); }
-  vec2 ph = onScr || (cockpitView && !pod) ? vec2(-1.0) : (pod ? h0 : tracePlane(ro, rd, tmax));
+  vec2 ph = onScr || cloak || (cockpitView && !pod) ? vec2(-1.0) : (pod ? h0 : tracePlane(ro, rd, tmax));
   float tSoFar = min(tT > 0.0 ? tT : (tW > 0.0 ? tW : tmax), tmax);
   vec3 tn; vec4 tinfo;
   float tB = pod ? -1.0 : traceTowns(ro, rd, tSoFar, tn, tinfo);
@@ -2566,7 +2599,8 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
         m.alb = mix(vec3(0.04), vec3(0.22), bl); m.metal = 0.9; m.rough = 0.3;
         if (length(fq) < gM[16].z*0.25) m.alb = vec3(0.05);
       }
-      if (mid >= 30 && mid < 60) {  // XR-9 research jet surfaces
+      if (mid >= 80 && mid < 100) shadeWraith(m, mid, lp, ln, t);
+      else if (mid >= 30 && mid < 60) {  // XR-9 research jet surfaces
         vec3 nT; vec4 tx;
         float pulse = 0.75 + 0.25*sin(uTime*2.5);
         if (mid == 30 || mid == 31) {
@@ -2772,14 +2806,403 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
   }
   // research jet exhaust plumes (additive, depth-limited by the scene)
   if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 5) col += jetPlumes(ro, rd, t, jitter);
+  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 6) col += wraithPlumes(ro, rd, t, jitter);
+  if (!pod && uFxBeams + uFxBombs + uFxBlasts > 0) col = weaponsFx(col, ro, rd, t);
   // clouds
   vec4 cl = pod ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(ro, rd, t, jitter);
   col = col*cl.a + cl.rgb;
   if (onScr) col = jetScreen(col, rd, scrId, scrL);
+  if (cloak) { col = cloakSkin(col, ckN, rd0, ckLp, ckLp.z - uWr[6].y + 0.8); t += ckT; taaFlag = 0.5; }
   if (any(isnan(col)) || any(isinf(col)) || !(col.r + col.g + col.b < 1e7)) col = vec3(0.0);
   oColor = vec4(clamp(col, vec3(0.0), vec3(3e4)), taaFlag);
   oDepth = t;
 }
+)";
+
+static const char* kRaytraceWraith = R"(// ---------------------------------------------------------------- XR-11 Wraith (engine code 6)
+// Faceted stealth airframe: diamond-section fuselage with sharp chines, caret intakes, a faceted canopy, a cranked
+// diamond wing with a forward-swept trailing edge and elevons, canted all-moving ruddervators, four tilting thruster
+// pods on pylons (intake fans, iris nozzles, vectoring vanes, trunnions and hydraulic tilt actuators), a belly bomb
+// bay with clamshell doors and the bomb in its cradle, and two laser turrets that drop out of the forward chines.
+// uWr: [0] pod tilt, [1] pod yaw vane, [2] pod thrust, [3] pod pitch vane, [4] fan angle, bay, lasers, stealth,
+// [5] elevon, ruddervator, roll surfaces, laser fire, [6] bomb loaded, cloak sweep, weapons armed, -
+const vec3 WR_POD[4] = vec3[4](vec3(-2.35, -0.08, -3.3), vec3(2.35, -0.08, -3.3), vec3(-2.75, 0.05, 3.45), vec3(2.75, 0.05, 3.45));
+float wrOct(vec2 q){ q = abs(q); return max(max(q.x, q.y), (q.x + q.y)*0.70711); }
+// fuselage cross-section at z: half width, chine height, ridge height, belly height
+void wrSection(float z, out float W, out float yc, out float top, out float bot){
+  W = z < -4.4 ? (z + 8.4)*0.30 : (z < 4.5 ? 1.2 + (z + 4.4)*0.012 : 1.31 - (z - 4.5)*0.13);
+  yc = -0.1 - 0.12*smoothstep(-5.0, -8.4, z);
+  top = yc + min((z + 8.4)*0.16, 0.62) - max(z - 4.0, 0.0)*0.05;
+  bot = yc - min((z + 8.4)*0.12, 0.48) + max(z - 5.0, 0.0)*0.06;
+}
+float wrBody(vec3 p){
+  float W, yc, top, bot; wrSection(p.z, W, yc, top, bot);
+  W = max(W, 0.001);
+  vec2 q = vec2(abs(p.x), p.y - yc);
+  float h = top - yc, hb = yc - bot, Wb = W*0.42;
+  vec2 nU = normalize(vec2(h, W)), nL = normalize(vec2(hb, Wb - W));
+  float d = max(dot(q - vec2(W, 0.0), nU), dot(q - vec2(W, 0.0), nL));
+  d = max(d, bot - p.y);
+  return max(d, max(-8.4 - p.z, p.z - 7.8));
+}
+// one thruster pod (i), evaluated in its own frame: pivot at the origin, exhaust along +z
+vec2 wrPod(vec3 p, int i, float lim){
+  vec3 P = WR_POD[i];
+  if (length(p - P) - 2.2 > lim) return vec2(1e5, 0.0);
+  float tilt = uWr[0][i], yawv = uWr[1][i], thr = uWr[2][i], vane = uWr[3][i];
+  float side = P.x > 0.0 ? 1.0 : -1.0;
+  vec3 q = p - P; q.yz = rot2(q.yz, -tilt);
+  // faceted nacelle: an octagonal shell that tapers aft, open at both ends
+  float R = 0.52 - 0.07*smoothstep(-0.2, 1.3, q.z);
+  float oc = wrOct(q.xy);
+  float shell = max(oc - R, abs(q.z + 0.03) - 1.32);
+  float duct = max(oc - (R - 0.07), max(-(q.z + 1.5), q.z + 0.82));       // intake duct
+  duct = min(duct, max(oc - (R - 0.06), max(0.92 - q.z, q.z - 1.5)));     // nozzle bay
+  shell = max(shell, -duct);
+  vec2 res = vec2(shell, 83.0);
+  // stealth intake lip: a sawtooth chevron edge
+  res = opU(res, vec2(max(abs(oc - R + 0.035) - 0.035, abs(q.z + 1.33) - 0.025 - 0.02*abs(fract(atan(q.y, q.x)*1.273) - 0.5)), 84.0));
+  // intake fan: hub and 14 twisted blades turning with the spool
+  float r = length(q.xy);
+  float a = atan(q.y, q.x) + uWr[4].x*(side > 0.0 ? 1.0 : -1.0);
+  float sec = 6.28318/14.0; float aa = mod(a + sec*0.5, sec) - sec*0.5;
+  vec2 bp = rot2(vec2(r*aa, q.z + 0.86), 0.65);
+  float blade = max(max(abs(bp.x) - 0.11, abs(bp.y) - 0.012), max(r - (R - 0.08), 0.1 - r));
+  float hub = sdEllipsoid(q - vec3(0.0, 0.0, -0.86), vec3(0.15, 0.15, 0.24));
+  res = opU(res, vec2(min(blade, hub), 85.0));
+  // turbine core glow deep in the nacelle
+  res = opU(res, vec2(max(oc - (R - 0.08), abs(q.z - 0.86) - 0.015), 86.0));
+  // iris nozzle: ten petals that open with thrust, with gaps between them
+  {
+    float zn = clamp((q.z - 0.95)/0.42, 0.0, 1.0);
+    float exitR = 0.28 + 0.1*clamp(thr, 0.0, 1.0);
+    float coneR = mix(R - 0.05, exitR, zn);
+    float ps = 6.28318/10.0; float pa = mod(atan(q.y, q.x) + ps*0.5, ps) - ps*0.5;
+    float pet = max(max(abs(r - coneR) - 0.022, abs(q.z - 1.16) - 0.21), abs(r*pa) - coneR*0.27);
+    res = opU(res, vec2(pet, 84.0));
+  }
+  // vectoring vanes across the jet: three pitch vanes and two yaw vanes, on pivots in the nozzle exit
+  {
+    float zr = R - 0.12;
+    for (int k = -1; k <= 1; k++) {
+      vec3 vq = q - vec3(0.0, float(k)*0.13, 1.42);
+      vq.yz = rot2(vq.yz, -vane*1.4);
+      res = opU(res, vec2(sdBox(vq, vec3(zr*0.9 - abs(float(k))*0.06, 0.012, 0.075)), 84.0));
+    }
+    for (int k = -1; k <= 1; k += 2) {
+      vec3 vq = q - vec3(float(k)*0.11, 0.0, 1.5);
+      vq.xz = rot2(vq.xz, -yawv*1.4*side);
+      res = opU(res, vec2(sdBox(vq, vec3(0.01, zr*0.75, 0.07)), 84.0));
+    }
+  }
+  // tilt trunnion (fixed to the airframe, along x) and the lug ring on the pod
+  vec3 tq = p - P;
+  float trun = sdCapsule(tq, vec3(-side*0.25, 0.0, 0.0), vec3(-side*0.85, 0.0, 0.0), 0.11);
+  res = opU(res, vec2(trun, 92.0));
+  res = opU(res, vec2(max(abs(length(q.yz) - 0.2) - 0.03, abs(q.x + side*0.5) - 0.06), 84.0));
+  // hydraulic tilt actuator: barrel on the pylon, chrome rod to a lug on the pod (its length follows the tilt)
+  vec3 anchor = P + vec3(-side*0.75, 0.42, -0.95);
+  vec3 lugL = vec3(-side*0.42, 0.36, -0.75); lugL.yz = rot2(lugL.yz, tilt);
+  vec3 lug = P + lugL;
+  vec3 ad = lug - anchor; float al = length(ad);
+  float act = min(sdCapsule(p, anchor, anchor + normalize(ad)*0.6, 0.07), sdCapsule(p, anchor + normalize(ad)*0.55, lug, 0.035));
+  res = opU(res, vec2(act, 92.0));
+  return res;
+}
+vec2 mapWraith(vec3 p){
+  float gear = gPS.x, inside = gPS.w;
+  if (inside > 0.5) return mapJetCockpit(p);
+  vec3 ap = vec3(abs(p.x), p.y, p.z);
+  float sgn = p.x > 0.0 ? 1.0 : -1.0;
+  float body = wrBody(p);
+  float W, yc, top, bot; wrSection(p.z, W, yc, top, bot);
+  // chine extensions (LERX) blend the fuselage into the wing
+  body = min(body, max(abs(p.y - yc + 0.02) - 0.05*(1.0 - smoothstep(0.0, 2.2, ap.x - W)), max(ap.x - W - 2.0 + (p.z + 4.0)*-0.5, max(-4.4 - p.z, p.z + 0.2))));
+  vec2 res = vec2(body, 80.0);
+  // caret intakes under the chines
+  {
+    vec3 iq = vec3(ap.x - 0.95, p.y - (yc - 0.24), p.z + 1.6);
+    float face = iq.z + 0.75 - iq.x*0.6;
+    float cut = max(sdBox(iq, vec3(0.26, 0.15, 0.9)), face);
+    res.x = max(res.x, -cut);
+    res = opU(res, vec2(max(sdBox(iq - vec3(0.0, 0.0, 0.25), vec3(0.24, 0.13, 0.7)), -face - 0.04), 93.0));
+  }
+  // bomb bay: clamshell doors hinged at the outer edges, cavity with frames, the bomb in its cradle
+  float bay = uWr[4].y;
+  {
+    float by = bot + 0.005;
+    vec3 cq = vec3(p.x, p.y - (by + 0.24), p.z - 0.1);
+    float cav = sdBox(cq, vec3(0.52, 0.25, 1.66));
+    if (-cav > res.x) res = vec2(-cav, 88.0); else res.x = max(res.x, -cav);
+    // frames across the bay roof
+    res = opU(res, vec2(max(sdBox(vec3(p.x, p.y - (by + 0.47), mod(p.z + 1.56, 0.52) - 0.26), vec3(0.52, 0.03, 0.025)), abs(p.z - 0.1) - 1.66), 88.0));
+    vec3 dq = vec3(ap.x - 0.53, p.y - by, p.z - 0.1);
+    vec2 dr = rot2(dq.xy, -bay*1.75);
+    float door = sdBox(vec3(dr.x + 0.265, dr.y + 0.014, dq.z), vec3(0.265, 0.014, 1.66));
+    res = opU(res, vec2(door, 81.0));
+    float bl = uWr[6].x;
+    if (bl > 0.01) {
+      vec3 bc = vec3(0.0, by + 0.27, 0.1);
+      res = opU(res, vec2(length(p - bc) - 0.29*bl, 89.0));
+      float cr = min(sdCapsule(ap, vec3(0.0, by + 0.5, -0.2), vec3(0.22, bc.y + 0.12, -0.2), 0.03), sdCapsule(ap, vec3(0.0, by + 0.5, 0.4), vec3(0.22, bc.y + 0.12, 0.4), 0.03));
+      res = opU(res, vec2(cr, 92.0));
+    }
+  }
+  // laser turrets: a hatch opens in each forward chine and the emitter drops out on its arm
+  float las = uWr[4].z;
+  if (length(ap - vec3(0.95, -0.45, -5.1)) < 2.0 + res.x) {
+    vec3 lq = ap - vec3(0.95, yc - 0.18, -5.1);
+    float well = sdBox(lq, vec3(0.2, 0.17, 0.5));
+    if (las > 0.02) res.x = max(res.x, -well);
+    vec3 hq = lq - vec3(0.2, -0.17, 0.0); hq.xy = rot2(hq.xy, las*1.9);
+    res = opU(res, vec2(sdBox(hq + vec3(0.2, -0.012, 0.0), vec3(0.2, 0.012, 0.5)), 81.0));
+    vec3 tq = lq - vec3(0.0, -0.38*las, -0.25*las);
+    float house = sdRoundBox(tq, vec3(0.13, 0.1, 0.32), 0.035);
+    float arm = sdCapsule(lq, vec3(0.0, 0.05, 0.1), vec3(0.0, -0.38*las + 0.05, -0.25*las + 0.1), 0.045);
+    res = opU(res, vec2(min(house, arm), 90.0));
+    vec3 bq = tq - vec3(0.0, -0.02, -0.32);
+    float barrel = sdCapsule(bq, vec3(0.0), vec3(0.0, 0.0, -0.55 - 0.15*las), 0.045);
+    float rings = max(abs(length(bq.xy) - 0.065) - 0.018, abs(mod(bq.z + 0.05, 0.11) - 0.055) - 0.018);
+    rings = max(rings, max(bq.z - 0.0, -bq.z - 0.45));
+    res = opU(res, vec2(min(barrel, rings), 92.0));
+    res = opU(res, vec2(length(bq - vec3(0.0, 0.0, -0.62 - 0.15*las)) - 0.05, 91.0));
+  }
+  // faceted canopy
+  {
+    vec3 cq = p - vec3(0.0, top - 0.05, -4.7);
+    float can = max(sdEllipsoid(cq, vec3(0.56, 0.4, 1.65)), abs(cq.x)*0.82 + cq.y*0.58 - 0.2);
+    can = max(can, -cq.y);
+    res = opU(res, vec2(can, 82.0));
+    res = opU(res, vec2(max(abs(can) - 0.012, abs(cq.x) - 0.025), 84.0));   // centre frame
+  }
+  // cranked diamond wing with a forward-swept trailing edge and elevons
+  {
+    float s = ap.x - 1.0, t = p.y - (yc - 0.02 - s*0.012), c = p.z + 3.0;
+    float defl = -uWr[5].x*0.45 - uWr[5].z*sgn*0.45;
+    float wing = sdPanel(s, c, t, 5.2, 8.2, 1.35, 4.7, 0.035, 0.8, 1.9, 5.0);
+    float elev = sdSurface(s, c, t, 5.2, 8.2, 1.35, 4.7, 0.035, 0.8, 1.9, 5.0, defl, 0.0);
+    float w2 = min(wing, elev);
+    float d = smin(res.x, w2, 0.12);
+    res = vec2(d, w2 < res.x ? (wing < elev ? 80.0 : 81.0) : res.y);
+  }
+  // canted all-moving ruddervators (pitch and yaw mixed)
+  {
+    vec3 q = ap - vec3(1.05, top - 0.05, 4.4); q.xy = rot2(q.xy, 0.72);
+    float dv = uWr[5].x*0.35 + uWr[5].y*sgn*0.35;
+    q.xz = rot2(q.xz - vec2(0.0, 1.0), dv) + vec2(0.0, 1.0);
+    float fin = max(sdPanel(q.y, q.z, q.x, 2.3, 2.6, 1.1, 1.6, 0.04, 1.0, 0.0, 0.0), -q.y - 0.05);   // ends at its root
+    res = opU(res, vec2(fin, 81.0));
+  }
+  // pylons for the pods: faceted struts from the airframe to each trunnion
+  {
+    float fpy = sdBox(vec3(ap.x - 1.65, p.y - (-0.12), p.z + 3.3), vec3(0.42, 0.09, 0.42));
+    float rpy = sdBox(vec3(ap.x - 2.0, p.y - 0.0, p.z - 3.45), vec3(0.4, 0.1, 0.5));
+)"
+R"(    res = opU(res, vec2(min(fpy, rpy), 80.0));
+  }
+  // thruster pods (the near side's front and rear pod)
+  int fi = p.x > 0.0 ? 1 : 0;
+  res = opU(res, wrPod(p, fi, res.x));
+  res = opU(res, wrPod(p, fi + 2, res.x));
+  // edge LEDs along the chines and the wing leading edges (cloaking field emitters)
+  float led = sdCapsule(ap, vec3(1.18, yc + 0.0, -4.0), vec3(0.15, -0.2, -8.0), 0.018);
+  led = min(led, sdCapsule(ap, vec3(1.25, -0.12, -2.7), vec3(6.1, -0.18, 1.95), 0.016));
+  res = opU(res, vec2(led, 87.0));
+  // retractable tricycle gear
+  if (gear > 0.06) {
+    vec4 G0 = gM[18], G1 = gM[19];
+    float gh = G1.x, wr = 0.38, lift = (1.0 - gear)*(gh - 0.5);
+    vec3 wc = vec3(G0.x, -gh + wr + lift, G0.z);
+    float legs = sdCapsule(ap, vec3(G0.x*0.8, -0.3, G0.z), wc + vec3(-0.1, 0.05, 0.0), 0.07);
+    float tyres = sdRoundCylX(ap - wc, wr, 0.13, 0.06);
+    vec3 nc = vec3(0.0, -gh + 0.33 + lift, G0.w);
+    legs = min(legs, sdCapsule(p, vec3(0.0, -0.35, G0.w), nc + vec3(0.0, 0.1, 0.0), 0.06));
+    tyres = min(tyres, sdRoundCylX(vec3(abs(p.x) - 0.1, p.y, p.z) - vec3(0.0, nc.y, nc.z), 0.33, 0.07, 0.04));
+    res = opU(res, vec2(legs, 8.0));
+    res = opU(res, vec2(tyres, 6.0));
+  }
+  return res;
+}
+// XR-11 surfaces (PBR texture sets): radar-absorbent faceted skin with sawtooth panel seams, smoked gold canopy,
+// heat-tinted titanium nozzles and vanes, glowing turbine cores, violet cloak-emitter strips, a dark bay, the
+// dark-energy bomb, laser housings and their emitter lenses, chrome actuator rods
+void shadeWraith(inout Mat m, int mid, vec3 lp, vec3 ln, float t){
+  vec3 nT; vec4 tx;
+  float pulse = 0.75 + 0.25*sin(uTime*2.5);
+  if (mid == 80 || mid == 81 || mid == 83) {
+    tx = triSample(lp, ln, M_PAINT, 0.6, nT);
+    vec3 base = gColBase*(0.85 + 0.3*tx.r);
+    // radar-absorbent coating: matte charcoal with a faint iridescent sheen and fine tile seams
+    float tile = max(abs(fract(lp.x*1.6 + lp.y*0.4) - 0.5), abs(fract(lp.z*1.1) - 0.5));
+    vec2 sz = vec2(lp.z*0.9 + abs(lp.x)*0.9, lp.z*0.9 - abs(lp.x)*0.9);       // sawtooth (chevron) panel lines
+    float saw = min(abs(fract(sz.x) - 0.5), abs(fract(sz.y) - 0.5));
+    m.alb = base; m.rough = mix(0.5, 0.72, tx.a); m.metal = 0.15; m.nrm = nT;
+    if (tile > 0.49) m.alb *= 0.75;
+    if (saw < 0.008 && t < 80.0 && abs(fract(lp.z*0.25) - 0.5) < 0.2) m.alb *= 0.6;   // sawtooth access-panel seams
+    if (mid == 81) { m.alb *= 0.82; m.rough = 0.62; }                        // control surfaces: slightly darker
+    if (mid == 83) { m.alb = base*0.9; m.metal = 0.3; m.rough = 0.45; }       // pod shells
+    if (abs(lp.x) < 0.04 && ln.y > 0.6) m.alb = mix(m.alb, gColStripe*0.3, 0.6); // spine stripe
+  }
+  else if (mid == 82) { m.alb = vec3(0.28, 0.2, 0.08); m.metal = 0.95; m.rough = 0.08; }   // smoked gold film
+  else if (mid == 84) {
+    tx = triSample(lp, ln, M_METAL, 0.8, nT); m.alb = tx.rgb*vec3(0.24, 0.23, 0.25); m.metal = 0.85; m.rough = clamp(tx.a*0.7, 0.18, 0.55); m.nrm = nT;
+    float heat = clamp(uWr[2].x + uWr[2].y + uWr[2].z + uWr[2].w, 0.0, 4.0)*0.25;
+    m.alb = mix(m.alb, vec3(0.2, 0.12, 0.24), 0.45*heat);                     // heat-blued titanium
+  }
+  else if (mid == 85) { tx = triSample(lp, ln, M_METAL, 1.4, nT); m.alb = tx.rgb*vec3(0.4, 0.41, 0.43); m.metal = 1.0; m.rough = 0.25; m.nrm = nT; }
+  else if (mid == 86) { float th = clamp((uWr[2].x + uWr[2].y + uWr[2].z + uWr[2].w)*0.25, 0.0, 1.5);
+    m.alb = vec3(0.02); m.emit = mix(vec3(0.35, 0.3, 1.0), vec3(0.95, 0.6, 1.0), th)*(0.4 + 9.0*th*th); }
+  else if (mid == 87) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = gColStripe*(1.0 + 2.0*uNight)*pulse*(1.0 + 3.0*uWr[4].w); }
+  else if (mid == 88) { tx = triSample(lp, ln, M_METAL, 0.5, nT); m.alb = tx.rgb*vec3(0.07, 0.07, 0.08); m.metal = 0.6; m.rough = 0.5; m.nrm = nT;
+    if (abs(fract(lp.z*2.0) - 0.5) < 0.03) m.emit = gColStripe*0.4*uWr[4].y; }                       // bay lights when open
+  else if (mid == 89) {   // dark-energy bomb: black glassy core, violet plasma veins crawling over it
+    vec3 bc = lp - vec3(0.0, -0.3, 0.1);
+    float vein = vnoise3(bc*9.0 + vec3(0.0, uTime*2.0, 0.0)) + 0.5*vnoise3(bc*21.0 - vec3(uTime*3.0));
+    m.alb = vec3(0.005); m.rough = 0.05; m.metal = 0.0;
+    m.emit = vec3(0.55, 0.15, 1.0)*pow(smoothstep(0.75, 1.15, vein), 2.0)*6.0 + vec3(0.2, 0.7, 1.0)*pow(smoothstep(1.05, 1.3, vein), 3.0)*8.0;
+  }
+  else if (mid == 90) { tx = triSample(lp, ln, M_METAL, 0.9, nT); m.alb = tx.rgb*vec3(0.12, 0.12, 0.13); m.metal = 0.8; m.rough = 0.4; m.nrm = nT;
+    if (abs(fract(lp.z*14.0) - 0.5) < 0.08) m.alb *= 0.5; }                                           // cooling slots
+  else if (mid == 91) { float f = uWr[5].w; m.alb = vec3(0.1, 0.02, 0.02); m.rough = 0.02; m.emit = vec3(1.0, 0.15, 0.25)*(0.6*uWr[4].z + 25.0*f); }
+  else if (mid == 92) { m.alb = vec3(0.75, 0.76, 0.78); m.metal = 1.0; m.rough = 0.12; }
+  else if (mid == 93) { m.alb = vec3(0.01); m.rough = 0.9; }
+}
+// four round plumes, one per pod (thrust fractions in uWr[2]): blue-violet plasma, white-hot and longer in boost
+vec3 plumeRound(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float sp, float ab, float jit){
+  float L = mix(1.5, 4.5, sp) + 7.0*ab;
+  vec3 c = o + ax*(L*0.5); float br = L*0.5 + 0.6;
+  vec3 oc = lo - c; float b = dot(oc, ld), h = b*b - dot(oc, oc) + br*br;
+  if (h <= 0.0) return vec3(0.0);
+  h = sqrt(h); float t0 = max(-b - h, 0.0), t1 = min(-b + h, tmax);
+  if (t1 <= t0) return vec3(0.0);
+  vec3 cOut = mix(vec3(0.3, 0.15, 1.0), vec3(1.0, 0.35, 0.8), ab), cIn = mix(vec3(0.6, 0.65, 1.0), vec3(1.0, 0.85, 1.0), ab);
+  float dt = (t1 - t0)/20.0; vec3 acc = vec3(0.0);
+  for (int i = 0; i < 20; i++) {
+    vec3 q = lo + ld*(t0 + (float(i) + jit)*dt) - o;
+    float x = dot(q, ax); if (x < -0.05 || x > L) continue;
+    float u = max(x, 0.0)/L;
+    float rr = length(q - ax*x), w = mix(0.3, 0.12, u)*(1.0 + 0.7*ab*u);
+    float e2 = rr*rr/(w*w); if (e2 > 9.0) continue;
+    float ph = x/(0.7 + 0.25*ab);
+    float turb = vnoise(vec2(x*3.0 - uTime*50.0, rr*9.0))*0.6 + 0.4;
+    float fall = smoothstep(0.0, 0.06, u + 0.02)*pow(1.0 - u, 1.5);
+    float disk = pow(0.5 + 0.5*cos(ph*6.2832), 8.0)*exp(-e2*3.0)*(1.0 - u);
+    acc += (cOut*exp(-e2*1.5)*turb*1.4 + cIn*exp(-e2*4.0)*smoothstep(1.0, 0.25, u)*6.0 + vec3(0.8, 0.85, 1.0)*disk*(2.0*sp + 7.0*ab))*fall*dt;
+  }
+  return acc*(0.3 + 0.7*sp);
+}
+vec3 wraithPlumes(vec3 ro, vec3 rd, float tmax, float jit){
+  if (gFlame.x < 0.02) return vec3(0.0);
+  mat3 inv = transpose(uPlaneRot);
+  vec3 lo = inv*(ro - uPlanePos), ld = inv*rd;
+  vec3 col = vec3(0.0);
+  for (int i = 0; i < 4; i++) {
+    float a = uWr[0][i] + uWr[3][i], y = uWr[1][i], a0 = uWr[0][i];
+    vec3 ax = normalize(vec3(-sin(y), -sin(a)*cos(y), cos(a)*cos(y)));
+    vec3 o = WR_POD[i] + vec3(0.0, -sin(a0), cos(a0))*1.5;
+    float th = clamp(uWr[2][i], 0.0, 1.6);
+    col += plumeRound(lo, ld, tmax, o, ax, clamp(th*1.3, 0.0, 1.0), gFlame.y, jit);
+  }
+  return col/(1.0 + max(col.r, max(col.g, col.b))*0.15);
+}
+// cloaked skin: the world seen through the craft (already traced along the bent ray) with a faint glassy rim,
+// a shimmer of the hexagonal emitter lattice and a bright wavefront where the cloak is still spreading
+vec3 cloakSkin(vec3 world, vec3 n, vec3 rd, vec3 lp, float front){
+  float fres = pow(1.0 - abs(dot(n, -rd)), 4.0);
+  vec3 r = reflect(rd, n);
+  vec2 hx = vec2(lp.x*3.0 + lp.z*1.5, lp.z*2.6 - lp.y*3.0);
+  float lat = smoothstep(0.46, 0.5, max(abs(fract(hx.x) - 0.5), abs(fract(hx.y) - 0.5)));
+  float shimmer = 0.5 + 0.5*sin(uTime*4.0 + lp.z*3.0 + lp.x*5.0);
+  vec3 col = world*0.93 + skyColor(r)*fres*0.25;
+  col += gColStripe*(lat*0.04*shimmer + fres*0.05);
+  col += gColStripe*exp(-abs(front)*6.0)*1.5;   // the wavefront of the cloak sweeping along the craft
+  return col;
+}
+// ---------------------------------------------------------------- XR-11 weapons in the world
+// Laser bolts: a white-hot core in a crimson sheath, glowing along the beam (closest approach of the view ray to
+// each beam segment, cut by the scene depth). Dark-energy bombs: black spheres wrapped in crawling violet plasma
+// with a halo. Detonations: an expanding shell of violet fire around a collapsing black core, a flat shock ring
+// and arcing filaments; the core swallows the light behind it.
+vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t){
+  for (int i = 0; i < 2; i++) {
+    if (i >= uFxBeams) break;
+    vec3 a = uBeamA[i].xyz, b = uBeamB[i].xyz; float r = uBeamA[i].w, I = uBeamB[i].w;
+    vec3 u = b - a; float L = length(u); u /= max(L, 1e-3);
+    vec3 w0 = ro - a; float bb = dot(rd, u), dd = dot(rd, w0), ee = dot(u, w0), den = 1.0 - bb*bb;
+    float sR = den > 1e-5 ? (bb*ee - dd)/den : 0.0, sB = den > 1e-5 ? (ee - bb*dd)/den : ee;
+    sB = clamp(sB, 0.0, L); sR = max(dot(a + u*sB - ro, rd), 0.0);
+    if (sR > t) continue;
+    float d = length(ro + rd*sR - (a + u*sB));
+    float core = exp(-d*d/(r*r*0.25)), halo = pow(r*r/(d*d + r*r), 1.6);
+    float flick = 0.85 + 0.15*sin(uTime*90.0 + sB*0.3);
+    col += (vec3(1.0, 0.9, 0.95)*core*6.0 + vec3(1.0, 0.08, 0.2)*halo*1.6)*I*flick;
+  }
+  for (int i = 0; i < 8; i++) {
+    if (i >= uFxBombs) break;
+    vec3 c = uBombs[i].xyz; float R = uBombs[i].w;
+    vec3 oc = ro - c; float b = dot(oc, rd), h = b*b - dot(oc, oc) + R*R;
+    float tc = -b; if (tc < 0.0) continue;
+    float dmin = length(oc + rd*tc);
+    if (h > 0.0 && -b - sqrt(h) < t) {
+      vec3 n = normalize(oc + rd*(-b - sqrt(h)));
+      float fres = pow(1.0 - abs(dot(n, rd)), 2.5);
+      float vein = vnoise3(n*5.0 + vec3(uTime*1.7)) + 0.5*vnoise3(n*13.0 - vec3(uTime*2.9));
+      col = vec3(0.003) + vec3(0.6, 0.18, 1.0)*(fres*3.0 + pow(smoothstep(0.8, 1.2, vein), 2.0)*5.0) + vec3(0.25, 0.75, 1.0)*pow(smoothstep(1.1, 1.35, vein), 3.0)*6.0;
+    } else if (tc < t) col += vec3(0.5, 0.15, 1.0)*exp(-(dmin - R)/(R*0.7))*0.9;
+  }
+  for (int i = 0; i < 6; i++) {
+    if (i >= uFxBlasts) break;
+    vec3 c = uBlast[i].xyz; float R = uBlast[i].w, age = uBlastI[i].x, I = uBlastI[i].y;
+)"
+R"(    float fade = pow(1.0 - age, 0.7);
+    vec3 oc = ro - c; float b = dot(oc, rd);
+    float tc = max(-b, 0.0), dmin = length(oc + rd*tc);
+    // the first instant: a white-violet flash that swamps everything around it
+    if (tc < t + R) col += vec3(1.0, 0.85, 1.0)*exp(-dmin*dmin/(R*R*0.8))*max(0.0, 1.0 - age*4.0)*8.0*I;
+    // shock ring racing out over the ground
+    if (abs(rd.y) > 1e-3) {
+      float tr = (c.y - R*0.2 - ro.y)/rd.y;
+      if (tr > 0.0 && tr < t + 2.0) {
+        float rr = length((ro + rd*tr - c).xz), ring = R*(1.4 + 3.0*age);
+        col += vec3(0.65, 0.3, 1.0)*exp(-pow((rr - ring)/(R*0.1), 2.0))*(1.0 - age)*3.0*I;
+      }
+    }
+    // plasma pillar climbing out of the blast
+    {
+      vec3 a0 = c, u = vec3(0.0, 1.0, 0.0); float L = R*(1.0 + 2.5*smoothstep(0.0, 0.6, age));
+      vec3 w0 = ro - a0; float bb = dot(rd, u), dd = dot(rd, w0), ee = dot(u, w0), den = 1.0 - bb*bb;
+      float sB = clamp(den > 1e-5 ? (ee - bb*dd)/den : ee, 0.0, L), sR = max(dot(a0 + u*sB - ro, rd), 0.0);
+      if (sR < t) {
+        float d = length(ro + rd*sR - (a0 + u*sB)), w = R*(0.18 + 0.12*sB/L);
+        float nz = vnoise(vec2(sB*0.08 - uTime*3.0, d*0.2));
+        col += vec3(0.7, 0.3, 1.0)*exp(-d*d/(w*w))*(0.6 + 0.6*nz)*(1.0 - sB/L)*fade*smoothstep(0.0, 0.08, age)*6.0*I;
+      }
+    }
+    float h = b*b - dot(oc, oc) + R*R*1.4;
+    if (h <= 0.0) continue;
+    h = sqrt(h); float t0 = max(-b - h, 0.0), t1 = min(-b + h, t);
+    if (t1 <= t0) continue;
+    float dt = (t1 - t0)/16.0, tr = 1.0; vec3 acc = vec3(0.0);
+    float coreR = 0.5*smoothstep(0.03, 0.15, age)*(1.0 - age)*(1.0 - age);
+    for (int k = 0; k < 16; k++) {
+      vec3 q = ro + rd*(t0 + (float(k) + 0.5)*dt) - c;
+      float x = length(q)/R; vec3 qn = q/R;
+      vec3 flow = qn*2.6 - normalize(q + vec3(1e-3))*uTime*1.4;
+      float nz = vnoise3(flow) + 0.5*vnoise3(flow*2.3 + vec3(7.1)) + 0.25*vnoise3(flow*5.1 - vec3(3.3));
+      float shell = exp(-pow((x - 0.78)/0.24, 2.0))*clamp(nz*0.9 - 0.1, 0.0, 2.0);
+      float hot = exp(-pow((x - 0.78)/0.1, 2.0))*clamp(nz - 0.6, 0.0, 1.0);
+      float fil = pow(clamp(1.0 - abs(vnoise3(qn*4.0 + vec3(0.0, uTime*2.5, 0.0)) - 0.5)*9.0, 0.0, 1.0), 6.0)*smoothstep(1.25, 0.6, x)*step(coreR, x);
+      float core = smoothstep(coreR + 0.06, coreR - 0.04, x);
+      float smoke = smoothstep(0.35, 1.0, age)*exp(-pow((x - 0.7)/0.35, 2.0))*clamp(nz, 0.0, 1.5)*0.8;
+      vec3 e = (vec3(0.55, 0.12, 1.0)*shell*8.0 + vec3(1.0, 0.65, 1.0)*hot*18.0 + vec3(0.6, 0.9, 1.0)*fil*16.0)*fade*I;
+      acc += e*tr*dt/R*3.0;
+      tr *= exp(-(core*8.0 + smoke*3.0)*dt/R);
+    }
+    col = col*tr + acc + vec3(0.03, 0.02, 0.04)*(1.0 - tr)*smoothstep(0.35, 1.0, age);   // lingering smoke has a dim violet body
+  }
+  return col;
+}
+
 )";
 
 // ------------------------------------------------------------------------------------------------

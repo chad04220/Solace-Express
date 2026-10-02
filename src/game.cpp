@@ -6,6 +6,23 @@
 static const vec3 kJetWingTip(5.62f, -0.38f, 4.4f);
 // XR-9 nozzle swivel (0 aft .. 90 deg down) plus pitch vectoring; mirrored by mapJet and the exhaust plumes
 static float jetNozzleAngle(const Plane& p) { return p.nozzle * 0.5f * PI - clampf(p.ctl.pitch + p.ctl.trim * 0.3f, -1, 1) * 0.5f; }
+static const vec3 kWraithWingTip(6.2f, -0.24f, 2.0f);
+// research craft exhaust exits and jet directions (body coords): XR-9 two 2D nozzles, XR-11 four pods.
+// strength: that exhaust's share of the thrust (1 = the XR-9's)
+static int jetExhausts(const Plane& p, vec3* pos, vec3* dir, float* strength) {
+  if (p.spec->special == 2) {
+    for (int i = 0; i < 4; i++) {
+      float a0 = p.podTilt[i], a = a0 + p.podVane[i], y = p.podYaw[i];
+      pos[i] = kWraithPods[i] + vec3(0, -sinf(a0), cosf(a0)) * 1.55f;
+      dir[i] = normalize(vec3(-sinf(y), -sinf(a) * cosf(y), cosf(a) * cosf(y)));
+      strength[i] = clampf(p.podThr[i] * 1.4f, 0.f, 1.2f);
+    }
+    return 4;
+  }
+  float a = jetNozzleAngle(p);
+  for (int s = 0; s < 2; s++) { pos[s] = vec3(s ? 0.82f : -0.82f, -0.12f, 7.75f) + vec3(0, -sinf(a), cosf(a)); dir[s] = vec3(0, -sinf(a), cosf(a)); strength[s] = 1.f; }
+  return 2;
+}
 
 // ------------------------------------------------------------------ settings / save
 static std::string joinPath(const std::string& d, const char* f) { return d.empty() ? std::string(f) : d + "/" + f; }
@@ -176,7 +193,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
   approachMinAgl = 1e9f;
-  apWasOn = false; apDest = -1;
+  apWasOn = false; apDest = -1; wraith = WraithState();
   licenseBefore = career.license;
   screen = SCR_FLIGHT;
   toast(fmt("%s - %s", a.code, a.name), vec3(0.7f, 0.9f, 1.0f));
@@ -328,7 +345,8 @@ void Game::flightControls(float dt) {
   }
   c.flaps = flapNotch;
   // gear
-  if ((in.pressed['G'] || (in.buttonsPressed & (PAD_Y | (showMap ? 0u : (unsigned)PAD_RIGHT)))) && plane.spec->retract) {
+  bool wrAir = plane.spec->special == 2 && !plane.onGround;   // XR-11 in the air: gamepad Y drops bombs instead
+  if ((in.pressed['G'] || (in.buttonsPressed & ((wrAir ? 0u : (unsigned)PAD_Y) | (showMap ? 0u : (unsigned)PAD_RIGHT)))) && plane.spec->retract) {
     if (plane.onGround && c.gearDown) toast("Gear lever is locked on the ground", vec3(1, 0.6f, 0.4f));
     else { c.gearDown = !c.gearDown; toast(c.gearDown ? "Gear down" : "Gear up", vec3(0.8f, 1, 0.8f)); }
   }
@@ -336,7 +354,8 @@ void Game::flightControls(float dt) {
   static bool parking = true;
   if (flightClock < 0.05f) parking = plane.onGround;
   if (plane.apDone) { plane.apDone = false; parking = true; toast("Autoland complete - parking brake set", vec3(0.5f, 1, 0.6f)); g_audio.trigger(SFX_AP_DISC, 0.7f); }
-  if (in.pressed['B'] || (!showMap && (in.buttonsPressed & PAD_LEFT))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
+  if (plane.spec->special == 2) wraithControls(dt);
+  if (in.pressed['B'] || (!showMap && !wrAir && (in.buttonsPressed & PAD_LEFT))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
   float wb = key(K_SPACE) ? 1.f : 0.f;
   if (in.pad && (in.buttons & PAD_A)) wb = 1.f;
   if (wb > 0 && parking && plane.onGround && length(plane.vel) > 2.f) parking = false;
@@ -424,6 +443,7 @@ void Game::updateFlight(float dt) {
   }
   for (auto& f : traffic.puffs) spawn(f.p, f.v, f.life, f.size, f.grow, f.col, f.alpha, f.kind, 1.f, 0.f);
   for (auto& b : traffic.booms) g_audio.trigger(SFX_BOOM, b.second);
+  updateWraith(simDt);
   for (float f : traffic.flybys) g_audio.trigger(SFX_FLYBY, f);
   for (auto& m : traffic.radio) toast(m, vec3(1.f, 0.78f, 0.3f));
   // entertainment: O + P held for a second while flying summons the Spectre display pair (again: sends them home).
@@ -523,7 +543,7 @@ void Game::updateFlight(float dt) {
   if (!plane.onGround && plane.gLoad > 1.7f && (wx.precip > 0 || plane.pos.y > wx.cloudBase - 300.f)) {
     // emitted at the real wingtips and spread back along the path flown this frame; the vapour stays in the air
     // mass (it used to be launched at 90% of the aircraft's speed, which carried it out ahead of the wingtips)
-    vec3 tip = plane.spec->special ? kJetWingTip : modelWingTip(kModels[plane.spec - kAircraft]);
+    vec3 tip = plane.spec->special == 2 ? kWraithWingTip : plane.spec->special ? kJetWingTip : modelWingTip(kModels[plane.spec - kAircraft]);
     int n = (int)clampf(length(plane.vel) * simDt / 0.45f, 1.f, 16.f);   // ~0.45 m spacing: a continuous streak
     for (int s = -1; s <= 1; s += 2)
       for (int k = 0; k < n; k++) {
@@ -707,23 +727,25 @@ void Game::drawPadCursor() {
 // ------------------------------------------------------------------ XR-9 research flights
 void Game::launchResearch() {
   Contract c;
-  c.id = "XR9"; c.title = "XR-9 Research Flight"; c.type = CT_FERRY;
+  bool wr = resCraft == kWraith;
+  c.id = wr ? "XR11" : "XR9"; c.title = wr ? "XR-11 Research Flight" : "XR-9 Research Flight"; c.type = CT_FERRY;
   c.from = c.to = resAirport; c.payout = 0;
   c.wx = Weather(); c.wx.timeOfDay = resTime; c.wx.windSpeed = 3; c.wx.turbulence = 0.05f;
   if (resWx == 0) { c.wx.cloudCover = 0.15f; c.wx.visibility = 60000; }
   else if (resWx == 1) { c.wx.cloudCover = 0.6f; c.wx.cloudBase = 1300; }
   else { c.wx.cloudCover = 0.95f; c.wx.cloudBase = 800; c.wx.precip = 1; c.wx.storm = true; c.wx.windSpeed = 9; c.wx.gust = 5; c.wx.turbulence = 0.5f; c.wx.visibility = 9000; }
-  startFlight(c, kResearchJet, Career::SRC_OWNED);
+  startFlight(c, resCraft, Career::SRC_OWNED);
   researchFlight = true;
   toasts.clear();
-  toast("XR-9 SPECTER // RESEARCH FLIGHT", vec3(0.4f, 0.9f, 1));
+  toast(wr ? "XR-11 WRAITH // RESEARCH FLIGHT" : "XR-9 SPECTER // RESEARCH FLIGHT", wr ? vec3(0.75f, 0.45f, 1.f) : vec3(0.4f, 0.9f, 1));
+  if (wr) toast("X cloak   Y lasers   LMB / Enter fire   Backspace / MMB plasma bomb", vec3(0.85f, 0.7f, 1.f));
   if (resAirborne) {
     const Airport& a = g_world.airports[resAirport];
     vec3 p = plane.pos + a.dir() * 1500.f; p.y = std::max(a.elev, g_world.height(p.x, p.z)) + 900.f;
-    plane.reset(&kAircraft[kResearchJet], p, plane.heading(), kAircraft[kResearchJet].maxFuel, 85, true, 200.f);
+    plane.reset(&kAircraft[resCraft], p, plane.heading(), kAircraft[resCraft].maxFuel, 85, true, 200.f);
     plane.ctl.throttle = 0.7f; takeoffAnnounced = true;
     camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 4, 26));
-  } else toast("F/V swivels the nozzles: full down for vertical takeoff", vec3(0.7f, 0.9f, 1));
+  } else toast(wr ? "F/V tilts the four thruster pods: full down for vertical takeoff" : "F/V swivels the nozzles: full down for vertical takeoff", vec3(0.7f, 0.9f, 1));
   prevMach = 0;
 }
 
@@ -731,22 +753,24 @@ void Game::jetEffects(float dt) {
   const float thr = plane.ctl.throttle;
   const float sp = plane.engineRunning ? plane.engineSpool : 0.f;
   float ab = plane.engineRunning ? smoothstepf(0.85f, 1.f, plane.engineSpool) : 0.f;
-  float a = jetNozzleAngle(plane);
-  vec3 exDir = plane.q.rotate(vec3(0, -sinf(a), cosf(a)));
-  vec3 r = plane.right(), u = plane.q.rotate(vec3(0, cosf(a), sinf(a)));
+  bool wr = plane.spec->special == 2;
+  vec3 exP[4], exD[4]; float exS[4];
+  int nEx = jetExhausts(plane, exP, exD, exS);
   auto frand = [] { return (rand() % 1000) * 0.001f; };
   // The plume itself is ray-marched in the shader; particles add the hot debris it sheds: blue plasma sparks when
-  // dry, a storm of amber embers in reheat. Spawned spread over the frame's flight path so they stream, not clump.
-  for (int s = -1; s <= 1; s += 2) {
-    vec3 ex = plane.pos + plane.q.rotate(vec3(s * 0.82f, -0.12f, 7.75f)) + exDir * 1.0f;
-    float rate = sp > 0.3f ? (40.f * sp + 260.f * ab) : 0.f;    // sparks per second per nozzle
+  // dry, a storm of amber embers in reheat (violet on the XR-11). Spread over the frame's flight path so they stream.
+  for (int s = 0; s < nEx; s++) {
+    vec3 exDir = plane.q.rotate(exD[s]);
+    vec3 r = normalize(cross(exDir, plane.up()) + plane.right() * 1e-3f), u = cross(r, exDir);
+    vec3 ex = plane.pos + plane.q.rotate(exP[s]);
+    float rate = sp > 0.3f ? (40.f * sp + 260.f * ab) * (wr ? 0.6f * exS[s] : 1.f) : 0.f;    // sparks per second per nozzle
     int n = (int)(rate * dt + frand());
     for (int i = 0; i < n; i++) {
       float k = frand(), hot = frand();
       vec3 jitter = r * ((frand() - 0.5f) * 0.55f) + u * ((frand() - 0.5f) * 0.35f);
       vec3 v = plane.vel + exDir * (90.f + 160.f * ab) * (0.6f + 0.6f * frand()) + jitter * (25.f + 40.f * ab);
-      vec3 col = ab > 0.05f ? lerp(vec3(1.f, 0.42f, 0.1f), vec3(1.f, 0.9f, 0.7f), hot * hot) * (2.f + 3.f * ab)
-                            : lerp(vec3(0.25f, 0.5f, 1.f), vec3(0.8f, 0.92f, 1.f), hot * hot) * 2.2f;
+      vec3 col = ab > 0.05f ? lerp(wr ? vec3(0.8f, 0.3f, 1.f) : vec3(1.f, 0.42f, 0.1f), vec3(1.f, 0.9f, 0.7f), hot * hot) * (2.f + 3.f * ab)
+                            : lerp(wr ? vec3(0.45f, 0.35f, 1.f) : vec3(0.25f, 0.5f, 1.f), vec3(0.8f, 0.92f, 1.f), hot * hot) * 2.2f;
       spawn(ex + jitter - plane.vel * (dt * k) + exDir * (k * 1.5f), v, 0.12f + 0.25f * frand() + 0.2f * ab, 0.07f + 0.08f * hot + 0.05f * ab, -0.15f,
             col, 1.f, SPR_SPARK, 2.5f, 0.f);
     }
@@ -758,8 +782,10 @@ void Game::jetEffects(float dt) {
   }
   // reheat light-off: a shock ring and a burst of sparks out of both nozzles
   if (ab > 0.08f && prevAB <= 0.08f) {
-    for (int s = -1; s <= 1; s += 2) {
-      vec3 ex = plane.pos + plane.q.rotate(vec3(s * 0.82f, -0.12f, 7.75f)) + exDir * 1.2f;
+    for (int s = 0; s < nEx; s++) {
+      vec3 exDir = plane.q.rotate(exD[s]);
+      vec3 r = normalize(cross(exDir, plane.up()) + plane.right() * 1e-3f), u = cross(r, exDir);
+      vec3 ex = plane.pos + plane.q.rotate(exP[s]) + exDir * 0.2f;
       spawn(ex, plane.vel + exDir * 30.f, 0.35f, 0.6f, 9.f, vec3(1.f, 0.7f, 0.4f) * 1.5f, 1.f, SPR_SHOCK, 0.f, 0.f);
       for (int i = 0; i < 30; i++) {
         vec3 j = r * (frand() - 0.5f) + u * (frand() - 0.5f);
@@ -1168,11 +1194,13 @@ FrameParams Game::buildFrame() {
       fp.wreck.deb[i][0] = d.p.x; fp.wreck.deb[i][1] = d.p.y; fp.wreck.deb[i][2] = d.p.z; fp.wreck.deb[i][3] = d.charred ? -d.size : d.size;
       fp.wreck.debQ[i][0] = d.q.w; fp.wreck.debQ[i][1] = d.q.x; fp.wreck.debQ[i][2] = d.q.y; fp.wreck.debQ[i][3] = d.q.z;
     }
-    fp.wreck.crater[0] = craterX; fp.wreck.crater[1] = craterZ; fp.wreck.crater[2] = craterR; fp.wreck.crater[3] = craterD;
+    fp.wreck.craterN = 0;
+    if (craterR > 0) { float* c = fp.wreck.crater[fp.wreck.craterN++]; c[0] = craterX; c[1] = craterZ; c[2] = craterR; c[3] = craterD; }
     vec3 fwd = camMode == 1 ? plane.q.rotate(quat::axisAngle(vec3(0, 1, 0), lookYaw).rotate(quat::axisAngle(vec3(1, 0, 0), lookPitch).rotate(vec3(0, 0, -1))))
                             : normalize(plane.pos + vec3(0, plane.spec->fusRad * 0.3f, 0) - camPos);
     vec3 upRef = camMode == 1 ? plane.up() : vec3(0, 1, 0);
     if (camMode == 0) upRef = normalize(lerp(vec3(0, 1, 0), camQ.rotate(vec3(0, 1, 0)), 0.3f));
+    if (dbgCam && dbgFollow) { dbgCamPos = plane.pos + dbgFollowOff; dbgCamLook = plane.pos; }
     if (dbgCam) { camPos = dbgCamPos; fwd = normalize(dbgCamLook - dbgCamPos); upRef = vec3(0, 1, 0); }
     fp.camPos = camPos;
     fp.camBack = -fwd;
@@ -1186,11 +1214,14 @@ FrameParams Game::buildFrame() {
     fp.landLightDir = normalize(plane.forward() - plane.up() * 0.1f);
     if (plane.spec->special && plane.engineRunning && !crashed && camMode != 1) {
       // the plume lights its surroundings: blue plasma when dry, white-amber and much brighter in reheat
-      float sp = plane.engineSpool, ab = fp.plane.flame[1], a = fp.plane.flame[2];
-      fp.flameLightPos = plane.pos + plane.q.rotate(vec3(0, -0.12f, 7.75f) + vec3(0, -sinf(a), cosf(a)) * (2.2f + 2.5f * ab));
+      float sp = plane.engineSpool, ab = fp.plane.flame[1];
+      vec3 exP[4], exD[4], c(0, 0, 0); float exS[4]; int nEx = jetExhausts(plane, exP, exD, exS);
+      for (int i = 0; i < nEx; i++) c += exP[i] + exD[i] * (1.2f + 2.5f * ab);
+      fp.flameLightPos = plane.pos + plane.q.rotate(c / (float)nEx);
       float flick = 0.85f + 0.15f * sinf(realTime * 57.f) * sinf(realTime * 23.f + 1.f);
       fp.flameLight = lerp(vec3(0.3f, 0.55f, 1.f), vec3(1.f, 0.62f, 0.3f), ab) * ((25.f * sp * sp + 260.f * ab) * flick);
     }
+    wraithVisual(fp);
     fp.rainLens = camMode == 1 && wx.precip == 1 ? 1.f : 0.f;
     fp.sealedCockpit = camMode == 1 && plane.spec->special && !crashed;
     fp.trafficN = traffic.fillVisuals(fp.camPos, fp.traffic, kMaxTrafficDrawn, nullptr);
@@ -1307,25 +1338,26 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     float t = realTime;
     float dcam = length(plane.pos - fp.camPos);
     float ls = std::max(0.25f, dcam * 0.002f);
-    float navI = 0.6f + 2.5f * night;
+    float navI = (0.6f + 2.5f * night) * (1.f - wraith.stealth);   // a cloaked XR-11 runs dark
     const ModelDef& md = kModels[plane.spec - kAircraft];
     bool jet = s.special != 0;   // the XR-9 is an SDF of its own: its lights don't follow the generic model layout
-    vec3 tip = jet ? kJetWingTip : modelWingTip(md);
+    vec3 tip = s.special == 2 ? kWraithWingTip : jet ? kJetWingTip : modelWingTip(md);
     vec3 lt = plane.pos + plane.q.rotate(vec3(-tip.x, tip.y, tip.z)), rtp = plane.pos + plane.q.rotate(tip);
     if (camMode != 1) {
       bill(add, lt, ls, vec3(1.f, 0.1f, 0.05f) * navI, 1, SPR_GLOW, 0.3f);
       bill(add, rtp, ls, vec3(0.1f, 1.f, 0.2f) * navI, 1, SPR_GLOW, 0.3f);
       bill(add, plane.pos + plane.q.rotate(jet ? vec3(0, 0.05f, 8.3f) : modelTailTip(md)), ls, vec3(1.f) * navI, 1, SPR_GLOW, 0.3f);
-      if (plane.engineRunning && fmodf(t, 1.0f) < 0.12f) bill(add, plane.pos + plane.q.rotate(jet ? vec3(0, 0.7f, 1.6f) : modelFinTop(md) + vec3(0, 0.06f, 0)), ls * 1.6f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night), 1, SPR_GLOW, 0.3f);
+      if (plane.engineRunning && wraith.stealth < 0.5f && fmodf(t, 1.0f) < 0.12f) bill(add, plane.pos + plane.q.rotate(jet ? vec3(0, 0.7f, 1.6f) : modelFinTop(md) + vec3(0, 0.06f, 0)), ls * 1.6f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night), 1, SPR_GLOW, 0.3f);
       float st = fmodf(t, 1.3f);
-      if (!plane.onGround && (st < 0.05f || (st > 0.12f && st < 0.16f))) { bill(add, lt, ls * 3.f, vec3(4.f), 1, SPR_GLOW, 0.3f); bill(add, rtp, ls * 3.f, vec3(4.f), 1, SPR_GLOW, 0.3f); }
+      if (!plane.onGround && wraith.stealth < 0.5f && (st < 0.05f || (st > 0.12f && st < 0.16f))) { bill(add, lt, ls * 3.f, vec3(4.f), 1, SPR_GLOW, 0.3f); bill(add, rtp, ls * 3.f, vec3(4.f), 1, SPR_GLOW, 0.3f); }
       if (jet && plane.engineRunning) {   // exhaust bloom at the nozzle exits (blue when dry, white-amber in reheat)
-        float sp = plane.engineSpool, ab = smoothstepf(0.85f, 1.f, sp), na = jetNozzleAngle(plane);
-        vec3 ax(0, -sinf(na), cosf(na));
-        float fl = 0.85f + 0.15f * sinf(t * 71.f + 0.7f);
-        for (int k = -1; k <= 1; k += 2)
-          bill(add, plane.pos + plane.q.rotate(vec3(k * 0.82f, -0.12f, 7.75f) + ax * (1.2f + 0.6f * ab)), 0.8f + 0.7f * ab,
-               lerp(vec3(0.3f, 0.55f, 1.f), vec3(1.f, 0.7f, 0.4f), ab) * ((0.25f * sp * sp + 0.5f * ab) * fl), 1, SPR_GLOW, 0.6f);
+        float sp = plane.engineSpool, ab = smoothstepf(0.85f, 1.f, sp);
+        vec3 exP[4], exD[4]; float exS[4]; int nEx = jetExhausts(plane, exP, exD, exS);
+        bool wr = plane.spec->special == 2;
+        float fl = 0.85f + 0.15f * sinf(t * 71.f + 0.7f), cl = 1.f - wraith.stealth * 0.9f;
+        for (int k = 0; k < nEx; k++)
+          bill(add, plane.pos + plane.q.rotate(exP[k] + exD[k] * (0.2f + 0.6f * ab)), (0.8f + 0.7f * ab) * (wr ? 0.7f : 1.f),
+               lerp(wr ? vec3(0.45f, 0.35f, 1.f) : vec3(0.3f, 0.55f, 1.f), wr ? vec3(1.f, 0.6f, 1.f) : vec3(1.f, 0.7f, 0.4f), ab) * ((0.25f * sp * sp + 0.5f * ab) * fl * exS[k] * cl), 1, SPR_GLOW, 0.6f);
       }
     }
     // AI traffic lights: nav lights, beacon, strobes when airborne, landing lights on the runway and on approach,
@@ -1600,6 +1632,40 @@ void Game::debugScene(const std::string& name) {
     return;
   }
   if (name == "research") { screen = SCR_RESEARCH; realTime = 20; resOpened = 15; return; }
+  if (name.compare(0, 3, "wr_") == 0) {   // XR-11: wr_<mode>_<cam yaw>_<cam pitch>_<cam dist>_<seconds>
+    // modes: 0 cruise, 1 hover, 2 parked, 3 cloak spreading, 4 cloaked, 5 turrets out + bay open, 6 lasers firing,
+    // 7 plasma bomb (camera on the impact), 8 cockpit
+    int mode = 0; float yawD = 210, pitD = 12, dist = 30, secs = 1.5f;
+    sscanf(name.c_str() + 3, "%d_%f_%f_%f_%f", &mode, &yawD, &pitD, &dist, &secs);
+    resCraft = kWraith; realTime = 20; resAirborne = mode != 2; resTime = getenv("TOD") ? (float)atof(getenv("TOD")) : 12.f; launchResearch();
+    botControl = true;
+    if (mode == 1) { plane.ctl.flaps = 1; flapNotch = 1; plane.flaps = plane.nozzle = 1; plane.vel = vec3(); plane.ctl.throttle = 0.66f; plane.engineRunning = true; plane.engineSpool = 0.66f; }
+    else if (mode != 2) { plane.apEngage(Plane::AP_HOLD, -1, wx); }
+    if (mode == 3 || mode == 4) wraith.cloakOn = true;
+    if (mode == 5 || mode == 6) { wraith.armed = true; }
+    if (mode == 5) wraith.bayHold = 100.f;
+    if (mode == 7) wraith.bombQueue = 1;
+    float firstDrop = 0; vec3 blastAt;
+    int frames = (int)((mode == 3 ? 0.55f : mode == 7 ? 60.f : secs) * 60.f);
+    for (int i = 0; i < frames; i++) {
+      realTime += 1 / 60.f; update(1 / 60.f);
+      if (mode == 6 && wraith.lasers > 0.97f) { wraith.laserCD -= 1 / 60.f; if (wraith.laserCD <= 0) { fireLaser(); wraith.laserCD = 0.12f; } }
+      if (mode == 7 && !wraith.blasts.empty() && firstDrop == 0) { firstDrop = realTime; blastAt = wraith.blasts[0].p; }
+      if (mode == 7 && firstDrop > 0 && realTime - firstDrop > secs) break;
+    }
+    if (mode == 6) { fireLaser(); fireLaser(); for (auto& b : wraith.bolts) b.life = 1.f; }   // hold the last pair for the screenshot
+    toasts.clear(); hint.clear();
+    for (auto& b : wraith.blasts) printf("wr: blast age %.2f R %.0f at %.0f %.0f %.0f particles %d\n", b.age, b.R, b.p.x, b.p.y, b.p.z, (int)particles.size());
+    printf("wr: mode %d stealth %.2f lasers %.2f bay %.2f bombs %d blasts %d tilt %.2f %.2f %.2f %.2f thr %.2f\n", mode, wraith.stealth, wraith.lasers, wraith.bay, (int)wraith.bombs.size(), (int)wraith.blasts.size(),
+           plane.podTilt[0], plane.podTilt[1], plane.podTilt[2], plane.podTilt[3], plane.podThr[0]);
+    if (mode == 8) { camMode = 1; lookYaw = yawD * DEG; lookPitch = pitD * DEG; camYaw = lookYaw; camPitch = lookPitch + 0.12f; return; }
+    hudOn = false; dbgCam = true;
+    float h = plane.heading() * DEG, yw = h + yawD * DEG, pt = pitD * DEG;
+    vec3 focus = mode == 7 && firstDrop > 0 ? blastAt + vec3(0, 30.f, 0) : plane.pos;
+    dbgCamLook = focus; dbgCamPos = focus + vec3(sinf(yw) * cosf(pt), sinf(pt), -cosf(yw) * cosf(pt)) * dist;
+    if (!(mode == 7 && firstDrop > 0)) { dbgFollow = true; dbgFollowOff = dbgCamPos - plane.pos; }
+    return;
+  }
   if (name == "rjet" || name == "rjetc" || name == "rhover" || name == "rjetl" || name == "rjetd" || name == "rjetr") { realTime = 20; resAirborne = name != "rhover"; launchResearch(); if (name == "rjetc" || name == "rjetl" || name == "rjetd" || name == "rjetr") camMode = 1; if (name == "rhover") { plane.ctl.flaps = 1; flapNotch = 1; plane.flaps = plane.nozzle = 1; plane.ctl.throttle = 0.7f; plane.engineRunning = true; plane.engineSpool = 0.7f; } for (int i = 0; i < 90; i++) { realTime += 1 / 30.f; update(1 / 30.f); } toasts.clear(); if (name == "rjetl") lookYaw = 1.75f; if (name == "rjetr") { lookYaw = -1.2f; lookPitch = -0.6f; } if (name == "rjetd") lookPitch = -0.75f; return; }
   if (name == "radio") { loadStations(); screen = SCR_HUB; showRadio = true; realTime = 20; radioScroll = 6; return; }
   if (name.size() == 4 && name.compare(0, 3, "hub") == 0) { screen = SCR_HUB; hubTab = name[3] - '0'; realTime = 20; return; }

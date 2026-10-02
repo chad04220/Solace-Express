@@ -16,6 +16,14 @@ struct PlaneVisual {
   float prop[2][4]; int propCount = 0;
   float hud[4] = {0, 0, 0, 0}, hud2[4] = {1, 0, 0, 0}, hudV[3] = {0, 0, -1}, hud3[4] = {0, 0, 0, 1000};  // research jet HUD data
   float flame[4] = {0, 0, 0, 0};  // research jet exhaust: spool, reheat, nozzle vector angle (rad), mach
+  float wr[7][4] = {};            // XR-11: pod tilts, yaw vanes, thrusts, pitch vanes | fan, bay, lasers, stealth | surfaces, laser fire | bomb, cloak front, armed
+};
+
+// XR-11 weapons in the world (see weaponsFx in shaders.h)
+struct FxVisual {
+  int beams = 0; float beamA[2][4], beamB[2][4];   // laser bolts: start + radius, end + intensity
+  int bombs = 0; float bomb[8][4];                 // dark-energy bombs: centre + radius
+  int blasts = 0; float blast[6][4], blastI[6][4]; // detonations: centre + radius, age 0..1 + intensity
 };
 
 // One AI traffic aircraft for the ray tracer: 32 texels (see loadTraffic in shaders.h)
@@ -28,7 +36,7 @@ struct WreckVisual {
   vec3 C[5], H[5];              // clip box (body coords) of each piece
   int debris = 0;
   float deb[16][4], debQ[16][4];  // chunk centre + size (negative = charred), orientation quaternion (w,x,y,z)
-  float crater[4] = {0, 0, 0, 0}; // x, z, radius, depth
+  int craterN = 0; float crater[8][4] = {};   // x, z, radius, depth (negative depth: dark-energy crater)
 };
 
 struct FrameParams {
@@ -39,6 +47,7 @@ struct FrameParams {
   vec2 windOff;
   PlaneVisual plane;
   WreckVisual wreck;
+  FxVisual fx;
   vec3 landLightPos, landLightDir; float landLight = 0;
   vec3 flameLightPos, flameLight;  // research jet exhaust light (radiance; zero when off)
   float exposure = 1.0f, rainLens = 0, fade = 1, vignette = 0.6f, gLoad = 0;

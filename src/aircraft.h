@@ -86,7 +86,7 @@ public:
   float mach = 0, nozzle = 0;  // research jet: Mach number, thrust-vector nozzle angle 0 (aft) .. 1 (straight down)
   // XR-11: each pod's pitch tilt (rad, 0 = thrust aft, pi/2 = thrust down, incl. vane vectoring), yaw vane (rad),
   // thrust fraction of full boost, fan angle; control-surface deflections (-1..1: pitch, yaw, roll) as allocated
-  float podTilt[4] = {0, 0, 0, 0}, podYaw[4] = {0, 0, 0, 0}, podThr[4] = {0, 0, 0, 0}, fanAngle = 0;
+  float podTilt[4] = {0, 0, 0, 0}, podYaw[4] = {0, 0, 0, 0}, podThr[4] = {0, 0, 0, 0}, podVane[4] = {0, 0, 0, 0}, fanAngle = 0;
   vec3 surf;
   FlightEvents ev;
   Rng rng;
