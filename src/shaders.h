@@ -717,12 +717,14 @@ vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
   mat3 inv = transpose(gPR);
   vec3 lo = gPC + inv*(ro - gPP), ld = inv*rd;
   float t = t0;
-  int steps = uPS.w > 0.5 ? 160 : 120;
-  for (int i=0;i<160;i++){
+  bool jet = int(uM[0].z + 0.5) == 5;   // XR-9: thin flattened shapes need finer steps
+  int steps = uPS.w > 0.5 || jet ? 200 : 120;
+  float relax = jet ? 0.65 : 0.8;
+  for (int i=0;i<200;i++){
     if (i >= steps) break;
     vec2 d = mapPiece(lo + ld*t);
     if (d.x < 0.0015*max(1.0, t*0.03)) return vec2(t, d.y);
-    t += d.x*0.8;
+    t += d.x*relax;
     if (t > t1) break;
   }
   return vec2(-1.0);
@@ -2003,16 +2005,16 @@ R"(          if (abs(lh.y) < 0.5) m.alb = vec3(0.8, 0.15, 0.1);
         float pulse = 0.75 + 0.25*sin(uTime*2.5);
         if (mid == 30 || mid == 31) {
           tx = triSample(lp, ln, M_PAINT, 0.7, nT);
-          m.alb = uColBase*tx.rgb*1.1; m.rough = 0.38; m.metal = 0.3; m.nrm = nT;
+          m.alb = uColBase*tx.rgb*1.6; m.rough = 0.55; m.metal = 0.08; m.nrm = nT;   // matte radar-absorbent coating: doesn't mirror the sky
           vec2 pl = abs(fract(lp.xz/vec2(0.9, 1.3)) - 0.5);           // panel seams
           if (max(pl.x, pl.y) > 0.49) m.alb *= 0.55;
           if (mid == 31 && abs(lp.x) > 4.6) m.alb = mix(m.alb, uColStripe*0.6, 0.6);
           if (mid == 30 && lp.z < -8.0) m.alb = vec3(0.03);              // radar nose cap
         } else if (mid == 32) { m.alb = vec3(0.3, 0.2, 0.06); m.metal = 0.95; m.rough = 0.06; }
         else if (mid == 33) {
-          tx = triSample(lp, ln, M_METAL, 0.8, nT); m.alb = tx.rgb*vec3(0.42, 0.4, 0.42); m.metal = 0.85; m.rough = 0.3; m.nrm = nT;
+          tx = triSample(lp, ln, M_METAL, 0.8, nT); m.alb = tx.rgb*vec3(0.2, 0.19, 0.2); m.metal = 0.6; m.rough = 0.5; m.nrm = nT;
           float heat = uCtl.w*uCtl.w;
-          m.alb = mix(m.alb, vec3(0.3, 0.22, 0.32), 0.4*heat);   // heat-tinted titanium
+          m.alb = mix(m.alb, vec3(0.16, 0.11, 0.17), 0.4*heat);   // heat-tinted titanium
         } else if (mid == 34) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = uColStripe*(1.2 + 2.0*uNight)*pulse; }
         else if (mid == 35) { m.alb = vec3(0.06); m.metal = 0.8; m.rough = 0.35; m.emit = vec3(0.25, 0.6, 1.0)*uPS.y*uCtl.w*2.5; }
         else if (mid == 36) { float ab = smoothstep(0.85, 1.0, uCtl.w); m.alb = vec3(0.02); m.emit = mix(vec3(1.0, 0.35, 0.08), vec3(1.0, 0.75, 0.5), ab)*(0.4 + 6.0*uCtl.w*uCtl.w + 10.0*ab); }

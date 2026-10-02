@@ -81,9 +81,9 @@ Menus work with the mouse or a gamepad. On a gamepad, the left stick (or D-pad) 
 
 Hold **U** and **I** together on the main menu, or click in **both sticks** on a gamepad, to open the Confidential Research Model menu. From there you can fly the **XR-9 Specter**, a VTOL research jet, for free from any airport, starting airborne or on the runway, in clear, cloudy or stormy weather.
 
-- **Performance:** a thrust-to-weight ratio of 2.2 and afterburners take it past Mach 2 at altitude. Breaking Mach 1 throws a vapour cone and a sonic boom.
+- **Performance:** full reheat doubles the thrust, for a thrust-to-weight ratio of about 4.4 and Mach 2.5 at 3,000 m. Breaking Mach 1 throws a vapour cone and a sonic boom.
 - **Thrust vectoring:** F and V (gamepad **B** / **X**) swivel the 2D nozzles from 0 to 90 degrees. Full down hovers at about 65% throttle, and the jet levels itself when you let go of the stick. Its lift fans and nozzle louvres move with the vectoring, and downwash kicks up dust or spray.
-- **Handling:** fly-by-wire with a 9 g limiter and a 315°/s roll rate.
+- **Handling:** inertially damped fly-by-wire pulls up to 30 g, about 55°/s of pitch at Mach 1, and rolls at 315°/s.
 - **Cockpit:** a sealed pod with no windows. You fly on a panoramic synthetic-vision display with a full HUD (pitch ladder, flight-path marker, heading tape, speed, altitude, Mach, G, nozzle angle and throttle). Side displays show the left and right cameras, and multi-function displays sit on the console.
 - **Career:** these flights don't count towards the career or the logbook.
 

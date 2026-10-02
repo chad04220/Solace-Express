@@ -1179,6 +1179,13 @@ void Game::debugScene(const std::string& name) {
   career.newGame(); career.license = LIC_ATP;
   if (name == "menu") { screen = SCR_MENU; realTime = 20; return; }
   if (name == "hub") { screen = SCR_HUB; realTime = 20; return; }
+  if (name.compare(0, 4, "jcam") == 0) {  // XR-9 close-up from an orbit angle: jcam<yaw deg>_<pitch deg>
+    float yawD = 0, pitD = 10; sscanf(name.c_str() + 4, "%f_%f", &yawD, &pitD);
+    resAirborne = true; realTime = 20; launchResearch(); wx.cloudCover = 0.3f;
+    camMode = 2; camYaw = yawD * DEG; camPitch = pitD * DEG; camZoom = 0.55f; hudOn = false;
+    for (int i = 0; i < 5; i++) updateCamera(0.1f);
+    toasts.clear(); return;
+  }
   if (name == "vapour") {  // XR-9 pulling g near the cloud base: wingtip vapour must trail behind the tips
     resAirborne = true; realTime = 20; launchResearch(); wx.cloudBase = 300; wx.cloudCover = 0.2f;
     plane.vel = plane.forward() * 280.f; plane.ctl.throttle = 0.9f; botControl = true; plane.ctl.pitch = 0.6f; plane.ctl.gearDown = false; plane.gear = 0;

@@ -64,7 +64,7 @@ int main() {
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 200);
     p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0;
     for (int i = 0; i < 40 * 240 && !p.ev.crashed; i++) { p.ctl.pitch = clampf((3000 - p.pos.y) * 0.002f - p.vel.y * 0.01f, -1, 1); p.step(1 / 240.f, calm, i / 240.f); }
-    bool ok = !p.ev.crashed && p.mach > 1.2f;
+    bool ok = !p.ev.crashed && p.mach > 2.0f;
     printf("XR-9 level acceleration: Mach %.2f after 40 s %s\n", p.mach, ok ? "ok" : "FAIL"); fails += !ok;
     p.reset(&s, vec3(0, 500, 0), 90, s.maxFuel, 85, true, 0); p.vel = vec3(); p.ctl.flaps = 1; p.flaps = p.nozzle = 1;
     for (int i = 0; i < 30 * 240 && !p.ev.crashed; i++) { p.ctl.throttle = clampf(0.5f + (500 - p.pos.y) * 0.01f - p.vel.y * 0.05f, 0, 1); p.step(1 / 240.f, calm, i / 240.f); }
@@ -73,8 +73,13 @@ int main() {
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.pitch = 1;
     float gmax = 0;
     for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); gmax = std::max(gmax, p.gLoad); }
-    ok = !p.ev.crashed && gmax < 10.5f && gmax > 7.f;
+    ok = !p.ev.crashed && gmax < 32.f && gmax > 10.f;
     printf("XR-9 full-back pull: peak %.1f g %s\n", gmax, ok ? "ok" : "FAIL"); fails += !ok;
+    p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 340); p.ctl.throttle = 1; p.ctl.pitch = 1;
+    float rate = 0;
+    for (int i = 0; i < 2 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); rate = std::max(rate, p.w.x / DEG); }
+    ok = !p.ev.crashed && rate > 50.f;
+    printf("XR-9 pitch rate at Mach 1: %.0f deg/s %s\n", rate, ok ? "ok" : "FAIL"); fails += !ok;
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.roll = 1;
     for (int i = 0; i < 240; i++) p.step(1 / 240.f, calm, i / 240.f);
     ok = -p.w.z / DEG > 250.f;

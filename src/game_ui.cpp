@@ -1134,11 +1134,11 @@ void Game::drawResearch() {
   header(px, py, lw - 48 * s, "AIRFRAME"); py += 26 * s;
   auto row = [&](const char* k, const char* v) { g_ren.text(px, py, 13 * s, k, C_DIM, e); g_ren.text(px + 135 * s, py, 13 * s, ellipsize(v, lw - 183 * s, 13 * s), C_TEXT, e); py += 20 * s; };
   row("Configuration", "Blended lifting body, cranked delta, canards");
-  row("Propulsion", "2 x afterburning turbofan, 236 kN");
-  row("Thrust / weight", "2.2 : 1");
-  row("Top speed", "Mach 2+ at altitude");
+  row("Propulsion", "2 x turbofan, 472 kN with full reheat");
+  row("Thrust / weight", "4.4 : 1 (reheat)");
+  row("Top speed", "Mach 2.5+");
   row("Thrust vectoring", "2D nozzles, 0 - 90 deg, VTOL");
-  row("Flight control", "Fly-by-wire, 9 g limiter, 315 deg/s roll");
+  row("Flight control", "Inertially damped FBW, 30 g, 315 deg/s roll");
   row("Cockpit", "Sealed pod, synthetic-vision displays + HUD");
   row("Fuel", "Unrestricted (research cell)");
   py += 10 * s;
@@ -1146,7 +1146,7 @@ void Game::drawResearch() {
   const char* notes[] = {"F / V   swivel nozzles: 0 = forward flight, 90 = hover",
                          "Hover:  nozzles 90, ~65% throttle, stick to translate",
                          "Hands off in the hover and the jet levels itself",
-                         "Above 85% throttle the afterburners light",
+                         "Above 85% throttle the afterburners light (2x thrust)",
                          "Mach 1 sets off a sonic boom - try it low over the sea",
                          "C cockpit view: you fly on the displays only"};
   for (auto n : notes) { if (py > ly + lh - 30 * s) break; g_ren.text(px, py, 13 * s, ellipsize(n, lw - 48 * s, 13 * s), C_DIM, e); py += 20 * s; }

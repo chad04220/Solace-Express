@@ -156,9 +156,9 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   float thrust = 0;
   if (engineRunning) {
     if (s.special) {
-      // two afterburning turbofans: dry up to 85% throttle, reheat above; thrust holds up to Mach 2+
+      // two afterburning turbofans: dry up to 85% throttle, reheat above (2x thrust at 100%, T/W ~4.4)
       float ab = smoothstepf(0.85f, 1.0f, engineSpool);
-      thrust = s.engines * s.power * powf(sigmaRho, 0.6f) * (0.82f * engineSpool + 0.18f * ab);
+      thrust = s.engines * s.power * powf(sigmaRho, 0.6f) * (0.82f * engineSpool + 1.18f * ab);   // full reheat doubles thrust
     } else if (s.engineType == ENG_JET) {
       float mach = V / 340.f;
       thrust = s.engines * s.power * engineSpool * powf(sigmaRho, 0.75f) * (1.f - 0.3f * mach);
@@ -229,18 +229,18 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     // fly-by-wire rate command through vectored thrust and reaction jets: authority independent of airspeed
     float Vt = std::max(V, 1.f);
     float hover = smoothstepf(0.3f, 0.7f, nozzle) * smoothstepf(70.f, 30.f, V);
-    float pMax = clampf(11.f * G0 / Vt, 0.9f, 2.6f);           // pitch rate limited to ~11 g
+    float pMax = clampf(33.f * G0 / Vt, 0.9f, 2.6f);           // inertially damped research cell: ~50 deg/s at Mach 1
     float rMax = 5.5f * (1.f - 0.6f * hover), yMax = 1.4f;
     vec3 wd(ctl.pitch * pMax + ctl.trim * 0.15f, -ctl.yaw * yMax, -ctl.roll * rMax);
     if (hover > 0) {  // hands-off attitude hold while hovering
       if (fabsf(ctl.pitch) < 0.05f) wd.x += hover * 2.2f * (0.f - pitchDeg()) * DEG;
       if (fabsf(ctl.roll) < 0.05f) wd.z += hover * 2.2f * bankDeg() * DEG;
     }
-    // g limiter: keep the angle of attack inside +9 / -4 g (or the stall) so hard pulls don't overstress
+    // g limiter: keep the angle of attack inside +30 / -12 g (or the stall)
     if (V > 20.f && !onGround) {
       float qS = 0.5f * density * V * V * s.wingArea, W = m * G0;
-      float aHi = std::min((9.f * W / qS - s.CL0) / s.CLa, (s.CLmax - s.CL0) / s.CLa);
-      float aLo = std::max((-4.f * W / qS - s.CL0) / s.CLa, (-1.1f - s.CL0) / s.CLa);
+      float aHi = std::min((30.f * W / qS - s.CL0) / s.CLa, (s.CLmax - s.CL0) / s.CLa);
+      float aLo = std::max((-12.f * W / qS - s.CL0) / s.CLa, (-1.1f - s.CL0) / s.CLa);
       wd.x = clampf(wd.x, (aLo - alpha) * 6.f - 0.2f, (aHi - alpha) * 6.f + 0.2f);
     }
     float ms0 = m / s.emptyMass, k = onGround ? 4.f : 9.f;
@@ -362,7 +362,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   vec3 accBody = q.conj().rotate(acc + vec3(0, G0, 0));
   gLoad = accBody.y / G0;
   if (!onGround) { maxG = std::max(maxG, gLoad); minG = std::min(minG, gLoad); }
-  if (!anyWheel && (s.special ? (gLoad > 16.f || gLoad < -8.f) : (gLoad > 5.8f || gLoad < -3.f))) { ev.crashed = true; ev.crashReason = "Structural failure - overstressed airframe"; return; }
+  if (!anyWheel && (s.special ? (gLoad > 40.f || gLoad < -20.f) : (gLoad > 5.8f || gLoad < -3.f))) { ev.crashed = true; ev.crashReason = "Structural failure - overstressed airframe"; return; }
   vel += acc * dt;
   pos += vel * dt;
   // inertia scales with loading
