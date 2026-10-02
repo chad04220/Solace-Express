@@ -55,7 +55,7 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   q = quat::axisAngle(vec3(0, 1, 0), -headingDeg * DEG);
   w = vec3(); ctl = Controls(); ev = FlightEvents();
   flaps = 0; gear = 1; rpm = 0; n1 = 0; engineSpool = 0; maxG = minG = 1; flightTime = 0;
-  apOn = false; apPitchI = 0; gust = vec3(); rng = Rng(77);
+  apDisengage(); apDone = false; apPitchI = 0; gust = vec3(); rng = Rng(77);
   // Calibrate parasitic drag so 75% power yields the published cruise speed at sea level
   {
     float V = s->cruise, qS = 0.5f * 1.225f * V * V * s->wingArea;

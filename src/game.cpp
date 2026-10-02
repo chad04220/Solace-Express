@@ -176,7 +176,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
   approachMinAgl = 1e9f;
-  apWasOn = false;
+  apWasOn = false; apDest = -1;
   licenseBefore = career.license;
   screen = SCR_FLIGHT;
   toast(fmt("%s - %s", a.code, a.name), vec3(0.7f, 0.9f, 1.0f));
@@ -228,6 +228,39 @@ int Game::computePhase() const {
   return 3;
 }
 
+// the autopilot is flying a leg where time acceleration is safe (holds, en route, descent orbit - not the approach)
+void Game::cycleApDest(int dir) {
+  int n = (int)g_world.airports.size();
+  std::vector<int> order(n);
+  for (int i = 0; i < n; i++) order[i] = i;
+  auto d2 = [&](int i) { float dx = g_world.airports[i].x - plane.pos.x, dz = g_world.airports[i].z - plane.pos.z; return dx * dx + dz * dz; };
+  std::sort(order.begin(), order.end(), [&](int a, int b) { return d2(a) < d2(b); });
+  if (apDest < 0) apDest = (int)(&dest() - &g_world.airports[0]);   // first pick: the contract's destination
+  else {
+    int k = (int)(std::find(order.begin(), order.end(), apDest) - order.begin());
+    apDest = order[((k + dir) % n + n) % n];
+  }
+  g_audio.trigger(SFX_CLICK);
+}
+
+bool Game::apCruising() const {
+  return plane.apOn && (plane.apMode == Plane::AP_HOLD || (plane.apMode == Plane::AP_APPR && plane.apStage == Plane::APS_NAV));
+}
+
+void Game::engageAutopilot() {
+  if (apDest >= 0) {
+    plane.apEngage(Plane::AP_NAV, apDest, wx);
+    const Airport& a = g_world.airports[apDest];
+    toast(fmt("Autopilot: AUTOLAND %s runway %02d", a.code, a.rwyNumber(plane.apRev)), vec3(0.6f, 1, 0.6f));
+    toast("Any stick input hands control back", vec3(0.8f, 0.8f, 0.8f));
+  } else {
+    plane.apEngage(Plane::AP_HOLD, -1, wx);
+    toast("Autopilot ON: A/D heading, W/S altitude, throttle keys speed", vec3(0.6f, 1, 0.6f));
+    toast("Pick an AUTOLAND airport on the GPS (N) to fly there", vec3(0.8f, 0.8f, 0.8f));
+  }
+  g_audio.trigger(SFX_CLICK);
+}
+
 void Game::flightControls(float dt) {
   Controls& c = plane.ctl;
   auto key = [&](int k) { return in.down[k]; };
@@ -243,11 +276,18 @@ void Game::flightControls(float dt) {
     padP = padP * fabsf(padP) * 0.4f + padP * 0.6f; padR = padR * fabsf(padR) * 0.4f + padR * 0.6f;
   }
   bool manual = fabsf(pitchIn) + fabsf(rollIn) > 0 || fabsf(padP) + fabsf(padR) > 0.3f;
+  bool apNav = plane.apOn && plane.apMode == Plane::AP_APPR;
   if (plane.apOn) {
-    plane.apHeading = wrapDeg360(plane.apHeading + (rollIn + padR) * 25.f * dt);
-    plane.apAlt += -(pitchIn + padP) * (set.invertPitch ? -1.f : 1.f) * 0.f + ((key('S') || key(K_DOWN)) ? -6.f : 0.f) * 0 * dt;
-    if (fabsf(pitchIn) > 0 || fabsf(padP) > 0.5f) { plane.apOn = false; g_audio.trigger(SFX_AP_DISC); toast("Autopilot disconnected", vec3(1, 0.7f, 0.3f)); }
-  } else {
+    if (apNav) {   // flying a GPS route / autoland: any real stick input hands control back
+      if (fabsf(pitchIn + padP) > 0.5f || fabsf(rollIn + padR) > 0.5f) {
+        plane.apDisengage(); g_audio.trigger(SFX_AP_DISC); toast("Autopilot disconnected - your aircraft", vec3(1, 0.7f, 0.3f));
+      }
+    } else {       // hold mode: the stick moves the targets (A/D heading, W/S altitude)
+      plane.apHeading = wrapDeg360(plane.apHeading + (rollIn + padR) * 20.f * dt);
+      plane.apAlt = std::max(plane.apAlt + (pitchIn + padP) * 45.f * dt, g_world.height(plane.pos.x, plane.pos.z) + 60.f);
+    }
+  }
+  if (!plane.apOn) {
     float tp = clampf(pitchIn + padP, -1, 1), tr = clampf(rollIn + padR, -1, 1);
     float rate = manual ? 2.8f : 5.f;
     c.pitch = approach(c.pitch, tp, rate, dt);
@@ -260,9 +300,18 @@ void Game::flightControls(float dt) {
   if (key(K_SHIFT) || key(K_PGUP) || key(K_PLUS)) thr += 0.55f;
   if (key(K_CTRL) || key(K_PGDN) || key(K_MINUS)) thr -= 0.55f;
   if (in.pad) thr += (in.rt - in.lt) * 0.6f;
-  c.throttle = clampf(c.throttle + thr * dt, 0, 1);
-  for (int k = 1; k <= 9; k++) if (in.pressed['0' + k] && !in.down[K_CTRL]) c.throttle = k / 9.f;
-  if (in.pressed['0']) c.throttle = 0;
+  bool numKey = in.pressed['0'];
+  for (int k = 1; k <= 9; k++) numKey |= in.pressed['0' + k] && !in.down[K_CTRL];
+  if (plane.apOn && plane.apMode == Plane::AP_HOLD && plane.apSpeed > 0 && numKey) { plane.apSpeed = 0; toast("Autothrottle off - manual throttle", vec3(1, 0.85f, 0.5f)); }
+  if (apNav) {}   // the autopilot has the throttle
+  else if (plane.apOn && plane.apSpeed > 0) {   // autothrottle: throttle inputs move the speed target
+    const AircraftSpec& sp = *plane.spec;
+    plane.apSpeed = clampf(plane.apSpeed + thr * 30.f * dt, sp.vref * 1.2f, sp.cruise * (sp.special ? 1.6f : 1.15f));
+  } else {
+    c.throttle = clampf(c.throttle + thr * dt, 0, 1);
+    for (int k = 1; k <= 9; k++) if (in.pressed['0' + k] && !in.down[K_CTRL]) c.throttle = k / 9.f;
+    if (in.pressed['0']) c.throttle = 0;
+  }
   // trim
   float tr = (key(K_RBRACKET) || key(K_HOME) ? 1.f : 0.f) - (key(K_LBRACKET) || key(K_END) ? 1.f : 0.f);
   if (in.pad) tr += ((in.buttons & PAD_UP) ? 1.f : 0.f) - ((in.buttons & PAD_DOWN) ? 1.f : 0.f);
@@ -272,38 +321,39 @@ void Game::flightControls(float dt) {
     if (plane.spec->special) toast(flapNotch > 0.99f ? "Thrust vector 90 deg - VTOL hover" : fmt("Thrust vector %d deg", (int)lroundf(flapNotch * 90)), vec3(0.4f, 0.9f, 1));
     else toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1));
   };
-  if (in.pressed['F'] || (in.buttonsPressed & PAD_B)) { flapNotch = std::min(1.f, flapNotch + 1.f / 3.f); flapToast(); }
-  if (in.pressed['V'] || (in.buttonsPressed & PAD_X)) { flapNotch = std::max(0.f, flapNotch - 1.f / 3.f); flapToast(); }
+  if (apNav) flapNotch = c.flaps;   // the autopilot runs the flaps on the approach
+  else {
+    if (in.pressed['F'] || (in.buttonsPressed & PAD_B)) { flapNotch = std::min(1.f, flapNotch + 1.f / 3.f); flapToast(); }
+    if (in.pressed['V'] || (in.buttonsPressed & PAD_X)) { flapNotch = std::max(0.f, flapNotch - 1.f / 3.f); flapToast(); }
+  }
   c.flaps = flapNotch;
   // gear
-  if ((in.pressed['G'] || (in.buttonsPressed & (PAD_Y | PAD_RIGHT))) && plane.spec->retract) {
+  if ((in.pressed['G'] || (in.buttonsPressed & (PAD_Y | (showMap ? 0u : (unsigned)PAD_RIGHT)))) && plane.spec->retract) {
     if (plane.onGround && c.gearDown) toast("Gear lever is locked on the ground", vec3(1, 0.6f, 0.4f));
     else { c.gearDown = !c.gearDown; toast(c.gearDown ? "Gear down" : "Gear up", vec3(0.8f, 1, 0.8f)); }
   }
   // brakes: B = parking brake toggle, Space = wheel brakes
   static bool parking = true;
-  if (flightClock < 0.05f) parking = true;
-  if (in.pressed['B'] || (in.buttonsPressed & PAD_LEFT)) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
+  if (flightClock < 0.05f) parking = plane.onGround;
+  if (plane.apDone) { plane.apDone = false; parking = true; toast("Autoland complete - parking brake set", vec3(0.5f, 1, 0.6f)); g_audio.trigger(SFX_AP_DISC, 0.7f); }
+  if (in.pressed['B'] || (!showMap && (in.buttonsPressed & PAD_LEFT))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
   float wb = key(K_SPACE) ? 1.f : 0.f;
   if (in.pad && (in.buttons & PAD_A)) wb = 1.f;
   if (wb > 0 && parking && plane.onGround && length(plane.vel) > 2.f) parking = false;
   c.brake = parking ? 1.f : wb;
-  // autopilot
+  // autopilot: Z / right stick click. With an autoland airport picked on the GPS it flies there and lands;
+  // otherwise it holds heading, altitude and speed
   if (in.pressed['Z'] || (in.buttonsPressed & PAD_RS)) {
-    if (plane.onGround) toast("Autopilot needs to be airborne", vec3(1, 0.6f, 0.4f));
-    else {
-      plane.apOn = !plane.apOn;
-      if (plane.apOn) { plane.apHeading = plane.heading(); plane.apAlt = plane.pos.y; plane.apPitchI = plane.pitchDeg(); toast("Autopilot ON: holding heading and altitude (A/D adjusts heading)", vec3(0.6f, 1, 0.6f)); }
-      else { g_audio.trigger(SFX_AP_DISC); toast("Autopilot OFF", vec3(1, 0.7f, 0.3f)); }
-    }
+    if (plane.apOn) { plane.apDisengage(); g_audio.trigger(SFX_AP_DISC); toast("Autopilot OFF", vec3(1, 0.7f, 0.3f)); }
+    else if (plane.onGround) toast("Autopilot needs to be airborne", vec3(1, 0.6f, 0.4f));
+    else engageAutopilot();
   }
-  if (plane.apOn && (key('W') || key(K_UP))) plane.apAlt += 0;
   if (in.pressed['L']) { landingLight = !landingLight; toast(landingLight ? "Landing lights ON" : "Landing lights OFF"); }
   if (in.pressed['I'] && !plane.engineRunning && plane.fuel > 0) { plane.starterTime = 0.01f; toast("Engine start"); }
   // time acceleration
   if (in.pressed['T']) {
     float dd = length(vec3(plane.pos.x - dest().x, 0, plane.pos.z - dest().z));
-    if (plane.onGround || plane.agl() < 250.f || dd < 3500.f) { timeAccel = 1; toast("Time acceleration only available in cruise", vec3(1, 0.7f, 0.4f)); }
+    if (!apCruising() && (plane.onGround || plane.agl() < 250.f || dd < 3500.f)) { timeAccel = 1; toast("Time acceleration only available in cruise", vec3(1, 0.7f, 0.4f)); }
     else { timeAccel = timeAccel >= 4 ? 1 : timeAccel * 2; toast(fmt("Time x%.0f", timeAccel)); }
   }
 }
@@ -336,7 +386,8 @@ void Game::updateFlight(float dt) {
   float simDt = dt * timeAccel;
   if (timeAccel > 1) {
     float dd = length(vec3(plane.pos.x - dest().x, 0, plane.pos.z - dest().z));
-    if (plane.agl() < 250.f || dd < 3500.f || plane.onGround || crashed) { timeAccel = 1; toast("Time acceleration off"); }
+    bool approach = plane.apOn && plane.apMode == Plane::AP_APPR && plane.apStage != Plane::APS_NAV;
+    if ((!apCruising() && (plane.agl() < 250.f || dd < 3500.f)) || approach || plane.onGround || crashed) { timeAccel = 1; toast("Time acceleration off"); }
   }
   vec3 prevPos = plane.pos;
   if (!crashed) {
@@ -1417,7 +1468,11 @@ void Game::update(float dt) {
       else { paused = !paused; settingsFromPause = false; }
     }
     if (in.pressed['N']) { showMap = !showMap; g_audio.trigger(SFX_CLICK); }
-    if (in.pressed[K_TAB]) { showMinimap = !showMinimap; toast(showMinimap ? "Minimap shown" : "Minimap hidden"); }
+    if (showMap && !paused) {   // GPS open: Tab / D-pad pick the autoland airport, Enter / A engages the autopilot to it
+      if (in.pressed[K_TAB] || (in.buttonsPressed & PAD_RIGHT)) cycleApDest(in.down[K_SHIFT] ? -1 : 1);
+      if (in.buttonsPressed & PAD_LEFT) cycleApDest(-1);
+      if ((in.pressed[K_ENTER] || (in.buttonsPressed & PAD_A)) && apDest >= 0 && !plane.onGround) engageAutopilot();
+    } else if (in.pressed[K_TAB]) { showMinimap = !showMinimap; toast(showMinimap ? "Minimap shown" : "Minimap hidden"); }
     if (in.pressed['H']) hudOn = !hudOn;
     if (!paused) {
       updateFlight(dt);
@@ -1740,6 +1795,21 @@ void Game::debugScene(const std::string& name) {
     if (name == "gps") { showMap = true; uiAnim[0x6e61u] = 1.f; }
     if (name == "pause") paused = true;
     if (name == "minimap") showMinimap = true;
+    for (int i = 0; i < 30; i++) updateCamera(0.1f);
+  }
+  if (name == "gpsap" || name == "apfinal" || name == "apvtol") {   // autopilot: GPS autoland pick, then the approach
+    int sp = name == "apvtol" ? 7 : 4;
+    plane.reset(&kAircraft[sp], vec3(-4000, 900, 9000), 40, kAircraft[sp].maxFuel, 100, true, kAircraft[sp].cruise * 0.8f);
+    plane.engineRunning = true; plane.engineSpool = 0.7f; plane.ctl.throttle = 0.7f;
+    takeoffAnnounced = true; engineAutoStarted = true; camQ = plane.q; hint.clear();
+    apDest = g_world.findAirport("CAP"); engageAutopilot();
+    int target = name == "gpsap" ? -1 : name == "apfinal" ? Plane::APS_FINAL : Plane::APS_HOVER;
+    for (int i = 0; i < (target < 0 ? 90 : 60 * 1500); i++) {
+      realTime += 1 / 60.f; update(1 / 60.f);
+      if (target >= 0 && plane.apStage == target && plane.apStageT > (target == Plane::APS_HOVER ? 14.f : 25.f)) break;
+    }
+    toasts.clear();
+    if (name == "gpsap") { showMap = true; uiAnim[0x6e61u] = 1.f; }
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
   }
 }

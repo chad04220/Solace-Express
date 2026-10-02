@@ -97,6 +97,10 @@ private:
   vec2 cloudOff;
   int diversion = -1;
   bool apWasOn = false;
+  int apDest = -1;              // airport picked on the GPS for the autopilot to fly to and land at
+  bool apCruising() const;
+  void engageAutopilot();
+  void cycleApDest(int dir);
   float approachMinAgl = 1e9f;
 
   // effects

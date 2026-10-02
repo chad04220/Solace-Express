@@ -825,7 +825,22 @@ void Game::drawHud(const FrameParams& fp) {
       float k = rel > 0 ? 1.f : -1.f, ex2 = W * 0.5f + k * (tw * 0.5f - 10 * s), yy = ty + th * 0.5f;
       for (int c2 = 0; c2 < 2; c2++) { float o = c2 * 7 * s * k; g_ren.line(ex2 - 5 * s * k + o, yy - 7 * s, ex2 + o, yy, 2.5f * s, mag, 1); g_ren.line(ex2 + o, yy, ex2 - 5 * s * k + o, yy + 7 * s, 2.5f * s, mag, 1); }
     }
-    if (fabsf(rel) > 8.f) g_ren.text(W * 0.5f + (rel > 0 ? 1 : -1) * (tw * 0.5f + 12 * s), ty + 6 * s, 13 * s, fmt("TURN %s %.0f", rel > 0 ? "R" : "L", fabsf(rel)), mag, 1, rel > 0 ? 0 : 2);
+    if (fabsf(rel) > 8.f && !plane.apOn) g_ren.text(W * 0.5f + (rel > 0 ? 1 : -1) * (tw * 0.5f + 12 * s), ty + 6 * s, 13 * s, fmt("TURN %s %.0f", rel > 0 ? "R" : "L", fabsf(rel)), mag, 1, rel > 0 ? 0 : 2);
+    // autopilot: heading bug on the tape and a status banner under it
+    if (plane.apOn) {
+      const vec3 APC(0.3f, 0.95f, 1.f);
+      float relA = wrapAngle((plane.apHeading - hdg) * DEG) / DEG;
+      if (fabsf(relA) <= 60.f) {
+        float bx = W * 0.5f + relA / 60.f * tw * 0.5f;
+        g_ren.rect(bx - 6 * s, ty + th - 5 * s, 12 * s, 5 * s, APC, 0.95f);
+        g_ren.rect(bx - 2 * s, ty + th - 9 * s, 4 * s, 4 * s, APC, 0.95f);
+      }
+      std::string ap = "AP  " + plane.apStatus;
+      float bw2 = g_ren.textWidth(ap, 13 * s) + 28 * s, by = ty + th + 8 * s;
+      hudPanel(W * 0.5f - bw2 * 0.5f, by, bw2, 24 * s);
+      g_ren.rect(W * 0.5f - bw2 * 0.5f, by, 3 * s, 24 * s, APC, 0.9f);
+      g_ren.text(W * 0.5f, by + 5 * s, 13 * s, ap, APC, 1, 1);
+    }
   }
   // 3D target marker: a diamond on the target itself with a stalk to the ground below it (reads height at a glance);
   // off-screen or behind, an arrow on the screen edge points the way to turn
@@ -961,7 +976,7 @@ void Game::drawHud(const FrameParams& fp) {
   erow("GND SPD", fmtSpeed(gs));
   std::string st;
   if (plane.ctl.brake > 0.5f) st += "BRAKE ";
-  if (plane.apOn) st += fmt("AP %03.0f/%s ", plane.apHeading, fmtAlt(plane.apAlt).c_str());
+  if (plane.apOn) st += plane.apMode == Plane::AP_APPR ? std::string("AP NAV ") : fmt("AP %03.0f/%s ", wrapDeg360(plane.apHeading), fmtAlt(plane.apAlt).c_str());
   if (landingLight) st += "LDG LT";
   g_ren.text(ex + 14 * s, ty, 13 * s, st, C_WARN, 1);
   } else if (!plane.spec->special) {
@@ -1090,7 +1105,7 @@ void Game::drawGps() {
   // breadcrumb trail
   for (size_t i = 0; i < trail.size(); i++) { vec2 p = toS(trail[i].x, trail[i].y); if (inside(p, 2 * s)) g_ren.rect(p.x - 1.5f * s, p.y - 1.5f * s, 3 * s, 3 * s, C_ACCENT, (0.25f + 0.6f * (float)i / trail.size()) * e, 1.5f * s); }
   // route: departure -> checkpoints -> destination, flowing dashes; active leg bright
-  const vec3 MAG(1.f, 0.35f, 1.f);
+  const vec3 MAG(1.f, 0.35f, 1.f), AP_CYAN(0.3f, 0.95f, 1.f);
   std::vector<vec2> pts; pts.push_back(vec2(g_world.airports[contract.from].x, g_world.airports[contract.from].z));
   for (auto& w : contract.wps) pts.push_back(vec2(w.x, w.z));
   pts.push_back(vec2(dest().x, dest().z));
@@ -1121,6 +1136,22 @@ void Game::drawGps() {
     seg(vec2(p.x - dir.x * hl, p.y - dir.z * hl), vec2(p.x + dir.x * hl, p.y + dir.z * hl), 2 * s, c, 1.f);
     if (isDest) for (int ring = 0; ring < 2; ring++) { float ph = fmodf(T * 0.7f + ring * 0.5f, 1.f), r = (8 + 30 * ph) * s; if (inside(p, r)) g_ren.rectOutline(p.x - r, p.y - r, 2 * r, 2 * r, MAG, (1 - ph) * e, r, 2 * s); }
     if (inside(p, 30 * s)) g_ren.text(p.x + 8 * s, p.y + 4 * s, 12 * s, a.code, c, e, 0, true);
+    if (i == apDest) {   // autoland pick: cyan target ring
+      float r = 14 * s + 2 * s * sinf(T * 4.f);
+      if (inside(p, r)) { g_ren.glow(p.x - r, p.y - r, 2 * r, 2 * r, AP_CYAN, 0.3f * e, r, 8 * s); g_ren.rectOutline(p.x - r, p.y - r, 2 * r, 2 * r, AP_CYAN, e, r, 2.5f * s); }
+      if (inside(p, 30 * s)) g_ren.text(p.x + 8 * s, p.y - 16 * s, 11 * s, "AUTOLAND", AP_CYAN, e, 0, true);
+    }
+    // click an airport to pick it for the autopilot
+    if (in.mPressed[0] && inside(p, 0) && fabsf(in.mx - p.x) < 16 * s && fabsf(in.my - p.y) < 16 * s && apDest != i) { apDest = i; g_audio.trigger(SFX_CLICK); }
+  }
+  // the autopilot's approach plan: descent orbit, intercept and final approach course
+  if (plane.apOn && plane.apMode == Plane::AP_APPR) {
+    vec2 hc = toS(plane.apHoldC.x, plane.apHoldC.z); float hr = plane.apHoldR * k;
+    for (int i = 0; i < 48; i += 2) { float a0 = i * 6.2832f / 48 + T * 0.3f, a1 = (i + 1) * 6.2832f / 48 + T * 0.3f; seg(vec2(hc.x + cosf(a0) * hr, hc.y + sinf(a0) * hr), vec2(hc.x + cosf(a1) * hr, hc.y + sinf(a1) * hr), 1.5f * s, AP_CYAN, 0.6f); }
+    vec3 fa = plane.apTd - plane.apLd * plane.apFinalLen, fb = plane.apTd;
+    seg(toS(fa.x, fa.z), toS(fb.x, fb.z), 3 * s, AP_CYAN, 0.9f);
+    vec3 fx = plane.apTd - plane.apLd * (plane.apFinalLen + 4000.f);
+    dashed(toS(fx.x, fx.z), toS(fa.x, fa.z), 1.5f * s, AP_CYAN, 0.6f, 6 * s, 0);
   }
   // radar sweep around the aircraft
   for (int i = 0; i < 14; i++) {
@@ -1212,6 +1243,23 @@ void Game::drawGps() {
   g_ren.text(px, py, 15 * s, ellipsize(fmt("%s  %s", D.code, D.name), vw, 15 * s), MAG, e); py += 22 * s;
   g_ren.text(px, py, 13 * s, ellipsize(fmt("RWY %02d/%02d  %.0f m  %s", D.rwyNumber(false), D.rwyNumber(true), D.length, surfaceName(D.surface)), vw, 13 * s), C_TEXT, e); py += 19 * s;
   g_ren.text(px, py, 13 * s, ellipsize(fmt("ELEV %s   WIND %03.0f/%.0fkt", fmtAlt(D.elev).c_str(), wx.windFrom, wx.windSpeed * MS_TO_KT), vw, 13 * s), C_DIM, e); py += 24 * s;
+  // autopilot / autoland
+  header(px, py, vw, "AUTOPILOT"); py += 24 * s;
+  g_ren.text(px, py, 13 * s, ellipsize(plane.apOn ? plane.apStatus : std::string("OFF  -  Z engages"), vw, 13 * s), plane.apOn ? C_GOOD : C_DIM, e); py += 20 * s;
+  {
+    float bw = 30 * s, bh = 26 * s;
+    if (button(px, py, bw, bh, "<")) cycleApDest(-1);
+    if (button(px + vw - bw, py, bw, bh, ">")) cycleApDest(1);
+    std::string tl = "PICK AN AIRPORT";
+    if (apDest >= 0) { const Airport& A = g_world.airports[apDest]; tl = fmt("%s  %.0f km", A.code, length(vec3(A.x - plane.pos.x, 0, A.z - plane.pos.z)) / 1000.f); }
+    g_ren.text(px + vw * 0.5f, py + 5 * s, 15 * s, ellipsize(tl, vw - 2 * bw - 12 * s, 15 * s), apDest >= 0 ? AP_CYAN : C_DIM, e, 1, true);
+    py += bh + 6 * s;
+    bool active = plane.apOn && plane.apMode == Plane::AP_APPR && plane.apAirport == apDest;
+    bool can = apDest >= 0 && !plane.onGround && !active;
+    if (button(px, py, vw * 0.64f, 28 * s, active ? "AUTOLAND ACTIVE" : "ENGAGE AUTOLAND", can, can)) engageAutopilot();
+    if (button(px + vw * 0.68f, py, vw * 0.32f, 28 * s, "CLEAR", apDest >= 0 && !active)) apDest = -1;
+    py += 38 * s;
+  }
   if (py < sy + sh - 70 * s) {
     header(px, py, vw, "NEAREST"); py += 24 * s;
     const Airport& N = g_world.airports[nearest];
@@ -1222,7 +1270,8 @@ void Game::drawGps() {
   if (button(x1 - 46 * s, my + 12 * s, 34 * s, 30 * s, "+")) gpsRangeTarget = std::max(1500.f, gpsRangeTarget * 0.6f);
   if (button(x1 - 46 * s, my + 46 * s, 34 * s, 30 * s, "-")) gpsRangeTarget = std::min(40000.f, gpsRangeTarget / 0.6f);
   if (button(x1 - 46 * s, my + 80 * s, 34 * s, 30 * s, "R")) gpsRangeTarget = clampf(std::max(dist, 3000.f) * 1.25f, 1500.f, 40000.f);
-  g_ren.text(sx + sw * 0.5f, sy + sh - 24 * s, 11.5f * s, "WHEEL ZOOM   R FIT TARGET   N CLOSE", C_DIM, 0.8f * e, 1, false);
+  g_ren.text(sx + sw * 0.5f, sy + sh - 42 * s, 11.5f * s, "TAB / CLICK PICK   ENTER AUTOLAND", C_DIM, 0.8f * e, 1, false);
+  g_ren.text(sx + sw * 0.5f, sy + sh - 24 * s, 11.5f * s, "WHEEL ZOOM   R FIT   N CLOSE", C_DIM, 0.8f * e, 1, false);
 }
 
 // ------------------------------------------------------------------ hidden research menu (U + I on the main menu)
