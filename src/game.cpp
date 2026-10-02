@@ -1052,6 +1052,7 @@ FrameParams Game::buildFrame() {
       fp.flameLight = lerp(vec3(0.3f, 0.55f, 1.f), vec3(1.f, 0.62f, 0.3f), ab) * ((25.f * sp * sp + 260.f * ab) * flick);
     }
     fp.rainLens = camMode == 1 && wx.precip == 1 ? 1.f : 0.f;
+    fp.sealedCockpit = camMode == 1 && plane.spec->special && !crashed;
     if (crashed) fp.fade = clampf(1.f - (crashTimer - (crashEndT - 1.f)), 0, 1);
     fp.gLoad = gTunnel;
   } else {
@@ -1526,6 +1527,15 @@ void Game::debugScene(const std::string& name) {
     if (!crashed) printf("airbreak: FAIL - no break-up\n");
     for (int i = 0; i < 5; i++) updateCamera(1 / 60.f);
     toasts.clear(); return;
+  }
+  if (name.compare(0, 3, "ckv") == 0) {   // cockpit view of aircraft N: ckv<N>_<look yaw deg>_<look pitch deg>_<hour>
+    int idx = 0; float ly = 0, lpch = -8, hour = 11; sscanf(name.c_str() + 3, "%d_%f_%f_%f", &idx, &ly, &lpch, &hour);
+    if (idx == kResearchJet) { resAirborne = true; resTime = hour; launchResearch(); }
+    else { timeOfDay = hour; plane.reset(&kAircraft[idx], vec3(-4000, 600, 9000), 40, kAircraft[idx].maxFuel, 100, true, kAircraft[idx].cruise); camQ = plane.q; takeoffAnnounced = true; }
+    camMode = 1; hint.clear(); toasts.clear();
+    for (int i = 0; i < 4; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    lookYaw = ly * DEG; lookPitch = lpch * DEG; camYaw = lookYaw; camPitch = lookPitch + 0.12f;
+    toasts.clear(); hint.clear(); return;
   }
   if (name.compare(0, 4, "gtun") == 0) {   // g-force tunnel at a forced strength (percent), chase view: gtun<pct>
     resAirborne = true; realTime = 20; launchResearch();

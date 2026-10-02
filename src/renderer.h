@@ -37,7 +37,8 @@ struct FrameParams {
   WreckVisual wreck;
   vec3 landLightPos, landLightDir; float landLight = 0;
   vec3 flameLightPos, flameLight;  // research jet exhaust light (radiance; zero when off)
-  float exposure = 1.0f, rainLens = 0, fade = 1, vignette = 0.6f, gLoad = 0;   // gLoad: g-force tunnel 0..1
+  float exposure = 1.0f, rainLens = 0, fade = 1, vignette = 0.6f, gLoad = 0;
+  bool sealedCockpit = false;   // XR-9 cockpit view: no sun glare (the pilot sees the sun only on the displays)   // gLoad: g-force tunnel 0..1
 };
 
 struct UIVert { float x, y, u, v, r, g, b, a, mode, hx, hy, p; };

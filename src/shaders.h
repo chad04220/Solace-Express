@@ -388,6 +388,12 @@ R"(  // sculpted seat: shell, bolsters, headrest with light strip, harness
   led = min(led, sdCapsule(vec3(abs(q.x), q.y, q.z), vec3(0.39, -0.395, -0.25), vec3(0.39, -0.395, 0.42), 0.0025));
   res = opU(res, vec2(led, 48.0));
   res = opU(res, vec2(sdCapsule(q, vec3(-0.3, -0.76, -0.55), vec3(0.3, -0.76, -0.55), 0.008), 57.0));
+  // recessed ceiling light bars either side of the spine: machined housings with warm diffuser lenses (id 58)
+  {
+    vec3 lq = vec3(abs(q.x) - 0.2, q.y - 0.63, q.z - 0.15);
+    res = opU(res, vec2(sdRoundBox(lq, vec3(0.034, 0.035, 0.21), 0.01), 44.0));
+    res = opU(res, vec2(sdRoundBox(lq + vec3(0.0, 0.035, 0.0), vec3(0.022, 0.003, 0.19), 0.002), 58.0));
+  }
   return res;
 }
 vec2 mapJet(vec3 p){
@@ -542,7 +548,8 @@ vec2 mapPlane(vec3 p){
     // pulling back (pitch +) raises the elevator trailing edge
     float elev = sdSurface(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98, -cPitch*0.4, 0.0);
     tail = min(tail, min(stab, elev));
-    if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + H0.y*0.45), vec3(0.18, 0.2, H0.y*0.55)), 0.08);
+)"
+R"(    if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + H0.y*0.45), vec3(0.18, 0.2, H0.y*0.55)), 0.08);
     float d = smin(res.x, tail, 0.12*R);
     res = vec2(d, tail < res.x ? 3.0 : res.y);
   }
@@ -552,8 +559,7 @@ vec2 mapPlane(vec3 p){
     vec4 S0 = uM[1];
     if (eng <= 1) {
       float sr = N1.y;
-)"
-R"(      float spin = sdRoundCone(p, vec3(0.0, S0.w, S0.x - sr*2.3), vec3(0.0, S0.w, S0.x + 0.05), 0.015, sr);
+      float spin = sdRoundCone(p, vec3(0.0, S0.w, S0.x - sr*2.3), vec3(0.0, S0.w, S0.x + 0.05), 0.015, sr);
       res = opU(res, vec2(spin, 16.0));
       if (eng == 0) {
         vec3 sec = fusSection(S0.x + 0.9);
@@ -677,76 +683,148 @@ R"(      float spin = sdRoundCone(p, vec3(0.0, S0.w, S0.x - sr*2.3), vec3(0.0, S
     res = opU(res, vec2(ant, 13.0));
   }
   // ---------------- cockpit interior (only rendered from inside)
+  // Ids: 10 panel (instruments drawn on it), 11 shell/floor, 12 seats, 13 controls, 14 glareshield & overhead,
+  // 60 brushed metal, 61 rubber, 63 trim panels, 64 light lenses, 65 radio stack, 66 satin black (bezels, knobs),
+  // 67 centre engine display (glass cockpits), 68 red knobs / buttons, 69 harness webbing
   if (inside > 0.5) {
     vec4 E = uM[22]; float pz = uM[21].w, phw = E.w; int ck = int(uM[21].z + 0.5);
+    float pf = pz + 0.045;                                             // panel face (towards the pilot)
     float panel = sdRoundBox(p - vec3(0.0, E.y - 0.36, pz), vec3(phw, 0.24, 0.045), 0.015);
     res = opU(res, vec2(panel, 10.0));
+    // raised bezels framing each pilot's instrument cluster
+    {
+      float cx = ck == 2 ? 0.02 : (ck == 1 ? 0.09 : 0.05), hx = ck == 2 ? 0.2 : (ck == 1 ? 0.255 : 0.215), hy = ck == 2 ? 0.098 : 0.112;
+      float sx = p.x*E.x >= 0.0 ? E.x + cx : -E.x + cx;               // copilot cluster: same layout, other seat
+      vec2 fq = vec2(p.x - sx, p.y - (E.y - 0.32));
+      vec2 dq = abs(fq) - vec2(hx, hy) + 0.02; float fr = length(max(dq, 0.0)) + min(max(dq.x, dq.y), 0.0) - 0.02;
+      float frame = max(abs(fr) - 0.007, abs(p.z - pf - 0.006) - 0.006);
+      res = opU(res, vec2(frame, 66.0));
+    }
+    // glareshield with a warm LED strip under its lip that floods the panel
     vec4 WSg = uM[23];
     float gz0 = min(WSg.x - 0.05, pz - 0.2);
     float glare = sdRoundBox(p - vec3(0.0, E.y - 0.1, 0.5*(gz0 + pz + 0.06)), vec3(phw*0.97, 0.022, 0.5*(pz + 0.06 - gz0)), 0.018);
     res = opU(res, vec2(glare, 14.0));
+    res = opU(res, vec2(sdCapsule(p, vec3(-phw*0.88, E.y - 0.124, pz + 0.07), vec3(phw*0.88, E.y - 0.124, pz + 0.07), 0.0035), 64.0));
+    // centre: radio / transponder stack below the clusters; glass cockpits add an engine display between the PFDs
+    res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.505, pf + 0.012), vec3(0.115, 0.06, 0.016), 0.004), 65.0));
+    if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.31, pf + 0.008), vec3(0.085, 0.085, 0.01), 0.004), 67.0));
+    // eyeball air vents at the panel corners
+    {
+      vec3 vq = vec3(abs(p.x) - (phw - 0.07), p.y - (E.y - 0.19), p.z - pf);
+      res = opU(res, vec2(max(sdRoundCylX(vq.zyx, 0.03, 0.012, 0.004), -sdRoundCylX(vq.zyx - vec3(0.012, 0.0, 0.0), 0.02, 0.01, 0.002)), 60.0));
+      res = opU(res, vec2(length(vq - vec3(0.0, 0.0, 0.004)) - 0.019, 66.0));
+    }
     float floor_ = sdBox(p - vec3(0.0, E.y - 1.08, E.z), vec3(phw, 0.02, 1.6));
     res = opU(res, vec2(floor_, 11.0));
-    // seats
-    vec3 sp = vec3(abs(p.x) - abs(E.x), p.y, p.z);
-    float seat = sdRoundBox(sp - vec3(0.0, E.y - 0.8, E.z + 0.05), vec3(0.21, 0.06, 0.24), 0.05);
-    vec3 bp = sp - vec3(0.0, E.y - 0.4, E.z + 0.37); bp.yz = rot2(bp.yz, 0.18);
-    seat = min(seat, sdRoundBox(bp, vec3(0.2, 0.36, 0.055), 0.05));
-    seat = min(seat, sdRoundBox(sp - vec3(0.0, E.y + 0.08, E.z + 0.47), vec3(0.11, 0.08, 0.05), 0.04));
-    res = opU(res, vec2(seat, 12.0));
+    // seats: pan with a front roll, bolstered back, headrest, rails, lap belt and shoulder harness
+    {
+      vec3 sp = vec3(abs(p.x) - abs(E.x), p.y, p.z);
+      float seat = sdRoundBox(sp - vec3(0.0, E.y - 0.8, E.z + 0.05), vec3(0.21, 0.055, 0.24), 0.05);
+)"
+R"(      seat = smin(seat, sdCapsule(sp, vec3(-0.19, E.y - 0.77, E.z - 0.17), vec3(0.19, E.y - 0.77, E.z - 0.17), 0.05), 0.03);
+      vec3 bp = sp - vec3(0.0, E.y - 0.4, E.z + 0.37); bp.yz = rot2(bp.yz, 0.18);
+      float back = sdRoundBox(bp, vec3(0.2, 0.36, 0.05), 0.05);
+      back = smin(back, sdRoundBox(vec3(abs(bp.x) - 0.2, bp.y + 0.05, bp.z + 0.03), vec3(0.035, 0.26, 0.07), 0.035), 0.04);   // side bolsters
+      seat = min(seat, back);
+      seat = min(seat, sdRoundBox(sp - vec3(0.0, E.y + 0.08, E.z + 0.47), vec3(0.11, 0.08, 0.05), 0.04));
+      res = opU(res, vec2(seat, 12.0));
+      float rails = sdBox(vec3(abs(sp.x) - 0.15, sp.y - (E.y - 1.045), sp.z - E.z), vec3(0.012, 0.018, 0.34));
+      rails = min(rails, sdBox(vec3(abs(sp.x) - 0.15, sp.y - (E.y - 0.94), sp.z - E.z - 0.05), vec3(0.01, 0.09, 0.012)));
+      res = opU(res, vec2(rails, 60.0));
+      vec3 hq = vec3(abs(sp.x) - 0.11, sp.y - (E.y - 0.43), sp.z - (E.z + 0.31)); hq.yz = rot2(hq.yz, 0.18);
+      float belt = sdBox(hq, vec3(0.022, 0.33, 0.004));
+      belt = min(belt, sdBox(vec3(sp.x, sp.y - (E.y - 0.73), sp.z - (E.z - 0.05)), vec3(0.2, 0.022, 0.004)));
+      res = opU(res, vec2(belt, 69.0));
+      res = opU(res, vec2(sdRoundBox(vec3(sp.x, sp.y - (E.y - 0.73), sp.z - (E.z - 0.055)), vec3(0.03, 0.02, 0.006), 0.004), 60.0));   // buckle
+    }
     // control yokes: pull moves toward the pilot, roll right turns the yoke clockwise
-    float pull = cPitch*0.075;
-    vec3 yp = vec3(abs(p.x) - abs(E.x), p.y - (E.y - 0.43), p.z - pz);
-    float col = sdCapsule(yp, vec3(0.0, 0.0, 0.02), vec3(0.0, 0.0, 0.2 + pull), 0.018);
-    vec3 hp = yp - vec3(0.0, 0.0, 0.22 + pull);
-    hp.xy = rot2(hp.xy, cRoll*0.75);
-    float yoke = min(col, sdCapsule(hp, vec3(-0.1, 0.0, 0.0), vec3(0.1, 0.0, 0.0), 0.015));
-    yoke = min(yoke, sdCapsule(vec3(abs(hp.x), hp.yz), vec3(0.1, 0.0, 0.0), vec3(0.125, 0.085, 0.0), 0.018));
-    yoke = min(yoke, sdRoundBox(hp, vec3(0.04, 0.025, 0.025), 0.01));
-    res = opU(res, vec2(yoke, 13.0));
-    // rudder pedals: right rudder pushes the right pedal forward
-    vec3 pp = vec3(p.x - sign(p.x)*abs(E.x), p.y - (E.y - 0.98), p.z - pz - 0.2);
-    float side = sign(pp.x);
-    pp.z += side*cYaw*0.06;
-    pp.x = abs(pp.x) - 0.1;
-    pp.yz = rot2(pp.yz, 0.5);
-    res = opU(res, vec2(sdRoundBox(pp, vec3(0.04, 0.075, 0.012), 0.008), 13.0));
-    // throttle
-    if (ck == 0) {
-      float zt = pz + 0.05 + 0.1*(1.0 - cThr);
-      float thr = min(sdCapsule(p, vec3(0.0, E.y - 0.5, pz + 0.04), vec3(0.0, E.y - 0.5, zt), 0.006), length(p - vec3(0.0, E.y - 0.5, zt)) - 0.022);
-      res = opU(res, vec2(thr, 13.0));
-    } else {
-      float ped = sdRoundBox(p - vec3(0.0, E.y - 0.78, pz + 0.3), vec3(0.11, 0.22, 0.3), 0.03);
-      res = opU(res, vec2(ped, 10.0));
-      float a = mix(-0.55, 0.6, cThr);
-      vec3 piv = vec3(0.0, E.y - 0.56, pz + 0.38);
-      vec3 tip = piv + vec3(0.0, 0.14*cos(a), -0.14*sin(a));
-      vec3 lp2 = vec3(abs(p.x) - 0.035, p.y, p.z);
-      float lev = min(sdCapsule(lp2, piv, tip, 0.008), sdRoundBox(lp2 - tip, vec3(0.025, 0.012, 0.018), 0.008));
-      res = opU(res, vec2(lev, 13.0));
+    {
+      float pull = cPitch*0.075;
+      vec3 yp = vec3(abs(p.x) - abs(E.x), p.y - (E.y - 0.43), p.z - pz);
+      res = opU(res, vec2(sdCapsule(yp, vec3(0.0, 0.0, 0.02), vec3(0.0, 0.0, 0.2 + pull), 0.017), 60.0));
+      res = opU(res, vec2(sdCylX(yp.zyx - vec3(0.05, 0.0, 0.0), 0.03, 0.012), 66.0));            // shaft collar
+      vec3 hp = yp - vec3(0.0, 0.0, 0.22 + pull);
+      hp.xy = rot2(hp.xy, cRoll*0.75);
+      float hub = sdRoundBox(hp, vec3(0.06, 0.03, 0.022), 0.015);
+      float horns = sdCapsule(vec3(abs(hp.x), hp.yz), vec3(0.05, 0.0, 0.0), vec3(0.118, 0.012, 0.0), 0.016);
+      float grips = sdCapsule(vec3(abs(hp.x), hp.yz), vec3(0.124, 0.0, 0.0), vec3(0.13, 0.095, 0.0), 0.02);
+      res = opU(res, vec2(smin(hub, horns, 0.02), 66.0));
+      res = opU(res, vec2(grips, 61.0));
+      res = opU(res, vec2(length(vec3(abs(hp.x) - 0.128, hp.y - 0.105, hp.z + 0.004)) - 0.009, 68.0));   // PTT / trim switches
+      res = opU(res, vec2(sdCylX(hp.zyx + vec3(0.024, 0.0, 0.0), 0.02, 0.003), 60.0));              // hub badge
+    }
+    // rudder pedals with toe brakes on metal arms: right rudder pushes the right pedal forward
+    {
+      vec3 pp = vec3(p.x - sign(p.x)*abs(E.x), p.y - (E.y - 0.98), p.z - pz - 0.2);
+      float side = sign(pp.x);
+      pp.z += side*cYaw*0.06;
+      pp.x = abs(pp.x) - 0.1;
+      vec3 pr = pp; pr.yz = rot2(pr.yz, 0.5);
+      res = opU(res, vec2(sdRoundBox(pr, vec3(0.045, 0.08, 0.01), 0.008), 61.0));
+      res = opU(res, vec2(sdCapsule(pp, vec3(0.0, 0.05, -0.03), vec3(0.0, 0.16, -0.12), 0.011), 60.0));
+    }
+    // centre pedestal: trim wheel, fuel selector; throttle (push-pull knobs or levers), mixture, flap lever
+    {
+      float pw = ck == 0 ? 0.075 : 0.11, ph = ck == 0 ? 0.16 : 0.22, pd = ck == 0 ? 0.24 : 0.32;
+      vec3 pc = vec3(0.0, E.y - 0.84 + (0.22 - ph), pz + 0.06 + pd);
+      res = opU(res, vec2(sdRoundBox(p - pc, vec3(pw, ph, pd), 0.03), 63.0));
+      vec3 tw = p - vec3(pw + 0.004, pc.y + ph*0.2, pc.z + pd*0.35);
+      res = opU(res, vec2(sdCylX(tw, 0.075, 0.012), 66.0));
+      res = opU(res, vec2(sdRoundCylX((p - vec3(0.0, pc.y + ph + 0.012, pc.z + pd*0.4)).yxz, 0.035, 0.012, 0.004), 66.0));   // fuel selector
+      if (ck == 0) {
+        float zt = pz + 0.05 + 0.1*(1.0 - cThr);
+        float thr = min(sdCapsule(p, vec3(0.0, E.y - 0.5, pz + 0.04), vec3(0.0, E.y - 0.5, zt), 0.006), length(p - vec3(0.0, E.y - 0.5, zt)) - 0.022);
+        res = opU(res, vec2(thr, 66.0));
+        float mix_ = min(sdCapsule(p, vec3(0.06, E.y - 0.55, pz + 0.04), vec3(0.06, E.y - 0.55, pz + 0.08), 0.005), length(p - vec3(0.06, E.y - 0.55, pz + 0.085)) - 0.018);
+        res = opU(res, vec2(mix_, 68.0));
+      } else {
+        float a = mix(-0.55, 0.6, cThr);
+        vec3 piv = vec3(0.0, pc.y + ph - 0.02, pc.z - pd*0.35);
+        vec3 tip = piv + vec3(0.0, 0.16*cos(a), -0.16*sin(a));
+        vec3 lp2 = vec3(abs(p.x) - 0.035, p.y, p.z);
+        res = opU(res, vec2(sdCapsule(lp2, piv, tip, 0.008), 60.0));
+        res = opU(res, vec2(sdRoundBox(lp2 - tip, vec3(0.03, 0.014, 0.02), 0.009), 66.0));
+        float fa = mix(0.3, -0.5, uPS.y);
+        vec3 fp = vec3(p.x - pw*0.6, p.y, p.z) - vec3(0.0, pc.y + ph - 0.02, pc.z + pd*0.1);
+        vec3 ft = vec3(0.0, 0.11*cos(fa), -0.11*sin(fa));
+        res = opU(res, vec2(min(sdCapsule(fp, vec3(0.0), ft, 0.006), sdRoundBox(fp - ft, vec3(0.022, 0.006, 0.012), 0.004)), 60.0));
+      }
     }
     if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y + 0.36, E.z - 0.2), vec3(0.22, 0.03, 0.3), 0.02), 14.0));
     // switch row along the lower panel edge (domain repetition)
-    vec3 swp = p - vec3(0.0, E.y - 0.565, pz + 0.05);
-    float sw = 0.032; float cell = clamp(floor(swp.x/sw + 0.5), -12.0, 12.0);
-    swp.x -= cell*sw;
-)"
-R"(    float sws = sdRoundBox(swp - vec3(0.0, 0.0, 0.01), vec3(0.006, 0.012, 0.012), 0.003);
-    sws = max(sws, abs(p.x) - phw*0.85);
-    res = opU(res, vec2(sws, 13.0));
-    // armrests / door panels
-    vec3 secA = fusSection(E.z);
-    vec3 ap = vec3(abs(p.x) - (secA.x*0.86), p.y - (E.y - 0.5), p.z - (E.z - 0.15));
-    res = opU(res, vec2(sdRoundBox(ap, vec3(0.05, 0.035, 0.38), 0.02), 12.0));
+    {
+      vec3 swp = p - vec3(0.0, E.y - 0.565, pz + 0.05);
+      float sw = 0.032; float cell = clamp(floor(swp.x/sw + 0.5), -12.0, 12.0);
+      swp.x -= cell*sw;
+      float sws = sdRoundBox(swp - vec3(0.0, 0.0, 0.01), vec3(0.006, 0.012, 0.012), 0.003);
+      sws = max(sws, abs(p.x) - phw*0.85);
+      sws = max(sws, -(abs(p.x) - 0.13));                              // leave the radio stack clear
+      res = opU(res, vec2(sws, 13.0));
+    }
+    // side trim panels with armrests, door handles and map pockets
+    {
+      vec3 secA = fusSection(E.z);
+      float wx = secA.x*0.86;
+      vec3 ap = vec3(abs(p.x) - wx, p.y - (E.y - 0.5), p.z - (E.z - 0.15));
+      res = opU(res, vec2(sdRoundBox(ap, vec3(0.05, 0.035, 0.38), 0.02), 12.0));
+      float trim = sdRoundBox(vec3(abs(p.x) - wx - 0.05, p.y - (E.y - 0.8), p.z - (E.z - 0.25)), vec3(0.025, 0.26, 0.6), 0.02);
+      res = opU(res, vec2(trim, 63.0));
+      res = opU(res, vec2(sdCapsule(vec3(abs(p.x) - wx + 0.012, p.y - (E.y - 0.42), p.z - (E.z - 0.42)), vec3(0.0), vec3(0.0, 0.0, 0.11), 0.009), 60.0));
+    }
     // sun visors folded against the cabin roof
     vec3 vp = vec3(abs(p.x) - abs(E.x), p.y - (E.y + 0.2), p.z - (E.z - 0.42));
     vp.yz = rot2(vp.yz, 0.25);
     res = opU(res, vec2(sdRoundBox(vp, vec3(0.16, 0.006, 0.07), 0.004), 14.0));
-    // overhead console with dome light
-    res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y + 0.27, E.z - 0.05), vec3(0.09, 0.025, 0.18), 0.015), 14.0));
+    // overhead console: dome light and two map lights (modelled lenses - the cabin's night lighting)
+    {
+      vec3 oc = p - vec3(0.0, E.y + 0.27, E.z - 0.05);
+      res = opU(res, vec2(sdRoundBox(oc, vec3(0.09, 0.025, 0.18), 0.015), 14.0));
+      res = opU(res, vec2(sdRoundCylX((oc + vec3(0.0, 0.024, 0.02)).yxz, 0.04, 0.004, 0.002), 64.0));
+      res = opU(res, vec2(sdRoundCylX((vec3(abs(oc.x) - 0.06, oc.y + 0.024, oc.z - 0.12)).yxz, 0.013, 0.004, 0.002), 64.0));
+    }
     float compass = sdRoundBox(p - vec3(0.0, E.y - 0.05, pz - 0.05), vec3(0.04, 0.03, 0.03), 0.01);
-    res = opU(res, vec2(compass, 13.0));
+    res = opU(res, vec2(compass, 66.0));
   }
   return res;
 }
@@ -831,7 +909,8 @@ float ticks(vec2 d, float r, float n, float a0, float a1, float inner){
   float a = atan(d.x, d.y); float rr = length(d)/r;
   if (a < a0 || a > a1 || rr < inner || rr > 0.95) return 0.0;
   float f = fract((a - a0)/(a1 - a0)*n + 0.5);
-  return step(abs(f - 0.5), 0.07);
+)"
+R"(  return step(abs(f - 0.5), 0.07);
 }
 // Returns instrument colour (emissive) for a point on the panel face; q relative to the pilot's panel centre.
 vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
@@ -964,8 +1043,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
     c = dialFace(d, r*0.85, inD);
     if (c.x >= 0.0) {
       if (inD) {
-)"
-R"(        float rr = length(d)/(r*0.85); float a = atan(d.x, d.y);
+        float rr = length(d)/(r*0.85); float a = atan(d.x, d.y);
         if (rr > 0.84 && rr < 0.95 && a > 0.9 && a < 1.7) c = vec3(0.1, 0.7, 0.2);
         if (rr > 0.84 && rr < 0.95 && a > 1.7 && a < 1.8) c = vec3(0.9, 0.1, 0.1);
         c += vec3(0.85)*ticks(d, r*0.85, 10.0, -2.36, 2.36, 0.8);
@@ -1887,18 +1965,44 @@ vec3 mfdPage(int page, vec2 uv){
   }
   return c;
 }
-// Emissive light inside the sealed cockpit: main display glow, LED strips, footwell, console screens
-vec3 cockpitLight(vec3 lp, vec3 ln, vec3 E){
-  vec3 L = vec3(0.012, 0.016, 0.022);
-  vec3 P[6] = vec3[6](E + vec3(0.0, 0.03, -0.5), E + vec3(0.0, 0.58, 0.1), E + vec3(0.0, -0.72, -0.5), E + vec3(-0.45, -0.36, 0.1), E + vec3(0.45, -0.36, 0.1), E + vec3(0.0, -0.3, -0.5));
-  vec3 Cl[6] = vec3[6](vec3(0.5, 0.62, 0.75)*1.4, uColStripe*0.45, vec3(1.0, 0.5, 0.15)*0.5, uColStripe*0.3, uColStripe*0.3, vec3(0.3, 0.9, 0.65)*0.35);
-  for (int i = 0; i < 6; i++) {
-    vec3 d = P[i] - lp; float dl = length(d);
-    L += Cl[i]*max(dot(ln, d/dl), 0.0)*(0.6 + 0.4*float(i == 0))/(1.0 + dl*dl*7.0);
+// ---------------------------------------------------------------- cockpit lighting
+// Every interior light comes from a modelled fixture (a lens, LED strip or display): it is treated as a line light
+// along that fixture, lighting from the nearest point on it with PBR shading and a soft falloff, so light never
+// appears to float in mid-air or pool into a hot spot. Body-space positions, normals and view vector.
+vec3 fixtureLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 a, vec3 b, vec3 c, float k, vec3 dir){
+  vec3 ab = b - a; float h = clamp(dot(p - a, ab)/max(dot(ab, ab), 1e-6), 0.0, 1.0);
+  vec3 d = a + ab*h - p; float dl = max(length(d), 1e-3);
+  float beam = dot(dir, dir) > 0.5 ? smoothstep(0.2, 0.75, dot(-d/dl, dir)) : 1.0;   // recessed: lights only the way its lens faces
+  return pbr(n, v, d/dl, m.alb, max(m.rough, 0.18), m.metal, c*(9.4*beam/(1.0 + dl*dl*k)));
+}
+// XR-9 sealed pod: panoramic display, two warm ceiling light bars, cyan spine and console strips, amber footwell, MFDs
+vec3 podLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E){
+  vec3 L = m.alb*vec3(0.03, 0.04, 0.055);                                       // faint bounce
+  L += fixtureLight(p, n, v, m, E + vec3(-0.45, 0.02, -0.47), E + vec3(0.45, 0.02, -0.47), vec3(0.42, 0.55, 0.68)*0.55, 6.0, vec3(0.0, 0.0, 1.0));
+  for (int i = -1; i <= 1; i += 2) {
+    float sx = float(i);
+    L += fixtureLight(p, n, v, m, E + vec3(0.2*sx, 0.588, -0.04), E + vec3(0.2*sx, 0.588, 0.34), vec3(1.0, 0.8, 0.58)*0.2, 9.0, vec3(0.0, -1.0, 0.0));
+    L += fixtureLight(p, n, v, m, E + vec3(0.39*sx, -0.395, -0.25), E + vec3(0.39*sx, -0.395, 0.42), uColStripe*0.05, 14.0, vec3(-0.6*sx, 0.8, 0.0));
   }
+  L += fixtureLight(p, n, v, m, E + vec3(0.0, 0.6, -0.7), E + vec3(0.0, 0.6, 0.9), uColStripe*0.06, 10.0, vec3(0.0, -1.0, 0.0));
+  L += fixtureLight(p, n, v, m, E + vec3(-0.3, -0.76, -0.55), E + vec3(0.3, -0.76, -0.55), vec3(1.0, 0.5, 0.15)*0.12, 10.0, vec3(0.0, 0.7, 0.7));
+  L += fixtureLight(p, n, v, m, E + vec3(-0.42, -0.33, -0.42), E + vec3(0.42, -0.33, -0.42), vec3(0.3, 0.75, 0.6)*0.1, 12.0, vec3(0.0, 0.6, 0.8));
   return L;
 }
-vec3 jetScreen(vec3 col, vec3 rd, int id, vec3 sl){
+// Light-aircraft / airliner cabin at night: glareshield LED strip floods the panel, dim amber dome light
+vec3 cabinLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E, float pz, float phw){
+  vec3 L = fixtureLight(p, n, v, m, vec3(-phw*0.88, E.y - 0.13, pz + 0.07), vec3(phw*0.88, E.y - 0.13, pz + 0.07), vec3(1.0, 0.84, 0.62)*(0.015 + 0.16*uNight), 18.0, normalize(vec3(0.0, -1.0, 0.35)));
+  L += fixtureLight(p, n, v, m, vec3(0.0, E.y + 0.24, E.z - 0.09), vec3(0.0, E.y + 0.24, E.z - 0.05), vec3(1.0, 0.72, 0.45)*0.12*uNight, 8.0, vec3(0.0, -1.0, 0.0));
+  return L;
+}
+// Cheap ambient occlusion from the cockpit's own distance field (3 taps along the normal)
+float interiorAO(vec3 p, vec3 n){
+  float occ = 0.0, w = 1.0;
+  for (int i = 1; i <= 3; i++) { float h = 0.02*float(i*i); occ += (h - mapPlane(p + n*h).x)*w; w *= 0.55; }
+  return clamp(1.0 - 3.5*occ, 0.3, 1.0);
+}
+)"
+R"(vec3 jetScreen(vec3 col, vec3 rd, int id, vec3 sl){
   vec3 E = uM[22].xyz; vec3 q = sl - E;
   // display look: slight contrast and cool grade, scanlines, darkened edges
   col = pow(max(col, vec3(0.0)), vec3(1.05))*vec3(0.95, 1.02, 1.06)*1.08;
@@ -1940,8 +2044,7 @@ vec3 jetScreen(vec3 col, vec3 rd, int id, vec3 sl){
     float hd = mod(degrees(atan(rd.x, -rd.z)) + 360.0, 360.0);
     if (h.y > 0.335 && h.y < 0.365 && abs(h.x) < 0.38) {
       float f10 = abs(fract(hd/10.0 + 0.5) - 0.5)*10.0;
-)"
-R"(      float tall = abs(fract(hd/30.0 + 0.5) - 0.5)*30.0 < 0.5 ? 1.0 : 0.0;
+      float tall = abs(fract(hd/30.0 + 0.5) - 0.5)*30.0 < 0.5 ? 1.0 : 0.0;
       hud = max(hud, step(f10*0.01745, px*0.8)*step(h.y, 0.35 + 0.015*tall));
     }
     hud = max(hud, hudNum(h - vec2(-0.044, 0.372), uHud.z, 3, vec2(0.022, 0.04)));
@@ -2038,12 +2141,15 @@ void main(){
   bool onScr = false; int scrId = 0; vec3 scrL = vec3(0.0);
   // pod = a pixel on the sealed cockpit's interior: it is shaded from the cockpit alone, and nothing outside the
   // aircraft (terrain, water, buildings, clouds, shadows) is traced for it. Only the display screens see out.
-  bool pod = false; vec2 h0 = vec2(-1.0);
-  if (uPlaneOn == 1 && uPS.w > 0.5 && int(uM[0].z + 0.5) == 5 && uWreck == 0) {
-    h0 = tracePlane(ro, rd, 6.0);
+  // In any cockpit view the aircraft is traced first: a pixel that lands on the cabin (or on a wing seen through a
+  // window) needs nothing from outside, so only rays leaving through the windows trace the world.
+  bool pod = false, cockpitView = uPlaneOn == 1 && uPS.w > 0.5 && uWreck == 0; vec2 h0 = vec2(-1.0);
+  if (cockpitView) {
+    bool jet = int(uM[0].z + 0.5) == 5;
+    h0 = tracePlane(ro, rd, jet ? 6.0 : planeBound()*2.0);
     if (h0.x > 0.0) {
       int id0 = int(h0.y + 0.5);
-      if (id0 >= 41 && id0 <= 43) { onScr = true; scrId = id0; scrL = transpose(uPlaneRot)*(ro + rd*h0.x - uPlanePos); }
+      if (jet && id0 >= 41 && id0 <= 43) { onScr = true; scrId = id0; scrL = transpose(uPlaneRot)*(ro + rd*h0.x - uPlanePos); }
       else { pod = true; tmax = h0.x + 0.05; }
     }
   }
@@ -2051,7 +2157,7 @@ void main(){
   float tW = (!pod && rd.y < 0.0 && ro.y > 0.0) ? -ro.y/rd.y : -1.0;
   vec3 bn; float bkind = 0.0; vec3 bl;
   vec2 bh = pod ? vec2(-1.0) : traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
-  vec2 ph = onScr ? vec2(-1.0) : (pod ? h0 : tracePlane(ro, rd, tmax));
+  vec2 ph = onScr || (cockpitView && !pod) ? vec2(-1.0) : (pod ? h0 : tracePlane(ro, rd, tmax));
   float tSoFar = min(tT > 0.0 ? tT : (tW > 0.0 ? tW : tmax), tmax);
   vec3 tn; vec4 tinfo;
   float tB = pod ? -1.0 : traceTowns(ro, rd, tSoFar, tn, tinfo);
@@ -2078,7 +2184,8 @@ void main(){
       vec3 ns = applyTS(n, m.nrm, t < 2000.0 ? 0.6 : 0.25);
       float sh = sunVis > 0.0 ? terrainShadow(p + n*0.5, uSunDir, t) : 0.0;
       if (t < 3000.0) sh *= planeShadow(p + n*0.2, uSunDir);
-      sh *= cloudShadow(p);
+)"
+R"(      sh *= cloudShadow(p);
       col = shadeSurface(p, ns, rd, m, sh);
     } else if (hit == 2) {
       // ocean
@@ -2112,8 +2219,7 @@ void main(){
       float ex = mix(900.0, 40.0, rough/0.6);
       float spec = pow(max(dot(n, h), 0.0), ex)*(ex + 8.0)/(900.0 + 8.0)*120.0 + pow(max(dot(n,h),0.0), 90.0*(1.0 - rough))*1.5;
       col = mix(lit, refl, fres) + uSunCol*spec*sh*(1.0 - smoothstep(0.5, 1.0, uCloudCover));
-)"
-R"(      // night: runway/town light reflections handled by overlay pass glow
+      // night: runway/town light reflections handled by overlay pass glow
     } else if (hit == 3 || hit == 5) {
       Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1); m.rough = 0.7; m.alb = vec3(0.7);
       vec3 nn = hit == 3 ? bn : tn;
@@ -2228,7 +2334,8 @@ R"(      // night: runway/town light reflections handled by overlay pass glow
       else if (mid == 10) {
         m.alb = vec3(0.075); m.rough = 0.6;
         if (ln.z > 0.6) {
-          bool pilot = lp.x*E.x >= 0.0;
+)"
+R"(          bool pilot = lp.x*E.x >= 0.0;
           vec2 q = vec2(pilot ? lp.x - E.x : lp.x + E.x, lp.y - (E.y - 0.32));
           if (!pilot && ck == 0) q.x = lp.x + E.x - 0.33 + 0.33;
           float px = t*2.0*uTanHalf/uRes.y;   // panel metres per pixel
@@ -2255,7 +2362,7 @@ R"(      // night: runway/town light reflections handled by overlay pass glow
         m.alb = mix(vec3(0.04), vec3(0.22), bl); m.metal = 0.9; m.rough = 0.3;
         if (length(fq) < uM[16].z*0.25) m.alb = vec3(0.05);
       }
-      if (mid >= 30) {  // XR-9 research jet surfaces
+      if (mid >= 30 && mid < 60) {  // XR-9 research jet surfaces
         vec3 nT; vec4 tx;
         float pulse = 0.75 + 0.25*sin(uTime*2.5);
         if (mid == 30 || mid == 31) {
@@ -2265,8 +2372,7 @@ R"(      // night: runway/town light reflections handled by overlay pass glow
           if (max(pl.x, pl.y) > 0.49) m.alb *= 0.55;
           if (mid == 31 && abs(lp.x) > 4.6) m.alb = mix(m.alb, uColStripe*0.6, 0.6);
           if (mid == 30 && lp.z < -8.0) m.alb = vec3(0.03);              // radar nose cap
-)"
-R"(        } else if (mid == 32) { m.alb = vec3(0.3, 0.2, 0.06); m.metal = 0.95; m.rough = 0.06; }
+        } else if (mid == 32) { m.alb = vec3(0.3, 0.2, 0.06); m.metal = 0.95; m.rough = 0.06; }
         else if (mid == 33) {
           tx = triSample(lp, ln, M_METAL, 0.8, nT); m.alb = tx.rgb*vec3(0.2, 0.19, 0.2); m.metal = 0.6; m.rough = 0.5; m.nrm = nT;
           float heat = uCtl.w*uCtl.w;
@@ -2276,7 +2382,8 @@ R"(        } else if (mid == 32) { m.alb = vec3(0.3, 0.2, 0.06); m.metal = 0.95;
         else if (mid == 36) { float ab = uFlame.y, sp = uFlame.x; m.alb = vec3(0.02); m.emit = mix(vec3(0.35, 0.6, 1.0), vec3(1.0, 0.82, 0.6), ab)*(0.3 + 9.0*sp*sp + 16.0*ab); }
         else if (mid == 40) {  // sealed pod: carbon weave between structural ribs
           vec2 wv = floor(vec2(lp.x + lp.z, lp.y - lp.z)*55.0);
-          m.alb = vec3(0.03, 0.032, 0.036)*(0.8 + 0.4*mod(wv.x + wv.y, 2.0)); m.rough = 0.35; m.metal = 0.2;
+          tx = triSample(lp, ln, M_FABRIC, 4.0, nT); m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.3);
+          m.alb = vec3(0.03, 0.032, 0.036)*(0.8 + 0.4*mod(wv.x + wv.y, 2.0)); m.rough = 0.3; m.metal = 0.2;
           float rib = abs(fract((lp.z - E.z)*4.0) - 0.5);
           if (rib > 0.46) { m.alb = vec3(0.07, 0.075, 0.08); m.metal = 0.7; m.rough = 0.3; }
           if (abs(lp.y - (E.y - 0.18)) < 0.004) m.emit = uColStripe*1.4*pulse;
@@ -2284,7 +2391,8 @@ R"(        } else if (mid == 32) { m.alb = vec3(0.3, 0.2, 0.06); m.metal = 0.95;
         else if (mid >= 41 && mid <= 43) { m.alb = vec3(0.0); m.rough = 0.05; }
         else if (mid == 44) {  // bezels and consoles: satin composite with machined edges and fasteners
           vec2 hx = lp.xz*45.0 + vec2(lp.y*30.0);
-          m.alb = vec3(0.028, 0.03, 0.034)*(0.9 + 0.2*step(0.5, fract(hx.x + floor(hx.y)*0.5))); m.rough = 0.42; m.metal = 0.35;
+          tx = triSample(lp, ln, M_PLASTIC, 0.4, nT); m.nrm = nT;
+          m.alb = vec3(0.028, 0.03, 0.034)*(0.9 + 0.2*step(0.5, fract(hx.x + floor(hx.y)*0.5)))*(0.7 + 0.6*tx.r); m.rough = mix(0.42, tx.a, 0.4); m.metal = 0.35;
           vec3 qd = lp - E.xyz; float rr = length(qd.xz), an = atan(qd.x, -qd.z);
           if (abs(fract(an*9.0) - 0.5) < 0.025 && rr < 0.7) m.alb *= 2.2;                 // panel seams
           if (length(vec2(fract(an*18.0) - 0.5, (qd.y - 0.36)*90.0)) < 0.12) { m.alb = vec3(0.35); m.metal = 1.0; m.rough = 0.25; }  // screws
@@ -2308,7 +2416,7 @@ R"(        } else if (mid == 32) { m.alb = vec3(0.3, 0.2, 0.06); m.metal = 0.95;
         else if (mid == 46) { tx = triSample(lp, ln, M_LEATHER, 0.3, nT); m.alb = vec3(dot(tx.rgb, vec3(0.33)))*vec3(0.3, 0.32, 0.36); m.rough = tx.a; m.nrm = nT;
           if (abs(abs(lp.x - E.x) - 0.16) < 0.005) m.emit = uColStripe*0.9*pulse;
           if (lp.y > E.y + 0.12 && abs(lp.x - E.x) < 0.1 && ln.z > 0.5) m.emit = uColStripe*1.2; }
-        else if (mid == 47) { m.alb = vec3(0.035); m.rough = 0.55; m.metal = 0.3; if (lp.y > E.y - 0.24 && ln.y > 0.3) m.emit = vec3(1.0, 0.45, 0.1)*0.8; }
+        else if (mid == 47) { tx = triSample(lp, ln, M_RUBBER, 0.1, nT); m.alb = tx.rgb*0.3; m.rough = tx.a; m.metal = 0.1; m.nrm = nT; if (lp.y > E.y - 0.24 && ln.y > 0.3) m.emit = vec3(1.0, 0.45, 0.1)*0.8; }
         else if (mid == 48) { m.alb = vec3(0.1); m.emit = uColStripe*1.1*pulse; }
         else if (mid == 49) {  // annunciator strip: GEAR, BRK, AB, VTOL, MACH, G, LOW ALT, SYS
           vec3 qd = lp - E.xyz; float an = atan(qd.x, -qd.z);
@@ -2342,8 +2450,50 @@ R"(        } else if (mid == 32) { m.alb = vec3(0.3, 0.2, 0.06); m.metal = 0.95;
           m.emit = led*(hk < 0.7 ? vec3(0.2, 1.0, 0.35) : vec3(1.0, 0.6, 0.15)*step(0.5, fract(uTime + hk)))*1.5;
           if (abs(f2.y + 0.03) < 0.0015 && abs(f2.x) < 0.02) m.emit = vec3(0.4, 0.5, 0.55)*0.6;   // engraved labels
         }
-        else if (mid == 56) { m.alb = vec3(0.06, 0.065, 0.07); m.rough = 0.9; if (abs(fract(lp.y*40.0) - 0.5) < 0.04) m.emit = vec3(1.0, 0.45, 0.1)*0.25; }
+        else if (mid == 56) { tx = triSample(lp, ln, M_FABRIC, 0.08, nT); m.alb = tx.rgb*vec3(0.18, 0.19, 0.21); m.rough = 0.9; m.nrm = nT; if (abs(fract(lp.y*40.0) - 0.5) < 0.04) m.emit = vec3(1.0, 0.45, 0.1)*0.25; }
         else if (mid == 57) { m.alb = vec3(0.1); m.emit = vec3(1.0, 0.5, 0.15)*1.8; }
+        else if (mid == 58) { m.alb = vec3(0.7, 0.66, 0.6); m.rough = 0.3; m.emit = vec3(1.0, 0.8, 0.58)*0.55; }   // ceiling light diffusers
+      }
+      else if (mid >= 60) {  // light-aircraft / airliner cockpit parts (PBR texture sets)
+        vec3 nT; vec4 tx;
+        if (mid == 60) { tx = triSample(lp, ln, M_METAL, 0.25, nT); m.alb = tx.rgb*vec3(0.62, 0.63, 0.65); m.metal = 0.9; m.rough = clamp(tx.a*0.6, 0.15, 0.5); m.nrm = nT; }
+        else if (mid == 61) { tx = triSample(lp, ln, M_RUBBER, 0.12, nT); m.alb = tx.rgb*0.6; m.rough = tx.a; m.nrm = nT; }
+        else if (mid == 63) {
+          tx = triSample(lp, ln, ck == 2 ? M_LEATHER : M_PLASTIC, ck == 2 ? 0.3 : 0.35, nT);
+          m.alb = tx.rgb*(ck == 2 ? vec3(0.3, 0.32, 0.36) : vec3(0.5, 0.48, 0.45)); m.rough = tx.a; m.nrm = nT;
+          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;                      // panel seams / stitching
+        }
+        else if (mid == 64) {   // light lenses: glareshield strip (cool white), dome and map lights (warm)
+          bool glare = lp.y < E.y;
+          m.alb = vec3(0.65, 0.62, 0.58); m.rough = 0.25;
+          m.emit = (glare ? vec3(1.0, 0.86, 0.66) : vec3(1.0, 0.72, 0.45))*(0.25 + 1.8*uNight);
+        }
+        else if (mid == 65) {   // radio / transponder stack: three units with amber frequency windows and knobs
+          m.alb = vec3(0.03); m.rough = 0.45; m.metal = 0.3;
+)"
+R"(          vec2 rq = vec2(lp.x, lp.y - (E.y - 0.505));
+          if (ln.z > 0.5) {
+            float row = clamp(floor((rq.y + 0.06)/0.04), 0.0, 2.0); float ry = rq.y + 0.06 - row*0.04 - 0.02;
+            if (abs(ry) < 0.0175 && abs(rq.y) < 0.059) m.alb = vec3(0.05);
+            vec2 dw = vec2(rq.x + 0.045, ry);
+            if (abs(dw.x) < 0.055 && abs(dw.y) < 0.009) {               // 7-segment-ish frequency digits
+              vec2 dc = vec2(fract((dw.x + 0.055)/0.0122), (dw.y + 0.009)/0.018);
+              float on = step(0.3, hash2i(ivec2(floor((dw.x + 0.055)/0.0122), int(row)*7 + int(dc.y*3.0))));
+              float seg = step(abs(dc.x - 0.5), 0.32)*(step(abs(dc.y - 0.5), 0.42))*max(step(abs(dc.x - 0.5), 0.12), step(abs(fract(dc.y*2.0) - 0.5), 0.12));
+              m.emit = vec3(1.0, 0.55, 0.15)*seg*on*1.6; m.alb = vec3(0.01);
+            }
+            vec2 kq = vec2(rq.x - 0.075, ry);
+            if (length(kq) < 0.013) { m.alb = vec3(0.12); m.rough = 0.35; m.metal = 0.6; if (abs(kq.x) < 0.0012 && kq.y > 0.0) m.alb = vec3(0.8); }
+          }
+        }
+        else if (mid == 66) { tx = triSample(lp, ln, M_PLASTIC, 0.2, nT); m.alb = tx.rgb*0.12; m.rough = mix(tx.a, 0.45, 0.5); m.nrm = nT; }
+        else if (mid == 67) {   // centre engine / systems display (glass cockpits)
+          vec2 uv = vec2(lp.x/0.085, (lp.y - (E.y - 0.31))/0.085);
+          vec3 sc = ln.z > 0.5 ? mfdPage(0, uv)*smoothstep(1.0, 0.92, max(abs(uv.x), abs(uv.y))) : vec3(0.0);
+          m.alb = vec3(0.01); m.rough = 0.06; m.emit = (sc + vec3(0.005, 0.012, 0.02))*1.3;
+        }
+        else if (mid == 68) { tx = triSample(lp, ln, M_PLASTIC, 0.2, nT); m.alb = tx.rgb*vec3(0.55, 0.05, 0.04); m.rough = 0.35; m.nrm = nT; }
+        else if (mid == 69) { tx = triSample(lp, ln, M_FABRIC, 0.08, nT); m.alb = tx.rgb*vec3(0.2, 0.21, 0.24); m.rough = 0.9; m.nrm = nT; }
       }
       else {
         vec3 nT; vec4 tx;
@@ -2353,13 +2503,17 @@ R"(        } else if (mid == 32) { m.alb = vec3(0.3, 0.2, 0.06); m.metal = 0.95;
         else if (mid == 6) { tx = triSample(lp, ln, M_RUBBER, 0.35, nT); m.alb = tx.rgb; m.rough = tx.a; m.nrm = nT; }
         else if (mid == 8 || mid == 16 || mid == 17) { tx = triSample(lp, ln, M_METAL, 0.6, nT); m.alb *= tx.rgb*1.4; m.rough = mix(m.rough, tx.a, 0.5); m.nrm = nT; }
         else if (mid == 10 && m.emit.x + m.emit.y + m.emit.z <= 0.0) { tx = triSample(lp, ln, M_PLASTIC, 0.25, nT); m.alb = tx.rgb*0.9; m.rough = tx.a; m.nrm = nT; }
-        else if (mid == 11) {
-          bool flr = lp.y < E.y - 1.0;
-          tx = triSample(lp, ln, flr ? M_CARPET : M_PLASTER, flr ? 0.4 : 0.8, nT);
-          m.alb = flr ? tx.rgb : tx.rgb*vec3(0.72, 0.7, 0.66); m.rough = flr ? tx.a : 0.85; m.nrm = nT*0.5;
+        else if (mid == 11) {   // carpeted floor, fabric headliner, moulded plastic side walls
+          bool flr = lp.y < E.y - 1.0, roof = lp.y > E.y + 0.12;
+          tx = triSample(lp, ln, flr ? M_CARPET : (roof ? M_FABRIC : M_PLASTIC), flr ? 0.4 : (roof ? 0.25 : 0.5), nT);
+          m.alb = flr ? tx.rgb*0.8 : tx.rgb*(roof ? vec3(0.95, 0.93, 0.88) : (ck == 2 ? vec3(0.62, 0.62, 0.62) : vec3(0.85, 0.82, 0.77))); m.rough = flr || roof ? 0.95 : tx.a; m.nrm = nT*0.7;
         }
-        else if (mid == 12) { tx = triSample(lp, ln, ck == 2 ? M_LEATHER : M_FABRIC, 0.35, nT); m.alb = tx.rgb*(ck == 2 ? 1.2 : 1.0); m.rough = tx.a; m.nrm = nT; }
-        else if (mid == 13 || mid == 14) { tx = triSample(lp, ln, M_PLASTIC, 0.2, nT); m.alb = tx.rgb*(mid == 14 ? 0.3 : 0.6); m.rough = mix(tx.a, 0.9, mid == 14 ? 0.6 : 0.0); m.nrm = nT; }
+        else if (mid == 12) {   // seats: leather (glass cockpits) or cloth, with stitched panels
+          tx = triSample(lp, ln, ck == 2 ? M_LEATHER : M_FABRIC, 0.3, nT); m.alb = tx.rgb*(ck == 2 ? 1.2 : 1.0); m.rough = tx.a; m.nrm = nT;
+          if (abs(fract(lp.y*7.0 + lp.z*2.0) - 0.5) < 0.02) m.alb *= 0.65;
+        }
+        else if (mid == 13) { tx = triSample(lp, ln, M_PLASTIC, 0.2, nT); m.alb = tx.rgb*0.6; m.rough = tx.a; m.nrm = nT; }
+        else if (mid == 14) { tx = triSample(lp, ln, M_CARPET, 0.15, nT); m.alb = tx.rgb*0.22; m.rough = 0.95; m.nrm = nT; }   // anti-glare flocking
       }
       if (uWreck > 0) {  // fire-blackened, buckled skin with a few glowing embers near the breaks
         float burn = vnoise(lp.xz*2.3 + lp.y*1.7) + 0.5*vnoise(lp.yz*5.1);
@@ -2369,18 +2523,19 @@ R"(        } else if (mid == 32) { m.alb = vec3(0.3, 0.2, 0.06); m.metal = 0.95;
         m.emit += vec3(1.0, 0.32, 0.06)*pow(clamp(burn*cut*0.9, 0.0, 1.0), 5.0)*(1.5 + sin(uTime*7.0 + lp.x*9.0))*3.0;
       }
       n = applyTS(n, m.nrm, interior ? 0.35 : 0.12);
-      float sh = sunVis > 0.0 && mid < 40 ? planeShadow(p + n*0.02, uSunDir) * terrainShadow(p, uSunDir, 50.0) * cloudShadow(p) : 0.0;   // the sealed pod sees no sun
-      if (mid >= 40) {  // sealed research cockpit: lit only by its displays and LED strips
-        vec3 v = -rd;
-        vec3 Li = cockpitLight(lp, ln, E.xyz);
-        col = m.alb*Li*3.0 + m.emit;
-        vec3 sDir = normalize(E.xyz + vec3(0.0, 0.03, -0.5) - lp);                          // reflection of the main display
-        vec3 hh = normalize(v + gPR*sDir);
-        float gl = pow(max(dot(n, hh), 0.0), mix(6.0, 220.0, 1.0 - m.rough));
-        col += vec3(0.35, 0.45, 0.55)*gl*(1.0 - m.rough)*(0.04 + 0.25*m.metal);
+      bool podMat = mid >= 40 && mid < 60;
+      float sh = sunVis > 0.0 && !podMat ? planeShadow(p + n*0.02, uSunDir) * terrainShadow(p, uSunDir, 50.0) * cloudShadow(p) : 0.0;   // the sealed pod sees no sun
+      if (podMat) {  // sealed research cockpit: lit only by its modelled fixtures, low and moody
+        mat3 inv = transpose(gPR);
+        col = podLight(lp, inv*n, inv*(-rd), m, E.xyz)*interiorAO(lp, ln) + m.emit;
       } else if (interior) {
-        vec3 v = -rd;
-        col = pbr(n, v, uSunDir, m.alb, m.rough, m.metal, uSunCol*sh*3.2) + m.alb*(ambientLight(n)*0.45 + ambientLight(vec3(0.0,1.0,0.0))*0.25) + m.emit;
+        vec3 v = -rd; mat3 inv = transpose(gPR);
+        float ao = interiorAO(lp, ln);
+        vec3 F = fresnelSchlick(max(dot(n, v), 0.0), mix(vec3(0.04), m.alb, m.metal));
+        col = pbr(n, v, uSunDir, m.alb, m.rough, m.metal, uSunCol*sh*3.2)
+            + (m.alb*(1.0 - m.metal)*(ambientLight(n)*0.4 + ambientLight(vec3(0.0, 1.0, 0.0))*0.2)
+               + skyColor(normalize(reflect(rd, n) + vec3(0.0, 0.3, 0.0)))*F*(1.0 - m.rough)*(1.0 - m.rough)*0.35)*ao
+            + cabinLight(lp, inv*n, inv*v, m, E.xyz, uM[21].w, E.w)*ao + m.emit;
       } else {
         col = shadeSurface(p, n, rd, m, sh);
         vec3 h = normalize(-rd + uSunDir);
@@ -2413,8 +2568,7 @@ R"(        } else if (mid == 32) { m.alb = vec3(0.3, 0.2, 0.06); m.metal = 0.95;
   // research jet exhaust plumes (additive, depth-limited by the scene)
   if (uPlaneOn == 1 && uWreck == 0 && uPS.w < 0.5 && int(uM[0].z + 0.5) == 5) col += jetPlumes(ro, rd, t, jitter);
   // clouds
-)"
-R"(  vec4 cl = pod ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(ro, rd, t, jitter);
+  vec4 cl = pod ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(ro, rd, t, jitter);
   col = col*cl.a + cl.rgb;
   if (onScr) col = jetScreen(col, rd, scrId, scrL);
   if (any(isnan(col)) || any(isinf(col)) || !(col.r + col.g + col.b < 1e7)) col = vec3(0.0);
@@ -2578,9 +2732,21 @@ static const char* kPostFS = R"(#version 330 core
 in vec2 vUV; out vec4 oColor;
 uniform sampler2D uScene; uniform sampler2D uBloom; uniform float uExposure; uniform float uTime; uniform vec2 uRes;
 uniform float uRainLens; uniform vec2 uSunScreen; uniform float uSunVisible; uniform float uFade; uniform float uVignette; uniform float uGLoad;
+uniform sampler2D uDepthTex;   // scene depth: the sun glow and lens ghosts only appear when the sun itself is unobstructed
 vec3 aces(vec3 x){ const float a=2.51,b=0.03,c=2.43,d=0.59,e=0.14; return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0); }
 float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
 void main(){
+  float sunVis = uSunVisible;
+  if (sunVis > 0.0) {
+    float open = 0.0;
+    for (int k = 0; k < 5; k++) {
+      vec2 o = k == 0 ? vec2(0.0) : vec2(k == 1 ? 1.0 : (k == 2 ? -1.0 : 0.0), k == 3 ? 1.0 : (k == 4 ? -1.0 : 0.0))*0.006;
+      vec2 su = clamp(uSunScreen + o, vec2(0.001), vec2(0.999));
+      open += step(9e5, texture(uDepthTex, su).r);
+    }
+    bool onScreen = all(greaterThan(uSunScreen, vec2(0.0))) && all(lessThan(uSunScreen, vec2(1.0)));
+    sunVis *= onScreen ? open/5.0 : 1.0;
+  }
   vec2 uv = vUV;
   // raindrops on the lens
   if (uRainLens > 0.0) {
@@ -2614,9 +2780,9 @@ void main(){
   // subtle sun glare / lens flare ghosts
   if (uSunVisible > 0.0) {
     vec2 sd = uv - uSunScreen; sd.x *= uRes.x/uRes.y;
-    c += vec3(1.0,0.85,0.6)*exp(-dot(sd,sd)*12.0)*0.35*uSunVisible;
+    c += vec3(1.0,0.85,0.6)*exp(-dot(sd,sd)*12.0)*0.35*sunVis;
     for (int i=1;i<4;i++){ vec2 gp = mix(uSunScreen, vec2(0.5), float(i)*0.55); vec2 gd = (uv - gp)*vec2(uRes.x/uRes.y,1.0);
-      c += vec3(0.4,0.6,1.0)*smoothstep(0.05*float(i), 0.0, length(gd))*0.03*uSunVisible; }
+      c += vec3(0.4,0.6,1.0)*smoothstep(0.05*float(i), 0.0, length(gd))*0.03*sunVis; }
   }
   c *= uExposure;
   c = aces(c);

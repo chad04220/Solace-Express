@@ -655,7 +655,8 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   float sx = 0, sy = 0; vec3 sp = fp.camPos + fp.sunDir * 10000.f;
   bool vis = fp.sunDir.y > -0.02f && project(fp, sp, sx, sy) && sx > -0.2f * W && sx < 1.2f * W && sy > -0.2f * H && sy < 1.2f * H;
   glUniform2f(U(progPost, "uSunScreen"), sx / W, 1.f - sy / H);
-  glUniform1f(U(progPost, "uSunVisible"), vis ? (1.f - smoothstepf(0.5f, 0.9f, fp.cloudCover)) * smoothstepf(-0.02f, 0.1f, fp.sunDir.y) : 0.f);
+  glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progPost, "uDepthTex"), 2);
+  glUniform1f(U(progPost, "uSunVisible"), vis && !fp.sealedCockpit ? (1.f - smoothstepf(0.5f, 0.9f, fp.cloudCover)) * smoothstepf(-0.02f, 0.1f, fp.sunDir.y) : 0.f);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);
   glEndQuery(GL_TIME_ELAPSED);
