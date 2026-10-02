@@ -348,17 +348,17 @@ void Game::flightControls(float dt) {
   }
   c.flaps = flapNotch;
   // gear
-  bool wrAir = plane.spec->special == 2 && !plane.onGround;   // XR-11 in the air: gamepad Y drops bombs instead
+  bool wrAir = plane.spec->special == 2 && !plane.onGround;   // XR-11 in the air: gamepad Y is weapons hot / safe instead of the gear
   if ((in.pressed['G'] || (in.buttonsPressed & ((wrAir ? 0u : (unsigned)PAD_Y) | (showMap ? 0u : (unsigned)PAD_RIGHT)))) && plane.spec->retract) {
     if (plane.onGround && c.gearDown) toast("Gear lever is locked on the ground", vec3(1, 0.6f, 0.4f));
     else { c.gearDown = !c.gearDown; toast(c.gearDown ? "Gear down" : "Gear up", vec3(0.8f, 1, 0.8f)); }
   }
-  // brakes: B = parking brake toggle, Space = wheel brakes
+  // brakes: B / D-pad left = parking brake toggle, Space = wheel brakes
   static bool parking = true;
   if (flightClock < 0.05f) parking = plane.onGround;
   if (plane.apDone) { plane.apDone = false; parking = true; toast("Autoland complete - parking brake set", vec3(0.5f, 1, 0.6f)); g_audio.trigger(SFX_AP_DISC, 0.7f); }
   if (plane.spec->special == 2) wraithControls(dt);
-  if (in.pressed['B'] || (!showMap && !wrAir && (in.buttonsPressed & PAD_LEFT))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
+  if (in.pressed['B'] || (!showMap && (in.buttonsPressed & PAD_LEFT))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
   float wb = key(K_SPACE) ? 1.f : 0.f;
   if (in.pad && (in.buttons & PAD_A)) wb = 1.f;
   if (wb > 0 && parking && plane.onGround && length(plane.vel) > 2.f) parking = false;

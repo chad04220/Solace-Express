@@ -30,13 +30,13 @@ float groundHit(vec3 a, vec3 d, float L) {
 void Game::wraithControls(float dt) {
   WraithState& W = wraith;
   bool air = !plane.onGround && !crashed;
-  // X, D-pad left in the air, or a double tap of gamepad A (A stays the wheel brake): cloak
+  // X, or a double tap of gamepad A (A stays the wheel brake): cloak
   bool dblA = false;
   W.padATap += dt;
   if (in.pad && (in.buttonsPressed & PAD_A) && !showMap) {
     if (W.padATap < 0.35f) { dblA = true; W.padATap = 9.f; } else W.padATap = 0;
   }
-  if (in.pressed['X'] || (air && (in.buttonsPressed & PAD_LEFT)) || dblA) {
+  if (in.pressed['X'] || dblA) {
     W.cloakOn = !W.cloakOn;
     toast(W.cloakOn ? "CLOAK ENGAGED" : "CLOAK DISENGAGED", vec3(0.75f, 0.45f, 1.f));
     g_audio.trigger(SFX_CLOAK, W.cloakOn ? 1.f : 0.7f);
