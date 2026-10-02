@@ -85,6 +85,8 @@ Menus work with the mouse or a gamepad. On a gamepad, the left stick (or D-pad) 
 <details>
 <summary>Classified (spoiler)</summary>
 
+Can't wait for a close encounter? Hold **J** and **K** together for a second while flying and they'll come to you.
+
 Hold **U** and **I** together on the main menu, or click in **both sticks** on a gamepad, to open the Confidential Research Model menu. From there you can fly the **XR-9 Specter**, a VTOL research jet, for free from any airport, starting airborne or on the runway, in clear, cloudy or stormy weather.
 
 - **Performance:** full reheat doubles the thrust, for a thrust-to-weight ratio of about 4.4 and Mach 2.5 at 3,000 m. Breaking Mach 1 throws a vapour cone and a sonic boom.

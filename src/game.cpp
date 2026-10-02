@@ -739,6 +739,12 @@ void Game::startUfo() {
 
 void Game::updateUfo(float dt) {
   if (!ufo.on) {
+    // summon: hold J and K together for a second while flying
+    bool flying = screen == SCR_FLIGHT && !paused && !crashed && !plane.onGround;
+    if (flying && in.down['J'] && in.down['K']) {
+      ufoSummon += dt;
+      if (ufoSummon >= 1.f) { ufoSummon = 0; startUfo(); return; }
+    } else ufoSummon = 0;
     // random encounters: only while properly airborne
     bool ok = screen == SCR_FLIGHT && !crashed && !plane.onGround && plane.agl() > 150.f && length(plane.vel) > 25.f;
     if (ok) ufo.next -= dt;
@@ -1646,6 +1652,17 @@ void Game::debugScene(const std::string& name) {
     if (view == 0) { dbgCamLook = W(0, side * 60.f); dbgCamLook.y = a.elev; dbgCamPos = W(-a.length * 0.2f, -side * 700.f); dbgCamPos.y = a.elev + 250.f; }
     else if (view - 1 < (int)traffic.craft.size()) { const TrafficCraft& c = traffic.craft[view - 1]; float sz = kAircraft[c.spec].fusLen;
       dbgCamLook = c.pos; dbgCamPos = c.pos + c.q.rotate(vec3(sz * 0.9f, sz * 0.35f, sz * 1.6f)); }
+    return;
+  }
+  if (name == "ufosummon") {   // J + K held for a second while flying summons the UFO
+    plane.reset(&kAircraft[1], vec3(-4000, 700, 9000), 40, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
+    takeoffAnnounced = true; camQ = plane.q; botControl = true; plane.ctl.throttle = 0.75f;
+    for (int i = 0; i < 10; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    in.down['J'] = true; in.down['K'] = true;
+    bool early = false;
+    for (int i = 0; i < 36; i++) { realTime += 1 / 30.f; update(1 / 30.f); if (i == 20 && ufo.on) early = true; }
+    in.down['J'] = in.down['K'] = false;
+    printf("ufosummon: %s\n", ufo.on && !early ? "ok" : "FAIL");
     return;
   }
   if (name.compare(0, 3, "ufo") == 0) {   // UFO encounter at t seconds: ufo<t>_<view> (0 chase-style, 1 cockpit, 2 close-up of the hatch)
