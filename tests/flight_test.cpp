@@ -110,6 +110,49 @@ int main() {
     ok = -p.w.z / DEG > 250.f;
     printf("XR-9 roll rate %.0f deg/s %s\n", -p.w.z / DEG, ok ? "ok" : "FAIL"); fails += !ok;
   }
+  // ---------------- autopilot: stable holds in turbulence, and autoland at Solace Capital for every aircraft
+  for (int i = 0; i < 8; i++) {
+    const AircraftSpec& s = kAircraft[i];
+    Weather wx; wx.windSpeed = 7; wx.windFrom = 200; wx.turbulence = 0.25f; wx.gust = 2;
+    Plane p; p.reset(&s, vec3(0, 1800, 2000), 30, s.maxFuel * 0.6f, 100, true, s.cruise * 0.85f);
+    p.ctl.gearDown = !s.retract; p.gear = p.ctl.gearDown ? 1.f : 0.f; p.ctl.throttle = 0.7f;
+    p.apEngage(Plane::AP_HOLD, -1, wx);
+    float maxBank = 0, rmsP = 0; int nP = 0;
+    for (int k = 0; k < 120 * 60 && !p.ev.crashed; k++) {
+      if (k == 10 * 60) { p.apHeading = wrapDeg360(p.apHeading + 90.f); p.apAlt += 200.f; }
+      p.step(1 / 60.f, wx, k / 60.f);
+      if (k > 10 * 60) maxBank = std::max(maxBank, fabsf(p.bankDeg()));
+      if (k > 90 * 60) { rmsP += p.w.z * p.w.z; nP++; }
+    }
+    float he = fabsf(wrapAngle((p.apHeading - p.heading()) * DEG) / DEG), ae = fabsf(p.apAlt - p.pos.y);
+    rmsP = sqrtf(rmsP / std::max(nP, 1)) / DEG;
+    bool ok = !p.ev.crashed && he < 6.f && ae < 40.f && maxBank < (s.special ? 50.f : 38.f) && rmsP < 4.f;
+    printf("AP hold %-16s hdg err %4.1f  alt err %5.1f m  max bank %4.1f  roll-rate rms %4.2f deg/s  %s\n", s.name, he, ae, maxBank, rmsP, ok ? "ok" : "FAIL"); fails += !ok;
+  }
+  {
+    int ai = g_world.findAirport("CAP"); const Airport& A = g_world.airports[ai];
+    for (int i = 0; i < 8; i++) {
+      const AircraftSpec& s = kAircraft[i];
+      Weather wx; wx.windSpeed = 6; wx.windFrom = wrapDeg360(A.heading + 25.f); wx.turbulence = 0.15f;
+      vec3 side(-A.dir().z, 0, A.dir().x);
+      vec3 start = A.pos() + side * 14000.f + A.dir() * 3000.f; start.y = std::max(A.elev + 1200.f, g_world.height(start.x, start.z) + 500.f);
+      Plane p; p.reset(&s, start, wrapDeg360(A.heading + 120.f), s.maxFuel * 0.6f, 100, true, s.cruise * 0.85f);
+      p.ctl.gearDown = !s.retract; p.gear = p.ctl.gearDown ? 1.f : 0.f; p.ctl.throttle = 0.7f;
+      p.apEngage(Plane::AP_NAV, ai, wx);
+      float tdVs = 0; bool td = false; int k = 0; int goArounds = 0, lastStage = 0;
+      for (; k < 1500 * 60 && !p.ev.crashed && !p.apDone; k++) {
+        p.step(1 / 60.f, wx, k / 60.f);
+        if (p.ev.touchdown && !td) { td = true; tdVs = -p.ev.touchdownVs; }
+        if (p.apStage == Plane::APS_GOAROUND && lastStage != Plane::APS_GOAROUND) goArounds++;
+        lastStage = p.apStage;
+      }
+      vec3 rel = p.pos - A.pos(); float along = fabsf(dot(rel, A.dir())), cross = fabsf(dot(rel, vec3(-A.dir().z, 0, A.dir().x)));
+      bool ok = !p.ev.crashed && p.apDone && td && tdVs < 3.0f && along < A.length * 0.5f && cross < A.width * 0.5f;
+      printf("AP autoland %-16s %s after %4.0f s  touchdown %.1f m/s  stop %4.0f m from centre, %4.1f m off the centreline, go-arounds %d %s%s\n", s.name,
+             p.apDone ? "landed" : "NOT DONE", k / 60.f, tdVs, along, cross, goArounds, p.ev.crashed ? p.ev.crashReason.c_str() : "", ok ? " ok" : " FAIL");
+      fails += !ok;
+    }
+  }
   printf("%d failures\n", fails);
   return fails ? 1 : 0;
 }
