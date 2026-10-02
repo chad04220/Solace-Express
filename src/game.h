@@ -121,7 +121,7 @@ private:
   float escortSummon = 0; bool escortLatch = false;   // O + P held: the Spectre display pair
   // XR-11 Wraith systems: cloak, retracting laser turrets, bomb bay and the dark-energy weapons in the world
   struct WraithState {
-    bool cloakOn = false; float stealth = 0, front = -12.f;        // cloak: strength 0..1 and the wavefront along the craft (body z)
+    bool cloakOn = false; float stealth = 0, front = -12.f, padATap = 9.f;        // cloak: strength 0..1 and the wavefront along the craft (body z)
     bool armed = false; float lasers = 0;                          // turrets deployed 0..1
     float laserCD = 0, laserGlow = 0; int laserSide = 0;
     float bay = 0, bayHold = 0, bombLoaded = 1; int bombQueue = 0;  // bomb bay doors, bomb in the cradle 0..1, pending drops
