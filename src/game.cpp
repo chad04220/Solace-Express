@@ -176,6 +176,12 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
 }
 
 void Game::endFlight(bool success, const std::string& reason) {
+  if (researchFlight) {  // research flights never touch the career: back to the research menu
+    researchFlight = false; paused = false; showMap = false;
+    screen = SCR_RESEARCH; resOpened = realTime;
+    if (!reason.empty()) toast(reason, success ? vec3(0.6f, 1, 0.7f) : vec3(1, 0.5f, 0.4f));
+    return;
+  }
   result.success = success;
   result.failReason = reason;
   result.flightMin = flightClock / 60.f;
@@ -254,8 +260,12 @@ void Game::flightControls(float dt) {
   if (in.pad) tr += ((in.buttons & PAD_UP) ? 1.f : 0.f) - ((in.buttons & PAD_DOWN) ? 1.f : 0.f);
   c.trim = clampf(c.trim + tr * 0.35f * dt, -1, 1);
   // flaps
-  if (in.pressed['F'] || (in.buttonsPressed & PAD_B)) { flapNotch = std::min(1.f, flapNotch + 1.f / 3.f); toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1)); }
-  if (in.pressed['V'] || (in.buttonsPressed & PAD_X)) { flapNotch = std::max(0.f, flapNotch - 1.f / 3.f); toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1)); }
+  auto flapToast = [&]() {
+    if (plane.spec->special) toast(flapNotch > 0.99f ? "Thrust vector 90 deg - VTOL hover" : fmt("Thrust vector %d deg", (int)lroundf(flapNotch * 90)), vec3(0.4f, 0.9f, 1));
+    else toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1));
+  };
+  if (in.pressed['F'] || (in.buttonsPressed & PAD_B)) { flapNotch = std::min(1.f, flapNotch + 1.f / 3.f); flapToast(); }
+  if (in.pressed['V'] || (in.buttonsPressed & PAD_X)) { flapNotch = std::max(0.f, flapNotch - 1.f / 3.f); flapToast(); }
   c.flaps = flapNotch;
   // gear
   if ((in.pressed['G'] || (in.buttonsPressed & PAD_Y)) && plane.spec->retract) {
@@ -408,6 +418,7 @@ void Game::updateFlight(float dt) {
   if (!plane.onGround && plane.gLoad > 1.7f && (wx.precip > 0 || plane.pos.y > wx.cloudBase - 300.f)) {
     for (int s = -1; s <= 1; s += 2) spawn(plane.pos + plane.q.rotate(vec3(s * plane.spec->span * 0.5f, plane.spec->wingY * plane.spec->fusRad, plane.spec->wingZ + 0.6f)), plane.vel * 0.9f, 0.5f, 0.25f, 0.4f, vec3(1, 1, 1), 0.35f, SPR_SMOKE, 3.f, 0.f);
   }
+  if (plane.spec->special) jetEffects(dt);
   // GPS breadcrumb trail
   trailT += dt;
   if (trailT > 2.f && !plane.onGround) { trailT = 0; trail.push_back(vec2(plane.pos.x, plane.pos.z)); if (trail.size() > 500) trail.erase(trail.begin()); }
@@ -455,7 +466,7 @@ void Game::updateFlight(float dt) {
   if (flightClock < 0.1f) lowFuelWarned = false;
   if (!lowFuelWarned && plane.fuel < plane.spec->maxFuel * 0.15f) { lowFuelWarned = true; g_audio.trigger(SFX_BEEP); toast("LOW FUEL", vec3(1, 0.5f, 0.2f)); }
   // completion
-  if (plane.onGround && takeoffAnnounced && gs < 2.5f) {
+  if (plane.onGround && takeoffAnnounced && gs < 2.5f && !researchFlight) {
     stillTimer += dt;
     if (stillTimer > 1.2f) {
       float dA; int ap = g_world.nearestAirport(plane.pos.x, plane.pos.z, &dA);
@@ -521,6 +532,78 @@ void Game::updateCamera(float dt) {
   }
   float gh = std::max(g_world.height(camPos.x, camPos.z, 6), 0.f) + 1.5f;
   if (camPos.y < gh) camPos.y = gh;
+}
+
+// ------------------------------------------------------------------ XR-9 research flights
+void Game::launchResearch() {
+  Contract c;
+  c.id = "XR9"; c.title = "XR-9 Research Flight"; c.type = CT_FERRY;
+  c.from = c.to = resAirport; c.payout = 0;
+  c.wx = Weather(); c.wx.timeOfDay = resTime; c.wx.windSpeed = 3; c.wx.turbulence = 0.05f;
+  if (resWx == 0) { c.wx.cloudCover = 0.15f; c.wx.visibility = 60000; }
+  else if (resWx == 1) { c.wx.cloudCover = 0.6f; c.wx.cloudBase = 1300; }
+  else { c.wx.cloudCover = 0.95f; c.wx.cloudBase = 800; c.wx.precip = 1; c.wx.storm = true; c.wx.windSpeed = 9; c.wx.gust = 5; c.wx.turbulence = 0.5f; c.wx.visibility = 9000; }
+  startFlight(c, kResearchJet, Career::SRC_OWNED);
+  researchFlight = true;
+  toasts.clear();
+  toast("XR-9 SPECTER // RESEARCH FLIGHT", vec3(0.4f, 0.9f, 1));
+  if (resAirborne) {
+    const Airport& a = g_world.airports[resAirport];
+    vec3 p = plane.pos + a.dir() * 1500.f; p.y = std::max(a.elev, g_world.height(p.x, p.z)) + 900.f;
+    plane.reset(&kAircraft[kResearchJet], p, plane.heading(), kAircraft[kResearchJet].maxFuel, 85, true, 200.f);
+    plane.ctl.throttle = 0.7f; takeoffAnnounced = true;
+    camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 4, 26));
+  } else toast("F/V swivels the nozzles: full down for vertical takeoff", vec3(0.7f, 0.9f, 1));
+  prevMach = 0;
+}
+
+void Game::jetEffects(float dt) {
+  const float thr = plane.ctl.throttle;
+  float ab = smoothstepf(0.85f, 1.f, plane.engineSpool);
+  float a = plane.nozzle * 0.5f * PI;
+  vec3 exDir = plane.q.rotate(vec3(0, -sinf(a), cosf(a)));
+  // afterburner plumes with shock diamonds
+  for (int s = -1; s <= 1; s += 2) {
+    vec3 ex = plane.pos + plane.q.rotate(vec3(s * 0.82f, -0.12f, 7.75f)) + exDir * 1.1f;
+    int n = ab > 0.05f ? 3 : (thr > 0.4f ? 1 : 0);
+    for (int i = 0; i < n; i++) {
+      float k = (rand() % 100) * 0.01f;
+      spawn(ex + exDir * k * 2.f, plane.vel + exDir * (40.f + 40.f * ab), 0.06f + 0.06f * ab, 0.45f + 0.35f * ab, -2.f,
+            ab > 0.05f ? vec3(1.f, 0.55f + 0.2f * k, 0.25f) * (0.7f + ab) : vec3(0.5f, 0.6f, 1.f) * 0.5f, 1.f, SPR_FIRE, 0.f, 0.f);
+    }
+    if (ab > 0.3f && rand() % 2 == 0) for (int d = 1; d <= 3; d++) spawn(ex + exDir * (d * 1.6f), plane.vel, 0.05f, 0.35f - d * 0.06f, 0.f, vec3(1.f, 0.8f, 0.6f) * 1.5f, 1.f, SPR_SPARK, 0.f, 0.f);
+  }
+  // hover downwash: dust or spray blown out in a ring under the jet
+  float agl = plane.agl();
+  if (plane.nozzle > 0.5f && thr > 0.25f && agl < 35.f) {
+    float gy = std::max(g_world.height(plane.pos.x, plane.pos.z), 0.f);
+    bool water = g_world.height(plane.pos.x, plane.pos.z) < 0.3f;
+    int n = (int)((1.f - agl / 35.f) * 6.f);
+    for (int i = 0; i < n; i++) {
+      float ang = (rand() % 628) * 0.01f;
+      vec3 d(cosf(ang), 0, sinf(ang));
+      spawn(vec3(plane.pos.x, gy + 0.5f, plane.pos.z) + d * 3.f, d * (12.f + (rand() % 100) * 0.1f) + vec3(0, 1.5f, 0), 1.6f, 1.2f, 3.f,
+            water ? vec3(0.9f, 0.95f, 1.f) : vec3(0.5f, 0.46f, 0.38f), water ? 0.5f : 0.35f, SPR_SMOKE, 1.2f, 0.3f);
+    }
+  }
+  // transonic vapour cone and the sonic boom when passing Mach 1
+  float M = plane.mach;
+  if (M > 0.93f && M < 1.05f && !plane.onGround) {
+    vec3 c = plane.pos + plane.q.rotate(vec3(0, 0.1f, 0.5f));
+    vec3 r = plane.right(), u = plane.up();
+    for (int i = 0; i < 10; i++) {
+      float ang = (rand() % 628) * 0.01f, rad = 2.2f + (rand() % 100) * 0.03f;
+      spawn(c + (r * cosf(ang) + u * sinf(ang) * 0.6f) * rad, plane.vel * 0.97f, 0.25f, 0.8f, 2.f, vec3(1.f), 0.35f, SPR_SMOKE, 0.f, 0.f);
+    }
+  }
+  if (prevMach < 1.f && M >= 1.f && !plane.onGround) {
+    g_audio.trigger(SFX_THUNDER, 1.f);
+    toast("MACH 1 - SONIC BOOM", vec3(0.4f, 0.9f, 1));
+    vec3 f = normalize(plane.vel), r = normalize(cross(f, vec3(0, 1, 0)) + vec3(1e-4f, 0, 0)), u = cross(r, f);
+    bursts.push_back({plane.pos, r * 25.f, u * 25.f, vec3(0.7f, 0.85f, 1.f), 0.f});
+  }
+  prevMach = M;
+  (void)dt;
 }
 
 // ------------------------------------------------------------------ crash wreckage
@@ -693,6 +776,10 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   pv.I2[0] = -p.q.rotate(p.w).y / DEG; pv.I2[1] = p.beta / DEG; pv.I2[2] = p.flaps; pv.I2[3] = p.gear;
   pv.colBase = s.colBase; pv.colStripe = s.colStripe;
   pv.propCount = modelProps(md, pv.prop);
+  pv.hud[0] = p.ias; pv.hud[1] = p.pos.y; pv.hud[2] = p.heading(); pv.hud[3] = p.mach;
+  pv.hud2[0] = p.gLoad; pv.hud2[1] = p.ctl.throttle; pv.hud2[2] = p.nozzle; pv.hud2[3] = p.gear > 0.5f ? 1.f : 0.f;
+  vec3 vb = length(p.vel) > 2.f ? p.q.conj().rotate(normalize(p.vel)) : vec3(0, 0, -1);
+  pv.hudV[0] = vb.x; pv.hudV[1] = vb.y; pv.hudV[2] = vb.z;
 }
 
 FrameParams Game::buildFrame() {
@@ -761,10 +848,12 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
   float hdg = atan2f(vdir.x, -vdir.z) / DEG;
   demo.pos = p;
   demo.q = quat::axisAngle(vec3(0, 1, 0), -hdg * DEG) * quat::axisAngle(vec3(0, 0, 1), -18.f * DEG) * quat::axisAngle(vec3(1, 0, 0), 2.f * DEG);
-  demo.rpm = 2400; demo.gear = 1; demo.flaps = 0; demo.ctl = Controls();
+  bool res = screen == SCR_RESEARCH;
+  demo.spec = &kAircraft[res ? kResearchJet : 1];
+  demo.rpm = 2400; demo.gear = res ? 0.f : 1.f; demo.flaps = 0; demo.nozzle = 0; demo.ctl = Controls(); demo.ctl.throttle = res ? 0.6f : 0.f;
   fillPlaneVisual(fp.plane, demo, realTime * 250.f, false);
-  float ca = realTime * 0.05f;
-  vec3 off = vec3(cosf(ca) * 16.f, 3.5f + 2.f * sinf(ca * 0.7f), sinf(ca) * 16.f) + vdir * -6.f;
+  float ca = realTime * 0.05f, cr = res ? 24.f : 16.f;
+  vec3 off = vec3(cosf(ca) * cr, (res ? 5.f : 3.5f) + 2.f * sinf(ca * 0.7f), sinf(ca) * cr) + vdir * -6.f;
   fp.camPos = p + off;
   vec3 fwd = normalize(p - fp.camPos + vdir * 4.f);
   fp.camBack = -fwd; fp.camRight = normalize(cross(fwd, vec3(0, 1, 0))); fp.camUp = cross(fp.camRight, fwd);
@@ -973,6 +1062,9 @@ void Game::update(float dt) {
   while (!toasts.empty() && toasts.front().t > 5.f) toasts.erase(toasts.begin());
   hubMsgTime = std::max(0.f, hubMsgTime - dt);
   if (in.pressed[K_F11]) wantFullscreenToggle = true;
+  if (screen == SCR_MENU && in.down['U'] && in.down['I'] && (in.pressed['U'] || in.pressed['I'])) {
+    screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP);
+  }
   if (in.pressed['R'] && screen == SCR_FLIGHT) showRadio = !showRadio;
   radio.poll();
   if (screen == SCR_FLIGHT) {
@@ -1008,6 +1100,7 @@ void Game::render() {
     case SCR_HUB: drawHub(); break;
     case SCR_FLIGHT: drawHud(fp); drawMapOverlay(); if (paused) drawPause(); break;
     case SCR_DEBRIEF: drawDebrief(); break;
+    case SCR_RESEARCH: drawResearch(); break;
   }
   drawToasts();
   g_ren.uiEnd();
@@ -1018,6 +1111,8 @@ void Game::debugScene(const std::string& name) {
   career.newGame(); career.license = LIC_ATP;
   if (name == "menu") { screen = SCR_MENU; realTime = 20; return; }
   if (name == "hub") { screen = SCR_HUB; realTime = 20; return; }
+  if (name == "research") { screen = SCR_RESEARCH; realTime = 20; resOpened = 15; return; }
+  if (name == "rjet" || name == "rjetc" || name == "rhover" || name == "rjetl") { realTime = 20; resAirborne = name != "rhover"; launchResearch(); if (name == "rjetc" || name == "rjetl") camMode = 1; if (name == "rhover") { plane.ctl.flaps = 1; flapNotch = 1; plane.flaps = plane.nozzle = 1; plane.ctl.throttle = 0.7f; plane.engineRunning = true; plane.engineSpool = 0.7f; } for (int i = 0; i < 90; i++) { realTime += 1 / 30.f; update(1 / 30.f); } toasts.clear(); if (name == "rjetl") lookYaw = 1.75f; return; }
   if (name == "radio") { loadStations(); screen = SCR_HUB; showRadio = true; realTime = 20; radioScroll = 6; return; }
   if (name.size() == 4 && name.compare(0, 3, "hub") == 0) { screen = SCR_HUB; hubTab = name[3] - '0'; realTime = 20; return; }
   Contract c = g_story[0];

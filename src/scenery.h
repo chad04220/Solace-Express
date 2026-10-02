@@ -9,7 +9,8 @@ static const float LOT = 28.0f;          // building lot grid (m)
 static const float TREE_CELL = 10.0f;    // one tree per cell at most
 static const float ROCK_CELL = 16.0f;
 static const float STACK_CELL = 70.0f;
-static const float ROAD_RANGE = 80.0f;   // mask R channel encodes road distance 0..80 m
+static const float ROAD_RANGE = 80.0f;
+static const float SCENERY_DENSITY = 0.3333f;  // trees, rocks and sea stacks per cell (matches the shader)   // mask R channel encodes road distance 0..80 m
 
 struct Town { const char* name; float x, z, r; int kind; };  // kind 0 village, 1 town, 2 city
 extern const Town kTowns[];

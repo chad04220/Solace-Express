@@ -35,9 +35,14 @@ const AircraftSpec kAircraft[] = {
    0.25f, 5.0f, 1.40f, 0.75f, 0.022f, 0.012f, 0.070f, 0.80f, 15000, 0, 55, 62, 200, 260, 1250, false, false, true,
    30000, 60000, 85000, 0.42f, 0.050f, 0.055f, LIC_ATP, 260000, 0,
    14.0f, 0.95f, -0.58f, 1.0f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f)},
+  // hidden research model: thrust-to-weight ~2.2, supersonic, VTOL thrust vectoring (see Plane::substep special path)
+  {"xr9", "XR-9 Specter", "Confidential research model", ENG_JET, 2, 0, 0, 0, 0, 9000, 3000, 0, 0, 46.0f, 11.2f, 4.6f,
+   0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 118000, 0, 60, 70, 420, 4000, 250, true, false, true,
+   25000, 90000, 110000, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 0, 0,
+   17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1},
 };
 // clang-format on
-const int kNumAircraft = sizeof(kAircraft) / sizeof(kAircraft[0]);
+const int kNumAircraft = sizeof(kAircraft) / sizeof(kAircraft[0]) - 1;  // the research jet is not part of the career
 
 float Plane::fuelFlowMax() const {
   float rangeS = spec->rangeKm * 1000.f / spec->cruise;
@@ -61,7 +66,9 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
     float cl0 = s->CL0, a = (CL - cl0) / s->CLa;
     cd0 = T / qS - CL * CL / (PI * s->oswald * AR) - (s->retract ? 0.f : s->gearCD) - 0.4f * 0.f - 0 * a;
     cd0 = std::max(cd0, 0.012f);
+    if (s->special) cd0 = 0.0125f;   // research jet: clean low-drag airframe, wave drag added in flight
   }
+  nozzle = 0; mach = 0;
   if (airborne) {
     vel = forward() * speed; engineRunning = true; engineSpool = 0.7f; ctl.throttle = 0.7f;
     rpm = s->engineType == ENG_PISTON ? s->maxRpm * 0.88f : s->maxRpm; n1 = 90;
@@ -126,7 +133,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     if (starterTime > (s.engineType == ENG_PISTON ? 1.6f : 3.0f) && hasFuel) engineRunning = true;
   }
   if (!hasFuel) engineRunning = false;
-  float spoolRate = s.engineType == ENG_PISTON ? 3.0f : (s.engineType == ENG_TURBOPROP ? 0.7f : 0.45f);
+  float spoolRate = s.engineType == ENG_PISTON ? 3.0f : (s.engineType == ENG_TURBOPROP ? 0.7f : (s.special ? 1.6f : 0.45f));
   float target = engineRunning ? ctl.throttle : 0.f;
   engineSpool = approach(engineSpool, target, spoolRate, dt);
   vec3 vaW = vel - windVel;
@@ -148,7 +155,11 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   }
   float thrust = 0;
   if (engineRunning) {
-    if (s.engineType == ENG_JET) {
+    if (s.special) {
+      // two afterburning turbofans: dry up to 85% throttle, reheat above; thrust holds up to Mach 2+
+      float ab = smoothstepf(0.85f, 1.0f, engineSpool);
+      thrust = s.engines * s.power * powf(sigmaRho, 0.6f) * (0.82f * engineSpool + 0.18f * ab);
+    } else if (s.engineType == ENG_JET) {
       float mach = V / 340.f;
       thrust = s.engines * s.power * engineSpool * powf(sigmaRho, 0.75f) * (1.f - 0.3f * mach);
     } else {
@@ -156,11 +167,12 @@ void Plane::substep(float dt, const Weather& wx, float time) {
       float vf = std::max(0.f, -va.z);
       thrust = P * 0.8f / sqrtf(vf * vf + s.v0 * s.v0);
     }
-    fuel = std::max(0.f, fuel - fuelFlowMax() * (0.2f + 0.8f * ctl.throttle) * dt);
+    if (!s.special) fuel = std::max(0.f, fuel - fuelFlowMax() * (0.2f + 0.8f * ctl.throttle) * dt);
   }
 
   // ---------------- configuration
-  flaps = approach(flaps, ctl.flaps, 0.6f, dt);
+  flaps = approach(flaps, ctl.flaps, s.special ? 0.5f : 0.6f, dt);
+  if (s.special) nozzle = flaps;   // the research jet's F/V keys swivel the thrust-vector nozzles instead of flaps
   if (s.retract) gear = clampf(gear + (ctl.gearDown ? 1.f : -1.f) * dt / 5.f, 0, 1);
   else gear = 1;
 
@@ -181,6 +193,8 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     if (altAgl < s.span) ge = 1.f + 0.12f * (1.f - altAgl / s.span);
     CL *= ge;
     float CD = cd0 + s.gearCD * gear + s.flapCD * flaps + CL * CL / (PI * s.oswald * AR) / ge + sig * (0.35f + 1.1f * sinf(alpha) * sinf(alpha)) + 0.4f * beta * beta;
+    mach = V / (340.f * sqrtf(std::max(1.f - pos.y / 44000.f, 0.6f)));
+    if (s.special) CD += 0.022f * smoothstepf(0.86f, 1.04f, mach) - 0.007f * smoothstepf(1.2f, 2.2f, mach);  // transonic drag rise
     float CY = -0.7f * beta;
     vec3 liftDir = normalize(cross(vec3(1, 0, 0), va));
     vec3 dragDir = va * (-1.f / V);
@@ -205,10 +219,34 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     // stall wing-drop
     if (sig > 0.3f) { float dv, a, b; noised(time * 0.8f, 2.2f, dv, a, b); Cl += sig * 0.04f * dv; }
     float L = Cl * qbar * s.wingArea * s.span, M = Cm * qbar * s.wingArea * s.chord, Nn = Cn * qbar * s.wingArea * s.span;
-    T += vec3(M, -Nn, -L);
+    if (!s.special) T += vec3(M, -Nn, -L);
     stallWarn = smoothstepf(aStall - 5 * DEG, aStall - 1.5f * DEG, alpha);
   } else { alpha = 0; beta = 0; }
-  F += vec3(0, 0, -thrust);
+  if (s.special) {
+    // thrust-vectoring nozzles swivel from aft (0) to straight down (1) for vertical flight
+    float a = nozzle * 0.5f * PI;
+    F += vec3(0, sinf(a), -cosf(a)) * thrust;
+    // fly-by-wire rate command through vectored thrust and reaction jets: authority independent of airspeed
+    float Vt = std::max(V, 1.f);
+    float hover = smoothstepf(0.3f, 0.7f, nozzle) * smoothstepf(70.f, 30.f, V);
+    float pMax = clampf(11.f * G0 / Vt, 0.9f, 2.6f);           // pitch rate limited to ~11 g
+    float rMax = 5.5f * (1.f - 0.6f * hover), yMax = 1.4f;
+    vec3 wd(ctl.pitch * pMax + ctl.trim * 0.15f, -ctl.yaw * yMax, -ctl.roll * rMax);
+    if (hover > 0) {  // hands-off attitude hold while hovering
+      if (fabsf(ctl.pitch) < 0.05f) wd.x += hover * 2.2f * (0.f - pitchDeg()) * DEG;
+      if (fabsf(ctl.roll) < 0.05f) wd.z += hover * 2.2f * bankDeg() * DEG;
+    }
+    // g limiter: keep the angle of attack inside +9 / -4 g (or the stall) so hard pulls don't overstress
+    if (V > 20.f && !onGround) {
+      float qS = 0.5f * density * V * V * s.wingArea, W = m * G0;
+      float aHi = std::min((9.f * W / qS - s.CL0) / s.CLa, (s.CLmax - s.CL0) / s.CLa);
+      float aLo = std::max((-4.f * W / qS - s.CL0) / s.CLa, (-1.1f - s.CL0) / s.CLa);
+      wd.x = clampf(wd.x, (aLo - alpha) * 6.f - 0.2f, (aHi - alpha) * 6.f + 0.2f);
+    }
+    float ms0 = m / s.emptyMass, k = onGround ? 4.f : 9.f;
+    vec3 Ii(s.Iyy * ms0, s.Izz * ms0, s.Ixx * ms0);
+    T += vec3(Ii.x * k * (wd.x - w.x), Ii.y * k * (wd.y - w.y), Ii.z * k * (wd.z - w.z));
+  } else F += vec3(0, 0, -thrust);
 
   // ---------------- ground contacts
   float L = s.fusLen, R = s.fusRad;
@@ -324,7 +362,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   vec3 accBody = q.conj().rotate(acc + vec3(0, G0, 0));
   gLoad = accBody.y / G0;
   if (!onGround) { maxG = std::max(maxG, gLoad); minG = std::min(minG, gLoad); }
-  if (!anyWheel && (gLoad > 5.8f || gLoad < -3.f)) { ev.crashed = true; ev.crashReason = "Structural failure - overstressed airframe"; return; }
+  if (!anyWheel && (s.special ? (gLoad > 16.f || gLoad < -8.f) : (gLoad > 5.8f || gLoad < -3.f))) { ev.crashed = true; ev.crashReason = "Structural failure - overstressed airframe"; return; }
   vel += acc * dt;
   pos += vel * dt;
   // inertia scales with loading

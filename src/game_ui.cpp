@@ -757,6 +757,7 @@ void Game::drawHud(const FrameParams& fp) {
   float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
   hudPanel(W * 0.5f - 300 * s, 8 * s, 600 * s, 54 * s);
   std::string obj = wpIndex < (int)contract.wps.size() ? fmt("Checkpoint %d/%d", wpIndex + 1, (int)contract.wps.size()) : fmt("Land at %s (%s)", d.code, d.name);
+  if (researchFlight) obj = fmt("Free roam  -  Mach %.2f", plane.mach);
   g_ren.text(W * 0.5f, 13 * s, 16 * s, ellipsize(contract.title + "  -  " + obj, 570 * s, 16 * s), C_TEXT, 1, 1);
   std::string info = fmt("%.1f km  BRG %03.0f", dist / 1000.f, brg);
   if (gs > 10) info += fmt("  ETE %d:%02d", (int)(dist / gs) / 60, (int)(dist / gs) % 60);
@@ -813,8 +814,9 @@ void Game::drawHud(const FrameParams& fp) {
   // engine & systems panel
   float ex = W - 300 * s, ey = H - 250 * s;
   if (camMode == 1) { ex = W * 0.5f + 160 * s; ey = H - 230 * s; }
-  hudPanel(ex, ey, 270 * s, 220 * s);
-  header(ex + 14 * s, ey + 10 * s, 242 * s, "SYSTEMS");
+  hudPanel(ex, ey - (plane.spec->special ? 22 * s : 0), 270 * s, 220 * s + (plane.spec->special ? 22 * s : 0));
+  if (plane.spec->special) ey -= 22 * s;
+  header(ex + 14 * s, ey + 10 * s, 242 * s, plane.spec->special ? "XR-9 SYSTEMS" : "SYSTEMS");
   float ty = ey + 34 * s;
   auto erow = [&](const std::string& k, const std::string& v, vec3 c = C_TEXT) { g_ren.text(ex + 14 * s, ty, 15 * s, k, C_DIM, 1); g_ren.text(ex + 256 * s, ty, 15 * s, v, c, 1, 2); ty += 22 * s; };
   const AircraftSpec& sp = *plane.spec;
@@ -828,8 +830,10 @@ void Game::drawHud(const FrameParams& fp) {
   if (sp.engineType == ENG_PISTON) erow("RPM", plane.engineRunning ? fmt("%.0f", plane.rpm) : (plane.starterTime > 0 ? "CRANKING" : "OFF"), plane.engineRunning ? C_TEXT : C_BAD);
   else erow("N1", plane.engineRunning ? fmt("%.1f%%", plane.n1) : (plane.starterTime > 0 ? fmt("START %.0f%%", plane.n1) : "OFF"), plane.engineRunning ? C_TEXT : C_BAD);
   float fuelFrac = plane.fuel / sp.maxFuel;
-  erow("FUEL", fmt("%.0f%%  ~%.0f km", fuelFrac * 100, plane.rangeLeftKm()), fuelFrac < 0.15f ? C_BAD : C_TEXT);
-  erow("FLAPS", fmt("%.0f%%", plane.flaps * 100));
+  if (sp.special) erow("FUEL", "RESEARCH CELL", C_ACCENT);
+  else erow("FUEL", fmt("%.0f%%  ~%.0f km", fuelFrac * 100, plane.rangeLeftKm()), fuelFrac < 0.15f ? C_BAD : C_TEXT);
+  if (sp.special) { erow("NOZZLE", fmt("%.0f deg%s", plane.nozzle * 90, plane.nozzle > 0.99f ? "  VTOL" : "")); erow("MACH", fmt("%.2f", plane.mach)); }
+  else erow("FLAPS", fmt("%.0f%%", plane.flaps * 100));
   std::string gearS = !sp.retract ? "FIXED" : plane.gear > 0.99f ? "DOWN" : plane.gear < 0.01f ? "UP" : "TRANSIT";
   erow("GEAR", gearS, plane.gear > 0.99f ? C_GOOD : plane.gear < 0.01f ? C_DIM : C_WARN);
   erow("TRIM", fmt("%+.0f", plane.ctl.trim * 100));
@@ -839,7 +843,7 @@ void Game::drawHud(const FrameParams& fp) {
   if (plane.apOn) st += fmt("AP %03.0f/%s ", plane.apHeading, fmtAlt(plane.apAlt).c_str());
   if (landingLight) st += "LDG LT";
   g_ren.text(ex + 14 * s, ty, 13 * s, st, C_WARN, 1);
-  } else {
+  } else if (!plane.spec->special) {
     // cockpit view: the 3D panel carries the instruments; add a compact readout strip
     std::string ro = fmt("IAS %s   ALT %s   HDG %03.0f   VS %+.0f   THR %.0f%%   FLAPS %.0f%%   %s   FUEL %.0f%%", fmtSpeed(plane.ias).c_str(), fmtAlt(plane.pos.y).c_str(),
                          plane.heading(), plane.vel.y * 196.85f, plane.ctl.throttle * 100, plane.flaps * 100,
@@ -1100,6 +1104,87 @@ void Game::drawGps() {
   g_ren.text(sx + sw * 0.5f, sy + sh - 24 * s, 11.5f * s, "WHEEL ZOOM   R FIT TARGET   N CLOSE", C_DIM, 0.8f * e, 1, false);
 }
 
+// ------------------------------------------------------------------ hidden research menu (U + I on the main menu)
+void Game::drawResearch() {
+  float s = S(), W = (float)g_ren.W, H = (float)g_ren.H, T = realTime - resOpened;
+  const vec3 RED(1.f, 0.28f, 0.25f);
+  g_ren.rectGrad(0, 0, W, H, vec3(0.0f, 0.02f, 0.04f), vec3(0.03f, 0.0f, 0.01f), 0.55f);
+  // access sequence
+  if (T < 1.4f) {
+    g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.85f * (1.f - smoothstepf(1.0f, 1.4f, T)));
+    const char* lines[] = {"> AUTHENTICATING BIOMETRIC TOKEN ...", "> DECRYPTING PROJECT NIGHTGLASS ...", "> ACCESS GRANTED"};
+    for (int i = 0; i < 3; i++) {
+      float st = i * 0.35f; if (T < st) break;
+      std::string l = lines[i]; l = l.substr(0, std::min(l.size(), (size_t)((T - st) * 60.f)));
+      g_ren.text(W * 0.5f - 260 * s, H * 0.4f + i * 34 * s, 20 * s, l, i == 2 ? C_GOOD : C_ACCENT, 1, 0, false);
+    }
+    return;
+  }
+  float e = smoothstepf(1.4f, 1.8f, T);
+  // dossier
+  float lx = 40 * s, ly = 40 * s, lw = std::min(500 * s, W * 0.42f), lh = H - 80 * s;
+  panel(lx, ly, lw, lh, 0.95f * e);
+  float px = lx + 24 * s, py = ly + 20 * s;
+  g_ren.rectOutline(px, py, 300 * s, 30 * s, RED, e, 3 * s, 2 * s);
+  g_ren.text(px + 150 * s, py + 7 * s, 15 * s, "TOP SECRET // NIGHTGLASS", RED, e, 1, false);
+  py += 46 * s;
+  g_ren.text(px, py, 13 * s, "CONFIDENTIAL RESEARCH MODEL", C_ACCENT, e, 0, false); py += 22 * s;
+  g_ren.text(px, py, 38 * s, "XR-9 SPECTER", C_TEXT, e); py += 52 * s;
+  header(px, py, lw - 48 * s, "AIRFRAME"); py += 26 * s;
+  auto row = [&](const char* k, const char* v) { g_ren.text(px, py, 13 * s, k, C_DIM, e); g_ren.text(px + 135 * s, py, 13 * s, ellipsize(v, lw - 183 * s, 13 * s), C_TEXT, e); py += 20 * s; };
+  row("Configuration", "Blended lifting body, cranked delta, canards");
+  row("Propulsion", "2 x afterburning turbofan, 236 kN");
+  row("Thrust / weight", "2.2 : 1");
+  row("Top speed", "Mach 2+ at altitude");
+  row("Thrust vectoring", "2D nozzles, 0 - 90 deg, VTOL");
+  row("Flight control", "Fly-by-wire, 9 g limiter, 315 deg/s roll");
+  row("Cockpit", "Sealed pod, synthetic-vision displays + HUD");
+  row("Fuel", "Unrestricted (research cell)");
+  py += 10 * s;
+  header(px, py, lw - 48 * s, "HANDLING NOTES"); py += 26 * s;
+  const char* notes[] = {"F / V   swivel nozzles: 0 = forward flight, 90 = hover",
+                         "Hover:  nozzles 90, ~65% throttle, stick to translate",
+                         "Hands off in the hover and the jet levels itself",
+                         "Above 85% throttle the afterburners light",
+                         "Mach 1 sets off a sonic boom - try it low over the sea",
+                         "C cockpit view: you fly on the displays only"};
+  for (auto n : notes) { if (py > ly + lh - 30 * s) break; g_ren.text(px, py, 13 * s, ellipsize(n, lw - 48 * s, 13 * s), C_DIM, e); py += 20 * s; }
+  // launch parameters
+  float rx = lx + lw + 24 * s, rw = std::min(W - rx - 40 * s, 640 * s);
+  panel(rx, ly, rw, lh, 0.95f * e);
+  float qx = rx + 24 * s, qy = ly + 20 * s, qw = rw - 48 * s;
+  header(qx, qy, qw, "LAUNCH SITE"); qy += 28 * s;
+  int na = (int)g_world.airports.size();
+  int cols = 2; float cw = (qw - 10 * s) / cols, ch = 30 * s;
+  for (int i = 0; i < na; i++) {
+    float bx = qx + (i % cols) * (cw + 10 * s), by = qy + (i / cols) * (ch + 6 * s);
+    const Airport& a = g_world.airports[i];
+    if (button(bx, by, cw, ch, ellipsize(fmt("%s  %s", a.code, a.name), cw - 20 * s, 14 * s), true, resAirport == i)) resAirport = i;
+  }
+  qy += ((na + cols - 1) / cols) * (ch + 6 * s) + 12 * s;
+  header(qx, qy, qw, "START"); qy += 28 * s;
+  if (button(qx, qy, 200 * s, 32 * s, "Airborne (3,000 ft)", true, resAirborne)) resAirborne = true;
+  if (button(qx + 210 * s, qy, 200 * s, 32 * s, "On the runway", true, !resAirborne)) resAirborne = false;
+  qy += 46 * s;
+  header(qx, qy, qw, "CONDITIONS"); qy += 28 * s;
+  const char* wxs[] = {"Clear", "Cloudy", "Storm"};
+  for (int i = 0; i < 3; i++) if (button(qx + i * 110 * s, qy, 100 * s, 32 * s, wxs[i], true, resWx == i)) resWx = i;
+  qy += 44 * s;
+  {
+    g_ren.text(qx, qy + 6 * s, 14 * s, fmt("Time  %02d:00", (int)resTime), C_DIM, e);
+    float sx = qx + 120 * s, sw = std::min(260 * s, qw - 130 * s), f = (resTime - 5.f) / 16.f;
+    g_ren.rect(sx, qy + 14 * s, sw, 4 * s, C_ACCENT, 0.15f, 2 * s);
+    g_ren.rectGrad(sx, qy + 14 * s, sw * f, 4 * s, C_ACCENT * 0.6f, C_ACCENT, 1, 2 * s);
+    g_ren.rect(sx + sw * f - 6 * s, qy + 10 * s, 12 * s, 12 * s, C_ACCENT, 1, 6 * s);
+    if (hovered(sx, qy, sw, 32 * s) && in.mDown[0]) resTime = floorf(5.f + clampf((in.mx - sx) / sw, 0, 1) * 16.f + 0.5f);
+  }
+  float by = ly + lh - 70 * s;
+  if (button(qx, by, 160 * s, 48 * s, "Back") || in.pressed[K_ESC]) { screen = SCR_MENU; return; }
+  if (button(rx + rw - 24 * s - 280 * s, by, 280 * s, 48 * s, "LAUNCH XR-9", true, true) || in.pressed[K_ENTER]) launchResearch();
+  // blinking classification footer
+  if (fmodf(realTime, 1.2f) < 0.8f) g_ren.text(W * 0.5f, H - 28 * s, 12 * s, "UNAUTHORISED ACCESS IS A FEDERAL OFFENCE  //  THIS SESSION IS NOT RECORDED IN YOUR LOGBOOK", RED, 0.8f * e, 1, false);
+}
+
 void Game::drawPause() {
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.55f);
@@ -1117,13 +1202,13 @@ void Game::drawPause() {
   float by = y + 80 * s, bw = 240 * s, bh = 46 * s;
   if (button(x + 30 * s, by, bw, bh, "Resume", true, true)) paused = false;
   by += bh + 12 * s;
-  if (button(x + 30 * s, by, bw, bh, "Restart flight")) { Contract c = contract; startFlight(c, specIdx, source); }
+  if (button(x + 30 * s, by, bw, bh, "Restart flight")) { if (researchFlight) launchResearch(); else { Contract c = contract; startFlight(c, specIdx, source); } }
   by += bh + 12 * s;
   if (button(x + 30 * s, by, bw, bh, "Settings")) settingsFromPause = true;
   by += bh + 12 * s;
   if (button(x + 30 * s, by, bw, bh, showRadio ? "Hide radio" : "Radio")) showRadio = !showRadio;
   by += bh + 12 * s;
-  if (button(x + 30 * s, by, bw, bh, "Abandon flight")) endFlight(false, "Abandoned flight");
+  if (button(x + 30 * s, by, bw, bh, researchFlight ? "End research flight" : "Abandon flight")) endFlight(false, researchFlight ? "" : "Abandoned flight");
   float cx = x + 310 * s, cy = y + 80 * s;
   const char* lines[] = {"W / S ........ pitch down / up", "A / D ........ roll", "Q / E ........ rudder / nosewheel", "SHIFT / CTRL . throttle (1-9, 0)",
                          "F / V ........ flaps down / up", "G ............ landing gear", "B ............ parking brake", "SPACE ........ wheel brakes",

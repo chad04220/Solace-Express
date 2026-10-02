@@ -14,6 +14,7 @@ struct PlaneVisual {
   float PS[4], Ctl[4], Pr[4], I0[4], I1[4], I2[4];  // state, controls, prop, instruments
   vec3 colBase, colStripe;
   float prop[2][4]; int propCount = 0;
+  float hud[4] = {0, 0, 0, 0}, hud2[4] = {1, 0, 0, 0}, hudV[3] = {0, 0, -1};  // research jet HUD data
 };
 
 struct WreckVisual {

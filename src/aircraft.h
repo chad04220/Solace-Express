@@ -25,11 +25,13 @@ struct AircraftSpec {
   // visual model
   float fusLen, fusRad, wingY, wingZ; int engLayout, tail;
   vec3 colBase, colStripe;
+  int special = 0;             // 1 = XR-9 research jet: fly-by-wire, thrust vectoring, VTOL nozzles, no fuel burn
   float runwayNeeded(float elev) const { return runwayM * (1.0f + elev / 3000.0f); }
 };
 
 extern const AircraftSpec kAircraft[];
-extern const int kNumAircraft;
+extern const int kNumAircraft;   // career aircraft (market, rentals, contracts)
+static const int kResearchJet = 7; // hidden XR-9, only reachable from the research menu
 
 struct Controls {
   float pitch = 0, roll = 0, yaw = 0;  // -1..1 (pitch +1 = nose up, roll +1 = right, yaw +1 = right)
@@ -66,6 +68,7 @@ public:
   bool apOn = false; float apHeading = 0, apAlt = 0, apPitchI = 0;
   float maxG = 1, minG = 1;
   float flightTime = 0;
+  float mach = 0, nozzle = 0;  // research jet: Mach number, thrust-vector nozzle angle 0 (aft) .. 1 (straight down)
   FlightEvents ev;
   Rng rng;
 

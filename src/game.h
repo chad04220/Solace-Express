@@ -35,7 +35,7 @@ struct Settings {
 
 struct Particle { vec3 p, v; float life, maxLife, size, grow; vec3 col; float alpha; int kind; float drag, buoy; };
 
-enum GameScreen { SCR_MENU = 0, SCR_HUB, SCR_FLIGHT, SCR_DEBRIEF };
+enum GameScreen { SCR_MENU = 0, SCR_HUB, SCR_FLIGHT, SCR_DEBRIEF, SCR_RESEARCH };
 enum HubTab { TAB_CONTRACTS = 0, TAB_HANGAR, TAB_LOGBOOK, TAB_SETTINGS };
 
 class Game {
@@ -171,6 +171,13 @@ private:
   float gpsRange = 12000.f, gpsRangeTarget = 12000.f;
   std::vector<vec2> trail; float trailT = 0;
   void drawGps();
+  // hidden Confidential Research Model menu (U + I on the main menu) and free XR-9 flights
+  bool researchFlight = false;
+  int resAirport = 0, resWx = 0; bool resAirborne = true; float resTime = 12.f, resOpened = 0;
+  float prevMach = 0;
+  void drawResearch();
+  void launchResearch();
+  void jetEffects(float dt);
   void drawMenu();
   void drawHub();
   void drawHubContracts(float x, float y, float w, float h);

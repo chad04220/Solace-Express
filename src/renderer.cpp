@@ -257,7 +257,7 @@ void Renderer::genMinimap() {
 
 bool Renderer::init(int w, int h) {
   std::string vsFS = kFullscreenVS;
-  std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2;
+  std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceFS3;
   progRT = program(vsFS, rt, error);
   if (!progRT) { error = "Ray tracer shader: " + error; return false; }
   progSprite = program(kSpriteVS, kSpriteFS, error);
@@ -468,6 +468,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glUniform3f(U(p, "uColBase"), pv.colBase.x, pv.colBase.y, pv.colBase.z);
     glUniform3f(U(p, "uColStripe"), pv.colStripe.x, pv.colStripe.y, pv.colStripe.z);
     glUniform1i(U(p, "uPropCount"), pv.propCount);
+    glUniform4fv(U(p, "uHud"), 1, pv.hud); glUniform4fv(U(p, "uHud2"), 1, pv.hud2); glUniform3f(U(p, "uHudV"), pv.hudV[0], pv.hudV[1], pv.hudV[2]);
     if (pv.propCount) glUniform4fv(U(p, "uProp"), pv.propCount, &pv.prop[0][0]);
   }
   {

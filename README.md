@@ -19,7 +19,7 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 - **Detailed aircraft.** Each of the 7 aircraft is hand-built. Fuselages are shaped from 8 cross-sections, and wings and tails are tapered airfoil sections with sweep, dihedral and winglets. Flaps (with rearward Fowler travel), ailerons, elevators and rudders are separate hinged parts. You'll also see wing struts, STOL slats, engine cowls, exhaust stacks, turboprop and jet nacelles with fan faces, a cargo pod, wheel fairings, tundra tyres, twin-wheel retracting gear, a steerable nose wheel, antennas, nav lights and liveries with window frames.
 - **3D cockpits.** You sit in a real cockpit with live gauges (airspeed, attitude, altimeter, turn coordinator, heading, VSI, RPM/N1, fuel) or glass PFD/ND screens on the jet and airliner. The yokes, rudder pedals and throttle levers move with your inputs, and sunlight falls through the window openings.
 - **Correct control movement.** Every control surface, plus the nose or tail wheel, moves in the same direction as the input and the aircraft's actual response. A test (`tests/flight_test.cpp`) checks this for every aircraft.
-- **Living world.** Forests of conifers, broadleaf trees and palms (picked by climate and altitude), boulders, mountain tors and sea stacks are part of the ray-traced heightfield. They're physically solid too: fly into a forest and you'll crash. Patchwork farmland has crop rows, wheat, ploughed soil, rapeseed, vineyards, wildflower meadows and hedgerows. There are 18 hand-placed settlements (two cities, three towns and thirteen villages and hamlets) with procedurally generated houses (gabled tile or slate roofs, plaster or brick walls, windows that light up at night) and city blocks and towers. A hand-drawn road network with lane markings links them, and town streets have pavements and street lights.
+- **Living world.** Light, open woodland of conifers, broadleaf trees and palms (picked by climate and altitude), boulders, mountain tors and sea stacks are part of the ray-traced heightfield. They're physically solid too: fly into a forest and you'll crash. Patchwork farmland has crop rows, wheat, ploughed soil, rapeseed, vineyards, wildflower meadows and hedgerows. There are 18 hand-placed settlements (two cities, three towns and thirteen villages and hamlets) with procedurally generated houses (gabled tile or slate roofs, plaster or brick walls, windows that light up at night) and city blocks and towers. A hand-drawn road network with lane markings links them, and town streets have pavements and street lights.
 - **Airports.** Airports have arched corrugated hangars with sliding doors, control towers with glass cabs and beacons, glass-fronted terminals, fuel farms and radar domes. Runways get concrete slabs or grooved asphalt, painted runway numbers, blast-pad chevrons, aprons with parking-stand markings, and taxiway holding-position lines.
 - **PBR materials.** 25 tileable PBR texture sets (albedo, roughness, normal, height, AO) are generated at startup. They cover terrain, buildings (concrete, clay tiles, slate, plaster, brick, corrugated metal), vegetation (leaves, needles, crops, wheat) and aircraft (paint, brushed metal, tyre rubber, cockpit plastic, seat fabric, leather, carpet). They're lit with GGX/Cook-Torrance shading, triplanar on cliffs, and darken and get glossier in the rain.
 - **Crashes.** On impact the aircraft breaks into its nose, centre section, both wings and tail. Each piece is a separately simulated rigid body that tumbles, bounces and comes to rest, blackened and burning with glowing embers at the breaks. Skin fragments scatter around the site. The impact blows a crater into the ray-traced terrain with a scorched blast ring, smouldering embers and the trees around it flattened, and the camera orbits the wreck. Crashing into water throws spray and leaves the pieces low in the water.
@@ -75,6 +75,19 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 | F11 / Alt+Enter | Fullscreen | |
 
 Menus use the mouse.
+
+<details>
+<summary>Classified (spoiler)</summary>
+
+Hold **U** and **I** together on the main menu to open the Confidential Research Model menu. From there you can fly the **XR-9 Specter**, a VTOL research jet, for free from any airport, starting airborne or on the runway, in clear, cloudy or stormy weather.
+
+- **Performance:** a thrust-to-weight ratio of 2.2 and afterburners take it past Mach 2 at altitude. Breaking Mach 1 throws a vapour cone and a sonic boom.
+- **Thrust vectoring:** F and V swivel the 2D nozzles from 0 to 90 degrees. Full down hovers at about 65% throttle, and the jet levels itself when you let go of the stick. Its lift fans and nozzle louvres move with the vectoring, and downwash kicks up dust or spray.
+- **Handling:** fly-by-wire with a 9 g limiter and a 315°/s roll rate.
+- **Cockpit:** a sealed pod with no windows. You fly on a panoramic synthetic-vision display with a full HUD (pitch ladder, flight-path marker, heading tape, speed, altitude, Mach, G, nozzle angle and throttle). Side displays show the left and right cameras, and multi-function displays sit on the console.
+- **Career:** these flights don't count towards the career or the logbook.
+
+</details>
 
 ## Flying tips
 

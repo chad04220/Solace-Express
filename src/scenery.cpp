@@ -3,24 +3,24 @@
 
 // ---------------------------------------------------------------- hand-placed settlements (metres)
 const Town kTowns[] = {
-  {"Port Verde", -29500, 10500, 2200, 2},
-  {"Solace Capital", -3200, -1200, 2000, 2},
-  {"Kaleo Town", 17400, 7000, 1400, 1},
-  {"Fjordhaven", 17500, -28600, 1100, 1},
-  {"Northpoint", -25300, -24100, 1000, 1},
-  {"Meadowbrook", -6600, 15700, 700, 0},
-  {"Cedar Ridge", -23600, -5500, 600, 0},
-  {"Orchard Valley", -15300, 3250, 550, 0},
-  {"Harlan", 200, 22500, 350, 0},
-  {"Palm Bay", 27600, 21100, 500, 0},
-  {"Far Isle Resort", 35000, 35000, 600, 0},
-  {"Lighthouse Key", -33600, 26200, 220, 0},
-  {"Westvale", -30000, -2000, 600, 0},
-  {"Riverton", -12000, -1000, 700, 0},
-  {"Greenhollow", -4000, 9000, 600, 0},
-  {"Saltmarsh", -20000, 22000, 500, 0},
-  {"Kaleo Springs", 23000, 14000, 600, 0},
-  {"Ice Harbor", 27000, -27500, 450, 0},
+  {"Port Verde", -29500, 10500, 1320, 2},
+  {"Solace Capital", -3200, -1200, 1200, 2},
+  {"Kaleo Town", 17400, 7000, 840, 1},
+  {"Fjordhaven", 17500, -28600, 660, 1},
+  {"Northpoint", -25300, -24100, 600, 1},
+  {"Meadowbrook", -6600, 15700, 420, 0},
+  {"Cedar Ridge", -23600, -5500, 360, 0},
+  {"Orchard Valley", -15300, 3250, 330, 0},
+  {"Harlan", 200, 22500, 210, 0},
+  {"Palm Bay", 27600, 21100, 300, 0},
+  {"Far Isle Resort", 35000, 35000, 360, 0},
+  {"Lighthouse Key", -33600, 26200, 130, 0},
+  {"Westvale", -30000, -2000, 360, 0},
+  {"Riverton", -12000, -1000, 420, 0},
+  {"Greenhollow", -4000, 9000, 360, 0},
+  {"Saltmarsh", -20000, 22000, 300, 0},
+  {"Kaleo Springs", 23000, 14000, 360, 0},
+  {"Ice Harbor", 27000, -27500, 270, 0},
 };
 const int kNumTowns = sizeof(kTowns) / sizeof(kTowns[0]);
 
@@ -183,7 +183,7 @@ float World::cover(float x, float z, float g, const float b[4], int* kindOut) co
     if (m[3] > 0.5f) {
       int ix = (int)floorf(x / STACK_CELL), iz = (int)floorf(z / STACK_CELL);
       float depthOk = smoothstepf(-16.f, -4.f, g) * smoothstepf(-0.5f, -2.5f, g);
-      if (hash2i(ix * 7 + 3, iz * 11 - 5) < 0.05f * depthOk) {
+      if (hash2i(ix * 7 + 3, iz * 11 - 5) < 0.05f * SCENERY_DENSITY * depthOk) {
         float cx = (ix + 0.5f + (hash2i(ix + 17, iz) - 0.5f) * 0.4f) * STACK_CELL, cz = (iz + 0.5f + (hash2i(ix, iz + 23) - 0.5f) * 0.4f) * STACK_CELL;
         float r = 7.f + 8.f * hash2i(ix, iz + 31), H = 14.f + 30.f * hash2i(ix + 5, iz + 9);
         float dx = x - cx, dz = z - cz, d = sqrtf(dx * dx + dz * dz);
@@ -204,7 +204,7 @@ float World::cover(float x, float z, float g, const float b[4], int* kindOut) co
   fd *= smoothstepf(4.f, 9.f, g) * smoothstepf(2.5f, 8.f, amp) * smoothstepf(9.f, 18.f, roadD) * (1.f - smoothstepf(0.03f, 0.2f, town)) * (1.f - 0.88f * farm);
   if (fd > 0.001f) {
     int ix = (int)floorf(x / TREE_CELL), iz = (int)floorf(z / TREE_CELL);
-    if (hash2i(ix * 3 + 11, iz * 5 - 7) < fd * 0.9f) {
+    if (hash2i(ix * 3 + 11, iz * 5 - 7) < fd * 0.9f * SCENERY_DENSITY) {
       float jx = hash2i(ix + 101, iz - 31) - 0.5f, jz = hash2i(ix - 57, iz + 77) - 0.5f;
       float cx = (ix + 0.5f + jx * 0.3f) * TREE_CELL, cz = (iz + 0.5f + jz * 0.3f) * TREE_CELL;
       float sp = hash2i(ix * 13 + 1, iz * 7 + 3), hv = hash2i(ix - 3, iz + 19);
@@ -230,7 +230,7 @@ float World::cover(float x, float z, float g, const float b[4], int* kindOut) co
   rdn *= smoothstepf(10.f, 20.f, roadD) * (1.f - smoothstepf(0.03f, 0.2f, town));
   if (rdn > 0.001f) {
     int ix = (int)floorf(x / ROCK_CELL), iz = (int)floorf(z / ROCK_CELL);
-    if (hash2i(ix * 5 - 13, iz * 3 + 29) < rdn) {
+    if (hash2i(ix * 5 - 13, iz * 3 + 29) < rdn * SCENERY_DENSITY) {
       float cx = (ix + 0.5f + (hash2i(ix + 41, iz - 9) - 0.5f) * 0.3f) * ROCK_CELL, cz = (iz + 0.5f + (hash2i(ix - 21, iz + 63) - 0.5f) * 0.3f) * ROCK_CELL;
       float hr = hash2i(ix + 7, iz - 77);
       float r = 1.6f + 5.0f * hr * hr;

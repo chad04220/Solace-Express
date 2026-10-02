@@ -56,6 +56,30 @@ int main() {
     }
   }
   printf("control directions checked\n");
+  // XR-9 research jet: supersonic in level flight, stable hands-off hover, g limiter, roll authority
+  {
+    const AircraftSpec& s = kAircraft[kResearchJet];
+    Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
+    Plane p;
+    p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 200);
+    p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0;
+    for (int i = 0; i < 40 * 240 && !p.ev.crashed; i++) { p.ctl.pitch = clampf((3000 - p.pos.y) * 0.002f - p.vel.y * 0.01f, -1, 1); p.step(1 / 240.f, calm, i / 240.f); }
+    bool ok = !p.ev.crashed && p.mach > 1.2f;
+    printf("XR-9 level acceleration: Mach %.2f after 40 s %s\n", p.mach, ok ? "ok" : "FAIL"); fails += !ok;
+    p.reset(&s, vec3(0, 500, 0), 90, s.maxFuel, 85, true, 0); p.vel = vec3(); p.ctl.flaps = 1; p.flaps = p.nozzle = 1;
+    for (int i = 0; i < 30 * 240 && !p.ev.crashed; i++) { p.ctl.throttle = clampf(0.5f + (500 - p.pos.y) * 0.01f - p.vel.y * 0.05f, 0, 1); p.step(1 / 240.f, calm, i / 240.f); }
+    ok = !p.ev.crashed && fabsf(p.pos.y - 500) < 25 && length(p.vel) < 2.f && fabsf(p.bankDeg()) < 2.f;
+    printf("XR-9 hover: alt %.0f m, drift %.1f m/s, throttle %.2f %s\n", p.pos.y, length(p.vel), p.ctl.throttle, ok ? "ok" : "FAIL"); fails += !ok;
+    p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.pitch = 1;
+    float gmax = 0;
+    for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); gmax = std::max(gmax, p.gLoad); }
+    ok = !p.ev.crashed && gmax < 10.5f && gmax > 7.f;
+    printf("XR-9 full-back pull: peak %.1f g %s\n", gmax, ok ? "ok" : "FAIL"); fails += !ok;
+    p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.roll = 1;
+    for (int i = 0; i < 240; i++) p.step(1 / 240.f, calm, i / 240.f);
+    ok = -p.w.z / DEG > 250.f;
+    printf("XR-9 roll rate %.0f deg/s %s\n", -p.w.z / DEG, ok ? "ok" : "FAIL"); fails += !ok;
+  }
   printf("%d failures\n", fails);
   return fails ? 1 : 0;
 }
