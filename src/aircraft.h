@@ -67,13 +67,13 @@ public:
   float density = 1.225f;
   // ---- autopilot: HOLD (heading / altitude / speed), NAV (to a chosen airport), APPR (approach, flare, rollout)
   enum ApMode { AP_OFF = 0, AP_HOLD, AP_NAV, AP_APPR };
-  enum ApStage { APS_NAV = 0, APS_FINAL, APS_FLARE, APS_ROLLOUT, APS_GOAROUND };
+  enum ApStage { APS_NAV = 0, APS_FINAL, APS_FLARE, APS_ROLLOUT, APS_GOAROUND, APS_HOVER };
   bool apOn = false; int apMode = AP_OFF;
   float apHeading = 0, apAlt = 0, apSpeed = 0, apVS = 0; bool apUseVS = false;
   float apPitchI = 0, apRollI = 0, apThrI = 0.5f, apXI = 0;
   int apAirport = -1, apStage = 0, apLeg = 0; bool apRev = false; float apStageT = 0, apCruiseAlt = 0, apFinalLen = 8000;
   vec3 apLd, apTd;            // landing direction and touchdown point of the chosen runway end
-  vec3 apHoldC; float apHoldR = 1500, apHoldAlt = 0, apIntAlt = 0; int apHoldDir = 1, apTurnDir = 0;   // descent orbit and intercept altitude
+  vec3 apHoldC; float apHoldR = 1500, apHoldAlt = 0, apIntAlt = 0; int apHoldDir = 1, apTurnDir = 0; float apGs = 0.0524f, apDrift = 0;   // descent orbit and intercept altitude
   bool apDone = false;        // an autoland just finished (the game sets the parking brake)
   std::string apStatus;       // one-line status for the HUD
   void apEngage(int mode, int airport, const Weather& wx);
@@ -103,6 +103,7 @@ private:
   void apGuidance(float dt);
   void apControl(float dt);
   float apPlan(int airport, bool rev, const Weather& wx, bool commit);
+  void apHover(float dt);
   vec3 gust;
   float cd0 = 0.03f;
 };

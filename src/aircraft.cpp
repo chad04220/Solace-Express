@@ -383,6 +383,43 @@ void Plane::substep(float dt, const Weather& wx, float time) {
 static float hdgErrDeg(float target, float cur) { return wrapAngle((target - cur) * DEG) / DEG; }
 static float len2(vec3 v) { return sqrtf(v.x * v.x + v.z * v.z); }
 
+// research jet vertical landing: nozzles down, pitch for the along-track speed, bank for the cross-track, throttle for
+// height, then straight down onto the touchdown point
+void Plane::apHover(float dt) {
+  vec3 rr(-apLd.z, 0, apLd.x), rel = pos - apTd;
+  float dist = -(rel.x * apLd.x + rel.z * apLd.z), cross = rel.x * rr.x + rel.z * rr.z;
+  float vAl = vel.x * apLd.x + vel.z * apLd.z, vCr = vel.x * rr.x + vel.z * rr.z;
+  float hab = pos.y - gearHeight() - apTd.y;
+  ctl.flaps = 1.f; ctl.gearDown = true; ctl.brake = 0;
+  float hov = smoothstepf(0.3f, 0.7f, nozzle) * smoothstepf(70.f, 30.f, length(vel));
+  // along track: close on the point at a comfortable deceleration
+  float vT = (dist > 0 ? 1.f : -1.f) * std::min(sqrtf(2.f * 1.3f * fabsf(dist)), fabsf(dist) * 0.35f);
+  vT = clampf(vT, -10.f, 90.f);
+  float ax = clampf((vT - vAl) * 0.5f, -4.f, 3.f);
+  float pitchT = clampf(-atanf(ax / G0) / DEG, -12.f, 18.f) + (1.f - hov) * 4.f;
+  // across: bank towards the centreline
+  float ay = clampf(-cross * 0.12f - vCr * 0.6f, -3.f, 3.f);
+  float bankT = clampf(atanf(ay / G0) / DEG, -12.f, 12.f);
+  float pMax = clampf(66.f * G0 / std::max(length(vel), 1.f), 1.8f, 5.2f), rMax = 5.5f * (1.f - 0.6f * hov);
+  float q = (clampf((pitchT - pitchDeg()) * 1.5f, -20.f, 20.f)) * DEG;
+  // near-neutral stick engages the jet's own hover attitude hold (towards level): cancel it so ours is the only loop
+  float cp = (q - ctl.trim * 0.15f) / pMax;
+  if (fabsf(cp) < 0.05f) cp = clampf(cp + hov * 2.2f * pitchDeg() * DEG / pMax, -0.0499f, 0.0499f);
+  ctl.pitch = clampf(cp, -1.f, 1.f);
+  float cr = clampf((bankT - bankDeg()) * 1.5f, -20.f, 20.f) * DEG / rMax;
+  if (fabsf(cr) < 0.05f) cr = clampf(cr + hov * 2.2f * bankDeg() * DEG / rMax, -0.0499f, 0.0499f);
+  ctl.roll = clampf(cr, -1.f, 1.f);
+  ctl.yaw = clampf(hdgErrDeg(atan2f(apLd.x, -apLd.z) / DEG, heading()) * 0.08f, -0.5f, 0.5f);
+  // height: hold a gentle descending profile in, then straight down once over the point and slow
+  bool over = fabsf(dist) < 25.f && fabsf(vAl) < 3.f && fabsf(cross) < 10.f;
+  float altT = apTd.y + gearHeight() + clampf(dist * 0.05f, 12.f, 90.f);
+  float vsT = over ? (hab > 4.f ? -1.6f : -0.6f) : clampf((altT - pos.y) * 0.4f, -4.f, 4.f);
+  float e = vsT - vel.y;
+  apThrI = clampf(apThrI + e * 0.06f * dt, 0.f, 1.f);
+  ctl.throttle = clampf(apThrI + e * 0.1f, 0.f, 1.f);
+}
+
+
 void Plane::apEngage(int mode, int airport, const Weather& wx) {
   apOn = mode != AP_OFF; apMode = mode; apDone = false;
   float spd0 = ias > 1.f ? ias : length(vel);
@@ -408,16 +445,23 @@ void Plane::apEngage(int mode, int airport, const Weather& wx) {
 float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   const AircraftSpec& s = *spec;
   const Airport& a = g_world.airports[airport];
-  const float gs = tanf(3.f * DEG);
   auto H = [](vec3 q) { return g_world.height(q.x, q.z); };
   vec3 ld = rev ? a.dir() * -1.f : a.dir(), rr(-ld.z, 0, ld.x);
-  vec3 td = a.threshold(rev) + ld * std::min(std::max(150.f, a.length * 0.12f), a.length * 0.3f); td.y = a.elev;
+  vec3 td = a.threshold(rev) + ld * clampf(a.length * 0.12f, 80.f, 300.f); td.y = a.elev;
+  // glidepath: 3 degrees, steepened (up to what the type can fly) to clear the ground and trees under the final
   float F0 = clampf(s.vref * 100.f, 4500.f, 8000.f), F = F0;
-  for (float d = 400.f; d <= F0; d += 100.f) {
+  bool jetT = s.engineType == ENG_JET && !s.special;
+  float maxAng = jetT ? 3.5f : s.special ? 4.f : s.runwayM < 300.f ? 6.5f : 5.5f;
+  auto margin = [](float d) { return clampf(d * 0.02f, 8.f, 60.f); };
+  float need = tanf(3.f * DEG);
+  for (float d = 300.f; d <= 3500.f; d += 50.f) { vec3 q = td - ld * d; need = std::max(need, (H(q) + margin(d) - a.elev) / d); }
+  float gs = std::min(need, tanf(maxAng * DEG));
+  for (float d = 300.f; d <= F0; d += 100.f) {
     vec3 q = td - ld * d;
-    if (a.elev + d * gs < H(q) + clampf(d * 0.012f, 6.f, 45.f)) { F = d - 600.f; break; }
+    if (a.elev + d * gs < H(q) + margin(d)) { F = d - 600.f; break; }
   }
-  F = std::max(F, 2500.f);
+  float blocked = F < 2000.f ? 3000.f : 0.f;
+  F = std::max(F, 2000.f);
   float gh = gearHeight();
   float iafAlt = a.elev + gh + F * gs + 20.f;
   // orbit radius: a comfortable turn at holding speed
@@ -425,14 +469,15 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   float R = clampf(vh * vh / (G0 * tanf((s.special ? 40.f : 24.f) * DEG)) * 1.15f, 900.f, 3500.f);
   // intercept region: the extended centreline from the gate out to 4 km beyond it
   float intMsa = 0;
-  for (float d = F; d <= F + 4000.f; d += 250.f) for (int k = -2; k <= 2; k++) intMsa = std::max(intMsa, H(td - ld * d + rr * (k * 500.f)));
+  for (float d = F; d <= F + 6000.f; d += 250.f) for (int k = -2; k <= 2; k++) intMsa = std::max(intMsa, H(td - ld * d + rr * (k * 500.f)));
   float intAlt = std::max(iafAlt, intMsa + 250.f);
   vec3 bestC = td - ld * (F + R + 2000.f); float bestCost = 1e9f, bestAlt = intAlt;
-  for (float al = F + 500.f; al <= F + R + 9000.f; al += 750.f)
+  for (float al = -3000.f; al <= F + R + vh * 15.f + 9000.f; al += 750.f)
     for (float cr = -7000.f; cr <= 7000.f; cr += 750.f) {
       if (fabsf(cr) < R * 0.5f && al < F + R + 1000.f) continue;   // keep the orbit off the final approach itself
-      if (al < F + 500.f + fabsf(cr) * 0.6f) continue;               // and far enough out for a shallow intercept
+      float near = al - R < F + 500.f + vh * 15.f ? 800.f : 0.f;     // too close in: an outbound leg first
       vec3 c = td - ld * al + rr * cr;
+      if (fabsf(c.x) > WORLD_HALF - R - 1500.f || fabsf(c.z) > WORLD_HALF - R - 1500.f) continue;   // stay on the chart
       float m = H(c);
       for (int k = 0; k < 16; k++) { float an = k * PI / 8; vec3 q = c + vec3(cosf(an), 0, sinf(an)) * (R + 600.f); m = std::max(m, H(q)); }
       for (int k = 0; k < 8; k++) { float an = k * PI / 4; vec3 q = c + vec3(cosf(an), 0, sinf(an)) * (R * 0.6f); m = std::max(m, H(q)); }
@@ -440,13 +485,14 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
       if (len2(c - qi) < R + 1200.f) continue;   // leave the orbit with room to line up
       for (int i = 1; i < 8; i++) { vec3 q = c + (qi - c) * (i / 8.f); m = std::max(m, H(q)); }
       float hAlt = std::max(intAlt, m + 280.f);
-      float cost = (hAlt - iafAlt) * 3.f + len2(c - qi) * 0.15f;
+      float cost = (hAlt - iafAlt) * 3.f + std::max(0.f, hAlt - iafAlt - 150.f) * 10.f + len2(c - qi) * 0.15f + near;
       if (cost < bestCost) { bestCost = cost; bestC = c; bestAlt = hAlt; }
     }
   vec3 from(sinf(wx.windFrom * DEG), 0, -cosf(wx.windFrom * DEG));
-  float score = dot(ld, from) * wx.windSpeed * 40.f - bestCost - (F0 - F) * 0.3f - len2(bestC - pos) * 0.02f;
+  float score = dot(ld, from) * wx.windSpeed * 40.f - bestCost - (F0 - F) * 0.3f - len2(bestC - pos) * 0.02f - blocked
+              - (atanf(gs) / DEG - 3.f) * 150.f;
   if (commit) {
-    apRev = rev; apFinalLen = F; apHoldC = bestC; apHoldC.y = 0; apHoldR = R; apHoldAlt = bestAlt; apIntAlt = intAlt;
+    apRev = rev; apFinalLen = F; apGs = gs; apHoldC = bestC; apHoldC.y = 0; apHoldR = R; apHoldAlt = bestAlt; apIntAlt = intAlt;
     apLd = ld; apTd = td;
   }
   return score;
@@ -467,10 +513,13 @@ void Plane::apGuidance(float dt) {
   float along = rel.x * ld.x + rel.z * ld.z, cross = rel.x * rr.x + rel.z * rr.z, dist = -along;
   float rwyHdg = atan2f(ld.x, -ld.z) / DEG;
   float gh = gearHeight(), hab = pos.y - gh - a.elev;
-  const float gs = tanf(3.f * DEG);
+  const float gs = apGs;
   float F = apFinalLen;
   float vref = s.vref;
   int rwyN = a.rwyNumber(apRev);
+  float vnow = std::max(length(vel), 30.f);
+  // wind drift (ground track minus heading), smoothed: the centreline legs steer the track, not the heading
+  if (len2(vel) > 10.f) apDrift = approach(apDrift, clampf(hdgErrDeg(atan2f(vel.x, -vel.z) / DEG, heading()), -30.f, 30.f), 0.6f, dt);
   switch (apStage) {
     case APS_NAV: {
       vec3 C = apHoldC; C.y = pos.y;
@@ -502,44 +551,57 @@ void Plane::apGuidance(float dt) {
         vec3 sd = dc > 1.f ? vec3(-d.z, 0, d.x) * (1.f / dc) : vec3(1, 0, 0);
         for (float i = 0; i <= n; i++) for (int k = -1; k <= 1; k++) { vec3 q = pos + d * (i / n) + sd * (k * 600.f); msa = std::max(msa, g_world.height(q.x, q.z)); }
         apAlt = std::max(clampf(apHoldAlt + (dc - apHoldR) * 0.06f, apHoldAlt, std::max(apCruiseAlt, apHoldAlt)), msa + 330.f);
-        apSpeed = dc < 9000.f ? vh : s.cruise * 0.85f;
+        apSpeed = dc < 9000.f + s.cruise * 40.f ? vh : s.cruise * 0.85f;   // slow down in time to turn tightly
+        if (fabsf(he) > 60.f) apSpeed = std::min(apSpeed, std::max(vh, s.cruise * 0.4f));   // and for big turns
         if (dc < apHoldR + 300.f) {
           apLeg = 1; apStageT = 0;
           vec3 r = pos - C;   // orbit the way we are already turning
           apHoldDir = (r.x * vel.z - r.z * vel.x) > 0 ? -1 : 1;
         }
         apStatus = fmt("NAV  %s  RWY %02d  %.1f km", a.code, rwyN, (dc + F) / 1000.f);
-      } else if (apLeg == 1) {
-        // descent orbit: circle the low ground until down at the intercept altitude, then leave towards the final
-        float th = atan2f(pos.x - C.x, -(pos.z - C.z)) / DEG;
-        apHeading = th + apHoldDir * (90.f + clampf((dc - apHoldR) / apHoldR * 80.f, -60.f, 60.f));
-        apAlt = apHoldAlt;
-        apSpeed = vh;
-        float aimAlong = clampf(along + fabsf(cross) * 0.85f, -(F + 6000.f), -(F + 500.f));
-        vec3 qi = td + ld * aimAlong;
-        float brg = atan2f(qi.x - pos.x, -(qi.z - pos.z)) / DEG;
-        if (pos.y < apHoldAlt + 50.f && apStageT > 5.f && fabsf(hdgErrDeg(brg, heading())) < 30.f) { apLeg = 2; apStageT = 0; }
-        apStatus = fmt("HOLD  %s  %s %.0f ft", a.code, pos.y > apHoldAlt + 50.f ? "descending to" : "leaving at", apHoldAlt * M_TO_FT);
       } else {
-        // to the final approach: aim at the centreline beyond the gate, at most a 50 degree intercept
-        float aimAlong = clampf(along + fabsf(cross) * 0.85f, -(F + 6000.f), -(F + 500.f));
-        vec3 aim = td + ld * aimAlong;
-        apHeading = atan2f(aim.x - pos.x, -(aim.z - pos.z)) / DEG;
-        apAlt = std::max(apIntAlt, std::min(apHoldAlt, pos.y));
-        apSpeed = vh;
-        float th = fabsf(hdgErrDeg(rwyHdg, heading()));
-        float vt = std::max(length(vel), 30.f), Rt = vt * vt / (G0 * tanf(20.f * DEG));
-        float lead = Rt * (1.f - cosf(std::min(th, 90.f) * DEG)) + 150.f;
-        if (along < -1500.f && fabsf(cross) < lead && th < 120.f) { apStage = APS_FINAL; apStageT = 0; apXI = 0; }
-        apStatus = fmt("NAV  %s  RWY %02d  intercept  %.1f km", a.code, rwyN, dist / 1000.f);
+        // the intercept: the extended centreline is flown with the same steering as the localizer, from far enough
+        // out to settle before the gate. Too close in (or on the wrong side), first fly outbound, diverging a little.
+        float outMin = F + 500.f + vnow * 15.f;
+        float Rt = vnow * vnow / (G0 * tanf((s.special ? 30.f : 20.f) * DEG));
+        float Rturn = std::max(vnow / (3.f * DEG), vnow * vnow / (G0 * tanf((s.special ? 45.f : 26.f) * DEG)));   // NAV turns
+        float L1 = vnow * 14.f;
+        float side = cross >= 0 ? 1.f : -1.f, D = side * 2.4f * Rturn;
+        // outbound: follow a line parallel to the centreline, a turn's width off it, so the turn back rolls out on it
+        auto intercept = [&](int leg) {
+          return (leg == 3 ? rwyHdg + 180.f + clampf(atanf((cross - D) / L1) / DEG * 1.2f, -45.f, 45.f)
+                           : rwyHdg - clampf(atanf(cross / L1) / DEG * 1.2f, -55.f, 55.f)) - apDrift;
+        };
+        if (apLeg == 1) {
+          // descent orbit: circle the low ground until down at the intercept altitude, then leave towards the final
+          float th = atan2f(pos.x - C.x, -(pos.z - C.z)) / DEG;
+          apHeading = th + apHoldDir * (90.f + clampf((dc - apHoldR) / apHoldR * 80.f, -60.f, 60.f));
+          apAlt = apHoldAlt;
+          apSpeed = vh;
+          int next = along > -outMin ? 3 : 2;
+          if (pos.y < apHoldAlt + 50.f && apStageT > 5.f &&
+              (fabsf(hdgErrDeg(intercept(next), heading())) < 30.f || apStageT > 2.f * PI * apHoldR / vh + 20.f)) { apLeg = next; apStageT = 0; }
+          apStatus = fmt("HOLD  %s  %s %.0f ft", a.code, pos.y > apHoldAlt + 50.f ? "descending to" : "leaving at", apHoldAlt * M_TO_FT);
+        } else {
+          if (apLeg == 2 && along > -(outMin - 400.f) && fabsf(cross) > 300.f) apLeg = 3;
+          if (apLeg == 3 && along < -(outMin + 800.f) && fabsf(cross - D) < 400.f) apLeg = 2;
+          apHeading = intercept(apLeg);
+          apAlt = std::max(apIntAlt, std::min(apHoldAlt, pos.y));
+          apSpeed = vh;
+          float hd = hdgErrDeg(heading(), rwyHdg), th = fabsf(hd);
+          float lead = Rt * (1.f - cosf(std::min(th, 90.f) * DEG)) + 150.f;
+          bool closing = cross * hd < 0.f || fabsf(cross) < 150.f;
+          if (apLeg == 2 && along < -1500.f && fabsf(cross) < lead && closing && th < 70.f) { apStage = APS_FINAL; apStageT = 0; apXI = 0; }
+          apStatus = fmt("NAV  %s  RWY %02d  %s  %.1f km", a.code, rwyN, apLeg == 3 ? "outbound" : "intercept", dist / 1000.f);
+        }
       }
       break;
     }
     case APS_FINAL: {
       // localizer: steer for a point a fixed time ahead on the centreline (gentle at any speed), plus a wind trim
       float L1 = std::max(length(vel), 30.f) * 14.f;
-      if (fabsf(cross) < 300.f) apXI = clampf(apXI + cross * dt * 0.0006f, -10.f, 10.f);
-      apHeading = rwyHdg - clampf(atanf(cross / L1) / DEG * 1.2f + apXI, -40.f, 40.f);
+      if (fabsf(cross) < 200.f) apXI = clampf(apXI + cross * dt * 0.002f, -5.f, 5.f);
+      apHeading = rwyHdg - clampf(atanf(cross / L1) / DEG * 1.2f + apXI, -40.f, 40.f) - apDrift;
       float gsAlt = a.elev + gh + std::max(dist, 0.f) * gs + 1.f;
       float vg = std::max(vel.x * ld.x + vel.z * ld.z, 15.f);
       float err = gsAlt - pos.y;
@@ -548,19 +610,27 @@ void Plane::apGuidance(float dt) {
       // outside the gate the glideslope can run below the safe intercept altitude: hold that until the gate
       if (dist > F && pos.y < apIntAlt + 30.f) apVS = std::max(apVS, clampf((apIntAlt - pos.y) * 0.1f, -1.f, 3.f));
       bool high = err < -40.f && dist < F + 1000.f;   // above the glideslope: configure early for the drag
-      ctl.flaps = high ? 1.f : dist > F ? 0.34f : dist > F * 0.55f ? 0.67f : 1.f;
+      if (high) ctl.flaps = 1.f;
+      else if (dist > F * 0.55f) ctl.flaps = dist > F ? 0.34f : 0.67f;
+      else {   // landing flap: what leaves a nose-up attitude (~4.5 deg angle of attack) for a main-wheels-first touchdown
+        float clReq = mass() * G0 / (0.5f * 1.225f * apSpeed * apSpeed * s.wingArea);
+        float fl = s.flapCL > 0.01f ? (clReq - s.CL0 - s.CLa * 4.5f * DEG) / s.flapCL : 0.f;
+        ctl.flaps = approach(ctl.flaps, clampf(fl, 0.34f, 1.f), 0.3f, dt);
+      }
       if (dist < F + 1500.f || high) ctl.gearDown = true;
       apSpeed = dist > F ? vref * 1.3f : dist > F * 0.5f ? vref * 1.18f : vref * 1.06f;
-      if (dist < 2000.f && dist > 250.f && (fabsf(cross) > 80.f || err > 40.f || err < -80.f)) { apStage = APS_GOAROUND; apStageT = 0; }
+      if (dist < 2000.f && dist > 250.f && (fabsf(cross) > std::min(80.f, std::max(a.width * 0.5f, 12.f) + dist * 0.03f) || err > 40.f || err < -80.f)) { apStage = APS_GOAROUND; apStageT = 0; }
       { vec3 ahead = pos + vec3(ld.x, 0, ld.z) * 800.f; if (dist > 1200.f && pos.y < g_world.height(ahead.x, ahead.z) + 40.f) { apStage = APS_GOAROUND; apStageT = 0; } }
-      float flareH = clampf(ias * 0.13f, 4.f, 12.f);
+      // the research jet comes to a hover over the touchdown point instead of a fast landing roll
+      if (s.special && dist < 1700.f && dist > 0.f && fabsf(cross) < 60.f) { apStage = APS_HOVER; apStageT = 0; apThrI = ctl.throttle; }
+      float flareH = clampf(std::max(ias * 0.13f, -vel.y * 2.2f), 4.f, 14.f);
       if (hab < flareH && dist < 1500.f) { apStage = APS_FLARE; apStageT = 0; }
       if (onGround) { apStage = APS_ROLLOUT; apStageT = 0; }
       apStatus = fmt("APPR  %s  RWY %02d  %.1f km  GS %+.0f m", a.code, rwyN, dist / 1000.f, -err);
       break;
     }
     case APS_FLARE:
-      apHeading = rwyHdg - clampf(cross * 0.05f, -6.f, 6.f);
+      apHeading = rwyHdg - clampf(cross * 0.05f, -6.f, 6.f) - apDrift * 0.5f;   // half the crab out before touchdown
       apUseVS = true; apVS = -clampf(hab * 0.22f + 0.25f, 0.3f, 2.5f);
       apSpeed = 0;
       if (onGround) { apStage = APS_ROLLOUT; apStageT = 0; }
@@ -571,6 +641,12 @@ void Plane::apGuidance(float dt) {
       apStatus = fmt("ROLLOUT  %s  %.0f kt", a.code, length(vel) * MS_TO_KT);
       if (length(vel) < 2.5f) { apDisengage(); apDone = true; ctl.brake = 1; apStatus = "AUTOLAND COMPLETE"; }
       break;
+    case APS_HOVER: {
+      float vAl = vel.x * ld.x + vel.z * ld.z;
+      apStatus = fmt("VTOL  %s  RWY %02d  %.0f m  %.0f kt", a.code, rwyN, std::max(dist, 0.f), fabsf(vAl) * MS_TO_KT);
+      if (onGround) { apStage = APS_ROLLOUT; apStageT = 0; }
+      break;
+    }
     case APS_GOAROUND:
       apHeading = rwyHdg; apUseVS = true; apVS = jet ? 9.f : 4.f; apSpeed = vref * 1.35f;
       ctl.flaps = 0.34f;
@@ -601,14 +677,16 @@ void Plane::apControl(float dt) {
     ctl.throttle = 0;
     ctl.pitch = s.taildragger ? 0.35f : (apStageT > 1.2f ? -0.1f : 0.f);
     ctl.roll = clampf(-bankDeg() * 0.05f, -0.4f, 0.4f);
-    ctl.yaw = clampf(-cross * 0.06f + he * 0.06f, -1.f, 1.f);
-    ctl.brake = clampf((apStageT - 1.5f) * 0.5f, 0.f, s.taildragger ? 0.55f : 1.f);
+    he = hdgErrDeg(atan2f(apLd.x, -apLd.z) / DEG - clampf(cross * 0.6f, -10.f, 10.f), heading());
+    ctl.yaw = clampf(he * 0.08f + w.y / DEG * 0.12f, -1.f, 1.f);   // steer for the centreline, damp the yaw rate
+    ctl.brake = clampf((apStageT - 0.6f) * 1.2f, 0.f, s.taildragger ? 0.55f : 1.f);
     return;
   }
+  if (apMode == AP_APPR && apStage == APS_HOVER) { apHover(dt); return; }
   if (onGround) return;
   // lateral: heading -> bank -> roll rate (gains scale with airspeed: control power grows with dynamic pressure)
   float herr = hdgErrDeg(apHeading, heading());
-  float bankMax = apMode == AP_APPR && apStage >= APS_FINAL ? 20.f : (fbw ? 45.f : 26.f);
+  float bankMax = apMode == AP_APPR && apStage >= APS_FINAL ? (fbw ? 30.f : 20.f) : (fbw ? 45.f : 26.f);
   float turnT = clampf(herr * 0.2f, -3.f, 3.f) * DEG;   // heading error -> turn rate (deg/s), rate-one turn at most
   float bankT = clampf(atanf(turnT * V / G0) / DEG, -bankMax, bankMax);
   if (apMode == AP_APPR && apStage == APS_FLARE) bankT = clampf(bankT, -4.f, 4.f);
@@ -619,6 +697,7 @@ void Plane::apControl(float dt) {
     apRollI = clampf(apRollI + (pT - pRate) * 0.006f * dt / vn, -0.3f, 0.3f);
     ctl.roll = clampf(apRollI + (pT - pRate) * 0.03f / vn, -0.6f, 0.6f);
   }
+  if (fbw) ctl.flaps = 0;   // the research jet's flap lever swivels its nozzles: keep them aft
   // vertical: altitude -> vertical speed -> flight path -> pitch rate
   float vsUp = fbw ? 30.f : s.engineType == ENG_JET ? 12.f : s.engineType == ENG_TURBOPROP ? 6.f : 4.f;
   float vsT = apUseVS ? apVS : clampf((apAlt - pos.y) * 0.08f, -vsUp * 1.2f, vsUp);
@@ -646,7 +725,8 @@ void Plane::apControl(float dt) {
   if (apSpeed > 0) {
     float e = apSpeed - ias;
     float maxThr = fbw && !(apMode == AP_APPR && apStage == APS_GOAROUND) ? 0.84f : 1.f;   // no reheat on autopilot
-    apThrI = clampf(apThrI + e * 0.012f * dt, 0.f, maxThr);
-    ctl.throttle = clampf(apThrI + e * 0.05f + (vsT - vel.y) * 0.015f, 0.f, maxThr);
-  } else ctl.throttle = std::max(0.f, ctl.throttle - dt * 0.6f);
+    apThrI = clampf(apThrI + e * 0.02f * dt, 0.f, maxThr);
+    ctl.throttle = clampf(apThrI + e * 0.08f + (vsT - vel.y) * 0.015f, 0.f, maxThr);
+  } else if (apMode == AP_APPR) ctl.throttle = std::max(0.f, ctl.throttle - dt * 0.6f);   // flare: idle
+  // (apSpeed 0 outside an approach: the pilot keeps the throttle)
 }

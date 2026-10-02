@@ -136,7 +136,7 @@ int main() {
       Weather wx; wx.windSpeed = 6; wx.windFrom = wrapDeg360(A.heading + 25.f); wx.turbulence = 0.15f;
       vec3 side(-A.dir().z, 0, A.dir().x);
       vec3 start = A.pos() + side * 14000.f + A.dir() * 3000.f; start.y = std::max(A.elev + 1200.f, g_world.height(start.x, start.z) + 500.f);
-      Plane p; p.reset(&s, start, wrapDeg360(A.heading + 120.f), s.maxFuel * 0.6f, 100, true, s.cruise * 0.85f);
+      Plane p; p.reset(&s, start, wrapDeg360(A.heading + 120.f), s.maxFuel, 100, true, s.cruise * 0.85f);
       p.ctl.gearDown = !s.retract; p.gear = p.ctl.gearDown ? 1.f : 0.f; p.ctl.throttle = 0.7f;
       p.apEngage(Plane::AP_NAV, ai, wx);
       float tdVs = 0; bool td = false; int k = 0; int goArounds = 0, lastStage = 0;
