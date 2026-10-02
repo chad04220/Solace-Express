@@ -107,7 +107,8 @@ private:
   std::vector<Debris> debris;
   float craterX = 0, craterZ = 0, craterR = 0, craterD = 0;
   void breakUp(vec3 impactVel, bool water, bool air = false);
-  bool airBreak = false;          // broke up in flight: pieces tumble down before anything hits the ground
+  bool airBreak = false;
+  float gTunnel = 0;              // smoothed g-force screen-edge effect 0..1          // broke up in flight: pieces tumble down before anything hits the ground
   float crashEndT = 7.5f;         // crashTimer at which the results screen comes up
   void updateWreck(float dt);
   float wreckGround(float x, float z) const;

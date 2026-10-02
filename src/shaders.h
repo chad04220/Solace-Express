@@ -2501,7 +2501,7 @@ void main(){
 static const char* kPostFS = R"(#version 330 core
 in vec2 vUV; out vec4 oColor;
 uniform sampler2D uScene; uniform sampler2D uBloom; uniform float uExposure; uniform float uTime; uniform vec2 uRes;
-uniform float uRainLens; uniform vec2 uSunScreen; uniform float uSunVisible; uniform float uFade; uniform float uVignette;
+uniform float uRainLens; uniform vec2 uSunScreen; uniform float uSunVisible; uniform float uFade; uniform float uVignette; uniform float uGLoad;
 vec3 aces(vec3 x){ const float a=2.51,b=0.03,c=2.43,d=0.59,e=0.14; return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0); }
 float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
 void main(){
@@ -2546,6 +2546,18 @@ void main(){
   c = aces(c);
   c = pow(c, vec3(1.0/2.2));
   vec2 vv = vUV - 0.5; c *= 1.0 - dot(vv,vv)*uVignette;
+  // g-force tunnel: a red rim that deepens to dark red and then black at the screen edge and closes in as g builds
+  if (uGLoad > 0.002) {
+    float asp = uRes.x/uRes.y;
+    float r = length(vv*vec2(asp, 1.0))/length(vec2(0.5*asp, 0.5));       // 0 centre .. 1 corner
+    float g = uGLoad*(1.0 + 0.04*sin(uTime*7.5)*uGLoad);                 // a faint heartbeat pulse at high g
+    float reach = mix(0.95, 0.12, g);
+    float k = clamp((r - reach)/max(1.05 - reach, 0.05), 0.0, 1.0);    // depth into the band
+    vec3 band = mix(vec3(0.7, 0.03, 0.02), vec3(0.22, 0.0, 0.0), smoothstep(0.0, 0.45, k));
+    band = mix(band, vec3(0.0), smoothstep(0.35, 0.85, k));
+    float a = smoothstep(0.0, 0.3, k)*clamp(0.2 + 0.9*g, 0.0, 1.0);
+    c = mix(c*mix(vec3(1.0), vec3(1.0, 0.62, 0.58), g*0.35), band, a);
+  }
   c += (h21(vUV*uRes + fract(uTime)*100.0) - 0.5)/255.0*2.0;
   c *= uFade;
   oColor = vec4(c, 1.0);

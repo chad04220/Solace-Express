@@ -160,7 +160,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   float fuel = s.maxFuel;
   plane.reset(&s, start, hdg, fuel, payloadKg, c.startAirborne, s.cruise);
   fuelStart = plane.fuel;
-  wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f;
+  wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0;
   paused = false; showMap = false; landed = completed = crashed = false;
   result = FlightResult();
   timeAccel = 1; camMode = camMode == 1 ? 1 : 0; camYaw = 0; camPitch = 0.12f; camZoom = 1;
@@ -362,8 +362,23 @@ void Game::updateFlight(float dt) {
   lightning = std::max(0.f, lightning - dt * 4.f) * (lightning > 0.5f ? 1.f : (rand() % 3 ? 1.f : 0.3f));
   cloudOff = cloudOff + vec2(-sinf(wx.windFrom * DEG), cosf(wx.windFrom * DEG)) * (wx.windSpeed * 2.f * simDt);
 
+  {
+    // g-force tunnel: onset where a pilot starts to feel it, full near the airframe's limit (the XR-9's damped cell
+    // tolerates far more); negative g reddens the edges too. Builds in ~0.3 s, recovers over ~1.5 s
+    bool jet = plane.spec->special != 0;
+    float gp = smoothstepf(jet ? 12.f : 3.f, jet ? 50.f : 5.8f, plane.gLoad), gn = smoothstepf(jet ? -6.f : -0.8f, jet ? -25.f : -3.f, plane.gLoad);
+    float target = crashed ? 0.f : std::max(gp, gn);
+    gTunnel = approach(gTunnel, target, target > gTunnel ? 3.f : 0.7f, dt);
+  }
   if (crashed) {
     crashTimer += dt;
+    // skip the crash sequence: A on the gamepad (or Enter / Space) goes straight to the results
+    if (screen == SCR_FLIGHT && crashTimer > 0.8f && ((in.buttonsPressed & PAD_A) || in.pressed[K_ENTER] || in.pressed[' '])) {
+      in.buttonsPressed &= ~PAD_A; in.pressed[K_ENTER] = in.pressed[' '] = false;   // don't let the same press click the results screen
+      in.mPressed[0] = false; in.mDown[0] = false; padHoldA = false;
+      endFlight(false, plane.ev.crashReason);
+      return;
+    }
     updateWreck(dt);
     camYaw += dt * 0.12f;   // slow orbit around the crash site
     if (crashTimer > crashEndT && screen == SCR_FLIGHT) endFlight(false, plane.ev.crashReason);
@@ -1037,6 +1052,7 @@ FrameParams Game::buildFrame() {
     }
     fp.rainLens = camMode == 1 && wx.precip == 1 ? 1.f : 0.f;
     if (crashed) fp.fade = clampf(1.f - (crashTimer - (crashEndT - 1.f)), 0, 1);
+    fp.gLoad = gTunnel;
   } else {
     menuBackgroundCamera(fp);
   }
@@ -1376,6 +1392,22 @@ void Game::debugScene(const std::string& name) {
     in.mx = tx; in.my = ty; frame(PAD_A); frame(0);
     printf("pad: A clicks the Hangar tab: %s\n", hubTab == 1 ? "ok" : "FAIL");
     in.lx = 0.5f; frame(0); in.lx = 0; in.mx = g_ren.W * 0.5f; in.my = g_ren.H * 0.4f;
+    // crash, then A skips the crash sequence straight to the results (and the press doesn't click through them)
+    resAirborne = true; launchResearch();
+    plane.vel = plane.forward() * 620.f; botControl = true; plane.ctl.pitch = 1;
+    for (int i = 0; i < 600 && !crashed; i++) frame(0);
+    for (int i = 0; i < 60; i++) frame(0);
+    bool wasCrash = crashed && screen == SCR_FLIGHT;
+    in.mx = g_ren.W * 0.5f; in.my = g_ren.H * 0.75f; frame(PAD_A); frame(0); frame(0);
+    printf("pad: A skips the research crash back to the research menu: %s\n", wasCrash && screen == SCR_RESEARCH ? "ok" : "FAIL");
+    // career flight: overstress it, skip with A, land on the results screen without clicking through
+    startFlight(g_story[0], 1, Career::SRC_OWNED);
+    plane.pos.y += 1500.f; plane.vel = plane.forward() * 95.f; plane.onGround = false; botControl = true; plane.ctl.pitch = -1;
+    for (int i = 0; i < 900 && !crashed; i++) frame(0);
+    for (int i = 0; i < 60; i++) frame(0);
+    wasCrash = crashed && screen == SCR_FLIGHT;
+    frame(PAD_A); frame(0); frame(0);
+    printf("pad: A skips the career crash to the results: %s\n", wasCrash && screen == SCR_DEBRIEF ? "ok" : "FAIL");
     return;
   }
   if (name == "research") { screen = SCR_RESEARCH; realTime = 20; resOpened = 15; return; }
@@ -1478,6 +1510,11 @@ void Game::debugScene(const std::string& name) {
     if (!crashed) printf("airbreak: FAIL - no break-up\n");
     for (int i = 0; i < 5; i++) updateCamera(1 / 60.f);
     toasts.clear(); return;
+  }
+  if (name.compare(0, 4, "gtun") == 0) {   // g-force tunnel at a forced strength (percent), chase view: gtun<pct>
+    resAirborne = true; realTime = 20; launchResearch();
+    for (int i = 0; i < 10; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    gTunnel = atof(name.c_str() + 4) / 100.f; toasts.clear(); return;
   }
   if (name == "seacrash") {  // ditches into deep sea: the wreck must float briefly, then sink to the seabed
     float gx = 0, gz = 0;

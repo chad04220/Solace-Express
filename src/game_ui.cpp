@@ -746,6 +746,10 @@ void Game::drawHud(const FrameParams& fp) {
   (void)fp;
   if (!plane.spec) return;
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  if (crashed && crashTimer > 0.8f && crashTimer < crashEndT - 1.f) {   // the crash sequence can be skipped
+    float a = 0.55f + 0.35f * sinf(realTime * 3.f);
+    g_ren.text(W * 0.5f, H - 46 * s, 17 * s, in.pad ? "PRESS  A  TO SKIP" : "PRESS  ENTER  TO SKIP", C_TEXT, a, 1);
+  }
   if (!hudOn) return;
   { auto it = uiAnim.find(0x6e61u); if (showMap && it != uiAnim.end() && it->second > 0.6f) return; }  // GPS map covers the HUD
   const AircraftSpec& spc = *plane.spec;

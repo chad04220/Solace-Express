@@ -73,6 +73,9 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 | H | Toggle HUD | |
 | Esc | Pause menu (restart, settings, abandon) | Start |
 | F11 / Alt+Enter | Fullscreen | |
+| Enter / Space (after a crash) | Skip the crash sequence | A |
+
+Pull hard and the edges of the screen close in red, turning dark red and then black as the g load approaches what the airframe can take (negative g reddens them too); the XR-9's damped cell tolerates far more before it starts.
 
 Menus work with the mouse or a gamepad. On a gamepad, the left stick (or D-pad) moves an on-screen cursor, **A** clicks, **B** backs out (like Esc), and the right stick scrolls lists. Moving the real mouse hands control straight back to it.
 

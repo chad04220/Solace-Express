@@ -555,6 +555,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform1f(U(progPost, "uRainLens"), fp.rainLens);
   glUniform1f(U(progPost, "uFade"), fp.fade);
   glUniform1f(U(progPost, "uVignette"), fp.vignette);
+  glUniform1f(U(progPost, "uGLoad"), fp.gLoad);
   float sx = 0, sy = 0; vec3 sp = fp.camPos + fp.sunDir * 10000.f;
   bool vis = fp.sunDir.y > -0.02f && project(fp, sp, sx, sy) && sx > -0.2f * W && sx < 1.2f * W && sy > -0.2f * H && sy < 1.2f * H;
   glUniform2f(U(progPost, "uSunScreen"), sx / W, 1.f - sy / H);
