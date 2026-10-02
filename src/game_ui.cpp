@@ -553,9 +553,9 @@ void Game::drawSettings(float x, float y, float w, float h) {
     if (button(x + 250 * s, py, 200 * s, 32 * s, v ? on : off, true, v)) v = !v;
     py += 42 * s;
   };
-  float rs = set.renderScale;
-  slider("Max render resolution", set.renderScale, 0.5f, 1.0f, 0.05f, fmt("%.0f%%", set.renderScale * 100));
-  if (fabsf(rs - set.renderScale) > 1e-4f) g_ren.setRenderScale(set.renderScale);
+  g_ren.text(x, py + 6 * s, 16 * s, "Render resolution", C_DIM, 1);
+  g_ren.text(x + 250 * s, py + 6 * s, 16 * s, fmt("100%%  native %dx%d, 60 Hz", g_ren.W, g_ren.H), C_TEXT, 1);
+  py += 42 * s;
   g_ren.text(x, py + 6 * s, 16 * s, "Ray tracing quality", C_DIM, 1);
   const char* q[] = {"Low", "Medium", "High"};
   for (int i = 0; i < 3; i++) if (button(x + 250 * s + i * 100 * s, py, 92 * s, 32 * s, q[i], true, set.quality == i)) { set.quality = i; g_ren.quality = i; }

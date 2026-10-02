@@ -3385,25 +3385,19 @@ void main(){
     float drop = smoothstep(0.14, 0.06, d) * step(0.55, r) * (1.0 - life) * uRainLens;
     uv += (f - o)*drop*0.08;
   }
-  // FXAA (console variant) on the HDR scene, using a tonemapped luma estimate
+  // contrast-adaptive sharpening (no FXAA: TAA already anti-aliases, and a second AA pass only softens the image).
+  // Works in a reversible tonemapped space so HDR highlights don't ring; the weight backs off where contrast is high.
   vec2 tp = 1.0/vec2(textureSize(uScene, 0));
   vec3 cM = texture(uScene, uv).rgb;
-  vec3 cNW = texture(uScene, uv + vec2(-1.0, -1.0)*tp).rgb, cNE = texture(uScene, uv + vec2(1.0, -1.0)*tp).rgb;
-  vec3 cSW = texture(uScene, uv + vec2(-1.0, 1.0)*tp).rgb, cSE = texture(uScene, uv + vec2(1.0, 1.0)*tp).rgb;
-  vec3 lw = vec3(0.299, 0.587, 0.114);
-  float lM = sqrt(dot(cM, lw)/(1.0 + dot(cM, lw))), lNW = sqrt(dot(cNW, lw)/(1.0 + dot(cNW, lw))), lNE = sqrt(dot(cNE, lw)/(1.0 + dot(cNE, lw)));
-  float lSW = sqrt(dot(cSW, lw)/(1.0 + dot(cSW, lw))), lSE = sqrt(dot(cSE, lw)/(1.0 + dot(cSE, lw)));
-  float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE))), lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));
-  vec3 scene = cM;
-  if (lMax - lMin > max(0.02, lMax*0.1)) {
-    vec2 dir = vec2(-((lNW + lNE) - (lSW + lSE)), (lNW + lSW) - (lNE + lSE));
-    float red = max((lNW + lNE + lSW + lSE)*0.03125, 1.0/128.0);
-    dir = clamp(dir/(min(abs(dir.x), abs(dir.y)) + red), -8.0, 8.0)*tp;
-    vec3 rA = 0.5*(texture(uScene, uv + dir*(1.0/3.0 - 0.5)).rgb + texture(uScene, uv + dir*(2.0/3.0 - 0.5)).rgb);
-    vec3 rB = rA*0.5 + 0.25*(texture(uScene, uv - dir*0.5).rgb + texture(uScene, uv + dir*0.5).rgb);
-    float lB = sqrt(dot(rB, lw)/(1.0 + dot(rB, lw)));
-    scene = (lB < lMin || lB > lMax) ? rA : rB;
-  }
+  vec3 tM = cM/(1.0 + cM);
+  vec3 tN = texture(uScene, uv + vec2(0.0, tp.y)).rgb, tS = texture(uScene, uv - vec2(0.0, tp.y)).rgb;
+  vec3 tE = texture(uScene, uv + vec2(tp.x, 0.0)).rgb, tW = texture(uScene, uv - vec2(tp.x, 0.0)).rgb;
+  tN /= 1.0 + tN; tS /= 1.0 + tS; tE /= 1.0 + tE; tW /= 1.0 + tW;
+  vec3 mn = min(tM, min(min(tN, tS), min(tE, tW))), mx = max(tM, max(max(tN, tS), max(tE, tW)));
+  vec3 amp = sqrt(clamp(min(mn, 1.0 - mx)/max(mx, 1e-4), 0.0, 1.0));
+  vec3 wgt = -amp/6.5;   // CAS sharpness ~0.5
+  vec3 sh = clamp((tM + (tN + tS + tE + tW)*wgt)/(1.0 + 4.0*wgt), 0.0, 0.99995);
+  vec3 scene = sh/(1.0 - sh);
   vec3 c = scene + texture(uBloom, uv).rgb*0.9;
   // subtle sun glare / lens flare ghosts
   if (uSunVisible > 0.0) {

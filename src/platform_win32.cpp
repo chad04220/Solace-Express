@@ -232,7 +232,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   game.init();
   if (game.set.fullscreen) { toggleFullscreen(); setupPacing(g_hwnd); }
   RECT cr; GetClientRect(g_hwnd, &cr);
-  g_ren.renderScale = game.set.renderScale; g_ren.quality = game.set.quality;
+  g_ren.renderScale = 1.0f; g_ren.quality = game.set.quality;
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) {
     FILE* f = fopen((game.saveDir + "\\error.log").c_str(), "w");
     if (f) { fprintf(f, "%s\nRenderer: %s\n", g_ren.error.c_str(), (const char*)glGetString(GL_RENDERER)); fclose(f); }

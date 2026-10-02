@@ -61,7 +61,7 @@ struct UIVert { float x, y, u, v, r, g, b, a, mode, hx, hy, p; };
 class Renderer {
 public:
   int W = 0, H = 0;          // window size
-  float renderScale = 0.75f;
+  float renderScale = 1.0f;
   int quality = 1;           // 0 low, 1 medium, 2 high
   bool ok = false;
   std::string error;

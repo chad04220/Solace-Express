@@ -33,7 +33,7 @@ void Game::loadSettings() {
   char k[64]; float v;
   while (fscanf(f, "%63s %f", k, &v) == 2) {
     std::string s = k;
-    if (s == "renderScale") set.renderScale = fabsf(v - 0.75f) < 1e-3f ? 1.0f : clampf(v, 0.5f, 1.0f);   // 0.75 was the old fixed default: now a ceiling for dynamic resolution
+    if (s == "renderScale") set.renderScale = 1.0f;   // old setting: rendering is now always at 100%
     else if (s == "quality") set.quality = (int)clampf(v, 0, 2);
     else if (s == "master") set.master = clampf(v, 0, 1);
     else if (s == "engineVol") set.engineVol = clampf(v, 0, 1.5f);
@@ -1480,28 +1480,9 @@ void Game::feedAudio() {
 
 // ------------------------------------------------------------------ main update / render
 void Game::update(float dt) {
-  // dynamic resolution: hold 60 fps. The ray tracer's GPU time (timer queries) is steered to a 14 ms budget by
-  // scaling the traced resolution between 50% and the "Render resolution" setting; TAA upscales to the display, so
-  // changes are seamless. Without timer queries it falls back to the measured frame time.
+  // the scene is always ray traced at the full display resolution (no dynamic resolution); the display is paced to 60 Hz
   fpsAvg = lerpf(fpsAvg, dt, 0.05f);
-  if (!headless && g_ren.ok) {
-    static float cooldown = 2.f, gpuAvg = -1.f;
-    cooldown -= dt;
-    float ms = g_ren.gpuMs;
-    if (ms > 0) gpuAvg = gpuAvg < 0 ? ms : lerpf(gpuAvg, ms, 0.15f);
-    // (frame time can't show headroom under vsync, so the fallback only reacts to missed frames and probes upward slowly)
-    float cost = gpuAvg > 0 ? gpuAvg : fpsAvg * 1000.f;
-    const float budget = gpuAvg > 0 ? 14.f : (fpsAvg * 1000.f > 18.f ? 16.f : 17.f * 1.3f);
-    if (cooldown <= 0 && cost > 0) {
-      float sc = g_ren.renderScale, maxS = set.renderScale;
-      float want = clampf(sc * sqrtf(budget / cost), 0.5f, maxS);   // pixel count scales with sc^2
-      want = roundf(want * 40.f) / 40.f;
-      if (want < sc - 0.01f) { g_ren.setRenderScale(want); cooldown = 0.25f; }                    // over budget: drop quickly
-      else if (want > sc + 0.01f && cost < budget * 0.85f) { g_ren.setRenderScale(std::min(want, sc + 0.05f)); cooldown = 1.f; }   // headroom: climb gently
-      else if (sc > maxS + 0.01f) { g_ren.setRenderScale(maxS); cooldown = 0.5f; }
-      else cooldown = 0.25f;
-    }
-  }
+  if (!headless && g_ren.ok && g_ren.renderScale != 1.f) g_ren.setRenderScale(1.f);
   dt = std::min(dt, 0.05f);
   realTime += dt;
   for (auto& t : toasts) t.t += dt;

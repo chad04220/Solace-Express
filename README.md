@@ -139,7 +139,7 @@ The presets include SomaFM, Radio Paradise and KEXP, plus free US East Coast pub
 - Windows 10 or 11, 64-bit
 - A GPU with OpenGL 3.3 (anything from roughly 2012 on). A mid-range GPU from the last 5–6 years is recommended for 1080p.
 - **60 fps.** The game runs locked to 60 Hz: vsync on 60/120/240 Hz displays (adaptive where the driver supports it, so a late frame tears once instead of dropping to 30), and a precise frame limiter on other refresh rates.
-- **Dynamic resolution** measures the GPU time of every frame and scales the internal ray-tracing resolution (50% up to the *Max render resolution* setting) to keep it within a 60 fps budget. Temporal anti-aliasing upscales the result to full display resolution, so the changes are seamless. Press **F3** for a frame-rate / GPU-time / resolution readout. Low/Medium/High quality is in Settings.
+- **Native resolution.** The scene is always ray traced at 100% of the display resolution, and the display is paced to 60 Hz (vsync on 60/120/180/240 Hz monitors, a precise limiter otherwise). Temporal anti-aliasing smooths edges, and a light contrast-adaptive sharpening pass keeps the image crisp. Press **F3** for a frame-rate / GPU-time / resolution readout. Low/Medium/High quality is in Settings.
 
 Save data, settings and the radio list live in `%APPDATA%\AirXpress`.
 

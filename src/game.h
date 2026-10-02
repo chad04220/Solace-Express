@@ -27,7 +27,7 @@ struct Input {
 };
 
 struct Settings {
-  float renderScale = 1.0f; int quality = 1;   // renderScale: the most the dynamic resolution may use
+  float renderScale = 1.0f; int quality = 1;   // renderScale: always 1 (full display resolution)
   float master = 0.8f, engineVol = 1.0f, sfxVol = 0.9f, radioVol = 0.6f;
   bool invertPitch = false, showHints = true, metric = false, fullscreen = false, traffic = true;
   int radioStation = 0;
