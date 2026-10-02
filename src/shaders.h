@@ -218,6 +218,19 @@ uniform vec3 uColBase; uniform vec3 uColStripe;
 uniform vec4 uProp[2]; uniform int uPropCount;
 uniform vec3 uLandLightPos; uniform vec3 uLandLightDir; uniform float uLandLight;
 uniform vec4 uFlame; uniform vec3 uFlameLP; uniform vec3 uFlameLI;  // research jet exhaust: spool, reheat, vector angle, mach | light pos, radiance
+// Per-aircraft data the SDF and its shading read: your aircraft (uniforms) or a traffic aircraft (uTraffic row k:
+// texels 0-23 model, 24 position + bound radius, 25-27 rotation columns, 28 state, 29 controls, 30 base colour + prop
+// angle, 31 stripe colour + reheat)
+vec4 gM[24]; vec4 gPS; vec4 gCtl; vec3 gColBase; vec3 gColStripe; vec4 gFlame;
+uniform sampler2D uTraffic; uniform int uTrafficN;
+void loadMain(){ for (int i = 0; i < 24; i++) gM[i] = uM[i]; gPS = uPS; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; }
+void loadTraffic(int k){
+  for (int i = 0; i < 24; i++) gM[i] = texelFetch(uTraffic, ivec2(i, k), 0);
+  gPS = texelFetch(uTraffic, ivec2(28, k), 0); gCtl = texelFetch(uTraffic, ivec2(29, k), 0);
+  vec4 c0 = texelFetch(uTraffic, ivec2(30, k), 0), c1 = texelFetch(uTraffic, ivec2(31, k), 0);
+  gColBase = c0.rgb; gColStripe = c1.rgb;
+  gFlame = vec4(gCtl.w, c1.w, gPS.y*1.5708 - gCtl.x*0.5, 0.0);
+}
 
 // ---------------------------------------------------------------- materials (texture array layers)
 const int M_GRASS=0, M_FOREST=1, M_ROCK=2, M_SAND=3, M_SNOW=4, M_ASPHALT=5, M_GRAVEL=6, M_DIRT=7;
@@ -239,7 +252,7 @@ float sdCylX(vec3 p, float r, float h){ vec2 d = abs(vec2(length(p.yz), p.x)) - 
 mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }
 
 // ---------------------------------------------------------------- aircraft (body frame: +x right, +y up, +z aft)
-// uM[] layout is written by packModel() in models.cpp.
+// gM[] layout is written by packModel() in models.cpp.
 // Rotation helper: rot2(v, a) rotates v counter-clockwise by a. To rotate GEOMETRY by A we query with rot2(p, -A).
 vec2 rot2(vec2 v, float a){ float c = cos(a), s = sin(a); return vec2(c*v.x - s*v.y, s*v.x + c*v.y); }
 float smin(float a, float b, float k){ float h = clamp(0.5 + 0.5*(b - a)/k, 0.0, 1.0); return mix(b, a, h) - k*h*(1.0 - h); }
@@ -255,23 +268,23 @@ float sdRoundCylX(vec3 p, float r, float h, float rr){ vec2 d = vec2(length(p.yz
 
 // fuselage cross-section (half width, half height, centre y) at body z
 vec3 fusSection(float z){
-  z = clamp(z, uM[1].x, uM[8].x);
-  vec4 a = uM[1], b = uM[2];
-  for (int i = 1; i < 8; i++) { a = uM[i]; b = uM[i+1]; if (z <= b.x) break; }
+  z = clamp(z, gM[1].x, gM[8].x);
+  vec4 a = gM[1], b = gM[2];
+  for (int i = 1; i < 8; i++) { a = gM[i]; b = gM[i+1]; if (z <= b.x) break; }
   float t = clamp((z - a.x)/max(b.x - a.x, 1e-3), 0.0, 1.0); t = t*t*(3.0 - 2.0*t);
   return mix(a.yzw, b.yzw, t);
 }
 float sdFuselage(vec3 p){
   vec3 sec = fusSection(p.z);
   vec2 q = vec2(p.x, p.y - sec.z);
-  float rnd = uM[15].z;
+  float rnd = gM[15].z;
   float m = min(sec.x, sec.y);
   float dEll = (length(q/sec.xy) - 1.0)*m;
   float r = m*mix(0.3, 1.0, rnd);
   vec2 d = abs(q) - sec.xy + r;
   float dRR = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r;
   float d2 = mix(dRR, dEll, rnd);
-  float dz = max(uM[1].x - p.z, p.z - uM[8].x);
+  float dz = max(gM[1].x - p.z, p.z - gM[8].x);
   return dz > 0.0 ? length(vec2(max(d2, 0.0), dz)) : d2;
 }
 
@@ -303,8 +316,8 @@ float sdSurface(float s, float c, float t, float span, float rc, float tc, float
 // elevons and lift fans, all-moving canards, canted twin fins, 2D thrust-vectoring nozzles, opaque sensor canopy.
 // The cockpit is a sealed pod: the pilot sees outside only through the panoramic and side display screens.
 vec2 mapJetCockpit(vec3 p){
-  vec4 E4 = uM[22]; vec3 q = p - E4.xyz;
-  float cPitch = uCtl.x, cRoll = uCtl.y, cThr = uCtl.w;
+  vec4 E4 = gM[22]; vec3 q = p - E4.xyz;
+  float cPitch = gCtl.x, cRoll = gCtl.y, cThr = gCtl.w;
   vec2 res = vec2(-sdEllipsoid(q - vec3(0.0, -0.05, 0.25), vec3(0.8, 0.72, 1.45)), 40.0);
   float r = length(q.xz), ang = atan(q.x, -q.z);
   // panoramic front display in a chamfered bezel, annunciator strip above it
@@ -341,7 +354,8 @@ vec2 mapJetCockpit(vec3 p){
     vec3 cq = vec3(abs(q.x) - 0.52, q.y + 0.44, q.z - 0.08);
     float shelf = sdRoundBox(cq, vec3(0.13, 0.05, 0.36), 0.015);
     res = opU(res, vec2(shelf, 44.0));
-    res = opU(res, vec2(sdBox(cq - vec3(0.02, 0.051, -0.2), vec3(0.075, 0.002, 0.06)), q.x < 0.0 ? 52.0 : 53.0));
+)"
+R"(    res = opU(res, vec2(sdBox(cq - vec3(0.02, 0.051, -0.2), vec3(0.075, 0.002, 0.06)), q.x < 0.0 ? 52.0 : 53.0));
     vec3 bq = cq - vec3(0.0, 0.055, 0.12);
     vec2 cell = clamp(floor(bq.xz/0.032 + 0.5), vec2(-3.0, -2.0), vec2(3.0, 3.0));
     bq.xz -= cell*0.032;
@@ -358,8 +372,7 @@ vec2 mapJetCockpit(vec3 p){
     res = opU(res, vec2(sdCapsule(tq, vec3(0.0), vec3(0.0, -0.022, 0.008), 0.0045), 47.0));
     res = opU(res, vec2(sdBox(oq + vec3(0.0, 0.019, 0.0), vec3(0.25, 0.001, 0.125)), 55.0));
   }
-)"
-R"(  // sculpted seat: shell, bolsters, headrest with light strip, harness
+  // sculpted seat: shell, bolsters, headrest with light strip, harness
   {
     float seat = sdRoundBox(q - vec3(0.0, -0.6, 0.12), vec3(0.24, 0.06, 0.26), 0.05);
     vec3 bq = q - vec3(0.0, -0.17, 0.42); bq.yz = rot2(bq.yz, 0.22);
@@ -397,9 +410,9 @@ R"(  // sculpted seat: shell, bolsters, headrest with light strip, harness
   return res;
 }
 vec2 mapJet(vec3 p){
-  float gear = uPS.x, noz = uPS.y, inside = uPS.w;
+  float gear = gPS.x, noz = gPS.y, inside = gPS.w;
   if (inside > 0.5) return mapJetCockpit(p);
-  float cPitch = uCtl.x, cRoll = uCtl.y, cYaw = uCtl.z;
+  float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z;
   vec3 ap = vec3(abs(p.x), p.y, p.z);
   float sgn = p.x > 0.0 ? 1.0 : -1.0;
   float body = sdFuselage(p);
@@ -442,7 +455,7 @@ vec2 mapJet(vec3 p){
   // 2D thrust-vectoring nozzles: swivel from aft to straight down, plus pitch vectoring
   {
     vec3 q = ap - vec3(0.82, -0.12, 7.75);
-    float a = uFlame.z;   // = nozzle*90 deg - pitch*0.5 rad (vectoring)
+    float a = gFlame.z;   // = nozzle*90 deg - pitch*0.5 rad (vectoring)
     vec2 yz = rot2(q.yz, -a);
     vec3 nq = vec3(q.x, yz.x, yz.y - 0.5);
     float nzl = sdRoundBox(nq, vec3(0.44, 0.31, 0.5), 0.06);
@@ -458,7 +471,7 @@ vec2 mapJet(vec3 p){
   res = opU(res, vec2(led, 34.0));
   // retractable tricycle gear
   if (gear > 0.06) {
-    vec4 G0 = uM[18], G1 = uM[19];
+    vec4 G0 = gM[18], G1 = gM[19];
     float gh = G1.x, wr = 0.38, lift = (1.0 - gear)*(gh - 0.5);
     vec3 wc = vec3(G0.x, -gh + wr + lift, G0.z);
     float legs = sdCapsule(ap, vec3(G0.x*0.8, -0.3, G0.z), wc + vec3(-0.1, 0.05, 0.0), 0.07);
@@ -472,19 +485,19 @@ vec2 mapJet(vec3 p){
   return res;
 }
 vec2 mapPlane(vec3 p){
-  if (int(uM[0].z + 0.5) == 5) return mapJet(p);
-  float L = uM[0].x; int gtype = int(uM[0].y + 0.5); int eng = int(uM[0].z + 0.5); float R = uM[0].w;
-  float gear = uPS.x, flaps = uPS.y, steer = uPS.z, inside = uPS.w;
-  float cPitch = uCtl.x, cRoll = uCtl.y, cYaw = uCtl.z, cThr = uCtl.w;
+  if (int(gM[0].z + 0.5) == 5) return mapJet(p);
+  float L = gM[0].x; int gtype = int(gM[0].y + 0.5); int eng = int(gM[0].z + 0.5); float R = gM[0].w;
+  float gear = gPS.x, flaps = gPS.y, steer = gPS.z, inside = gPS.w;
+  float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z, cThr = gCtl.w;
   // ---------------- fuselage (hollow with window openings in cockpit view)
   float f = sdFuselage(p);
   vec2 res = vec2(f, 1.0);
   if (inside > 0.5) {
     // hollow cabin with real window openings
-    vec4 E = uM[22]; vec4 WS = uM[23]; vec3 sec = fusSection(p.z);
+    vec4 E = gM[22]; vec4 WS = gM[23]; vec3 sec = fusSection(p.z);
     float shell = abs(f + 0.03) - 0.03;
     float holeWs = sdBox(p - vec3(0.0, WS.z + 1.0, 0.5*(WS.x + WS.y)), vec3(sec.x*1.25, 1.0, 0.5*(WS.y - WS.x)));
-    float post = uM[21].z > 1.5 ? min(abs(p.x) - 0.03, abs(abs(p.x) - abs(E.x) - 0.42) - 0.035) : abs(p.x) - 0.025;
+    float post = gM[21].z > 1.5 ? min(abs(p.x) - 0.03, abs(abs(p.x) - abs(E.x) - 0.42) - 0.035) : abs(p.x) - 0.025;
     holeWs = max(holeWs, -post);
     float sideTop = sec.z + sec.y*0.78;
     float holeSide = sdBox(p - vec3(0.0, 0.5*(WS.z - 0.12 + sideTop), 0.5*(WS.y + WS.w)), vec3(5.0, 0.5*(sideTop - WS.z + 0.12), 0.5*(WS.w - WS.y)));
@@ -495,7 +508,7 @@ vec2 mapPlane(vec3 p){
   }
   // ---------------- main wing with flaps and ailerons
   {
-    vec4 W0 = uM[9], W1 = uM[10], W2 = uM[11];
+    vec4 W0 = gM[9], W1 = gM[10], W2 = gM[11];
     float span = W0.x, rc = W0.y, tc = W0.z, sw = W0.w, th = W1.w;
     float s = abs(p.x);
     float t = p.y - (W1.x + s*W1.z);
@@ -511,7 +524,7 @@ vec2 mapPlane(vec3 p){
       float wl = sdPanel(t - 0.02, c - sw - tc*0.15, s - span + 0.05, W2.z, tc*0.85, tc*0.4, 0.55, 0.09, 1.0, 0.0, 0.0);
       wd = smin(wd, wl, 0.08);
     }
-    if (uM[15].w > 0.5) {  // leading-edge slats (STOL)
+    if (gM[15].w > 0.5) {  // leading-edge slats (STOL)
       float sl = sdPanel(s, c + 0.09, t + 0.03, span*0.95, rc*0.16, tc*0.16, sw, 0.5, 1.0, 0.0, 0.0);
       wd = min(wd, max(sl, fus0 + 0.4 - s));
     }
@@ -527,36 +540,36 @@ vec2 mapPlane(vec3 p){
       vec3 base = vec3(0.6*R, -0.35*R, W1.y + rc*0.35);
       vec3 ap = vec3(abs(p.x), p.y, p.z);
       float st = sdCapsule(ap, base, top1, 0.035);
-      if (uM[15].w > 0.5) st = min(st, sdCapsule(ap, base, top1 + vec3(0.0, 0.0, ch*0.45), 0.03));
+      if (gM[15].w > 0.5) st = min(st, sdCapsule(ap, base, top1 + vec3(0.0, 0.0, ch*0.45), 0.03));
       res = opU(res, vec2(st, 8.0));
     }
   }
   // ---------------- tail
   {
-    vec4 V0 = uM[14], V1 = uM[15];
+)"
+R"(    vec4 V0 = gM[14], V1 = gM[15];
     float s = p.y - V1.x, c = p.z - V1.y, t = p.x;
     float h = V0.x;
-    float hasT = uM[13].w;
+    float hasT = gM[13].w;
     float rud0 = hasT > 0.5 ? 0.05 : 0.08*h;
     float fin = sdPanel(s, c, t, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97);
     // right rudder (yaw +) swings the trailing edge to the right (+x)
     float rud = sdSurface(s, c, t, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97, -cYaw*0.42, 0.0);
     float tail = min(fin, rud);
-    vec4 H0 = uM[12], H1 = uM[13];
+    vec4 H0 = gM[12], H1 = gM[13];
     float hs = abs(p.x), ht = p.y - (H1.x + hs*H1.z), hc = p.z - H1.y;
     float stab = sdPanel(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98);
     // pulling back (pitch +) raises the elevator trailing edge
     float elev = sdSurface(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98, -cPitch*0.4, 0.0);
     tail = min(tail, min(stab, elev));
-)"
-R"(    if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + H0.y*0.45), vec3(0.18, 0.2, H0.y*0.55)), 0.08);
+    if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + H0.y*0.45), vec3(0.18, 0.2, H0.y*0.55)), 0.08);
     float d = smin(res.x, tail, 0.12*R);
     res = vec2(d, tail < res.x ? 3.0 : res.y);
   }
   // ---------------- engines
   {
-    vec4 N0 = uM[16], N1 = uM[17];
-    vec4 S0 = uM[1];
+    vec4 N0 = gM[16], N1 = gM[17];
+    vec4 S0 = gM[1];
     if (eng <= 1) {
       float sr = N1.y;
       float spin = sdRoundCone(p, vec3(0.0, S0.w, S0.x - sr*2.3), vec3(0.0, S0.w, S0.x + 0.05), 0.015, sr);
@@ -577,7 +590,7 @@ R"(    if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + 
     } else if (eng <= 3) {
       vec3 np = vec3(abs(p.x) - N0.x, p.y - N0.y, p.z);
       float nr = N0.z, z0 = N0.w, len = N1.x;
-      float wingY = uM[10].x + N0.x*uM[10].z;
+      float wingY = gM[10].x + N0.x*gM[10].z;
       float nac = sdRoundCone(np, vec3(0.0, 0.0, z0), vec3(0.0, 0.02, z0 + len*0.3), nr*0.72, nr);
       nac = smin(nac, sdRoundCone(np, vec3(0.0, 0.02, z0 + len*0.3), vec3(0.0, wingY - N0.y - nr*0.25, z0 + len), nr, nr*0.35), 0.1);
       if (eng == 3) {
@@ -606,7 +619,7 @@ R"(    if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + 
     }
   }
   // ---------------- cargo pod
-  if (uM[17].w > 0.5) {
+  if (gM[17].w > 0.5) {
     vec3 sec = fusSection(-0.5);
     float pod = sdRoundBox(p - vec3(0.0, sec.z - sec.y - 0.18, -0.4), vec3(0.42, 0.2, 2.6), 0.17);
     pod = smin(pod, sdEllipsoid(p - vec3(0.0, sec.z - sec.y - 0.2, -3.0), vec3(0.42, 0.22, 0.8)), 0.2);
@@ -614,7 +627,7 @@ R"(    if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + 
   }
   // ---------------- landing gear
   if (gear > 0.02) {
-    vec4 G0 = uM[18], G1 = uM[19];
+    vec4 G0 = gM[18], G1 = gM[19];
     float track = G0.x, wr = G0.y, mz = G0.z, nz = G0.w, gh = G1.x, tz = G1.y;
     bool retract = gtype >= 3;
     float up = retract ? (1.0 - gear) : 0.0;
@@ -637,12 +650,12 @@ R"(    if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + 
       legs = min(sdCapsule(ap, vec3(secM.x*0.8, secM.z - secM.y*0.8, mz - 0.35), wc, 0.03), sdCapsule(ap, vec3(secM.x*0.8, secM.z - secM.y*0.8, mz + 0.3), wc, 0.03));
       tyres = sdRoundCylX(ap - wc, wr, 0.14, 0.09);
     } else if (gtype == 3) {
-      vec3 top = vec3(track, uM[16].y - uM[16].z*0.6, mz);
+      vec3 top = vec3(track, gM[16].y - gM[16].z*0.6, mz);
       legs = sdCapsule(ap, top, vec3(track, wc.y + 0.05, mz), 0.09);
       legs = min(legs, sdCapsule(ap, vec3(track - 0.25, wc.y, mz), vec3(track + 0.25, wc.y, mz), 0.05));
       tyres = min(sdRoundCylX(ap - wc - vec3(0.22, 0.0, 0.0), wr, 0.11, 0.06), sdRoundCylX(ap - wc + vec3(0.22, 0.0, 0.0), wr, 0.11, 0.06));
     } else {
-      float wyy = uM[10].x + track*uM[10].z;
+      float wyy = gM[10].x + track*gM[10].z;
       legs = sdCapsule(ap, vec3(track, wyy - 0.1 + lift*0.2, mz), wc + vec3(0.0, 0.05, 0.0), 0.06);
       tyres = sdRoundCylX(ap - wc, wr, 0.1, 0.05);
     }
@@ -673,10 +686,10 @@ R"(    if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + 
   }
   // ---------------- small details: nav lights, beacon, antennas, pitot
   {
-    vec4 W0 = uM[9], W1 = uM[10];
+    vec4 W0 = gM[9], W1 = gM[10];
     vec3 tip = vec3(W0.x + 0.02, W1.x + W0.x*W1.z, W1.y + W0.w + W0.z*0.25);
     res = opU(res, vec2(length(vec3(abs(p.x), p.y, p.z) - tip) - 0.045, 18.0));
-    vec4 V0 = uM[14], V1 = uM[15];
+    vec4 V0 = gM[14], V1 = gM[15];
     res = opU(res, vec2(length(p - vec3(0.0, V1.x + V0.x + 0.04, V1.y + V0.w + V0.z*0.4)) - 0.05, 19.0));
     vec3 sec = fusSection(0.2);
     float ant = sdRoundBox(p - vec3(0.0, sec.z + sec.y + 0.11, 0.2), vec3(0.006, 0.12, 0.05), 0.004);
@@ -687,7 +700,7 @@ R"(    if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + 
   // 60 brushed metal, 61 rubber, 63 trim panels, 64 light lenses, 65 radio stack, 66 satin black (bezels, knobs),
   // 67 centre engine display (glass cockpits), 68 red knobs / buttons, 69 harness webbing
   if (inside > 0.5) {
-    vec4 E = uM[22]; float pz = uM[21].w, phw = E.w; int ck = int(uM[21].z + 0.5);
+    vec4 E = gM[22]; float pz = gM[21].w, phw = E.w; int ck = int(gM[21].z + 0.5);
     float pf = pz + 0.045;                                             // panel face (towards the pilot)
     float panel = sdRoundBox(p - vec3(0.0, E.y - 0.36, pz), vec3(phw, 0.24, 0.045), 0.015);
     res = opU(res, vec2(panel, 10.0));
@@ -701,14 +714,15 @@ R"(    if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + 
       res = opU(res, vec2(frame, 66.0));
     }
     // glareshield with a warm LED strip under its lip that floods the panel
-    vec4 WSg = uM[23];
+    vec4 WSg = gM[23];
     float gz0 = min(WSg.x - 0.05, pz - 0.2);
     float glare = sdRoundBox(p - vec3(0.0, E.y - 0.1, 0.5*(gz0 + pz + 0.06)), vec3(phw*0.97, 0.022, 0.5*(pz + 0.06 - gz0)), 0.018);
     res = opU(res, vec2(glare, 14.0));
     res = opU(res, vec2(sdCapsule(p, vec3(-phw*0.88, E.y - 0.124, pz + 0.07), vec3(phw*0.88, E.y - 0.124, pz + 0.07), 0.0035), 64.0));
     // centre: radio / transponder stack below the clusters; glass cockpits add an engine display between the PFDs
     res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.505, pf + 0.012), vec3(0.115, 0.06, 0.016), 0.004), 65.0));
-    if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.31, pf + 0.008), vec3(0.085, 0.085, 0.01), 0.004), 67.0));
+)"
+R"(    if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.31, pf + 0.008), vec3(0.085, 0.085, 0.01), 0.004), 67.0));
     // eyeball air vents at the panel corners
     {
       vec3 vq = vec3(abs(p.x) - (phw - 0.07), p.y - (E.y - 0.19), p.z - pf);
@@ -721,8 +735,7 @@ R"(    if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + 
     {
       vec3 sp = vec3(abs(p.x) - abs(E.x), p.y, p.z);
       float seat = sdRoundBox(sp - vec3(0.0, E.y - 0.8, E.z + 0.05), vec3(0.21, 0.055, 0.24), 0.05);
-)"
-R"(      seat = smin(seat, sdCapsule(sp, vec3(-0.19, E.y - 0.77, E.z - 0.17), vec3(0.19, E.y - 0.77, E.z - 0.17), 0.05), 0.03);
+      seat = smin(seat, sdCapsule(sp, vec3(-0.19, E.y - 0.77, E.z - 0.17), vec3(0.19, E.y - 0.77, E.z - 0.17), 0.05), 0.03);
       vec3 bp = sp - vec3(0.0, E.y - 0.4, E.z + 0.37); bp.yz = rot2(bp.yz, 0.18);
       float back = sdRoundBox(bp, vec3(0.2, 0.36, 0.05), 0.05);
       back = smin(back, sdRoundBox(vec3(abs(bp.x) - 0.2, bp.y + 0.05, bp.z + 0.03), vec3(0.035, 0.26, 0.07), 0.035), 0.04);   // side bolsters
@@ -785,7 +798,7 @@ R"(      seat = smin(seat, sdCapsule(sp, vec3(-0.19, E.y - 0.77, E.z - 0.17), ve
         vec3 lp2 = vec3(abs(p.x) - 0.035, p.y, p.z);
         res = opU(res, vec2(sdCapsule(lp2, piv, tip, 0.008), 60.0));
         res = opU(res, vec2(sdRoundBox(lp2 - tip, vec3(0.03, 0.014, 0.02), 0.009), 66.0));
-        float fa = mix(0.3, -0.5, uPS.y);
+        float fa = mix(0.3, -0.5, gPS.y);
         vec3 fp = vec3(p.x - pw*0.6, p.y, p.z) - vec3(0.0, pc.y + ph - 0.02, pc.z + pd*0.1);
         vec3 ft = vec3(0.0, 0.11*cos(fa), -0.11*sin(fa));
         res = opU(res, vec2(min(sdCapsule(fp, vec3(0.0), ft, 0.006), sdRoundBox(fp - ft, vec3(0.022, 0.006, 0.012), 0.004)), 60.0));
@@ -832,7 +845,7 @@ vec2 mapPiece(vec3 p){ vec2 d = mapPlane(p); if (gPI >= 0) d.x = max(d.x, sdBox(
 vec3 planeNormal(vec3 p){ const vec2 k = vec2(1,-1); float e = 0.0025;
   return normalize(k.xyy*mapPiece(p+k.xyy*e).x + k.yyx*mapPiece(p+k.yyx*e).x + k.yxy*mapPiece(p+k.yxy*e).x + k.xxx*mapPiece(p+k.xxx*e).x); }
 
-float planeBound(){ return max(uM[0].x, uM[9].x*2.0)*0.55 + 1.5; }
+float planeBound(){ return max(gM[0].x, gM[9].x*2.0)*0.55 + 1.5; }
 void pieceXf(int i){ gPI = i; if (i < 0) { gPP = uPlanePos; gPR = uPlaneRot; gPC = vec3(0.0); } else { gPP = uPcPos[i]; gPR = uPcRot[i]; gPC = uPcC[i]; } }
 vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
   vec3 oc = ro - gPP;
@@ -843,8 +856,8 @@ vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
   mat3 inv = transpose(gPR);
   vec3 lo = gPC + inv*(ro - gPP), ld = inv*rd;
   float t = t0;
-  bool jet = int(uM[0].z + 0.5) == 5;   // XR-9: thin flattened shapes need finer steps
-  int steps = uPS.w > 0.5 || jet ? 200 : 120;
+  bool jet = int(gM[0].z + 0.5) == 5;   // XR-9: thin flattened shapes need finer steps
+  int steps = gPS.w > 0.5 || jet ? 200 : 120;
   float relax = jet ? 0.65 : 0.8;
   for (int i=0;i<200;i++){
     if (i >= steps) break;
@@ -868,6 +881,41 @@ vec2 tracePlane(vec3 ro, vec3 rd, float tmax){
   }
   pieceXf(bi);
   return best;
+}
+// Other aircraft (AI traffic): bounding-sphere culled, then the same SDF march with that aircraft's data loaded.
+// Leaves the globals pointing at the closest hit's aircraft; the caller reloads with loadMain() / loadTraffic().
+void trafficXf(int k){
+  gPI = -1; gPC = vec3(0.0); gPP = texelFetch(uTraffic, ivec2(24, k), 0).xyz;
+  gPR = mat3(texelFetch(uTraffic, ivec2(25, k), 0).xyz, texelFetch(uTraffic, ivec2(26, k), 0).xyz, texelFetch(uTraffic, ivec2(27, k), 0).xyz);
+}
+vec2 traceTraffic(vec3 ro, vec3 rd, float tmax, out int idx){
+  vec2 best = vec2(-1.0); idx = -1;
+  for (int k = 0; k < 12; k++) {
+    if (k >= uTrafficN) break;
+    vec4 P = texelFetch(uTraffic, ivec2(24, k), 0);
+    vec3 oc = ro - P.xyz; float b = dot(oc, rd), h = b*b - dot(oc, oc) + P.w*P.w;
+)"
+R"(    float lim = best.x > 0.0 ? best.x : tmax;
+    if (h < 0.0 || -b + sqrt(h) < 0.0 || -b - sqrt(h) > lim) continue;
+    loadTraffic(k); trafficXf(k);
+    vec2 hh = tracePieceOnce(ro, rd, lim, P.w);
+    if (hh.x > 0.0 && (best.x < 0.0 || hh.x < best.x)) { best = hh; idx = k; }
+  }
+  return best;
+}
+// soft contact / cast shadow blobs of traffic on the ground (the sun's projection of each aircraft)
+float trafficShadow(vec3 p){
+  float s = 1.0;
+  for (int k = 0; k < 12; k++) {
+    if (k >= uTrafficN) break;
+    vec4 P = texelFetch(uTraffic, ivec2(24, k), 0);
+    float hgt = P.y - p.y;
+    if (hgt < -2.0 || hgt > 300.0) continue;
+    vec3 c = P.xyz - uSunDir*(hgt/max(uSunDir.y, 0.15));
+    float d = length((p - c).xz)/(P.w*0.42);
+    s *= mix(0.4 + 0.5*smoothstep(0.0, 300.0, hgt), 1.0, smoothstep(0.55, 1.0, d));
+  }
+  return s;
 }
 float pieceShadow(vec3 ro, vec3 rd, float br){
   vec3 oc = ro - gPP;
@@ -909,8 +957,7 @@ float ticks(vec2 d, float r, float n, float a0, float a1, float inner){
   float a = atan(d.x, d.y); float rr = length(d)/r;
   if (a < a0 || a > a1 || rr < inner || rr > 0.95) return 0.0;
   float f = fract((a - a0)/(a1 - a0)*n + 0.5);
-)"
-R"(  return step(abs(f - 0.5), 0.07);
+  return step(abs(f - 0.5), 0.07);
 }
 // Returns instrument colour (emissive) for a point on the panel face; q relative to the pilot's panel centre.
 vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
@@ -1982,9 +2029,9 @@ vec3 podLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E){
   for (int i = -1; i <= 1; i += 2) {
     float sx = float(i);
     L += fixtureLight(p, n, v, m, E + vec3(0.2*sx, 0.588, -0.04), E + vec3(0.2*sx, 0.588, 0.34), vec3(1.0, 0.8, 0.58)*0.2, 9.0, vec3(0.0, -1.0, 0.0));
-    L += fixtureLight(p, n, v, m, E + vec3(0.39*sx, -0.395, -0.25), E + vec3(0.39*sx, -0.395, 0.42), uColStripe*0.05, 14.0, vec3(-0.6*sx, 0.8, 0.0));
+    L += fixtureLight(p, n, v, m, E + vec3(0.39*sx, -0.395, -0.25), E + vec3(0.39*sx, -0.395, 0.42), gColStripe*0.05, 14.0, vec3(-0.6*sx, 0.8, 0.0));
   }
-  L += fixtureLight(p, n, v, m, E + vec3(0.0, 0.6, -0.7), E + vec3(0.0, 0.6, 0.9), uColStripe*0.06, 10.0, vec3(0.0, -1.0, 0.0));
+  L += fixtureLight(p, n, v, m, E + vec3(0.0, 0.6, -0.7), E + vec3(0.0, 0.6, 0.9), gColStripe*0.06, 10.0, vec3(0.0, -1.0, 0.0));
   L += fixtureLight(p, n, v, m, E + vec3(-0.3, -0.76, -0.55), E + vec3(0.3, -0.76, -0.55), vec3(1.0, 0.5, 0.15)*0.12, 10.0, vec3(0.0, 0.7, 0.7));
   L += fixtureLight(p, n, v, m, E + vec3(-0.42, -0.33, -0.42), E + vec3(0.42, -0.33, -0.42), vec3(0.3, 0.75, 0.6)*0.1, 12.0, vec3(0.0, 0.6, 0.8));
   return L;
@@ -2003,7 +2050,7 @@ float interiorAO(vec3 p, vec3 n){
 }
 )"
 R"(vec3 jetScreen(vec3 col, vec3 rd, int id, vec3 sl){
-  vec3 E = uM[22].xyz; vec3 q = sl - E;
+  vec3 E = gM[22].xyz; vec3 q = sl - E;
   // display look: slight contrast and cool grade, scanlines, darkened edges
   col = pow(max(col, vec3(0.0)), vec3(1.05))*vec3(0.95, 1.02, 1.06)*1.08;
   col *= 0.93 + 0.07*sin(sl.y*1900.0);
@@ -2080,7 +2127,7 @@ R"(vec3 jetScreen(vec3 col, vec3 rd, int id, vec3 sl){
 // Reheat: a long white-hot core in an amber envelope, threaded with bright Mach disks (shock diamonds),
 // with turbulent flicker scrolling downstream.
 vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float jit){
-  float sp = uFlame.x, ab = uFlame.y;
+  float sp = gFlame.x, ab = gFlame.y;
   float L = mix(2.0, 6.0, sp) + 9.0*ab;
   vec3 c = o + ax*(L*0.5); float br = L*0.5 + 0.9;
   vec3 oc = lo - c; float b = dot(oc, ld), h = b*b - dot(oc, oc) + br*br;
@@ -2088,7 +2135,7 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float jit){
   h = sqrt(h); float t0 = max(-b - h, 0.0), t1 = min(-b + h, tmax);
   if (t1 <= t0) return vec3(0.0);
   vec3 ay = normalize(cross(ax, vec3(1.0, 0.0, 0.0)));
-  float spacing = 0.95 + 0.35*clamp(uFlame.w, 0.0, 2.5);
+  float spacing = 0.95 + 0.35*clamp(gFlame.w, 0.0, 2.5);
   vec3 cOut = mix(vec3(0.12, 0.28, 1.0), vec3(1.0, 0.3, 0.05), ab);
   vec3 cIn = mix(vec3(0.55, 0.8, 1.0), vec3(1.0, 0.7, 0.35), ab);
   vec3 cDisk = vec3(0.75, 0.88, 1.0);
@@ -2118,10 +2165,10 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float jit){
   return acc/(1.0 + max(acc.r, max(acc.g, acc.b))*0.2);   // hue-preserving roll-off: looking down the plume stays amber
 }
 vec3 jetPlumes(vec3 ro, vec3 rd, float tmax, float jit){
-  if (uFlame.x < 0.02) return vec3(0.0);
+  if (gFlame.x < 0.02) return vec3(0.0);
   mat3 inv = transpose(uPlaneRot);
   vec3 lo = inv*(ro - uPlanePos), ld = inv*rd;
-  float a = uFlame.z;
+  float a = gFlame.z;
   vec3 ax = vec3(0.0, -sin(a), cos(a));
   vec3 col = vec3(0.0);
   for (int s = -1; s <= 1; s += 2) {
@@ -2131,6 +2178,7 @@ vec3 jetPlumes(vec3 ro, vec3 rd, float tmax, float jit){
   return col;
 }
 void main(){
+  loadMain();
   vec2 ndc = (vUV + uJit)*2.0 - 1.0;
   vec3 rd = normalize(uCamRot * vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, -1.0));
   vec3 ro = uCamPos;
@@ -2143,9 +2191,9 @@ void main(){
   // aircraft (terrain, water, buildings, clouds, shadows) is traced for it. Only the display screens see out.
   // In any cockpit view the aircraft is traced first: a pixel that lands on the cabin (or on a wing seen through a
   // window) needs nothing from outside, so only rays leaving through the windows trace the world.
-  bool pod = false, cockpitView = uPlaneOn == 1 && uPS.w > 0.5 && uWreck == 0; vec2 h0 = vec2(-1.0);
+  bool pod = false, cockpitView = uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0; vec2 h0 = vec2(-1.0);
   if (cockpitView) {
-    bool jet = int(uM[0].z + 0.5) == 5;
+    bool jet = int(gM[0].z + 0.5) == 5;
     h0 = tracePlane(ro, rd, jet ? 6.0 : planeBound()*2.0);
     if (h0.x > 0.0) {
       int id0 = int(h0.y + 0.5);
@@ -2157,6 +2205,8 @@ void main(){
   float tW = (!pod && rd.y < 0.0 && ro.y > 0.0) ? -ro.y/rd.y : -1.0;
   vec3 bn; float bkind = 0.0; vec3 bl;
   vec2 bh = pod ? vec2(-1.0) : traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
+  int trafK = -1; vec2 trafH = vec2(-1.0);
+  if (!pod && uTrafficN > 0) { trafH = traceTraffic(ro, rd, tmax, trafK); loadMain(); }
   vec2 ph = onScr || (cockpitView && !pod) ? vec2(-1.0) : (pod ? h0 : tracePlane(ro, rd, tmax));
   float tSoFar = min(tT > 0.0 ? tT : (tW > 0.0 ? tW : tmax), tmax);
   vec3 tn; vec4 tinfo;
@@ -2167,25 +2217,28 @@ void main(){
   if (bh.x > 0.0 && bh.x < t) { t = bh.x; hit = 3; }
   if (tB > 0.0 && tB < t) { t = tB; hit = 5; }
   if (ph.x > 0.0 && ph.x < t) { t = ph.x; hit = 4; }
+  bool trafHit = false;
+  if (trafH.x > 0.0 && trafH.x < t) { t = trafH.x; hit = 4; ph = trafH; trafHit = true; loadTraffic(trafK); trafficXf(trafK); }
   vec3 dn; float dChar = 0.0;
   float tD = uDebN > 0 && !pod ? traceDebris(ro, rd, t < 1e8 ? t : tmax, dn, dChar) : -1.0;
   if (tD > 0.0 && tD < t) { t = tD; hit = 6; }
   vec3 col;
-  float taaFlag = hit == 4 ? (uWreck > 0 ? 0.2 : 0.5) : (hit == 6 ? 0.2 : 1.0);   // 1 world, 0.5 rigid with the aircraft, 0.2 moving, 0 no history
+  float taaFlag = hit == 4 ? (uWreck > 0 || trafHit ? 0.2 : 0.5) : (hit == 6 ? 0.2 : 1.0);   // 1 world, 0.5 rigid with the aircraft, 0.2 moving, 0 no history
   if (onScr) taaFlag = 0.0;
   if (hit == 0) { col = skyColor(rd); t = 1e6; }
   else {
     vec3 p = ro + rd*t;
     float sunVis = smoothstep(-0.05, 0.05, uSunDir.y);
     if (hit == 1) {
-      vec3 n = terrainNormal(p.xz, t);
+)"
+R"(      vec3 n = terrainNormal(p.xz, t);
       vec4 base = baseAt(p.xz);
       Mat m = terrainMaterial(p, n, t, base);
       vec3 ns = applyTS(n, m.nrm, t < 2000.0 ? 0.6 : 0.25);
       float sh = sunVis > 0.0 ? terrainShadow(p + n*0.5, uSunDir, t) : 0.0;
       if (t < 3000.0) sh *= planeShadow(p + n*0.2, uSunDir);
-)"
-R"(      sh *= cloudShadow(p);
+      if (uTrafficN > 0) sh *= trafficShadow(p);
+      sh *= cloudShadow(p);
       col = shadeSurface(p, ns, rd, m, sh);
     } else if (hit == 2) {
       // ocean
@@ -2266,7 +2319,7 @@ R"(      sh *= cloudShadow(p);
       vec3 nT; vec4 tx = triSample(p*2.0, dn, M_METAL, 1.0, nT);
       Mat m; m.metal = 0.5; m.emit = vec3(0.0); m.nrm = nT;
       float burn = vnoise(p.xz*3.0 + p.y);
-      m.alb = dChar > 0.5 ? vec3(0.03, 0.028, 0.026)*(0.6 + burn) : uColBase*tx.rgb*(0.3 + 0.4*burn);
+      m.alb = dChar > 0.5 ? vec3(0.03, 0.028, 0.026)*(0.6 + burn) : gColBase*tx.rgb*(0.3 + 0.4*burn);
       m.rough = dChar > 0.5 ? 0.9 : 0.45;
       float sh = sunVis > 0.0 ? terrainShadow(p + dn*0.05, uSunDir, t) : 0.0;
       col = shadeSurface(p, applyTS(dn, m.nrm, 0.4), rd, m, sh);
@@ -2277,20 +2330,20 @@ R"(      sh *= cloudShadow(p);
       vec3 ln = planeNormal(lp);
       vec3 n = gPR*ln;
       int mid = int(ph.y + 0.5);
-      if (mid == 11) { vec3 sc = fusSection(lp.z); vec3 rad = vec3(lp.x, lp.y - sc.z, 0.0); if (dot(ln, rad) > 0.55*length(rad) && lp.y > uM[22].y - 0.9) mid = 1; }
+      if (mid == 11) { vec3 sc = fusSection(lp.z); vec3 rad = vec3(lp.x, lp.y - sc.z, 0.0); if (dot(ln, rad) > 0.55*length(rad) && lp.y > gM[22].y - 0.9) mid = 1; }
       Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
-      m.alb = uColBase; m.rough = 0.28;
+      m.alb = gColBase; m.rough = 0.28;
       bool interior = (mid >= 10 && mid <= 14) || mid >= 40;
       vec3 sec = fusSection(lp.z);
-      vec4 WS = uM[23]; vec4 E = uM[22];
-      int ck = int(uM[21].z + 0.5);
+      vec4 WS = gM[23]; vec4 E = gM[22];
+      int ck = int(gM[21].z + 0.5);
       if (mid == 1) {
         float yr = (lp.y - sec.z)/sec.y;
-        bool body = lp.z > uM[1].x + 0.05 && lp.z < uM[8].x - 0.05 && abs(lp.x) < sec.x + 0.05 && abs(yr) < 1.05;
+        bool body = lp.z > gM[1].x + 0.05 && lp.z < gM[8].x - 0.05 && abs(lp.x) < sec.x + 0.05 && abs(yr) < 1.05;
         if (body) {
-          if (yr > -0.22 && yr < 0.0 && lp.z > uM[2].x) m.alb = uColStripe;
-          if (yr > 0.06 && yr < 0.11 && lp.z > uM[2].x) m.alb = mix(uColStripe, vec3(1.0), 0.35);
-          if (yr < -0.72) m.alb = mix(uColBase, vec3(0.62, 0.64, 0.66), 0.5);
+          if (yr > -0.22 && yr < 0.0 && lp.z > gM[2].x) m.alb = gColStripe;
+          if (yr > 0.06 && yr < 0.11 && lp.z > gM[2].x) m.alb = mix(gColStripe, vec3(1.0), 0.35);
+          if (yr < -0.72) m.alb = mix(gColBase, vec3(0.62, 0.64, 0.66), 0.5);
           if (fract(lp.z/0.85) < 0.01) m.alb *= 0.8;
           float post = ck == 2 ? min(abs(lp.x) - 0.03, abs(abs(lp.x) - abs(E.x) - 0.42) - 0.035) : abs(lp.x) - 0.025;
           bool ws = lp.z > WS.x && lp.z < WS.y && lp.y > WS.z;
@@ -2299,43 +2352,43 @@ R"(      sh *= cloudShadow(p);
           bool frame = (ws && post <= 0.0) || (lp.z > WS.x - 0.03 && lp.z < WS.w + 0.03 && lp.y > WS.z - 0.15 && lp.y < sideTop + 0.03 && abs(lp.x) > 0.3 && !sideW && lp.z > WS.y);
           if ((ws && post > 0.0) || sideW) { m.alb = vec3(0.012, 0.016, 0.02); m.rough = 0.03; m.metal = 0.2; }
           else if (frame) m.alb *= 0.55;
-          int nw = int(uM[20].x + 0.5);
-          if (nw > 0 && abs(lp.x) > sec.x*0.4 && lp.z > uM[20].y && lp.z < uM[20].z) {
-            float pw = (uM[20].z - uM[20].y)/float(nw);
-            vec2 wq = vec2(mod(lp.z - uM[20].y, pw) - pw*0.5, lp.y - (sec.z + uM[20].w));
-            vec2 hs = uM[21].xy; float rr = min(hs.x, hs.y)*0.7;
+          int nw = int(gM[20].x + 0.5);
+          if (nw > 0 && abs(lp.x) > sec.x*0.4 && lp.z > gM[20].y && lp.z < gM[20].z) {
+            float pw = (gM[20].z - gM[20].y)/float(nw);
+            vec2 wq = vec2(mod(lp.z - gM[20].y, pw) - pw*0.5, lp.y - (sec.z + gM[20].w));
+            vec2 hs = gM[21].xy; float rr = min(hs.x, hs.y)*0.7;
             vec2 dq = abs(wq) - hs + rr; float wd = length(max(dq, 0.0)) + min(max(dq.x, dq.y), 0.0) - rr;
             if (wd < 0.0) { m.alb = vec3(0.02, 0.025, 0.03); m.rough = 0.05; m.emit = vec3(1.0, 0.85, 0.6)*uNight*0.5; }
             else if (wd < 0.022) m.alb *= 0.7;
           }
           if (ck == 2 && lp.z < WS.x && lp.z > WS.x - 2.0 && yr > 0.2) { m.alb = vec3(0.02); m.rough = 0.85; }
-          if (int(uM[0].z + 0.5) == 0 && lp.z < uM[1].x + 0.3 && ln.z < -0.4 && abs(lp.x) > 0.11 && abs(lp.x) < sec.x*0.8 && abs(yr + 0.15) < 0.35) m.alb = vec3(0.02);
-          if (int(uM[0].z + 0.5) == 1 && lp.z < uM[1].x + 0.7 && lp.y < sec.z - sec.y*0.45 && ln.z < -0.3) m.alb = vec3(0.02);
+          if (int(gM[0].z + 0.5) == 0 && lp.z < gM[1].x + 0.3 && ln.z < -0.4 && abs(lp.x) > 0.11 && abs(lp.x) < sec.x*0.8 && abs(yr + 0.15) < 0.35) m.alb = vec3(0.02);
+          if (int(gM[0].z + 0.5) == 1 && lp.z < gM[1].x + 0.7 && lp.y < sec.z - sec.y*0.45 && ln.z < -0.3) m.alb = vec3(0.02);
         }
       } else if (mid == 2) {
-        float s = abs(lp.x); float k = clamp(s/uM[9].x, 0.0, 1.0);
-        float ch = mix(uM[9].y, uM[9].z, k); float le = uM[9].w*k;
-        float cc = (lp.z - uM[10].y - le)/ch;
-        m.alb = uColBase*0.98;
-        if (s > uM[9].x*0.9) m.alb = uColStripe;
-        if (uM[19].w > 0.5 && cc < 0.045) { m.alb = vec3(0.06); m.rough = 0.6; }
+        float s = abs(lp.x); float k = clamp(s/gM[9].x, 0.0, 1.0);
+        float ch = mix(gM[9].y, gM[9].z, k); float le = gM[9].w*k;
+        float cc = (lp.z - gM[10].y - le)/ch;
+        m.alb = gColBase*0.98;
+        if (s > gM[9].x*0.9) m.alb = gColStripe;
+        if (gM[19].w > 0.5 && cc < 0.045) { m.alb = vec3(0.06); m.rough = 0.6; }
         if (fract(s/0.8) < 0.01 && cc > 0.05) m.alb *= 0.86;
-        if (uM[11].x > 0.5 && s < 1.6 && ln.y > 0.5 && cc < 0.7) m.alb *= 0.9;
+        if (gM[11].x > 0.5 && s < 1.6 && ln.y > 0.5 && cc < 0.7) m.alb *= 0.9;
       } else if (mid == 3) {
-        m.alb = uColBase;
-        float tailTop = uM[15].x + uM[14].x;
-        if (lp.y > uM[15].x + uM[14].x*0.5 && abs(lp.x) < 0.25) m.alb = uColStripe;
+        m.alb = gColBase;
+        float tailTop = gM[15].x + gM[14].x;
+        if (lp.y > gM[15].x + gM[14].x*0.5 && abs(lp.x) < 0.25) m.alb = gColStripe;
         if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
       } else if (mid == 5) {
-        m.alb = uColBase*0.96; m.rough = 0.3;
-        if (int(uM[0].z + 0.5) == 4 && lp.z < uM[16].w + 0.3) { m.alb = vec3(0.85); m.metal = 1.0; m.rough = 0.18; }
+        m.alb = gColBase*0.96; m.rough = 0.3;
+)"
+R"(        if (int(gM[0].z + 0.5) == 4 && lp.z < gM[16].w + 0.3) { m.alb = vec3(0.85); m.metal = 1.0; m.rough = 0.18; }
       } else if (mid == 6) { m.alb = vec3(0.025); m.rough = 0.85; }
-      else if (mid == 8) { m.alb = uM[11].x > 0.5 && length(lp.xz) > 1.2 && lp.y > -0.3 ? uColBase*0.95 : vec3(0.6, 0.61, 0.63); m.metal = 0.5; m.rough = 0.35; }
+      else if (mid == 8) { m.alb = gM[11].x > 0.5 && length(lp.xz) > 1.2 && lp.y > -0.3 ? gColBase*0.95 : vec3(0.6, 0.61, 0.63); m.metal = 0.5; m.rough = 0.35; }
       else if (mid == 10) {
         m.alb = vec3(0.075); m.rough = 0.6;
         if (ln.z > 0.6) {
-)"
-R"(          bool pilot = lp.x*E.x >= 0.0;
+          bool pilot = lp.x*E.x >= 0.0;
           vec2 q = vec2(pilot ? lp.x - E.x : lp.x + E.x, lp.y - (E.y - 0.32));
           if (!pilot && ck == 0) q.x = lp.x + E.x - 0.33 + 0.33;
           float px = t*2.0*uTanHalf/uRes.y;   // panel metres per pixel
@@ -2352,41 +2405,41 @@ R"(          bool pilot = lp.x*E.x >= 0.0;
       else if (mid == 12) { m.alb = vec3(0.09, 0.1, 0.14)*(0.9 + 0.2*step(0.5, fract(lp.y*12.0))); m.rough = 1.0; }
       else if (mid == 13) { m.alb = vec3(0.035); m.rough = 0.4; }
       else if (mid == 14) { m.alb = vec3(0.018); m.rough = 0.95; }
-      else if (mid == 16) { m.alb = uM[0].x > 9.0 ? uColBase*0.9 : uColStripe; m.metal = 0.5; m.rough = 0.2; }
+      else if (mid == 16) { m.alb = gM[0].x > 9.0 ? gColBase*0.9 : gColStripe; m.metal = 0.5; m.rough = 0.2; }
       else if (mid == 17) { m.alb = vec3(0.09, 0.075, 0.06); m.metal = 0.7; m.rough = 0.55; }
       else if (mid == 18) { m.alb = vec3(0.1); m.emit = (lp.x < 0.0 ? vec3(1.0, 0.05, 0.02) : vec3(0.05, 1.0, 0.15))*(0.5 + 2.0*uNight); m.rough = 0.1; }
       else if (mid == 19) { m.alb = vec3(0.3, 0.02, 0.02); m.emit = vec3(1.0, 0.05, 0.02)*step(0.88, fract(uTime))*3.0; m.rough = 0.1; }
       else if (mid == 21) {
-        vec2 fq = vec2(abs(lp.x) - uM[16].x, lp.y - uM[16].y);
+        vec2 fq = vec2(abs(lp.x) - gM[16].x, lp.y - gM[16].y);
         float bl = step(0.5, fract(atan(fq.y, fq.x)*22.0/6.2832 + length(fq)*2.0));
         m.alb = mix(vec3(0.04), vec3(0.22), bl); m.metal = 0.9; m.rough = 0.3;
-        if (length(fq) < uM[16].z*0.25) m.alb = vec3(0.05);
+        if (length(fq) < gM[16].z*0.25) m.alb = vec3(0.05);
       }
       if (mid >= 30 && mid < 60) {  // XR-9 research jet surfaces
         vec3 nT; vec4 tx;
         float pulse = 0.75 + 0.25*sin(uTime*2.5);
         if (mid == 30 || mid == 31) {
           tx = triSample(lp, ln, M_PAINT, 0.7, nT);
-          m.alb = uColBase*tx.rgb*1.6; m.rough = 0.55; m.metal = 0.08; m.nrm = nT;   // matte radar-absorbent coating: doesn't mirror the sky
+          m.alb = gColBase*tx.rgb*1.6; m.rough = 0.55; m.metal = 0.08; m.nrm = nT;   // matte radar-absorbent coating: doesn't mirror the sky
           vec2 pl = abs(fract(lp.xz/vec2(0.9, 1.3)) - 0.5);           // panel seams
           if (max(pl.x, pl.y) > 0.49) m.alb *= 0.55;
-          if (mid == 31 && abs(lp.x) > 4.6) m.alb = mix(m.alb, uColStripe*0.6, 0.6);
+          if (mid == 31 && abs(lp.x) > 4.6) m.alb = mix(m.alb, gColStripe*0.6, 0.6);
           if (mid == 30 && lp.z < -8.0) m.alb = vec3(0.03);              // radar nose cap
         } else if (mid == 32) { m.alb = vec3(0.3, 0.2, 0.06); m.metal = 0.95; m.rough = 0.06; }
         else if (mid == 33) {
           tx = triSample(lp, ln, M_METAL, 0.8, nT); m.alb = tx.rgb*vec3(0.2, 0.19, 0.2); m.metal = 0.6; m.rough = 0.5; m.nrm = nT;
-          float heat = uCtl.w*uCtl.w;
+          float heat = gCtl.w*gCtl.w;
           m.alb = mix(m.alb, vec3(0.16, 0.11, 0.17), 0.4*heat);   // heat-tinted titanium
-        } else if (mid == 34) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = uColStripe*(1.2 + 2.0*uNight)*pulse; }
-        else if (mid == 35) { m.alb = vec3(0.06); m.metal = 0.8; m.rough = 0.35; m.emit = vec3(0.25, 0.6, 1.0)*uPS.y*uCtl.w*2.5; }
-        else if (mid == 36) { float ab = uFlame.y, sp = uFlame.x; m.alb = vec3(0.02); m.emit = mix(vec3(0.35, 0.6, 1.0), vec3(1.0, 0.82, 0.6), ab)*(0.3 + 9.0*sp*sp + 16.0*ab); }
+        } else if (mid == 34) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = gColStripe*(1.2 + 2.0*uNight)*pulse; }
+        else if (mid == 35) { m.alb = vec3(0.06); m.metal = 0.8; m.rough = 0.35; m.emit = vec3(0.25, 0.6, 1.0)*gPS.y*gCtl.w*2.5; }
+        else if (mid == 36) { float ab = gFlame.y, sp = gFlame.x; m.alb = vec3(0.02); m.emit = mix(vec3(0.35, 0.6, 1.0), vec3(1.0, 0.82, 0.6), ab)*(0.3 + 9.0*sp*sp + 16.0*ab); }
         else if (mid == 40) {  // sealed pod: carbon weave between structural ribs
           vec2 wv = floor(vec2(lp.x + lp.z, lp.y - lp.z)*55.0);
           tx = triSample(lp, ln, M_FABRIC, 4.0, nT); m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.3);
           m.alb = vec3(0.03, 0.032, 0.036)*(0.8 + 0.4*mod(wv.x + wv.y, 2.0)); m.rough = 0.3; m.metal = 0.2;
           float rib = abs(fract((lp.z - E.z)*4.0) - 0.5);
           if (rib > 0.46) { m.alb = vec3(0.07, 0.075, 0.08); m.metal = 0.7; m.rough = 0.3; }
-          if (abs(lp.y - (E.y - 0.18)) < 0.004) m.emit = uColStripe*1.4*pulse;
+          if (abs(lp.y - (E.y - 0.18)) < 0.004) m.emit = gColStripe*1.4*pulse;
         }
         else if (mid >= 41 && mid <= 43) { m.alb = vec3(0.0); m.rough = 0.05; }
         else if (mid == 44) {  // bezels and consoles: satin composite with machined edges and fasteners
@@ -2414,10 +2467,10 @@ R"(          bool pilot = lp.x*E.x >= 0.0;
           m.alb = vec3(0.01); m.rough = 0.06; m.metal = 0.0; m.emit = sc*1.5;
         }
         else if (mid == 46) { tx = triSample(lp, ln, M_LEATHER, 0.3, nT); m.alb = vec3(dot(tx.rgb, vec3(0.33)))*vec3(0.3, 0.32, 0.36); m.rough = tx.a; m.nrm = nT;
-          if (abs(abs(lp.x - E.x) - 0.16) < 0.005) m.emit = uColStripe*0.9*pulse;
-          if (lp.y > E.y + 0.12 && abs(lp.x - E.x) < 0.1 && ln.z > 0.5) m.emit = uColStripe*1.2; }
+          if (abs(abs(lp.x - E.x) - 0.16) < 0.005) m.emit = gColStripe*0.9*pulse;
+          if (lp.y > E.y + 0.12 && abs(lp.x - E.x) < 0.1 && ln.z > 0.5) m.emit = gColStripe*1.2; }
         else if (mid == 47) { tx = triSample(lp, ln, M_RUBBER, 0.1, nT); m.alb = tx.rgb*0.3; m.rough = tx.a; m.metal = 0.1; m.nrm = nT; if (lp.y > E.y - 0.24 && ln.y > 0.3) m.emit = vec3(1.0, 0.45, 0.1)*0.8; }
-        else if (mid == 48) { m.alb = vec3(0.1); m.emit = uColStripe*1.1*pulse; }
+        else if (mid == 48) { m.alb = vec3(0.1); m.emit = gColStripe*1.1*pulse; }
         else if (mid == 49) {  // annunciator strip: GEAR, BRK, AB, VTOL, MACH, G, LOW ALT, SYS
           vec3 qd = lp - E.xyz; float an = atan(qd.x, -qd.z);
           int cell = int(clamp(floor((an + 0.62)/0.155), 0.0, 7.0));
@@ -2438,7 +2491,7 @@ R"(          bool pilot = lp.x*E.x >= 0.0;
         else if (mid == 54) {  // backlit keys
           vec3 qd = lp - E.xyz; vec3 cq = vec3(abs(qd.x) - 0.52, qd.y + 0.44, qd.z - 0.08) - vec3(0.0, 0.055, 0.12);
           vec2 cell = floor(cq.xz/0.032 + 0.5); float hk = hash2i(ivec2(cell) + ivec2(qd.x < 0.0 ? 11 : 37, 5));
-          vec3 kc = hk < 0.15 ? vec3(1.0, 0.55, 0.15) : hk < 0.25 ? vec3(0.3, 1.0, 0.5) : uColStripe*0.6;
+          vec3 kc = hk < 0.15 ? vec3(1.0, 0.55, 0.15) : hk < 0.25 ? vec3(0.3, 1.0, 0.5) : gColStripe*0.6;
           m.alb = vec3(0.04); m.rough = 0.4; m.emit = ln.y > 0.6 ? kc*(0.12 + 0.5*step(0.85, hk)*step(0.5, fract(uTime*0.7 + hk*3.0))) : vec3(0.0);
         }
         else if (mid == 55) {  // overhead panel face: status LEDs beside each switch
@@ -2463,15 +2516,15 @@ R"(          bool pilot = lp.x*E.x >= 0.0;
           m.alb = tx.rgb*(ck == 2 ? vec3(0.3, 0.32, 0.36) : vec3(0.5, 0.48, 0.45)); m.rough = tx.a; m.nrm = nT;
           if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;                      // panel seams / stitching
         }
-        else if (mid == 64) {   // light lenses: glareshield strip (cool white), dome and map lights (warm)
+)"
+R"(        else if (mid == 64) {   // light lenses: glareshield strip (cool white), dome and map lights (warm)
           bool glare = lp.y < E.y;
           m.alb = vec3(0.65, 0.62, 0.58); m.rough = 0.25;
           m.emit = (glare ? vec3(1.0, 0.86, 0.66) : vec3(1.0, 0.72, 0.45))*(0.25 + 1.8*uNight);
         }
         else if (mid == 65) {   // radio / transponder stack: three units with amber frequency windows and knobs
           m.alb = vec3(0.03); m.rough = 0.45; m.metal = 0.3;
-)"
-R"(          vec2 rq = vec2(lp.x, lp.y - (E.y - 0.505));
+          vec2 rq = vec2(lp.x, lp.y - (E.y - 0.505));
           if (ln.z > 0.5) {
             float row = clamp(floor((rq.y + 0.06)/0.04), 0.0, 2.0); float ry = rq.y + 0.06 - row*0.04 - 0.02;
             if (abs(ry) < 0.0175 && abs(rq.y) < 0.059) m.alb = vec3(0.05);
@@ -2515,7 +2568,7 @@ R"(          vec2 rq = vec2(lp.x, lp.y - (E.y - 0.505));
         else if (mid == 13) { tx = triSample(lp, ln, M_PLASTIC, 0.2, nT); m.alb = tx.rgb*0.6; m.rough = tx.a; m.nrm = nT; }
         else if (mid == 14) { tx = triSample(lp, ln, M_CARPET, 0.15, nT); m.alb = tx.rgb*0.22; m.rough = 0.95; m.nrm = nT; }   // anti-glare flocking
       }
-      if (uWreck > 0) {  // fire-blackened, buckled skin with a few glowing embers near the breaks
+      if (uWreck > 0 && !trafHit) {  // fire-blackened, buckled skin with a few glowing embers near the breaks
         float burn = vnoise(lp.xz*2.3 + lp.y*1.7) + 0.5*vnoise(lp.yz*5.1);
         float cut = 1.0 - smoothstep(0.0, 0.6, -sdBox(lp - uPcC[gPI], uPcH[gPI]));
         float k = clamp(0.25 + 0.55*burn + 0.5*cut, 0.0, 1.0);
@@ -2524,7 +2577,7 @@ R"(          vec2 rq = vec2(lp.x, lp.y - (E.y - 0.505));
       }
       n = applyTS(n, m.nrm, interior ? 0.35 : 0.12);
       bool podMat = mid >= 40 && mid < 60;
-      float sh = sunVis > 0.0 && !podMat ? planeShadow(p + n*0.02, uSunDir) * terrainShadow(p, uSunDir, 50.0) * cloudShadow(p) : 0.0;   // the sealed pod sees no sun
+      float sh = sunVis > 0.0 && !podMat ? (trafHit ? 1.0 : planeShadow(p + n*0.02, uSunDir)) * terrainShadow(p, uSunDir, 50.0) * cloudShadow(p) : 0.0;   // the sealed pod sees no sun
       if (podMat) {  // sealed research cockpit: lit only by its modelled fixtures, low and moody
         mat3 inv = transpose(gPR);
         col = podLight(lp, inv*n, inv*(-rd), m, E.xyz)*interiorAO(lp, ln) + m.emit;
@@ -2535,7 +2588,7 @@ R"(          vec2 rq = vec2(lp.x, lp.y - (E.y - 0.505));
         col = pbr(n, v, uSunDir, m.alb, m.rough, m.metal, uSunCol*sh*3.2)
             + (m.alb*(1.0 - m.metal)*(ambientLight(n)*0.4 + ambientLight(vec3(0.0, 1.0, 0.0))*0.2)
                + skyColor(normalize(reflect(rd, n) + vec3(0.0, 0.3, 0.0)))*F*(1.0 - m.rough)*(1.0 - m.rough)*0.35)*ao
-            + cabinLight(lp, inv*n, inv*v, m, E.xyz, uM[21].w, E.w)*ao + m.emit;
+            + cabinLight(lp, inv*n, inv*v, m, E.xyz, gM[21].w, E.w)*ao + m.emit;
       } else {
         col = shadeSurface(p, n, rd, m, sh);
         vec3 h = normalize(-rd + uSunDir);
@@ -2543,6 +2596,7 @@ R"(          vec2 rq = vec2(lp.x, lp.y - (E.y - 0.505));
       }
     }
     if (!pod) col = applyFog(col, ro, rd, t);
+    if (trafHit) loadMain();
   }
   // propeller discs (motion-blurred), composited over scene
   if (uPlaneOn == 1 && uWreck == 0) {
@@ -2566,7 +2620,7 @@ R"(          vec2 rq = vec2(lp.x, lp.y - (E.y - 0.505));
     }
   }
   // research jet exhaust plumes (additive, depth-limited by the scene)
-  if (uPlaneOn == 1 && uWreck == 0 && uPS.w < 0.5 && int(uM[0].z + 0.5) == 5) col += jetPlumes(ro, rd, t, jitter);
+  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 5) col += jetPlumes(ro, rd, t, jitter);
   // clouds
   vec4 cl = pod ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(ro, rd, t, jitter);
   col = col*cl.a + cl.rgb;

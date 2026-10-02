@@ -18,6 +18,10 @@ struct PlaneVisual {
   float flame[4] = {0, 0, 0, 0};  // research jet exhaust: spool, reheat, nozzle vector angle (rad), mach
 };
 
+// One AI traffic aircraft for the ray tracer: 32 texels (see loadTraffic in shaders.h)
+struct TrafficVisual { float t[32 * 4]; };
+static const int kMaxTrafficDrawn = 12;
+
 struct WreckVisual {
   int pieces = 0;               // > 0: draw these clipped pieces instead of the intact aircraft
   vec3 pos[5]; float rot[5][9]; // piece centre (world) and body->world rotation
@@ -38,7 +42,8 @@ struct FrameParams {
   vec3 landLightPos, landLightDir; float landLight = 0;
   vec3 flameLightPos, flameLight;  // research jet exhaust light (radiance; zero when off)
   float exposure = 1.0f, rainLens = 0, fade = 1, vignette = 0.6f, gLoad = 0;
-  bool sealedCockpit = false;   // XR-9 cockpit view: no sun glare (the pilot sees the sun only on the displays)   // gLoad: g-force tunnel 0..1
+  bool sealedCockpit = false;
+  int trafficN = 0; TrafficVisual traffic[kMaxTrafficDrawn];   // XR-9 cockpit view: no sun glare (the pilot sees the sun only on the displays)   // gLoad: g-force tunnel 0..1
 };
 
 struct UIVert { float x, y, u, v, r, g, b, a, mode, hx, hy, p; };
@@ -82,6 +87,7 @@ private:
   GLuint fboScene = 0, texColor = 0, texDepth = 0, fboSprite = 0;
   // temporal AA: the ray tracer writes texRaw; the resolve blends it with the reprojected history into texHist[cur] + texColor
   GLuint texRaw = 0, texHist[2] = {0, 0}, fboTAA[2] = {0, 0};
+  GLuint texTraffic = 0;
   int histIdx = 0, frameNo = 0; bool histValid = false;
   // GPU frame time from a ring of timer queries (read a few frames late so the CPU never waits on them)
   GLuint gpuQ[4] = {0, 0, 0, 0}; bool gpuQUsed[4] = {false, false, false, false}; int gpuQi = 0;

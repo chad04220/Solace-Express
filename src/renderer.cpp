@@ -478,6 +478,17 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glActiveTexture(GL_TEXTURE0 + 3); glBindTexture(GL_TEXTURE_2D, texMask); glUniform1i(U(p, "uMask"), 3);
   glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadId"), 4);
   glActiveTexture(GL_TEXTURE0 + 6); glBindTexture(GL_TEXTURE_2D, texHMax); glUniform1i(U(p, "uHMax"), 6);
+  {   // AI traffic: one row of 32 texels per aircraft
+    if (!texTraffic) {
+      glGenTextures(1, &texTraffic); glBindTexture(GL_TEXTURE_2D, texTraffic);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 32, kMaxTrafficDrawn, 0, GL_RGBA, GL_FLOAT, nullptr);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    }
+    glActiveTexture(GL_TEXTURE0 + 7); glBindTexture(GL_TEXTURE_2D, texTraffic);
+    int n = std::min(fp.trafficN, kMaxTrafficDrawn);
+    if (n > 0) glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 32, n, GL_RGBA, GL_FLOAT, fp.traffic[0].t);
+    glUniform1i(U(p, "uTraffic"), 7); glUniform1i(U(p, "uTrafficN"), n);
+  }
   glUniform2f(U(p, "uRes"), (float)rw, (float)rh);
   // TAA: Halton(2,3) sub-pixel jitter and a golden-ratio noise seed, both changing every frame
   frameNo++;

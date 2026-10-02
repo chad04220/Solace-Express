@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include "world.h"
 #include "aircraft.h"
+#include "traffic.h"
 #include "career.h"
 #include "renderer.h"
 #include "audio.h"
@@ -28,7 +29,7 @@ struct Input {
 struct Settings {
   float renderScale = 1.0f; int quality = 1;   // renderScale: the most the dynamic resolution may use
   float master = 0.8f, engineVol = 1.0f, sfxVol = 0.9f, radioVol = 0.6f;
-  bool invertPitch = false, showHints = true, metric = false, fullscreen = false;
+  bool invertPitch = false, showHints = true, metric = false, fullscreen = false, traffic = true;
   int radioStation = 0;
   float mouseSens = 1.0f;
 };
@@ -109,6 +110,8 @@ private:
   void breakUp(vec3 impactVel, bool water, bool air = false);
   bool airBreak = false;
   float gTunnel = 0;
+  Traffic traffic;
+  bool dbgCam = false; vec3 dbgCamPos, dbgCamLook;   // debug scenes: free camera               // AI aircraft: airport circuits, cruisers, XR-9 formations, display team
   float fpsAvg = 1.f / 60.f; bool showPerf = false;   // F3: frame-rate / GPU time / resolution overlay              // smoothed g-force screen-edge effect 0..1          // broke up in flight: pieces tumble down before anything hits the ground
   float crashEndT = 7.5f;         // crashTimer at which the results screen comes up
   void updateWreck(float dt);

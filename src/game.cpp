@@ -24,6 +24,7 @@ void Game::loadSettings() {
     else if (s == "radioVol") set.radioVol = clampf(v, 0, 1);
     else if (s == "invertPitch") set.invertPitch = v != 0;
     else if (s == "showHints") set.showHints = v != 0;
+    else if (s == "traffic") set.traffic = v != 0;
     else if (s == "metric") set.metric = v != 0;
     else if (s == "fullscreen") set.fullscreen = v != 0;
     else if (s == "radioStation") set.radioStation = (int)v;
@@ -35,8 +36,8 @@ void Game::loadSettings() {
 void Game::saveSettings() {
   FILE* f = fopen(joinPath(saveDir, "settings.cfg").c_str(), "w");
   if (!f) return;
-  fprintf(f, "renderScale %f\nquality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\n",
-          set.renderScale, set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens);
+  fprintf(f, "renderScale %f\nquality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\n",
+          set.renderScale, set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic);
   fclose(f);
 }
 
@@ -161,6 +162,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   plane.reset(&s, start, hdg, fuel, payloadKg, c.startAirborne, s.cruise);
   fuelStart = plane.fuel;
   wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0;
+  traffic.reset();
   paused = false; showMap = false; landed = completed = crashed = false;
   result = FlightResult();
   timeAccel = 1; camMode = camMode == 1 ? 1 : 0; camYaw = 0; camPitch = 0.12f; camZoom = 1;
@@ -362,6 +364,13 @@ void Game::updateFlight(float dt) {
   lightning = std::max(0.f, lightning - dt * 4.f) * (lightning > 0.5f ? 1.f : (rand() % 3 ? 1.f : 0.3f));
   cloudOff = cloudOff + vec2(-sinf(wx.windFrom * DEG), cosf(wx.windFrom * DEG)) * (wx.windSpeed * 2.f * simDt);
 
+  // AI traffic
+  traffic.enabled = set.traffic;
+  if (traffic.update(simDt, plane.pos, plane.vel, plane.onGround || crashed, plane.spec->span) && !crashed && !plane.ev.crashed) {
+    plane.ev.crashed = true; plane.ev.crashReason = "Mid-air collision";
+  }
+  for (auto& f : traffic.puffs) spawn(f.p, f.v, f.life, f.size, f.grow, f.col, f.alpha, f.kind, 1.f, 0.f);
+  for (auto& b : traffic.booms) g_audio.trigger(SFX_BOOM, b.second);
   {
     // g-force tunnel: a faint red tint from the first noticeable g that slowly closes into the full ring as the load
     // nears the airframe's limit (regular aircraft 1.8 -> 6 g, the XR-9's damped cell 4 -> 50 g; negative g from
@@ -1034,6 +1043,7 @@ FrameParams Game::buildFrame() {
                             : normalize(plane.pos + vec3(0, plane.spec->fusRad * 0.3f, 0) - camPos);
     vec3 upRef = camMode == 1 ? plane.up() : vec3(0, 1, 0);
     if (camMode == 0) upRef = normalize(lerp(vec3(0, 1, 0), camQ.rotate(vec3(0, 1, 0)), 0.3f));
+    if (dbgCam) { camPos = dbgCamPos; fwd = normalize(dbgCamLook - dbgCamPos); upRef = vec3(0, 1, 0); }
     fp.camPos = camPos;
     fp.camBack = -fwd;
     fp.camRight = normalize(cross(fwd, upRef));
@@ -1053,6 +1063,7 @@ FrameParams Game::buildFrame() {
     }
     fp.rainLens = camMode == 1 && wx.precip == 1 ? 1.f : 0.f;
     fp.sealedCockpit = camMode == 1 && plane.spec->special && !crashed;
+    fp.trafficN = traffic.fillVisuals(fp.camPos, fp.traffic, kMaxTrafficDrawn, nullptr);
     if (crashed) fp.fade = clampf(1.f - (crashTimer - (crashEndT - 1.f)), 0, 1);
     fp.gLoad = gTunnel;
   } else {
@@ -1179,6 +1190,26 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
           bill(add, plane.pos + plane.q.rotate(vec3(k * 0.82f, -0.12f, 7.75f) + ax * (1.2f + 0.6f * ab)), 0.8f + 0.7f * ab,
                lerp(vec3(0.3f, 0.55f, 1.f), vec3(1.f, 0.7f, 0.4f), ab) * ((0.25f * sp * sp + 0.5f * ab) * fl), 1, SPR_GLOW, 0.6f);
       }
+    }
+    // AI traffic lights: nav lights, beacon, strobes when airborne, landing lights on the runway and on approach,
+    // reheat glow on XR-9 formations
+    for (const TrafficCraft& c : traffic.craft) {
+      float dc = length(c.pos - fp.camPos);
+      if (dc > 9000.f) continue;
+      const ModelDef& tm = kModels[c.spec];
+      float ls2 = std::max(0.25f, dc * 0.002f);
+      vec3 tip = c.spec == kResearchJet ? kJetWingTip : modelWingTip(tm);
+      vec3 lt = c.pos + c.q.rotate(vec3(-tip.x, tip.y, tip.z)), rt = c.pos + c.q.rotate(tip);
+      bill(add, lt, ls2, vec3(1.f, 0.1f, 0.05f) * navI, 1, SPR_GLOW, 0.3f);
+      bill(add, rt, ls2, vec3(0.1f, 1.f, 0.2f) * navI, 1, SPR_GLOW, 0.3f);
+      float ph = fmodf(t + c.id * 0.37f, 1.f);
+      if (ph < 0.1f) bill(add, c.pos + c.q.rotate(vec3(0, kAircraft[c.spec].fusRad * 1.05f, 0)), ls2 * 1.4f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night), 1, SPR_GLOW, 0.3f);
+      bool airborne = c.state >= TrafficCraft::TAKEOFF && c.state <= TrafficCraft::ROLLOUT;
+      if ((airborne || c.role != TrafficCraft::AIRPORT) && fmodf(t * 0.77f + c.id * 0.13f, 1.3f) < 0.05f) { bill(add, lt, ls2 * 2.5f, vec3(4.f), 1, SPR_GLOW, 0.3f); bill(add, rt, ls2 * 2.5f, vec3(4.f), 1, SPR_GLOW, 0.3f); }
+      if (c.role == TrafficCraft::AIRPORT && (c.state == TrafficCraft::TAKEOFF || c.state == TrafficCraft::FINAL || c.state == TrafficCraft::ROLLOUT || c.state == TrafficCraft::LINEUP))
+        bill(add, c.pos + c.q.rotate(vec3(0, -kAircraft[c.spec].fusRad * 0.6f, -kAircraft[c.spec].fusLen * 0.4f)), ls2 * 2.f, vec3(1.f, 0.95f, 0.85f) * (1.f + 4.f * night), 1, SPR_GLOW, 0.3f);
+      if (c.ab > 0.5f) for (int k = -1; k <= 1; k += 2)
+        bill(add, c.pos + c.q.rotate(vec3(k * 0.82f, -0.12f, 8.9f)), 1.6f + ls2, vec3(1.f, 0.65f, 0.35f) * 1.6f, 1, SPR_GLOW, 0.6f);
     }
     if (landingLight && plane.engineRunning && camMode != 1)
       bill(add, plane.pos + plane.q.rotate(vec3(s.engLayout == 0 ? -s.span * 0.25f : 0, s.engLayout == 0 ? s.wingY * s.fusRad : -s.fusRad * 0.6f, s.engLayout == 0 ? s.wingZ - s.chord * 0.5f : -0.35f * s.fusLen)), ls * 1.8f,
@@ -1536,6 +1567,37 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < 4; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     lookYaw = ly * DEG; lookPitch = lpch * DEG; camYaw = lookYaw; camPitch = lookPitch + 0.12f;
     toasts.clear(); hint.clear(); return;
+  }
+  if (name.compare(0, 3, "trf") == 0) {   // AI traffic: trf<seconds>_<view> at Solace Capital; view 0 = airport overview, k = chase craft k-1
+    float secs = 60; int view = 0; sscanf(name.c_str() + 3, "%f_%d", &secs, &view);
+    set.traffic = getenv("NOTRF") == nullptr;
+    int ai = g_world.findAirport("CAP"); const Airport& a = g_world.airports[ai];
+    float h = a.heading * DEG, sn = sinf(h), cs = cosf(h), side = (ai & 1) ? 1.f : -1.f;
+    auto W = [&](float u, float v) { return vec3(a.x + u * sn + v * cs, 0, a.z - u * cs + v * sn); };
+    vec3 pp = W(a.length * 0.47f, side * (a.width * 0.5f + 130.f)); pp.y = g_world.height(pp.x, pp.z) + 1.5f;
+    plane.reset(&kAircraft[1], pp, a.heading, kAircraft[1].maxFuel, 100, false, 0);
+    takeoffAnnounced = true; camQ = plane.q; hint.clear(); timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 15.f;
+    for (float tt = 0; tt < secs; tt += 1 / 20.f) { realTime += 1 / 20.f; update(1 / 20.f); }
+    const char* st[] = {"PARKED", "TAXI_OUT", "HOLD", "LINEUP", "TAKEOFF", "CLIMB", "CIRCUIT", "FINAL", "ROLLOUT", "TAXI_IN", "FLY"};
+    const char* rl[] = {"airport", "cruiser", "formation", "stunt"};
+    for (int i = 0; i < (int)traffic.craft.size(); i++) { const TrafficCraft& c = traffic.craft[i];
+      printf("trf %2d %-9s %-17s %-8s agl %6.0f spd %5.1f dist %6.0f man %d\n", i, rl[c.role], kAircraft[c.spec].name, st[c.state], c.pos.y - g_world.height(c.pos.x, c.pos.z), c.speed, length(c.pos - plane.pos), c.man); }
+    dbgCam = true; hudOn = false; toasts.clear();
+    if (view == 0) { dbgCamLook = W(0, side * 60.f); dbgCamLook.y = a.elev; dbgCamPos = W(-a.length * 0.2f, -side * 700.f); dbgCamPos.y = a.elev + 250.f; }
+    else if (view - 1 < (int)traffic.craft.size()) { const TrafficCraft& c = traffic.craft[view - 1]; float sz = kAircraft[c.spec].fusLen;
+      dbgCamLook = c.pos; dbgCamPos = c.pos + c.q.rotate(vec3(sz * 0.9f, sz * 0.35f, sz * 1.6f)); }
+    return;
+  }
+  if (name.compare(0, 3, "xrf") == 0) {   // XR-9 formation pass: xrf<seconds after spawn>; camera at the player looking at the leader
+    float secs = 20; sscanf(name.c_str() + 3, "%f", &secs);
+    plane.reset(&kAircraft[1], vec3(-4000, 700, 9000), 40, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
+    takeoffAnnounced = true; camQ = plane.q; hint.clear(); timeOfDay = 14.f;
+    traffic.reset(); traffic.spawnFormation(plane.pos, vec3());
+    for (float tt = 0; tt < secs; tt += 1 / 30.f) { realTime += 1 / 30.f; update(1 / 30.f); }
+    for (auto& c : traffic.craft) if (c.role == TrafficCraft::FORMATION && c.leader < 0) {
+      printf("xrf: leader %.0f m from the player, %.0f m/s\n", length(c.pos - plane.pos), c.speed);
+      dbgCam = true; dbgCamPos = plane.pos + vec3(0, 3, 0); dbgCamLook = c.pos; break; }
+    hudOn = false; toasts.clear(); return;
   }
   if (name.compare(0, 4, "gtun") == 0) {   // g-force tunnel at a forced strength (percent), chase view: gtun<pct>
     resAirborne = true; realTime = 20; launchResearch();

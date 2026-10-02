@@ -570,6 +570,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
   toggle("Pitch control", set.invertPitch, "Inverted", "Normal (S = nose up)");
   toggle("Units", set.metric, "Metric", "Aviation (kt / ft)");
   toggle("Instructor hints", set.showHints, "Shown", "Hidden");
+  toggle("Air traffic", set.traffic, "On", "Off");
   bool fs = set.fullscreen;
   toggle("Display", set.fullscreen, "Fullscreen", "Windowed");
   if (fs != set.fullscreen) wantFullscreenToggle = true;
