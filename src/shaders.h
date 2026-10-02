@@ -198,6 +198,7 @@ in vec2 vUV;
 layout(location=0) out vec4 oColor;
 layout(location=1) out float oDepth;
 uniform vec2 uRes; uniform vec3 uCamPos; uniform mat3 uCamRot; uniform float uTanHalf; uniform float uAspect;
+uniform vec2 uJit; uniform float uSeed;  // TAA: sub-pixel jitter (uv units) and a per-frame noise seed
 uniform float uMaxH; uniform int uQuality;
 uniform sampler2DArray uAlb; uniform sampler2DArray uNrm;
 // airports
@@ -357,10 +358,10 @@ vec2 mapJetCockpit(vec3 p){
     res = opU(res, vec2(sdCapsule(tq, vec3(0.0), vec3(0.0, -0.022, 0.008), 0.0045), 47.0));
     res = opU(res, vec2(sdBox(oq + vec3(0.0, 0.019, 0.0), vec3(0.25, 0.001, 0.125)), 55.0));
   }
-  // sculpted seat: shell, bolsters, headrest with light strip, harness
-  {
 )"
-R"(    float seat = sdRoundBox(q - vec3(0.0, -0.6, 0.12), vec3(0.24, 0.06, 0.26), 0.05);
+R"(  // sculpted seat: shell, bolsters, headrest with light strip, harness
+  {
+    float seat = sdRoundBox(q - vec3(0.0, -0.6, 0.12), vec3(0.24, 0.06, 0.26), 0.05);
     vec3 bq = q - vec3(0.0, -0.17, 0.42); bq.yz = rot2(bq.yz, 0.22);
     seat = min(seat, sdRoundBox(bq, vec3(0.23, 0.42, 0.05), 0.05));
     seat = min(seat, sdRoundBox(vec3(abs(q.x) - 0.25, q.y + 0.3, q.z - 0.3), vec3(0.04, 0.24, 0.12), 0.03));
@@ -551,10 +552,10 @@ vec2 mapPlane(vec3 p){
     vec4 S0 = uM[1];
     if (eng <= 1) {
       float sr = N1.y;
-      float spin = sdRoundCone(p, vec3(0.0, S0.w, S0.x - sr*2.3), vec3(0.0, S0.w, S0.x + 0.05), 0.015, sr);
-      res = opU(res, vec2(spin, 16.0));
 )"
-R"(      if (eng == 0) {
+R"(      float spin = sdRoundCone(p, vec3(0.0, S0.w, S0.x - sr*2.3), vec3(0.0, S0.w, S0.x + 0.05), 0.015, sr);
+      res = opU(res, vec2(spin, 16.0));
+      if (eng == 0) {
         vec3 sec = fusSection(S0.x + 0.9);
         float ex = sdCapsule(vec3(abs(p.x), p.y, p.z), vec3(0.12, sec.z - sec.y*0.85, S0.x + 0.9), vec3(0.16, sec.z - sec.y - 0.06, S0.x + 1.15), 0.035);
         res = opU(res, vec2(ex, 17.0));
@@ -730,10 +731,10 @@ R"(      if (eng == 0) {
     vec3 swp = p - vec3(0.0, E.y - 0.565, pz + 0.05);
     float sw = 0.032; float cell = clamp(floor(swp.x/sw + 0.5), -12.0, 12.0);
     swp.x -= cell*sw;
-    float sws = sdRoundBox(swp - vec3(0.0, 0.0, 0.01), vec3(0.006, 0.012, 0.012), 0.003);
-    sws = max(sws, abs(p.x) - phw*0.85);
 )"
-R"(    res = opU(res, vec2(sws, 13.0));
+R"(    float sws = sdRoundBox(swp - vec3(0.0, 0.0, 0.01), vec3(0.006, 0.012, 0.012), 0.003);
+    sws = max(sws, abs(p.x) - phw*0.85);
+    res = opU(res, vec2(sws, 13.0));
     // armrests / door panels
     vec3 secA = fusSection(E.z);
     vec3 ap = vec3(abs(p.x) - (secA.x*0.86), p.y - (E.y - 0.5), p.z - (E.z - 0.15));
@@ -963,10 +964,10 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
     c = dialFace(d, r*0.85, inD);
     if (c.x >= 0.0) {
       if (inD) {
-        float rr = length(d)/(r*0.85); float a = atan(d.x, d.y);
-        if (rr > 0.84 && rr < 0.95 && a > 0.9 && a < 1.7) c = vec3(0.1, 0.7, 0.2);
 )"
-R"(        if (rr > 0.84 && rr < 0.95 && a > 1.7 && a < 1.8) c = vec3(0.9, 0.1, 0.1);
+R"(        float rr = length(d)/(r*0.85); float a = atan(d.x, d.y);
+        if (rr > 0.84 && rr < 0.95 && a > 0.9 && a < 1.7) c = vec3(0.1, 0.7, 0.2);
+        if (rr > 0.84 && rr < 0.95 && a > 1.7 && a < 1.8) c = vec3(0.9, 0.1, 0.1);
         c += vec3(0.85)*ticks(d, r*0.85, 10.0, -2.36, 2.36, 0.8);
         c = mix(c, vec3(0.95), needle(d, r*0.85, -2.36 + clamp(engF, 0.0, 1.1)*4.2, 0.85, 0.05));
       }
@@ -2020,10 +2021,10 @@ vec3 jetPlumes(vec3 ro, vec3 rd, float tmax, float jit){
   return col;
 }
 void main(){
-  vec2 ndc = vUV*2.0 - 1.0;
+  vec2 ndc = (vUV + uJit)*2.0 - 1.0;
   vec3 rd = normalize(uCamRot * vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, -1.0));
   vec3 ro = uCamPos;
-  float jitter = hash1(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)) + fract(uTime)*7.0);
+  float jitter = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))) + uSeed);   // interleaved gradient noise, rotated per frame
   float tmax = 80000.0;
   // research jet cockpit: display screens show the outside world (re-traced without the airframe); the rest of
   // the sealed pod hides everything beyond it
@@ -2054,6 +2055,8 @@ void main(){
   float tD = uDebN > 0 ? traceDebris(ro, rd, t < 1e8 ? t : tmax, dn, dChar) : -1.0;
   if (tD > 0.0 && tD < t) { t = tD; hit = 6; }
   vec3 col;
+  float taaFlag = hit == 4 ? (uWreck > 0 ? 0.2 : 0.5) : (hit == 6 ? 0.2 : 1.0);   // 1 world, 0.5 rigid with the aircraft, 0.2 moving, 0 no history
+  if (onScr) taaFlag = 0.0;
   if (hit == 0) { col = skyColor(rd); t = 1e6; }
   else {
     vec3 p = ro + rd*t;
@@ -2111,11 +2114,11 @@ void main(){
           vec4 tx = triSample(lh*vec3(1.0, 1.0, 1.0), nn, M_CORRUGATED, 2.0, nTS);
           m.alb = tx.rgb*vec3(0.75, 0.78, 0.8); m.rough = tx.a; m.metal = 0.7; m.nrm = nTS;
           if (abs(bn.y) < 0.6 && abs(lh.z) < H.z*0.85 && lh.y < H.y*0.2 && abs(abs(lh.x) - H.x) < 0.3) {
-            m.alb = vec3(0.35, 0.4, 0.45); if (fract(lh.z/4.0) < 0.03) m.alb *= 0.5; }
+)"
+R"(            m.alb = vec3(0.35, 0.4, 0.45); if (fract(lh.z/4.0) < 0.03) m.alb *= 0.5; }
         } else if (k == 1) { // control tower: concrete shaft, glass cab
           float Ht = H.y*2.0, yy = lh.y + H.y;
-)"
-R"(          vec4 tx = triSample(lh, nn, M_CONCRETE, 3.0, nTS); m.alb = tx.rgb; m.rough = tx.a; m.nrm = nTS;
+          vec4 tx = triSample(lh, nn, M_CONCRETE, 3.0, nTS); m.alb = tx.rgb; m.rough = tx.a; m.nrm = nTS;
           if (yy > Ht*0.78 && yy < Ht*0.93 && abs(bn.y) < 0.5) { m.alb = vec3(0.03, 0.06, 0.07); m.rough = 0.04; m.metal = 0.5; m.emit = vec3(0.3, 0.7, 0.45)*uNight*0.6; }
           if (yy > Ht*0.93) m.alb = vec3(0.25);
           if (yy > Ht*0.97) { m.alb = vec3(0.8, 0.1, 0.1); m.emit = vec3(1.0, 0.1, 0.05)*step(0.5, fract(uTime*0.7))*2.0; }
@@ -2260,10 +2263,10 @@ R"(          vec4 tx = triSample(lh, nn, M_CONCRETE, 3.0, nTS); m.alb = tx.rgb; 
         } else if (mid == 34) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = uColStripe*(1.2 + 2.0*uNight)*pulse; }
         else if (mid == 35) { m.alb = vec3(0.06); m.metal = 0.8; m.rough = 0.35; m.emit = vec3(0.25, 0.6, 1.0)*uPS.y*uCtl.w*2.5; }
         else if (mid == 36) { float ab = uFlame.y, sp = uFlame.x; m.alb = vec3(0.02); m.emit = mix(vec3(0.35, 0.6, 1.0), vec3(1.0, 0.82, 0.6), ab)*(0.3 + 9.0*sp*sp + 16.0*ab); }
-        else if (mid == 40) {  // sealed pod: carbon weave between structural ribs
-          vec2 wv = floor(vec2(lp.x + lp.z, lp.y - lp.z)*55.0);
 )"
-R"(          m.alb = vec3(0.03, 0.032, 0.036)*(0.8 + 0.4*mod(wv.x + wv.y, 2.0)); m.rough = 0.35; m.metal = 0.2;
+R"(        else if (mid == 40) {  // sealed pod: carbon weave between structural ribs
+          vec2 wv = floor(vec2(lp.x + lp.z, lp.y - lp.z)*55.0);
+          m.alb = vec3(0.03, 0.032, 0.036)*(0.8 + 0.4*mod(wv.x + wv.y, 2.0)); m.rough = 0.35; m.metal = 0.2;
           float rib = abs(fract((lp.z - E.z)*4.0) - 0.5);
           if (rib > 0.46) { m.alb = vec3(0.07, 0.075, 0.08); m.metal = 0.7; m.rough = 0.3; }
           if (abs(lp.y - (E.y - 0.18)) < 0.004) m.emit = uColStripe*1.4*pulse;
@@ -2404,7 +2407,7 @@ R"(          m.alb = vec3(0.03, 0.032, 0.036)*(0.8 + 0.4*mod(wv.x + wv.y, 2.0));
   col = col*cl.a + cl.rgb;
   if (onScr) col = jetScreen(col, rd, scrId, scrL);
   if (any(isnan(col)) || any(isinf(col)) || !(col.r + col.g + col.b < 1e7)) col = vec3(0.0);
-  oColor = vec4(clamp(col, vec3(0.0), vec3(3e4)), 1.0);
+  oColor = vec4(clamp(col, vec3(0.0), vec3(3e4)), taaFlag);
   oDepth = t;
 }
 )";
@@ -2498,6 +2501,63 @@ void main(){
   oColor = vec4(c, 1.0);
 }
 )";
+// Temporal anti-aliasing resolve: reprojects the previous frame (world points through the camera; aircraft pixels
+// through the aircraft's own motion), clamps it to the current neighbourhood and blends. Averages away the per-frame
+// jitter of the ray marcher (clouds, distant terrain, water sparkle) and sub-pixel geometry.
+static const char* kTaaFS = R"(#version 330 core
+in vec2 vUV; layout(location=0) out vec4 oHist; layout(location=1) out vec4 oColor;
+uniform sampler2D uRaw; uniform sampler2D uDepth; uniform sampler2D uHist; uniform vec2 uRes; uniform float uHistValid;
+uniform vec3 uCamPos; uniform mat3 uCamRot; uniform vec3 uPrevCamPos; uniform mat3 uPrevCamRot; uniform float uTanHalf; uniform float uAspect;
+uniform vec3 uPlanePos; uniform mat3 uPlaneRot; uniform vec3 uPrevPlanePos; uniform mat3 uPrevPlaneRot;
+vec3 toY(vec3 c){ c = c/(1.0 + max(c.r, max(c.g, c.b))); return vec3(0.25*c.r + 0.5*c.g + 0.25*c.b, 0.5*c.r - 0.5*c.b, -0.25*c.r + 0.5*c.g - 0.25*c.b); }
+vec3 fromY(vec3 y){ vec3 c = vec3(y.x + y.y - y.z, y.x + y.z, y.x - y.y - y.z); return c/max(1.0 - max(c.r, max(c.g, c.b)), 1e-3); }
+// 5-tap Catmull-Rom history fetch: keeps the accumulated image sharp
+vec3 histCR(vec2 uv){
+  vec2 sp = uv*uRes, tp = floor(sp - 0.5) + 0.5, f = sp - tp;
+  vec2 w0 = f*(-0.5 + f*(1.0 - 0.5*f)), w1 = 1.0 + f*f*(-2.5 + 1.5*f), w2 = f*(0.5 + f*(2.0 - 1.5*f)), w3 = f*f*(-0.5 + 0.5*f);
+  vec2 w12 = w1 + w2, t0 = (tp - 1.0)/uRes, t3 = (tp + 2.0)/uRes, t12 = (tp + w2/w12)/uRes;
+  vec3 r = texture(uHist, vec2(t12.x, t0.y)).rgb*w12.x*w0.y + texture(uHist, vec2(t0.x, t12.y)).rgb*w0.x*w12.y
+         + texture(uHist, t12).rgb*w12.x*w12.y + texture(uHist, vec2(t3.x, t12.y)).rgb*w3.x*w12.y + texture(uHist, vec2(t12.x, t3.y)).rgb*w12.x*w3.y;
+  float ws = w12.x*w0.y + w0.x*w12.y + w12.x*w12.y + w3.x*w12.y + w12.x*w3.y;
+  return max(r/ws, vec3(0.0));
+}
+void main(){
+  ivec2 ip = ivec2(gl_FragCoord.xy);
+  vec4 cur = texelFetch(uRaw, ip, 0);
+  float flag = cur.a;
+  vec3 m1 = vec3(0.0), m2 = vec3(0.0), cy = toY(cur.rgb);
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+    vec3 y = toY(texelFetch(uRaw, clamp(ip + ivec2(i, j), ivec2(0), ivec2(uRes) - 1), 0).rgb);
+    m1 += y; m2 += y*y;
+  }
+  m1 /= 9.0; vec3 sd = sqrt(max(m2/9.0 - m1*m1, 0.0));
+  float t = texelFetch(uDepth, ip, 0).r;
+  vec2 ndc = vUV*2.0 - 1.0;
+  vec3 rd = normalize(uCamRot*vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, -1.0));
+  vec3 d;
+  if (t > 9e5) d = transpose(uPrevCamRot)*rd;          // sky: a direction, only camera rotation matters
+  else {
+    vec3 P = uCamPos + rd*t;
+    if (flag > 0.4 && flag < 0.6) P = uPrevPlaneRot*(transpose(uPlaneRot)*(P - uPlanePos)) + uPrevPlanePos;
+    d = transpose(uPrevCamRot)*(P - uPrevCamPos);
+  }
+  vec2 puv = d.z < -1e-4 ? vec2(d.x/(-d.z)/(uTanHalf*uAspect), d.y/(-d.z)/uTanHalf)*0.5 + 0.5 : vec2(-1.0);
+  bool valid = uHistValid > 0.5 && flag > 0.1 && all(greaterThan(puv, vec2(0.0))) && all(lessThan(puv, vec2(1.0)));
+  vec3 res = cur.rgb;
+  if (valid) {
+    vec3 hy = toY(histCR(puv));
+    float k = flag > 0.9 ? 1.25 : 0.9;                  // tighter clamp for moving parts
+    hy = clamp(hy, m1 - k*sd - 0.002, m1 + k*sd + 0.002);
+    float motion = length((puv - vUV)*uRes);
+    float a = mix(0.08, 0.3, clamp(motion/12.0, 0.0, 1.0));   // fast motion: lean on the new frame, less smear
+    if (flag < 0.4) a = max(a, 0.4);
+    res = fromY(mix(hy, cy, a));
+  }
+  oHist = vec4(res, flag);
+  oColor = vec4(res, 1.0);
+}
+)";
+
 static const char* kPostFS = R"(#version 330 core
 in vec2 vUV; out vec4 oColor;
 uniform sampler2D uScene; uniform sampler2D uBloom; uniform float uExposure; uniform float uTime; uniform vec2 uRes;

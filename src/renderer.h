@@ -72,12 +72,16 @@ public:
   bool screenshot(const char* path);
 
 private:
-  GLuint progRT = 0, progSprite = 0, progBright = 0, progBlur = 0, progPost = 0, progUI = 0;
+  GLuint progRT = 0, progSprite = 0, progBright = 0, progBlur = 0, progPost = 0, progUI = 0, progTAA = 0;
   GLuint vaoEmpty = 0, vaoSprite = 0, vboSprite = 0, vaoUI = 0, vboUI = 0;
   GLuint texHM = 0, texAlb = 0, texNrm = 0, texFont = 0, texMask = 0, texRoadId = 0, texData = 0, texHMax = 0;
   struct V4 { float x, y, z, w; };
   std::vector<V4> townB, townY;
   GLuint fboScene = 0, texColor = 0, texDepth = 0, fboSprite = 0;
+  // temporal AA: the ray tracer writes texRaw; the resolve blends it with the reprojected history into texHist[cur] + texColor
+  GLuint texRaw = 0, texHist[2] = {0, 0}, fboTAA[2] = {0, 0};
+  int histIdx = 0, frameNo = 0; bool histValid = false;
+  vec3 prevCamPos, prevPlanePos; float prevCamRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1}, prevPlaneRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
   GLuint fboBloom[2] = {0, 0}, texBloom[2] = {0, 0};
   int rw = 0, rh = 0, bw = 0, bh = 0;
   float maxH = 2500;

@@ -46,6 +46,8 @@ int main(int argc, char** argv) {
   game.initHeadless();
   game.debugScene(scene);
   for (int i = 0; i < 3; i++) { game.update(1.f / 30.f); game.render(); }
+  if (getenv("TAAM")) for (int i = 0, n = atoi(getenv("TAAM")); i < n; i++) { game.update(1.f / 60.f); game.render(); }   // moving frames
+  if (getenv("TAAF")) for (int i = 0, n = atoi(getenv("TAAF")); i < n; i++) game.render();   // extra static frames: let TAA converge
   glFinish();
   if (getenv("BENCH")) {
     auto t0 = std::chrono::steady_clock::now();

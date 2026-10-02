@@ -4,6 +4,7 @@
 #include "font_data.h"
 #include "scenery.h"
 #include <unordered_map>
+#include <cstring>
 
 Renderer g_ren;
 
@@ -264,8 +265,9 @@ bool Renderer::init(int w, int h) {
   progBright = program(vsFS, kBrightFS, error);
   progBlur = program(vsFS, kBlurFS, error);
   progPost = program(vsFS, kPostFS, error);
+  progTAA = program(vsFS, kTaaFS, error);
   progUI = program(kUIVS, kUIFS, error);
-  if (!progSprite || !progBright || !progBlur || !progPost || !progUI) { error = "Shader: " + error; return false; }
+  if (!progSprite || !progBright || !progBlur || !progPost || !progUI || !progTAA) { error = "Shader: " + error; return false; }
 
   glGenVertexArrays(1, &vaoEmpty);
   glGenVertexArrays(1, &vaoSprite); glGenBuffers(1, &vboSprite);
@@ -365,9 +367,18 @@ void Renderer::createTargets() {
   rw = std::max(64, (int)(W * renderScale)); rh = std::max(64, (int)(H * renderScale));
   makeTex(texColor, rw, rh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
   makeTex(texDepth, rw, rh, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST);
+  makeTex(texRaw, rw, rh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST);
+  for (int i = 0; i < 2; i++) {
+    makeTex(texHist[i], rw, rh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
+    if (!fboTAA[i]) glGenFramebuffers(1, &fboTAA[i]);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboTAA[i]);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texHist[i], 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texColor, 0);
+  }
+  histValid = false;
   if (!fboScene) glGenFramebuffers(1, &fboScene);
   glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColor, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texRaw, 0);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texDepth, 0);
   if (!fboSprite) glGenFramebuffers(1, &fboSprite);
   glBindFramebuffer(GL_FRAMEBUFFER, fboSprite);
@@ -423,6 +434,12 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadId"), 4);
   glActiveTexture(GL_TEXTURE0 + 6); glBindTexture(GL_TEXTURE_2D, texHMax); glUniform1i(U(p, "uHMax"), 6);
   glUniform2f(U(p, "uRes"), (float)rw, (float)rh);
+  // TAA: Halton(2,3) sub-pixel jitter and a golden-ratio noise seed, both changing every frame
+  frameNo++;
+  auto halton = [](int i, int b) { float f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i /= b; } return r; };
+  int hi = (frameNo % 8) + 1;
+  glUniform2f(U(p, "uJit"), (halton(hi, 2) - 0.5f) / rw, (halton(hi, 3) - 0.5f) / rh);
+  glUniform1f(U(p, "uSeed"), fmodf(frameNo * 0.618034f, 1.f));
   glUniform3f(U(p, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
   float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};
   glUniformMatrix3fv(U(p, "uCamRot"), 1, GL_FALSE, cr);
@@ -494,6 +511,36 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform3f(U(p, "uFlameLI"), fp.flameLight.x, fp.flameLight.y, fp.flameLight.z);
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
+
+  // ------------------------------------------------ temporal AA resolve (before the sprites: particles never smear)
+  {
+    int cur = histIdx ^ 1;
+    if (length(fp.camPos - prevCamPos) > 400.f) histValid = false;   // camera cut
+    glBindFramebuffer(GL_FRAMEBUFFER, fboTAA[cur]);
+    glDrawBuffers(2, bufs);
+    glUseProgram(progTAA);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texRaw); glUniform1i(U(progTAA, "uRaw"), 0);
+    glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progTAA, "uDepth"), 1);
+    glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D, texHist[histIdx]); glUniform1i(U(progTAA, "uHist"), 2);
+    glUniform2f(U(progTAA, "uRes"), (float)rw, (float)rh);
+    glUniform1f(U(progTAA, "uHistValid"), histValid ? 1.f : 0.f);
+    glUniform3f(U(progTAA, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
+    glUniformMatrix3fv(U(progTAA, "uCamRot"), 1, GL_FALSE, cr);
+    glUniform3f(U(progTAA, "uPrevCamPos"), prevCamPos.x, prevCamPos.y, prevCamPos.z);
+    glUniformMatrix3fv(U(progTAA, "uPrevCamRot"), 1, GL_FALSE, prevCamRot);
+    glUniform1f(U(progTAA, "uTanHalf"), tanf(fp.fovY * 0.5f));
+    glUniform1f(U(progTAA, "uAspect"), (float)W / H);
+    const PlaneVisual& pv2 = fp.plane;
+    vec3 pp = pv2.on ? pv2.pos : prevPlanePos;
+    glUniform3f(U(progTAA, "uPlanePos"), pp.x, pp.y, pp.z);
+    glUniformMatrix3fv(U(progTAA, "uPlaneRot"), 1, GL_FALSE, pv2.on ? pv2.rot : prevPlaneRot);
+    glUniform3f(U(progTAA, "uPrevPlanePos"), prevPlanePos.x, prevPlanePos.y, prevPlanePos.z);
+    glUniformMatrix3fv(U(progTAA, "uPrevPlaneRot"), 1, GL_FALSE, prevPlaneRot);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    histIdx = cur; histValid = true;
+    prevCamPos = fp.camPos; memcpy(prevCamRot, cr, sizeof cr);
+    if (pv2.on) { prevPlanePos = pv2.pos; memcpy(prevPlaneRot, pv2.rot, sizeof prevPlaneRot); }
+  }
 
   // ------------------------------------------------ sprites
   glBindFramebuffer(GL_FRAMEBUFFER, fboSprite);
