@@ -265,6 +265,7 @@ static void startShot(OneShot& s, int type, float inten, float sr) {
     case SFX_THUNDER: s.f1.set(LP, 160, 0.7f, sr); s.f2.set(LP, 60, 0.7f, sr); break;
     case SFX_BOOM: s.f1.set(LP, 240, 0.7f, sr); s.f2.set(LP, 75, 0.8f, sr); s.f3.set(HP, 26, 0.7f, sr); s.f4.set(HP, 26, 0.7f, sr); break;
     case SFX_CASH: s.f1.set(BP, 5000, 2.0f, sr); break;
+    case SFX_UFO_ZOOM: s.f1.set(BP, 1800, 0.8f, sr); break;
     case SFX_GEAR_CLUNK: s.f1.set(LP, 300, 1.0f, sr); break;
     default: break;
   }
@@ -311,6 +312,24 @@ static bool runShot(OneShot& s, float sr, float& out) {
       float rumble = s.f2.p(s.nz.w()) * 7.f * expf(-t * 0.9f) * smoothstepf(0.05f, 0.4f, t);
       v = s.f4.p(s.f3.p(body * 2.6f + sub * 0.8f + rumble)) * s.intensity;   // 24 dB/oct high-pass: no wasted infrasound
       alive = t < 5.f; break; }
+    case SFX_UFO_ARRIVE: {   // theremin warble over a low hum
+      float env = smoothstepf(0.f, 0.4f, t) * smoothstepf(3.2f, 2.2f, t);
+      float f = 520.f + 180.f * sinf(2 * PI * 5.5f * t) + 120.f * sinf(2 * PI * 0.6f * t);
+      s.ph += 2 * PI * f * dt; s.ph2 += 2 * PI * 68.f * dt;
+      v = (sinf(s.ph) * 0.16f + (sinf(s.ph2) + 0.4f * sinf(s.ph2 * 2.01f)) * 0.12f) * env * s.intensity; alive = t < 3.3f; break; }
+    case SFX_UFO_LAUGH: {    // two squeaky voices giggling "hee-hee-hee"
+      float syl = 0.15f; int k = (int)(t / syl); float u = fmodf(t, syl) / syl;
+      float voice = (k % 2) ? 1.22f : 1.f;
+      float f = (820.f + 650.f * u) * voice * (1.f + 0.04f * sinf(2 * PI * 30.f * t));
+      float env = sinf(PI * clampf(u * 1.25f, 0.f, 1.f)) * (k < 12 ? 1.f : 0.f) * (1.f - 0.04f * k);
+      s.ph += 2 * PI * f * dt;
+      float saw = fmodf(s.ph / (2 * PI), 1.f) * 2.f - 1.f;
+      v = (sinf(s.ph) * 0.6f + saw * 0.25f) * env * 0.16f * s.intensity; alive = t < 1.9f; break; }
+    case SFX_UFO_ZOOM: {     // rising whistle and a whoosh as it shoots away
+      float f = 300.f * powf(14.f, clampf(t / 1.6f, 0.f, 1.f)) * (1.f + 0.03f * sinf(2 * PI * 9.f * t));
+      s.ph += 2 * PI * f * dt;
+      float env = smoothstepf(0.f, 0.08f, t) * smoothstepf(2.4f, 1.0f, t);
+      v = (sinf(s.ph) * 0.18f + s.f1.p(s.nz.w()) * 0.5f * smoothstepf(1.8f, 0.2f, t)) * env * s.intensity; alive = t < 2.5f; break; }
     default: alive = false;
   }
   s.t += dt;

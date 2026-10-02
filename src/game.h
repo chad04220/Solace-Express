@@ -111,7 +111,12 @@ private:
   bool airBreak = false;
   float gTunnel = 0;
   Traffic traffic;
-  bool dbgCam = false; vec3 dbgCamPos, dbgCamLook;   // debug scenes: free camera               // AI aircraft: airport circuits, cruisers, XR-9 formations, display team
+  bool dbgCam = false; vec3 dbgCamPos, dbgCamLook;
+  // UFO encounter: pulls up alongside, opens its hatch on two dancing aliens, laughs, waves and zooms off
+  struct Ufo { bool on = false; float t = 0, next = 0, side = 1, hatch = 0, laugh = 0, wave = 0; vec3 pos, fwd, right, up; bool sfxLaugh = false, sfxZoom = false; };
+  Ufo ufo;
+  void startUfo();
+  void updateUfo(float dt);   // debug scenes: free camera               // AI aircraft: airport circuits, cruisers, XR-9 formations, display team
   float fpsAvg = 1.f / 60.f; bool showPerf = false;   // F3: frame-rate / GPU time / resolution overlay              // smoothed g-force screen-edge effect 0..1          // broke up in flight: pieces tumble down before anything hits the ground
   float crashEndT = 7.5f;         // crashTimer at which the results screen comes up
   void updateWreck(float dt);

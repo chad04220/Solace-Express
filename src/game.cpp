@@ -163,6 +163,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   fuelStart = plane.fuel;
   wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0;
   traffic.reset();
+  ufo = Ufo(); ufo.next = 180.f + (rand() % 1000) * 0.24f;   // first encounter after 3-7 minutes in the air
   paused = false; showMap = false; landed = completed = crashed = false;
   result = FlightResult();
   timeAccel = 1; camMode = camMode == 1 ? 1 : 0; camYaw = 0; camPitch = 0.12f; camZoom = 1;
@@ -364,6 +365,7 @@ void Game::updateFlight(float dt) {
   lightning = std::max(0.f, lightning - dt * 4.f) * (lightning > 0.5f ? 1.f : (rand() % 3 ? 1.f : 0.3f));
   cloudOff = cloudOff + vec2(-sinf(wx.windFrom * DEG), cosf(wx.windFrom * DEG)) * (wx.windSpeed * 2.f * simDt);
 
+  updateUfo(simDt);
   // AI traffic
   traffic.enabled = set.traffic;
   if (traffic.update(simDt, plane.pos, plane.vel, plane.onGround || crashed, plane.spec->span) && !crashed && !plane.ev.crashed) {
@@ -728,6 +730,57 @@ void Game::jetEffects(float dt) {
   prevMach = M;
 }
 
+// ------------------------------------------------------------------ UFO encounter
+void Game::startUfo() {
+  ufo = Ufo(); ufo.on = true; ufo.side = (rand() & 1) ? 1.f : -1.f;
+  g_audio.trigger(SFX_UFO_ARRIVE, 0.9f);
+  toast("UNIDENTIFIED CONTACT", vec3(0.4f, 1.f, 0.6f));
+}
+
+void Game::updateUfo(float dt) {
+  if (!ufo.on) {
+    // random encounters: only while properly airborne
+    bool ok = screen == SCR_FLIGHT && !crashed && !plane.onGround && plane.agl() > 150.f && length(plane.vel) > 25.f;
+    if (ok) ufo.next -= dt;
+    if (ufo.next <= 0 && ok) startUfo();
+    return;
+  }
+  float t = (ufo.t += dt);
+  // abort (zoom off) if the player crashes or lands
+  if ((crashed || plane.onGround) && t < 23.f) { ufo.t = t = 23.f; }
+  // frame that rides with the player: horizontal flight direction, its right, world up
+  vec3 f = plane.vel; f.y = 0;
+  f = length(f) > 1.f ? normalize(f) : normalize(vec3(plane.forward().x, 0, plane.forward().z) + vec3(1e-4f, 0, 0));
+  vec3 r(-f.z, 0, f.x), u(0, 1, 0);
+  float span = plane.spec->span;
+  vec3 hold = r * (ufo.side * (span * 0.5f + 26.f)) + u * 4.f + f * 3.f;           // station alongside
+  vec3 from = -f * 520.f + u * 170.f + r * (ufo.side * 140.f);                      // swoops in from behind and above
+  float k = smoothstepf(0.f, 6.5f, t);
+  vec3 off = from + (hold - from) * k;
+  off.y += sinf(t * 1.7f) * 0.6f + sinf(t * 0.9f) * 0.4f;                           // floating bob
+  if (t > 23.f) { float z = t - 23.f; off += f * (z * z * z * 120.f + z * 30.f) + u * (z * z * 45.f); }   // zoom away
+  ufo.pos = plane.pos + off;
+  // orientation: hatch side (+x) towards the player, tilted into the swoop
+  vec3 toP = plane.pos - ufo.pos; toP.y = 0; toP = length(toP) > 1.f ? normalize(toP) : r * -ufo.side;
+  float tilt = (1.f - k) * 0.35f * ufo.side + (t > 23.f ? -0.25f * ufo.side : 0.f) + 0.04f * sinf(t * 1.3f);
+  vec3 x = toP, z = normalize(cross(x, u));
+  vec3 xr = x * cosf(tilt) + u * sinf(tilt), yr = u * cosf(tilt) - x * sinf(tilt);
+  ufo.right = xr; ufo.up = yr; ufo.fwd = z;
+  // the show: hatch opens 8-10 s, dance 10-16, laugh 16-18.5, wave 18.5-21, hatch closes 21-23, zoom 23-26
+  ufo.hatch = smoothstepf(8.f, 10.f, t) * (1.f - smoothstepf(21.f, 23.f, t));
+  ufo.laugh = smoothstepf(15.8f, 16.3f, t) * (1.f - smoothstepf(18.3f, 18.8f, t));
+  ufo.wave = smoothstepf(18.4f, 18.9f, t) * (1.f - smoothstepf(20.8f, 21.3f, t));
+  if (t > 16.f && !ufo.sfxLaugh) { ufo.sfxLaugh = true; g_audio.trigger(SFX_UFO_LAUGH, 1.f); }
+  if (t > 23.f && !ufo.sfxZoom) {
+    ufo.sfxZoom = true; g_audio.trigger(SFX_UFO_ZOOM, 1.f);
+    vec3 c = ufo.pos;
+    bursts.push_back({c, ufo.right * 14.f, ufo.fwd * 14.f, vec3(0.4f, 1.f, 0.7f), 0.f});
+    for (int i = 0; i < 40; i++) spawn(c, plane.vel + vec3((rand() % 200 - 100) * 0.3f, (rand() % 200 - 100) * 0.3f, (rand() % 200 - 100) * 0.3f), 0.6f, 0.25f, -0.3f, vec3(0.5f, 1.f, 0.8f) * 3.f, 1.f, SPR_SPARK, 1.f, 0.f);
+  }
+  if (t > 23.f && t < 26.f) spawn(ufo.pos, plane.vel * 0.5f, 0.5f, 3.f, -4.f, vec3(0.4f, 1.f, 0.8f) * 1.5f, 1.f, SPR_GLOW, 0.f, 0.f);   // light streak
+  if (t > 26.5f) { ufo.on = false; ufo.next = 480.f + (rand() % 1000) * 0.42f; }   // next one in 8-15 minutes
+}
+
 // ------------------------------------------------------------------ crash wreckage
 float Game::wreckGround(float x, float z) const {
   float g = g_world.height(x, z, 6);
@@ -1064,6 +1117,13 @@ FrameParams Game::buildFrame() {
     fp.rainLens = camMode == 1 && wx.precip == 1 ? 1.f : 0.f;
     fp.sealedCockpit = camMode == 1 && plane.spec->special && !crashed;
     fp.trafficN = traffic.fillVisuals(fp.camPos, fp.traffic, kMaxTrafficDrawn, nullptr);
+    fp.ufoOn = ufo.on && length(ufo.pos - fp.camPos) < 20000.f;
+    if (fp.ufoOn) {
+      fp.ufoPos = ufo.pos;
+      float m[9] = {ufo.right.x, ufo.right.y, ufo.right.z, ufo.up.x, ufo.up.y, ufo.up.z, ufo.fwd.x, ufo.fwd.y, ufo.fwd.z};
+      memcpy(fp.ufoRot, m, sizeof m);
+      fp.ufoAnim[0] = ufo.hatch; fp.ufoAnim[1] = ufo.t; fp.ufoAnim[2] = ufo.laugh; fp.ufoAnim[3] = ufo.wave;
+    }
     if (crashed) fp.fade = clampf(1.f - (crashTimer - (crashEndT - 1.f)), 0, 1);
     fp.gLoad = gTunnel;
   } else {
@@ -1586,6 +1646,20 @@ void Game::debugScene(const std::string& name) {
     if (view == 0) { dbgCamLook = W(0, side * 60.f); dbgCamLook.y = a.elev; dbgCamPos = W(-a.length * 0.2f, -side * 700.f); dbgCamPos.y = a.elev + 250.f; }
     else if (view - 1 < (int)traffic.craft.size()) { const TrafficCraft& c = traffic.craft[view - 1]; float sz = kAircraft[c.spec].fusLen;
       dbgCamLook = c.pos; dbgCamPos = c.pos + c.q.rotate(vec3(sz * 0.9f, sz * 0.35f, sz * 1.6f)); }
+    return;
+  }
+  if (name.compare(0, 3, "ufo") == 0) {   // UFO encounter at t seconds: ufo<t>_<view> (0 chase-style, 1 cockpit, 2 close-up of the hatch)
+    float tt = 12; int view = 0; sscanf(name.c_str() + 3, "%f_%d", &tt, &view);
+    plane.reset(&kAircraft[1], vec3(-4000, 700, 9000), 40, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
+    takeoffAnnounced = true; camQ = plane.q; hint.clear(); timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 14.f;
+    botControl = true; plane.ctl.throttle = 0.75f;
+    startUfo(); ufo.side = 1.f;
+    for (float x = 0; x < tt; x += 1 / 30.f) { realTime += 1 / 30.f; update(1 / 30.f); }
+    toasts.clear(); hudOn = false;
+    if (view == 1) { camMode = 1; lookYaw = -80.f * DEG; lookPitch = 0.f; camYaw = lookYaw; camPitch = 0.12f; }
+    else { dbgCam = true; dbgCamLook = ufo.pos + ufo.up * 1.5f;
+      dbgCamPos = view == 2 ? ufo.pos + ufo.right * 9.f + ufo.up * 2.5f : plane.pos + ufo.right * 6.f - ufo.fwd * 22.f + ufo.up * 6.f; }
+    printf("ufo: t %.1f hatch %.2f laugh %.2f wave %.2f, %.1f m from the player\n", ufo.t, ufo.hatch, ufo.laugh, ufo.wave, length(ufo.pos - plane.pos));
     return;
   }
   if (name.compare(0, 3, "xrf") == 0) {   // XR-9 formation pass: xrf<seconds after spawn>; camera at the player looking at the leader

@@ -43,7 +43,8 @@ struct FrameParams {
   vec3 flameLightPos, flameLight;  // research jet exhaust light (radiance; zero when off)
   float exposure = 1.0f, rainLens = 0, fade = 1, vignette = 0.6f, gLoad = 0;
   bool sealedCockpit = false;
-  int trafficN = 0; TrafficVisual traffic[kMaxTrafficDrawn];   // XR-9 cockpit view: no sun glare (the pilot sees the sun only on the displays)   // gLoad: g-force tunnel 0..1
+  int trafficN = 0; TrafficVisual traffic[kMaxTrafficDrawn];
+  bool ufoOn = false; vec3 ufoPos; float ufoRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1}, ufoAnim[4] = {0, 0, 0, 0};   // UFO encounter   // XR-9 cockpit view: no sun glare (the pilot sees the sun only on the displays)   // gLoad: g-force tunnel 0..1
 };
 
 struct UIVert { float x, y, u, v, r, g, b, a, mode, hx, hy, p; };

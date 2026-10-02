@@ -258,7 +258,7 @@ void Renderer::genMinimap() {
 
 bool Renderer::init(int w, int h) {
   std::string vsFS = kFullscreenVS;
-  std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceFS3;
+  std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceFS3;
   progRT = program(vsFS, rt, error);
   if (!progRT) { error = "Ray tracer shader: " + error; return false; }
   progSprite = program(kSpriteVS, kSpriteFS, error);
@@ -488,6 +488,12 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     int n = std::min(fp.trafficN, kMaxTrafficDrawn);
     if (n > 0) glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 32, n, GL_RGBA, GL_FLOAT, fp.traffic[0].t);
     glUniform1i(U(p, "uTraffic"), 7); glUniform1i(U(p, "uTrafficN"), n);
+  }
+  glUniform1i(U(p, "uUfoOn"), fp.ufoOn ? 1 : 0);
+  if (fp.ufoOn) {
+    glUniform3f(U(p, "uUfoPos"), fp.ufoPos.x, fp.ufoPos.y, fp.ufoPos.z);
+    glUniformMatrix3fv(U(p, "uUfoRot"), 1, GL_FALSE, fp.ufoRot);
+    glUniform4fv(U(p, "uUfoAnim"), 1, fp.ufoAnim);
   }
   glUniform2f(U(p, "uRes"), (float)rw, (float)rh);
   // TAA: Halton(2,3) sub-pixel jitter and a golden-ratio noise seed, both changing every frame
