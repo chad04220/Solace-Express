@@ -754,31 +754,146 @@ void Game::drawHud(const FrameParams& fp) {
   if (!hudOn) return;
   { auto it = uiAnim.find(0x6e61u); if (showMap && it != uiAnim.end() && it->second > 0.6f) return; }  // GPS map covers the HUD
   const AircraftSpec& spc = *plane.spec;
-  // mission bar
+  // ---- navigation: card (top centre), heading tape with the target caret, 3D target marker in the world
   const Airport& d = dest();
-  vec3 target = wpIndex < (int)contract.wps.size() ? vec3(contract.wps[wpIndex].x, contract.wps[wpIndex].alt, contract.wps[wpIndex].z) : d.pos();
+  bool toWp = wpIndex < (int)contract.wps.size();
+  vec3 target = toWp ? vec3(contract.wps[wpIndex].x, contract.wps[wpIndex].alt, contract.wps[wpIndex].z) : d.pos();
   vec3 to = target - plane.pos;
   float dist = length(vec3(to.x, 0, to.z));
   float brg = wrapDeg360(atan2f(to.x, -to.z) / DEG);
   float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
-  hudPanel(W * 0.5f - 300 * s, 8 * s, 600 * s, 54 * s);
-  std::string obj = wpIndex < (int)contract.wps.size() ? fmt("Checkpoint %d/%d", wpIndex + 1, (int)contract.wps.size()) : fmt("Land at %s (%s)", d.code, d.name);
-  if (researchFlight) obj = fmt("Free roam  -  Mach %.2f", plane.mach);
-  g_ren.text(W * 0.5f, 13 * s, 16 * s, ellipsize(contract.title + "  -  " + obj, 570 * s, 16 * s), C_TEXT, 1, 1);
-  std::string info = fmt("%.1f km  BRG %03.0f", dist / 1000.f, brg);
-  if (gs > 10) info += fmt("  ETE %d:%02d", (int)(dist / gs) / 60, (int)(dist / gs) % 60);
-  if (contract.timeLimitMin > 0) { float left = contract.timeLimitMin * 60 - flightClock; info += left > 0 ? fmt("  DEADLINE %d:%02d", (int)left / 60, (int)left % 60) : "  LATE!"; }
-  if (timeAccel > 1) info += fmt("  TIME x%.0f", timeAccel);
-  g_ren.text(W * 0.5f, 37 * s, 15 * s, info, C_ACCENT, 1, 1);
-  // GPS arrow
-  float rel = wrapAngle((brg - plane.heading()) * DEG);
-  vec2 ac(W * 0.5f, 92 * s);
-  float al = 24 * s;
-  vec2 dv(sinf(rel), -cosf(rel)), pv(-dv.y, dv.x);
   vec3 mag(1.f, 0.35f, 1.f);
-  g_ren.line(ac.x - dv.x * al, ac.y - dv.y * al, ac.x + dv.x * al, ac.y + dv.y * al, 5 * s, mag, 0.95f);
-  g_ren.line(ac.x + dv.x * al, ac.y + dv.y * al, ac.x + dv.x * al * 0.3f + pv.x * al * 0.6f, ac.y + dv.y * al * 0.3f + pv.y * al * 0.6f, 5 * s, mag, 0.95f);
-  g_ren.line(ac.x + dv.x * al, ac.y + dv.y * al, ac.x + dv.x * al * 0.3f - pv.x * al * 0.6f, ac.y + dv.y * al * 0.3f - pv.y * al * 0.6f, 5 * s, mag, 0.95f);
+  {
+    float cw = 560 * s, ch = 70 * s, cx = W * 0.5f - cw * 0.5f, cy = 8 * s;
+    hudPanel(cx, cy, cw, ch);
+    std::string obj = toWp ? fmt("CHECKPOINT %d / %d", wpIndex + 1, (int)contract.wps.size()) : fmt("LAND  %s  %s", d.code, d.name);
+    if (researchFlight) obj = fmt("FREE ROAM  -  MACH %.2f", plane.mach);
+    g_ren.text(cx + 16 * s, cy + 7 * s, 12 * s, ellipsize(obj, cw * 0.55f, 12 * s), mag, 1, 0, false);
+    std::string extra;
+    if (contract.timeLimitMin > 0) { float left = contract.timeLimitMin * 60 - flightClock; extra = left > 0 ? fmt("DEADLINE %d:%02d", (int)left / 60, (int)left % 60) : "LATE!"; }
+    if (timeAccel > 1) extra += fmt("%sTIME x%.0f", extra.empty() ? "" : "   ", timeAccel);
+    g_ren.text(cx + cw - 16 * s, cy + 7 * s, 12 * s, extra.empty() ? ellipsize(contract.title, cw * 0.4f, 12 * s) : extra, extra.empty() ? C_DIM : C_WARN, 1, 2, false);
+    // four readouts: distance, bearing, altitude to go (climb / descend cue), time en route
+    float dAlt = toWp ? target.y - plane.pos.y : 0.f;
+    bool altOk = fabsf(dAlt) < 45.f;
+    std::string altS = !toWp ? "LAND" : altOk ? "ON ALT" : fmtAlt(fabsf(dAlt));
+    std::string cols[4][2] = {{"DIST", set.metric || dist < 1000.f ? (dist < 1000.f ? fmt("%.0f m", dist) : fmt("%.1f km", dist / 1000.f)) : fmt("%.1f nm", dist / 1852.f)},
+                              {"BRG", fmt("%03.0f", brg)},
+                              {"ALT", altS},
+                              {"ETE", gs > 10 ? fmt("%d:%02d", (int)(dist / gs) / 60, (int)(dist / gs) % 60) : "--:--"}};
+    for (int i = 0; i < 4; i++) {
+      float colX = cx + 16 * s + i * (cw - 32 * s) / 4.f;
+      if (i) g_ren.rect(colX - 8 * s, cy + 28 * s, 1 * s, 34 * s, C_ACCENT, 0.25f);
+      g_ren.text(colX, cy + 27 * s, 10 * s, cols[i][0], C_DIM, 1, 0, false);
+      vec3 vc = i == 2 ? (!toWp ? C_TEXT : altOk ? C_GOOD : C_WARN) : C_TEXT;
+      float vx = colX;
+      if (i == 2 && toWp && !altOk) {   // climb / descend chevron ahead of the value
+        float ax = colX + 6 * s, ay = cy + 52 * s, k = dAlt > 0 ? -1.f : 1.f;
+        g_ren.line(ax - 6 * s, ay - k * 4 * s, ax, ay + k * 4 * s, 2.5f * s, C_WARN, 1);
+        g_ren.line(ax, ay + k * 4 * s, ax + 6 * s, ay - k * 4 * s, 2.5f * s, C_WARN, 1);
+        g_ren.line(ax - 6 * s, ay - k * 4 * s + k * 6 * s, ax, ay + k * 4 * s + k * 6 * s, 2.5f * s, C_WARN, 0.6f);
+        g_ren.line(ax, ay + k * 4 * s + k * 6 * s, ax + 6 * s, ay - k * 4 * s + k * 6 * s, 2.5f * s, C_WARN, 0.6f);
+        vx += 18 * s;
+      }
+      g_ren.text(vx, cy + 41 * s, 19 * s, ellipsize(cols[i][1], (cw - 32 * s) / 4.f - 14 * s - (vx - colX), 19 * s), vc, 1, 0, false);
+    }
+    // heading tape: +-60 deg around the current heading, target caret, turn cue
+    float tw = 380 * s, tx = W * 0.5f - tw * 0.5f, ty = cy + ch + 6 * s, th = 26 * s;
+    g_ren.rect(tx, ty, tw, th, vec3(0.01f, 0.03f, 0.05f), 0.55f, 4 * s);
+    float hdg = plane.heading();
+    for (int a = -60; a <= 60; a += 5) {
+      float hv = floorf(hdg / 5.f) * 5.f + a, off = wrapAngle((hv - hdg) * DEG) / DEG;
+      if (fabsf(off) > 60.f) continue;
+      float px2 = W * 0.5f + off / 60.f * tw * 0.5f;
+      int hvi = ((int)roundf(hv) % 360 + 360) % 360;
+      bool major = hvi % 30 == 0;
+      g_ren.rect(px2 - 0.5f * s, ty + th - (major ? 10 : (hvi % 10 == 0 ? 7 : 4)) * s, 1 * s, (major ? 10 : (hvi % 10 == 0 ? 7 : 4)) * s, C_TEXT, 0.7f);
+      if (major) {
+        const char* cards[] = {"N", "", "", "E", "", "", "S", "", "", "W", "", ""};
+        std::string lab = cards[hvi / 30][0] ? cards[hvi / 30] : fmt("%02d", hvi / 10);
+        g_ren.text(px2, ty + 1 * s, 11 * s, lab, hvi % 90 == 0 ? C_ACCENT : C_TEXT, 0.9f, 1, false);
+      }
+    }
+    g_ren.line(W * 0.5f, ty + th - 2 * s, W * 0.5f, ty + th + 6 * s, 2 * s, C_TEXT, 1);   // lubber line
+    float rel = wrapAngle((brg - hdg) * DEG) / DEG;
+    float cxp = W * 0.5f + clampf(rel, -60.f, 60.f) / 60.f * tw * 0.5f;
+    if (fabsf(rel) <= 60.f) {   // target bearing caret (diamond)
+      float r = 7 * s, yy = ty + th * 0.5f + 2 * s;
+      g_ren.line(cxp - r, yy, cxp, yy - r, 2.5f * s, mag, 1); g_ren.line(cxp, yy - r, cxp + r, yy, 2.5f * s, mag, 1);
+      g_ren.line(cxp + r, yy, cxp, yy + r, 2.5f * s, mag, 1); g_ren.line(cxp, yy + r, cxp - r, yy, 2.5f * s, mag, 1);
+    } else {                    // off the tape: chevrons at the end
+      float k = rel > 0 ? 1.f : -1.f, ex2 = W * 0.5f + k * (tw * 0.5f - 10 * s), yy = ty + th * 0.5f;
+      for (int c2 = 0; c2 < 2; c2++) { float o = c2 * 7 * s * k; g_ren.line(ex2 - 5 * s * k + o, yy - 7 * s, ex2 + o, yy, 2.5f * s, mag, 1); g_ren.line(ex2 + o, yy, ex2 - 5 * s * k + o, yy + 7 * s, 2.5f * s, mag, 1); }
+    }
+    if (fabsf(rel) > 8.f) g_ren.text(W * 0.5f + (rel > 0 ? 1 : -1) * (tw * 0.5f + 12 * s), ty + 6 * s, 13 * s, fmt("TURN %s %.0f", rel > 0 ? "R" : "L", fabsf(rel)), mag, 1, rel > 0 ? 0 : 2);
+  }
+  // 3D target marker: a diamond on the target itself with a stalk to the ground below it (reads height at a glance);
+  // off-screen or behind, an arrow on the screen edge points the way to turn
+  {
+    vec3 tgt3 = target; if (!toWp) tgt3.y = d.elev + 3.f;
+    float sx, sy;
+    vec3 rel3 = tgt3 - fp.camPos;
+    float zc = dot(rel3, -fp.camBack);
+    bool onS = zc > 1.f && g_ren.project(fp, tgt3, sx, sy) && sx > 40 * s && sx < W - 40 * s && sy > 150 * s && sy < H - 40 * s;
+    std::string lab = dist < 1000.f ? fmt("%.0f m", length(rel3)) : fmt("%.1f km", dist / 1000.f);
+    if (toWp && fabsf(target.y - plane.pos.y) > 45.f) lab += fmt("  %s%s", target.y > plane.pos.y ? "+" : "-", fmtAlt(fabsf(target.y - plane.pos.y)).c_str());
+    if (onS) {
+      float gx, gy; vec3 gpt(tgt3.x, g_world.height(tgt3.x, tgt3.z), tgt3.z);
+      if (toWp && g_ren.project(fp, gpt, gx, gy) && gy > sy + 8 * s) {   // altitude stalk, dashed
+        float len = gy - sy;
+        for (float u = 0; u < len; u += 9 * s) g_ren.line(sx, sy + u, sx, sy + std::min(u + 5 * s, len), 1.5f * s, mag, 0.6f);
+        g_ren.line(gx - 6 * s, gy, gx + 6 * s, gy, 1.5f * s, mag, 0.6f);
+      }
+      float r = 11 * s + 4 * s * (0.5f + 0.5f * sinf(realTime * 4.f));
+      g_ren.line(sx - r, sy, sx, sy - r, 2.5f * s, mag, 0.95f); g_ren.line(sx, sy - r, sx + r, sy, 2.5f * s, mag, 0.95f);
+      g_ren.line(sx + r, sy, sx, sy + r, 2.5f * s, mag, 0.95f); g_ren.line(sx, sy + r, sx - r, sy, 2.5f * s, mag, 0.95f);
+      g_ren.rect(sx - 2.5f * s, sy - 2.5f * s, 5 * s, 5 * s, mag, 1, 2.5f * s);
+      g_ren.text(sx, sy + r + 4 * s, 13 * s, lab, mag, 1, 1);
+    } else {
+      vec2 dir(dot(rel3, fp.camRight), -dot(rel3, fp.camUp));
+      if (zc < 0) dir = vec2(dir.x >= 0 ? 1.f : -1.f, clampf(dir.y / (fabsf(dir.x) + fabsf(dir.y) + 1e-3f), -0.4f, 0.4f));   // behind: point to the side to turn
+      { float dl = length(dir); dir = vec2(dir.x / dl, dir.y / dl); }
+      float ex2 = W * 0.5f + dir.x * (W * 0.5f - 70 * s), ey2 = H * 0.5f + dir.y * (H * 0.5f - 90 * s);
+      float t2 = std::min(fabsf((W * 0.5f - 70 * s) / std::max(fabsf(dir.x), 1e-3f)), fabsf((H * 0.5f - 90 * s) / std::max(fabsf(dir.y), 1e-3f)));
+      ex2 = W * 0.5f + dir.x * t2; ey2 = H * 0.5f + dir.y * t2;
+      vec2 pv(-dir.y, dir.x); float al = 16 * s;
+      g_ren.rect(ex2 - 20 * s, ey2 - 20 * s, 40 * s, 40 * s, vec3(0.01f, 0.03f, 0.05f), 0.5f, 20 * s);
+      g_ren.line(ex2 - dir.x * al * 0.6f + pv.x * al * 0.7f, ey2 - dir.y * al * 0.6f + pv.y * al * 0.7f, ex2 + dir.x * al * 0.6f, ey2 + dir.y * al * 0.6f, 3.5f * s, mag, 1);
+      g_ren.line(ex2 - dir.x * al * 0.6f - pv.x * al * 0.7f, ey2 - dir.y * al * 0.6f - pv.y * al * 0.7f, ex2 + dir.x * al * 0.6f, ey2 + dir.y * al * 0.6f, 3.5f * s, mag, 1);
+      g_ren.text(ex2 - dir.x * 34 * s, ey2 - dir.y * 34 * s - 7 * s, 13 * s, lab, mag, 1, 1);
+    }
+  }
+  // ---- wind: dial with the wind relative to the nose (arrow points where it blows), speed, gusts and components
+  {
+    float wx0 = 16 * s, wy0 = camMode == 1 ? 120 * s : H - 210 * s - 60 * s - 86 * s;
+    if (camMode != 1) wx0 = 110 * s;
+    float pw = 236 * s, ph = 72 * s;
+    hudPanel(wx0, wy0, pw, ph);
+    vec3 wv = plane.windVel; float ws = length(vec3(wv.x, 0, wv.z));
+    float from = wrapDeg360(atan2f(-wv.x, wv.z) / DEG);
+    float cxw = wx0 + 38 * s, cyw = wy0 + ph * 0.5f, R = 26 * s;
+    g_ren.rectOutline(cxw - R, cyw - R, 2 * R, 2 * R, C_ACCENT, 0.5f, R, 1.5f * s);
+    for (int k = 0; k < 8; k++) { float a = k * PI / 4; g_ren.line(cxw + sinf(a) * R * 0.82f, cyw - cosf(a) * R * 0.82f, cxw + sinf(a) * R, cyw - cosf(a) * R, (k % 2 ? 1.f : 2.f) * s, C_TEXT, 0.6f); }
+    g_ren.rect(cxw - 3 * s, cyw - R + 3 * s, 6 * s, 6 * s, C_TEXT, 0.9f, 3 * s);   // nose reference
+    if (ws > 0.5f) {
+      float rel = (from - plane.heading()) * DEG;
+      vec2 src(sinf(rel), -cosf(rel)), dv(-src.x, -src.y), pv(-dv.y, dv.x);
+      float x0 = cxw + src.x * R * 0.75f, y0 = cyw + src.y * R * 0.75f, x1 = cxw + dv.x * R * 0.7f, y1 = cyw + dv.y * R * 0.7f;
+      vec3 wc(0.45f, 0.85f, 1.f);
+      g_ren.line(x0, y0, x1, y1, 3 * s, wc, 1);
+      g_ren.line(x1, y1, x1 - dv.x * 9 * s + pv.x * 6 * s, y1 - dv.y * 9 * s + pv.y * 6 * s, 3 * s, wc, 1);
+      g_ren.line(x1, y1, x1 - dv.x * 9 * s - pv.x * 6 * s, y1 - dv.y * 9 * s - pv.y * 6 * s, 3 * s, wc, 1);
+      float hw = ws * cosf(rel), xw = ws * sinf(rel);
+      std::string g = wx.gust > 0.5f ? fmt(" G%s", fmtSpeed(wx.windSpeed + wx.gust).c_str()) : "";
+      g_ren.text(wx0 + 76 * s, wy0 + 9 * s, 10 * s, "WIND", C_DIM, 1, 0, false);
+      g_ren.text(wx0 + 76 * s, wy0 + 21 * s, 17 * s, fmt("%03.0f / %s", from, fmtSpeed(ws).c_str()) + g, C_TEXT, 1, 0, false);
+      g_ren.text(wx0 + 76 * s, wy0 + 46 * s, 12 * s, fmt("%s %s   X %s %s", hw >= 0 ? "HEAD" : "TAIL", fmtSpeed(fabsf(hw)).c_str(), fmtSpeed(fabsf(xw)).c_str(), xw >= 0 ? "R" : "L"),
+                 fabsf(xw) > 7.f ? C_WARN : C_DIM, 1, 0, false);
+    } else {
+      g_ren.text(wx0 + 76 * s, wy0 + 9 * s, 10 * s, "WIND", C_DIM, 1, 0, false);
+      g_ren.text(wx0 + 76 * s, wy0 + 24 * s, 17 * s, "CALM", C_TEXT, 1, 0, false);
+    }
+  }
   if (camMode != 1) {
   // PFD
   float pfd = 210 * s;

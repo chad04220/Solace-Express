@@ -98,7 +98,8 @@ Hold **U** and **I** together on the main menu, or click in **both sticks** on a
 
 ## Flying tips
 
-- Fly the green rings in the lessons. The magenta HUD arrow always points at your next objective.
+- Fly the green rings in the lessons. The navigation card at the top shows distance, bearing, how far to climb or descend and time en route; the heading tape below it has a magenta caret on your target's bearing with a turn cue. The magenta diamond sits on the objective itself in 3D, with a dashed stalk down to the ground so you can read its height, and turns into an arrow at the screen edge when the target is out of view.
+- The wind dial (left) shows the wind at your aircraft relative to your nose, its direction, speed and gusts, and the headwind / crosswind components (amber when the crosswind is strong).
 - On approach the HUD shows a glidepath (G/S) and localiser guide. The PAPI lights by the runway show **two white and two red** when you're on a 3° glidepath.
 - A touchdown under 150 fpm earns a "butter" bonus. Over 600 fpm costs you, and over about 900 fpm collapses the gear.
 - High and hot airfields need more runway. Summit Pass (5,400 ft) only works in a STOL aircraft.
