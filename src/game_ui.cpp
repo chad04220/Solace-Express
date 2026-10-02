@@ -950,9 +950,10 @@ void Game::drawHud(const FrameParams& fp) {
   // engine & systems panel
   float ex = W - 300 * s, ey = H - 250 * s;
   if (camMode == 1) { ex = W * 0.5f + 160 * s; ey = H - 230 * s; }
-  hudPanel(ex, ey - (plane.spec->special ? 22 * s : 0), 270 * s, 220 * s + (plane.spec->special ? 22 * s : 0));
-  if (plane.spec->special) ey -= 22 * s;
-  header(ex + 14 * s, ey + 10 * s, 242 * s, plane.spec->special ? "XR-9 SYSTEMS" : "SYSTEMS");
+  float extra = plane.spec->special == 2 ? 66 * s : plane.spec->special ? 22 * s : 0;
+  hudPanel(ex, ey - extra, 270 * s, 220 * s + extra);
+  ey -= extra;
+  header(ex + 14 * s, ey + 10 * s, 242 * s, plane.spec->special == 2 ? "XR-11 SYSTEMS" : plane.spec->special ? "XR-9 SYSTEMS" : "SYSTEMS");
   float ty = ey + 34 * s;
   auto erow = [&](const std::string& k, const std::string& v, vec3 c = C_TEXT) { g_ren.text(ex + 14 * s, ty, 15 * s, k, C_DIM, 1); g_ren.text(ex + 256 * s, ty, 15 * s, v, c, 1, 2); ty += 22 * s; };
   const AircraftSpec& sp = *plane.spec;
@@ -968,7 +969,14 @@ void Game::drawHud(const FrameParams& fp) {
   float fuelFrac = plane.fuel / sp.maxFuel;
   if (sp.special) erow("FUEL", "RESEARCH CELL", C_ACCENT);
   else erow("FUEL", fmt("%.0f%%  ~%.0f km", fuelFrac * 100, plane.rangeLeftKm()), fuelFrac < 0.15f ? C_BAD : C_TEXT);
-  if (sp.special) { erow("NOZZLE", fmt("%.0f deg%s", plane.nozzle * 90, plane.nozzle > 0.99f ? "  VTOL" : "")); erow("MACH", fmt("%.2f", plane.mach)); }
+  if (sp.special == 2) {
+    const vec3 VIO(0.8f, 0.5f, 1.f);
+    erow("PODS", fmt("%.0f deg%s", plane.nozzle * 90, plane.nozzle > 0.99f ? "  VTOL" : "")); erow("MACH", fmt("%.2f", plane.mach));
+    erow("CLOAK", wraith.stealth > 0.99f ? "ACTIVE" : wraith.stealth > 0.01f ? fmt("%s %.0f%%", wraith.cloakOn ? "SPREADING" : "FADING", wraith.stealth * 100) : "OFF  (X)", wraith.stealth > 0.01f ? VIO : C_DIM);
+    erow("LASERS", wraith.lasers > 0.97f ? "HOT" : wraith.lasers > 0.01f ? "DEPLOYING" : "STOWED  (Y)", wraith.lasers > 0.97f ? C_BAD : C_DIM);
+    erow("PLASMA", wraith.bay > 0.05f ? "BAY OPEN" : wraith.bombLoaded >= 1.f ? "READY  (BKSP)" : "CONDENSING", wraith.bombLoaded >= 1.f ? VIO : C_WARN);
+  }
+  else if (sp.special) { erow("NOZZLE", fmt("%.0f deg%s", plane.nozzle * 90, plane.nozzle > 0.99f ? "  VTOL" : "")); erow("MACH", fmt("%.2f", plane.mach)); }
   else erow("FLAPS", fmt("%.0f%%", plane.flaps * 100));
   std::string gearS = !sp.retract ? "FIXED" : plane.gear > 0.99f ? "DOWN" : plane.gear < 0.01f ? "UP" : "TRANSIT";
   erow("GEAR", gearS, plane.gear > 0.99f ? C_GOOD : plane.gear < 0.01f ? C_DIM : C_WARN);
@@ -1298,27 +1306,54 @@ void Game::drawResearch() {
   g_ren.rectOutline(px, py, 300 * s, 30 * s, RED, e, 3 * s, 2 * s);
   g_ren.text(px + 150 * s, py + 7 * s, 15 * s, "TOP SECRET // NIGHTGLASS", RED, e, 1, false);
   py += 46 * s;
-  g_ren.text(px, py, 13 * s, "CONFIDENTIAL RESEARCH MODEL", C_ACCENT, e, 0, false); py += 22 * s;
-  g_ren.text(px, py, 38 * s, "XR-9 SPECTER", C_TEXT, e); py += 52 * s;
+  // two airframes in the programme
+  {
+    float tw = (lw - 58 * s) * 0.5f;
+    if (button(px, py, tw, 32 * s, "XR-9 SPECTER", true, resCraft == kResearchJet)) resCraft = kResearchJet;
+    if (button(px + tw + 10 * s, py, tw, 32 * s, "XR-11 WRAITH", true, resCraft == kWraith)) resCraft = kWraith;
+    if (in.pressed[K_TAB]) resCraft = resCraft == kWraith ? kResearchJet : kWraith;
+    py += 44 * s;
+  }
+  bool wrc = resCraft == kWraith;
+  g_ren.text(px, py, 13 * s, wrc ? "STEALTH AEROBATIC RESEARCH MODEL" : "CONFIDENTIAL RESEARCH MODEL", wrc ? vec3(0.8f, 0.5f, 1.f) : C_ACCENT, e, 0, false); py += 22 * s;
+  g_ren.text(px, py, 38 * s, wrc ? "XR-11 WRAITH" : "XR-9 SPECTER", C_TEXT, e); py += 52 * s;
   header(px, py, lw - 48 * s, "AIRFRAME"); py += 26 * s;
   auto row = [&](const char* k, const char* v) { g_ren.text(px, py, 13 * s, k, C_DIM, e); g_ren.text(px + 135 * s, py, 13 * s, ellipsize(v, lw - 183 * s, 13 * s), C_TEXT, e); py += 20 * s; };
-  row("Configuration", "Blended lifting body, cranked delta, canards");
-  row("Propulsion", "2 x turbofan, 472 kN with full reheat");
-  row("Thrust / weight", "4.4 : 1 (reheat)");
-  row("Top speed", "Mach 2.5+");
-  row("Thrust vectoring", "2D nozzles, 0 - 90 deg, VTOL");
-  row("Flight control", "Inertially damped FBW, 30 g, 315 deg/s roll");
-  row("Cockpit", "Sealed pod, synthetic-vision displays + HUD");
-  row("Fuel", "Unrestricted (research cell)");
+  if (wrc) {
+    row("Configuration", "Faceted stealth body, diamond wing, V-tail");
+    row("Propulsion", "4 x tilting thruster pods, 520 kN boosted");
+    row("Thrust / weight", "2.2 dry, 4.6 boost");
+    row("Top speed", "Mach 3.6+");
+    row("VTOL", "4 pods tilt 0 - 90 deg, vectoring vanes");
+    row("Flight control", "Allocating FBW, 80 g, 400 deg/s roll");
+    row("Stealth", "Active refractive cloak");
+    row("Weapons", "2 retracting pulse lasers, plasma bombs");
+  } else {
+    row("Configuration", "Blended lifting body, cranked delta, canards");
+    row("Propulsion", "2 x turbofan, 472 kN with full reheat");
+    row("Thrust / weight", "4.4 : 1 (reheat)");
+    row("Top speed", "Mach 2.5+");
+    row("Thrust vectoring", "2D nozzles, 0 - 90 deg, VTOL");
+    row("Flight control", "Inertially damped FBW, 30 g, 315 deg/s roll");
+    row("Cockpit", "Sealed pod, synthetic-vision displays + HUD");
+    row("Fuel", "Unrestricted (research cell)");
+  }
   py += 10 * s;
   header(px, py, lw - 48 * s, "HANDLING NOTES"); py += 26 * s;
-  const char* notes[] = {"F / V   swivel nozzles: 0 = forward flight, 90 = hover",
+  const char* notesJ[] = {"F / V   swivel nozzles: 0 = forward flight, 90 = hover",
                          "Hover:  nozzles 90, ~65% throttle, stick to translate",
                          "Hands off in the hover and the jet levels itself",
                          "Above 85% throttle the afterburners light (2x thrust)",
                          "Mach 1 sets off a sonic boom - try it low over the sea",
                          "C cockpit view: you fly on the displays only"};
-  for (auto n : notes) { if (py > ly + lh - 30 * s) break; g_ren.text(px, py, 13 * s, ellipsize(n, lw - 48 * s, 13 * s), C_DIM, e); py += 20 * s; }
+  const char* notesW[] = {"F / V   tilt the pods: 0 = forward flight, 90 = hover",
+                          "X cloak    Y deploy / stow the laser turrets",
+                          "LMB or Enter fires the lasers (gamepad A)",
+                          "Backspace / MMB drops a plasma bomb (gamepad Y)",
+                          "Slow and low on power the controls go soft: the pods",
+                          "fly it. The airframe holds +90 / -45 g."};
+  const char* const* notes = wrc ? notesW : notesJ;
+  for (int ni = 0; ni < 6; ni++) { const char* n = notes[ni]; if (py > ly + lh - 30 * s) break; g_ren.text(px, py, 13 * s, ellipsize(n, lw - 48 * s, 13 * s), C_DIM, e); py += 20 * s; }
   // launch parameters
   float rx = lx + lw + 24 * s, rw = std::min(W - rx - 40 * s, 640 * s);
   panel(rx, ly, rw, lh, 0.95f * e);
@@ -1350,7 +1385,7 @@ void Game::drawResearch() {
   }
   float by = ly + lh - 70 * s;
   if (button(qx, by, 160 * s, 48 * s, "Back") || in.pressed[K_ESC]) { screen = SCR_MENU; return; }
-  if (button(rx + rw - 24 * s - 280 * s, by, 280 * s, 48 * s, "LAUNCH XR-9", true, true) || in.pressed[K_ENTER]) launchResearch();
+  if (button(rx + rw - 24 * s - 280 * s, by, 280 * s, 48 * s, resCraft == kWraith ? "LAUNCH XR-11" : "LAUNCH XR-9", true, true) || in.pressed[K_ENTER]) launchResearch();
   g_ren.text(qx, by - 26 * s, 12 * s, "GAMEPAD:  L-STICK CURSOR   A SELECT   B BACK   LB / RB SITE   START LAUNCH", C_DIM, 0.8f * e, 0, false);
   // blinking classification footer
   if (fmodf(realTime, 1.2f) < 0.8f) g_ren.text(W * 0.5f, H - 28 * s, 12 * s, "UNAUTHORISED ACCESS IS A FEDERAL OFFENCE  //  THIS SESSION IS NOT RECORDED IN YOUR LOGBOOK", RED, 0.8f * e, 1, false);

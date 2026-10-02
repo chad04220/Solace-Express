@@ -335,7 +335,8 @@ void Game::flightControls(float dt) {
   c.trim = clampf(c.trim + tr * 0.35f * dt, -1, 1);
   // flaps
   auto flapToast = [&]() {
-    if (plane.spec->special) toast(flapNotch > 0.99f ? "Thrust vector 90 deg - VTOL hover" : fmt("Thrust vector %d deg", (int)lroundf(flapNotch * 90)), vec3(0.4f, 0.9f, 1));
+    if (plane.spec->special == 2) toast(flapNotch > 0.99f ? "Pods 90 deg - VTOL hover" : fmt("Pods %d deg", (int)lroundf(flapNotch * 90)), vec3(0.8f, 0.55f, 1));
+    else if (plane.spec->special) toast(flapNotch > 0.99f ? "Thrust vector 90 deg - VTOL hover" : fmt("Thrust vector %d deg", (int)lroundf(flapNotch * 90)), vec3(0.4f, 0.9f, 1));
     else toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1));
   };
   if (apNav) flapNotch = c.flaps;   // the autopilot runs the flaps on the approach
@@ -1255,7 +1256,7 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
   demo.pos = p;
   demo.q = quat::axisAngle(vec3(0, 1, 0), -hdg * DEG) * quat::axisAngle(vec3(0, 0, 1), -18.f * DEG) * quat::axisAngle(vec3(1, 0, 0), 2.f * DEG);
   bool res = screen == SCR_RESEARCH;
-  demo.spec = &kAircraft[res ? kResearchJet : 1];
+  demo.spec = &kAircraft[res ? resCraft : 1];
   demo.rpm = 2400; demo.gear = res ? 0.f : 1.f; demo.flaps = 0; demo.nozzle = 0; demo.ctl = Controls(); demo.ctl.throttle = res ? 0.6f : 0.f;
   fillPlaneVisual(fp.plane, demo, realTime * 250.f, false);
   float ca = realTime * 0.05f, cr = res ? 24.f : 16.f;
@@ -1632,6 +1633,7 @@ void Game::debugScene(const std::string& name) {
     return;
   }
   if (name == "research") { screen = SCR_RESEARCH; realTime = 20; resOpened = 15; return; }
+  if (name == "research11") { screen = SCR_RESEARCH; realTime = 20; resOpened = 15; resCraft = kWraith; return; }
   if (name.compare(0, 3, "wr_") == 0) {   // XR-11: wr_<mode>_<cam yaw>_<cam pitch>_<cam dist>_<seconds>
     // modes: 0 cruise, 1 hover, 2 parked, 3 cloak spreading, 4 cloaked, 5 turrets out + bay open, 6 lasers firing,
     // 7 plasma bomb (camera on the impact), 8 cockpit
