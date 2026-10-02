@@ -753,7 +753,7 @@ void Game::updateUfo(float dt) {
   f = length(f) > 1.f ? normalize(f) : normalize(vec3(plane.forward().x, 0, plane.forward().z) + vec3(1e-4f, 0, 0));
   vec3 r(-f.z, 0, f.x), u(0, 1, 0);
   float span = plane.spec->span;
-  vec3 hold = r * (ufo.side * (span * 0.5f + 26.f)) + u * 4.f + f * 3.f;           // station alongside
+  vec3 hold = r * (ufo.side * (span * 0.5f + 15.f)) + u * 3.f + f * 2.f;           // station alongside
   vec3 from = -f * 520.f + u * 170.f + r * (ufo.side * 140.f);                      // swoops in from behind and above
   float k = smoothstepf(0.f, 6.5f, t);
   vec3 off = from + (hold - from) * k;
@@ -1658,7 +1658,7 @@ void Game::debugScene(const std::string& name) {
     toasts.clear(); hudOn = false;
     if (view == 1) { camMode = 1; lookYaw = -80.f * DEG; lookPitch = 0.f; camYaw = lookYaw; camPitch = 0.12f; }
     else { dbgCam = true; dbgCamLook = ufo.pos + ufo.up * 1.5f;
-      dbgCamPos = view == 2 ? ufo.pos + ufo.right * 9.f + ufo.up * 2.5f : plane.pos + ufo.right * 6.f - ufo.fwd * 22.f + ufo.up * 6.f; }
+      dbgCamPos = view == 2 ? ufo.pos + ufo.right * 9.f + ufo.up * 2.5f : plane.pos - ufo.right * 3.f + ufo.up * 2.f; }
     printf("ufo: t %.1f hatch %.2f laugh %.2f wave %.2f, %.1f m from the player\n", ufo.t, ufo.hatch, ufo.laugh, ufo.wave, length(ufo.pos - plane.pos));
     return;
   }

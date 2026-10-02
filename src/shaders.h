@@ -1766,11 +1766,11 @@ vec2 mapUfo(vec3 p){
   float rD = 3.1, thick = 0.09;
   float dOut = length(dq) - rD;
   float shell = max(abs(dOut + thick) - thick, -dq.y);
-  vec3 hb = vec3(1.0, 0.95, 1.05);                                        // hatch half-extents (cut-out box)
-  float cut = sdRoundBox(dq - vec3(rD, 1.05, 0.0), hb, 0.25);
+  vec3 hb = vec3(1.0, 1.05, 1.35);                                        // hatch half-extents (cut-out box)
+  float cut = sdRoundBox(dq - vec3(rD, 1.15, 0.0), hb, 0.3);
   float shellCut = max(shell, -cut);
-  vec3 dr = dq; dr.xy = rot2(dr.xy, -hatch*1.25);                          // the door, rotated up over the dome
-  float door = max(max(abs(length(dr) - rD) - thick*0.9, -dr.y), sdRoundBox(dr - vec3(rD, 1.05, 0.0), hb - 0.04, 0.25));
+  vec3 dr = dq; dr.xz = rot2(dr.xz, -hatch*1.7);                           // the door slides round the dome
+  float door = max(max(abs(length(dr) - rD) - thick*0.9, -dr.y), sdRoundBox(dr - vec3(rD, 1.15, 0.0), hb - 0.04, 0.3));
   res = opU(res, vec2(shellCut, 71.0));
   res = opU(res, vec2(door, 78.0));
   res = opU(res, vec2(sdCapsule(dq, vec3(0.0, rD - 0.1, 0.0), vec3(0.0, rD + 0.9, 0.0), 0.04), 70.0));   // antenna
@@ -1778,8 +1778,9 @@ vec2 mapUfo(vec3 p){
   // cabin interior: dance floor and the two aliens (only when the hatch is opening)
   if (hatch > 0.01 && length(dq) < rD + 0.2) {
     res = opU(res, vec2(max(abs(dq.y) - 0.04, length(dq.xz) - rD + 0.05), 77.0));
-    vec2 a1 = mapAlien(dq - vec3(0.85, 0.04, -0.75), -1.0);
-    vec2 a2 = mapAlien(dq - vec3(0.95, 0.04, 0.8), 1.0);
+    const float AS = 1.45;   // cartoon-sized aliens, readable from the cockpit
+    vec2 a1 = mapAlien((dq - vec3(0.7, 0.04, -0.7))/AS, -1.0); a1.x *= AS;
+    vec2 a2 = mapAlien((dq - vec3(0.8, 0.04, 0.75))/AS, 1.0); a2.x *= AS;
     res = opU(res, opU(a1, a2));
   }
   return res;
