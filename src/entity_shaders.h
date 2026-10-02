@@ -55,6 +55,12 @@ bool leafCut(float viewEdge){
     float n = vn3(vL*2.3 + vInst.x*17.0)*0.55 + vn3(vL*7.3 - vInst.x*9.0)*0.45;
     return n < 0.24 + 0.4*viewEdge;
   }
+  if (part == P_LEAFCARD && uKind == K_PINE) {   // a tuft of needles radiating from the shoot
+    vec2 q = vec2(fract(vAux.z), vAux.w)*2.0 - 1.0; float r = length(q);
+    float a = atan(q.y, q.x)/6.2832 + 0.5;
+    float k = fract(a*46.0 + r*0.6 + hsh(vec2(floor(vAux.z), vInst.x))*7.0);
+    return r > 0.95 - 0.25*hsh(vec2(floor(a*46.0), floor(vAux.z))) || r < 0.06 || k > 0.32;
+  }
   if (part == P_LEAFCARD) {   // a spray of leaves: jittered ellipses on a 3x3 grid, each at its own angle
     vec2 uv0 = vec2(fract(vAux.z), vAux.w);
     if (length(uv0 - 0.5) > 0.47 - 0.12*vn3(vec3(uv0*5.0, floor(vAux.z) + vInst.x*7.0))) return true;   // ragged round spray
@@ -122,7 +128,7 @@ void main(){
   if (part == P_LEAFCARD) {
     cls = 1.0;
     float h = hsh(floor(vec2(fract(vAux.z), vAux.w)*5.0) + floor(vAux.z)*7.0 + vInst.x*13.0);
-    vec3 tint = uKind == K_OAK ? vec3(0.07, 0.12, 0.035) : uKind == K_BIRCH ? vec3(0.11, 0.17, 0.045) : vec3(0.075, 0.12, 0.04);
+    vec3 tint = uKind == K_OAK ? vec3(0.07, 0.12, 0.035) : uKind == K_BIRCH ? vec3(0.11, 0.17, 0.045) : uKind == K_PINE ? vec3(0.045, 0.085, 0.06) : vec3(0.075, 0.12, 0.04);
     alb = tint*mix(0.75, 1.3, h)*mix(0.82, 1.12, fract(seed*5.3));
     alb = mix(alb, alb*vec3(1.6, 1.05, 0.55), smoothstep(0.8, 1.0, fract(seed*13.7))*0.8);   // trees turning
     alb *= mix(0.6, 1.0, ao);
@@ -132,7 +138,7 @@ void main(){
     cls = 1.0;
     if (part == P_NEEDLE) {
       alb = triS(lp, n0, M_NEEDLES, 0.9, 1.4, nb, rough);
-      vec3 tint = (uKind == K_SPRUCE ? vec3(0.5, 0.7, 0.68) : uKind == K_PINE ? vec3(0.66, 0.8, 0.55) : vec3(0.55, 0.76, 0.62))*mix(0.85, 1.1, vAux.z);
+      vec3 tint = (uKind == K_SPRUCE ? vec3(0.5, 0.7, 0.68) : uKind == K_PINE ? vec3(0.5, 0.68, 0.56) : vec3(0.55, 0.76, 0.62))*mix(0.85, 1.1, vAux.z);
       alb *= tint*mix(0.85, 1.15, fract(seed*7.31));
       if (uSnow > 0.05 || wy > 1500.0) alb = mix(alb, vec3(0.85, 0.88, 0.92), smoothstep(0.35, 0.8, n0.y)*max(uSnow, smoothstep(1500.0, 1900.0, wy))*0.85);
     } else if (part == P_FROND) {

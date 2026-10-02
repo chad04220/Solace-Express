@@ -150,7 +150,7 @@ uniform vec3 uColBase; uniform vec3 uColStripe;
 uniform vec4 uProp[2]; uniform int uPropCount;
 uniform vec3 uLandLightPos; uniform vec3 uLandLightDir; uniform float uLandLight;
 uniform vec4 uWr[7];   // XR-11 Wraith animation and weapons state (see mapWraith)
-uniform int uFxBeams; uniform vec4 uBeamA[2]; uniform vec4 uBeamB[2];   // laser bolts: start + radius, end + intensity
+uniform int uFxBeams; uniform vec4 uBeamA[16]; uniform vec4 uBeamB[16];   // laser bolts: tail + radius, head + intensity
 uniform int uFxBombs; uniform vec4 uBombs[8];                           // dark-energy bombs in flight: centre + radius
 uniform int uFxBlasts; uniform vec4 uBlast[6]; uniform vec4 uBlastI[6]; // detonations: centre + radius, age 0..1 + intensity
 uniform vec4 uFlame; uniform vec3 uFlameLP; uniform vec3 uFlameLI;  // research jet exhaust: spool, reheat, vector angle, mach | light pos, radiance
@@ -2967,7 +2967,7 @@ vec3 cloakSkin(vec3 world, vec3 n, vec3 rd, vec3 lp, float front){
 // with a halo. Detonations: an expanding shell of violet fire around a collapsing black core, a flat shock ring
 // and arcing filaments; the core swallows the light behind it.
 vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t){
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 16; i++) {
     if (i >= uFxBeams) break;
     vec3 a = uBeamA[i].xyz, b = uBeamB[i].xyz; float r = uBeamA[i].w, I = uBeamB[i].w;
     vec3 u = b - a; float L = length(u); u /= max(L, 1e-3);

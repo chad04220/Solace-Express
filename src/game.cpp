@@ -1633,17 +1633,33 @@ void Game::debugScene(const std::string& name) {
     else if (mode != 2) { plane.apEngage(Plane::AP_HOLD, -1, wx); }
     if (mode == 3 || mode == 4) wraith.cloakOn = true;
     if (mode == 5 || mode == 6) { wraith.armed = true; }
+    if (getenv("WRSPD")) { plane.vel = plane.forward() * (float)atof(getenv("WRSPD")); plane.apSpeed = (float)atof(getenv("WRSPD")); }
     if (mode == 5) wraith.bayHold = 100.f;
     if (mode == 7) wraith.bombQueue = 1;
     float firstDrop = 0; vec3 blastAt;
     int frames = (int)((mode == 3 ? 0.55f : mode == 7 ? 60.f : secs) * 60.f);
     for (int i = 0; i < frames; i++) {
       realTime += 1 / 60.f; update(1 / 60.f);
-      if (mode == 6 && wraith.lasers > 0.97f) { wraith.laserCD -= 1 / 60.f; if (wraith.laserCD <= 0) { fireLaser(); wraith.laserCD = 0.12f; } }
+      if (mode == 6) wraith.wantFire = true;   // trigger held
       if (mode == 7 && !wraith.blasts.empty() && firstDrop == 0) { firstDrop = realTime; blastAt = wraith.blasts[0].p; }
       if (mode == 7 && firstDrop > 0 && realTime - firstDrop > secs) break;
     }
-    if (mode == 6) { fireLaser(); fireLaser(); for (auto& b : wraith.bolts) b.life = 1.f; }   // hold the last pair for the screenshot
+    if (mode == 6) {
+      for (auto& b : wraith.bolts) b.life = b.age + 1.f;   // keep the bolts in flight bright for the screenshot
+      // the streak of the youngest visible bolt must start at its lens, however fast the craft flies
+      // (in the craft's frame the tail sits on the lens's firing line, 2000 m/s x age - streak out from it)
+      float worstOff = 0, worstAlong = 0; int n = 0;
+      for (auto& b : wraith.bolts) if (b.len > 0.05f && !b.hit && b.age < 0.5f) {
+        float off = 1e9f, alongErr = 0;
+        for (int s = 0; s < 2; s++) {
+          vec3 lens = plane.pos + plane.q.rotate(vec3(s ? 0.95f : -0.95f, -0.68f, -6.44f));
+          vec3 r = b.h - b.d * b.len - lens; float al = dot(r, b.d), o = length(r - b.d * al);
+          if (o < off) { off = o; alongErr = al - (2000.f * b.age - b.len); }
+        }
+        worstOff = std::max(worstOff, off); worstAlong = std::max(worstAlong, fabsf(alongErr)); n++;
+      }
+      printf("wr: speed %.0f m/s, %d young bolts: streak tails off the firing line by <= %.2f m, along-error <= %.2f m\n", length(plane.vel), n, worstOff, worstAlong);
+    }
     toasts.clear(); hint.clear();
     for (auto& b : wraith.blasts) printf("wr: blast age %.2f R %.0f at %.0f %.0f %.0f particles %d\n", b.age, b.R, b.p.x, b.p.y, b.p.z, (int)particles.size());
     printf("wr: mode %d stealth %.2f lasers %.2f bay %.2f bombs %d blasts %d tilt %.2f %.2f %.2f %.2f thr %.2f\n", mode, wraith.stealth, wraith.lasers, wraith.bay, (int)wraith.bombs.size(), (int)wraith.blasts.size(),

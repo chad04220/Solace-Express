@@ -224,16 +224,38 @@ void buildTree(MB& mb, int kind, int lod) {
     case EK_FIR: conifer(mb, lod, I.h, I.hx, 1.6f, 8, 0.86f, 0.3f); break;
     case EK_SPRUCE: conifer(mb, lod, I.h, I.hx, 0.9f, 11, 0.9f, 1.7f); break;
     case EK_PINE: {
-      vec3 top(0.35f, I.h * 0.66f, 0.1f), cc(0.3f, I.h * 0.8f, 0.1f);
-      if (lod >= 2) { clump(mb, cc, I.hx * 0.95f, 0.5f, 0, P_NEEDLE, cc, cc.y - 2.f, cc.y + 2.f, 0.5f); mb.cyl(vec3(0, -1, 0), top, 0.3f, 0.2f, 3, P_BARK, false, false); break; }
-      trunk(mb, vec3(0, -1, 0), top, 0.34f, 0.2f, lod == 0 ? 6 : 4, 0.8f, 0.85f);
-      vec3 cs[7] = {vec3(0.3f, I.h * 0.9f, 0.1f), vec3(2.2f, I.h * 0.8f, 0.9f), vec3(-1.9f, I.h * 0.78f, -0.4f), vec3(0.4f, I.h * 0.74f, -2.2f),
-                    vec3(-0.6f, I.h * 0.84f, 1.8f), vec3(1.4f, I.h * 0.68f, -1.1f), vec3(-1.5f, I.h * 0.66f, 1.4f)};
-      float rs[7] = {1.9f, 1.6f, 1.6f, 1.5f, 1.4f, 1.3f, 1.25f};
-      for (int i = 0; i < (lod == 0 ? 7 : 4); i++) {
-        if (i > 0 && lod == 0) trunk(mb, top - vec3(0, 0.5f + 0.4f * (i & 1), 0), cs[i] - vec3(0, 0.3f, 0), 0.13f, 0.06f, 4);
-        clump(mb, cs[i], rs[i] * (lod == 0 ? 1.f : 1.25f), 0.62f, sub, P_NEEDLE, cc, cc.y - 2.5f, cc.y + 2.f, 0.3f + i * 0.17f, 0.42f);
+      // Scots-style pine: tall bare trunk, whorls of upturned branches carrying lumpy needle tufts, a rounded top
+      vec3 cc(0.3f, I.h * 0.8f, 0.1f);
+      auto T = [&](float y) { float t = y / I.h; return vec3(0.35f * t * t, y, 0.1f * t * t); };   // gently leaning stem
+      if (lod >= 2) {
+        trunk(mb, vec3(0, -1, 0), T(I.h * 0.7f), 0.3f, 0.18f, 3);
+        clump(mb, T(I.h * 0.86f), 2.4f, 0.55f, 0, P_NEEDLE, cc, cc.y - 3.f, I.h, 0.2f, 0.3f);
+        clump(mb, T(I.h * 0.7f) + vec3(1.4f, 0, 0.6f), 2.0f, 0.5f, 0, P_NEEDLE, cc, cc.y - 3.f, I.h, 0.5f, 0.3f);
+        clump(mb, T(I.h * 0.72f) + vec3(-1.2f, 0, -0.8f), 1.9f, 0.5f, 0, P_NEEDLE, cc, cc.y - 3.f, I.h, 0.8f, 0.3f);
+        break;
       }
+      trunk(mb, vec3(0, -1, 0), T(I.h * 0.97f), 0.36f, 0.08f, lod == 0 ? 7 : 4, 0.8f, 0.9f);
+      int whorls = lod == 0 ? 7 : 4, perW = lod == 0 ? 4 : 3;
+      for (int w = 0; w < whorls; w++) {
+        float t = (float)w / (whorls - 1), y = I.h * lerpf(0.5f, 0.9f, t);
+        float len = lerpf(3.3f, 1.3f, t);
+        for (int bI = 0; bI < perW; bI++) {
+          int id = w * 7 + bI;
+          float az = (bI + 0.5f * (w & 1)) * 2 * PI / perW + 1.3f * hash2i(id, 17);
+          float up = 0.25f + 0.35f * hash2i(id, 23), L = len * (0.75f + 0.5f * hash2i(id, 29));
+          vec3 dir = normalize(vec3(cosf(az), up, sinf(az)));
+          vec3 b0 = T(y), b1 = b0 + dir * L;
+          if (lod == 0) trunk(mb, b0, b1, 0.1f * (1.f - 0.5f * t) + 0.04f, 0.035f, 3, 0.75f, 0.85f);
+          float tr = (0.85f + 0.35f * hash2i(id, 31)) * lerpf(1.05f, 0.85f, t);
+          vec3 tip = b1 + vec3(0, 0.25f, 0);
+          clump(mb, tip, tr * (lod == 0 ? 1.f : 1.35f), 0.6f, 0, P_NEEDLE, cc, cc.y - 3.f, I.h, 0.07f * id, 0.38f);
+          if (lod == 0) {
+            clump(mb, b0 + dir * (L * 0.55f) + vec3(0, 0.15f, 0), tr * 0.75f, 0.6f, 0, P_NEEDLE, cc, cc.y - 3.f, I.h, 0.07f * id + 0.3f, 0.38f);
+            leafCards(mb, tip, tr * 1.25f, 0.65f, 5, cc, cc.y - 3.f, I.h, 0.07f * id + 0.5f, 0.75f);
+          }
+        }
+      }
+      clump(mb, T(I.h * 0.95f), lod == 0 ? 1.2f : 1.5f, 0.75f, 0, P_NEEDLE, cc, cc.y - 3.f, I.h, 0.9f, 0.35f);
       break;
     }
     case EK_OAK: {

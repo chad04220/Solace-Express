@@ -1,12 +1,14 @@
 // Air Xpress - XR-11 Wraith systems: the cloak, the retracting laser turrets, the bomb bay and the dark-energy
 // weapons out in the world (laser bolts, plasma bombs, detonations and their glassed craters)
 #include "game.h"
+#include "entities.h"
 
 namespace {
 float frand() { return (rand() % 10000) * 0.0001f; }
 vec3 rndDir() { vec3 d(frand() - 0.5f, frand() - 0.5f, frand() - 0.5f); return length(d) > 1e-3f ? normalize(d) : vec3(0, 1, 0); }
 // laser emitter lens tips (body coords) once the turrets are fully out
 const vec3 kLaserLens[2] = {vec3(-0.95f, -0.68f, -6.44f), vec3(0.95f, -0.68f, -6.44f)};
+const float kBoltSpeed = 2000.f, kBoltStreak = 55.f, kBoltRange = 4500.f;   // muzzle speed (added to the craft's), streak, range
 // the bomb in its cradle (body coords)
 const vec3 kBayBomb(0.f, -0.31f, 0.1f);
 float groundAt(vec3 p) { return std::max(g_world.height(p.x, p.z), 0.f); }
@@ -52,51 +54,72 @@ void Game::wraithControls(float dt) {
   bool padHot = air && in.pad && W.armed;
   bool fire = (in.mDown[0] && !showMap) || (in.down[K_ENTER] && !showMap) || (padHot && (in.buttons & PAD_RB));
   if (fire && !W.armed) { W.armed = true; g_audio.trigger(SFX_GEAR_CLUNK, 0.6f); }
-  W.laserCD -= dt;
-  if (fire && W.lasers > 0.97f && W.laserCD <= 0) { fireLaser(); W.laserCD = 0.12f; }
+  W.wantFire = fire;   // the bolt leaves the lens after this frame's physics step (updateWraith)
   // bombs: Backspace, middle mouse, or the left bumper while weapons are hot - each press queues a drop
   if (in.pressed[K_BACK] || in.mPressed[2] || (padHot && (in.buttonsPressed & PAD_LB))) {
     if (W.bombQueue < 3) W.bombQueue++;
   }
 }
 
+// A bolt leaves the lens tip at the muzzle speed plus the craft's own velocity, so in the craft's frame it always
+// streaks away from the turret, however fast the Wraith is flying.
 void Game::fireLaser() {
   WraithState& W = wraith;
   int s = W.laserSide; W.laserSide ^= 1;
   vec3 a = plane.pos + plane.q.rotate(kLaserLens[s]);
-  vec3 f = plane.forward();
-  vec3 aim = plane.pos + f * 650.f;   // the two turrets converge 650 m ahead
+  vec3 aim = plane.pos + plane.forward() * 650.f;   // the two turrets converge 650 m ahead
   vec3 d = normalize(aim - a);
-  const float L = 4500.f;
-  float tg = groundHit(a, d, L);
-  float tt = 0; int k = traffic.rayHit(a, d, tg > 0 ? tg : L, tt);
-  float tHit = k >= 0 ? tt : tg;
-  vec3 b = a + d * (tHit > 0 ? tHit : L);
-  W.bolts.push_back({a, b, 0.09f});
+  W.bolts.push_back({a, plane.vel + d * kBoltSpeed, d, 0.f, 0.f, kBoltRange / kBoltSpeed, false});
   W.laserGlow = 1.f;
   g_audio.trigger(SFX_LASER, 0.8f);
-  // muzzle flash
-  spawn(a, plane.vel, 0.06f, 0.9f, 2.f, vec3(1.f, 0.3f, 0.45f) * 3.f, 1.f, SPR_GLOW, 0.f, 0.f);
-  if (k >= 0) {   // a direct hit: the aircraft comes apart in a fireball
-    vec3 p = traffic.craft[k].pos, v = traffic.craft[k].vel;
-    traffic.craft[k].alive = false;
+  spawn(a, plane.vel, 0.06f, 0.9f, 2.f, vec3(1.f, 0.3f, 0.45f) * 3.f, 1.f, SPR_GLOW, 0.f, 0.f);   // muzzle flash
+}
+
+// a bolt striking something: aircraft come apart, scenery and the ground spark and smoke
+void Game::laserImpact(vec3 b, int craft, bool solid) {
+  WraithState& W = wraith;
+  if (craft >= 0) {
+    vec3 p = traffic.craft[craft].pos, v = traffic.craft[craft].vel;
+    traffic.craft[craft].alive = false;
     W.kills++;
-    toast(fmt("SPLASH %d - %s down", W.kills, kAircraft[traffic.craft[k].spec].name), vec3(1.f, 0.5f, 0.3f));
+    toast(fmt("SPLASH %d - %s down", W.kills, kAircraft[traffic.craft[craft].spec].name), vec3(1.f, 0.5f, 0.3f));
     g_audio.trigger(SFX_BOOM, 0.5f);
     for (int i = 0; i < 40; i++) spawn(p + rndDir() * 2.f, v * 0.5f + rndDir() * (10.f + 25.f * frand()), 0.6f + frand(), 2.5f + 2.f * frand(), 4.f, vec3(1.f, 0.55f, 0.2f) * 3.f, 1.f, SPR_FIRE, 1.2f, 0.4f);
     for (int i = 0; i < 25; i++) spawn(p, v * 0.6f + rndDir() * (30.f + 50.f * frand()), 1.f + frand(), 0.25f, -0.1f, vec3(1.f, 0.7f, 0.3f) * 4.f, 1.f, SPR_SPARK, 0.8f, -1.f);
     for (int i = 0; i < 20; i++) spawn(p + rndDir() * 3.f, v * 0.3f + rndDir() * 6.f, 4.f + 3.f * frand(), 3.f, 5.f, vec3(0.12f), 0.6f, SPR_SMOKE, 1.f, 0.6f);
-  } else if (tg > 0) {   // ground or sea: sparks, a brief fire and a puff of smoke or steam
-    bool water = b.y < 0.5f;
-    for (int i = 0; i < 14; i++) spawn(b + vec3(0, 0.3f, 0), rndDir() * (8.f + 18.f * frand()) + vec3(0, 6.f, 0), 0.3f + 0.4f * frand(), 0.12f, -0.1f, vec3(1.f, 0.4f, 0.5f) * 4.f, 1.f, SPR_SPARK, 1.f, -1.f);
-    spawn(b + vec3(0, 0.5f, 0), vec3(0, 1.f, 0), 0.15f, 3.f, 3.f, vec3(1.f, 0.3f, 0.45f) * 3.f, 1.f, SPR_GLOW, 0.f, 0.f);
-    spawn(b + vec3(0, 1.f, 0), vec3(0, 2.f, 0), 2.5f, 1.5f, 3.f, water ? vec3(0.85f, 0.88f, 0.9f) : vec3(0.15f, 0.13f, 0.12f), 0.5f, SPR_SMOKE, 1.f, 0.5f);
-    if (!water && frand() < 0.4f) spawn(b, vec3(0, 1.f, 0), 0.8f, 1.2f, 1.5f, vec3(1.f, 0.5f, 0.2f) * 2.f, 1.f, SPR_FIRE, 1.f, 0.2f);
+    return;
   }
-  if (ufo.on && ufo.t < 20.f) {   // tag the UFO and it decides it has seen enough
-    vec3 rel = ufo.pos - a; float along = dot(rel, d);
-    if (along > 0 && along < (tHit > 0 ? tHit : L) && length(rel - d * along) < 9.f) { ufo.t = 23.f; toast("The visitors don't appreciate that...", vec3(0.4f, 1.f, 0.6f)); }
+  bool water = !solid && b.y < 0.5f;
+  for (int i = 0; i < 14; i++) spawn(b + vec3(0, 0.3f, 0), rndDir() * (8.f + 18.f * frand()) + vec3(0, 6.f, 0), 0.3f + 0.4f * frand(), 0.12f, -0.1f, vec3(1.f, 0.4f, 0.5f) * 4.f, 1.f, SPR_SPARK, 1.f, -1.f);
+  spawn(b + vec3(0, 0.5f, 0), vec3(0, 1.f, 0), 0.15f, 3.f, 3.f, vec3(1.f, 0.3f, 0.45f) * 3.f, 1.f, SPR_GLOW, 0.f, 0.f);
+  spawn(b + vec3(0, 1.f, 0), vec3(0, 2.f, 0), 2.5f, 1.5f, 3.f, water ? vec3(0.85f, 0.88f, 0.9f) : vec3(0.15f, 0.13f, 0.12f), 0.5f, SPR_SMOKE, 1.f, 0.5f);
+  if (!water && frand() < 0.4f) spawn(b, vec3(0, 1.f, 0), 0.8f, 1.2f, 1.5f, vec3(1.f, 0.5f, 0.2f) * 2.f, 1.f, SPR_FIRE, 1.f, 0.2f);
+}
+
+// bolts in flight: sweep each one's path this frame against the ground, aircraft, scenery and the UFO (runs after the
+// physics step and before this frame's new bolts leave the lenses, so a bolt's first move is the frame after it fires)
+void Game::updateBolts(float dt) {
+  WraithState& W = wraith;
+  for (auto& b : W.bolts) {
+    b.age += dt;
+    if (b.hit) { b.len -= kBoltSpeed * dt; continue; }   // the streak runs into the impact point
+    float segL = length(b.v) * dt;
+    vec3 sd = b.v / std::max(length(b.v), 1e-3f), a = b.h;
+    float tHit = -1.f; int craft = -1; bool solid = false;
+    float tg = groundHit(a, sd, segL);
+    if (tg >= 0) tHit = tg;
+    float tt = 0; int k = traffic.rayHit(a, sd, tHit >= 0 ? tHit : segL, tt);
+    if (k >= 0) { tHit = tt; craft = k; }
+    int ek = 0; float te = g_scenery.raycast(a, sd, tHit >= 0 ? tHit : segL, &ek);
+    if (te >= 0) { tHit = te; craft = -1; solid = true; }
+    if (ufo.on && ufo.t < 20.f) {   // tag the UFO and it decides it has seen enough
+      vec3 rel = ufo.pos - a; float along = dot(rel, sd);
+      if (along > 0 && along < (tHit >= 0 ? tHit : segL) && length(rel - sd * along) < 9.f) { ufo.t = 23.f; toast("The visitors don't appreciate that...", vec3(0.4f, 1.f, 0.6f)); }
+    }
+    if (tHit >= 0) { b.h = a + sd * tHit; b.hit = true; laserImpact(b.h, craft, solid); }
+    else { b.h = a + b.v * dt; b.len = std::min(kBoltStreak, b.len + kBoltSpeed * dt); }
   }
+  W.bolts.erase(std::remove_if(W.bolts.begin(), W.bolts.end(), [](const WraithState::Bolt& b) { return b.age > b.life || (b.hit && b.len <= 0.f); }), W.bolts.end());
 }
 
 void Game::detonate(vec3 p, bool water) {
@@ -158,9 +181,11 @@ void Game::updateWraith(float dt) {
     toast("PLASMA BOMB AWAY", vec3(0.7f, 0.4f, 1.f));
   }
   if (W.bombQueue > 0 && plane.onGround) W.bombQueue = 0;
-  // bolts fade
-  for (auto& b : W.bolts) b.life -= dt;
-  W.bolts.erase(std::remove_if(W.bolts.begin(), W.bolts.end(), [](const WraithState::Bolt& b) { return b.life <= 0; }), W.bolts.end());
+  // laser bolts fly, then new ones leave the lenses (after the physics step, from where the turrets are now)
+  updateBolts(dt);
+  W.laserCD -= dt;
+  if (wr && W.wantFire && W.lasers > 0.97f && W.laserCD <= 0) { fireLaser(); W.laserCD = 0.12f; }
+  W.wantFire = false;
   // bombs fall (a little drag), trail violet sparks, and go off on the ground, the sea or near an aircraft
   for (size_t i = 0; i < W.bombs.size(); i++) {
     WraithState::Bomb& b = W.bombs[i];
@@ -194,12 +219,14 @@ void Game::wraithVisual(FrameParams& fp) {
   }
   FxVisual& fx = fp.fx;
   fx.beams = 0;
-  for (int i = (int)W.bolts.size() - 1; i >= 0 && fx.beams < 2; i--) {
+  for (int i = (int)W.bolts.size() - 1; i >= 0 && fx.beams < 16; i--) {
     const WraithState::Bolt& b = W.bolts[i];
-    float k = clampf(b.life / 0.09f, 0.f, 1.f);
+    if (b.len <= 0.05f) continue;
+    vec3 tail = b.h - b.d * b.len;   // the streak trails along the aim line (it leaves the lens in the craft's frame)
+    float k = clampf((b.life - b.age) / 0.25f, 0.f, 1.f);
     float* A = fx.beamA[fx.beams]; float* B = fx.beamB[fx.beams];
-    A[0] = b.a.x; A[1] = b.a.y; A[2] = b.a.z; A[3] = 0.22f;
-    B[0] = b.b.x; B[1] = b.b.y; B[2] = b.b.z; B[3] = k;
+    A[0] = tail.x; A[1] = tail.y; A[2] = tail.z; A[3] = 0.22f;
+    B[0] = b.h.x; B[1] = b.h.y; B[2] = b.h.z; B[3] = k;
     fx.beams++;
   }
   fx.bombs = 0;

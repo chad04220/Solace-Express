@@ -382,3 +382,15 @@ int Scenery::collide(vec3 p, float r) {
     }
   return 0;
 }
+
+float Scenery::raycast(vec3 a, vec3 d, float L, int* kindOut) {
+  // sampled along the segment (bolts and the like); skipped when the whole segment is well above the ground
+  vec3 b = a + d * L;
+  float g = std::max(std::min(g_world.groundHeight(a.x, a.z, 4), g_world.groundHeight(b.x, b.z, 4)), 0.f);
+  if (std::min(a.y, b.y) - g > 220.f) return -1.f;
+  for (float t = 0; t <= L; t += 2.5f) {
+    int k = collide(a + d * t, 0.4f);
+    if (k) { if (kindOut) *kindOut = k; return t; }
+  }
+  return -1.f;
+}

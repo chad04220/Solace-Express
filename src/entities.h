@@ -44,6 +44,8 @@ public:
   static float chunkX0(int c) { return c * CH - WORLD_HALF; }
   // Collision: returns the kind + 1 of an entity the sphere (p, r) touches, 0 if none.
   int collide(vec3 p, float r);
+  // First entity a segment (a, unit d, length L) passes through: distance along it, or -1 (kindOut = kind + 1)
+  float raycast(vec3 a, vec3 d, float L, int* kindOut = nullptr);
   // Plasma craters destroy what stands in them (x, z, radius)
   std::vector<vec3> craters;
   bool destroyed(const Ent& e) const;

@@ -22,7 +22,7 @@ struct PlaneVisual {
 
 // XR-11 weapons in the world (see weaponsFx in shaders.h)
 struct FxVisual {
-  int beams = 0; float beamA[2][4], beamB[2][4];   // laser bolts: start + radius, end + intensity
+  int beams = 0; float beamA[16][4], beamB[16][4]; // laser bolts: tail + radius, head + intensity
   int bombs = 0; float bomb[8][4];                 // dark-energy bombs: centre + radius
   int blasts = 0; float blast[6][4], blastI[6][4]; // detonations: centre + radius, age 0..1 + intensity
 };
