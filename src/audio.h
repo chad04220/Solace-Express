@@ -15,9 +15,10 @@ struct AudioParams {
   float master = 0.8f, engineVol = 1.0f, sfxVol = 1.0f;
   bool paused = false;
   bool stallIsShaker = false;
+  bool research = false; float nozzle = 0, mach = 0;   // XR-9 research craft voice
 };
 
-enum Sfx { SFX_CLICK = 0, SFX_HOVER, SFX_CHIME, SFX_SUCCESS, SFX_FAIL, SFX_CASH, SFX_TOUCHDOWN, SFX_CRASH, SFX_THUNDER, SFX_BEEP, SFX_GEAR_CLUNK, SFX_AP_DISC, SFX_COUNT };
+enum Sfx { SFX_CLICK = 0, SFX_HOVER, SFX_CHIME, SFX_SUCCESS, SFX_FAIL, SFX_CASH, SFX_TOUCHDOWN, SFX_CRASH, SFX_THUNDER, SFX_BEEP, SFX_GEAR_CLUNK, SFX_AP_DISC, SFX_BOOM, SFX_COUNT };
 
 class AudioEngine {
 public:

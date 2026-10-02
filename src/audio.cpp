@@ -147,6 +147,77 @@ struct TurbineVoice {
   }
 };
 
+// XR-9 research craft: a tuned, layered power voice instead of a raw jet roar.
+//  - core: a warm harmonic stack (detuned left/right for width) whose pitch rises with spool
+//  - fan: soft high whine with two slowly beating partials
+//  - sub: deep sine + filtered rumble you feel more than hear
+//  - exhaust: band-shaped roar that opens up with thrust; reheat adds a broad, crackling, pulsing roar
+//  - lift fans: rhythmic blade-pass thrum when the nozzles swivel towards the hover
+struct ResearchVoice {
+  float ph[6] = {}, sub = 0, fanPh[2] = {}, liftPh = 0, vib = 0, crackEnv = 0, pulse = 0, pulseT = 0;
+  Noise nz;
+  Biquad roarA, roarB, roarHP, abLP, abBP, crackBP, subLP, liftBP, liftLP, airBP, warmL, warmR;
+  void init() { nz.s = 9119; }
+  void tick(float sr, float spool, float ab, float nozzle, float mach, int bp, float& outL, float& outR) {
+    if (bp == 0) {
+      roarA.set(LP, 300.f + 2400.f * spool * spool, 0.6f, sr);
+      roarB.set(LP, 420.f + 2000.f * spool, 0.6f, sr);
+      roarHP.set(HP, 45.f, 0.7f, sr);
+      abLP.set(LP, 900.f + 900.f * ab, 0.6f, sr);
+      abBP.set(BP, 140.f, 0.9f, sr);
+      crackBP.set(BP, 2600.f, 1.4f, sr);
+      subLP.set(LP, 75.f, 0.8f, sr);
+      liftBP.set(BP, 160.f + 90.f * spool, 1.1f, sr);
+      liftLP.set(LP, 700.f, 0.7f, sr);
+      airBP.set(BP, 600.f + 900.f * std::min(mach, 2.f), 0.5f, sr);
+      warmL.set(PK, 220.f, 0.9f, sr, 3.f); warmR.set(PK, 220.f, 0.9f, sr, 3.f);
+    }
+    float n = nz.w(), n2 = nz.w();
+    vib += 4.7f / sr; vib -= floorf(vib);
+    float f0 = (72.f + 230.f * spool) * (1.f + 0.003f * sinf(2 * PI * vib));
+    // harmonic stack: 1, 2, 3, 4.5 (a gentle inharmonic partial gives it a synthetic "drive" character)
+    const float mult[6] = {1.f, 1.003f, 2.f, 2.996f, 4.5f, 6.02f};
+    const float amp[6] = {0.32f, 0.32f, 0.16f, 0.1f, 0.05f, 0.025f};
+    float coreL = 0, coreR = 0;
+    for (int i = 0; i < 6; i++) {
+      ph[i] += f0 * mult[i] / sr; ph[i] -= floorf(ph[i]);
+      float s = sinf(2 * PI * ph[i]) * amp[i];
+      if (i & 1) coreR += s; else coreL += s;
+      if (i == 0 || i == 2) coreR += s * 0.6f; else coreL += s * 0.6f;
+    }
+    float coreAmp = 0.18f + 0.32f * spool;
+    // fan whine
+    float ff = 900.f + 3200.f * spool;
+    fanPh[0] += ff / sr; fanPh[1] += ff * 1.5013f / sr; fanPh[0] -= floorf(fanPh[0]); fanPh[1] -= floorf(fanPh[1]);
+    float fan = (sinf(2 * PI * fanPh[0]) * 0.6f + sinf(2 * PI * fanPh[1]) * 0.4f) * (0.025f + 0.03f * spool) * (1.f - 0.5f * ab);
+    // sub
+    sub += (34.f + 18.f * spool) / sr; sub -= floorf(sub);
+    float subV = sinf(2 * PI * sub) * (0.12f + 0.3f * spool) + subLP.p(n) * (0.6f + 1.4f * spool);
+    // exhaust roar
+    float roar = roarHP.p(roarB.p(roarA.p(n))) * (0.15f + 0.9f * powf(spool, 1.5f));
+    // reheat: broad roar with slow random pulsing and crackle
+    float abV = 0;
+    if (ab > 0.01f) {
+      pulseT -= 1.f / sr;
+      if (pulseT <= 0) { pulseT = 0.05f + 0.1f * (0.5f + 0.5f * nz.w()); pulse = 0.75f + 0.25f * nz.w(); }
+      if ((nz.s & 0x7FF) < 3) crackEnv = 1.f;
+      crackEnv *= 0.995f;
+      abV = (abLP.p(n2) * 1.3f * pulse + abBP.p(n2) * 1.8f + crackBP.p(n) * crackEnv * 0.35f) * ab;
+    }
+    // lift fans in the hover
+    float lift = 0;
+    if (nozzle > 0.05f) {
+      liftPh += (55.f + 30.f * spool) / sr; liftPh -= floorf(liftPh);
+      float blade = 0.55f + 0.45f * powf(0.5f + 0.5f * cosf(2 * PI * liftPh), 3.f);
+      lift = (liftBP.p(n2) * 1.2f + liftLP.p(n) * 0.25f) * blade * nozzle * (0.3f + 0.7f * spool);
+    }
+    float air = airBP.p(n) * clampf(mach, 0.f, 2.5f) * 0.12f;
+    float common = subV * 0.9f + roar * 0.75f + abV + lift + air + fan;
+    outL = tanhf(warmL.p(coreL * coreAmp + common) * 1.3f) * 0.85f;
+    outR = tanhf(warmR.p(coreR * coreAmp + common * 0.97f) * 1.3f) * 0.85f;
+  }
+};
+
 struct OneShot { int type; float t; float intensity; float ph; float ph2; Biquad f1, f2; Noise nz; bool active; };
 }  // namespace
 
@@ -155,6 +226,7 @@ struct AudioEngine::Impl {
   AudioParams P;
   PistonVoice pv[2];
   TurbineVoice tv[2];
+  ResearchVoice rv;
   Smooth sRpm, sN1, sSpool, sAir, sGs, sLoad, sRain, sMuffle, sInterior, sVol, sStall, sCrank;
   Noise nz;
   Biquad windBP, windLP, rollLP, rollBP, gearRumble, rainHP, rainLP;
@@ -172,7 +244,7 @@ void AudioEngine::init(int sr) {
   impl = new Impl();
   impl->sr = (float)sr;
   impl->pv[0].init(1234); impl->pv[1].init(98765);
-  impl->tv[0].init(555); impl->tv[1].init(777);
+  impl->tv[0].init(555); impl->tv[1].init(777); impl->rv.init();
   for (auto& s : impl->shots) s.active = false;
   impl->thunderLP.set(LP, 120, 0.7f, (float)sr);
 }
@@ -191,6 +263,7 @@ static void startShot(OneShot& s, int type, float inten, float sr) {
     case SFX_TOUCHDOWN: s.f1.set(BP, 1700, 1.4f, sr); s.f2.set(LP, 90, 0.8f, sr); break;
     case SFX_CRASH: s.f1.set(LP, 900, 0.7f, sr); s.f2.set(BP, 2500, 1.0f, sr); break;
     case SFX_THUNDER: s.f1.set(LP, 160, 0.7f, sr); s.f2.set(LP, 60, 0.7f, sr); break;
+    case SFX_BOOM: s.f1.set(LP, 2200, 0.7f, sr); s.f2.set(LP, 70, 0.8f, sr); break;
     case SFX_CASH: s.f1.set(BP, 5000, 2.0f, sr); break;
     case SFX_GEAR_CLUNK: s.f1.set(LP, 300, 1.0f, sr); break;
     default: break;
@@ -227,6 +300,12 @@ static bool runShot(OneShot& s, float sr, float& out) {
     case SFX_THUNDER: {
       float env = smoothstepf(0, 0.15f, t) * expf(-t * 0.7f) * (0.6f + 0.4f * sinf(t * 7.f) * sinf(t * 2.3f));
       v = (s.f1.p(s.nz.w()) * 3.f + s.f2.p(s.nz.w()) * 4.f) * env * s.intensity; alive = t < 6.f; break; }
+    case SFX_BOOM: {  // sonic boom: the classic double crack (bow and tail shocks) and a rolling low tail
+      auto nwave = [&](float t0) { float tt = t - t0; if (tt < 0 || tt > 0.03f) return 0.f; return (1.f - 2.f * tt / 0.03f) * smoothstepf(0, 0.0015f, tt); };
+      float crack = nwave(0.0f) * 1.4f + nwave(0.14f) * 1.2f;
+      float body = s.f1.p(crack * 3.f + s.nz.w() * expf(-t * 18.f) * 0.4f);
+      float tail = s.f2.p(s.nz.w()) * 5.f * expf(-t * 1.6f) * smoothstepf(0.0f, 0.05f, t);
+      v = (body * 1.2f + tail) * s.intensity; alive = t < 3.5f; break; }
     default: alive = false;
   }
   s.t += dt;
@@ -260,6 +339,8 @@ void AudioEngine::render(float* out, int frames) {
     if (vol > 0.001f) {
       float eng[2] = {0, 0}, prop[2] = {0, 0};
       int ne = std::min(P.engines, 2);
+      float resL = 0, resR = 0;
+      if (P.research) { I.rv.tick(sr, spool, smoothstepf(0.85f, 1.f, spool), P.nozzle, P.mach, bp, resL, resR); ne = 0; }
       for (int e = 0; e < ne; e++) {
         float det = e == 0 ? 1.f : 1.0065f;  // unsynchronised twins beat slowly
         if (P.engineType == 0)
@@ -272,9 +353,10 @@ void AudioEngine::render(float* out, int frames) {
       // cabin/exterior tone shaping
       if (bp == 0) {
         for (int c = 0; c < 2; c++) {
-          I.engL[c].set(LP, lerpf(9000.f, 2200.f, inter), 0.7f, sr);
-          I.engR[c].set(LP, lerpf(9000.f, 2200.f, inter), 0.7f, sr);
-          I.cabinBoom[c].set(PK, 115.f, 1.2f, sr, 6.f * inter);
+          float cab = P.research ? 5200.f : 2200.f;   // the XR-9's sealed pod passes more of the engine's character
+          I.engL[c].set(LP, lerpf(12000.f, cab, inter), 0.7f, sr);
+          I.engR[c].set(LP, lerpf(12000.f, cab, inter), 0.7f, sr);
+          I.cabinBoom[c].set(PK, P.research ? 60.f : 115.f, 1.2f, sr, (P.research ? 4.f : 6.f) * inter);
           I.muffleLP[c][0].set(LP, lerpf(16000.f, 380.f, muff), 0.7f, sr);
           I.muffleLP[c][1].set(LP, lerpf(16000.f, 380.f, muff), 0.7f, sr);
         }
@@ -292,6 +374,7 @@ void AudioEngine::render(float* out, int frames) {
       float mono = (ne == 2) ? 0.f : e0;
       float el = ne == 2 ? e0 * 0.8f + e1 * 0.45f : mono;
       float er = ne == 2 ? e1 * 0.8f + e0 * 0.45f : mono;
+      if (P.research) { el = resL; er = resR; }
       // Haas widening for single engines
       I.delayL[I.dpos & 2047] = el; I.delayR[I.dpos & 2047] = er;
       float wl = I.delayR[(I.dpos - 331) & 2047], wr = I.delayL[(I.dpos - 547) & 2047];
@@ -348,7 +431,7 @@ void AudioEngine::render(float* out, int frames) {
     for (auto& s : I.shots) {
       if (!s.active) continue;
       float v; s.active = runShot(s, sr, v);
-      bool muffles = s.type == SFX_TOUCHDOWN || s.type == SFX_CRASH || s.type == SFX_THUNDER;
+      bool muffles = s.type == SFX_TOUCHDOWN || s.type == SFX_CRASH || s.type == SFX_THUNDER || s.type == SFX_BOOM;
       sfx += v * (muffles ? lerpf(1.f, 0.5f, muff) : 1.f);
     }
     L += sfx * P.sfxVol; R += sfx * P.sfxVol;

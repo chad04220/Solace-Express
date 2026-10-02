@@ -530,7 +530,8 @@ void Game::updateCamera(float dt) {
     camPos = plane.pos + orbit.rotate(vec3(0, 0, dist)) + vec3(0, s.fusRad * 0.6f, 0);
   } else if (camMode == 1) {
     if (drag || in.pad) { lookYaw = camYaw; lookPitch = camPitch - 0.12f; }
-    else { lookYaw = approach(lookYaw, 0, 2.f, dt); lookPitch = approach(lookPitch, -0.13f, 2.f, dt); camYaw = lookYaw; camPitch = lookPitch + 0.12f; }
+    else { float rest = plane.spec->special ? -0.24f : -0.13f;   // XR-9: rest the view so the instrument console is in sight
+      lookYaw = approach(lookYaw, 0, 2.f, dt); lookPitch = approach(lookPitch, rest, 2.f, dt); camYaw = lookYaw; camPitch = lookPitch + 0.12f; }
     camPos = plane.pos + plane.q.rotate(kModels[plane.spec - kAircraft].eye);
   } else if (camMode == 2) {
     float dist = (size * 1.4f + 8.f) * camZoom;
@@ -659,7 +660,7 @@ void Game::jetEffects(float dt) {
     }
   }
   if (prevMach < 1.f && M >= 1.f && !plane.onGround) {
-    g_audio.trigger(SFX_THUNDER, 1.f);
+    g_audio.trigger(SFX_BOOM, 1.f);
     toast("MACH 1 - SONIC BOOM", vec3(0.4f, 0.9f, 1));
     vec3 f = normalize(plane.vel), r = normalize(cross(f, vec3(0, 1, 0)) + vec3(1e-4f, 0, 0)), u = cross(r, f);
     bursts.push_back({plane.pos, r * 25.f, u * 25.f, vec3(0.7f, 0.85f, 1.f), 0.f});
@@ -841,6 +842,7 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   pv.hud2[0] = p.gLoad; pv.hud2[1] = p.ctl.throttle; pv.hud2[2] = p.nozzle; pv.hud2[3] = p.gear > 0.5f ? 1.f : 0.f;
   vec3 vb = length(p.vel) > 2.f ? p.q.conj().rotate(normalize(p.vel)) : vec3(0, 0, -1);
   pv.hudV[0] = vb.x; pv.hudV[1] = vb.y; pv.hudV[2] = vb.z;
+  pv.hud3[0] = p.engineSpool; pv.hud3[1] = p.alpha / DEG; pv.hud3[2] = p.vel.y; pv.hud3[3] = p.agl();
 }
 
 FrameParams Game::buildFrame() {
@@ -1085,6 +1087,7 @@ void Game::feedAudio() {
     const AircraftSpec& s = *plane.spec;
     ap.inFlight = true;
     ap.engineType = s.engineType; ap.engines = s.engines; ap.cylinders = s.cylinders; ap.blades = s.blades;
+    ap.research = s.special != 0; ap.nozzle = plane.nozzle; ap.mach = plane.mach;
     ap.rpm = s.engineType == ENG_JET ? plane.n1 : plane.rpm; ap.maxRpm = s.maxRpm; ap.n1 = plane.n1;
     ap.spool = plane.engineSpool; ap.throttle = plane.engineRunning ? plane.ctl.throttle : 0.f;
     ap.running = plane.engineRunning; ap.cranking = !plane.engineRunning && plane.starterTime > 0;
@@ -1214,7 +1217,7 @@ void Game::debugScene(const std::string& name) {
     return;
   }
   if (name == "research") { screen = SCR_RESEARCH; realTime = 20; resOpened = 15; return; }
-  if (name == "rjet" || name == "rjetc" || name == "rhover" || name == "rjetl") { realTime = 20; resAirborne = name != "rhover"; launchResearch(); if (name == "rjetc" || name == "rjetl") camMode = 1; if (name == "rhover") { plane.ctl.flaps = 1; flapNotch = 1; plane.flaps = plane.nozzle = 1; plane.ctl.throttle = 0.7f; plane.engineRunning = true; plane.engineSpool = 0.7f; } for (int i = 0; i < 90; i++) { realTime += 1 / 30.f; update(1 / 30.f); } toasts.clear(); if (name == "rjetl") lookYaw = 1.75f; return; }
+  if (name == "rjet" || name == "rjetc" || name == "rhover" || name == "rjetl" || name == "rjetd" || name == "rjetr") { realTime = 20; resAirborne = name != "rhover"; launchResearch(); if (name == "rjetc" || name == "rjetl" || name == "rjetd" || name == "rjetr") camMode = 1; if (name == "rhover") { plane.ctl.flaps = 1; flapNotch = 1; plane.flaps = plane.nozzle = 1; plane.ctl.throttle = 0.7f; plane.engineRunning = true; plane.engineSpool = 0.7f; } for (int i = 0; i < 90; i++) { realTime += 1 / 30.f; update(1 / 30.f); } toasts.clear(); if (name == "rjetl") lookYaw = 1.75f; if (name == "rjetr") { lookYaw = -1.2f; lookPitch = -0.6f; } if (name == "rjetd") lookPitch = -0.75f; return; }
   if (name == "radio") { loadStations(); screen = SCR_HUB; showRadio = true; realTime = 20; radioScroll = 6; return; }
   if (name.size() == 4 && name.compare(0, 3, "hub") == 0) { screen = SCR_HUB; hubTab = name[3] - '0'; realTime = 20; return; }
   Contract c = g_story[0];
