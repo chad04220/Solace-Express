@@ -32,7 +32,8 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 - **Clean glass UI.** Menus and HUD panels use a consistent glass style with cyan accents and corner brackets. Buttons, cards, tabs and sliders respond to the mouse with animated glow, sheen and press feedback.
 - **Muffle button (M).** A headset-style noise filter that turns down engine, wind and rolling noise for relaxed cruising.
 - **Live internet radio (R).** Streams MP3/AAC stations through Windows Media Foundation. You can add your own stations.
-- **Flight model.** Six degrees of freedom with stall and wing drop, flaps, ground effect, prop wash, density altitude, wind shear near the ground, gusts and turbulence, spring-damper gear with steering and brakes, and taildragger handling. Includes an autopilot (heading and altitude hold) and time acceleration in cruise.
+- **Flight model.** Six degrees of freedom with stall and wing drop, flaps, ground effect, prop wash, density altitude, wind shear near the ground, gusts and turbulence, spring-damper gear with steering and brakes, and taildragger handling. Includes time acceleration in cruise and a full autopilot (see below).
+- **Autopilot and autoland.** Press **Z** for heading, altitude and speed hold: A/D turns the heading bug, W/S moves the altitude target and the throttle keys set the speed (a number key hands the throttle back to you). Pick an airport on the GPS map (click it, or Tab / D-pad, then **ENGAGE AUTOLAND** or Enter) and the autopilot flies you there and lands. It picks the runway end from the wind and the terrain, cruises above the high ground, descends in an orbit over the lowest ground near the approach, intercepts the localizer and a glidepath that steepens where hills demand it, sets flaps and gear, flares, brakes to a stop and sets the parking brake. If it isn't stable on final it goes around and tries again. The XR-9 comes to a hover over the runway and lands vertically. The GPS draws the planned approach, the HUD shows an autopilot banner, and time acceleration stays available while it's en route. Any stick input hands control back.
 - **Hand-designed world.** "The Solace Islands" has 16 airports on 5 islands: a flight-school field, grass farm strips, a rock in the sea, international hubs, a 5,400 ft gravel mountain pass, a volcano research strip, a glacier snow runway, a fjord town and a remote resort isle. Every approach has a cleared glide corridor.
 - **Career.** There are 4 lessons and 27 story contracts in 5 chapters (Student → PPL → CPL → Owner-operator → ATP), plus endless freelance jobs. Work includes cargo, passengers, fragile loads, medevac with deadlines, VIP charters and a scenic tour. You're scored on landing softness, passenger comfort (bank and G), deadlines and fragile-cargo handling. You can rent at any airport, buy and sell 7 aircraft, and pay for ferry flights and positioning tickets.
 - **No softlocks.** The campaign is checked automatically (`tests/progression_test.cpp`). Every contract is flown with an aircraft you can rent or afford, fuel range (with reserve), runway length (corrected for elevation), surface type and deadlines all fit, and the money curve needs only light freelancing or selling an old plane. Rentals never require cash up front, and if you're broke you get free courtesy rides.
@@ -62,14 +63,14 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 | B | Parking brake (set / release) | D-pad ← |
 | Space | Wheel brakes | A |
 | [ / ] | Elevator trim | D-pad ↑ / ↓ |
-| Z | Autopilot (A/D steers heading) | Right-stick click |
+| Z | Autopilot: hold, or autoland at the airport picked on the GPS | Right-stick click |
 | T | Time acceleration ×1 / ×2 / ×4 (cruise only) | |
 | C | Camera: chase, cockpit, orbit, flyby | Back |
 | Right mouse drag, wheel | Look around, zoom | Right stick |
 | L | Landing lights | |
 | I | Engine restart | |
 | **M** | **Muffle engine noise** | Left-stick click |
-| Tab | Toggle minimap (hidden by default) | |
+| Tab | Toggle minimap (hidden by default); with the GPS open, pick the autoland airport | D-pad ← / → on the GPS |
 | **R** | **Internet radio** | |
 | **N** | **GPS moving map** (mouse wheel or the on-map buttons zoom) | |
 | H | Toggle HUD | |
@@ -86,6 +87,8 @@ Menus work with the mouse or a gamepad. On a gamepad, the left stick (or D-pad) 
 <summary>Classified (spoiler)</summary>
 
 Can't wait for a close encounter? Hold **J** and **K** together for a second while flying and they'll come to you.
+
+Bored on a long leg? Hold **O** and **P** together for a second while flying and the **Spectre display pair** joins you: two XR-9s in red-and-gold and blue-and-white livery, trailing coloured smoke. They fly a show around you all the way to your destination: synchronised rolls in formation, a double helix around your flight path, a head-on knife-edge crossover with a fly-by roar, synchronised loops off your nose, and a split-and-cross with one high and one low. The radio calls each act. Hold O + P again to send them home; they also rock their wings and pull away in reheat when you settle onto an approach.
 
 Hold **U** and **I** together on the main menu, or click in **both sticks** on a gamepad, to open the Confidential Research Model menu. From there you can fly the **XR-9 Specter**, a VTOL research jet, for free from any airport, starting airborne or on the runway, in clear, cloudy or stormy weather.
 

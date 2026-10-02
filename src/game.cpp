@@ -424,6 +424,26 @@ void Game::updateFlight(float dt) {
   }
   for (auto& f : traffic.puffs) spawn(f.p, f.v, f.life, f.size, f.grow, f.col, f.alpha, f.kind, 1.f, 0.f);
   for (auto& b : traffic.booms) g_audio.trigger(SFX_BOOM, b.second);
+  for (float f : traffic.flybys) g_audio.trigger(SFX_FLYBY, f);
+  for (auto& m : traffic.radio) toast(m, vec3(1.f, 0.78f, 0.3f));
+  // entertainment: O + P held for a second while flying summons the Spectre display pair (again: sends them home).
+  // They fly their show around you and bow out when you land or settle onto an approach
+  {
+    bool flying = !crashed && !plane.onGround;
+    if (flying && in.down['O'] && in.down['P']) {
+      escortSummon += dt;
+      if (escortSummon >= 1.f && !escortLatch) {
+        escortLatch = true;
+        if (traffic.escortActive()) traffic.dismissEscort();
+        else if (traffic.escortStop) toast("Spectre display pair: climb away from the field first", vec3(1.f, 0.78f, 0.3f));
+        else { traffic.spawnEscort(plane.pos, plane.vel); g_audio.trigger(SFX_CHIME, 0.8f); }
+      }
+    } else { escortSummon = 0; escortLatch = false; }
+    float dn; int na = g_world.nearestAirport(plane.pos.x, plane.pos.z, &dn);
+    (void)na;
+    bool onApproach = plane.apOn && plane.apMode == Plane::AP_APPR && plane.apStage != Plane::APS_NAV && plane.apStage != Plane::APS_GOAROUND;
+    traffic.escortStop = crashed || plane.onGround || onApproach || (plane.agl() < 150.f && dn < 4000.f);
+  }
   {
     // g-force tunnel: a faint red tint from the first noticeable g that slowly closes into the full ring as the load
     // nears the airframe's limit (regular aircraft 1.8 -> 6 g, the XR-9's damped cell 4 -> 50 g; negative g from
@@ -1700,7 +1720,7 @@ void Game::debugScene(const std::string& name) {
     takeoffAnnounced = true; camQ = plane.q; hint.clear(); timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 15.f;
     for (float tt = 0; tt < secs; tt += 1 / 20.f) { realTime += 1 / 20.f; update(1 / 20.f); }
     const char* st[] = {"PARKED", "TAXI_OUT", "HOLD", "LINEUP", "TAKEOFF", "CLIMB", "CIRCUIT", "FINAL", "ROLLOUT", "TAXI_IN", "FLY"};
-    const char* rl[] = {"airport", "cruiser", "formation", "stunt"};
+    const char* rl[] = {"airport", "cruiser", "formation", "stunt", "escort"};
     for (int i = 0; i < (int)traffic.craft.size(); i++) { const TrafficCraft& c = traffic.craft[i];
       printf("trf %2d %-9s %-17s %-8s agl %6.0f spd %5.1f dist %6.0f man %d\n", i, rl[c.role], kAircraft[c.spec].name, st[c.state], c.pos.y - g_world.height(c.pos.x, c.pos.z), c.speed, length(c.pos - plane.pos), c.man); }
     dbgCam = true; hudOn = false; toasts.clear();
@@ -1718,6 +1738,56 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < 36; i++) { realTime += 1 / 30.f; update(1 / 30.f); if (i == 20 && ufo.on) early = true; }
     in.down['J'] = in.down['K'] = false;
     printf("ufosummon: %s\n", ufo.on && !early ? "ok" : "FAIL");
+    return;
+  }
+  if (name == "escsummon") {   // O + P held for a second while flying summons the display pair
+    plane.reset(&kAircraft[1], vec3(-4000, 700, 9000), 40, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
+    takeoffAnnounced = true; camQ = plane.q; botControl = true; plane.ctl.throttle = 0.75f;
+    for (int i = 0; i < 10; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    in.down['O'] = true; in.down['P'] = true;
+    bool early = false;
+    for (int i = 0; i < 36; i++) { realTime += 1 / 30.f; update(1 / 30.f); if (i == 20 && traffic.count(TrafficCraft::ESCORT)) early = true; }
+    in.down['O'] = in.down['P'] = false;
+    printf("escsummon: %s\n", traffic.count(TrafficCraft::ESCORT) == 2 && !early ? "ok" : "FAIL");
+    return;
+  }
+  if (name == "escdismiss") {   // O + P again mid-helix: the pair blends out of the act, waves and leaves without jumps
+    plane.reset(&kAircraft[1], vec3(-4000, 900, 9000), 40, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
+    takeoffAnnounced = true; camQ = plane.q; plane.engineRunning = true; plane.engineSpool = 0.7f;
+    plane.apEngage(Plane::AP_HOLD, -1, wx);
+    traffic.spawnEscort(plane.pos, plane.vel);
+    float worstJump = 0; std::vector<vec3> last;
+    for (float x = 0; x < 50.f; x += 1 / 60.f) {
+      if (fabsf(x - 27.f) < 1e-3f) traffic.dismissEscort();
+      realTime += 1 / 60.f; update(1 / 60.f);
+      std::vector<vec3> now; std::vector<float> spd;
+      for (auto& c : traffic.craft) if (c.role == TrafficCraft::ESCORT) { now.push_back(c.pos); spd.push_back(c.speed); }
+      if (now.size() == last.size()) for (size_t i = 0; i < now.size(); i++) worstJump = std::max(worstJump, length(now[i] - last[i]) * 60.f / std::max(spd[i], 30.f));
+      last = now;
+    }
+    // a frame's step must match the jet's own speed (no teleports when the act is cut short)
+    printf("escdismiss: worst step / speed %.2f, %d escorts left %s\n", worstJump, traffic.count(TrafficCraft::ESCORT),
+           worstJump < 1.3f && traffic.count(TrafficCraft::ESCORT) == 0 ? "ok" : "FAIL");
+    return;
+  }
+  if (name.compare(0, 3, "esc") == 0) {   // display pair at t seconds: esc<t>_<view>_<aircraft> (0 chase, 1 cockpit, 2 side camera)
+    float tt = 20; int view = 0, sp = 1; sscanf(name.c_str() + 3, "%f_%d_%d", &tt, &view, &sp);
+    plane.reset(&kAircraft[sp], vec3(-4000, 900, 9000), 40, kAircraft[sp].maxFuel, 100, true, kAircraft[sp].cruise);
+    takeoffAnnounced = true; camQ = plane.q; hint.clear(); timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 14.f;
+    plane.engineRunning = true; plane.engineSpool = 0.7f;
+    plane.apEngage(Plane::AP_HOLD, -1, wx);
+    traffic.spawnEscort(plane.pos, plane.vel);
+    float worst = 0;
+    for (float x = 0; x < tt; x += 1 / 60.f) {
+      realTime += 1 / 60.f; update(1 / 60.f);
+      for (auto& c : traffic.craft) if (c.role == TrafficCraft::ESCORT && length(c.vel) > 1.f) worst = std::max(worst, acosf(clampf(dot(c.q.rotate(vec3(0, 0, -1)), normalize(c.vel)), -1.f, 1.f)) / DEG);
+    }
+    for (auto& c : traffic.craft) if (c.role == TrafficCraft::ESCORT)
+      printf("esc: act %d t %.1f  jet %+.0f  %.0f m from the player  %.0f m/s  agl %.0f\n", traffic.escAct, traffic.escT, c.escSide, length(c.pos - plane.pos), c.speed, c.pos.y - g_world.height(c.pos.x, c.pos.z));
+    printf("esc: worst nose-off-path %.1f deg %s\n", worst, worst < 2.f ? "ok" : "FAIL");
+    toasts.clear();
+    if (view == 1) { camMode = 1; lookYaw = 0; lookPitch = -0.05f; camYaw = 0; camPitch = 0.12f; }
+    else if (view == 2) { hudOn = false; dbgCam = true; vec3 f = normalize(plane.vel), r = normalize(cross(f, vec3(0, 1, 0))); dbgCamPos = plane.pos + r * 160.f + vec3(0, 40, 0) - f * 60.f; dbgCamLook = plane.pos + f * 60.f; }
     return;
   }
   if (name.compare(0, 3, "ufo") == 0) {   // UFO encounter at t seconds: ufo<t>_<view> (0 chase-style, 1 cockpit, 2 close-up of the hatch)

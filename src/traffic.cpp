@@ -40,6 +40,16 @@ void Traffic::attitudeToQuat(TrafficCraft& c) const {
   c.q = quat::axisAngle(vec3(0, 1, 0), -c.hdg) * quat::axisAngle(vec3(1, 0, 0), c.pitch) * quat::axisAngle(vec3(0, 0, 1), -c.bank);
 }
 
+// rotation whose columns are the given orthonormal axes
+static quat quatFromBasis(vec3 x, vec3 y, vec3 z) {
+  float tr = x.x + y.y + z.z; quat q;
+  if (tr > 0) { float s = sqrtf(tr + 1.f) * 2; q = quat(0.25f * s, (y.z - z.y) / s, (z.x - x.z) / s, (x.y - y.x) / s); }
+  else if (x.x > y.y && x.x > z.z) { float s = sqrtf(1.f + x.x - y.y - z.z) * 2; q = quat((y.z - z.y) / s, 0.25f * s, (y.x + x.y) / s, (z.x + x.z) / s); }
+  else if (y.y > z.z) { float s = sqrtf(1.f + y.y - x.x - z.z) * 2; q = quat((z.x - x.z) / s, (y.x + x.y) / s, 0.25f * s, (z.y + y.z) / s); }
+  else { float s = sqrtf(1.f + z.z - x.x - y.y) * 2; q = quat((x.y - y.x) / s, (z.x + x.z) / s, (z.y + y.z) / s, 0.25f * s); }
+  q.normalize(); return q;
+}
+
 static void liveries(TrafficCraft& c, float r) {
   const AircraftSpec& s = kAircraft[c.spec];
   vec3 stripes[6] = {s.colStripe, vec3(0.75f, 0.1f, 0.1f), vec3(0.1f, 0.3f, 0.75f), vec3(0.1f, 0.55f, 0.25f), vec3(0.9f, 0.55f, 0.1f), vec3(0.15f, 0.15f, 0.18f)};
@@ -427,15 +437,210 @@ void Traffic::updateStunt(TrafficCraft& c, float dt) {
   }
 }
 
+// ------------------------------------------------------------------ escort: the O+P display pair
+// The show is choreographed in a frame that rides with the player (x right, y up, z along the flight path), so the
+// pair always performs around the player whatever they do. Attitude comes from the path itself: the jets bank and
+// pull exactly as the curve demands (lift along the needed acceleration), with scripted rolls added on top.
+namespace {
+struct Key { float t, x, y, z, roll; };
+// cubic Hermite between two points with end velocities, u in 0..1 over duration T
+vec3 hermite(vec3 p0, vec3 v0, vec3 p1, vec3 v1, float u, float T) {
+  float u2 = u * u, u3 = u2 * u;
+  return p0 * (2 * u3 - 3 * u2 + 1) + v0 * (T * (u3 - 2 * u2 + u)) + p1 * (-2 * u3 + 3 * u2) + v1 * (T * (u3 - u2));
+}
+// Catmull-Rom through timed keys (zero velocity at the ends); x is mirrored by side, z scaled by zs
+vec3 keyPath(const Key* k, int n, float t, float side, float zs, float* roll) {
+  auto P = [&](int i) { return vec3(k[i].x * side, k[i].y, k[i].z * (k[i].z > 0.f || k[i].z < -60.f ? zs : 1.f)); };   // far points stretch with speed
+  t = clampf(t, k[0].t, k[n - 1].t);
+  int i = 0; while (i < n - 2 && t > k[i + 1].t) i++;
+  auto V = [&](int j) { if (j <= 0 || j >= n - 1) return vec3(0, 0, 0); return (P(j + 1) - P(j - 1)) * (1.f / (k[j + 1].t - k[j - 1].t)); };
+  float T = k[i + 1].t - k[i].t, u = (t - k[i].t) / T;
+  if (roll) { float a = u * u * (3 - 2 * u); *roll = (k[i].roll + (k[i + 1].roll - k[i].roll) * a) * DEG * side; }
+  return hermite(P(i), V(i), P(i + 1), V(i + 1), u, T);
+}
+const vec3 kSlot(38.f, 5.f, 45.f);   // a little ahead of the player's wingline, where both views can see it
+const Key kCross[] = {{0, 38, 5, 45, 0}, {3, 110, 25, 350, 0}, {5, 150, 30, 700, 0}, {6.2f, 230, 32, 790, 0}, {7.4f, 310, 30, 700, 0},
+                      {8.6f, 210, 22, 380, 0}, {9.6f, 70, 9, 120, 90}, {10.2f, 28, 5, 0, 90}, {10.9f, 22, 3, -230, 0},
+                      {12.3f, 22, 130, -420, 0}, {13.6f, 25, 250, -330, 0}, {15.6f, 40, 110, -140, 0}, {19, 38, 5, 45, 0}};
+const Key kSplit[] = {{0, 38, 5, 45, 0}, {2.5f, 90, 70, 120, 0}, {5, 260, 200, 380, 0}, {7.5f, 380, 120, 600, 0}, {9.5f, 250, 40, 520, 0},
+                      {11.5f, 0, 6, 260, 0}, {13.5f, -200, 20, 150, 0}, {16, -90, 10, 20, 0}, {18, -38, 5, 45, 0}};
+const Key kLeave[] = {{0, 38, 5, 45, 0}, {1, 38, 5, 45, 25}, {1.5f, 38, 5, 45, -25}, {2, 38, 5, 45, 25}, {2.5f, 38, 5, 45, -25},
+                      {3, 38, 5, 45, 0}, {6, 250, 300, 500, 180}, {9, 900, 1100, 2500, 360}, {13, 1800, 2200, 5000, 360}};
+}
+
+float Traffic::escDur(int act) const {
+  switch (act) {
+    case ESC_JOIN: return 10.f;
+    case ESC_FORM: return 10.f;
+    case ESC_HELIX: return 16.f;
+    case ESC_CROSS: return 19.f;
+    case ESC_LOOPS: return 16.f;
+    case ESC_SPLIT: return 18.f;
+    default: return 13.f;
+  }
+}
+
+vec3 Traffic::escRel(int act, float t, float side, float* roll, bool* smoke) const {
+  float zs = clampf(escV / 70.f, 1.f, 4.5f);
+  vec3 slot(kSlot.x * side, kSlot.y, kSlot.z);
+  *roll = 0; *smoke = true;
+  switch (act) {
+    case ESC_JOIN: {   // run in from far behind and above, slowing into the slots
+      float u = clampf(t / 10.f, 0, 1), e = 1.f - (1.f - u) * (1.f - u);
+      vec3 st(700.f * side, 220.f, -1500.f * zs);
+      *smoke = u > 0.85f;
+      return st + (slot - st) * e + vec3(0, 60.f * sinf(PI * e) * (1.f - e), 0);
+    }
+    case ESC_FORM: {   // close formation, a synchronised roll each (mirrored), gentle bob
+      float r1 = smoothstepf(3.f, 5.5f, t), r2 = smoothstepf(6.5f, 9.f, t);
+      *roll = (r1 - r2) * 2 * PI * side;
+      return slot + vec3(0, 2.5f * sinf(t * 0.9f) * smoothstepf(0, 1, t) * smoothstepf(10, 9, t), 0);
+    }
+    case ESC_HELIX: {  // a double helix around the player's flight path, the pair on opposite sides
+      float D = 16.f, b = smoothstepf(0, 2.5f, t) * smoothstepf(D, D - 2.5f, t);
+      float R = 38.f + (60.f * sqrtf(zs) - 38.f) * b;
+      float th = (side > 0 ? 0.f : PI) + 3 * 2 * PI * smoothstepf(0.5f, D - 0.5f, t);
+      return vec3(R * cosf(th), 5.f + R * sinf(th), 45.f + 30.f * zs * b);
+    }
+    case ESC_CROSS: return keyPath(kCross, sizeof(kCross) / sizeof(Key), t, side, zs, roll);
+    case ESC_LOOPS: {  // break ahead and loop side by side, then drop back into the slots
+      float R = std::max(140.f, (escV + 110.f) * 7.f / (2 * PI)), vl = 2 * PI * R / 7.f, Zl = 120.f * zs;
+      vec3 L0(60.f * side, 10.f, Zl);
+      if (t < 3.f) return hermite(slot, vec3(0, 0, 0), L0, vec3(0, 0, vl), t / 3.f, 3.f);
+      if (t < 10.f) { float ps = 2 * PI * (t - 3.f) / 7.f; return vec3(L0.x, 10.f + R - R * cosf(ps), Zl + R * sinf(ps)); }
+      return hermite(L0, vec3(0, 0, vl), slot, vec3(0, 0, 0), clampf((t - 10.f) / 6.f, 0, 1), 6.f);
+    }
+    case ESC_SPLIT: {  // pull up and out, swing round and cross in front of the player (one high, one low)
+      vec3 p = keyPath(kSplit, sizeof(kSplit) / sizeof(Key), t, side, zs, roll);
+      p.y += side * 14.f * smoothstepf(9.5f, 11.5f, t) * smoothstepf(13.5f, 11.5f, t);
+      return p;
+    }
+    default: {         // farewell: rock the wings, then pull up and away in reheat
+      vec3 p = keyPath(kLeave, sizeof(kLeave) / sizeof(Key), t, side, zs, roll);
+      *smoke = t > 3.f;
+      return p;
+    }
+  }
+}
+
+void Traffic::spawnEscort(vec3 player, vec3 playerVel) {
+  craft.erase(std::remove_if(craft.begin(), craft.end(), [](const TrafficCraft& c) { return c.role == TrafficCraft::ESCORT; }), craft.end());
+  vec3 f = playerVel; f.y = 0;
+  escF = length(f) > 5.f ? normalize(playerVel) : vec3(0, 0, -1);
+  escV = std::max(length(playerVel), 40.f); escLift = 0;
+  escAct = ESC_JOIN; escT = 0; escNext = 0; escLeft = 0; escortStop = false;
+  for (int j = 0; j < 2; j++) {
+    TrafficCraft c; c.id = nextId++;
+    c.spec = kResearchJet; c.role = TrafficCraft::ESCORT; c.state = TrafficCraft::FLY;
+    c.escSide = j ? -1.f : 1.f; c.escUp = vec3(0, 1, 0);
+    c.colBase = j ? vec3(0.06f, 0.16f, 0.62f) : vec3(0.72f, 0.07f, 0.05f);   // display liveries: red / gold and blue / white
+    c.colStripe = j ? vec3(0.95f, 0.95f, 1.f) : vec3(1.f, 0.78f, 0.15f);
+    c.smokeCol = j ? vec3(0.3f, 0.55f, 1.f) : vec3(1.f, 0.3f, 0.2f);
+    c.gear = 0; c.flaps = 0; c.throttle = 0.8f;
+    vec3 R = normalize(cross(escF, vec3(0, 1, 0)) + vec3(1e-4f, 0, 0)), U = cross(R, escF);
+    float roll; bool sm;
+    vec3 rel = escRel(ESC_JOIN, 0, c.escSide, &roll, &sm);
+    c.pos = player + R * rel.x + U * rel.y + escF * rel.z;
+    c.vel = escF * escV; c.speed = escV;
+    c.hdg = atan2f(escF.x, -escF.z); attitudeToQuat(c);
+    craft.push_back(c);
+  }
+  radio.push_back("SPECTRE DISPLAY PAIR: Two Specters joining on your wing - enjoy the show!");
+}
+
+// an act change mid-manoeuvre: each jet blends from where it is onto the new act's path
+void Traffic::escMark() {
+  for (auto& c : craft) {
+    if (c.role != TrafficCraft::ESCORT) continue;
+    float r; bool sm;
+    vec3 st = escRel(escAct, 0, c.escSide, &r, &sm);
+    c.escFrom = c.escRel; c.escBlend = length(st - c.escRel) > 5.f ? 1.f : 0.f;
+  }
+}
+
+void Traffic::dismissEscort() {
+  if (count(TrafficCraft::ESCORT) == 0 || escAct == ESC_LEAVE) return;
+  escAct = ESC_LEAVE; escT = 0; escMark();
+  radio.push_back("SPECTRE: That's the show - Specters breaking off. Fly safe!");
+}
+
+void Traffic::updateEscorts(float dt, vec3 player, vec3 playerVel) {
+  if (count(TrafficCraft::ESCORT) == 0) return;
+  // the player's frame, smoothed against turbulence: flight-path direction (with climb), right, up
+  if (length(playerVel) > 5.f) escF = normalize(escF + (normalize(playerVel) - escF) * (1.f - expf(-2.5f * dt)));
+  escV += (std::max(length(playerVel), 40.f) - escV) * (1.f - expf(-1.5f * dt));
+  vec3 F = escF, R = normalize(cross(F, vec3(0, 1, 0)) + vec3(1e-4f, 0, 0)), U = cross(R, F);
+  // keep the show clear of the ground when the player is low
+  float agl = player.y - std::max(g_world.height(player.x, player.z), 0.f);
+  escLift += (clampf(130.f - agl, 0.f, 200.f) - escLift) * (1.f - expf(-1.f * dt));
+  // act sequencing: an act can only change at its end, when both jets are back in their slots
+  escT += dt;
+  if (escortStop && escAct != ESC_LEAVE && (escAct == ESC_FORM || escT >= escDur(escAct))) {
+    escAct = ESC_LEAVE; escT = 0; escMark(); radio.push_back("SPECTRE: You're on approach - we'll leave you to it. Specters out!");
+  }
+  if (escT >= escDur(escAct)) {
+    if (escAct == ESC_LEAVE) { for (auto& c : craft) if (c.role == TrafficCraft::ESCORT) c.alive = false; return; }
+    if (escAct == ESC_SPLIT) for (auto& c : craft) if (c.role == TrafficCraft::ESCORT) c.escSide = -c.escSide;   // they crossed over
+    static const int order[] = {ESC_FORM, ESC_HELIX, ESC_CROSS, ESC_FORM, ESC_LOOPS, ESC_SPLIT};
+    static const char* calls[] = {"SPECTRE: Smoke on... now. Tight formation, hold her steady.", "SPECTRE: Helix - we'll wrap you up. Don't flinch!",
+                                  "SPECTRE: Opposition pass coming at you, knife-edge!", "SPECTRE: Back in formation. Nice flying, partner.",
+                                  "SPECTRE: Synchronised loops off your nose - watch this.", "SPECTRE: Split and cross - one high, one low!"};
+    escAct = order[escNext % 6]; radio.push_back(calls[escNext % 6]); escNext++;
+    escT = 0; escMark();
+  }
+  const float h = 0.05f;
+  for (auto& c : craft) {
+    if (c.role != TrafficCraft::ESCORT || !c.alive) continue;
+    float roll, roll2; bool smoke, sm2;
+    auto relAt = [&](float t, float* rl, bool* sm) {
+      vec3 p = escRel(escAct, t, c.escSide, rl, sm);
+      if (c.escBlend > 0.f) { float w = smoothstepf(0.f, 3.f, t); p = c.escFrom + (p - c.escFrom) * w; }
+      return p;
+    };
+    vec3 rel = relAt(escT, &roll, &smoke);
+    vec3 r0 = relAt(std::max(escT - h, 0.f), &roll2, &sm2), r1 = relAt(escT + h, &roll2, &sm2);
+    c.escRel = rel;
+    vec3 relV = (r1 - r0) * (1.f / (2 * h)), relA = (r1 - rel * 2.f + r0) * (1.f / (h * h));
+    rel.y += escLift;
+    auto W = [&](vec3 v) { return R * v.x + U * v.y + F * v.z; };
+    vec3 pos = player + W(rel), vel = F * escV + W(relV), acc = W(relA);
+    float sp = std::max(length(vel), 1.f);
+    vec3 f = vel * (1.f / sp);
+    // lift along the acceleration the path needs (plus holding up against gravity); roll towards it at a finite rate
+    vec3 lift = acc + vec3(0, G, 0); lift = lift - f * dot(lift, f);
+    vec3 up = c.escUp - f * dot(c.escUp, f);
+    up = length(up) > 1e-3f ? normalize(up) : U;
+    if (length(lift) > 0.5f) {
+      vec3 ld = normalize(lift);
+      float ang = atan2f(dot(cross(up, ld), f), dot(up, ld));
+      float stepA = clampf(ang, -6.f * dt, 6.f * dt);
+      up = up * cosf(stepA) + cross(f, up) * sinf(stepA);
+    }
+    c.escUp = up;
+    vec3 upR = up * cosf(roll) + cross(f, up) * sinf(roll);   // scripted rolls (positive = to the right)
+    vec3 rx = normalize(cross(f, upR)); upR = cross(rx, f);
+    c.q = quatFromBasis(rx, upR, f * -1.f);   // body +x right, +y up, +z back
+    c.hdg = atan2f(f.x, -f.z); c.pitch = asinf(clampf(f.y, -1.f, 1.f)); c.bank = 0;
+    c.pos = pos; c.vel = vel; c.speed = sp; c.vs = vel.y;
+    c.smoke = smoke;
+    c.ab = sp > 260.f || (escAct == ESC_LEAVE && escT > 3.f) ? 1.f : 0.f;
+    c.throttle = clampf(0.5f + dot(acc, f) * 0.02f + c.ab * 0.5f, 0.3f, 1.f);
+    c.ctlPitch = clampf(dot(acc, upR) * 0.01f, -1.f, 1.f); c.ctlRoll = 0; c.ctlYaw = 0;
+    c.timer += dt;
+  }
+}
+
 // ------------------------------------------------------------------ update
 bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround, float playerSpan) {
-  puffs.clear(); booms.clear();
-  if (!enabled) { craft.clear(); return false; }
+  puffs.clear(); booms.clear(); flybys.clear(); radio.clear();
+  if (!enabled)   // traffic off in the settings: only a summoned display pair flies
+    craft.erase(std::remove_if(craft.begin(), craft.end(), [](const TrafficCraft& c) { return c.role != TrafficCraft::ESCORT; }), craft.end());
   t += dt;
   bool hitPlayer = false;
+  updateEscorts(dt, player, playerVel);
   // airport traffic around nearby airports
   spawnT -= dt;
-  if (spawnT <= 0) {
+  if (enabled && spawnT <= 0) {
     spawnT = 2.f;
     for (int ai = 0; ai < (int)g_world.airports.size(); ai++) {
       const Airport& a = g_world.airports[ai];
@@ -458,7 +663,7 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
     }
   }
   formationT -= dt;
-  if (formationT <= 0) { formationT = rnd(80.f, 200.f); spawnFormation(player, playerVel); }
+  if (enabled && formationT <= 0) { formationT = rnd(80.f, 200.f); spawnFormation(player, playerVel); }
 
   for (size_t i = 0; i < craft.size(); i++) {
     TrafficCraft& c = craft[i];
@@ -504,6 +709,14 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
         if (dist > 20000.f || c.timer > 120.f) c.alive = false;
         break;
       }
+      case TrafficCraft::ESCORT: {   // flown by updateEscorts; here: booms and fly-by roars on close fast passes
+        c.boomCD -= dt; c.flybyCD -= dt;
+        if (c.speed > 340.f && dist < 1500.f && c.boomCD <= 0) { booms.push_back({c.pos, clampf(1.3f - dist / 1500.f, 0.25f, 1.f)}); c.boomCD = 25.f; }
+        vec3 relV = c.vel - playerVel, toP = player - c.pos;
+        float closing = dot(relV, toP) / std::max(dist, 1.f);
+        if (dist < 220.f && closing > 25.f && c.flybyCD <= 0) { flybys.push_back(clampf(closing / 200.f, 0.35f, 1.f) * clampf(1.4f - dist / 220.f, 0.4f, 1.f)); c.flybyCD = 5.f; }
+        break;
+      }
       case TrafficCraft::STUNT:
         updateStunt(c, dt);
         if (length(vec2(g_world.airports[c.airport].x - player.x, g_world.airports[c.airport].z - player.z)) > 22000.f) c.alive = false;
@@ -521,7 +734,7 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
     if (c.ab > 0.5f && dist < 6000.f)
       for (int k = -1; k <= 1; k += 2) puffs.push_back({c.pos + c.q.rotate(vec3(k * 0.82f, -0.12f, 9.2f)), c.vel * 0.7f, vec3(1.f, 0.6f, 0.25f) * 2.5f, 0.12f, 0.6f, -1.f, 1.f, SPR_SPARK});
     // mid-air collision with the player
-    if (dist < (playerSpan + s.span) * 0.32f && !playerOnGround && c.role != TrafficCraft::AIRPORT) hitPlayer = true;
+    if (dist < (playerSpan + s.span) * 0.32f && !playerOnGround && c.role != TrafficCraft::AIRPORT && c.role != TrafficCraft::ESCORT) hitPlayer = true;
     if (dist < (playerSpan + s.span) * 0.32f && !playerOnGround && c.role == TrafficCraft::AIRPORT && c.state >= TrafficCraft::CLIMB && c.state <= TrafficCraft::FINAL) hitPlayer = true;
   }
   craft.erase(std::remove_if(craft.begin(), craft.end(), [](const TrafficCraft& c) { return !c.alive; }), craft.end());

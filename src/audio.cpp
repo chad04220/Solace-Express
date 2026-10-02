@@ -266,6 +266,7 @@ static void startShot(OneShot& s, int type, float inten, float sr) {
     case SFX_BOOM: s.f1.set(LP, 240, 0.7f, sr); s.f2.set(LP, 75, 0.8f, sr); s.f3.set(HP, 26, 0.7f, sr); s.f4.set(HP, 26, 0.7f, sr); break;
     case SFX_CASH: s.f1.set(BP, 5000, 2.0f, sr); break;
     case SFX_UFO_ZOOM: s.f1.set(BP, 1800, 0.8f, sr); break;
+    case SFX_FLYBY: s.f1.set(BP, 2200, 0.7f, sr); s.f2.set(LP, 320, 0.7f, sr); s.f3.set(BP, 900, 0.9f, sr); break;
     case SFX_GEAR_CLUNK: s.f1.set(LP, 300, 1.0f, sr); break;
     default: break;
   }
@@ -330,6 +331,14 @@ static bool runShot(OneShot& s, float sr, float& out) {
       s.ph += 2 * PI * f * dt;
       float env = smoothstepf(0.f, 0.08f, t) * smoothstepf(2.4f, 1.0f, t);
       v = (sinf(s.ph) * 0.18f + s.f1.p(s.nz.w()) * 0.5f * smoothstepf(1.8f, 0.2f, t)) * env * s.intensity; alive = t < 2.5f; break; }
+    case SFX_FLYBY: {        // jet fly-by: rising tearing roar, a doppler drop in the turbine whine as it passes, rumbling away
+      float tp = 0.9f, x = t - tp;
+      float env = expf(-x * x * (x < 0 ? 5.f : 1.6f)) * smoothstepf(0.f, 0.15f, t);
+      float dop = 1.f / (1.f + 0.55f * tanhf(x * 4.f));          // pitch ratio: high on approach, low going away
+      s.ph += 2 * PI * 1900.f * dop * dt; s.ph2 += 2 * PI * 3100.f * dop * dt;
+      float hiss = s.f1.p(s.nz.w()) * (x < 0 ? 1.4f : 0.6f), roar = s.f2.p(s.nz.w()) * 3.2f, mid = s.f3.p(s.nz.w()) * 1.1f;
+      float whine = (sinf(s.ph) * 0.05f + sinf(s.ph2) * 0.03f) * (x < 0.2f ? 1.f : 0.5f);
+      v = (hiss + roar + mid + whine) * env * 0.55f * s.intensity; alive = t < 4.5f; break; }
     default: alive = false;
   }
   s.t += dt;
@@ -455,7 +464,7 @@ void AudioEngine::render(float* out, int frames) {
     for (auto& s : I.shots) {
       if (!s.active) continue;
       float v; s.active = runShot(s, sr, v);
-      bool muffles = s.type == SFX_TOUCHDOWN || s.type == SFX_CRASH || s.type == SFX_THUNDER || s.type == SFX_BOOM;
+      bool muffles = s.type == SFX_TOUCHDOWN || s.type == SFX_CRASH || s.type == SFX_THUNDER || s.type == SFX_BOOM || s.type == SFX_FLYBY;
       sfx += v * (muffles ? lerpf(1.f, 0.5f, muff) : 1.f);
     }
     L += sfx * P.sfxVol; R += sfx * P.sfxVol;

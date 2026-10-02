@@ -118,6 +118,7 @@ private:
   bool dbgCam = false; vec3 dbgCamPos, dbgCamLook;
   // UFO encounter: pulls up alongside, opens its hatch on two dancing aliens, laughs, waves and zooms off
   struct Ufo { bool on = false; float t = 0, next = 0, side = 1, hatch = 0, laugh = 0, wave = 0; vec3 pos, fwd, right, up; bool sfxLaugh = false, sfxZoom = false; };
+  float escortSummon = 0; bool escortLatch = false;   // O + P held: the Spectre display pair
   float ufoSummon = 0;          // J + K held while flying summons the UFO after a second
   Ufo ufo;
   void startUfo();
