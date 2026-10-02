@@ -73,13 +73,20 @@ int main() {
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.pitch = 1;
     float gmax = 0;
     for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); gmax = std::max(gmax, p.gLoad); }
-    ok = !p.ev.crashed && gmax < 32.f && gmax > 10.f;
+    ok = !p.ev.crashed && gmax < 62.f && gmax > 10.f;
     printf("XR-9 full-back pull: peak %.1f g %s\n", gmax, ok ? "ok" : "FAIL"); fails += !ok;
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 340); p.ctl.throttle = 1; p.ctl.pitch = 1;
     float rate = 0;
     for (int i = 0; i < 2 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); rate = std::max(rate, p.w.x / DEG); }
-    ok = !p.ev.crashed && rate > 50.f;
+    ok = !p.ev.crashed && rate > 100.f;
     printf("XR-9 pitch rate at Mach 1: %.0f deg/s %s\n", rate, ok ? "ok" : "FAIL"); fails += !ok;
+    // stick snapped from full back to full forward: the vectoring nozzles reverse the pitch rate quickly
+    p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.pitch = 1;
+    for (int i = 0; i < 120; i++) p.step(1 / 240.f, calm, i / 240.f);
+    p.ctl.pitch = -1; float trev = -1;
+    for (int i = 0; i < 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); if (trev < 0 && p.w.x < -60 * DEG) trev = i / 240.f; }
+    ok = !p.ev.crashed && trev > 0 && trev < 0.3f;
+    printf("XR-9 pitch reversal to -60 deg/s: %.2f s %s\n", trev, ok ? "ok" : "FAIL"); fails += !ok;
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.roll = 1;
     for (int i = 0; i < 240; i++) p.step(1 / 240.f, calm, i / 240.f);
     ok = -p.w.z / DEG > 250.f;

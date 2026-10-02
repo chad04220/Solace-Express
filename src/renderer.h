@@ -15,6 +15,7 @@ struct PlaneVisual {
   vec3 colBase, colStripe;
   float prop[2][4]; int propCount = 0;
   float hud[4] = {0, 0, 0, 0}, hud2[4] = {1, 0, 0, 0}, hudV[3] = {0, 0, -1}, hud3[4] = {0, 0, 0, 1000};  // research jet HUD data
+  float flame[4] = {0, 0, 0, 0};  // research jet exhaust: spool, reheat, nozzle vector angle (rad), mach
 };
 
 struct WreckVisual {
@@ -35,6 +36,7 @@ struct FrameParams {
   PlaneVisual plane;
   WreckVisual wreck;
   vec3 landLightPos, landLightDir; float landLight = 0;
+  vec3 flameLightPos, flameLight;  // research jet exhaust light (radiance; zero when off)
   float exposure = 1.0f, rainLens = 0, fade = 1, vignette = 0.6f;
 };
 

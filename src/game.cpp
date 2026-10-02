@@ -2,6 +2,11 @@
 #include "game.h"
 #include "models.h"
 
+// XR-9 wingtip (body frame) matching mapJet's cranked delta in shaders.h
+static const vec3 kJetWingTip(5.62f, -0.38f, 4.4f);
+// XR-9 nozzle swivel (0 aft .. 90 deg down) plus pitch vectoring; mirrored by mapJet and the exhaust plumes
+static float jetNozzleAngle(const Plane& p) { return p.nozzle * 0.5f * PI - clampf(p.ctl.pitch + p.ctl.trim * 0.3f, -1, 1) * 0.5f; }
+
 // ------------------------------------------------------------------ settings / save
 static std::string joinPath(const std::string& d, const char* f) { return d.empty() ? std::string(f) : d + "/" + f; }
 
@@ -418,7 +423,7 @@ void Game::updateFlight(float dt) {
   if (!plane.onGround && plane.gLoad > 1.7f && (wx.precip > 0 || plane.pos.y > wx.cloudBase - 300.f)) {
     // emitted at the real wingtips and spread back along the path flown this frame; the vapour stays in the air
     // mass (it used to be launched at 90% of the aircraft's speed, which carried it out ahead of the wingtips)
-    vec3 tip = modelWingTip(kModels[plane.spec - kAircraft]);
+    vec3 tip = plane.spec->special ? kJetWingTip : modelWingTip(kModels[plane.spec - kAircraft]);
     int n = (int)clampf(length(plane.vel) * simDt / 0.45f, 1.f, 16.f);   // ~0.45 m spacing: a continuous streak
     for (int s = -1; s <= 1; s += 2)
       for (int k = 0; k < n; k++) {
@@ -622,20 +627,46 @@ void Game::launchResearch() {
 
 void Game::jetEffects(float dt) {
   const float thr = plane.ctl.throttle;
-  float ab = smoothstepf(0.85f, 1.f, plane.engineSpool);
-  float a = plane.nozzle * 0.5f * PI;
+  const float sp = plane.engineRunning ? plane.engineSpool : 0.f;
+  float ab = plane.engineRunning ? smoothstepf(0.85f, 1.f, plane.engineSpool) : 0.f;
+  float a = jetNozzleAngle(plane);
   vec3 exDir = plane.q.rotate(vec3(0, -sinf(a), cosf(a)));
-  // afterburner plumes with shock diamonds
+  vec3 r = plane.right(), u = plane.q.rotate(vec3(0, cosf(a), sinf(a)));
+  auto frand = [] { return (rand() % 1000) * 0.001f; };
+  // The plume itself is ray-marched in the shader; particles add the hot debris it sheds: blue plasma sparks when
+  // dry, a storm of amber embers in reheat. Spawned spread over the frame's flight path so they stream, not clump.
   for (int s = -1; s <= 1; s += 2) {
-    vec3 ex = plane.pos + plane.q.rotate(vec3(s * 0.82f, -0.12f, 7.75f)) + exDir * 1.1f;
-    int n = ab > 0.05f ? 3 : (thr > 0.4f ? 1 : 0);
+    vec3 ex = plane.pos + plane.q.rotate(vec3(s * 0.82f, -0.12f, 7.75f)) + exDir * 1.0f;
+    float rate = sp > 0.3f ? (40.f * sp + 260.f * ab) : 0.f;    // sparks per second per nozzle
+    int n = (int)(rate * dt + frand());
     for (int i = 0; i < n; i++) {
-      float k = (rand() % 100) * 0.01f;
-      spawn(ex + exDir * k * 2.f - plane.vel * dt, plane.vel + exDir * (40.f + 40.f * ab), 0.06f + 0.06f * ab, 0.45f + 0.35f * ab, -2.f,
-            ab > 0.05f ? vec3(1.f, 0.55f + 0.2f * k, 0.25f) * (0.7f + ab) : vec3(0.5f, 0.6f, 1.f) * 0.5f, 1.f, SPR_FIRE, 0.f, 0.f);
+      float k = frand(), hot = frand();
+      vec3 jitter = r * ((frand() - 0.5f) * 0.55f) + u * ((frand() - 0.5f) * 0.35f);
+      vec3 v = plane.vel + exDir * (90.f + 160.f * ab) * (0.6f + 0.6f * frand()) + jitter * (25.f + 40.f * ab);
+      vec3 col = ab > 0.05f ? lerp(vec3(1.f, 0.42f, 0.1f), vec3(1.f, 0.9f, 0.7f), hot * hot) * (2.f + 3.f * ab)
+                            : lerp(vec3(0.25f, 0.5f, 1.f), vec3(0.8f, 0.92f, 1.f), hot * hot) * 2.2f;
+      spawn(ex + jitter - plane.vel * (dt * k) + exDir * (k * 1.5f), v, 0.12f + 0.25f * frand() + 0.2f * ab, 0.07f + 0.08f * hot + 0.05f * ab, -0.15f,
+            col, 1.f, SPR_SPARK, 2.5f, 0.f);
     }
-    if (ab > 0.3f && rand() % 2 == 0) for (int d = 1; d <= 3; d++) spawn(ex + exDir * (d * 1.6f) - plane.vel * dt, plane.vel, 0.05f, 0.35f - d * 0.06f, 0.f, vec3(1.f, 0.8f, 0.6f) * 1.5f, 1.f, SPR_SPARK, 0.f, 0.f);
+    // reheat: a faint heat haze trailing the plume at low level
+    if (ab > 0.05f) {
+      if (plane.agl() < 800.f && frand() < 30.f * dt)
+        spawn(ex + exDir * (8.f + 6.f * ab), plane.vel * 0.2f + exDir * 20.f, 1.2f, 1.6f, 3.5f, vec3(0.32f, 0.3f, 0.3f), 0.06f * ab, SPR_SMOKE, 1.5f, 0.2f);
+    }
   }
+  // reheat light-off: a shock ring and a burst of sparks out of both nozzles
+  if (ab > 0.08f && prevAB <= 0.08f) {
+    for (int s = -1; s <= 1; s += 2) {
+      vec3 ex = plane.pos + plane.q.rotate(vec3(s * 0.82f, -0.12f, 7.75f)) + exDir * 1.2f;
+      spawn(ex, plane.vel + exDir * 30.f, 0.35f, 0.6f, 9.f, vec3(1.f, 0.7f, 0.4f) * 1.5f, 1.f, SPR_SHOCK, 0.f, 0.f);
+      for (int i = 0; i < 30; i++) {
+        vec3 j = r * (frand() - 0.5f) + u * (frand() - 0.5f);
+        spawn(ex, plane.vel + exDir * (60.f + 120.f * frand()) + j * 70.f, 0.25f + 0.3f * frand(), 0.12f, -0.2f, vec3(1.f, 0.75f, 0.4f) * 4.f, 1.f, SPR_SPARK, 2.f, 0.f);
+      }
+    }
+    g_audio.trigger(SFX_BOOM, 0.25f);
+  }
+  prevAB = ab;
   // hover downwash: dust or spray blown out in a ring under the jet
   float agl = plane.agl();
   if (plane.nozzle > 0.5f && thr > 0.25f && agl < 35.f) {
@@ -843,6 +874,10 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   vec3 vb = length(p.vel) > 2.f ? p.q.conj().rotate(normalize(p.vel)) : vec3(0, 0, -1);
   pv.hudV[0] = vb.x; pv.hudV[1] = vb.y; pv.hudV[2] = vb.z;
   pv.hud3[0] = p.engineSpool; pv.hud3[1] = p.alpha / DEG; pv.hud3[2] = p.vel.y; pv.hud3[3] = p.agl();
+  if (s.special) {
+    pv.flame[0] = p.engineRunning ? p.engineSpool : 0.f; pv.flame[1] = p.engineRunning ? smoothstepf(0.85f, 1.f, p.engineSpool) : 0.f;
+    pv.flame[2] = jetNozzleAngle(p); pv.flame[3] = p.mach;
+  }
 }
 
 FrameParams Game::buildFrame() {
@@ -889,6 +924,13 @@ FrameParams Game::buildFrame() {
     fp.landLight = landingLight && plane.engineRunning ? (0.3f + 0.7f * fp.night) : 0.f;
     fp.landLightPos = plane.pos + plane.forward() * (plane.spec->fusLen * 0.4f);
     fp.landLightDir = normalize(plane.forward() - plane.up() * 0.1f);
+    if (plane.spec->special && plane.engineRunning && !crashed && camMode != 1) {
+      // the plume lights its surroundings: blue plasma when dry, white-amber and much brighter in reheat
+      float sp = plane.engineSpool, ab = fp.plane.flame[1], a = fp.plane.flame[2];
+      fp.flameLightPos = plane.pos + plane.q.rotate(vec3(0, -0.12f, 7.75f) + vec3(0, -sinf(a), cosf(a)) * (2.2f + 2.5f * ab));
+      float flick = 0.85f + 0.15f * sinf(realTime * 57.f) * sinf(realTime * 23.f + 1.f);
+      fp.flameLight = lerp(vec3(0.3f, 0.55f, 1.f), vec3(1.f, 0.62f, 0.3f), ab) * ((25.f * sp * sp + 260.f * ab) * flick);
+    }
     fp.rainLens = camMode == 1 && wx.precip == 1 ? 1.f : 0.f;
     if (crashed) fp.fade = clampf(1.f - (crashTimer - 6.5f), 0, 1);
   } else {
@@ -997,15 +1039,24 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     float ls = std::max(0.25f, dcam * 0.002f);
     float navI = 0.6f + 2.5f * night;
     const ModelDef& md = kModels[plane.spec - kAircraft];
-    vec3 tip = modelWingTip(md);
+    bool jet = s.special != 0;   // the XR-9 is an SDF of its own: its lights don't follow the generic model layout
+    vec3 tip = jet ? kJetWingTip : modelWingTip(md);
     vec3 lt = plane.pos + plane.q.rotate(vec3(-tip.x, tip.y, tip.z)), rtp = plane.pos + plane.q.rotate(tip);
     if (camMode != 1) {
       bill(add, lt, ls, vec3(1.f, 0.1f, 0.05f) * navI, 1, SPR_GLOW, 0.3f);
       bill(add, rtp, ls, vec3(0.1f, 1.f, 0.2f) * navI, 1, SPR_GLOW, 0.3f);
-      bill(add, plane.pos + plane.q.rotate(modelTailTip(md)), ls, vec3(1.f) * navI, 1, SPR_GLOW, 0.3f);
-      if (plane.engineRunning && fmodf(t, 1.0f) < 0.12f) bill(add, plane.pos + plane.q.rotate(modelFinTop(md) + vec3(0, 0.06f, 0)), ls * 1.6f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night), 1, SPR_GLOW, 0.3f);
+      bill(add, plane.pos + plane.q.rotate(jet ? vec3(0, 0.05f, 8.3f) : modelTailTip(md)), ls, vec3(1.f) * navI, 1, SPR_GLOW, 0.3f);
+      if (plane.engineRunning && fmodf(t, 1.0f) < 0.12f) bill(add, plane.pos + plane.q.rotate(jet ? vec3(0, 0.7f, 1.6f) : modelFinTop(md) + vec3(0, 0.06f, 0)), ls * 1.6f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night), 1, SPR_GLOW, 0.3f);
       float st = fmodf(t, 1.3f);
       if (!plane.onGround && (st < 0.05f || (st > 0.12f && st < 0.16f))) { bill(add, lt, ls * 3.f, vec3(4.f), 1, SPR_GLOW, 0.3f); bill(add, rtp, ls * 3.f, vec3(4.f), 1, SPR_GLOW, 0.3f); }
+      if (jet && plane.engineRunning) {   // exhaust bloom at the nozzle exits (blue when dry, white-amber in reheat)
+        float sp = plane.engineSpool, ab = smoothstepf(0.85f, 1.f, sp), na = jetNozzleAngle(plane);
+        vec3 ax(0, -sinf(na), cosf(na));
+        float fl = 0.85f + 0.15f * sinf(t * 71.f + 0.7f);
+        for (int k = -1; k <= 1; k += 2)
+          bill(add, plane.pos + plane.q.rotate(vec3(k * 0.82f, -0.12f, 7.75f) + ax * (1.2f + 0.6f * ab)), 0.8f + 0.7f * ab,
+               lerp(vec3(0.3f, 0.55f, 1.f), vec3(1.f, 0.7f, 0.4f), ab) * ((0.25f * sp * sp + 0.5f * ab) * fl), 1, SPR_GLOW, 0.6f);
+      }
     }
     if (landingLight && plane.engineRunning && camMode != 1)
       bill(add, plane.pos + plane.q.rotate(vec3(s.engLayout == 0 ? -s.span * 0.25f : 0, s.engLayout == 0 ? s.wingY * s.fusRad : -s.fusRad * 0.6f, s.engLayout == 0 ? s.wingZ - s.chord * 0.5f : -0.35f * s.fusLen)), ls * 1.8f,
@@ -1183,9 +1234,14 @@ void Game::debugScene(const std::string& name) {
   if (name == "menu") { screen = SCR_MENU; realTime = 20; return; }
   if (name == "hub") { screen = SCR_HUB; realTime = 20; return; }
   if (name.compare(0, 4, "jcam") == 0) {  // XR-9 close-up from an orbit angle: jcam<yaw deg>_<pitch deg>
-    float yawD = 0, pitD = 10; sscanf(name.c_str() + 4, "%f_%f", &yawD, &pitD);
+    float yawD = 0, pitD = 10, thrP = -1, nozP = 0, zoom = 0.55f, tod = -1; sscanf(name.c_str() + 4, "%f_%f_%f_%f_%f_%f", &yawD, &pitD, &thrP, &nozP, &zoom, &tod);
+    if (tod >= 0) resTime = tod;
     resAirborne = true; realTime = 20; launchResearch(); wx.cloudCover = 0.3f;
-    camMode = 2; camYaw = yawD * DEG; camPitch = pitD * DEG; camZoom = 0.55f; hudOn = false;
+    if (thrP >= 0) {   // optional throttle (and nozzle) percent: let the exhaust plumes and sparks develop
+      plane.ctl.throttle = thrP / 100.f; plane.engineSpool = thrP / 100.f; plane.ctl.flaps = plane.flaps = plane.nozzle = nozP / 100.f;
+      for (int i = 0; i < 30; i++) { realTime += 1 / 60.f; update(1 / 60.f); plane.engineSpool = thrP / 100.f; }
+    }
+    camMode = 2; camYaw = yawD * DEG; camPitch = pitD * DEG; camZoom = zoom; hudOn = false;
     for (int i = 0; i < 5; i++) updateCamera(0.1f);
     toasts.clear(); return;
   }

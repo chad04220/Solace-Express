@@ -216,6 +216,7 @@ uniform vec4 uM[24]; uniform vec4 uPS; uniform vec4 uCtl; uniform vec4 uPr; unif
 uniform vec3 uColBase; uniform vec3 uColStripe;
 uniform vec4 uProp[2]; uniform int uPropCount;
 uniform vec3 uLandLightPos; uniform vec3 uLandLightDir; uniform float uLandLight;
+uniform vec4 uFlame; uniform vec3 uFlameLP; uniform vec3 uFlameLI;  // research jet exhaust: spool, reheat, vector angle, mach | light pos, radiance
 
 // ---------------------------------------------------------------- materials (texture array layers)
 const int M_GRASS=0, M_FOREST=1, M_ROCK=2, M_SAND=3, M_SNOW=4, M_ASPHALT=5, M_GRAVEL=6, M_DIRT=7;
@@ -358,11 +359,11 @@ vec2 mapJetCockpit(vec3 p){
   }
   // sculpted seat: shell, bolsters, headrest with light strip, harness
   {
-    float seat = sdRoundBox(q - vec3(0.0, -0.6, 0.12), vec3(0.24, 0.06, 0.26), 0.05);
+)"
+R"(    float seat = sdRoundBox(q - vec3(0.0, -0.6, 0.12), vec3(0.24, 0.06, 0.26), 0.05);
     vec3 bq = q - vec3(0.0, -0.17, 0.42); bq.yz = rot2(bq.yz, 0.22);
     seat = min(seat, sdRoundBox(bq, vec3(0.23, 0.42, 0.05), 0.05));
-)"
-R"(    seat = min(seat, sdRoundBox(vec3(abs(q.x) - 0.25, q.y + 0.3, q.z - 0.3), vec3(0.04, 0.24, 0.12), 0.03));
+    seat = min(seat, sdRoundBox(vec3(abs(q.x) - 0.25, q.y + 0.3, q.z - 0.3), vec3(0.04, 0.24, 0.12), 0.03));
     seat = min(seat, sdRoundBox(vec3(abs(q.x) - 0.22, q.y + 0.52, q.z - 0.1), vec3(0.035, 0.07, 0.22), 0.03));
     seat = min(seat, sdRoundBox(q - vec3(0.0, 0.2, 0.47), vec3(0.13, 0.1, 0.05), 0.04));
     res = opU(res, vec2(seat, 46.0));
@@ -373,7 +374,7 @@ R"(    seat = min(seat, sdRoundBox(vec3(abs(q.x) - 0.25, q.y + 0.3, q.z - 0.3), 
   {
     vec3 sb = q - vec3(0.42, -0.375, -0.02);
     float stick = sdRoundBox(sb, vec3(0.045, 0.02, 0.07), 0.015);
-    vec3 st = sb; st.yz = rot2(st.yz, -cPitch*0.25); st.xy = rot2(st.xy, -cRoll*0.25);
+    vec3 st = sb; st.yz = rot2(st.yz, -cPitch*0.25); st.xy = rot2(st.xy, cRoll*0.25);
     stick = min(stick, sdCapsule(st, vec3(0.0), vec3(0.0, 0.11, -0.01), 0.016));
     stick = min(stick, sdRoundBox(st - vec3(0.0, 0.15, -0.01), vec3(0.021, 0.042, 0.027), 0.015));
     vec3 tq = q - vec3(-0.42, -0.34, -0.02 + 0.12*(0.5 - cThr));
@@ -404,8 +405,7 @@ vec2 mapJet(vec3 p){
   {
     float s = ap.x, t = p.y - (-0.18 - s*0.035), c = p.z + 1.6;
     float wing = sdPanel(s, c, t, 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3);
-)"
-R"(    float elevon = sdSurface(s, c, t, 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3, -cPitch*0.3 - cRoll*sgn*0.3, 0.0);
+    float elevon = sdSurface(s, c, t, 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3, -cPitch*0.3 - cRoll*sgn*0.3, 0.0);
     float hole = length(ap.xz - vec2(2.5, 1.2)) - 0.62;
     wing = max(min(wing, elevon), -hole);
     float d = smin(res.x, wing, 0.25);
@@ -435,7 +435,7 @@ R"(    float elevon = sdSurface(s, c, t, 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.
   // 2D thrust-vectoring nozzles: swivel from aft to straight down, plus pitch vectoring
   {
     vec3 q = ap - vec3(0.82, -0.12, 7.75);
-    float a = noz*1.5708 - cPitch*0.25;
+    float a = uFlame.z;   // = nozzle*90 deg - pitch*0.5 rad (vectoring)
     vec2 yz = rot2(q.yz, -a);
     vec3 nq = vec3(q.x, yz.x, yz.y - 0.5);
     float nzl = sdRoundBox(nq, vec3(0.44, 0.31, 0.5), 0.06);
@@ -552,9 +552,9 @@ vec2 mapPlane(vec3 p){
     if (eng <= 1) {
       float sr = N1.y;
       float spin = sdRoundCone(p, vec3(0.0, S0.w, S0.x - sr*2.3), vec3(0.0, S0.w, S0.x + 0.05), 0.015, sr);
+      res = opU(res, vec2(spin, 16.0));
 )"
-R"(      res = opU(res, vec2(spin, 16.0));
-      if (eng == 0) {
+R"(      if (eng == 0) {
         vec3 sec = fusSection(S0.x + 0.9);
         float ex = sdCapsule(vec3(abs(p.x), p.y, p.z), vec3(0.12, sec.z - sec.y*0.85, S0.x + 0.9), vec3(0.16, sec.z - sec.y - 0.06, S0.x + 1.15), 0.035);
         res = opU(res, vec2(ex, 17.0));
@@ -731,9 +731,9 @@ R"(      res = opU(res, vec2(spin, 16.0));
     float sw = 0.032; float cell = clamp(floor(swp.x/sw + 0.5), -12.0, 12.0);
     swp.x -= cell*sw;
     float sws = sdRoundBox(swp - vec3(0.0, 0.0, 0.01), vec3(0.006, 0.012, 0.012), 0.003);
+    sws = max(sws, abs(p.x) - phw*0.85);
 )"
-R"(    sws = max(sws, abs(p.x) - phw*0.85);
-    res = opU(res, vec2(sws, 13.0));
+R"(    res = opU(res, vec2(sws, 13.0));
     // armrests / door panels
     vec3 secA = fusSection(E.z);
     vec3 ap = vec3(abs(p.x) - (secA.x*0.86), p.y - (E.y - 0.5), p.z - (E.z - 0.15));
@@ -965,9 +965,9 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
       if (inD) {
         float rr = length(d)/(r*0.85); float a = atan(d.x, d.y);
         if (rr > 0.84 && rr < 0.95 && a > 0.9 && a < 1.7) c = vec3(0.1, 0.7, 0.2);
-        if (rr > 0.84 && rr < 0.95 && a > 1.7 && a < 1.8) c = vec3(0.9, 0.1, 0.1);
 )"
-R"(        c += vec3(0.85)*ticks(d, r*0.85, 10.0, -2.36, 2.36, 0.8);
+R"(        if (rr > 0.84 && rr < 0.95 && a > 1.7 && a < 1.8) c = vec3(0.9, 0.1, 0.1);
+        c += vec3(0.85)*ticks(d, r*0.85, 10.0, -2.36, 2.36, 0.8);
         c = mix(c, vec3(0.95), needle(d, r*0.85, -2.36 + clamp(engF, 0.0, 1.1)*4.2, 0.85, 0.05));
       }
       return c;
@@ -992,8 +992,7 @@ R"(        c += vec3(0.85)*ticks(d, r*0.85, 10.0, -2.36, 2.36, 0.8);
     col = vec3(0.04);
     if (abs(cell.y) < 0.008 && abs(cell.x) < 0.045) col = vec3(0.05, 0.6, 0.25)*(0.6 + 0.4*step(0.5, fract(cell.x*60.0 + row)));
     if (abs(cell.y) < 0.006 && abs(cell.x - 0.058) < 0.006) col = vec3(0.3);
-)"
-R"(    return col;
+    return col;
   }
   return col;
 }
@@ -1049,14 +1048,17 @@ float traceTerrain(vec3 ro, vec3 rd, float tmax){
 }
 float terrainShadow(vec3 ro, vec3 rd, float camT){
   float res = 1.0, t = 2.0;
-  float fade = coverFade(camT);
+  // trees/rocks only cast shadows near the camera (past ~1 km they are sub-pixel and the fine steps they need are
+  // the most expensive part of the shadow ray); the bare heightfield keeps shadowing all the way out
+  float fade = coverFade(camT)*smoothstep(1100.0, 650.0, camT);
+  float near = fade > 0.001 ? 120.0 : 0.0;
   for (int i=0;i<40;i++){
     vec3 p = ro + rd*t;
     if (p.y > uMaxH) break;
-    float h = p.y - terrainHF(p.xz, 4, t < 120.0 ? fade : 0.0, p.y);
+    float h = p.y - terrainHF(p.xz, 4, t < near ? fade : 0.0, p.y);
     res = min(res, 12.0*h/t);
     if (res < 0.0) return 0.0;
-    t += clamp(h*0.6, t < 120.0 ? 1.5 : 6.0, 450.0);
+    t += clamp(h*0.6, t < near ? 1.5 : 6.0, 450.0);
   }
   return clamp(res, 0.0, 1.0);
 }
@@ -1215,15 +1217,15 @@ float seg7(vec2 q, int d){
   if ((b & 8) != 0 && q.y < w) on = 1.0;
   if ((b & 16) != 0 && q.x < w && q.y < 0.5) on = 1.0;
   if ((b & 32) != 0 && q.x < w && q.y > 0.5) on = 1.0;
-  if ((b & 64) != 0 && abs(q.y - 0.5) < w*0.5) on = 1.0;
+)"
+R"(  if ((b & 64) != 0 && abs(q.y - 0.5) < w*0.5) on = 1.0;
   return on;
 }
 float rwyDigits(vec2 q, int num){
   // two digits side by side, each 7 m wide x 18 m long, 3 m gap; q relative to the block centre (x across, y along)
   int d0 = num/10, d1 = num - d0*10;
   float a = seg7(vec2((q.x + 8.5)/7.0, q.y/18.0 + 0.5), d0);
-)"
-R"(  float b = seg7(vec2((q.x - 1.5)/7.0, q.y/18.0 + 0.5), d1);
+  float b = seg7(vec2((q.x - 1.5)/7.0, q.y/18.0 + 0.5), d1);
   return max(a, b);
 }
 
@@ -1248,8 +1250,7 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bo
       if (abs(apronV - wid*0.5 - 45.0) < 0.3) m.alb = vec3(0.65,0.5,0.05);
       float st = mod(u + len*0.05, 45.0) - 22.5;
       if (abs(st) < 0.25 && apronV > wid*0.5 + 45.0 && apronV < apronEnd - 8.0) m.alb = vec3(0.65,0.5,0.05);
-)"
-R"(      if (abs(st) < 6.0 && abs(apronV - apronEnd + 12.0) < 0.25) m.alb = vec3(0.7);
+      if (abs(st) < 6.0 && abs(apronV - apronEnd + 12.0) < 0.25) m.alb = vec3(0.7);
       return;
     }
     if (apronV > wid*0.5 - 1.0 && apronV < off && (abs(u - len*0.28) < 11.0 || abs(u + len*0.38) < 11.0)) {
@@ -1274,8 +1275,7 @@ R"(      if (abs(st) < 6.0 && abs(apronV - apronEnd + 12.0) < 0.25) m.alb = vec3
       return;
     }
     if (abs(u) < len*0.5 + 120.0 && abs(v) < wid*0.5 + 60.0) {
-)"
-R"(      vec4 t = matSample(pw.xz, M_GRASS, 5.0, nTS);
+      vec4 t = matSample(pw.xz, M_GRASS, 5.0, nTS);
       float stripe = step(0.5, fract(u/18.0));
       m.alb = t.rgb*(0.85 + 0.15*stripe)*vec3(0.95,1.05,0.9); m.rough = 0.9; m.nrm = nTS;
     }
@@ -1405,7 +1405,8 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
   float wDirt = smoothstep(0.55, 0.7, n2) * (1.0 - wForest) * 0.6;
   float hC, hL;
   vec4 gr = groundSample(p.xz, M_GRASS, 6.0, nTS, hC); vec3 nG = nTS;
-  vec3 grassTint = mix(vec3(0.75,0.85,0.45), vec3(0.55,0.95,0.45), lush) * mix(vec3(1.0), vec3(1.15,1.0,0.8), smoothstep(0.4,0.8,hNoise));
+)"
+R"(  vec3 grassTint = mix(vec3(0.75,0.85,0.45), vec3(0.55,0.95,0.45), lush) * mix(vec3(1.0), vec3(1.15,1.0,0.8), smoothstep(0.4,0.8,hNoise));
   grassTint = mix(grassTint, vec3(0.75,0.8,0.65), cold*0.6);
   grassTint *= 0.92 + 0.16*vnoise(p.xz/23.0);                 // gentle colour variation breaks up repetition
   m.alb = gr.rgb*grassTint; m.rough = gr.a; m.nrm = nG;
@@ -1445,8 +1446,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
     m.alb = mix(m.alb, c, townW); m.rough = mix(m.rough, tx.a, townW); m.nrm = mix(m.nrm, nTS, townW);
     // street lamps pools at night
     vec2 corner = vec2(sx, sz) - 13.0;
-)"
-R"(    m.emit += vec3(1.0, 0.75, 0.4)*smoothstep(8.0, 0.0, length(corner))*uNight*0.35*townW;
+    m.emit += vec3(1.0, 0.75, 0.4)*smoothstep(8.0, 0.0, length(corner))*uNight*0.35*townW;
   }
   // ---- roads (exact geometry from the baked segment ids)
   if (msk.x < 0.25) {
@@ -1544,6 +1544,11 @@ vec3 shadeSurface(vec3 p, vec3 n, vec3 rd, Mat m, float shadow){
     vec3 lv = p - uLandLightPos; float ld = length(lv); vec3 l = lv/ld;
     float cone = smoothstep(0.93, 0.985, dot(l, uLandLightDir));
     col += pbr(n, v, -l, m.alb, m.rough, m.metal, vec3(1.0,0.95,0.85)*cone*uLandLight*9000.0/(ld*ld + 50.0));
+  }
+  // research jet exhaust plume light (flickering; lights the tail, the nozzles and the ground while hovering)
+  if (uFlameLI.x + uFlameLI.y + uFlameLI.z > 0.0) {
+    vec3 lv = uFlameLP - p; float d2 = dot(lv, lv);
+    col += pbr(n, v, lv*inversesqrt(max(d2, 1e-4)), m.alb, m.rough, m.metal, uFlameLI/(d2 + 1.5));
   }
   col += m.emit;
   col += m.alb*vec3(0.7,0.75,1.0)*uLightning*0.4;
@@ -1655,8 +1660,7 @@ float hitLot(vec3 ro, vec3 rd, Lot L, float tmax, out vec3 n, out vec4 info){
   float top = L.ground + 1.0 + L.wallH;
   vec3 nb; vec2 b = iBox(ro, rd, vec3(L.c.x - L.hw, L.ground, L.c.y - L.hd), vec3(L.c.x + L.hw, top, L.c.y + L.hd), nb);
   float best = tmax; float res = -1.0; info = vec4(0.0);
-)"
-R"(  if (b.x < b.y && b.y > 0.0 && b.x < best && b.x > 0.0) { best = b.x; res = b.x; n = nb; info = vec4(float(L.type), L.seed, top, 0.0); }
+  if (b.x < b.y && b.y > 0.0 && b.x < best && b.x > 0.0) { best = b.x; res = b.x; n = nb; info = vec4(float(L.type), L.seed, top, 0.0); }
   if (L.type == 0) {
     float ox = L.hw + 0.4, oz = L.hd + 0.4, rh = L.roofH;
     vec4 pl[7];
@@ -1680,8 +1684,7 @@ float traceTowns(vec3 ro, vec3 rd, float tmax, out vec3 nOut, out vec4 info){
   for (int i = 0; i < 24; i++) {
     if (i >= uTownCount) break;
     vec4 TB = dataAt(320 + i), TY = dataAt(352 + i);
-)"
-R"(    vec3 nb; vec2 tb = iBox(ro, rd, vec3(TB.x, TY.x, TB.y), vec3(TB.z, TY.y, TB.w), nb);
+    vec3 nb; vec2 tb = iBox(ro, rd, vec3(TB.x, TY.x, TB.y), vec3(TB.z, TY.y, TB.w), nb);
     float t0 = max(tb.x, 0.0), t1 = min(tb.y, best > 0.0 ? best : limit);
     if (t0 >= t1) continue;
     vec3 p0 = ro + rd*(t0 + 0.01);
@@ -1759,7 +1762,8 @@ vec2 traceBoxes(vec3 ro, vec3 rd, float tmax, out vec3 nOut, out float kind, out
       if (c1.x < c1.y && c1.x > 0.0) { tHit = c1.x; nl = n1; }
       vec3 sc = vec3(0.0, -H.y + H.y*1.1 + H.x*0.8, 0.0);
       vec3 oc = lo - sc; float b = dot(oc, ld), cc = dot(oc, oc) - H.x*H.x, h = b*b - cc;
-      if (h > 0.0) { float ts = -b - sqrt(h); if (ts > 0.0 && ts < tHit) { tHit = ts; nl = normalize(lo + ld*ts - sc); } }
+)"
+R"(      if (h > 0.0) { float ts = -b - sqrt(h); if (ts > 0.0 && ts < tHit) { tHit = ts; nl = normalize(lo + ld*ts - sc); } }
     } else {
       if (bb.x > 0.0) { tHit = bb.x; nl = nb; }
     }
@@ -1863,8 +1867,7 @@ vec3 mfdPage(int page, vec2 uv){
     c += W*mLine(abs(o.x*nd.y - o.y*nd.x), w)*step(0.0, dot(o, nd))*step(length(o), 0.66);
     c += W*hudNum(uv - vec2(-0.3, -0.85), abs(gv)*10.0, 3, vec2(0.15, 0.25));
     c += A*step(abs(uv.x + 0.85), 0.05)*step(abs(uv.y - (clamp(uHud3.y/30.0, -1.0, 1.0)*0.7)), 0.05);
-)"
-R"(  } else {                  // COMPASS rose, heading and altitude readouts
+  } else {                  // COMPASS rose, heading and altitude readouts
     float h = radians(uHud.z);
     vec2 o = rot2(uv - vec2(0.0, -0.1), -h);
     float rr = length(uv - vec2(0.0, -0.1)), a = atan(o.x, o.y);
@@ -1936,7 +1939,8 @@ vec3 jetScreen(vec3 col, vec3 rd, int id, vec3 sl){
     hud = max(hud, hudBox(h, vec2(0.0, 0.392), vec2(0.056, 0.03), px));
     // airspeed (kt) and altitude (ft) boxes, Mach and G below, nozzle angle and throttle readouts
     hud = max(hud, hudBox(h, vec2(-0.36, 0.0), vec2(0.075, 0.03), px));
-    hud = max(hud, hudNum(h - vec2(-0.418, -0.02), uHud.x*1.94384, 4, vec2(0.022, 0.04)));
+)"
+R"(    hud = max(hud, hudNum(h - vec2(-0.418, -0.02), uHud.x*1.94384, 4, vec2(0.022, 0.04)));
     hud = max(hud, hudBox(h, vec2(0.38, 0.0), vec2(0.092, 0.03), px));
     hud = max(hud, hudNum(h - vec2(0.305, -0.02), uHud.y*3.28084, 5, vec2(0.022, 0.04)));
     hud = max(hud, hudNum(h - vec2(-0.41, -0.085), uHud.w*100.0, 3, vec2(0.014, 0.025)));
@@ -1960,6 +1964,61 @@ vec3 jetScreen(vec3 col, vec3 rd, int id, vec3 sl){
   }
   return mix(col, hc*1.6, clamp(hud, 0.0, 1.0)*0.85);
 }
+// ---------------------------------------------------------------- research jet exhaust plumes
+// Volumetric emission marched through each plume (body space). Dry thrust: a tight blue-white plasma cone.
+// Reheat: a long white-hot core in an amber envelope, threaded with bright Mach disks (shock diamonds),
+// with turbulent flicker scrolling downstream.
+vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float jit){
+  float sp = uFlame.x, ab = uFlame.y;
+  float L = mix(2.0, 6.0, sp) + 9.0*ab;
+  vec3 c = o + ax*(L*0.5); float br = L*0.5 + 0.9;
+  vec3 oc = lo - c; float b = dot(oc, ld), h = b*b - dot(oc, oc) + br*br;
+  if (h <= 0.0) return vec3(0.0);
+  h = sqrt(h); float t0 = max(-b - h, 0.0), t1 = min(-b + h, tmax);
+  if (t1 <= t0) return vec3(0.0);
+  vec3 ay = normalize(cross(ax, vec3(1.0, 0.0, 0.0)));
+  float spacing = 0.95 + 0.35*clamp(uFlame.w, 0.0, 2.5);
+  vec3 cOut = mix(vec3(0.12, 0.28, 1.0), vec3(1.0, 0.3, 0.05), ab);
+  vec3 cIn = mix(vec3(0.55, 0.8, 1.0), vec3(1.0, 0.7, 0.35), ab);
+  vec3 cDisk = vec3(0.75, 0.88, 1.0);
+  float dt = (t1 - t0)/32.0;
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < 32; i++) {
+    vec3 q = lo + ld*(t0 + (float(i) + jit)*dt) - o;
+    float x = dot(q, ax);
+    if (x < -0.05 || x > L) continue;
+    float u = max(x, 0.0)/L;
+    float nx = q.x, ny = dot(q, ay);
+    // 2D nozzle: a flat rectangular jet that rounds out and tapers downstream; shocks pinch the reheat plume
+    float ph = x/spacing;
+    float pinch = 1.0 - 0.18*ab*(0.5 + 0.5*cos(ph*6.2832))*(1.0 - u);
+    float wx = mix(0.40, 0.15, u)*pinch*(1.0 + 0.6*ab*u), wy = mix(0.27, 0.15, u)*pinch*(1.0 + 0.8*ab*u);
+    float e2 = (nx*nx)/(wx*wx) + (ny*ny)/(wy*wy);
+    if (e2 > 9.0) continue;
+    float turb = vnoise(vec2(x*2.6 - uTime*48.0, nx*5.0 + ny*7.0)) * 0.6 + vnoise(vec2(x*6.0 - uTime*90.0, ny*11.0 - nx*6.0))*0.4;
+    float fall = smoothstep(0.0, 0.06, u + 0.02)*pow(1.0 - u, 1.4);
+    float env = exp(-e2*1.5)*smoothstep(0.25, 0.75, turb + 0.35*(1.0 - u));
+    float core = exp(-e2*4.0)*smoothstep(1.0, 0.2, u + 0.25*(1.0 - ab));
+    float disk = pow(0.5 + 0.5*cos((ph - 0.15)*6.2832), 8.0)*exp(-e2*3.0)*smoothstep(0.3, 0.8, ph)*(1.0 - smoothstep(0.3, 0.8, u));
+    vec3 e = cOut*env*(1.3 - 0.4*ab) + cIn*core*(7.0 - 1.0*ab) + cDisk*disk*(4.0*sp + 8.0*ab);
+    acc += e*fall*dt;
+  }
+  acc *= (0.25 + 0.75*sp)*(0.9 + 0.1*sin(uTime*63.0));
+  return acc/(1.0 + max(acc.r, max(acc.g, acc.b))*0.2);   // hue-preserving roll-off: looking down the plume stays amber
+}
+vec3 jetPlumes(vec3 ro, vec3 rd, float tmax, float jit){
+  if (uFlame.x < 0.02) return vec3(0.0);
+  mat3 inv = transpose(uPlaneRot);
+  vec3 lo = inv*(ro - uPlanePos), ld = inv*rd;
+  float a = uFlame.z;
+  vec3 ax = vec3(0.0, -sin(a), cos(a));
+  vec3 col = vec3(0.0);
+  for (int s = -1; s <= 1; s += 2) {
+    vec3 o = vec3(0.82*float(s), -0.12, 7.75) + ax*1.0;   // nozzle exit (pivot + 1 m along the swivelled axis)
+    col += plumeOne(lo, ld, tmax, o, ax, jit);
+  }
+  return col;
+}
 void main(){
   vec2 ndc = vUV*2.0 - 1.0;
   vec3 rd = normalize(uCamRot * vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, -1.0));
@@ -1977,8 +2036,7 @@ void main(){
       else tmax = h0.x + 0.05;
     }
   }
-)"
-R"(  float tT = traceTerrain(ro, rd, tmax);
+  float tT = traceTerrain(ro, rd, tmax);
   float tW = (rd.y < 0.0 && ro.y > 0.0) ? -ro.y/rd.y : -1.0;
   vec3 bn; float bkind = 0.0; vec3 bl;
   vec2 bh = traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
@@ -2056,7 +2114,8 @@ R"(  float tT = traceTerrain(ro, rd, tmax);
             m.alb = vec3(0.35, 0.4, 0.45); if (fract(lh.z/4.0) < 0.03) m.alb *= 0.5; }
         } else if (k == 1) { // control tower: concrete shaft, glass cab
           float Ht = H.y*2.0, yy = lh.y + H.y;
-          vec4 tx = triSample(lh, nn, M_CONCRETE, 3.0, nTS); m.alb = tx.rgb; m.rough = tx.a; m.nrm = nTS;
+)"
+R"(          vec4 tx = triSample(lh, nn, M_CONCRETE, 3.0, nTS); m.alb = tx.rgb; m.rough = tx.a; m.nrm = nTS;
           if (yy > Ht*0.78 && yy < Ht*0.93 && abs(bn.y) < 0.5) { m.alb = vec3(0.03, 0.06, 0.07); m.rough = 0.04; m.metal = 0.5; m.emit = vec3(0.3, 0.7, 0.45)*uNight*0.6; }
           if (yy > Ht*0.93) m.alb = vec3(0.25);
           if (yy > Ht*0.97) { m.alb = vec3(0.8, 0.1, 0.1); m.emit = vec3(1.0, 0.1, 0.05)*step(0.5, fract(uTime*0.7))*2.0; }
@@ -2074,8 +2133,7 @@ R"(  float tT = traceTerrain(ro, rd, tmax);
           if (abs(bn.y) < 0.3 && fract(lh.z/2.5) > 0.6 && lh.y > -H.y*0.5 && lh.y < 0.0) { m.alb = vec3(0.05); m.rough = 0.08; m.emit = vec3(1.0,0.8,0.5)*uNight*1.5; }
         } else if (k == 4) { // fuel tank
           vec4 tx = triSample(lh, nn, M_METAL, 3.0, nTS); m.alb = tx.rgb*vec3(0.95); m.rough = 0.35; m.metal = 0.6; m.nrm = nTS;
-)"
-R"(          if (abs(lh.y) < 0.5) m.alb = vec3(0.8, 0.15, 0.1);
+          if (abs(lh.y) < 0.5) m.alb = vec3(0.8, 0.15, 0.1);
         } else {             // radar dome on a pylon
           m.alb = vec3(0.92); m.rough = 0.5;
           if (lh.y < 0.0) { vec4 tx = triSample(lh, nn, M_METAL, 2.0, nTS); m.alb = tx.rgb*0.7; m.metal = 0.6; m.nrm = nTS; }
@@ -2201,10 +2259,11 @@ R"(          if (abs(lh.y) < 0.5) m.alb = vec3(0.8, 0.15, 0.1);
           m.alb = mix(m.alb, vec3(0.16, 0.11, 0.17), 0.4*heat);   // heat-tinted titanium
         } else if (mid == 34) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = uColStripe*(1.2 + 2.0*uNight)*pulse; }
         else if (mid == 35) { m.alb = vec3(0.06); m.metal = 0.8; m.rough = 0.35; m.emit = vec3(0.25, 0.6, 1.0)*uPS.y*uCtl.w*2.5; }
-        else if (mid == 36) { float ab = smoothstep(0.85, 1.0, uCtl.w); m.alb = vec3(0.02); m.emit = mix(vec3(1.0, 0.35, 0.08), vec3(1.0, 0.75, 0.5), ab)*(0.4 + 6.0*uCtl.w*uCtl.w + 10.0*ab); }
+        else if (mid == 36) { float ab = uFlame.y, sp = uFlame.x; m.alb = vec3(0.02); m.emit = mix(vec3(0.35, 0.6, 1.0), vec3(1.0, 0.82, 0.6), ab)*(0.3 + 9.0*sp*sp + 16.0*ab); }
         else if (mid == 40) {  // sealed pod: carbon weave between structural ribs
           vec2 wv = floor(vec2(lp.x + lp.z, lp.y - lp.z)*55.0);
-          m.alb = vec3(0.03, 0.032, 0.036)*(0.8 + 0.4*mod(wv.x + wv.y, 2.0)); m.rough = 0.35; m.metal = 0.2;
+)"
+R"(          m.alb = vec3(0.03, 0.032, 0.036)*(0.8 + 0.4*mod(wv.x + wv.y, 2.0)); m.rough = 0.35; m.metal = 0.2;
           float rib = abs(fract((lp.z - E.z)*4.0) - 0.5);
           if (rib > 0.46) { m.alb = vec3(0.07, 0.075, 0.08); m.metal = 0.7; m.rough = 0.3; }
           if (abs(lp.y - (E.y - 0.18)) < 0.004) m.emit = uColStripe*1.4*pulse;
@@ -2228,8 +2287,7 @@ R"(          if (abs(lh.y) < 0.5) m.alb = vec3(0.8, 0.15, 0.1);
             page = mid == 52 ? 5 : 6; uv = vec2((cq.x - 0.02)/0.075*sign(qd.x), -(cq.z + 0.2)/0.06);
           }
           vec3 sc = mfdPage(page, uv);
-)"
-R"(          float edge = smoothstep(1.0, 0.92, max(abs(uv.x), abs(uv.y)));
+          float edge = smoothstep(1.0, 0.92, max(abs(uv.x), abs(uv.y)));
           sc = sc*edge + vec3(0.01, 0.03, 0.04)*edge;                                         // dark-blue backlight
           sc *= 0.92 + 0.08*sin(uv.y*160.0);                                                  // pixel rows
           m.alb = vec3(0.01); m.rough = 0.06; m.metal = 0.0; m.emit = sc*1.5;
@@ -2339,6 +2397,8 @@ R"(          float edge = smoothstep(1.0, 0.92, max(abs(uv.x), abs(uv.y)));
       col = mix(col, pc, clamp(a, 0.0, 1.0)*0.85);
     }
   }
+  // research jet exhaust plumes (additive, depth-limited by the scene)
+  if (uPlaneOn == 1 && uWreck == 0 && uPS.w < 0.5 && int(uM[0].z + 0.5) == 5) col += jetPlumes(ro, rd, t, jitter);
   // clouds
   vec4 cl = traceClouds(ro, rd, t, jitter);
   col = col*cl.a + cl.rgb;
