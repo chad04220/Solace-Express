@@ -25,13 +25,16 @@ struct AircraftSpec {
   // visual model
   float fusLen, fusRad, wingY, wingZ; int engLayout, tail;
   vec3 colBase, colStripe;
-  int special = 0;             // 1 = XR-9 research jet: fly-by-wire, thrust vectoring, VTOL nozzles, no fuel burn
+  int special = 0;             // 1 = XR-9 research jet: fly-by-wire, thrust vectoring, VTOL nozzles, no fuel burn; 2 = XR-11 Wraith
   float runwayNeeded(float elev) const { return runwayM * (1.0f + elev / 3000.0f); }
 };
 
 extern const AircraftSpec kAircraft[];
 extern const int kNumAircraft;   // career aircraft (market, rentals, contracts)
 static const int kResearchJet = 7; // hidden XR-9, only reachable from the research menu
+static const int kWraith = 8;      // hidden XR-11 Wraith stealth aerobatic research craft (research menu)
+// XR-11 thruster pods (body coords, +z aft): front left, front right, rear left, rear right pivot points
+static const vec3 kWraithPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.08f, -3.3f), vec3(-2.75f, 0.05f, 3.45f), vec3(2.75f, 0.05f, 3.45f)};
 
 struct Controls {
   float pitch = 0, roll = 0, yaw = 0;  // -1..1 (pitch +1 = nose up, roll +1 = right, yaw +1 = right)
@@ -81,6 +84,10 @@ public:
   float maxG = 1, minG = 1;
   float flightTime = 0;
   float mach = 0, nozzle = 0;  // research jet: Mach number, thrust-vector nozzle angle 0 (aft) .. 1 (straight down)
+  // XR-11: each pod's pitch tilt (rad, 0 = thrust aft, pi/2 = thrust down, incl. vane vectoring), yaw vane (rad),
+  // thrust fraction of full boost, fan angle; control-surface deflections (-1..1: pitch, yaw, roll) as allocated
+  float podTilt[4] = {0, 0, 0, 0}, podYaw[4] = {0, 0, 0, 0}, podThr[4] = {0, 0, 0, 0}, fanAngle = 0;
+  vec3 surf;
   FlightEvents ev;
   Rng rng;
 
@@ -98,12 +105,16 @@ public:
   float fuelFlowMax() const;   // kg/s at full throttle
   float rangeLeftKm() const;
   float cd0Value() const { return cd0; }
+  // fly-by-wire rate command of the research craft: full-stick pitch and roll rates (rad/s)
+  float fbwPitchMax(float V) const { V = std::max(V, 1.f); return spec->special == 2 ? clampf(80.f * G0 / V, 2.0f, 6.0f) : clampf(66.f * G0 / V, 1.8f, 5.2f); }
+  float fbwRollMax(float hover) const { return (spec->special == 2 ? 7.0f : 5.5f) * (1.f - 0.6f * hover); }
 private:
   void substep(float dt, const Weather& wx, float time);
   void apGuidance(float dt);
   void apControl(float dt);
   float apPlan(int airport, bool rev, const Weather& wx, bool commit);
   void apHover(float dt);
+  void wraithThrust(vec3& F, vec3& T, float podThrust, vec3 wd, vec3 Taero, vec3 surfMax, float dt);
   vec3 gust;
   float cd0 = 0.03f;
 };

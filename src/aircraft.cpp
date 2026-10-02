@@ -40,9 +40,15 @@ const AircraftSpec kAircraft[] = {
    0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 118000, 0, 60, 70, 420, 4000, 250, true, false, true,
    25000, 90000, 110000, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 0, 0,
    17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1},
+  // hidden stealth aerobatic research model: four tilting thruster pods (power = one pod's dry thrust), T/W ~2.2 dry
+  // and ~4.6 boosted, structure good for +90 / -45 g (see Plane::wraithThrust)
+  {"xr11", "XR-11 Wraith", "Stealth aerobatic research model", ENG_JET, 4, 0, 0, 0, 0, 10500, 3000, 0, 0, 52.0f, 12.4f, 5.2f,
+   0.03f, 3.4f, 1.60f, 0.0f, 0.012f, 0.010f, 0.0f, 0.72f, 62000, 0, 60, 70, 480, 5000, 200, true, false, true,
+   30000, 80000, 100000, 0.90f, 0.090f, 0.070f, LIC_STUDENT, 0, 0,
+   16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.15f, 0.16f, 0.18f), vec3(0.72f, 0.3f, 1.0f), 2},
 };
 // clang-format on
-const int kNumAircraft = sizeof(kAircraft) / sizeof(kAircraft[0]) - 1;  // the research jet is not part of the career
+const int kNumAircraft = sizeof(kAircraft) / sizeof(kAircraft[0]) - 2;  // the research craft are not part of the career
 
 float Plane::fuelFlowMax() const {
   float rangeS = spec->rangeKm * 1000.f / spec->cruise;
@@ -156,7 +162,11 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   }
   float thrust = 0;
   if (engineRunning) {
-    if (s.special) {
+    if (s.special == 2) {
+      // four thruster pods: dry up to 85% throttle, boost above; ram compression adds thrust with Mach
+      float ab = smoothstepf(0.85f, 1.0f, engineSpool);
+      thrust = s.engines * s.power * powf(sigmaRho, 0.5f) * (0.85f * engineSpool + 1.25f * ab) * (1.f + 0.3f * std::min(V / 330.f, 4.f));
+    } else if (s.special) {
       // two afterburning turbofans: dry up to 85% throttle, reheat above (2x thrust at 100%, T/W ~4.4)
       float ab = smoothstepf(0.85f, 1.0f, engineSpool);
       thrust = s.engines * s.power * powf(sigmaRho, 0.6f) * (0.82f * engineSpool + 1.18f * ab);   // full reheat doubles thrust
@@ -179,6 +189,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
 
   // ---------------- aerodynamics
   vec3 F(0, 0, 0), T(0, 0, 0);  // body-frame force and torque
+  vec3 Taero(0, 0, 0), surfMax(0, 0, 0);   // XR-11: passive aerodynamic torque and full-deflection surface authority
   float AR = s.span * s.span / s.wingArea;
   stallWarn = 0;
   if (V > 0.5f) {
@@ -221,18 +232,26 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     if (sig > 0.3f) { float dv, a, b; noised(time * 0.8f, 2.2f, dv, a, b); Cl += sig * 0.04f * dv; }
     float L = Cl * qbar * s.wingArea * s.span, M = Cm * qbar * s.wingArea * s.chord, Nn = Cn * qbar * s.wingArea * s.span;
     if (!s.special) T += vec3(M, -Nn, -L);
+    else if (s.special == 2) {
+      // XR-11: the airframe's own stability and damping act on it; the fly-by-wire decides the surface deflections
+      float Cm0 = Cma * (alpha - aCruise) * 0.4f + Cmq * 0.35f * qh, Cl0 = -0.10f * beta - 0.55f * ph + 0.08f * rh, Cn0 = 0.09f * beta - 0.16f * rh;
+      Taero = vec3(Cm0 * qbar * s.wingArea * s.chord, -Cn0 * qbar * s.wingArea * s.span, -Cl0 * qbar * s.wingArea * s.span);
+      surfMax = vec3(s.elevPow * s.chord, s.rudPow * s.span, s.ailPow * s.span) * (qbar * s.wingArea * ctlEff);
+      T += Taero;
+    }
     stallWarn = smoothstepf(aStall - 5 * DEG, aStall - 1.5f * DEG, alpha);
   } else { alpha = 0; beta = 0; }
   if (s.special) {
     // thrust-vectoring nozzles swivel from aft (0) to straight down (1) for vertical flight
     float a = nozzle * 0.5f * PI;
-    F += vec3(0, sinf(a), -cosf(a)) * thrust;
+    if (s.special == 1) F += vec3(0, sinf(a), -cosf(a)) * thrust;
     // fly-by-wire rate command through vectored thrust and reaction jets: authority independent of airspeed
     float Vt = std::max(V, 1.f);
     float hover = smoothstepf(0.3f, 0.7f, nozzle) * smoothstepf(70.f, 30.f, V);
     // pitch authority comes from the vectoring nozzles (+-29 deg of deflection, doubled in v1.7): ~110 deg/s at Mach 1
-    float pMax = clampf(66.f * G0 / Vt, 1.8f, 5.2f);
-    float rMax = 5.5f * (1.f - 0.6f * hover), yMax = 1.4f;
+    bool wr = s.special == 2;   // XR-11: ~80 g at full stick, 400 deg/s roll
+    float pMax = fbwPitchMax(Vt);
+    float rMax = fbwRollMax(hover), yMax = wr ? 1.8f : 1.4f;
     vec3 wd(ctl.pitch * pMax + ctl.trim * 0.15f, -ctl.yaw * yMax, -ctl.roll * rMax);
     if (hover > 0) {  // hands-off attitude hold while hovering
       if (fabsf(ctl.pitch) < 0.05f) wd.x += hover * 2.2f * (0.f - pitchDeg()) * DEG;
@@ -241,7 +260,8 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     // no g or angle-of-attack limiting: the stick commands rotation directly and the pilot owns the airframe's limits
     float ms0 = m / s.emptyMass, k = onGround ? 4.f : 9.f, kp = onGround ? 4.f : 18.f;   // stiffer pitch loop: snap reversals
     vec3 Ii(s.Iyy * ms0, s.Izz * ms0, s.Ixx * ms0);
-    T += vec3(Ii.x * kp * (wd.x - w.x), Ii.y * k * (wd.y - w.y), Ii.z * k * (wd.z - w.z));
+    if (wr) wraithThrust(F, T, thrust * 0.25f, wd, Taero, surfMax, dt);
+    else T += vec3(Ii.x * kp * (wd.x - w.x), Ii.y * k * (wd.y - w.y), Ii.z * k * (wd.z - w.z));
   } else F += vec3(0, 0, -thrust);
 
   // ---------------- ground contacts
@@ -358,7 +378,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   vec3 accBody = q.conj().rotate(acc + vec3(0, G0, 0));
   gLoad = accBody.y / G0;
   if (!onGround) { maxG = std::max(maxG, gLoad); minG = std::min(minG, gLoad); }
-  if (!anyWheel && (s.special ? (gLoad > 50.f || gLoad < -25.f) : (gLoad > 5.8f || gLoad < -3.f))) { ev.crashed = true; ev.crashReason = "Structural failure - overstressed airframe"; return; }
+  if (!anyWheel && (s.special == 2 ? (gLoad > 90.f || gLoad < -45.f) : s.special ? (gLoad > 50.f || gLoad < -25.f) : (gLoad > 5.8f || gLoad < -3.f))) { ev.crashed = true; ev.crashReason = "Structural failure - overstressed airframe"; return; }
   vel += acc * dt;
   pos += vel * dt;
   // inertia scales with loading
@@ -377,6 +397,105 @@ void Plane::substep(float dt, const Weather& wx, float time) {
 
   // ---------------- autopilot inner loops
   if (apOn) apControl(dt);
+}
+
+// ------------------------------------------------------------------ XR-11 Wraith thruster pods
+// Four pods pivot from thrust-aft (0) to thrust-down (pi/2). Each carries vanes that deflect its jet in pitch and yaw,
+// and can trim its own thrust. The fly-by-wire turns the stick's rate demand into an angular acceleration, takes
+// what the control surfaces can give (authority grows with dynamic pressure), then solves for the pod controls that
+// produce the rest from the pods' real positions and thrust: differential thrust front/rear and left/right,
+// collective pitch and roll vanes, yaw vanes and differential tilt. Whatever can't be produced simply isn't: at low
+// speed and low power the controls really do go soft.
+namespace {
+struct PodCmd { float diff[4], dp[4], dy[4], dt[4]; };
+void podForces(const PodCmd& c, float tilt, float Tp, vec3& F, vec3& Tq, float* outTilt, float* outYaw, float* outThr) {
+  F = vec3(0, 0, 0); Tq = vec3(0, 0, 0);
+  for (int i = 0; i < 4; i++) {
+    float a = tilt + c.dp[i] + c.dt[i], y = c.dy[i];
+    vec3 d(sinf(y), sinf(a) * cosf(y), -cosf(a) * cosf(y));   // jet force direction (opposite the exhaust)
+    float T = Tp * (1.f + c.diff[i]);
+    vec3 f = d * T;
+    F += f; Tq += cross(kWraithPods[i], f);
+    if (outTilt) { outTilt[i] = a; outYaw[i] = y; outThr[i] = T; }
+  }
+}
+// virtual control k (0..5) at unit strength u -> per-pod commands
+void applyVirtual(PodCmd& c, int k, float u) {
+  for (int i = 0; i < 4; i++) {
+    float fr = i < 2 ? 1.f : -1.f, lr = (i & 1) ? -1.f : 1.f;   // front +1 / rear -1, left +1 / right -1
+    switch (k) {
+      case 0: c.diff[i] += 0.40f * u * fr; break;   // thrust front vs rear (pitch in the hover)
+      case 1: c.diff[i] += 0.45f * u * lr; break;   // thrust left vs right (roll in the hover, yaw when aft)
+      case 2: c.dp[i] += 0.45f * u * -fr; break;    // pitch vanes, opposed front / rear (pitch when aft)
+      case 3: c.dp[i] += 0.40f * u * lr; break;     // pitch vanes, opposed left / right (roll when aft)
+      case 4: c.dy[i] += 0.30f * u * -fr; break;    // yaw vanes, opposed front / rear (yaw)
+      case 5: c.dt[i] += 0.25f * u * lr; break;     // differential tilt (yaw in the hover)
+    }
+  }
+}
+}
+
+void Plane::wraithThrust(vec3& F, vec3& T, float Tp, vec3 wd, vec3 Taero, vec3 surfMax, float dt) {
+  const AircraftSpec& s = *spec;
+  float ms0 = mass() / s.emptyMass, k = onGround ? 4.f : 9.f, kp = onGround ? 4.f : 18.f;
+  vec3 I(s.Iyy * ms0, s.Izz * ms0, s.Ixx * ms0);
+  vec3 tDes(I.x * kp * (wd.x - w.x), I.y * k * (wd.y - w.y), I.z * k * (wd.z - w.z));
+  vec3 need = tDes - Taero;   // cancel the airframe's own moments too
+  // 1) control surfaces: elevons (pitch, roll) and ruddervators (yaw)
+  vec3 u(surfMax.x > 1.f ? clampf(need.x / surfMax.x, -1.f, 1.f) : 0.f, surfMax.y > 1.f ? clampf(need.y / surfMax.y, -1.f, 1.f) : 0.f,
+         surfMax.z > 1.f ? clampf(need.z / surfMax.z, -1.f, 1.f) : 0.f);
+  vec3 tSurf(u.x * surfMax.x, u.y * surfMax.y, u.z * surfMax.z);
+  surf = vec3(u.x, -u.y, -u.z);   // as stick-style deflections: pitch up, yaw right, roll right
+  // 2) thrust: base forces at the commanded tilt, then the pod controls for the remainder (bounded least squares)
+  float tilt = nozzle * 0.5f * PI;
+  PodCmd c0 = {};
+  vec3 F0, T0;
+  podForces(c0, tilt, Tp, F0, T0, nullptr, nullptr, nullptr);
+  vec3 rem = need - tSurf - T0;
+  float J[3][6];
+  for (int kk = 0; kk < 6; kk++) {
+    PodCmd c = {}; applyVirtual(c, kk, 1.f);
+    vec3 Fk, Tk; podForces(c, tilt, Tp, Fk, Tk, nullptr, nullptr, nullptr);
+    vec3 d = Tk - T0; J[0][kk] = d.x; J[1][kk] = d.y; J[2][kk] = d.z;
+  }
+  float uv[6] = {0, 0, 0, 0, 0, 0}; bool free_[6] = {true, true, true, true, true, true};
+  vec3 r = rem;
+  for (int pass = 0; pass < 3; pass++) {
+    // u = J^T (J J^T + lambda I)^-1 r over the unsaturated controls
+    float A[3][3] = {};
+    for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) { for (int kk = 0; kk < 6; kk++) if (free_[kk]) A[i][j] += J[i][kk] * J[j][kk]; }
+    float lam = 1e3f + 0.01f * (A[0][0] + A[1][1] + A[2][2]);   // damped: weak controls aren't driven into saturation
+    for (int i = 0; i < 3; i++) A[i][i] += lam;
+    float det = A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1]) - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0]) + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]);
+    if (fabsf(det) < 1e-12f) break;
+    float inv[3][3] = {
+      {(A[1][1] * A[2][2] - A[1][2] * A[2][1]) / det, (A[0][2] * A[2][1] - A[0][1] * A[2][2]) / det, (A[0][1] * A[1][2] - A[0][2] * A[1][1]) / det},
+      {(A[1][2] * A[2][0] - A[1][0] * A[2][2]) / det, (A[0][0] * A[2][2] - A[0][2] * A[2][0]) / det, (A[0][2] * A[1][0] - A[0][0] * A[1][2]) / det},
+      {(A[1][0] * A[2][1] - A[1][1] * A[2][0]) / det, (A[0][1] * A[2][0] - A[0][0] * A[2][1]) / det, (A[0][0] * A[1][1] - A[0][1] * A[1][0]) / det}};
+    float y[3];
+    for (int i = 0; i < 3; i++) y[i] = inv[i][0] * r.x + inv[i][1] * r.y + inv[i][2] * r.z;
+    bool sat = false;
+    for (int kk = 0; kk < 6; kk++) {
+      if (!free_[kk]) continue;
+      float du = J[0][kk] * y[0] + J[1][kk] * y[1] + J[2][kk] * y[2];
+      uv[kk] += du;
+      if (fabsf(uv[kk]) > 1.f) { uv[kk] = clampf(uv[kk], -1.f, 1.f); free_[kk] = false; sat = true; }
+    }
+    if (!sat) break;
+    // residual left after saturation, for the controls still free
+    vec3 got(0, 0, 0);
+    for (int kk = 0; kk < 6; kk++) got += vec3(J[0][kk], J[1][kk], J[2][kk]) * uv[kk];
+    r = rem - got;
+  }
+  PodCmd c = {};
+  for (int kk = 0; kk < 6; kk++) applyVirtual(c, kk, uv[kk]);
+  vec3 Fp, Tpq;
+  podForces(c, tilt, Tp, Fp, Tpq, podTilt, podYaw, podThr);
+  float Tfull = s.power * 2.1f;
+  for (int i = 0; i < 4; i++) podThr[i] /= Tfull;
+  fanAngle = fmodf(fanAngle + (6.f + 90.f * engineSpool) * dt, 2 * PI * 64.f);
+  F += Fp;
+  T += tSurf + Tpq;
 }
 
 // ------------------------------------------------------------------ autopilot
@@ -400,7 +519,7 @@ void Plane::apHover(float dt) {
   // across: bank towards the centreline
   float ay = clampf(-cross * 0.12f - vCr * 0.6f, -3.f, 3.f);
   float bankT = clampf(atanf(ay / G0) / DEG, -12.f, 12.f);
-  float pMax = clampf(66.f * G0 / std::max(length(vel), 1.f), 1.8f, 5.2f), rMax = 5.5f * (1.f - 0.6f * hov);
+  float pMax = fbwPitchMax(length(vel)), rMax = fbwRollMax(hov);
   float q = (clampf((pitchT - pitchDeg()) * 1.5f, -20.f, 20.f)) * DEG;
   // near-neutral stick engages the jet's own hover attitude hold (towards level): cancel it so ours is the only loop
   float cp = (q - ctl.trim * 0.15f) / pMax;
@@ -692,7 +811,7 @@ void Plane::apControl(float dt) {
   if (apMode == AP_APPR && apStage == APS_FLARE) bankT = clampf(bankT, -4.f, 4.f);
   float bank = bankDeg(), pRate = -w.z / DEG;
   float pT = clampf((bankT - bank) * 0.8f, -10.f, 10.f);
-  if (fbw) ctl.roll = clampf(pT * DEG / 5.5f, -1.f, 1.f);
+  if (fbw) ctl.roll = clampf(pT * DEG / fbwRollMax(0.f), -1.f, 1.f);
   else {
     apRollI = clampf(apRollI + (pT - pRate) * 0.006f * dt / vn, -0.3f, 0.3f);
     ctl.roll = clampf(apRollI + (pT - pRate) * 0.03f / vn, -0.6f, 0.6f);
@@ -713,7 +832,7 @@ void Plane::apControl(float dt) {
   float qT = clampf((gT - g) * 0.7f, -4.f, 4.f) + turn;
   float qRate = w.x / DEG;
   if (fbw) {
-    float pMax = clampf(66.f * G0 / V, 1.8f, 5.2f);
+    float pMax = fbwPitchMax(V);
     ctl.pitch = clampf((qT * DEG - ctl.trim * 0.15f) / pMax, -1.f, 1.f);
   } else {
     apPitchI = clampf(apPitchI + (qT - qRate) * 0.012f * dt / (vn * vn) + (gT - g) * 0.004f * dt / (vn * vn), -0.6f, 0.6f);

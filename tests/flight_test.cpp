@@ -110,8 +110,29 @@ int main() {
     ok = -p.w.z / DEG > 250.f;
     printf("XR-9 roll rate %.0f deg/s %s\n", -p.w.z / DEG, ok ? "ok" : "FAIL"); fails += !ok;
   }
+  // ---------------- XR-11 Wraith: four-pod VTOL hover, top speed, roll rate and the structural g it can pull
+  {
+    const AircraftSpec& s = kAircraft[kWraith];
+    Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
+    Plane p; p.reset(&s, vec3(0, 800, 0), 0, s.maxFuel, 85, true, 0.1f); p.vel = vec3(); p.ctl.flaps = 1; p.flaps = p.nozzle = 1;
+    float I = 0.45f;
+    for (int i = 0; i < 60 * 30; i++) { I = clampf(I - p.vel.y * 0.004f / 60.f * 60.f * 0.05f, 0.f, 1.f); p.ctl.throttle = clampf(I - p.vel.y * 0.04f, 0.f, 1.f); p.step(1 / 60.f, calm, i / 60.f); }
+    bool ok = !p.ev.crashed && fabsf(p.vel.y) < 1.f && fabsf(p.pitchDeg()) < 2.f && fabsf(p.bankDeg()) < 2.f && length(vec3(p.vel.x, 0, p.vel.z)) < 2.f;
+    printf("XR-11 hover: throttle %.2f vs %.2f m/s pitch %.1f bank %.1f drift %.1f m/s %s\n", p.ctl.throttle, p.vel.y, p.pitchDeg(), p.bankDeg(), length(vec3(p.vel.x, 0, p.vel.z)), ok ? "ok" : "FAIL"); fails += !ok;
+    p.ctl.roll = 0.6f; for (int i = 0; i < 60; i++) p.step(1 / 60.f, calm, 0);
+    ok = -p.w.z / DEG > 25.f; printf("XR-11 hover roll rate (pod thrust differential) %.0f deg/s %s\n", -p.w.z / DEG, ok ? "ok" : "FAIL"); fails += !ok;
+    p.reset(&s, vec3(-46000, 4000, 0), 90, s.maxFuel, 85, true, 300); p.ctl.throttle = 1; p.apEngage(Plane::AP_HOLD, -1, calm); p.apSpeed = 0;
+    for (int i = 0; i < 60 * 40; i++) p.step(1 / 60.f, calm, 0);
+    ok = !p.ev.crashed && p.mach > 3.0f; printf("XR-11 top speed Mach %.2f at %.0f m %s %s\n", p.mach, p.pos.y, p.ev.crashReason.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
+    p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.roll = 1;
+    for (int i = 0; i < 240; i++) p.step(1 / 240.f, calm, 0);
+    ok = -p.w.z / DEG > 330.f; printf("XR-11 roll rate %.0f deg/s %s\n", -p.w.z / DEG, ok ? "ok" : "FAIL"); fails += !ok;
+    p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 600); p.ctl.throttle = 0.8f; p.ctl.pitch = 1; float mg = 0;
+    for (int i = 0; i < 480 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, 0); mg = std::max(mg, p.gLoad); }
+    ok = !p.ev.crashed && mg > 60.f; printf("XR-11 full pull at 600 m/s: %.0f g %s\n", mg, ok ? "ok" : "FAIL"); fails += !ok;
+  }
   // ---------------- autopilot: stable holds in turbulence, and autoland at Solace Capital for every aircraft
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 9; i++) {
     const AircraftSpec& s = kAircraft[i];
     Weather wx; wx.windSpeed = 7; wx.windFrom = 200; wx.turbulence = 0.25f; wx.gust = 2;
     Plane p; p.reset(&s, vec3(0, 1800, 2000), 30, s.maxFuel * 0.6f, 100, true, s.cruise * 0.85f);
@@ -131,7 +152,7 @@ int main() {
   }
   {
     int ai = g_world.findAirport("CAP"); const Airport& A = g_world.airports[ai];
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 9; i++) {
       const AircraftSpec& s = kAircraft[i];
       Weather wx; wx.windSpeed = 6; wx.windFrom = wrapDeg360(A.heading + 25.f); wx.turbulence = 0.15f;
       vec3 side(-A.dir().z, 0, A.dir().x);
