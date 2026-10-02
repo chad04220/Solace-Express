@@ -160,7 +160,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   float fuel = s.maxFuel;
   plane.reset(&s, start, hdg, fuel, payloadKg, c.startAirborne, s.cruise);
   fuelStart = plane.fuel;
-  wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0;
+  wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f;
   paused = false; showMap = false; landed = completed = crashed = false;
   result = FlightResult();
   timeAccel = 1; camMode = camMode == 1 ? 1 : 0; camYaw = 0; camPitch = 0.12f; camZoom = 1;
@@ -306,7 +306,7 @@ void Game::flightControls(float dt) {
 }
 
 void Game::spawn(vec3 p, vec3 v, float life, float size, float grow, vec3 col, float alpha, int kind, float drag, float buoy) {
-  if (particles.size() > 3000) return;
+  if (particles.size() > 6000) return;
   particles.push_back({p, v, life, life, size, grow, col, alpha, kind, drag, buoy, false});
 }
 
@@ -366,18 +366,20 @@ void Game::updateFlight(float dt) {
     crashTimer += dt;
     updateWreck(dt);
     camYaw += dt * 0.12f;   // slow orbit around the crash site
-    if (crashTimer > 7.5f && screen == SCR_FLIGHT) endFlight(false, plane.ev.crashReason);
+    if (crashTimer > crashEndT && screen == SCR_FLIGHT) endFlight(false, plane.ev.crashReason);
     return;
   }
   if (plane.ev.crashed) {
     vec3 impactVel = plane.vel;
-    crashed = true; plane.vel = vec3(); plane.w = vec3();
+    crashed = true;
     g_audio.trigger(SFX_CRASH);
     toast(plane.ev.crashReason, vec3(1, 0.4f, 0.3f));
     bool water = g_world.height(plane.pos.x, plane.pos.z) < 0.5f;
-    breakUp(impactVel, water);
+    bool air = plane.ev.crashReason.find("Structural") != std::string::npos && plane.agl() > 4.f;   // overstressed in flight: it comes apart in the air
+    breakUp(impactVel, water, air);
+    plane.vel = vec3(); plane.w = vec3();
     if (camMode == 1 || camMode == 3) camMode = 2;
-    camZoom = std::max(camZoom, 1.8f); camPitch = 0.3f;
+    camZoom = std::max(camZoom, air ? 2.6f : 1.8f); camPitch = 0.3f;
     return;
   }
   // takeoff
@@ -713,7 +715,7 @@ float Game::wreckGround(float x, float z) const {
 
 // Splits the airframe into nose, centre section, both wings and tail (each the ray-traced model clipped to a
 // body-space box), throws them apart with the impact energy, scatters skin fragments and digs a crater.
-void Game::breakUp(vec3 impactVel, bool water) {
+void Game::breakUp(vec3 impactVel, bool water, bool air) {
   const ModelDef& m = kModels[plane.spec - kAircraft];
   Rng r(1234 + (uint32_t)(flightClock * 100));
   float speed = length(impactVel);
@@ -730,9 +732,57 @@ void Game::breakUp(vec3 impactVel, bool water) {
   auto box = [](vec3 lo, vec3 hi, vec3& C, vec3& H) { C = (lo + hi) * 0.5f; H = (hi - lo) * 0.5f; };
   vec3 lo[5] = {vec3(-xs, y0, z0), vec3(-xr, y0, zA), vec3(-xs, wy0, zA), vec3(xr, wy0, zA), vec3(-xs, y0, zB)};
   vec3 hi[5] = {vec3(xs, y1, zA), vec3(xr, y1, zB), vec3(-xr, wy1, zB), vec3(xs, wy1, zB), vec3(xs, y1, z1)};
+  if (plane.spec->special) {   // XR-9: its own airframe (mapJet) - nose, centre, tail and both outer wings, no overlaps
+    const float y0j = -1.7f, y1j = 2.9f;
+    vec3 jl[5] = {vec3(-2.2f, y0j, -9.6f), vec3(-2.2f, y0j, -3.f), vec3(-5.9f, -1.1f, -3.f), vec3(2.2f, -1.1f, -3.f), vec3(-2.2f, y0j, 3.6f)};
+    vec3 jh[5] = {vec3(2.2f, y1j, -3.f), vec3(2.2f, y1j, 3.6f), vec3(-2.2f, 0.8f, 6.1f), vec3(5.9f, 0.8f, 6.1f), vec3(2.2f, y1j, 9.6f)};
+    for (int i = 0; i < 5; i++) { lo[i] = jl[i]; hi[i] = jh[i]; }
+  }
   wreck.clear();
   vec3 centre = plane.pos;
   float energy = clampf(speed / 50.f, 0.4f, 2.5f);
+  airBreak = air;
+  if (air) {
+    // In-flight break-up: every piece keeps the airframe's momentum and rotation, is flung apart by the failure
+    // and tumbles violently; nothing touches the ground (no crater) until the pieces fall out of the sky.
+    vec3 vRot = plane.q.rotate(plane.w);
+    for (int i = 0; i < 5; i++) {
+      WreckPiece w;
+      box(lo[i], hi[i], w.C, w.H);
+      w.q = plane.q;
+      w.c = plane.pos + plane.q.rotate(w.C);
+      vec3 arm = w.c - centre, out = length(arm) > 0.1f ? normalize(arm) : vec3(0, 1, 0);
+      w.v = plane.vel * r.range(0.9f, 1.f) + cross(vRot, arm) + out * r.range(8.f, 20.f) + vec3(r.range(-4, 4), r.range(-2, 6), r.range(-4, 4));
+      vec3 ax = normalize(vec3(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1)));
+      w.w = vRot + ax * r.range(4.f, 9.f) * (i == 1 ? 0.5f : 1.f);   // light wings and tail spin hardest
+      w.rest = false; w.fire = r.range(0.7f, 1.f); w.landed = false;
+      wreck.push_back(w);
+    }
+    debris.clear();
+    for (int i = 0; i < 16; i++) {
+      Debris d;
+      d.p = centre + vec3(r.range(-3, 3), r.range(-1.5f, 1.5f), r.range(-4, 4));
+      d.v = plane.vel * r.range(0.6f, 0.95f) + normalize(vec3(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1))) * r.range(10.f, 35.f);
+      d.w = normalize(vec3(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1))) * r.range(6.f, 18.f);
+      d.q = quat::axisAngle(normalize(vec3(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1))), r.range(0, 6.f));
+      d.size = r.range(0.25f, 0.8f); d.charred = (i % 3) == 0; d.rest = false;
+      debris.push_back(d);
+    }
+    craterR = 0;
+    crashEndT = 1e9f;   // set once everything is down
+    // the failure: a fireball and a spray of sparks and skin that the slipstream tears away
+    for (int i = 0; i < 70; i++) {
+      vec3 v(r.range(-14, 14), r.range(-10, 14), r.range(-14, 14));
+      spawn(centre, plane.vel * 0.55f + v, r.range(0.6f, 1.3f), r.range(2.f, 4.5f), 4.f, vec3(1.f, 0.55f, 0.18f), 1.f, SPR_FIRE, 2.5f, 1.f);
+    }
+    for (int i = 0; i < 90; i++) spawn(centre, plane.vel * 0.7f + vec3(r.range(-40, 40), r.range(-30, 40), r.range(-40, 40)), r.range(0.8f, 2.2f), r.range(0.5f, 1.4f), -0.3f, vec3(1.f, 0.7f, 0.3f) * r.range(2.f, 5.f), 1.f, SPR_SPARK, 1.2f, -9.f);
+    for (int i = 0; i < 30; i++) spawn(centre, plane.vel * 0.4f + vec3(r.range(-8, 8), r.range(-6, 8), r.range(-8, 8)), r.range(3.f, 6.f), r.range(3.f, 6.f), 2.5f, vec3(0.12f, 0.11f, 0.1f), 0.7f, SPR_SMOKE, 1.5f, 0.5f);
+    {
+      vec3 f = length(plane.vel) > 1.f ? normalize(plane.vel) : vec3(0, 0, -1), rr = normalize(cross(f, vec3(0, 1, 0)) + vec3(1e-4f, 0, 0)), u = cross(rr, f);
+      bursts.push_back({centre, rr * 30.f, u * 30.f, vec3(1.f, 0.6f, 0.3f), 0.f});
+    }
+    return;
+  }
   for (int i = 0; i < 5; i++) {
     WreckPiece w;
     box(lo[i], hi[i], w.C, w.H);
@@ -791,6 +841,10 @@ void Game::updateWreck(float dt) {
     if (!sunk && rand() % 100 < (int)(heat * 22)) spawn(w.c + vec3(0, 2.5f, 0), vec3((rand() % 100 - 50) * 0.02f, 3.5f, (rand() % 100 - 50) * 0.02f) + plane.windVel * 0.5f, 7.f, 1.5f, 2.5f, wet ? vec3(0.8f) : vec3(0.1f, 0.095f, 0.09f), 0.45f, SPR_SMOKE, 0.25f, 1.5f);
     if (w.rest) continue;
     if (wet && w.c.y < 0.3f) {
+      if (!w.landed) {   // a piece falling into the sea: a tall splash
+        w.landed = true;
+        if (airBreak) { g_audio.trigger(SFX_CRASH, 0.5f); for (int i = 0; i < 40; i++) spawn(vec3(w.c.x, 0.2f, w.c.z), vec3((rand() % 200 - 100) * 0.06f, 8.f + (rand() % 100) * 0.14f, (rand() % 200 - 100) * 0.06f), 2.2f, 1.4f, 2.f, vec3(0.9f, 0.95f, 1.f), 0.75f, SPR_SMOKE, 1.f, -7.f); }
+      }
       // in the sea: heavy drag, a short float on trapped air, then the piece sinks out of sight to the seabed
       float floatT = 1.f + 1.5f * w.fire;
       float vy = crashTimer < floatT ? (-0.35f - w.c.y) * 2.f : -2.2f - 1.2f * w.fire;
@@ -799,6 +853,18 @@ void Game::updateWreck(float dt) {
       w.w = w.w * expf(-1.2f * dt);
       if (crashTimer > floatT && w.c.y > -12.f && rand() % 100 < 25)   // air escaping as it goes down
         spawn(vec3(w.c.x + (rand() % 100 - 50) * 0.03f, 0.05f, w.c.z + (rand() % 100 - 50) * 0.03f), vec3(0, 0.6f, 0), 0.9f, 0.35f, 1.5f, vec3(0.9f, 0.95f, 1.f), 0.45f, SPR_SMOKE, 1.f, 0.f);
+    } else if (airBreak && !w.landed) {
+      // falling and tumbling: quadratic drag brings a chunk from supersonic down to ~90 m/s terminal; it keeps spinning
+      w.v.y -= G * dt;
+      w.v = w.v - w.v * (0.0012f * length(w.v) * dt);
+      w.w = w.w * expf(-0.05f * dt);
+      // burning smoke trail: spread along this frame's path so it streams continuously even at high speed
+      int n = (int)clampf(length(w.v) * dt / 2.f, 1.f, 4.f);
+      for (int k = 0; k < n; k++) {
+        vec3 tp = w.c - w.v * (dt * (float)k / n);
+        spawn(tp, w.v * 0.05f, 2.6f + (rand() % 100) * 0.01f, 1.4f + w.fire, 3.f, vec3(0.07f, 0.065f, 0.06f), 0.5f, SPR_SMOKE, 1.f, 0.6f);
+        if (k % 2 == 0) spawn(tp, w.v * 0.1f, 0.1f + (rand() % 100) * 0.001f, 0.6f + w.fire * 0.5f, -2.f, vec3(1.f, 0.42f, 0.1f) * 0.6f, 1.f, SPR_FIRE, 2.f, 0.f);
+      }
     } else w.v.y -= G * dt;
     w.v = w.v * expf(-0.08f * dt);
     w.c += w.v * dt;
@@ -812,6 +878,22 @@ void Game::updateWreck(float dt) {
       float g = wreckGround(cw.x, cw.z);
       if (g - cw.y > pen) { pen = g - cw.y; hitArm = cw - w.c; }
     }
+    if (pen > 0 && !w.landed) {
+      // first contact of a piece that fell out of the sky: it hits hard
+      w.landed = true;
+      float sp = length(w.v);
+      if (airBreak && sp > 8.f) {
+        g_audio.trigger(SFX_CRASH, clampf(sp / 90.f, 0.3f, 1.f));
+        for (int i = 0; i < 30; i++) {
+          vec3 v((rand() % 200 - 100) * 0.12f, (rand() % 100) * 0.16f, (rand() % 200 - 100) * 0.12f);
+          spawn(w.c, v, 0.8f + (rand() % 100) * 0.008f, 2.f, 3.f, vec3(1.f, 0.55f, 0.2f), 1.f, SPR_FIRE, 1.2f, 2.f);
+          spawn(w.c, v * 1.3f, 2.f, 1.5f, 2.f, vec3(0.32f, 0.25f, 0.18f), 0.8f, SPR_SMOKE, 1.5f, -5.f);
+        }
+        if (craterR <= 0 && &w == &wreck[1]) {   // the heavy centre section digs the crater
+          craterX = w.c.x; craterZ = w.c.z; craterR = clampf(3.f + sp * 0.06f, 4.f, 10.f); craterD = craterR * 0.28f;
+        }
+      }
+    }
     if (pen > 0) {
       w.c.y += pen;
       if (w.v.y < 0) w.v.y = -w.v.y * 0.22f;
@@ -820,9 +902,16 @@ void Game::updateWreck(float dt) {
       if (length(w.v) < 0.8f && length(w.w) < 0.35f) w.rest = true;
     }
   }
+  // in-flight break-up: the camera rides with the centre section; results come up a while after the last piece is down
+  if (airBreak && !wreck.empty()) {
+    plane.pos = wreck.size() > 1 ? wreck[1].c : wreck[0].c;
+    bool all = true; for (auto& w : wreck) all = all && (w.landed || w.c.y < -1.f);
+    if (crashEndT > 1e8f && (all || crashTimer > 150.f)) crashEndT = crashTimer + 6.f;
+  }
   for (Debris& d : debris) {
     if (d.rest) continue;
     d.v.y -= G * dt; d.v = d.v * expf(-0.3f * dt);
+    if (airBreak) d.v = d.v - d.v * (0.02f * length(d.v) * dt);   // light skin panels flutter down
     d.p += d.v * dt;
     float wl = length(d.w);
     if (wl > 1e-4f) { d.q = quat::axisAngle(d.w, wl * dt) * d.q; d.q.normalize(); }
@@ -947,7 +1036,7 @@ FrameParams Game::buildFrame() {
       fp.flameLight = lerp(vec3(0.3f, 0.55f, 1.f), vec3(1.f, 0.62f, 0.3f), ab) * ((25.f * sp * sp + 260.f * ab) * flick);
     }
     fp.rainLens = camMode == 1 && wx.precip == 1 ? 1.f : 0.f;
-    if (crashed) fp.fade = clampf(1.f - (crashTimer - 6.5f), 0, 1);
+    if (crashed) fp.fade = clampf(1.f - (crashTimer - (crashEndT - 1.f)), 0, 1);
   } else {
     menuBackgroundCamera(fp);
   }
@@ -1369,6 +1458,26 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
     for (int i = 0; i < (name == "rings" ? 60 : 42); i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     return;
+  }
+  if (name.compare(0, 8, "airbreak") == 0) {   // XR-9 overstressed at speed: breaks up in the air; airbreak<seconds after>
+    bool cessna = name.size() > 8 && name[8] == 'c';   // airbreakc<s>: a light aircraft pushed over hard in a dive instead
+    float after = name.size() > 8 + cessna ? atof(name.c_str() + 8 + cessna) : 3.f;
+    resAirborne = true; realTime = 20; launchResearch(); hudOn = false;
+    if (cessna) { plane.reset(&kAircraft[1], plane.pos, 90, kAircraft[1].maxFuel, 100, true, 90); researchFlight = false; }
+    plane.pos.y = std::max(plane.pos.y, g_world.height(plane.pos.x, plane.pos.z) + 2500.f);
+    plane.vel = plane.forward() * (cessna ? 95.f : 620.f); plane.ctl.throttle = 1; plane.engineSpool = 1; botControl = true; plane.ctl.pitch = cessna ? -1.f : 1.f;
+    camMode = 2; camYaw = 0.9f; camPitch = 0.25f; camZoom = 1.2f;
+    float tb = -1, tEnd = -1;
+    for (int i = 0; i < 60 * 200; i++) {
+      realTime += 1 / 60.f; update(1 / 60.f);
+      if (crashed && tb < 0) { tb = flightClock; printf("airbreak: broke up (%s), %d pieces, %.0f m AGL\n", plane.ev.crashReason.c_str(), (int)wreck.size(), plane.agl()); }
+      if (crashed && tEnd < 0 && crashEndT < 1e8f) { tEnd = crashTimer; float sp = 0; for (auto& w : wreck) sp = std::max(sp, length(w.v));
+        printf("airbreak: all pieces down %.1f s after the break-up (crater %.1f m) %s\n", crashTimer, craterR, crashTimer > 5.f ? "ok" : "FAIL"); }
+      if (crashed && crashTimer >= after) break;
+    }
+    if (!crashed) printf("airbreak: FAIL - no break-up\n");
+    for (int i = 0; i < 5; i++) updateCamera(1 / 60.f);
+    toasts.clear(); return;
   }
   if (name == "seacrash") {  // ditches into deep sea: the wreck must float briefly, then sink to the seabed
     float gx = 0, gz = 0;
