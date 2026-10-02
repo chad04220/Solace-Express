@@ -35,15 +35,53 @@ void Game::saveSettings() {
   fclose(f);
 }
 
+// Built-in presets. Bump kStationsVersion when adding presets: older station files get the new ones appended.
+static const int kStationsVersion = 2;
+static const std::pair<const char*, const char*> kDefaultStations[] = {
+  {"SomaFM Groove Salad (ambient)", "https://ice1.somafm.com/groovesalad-128-mp3"},
+  {"SomaFM Drone Zone", "https://ice1.somafm.com/dronezone-128-mp3"},
+  {"SomaFM Secret Agent", "https://ice1.somafm.com/secretagent-128-mp3"},
+  {"SomaFM Lush", "https://ice1.somafm.com/lush-128-mp3"},
+  {"SomaFM Indie Pop Rocks", "https://ice1.somafm.com/indiepop-128-mp3"},
+  {"Radio Paradise (eclectic)", "https://stream.radioparadise.com/mp3-128"},
+  {"Radio Paradise Mellow", "https://stream.radioparadise.com/mellow-128"},
+  {"KEXP Seattle", "https://kexp-mp3-128.streamguys1.com/kexp128.mp3"},
+  // US East Coast public and college stations (free, listener-supported)
+  {"WNYC 93.9 New York - NPR news", "https://fm939.wnyc.org/wnycfm"},
+  {"WQXR 105.9 New York - classical", "https://stream.wqxr.org/wqxr"},
+  {"WFMU 91.1 Jersey City - freeform", "https://stream0.wfmu.org/freeform-128k"},
+  {"WBGO 88.3 Newark - jazz", "https://wbgo.streamguys1.com/wbgo128"},
+  {"WFUV 90.7 New York - indie & folk", "https://onair.wfuv.org/onair-hi"},
+  {"WXPN 88.5 Philadelphia - AAA", "https://wxpnhi.xpn.org/xpnhi"},
+  {"WBUR 90.9 Boston - NPR news", "https://icecast-stream.wbur.org/wbur"},
+  {"GBH 89.7 Boston - NPR news", "https://wgbh-live.streamguys1.com/wgbh"},
+  {"CRB 99.5 Boston - classical", "https://wgbh-live.streamguys1.com/classical-hi"},
+  {"WMBR 88.1 MIT Cambridge - college", "https://wmbr.org:8002/hi"},
+  {"WUNC 91.5 Chapel Hill - NPR news", "https://wunc-ice.streamguys1.com/wunc-128-mp3"},
+  {"WCPE 89.7 Raleigh - classical", "https://audio-mp3.ibiblio.org/wcpe.mp3"},
+};
+
+static void writeStations(const std::string& path, const std::vector<std::pair<std::string, std::string>>& st) {
+  FILE* f = fopen(path.c_str(), "w");
+  if (!f) return;
+  fprintf(f, "# Air Xpress internet radio stations\n# stations-version %d\n# One per line:  Name|URL   (MP3 or AAC HTTP/HTTPS streams). Add your own below.\n", kStationsVersion);
+  for (auto& s : st) fprintf(f, "%s|%s\n", s.first.c_str(), s.second.c_str());
+  fclose(f);
+}
+
 void Game::loadStations() {
   stations.clear();
-  FILE* f = fopen(joinPath(saveDir, "radio_stations.txt").c_str(), "r");
+  std::string path = joinPath(saveDir, "radio_stations.txt");
+  FILE* f = fopen(path.c_str(), "r");
+  bool userFile = f != nullptr;
   if (!f) f = fopen("radio_stations.txt", "r");
+  int version = 1;
   if (f) {
     char line[1024];
     while (fgets(line, sizeof(line), f)) {
       std::string s = line;
       while (!s.empty() && (s.back() == '\n' || s.back() == '\r' || s.back() == ' ')) s.pop_back();
+      if (s.compare(0, 19, "# stations-version ") == 0) version = atoi(s.c_str() + 19);
       if (s.empty() || s[0] == '#') continue;
       size_t bar = s.find('|');
       if (bar == std::string::npos) stations.push_back({s, s});
@@ -51,15 +89,14 @@ void Game::loadStations() {
     }
     fclose(f);
   }
-  if (stations.empty()) {
-    stations = {{"SomaFM Groove Salad (ambient)", "https://ice1.somafm.com/groovesalad-128-mp3"},
-                {"SomaFM Drone Zone", "https://ice1.somafm.com/dronezone-128-mp3"},
-                {"SomaFM Secret Agent", "https://ice1.somafm.com/secretagent-128-mp3"},
-                {"SomaFM Lush", "https://ice1.somafm.com/lush-128-mp3"},
-                {"Radio Paradise (eclectic)", "https://stream.radioparadise.com/mp3-128"},
-                {"Radio Paradise Mellow", "https://stream.radioparadise.com/mellow-128"},
-                {"KEXP Seattle", "https://kexp-mp3-128.streamguys1.com/kexp128.mp3"},
-                {"Classic FM style: Venice Classic", "https://uk2.streamingpulse.com/ssl/vcr1"}};
+  if (stations.empty() || version < kStationsVersion || (!userFile && !saveDir.empty())) {
+    // add presets the list doesn't have yet (keeps the player's own stations and order)
+    for (auto& d : kDefaultStations) {
+      bool have = false;
+      for (auto& s : stations) if (s.second == d.second) have = true;
+      if (!have) stations.push_back({d.first, d.second});
+    }
+    if (!saveDir.empty() || userFile) writeStations(path, stations);
   }
   set.radioStation = std::clamp(set.radioStation, 0, (int)stations.size() - 1);
 }
@@ -127,7 +164,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
   takeoffAnnounced = false; touchedDown = false; touchdownFpm = 0; stillTimer = 0;
   engineAutoStarted = false; startDelay = 1.2f;
-  particles.clear(); bursts.clear(); trail.clear(); trailT = 0;
+  particles.clear(); bursts.clear(); trail.clear(); trailT = 0; wreck.clear(); debris.clear(); craterR = 0;
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
   approachMinAgl = 1e9f;
@@ -312,23 +349,20 @@ void Game::updateFlight(float dt) {
 
   if (crashed) {
     crashTimer += dt;
-    if (crashTimer < 6.f) {
-      for (int i = 0; i < 3; i++) spawn(plane.pos + vec3((rand() % 100 - 50) * 0.05f, 0.5f, (rand() % 100 - 50) * 0.05f), vec3(0, 3.f + (rand() % 100) * 0.03f, 0), 1.0f, 2.f, 1.5f, vec3(1.f, 0.45f, 0.12f), 1.f, SPR_FIRE, 0.5f, 1.f);
-      spawn(plane.pos + vec3(0, 2, 0), vec3((rand() % 100 - 50) * 0.02f, 4.f, (rand() % 100 - 50) * 0.02f) + plane.windVel, 6.f, 3.f, 3.f, vec3(0.12f, 0.11f, 0.1f), 0.7f, SPR_SMOKE, 0.3f, 1.5f);
-    }
-    if (crashTimer > 4.0f && screen == SCR_FLIGHT) endFlight(false, plane.ev.crashReason);
+    updateWreck(dt);
+    camYaw += dt * 0.12f;   // slow orbit around the crash site
+    if (crashTimer > 7.5f && screen == SCR_FLIGHT) endFlight(false, plane.ev.crashReason);
     return;
   }
   if (plane.ev.crashed) {
+    vec3 impactVel = plane.vel;
     crashed = true; plane.vel = vec3(); plane.w = vec3();
     g_audio.trigger(SFX_CRASH);
     toast(plane.ev.crashReason, vec3(1, 0.4f, 0.3f));
     bool water = g_world.height(plane.pos.x, plane.pos.z) < 0.5f;
-    for (int i = 0; i < 60; i++) {
-      vec3 v((rand() % 200 - 100) * 0.12f, (rand() % 100) * 0.15f, (rand() % 200 - 100) * 0.12f);
-      if (water) spawn(plane.pos, v, 2.5f, 1.5f, 2.f, vec3(0.9f, 0.95f, 1.f), 0.8f, SPR_SMOKE, 1.f, -6.f);
-      else spawn(plane.pos, v, 1.2f, 2.f, 3.f, vec3(1.f, 0.6f, 0.2f), 1.f, SPR_FIRE, 1.f, 0.f);
-    }
+    breakUp(impactVel, water);
+    if (camMode == 1 || camMode == 3) camMode = 2;
+    camZoom = std::max(camZoom, 1.8f); camPitch = 0.3f;
     return;
   }
   // takeoff
@@ -457,7 +491,7 @@ void Game::updateCamera(float dt) {
     if (camMode == 3) camPos = plane.pos + normalize(vec3(plane.vel.x, 0, plane.vel.z) + vec3(0.01f, 0, 0)) * 350.f + plane.right() * 40.f + vec3(0, 12, 0);
   }
   if (in.wheel != 0 && showMap) gpsRangeTarget = clampf(gpsRangeTarget * powf(0.8f, in.wheel), 1500.f, 40000.f);
-  else if (in.wheel != 0) camZoom = clampf(camZoom * powf(0.88f, in.wheel), 0.35f, 4.f);
+  else if (in.wheel != 0 && !showRadio) camZoom = clampf(camZoom * powf(0.88f, in.wheel), 0.35f, 4.f);
   bool drag = in.mDown[1] || (camMode == 2 && in.mDown[0]);
   if (drag) { camYaw -= in.mdx * 0.005f * set.mouseSens; camPitch = clampf(camPitch + in.mdy * 0.004f * set.mouseSens, -1.3f, 1.4f); }
   if (in.pad) { float rx = fabsf(in.rx) > 0.2f ? in.rx : 0, ry = fabsf(in.ry) > 0.2f ? in.ry : 0; camYaw -= rx * 2.f * dt; camPitch = clampf(camPitch + ry * 1.5f * dt, -1.3f, 1.4f); }
@@ -487,6 +521,136 @@ void Game::updateCamera(float dt) {
   }
   float gh = std::max(g_world.height(camPos.x, camPos.z, 6), 0.f) + 1.5f;
   if (camPos.y < gh) camPos.y = gh;
+}
+
+// ------------------------------------------------------------------ crash wreckage
+float Game::wreckGround(float x, float z) const {
+  float g = g_world.height(x, z, 6);
+  if (craterR > 0 && g > 0.3f) {
+    float d = sqrtf((x - craterX) * (x - craterX) + (z - craterZ) * (z - craterZ)) / craterR;
+    if (d < 1.8f) { g = g_world.groundHeight(x, z, 6) - craterD * std::max(1.f - d * d, 0.f) + 0.22f * craterD * expf(-(d - 1.f) * (d - 1.f) * 14.f); }
+  }
+  return g;
+}
+
+// Splits the airframe into nose, centre section, both wings and tail (each the ray-traced model clipped to a
+// body-space box), throws them apart with the impact energy, scatters skin fragments and digs a crater.
+void Game::breakUp(vec3 impactVel, bool water) {
+  const ModelDef& m = kModels[plane.spec - kAircraft];
+  Rng r(1234 + (uint32_t)(flightClock * 100));
+  float speed = length(impactVel);
+  float xs = std::max(m.wing[0], m.ht[0]) + 0.6f;
+  float y0 = -(plane.gearHeight() + 0.7f), y1 = std::max(m.vt[4] + m.vt[0], m.ht[4]) + 0.6f;
+  float z0 = std::min(m.st[0][0], m.engine >= 2 && m.engine <= 3 ? m.nacZ0 : 0.f) - 0.9f;
+  float z1 = std::max(std::max(m.st[7][0], m.vt[5] + m.vt[1]), m.ht[5] + m.ht[1]) + 0.6f;
+  float zA = m.wing[5] - 0.25f, zB = m.wing[5] + std::max(m.wing[1], m.wing[3] + m.wing[2]) + 0.35f;
+  float xr = modelHalfWidth(m, m.wing[5] + m.wing[1] * 0.5f) * 1.08f + 0.05f;
+  float wy0 = m.wing[4] - 0.45f, wy1 = m.wing[4] + 0.5f + m.winglet * 1.2f;
+  if (m.engine == 2 || m.engine == 3) { wy0 = std::min(wy0, m.nacY - m.nacR - 0.3f); wy1 = std::max(wy1, m.nacY + m.nacR + 0.2f); }
+  if (m.gear == 3) wy0 = y0;
+  if (m.strut) wy0 = std::min(wy0, m.st[3][3] - m.st[3][2]);
+  auto box = [](vec3 lo, vec3 hi, vec3& C, vec3& H) { C = (lo + hi) * 0.5f; H = (hi - lo) * 0.5f; };
+  vec3 lo[5] = {vec3(-xs, y0, z0), vec3(-xr, y0, zA), vec3(-xs, wy0, zA), vec3(xr, wy0, zA), vec3(-xs, y0, zB)};
+  vec3 hi[5] = {vec3(xs, y1, zA), vec3(xr, y1, zB), vec3(-xr, wy1, zB), vec3(xs, wy1, zB), vec3(xs, y1, z1)};
+  wreck.clear();
+  vec3 centre = plane.pos;
+  float energy = clampf(speed / 50.f, 0.4f, 2.5f);
+  for (int i = 0; i < 5; i++) {
+    WreckPiece w;
+    box(lo[i], hi[i], w.C, w.H);
+    w.q = plane.q;
+    w.c = plane.pos + plane.q.rotate(w.C);
+    vec3 out = w.c - centre; out.y = 0; out = length(out) > 0.1f ? normalize(out) : normalize(vec3(r.range(-1, 1), 0, r.range(-1, 1)));
+    w.v = impactVel * r.range(0.25f, 0.45f) + out * r.range(4.f, 9.f) * energy + vec3(0, r.range(5.f, 11.f) * energy, 0);
+    if (water) w.v = w.v * 0.4f;
+    vec3 ax = normalize(vec3(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1)));
+    w.w = ax * r.range(1.f, 4.f) * energy;
+    w.rest = false; w.fire = r.range(0.6f, 1.f);
+    wreck.push_back(w);
+  }
+  // skin fragments
+  debris.clear();
+  for (int i = 0; i < 16; i++) {
+    Debris d;
+    d.p = centre + vec3(r.range(-2, 2), r.range(0.5f, 2.f), r.range(-2, 2));
+    float a = r.range(0, 6.2832f);
+    d.v = vec3(cosf(a), 0, sinf(a)) * r.range(6.f, 22.f) * energy + vec3(0, r.range(6.f, 18.f) * energy, 0) + impactVel * r.range(0.2f, 0.5f);
+    if (water) d.v = d.v * 0.5f;
+    d.w = normalize(vec3(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1))) * r.range(3.f, 12.f);
+    d.q = quat::axisAngle(normalize(vec3(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1))), r.range(0, 6.f));
+    d.size = r.range(0.25f, 0.8f); d.charred = (i % 3) == 0; d.rest = false;
+    debris.push_back(d);
+  }
+  // crater (on land only)
+  if (!water) {
+    craterX = centre.x; craterZ = centre.z;
+    craterR = clampf(3.f + speed * 0.07f + std::max(plane.spec->fusLen, plane.spec->span) * 0.12f, 4.f, 13.f);
+    craterD = craterR * 0.28f;
+  } else craterR = 0;
+  // fireball, sparks, dirt and smoke
+  for (int i = 0; i < 90; i++) {
+    vec3 v(r.range(-12, 12), r.range(0, 16), r.range(-12, 12));
+    if (water) spawn(centre, v * 0.9f + vec3(0, 6, 0), 2.5f, 1.5f, 2.f, vec3(0.9f, 0.95f, 1.f), 0.8f, SPR_SMOKE, 1.f, -6.f);
+    else spawn(centre + vec3(0, 1, 0), v, r.range(0.8f, 1.6f), r.range(2.f, 4.f), 4.f, vec3(1.f, 0.6f, 0.2f), 1.f, SPR_FIRE, 1.2f, 2.f);
+  }
+  if (!water) {
+    for (int i = 0; i < 80; i++) spawn(centre, vec3(r.range(-25, 25), r.range(5, 30), r.range(-25, 25)), r.range(1.f, 2.5f), r.range(0.8f, 2.f), -0.3f, vec3(1.f, 0.7f, 0.3f) * r.range(2.f, 5.f), 1.f, SPR_SPARK, 0.4f, -9.f);
+    for (int i = 0; i < 40; i++) spawn(centre, vec3(r.range(-10, 10), r.range(4, 14), r.range(-10, 10)), r.range(1.5f, 3.f), r.range(1.5f, 3.f), 2.f, vec3(0.32f, 0.25f, 0.18f), 0.9f, SPR_SMOKE, 1.5f, -5.f);
+  }
+}
+
+void Game::updateWreck(float dt) {
+  const float G = 9.81f;
+  for (WreckPiece& w : wreck) {
+    // fire and smoke from the burning pieces (stronger right after the impact)
+    float heat = w.fire * clampf(1.2f - crashTimer * 0.06f, 0.3f, 1.f);
+    bool wet = g_world.height(w.c.x, w.c.z) < 0.5f;
+    if (!wet && rand() % 100 < (int)(heat * 40)) {
+      vec3 jp = w.c + w.q.rotate(vec3((rand() % 100 - 50) * 0.01f * w.H.x, 0, (rand() % 100 - 50) * 0.01f * w.H.z));
+      spawn(jp, vec3(0, 2.f + (rand() % 100) * 0.02f, 0), 0.7f, 0.45f + 0.5f * heat, 0.8f, vec3(1.f, 0.42f, 0.1f) * 0.55f, 1.f, SPR_FIRE, 0.5f, 1.f);
+    }
+    if (rand() % 100 < (int)(heat * 22)) spawn(w.c + vec3(0, 2.5f, 0), vec3((rand() % 100 - 50) * 0.02f, 3.5f, (rand() % 100 - 50) * 0.02f) + plane.windVel * 0.5f, 7.f, 1.5f, 2.5f, wet ? vec3(0.8f) : vec3(0.1f, 0.095f, 0.09f), 0.45f, SPR_SMOKE, 0.25f, 1.5f);
+    if (w.rest) continue;
+    w.v.y -= G * dt;
+    w.v = w.v * expf(-0.08f * dt);
+    w.c += w.v * dt;
+    float wl = length(w.w);
+    if (wl > 1e-4f) { w.q = quat::axisAngle(w.w, wl * dt) * w.q; w.q.normalize(); }
+    // ground contact against the corners of the piece's box
+    float pen = 0; vec3 hitArm;
+    for (int k = 0; k < 8; k++) {
+      vec3 cl((k & 1) ? w.H.x : -w.H.x, (k & 2) ? w.H.y : -w.H.y, (k & 4) ? w.H.z : -w.H.z);
+      vec3 cw = w.c + w.q.rotate(cl * 0.85f);
+      float g = wreckGround(cw.x, cw.z);
+      if (g < 0) g = -0.6f * std::min(crashTimer * 0.4f, 1.f) - 0.2f;   // floats briefly, then settles low in the water
+      if (g - cw.y > pen) { pen = g - cw.y; hitArm = cw - w.c; }
+    }
+    if (pen > 0) {
+      w.c.y += pen;
+      if (w.v.y < 0) w.v.y = -w.v.y * 0.22f;
+      w.v.x *= 0.72f; w.v.z *= 0.72f;
+      w.w = w.w * 0.75f + cross(hitArm, vec3(w.v.x, 0, w.v.z)) * 0.02f;
+      if (length(w.v) < 0.8f && length(w.w) < 0.35f) w.rest = true;
+    }
+  }
+  for (Debris& d : debris) {
+    if (d.rest) continue;
+    d.v.y -= G * dt; d.v = d.v * expf(-0.3f * dt);
+    d.p += d.v * dt;
+    float wl = length(d.w);
+    if (wl > 1e-4f) { d.q = quat::axisAngle(d.w, wl * dt) * d.q; d.q.normalize(); }
+    float g = wreckGround(d.p.x, d.p.z);
+    if (g < 0) { if (d.p.y < -0.2f) { d.v = d.v * 0.5f; d.p.y = -0.2f; d.rest = true; } continue; }
+    if (d.p.y < g + d.size * 0.15f) {
+      d.p.y = g + d.size * 0.15f;
+      d.v.y = fabsf(d.v.y) * 0.25f; d.v.x *= 0.6f; d.v.z *= 0.6f; d.w = d.w * 0.6f;
+      if (length(d.v) < 0.7f) {  // settle flat on the ground
+        d.rest = true;
+        float yaw = atan2f(d.q.rotate(vec3(1, 0, 0)).z, d.q.rotate(vec3(1, 0, 0)).x);
+        d.q = quat::axisAngle(vec3(0, 1, 0), -yaw) * quat::axisAngle(vec3(1, 0, 0), (d.size - 0.5f) * 0.4f);
+      }
+    }
+  }
 }
 
 // ------------------------------------------------------------------ particles
@@ -543,6 +707,24 @@ FrameParams Game::buildFrame() {
   fp.exposure = 1.0f + fp.night * 0.8f;
   if ((screen == SCR_FLIGHT || screen == SCR_DEBRIEF) && plane.spec) {
     fillPlaneVisual(fp.plane, plane, propAngle, camMode == 1);
+    if (!wreck.empty()) {
+      WreckVisual& wv = fp.wreck;
+      wv.pieces = std::min((int)wreck.size(), 5);
+      for (int i = 0; i < wv.pieces; i++) {
+        const WreckPiece& w = wreck[i];
+        wv.pos[i] = w.c; wv.C[i] = w.C; wv.H[i] = w.H;
+        vec3 ax = w.q.rotate(vec3(1, 0, 0)), ay = w.q.rotate(vec3(0, 1, 0)), az = w.q.rotate(vec3(0, 0, 1));
+        float r[9] = {ax.x, ax.y, ax.z, ay.x, ay.y, ay.z, az.x, az.y, az.z};
+        memcpy(wv.rot[i], r, sizeof r);
+      }
+    }
+    fp.wreck.debris = std::min((int)debris.size(), 16);
+    for (int i = 0; i < fp.wreck.debris; i++) {
+      const Debris& d = debris[i];
+      fp.wreck.deb[i][0] = d.p.x; fp.wreck.deb[i][1] = d.p.y; fp.wreck.deb[i][2] = d.p.z; fp.wreck.deb[i][3] = d.charred ? -d.size : d.size;
+      fp.wreck.debQ[i][0] = d.q.w; fp.wreck.debQ[i][1] = d.q.x; fp.wreck.debQ[i][2] = d.q.y; fp.wreck.debQ[i][3] = d.q.z;
+    }
+    fp.wreck.crater[0] = craterX; fp.wreck.crater[1] = craterZ; fp.wreck.crater[2] = craterR; fp.wreck.crater[3] = craterD;
     vec3 fwd = camMode == 1 ? plane.q.rotate(quat::axisAngle(vec3(0, 1, 0), lookYaw).rotate(quat::axisAngle(vec3(1, 0, 0), lookPitch).rotate(vec3(0, 0, -1))))
                             : normalize(plane.pos + vec3(0, plane.spec->fusRad * 0.3f, 0) - camPos);
     vec3 upRef = camMode == 1 ? plane.up() : vec3(0, 1, 0);
@@ -558,7 +740,7 @@ FrameParams Game::buildFrame() {
     fp.landLightPos = plane.pos + plane.forward() * (plane.spec->fusLen * 0.4f);
     fp.landLightDir = normalize(plane.forward() - plane.up() * 0.1f);
     fp.rainLens = camMode == 1 && wx.precip == 1 ? 1.f : 0.f;
-    if (crashed) fp.fade = clampf(1.f - (crashTimer - 3.f), 0, 1);
+    if (crashed) fp.fade = clampf(1.f - (crashTimer - 6.5f), 0, 1);
   } else {
     menuBackgroundCamera(fp);
   }
@@ -836,6 +1018,7 @@ void Game::debugScene(const std::string& name) {
   career.newGame(); career.license = LIC_ATP;
   if (name == "menu") { screen = SCR_MENU; realTime = 20; return; }
   if (name == "hub") { screen = SCR_HUB; realTime = 20; return; }
+  if (name == "radio") { loadStations(); screen = SCR_HUB; showRadio = true; realTime = 20; radioScroll = 6; return; }
   if (name.size() == 4 && name.compare(0, 3, "hub") == 0) { screen = SCR_HUB; hubTab = name[3] - '0'; realTime = 20; return; }
   Contract c = g_story[0];
   int spec = 0;
@@ -912,6 +1095,21 @@ void Game::debugScene(const std::string& name) {
     plane.ctl = Controls(); plane.ctl.throttle = 0.7f;
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
     for (int i = 0; i < (name == "rings" ? 60 : 42); i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    return;
+  }
+  if (name.compare(0, 5, "crash") == 0) {
+    // flies into a field nose-down, then advances the wreck simulation by the given number of tenths of a second
+    int sp = name.size() > 6 ? name[5] - '0' : 1;
+    float after = name.size() > 7 ? atof(name.c_str() + 7) * 0.1f : 1.f;
+    float gx = -9000, gz = 11500;
+    plane.reset(&kAircraft[sp], vec3(gx, g_world.height(gx, gz) + 60.f, gz), 30, kAircraft[sp].maxFuel, 100, true, kAircraft[sp].cruise);
+    plane.q = plane.q * quat::axisAngle(vec3(1, 0, 0), -0.6f);
+    plane.vel = plane.q.rotate(vec3(0, 0, -kAircraft[sp].cruise));
+    takeoffAnnounced = true; camQ = plane.q; hint.clear(); toasts.clear(); botControl = true; hudOn = false;
+    for (int i = 0; i < 30; i++) updateCamera(0.1f);
+    for (int i = 0; i < 600 && !crashed; i++) { realTime += 1 / 60.f; update(1 / 60.f); }
+    for (float tt = 0; tt < after; tt += 1 / 60.f) { realTime += 1 / 60.f; crashTimer = std::min(crashTimer, 5.f); update(1 / 60.f); }
+    toasts.clear();
     return;
   }
   if (name == "top") { camMode = 2; camYaw = 0.3f; camPitch = 1.35f; camZoom = 4.f; }

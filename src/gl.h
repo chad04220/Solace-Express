@@ -118,6 +118,7 @@ typedef ptrdiff_t GLsizeiptr; typedef ptrdiff_t GLintptr; typedef unsigned char 
   X(void, glUniform3f, (GLint, GLfloat, GLfloat, GLfloat)) \
   X(void, glUniform4f, (GLint, GLfloat, GLfloat, GLfloat, GLfloat)) \
   X(void, glUniform4fv, (GLint, GLsizei, const GLfloat*)) \
+  X(void, glUniform3fv, (GLint, GLsizei, const GLfloat*)) \
   X(void, glUniformMatrix3fv, (GLint, GLsizei, GLboolean, const GLfloat*)) \
   X(void, glUniformMatrix4fv, (GLint, GLsizei, GLboolean, const GLfloat*)) \
   X(void, glGenVertexArrays, (GLsizei, GLuint*)) \

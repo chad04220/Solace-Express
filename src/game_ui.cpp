@@ -254,7 +254,7 @@ void Game::drawHub() {
     case TAB_LOGBOOK: drawHubLogbook(cx, cy, cw, ch); break;
     default: panel(cx, cy, std::min(cw, 760 * s), ch); drawSettings(cx + 24 * s, cy + 20 * s, std::min(cw, 760 * s) - 48 * s, ch); break;
   }
-  if (showRadio) drawRadioPanel(W - 440 * s, 126 * s);
+  if (showRadio) drawRadioPanel(W - 460 * s, 126 * s);
   if (in.pressed[K_ESC]) { if (showRadio) showRadio = false; else { screen = SCR_MENU; saveGame(); } }
 }
 
@@ -580,27 +580,44 @@ void Game::drawSettings(float x, float y, float w, float h) {
 
 void Game::drawRadioPanel(float x, float y) {
   float s = S();
-  float w = 420 * s, h = (110 + 34 * std::min((int)stations.size(), 12)) * s;
+  const int rows = std::min((int)stations.size(), std::max(4, (int)((g_ren.H - y - 140 * s) / (34 * s))));
+  const int visible = std::min(rows, 12);
+  float w = 440 * s, h = (118 + 34 * visible) * s;
   panel(x, y, w, h, 0.92f);
   g_ren.text(x + 18 * s, y + 14 * s, 20 * s, "Internet Radio", C_TEXT, 1);
   if (radio.state() == Radio::PLAYING)  // live equaliser bars
     for (int i = 0; i < 12; i++) { float bh = (0.3f + 0.7f * fabsf(sinf(realTime * (3.1f + i * 0.7f) + i * 1.3f))) * 16 * s; g_ren.rect(x + w - 120 * s + i * 8 * s, y + 34 * s - bh, 5 * s, bh, C_ACCENT, 0.8f, 1 * s); }
   vec3 sc = radio.state() == Radio::PLAYING ? C_GOOD : radio.state() == Radio::FAILED ? C_BAD : C_DIM;
-  std::string stat = radio.status();
-  while (g_ren.textWidth(stat, 14 * s) > w - 36 * s && stat.size() > 4) stat = stat.substr(0, stat.size() - 4) + "...";
-  g_ren.text(x + 18 * s, y + 44 * s, 14 * s, stat, sc, 1);
-  float py = y + 72 * s;
-  for (int i = 0; i < (int)stations.size() && i < 12; i++) {
+  g_ren.text(x + 18 * s, y + 44 * s, 14 * s, ellipsize(radio.status(), w - 36 * s, 14 * s), sc, 1);
+  // scrolling station list (mouse wheel over the list, or the arrows)
+  int maxScroll = std::max(0, (int)stations.size() - visible);
+  float listY = y + 72 * s, listH = visible * 34 * s;
+  if (hovered(x, listY, w, listH) && in.wheel != 0) { radioScroll -= (int)in.wheel; in.wheel = 0; }
+  radioScroll = std::clamp(radioScroll, 0, maxScroll);
+  float py = listY;
+  float bw = w - (maxScroll > 0 ? 50 : 28) * s;
+  for (int k = 0; k < visible; k++) {
+    int i = radioScroll + k;
+    if (i >= (int)stations.size()) break;
     bool cur = i == set.radioStation && radio.state() != Radio::IDLE;
-    if (button(x + 14 * s, py, w - 28 * s, 30 * s, stations[i].first, true, cur)) {
+    if (button(x + 14 * s, py, bw, 30 * s, ellipsize(stations[i].first, bw - 20 * s, std::min(30 * s * 0.46f, 18 * s)), true, cur)) {
       set.radioStation = i; radio.setVolume(set.radioVol); radio.play(stations[i].second); saveSettings();
     }
     py += 34 * s;
+  }
+  if (maxScroll > 0) {  // scrollbar
+    float sx = x + w - 28 * s;
+    if (button(sx, listY, 18 * s, 22 * s, "^")) radioScroll = std::max(0, radioScroll - 3);
+    if (button(sx, listY + listH - 26 * s, 18 * s, 22 * s, "v")) radioScroll = std::min(maxScroll, radioScroll + 3);
+    float ty = listY + 26 * s, th = listH - 56 * s, kh = std::max(20 * s, th * visible / stations.size());
+    g_ren.rect(sx + 7 * s, ty, 4 * s, th, C_ACCENT, 0.15f, 2 * s);
+    g_ren.rect(sx + 5 * s, ty + (th - kh) * radioScroll / maxScroll, 8 * s, kh, C_ACCENT, 0.8f, 4 * s);
   }
   if (button(x + 14 * s, py + 4 * s, 120 * s, 30 * s, "Stop")) radio.stop();
   if (button(x + 150 * s, py + 4 * s, 40 * s, 30 * s, "-")) { set.radioVol = clampf(set.radioVol - 0.1f, 0, 1); radio.setVolume(set.radioVol); }
   g_ren.text(x + 200 * s, py + 10 * s, 15 * s, fmt("Vol %.0f%%", set.radioVol * 100), C_TEXT, 1);
   if (button(x + 290 * s, py + 4 * s, 40 * s, 30 * s, "+")) { set.radioVol = clampf(set.radioVol + 0.1f, 0, 1); radio.setVolume(set.radioVol); }
+  g_ren.text(x + w - 14 * s, py + 12 * s, 11 * s, fmt("%d STATIONS", (int)stations.size()), C_DIM, 0.8f, 2, false);
 }
 
 // ------------------------------------------------------------------ HUD

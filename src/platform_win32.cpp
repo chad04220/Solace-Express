@@ -157,30 +157,12 @@ static std::string userDir() {
   return d;
 }
 
-static void writeDefaultStations(const std::string& dir) {
-  std::string p = dir + "\\radio_stations.txt";
-  if (GetFileAttributesA(p.c_str()) != INVALID_FILE_ATTRIBUTES) return;
-  FILE* f = fopen(p.c_str(), "w");
-  if (!f) return;
-  fprintf(f, "# Air Xpress internet radio stations\n# One per line:  Name|URL   (MP3 or AAC HTTP/HTTPS streams)\n"
-             "SomaFM Groove Salad (ambient)|https://ice1.somafm.com/groovesalad-128-mp3\n"
-             "SomaFM Drone Zone|https://ice1.somafm.com/dronezone-128-mp3\n"
-             "SomaFM Secret Agent|https://ice1.somafm.com/secretagent-128-mp3\n"
-             "SomaFM Lush|https://ice1.somafm.com/lush-128-mp3\n"
-             "SomaFM Indie Pop Rocks|https://ice1.somafm.com/indiepop-128-mp3\n"
-             "Radio Paradise (eclectic)|https://stream.radioparadise.com/mp3-128\n"
-             "Radio Paradise Mellow|https://stream.radioparadise.com/mellow-128\n"
-             "KEXP Seattle|https://kexp-mp3-128.streamguys1.com/kexp128.mp3\n");
-  fclose(f);
-}
-
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   SetProcessDPIAware();
   timeBeginPeriod(1);
   static Game game;
   g_game = &game;
   game.saveDir = userDir();
-  writeDefaultStations(game.saveDir);
 
   WNDCLASSEXW wc = {sizeof(wc)};
   wc.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;

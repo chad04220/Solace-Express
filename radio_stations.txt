@@ -1,6 +1,7 @@
 # Air Xpress internet radio stations
-# One per line:  Name|URL   (MP3 or AAC HTTP/HTTPS streams)
-# The game copies this list to %APPDATA%\AirXpress\radio_stations.txt on first run - edit that copy to add your own.
+# stations-version 2
+# One per line:  Name|URL   (MP3 or AAC HTTP/HTTPS streams). Add your own below.
+# The game keeps its copy in %APPDATA%\AirXpress\radio_stations.txt - edit that one; new presets are merged in on updates.
 SomaFM Groove Salad (ambient)|https://ice1.somafm.com/groovesalad-128-mp3
 SomaFM Drone Zone|https://ice1.somafm.com/dronezone-128-mp3
 SomaFM Secret Agent|https://ice1.somafm.com/secretagent-128-mp3
@@ -9,3 +10,15 @@ SomaFM Indie Pop Rocks|https://ice1.somafm.com/indiepop-128-mp3
 Radio Paradise (eclectic)|https://stream.radioparadise.com/mp3-128
 Radio Paradise Mellow|https://stream.radioparadise.com/mellow-128
 KEXP Seattle|https://kexp-mp3-128.streamguys1.com/kexp128.mp3
+WNYC 93.9 New York - NPR news|https://fm939.wnyc.org/wnycfm
+WQXR 105.9 New York - classical|https://stream.wqxr.org/wqxr
+WFMU 91.1 Jersey City - freeform|https://stream0.wfmu.org/freeform-128k
+WBGO 88.3 Newark - jazz|https://wbgo.streamguys1.com/wbgo128
+WFUV 90.7 New York - indie & folk|https://onair.wfuv.org/onair-hi
+WXPN 88.5 Philadelphia - AAA|https://wxpnhi.xpn.org/xpnhi
+WBUR 90.9 Boston - NPR news|https://icecast-stream.wbur.org/wbur
+GBH 89.7 Boston - NPR news|https://wgbh-live.streamguys1.com/wgbh
+CRB 99.5 Boston - classical|https://wgbh-live.streamguys1.com/classical-hi
+WMBR 88.1 MIT Cambridge - college|https://wmbr.org:8002/hi
+WUNC 91.5 Chapel Hill - NPR news|https://wunc-ice.streamguys1.com/wunc-128-mp3
+WCPE 89.7 Raleigh - classical|https://audio-mp3.ibiblio.org/wcpe.mp3

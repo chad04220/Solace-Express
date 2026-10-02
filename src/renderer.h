@@ -16,6 +16,15 @@ struct PlaneVisual {
   float prop[2][4]; int propCount = 0;
 };
 
+struct WreckVisual {
+  int pieces = 0;               // > 0: draw these clipped pieces instead of the intact aircraft
+  vec3 pos[5]; float rot[5][9]; // piece centre (world) and body->world rotation
+  vec3 C[5], H[5];              // clip box (body coords) of each piece
+  int debris = 0;
+  float deb[16][4], debQ[16][4];  // chunk centre + size (negative = charred), orientation quaternion (w,x,y,z)
+  float crater[4] = {0, 0, 0, 0}; // x, z, radius, depth
+};
+
 struct FrameParams {
   vec3 camPos; vec3 camRight, camUp, camBack; float fovY = 1.0f;
   float time = 0;
@@ -23,6 +32,7 @@ struct FrameParams {
   float cloudCover = 0.3f, cloudBase = 1500, fogB = 0.0001f, wet = 0, snow = 0, lightning = 0, storm = 0;
   vec2 windOff;
   PlaneVisual plane;
+  WreckVisual wreck;
   vec3 landLightPos, landLightDir; float landLight = 0;
   float exposure = 1.0f, rainLens = 0, fade = 1, vignette = 0.6f;
 };

@@ -14,6 +14,9 @@ const int HMN = 1024;
 const float TEXEL = 78.125;
 const float PI = 3.14159265;
 uniform sampler2D uHM;
+uniform vec4 uCrater;  // impact crater: x, z, radius, depth (radius 0 = none)
+float craterH(vec2 p){ if (uCrater.z <= 0.0) return 0.0; float d = length(p - uCrater.xy)/uCrater.z; if (d > 1.8) return 0.0;
+  return -uCrater.w*max(1.0 - d*d, 0.0) + 0.22*uCrater.w*exp(-(d - 1.0)*(d - 1.0)*14.0); }
 float hash2i(ivec2 p){ uint h = uint(p.x)*0x8da6b343u + uint(p.y)*0xd8163841u; h ^= h>>13; h *= 0x5bd1e995u; h ^= h>>15; return float(h & 0xFFFFFFu)/16777216.0; }
 float hash1(float n){ return fract(sin(n)*43758.5453); }
 float hash3(vec3 p){ p = fract(p*0.3183099+0.1); p*=17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
@@ -89,6 +92,7 @@ float coverH(vec2 p, float g, vec4 b, out int kind){
     if (hash2i(ivec2(c.x*3+11, c.y*5-7)) < fd*0.9) {
       vec2 j = vec2(hash2i(c+ivec2(101,-31)), hash2i(c+ivec2(-57,77))) - 0.5;
       vec2 cc = (vec2(c) + 0.5 + j*0.3)*10.0;
+      if (uCrater.z > 0.0 && length(cc - uCrater.xy) < uCrater.z*1.7) return best;  // flattened by the impact
       float sp = hash2i(ivec2(c.x*13+1, c.y*7+3)), hv = hash2i(c+ivec2(-3,19));
       bool conifer = cold > 0.45 || g > 650.0 || sp < 0.18;
       bool palm = !conifer && lush > 0.85 && g < 70.0 && sp > 0.35;
@@ -130,6 +134,7 @@ float coverH(vec2 p, float g, vec4 b, out int kind){
 float terrainHF(vec2 p, int oct, float fade, float rayY){
   vec4 b = baseAt(p);
   float g = b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct);
+  if (uCrater.z > 0.0 && g > 0.3) { float cd = length(p - uCrater.xy)/uCrater.z; if (cd < 1.8) g += craterH(p); }
   // trees <= 18 m and rocks <= 7 m above land, sea stacks <= 44 m: above that the cover cannot be hit
   if (fade <= 0.001 || (b.y < 0.01 && g > 0.5) || rayY - g > (g < 0.3 ? 46.0 : 19.0)) return g;
   int k;
@@ -202,6 +207,10 @@ uniform sampler2D uData;  // static scene data: [0,64) roads, [64,192) box centr
 vec4 dataAt(int i){ return texelFetch(uData, ivec2(i, 0), 0); }
 // aircraft
 uniform int uPlaneOn; uniform vec3 uPlanePos; uniform mat3 uPlaneRot;
+// wreckage: pieces of the airframe, each the aircraft SDF clipped to a body-space box with its own transform
+uniform int uWreck; uniform vec3 uPcPos[5]; uniform mat3 uPcRot[5]; uniform vec3 uPcC[5]; uniform vec3 uPcH[5];
+uniform int uDebN; uniform vec4 uDeb[16]; uniform vec4 uDebQ[16];
+int gPI = -1; vec3 gPP; mat3 gPR; vec3 gPC;   // transform of the piece being traced / shaded
 uniform vec4 uM[24]; uniform vec4 uPS; uniform vec4 uCtl; uniform vec4 uPr; uniform vec4 uI0; uniform vec4 uI1; uniform vec4 uI2;
 uniform vec3 uColBase; uniform vec3 uColStripe;
 uniform vec4 uProp[2]; uniform int uPropCount;
@@ -571,40 +580,54 @@ R"(    sws = max(sws, abs(p.x) - phw*0.85);
   }
   return res;
 }
+vec2 mapPiece(vec3 p){ vec2 d = mapPlane(p); if (gPI >= 0) d.x = max(d.x, sdBox(p - uPcC[gPI], uPcH[gPI])); return d; }
 vec3 planeNormal(vec3 p){ const vec2 k = vec2(1,-1); float e = 0.0025;
-  return normalize(k.xyy*mapPlane(p+k.xyy*e).x + k.yyx*mapPlane(p+k.yyx*e).x + k.yxy*mapPlane(p+k.yxy*e).x + k.xxx*mapPlane(p+k.xxx*e).x); }
+  return normalize(k.xyy*mapPiece(p+k.xyy*e).x + k.yyx*mapPiece(p+k.yyx*e).x + k.yxy*mapPiece(p+k.yxy*e).x + k.xxx*mapPiece(p+k.xxx*e).x); }
 
 float planeBound(){ return max(uM[0].x, uM[9].x*2.0)*0.55 + 1.5; }
-vec2 tracePlane(vec3 ro, vec3 rd, float tmax){
-  if (uPlaneOn == 0) return vec2(-1.0);
-  vec3 oc = ro - uPlanePos; float br = planeBound();
+void pieceXf(int i){ gPI = i; if (i < 0) { gPP = uPlanePos; gPR = uPlaneRot; gPC = vec3(0.0); } else { gPP = uPcPos[i]; gPR = uPcRot[i]; gPC = uPcC[i]; } }
+vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
+  vec3 oc = ro - gPP;
   float b = dot(oc, rd), c = dot(oc,oc) - br*br, h = b*b - c;
   if (h < 0.0) return vec2(-1.0);
   h = sqrt(h); float t0 = max(-b-h, 0.0), t1 = min(-b+h, tmax);
   if (t0 > t1) return vec2(-1.0);
-  mat3 inv = transpose(uPlaneRot);
-  vec3 lo = inv*(ro - uPlanePos), ld = inv*rd;
+  mat3 inv = transpose(gPR);
+  vec3 lo = gPC + inv*(ro - gPP), ld = inv*rd;
   float t = t0;
   int steps = uPS.w > 0.5 ? 160 : 120;
   for (int i=0;i<160;i++){
     if (i >= steps) break;
-    vec2 d = mapPlane(lo + ld*t);
+    vec2 d = mapPiece(lo + ld*t);
     if (d.x < 0.0015*max(1.0, t*0.03)) return vec2(t, d.y);
     t += d.x*0.8;
     if (t > t1) break;
   }
   return vec2(-1.0);
 }
-float planeShadow(vec3 ro, vec3 rd){
-  if (uPlaneOn == 0) return 1.0;
-  vec3 oc = ro - uPlanePos; float br = planeBound();
+// Leaves gPI/gPP/gPR/gPC set to the piece that was hit (for shading)
+vec2 tracePlane(vec3 ro, vec3 rd, float tmax){
+  if (uPlaneOn == 0) return vec2(-1.0);
+  if (uWreck == 0) { pieceXf(-1); return tracePieceOnce(ro, rd, tmax, planeBound()); }
+  vec2 best = vec2(-1.0); int bi = 0;
+  for (int i = 0; i < 5; i++) {
+    if (i >= uWreck) break;
+    pieceXf(i);
+    vec2 h = tracePieceOnce(ro, rd, best.x > 0.0 ? best.x : tmax, length(uPcH[i]) + 0.3);
+    if (h.x > 0.0 && (best.x < 0.0 || h.x < best.x)) { best = h; bi = i; }
+  }
+  pieceXf(bi);
+  return best;
+}
+float pieceShadow(vec3 ro, vec3 rd, float br){
+  vec3 oc = ro - gPP;
   float b = dot(oc, rd), c = dot(oc,oc) - br*br, h = b*b - c;
   if (h < 0.0 || -b + sqrt(max(h,0.0)) < 0.0) return 1.0;
   h = sqrt(h); float t = max(-b-h, 0.0), t1 = -b+h;
-  mat3 inv = transpose(uPlaneRot); vec3 lo = inv*(ro - uPlanePos), ld = inv*rd;
+  mat3 inv = transpose(gPR); vec3 lo = gPC + inv*(ro - gPP), ld = inv*rd;
   float res = 1.0;
   for (int i=0;i<56;i++){
-    float d = mapPlane(lo + ld*t).x;
+    float d = mapPiece(lo + ld*t).x;
     res = min(res, 10.0*d/max(t,0.1));
     if (res < 0.01) return 0.0;
     t += clamp(d, 0.03, 2.0);
@@ -612,8 +635,15 @@ float planeShadow(vec3 ro, vec3 rd){
   }
   return clamp(res, 0.0, 1.0);
 }
-
-// ---------------------------------------------------------------- cockpit instruments (drawn on the panel face)
+float planeShadow(vec3 ro, vec3 rd){
+  if (uPlaneOn == 0) return 1.0;
+  int keep = gPI; vec3 kP = gPP; mat3 kR = gPR; vec3 kC = gPC;
+  float res = 1.0;
+  if (uWreck == 0) { pieceXf(-1); res = pieceShadow(ro, rd, planeBound()); }
+  else for (int i = 0; i < 5; i++) { if (i >= uWreck) break; pieceXf(i); res = min(res, pieceShadow(ro, rd, length(uPcH[i]) + 0.3)); }
+  gPI = keep; gPP = kP; gPR = kR; gPC = kC;
+  return res;
+}
 vec3 dialFace(vec2 d, float r, out bool inside){
   float rr = length(d)/r; inside = rr < 1.0;
   if (rr > 1.12) return vec3(-1.0);
@@ -765,7 +795,8 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
         float rr = length(d)/(r*0.85); float a = atan(d.x, d.y);
         if (rr > 0.84 && rr < 0.95 && a > 0.9 && a < 1.7) c = vec3(0.1, 0.7, 0.2);
         if (rr > 0.84 && rr < 0.95 && a > 1.7 && a < 1.8) c = vec3(0.9, 0.1, 0.1);
-        c += vec3(0.85)*ticks(d, r*0.85, 10.0, -2.36, 2.36, 0.8);
+)"
+R"(        c += vec3(0.85)*ticks(d, r*0.85, 10.0, -2.36, 2.36, 0.8);
         c = mix(c, vec3(0.95), needle(d, r*0.85, -2.36 + clamp(engF, 0.0, 1.1)*4.2, 0.85, 0.05));
       }
       return c;
@@ -1021,7 +1052,8 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bo
       if (abs(apronV - wid*0.5 - 45.0) < 0.3) m.alb = vec3(0.65,0.5,0.05);
       float st = mod(u + len*0.05, 45.0) - 22.5;
       if (abs(st) < 0.25 && apronV > wid*0.5 + 45.0 && apronV < apronEnd - 8.0) m.alb = vec3(0.65,0.5,0.05);
-      if (abs(st) < 6.0 && abs(apronV - apronEnd + 12.0) < 0.25) m.alb = vec3(0.7);
+)"
+R"(      if (abs(st) < 6.0 && abs(apronV - apronEnd + 12.0) < 0.25) m.alb = vec3(0.7);
       return;
     }
     if (apronV > wid*0.5 - 1.0 && apronV < off && (abs(u - len*0.28) < 11.0 || abs(u + len*0.38) < 11.0)) {
@@ -1229,6 +1261,19 @@ R"(    m.emit += vec3(1.0, 0.75, 0.4)*smoothstep(8.0, 0.0, length(corner))*uNigh
   // ---- airport surfaces
   vec2 auv; int ai = airportAt(p.xz, auv);
   if (ai >= 0) { bool onRw, paved; runwayMaterial(ai, auv, m, p, onRw, paved); }
+  // ---- impact crater: churned earth, scorched blast ring, smouldering embers in the pit
+  if (uCrater.z > 0.0) {
+    float cd = length(p.xz - uCrater.xy)/uCrater.z;
+    if (cd < 2.6) {
+      float nz = vnoise(p.xz*0.35) + 0.5*vnoise(p.xz*1.7);
+      float scorch = smoothstep(2.6, 1.1, cd*(0.8 + 0.35*nz));
+      vec3 dirt = mix(vec3(0.16, 0.12, 0.09), vec3(0.08, 0.065, 0.05), nz*0.7);
+      m.alb = mix(m.alb, dirt, smoothstep(1.25, 0.9, cd));
+      m.alb = mix(m.alb, vec3(0.02, 0.018, 0.016), scorch*0.85);
+      m.rough = mix(m.rough, 0.97, scorch); m.nrm = mix(m.nrm, vec3(0,0,1), scorch*0.5);
+      m.emit += vec3(1.0, 0.3, 0.05)*pow(clamp(vnoise(p.xz*2.5 + uTime*0.15)*smoothstep(0.55, 0.1, cd), 0.0, 1.0), 8.0)*2.0;
+    }
+  }
   // wet look in rain
   m.alb *= 1.0 - 0.35*uWet*(1.0-wSnow);
   m.rough = mix(m.rough, m.rough*0.35, uWet*(1.0-wSnow));
@@ -1327,6 +1372,23 @@ vec2 iBox(vec3 ro, vec3 rd, vec3 bmin, vec3 bmax, out vec3 n){
   return vec2(tN, tF);
 }
 // vertical capped cylinder (base centre c, radius r, height h)
+// small debris chunks: oriented boxes
+vec3 qrot(vec4 q, vec3 v){ vec3 u = q.yzw; vec3 tt = 2.0*cross(u, v); return v + q.x*tt + cross(u, tt); }
+float traceDebris(vec3 ro, vec3 rd, float tmax, out vec3 nOut, out float charred){
+  float best = -1.0; nOut = vec3(0,1,0); charred = 0.0;
+  for (int i = 0; i < 16; i++) {
+    if (i >= uDebN) break;
+    vec4 d = uDeb[i]; float sz = abs(d.w);
+    vec3 oc = ro - d.xyz; float b = dot(oc, rd), c = dot(oc, oc) - sz*sz*1.6, h = b*b - c;
+    if (h < 0.0) continue;
+    vec4 qi = vec4(uDebQ[i].x, -uDebQ[i].yzw);
+    vec3 lo = qrot(qi, ro - d.xyz), ld = qrot(qi, rd);
+    vec3 hs = sz*vec3(1.0, 0.18, 0.6), n;
+    vec2 tt = iBox(lo, ld, -hs, hs, n);
+    if (tt.x > 0.0 && tt.x < tt.y && tt.x < tmax && (best < 0.0 || tt.x < best)) { best = tt.x; nOut = qrot(uDebQ[i], n); charred = d.w < 0.0 ? 1.0 : 0.0; }
+  }
+  return best;
+}
 vec2 iVCyl(vec3 ro, vec3 rd, vec3 c, float r, float h, out vec3 n){
   vec2 o = ro.xz - c.xz; vec2 d = rd.xz;
   float a = dot(d,d), b = dot(o,d), cc = dot(o,o) - r*r;
@@ -1389,7 +1451,8 @@ float hitLot(vec3 ro, vec3 rd, Lot L, float tmax, out vec3 n, out vec4 info){
   float top = L.ground + 1.0 + L.wallH;
   vec3 nb; vec2 b = iBox(ro, rd, vec3(L.c.x - L.hw, L.ground, L.c.y - L.hd), vec3(L.c.x + L.hw, top, L.c.y + L.hd), nb);
   float best = tmax; float res = -1.0; info = vec4(0.0);
-  if (b.x < b.y && b.y > 0.0 && b.x < best && b.x > 0.0) { best = b.x; res = b.x; n = nb; info = vec4(float(L.type), L.seed, top, 0.0); }
+)"
+R"(  if (b.x < b.y && b.y > 0.0 && b.x < best && b.x > 0.0) { best = b.x; res = b.x; n = nb; info = vec4(float(L.type), L.seed, top, 0.0); }
   if (L.type == 0) {
     float ox = L.hw + 0.4, oz = L.hd + 0.4, rh = L.roofH;
     vec4 pl[7];
@@ -1525,6 +1588,9 @@ void main(){
   if (bh.x > 0.0 && bh.x < t) { t = bh.x; hit = 3; }
   if (tB > 0.0 && tB < t) { t = tB; hit = 5; }
   if (ph.x > 0.0 && ph.x < t) { t = ph.x; hit = 4; }
+  vec3 dn; float dChar = 0.0;
+  float tD = uDebN > 0 ? traceDebris(ro, rd, t < 1e8 ? t : tmax, dn, dChar) : -1.0;
+  if (tD > 0.0 && tD < t) { t = tD; hit = 6; }
   vec3 col;
   if (hit == 0) { col = skyColor(rd); t = 1e6; }
   else {
@@ -1607,12 +1673,21 @@ R"(          if (abs(lh.y) < 0.5) m.alb = vec3(0.8, 0.15, 0.1);
       vec3 ns = applyTS(nn, m.nrm, 0.5);
       float sh = sunVis > 0.0 ? terrainShadow(p + nn*0.3, uSunDir, t) : 0.0;
       col = shadeSurface(p, ns, rd, m, sh*cloudShadow(p));
+    } else if (hit == 6) {
+      // debris chunk: torn painted skin or charred metal
+      vec3 nT; vec4 tx = triSample(p*2.0, dn, M_METAL, 1.0, nT);
+      Mat m; m.metal = 0.5; m.emit = vec3(0.0); m.nrm = nT;
+      float burn = vnoise(p.xz*3.0 + p.y);
+      m.alb = dChar > 0.5 ? vec3(0.03, 0.028, 0.026)*(0.6 + burn) : uColBase*tx.rgb*(0.3 + 0.4*burn);
+      m.rough = dChar > 0.5 ? 0.9 : 0.45;
+      float sh = sunVis > 0.0 ? terrainShadow(p + dn*0.05, uSunDir, t) : 0.0;
+      col = shadeSurface(p, applyTS(dn, m.nrm, 0.4), rd, m, sh);
     } else {
-      // aircraft
-      mat3 inv = transpose(uPlaneRot);
-      vec3 lp = inv*(p - uPlanePos);
+      // aircraft (or one wreck piece: gP* hold the transform of the piece that was hit)
+      mat3 inv = transpose(gPR);
+      vec3 lp = gPC + inv*(p - gPP);
       vec3 ln = planeNormal(lp);
-      vec3 n = uPlaneRot*ln;
+      vec3 n = gPR*ln;
       int mid = int(ph.y + 0.5);
       if (mid == 11) { vec3 sc = fusSection(lp.z); vec3 rad = vec3(lp.x, lp.y - sc.z, 0.0); if (dot(ln, rad) > 0.55*length(rad) && lp.y > uM[22].y - 0.9) mid = 1; }
       Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
@@ -1714,6 +1789,13 @@ R"(          if (abs(lh.y) < 0.5) m.alb = vec3(0.8, 0.15, 0.1);
         else if (mid == 12) { tx = triSample(lp, ln, ck == 2 ? M_LEATHER : M_FABRIC, 0.35, nT); m.alb = tx.rgb*(ck == 2 ? 1.2 : 1.0); m.rough = tx.a; m.nrm = nT; }
         else if (mid == 13 || mid == 14) { tx = triSample(lp, ln, M_PLASTIC, 0.2, nT); m.alb = tx.rgb*(mid == 14 ? 0.3 : 0.6); m.rough = mix(tx.a, 0.9, mid == 14 ? 0.6 : 0.0); m.nrm = nT; }
       }
+      if (uWreck > 0) {  // fire-blackened, buckled skin with a few glowing embers near the breaks
+        float burn = vnoise(lp.xz*2.3 + lp.y*1.7) + 0.5*vnoise(lp.yz*5.1);
+        float cut = 1.0 - smoothstep(0.0, 0.6, -sdBox(lp - uPcC[gPI], uPcH[gPI]));
+        float k = clamp(0.25 + 0.55*burn + 0.5*cut, 0.0, 1.0);
+        m.alb = mix(m.alb, vec3(0.025, 0.022, 0.02), k); m.rough = mix(m.rough, 0.95, k); m.metal *= 1.0 - k;
+        m.emit += vec3(1.0, 0.32, 0.06)*pow(clamp(burn*cut*0.9, 0.0, 1.0), 5.0)*(1.5 + sin(uTime*7.0 + lp.x*9.0))*3.0;
+      }
       n = applyTS(n, m.nrm, interior ? 0.35 : 0.12);
       float sh = sunVis > 0.0 ? planeShadow(p + n*0.02, uSunDir) * terrainShadow(p, uSunDir, 50.0) * cloudShadow(p) : 0.0;
       if (interior) {
@@ -1728,7 +1810,7 @@ R"(          if (abs(lh.y) < 0.5) m.alb = vec3(0.8, 0.15, 0.1);
     col = applyFog(col, ro, rd, t);
   }
   // propeller discs (motion-blurred), composited over scene
-  if (uPlaneOn == 1) {
+  if (uPlaneOn == 1 && uWreck == 0) {
     mat3 inv = transpose(uPlaneRot);
     vec3 lo = inv*(ro - uPlanePos), ld = inv*rd;
     for (int i=0;i<2;i++){

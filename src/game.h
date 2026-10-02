@@ -100,6 +100,15 @@ private:
 
   // effects
   std::vector<Particle> particles;
+  // crash wreckage: rigid pieces of the airframe, small debris chunks and the impact crater
+  struct WreckPiece { vec3 c, v, w; quat q; vec3 C, H; bool rest; float fire; };
+  struct Debris { vec3 p, v, w; quat q; float size; bool charred, rest; };
+  std::vector<WreckPiece> wreck;
+  std::vector<Debris> debris;
+  float craterX = 0, craterZ = 0, craterR = 0, craterD = 0;
+  void breakUp(vec3 impactVel, bool water);
+  void updateWreck(float dt);
+  float wreckGround(float x, float z) const;
   struct RingBurst { vec3 c, ax, ay, col; float t; };
   std::vector<RingBurst> bursts;   // checkpoint shockwaves
   float sparkAccum = 0;
@@ -129,6 +138,7 @@ private:
   // ---------------------------------------------------------------- helpers
   void loadSettings(); void saveSettings();
   void loadStations();
+  int radioScroll = 0;
   void saveGame();
   void toast(const std::string& s, vec3 col = vec3(1, 1, 1));
   void startFlight(const Contract& c, int spec, Career::Source src);
