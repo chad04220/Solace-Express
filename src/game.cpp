@@ -363,12 +363,13 @@ void Game::updateFlight(float dt) {
   cloudOff = cloudOff + vec2(-sinf(wx.windFrom * DEG), cosf(wx.windFrom * DEG)) * (wx.windSpeed * 2.f * simDt);
 
   {
-    // g-force tunnel: onset where a pilot starts to feel it, full near the airframe's limit (the XR-9's damped cell
-    // tolerates far more); negative g reddens the edges too. Builds in ~0.3 s, recovers over ~1.5 s
+    // g-force tunnel: a faint red tint from the first noticeable g that slowly closes into the full ring as the load
+    // nears the airframe's limit (regular aircraft 1.8 -> 6 g, the XR-9's damped cell 4 -> 50 g; negative g from
+    // -0.5 g). It builds over ~1 s and recovers over ~1.5 s
     bool jet = plane.spec->special != 0;
-    float gp = smoothstepf(jet ? 12.f : 3.f, jet ? 50.f : 5.8f, plane.gLoad), gn = smoothstepf(jet ? -6.f : -0.8f, jet ? -25.f : -3.f, plane.gLoad);
+    float gp = smoothstepf(jet ? 4.f : 1.8f, jet ? 50.f : 6.f, plane.gLoad), gn = smoothstepf(jet ? -2.f : -0.5f, jet ? -25.f : -3.f, plane.gLoad);
     float target = crashed ? 0.f : std::max(gp, gn);
-    gTunnel = approach(gTunnel, target, target > gTunnel ? 3.f : 0.7f, dt);
+    gTunnel = approach(gTunnel, target, target > gTunnel ? 1.2f : 0.7f, dt);
   }
   if (crashed) {
     crashTimer += dt;

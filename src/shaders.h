@@ -2036,22 +2036,25 @@ void main(){
   // research jet cockpit: display screens show the outside world (re-traced without the airframe); the rest of
   // the sealed pod hides everything beyond it
   bool onScr = false; int scrId = 0; vec3 scrL = vec3(0.0);
+  // pod = a pixel on the sealed cockpit's interior: it is shaded from the cockpit alone, and nothing outside the
+  // aircraft (terrain, water, buildings, clouds, shadows) is traced for it. Only the display screens see out.
+  bool pod = false; vec2 h0 = vec2(-1.0);
   if (uPlaneOn == 1 && uPS.w > 0.5 && int(uM[0].z + 0.5) == 5 && uWreck == 0) {
-    vec2 h0 = tracePlane(ro, rd, 6.0);
+    h0 = tracePlane(ro, rd, 6.0);
     if (h0.x > 0.0) {
       int id0 = int(h0.y + 0.5);
       if (id0 >= 41 && id0 <= 43) { onScr = true; scrId = id0; scrL = transpose(uPlaneRot)*(ro + rd*h0.x - uPlanePos); }
-      else tmax = h0.x + 0.05;
+      else { pod = true; tmax = h0.x + 0.05; }
     }
   }
-  float tT = traceTerrain(ro, rd, tmax);
-  float tW = (rd.y < 0.0 && ro.y > 0.0) ? -ro.y/rd.y : -1.0;
+  float tT = pod ? -1.0 : traceTerrain(ro, rd, tmax);
+  float tW = (!pod && rd.y < 0.0 && ro.y > 0.0) ? -ro.y/rd.y : -1.0;
   vec3 bn; float bkind = 0.0; vec3 bl;
-  vec2 bh = traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
-  vec2 ph = onScr ? vec2(-1.0) : tracePlane(ro, rd, tmax);
+  vec2 bh = pod ? vec2(-1.0) : traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
+  vec2 ph = onScr ? vec2(-1.0) : (pod ? h0 : tracePlane(ro, rd, tmax));
   float tSoFar = min(tT > 0.0 ? tT : (tW > 0.0 ? tW : tmax), tmax);
   vec3 tn; vec4 tinfo;
-  float tB = traceTowns(ro, rd, tSoFar, tn, tinfo);
+  float tB = pod ? -1.0 : traceTowns(ro, rd, tSoFar, tn, tinfo);
   float t = 1e9; int hit = 0;
   if (tT > 0.0) { t = tT; hit = 1; }
   if (tW > 0.0 && tW < t) { t = tW; hit = 2; }
@@ -2059,7 +2062,7 @@ void main(){
   if (tB > 0.0 && tB < t) { t = tB; hit = 5; }
   if (ph.x > 0.0 && ph.x < t) { t = ph.x; hit = 4; }
   vec3 dn; float dChar = 0.0;
-  float tD = uDebN > 0 ? traceDebris(ro, rd, t < 1e8 ? t : tmax, dn, dChar) : -1.0;
+  float tD = uDebN > 0 && !pod ? traceDebris(ro, rd, t < 1e8 ? t : tmax, dn, dChar) : -1.0;
   if (tD > 0.0 && tD < t) { t = tD; hit = 6; }
   vec3 col;
   float taaFlag = hit == 4 ? (uWreck > 0 ? 0.2 : 0.5) : (hit == 6 ? 0.2 : 1.0);   // 1 world, 0.5 rigid with the aircraft, 0.2 moving, 0 no history
@@ -2109,15 +2112,15 @@ void main(){
       float ex = mix(900.0, 40.0, rough/0.6);
       float spec = pow(max(dot(n, h), 0.0), ex)*(ex + 8.0)/(900.0 + 8.0)*120.0 + pow(max(dot(n,h),0.0), 90.0*(1.0 - rough))*1.5;
       col = mix(lit, refl, fres) + uSunCol*spec*sh*(1.0 - smoothstep(0.5, 1.0, uCloudCover));
-      // night: runway/town light reflections handled by overlay pass glow
+)"
+R"(      // night: runway/town light reflections handled by overlay pass glow
     } else if (hit == 3 || hit == 5) {
       Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1); m.rough = 0.7; m.alb = vec3(0.7);
       vec3 nn = hit == 3 ? bn : tn;
       vec3 nTS = vec3(0,0,1);
       if (hit == 5) m = buildingMaterial(p, nn, tinfo);
       else {
-)"
-R"(        int k = int(bkind + 0.5); vec3 lh = bl; vec3 H = dataAt(192 + int(bh.y)).xyz;
+        int k = int(bkind + 0.5); vec3 lh = bl; vec3 H = dataAt(192 + int(bh.y)).xyz;
         if (k == 0) {        // arched hangar: corrugated metal skin, big sliding doors facing the runway
           vec4 tx = triSample(lh*vec3(1.0, 1.0, 1.0), nn, M_CORRUGATED, 2.0, nTS);
           m.alb = tx.rgb*vec3(0.75, 0.78, 0.8); m.rough = tx.a; m.metal = 0.7; m.nrm = nTS;
@@ -2262,12 +2265,12 @@ R"(        int k = int(bkind + 0.5); vec3 lh = bl; vec3 H = dataAt(192 + int(bh.
           if (max(pl.x, pl.y) > 0.49) m.alb *= 0.55;
           if (mid == 31 && abs(lp.x) > 4.6) m.alb = mix(m.alb, uColStripe*0.6, 0.6);
           if (mid == 30 && lp.z < -8.0) m.alb = vec3(0.03);              // radar nose cap
-        } else if (mid == 32) { m.alb = vec3(0.3, 0.2, 0.06); m.metal = 0.95; m.rough = 0.06; }
+)"
+R"(        } else if (mid == 32) { m.alb = vec3(0.3, 0.2, 0.06); m.metal = 0.95; m.rough = 0.06; }
         else if (mid == 33) {
           tx = triSample(lp, ln, M_METAL, 0.8, nT); m.alb = tx.rgb*vec3(0.2, 0.19, 0.2); m.metal = 0.6; m.rough = 0.5; m.nrm = nT;
           float heat = uCtl.w*uCtl.w;
-)"
-R"(          m.alb = mix(m.alb, vec3(0.16, 0.11, 0.17), 0.4*heat);   // heat-tinted titanium
+          m.alb = mix(m.alb, vec3(0.16, 0.11, 0.17), 0.4*heat);   // heat-tinted titanium
         } else if (mid == 34) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = uColStripe*(1.2 + 2.0*uNight)*pulse; }
         else if (mid == 35) { m.alb = vec3(0.06); m.metal = 0.8; m.rough = 0.35; m.emit = vec3(0.25, 0.6, 1.0)*uPS.y*uCtl.w*2.5; }
         else if (mid == 36) { float ab = uFlame.y, sp = uFlame.x; m.alb = vec3(0.02); m.emit = mix(vec3(0.35, 0.6, 1.0), vec3(1.0, 0.82, 0.6), ab)*(0.3 + 9.0*sp*sp + 16.0*ab); }
@@ -2366,7 +2369,7 @@ R"(          m.alb = mix(m.alb, vec3(0.16, 0.11, 0.17), 0.4*heat);   // heat-tin
         m.emit += vec3(1.0, 0.32, 0.06)*pow(clamp(burn*cut*0.9, 0.0, 1.0), 5.0)*(1.5 + sin(uTime*7.0 + lp.x*9.0))*3.0;
       }
       n = applyTS(n, m.nrm, interior ? 0.35 : 0.12);
-      float sh = sunVis > 0.0 ? planeShadow(p + n*0.02, uSunDir) * terrainShadow(p, uSunDir, 50.0) * cloudShadow(p) : 0.0;
+      float sh = sunVis > 0.0 && mid < 40 ? planeShadow(p + n*0.02, uSunDir) * terrainShadow(p, uSunDir, 50.0) * cloudShadow(p) : 0.0;   // the sealed pod sees no sun
       if (mid >= 40) {  // sealed research cockpit: lit only by its displays and LED strips
         vec3 v = -rd;
         vec3 Li = cockpitLight(lp, ln, E.xyz);
@@ -2384,7 +2387,7 @@ R"(          m.alb = mix(m.alb, vec3(0.16, 0.11, 0.17), 0.4*heat);   // heat-tin
         col += uSunCol*pow(max(dot(n, h), 0.0), 400.0)*sh*3.0*float(mid <= 5);
       }
     }
-    col = applyFog(col, ro, rd, t);
+    if (!pod) col = applyFog(col, ro, rd, t);
   }
   // propeller discs (motion-blurred), composited over scene
   if (uPlaneOn == 1 && uWreck == 0) {
@@ -2410,7 +2413,8 @@ R"(          m.alb = mix(m.alb, vec3(0.16, 0.11, 0.17), 0.4*heat);   // heat-tin
   // research jet exhaust plumes (additive, depth-limited by the scene)
   if (uPlaneOn == 1 && uWreck == 0 && uPS.w < 0.5 && int(uM[0].z + 0.5) == 5) col += jetPlumes(ro, rd, t, jitter);
   // clouds
-  vec4 cl = traceClouds(ro, rd, t, jitter);
+)"
+R"(  vec4 cl = pod ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(ro, rd, t, jitter);
   col = col*cl.a + cl.rgb;
   if (onScr) col = jetScreen(col, rd, scrId, scrL);
   if (any(isnan(col)) || any(isinf(col)) || !(col.r + col.g + col.b < 1e7)) col = vec3(0.0);

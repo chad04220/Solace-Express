@@ -76,7 +76,7 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 | F3 | Performance readout (fps, GPU time, resolution) | |
 | Enter / Space (after a crash) | Skip the crash sequence | A |
 
-Pull hard and the edges of the screen close in red, turning dark red and then black as the g load approaches what the airframe can take (negative g reddens them too); the XR-9's damped cell tolerates far more before it starts.
+Pull g and the edges of the screen take on a faint red tint that slowly closes in, deepening to dark red and then black as the load approaches what the airframe can take (from about 1.8 g in regular aircraft; negative g reddens them too). The XR-9's damped cell starts at 4 g and only reaches the full ring near 50 g.
 
 Menus work with the mouse or a gamepad. On a gamepad, the left stick (or D-pad) moves an on-screen cursor, **A** clicks, **B** backs out (like Esc), and the right stick scrolls lists. Moving the real mouse hands control straight back to it.
 
