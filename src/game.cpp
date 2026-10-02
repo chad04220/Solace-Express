@@ -311,6 +311,8 @@ void Game::flightControls(float dt) {
     c.roll = approach(c.roll, tr, rate, dt);
   }
   (void)manual;
+  // XR-11 weapons hot: the bumpers fire and bomb, so the rudder is frozen until weapons are safe again
+  if (plane.spec->special == 2 && wraith.armed && !plane.onGround) { yawIn = 0; padY = 0; }
   c.yaw = approach(c.yaw, clampf(yawIn + padY, -1, 1), 4.f, dt);
   // throttle
   float thr = 0;
@@ -739,7 +741,7 @@ void Game::launchResearch() {
   researchFlight = true;
   toasts.clear();
   toast(wr ? "XR-11 WRAITH // RESEARCH FLIGHT" : "XR-9 SPECTER // RESEARCH FLIGHT", wr ? vec3(0.75f, 0.45f, 1.f) : vec3(0.4f, 0.9f, 1));
-  if (wr) toast("X cloak   Y lasers   LMB / Enter fire   Backspace / MMB plasma bomb", vec3(0.85f, 0.7f, 1.f));
+  if (wr) toast("X cloak   Y weapons hot   LMB / Enter or RB fire   Backspace / MMB or LB bomb", vec3(0.85f, 0.7f, 1.f));
   if (resAirborne) {
     const Airport& a = g_world.airports[resAirport];
     vec3 p = plane.pos + a.dir() * 1500.f; p.y = std::max(a.elev, g_world.height(p.x, p.z)) + 900.f;

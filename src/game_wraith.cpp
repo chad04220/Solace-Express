@@ -36,15 +36,21 @@ void Game::wraithControls(float dt) {
     toast(W.cloakOn ? "CLOAK ENGAGED" : "CLOAK DISENGAGED", vec3(0.75f, 0.45f, 1.f));
     g_audio.trigger(SFX_CLOAK, W.cloakOn ? 1.f : 0.7f);
   }
-  // Y: deploy / stow the laser turrets (firing deploys them too)
-  if (in.pressed['Y']) { W.armed = !W.armed; toast(W.armed ? "WEAPONS HOT - laser turrets deployed" : "WEAPONS SAFE - turrets stowed", vec3(1.f, 0.35f, 0.4f)); g_audio.trigger(SFX_GEAR_CLUNK, 0.5f); }
-  // fire: left mouse or Enter held (gamepad A in the air)
-  bool fire = (in.mDown[0] && !showMap) || (in.down[K_ENTER] && !showMap) || (air && in.pad && (in.buttons & PAD_A));
-  if (fire && !W.armed) { W.armed = true; g_audio.trigger(SFX_GEAR_CLUNK, 0.5f); }
+  // Y (keyboard or gamepad, in the air on the pad): weapons hot - the laser turrets drop out and the bomb bay opens.
+  // Y again: weapons safe - bay closed, turrets stowed. While hot the gamepad bumpers are the triggers, not the rudder.
+  if (in.pressed['Y'] || (air && (in.buttonsPressed & PAD_Y))) {
+    W.armed = !W.armed;
+    toast(W.armed ? "WEAPONS HOT - lasers out, bomb bay open  (RB fire, LB bomb)" : "WEAPONS SAFE - bay closed, lasers stowed", vec3(1.f, 0.35f, 0.4f));
+    g_audio.trigger(SFX_GEAR_CLUNK, 0.6f);
+  }
+  // fire: left mouse or Enter held, or the right bumper while weapons are hot
+  bool padHot = air && in.pad && W.armed;
+  bool fire = (in.mDown[0] && !showMap) || (in.down[K_ENTER] && !showMap) || (padHot && (in.buttons & PAD_RB));
+  if (fire && !W.armed) { W.armed = true; g_audio.trigger(SFX_GEAR_CLUNK, 0.6f); }
   W.laserCD -= dt;
   if (fire && W.lasers > 0.97f && W.laserCD <= 0) { fireLaser(); W.laserCD = 0.12f; }
-  // bombs: Backspace, middle mouse (gamepad Y in the air) - each press queues a drop
-  if (in.pressed[K_BACK] || in.mPressed[2] || (air && (in.buttonsPressed & PAD_Y))) {
+  // bombs: Backspace, middle mouse, or the left bumper while weapons are hot - each press queues a drop
+  if (in.pressed[K_BACK] || in.mPressed[2] || (padHot && (in.buttonsPressed & PAD_LB))) {
     if (W.bombQueue < 3) W.bombQueue++;
   }
 }
@@ -135,7 +141,7 @@ void Game::updateWraith(float dt) {
   W.laserGlow = std::max(0.f, W.laserGlow - dt * 9.f);
   // bomb bay: open for queued drops, release when the doors are clear, a new bomb condenses in the cradle
   if (!wr) W.bombQueue = 0;
-  bool wantOpen = W.bombQueue > 0 || W.bayHold > 0;
+  bool wantOpen = W.bombQueue > 0 || W.bayHold > 0 || (wr && W.armed && !plane.onGround);   // weapons hot: bay stays open
   W.bay = clampf(W.bay + (wantOpen ? 3.f : -2.f) * dt, 0.f, 1.f);
   W.bayHold = std::max(0.f, W.bayHold - dt);
   W.bombLoaded = std::min(1.f, W.bombLoaded + dt / 0.8f);

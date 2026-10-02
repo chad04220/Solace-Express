@@ -973,7 +973,7 @@ void Game::drawHud(const FrameParams& fp) {
     const vec3 VIO(0.8f, 0.5f, 1.f);
     erow("PODS", fmt("%.0f deg%s", plane.nozzle * 90, plane.nozzle > 0.99f ? "  VTOL" : "")); erow("MACH", fmt("%.2f", plane.mach));
     erow("CLOAK", wraith.stealth > 0.99f ? "ACTIVE" : wraith.stealth > 0.01f ? fmt("%s %.0f%%", wraith.cloakOn ? "SPREADING" : "FADING", wraith.stealth * 100) : "OFF  (X)", wraith.stealth > 0.01f ? VIO : C_DIM);
-    erow("LASERS", wraith.lasers > 0.97f ? "HOT" : wraith.lasers > 0.01f ? "DEPLOYING" : "STOWED  (Y)", wraith.lasers > 0.97f ? C_BAD : C_DIM);
+    erow("WEAPONS", wraith.lasers > 0.97f ? "HOT  (RB / LB)" : wraith.lasers > 0.01f ? "DEPLOYING" : "SAFE  (Y)", wraith.lasers > 0.97f ? C_BAD : C_DIM);
     erow("PLASMA", wraith.bay > 0.05f ? "BAY OPEN" : wraith.bombLoaded >= 1.f ? "READY  (BKSP)" : "CONDENSING", wraith.bombLoaded >= 1.f ? VIO : C_WARN);
   }
   else if (sp.special) { erow("NOZZLE", fmt("%.0f deg%s", plane.nozzle * 90, plane.nozzle > 0.99f ? "  VTOL" : "")); erow("MACH", fmt("%.2f", plane.mach)); }
@@ -1347,9 +1347,9 @@ void Game::drawResearch() {
                          "Mach 1 sets off a sonic boom - try it low over the sea",
                          "C cockpit view: you fly on the displays only"};
   const char* notesW[] = {"F / V   tilt the pods: 0 = forward flight, 90 = hover",
-                          "X cloak    Y deploy / stow the laser turrets",
-                          "LMB or Enter fires the lasers (gamepad A)",
-                          "Backspace / MMB drops a plasma bomb (gamepad Y)",
+                          "X cloak    Y weapons hot / safe (lasers + bomb bay)",
+                          "Fire: LMB or Enter (gamepad RB while hot)",
+                          "Bomb: Backspace / MMB (gamepad LB while hot)",
                           "Slow and low on power the controls go soft: the pods",
                           "fly it. The airframe holds +90 / -45 g."};
   const char* const* notes = wrc ? notesW : notesJ;
