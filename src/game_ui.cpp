@@ -196,6 +196,7 @@ void Game::drawMenu() {
     if (button(60 * s, y, bw, bh, "Continue Career", true, true)) { screen = SCR_HUB; career.refreshBoard(); }
     y += bh + 14 * s;
   }
+  if (in.pressed[K_ESC]) confirmNew = false;
   if (!confirmNew) {
     if (button(60 * s, y, bw, bh, "New Career", true, !hasSave)) { if (hasSave) confirmNew = true; else { career.newGame(); saveGame(); screen = SCR_HUB; } }
   } else {
@@ -1181,6 +1182,7 @@ void Game::drawResearch() {
   float by = ly + lh - 70 * s;
   if (button(qx, by, 160 * s, 48 * s, "Back") || in.pressed[K_ESC]) { screen = SCR_MENU; return; }
   if (button(rx + rw - 24 * s - 280 * s, by, 280 * s, 48 * s, "LAUNCH XR-9", true, true) || in.pressed[K_ENTER]) launchResearch();
+  g_ren.text(qx, by - 26 * s, 12 * s, "GAMEPAD:  L-STICK CURSOR   A SELECT   B BACK   LB / RB SITE   START LAUNCH", C_DIM, 0.8f * e, 0, false);
   // blinking classification footer
   if (fmodf(realTime, 1.2f) < 0.8f) g_ren.text(W * 0.5f, H - 28 * s, 12 * s, "UNAUTHORISED ACCESS IS A FEDERAL OFFENCE  //  THIS SESSION IS NOT RECORDED IN YOUR LOGBOOK", RED, 0.8f * e, 1, false);
 }

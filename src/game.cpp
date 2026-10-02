@@ -534,6 +534,59 @@ void Game::updateCamera(float dt) {
   if (camPos.y < gh) camPos.y = gh;
 }
 
+// ------------------------------------------------------------------ gamepad menus
+// Outside active flight the left stick drives an on-screen cursor: A clicks, B backs out (same as Esc),
+// the right stick scrolls lists. Any real mouse movement hands control back to the mouse.
+void Game::gamepadMenus(float dt) {
+  if (fabsf(in.mdx) + fabsf(in.mdy) > 0.5f) padCursorT = -100.f;
+  bool menus = screen != SCR_FLIGHT || paused || crashed;
+  if (!in.pad || !menus) { if (padHoldA && !(in.buttons & PAD_A)) { in.mDown[0] = false; padHoldA = false; } return; }
+  auto dz = [](float v) { return fabsf(v) < 0.15f ? 0.f : (v - (v > 0 ? 0.15f : -0.15f)) / 0.85f; };
+  float sx = dz(in.lx), sy = dz(in.ly);
+  if (in.buttons & (PAD_LEFT | PAD_RIGHT | PAD_UP | PAD_DOWN)) {  // D-pad nudges the cursor too
+    sx += ((in.buttons & PAD_RIGHT) ? 0.6f : 0.f) - ((in.buttons & PAD_LEFT) ? 0.6f : 0.f);
+    sy += ((in.buttons & PAD_UP) ? 0.6f : 0.f) - ((in.buttons & PAD_DOWN) ? 0.6f : 0.f);
+  }
+  bool active = fabsf(sx) + fabsf(sy) > 0 || (in.buttonsPressed & (PAD_A | PAD_B));
+  if (active) {
+    if (padCursorT < realTime - 50.f) { in.mx = g_ren.W * 0.5f; in.my = g_ren.H * 0.5f; }   // first use: start centred
+    padCursorT = realTime;
+  }
+  float speed = 1100.f * S() * dt;
+  in.mx = clampf(in.mx + sx * fabsf(sx) * speed * 1.4f + sx * speed * 0.3f, 0.f, (float)g_ren.W - 1);
+  in.my = clampf(in.my - sy * fabsf(sy) * speed * 1.4f - sy * speed * 0.3f, 0.f, (float)g_ren.H - 1);
+  if (in.buttonsPressed & PAD_A) { in.mPressed[0] = true; in.mDown[0] = true; padHoldA = true; }
+  if (padHoldA && !(in.buttons & PAD_A)) { in.mDown[0] = false; in.mReleased[0] = true; padHoldA = false; }
+  if (in.buttonsPressed & PAD_B) {
+    in.pressed[K_ESC] = true;
+    if (screen == SCR_DEBRIEF) in.pressed[K_ENTER] = true;   // B on the results screen continues to the hub
+  }
+  float ry = dz(in.ry);
+  if (ry != 0) { static float acc = 0; acc += ry * dt * 8.f; while (fabsf(acc) >= 1.f) { in.wheel += acc > 0 ? 1.f : -1.f; acc -= acc > 0 ? 1.f : -1.f; } }
+  // research menu: D-pad also steps through launch sites, Start launches
+  if (screen == SCR_RESEARCH) {
+    int n = (int)g_world.airports.size();
+    if (in.buttonsPressed & PAD_START) in.pressed[K_ENTER] = true;
+    if (in.buttonsPressed & PAD_RB) resAirport = (resAirport + 1) % n;
+    if (in.buttonsPressed & PAD_LB) resAirport = (resAirport + n - 1) % n;
+  }
+}
+
+void Game::drawPadCursor() {
+  if (!in.pad || realTime - padCursorT > 6.f) return;
+  if (screen == SCR_FLIGHT && !paused && !crashed) return;
+  float s = S(), x = in.mx, y = in.my;
+  float pulse = 0.5f + 0.5f * sinf(realTime * 5.f);
+  bool down = in.mDown[0];
+  g_ren.glow(x - 9 * s, y - 9 * s, 18 * s, 18 * s, vec3(0.32f, 0.86f, 1.f), 0.35f + 0.2f * pulse, 9 * s, 10 * s);
+  g_ren.rectOutline(x - 11 * s, y - 11 * s, 22 * s, 22 * s, vec3(0.32f, 0.86f, 1.f), 0.9f, 11 * s, 2 * s);
+  g_ren.rect(x - (down ? 5.f : 3.f) * s, y - (down ? 5.f : 3.f) * s, (down ? 10.f : 6.f) * s, (down ? 10.f : 6.f) * s, vec3(1, 1, 1), 1, 5 * s);
+  for (int i = 0; i < 4; i++) {
+    float a = i * 1.5708f + realTime * 0.8f;
+    g_ren.line(x + cosf(a) * 14 * s, y + sinf(a) * 14 * s, x + cosf(a) * 19 * s, y + sinf(a) * 19 * s, 2 * s, vec3(0.32f, 0.86f, 1.f), 0.8f);
+  }
+}
+
 // ------------------------------------------------------------------ XR-9 research flights
 void Game::launchResearch() {
   Contract c;
@@ -1018,7 +1071,7 @@ void Game::feedAudio() {
   AudioParams ap;
   ap.master = set.master; ap.engineVol = set.engineVol; ap.sfxVol = set.sfxVol;
   static bool muffled = false;
-  if (in.pressed['M'] || (in.buttonsPressed & PAD_LS)) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
+  if (in.pressed['M'] || (screen == SCR_FLIGHT && !paused && (in.buttonsPressed & PAD_LS))) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
   ap.muffled = muffled;
   if (screen == SCR_FLIGHT && plane.spec && !crashed) {
     const AircraftSpec& s = *plane.spec;
@@ -1062,13 +1115,19 @@ void Game::update(float dt) {
   while (!toasts.empty() && toasts.front().t > 5.f) toasts.erase(toasts.begin());
   hubMsgTime = std::max(0.f, hubMsgTime - dt);
   if (in.pressed[K_F11]) wantFullscreenToggle = true;
-  if (screen == SCR_MENU && in.down['U'] && in.down['I'] && (in.pressed['U'] || in.pressed['I'])) {
+  gamepadMenus(dt);
+  bool padCombo = in.pad && (in.buttons & PAD_LS) && (in.buttons & PAD_RS) && (in.buttonsPressed & (PAD_LS | PAD_RS));
+  if (screen == SCR_MENU && ((in.down['U'] && in.down['I'] && (in.pressed['U'] || in.pressed['I'])) || padCombo)) {
     screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP);
   }
   if (in.pressed['R'] && screen == SCR_FLIGHT) showRadio = !showRadio;
   radio.poll();
   if (screen == SCR_FLIGHT) {
-    if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_START)) { if (showMap) showMap = false; else if (showRadio) showRadio = false; else { paused = !paused; settingsFromPause = false; } }
+    if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_START)) {
+      if (showMap) showMap = false; else if (showRadio) showRadio = false;
+      else if (paused && settingsFromPause && !(in.buttonsPressed & PAD_START)) settingsFromPause = false;   // B / Esc: back to the pause menu
+      else { paused = !paused; settingsFromPause = false; }
+    }
     if (in.pressed['N']) { showMap = !showMap; g_audio.trigger(SFX_CLICK); }
     if (in.pressed[K_TAB]) { showMinimap = !showMinimap; toast(showMinimap ? "Minimap shown" : "Minimap hidden"); }
     if (in.pressed['H']) hudOn = !hudOn;
@@ -1103,6 +1162,7 @@ void Game::render() {
     case SCR_RESEARCH: drawResearch(); break;
   }
   drawToasts();
+  drawPadCursor();
   g_ren.uiEnd();
 }
 
@@ -1111,6 +1171,25 @@ void Game::debugScene(const std::string& name) {
   career.newGame(); career.license = LIC_ATP;
   if (name == "menu") { screen = SCR_MENU; realTime = 20; return; }
   if (name == "hub") { screen = SCR_HUB; realTime = 20; return; }
+  if (name == "pad") {  // gamepad menu navigation self-test
+    auto frame = [&](unsigned btn) { in.pad = true; in.buttonsPressed = btn & ~in.buttons; in.buttons = btn; realTime += 1 / 30.f; update(1 / 30.f); render(); in.endFrame(); };
+    screen = SCR_MENU; realTime = 20;
+    frame(PAD_LS | PAD_RS); frame(0);
+    printf("pad: combo -> research menu: %s\n", screen == SCR_RESEARCH ? "ok" : "FAIL");
+    for (int i = 0; i < 50; i++) frame(0);           // let the access sequence finish
+    int site = resAirport; frame(PAD_RB); frame(0);
+    printf("pad: RB steps launch site: %s\n", resAirport == (site + 1) % (int)g_world.airports.size() ? "ok" : "FAIL");
+    frame(PAD_B); frame(0);
+    printf("pad: B backs out to main menu: %s\n", screen == SCR_MENU ? "ok" : "FAIL");
+    screen = SCR_HUB; hubTab = 0; frame(0);
+    float s = S(); float tx = 20 * s + 1 * (150 * s + 10 * s) + 75 * s, ty = 76 * s + 19 * s;
+    in.lx = 1.f; float x0 = in.mx; frame(0); in.lx = 0;
+    printf("pad: stick moves cursor: %s\n", in.mx > x0 ? "ok" : "FAIL");
+    in.mx = tx; in.my = ty; frame(PAD_A); frame(0);
+    printf("pad: A clicks the Hangar tab: %s\n", hubTab == 1 ? "ok" : "FAIL");
+    in.lx = 0.5f; frame(0); in.lx = 0; in.mx = g_ren.W * 0.5f; in.my = g_ren.H * 0.4f;
+    return;
+  }
   if (name == "research") { screen = SCR_RESEARCH; realTime = 20; resOpened = 15; return; }
   if (name == "rjet" || name == "rjetc" || name == "rhover" || name == "rjetl") { realTime = 20; resAirborne = name != "rhover"; launchResearch(); if (name == "rjetc" || name == "rjetl") camMode = 1; if (name == "rhover") { plane.ctl.flaps = 1; flapNotch = 1; plane.flaps = plane.nozzle = 1; plane.ctl.throttle = 0.7f; plane.engineRunning = true; plane.engineSpool = 0.7f; } for (int i = 0; i < 90; i++) { realTime += 1 / 30.f; update(1 / 30.f); } toasts.clear(); if (name == "rjetl") lookYaw = 1.75f; return; }
   if (name == "radio") { loadStations(); screen = SCR_HUB; showRadio = true; realTime = 20; radioScroll = 6; return; }

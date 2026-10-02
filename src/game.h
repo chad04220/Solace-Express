@@ -175,6 +175,10 @@ private:
   bool researchFlight = false;
   int resAirport = 0, resWx = 0; bool resAirborne = true; float resTime = 12.f, resOpened = 0;
   float prevMach = 0;
+  // gamepad-driven menu cursor (left stick moves, A clicks, B backs out)
+  float padCursorT = -100.f; bool padHoldA = false;
+  void gamepadMenus(float dt);
+  void drawPadCursor();
   void drawResearch();
   void launchResearch();
   void jetEffects(float dt);
