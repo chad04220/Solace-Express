@@ -1713,8 +1713,14 @@ float traceTowns(vec3 ro, vec3 rd, float tmax, out vec3 nOut, out vec4 info){
 // kinds: 0 arched hangar, 1 control tower, 2 terminal, 3 gabled shed, 4 fuel tank, 5 radome
 vec2 traceBoxes(vec3 ro, vec3 rd, float tmax, out vec3 nOut, out float kind, out vec3 localHit){
   float best = tmax; vec2 res = vec2(-1.0);
-  for (int i=0;i<128;i++){
-    if (i >= uBoxCount) break;
+  // buildings are stored per airport: skip every airport whose world bounds the ray misses (most of them)
+  for (int ap = 0; ap < 16; ap++) {
+    if (ap >= uApCount) break;
+    vec4 A0 = dataAt(384 + ap), A1 = dataAt(400 + ap);   // xyz bounds, w = first box / box count
+    vec3 nap; vec2 ab = iBox(ro, rd, A0.xyz, A1.xyz, nap);
+    if (ab.x > ab.y || ab.y < 0.0 || ab.x > best || A1.w < 0.5) continue;
+    int i0 = int(A0.w + 0.5), i1 = i0 + int(A1.w + 0.5);
+  for (int i = i0; i < i1; i++){
     vec4 BC = dataAt(64 + i), BH = dataAt(192 + i);
     int ai = int(BC.w);
     vec4 a = uAp[ai];
@@ -1756,15 +1762,15 @@ vec2 traceBoxes(vec3 ro, vec3 rd, float tmax, out vec3 nOut, out float kind, out
       vec3 nc; vec2 r = iConvex(lo, ld, pl, 7, nc);
       if (r.x < r.y && r.y > 0.0) { tHit = r.x; nl = nc; }
     } else if (k == 4) {
-      vec3 n1; vec2 c1 = iVCyl(lo, ld, vec3(0.0, -H.y, 0.0), H.x, H.y*2.0, n1);
+)"
+R"(      vec3 n1; vec2 c1 = iVCyl(lo, ld, vec3(0.0, -H.y, 0.0), H.x, H.y*2.0, n1);
       if (c1.x < c1.y && c1.y > 0.0) { tHit = c1.x; nl = n1; }
     } else if (k == 5) {
       vec3 n1; vec2 c1 = iVCyl(lo, ld, vec3(0.0, -H.y, 0.0), H.x*0.4, H.y*1.1, n1);
       if (c1.x < c1.y && c1.x > 0.0) { tHit = c1.x; nl = n1; }
       vec3 sc = vec3(0.0, -H.y + H.y*1.1 + H.x*0.8, 0.0);
       vec3 oc = lo - sc; float b = dot(oc, ld), cc = dot(oc, oc) - H.x*H.x, h = b*b - cc;
-)"
-R"(      if (h > 0.0) { float ts = -b - sqrt(h); if (ts > 0.0 && ts < tHit) { tHit = ts; nl = normalize(lo + ld*ts - sc); } }
+      if (h > 0.0) { float ts = -b - sqrt(h); if (ts > 0.0 && ts < tHit) { tHit = ts; nl = normalize(lo + ld*ts - sc); } }
     } else {
       if (bb.x > 0.0) { tHit = bb.x; nl = nb; }
     }
@@ -1773,6 +1779,7 @@ R"(      if (h > 0.0) { float ts = -b - sqrt(h); if (ts > 0.0 && ts < tHit) { tH
       nOut = vec3(nl.x*c + nl.z*s, nl.y, nl.x*s - nl.z*c);
       localHit = lo + ld*tHit;
     }
+  }
   }
   return res;
 }
@@ -1933,15 +1940,15 @@ vec3 jetScreen(vec3 col, vec3 rd, int id, vec3 sl){
     float hd = mod(degrees(atan(rd.x, -rd.z)) + 360.0, 360.0);
     if (h.y > 0.335 && h.y < 0.365 && abs(h.x) < 0.38) {
       float f10 = abs(fract(hd/10.0 + 0.5) - 0.5)*10.0;
-      float tall = abs(fract(hd/30.0 + 0.5) - 0.5)*30.0 < 0.5 ? 1.0 : 0.0;
+)"
+R"(      float tall = abs(fract(hd/30.0 + 0.5) - 0.5)*30.0 < 0.5 ? 1.0 : 0.0;
       hud = max(hud, step(f10*0.01745, px*0.8)*step(h.y, 0.35 + 0.015*tall));
     }
     hud = max(hud, hudNum(h - vec2(-0.044, 0.372), uHud.z, 3, vec2(0.022, 0.04)));
     hud = max(hud, hudBox(h, vec2(0.0, 0.392), vec2(0.056, 0.03), px));
     // airspeed (kt) and altitude (ft) boxes, Mach and G below, nozzle angle and throttle readouts
     hud = max(hud, hudBox(h, vec2(-0.36, 0.0), vec2(0.075, 0.03), px));
-)"
-R"(    hud = max(hud, hudNum(h - vec2(-0.418, -0.02), uHud.x*1.94384, 4, vec2(0.022, 0.04)));
+    hud = max(hud, hudNum(h - vec2(-0.418, -0.02), uHud.x*1.94384, 4, vec2(0.022, 0.04)));
     hud = max(hud, hudBox(h, vec2(0.38, 0.0), vec2(0.092, 0.03), px));
     hud = max(hud, hudNum(h - vec2(0.305, -0.02), uHud.y*3.28084, 5, vec2(0.022, 0.04)));
     hud = max(hud, hudNum(h - vec2(-0.41, -0.085), uHud.w*100.0, 3, vec2(0.014, 0.025)));
@@ -2109,13 +2116,13 @@ void main(){
       vec3 nTS = vec3(0,0,1);
       if (hit == 5) m = buildingMaterial(p, nn, tinfo);
       else {
-        int k = int(bkind + 0.5); vec3 lh = bl; vec3 H = dataAt(192 + int(bh.y)).xyz;
+)"
+R"(        int k = int(bkind + 0.5); vec3 lh = bl; vec3 H = dataAt(192 + int(bh.y)).xyz;
         if (k == 0) {        // arched hangar: corrugated metal skin, big sliding doors facing the runway
           vec4 tx = triSample(lh*vec3(1.0, 1.0, 1.0), nn, M_CORRUGATED, 2.0, nTS);
           m.alb = tx.rgb*vec3(0.75, 0.78, 0.8); m.rough = tx.a; m.metal = 0.7; m.nrm = nTS;
           if (abs(bn.y) < 0.6 && abs(lh.z) < H.z*0.85 && lh.y < H.y*0.2 && abs(abs(lh.x) - H.x) < 0.3) {
-)"
-R"(            m.alb = vec3(0.35, 0.4, 0.45); if (fract(lh.z/4.0) < 0.03) m.alb *= 0.5; }
+            m.alb = vec3(0.35, 0.4, 0.45); if (fract(lh.z/4.0) < 0.03) m.alb *= 0.5; }
         } else if (k == 1) { // control tower: concrete shaft, glass cab
           float Ht = H.y*2.0, yy = lh.y + H.y;
           vec4 tx = triSample(lh, nn, M_CONCRETE, 3.0, nTS); m.alb = tx.rgb; m.rough = tx.a; m.nrm = nTS;
@@ -2259,12 +2266,12 @@ R"(            m.alb = vec3(0.35, 0.4, 0.45); if (fract(lh.z/4.0) < 0.03) m.alb 
         else if (mid == 33) {
           tx = triSample(lp, ln, M_METAL, 0.8, nT); m.alb = tx.rgb*vec3(0.2, 0.19, 0.2); m.metal = 0.6; m.rough = 0.5; m.nrm = nT;
           float heat = uCtl.w*uCtl.w;
-          m.alb = mix(m.alb, vec3(0.16, 0.11, 0.17), 0.4*heat);   // heat-tinted titanium
+)"
+R"(          m.alb = mix(m.alb, vec3(0.16, 0.11, 0.17), 0.4*heat);   // heat-tinted titanium
         } else if (mid == 34) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = uColStripe*(1.2 + 2.0*uNight)*pulse; }
         else if (mid == 35) { m.alb = vec3(0.06); m.metal = 0.8; m.rough = 0.35; m.emit = vec3(0.25, 0.6, 1.0)*uPS.y*uCtl.w*2.5; }
         else if (mid == 36) { float ab = uFlame.y, sp = uFlame.x; m.alb = vec3(0.02); m.emit = mix(vec3(0.35, 0.6, 1.0), vec3(1.0, 0.82, 0.6), ab)*(0.3 + 9.0*sp*sp + 16.0*ab); }
-)"
-R"(        else if (mid == 40) {  // sealed pod: carbon weave between structural ribs
+        else if (mid == 40) {  // sealed pod: carbon weave between structural ribs
           vec2 wv = floor(vec2(lp.x + lp.z, lp.y - lp.z)*55.0);
           m.alb = vec3(0.03, 0.032, 0.036)*(0.8 + 0.4*mod(wv.x + wv.y, 2.0)); m.rough = 0.35; m.metal = 0.2;
           float rib = abs(fract((lp.z - E.z)*4.0) - 0.5);
@@ -2507,6 +2514,7 @@ void main(){
 static const char* kTaaFS = R"(#version 330 core
 in vec2 vUV; layout(location=0) out vec4 oHist; layout(location=1) out vec4 oColor;
 uniform sampler2D uRaw; uniform sampler2D uDepth; uniform sampler2D uHist; uniform vec2 uRes; uniform float uHistValid;
+uniform vec2 uRawRes; uniform vec2 uJit;   // ray-trace resolution (<= uRes: temporal upscaling) and this frame's jitter
 uniform vec3 uCamPos; uniform mat3 uCamRot; uniform vec3 uPrevCamPos; uniform mat3 uPrevCamRot; uniform float uTanHalf; uniform float uAspect;
 uniform vec3 uPlanePos; uniform mat3 uPlaneRot; uniform vec3 uPrevPlanePos; uniform mat3 uPrevPlaneRot;
 vec3 toY(vec3 c){ c = c/(1.0 + max(c.r, max(c.g, c.b))); return vec3(0.25*c.r + 0.5*c.g + 0.25*c.b, 0.5*c.r - 0.5*c.b, -0.25*c.r + 0.5*c.g - 0.25*c.b); }
@@ -2522,12 +2530,16 @@ vec3 histCR(vec2 uv){
   return max(r/ws, vec3(0.0));
 }
 void main(){
-  ivec2 ip = ivec2(gl_FragCoord.xy);
+  // the raw frame was traced at a lower resolution, offset by this frame's jitter: reconstruct it at this pixel
+  bool up = uRawRes.x < uRes.x - 0.5;
+  vec2 ruv = vUV - uJit;
+  ivec2 ip = up ? clamp(ivec2(floor(ruv*uRawRes)), ivec2(0), ivec2(uRawRes) - 1) : ivec2(gl_FragCoord.xy);
   vec4 cur = texelFetch(uRaw, ip, 0);
   float flag = cur.a;
+  if (up) cur.rgb = texture(uRaw, ruv).rgb;
   vec3 m1 = vec3(0.0), m2 = vec3(0.0), cy = toY(cur.rgb);
   for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
-    vec3 y = toY(texelFetch(uRaw, clamp(ip + ivec2(i, j), ivec2(0), ivec2(uRes) - 1), 0).rgb);
+    vec3 y = toY(texelFetch(uRaw, clamp(ip + ivec2(i, j), ivec2(0), ivec2(uRawRes) - 1), 0).rgb);
     m1 += y; m2 += y*y;
   }
   m1 /= 9.0; vec3 sd = sqrt(max(m2/9.0 - m1*m1, 0.0));

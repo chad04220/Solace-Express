@@ -53,6 +53,7 @@ public:
 
   bool init(int w, int h);
   void resize(int w, int h);
+  void setRenderScale(float s);   // ray-trace resolution only: the TAA history stays at display resolution, no pop
   void renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites);
   mat4 viewProj(const FrameParams& fp) const;
   bool project(const FrameParams& fp, vec3 p, float& sx, float& sy) const;  // to window pixels
@@ -81,6 +82,11 @@ private:
   // temporal AA: the ray tracer writes texRaw; the resolve blends it with the reprojected history into texHist[cur] + texColor
   GLuint texRaw = 0, texHist[2] = {0, 0}, fboTAA[2] = {0, 0};
   int histIdx = 0, frameNo = 0; bool histValid = false;
+  // GPU frame time from a ring of timer queries (read a few frames late so the CPU never waits on them)
+  GLuint gpuQ[4] = {0, 0, 0, 0}; bool gpuQUsed[4] = {false, false, false, false}; int gpuQi = 0;
+public:
+  float gpuMs = -1.f;   // last measured GPU time of renderScene, ms (-1 = not known yet)
+private:
   vec3 prevCamPos, prevPlanePos; float prevCamRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1}, prevPlaneRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
   GLuint fboBloom[2] = {0, 0}, texBloom[2] = {0, 0};
   int rw = 0, rh = 0, bw = 0, bh = 0;
@@ -89,6 +95,8 @@ private:
   GLuint curImg = 0;
   void flushUI();
   void createTargets();
+  void createRenderTargets();
+  float jitX = 0, jitY = 0;
   void genMaterials();
   void genMinimap();
 };

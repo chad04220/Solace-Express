@@ -326,8 +326,31 @@ bool Renderer::init(int w, int h) {
       d[192 + i] = {b.h.x, b.h.y, b.h.z, (float)b.kind};
     }
     for (int i = 0; i < (int)townB.size(); i++) { d[320 + i] = townB[i]; d[352 + i] = townY[i]; }
+    // [384,400) / [400,416): world bounds of each airport's buildings + their box range (lets the shader skip airports)
+    d.resize(416, V4{0, 0, 0, 0});
+    int nb = std::min(128, (int)g_world.boxes.size());
+    for (int ap = 0; ap < 16 && ap < (int)g_world.airports.size(); ap++) {
+      const Airport& A = g_world.airports[ap];
+      float s = sinf(A.heading * DEG), c = cosf(A.heading * DEG);
+      vec3 lo(1e9f, 1e9f, 1e9f), hi(-1e9f, -1e9f, -1e9f); int first = -1, count = 0;
+      for (int i = 0; i < nb; i++) {
+        const Box& b = g_world.boxes[i];
+        if (b.airport != ap) continue;
+        if (first < 0) first = i;
+        count = i - first + 1;
+        float r = length(vec3(b.h.x * 2.f, 0, b.h.z * 2.f)) + 2.f;   // generous: towers/radomes, rotation
+        for (int k = 0; k < 4; k++) {
+          float lx = b.c.x + ((k & 1) ? r : -r), lz = b.c.z + ((k & 2) ? r : -r);
+          // inverse of the shader's airport frame: local (x, z) -> world
+          float wx = A.x + lx * c + lz * s, wz = A.z + lx * s - lz * c;
+          lo.x = std::min(lo.x, wx); hi.x = std::max(hi.x, wx); lo.z = std::min(lo.z, wz); hi.z = std::max(hi.z, wz);
+        }
+        lo.y = std::min(lo.y, A.elev + b.c.y - b.h.y * 1.3f - 2.f); hi.y = std::max(hi.y, A.elev + b.c.y + b.h.y * 1.3f + 2.f);
+      }
+      if (first >= 0) { d[384 + ap] = {lo.x, lo.y, lo.z, (float)first}; d[400 + ap] = {hi.x, hi.y, hi.z, (float)count}; }
+    }
     glGenTextures(1, &texData); glBindTexture(GL_TEXTURE_2D, texData);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 384, 1, 0, GL_RGBA, GL_FLOAT, d.data());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, (GLsizei)d.size(), 1, 0, GL_RGBA, GL_FLOAT, d.data());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   }
@@ -363,27 +386,34 @@ static void makeTex(GLuint& t, int w, int h, GLenum ifmt, GLenum fmt, GLenum typ
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
-void Renderer::createTargets() {
+// Render-resolution targets: the ray tracer's colour (+ TAA class in alpha) and depth
+void Renderer::createRenderTargets() {
   rw = std::max(64, (int)(W * renderScale)); rh = std::max(64, (int)(H * renderScale));
-  makeTex(texColor, rw, rh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
+  makeTex(texRaw, rw, rh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
   makeTex(texDepth, rw, rh, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST);
-  makeTex(texRaw, rw, rh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST);
+  if (!fboScene) glGenFramebuffers(1, &fboScene);
+  glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texRaw, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texDepth, 0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+// Display-resolution targets: TAA history + the upscaled scene that sprites, bloom and the composite work on
+void Renderer::createTargets() {
+  createRenderTargets();
+  makeTex(texColor, W, H, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
   for (int i = 0; i < 2; i++) {
-    makeTex(texHist[i], rw, rh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
+    makeTex(texHist[i], W, H, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
     if (!fboTAA[i]) glGenFramebuffers(1, &fboTAA[i]);
     glBindFramebuffer(GL_FRAMEBUFFER, fboTAA[i]);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texHist[i], 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texColor, 0);
   }
   histValid = false;
-  if (!fboScene) glGenFramebuffers(1, &fboScene);
-  glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texRaw, 0);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texDepth, 0);
   if (!fboSprite) glGenFramebuffers(1, &fboSprite);
   glBindFramebuffer(GL_FRAMEBUFFER, fboSprite);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColor, 0);
-  bw = std::max(16, rw / 4); bh = std::max(16, rh / 4);
+  bw = std::max(16, W / 4); bh = std::max(16, H / 4);
   for (int i = 0; i < 2; i++) {
     makeTex(texBloom[i], bw, bh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
     if (!fboBloom[i]) glGenFramebuffers(1, &fboBloom[i]);
@@ -391,6 +421,12 @@ void Renderer::createTargets() {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texBloom[i], 0);
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Renderer::setRenderScale(float s) {
+  if (fabsf(s - renderScale) < 1e-4f) return;
+  renderScale = s;
+  if (ok) createRenderTargets();
 }
 
 void Renderer::resize(int w, int h) {
@@ -419,6 +455,15 @@ bool Renderer::project(const FrameParams& fp, vec3 p, float& sx, float& sy) cons
 }
 
 void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites) {
+  if (!gpuQ[0]) glGenQueries(4, gpuQ);
+  {
+    int rq = (gpuQi + 1) % 4;   // issued three frames ago
+    if (gpuQUsed[rq]) {
+      GLint avail = 0; glGetQueryObjectiv(gpuQ[rq], GL_QUERY_RESULT_AVAILABLE, &avail);
+      if (avail) { GLuint64 ns = 0; glGetQueryObjectui64v(gpuQ[rq], GL_QUERY_RESULT, &ns); gpuMs = (float)(ns * 1e-6); gpuQUsed[rq] = false; }
+    }
+  }
+  glBeginQuery(GL_TIME_ELAPSED, gpuQ[gpuQi]);
   // ------------------------------------------------ ray trace
   glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
   GLenum bufs[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
@@ -438,7 +483,8 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   frameNo++;
   auto halton = [](int i, int b) { float f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i /= b; } return r; };
   int hi = (frameNo % 8) + 1;
-  glUniform2f(U(p, "uJit"), (halton(hi, 2) - 0.5f) / rw, (halton(hi, 3) - 0.5f) / rh);
+  jitX = (halton(hi, 2) - 0.5f) / rw; jitY = (halton(hi, 3) - 0.5f) / rh;
+  glUniform2f(U(p, "uJit"), jitX, jitY);
   glUniform1f(U(p, "uSeed"), fmodf(frameNo * 0.618034f, 1.f));
   glUniform3f(U(p, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
   float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};
@@ -518,11 +564,14 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     if (length(fp.camPos - prevCamPos) > 400.f) histValid = false;   // camera cut
     glBindFramebuffer(GL_FRAMEBUFFER, fboTAA[cur]);
     glDrawBuffers(2, bufs);
+    glViewport(0, 0, W, H);
     glUseProgram(progTAA);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texRaw); glUniform1i(U(progTAA, "uRaw"), 0);
     glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progTAA, "uDepth"), 1);
     glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D, texHist[histIdx]); glUniform1i(U(progTAA, "uHist"), 2);
-    glUniform2f(U(progTAA, "uRes"), (float)rw, (float)rh);
+    glUniform2f(U(progTAA, "uRes"), (float)W, (float)H);
+    glUniform2f(U(progTAA, "uRawRes"), (float)rw, (float)rh);
+    glUniform2f(U(progTAA, "uJit"), jitX, jitY);
     glUniform1f(U(progTAA, "uHistValid"), histValid ? 1.f : 0.f);
     glUniform3f(U(progTAA, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
     glUniformMatrix3fv(U(progTAA, "uCamRot"), 1, GL_FALSE, cr);
@@ -545,14 +594,14 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   // ------------------------------------------------ sprites
   glBindFramebuffer(GL_FRAMEBUFFER, fboSprite);
   GLenum one = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &one);
-  glViewport(0, 0, rw, rh);
+  glViewport(0, 0, W, H);
   glEnable(GL_BLEND);
   glUseProgram(progSprite);
   mat4 vp = viewProj(fp);
   glUniformMatrix4fv(U(progSprite, "uViewProj"), 1, GL_FALSE, vp.m);
   glUniform3f(U(progSprite, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progSprite, "uDepth"), 0);
-  glUniform2f(U(progSprite, "uRes"), (float)rw, (float)rh);
+  glUniform2f(U(progSprite, "uRes"), (float)W, (float)H);
   glUniform3f(U(progSprite, "uSunDir"), fp.sunDir.x, fp.sunDir.y, fp.sunDir.z);
   glUniform3f(U(progSprite, "uSunCol"), fp.sunCol.x, fp.sunCol.y, fp.sunCol.z);
   float amb = 0.08f + 0.35f * clampf(fp.sunDir.y + 0.1f, 0, 1);
@@ -579,7 +628,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glBindFramebuffer(GL_FRAMEBUFFER, fboBloom[0]);
   glUseProgram(progBright);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texColor);
-  glUniform1i(U(progBright, "uTex"), 0); glUniform2f(U(progBright, "uTexel"), 1.f / rw * 1.5f, 1.f / rh * 1.5f);
+  glUniform1i(U(progBright, "uTex"), 0); glUniform2f(U(progBright, "uTexel"), 1.f / W * 1.5f, 1.f / H * 1.5f);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glUseProgram(progBlur);
   glUniform1i(U(progBlur, "uTex"), 0);
@@ -609,6 +658,8 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform1f(U(progPost, "uSunVisible"), vis ? (1.f - smoothstepf(0.5f, 0.9f, fp.cloudCover)) * smoothstepf(-0.02f, 0.1f, fp.sunDir.y) : 0.f);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);
+  glEndQuery(GL_TIME_ELAPSED);
+  gpuQUsed[gpuQi] = true; gpuQi = (gpuQi + 1) % 4;
 }
 
 // ------------------------------------------------------------------ UI

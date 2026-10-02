@@ -73,6 +73,7 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 | H | Toggle HUD | |
 | Esc | Pause menu (restart, settings, abandon) | Start |
 | F11 / Alt+Enter | Fullscreen | |
+| F3 | Performance readout (fps, GPU time, resolution) | |
 | Enter / Space (after a crash) | Skip the crash sequence | A |
 
 Pull hard and the edges of the screen close in red, turning dark red and then black as the g load approaches what the airframe can take (negative g reddens them too); the XR-9's damped cell tolerates far more before it starts.
@@ -118,7 +119,8 @@ The presets include SomaFM, Radio Paradise and KEXP, plus free US East Coast pub
 
 - Windows 10 or 11, 64-bit
 - A GPU with OpenGL 3.3 (anything from roughly 2012 on). A mid-range GPU from the last 5–6 years is recommended for 1080p.
-- **Dynamic resolution** lowers the internal ray-tracing resolution automatically to stay above about 40 fps. You can also set the resolution scale and Low/Medium/High quality in Settings.
+- **60 fps.** The game runs locked to 60 Hz: vsync on 60/120/240 Hz displays (adaptive where the driver supports it, so a late frame tears once instead of dropping to 30), and a precise frame limiter on other refresh rates.
+- **Dynamic resolution** measures the GPU time of every frame and scales the internal ray-tracing resolution (50% up to the *Max render resolution* setting) to keep it within a 60 fps budget. Temporal anti-aliasing upscales the result to full display resolution, so the changes are seamless. Press **F3** for a frame-rate / GPU-time / resolution readout. Low/Medium/High quality is in Settings.
 
 Save data, settings and the radio list live in `%APPDATA%\AirXpress`.
 

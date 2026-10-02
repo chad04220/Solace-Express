@@ -12,8 +12,12 @@
 typedef unsigned int GLenum; typedef unsigned char GLboolean; typedef unsigned int GLbitfield; typedef void GLvoid;
 typedef int GLint; typedef unsigned int GLuint; typedef int GLsizei; typedef float GLfloat; typedef char GLchar;
 typedef ptrdiff_t GLsizeiptr; typedef ptrdiff_t GLintptr; typedef unsigned char GLubyte;
+typedef unsigned long long GLuint64;
 
 #define GL_FALSE 0
+#define GL_TIME_ELAPSED 0x88BF
+#define GL_QUERY_RESULT 0x8866
+#define GL_QUERY_RESULT_AVAILABLE 0x8867
 #define GL_TRUE 1
 #define GL_TRIANGLES 0x0004
 #define GL_UNSIGNED_BYTE 0x1401
@@ -133,7 +137,12 @@ typedef ptrdiff_t GLsizeiptr; typedef ptrdiff_t GLintptr; typedef unsigned char 
   X(void, glBindFramebuffer, (GLenum, GLuint)) \
   X(void, glFramebufferTexture2D, (GLenum, GLenum, GLenum, GLuint, GLint)) \
   X(GLenum, glCheckFramebufferStatus, (GLenum)) \
-  X(void, glDrawBuffers, (GLsizei, const GLenum*))
+  X(void, glDrawBuffers, (GLsizei, const GLenum*)) \
+  X(void, glGenQueries, (GLsizei, GLuint*)) \
+  X(void, glBeginQuery, (GLenum, GLuint)) \
+  X(void, glEndQuery, (GLenum)) \
+  X(void, glGetQueryObjectiv, (GLuint, GLenum, GLint*)) \
+  X(void, glGetQueryObjectui64v, (GLuint, GLenum, GLuint64*))
 
 // Function pointers live in a namespace so they never clash with the system GL library's exports.
 namespace glf {

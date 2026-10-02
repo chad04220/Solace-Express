@@ -18,6 +18,27 @@
 #define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
 typedef HGLRC(WINAPI* PFNWGLCREATECONTEXTATTRIBSARBPROC)(HDC, HGLRC, const int*);
 typedef BOOL(WINAPI* PFNWGLSWAPINTERVALEXTPROC)(int);
+typedef const char*(WINAPI* PFNWGLGETEXTENSIONSSTRINGEXTPROC)(void);
+
+// ------------------------------------------------------------------ 60 Hz frame pacing
+// On 60/120/180/240 Hz displays vsync runs every 1st/2nd/3rd/4th refresh (adaptive when WGL_EXT_swap_control_tear is
+// available, so a late frame tears once instead of halving to 30 fps); on other refresh rates a precise software
+// limiter holds 60 fps.
+static PFNWGLSWAPINTERVALEXTPROC s_swapInterval = nullptr;
+static bool s_tear = false;
+static int s_vsyncDiv = 0;   // > 0: swap interval that gives 60 Hz; 0: software limiter
+static void setupPacing(HWND hwnd) {
+  int hz = 60;
+  MONITORINFOEXA mi; mi.cbSize = sizeof mi;
+  if (GetMonitorInfoA(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi)) {
+    DEVMODEA dm; ZeroMemory(&dm, sizeof dm); dm.dmSize = sizeof dm;
+    if (EnumDisplaySettingsA(mi.szDevice, ENUM_CURRENT_SETTINGS, &dm) && dm.dmDisplayFrequency > 1) hz = (int)dm.dmDisplayFrequency;
+  }
+  int div = 0;
+  for (int d = 1; d <= 4; d++) if (abs(hz - 60 * d) <= 1) div = d;
+  s_vsyncDiv = s_swapInterval ? div : 0;
+  if (s_swapInterval) s_swapInterval(s_vsyncDiv ? (s_tear ? -s_vsyncDiv : s_vsyncDiv) : 0);
+}
 
 // ------------------------------------------------------------------ XInput (loaded dynamically)
 struct XGamepad { WORD wButtons; BYTE bLeftTrigger, bRightTrigger; SHORT sThumbLX, sThumbLY, sThumbRX, sThumbRY; };
@@ -59,11 +80,12 @@ static LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   Input* in = g_game ? &g_game->in : nullptr;
   switch (msg) {
     case WM_CLOSE: if (g_game) g_game->quit = true; return 0;
+    case WM_DISPLAYCHANGE: case WM_EXITSIZEMOVE: if (s_swapInterval || !s_vsyncDiv) setupPacing(h); break;   // refresh rate / monitor may have changed
     case WM_SIZE: if (g_ren.ok) g_ren.resize(LOWORD(lp), HIWORD(lp)); return 0;
     case WM_KEYDOWN: case WM_SYSKEYDOWN:
       if (in && wp < 256) { if (!(lp & (1 << 30))) in->pressed[wp] = true; in->down[wp] = true; }
       if (wp == VK_F10 || wp == VK_MENU) return 0;
-      if (msg == WM_SYSKEYDOWN && wp == VK_RETURN) { toggleFullscreen(); return 0; }
+      if (msg == WM_SYSKEYDOWN && wp == VK_RETURN) { toggleFullscreen(); setupPacing(h); return 0; }
       break;
     case WM_KEYUP: case WM_SYSKEYUP:
       if (in && wp < 256) in->down[wp] = false;
@@ -195,8 +217,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   g_opengl32 = LoadLibraryA("opengl32.dll");
   const char* missing = nullptr;
   if (!glLoad(wglProc, &missing)) { MessageBoxA(g_hwnd, (std::string("Missing OpenGL function: ") + missing).c_str(), "Air Xpress", MB_ICONERROR); return 1; }
-  auto swapInterval = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
-  if (swapInterval) swapInterval(1);
+  s_swapInterval = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
+  if (auto ext = (PFNWGLGETEXTENSIONSSTRINGEXTPROC)wglGetProcAddress("wglGetExtensionsStringEXT")) { const char* e = ext(); s_tear = e && strstr(e, "WGL_EXT_swap_control_tear"); }
+  timeBeginPeriod(1);   // 1 ms Sleep granularity for the frame limiter
+  setupPacing(g_hwnd);
   const char* xdlls[] = {"xinput1_4.dll", "xinput9_1_0.dll", "xinput1_3.dll"};
   for (auto d : xdlls) { HMODULE m = LoadLibraryA(d); if (m) { s_xinput = (PFNXINPUTGETSTATE)GetProcAddress(m, "XInputGetState"); if (s_xinput) break; } }
 
@@ -206,7 +230,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
 
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   game.init();
-  if (game.set.fullscreen) toggleFullscreen();
+  if (game.set.fullscreen) { toggleFullscreen(); setupPacing(g_hwnd); }
   RECT cr; GetClientRect(g_hwnd, &cr);
   g_ren.renderScale = game.set.renderScale; g_ren.quality = game.set.quality;
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) {
@@ -232,12 +256,26 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       game.update(dt);
       game.render();
       SwapBuffers(g_hdc);
+      if (!s_vsyncDiv) {   // software 60 fps limiter: sleep most of the way, spin the last ~2 ms
+        static LONGLONG deadline = 0;
+        const LONGLONG period = freq.QuadPart / 60;
+        LARGE_INTEGER t; QueryPerformanceCounter(&t);
+        deadline += period;
+        if (deadline < t.QuadPart - period || deadline > t.QuadPart + 2 * period) deadline = t.QuadPart;   // fell behind / first frame: resync
+        for (;;) {
+          QueryPerformanceCounter(&t);
+          LONGLONG left = deadline - t.QuadPart;
+          if (left <= 0) break;
+          if (left * 1000 > 2 * freq.QuadPart) Sleep(1); else YieldProcessor();
+        }
+      }
     } else Sleep(16);
-    if (game.wantFullscreenToggle) { game.wantFullscreenToggle = false; toggleFullscreen(); game.set.fullscreen = g_fullscreen; }
+    if (game.wantFullscreenToggle) { game.wantFullscreenToggle = false; toggleFullscreen(); game.set.fullscreen = g_fullscreen; setupPacing(g_hwnd); }
     game.in.endFrame();
   }
   game.shutdown();
   stopAudio();
+  timeEndPeriod(1);
   timeEndPeriod(1);
   return 0;
 }

@@ -26,7 +26,7 @@ struct Input {
 };
 
 struct Settings {
-  float renderScale = 0.75f; int quality = 1;
+  float renderScale = 1.0f; int quality = 1;   // renderScale: the most the dynamic resolution may use
   float master = 0.8f, engineVol = 1.0f, sfxVol = 0.9f, radioVol = 0.6f;
   bool invertPitch = false, showHints = true, metric = false, fullscreen = false;
   int radioStation = 0;
@@ -108,7 +108,8 @@ private:
   float craterX = 0, craterZ = 0, craterR = 0, craterD = 0;
   void breakUp(vec3 impactVel, bool water, bool air = false);
   bool airBreak = false;
-  float gTunnel = 0;              // smoothed g-force screen-edge effect 0..1          // broke up in flight: pieces tumble down before anything hits the ground
+  float gTunnel = 0;
+  float fpsAvg = 1.f / 60.f; bool showPerf = false;   // F3: frame-rate / GPU time / resolution overlay              // smoothed g-force screen-edge effect 0..1          // broke up in flight: pieces tumble down before anything hits the ground
   float crashEndT = 7.5f;         // crashTimer at which the results screen comes up
   void updateWreck(float dt);
   float wreckGround(float x, float z) const;

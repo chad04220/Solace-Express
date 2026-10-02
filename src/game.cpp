@@ -16,7 +16,7 @@ void Game::loadSettings() {
   char k[64]; float v;
   while (fscanf(f, "%63s %f", k, &v) == 2) {
     std::string s = k;
-    if (s == "renderScale") set.renderScale = clampf(v, 0.4f, 1.0f);
+    if (s == "renderScale") set.renderScale = fabsf(v - 0.75f) < 1e-3f ? 1.0f : clampf(v, 0.5f, 1.0f);   // 0.75 was the old fixed default: now a ceiling for dynamic resolution
     else if (s == "quality") set.quality = (int)clampf(v, 0, 2);
     else if (s == "master") set.master = clampf(v, 0, 1);
     else if (s == "engineVol") set.engineVol = clampf(v, 0, 1.5f);
@@ -1275,20 +1275,26 @@ void Game::feedAudio() {
 
 // ------------------------------------------------------------------ main update / render
 void Game::update(float dt) {
-  // dynamic resolution: keep the ray tracer above ~40 fps on slower GPUs
+  // dynamic resolution: hold 60 fps. The ray tracer's GPU time (timer queries) is steered to a 14 ms budget by
+  // scaling the traced resolution between 50% and the "Render resolution" setting; TAA upscales to the display, so
+  // changes are seamless. Without timer queries it falls back to the measured frame time.
+  fpsAvg = lerpf(fpsAvg, dt, 0.05f);
   if (!headless && g_ren.ok) {
-    static float avg = 1.f / 60.f, cooldown = 3.f;
-    avg = lerpf(avg, dt, 0.05f);
+    static float cooldown = 2.f, gpuAvg = -1.f;
     cooldown -= dt;
-    if (cooldown <= 0) {
-      float sc = g_ren.renderScale;
-      if (avg > 1.f / 38.f && sc > 0.42f) sc = std::max(0.4f, sc - 0.05f);
-      // the cockpit is mostly close-up detail: allow full resolution there when the GPU keeps up
-      float target = (screen == SCR_FLIGHT && camMode == 1) ? std::max(set.renderScale, 1.0f) : set.renderScale;
-      if (sc > target + 0.01f) sc = target;
-      else if (avg < 1.f / 56.f && sc < target - 0.01f) sc = std::min(target, sc + 0.05f);
-      if (sc != g_ren.renderScale) { g_ren.renderScale = sc; g_ren.resize(g_ren.W, g_ren.H); cooldown = 2.f; }
-      else cooldown = 0.5f;
+    float ms = g_ren.gpuMs;
+    if (ms > 0) gpuAvg = gpuAvg < 0 ? ms : lerpf(gpuAvg, ms, 0.15f);
+    // (frame time can't show headroom under vsync, so the fallback only reacts to missed frames and probes upward slowly)
+    float cost = gpuAvg > 0 ? gpuAvg : fpsAvg * 1000.f;
+    const float budget = gpuAvg > 0 ? 14.f : (fpsAvg * 1000.f > 18.f ? 16.f : 17.f * 1.3f);
+    if (cooldown <= 0 && cost > 0) {
+      float sc = g_ren.renderScale, maxS = set.renderScale;
+      float want = clampf(sc * sqrtf(budget / cost), 0.5f, maxS);   // pixel count scales with sc^2
+      want = roundf(want * 40.f) / 40.f;
+      if (want < sc - 0.01f) { g_ren.setRenderScale(want); cooldown = 0.25f; }                    // over budget: drop quickly
+      else if (want > sc + 0.01f && cost < budget * 0.85f) { g_ren.setRenderScale(std::min(want, sc + 0.05f)); cooldown = 1.f; }   // headroom: climb gently
+      else if (sc > maxS + 0.01f) { g_ren.setRenderScale(maxS); cooldown = 0.5f; }
+      else cooldown = 0.25f;
     }
   }
   dt = std::min(dt, 0.05f);
@@ -1297,6 +1303,7 @@ void Game::update(float dt) {
   while (!toasts.empty() && toasts.front().t > 5.f) toasts.erase(toasts.begin());
   hubMsgTime = std::max(0.f, hubMsgTime - dt);
   if (in.pressed[K_F11]) wantFullscreenToggle = true;
+  if (in.pressed[0x72]) showPerf = !showPerf;   // F3
   gamepadMenus(dt);
   bool padCombo = in.pad && (in.buttons & PAD_LS) && (in.buttons & PAD_RS) && (in.buttonsPressed & (PAD_LS | PAD_RS));
   if (screen == SCR_MENU && ((in.down['U'] && in.down['I'] && (in.pressed['U'] || in.pressed['I'])) || padCombo)) {
@@ -1347,6 +1354,14 @@ void Game::render() {
   }
   drawToasts();
   drawPadCursor();
+  if (showPerf) {
+    float s = S();
+    std::string t = fmt("%.0f fps  %.1f ms   GPU %s   res %.0f%% (%dx%d)", 1.f / std::max(fpsAvg, 1e-4f), fpsAvg * 1000.f,
+                        g_ren.gpuMs > 0 ? fmt("%.1f ms", g_ren.gpuMs).c_str() : "n/a", g_ren.renderScale * 100.f,
+                        (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale));
+    g_ren.rect(6 * s, 6 * s, 420 * s, 24 * s, vec3(0, 0, 0), 0.55f);
+    g_ren.text(14 * s, 10 * s, 14 * s, t, fpsAvg < 1.f / 57.f ? vec3(1, 0.5f, 0.3f) : vec3(0.5f, 1, 0.6f), 1, 0, false);
+  }
   g_ren.uiEnd();
 }
 

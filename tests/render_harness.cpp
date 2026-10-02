@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
   printf("GL: %s\n", glGetString(GL_RENDERER));
   g_world.build();
   buildStory();
-  g_ren.renderScale = 1.0f; g_ren.quality = 1;
+  g_ren.renderScale = getenv("RSCALE") ? (float)atof(getenv("RSCALE")) : 1.0f; g_ren.quality = 1;
   if (!g_ren.init(W, H)) { printf("init failed: %s\n", g_ren.error.c_str()); return 1; }
   printf("renderer ok\n");
   std::string scene = argc > 1 ? argv[1] : "default";
