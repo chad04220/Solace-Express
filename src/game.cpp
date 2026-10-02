@@ -753,7 +753,7 @@ void Game::updateUfo(float dt) {
   f = length(f) > 1.f ? normalize(f) : normalize(vec3(plane.forward().x, 0, plane.forward().z) + vec3(1e-4f, 0, 0));
   vec3 r(-f.z, 0, f.x), u(0, 1, 0);
   float span = plane.spec->span;
-  vec3 hold = r * (ufo.side * (span * 0.5f + 15.f)) + u * 3.f + f * 2.f;           // station alongside
+  vec3 hold = r * (ufo.side * (span * 0.5f + 15.f)) + u * -0.6f + f * 2.f;         // station alongside, cabin at eye level
   vec3 from = -f * 520.f + u * 170.f + r * (ufo.side * 140.f);                      // swoops in from behind and above
   float k = smoothstepf(0.f, 6.5f, t);
   vec3 off = from + (hold - from) * k;
