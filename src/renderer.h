@@ -3,6 +3,7 @@
 #include "common.h"
 #include "gl.h"
 #include "world.h"
+#include "entity_mesh.h"
 
 struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft; };
 enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7 };
@@ -87,13 +88,16 @@ public:
   void uiEnd();
   void flushUIPublic() { flushUI(); }
   bool screenshot(const char* path);
+  // environment entities: entSync generates every chunk in range before drawing (headless captures)
+  bool entSync = false;
+  int entDrawn = 0, entChunks = 0;   // instances drawn / chunks generated (F3 readout)
+  float entCpuMs = 0;                // CPU time of the entity pass (streaming + culling + submission)
 
 private:
   GLuint progRT = 0, progSprite = 0, progBright = 0, progBlur = 0, progPost = 0, progUI = 0, progTAA = 0;
   GLuint vaoEmpty = 0, vaoSprite = 0, vboSprite = 0, vaoUI = 0, vboUI = 0;
   GLuint texHM = 0, texAlb = 0, texNrm = 0, texFont = 0, texMask = 0, texRoadId = 0, texData = 0, texHMax = 0;
   struct V4 { float x, y, z, w; };
-  std::vector<V4> townB, townY;
   GLuint fboScene = 0, texColor = 0, texDepth = 0, fboSprite = 0;
   // temporal AA: the ray tracer writes texRaw; the resolve blends it with the reprojected history into texHist[cur] + texColor
   GLuint texRaw = 0, texHist[2] = {0, 0}, fboTAA[2] = {0, 0};
@@ -116,6 +120,17 @@ private:
   float jitX = 0, jitY = 0;
   void genMaterials();
   void genMinimap();
+  // ---- environment entities: instanced meshes -> G-buffer (lit by the ray tracer) + sun shadow cascades
+  GLuint progEnt = 0, progEntSh = 0, vaoEnt = 0, vboEntMesh = 0, vboEntInst = 0;
+  GLuint fboGB = 0, texGB[3] = {0, 0, 0}, texGBDepth = 0;
+  GLuint fboSh[2] = {0, 0}, texSh[2] = {0, 0}; int shRes = 0;
+  mat4 shVP[2]; vec3 shCenter[2], shSun[2]; bool shValid[2] = {false, false}; int shGen[2] = {-1, -1}, shAge[2] = {0, 0}; float shR[2] = {0, 0};
+  EntMeshRange entRange[EK_COUNT];
+  std::vector<Ent> entStage;
+  int entFrame = 0, entGenCount = 0;
+  bool initEntities();
+  void drawEntities(const FrameParams& fp);
+  void createGBuffer();
 };
 
 extern Renderer g_ren;

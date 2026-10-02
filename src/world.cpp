@@ -241,7 +241,7 @@ int World::findAirport(const char* code) const {
   return -1;
 }
 
-// Upper bound of the rendered terrain (ground + detail + trees/rocks/sea stacks) per cell, so the ray marcher can
+// Upper bound of the rendered terrain (ground + detail) per cell, so the ray marcher can
 // skip whole cells it passes above. Conservative: per-texel max of the base layer over the bilinear footprint, the
 // detail fbm sampled densely with 6 octaves plus the bound of all finer octaves (sum of their amplitudes).
 void World::buildHMax() {
@@ -266,8 +266,8 @@ void World::buildHMax() {
         fmax += 0.12f;  // finer octaves (<= 1/32) + sampling error of octaves up to 6
       }
       float top = b0 + b1 * std::max(fmax, 0.f);
-      float coverMax = gmin < 0.5f ? 46.f : 20.f;  // sea stacks only grow from shallow water; trees <= 18 m
-      hmax[0][(size_t)cj * HMAX_N + ci] = std::max(top, 0.f) + coverMax;
+      (void)gmin;
+      hmax[0][(size_t)cj * HMAX_N + ci] = std::max(top, 0.f) + 4.f;   // + crater rims
     }
   for (int L = 1; L < HMAX_LEVELS; L++) {
     int n = HMAX_N >> L, pn = n * 2;
@@ -296,8 +296,7 @@ void World::sampleBase(float x, float z, float out[4]) const {
 float World::height(float x, float z, int octaves) const {
   float b[4]; sampleBase(x, z, b);
   float g = b[1] < 0.01f ? b[0] : b[0] + b[1] * terrainFbm(x / DETAIL_SCALE, z / DETAIL_SCALE, octaves);
-  if (b[1] < 0.01f && g > 0.5f) return g;   // airport grounds: bare
-  return g + cover(x, z, g, b, nullptr);
+  return g;   // bare ground: trees, rocks and buildings are separate entities (entities.h)
 }
 
 vec3 World::normal(float x, float z) const {

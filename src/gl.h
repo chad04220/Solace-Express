@@ -12,7 +12,7 @@
 typedef unsigned int GLenum; typedef unsigned char GLboolean; typedef unsigned int GLbitfield; typedef void GLvoid;
 typedef int GLint; typedef unsigned int GLuint; typedef int GLsizei; typedef float GLfloat; typedef char GLchar;
 typedef ptrdiff_t GLsizeiptr; typedef ptrdiff_t GLintptr; typedef unsigned char GLubyte;
-typedef unsigned long long GLuint64;
+typedef unsigned long long GLuint64; typedef double GLdouble;
 
 #define GL_FALSE 0
 #define GL_TIME_ELAPSED 0x88BF
@@ -76,6 +76,16 @@ typedef unsigned long long GLuint64;
 #define GL_RENDERER 0x1F01
 #define GL_VERSION 0x1F02
 #define GL_BACK 0x0405
+#define GL_NONE 0
+#define GL_LESS 0x0201
+#define GL_LEQUAL 0x0203
+#define GL_DEPTH_BUFFER_BIT 0x00000100
+#define GL_DEPTH_COMPONENT 0x1902
+#define GL_DEPTH_COMPONENT32F 0x8CAC
+#define GL_DEPTH_ATTACHMENT 0x8D00
+#define GL_COLOR_ATTACHMENT2 0x8CE2
+#define GL_POLYGON_OFFSET_FILL 0x8037
+#define GL_COLOR 0x1800
 
 #define GL_FUNCS(X) \
   X(void, glViewport, (GLint, GLint, GLsizei, GLsizei)) \
@@ -142,7 +152,15 @@ typedef unsigned long long GLuint64;
   X(void, glBeginQuery, (GLenum, GLuint)) \
   X(void, glEndQuery, (GLenum)) \
   X(void, glGetQueryObjectiv, (GLuint, GLenum, GLint*)) \
-  X(void, glGetQueryObjectui64v, (GLuint, GLenum, GLuint64*))
+  X(void, glGetQueryObjectui64v, (GLuint, GLenum, GLuint64*)) \
+  X(void, glDrawArraysInstanced, (GLenum, GLint, GLsizei, GLsizei)) \
+  X(void, glVertexAttribDivisor, (GLuint, GLuint)) \
+  X(void, glDepthFunc, (GLenum)) \
+  X(void, glDepthMask, (GLboolean)) \
+  X(void, glClearDepth, (GLdouble)) \
+  X(void, glPolygonOffset, (GLfloat, GLfloat)) \
+  X(void, glClearBufferfv, (GLenum, GLint, const GLfloat*)) \
+  X(void, glBufferSubData, (GLenum, GLintptr, GLsizeiptr, const void*))
 
 // Function pointers live in a namespace so they never clash with the system GL library's exports.
 namespace glf {

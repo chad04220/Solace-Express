@@ -64,7 +64,7 @@ static float pworley(float u, float v, int P, int seed, float* id = nullptr) {
 }
 
 void Renderer::genMaterials() {
-  const int L = 25;
+  const int L = 30;
   std::vector<uint8_t> alb((size_t)TS * TS * 4 * L), nrm((size_t)TS * TS * 4 * L);
   std::vector<float> hgt((size_t)TS * TS);
   for (int l = 0; l < L; l++) {
@@ -186,17 +186,54 @@ void Renderer::genMaterials() {
           float rows = 0.5f + 0.5f * sinf(u * PI * 2.f * 24.f), n = pfbm(u, v, 16, 3, 231);
           c = lerp(vec3(0.3f, 0.22f, 0.12f), vec3(0.2f, 0.45f, 0.1f), smoothstepf(0.3f, 0.7f, rows) * (0.7f + 0.3f * n));
           h = rows; rough = 0.9f; break; }
-        default: {  // wheat
+        case 24: {  // wheat
           float s1 = pnoise(u * 300, v * 30, 300, 241), n = pfbm(u, v, 4, 4, 242);
           c = lerp(vec3(0.62f, 0.5f, 0.22f), vec3(0.82f, 0.7f, 0.38f), s1 * 0.6f + n * 0.4f);
           h = s1; rough = 0.85f; break; }
+        case 25: {  // bark: deep vertical furrows broken into plates
+          float w = pfbm(u, v, 4, 3, 251) * 0.6f;
+          float fur = fabsf(sinf((u * 22.f + w * 4.f) * PI));
+          float plates = smoothstepf(0.15f, 0.55f, fur) * (0.7f + 0.3f * pnoise(u * 40, v * 10, 40, 252));
+          float n = pfbm(u, v, 16, 3, 253);
+          c = lerp(vec3(0.09f, 0.07f, 0.05f), vec3(0.36f, 0.3f, 0.24f), plates * (0.7f + 0.3f * n));
+          c = lerp(c, vec3(0.3f, 0.36f, 0.22f), smoothstepf(0.62f, 0.8f, pfbm(u, v, 3, 3, 254)) * 0.35f);   // lichen
+          h = plates * 0.8f + n * 0.2f; rough = 0.92f; break; }
+        case 26: {  // weathered wood planks
+          float row = floorf(v * 8.f), fv = v * 8.f - row;
+          float id = hash2i((int)row, 261), grain = pnoise(u * 6 + id * 7.f, v * 160, 6, 262) * 0.6f + pnoise(u * 60, v * 400, 60, 263) * 0.4f;
+          float gap = smoothstepf(0.f, 0.06f, fv) * smoothstepf(1.f, 0.94f, fv);
+          float b = (0.55f + 0.25f * id) * (0.75f + 0.35f * grain) * (0.45f + 0.55f * gap);
+          c = vec3(b, b * 0.93f, b * 0.85f);
+          h = gap * (0.7f + 0.3f * grain); rough = 0.85f; break; }
+        case 27: {  // forest floor: leaf litter, needles and twigs over dark soil
+          float id; float w = pworley(u, v, 48, 271, &id);
+          float leaf = 1.f - smoothstepf(0.1f, 0.5f, w);
+          float n = pfbm(u, v, 4, 4, 272), tw = smoothstepf(0.985f, 1.f, pnoise(u * 300, v * 30, 300, 273)) + smoothstepf(0.985f, 1.f, pnoise(u * 30, v * 300, 30, 274));
+          c = lerp(vec3(0.1f, 0.075f, 0.05f), lerp(vec3(0.38f, 0.26f, 0.12f), vec3(0.42f, 0.36f, 0.16f), id), leaf * (0.6f + 0.4f * n));
+          c = lerp(c, vec3(0.2f, 0.26f, 0.1f), smoothstepf(0.55f, 0.75f, pfbm(u, v, 3, 3, 275)) * 0.5f);   // moss patches
+          c = lerp(c, vec3(0.3f, 0.22f, 0.14f), clampf(tw, 0, 1) * 0.7f);
+          h = leaf * 0.6f + n * 0.3f + tw * 0.2f; rough = 0.95f; break; }
+        case 28: {  // asphalt shingles
+          float rv = v * 16.f, row = floorf(rv), fv = rv - row;
+          float cu = u * 8.f + (fmodf(row, 2.f) ? 0.5f : 0.f), fu = cu - floorf(cu);
+          float id = hash2i((int)floorf(cu) + 9, (int)row + 3), g = pnoise(u * 300, v * 300, 300, 281);
+          float edge = smoothstepf(0.f, 0.06f, fu) * smoothstepf(1.f, 0.94f, fu);
+          float b = (0.75f + 0.3f * id) * (0.8f + 0.25f * g) * (0.55f + 0.45f * smoothstepf(0.f, 0.3f, fv)) * (0.7f + 0.3f * edge);
+          c = vec3(b * 0.5f, b * 0.5f, b * 0.52f);
+          h = fv * 0.5f + edge * 0.3f + g * 0.2f; rough = 0.9f; break; }
+        default: {  // lap siding: overlapping horizontal boards
+          float rv = v * 20.f, row = floorf(rv), fv = rv - row;
+          float n = pfbm(u, v, 4, 3, 291), g = pnoise(u * 200, v * 20, 200, 292);
+          float b = 0.86f * (0.55f + 0.45f * powf(fv, 0.6f)) * (0.95f + 0.05f * n) * (0.97f + 0.03f * g);
+          c = vec3(b);
+          h = fv; rough = 0.7f; (void)row; break; }
       }
       hgt[(size_t)y * TS + x] = h;
       size_t o = (((size_t)l * TS + y) * TS + x) * 4;
       alb[o + 0] = (uint8_t)(sqrtf(clampf(c.x, 0, 1)) * 255); alb[o + 1] = (uint8_t)(sqrtf(clampf(c.y, 0, 1)) * 255);
       alb[o + 2] = (uint8_t)(sqrtf(clampf(c.z, 0, 1)) * 255); alb[o + 3] = (uint8_t)(clampf(rough, 0, 1) * 255);
     }
-    float strength = (l == 1 || l == 13 ? 6.f : l == 2 || l == 9 || l == 10 || l == 12 ? 5.f : l == 6 || l == 22 ? 4.f : l == 15 || l == 16 ? 0.8f : 2.5f);
+    float strength = (l == 1 || l == 13 || l == 25 ? 6.f : l == 2 || l == 9 || l == 10 || l == 12 || l == 28 ? 5.f : l == 6 || l == 22 || l == 26 || l == 27 || l == 29 ? 4.f : l == 15 || l == 16 ? 0.8f : 2.5f);
     for (int y = 0; y < TS; y++) for (int x = 0; x < TS; x++) {
       auto H = [&](int i, int j) { return hgt[(size_t)((j + TS) % TS) * TS + (i + TS) % TS]; };
       float dx = (H(x + 1, y) - H(x - 1, y)) * strength, dy = (H(x, y + 1) - H(x, y - 1)) * strength;
@@ -307,16 +344,6 @@ bool Renderer::init(int w, int h) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glBindTexture(GL_TEXTURE_2D, texHM);
-  // town bounding volumes for the building ray tracer
-  for (int k = 0; k < kNumTowns && k < 24; k++) {
-    const Town& t = kTowns[k];
-    float gmin = 1e9f, gmax = -1e9f;
-    for (float dz = -t.r; dz <= t.r; dz += t.r / 8.f)
-      for (float dx = -t.r; dx <= t.r; dx += t.r / 8.f) { float g = g_world.groundHeight(t.x + dx, t.z + dz, 5); gmin = std::min(gmin, g); gmax = std::max(gmax, g); }
-    float hmax = t.kind == 2 ? 75.f : t.kind == 1 ? 45.f : 20.f;
-    townB.push_back({t.x - t.r - 30.f, t.z - t.r - 30.f, t.x + t.r + 30.f, t.z + t.r + 30.f});
-    townY.push_back({std::max(gmin, 0.f) - 3.f, gmax + hmax + 30.f, 0, 0});
-  }
   {
     std::vector<V4> d(384, V4{0, 0, 0, 0});
     for (int i = 0; i < (int)g_roads.size() && i < 64; i++) d[i] = {g_roads[i].ax, g_roads[i].az, g_roads[i].bx, g_roads[i].bz};
@@ -325,7 +352,6 @@ bool Renderer::init(int w, int h) {
       d[64 + i] = {b.c.x, b.c.y, b.c.z, (float)b.airport};
       d[192 + i] = {b.h.x, b.h.y, b.h.z, (float)b.kind};
     }
-    for (int i = 0; i < (int)townB.size(); i++) { d[320 + i] = townB[i]; d[352 + i] = townY[i]; }
     // [384,400) / [400,416): world bounds of each airport's buildings + their box range (lets the shader skip airports)
     d.resize(416, V4{0, 0, 0, 0});
     int nb = std::min(128, (int)g_world.boxes.size());
@@ -370,6 +396,7 @@ bool Renderer::init(int w, int h) {
   glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
   genMaterials();
   genMinimap();
+  if (!initEntities()) return false;
   W = w; H = h;
   createTargets();
   ok = true;
@@ -396,6 +423,7 @@ void Renderer::createRenderTargets() {
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texRaw, 0);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texDepth, 0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  createGBuffer();
 }
 
 // Display-resolution targets: TAA history + the upscaled scene that sprites, bloom and the composite work on
@@ -464,6 +492,15 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     }
   }
   glBeginQuery(GL_TIME_ELAPSED, gpuQ[gpuQi]);
+  // TAA: Halton(2,3) sub-pixel jitter and a golden-ratio noise seed, both changing every frame
+  frameNo++;
+  {
+    auto halton = [](int i, int b) { float f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i /= b; } return r; };
+    int hi = (frameNo % 8) + 1;
+    jitX = (halton(hi, 2) - 0.5f) / rw; jitY = (halton(hi, 3) - 0.5f) / rh;
+  }
+  // ------------------------------------------------ environment entities: shadow cascades + G-buffer
+  drawEntities(fp);
   // ------------------------------------------------ ray trace
   glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
   GLenum bufs[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
@@ -496,11 +533,6 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glUniform4fv(U(p, "uUfoAnim"), 1, fp.ufoAnim);
   }
   glUniform2f(U(p, "uRes"), (float)rw, (float)rh);
-  // TAA: Halton(2,3) sub-pixel jitter and a golden-ratio noise seed, both changing every frame
-  frameNo++;
-  auto halton = [](int i, int b) { float f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i /= b; } return r; };
-  int hi = (frameNo % 8) + 1;
-  jitX = (halton(hi, 2) - 0.5f) / rw; jitY = (halton(hi, 3) - 0.5f) / rh;
   glUniform2f(U(p, "uJit"), jitX, jitY);
   glUniform1f(U(p, "uSeed"), fmodf(frameNo * 0.618034f, 1.f));
   glUniform3f(U(p, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
@@ -534,7 +566,6 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glUniform1i(U(p, "uApCount"), n);
     glUniform4fv(U(p, "uAp"), n, ap); glUniform4fv(U(p, "uApDim"), n, dim);
     glUniform1i(U(p, "uBoxCount"), std::min(128, (int)g_world.boxes.size()));
-    glUniform1i(U(p, "uTownCount"), (int)townB.size());
     glActiveTexture(GL_TEXTURE0 + 5); glBindTexture(GL_TEXTURE_2D, texData); glUniform1i(U(p, "uData"), 5);
   }
   const PlaneVisual& pv = fp.plane;
@@ -578,6 +609,18 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     if (fx.beams) { glUniform4fv(U(p, "uBeamA"), fx.beams, &fx.beamA[0][0]); glUniform4fv(U(p, "uBeamB"), fx.beams, &fx.beamB[0][0]); }
     if (fx.bombs) glUniform4fv(U(p, "uBombs"), fx.bombs, &fx.bomb[0][0]);
     if (fx.blasts) { glUniform4fv(U(p, "uBlast"), fx.blasts, &fx.blast[0][0]); glUniform4fv(U(p, "uBlastI"), fx.blasts, &fx.blastI[0][0]); }
+  }
+  {   // entity G-buffer and the sun shadow cascades
+    for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, texGB[i]); }
+    glUniform1i(U(p, "uGB0"), 8); glUniform1i(U(p, "uGB1"), 9); glUniform1i(U(p, "uGB2"), 10);
+    bool sh = fp.sunDir.y > 0.03f && shValid[0];
+    glUniform1i(U(p, "uShOn"), sh ? (shValid[1] ? 2 : 1) : 0);
+    for (int c = 0; c < 2; c++) { glActiveTexture(GL_TEXTURE0 + 11 + c); glBindTexture(GL_TEXTURE_2D, texSh[c]); }
+    glUniform1i(U(p, "uShMap0"), 11); glUniform1i(U(p, "uShMap1"), 12);
+    glUniformMatrix4fv(U(p, "uShM0"), 1, GL_FALSE, shVP[0].m); glUniformMatrix4fv(U(p, "uShM1"), 1, GL_FALSE, shVP[1].m);
+    glUniform2f(U(p, "uShTexel"), shR[0] * 2.f / std::max(shRes, 1), shR[1] * 2.f / std::max(shRes, 1));
+    float tf = quality <= 0 ? 2200.f : quality == 1 ? 3600.f : 5500.f;
+    glUniform1f(U(p, "uTreeFar"), tf);
   }
   glUniform3f(U(p, "uFlameLP"), fp.flameLightPos.x, fp.flameLightPos.y, fp.flameLightPos.z);
   glUniform3f(U(p, "uFlameLI"), fp.flameLight.x, fp.flameLight.y, fp.flameLight.z);

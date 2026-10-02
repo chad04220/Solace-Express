@@ -51,7 +51,7 @@ float fbm2(vec2 p, int oct){ float s=0.0, a=0.5; for(int i=0;i<8;i++){ if(i>=oct
 
 // ---------------------------------------------------------------- scenery (mirrors scenery.cpp exactly)
 uniform sampler2D uMask; uniform sampler2D uRoadId;
-const int MASKN = 2048; const float MTEX = 39.0625; const float SCENERY_DENSITY = 0.3333;
+const int MASKN = 2048; const float MTEX = 39.0625;
 vec4 maskAt(vec2 p){
   vec2 f = (p + WH)/MTEX - 0.5; vec2 fl = floor(f); ivec2 i = ivec2(fl); vec2 t = f - fl; ivec2 mx = ivec2(MASKN-1);
   vec4 a = texelFetch(uMask, clamp(i, ivec2(0), mx), 0), b = texelFetch(uMask, clamp(i+ivec2(1,0), ivec2(0), mx), 0);
@@ -66,84 +66,13 @@ float forestAt(vec2 p){
 }
 vec4 maskTexel(vec2 p){ return texelFetch(uMask, clamp(ivec2(floor((p + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0); }
 float groundH(vec2 p, int oct){ vec4 b = baseAt(p); return b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct); }
-// kinds: 1 conifer, 2 broadleaf, 3 palm, 4 rock, 5 sea stack
-float coverH(vec2 p, float g, vec4 b, out int kind){
-  kind = 0; float best = 0.0;
-  vec4 m = maskAt(p);
-  if (g < 0.3) {
-    if (m.w > 0.5) {
-      ivec2 c = ivec2(floor(p/70.0));
-      float depthOk = smoothstep(-16.0, -4.0, g)*smoothstep(-0.5, -2.5, g);
-      if (hash2i(ivec2(c.x*7+3, c.y*11-5)) < 0.05*SCENERY_DENSITY*depthOk) {
-        vec2 cc = (vec2(c) + 0.5 + (vec2(hash2i(c+ivec2(17,0)), hash2i(c+ivec2(0,23))) - 0.5)*0.4)*70.0;
-        float r = 7.0 + 8.0*hash2i(c+ivec2(0,31)), H = 14.0 + 30.0*hash2i(c+ivec2(5,9));
-        float top = H*smoothstep(r, r*0.7, length(p - cc)*(0.85 + 0.3*vnoise(p*0.12)));
-        if (top - g > best) { best = top - g; kind = 5; }
-      }
-    }
-    return best;
-  }
-  float lush = b.z, cold = b.w, amp = b.y;
-  float roadD = m.x*80.0, town = m.y, farm = m.w;
-  float fn = forestAt(p);
-  float treeline = smoothstep(1500.0 - cold*900.0, 1100.0 - cold*700.0, g);
-  float fd = smoothstep(0.42 - 0.1*lush, 0.5 - 0.1*lush, fn)*treeline;
-  fd = max(fd, 0.04*treeline);
-  fd *= smoothstep(4.0, 9.0, g)*smoothstep(2.5, 8.0, amp)*smoothstep(9.0, 18.0, roadD)*(1.0 - smoothstep(0.03, 0.2, town))*(1.0 - 0.88*farm);
-  if (fd > 0.001) {
-    ivec2 c = ivec2(floor(p/10.0));
-    if (hash2i(ivec2(c.x*3+11, c.y*5-7)) < fd*0.9*SCENERY_DENSITY) {
-      vec2 j = vec2(hash2i(c+ivec2(101,-31)), hash2i(c+ivec2(-57,77))) - 0.5;
-      vec2 cc = (vec2(c) + 0.5 + j*0.3)*10.0;
-      if (uCraterN > 0 && craterAt(cc, 1.7) >= 0) return best;  // flattened by the impact
-      float sp = hash2i(ivec2(c.x*13+1, c.y*7+3)), hv = hash2i(c+ivec2(-3,19));
-      bool conifer = cold > 0.45 || g > 650.0 || sp < 0.18;
-      bool palm = !conifer && lush > 0.85 && g < 70.0 && sp > 0.35;
-      int k; float r, H;
-      if (conifer) { k = 1; r = 2.2 + 1.0*hv; H = 9.0 + 9.0*hv; }
-      else if (palm) { k = 3; r = 2.4 + 0.6*hv; H = 7.0 + 5.0*hv; }
-      else { k = 2; r = 3.6 + 1.6*hv; H = 6.0 + 6.0*hv; }
-      vec2 dd = p - cc; float d = length(dd);
-      float th = 0.0;
-      if (d < r) {
-        float q = d/r;
-        if (k == 1) th = H*(1.0 - q);
-        else if (k == 2) th = H*(0.22 + 0.78*sqrt(1.0 - q*q));
-        else { float star = 0.7 + 0.3*cos(atan(dd.y, dd.x)*7.0); th = q < star ? H*(0.82 + 0.18*(1.0 - q/star)) : 0.0; }
-      }
-      if (th > best) { best = th; kind = k; }
-    }
-  }
-  float rdn = smoothstep(60.0, 200.0, amp)*0.25 + smoothstep(900.0, 1400.0, g)*0.12 + smoothstep(3.0, 0.5, g)*0.04*(1.0 - farm);
-  rdn *= smoothstep(10.0, 20.0, roadD)*(1.0 - smoothstep(0.03, 0.2, town));
-  if (rdn > 0.001) {
-    ivec2 c = ivec2(floor(p/16.0));
-    if (hash2i(ivec2(c.x*5-13, c.y*3+29)) < rdn*SCENERY_DENSITY) {
-      vec2 cc = (vec2(c) + 0.5 + (vec2(hash2i(c+ivec2(41,-9)), hash2i(c+ivec2(-21,63))) - 0.5)*0.3)*16.0;
-      float hr = hash2i(c+ivec2(7,-77));
-      float r = 1.6 + 5.0*hr*hr;
-      float d = length(p - cc);
-      if (d < r) {
-        float q = d/r;
-        float th = r*0.75*pow(1.0 - q*q, 0.6)*(0.6 + 0.8*vnoise(p*0.9));
-        if (th > best) { best = th; kind = 4; }
-      }
-    }
-  }
-  return best;
-}
-// Full height with trees/rocks scaled by an LOD fade (1 = exact, identical to the CPU collision height).
-// rayY lets the marcher skip the cover evaluation when far above the canopy.
-float terrainHF(vec2 p, int oct, float fade, float rayY){
+// Terrain height: the bare heightfield (trees, rocks and buildings are separate entities) plus impact craters
+float terrainH(vec2 p, int oct){
   vec4 b = baseAt(p);
   float g = b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct);
   if (uCraterN > 0 && g > 0.3) g += craterH(p);
-  // trees <= 18 m and rocks <= 7 m above land, sea stacks <= 44 m: above that the cover cannot be hit
-  if (fade <= 0.001 || (b.y < 0.01 && g > 0.5) || rayY - g > (g < 0.3 ? 46.0 : 19.0)) return g;
-  int k;
-  return g + fade*coverH(p, g, b, k);
+  return g;
 }
-float terrainH(vec2 p, int oct){ return terrainHF(p, oct, 1.0, -1e9); }
 
 // Scene / atmosphere uniforms
 uniform vec3 uSunDir; uniform vec3 uSunCol; uniform float uNight; uniform float uTime;
@@ -243,6 +172,7 @@ void loadTraffic(int k){
 const int M_GRASS=0, M_FOREST=1, M_ROCK=2, M_SAND=3, M_SNOW=4, M_ASPHALT=5, M_GRAVEL=6, M_DIRT=7;
 const int M_CONCRETE=8, M_TILES=9, M_SLATE=10, M_PLASTER=11, M_BRICK=12, M_LEAVES=13, M_NEEDLES=14, M_PAINT=15;
 const int M_METAL=16, M_RUBBER=17, M_PLASTIC=18, M_FABRIC=19, M_CARPET=20, M_LEATHER=21, M_CORRUGATED=22, M_CROP=23, M_WHEAT=24;
+const int M_BARK=25, M_PLANKS=26, M_LITTER=27, M_SHINGLES=28, M_SIDING=29;
 
 float sdBox(vec3 p, vec3 b){ vec3 q = abs(p)-b; return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0); }
 float sdRoundBox(vec3 p, vec3 b, float r){ vec3 q = abs(p)-b+r; return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r; }
@@ -1134,8 +1064,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
 
 )";
 // Split in two constants: MSVC limits a concatenated string literal to 64 KB.
-static const char* kRaytraceFS2 = R"(// ---------------------------------------------------------------- terrain (+ trees, rocks, sea stacks)
-float coverFade(float t){ return smoothstep(4500.0, 2500.0, t); }
+static const char* kRaytraceFS2 = R"(// ---------------------------------------------------------------- terrain
 uniform sampler2D uHMax;  // conservative max height per cell, mip L = 256>>L cells per side
 const int HMAXN = 256; const int HMAXL = 5;
 // Ray march the heightfield. Cells the ray passes entirely above (per the max-height mip chain) are skipped,
@@ -1165,44 +1094,67 @@ float traceTerrain(vec3 ro, vec3 rd, float tmax){
     }
     if (sk) { skipped = true; continue; }
     int oct = t < 1500.0 ? 7 : (t < 6000.0 ? 6 : 5);
-    float fade = coverFade(t);
-    float h = terrainHF(p.xz, oct, fade, p.y);
+    float h = terrainH(p.xz, oct);
     float dh = p.y - h;
     if (dh < 0.0015*t) {
       if (skipped) return t;
       return lt + (t - lt) * ldh / max(ldh - dh, 1e-4);
     }
     skipped = false; lt = t; ldh = dh;
-    // trees and boulders are steep: take shorter steps close to the canopy
-    float k = (fade > 0.0 && dh < 50.0) ? 0.3 : (t > 4500.0 ? 0.6 : 0.42);
+    float k = t > 4500.0 ? 0.6 : 0.42;
     t += max(dh*k, 0.2 + 0.0015*t);
   }
   // out of steps while skimming just above the ground: count it as a hit rather than showing the sea through hills
-  if (t <= tmax) { vec3 p = ro + rd*t; if (p.y - terrainHF(p.xz, 5, 0.0, p.y) < 0.02*t) return t; }
+  if (t <= tmax) { vec3 p = ro + rd*t; if (p.y - terrainH(p.xz, 5) < 0.02*t) return t; }
   return -1.0;
 }
 float terrainShadow(vec3 ro, vec3 rd, float camT){
   float res = 1.0, t = 2.0;
-  // trees/rocks only cast shadows near the camera (past ~1 km they are sub-pixel and the fine steps they need are
-  // the most expensive part of the shadow ray); the bare heightfield keeps shadowing all the way out
-  float fade = coverFade(camT)*smoothstep(1100.0, 650.0, camT);
-  float near = fade > 0.001 ? 120.0 : 0.0;
   for (int i=0;i<40;i++){
     vec3 p = ro + rd*t;
     if (p.y > uMaxH) break;
-    float h = p.y - terrainHF(p.xz, 4, t < near ? fade : 0.0, p.y);
+    float h = p.y - terrainH(p.xz, 4);
     res = min(res, 12.0*h/t);
     if (res < 0.0) return 0.0;
-    t += clamp(h*0.6, t < near ? 1.5 : 6.0, 450.0);
+    t += clamp(h*0.6, 6.0, 450.0);
   }
   return clamp(res, 0.0, 1.0);
 }
 vec3 terrainNormal(vec2 p, float t){
   float e = max(0.25, t*0.0012);
   int oct = t < 600.0 ? 11 : (t < 3000.0 ? 9 : 7);
-  float f = coverFade(t);
-  return normalize(vec3(terrainHF(p - vec2(e,0.0), oct, f, -1e9) - terrainHF(p + vec2(e,0.0), oct, f, -1e9), 2.0*e,
-                        terrainHF(p - vec2(0.0,e), oct, f, -1e9) - terrainHF(p + vec2(0.0,e), oct, f, -1e9)));
+  return normalize(vec3(terrainH(p - vec2(e,0.0), oct) - terrainH(p + vec2(e,0.0), oct), 2.0*e,
+                        terrainH(p - vec2(0.0,e), oct) - terrainH(p + vec2(0.0,e), oct)));
+}
+// ---------------------------------------------------------------- environment entities (G-buffer from the raster pass)
+uniform sampler2D uGB0; uniform sampler2D uGB1; uniform sampler2D uGB2;
+uniform int uShOn; uniform sampler2D uShMap0; uniform sampler2D uShMap1; uniform mat4 uShM0; uniform mat4 uShM1; uniform vec2 uShTexel;
+uniform float uTreeFar;
+vec3 octDec(vec2 e){ vec3 n = vec3(e.x, 1.0 - abs(e.x) - abs(e.y), e.y); if (n.y < 0.0) n.xz = (1.0 - abs(n.zx))*vec2(n.x >= 0.0 ? 1.0 : -1.0, n.z >= 0.0 ? 1.0 : -1.0); return normalize(n); }
+// sun shadow of trees, rocks and buildings (two cascades, 4-tap PCF; normal offset against acne)
+float shTap(sampler2D m, vec3 q, float bias){
+  vec2 f = q.xy*float(textureSize(m, 0).x) - 0.5; vec2 i = floor(f); vec2 w = f - i;
+  float s = 0.0;
+  for (int k = 0; k < 4; k++) { vec2 o = vec2(k & 1, k >> 1);
+    float d = texelFetch(m, clamp(ivec2(i + o), ivec2(0), textureSize(m, 0) - 1), 0).r;
+    s += (q.z - bias <= d ? 1.0 : 0.0)*mix(1.0 - w.x, w.x, o.x)*mix(1.0 - w.y, w.y, o.y); }
+  return s;
+}
+float entShadow(vec3 p, vec3 n){
+  if (uShOn == 0) return 1.0;
+  for (int c = 0; c < 2; c++) {
+    if (c >= uShOn) break;
+    vec3 pp = p + n*(c == 0 ? uShTexel.x : uShTexel.y)*1.5;
+    vec4 h = (c == 0 ? uShM0 : uShM1)*vec4(pp, 1.0);
+    vec3 q = h.xyz*0.5 + 0.5;
+    vec2 edge = abs(q.xy - 0.5);
+    if (max(edge.x, edge.y) < 0.48 && q.z < 1.0) {
+      float s = c == 0 ? shTap(uShMap0, q, 0.0004) : shTap(uShMap1, q, 0.0006);
+      // fade out over the outer rim of the far cascade
+      return c == 1 ? mix(s, 1.0, smoothstep(0.4, 0.48, max(edge.x, edge.y))) : s;
+    }
+  }
+  return 1.0;
 }
 
 // ---------------------------------------------------------------- clouds
@@ -1501,34 +1453,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
   float hNoise = fbm2(p.xz/900.0, 4);
   float n2 = fbm2(p.xz/180.0, 3);
   vec3 nTS;
-  float g = groundH(p.xz, t < 1500.0 ? 7 : 6);
-  int ckind = 0;
-  float cover = 0.0;
-  if (p.y - g > 0.25 && t < 4500.0) cover = coverH(p.xz, g, base, ckind);
   vec4 msk = maskAt(p.xz);
-  // ---- cover: trees, rocks, sea stacks
-  if (ckind > 0 && cover > 0.25) {
-    float rel = clamp((p.y - g)/max(cover, 1.0), 0.0, 1.0);
-    float th = hash2i(ivec2(floor(p.xz/10.0)) + ivec2(5, 5));
-    if (ckind <= 3) {
-      int layer = ckind == 1 ? M_NEEDLES : M_LEAVES;
-      vec4 tx = triSample(p, n, layer, ckind == 1 ? 2.0 : 2.6, nTS);
-      vec3 tint = ckind == 1 ? mix(vec3(0.55,0.75,0.6), vec3(0.42,0.6,0.5), th) : ckind == 3 ? vec3(0.8,1.05,0.55) : mix(vec3(0.75,0.95,0.5), vec3(0.55,0.85,0.45), th);
-      tint = mix(tint, vec3(0.85,0.7,0.35), smoothstep(0.88, 1.0, th)*(ckind == 2 ? 0.6 : 0.0)*(1.0 - lush));
-      m.alb = tx.rgb*tint*mix(0.62, 1.05, rel)*mix(0.38, 1.0, smoothstep(0.12, 0.32, rel));  // shaded understorey / trunks
-      m.rough = 0.8; m.nrm = nTS*vec3(2.5, 2.5, 1.0);
-      if (ckind == 1 && (cold > 0.6 || uSnow > 0.1)) m.alb = mix(m.alb, vec3(0.9), smoothstep(0.55, 0.85, n.y)*0.7);
-      m.emit = m.alb*0.04*vec3(0.3, 1.0, 0.2);   // leaf translucency
-    } else {
-      vec4 r = triSample(p, n, M_ROCK, 6.0, nTS);
-      m.alb = r.rgb*(ckind == 5 ? vec3(0.8, 0.76, 0.7) : mix(vec3(0.62, 0.6, 0.57), vec3(0.55,0.55,0.58), cold));
-      m.alb = mix(m.alb, vec3(0.45, 0.5, 0.3), smoothstep(0.6, 0.9, n.y)*0.35*lush);  // lichen / moss on top
-      if (ckind == 5) m.alb = mix(m.alb, vec3(0.92), smoothstep(0.85, 0.98, rel)*0.6);
-      m.rough = r.a; m.nrm = nTS*vec3(1.5, 1.5, 1.0);
-    }
-    m.alb *= 1.0 - 0.3*uWet;
-    return m;
-  }
   // ---- natural ground layers
   float snowLine = mix(1700.0, 350.0, cold) + (hNoise - 0.5)*300.0;
   float wSnow = smoothstep(snowLine - 60.0, snowLine + 60.0, p.y) * smoothstep(0.55, 0.3, slope);
@@ -1546,12 +1471,24 @@ R"(  vec3 grassTint = mix(vec3(0.75,0.85,0.45), vec3(0.55,0.95,0.45), lush) * mi
   grassTint *= 0.92 + 0.16*vnoise(p.xz/23.0);                 // gentle colour variation breaks up repetition
   m.alb = gr.rgb*grassTint; m.rough = gr.a; m.nrm = nG;
   // wildflower and dry patches
-  float fl = smoothstep(0.62, 0.7, vnoise(p.xz/35.0))*step(0.93, hash2i(ivec2(floor(p.xz*1.3))));
+  // round flower heads up close; further out only the patch's tint survives (no aliasing squares)
+  vec2 fc = floor(p.xz*1.3), ff = fract(p.xz*1.3) - 0.5 - (vec2(hash2i(ivec2(fc) + ivec2(3, 1)), hash2i(ivec2(fc) + ivec2(-5, 7))) - 0.5)*0.5;
+  float patch = smoothstep(0.62, 0.7, vnoise(p.xz/35.0));
+  float fl = patch*mix(0.12, step(0.9, hash2i(ivec2(fc)))*smoothstep(0.2, 0.1, length(ff)), smoothstep(120.0, 40.0, t));
   m.alb = mix(m.alb, mix(vec3(0.95,0.85,0.2), vec3(0.75,0.35,0.85), step(0.5, vnoise(p.xz/20.0))), fl*(1.0 - cold)*0.7);
   if (wDirt > 0.01) { vec4 d = groundSample(p.xz, M_DIRT, 7.0, nTS, hL); float w = hblend(wDirt, hC, hL);
     m.alb = mix(m.alb, d.rgb, w); m.rough = mix(m.rough, d.a, w); m.nrm = mix(m.nrm, nTS, w); hC = mix(hC, hL, w); }
-  if (wForest > 0.01) { vec4 f = groundSample(p.xz, M_FOREST, 9.0, nTS, hL); float w = hblend(wForest*0.6, hC, hL);   // light forest floor between the (now sparser) trees
-    m.alb = mix(m.alb, f.rgb*vec3(0.72,0.78,0.56), w); m.rough = mix(m.rough, 0.95, w); m.nrm = mix(m.nrm, nTS, w); hC = mix(hC, hL, w); }
+  if (wForest > 0.01) {
+    // forest floor under the trees: leaf litter, needles and moss
+    vec4 f = groundSample(p.xz, M_LITTER, 4.0, nTS, hL); float w = hblend(wForest*0.85, hC, hL);
+    vec3 litter = f.rgb*mix(vec3(1.0), vec3(0.8, 0.9, 0.85), cold);
+    m.alb = mix(m.alb, litter, w); m.rough = mix(m.rough, 0.95, w); m.nrm = mix(m.nrm, nTS, w); hC = mix(hC, hL, w);
+    // beyond the tree draw distance the forest is the ground's own canopy texture, faded in as the trees thin out
+    float far = smoothstep(uTreeFar*0.45, uTreeFar*0.95, t)*wForest;
+    if (far > 0.01) { vec4 cn = groundSample(p.xz, M_FOREST, 26.0, nTS, hL);
+      vec3 tint = mix(vec3(0.62, 0.8, 0.5), vec3(0.45, 0.62, 0.52), max(cold, smoothstep(500.0, 900.0, p.y)));
+      m.alb = mix(m.alb, cn.rgb*tint*0.8, far); m.rough = mix(m.rough, 0.9, far); m.nrm = mix(m.nrm, nTS, far); }
+  }
   if (msk.w > 0.05 && p.y > 0.5) fieldMaterial(p.xz, msk.w*(1.0 - wRock), m);
   if (wSand > 0.01) { vec4 s = groundSample(p.xz, M_SAND, 6.0, nTS, hL); float w = hblend(wSand, hC, 1.0 - hL);
     m.alb = mix(m.alb, s.rgb*mix(vec3(1.0), vec3(1.08,1.04,0.95), lush), w); m.rough = mix(m.rough, s.a, w); m.nrm = mix(m.nrm, nTS, w); hC = mix(hC, hL, w); }
@@ -1622,46 +1559,6 @@ R"(  vec3 grassTint = mix(vec3(0.75,0.85,0.45), vec3(0.55,0.95,0.45), lush) * mi
   // wet look in rain
   m.alb *= 1.0 - 0.35*uWet*(1.0-wSnow);
   m.rough = mix(m.rough, m.rough*0.35, uWet*(1.0-wSnow));
-  return m;
-}
-
-// building facades (town lots); info = (type, seed, roofTop y, part)
-Mat buildingMaterial(vec3 p, vec3 n, vec4 info){
-  Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1); m.rough = 0.8;
-  float seed = info.y; int type = int(info.x + 0.5); int part = int(info.w + 0.5);
-  vec3 nTS;
-  if (part == 1) {
-    // pitched roof: clay tiles or slate
-    bool slate = seed > 0.72;
-    vec4 t = triSample(p, n, slate ? M_SLATE : M_TILES, 3.0, nTS);
-    vec3 tint = slate ? vec3(0.7, 0.72, 0.78) : mix(vec3(1.0, 0.8, 0.7), vec3(0.8, 0.55, 0.45), fract(seed*7.0));
-    m.alb = t.rgb*tint; m.rough = t.a; m.nrm = nTS*vec3(1.6, 1.6, 1.0);
-    return m;
-  }
-  if (abs(n.y) > 0.5) { vec4 t = triSample(p, n, M_CONCRETE, 4.0, nTS); m.alb = t.rgb*0.75; m.rough = t.a; m.nrm = nTS; return m; }
-  float u = abs(n.x) > 0.5 ? p.z : p.x;
-  float floorH = type == 1 ? 3.6 : 2.9;
-  float y = p.y - (info.z - floor((info.z - p.y)/floorH)*floorH);
-  float fy = fract((info.z - p.y)/floorH);
-  float fx = fract(u/(type == 1 ? 2.6 : 3.2));
-  float win = step(0.18, fx)*step(fx, 0.82)*step(0.25, fy)*step(fy, 0.72);
-  if (type == 1) {
-    vec4 t = triSample(p, n, M_CONCRETE, 4.0, nTS);
-    vec3 facade = mix(vec3(0.85, 0.83, 0.8), vec3(0.6, 0.62, 0.66), fract(seed*13.0));
-    if (fract(seed*5.0) > 0.6) win = step(0.06, fx)*step(fx, 0.94)*step(0.15, fy)*step(fy, 0.88);  // curtain-wall towers
-    m.alb = t.rgb*facade; m.rough = t.a; m.nrm = nTS;
-    if (win > 0.5) { m.alb = vec3(0.04, 0.06, 0.08); m.rough = 0.06; m.metal = 0.4; }
-  } else {
-    bool brick = fract(seed*3.0) > 0.7;
-    vec4 t = triSample(p, n, brick ? M_BRICK : M_PLASTER, 2.5, nTS);
-    vec3 pal[5] = vec3[5](vec3(0.95,0.93,0.88), vec3(0.95,0.85,0.65), vec3(0.85,0.6,0.45), vec3(0.75,0.85,0.9), vec3(0.9,0.9,0.8));
-    m.alb = t.rgb*(brick ? vec3(1.0) : pal[int(fract(seed*11.0)*4.99)]); m.rough = t.a; m.nrm = nTS;
-    if (win > 0.5) { m.alb = vec3(0.05, 0.07, 0.09); m.rough = 0.08; m.metal = 0.3; }
-    else if (step(0.12, fx)*step(fx, 0.88)*step(0.2, fy)*step(fy, 0.77) > 0.5) m.alb = vec3(0.92);   // window frames
-  }
-  float lit = step(0.55, hash1(floor(u/2.6)*7.13 + floor((info.z - p.y)/floorH)*3.71 + seed*91.0));
-  m.emit = win*lit*vec3(1.0, 0.82, 0.55)*uNight*1.6;
-  m.alb *= 1.0 - 0.25*uWet;
   return m;
 }
 
@@ -1924,78 +1821,6 @@ vec2 iConvex(vec3 ro, vec3 rd, vec4 pl[7], int cnt, out vec3 nOut){
     if (den < 0.0) { if (t > tN) { tN = t; nOut = pl[i].xyz; } } else tF = min(tF, t);
   }
   return vec2(tN, tF);
-}
-
-// ---------------------------------------------------------------- town buildings (lot grid; mirrors World::lotAt)
-uniform int uTownCount;
-struct Lot { bool present; vec2 c; float hw, hd, wallH, roofH, ground; int type; int ridgeX; float seed; };
-Lot lotAt(ivec2 c){
-  Lot L; L.present = false;
-  L.c = vec2((float(c.x) + 0.5 + (hash2i(ivec2(c.x*3+1, c.y*5+2)) - 0.5)*0.14)*28.0, (float(c.y) + 0.5 + (hash2i(ivec2(c.x*7-3, c.y*3+9)) - 0.5)*0.14)*28.0);
-  vec4 m = maskTexel(L.c);
-  if (m.y < 0.01 || hash2i(ivec2(c.x*11+5, c.y*13-1)) > m.y*1.25) return L;
-  float h3 = hash2i(c+ivec2(3,-7)), h4 = hash2i(c+ivec2(-9,4)), h5 = hash2i(c+ivec2(15,21)), h6 = hash2i(c+ivec2(-31,-2));
-  L.seed = hash2i(ivec2(c.x*17+3, c.y*19+5));
-  float urban = m.z;
-  if (urban > 0.45) { L.type = 1; L.hw = 6.0 + 3.5*h3; L.hd = 6.0 + 3.5*h4; L.wallH = 9.0 + urban*urban*50.0*pow(h5, 1.5); L.roofH = 0.0; L.ridgeX = 0; }
-  else { L.type = 0; L.hw = 3.5 + 2.0*h3; L.hd = 4.5 + 2.5*h4; L.wallH = 3.0 + 2.5*h5 + (urban > 0.2 ? 3.0 : 0.0); L.roofH = 1.8 + 1.2*h6; L.ridgeX = L.seed < 0.5 ? 1 : 0; }
-  if (m.x*80.0 < max(L.hw, L.hd) + 6.0) return L;
-  L.ground = groundH(L.c, 5) - 1.0;
-  if (L.ground < 1.5) return L;
-  L.present = true;
-  return L;
-}
-// returns t (or -1); info = (type, seed, localY, part) ; part 0 wall, 1 roof
-float hitLot(vec3 ro, vec3 rd, Lot L, float tmax, out vec3 n, out vec4 info){
-  float top = L.ground + 1.0 + L.wallH;
-  vec3 nb; vec2 b = iBox(ro, rd, vec3(L.c.x - L.hw, L.ground, L.c.y - L.hd), vec3(L.c.x + L.hw, top, L.c.y + L.hd), nb);
-  float best = tmax; float res = -1.0; info = vec4(0.0);
-  if (b.x < b.y && b.y > 0.0 && b.x < best && b.x > 0.0) { best = b.x; res = b.x; n = nb; info = vec4(float(L.type), L.seed, top, 0.0); }
-  if (L.type == 0) {
-    float ox = L.hw + 0.4, oz = L.hd + 0.4, rh = L.roofH;
-    vec4 pl[7];
-    pl[0] = vec4(1,0,0, L.c.x + ox); pl[1] = vec4(-1,0,0, -(L.c.x - ox)); pl[2] = vec4(0,0,1, L.c.y + oz); pl[3] = vec4(0,0,-1, -(L.c.y - oz));
-    pl[4] = vec4(0,-1,0, -top);
-    if (L.ridgeX == 1) { vec3 a = normalize(vec3(0.0, 1.0, rh/oz)), bb = normalize(vec3(0.0, 1.0, -rh/oz));
-      pl[5] = vec4(a, dot(a, vec3(L.c.x, top + rh, L.c.y))); pl[6] = vec4(bb, dot(bb, vec3(L.c.x, top + rh, L.c.y))); }
-    else { vec3 a = normalize(vec3(rh/ox, 1.0, 0.0)), bb = normalize(vec3(-rh/ox, 1.0, 0.0));
-      pl[5] = vec4(a, dot(a, vec3(L.c.x, top + rh, L.c.y))); pl[6] = vec4(bb, dot(bb, vec3(L.c.x, top + rh, L.c.y))); }
-    vec3 nr; vec2 r = iConvex(ro, rd, pl, 7, nr);
-    if (r.x < r.y && r.x > 0.0 && r.x < best) { best = r.x; res = r.x; n = nr; info = vec4(0.0, L.seed, top, 1.0); }
-  } else {
-    // rooftop plant room
-    vec3 nb2; vec2 b2 = iBox(ro, rd, vec3(L.c.x - L.hw*0.35, top, L.c.y - L.hd*0.3), vec3(L.c.x + L.hw*0.35, top + 3.0, L.c.y + L.hd*0.3), nb2);
-    if (b2.x < b2.y && b2.x > 0.0 && b2.x < best) { best = b2.x; res = b2.x; n = nb2; info = vec4(1.0, L.seed, top, 2.0); }
-  }
-  return res;
-}
-float traceTowns(vec3 ro, vec3 rd, float tmax, out vec3 nOut, out vec4 info){
-  float best = -1.0; float limit = min(tmax, 9000.0);
-  for (int i = 0; i < 24; i++) {
-    if (i >= uTownCount) break;
-    vec4 TB = dataAt(320 + i), TY = dataAt(352 + i);
-    vec3 nb; vec2 tb = iBox(ro, rd, vec3(TB.x, TY.x, TB.y), vec3(TB.z, TY.y, TB.w), nb);
-    float t0 = max(tb.x, 0.0), t1 = min(tb.y, best > 0.0 ? best : limit);
-    if (t0 >= t1) continue;
-    vec3 p0 = ro + rd*(t0 + 0.01);
-    ivec2 c = ivec2(floor(p0.xz/28.0));
-    vec2 sgn = vec2(rd.x >= 0.0 ? 1.0 : -1.0, rd.z >= 0.0 ? 1.0 : -1.0);
-    vec2 inv = 1.0/max(abs(rd.xz), vec2(1e-6));
-    vec2 nextB = (vec2(c) + max(sgn, 0.0))*28.0;
-    vec2 tNext = t0 + (nextB - p0.xz)*sgn*inv;
-    vec2 tDelta = 28.0*inv;
-    for (int k = 0; k < 90; k++) {
-      Lot L = lotAt(c);
-      if (L.present) {
-        vec3 n; vec4 inf;
-        float th = hitLot(ro, rd, L, t1, n, inf);
-        if (th > 0.0 && th < t1) { best = th; t1 = th; nOut = n; info = inf; break; }
-      }
-      if (tNext.x < tNext.y) { if (tNext.x > t1) break; c.x += int(sgn.x); tNext.x += tDelta.x; }
-      else { if (tNext.y > t1) break; c.y += int(sgn.y); tNext.y += tDelta.y; }
-    }
-  }
-  return best;
 }
 
 // ---------------------------------------------------------------- airport structures (runway frame)
@@ -2381,21 +2206,23 @@ void main(){
       }
     }
   }
-  float tT = pod ? -1.0 : traceTerrain(ro, rd, tmax);
+  // environment entities: the raster pass already found the nearest tree / rock / building on this pixel
+  vec4 g0 = vec4(0.0);
+  if (!pod && !onScr) g0 = texelFetch(uGB0, ivec2(gl_FragCoord.xy), 0);
+  if (cloak) g0.x = g0.x > ckT ? g0.x - ckT : 0.0;   // seen through the cloak (the ray now starts on its skin)
+  float tE = g0.x > 0.0 && g0.x < tmax ? g0.x : -1.0;
+  float tT = pod ? -1.0 : traceTerrain(ro, rd, tE > 0.0 ? tE + 1.0 : tmax);
   float tW = (!pod && rd.y < 0.0 && ro.y > 0.0) ? -ro.y/rd.y : -1.0;
   vec3 bn; float bkind = 0.0; vec3 bl;
   vec2 bh = pod ? vec2(-1.0) : traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
   int trafK = -1; vec2 trafH = vec2(-1.0);
   if (!pod && uTrafficN > 0) { trafH = traceTraffic(ro, rd, tmax, trafK); loadMain(); }
   vec2 ph = onScr || cloak || (cockpitView && !pod) ? vec2(-1.0) : (pod ? h0 : tracePlane(ro, rd, tmax));
-  float tSoFar = min(tT > 0.0 ? tT : (tW > 0.0 ? tW : tmax), tmax);
-  vec3 tn; vec4 tinfo;
-  float tB = pod ? -1.0 : traceTowns(ro, rd, tSoFar, tn, tinfo);
   float t = 1e9; int hit = 0;
   if (tT > 0.0) { t = tT; hit = 1; }
   if (tW > 0.0 && tW < t) { t = tW; hit = 2; }
   if (bh.x > 0.0 && bh.x < t) { t = bh.x; hit = 3; }
-  if (tB > 0.0 && tB < t) { t = tB; hit = 5; }
+  if (tE > 0.0 && tE < t) { t = tE; hit = 5; }
   if (ph.x > 0.0 && ph.x < t) { t = ph.x; hit = 4; }
   float tU = (uUfoOn == 1 && !pod) ? traceUfo(ro, rd, t < 1e8 ? t : tmax) : -1.0;
   bool ufoHit = tU > 0.0 && tU < t;
@@ -2420,6 +2247,7 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
       Mat m = terrainMaterial(p, n, t, base);
       vec3 ns = applyTS(n, m.nrm, t < 2000.0 ? 0.6 : 0.25);
       float sh = sunVis > 0.0 ? terrainShadow(p + n*0.5, uSunDir, t) : 0.0;
+      if (sh > 0.0) sh *= entShadow(p, n);
       if (t < 3000.0) sh *= planeShadow(p + n*0.2, uSunDir);
       if (uTrafficN > 0) sh *= trafficShadow(p);
       sh *= cloudShadow(p);
@@ -2444,7 +2272,7 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
       vec3 refl = skyColor(r);
       // reflected clouds (cheap)
       if (uCloudCover > 0.05 && uQuality > 0) { vec4 cl = traceClouds(p, r, 30000.0, 0.5); refl = refl*cl.a + cl.rgb; }
-      float sh = sunVis > 0.0 ? terrainShadow(p + vec3(0,1,0), uSunDir, t) * cloudShadow(p) : 0.0;
+      float sh = sunVis > 0.0 ? terrainShadow(p + vec3(0,1,0), uSunDir, t) * cloudShadow(p) * entShadow(p, vec3(0,1,0)) : 0.0;
       vec4 base = baseAt(p.xz);
       vec3 deep = mix(vec3(0.004,0.03,0.06), vec3(0.003,0.02,0.035), base.w);
       vec3 shallow = mix(vec3(0.02,0.16,0.17), vec3(0.03,0.30,0.29), base.z) * (1.0 - 0.7*base.w);
@@ -2457,12 +2285,27 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
       float spec = pow(max(dot(n, h), 0.0), ex)*(ex + 8.0)/(900.0 + 8.0)*120.0 + pow(max(dot(n,h),0.0), 90.0*(1.0 - rough))*1.5;
       col = mix(lit, refl, fres) + uSunCol*spec*sh*(1.0 - smoothstep(0.5, 1.0, uCloudCover));
       // night: runway/town light reflections handled by overlay pass glow
-    } else if (hit == 3 || hit == 5) {
+    } else if (hit == 5) {
+      // tree, rock or building from the G-buffer
+      vec3 n = octDec(g0.yz);
+      vec4 g1 = texelFetch(uGB1, ivec2(gl_FragCoord.xy), 0), g2 = texelFetch(uGB2, ivec2(gl_FragCoord.xy), 0);
+      Mat m; m.alb = g1.rgb*g1.rgb; m.rough = g1.a; m.metal = g2.a; m.emit = g2.rgb*g2.rgb*8.0; m.nrm = vec3(0,0,1);
+      int cls = int(g0.w + 0.5);
+      p = ro + rd*t;
+      float sh = sunVis > 0.0 ? terrainShadow(p + n*0.5 + vec3(0.0, 0.5, 0.0), uSunDir, t) : 0.0;
+      if (sh > 0.0) sh *= entShadow(p, n)*cloudShadow(p);
+      if (sh > 0.0 && t < 3000.0) sh *= planeShadow(p + n*0.2, uSunDir);
+      if (uTrafficN > 0) sh *= trafficShadow(p);
+      col = shadeSurface(p, n, rd, m, sh);
+      if (cls == 1) {   // foliage: light through the leaves when the sun is behind them, and a soft wrap
+        float back = pow(max(dot(rd, uSunDir), 0.0), 3.0)*0.9 + 0.12*max(dot(-n, uSunDir), 0.0);
+        col += m.alb*vec3(0.85, 1.0, 0.55)*uSunCol*sh*back*1.6;
+      }
+    } else if (hit == 3) {
       Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1); m.rough = 0.7; m.alb = vec3(0.7);
-      vec3 nn = hit == 3 ? bn : tn;
+      vec3 nn = bn;
       vec3 nTS = vec3(0,0,1);
-      if (hit == 5) m = buildingMaterial(p, nn, tinfo);
-      else {
+      {
         int k = int(bkind + 0.5); vec3 lh = bl; vec3 H = dataAt(192 + int(bh.y)).xyz;
         if (k == 0) {        // arched hangar: corrugated metal skin, big sliding doors facing the runway
           vec4 tx = triSample(lh*vec3(1.0, 1.0, 1.0), nn, M_CORRUGATED, 2.0, nTS);

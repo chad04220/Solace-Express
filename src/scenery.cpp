@@ -176,76 +176,6 @@ float World::groundHeight(float x, float z, int octaves) const {
   return b[0] + b[1] * terrainFbm(x / DETAIL_SCALE, z / DETAIL_SCALE, octaves);
 }
 
-float World::cover(float x, float z, float g, const float b[4], int* kindOut) const {
-  int kind = COV_NONE; float best = 0;
-  float m[4]; sampleMask(x, z, m);
-  if (g < 0.3f) {
-    if (m[3] > 0.5f) {
-      int ix = (int)floorf(x / STACK_CELL), iz = (int)floorf(z / STACK_CELL);
-      float depthOk = smoothstepf(-16.f, -4.f, g) * smoothstepf(-0.5f, -2.5f, g);
-      if (hash2i(ix * 7 + 3, iz * 11 - 5) < 0.05f * SCENERY_DENSITY * depthOk) {
-        float cx = (ix + 0.5f + (hash2i(ix + 17, iz) - 0.5f) * 0.4f) * STACK_CELL, cz = (iz + 0.5f + (hash2i(ix, iz + 23) - 0.5f) * 0.4f) * STACK_CELL;
-        float r = 7.f + 8.f * hash2i(ix, iz + 31), H = 14.f + 30.f * hash2i(ix + 5, iz + 9);
-        float dx = x - cx, dz = z - cz, d = sqrtf(dx * dx + dz * dz);
-        float top = H * smoothstepf(r, r * 0.7f, d * (0.85f + 0.3f * valueNoise(x * 0.12f, z * 0.12f)));
-        if (top - g > best) { best = top - g; kind = COV_STACK; }
-      }
-    }
-    if (kindOut) *kindOut = kind;
-    return best;
-  }
-  float lush = b[2], cold = b[3], amp = b[1];
-  float roadD = m[0] * ROAD_RANGE, town = m[1], farm = m[3];
-  // ---- trees
-  float fn = forestAt(x, z);
-  float treeline = smoothstepf(1500.f - cold * 900.f, 1100.f - cold * 700.f, g);
-  float fd = smoothstepf(0.42f - 0.1f * lush, 0.5f - 0.1f * lush, fn) * treeline;
-  fd = std::max(fd, 0.04f * treeline);
-  fd *= smoothstepf(4.f, 9.f, g) * smoothstepf(2.5f, 8.f, amp) * smoothstepf(9.f, 18.f, roadD) * (1.f - smoothstepf(0.03f, 0.2f, town)) * (1.f - 0.88f * farm);
-  if (fd > 0.001f) {
-    int ix = (int)floorf(x / TREE_CELL), iz = (int)floorf(z / TREE_CELL);
-    if (hash2i(ix * 3 + 11, iz * 5 - 7) < fd * 0.9f * SCENERY_DENSITY) {
-      float jx = hash2i(ix + 101, iz - 31) - 0.5f, jz = hash2i(ix - 57, iz + 77) - 0.5f;
-      float cx = (ix + 0.5f + jx * 0.3f) * TREE_CELL, cz = (iz + 0.5f + jz * 0.3f) * TREE_CELL;
-      float sp = hash2i(ix * 13 + 1, iz * 7 + 3), hv = hash2i(ix - 3, iz + 19);
-      bool conifer = cold > 0.45f || g > 650.f || sp < 0.18f;
-      bool palm = !conifer && lush > 0.85f && g < 70.f && sp > 0.35f;
-      int k; float r, H;
-      if (conifer) { k = COV_CONIFER; r = 2.2f + 1.0f * hv; H = 9.f + 9.f * hv; }
-      else if (palm) { k = COV_PALM; r = 2.4f + 0.6f * hv; H = 7.f + 5.f * hv; }
-      else { k = COV_BROADLEAF; r = 3.6f + 1.6f * hv; H = 6.f + 6.f * hv; }
-      float dx = x - cx, dz = z - cz, d = sqrtf(dx * dx + dz * dz);
-      float th = 0;
-      if (d < r) {
-        float q = d / r;
-        if (k == COV_CONIFER) th = H * (1.f - q);
-        else if (k == COV_BROADLEAF) th = H * (0.22f + 0.78f * sqrtf(1.f - q * q));
-        else { float star = 0.7f + 0.3f * cosf(atan2f(dz, dx) * 7.f); th = q < star ? H * (0.82f + 0.18f * (1.f - q / star)) : 0.f; }
-      }
-      if (th > best) { best = th; kind = k; }
-    }
-  }
-  // ---- boulders and rock formations
-  float rdn = smoothstepf(60.f, 200.f, amp) * 0.25f + smoothstepf(900.f, 1400.f, g) * 0.12f + smoothstepf(3.f, 0.5f, g) * 0.04f * (1.f - farm);
-  rdn *= smoothstepf(10.f, 20.f, roadD) * (1.f - smoothstepf(0.03f, 0.2f, town));
-  if (rdn > 0.001f) {
-    int ix = (int)floorf(x / ROCK_CELL), iz = (int)floorf(z / ROCK_CELL);
-    if (hash2i(ix * 5 - 13, iz * 3 + 29) < rdn * SCENERY_DENSITY) {
-      float cx = (ix + 0.5f + (hash2i(ix + 41, iz - 9) - 0.5f) * 0.3f) * ROCK_CELL, cz = (iz + 0.5f + (hash2i(ix - 21, iz + 63) - 0.5f) * 0.3f) * ROCK_CELL;
-      float hr = hash2i(ix + 7, iz - 77);
-      float r = 1.6f + 5.0f * hr * hr;
-      float dx = x - cx, dz = z - cz, d = sqrtf(dx * dx + dz * dz);
-      if (d < r) {
-        float q = d / r;
-        float th = r * 0.75f * powf(1.f - q * q, 0.6f) * (0.6f + 0.8f * valueNoise(x * 0.9f, z * 0.9f));
-        if (th > best) { best = th; kind = COV_ROCK; }
-      }
-    }
-  }
-  if (kindOut) *kindOut = kind;
-  return best;
-}
-
 bool World::lotAt(int i, int j, Lot& L) const {
   L.present = false;
   L.cx = (i + 0.5f + (hash2i(i * 3 + 1, j * 5 + 2) - 0.5f) * 0.14f) * LOT;
@@ -269,18 +199,4 @@ bool World::lotAt(int i, int j, Lot& L) const {
   if (L.ground < 1.5f) return false;
   L.present = true;
   return true;
-}
-
-bool World::hitsBuilding(vec3 p, float r) const {
-  if (p.y > 600.f) return false;
-  int i0 = (int)floorf((p.x - r - 14.f) / LOT), i1 = (int)floorf((p.x + r + 14.f) / LOT);
-  int j0 = (int)floorf((p.z - r - 14.f) / LOT), j1 = (int)floorf((p.z + r + 14.f) / LOT);
-  for (int j = j0; j <= j1; j++)
-    for (int i = i0; i <= i1; i++) {
-      Lot L;
-      if (!lotAt(i, j, L)) continue;
-      float top = L.ground + 1.f + L.wallH + L.roofH;
-      if (fabsf(p.x - L.cx) < L.hw + r && fabsf(p.z - L.cz) < L.hd + r && p.y > L.ground - r && p.y < top + r * 0.5f) return true;
-    }
-  return false;
 }

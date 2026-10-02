@@ -1,5 +1,6 @@
 // Air Xpress - game flow, flight session, cameras, particles, lights, audio feed
 #include "game.h"
+#include "entities.h"
 #include "models.h"
 
 // XR-9 wingtip (body frame) matching mapJet's cranked delta in shaders.h
@@ -1225,6 +1226,9 @@ FrameParams Game::buildFrame() {
       fp.flameLight = lerp(vec3(0.3f, 0.55f, 1.f), vec3(1.f, 0.62f, 0.3f), ab) * ((25.f * sp * sp + 260.f * ab) * flick);
     }
     wraithVisual(fp);
+    // craters flatten the scenery that stood in them (a plasma blast clears a far wider circle than its pit)
+    g_scenery.craters.clear();
+    for (int i = 0; i < fp.wreck.craterN; i++) { const float* c = fp.wreck.crater[i]; g_scenery.craters.push_back(vec3(c[0], c[1], c[3] < 0 ? c[2] * 4.f : c[2] * 1.5f)); }
     fp.rainLens = camMode == 1 && wx.precip == 1 ? 1.f : 0.f;
     fp.sealedCockpit = camMode == 1 && plane.spec->special && !crashed;
     fp.trafficN = traffic.fillVisuals(fp.camPos, fp.traffic, kMaxTrafficDrawn, nullptr);
@@ -1549,6 +1553,7 @@ void Game::render() {
     std::string t = fmt("%.0f fps  %.1f ms   GPU %s   res %.0f%% (%dx%d)", 1.f / std::max(fpsAvg, 1e-4f), fpsAvg * 1000.f,
                         g_ren.gpuMs > 0 ? fmt("%.1f ms", g_ren.gpuMs).c_str() : "n/a", g_ren.renderScale * 100.f,
                         (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale));
+    t += fmt("   scenery %d drawn, %d chunks, %.1f ms CPU", g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs);
     g_ren.rect(6 * s, 6 * s, 420 * s, 24 * s, vec3(0, 0, 0), 0.55f);
     g_ren.text(14 * s, 10 * s, 14 * s, t, fpsAvg < 1.f / 57.f ? vec3(1, 0.5f, 0.3f) : vec3(0.5f, 1, 0.6f), 1, 0, false);
   }
@@ -1698,6 +1703,17 @@ void Game::debugScene(const std::string& name) {
   plane.starterTime = 0.01f; plane.engineRunning = true; plane.rpm = 1000; engineAutoStarted = true;
   {
     float px, pz, agl, hdg; char cm = 'c';
+    float yw, pt, dist, lh = 8, tod = -1;
+    if (sscanf(name.c_str(), "look_%f_%f_%f_%f_%f_%f_%f", &px, &pz, &yw, &pt, &dist, &lh, &tod) >= 5) {   // free camera on a ground point
+      if (tod >= 0) timeOfDay = tod;
+      plane.reset(&kAircraft[1], vec3(px + 4000.f, std::max(g_world.height(px + 4000.f, pz), 0.f) + 900.f, pz), 90, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
+      takeoffAnnounced = true; hudOn = false; hint.clear(); toasts.clear(); dbgCam = true; dbgFollow = false;
+      dbgCamLook = vec3(px, std::max(g_world.height(px, pz), 0.f) + lh, pz);
+      dbgCamPos = dbgCamLook + vec3(sinf(yw * DEG) * cosf(pt * DEG), sinf(pt * DEG), -cosf(yw * DEG) * cosf(pt * DEG)) * dist;
+      dbgCamPos.y = std::max(dbgCamPos.y, std::max(g_world.height(dbgCamPos.x, dbgCamPos.z), 0.f) + 2.f);
+      for (int i = 0; i < 5; i++) updateCamera(0.1f);
+      return;
+    }
     if (sscanf(name.c_str(), "at_%f_%f_%f_%f_%c", &px, &pz, &agl, &hdg, &cm) >= 4) {
       plane.reset(&kAircraft[1], vec3(px, std::max(g_world.height(px, pz), 0.f) + agl, pz), hdg, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
       takeoffAnnounced = true; camQ = plane.q; hudOn = false; hint.clear(); toasts.clear();

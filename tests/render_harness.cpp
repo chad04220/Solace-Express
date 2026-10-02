@@ -40,6 +40,7 @@ int main(int argc, char** argv) {
   buildStory();
   g_ren.renderScale = getenv("RSCALE") ? (float)atof(getenv("RSCALE")) : 1.0f; g_ren.quality = 1;
   if (!g_ren.init(W, H)) { printf("init failed: %s\n", g_ren.error.c_str()); return 1; }
+  g_ren.entSync = !getenv("ENTSTREAM");   // captures generate every scenery chunk in range up front
   printf("renderer ok\n");
   std::string scene = argc > 1 ? argv[1] : "default";
   Game game;
@@ -54,7 +55,7 @@ int main(int argc, char** argv) {
     int frames = atoi(getenv("BENCH"));
     for (int i = 0; i < frames; i++) game.render();
     glFinish();
-    printf("bench: %.1f ms/frame\n", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / frames);
+    printf("bench: %.1f ms/frame  (scenery: %d instances, %d chunks, %.2f ms CPU)\n", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / frames, g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs);
   }
   std::string out = "/tmp/claude-0/sp/shot_" + scene + ".ppm";
   g_ren.screenshot(out.c_str());

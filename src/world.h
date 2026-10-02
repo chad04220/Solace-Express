@@ -49,19 +49,17 @@ public:
   std::vector<float> hm;     // RGBA per texel: base height, detail amplitude, lushness, coldness
   std::vector<uint8_t> roadId; // RG8 per mask texel: nearest road segment + 1 (shader computes exact road edges), baked forest noise
   std::vector<uint8_t> mask; // RGBA8: road distance, building density, urbanness, farmland / sea-stack flag
-  std::vector<float> hmax[HMAX_LEVELS];   // upper bound of terrain + cover per cell, level L has HMAX_N>>L cells per side
+  std::vector<float> hmax[HMAX_LEVELS];   // upper bound of the terrain per cell, level L has HMAX_N>>L cells per side
   void build();
   void buildHMax();
   void bakeMask();
   void sampleMask(float x, float z, float out[4]) const;   // manual bilinear (matches shader)
   void maskTexel(float x, float z, float out[4]) const;    // nearest texel (matches shader texelFetch)
   float forestAt(float x, float z) const;                  // baked forest-patch noise, manual bilinear (matches shader)
-  float groundHeight(float x, float z, int octaves = 8) const;          // terrain without trees/rocks
-  float cover(float x, float z, float ground, const float base[4], int* kind) const;  // tree / rock height above ground
-  bool lotAt(int i, int j, Lot& out) const;                 // procedural building on a town lot
-  bool hitsBuilding(vec3 p, float radius) const;
+  float groundHeight(float x, float z, int octaves = 8) const;          // same as height()
+  bool lotAt(int i, int j, Lot& out) const;                 // a town lot with a building on it (entities.cpp picks the building)
   int findAirport(const char* code) const;
-  // Terrain height (m) at world position including trees and rocks. octaves controls detail fidelity.
+  // Terrain height (m) at a world position (bare ground). octaves controls detail fidelity.
   float height(float x, float z, int octaves = 8) const;
   vec3 normal(float x, float z) const;
   // Base layer sample (manual bilinear, matches the shader exactly)
