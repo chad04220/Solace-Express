@@ -468,12 +468,18 @@ void Plane::wraithThrust(vec3& F, vec3& T, float Tp, vec3 wd, vec3 Taero, vec3 s
     vec3 Fk, Tk; podForces(c, tilt, Tp, Fk, Tk, nullptr, nullptr, nullptr);
     vec3 d = Tk - T0; J[0][kk] = d.x; J[1][kk] = d.y; J[2][kk] = d.z;
   }
+  // weighted allocation (minimum sum of u^2 / wt): in the hover, differential thrust does the work and the visible
+  // controls (vanes, pod yaw, differential tilt) only top it up, so a stick input doesn't twist every pod at once.
+  // Yaw still needs them; differential tilt is the cleaner-looking way, the yaw vanes come last.
+  float hv = smoothstepf(0.4f, 0.9f, nozzle);
+  float wt[6] = {1.f, 1.f, 1.f - 0.92f * hv, 1.f - 0.92f * hv, 1.f - 0.85f * hv, 1.f - 0.5f * hv};
+  float um[6] = {1.f, 1.f, 1.f - 0.7f * hv, 1.f - 0.7f * hv, 1.f - 0.6f * hv, 1.f};   // and they stay within a modest throw
   float uv[6] = {0, 0, 0, 0, 0, 0}; bool free_[6] = {true, true, true, true, true, true};
   vec3 r = rem;
   for (int pass = 0; pass < 3; pass++) {
     // u = J^T (J J^T + lambda I)^-1 r over the unsaturated controls
     float A[3][3] = {};
-    for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) { for (int kk = 0; kk < 6; kk++) if (free_[kk]) A[i][j] += J[i][kk] * J[j][kk]; }
+    for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) { for (int kk = 0; kk < 6; kk++) if (free_[kk]) A[i][j] += wt[kk] * J[i][kk] * J[j][kk]; }
     float lam = 1e3f + 0.01f * (A[0][0] + A[1][1] + A[2][2]);   // damped: weak controls aren't driven into saturation
     for (int i = 0; i < 3; i++) A[i][i] += lam;
     float det = A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1]) - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0]) + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]);
@@ -487,9 +493,9 @@ void Plane::wraithThrust(vec3& F, vec3& T, float Tp, vec3 wd, vec3 Taero, vec3 s
     bool sat = false;
     for (int kk = 0; kk < 6; kk++) {
       if (!free_[kk]) continue;
-      float du = J[0][kk] * y[0] + J[1][kk] * y[1] + J[2][kk] * y[2];
+      float du = wt[kk] * (J[0][kk] * y[0] + J[1][kk] * y[1] + J[2][kk] * y[2]);
       uv[kk] += du;
-      if (fabsf(uv[kk]) > 1.f) { uv[kk] = clampf(uv[kk], -1.f, 1.f); free_[kk] = false; sat = true; }
+      if (fabsf(uv[kk]) > um[kk]) { uv[kk] = clampf(uv[kk], -um[kk], um[kk]); free_[kk] = false; sat = true; }
     }
     if (!sat) break;
     // residual left after saturation, for the controls still free
