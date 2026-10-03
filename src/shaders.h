@@ -543,8 +543,15 @@ vec2 mapPlaneBody(vec3 p){
     shell = max(shell, -min(holeWs, holeSide));
     res = vec2(shell, 11.0);
   }
+  // Each part below is skipped when its bounding box is farther than the nearest surface found so far (plus its blend
+  // radius): its own distance can only be larger, so the result is unchanged - but a sample in the cabin no longer
+  // evaluates the wingtips, the tail and the wheels (the cockpit view takes ~30 such samples per pixel).
   // ---------------- main wing with flaps and ailerons
-  {
+  vec4 W0b = gM[9], W1b = gM[10], W2b = gM[11];
+  float wy0 = min(W1b.x, W1b.x + W0b.x*W1b.z), wy1 = max(W1b.x, W1b.x + W0b.x*W1b.z);
+  float wyLo = (W2b.x > 0.5 ? min(wy0, -0.35*R) : wy0) - 0.45 - W2b.z, wyHi = wy1 + 0.45 + W2b.z;
+  float wz0 = W1b.y - 0.45, wz1 = W1b.y + max(W0b.y, W0b.w + W0b.z) + 0.45;
+  if (sdBox(p - vec3(0.0, 0.5*(wyLo + wyHi), 0.5*(wz0 + wz1)), vec3(W0b.x + 0.35, 0.5*(wyHi - wyLo), 0.5*(wz1 - wz0))) < res.x + 0.06*R + 0.1) {
     vec4 W0 = gM[9], W1 = gM[10], W2 = gM[11];
     float span = W0.x, rc = W0.y, tc = W0.z, sw = W0.w, th = W1.w;
     float s = abs(p.x);
@@ -582,7 +589,10 @@ vec2 mapPlaneBody(vec3 p){
     }
   }
   // ---------------- tail
-  {
+  vec4 V0b = gM[14], V1b = gM[15], H0b = gM[12], H1b = gM[13];
+  float tz0 = min(V1b.y, H1b.y) - 0.35, tz1 = max(V1b.y + max(V0b.y, V0b.w + V0b.z), H1b.y + max(H0b.y, H0b.w + H0b.z)) + 0.35;
+  float ty0 = min(V1b.x, H1b.x - H0b.x*abs(H1b.z)) - 0.45, ty1 = max(V1b.x + V0b.x, H1b.x + H0b.x*abs(H1b.z)) + 0.45;
+  if (sdBox(p - vec3(0.0, 0.5*(ty0 + ty1), 0.5*(tz0 + tz1)), vec3(max(H0b.x, 0.3) + 0.35, 0.5*(ty1 - ty0), 0.5*(tz1 - tz0))) < res.x + 0.12*R) {
 )"
 R"(    vec4 V0 = gM[14], V1 = gM[15];
     float s = p.y - V1.x, c = p.z - V1.y, t = p.x;
@@ -607,7 +617,13 @@ R"(    vec4 V0 = gM[14], V1 = gM[15];
   {
     vec4 N0 = gM[16], N1 = gM[17];
     vec4 S0 = gM[1];
-    if (eng <= 1) {
+    float eb;   // distance to the engines' bounding box
+    if (eng <= 1) { float sr0 = max(N1.y, 0.1); eb = sdBox(p - vec3(0.0, S0.w, S0.x + 0.5*(1.75 - sr0*2.3)), vec3(0.95, 1.1, 0.5*(1.75 + sr0*2.3) + 0.25)); }
+    else if (eng <= 3) { vec3 nq = vec3(abs(p.x) - N0.x, p.y - N0.y, p.z); float yr = abs(gM[10].x + N0.x*gM[10].z - N0.y);
+                         eb = sdBox(nq - vec3(0.0, 0.0, N0.w + 0.5*(N1.x - N1.y*2.3)), vec3(N0.z + 0.6, N0.z + yr + 0.6, 0.5*(N1.x + N1.y*2.3) + 0.4)); }
+    else { vec3 nq = vec3(abs(p.x), p.y - N0.y, p.z - N0.w); eb = sdBox(nq - vec3(0.5*(N0.x + N0.z), 0.0, 0.5*N1.x), vec3(0.5*(N0.x + N0.z) + 0.3, N0.z + 0.4, 0.5*N1.x + 0.75)); }
+    if (eb > res.x + 0.12) {}
+    else if (eng <= 1) {
       float sr = N1.y;
       float spin = sdRoundCone(p, vec3(0.0, S0.w, S0.x - sr*2.3), vec3(0.0, S0.w, S0.x + 0.05), 0.015, sr);
       res = opU(res, vec2(spin, 16.0));
@@ -662,8 +678,11 @@ R"(    vec4 V0 = gM[14], V1 = gM[15];
     pod = smin(pod, sdEllipsoid(p - vec3(0.0, sec.z - sec.y - 0.2, -3.0), vec3(0.42, 0.22, 0.8)), 0.2);
     res.x = smin(res.x, pod, 0.12);
   }
-  // ---------------- landing gear
-  if (gear > 0.02) {
+  // ---------------- landing gear (fixed types hang below the lower fuselage: a plane bounds them)
+  float gearTop = 1e5;
+  if (int(gM[0].y + 0.5) <= 2) { vec3 sg0 = fusSection(gM[18].z), sg1 = fusSection(gM[19].z < 0.5 ? gM[18].w : gM[19].y);
+                                  gearTop = max(sg0.z - sg0.y*0.5, sg1.z - sg1.y*0.5) + 0.12; }
+  if (gear > 0.02 && p.y - gearTop < res.x) {
     vec4 G0 = gM[18], G1 = gM[19];
     float track = G0.x, wr = G0.y, mz = G0.z, nz = G0.w, gh = G1.x, tz = G1.y;
     bool retract = gtype >= 3;
@@ -2796,9 +2815,9 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float jit){
   // a camera inside the jet (chase view right behind in reheat) sees the flame ahead of it, not a glow all around
   vec3 co = lo - o; float cax = dot(co, ax), crad = length(co - ax*cax);
   float camIn = smoothstep(3.5, 1.5, crad)*smoothstep(-1.0, 0.5, cax)*smoothstep(L + 6.0, L, cax);
-  float dt = (t1 - t0)/40.0;
-  vec3 acc = vec3(0.0);
-  for (int i = 0; i < 40; i++) {
+  float dt = (t1 - t0)/28.0;   // 28 jittered steps (the TAA smooths the rest): 40 made the plume pixels the costliest
+  vec3 acc = vec3(0.0);        // on screen behind the XR-9
+  for (int i = 0; i < 28; i++) {
     COST(3);
     vec3 q = lo + ld*(t0 + (float(i) + jit)*dt) - o;
     float x = dot(q, ax);

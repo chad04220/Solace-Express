@@ -21,6 +21,10 @@ enum EntKind {
 };
 enum EntClass { EC_TREE = 0, EC_ROCK, EC_BUILDING };
 inline int entClass(int k) { return k <= EK_BUSH ? EC_TREE : k <= EK_SEASTACK ? EC_ROCK : EC_BUILDING; }
+// Distance thinning of the small, numerous kinds (trees, bushes, boulders): an instance is drawn while its key is below
+// the keep fraction for its distance, (ref / d)^2 with ref proportional to the kind's height - so the number of
+// instances per screen pixel stays about constant out to the draw limit, where the ground texture has taken over.
+inline bool entThins(int k) { return k <= EK_BUSH || (k >= EK_BOULDER && k <= EK_SLAB); }
 
 // Nominal size of each kind's mesh (metres, before the per-instance scale): half width (x), full height (y),
 // half depth (z). Meshes stand on y = 0 with their front facing +z.
@@ -29,6 +33,9 @@ extern const EntKindInfo kEntInfo[EK_COUNT];
 
 // One placed entity (also the GPU instance record: 2 x vec4)
 struct Ent { float x, y, z, yaw, sx, sy, sz, seed; };
+inline float entThinKey(const Ent& e) { return fmodf(e.seed * 7.13f, 1.f); }   // (the entity vertex shader uses the same)
+inline float entThinRef(int k) { return 80.f * kEntInfo[k].h; }               // full density out to here (m)
+inline float entKeep(int k, float d) { float r = entThinRef(k); return d <= r ? 1.f : r * r / (d * d); }
 
 class Scenery {
 public:

@@ -6,14 +6,14 @@ static const char* kEntVS = R"(
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNrm; layout(location=2) in vec4 aAux;   // part, ao, u, v
 layout(location=3) in vec4 iA; layout(location=4) in vec4 iB;   // position + yaw | scale + seed
 uniform mat4 uVP; uniform vec2 uJit; uniform float uLogC; uniform float uTime; uniform int uKind; uniform int uShadowPass;
-uniform vec3 uCamV; uniform float uFar; uniform float uThin;   // view pass: per-instance distance thinning on the GPU
+uniform vec3 uCamV; uniform float uFar; uniform float uThin; uniform float uThinRef;   // view pass: per-instance distance thinning (entKeep)
 out vec3 vW; out vec3 vL; out vec3 vLN; out vec4 vAux;
 flat out vec4 vInst;   // seed, yaw, scale y, instance height
 flat out vec3 vScale;
 void main(){
   if (uShadowPass == 0 && uThin > 0.5) {   // thin out towards the far limit (the ground texture takes over distant forest)
     float d = length(iA.xyz - uCamV);
-    if (fract(iB.w*7.13) < smoothstep(uFar*0.45, uFar, d)*0.92 || d >= uFar) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+    if (fract(iB.w*7.13) >= min(1.0, uThinRef*uThinRef/max(d*d, 1.0)) || d >= uFar) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   }
   vec3 lp = aPos*iB.xyz;
   // foliage sways a little in the wind, more towards the top and the frond tips

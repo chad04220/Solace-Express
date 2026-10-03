@@ -474,6 +474,9 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
   ch.ents.clear();
   ch.ymin = 1e9f; ch.ymax = -1e9f;
   for (int k = 0; k < EK_COUNT; k++) {
+    // trees, bushes and small rocks in ascending order of their thinning key, so the renderer keeps a prefix of the
+    // list when it thins a whole chunk out with distance (see entThinKey)
+    if (entThins(k)) std::sort(lists[k].begin(), lists[k].end(), [](const Ent& a, const Ent& b) { return entThinKey(a) < entThinKey(b); });
     ch.off[k] = (uint32_t)ch.ents.size();
     for (const Ent& e : lists[k]) {
       ch.ents.push_back(e);

@@ -222,14 +222,23 @@ void Renderer::drawEntities(const FrameParams& fp) {
         if (b == e) continue;
         float far = rangeOf(R, k), l0, l1;
         lodLimits(R, k, l0, l1);
-        bool thin = entClass(k) == EC_TREE || k <= EK_SLAB;
+        bool thin = entThins(k);
         bool viewK = inView && dmin < far;
         if (!viewK && !inSh[0] && !inSh[1]) continue;
         // the whole chunk in one LOD band and inside the draw distance: hand its instances over in one block (the
         // vertex shader does the distance thinning per instance, exactly as below)
         int lodN = dmin < l0 ? 0 : dmin < l1 ? 1 : 2, lodF = dmax < l0 ? 0 : dmax < l1 ? 1 : 2;
         bool bulk = viewK && !affected && dmax < far && lodN == lodF;
-        if (bulk) { auto& bk = bucket[0][k][lodN]; bk.insert(bk.end(), ch->ents.begin() + b, ch->ents.begin() + e); }
+        if (bulk) {
+          // thinned kinds: only the prefix that can survive anywhere in the chunk (keys ascending, nearest point's
+          // keep fraction); the vertex shader thins the rest of the way per instance
+          uint32_t eb = e;
+          if (thin) {
+            float kp = entKeep(k, std::max(dmin, 1.f));
+            eb = (uint32_t)(std::lower_bound(ch->ents.begin() + b, ch->ents.begin() + e, kp, [](const Ent& x, float v) { return entThinKey(x) < v; }) - ch->ents.begin());
+          }
+          auto& bk = bucket[0][k][lodN]; bk.insert(bk.end(), ch->ents.begin() + b, ch->ents.begin() + eb);
+        }
         if (bulk && !inSh[0] && !inSh[1]) continue;
         for (uint32_t i = b; i < e; i++) {
           const Ent& en = ch->ents[i];
@@ -237,14 +246,11 @@ void Renderer::drawEntities(const FrameParams& fp) {
           float ddx = en.x - cam.x, ddy = en.y - cam.y, ddz = en.z - cam.z;
           float d = sqrtf(ddx * ddx + ddy * ddy + ddz * ddz);
           int lod = d < l0 ? 0 : d < l1 ? 1 : 2;
-          if (viewK && d < far && !bulk) {
-            // thin out towards the far limit (the ground texture takes over the look of distant forest)
-            bool keep = !thin || fmodf(en.seed * 7.13f, 1.f) >= smoothstepf(far * 0.45f, far, d) * 0.92f;
-            if (keep) bucket[0][k][lod].push_back(en);
-          }
+          bool keep = !thin || entThinKey(en) < entKeep(k, d);   // (the ground texture takes over distant forest)
+          if (viewK && d < far && !bulk && keep) bucket[0][k][lod].push_back(en);
           // shadows: only what can cast into the faded circle the shader uses (radius kShFade1 x R around the
           // centre; a caster's shadow reaches h / tan(sun elevation) away), thinned like the trees themselves
-          bool shKeep = !thin || fmodf(en.seed * 7.13f, 1.f) >= smoothstepf(far * 0.45f, far, d) * 0.92f;
+          bool shKeep = keep;   // shadows only from what is drawn
           for (int c = 0; c < 2; c++)
             if (inSh[c] && shKeep && k != EK_RWYLIGHT && k != EK_PAPI) {
               float sx = en.x - newCenter[c].x, sz = en.z - newCenter[c].z;
@@ -276,9 +282,9 @@ void Renderer::drawEntities(const FrameParams& fp) {
   glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
   glBufferData(GL_ARRAY_BUFFER, std::max<size_t>(entStage.size(), 1) * sizeof(Ent), entStage.empty() ? nullptr : entStage.data(), GL_STREAM_DRAW);
   auto issue = [&](GLuint prog, const std::vector<Draw>& list) {
-    GLint uk = glGetUniformLocation(prog, "uKind"), uf = glGetUniformLocation(prog, "uFar"), ut = glGetUniformLocation(prog, "uThin");
+    GLint uk = glGetUniformLocation(prog, "uKind"), uf = glGetUniformLocation(prog, "uFar"), ut = glGetUniformLocation(prog, "uThin"), ur = glGetUniformLocation(prog, "uThinRef");
     for (const Draw& d : list) {
-      glUniform1f(uf, rangeOf(R, d.kind)); glUniform1f(ut, (entClass(d.kind) == EC_TREE || d.kind <= EK_SLAB) ? 1.f : 0.f);
+      glUniform1f(uf, rangeOf(R, d.kind)); glUniform1f(ut, entThins(d.kind) ? 1.f : 0.f); glUniform1f(ur, entThinRef(d.kind));
       glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent)));
       glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent) + 16));
       glUniform1i(uk, d.kind);

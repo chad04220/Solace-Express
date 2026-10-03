@@ -157,6 +157,7 @@ void main(){
     for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
       std::string sc = list.substr(a, b - a);
       if (sc.empty()) continue;
+      if (getenv("ENTSYNC")) g_ren.entSync = true;   // deterministic scenery (for exact image comparisons)
       Game* g = new Game();
       g->initHeadless(); g->debugScene(sc);
       for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
