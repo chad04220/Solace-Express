@@ -766,7 +766,7 @@ void Game::jetEffects(float dt) {
     vec3 exDir = plane.q.rotate(exD[s]);
     vec3 r = normalize(cross(exDir, plane.up()) + plane.right() * 1e-3f), u = cross(r, exDir);
     vec3 ex = plane.pos + plane.q.rotate(exP[s]);
-    float rate = (wr ? 20.f * exS[s] : 25.f) * ab;    // embers per second per nozzle: reheat / boost only (a dry jet sheds none)
+    float rate = wr ? 0.f : 25.f * ab;    // embers per second per nozzle: reheat only (dry jets and the XR-11's plasma shed none)
     int n = (int)(rate * dt + frand());
     for (int i = 0; i < n; i++) {
       float k = frand(), hot = frand();
@@ -789,7 +789,7 @@ void Game::jetEffects(float dt) {
       vec3 r = normalize(cross(exDir, plane.up()) + plane.right() * 1e-3f), u = cross(r, exDir);
       vec3 ex = plane.pos + plane.q.rotate(exP[s]) + exDir * 0.2f;
       spawn(ex, plane.vel + exDir * 30.f, 0.35f, 0.6f, 9.f, vec3(1.f, 0.7f, 0.4f) * 1.5f, 1.f, SPR_SHOCK, 0.f, 0.f);
-      for (int i = 0; i < 30; i++) {
+      for (int i = 0; i < (wr ? 0 : 30); i++) {   // the XR-11's plasma lights with the shock ring alone
         vec3 j = r * (frand() - 0.5f) + u * (frand() - 0.5f);
         spawn(ex, plane.vel + exDir * (60.f + 120.f * frand()) + j * 70.f, 0.25f + 0.3f * frand(), 0.12f, -0.2f, vec3(1.f, 0.75f, 0.4f) * 4.f, 1.f, SPR_SPARK, 2.f, 0.f);
       }
@@ -1367,13 +1367,13 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
           vec3 p = a.pos() + dir * u + rt * (sd * (a.width * 0.5f + 1.5f)) + vec3(0, 0.4f, 0);
           vec3 col = fabsf(u) > a.length * 0.5f - 600.f && a.size > 0 ? vec3(1.f, 0.85f, 0.45f) : vec3(1.f, 0.92f, 0.75f);
           float dl = length(p - fp.camPos);   // glints at range; close up the modelled fixture and its pool are the light
-          bill(add, p, std::max(0.04f, dl * 0.0011f), col * (2.0f * lightI) * (0.12f + 0.88f * smoothstepf(150.f, 1600.f, dl)), 1.f, SPR_GLOW, 2.f);
+          bill(add, p, dl * 0.0009f, col * (2.0f * lightI) * smoothstepf(60.f, 250.f, dl), 1.f, SPR_GLOW, 2.f);   // a pixel-sized point at range
         }
       for (int end = -1; end <= 1; end += 2) {
         for (float v = -a.width * 0.5f; v <= a.width * 0.5f; v += 3.f) {
           vec3 p = a.pos() + dir * (end * (a.length * 0.5f + 1.f)) + rt * v + vec3(0, 0.4f, 0);
           float dl = length(p - fp.camPos);
-          bill(add, p, std::max(0.04f, dl * 0.0011f), (end < 0 ? vec3(0.2f, 1.f, 0.3f) : vec3(1.f, 0.15f, 0.1f)) * 2.0f * lightI * (0.12f + 0.88f * smoothstepf(150.f, 1600.f, dl)), 1.f, SPR_GLOW, 2.f);
+          bill(add, p, dl * 0.0009f, (end < 0 ? vec3(0.2f, 1.f, 0.3f) : vec3(1.f, 0.15f, 0.1f)) * 2.0f * lightI * smoothstepf(60.f, 250.f, dl), 1.f, SPR_GLOW, 2.f);
         }
         if (a.size > 0 && night > 0.3f)
           for (int k = 1; k <= 6; k++)
@@ -1381,7 +1381,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
               vec3 p = a.pos() + dir * (end * (a.length * 0.5f + 60.f * k)) + rt * v;
               p.y = std::max(g_world.height(p.x, p.z), a.elev) + 1.f;
               float dl = length(p - fp.camPos);
-              bill(add, p, std::max(0.05f, dl * 0.0013f), vec3(1.f, 0.95f, 0.85f) * 2.5f * night * (0.12f + 0.88f * smoothstepf(150.f, 1600.f, dl)), 1.f, SPR_GLOW, 3.f);
+              bill(add, p, dl * 0.0009f, vec3(1.f, 0.95f, 0.85f) * 2.5f * night * smoothstepf(60.f, 250.f, dl), 1.f, SPR_GLOW, 3.f);
             }
       }
     }
@@ -1401,7 +1401,8 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
           bool white = ang > (3.5f - i * 0.333f);
           (void)th;
           vec3 p = base - lrt * (i * 9.f);
-          bill(add, p, std::max(0.7f, d * 0.003f), (white ? vec3(1.f, 0.95f, 0.9f) : vec3(1.f, 0.1f, 0.08f)) * 3.0f, 1.f, SPR_GLOW, 3.f);
+          float dl = length(p - fp.camPos);   // the modelled unit carries it up close; a pixel-sized point beyond
+          bill(add, p, dl * 0.0009f, (white ? vec3(1.f, 0.95f, 0.9f) : vec3(1.f, 0.1f, 0.08f)) * 3.0f * smoothstepf(150.f, 500.f, dl), 1.f, SPR_GLOW, 3.f);
         }
       }
     }
@@ -1424,15 +1425,6 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       if (plane.engineRunning && wraith.stealth < 0.5f && fmodf(t, 1.0f) < 0.12f) bill(add, plane.pos + plane.q.rotate(s.special == 2 ? vec3(0, 0.6f, 1.6f) : jet ? vec3(0, 0.74f, 1.6f) : modelFinTop(md) + vec3(0, 0.06f, 0)), ls * 1.6f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night) * glint, 1, SPR_GLOW, 0.3f);
       float st = fmodf(t, 1.3f);
       if (!plane.onGround && wraith.stealth < 0.5f && (st < 0.05f || (st > 0.12f && st < 0.16f))) { bill(add, lt, ls * 3.f, vec3(4.f) * glint, 1, SPR_GLOW, 0.3f); bill(add, rtp, ls * 3.f, vec3(4.f) * glint, 1, SPR_GLOW, 0.3f); }
-      if (jet && plane.engineRunning) {   // exhaust bloom at the nozzle exits (blue when dry, white-amber in reheat)
-        float sp = plane.engineSpool, ab = smoothstepf(0.85f, 1.f, sp);
-        vec3 exP[4], exD[4]; float exS[4]; int nEx = jetExhausts(plane, exP, exD, exS);
-        bool wr = plane.spec->special == 2;
-        float fl = 0.85f + 0.15f * sinf(t * 71.f + 0.7f), cl = 1.f - wraith.stealth * 0.9f;
-        for (int k = 0; k < nEx; k++)
-          bill(add, plane.pos + plane.q.rotate(exP[k] + exD[k] * (0.2f + 0.6f * ab)), (0.45f + 0.35f * ab) * (wr ? 0.7f : 1.f),
-               lerp(wr ? vec3(0.45f, 0.35f, 1.f) : vec3(0.3f, 0.55f, 1.f), wr ? vec3(1.f, 0.6f, 1.f) : vec3(1.f, 0.7f, 0.4f), ab) * ((0.25f * sp * sp + 0.5f * ab) * fl * exS[k] * cl), 1, SPR_GLOW, 0.6f);
-      }
     }
     // AI traffic lights: nav lights, beacon, strobes when airborne, landing lights on the runway and on approach,
     // reheat glow on XR-9 formations
@@ -1453,7 +1445,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       if (c.role == TrafficCraft::AIRPORT && (c.state == TrafficCraft::TAKEOFF || c.state == TrafficCraft::FINAL || c.state == TrafficCraft::ROLLOUT || c.state == TrafficCraft::LINEUP))
         bill(add, c.pos + c.q.rotate(vec3(0, -kAircraft[c.spec].fusRad * 0.6f, -kAircraft[c.spec].fusLen * 0.4f)), ls2 * 2.f, vec3(1.f, 0.95f, 0.85f) * (1.f + 4.f * night), 1, SPR_GLOW, 0.3f);
       if (c.ab > 0.5f) for (int k = -1; k <= 1; k += 2)
-        bill(add, c.pos + c.q.rotate(vec3(k * 0.82f, -0.12f, 8.9f)), 1.6f + ls2, vec3(1.f, 0.65f, 0.35f) * 1.6f, 1, SPR_GLOW, 0.6f);
+        bill(add, c.pos + c.q.rotate(vec3(k * 0.82f, -0.12f, 8.9f)), 0.3f + ls2, vec3(1.f, 0.65f, 0.35f) * 1.6f, 1, SPR_GLOW, 0.6f);
     }
     if (landingLight && plane.engineRunning && camMode != 1)
       bill(add, plane.pos + plane.q.rotate(vec3(s.engLayout == 0 ? -s.span * 0.25f : 0, s.engLayout == 0 ? s.wingY * s.fusRad : -s.fusRad * 0.6f, s.engLayout == 0 ? s.wingZ - s.chord * 0.5f : -0.35f * s.fusLen)), ls * 1.8f,
@@ -1496,7 +1488,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     if (p.kind == SPR_SPARK) {   // hot embers: streaks along their motion relative to the camera (1/60 s shutter)
       vec3 rv = p.v - camVel, vd = normalize(p.p - fp.camPos);
       vec3 perp = rv - vd * dot(rv, vd);
-      float pl = length(perp), len = std::min(pl / 60.f * 0.6f, 2.5f);
+      float pl = length(perp), len = std::min(std::min(pl / 60.f * 0.6f, 2.5f), pl * (p.maxLife - p.life));   // never longer than its path since it left the nozzle
       vec3 ax = pl > 0.01f ? perp / pl : cr, ay = normalize(cross(ax, vd));
       quadAx(add, p.p - ax * (len * 0.5f), ax * (len * 0.5f + p.size), ay * p.size, p.col, fade, p.kind, 1.f);
     }
@@ -1715,6 +1707,7 @@ void Game::debugScene(const std::string& name) {
     else if (mode != 2) { plane.apEngage(Plane::AP_HOLD, -1, wx); }
     if (mode == 3 || mode == 4) wraith.cloakOn = true;
     if (mode == 5 || mode == 6) { wraith.armed = true; }
+    if (getenv("WRTHR")) { plane.ctl.throttle = (float)atof(getenv("WRTHR")); plane.apSpeed = 900.f; }
     if (getenv("WRSPD")) { plane.vel = plane.forward() * (float)atof(getenv("WRSPD")); plane.apSpeed = (float)atof(getenv("WRSPD")); }
     if (mode == 5) wraith.bayHold = 100.f;
     if (mode == 7) wraith.bombQueue = 1;
@@ -1724,6 +1717,7 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < frames; i++) {
       realTime += 1 / 60.f; update(1 / 60.f);
       if (mode == 6) wraith.wantFire = true;   // trigger held
+      if (getenv("WRTHR")) { plane.ctl.throttle = (float)atof(getenv("WRTHR")); plane.engineSpool = std::max(plane.engineSpool, plane.ctl.throttle * 0.98f); }
       if (mode == 7 && !wraith.blasts.empty() && firstDrop == 0) { firstDrop = realTime; blastAt = wraith.blasts[0].p; }
       if (mode == 7 && firstDrop > 0 && realTime - firstDrop > secs) break;
     }
@@ -1743,6 +1737,7 @@ void Game::debugScene(const std::string& name) {
       }
       printf("wr: speed %.0f m/s, %d young bolts: streak tails off the firing line by <= %.2f m, along-error <= %.2f m\n", length(plane.vel), n, worstOff, worstAlong);
     }
+    if (getenv("WRSPARKS")) { int n = 0; for (auto& q : particles) if (q.kind == SPR_SPARK && n < 12) { vec3 b = plane.q.conj().rotate(q.p - plane.pos); printf("spark body (%.1f, %.1f, %.1f) life %.2f\n", b.x, b.y, b.z, q.life); n++; } }
     if (ufo.on) { vec3 r = plane.q.conj().rotate(ufo.pos - plane.pos); printf("wr: ufo t %.1f at craft-frame (%.0f, %.0f, %.0f) m\n", ufo.t, r.x, r.y, r.z); }
     toasts.clear(); hint.clear();
     for (auto& b : wraith.blasts) printf("wr: blast age %.2f R %.0f at %.0f %.0f %.0f particles %d\n", b.age, b.R, b.p.x, b.p.y, b.p.z, (int)particles.size());

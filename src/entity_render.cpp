@@ -4,24 +4,7 @@
 #include "entity_shaders.h"
 #include <chrono>
 
-static GLuint compileEnt(GLenum type, const std::string& src, std::string& err) {
-  GLuint s = glCreateShader(type);
-  const char* c = src.c_str();
-  glShaderSource(s, 1, &c, nullptr);
-  glCompileShader(s);
-  GLint ok = 0; glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
-  if (!ok) { char log[8192]; glGetShaderInfoLog(s, sizeof(log), nullptr, log); err += log; return 0; }
-  return s;
-}
-static GLuint linkEnt(const std::string& vs, const std::string& fs, std::string& err) {
-  GLuint v = compileEnt(GL_VERTEX_SHADER, vs, err), f = compileEnt(GL_FRAGMENT_SHADER, fs, err);
-  if (!v || !f) return 0;
-  GLuint p = glCreateProgram(); glAttachShader(p, v); glAttachShader(p, f); glLinkProgram(p);
-  GLint ok = 0; glGetProgramiv(p, GL_LINK_STATUS, &ok);
-  if (!ok) { char log[8192]; glGetProgramInfoLog(p, sizeof(log), nullptr, log); err += log; return 0; }
-  glDeleteShader(v); glDeleteShader(f);
-  return p;
-}
+static GLuint linkEnt(const std::string& vs, const std::string& fs, std::string& err) { return linkProgramCached(vs, fs, err); }
 
 bool Renderer::initEntities() {
   std::string hdr = "#version 330 core\n";
@@ -73,6 +56,7 @@ EntRanges rangesFor(int q) {
 }
 float rangeOf(const EntRanges& R, int k) {
   if (k == EK_RWYLIGHT) return 1800.f;   // beyond this a glint sprite stands in
+  if (k == EK_PAPI) return 3500.f;
   if (k == EK_BUSH) return R.bush;
   if (entClass(k) == EC_TREE) return R.tree;
   if (k <= EK_SLAB) return R.rock;
@@ -201,6 +185,10 @@ void Renderer::drawEntities(const FrameParams& fp) {
       float ex = std::max(std::max(x0 - cam.x, cam.x - x1), 0.f), ez = std::max(std::max(z0 - cam.z, cam.z - z1), 0.f);
       float ey = std::max(std::max(ch->ymin - cam.y, cam.y - ch->ymax), 0.f);
       float dmin = sqrtf(ex * ex + ez * ez + ey * ey);
+      float fx = std::max(fabsf(x0 - cam.x), fabsf(x1 - cam.x)), fz = std::max(fabsf(z0 - cam.z), fabsf(z1 - cam.z));
+      float fy = std::max(fabsf(ch->ymin - cam.y), fabsf(ch->ymax - cam.y));
+      float dmax = sqrtf(fx * fx + fz * fz + fy * fy);
+      bool affected = anyCrater && g_scenery.chunkAffected(ccx + dx, ccz + dz);
       bool inView = dmin < farAll && boxVisible(x0 - 12, ch->ymin, z0 - 12, x1 + 12, ch->ymax, z1 + 12);
       bool inSh[2] = {false, false};
       for (int c = 0; c < 2; c++)
@@ -219,13 +207,19 @@ void Renderer::drawEntities(const FrameParams& fp) {
         bool thin = entClass(k) == EC_TREE || k <= EK_SLAB;
         bool viewK = inView && dmin < far;
         if (!viewK && !inSh[0] && !inSh[1]) continue;
+        // the whole chunk in one LOD band and inside the draw distance: hand its instances over in one block (the
+        // vertex shader does the distance thinning per instance, exactly as below)
+        int lodN = dmin < l0 ? 0 : dmin < l1 ? 1 : 2, lodF = dmax < l0 ? 0 : dmax < l1 ? 1 : 2;
+        bool bulk = viewK && !affected && dmax < far && lodN == lodF;
+        if (bulk) { auto& bk = bucket[0][k][lodN]; bk.insert(bk.end(), ch->ents.begin() + b, ch->ents.begin() + e); }
+        if (bulk && !inSh[0] && !inSh[1]) continue;
         for (uint32_t i = b; i < e; i++) {
           const Ent& en = ch->ents[i];
-          if (anyCrater && g_scenery.destroyed(en)) continue;
+          if (affected && g_scenery.destroyed(en)) continue;
           float ddx = en.x - cam.x, ddy = en.y - cam.y, ddz = en.z - cam.z;
           float d = sqrtf(ddx * ddx + ddy * ddy + ddz * ddz);
           int lod = d < l0 ? 0 : d < l1 ? 1 : 2;
-          if (viewK && d < far) {
+          if (viewK && d < far && !bulk) {
             // thin out towards the far limit (the ground texture takes over the look of distant forest)
             bool keep = !thin || fmodf(en.seed * 7.13f, 1.f) >= smoothstepf(far * 0.45f, far, d) * 0.92f;
             if (keep) bucket[0][k][lod].push_back(en);
@@ -234,7 +228,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
           // centre; a caster's shadow reaches h / tan(sun elevation) away), thinned like the trees themselves
           bool shKeep = !thin || fmodf(en.seed * 7.13f, 1.f) >= smoothstepf(far * 0.45f, far, d) * 0.92f;
           for (int c = 0; c < 2; c++)
-            if (inSh[c] && shKeep && k != EK_RWYLIGHT) {
+            if (inSh[c] && shKeep && k != EK_RWYLIGHT && k != EK_PAPI) {
               float sx = en.x - newCenter[c].x, sz = en.z - newCenter[c].z;
               float h = kEntInfo[k].h * en.sy, er = std::max(kEntInfo[k].hx * en.sx, kEntInfo[k].hz * en.sz) + h * shReach;
               float cr = cR[c] * kShFade1 + er; if (sx * sx + sz * sz > cr * cr) continue;
@@ -264,8 +258,9 @@ void Renderer::drawEntities(const FrameParams& fp) {
   glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
   glBufferData(GL_ARRAY_BUFFER, std::max<size_t>(entStage.size(), 1) * sizeof(Ent), entStage.empty() ? nullptr : entStage.data(), GL_STREAM_DRAW);
   auto issue = [&](GLuint prog, const std::vector<Draw>& list) {
-    GLint uk = glGetUniformLocation(prog, "uKind");
+    GLint uk = glGetUniformLocation(prog, "uKind"), uf = glGetUniformLocation(prog, "uFar"), ut = glGetUniformLocation(prog, "uThin");
     for (const Draw& d : list) {
+      glUniform1f(uf, rangeOf(R, d.kind)); glUniform1f(ut, (entClass(d.kind) == EC_TREE || d.kind <= EK_SLAB) ? 1.f : 0.f);
       glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent)));
       glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent) + 16));
       glUniform1i(uk, d.kind);
@@ -325,6 +320,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
     glUniform1f(glGetUniformLocation(progEnt, "uTime"), fp.time);
     glUniform1i(glGetUniformLocation(progEnt, "uShadowPass"), 0);
     glUniform3f(glGetUniformLocation(progEnt, "uCam"), cam.x, cam.y, cam.z);
+    glUniform3f(glGetUniformLocation(progEnt, "uCamV"), cam.x, cam.y, cam.z);
     glUniform1f(glGetUniformLocation(progEnt, "uNight"), fp.night);
     glUniform1f(glGetUniformLocation(progEnt, "uRwyLights"), fp.rwyLights);
     glUniform1f(glGetUniformLocation(progEnt, "uWet"), fp.wet);

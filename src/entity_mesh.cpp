@@ -633,6 +633,14 @@ void buildBuilding(MB& mb, int kind, int lod) {
       }
       break;
     }
+    case EK_PAPI: {   // precision approach path indicator: a light box on two legs, two lenses facing the approach
+      if (lod == 2) break;
+      for (int s = -1; s <= 1; s += 2) mb.box(vec3(s * 0.3f - 0.03f, -0.3f, -0.03f), vec3(s * 0.3f + 0.03f, 0.4f, 0.03f), P_METAL);
+      mb.box(vec3(-0.42f, 0.4f, -0.3f), vec3(0.42f, 0.78f, 0.25f), P_TRIM, 0x3F);
+      mb.box(vec3(-0.44f, 0.78f, -0.33f), vec3(0.44f, 0.8f, 0.3f), P_DARK, 0x3F);   // sun hood
+      for (int s = -1; s <= 1; s += 2) mb.cyl(vec3(s * 0.2f, 0.59f, 0.25f), vec3(s * 0.2f, 0.59f, 0.27f), 0.11f, 0.11f, d0 ? 14 : 8, P_PAPI, true, false);
+      break;
+    }
     case EK_GASSTATION: {
       mb.box(vec3(-8.f, -1.f, -7.f), vec3(8.f, 0.15f, 7.f), P_TRIM, 0x3F);                 // forecourt slab
       mb.box(vec3(-4.5f, 0.15f, -7.f), vec3(4.5f, 3.6f, -3.2f), P_WALL, 0x3B);           // kiosk

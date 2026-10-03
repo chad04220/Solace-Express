@@ -13,7 +13,7 @@ const EntKindInfo kEntInfo[EK_COUNT] = {
   {"Townhouses", 9.0f, 10.5f, 5.5f}, {"Shop", 7.0f, 5.5f, 7.0f}, {"Apartments", 9.0f, 22.f, 7.0f}, {"Office", 9.0f, 38.f, 9.0f},
   {"Tower", 10.f, 80.f, 10.f}, {"Skyscraper", 9.0f, 135.f, 9.0f}, {"Warehouse", 12.f, 8.5f, 9.0f}, {"Barn", 6.0f, 10.f, 9.0f},
   {"Silo", 3.0f, 19.f, 3.0f}, {"Church", 5.0f, 28.f, 13.f}, {"Water tower", 5.2f, 28.f, 5.2f}, {"Lighthouse", 3.4f, 27.f, 3.4f},
-  {"Gas station", 8.0f, 5.5f, 7.0f}, {"Runway light", 0.12f, 0.42f, 0.12f},
+  {"Gas station", 8.0f, 5.5f, 7.0f}, {"Runway light", 0.12f, 0.42f, 0.12f}, {"PAPI unit", 0.45f, 0.8f, 0.35f},
 };
 
 static inline float h2(int a, int b) { return hash2i(a, b); }
@@ -42,6 +42,16 @@ bool Scenery::destroyed(const Ent& e) const {
   if (it == wrecked.end()) return false;
   uint64_t k = keyOf(e);
   for (uint64_t w : it->second) if (w == k) return true;
+  return false;
+}
+
+bool Scenery::chunkAffected(int cx, int cz) const {
+  if (!wrecked.empty() && wrecked.count(cz * NC + cx)) return true;
+  float x0 = chunkX0(cx), z0 = chunkX0(cz), x1 = x0 + CH, z1 = z0 + CH;
+  for (const vec3& c : craters) {
+    float dx = std::max(std::max(x0 - c.x, c.x - x1), 0.f), dz = std::max(std::max(z0 - c.y, c.y - z1), 0.f);
+    if (dx * dx + dz * dz < c.z * c.z * 1.44f) return true;
+  }
   return false;
 }
 
@@ -154,6 +164,17 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
         for (float u = -a.length * 0.5f; u <= a.length * 0.5f + 0.1f; u += 60.f)
           for (int sd = -1; sd <= 1; sd += 2)
             put(c + dir * u + rt * (sd * (a.width * 0.5f + 1.5f)), fabsf(u) > a.length * 0.5f - 600.f && a.size > 0 ? 1 : 0);
+        if (a.size > 0 || a.surface == SURF_ASPHALT)   // PAPI: four units left of each landing direction, 300 m in
+          for (int end = -1; end <= 1; end += 2) {
+            vec3 ld = dir * (float)(-end), lrt(-ld.z, 0, ld.x);
+            vec3 base = c + dir * (end * a.length * 0.5f) + ld * 300.f - lrt * (a.width * 0.5f + 15.f);
+            for (int i = 0; i < 4; i++) {
+              vec3 p = base - lrt * (i * 9.f);
+              if (!C.inside(p.x, p.z)) continue;
+              float y = std::max(g_world.height(p.x, p.z), a.elev - 0.5f);
+              C.out[EK_PAPI]->push_back({p.x, y, p.z, atan2f(-ld.x, -ld.z), 1.f, 1.f, 1.f, 3.5f - i * 0.333f});
+            }
+          }
         for (int end = -1; end <= 1; end += 2) {
           for (float v = -a.width * 0.5f; v <= a.width * 0.5f + 0.01f; v += 3.f)
             put(c + dir * (end * (a.length * 0.5f + 1.f)) + rt * v, end < 0 ? 2 : 3);
@@ -402,7 +423,7 @@ int Scenery::collide(vec3 p, float r, Ent* entOut) {
       Chunk* ch = ensure(cx, cz, 2);
       if (!ch || ch->ents.empty() || p.y - r > ch->ymax || p.y + r < ch->ymin) continue;
       for (int k = 0; k < EK_COUNT; k++) {
-        if (k == EK_RWYLIGHT) continue;   // frangible airport fixtures
+        if (k == EK_RWYLIGHT || k == EK_PAPI) continue;   // frangible airport fixtures
         const EntKindInfo& I = kEntInfo[k];
         int cls = entClass(k);
         for (uint32_t i = ch->off[k]; i < ch->off[k + 1]; i++) {

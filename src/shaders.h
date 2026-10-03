@@ -1243,25 +1243,29 @@ float entShadow(vec3 p, vec3 n){
 // Volumetric cumulus: a coverage field (2D) gives each cloud its footprint; a flat base and a billowing, rounded top
 // come from the height profile, two scales of 3D noise carve the billows, and fine 3D detail erodes only the thin
 // edges into wisps (the dense cores stay solid).
+uniform sampler2D uCloudCov; uniform sampler3D uNoise3;
+float cn3(vec3 x){ return textureLod(uNoise3, x*(1.0/32.0), 0.0).r; }   // vnoise3 from the baked volume
+float tfbm(vec2 x){ return textureLod(uCloudCov, x*(1.0/16.0), 0.0).r*0.9375; }   // fbm2(x, 4) from the baked map
 float cloudDensity(vec3 p, int detail){
   float thick = 900.0 + 900.0*uCloudCover;
   float hf = (p.y - uCloudBase) / thick;
   if (hf < 0.0 || hf > 1.0) return 0.0;
   vec2 q = (p.xz + uWindOff) / 5200.0;
-  float cov = fbm2(q, 4);
+  float cov = textureLod(uCloudCov, q*(1.0/16.0), 0.0).r*0.9375;
   float shape = smoothstep(0.0, 0.07, hf) * smoothstep(1.0, 0.4 - 0.22*uCloudCover, hf);
   float d = cov - (1.05 - uCloudCover*0.75) + shape*0.45 - 0.45;
   if (d < -0.2) return 0.0;
   vec3 w = p + vec3(uWindOff.x, 0.0, uWindOff.y);
-  float bill = vnoise3(w/760.0)*0.6 + vnoise3(w/270.0)*0.4;
+  float bill = cn3(w/760.0)*0.6 + cn3(w/270.0 + vec3(11.3, 4.1, 7.7))*0.4;
   d += (bill - 0.55)*0.42*(0.55 + hf);                                       // billows, deeper towards the tops
   if (detail > 0) {
-    float e = (vnoise3(w/95.0 + vec3(0.0, uTime*0.015, 0.0)) - 0.5)*0.17 + (vnoise3(w/36.0) - 0.5)*0.06;
+    float e = (cn3(w/95.0 + vec3(3.7, uTime*0.015, 1.9)) - 0.5)*0.17 + (cn3(w/36.0 + vec3(17.1, 9.3, 5.5)) - 0.5)*0.06;
     d += e*(1.0 - smoothstep(0.0, 0.3, d));                                   // wispy edges, solid cores
   }
   return clamp(d*4.5, 0.0, 1.0);
 }
 float hgPhase(float c, float g){ float g2 = g*g; return (1.0 - g2)/(12.566*pow(max(1.0 + g2 - 2.0*g*c, 1e-4), 1.5)); }
+int gCloudLite = 0;   // reflections: half the steps
 vec4 traceClouds(vec3 ro, vec3 rd, float tmax, float jitter){
   if (uCloudCover < 0.02) return vec4(0.0,0.0,0.0,1.0);
   float thick = 900.0 + 900.0*uCloudCover;
@@ -1274,7 +1278,7 @@ vec4 traceClouds(vec3 ro, vec3 rd, float tmax, float jitter){
   }
   t1 = min(t1, min(tmax, 45000.0));
   if (t1 <= t0) return vec4(0,0,0,1);
-  int N = uQuality > 1 ? 56 : (uQuality > 0 ? 40 : 24);
+  int N = (uQuality > 1 ? 56 : (uQuality > 0 ? 40 : 24)) >> gCloudLite;
   float dt = (t1 - t0)/float(N);
   float T = 1.0; vec3 L = vec3(0.0);
   float mu = dot(rd, uSunDir);
@@ -1284,11 +1288,12 @@ vec4 traceClouds(vec3 ro, vec3 rd, float tmax, float jitter){
   float ph0 = mix(hgPhase(mu, 0.8), hgPhase(mu, -0.25), 0.3);
   float ph1 = mix(hgPhase(mu, 0.4), hgPhase(mu, -0.12), 0.3), ph2 = mix(hgPhase(mu, 0.2), hgPhase(mu, -0.06), 0.3);
   float t = t0 + dt*jitter;
-  for (int i=0;i<56;i++){
-    if (i >= N) break;
+  for (int i=0;i<84;i++){
+    if (t > t1) break;
     vec3 p = ro + rd*t;
     float d = cloudDensity(p, 1);
-    if (d > 0.01) {
+    if (d <= 0.01) { t += dt*1.5; continue; }   // clear air between clouds: longer strides
+    {
       // light march towards the sun: optical depth through the cloud above this point
       float od = (cloudDensity(p + uSunDir*60.0, 0)*60.0 + cloudDensity(p + uSunDir*160.0, 0)*100.0
                 + cloudDensity(p + uSunDir*340.0, 0)*180.0 + cloudDensity(p + uSunDir*650.0, 0)*310.0)*0.012;
@@ -1562,8 +1567,8 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
   Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
   float lush = base.z, cold = base.w;
   float slope = 1.0 - n.y;
-  float hNoise = fbm2(p.xz/900.0, 4);
-  float n2 = fbm2(p.xz/180.0, 3);
+  float hNoise = tfbm(p.xz/900.0);
+  float n2 = tfbm(p.xz/180.0 + vec2(5.3, 2.9));
   vec3 nTS;
   vec4 msk = maskAt(p.xz);
   // ---- natural ground layers
@@ -1580,7 +1585,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
 )"
 R"(  // grass colour at several scales: lush meadow, olive and dry grass by moisture (low noise fields, drier on slopes and
   // up high), with mown / grazed patches and streaks; keeps distant hills from reading as one flat green
-  float dry = (fbm2(p.xz/2600.0 + 4.7, 3) - 0.5)*1.6 + (vnoise(p.xz/420.0) - 0.5)*0.7 + (vnoise(p.xz/130.0) - 0.5)*0.45 + slope*1.6 - lush*0.55 + 0.42
+  float dry = (tfbm(p.xz/2600.0 + 4.7) - 0.5)*1.6 + (vnoise(p.xz/420.0) - 0.5)*0.7 + (vnoise(p.xz/130.0) - 0.5)*0.45 + slope*1.6 - lush*0.55 + 0.42
             + smoothstep(250.0, 900.0, p.y)*0.25;
   vec3 grassTint = mix(vec3(0.6, 0.8, 0.42), vec3(0.78, 0.78, 0.44), smoothstep(0.25, 0.65, dry));
   grassTint = mix(grassTint, vec3(0.98, 0.84, 0.52), smoothstep(0.65, 1.0, dry)*0.8);
@@ -2439,7 +2444,7 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
       vec3 r = reflect(rd, n); r.y = abs(r.y);
       vec3 refl = skyColor(r);
       // reflected clouds (cheap)
-      if (uCloudCover > 0.05 && uQuality > 0) { vec4 cl = traceClouds(p, r, 30000.0, 0.5); refl = refl*cl.a + cl.rgb; }
+      if (uCloudCover > 0.05 && uQuality > 0) { gCloudLite = 1; vec4 cl = traceClouds(p, r, 30000.0, 0.5); gCloudLite = 0; refl = refl*cl.a + cl.rgb; }
       float sh = sunVis > 0.0 ? terrainShadow(p + vec3(0,1,0), uSunDir, t) * cloudShadow(p) * entShadow(p, vec3(0,1,0)) : 0.0;
       vec4 base = baseAt(p.xz);
       vec3 deep = mix(vec3(0.004,0.03,0.06), vec3(0.003,0.02,0.035), base.w);
@@ -2842,9 +2847,9 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
     }
   }
   // research jet exhaust plumes (additive, depth-limited by the scene)
-  if (uPlaneOn == 1 && uWreck == 0 && uVapor.x > 0.01) col = vaporCone(col, ro, rd, t, jitter);
-  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 5) { vec3 e = jetPlumes(ro, rd, t, jitter); col = col*gPlumeT + e; }
-  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 6) { vec3 e = wraithPlumes(ro, rd, t, jitter); col = col*gPlumeT + e; }
+  if (uPlaneOn == 1 && uWreck == 0 && uVapor.x > 0.01) { vec3 c0 = col; col = vaporCone(col, ro, rd, t, jitter); if (dot(abs(col - c0), vec3(1.0)) > 0.02) taaFlag = min(taaFlag, 0.2); }
+  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 5) { vec3 e = jetPlumes(ro, rd, t, jitter); col = col*gPlumeT + e; if (e.r + e.g + e.b > 0.03) taaFlag = min(taaFlag, 0.2); }
+  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 6) { vec3 e = wraithPlumes(ro, rd, t, jitter); col = col*gPlumeT + e; if (e.r + e.g + e.b > 0.03) taaFlag = min(taaFlag, 0.2); }
   if (!pod && uFxBeams + uFxBombs + uFxBlasts > 0) col = weaponsFx(col, ro, rd, t);
   // clouds
   vec4 cl = pod ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(ro, rd, t, jitter);
@@ -3509,8 +3514,10 @@ void main(){
     float k = flag > 0.9 ? 1.25 : 0.9;                  // tighter clamp for moving parts
     hy = clamp(hy, m1 - k*sd - 0.002, m1 + k*sd + 0.002);
     float motion = length((puv - vUV)*uRes);
+    float hflag = texture(uHist, puv).a;   // what the history pixel was: aircraft, world or a moving effect
     float a = mix(0.08, 0.3, clamp(motion/12.0, 0.0, 1.0));   // fast motion: lean on the new frame, less smear
     if (flag < 0.4) a = max(a, 0.4);
+    if (abs(hflag - flag) > 0.25) a = max(a, 0.9);   // disocclusion (a wing sweeping off the sky): drop the stale history
     res = fromY(mix(hy, cy, a));
   }
   oHist = vec4(res, flag);

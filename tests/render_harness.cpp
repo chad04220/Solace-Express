@@ -38,10 +38,11 @@ int main(int argc, char** argv) {
   printf("GL: %s\n", glGetString(GL_RENDERER));
   g_world.build();
   buildStory();
+  if (getenv("SHADERCACHE")) g_shaderCacheDir = getenv("SHADERCACHE");   // test the program-binary cache
   g_ren.renderScale = getenv("RSCALE") ? (float)atof(getenv("RSCALE")) : 1.0f; g_ren.quality = 1;
   if (!g_ren.init(W, H)) { printf("init failed: %s\n", g_ren.error.c_str()); return 1; }
   g_ren.entSync = !getenv("ENTSTREAM");   // captures generate every scenery chunk in range up front
-  printf("renderer ok\n");
+  printf("renderer ok (shader cache: %d loaded, %d compiled)\n", g_shaderCacheHits, g_shaderCacheMisses);
   std::string scene = argc > 1 ? argv[1] : "default";
   Game game;
   game.initHeadless();

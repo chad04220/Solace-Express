@@ -28,15 +28,77 @@ static GLuint compile(GLenum type, const std::string& src, std::string& err) {
   if (!ok) { char log[8192]; glGetShaderInfoLog(s, sizeof(log), nullptr, log); err += log; return 0; }
   return s;
 }
-static GLuint program(const std::string& vs, const std::string& fs, std::string& err) {
+// ------------------------------------------------------------------ shader program cache
+// Linked programs are saved as the driver's own binaries (ARB_get_program_binary) in g_shaderCacheDir, one file per
+// program, named by a hash of its source and the GPU / driver strings: later launches load them instead of compiling,
+// and a new game version, driver or GPU simply misses the cache and rebuilds it. A binary the driver rejects (or a
+// driver without the extension) falls back to compiling.
+std::string g_shaderCacheDir;
+int g_shaderCacheHits = 0, g_shaderCacheMisses = 0;
+static uint64_t fnv1a(const std::string& s, uint64_t h = 1469598103934665603ull) {
+  for (unsigned char c : s) { h ^= c; h *= 1099511628211ull; }
+  return h;
+}
+static bool binaryCacheUsable() {
+  if (g_shaderCacheDir.empty() || !glGetProgramBinary || !glProgramBinary || !glProgramParameteri || !glGetIntegerv) return false;
+  GLint n = 0; glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &n);
+  return n > 0;
+}
+static std::string cachePath(const std::string& vs, const std::string& fs) {
+  auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
+  uint64_t h = fnv1a(vs); h = fnv1a("\x1f" + fs, h);
+  h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
+  char name[40]; snprintf(name, sizeof name, "%016llx.bin", (unsigned long long)h);
+  return g_shaderCacheDir + "/" + name;
+}
+GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err) {
+  bool cache = binaryCacheUsable();
+  std::string path = cache ? cachePath(vs, fs) : std::string();
+  if (cache) {
+    if (FILE* f = fopen(path.c_str(), "rb")) {
+      char magic[4] = {}; uint32_t fmt = 0, len = 0;
+      bool ok = fread(magic, 1, 4, f) == 4 && memcmp(magic, "AXSC", 4) == 0 && fread(&fmt, 4, 1, f) == 1 && fread(&len, 4, 1, f) == 1 && len > 0 && len < (64u << 20);
+      std::vector<char> data(ok ? len : 0);
+      ok = ok && fread(data.data(), 1, len, f) == len;
+      fclose(f);
+      if (ok) {
+        GLuint p = glCreateProgram();
+        glProgramBinary(p, (GLenum)fmt, data.data(), (GLsizei)len);
+        GLint linked = 0; glGetProgramiv(p, GL_LINK_STATUS, &linked);
+        if (linked) { g_shaderCacheHits++; return p; }
+        glDeleteProgram(p);   // stale or rejected: rebuild below
+      }
+    }
+  }
   GLuint v = compile(GL_VERTEX_SHADER, vs, err), f = compile(GL_FRAGMENT_SHADER, fs, err);
   if (!v || !f) return 0;
-  GLuint p = glCreateProgram(); glAttachShader(p, v); glAttachShader(p, f); glLinkProgram(p);
+  GLuint p = glCreateProgram(); glAttachShader(p, v); glAttachShader(p, f);
+  if (cache) glProgramParameteri(p, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, 1);
+  glLinkProgram(p);
   GLint ok = 0; glGetProgramiv(p, GL_LINK_STATUS, &ok);
   if (!ok) { char log[8192]; glGetProgramInfoLog(p, sizeof(log), nullptr, log); err += log; return 0; }
   glDeleteShader(v); glDeleteShader(f);
+  g_shaderCacheMisses++;
+  if (cache) {
+    GLint len = 0; glGetProgramiv(p, GL_PROGRAM_BINARY_LENGTH, &len);
+    if (len > 0) {
+      std::vector<char> data(len); GLsizei got = 0; GLenum fmt = 0;
+      glGetProgramBinary(p, len, &got, &fmt, data.data());
+      if (got > 0) {
+        std::string tmp = path + ".tmp";   // written whole, then renamed: a crash never leaves a torn file
+        if (FILE* fo = fopen(tmp.c_str(), "wb")) {
+          uint32_t f32 = fmt, l32 = (uint32_t)got;
+          bool w = fwrite("AXSC", 1, 4, fo) == 4 && fwrite(&f32, 4, 1, fo) == 1 && fwrite(&l32, 4, 1, fo) == 1 && fwrite(data.data(), 1, got, fo) == (size_t)got;
+          fclose(fo);
+          remove(path.c_str());
+          if (!w || rename(tmp.c_str(), path.c_str()) != 0) remove(tmp.c_str());
+        }
+      }
+    }
+  }
   return p;
 }
+static GLuint program(const std::string& vs, const std::string& fs, std::string& err) { return linkProgramCached(vs, fs, err); }
 
 // ------------------------------------------------------------------ procedural PBR materials
 static const int TS = 512;
@@ -62,6 +124,55 @@ static float pworley(float u, float v, int P, int seed, float* id = nullptr) {
   }
   if (id) *id = bid;
   return sqrtf(best);
+}
+
+// Cloud noise baked once into tileable textures, so the cloud march samples them with the GPU's texture filtering
+// instead of evaluating hashed value noise per sample: a 1024^2 coverage map (4 octaves, period 16 coverage units =
+// 83 km) and a 128^3 smooth value-noise volume (period 32 lattice cells) used at every billow and detail scale.
+void Renderer::genCloudNoise() {
+  auto hp = [](int x, int y, int z, int P) {
+    x = ((x % P) + P) % P; y = ((y % P) + P) % P; z = ((z % P) + P) % P;
+    return hash2i(x * 73856093 ^ (z * 19349663) ^ (P * 7919), y * 83492791 + z * 2971);
+  };
+  auto s3 = [](float t) { return t * t * (3.f - 2.f * t); };
+  auto vn2 = [&](float x, float y, int P) {
+    int ix = (int)floorf(x), iy = (int)floorf(y); float fx = s3(x - ix), fy = s3(y - iy);
+    return lerpf(lerpf(hp(ix, iy, 0, P), hp(ix + 1, iy, 0, P), fx), lerpf(hp(ix, iy + 1, 0, P), hp(ix + 1, iy + 1, 0, P), fx), fy);
+  };
+  const int CN = 1024;
+  std::vector<uint8_t> cov((size_t)CN * CN);
+  for (int y = 0; y < CN; y++)
+    for (int x = 0; x < CN; x++) {
+      float qx = (x + 0.5f) / CN * 16.f, qy = (y + 0.5f) / CN * 16.f, s = 0, a = 0.5f; int P = 16;
+      for (int o = 0; o < 4; o++) { s += a * vn2(qx, qy, P); qx *= 2; qy *= 2; P *= 2; a *= 0.5f; }
+      cov[(size_t)y * CN + x] = (uint8_t)std::min(255.f, s / 0.9375f * 255.f + 0.5f);
+    }
+  if (!texCloudCov) glGenTextures(1, &texCloudCov);
+  glBindTexture(GL_TEXTURE_2D, texCloudCov);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, CN, CN, 0, GL_RED, GL_UNSIGNED_BYTE, cov.data());
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  const int VN = 128, VP = 32;   // 4 texels per lattice cell
+  std::vector<uint8_t> vol((size_t)VN * VN * VN);
+  for (int z = 0; z < VN; z++)
+    for (int y = 0; y < VN; y++)
+      for (int x = 0; x < VN; x++) {
+        float px = (x + 0.5f) / VN * VP, py = (y + 0.5f) / VN * VP, pz = (z + 0.5f) / VN * VP;
+        int ix = (int)floorf(px), iy = (int)floorf(py), iz = (int)floorf(pz);
+        float fx = s3(px - ix), fy = s3(py - iy), fz = s3(pz - iz);
+        auto h = [&](int a, int b, int c) { return hp(ix + a, iy + b, iz + c, VP); };
+        float v = lerpf(lerpf(lerpf(h(0, 0, 0), h(1, 0, 0), fx), lerpf(h(0, 1, 0), h(1, 1, 0), fx), fy),
+                        lerpf(lerpf(h(0, 0, 1), h(1, 0, 1), fx), lerpf(h(0, 1, 1), h(1, 1, 1), fx), fy), fz);
+        vol[((size_t)z * VN + y) * VN + x] = (uint8_t)(v * 255.f + 0.5f);
+      }
+  if (!texNoise3) glGenTextures(1, &texNoise3);
+  glBindTexture(GL_TEXTURE_3D, texNoise3);
+  glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, VN, VN, VN, 0, GL_RED, GL_UNSIGNED_BYTE, vol.data());
+  glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT); glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 }
 
 void Renderer::genMaterials() {
@@ -398,6 +509,7 @@ bool Renderer::init(int w, int h) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
   genMaterials();
+  genCloudNoise();
   genMinimap();
   if (!initEntities()) return false;
   W = w; H = h;
@@ -528,6 +640,8 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glActiveTexture(GL_TEXTURE0 + 3); glBindTexture(GL_TEXTURE_2D, texMask); glUniform1i(U(p, "uMask"), 3);
   glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadId"), 4);
   glActiveTexture(GL_TEXTURE0 + 6); glBindTexture(GL_TEXTURE_2D, texHMax); glUniform1i(U(p, "uHMax"), 6);
+  glActiveTexture(GL_TEXTURE0 + 13); glBindTexture(GL_TEXTURE_2D, texCloudCov); glUniform1i(U(p, "uCloudCov"), 13);
+  glActiveTexture(GL_TEXTURE0 + 14); glBindTexture(GL_TEXTURE_3D, texNoise3); glUniform1i(U(p, "uNoise3"), 14);
   {   // AI traffic: one row of 32 texels per aircraft
     if (!texTraffic) {
       glGenTextures(1, &texTraffic); glBindTexture(GL_TEXTURE_2D, texTraffic);

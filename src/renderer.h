@@ -44,6 +44,11 @@ struct WreckVisual {
   int craterN = 0; float crater[24][4] = {};  // x, z, radius, depth (negative depth: dark-energy crater)
 };
 
+// Shader programs, compiled once and then loaded from the driver-binary cache in g_shaderCacheDir (empty: no cache)
+extern std::string g_shaderCacheDir;
+extern int g_shaderCacheHits, g_shaderCacheMisses;
+GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err);
+
 struct FrameParams {
   vec3 camPos; vec3 camRight, camUp, camBack; float fovY = 1.0f;
   float time = 0;
@@ -128,6 +133,8 @@ private:
   void createRenderTargets();
   float jitX = 0, jitY = 0;
   void genMaterials();
+  void genCloudNoise();   // tileable cloud coverage (2D) and billow / detail noise (3D) textures
+  GLuint texCloudCov = 0, texNoise3 = 0;
   void genMinimap();
   // ---- environment entities: instanced meshes -> G-buffer (lit by the ray tracer) + sun shadow cascades
   GLuint progEnt = 0, progEntSh = 0, vaoEnt = 0, vboEntMesh = 0, vboEntInst = 0;

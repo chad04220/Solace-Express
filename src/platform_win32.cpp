@@ -247,7 +247,24 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (game.set.fullscreen) { toggleFullscreen(); setupPacing(g_hwnd); }
   RECT cr; GetClientRect(g_hwnd, &cr);
   g_ren.renderScale = 1.0f; g_ren.quality = game.set.quality;
-  status(("compiling shaders on " + gpu + " (can take a minute)...").c_str());
+  {   // compiled shader programs are cached next to the game (or with the save data if that folder is read-only)
+    char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+    std::string dir = std::string(exe, n);
+    size_t sl = dir.find_last_of("\\/");
+    dir = (sl == std::string::npos ? std::string(".") : dir.substr(0, sl)) + "\\shadercache";
+    auto writable = [](const std::string& d) {
+      CreateDirectoryA(d.c_str(), nullptr);
+      std::string probe = d + "\\.probe";
+      FILE* f = fopen(probe.c_str(), "wb"); if (!f) return false;
+      fclose(f); remove(probe.c_str()); return true;
+    };
+    if (!writable(dir)) { dir = game.saveDir + "\\shadercache"; if (!writable(dir)) dir.clear(); }
+    g_shaderCacheDir = dir;
+    WIN32_FIND_DATAA fd; HANDLE h = dir.empty() ? INVALID_HANDLE_VALUE : FindFirstFileA((dir + "\\*.bin").c_str(), &fd);
+    bool cached = h != INVALID_HANDLE_VALUE; if (cached) FindClose(h);
+    status(cached ? ("loading shaders on " + gpu + "...").c_str()
+                  : ("compiling shaders on " + gpu + " (first launch only: can take a minute)...").c_str());
+  }
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) {
     FILE* f = fopen((game.saveDir + "\\error.log").c_str(), "w");
     if (f) { fprintf(f, "%s\nRenderer: %s\n", g_ren.error.c_str(), (const char*)glGetString(GL_RENDERER)); fclose(f); }
@@ -255,6 +272,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     return 1;
   }
   SetWindowTextA(g_hwnd, "Air Xpress");
+  if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
+    fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits, g_shaderCacheMisses);
+    fclose(f);
+  }
   startAudio();
 
   LARGE_INTEGER freq, prev, now;

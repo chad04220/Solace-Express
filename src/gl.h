@@ -75,6 +75,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_PACK_ALIGNMENT 0x0D05
 #define GL_RENDERER 0x1F01
 #define GL_VERSION 0x1F02
+#define GL_VENDOR 0x1F00
 #define GL_BACK 0x0405
 #define GL_NONE 0
 #define GL_LESS 0x0201
@@ -86,6 +87,11 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_COLOR_ATTACHMENT2 0x8CE2
 #define GL_POLYGON_OFFSET_FILL 0x8037
 #define GL_COLOR 0x1800
+#define GL_TEXTURE_3D 0x806F
+#define GL_TEXTURE_WRAP_R 0x8072
+#define GL_PROGRAM_BINARY_RETRIEVABLE_HINT 0x8257
+#define GL_PROGRAM_BINARY_LENGTH 0x8741
+#define GL_NUM_PROGRAM_BINARY_FORMATS 0x87FE
 
 #define GL_FUNCS(X) \
   X(void, glViewport, (GLint, GLint, GLsizei, GLsizei)) \
@@ -160,12 +166,21 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
   X(void, glClearDepth, (GLdouble)) \
   X(void, glPolygonOffset, (GLfloat, GLfloat)) \
   X(void, glClearBufferfv, (GLenum, GLint, const GLfloat*)) \
-  X(void, glBufferSubData, (GLenum, GLintptr, GLsizeiptr, const void*))
+  X(void, glBufferSubData, (GLenum, GLintptr, GLsizeiptr, const void*)) \
+  X(void, glDeleteProgram, (GLuint))
+
+// Optional entry points (ARB_get_program_binary, core in 4.1): null when the driver lacks them
+#define GL_OPT_FUNCS(X) \
+  X(void, glGetIntegerv, (GLenum, GLint*)) \
+  X(void, glProgramParameteri, (GLuint, GLenum, GLint)) \
+  X(void, glGetProgramBinary, (GLuint, GLsizei, GLsizei*, GLenum*, void*)) \
+  X(void, glProgramBinary, (GLuint, GLenum, const void*, GLsizei))
 
 // Function pointers live in a namespace so they never clash with the system GL library's exports.
 namespace glf {
 #define GL_DECLARE(ret, name, args) typedef ret(GLAPIENTRY* PFN_##name) args; extern PFN_##name name;
 GL_FUNCS(GL_DECLARE)
+GL_OPT_FUNCS(GL_DECLARE)
 #undef GL_DECLARE
 }
 using namespace glf;

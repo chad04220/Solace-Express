@@ -16,6 +16,7 @@ enum EntKind {
   EK_WAREHOUSE, EK_BARN, EK_SILO, EK_CHURCH, EK_WATERTOWER, EK_LIGHTHOUSE, EK_GASSTATION,
   // airport fixtures (seed = lamp colour: 0 white, 1 amber, 2 green, 3 red)
   EK_RWYLIGHT,
+  EK_PAPI,     // seed = the unit's glide-slope threshold (deg): white above it, red below
   EK_COUNT
 };
 enum EntClass { EC_TREE = 0, EC_ROCK, EC_BUILDING };
@@ -52,6 +53,7 @@ public:
   // Craters destroy what stands in them (x, z, radius)
   std::vector<vec3> craters;
   bool destroyed(const Ent& e) const;
+  bool chunkAffected(int cx, int cz) const;   // anything in this chunk destroyed or under a crater
   bool anyGone() const { return !craters.empty() || !wrecked.empty(); }
   // Weapon damage: hit points scale with the entity's size (a tree or a boulder takes one hit, a skyscraper twelve).
   // Returns true when this hit destroys it. Destroyed entities stay gone until resetDamage().

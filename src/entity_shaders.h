@@ -6,10 +6,15 @@ static const char* kEntVS = R"(
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNrm; layout(location=2) in vec4 aAux;   // part, ao, u, v
 layout(location=3) in vec4 iA; layout(location=4) in vec4 iB;   // position + yaw | scale + seed
 uniform mat4 uVP; uniform vec2 uJit; uniform float uLogC; uniform float uTime; uniform int uKind; uniform int uShadowPass;
+uniform vec3 uCamV; uniform float uFar; uniform float uThin;   // view pass: per-instance distance thinning on the GPU
 out vec3 vW; out vec3 vL; out vec3 vLN; out vec4 vAux;
 flat out vec4 vInst;   // seed, yaw, scale y, instance height
 flat out vec3 vScale;
 void main(){
+  if (uShadowPass == 0 && uThin > 0.5) {   // thin out towards the far limit (the ground texture takes over distant forest)
+    float d = length(iA.xyz - uCamV);
+    if (fract(iB.w*7.13) < smoothstep(uFar*0.45, uFar, d)*0.92 || d >= uFar) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  }
   vec3 lp = aPos*iB.xyz;
   // foliage sways a little in the wind, more towards the top and the frond tips
   if (uKind <= 6 && (aAux.x < 3.5 || aAux.x > 17.5) && uShadowPass == 0) {
@@ -42,7 +47,7 @@ const int K_FIR=0, K_SPRUCE=1, K_PINE=2, K_OAK=3, K_BIRCH=4, K_PALM=5, K_BUSH=6,
 const int K_HOUSE=13, K_HIP=14, K_LHOUSE=15, K_FARM=16, K_TOWNHOUSE=17, K_SHOP=18, K_APART=19, K_OFFICE=20, K_TOWER=21, K_SKY=22;
 const int K_WAREHOUSE=23, K_BARN=24, K_SILO=25, K_CHURCH=26, K_WATERTOWER=27, K_LIGHTHOUSE=28, K_GAS=29;
 const int P_BARK=0, P_LEAF=1, P_FROND=2, P_NEEDLE=3, P_ROCK=4, P_WALL=5, P_ROOF=6, P_TRIM=7, P_GLASS=8, P_METAL=9, P_DOOR=10, P_BRICK=11;
-const int P_AWNING=12, P_WOOD=13, P_DARK=14, P_LAMP=15, P_SIGN=16, P_CANOPY=17, P_LEAFCARD=18, P_RLAMP=19;
+const int P_AWNING=12, P_WOOD=13, P_DARK=14, P_LAMP=15, P_SIGN=16, P_CANOPY=17, P_LEAFCARD=18, P_RLAMP=19, P_PAPI=20;
 float hsh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
 float hsh3(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7)))*43758.5453); }
 float vn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f*f*(3.0 - 2.0*f);
@@ -287,6 +292,14 @@ R"(    } else if (part == P_ROOF) {
       vec3 lc = ci == 1 ? vec3(1.0, 0.7, 0.25) : ci == 2 ? vec3(0.15, 1.0, 0.35) : ci == 3 ? vec3(1.0, 0.12, 0.08) : vec3(1.0, 0.93, 0.78);
       alb = mix(vec3(0.6), lc, 0.5)*0.4; rough = 0.05; metal = 0.0; cls = 3.0;
       emit = lc*uRwyLights*(1.0 + 7.0*smoothstep(0.0, 0.03, lp.y - 0.33));
+    }
+    else if (part == P_PAPI) {   // PAPI lens: white seen from above the unit's threshold angle, red below; sharp transition
+      vec3 toC = uCam - vW; float ang = degrees(atan(toC.y, length(toC.xz)));
+      vec2 face = vec2(sin(vInst.y), cos(vInst.y));
+      float front = smoothstep(0.0, 0.2, dot(normalize(toC.xz), face));
+      vec3 lc = mix(vec3(1.0, 0.08, 0.05), vec3(1.0, 0.95, 0.88), smoothstep(-0.05, 0.05, ang - seed));
+      alb = vec3(0.05); rough = 0.05; metal = 0.0; cls = 3.0;
+      emit = lc*front*8.0;
     }
     else if (part == P_SIGN) { alb = pal(s1, vec3(0.8, 0.1, 0.08), vec3(0.1, 0.3, 0.7), vec3(0.95, 0.75, 0.1), vec3(0.1, 0.55, 0.3)); rough = 0.4; emit = alb*uNight*2.5; }
     else if (part == P_CANOPY) { alb = vec3(0.92); if (n0.y < -0.5) emit = vec3(1.0, 0.98, 0.95)*uNight*3.0; if (abs(n0.y) < 0.5 && lp.y < 4.95) alb = pal(s1, vec3(0.8, 0.1, 0.08), vec3(0.1, 0.3, 0.7), vec3(0.95, 0.75, 0.1), vec3(0.1, 0.55, 0.3)); rough = 0.4; }
