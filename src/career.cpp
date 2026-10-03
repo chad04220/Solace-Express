@@ -307,7 +307,8 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
   *stars = 0;
   flights++; hours += r.flightMin / 60.f;
   if (!r.success) {
-    if (r.failReason.find("Abandon") == std::string::npos) {
+    if (r.outcome == OUT_OFF_AIRPORT && src != SRC_LESSON) L.push_back({"Aircraft recovery from the field", -(150 + s.rentFee)});
+    if (r.outcome == OUT_CRASHED) {
       crashes++;
       int repair = src == SRC_RENT ? 300 + s.rentFee * 2 : src == SRC_OWNED ? s.price / 12 : 0;
       if (repair) L.push_back({src == SRC_RENT ? "Insurance deductible" : "Repairs", -repair});

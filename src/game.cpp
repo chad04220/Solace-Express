@@ -295,7 +295,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   toast(fmt("Runway %02d, %s", a.rwyNumber(reverse), wx.describe().c_str()), vec3(0.8f, 0.8f, 0.8f));
 }
 
-void Game::endFlight(bool success, const std::string& reason) {
+void Game::endFlight(bool success, const std::string& reason, FlightOutcome outcome) {
   if (researchFlight) {  // research flights never touch the career: back to the research menu
     researchFlight = false; paused = false; showMap = false;
     screen = SCR_RESEARCH; resOpened = realTime;
@@ -303,6 +303,7 @@ void Game::endFlight(bool success, const std::string& reason) {
     return;
   }
   result.success = success;
+  result.outcome = success ? OUT_SUCCESS : outcome;
   result.failReason = reason;
   result.flightMin = flightClock / 60.f;
   result.maxG = plane.maxG; result.minG = plane.minG;
@@ -712,14 +713,18 @@ void Game::updateFlight(float dt) {
       if (wpIndex < (int)contract.wps.size()) {
         if (stillTimer > 1.25f && stillTimer < 1.3f) toast("Checkpoints remaining - take off again to continue", vec3(1, 0.8f, 0.4f));
       } else if (atField && ap == contract.to) { endFlight(true, ""); return; }
-      else if (atField) { endFlight(false, fmt("Diverted to %s", g_world.airports[ap].name)); return; }
-      else if (stillTimer > 3.f) { endFlight(false, "Landed off-airport"); return; }
+      else if (atField) { endFlight(false, fmt("Diverted to %s", g_world.airports[ap].name), OUT_DIVERTED); return; }
+      else if (stillTimer > 3.f) { endFlight(false, "Landed off-airport", OUT_OFF_AIRPORT); return; }
     }
   } else stillTimer = 0;
-  if (plane.fuel <= 0 && plane.onGround && gs < 1.f && !takeoffAnnounced) { endFlight(false, "Out of fuel"); return; }
+  if (plane.fuel <= 0 && plane.onGround && gs < 1.f && !takeoffAnnounced) { endFlight(false, "Out of fuel", OUT_OUT_OF_FUEL); return; }
   if (plane.fuel <= 0 && plane.onGround && gs < 1.f && takeoffAnnounced) {
+    // stopped dry: done, unless this is the destination with nothing left to fly (the completion check above ends
+    // that one as a success). With checkpoints still to collect there's no way to take off again.
     float dA; int ap = g_world.nearestAirport(plane.pos.x, plane.pos.z, &dA);
-    if (!(ap == contract.to && dA < 2000)) { endFlight(false, "Out of fuel"); return; }
+    bool wpsLeft = wpIndex < (int)contract.wps.size();
+    if (wpsLeft) { endFlight(false, "Out of fuel with checkpoints remaining", OUT_OUT_OF_FUEL); return; }
+    if (!(ap == contract.to && dA < 2000)) { endFlight(false, "Out of fuel", OUT_OUT_OF_FUEL); return; }
   }
   (void)prevPos;
   // tutorial hints
@@ -1932,6 +1937,10 @@ void Game::update(float dt) {
     want = floorf(want * 20.f + 0.5f) / 20.f;   // 5% steps: the targets are rebuilt only when it changes
     if (fabsf(g_ren.renderScale - want) > 1e-3f) g_ren.setRenderScale(want);
   }
+  // the flight sim replays the whole frame time in steps of at most 50 ms, so the simulation keeps pace with the
+  // clock down to 4 fps; a longer hitch (window drag, alt-tab) is dropped rather than replayed. UI and animation
+  // timers just use the clamped step.
+  float simDt = std::min(dt, 0.25f);
   dt = std::min(dt, 0.05f);
   realTime += dt;
   updateBindCapture(dt);
@@ -1966,8 +1975,16 @@ void Game::update(float dt) {
     } else if (actPressed(ACT_MINIMAP)) { showMinimap = !showMinimap; toast(showMinimap ? "Minimap shown" : "Minimap hidden"); }
     if (actPressed(ACT_HUD)) hudOn = !hudOn;
     if (!paused) {
-      updateFlight(dt);
-      if (screen == SCR_FLIGHT) { updateCamera(dt); updateParticles(dt * timeAccel); }
+      int nSim = std::max(1, (int)ceilf(simDt / 0.05f - 1e-4f));
+      Input frameIn; bool saved = false;   // key presses act once: the catch-up steps see the held state without the press edges
+      for (int k = 0; k < nSim && screen == SCR_FLIGHT && !paused; k++) {
+        float h = simDt / nSim;
+        updateFlight(h);
+        if (screen == SCR_FLIGHT) updateParticles(h * timeAccel);
+        if (k == 0 && nSim > 1) { frameIn = in; saved = true; in.endFrame(); }
+      }
+      if (saved) in = frameIn;
+      if (screen == SCR_FLIGHT) updateCamera(dt);
       if (plane.spec) {
         float rps = plane.spec->engineType == ENG_TURBOPROP ? plane.rpm / 60.f : plane.rpm / 60.f;
         propAngle = fmodf(propAngle + rps * 2 * PI * dt * (plane.rpm < 400 ? 1.f : 0.0f) + (plane.rpm >= 400 ? dt * 3.f : 0.f), 2 * PI * 100);

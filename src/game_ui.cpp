@@ -1725,7 +1725,7 @@ void Game::drawPause() {
   by += bh + 12 * s;
   if (button(x + 30 * s, by, bw, bh, showRadio ? "Hide radio" : "Radio")) showRadio = !showRadio;
   by += bh + 12 * s;
-  if (button(x + 30 * s, by, bw, bh, researchFlight ? "End research flight" : "Abandon flight")) endFlight(false, researchFlight ? "" : "Abandoned flight");
+  if (button(x + 30 * s, by, bw, bh, researchFlight ? "End research flight" : "Abandon flight")) endFlight(false, researchFlight ? "" : "Abandoned flight", OUT_ABANDONED);
   if (showRadio) drawRadioPanel(20 * s, 60 * s);
 }
 

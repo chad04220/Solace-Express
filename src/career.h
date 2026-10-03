@@ -29,8 +29,13 @@ struct Contract {
 
 struct OwnedPlane { int spec; int location; float fuel; float condition; };
 
+// How a flight ended. Only a crash counts against the record and costs repairs; a safe diversion, an off-airport
+// landing, running dry on the ground or abandoning the job just fail the contract.
+enum FlightOutcome { OUT_SUCCESS = 0, OUT_ABANDONED, OUT_DIVERTED, OUT_OFF_AIRPORT, OUT_OUT_OF_FUEL, OUT_CRASHED };
+
 struct FlightResult {
   bool success = false;
+  FlightOutcome outcome = OUT_SUCCESS;
   std::string failReason;
   bool landed = false;          // flight ended on the ground after a touchdown
   float touchdownFpm = 0, maxG = 1, minG = 1, maxBank = 0, flightMin = 0;

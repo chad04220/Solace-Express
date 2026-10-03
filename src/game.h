@@ -239,7 +239,7 @@ private:
   void saveGame();
   void toast(const std::string& s, vec3 col = vec3(1, 1, 1));
   void startFlight(const Contract& c, int spec, Career::Source src);
-  void endFlight(bool success, const std::string& reason);
+  void endFlight(bool success, const std::string& reason, FlightOutcome outcome = OUT_CRASHED);
   void updateFlight(float dt);
   void flightControls(float dt);
   void updateCamera(float dt);

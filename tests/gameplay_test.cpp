@@ -98,6 +98,38 @@ struct GameTest {
            g_world.airports[g.career.location].code, g.debriefTitle.c_str());
     for (auto& l : g.payout) printf("   %-30s %d\n", l.label.c_str(), l.amount);
     if (!(g.screen == SCR_DEBRIEF && g.lastSuccess && g.career.location == c.to)) fails++;
+    // ---- low frame rates keep simulated time: 5 s of 5 fps frames is 5 s of flight
+    {
+      g.startFlight(g_story[0], 0, Career::SRC_LESSON);
+      float c0 = g.flightClock;
+      for (int i = 0; i < 25; i++) g.update(0.2f);
+      float got = g.flightClock - c0;
+      printf("5 fps timing: %.2f s simulated for 5.00 s of frames\n", got);
+      if (fabsf(got - 5.f) > 0.05f) fails++;
+    }
+    // ---- stopped dry with checkpoints left ends the flight (was a stall) and isn't a crash
+    {
+      g.startFlight(g_story[0], 0, Career::SRC_LESSON);
+      int crashes0 = g.career.crashes;
+      g.takeoffAnnounced = true; g.touchedDown = true; g.wpIndex = 0; g.plane.fuel = 0;
+      for (int i = 0; i < 600 && g.screen == SCR_FLIGHT; i++) g.update(1.f / 60.f);
+      printf("Dry with checkpoints left: screen=%d outcome=%d crashes %+d (%s)\n", g.screen, (int)g.result.outcome, g.career.crashes - crashes0, g.debriefTitle.c_str());
+      if (g.screen != SCR_DEBRIEF || g.result.outcome != OUT_OUT_OF_FUEL || g.career.crashes != crashes0) fails++;
+    }
+    // ---- settle: only crashes count as crashes and cost repairs
+    {
+      Career c; c.newGame(); c.money = 100000; c.license = LIC_ATP;
+      int spec = 2; c.fleet.push_back({spec, g_story[4].from, kAircraft[spec].maxFuel, 0.f});
+      const FlightOutcome outs[] = {OUT_ABANDONED, OUT_DIVERTED, OUT_OFF_AIRPORT, OUT_OUT_OF_FUEL, OUT_CRASHED};
+      for (FlightOutcome o : outs) {
+        Career t = c; FlightResult r; r.success = false; r.outcome = o; r.failReason = "x"; int st = 0;
+        auto lines = t.settle(g_story[4], spec, Career::SRC_OWNED, r, &st);
+        bool repaired = false; for (auto& l : lines) if (l.label == "Repairs") repaired = true;
+        bool wantCrash = o == OUT_CRASHED;
+        printf("  settle outcome %d: crashes %+d repairs %d\n", (int)o, t.crashes - c.crashes, repaired);
+        if ((t.crashes != c.crashes) != wantCrash || repaired != wantCrash) fails++;
+      }
+    }
     printf("%d failures\n", fails);
     return fails;
   }
