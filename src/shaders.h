@@ -135,6 +135,7 @@ layout(location=1) out float oDepth;
 uniform vec2 uRes; uniform vec3 uCamPos; uniform mat3 uCamRot; uniform float uTanHalf; uniform float uAspect;
 uniform vec2 uJit; uniform float uSeed;  // TAA: sub-pixel jitter (uv units) and a per-frame noise seed
 uniform float uMaxH; uniform int uQuality;
+uniform int uDbg;   // profiling: each set bit switches one feature off (see Renderer::dbgOff)
 uniform sampler2DArray uAlb; uniform sampler2DArray uNrm;
 // airports
 uniform int uApCount; uniform vec4 uAp[16]; uniform vec4 uApDim[16];
@@ -960,7 +961,7 @@ float pieceShadow(vec3 ro, vec3 rd, float br){
   return clamp(res, 0.0, 1.0);
 }
 float planeShadow(vec3 ro, vec3 rd){
-  if (uPlaneOn == 0) return 1.0;
+  if (uPlaneOn == 0 || (uDbg & 8) != 0) return 1.0;
   int keep = gPI; vec3 kP = gPP; mat3 kR = gPR; vec3 kC = gPC;
   float res = 1.0;
   if (uWreck == 0) { pieceXf(-1); res = pieceShadow(ro, rd, planeBound()); }
@@ -980,6 +981,7 @@ float traceTerrain(vec3 ro, vec3 rd, float tmax){
   if (ro.y > uMaxH) { if (rd.y >= 0.0) return -1.0; t = max(t, (ro.y - uMaxH)/(-rd.y)); }
   float lt = t, ldh = 0.0; bool skipped = true;
   int maxSteps = uQuality > 1 ? 360 : (uQuality > 0 ? 270 : 190);
+  if ((uDbg & 64) != 0) maxSteps /= 2;
   vec2 ird = vec2(abs(rd.x) > 1e-6 ? 1.0/rd.x : 1e9, abs(rd.z) > 1e-6 ? 1.0/rd.z : 1e9);
   for (int i=0;i<360;i++){
     if (i >= maxSteps || t > tmax) break;
@@ -1015,6 +1017,7 @@ float traceTerrain(vec3 ro, vec3 rd, float tmax){
   return -1.0;
 }
 float terrainShadow(vec3 ro, vec3 rd, float camT){
+  if ((uDbg & 2) != 0) return 1.0;
   float res = 1.0, t = 2.0;
   for (int i=0;i<40;i++){
     vec3 p = ro + rd*t;
@@ -1059,7 +1062,7 @@ float shCascade(int c, vec3 p, vec3 n){
 // the camera, well inside the area its map covers: the near cascade hands over to the far one, the far one to none,
 // and a map re-rendering as the camera moves on never makes shadows appear or vanish.
 float entShadow(vec3 p, vec3 n){
-  if (uShOn == 0) return 1.0;
+  if (uShOn == 0 || (uDbg & 4) != 0) return 1.0;
   float w0 = 1.0 - smoothstep(uShFadeR.x, uShFadeR.y, length(p.xz - uShFade.xy));
   float w1 = uShOn > 1 ? 1.0 - smoothstep(uShFadeR.z, uShFadeR.w, length(p.xz - uShFade.zw)) : 0.0;
   float s = 1.0;
@@ -1096,7 +1099,7 @@ float cloudDensity(vec3 p, int detail){
 float hgPhase(float c, float g){ float g2 = g*g; return (1.0 - g2)/(12.566*pow(max(1.0 + g2 - 2.0*g*c, 1e-4), 1.5)); }
 int gCloudLite = 0;   // reflections: half the steps
 vec4 traceClouds(vec3 ro, vec3 rd, float tmax, float jitter){
-  if (uCloudCover < 0.02) return vec4(0.0,0.0,0.0,1.0);
+  if (uCloudCover < 0.02 || (uDbg & 1) != 0) return vec4(0.0,0.0,0.0,1.0);
   float thick = 900.0 + 900.0*uCloudCover;
   float yb = uCloudBase, yt = uCloudBase + thick;
   float t0, t1;
@@ -1144,7 +1147,7 @@ vec4 traceClouds(vec3 ro, vec3 rd, float tmax, float jitter){
   return vec4(L, T);
 }
 float cloudShadow(vec3 p){
-  if (uCloudCover < 0.05) return 1.0;
+  if (uCloudCover < 0.05 || (uDbg & 32) != 0) return 1.0;
   vec3 c = p + uSunDir * ((uCloudBase + 500.0 - p.y)/max(uSunDir.y, 0.1));
   float d = cloudDensity(vec3(c.x, uCloudBase + 400.0, c.z), 0);
   return mix(1.0, 0.25, smoothstep(0.0, 0.5, d));
@@ -1395,6 +1398,7 @@ void fieldMaterial(vec2 p, float farm, inout Mat m){
 
 Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
   Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
+  if ((uDbg & 128) != 0) { m.alb = vec3(0.2, 0.3, 0.12); m.rough = 0.9; return m; }
   float lush = base.z, cold = base.w;
   float slope = 1.0 - n.y;
   float hNoise = tfbm(p.xz/900.0);
@@ -1541,7 +1545,7 @@ vec3 shadeSurface(vec3 p, vec3 n, vec3 rd, Mat m, float shadow){
   // point and spot lights (exhaust flames, landing lights, nav lights, beacon, strobes, blasts) with ray-traced
   // shadows from the aircraft: shadow rays only where a light contributes visibly
   for (int i = 0; i < 12; i++) {
-    if (i >= uPLN) break;
+    if (i >= uPLN || (uDbg & 16) != 0) break;
     vec3 lv = uPLP[i].xyz - p; float d2 = dot(lv, lv), d = sqrt(d2); vec3 l = lv/max(d, 1e-4);
     float ndl = dot(n, l);
     if (ndl <= 0.0) continue;
@@ -1570,6 +1574,7 @@ float layerDepth(float y0, float dy, float t, float H){
 // contrast) plus a low haze layer whose density follows the weather's visibility and that glows around the sun.
 // Both thin out with altitude. The in-scattered light is the horizon sky's, so far terrain melts into the sky.
 vec3 applyFog(vec3 col, vec3 ro, vec3 rd, float t){
+  if ((uDbg & 256) != 0) return col;
   float odR = layerDepth(ro.y, rd.y, t, 8000.0), odM = layerDepth(ro.y, rd.y, t, 1100.0);
   vec3 bR = vec3(5.8e-6, 13.5e-6, 33.1e-6);
   float bM = 3e-6 + uFogB*0.8;

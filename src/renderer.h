@@ -79,6 +79,7 @@ public:
   int W = 0, H = 0;          // window size
   float renderScale = 1.0f;
   int quality = 1;           // 0 low, 1 medium, 2 high
+  int dbgOff = 0;            // profiling: ray tracer features switched off (uDbg bits)
   bool ok = false;
   std::string error;
   GLuint minimapTex = 0;

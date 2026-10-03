@@ -439,13 +439,70 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) { stopIntro(false); fatal(g_ren.error); return 1; }
   {
     std::string cl = GetCommandLineA();
-    bool tool = cl.find("--bench ") != std::string::npos || cl.find("--shots ") != std::string::npos;
+    bool tool = cl.find("--bench ") != std::string::npos || cl.find("--shots ") != std::string::npos || cl.find("--profile ") != std::string::npos;
     stopIntro(!tool);   // the bench and shot tools draw straight away; a normal start fades the intro out
   }
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
     fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits.load(), g_shaderCacheMisses.load());
     if (!g_ren.dispError.empty()) fprintf(f, "Display shader failed (cockpit screens disabled):\n%s\n", g_ren.dispError.c_str());
     fclose(f);
+  }
+  // Profile: SolaceExpress.exe --profile scene1,scene2,... renders each scene at 1920x1080 once normally and once with
+  // each ray tracer feature switched off (Renderer::dbgOff), and writes profile.txt next to the exe: what every
+  // feature costs on this GPU
+  {
+    std::string cl = GetCommandLineA();
+    size_t k = cl.find("--profile ");
+    if (k != std::string::npos) {
+      std::string list = cl.substr(k + 10); list = list.substr(0, list.find(' ')) + ",";
+      if (g_fullscreen) toggleFullscreen();
+      RECT wr = {0, 0, 1920, 1080}; AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+      SetWindowPos(g_hwnd, nullptr, 0, 0, wr.right - wr.left, wr.bottom - wr.top, SWP_NOMOVE | SWP_NOZORDER);
+      { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } }
+      if (s_swapInterval) s_swapInterval(0);
+      char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+      std::string dir(exe, n); dir = dir.substr(0, dir.find_last_of("\\/"));
+      FILE* pf = fopen((dir + "\\profile.txt").c_str(), "w");
+      static const struct { int bit; const char* name; } kFeat[] = {
+        {0, "everything on"}, {1, "volumetric clouds"}, {2, "terrain shadows"}, {4, "scenery shadow maps"}, {8, "aircraft shadow"},
+        {16, "point lights"}, {32, "cloud shadows"}, {64, "half terrain march steps"}, {128, "terrain materials"}, {256, "fog / aerial perspective"},
+      };
+      if (pf) fprintf(pf, "GPU: %s\nRender %dx%d, quality %d. Each line: frame time with that feature off, and what it saves.\n", gpu.c_str(), g_ren.W, g_ren.H, g_ren.quality);
+      g_ren.entSync = true;
+      for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
+        std::string sc = list.substr(a, b - a);
+        if (sc.empty()) continue;
+        RECT rc; GetClientRect(g_hwnd, &rc);
+        if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
+        if (pf) fprintf(pf, "\n%s\n", sc.c_str());
+        double base = 0;
+        for (const auto& F : kFeat) {
+          MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
+          SetWindowTextA(g_hwnd, ("Solace Express - profiling " + sc + ": " + F.name).c_str());
+          Game* g = new Game();
+          g->saveDir = game.saveDir;
+          g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
+          g_ren.entSync = false; g_ren.dbgOff = F.bit;
+          for (int i = 0; i < 30; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); }
+          glFinish();
+          LARGE_INTEGER f0, f1; QueryPerformanceCounter(&f0);
+          const int N = 60;
+          for (int i = 0; i < N; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); }
+          glFinish(); QueryPerformanceCounter(&f1);
+          double ms = (double)(f1.QuadPart - f0.QuadPart) / freq.QuadPart * 1000.0 / N;
+          if (F.bit == 0) base = ms;
+          if (pf) {
+            if (F.bit == 0) fprintf(pf, "  %-26s %7.2f ms   (scenery+shadows %.2f, ray trace %.2f)\n", F.name, ms, g_ren.passMs[0], g_ren.passMs[1]);
+            else fprintf(pf, "  %-26s %7.2f ms   saves %6.2f ms\n", F.name, ms, base - ms);
+            fflush(pf);
+          }
+          g_ren.dbgOff = 0; g_ren.entSync = true;
+          delete g;
+        }
+      }
+      if (pf) fclose(pf);
+      return 0;
+    }
   }
   // Benchmark: SolaceExpress.exe --bench scene1,scene2,... [--size WxH] times each scene (wall clock with the GPU flushed,
   // plus the GPU time of every pass) and writes bench.txt next to the exe

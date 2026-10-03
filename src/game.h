@@ -47,7 +47,7 @@ struct Settings {
   bool invertPitch = false, showHints = true, metric = false, fullscreen = false, traffic = true;
   int radioStation = 0;
   float mouseSens = 1.0f;
-  int resMode = 0;   // 0 native, 1 auto (holds 60 fps), 2 85%, 3 75%, 4 67% (TAA upscales to the display)
+  int resMode = 1;   // 0 native, 1 auto (holds 60 fps, the default), 2 85%, 3 75%, 4 67% (TAA upscales to the display)
   int keyBind[ACT_COUNT]; unsigned padBind[ACT_COUNT];
   Settings() { resetBindings(); }
   void resetBindings() { for (int i = 0; i < ACT_COUNT; i++) { keyBind[i] = kActions[i].key; padBind[i] = kActions[i].pad; } }

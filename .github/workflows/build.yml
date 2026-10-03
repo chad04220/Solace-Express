@@ -35,7 +35,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist/SolaceExpress | Out-Null
           Copy-Item build/Release/SolaceExpress.exe dist/SolaceExpress/
-          Copy-Item README.md, radio_stations.txt, THIRD_PARTY_NOTICES.md, render_shots.bat, benchmark.bat dist/SolaceExpress/
+          Copy-Item README.md, radio_stations.txt, THIRD_PARTY_NOTICES.md, render_shots.bat, benchmark.bat, profile.bat dist/SolaceExpress/
           Compress-Archive -Path dist/SolaceExpress/* -DestinationPath dist/SolaceExpress-windows-x64.zip -Force
 
       - uses: actions/upload-artifact@v4

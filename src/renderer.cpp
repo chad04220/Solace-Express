@@ -821,7 +821,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform1f(U(p, "uTanHalf"), tanf(fp.fovY * 0.5f));
   glUniform1f(U(p, "uAspect"), (float)W / H);
   glUniform1f(U(p, "uMaxH"), maxH);
-  glUniform1i(U(p, "uQuality"), quality);
+  glUniform1i(U(p, "uQuality"), quality); glUniform1i(U(p, "uDbg"), dbgOff);
   glUniform1f(U(p, "uTime"), fp.time);
   glUniform3f(U(p, "uSunDir"), fp.sunDir.x, fp.sunDir.y, fp.sunDir.z);
   glUniform3f(U(p, "uSunCol"), fp.sunCol.x, fp.sunCol.y, fp.sunCol.z);

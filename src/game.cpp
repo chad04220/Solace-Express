@@ -120,7 +120,7 @@ void Game::loadSettings() {
     else if (s == "fullscreen") set.fullscreen = v != 0;
     else if (s == "radioStation") set.radioStation = (int)v;
     else if (s == "mouseSens") set.mouseSens = clampf(v, 0.2f, 3.f);
-    else if (s == "resMode") set.resMode = std::clamp((int)v, 0, 4);
+    else if (s == "renderRes") set.resMode = std::clamp((int)v, 0, 4);   // (the old key, "resMode", defaulted to native: ignored)
     else if (s.rfind("key.", 0) == 0 || s.rfind("pad.", 0) == 0)
       for (int i = 0; i < ACT_COUNT; i++)
         if (s.compare(4, std::string::npos, kActions[i].id) == 0) {
@@ -135,7 +135,7 @@ void Game::saveSettings() {
   if (!f) return;
   fprintf(f, "renderScale %f\nquality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\n",
           set.renderScale, set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic);
-  fprintf(f, "resMode %d\n", set.resMode);
+  fprintf(f, "renderRes %d\n", set.resMode);
   for (int i = 0; i < ACT_COUNT; i++) fprintf(f, "key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   fclose(f);
 }
@@ -221,7 +221,7 @@ void Game::init(bool buildWorld) {
   camQ = quat();
 }
 
-void Game::initHeadless() { headless = true; career.newGame(); }
+void Game::initHeadless() { headless = true; career.newGame(); set.resMode = 0; }   // tools and tests render at the full resolution
 
 void Game::shutdown() { saveSettings(); radio.shutdown(); }
 
