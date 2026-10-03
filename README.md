@@ -145,6 +145,8 @@ The presets include SomaFM, Radio Paradise and KEXP, plus free US East Coast pub
 
 Save data, settings and the radio list live in `%APPDATA%\AirXpress`.
 
+**Laptops with two GPUs.** The game asks NVIDIA Optimus and AMD switchable graphics for the dedicated GPU. If it still starts on the integrated one (very slow loading, or a shader error at startup), set `AirXpress.exe` to *High performance* in Windows Settings → System → Display → Graphics. While loading, the window title shows progress and the GPU in use. Each launch writes that GPU's name to `%APPDATA%\AirXpress\startup.log`.
+
 ## Building
 
 ### Visual Studio 2022 or newer (MSVC)

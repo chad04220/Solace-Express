@@ -11,6 +11,12 @@
 #include <objbase.h>
 #include "game.h"
 
+// Ask hybrid-graphics laptops for the dedicated GPU: the integrated one may reject or take minutes over the ray tracer
+extern "C" {
+__declspec(dllexport) DWORD NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+
 // ------------------------------------------------------------------ WGL bits
 #define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
 #define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
@@ -228,17 +234,27 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   // loading screen while the world and textures are generated
   glViewport(0, 0, ww, wh); glClearColor(0.03f, 0.05f, 0.08f, 1); glClear(GL_COLOR_BUFFER_BIT); SwapBuffers(g_hdc);
 
+  // startup.log names the GPU in use (support aid); the title shows progress while the world and shaders are built
+  std::string gpu = std::string((const char*)glGetString(GL_RENDERER)) + " / " + (const char*)glGetString(GL_VERSION);
+  if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "w")) { fprintf(f, "GPU: %s\n", gpu.c_str()); fclose(f); }
+  auto status = [&](const char* s) {
+    SetWindowTextA(g_hwnd, (std::string("Air Xpress - ") + s).c_str());
+    MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
+  };
+  status("generating world...");
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   game.init();
   if (game.set.fullscreen) { toggleFullscreen(); setupPacing(g_hwnd); }
   RECT cr; GetClientRect(g_hwnd, &cr);
   g_ren.renderScale = 1.0f; g_ren.quality = game.set.quality;
+  status(("compiling shaders on " + gpu + " (can take a minute)...").c_str());
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) {
     FILE* f = fopen((game.saveDir + "\\error.log").c_str(), "w");
     if (f) { fprintf(f, "%s\nRenderer: %s\n", g_ren.error.c_str(), (const char*)glGetString(GL_RENDERER)); fclose(f); }
     MessageBoxA(g_hwnd, ("Graphics initialisation failed:\n" + g_ren.error.substr(0, 1500)).c_str(), "Air Xpress", MB_ICONERROR);
     return 1;
   }
+  SetWindowTextA(g_hwnd, "Air Xpress");
   startAudio();
 
   LARGE_INTEGER freq, prev, now;
