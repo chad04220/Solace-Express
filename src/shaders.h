@@ -951,11 +951,11 @@ float pieceShadow(vec3 ro, vec3 rd, float br){
   h = sqrt(h); float t = max(-b-h, 0.0), t1 = -b+h;
   mat3 inv = transpose(gPR); vec3 lo = gPC + inv*(ro - gPP), ld = inv*rd;
   float res = 1.0;
-  for (int i=0;i<56;i++){
+  for (int i=0;i<40;i++){   // (was 56: the aircraft's self-shadow cost 16 ms a frame in the light aircraft's cockpit)
     float d = mapPiece(lo + ld*t).x;
     res = min(res, gShK*d/max(t,0.1));
-    if (res < 0.01) return 0.0;
-    t += clamp(d, 0.03, 2.0);
+    if (res < 0.02) return 0.0;
+    t += clamp(d, 0.045, 2.0);
     if (t > min(t1, gShMax)) break;
   }
   return clamp(res, 0.0, 1.0);
@@ -1019,10 +1019,14 @@ float traceTerrain(vec3 ro, vec3 rd, float tmax){
 float terrainShadow(vec3 ro, vec3 rd, float camT){
   if ((uDbg & 2) != 0) return 1.0;
   float res = 1.0, t = 2.0;
+  // distant pixels cover many metres each: fewer steps and octaves are enough there (the profile showed terrain
+  // shadows among the most expensive features)
+  int n = camT > 6000.0 ? 16 : (camT > 2000.0 ? 26 : 40), oct = camT > 2000.0 ? 3 : 4;
   for (int i=0;i<40;i++){
+    if (i >= n) break;
     vec3 p = ro + rd*t;
     if (p.y > uMaxH) break;
-    float h = p.y - terrainH(p.xz, 4);
+    float h = p.y - terrainH(p.xz, oct);
     res = min(res, 12.0*h/t);
     if (res < 0.0) return 0.0;
     t += clamp(h*0.6, 6.0, 450.0);
@@ -3915,20 +3919,16 @@ void main(){
     vec2 cell = vec2(uDispRes.x/4.0, uDispRes.y/2.0);
     vec2 id = floor(px/cell); vec2 uv = (px - id*cell)/cell*2.0 - 1.0;
     int page = int(id.x) + int(id.y)*4;
-    float fp = 2.0/cell.y; gAA = fp*0.6;
-    if (page < 7) o = vec4(0.25*(mfdPage(page, uv + vec2(-0.25, -0.75)*fp) + mfdPage(page, uv + vec2(0.75, -0.25)*fp)
-                               + mfdPage(page, uv + vec2(0.25, 0.75)*fp) + mfdPage(page, uv + vec2(-0.75, 0.25)*fp)), 1.0);
+    float fp = 2.0/cell.y; gAA = fp*0.85;
+    // one evaluation per texel (each shape is anti-aliased over gAA already): four inlined copies of every page made
+    // the shader too big for some NVIDIA drivers
+    if (page < 7) o = vec4(mfdPage(page, uv), 1.0);
   } else {   // panel coordinates (m): x -0.16 .. 0.42, y -0.11 .. 0.11; colour premultiplied by gauge coverage
     float mpp = 0.58/uDispRes.x;
     vec2 q = vec2(-0.16, -0.11) + px*mpp;
-    gAA = mpp*0.6;
-    vec3 acc = vec3(0.0); float cov = 0.0;
-    for (int si = 0; si < 4; si++) {
-      vec2 off = (vec2(si & 1, si >> 1) - 0.5)*mpp*0.7;
-      vec3 c4 = drawInstruments(q + off, int(uDispMode.y + 0.5), true);
-      if (c4.x >= 0.0) { acc += c4; cov += 1.0; }
-    }
-    o = vec4(acc*0.25, cov*0.25);
+    gAA = mpp*0.85;
+    vec3 c4 = drawInstruments(q, int(uDispMode.y + 0.5), true);   // (one evaluation: see the pages above)
+    o = c4.x >= 0.0 ? vec4(c4, 1.0) : vec4(0.0);
   }
   // the atlas is half float (max 65504): one overflowing or NaN pixel would turn to inf, and mipmapping would smear it
   // over the whole screen. Displays never need more than this.

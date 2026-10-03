@@ -482,8 +482,8 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
 
 // Cockpit display atlas for this frame: the research jets' display pages, or the light aircraft's instrument panel
 void Renderer::renderDisplays(const FrameParams& fp, bool panel) {
-  if (!progDisp) return;
   GLuint& tex = panel ? texPanel : texPages;
+  if (!progDisp && tex) return;   // no display shader: the screens stay as cleared below (dark)
   int w = 2048, h = panel ? 776 : 1024;
   if (!tex) {
     glGenTextures(1, &tex); glBindTexture(GL_TEXTURE_2D, tex);
@@ -496,6 +496,11 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel) {
   glBindFramebuffer(GL_FRAMEBUFFER, fboDisp);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
   glViewport(0, 0, w, h); glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
+  if (!progDisp) {
+    glClearColor(0, 0, 0, 0); glClear(GL_COLOR_BUFFER_BIT);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, tex); glGenerateMipmap(GL_TEXTURE_2D);
+    return;
+  }
   GLuint p = progDisp;
   glUseProgram(p);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);

@@ -243,6 +243,8 @@ void Game::computeSun(float tod, vec3& dir, vec3& col, float& night) const {
 
 // ------------------------------------------------------------------ flight session
 void Game::startFlight(const Contract& c, int spec, Career::Source src) {
+  static bool dispWarned = false;   // say once if the cockpit display shader could not be built on this GPU
+  if (!g_ren.dispError.empty() && !dispWarned && !headless) { dispWarned = true; toast("Cockpit display shader failed on this GPU (details in startup.log)", vec3(1.f, 0.45f, 0.35f)); }
   contract = c; specIdx = spec; source = src;
   wx = c.wx; timeOfDay = wx.timeOfDay;
   const AircraftSpec& s = kAircraft[spec];
