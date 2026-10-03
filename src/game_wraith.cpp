@@ -163,8 +163,8 @@ void Game::updateBolts(float dt) {
 }
 
 // The bomb camera is a separate camera object spawned when a bomb leaves the bay. It chases the oldest falling bomb
-// from just behind and above, and when that bomb goes off it flies out to a vantage point about 400 m away and 20
-// degrees up, slowly orbiting the blast while it burns. Then it is removed (or picks up the next bomb in the air).
+// from just behind and above, and when that bomb goes off it flies out to a vantage point 400-700 m away and 18
+// degrees up, slowly orbiting and pulling back as the cloud climbs. Then it is removed (or picks up the next bomb in the air).
 void Game::updateBombCam(float dt) {
   WraithState& W = wraith;
   WraithState::BombCam& C = W.cam;
@@ -187,14 +187,15 @@ void Game::updateBombCam(float dt) {
     C.tanHalf += (0.28f - C.tanHalf) * (1.f - expf(-dt * 3.f));
   } else {
     C.orbit += dt * 0.14f;
-    float el = 20.f * DEG, d = 420.f;
+    float rise = clampf(C.t / 7.f, 0.f, 1.f);   // the cloud climbs: pull back and look higher
+    float el = 18.f * DEG, d = 420.f + 260.f * rise;
     vec3 want = C.blastP + vec3(sinf(C.orbit) * cosf(el), sinf(el), cosf(C.orbit) * cosf(el)) * d;
     want.y = std::max(want.y, groundAt(want) + 25.f);
     C.pos = want + (C.pos - want) * expf(-dt * 1.8f);   // flies out to the vantage point
-    vec3 lookAt = C.blastP + vec3(0, 45.f, 0);
+    vec3 lookAt = C.blastP + vec3(0, 45.f + 170.f * rise, 0);
     C.look = lookAt + (C.look - lookAt) * expf(-dt * 4.f);
     C.tanHalf += (0.42f - C.tanHalf) * (1.f - expf(-dt * 2.f));
-    if (C.t > 3.4f) {   // the blast has burnt out: next bomb in the air, or the camera is removed
+    if (C.t > 6.5f) {   // the blast has burnt out: next bomb in the air, or the camera is removed
       if (!W.bombs.empty()) { C.phase = 0; C.t = 0; }
       else C.on = false;
     }
@@ -204,7 +205,7 @@ void Game::updateBombCam(float dt) {
 
 void Game::detonate(vec3 p, bool water) {
   WraithState& W = wraith;
-  W.blasts.push_back({p, water ? 80.f : 100.f, 0.f, 3.6f, water});
+  W.blasts.push_back({p, water ? 80.f : 100.f, 0.f, 7.f, water});
   if (W.blasts.size() > 6) W.blasts.erase(W.blasts.begin());
   if (!water) {
     W.craters.push_back({p.x, p.z, 24.f, -8.f});
@@ -224,6 +225,26 @@ void Game::detonate(vec3 p, bool water) {
     vec3 d = rndDir(); d.y = fabsf(d.y);
     spawn(p + d * 10.f, d * (6.f + 12.f * frand()) + vec3(0, 8.f + 10.f * frand(), 0), 12.f + 8.f * frand(), 14.f + 8.f * frand(), 14.f,
           water ? vec3(0.85f, 0.9f, 0.95f) : vec3(0.06f, 0.05f, 0.08f), water ? 0.55f : 0.75f, SPR_SMOKE, 0.6f, water ? 0.f : 0.5f);
+  }
+  // ejecta: white-hot glassed fragments arcing out, and clods of earth (or sheets of water) thrown up and falling back
+  for (int i = 0; i < 70; i++) {
+    vec3 d = rndDir(); d.y = 0.5f + fabsf(d.y);
+    spawn(p + vec3(0, 3.f, 0), normalize(d) * (35.f + 70.f * frand()), 2.f + 2.f * frand(), 1.6f, -0.1f,
+          lerp(vec3(1.f, 0.75f, 1.f), vec3(0.6f, 0.3f, 1.f), frand()) * 6.f, 1.f, SPR_SPARK, 0.15f, -1.f);
+  }
+  for (int i = 0; i < 60; i++) {
+    vec3 d = rndDir(); d.y = 0.7f + fabsf(d.y);
+    spawn(p + vec3(0, 2.f, 0), normalize(d) * (25.f + 55.f * frand()), 3.f + 2.f * frand(), 2.5f + 3.f * frand(), 1.5f,
+          water ? vec3(0.8f, 0.85f, 0.9f) : vec3(0.09f, 0.075f, 0.06f), water ? 0.6f : 0.9f, SPR_SMOKE, 0.25f, -1.f);
+  }
+  // base surge: a ring of dust (or spray) rolling out along the ground under the rising cloud
+  for (int i = 0; i < 48; i++) {
+    float a = i * (6.2832f / 48.f) + frand() * 0.1f;
+    vec3 d(cosf(a), 0, sinf(a));
+    vec3 q = p + d * (20.f + 15.f * frand());
+    q.y = std::max(groundAt(q), p.y) + 4.f;
+    spawn(q, d * (45.f + 25.f * frand()) + vec3(0, 2.f, 0), 9.f + 4.f * frand(), 22.f + 10.f * frand(), 9.f,
+          water ? vec3(0.85f, 0.88f, 0.92f) : vec3(0.32f, 0.28f, 0.25f), water ? 0.5f : 0.6f, SPR_SMOKE, 1.4f, 0.05f);
   }
   vec3 ax(30.f, 0, 0), ay(0, 0, 30.f);
   bursts.push_back({p + vec3(0, 2.f, 0), ax, ay, vec3(0.7f, 0.35f, 1.f), 0.f});
@@ -320,9 +341,8 @@ void Game::wraithVisual(FrameParams& fp) {
   fx.blasts = 0;
   for (size_t i = 0; i < W.blasts.size() && fx.blasts < 6; i++) {
     const WraithState::Blast& b = W.blasts[i];
-    float e = 1.f - (1.f - b.age) * (1.f - b.age) * (1.f - b.age);
     float* o = fx.blast[fx.blasts]; float* I = fx.blastI[fx.blasts]; fx.blasts++;
-    o[0] = b.p.x; o[1] = b.p.y + b.R * 0.25f * e; o[2] = b.p.z; o[3] = b.R * (0.15f + 0.85f * e);
+    o[0] = b.p.x; o[1] = b.p.y; o[2] = b.p.z; o[3] = b.R;   // the shader grows the fireball and lifts the cap
     I[0] = b.age; I[1] = 1.f; I[2] = 0; I[3] = 0;
   }
   // bomb impact prediction for the cockpit's floor and chin displays: a bomb released now, falling with the same
@@ -358,5 +378,10 @@ void Game::wraithVisual(FrameParams& fp) {
   }
   // a young detonation lights up its surroundings (borrowing the exhaust light)
   for (const auto& b : W.blasts)
-    if (b.age < 0.5f) { fp.flameLightPos = b.p + vec3(0, b.R * 0.4f, 0); fp.flameLight = vec3(0.6f, 0.25f, 1.f) * (30000.f * (1.f - b.age * 2.f)); break; }
+    if (b.age < 0.4f) {
+      float k = 1.f - b.age / 0.4f;
+      fp.flameLightPos = b.p + vec3(0, b.R * (0.3f + 1.2f * b.age), 0);
+      fp.flameLight = lerp(vec3(0.5f, 0.2f, 1.f), vec3(1.f, 0.85f, 1.f), k * k) * (45000.f * k * k);
+      break;
+    }
 }

@@ -986,7 +986,7 @@ void Game::buildLights(FrameParams& fp) {
     vec3 exP[4], exD[4]; float exS[4]; int nEx = jetExhausts(plane, exP, exD, exS);
     float flick = 0.85f + 0.15f * sinf(t * 57.f) * sinf(t * 23.f + 1.f);
     vec3 c = lerp(s.special == 2 ? vec3(0.45f, 0.35f, 1.f) : vec3(0.3f, 0.55f, 1.f), s.special == 2 ? vec3(0.9f, 0.6f, 1.f) : vec3(1.f, 0.62f, 0.3f), ab)
-             * ((6.f * sp * sp + 45.f * ab) * flick / (float)nEx) * dark;
+             * (((s.special == 2 ? 6.f * sp * sp : 14.f * sp) + 45.f * ab) * flick / (float)nEx) * dark;
     for (int k = 0; k < nEx; k++) light(W(exP[k] + exD[k] * (0.15f + 0.15f * ab)), 0.08f, c * (s.special == 2 ? exS[k] : 1.f), -2.f, vec3(0, 1, 0), 0.05f);
   }
   // fixture positions (body space)
@@ -1437,7 +1437,7 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   pv.hudV[0] = vb.x; pv.hudV[1] = vb.y; pv.hudV[2] = vb.z;
   pv.hud3[0] = p.engineSpool; pv.hud3[1] = p.alpha / DEG; pv.hud3[2] = p.vel.y; pv.hud3[3] = p.agl();
   if (s.special) {
-    pv.flame[0] = p.engineRunning ? p.engineSpool : 0.f; pv.flame[1] = p.engineRunning ? smoothstepf(0.85f, 1.f, p.engineSpool) : 0.f;
+    pv.flame[0] = p.engineRunning ? p.engineSpool : 0.f; pv.flame[1] = p.engineRunning ? smoothstepf(0.7f, 1.f, p.engineSpool) : 0.f;
     pv.flame[2] = jetNozzleAngle(p); pv.flame[3] = p.mach;
   }
 }

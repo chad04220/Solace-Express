@@ -2729,14 +2729,15 @@ R"(vec3 jetScreen(vec3 col, vec3 rd, int id, vec3 sl){
   return mix(col, hc*1.6, clamp(hud, 0.0, 1.0)*0.85);
 }
 // ---------------------------------------------------------------- research jet exhaust plumes
-// Volumetric emission marched through each plume (body space). Dry thrust is all but invisible, as on a real engine:
-// a faint heat-blue core and, at full power, a few pale shock cells. Reheat: a translucent blue-violet shell at the
+// Volumetric emission marched through each plume (body space). Dry thrust: a blue core whose length and brightness
+// follow the throttle, an orange-tipped flame from mid power and pale shock cells towards full military power. Reheat
+// (phasing in from ~70% spool): a translucent blue-violet shell at the
 // nozzle, a train of white-yellow shock diamonds (Mach disks joined by the expansion / compression cones, spaced
 // wider as the pressure ratio climbs with Mach) inside an orange flame that flares, flickers and reddens downstream.
 float gPlumeT = 1.0;   // light from behind that gets through the flames (reheat gas and soot absorb a little)
 vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float jit){
   float sp = gFlame.x, ab = gFlame.y;
-  float L = mix(1.4, 3.0, sp*sp) + 9.5*ab;
+  float L = mix(1.6, 4.5, sp) + 8.0*ab;
   vec3 c = o + ax*(L*0.5); float br = L*0.5 + 1.0;
   vec3 oc = lo - c; float b = dot(oc, ld), h = b*b - dot(oc, oc) + br*br;
   if (h <= 0.0) return vec3(0.0);
@@ -2744,7 +2745,6 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float jit){
   if (t1 <= t0) return vec3(0.0);
   vec3 ay = normalize(cross(ax, vec3(1.0, 0.0, 0.0)));
   float spacing = 0.8 + 0.3*clamp(gFlame.w, 0.0, 2.5);
-  float hiDry = smoothstep(0.75, 1.0, sp)*(1.0 - ab);
   // a camera inside the jet (chase view right behind in reheat) sees the flame ahead of it, not a glow all around
   vec3 co = lo - o; float cax = dot(co, ax), crad = length(co - ax*cax);
   float camIn = smoothstep(3.5, 1.5, crad)*smoothstep(-1.0, 0.5, cax)*smoothstep(L + 6.0, L, cax);
@@ -2777,8 +2777,10 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float jit){
     vec3 fCol = mix(vec3(1.0, 0.5, 0.14), vec3(0.85, 0.16, 0.04), smoothstep(0.4, 1.0, u));
     vec3 e = ab*(vec3(0.75, 0.38, 0.95)*shell*0.9 + vec3(1.0, 0.8, 0.45)*diam*7.0 + fCol*flame*(4.0 - 2.4*u)
                  + vec3(1.0, 0.62, 0.3)*exp(-e2*5.0)*(1.0 - smoothstep(0.0, 0.5, u))*1.2);
-    // dry: a faint heat-blue core, pale shock cells at full military power
-    e += (1.0 - ab)*(vec3(0.25, 0.45, 1.0)*exp(-e2*3.0)*(1.0 - u)*0.9*sp*sp + vec3(0.6, 0.75, 1.0)*diam*2.0*hiDry);
+    // dry: a blue core that grows with the throttle, an orange-tipped flame from mid power, pale shock cells near full
+    e += (1.0 - ab)*(vec3(0.3, 0.5, 1.0)*exp(-e2*2.5)*(1.0 - u)*3.2*sp
+                     + mix(vec3(1.0, 0.55, 0.25), fCol, u)*flame*(1.8 - 0.8*u)*smoothstep(0.3, 0.85, sp)
+                     + vec3(0.65, 0.78, 1.0)*diam*3.5*smoothstep(0.5, 0.95, sp));
     float tcam = t0 + (float(i) + jit)*dt;
     acc += e*lip*pow(1.0 - u, 0.8)*mix(1.0, smoothstep(3.0, 14.0, tcam), camIn)*dt;
     gPlumeT *= exp(-ab*(flame*0.9 + shell*0.3)*lip*dt);
@@ -3747,53 +3749,81 @@ vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t){
   }
   for (int i = 0; i < 6; i++) {
     if (i >= uFxBlasts) break;
-    vec3 c = uBlast[i].xyz; float R = uBlast[i].w, age = uBlastI[i].x, I = uBlastI[i].y;
-)"
-R"(    float fade = pow(1.0 - age, 0.7);
+    vec3 c = uBlast[i].xyz; float R = uBlast[i].w, age = uBlastI[i].x, I = uBlastI[i].y;   // c: ground zero
+    float g = 1.0 - (1.0 - age)*(1.0 - age)*(1.0 - age);   // fast early growth
+    float rise = smoothstep(0.05, 1.0, age);               // the fireball lifts off into a rolling cap
     vec3 oc = ro - c; float b = dot(oc, rd);
     float tc = max(-b, 0.0), dmin = length(oc + rd*tc);
     // the first instant: a white-violet flash that swamps everything around it
-    if (tc < t + R) col += vec3(1.0, 0.85, 1.0)*exp(-dmin*dmin/(R*R*0.8))*max(0.0, 1.0 - age*4.0)*8.0*I;
-    // shock ring racing out over the ground
+    if (tc < t + R) col += vec3(1.0, 0.85, 1.0)*exp(-dmin*dmin/(R*R*0.5))*max(0.0, 1.0 - age*7.0)*10.0*I;
+    // condensation dome: a thin white shell racing out ahead of the fireball in the first moments (far side first)
+    float dome = max(0.0, 1.0 - age*4.0);
+    if (dome > 0.0) {
+      float Rs = R*(0.4 + 4.5*sqrt(age)), hs = b*b - dot(oc, oc) + Rs*Rs;
+      if (hs > 0.0) {
+        hs = sqrt(hs);
+        for (int s = 1; s >= 0; s--) {
+          float ts = s == 0 ? -b - hs : -b + hs;
+          if (ts <= 0.0 || ts > t) continue;
+          vec3 n = (ro + rd*ts - c)/Rs;
+          float limb = pow(1.0 - abs(dot(n, rd)), 3.0), up = smoothstep(-0.05, 0.25, n.y);   // the lower half is underground
+          col = col*(1.0 - 0.3*limb*dome*up) + vec3(0.9, 0.88, 1.0)*(0.06 + 1.5*limb)*dome*up*I;
+        }
+      }
+    }
+    // on the ground: the shock ring racing outward and the blasted ground glowing violet-white, then cooling
     if (abs(rd.y) > 1e-3) {
-      float tr = (c.y - R*0.2 - ro.y)/rd.y;
-      if (tr > 0.0 && tr < t + 2.0) {
-        float rr = length((ro + rd*tr - c).xz), ring = R*(1.4 + 3.0*age);
-        col += vec3(0.65, 0.3, 1.0)*exp(-pow((rr - ring)/(R*0.1), 2.0))*(1.0 - age)*3.0*I;
+      float tr = (c.y + 1.0 - ro.y)/rd.y;
+      if (tr > 0.0 && tr < t + 3.0) {
+        float rr = length((ro + rd*tr - c).xz), ring = R*(0.6 + 5.0*sqrt(age));
+        col += vec3(0.65, 0.3, 1.0)*exp(-pow((rr - ring)/(R*0.08), 2.0))*(1.0 - age)*(1.0 - age)*4.0*I;
+        col += vec3(0.8, 0.45, 1.0)*exp(-rr*rr/(R*R*0.35))*exp(-age*3.5)*2.5*I;
       }
     }
-    // plasma pillar climbing out of the blast
-    {
-      vec3 a0 = c, u = vec3(0.0, 1.0, 0.0); float L = R*(1.0 + 2.5*smoothstep(0.0, 0.6, age));
-      vec3 w0 = ro - a0; float bb = dot(rd, u), dd = dot(rd, w0), ee = dot(u, w0), den = 1.0 - bb*bb;
-      float sB = clamp(den > 1e-5 ? (ee - bb*dd)/den : ee, 0.0, L), sR = max(dot(a0 + u*sB - ro, rd), 0.0);
-      if (sR < t) {
-        float d = length(ro + rd*sR - (a0 + u*sB)), w = R*(0.18 + 0.12*sB/L);
-        float nz = vnoise(vec2(sB*0.08 - uTime*3.0, d*0.2));
-        col += vec3(0.7, 0.3, 1.0)*exp(-d*d/(w*w))*(0.6 + 0.6*nz)*(1.0 - sB/L)*fade*smoothstep(0.0, 0.08, age)*6.0*I;
-      }
-    }
-    float h = b*b - dot(oc, oc) + R*R*1.4;
+    // the cloud: fireball -> torus cap on a stem, a volume with plasma emission that cools into dark smoke
+    float Hc = R*(0.25*g + 2.8*rise);                                // cap height above ground zero
+    float sb = R*(0.2 + 0.85*g)*(1.0 - 0.45*rise);                   // fireball radius
+    float cRm = R*(0.1 + 0.8*rise), cRr = R*(0.38 + 0.12*rise);      // torus major / minor radius
+    float stemOn = smoothstep(0.04, 0.25, age);
+    vec3 bc = c + vec3(0.0, Hc*0.5, 0.0);
+    float bR = max(Hc*0.5 + max(sb, cRr)*1.2, length(vec2(cRm + cRr*1.2, Hc*0.5 + cRr*1.2)));
+    vec3 ob = ro - bc; float bb2 = dot(ob, rd), h = bb2*bb2 - dot(ob, ob) + bR*bR;
     if (h <= 0.0) continue;
-    h = sqrt(h); float t0 = max(-b - h, 0.0), t1 = min(-b + h, t);
+    h = sqrt(h); float t0 = max(-bb2 - h, 0.0), t1 = min(-bb2 + h, t);
     if (t1 <= t0) continue;
-    float dt = (t1 - t0)/16.0, tr = 1.0; vec3 acc = vec3(0.0);
-    float coreR = 0.5*smoothstep(0.03, 0.15, age)*(1.0 - age)*(1.0 - age);
-    for (int k = 0; k < 16; k++) {
-      vec3 q = ro + rd*(t0 + (float(k) + 0.5)*dt) - c;
-      float x = length(q)/R; vec3 qn = q/R;
-      vec3 flow = qn*2.6 - normalize(q + vec3(1e-3))*uTime*1.4;
+    const int NS = 28;
+    float dt = (t1 - t0)/float(NS), tr = 1.0; vec3 acc = vec3(0.0);
+    float jit = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+    float life = smoothstep(1.0, 0.72, age);                         // the whole cloud thins out at the end
+    for (int k = 0; k < NS; k++) {
+      vec3 q = ro + rd*(t0 + (float(k) + jit)*dt) - c;
+      vec3 qc = q - vec3(0.0, Hc, 0.0);
+      float ball = length(qc)/sb;
+      float tor = length(vec2(length(qc.xz) - cRm, qc.y*1.3))/cRr;
+      float sw = R*(0.12 + 0.14*clamp(q.y/max(Hc, 1.0), 0.0, 1.0))*stemOn;
+      float stem = (q.y > -R*0.1 && q.y < Hc) ? length(q.xz)/max(sw, 1e-3) : 9.0;
+      float x0 = min(min(ball, mix(9.0, tor, rise)), stem);
+      if (x0 > 1.5) continue;
+      // rolling turbulence: noise advected outward from the core and up the stem
+      vec3 flow = qc/R*2.4 - normalize(qc + vec3(1e-3))*uTime*0.9 + vec3(0.0, -uTime*0.6, 0.0);
       float nz = vnoise3(flow) + 0.5*vnoise3(flow*2.3 + vec3(7.1)) + 0.25*vnoise3(flow*5.1 - vec3(3.3));
-      float shell = exp(-pow((x - 0.78)/0.24, 2.0))*clamp(nz*0.9 - 0.1, 0.0, 2.0);
-      float hot = exp(-pow((x - 0.78)/0.1, 2.0))*clamp(nz - 0.6, 0.0, 1.0);
-      float fil = pow(clamp(1.0 - abs(vnoise3(qn*4.0 + vec3(0.0, uTime*2.5, 0.0)) - 0.5)*9.0, 0.0, 1.0), 6.0)*smoothstep(1.25, 0.6, x)*step(coreR, x);
-      float core = smoothstep(coreR + 0.06, coreR - 0.04, x);
-      float smoke = smoothstep(0.35, 1.0, age)*exp(-pow((x - 0.7)/0.35, 2.0))*clamp(nz, 0.0, 1.5)*0.8;
-      vec3 e = (vec3(0.55, 0.12, 1.0)*shell*8.0 + vec3(1.0, 0.65, 1.0)*hot*18.0 + vec3(0.6, 0.9, 1.0)*fil*16.0)*fade*I;
-      acc += e*tr*dt/R*3.0;
-      tr *= exp(-(core*8.0 + smoke*3.0)*dt/R);
+      float x = x0 + (nz - 0.875)*0.45;
+      float dens = smoothstep(1.0, 0.5, x)*life;
+      if (dens <= 0.0) continue;
+      // temperature: everything is hot at first, later only the core of the cap and the lower stem still glow
+      float temp = exp(-age*2.8)*(1.3 - 0.7*clamp(x, 0.0, 1.0)) + 0.4*exp(-age*1.4)*smoothstep(0.7, 0.1, x)*(0.6 + 0.6*nz);
+      vec3 eCol = mix(vec3(0.3, 0.05, 0.85), vec3(0.75, 0.35, 1.0), smoothstep(0.15, 0.6, temp));
+      eCol = mix(eCol, vec3(1.0, 0.92, 1.0), smoothstep(0.7, 1.25, temp));
+      float fil = pow(clamp(1.0 - abs(vnoise3(q/R*4.0 + vec3(0.0, uTime*2.5, 0.0)) - 0.5)*9.0, 0.0, 1.0), 6.0)*exp(-age*2.0);
+      vec3 e = (eCol*temp*temp*(0.5 + 0.7*nz)*14.0 + vec3(0.55, 0.9, 1.0)*fil*12.0)*dens*I;
+      float sig = dens*(0.6 + 0.6*nz)*mix(0.5, 3.5, smoothstep(0.08, 0.55, age))*5.0;
+      // smoke body: dim and cool, lit from above by the sky and from inside by what still burns
+      vec3 smokeC = vec3(0.05, 0.045, 0.06)*(0.6 + 0.6*smoothstep(-R, R, qc.y)) + vec3(0.35, 0.12, 0.7)*temp*0.4;
+      acc += tr*(e + smokeC*sig)*dt/R;
+      tr *= exp(-sig*dt/R);
+      if (tr < 0.01) break;
     }
-    col = col*tr + acc + vec3(0.03, 0.02, 0.04)*(1.0 - tr)*smoothstep(0.35, 1.0, age);   // lingering smoke has a dim violet body
+    col = col*tr + acc;
   }
   return col;
 }
