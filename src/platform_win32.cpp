@@ -244,6 +244,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   static Game game;
   g_game = &game;
   game.saveDir = userDir();
+  { char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);   // pictures etc. live next to the exe
+    std::string d(exe, n); size_t sl = d.find_last_of("\\/"); game.assetDir = sl == std::string::npos ? std::string(".") : d.substr(0, sl); }
 
   WNDCLASSEXW wc = {sizeof(wc)};
   wc.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
@@ -525,7 +527,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) { stopIntro(false); fatal(g_ren.error); return 1; }
   {
     std::string cl = GetCommandLineA();
-    bool tool = cl.find("--bench ") != std::string::npos || cl.find("--shots ") != std::string::npos || cl.find("--profile ") != std::string::npos || cl.find("--analyze") != std::string::npos;
+    bool tool = cl.find("--bench ") != std::string::npos || cl.find("--shots ") != std::string::npos || cl.find("--profile ") != std::string::npos || cl.find("--analyze") != std::string::npos || cl.find("--loadshots") != std::string::npos;
     stopIntro(!tool);   // the bench and shot tools draw straight away; a normal start fades the intro out
   }
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
@@ -812,6 +814,54 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         delete g;
       }
       if (bf) fclose(bf);
+      return 0;
+    }
+  }
+  // Loading-screen pictures: SolaceExpress.exe --loadshots renders every airport (and every aircraft in flight) at
+  // 1920x1080 with all scenery generated and the anti-aliasing settled, and saves them at 1280x720 (averaged down) in
+  // the "loading" folder next to the exe, where the pre-flight loading screen picks them up.
+  {
+    std::string cl = GetCommandLineA();
+    if (cl.find("--loadshots") != std::string::npos) {
+      if (g_fullscreen) toggleFullscreen();
+      RECT wr = {0, 0, 1920, 1080}; AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+      SetWindowPos(g_hwnd, nullptr, 0, 0, wr.right - wr.left, wr.bottom - wr.top, SWP_NOMOVE | SWP_NOZORDER);
+      std::string dir = game.assetDir + "\\loading";
+      CreateDirectoryA(dir.c_str(), nullptr);
+      std::vector<std::pair<std::string, std::string>> jobs;   // scene, file
+      for (const Airport& a : g_world.airports) jobs.push_back({std::string("loadshot_") + a.code, a.code});
+      for (int i = 0; i <= kWraith; i++) jobs.push_back({"loadshot_air_" + std::to_string(i), "air_" + std::to_string(i)});
+      int done = 0;
+      for (auto& J : jobs) {
+        MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
+        RECT rc; GetClientRect(g_hwnd, &rc);
+        if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
+        SetWindowTextA(g_hwnd, ("Solace Express - rendering loading pictures " + std::to_string(++done) + " / " + std::to_string(jobs.size()) + ": " + J.second).c_str());
+        g_ren.entSync = true;
+        Game* g = new Game();
+        g->saveDir = game.saveDir; g->assetDir = game.assetDir;
+        g->initHeadless(); g->iconTex = iconTex; g->debugScene(J.first);
+        for (int i = 0; i < 4; i++) { g->update(1.f / 30.f); g->render(); }
+        for (int i = 0; i < 40; i++) { g->update(1.f / 240.f); g->render(); }   // the TAA settles (barely moving)
+        glFinish();
+        int w = g_ren.W, h = g_ren.H;
+        std::vector<uint8_t> px((size_t)w * h * 3);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, px.data());
+        SwapBuffers(g_hdc);
+        // average down to 1280x720 (or keep a smaller window's size)
+        int ow = std::min(1280, w), oh = std::min(720, h);
+        std::vector<uint8_t> out((size_t)ow * oh * 3);
+        for (int y = 0; y < oh; y++)
+          for (int x = 0; x < ow; x++) {
+            int x0 = x * w / ow, x1 = std::max(x0 + 1, (x + 1) * w / ow), y0 = y * h / oh, y1 = std::max(y0 + 1, (y + 1) * h / oh);
+            int acc[3] = {0, 0, 0}, n = 0;
+            for (int yy = y0; yy < y1; yy++) for (int xx = x0; xx < x1; xx++) { const uint8_t* q = &px[((size_t)yy * w + xx) * 3]; acc[0] += q[0]; acc[1] += q[1]; acc[2] += q[2]; n++; }
+            for (int c = 0; c < 3; c++) out[((size_t)y * ow + x) * 3 + c] = (uint8_t)(acc[c] / n);
+          }
+        writePNG((dir + "\\" + J.second + ".png").c_str(), ow, oh, out);
+        delete g;
+      }
       return 0;
     }
   }

@@ -49,9 +49,10 @@ struct WreckVisual {
 
 // Shader programs, compiled once and then loaded from the driver-binary cache in g_shaderCacheDir (empty: no cache)
 extern std::string g_shaderCacheDir;
-extern std::atomic<int> g_shaderCacheHits, g_shaderCacheMisses;
-std::string shaderCacheStamp();
-bool writePNG(const char* path, int w, int h, const std::vector<uint8_t>& rgbBottomUp);   // fingerprint of all shader sources + the driver (current context needed)   // bumped from several GL threads at startup
+extern std::atomic<int> g_shaderCacheHits, g_shaderCacheMisses;   // bumped from several GL threads at startup
+std::string shaderCacheStamp();   // fingerprint of all shader sources + the driver (current context needed)
+bool writePNG(const char* path, int w, int h, const std::vector<uint8_t>& rgbBottomUp);
+bool readPNG(const char* path, int& w, int& h, std::vector<uint8_t>& rgbaTopDown);   // (PNGs from writePNG)
 GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err);
 
 struct FrameParams {

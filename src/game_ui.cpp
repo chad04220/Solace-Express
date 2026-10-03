@@ -291,7 +291,16 @@ void Game::drawLoading() {
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   bool air = !plane.onGround;
   const Airport& ap = g_world.airports[air ? contract.to : contract.from];
-  if (!loadMap) {   // the aerial image of the airport, rendered once from the real terrain
+  // a picture rendered by render_loading.bat - the airport, or the aircraft in flight - when there is one on disk
+  std::string key = air ? fmt("air_%d", (int)(plane.spec - kAircraft)) : std::string(ap.code);
+  auto li = loadImg.find(key);
+  if (li == loadImg.end()) {
+    unsigned tex = 0; int w = 0, h = 0; std::vector<uint8_t> px;
+    if (readPNG((assetDir + "/loading/" + key + ".png").c_str(), w, h, px)) tex = g_ren.makeTexture(px.data(), w, h);
+    li = loadImg.emplace(key, tex).first;
+  }
+  unsigned pic = li->second;
+  if (!loadMap && !pic) {   // otherwise the aerial image of the airport, rendered once from the real terrain
     loadMap = true; gpsMapValid = false;
     g_ren.renderMap(ap.x, ap.z, 2400.f, 1536);
   }
@@ -299,7 +308,12 @@ void Game::drawLoading() {
   float cover = 1.f - smoothstepf(0.f, 1.4f, rt);   // the card fades out onto the live shot once the scenery is in
   if (cover > 0.001f) {
     g_ren.rect(0, 0, W, H, vec3(0.01f, 0.02f, 0.035f), cover);
-    if (g_ren.mapTex()) {   // slow push-in over the aerial image
+    if (pic) {   // slow push-in over the picture (cropped to fill the screen)
+      float z = 1.f - 0.06f * std::min(loadT, 12.f) / 12.f, asp = (W / H) / (16.f / 9.f);
+      float su = z * std::min(1.f, asp), sv = z * std::min(1.f, 1.f / asp);
+      g_ren.image(pic, 0, 0, W, H, 0.5f - su * 0.5f, 0.5f - sv * 0.5f, 0.5f + su * 0.5f, 0.5f + sv * 0.5f, cover);
+      g_ren.flushUIPublic();
+    } else if (g_ren.mapTex()) {   // slow push-in over the aerial image
       float z = 0.62f - 0.05f * std::min(loadT, 12.f) / 12.f;
       float sv = z, su = z * W / H;
       if (su > 0.98f) { sv *= 0.98f / su; su = 0.98f; }

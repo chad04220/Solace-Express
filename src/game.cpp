@@ -1550,7 +1550,68 @@ FrameParams Game::buildFrame() {
   return fp;
 }
 
+// Main menu: a tour of the islands - every 16 s a different place, aircraft, time of day and camera, cutting through black
+struct MenuShot { const char* ap; int craft; float tod, cloud; int cam; float alt, turn; };
+static const MenuShot kMenuShots[] = {
+  {"PVI", 3, 9.0f, 0.30f, 0, 260.f, 35.f},    // west-coast port, morning, side chase
+  {"VCF", 7, 17.6f, 0.25f, 1, 520.f, -20.f},  // the volcano at sunset, an XR-9 roaring past a fixed camera
+  {"PMB", 1, 12.5f, 0.20f, 3, 150.f, 60.f},   // the lagoon at noon, trailing chase
+  {"SMP", 4, 16.5f, 0.35f, 0, 320.f, -45.f},  // the Spine mountains
+  {"CAP", 5, 19.1f, 0.30f, 2, 650.f, 15.f},   // the capital at dusk, lights coming on, high orbit
+  {"FJH", 2, 11.0f, 0.45f, 1, 260.f, 80.f},   // the fjord
+  {"LHK", 8, 7.0f, 0.25f, 0, 200.f, -70.f},   // Lighthouse Key at dawn, the XR-11
+  {"MDB", 0, 14.0f, 0.35f, 3, 210.f, 25.f},   // Meadowbrook farmland
+};
+static const float kMenuShotLen = 16.f;
+static const MenuShot& menuShot(float t) { int n = (int)floorf(t / kMenuShotLen); return kMenuShots[((n % 8) + 8) % 8]; }
+
+void Game::menuTour(FrameParams& fp) {
+  static Plane demo;
+  static int lastCraft = -1;
+  const MenuShot& S = menuShot(realTime);
+  float u = realTime - floorf(realTime / kMenuShotLen) * kMenuShotLen;
+  int ai = std::max(0, g_world.findAirport(S.ap));
+  const Airport& a = g_world.airports[ai];
+  if (lastCraft != S.craft) { demo.reset(&kAircraft[S.craft], a.pos() + vec3(0, 500, 0), 0, kAircraft[S.craft].maxFuel, 100, true, kAircraft[S.craft].cruise); lastCraft = S.craft; }
+  // the aircraft passes over the airfield at mid-shot, on a heading turned from the runway's
+  float hd = a.heading + S.turn;
+  vec3 dir(sinf(hd * DEG), 0, -cosf(hd * DEG)), right = normalize(cross(dir, vec3(0, 1, 0)));
+  float v = std::min(kAircraft[S.craft].cruise, S.craft >= kResearchJet ? 140.f : 75.f);
+  vec3 C = a.pos();
+  vec3 p = C + dir * ((u - kMenuShotLen * 0.5f) * v);
+  float g = std::max({g_world.height(p.x, p.z), g_world.height(p.x + dir.x * 400.f, p.z + dir.z * 400.f), g_world.height(p.x - dir.x * 400.f, p.z - dir.z * 400.f), 0.f});
+  p.y = std::max(C.y + S.alt, g + S.alt * 0.7f);
+  float bank = 6.f * sinf(u * 0.35f);
+  demo.pos = p;
+  demo.q = quat::axisAngle(vec3(0, 1, 0), -hd * DEG) * quat::axisAngle(vec3(0, 0, 1), -bank * DEG) * quat::axisAngle(vec3(1, 0, 0), 1.5f * DEG);
+  demo.spec = &kAircraft[S.craft];
+  demo.vel = dir * v; demo.onGround = false;
+  demo.rpm = 2400; demo.gear = 0.f; demo.flaps = 0; demo.nozzle = 0; demo.ctl = Controls(); demo.ctl.throttle = 0.7f;
+  demo.engineRunning = true; demo.engineSpool = 0.75f;
+  fillPlaneVisual(fp.plane, demo, realTime * 250.f, false);
+  float size = std::max(demo.spec->span, demo.spec->fusLen), R = size * 2.4f + 10.f;
+  vec3 up(0, 1, 0), cam, look;
+  if (S.cam == 0) { cam = p + right * (R * 0.9f) + dir * (R * (0.45f - 0.03f * u)) + up * (R * 0.16f); look = p + dir * (size * 0.3f); fp.fovY = 50.f * DEG; }
+  else if (S.cam == 1) {   // a fixed camera beside the path, panning as it flies past
+    vec3 pm = C + dir * 0.f; pm.y = p.y;
+    cam = pm + right * (40.f + size * 3.f) + dir * 90.f + up * -(size * 0.6f);
+    cam.y = std::max(cam.y, g_world.height(cam.x, cam.z) + 15.f);
+    look = p; fp.fovY = 38.f * DEG;
+  } else if (S.cam == 2) {   // high slow orbit over the airfield
+    float o = u * 0.03f + 0.6f;
+    cam = C + vec3(cosf(o) * 1900.f, S.alt + 450.f, sinf(o) * 1900.f);
+    cam.y = std::max(cam.y, g_world.height(cam.x, cam.z) + 300.f);
+    look = C + vec3(0, 60.f, 0); fp.fovY = 46.f * DEG;
+  } else { cam = p - dir * (R * 1.5f) + up * (R * 0.32f) + right * (R * 0.22f); look = p + dir * (size * 2.f); fp.fovY = 52.f * DEG; }
+  fp.camPos = cam;
+  vec3 fwd = normalize(look - cam);
+  fp.camBack = -fwd; fp.camRight = normalize(cross(fwd, up)); fp.camUp = cross(fp.camRight, fwd);
+  fp.vignette = 0.9f;
+  fp.fade = smoothstepf(0.f, 0.9f, u) * smoothstepf(kMenuShotLen, kMenuShotLen - 0.9f, u);   // cut through black
+}
+
 void Game::menuBackgroundCamera(FrameParams& fp) {
+  if (screen == SCR_MENU && !getenv("MENUORBIT")) { menuTour(fp); return; }
   // A Wren circles over the islands while the camera chases it in a slow arc
   static Plane demo;
   static bool initd = false;
@@ -1909,7 +1970,8 @@ void Game::update(float dt) {
     if (crashed) { crashTimer += dt; updateWreck(dt); updateParticles(dt); }   // the wreck keeps settling/sinking behind the results
   } else {
     wx = Weather(); wx.cloudCover = 0.35f; wx.cloudBase = 1500; wx.visibility = 45000; wx.windSpeed = 4;
-    timeOfDay = screen == SCR_MENU ? 17.3f : 15.8f;
+    timeOfDay = screen == SCR_MENU ? menuShot(realTime).tod : 15.8f;
+    if (screen == SCR_MENU) wx.cloudCover = menuShot(realTime).cloud;
     cloudOff = cloudOff + vec2(dt * 8.f, dt * 3.f);
   }
   feedAudio();
@@ -1961,6 +2023,7 @@ void Game::render() {
 void Game::debugScene(const std::string& name) {
   career.newGame(); career.license = LIC_ATP;
   if (name == "menu") { screen = SCR_MENU; realTime = 20; return; }
+  if (name.compare(0, 5, "menuT") == 0) { screen = SCR_MENU; realTime = (float)atof(name.c_str() + 5); return; }   // the menu tour at t seconds
   if (name == "hub") { screen = SCR_HUB; realTime = 20; return; }
   if (name.compare(0, 4, "jcam") == 0) {  // XR-9 close-up from an orbit angle: jcam<yaw deg>_<pitch deg>
     float yawD = 0, pitD = 10, thrP = -1, nozP = 0, zoom = 0.55f, tod = -1; sscanf(name.c_str() + 4, "%f_%f_%f_%f_%f_%f", &yawD, &pitD, &thrP, &nozP, &zoom, &tod);
@@ -2361,6 +2424,32 @@ void Game::debugScene(const std::string& name) {
     resAirborne = true; realTime = 20; launchResearch();
     for (int i = 0; i < 10; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     gTunnel = atof(name.c_str() + 4) / 100.f; toasts.clear(); return;
+  }
+  // loading-screen pictures (--loadshots): loadshot_<CODE> an airport from an elevated three-quarter view with the aircraft
+  // on its runway; loadshot_air_<n> aircraft n in flight, filmed from alongside. Afternoon light, a little cloud.
+  if (name.compare(0, 13, "loadshot_air_") == 0) {
+    resCraft = std::clamp(atoi(name.c_str() + 13), 0, 8); resAirborne = true; resTime = 16.3f; resWx = 0; resAirport = 0;
+    launchResearch();
+    wx.cloudCover = 0.3f; realTime = 20;
+    for (int i = 0; i < 20; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    float size = std::max(plane.spec->span, plane.spec->fusLen), R = size * 2.2f + 8.f;
+    dbgCam = true; dbgFollow = true;
+    dbgFollowOff = plane.right() * (R * 0.85f) + plane.forward() * (R * 0.55f) + vec3(0, R * 0.16f, 0);
+    toasts.clear(); hint.clear(); uiHidden = true; return;
+  }
+  if (name.compare(0, 9, "loadshot_") == 0) {
+    int ai = std::max(0, g_world.findAirport(name.substr(9).c_str()));
+    Contract c; c.from = ai; c.to = (ai + 1) % (int)g_world.airports.size(); c.title = "Airport";
+    c.wx = Weather(); c.wx.timeOfDay = 16.3f; c.wx.cloudCover = 0.3f; c.wx.visibility = 60000;
+    realTime = 20; startFlight(c, 0, Career::SRC_OWNED);
+    for (int i = 0; i < 10; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    const Airport& a = g_world.airports[ai];
+    vec3 ctr = a.pos(), d = a.dir(), r = normalize(cross(d, vec3(0, 1, 0)));
+    float len = a.length;
+    vec3 cam = ctr + r * (len * 0.45f + 380.f) - d * (len * 0.55f + 250.f);
+    cam.y = std::max(a.elev, g_world.height(cam.x, cam.z)) + 170.f + len * 0.04f;
+    dbgCam = true; dbgFollow = false; dbgCamPos = cam; dbgCamLook = ctr + d * (len * 0.1f) + vec3(0, 10.f, 0);
+    toasts.clear(); hint.clear(); uiHidden = true; return;
   }
   if (name.compare(0, 3, "apt") == 0 && name.size() >= 6) {   // on the runway of an airport: apt<CODE>, e.g. aptHFS
     int ai = g_world.findAirport(name.substr(3, 3).c_str());

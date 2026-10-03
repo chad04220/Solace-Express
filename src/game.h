@@ -68,6 +68,7 @@ public:
   bool wantFullscreenToggle = false;
   Settings set;
   std::string saveDir;
+  std::string assetDir = ".";                          // folder of the exe (pre-rendered loading pictures live in assetDir\loading)
 
   void loadSettings();
   // startup screen, drawn with the given renderer (the intro thread has its own, in its own GL context)
@@ -145,6 +146,7 @@ private:
   float gTunnel = 0;
   Traffic traffic;
   bool dbgCam = false, dbgFollow = false; vec3 dbgCamPos, dbgCamLook, dbgFollowOff;
+  std::unordered_map<std::string, unsigned> loadImg;   // loading pictures by name (0: none on disk)
   // UFO encounter: pulls up alongside, opens its hatch on two dancing aliens, laughs, waves and zooms off
   struct Ufo { bool on = false; float t = 0, next = 0, side = 1, hatch = 0, laugh = 0, wave = 0; vec3 pos, fwd, right, up; bool sfxLaugh = false, sfxZoom = false; };
   float escortSummon = 0; bool escortLatch = false;   // O + P held: the Spectre display pair
@@ -248,6 +250,7 @@ private:
   void buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, std::vector<SpriteVert>& add);
   void feedAudio();
   void menuBackgroundCamera(FrameParams& fp);
+  void menuTour(FrameParams& fp);   // main menu: a tour of the islands
   int computePhase() const;
   const Airport& dest() const { return g_world.airports[contract.to]; }
 
