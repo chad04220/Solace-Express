@@ -206,7 +206,10 @@ void Game::loadStations() {
   set.radioStation = std::clamp(set.radioStation, 0, (int)stations.size() - 1);
 }
 
-void Game::saveGame() { career.save(joinPath(saveDir, "career.sav")); hasSave = true; }
+void Game::saveGame() {
+  if (career.save(joinPath(saveDir, "career.sav"))) hasSave = true;
+  else toast("Couldn't save the career (disk full or folder not writable)", vec3(1.f, 0.4f, 0.3f));
+}
 
 void Game::init(bool buildWorld) {
   if (buildWorld) g_world.build();
@@ -214,8 +217,14 @@ void Game::init(bool buildWorld) {
   loadSettings();
   loadStations();
   career.newGame();
-  hasSave = career.load(joinPath(saveDir, "career.sav"));
-  if (!hasSave) career.newGame();
+  std::string sav = joinPath(saveDir, "career.sav");
+  hasSave = career.load(sav);
+  if (!hasSave && career.load(sav + ".bak")) { hasSave = true; toast("Career save was damaged: restored the previous save"); }
+  if (!hasSave) {
+    career.newGame();
+    // keep an unreadable save aside rather than overwriting it with a new career
+    if (FILE* f = fopen(sav.c_str(), "r")) { fclose(f); remove((sav + ".damaged").c_str()); rename(sav.c_str(), (sav + ".damaged").c_str()); toast("Career save couldn't be read: kept as career.sav.damaged"); }
+  }
   radio.init();
   radio.setVolume(set.radioVol);
   camQ = quat();

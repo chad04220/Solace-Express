@@ -1,5 +1,13 @@
 // Solace Express - career progression and hand-designed story campaign
 #include "career.h"
+#include <cmath>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 std::vector<Contract> g_story;
 
@@ -361,44 +369,76 @@ bool Career::sell(int fi, std::string* msg) {
   return true;
 }
 
+// Saves go to a sibling temp file first; only a fully written, flushed and closed file replaces the career, and the
+// previous save is kept as <path>.bak. A failed write leaves the old save untouched and reports false.
+static bool replaceFile(const std::string& from, const std::string& to) {
+#ifdef _WIN32
+  return MoveFileExA(from.c_str(), to.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+#else
+  return rename(from.c_str(), to.c_str()) == 0;
+#endif
+}
+
 bool Career::save(const std::string& path) const {
-  FILE* f = fopen(path.c_str(), "w");
+  std::string tmp = path + ".tmp";
+  FILE* f = fopen(tmp.c_str(), "w");
   if (!f) return false;
-  fprintf(f, "solace_save 1\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\n",
-          money, license, reputation, location, storyIndex, flights, landings, crashes, hours, bestLandingFpm, boardSeed, finished ? 1 : 0);
-  for (auto& p : fleet) fprintf(f, "plane %s %d %f\n", kAircraft[p.spec].id, p.location, p.fuel);
-  fclose(f);
+  bool ok = fprintf(f, "solace_save 1\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\n",
+                    money, license, reputation, location, storyIndex, flights, landings, crashes, hours, bestLandingFpm, boardSeed, finished ? 1 : 0) > 0;
+  for (auto& p : fleet) ok = ok && fprintf(f, "plane %s %d %f\n", kAircraft[p.spec].id, p.location, p.fuel) > 0;
+  fprintf(f, "end\n");
+  ok = ok && fflush(f) == 0 && !ferror(f);
+  ok = (fclose(f) == 0) && ok;
+  if (!ok) { remove(tmp.c_str()); return false; }
+  if (FILE* old = fopen(path.c_str(), "r")) { fclose(old); replaceFile(path, path + ".bak"); }
+  if (!replaceFile(tmp, path)) { remove(tmp.c_str()); return false; }
   return true;
 }
 
+// Parses into a temporary career and only commits it when the file is complete and every value is in range:
+// a damaged save is rejected (the caller then falls back to the backup) instead of crashing later or silently
+// resetting progress.
 bool Career::load(const std::string& path) {
   FILE* f = fopen(path.c_str(), "r");
   if (!f) return false;
-  Career c; char key[64];
-  if (fscanf(f, "%63s %*d", key) != 1 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save"))) { fclose(f); return false; }
-  while (fscanf(f, "%63s", key) == 1) {
+  Career c; char key[64]; int ver = 0;
+  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver != 1) { fclose(f); return false; }
+  const int nApt = (int)g_world.airports.size();
+  bool ok = true;
+  unsigned have = 0;   // mandatory fields seen
+  auto rdI = [&](int& v, unsigned bit) { ok = ok && fscanf(f, "%d", &v) == 1; have |= bit; };
+  auto rdF = [&](float& v) { ok = ok && fscanf(f, "%f", &v) == 1 && std::isfinite(v); };
+  while (ok && fscanf(f, "%63s", key) == 1) {
     int fin = 0;
-    if (!strcmp(key, "money")) (void)!fscanf(f, "%d", &c.money);
-    else if (!strcmp(key, "license")) (void)!fscanf(f, "%d", &c.license);
-    else if (!strcmp(key, "rep")) (void)!fscanf(f, "%d", &c.reputation);
-    else if (!strcmp(key, "location")) (void)!fscanf(f, "%d", &c.location);
-    else if (!strcmp(key, "story")) (void)!fscanf(f, "%d", &c.storyIndex);
-    else if (!strcmp(key, "flights")) (void)!fscanf(f, "%d", &c.flights);
-    else if (!strcmp(key, "landings")) (void)!fscanf(f, "%d", &c.landings);
-    else if (!strcmp(key, "crashes")) (void)!fscanf(f, "%d", &c.crashes);
-    else if (!strcmp(key, "hours")) (void)!fscanf(f, "%f", &c.hours);
-    else if (!strcmp(key, "best")) (void)!fscanf(f, "%f", &c.bestLandingFpm);
-    else if (!strcmp(key, "seed")) (void)!fscanf(f, "%u", &c.boardSeed);
-    else if (!strcmp(key, "finished")) { (void)!fscanf(f, "%d", &fin); c.finished = fin != 0; }
+    if (!strcmp(key, "money")) rdI(c.money, 1);
+    else if (!strcmp(key, "license")) rdI(c.license, 2);
+    else if (!strcmp(key, "rep")) rdI(c.reputation, 0);
+    else if (!strcmp(key, "location")) rdI(c.location, 4);
+    else if (!strcmp(key, "story")) rdI(c.storyIndex, 8);
+    else if (!strcmp(key, "flights")) rdI(c.flights, 0);
+    else if (!strcmp(key, "landings")) rdI(c.landings, 0);
+    else if (!strcmp(key, "crashes")) rdI(c.crashes, 0);
+    else if (!strcmp(key, "hours")) rdF(c.hours);
+    else if (!strcmp(key, "best")) rdF(c.bestLandingFpm);
+    else if (!strcmp(key, "seed")) ok = fscanf(f, "%u", &c.boardSeed) == 1;
+    else if (!strcmp(key, "finished")) { rdI(fin, 0); c.finished = fin != 0; }
     else if (!strcmp(key, "plane")) {
-      char id[64]; int loc; float fuel;
-      if (fscanf(f, "%63s %d %f", id, &loc, &fuel) == 3)
-        for (int i = 0; i < kNumAircraft; i++) if (!strcmp(kAircraft[i].id, id)) c.fleet.push_back({i, loc, fuel, 0.f});
+      char id[64]; int loc = -1; float fuel = 0; int spec = -1;
+      ok = fscanf(f, "%63s %d %f", id, &loc, &fuel) == 3;
+      for (int i = 0; ok && i < kNumAircraft; i++) if (!strcmp(kAircraft[i].id, id)) spec = i;
+      ok = ok && spec >= 0 && loc >= 0 && loc < nApt && std::isfinite(fuel);
+      if (ok) c.fleet.push_back({spec, loc, std::clamp(fuel, 0.f, kAircraft[spec].maxFuel), 0.f});
     }
+    else if (!strcmp(key, "end")) break;   // older saves have no marker and end at EOF
+    else ok = false;   // unknown key: not a file this version wrote
   }
   fclose(f);
-  c.location = std::clamp(c.location, 0, (int)g_world.airports.size() - 1);
-  c.storyIndex = std::clamp(c.storyIndex, 0, (int)g_story.size());
+  ok = ok && (have & 15) == 15
+       && c.license >= LIC_STUDENT && c.license <= LIC_ATP
+       && c.location >= 0 && c.location < nApt
+       && c.storyIndex >= 0 && c.storyIndex <= (int)g_story.size()
+       && c.flights >= 0 && c.landings >= 0 && c.crashes >= 0 && c.hours >= 0;
+  if (!ok) return false;
   *this = c;
   refreshBoard();
   return true;
