@@ -49,7 +49,7 @@ static int scan(const char* name, const std::string& src) {
 
 int main() {
   // same assembly as Renderer::init: line numbers match the driver's error log
-  std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceFS3 +
+  std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRaytraceFS3 +
                    kRaytraceWraith + kRaytraceWraithCockpit;
   std::string h = "#version 330 core\n";
   int bad = scan("raytrace.frag", rt);

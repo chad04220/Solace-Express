@@ -35,28 +35,29 @@ void Game::wraithControls(float dt) {
   // X, or a double tap of gamepad A (A stays the wheel brake): cloak
   bool dblA = false;
   W.padATap += dt;
-  if (in.pad && (in.buttonsPressed & PAD_A) && !showMap) {
+  if (actPadP(ACT_BRAKE) && !showMap) {
     if (W.padATap < 0.35f) { dblA = true; W.padATap = 9.f; } else W.padATap = 0;
   }
-  if (in.pressed['X'] || dblA) {
+  if (actPressed(ACT_CLOAK) || dblA) {
     W.cloakOn = !W.cloakOn;
     toast(W.cloakOn ? "CLOAK ENGAGED" : "CLOAK DISENGAGED", vec3(0.75f, 0.45f, 1.f));
     g_audio.trigger(SFX_CLOAK, W.cloakOn ? 1.f : 0.7f);
   }
   // Y (keyboard or gamepad, in the air on the pad): weapons hot - the laser turrets drop out and the bomb bay opens.
   // Y again: weapons safe - bay closed, turrets stowed. While hot the gamepad bumpers are the triggers, not the rudder.
-  if (in.pressed['Y'] || (air && (in.buttonsPressed & PAD_Y))) {
+  if (actKeyP(ACT_WEAPONS) || (air && actPadP(ACT_WEAPONS))) {
     W.armed = !W.armed;
-    toast(W.armed ? "WEAPONS HOT - lasers out, bomb bay open  (RB fire, LB bomb)" : "WEAPONS SAFE - bay closed, lasers stowed", vec3(1.f, 0.35f, 0.4f));
+    toast(W.armed ? "WEAPONS HOT - lasers out, bomb bay open" : "WEAPONS SAFE - bay closed, lasers stowed", vec3(1.f, 0.35f, 0.4f));
     g_audio.trigger(SFX_GEAR_CLUNK, 0.6f);
   }
   // fire: left mouse or Enter held, or the right bumper while weapons are hot
   bool padHot = air && in.pad && W.armed;
-  bool fire = (in.mDown[0] && !showMap) || (in.down[K_ENTER] && !showMap) || (padHot && (in.buttons & PAD_RB));
+  bool fire = (in.mDown[0] && !showMap) || (actKey(ACT_FIRE) && !showMap) || (padHot && actPad(ACT_FIRE));
+  if (W.fireLatch) { if (!in.mDown[0] && !actKey(ACT_FIRE)) W.fireLatch = false; fire = false; }
   if (fire && !W.armed) { W.armed = true; g_audio.trigger(SFX_GEAR_CLUNK, 0.6f); }
   W.wantFire = fire;   // the bolt leaves the lens after this frame's physics step (updateWraith)
   // bombs: Backspace, middle mouse, or the left bumper while weapons are hot - each press queues a drop
-  if (in.pressed[K_BACK] || in.mPressed[2] || (padHot && (in.buttonsPressed & PAD_LB))) {
+  if (actKeyP(ACT_BOMB) || in.mPressed[2] || (padHot && actPadP(ACT_BOMB))) {
     if (W.bombQueue < 3) W.bombQueue++;
   }
 }
@@ -202,7 +203,7 @@ void Game::updateWraith(float dt) {
   float tgt = wr && W.cloakOn ? 1.f : 0.f;
   W.stealth = clampf(W.stealth + (tgt > W.stealth ? 0.8f : -1.1f) * dt, 0.f, 1.f);
   if (fabsf(W.stealth - tgt) < 1e-4f) W.stealth = tgt;
-  W.front = -9.5f + 19.f * W.stealth;
+  W.front = W.stealth >= 1.f ? 1e3f : -9.5f + 19.f * W.stealth;   // fully spread: the whole craft, wavefront gone
   // turrets
   W.lasers = clampf(W.lasers + ((wr && W.armed) ? 1.f : -1.f) * dt / 0.7f, 0.f, 1.f);
   W.laserGlow = std::max(0.f, W.laserGlow - dt * 9.f);

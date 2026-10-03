@@ -2,6 +2,7 @@
 #include "renderer.h"
 #include "shaders.h"
 #include "shaders_wraith_cockpit.h"
+#include "entity_shaders.h"
 #include "font_data.h"
 #include "scenery.h"
 #include <unordered_map>
@@ -405,20 +406,71 @@ void Renderer::genMinimap() {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
-bool Renderer::init(int w, int h) {
+// The UI program, its vertex array and the font: enough to draw the intro screen while everything else is built
+bool Renderer::initUI(int w, int h) {
+  if (progUI) return true;
+  progUI = program(kUIVS, kUIFS, error);
+  if (!progUI) { error = "UI shader: " + error; return false; }
+  glGenVertexArrays(1, &vaoUI); glGenBuffers(1, &vboUI);
+  glBindVertexArray(vaoUI); glBindBuffer(GL_ARRAY_BUFFER, vboUI);
+  glEnableVertexAttribArray(0); glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(UIVert), (void*)0);
+  glEnableVertexAttribArray(1); glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(UIVert), (void*)8);
+  glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(UIVert), (void*)16);
+  glEnableVertexAttribArray(3); glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(UIVert), (void*)32);
+  glBindVertexArray(0);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glGenTextures(1, &texFont); glBindTexture(GL_TEXTURE_2D, texFont);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, FONT_W, FONT_H, 0, GL_RED, GL_UNSIGNED_BYTE, FONT_PIX);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+  W = w; H = h;
+  return true;
+}
+
+GLuint Renderer::makeTexture(const uint8_t* rgba, int w, int h) {
+  GLuint t = 0;
+  glGenTextures(1, &t); glBindTexture(GL_TEXTURE_2D, t);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+  glGenerateMipmap(GL_TEXTURE_2D);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  return t;
+}
+
+// Compiles and links every scene program (or loads it from the binary cache). Touches only shader and program
+// objects, which are shared between contexts, so the platform layer can run it on a worker thread with its own
+// context while the intro screen animates. `done` counts finished programs (kProgramCount in all).
+bool Renderer::compilePrograms(std::atomic<int>* done) {
+  auto step = [&]() { if (done) done->fetch_add(1); };
   std::string vsFS = kFullscreenVS;
-  std::string rt = std::string("#version 330 core\n") + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + (getenv("CLIPATLAS") ? "#define WR_CLIPATLAS\n" : "") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceFS3 + kRaytraceWraith + kRaytraceWraithCockpit;
+  std::string rt = std::string("#version 330 core\n") + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + (getenv("CLIPATLAS") ? "#define WR_CLIPATLAS\n" : "") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRaytraceFS3 + kRaytraceWraith + kRaytraceWraithCockpit;
   progRT = program(vsFS, rt, error);
   if (!progRT) { error = "Ray tracer shader: " + error; return false; }
-  progSprite = program(kSpriteVS, kSpriteFS, error);
-  progDown = program(vsFS, kDownFS, error);
-  progUp = program(vsFS, kUpFS, error);
-  progRayMask = program(vsFS, kRayMaskFS, error);
-  progRay = program(vsFS, kRayFS, error);
-  progPost = program(vsFS, kPostFS, error);
-  progTAA = program(vsFS, kTaaFS, error);
-  progUI = program(kUIVS, kUIFS, error);
-  if (!progSprite || !progDown || !progUp || !progRayMask || !progRay || !progPost || !progUI || !progTAA) { error = "Shader: " + error; return false; }
+  step();
+  std::string hdr = "#version 330 core\n";
+  progEnt = program(hdr + kEntVS, hdr + kEntFS1 + kEntFS2, error); step();
+  progEntSh = program(hdr + kEntVS, hdr + kEntFS1 + kEntShadowFS, error); step();
+  if (!progEnt || !progEntSh) { error = "Entity shader: " + error; return false; }
+  progSprite = program(kSpriteVS, kSpriteFS, error); step();
+  progDown = program(vsFS, kDownFS, error); step();
+  progUp = program(vsFS, kUpFS, error); step();
+  progRayMask = program(vsFS, kRayMaskFS, error); step();
+  progRay = program(vsFS, kRayFS, error); step();
+  progPost = program(vsFS, kPostFS, error); step();
+  progTAA = program(vsFS, kTaaFS, error); step();
+  if (!progSprite || !progDown || !progUp || !progRayMask || !progRay || !progPost || !progTAA) { error = "Shader: " + error; return false; }
+  glFinish();   // everything complete before another context uses the programs
+  return true;
+}
+
+bool Renderer::init(int w, int h) {
+  if (!initUI(w, h)) return false;
+  if (!progRT && !compilePrograms(nullptr)) return false;
 
   glGenVertexArrays(1, &vaoEmpty);
   glGenVertexArrays(1, &vaoSprite); glGenBuffers(1, &vboSprite);
@@ -427,12 +479,6 @@ bool Renderer::init(int w, int h) {
   glEnableVertexAttribArray(1); glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(SpriteVert), (void*)12);
   glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(SpriteVert), (void*)20);
   glEnableVertexAttribArray(3); glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(SpriteVert), (void*)36);
-  glGenVertexArrays(1, &vaoUI); glGenBuffers(1, &vboUI);
-  glBindVertexArray(vaoUI); glBindBuffer(GL_ARRAY_BUFFER, vboUI);
-  glEnableVertexAttribArray(0); glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(UIVert), (void*)0);
-  glEnableVertexAttribArray(1); glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(UIVert), (void*)8);
-  glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(UIVert), (void*)16);
-  glEnableVertexAttribArray(3); glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(UIVert), (void*)32);
   glBindVertexArray(0);
 
   // heightmap
@@ -499,15 +545,6 @@ bool Renderer::init(int w, int h) {
   maxH = 0;
   for (size_t i = 0; i < g_world.hm.size(); i += 4) maxH = std::max(maxH, g_world.hm[i] + g_world.hm[i + 1] * 1.5f);
   maxH += 20;
-  // font
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  glGenTextures(1, &texFont); glBindTexture(GL_TEXTURE_2D, texFont);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, FONT_W, FONT_H, 0, GL_RED, GL_UNSIGNED_BYTE, FONT_PIX);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
   genMaterials();
   genCloudNoise();
   genMinimap();
@@ -642,6 +679,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glActiveTexture(GL_TEXTURE0 + 6); glBindTexture(GL_TEXTURE_2D, texHMax); glUniform1i(U(p, "uHMax"), 6);
   glActiveTexture(GL_TEXTURE0 + 13); glBindTexture(GL_TEXTURE_2D, texCloudCov); glUniform1i(U(p, "uCloudCov"), 13);
   glActiveTexture(GL_TEXTURE0 + 14); glBindTexture(GL_TEXTURE_3D, texNoise3); glUniform1i(U(p, "uNoise3"), 14);
+  glActiveTexture(GL_TEXTURE0 + 15); glBindTexture(GL_TEXTURE_2D, texFont); glUniform1i(U(p, "uFontTex"), 15);
   {   // AI traffic: one row of 32 texels per aircraft
     if (!texTraffic) {
       glGenTextures(1, &texTraffic); glBindTexture(GL_TEXTURE_2D, texTraffic);

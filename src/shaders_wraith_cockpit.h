@@ -238,10 +238,13 @@ void shadeWraithCockpit(inout Mat m, int mid, vec3 lp, vec3 ln, vec3 E){
       vec3 mq = cq - vec3(0.015, 0.075, -0.24); mq.yz = rot2(mq.yz, -0.55);
       page = q.x < 0.0 ? 1 : 3; uv = vec2(mq.x/0.09*sign(q.x), -mq.z/0.055);
     }
-    vec3 sc = mfdPage(page, uv)*vec3(0.85, 1.0, 1.15);
+    // 4x supersampled over the pixel's footprint on the glass, every element anti-aliased: crisp at any resolution
+    float fp = gPixM/(q.y > -0.4 ? 0.07 : 0.055);
+    gAA = fp*0.55;
+    vec3 sc = 0.25*(mfdPage(page, uv + vec2(-0.25, -0.75)*fp) + mfdPage(page, uv + vec2(0.75, -0.25)*fp)
+                  + mfdPage(page, uv + vec2(0.25, 0.75)*fp) + mfdPage(page, uv + vec2(-0.75, 0.25)*fp))*vec3(0.85, 1.0, 1.15);
     float edge = smoothstep(1.0, 0.93, max(abs(uv.x), abs(uv.y)));
     sc = sc*edge + vec3(0.008, 0.02, 0.035)*edge;
-    sc *= 0.93 + 0.07*sin(uv.y*220.0);
     m.alb = vec3(0.01); m.rough = 0.05; m.emit = sc*1.5;
   } else if (mid == 70) {   // grips, knobs and toggles: rubberised with machined caps
     tx = triSample(lp, ln, M_RUBBER, 0.08, nT); m.alb = tx.rgb*0.25; m.rough = tx.a; m.nrm = nT; m.metal = 0.1;
@@ -383,7 +386,6 @@ vec3 wrFeedOverlay(vec3 col, vec3 sl){
 vec3 wraithScreen(vec3 col, vec3 rd, int id, vec3 sl){
   vec3 q = sl - gM[22].xyz;
   col = pow(max(col, vec3(0.0)), vec3(1.04))*vec3(0.95, 1.01, 1.07)*1.1;
-  col *= 0.95 + 0.05*sin((sl.y + sl.x*0.37)*2600.0);
   float ed = -wrScreenEdge(q, id);
   col *= smoothstep(0.0, 0.04, ed);
   vec3 hc = vec3(0.3, 0.95, 1.0), wc = vec3(1.0, 0.3, 0.4), vc = vec3(0.75, 0.45, 1.0);

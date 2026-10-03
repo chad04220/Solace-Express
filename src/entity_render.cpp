@@ -4,13 +4,8 @@
 #include "entity_shaders.h"
 #include <chrono>
 
-static GLuint linkEnt(const std::string& vs, const std::string& fs, std::string& err) { return linkProgramCached(vs, fs, err); }
 
 bool Renderer::initEntities() {
-  std::string hdr = "#version 330 core\n";
-  progEnt = linkEnt(hdr + kEntVS, hdr + kEntFS1 + kEntFS2, error);
-  progEntSh = linkEnt(hdr + kEntVS, hdr + kEntFS1 + kEntShadowFS, error);
-  if (!progEnt || !progEntSh) { error = "Entity shader: " + error; return false; }
   std::vector<EVert> verts;
   buildEntityMeshes(verts, entRange);
   glGenVertexArrays(1, &vaoEnt); glBindVertexArray(vaoEnt);

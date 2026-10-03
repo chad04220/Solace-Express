@@ -9,6 +9,8 @@
 #include <mmsystem.h>
 #include <shellapi.h>
 #include <objbase.h>
+#include <thread>
+#include <atomic>
 #include "game.h"
 
 // Ask hybrid-graphics laptops for the dedicated GPU: the integrated one may reject or take minutes over the ray tracer
@@ -231,22 +233,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   for (auto d : xdlls) { HMODULE m = LoadLibraryA(d); if (m) { s_xinput = (PFNXINPUTGETSTATE)GetProcAddress(m, "XInputGetState"); if (s_xinput) break; } }
 
   ShowWindow(g_hwnd, SW_SHOW);
-  // loading screen while the world and textures are generated
-  glViewport(0, 0, ww, wh); glClearColor(0.03f, 0.05f, 0.08f, 1); glClear(GL_COLOR_BUFFER_BIT); SwapBuffers(g_hdc);
+  game.loadSettings();   // early, for fullscreen during the intro (Game::init loads them again)
+  if (game.set.fullscreen) { toggleFullscreen(); setupPacing(g_hwnd); }
 
-  // startup.log names the GPU in use (support aid); the title shows progress while the world and shaders are built
+  // startup.log names the GPU in use (support aid)
   std::string gpu = std::string((const char*)glGetString(GL_RENDERER)) + " / " + (const char*)glGetString(GL_VERSION);
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "w")) { fprintf(f, "GPU: %s\n", gpu.c_str()); fclose(f); }
-  auto status = [&](const char* s) {
-    SetWindowTextA(g_hwnd, (std::string("Air Xpress - ") + s).c_str());
-    MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
-  };
-  status("generating world...");
-  CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-  game.init();
-  if (game.set.fullscreen) { toggleFullscreen(); setupPacing(g_hwnd); }
-  RECT cr; GetClientRect(g_hwnd, &cr);
-  g_ren.renderScale = 1.0f; g_ren.quality = game.set.quality;
+  bool cached = false;
   {   // compiled shader programs are cached next to the game (or with the save data if that folder is read-only)
     char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
     std::string dir = std::string(exe, n);
@@ -261,25 +254,120 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     if (!writable(dir)) { dir = game.saveDir + "\\shadercache"; if (!writable(dir)) dir.clear(); }
     g_shaderCacheDir = dir;
     WIN32_FIND_DATAA fd; HANDLE h = dir.empty() ? INVALID_HANDLE_VALUE : FindFirstFileA((dir + "\\*.bin").c_str(), &fd);
-    bool cached = h != INVALID_HANDLE_VALUE; if (cached) FindClose(h);
-    status(cached ? ("loading shaders on " + gpu + "...").c_str()
-                  : ("compiling shaders on " + gpu + " (first launch only: can take a minute)...").c_str());
+    cached = h != INVALID_HANDLE_VALUE; if (cached) FindClose(h);
   }
-  if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) {
+  game.shaderFirstRun = !cached;
+  auto fatal = [&](const std::string& what) {
     FILE* f = fopen((game.saveDir + "\\error.log").c_str(), "w");
-    if (f) { fprintf(f, "%s\nRenderer: %s\n", g_ren.error.c_str(), (const char*)glGetString(GL_RENDERER)); fclose(f); }
-    MessageBoxA(g_hwnd, ("Graphics initialisation failed:\n" + g_ren.error.substr(0, 1500)).c_str(), "Air Xpress", MB_ICONERROR);
-    return 1;
+    if (f) { fprintf(f, "%s\nRenderer: %s\n", what.c_str(), (const char*)glGetString(GL_RENDERER)); fclose(f); }
+    MessageBoxA(g_hwnd, ("Graphics initialisation failed:\n" + what.substr(0, 1500)).c_str(), "Air Xpress", MB_ICONERROR);
+  };
+  RECT cr; GetClientRect(g_hwnd, &cr);
+  if (!g_ren.initUI(std::max(64L, cr.right), std::max(64L, cr.bottom))) { fatal(g_ren.error); return 1; }
+
+  // the intro shows the application icon large: its 256 px frame from the exe's resources
+  GLuint iconTex = 0;
+  if (HICON hi = (HICON)LoadImageW(hInst, MAKEINTRESOURCEW(1), IMAGE_ICON, 256, 256, LR_DEFAULTCOLOR)) {
+    ICONINFO ii = {};
+    if (GetIconInfo(hi, &ii)) {
+      BITMAPINFO bi = {}; bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER); bi.bmiHeader.biWidth = 256; bi.bmiHeader.biHeight = -256;
+      bi.bmiHeader.biPlanes = 1; bi.bmiHeader.biBitCount = 32; bi.bmiHeader.biCompression = BI_RGB;
+      std::vector<uint8_t> px(256 * 256 * 4);
+      HDC sdc = GetDC(nullptr);
+      if (ii.hbmColor && GetDIBits(sdc, ii.hbmColor, 0, 256, px.data(), &bi, DIB_RGB_COLORS) == 256) {
+        for (size_t i = 0; i < px.size(); i += 4) std::swap(px[i], px[i + 2]);   // BGRA -> RGBA
+        iconTex = g_ren.makeTexture(px.data(), 256, 256);
+      }
+      ReleaseDC(nullptr, sdc);
+      if (ii.hbmColor) DeleteObject(ii.hbmColor);
+      if (ii.hbmMask) DeleteObject(ii.hbmMask);
+    }
+    DestroyIcon(hi);
   }
-  SetWindowTextA(g_hwnd, "Air Xpress");
+
+  game.iconTex = iconTex;
+  // Shaders compile on a worker thread with its own context (sharing objects with the main one) on a hidden
+  // window, while another thread generates the world and the main thread animates the intro at 60 Hz.
+  WNDCLASSEXW wc2 = {sizeof(wc2)}; wc2.style = CS_OWNDC; wc2.lpfnWndProc = DefWindowProcW; wc2.hInstance = hInst; wc2.lpszClassName = L"AirXpressGL";
+  RegisterClassExW(&wc2);
+  HWND hw2 = CreateWindowExW(0, wc2.lpszClassName, L"", WS_POPUP, 0, 0, 8, 8, nullptr, nullptr, hInst, nullptr);
+  HDC dc2 = hw2 ? GetDC(hw2) : nullptr;
+  HGLRC ctx2 = nullptr;
+  if (dc2 && SetPixelFormat(dc2, GetPixelFormat(g_hdc), &pfd)) {
+    int attrs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB, 3, WGL_CONTEXT_MINOR_VERSION_ARB, 3, WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB, 0};
+    ctx2 = createAttribs(dc2, ctx, attrs);
+  }
+  std::atomic<int> progDone{0}, compileState{0};   // state: 0 running, 1 ok, 2 failed
+  std::atomic<bool> worldDone{false};
+  std::thread worldThread([&] { g_world.build(); worldDone = true; });
+  std::thread compileThread;
+  if (ctx2) compileThread = std::thread([&] {
+    wglMakeCurrent(dc2, ctx2);
+    bool ok = g_ren.compilePrograms(&progDone);
+    wglMakeCurrent(nullptr, nullptr);
+    compileState = ok ? 1 : 2;
+  });
+  // the ray tracer is most of the work: its progress is estimated from the last measured compile time
+  float estRT = cached ? 1.5f : 40.f;
+  if (!cached && !g_shaderCacheDir.empty())
+    if (FILE* f = fopen((g_shaderCacheDir + "\\compile_time.txt").c_str(), "r")) { float v; if (fscanf(f, "%f", &v) == 1 && v > 1 && v < 3600) estRT = v; fclose(f); }
+  LARGE_INTEGER freq, prev, now;
+  QueryPerformanceFrequency(&freq); QueryPerformanceCounter(&prev);
+  LARGE_INTEGER t0 = prev; float shown = 0, compileSecs = 0;
+  auto introFrame = [&](float target, const std::string& stage, float fade) {
+    MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { if (m.message == WM_QUIT) game.quit = true; TranslateMessage(&m); DispatchMessageW(&m); }
+    QueryPerformanceCounter(&now);
+    float t = (float)(now.QuadPart - t0.QuadPart) / freq.QuadPart;
+    shown = std::max(shown, shown + (target - shown) * 0.12f);
+    RECT rc; GetClientRect(g_hwnd, &rc);
+    if (rc.right > 0 && rc.bottom > 0) { g_ren.W = rc.right; g_ren.H = rc.bottom; }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, g_ren.W, g_ren.H); glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
+    g_ren.uiBegin(); game.drawIntro(shown, stage, t, iconTex, fade); g_ren.uiEnd();
+    SwapBuffers(g_hdc);
+    if (!s_vsyncDiv) Sleep(14);
+    return t;
+  };
+  for (;;) {
+    QueryPerformanceCounter(&now);
+    float t = (float)(now.QuadPart - t0.QuadPart) / freq.QuadPart;
+    int d = progDone;
+    bool compiled = !ctx2 || compileState != 0, built = worldDone;
+    if (d == 0 && compileState == 0) compileSecs = t;
+    float sp = !ctx2 ? 0.f : compileState == 1 ? 1.f : d == 0 ? 0.8f * std::min(0.97f, 1.f - expf(-t / (estRT * 0.6f))) : 0.8f + 0.2f * (d - 1) / (Renderer::kProgramCount - 1);
+    float wp = built ? 1.f : std::min(0.95f, t / 4.f);
+    float target = 0.12f * wp + 0.83f * sp;
+    std::string stage = !ctx2 ? "PREPARING" : d == 0 ? (cached ? "LOADING SHADERS FROM CACHE" : "COMPILING RAY TRACING SHADERS")
+                      : compileState == 0 ? "COMPILING SHADERS  " + std::to_string(d) + " / " + std::to_string(Renderer::kProgramCount) : "SHADERS READY";
+    if (!built) stage += "   //   GENERATING THE SOLACE ISLANDS";
+    introFrame(target, stage, 1.f);
+    if (game.quit) break;
+    if (compiled && built && t > 3.2f) break;   // the logo stays up long enough to be seen
+  }
+  if (compileThread.joinable()) compileThread.join();
+  worldThread.join();
+  if (ctx2) wglDeleteContext(ctx2);
+  if (dc2) ReleaseDC(hw2, dc2);
+  if (hw2) DestroyWindow(hw2);
+  if (game.quit) return 0;
+  if (ctx2 && compileState != 1) { fatal(g_ren.error); return 1; }
+  if (!ctx2) introFrame(0.12f, cached ? "LOADING SHADERS FROM CACHE" : "COMPILING SHADERS (this can take a minute)", 1.f);
+  if (g_shaderCacheMisses > 0 && ctx2 && !g_shaderCacheDir.empty())
+    if (FILE* f = fopen((g_shaderCacheDir + "\\compile_time.txt").c_str(), "w")) { fprintf(f, "%.1f\n", compileSecs); fclose(f); }
+  CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  game.init(false);
+  introFrame(0.97f, "PREPARING TEXTURES", 1.f);
+  g_ren.renderScale = 1.0f; g_ren.quality = game.set.quality;
+  GetClientRect(g_hwnd, &cr);
+  if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) { fatal(g_ren.error); return 1; }
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
     fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits, g_shaderCacheMisses);
     fclose(f);
   }
+  for (int i = 0; i < 20; i++) introFrame(1.f, "READY", 1.f - i / 20.f);   // fade out to the main menu
   startAudio();
 
-  LARGE_INTEGER freq, prev, now;
-  QueryPerformanceFrequency(&freq); QueryPerformanceCounter(&prev);
+  QueryPerformanceCounter(&prev);
   while (!game.quit) {
     MSG m;
     while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { if (m.message == WM_QUIT) game.quit = true; TranslateMessage(&m); DispatchMessageW(&m); }

@@ -27,15 +27,33 @@ struct Input {
   void endFrame() { memset(pressed, 0, sizeof(pressed)); for (int i = 0; i < 3; i++) mPressed[i] = mReleased[i] = false; wheel = 0; mdx = mdy = 0; buttonsPressed = 0; }
 };
 
+// Rebindable flight actions. Each has one keyboard key and one gamepad button; the sticks and triggers stay fixed
+// (left stick pitch/roll, triggers throttle) and the arrow keys / PgUp / PgDn / Home / End stay as fixed alternates.
+enum Action {
+  ACT_PITCH_DN = 0, ACT_PITCH_UP, ACT_ROLL_L, ACT_ROLL_R, ACT_YAW_L, ACT_YAW_R, ACT_THR_UP, ACT_THR_DN, ACT_TRIM_UP, ACT_TRIM_DN,
+  ACT_FLAPS_DN, ACT_FLAPS_UP, ACT_GEAR, ACT_BRAKE, ACT_PARK, ACT_AP, ACT_LIGHTS, ACT_ENGINE, ACT_TIME,
+  ACT_CAMERA, ACT_HUD, ACT_MAP, ACT_MINIMAP, ACT_RADIO, ACT_ANR,
+  ACT_CLOAK, ACT_WEAPONS, ACT_FIRE, ACT_BOMB, ACT_COUNT
+};
+struct ActionInfo { const char* id; const char* name; int group; int key; unsigned pad; };
+extern const ActionInfo kActions[ACT_COUNT];
+extern const char* const kActionGroups[];
+std::string keyName(int vk);
+std::string padName(unsigned bit);
+
 struct Settings {
   float renderScale = 1.0f; int quality = 1;   // renderScale: always 1 (full display resolution)
   float master = 0.8f, engineVol = 1.0f, sfxVol = 0.9f, radioVol = 0.6f;
   bool invertPitch = false, showHints = true, metric = false, fullscreen = false, traffic = true;
   int radioStation = 0;
   float mouseSens = 1.0f;
+  int keyBind[ACT_COUNT]; unsigned padBind[ACT_COUNT];
+  Settings() { resetBindings(); }
+  void resetBindings() { for (int i = 0; i < ACT_COUNT; i++) { keyBind[i] = kActions[i].key; padBind[i] = kActions[i].pad; } }
 };
 
-struct Particle { vec3 p, v; float life, maxLife, size, grow; vec3 col; float alpha; int kind; float drag, buoy; bool instant = false; };  // instant: no fade-in (trails)
+struct TipPt { vec3 p; float age, a; int seg; };   // wingtip vapour ribbon point (in the air mass)
+struct Particle { vec3 p, v; float life, maxLife, size, grow; vec3 col; float alpha; int kind; float drag, buoy; bool instant = false; bool fresh = true; };  // instant: no fade-in (trails)
 
 enum GameScreen { SCR_MENU = 0, SCR_HUB, SCR_FLIGHT, SCR_DEBRIEF, SCR_RESEARCH };
 enum HubTab { TAB_CONTRACTS = 0, TAB_HANGAR, TAB_LOGBOOK, TAB_SETTINGS };
@@ -50,7 +68,11 @@ public:
   Settings set;
   std::string saveDir;
 
-  void init();
+  void loadSettings();
+  void drawIntro(float progress, const std::string& stage, float t, unsigned icon, float fade);   // startup screen
+  bool shaderFirstRun = false;
+  unsigned iconTex = 0;   // the application icon (intro screen, main menu)
+  void init(bool buildWorld = true);   // buildWorld false: g_world.build() already ran (on the intro's worker thread)
   void initHeadless();
   void debugScene(const std::string& name);
   void update(float dt);
@@ -124,6 +146,7 @@ private:
   struct WraithState {
     bool cloakOn = false; float stealth = 0, front = -12.f, padATap = 9.f;        // cloak: strength 0..1 and the wavefront along the craft (body z)
     bool armed = false; float lasers = 0;                          // turrets deployed 0..1
+    bool fireLatch = true;   // a click / Enter still held from the launch menu doesn't fire (or arm) until released
     float laserCD = 0, laserGlow = 0; int laserSide = 0;
     float bay = 0, bayHold = 0, bombLoaded = 1; int bombQueue = 0;  // bomb bay doors, bomb in the cradle 0..1, pending drops
     struct Bolt { vec3 h, v, d; float len, age, life; bool hit; };   // head, world velocity, aim; streak length behind the head
@@ -177,10 +200,22 @@ private:
   Radio radio;
   std::vector<std::pair<std::string, std::string>> stations;
   bool settingsFromPause = false;
+  int settingsPage = 0;                    // 0 general, 1 controls
+  int bindCapture = -1, bindCaptureDev = 0; // action waiting for a key (dev 0) or gamepad button (dev 1)
+  float bindCaptureT = 0;
+  std::vector<TipPt> tipTrail[2]; int tipSeg = 0; bool tipOn = false;
+  int ctlScroll = 0; float ctlScrollAcc = 0;
+  // bound action state: keyboard key or gamepad button
+  bool actKey(int a) const { int k = set.keyBind[a]; return k > 0 && k < 256 && in.down[k]; }
+  bool actKeyP(int a) const { int k = set.keyBind[a]; return k > 0 && k < 256 && in.pressed[k]; }
+  bool actPad(int a) const { return in.pad && (in.buttons & set.padBind[a]); }
+  bool actPadP(int a) const { return in.pad && (in.buttonsPressed & set.padBind[a]); }
+  bool actDown(int a) const { return actKey(a) || actPad(a); }
+  bool actPressed(int a) const { return actKeyP(a) || actPadP(a); }
   bool confirmNew = false;
 
   // ---------------------------------------------------------------- helpers
-  void loadSettings(); void saveSettings();
+  void saveSettings();
   void loadStations();
   int radioScroll = 0;
   void saveGame();
@@ -232,6 +267,8 @@ private:
   void drawHubHangar(float x, float y, float w, float h);
   void drawHubLogbook(float x, float y, float w, float h);
   void drawSettings(float x, float y, float w, float h);
+  void drawControls(float x, float y, float w, float h);
+  void updateBindCapture(float dt);
   void drawHud(const FrameParams& fp);
   void drawPFD(float x, float y, float size);
   void drawMinimap(float x, float y, float size, float rangeM);

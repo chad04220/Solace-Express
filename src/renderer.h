@@ -1,12 +1,13 @@
 // Air Xpress - renderer interface
 #pragma once
+#include <atomic>
 #include "common.h"
 #include "gl.h"
 #include "world.h"
 #include "entity_mesh.h"
 
 struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft; };
-enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7 };
+enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7, SPR_RIBBON = 8 };
 
 struct PlaneVisual {
   bool on = false;
@@ -80,7 +81,11 @@ public:
   std::string error;
   GLuint minimapTex = 0;
 
-  bool init(int w, int h);
+  bool initUI(int w, int h);                     // UI program + font only (the intro screen)
+  static constexpr int kProgramCount = 10;
+  bool compilePrograms(std::atomic<int>* done);  // scene programs; safe on a worker thread with a shared context
+  bool init(int w, int h);                       // everything else (runs compilePrograms itself if not done yet)
+  GLuint makeTexture(const uint8_t* rgba, int w, int h);
   void resize(int w, int h);
   void setRenderScale(float s);   // ray-trace resolution only: the TAA history stays at display resolution, no pop
   void renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites);

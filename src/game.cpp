@@ -25,6 +25,78 @@ static int jetExhausts(const Plane& p, vec3* pos, vec3* dir, float* strength) {
   return 2;
 }
 
+// ------------------------------------------------------------------ control bindings
+const char* const kActionGroups[] = {"FLIGHT", "SYSTEMS", "VIEW / COMMS", "XR-11 WRAITH"};
+const ActionInfo kActions[ACT_COUNT] = {
+  {"pitchDown", "Pitch down (nose down)", 0, 'W', 0},          {"pitchUp", "Pitch up (nose up)", 0, 'S', 0},
+  {"rollLeft", "Roll left", 0, 'A', 0},                         {"rollRight", "Roll right", 0, 'D', 0},
+  {"yawLeft", "Rudder left", 0, 'Q', PAD_LB},                   {"yawRight", "Rudder right", 0, 'E', PAD_RB},
+  {"throttleUp", "Throttle up", 0, K_SHIFT, 0},                 {"throttleDown", "Throttle down", 0, K_CTRL, 0},
+  {"trimUp", "Trim nose up", 0, K_RBRACKET, PAD_UP},            {"trimDown", "Trim nose down", 0, K_LBRACKET, PAD_DOWN},
+  {"flapsDown", "Flaps down / pods to VTOL", 1, 'F', PAD_B},    {"flapsUp", "Flaps up / pods forward", 1, 'V', PAD_X},
+  {"gear", "Landing gear", 1, 'G', PAD_Y},                      {"brake", "Wheel brakes", 1, K_SPACE, PAD_A},
+  {"parkingBrake", "Parking brake", 1, 'B', PAD_LEFT},          {"autopilot", "Autopilot", 1, 'Z', PAD_RS},
+  {"lights", "Landing lights", 1, 'L', 0},                      {"engine", "Engine start", 1, 'I', 0},
+  {"timeAccel", "Time acceleration", 1, 'T', 0},
+  {"camera", "Cycle camera", 2, 'C', PAD_BACK},                 {"hud", "Show / hide HUD", 2, 'H', 0},
+  {"gpsMap", "GPS moving map", 2, 'N', 0},                      {"minimap", "Minimap", 2, K_TAB, 0},
+  {"radio", "Internet radio", 2, 'R', 0},                       {"anr", "Headset noise cancelling", 2, 'M', PAD_LS},
+  {"cloak", "Cloak (or double-tap brake)", 3, 'X', 0},          {"weapons", "Weapons hot / safe", 3, 'Y', PAD_Y},
+  {"fire", "Fire lasers (or left mouse)", 3, K_ENTER, PAD_RB},  {"bomb", "Drop bomb (or middle mouse)", 3, K_BACK, PAD_LB},
+};
+
+std::string keyName(int vk) {
+  if (vk <= 0) return "--";
+  if ((vk >= 'A' && vk <= 'Z') || (vk >= '0' && vk <= '9')) return std::string(1, (char)vk);
+  if (vk >= 0x70 && vk <= 0x7B) return fmt("F%d", vk - 0x6F);
+  if (vk >= 0x60 && vk <= 0x69) return fmt("NUM %d", vk - 0x60);
+  switch (vk) {
+    case K_BACK: return "BACKSPACE"; case K_TAB: return "TAB"; case K_ENTER: return "ENTER"; case K_SHIFT: return "SHIFT";
+    case K_CTRL: return "CTRL"; case 0x12: return "ALT"; case K_SPACE: return "SPACE"; case K_PGUP: return "PAGE UP"; case K_PGDN: return "PAGE DOWN";
+    case K_END: return "END"; case K_HOME: return "HOME"; case K_LEFT: return "LEFT"; case K_UP: return "UP"; case K_RIGHT: return "RIGHT";
+    case K_DOWN: return "DOWN"; case 0x2D: return "INSERT"; case 0x2E: return "DELETE"; case 0x14: return "CAPS LOCK";
+    case K_LBRACKET: return "["; case K_RBRACKET: return "]"; case K_PLUS: return "="; case K_MINUS: return "-";
+    case 0xBA: return ";"; case 0xBC: return ","; case 0xBE: return "."; case 0xBF: return "/"; case 0xC0: return "`"; case 0xDC: return "\\"; case 0xDE: return "'";
+    case 0x6A: return "NUM *"; case 0x6B: return "NUM +"; case 0x6D: return "NUM -"; case 0x6E: return "NUM ."; case 0x6F: return "NUM /";
+  }
+  return fmt("KEY %02X", vk);
+}
+
+std::string padName(unsigned bit) {
+  static const char* n[] = {"A", "B", "X", "Y", "LB", "RB", "VIEW", "MENU", "D-PAD UP", "D-PAD DOWN", "D-PAD LEFT", "D-PAD RIGHT", "LS CLICK", "RS CLICK"};
+  for (int i = 0; i < 14; i++) if (bit & (1u << i)) return n[i];
+  return "--";
+}
+
+// Settings / pause menu "press a key" capture. Runs before anything else reads the frame's input and swallows it,
+// so the press that sets a binding never also flies the aircraft or closes the menu.
+void Game::updateBindCapture(float dt) {
+  if (bindCapture < 0) return;
+  bindCaptureT += dt;
+  int a = bindCapture;
+  bool done = false;
+  if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_START) || bindCaptureT > 8.f) done = true;   // cancel
+  else if (bindCaptureDev == 0) {
+    for (int k = 1; k < 256 && !done; k++) {
+      if (!in.pressed[k] || k == K_ESC || k == K_F11 || k == 0x72) continue;
+      for (int b = 0; b < ACT_COUNT; b++)   // a key already used in the same group swaps over
+        if (b != a && set.keyBind[b] == k && kActions[b].group == kActions[a].group) set.keyBind[b] = set.keyBind[a];
+      set.keyBind[a] = k; done = true;
+    }
+  } else if (in.buttonsPressed) {
+    unsigned bit = in.buttonsPressed & ~(unsigned)PAD_START;
+    if (bit) {
+      bit &= ~(bit - 1);   // lowest set bit
+      for (int b = 0; b < ACT_COUNT; b++)
+        if (b != a && set.padBind[b] == bit && kActions[b].group == kActions[a].group) set.padBind[b] = set.padBind[a];
+      set.padBind[a] = bit; done = true;
+    }
+  }
+  if (done) { bindCapture = -1; saveSettings(); g_audio.trigger(SFX_CLICK); }
+  memset(in.pressed, 0, sizeof(in.pressed)); in.buttonsPressed = 0;
+  for (int i = 0; i < 3; i++) in.mPressed[i] = false;
+}
+
 // ------------------------------------------------------------------ settings / save
 static std::string joinPath(const std::string& d, const char* f) { return d.empty() ? std::string(f) : d + "/" + f; }
 
@@ -47,6 +119,11 @@ void Game::loadSettings() {
     else if (s == "fullscreen") set.fullscreen = v != 0;
     else if (s == "radioStation") set.radioStation = (int)v;
     else if (s == "mouseSens") set.mouseSens = clampf(v, 0.2f, 3.f);
+    else if (s.rfind("key.", 0) == 0 || s.rfind("pad.", 0) == 0)
+      for (int i = 0; i < ACT_COUNT; i++)
+        if (s.compare(4, std::string::npos, kActions[i].id) == 0) {
+          if (s[0] == 'k') set.keyBind[i] = std::clamp((int)v, 0, 255); else set.padBind[i] = (unsigned)v & 0x3FFFu;
+        }
   }
   fclose(f);
 }
@@ -56,6 +133,7 @@ void Game::saveSettings() {
   if (!f) return;
   fprintf(f, "renderScale %f\nquality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\n",
           set.renderScale, set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic);
+  for (int i = 0; i < ACT_COUNT; i++) fprintf(f, "key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   fclose(f);
 }
 
@@ -127,8 +205,8 @@ void Game::loadStations() {
 
 void Game::saveGame() { career.save(joinPath(saveDir, "career.sav")); hasSave = true; }
 
-void Game::init() {
-  g_world.build();
+void Game::init(bool buildWorld) {
+  if (buildWorld) g_world.build();
   buildStory();
   loadSettings();
   loadStations();
@@ -190,7 +268,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
   takeoffAnnounced = false; touchedDown = false; touchdownFpm = 0; stillTimer = 0;
   engineAutoStarted = false; startDelay = 1.2f;
-  particles.clear(); bursts.clear(); trail.clear(); trailT = 0; wreck.clear(); debris.clear(); craterR = 0;
+  particles.clear(); bursts.clear(); trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0;
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
   approachMinAgl = 1e9f;
@@ -273,8 +351,8 @@ void Game::engageAutopilot() {
     toast("Any stick input hands control back", vec3(0.8f, 0.8f, 0.8f));
   } else {
     plane.apEngage(Plane::AP_HOLD, -1, wx);
-    toast("Autopilot ON: A/D heading, W/S altitude, throttle keys speed", vec3(0.6f, 1, 0.6f));
-    toast("Pick an AUTOLAND airport on the GPS (N) to fly there", vec3(0.8f, 0.8f, 0.8f));
+    toast("Autopilot ON: the stick trims heading and altitude, throttle sets speed", vec3(0.6f, 1, 0.6f));
+    toast("Pick an AUTOLAND airport on the GPS map to fly there", vec3(0.8f, 0.8f, 0.8f));
   }
   g_audio.trigger(SFX_CLICK);
 }
@@ -282,15 +360,17 @@ void Game::engageAutopilot() {
 void Game::flightControls(float dt) {
   Controls& c = plane.ctl;
   auto key = [&](int k) { return in.down[k]; };
-  float pitchIn = ((key('S') || key(K_DOWN)) ? 1.f : 0.f) - ((key('W') || key(K_UP)) ? 1.f : 0.f);
-  float rollIn = ((key('D') || key(K_RIGHT)) ? 1.f : 0.f) - ((key('A') || key(K_LEFT)) ? 1.f : 0.f);
-  float yawIn = (key('E') ? 1.f : 0.f) - (key('Q') ? 1.f : 0.f);
+  float pitchIn = ((actKey(ACT_PITCH_UP) || key(K_DOWN)) ? 1.f : 0.f) - ((actKey(ACT_PITCH_DN) || key(K_UP)) ? 1.f : 0.f);
+  float rollIn = ((actKey(ACT_ROLL_R) || key(K_RIGHT)) ? 1.f : 0.f) - ((actKey(ACT_ROLL_L) || key(K_LEFT)) ? 1.f : 0.f);
+  float yawIn = (actKey(ACT_YAW_R) ? 1.f : 0.f) - (actKey(ACT_YAW_L) ? 1.f : 0.f);
   if (set.invertPitch) pitchIn = -pitchIn;
   float padP = 0, padR = 0, padY = 0;
   if (in.pad) {
     auto dz = [](float v) { return fabsf(v) < 0.12f ? 0.f : (v - (v > 0 ? 0.12f : -0.12f)) / 0.88f; };
     padP = -dz(in.ly) * (set.invertPitch ? -1.f : 1.f); padR = dz(in.lx);
-    padY = ((in.buttons & PAD_RB) ? 1.f : 0.f) - ((in.buttons & PAD_LB) ? 1.f : 0.f) + dz(in.rx) * 0.0f;
+    padY = (actPad(ACT_YAW_R) ? 1.f : 0.f) - (actPad(ACT_YAW_L) ? 1.f : 0.f);
+    padP += (actPad(ACT_PITCH_UP) ? 1.f : 0.f) - (actPad(ACT_PITCH_DN) ? 1.f : 0.f);
+    padR += (actPad(ACT_ROLL_R) ? 1.f : 0.f) - (actPad(ACT_ROLL_L) ? 1.f : 0.f);
     padP = padP * fabsf(padP) * 0.4f + padP * 0.6f; padR = padR * fabsf(padR) * 0.4f + padR * 0.6f;
   }
   bool manual = fabsf(pitchIn) + fabsf(rollIn) > 0 || fabsf(padP) + fabsf(padR) > 0.3f;
@@ -317,11 +397,11 @@ void Game::flightControls(float dt) {
   c.yaw = approach(c.yaw, clampf(yawIn + padY, -1, 1), 4.f, dt);
   // throttle
   float thr = 0;
-  if (key(K_SHIFT) || key(K_PGUP) || key(K_PLUS)) thr += 0.55f;
-  if (key(K_CTRL) || key(K_PGDN) || key(K_MINUS)) thr -= 0.55f;
+  if (actDown(ACT_THR_UP) || key(K_PGUP) || key(K_PLUS)) thr += 0.55f;
+  if (actDown(ACT_THR_DN) || key(K_PGDN) || key(K_MINUS)) thr -= 0.55f;
   if (in.pad) thr += (in.rt - in.lt) * 0.6f;
   bool numKey = in.pressed['0'];
-  for (int k = 1; k <= 9; k++) numKey |= in.pressed['0' + k] && !in.down[K_CTRL];
+  for (int k = 1; k <= 9; k++) numKey |= in.pressed['0' + k] && !actKey(ACT_THR_DN);
   if (plane.apOn && plane.apMode == Plane::AP_HOLD && plane.apSpeed > 0 && numKey) { plane.apSpeed = 0; toast("Autothrottle off - manual throttle", vec3(1, 0.85f, 0.5f)); }
   if (apNav) {}   // the autopilot has the throttle
   else if (plane.apOn && plane.apSpeed > 0) {   // autothrottle: throttle inputs move the speed target
@@ -329,12 +409,11 @@ void Game::flightControls(float dt) {
     plane.apSpeed = clampf(plane.apSpeed + thr * 30.f * dt, sp.vref * 1.2f, sp.cruise * (sp.special ? 1.6f : 1.15f));
   } else {
     c.throttle = clampf(c.throttle + thr * dt, 0, 1);
-    for (int k = 1; k <= 9; k++) if (in.pressed['0' + k] && !in.down[K_CTRL]) c.throttle = k / 9.f;
+    for (int k = 1; k <= 9; k++) if (in.pressed['0' + k] && !actKey(ACT_THR_DN)) c.throttle = k / 9.f;
     if (in.pressed['0']) c.throttle = 0;
   }
   // trim
-  float tr = (key(K_RBRACKET) || key(K_HOME) ? 1.f : 0.f) - (key(K_LBRACKET) || key(K_END) ? 1.f : 0.f);
-  if (in.pad) tr += ((in.buttons & PAD_UP) ? 1.f : 0.f) - ((in.buttons & PAD_DOWN) ? 1.f : 0.f);
+  float tr = (actDown(ACT_TRIM_UP) || key(K_HOME) ? 1.f : 0.f) - (actDown(ACT_TRIM_DN) || key(K_END) ? 1.f : 0.f);
   c.trim = clampf(c.trim + tr * 0.35f * dt, -1, 1);
   // flaps
   auto flapToast = [&]() {
@@ -344,13 +423,14 @@ void Game::flightControls(float dt) {
   };
   if (apNav) flapNotch = c.flaps;   // the autopilot runs the flaps on the approach
   else {
-    if (in.pressed['F'] || (in.buttonsPressed & PAD_B)) { flapNotch = std::min(1.f, flapNotch + 1.f / 3.f); flapToast(); }
-    if (in.pressed['V'] || (in.buttonsPressed & PAD_X)) { flapNotch = std::max(0.f, flapNotch - 1.f / 3.f); flapToast(); }
+    if (actPressed(ACT_FLAPS_DN)) { flapNotch = std::min(1.f, flapNotch + 1.f / 3.f); flapToast(); }
+    if (actPressed(ACT_FLAPS_UP)) { flapNotch = std::max(0.f, flapNotch - 1.f / 3.f); flapToast(); }
   }
   c.flaps = flapNotch;
   // gear
   bool wrAir = plane.spec->special == 2 && !plane.onGround;   // XR-11 in the air: gamepad Y is weapons hot / safe instead of the gear
-  if ((in.pressed['G'] || (in.buttonsPressed & ((wrAir ? 0u : (unsigned)PAD_Y) | (showMap ? 0u : (unsigned)PAD_RIGHT)))) && plane.spec->retract) {
+  bool gearPad = actPadP(ACT_GEAR) && !(wrAir && set.padBind[ACT_GEAR] == set.padBind[ACT_WEAPONS]);
+  if ((actKeyP(ACT_GEAR) || gearPad || (!showMap && (in.buttonsPressed & PAD_RIGHT))) && plane.spec->retract) {
     if (plane.onGround && c.gearDown) toast("Gear lever is locked on the ground", vec3(1, 0.6f, 0.4f));
     else { c.gearDown = !c.gearDown; toast(c.gearDown ? "Gear down" : "Gear up", vec3(0.8f, 1, 0.8f)); }
   }
@@ -359,22 +439,21 @@ void Game::flightControls(float dt) {
   if (flightClock < 0.05f) parking = plane.onGround;
   if (plane.apDone) { plane.apDone = false; parking = true; toast("Autoland complete - parking brake set", vec3(0.5f, 1, 0.6f)); g_audio.trigger(SFX_AP_DISC, 0.7f); }
   if (plane.spec->special == 2) wraithControls(dt);
-  if (in.pressed['B'] || (!showMap && (in.buttonsPressed & PAD_LEFT))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
-  float wb = key(K_SPACE) ? 1.f : 0.f;
-  if (in.pad && (in.buttons & PAD_A)) wb = 1.f;
+  if (actKeyP(ACT_PARK) || (!showMap && actPadP(ACT_PARK))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
+  float wb = actDown(ACT_BRAKE) ? 1.f : 0.f;
   if (wb > 0 && parking && plane.onGround && length(plane.vel) > 2.f) parking = false;
   c.brake = parking ? 1.f : wb;
   // autopilot: Z / right stick click. With an autoland airport picked on the GPS it flies there and lands;
   // otherwise it holds heading, altitude and speed
-  if (in.pressed['Z'] || (in.buttonsPressed & PAD_RS)) {
+  if (actPressed(ACT_AP)) {
     if (plane.apOn) { plane.apDisengage(); g_audio.trigger(SFX_AP_DISC); toast("Autopilot OFF", vec3(1, 0.7f, 0.3f)); }
     else if (plane.onGround) toast("Autopilot needs to be airborne", vec3(1, 0.6f, 0.4f));
     else engageAutopilot();
   }
-  if (in.pressed['L']) { landingLight = !landingLight; toast(landingLight ? "Landing lights ON" : "Landing lights OFF"); }
-  if (in.pressed['I'] && !plane.engineRunning && plane.fuel > 0) { plane.starterTime = 0.01f; toast("Engine start"); }
+  if (actPressed(ACT_LIGHTS)) { landingLight = !landingLight; toast(landingLight ? "Landing lights ON" : "Landing lights OFF"); }
+  if (actPressed(ACT_ENGINE) && !plane.engineRunning && plane.fuel > 0) { plane.starterTime = 0.01f; toast("Engine start"); }
   // time acceleration
-  if (in.pressed['T']) {
+  if (actPressed(ACT_TIME)) {
     float dd = length(vec3(plane.pos.x - dest().x, 0, plane.pos.z - dest().z));
     if (!apCruising() && (plane.onGround || plane.agl() < 250.f || dd < 3500.f)) { timeAccel = 1; toast("Time acceleration only available in cruise", vec3(1, 0.7f, 0.4f)); }
     else { timeAccel = timeAccel >= 4 ? 1 : timeAccel * 2; toast(fmt("Time x%.0f", timeAccel)); }
@@ -383,7 +462,7 @@ void Game::flightControls(float dt) {
 
 void Game::spawn(vec3 p, vec3 v, float life, float size, float grow, vec3 col, float alpha, int kind, float drag, float buoy) {
   if (particles.size() > 6000) return;
-  particles.push_back({p, v, life, life, size, grow, col, alpha, kind, drag, buoy, false});
+  particles.push_back({p, v, life, life, size, grow, col, alpha, kind, drag, buoy, false, true});
 }
 
 // checkpoint gate i: centre and half-extent axes (gate faces along the leg leading to it)
@@ -543,18 +622,23 @@ void Game::updateFlight(float dt) {
     vec3 bp = plane.pos + plane.q.rotate(vec3((rand() % 100 - 50) * 0.04f, -plane.gearHeight(), 3.f));
     spawn(bp, plane.q.rotate(vec3(0, 0.3f, 8.f)), 1.5f, 0.6f, 2.f, vec3(0.6f, 0.55f, 0.45f), 0.18f, SPR_SMOKE, 2.f, 0.f);
   }
-  // wingtip vapour in humid air under g
-  if (!plane.onGround && plane.gLoad > 1.7f && (wx.precip > 0 || plane.pos.y > wx.cloudBase - 300.f)) {
-    // emitted at the real wingtips and spread back along the path flown this frame; the vapour stays in the air
-    // mass (it used to be launched at 90% of the aircraft's speed, which carried it out ahead of the wingtips)
+  // wingtip vapour in humid air under g: a continuous ribbon from each tip. Points are dropped at the tips and stay
+  // in the air mass (drifting with the wind); the strip between them widens and thins out as it ages.
+  for (int sd = 0; sd < 2; sd++) {
+    auto& tt = tipTrail[sd];
+    for (auto& q : tt) { q.age += simDt; q.p += plane.windVel * simDt; }
+    while (!tt.empty() && tt.front().age > 1.8f) tt.erase(tt.begin());
+  }
+  float vapK = plane.onGround ? 0.f : clampf((plane.gLoad - 1.7f) / 1.5f, 0.f, 1.f) * ((wx.precip > 0 || plane.pos.y > wx.cloudBase - 300.f) ? 1.f : 0.f);
+  if (vapK > 0.f || tipOn) {
+    if (vapK > 0.f && !tipOn) tipSeg++;
     vec3 tip = plane.spec->special == 2 ? kWraithWingTip : plane.spec->special ? kJetWingTip : modelWingTip(kModels[plane.spec - kAircraft]);
-    int n = (int)clampf(length(plane.vel) * simDt / 0.45f, 1.f, 16.f);   // ~0.45 m spacing: a continuous streak
-    for (int s = -1; s <= 1; s += 2)
-      for (int k = 0; k < n; k++) {
-        vec3 tp = plane.pos + plane.q.rotate(vec3(s * tip.x, tip.y, tip.z + 0.3f)) - plane.vel * (simDt * (float)k / n);
-        spawn(tp, plane.vel * 0.04f + plane.windVel, 0.5f, 0.42f, 1.4f, vec3(1, 1, 1), 0.2f, SPR_SMOKE, 1.f, 0.f);
-        if (!particles.empty()) particles.back().instant = true;
-      }
+    for (int sd = 0; sd < 2; sd++) {
+      float sx = sd ? 1.f : -1.f;
+      tipTrail[sd].push_back({plane.pos + plane.q.rotate(vec3(sx * tip.x, tip.y, tip.z + 0.3f)), 0.f, vapK, tipSeg});
+      if (tipTrail[sd].size() > 400) tipTrail[sd].erase(tipTrail[sd].begin());
+    }
+    tipOn = vapK > 0.f;
   }
   if (plane.spec->special) jetEffects(simDt);
   // GPS breadcrumb trail
@@ -633,7 +717,7 @@ void Game::updateFlight(float dt) {
 // ------------------------------------------------------------------ camera
 void Game::updateCamera(float dt) {
   if (!plane.spec) return;
-  if (in.pressed['C'] || (in.buttonsPressed & PAD_BACK)) {
+  if (actPressed(ACT_CAMERA)) {
     camMode = (camMode + 1) % 4; camYaw = 0; camPitch = 0.12f; lookYaw = 0; lookPitch = -0.13f;
     static const char* names[] = {"Chase camera", "Cockpit view", "Orbit camera", "Flyby camera"};
     toast(names[camMode]);
@@ -742,7 +826,6 @@ void Game::launchResearch() {
   researchFlight = true;
   toasts.clear();
   toast(wr ? "XR-11 WRAITH // RESEARCH FLIGHT" : "XR-9 SPECTER // RESEARCH FLIGHT", wr ? vec3(0.75f, 0.45f, 1.f) : vec3(0.4f, 0.9f, 1));
-  if (wr) toast("X cloak   Y weapons hot   LMB / Enter or RB fire   Backspace / MMB or LB bomb", vec3(0.85f, 0.7f, 1.f));
   if (resAirborne) {
     const Airport& a = g_world.airports[resAirport];
     vec3 p = plane.pos + a.dir() * 1500.f; p.y = std::max(a.elev, g_world.height(p.x, p.z)) + 900.f;
@@ -858,7 +941,7 @@ void Game::buildLights(FrameParams& fp) {
   vec3 tail = s.special == 2 ? vec3(0, -0.1f, 7.86f) : s.special ? vec3(0, 0.45f, 7.6f) : modelTailTip(md);
   vec3 bcn = s.special == 2 ? vec3(0, 0.53f, 1.6f) : s.special ? vec3(0, 0.67f, 1.6f) : modelFinTop(md);
   vec3 ldg;   // left landing light, in the wing leading edge
-  if (s.special == 2) ldg = vec3(-1.45f, -0.13f, -2.6f);
+  if (s.special == 2) ldg = vec3(-0.2f, -0.38f, -6.6f);   // XR-11: under the chin, ahead of the pods, turrets and gear
   else if (s.special) ldg = vec3(-1.8f, -0.26f, 0.15f);
   else { float k = 0.3f, x = md.wing[0] * k; ldg = vec3(-x, md.wing[4] + x * tanf(md.wing[6] * DEG), md.wing[5] + md.wing[3] * k - 0.02f); }
   bool on = plane.engineRunning || plane.onGround;
@@ -1182,6 +1265,9 @@ void Game::updateParticles(float dt) {
   for (size_t i = 0; i < bursts.size();) { bursts[i].t += dt; if (bursts[i].t > 0.9f) { bursts[i] = bursts.back(); bursts.pop_back(); } else i++; }
   for (size_t i = 0; i < particles.size();) {
     Particle& p = particles[i];
+    // spawned this frame: emitters already place particles along the path flown this frame, so moving them by a
+    // whole frame of velocity too would carry them that far ahead (at 25 fps and Mach 0.9, past the nose)
+    if (p.fresh) { p.fresh = false; i++; continue; }
     p.life -= dt;
     if (p.life <= 0) { particles[i] = particles.back(); particles.pop_back(); continue; }
     p.v = p.v * expf(-p.drag * dt);
@@ -1476,6 +1562,32 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       if (k < 0.35f) bill(add, b.c, 90.f * (0.5f + k * 3.f), b.col * 2.f * (1.f - k / 0.35f), 1.f, SPR_GLOW, 5.f);
     }
   }
+  // wingtip vapour ribbons: camera-facing strips through the trail points, soft across their width
+  for (int sd = 0; sd < 2; sd++) {
+    const auto& tt = tipTrail[sd];
+    vec3 lit = vec3(1.f);
+    for (size_t i = 1; i < tt.size(); i++) {
+      const TipPt &q0 = tt[i - 1], &q1 = tt[i];
+      if (q0.seg != q1.seg) continue;
+      auto edge = [&](const TipPt& q, vec3 dir, vec3& lo, vec3& hi, float& al) {
+        vec3 vd = normalize(q.p - fp.camPos), side = cross(dir, vd);
+        float sl = length(side); side = sl > 1e-4f ? side / sl : cr;
+        float w = 0.22f + q.age * 0.9f;
+        lo = q.p - side * w; hi = q.p + side * w;
+        float life = 1.f - q.age / 1.8f;
+        al = 0.26f * q.a * life * life * smoothstepf(0.f, 0.05f, q.age) * smoothstepf(0.3f, 4.f, length(q.p - fp.camPos));
+      };
+      vec3 dir = q1.p - q0.p; float dl = length(dir);
+      if (dl < 1e-3f) continue;
+      dir = dir / dl;
+      vec3 a0, b0, a1, b1; float al0, al1;
+      edge(q0, dir, a0, b0, al0); edge(q1, dir, a1, b1, al1);
+      if (al0 + al1 < 0.002f) continue;
+      SpriteVert v0 = {a0.x, a0.y, a0.z, 0.5f, 0, lit.x, lit.y, lit.z, al0, 8.f, 1.5f}, v1 = {b0.x, b0.y, b0.z, 0.5f, 1, lit.x, lit.y, lit.z, al0, 8.f, 1.5f};
+      SpriteVert v2 = {b1.x, b1.y, b1.z, 0.5f, 1, lit.x, lit.y, lit.z, al1, 8.f, 1.5f}, v3 = {a1.x, a1.y, a1.z, 0.5f, 0, lit.x, lit.y, lit.z, al1, 8.f, 1.5f};
+      alpha.push_back(v0); alpha.push_back(v1); alpha.push_back(v2); alpha.push_back(v0); alpha.push_back(v2); alpha.push_back(v3);
+    }
+  }
   // particles
   vec3 camVel = screen == SCR_FLIGHT && plane.spec ? plane.vel : vec3();
   std::vector<std::pair<float, const Particle*>> order;
@@ -1529,7 +1641,7 @@ void Game::feedAudio() {
   AudioParams ap;
   ap.master = set.master; ap.engineVol = set.engineVol; ap.sfxVol = set.sfxVol;
   static bool muffled = false;
-  if (in.pressed['M'] || (screen == SCR_FLIGHT && !paused && (in.buttonsPressed & PAD_LS))) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
+  if (actKeyP(ACT_ANR) || (screen == SCR_FLIGHT && !paused && actPadP(ACT_ANR))) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
   ap.muffled = muffled;
   if (screen == SCR_FLIGHT && plane.spec && !crashed) {
     const AircraftSpec& s = *plane.spec;
@@ -1557,6 +1669,7 @@ void Game::update(float dt) {
   if (!headless && g_ren.ok && g_ren.renderScale != 1.f) g_ren.setRenderScale(1.f);
   dt = std::min(dt, 0.05f);
   realTime += dt;
+  updateBindCapture(dt);
   for (auto& t : toasts) t.t += dt;
   while (!toasts.empty() && toasts.front().t > 5.f) toasts.erase(toasts.begin());
   hubMsgTime = std::max(0.f, hubMsgTime - dt);
@@ -1567,7 +1680,7 @@ void Game::update(float dt) {
   if (screen == SCR_MENU && ((in.down['U'] && in.down['I'] && (in.pressed['U'] || in.pressed['I'])) || padCombo)) {
     screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP);
   }
-  if (in.pressed['R'] && screen == SCR_FLIGHT) showRadio = !showRadio;
+  if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
   radio.poll();
   if (screen == SCR_FLIGHT) {
     if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_START)) {
@@ -1575,13 +1688,13 @@ void Game::update(float dt) {
       else if (paused && settingsFromPause && !(in.buttonsPressed & PAD_START)) settingsFromPause = false;   // B / Esc: back to the pause menu
       else { paused = !paused; settingsFromPause = false; }
     }
-    if (in.pressed['N']) { showMap = !showMap; g_audio.trigger(SFX_CLICK); }
+    if (!paused && actPressed(ACT_MAP)) { showMap = !showMap; g_audio.trigger(SFX_CLICK); }
     if (showMap && !paused) {   // GPS open: Tab / D-pad pick the autoland airport, Enter / A engages the autopilot to it
       if (in.pressed[K_TAB] || (in.buttonsPressed & PAD_RIGHT)) cycleApDest(in.down[K_SHIFT] ? -1 : 1);
       if (in.buttonsPressed & PAD_LEFT) cycleApDest(-1);
       if ((in.pressed[K_ENTER] || (in.buttonsPressed & PAD_A)) && apDest >= 0 && !plane.onGround) engageAutopilot();
-    } else if (in.pressed[K_TAB]) { showMinimap = !showMinimap; toast(showMinimap ? "Minimap shown" : "Minimap hidden"); }
-    if (in.pressed['H']) hudOn = !hudOn;
+    } else if (actPressed(ACT_MINIMAP)) { showMinimap = !showMinimap; toast(showMinimap ? "Minimap shown" : "Minimap hidden"); }
+    if (actPressed(ACT_HUD)) hudOn = !hudOn;
     if (!paused) {
       updateFlight(dt);
       if (screen == SCR_FLIGHT) { updateCamera(dt); updateParticles(dt * timeAccel); }
@@ -1647,6 +1760,7 @@ void Game::debugScene(const std::string& name) {
       for (int i = 0; i < 10; i++) { plane.vel = plane.forward() * (M * 330.f); realTime += 1 / 60.f; update(1 / 60.f); }
       plane.vel = plane.forward() * (M * 330.f); plane.mach = M;
     }
+    if (getenv("WRSPARKS")) { int n = 0; for (auto& q : particles) if (q.kind == SPR_SPARK && n < 16) { vec3 b = plane.q.conj().rotate(q.p - plane.pos), v = plane.q.conj().rotate(q.v - plane.vel); printf("spark body (%.1f, %.1f, %.1f) rel v (%.0f, %.0f, %.0f) age %.2f\n", b.x, b.y, b.z, v.x, v.y, v.z, q.maxLife - q.life); n++; } }
     camMode = 2; camYaw = yawD * DEG; camPitch = pitD * DEG; camZoom = zoom; hudOn = false;
     for (int i = 0; i < 5; i++) updateCamera(0.1f);
     toasts.clear(); return;
@@ -1656,7 +1770,7 @@ void Game::debugScene(const std::string& name) {
     plane.vel = plane.forward() * 280.f; plane.ctl.throttle = 0.9f; botControl = true; plane.ctl.pitch = 0.6f; plane.ctl.gearDown = false; plane.gear = 0;
     for (int i = 0; i < 40; i++) { realTime += 1 / 60.f; update(1 / 60.f); }
     camMode = 2; camYaw = 1.2f; camPitch = 0.25f; camZoom = 1.2f; for (int i = 0; i < 5; i++) updateCamera(0.1f); toasts.clear();
-    { int ni = 0; float dmin = 1e9f; for (auto& q : particles) if (q.instant) { ni++; dmin = std::min(dmin, length(q.p - plane.pos)); } printf("vapour: %d trail particles, nearest %.1f m from the CG, g=%.1f\n", ni, dmin, plane.gLoad); }
+    { int ni = 0; float dmin = 1e9f; for (auto& tt : tipTrail) for (auto& q : tt) { ni++; dmin = std::min(dmin, length(q.p - plane.pos)); } printf("vapour: %d ribbon points, nearest %.1f m from the CG, g=%.1f\n", ni, dmin, plane.gLoad); }
     return;
   }
   if (name == "pad") {  // gamepad menu navigation self-test
@@ -1706,6 +1820,7 @@ void Game::debugScene(const std::string& name) {
     if (mode == 1) { plane.ctl.flaps = 1; flapNotch = 1; plane.flaps = plane.nozzle = 1; plane.vel = vec3(); plane.ctl.throttle = 0.66f; plane.engineRunning = true; plane.engineSpool = 0.66f; }
     else if (mode != 2) { plane.apEngage(Plane::AP_HOLD, -1, wx); }
     if (mode == 3 || mode == 4) wraith.cloakOn = true;
+    if (getenv("WRCLOUD")) { wx.cloudCover = (float)atof(getenv("WRCLOUD")); wx.cloudBase = plane.pos.y - 60.f; }   // craft inside the cloud deck
     if (mode == 5 || mode == 6) { wraith.armed = true; }
     if (getenv("WRTHR")) { plane.ctl.throttle = (float)atof(getenv("WRTHR")); plane.apSpeed = 900.f; }
     if (getenv("WRSPD")) { plane.vel = plane.forward() * (float)atof(getenv("WRSPD")); plane.apSpeed = (float)atof(getenv("WRSPD")); }
