@@ -194,7 +194,51 @@ static std::string userDir() {
   return d;
 }
 
+// Child process: SolaceExpress.exe --build-shader-cache "<dir>" compiles every program into the binary cache and
+// exits, reporting progress on stdout ("<programs done>" lines, then "m <programs compiled>"). The game runs the long
+// first-time compile this way because NVIDIA's driver holds a process-wide lock while it links the ray tracer: no
+// thread of the compiling process, whatever its context, can draw until it lets go, so the intro froze. A separate
+// process has its own driver state, and the game then loads the finished programs from the cache in a moment.
+static int buildShaderCacheChild(HINSTANCE hInst, const std::string& dir) {
+  WNDCLASSEXW wc = {sizeof(wc)}; wc.style = CS_OWNDC; wc.lpfnWndProc = DefWindowProcW; wc.hInstance = hInst; wc.lpszClassName = L"SolaceExpressCompile";
+  RegisterClassExW(&wc);
+  HWND hw = CreateWindowExW(0, wc.lpszClassName, L"", WS_POPUP, 0, 0, 8, 8, nullptr, nullptr, hInst, nullptr);
+  if (!hw) return 2;
+  HDC dc = GetDC(hw);
+  PIXELFORMATDESCRIPTOR pfd = {sizeof(pfd), 1, PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER, PFD_TYPE_RGBA, 32};
+  pfd.cDepthBits = 24; pfd.cStencilBits = 8; pfd.iLayerType = PFD_MAIN_PLANE;
+  SetPixelFormat(dc, ChoosePixelFormat(dc, &pfd), &pfd);
+  HGLRC legacy = wglCreateContext(dc);
+  if (!legacy || !wglMakeCurrent(dc, legacy)) return 2;
+  auto createAttribs = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+  int attrs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB, 3, WGL_CONTEXT_MINOR_VERSION_ARB, 3, WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB, 0};
+  HGLRC ctx = createAttribs ? createAttribs(dc, nullptr, attrs) : nullptr;
+  if (!ctx) return 2;
+  wglMakeCurrent(dc, ctx); wglDeleteContext(legacy);
+  g_opengl32 = LoadLibraryA("opengl32.dll");
+  if (!glLoad(wglProc, nullptr)) return 3;
+  g_shaderCacheDir = dir;
+  HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+  auto say = [&](const char* fmt2, int v) { char b[32]; int n = snprintf(b, sizeof b, fmt2, v); DWORD w; if (out && out != INVALID_HANDLE_VALUE) WriteFile(out, b, n, &w, nullptr); };
+  std::atomic<int> done{0}; std::atomic<bool> fin{false};
+  std::thread rep([&] { int last = -1; while (!fin) { int d = done; if (d != last) { last = d; say("%d\n", d); } Sleep(15); } });
+  bool ok = g_ren.compilePrograms(&done);
+  fin = true; rep.join();
+  say("%d\n", (int)done);
+  say("m %d\n", g_shaderCacheMisses.load());
+  wglMakeCurrent(nullptr, nullptr); wglDeleteContext(ctx);
+  return ok ? 0 : 1;
+}
+
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
+  {
+    std::string cl = GetCommandLineA();
+    size_t k = cl.find("--build-shader-cache \"");
+    if (k != std::string::npos) {
+      size_t b = k + 22, e = cl.find('"', b);
+      return buildShaderCacheChild(hInst, cl.substr(b, e == std::string::npos ? std::string::npos : e - b));
+    }
+  }
   SetProcessDPIAware();
   timeBeginPeriod(1);
   static Game game;
@@ -309,8 +353,46 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   std::atomic<int> progDone{0}, compileState{0};   // state: 0 running, 1 ok, 2 failed
   std::atomic<bool> worldDone{false};
   std::thread worldThread([&] { g_world.build(); worldDone = true; });
+  // the first-time compile runs in a child process (see buildShaderCacheChild); this process then loads the results
+  PROCESS_INFORMATION child = {};
+  std::atomic<int> childDone{-1}, childMisses{0};
+  std::thread childReader;
+  const std::string stampPath = g_shaderCacheDir.empty() ? std::string() : g_shaderCacheDir + "\\stamp.txt", stamp = shaderCacheStamp();
+  bool cacheCurrent = false;
+  if (!stampPath.empty()) if (FILE* f = fopen(stampPath.c_str(), "r")) { char b[32] = {}; cacheCurrent = fscanf(f, "%31s", b) == 1 && stamp == b; fclose(f); }
+  if (ctx2 && !g_shaderCacheDir.empty() && !cacheCurrent) {
+    SECURITY_ATTRIBUTES sa = {sizeof(sa), nullptr, TRUE};
+    HANDLE rd = nullptr, wr = nullptr;
+    if (CreatePipe(&rd, &wr, &sa, 0)) {
+      SetHandleInformation(rd, HANDLE_FLAG_INHERIT, 0);
+      char exe[MAX_PATH] = {}; GetModuleFileNameA(nullptr, exe, MAX_PATH);
+      std::string cmd = std::string("\"") + exe + "\" --build-shader-cache \"" + g_shaderCacheDir + "\"";
+      STARTUPINFOA si = {sizeof(si)}; si.dwFlags = STARTF_USESTDHANDLES; si.hStdOutput = wr; si.hStdError = wr; si.hStdInput = nullptr;
+      std::vector<char> cmdBuf(cmd.begin(), cmd.end()); cmdBuf.push_back(0);
+      if (CreateProcessA(nullptr, cmdBuf.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS, nullptr, nullptr, &si, &child)) {
+        childDone = 0;
+        childReader = std::thread([rd, &childDone, &childMisses] {
+          std::string line; char buf[256]; DWORD n = 0;
+          while (ReadFile(rd, buf, sizeof buf, &n, nullptr) && n > 0)
+            for (DWORD i = 0; i < n; i++) {
+              if (buf[i] != '\n') { line += buf[i]; continue; }
+              if (line.size() > 2 && line[0] == 'm') childMisses = atoi(line.c_str() + 2);
+              else if (!line.empty()) childDone = atoi(line.c_str());
+              line.clear();
+            }
+          CloseHandle(rd);
+        });
+      } else CloseHandle(rd);
+      CloseHandle(wr);   // the child holds its own copy: the reader sees the end of the pipe when the child exits
+    }
+  }
   std::thread compileThread;
   if (ctx2) compileThread = std::thread([&] {
+    if (child.hProcess) {   // wait for the child's compile (it may take a minute on the first run), then load its results
+      if (WaitForSingleObject(child.hProcess, 300000) == WAIT_TIMEOUT) TerminateProcess(child.hProcess, 9);
+      if (childReader.joinable()) childReader.join();
+    }
+    if (game.quit) { compileState = 2; return; }   // closed during the intro
     wglMakeCurrent(dc2, ctx2);
     bool ok = g_ren.compilePrograms(&progDone);
     wglMakeCurrent(nullptr, nullptr);
@@ -408,7 +490,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   for (;;) {
     QueryPerformanceCounter(&now);
     float t = (float)(now.QuadPart - t0.QuadPart) / freq.QuadPart;
-    int d = progDone;
+    int d = childDone >= 0 && compileState == 0 ? std::max((int)childDone, (int)progDone) : (int)progDone;
     bool compiled = !ctx2 || compileState != 0, built = worldDone;
     if (d == 0 && compileState == 0) compileSecs = t;
     float sp = !ctx2 ? 0.f : compileState == 1 ? 1.f : d == 0 ? 0.8f * std::min(0.97f, 1.f - expf(-t / (estRT * 0.6f))) : 0.8f + 0.2f * (d - 1) / (Renderer::kProgramCount - 1);
@@ -421,7 +503,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     if (game.quit) break;
     if (compiled && built && t > 3.2f) break;   // the logo stays up long enough to be seen
   }
+  if (game.quit && child.hProcess) TerminateProcess(child.hProcess, 9);   // closed during the intro: don't wait for it
   if (compileThread.joinable()) compileThread.join();
+  if (child.hProcess) { CloseHandle(child.hProcess); CloseHandle(child.hThread); }
   worldThread.join();
   if (ctx2) wglDeleteContext(ctx2);
   if (dc2) ReleaseDC(hw2, dc2);
@@ -429,7 +513,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (game.quit) { stopIntro(false); return 0; }
   if (ctx2 && compileState != 1) { stopIntro(false); fatal(g_ren.error); return 1; }
   if (!ctx2) introFrame(0.12f, cached ? "LOADING SHADERS FROM CACHE" : "COMPILING SHADERS (this can take a minute)", 1.f);
-  if (g_shaderCacheMisses > 0 && ctx2 && !g_shaderCacheDir.empty())
+  if (ctx2 && compileState == 1 && !stampPath.empty() && !cacheCurrent && g_ren.dispError.empty())   // the cache now holds this build
+    if (FILE* f = fopen(stampPath.c_str(), "w")) { fprintf(f, "%s\n", stamp.c_str()); fclose(f); }
+  if ((g_shaderCacheMisses > 0 || childMisses > 0) && ctx2 && !g_shaderCacheDir.empty())
     if (FILE* f = fopen((g_shaderCacheDir + "\\compile_time.txt").c_str(), "w")) { fprintf(f, "%.1f\n", compileSecs); fclose(f); }
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   game.init(false);

@@ -101,6 +101,16 @@ GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::stri
   return p;
 }
 static GLuint program(const std::string& vs, const std::string& fs, std::string& err) { return linkProgramCached(vs, fs, err); }
+// Fingerprint of every shader source and of the driver (needs a current context): the platform layer stamps the
+// shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
+std::string shaderCacheStamp() {
+  uint64_t h = 1469598103934665603ull;
+  for (const char* src : {kFullscreenVS, kCommonGLSL, kRaytraceFS, kRaytraceFS2, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRaytraceFS3, kRaytraceWraith, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kDownFS, kUpFS, kCockpitMaskFS, kRayMaskFS, kRayFS, kTaaFS, kPostFS, kUIVS, kUIFS, kRaytraceWraithCockpit, kEntVS, kEntFS1, kEntFS2, kEntShadowFS}) h = fnv1a(src, h);
+  auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
+  h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
+  char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
+  return b;
+}
 
 // ------------------------------------------------------------------ procedural PBR materials
 static const int TS = 512;
