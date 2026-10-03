@@ -162,6 +162,14 @@ void main(){
       for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
       for (int i = 0; i < 6; i++) g->render();
       glFinish();
+      if (getenv("TIMEIT")) {   // average frame time over a few frames (GPU finished each time)
+        g->render(); glFinish();
+        auto t0 = std::chrono::steady_clock::now();
+        for (int i = 0; i < 4; i++) { g->update(1.f / 60.f); g->render(); }
+        glFinish();
+        printf("time %s: %.0f ms/frame\n", sc.c_str(), std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 4);
+        fflush(stdout);
+      }
       if (getenv("COSTMAP") && g_ren.buildCostProgram()) {   // the analysis build's per-pixel work counters
         g_ren.costMap = true; g->render(); glFinish(); g_ren.costMap = false;
         std::vector<float> cm; int w = 0, h = 0; g_ren.readCostMap(cm, w, h);

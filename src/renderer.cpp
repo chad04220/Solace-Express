@@ -514,6 +514,9 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     std::string ms = rt; size_t m = ms.find("void main(");
     if (m != std::string::npos) ms.replace(m, 10, "void mainRT(");
     progMap = program(vsFS, ms + kMapMain, error); step();
+    { std::string e; progTShBake = program(vsFS, ms + kTShBakeMain, e); step(); }   // optional: without it, per-pixel shadow rays
+    { std::string e; progClouds = program(vsFS, ms + kCloudMain, e); step(); }       // optional: without them the ray tracer
+    { std::string e; progCloudComp = program(vsFS, kCloudCompFS, e); step(); }       // marches every pixel's clouds itself
     if (!progMap) { error = "Map shader: " + error; return false; }
     { std::string e; progCkMask = program(vsFS, kCockpitMaskFS, e); step(); }   // optional: without it nothing is masked
     progDisp = program(vsFS, ms + kDispMain, error); step();
@@ -522,6 +525,43 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
   }
   glFinish();   // everything complete before another context uses the programs
   return true;
+}
+
+// Terrain sun shadow, baked in world space for the current sun direction (see kTShBakeMain): a band of rows a frame
+// into the back texture, swapped in when complete; a new bake starts only when the sun has moved ~0.25 degrees
+void Renderer::bakeTerrainShadow(const FrameParams& fp) {
+  if (!progTShBake || fp.sunDir.y < 0.02f) return;
+  vec3 L = normalize(fp.sunDir);
+  if (!tshBaking) {
+    if (tshFront >= 0 && dot(L, tshSun) > 0.99999f) return;
+    tshBaking = true; tshRow = 0; tshBakeSun = L; tshBack = tshFront < 0 ? 0 : 1 - tshFront;
+  }
+  GLuint& tex = texTSh[tshBack];
+  if (!tex) {
+    glGenTextures(1, &tex); glBindTexture(GL_TEXTURE_2D, tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, kTShN, kTShN, 0, GL_RG, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  }
+  if (!fboTSh) glGenFramebuffers(1, &fboTSh);
+  glBindFramebuffer(GL_FRAMEBUFFER, fboTSh);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+  GLenum b0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &b0);
+  glViewport(0, 0, kTShN, kTShN);
+  int rows = tshFront < 0 ? kTShN : kTShRows;   // the very first bake in one go (it happens while loading)
+  glEnable(GL_SCISSOR_TEST); glScissor(0, tshRow, kTShN, rows);
+  glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
+  GLuint p = progTShBake;
+  glUseProgram(p);
+  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
+  glUniform1i(U(p, "uCraterN"), 0); glUniform1f(U(p, "uMaxH"), maxH);
+  glUniform3f(U(p, "uBakeSun"), tshBakeSun.x, tshBakeSun.y, tshBakeSun.z);
+  glUniform1f(U(p, "uBakeN"), (float)kTShN);
+  glBindVertexArray(vaoEmpty);
+  glDrawArrays(GL_TRIANGLES, 0, 3);
+  glDisable(GL_SCISSOR_TEST);
+  tshRow += rows;
+  if (tshRow >= kTShN) { tshFront = tshBack; tshSun = tshBakeSun; tshBaking = false; }
 }
 
 // Cockpit display atlas for this frame: the research jets' display pages, or the light aircraft's instrument panel
@@ -715,11 +755,23 @@ void Renderer::createRenderTargets() {
   rw = std::max(64, (int)(W * renderScale)); rh = std::max(64, (int)(H * renderScale));
   makeTex(texRaw, rw, rh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
   makeTex(texDepth, rw, rh, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST);
+  makeTex(texCloudMask, rw, rh, GL_R8, GL_RED, GL_UNSIGNED_BYTE, GL_NEAREST);
   depthValid = false;
+  cw = (rw + 1) / 2; ch = (rh + 1) / 2;
+  makeTex(texCloud, cw, ch, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST);
+  makeTex(texCloudD, cw, ch, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST);
+  if (!fboCloud) glGenFramebuffers(1, &fboCloud);
+  glBindFramebuffer(GL_FRAMEBUFFER, fboCloud);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texCloud, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texCloudD, 0);
+  if (!fboComp) glGenFramebuffers(1, &fboComp);   // the composite writes the ray tracer's colour only
+  glBindFramebuffer(GL_FRAMEBUFFER, fboComp);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texRaw, 0);
   if (!fboScene) glGenFramebuffers(1, &fboScene);
   glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texRaw, 0);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texDepth, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, texCloudMask, 0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   createGBuffer();
 }
@@ -823,16 +875,21 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   }
   // ------------------------------------------------ environment entities: shadow cascades + G-buffer
   drawEntities(fp);
+  bakeTerrainShadow(fp);
   if (fp.dispMode & 1) renderDisplays(fp, false);   // the cockpit display atlases, before the ray tracer samples them
   if (fp.dispMode & 2) renderDisplays(fp, true);
   // ------------------------------------------------ ray trace
   glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
-  GLenum bufs[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-  glDrawBuffers(2, bufs);
+  GLenum bufs[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
+  glDrawBuffers(3, bufs);
   glViewport(0, 0, rw, rh);
   glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
   stamp(1);
-  GLuint p = costMap && progRTCost ? progRTCost : progRT;
+  float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};
+  static const bool cloudSplitOff = getenv("CLOUDSPLITOFF") != nullptr;   // (debug: every pixel marches its clouds in the ray tracer)
+  const bool cloudSplit = !costMap && !cloudSplitOff && progClouds && progCloudComp && fp.cloudCover >= 0.02f;
+  // the ray tracer's uniforms and textures; the quarter-resolution cloud pass uses the same set
+  auto setRT = [&](GLuint p) {
   glUseProgram(p);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(U(p, "uAlb"), 1);
@@ -847,6 +904,9 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   // 16 and 17 (every GL 3.3 GPU that runs the ray tracer has at least 32)
   glActiveTexture(GL_TEXTURE0 + 16); glBindTexture(GL_TEXTURE_2D, texPages); glUniform1i(U(p, "uDispTex"), 16);
   glActiveTexture(GL_TEXTURE0 + 17); glBindTexture(GL_TEXTURE_2D, texPanel); glUniform1i(U(p, "uPanelTex"), 17);
+  glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, tshFront >= 0 ? texTSh[tshFront] : 0); glUniform1i(U(p, "uTSh"), 18);
+  static const bool tshOff = getenv("TSHOFF") != nullptr;   // (debug: compare with per-pixel shadow rays)
+  glUniform1i(U(p, "uTShOn"), tshFront >= 0 && !tshOff ? 1 : 0);
   {   // AI traffic: one row of 32 texels per aircraft
     if (!texTraffic) {
       glGenTextures(1, &texTraffic); glBindTexture(GL_TEXTURE_2D, texTraffic);
@@ -868,7 +928,6 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform2f(U(p, "uJit"), jitX, jitY);
   glUniform1f(U(p, "uSeed"), fmodf(frameNo * 0.618034f, 1.f));
   glUniform3f(U(p, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
-  float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};
   glUniformMatrix3fv(U(p, "uCamRot"), 1, GL_FALSE, cr);
   glUniform1f(U(p, "uTanHalf"), tanf(fp.fovY * 0.5f));
   glUniform1f(U(p, "uAspect"), (float)W / H);
@@ -980,9 +1039,37 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   }
   glUniform3f(U(p, "uFlameLP"), fp.flameLightPos.x, fp.flameLightPos.y, fp.flameLightPos.z);
   glUniform3f(U(p, "uFlameLI"), fp.flameLight.x, fp.flameLight.y, fp.flameLight.z);
+  glUniform1i(U(p, "uCloudSplit"), cloudSplit ? 1 : 0);
+  };
+  GLuint prt = costMap && progRTCost ? progRTCost : progRT;
+  setRT(prt);
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   depthValid = true;
+  if (cloudSplit) {
+    // clouds at a quarter of the pixels, along the rays of the depths just traced
+    glBindFramebuffer(GL_FRAMEBUFFER, fboCloud);
+    GLenum cb[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, cb);
+    glViewport(0, 0, cw, ch);
+    setRT(progClouds);
+    glActiveTexture(GL_TEXTURE0 + 19); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progClouds, "uSceneDepth"), 19);
+    glUniform1i(U(progClouds, "uFrame"), (int)(frameNo & 3));
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    // composite over the ray tracer's colour: colour x transmittance + in-scatter (its alpha, the TAA class, is kept)
+    glBindFramebuffer(GL_FRAMEBUFFER, fboComp);
+    GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
+    glViewport(0, 0, rw, rh);
+    glUseProgram(progCloudComp);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texCloud); glUniform1i(U(progCloudComp, "uCloud"), 0);
+    glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, texCloudD); glUniform1i(U(progCloudComp, "uCloudD"), 1);
+    glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progCloudComp, "uDepthTex"), 2);
+    glActiveTexture(GL_TEXTURE0 + 3); glBindTexture(GL_TEXTURE_2D, texCloudMask); glUniform1i(U(progCloudComp, "uMaskTex"), 3);
+    glEnable(GL_BLEND); glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDisable(GL_BLEND);
+    glActiveTexture(GL_TEXTURE0);
+  }
 
   stamp(2);
   // ------------------------------------------------ temporal AA resolve (before the sprites: particles never smear)

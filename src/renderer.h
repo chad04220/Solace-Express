@@ -89,7 +89,7 @@ public:
   GLuint minimapTex = 0;
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
-  static constexpr int kProgramCount = 13;
+  static constexpr int kProgramCount = 16;
   float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
   // analysis tool (--analyze): exact per-pass times (the GPU is waited on at every pass boundary) and a build of the
   // ray tracer that writes its per-pixel work counters instead of colour
@@ -135,7 +135,15 @@ private:
   GLuint progMap = 0, texMap = 0, fboMap = 0; int mapN = 0;
   GLuint progDisp = 0, texPages = 0, texPanel = 0, fboDisp = 0;
   std::chrono::steady_clock::time_point syncT;
-  GLuint progRTCost = 0;            // analysis build of the ray tracer (built on demand)
+  GLuint progRTCost = 0;
+  // quarter-resolution clouds: the cloud march, its full-resolution composite, their targets
+  GLuint progClouds = 0, progCloudComp = 0, texCloud = 0, texCloudD = 0, fboCloud = 0, texCloudMask = 0, fboComp = 0;
+  int cw = 0, ch = 0;
+  // baked terrain sun shadow (world space): front = the one the ray tracer reads, back = the one being baked
+  GLuint progTShBake = 0, texTSh[2] = {0, 0}, fboTSh = 0;
+  int tshFront = -1, tshBack = 0, tshRow = 0; bool tshBaking = false; vec3 tshSun, tshBakeSun;
+  static constexpr int kTShN = 2048, kTShRows = 64;   // texels per side, rows baked per frame
+  void bakeTerrainShadow(const FrameParams& fp);            // analysis build of the ray tracer (built on demand)
   GLuint progCkMask = 0;           // cockpit occlusion mask for the scenery pass
   bool depthValid = false, ckMaskPrev = false;   // last frame's ray-traced depth is usable / was a cockpit view
   void renderDisplays(const FrameParams& fp, bool panel);

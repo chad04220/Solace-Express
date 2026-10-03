@@ -142,6 +142,8 @@ static const char* kRaytraceFS = R"(
 in vec2 vUV;
 layout(location=0) out vec4 oColor;
 layout(location=1) out float oDepth;
+layout(location=2) out float oCloudMask;   // 1: this pixel's clouds are left to the quarter-resolution cloud pass
+uniform int uCloudSplit;
 uniform vec2 uRes; uniform vec3 uCamPos; uniform mat3 uCamRot; uniform float uTanHalf; uniform float uAspect;
 uniform vec2 uJit; uniform float uSeed;  // TAA: sub-pixel jitter (uv units) and a per-frame noise seed
 uniform float uMaxH; uniform int uQuality;
@@ -1028,8 +1030,13 @@ float traceTerrain(vec3 ro, vec3 rd, float tmax){
   if (t <= tmax) { vec3 p = ro + rd*t; if (p.y - terrainH(p.xz, 5) < 0.02*t) return t; }
   return -1.0;
 }
+uniform sampler2D uTSh; uniform int uTShOn;   // baked terrain sun shadow (see kTShBakeMain)
 float terrainShadow(vec3 ro, vec3 rd, float camT){
   if ((uDbg & 2) != 0) return 1.0;
+  if (uTShOn == 1) {   // one lookup instead of a march: the height a point here needs to see the sun, and how far away
+    vec2 hd = texture(uTSh, ro.xz/(2.0*WH) + 0.5).xy;   // the terrain that blocks it is (that sets the penumbra)
+    return clamp(12.0*length(rd.xz)*(ro.y - hd.x)/max(hd.y, 1.0), 0.0, 1.0);
+  }
   float res = 1.0, t = 2.0;
   // distant pixels cover many metres each: fewer steps and octaves are enough there (the profile showed terrain
   // shadows among the most expensive features)
@@ -3373,9 +3380,13 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
   if (!pod && uFxBeams + uFxBombs + uFxBlasts > 0) col = weaponsFx(col, ro, rd, t);
   // clouds (a cloaked craft: the skin first, then one cloud march along the whole camera ray through it)
   if (cloak) { col = cloakSkin(col, ckN, rd0, ckLp, ckLp.z - uWr[6].y + 0.8); col = applyFog(col, ro0, rd0, ckT); }
-  vec4 cl = pod ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(cloak ? ro0 : ro, cloak ? rd0 : rd, cloak ? t + ckT : t, jitter);
-  col = col*cl.a + cl.rgb;
+  // ordinary world pixels leave their clouds to the quarter-resolution cloud pass (composited before the TAA); the
+  // cabin, the display screens and the bomb feed (whose screen effects go on top of the clouds) march them here
   bool wrCk = cockpitView && int(gM[0].z + 0.5) == 6;
+  bool cloudLater = uCloudSplit == 1 && !pod && !onScr && !feed && !wrCk;
+  vec4 cl = pod || cloudLater ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(cloak ? ro0 : ro, cloak ? rd0 : rd, cloak ? t + ckT : t, jitter);
+  col = col*cl.a + cl.rgb;
+  oCloudMask = cloudLater ? 1.0 : 0.0;
   if (onScr) col = feed ? wrFeedOverlay(col, scrL) : wrCk ? wraithScreen(col, rd, scrId, scrL) : jetScreen(col, rd, scrId, scrL);
   if (wrCk) col += wrHolo(roV, rdV, pod ? t : h0.x);   // the hologram floats inside the cabin, in front of everything
   if (cloak) { t += ckT; taaFlag = 0.5; }
@@ -3889,6 +3900,69 @@ vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t){
 // GPS aerial imagery: the ray tracer's own terrain material seen straight down (the full ray-tracer source is linked
 // in with its main() renamed, so the map is exactly the world you fly over), hill-shaded from the north-west like a
 // satellite photo. 4 samples per texel; rendered into a texture only when the map view moves or zooms.
+// Terrain sun-shadow bake (world space, one texel per ~39 m): for the sun direction, the height a point above this
+// texel must reach to see over all the terrain towards the sun (x), and the distance to the terrain that sets it
+// (y, which sets the soft shadow's penumbra). The ray tracer's terrainShadow() reads it instead of marching a shadow
+// ray for every pixel. Rendered in bands of rows over several frames, and only when the sun has moved.
+static const char* kTShBakeMain = R"(
+uniform vec3 uBakeSun; uniform float uBakeN;
+void main(){
+  vec2 p = (gl_FragCoord.xy/uBakeN*2.0 - 1.0)*WH;
+  float lxz = length(uBakeSun.xz);
+  if (lxz < 0.02 || uBakeSun.y <= 0.0) { oColor = vec4(-6e4, 1.0, 0.0, 1.0); return; }   // sun overhead: no terrain shadows
+  vec2 dir = uBakeSun.xz/lxz;
+  float slope = uBakeSun.y/lxz;              // the sun ray's rise per horizontal metre
+  float H = -6e4, D = 1.0;
+  float t = 3.0*WH/uBakeN;                   // start past this texel's own ground
+  for (int i = 0; i < 80; i++) {
+    float y = terrainH(p + dir*t, 4) - t*slope;   // a point here must reach this height to see over that sample
+    if (y > H) { H = y; D = t; }
+    if (uMaxH - t*slope < H || t > 30000.0) break;   // nothing further away can rise above that
+    t += max(20.0, t*0.05);
+  }
+  oColor = vec4(H, D, 0.0, 1.0);
+}
+)";
+// Quarter-resolution cloud pass: each texel marches the clouds along the camera ray of one of the four full-resolution
+// pixels it covers (rotating every frame), up to that pixel's scene depth; the depth goes out too, for the upsampling
+static const char* kCloudMain = R"(
+uniform sampler2D uSceneDepth; uniform int uFrame;
+void main(){
+  ivec2 full = textureSize(uSceneDepth, 0);
+  ivec2 fp2 = min(ivec2(gl_FragCoord.xy)*2 + ivec2(uFrame & 1, (uFrame >> 1) & 1), full - 1);
+  float d = texelFetch(uSceneDepth, fp2, 0).r;
+  vec2 uv = (vec2(fp2) + 0.5)/vec2(full);
+  vec2 ndc = (uv + uJit)*2.0 - 1.0;
+  vec3 rd = normalize(uCamRot * vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, -1.0));
+  float jitter = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))) + uSeed);
+  oColor = traceClouds(uCamPos, rd, d, jitter);
+  oDepth = d;
+}
+)";
+// Cloud composite: full resolution, blended over the ray tracer's output (colour x transmittance + in-scatter). Of the
+// four nearest cloud texels it favours those whose depth matches this pixel's, so no cloud bleeds across a silhouette.
+static const char* kCloudCompFS = R"(#version 330 core
+in vec2 vUV; out vec4 oColor;
+uniform sampler2D uCloud; uniform sampler2D uCloudD; uniform sampler2D uDepthTex; uniform sampler2D uMaskTex;
+void main(){
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  if (texelFetch(uMaskTex, p, 0).r < 0.5) discard;   // marched in the ray tracer
+  float d = texelFetch(uDepthTex, p, 0).r, ld = log(max(d, 0.1));
+  ivec2 hi = textureSize(uCloud, 0) - 1;
+  vec2 lc = (vec2(p) + 0.5)*0.5 - 0.5;
+  ivec2 b = ivec2(floor(lc)); vec2 f = lc - vec2(b);
+  vec4 acc = vec4(0.0); float ws = 0.0;
+  for (int j = 0; j < 2; j++)
+    for (int i = 0; i < 2; i++) {
+      ivec2 q = clamp(b + ivec2(i, j), ivec2(0), hi);
+      float wb = (i == 0 ? 1.0 - f.x : f.x)*(j == 0 ? 1.0 - f.y : f.y);
+      float wd = 1.0/(0.02 + abs(ld - log(max(texelFetch(uCloudD, q, 0).r, 0.1)))*6.0);
+      float w = wb*wd + 1e-6;
+      acc += texelFetch(uCloud, q, 0)*w; ws += w;
+    }
+  oColor = acc/ws;
+}
+)";
 static const char* kMapMain = R"(
 uniform vec4 uMapView;   // centre x, centre z, half extent (m), metres per texel
 uniform vec2 uMapRes;
