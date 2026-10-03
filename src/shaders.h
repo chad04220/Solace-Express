@@ -2968,6 +2968,7 @@ vec3 cabinLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E, float pz, float phw){
 }
 // Cheap ambient occlusion from the cockpit's own distance field (3 taps along the normal)
 float interiorAO(vec3 p, vec3 n){
+  if ((uDbg & 512) != 0) return 1.0;
   float occ = 0.0, w = 1.0;
   for (int i = 1; i <= 3; i++) { float h = 0.02*float(i*i); occ += (h - mapPlane(p + n*h).x)*w; w *= 0.55; }
   return clamp(1.0 - 3.5*occ, 0.3, 1.0);

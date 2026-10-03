@@ -148,6 +148,7 @@ void main(){
   }
   if (getenv("SHADERCACHE")) g_shaderCacheDir = getenv("SHADERCACHE");   // test the program-binary cache
   g_ren.renderScale = getenv("RSCALE") ? (float)atof(getenv("RSCALE")) : 1.0f; g_ren.quality = 1;
+  if (getenv("DBGOFF")) g_ren.dbgOff = atoi(getenv("DBGOFF"));   // switch ray tracer features off (Renderer::dbgOff bits)
   if (!g_ren.init(W, H)) { printf("init failed: %s\n", g_ren.error.c_str()); return 1; }
   g_ren.entSync = !getenv("ENTSTREAM");   // captures generate every scenery chunk in range up front
   printf("renderer ok (shader cache: %d loaded, %d compiled)\n", g_shaderCacheHits.load(), g_shaderCacheMisses.load());
