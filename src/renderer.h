@@ -1,5 +1,6 @@
 // Solace Express - renderer interface
 #pragma once
+#include <chrono>
 #include <atomic>
 #include "common.h"
 #include "gl.h"
@@ -49,7 +50,8 @@ struct WreckVisual {
 // Shader programs, compiled once and then loaded from the driver-binary cache in g_shaderCacheDir (empty: no cache)
 extern std::string g_shaderCacheDir;
 extern std::atomic<int> g_shaderCacheHits, g_shaderCacheMisses;
-std::string shaderCacheStamp();   // fingerprint of all shader sources + the driver (current context needed)   // bumped from several GL threads at startup
+std::string shaderCacheStamp();
+bool writePNG(const char* path, int w, int h, const std::vector<uint8_t>& rgbBottomUp);   // fingerprint of all shader sources + the driver (current context needed)   // bumped from several GL threads at startup
 GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err);
 
 struct FrameParams {
@@ -89,6 +91,13 @@ public:
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
   static constexpr int kProgramCount = 13;
   float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
+  // analysis tool (--analyze): exact per-pass times (the GPU is waited on at every pass boundary) and a build of the
+  // ray tracer that writes its per-pixel work counters instead of colour
+  bool syncTiming = false; double passWall[7] = {};   // (kPasses)
+  bool costMap = false;
+  bool buildCostProgram();
+  bool readCostMap(std::vector<float>& out, int& w, int& h);
+  std::string rtSource(const char* defines);
   std::string dispError;   // set when the cockpit display shader failed to build (the screens stay dark)
   bool compilePrograms(std::atomic<int>* done);  // scene programs; safe on a worker thread with a shared context
   bool init(int w, int h);                       // everything else (runs compilePrograms itself if not done yet)
@@ -125,6 +134,8 @@ public:
 private:
   GLuint progMap = 0, texMap = 0, fboMap = 0; int mapN = 0;
   GLuint progDisp = 0, texPages = 0, texPanel = 0, fboDisp = 0;
+  std::chrono::steady_clock::time_point syncT;
+  GLuint progRTCost = 0;            // analysis build of the ray tracer (built on demand)
   GLuint progCkMask = 0;           // cockpit occlusion mask for the scenery pass
   bool depthValid = false, ckMaskPrev = false;   // last frame's ray-traced depth is usable / was a cockpit view
   void renderDisplays(const FrameParams& fp, bool panel);
@@ -147,7 +158,8 @@ public:
   static constexpr int kPasses = 7;   // scenery+shadows, ray trace, TAA, sprites, bloom, light shafts, composite
   float passMs[kPasses] = {};         // GPU time of each pass (timestamp queries, a few frames late)
   GLuint stampQ[4][kPasses + 1] = {}; bool stampUsed[4] = {};
-  void stamp(int i) { if (stampQ[gpuQi][i]) glQueryCounter(stampQ[gpuQi][i], GL_TIMESTAMP); }
+  void stamp(int i) { if (syncTiming) syncStamp(i); else if (stampQ[gpuQi][i]) glQueryCounter(stampQ[gpuQi][i], GL_TIMESTAMP); }
+  void syncStamp(int i);
 private:
   vec3 prevCamPos, prevPlanePos; float prevCamRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1}, prevPlaneRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
   int rw = 0, rh = 0, bw = 0, bh = 0;

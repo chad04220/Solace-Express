@@ -262,8 +262,9 @@ void Game::updateWraith(float dt) {
   bool wr = plane.spec && plane.spec->special == 2 && !crashed;
   // cloak: the field spreads from the nose to the tail (and collapses from the tail back)
   float tgt = wr && W.cloakOn ? 1.f : 0.f;
-  W.stealth = clampf(W.stealth + (tgt > W.stealth ? 0.8f : -1.1f) * dt, 0.f, 1.f);
-  if (fabsf(W.stealth - tgt) < 1e-4f) W.stealth = tgt;
+  // move toward the target and stop on it (at exactly 1 the old ramp took the fading branch every other frame, so the
+  // cloak flickered between ~98% and fully engaged)
+  W.stealth = tgt > W.stealth ? std::min(tgt, W.stealth + 0.8f * dt) : std::max(tgt, W.stealth - 1.1f * dt);
   W.front = W.stealth >= 1.f ? 1e3f : -9.5f + 19.f * W.stealth;   // fully spread: the whole craft, wavefront gone
   // turrets
   W.lasers = clampf(W.lasers + ((wr && W.armed) ? 1.f : -1.f) * dt / 0.7f, 0.f, 1.f);

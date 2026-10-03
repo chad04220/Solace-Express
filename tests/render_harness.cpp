@@ -162,6 +162,15 @@ void main(){
       for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
       for (int i = 0; i < 6; i++) g->render();
       glFinish();
+      if (getenv("COSTMAP") && g_ren.buildCostProgram()) {   // the analysis build's per-pixel work counters
+        g_ren.costMap = true; g->render(); glFinish(); g_ren.costMap = false;
+        std::vector<float> cm; int w = 0, h = 0; g_ren.readCostMap(cm, w, h);
+        double m[4] = {}; float mx[4] = {};
+        for (size_t i = 0; i < (size_t)w * h; i++) for (int c = 0; c < 4; c++) { m[c] += cm[i * 4 + c]; mx[c] = std::max(mx[c], cm[i * 4 + c]); }
+        printf("cost %s %dx%d: terrain %.1f (max %.0f)  aircraft %.1f (max %.0f)  clouds %.1f (max %.0f)  fx %.1f (max %.0f)\n", sc.c_str(), w, h,
+               m[0] / (w * h), mx[0], m[1] / (w * h), mx[1], m[2] / (w * h), mx[2], m[3] / (w * h), mx[3]);
+        g->render(); glFinish();
+      }
       std::string out = "/tmp/claude-0/sp/shot_" + sc + ".ppm";
       g_ren.screenshot(out.c_str()); printf("wrote %s\n", out.c_str()); fflush(stdout);
       delete g;

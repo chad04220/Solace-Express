@@ -9,6 +9,15 @@ void main(){ vec2 p = vec2((gl_VertexID<<1)&2, gl_VertexID&2); vUV = p; gl_Posit
 // ------------------------------------------------------------------------------------------------
 // Shared noise + terrain (must match world.cpp exactly)
 static const char* kCommonGLSL = R"(
+// Work counters for the analysis build of the ray tracer (analyze.bat): each COST(k) counts one unit of the expensive
+// work of category k in this pixel - 0 terrain height samples, 1 aircraft distance-field samples, 2 cloud march
+// steps, 3 effect / light steps. In the game build they compile to nothing.
+#ifdef COST_MAP
+vec4 gCost = vec4(0.0);
+#define COST(k) gCost[k] += 1.0
+#else
+#define COST(k)
+#endif
 const float WH = 40000.0;
 const int HMN = 1024;
 const float TEXEL = 78.125;
@@ -71,6 +80,7 @@ vec4 maskTexel(vec2 p){ return texelFetch(uMask, clamp(ivec2(floor((p + WH)/MTEX
 float groundH(vec2 p, int oct){ vec4 b = baseAt(p); return b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct); }
 // Terrain height: the bare heightfield (trees, rocks and buildings are separate entities) plus impact craters
 float terrainH(vec2 p, int oct){
+  COST(0);
   vec4 b = baseAt(p);
   float g = b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct);
   if (uCraterN > 0 && g > 0.3) g += craterH(p);
@@ -477,6 +487,7 @@ vec2 mapWraithCockpit(vec3 p);
 vec2 mapPlaneBody(vec3 p);
 // light fixtures: a faired housing set into the airframe with a domed lens facing out along the light's axis
 vec2 mapPlane(vec3 p){
+  COST(1);
   vec2 res = mapPlaneBody(p);
   if (gPS.w > 0.5) return res;
   if (!gOwn) {   // traffic: the same fixtures, placed from the packed model (wingtips, fin top, tail cone)
@@ -1127,6 +1138,7 @@ vec4 traceClouds(vec3 ro, vec3 rd, float tmax, float jitter){
   float t = t0 + dt*jitter;
   for (int i=0;i<84;i++){
     if (t > t1) break;
+    COST(2);
     vec3 p = ro + rd*t;
     float d = cloudDensity(p, 1);
     if (d <= 0.01) { t += dt*1.5; continue; }   // clear air between clouds: longer strides
@@ -1565,6 +1577,7 @@ vec3 shadeSurface(vec3 p, vec3 n, vec3 rd, Mat m, float shadow){
   // shadows from the aircraft: shadow rays only where a light contributes visibly
   for (int i = 0; i < 12; i++) {
     if (i >= uPLN || (uDbg & 16) != 0) break;
+    COST(3);
     vec3 lv = uPLP[i].xyz - p; float d2 = dot(lv, lv), d = sqrt(d2); vec3 l = lv/max(d, 1e-4);
     float ndl = dot(n, l);
     if (ndl <= 0.0) continue;
@@ -2779,6 +2792,7 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float jit){
   float dt = (t1 - t0)/40.0;
   vec3 acc = vec3(0.0);
   for (int i = 0; i < 40; i++) {
+    COST(3);
     vec3 q = lo + ld*(t0 + (float(i) + jit)*dt) - o;
     float x = dot(q, ax);
     if (x < -0.05 || x > L) continue;
@@ -3381,6 +3395,9 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
   if (gDispPx && taaFlag > 0.4 && taaFlag < 0.6) taaFlag = 0.55;
   oColor = vec4(clamp(col, vec3(0.0), vec3(3e4)), taaFlag);
   oDepth = t;
+#ifdef COST_MAP
+  oColor = gCost;   // analysis build: the work counters instead of the colour
+#endif
 }
 )";
 
@@ -3668,6 +3685,7 @@ vec3 plumeRound(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float sp, float a
   float spacing = 0.75 - 0.2*ab;
   float dt = (t1 - t0)/28.0; vec3 acc = vec3(0.0);
   for (int i = 0; i < 28; i++) {
+    COST(3);
     vec3 q = lo + ld*(t0 + (float(i) + jit)*dt) - o;
     float x = dot(q, ax); if (x < -0.05 || x > L) continue;
     float u = max(x, 0.0)/L;
@@ -3831,6 +3849,7 @@ vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t){
     float jit = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     float life = smoothstep(1.0, 0.72, age);                         // the whole cloud thins out at the end
     for (int k = 0; k < NS; k++) {
+      COST(3);
       vec3 q = ro + rd*(t0 + (float(k) + jit)*dt) - c;
       vec3 qc = q - vec3(0.0, Hc, 0.0);
       float ball = length(qc)/sb;

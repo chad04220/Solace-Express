@@ -458,10 +458,43 @@ GLuint Renderer::makeTexture(const uint8_t* rgba, int w, int h) {
 // Compiles and links every scene program (or loads it from the binary cache). Touches only shader and program
 // objects, which are shared between contexts, so the platform layer can run it on a worker thread with its own
 // context while the intro screen animates. `done` counts finished programs (kProgramCount in all).
+std::string Renderer::rtSource(const char* defines) {
+  return std::string("#version 330 core\n") + defines + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + (getenv("CLIPATLAS") ? "#define WR_CLIPATLAS\n" : "") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRaytraceFS3 + kRaytraceWraith + kRaytraceWraithCockpit;
+}
+
+// The analysis build of the ray tracer: the same shader with its work counters (COST) written out instead of colour
+bool Renderer::buildCostProgram() {
+  if (progRTCost) return true;
+  std::string e;
+  progRTCost = program(kFullscreenVS, rtSource("#define COST_MAP\n"), e);
+  if (!progRTCost) error = "Analysis shader: " + e;
+  return progRTCost != 0;
+}
+
+// The work counters of the last ray-traced frame (RGBA per pixel, bottom row first), at the render resolution
+bool Renderer::readCostMap(std::vector<float>& out, int& w, int& h) {
+  if (!fboScene) return false;
+  w = rw; h = rh; out.resize((size_t)w * h * 4);
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, fboScene);
+  glReadBuffer(GL_COLOR_ATTACHMENT0);
+  glReadPixels(0, 0, w, h, GL_RGBA, GL_FLOAT, out.data());
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+  return true;
+}
+
+// Exact pass timing for the analysis tool: wait for the GPU at every pass boundary
+static_assert(Renderer::kPasses == 7, "passWall holds kPasses entries");
+void Renderer::syncStamp(int i) {
+  glFinish();
+  auto now = std::chrono::steady_clock::now();
+  if (i > 0 && i <= kPasses) passWall[i - 1] = std::chrono::duration<double, std::milli>(now - syncT).count();
+  syncT = now;
+}
+
 bool Renderer::compilePrograms(std::atomic<int>* done) {
   auto step = [&]() { if (done) done->fetch_add(1); };
   std::string vsFS = kFullscreenVS;
-  std::string rt = std::string("#version 330 core\n") + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + (getenv("CLIPATLAS") ? "#define WR_CLIPATLAS\n" : "") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRaytraceFS3 + kRaytraceWraith + kRaytraceWraithCockpit;
+  std::string rt = rtSource("");
   progRT = program(vsFS, rt, error);
   if (!progRT) { error = "Ray tracer shader: " + error; return false; }
   step();
@@ -799,7 +832,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glViewport(0, 0, rw, rh);
   glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
   stamp(1);
-  GLuint p = progRT;
+  GLuint p = costMap && progRTCost ? progRTCost : progRT;
   glUseProgram(p);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(U(p, "uAlb"), 1);
@@ -1190,6 +1223,11 @@ bool Renderer::screenshotPNG(const char* path) {
   std::vector<uint8_t> px((size_t)W * H * 3);
   glPixelStorei(GL_PACK_ALIGNMENT, 1);
   glReadPixels(0, 0, W, H, GL_RGB, GL_UNSIGNED_BYTE, px.data());
+  return writePNG(path, W, H, px);
+}
+
+// RGB8 image, bottom row first (as glReadPixels returns it), saved as a PNG with stored (uncompressed) deflate blocks
+bool writePNG(const char* path, int W, int H, const std::vector<uint8_t>& px) {
   std::vector<uint8_t> raw;   // filter byte 0 + RGB row, top row first
   raw.reserve((size_t)(W * 3 + 1) * H);
   for (int y = H - 1; y >= 0; y--) { raw.push_back(0); raw.insert(raw.end(), px.begin() + (size_t)y * W * 3, px.begin() + (size_t)(y + 1) * W * 3); }

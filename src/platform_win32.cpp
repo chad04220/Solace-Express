@@ -525,13 +525,182 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) { stopIntro(false); fatal(g_ren.error); return 1; }
   {
     std::string cl = GetCommandLineA();
-    bool tool = cl.find("--bench ") != std::string::npos || cl.find("--shots ") != std::string::npos || cl.find("--profile ") != std::string::npos;
+    bool tool = cl.find("--bench ") != std::string::npos || cl.find("--shots ") != std::string::npos || cl.find("--profile ") != std::string::npos || cl.find("--analyze") != std::string::npos;
     stopIntro(!tool);   // the bench and shot tools draw straight away; a normal start fades the intro out
   }
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
     fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits.load(), g_shaderCacheMisses.load());
     if (!g_ren.dispError.empty()) fprintf(f, "Display shader failed (cockpit screens disabled):\n%s\n", g_ren.dispError.c_str());
     fclose(f);
+  }
+  // Analysis: SolaceExpress.exe --analyze [scenes] - a thorough look at where the frame time goes, written to
+  // analysis.txt (heat maps of the ray tracer's per-pixel work in the "analysis" folder), all at 1920x1080:
+  //   CPU vs GPU (update / submit / wait), exact per-pass GPU times (the GPU is waited on at each pass boundary),
+  //   frame time against render resolution (does it scale with pixel count?), what each ray tracer feature costs,
+  //   and the per-pixel work the ray tracer does (terrain samples, aircraft distance-field samples, cloud steps,
+  //   effect / light steps), averaged and drawn as heat maps.
+  {
+    std::string cl = GetCommandLineA();
+    size_t k = cl.find("--analyze");
+    if (k != std::string::npos) {
+      std::string list = "menu,air,storm,night,cockpit,rjet,rjetc,wr_8_0_0_0_1";
+      if (cl.size() > k + 10 && cl[k + 9] == ' ' && cl[k + 10] != '-') { list = cl.substr(k + 10); list = list.substr(0, list.find(' ')); }
+      list += ",";
+      if (g_fullscreen) toggleFullscreen();
+      RECT wr = {0, 0, 1920, 1080}; AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+      SetWindowPos(g_hwnd, nullptr, 0, 0, wr.right - wr.left, wr.bottom - wr.top, SWP_NOMOVE | SWP_NOZORDER);
+      { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } }
+      if (s_swapInterval) s_swapInterval(0);
+      char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+      std::string dir(exe, n); dir = dir.substr(0, dir.find_last_of("\\/"));
+      CreateDirectoryA((dir + "\\analysis").c_str(), nullptr);
+      FILE* af = fopen((dir + "\\analysis.txt").c_str(), "w");
+      if (!af) return 1;
+      SetWindowTextA(g_hwnd, "Solace Express - analysis: building the counting ray tracer (about a minute)");
+      LARGE_INTEGER c0, c1; QueryPerformanceCounter(&c0);
+      bool haveCost = g_ren.buildCostProgram();
+      QueryPerformanceCounter(&c1);
+      fprintf(af, "Solace Express performance analysis\nGPU: %s\nCPU threads: %u   Quality: %d   Window: %dx%d\n",
+              gpu.c_str(), std::thread::hardware_concurrency(), g_ren.quality, g_ren.W, g_ren.H);
+      fprintf(af, "Counting ray tracer: %s (%.1f s)\n", haveCost ? "built" : ("FAILED - " + g_ren.error.substr(0, 300)).c_str(), (double)(c1.QuadPart - c0.QuadPart) / freq.QuadPart);
+      fprintf(af, "\nHow to read this: 'ms' is wall-clock time per frame with the GPU finished (vsync off). Per-pass times are\n"
+                  "exact (the GPU is waited on between passes, which adds a little overhead). Resolution scaling: if a frame\n"
+                  "takes ~2.2x as long at 100%% as at 67%% (2.2x the pixels), the per-pixel ray tracing is the bottleneck.\n");
+      auto qpcMs = [&](LARGE_INTEGER a, LARGE_INTEGER b) { return (double)(b.QuadPart - a.QuadPart) / freq.QuadPart * 1000.0; };
+      auto pump = [&] { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } };
+      static const char* kPassName[Renderer::kPasses] = {"scenery+shadows+displays", "ray trace", "TAA", "sprites", "bloom", "light shafts", "composite"};
+      static const struct { int bit; const char* name; } kFeat[] = {
+        {1, "volumetric clouds"}, {2, "terrain shadows"}, {4, "scenery shadow maps"}, {8, "aircraft shadow"}, {16, "point lights"},
+        {32, "cloud shadows"}, {64, "half terrain march steps"}, {128, "terrain materials"}, {256, "fog / aerial perspective"},
+      };
+      struct Summary { std::string sc; double ms, rt, scale; std::string top; };
+      std::vector<Summary> sums;
+      for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
+        std::string sc = list.substr(a, b - a);
+        if (sc.empty()) continue;
+        pump();
+        RECT rc; GetClientRect(g_hwnd, &rc);
+        if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
+        SetWindowTextA(g_hwnd, ("Solace Express - analysing " + sc).c_str());
+        g_ren.entSync = true;
+        Game* g = new Game();
+        g->saveDir = game.saveDir;
+        g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
+        g_ren.entSync = false;
+        auto frames = [&](int n) { for (int i = 0; i < n; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); } };
+        auto timed = [&](int n) { frames(8); glFinish(); LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0); frames(n); glFinish(); QueryPerformanceCounter(&t1); return qpcMs(t0, t1) / n; };
+        frames(30);
+        fprintf(af, "\n==================== %s ====================\n", sc.c_str());
+        // 1. CPU vs GPU
+        {
+          double tu = 0, tr = 0, tw = 0; const int N = 30;
+          glFinish();
+          for (int i = 0; i < N; i++) {
+            LARGE_INTEGER t0, t1, t2, t3;
+            QueryPerformanceCounter(&t0); g->update(1.f / 60.f);
+            QueryPerformanceCounter(&t1); g->render();
+            QueryPerformanceCounter(&t2); glFinish();
+            QueryPerformanceCounter(&t3); SwapBuffers(g_hdc);
+            tu += qpcMs(t0, t1); tr += qpcMs(t1, t2); tw += qpcMs(t2, t3);
+          }
+          tu /= N; tr /= N; tw /= N;
+          fprintf(af, "Frame: %.2f ms (%.1f fps)   CPU update %.2f ms + CPU render/submit %.2f ms, then waiting for the GPU %.2f ms\n",
+                  tu + tr + tw, 1000.0 / (tu + tr + tw), tu, tr, tw);
+          fprintf(af, "  -> %s\n", tw > tu + tr ? "GPU-bound: the CPU finishes long before the GPU" : "CPU-bound or balanced: the CPU side takes as long as the GPU");
+          fprintf(af, "Scenery: %d instances drawn from %d chunks, %.2f ms CPU to gather   Render resolution %dx%d\n",
+                  g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs, (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale));
+        }
+        // 2. exact per-pass GPU times
+        double passSum[Renderer::kPasses] = {};
+        {
+          g_ren.syncTiming = true;
+          const int N = 20;
+          frames(3);
+          for (int i = 0; i < N; i++) { frames(1); for (int p = 0; p < Renderer::kPasses; p++) passSum[p] += g_ren.passWall[p] / N; }
+          g_ren.syncTiming = false;
+          double tot = 0; for (double v : passSum) tot += v;
+          fprintf(af, "GPU passes (exact, %.2f ms total):\n", tot);
+          for (int p = 0; p < Renderer::kPasses; p++) fprintf(af, "  %-26s %7.2f ms  %5.1f%%\n", kPassName[p], passSum[p], tot > 0 ? passSum[p] / tot * 100.0 : 0.0);
+        }
+        // 3. resolution scaling
+        double ms100 = 0, ms67 = 0;
+        {
+          static const struct { float scale; const char* name; } kRes[] = {{1.f, "100%"}, {0.85f, " 85%"}, {0.75f, " 75%"}, {0.67f, " 67%"}};
+          fprintf(af, "Render resolution (ray trace + TAA at a fraction of 1920x1080, upscaled):\n");
+          for (const auto& R : kRes) {
+            g_ren.setRenderScale(R.scale); frames(4);
+            double ms = timed(30);
+            if (R.scale == 1.f) ms100 = ms;
+            if (R.scale < 0.7f) ms67 = ms;
+            fprintf(af, "  %s  %7.2f ms  (%5.1f fps)   pixels x%.2f\n", R.name, ms, 1000.0 / ms, R.scale * R.scale);
+          }
+          g_ren.setRenderScale(1.f); frames(4);
+          double r = ms67 > 0 ? ms100 / ms67 : 0;
+          fprintf(af, "  -> 100%% takes %.2fx as long as 67%% (2.23x the pixels): %s\n", r,
+                  r > 1.8 ? "per-pixel ray tracing dominates" : r > 1.35 ? "mostly per-pixel, with a fixed cost besides" : "a fixed per-frame cost dominates (not pixel work)");
+        }
+        // 4. features
+        std::string top; double topSave = 0;
+        {
+          double base = timed(30);
+          fprintf(af, "Ray tracer features (frame time with it switched off; base %.2f ms):\n", base);
+          for (const auto& F : kFeat) {
+            g_ren.dbgOff = F.bit;
+            double ms = timed(30);
+            g_ren.dbgOff = 0;
+            fprintf(af, "  %-26s %7.2f ms   saves %6.2f ms (%4.1f%%)\n", F.name, ms, base - ms, (base - ms) / base * 100.0);
+            if (base - ms > topSave) { topSave = base - ms; top = F.name; }
+          }
+        }
+        // 5. per-pixel work of the ray tracer
+        if (haveCost) {
+          g_ren.costMap = true; frames(2); glFinish();
+          std::vector<float> cm; int w = 0, h = 0;
+          g_ren.readCostMap(cm, w, h);
+          g_ren.costMap = false;
+          static const char* kCat[4] = {"terrain height samples", "aircraft shape samples", "cloud march steps", "effect / light steps"};
+          size_t np = (size_t)w * h;
+          fprintf(af, "Ray tracer work per pixel (%dx%d):            mean     95th pct      max\n", w, h);
+          float p95v[4] = {};
+          for (int c = 0; c < 4; c++) {
+            std::vector<float> v(np); double sum = 0; float mx = 0;
+            for (size_t i = 0; i < np; i++) { v[i] = cm[i * 4 + c]; sum += v[i]; mx = std::max(mx, v[i]); }
+            std::nth_element(v.begin(), v.begin() + np * 95 / 100, v.end());
+            p95v[c] = v[np * 95 / 100];
+            fprintf(af, "  %-26s           %8.1f %10.0f %10.0f\n", kCat[c], sum / np, p95v[c], mx);
+          }
+          // heat maps: the four counters side by side (2x2), each scaled to its own 95th percentile
+          int hw = w / 2, hh = h / 2;
+          std::vector<uint8_t> img((size_t)w * h * 3, 0);
+          for (int c = 0; c < 4; c++) {
+            int ox = (c & 1) * hw, oy = (c < 2 ? 1 : 0) * hh;   // bottom-up rows: the first two on the top row
+            float sc2 = p95v[c] > 0 ? 1.f / p95v[c] : 0.f;
+            for (int y = 0; y < hh; y++)
+              for (int x = 0; x < hw; x++) {
+                float vv = cm[((size_t)(y * 2) * w + x * 2) * 4 + c] * sc2;
+                float t = std::min(vv, 1.5f) / 1.5f;   // black -> blue -> red -> yellow -> white
+                float r = std::min(1.f, t * 2.2f), gg = std::max(0.f, std::min(1.f, t * 2.2f - 0.9f)), bl = t < 0.3f ? t * 3.f : std::max(0.f, 1.f - (t - 0.3f) * 3.f) + std::max(0.f, t * 3.f - 2.f);
+                uint8_t* o = &img[((size_t)(oy + y) * w + ox + x) * 3];
+                o[0] = (uint8_t)(r * 255); o[1] = (uint8_t)(gg * 255); o[2] = (uint8_t)(std::min(bl, 1.f) * 255);
+              }
+          }
+          writePNG((dir + "\\analysis\\" + sc + "_work.png").c_str(), w, h, img);
+          fprintf(af, "  (heat map: analysis\\%s_work.png - top left terrain, top right aircraft, bottom left clouds, bottom right effects)\n", sc.c_str());
+        }
+        // a picture of the scene for reference
+        frames(3); glFinish();
+        g_ren.screenshotPNG((dir + "\\analysis\\" + sc + ".png").c_str());
+        double rt = passSum[1];
+        sums.push_back({sc, ms100, rt, ms67 > 0 ? ms100 / ms67 : 0, top});
+        fflush(af);
+        delete g;
+      }
+      fprintf(af, "\n==================== summary ====================\n");
+      fprintf(af, "%-16s %9s %9s %12s  %s\n", "scene", "frame ms", "RT ms", "100%/67%", "most expensive feature");
+      for (auto& S : sums) fprintf(af, "%-16s %9.2f %9.2f %12.2f  %s\n", S.sc.c_str(), S.ms, S.rt, S.scale, S.top.c_str());
+      fclose(af);
+      return 0;
+    }
   }
   // Profile: SolaceExpress.exe --profile scene1,scene2,... renders each scene at 1920x1080 once normally and once with
   // each ray tracer feature switched off (Renderer::dbgOff), and writes profile.txt next to the exe: what every
