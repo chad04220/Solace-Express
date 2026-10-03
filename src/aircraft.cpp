@@ -497,6 +497,10 @@ void Plane::wraithThrust(vec3& F, vec3& T, float Tp, vec3 wd, vec3 Taero, vec3 s
     for (int kk = 0; kk < 6; kk++) got += vec3(J[0][kk], J[1][kk], J[2][kk]) * uv[kk];
     r = rem - got;
   }
+  // on the ground the wheels hold the attitude and the nosewheel steers: the pods stay squared up and only push.
+  // (Otherwise the fly-by-wire fights the gear's reaction moments with full vane and differential-tilt deflection,
+  // and parked pods sit visibly skewed.) The authority comes back smoothly as the craft lifts off.
+  if (onGround) for (int kk = 0; kk < 6; kk++) uv[kk] = 0.f;
   PodCmd c = {};
   for (int kk = 0; kk < 6; kk++) applyVirtual(c, kk, uv[kk]);
   vec3 Fp, Tpq;

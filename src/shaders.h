@@ -3619,13 +3619,15 @@ vec2 mapWraith(vec3 p){
     res = vec2(d, w2 < res.x ? (wing < elev ? 80.0 : 81.0) : res.y);
     res = opU(res, vec2(rim, 84.0));
   }
-  // canted all-moving ruddervators (pitch and yaw mixed)
+  // canted V-tail: fixed fins with hinged ruddervators on the aft third of the chord (pitch and yaw mixed), which
+  // swing on their hinge line instead of the whole fin turning
   {
     vec3 q = ap - vec3(1.05, top - 0.05, 4.4); q.xy = rot2(q.xy, 0.72);
     float dv = uWr[5].x*0.35 + uWr[5].y*sgn*0.35;
-    q.xz = rot2(q.xz - vec2(0.0, 1.0), dv) + vec2(0.0, 1.0);
-    float fin = max(sdPanel(q.y + 0.75, q.z, q.x, 3.05, 2.6, 1.1, 1.6*3.05/2.3, 0.04, 1.0, 0.0, 0.0), -q.y - 0.75);   // root buried in the body
-    res = opU(res, vec2(fin, 81.0));
+    float fs = q.y + 0.75, span = 3.05, fsw = 1.6*3.05/2.3, hinge = 0.68, s0 = 0.14, s1 = span*0.95;
+    float fin = max(sdPanel(fs, q.z, q.x, span, 2.6, 1.1, fsw, 0.04, hinge, s0, s1), -fs);   // root buried in the body
+    float rv = sdSurface(fs, q.z, q.x, span, 2.6, 1.1, fsw, 0.04, hinge, s0, s1, -dv*1.4, 0.0);
+    res = opU(res, vec2(min(fin, rv), 81.0));
   }
   // pylons for the pods: faceted struts from the airframe to each trunnion
   {
