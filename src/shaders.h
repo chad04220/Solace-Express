@@ -1133,6 +1133,7 @@ vec3 terrainNormal(vec2 p, float t){
 // ---------------------------------------------------------------- environment entities (G-buffer from the raster pass)
 uniform sampler2D uGB0; uniform sampler2D uGB1; uniform sampler2D uGB2;
 uniform int uShOn; uniform sampler2D uShMap0; uniform sampler2D uShMap1; uniform mat4 uShM0; uniform mat4 uShM1; uniform vec2 uShTexel;
+uniform vec4 uShFade; uniform vec4 uShFadeR;   // camera-anchored fade centres (xz, per cascade) and fade radii
 uniform float uTreeFar;
 vec3 octDec(vec2 e){ vec3 n = vec3(e.x, 1.0 - abs(e.x) - abs(e.y), e.y); if (n.y < 0.0) n.xz = (1.0 - abs(n.zx))*vec2(n.x >= 0.0 ? 1.0 : -1.0, n.z >= 0.0 ? 1.0 : -1.0); return normalize(n); }
 // sun shadow of trees, rocks and buildings (two cascades, 4-tap PCF; normal offset against acne)
@@ -1144,21 +1145,25 @@ float shTap(sampler2D m, vec3 q, float bias){
     s += (q.z - bias <= d ? 1.0 : 0.0)*mix(1.0 - w.x, w.x, o.x)*mix(1.0 - w.y, w.y, o.y); }
   return s;
 }
+float shCascade(int c, vec3 p, vec3 n){
+  vec3 pp = p + n*(c == 0 ? uShTexel.x : uShTexel.y)*1.5;
+  vec4 h = (c == 0 ? uShM0 : uShM1)*vec4(pp, 1.0);
+  vec3 q = h.xyz*0.5 + 0.5;
+  vec2 edge = abs(q.xy - 0.5);
+  if (max(edge.x, edge.y) > 0.48 || q.z > 1.0) return 1.0;   // (only steep terrain far above or below the centre)
+  return c == 0 ? shTap(uShMap0, q, 0.0004) : shTap(uShMap1, q, 0.0006);
+}
+// Scenery shadows from two cached sun cascades. Each fades out with distance from a point that moves smoothly with
+// the camera, well inside the area its map covers: the near cascade hands over to the far one, the far one to none,
+// and a map re-rendering as the camera moves on never makes shadows appear or vanish.
 float entShadow(vec3 p, vec3 n){
   if (uShOn == 0) return 1.0;
-  for (int c = 0; c < 2; c++) {
-    if (c >= uShOn) break;
-    vec3 pp = p + n*(c == 0 ? uShTexel.x : uShTexel.y)*1.5;
-    vec4 h = (c == 0 ? uShM0 : uShM1)*vec4(pp, 1.0);
-    vec3 q = h.xyz*0.5 + 0.5;
-    vec2 edge = abs(q.xy - 0.5);
-    if (max(edge.x, edge.y) < 0.48 && q.z < 1.0) {
-      float s = c == 0 ? shTap(uShMap0, q, 0.0004) : shTap(uShMap1, q, 0.0006);
-      // fade out over the outer rim of the far cascade
-      return c == 1 ? mix(s, 1.0, smoothstep(0.4, 0.48, max(edge.x, edge.y))) : s;
-    }
-  }
-  return 1.0;
+  float w0 = 1.0 - smoothstep(uShFadeR.x, uShFadeR.y, length(p.xz - uShFade.xy));
+  float w1 = uShOn > 1 ? 1.0 - smoothstep(uShFadeR.z, uShFadeR.w, length(p.xz - uShFade.zw)) : 0.0;
+  float s = 1.0;
+  if (w0 < 1.0 && w1 > 0.0) s = mix(1.0, shCascade(1, p, n), w1);
+  if (w0 > 0.0) s = mix(s, shCascade(0, p, n), w0);
+  return s;
 }
 
 // ---------------------------------------------------------------- clouds
@@ -1470,27 +1475,38 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
   float hC, hL;
   vec4 gr = groundSample(p.xz, M_GRASS, 6.0, nTS, hC); vec3 nG = nTS;
 )"
-R"(  vec3 grassTint = mix(vec3(0.75,0.85,0.45), vec3(0.55,0.95,0.45), lush) * mix(vec3(1.0), vec3(1.15,1.0,0.8), smoothstep(0.4,0.8,hNoise));
+R"(  // grass colour at several scales: lush meadow, olive and dry grass by moisture (low noise fields, drier on slopes and
+  // up high), with mown / grazed patches and streaks; keeps distant hills from reading as one flat green
+  float dry = (fbm2(p.xz/2600.0 + 4.7, 3) - 0.5)*1.6 + (vnoise(p.xz/420.0) - 0.5)*0.7 + (vnoise(p.xz/130.0) - 0.5)*0.45 + slope*1.6 - lush*0.55 + 0.42
+            + smoothstep(250.0, 900.0, p.y)*0.25;
+  vec3 grassTint = mix(vec3(0.6, 0.8, 0.42), vec3(0.78, 0.78, 0.44), smoothstep(0.25, 0.65, dry));
+  grassTint = mix(grassTint, vec3(0.98, 0.84, 0.52), smoothstep(0.65, 1.0, dry)*0.8);
   grassTint = mix(grassTint, vec3(0.75,0.8,0.65), cold*0.6);
-  grassTint *= 0.92 + 0.16*vnoise(p.xz/23.0);                 // gentle colour variation breaks up repetition
-  m.alb = gr.rgb*grassTint; m.rough = gr.a; m.nrm = nG;
+  grassTint *= 0.84 + 0.22*vnoise(p.xz/90.0) + 0.1*vnoise(p.xz/23.0);   // patchy brightness breaks up repetition
+  grassTint *= 1.0 - 0.18*smoothstep(0.08, 0.3, slope);                   // steeper ground: coarser, shadowed tufts
+  vec3 grB = mix(vec3(dot(gr.rgb, vec3(0.2126, 0.7152, 0.0722))), gr.rgb, 0.68);   // real grass is far less saturated than the raw texture
+  m.alb = grB*grassTint*1.05; m.rough = gr.a; m.nrm = nG;
   // wildflower and dry patches
   // round flower heads up close; further out only the patch's tint survives (no aliasing squares)
   vec2 fc = floor(p.xz*1.3), ff = fract(p.xz*1.3) - 0.5 - (vec2(hash2i(ivec2(fc) + ivec2(3, 1)), hash2i(ivec2(fc) + ivec2(-5, 7))) - 0.5)*0.5;
   float flPatch = smoothstep(0.62, 0.7, vnoise(p.xz/35.0));
   float fl = flPatch*mix(0.12, step(0.9, hash2i(ivec2(fc)))*smoothstep(0.2, 0.1, length(ff)), smoothstep(120.0, 40.0, t));
-  m.alb = mix(m.alb, mix(vec3(0.95,0.85,0.2), vec3(0.75,0.35,0.85), step(0.5, vnoise(p.xz/20.0))), fl*(1.0 - cold)*0.7);
+  float flNear = smoothstep(120.0, 40.0, t);   // far away a meadow in flower only warms slightly (no grey-violet patches)
+  vec3 flCol = mix(vec3(0.95,0.85,0.2), mix(vec3(0.95,0.85,0.2), vec3(0.75,0.35,0.85), step(0.5, vnoise(p.xz/20.0))), flNear);
+  m.alb = mix(m.alb, flCol*m.alb/max(dot(m.alb, vec3(0.333)), 1e-3)*mix(0.33, 1.0, flNear), fl*(1.0 - cold)*mix(0.35, 0.7, flNear));
   if (wDirt > 0.01) { vec4 d = groundSample(p.xz, M_DIRT, 7.0, nTS, hL); float w = hblend(wDirt, hC, hL);
     m.alb = mix(m.alb, d.rgb, w); m.rough = mix(m.rough, d.a, w); m.nrm = mix(m.nrm, nTS, w); hC = mix(hC, hL, w); }
   if (wForest > 0.01) {
     // forest floor under the trees: leaf litter, needles and moss
     vec4 f = groundSample(p.xz, M_LITTER, 4.0, nTS, hL); float w = hblend(wForest*0.85, hC, hL);
-    vec3 litter = f.rgb*mix(vec3(1.0), vec3(0.8, 0.9, 0.85), cold);
+    vec3 litter = f.rgb*mix(vec3(1.0), vec3(0.8, 0.9, 0.85), cold)*0.6;   // shaded by the canopy (no bright speckle between the trees)
     m.alb = mix(m.alb, litter, w); m.rough = mix(m.rough, 0.95, w); m.nrm = mix(m.nrm, nTS, w); hC = mix(hC, hL, w);
     // beyond the tree draw distance the forest is the ground's own canopy texture, faded in as the trees thin out
-    float far = smoothstep(uTreeFar*0.45, uTreeFar*0.95, t)*wForest;
+    float rag = smoothstep(0.25, 0.75, wForest + (vnoise(p.xz/38.0) - 0.5)*0.9);   // ragged canopy margins
+    float far = smoothstep(uTreeFar*0.45, uTreeFar*0.95, t)*rag;
     if (far > 0.01) { vec4 cn = groundSample(p.xz, M_FOREST, 26.0, nTS, hL);
-      vec3 tint = mix(vec3(0.62, 0.8, 0.5), vec3(0.45, 0.62, 0.52), max(cold, smoothstep(500.0, 900.0, p.y)));
+      vec3 tint = mix(vec3(0.6, 0.78, 0.46), vec3(0.5, 0.64, 0.5), max(cold, smoothstep(500.0, 900.0, p.y)));
+      tint *= 0.85 + 0.3*vnoise(p.xz/160.0);   // stands of different age and species
       m.alb = mix(m.alb, cn.rgb*tint*0.8, far); m.rough = mix(m.rough, 0.9, far); m.nrm = mix(m.nrm, nTS, far); }
   }
   if (msk.w > 0.05 && p.y > 0.5) fieldMaterial(p.xz, msk.w*(1.0 - wRock), m);
@@ -1600,17 +1616,26 @@ vec3 shadeSurface(vec3 p, vec3 n, vec3 rd, Mat m, float shadow){
   return col;
 }
 
+// optical depth along a ray through an exponential layer of scale height H: integral of exp(-y/H) over the path
+float layerDepth(float y0, float dy, float t, float H){
+  float a = exp(-max(y0, 0.0)/H), k = dy*t/H;
+  return abs(k) > 1e-3 ? a*H*(1.0 - exp(-k))/dy : a*t;
+}
+// Aerial perspective: Rayleigh scattering (blue light scatters most, so distance turns hills blue and drains their
+// contrast) plus a low haze layer whose density follows the weather's visibility and that glows around the sun.
+// Both thin out with altitude. The in-scattered light is the horizon sky's, so far terrain melts into the sky.
 vec3 applyFog(vec3 col, vec3 ro, vec3 rd, float t){
-  // height-dependent haze (analytic integral of exp(-y/H))
-  float H = 1400.0;
-  float b = 1.0/H;
-  float dens = uFogB * exp(-max(ro.y, 0.0)*b);
-  float fogAmt = rd.y*t*b > 1e-4 ? dens*(1.0 - exp(-t*rd.y*b))/(rd.y*b) : dens*t;
-  fogAmt = 1.0 - exp(-fogAmt - t*uFogB*0.04);
-  float mu = max(dot(rd, uSunDir), 0.0);
-  vec3 fogCol = skyColor(normalize(vec3(rd.x, 0.06, rd.z)))*vec3(0.88, 0.93, 1.0);
-  fogCol += uSunCol*pow(mu, 8.0)*0.2;
-  return mix(col, fogCol, clamp(fogAmt, 0.0, 1.0));
+  float odR = layerDepth(ro.y, rd.y, t, 8000.0), odM = layerDepth(ro.y, rd.y, t, 1100.0);
+  vec3 bR = vec3(5.8e-6, 13.5e-6, 33.1e-6);
+  float bM = 3e-6 + uFogB*0.8;
+  vec3 tau = bR*odR + vec3(bM*odM) + uFogB*0.03*t;
+  vec3 T = exp(-tau);
+  float mu = dot(rd, uSunDir), mp = max(mu, 0.0);
+  vec3 fogCol = skyColor(normalize(vec3(rd.x, 0.06, rd.z)))*vec3(0.9, 0.94, 1.0);
+  // forward scattering by the haze: a broad warm glow towards the sun, stronger the hazier the air
+  float hazeW = clamp(bM*odM/max(dot(tau, vec3(0.333)), 1e-6), 0.0, 1.0);
+  fogCol += uSunCol*(pow(mp, 8.0)*0.22 + pow(mp, 2.5)*0.07*hazeW);
+  return col*T + fogCol*(1.0 - T);
 }
 
 )";

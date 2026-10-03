@@ -126,6 +126,10 @@ private:
   GLuint progEnt = 0, progEntSh = 0, vaoEnt = 0, vboEntMesh = 0, vboEntInst = 0;
   GLuint fboGB = 0, texGB[3] = {0, 0, 0}, texGBDepth = 0;
   GLuint fboSh[2] = {0, 0}, texSh[2] = {0, 0}; int shRes = 0;
+  // shadows fade between kShFade0 and kShFade1 x the cascade radius around shIdeal (camera-anchored, so a cached
+  // map re-rendering never changes a pixel: each map covers at least 0.84 x its radius around that point)
+  static constexpr float kShFade0 = 0.5f, kShFade1 = 0.78f;
+  vec3 shIdeal[2]; float entTreeFar = 4500.f;
   mat4 shVP[2]; vec3 shCenter[2], shSun[2]; bool shValid[2] = {false, false}; int shGen[2] = {-1, -1}, shAge[2] = {0, 0}; float shR[2] = {0, 0};
   EntMeshRange entRange[EK_COUNT];
   std::vector<Ent> entStage;

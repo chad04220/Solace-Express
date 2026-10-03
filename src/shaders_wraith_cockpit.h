@@ -1,10 +1,11 @@
 // Air Xpress - XR-11 Wraith cockpit (GLSL, appended to the ray tracer after kRaytraceWraith)
 #pragma once
 
-// A faceted sealed cabin wrapped in see-through angular displays: a three-pane front wrap, tall side displays, an
+// A faceted sealed cabin wrapped in see-through angular displays: a three-pane front wrap, tall side displays with aft
+// displays behind them (to watch the flanks and the rear quarter), an
 // overhead pane, a sloped chin pane and a glass floor in the footwell. Every display re-traces the world along the
 // view ray, so looking down through the floor shows the ground, the bombs falling and the blasts below.
-// Screen ids: 41 front, 42 left, 43 right, 61 floor, 62 overhead, 63 chin. Interior materials 64-79.
+// Screen ids: 41 front, 42 left, 43 right (side + aft displays), 61 floor, 62 overhead, 63 chin. Interior materials 64-79.
 static const char* kRaytraceWraithCockpit = R"(// ---------------------------------------------------------------- XR-11 cockpit
 uniform vec4 uPip;   // bomb impact prediction (world) + valid flag
 uniform vec4 uFeed;  // belly camera target: a falling bomb or its blast (world) + active flag
@@ -20,6 +21,7 @@ vec2 wrPane(vec3 q, vec3 c, vec3 n, vec3 up, vec2 hs, float ch){
 const vec3 WF_C = vec3(0.0, 0.07, -1.2);    const vec3 WF_N = vec3(0.0, 0.2425, 0.9701);  const vec2 WF_S = vec2(0.4, 0.33);
 const vec3 WW_C = vec3(0.6, 0.07, -0.93);   const vec3 WW_N = vec3(-0.7686, 0.1774, 0.6147); const vec2 WW_S = vec2(0.24, 0.33);
 const vec3 WS_C = vec3(0.8, -0.075, -0.4);  const vec3 WS_N = vec3(-1.0, 0.0, 0.0);      const vec2 WS_S = vec2(0.34, 0.345);
+const vec3 WA_C = vec3(0.8, -0.075, 0.34);  const vec2 WA_S = vec2(0.25, 0.345);   // aft side displays (same facing as WS)
 const vec3 WO_C = vec3(0.0, 0.403, -0.55);  const vec3 WO_N = vec3(0.0, -1.0, 0.0);       const vec2 WO_S = vec2(0.42, 0.36);
 const vec3 WC_C = vec3(0.0, -0.5, -1.0);    const vec3 WC_N = vec3(0.0, 0.7509, 0.6604);  const vec2 WC_S = vec2(0.38, 0.2);
 const vec3 WL_C = vec3(0.0, -0.775, -0.66); const vec3 WL_N = vec3(0.0, 1.0, 0.0);       const vec2 WL_S = vec2(0.4, 0.34);
@@ -32,7 +34,8 @@ float wrScreenEdge(vec3 q, int id){
     vec3 aq = vec3(abs(q.x), q.y, q.z);
     return min(c, wrShape(wrFrame(aq, WW_C, WW_N, vec3(0,1,0)).xy, WW_S, 0.16));
   }
-  if (id == 42 || id == 43) return wrShape(wrFrame(vec3(abs(q.x), q.y, q.z), WS_C, WS_N, vec3(0,1,0)).xy, WS_S, 0.13);
+  if (id == 42 || id == 43) { vec3 aq = vec3(abs(q.x), q.y, q.z);
+    return min(wrShape(wrFrame(aq, WS_C, WS_N, vec3(0,1,0)).xy, WS_S, 0.13), wrShape(wrFrame(aq, WA_C, WS_N, vec3(0,1,0)).xy, WA_S, 0.11)); }
   if (id == 61) return q.z > 0.1 ? wrShape(wrFrame(vec3(abs(q.x), q.y, q.z), WB_C, WB_N, vec3(0,0,-1)).xy, WB_S, 0.07) : wrShape(wrFrame(q, WL_C, WL_N, vec3(0,0,-1)).xy, WL_S, 0.1);
   if (id == 62) return wrShape(wrFrame(q, WO_C, WO_N, vec3(0,0,-1)).xy, WO_S, 0.12);
   return wrShape(wrFrame(q, WC_C, WC_N, vec3(0,1,0)).xy, WC_S, 0.07);
@@ -58,6 +61,8 @@ vec2 mapWraithCockpit(vec3 p){
   vec2 sF = wrPane(q, WF_C, WF_N, vec3(0,1,0), WF_S, 0.1);
   vec2 sW = wrPane(aq, WW_C, WW_N, vec3(0,1,0), WW_S, 0.16);
   vec2 sS = wrPane(aq, WS_C, WS_N, vec3(0,1,0), WS_S, 0.13);
+  vec2 sA = wrPane(aq, WA_C, WS_N, vec3(0,1,0), WA_S, 0.11);
+  sS = vec2(min(sS.x, sA.x), min(sS.y, sA.y));
   vec2 sO = wrPane(q, WO_C, WO_N, vec3(0,0,-1), WO_S, 0.12);
   vec2 sC = wrPane(q, WC_C, WC_N, vec3(0,1,0), WC_S, 0.07);
   vec2 sL = wrPane(q, WL_C, WL_N, vec3(0,0,-1), WL_S, 0.1);
@@ -317,9 +322,9 @@ float wrClip(vec3 lp, int mid){
 // is a point on one of them: red if it lies inside other cockpit geometry, green if clear, black off the surface.
 vec3 wrPanePoint(vec3 c, vec3 n, vec3 up, vec3 l){ vec3 t = normalize(cross(up, n)), b = cross(n, t); return c + t*l.x + b*l.y + n*l.z; }
 vec3 wrClipAtlas(vec2 uv){
-  vec2 g = uv*vec2(6.0, 4.0); int tile = int(floor(g.y))*6 + int(floor(g.x)); vec2 f = fract(g)*2.2 - 1.1;   // f in [-1.1, 1.1]; the top row stays clear for the game HUD
+  vec2 g = uv*vec2(6.0, 5.0); int tile = int(floor(g.y))*6 + int(floor(g.x)); vec2 f = fract(g)*2.2 - 1.1;   // f in [-1.1, 1.1]; the top row stays clear for the game HUD
   vec3 q; float inside; int skip = 1;
-  float sgn = (tile == 1 || tile == 3 || tile == 8 || tile == 10 || tile == 12 || tile == 14) ? -1.0 : 1.0;
+  float sgn = (tile == 1 || tile == 3 || tile == 8 || tile == 10 || tile == 12 || tile == 14 || tile == 17) ? -1.0 : 1.0;
   if (tile == 0) { q = wrPanePoint(WF_C, WF_N, vec3(0,1,0), vec3(f*WF_S, 0.0)); inside = wrShape(f*WF_S, WF_S, 0.1); }
   else if (tile <= 2) { q = wrPanePoint(WW_C, WW_N, vec3(0,1,0), vec3(f*WW_S, 0.0)); inside = wrShape(f*WW_S, WW_S, 0.16); }
   else if (tile <= 4) { q = wrPanePoint(WS_C, WS_N, vec3(0,1,0), vec3(f*WS_S, 0.0)); inside = wrShape(f*WS_S, WS_S, 0.13); }
@@ -332,6 +337,7 @@ vec3 wrClipAtlas(vec2 uv){
   else if (tile <= 15) { skip = 2; vec2 m = f*vec2(0.09, 0.055); vec3 mq = vec3(m.x, 0.0, m.y); mq.yz = rot2(mq.yz, 0.55);
     vec3 cq = mq + vec3(0.015, 0.075, -0.24); q = vec3(0.56 + cq.x, cq.y - 0.47, cq.z - 0.12); inside = wrShape(m, vec2(0.09, 0.055), 0.02); }
   else if (tile == 16) { skip = 2; vec2 m = f*vec2(0.28, 0.009); q = wrPanePoint(WD_C, WD_N, vec3(0,1,0), vec3(m.x, 0.083 + m.y, 0.001)); inside = max(abs(m.x) - 0.28, abs(m.y) - 0.009); }
+  else if (tile <= 18) { q = wrPanePoint(WA_C, WS_N, vec3(0,1,0), vec3(f*WA_S, 0.0)); inside = wrShape(f*WA_S, WA_S, 0.11); }
   else return vec3(0.02);
   q.x *= sgn;
   if (inside > 0.0) return vec3(0.0);
@@ -468,9 +474,24 @@ vec3 wraithScreen(vec3 col, vec3 rd, int id, vec3 sl){
   } else {
     // side displays: heading readout and edge ticks
     float hd = mod(degrees(atan(rd.x, -rd.z)) + 360.0, 360.0);
-    vec2 u = vec2(q.z + 0.38, q.y + 0.03);
+    bool aft = q.z > 0.05;
+    vec2 u = vec2(q.z - (aft ? 0.34 : -0.38), q.y + 0.03);
     hud = max(hud, hudNum(u - vec2(-0.03, 0.33), hd, 3, vec2(0.014, 0.024)));
-    hud = max(hud, hudLine(abs(u.y), 0.0012)*step(0.3, abs(u.x)));
+    hud = max(hud, hudLine(abs(u.y), 0.0012)*step(aft ? 0.21 : 0.3, abs(u.x)));
+  }
+  // alien tracker on every display: an angular violet bracket around the UFO with its range
+  if (uUfoOn == 1) {
+    vec3 dd = uUfoPos - uCamPos; float rng = length(dd); dd /= rng;
+    vec3 u = normalize(cross(dd, vec3(0.0, 1.0, 0.0) + vec3(1e-4, 0.0, 0.0))), v = cross(u, dd);
+    float dz = dot(rd, dd);
+    if (dz > 0.6) {
+      vec2 s = vec2(dot(rd, u), dot(rd, v))/dz;
+      float b = max(14.0/rng, 0.03);
+      vec2 a = abs(s);
+      viol = max(viol, hudLine(abs(max(a.x, a.y) - b), px*1.3)*step(b*0.55, min(a.x, a.y)));   // corner brackets only
+      viol = max(viol, hudLine(abs(a.x + a.y - b*0.35), px)*step(max(a.x, a.y), b*0.35));
+      viol = max(viol, hudNum(s - vec2(-0.02, -b - 0.03), rng, 4, vec2(0.012, 0.02)));
+    }
   }
   col = mix(col, hc*2.4, clamp(hud, 0.0, 1.0)*0.9);
   col = mix(col, wc*2.4, clamp(warn, 0.0, 1.0)*0.9);

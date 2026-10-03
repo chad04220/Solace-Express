@@ -861,7 +861,7 @@ void Game::updateUfo(float dt) {
   vec3 r(-f.z, 0, f.x), u(0, 1, 0);
   float span = plane.spec->span;
   vec3 hold = r * (ufo.side * (span * 0.5f + 15.f)) + u * -0.6f + f * 2.f;         // station alongside, cabin at eye level
-  vec3 from = -f * 520.f + u * 170.f + r * (ufo.side * 140.f);                      // swoops in from behind and above
+  vec3 from = -f * 250.f + u * 60.f + r * (ufo.side * 520.f);                       // swoops in from the rear quarter and above (in view of the XR-11's aft displays)
   float k = smoothstepf(0.f, 6.5f, t);
   vec3 off = from + (hold - from) * k;
   off.y += sinf(t * 1.7f) * 0.6f + sinf(t * 0.9f) * 0.4f;                           // floating bob
@@ -1638,6 +1638,7 @@ void Game::debugScene(const std::string& name) {
     if (getenv("WRSPD")) { plane.vel = plane.forward() * (float)atof(getenv("WRSPD")); plane.apSpeed = (float)atof(getenv("WRSPD")); }
     if (mode == 5) wraith.bayHold = 100.f;
     if (mode == 7) wraith.bombQueue = 1;
+    if (getenv("WRUFO")) { startUfo(); ufo.side = (float)atof(getenv("WRUFO")); }   // UFO alongside (side -1 / 1)
     float firstDrop = 0; vec3 blastAt;
     int frames = (int)((mode == 3 ? 0.55f : mode == 7 ? 60.f : secs) * 60.f);
     for (int i = 0; i < frames; i++) {
@@ -1662,6 +1663,7 @@ void Game::debugScene(const std::string& name) {
       }
       printf("wr: speed %.0f m/s, %d young bolts: streak tails off the firing line by <= %.2f m, along-error <= %.2f m\n", length(plane.vel), n, worstOff, worstAlong);
     }
+    if (ufo.on) { vec3 r = plane.q.conj().rotate(ufo.pos - plane.pos); printf("wr: ufo t %.1f at craft-frame (%.0f, %.0f, %.0f) m\n", ufo.t, r.x, r.y, r.z); }
     toasts.clear(); hint.clear();
     for (auto& b : wraith.blasts) printf("wr: blast age %.2f R %.0f at %.0f %.0f %.0f particles %d\n", b.age, b.R, b.p.x, b.p.y, b.p.z, (int)particles.size());
     printf("wr: mode %d stealth %.2f lasers %.2f bay %.2f bombs %d blasts %d tilt %.2f %.2f %.2f %.2f thr %.2f\n", mode, wraith.stealth, wraith.lasers, wraith.bay, (int)wraith.bombs.size(), (int)wraith.blasts.size(),

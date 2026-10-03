@@ -628,8 +628,9 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glUniform1i(U(p, "uShMap0"), 11); glUniform1i(U(p, "uShMap1"), 12);
     glUniformMatrix4fv(U(p, "uShM0"), 1, GL_FALSE, shVP[0].m); glUniformMatrix4fv(U(p, "uShM1"), 1, GL_FALSE, shVP[1].m);
     glUniform2f(U(p, "uShTexel"), shR[0] * 2.f / std::max(shRes, 1), shR[1] * 2.f / std::max(shRes, 1));
-    float tf = quality <= 0 ? 2200.f : quality == 1 ? 3600.f : 5500.f;
-    glUniform1f(U(p, "uTreeFar"), tf);
+    glUniform4f(U(p, "uShFade"), shIdeal[0].x, shIdeal[0].z, shIdeal[1].x, shIdeal[1].z);
+    glUniform4f(U(p, "uShFadeR"), shR[0] * kShFade0, shR[0] * kShFade1, shR[1] * kShFade0, shR[1] * kShFade1);
+    glUniform1f(U(p, "uTreeFar"), entTreeFar);
   }
   glUniform3f(U(p, "uFlameLP"), fp.flameLightPos.x, fp.flameLightPos.y, fp.flameLightPos.z);
   glUniform3f(U(p, "uFlameLI"), fp.flameLight.x, fp.flameLight.y, fp.flameLight.z);

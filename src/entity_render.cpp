@@ -67,9 +67,9 @@ void Renderer::createGBuffer() {
 namespace {
 struct EntRanges { float tree, bush, rock, big, build, t0, t1, r0, r1, b0, b1, sh0, sh1; int shRes; };
 EntRanges rangesFor(int q) {
-  if (q <= 0) return {2200, 700, 1500, 8000, 8000, 170, 800, 250, 1000, 500, 2500, 170, 1100, 1024};
-  if (q == 1) return {3600, 1100, 2400, 12000, 12000, 240, 1100, 350, 1400, 800, 3500, 230, 1800, 2048};
-  return {5500, 1600, 3400, 16000, 16000, 340, 1500, 450, 1800, 1200, 5000, 300, 2600, 2048};
+  if (q <= 0) return {2600, 800, 1700, 9000, 9000, 190, 900, 280, 1100, 550, 2800, 300, 1600, 2048};
+  if (q == 1) return {4500, 1300, 2800, 13000, 13000, 260, 1300, 380, 1600, 850, 4000, 420, 2600, 2048};
+  return {7000, 1800, 3800, 18000, 18000, 360, 1800, 480, 2000, 1300, 5500, 520, 3600, 4096};
 }
 float rangeOf(const EntRanges& R, int k) {
   if (k == EK_BUSH) return R.bush;
@@ -177,14 +177,17 @@ void Renderer::drawEntities(const FrameParams& fp) {
     if (g_scenery.craters.size() != lastCraters || sum != lastSum) { shGen[0] = shGen[1] = -1; lastCraters = g_scenery.craters.size(); lastSum = sum; }
   }
   vec3 newCenter[2];
+  for (int c = 0; c < 2; c++) shIdeal[c] = cam + fwdH * (cR[c] * 0.45f);   // the shader fades shadows around these
+  entTreeFar = R.tree;
   for (int c = 0; c < 2 && sunUp; c++) {
-    newCenter[c] = cam + fwdH * (cR[c] * 0.45f);
+    newCenter[c] = shIdeal[c];
     float moved = length(vec3(newCenter[c].x - shCenter[c].x, 0, newCenter[c].z - shCenter[c].z));
     shAge[c]++;
     shDirty[c] = !shValid[c] || moved > cR[c] * 0.12f || fabsf(newCenter[c].y - shCenter[c].y) > cR[c] * 0.25f || dot(L, shSun[c]) < 0.99998f ||
                  shGen[c] < 0 || shR[c] != cR[c] || shAge[c] > 600;
   }
 
+  const float shReach = sqrtf(std::max(1.f - L.y * L.y, 0.f)) / std::max(L.y, 0.15f);   // shadow length per metre of height
   // ------------------------------------------------ gather instances into (pass, kind, lod) buckets
   static std::vector<Ent> bucket[3][EK_COUNT][ENT_LODS];   // pass 0 view, 1/2 shadow cascades
   for (auto& a : bucket) for (auto& b : a) for (auto& v : b) v.clear();
@@ -226,11 +229,14 @@ void Renderer::drawEntities(const FrameParams& fp) {
             bool keep = !thin || fmodf(en.seed * 7.13f, 1.f) >= smoothstepf(far * 0.45f, far, d) * 0.92f;
             if (keep) bucket[0][k][lod].push_back(en);
           }
+          // shadows: only what can cast into the faded circle the shader uses (radius kShFade1 x R around the
+          // centre; a caster's shadow reaches h / tan(sun elevation) away), thinned like the trees themselves
+          bool shKeep = !thin || fmodf(en.seed * 7.13f, 1.f) >= smoothstepf(far * 0.45f, far, d) * 0.92f;
           for (int c = 0; c < 2; c++)
-            if (inSh[c]) {
+            if (inSh[c] && shKeep) {
               float sx = en.x - newCenter[c].x, sz = en.z - newCenter[c].z;
-              float er = kEntInfo[k].h * en.sy + std::max(kEntInfo[k].hx * en.sx, kEntInfo[k].hz * en.sz);
-              if (fabsf(sx) > cR[c] * 1.45f + er || fabsf(sz) > cR[c] * 1.45f + er) continue;
+              float h = kEntInfo[k].h * en.sy, er = std::max(kEntInfo[k].hx * en.sx, kEntInfo[k].hz * en.sz) + h * shReach;
+              float cr = cR[c] * kShFade1 + er; if (sx * sx + sz * sz > cr * cr) continue;
               int sl = c == 0 ? std::min(lod, 1) : (entClass(k) == EC_BUILDING ? 1 : 2);
               if (c == 1 && thin && kEntInfo[k].h * en.sy < 3.f) continue;   // boulders and bushes don't reach the far cascade
               bucket[1 + c][k][sl].push_back(en);
@@ -327,7 +333,11 @@ void Renderer::drawEntities(const FrameParams& fp) {
   glBindVertexArray(0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   static const bool dbg = getenv("ENTDBG") != nullptr;
-  if (dbg) printf("ent: stream %.2f gather %.2f total %.2f ms, %d view / %d+%d shadow inst, dirty %d%d\n", tStream, tGather - tStream,
-    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count(), entDrawn, (int)0, (int)0, (int)shDirty[0], (int)shDirty[1]);
+  if (dbg) {
+    int nSh[2] = {0, 0};
+    for (int c = 0; c < 2; c++) for (auto& d : draws[1 + c]) nSh[c] += d.count;
+    printf("ent: stream %.2f gather %.2f total %.2f ms, %d view / %d+%d shadow inst, dirty %d%d\n", tStream, tGather - tStream,
+      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count(), entDrawn, nSh[0], nSh[1], (int)shDirty[0], (int)shDirty[1]);
+  }
   entCpuMs = lerpf(entCpuMs, (float)std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count(), 0.1f);
 }
