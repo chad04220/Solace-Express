@@ -232,7 +232,16 @@ Career::Source Career::canFly(const Contract& c, int si, std::string* why) const
   if (s.cargoKg < c.cargoKg) return no(fmt("Max cargo %.0f kg", s.cargoKg));
   if (s.pax < c.pax) return no(fmt("Only %d passenger seats", s.pax));
   float km = contractKm(c);
-  if (s.rangeKm < km * 1.25f) return no(fmt("Range %.0f km too short (need %.0f km incl. reserve)", s.rangeKm, km * 1.25f));
+  // the route plus the arrival (descent, intercept and final: ~6 km) and the climb over the highest ground on the way
+  // (~8 km of cruise fuel per 1000 m), with a 20% reserve
+  float top = 0;
+  {
+    vec3 p0 = g_world.airports[c.from].pos(), p1 = g_world.airports[c.to].pos();
+    for (int i = 0; i <= 40; i++) { vec3 q = p0 + (p1 - p0) * (i / 40.f); top = std::max(top, g_world.height(q.x, q.z)); }
+    top = std::max(0.f, top + 350.f - p0.y);
+  }
+  float needKm = (km + 6.f + top * 0.008f) * 1.2f;
+  if (s.rangeKm < needKm) return no(fmt("Range %.0f km too short (need %.0f km incl. approach and reserve)", s.rangeKm, needKm));
   for (int ap : {c.from, c.to}) {
     const Airport& a = g_world.airports[ap];
     if (!surfaceOK(s, a.surface)) return no(fmt("Cannot use %s runway at %s", surfaceName(a.surface), a.code));

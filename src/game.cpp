@@ -1,5 +1,6 @@
 // Solace Express - game flow, flight session, cameras, particles, lights, audio feed
 #include "game.h"
+#include "airport_layout.h"
 #include "entities.h"
 #include "models.h"
 
@@ -1482,6 +1483,7 @@ FrameParams Game::buildFrame() {
   fp.wet = wx.precip == 1 ? 1.f : 0.f; fp.snow = wx.precip == 2 ? 0.8f : 0.f;
   fp.storm = wx.storm ? 1.f : 0.f; fp.lightning = lightning;
   fp.windOff = cloudOff;
+  fp.wind = vec3(-sinf(wx.windFrom * DEG), 0, cosf(wx.windFrom * DEG)) * wx.windSpeed;
   fp.exposure = 1.0f + fp.night * 0.8f;
   if ((screen == SCR_FLIGHT || screen == SCR_DEBRIEF || screen == SCR_LOADING) && plane.spec) {
     fillPlaneVisual(fp.plane, plane, propAngle, camMode == 1);
@@ -1683,6 +1685,21 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
           float dl = length(p - fp.camPos);   // glints at range; close up the modelled fixture and its pool are the light
           bill(add, p, dl * 0.0009f, col * (2.0f * lightI) * smoothstepf(60.f, 250.f, dl), 1.f, SPR_GLOW, 2.f);   // a pixel-sized point at range
         }
+      AptLayout L = aptLayout(a, (int)ai);
+      if (L.paved) {   // blue taxiway edge lights (the same positions as the fixtures in airport_scenery.cpp)
+        auto blue = [&](float u, float vv) {
+          vec3 p = aptWorld(a, u, L.side * vv, a.elev + 0.4f);
+          float dl = length(p - fp.camPos);
+          bill(add, p, dl * 0.0012f, vec3(0.2f, 0.35f, 1.f) * 2.2f * lightI * smoothstepf(60.f, 250.f, dl), 1.f, SPR_GLOW, 2.f);
+        };
+        float tEnd = a.length * 0.5f - 25.f + L.twHW;
+        for (float tu = -tEnd; tu <= tEnd; tu += 60.f) {
+          bool atExit = false;
+          for (int e = 0; e < L.nExit; e++) if (fabsf(tu - L.exitU[e]) < L.twHW + 4.f) atExit = true;
+          if (!atExit) blue(tu, L.twV - L.twHW - 1.f);
+          if (!(tu > L.apU0 && tu < L.apU1)) blue(tu, L.twV + L.twHW + 1.f);
+        }
+      }
       for (int end = -1; end <= 1; end += 2) {
         for (float v = -a.width * 0.5f; v <= a.width * 0.5f; v += 3.f) {
           vec3 p = a.pos() + dir * (end * (a.length * 0.5f + 1.f)) + rt * v + vec3(0, 0.4f, 0);
@@ -2469,6 +2486,26 @@ void Game::debugScene(const std::string& name) {
     float size = std::max(plane.spec->span, plane.spec->fusLen), R = size * 1.5f + 6.f;
     dbgCam = true; dbgFollow = true;
     dbgFollowOff = plane.right() * (R * 0.85f) + plane.forward() * (R * 0.55f) + vec3(0, R * 0.16f, 0);
+    toasts.clear(); hint.clear(); uiHidden = true; return;
+  }
+  if (name.compare(0, 4, "apv_") == 0 && name.size() >= 9) {   // airport detail views: apv_<CODE>_<view>_<hour>
+    int ai = std::max(0, g_world.findAirport(name.substr(4, 3).c_str()));
+    int view = atoi(name.c_str() + 8);
+    size_t us = name.find('_', 8);
+    float tod = us != std::string::npos ? (float)atof(name.c_str() + us + 1) : 15.f;
+    Contract c; c.from = ai; c.to = (ai + 1) % (int)g_world.airports.size(); c.title = "Airport";
+    c.wx = Weather(); c.wx.timeOfDay = tod; c.wx.cloudCover = 0.25f; c.wx.visibility = 60000; c.wx.windSpeed = 6; c.wx.windFrom = 200;
+    realTime = 20; startFlight(c, 0, Career::SRC_OWNED);
+    for (int i = 0; i < 10; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    const Airport& a = g_world.airports[ai];
+    AptLayout L = aptLayout(a, ai);
+    float mid = 0.5f * (L.apU0 + L.apU1);
+    vec3 cam, look;
+    if (view == 0) { cam = aptWorld(a, L.apU0 - 120.f, L.side * (L.twV - 60.f), 0); cam.y = a.elev + 70.f; look = aptWorld(a, mid, L.side * L.bldV, a.elev + 5.f); }
+    else if (view == 1) { cam = aptWorld(a, L.termU - 140.f, L.side * (L.apV0 + 10.f), 0); cam.y = a.elev + 4.f; look = aptWorld(a, L.termU + 40.f, L.side * L.bldV, a.elev + 6.f); }
+    else if (view == 2) { cam = aptWorld(a, L.standU0 - 60.f, L.side * (L.twV - 30.f), 0); cam.y = a.elev + 25.f; look = aptWorld(a, L.standU1, L.side * L.bldV, a.elev + 4.f); }
+    else { cam = aptWorld(a, -a.length * 0.5f - 300.f, -L.side * 60.f, 0); cam.y = a.elev + 160.f; look = aptWorld(a, 0, L.side * L.apV0, a.elev); }
+    dbgCam = true; dbgFollow = false; dbgCamPos = cam; dbgCamLook = look;
     toasts.clear(); hint.clear(); uiHidden = true; return;
   }
   if (name.compare(0, 9, "loadshot_") == 0) {

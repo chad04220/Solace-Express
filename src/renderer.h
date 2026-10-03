@@ -62,6 +62,7 @@ struct FrameParams {
   float planeTerrSh = 1.f;   // terrain's sun shadow at the player's aircraft (one value for the whole airframe, from the CPU)
   float cloudCover = 0.3f, cloudBase = 1500, fogB = 0.0001f, wet = 0, snow = 0, lightning = 0, storm = 0;
   vec2 windOff;
+  vec3 wind;   // surface wind velocity (m/s, the way the air moves): windsocks
   PlaneVisual plane;
   WreckVisual wreck;
   FxVisual fx;

@@ -106,6 +106,11 @@ const EntKindInfo kEntInfo[EK_COUNT] = {
   {"Tower", 10.f, 80.f, 10.f}, {"Skyscraper", 9.0f, 135.f, 9.0f}, {"Warehouse", 12.f, 8.5f, 9.0f}, {"Barn", 6.0f, 10.f, 9.0f},
   {"Silo", 3.0f, 19.f, 3.0f}, {"Church", 5.0f, 28.f, 13.f}, {"Water tower", 5.2f, 28.f, 5.2f}, {"Lighthouse", 3.4f, 27.f, 3.4f},
   {"Gas station", 8.0f, 5.5f, 7.0f}, {"Runway light", 0.12f, 0.42f, 0.12f}, {"PAPI unit", 0.45f, 0.8f, 0.35f},
+  {"Hangar", 20.f, 13.f, 16.f}, {"Arch hangar", 9.f, 7.5f, 12.f}, {"T-hangars", 24.f, 4.8f, 7.f}, {"Terminal", 60.f, 15.f, 20.f},
+  {"Control tower", 5.f, 34.f, 5.f}, {"Flight centre", 10.f, 5.f, 7.f}, {"Fuel tank", 6.f, 9.f, 6.f}, {"Fuel pump", 2.5f, 2.6f, 1.6f},
+  {"Windsock", 1.9f, 6.6f, 1.9f}, {"Beacon", 1.2f, 15.f, 1.2f}, {"Parked aircraft", 5.5f, 2.7f, 4.2f}, {"Parked airliner", 17.f, 11.5f, 19.5f},
+  {"Jet bridge", 1.6f, 5.6f, 10.f}, {"Car", 0.9f, 1.5f, 2.25f}, {"Truck", 1.25f, 3.1f, 4.5f}, {"Fence", 10.f, 2.4f, 0.1f},
+  {"Localizer", 18.f, 3.2f, 1.f}, {"Radar", 5.f, 22.f, 5.f}, {"Mast", 1.5f, 12.f, 1.5f}, {"Floodlight mast", 1.5f, 20.f, 1.5f},
 };
 
 static inline float h2(int a, int b) { return hash2i(a, b); }
@@ -275,6 +280,28 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
               for (float v = -8.f; v <= 8.f; v += 4.f) put(c + dir * (end * (a.length * 0.5f + 60.f * k)) + rt * v, 0);
         }
       }
+    // ---------------------------------------------------------------- airport buildings, aircraft, vehicles (L1)
+    if (L == 1) {
+      static std::once_flag once;
+      static std::vector<std::vector<AptItem>> items;
+      struct Bounds { float x0, z0, x1, z1; };
+      static std::vector<Bounds> boxes;   // extent of each airport's items
+      std::call_once(once, [] {
+        items.resize(g_world.airports.size()); boxes.resize(g_world.airports.size());
+        for (size_t i = 0; i < items.size(); i++) {
+          airportItems((int)i, items[i]);
+          Bounds b{1e9f, 1e9f, -1e9f, -1e9f};
+          for (auto& it : items[i]) { float r = std::max(kEntInfo[it.kind].hx * it.e.sx, kEntInfo[it.kind].hz * it.e.sz);
+            b.x0 = std::min(b.x0, it.e.x - r); b.z0 = std::min(b.z0, it.e.z - r); b.x1 = std::max(b.x1, it.e.x + r); b.z1 = std::max(b.z1, it.e.z + r); }
+          boxes[i] = b;
+        }
+      });
+      for (size_t i = 0; i < items.size(); i++) {
+        const Bounds& b = boxes[i];
+        if (b.x1 < C.x0 || b.x0 > C.x1 || b.z1 < C.z0 || b.z0 > C.z1) continue;
+        for (auto& it : items[i]) if (C.inside(it.e.x, it.e.z)) C.out[it.kind]->push_back(it.e);
+      }
+    }
     // ---------------------------------------------------------------- town lots (buildings L1, garden trees L2)
     int i0 = (int)floorf(C.x0 / LOT) - 1, i1 = (int)floorf(C.x1 / LOT) + 1, j0 = (int)floorf(C.z0 / LOT) - 1, j1 = (int)floorf(C.z1 / LOT) + 1;
     for (int j = j0; j <= j1; j++)
@@ -547,14 +574,78 @@ int Scenery::collide(vec3 p, float r, Ent* entOut) {
   return 0;
 }
 
+// Segment against the same shapes collide() uses (tree crown cylinders, rock ellipsoids, building boxes), inflated by
+// the bolt radius, solved exactly: nothing between samples can be missed.
 float Scenery::raycast(vec3 a, vec3 d, float L, int* kindOut, Ent* entOut) {
-  // sampled along the segment (bolts and the like); skipped when the whole segment is well above the ground
+  const float r = 0.4f;
   vec3 b = a + d * L;
   float g = std::max(std::min(g_world.groundHeight(a.x, a.z, 4), g_world.groundHeight(b.x, b.z, 4)), 0.f);
   if (std::min(a.y, b.y) - g > 220.f) return -1.f;
-  for (float t = 0; t <= L; t += 2.5f) {
-    int k = collide(a + d * t, 0.4f, entOut);
-    if (k) { if (kindOut) *kindOut = k; return t; }
-  }
-  return -1.f;
+  // slab test of the segment against an axis-aligned box in some frame (o, dir given in that frame)
+  auto slab = [&](vec3 o, vec3 dir, vec3 mn, vec3 mx, float& t0) {
+    float tn = 0.f, tf = L;
+    for (int k = 0; k < 3; k++) {
+      float oo = k == 0 ? o.x : k == 1 ? o.y : o.z, dd = k == 0 ? dir.x : k == 1 ? dir.y : dir.z;
+      float lo = k == 0 ? mn.x : k == 1 ? mn.y : mn.z, hi = k == 0 ? mx.x : k == 1 ? mx.y : mx.z;
+      if (fabsf(dd) < 1e-8f) { if (oo < lo || oo > hi) return false; continue; }
+      float t1 = (lo - oo) / dd, t2 = (hi - oo) / dd;
+      if (t1 > t2) std::swap(t1, t2);
+      tn = std::max(tn, t1); tf = std::min(tf, t2);
+      if (tn > tf) return false;
+    }
+    t0 = tn; return true;
+  };
+  float best = -1.f; int bestK = 0; Ent bestE{};
+  float mx0 = std::min(a.x, b.x) - 30.f, mx1 = std::max(a.x, b.x) + 30.f, mz0 = std::min(a.z, b.z) - 30.f, mz1 = std::max(a.z, b.z) + 30.f;
+  float ylo = std::min(a.y, b.y) - r, yhi = std::max(a.y, b.y) + r;
+  for (int cz = chunkOf(mz0); cz <= chunkOf(mz1); cz++)
+    for (int cx = chunkOf(mx0); cx <= chunkOf(mx1); cx++) {
+      Chunk* ch = ensure(cx, cz, 2);
+      if (!ch || ch->ents.empty() || ylo > ch->ymax || yhi < ch->ymin) continue;
+      for (int k = 0; k < EK_COUNT; k++) {
+        if (k == EK_RWYLIGHT || k == EK_PAPI) continue;
+        const EntKindInfo& I = kEntInfo[k];
+        int cls = entClass(k);
+        for (uint32_t i = ch->off[k]; i < ch->off[k + 1]; i++) {
+          const Ent& e = ch->ents[i];
+          float R = std::max(I.hx * e.sx, I.hz * e.sz) + r, H = I.h * e.sy;
+          // quick reject: horizontal distance from the segment, vertical range
+          vec3 rel = vec3(e.x, 0, e.z) - vec3(a.x, 0, a.z);
+          vec3 dh(d.x, 0, d.z); float dh2 = dot(dh, dh);
+          float th = dh2 > 1e-8f ? clampf(dot(rel, dh) / dh2, 0.f, L) : 0.f;
+          vec3 cp = vec3(a.x, 0, a.z) + dh * th;
+          if ((cp.x - e.x) * (cp.x - e.x) + (cp.z - e.z) * (cp.z - e.z) > R * R * 1.5f || yhi < e.y - 1.f || ylo > e.y + H + r) continue;
+          vec3 o = a - vec3(e.x, e.y, e.z);
+          float t = -1.f;
+          if (cls == EC_TREE) {   // crown: vertical cylinder from y0 to the top
+            float cr = I.hx * e.sx * 0.8f + r, y0 = H * (k == EK_PALM ? 0.7f : k == EK_PINE ? 0.5f : 0.22f) - r;
+            if (k == EK_BUSH) y0 = -r;
+            float A = d.x * d.x + d.z * d.z, B = o.x * d.x + o.z * d.z, C = o.x * o.x + o.z * o.z - cr * cr;
+            float tn = 0.f, tf = L;
+            if (A > 1e-8f) { float disc = B * B - A * C; if (disc < 0) continue; float sq = sqrtf(disc); tn = std::max(tn, (-B - sq) / A); tf = std::min(tf, (-B + sq) / A); }
+            else if (C > 0) continue;
+            if (fabsf(d.y) > 1e-8f) { float t1 = (y0 - o.y) / d.y, t2 = (H + r - o.y) / d.y; if (t1 > t2) std::swap(t1, t2); tn = std::max(tn, t1); tf = std::min(tf, t2); }
+            else if (o.y < y0 || o.y > H + r) continue;
+            if (tn <= tf) t = tn;
+          } else if (cls == EC_ROCK) {   // ellipsoid about the base point
+            float rr = I.hx * e.sx * 0.85f + r, hh = H * 0.92f + r;
+            vec3 os(o.x / rr, o.y / hh, o.z / rr), ds(d.x / rr, d.y / hh, d.z / rr);
+            float A = dot(ds, ds), B = dot(os, ds), C = dot(os, os) - 1.f, disc = B * B - A * C;
+            if (disc < 0) continue;
+            float t1 = (-B - sqrtf(disc)) / A, t2 = (-B + sqrtf(disc)) / A;
+            if (t2 < 0 || t1 > L) continue;
+            t = std::max(t1, 0.f);
+          } else {   // building: oriented box in its own frame
+            float c = cosf(e.yaw), s = sinf(e.yaw);
+            vec3 lo(c * o.x - s * o.z, o.y, s * o.x + c * o.z), ld(c * d.x - s * d.z, d.y, s * d.x + c * d.z);
+            float t0;
+            if (slab(lo, ld, vec3(-I.hx * e.sx - r, -1.f - r, -I.hz * e.sz - r), vec3(I.hx * e.sx + r, H + r * 0.5f, I.hz * e.sz + r), t0)) t = t0;
+          }
+          if (t < 0.f || t > L || (best >= 0.f && t >= best) || destroyed(e)) continue;
+          best = t; bestK = k; bestE = e;
+        }
+      }
+    }
+  if (best >= 0.f) { if (kindOut) *kindOut = bestK + 1; if (entOut) *entOut = bestE; }
+  return best;
 }

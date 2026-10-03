@@ -7,6 +7,7 @@ layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNrm; layout(locatio
 layout(location=3) in vec4 iA; layout(location=4) in vec4 iB;   // position + yaw | scale + seed
 uniform mat4 uVP; uniform vec2 uJit; uniform float uLogC; uniform float uTime; uniform int uKind; uniform int uShadowPass;
 uniform vec3 uCamV; uniform float uFar; uniform float uThin; uniform float uThinRef;   // view pass: per-instance distance thinning (entKeep)
+uniform vec3 uWind;   // surface wind velocity (windsocks)
 out vec3 vW; out vec3 vL; out vec3 vLN; out vec4 vAux;
 flat out vec4 vInst;   // seed, yaw, scale y, instance height
 flat out vec3 vScale;
@@ -25,6 +26,21 @@ void main(){
   float c = cos(iA.w), s = sin(iA.w);
   vec3 wp = vec3(c*lp.x + s*lp.z, lp.y, -s*lp.x + c*lp.z) + iA.xyz;
   vec3 ln = normalize(aNrm/iB.xyz);
+  if (uKind == 40 && abs(aAux.x - 23.0) < 0.5) {
+    // windsock: the sock (modelled along +x from the pole top) streams downwind, filling out by ~15 kt and drooping
+    // when calm, with a little flutter. Built straight in world space, then expressed back in the instance frame.
+    vec2 w = uWind.xz; float sp = length(w), k = clamp(sp/7.7, 0.0, 1.0);
+    vec2 wd = sp > 0.1 ? w/sp : vec2(1.0, 0.0);
+    float ph = uTime*(2.0 + 2.5*k) + iA.x*0.13;
+    wd = normalize(wd + vec2(-wd.y, wd.x)*sin(ph)*0.1*(0.25 + k));
+    vec3 d = normalize(vec3(wd.x*max(k, 0.08), -(1.0 - k)*1.3 - 0.06 + 0.04*sin(ph*1.7)*k, wd.y*max(k, 0.08)));
+    vec3 s1 = normalize(cross(d, vec3(0.0, 1.0, 0.0)) + vec3(1e-4, 0.0, 0.0)), s2 = cross(s1, d);
+    vec3 top = iA.xyz + vec3(0.0, 6.0*iB.y, 0.0);
+    wp = top + d*aPos.x + s2*(aPos.y - 6.0) + s1*aPos.z;
+    vec3 wn = normalize(d*aNrm.x + s2*aNrm.y + s1*aNrm.z);
+    ln = vec3(c*wn.x - s*wn.z, wn.y, s*wn.x + c*wn.z);
+    lp = aPos;
+  }
   vW = wp; vL = lp; vLN = ln; vAux = aAux;
   vInst = vec4(iB.w, iA.w, iB.y, iA.y); vScale = iB.xyz;
   gl_Position = uVP*vec4(wp, 1.0);
@@ -48,6 +64,9 @@ const int K_HOUSE=13, K_HIP=14, K_LHOUSE=15, K_FARM=16, K_TOWNHOUSE=17, K_SHOP=1
 const int K_WAREHOUSE=23, K_BARN=24, K_SILO=25, K_CHURCH=26, K_WATERTOWER=27, K_LIGHTHOUSE=28, K_GAS=29;
 const int P_BARK=0, P_LEAF=1, P_FROND=2, P_NEEDLE=3, P_ROCK=4, P_WALL=5, P_ROOF=6, P_TRIM=7, P_GLASS=8, P_METAL=9, P_DOOR=10, P_BRICK=11;
 const int P_AWNING=12, P_WOOD=13, P_DARK=14, P_LAMP=15, P_SIGN=16, P_CANOPY=17, P_LEAFCARD=18, P_RLAMP=19, P_PAPI=20;
+const int P_PAINT=21, P_STRIPE=22, P_SOCK=23, P_BEACON=24, P_FENCE=25, P_OBST=26;
+const int K_HANGAR=32, K_ARCH=33, K_THANGAR=34, K_TERMINAL=35, K_CTRL=36, K_FBO=37, K_FUELTANK=38, K_PUMP=39, K_WINDSOCK=40, K_BEACON=41;
+const int K_GAPLANE=42, K_AIRLINER=43, K_JETBRIDGE=44, K_CAR=45, K_TRUCK=46, K_FENCE=47, K_LOC=48, K_RADAR=49, K_MAST=50, K_FLOOD=51;
 float hsh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
 float hsh3(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7)))*43758.5453); }
 float vn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f*f*(3.0 - 2.0*f);
@@ -80,6 +99,11 @@ bool leafCut(float viewEdge){
       best = min(best, length(d/vec2(0.5, 0.23)) + 0.15*step(abs(d.y), 0.02));
     }
     return best > 1.0;
+  }
+  if (part == P_FENCE) {   // chain link: real diamonds up close, a dithered see-through panel further away
+    float d = length(uCam - vW);
+    if (d < 35.0) { vec2 q = vec2(vL.x + vL.y, vL.x - vL.y)/0.17; vec2 f = abs(fract(q) - 0.5); return min(f.x, f.y) > 0.07*(1.0 + d/35.0); }
+    return hsh(gl_FragCoord.xy + fract(uTime*7.31)*vec2(17.0, 41.0)) > 0.06 + 0.2*smoothstep(500.0, 40.0, d);
   }
   if (part == P_FROND) {   // leaflets either side of the midrib
     float a = abs(vAux.z);
@@ -189,6 +213,96 @@ void main(){
     if (uKind == K_SEASTACK) { alb = mix(alb, vec3(0.92, 0.9, 0.85), top*smoothstep(20.0, 26.0, lp.y)*0.7); alb *= mix(0.55, 1.0, smoothstep(0.0, 2.5, wy)); }   // guano, wet base
     float sn = max(uSnow, smoothstep(1400.0, 1800.0, wy));
     if (sn > 0.0) alb = mix(alb, vec3(0.9, 0.92, 0.95), smoothstep(0.45, 0.8, nb.y)*sn);
+  } else if (uKind >= K_HANGAR) {
+)"
+R"(    // ---------------------------------------------------------------- airport buildings, aircraft, vehicles, furniture
+    vec3 mp = lp/vScale;   // mesh coordinates (the instance scale removed)
+    bool sideX = abs(n0.x) > 0.5;
+    float u = sideX ? lp.z : lp.x;
+    float s2 = fract(seed*13.31), s3 = fract(seed*3.77);
+    vec3 livery = s3 < 0.5 ? pal(s3*2.0, vec3(0.7, 0.07, 0.06), vec3(0.06, 0.2, 0.55), vec3(0.05, 0.4, 0.2), vec3(0.9, 0.5, 0.05))
+                           : pal(s3*2.0 - 1.0, vec3(0.04, 0.08, 0.25), vec3(0.0, 0.45, 0.5), vec3(0.45, 0.06, 0.25), vec3(0.15, 0.15, 0.17));
+    if (part == P_WALL) {
+      if (uKind == K_TERMINAL || uKind == K_CTRL || uKind == K_MAST) alb = triS(lp, n0, M_CONCRETE, 4.0, 0.5, nb, rough)*vec3(0.9, 0.89, 0.86);
+      else if (uKind == K_FBO) alb = triS(lp, n0, M_PLASTER, 2.5, 0.6, nb, rough)*pal(s2, vec3(0.95, 0.93, 0.88), vec3(0.85, 0.88, 0.92), vec3(0.93, 0.86, 0.74), vec3(0.8, 0.82, 0.8));
+      else if (uKind == K_JETBRIDGE) {
+        alb = triS(vec3(lp.x, lp.z, lp.y), n0, M_CORRUGATED, 2.0, 0.3, nb, rough)*vec3(0.78, 0.8, 0.82); metal = 0.4;
+        if (sideX && mp.y > 4.3 && mp.y < 5.3 && mp.z > -7.5 && mp.z < 8.0) { alb = vec3(0.05, 0.07, 0.09); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.95, 0.85)*uNight*0.8; }
+      } else {   // hangars and sheds: profiled steel cladding with vertical ribs
+        vec3 tint = pal(s2, vec3(0.82, 0.84, 0.86), vec3(0.6, 0.67, 0.74), vec3(0.84, 0.8, 0.68), vec3(0.6, 0.66, 0.6));
+        if (uKind == K_ARCH) tint = vec3(0.74, 0.74, 0.7);
+        alb = triS(vec3(lp.x, lp.z, lp.y), n0, M_CORRUGATED, 3.0, 0.7, nb, rough)*tint; metal = 0.3;
+        if (uKind == K_HANGAR && sideX && mp.y > 7.0 && mp.y < 8.3 && fract(mp.z/4.0) < 0.7 && abs(mp.z) < 14.5) {   // clerestory
+          alb = vec3(0.06, 0.08, 0.1); rough = 0.1; cls = 3.0; nb = n0; metal = 0.0; emit = vec3(1.0, 0.92, 0.75)*uNight*0.7; }
+        alb *= mix(0.8, 1.0, smoothstep(0.0, 1.2, mp.y));   // splash dirt along the base
+      }
+      alb *= 1.0 - 0.3*uWet;
+    } else if (part == P_ROOF) {
+      vec3 rp = abs(n0.x) > abs(n0.z) ? vec3(lp.z, lp.y, lp.x) : lp;
+      alb = triS(rp, n0, M_CORRUGATED, 2.0, 0.8, nb, rough)*(uKind == K_THANGAR ? vec3(0.58, 0.62, 0.64) : uKind == K_ARCH ? vec3(0.7, 0.71, 0.7) : vec3(0.74, 0.76, 0.77));
+      metal = 0.5; rough = max(rough, 0.35);
+      alb *= 1.0 - 0.25*smoothstep(0.6, 0.9, vn3(lp*0.15 + seed))*0.6;   // weathering streaks
+      if (uSnow > 0.05) alb = mix(alb, vec3(0.9, 0.92, 0.95), smoothstep(0.3, 0.6, n0.y)*uSnow);
+    } else if (part == P_DOOR) {
+      alb = triS(vec3(lp.x, lp.z, lp.y), n0, M_CORRUGATED, 1.2, 0.6, nb, rough);
+      float bay = uKind == K_THANGAR ? floor((mp.x + 24.0)/12.0) : 0.0;
+      alb *= pal(fract(seed*5.1 + bay*0.37), vec3(0.88, 0.88, 0.86), vec3(0.22, 0.36, 0.58), vec3(0.52, 0.55, 0.58), vec3(0.72, 0.7, 0.62));
+      if (uKind == K_HANGAR && abs(fract((mp.x + 19.6)/6.53) - 0.5) > 0.49) alb *= 0.45;   // sliding panel joints
+      metal = 0.35;
+    } else if (part == P_GLASS) {
+      cls = 3.0; rough = 0.06; metal = 0.1; nb = n0;
+      alb = vec3(0.05, 0.08, 0.1);
+      if (uKind == K_TERMINAL) {
+        float mul = abs(fract(u/1.6) - 0.5), tr = abs(fract(mp.y/3.85) - 0.5);
+        if (mul > 0.47 || tr > 0.48) { alb = vec3(0.32, 0.34, 0.36); rough = 0.35; metal = 0.6; cls = 2.0; }
+        else { alb = vec3(0.06, 0.1, 0.12); emit = vec3(1.0, 0.9, 0.74)*uNight*(1.1 + 0.4*hsh(floor(vec2(u/1.6, mp.y/3.85))))*1.2; }
+      } else if (uKind == K_CTRL) { alb = vec3(0.04, 0.09, 0.08); emit = vec3(0.5, 0.9, 0.7)*uNight*0.25; }
+      else if (uKind == K_FBO || uKind == K_ARCH) emit = vec3(1.0, 0.88, 0.68)*uNight*0.6;
+    } else if (part == P_METAL) {
+      metal = 0.7; rough = 0.4;
+      if (uKind == K_FUELTANK || uKind == K_PUMP) { alb = vec3(0.86, 0.86, 0.84); metal = 0.1; rough = 0.45;
+        if (uKind == K_PUMP && abs(mp.y - 1.65) < 0.12) alb = vec3(0.75, 0.08, 0.06); }
+      else if (uKind == K_TRUCK) { alb = vec3(0.78); metal = 0.9; rough = 0.25; }
+      else if (uKind == K_AIRLINER) { alb = vec3(0.72, 0.73, 0.75); metal = 0.35; rough = 0.35; }
+      else alb = triS(lp, n0, M_METAL, 2.0, 0.3, nb, rough)*0.75;
+    } else if (part == P_PAINT) {
+      metal = 0.0; rough = 0.3;
+      if (uKind == K_CAR) alb = s2 < 0.5 ? pal(s2*2.0, vec3(0.85), vec3(0.6, 0.62, 0.64), vec3(0.04), vec3(0.55, 0.06, 0.05)) : pal(s2*2.0 - 1.0, vec3(0.08, 0.16, 0.38), vec3(0.75, 0.75, 0.78), vec3(0.1, 0.22, 0.14), vec3(0.3, 0.32, 0.35));
+      else if (uKind == K_TRUCK) alb = pal(s2, vec3(0.88), vec3(0.75, 0.1, 0.07), vec3(0.85, 0.65, 0.05), vec3(0.88));
+      else if (uKind == K_GAPLANE) {
+        alb = s2 < 0.75 ? vec3(0.88, 0.88, 0.86) : vec3(0.9, 0.85, 0.65);
+        if (abs(n0.y) < 0.6 && mp.y > 1.22 && mp.y < 1.42 && mp.z < 3.0) alb = livery;   // fuselage stripe
+        if (mp.y > 1.97 && abs(mp.x) > 4.6) alb = livery;                               // wing tips
+      } else {   // airliner: white top, grey belly, cheat line, cabin windows, cockpit
+        alb = vec3(0.9, 0.9, 0.9);
+        if (mp.y < 2.0 && abs(mp.x) < 2.0) alb = vec3(0.6, 0.62, 0.66);
+        if (mp.y > 2.75 && mp.y < 2.95 && abs(mp.x) < 2.1) alb = livery;
+        if (abs(mp.x) > 4.0 && mp.y < 2.7) alb = livery*0.9 + 0.05;   // nacelles in the airline colour
+        bool win = mp.y > 3.3 && mp.y < 3.68 && mp.z > -10.5 && mp.z < 12.5 && abs(fract(mp.z/0.53) - 0.5) < 0.22 && abs(mp.x) > 1.4;
+        bool ck = mp.z > 16.2 && mp.z < 17.7 && mp.y > 3.15 && mp.y < 3.65 && abs(mp.x) > 0.25;
+        if (win || ck) { alb = vec3(0.03, 0.04, 0.05); rough = 0.08; cls = 3.0; nb = n0; emit = win ? vec3(1.0, 0.9, 0.7)*uNight*0.5 : vec3(0.0); }
+        if (abs(abs(mp.z - 11.6) - 0.5) < 0.04 && mp.y > 2.2 && mp.y < 4.3 && abs(mp.x) > 1.5) alb *= 0.5;   // forward door outline
+      }
+    } else if (part == P_STRIPE) { alb = livery; rough = 0.3; }
+    else if (part == P_SOCK) { float b = floor(clamp((mp.x - 0.15)/0.72, 0.0, 4.99)); alb = mod(b, 2.0) < 0.5 ? vec3(0.95, 0.3, 0.03) : vec3(0.92); rough = 0.85; }
+    else if (part == P_BEACON) {   // aerodrome beacon: alternating white and green beams sweeping round
+      float a = atan(lp.z, lp.x) - uTime*1.6;
+      float w = pow(max(cos(a), 0.0), 12.0), g = pow(max(-cos(a), 0.0), 12.0);
+      alb = vec3(0.15); rough = 0.05; cls = 3.0; nb = n0;
+      emit = (vec3(1.0, 0.97, 0.9)*w + vec3(0.1, 1.0, 0.35)*g)*(0.6 + 14.0*uNight);
+    }
+    else if (part == P_FENCE) { alb = vec3(0.55, 0.57, 0.58); metal = 0.7; rough = 0.45; }
+    else if (part == P_OBST) {   // obstruction marking: red and white bands, a red light on top at night
+      float hb = uKind == K_WINDSOCK ? 1.25 : 3.0;
+      alb = mod(floor(mp.y/hb), 2.0) < 0.5 ? vec3(0.95) : vec3(0.75, 0.1, 0.06); rough = 0.5;
+      if (uKind != K_WINDSOCK && mp.y > (uKind == K_CTRL ? 33.5 : uKind == K_MAST ? 11.5 : 1e9)) emit = vec3(1.0, 0.08, 0.04)*uNight*(4.0 + 3.0*step(0.5, fract(uTime*0.8)));
+    }
+    else if (part == P_LAMP) { alb = vec3(0.9); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.93, 0.8)*(0.15 + 10.0*uNight); }
+    else if (part == P_SIGN) { alb = uKind == K_PUMP ? vec3(0.75, 0.1, 0.06) : vec3(0.08, 0.22, 0.55); rough = 0.4; emit = alb*uNight*2.5; }
+    else if (part == P_CANOPY) { alb = vec3(0.9); if (n0.y < -0.5) emit = vec3(1.0, 0.97, 0.9)*uNight*2.5; rough = 0.4; }
+    else if (part == P_DARK) { alb = uKind == K_GAPLANE || uKind == K_AIRLINER || uKind == K_CAR || uKind == K_TRUCK ? vec3(0.03) : triS(lp, n0, M_GRAVEL, 2.0, 0.5, nb, rough)*0.4; rough = 0.8; }
+    else { alb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nb, rough)*vec3(0.88, 0.86, 0.82); }   // P_TRIM: concrete
+    if (uSnow > 0.05 && part != P_GLASS && part != P_ROOF) alb = mix(alb, vec3(0.9), smoothstep(0.6, 0.9, n0.y)*uSnow*0.8);
   } else {
 )"
 R"(    // ---------------------------------------------------------------- buildings
@@ -289,7 +403,7 @@ R"(    } else if (part == P_ROOF) {
     else if (part == P_LAMP) { alb = vec3(0.1); rough = 0.05; cls = 3.0; emit = vec3(1.0, 0.9, 0.6)*(0.4 + 9.0*uNight)*(0.6 + 0.4*step(0.0, sin(atan(lp.z, lp.x) - uTime*1.2))); }
     else if (part == P_RLAMP) {   // runway light globe: tinted glass, the lamp glowing through it when the lights are on
       int ci = int(seed);
-      vec3 lc = ci == 1 ? vec3(1.0, 0.7, 0.25) : ci == 2 ? vec3(0.15, 1.0, 0.35) : ci == 3 ? vec3(1.0, 0.12, 0.08) : vec3(1.0, 0.93, 0.78);
+      vec3 lc = ci == 1 ? vec3(1.0, 0.7, 0.25) : ci == 2 ? vec3(0.15, 1.0, 0.35) : ci == 3 ? vec3(1.0, 0.12, 0.08) : ci == 4 ? vec3(0.15, 0.3, 1.0) : vec3(1.0, 0.93, 0.78);
       alb = mix(vec3(0.6), lc, 0.5)*0.4; rough = 0.05; metal = 0.0; cls = 3.0;
       emit = lc*uRwyLights*(1.0 + 7.0*smoothstep(0.0, 0.03, lp.y - 0.33));
     }

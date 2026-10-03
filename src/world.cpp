@@ -208,34 +208,30 @@ void World::build() {
       computeTexel(x, z, &hm[((size_t)j * HM_N + i) * 4]);
     }
   });
-  bakeMask();
-  buildHMax();
-  // Airport structures in runway-local frame (x = across, z = along runway); see Box kinds in world.h
-  boxes.clear();
-  for (int ai = 0; ai < (int)airports.size(); ai++) {
-    const Airport& a = airports[ai];
-    Rng r(1000 + ai * 77);
-    float side = (ai & 1) ? 1.f : -1.f;
-    float off = a.width * 0.5f + (a.size == 2 ? 170.f : 85.f);
-    int nh = a.size == 0 ? 1 : (a.size == 1 ? 3 : 5);
-    for (int k = 0; k < nh; k++) {
-      float along = (k - (nh - 1) * 0.5f) * 58.f - a.length * 0.12f;
-      float hw = r.range(16, 24), hd = r.range(14, 20), hh = r.range(7, 11) * (a.size == 0 ? 0.65f : 1.f);
-      boxes.push_back({vec3(side * (off + hd), hh, along), vec3(hd, hh, hw), ai, 0});
-    }
-    if (a.size >= 1) {
-      float th = a.size == 2 ? 20.f : 13.f;
-      boxes.push_back({vec3(side * (off + 12), th, a.length * 0.08f), vec3(3.2f, th, 3.2f), ai, 1});
-      boxes.push_back({vec3(side * (off + 40), 7.f, a.length * 0.18f + 30.f), vec3(26.f, 7.f, a.size == 2 ? 120.f : 40.f), ai, 2});
-      boxes.push_back({vec3(side * (off + 30), 4.f, -a.length * 0.12f - 120.f), vec3(4.f, 4.f, 4.f), ai, 4});
-      if (a.size == 2) {
-        boxes.push_back({vec3(side * (off + 30), 4.f, -a.length * 0.12f - 135.f), vec3(4.f, 4.f, 4.f), ai, 4});
-        boxes.push_back({vec3(side * (off + 70), 10.f, -a.length * 0.12f - 60.f), vec3(5.f, 10.f, 5.f), ai, 5});
-      }
-    } else {
-      boxes.push_back({vec3(side * (off + 8), 3.5f, a.length * 0.2f), vec3(5.f, 3.5f, 4.f), ai, 3});
+  // Smooth the ground heights with a separable 1-2-1 filter (twice): bilinear interpolation of the raw samples leaves
+  // visible creases along the grid on big smooth landforms (volcano flanks, ridges, sea cliffs) - a faceted, low-poly
+  // look. Flat areas (airport grounds, the sea floor plateau) are unchanged by it.
+  {
+    std::vector<float> tmp((size_t)HM_N * HM_N);
+    for (int pass = 0; pass < 2; pass++) {
+      parallelFor(HM_N, [&](int j) {
+        for (int i = 0; i < HM_N; i++) {
+          int i0 = std::max(i - 1, 0), i1 = std::min(i + 1, HM_N - 1);
+          const float* r = &hm[(size_t)j * HM_N * 4];
+          tmp[(size_t)j * HM_N + i] = (r[i0 * 4] + 2.f * r[i * 4] + r[i1 * 4]) * 0.25f;
+        }
+      });
+      parallelFor(HM_N, [&](int j) {
+        int j0 = std::max(j - 1, 0), j1 = std::min(j + 1, HM_N - 1);
+        for (int i = 0; i < HM_N; i++)
+          hm[((size_t)j * HM_N + i) * 4] = (tmp[(size_t)j0 * HM_N + i] + 2.f * tmp[(size_t)j * HM_N + i] + tmp[(size_t)j1 * HM_N + i]) * 0.25f;
+      });
     }
   }
+  bakeMask();
+  buildHMax();
+  // Airport buildings are raster scenery entities now (airport_scenery.cpp); the ray-traced box list stays empty
+  boxes.clear();
 }
 
 int World::findAirport(const char* code) const {

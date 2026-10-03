@@ -52,6 +52,10 @@ EntRanges rangesFor(int q) {
 float rangeOf(const EntRanges& R, int k) {
   if (k == EK_RWYLIGHT) return 1800.f;   // beyond this a glint sprite stands in
   if (k == EK_PAPI) return 3500.f;
+  if (k == EK_CAR || k == EK_FUEL_PUMP) return std::min(R.build, 1600.f);
+  if (k == EK_FENCE) return std::min(R.build, 1100.f);
+  if (k == EK_WINDSOCK || k == EK_TRUCK || k == EK_LOCALIZER) return std::min(R.build, 2500.f);
+  if (k == EK_GA_PLANE || k == EK_JETBRIDGE || k == EK_MAST || k == EK_FLOODMAST || k == EK_BEACON) return std::min(R.build, 4500.f);
   if (k == EK_BUSH) return R.bush;
   if (entClass(k) == EC_TREE) return R.tree;
   if (k <= EK_SLAB) return R.rock;
@@ -323,6 +327,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
     glUniformMatrix4fv(glGetUniformLocation(progEntSh, "uVP"), 1, GL_FALSE, shVP[c].m);
     glUniform1i(glGetUniformLocation(progEntSh, "uShadowPass"), 1);
     glUniform1f(glGetUniformLocation(progEntSh, "uTime"), fp.time);
+    glUniform3f(glGetUniformLocation(progEntSh, "uWind"), fp.wind.x, fp.wind.y, fp.wind.z);
     glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(1.5f, 2.f);
     issue(progEntSh, draws[1 + c]);
     glDisable(GL_POLYGON_OFFSET_FILL);
@@ -362,6 +367,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
     glUniform2f(glGetUniformLocation(progEnt, "uJit"), jitX, jitY);
     glUniform1f(glGetUniformLocation(progEnt, "uLogC"), 2.f / log2f(40000.f + 1.f));
     glUniform1f(glGetUniformLocation(progEnt, "uTime"), fp.time);
+    glUniform3f(glGetUniformLocation(progEnt, "uWind"), fp.wind.x, fp.wind.y, fp.wind.z);
     glUniform1i(glGetUniformLocation(progEnt, "uShadowPass"), 0);
     glUniform3f(glGetUniformLocation(progEnt, "uCam"), cam.x, cam.y, cam.z);
     glUniform3f(glGetUniformLocation(progEnt, "uCamV"), cam.x, cam.y, cam.z);

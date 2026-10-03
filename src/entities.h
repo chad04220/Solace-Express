@@ -17,6 +17,10 @@ enum EntKind {
   // airport fixtures (seed = lamp colour: 0 white, 1 amber, 2 green, 3 red)
   EK_RWYLIGHT,
   EK_PAPI,     // seed = the unit's glide-slope threshold (deg): white above it, red below
+  // airport buildings and furniture (see airport_layout.h / placeAirport)
+  EK_HANGAR, EK_ARCH_HANGAR, EK_T_HANGAR, EK_TERMINAL, EK_CTRL_TOWER, EK_FBO, EK_FUEL_TANK, EK_FUEL_PUMP,
+  EK_WINDSOCK, EK_BEACON, EK_GA_PLANE, EK_AIRLINER, EK_JETBRIDGE, EK_CAR, EK_TRUCK, EK_FENCE, EK_LOCALIZER,
+  EK_RADAR, EK_MAST, EK_FLOODMAST,
   EK_COUNT
 };
 enum EntClass { EC_TREE = 0, EC_ROCK, EC_BUILDING };
@@ -36,6 +40,10 @@ struct Ent { float x, y, z, yaw, sx, sy, sz, seed; };
 inline float entThinKey(const Ent& e) { return fmodf(e.seed * 7.13f, 1.f); }   // (the entity vertex shader uses the same)
 inline float entThinRef(int k) { return 80.f * kEntInfo[k].h; }               // full density out to here (m)
 inline float entKeep(int k, float d) { float r = entThinRef(k); return d <= r ? 1.f : r * r / (d * d); }
+
+// One item of an airport's furniture (airport_scenery.cpp): kind + the placed instance
+struct AptItem { int kind; Ent e; };
+void airportItems(int ai, std::vector<AptItem>& out);
 
 class Scenery {
 public:

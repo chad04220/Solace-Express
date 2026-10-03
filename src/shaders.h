@@ -19,8 +19,8 @@ vec4 gCost = vec4(0.0);
 #define COST(k)
 #endif
 const float WH = 40000.0;
-const int HMN = 1024;
-const float TEXEL = 78.125;
+const int HMN = 2048;
+const float TEXEL = 39.0625;
 const float PI = 3.14159265;
 uniform sampler2D uHM;
 uniform vec4 uCrater[24]; uniform int uCraterN;  // impact craters: x, z, radius, depth (negative depth: dark-energy blast)
@@ -1296,6 +1296,136 @@ float rwyDigits(vec2 q, int num){
   return max(a, b);
 }
 
+// Airport ground plan: mirrors aptLayout() in airport_layout.h (taxiway, exits, apron, car parks; strip parking).
+// Returns true when it painted the point. No local arrays (see seg7).
+float lineM(float d, float hw){ return step(abs(d), hw); }
+bool aptGround(int ai, vec2 uv, vec3 pw, int surf, int size, float len, float wid, inout Mat m){
+  float side = (ai - (ai/2)*2) == 1 ? 1.0 : -1.0;
+  float u = uv.x, vv = uv.y*side, hw = wid*0.5;
+  vec3 nTS;
+  vec3 yel = vec3(0.62, 0.47, 0.05), wht = vec3(0.8);
+  if (surf == 0 && size > 0) {
+    bool big = size == 2;
+    float twHW = big ? 11.5 : 7.5, twV = hw + (big ? 95.0 : 62.0);
+    float apV0 = twV + twHW, apV1 = apV0 + (big ? 120.0 : 85.0);
+    float apU0 = -len*(big ? 0.26 : 0.22), apU1 = len*(big ? 0.17 : 0.14);
+    float bldV = apV1 + 2.0, lotV0 = bldV + (big ? 48.0 : 34.0), lotV1 = lotV0 + (big ? 50.0 : 34.0);
+    float ap = apU1 - apU0;
+    float termU = apU0 + ap*(big ? 0.51 : 0.47), termHL = min(ap*(big ? 0.17 : 0.1), big ? 130.0 : 45.0);
+    float tieU0 = big ? apU0 + ap*0.2 : apU0 + 12.0, tieU1 = apU0 + ap*(big ? 0.31 : 0.32);
+    float standU0 = apU0 + ap*(big ? 0.72 : 0.6), standU1 = apU1 - (big ? 25.0 : 20.0);
+    int padLayer = big ? M_CONCRETE : M_ASPHALT;
+    // nearest exit (signed offset of u from its centreline)
+    float e0 = -(len*0.5 - 25.0), e1 = big ? -len*0.22 : -len*0.12, e2 = big ? len*0.05 : len*0.22, e3 = big ? len*0.27 : 1e9, e4 = len*0.5 - 25.0;
+    float ce = u - e0;
+    if (abs(u - e1) < abs(ce)) ce = u - e1; if (abs(u - e2) < abs(ce)) ce = u - e2;
+    if (abs(u - e3) < abs(ce)) ce = u - e3; if (abs(u - e4) < abs(ce)) ce = u - e4;
+    bool onTw = abs(vv - twV) < twHW + 2.0 && abs(u) < len*0.5 - 25.0 + twHW + 2.0;
+    bool onEx = abs(ce) < twHW + 2.0 && vv > hw + 3.0 && vv < twV;
+    bool onAp = vv >= apV0 && vv < apV1 + 1.0 && u > apU0 && u < apU1;
+    float lu0 = termU - termHL - 24.0, lu1 = termU + termHL + 24.0;
+    bool onLot = vv > bldV + (big ? 40.0 : 28.0) && vv < lotV1 + 2.0 && u > lu0 && u < lu1;
+    if (!(onTw || onEx || onAp || onLot)) return false;
+    vec4 t = matSample(pw.xz, onLot ? M_ASPHALT : (onAp ? padLayer : M_ASPHALT), 8.0, nTS);
+    m.alb = t.rgb*(onLot ? 0.85 : 1.02); m.rough = t.a; m.nrm = nTS; m.metal = 0.0;
+    float paint = 0.0; vec3 pc = yel;
+    if (onLot) {
+      if (vv > lotV0 - 0.5) {   // stalls either side of each aisle, 2.7 m wide; kerbs at the ends
+        float mm = mod(vv - lotV0, 16.0);
+        bool stall = mm < 5.5 || mm > 10.5;
+        if (stall && abs(fract((u - lu0)/2.7) - 0.5)*2.7 > 1.27) { paint = 1.0; pc = wht; }
+        if (abs(mm - 5.5) < 0.08 || abs(mm - 10.5) < 0.08) { paint = 1.0; pc = wht; }
+      } else if (abs(vv - (bldV + (big ? 44.0 : 31.0))) < 0.1 && fract(u/6.0) < 0.5) { paint = 1.0; pc = wht; }   // forecourt road
+      if (abs(u - lu0) < 0.4 || abs(u - lu1) < 0.4) { m.alb = vec3(0.6, 0.6, 0.58); }
+    } else if (onAp && !onTw) {
+      // weathered pavement: slab joints, patched panels, rubber and fuel staining
+      m.alb *= big ? 0.78 : 0.95;
+      m.alb *= 0.88 + 0.2*vnoise(pw.xz/23.0) - 0.1*smoothstep(0.6, 0.9, vnoise(pw.xz/7.0 + 3.1));
+      if (big) { vec2 sj = abs(fract(pw.xz/6.0) - 0.5); if (max(sj.x, sj.y) > 0.49) m.alb *= 0.78;
+        vec2 slab = floor(pw.xz/6.0); m.alb *= 0.93 + 0.12*hash2i(ivec2(slab)); }
+      // AI stands: lead-in line from the taxiway, stop bar, oil stains
+      if (u > standU0 && u < standU1) {
+        float su = mod(u - standU0 - 22.5, 45.0) - 22.5;
+        if (abs(su) < 0.15 && vv < apV1 - 14.0) paint = 1.0;
+        if (abs(vv - (apV1 - 14.0)) < 0.15 && abs(su) < 3.0) paint = 1.0;
+        m.alb *= 1.0 - 0.35*smoothstep(0.55, 0.85, vnoise(pw.xz*0.4))*smoothstep(10.0, 2.0, length(vec2(su, vv - apV1 + 24.0)));
+      }
+      // gates in front of the terminal (international)
+      if (big) {
+        float n = max(2.0, floor(termHL*2.0/54.0)), span = n*54.0, gu = u - (termU - span*0.5);
+        if (gu > 0.0 && gu < span) {
+          float gs = mod(gu, 54.0) - 27.0;
+          if (abs(gs) < 0.15 && vv > bldV - 70.0 && vv < bldV - 7.0) paint = 1.0;
+          if (abs(vv - (bldV - 7.5)) < 0.15 && abs(gs) < 2.5) paint = 1.0;
+          if (abs(abs(gs) - 27.0) < 0.12 && vv > bldV - 60.0) { paint = 1.0; pc = vec3(0.7, 0.08, 0.06); }   // stand boundaries
+        }
+      }
+      // GA tie-down rows
+      if (u > tieU0 && u < tieU1) {
+        float tu = mod(u - tieU0 - 7.0, 14.0) - 7.0;
+        float r0 = vv - (apV0 + 24.0), r1 = vv - (apV0 + 46.0);
+        if ((abs(r0) < 0.1 || abs(r1) < 0.1) && abs(tu) < 4.5) paint = 1.0;
+        if (abs(tu) < 0.1 && (abs(r0) < 3.0 || abs(r1) < 3.0)) paint = 1.0;
+      }
+      // taxilane along the apron front, red equipment line in front of the buildings
+      if (abs(vv - (apV0 + 8.0)) < 0.15) paint = 1.0;
+      if (abs(vv - (bldV - 4.0)) < 0.1) { paint = 1.0; pc = vec3(0.7, 0.08, 0.06); }
+      // floodlight pools from the masts along the back of the apron (airport_scenery.cpp: every 75 / 90 m, heads ~19 m up)
+      if (uRwyLights > 0.01) {
+        float stp = big ? 90.0 : 75.0, u0 = apU0 + 30.0, hh = big ? 23.0 : 16.5;
+        float k = clamp(floor((u - u0)/stp + 0.5), 0.0, floor((apU1 - u0)/stp));
+        vec3 E = vec3(0.0);
+        for (int j = -1; j <= 1; j++) {
+          float mu = u0 + (k + float(j))*stp;
+          if (mu < u0 - 1.0 || mu > apU1 || (big && abs(mu - termU) < termHL + 12.0)) continue;
+          float du = u - mu, dv = vv - (apV1 - 1.0), d2 = du*du + dv*dv + hh*hh;
+          E += vec3(hh/(d2*sqrt(d2)))*(dv < 0.0 ? 1.0 : 0.3);   // aimed out over the apron
+        }
+        m.emit += m.alb*vec3(1.0, 0.86, 0.62)*E*uRwyLights*900.0;
+      }
+    } else {
+      // parallel taxiway and exits: centreline, edge lines, holding position markings on the exits
+      if (onTw && abs(vv - twV) < 0.15) paint = 1.0;
+      if (onTw && abs(abs(vv - twV) - (twHW - 0.4)) < 0.1 && !(onEx && vv < twV) && !(onAp)) paint = 1.0;
+      if (onEx) {
+        if (abs(ce) < 0.15) paint = 1.0;
+        if (abs(abs(ce) - (twHW - 0.4)) < 0.1 && vv < twV - twHW) paint = 1.0;
+        float hp = vv - (hw + 26.0);
+        if (abs(ce) < twHW && ((abs(hp) < 0.15 || abs(hp - 0.45) < 0.15) || ((abs(hp - 1.05) < 0.15 || abs(hp - 1.5) < 0.15) && fract(ce/1.8) < 0.5))) paint = 1.0;
+      }
+      // dark shoulders
+      if ((onTw && abs(vv - twV) > twHW) || (onEx && abs(ce) > twHW)) m.alb *= 0.75;
+    }
+    m.alb = mix(m.alb, pc, paint*0.9); m.rough = mix(m.rough, 0.6, paint);
+    return true;
+  }
+  // ---- strips: parking area beside the strip, a worn track to it
+  float pu = -len*0.18;
+  float apV0 = hw + 16.0, apV1 = hw + 70.0;
+  bool inPark = vv > apV0 && vv < apV1 + 4.0 && abs(u - pu) < 60.0;
+  bool track = vv > hw && vv < apV0 + 1.0 && abs(u - pu + 20.0) < 5.0;
+  if (!(inPark || track)) return false;
+  float edge = smoothstep(0.0, 4.0, min(min(vv - apV0, apV1 + 4.0 - vv), 60.0 - abs(u - pu)));
+  if (surf == 0) {   // small paved field: asphalt pad with tie-down lines
+    vec4 t = matSample(pw.xz, M_ASPHALT, 7.0, nTS); m.alb = t.rgb; m.rough = t.a; m.nrm = nTS;
+    float tu = mod(u - pu + 60.0, 15.0) - 7.5;
+    if (inPark && ((abs(tu) < 0.1 && abs(vv - apV0 - 26.0) < 3.0) || abs(vv - apV0 - 26.0) < 0.1)) m.alb = mix(m.alb, yel, 0.9);
+    return true;
+  }
+  if (surf == 1) {   // grass: a mown parking area, bare wheel tracks
+    vec4 t = matSample(pw.xz, M_GRASS, 5.0, nTS);
+    vec3 g = t.rgb*vec3(1.08, 1.15, 0.82)*(0.88 + 0.12*step(0.5, fract((u - pu)/5.0)));
+    float worn = track ? smoothstep(4.0, 1.0, abs(abs(u - pu + 20.0) - 1.4))*0.7 : smoothstep(0.6, 0.85, vnoise(pw.xz*0.15))*0.35;
+    m.alb = mix(m.alb, mix(g, vec3(0.33, 0.28, 0.18), worn), track ? 1.0 : edge); m.nrm = mix(m.nrm, nTS, edge);
+    return true;
+  }
+  int layer = surf == 2 ? M_GRAVEL : surf == 3 ? M_SNOW : M_SAND;
+  vec4 t = matSample(pw.xz, layer, 5.0, nTS);
+  float w = track ? smoothstep(5.0, 3.0, abs(u - pu + 20.0)) : edge;
+  m.alb = mix(m.alb, t.rgb*(surf == 3 ? 0.92 : 1.0), w); m.rough = mix(m.rough, t.a, w); m.nrm = mix(m.nrm, nTS, w);
+  return true;
+}
+
 void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bool paved){
   vec4 d = uApDim[ai]; float len = d.x, wid = d.y; int surf = int(d.z); int size = int(d.w);
   onRw = false; paved = false;
@@ -1304,34 +1434,7 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bo
   float side = (ai - (ai/2)*2) == 1 ? 1.0 : -1.0;
   float off = wid*0.5 + (size == 2 ? 170.0 : 85.0);
   int padLayer = size == 2 ? M_CONCRETE : M_ASPHALT;
-  if (surf == 0 && size > 0) {
-    float apronV = side*v;
-    float apronEnd = off + (size == 2 ? 90.0 : 60.0);
-    if (apronV > wid*0.5 + 20.0 && apronV < apronEnd && abs(u + len*0.05) < len*0.33) {
-      vec4 t = matSample(pw.xz, padLayer, 9.0, nTS);
-      m.alb = t.rgb*1.1; m.rough = t.a; m.nrm = nTS; m.metal = 0.0; paved = true;
-      // concrete slab joints
-      vec2 sj = abs(fract(pw.xz/6.0) - 0.5);
-      if (size == 2 && max(sj.x, sj.y) > 0.49) m.alb *= 0.8;
-      // taxi lane and parking stand lead-in lines
-      if (abs(apronV - wid*0.5 - 45.0) < 0.3) m.alb = vec3(0.65,0.5,0.05);
-      float st = mod(u + len*0.05, 45.0) - 22.5;
-      if (abs(st) < 0.25 && apronV > wid*0.5 + 45.0 && apronV < apronEnd - 8.0) m.alb = vec3(0.65,0.5,0.05);
-      if (abs(st) < 6.0 && abs(apronV - apronEnd + 12.0) < 0.25) m.alb = vec3(0.7);
-      return;
-    }
-    if (apronV > wid*0.5 - 1.0 && apronV < off && (abs(u - len*0.28) < 11.0 || abs(u + len*0.38) < 11.0)) {
-      vec4 t = matSample(pw.xz, padLayer, 9.0, nTS);
-      m.alb = t.rgb*1.05; m.rough = t.a; m.nrm = nTS; m.metal = 0.0; paved = true;
-      float cl = abs(u - len*0.28) < 11.0 ? u - len*0.28 : u + len*0.38;
-      if (abs(cl) < 0.25) m.alb = vec3(0.65,0.5,0.05);
-      if (abs(abs(cl) - 10.0) < 0.2) m.alb = vec3(0.65,0.5,0.05);
-      // runway holding position marking (2 solid + 2 dashed)
-      float hp = apronV - (wid*0.5 + 22.0);
-      if (abs(cl) < 10.0 && ((abs(hp) < 0.2 || abs(hp - 0.6) < 0.2) || ((abs(hp - 1.4) < 0.2 || abs(hp - 2.0) < 0.2) && fract(cl/2.0) < 0.5))) m.alb = vec3(0.7,0.55,0.05);
-      return;
-    }
-  }
+  if (abs(v) > wid*0.5 + 3.0 && aptGround(ai, uv, pw, surf, size, len, wid, m)) { paved = surf == 0; return; }
   if (abs(u) > len*0.5 + 6.0 || abs(v) > wid*0.5 + 3.0) {
     if (abs(u) < len*0.5 + 60.0 && abs(v) < wid*0.5 + 7.5 && surf == 0) {
       // paved blast pad / shoulders with yellow chevrons
@@ -1341,7 +1444,7 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bo
       if (bu > 6.0 && fract((bu + abs(v)*1.2)/14.0) < 0.12 && abs(v) < wid*0.5) m.alb = vec3(0.6,0.48,0.05);
       return;
     }
-    if (abs(u) < len*0.5 + 120.0 && abs(v) < wid*0.5 + 60.0) {
+    if (abs(u) < len*0.5 + 120.0 && abs(v) < wid*0.5 + 60.0 && (surf == 0 || surf == 1)) {
       vec4 t = matSample(pw.xz, M_GRASS, 5.0, nTS);
       float stripe = step(0.5, fract(u/18.0));
       m.alb = t.rgb*(0.85 + 0.15*stripe)*vec3(0.95,1.05,0.9); m.rough = 0.9; m.nrm = nTS;
@@ -1470,6 +1573,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
   float wSand = smoothstep(4.5 + 3.0*hNoise, 1.0, p.y) * (1.0 - wRock);
   float forestN = forestAt(p.xz);
   float wForest = smoothstep(0.42 - lush*0.1, 0.5 - lush*0.1, forestN) * smoothstep(0.35, 0.2, slope) * smoothstep(4.0, 9.0, p.y) * smoothstep(1500.0 - cold*900.0, 1100.0 - cold*700.0, p.y);
+  wForest *= smoothstep(2.0, 3.0, base.y);   // airport grounds are cleared (no trees there either: amp < 2.5)
   float wDirt = smoothstep(0.55, 0.7, n2) * (1.0 - wForest) * 0.6;
   float hC, hL;
   vec4 gr = groundSample(p.xz, M_GRASS, 6.0, nTS, hC); vec3 nG = nTS;

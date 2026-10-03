@@ -656,6 +656,265 @@ void buildBuilding(MB& mb, int kind, int lod) {
     }
   }
 }
+// ------------------------------------------------------------------ airport buildings and furniture
+// thin plate through four corners (root leading / trailing, tip trailing / leading), thickness 2|off| along off
+void plate(MB& mb, vec3 r0, vec3 r1, vec3 t1, vec3 t0, vec3 off, int part) {
+  vec3 A[4] = {r0, r1, t1, t0};
+  vec3 c = (r0 + r1 + t0 + t1) * 0.25f;
+  mb.quad(A[0] + off, A[1] + off, A[2] + off, A[3] + off, part, c - off * 4.f);
+  mb.quad(A[0] - off, A[1] - off, A[2] - off, A[3] - off, part, c + off * 4.f);
+  for (int i = 0; i < 4; i++) { int j = (i + 1) & 3; mb.quad(A[i] + off, A[j] + off, A[j] - off, A[i] - off, part, c); }
+}
+// half-elliptic arch (Quonset) along z: half width hw, height h; smooth shell plus flat end walls
+void archShell(MB& mb, float hw, float h, float z0, float z1, int segs, int part, int endPart, bool ends) {
+  for (int i = 0; i < segs; i++) {
+    float a0 = PI * i / segs, a1 = PI * (i + 1) / segs;
+    vec3 p0(cosf(a0) * hw, sinf(a0) * h, 0), p1(cosf(a1) * hw, sinf(a1) * h, 0);
+    vec3 n0 = normalize(vec3(cosf(a0) / hw, sinf(a0) / h, 0)), n1 = normalize(vec3(cosf(a1) / hw, sinf(a1) / h, 0));
+    mb.vert(vec3(p0.x, p0.y, z0), n0, part); mb.vert(vec3(p1.x, p1.y, z0), n1, part); mb.vert(vec3(p1.x, p1.y, z1), n1, part);
+    mb.vert(vec3(p0.x, p0.y, z0), n0, part); mb.vert(vec3(p1.x, p1.y, z1), n1, part); mb.vert(vec3(p0.x, p0.y, z1), n0, part);
+    if (ends) for (int e = 0; e < 2; e++) {
+      float z = e ? z1 : z0;
+      mb.tri(vec3(0, 0, z), vec3(p0.x, p0.y, z), vec3(p1.x, p1.y, z), endPart, vec3(0, h * 0.3f, (z0 + z1) * 0.5f));
+    }
+  }
+}
+// wheel: a short cylinder across x
+void wheel(MB& mb, vec3 c, float r, float w, int segs) { mb.cyl(c - vec3(w * 0.5f, 0, 0), c + vec3(w * 0.5f, 0, 0), r, r, segs, P_DARK, true, true); }
+
+void buildAirportKind(MB& mb, int kind, int lod) {
+  bool d0 = lod == 0, d1 = lod <= 1;
+  switch (kind) {
+    case EK_HANGAR: {   // steel-clad hangar: low gable roof spanning the door, sliding doors across the whole front
+      mb.box(vec3(-20.1f, -2.f, -16.1f), vec3(20.1f, 0.2f, 16.1f), P_TRIM, 0x3B);
+      mb.box(vec3(-20.f, 0.2f, -16.f), vec3(20.f, 10.f, 16.f), P_WALL, 0x3B & ~8 & ~32);
+      mb.box(vec3(-20.f, 8.9f, 15.9f), vec3(20.f, 10.f, 16.f), P_WALL, 32);   // header over the doors
+      mb.gable(-20.f, 20.f, -16.f, 16.f, 10.f, 13.f, true, d1 ? 0.6f : 0.f, P_ROOF, P_WALL);
+      mb.box(vec3(-19.6f, 0.2f, 16.f), vec3(19.6f, 8.9f, 16.12f), P_DOOR, 32);
+      if (d1) mb.box(vec3(-20.f, 8.8f, 16.f), vec3(20.f, 9.1f, 16.5f), P_METAL, 0x3F);   // door track
+      if (d0) {
+        mb.box(vec3(20.f, 0.2f, 12.f), vec3(20.06f, 2.3f, 13.f), P_DOOR, 2);   // personnel door on the side
+        for (int i = 0; i < 3; i++) mb.box(vec3(-10.f + i * 10.f - 0.6f, 12.f, -8.f), vec3(-10.f + i * 10.f + 0.6f, 12.9f + i * 0.f, -6.8f), P_METAL, 0x3B | 8);   // roof vents
+      }
+      break;
+    }
+    case EK_ARCH_HANGAR: {   // Quonset hut hangar
+      mb.box(vec3(-9.1f, -2.f, -12.1f), vec3(9.1f, 0.15f, 12.1f), P_TRIM, 0x3B);
+      archShell(mb, 9.f, 7.5f, -12.f, 12.f, lod == 0 ? 16 : lod == 1 ? 10 : 6, P_ROOF, P_WALL, true);
+      mb.box(vec3(-5.f, 0.15f, 12.f), vec3(5.f, 5.6f, 12.1f), P_DOOR, 32);
+      if (d1) mb.box(vec3(-5.4f, 5.6f, 12.f), vec3(5.4f, 5.9f, 12.25f), P_METAL, 0x3F);
+      if (d0) { door(mb, -7.f, -12.f, 0.9f, 2.f, 0.15f); mb.box(vec3(6.f, 2.4f, 12.f), vec3(7.4f, 3.4f, 12.08f), P_GLASS, 32); }
+      break;
+    }
+    case EK_T_HANGAR: {   // row of four nested T-hangar bays: mono-pitch roof, a wide door per bay
+      mb.box(vec3(-24.1f, -2.f, -7.1f), vec3(24.1f, 0.15f, 7.1f), P_TRIM, 0x3B);
+      mb.box(vec3(-24.f, 0.15f, -7.f), vec3(24.f, 4.f, 7.f), P_WALL, 0x3B & ~8 & ~32);
+      mb.quad(vec3(-24.4f, 4.8f, 7.4f), vec3(24.4f, 4.8f, 7.4f), vec3(24.4f, 4.f, -7.4f), vec3(-24.4f, 4.f, -7.4f), P_ROOF, vec3(0, 2, 0));
+      for (int s = -1; s <= 1; s += 2) mb.quad(vec3(s * 24.f, 4.f, -7.f), vec3(s * 24.f, 4.8f, 7.f), vec3(s * 24.f, 4.f, 7.f), vec3(s * 24.f, 4.f, -7.f), P_WALL, vec3(0, 2, 0));
+      mb.box(vec3(-24.f, 3.7f, 6.95f), vec3(24.f, 4.8f, 7.f), P_WALL, 32);
+      for (int b = 0; b < 4; b++) {
+        float x0 = -24.f + b * 12.f;
+        mb.box(vec3(x0 + 0.5f, 0.15f, 7.f), vec3(x0 + 11.5f, 3.7f, 7.1f), P_DOOR, 32);
+        if (d1) mb.box(vec3(x0 - 0.25f, 0.15f, 6.9f), vec3(x0 + 0.25f, 3.75f, 7.2f), P_TRIM, 0x3B);
+      }
+      break;
+    }
+    case EK_TERMINAL: {   // passenger terminal: glazed airside facade under a deep roof, landside entrance canopy
+      mb.box(vec3(-60.f, -2.f, -20.f), vec3(60.f, 0.3f, 20.f), P_TRIM, 0x3B);
+      mb.box(vec3(-60.f, 0.3f, -20.f), vec3(60.f, 11.6f, 20.f), P_WALL, 0x3B & ~8 & ~32);
+      mb.box(vec3(-59.f, 0.3f, 19.6f), vec3(59.f, 11.6f, 19.7f), P_GLASS, 32);   // curtain wall
+      mb.box(vec3(-63.f, 11.6f, -21.f), vec3(63.f, 12.6f, 25.f), P_TRIM, 0x3F);  // roof slab, oversailing the glass
+      mb.box(vec3(-62.f, 12.6f, -20.f), vec3(62.f, 12.65f, 24.f), P_DARK, 8);
+      if (d1) {
+        mb.box(vec3(-18.f, 12.6f, -14.f), vec3(18.f, 15.f, 8.f), P_WALL, 0x3B);   // upper hall / plant
+        mb.box(vec3(-17.5f, 12.8f, 8.f), vec3(17.5f, 14.6f, 8.08f), P_GLASS, 32);
+        mb.box(vec3(-26.f, 4.4f, -27.f), vec3(26.f, 5.f, -20.f), P_CANOPY, 0x3F);   // drop-off canopy
+        for (int i = 0; i < 5; i++) { float x = -24.f + i * 12.f; mb.box(vec3(x - 0.25f, 0.3f, -26.6f), vec3(x + 0.25f, 4.4f, -26.1f), P_TRIM); }
+        mb.box(vec3(-25.f, 0.3f, -20.1f), vec3(25.f, 4.2f, -20.f), P_GLASS, 16);   // landside entrance glazing
+        for (int i = 0; i < 9; i++) { float x = -52.f + i * 13.f; mb.box(vec3(x - 0.35f, 0.3f, 19.7f), vec3(x + 0.35f, 11.6f, 20.4f), P_TRIM); }   // facade fins
+      }
+      if (d0) {
+        mb.box(vec3(-9.f, 15.f, 7.8f), vec3(9.f, 16.6f, 8.2f), P_SIGN, 0x3F);
+        for (int i = 0; i < 4; i++) mb.box(vec3(-48.f + i * 26.f, 12.65f, -12.f), vec3(-44.f + i * 26.f, 14.3f, -8.f), P_METAL, 0x3B | 8);
+      }
+      break;
+    }
+    case EK_CTRL_TOWER: {   // control tower: base block, concrete shaft, splayed glazed cab with a catwalk, antennas
+      int sg = lod == 0 ? 16 : lod == 1 ? 10 : 6;
+      mb.box(vec3(-5.f, -2.f, -5.f), vec3(5.f, 7.f, 5.f), P_WALL, 0x3B);
+      mb.box(vec3(-5.2f, 7.f, -5.2f), vec3(5.2f, 7.5f, 5.2f), P_TRIM, 0x3F);
+      mb.cyl(vec3(0, 7.5f, 0), vec3(0, 26.f, 0), 2.5f, 2.2f, sg, P_WALL, false, false);
+      mb.cyl(vec3(0, 26.f, 0), vec3(0, 27.f, 0), 3.2f, 4.3f, 8, P_TRIM, false, true, 1, 1, PI / 8, false);
+      mb.cyl(vec3(0, 27.f, 0), vec3(0, 30.6f, 0), 4.3f, 4.7f, 8, P_GLASS, false, false, 1, 1, PI / 8, false);
+      mb.cyl(vec3(0, 30.6f, 0), vec3(0, 31.4f, 0), 5.1f, 5.1f, 8, P_TRIM, true, true, 1, 1, PI / 8, false);
+      if (d1) { mb.cyl(vec3(0, 26.9f, 0), vec3(0, 27.05f, 0), 5.3f, 5.3f, 8, P_METAL, true, true, 1, 1, PI / 8, false);   // catwalk
+        mb.cyl(vec3(0, 31.4f, 0), vec3(0, 34.f, 0), 0.07f, 0.05f, 4, P_OBST, false, false); }
+      if (d0) { mb.cyl(vec3(2.f, 31.4f, 1.f), vec3(2.f, 33.f, 1.f), 0.05f, 0.05f, 4, P_METAL, false, false);
+        mb.box(vec3(-2.5f, 31.4f, -2.f), vec3(-1.f, 32.3f, -0.8f), P_METAL, 0x3B | 8); door(mb, 0.f, 5.f, 1.4f, 2.4f, 0.f); }
+      break;
+    }
+    case EK_FBO: {   // flight centre / club house: single storey, glazed front, flat roof with parapet
+      mb.box(vec3(-10.1f, -2.f, -7.1f), vec3(10.1f, 0.3f, 7.1f), P_TRIM, 0x3B);
+      mb.box(vec3(-10.f, 0.3f, -7.f), vec3(10.f, 4.2f, 7.f), P_WALL, 0x3B & ~8);
+      mb.box(vec3(-10.2f, 4.2f, -7.2f), vec3(10.2f, 5.f, 7.2f), P_TRIM, 0x3B & ~8);
+      mb.box(vec3(-9.8f, 4.1f, -6.8f), vec3(9.8f, 4.2f, 6.8f), P_DARK, 8);
+      mb.box(vec3(-8.5f, 0.5f, 7.f), vec3(6.f, 3.4f, 7.08f), P_GLASS, 32);
+      if (d1) { mb.box(vec3(-4.f, 3.2f, 7.f), vec3(4.f, 3.5f, 9.f), P_TRIM, 0x3F); mb.box(vec3(-6.f, 4.25f, 7.2f), vec3(2.f, 4.95f, 7.3f), P_SIGN, 32); }
+      if (d0) { door(mb, 7.8f, 7.f, 1.6f, 2.3f, 0.3f); mb.box(vec3(2.f, 5.f, -4.f), vec3(4.f, 6.1f, -2.f), P_METAL, 0x3B | 8);
+        mb.cyl(vec3(-8.f, 5.f, -5.f), vec3(-8.f, 9.f, -5.f), 0.05f, 0.04f, 4, P_METAL, false, false); }
+      break;
+    }
+    case EK_FUEL_TANK: {   // vertical fuel tank inside a bund wall
+      int sg = lod == 0 ? 20 : lod == 1 ? 12 : 8;
+      if (d1) for (int s = -1; s <= 1; s += 2) { mb.box(vec3(-6.f, -1.f, s * 5.8f - 0.2f), vec3(6.f, 1.f, s * 5.8f + 0.2f), P_TRIM, 0x3F);
+        mb.box(vec3(s * 5.8f - 0.2f, -1.f, -6.f), vec3(s * 5.8f + 0.2f, 1.f, 6.f), P_TRIM, 0x3F); }
+      mb.cyl(vec3(0, -0.5f, 0), vec3(0, 8.f, 0), 4.5f, 4.5f, sg, P_METAL, false, false);
+      mb.cyl(vec3(0, 8.f, 0), vec3(0, 9.f, 0), 4.6f, 0.4f, sg, P_METAL, false, false);
+      if (d0) { for (int i = 0; i < 6; i++) { float a = i * 0.3f, y = 0.5f + i * 1.3f; mb.box(vec3(cosf(a) * 4.55f - 0.4f, y, sinf(a) * 4.55f - 0.4f), vec3(cosf(a) * 4.55f + 0.4f, y + 0.08f, sinf(a) * 4.55f + 0.4f), P_METAL, 0x3F); }
+        mb.cyl(vec3(-4.5f, 0.6f, 2.f), vec3(-6.f, 0.6f, 2.f), 0.18f, 0.18f, 6, P_METAL, false, false); }
+      break;
+    }
+    case EK_FUEL_PUMP: {   // small fuel station: horizontal tank on saddles, dispenser with hose
+      mb.box(vec3(-2.5f, -0.5f, -1.6f), vec3(2.5f, 0.12f, 1.6f), P_TRIM, 0x3F);
+      for (int s = -1; s <= 1; s += 2) mb.box(vec3(s * 1.2f - 0.15f, 0.12f, -0.75f), vec3(s * 1.2f + 0.15f, 0.8f, 0.75f), P_TRIM, 0x3B);
+      mb.cyl(vec3(-2.f, 1.65f, -0.2f), vec3(2.f, 1.65f, -0.2f), 0.95f, 0.95f, lod == 0 ? 14 : 8, P_METAL, true, true);
+      mb.box(vec3(-0.45f, 0.12f, 1.f), vec3(0.45f, 1.7f, 1.45f), P_TRIM, 0x3B | 8);
+      if (d1) mb.box(vec3(-0.4f, 0.9f, 1.45f), vec3(0.4f, 1.5f, 1.5f), P_SIGN, 32);
+      if (d0) mb.cyl(vec3(0.35f, 1.3f, 1.45f), vec3(0.6f, 0.3f, 1.6f), 0.025f, 0.025f, 4, P_DARK, false, false);
+      break;
+    }
+    case EK_WINDSOCK: {   // pole, frame ring and a striped sock (the vertex shader turns the sock with the wind)
+      mb.box(vec3(-0.4f, -0.5f, -0.4f), vec3(0.4f, 0.1f, 0.4f), P_TRIM, 0x3F);
+      mb.cyl(vec3(0, 0.1f, 0), vec3(0, 6.3f, 0), 0.06f, 0.05f, d0 ? 6 : 4, P_OBST, false, false);
+      int sg = d0 ? 12 : 7;
+      for (int i = 0; i < 4; i++) { float x0 = 0.15f + i * 0.9f, x1 = x0 + 0.9f;   // sock along +x, tapering
+        mb.cyl(vec3(x0, 6.f, 0), vec3(x1, 6.f, 0), 0.36f - i * 0.05f, 0.36f - (i + 1) * 0.05f, sg, P_SOCK, false, false); }
+      break;
+    }
+    case EK_BEACON: {   // rotating aerodrome beacon on a lattice mast
+      for (int i = 0; i < 3; i++) { float a = i * 2.094f; mb.cyl(vec3(cosf(a) * 1.1f, 0, sinf(a) * 1.1f), vec3(cosf(a) * 0.45f, 13.6f, sinf(a) * 0.45f), 0.06f, 0.05f, 4, P_METAL, false, false); }
+      if (d0) for (int i = 0; i < 3; i++) for (int k = 0; k < 4; k++) { float a0 = i * 2.094f, a1 = a0 + 2.094f, y0 = k * 3.4f, y1 = y0 + 3.4f;
+          float r0 = lerpf(1.1f, 0.45f, y0 / 13.6f), r1 = lerpf(1.1f, 0.45f, y1 / 13.6f);
+          mb.cyl(vec3(cosf(a0) * r0, y0, sinf(a0) * r0), vec3(cosf(a1) * r1, y1, sinf(a1) * r1), 0.025f, 0.025f, 3, P_METAL, false, false); }
+      mb.box(vec3(-0.8f, 13.6f, -0.8f), vec3(0.8f, 13.75f, 0.8f), P_METAL, 0x3F);
+      mb.cyl(vec3(0, 13.75f, 0), vec3(0, 14.6f, 0), 0.42f, 0.42f, d0 ? 12 : 8, P_BEACON, true, false);
+      if (d1) mb.cyl(vec3(0, 14.6f, 0), vec3(0, 15.f, 0), 0.3f, 0.05f, 6, P_METAL, false, false);
+      break;
+    }
+    case EK_GA_PLANE: {   // parked high-wing single: nose +z, wing span 11 m
+      int sg = lod == 0 ? 10 : 6;
+      mb.cyl(vec3(0, 1.2f, 3.0f), vec3(0, 1.15f, 4.15f), 0.6f, 0.38f, sg, P_PAINT, false, true);   // cowling
+      mb.box(vec3(-0.6f, 0.7f, 0.2f), vec3(0.6f, 1.75f, 3.0f), P_PAINT, 0x3F);                       // cabin
+      mb.quad(vec3(-0.58f, 1.75f, 2.95f), vec3(0.58f, 1.75f, 2.95f), vec3(0.55f, 1.98f, 1.9f), vec3(-0.55f, 1.98f, 1.9f), P_GLASS, vec3(0, 1.2f, 1.f));
+      mb.box(vec3(-0.6f, 1.75f, 0.2f), vec3(0.6f, 1.98f, 1.9f), P_PAINT, 0x3B | 8);
+      for (int s = -1; s <= 1; s += 2) mb.box(vec3(s * 0.6f - 0.02f, 1.2f, 0.4f), vec3(s * 0.6f + 0.02f, 1.7f, 2.7f), P_GLASS, 3);
+      mb.cyl(vec3(0, 1.35f, 0.2f), vec3(0, 1.5f, -3.9f), 0.6f, 0.13f, sg, P_PAINT, false, false);   // tail cone
+      mb.box(vec3(-5.5f, 1.98f, 0.55f), vec3(5.5f, 2.12f, 2.1f), P_PAINT, 0x3F);                     // wing
+      mb.box(vec3(-1.75f, 1.42f, -4.f), vec3(1.75f, 1.48f, -3.15f), P_PAINT, 0x3F);                  // stabiliser
+      plate(mb, vec3(0, 1.5f, -2.9f), vec3(0, 1.5f, -4.05f), vec3(0, 2.7f, -4.15f), vec3(0, 2.7f, -3.55f), vec3(0.03f, 0, 0), P_STRIPE);   // fin
+      if (d1) {
+        for (int s = -1; s <= 1; s += 2) mb.cyl(vec3(s * 0.6f, 0.95f, 1.4f), vec3(s * 2.7f, 1.98f, 1.5f), 0.035f, 0.035f, 4, P_METAL, false, false);   // struts
+        for (int s = -1; s <= 1; s += 2) { mb.cyl(vec3(s * 0.45f, 0.75f, 1.0f), vec3(s * 1.2f, 0.3f, 1.0f), 0.04f, 0.04f, 4, P_METAL, false, false); wheel(mb, vec3(s * 1.25f, 0.27f, 1.0f), 0.27f, 0.14f, sg); }
+        mb.cyl(vec3(0, 0.75f, 3.4f), vec3(0, 0.25f, 3.45f), 0.04f, 0.04f, 4, P_METAL, false, false); wheel(mb, vec3(0, 0.22f, 3.45f), 0.22f, 0.1f, sg);
+        for (int s = -1; s <= 1; s += 2) mb.box(vec3(-0.05f, 1.15f, 4.15f), vec3(0.05f, 1.15f + s * 0.95f, 4.2f), P_DARK, 0x3F);   // propeller
+      }
+      break;
+    }
+    case EK_AIRLINER: {   // parked narrow-body airliner: nose +z, 38 m long, 34 m span; fuselage centre 3 m up
+      int sg = lod == 0 ? 18 : lod == 1 ? 12 : 8;
+      const float R = 1.98f, Y = 3.0f;
+      mb.cyl(vec3(0, Y, -12.f), vec3(0, Y, 13.5f), R, R, sg, P_PAINT, false, false);
+      float nz[5] = {13.5f, 16.3f, 18.1f, 19.1f, 19.55f}, nr[5] = {R, 1.78f, 1.25f, 0.6f, 0.f}, ny[5] = {Y, Y - 0.05f, Y - 0.2f, Y - 0.35f, Y - 0.42f};
+      for (int i = 0; i < 4; i++) mb.cyl(vec3(0, ny[i], nz[i]), vec3(0, ny[i + 1], nz[i + 1]), nr[i], nr[i + 1], sg, P_PAINT, false, false);
+      float tz[4] = {-12.f, -15.f, -17.6f, -19.3f}, tr[4] = {R, 1.55f, 0.85f, 0.25f}, ty[4] = {Y, Y + 0.35f, Y + 0.8f, Y + 1.2f};
+      for (int i = 0; i < 3; i++) mb.cyl(vec3(0, ty[i], tz[i]), vec3(0, ty[i + 1], tz[i + 1]), tr[i], tr[i + 1], sg, P_PAINT, false, i == 2);
+      for (int s = -1; s <= 1; s += 2) {
+        plate(mb, vec3(s * 1.7f, 1.75f, 2.2f), vec3(s * 1.7f, 1.75f, -4.4f), vec3(s * 17.f, 2.75f, -10.2f), vec3(s * 17.f, 2.75f, -8.6f), vec3(0, 0.12f, 0), P_METAL);   // wing
+        plate(mb, vec3(s * 0.4f, Y + 0.9f, -14.6f), vec3(s * 0.4f, Y + 0.9f, -17.8f), vec3(s * 6.3f, Y + 1.3f, -19.4f), vec3(s * 6.3f, Y + 1.3f, -18.3f), vec3(0, 0.06f, 0), P_METAL);   // stabiliser
+        // engine: nacelle on a pylon under the wing
+        float ex = s * 5.8f;
+        mb.cyl(vec3(ex, 1.45f, 2.4f), vec3(ex, 1.5f, -2.0f), 1.05f, 0.75f, sg, P_PAINT, true, false);
+        mb.cyl(vec3(ex, 1.5f, -2.0f), vec3(ex, 1.55f, -3.0f), 0.55f, 0.15f, sg / 2 + 2, P_METAL, false, false);
+        if (d0) mb.cyl(vec3(ex, 1.45f, 2.45f), vec3(ex, 1.45f, 2.3f), 0.9f, 0.9f, sg, P_DARK, true, false);   // fan face
+        mb.box(vec3(ex - 0.15f, 2.2f, -2.f), vec3(ex + 0.15f, 2.45f, 1.5f), P_METAL, 0x3F);
+        if (d1) plate(mb, vec3(s * 17.f, 2.75f, -8.7f), vec3(s * 17.f, 2.75f, -10.1f), vec3(s * 17.1f, 4.3f, -10.9f), vec3(s * 17.1f, 4.3f, -10.f), vec3(0.04f, 0, 0), P_STRIPE);   // winglet
+      }
+      plate(mb, vec3(0, Y + 1.5f, -12.6f), vec3(0, Y + 1.2f, -18.4f), vec3(0, 11.4f, -19.4f), vec3(0, 11.4f, -16.9f), vec3(0.14f, 0, 0), P_STRIPE);   // fin
+      if (d1) {   // undercarriage
+        for (int s = -1; s <= 1; s += 2) { mb.cyl(vec3(s * 3.8f, 1.9f, -1.2f), vec3(s * 3.8f, 0.55f, -1.2f), 0.14f, 0.14f, 6, P_METAL, false, false);
+          for (int w = -1; w <= 1; w += 2) wheel(mb, vec3(s * 3.8f + w * 0.4f, 0.57f, -1.2f), 0.57f, 0.35f, sg); }
+        mb.cyl(vec3(0, 1.4f, 14.6f), vec3(0, 0.4f, 14.6f), 0.1f, 0.1f, 6, P_METAL, false, false);
+        for (int w = -1; w <= 1; w += 2) wheel(mb, vec3(w * 0.22f, 0.38f, 14.6f), 0.38f, 0.22f, sg);
+        mb.box(vec3(-1.4f, 1.1f, -4.f), vec3(1.4f, 1.6f, 2.5f), P_PAINT, 0x3F);   // wing-to-body fairing
+      }
+      break;
+    }
+    case EK_JETBRIDGE: {   // passenger boarding bridge: rotunda at -z (terminal), tunnel, drive column, cab at +z (aircraft door)
+      mb.cyl(vec3(0, 0, -9.f), vec3(0, 6.3f, -9.f), 1.9f, 1.9f, lod == 0 ? 12 : 8, P_WALL, true, false);
+      mb.box(vec3(-1.35f, 3.5f, -8.f), vec3(1.35f, 6.f, 8.6f), P_WALL, 0x3F);
+      mb.box(vec3(-1.6f, 3.3f, 8.6f), vec3(1.6f, 6.2f, 10.f), P_DARK, 0x3F);   // cab bellows
+      if (d1) { for (int s = -1; s <= 1; s += 2) mb.box(vec3(s * 0.9f - 0.15f, 0.f, 5.f), vec3(s * 0.9f + 0.15f, 3.5f, 5.3f), P_METAL);
+        mb.box(vec3(-1.3f, 0.f, 4.8f), vec3(1.3f, 0.55f, 5.5f), P_DARK, 0x3F); }
+      break;
+    }
+    case EK_CAR: {
+      mb.box(vec3(-0.88f, 0.32f, -2.2f), vec3(0.88f, 0.92f, 2.2f), P_PAINT, 0x3F);
+      mb.box(vec3(-0.8f, 0.92f, -1.15f), vec3(0.8f, 1.38f, 0.85f), P_GLASS, 0x3F);
+      mb.box(vec3(-0.78f, 1.38f, -1.05f), vec3(0.78f, 1.46f, 0.7f), P_PAINT, 0x3F);
+      if (d1) for (int i = 0; i < 4; i++) wheel(mb, vec3((i & 1) ? 0.8f : -0.8f, 0.31f, (i & 2) ? 1.35f : -1.35f), 0.31f, 0.2f, d0 ? 8 : 5);
+      break;
+    }
+    case EK_TRUCK: {   // airport fuel bowser
+      mb.box(vec3(-1.2f, 0.45f, -4.4f), vec3(1.2f, 0.85f, 4.4f), P_DARK, 0x3F);
+      mb.box(vec3(-1.25f, 0.85f, 2.6f), vec3(1.25f, 2.9f, 4.5f), P_PAINT, 0x3F);
+      if (d1) mb.box(vec3(-1.1f, 1.9f, 4.5f), vec3(1.1f, 2.7f, 4.55f), P_GLASS, 32);
+      mb.cyl(vec3(0, 1.95f, -4.3f), vec3(0, 1.95f, 2.4f), 1.1f, 1.1f, lod == 0 ? 14 : 8, P_METAL, true, true);
+      if (d1) for (int i = 0; i < 6; i++) wheel(mb, vec3((i & 1) ? 1.f : -1.f, 0.48f, i < 2 ? 3.4f : i < 4 ? -2.4f : -3.6f), 0.48f, 0.35f, d0 ? 8 : 5);
+      break;
+    }
+    case EK_FENCE: {   // 20 m of chain-link fence: post at -x, top rail, mesh panel
+      mb.cyl(vec3(-10.f, -0.3f, 0), vec3(-10.f, 2.45f, 0), 0.045f, 0.04f, 4, P_METAL, true, false);
+      if (d1) mb.cyl(vec3(-10.f, 2.35f, 0), vec3(10.f, 2.35f, 0), 0.025f, 0.025f, 4, P_METAL, false, false);
+      if (d0) mb.cyl(vec3(0.f, -0.3f, 0), vec3(0.f, 2.45f, 0), 0.035f, 0.03f, 4, P_METAL, false, false);
+      mb.quad(vec3(-10.f, 0.f, 0), vec3(10.f, 0.f, 0), vec3(10.f, 2.35f, 0), vec3(-10.f, 2.35f, 0), P_FENCE, vec3(0, 1.f, -1.f));
+      break;
+    }
+    case EK_LOCALIZER: {   // ILS localizer: a row of antenna elements on a low frame, facing the runway (+z)
+      mb.box(vec3(-17.f, -0.4f, -0.35f), vec3(17.f, 0.35f, 0.35f), P_METAL, 0x3F);
+      int n = lod == 0 ? 14 : lod == 1 ? 7 : 0;
+      for (int i = 0; i < n; i++) {
+        float x = -16.f + i * 32.f / std::max(n - 1, 1);
+        mb.box(vec3(x - 0.05f, 0.35f, -0.05f), vec3(x + 0.05f, 2.6f, 0.05f), P_METAL);
+        mb.box(vec3(x - 0.5f, 2.3f, 0.05f), vec3(x + 0.5f, 3.f, 0.35f), P_TRIM, 0x3F);
+      }
+      if (lod == 2) mb.box(vec3(-16.f, 0.35f, -0.1f), vec3(16.f, 3.f, 0.3f), P_TRIM, 0x3F);
+      break;
+    }
+    case EK_RADAR: {   // radome on a lattice tower
+      for (int i = 0; i < 4; i++) { float sx = (i & 1) ? 1.f : -1.f, sz = (i & 2) ? 1.f : -1.f;
+        mb.cyl(vec3(sx * 3.6f, -0.5f, sz * 3.6f), vec3(sx * 1.6f, 15.f, sz * 1.6f), 0.14f, 0.11f, 4, P_METAL, false, false); }
+      if (d0) for (int k = 0; k < 4; k++) { float y = 2.f + k * 3.3f, r = lerpf(3.6f, 1.6f, y / 15.f);
+        mb.box(vec3(-r, y, -r), vec3(r, y + 0.12f, -r + 0.12f), P_METAL); mb.box(vec3(-r, y, r - 0.12f), vec3(r, y + 0.12f, r), P_METAL);
+        mb.box(vec3(-r, y, -r), vec3(-r + 0.12f, y + 0.12f, r), P_METAL); mb.box(vec3(r - 0.12f, y, -r), vec3(r, y + 0.12f, r), P_METAL); }
+      mb.box(vec3(-2.2f, 15.f, -2.2f), vec3(2.2f, 15.6f, 2.2f), P_TRIM, 0x3F);
+      blob(mb, lod == 0 ? 2 : 1, [](vec3 d) { return vec3(d.x * 3.7f, 19.f + d.y * 3.5f, d.z * 3.7f); }, [](vec3, vec3) { return 1.f; }, P_TRIM);
+      break;
+    }
+    case EK_MAST: {   // antenna mast (glide slope / radio): banded tube, antenna panels facing +z, equipment hut
+      mb.box(vec3(-1.4f, -0.5f, -1.5f), vec3(1.4f, 2.5f, -0.3f), P_WALL, 0x3B);
+      mb.cyl(vec3(0, 0, 0.5f), vec3(0, 12.f, 0.5f), 0.16f, 0.12f, d0 ? 8 : 5, P_OBST, false, true);
+      if (d1) for (int i = 0; i < 3; i++) mb.box(vec3(-0.35f, 4.f + i * 3.f, 0.65f), vec3(0.35f, 5.5f + i * 3.f, 0.8f), P_TRIM, 0x3F);
+      break;
+    }
+    case EK_FLOODMAST: {   // apron floodlight mast: lamp head aimed down and forward (+z)
+      mb.cyl(vec3(0, -0.5f, 0), vec3(0, 19.f, 0), 0.32f, 0.18f, d0 ? 10 : 6, P_METAL, false, false);
+      mb.box(vec3(-1.4f, 19.f, -0.35f), vec3(1.4f, 19.9f, 0.35f), P_DARK, 0x3F);
+      for (int i = 0; i < 4; i++) { float x = -1.05f + i * 0.7f;
+        mb.quad(vec3(x - 0.3f, 18.98f, -0.25f), vec3(x + 0.3f, 18.98f, -0.25f), vec3(x + 0.3f, 18.98f, 0.3f), vec3(x - 0.3f, 18.98f, 0.3f), P_LAMP, vec3(0, 19.5f, 0)); }
+      break;
+    }
+  }
+}
 }  // namespace
 
 void buildEntityMeshes(std::vector<EVert>& out, EntMeshRange ranges[EK_COUNT]) {
@@ -665,7 +924,8 @@ void buildEntityMeshes(std::vector<EVert>& out, EntMeshRange ranges[EK_COUNT]) {
     for (int l = 0; l < ENT_LODS; l++) {
       ranges[k].first[l] = (int)out.size();
       int cls = entClass(k);
-      if (cls == EC_TREE) buildTree(mb, k, l);
+      if (k >= EK_HANGAR) buildAirportKind(mb, k, l);
+      else if (cls == EC_TREE) buildTree(mb, k, l);
       else if (cls == EC_ROCK) buildRock(mb, k, l);
       else buildBuilding(mb, k, l);
       ranges[k].count[l] = (int)out.size() - ranges[k].first[l];

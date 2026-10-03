@@ -76,7 +76,7 @@ public:
   float apPitchI = 0, apRollI = 0, apThrI = 0.5f, apXI = 0;
   int apAirport = -1, apStage = 0, apLeg = 0; bool apRev = false; float apStageT = 0, apCruiseAlt = 0, apFinalLen = 8000;
   vec3 apLd, apTd;            // landing direction and touchdown point of the chosen runway end
-  vec3 apHoldC; float apHoldR = 1500, apHoldAlt = 0, apIntAlt = 0; int apHoldDir = 1, apTurnDir = 0; float apGs = 0.0524f, apDrift = 0;   // descent orbit and intercept altitude
+  vec3 apHoldC; float apHoldR = 1500, apHoldAlt = 0, apIntAlt = 0; int apHoldDir = 1, apTurnDir = 0, apClimbDir = 0; float apGs = 0.0524f, apDrift = 0;   // descent orbit and intercept altitude
   bool apDone = false;        // an autoland just finished (the game sets the parking brake)
   std::string apStatus;       // one-line status for the HUD
   void apEngage(int mode, int airport, const Weather& wx);

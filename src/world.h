@@ -3,7 +3,7 @@
 #include "common.h"
 
 static const float WORLD_HALF = 40000.0f;  // map spans [-40km, 40km] on x and z
-static const int HM_N = 1024;              // base heightmap resolution
+static const int HM_N = 2048;              // base heightmap resolution (39 m texels; smoothed, see World::build)
 static const float HM_TEXEL = 2.0f * WORLD_HALF / HM_N;
 static const float DETAIL_SCALE = 2200.0f; // wavelength of the procedural detail layer
 static const int HMAX_N = 256;             // conservative max-height grid for ray-march skipping (mip chain)

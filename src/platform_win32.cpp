@@ -120,7 +120,8 @@ static HWAVEOUT s_waveOut = nullptr;
 static WAVEHDR s_hdr[kAudioBuffers];
 static int16_t s_pcm[kAudioBuffers][kAudioFrames * 2];
 static HANDLE s_audioEvent = nullptr;
-static volatile bool s_audioRun = true;
+static std::atomic<bool> s_audioRun{true};
+static HANDLE s_audioThread = nullptr;
 
 static DWORD WINAPI audioThread(LPVOID) {
   SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
@@ -152,14 +153,20 @@ static bool startAudio() {
     waveOutPrepareHeader(s_waveOut, &s_hdr[i], sizeof(WAVEHDR));
     waveOutWrite(s_waveOut, &s_hdr[i], sizeof(WAVEHDR));
   }
-  CreateThread(nullptr, 0, audioThread, nullptr, 0, nullptr);
+  s_audioThread = CreateThread(nullptr, 0, audioThread, nullptr, 0, nullptr);
   return true;
 }
 
 static void stopAudio() {
+  // stop the mixer thread and wait for it to finish its last buffer before the device goes away
   s_audioRun = false;
-  Sleep(60);
-  if (s_waveOut) { waveOutReset(s_waveOut); for (int i = 0; i < kAudioBuffers; i++) waveOutUnprepareHeader(s_waveOut, &s_hdr[i], sizeof(WAVEHDR)); waveOutClose(s_waveOut); }
+  if (s_audioThread) {
+    if (s_audioEvent) SetEvent(s_audioEvent);
+    WaitForSingleObject(s_audioThread, 2000);
+    CloseHandle(s_audioThread); s_audioThread = nullptr;
+  }
+  if (s_waveOut) { waveOutReset(s_waveOut); for (int i = 0; i < kAudioBuffers; i++) waveOutUnprepareHeader(s_waveOut, &s_hdr[i], sizeof(WAVEHDR)); waveOutClose(s_waveOut); s_waveOut = nullptr; }
+  if (s_audioEvent) { CloseHandle(s_audioEvent); s_audioEvent = nullptr; }
 }
 
 // ------------------------------------------------------------------ gamepad
@@ -291,7 +298,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
 
   // startup.log names the GPU in use (support aid)
   std::string gpu = std::string((const char*)glGetString(GL_RENDERER)) + " / " + (const char*)glGetString(GL_VERSION);
-  if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "w")) { fprintf(f, "GPU: %s\n", gpu.c_str()); fclose(f); }
+  // the ray tracer samples 20 textures in one fragment shader; OpenGL 3.3 only guarantees 16 (every current GPU has 32)
+  GLint texUnits = 0; glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &texUnits);
+  if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "w")) { fprintf(f, "GPU: %s\nFragment texture units: %d\n", gpu.c_str(), (int)texUnits); fclose(f); }
+  if (texUnits > 0 && texUnits < 20) {
+    MessageBoxA(g_hwnd, ("This graphics driver offers " + std::to_string(texUnits) + " texture units per shader; Solace Express needs 20.\n"
+                         "Please update the graphics driver, or run the game on the dedicated GPU.").c_str(), "Solace Express", MB_ICONERROR);
+    return 1;
+  }
   bool cached = false;
   {   // compiled shader programs are cached next to the game (or with the save data if that folder is read-only)
     char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);

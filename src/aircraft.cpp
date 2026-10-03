@@ -17,7 +17,7 @@ const AircraftSpec kAircraft[] = {
    1500, 2000, 3000, 0.40f, 0.058f, 0.060f, LIC_PPL, 30000, 250,
    8.3f, 0.68f, 1.18f, -1.07f, 0, 0, vec3(0.95f, 0.95f, 0.92f), vec3(0.10f, 0.30f, 0.70f)},
   {"bush", "Bushmaster STOL", "Backcountry taildragger", ENG_PISTON, 1, 6, 3, 700, 2700, 760, 120, 480, 4, 21.5f, 12.4f, 1.75f,
-   0.35f, 5.0f, 1.85f, 0.95f, 0.034f, 0.006f, 0.070f, 0.74f, 220000, 18, 18, 24, 55, 60, 220, true, true, false,
+   0.35f, 5.0f, 1.85f, 0.95f, 0.034f, 0.006f, 0.070f, 0.74f, 220000, 18, 18, 24, 55, 72, 220, true, true, false,
    1500, 2100, 3200, 0.42f, 0.065f, 0.070f, LIC_CPL, 40000, 450,
    8.0f, 0.70f, 1.17f, -1.05f, 0, 0, vec3(0.95f, 0.75f, 0.10f), vec3(0.12f, 0.12f, 0.12f)},
   {"islander", "Islander Twin", "Nine-seat utility twin", ENG_PISTON, 2, 6, 2, 700, 2700, 1750, 260, 900, 9, 30.2f, 14.9f, 2.05f,
@@ -564,7 +564,7 @@ void Plane::apEngage(int mode, int airport, const Weather& wx) {
   float spd0 = ias > 1.f ? ias : length(vel);
   apHeading = heading(); apAlt = pos.y; apSpeed = std::max(spd0, spec->vref * 1.3f);
   apPitchI = 0; apRollI = 0; apThrI = ctl.throttle; apXI = 0; apUseVS = false;
-  apAirport = airport; apStage = APS_NAV; apStageT = 0; apLeg = 0; apTurnDir = 0;
+  apAirport = airport; apStage = APS_NAV; apStageT = 0; apLeg = 0; apTurnDir = 0; apClimbDir = 0;
   if (mode >= AP_NAV && airport >= 0) {
     // runway end: the better of the two plans (terrain on the approach, headwind, and how far away it is)
     bool rev = apPlan(airport, true, wx, false) > apPlan(airport, false, wx, false);
@@ -624,7 +624,9 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
       if (len2(c - qi) < R + 1200.f) continue;   // leave the orbit with room to line up
       for (int i = 1; i < 8; i++) { vec3 q = c + (qi - c) * (i / 8.f); m = std::max(m, H(q)); }
       float hAlt = std::max(intAlt, m + 280.f);
-      float cost = (hAlt - iafAlt) * 3.f + std::max(0.f, hAlt - iafAlt - 150.f) * 10.f + len2(c - qi) * 0.15f + near;
+      // ...and how far out of the way it is from where the aircraft is now (every km flown is fuel)
+      float cost = (hAlt - iafAlt) * 3.f + std::max(0.f, hAlt - iafAlt - 150.f) * 10.f + len2(c - qi) * 0.15f + near
+                 + std::max(0.f, len2(c - pos) + len2(c - qi) - len2(qi - pos)) * 0.12f;
       if (cost < bestCost) { bestCost = cost; bestC = c; bestAlt = hAlt; }
     }
   vec3 from(sinf(wx.windFrom * DEG), 0, -cosf(wx.windFrom * DEG));
@@ -690,14 +692,49 @@ void Plane::apGuidance(float dt) {
         vec3 sd = dc > 1.f ? vec3(-d.z, 0, d.x) * (1.f / dc) : vec3(1, 0, 0);
         for (float i = 0; i <= n; i++) for (int k = -1; k <= 1; k++) { vec3 q = pos + d * (i / n) + sd * (k * 600.f); msa = std::max(msa, g_world.height(q.x, q.z)); }
         apAlt = std::max(clampf(apHoldAlt + (dc - apHoldR) * 0.06f, apHoldAlt, std::max(apCruiseAlt, apHoldAlt)), msa + 330.f);
-        apSpeed = dc < 9000.f + s.cruise * 40.f ? vh : s.cruise * 0.85f;   // slow down in time to turn tightly
+        apSpeed = dc < 2500.f + s.cruise * 20.f ? vh : s.cruise * 0.85f;   // slow down in time to turn tightly (not so early that slow, high-power flight eats the reserve)
+        // climb planning: can this aircraft out-climb the ground ahead on the way? Compare the height needed over
+        // the next 12 km of track with what it can reach at a conservative climb gradient. If it can't, climb in a
+        // circle (turning towards the lower side) until it can, then carry on.
+        {
+          vec3 f = d * (1.f / std::max(dc, 1.f));
+          float vsCap = (s.special ? 30.f : jet ? 12.f : s.engineType == ENG_TURBOPROP ? 6.f : 4.f) * 0.55f;
+          float grad = vsCap / std::max(length(vel), 30.f), short_ = -1e9f, needTop = 0;
+          for (int i = 1; i <= 24; i++) {
+            float dd = i * 500.f; if (dd > dc + 500.f) break;
+            vec3 q = pos + f * dd;
+            float need = g_world.height(q.x, q.z) + 250.f;
+            needTop = std::max(needTop, need);
+            short_ = std::max(short_, need - (pos.y + dd * grad));
+          }
+          if (apClimbDir == 0 && short_ > 0.f) {
+            // circle the side with the lower ground
+            float vt = std::max(length(vel), 30.f), Rt = vt * vt / (G0 * tanf(25.f * DEG)), hh = heading() * DEG, best = 1e9f;
+            for (int sd = -1; sd <= 1; sd += 2) {
+              vec3 r(cosf(hh) * sd, 0, sinf(hh) * sd), c = pos + r * Rt; float hm = 0;
+              for (int k = 0; k < 12; k++) { float an = k * PI / 6; vec3 q = c + vec3(cosf(an), 0, sinf(an)) * (Rt + 300.f); hm = std::max(hm, g_world.height(q.x, q.z)); }
+              if (hm < best) { best = hm; apClimbDir = sd; }
+            }
+          }
+          if (apClimbDir != 0) {
+            if (short_ < -80.f) apClimbDir = 0;   // clear (with some margin): resume the track
+            else {
+              apHeading = heading() + apClimbDir * 60.f;
+              apAlt = std::max(apAlt, needTop);
+              apSpeed = std::max(vh, s.vref * 1.35f);
+              apStatus = fmt("NAV  %s  climbing to %.0f ft before the high ground", a.code, needTop * M_TO_FT);
+            }
+          }
+        }
         if (fabsf(he) > 60.f) apSpeed = std::min(apSpeed, std::max(vh, s.cruise * 0.4f));   // and for big turns
         if (dc < apHoldR + 300.f) {
           apLeg = 1; apStageT = 0;
           vec3 r = pos - C;   // orbit the way we are already turning
           apHoldDir = (r.x * vel.z - r.z * vel.x) > 0 ? -1 : 1;
+          // already down at the orbit's height: no need to circle (a full orbit costs minutes of fuel), go for the final
+          if (pos.y < apHoldAlt + 60.f) apLeg = along > -(F + 500.f + vnow * 15.f) ? 3 : 2;
         }
-        apStatus = fmt("NAV  %s  RWY %02d  %.1f km", a.code, rwyN, (dc + F) / 1000.f);
+        if (apClimbDir == 0) apStatus = fmt("NAV  %s  RWY %02d  %.1f km", a.code, rwyN, (dc + F) / 1000.f);
       } else {
         // the intercept: the extended centreline is flown with the same steering as the localizer, from far enough
         // out to settle before the gate. Too close in (or on the wrong side), first fly outbound, diverging a little.

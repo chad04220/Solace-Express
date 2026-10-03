@@ -4,6 +4,7 @@
 #include "traffic.h"
 #include "aircraft.h"
 #include "world.h"
+#include "airport_layout.h"
 #include "models.h"
 #include "renderer.h"
 #include <algorithm>
@@ -25,10 +26,15 @@ static vec2 apLocal(const Airport& a, vec3 p) {
 }
 static float apSide(int ai) { return (ai & 1) ? 1.f : -1.f; }   // apron side, as in World::build / runwayMaterial
 static bool apUsable(const Airport& a) { return a.surface == 0 && a.size > 0; }
-static float apOff(const Airport& a) { return a.width * 0.5f + (a.size == 2 ? 170.f : 85.f); }
-static float apLane(const Airport& a) { return a.width * 0.5f + 45.f; }
-static float standU(const Airport& a, int k) { return -a.length * 0.05f + 22.5f + 45.f * k; }
-static int standRange(const Airport& a) { return std::max(1, (int)((a.length * 0.33f - 30.f) / 45.f)); }
+// the ground plan (airport_layout.h): stands are the marked lead-in lines on the apron, every 45 m between standU0 and
+// standU1; aircraft taxi on the parallel taxiway, depart from the exit at the runway's start and vacate at a mid exit
+static AptLayout apL(const Airport& a) { return aptLayout(a, (int)(&a - &g_world.airports[0])); }
+static float apLane(const Airport& a) { return apL(a).twV; }
+static int standCount(const Airport& a) { AptLayout L = apL(a); return std::max(1, (int)((L.standU1 - L.standU0) / 45.f)); }
+static float standU(const Airport& a, int k) { return apL(a).standU0 + 22.5f + 45.f * k; }
+static float standV(const Airport& a, float fusLen) { return apL(a).apV1 - 20.f - fusLen * 0.3f; }
+static float exitDep(const Airport& a) { return apL(a).exitU[0]; }
+static float exitArr(const Airport& a) { AptLayout L = apL(a); return L.exitU[a.size == 2 ? 3 : 2]; }
 
 float Traffic::rnd() { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; return (seed & 0xFFFFFF) / 16777216.f; }
 
@@ -61,10 +67,10 @@ static void liveries(TrafficCraft& c, float r) {
 void Traffic::spawnAirport(int ai, vec3 player) {
   (void)player;
   const Airport& a = g_world.airports[ai];
-  int nst = standRange(a);
+  int nst = standCount(a);
   // pick a free stand
   for (int tries = 0; tries < 8; tries++) {
-    int k = (int)rnd(-nst, nst + 0.99f);
+    int k = (int)rnd(0.f, nst - 0.01f);
     bool used = false;
     for (auto& c : craft) if (c.alive && c.role == TrafficCraft::AIRPORT && c.airport == ai && c.stand == k) used = true;
     if (used) continue;
@@ -74,7 +80,7 @@ void Traffic::spawnAirport(int ai, vec3 player) {
     if (a.length < kAircraft[c.spec].runwayNeeded(a.elev) * 1.1f) c.spec = 0;
     c.role = TrafficCraft::AIRPORT; c.airport = ai; c.stand = k; c.state = TrafficCraft::PARKED; c.timer = rnd(8.f, 70.f);
     float side = apSide(ai);
-    c.pos = apWorld(a, standU(a, k), side * (apOff(a) - 12.f - kAircraft[c.spec].fusLen * 0.3f), 0);
+    c.pos = apWorld(a, standU(a, k), side * standV(a, kAircraft[c.spec].fusLen), 0);
     vec3 face = apWorld(a, 0, -side, 0) - apWorld(a, 0, 0, 0);   // nose towards the runway
     c.hdg = atan2f(face.x, -face.z);
     c.pos.y = g_world.height(c.pos.x, c.pos.z) + gearH(kAircraft[c.spec]);
@@ -226,7 +232,7 @@ void Traffic::updateAirport(TrafficCraft& c, float dt, vec3 playerPos, bool play
   const Airport& a = g_world.airports[c.airport];
   const AircraftSpec& s = kAircraft[c.spec];
   float side = apSide(c.airport), lane = apLane(a), hold = a.width * 0.5f + 26.f;
-  float uC = -a.length * 0.38f, uE = a.length * 0.28f, uTD = -a.length * 0.5f + std::max(150.f, a.length * 0.12f);
+  float uC = exitDep(a), uE = exitArr(a), uTD = -a.length * 0.5f + std::max(150.f, a.length * 0.12f);
   float rwyHdg = a.heading * DEG, gh = gearH(s);
   float k = bigAircraft(c.spec) || jetLike(c.spec) ? 1.6f : 1.f;
   float patAlt = a.elev + (k > 1.f ? 450.f : 300.f);
@@ -354,7 +360,7 @@ void Traffic::updateAirport(TrafficCraft& c, float dt, vec3 playerPos, bool play
         c.state = TrafficCraft::TAXI_IN;
         float us = standU(a, c.stand);
         c.path = {apWorld(a, uE, side * hold, 0), apWorld(a, uE, side * lane, 0), apWorld(a, us, side * lane, 0),
-                  apWorld(a, us, side * (apOff(a) - 12.f - s.fusLen * 0.3f), 0)};
+                  apWorld(a, us, side * standV(a, s.fusLen), 0)};
         c.wp = 0;
       }
       break;
@@ -689,6 +695,7 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
     if (!c.alive) continue;
     const AircraftSpec& s = kAircraft[c.spec];
     c.propAngle = fmodf(c.propAngle + (8.f + 50.f * c.throttle) * dt, 2 * PI * 50.f);
+    vec3 pos0 = c.pos;   // for the swept collision test below
     float dist = length(c.pos - player);
     if (c.leader >= 0) {   // wingman: rigid formation on the leader
       TrafficCraft& L = craft[c.leader];
@@ -752,7 +759,13 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
     }
     if (c.ab > 0.5f && dist < 6000.f)
       for (int k = -1; k <= 1; k += 2) puffs.push_back({c.pos + c.q.rotate(vec3(k * 0.82f, -0.12f, 9.2f)), c.vel * 0.7f, vec3(1.f, 0.6f, 0.25f) * 2.5f, 0.12f, 0.6f, -1.f, 1.f, SPR_SPARK});
-    // mid-air collision with the player
+    // mid-air collision with the player: closest approach of the two over this step (relative motion), so a fast
+    // craft can't pass through between frames
+    {
+      vec3 r0 = pos0 - (player - playerVel * dt), r1 = c.pos - player, dr = r1 - r0;
+      float t = clampf(-dot(r0, dr) / std::max(dot(dr, dr), 1e-6f), 0.f, 1.f);
+      dist = length(r0 + dr * t);
+    }
     if (dist < (playerSpan + s.span) * 0.32f && !playerOnGround && c.role != TrafficCraft::AIRPORT && c.role != TrafficCraft::ESCORT) hitPlayer = true;
     if (dist < (playerSpan + s.span) * 0.32f && !playerOnGround && c.role == TrafficCraft::AIRPORT && c.state >= TrafficCraft::CLIMB && c.state <= TrafficCraft::FINAL) hitPlayer = true;
   }
