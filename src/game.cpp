@@ -2345,6 +2345,13 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < 10; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     gTunnel = atof(name.c_str() + 4) / 100.f; toasts.clear(); return;
   }
+  if (name.compare(0, 3, "apt") == 0 && name.size() >= 6) {   // on the runway of an airport: apt<CODE>, e.g. aptHFS
+    int ai = g_world.findAirport(name.substr(3, 3).c_str());
+    Contract c; c.from = std::max(ai, 0); c.to = (c.from + 1) % (int)g_world.airports.size(); c.title = "Airport check";
+    realTime = 20; startFlight(c, 0, Career::SRC_OWNED);
+    for (int i = 0; i < 30; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    toasts.clear(); return;
+  }
   if (name == "loading" || name == "loadingready" || name == "loadingair") {   // the pre-flight loading screen: card / live shot
     if (name == "loadingair") { resAirborne = true; resCraft = kResearchJet; launchResearch(); }
     else { Contract c = career.board.empty() ? Contract() : career.board[0]; if (career.board.empty()) { c.from = 0; c.to = 1; c.title = "Lesson 1: Takeoff and Climb"; } startFlight(c, 0, Career::SRC_OWNED); }

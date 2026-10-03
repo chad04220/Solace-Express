@@ -1302,6 +1302,7 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bo
       vec4 t = matSample(pw.xz, M_GRASS, 5.0, nTS);
       float stripe = step(0.5, fract(u/18.0));
       m.alb = t.rgb*(0.85 + 0.15*stripe)*vec3(0.95,1.05,0.9); m.rough = 0.9; m.nrm = nTS;
+      if (surf != 0) m.alb *= vec3(0.78, 0.82, 0.7);   // longer, darker rough beside an unpaved strip: the strip stands out
     }
     return;
   }
@@ -1309,8 +1310,21 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bo
   int layer = surf == 0 ? padLayer : surf == 1 ? M_GRASS : surf == 2 ? M_GRAVEL : surf == 3 ? M_SNOW : M_SAND;
   vec4 t = matSample(pw.xz, layer, surf == 0 ? 7.0 : 5.0, nTS);
   m.alb = t.rgb; m.rough = t.a; m.nrm = nTS; m.metal = 0.0;
-  if (surf == 1) m.alb *= vec3(0.8,1.0,0.75) * (0.88 + 0.12*step(0.5, fract(u/22.0)));
+  if (surf == 1) {   // mown strip: short, lighter, yellower grass in lengthwise mowing bands, worn wheel tracks
+    m.alb *= vec3(1.12, 1.18, 0.82) * (0.84 + 0.16*step(0.5, fract((v + wid*0.5)/4.5)));
+    float track = smoothstep(1.4, 0.4, abs(abs(v) - 1.3))*(0.7 + 0.3*vnoise(vec2(u*0.08, v)));
+    m.alb = mix(m.alb, vec3(0.32, 0.27, 0.17), track*0.55);
+    float worn = smoothstep(len*0.5 - 40.0, len*0.5 - 160.0, abs(u))*smoothstep(len*0.5 - 260.0, len*0.5 - 120.0, abs(u));
+    m.alb = mix(m.alb, vec3(0.36, 0.3, 0.2), worn*smoothstep(0.55, 0.8, vnoise(pw.xz*0.25))*0.6);   // bare patches at touchdown
+  }
   if (surf >= 2) { float rut = smoothstep(1.5, 0.3, abs(abs(v) - 2.2)); m.alb *= 1.0 - 0.18*rut; }
+  if (surf != 0) {   // white edge boards every 50 m and a row of them across each threshold, as on real unpaved strips
+    float au = abs(u), hl = len*0.5;
+    float eb = abs(fract((u + hl)/50.0 + 0.5) - 0.5)*50.0;
+    bool board = (eb < 0.9 && abs(abs(v) - wid*0.5) < 0.35)
+              || (au > hl - 4.0 && au < hl - 2.6 && abs(fract(v/4.0 + 0.5) - 0.5)*4.0 < 0.9);
+    if (board) { m.alb = vec3(0.85); m.rough = 0.6; m.nrm = vec3(0,0,1); }
+  }
   if (surf == 0) {
     if (size == 2) { vec2 sj = vec2(abs(fract(u/7.5) - 0.5), abs(fract(v/7.5) - 0.5)); if (max(sj.x, sj.y) > 0.49) m.alb *= 0.78; }
     else { float gr = smoothstep(0.42, 0.5, abs(fract(u/0.04) - 0.5)); m.nrm.y += gr*0.2; }
