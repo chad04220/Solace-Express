@@ -917,8 +917,10 @@ R"(    if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.31, pf 
     floor_ = max(floor_, f + 0.04);
     res = opU(res, vec2(floor_, 11.0));
     // seats: pan with a front roll, bolstered back, headrest, rails, lap belt and shoulder harness
-    {
-      vec3 sp = vec3(abs(p.x) - abs(E.x), p.y, p.z);
+    // (each group below is skipped when its bounding box is farther than the nearest surface so far, as outside)
+    vec3 sp = vec3(abs(p.x) - abs(E.x), p.y, p.z);
+    float sbTop = max(gCab0.y + 0.16, E.y + 0.06);
+    if (sdBox(sp - vec3(0.0, 0.5*(E.y - 1.08 + sbTop), E.z + 0.13), vec3(max(gCab0.x, 0.2) + 0.08, 0.5*(sbTop - E.y + 1.08), 0.49)) < res.x) {
       float sw = gCab0.x;
       float seat = sdRoundBox(sp - vec3(0.0, E.y - 0.8, E.z + 0.05), vec3(sw, 0.055, 0.24), 0.05);
       seat = smin(seat, sdCapsule(sp, vec3(-sw + 0.02, E.y - 0.77, E.z - 0.17), vec3(sw - 0.02, E.y - 0.77, E.z - 0.17), 0.05), 0.025);
@@ -947,6 +949,7 @@ R"(    if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.31, pf 
     {
       float pull = cPitch*0.075;
       vec3 yp = vec3(abs(p.x) - abs(E.x), p.y - (E.y - 0.43), p.z - pz);
+      if (sdBox(yp - vec3(0.0, 0.0, 0.17), vec3(0.19, 0.19, 0.2)) < res.x) {
       res = opU(res, vec2(sdCapsule(yp, vec3(0.0, 0.0, 0.02), vec3(0.0, 0.0, 0.2 + pull), 0.017), 60.0));
       res = opU(res, vec2(sdCylX(yp.zyx - vec3(0.05, 0.0, 0.0), 0.03, 0.012), 66.0));            // shaft collar
       vec3 hp = yp - vec3(0.0, 0.0, 0.22 + pull);
@@ -958,6 +961,7 @@ R"(    if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.31, pf 
       res = opU(res, vec2(grips, 61.0));
       res = opU(res, vec2(length(vec3(abs(hp.x) - 0.128, hp.y - 0.105, hp.z + 0.004)) - 0.009, 68.0));   // PTT / trim switches
       res = opU(res, vec2(sdCylX(hp.zyx + vec3(0.024, 0.0, 0.0), 0.02, 0.003), 60.0));              // hub badge
+      }
     }
     // rudder pedals with toe brakes on metal arms: right rudder pushes the right pedal forward
     {
@@ -966,6 +970,7 @@ R"(    if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.31, pf 
       float kx = clamp((abs(E.x) + 0.1)/max(sP.x - 0.035, 0.01), 0.0, 0.98);
       float floorY = max(E.y - 1.06, sP.z - (sP.y - 0.035)*sqrt(1.0 - kx*kx) + 0.03);
       float pyc = max(E.y - 0.98, floorY + 0.09);
+      if (sdBox(vec3(abs(p.x) - abs(E.x), p.y - pyc - 0.075, p.z - pz - 0.15), vec3(0.18, 0.19, 0.21)) < res.x) {
       vec3 pp = vec3(p.x - sign(p.x)*abs(E.x), p.y - pyc, p.z - pz - 0.2);
       float side = sign(pp.x);
       pp.z += side*cYaw*0.06;
@@ -974,6 +979,7 @@ R"(    if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.31, pf 
       float psz = ck == 0 ? 0.8 : 1.0;   // smaller pedals in the cramped light-aircraft footwells
       res = opU(res, vec2(sdRoundBox(pr, vec3(0.045, 0.08, 0.01)*psz, 0.008), 61.0));
       res = opU(res, vec2(sdCapsule(pp, vec3(0.0, 0.05, -0.03), vec3(0.0, 0.2, -0.21), 0.011), 60.0));   // arm up to the footwell wall
+      }
     }
     // footwell wall: closes the space between the floor and the panel's lower edge; the pedals hang from it
     {
@@ -985,6 +991,7 @@ R"(    if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.31, pf 
     {
       float pw = ck == 0 ? 0.075 : 0.11, ph = 0.22, pd = ck == 0 ? 0.24 : 0.32;  // all pedestals meet the floor; controls keep their original top height
       vec3 pc = vec3(0.0, E.y - 0.84 + (0.22 - ph), pz + 0.06 + pd);
+      if (sdBox(p - vec3(0.0, E.y - 0.76, pz + 0.04 + pd), vec3(0.23, 0.35, pd + 0.08)) < res.x) {
       res = opU(res, vec2(sdRoundBox(p - pc, vec3(pw, ph, pd), 0.03), 63.0));
       vec3 tw = p - vec3(pw + 0.004, pc.y + ph*0.2, pc.z + pd*0.35);
       res = opU(res, vec2(sdCylX(tw, 0.075, 0.012), 66.0));
@@ -1007,39 +1014,48 @@ R"(    if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.31, pf 
         vec3 ft = vec3(0.0, 0.11*cos(fa), -0.11*sin(fa));
         res = opU(res, vec2(min(sdCapsule(fp, vec3(0.0), ft, 0.006), sdRoundBox(fp - ft, vec3(0.022, 0.006, 0.012), 0.004)), 60.0));
       }
+      }
     }
     if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, gCab1.z, E.z - 0.2), vec3(0.22, 0.03, 0.3), 0.02), 14.0));
     // switch row along the lower panel edge (domain repetition)
     {
       vec3 swp = p - vec3(0.0, E.y - 0.565, pz + 0.05);
+      if (sdBox(swp - vec3(0.0, 0.0, 0.01), vec3(phw, 0.03, 0.03)) < res.x) {
       float sw = 0.032; float cell = clamp(floor(swp.x/sw + 0.5), -12.0, 12.0);
       swp.x -= cell*sw;
       float sws = sdRoundBox(swp - vec3(0.0, 0.0, 0.01), vec3(0.006, 0.012, 0.012), 0.003);
       sws = max(sws, abs(p.x) - phw*0.85);
       sws = max(sws, -(abs(p.x) - 0.13));                              // leave the radio stack clear
       res = opU(res, vec2(sws, 13.0));
+      }
     }
     // side trim panels with armrests, door handles and map pockets
     {
       float wx = gCab0.w;
+      if (sdBox(vec3(abs(p.x) - wx, p.y - (E.y - 0.73), p.z - (E.z - 0.2)), vec3(0.09, 0.36, 0.68)) < res.x) {
       vec3 ap = vec3(abs(p.x) - wx, p.y - (E.y - 0.5), p.z - (E.z - 0.15));
       res = opU(res, vec2(sdRoundBox(ap, vec3(0.05, 0.035, 0.38), 0.02), 12.0));
       float trim = sdRoundBox(vec3(abs(p.x) - wx + 0.02, p.y - (E.y - 0.8), p.z - (E.z - 0.25)), vec3(0.025, 0.26, 0.6), 0.02);
       trim = max(trim, f + 0.045);
       res = opU(res, vec2(trim, 63.0));
       res = opU(res, vec2(sdCapsule(vec3(abs(p.x) - wx + 0.012, p.y - (E.y - 0.42), p.z - (E.z - 0.42)), vec3(0.0), vec3(0.0, 0.0, 0.11), 0.009), 60.0));
+      }
     }
     // sun visors folded against the cabin roof
     vec3 vp = vec3(p.x - sign(p.x)*abs(E.x), p.y - gCab1.x, p.z - (E.z - 0.30));
-    vp.xy = rot2(vp.xy, sign(p.x)*gCab1.y);  // fold against the curved roof, rather than through it
-    vp.yz = rot2(vp.yz, 0.25);
-    res = opU(res, vec2(max(sdRoundBox(vp, vec3(0.13, 0.006, 0.05), 0.004), f + 0.055), 14.0));
+    if (sdBox(vp, vec3(0.16, 0.16, 0.16)) < res.x) {
+      vp.xy = rot2(vp.xy, sign(p.x)*gCab1.y);  // fold against the curved roof, rather than through it
+      vp.yz = rot2(vp.yz, 0.25);
+      res = opU(res, vec2(max(sdRoundBox(vp, vec3(0.13, 0.006, 0.05), 0.004), f + 0.055), 14.0));
+    }
     // overhead console: dome light and two map lights (modelled lenses - the cabin's night lighting)
     {
       vec3 oc = p - vec3(0.0, gCab0.z, E.z - 0.05);
+      if (sdBox(oc, vec3(0.12, 0.06, 0.22)) < res.x) {
       res = opU(res, vec2(sdRoundBox(oc, vec3(0.09, 0.025, 0.18), 0.015), 14.0));
       res = opU(res, vec2(sdRoundCylX((oc + vec3(0.0, 0.024, 0.02)).yxz, 0.04, 0.004, 0.002), 64.0));
       res = opU(res, vec2(sdRoundCylX((vec3(abs(oc.x) - 0.06, oc.y + 0.024, oc.z - 0.12)).yxz, 0.013, 0.004, 0.002), 64.0));
+      }
     }
     float compass = sdRoundBox(p - vec3(0.0, E.y - 0.05, pz - 0.05), vec3(0.04, 0.03, 0.03), 0.01);
     res = opU(res, vec2(compass, 66.0));
