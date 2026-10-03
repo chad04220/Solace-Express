@@ -29,6 +29,7 @@ struct FxVisual {
   int bombs = 0; float bomb[8][4];                 // dark-energy bombs: centre + radius
   int blasts = 0; float blast[6][4], blastI[6][4]; // detonations: centre + radius, age 0..1 + intensity
   float pip[4] = {0, 0, 0, 0};                     // XR-11 bomb impact prediction: world point + valid
+  float feedCam[4] = {0, 0, 0, 0.3f};             // XR-11 bomb camera: position + tan(half fov)
   float feed[4] = {0, 0, 0, 0};                    // XR-11 belly camera target: world point + active
 };
 
@@ -82,10 +83,12 @@ public:
   GLuint minimapTex = 0;
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
-  static constexpr int kProgramCount = 10;
+  static constexpr int kProgramCount = 11;
   bool compilePrograms(std::atomic<int>* done);  // scene programs; safe on a worker thread with a shared context
   bool init(int w, int h);                       // everything else (runs compilePrograms itself if not done yet)
   GLuint makeTexture(const uint8_t* rgba, int w, int h);
+  void renderMap(float cx, float cz, float half, int N);   // GPS aerial image into mapTex()
+  GLuint mapTex() const { return texMap; }
   void resize(int w, int h);
   void setRenderScale(float s);   // ray-trace resolution only: the TAA history stays at display resolution, no pop
   void renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites);
@@ -105,12 +108,16 @@ public:
   void uiEnd();
   void flushUIPublic() { flushUI(); }
   bool screenshot(const char* path);
+  bool screenshotPNG(const char* path);
   // environment entities: entSync generates every chunk in range before drawing (headless captures)
   bool entSync = false;
-  int entDrawn = 0, entChunks = 0;   // instances drawn / chunks generated (F3 readout)
+  int entDrawn = 0, entChunks = 0;
+  int entPending = 0;            // scenery chunks still to generate around the camera (after this frame)
+  float entBudgetMs = 2.5f;      // per-frame scenery generation budget for chunks beyond 700 m (raised on loading screens)   // instances drawn / chunks generated (F3 readout)
   float entCpuMs = 0;                // CPU time of the entity pass (streaming + culling + submission)
 
 private:
+  GLuint progMap = 0, texMap = 0, fboMap = 0; int mapN = 0;
   GLuint progRT = 0, progSprite = 0, progDown = 0, progUp = 0, progRayMask = 0, progRay = 0, progPost = 0, progUI = 0, progTAA = 0;
   static constexpr int kBloomMips = 6;
   GLuint fboMip[kBloomMips] = {}, texMip[kBloomMips] = {}; int mipW[kBloomMips] = {}, mipH[kBloomMips] = {};

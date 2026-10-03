@@ -364,6 +364,44 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits, g_shaderCacheMisses);
     fclose(f);
   }
+  // Development captures: AirXpress.exe --shots scene1,scene2,... [--size 1920x1080] renders each debug scene
+  // (see Game::debugScene) with all scenery generated up front and saves shots\<scene>.png next to the exe.
+  {
+    std::string cl = GetCommandLineA();
+    size_t k = cl.find("--shots ");
+    if (k != std::string::npos) {
+      std::string list = cl.substr(k + 8); list = list.substr(0, list.find(' ')) + ",";
+      int sw2 = 0, sh2 = 0; size_t kz = cl.find("--size ");
+      if (kz != std::string::npos) sscanf(cl.c_str() + kz + 7, "%dx%d", &sw2, &sh2);
+      if (sw2 > 64 && sh2 > 64) {
+        if (g_fullscreen) toggleFullscreen();
+        RECT wr = {0, 0, sw2, sh2}; AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+        SetWindowPos(g_hwnd, nullptr, 0, 0, wr.right - wr.left, wr.bottom - wr.top, SWP_NOMOVE | SWP_NOZORDER);
+      }
+      char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+      std::string dir(exe, n); dir = dir.substr(0, dir.find_last_of("\\/")) + "\\shots";
+      CreateDirectoryA(dir.c_str(), nullptr);
+      g_ren.entSync = true;
+      for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
+        std::string sc = list.substr(a, b - a);
+        if (sc.empty()) continue;
+        MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
+        RECT rc; GetClientRect(g_hwnd, &rc);
+        if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
+        SetWindowTextA(g_hwnd, ("Air Xpress - rendering " + sc).c_str());
+        Game* g = new Game();
+        g->saveDir = game.saveDir;
+        g->initHeadless(); g->debugScene(sc);
+        for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
+        for (int i = 0; i < 24; i++) g->render();   // TAA settles
+        glFinish();
+        g_ren.screenshotPNG((dir + "\\" + sc + ".png").c_str());
+        SwapBuffers(g_hdc);
+        delete g;
+      }
+      return 0;
+    }
+  }
   for (int i = 0; i < 20; i++) introFrame(1.f, "READY", 1.f - i / 20.f);   // fade out to the main menu
   startAudio();
 

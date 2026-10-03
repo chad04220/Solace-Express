@@ -152,6 +152,22 @@ void main(){
   g_ren.entSync = !getenv("ENTSTREAM");   // captures generate every scenery chunk in range up front
   printf("renderer ok (shader cache: %d loaded, %d compiled)\n", g_shaderCacheHits, g_shaderCacheMisses);
   std::string scene = argc > 1 ? argv[1] : "default";
+  if (scene.rfind("multi:", 0) == 0) {   // several scenes from one shader compile: multi:a,b,c
+    std::string list = scene.substr(6) + ",";
+    for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
+      std::string sc = list.substr(a, b - a);
+      if (sc.empty()) continue;
+      Game* g = new Game();
+      g->initHeadless(); g->debugScene(sc);
+      for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
+      for (int i = 0; i < 6; i++) g->render();
+      glFinish();
+      std::string out = "/tmp/claude-0/sp/shot_" + sc + ".ppm";
+      g_ren.screenshot(out.c_str()); printf("wrote %s\n", out.c_str()); fflush(stdout);
+      delete g;
+    }
+    return 0;
+  }
   Game game;
   game.initHeadless();
   game.debugScene(scene);

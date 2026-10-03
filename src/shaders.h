@@ -150,6 +150,14 @@ uniform int uDebN; uniform vec4 uDeb[16]; uniform vec4 uDebQ[16];
 int gPI = -1; vec3 gPP; mat3 gPR; vec3 gPC;   // transform of the piece being traced / shaded
 uniform vec4 uM[24]; uniform vec4 uPS; uniform vec4 uCtl; uniform vec4 uPr; uniform vec4 uI0; uniform vec4 uI1; uniform vec4 uI2;
 uniform vec3 uColBase; uniform vec3 uColStripe;
+// copilot instrument cluster: the pilot's layout one seat over, shifted inboard so its bezel stays on the panel
+// (steam-gauge copilots get the six-pack only: engine gauges and radios stay with the pilot)
+vec2 coCluster(int ck){ return ck == 2 ? vec2(0.02, 0.2) : vec2(0.0, 0.16); }   // centre offset, half width
+float coShift(vec4 E, int ck){
+  float cx = coCluster(ck).x, hx = coCluster(ck).y;
+  float c = -E.x + cx, lim = E.w - 0.035;
+  return min(0.0, lim - (c + hx)) + max(0.0, -lim - (c - hx));
+}
 uniform vec4 uProp[2]; uniform int uPropCount;
 uniform vec3 uLandLightPos; uniform vec3 uLandLightDir; uniform float uLandLight;
 // point / spot lights (everything but the sun and moon): position + source radius | radiance + spot cutoff cosine
@@ -721,7 +729,9 @@ R"(    vec4 V0 = gM[14], V1 = gM[15];
     // raised bezels framing each pilot's instrument cluster
     {
       float cx = ck == 2 ? 0.02 : (ck == 1 ? 0.09 : 0.05), hx = ck == 2 ? 0.2 : (ck == 1 ? 0.255 : 0.215), hy = ck == 2 ? 0.098 : 0.112;
-      float sx = p.x*E.x >= 0.0 ? E.x + cx : -E.x + cx;               // copilot cluster: same layout, other seat
+      bool co = p.x*E.x < 0.0;
+      if (co) hx = coCluster(ck).y;
+      float sx = !co ? E.x + cx : -E.x + coCluster(ck).x + coShift(E, ck);   // copilot cluster: other seat, kept on the panel
       vec2 fq = vec2(p.x - sx, p.y - (E.y - 0.32));
       vec2 dq = abs(fq) - vec2(hx, hy) + 0.02; float fr = length(max(dq, 0.0)) + min(max(dq.x, dq.y), 0.0) - 0.02;
       float frame = max(abs(fr) - 0.007, abs(p.z - pf - 0.006) - 0.006);
@@ -1757,9 +1767,14 @@ static const char* kRaytraceDisplays = R"(// -----------------------------------
 // pixel from the hit distance), so needles, scales and lettering stay crisp at any display resolution. Lettering
 // and numerals come from the SDF font atlas.
 float gAA = 0.002;
-float gPixM = 0.001;   // metres of surface per pixel at the current hit (set before shading cockpit displays)
+float gPixM = 0.001;
+bool gDispPx = false;   // this pixel shows a display or gauge face: the post pass doesn't sharpen it   // metres of surface per pixel at the current hit (set before shading cockpit displays)
 float aFill(float d){ return clamp(0.5 - d/gAA, 0.0, 1.0); }
-float aLine(float d, float w){ return clamp(0.5 - (abs(d) - w*0.5)/gAA, 0.0, 1.0); }
+float aLine(float d, float w){   // a stroke never thinner than 1.5 px: thin lines stay continuous, dimmed to keep their weight
+  float we = max(w, 1.5*gAA);
+  return clamp(0.5 - (abs(d) - we*0.5)/gAA, 0.0, 1.0)*sqrt(w/we);
+}
+float aStroke(float d, float w){ return aLine(d, w); }   // d: unsigned distance to the centre line
 float sdSeg(vec2 p, vec2 a, vec2 b){ vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba)/max(dot(ba, ba), 1e-9), 0.0, 1.0); return length(pa - ba*h); }
 float sdBox(vec2 p, vec2 b){ vec2 d = abs(p) - b; return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0); }
 float sdRBox(vec2 p, vec2 b, float r){ return sdBox(p, b - r) - r; }
@@ -1827,7 +1842,7 @@ float dTicks(vec2 d, float r, float a0, float a1, float n, float r0, float r1, f
   float a = wrapA(atan(d.x, d.y), a0, a1);
   float k = clamp(floor((a - a0)/(a1 - a0)*n + 0.5), 0.0, n);
   vec2 u = dirA(a0 + (a1 - a0)*k/n);
-  return aFill(sdSeg(d, u*r*r0, u*r*r1) - w*0.5);
+  return aStroke(sdSeg(d, u*r*r0, u*r*r1), 2.0*(w*0.5));
 }
 float dNums(vec2 d, float r, float a0, float a1, float n, float v0, float dv, float vmod, float rr, float h){
   float a = wrapA(atan(d.x, d.y), a0, a1);
@@ -1838,7 +1853,7 @@ float dNums(vec2 d, float r, float a0, float a1, float n, float v0, float dv, fl
 float dArc(vec2 d, float r, float a0, float a1, float w){
   float a = wrapA(atan(d.x, d.y), a0, a1);
   float ac = clamp(a, min(a0, a1), max(a0, a1));
-  return aFill(length(d - dirA(ac)*r) - w*0.5);
+  return aStroke(length(d - dirA(ac)*r), w);
 }
 // tapered needle with a counterweight tail and a pointed tip
 float dNeedle(vec2 d, float ang, float len, float w, float tail){
@@ -1887,7 +1902,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
           if (i == 0) continue;
           float ly = hz - float(i)*5.0*ppd;
           float hl = (abs(i) % 2 == 0) ? 0.014 : 0.007;
-          col = mix(col, IW, aFill(sdSeg(vec2(o.x, ly), vec2(-hl, 0.0), vec2(hl, 0.0)) - lw*0.5));
+          col = mix(col, IW, aStroke(sdSeg(vec2(o.x, ly), vec2(-hl, 0.0), vec2(hl, 0.0)), 2.0*(lw*0.5)));
           if (abs(i) % 2 == 0) {
             float v = abs(float(i))*5.0;
             col = mix(col, IW, numC(vec2(o.x - sign(o.x)*(hl + 0.0055), ly), v, 0.0028, 1, 0));
@@ -1903,7 +1918,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
             for (int sgn = -1; sgn <= 1; sgn += 2) {
               vec2 u = dirA(ta*float(sgn));
               float len = (k == 0 || k == 3 || k == 5) ? 0.006 : 0.0035;
-              tk = max(tk, aFill(sdSeg(ad, u*0.04, u*(0.04 + len)) - lw*0.5));
+              tk = max(tk, aStroke(sdSeg(ad, u*0.04, u*(0.04 + len)), 2.0*(lw*0.5)));
             }
           }
           col = mix(col, IW, tk);
@@ -1927,7 +1942,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
           float vy = val + t.y/ppu;
           float k = floor(vy/stp + 0.5), dy = (vy - k*stp)*ppu;
           float tx = side == 0 ? 0.0135 : -0.0135, dir = side == 0 ? -1.0 : 1.0;
-          col = mix(col, IW, aFill(sdSeg(vec2(t.x, dy), vec2(tx, 0.0), vec2(tx + dir*(mod(k, 2.0) == 0.0 ? 0.004 : 0.0022), 0.0)) - lw*0.5));
+          col = mix(col, IW, aStroke(sdSeg(vec2(t.x, dy), vec2(tx, 0.0), vec2(tx + dir*(mod(k, 2.0) == 0.0 ? 0.004 : 0.0022), 0.0)), 2.0*(lw*0.5)));
           if (mod(k, 2.0) == 0.0 && k*stp >= 0.0) col = mix(col, IW, numC(vec2(t.x - (side == 0 ? 0.0075 : -0.0075), dy), k*stp, 0.0026, side == 0 ? 2 : 0, 0));
           // readout window
           float wb = sdRBox(t, vec2(0.0135, 0.0042), 0.0008);
@@ -1944,7 +1959,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
         col = vec3(0.07, 0.075, 0.09);
         float ppd2 = 0.0011, hv = hdg + hd.x/ppd2;
         float k = floor(hv/5.0 + 0.5), dx = (hv - k*5.0)*ppd2;
-        col = mix(col, IW, aFill(sdSeg(vec2(dx, hd.y), vec2(0.0, 0.0095), vec2(0.0, mod(k, 2.0) == 0.0 ? 0.0055 : 0.0075)) - lw*0.5));
+        col = mix(col, IW, aStroke(sdSeg(vec2(dx, hd.y), vec2(0.0, 0.0095), vec2(0.0, mod(k, 2.0) == 0.0 ? 0.0055 : 0.0075)), 2.0*(lw*0.5)));
         if (mod(k, 6.0) == 0.0) col = mix(col, IW, numC(vec2(dx, hd.y + 0.0005), mod(k*5.0/10.0, 36.0), 0.0032, 1, 0));
         float wb = sdRBox(hd - vec2(0.0, -0.0045), vec2(0.0065, 0.0042), 0.0008);
         if (wb < 0.0) { col = vec3(0.0); col = mix(col, IW, numC(hd - vec2(0.0, -0.0045), mod(hdg, 360.0), 0.0036, 1, 0)); }
@@ -1964,10 +1979,10 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
         float ah = degrees(a) + hdg;
         float k = floor(ah/5.0 + 0.5), at = radians(k*5.0 - hdg);
         vec2 u = dirA(at);
-        col = mix(col, IW, aFill(sdSeg(c, u*0.075, u*(0.075 - (mod(k, 2.0) == 0.0 ? 0.0045 : 0.0025))) - lw*0.5));
+        col = mix(col, IW, aStroke(sdSeg(c, u*0.075, u*(0.075 - (mod(k, 2.0) == 0.0 ? 0.0045 : 0.0025))), 2.0*(lw*0.5)));
         if (mod(k, 6.0) == 0.0) col = mix(col, IW, numC(rot2(c - u*0.0655, at), mod(k*0.5, 36.0), 0.0032, 1, 0));
       }
-      col = mix(col, vec3(1.0, 0.35, 1.0), aFill(sdSeg(c, vec2(0.0, 0.004), vec2(0.0, 0.074)) - lw*0.5));
+      col = mix(col, vec3(1.0, 0.35, 1.0), aStroke(sdSeg(c, vec2(0.0, 0.004), vec2(0.0, 0.074)), 2.0*(lw*0.5)));
       col = mix(col, IY, aFill(sdTri(c, vec2(0.0, 0.006), vec2(-0.0045, -0.005), vec2(0.0045, -0.005))));
       float wb = sdRBox(nd - vec2(0.0, 0.066), vec2(0.008, 0.0045), 0.0008);
       if (wb < 0.0) { col = vec3(0.0); col = mix(col, IW, numC(nd - vec2(0.0, 0.066), mod(hdg, 360.0), 0.0038, 1, 0)); }
@@ -2002,7 +2017,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
       c = mix(c, IW, dArc(d, r*0.9, A0 + vso/vmax*5.2, A0 + vfe/vmax*5.2, r*0.05)*0.85);
       c = mix(c, IG, dArc(d, r*0.85, A0 + vso/vmax*5.2 + 0.08, A0 + vno/vmax*5.2, r*0.06));
       c = mix(c, IY, dArc(d, r*0.85, A0 + vno/vmax*5.2, A0 + vne/vmax*5.2, r*0.06));
-      vec2 ur = dirA(A0 + vne/vmax*5.2); c = mix(c, IR, aFill(sdSeg(d, ur*r*0.78, ur*r*0.96) - r*0.025));
+      vec2 ur = dirA(A0 + vne/vmax*5.2); c = mix(c, IR, aStroke(sdSeg(d, ur*r*0.78, ur*r*0.96), 2.0*(r*0.025)));
       c = mix(c, IW, dTicks(d, r, A0, A1, 40.0, 0.88, 0.96, lw*0.7));
       c = mix(c, IW, dTicks(d, r, A0, A1, 10.0, 0.8, 0.96, lw*1.2));
       c = mix(c, IW, dNums(d, r, A0 + 5.2*0.2, A1, 4.0, 40.0, 40.0, 1e5, 0.62, nh));
@@ -2027,7 +2042,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
       for (int i = -4; i <= 4; i++) {
         if (i == 0) continue;
         float ly = hz - float(i)*5.0*ppd, hl = abs(i) % 2 == 0 ? r*0.26 : r*0.12;
-        c = mix(c, IW, aFill(sdSeg(vec2(o.x, ly), vec2(-hl, 0.0), vec2(hl, 0.0)) - lw*0.45));
+        c = mix(c, IW, aStroke(sdSeg(vec2(o.x, ly), vec2(-hl, 0.0), vec2(hl, 0.0)), 2.0*(lw*0.45)));
         if (abs(i) % 2 == 0) c = mix(c, IW, numC(vec2(o.x - sign(o.x)*(hl + r*0.12), ly), abs(float(i))*5.0, nh*0.6, 1, 0));
       }
       // rotating bank ring with ticks, fixed pointer
@@ -2040,7 +2055,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
           for (int sgn = -1; sgn <= 1; sgn += 2) {
             vec2 u = dirA(ta*float(sgn) - b);
             float len = (k == 3 || k == 4) ? 0.14 : 0.08;
-            tk = max(tk, aFill(sdSeg(d, u*r*0.82, u*r*(0.82 + len)) - lw*0.6));
+            tk = max(tk, aStroke(sdSeg(d, u*r*0.82, u*r*(0.82 + len)), 2.0*(lw*0.6)));
           }
         }
         c = mix(c, IW, tk);
@@ -2089,8 +2104,8 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
       float rt = clamp(uI2.x/3.0, -1.5, 1.5)*0.2618;
       for (int sgn = -1; sgn <= 1; sgn += 2) {
         vec2 u0 = dirA(float(sgn)*1.5708), u1 = dirA(float(sgn)*(1.5708 + 0.2618));
-        c = mix(c, IW, aFill(sdSeg(d, u0*r*0.72, u0*r*0.9) - lw*0.9));
-        c = mix(c, IW, aFill(sdSeg(d, u1*r*0.72, u1*r*0.9) - lw*0.9));
+        c = mix(c, IW, aStroke(sdSeg(d, u0*r*0.72, u0*r*0.9), 2.0*(lw*0.9)));
+        c = mix(c, IW, aStroke(sdSeg(d, u1*r*0.72, u1*r*0.9), 2.0*(lw*0.9)));
       }
       c = mix(c, IW, txt4(d - vec2(-r*0.66, -r*0.3), nh*0.6, ivec4(76, 0, 0, 0), 1));
       c = mix(c, IW, txt4(d - vec2(r*0.66, -r*0.3), nh*0.6, ivec4(82, 0, 0, 0), 1));
@@ -2127,7 +2142,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
       float lab = ki == 0 ? txt4(lc, nh, ivec4(78, 0, 0, 0), 1) : ki == 3 ? txt4(lc, nh, ivec4(69, 0, 0, 0), 1) : ki == 6 ? txt4(lc, nh, ivec4(83, 0, 0, 0), 1) : ki == 9 ? txt4(lc, nh, ivec4(87, 0, 0, 0), 1)
                 : numC(lc, float(ki*3), nh*0.85, 1, 0);
       c = mix(c, ki % 3 == 0 ? IO : IW, lab);
-      for (int k2 = 0; k2 < 8; k2++) { vec2 u = dirA(float(k2)*P/4.0); c = mix(c, IO, aFill(sdSeg(d, u*r*0.97, u*r*1.0) - lw)); }
+      for (int k2 = 0; k2 < 8; k2++) { vec2 u = dirA(float(k2)*P/4.0); c = mix(c, IO, aStroke(sdSeg(d, u*r*0.97, u*r*1.0), 2.0*(lw))); }
       c = mix(c, IO, aFill(sdTri(d, vec2(0.0, r*0.8), vec2(-r*0.05, r*0.93), vec2(r*0.05, r*0.93))));
       float pl = min(sdBox(d - vec2(0.0, -r*0.05), vec2(r*0.025, r*0.32)), sdBox(d - vec2(0.0, r*0.03), vec2(r*0.28, r*0.03)));
       pl = min(pl, sdBox(d - vec2(0.0, -r*0.33), vec2(r*0.12, r*0.025)));
@@ -2159,7 +2174,8 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
     }
     return c;
   }
-  // ---- engine RPM / N1 and fuel
+  // ---- engine RPM / N1 and fuel (pilot's side)
+  if (!pilotSide) return vec3(-1.0);
   int engines = ck == 1 ? 2 : 1;
   for (int e = 0; e < 2; e++) {
     if (e >= engines) break;
@@ -2170,7 +2186,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
       if (inD) {
         float A0 = -2.36, A1 = -2.36 + 4.2/1.1*1.1;
         c = mix(c, IG, dArc(d, re*0.86, A0 + 4.2*0.55, A0 + 4.2*0.96, re*0.07));
-        vec2 ur = dirA(A0 + 4.2); c = mix(c, IR, aFill(sdSeg(d, ur*re*0.78, ur*re*0.96) - re*0.03));
+        vec2 ur = dirA(A0 + 4.2); c = mix(c, IR, aStroke(sdSeg(d, ur*re*0.78, ur*re*0.96), 2.0*(re*0.03)));
         c = mix(c, IW, dTicks(d, re, A0, A0 + 4.2*1.1, 22.0, 0.88, 0.96, lw*0.6));
         c = mix(c, IW, dTicks(d, re, A0, A0 + 4.2*1.1, 11.0, 0.8, 0.96, lw*1.1));
         float a = wrapA(atan(d.x, d.y), A0, A0 + 4.62);
@@ -2204,9 +2220,9 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
     }
     return c;
   }
-  // ---- radio stack: three LCD rows (COM, NAV, transponder) with standby frequencies
+  // ---- radio stack: three LCD rows (COM, NAV, transponder) with standby frequencies (pilot's side only)
   vec2 rs = q - vec2(0.33, 0.0);
-  if (abs(rs.x) < 0.07 && abs(rs.y) < 0.09) {
+  if (pilotSide && abs(rs.x) < 0.07 && abs(rs.y) < 0.09) {
     float row = floor((rs.y + 0.09)/0.06);
     vec2 cell = vec2(rs.x, mod(rs.y + 0.09, 0.06) - 0.03);
     vec3 col = vec3(0.035, 0.036, 0.04);
@@ -2282,7 +2298,7 @@ vec3 mfdPage(int page, vec2 uv){
       c = mix(c, bc*0.85, aFill(max(sdBox(o, vec2(0.075, 0.475)), o.y + 0.475 - lv*0.95)));
       c = mix(c, bc*0.6, aLine(frame, lw*0.6));
       float tk = fract((o.y + 0.475)/0.095 + 0.5) - 0.5;
-      c = mix(c, W*0.5, aFill(sdSeg(vec2(o.x, tk*0.095), vec2(0.11, 0.0), vec2(0.15, 0.0)) - lw*0.3)*step(abs(o.y), 0.48));
+      c = mix(c, W*0.5, aStroke(sdSeg(vec2(o.x, tk*0.095), vec2(0.11, 0.0), vec2(0.15, 0.0)), 2.0*(lw*0.3))*step(abs(o.y), 0.48));
       c = mix(c, W*0.85, numC(o - vec2(0.0, 0.58), lv*100.0, 0.06, 1, 0));
       ivec4 lb = b == 0 ? ivec4(84, 72, 82, 0) : b == 1 ? ivec4(67, 69, 76, 76) : b == 2 ? ivec4(67, 79, 82, 69) : ivec4(78, 79, 90, 0);
       c = mix(c, W*0.6, txt4(o - vec2(0.0, -0.6), 0.05, lb, 1));
@@ -2303,7 +2319,7 @@ vec3 mfdPage(int page, vec2 uv){
     float tri = sdTri(uv, vec2(0.0, 0.1), vec2(-0.065, -0.07), vec2(0.065, -0.07));
     c = mix(c, vec3(0.0), aFill(tri - 0.015));
     c = mix(c, W, aFill(tri));
-    c = mix(c, W*0.5, aFill(sdSeg(uv, vec2(0.0, 0.1), vec2(0.0, 0.9)) - lw*0.3)*step(0.5, fract(uv.y*8.0)));
+    c = mix(c, W*0.5, aStroke(sdSeg(uv, vec2(0.0, 0.1), vec2(0.0, 0.9)), 2.0*(lw*0.3))*step(0.5, fract(uv.y*8.0)));
     vec2 nn = -vec2(dot(vec2(0.0, -1.0), rt), dot(vec2(0.0, -1.0), f))*0.8;   // north marker
     float nc = length(uv - nn) - 0.075;
     c = mix(c, R*0.3, aFill(nc)); c = mix(c, R, aLine(nc, lw*0.6));
@@ -2322,7 +2338,7 @@ vec3 mfdPage(int page, vec2 uv){
     for (int k = -6; k <= 6; k++) {
       if (k == 0) continue;
       float y = hz - float(k)*0.0873*ppr, hl = abs(k) % 2 == 0 ? 0.24 : 0.12;
-      c = mix(c, W*0.9, aFill(sdSeg(vec2(o.x, y), vec2(-hl, 0.0), vec2(hl, 0.0)) - lw*0.45));
+      c = mix(c, W*0.9, aStroke(sdSeg(vec2(o.x, y), vec2(-hl, 0.0), vec2(hl, 0.0)), 2.0*(lw*0.45)));
       if (abs(k) % 2 == 0) c = mix(c, W*0.9, numC(vec2(o.x - sign(o.x)*(hl + 0.1), y), abs(float(k))*5.0, 0.06, 1, 0));
     }
     float rr = length(uv);
@@ -2330,7 +2346,7 @@ vec3 mfdPage(int page, vec2 uv){
       float ta = radians(k == 0 ? 0.0 : k == 1 ? 10.0 : k == 2 ? 20.0 : k == 3 ? 30.0 : k == 4 ? 45.0 : 60.0);
       for (int sgn = -1; sgn <= 1; sgn += 2) {
         vec2 u = dirA(ta*float(sgn));
-        c = mix(c, W, aFill(sdSeg(uv, u*0.8, u*(k == 0 || k == 3 || k == 5 ? 0.92 : 0.87)) - lw*0.45));
+        c = mix(c, W, aStroke(sdSeg(uv, u*0.8, u*(k == 0 || k == 3 || k == 5 ? 0.92 : 0.87)), 2.0*(lw*0.45)));
       }
     }
     c = mix(c, W, dArc(uv, 0.8, -1.05, 1.05, lw*0.7));
@@ -2368,7 +2384,7 @@ vec3 mfdPage(int page, vec2 uv){
     for (int k = 0; k <= 3; k++) {
       float ta = 1.5708 + float(k)*0.5236;
       vec2 u = dirA(ta);
-      c = mix(c, W*0.7, aFill(sdSeg(sq, u*0.62, u*0.68) - lw*0.4));
+      c = mix(c, W*0.7, aStroke(sdSeg(sq, u*0.62, u*0.68), 2.0*(lw*0.4)));
       c = mix(c, W*0.7, numC(sq - u*0.75, float(k)*30.0, 0.05, 1, 0));
     }
     vec2 u = dirA(1.5708 + a);
@@ -2409,7 +2425,7 @@ vec3 mfdPage(int page, vec2 uv){
     float tape = sdRBox(aq, vec2(0.06, 0.58), 0.02);
     c = mix(c, C*0.08, aFill(tape)); c = mix(c, C*0.6, aLine(tape, lw*0.6));
     float tk = fract(aq.y/0.0967 + 0.5) - 0.5;
-    c = mix(c, W*0.5, aFill(sdSeg(vec2(aq.x, tk*0.0967), vec2(-0.06, 0.0), vec2(-0.02, 0.0)) - lw*0.3)*step(abs(aq.y), 0.56));
+    c = mix(c, W*0.5, aStroke(sdSeg(vec2(aq.x, tk*0.0967), vec2(-0.06, 0.0), vec2(-0.02, 0.0)), 2.0*(lw*0.3))*step(abs(aq.y), 0.56));
     float ay = clamp(uHud3.y/30.0, -1.0, 1.0)*0.56;
     c = mix(c, A, aFill(sdTri(aq - vec2(0.0, ay), vec2(-0.05, 0.0), vec2(0.06, 0.04), vec2(0.06, -0.04))));
     c = mix(c, W*0.6, txt4(aq - vec2(0.0, -0.68), 0.045, ivec4(65, 79, 65, 0), 1));
@@ -3030,8 +3046,7 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
         m.alb = vec3(0.075); m.rough = 0.6;
         if (ln.z > 0.6) {
           bool pilot = lp.x*E.x >= 0.0;
-          vec2 q = vec2(pilot ? lp.x - E.x : lp.x + E.x, lp.y - (E.y - 0.32));
-          if (!pilot && ck == 0) q.x = lp.x + E.x - 0.33 + 0.33;
+          vec2 q = vec2(pilot ? lp.x - E.x : lp.x + E.x - coShift(E, ck), lp.y - (E.y - 0.32));
           float px = t*2.0*uTanHalf/uRes.y;   // panel metres per pixel
           gAA = px*0.55;
           vec3 ic = vec3(0.0); float cov = 0.0;
@@ -3040,7 +3055,7 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
             vec3 c4 = drawInstruments(q + o, ck, pilot);
             if (c4.x >= 0.0) { ic += c4; cov += 1.0; }
           }
-          if (cov > 0.0) { ic /= cov; float k = cov*0.25; m.alb = mix(m.alb, ic*0.25, k); m.emit = ic*(0.3 + 0.6*uNight)*k; m.rough = mix(m.rough, 0.12, k); }
+          if (cov > 0.0) { gDispPx = true; ic /= cov; float k = cov*0.25; m.alb = mix(m.alb, ic*0.25, k); m.emit = ic*(0.3 + 0.6*uNight)*k; m.rough = mix(m.rough, 0.12, k); }
         }
       }
       else if (mid == 11) { m.alb = lp.y < E.y - 1.0 ? vec3(0.08, 0.08, 0.09) : vec3(0.5, 0.49, 0.46); m.rough = 0.85; }
@@ -3136,7 +3151,7 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
                         + mfdPage(page, uv + vec2(0.25, 0.75)*fp) + mfdPage(page, uv + vec2(-0.75, 0.25)*fp));
           float edge = smoothstep(1.0, 0.92, max(abs(uv.x), abs(uv.y)));
           sc = sc*edge + vec3(0.01, 0.03, 0.04)*edge;                                         // dark-blue backlight
-          m.alb = vec3(0.01); m.rough = 0.06; m.metal = 0.0; m.emit = sc*1.5;
+          m.alb = vec3(0.01); m.rough = 0.06; m.metal = 0.0; m.emit = sc*1.5; gDispPx = true;
         }
         else if (mid == 46) { tx = triSample(lp, ln, M_LEATHER, 0.3, nT); m.alb = vec3(dot(tx.rgb, vec3(0.33)))*vec3(0.3, 0.32, 0.36); m.rough = tx.a; m.nrm = nT;
           if (abs(abs(lp.x - E.x) - 0.16) < 0.005) m.emit = gColStripe*0.9*pulse;
@@ -3321,6 +3336,7 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
   }
 #endif
   if (any(isnan(col)) || any(isinf(col)) || !(col.r + col.g + col.b < 1e7)) col = vec3(0.0);
+  if (gDispPx && taaFlag > 0.4 && taaFlag < 0.6) taaFlag = 0.55;
   oColor = vec4(clamp(col, vec3(0.0), vec3(3e4)), taaFlag);
   oDepth = t;
 }
@@ -3781,6 +3797,44 @@ R"(    float fade = pow(1.0 - age, 0.7);
 
 // ------------------------------------------------------------------------------------------------
 // Overlay pass: world-space sprites (particles, lights, rings) depth-tested against the ray-traced depth
+// GPS aerial imagery: the ray tracer's own terrain material seen straight down (the full ray-tracer source is linked
+// in with its main() renamed, so the map is exactly the world you fly over), hill-shaded from the north-west like a
+// satellite photo. 4 samples per texel; rendered into a texture only when the map view moves or zooms.
+static const char* kMapMain = R"(
+uniform vec4 uMapView;   // centre x, centre z, half extent (m), metres per texel
+uniform vec2 uMapRes;
+void main(){
+  vec2 uv = gl_FragCoord.xy/uMapRes;
+  vec2 c0 = uMapView.xy + (uv*2.0 - 1.0)*uMapView.z;
+  float foot = uMapView.w;
+  float tq = clamp(foot*900.0, 900.0, 20000.0);   // material detail matched to the texel footprint
+  vec3 L = normalize(vec3(-0.55, 0.75, -0.4));
+  vec3 acc = vec3(0.0);
+  for (int si = 0; si < 4; si++) {
+    vec2 wp = c0 + (vec2(si & 1, si >> 1) - 0.5)*foot*0.7;
+    vec4 base = baseAt(wp);
+    float h = terrainH(wp, 9);
+    vec3 col;
+    if (h < 0.0) {   // sea: turquoise shallows over sand, deepening to blue, a white surf line on the shore
+      float dpt = -h;
+      col = mix(vec3(0.25, 0.62, 0.62), vec3(0.03, 0.17, 0.33), smoothstep(0.0, 35.0, dpt));
+      col = mix(col, vec3(0.015, 0.07, 0.17), smoothstep(35.0, 220.0, dpt));
+      col += vec3(0.02)*(cn3(vec3(wp*0.02, 0.0)) - 0.5);
+      col = mix(col, vec3(0.85, 0.9, 0.9), smoothstep(1.2, 0.0, dpt)*0.6);
+    } else {
+      vec3 n = terrainNormal(wp, tq);
+      Mat m = terrainMaterial(vec3(wp.x, h, wp.y), n, tq, base);
+      float sun = max(dot(n, L), 0.0);
+      col = m.alb*(0.42 + 0.9*sun) + m.emit*0.0;
+    }
+    acc += col;
+  }
+  vec3 col = acc*0.25*1.25;
+  col = col/(1.0 + col*0.35);
+  oColor = vec4(pow(clamp(col, 0.0, 1.0), vec3(1.0/2.2)), 1.0);
+}
+)";
+
 static const char* kSpriteVS = R"(#version 330 core
 layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUV; layout(location=2) in vec4 aCol; layout(location=3) in vec2 aKind;
 uniform mat4 uViewProj; uniform vec3 uCamPos;
@@ -3947,9 +4001,12 @@ void main(){
   float flag = cur.a;
   if (up) cur.rgb = texture(uRaw, ruv).rgb;
   vec3 m1 = vec3(0.0), m2 = vec3(0.0), cy = toY(cur.rgb);
+  float fmin = flag, fmax = flag;   // pixel classes around this one (a silhouette edge holds both)
   for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
-    vec3 y = toY(texelFetch(uRaw, clamp(ip + ivec2(i, j), ivec2(0), ivec2(uRawRes) - 1), 0).rgb);
+    vec4 nb = texelFetch(uRaw, clamp(ip + ivec2(i, j), ivec2(0), ivec2(uRawRes) - 1), 0);
+    vec3 y = toY(nb.rgb);
     m1 += y; m2 += y*y;
+    fmin = min(fmin, nb.a); fmax = max(fmax, nb.a);
   }
   m1 /= 9.0; vec3 sd = sqrt(max(m2/9.0 - m1*m1, 0.0));
   float t = texelFetch(uDepth, ip, 0).r;
@@ -3973,11 +4030,13 @@ void main(){
     float hflag = texture(uHist, puv).a;   // what the history pixel was: aircraft, world or a moving effect
     float a = mix(0.08, 0.3, clamp(motion/12.0, 0.0, 1.0));   // fast motion: lean on the new frame, less smear
     if (flag < 0.4) a = max(a, 0.4);
-    if (abs(hflag - flag) > 0.25) a = max(a, 0.9);   // disocclusion (a wing sweeping off the sky): drop the stale history
+    // disocclusion (a wing sweeping off the sky): drop the stale history - but only when no neighbour shares the
+    // history's class, so jittered silhouette edges keep accumulating and stay anti-aliased
+    if (hflag < fmin - 0.25 || hflag > fmax + 0.25) a = max(a, 0.9);
     res = fromY(mix(hy, cy, a));
   }
   oHist = vec4(res, flag);
-  oColor = vec4(res, 1.0);
+  oColor = vec4(res, flag);
 }
 )";
 
@@ -4022,6 +4081,7 @@ void main(){
   vec3 mn = min(tM, min(min(tN, tS), min(tE, tW))), mx = max(tM, max(max(tN, tS), max(tE, tW)));
   vec3 amp = sqrt(clamp(min(mn, 1.0 - mx)/max(mx, 1e-4), 0.0, 1.0));
   vec3 wgt = -amp/6.5;   // CAS sharpness ~0.5
+  if (abs(texture(uScene, uv).a - 0.55) < 0.02) wgt = vec3(0.0);   // cockpit displays: already anti-aliased, sharpening only makes them crunchy
   vec3 sh = clamp((tM + (tN + tS + tE + tW)*wgt)/(1.0 + 4.0*wgt), 0.0, 0.99995);
   vec3 scene = sh/(1.0 - sh);
   vec3 c = mix(scene, texture(uBloom, uv).rgb/6.0, uBloomK) + texture(uRays, uv).rgb*uRayK;   // 6 bloom levels summed

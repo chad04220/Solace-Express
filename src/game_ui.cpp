@@ -286,6 +286,69 @@ void Game::drawIntro(float progress, const std::string& stage, float t, unsigned
   }
 }
 
+// ------------------------------------------------------------------ pre-flight loading screen
+void Game::drawLoading() {
+  float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  bool air = !plane.onGround;
+  const Airport& ap = g_world.airports[air ? contract.to : contract.from];
+  if (!loadMap) {   // the aerial image of the airport, rendered once from the real terrain
+    loadMap = true; gpsMapValid = false;
+    g_ren.renderMap(ap.x, ap.z, 2400.f, 1536);
+  }
+  float rt = loadReadyT >= 0 ? loadT - loadReadyT : 0.f;
+  float cover = 1.f - smoothstepf(0.f, 1.4f, rt);   // the card fades out onto the live shot once the scenery is in
+  if (cover > 0.001f) {
+    g_ren.rect(0, 0, W, H, vec3(0.01f, 0.02f, 0.035f), cover);
+    if (g_ren.mapTex()) {   // slow push-in over the aerial image
+      float z = 0.62f - 0.05f * std::min(loadT, 12.f) / 12.f;
+      float sv = z, su = z * W / H;
+      if (su > 0.98f) { sv *= 0.98f / su; su = 0.98f; }
+      g_ren.image(g_ren.mapTex(), 0, 0, W, H, 0.5f - su * 0.5f, 0.5f - sv * 0.5f, 0.5f + su * 0.5f, 0.5f + sv * 0.5f, cover);
+      g_ren.flushUIPublic();
+    }
+    // runway marker on the image
+  }
+  // legibility gradients
+  g_ren.rectGrad(0, H * 0.55f, W, H * 0.45f, vec3(0, 0, 0), vec3(0.0f, 0.01f, 0.02f), 0.75f);
+  g_ren.rectGrad(0, 0, W, 90 * s, vec3(0.0f, 0.01f, 0.02f), vec3(0, 0, 0), 0.55f);
+  // header
+  bool research = researchFlight;
+  g_ren.text(40 * s, 26 * s, 13 * s, research ? "CONFIDENTIAL RESEARCH FLIGHT" : contract.type == CT_LESSON ? "FLIGHT LESSON" : "CONTRACT", C_ACCENT, 1, 0, false);
+  g_ren.text(40 * s, 44 * s, 30 * s, contract.title, C_TEXT, 1);
+  // mission card
+  float cx = 40 * s, cy = H - 250 * s, cw = std::min(720 * s, W - 80 * s);
+  const Airport& from = g_world.airports[contract.from];
+  const Airport& to = g_world.airports[contract.to];
+  header(cx, cy, cw, air ? "IN FLIGHT  //  INBOUND" : "DEPARTURE");
+  g_ren.text(cx, cy + 26 * s, 40 * s, fmt("%s", ap.code), C_TEXT, 1);
+  g_ren.text(cx + g_ren.textWidth(ap.code, 40 * s) + 16 * s, cy + 40 * s, 20 * s, ap.name, C_DIM, 1);
+  float ly = cy + 86 * s;
+  auto kv = [&](float x, const char* k, const std::string& v) {
+    g_ren.text(x, ly, 11 * s, k, C_DIM, 1, 0, false);
+    g_ren.text(x, ly + 15 * s, 17 * s, v, C_TEXT, 1);
+  };
+  kv(cx, "AIRCRAFT", plane.spec->name);
+  if (contract.from != contract.to) kv(cx + 240 * s, "ROUTE", fmt("%s  >  %s", from.code, to.code));
+  kv(cx + 420 * s, "CONDITIONS", wx.describe());
+  // progress / ready prompt
+  float by = H - 70 * s, bw = cw, bh = 8 * s;
+  if (loadReadyT < 0) {
+    g_ren.text(cx, by - 24 * s, 13 * s, "PREPARING SCENERY", C_TEXT, 0.9f, 0, false);
+    g_ren.text(cx + bw, by - 24 * s, 13 * s, fmt("%3.0f%%", loadShown * 100), C_ACCENT, 1, 2, false);
+    g_ren.rect(cx, by, bw, bh, C_ACCENT, 0.12f, 2 * s);
+    g_ren.rectGrad(cx, by, std::max(bw * loadShown, 4 * s), bh, C_ACCENT * 0.7f, C_ACCENT, 1, 2 * s);
+    float hx = cx + bw * loadShown;
+    g_ren.glow(hx - 4 * s, by - 2 * s, 8 * s, bh + 4 * s, C_ACCENT, 0.5f + 0.3f * sinf(realTime * 6.f), 4 * s, 14 * s);
+  } else {
+    float pulse = 0.6f + 0.4f * sinf(realTime * 3.f);
+    float bx = cx, bwid = 380 * s;
+    g_ren.glow(bx, by - 12 * s, bwid, 40 * s, C_ACCENT, 0.25f * pulse, 4 * s, 16 * s);
+    g_ren.rectGrad(bx, by - 12 * s, bwid, 40 * s, C_ACCENT * 1.05f, C_ACCENT * 0.6f, 0.95f, 4 * s);
+    g_ren.text(bx + bwid * 0.5f, by - 1 * s, 17 * s, in.pad ? "PRESS  A  TO FLY" : "CLICK OR PRESS ENTER TO FLY", C_INK, 1, 1, false);
+    g_ren.text(bx + bwid + 20 * s, by + 1 * s, 13 * s, in.pad ? "B  BACK" : "ESC  BACK", C_DIM, 0.9f, 0, false);
+  }
+}
+
 // ------------------------------------------------------------------ main menu
 void Game::drawMenu() {
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
@@ -323,7 +386,6 @@ void Game::drawMenu() {
   if (button(60 * s, y, bw, bh, "Controls")) { screen = SCR_HUB; hubTab = TAB_SETTINGS; settingsPage = 1; }
   y += bh + 14 * s;
   if (button(60 * s, y, bw, bh, "Quit")) quit = true;
-  g_ren.text(60 * s, H - 45 * s, 13 * s, "v1.3  -  Real-time GPU ray-traced terrain, water, clouds and aircraft", C_DIM, 0.6f);
 }
 
 // ------------------------------------------------------------------ hub
@@ -1301,17 +1363,23 @@ void Game::drawGps() {
   // frame + map image (world clipped to the frame, open sea outside the island chart)
   g_ren.glow(mx, my, msz, msz, C_ACCENT, 0.25f * e, 4 * s, 18 * s);
   g_ren.rect(mx, my, msz, msz, vec3(0.03f, 0.1f, 0.18f), e);
-  {
-    float wx0 = std::max(plane.pos.x - range, -WORLD_HALF), wx1 = std::min(plane.pos.x + range, WORLD_HALF);
-    float wz0 = std::max(plane.pos.z - range, -WORLD_HALF), wz1 = std::min(plane.pos.z + range, WORLD_HALF);
-    if (wx1 > wx0 && wz1 > wz0) {
-      vec2 a = toS(wx0, wz0), b = toS(wx1, wz1);
-      g_ren.image(g_ren.minimapTex, a.x, a.y, b.x - a.x, b.y - a.y, (wx0 + WORLD_HALF) / (2 * WORLD_HALF), (wz0 + WORLD_HALF) / (2 * WORLD_HALF),
-                  (wx1 + WORLD_HALF) / (2 * WORLD_HALF), (wz1 + WORLD_HALF) / (2 * WORLD_HALF), e);
+  {   // aerial imagery rendered from the real terrain on the GPU; re-rendered only when the view drifts or zooms
+    int N = std::clamp((int)(msz * 1.4f / 256.f + 0.5f) * 256, 768, 2048);
+    bool stale = !gpsMapValid || N != gpsMapN || range * 1.04f > gpsMapHalf || range * 1.7f < gpsMapHalf ||
+                 fabsf(plane.pos.x - gpsMapC.x) + range > gpsMapHalf || fabsf(plane.pos.z - gpsMapC.y) + range > gpsMapHalf;
+    if (stale && g_ren.ok) {
+      gpsMapHalf = range * 1.3f; gpsMapC = vec2(plane.pos.x, plane.pos.z); gpsMapN = N;
+      g_ren.renderMap(gpsMapC.x, gpsMapC.y, gpsMapHalf, N);
+      gpsMapValid = true;
+    }
+    if (gpsMapValid && g_ren.mapTex()) {
+      float u0 = (plane.pos.x - range - (gpsMapC.x - gpsMapHalf)) / (2 * gpsMapHalf), u1 = u0 + range / gpsMapHalf;
+      float v0 = (plane.pos.z - range - (gpsMapC.y - gpsMapHalf)) / (2 * gpsMapHalf), v1 = v0 + range / gpsMapHalf;
+      g_ren.image(g_ren.mapTex(), mx, my, msz, msz, u0, v0, u1, v1, e);
       g_ren.flushUIPublic();
     }
   }
-  g_ren.rect(mx, my, msz, msz, vec3(0.0f, 0.05f, 0.1f), 0.28f * e);   // night-mode tint
+  g_ren.rect(mx, my, msz, msz, vec3(0.0f, 0.05f, 0.1f), 0.1f * e);   // a touch of display tint over the imagery
   // grid every 5 / 10 km
   float gstep = range > 15000 ? 10000.f : range > 6000 ? 5000.f : 2000.f;
   for (float gx = floorf((plane.pos.x - range) / gstep) * gstep; gx <= plane.pos.x + range; gx += gstep) { vec2 a = toS(gx, plane.pos.z - range), b = toS(gx, plane.pos.z + range); seg(a, b, 1 * s, C_ACCENT, 0.12f); }

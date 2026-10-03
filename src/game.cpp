@@ -41,6 +41,7 @@ const ActionInfo kActions[ACT_COUNT] = {
   {"camera", "Cycle camera", 2, 'C', PAD_BACK},                 {"hud", "Show / hide HUD", 2, 'H', 0},
   {"gpsMap", "GPS moving map", 2, 'N', 0},                      {"minimap", "Minimap", 2, K_TAB, 0},
   {"radio", "Internet radio", 2, 'R', 0},                       {"anr", "Headset noise cancelling", 2, 'M', PAD_LS},
+  {"zoom", "Cockpit zoom (hold; wheel zooms too)", 2, 'U', 0},
   {"cloak", "Cloak (or double-tap brake)", 3, 'X', 0},          {"weapons", "Weapons hot / safe", 3, 'Y', PAD_Y},
   {"fire", "Fire lasers (or left mouse)", 3, K_ENTER, PAD_RB},  {"bomb", "Drop bomb (or middle mouse)", 3, K_BACK, PAD_LB},
 };
@@ -268,13 +269,15 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
   takeoffAnnounced = false; touchedDown = false; touchdownFpm = 0; stillTimer = 0;
   engineAutoStarted = false; startDelay = 1.2f;
-  particles.clear(); bursts.clear(); trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0;
+  particles.clear(); bursts.clear(); pops.clear(); boomT = -1; trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0;
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
   approachMinAgl = 1e9f;
   apWasOn = false; apDest = -1; wraith = WraithState(); g_scenery.resetDamage();
   licenseBefore = career.license;
-  screen = SCR_FLIGHT;
+  // the player sees a loading screen while the scenery around the start is generated (tests fly straight away)
+  screen = headless ? SCR_FLIGHT : SCR_LOADING;
+  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadMap = false; dbgCam = dbgFollow = false;
   toast(fmt("%s - %s", a.code, a.name), vec3(0.7f, 0.9f, 1.0f));
   toast(fmt("Runway %02d, %s", a.rwyNumber(reverse), wx.describe().c_str()), vec3(0.8f, 0.8f, 0.8f));
 }
@@ -461,7 +464,7 @@ void Game::flightControls(float dt) {
 }
 
 void Game::spawn(vec3 p, vec3 v, float life, float size, float grow, vec3 col, float alpha, int kind, float drag, float buoy) {
-  if (particles.size() > 6000) return;
+  if (particles.size() > 9000) return;
   particles.push_back({p, v, life, life, size, grow, col, alpha, kind, drag, buoy, false, true});
 }
 
@@ -714,6 +717,48 @@ void Game::updateFlight(float dt) {
   }
 }
 
+// ------------------------------------------------------------------ pre-flight loading screen
+// After a flight is chosen the world is held still while the scenery around the start position is generated (with a
+// bigger per-frame budget), behind a card showing an aerial image of the airport. Once nothing is left to stream it
+// cross-fades into a live establishing shot of the aircraft, and the player starts the flight when ready.
+void Game::updateLoading(float dt) {
+  loadT += dt;
+  if (loadReadyT < 0) {
+    dbgCam = false;
+    updateCamera(dt);   // stream around the camera the flight will open with
+    g_ren.entBudgetMs = 14.f;
+    int pend = g_ren.entPending;
+    if (loadT > 0.05f) loadPend0 = std::max(loadPend0, pend);
+    float prog = loadPend0 > 0 ? 1.f - (float)pend / loadPend0 : clampf(loadT / 0.8f, 0.f, 1.f);
+    loadShown = std::max(loadShown, loadShown + (prog - loadShown) * (1.f - expf(-dt * 8.f)));
+    if (pend == 0 && loadT > 0.8f) { loadReadyT = loadT; loadShown = 1.f; g_ren.entBudgetMs = 2.5f; }
+  } else {
+    // establishing shot: a slow orbit round the aircraft on the ground, or a camera flying alongside in the air
+    float t = loadT - loadReadyT, size = std::max(plane.spec->span, plane.spec->fusLen);
+    dbgCam = true; dbgFollow = false;
+    if (plane.onGround) {
+      float a = plane.heading() * DEG + 2.2f + t * 0.07f, R = size * 1.9f + 10.f;
+      dbgCamPos = plane.pos + vec3(sinf(a) * R, R * 0.32f + 2.f, -cosf(a) * R);
+      dbgCamLook = plane.pos + vec3(0, size * 0.1f, 0);
+    } else {
+      float R = size * 2.2f + 8.f;
+      dbgCamPos = plane.pos + plane.right() * (R * 0.85f) + plane.forward() * (R * (0.7f - 0.04f * t)) + vec3(0, R * 0.18f, 0);
+      dbgCamLook = plane.pos + plane.forward() * (size * 0.2f);
+    }
+    bool go = in.pressed[K_ENTER] || in.pressed[' '] || in.mPressed[0] || (in.buttonsPressed & PAD_A);
+    if (go && t > 0.5f) {
+      screen = SCR_FLIGHT; dbgCam = false;
+      camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 3, 15));
+      in.pressed[K_ENTER] = in.pressed[' '] = false; in.mPressed[0] = false; in.buttonsPressed &= ~PAD_A;
+      g_audio.trigger(SFX_CLICK);
+    }
+  }
+  if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) {   // back out to where the flight was chosen
+    dbgCam = false; g_ren.entBudgetMs = 2.5f;
+    screen = researchFlight ? SCR_RESEARCH : SCR_HUB;
+  }
+}
+
 // ------------------------------------------------------------------ camera
 void Game::updateCamera(float dt) {
   if (!plane.spec) return;
@@ -724,11 +769,17 @@ void Game::updateCamera(float dt) {
     if (camMode == 3) camPos = plane.pos + normalize(vec3(plane.vel.x, 0, plane.vel.z) + vec3(0.01f, 0, 0)) * 350.f + plane.right() * 40.f + vec3(0, 12, 0);
   }
   if (in.wheel != 0 && showMap) gpsRangeTarget = clampf(gpsRangeTarget * powf(0.8f, in.wheel), 1500.f, 40000.f);
+  else if (in.wheel != 0 && !showRadio && camMode == 1) ckZoomT = clampf(ckZoomT * powf(1.2f, in.wheel), 1.f, 4.f);
   else if (in.wheel != 0 && !showRadio) camZoom = clampf(camZoom * powf(0.88f, in.wheel), 0.35f, 4.f);
+  {   // cockpit zoom eases toward the wheel setting, or 2.8x while the zoom action is held
+    float tz = camMode == 1 ? (actDown(ACT_ZOOM) ? std::max(ckZoomT, 2.8f) : ckZoomT) : 1.f;
+    ckZoom += (tz - ckZoom) * (1.f - expf(-dt * 10.f));
+  }
   bool drag = in.mDown[1] || (camMode == 2 && in.mDown[0]);
   // chase and orbit cameras use reversed pitch: stick up / drag up swings the camera down so the view tilts up
   float pitchDir = (camMode == 0 || camMode == 2) ? -1.f : 1.f;
-  if (drag) { camYaw -= in.mdx * 0.005f * set.mouseSens; camPitch = clampf(camPitch + pitchDir * in.mdy * 0.004f * set.mouseSens, -1.3f, 1.4f); }
+  float lookK = camMode == 1 ? 1.f / ckZoom : 1.f;   // zoomed in: finer look control
+  if (drag) { camYaw -= in.mdx * 0.005f * set.mouseSens * lookK; camPitch = clampf(camPitch + pitchDir * in.mdy * 0.004f * set.mouseSens * lookK, -1.3f, 1.4f); }
   if (in.pad) { float rx = fabsf(in.rx) > 0.2f ? in.rx : 0, ry = fabsf(in.ry) > 0.2f ? in.ry : 0; camYaw -= rx * 2.f * dt; camPitch = clampf(camPitch + pitchDir * ry * 1.5f * dt, -1.3f, 1.4f); }
   const AircraftSpec& s = *plane.spec;
   float size = std::max(s.fusLen, s.span);
@@ -915,7 +966,7 @@ void Game::buildLights(FrameParams& fp) {
     if (fp.plN < 12 && col.x + col.y + col.z > 1e-4f) fp.pl[fp.plN++] = {pos, rad, col, cosCut, dir, shadow};
   };
   if (length(fp.flameLight) > 0.f) light(fp.flameLightPos, 4.f, fp.flameLight, -2.f, vec3(0, 1, 0), 0.f);   // plasma blast
-  if (screen != SCR_FLIGHT || !plane.spec || crashed) return;
+  if ((screen != SCR_FLIGHT && screen != SCR_LOADING) || !plane.spec || crashed) return;
   const AircraftSpec& s = *plane.spec;
   const ModelDef& md = kModels[plane.spec - kAircraft];
   float t = realTime, night = fp.night;
@@ -1042,6 +1093,49 @@ float Game::wreckGround(float x, float z) const {
 
 // Splits the airframe into nose, centre section, both wings and tail (each the ray-traced model clipped to a
 // body-space box), throws them apart with the impact energy, scatters skin fragments and digs a crater.
+// A layered explosion: a white-hot flash that lights the scene, a fireball of flame cooling from yellow to deep red
+// as it billows out and rises, a dark smoke column that keeps climbing and spreading after the flames die, arcing
+// sparks, burning fragments that trail fire and smoke, and a shock ring. R: fireball radius (m).
+void Game::fireball(vec3 c, vec3 baseV, float R, bool air, bool water) {
+  Rng r((uint32_t)(c.x * 13.f + c.z * 7.f + realTime * 1000.f));
+  auto sph = [&]() { vec3 d(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1)); float l = length(d); return l > 1e-3f ? d / l : vec3(0, 1, 0); };
+  boomT = 0; boomP = c + vec3(0, R * 0.4f, 0); boomI = R * R * 500.f;
+  for (int i = 0; i < 3; i++) spawn(c + sph() * R * 0.2f, baseV, r.range(0.12f, 0.22f), R * r.range(0.9f, 1.3f), R * 1.5f, vec3(1.f, 0.9f, 0.7f) * 1.6f, 1.f, SPR_GLOW, 0.f, 0.f);   // flash
+  if (water) {   // into the sea: a tall column of spray and steam instead of a fireball
+    for (int i = 0; i < 110; i++) { vec3 d = sph(); d.y = fabsf(d.y) * 2.5f + 0.6f;
+      spawn(c + vec3(0, 0.5f, 0), baseV * 0.3f + d * R * r.range(1.5f, 4.f), r.range(1.8f, 3.2f), R * r.range(0.15f, 0.35f), R * 0.5f, vec3(0.92f, 0.95f, 1.f), 0.8f, SPR_SMOKE, 1.f, -7.f); }
+    bursts.push_back({c + vec3(0, 0.3f, 0), vec3(R * 3.f, 0, 0), vec3(0, 0, R * 3.f), vec3(0.8f, 0.9f, 1.f), 0.f});
+    return;
+  }
+  int nf = (int)clampf(R * 22.f, 40.f, 160.f);
+  for (int i = 0; i < nf; i++) {   // the fireball: fast core flames, slower outer billows that rise
+    vec3 d = sph(); if (!air) d.y = fabsf(d.y) * 0.8f + 0.15f;
+    float k = r.range(0.f, 1.f);
+    vec3 col = lerp(vec3(1.f, 0.85f, 0.45f), vec3(1.f, 0.42f, 0.1f), k) * r.range(0.8f, 1.2f);
+    spawn(c + d * R * 0.25f * k, baseV * 0.6f + d * R * r.range(1.4f, 3.2f), r.range(0.7f, 1.6f), R * r.range(0.25f, 0.5f), R * r.range(0.3f, 0.7f), col, 0.16f, SPR_FIRE, 2.6f, r.range(2.f, 5.f));   // dim each: they build up, not blow out
+  }
+  int ns = (int)clampf(R * 14.f, 25.f, 100.f);
+  for (int i = 0; i < ns; i++) {   // smoke: the column keeps climbing and spreading long after the flames
+    vec3 d = sph(); if (!air) d.y = fabsf(d.y) + 0.3f;
+    float g = r.range(0.06f, 0.16f);
+    spawn(c + d * R * 0.4f, baseV * 0.35f + d * R * r.range(0.4f, 1.2f) + plane.windVel * 0.5f, r.range(4.f, 9.f), R * r.range(0.35f, 0.6f), R * r.range(0.25f, 0.45f), vec3(g, g * 0.95f, g * 0.9f), r.range(0.45f, 0.7f), SPR_SMOKE, 0.6f, r.range(1.5f, 3.5f));
+  }
+  for (int i = 0; i < (int)clampf(R * 25.f, 50.f, 160.f); i++)   // sparks arcing out and falling
+    spawn(c, baseV * 0.7f + sph() * r.range(15.f, 55.f) + vec3(0, r.range(0.f, 15.f), 0), r.range(0.8f, 2.4f), r.range(0.05f, 0.12f), -0.02f, vec3(1.f, 0.7f, 0.3f) * r.range(2.f, 5.f), 1.f, SPR_SPARK, 0.6f, -9.f);
+  for (int i = 0; i < (int)clampf(R * 2.5f, 6.f, 18.f); i++) {   // burning fragments trailing fire and smoke
+    Debris d;
+    d.p = c + sph() * R * 0.3f;
+    vec3 dir = sph(); if (!air) dir.y = fabsf(dir.y) + 0.4f;
+    d.v = baseV * 0.7f + normalize(dir) * r.range(15.f, 40.f);
+    d.w = sph() * r.range(4.f, 14.f); d.q = quat::axisAngle(sph(), r.range(0, 6.f));
+    d.size = r.range(0.15f, 0.45f); d.charred = true; d.rest = false; d.burn = r.range(1.2f, 3.5f);
+    debris.push_back(d);
+  }
+  vec3 f = air && length(baseV) > 1.f ? normalize(baseV) : vec3(0, 1, 0);
+  vec3 rr = normalize(cross(f, fabsf(f.y) > 0.9f ? vec3(1, 0, 0) : vec3(0, 1, 0))), u = cross(rr, f);
+  bursts.push_back({c, rr * R * 3.5f, u * R * 3.5f, vec3(1.f, 0.65f, 0.35f), 0.f});   // shock ring
+}
+
 void Game::breakUp(vec3 impactVel, bool water, bool air) {
   const ModelDef& m = kModels[plane.spec - kAircraft];
   Rng r(1234 + (uint32_t)(flightClock * 100));
@@ -1097,16 +1191,26 @@ void Game::breakUp(vec3 impactVel, bool water, bool air) {
     }
     craterR = 0;
     crashEndT = 1e9f;   // set once everything is down
-    // the failure: a fireball and a spray of sparks and skin that the slipstream tears away
-    for (int i = 0; i < 70; i++) {
-      vec3 v(r.range(-14, 14), r.range(-10, 14), r.range(-14, 14));
-      spawn(centre, plane.vel * 0.55f + v, r.range(0.6f, 1.3f), r.range(2.f, 4.5f), 4.f, vec3(1.f, 0.55f, 0.18f), 1.f, SPR_FIRE, 2.5f, 1.f);
+    // the failure: the fuel tanks flash into a fireball smeared along the flight path, the slipstream tears the
+    // skin away, and over the next couple of seconds the pieces go off again one after another
+    pops.clear();
+    for (int i = 0; i < 4; i++) {
+      float k = i / 3.f;
+      fireball(centre - plane.vel * (0.06f * k), plane.vel * (0.85f - 0.25f * k), 4.f + 3.f * (1.f - k), true, false);
     }
-    for (int i = 0; i < 90; i++) spawn(centre, plane.vel * 0.7f + vec3(r.range(-40, 40), r.range(-30, 40), r.range(-40, 40)), r.range(0.8f, 2.2f), r.range(0.5f, 1.4f), -0.3f, vec3(1.f, 0.7f, 0.3f) * r.range(2.f, 5.f), 1.f, SPR_SPARK, 1.2f, -9.f);
-    for (int i = 0; i < 30; i++) spawn(centre, plane.vel * 0.4f + vec3(r.range(-8, 8), r.range(-6, 8), r.range(-8, 8)), r.range(3.f, 6.f), r.range(3.f, 6.f), 2.5f, vec3(0.12f, 0.11f, 0.1f), 0.7f, SPR_SMOKE, 1.5f, 0.5f);
-    {
-      vec3 f = length(plane.vel) > 1.f ? normalize(plane.vel) : vec3(0, 0, -1), rr = normalize(cross(f, vec3(0, 1, 0)) + vec3(1e-4f, 0, 0)), u = cross(rr, f);
-      bursts.push_back({centre, rr * 30.f, u * 30.f, vec3(1.f, 0.6f, 0.3f), 0.f});
+    for (int i = 0; i < 24; i++) {   // condensation and fuel mist torn off at the break
+      vec3 v(r.range(-25, 25), r.range(-20, 25), r.range(-25, 25));
+      spawn(centre, plane.vel * r.range(0.5f, 0.9f) + v, r.range(0.6f, 1.4f), r.range(2.f, 4.f), 6.f, vec3(0.9f, 0.92f, 0.95f), 0.35f, SPR_SMOKE, 3.f, 0.f);
+    }
+    for (int i = 0; i < 6; i++) pops.push_back({vec3(), vec3(), r.range(0.35f, 2.6f), r.range(2.f, 4.5f), i % 5});
+    for (int i = 0; i < 20; i++) {   // extra torn skin panels
+      Debris d;
+      d.p = centre + vec3(r.range(-3, 3), r.range(-1.5f, 1.5f), r.range(-4, 4));
+      d.v = plane.vel * r.range(0.5f, 0.9f) + normalize(vec3(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1))) * r.range(15.f, 45.f);
+      d.w = normalize(vec3(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1))) * r.range(8.f, 22.f);
+      d.q = quat::axisAngle(normalize(vec3(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1))), r.range(0, 6.f));
+      d.size = r.range(0.2f, 0.7f); d.charred = (i % 2) == 0; d.rest = false; d.burn = i % 3 == 0 ? r.range(1.f, 3.f) : 0.f;
+      debris.push_back(d);
     }
     return;
   }
@@ -1142,20 +1246,30 @@ void Game::breakUp(vec3 impactVel, bool water, bool air) {
     craterR = clampf(3.f + speed * 0.07f + std::max(plane.spec->fusLen, plane.spec->span) * 0.12f, 4.f, 13.f);
     craterD = craterR * 0.28f;
   } else craterR = 0;
-  // fireball, sparks, dirt and smoke
-  for (int i = 0; i < 90; i++) {
-    vec3 v(r.range(-12, 12), r.range(0, 16), r.range(-12, 12));
-    if (water) spawn(centre, v * 0.9f + vec3(0, 6, 0), 2.5f, 1.5f, 2.f, vec3(0.9f, 0.95f, 1.f), 0.8f, SPR_SMOKE, 1.f, -6.f);
-    else spawn(centre + vec3(0, 1, 0), v, r.range(0.8f, 1.6f), r.range(2.f, 4.f), 4.f, vec3(1.f, 0.6f, 0.2f), 1.f, SPR_FIRE, 1.2f, 2.f);
-  }
+  // the impact: a fireball (or a column of spray), dirt thrown up, and a couple of secondary blasts as fuel goes up
+  pops.clear();
+  float R = clampf(3.f + speed * 0.05f + std::max(plane.spec->fusLen, plane.spec->span) * 0.15f, 4.f, 11.f);
+  fireball(centre + vec3(0, 1.f, 0), impactVel * 0.15f, R, false, water);
   if (!water) {
-    for (int i = 0; i < 80; i++) spawn(centre, vec3(r.range(-25, 25), r.range(5, 30), r.range(-25, 25)), r.range(1.f, 2.5f), r.range(0.8f, 2.f), -0.3f, vec3(1.f, 0.7f, 0.3f) * r.range(2.f, 5.f), 1.f, SPR_SPARK, 0.4f, -9.f);
-    for (int i = 0; i < 40; i++) spawn(centre, vec3(r.range(-10, 10), r.range(4, 14), r.range(-10, 10)), r.range(1.5f, 3.f), r.range(1.5f, 3.f), 2.f, vec3(0.32f, 0.25f, 0.18f), 0.9f, SPR_SMOKE, 1.5f, -5.f);
+    for (int i = 0; i < 50; i++) spawn(centre, vec3(r.range(-12, 12), r.range(6, 20), r.range(-12, 12)) * energy * 0.6f, r.range(1.5f, 3.f), r.range(1.2f, 2.6f), 2.f, vec3(0.32f, 0.25f, 0.18f), 0.85f, SPR_SMOKE, 1.5f, -5.f);   // dirt
+    for (int i = 0; i < 3; i++) pops.push_back({vec3(), vec3(), r.range(0.4f, 2.2f), R * r.range(0.4f, 0.6f), r.range(0.f, 4.99f) > 2.5f ? 1 : 0});
   }
 }
 
 void Game::updateWreck(float dt) {
   const float G = 9.81f;
+  if (boomT >= 0) boomT += dt;
+  for (size_t i = 0; i < pops.size(); i++) {   // secondary explosions on the pieces
+    pops[i].t -= dt;
+    if (pops[i].t > 0) continue;
+    const Pop pp = pops[i];
+    pops.erase(pops.begin() + i); i--;
+    if (pp.piece < (int)wreck.size()) {
+      const WreckPiece& w = wreck[pp.piece];
+      bool wet = g_world.height(w.c.x, w.c.z) < 0.5f && w.c.y < 1.f;
+      if (!(wet && w.c.y < -1.f)) { fireball(w.c, w.v, pp.R, airBreak && !w.landed, wet); g_audio.trigger(SFX_CRASH, 0.35f); }
+    }
+  }
   for (WreckPiece& w : wreck) {
     // fire and smoke from the burning pieces (stronger right after the impact)
     float heat = w.fire * clampf(1.2f - crashTimer * 0.06f, 0.3f, 1.f);
@@ -1186,11 +1300,13 @@ void Game::updateWreck(float dt) {
       w.v = w.v - w.v * (0.0012f * length(w.v) * dt);
       w.w = w.w * expf(-0.05f * dt);
       // burning smoke trail: spread along this frame's path so it streams continuously even at high speed
-      int n = (int)clampf(length(w.v) * dt / 2.f, 1.f, 4.f);
+      // emitted every ~0.8 m of path so the fire and smoke read as continuous streams, not beads
+      int n = (int)clampf(length(w.v) * dt / 0.8f, 1.f, 24.f);
+      float heatT = clampf(1.3f - crashTimer * 0.08f, 0.35f, 1.f);
       for (int k = 0; k < n; k++) {
         vec3 tp = w.c - w.v * (dt * (float)k / n);
-        spawn(tp, w.v * 0.05f, 2.6f + (rand() % 100) * 0.01f, 1.4f + w.fire, 3.f, vec3(0.07f, 0.065f, 0.06f), 0.5f, SPR_SMOKE, 1.f, 0.6f);
-        if (k % 2 == 0) spawn(tp, w.v * 0.1f, 0.1f + (rand() % 100) * 0.001f, 0.6f + w.fire * 0.5f, -2.f, vec3(1.f, 0.42f, 0.1f) * 0.6f, 1.f, SPR_FIRE, 2.f, 0.f);
+        if (k % 4 == 0) spawn(tp, w.v * 0.04f, 3.f + (rand() % 100) * 0.015f, 1.1f + w.fire, 3.2f, vec3(0.06f, 0.055f, 0.05f), 0.32f, SPR_SMOKE, 1.f, 0.6f);
+        spawn(tp, w.v * 0.08f, 0.12f + (rand() % 100) * 0.0015f, (0.9f + w.fire * 0.6f) * heatT, -3.f, vec3(1.f, 0.45f, 0.12f), 0.35f * heatT, SPR_FIRE, 2.f, 0.f);
       }
     } else w.v.y -= G * dt;
     w.v = w.v * expf(-0.08f * dt);
@@ -1236,6 +1352,12 @@ void Game::updateWreck(float dt) {
     if (crashEndT > 1e8f && (all || crashTimer > 150.f)) crashEndT = crashTimer + 6.f;
   }
   for (Debris& d : debris) {
+    if (d.burn > 0 && !d.rest) {   // a burning fragment: a flame and a thin smoke trail behind it
+      d.burn -= dt;
+      float k = clampf(d.burn, 0.f, 1.f);
+      spawn(d.p, d.v * 0.1f, 0.25f, 0.25f + 0.5f * d.size * k, 0.6f, vec3(1.f, 0.5f, 0.15f) * (0.6f + 0.6f * k), 1.f, SPR_FIRE, 2.f, 0.5f);
+      if (rand() % 2) spawn(d.p, d.v * 0.05f, 1.6f, 0.3f + d.size * 0.5f, 1.4f, vec3(0.1f), 0.35f * k + 0.1f, SPR_SMOKE, 1.f, 0.8f);
+    }
     if (d.rest) continue;
     d.v.y -= G * dt; d.v = d.v * expf(-0.3f * dt);
     if (airBreak) d.v = d.v - d.v * (0.02f * length(d.v) * dt);   // light skin panels flutter down
@@ -1324,7 +1446,7 @@ FrameParams Game::buildFrame() {
   fp.storm = wx.storm ? 1.f : 0.f; fp.lightning = lightning;
   fp.windOff = cloudOff;
   fp.exposure = 1.0f + fp.night * 0.8f;
-  if ((screen == SCR_FLIGHT || screen == SCR_DEBRIEF) && plane.spec) {
+  if ((screen == SCR_FLIGHT || screen == SCR_DEBRIEF || screen == SCR_LOADING) && plane.spec) {
     fillPlaneVisual(fp.plane, plane, propAngle, camMode == 1);
     {   // transonic vapour cone: strongest just below Mach 1 in humid low-level air
       float M = plane.mach, humid = clampf(0.35f + 0.45f * wx.cloudCover + (wx.precip ? 0.3f : 0.f), 0.f, 1.f) * smoothstepf(11000.f, 1500.f, plane.pos.y);
@@ -1363,11 +1485,15 @@ FrameParams Game::buildFrame() {
     fp.camUp = cross(fp.camRight, fwd);
     fp.fovY = (camMode == 1 ? 74.f : 55.f) * DEG;
     if (camMode == 3) fp.fovY = clampf(2.f * atanf(std::max(plane.spec->span, plane.spec->fusLen) * (botControl ? 0.42f : 1.5f) / length(plane.pos - camPos)), 4.f * DEG, 60.f * DEG);
-    if (camMode == 1) fp.fovY /= std::min(camZoom, 1.4f) > 0 ? 1.f : 1.f;
+    if (camMode == 1) fp.fovY = 2.f * atanf(tanf(37.f * DEG) / ckZoom);   // cockpit zoom: lean in to read the displays
     fp.landLight = landingLight && plane.engineRunning ? (0.3f + 0.7f * fp.night) : 0.f;
     fp.landLightPos = plane.pos + plane.forward() * (plane.spec->fusLen * 0.4f);
     fp.landLightDir = normalize(plane.forward() - plane.up() * 0.1f);
     wraithVisual(fp);
+    if (boomT >= 0 && boomT < 1.6f && !(length(fp.flameLight) > 0.f)) {   // an explosion's flash lights the scene, fading as the fireball cools
+      float k = boomT < 0.08f ? boomT / 0.08f : expf(-(boomT - 0.08f) * 2.6f);
+      fp.flameLightPos = boomP; fp.flameLight = vec3(1.f, 0.6f, 0.28f) * (boomI * k);
+    }
     buildLights(fp);
     {   // airport lighting: on at night and in low visibility
       float lowVis = smoothstepf(8000.f, 2000.f, wx.visibility) + (wx.cloudCover > 0.8f ? 0.3f : 0.f);
@@ -1493,7 +1619,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       }
     }
   }
-  if (screen == SCR_FLIGHT && plane.spec && !crashed) {
+  if ((screen == SCR_FLIGHT || screen == SCR_LOADING) && plane.spec && !crashed) {   // nav light glints
     const AircraftSpec& s = *plane.spec;
     float t = realTime;
     float dcam = length(plane.pos - fp.camPos);
@@ -1604,7 +1730,11 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       vec3 ax = pl > 0.01f ? perp / pl : cr, ay = normalize(cross(ax, vd));
       quadAx(add, p.p - ax * (len * 0.5f), ax * (len * 0.5f + p.size), ay * p.size, p.col, fade, p.kind, 1.f);
     }
-    else if (p.kind == SPR_FIRE) bill(add, p.p, std::max(p.size, 0.05f), p.col, a, p.kind, 1.f);
+    else if (p.kind == SPR_FIRE) {   // flame cools from its spawn colour toward a deep red as it ages
+      float cool = 1.f - fade;
+      vec3 col = lerp(p.col, vec3(0.9f, 0.18f, 0.04f) * (p.col.x + p.col.y + p.col.z) * 0.4f, cool * cool);
+      bill(add, p.p, std::max(p.size, 0.05f), col, a, p.kind, 1.f);
+    }
     else bill(alpha, p.p, p.size, p.col, a, p.kind, 1.f);
   }
   // precipitation around the camera
@@ -1670,6 +1800,11 @@ void Game::update(float dt) {
   dt = std::min(dt, 0.05f);
   realTime += dt;
   updateBindCapture(dt);
+  // gamepad: both bumpers held together for a second hides the whole flight UI; again brings it back
+  if (in.pad && (in.buttons & PAD_LB) && (in.buttons & PAD_RB)) {
+    bumperHold += dt;
+    if (bumperHold >= 1.f && !bumperFired) { bumperFired = true; uiHidden = !uiHidden; g_audio.trigger(SFX_CLICK); }
+  } else { bumperHold = 0; bumperFired = false; }
   for (auto& t : toasts) t.t += dt;
   while (!toasts.empty() && toasts.front().t > 5.f) toasts.erase(toasts.begin());
   hubMsgTime = std::max(0.f, hubMsgTime - dt);
@@ -1703,6 +1838,8 @@ void Game::update(float dt) {
         propAngle = fmodf(propAngle + rps * 2 * PI * dt * (plane.rpm < 400 ? 1.f : 0.0f) + (plane.rpm >= 400 ? dt * 3.f : 0.f), 2 * PI * 100);
       }
     }
+  } else if (screen == SCR_LOADING) {
+    updateLoading(dt);
   } else if (screen == SCR_DEBRIEF) {
     if (crashed) { crashTimer += dt; updateWreck(dt); updateParticles(dt); }   // the wreck keeps settling/sinking behind the results
   } else {
@@ -1723,12 +1860,21 @@ void Game::render() {
   switch (screen) {
     case SCR_MENU: drawMenu(); break;
     case SCR_HUB: drawHub(); break;
-    case SCR_FLIGHT: drawHud(fp); drawMapOverlay(); if (paused) drawPause(); break;
+    case SCR_FLIGHT: if (!uiHidden || paused || showMap) { drawHud(fp); drawMapOverlay(); } if (paused) drawPause(); break;
     case SCR_DEBRIEF: drawDebrief(); break;
     case SCR_RESEARCH: drawResearch(); break;
+    case SCR_LOADING: drawLoading(); break;
   }
-  drawToasts();
+  if (!(uiHidden && screen == SCR_FLIGHT && !paused)) drawToasts();
   drawPadCursor();
+  if (!headless) {   // always-on frame-rate counter, top right
+    float s = S(), fps = 1.f / std::max(fpsAvg, 1e-4f);
+    std::string t = fmt("%.0f FPS", fps);
+    float ts = 13 * s, tw = g_ren.textWidth(t, ts);
+    vec3 c = fps >= 57.f ? vec3(0.45f, 1.f, 0.6f) : fps >= 40.f ? vec3(1.f, 0.82f, 0.3f) : vec3(1.f, 0.4f, 0.35f);
+    g_ren.rect(g_ren.W - tw - 18 * s, 4 * s, tw + 14 * s, ts + 8 * s, vec3(0, 0, 0), 0.45f, 3 * s);
+    g_ren.text(g_ren.W - 11 * s, 7 * s, ts, t, c, 1, 2, false);
+  }
   if (showPerf) {
     float s = S();
     std::string t = fmt("%.0f fps  %.1f ms   GPU %s   res %.0f%% (%dx%d)", 1.f / std::max(fpsAvg, 1e-4f), fpsAvg * 1000.f,
@@ -1825,7 +1971,8 @@ void Game::debugScene(const std::string& name) {
     if (getenv("WRTHR")) { plane.ctl.throttle = (float)atof(getenv("WRTHR")); plane.apSpeed = 900.f; }
     if (getenv("WRSPD")) { plane.vel = plane.forward() * (float)atof(getenv("WRSPD")); plane.apSpeed = (float)atof(getenv("WRSPD")); }
     if (mode == 5) wraith.bayHold = 100.f;
-    if (mode == 7) wraith.bombQueue = 1;
+    if (mode == 7 || (mode == 8 && getenv("WRBOMB"))) { wraith.bombQueue = 1; wraith.armed = mode == 8; }
+    if (mode == 8 && getenv("WRBOMB")) camMode = 1;   // the floor screens show the bomb camera
     if (getenv("WRUFO")) { startUfo(); ufo.side = (float)atof(getenv("WRUFO")); }   // UFO alongside (side -1 / 1)
     float firstDrop = 0; vec3 blastAt;
     int frames = (int)((mode == 3 ? 0.55f : mode == 7 ? 60.f : secs) * 60.f);
@@ -2136,6 +2283,13 @@ void Game::debugScene(const std::string& name) {
     resAirborne = true; realTime = 20; launchResearch();
     for (int i = 0; i < 10; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     gTunnel = atof(name.c_str() + 4) / 100.f; toasts.clear(); return;
+  }
+  if (name == "loading" || name == "loadingready" || name == "loadingair") {   // the pre-flight loading screen: card / live shot
+    if (name == "loadingair") { resAirborne = true; resCraft = kResearchJet; launchResearch(); }
+    else { Contract c = career.board.empty() ? Contract() : career.board[0]; if (career.board.empty()) { c.from = 0; c.to = 1; c.title = "Lesson 1: Takeoff and Climb"; } startFlight(c, 0, Career::SRC_OWNED); }
+    screen = SCR_LOADING; loadT = 0; loadReadyT = -1; loadMap = false; toasts.clear(); hint.clear();
+    if (name != "loading") { loadT = 3.f; loadReadyT = 0.f; loadShown = 1.f; }
+    return;
   }
   if (name == "seacrash") {  // ditches into deep sea: the wreck must float briefly, then sink to the seabed
     float gx = 0, gz = 0;

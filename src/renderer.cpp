@@ -464,8 +464,64 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
   progPost = program(vsFS, kPostFS, error); step();
   progTAA = program(vsFS, kTaaFS, error); step();
   if (!progSprite || !progDown || !progUp || !progRayMask || !progRay || !progPost || !progTAA) { error = "Shader: " + error; return false; }
+  {   // GPS aerial imagery: the ray tracer's source (main renamed) + a top-down terrain pass
+    std::string ms = rt; size_t m = ms.find("void main(");
+    if (m != std::string::npos) ms.replace(m, 10, "void mainRT(");
+    progMap = program(vsFS, ms + kMapMain, error); step();
+    if (!progMap) { error = "Map shader: " + error; return false; }
+  }
   glFinish();   // everything complete before another context uses the programs
   return true;
+}
+
+// Renders the GPS aerial image: half x half metres around (cx, cz), north (-z) at the top, into texMap
+void Renderer::renderMap(float cx, float cz, float half, int N) {
+  if (!progMap) return;
+  if (!texMap || mapN != N) {
+    if (texMap) glDeleteTextures(1, &texMap);
+    glGenTextures(1, &texMap); glBindTexture(GL_TEXTURE_2D, texMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, N, N, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    if (!fboMap) glGenFramebuffers(1, &fboMap);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboMap);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texMap, 0);
+    mapN = N;
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, fboMap);
+  glViewport(0, 0, N, N); glDisable(GL_BLEND);
+  GLuint p = progMap;
+  glUseProgram(p);
+  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
+  glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(U(p, "uAlb"), 1);
+  glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D_ARRAY, texNrm); glUniform1i(U(p, "uNrm"), 2);
+  glActiveTexture(GL_TEXTURE0 + 3); glBindTexture(GL_TEXTURE_2D, texMask); glUniform1i(U(p, "uMask"), 3);
+  glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadId"), 4);
+  glActiveTexture(GL_TEXTURE0 + 5); glBindTexture(GL_TEXTURE_2D, texData); glUniform1i(U(p, "uData"), 5);
+  glActiveTexture(GL_TEXTURE0 + 6); glBindTexture(GL_TEXTURE_2D, texHMax); glUniform1i(U(p, "uHMax"), 6);
+  glActiveTexture(GL_TEXTURE0 + 13); glBindTexture(GL_TEXTURE_2D, texCloudCov); glUniform1i(U(p, "uCloudCov"), 13);
+  glActiveTexture(GL_TEXTURE0 + 14); glBindTexture(GL_TEXTURE_3D, texNoise3); glUniform1i(U(p, "uNoise3"), 14);
+  {
+    int n = std::min(16, (int)g_world.airports.size());
+    float ap[64], dim[64];
+    for (int i = 0; i < n; i++) {
+      const Airport& a = g_world.airports[i];
+      ap[i * 4] = a.x; ap[i * 4 + 1] = a.z; ap[i * 4 + 2] = a.elev; ap[i * 4 + 3] = a.heading * DEG;
+      dim[i * 4] = a.length; dim[i * 4 + 1] = a.width; dim[i * 4 + 2] = (float)a.surface; dim[i * 4 + 3] = (float)a.size;
+    }
+    glUniform1i(U(p, "uApCount"), n); glUniform4fv(U(p, "uAp"), n, ap); glUniform4fv(U(p, "uApDim"), n, dim);
+    glUniform1i(U(p, "uBoxCount"), std::min(128, (int)g_world.boxes.size()));
+  }
+  glUniform1i(U(p, "uCraterN"), 0); glUniform1f(U(p, "uMaxH"), maxH); glUniform1i(U(p, "uQuality"), 2);
+  glUniform1f(U(p, "uTime"), 0.f); glUniform1f(U(p, "uWet"), 0.f); glUniform1f(U(p, "uSnow"), 0.f);
+  glUniform4f(U(p, "uMapView"), cx, cz, half, 2.f * half / N);
+  glUniform2f(U(p, "uMapRes"), (float)N, (float)N);
+  glBindVertexArray(vaoEmpty);
+  glDrawArrays(GL_TRIANGLES, 0, 3);
+  glBindTexture(GL_TEXTURE_2D, texMap); glGenerateMipmap(GL_TEXTURE_2D);
+  glActiveTexture(GL_TEXTURE0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0); glViewport(0, 0, W, H);
 }
 
 bool Renderer::init(int w, int h) {
@@ -784,7 +840,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     if (fx.bombs) glUniform4fv(U(p, "uBombs"), fx.bombs, &fx.bomb[0][0]);
     if (fx.blasts) { glUniform4fv(U(p, "uBlast"), fx.blasts, &fx.blast[0][0]); glUniform4fv(U(p, "uBlastI"), fx.blasts, &fx.blastI[0][0]); }
     glUniform4fv(U(p, "uPip"), 1, fx.pip);
-    glUniform4fv(U(p, "uFeed"), 1, fx.feed);
+    glUniform4fv(U(p, "uFeed"), 1, fx.feed); glUniform4fv(U(p, "uFeedCam"), 1, fx.feedCam);
   }
   {   // entity G-buffer and the sun shadow cascades
     for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, texGB[i]); }
@@ -869,12 +925,12 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glBindVertexArray(vaoSprite);
   glBindBuffer(GL_ARRAY_BUFFER, vboSprite);
   if (!alphaSprites.empty()) {
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);   // alpha keeps the pixel's class flag
     glBufferData(GL_ARRAY_BUFFER, alphaSprites.size() * sizeof(SpriteVert), alphaSprites.data(), GL_STREAM_DRAW);
     glDrawArrays(GL_TRIANGLES, 0, (GLsizei)alphaSprites.size());
   }
   if (!addSprites.empty()) {
-    glBlendFunc(GL_ONE, GL_ONE);
+    glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
     glBufferData(GL_ARRAY_BUFFER, addSprites.size() * sizeof(SpriteVert), addSprites.data(), GL_STREAM_DRAW);
     glDrawArrays(GL_TRIANGLES, 0, (GLsizei)addSprites.size());
   }
@@ -1042,6 +1098,40 @@ void Renderer::flushUI() {
 }
 
 void Renderer::uiEnd() { flushUI(); glDisable(GL_BLEND); curImg = 0; }
+
+// The current frame as a PNG (uncompressed deflate blocks: no zlib needed, every image viewer opens it)
+bool Renderer::screenshotPNG(const char* path) {
+  std::vector<uint8_t> px((size_t)W * H * 3);
+  glPixelStorei(GL_PACK_ALIGNMENT, 1);
+  glReadPixels(0, 0, W, H, GL_RGB, GL_UNSIGNED_BYTE, px.data());
+  std::vector<uint8_t> raw;   // filter byte 0 + RGB row, top row first
+  raw.reserve((size_t)(W * 3 + 1) * H);
+  for (int y = H - 1; y >= 0; y--) { raw.push_back(0); raw.insert(raw.end(), px.begin() + (size_t)y * W * 3, px.begin() + (size_t)(y + 1) * W * 3); }
+  static uint32_t crcT[256]; static bool crcInit = false;
+  if (!crcInit) { for (uint32_t n = 0; n < 256; n++) { uint32_t c = n; for (int k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320u ^ (c >> 1) : c >> 1; crcT[n] = c; } crcInit = true; }
+  auto crc = [&](const uint8_t* d, size_t n, uint32_t c) { c = ~c; for (size_t i = 0; i < n; i++) c = crcT[(c ^ d[i]) & 255] ^ (c >> 8); return ~c; };
+  std::vector<uint8_t> z = {0x78, 0x01};
+  for (size_t o = 0; o < raw.size(); o += 65535) {
+    size_t n = std::min<size_t>(65535, raw.size() - o);
+    z.push_back(o + n == raw.size() ? 1 : 0);
+    z.push_back((uint8_t)(n & 255)); z.push_back((uint8_t)(n >> 8)); z.push_back((uint8_t)(~n & 255)); z.push_back((uint8_t)((~n >> 8) & 255));
+    z.insert(z.end(), raw.begin() + o, raw.begin() + o + n);
+  }
+  uint32_t a = 1, b = 0; for (uint8_t v : raw) { a = (a + v) % 65521; b = (b + a) % 65521; }
+  uint32_t ad = (b << 16) | a; z.push_back(ad >> 24); z.push_back(ad >> 16); z.push_back(ad >> 8); z.push_back(ad);
+  FILE* f = fopen(path, "wb");
+  if (!f) return false;
+  auto be32 = [&](uint32_t v) { uint8_t q[4] = {(uint8_t)(v >> 24), (uint8_t)(v >> 16), (uint8_t)(v >> 8), (uint8_t)v}; fwrite(q, 1, 4, f); };
+  auto chunk = [&](const char* type, const std::vector<uint8_t>& d) {
+    be32((uint32_t)d.size()); fwrite(type, 1, 4, f); if (!d.empty()) fwrite(d.data(), 1, d.size(), f);
+    uint32_t c = crc((const uint8_t*)type, 4, 0); c = crc(d.data(), d.size(), c); be32(c);
+  };
+  const uint8_t sig[8] = {137, 80, 78, 71, 13, 10, 26, 10}; fwrite(sig, 1, 8, f);
+  std::vector<uint8_t> ih = {(uint8_t)(W >> 24), (uint8_t)(W >> 16), (uint8_t)(W >> 8), (uint8_t)W, (uint8_t)(H >> 24), (uint8_t)(H >> 16), (uint8_t)(H >> 8), (uint8_t)H, 8, 2, 0, 0, 0};
+  chunk("IHDR", ih); chunk("IDAT", z); chunk("IEND", {});
+  fclose(f);
+  return true;
+}
 
 bool Renderer::screenshot(const char* path) {
   std::vector<uint8_t> px((size_t)W * H * 3);

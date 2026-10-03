@@ -92,12 +92,16 @@ void Renderer::drawEntities(const FrameParams& fp) {
       if (c) c->lastUse = entFrame;
       if (!c || c->level < want) need.push_back({d, cx, cz, want});
     }
+  if (need.empty()) entPending = 0;
   if (!need.empty()) {
     std::sort(need.begin(), need.end(), [](const Need& a, const Need& b) { return a.d < b.d; });
     auto t0 = std::chrono::steady_clock::now();
+    int made = 0;
+    entPending = (int)need.size();
     for (const Need& n : need) {
       double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
-      if (!entSync && n.d > 700.f && ms > 2.5) break;   // close chunks are never left missing
+      if (!entSync && n.d > 700.f && ms > entBudgetMs) break;   // close chunks are never left missing
+      entPending = (int)need.size() - ++made;
       g_scenery.ensure(n.cx, n.cz, n.level)->lastUse = entFrame;
       entGenCount++;
       // a new chunk inside a shadow cascade's area makes that cascade re-render

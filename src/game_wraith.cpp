@@ -162,6 +162,46 @@ void Game::updateBolts(float dt) {
   W.bolts.erase(std::remove_if(W.bolts.begin(), W.bolts.end(), [](const WraithState::Bolt& b) { return b.age > b.life || (b.hit && b.len <= 0.f); }), W.bolts.end());
 }
 
+// The bomb camera is a separate camera object spawned when a bomb leaves the bay. It chases the oldest falling bomb
+// from just behind and above, and when that bomb goes off it flies out to a vantage point about 400 m away and 20
+// degrees up, slowly orbiting the blast while it burns. Then it is removed (or picks up the next bomb in the air).
+void Game::updateBombCam(float dt) {
+  WraithState& W = wraith;
+  WraithState::BombCam& C = W.cam;
+  if (!C.on) {
+    if (W.bombs.empty()) return;
+    const WraithState::Bomb& b = W.bombs.front();
+    C = WraithState::BombCam();
+    C.on = true; C.phase = 0;
+    C.pos = b.p - normalize(b.v + vec3(0, -0.1f, 0)) * 18.f + vec3(0, 6.f, 0);
+    C.look = b.p; C.tanHalf = 0.3f;
+  }
+  C.t += dt;
+  if (C.phase == 0) {
+    if (W.bombs.empty()) { C.on = false; return; }
+    const WraithState::Bomb& b = W.bombs.front();
+    vec3 vd = normalize(b.v + vec3(0, -0.1f, 0)), side = normalize(cross(vd, vec3(0, 1, 0)) + vec3(1e-4f, 0, 0));
+    vec3 want = b.p - vd * 30.f + vec3(0, 8.f, 0) + side * 6.f;
+    C.pos = want + (C.pos - want) * expf(-dt * 8.f);
+    C.look = b.p + b.v * 0.12f;
+    C.tanHalf += (0.28f - C.tanHalf) * (1.f - expf(-dt * 3.f));
+  } else {
+    C.orbit += dt * 0.14f;
+    float el = 20.f * DEG, d = 420.f;
+    vec3 want = C.blastP + vec3(sinf(C.orbit) * cosf(el), sinf(el), cosf(C.orbit) * cosf(el)) * d;
+    want.y = std::max(want.y, groundAt(want) + 25.f);
+    C.pos = want + (C.pos - want) * expf(-dt * 1.8f);   // flies out to the vantage point
+    vec3 lookAt = C.blastP + vec3(0, 45.f, 0);
+    C.look = lookAt + (C.look - lookAt) * expf(-dt * 4.f);
+    C.tanHalf += (0.42f - C.tanHalf) * (1.f - expf(-dt * 2.f));
+    if (C.t > 3.4f) {   // the blast has burnt out: next bomb in the air, or the camera is removed
+      if (!W.bombs.empty()) { C.phase = 0; C.t = 0; }
+      else C.on = false;
+    }
+  }
+  C.pos.y = std::max(C.pos.y, groundAt(C.pos) + 3.f);
+}
+
 void Game::detonate(vec3 p, bool water) {
   WraithState& W = wraith;
   W.blasts.push_back({p, water ? 80.f : 100.f, 0.f, 3.6f, water});
@@ -240,9 +280,15 @@ void Game::updateWraith(float dt) {
     if (b.p.y <= g || near || b.t > 60.f) {
       vec3 at = b.p; if (at.y < g) at.y = g;
       detonate(at, g_world.height(at.x, at.z) < 0.3f && at.y < 1.f);
+      if (i == 0 && W.cam.on && W.cam.phase == 0) {   // the bomb the camera was chasing went off: pull out to watch it
+        W.cam.phase = 1; W.cam.t = 0; W.cam.blastP = at;
+        vec3 h = W.cam.pos - at; h.y = 0;
+        W.cam.orbit = atan2f(h.x, h.z + 1e-4f) + 0.5f;   // swing round to a three-quarter view
+      }
       W.bombs.erase(W.bombs.begin() + i); i--;
     }
   }
+  updateBombCam(dt);
   for (auto& bl : W.blasts) bl.age += dt / bl.dur;
   W.blasts.erase(std::remove_if(W.blasts.begin(), W.blasts.end(), [](const WraithState::Blast& b) { return b.age >= 1.f; }), W.blasts.end());
 }
@@ -294,13 +340,11 @@ void Game::wraithVisual(FrameParams& fp) {
       }
     }
   }
-  // belly camera: follows the newest bomb down and holds on its blast while it burns
+  // bomb camera: its view goes to the footwell floor screen while it exists
   fx.feed[3] = 0.f;
-  if (plane.spec && plane.spec->special == 2 && camMode == 1 && !crashed) {
-    const vec3* tgt = nullptr;
-    if (!W.blasts.empty() && W.blasts.back().age < 0.85f) tgt = &W.blasts.back().p;
-    else if (!W.bombs.empty()) tgt = &W.bombs.back().p;
-    if (tgt) { fx.feed[0] = tgt->x; fx.feed[1] = tgt->y; fx.feed[2] = tgt->z; fx.feed[3] = 1.f; }
+  if (plane.spec && plane.spec->special == 2 && camMode == 1 && !crashed && W.cam.on) {
+    fx.feed[0] = W.cam.look.x; fx.feed[1] = W.cam.look.y; fx.feed[2] = W.cam.look.z; fx.feed[3] = 1.f;
+    fx.feedCam[0] = W.cam.pos.x; fx.feedCam[1] = W.cam.pos.y; fx.feedCam[2] = W.cam.pos.z; fx.feedCam[3] = W.cam.tanHalf;
   }
   // glassed craters join the crash crater (if any)
   for (size_t i = 0; i < W.craters.size() && fp.wreck.craterN < 24; i++) {

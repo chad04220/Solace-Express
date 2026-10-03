@@ -32,7 +32,7 @@ struct Input {
 enum Action {
   ACT_PITCH_DN = 0, ACT_PITCH_UP, ACT_ROLL_L, ACT_ROLL_R, ACT_YAW_L, ACT_YAW_R, ACT_THR_UP, ACT_THR_DN, ACT_TRIM_UP, ACT_TRIM_DN,
   ACT_FLAPS_DN, ACT_FLAPS_UP, ACT_GEAR, ACT_BRAKE, ACT_PARK, ACT_AP, ACT_LIGHTS, ACT_ENGINE, ACT_TIME,
-  ACT_CAMERA, ACT_HUD, ACT_MAP, ACT_MINIMAP, ACT_RADIO, ACT_ANR,
+  ACT_CAMERA, ACT_HUD, ACT_MAP, ACT_MINIMAP, ACT_RADIO, ACT_ANR, ACT_ZOOM,
   ACT_CLOAK, ACT_WEAPONS, ACT_FIRE, ACT_BOMB, ACT_COUNT
 };
 struct ActionInfo { const char* id; const char* name; int group; int key; unsigned pad; };
@@ -55,7 +55,7 @@ struct Settings {
 struct TipPt { vec3 p; float age, a; int seg; };   // wingtip vapour ribbon point (in the air mass)
 struct Particle { vec3 p, v; float life, maxLife, size, grow; vec3 col; float alpha; int kind; float drag, buoy; bool instant = false; bool fresh = true; };  // instant: no fade-in (trails)
 
-enum GameScreen { SCR_MENU = 0, SCR_HUB, SCR_FLIGHT, SCR_DEBRIEF, SCR_RESEARCH };
+enum GameScreen { SCR_MENU = 0, SCR_HUB, SCR_FLIGHT, SCR_DEBRIEF, SCR_RESEARCH, SCR_LOADING };
 enum HubTab { TAB_CONTRACTS = 0, TAB_HANGAR, TAB_LOGBOOK, TAB_SETTINGS };
 
 class Game {
@@ -130,7 +130,10 @@ private:
   std::vector<Particle> particles;
   // crash wreckage: rigid pieces of the airframe, small debris chunks and the impact crater
   struct WreckPiece { vec3 c, v, w; quat q; vec3 C, H; bool rest; float fire; bool landed = false; };
-  struct Debris { vec3 p, v, w; quat q; float size; bool charred, rest; };
+  struct Debris { vec3 p, v, w; quat q; float size; bool charred, rest; float burn = 0; };   // burn: seconds it trails fire
+  struct Pop { vec3 p, v; float t, R; int piece; };   // a delayed secondary explosion (on a wreck piece when piece >= 0)
+  std::vector<Pop> pops;
+  float boomT = -1, boomI = 0; vec3 boomP;           // the flash of the latest explosion lights the scene
   std::vector<WreckPiece> wreck;
   std::vector<Debris> debris;
   float craterX = 0, craterZ = 0, craterR = 0, craterD = 0;
@@ -155,6 +158,7 @@ private:
     struct Blast { vec3 p; float R, age, dur; bool water; };
     struct Crater { float x, z, R, D; };
     std::vector<Bolt> bolts; std::vector<Bomb> bombs; std::vector<Blast> blasts; std::vector<Crater> craters;
+    struct BombCam { bool on = false; int phase = 0; vec3 pos, look, blastP; float t = 0, orbit = 0, tanHalf = 0.3f; } cam;   // spawned bomb camera (floor screen)
     std::vector<Crater> scorch;   // small laser craters (most recent 16)
     int wrecked = 0;              // trees, rocks and buildings destroyed
     int kills = 0;
@@ -168,6 +172,10 @@ private:
   void laserImpact(vec3 at, int craft, int entKind, const Ent* ent);
   void addScorch(float x, float z, float R, float D);
   void detonate(vec3 p, bool water);
+  void fireball(vec3 c, vec3 baseV, float R, bool air, bool water);
+  void updateBombCam(float dt);
+  void updateLoading(float dt);
+  void drawLoading();
   float ufoSummon = 0;          // J + K held while flying summons the UFO after a second
   Ufo ufo;
   void startUfo();
@@ -205,6 +213,10 @@ private:
   float bindCaptureT = 0;
   std::vector<TipPt> tipTrail[2]; int tipSeg = 0; bool tipOn = false;
   int ctlScroll = 0; float ctlScrollAcc = 0;
+  float ckZoom = 1.f, ckZoomT = 1.f;   // cockpit view zoom (current, target)
+  float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0; bool loadMap = false;   // pre-flight loading screen
+  bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
+  bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI
   // bound action state: keyboard key or gamepad button
   bool actKey(int a) const { int k = set.keyBind[a]; return k > 0 && k < 256 && in.down[k]; }
   bool actKeyP(int a) const { int k = set.keyBind[a]; return k > 0 && k < 256 && in.pressed[k]; }

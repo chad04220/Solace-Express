@@ -8,7 +8,8 @@
 // Screen ids: 41 front, 42 left, 43 right (side + aft displays), 61 floor, 62 overhead, 63 chin. Interior materials 64-79.
 static const char* kRaytraceWraithCockpit = R"(// ---------------------------------------------------------------- XR-11 cockpit
 uniform vec4 uPip;   // bomb impact prediction (world) + valid flag
-uniform vec4 uFeed;  // belly camera target: a falling bomb or its blast (world) + active flag
+uniform vec4 uFeed;     // bomb camera look-at point (world) + active flag
+uniform vec4 uFeedCam;  // bomb camera position (world) + tan of its half field of view
 // a flat display pane: c centre, n facing the pilot, up hint, half size, corner chamfer. x = pane, y = raised bezel
 vec3 wrFrame(vec3 q, vec3 c, vec3 n, vec3 up){ vec3 t = normalize(cross(up, n)), b = cross(n, t); vec3 d = q - c; return vec3(dot(d, t), dot(d, b), dot(d, n)); }
 float wrShape(vec2 l, vec2 hs, float ch){ vec2 a = abs(l); return max(max(a.x - hs.x, a.y - hs.y), (a.x + a.y - (hs.x + hs.y - ch))*0.70711); }
@@ -227,7 +228,7 @@ void shadeWraithCockpit(inout Mat m, int mid, vec3 lp, vec3 ln, vec3 E){
   else if (mid == 68) {   // touch glass on the consoles
     vec3 cq = vec3(abs(q.x) - 0.56, q.y + 0.47, q.z + 0.12);
     vec2 uv = vec2((cq.x - 0.015)/0.1, (cq.z - 0.12)/0.2)*0.5 + 0.5;
-    m.alb = vec3(0.01); m.rough = 0.04; m.emit = wrUiPanel(uv, q.x > 0.0 ? 0.3 : 0.7)*1.5;
+    m.alb = vec3(0.01); m.rough = 0.04; m.emit = wrUiPanel(uv, q.x > 0.0 ? 0.3 : 0.7)*1.5; gDispPx = true;
   } else if (mid == 69) {   // multi-function displays (dash and consoles)
     int page; vec2 uv;
     if (q.y > -0.4) {   // dash pair
@@ -245,7 +246,7 @@ void shadeWraithCockpit(inout Mat m, int mid, vec3 lp, vec3 ln, vec3 E){
                   + mfdPage(page, uv + vec2(0.25, 0.75)*fp) + mfdPage(page, uv + vec2(-0.75, 0.25)*fp))*vec3(0.85, 1.0, 1.15);
     float edge = smoothstep(1.0, 0.93, max(abs(uv.x), abs(uv.y)));
     sc = sc*edge + vec3(0.008, 0.02, 0.035)*edge;
-    m.alb = vec3(0.01); m.rough = 0.05; m.emit = sc*1.5;
+    m.alb = vec3(0.01); m.rough = 0.05; m.emit = sc*1.5; gDispPx = true;
   } else if (mid == 70) {   // grips, knobs and toggles: rubberised with machined caps
     tx = triSample(lp, ln, M_RUBBER, 0.08, nT); m.alb = tx.rgb*0.25; m.rough = tx.a; m.nrm = nT; m.metal = 0.1;
     if (ln.y > 0.7) { m.alb = vec3(0.3); m.metal = 0.9; m.rough = 0.25; }
@@ -353,33 +354,38 @@ vec3 wrClipAtlas(vec2 uv){
   return d < -0.0015 ? bad : vec3(0.0, 0.12 + 0.2*clamp(d*10.0, 0.0, 1.0), 0.0);
 }
 // ---------------------------------------------------------------- belly camera on the front floor pane
-// While a bomb falls or goes off, the footwell floor shows a gimballed camera under the nose locked onto it.
+// While a bomb falls or goes off, the footwell floor shows the bomb camera (Game::updateBombCam).
+// floor pane coordinates [-1, 1] and the pane's aspect (the chin-side footwell pane or a pane beside the seat)
+vec3 wrFloorUV(vec3 q){
+  if (q.z > 0.1) return vec3(wrFrame(vec3(abs(q.x), q.y, q.z), WB_C, WB_N, vec3(0,0,-1)).xy/WB_S*vec2(sign(q.x), 1.0), WB_S.x/WB_S.y);
+  return vec3(wrFrame(q, WL_C, WL_N, vec3(0,0,-1)).xy/WL_S, WL_S.x/WL_S.y);
+}
 bool wrFeedRay(vec3 sl, inout vec3 ro, inout vec3 rd){
   if (uFeed.w < 0.5) return false;
   vec3 q = sl - gM[22].xyz;
-  if (q.z > 0.1) return false;   // the panes beside the seat stay see-through
-  vec3 l = wrFrame(q, WL_C, WL_N, vec3(0,0,-1));
-  vec2 uv = l.xy/WL_S;
-  vec3 cam = uPlanePos + uPlaneRot*vec3(0.0, -0.75, -5.2);
+  vec3 fu = wrFloorUV(q);
+  vec2 uv = fu.xy*vec2(fu.z, 1.0);
+  vec3 cam = uFeedCam.xyz;   // the separate bomb camera, horizon level
   vec3 f = normalize(uFeed.xyz - cam);
-  vec3 r = uPlaneRot*vec3(1.0, 0.0, 0.0); r = normalize(r - f*dot(r, f));
+  vec3 r = normalize(cross(f, vec3(0.0, 1.0, 0.0)) + vec3(1e-4, 0.0, 0.0));
   vec3 u = cross(r, f);
-  float zoom = clamp(length(uFeed.xyz - cam)/900.0, 0.12, 0.55);   // frames the blast whatever the range
-  ro = cam; rd = normalize(f + (r*uv.x*(WL_S.x/WL_S.y) + u*uv.y)*zoom);
+  ro = cam; rd = normalize(f + (r*uv.x + u*uv.y)*uFeedCam.w);
   return true;
 }
 vec3 wrFeedOverlay(vec3 col, vec3 sl){
   vec3 q = sl - gM[22].xyz;
-  vec2 uv = wrFrame(q, WL_C, WL_N, vec3(0,0,-1)).xy/WL_S;
+  vec2 uv = wrFloorUV(q).xy;
   col = mix(vec3(dot(col, vec3(0.3, 0.55, 0.15))), col, 0.55)*vec3(0.95, 1.05, 1.12);   // sensor look
-  col *= 0.9 + 0.1*sin(uv.y*180.0 + uTime*20.0);
+  float aa = 0.006; gAA = aa;
   vec2 a = abs(uv);
-  float br = step(abs(max(a.x, a.y) - 0.22), 0.012)*step(0.13, min(a.x, a.y));   // tracking brackets
-  br = max(br, step(abs(a.x), 0.006)*step(a.y, 0.06)*step(0.02, a.y));
-  br = max(br, step(abs(a.y), 0.006)*step(a.x, 0.06)*step(0.02, a.x));
-  float frame = step(0.9, max(a.x, a.y))*step(max(a.x, a.y), 0.91);
-  float rec = step(length(uv - vec2(-0.78, 0.78)), 0.035)*step(0.5, fract(uTime*1.5));
+  float br = aLine(max(a.x, a.y) - 0.22, 0.02)*smoothstep(0.13 - aa, 0.13 + aa, min(a.x, a.y));   // tracking brackets
+  br = max(br, aLine(a.x, 0.01)*smoothstep(0.06 + aa, 0.06 - aa, a.y)*smoothstep(0.02 - aa, 0.02 + aa, a.y));
+  br = max(br, aLine(a.y, 0.01)*smoothstep(0.06 + aa, 0.06 - aa, a.x)*smoothstep(0.02 - aa, 0.02 + aa, a.x));
+  float frame = aLine(max(a.x, a.y) - 0.905, 0.012);
+  float rec = smoothstep(0.035 + aa, 0.035 - aa, length(uv - vec2(-0.78, 0.78)))*step(0.5, fract(uTime*1.5));
+  float lbl = txt(uv - vec2(-0.7, 0.78), 0.06, ivec4(66, 79, 77, 66), ivec4(32, 67, 65, 77), 0);
   vec3 c = mix(col, vec3(1.0, 0.3, 0.4)*2.0, clamp(br + rec, 0.0, 1.0)*0.9);
+  c = mix(c, vec3(0.3, 0.95, 1.0)*1.5, lbl);
   return mix(c, vec3(0.3, 0.95, 1.0)*1.5, frame*0.8);
 }
 // ---------------------------------------------------------------- display look and HUD
