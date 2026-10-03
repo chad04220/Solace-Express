@@ -173,7 +173,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
   }
   {   // craters added or cleared: the scenery they flattened leaves the shadow maps too
     static size_t lastCraters = 0; static float lastSum = 0;
-    float sum = 0; for (const vec3& c : g_scenery.craters) sum += c.x + c.y * 3.f + c.z * 7.f;
+    float sum = (float)g_scenery.wreckRev * 1013.f; for (const vec3& c : g_scenery.craters) sum += c.x + c.y * 3.f + c.z * 7.f;
     if (g_scenery.craters.size() != lastCraters || sum != lastSum) { shGen[0] = shGen[1] = -1; lastCraters = g_scenery.craters.size(); lastSum = sum; }
   }
   vec3 newCenter[2];
@@ -188,7 +188,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
   // ------------------------------------------------ gather instances into (pass, kind, lod) buckets
   static std::vector<Ent> bucket[3][EK_COUNT][ENT_LODS];   // pass 0 view, 1/2 shadow cascades
   for (auto& a : bucket) for (auto& b : a) for (auto& v : b) v.clear();
-  bool anyCrater = !g_scenery.craters.empty();
+  bool anyCrater = g_scenery.anyGone();
   for (int dz = -rad; dz <= rad; dz++)
     for (int dx = -rad; dx <= rad; dx++) {
       Scenery::Chunk* ch = g_scenery.get(ccx + dx, ccz + dz);

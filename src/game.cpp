@@ -194,7 +194,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
   approachMinAgl = 1e9f;
-  apWasOn = false; apDest = -1; wraith = WraithState();
+  apWasOn = false; apDest = -1; wraith = WraithState(); g_scenery.resetDamage();
   licenseBefore = career.license;
   screen = SCR_FLIGHT;
   toast(fmt("%s - %s", a.code, a.name), vec3(0.7f, 0.9f, 1.0f));
@@ -1227,8 +1227,10 @@ FrameParams Game::buildFrame() {
     }
     wraithVisual(fp);
     // craters flatten the scenery that stood in them (a plasma blast clears a far wider circle than its pit)
+    // (laser scorch pits don't: what a bolt destroys is tracked one object at a time)
     g_scenery.craters.clear();
-    for (int i = 0; i < fp.wreck.craterN; i++) { const float* c = fp.wreck.crater[i]; g_scenery.craters.push_back(vec3(c[0], c[1], c[3] < 0 ? c[2] * 4.f : c[2] * 1.5f)); }
+    if (craterR > 0) g_scenery.craters.push_back(vec3(craterX, craterZ, craterR * 1.5f));
+    for (const auto& c : wraith.craters) g_scenery.craters.push_back(vec3(c.x, c.z, c.R * 4.f));
     fp.rainLens = camMode == 1 && wx.precip == 1 ? 1.f : 0.f;
     fp.sealedCockpit = camMode == 1 && plane.spec->special && !crashed;
     fp.trafficN = traffic.fillVisuals(fp.camPos, fp.traffic, kMaxTrafficDrawn, nullptr);
@@ -1719,6 +1721,27 @@ void Game::debugScene(const std::string& name) {
   plane.starterTime = 0.01f; plane.engineRunning = true; plane.rpm = 1000; engineAutoStarted = true;
   {
     float px, pz, agl, hdg; char cm = 'c';
+    float fx, fz, fsec = 3, fpitch = 28, fyaw = 0;
+    if (sscanf(name.c_str(), "lasertest_%f_%f_%f_%f_%f", &fx, &fz, &fsec, &fpitch, &fyaw) >= 2) {   // XR-11 firing at the ground ahead from a fixed hover
+      resCraft = kWraith; realTime = 20; resAirborne = true; resTime = 12.f; launchResearch();
+      float g = std::max(g_world.height(fx, fz), 0.f);
+      vec3 pos(fx, g + 70.f, fz);
+      quat q = quat::axisAngle(vec3(0, 1, 0), -fyaw * DEG) * quat::axisAngle(vec3(1, 0, 0), -fpitch * DEG);
+      wraith.armed = true; botControl = true;
+      for (int i = 0; i < (int)((fsec + 1.f) * 60.f); i++) {
+        plane.pos = pos; plane.q = q; plane.vel = vec3(); plane.w = vec3();
+        if (i > 60) wraith.wantFire = true;
+        realTime += 1 / 60.f; update(1 / 60.f);
+        if ((i & 7) == 0) { plane.q = quat::axisAngle(vec3(0, 1, 0), (-fyaw + 6.f * sinf(i * 0.05f)) * DEG) * quat::axisAngle(vec3(1, 0, 0), -fpitch * DEG); q = plane.q; }   // sweep the aim
+      }
+      printf("lasertest: %d destroyed, %d scorch pits, %d bolts in flight\n", wraith.wrecked, (int)wraith.scorch.size(), (int)wraith.bolts.size());
+      vec3 f = q.rotate(vec3(0, 0, -1)); vec3 tgt = pos + f * (70.f / std::max(-f.y, 0.2f));
+      hudOn = false; dbgCam = true; dbgFollow = false; toasts.clear(); hint.clear();
+      float cd = getenv("LTDIST") ? (float)atof(getenv("LTDIST")) : 1.f;
+      dbgCamLook = tgt; dbgCamPos = tgt + vec3(70.f, 45.f, 40.f) * cd;
+      for (int i = 0; i < 5; i++) updateCamera(0.1f);
+      return;
+    }
     float yw, pt, dist, lh = 8, tod = -1;
     if (sscanf(name.c_str(), "look_%f_%f_%f_%f_%f_%f_%f", &px, &pz, &yw, &pt, &dist, &lh, &tod) >= 5) {   // free camera on a ground point
       if (tod >= 0) timeOfDay = tod;

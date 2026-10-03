@@ -7,6 +7,7 @@
 #include "traffic.h"
 #include "career.h"
 #include "renderer.h"
+#include "entities.h"
 #include "audio.h"
 #include "radio.h"
 
@@ -131,6 +132,8 @@ private:
     struct Blast { vec3 p; float R, age, dur; bool water; };
     struct Crater { float x, z, R, D; };
     std::vector<Bolt> bolts; std::vector<Bomb> bombs; std::vector<Blast> blasts; std::vector<Crater> craters;
+    std::vector<Crater> scorch;   // small laser craters (most recent 16)
+    int wrecked = 0;              // trees, rocks and buildings destroyed
     int kills = 0;
   } wraith;
   void wraithControls(float dt);
@@ -138,7 +141,8 @@ private:
   void wraithVisual(FrameParams& fp);
   void fireLaser();
   void updateBolts(float dt);
-  void laserImpact(vec3 at, int craft, bool solid);
+  void laserImpact(vec3 at, int craft, int entKind, const Ent* ent);
+  void addScorch(float x, float z, float R, float D);
   void detonate(vec3 p, bool water);
   float ufoSummon = 0;          // J + K held while flying summons the UFO after a second
   Ufo ufo;

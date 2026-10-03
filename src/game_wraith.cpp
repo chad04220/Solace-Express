@@ -75,8 +75,18 @@ void Game::fireLaser() {
   spawn(a, plane.vel, 0.06f, 0.9f, 2.f, vec3(1.f, 0.3f, 0.45f) * 3.f, 1.f, SPR_GLOW, 0.f, 0.f);   // muzzle flash
 }
 
-// a bolt striking something: aircraft come apart, scenery and the ground spark and smoke
-void Game::laserImpact(vec3 b, int craft, bool solid) {
+// laser scorch craters: a new hit close to an old one deepens and widens it instead of adding another
+void Game::addScorch(float x, float z, float R, float D) {
+  WraithState& W = wraith;
+  for (auto& c : W.scorch)
+    if ((c.x - x) * (c.x - x) + (c.z - z) * (c.z - z) < c.R * c.R * 0.6f) { c.R = std::min(std::max(c.R, R) + 0.1f, std::max(R, 2.6f)); c.D = std::min(c.D + 0.1f, std::max(D, 1.f)); return; }
+  W.scorch.push_back({x, z, R, D});
+  if (W.scorch.size() > 16) W.scorch.erase(W.scorch.begin());
+}
+
+// a bolt striking something: aircraft come apart; trees, rocks and buildings take damage and are destroyed in fire
+// and smoke when it's enough; the ground is scorched with a small crater
+void Game::laserImpact(vec3 b, int craft, int entKind, const Ent* ent) {
   WraithState& W = wraith;
   if (craft >= 0) {
     vec3 p = traffic.craft[craft].pos, v = traffic.craft[craft].vel;
@@ -89,11 +99,40 @@ void Game::laserImpact(vec3 b, int craft, bool solid) {
     for (int i = 0; i < 20; i++) spawn(p + rndDir() * 3.f, v * 0.3f + rndDir() * 6.f, 4.f + 3.f * frand(), 3.f, 5.f, vec3(0.12f), 0.6f, SPR_SMOKE, 1.f, 0.6f);
     return;
   }
-  bool water = !solid && b.y < 0.5f;
+  bool water = !entKind && b.y < 0.5f && g_world.height(b.x, b.z) < 0.3f;
+  // every hit: sparks, a flash and a puff
   for (int i = 0; i < 14; i++) spawn(b + vec3(0, 0.3f, 0), rndDir() * (8.f + 18.f * frand()) + vec3(0, 6.f, 0), 0.3f + 0.4f * frand(), 0.12f, -0.1f, vec3(1.f, 0.4f, 0.5f) * 4.f, 1.f, SPR_SPARK, 1.f, -1.f);
   spawn(b + vec3(0, 0.5f, 0), vec3(0, 1.f, 0), 0.15f, 3.f, 3.f, vec3(1.f, 0.3f, 0.45f) * 3.f, 1.f, SPR_GLOW, 0.f, 0.f);
   spawn(b + vec3(0, 1.f, 0), vec3(0, 2.f, 0), 2.5f, 1.5f, 3.f, water ? vec3(0.85f, 0.88f, 0.9f) : vec3(0.15f, 0.13f, 0.12f), 0.5f, SPR_SMOKE, 1.f, 0.5f);
-  if (!water && frand() < 0.4f) spawn(b, vec3(0, 1.f, 0), 0.8f, 1.2f, 1.5f, vec3(1.f, 0.5f, 0.2f) * 2.f, 1.f, SPR_FIRE, 1.f, 0.2f);
+  if (entKind && ent) {
+    int k = entKind - 1, cl = entClass(k);
+    const EntKindInfo& I = kEntInfo[k];
+    float R = std::max(I.hx * ent->sx, I.hz * ent->sz), H = I.h * ent->sy;
+    if (!g_scenery.damage(*ent, k)) {   // damaged, still standing: it burns where it was hit
+      spawn(b, vec3(0, 1.5f, 0), 1.2f, 1.6f, 2.f, vec3(1.f, 0.5f, 0.2f) * 2.f, 1.f, SPR_FIRE, 1.f, 0.3f);
+      spawn(b + vec3(0, 1.f, 0), vec3(0, 3.f, 0), 4.f, 2.5f, 4.f, vec3(0.1f), 0.6f, SPR_SMOKE, 1.f, 0.5f);
+      return;
+    }
+    // destroyed: a blast sized to what it was, debris, a smoke column and a scorched pit where it stood
+    W.wrecked++;
+    vec3 base(ent->x, ent->y, ent->z), mid = base + vec3(0, H * 0.4f, 0);
+    float sz = std::clamp(R, 1.f, 12.f);
+    int nf = cl == EC_BUILDING ? 40 : cl == EC_ROCK ? 18 : 14;
+    for (int i = 0; i < nf; i++) spawn(mid + rndDir() * (sz * 0.5f) + vec3(0, H * 0.3f * frand(), 0), rndDir() * (3.f + 6.f * frand()) + vec3(0, 4.f, 0), 0.8f + frand(), sz * (0.5f + 0.5f * frand()), sz * 0.6f,
+                                vec3(1.f, 0.5f, 0.2f) * 3.f, 1.f, SPR_FIRE, 1.2f, 0.4f);
+    for (int i = 0; i < nf; i++) spawn(mid, rndDir() * (15.f + 30.f * frand()) + vec3(0, 12.f, 0), 1.2f + frand(), 0.3f, -0.1f, cl == EC_TREE ? vec3(1.f, 0.6f, 0.25f) * 3.f : vec3(1.f, 0.75f, 0.4f) * 4.f, 1.f, SPR_SPARK, 1.f, -1.f);
+    for (int i = 0; i < nf / 2 + 4; i++) spawn(mid + rndDir() * sz * 0.5f, vec3(0, 3.f + 4.f * frand(), 0) + rndDir() * 2.f, 6.f + 5.f * frand(), sz * 0.8f + 2.f, sz * 0.9f + 3.f,
+                                     cl == EC_ROCK ? vec3(0.5f, 0.47f, 0.43f) : vec3(0.09f, 0.08f, 0.08f), 0.7f, SPR_SMOKE, 0.6f, 0.5f);
+    g_audio.trigger(SFX_BOOM, clampf(0.25f + R * 0.04f, 0.25f, 0.8f) * clampf(1.4f - length(b - camPos) / 3000.f, 0.2f, 1.f));
+    if (ent->y > 0.3f) addScorch(ent->x, ent->z, clampf(R * 0.75f, 1.6f, 9.f), clampf(0.3f + R * 0.08f, 0.4f, 1.4f));
+    if (cl == EC_BUILDING) toast(fmt("%s destroyed", I.name), vec3(1.f, 0.6f, 0.3f));
+    return;
+  }
+  if (!water) {
+    if (frand() < 0.4f) spawn(b, vec3(0, 1.f, 0), 0.8f, 1.2f, 1.5f, vec3(1.f, 0.5f, 0.2f) * 2.f, 1.f, SPR_FIRE, 1.f, 0.2f);
+    for (int i = 0; i < 6; i++) spawn(b, rndDir() * 4.f + vec3(0, 7.f + 5.f * frand(), 0), 1.2f, 0.25f, 0.4f, vec3(0.12f, 0.09f, 0.07f), 0.9f, SPR_SMOKE, 2.f, 0.f);   // thrown dirt
+    addScorch(b.x, b.z, 1.6f, 0.5f);
+  }
 }
 
 // bolts in flight: sweep each one's path this frame against the ground, aircraft, scenery and the UFO (runs after the
@@ -105,18 +144,18 @@ void Game::updateBolts(float dt) {
     if (b.hit) { b.len -= kBoltSpeed * dt; continue; }   // the streak runs into the impact point
     float segL = length(b.v) * dt;
     vec3 sd = b.v / std::max(length(b.v), 1e-3f), a = b.h;
-    float tHit = -1.f; int craft = -1; bool solid = false;
+    float tHit = -1.f; int craft = -1;
     float tg = groundHit(a, sd, segL);
     if (tg >= 0) tHit = tg;
     float tt = 0; int k = traffic.rayHit(a, sd, tHit >= 0 ? tHit : segL, tt);
     if (k >= 0) { tHit = tt; craft = k; }
-    int ek = 0; float te = g_scenery.raycast(a, sd, tHit >= 0 ? tHit : segL, &ek);
-    if (te >= 0) { tHit = te; craft = -1; solid = true; }
+    int ek = 0; Ent hitEnt; float te = g_scenery.raycast(a, sd, tHit >= 0 ? tHit : segL, &ek, &hitEnt);
+    if (te >= 0) { tHit = te; craft = -1; } else ek = 0;
     if (ufo.on && ufo.t < 20.f) {   // tag the UFO and it decides it has seen enough
       vec3 rel = ufo.pos - a; float along = dot(rel, sd);
       if (along > 0 && along < (tHit >= 0 ? tHit : segL) && length(rel - sd * along) < 9.f) { ufo.t = 23.f; toast("The visitors don't appreciate that...", vec3(0.4f, 1.f, 0.6f)); }
     }
-    if (tHit >= 0) { b.h = a + sd * tHit; b.hit = true; laserImpact(b.h, craft, solid); }
+    if (tHit >= 0) { b.h = a + sd * tHit; b.hit = true; laserImpact(b.h, craft, ek, ek ? &hitEnt : nullptr); }
     else { b.h = a + b.v * dt; b.len = std::min(kBoltStreak, b.len + kBoltSpeed * dt); }
   }
   W.bolts.erase(std::remove_if(W.bolts.begin(), W.bolts.end(), [](const WraithState::Bolt& b) { return b.age > b.life || (b.hit && b.len <= 0.f); }), W.bolts.end());
@@ -240,9 +279,14 @@ void Game::wraithVisual(FrameParams& fp) {
     I[0] = b.age; I[1] = 1.f; I[2] = 0; I[3] = 0;
   }
   // glassed craters join the crash crater (if any)
-  for (size_t i = 0; i < W.craters.size() && fp.wreck.craterN < 8; i++) {
+  for (size_t i = 0; i < W.craters.size() && fp.wreck.craterN < 24; i++) {
     float* c = fp.wreck.crater[fp.wreck.craterN++];
     c[0] = W.craters[i].x; c[1] = W.craters[i].z; c[2] = W.craters[i].R; c[3] = W.craters[i].D;
+  }
+  // laser scorch pits (newest first, in case the list is full)
+  for (int i = (int)W.scorch.size() - 1; i >= 0 && fp.wreck.craterN < 24; i--) {
+    float* c = fp.wreck.crater[fp.wreck.craterN++];
+    c[0] = W.scorch[i].x; c[1] = W.scorch[i].z; c[2] = W.scorch[i].R; c[3] = W.scorch[i].D;
   }
   // a young detonation lights up its surroundings (borrowing the exhaust light)
   for (const auto& b : W.blasts)

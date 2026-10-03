@@ -14,10 +14,13 @@ const int HMN = 1024;
 const float TEXEL = 78.125;
 const float PI = 3.14159265;
 uniform sampler2D uHM;
-uniform vec4 uCrater[8]; uniform int uCraterN;  // impact craters: x, z, radius, depth (negative depth: dark-energy blast)
-int craterAt(vec2 p, float k){ for (int i = 0; i < 8; i++) { if (i >= uCraterN) break; if (length(p - uCrater[i].xy) < uCrater[i].z*k) return i; } return -1; }
+uniform vec4 uCrater[24]; uniform int uCraterN;  // impact craters: x, z, radius, depth (negative depth: dark-energy blast)
+uniform vec3 uCraterB;   // circle (x, z, radius) around every crater's influence
+int craterAt(vec2 p, float k){ if (length(p - uCraterB.xy) > uCraterB.z) return -1;
+  for (int i = 0; i < 24; i++) { if (i >= uCraterN) break; if (length(p - uCrater[i].xy) < uCrater[i].z*k) return i; } return -1; }
 float craterH(vec2 p){ float h = 0.0;
-  for (int i = 0; i < 8; i++) { if (i >= uCraterN) break; vec4 c = uCrater[i]; float d = length(p - c.xy)/c.z; if (d > 1.8) continue; float D = abs(c.w);
+  if (length(p - uCraterB.xy) > uCraterB.z) return 0.0;
+  for (int i = 0; i < 24; i++) { if (i >= uCraterN) break; vec4 c = uCrater[i]; float d = length(p - c.xy)/c.z; if (d > 1.8) continue; float D = abs(c.w);
     h += -D*max(1.0 - d*d, 0.0) + 0.22*D*exp(-(d - 1.0)*(d - 1.0)*14.0); }
   return h; }
 float hash2i(ivec2 p){ uint h = uint(p.x)*0x8da6b343u + uint(p.y)*0xd8163841u; h ^= h>>13; h *= 0x5bd1e995u; h ^= h>>15; return float(h & 0xFFFFFFu)/16777216.0; }
@@ -1547,7 +1550,8 @@ R"(  vec3 grassTint = mix(vec3(0.75,0.85,0.45), vec3(0.55,0.95,0.45), lush) * mi
       float crack = pow(clamp(1.0 - abs(vnoise(p.xz*1.3 + 7.0) - 0.5)*7.0, 0.0, 1.0), 4.0);
       m.emit += vec3(0.6, 0.2, 1.0)*crack*glass*(1.5 + sin(uTime*2.0 + nz*6.0));
     } else if (cd < 2.6) {
-      float nz = vnoise(p.xz*0.35) + 0.5*vnoise(p.xz*1.7);
+      vec2 cq = (p.xz - cr.xy)/max(cr.z, 1.0);   // noise in crater units: small pits get ragged edges too
+      float nz = vnoise(cq*3.5 + cr.xy*0.1) + 0.5*vnoise(cq*13.0);
       float scorch = smoothstep(2.6, 1.1, cd*(0.8 + 0.35*nz));
       vec3 dirt = mix(vec3(0.16, 0.12, 0.09), vec3(0.08, 0.065, 0.05), nz*0.7);
       m.alb = mix(m.alb, dirt, smoothstep(1.25, 0.9, cd));
@@ -2679,14 +2683,17 @@ void wrSection(float z, out float W, out float yc, out float top, out float bot)
   bot = yc - min((z + 8.4)*0.12, 0.48) + max(z - 5.0, 0.0)*0.06;
 }
 float wrBody(vec3 p){
-  float W, yc, top, bot; wrSection(p.z, W, yc, top, bot);
+  // the cross-section is only meaningful along the body (ahead of the nose its heights go negative, the half-planes
+  // flip and it would leave an invisible wall across the nose plane): evaluate it inside, then add the end caps
+  float W, yc, top, bot; wrSection(clamp(p.z, -8.3, 7.8), W, yc, top, bot);
   W = max(W, 0.001);
   vec2 q = vec2(abs(p.x), p.y - yc);
   float h = top - yc, hb = yc - bot, Wb = W*0.42;
   vec2 nU = normalize(vec2(h, W)), nL = normalize(vec2(hb, Wb - W));
   float d = max(dot(q - vec2(W, 0.0), nU), dot(q - vec2(W, 0.0), nL));
   d = max(d, bot - p.y);
-  return max(d, max(-8.4 - p.z, p.z - 7.8));
+  float dz = max(-8.4 - p.z, p.z - 7.8);
+  return dz > 0.0 ? length(vec2(max(d, 0.0), dz)) : max(d, dz);
 }
 // one thruster pod (i), evaluated in its own frame: pivot at the origin, exhaust along +z
 vec2 wrPod(vec3 p, int i, float lim){

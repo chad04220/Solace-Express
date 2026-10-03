@@ -37,7 +37,31 @@ size_t Scenery::generated() const { size_t n = 0; for (auto& c : chunks) if (c) 
 
 bool Scenery::destroyed(const Ent& e) const {
   for (const vec3& c : craters) { float dx = e.x - c.x, dz = e.z - c.y; if (dx * dx + dz * dz < c.z * c.z * 1.44f) return true; }
+  if (wrecked.empty()) return false;
+  auto it = wrecked.find(chunkOf(e.z) * NC + chunkOf(e.x));
+  if (it == wrecked.end()) return false;
+  uint64_t k = keyOf(e);
+  for (uint64_t w : it->second) if (w == k) return true;
   return false;
+}
+
+int Scenery::hitPoints(const Ent& e, int kind) {
+  if (entClass(kind) == EC_TREE || kind <= EK_SLAB) return 1;
+  const EntKindInfo& I = kEntInfo[kind];
+  float vol = (2.f * I.hx * e.sx) * (I.h * e.sy) * (2.f * I.hz * e.sz);
+  return std::clamp((int)lroundf(vol / 260.f), 2, 12);
+}
+
+bool Scenery::damage(const Ent& e, int kind, int amount) {
+  if (destroyed(e)) return false;
+  uint64_t k = keyOf(e);
+  int& h = hits[k];
+  h += amount;
+  if (h < hitPoints(e, kind)) return false;
+  hits.erase(k);
+  wrecked[chunkOf(e.z) * NC + chunkOf(e.x)].push_back(k);
+  wreckRev++;
+  return true;
 }
 
 // ------------------------------------------------------------------ placement helpers
@@ -348,7 +372,7 @@ void Scenery::trim(vec3 cam, float keepDetail, float keepAll, int frame) {
 }
 
 // ------------------------------------------------------------------ collisions
-int Scenery::collide(vec3 p, float r) {
+int Scenery::collide(vec3 p, float r, Ent* entOut) {
   int c0x = chunkOf(p.x - r - 20.f), c1x = chunkOf(p.x + r + 20.f), c0z = chunkOf(p.z - r - 20.f), c1z = chunkOf(p.z + r + 20.f);
   for (int cz = c0z; cz <= c1z; cz++)
     for (int cx = c0x; cx <= c1x; cx++) {
@@ -367,15 +391,15 @@ int Scenery::collide(vec3 p, float r) {
             // the crown (trunks alone are too thin to matter at flying speeds)
             float crownR = I.hx * e.sx * 0.8f, y0 = I.h * e.sy * (k == EK_PALM ? 0.7f : k == EK_PINE ? 0.5f : 0.22f);
             if (k == EK_BUSH) y0 = 0;
-            if (ly > y0 - r && dx * dx + dz * dz < (crownR + r) * (crownR + r)) return k + 1;
+            if (ly > y0 - r && dx * dx + dz * dz < (crownR + r) * (crownR + r)) { if (entOut) *entOut = e; return k + 1; }
           } else if (cls == EC_ROCK) {
             float rr = I.hx * e.sx * 0.85f, hh = I.h * e.sy * 0.92f;
             float q = (dx * dx + dz * dz) / ((rr + r) * (rr + r)) + (ly * ly) / ((hh + r) * (hh + r));
-            if (q < 1.f) return k + 1;
+            if (q < 1.f) { if (entOut) *entOut = e; return k + 1; }
           } else {
             float c = cosf(e.yaw), s = sinf(e.yaw);
             float lx = c * dx - s * dz, lz = s * dx + c * dz;
-            if (fabsf(lx) < I.hx * e.sx + r && fabsf(lz) < I.hz * e.sz + r && ly < I.h * e.sy + r * 0.5f) return k + 1;
+            if (fabsf(lx) < I.hx * e.sx + r && fabsf(lz) < I.hz * e.sz + r && ly < I.h * e.sy + r * 0.5f) { if (entOut) *entOut = e; return k + 1; }
           }
         }
       }
@@ -383,13 +407,13 @@ int Scenery::collide(vec3 p, float r) {
   return 0;
 }
 
-float Scenery::raycast(vec3 a, vec3 d, float L, int* kindOut) {
+float Scenery::raycast(vec3 a, vec3 d, float L, int* kindOut, Ent* entOut) {
   // sampled along the segment (bolts and the like); skipped when the whole segment is well above the ground
   vec3 b = a + d * L;
   float g = std::max(std::min(g_world.groundHeight(a.x, a.z, 4), g_world.groundHeight(b.x, b.z, 4)), 0.f);
   if (std::min(a.y, b.y) - g > 220.f) return -1.f;
   for (float t = 0; t <= L; t += 2.5f) {
-    int k = collide(a + d * t, 0.4f);
+    int k = collide(a + d * t, 0.4f, entOut);
     if (k) { if (kindOut) *kindOut = k; return t; }
   }
   return -1.f;

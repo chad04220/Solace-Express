@@ -37,7 +37,7 @@ struct WreckVisual {
   vec3 C[5], H[5];              // clip box (body coords) of each piece
   int debris = 0;
   float deb[16][4], debQ[16][4];  // chunk centre + size (negative = charred), orientation quaternion (w,x,y,z)
-  int craterN = 0; float crater[8][4] = {};   // x, z, radius, depth (negative depth: dark-energy crater)
+  int craterN = 0; float crater[24][4] = {};  // x, z, radius, depth (negative depth: dark-energy crater)
 };
 
 struct FrameParams {

@@ -4,6 +4,7 @@
 #pragma once
 #include "world.h"
 #include <memory>
+#include <unordered_map>
 
 enum EntKind {
   // foliage
@@ -42,19 +43,29 @@ public:
   Chunk* ensure(int cx, int cz, int level);          // generates up to the level if needed
   static int chunkOf(float v) { return (int)floorf((v + WORLD_HALF) / CH); }
   static float chunkX0(int c) { return c * CH - WORLD_HALF; }
-  // Collision: returns the kind + 1 of an entity the sphere (p, r) touches, 0 if none.
-  int collide(vec3 p, float r);
+  // Collision: returns the kind + 1 of an entity the sphere (p, r) touches, 0 if none (entOut: a copy of it).
+  int collide(vec3 p, float r, Ent* entOut = nullptr);
   // First entity a segment (a, unit d, length L) passes through: distance along it, or -1 (kindOut = kind + 1)
-  float raycast(vec3 a, vec3 d, float L, int* kindOut = nullptr);
-  // Plasma craters destroy what stands in them (x, z, radius)
+  float raycast(vec3 a, vec3 d, float L, int* kindOut = nullptr, Ent* entOut = nullptr);
+  // Craters destroy what stands in them (x, z, radius)
   std::vector<vec3> craters;
   bool destroyed(const Ent& e) const;
+  bool anyGone() const { return !craters.empty() || !wrecked.empty(); }
+  // Weapon damage: hit points scale with the entity's size (a tree or a boulder takes one hit, a skyscraper twelve).
+  // Returns true when this hit destroys it. Destroyed entities stay gone until resetDamage().
+  bool damage(const Ent& e, int kind, int amount = 1);
+  static int hitPoints(const Ent& e, int kind);
+  void resetDamage() { wrecked.clear(); hits.clear(); wreckRev++; }
+  int wreckRev = 0;   // bumps whenever something is destroyed (the renderer refreshes its shadow maps)
   // Drops tree-level data of chunks far from the camera and whole chunks further out
   void trim(vec3 cam, float keepDetail, float keepAll, int frame);
   void clear() { chunks.clear(); }
   size_t generated() const;
 private:
   std::vector<std::unique_ptr<Chunk>> chunks;
+  std::unordered_map<int, std::vector<uint64_t>> wrecked;   // chunk index -> keys of destroyed entities
+  std::unordered_map<uint64_t, int> hits;                   // damage taken so far
+  static uint64_t keyOf(const Ent& e) { return ((uint64_t)(uint32_t)(int)lroundf(e.x * 8.f) << 32) | (uint32_t)(int)lroundf(e.z * 8.f); }
   void generate(Chunk& c, int cx, int cz, int level);
 };
 

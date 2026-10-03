@@ -596,7 +596,13 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glUniform1i(U(p, "uDebN"), wv.debris);
     if (wv.debris > 0) { glUniform4fv(U(p, "uDeb"), wv.debris, &wv.deb[0][0]); glUniform4fv(U(p, "uDebQ"), wv.debris, &wv.debQ[0][0]); }
     glUniform1i(U(p, "uCraterN"), wv.craterN);
-    if (wv.craterN > 0) glUniform4fv(U(p, "uCrater"), wv.craterN, &wv.crater[0][0]);
+    if (wv.craterN > 0) {
+      glUniform4fv(U(p, "uCrater"), wv.craterN, &wv.crater[0][0]);
+      // a circle around them all lets the terrain skip the crater loop everywhere else
+      float x0 = 1e9f, z0 = 1e9f, x1 = -1e9f, z1 = -1e9f;
+      for (int i = 0; i < wv.craterN; i++) { const float* c = wv.crater[i]; float r = c[2] * 2.7f; x0 = std::min(x0, c[0] - r); x1 = std::max(x1, c[0] + r); z0 = std::min(z0, c[1] - r); z1 = std::max(z1, c[1] + r); }
+      glUniform3f(U(p, "uCraterB"), (x0 + x1) * 0.5f, (z0 + z1) * 0.5f, 0.5f * sqrtf((x1 - x0) * (x1 - x0) + (z1 - z0) * (z1 - z0)));
+    }
   }
   glUniform3f(U(p, "uLandLightPos"), fp.landLightPos.x, fp.landLightPos.y, fp.landLightPos.z);
   glUniform3f(U(p, "uLandLightDir"), fp.landLightDir.x, fp.landLightDir.y, fp.landLightDir.z);
