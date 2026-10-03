@@ -326,7 +326,27 @@ void Renderer::drawEntities(const FrameParams& fp) {
   glViewport(0, 0, rw, rh);
   glClearColor(0, 0, 0, 0); glClearDepth(1.0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  // cockpit view: the screen area the cabin covered last frame is filled with the nearest depth first, so the scenery
+  // behind the cabin walls fails the depth test before it is shaded (only the windows and displays draw it)
+  bool ckView = fp.plane.on && fp.plane.PS[3] > 0.5f && fp.wreck.pieces == 0;
+  if (ckView && ckMaskPrev && depthValid && progCkMask && !draws[0].empty()) {
+    glUseProgram(progCkMask);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texDepth);
+    glUniform1i(glGetUniformLocation(progCkMask, "uDepthTex"), 0);
+    glUniform1f(glGetUniformLocation(progCkMask, "uNear"), 4.f);
+    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE); glDepthFunc(GL_ALWAYS);
+    glBindVertexArray(vaoEmpty); glDrawArrays(GL_TRIANGLES, 0, 3);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); glDepthFunc(GL_LESS);
+    glBindVertexArray(vaoEnt); glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
+  }
+  ckMaskPrev = ckView;
   if (!draws[0].empty()) {
+    // near detail levels first, and buildings and rocks before trees: the big near occluders fill the depth buffer
+    // early, so less of what lies behind them gets shaded
+    std::stable_sort(draws[0].begin(), draws[0].end(), [](const Draw& a, const Draw& b) {
+      if (a.lod != b.lod) return a.lod < b.lod;
+      return (2 - entClass(a.kind)) < (2 - entClass(b.kind));
+    });
     glUseProgram(progEnt);
     bindMats(progEnt);
     glUniformMatrix4fv(glGetUniformLocation(progEnt, "uVP"), 1, GL_FALSE, vp.m);

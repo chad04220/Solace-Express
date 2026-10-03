@@ -55,6 +55,7 @@ struct FrameParams {
   vec3 camPos; vec3 camRight, camUp, camBack; float fovY = 1.0f;
   float time = 0;
   vec3 sunDir, sunCol; float night = 0;
+  float planeTerrSh = 1.f;   // terrain's sun shadow at the player's aircraft (one value for the whole airframe, from the CPU)
   float cloudCover = 0.3f, cloudBase = 1500, fogB = 0.0001f, wet = 0, snow = 0, lightning = 0, storm = 0;
   vec2 windOff;
   PlaneVisual plane;
@@ -85,7 +86,8 @@ public:
   GLuint minimapTex = 0;
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
-  static constexpr int kProgramCount = 12;
+  static constexpr int kProgramCount = 13;
+  float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
   std::string dispError;   // set when the cockpit display shader failed to build (the screens stay dark)
   bool compilePrograms(std::atomic<int>* done);  // scene programs; safe on a worker thread with a shared context
   bool init(int w, int h);                       // everything else (runs compilePrograms itself if not done yet)
@@ -122,6 +124,8 @@ public:
 private:
   GLuint progMap = 0, texMap = 0, fboMap = 0; int mapN = 0;
   GLuint progDisp = 0, texPages = 0, texPanel = 0, fboDisp = 0;
+  GLuint progCkMask = 0;           // cockpit occlusion mask for the scenery pass
+  bool depthValid = false, ckMaskPrev = false;   // last frame's ray-traced depth is usable / was a cockpit view
   void renderDisplays(const FrameParams& fp, bool panel);
   GLuint progRT = 0, progSprite = 0, progDown = 0, progUp = 0, progRayMask = 0, progRay = 0, progPost = 0, progUI = 0, progTAA = 0;
   static constexpr int kBloomMips = 6;

@@ -81,6 +81,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_NONE 0
 #define GL_LESS 0x0201
 #define GL_LEQUAL 0x0203
+#define GL_ALWAYS 0x0207
 #define GL_DEPTH_BUFFER_BIT 0x00000100
 #define GL_DEPTH_COMPONENT 0x1902
 #define GL_DEPTH_COMPONENT32F 0x8CAC
@@ -165,6 +166,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
   X(void, glVertexAttribDivisor, (GLuint, GLuint)) \
   X(void, glDepthFunc, (GLenum)) \
   X(void, glDepthMask, (GLboolean)) \
+  X(void, glColorMask, (GLboolean, GLboolean, GLboolean, GLboolean)) \
   X(void, glClearDepth, (GLdouble)) \
   X(void, glPolygonOffset, (GLfloat, GLfloat)) \
   X(void, glClearBufferfv, (GLenum, GLint, const GLfloat*)) \

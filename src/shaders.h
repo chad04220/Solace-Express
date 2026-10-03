@@ -135,7 +135,8 @@ layout(location=1) out float oDepth;
 uniform vec2 uRes; uniform vec3 uCamPos; uniform mat3 uCamRot; uniform float uTanHalf; uniform float uAspect;
 uniform vec2 uJit; uniform float uSeed;  // TAA: sub-pixel jitter (uv units) and a per-frame noise seed
 uniform float uMaxH; uniform int uQuality;
-uniform int uDbg;   // profiling: each set bit switches one feature off (see Renderer::dbgOff)
+uniform int uDbg;
+uniform float uPlaneTSh;   // terrain's sun shadow at the player's aircraft (computed once per frame on the CPU)   // profiling: each set bit switches one feature off (see Renderer::dbgOff)
 uniform sampler2DArray uAlb; uniform sampler2DArray uNrm;
 // airports
 uniform int uApCount; uniform vec4 uAp[16]; uniform vec4 uApDim[16];
@@ -3302,7 +3303,14 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
       }
       n = applyTS(n, m.nrm, interior ? 0.35 : 0.12);
       bool podMat = mid >= 40 && mid < 80 && int(gM[0].z + 0.5) >= 5 && !trafHit;   // research jets only: light aircraft use ids 60+ for their cockpits
-      float sh = sunVis > 0.0 && !podMat ? (trafHit ? 1.0 : planeShadow(p + n*0.02, uSunDir)) * terrainShadow(p, uSunDir, 50.0) * cloudShadow(p) : 0.0;   // the sealed pod sees no sun
+      // sun shadow: the terrain's is one value for the whole intact airframe (from the CPU); inside the cabin the
+      // self-shadow ray only needs to get out through the cabin and the wing above it, not cross the whole aircraft
+      float sh = 0.0;
+      if (sunVis > 0.0 && !podMat) {
+        float tsh = (trafHit || uWreck > 0) ? terrainShadow(p, uSunDir, t) : uPlaneTSh;
+        if (tsh > 0.0 && !trafHit) { gShMax = interior ? 3.5 : 1e9; tsh *= planeShadow(p + n*0.02, uSunDir); gShMax = 1e9; }
+        sh = tsh > 0.0 ? tsh*cloudShadow(p) : 0.0;
+      }
       if (podMat) {  // sealed research cockpit: lit only by its modelled fixtures, low and moody
         mat3 inv = transpose(gPR);
         col = (int(gM[0].z + 0.5) == 6 ? wraithPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : podLight(lp, inv*n, inv*(-rd), m, E.xyz))*interiorAO(lp, ln) + m.emit;
@@ -4054,6 +4062,20 @@ void main(){
 )";
 // Light shafts (crepuscular rays): bright, unobstructed sky and cloud around the sun is radially blurred towards
 // the sun's position on screen, so beams fan out through gaps in clouds, between hills and around the aircraft.
+// Cockpit occlusion mask for the scenery pass: where last frame's ray-traced depth found the cabin (anything within a
+// few metres of the eye, and all of a pixel's neighbours too, so head and camera motion never uncover a gap), write
+// the nearest depth so the trees and buildings behind the cabin walls are rejected before they are shaded
+static const char* kCockpitMaskFS = R"(#version 330 core
+in vec2 vUV; uniform sampler2D uDepthTex; uniform float uNear;
+void main(){
+  ivec2 p = ivec2(gl_FragCoord.xy), hi = textureSize(uDepthTex, 0) - 1;
+  float m = 0.0;
+  for (int j = -2; j <= 2; j += 2)
+    for (int i = -2; i <= 2; i += 2) m = max(m, texelFetch(uDepthTex, clamp(p + ivec2(i, j), ivec2(0), hi), 0).r);
+  if (!(m < uNear)) discard;
+  gl_FragDepth = 0.0;
+}
+)";
 static const char* kRayMaskFS = R"(#version 330 core
 in vec2 vUV; out vec4 oColor; uniform sampler2D uScene; uniform sampler2D uDepthTex; uniform vec2 uSun; uniform float uAsp;
 void main(){

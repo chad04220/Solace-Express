@@ -1448,6 +1448,21 @@ FrameParams Game::buildFrame() {
   FrameParams fp;
   fp.time = realTime;
   computeSun(timeOfDay, fp.sunDir, fp.sunCol, fp.night);
+  {   // terrain's soft sun shadow at the aircraft: the same march as the shader's terrainShadow, done once here instead
+      // of for every pixel of the airframe and cockpit
+    float res = 1.f, t = 2.f;
+    vec3 ro = plane.pos;
+    if (fp.sunDir.y > -0.05f)
+      for (int i = 0; i < 40; i++) {
+        vec3 q = ro + fp.sunDir * t;
+        if (q.y > g_ren.terrainCeiling()) break;
+        float h = q.y - g_world.height(q.x, q.z, 4);
+        res = std::min(res, 12.f * h / t);
+        if (res < 0.f) { res = 0.f; break; }
+        t += clampf(h * 0.6f, 6.f, 450.f);
+      }
+    fp.planeTerrSh = clampf(res, 0.f, 1.f);
+  }
   fp.cloudCover = wx.cloudCover; fp.cloudBase = wx.cloudBase;
   fp.fogB = 1.5f / std::max(wx.visibility, 500.f);
   fp.wet = wx.precip == 1 ? 1.f : 0.f; fp.snow = wx.precip == 2 ? 0.8f : 0.f;

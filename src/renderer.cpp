@@ -472,6 +472,7 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     if (m != std::string::npos) ms.replace(m, 10, "void mainRT(");
     progMap = program(vsFS, ms + kMapMain, error); step();
     if (!progMap) { error = "Map shader: " + error; return false; }
+    { std::string e; progCkMask = program(vsFS, kCockpitMaskFS, e); step(); }   // optional: without it nothing is masked
     progDisp = program(vsFS, ms + kDispMain, error); step();
     // not fatal: without it the cockpit screens stay dark, but the game still runs (the error goes to startup.log)
     if (!progDisp) { dispError = error; error.clear(); }
@@ -671,6 +672,7 @@ void Renderer::createRenderTargets() {
   rw = std::max(64, (int)(W * renderScale)); rh = std::max(64, (int)(H * renderScale));
   makeTex(texRaw, rw, rh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
   makeTex(texDepth, rw, rh, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST);
+  depthValid = false;
   if (!fboScene) glGenFramebuffers(1, &fboScene);
   glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texRaw, 0);
@@ -798,8 +800,10 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glActiveTexture(GL_TEXTURE0 + 13); glBindTexture(GL_TEXTURE_2D, texCloudCov); glUniform1i(U(p, "uCloudCov"), 13);
   glActiveTexture(GL_TEXTURE0 + 14); glBindTexture(GL_TEXTURE_3D, texNoise3); glUniform1i(U(p, "uNoise3"), 14);
   glActiveTexture(GL_TEXTURE0 + 15); glBindTexture(GL_TEXTURE_2D, texFont); glUniform1i(U(p, "uFontTex"), 15);
-  glActiveTexture(GL_TEXTURE0 + 12); glBindTexture(GL_TEXTURE_2D, texPages); glUniform1i(U(p, "uDispTex"), 12);
-  glActiveTexture(GL_TEXTURE0 + 10); glBindTexture(GL_TEXTURE_2D, texPanel); glUniform1i(U(p, "uPanelTex"), 10);
+  // units 0-15 are all taken (10 and 12 by the G-buffer and the far shadow cascade below): the display atlases use
+  // 16 and 17 (every GL 3.3 GPU that runs the ray tracer has at least 32)
+  glActiveTexture(GL_TEXTURE0 + 16); glBindTexture(GL_TEXTURE_2D, texPages); glUniform1i(U(p, "uDispTex"), 16);
+  glActiveTexture(GL_TEXTURE0 + 17); glBindTexture(GL_TEXTURE_2D, texPanel); glUniform1i(U(p, "uPanelTex"), 17);
   {   // AI traffic: one row of 32 texels per aircraft
     if (!texTraffic) {
       glGenTextures(1, &texTraffic); glBindTexture(GL_TEXTURE_2D, texTraffic);
@@ -828,7 +832,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform1f(U(p, "uMaxH"), maxH);
   glUniform1i(U(p, "uQuality"), quality); glUniform1i(U(p, "uDbg"), dbgOff);
   glUniform1f(U(p, "uTime"), fp.time);
-  glUniform3f(U(p, "uSunDir"), fp.sunDir.x, fp.sunDir.y, fp.sunDir.z);
+  glUniform3f(U(p, "uSunDir"), fp.sunDir.x, fp.sunDir.y, fp.sunDir.z); glUniform1f(U(p, "uPlaneTSh"), fp.planeTerrSh);
   glUniform3f(U(p, "uSunCol"), fp.sunCol.x, fp.sunCol.y, fp.sunCol.z);
   glUniform1f(U(p, "uNight"), fp.night);
   glUniform1f(U(p, "uCloudCover"), fp.cloudCover);
@@ -935,6 +939,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform3f(U(p, "uFlameLI"), fp.flameLight.x, fp.flameLight.y, fp.flameLight.z);
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
+  depthValid = true;
 
   stamp(2);
   // ------------------------------------------------ temporal AA resolve (before the sprites: particles never smear)
