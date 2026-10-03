@@ -510,8 +510,8 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel) {
   glUniform2f(U(p, "uDispRes"), (float)w, (float)h);
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
+  glActiveTexture(GL_TEXTURE0);   // (not unit 15, which holds the font)
   glBindTexture(GL_TEXTURE_2D, tex); glGenerateMipmap(GL_TEXTURE_2D);
-  glActiveTexture(GL_TEXTURE0);
 }
 
 // Renders the GPS aerial image: half x half metres around (cx, cz), north (-z) at the top, into texMap

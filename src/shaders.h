@@ -3853,8 +3853,15 @@ void main(){
     vec2 wp = c0 + (vec2(si & 1, si >> 1) - 0.5)*foot*0.7;
     vec4 base = baseAt(wp);
     float h = terrainH(wp, 9);
-    // land cover comes from ~40 m mask cells: warp the material lookup so forest and field edges come out organic
-    vec2 mw = wp + (vec2(cn3(vec3(wp*0.012, 1.3)), cn3(vec3(wp*0.012, 7.9))) - 0.5)*70.0 + (vec2(cn3(vec3(wp*0.05, 3.1)), cn3(vec3(wp*0.05, 5.7))) - 0.5)*18.0;
+    // land cover comes from ~40 m mask cells: warp the material lookup so forest and field edges come out organic,
+    // but not on and around the airfields, where it would bend and break up the runways
+    float apK = 0.0;
+    for (int ai = 0; ai < 16; ai++) {
+      if (ai >= uApCount) break;
+      float hl = uApDim[ai].x*0.5;
+      apK = max(apK, smoothstep(hl + 900.0, hl + 350.0, length(wp - uAp[ai].xy)));
+    }
+    vec2 mw = wp + ((vec2(cn3(vec3(wp*0.012, 1.3)), cn3(vec3(wp*0.012, 7.9))) - 0.5)*70.0 + (vec2(cn3(vec3(wp*0.05, 3.1)), cn3(vec3(wp*0.05, 5.7))) - 0.5)*18.0)*(1.0 - apK);
     vec3 col;
     if (h < 0.0) {   // sea: turquoise shallows over sand, deepening to blue, a white surf line on the shore
       float dpt = -h;
@@ -3904,6 +3911,10 @@ void main(){
     }
     o = vec4(acc*0.25, cov*0.25);
   }
+  // the atlas is half float (max 65504): one overflowing or NaN pixel would turn to inf, and mipmapping would smear it
+  // over the whole screen. Displays never need more than this.
+  o = min(max(o, vec4(0.0)), vec4(64.0));
+  if (!(o.r + o.g + o.b + o.a < 1e6)) o = vec4(0.0);
   oColor = o;
 }
 )";
