@@ -2168,6 +2168,8 @@ vec3 wrHolo(vec3 ro, vec3 rd, float tmax);
 vec3 wraithScreen(vec3 col, vec3 rd, int id, vec3 sl);
 bool wrFeedRay(vec3 sl, inout vec3 ro, inout vec3 rd);
 vec3 wrFeedOverlay(vec3 col, vec3 sl);
+float wrClip(vec3 lp, int mid);
+vec3 wrClipAtlas(vec2 uv);
 vec3 jetPlumes(vec3 ro, vec3 rd, float tmax, float jit){
   if (gFlame.x < 0.02) return vec3(0.0);
   mat3 inv = transpose(uPlaneRot);
@@ -2673,6 +2675,18 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
   if (onScr) col = feed ? wrFeedOverlay(col, scrL) : wrCk ? wraithScreen(col, rd, scrId, scrL) : jetScreen(col, rd, scrId, scrL);
   if (wrCk) col += wrHolo(roV, rdV, pod ? t : h0.x);   // the hologram floats inside the cabin, in front of everything
   if (cloak) { col = cloakSkin(col, ckN, rd0, ckLp, ckLp.z - uWr[6].y + 0.8); t += ckT; taaFlag = 0.5; }
+#ifdef WR_CLIPATLAS
+  col = wrClipAtlas(vUV); t = 1.0;
+#endif
+#ifdef WR_CLIPDEBUG
+  if (wrCk && (onScr || pod)) {   // red: a display or gauge surface inside other cockpit geometry
+    vec3 hp = transpose(uPlaneRot)*(uCamPos + rdV*h0.x - uPlanePos);
+    int m0 = int(h0.y + 0.5);
+    if ((m0 >= 41 && m0 <= 43) || (m0 >= 61 && m0 <= 63) || m0 == 68 || m0 == 69 || m0 == 76) {
+      if (wrClip(hp, m0) < -0.0015) col = vec3(1e3, 0.0, 0.0); else col = vec3(0.0, 0.05, 0.0) + col*0.3;
+    }
+  }
+#endif
   if (any(isnan(col)) || any(isinf(col)) || !(col.r + col.g + col.b < 1e7)) col = vec3(0.0);
   oColor = vec4(clamp(col, vec3(0.0), vec3(3e4)), taaFlag);
   oDepth = t;

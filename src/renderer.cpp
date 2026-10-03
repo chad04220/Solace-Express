@@ -296,7 +296,7 @@ void Renderer::genMinimap() {
 
 bool Renderer::init(int w, int h) {
   std::string vsFS = kFullscreenVS;
-  std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceFS3 + kRaytraceWraith + kRaytraceWraithCockpit;
+  std::string rt = std::string("#version 330 core\n") + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + (getenv("CLIPATLAS") ? "#define WR_CLIPATLAS\n" : "") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceFS3 + kRaytraceWraith + kRaytraceWraithCockpit;
   progRT = program(vsFS, rt, error);
   if (!progRT) { error = "Ray tracer shader: " + error; return false; }
   progSprite = program(kSpriteVS, kSpriteFS, error);

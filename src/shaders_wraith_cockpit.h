@@ -18,25 +18,26 @@ vec2 wrPane(vec3 q, vec3 c, vec3 n, vec3 up, vec2 hs, float ch){
 }
 // pane layout (cabin frame: eye at the origin, -z forward)
 const vec3 WF_C = vec3(0.0, 0.07, -1.2);    const vec3 WF_N = vec3(0.0, 0.2425, 0.9701);  const vec2 WF_S = vec2(0.4, 0.33);
-const vec3 WW_C = vec3(0.6, 0.07, -0.93);   const vec3 WW_N = vec3(-0.7686, 0.1774, 0.6147); const vec2 WW_S = vec2(0.27, 0.33);
-const vec3 WS_C = vec3(0.8, -0.03, -0.38);  const vec3 WS_N = vec3(-1.0, 0.0, 0.0);      const vec2 WS_S = vec2(0.36, 0.41);
-const vec3 WO_C = vec3(0.0, 0.41, -0.55);   const vec3 WO_N = vec3(0.0, -0.9889, 0.1483); const vec2 WO_S = vec2(0.42, 0.36);
+const vec3 WW_C = vec3(0.6, 0.07, -0.93);   const vec3 WW_N = vec3(-0.7686, 0.1774, 0.6147); const vec2 WW_S = vec2(0.24, 0.33);
+const vec3 WS_C = vec3(0.8, -0.075, -0.4);  const vec3 WS_N = vec3(-1.0, 0.0, 0.0);      const vec2 WS_S = vec2(0.34, 0.345);
+const vec3 WO_C = vec3(0.0, 0.403, -0.55);  const vec3 WO_N = vec3(0.0, -1.0, 0.0);       const vec2 WO_S = vec2(0.42, 0.36);
 const vec3 WC_C = vec3(0.0, -0.5, -1.0);    const vec3 WC_N = vec3(0.0, 0.7509, 0.6604);  const vec2 WC_S = vec2(0.38, 0.2);
 const vec3 WL_C = vec3(0.0, -0.775, -0.66); const vec3 WL_N = vec3(0.0, 1.0, 0.0);       const vec2 WL_S = vec2(0.4, 0.34);
-const vec3 WD_C = vec3(0.0, -0.31, -1.03);  const vec3 WD_N = vec3(0.0, 0.6, 0.8);
-const vec3 WB_C = vec3(0.47, -0.74, 0.47);   const vec3 WB_N = vec3(-0.3714, 0.9285, 0.0); const vec2 WB_S = vec2(0.15, 0.24);
+const vec3 WD_C = vec3(0.0, -0.34, -0.99);  const vec3 WD_N = vec3(0.0, 0.6, 0.8);
+const vec3 WB_C = vec3(0.47, -0.705, 0.4);   const vec3 WB_N = vec3(-0.3714, 0.9285, 0.0); const vec2 WB_S = vec2(0.14, 0.2);
 // distance (negative inside) to the edge of the display a point lies on, for the HUD frame and vignette
 float wrScreenEdge(vec3 q, int id){
   if (id == 41) {
     float c = wrShape(wrFrame(q, WF_C, WF_N, vec3(0,1,0)).xy, WF_S, 0.1);
     vec3 aq = vec3(abs(q.x), q.y, q.z);
-    return min(c, wrShape(wrFrame(aq, WW_C, WW_N, vec3(0,1,0)).xy, WW_S, 0.09));
+    return min(c, wrShape(wrFrame(aq, WW_C, WW_N, vec3(0,1,0)).xy, WW_S, 0.16));
   }
   if (id == 42 || id == 43) return wrShape(wrFrame(vec3(abs(q.x), q.y, q.z), WS_C, WS_N, vec3(0,1,0)).xy, WS_S, 0.13);
   if (id == 61) return q.z > 0.1 ? wrShape(wrFrame(vec3(abs(q.x), q.y, q.z), WB_C, WB_N, vec3(0,0,-1)).xy, WB_S, 0.07) : wrShape(wrFrame(q, WL_C, WL_N, vec3(0,0,-1)).xy, WL_S, 0.1);
   if (id == 62) return wrShape(wrFrame(q, WO_C, WO_N, vec3(0,0,-1)).xy, WO_S, 0.12);
   return wrShape(wrFrame(q, WC_C, WC_N, vec3(0,1,0)).xy, WC_S, 0.07);
 }
+int gCkSkip = 0;   // clipping checks: 1 = without the displays, 2 = without the gauges
 vec2 mapWraithCockpit(vec3 p){
   vec4 E4 = gM[22]; vec3 q = p - E4.xyz;
   float cPitch = gCtl.x, cRoll = gCtl.y, cThr = gCtl.w;
@@ -48,31 +49,34 @@ vec2 mapWraithCockpit(vec3 p){
   float shell = max(sec, max(-1.34 - q.z, q.z - 0.74));
   vec2 res = vec2(-shell, 64.0);
   // structural ribs hugging the shell, framing the displays
-  float ribs = max(abs(q.z + 0.76) - 0.022, -shell - 0.042);
+  float ribs = max(abs(q.z + 0.8) - 0.018, -shell - 0.042);
   ribs = min(ribs, max(abs(q.z - 0.02) - 0.03, -shell - 0.05));
-  ribs = min(ribs, max(abs(q.z - 0.5) - 0.022, -shell - 0.04));
+  ribs = min(ribs, max(abs(q.z - 0.66) - 0.02, -shell - 0.04));
+  ribs = max(ribs, 0.56 - aq.x);   // side walls only: the floor glass and the overhead pane stay clear
   res = opU(res, vec2(ribs, 65.0));
   // displays and their raised chamfered frames
   vec2 sF = wrPane(q, WF_C, WF_N, vec3(0,1,0), WF_S, 0.1);
-  vec2 sW = wrPane(aq, WW_C, WW_N, vec3(0,1,0), WW_S, 0.09);
+  vec2 sW = wrPane(aq, WW_C, WW_N, vec3(0,1,0), WW_S, 0.16);
   vec2 sS = wrPane(aq, WS_C, WS_N, vec3(0,1,0), WS_S, 0.13);
   vec2 sO = wrPane(q, WO_C, WO_N, vec3(0,0,-1), WO_S, 0.12);
   vec2 sC = wrPane(q, WC_C, WC_N, vec3(0,1,0), WC_S, 0.07);
   vec2 sL = wrPane(q, WL_C, WL_N, vec3(0,0,-1), WL_S, 0.1);
   vec2 sB = wrPane(aq, WB_C, WB_N, vec3(0,0,-1), WB_S, 0.07);   // floor panes either side of the seat, behind the consoles
   sL = vec2(min(sL.x, sB.x), min(sL.y, sB.y));
+  if (gCkSkip != 1) {
   res = opU(res, vec2(min(sF.x, sW.x), 41.0));
   res = opU(res, vec2(sS.x, sx < 0.0 ? 42.0 : 43.0));
   res = opU(res, vec2(sO.x, 62.0));
   res = opU(res, vec2(sC.x, 63.0));
   res = opU(res, vec2(sL.x, 61.0));
   res = opU(res, vec2(min(min(min(sF.y, sW.y), min(sS.y, sO.y)), min(sC.y, sL.y)), 65.0));
+  }
   // glass floor: a grid of thin titanium ribs over the pane
   {
     vec3 l = wrFrame(q, WL_C, WL_N, vec3(0,0,-1));
     vec2 g = abs(fract(l.xy/vec2(0.2, 0.17) + 0.5) - 0.5)*vec2(0.2, 0.17);
     float grid = max(max(min(g.x, g.y) - 0.006, l.z - 0.012), max(wrShape(l.xy, WL_S, 0.1), -l.z));
-    res = opU(res, vec2(grid, 72.0));
+    if (gCkSkip != 1) res = opU(res, vec2(grid, 72.0));
   }
   // dash: an angular carbon blade under the front wrap with two displays and the hologram emitter between them
   {
@@ -81,7 +85,7 @@ vec2 mapWraithCockpit(vec3 p){
     blade = max(blade, (abs(l.x)*0.6 + abs(l.y) - 0.48));                                // swept ends
     res = opU(res, vec2(blade, 65.0));
     vec3 m = vec3(abs(l.x) - 0.33, l.y + 0.005, l.z - 0.003);
-    res = opU(res, vec2(max(wrShape(m.xy, vec2(0.15, 0.08), 0.035), abs(m.z) - 0.0015), 69.0));
+    if (gCkSkip != 2) res = opU(res, vec2(max(wrShape(m.xy, vec2(0.15, 0.07), 0.035), abs(m.z) - 0.0015), 69.0));
     vec3 h = vec3(l.x, l.y + 0.01, l.z);
     float pod = max(length(h.xy) - 0.055, abs(h.z - 0.012) - 0.012);
     res = opU(res, vec2(pod, 74.0));
@@ -90,7 +94,7 @@ vec2 mapWraithCockpit(vec3 p){
     vec3 a = vec3(l.x, l.y - 0.083, l.z - 0.001);
     float cell = clamp(floor(a.x/0.07 + 0.5), -3.5, 3.5);
     a.x -= (floor(a.x/0.07) + 0.5)*0.07;
-    res = opU(res, vec2(max(max(abs(a.x) - 0.028, abs(a.y) - 0.009), max(abs(l.x) - 0.28, abs(a.z) - 0.0015)), 76.0));
+    if (gCkSkip != 2) res = opU(res, vec2(max(max(abs(a.x) - 0.028, abs(a.y) - 0.009), max(abs(l.x) - 0.28, abs(a.z) - 0.0015)), 76.0));
   }
   // side consoles: angular slabs below the side displays with touch glass, a display and the controls
   {
@@ -99,9 +103,9 @@ vec2 mapWraithCockpit(vec3 p){
     slab = max(slab, (-cq.x*0.7 + cq.y) - 0.035);                      // chamfered inner edge
     slab = max(slab, (abs(cq.z) + abs(cq.x)*0.5) - 0.4);
     res = opU(res, vec2(slab, 65.0));
-    res = opU(res, vec2(max(max(abs(cq.x - 0.015) - 0.1, abs(cq.y - 0.041) - 0.0015), abs(cq.z - 0.12) - 0.2), 68.0));
-    vec3 mq = cq - vec3(0.015, 0.05, -0.24); mq.yz = rot2(mq.yz, -0.55);
-    res = opU(res, vec2(max(wrShape(mq.xz, vec2(0.09, 0.055), 0.02), abs(mq.y) - 0.0015), 69.0));
+    if (gCkSkip != 2) res = opU(res, vec2(max(max(abs(cq.x - 0.015) - 0.1, abs(cq.y - 0.041) - 0.0015), abs(cq.z - 0.12) - 0.2), 68.0));
+    vec3 mq = cq - vec3(0.015, 0.075, -0.24); mq.yz = rot2(mq.yz, -0.55);
+    if (gCkSkip != 2) res = opU(res, vec2(max(wrShape(mq.xz, vec2(0.09, 0.055), 0.02), abs(mq.y) - 0.0015), 69.0));
     res = opU(res, vec2(sdBox(mq + vec3(0.0, 0.012, 0.0), vec3(0.105, 0.012, 0.07)), 65.0));
   }
   // side stick (right) follows pitch and roll; throttle (left) slides with the throttle
@@ -139,9 +143,9 @@ vec2 mapWraithCockpit(vec3 p){
   }
   // rudder pedals over the glass floor
   {
-    vec3 pq = vec3(aq.x - 0.16, q.y + 0.63, q.z + 0.86 - sx*gCtl.z*0.04);
+    vec3 pq = vec3(aq.x - 0.16, q.y + 0.63, q.z + 0.78 - sx*gCtl.z*0.04);
     float ped = max(sdBox(pq, vec3(0.05, 0.075, 0.012)), (abs(pq.x) + abs(pq.y))*0.70711 - 0.08);
-    ped = min(ped, sdCapsule(pq, vec3(0.0, -0.07, 0.02), vec3(0.0, -0.14, 0.12), 0.012));
+    ped = min(ped, sdCapsule(pq, vec3(0.0, -0.07, 0.02), vec3(0.0, -0.12, 0.1), 0.012));
     res = opU(res, vec2(ped, 71.0));
   }
   // overhead switch rail behind the overhead pane: faceted toggles and status lights
@@ -223,10 +227,10 @@ void shadeWraithCockpit(inout Mat m, int mid, vec3 lp, vec3 ln, vec3 E){
     int page; vec2 uv;
     if (q.y > -0.4) {   // dash pair
       vec3 l = wrFrame(q, WD_C, WD_N, vec3(0,1,0));
-      page = l.x < 0.0 ? 0 : 2; uv = vec2((abs(l.x) - 0.33)/0.15*sign(l.x), (l.y + 0.005)/0.08);
+      page = l.x < 0.0 ? 0 : 2; uv = vec2((abs(l.x) - 0.33)/0.15*sign(l.x), (l.y + 0.005)/0.07);
     } else {
       vec3 cq = vec3(abs(q.x) - 0.56, q.y + 0.47, q.z + 0.12);
-      vec3 mq = cq - vec3(0.015, 0.05, -0.24); mq.yz = rot2(mq.yz, -0.55);
+      vec3 mq = cq - vec3(0.015, 0.075, -0.24); mq.yz = rot2(mq.yz, -0.55);
       page = q.x < 0.0 ? 1 : 3; uv = vec2(mq.x/0.09*sign(q.x), -mq.z/0.055);
     }
     vec3 sc = mfdPage(page, uv)*vec3(0.85, 1.0, 1.15);
@@ -275,12 +279,12 @@ vec3 wraithPodLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E){
 
 // ---------------------------------------------------------------- hologram: a rotating wireframe globe over the dash
 vec3 wrHolo(vec3 ro, vec3 rd, float tmax){
-  vec3 c = uPlanePos + uPlaneRot*(gM[22].xyz + vec3(0.0, -0.17, -0.97));
+  vec3 c = uPlanePos + uPlaneRot*(gM[22].xyz + vec3(0.0, -0.21, -0.93));
   float R = 0.07;
   vec3 oc = ro - c; float b = dot(oc, rd), h = b*b - dot(oc, oc) + R*R;
   vec3 col = vec3(0.0);
   // projection cone from the emitter
-  vec3 e = uPlanePos + uPlaneRot*(gM[22].xyz + vec3(0.0, -0.29, -1.03));
+  vec3 e = uPlanePos + uPlaneRot*(gM[22].xyz + vec3(0.0, -0.335, -0.975));
   vec3 ax = normalize(c - e); vec3 w = ro - e; float bb = dot(rd, ax), dd = dot(rd, w), ee = dot(ax, w), den = 1.0 - bb*bb;
   float sA = den > 1e-5 ? (ee - bb*dd)/den : 0.0, sR = max(dot(e + ax*sA - ro, rd), 0.0);
   float L = length(c - e);
@@ -301,6 +305,44 @@ vec3 wrHolo(vec3 ro, vec3 rd, float tmax){
   return col*(0.85 + 0.15*sin(uTime*30.0));
 }
 
+// clipping check (debug builds): is this display / gauge surface point buried inside other cockpit geometry?
+float wrClip(vec3 lp, int mid){
+  int keep = gCkSkip;
+  gCkSkip = (mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63) ? 1 : 2;
+  float d = mapWraithCockpit(lp).x;
+  gCkSkip = keep;
+  return d;
+}
+// Clipping atlas (debug builds): the screen is tiled with every display and gauge surface, unrolled flat. Each pixel
+// is a point on one of them: red if it lies inside other cockpit geometry, green if clear, black off the surface.
+vec3 wrPanePoint(vec3 c, vec3 n, vec3 up, vec3 l){ vec3 t = normalize(cross(up, n)), b = cross(n, t); return c + t*l.x + b*l.y + n*l.z; }
+vec3 wrClipAtlas(vec2 uv){
+  vec2 g = uv*vec2(6.0, 4.0); int tile = int(floor(g.y))*6 + int(floor(g.x)); vec2 f = fract(g)*2.2 - 1.1;   // f in [-1.1, 1.1]; the top row stays clear for the game HUD
+  vec3 q; float inside; int skip = 1;
+  float sgn = (tile == 1 || tile == 3 || tile == 8 || tile == 10 || tile == 12 || tile == 14) ? -1.0 : 1.0;
+  if (tile == 0) { q = wrPanePoint(WF_C, WF_N, vec3(0,1,0), vec3(f*WF_S, 0.0)); inside = wrShape(f*WF_S, WF_S, 0.1); }
+  else if (tile <= 2) { q = wrPanePoint(WW_C, WW_N, vec3(0,1,0), vec3(f*WW_S, 0.0)); inside = wrShape(f*WW_S, WW_S, 0.16); }
+  else if (tile <= 4) { q = wrPanePoint(WS_C, WS_N, vec3(0,1,0), vec3(f*WS_S, 0.0)); inside = wrShape(f*WS_S, WS_S, 0.13); }
+  else if (tile == 5) { q = wrPanePoint(WO_C, WO_N, vec3(0,0,-1), vec3(f*WO_S, 0.0)); inside = wrShape(f*WO_S, WO_S, 0.12); }
+  else if (tile == 6) { q = wrPanePoint(WC_C, WC_N, vec3(0,1,0), vec3(f*WC_S, 0.0)); inside = wrShape(f*WC_S, WC_S, 0.07); }
+  else if (tile == 7) { q = wrPanePoint(WL_C, WL_N, vec3(0,0,-1), vec3(f*WL_S, 0.0)); inside = wrShape(f*WL_S, WL_S, 0.1); }
+  else if (tile <= 9) { q = wrPanePoint(WB_C, WB_N, vec3(0,0,-1), vec3(f*WB_S, 0.0)); inside = wrShape(f*WB_S, WB_S, 0.07); }
+  else if (tile <= 11) { skip = 2; vec2 m = f*vec2(0.15, 0.07); q = wrPanePoint(WD_C, WD_N, vec3(0,1,0), vec3(0.33 + m.x, m.y - 0.005, 0.003)); inside = wrShape(m, vec2(0.15, 0.07), 0.035); }
+  else if (tile <= 13) { skip = 2; vec2 m = f*vec2(0.1, 0.2); q = vec3(0.56 + 0.015 + m.x, 0.041 - 0.47, 0.12 + m.y - 0.12); inside = max(abs(m.x) - 0.1, abs(m.y) - 0.2); }
+  else if (tile <= 15) { skip = 2; vec2 m = f*vec2(0.09, 0.055); vec3 mq = vec3(m.x, 0.0, m.y); mq.yz = rot2(mq.yz, 0.55);
+    vec3 cq = mq + vec3(0.015, 0.075, -0.24); q = vec3(0.56 + cq.x, cq.y - 0.47, cq.z - 0.12); inside = wrShape(m, vec2(0.09, 0.055), 0.02); }
+  else if (tile == 16) { skip = 2; vec2 m = f*vec2(0.28, 0.009); q = wrPanePoint(WD_C, WD_N, vec3(0,1,0), vec3(m.x, 0.083 + m.y, 0.001)); inside = max(abs(m.x) - 0.28, abs(m.y) - 0.009); }
+  else return vec3(0.02);
+  q.x *= sgn;
+  if (inside > 0.0) return vec3(0.0);
+  int keep = gCkSkip; gCkSkip = skip;
+  vec2 dm = mapWraithCockpit(q + gM[22].xyz); float d = dm.x;
+  gCkSkip = keep;
+  int im = int(dm.y + 0.5);
+  vec3 bad = im == 64 ? vec3(0.6, 0.0, 0.0) : im == 65 ? vec3(0.6, 0.25, 0.0) : im == 67 ? vec3(0.6, 0.0, 0.6) : im == 66 ? vec3(0.6, 0.6, 0.0)
+           : (im == 70 || im == 71) ? vec3(0.0, 0.0, 0.7) : (im >= 41 && im <= 63) ? vec3(0.7) : vec3(0.0, 0.6, 0.6);
+  return d < -0.0015 ? bad : vec3(0.0, 0.12 + 0.2*clamp(d*10.0, 0.0, 1.0), 0.0);
+}
 // ---------------------------------------------------------------- belly camera on the front floor pane
 // While a bomb falls or goes off, the footwell floor shows a gimballed camera under the nose locked onto it.
 bool wrFeedRay(vec3 sl, inout vec3 ro, inout vec3 rd){
