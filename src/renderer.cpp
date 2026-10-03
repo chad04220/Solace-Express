@@ -142,12 +142,13 @@ void Renderer::genCloudNoise() {
   };
   const int CN = 1024;
   std::vector<uint8_t> cov((size_t)CN * CN);
-  for (int y = 0; y < CN; y++)
+  parallelFor(CN, [&](int y) {
     for (int x = 0; x < CN; x++) {
       float qx = (x + 0.5f) / CN * 16.f, qy = (y + 0.5f) / CN * 16.f, s = 0, a = 0.5f; int P = 16;
       for (int o = 0; o < 4; o++) { s += a * vn2(qx, qy, P); qx *= 2; qy *= 2; P *= 2; a *= 0.5f; }
       cov[(size_t)y * CN + x] = (uint8_t)std::min(255.f, s / 0.9375f * 255.f + 0.5f);
     }
+  });
   if (!texCloudCov) glGenTextures(1, &texCloudCov);
   glBindTexture(GL_TEXTURE_2D, texCloudCov);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -156,7 +157,7 @@ void Renderer::genCloudNoise() {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
   const int VN = 128, VP = 32;   // 4 texels per lattice cell
   std::vector<uint8_t> vol((size_t)VN * VN * VN);
-  for (int z = 0; z < VN; z++)
+  parallelFor(VN, [&](int z) {
     for (int y = 0; y < VN; y++)
       for (int x = 0; x < VN; x++) {
         float px = (x + 0.5f) / VN * VP, py = (y + 0.5f) / VN * VP, pz = (z + 0.5f) / VN * VP;
@@ -167,6 +168,7 @@ void Renderer::genCloudNoise() {
                         lerpf(lerpf(h(0, 0, 1), h(1, 0, 1), fx), lerpf(h(0, 1, 1), h(1, 1, 1), fx), fy), fz);
         vol[((size_t)z * VN + y) * VN + x] = (uint8_t)(v * 255.f + 0.5f);
       }
+  });
   if (!texNoise3) glGenTextures(1, &texNoise3);
   glBindTexture(GL_TEXTURE_3D, texNoise3);
   glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, VN, VN, VN, 0, GL_RED, GL_UNSIGNED_BYTE, vol.data());
@@ -179,8 +181,8 @@ void Renderer::genCloudNoise() {
 void Renderer::genMaterials() {
   const int L = 30;
   std::vector<uint8_t> alb((size_t)TS * TS * 4 * L), nrm((size_t)TS * TS * 4 * L);
-  std::vector<float> hgt((size_t)TS * TS);
-  for (int l = 0; l < L; l++) {
+  parallelFor(L, [&](int l) {   // the 30 texture sets are independent: one per core at a time
+    std::vector<float> hgt((size_t)TS * TS);
     for (int y = 0; y < TS; y++) for (int x = 0; x < TS; x++) {
       float u = (x + 0.5f) / TS, v = (y + 0.5f) / TS;
       vec3 c; float rough = 0.9f, h = 0;
@@ -356,7 +358,7 @@ void Renderer::genMaterials() {
       nrm[o + 0] = (uint8_t)((n.x * 0.5f + 0.5f) * 255); nrm[o + 1] = (uint8_t)((n.y * 0.5f + 0.5f) * 255);
       nrm[o + 2] = (uint8_t)(clampf(H(x, y), 0, 1) * 255); nrm[o + 3] = (uint8_t)(ao * 255);
     }
-  }
+  });
   auto up = [&](GLuint& tex, std::vector<uint8_t>& d) {
     glGenTextures(1, &tex); glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
     glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, TS, TS, L, 0, GL_RGBA, GL_UNSIGNED_BYTE, d.data());
@@ -374,7 +376,7 @@ void Renderer::genMaterials() {
 void Renderer::genMinimap() {
   const int N = 1024;
   std::vector<uint8_t> img((size_t)N * N * 4);
-  for (int j = 0; j < N; j++) for (int i = 0; i < N; i++) {
+  parallelFor(N, [&](int j) { for (int i = 0; i < N; i++) {
     float x = -WORLD_HALF + (i + 0.5f) * 2 * WORLD_HALF / N, z = -WORLD_HALF + (j + 0.5f) * 2 * WORLD_HALF / N;
     float h = g_world.groundHeight(x, z, 5);
     float hx = g_world.groundHeight(x + 80, z, 5) - h;
@@ -396,7 +398,7 @@ void Renderer::genMinimap() {
     if (g_world.onRunway(x, z, 40) >= 0) c = vec3(0.12f, 0.12f, 0.14f);
     size_t o = ((size_t)j * N + i) * 4;
     img[o] = (uint8_t)(clampf(c.x, 0, 1) * 255); img[o + 1] = (uint8_t)(clampf(c.y, 0, 1) * 255); img[o + 2] = (uint8_t)(clampf(c.z, 0, 1) * 255); img[o + 3] = 255;
-  }
+  } });
   glGenTextures(1, &minimapTex); glBindTexture(GL_TEXTURE_2D, minimapTex);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, N, N, 0, GL_RGBA, GL_UNSIGNED_BYTE, img.data());
   glGenerateMipmap(GL_TEXTURE_2D);
@@ -469,9 +471,45 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     if (m != std::string::npos) ms.replace(m, 10, "void mainRT(");
     progMap = program(vsFS, ms + kMapMain, error); step();
     if (!progMap) { error = "Map shader: " + error; return false; }
+    progDisp = program(vsFS, ms + kDispMain, error); step();
+    if (!progDisp) { error = "Display shader: " + error; return false; }
   }
   glFinish();   // everything complete before another context uses the programs
   return true;
+}
+
+// Cockpit display atlas for this frame: the research jets' display pages, or the light aircraft's instrument panel
+void Renderer::renderDisplays(const FrameParams& fp, bool panel) {
+  if (!progDisp) return;
+  GLuint& tex = panel ? texPanel : texPages;
+  int w = 2048, h = panel ? 776 : 1024;
+  if (!tex) {
+    glGenTextures(1, &tex); glBindTexture(GL_TEXTURE_2D, tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glGenerateMipmap(GL_TEXTURE_2D);
+  }
+  if (!fboDisp) glGenFramebuffers(1, &fboDisp);
+  glBindFramebuffer(GL_FRAMEBUFFER, fboDisp);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+  glViewport(0, 0, w, h); glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
+  GLuint p = progDisp;
+  glUseProgram(p);
+  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
+  glActiveTexture(GL_TEXTURE0 + 15); glBindTexture(GL_TEXTURE_2D, texFont); glUniform1i(U(p, "uFontTex"), 15);
+  const PlaneVisual& pv = fp.plane;
+  glUniform3f(U(p, "uPlanePos"), pv.pos.x, pv.pos.y, pv.pos.z);
+  glUniformMatrix3fv(U(p, "uPlaneRot"), 1, GL_FALSE, pv.rot);
+  glUniform4fv(U(p, "uHud"), 1, pv.hud); glUniform4fv(U(p, "uHud2"), 1, pv.hud2); glUniform4fv(U(p, "uHud3"), 1, pv.hud3);
+  glUniform4fv(U(p, "uI0"), 1, pv.I0); glUniform4fv(U(p, "uI1"), 1, pv.I1); glUniform4fv(U(p, "uI2"), 1, pv.I2);
+  glUniform1f(U(p, "uTime"), fp.time); glUniform1i(U(p, "uCraterN"), 0);
+  glUniform4f(U(p, "uDispMode"), panel ? 1.f : 0.f, (float)fp.dispCk, 0, 0);
+  glUniform2f(U(p, "uDispRes"), (float)w, (float)h);
+  glBindVertexArray(vaoEmpty);
+  glDrawArrays(GL_TRIANGLES, 0, 3);
+  glBindTexture(GL_TEXTURE_2D, tex); glGenerateMipmap(GL_TEXTURE_2D);
+  glActiveTexture(GL_TEXTURE0);
 }
 
 // Renders the GPS aerial image: half x half metres around (cx, cz), north (-z) at the top, into texMap
@@ -709,7 +747,21 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
       if (avail) { GLuint64 ns = 0; glGetQueryObjectui64v(gpuQ[rq], GL_QUERY_RESULT, &ns); gpuMs = (float)(ns * 1e-6); gpuQUsed[rq] = false; }
     }
   }
+  if (!stampQ[0][0] && glQueryCounter) for (int f = 0; f < 4; f++) glGenQueries(kPasses + 1, stampQ[f]);
+  {   // per-pass timings from the frame issued three frames ago
+    int rq = (gpuQi + 1) % 4;
+    if (stampUsed[rq]) {
+      GLint avail = 0; glGetQueryObjectiv(stampQ[rq][kPasses], GL_QUERY_RESULT_AVAILABLE, &avail);
+      if (avail) {
+        GLuint64 t[kPasses + 1];
+        for (int i = 0; i <= kPasses; i++) glGetQueryObjectui64v(stampQ[rq][i], GL_QUERY_RESULT, &t[i]);
+        for (int i = 0; i < kPasses; i++) passMs[i] = passMs[i] * 0.8f + (float)((t[i + 1] - t[i]) * 1e-6) * 0.2f;
+        stampUsed[rq] = false;
+      }
+    }
+  }
   glBeginQuery(GL_TIME_ELAPSED, gpuQ[gpuQi]);
+  stamp(0);
   // TAA: Halton(2,3) sub-pixel jitter and a golden-ratio noise seed, both changing every frame
   frameNo++;
   {
@@ -719,12 +771,15 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   }
   // ------------------------------------------------ environment entities: shadow cascades + G-buffer
   drawEntities(fp);
+  if (fp.dispMode & 1) renderDisplays(fp, false);   // the cockpit display atlases, before the ray tracer samples them
+  if (fp.dispMode & 2) renderDisplays(fp, true);
   // ------------------------------------------------ ray trace
   glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
   GLenum bufs[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
   glDrawBuffers(2, bufs);
   glViewport(0, 0, rw, rh);
   glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
+  stamp(1);
   GLuint p = progRT;
   glUseProgram(p);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
@@ -736,6 +791,8 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glActiveTexture(GL_TEXTURE0 + 13); glBindTexture(GL_TEXTURE_2D, texCloudCov); glUniform1i(U(p, "uCloudCov"), 13);
   glActiveTexture(GL_TEXTURE0 + 14); glBindTexture(GL_TEXTURE_3D, texNoise3); glUniform1i(U(p, "uNoise3"), 14);
   glActiveTexture(GL_TEXTURE0 + 15); glBindTexture(GL_TEXTURE_2D, texFont); glUniform1i(U(p, "uFontTex"), 15);
+  glActiveTexture(GL_TEXTURE0 + 12); glBindTexture(GL_TEXTURE_2D, texPages); glUniform1i(U(p, "uDispTex"), 12);
+  glActiveTexture(GL_TEXTURE0 + 10); glBindTexture(GL_TEXTURE_2D, texPanel); glUniform1i(U(p, "uPanelTex"), 10);
   {   // AI traffic: one row of 32 texels per aircraft
     if (!texTraffic) {
       glGenTextures(1, &texTraffic); glBindTexture(GL_TEXTURE_2D, texTraffic);
@@ -872,6 +929,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
 
+  stamp(2);
   // ------------------------------------------------ temporal AA resolve (before the sprites: particles never smear)
   {
     int cur = histIdx ^ 1;
@@ -905,6 +963,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     if (pv2.on) { prevPlanePos = pv2.pos; memcpy(prevPlaneRot, pv2.rot, sizeof prevPlaneRot); }
   }
 
+  stamp(3);
   // ------------------------------------------------ sprites
   glBindFramebuffer(GL_FRAMEBUFFER, fboSprite);
   GLenum one = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &one);
@@ -936,6 +995,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   }
   glDisable(GL_BLEND);
 
+  stamp(4);
   // ------------------------------------------------ bloom
   glBindVertexArray(vaoEmpty);
   glActiveTexture(GL_TEXTURE0);
@@ -958,6 +1018,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glDrawArrays(GL_TRIANGLES, 0, 3);
   }
   glDisable(GL_BLEND);
+  stamp(5);
   // ------------------------------------------------ light shafts
   float rsx = 0, rsy = 0; vec3 rsp = fp.camPos + fp.sunDir * 10000.f;
   bool sunFront = dot(fp.sunDir, -fp.camBack) > 0.f && project(fp, rsp, rsx, rsy);
@@ -979,6 +1040,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glDrawArrays(GL_TRIANGLES, 0, 3);
   }
 
+  stamp(6);
   // ------------------------------------------------ composite to backbuffer
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glViewport(0, 0, W, H);
@@ -1003,7 +1065,9 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform1f(U(progPost, "uSunVisible"), vis && !fp.sealedCockpit ? (1.f - smoothstepf(0.5f, 0.9f, fp.cloudCover)) * smoothstepf(-0.02f, 0.1f, fp.sunDir.y) : 0.f);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);
+  stamp(kPasses);
   glEndQuery(GL_TIME_ELAPSED);
+  stampUsed[gpuQi] = stampQ[gpuQi][0] != 0;
   gpuQUsed[gpuQi] = true; gpuQi = (gpuQi + 1) % 4;
 }
 

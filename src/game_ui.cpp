@@ -747,8 +747,14 @@ void Game::drawSettings(float x, float y, float w, float h) {
     py += 42 * s;
   };
   g_ren.text(x, py + 6 * s, 16 * s, "Render resolution", C_DIM, 1);
-  g_ren.text(x + 250 * s, py + 6 * s, 16 * s, fmt("100%%  native %dx%d, 60 Hz", g_ren.W, g_ren.H), C_TEXT, 1);
-  py += 42 * s;
+  {
+    const char* rm[] = {"Native", "Auto 60", "85%", "75%", "67%"};
+    for (int i = 0; i < 5; i++) if (button(x + 250 * s + i * 78 * s, py, 72 * s, 32 * s, rm[i], true, set.resMode == i)) set.resMode = i;
+    py += 36 * s;
+    g_ren.text(x + 250 * s, py, 12.5f * s, fmt("ray traced at %dx%d (%.0f%%), upscaled to %dx%d by the temporal AA", (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale),
+               g_ren.renderScale * 100.f, g_ren.W, g_ren.H), C_DIM, 0.85f, 0, false);
+    py += 24 * s;
+  }
   g_ren.text(x, py + 6 * s, 16 * s, "Ray tracing quality", C_DIM, 1);
   const char* q[] = {"Low", "Medium", "High"};
   for (int i = 0; i < 3; i++) if (button(x + 250 * s + i * 100 * s, py, 92 * s, 32 * s, q[i], true, set.quality == i)) { set.quality = i; g_ren.quality = i; }

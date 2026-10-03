@@ -120,6 +120,7 @@ void Game::loadSettings() {
     else if (s == "fullscreen") set.fullscreen = v != 0;
     else if (s == "radioStation") set.radioStation = (int)v;
     else if (s == "mouseSens") set.mouseSens = clampf(v, 0.2f, 3.f);
+    else if (s == "resMode") set.resMode = std::clamp((int)v, 0, 4);
     else if (s.rfind("key.", 0) == 0 || s.rfind("pad.", 0) == 0)
       for (int i = 0; i < ACT_COUNT; i++)
         if (s.compare(4, std::string::npos, kActions[i].id) == 0) {
@@ -134,6 +135,7 @@ void Game::saveSettings() {
   if (!f) return;
   fprintf(f, "renderScale %f\nquality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\n",
           set.renderScale, set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic);
+  fprintf(f, "resMode %d\n", set.resMode);
   for (int i = 0; i < ACT_COUNT; i++) fprintf(f, "key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   fclose(f);
 }
@@ -269,7 +271,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
   takeoffAnnounced = false; touchedDown = false; touchdownFpm = 0; stillTimer = 0;
   engineAutoStarted = false; startDelay = 1.2f;
-  particles.clear(); bursts.clear(); pops.clear(); boomT = -1; trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0;
+  particles.clear(); bursts.clear(); pops.clear(); boomT = -1; for (auto& tt : pieceTrail) tt.clear(); trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0;
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
   approachMinAgl = 1e9f;
@@ -1260,6 +1262,10 @@ void Game::breakUp(vec3 impactVel, bool water, bool air) {
 
 void Game::updateWreck(float dt) {
   const float G = 9.81f;
+  for (auto& tt : pieceTrail) {   // smoke trails drift with the wind and fade out
+    for (auto& q : tt) { q.age += dt; q.p += (plane.windVel + vec3(0, 0.6f, 0)) * dt; }
+    while (!tt.empty() && tt.front().age > 7.f) tt.erase(tt.begin());
+  }
   if (boomT >= 0) boomT += dt;
   for (size_t i = 0; i < pops.size(); i++) {   // secondary explosions on the pieces
     pops[i].t -= dt;
@@ -1301,15 +1307,12 @@ void Game::updateWreck(float dt) {
       w.v.y -= G * dt;
       w.v = w.v - w.v * (0.0012f * length(w.v) * dt);
       w.w = w.w * expf(-0.05f * dt);
-      // burning smoke trail: spread along this frame's path so it streams continuously even at high speed
-      // emitted every ~0.8 m of path so the fire and smoke read as continuous streams, not beads
-      int n = (int)clampf(length(w.v) * dt / 0.8f, 1.f, 24.f);
-      float heatT = clampf(1.3f - crashTimer * 0.08f, 0.35f, 1.f);
-      for (int k = 0; k < n; k++) {
-        vec3 tp = w.c - w.v * (dt * (float)k / n);
-        if (k % 3 == 0) spawn(tp, w.v * 0.04f, 4.f + (rand() % 100) * 0.02f, 1.2f + w.fire, 2.6f, vec3(0.055f, 0.05f, 0.045f), 0.45f, SPR_SMOKE, 1.f, 0.6f);
-        // the flame streams only a few metres off the piece (its life is set by the speed); the smoke trails on
-        if (k % 2 == 0) spawn(tp, w.v * 0.6f, clampf(6.f / std::max(length(w.v), 1.f), 0.03f, 0.3f), (0.9f + w.fire * 0.6f) * heatT, 2.f, vec3(1.f, 0.62f, 0.25f), 0.85f * heatT, SPR_FLAME, 0.f, 0.f);
+      // the smoke trail is a ribbon through one point per frame (continuous at any speed); the flame is drawn as a jet
+      int k = (int)(&w - &wreck[0]);
+      if (k < 5) {
+        float heatT = clampf(1.3f - crashTimer * 0.08f, 0.35f, 1.f);
+        pieceTrail[k].push_back({w.c, 0.f, (0.5f + 0.5f * w.fire) * heatT, 1});
+        if (pieceTrail[k].size() > 600) pieceTrail[k].erase(pieceTrail[k].begin());
       }
     } else w.v.y -= G * dt;
     w.v = w.v * expf(-0.08f * dt);
@@ -1451,6 +1454,10 @@ FrameParams Game::buildFrame() {
   fp.exposure = 1.0f + fp.night * 0.8f;
   if ((screen == SCR_FLIGHT || screen == SCR_DEBRIEF || screen == SCR_LOADING) && plane.spec) {
     fillPlaneVisual(fp.plane, plane, propAngle, camMode == 1);
+    if (camMode == 1 && wreck.empty()) {   // cockpit view: draw this frame's display / gauge atlas
+      fp.dispCk = kModels[plane.spec - kAircraft].cockpit;
+      fp.dispMode = plane.spec->special ? 1 : fp.dispCk == 2 ? 3 : 2;   // glass cockpits: panel + the centre display page
+    }
     {   // transonic vapour cone: strongest just below Mach 1 in humid low-level air
       float M = plane.mach, humid = clampf(0.35f + 0.45f * wx.cloudCover + (wx.precip ? 0.3f : 0.f), 0.f, 1.f) * smoothstepf(11000.f, 1500.f, plane.pos.y);
       float k = smoothstepf(0.9f, 0.965f, M) * smoothstepf(1.07f, 1.0f, M) * humid * (plane.onGround || crashed ? 0.f : 1.f);
@@ -1691,20 +1698,19 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       if (k < 0.35f) bill(add, b.c, 90.f * (0.5f + k * 3.f), b.col * 2.f * (1.f - k / 0.35f), 1.f, SPR_GLOW, 5.f);
     }
   }
-  // wingtip vapour ribbons: camera-facing strips through the trail points, soft across their width
-  for (int sd = 0; sd < 2; sd++) {
-    const auto& tt = tipTrail[sd];
-    vec3 lit = vec3(1.f);
+  // trail ribbons: camera-facing strips through trail points, soft across their width (wingtip vapour; the smoke
+  // trailing from break-up pieces)
+  auto ribbon = [&](const std::vector<TipPt>& tt, float life, float w0, float wg, vec3 lit, float aMax) {
     for (size_t i = 1; i < tt.size(); i++) {
       const TipPt &q0 = tt[i - 1], &q1 = tt[i];
       if (q0.seg != q1.seg) continue;
       auto edge = [&](const TipPt& q, vec3 dir, vec3& lo, vec3& hi, float& al) {
         vec3 vd = normalize(q.p - fp.camPos), side = cross(dir, vd);
         float sl = length(side); side = sl > 1e-4f ? side / sl : cr;
-        float w = 0.22f + q.age * 0.9f;
+        float w = w0 + q.age * wg;
         lo = q.p - side * w; hi = q.p + side * w;
-        float life = 1.f - q.age / 1.8f;
-        al = 0.26f * q.a * life * life * smoothstepf(0.f, 0.05f, q.age) * smoothstepf(0.3f, 4.f, length(q.p - fp.camPos));
+        float lf = 1.f - q.age / life;
+        al = aMax * q.a * lf * lf * smoothstepf(0.f, 0.05f, q.age) * smoothstepf(0.3f, 4.f, length(q.p - fp.camPos));
       };
       vec3 dir = q1.p - q0.p; float dl = length(dir);
       if (dl < 1e-3f) continue;
@@ -1715,6 +1721,24 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       SpriteVert v0 = {a0.x, a0.y, a0.z, 0.5f, 0, lit.x, lit.y, lit.z, al0, 8.f, 1.5f}, v1 = {b0.x, b0.y, b0.z, 0.5f, 1, lit.x, lit.y, lit.z, al0, 8.f, 1.5f};
       SpriteVert v2 = {b1.x, b1.y, b1.z, 0.5f, 1, lit.x, lit.y, lit.z, al1, 8.f, 1.5f}, v3 = {a1.x, a1.y, a1.z, 0.5f, 0, lit.x, lit.y, lit.z, al1, 8.f, 1.5f};
       alpha.push_back(v0); alpha.push_back(v1); alpha.push_back(v2); alpha.push_back(v0); alpha.push_back(v2); alpha.push_back(v3);
+    }
+  };
+  for (int sd = 0; sd < 2; sd++) ribbon(tipTrail[sd], 1.8f, 0.22f, 0.9f, vec3(1.f), 0.26f);
+  for (int k = 0; k < 5; k++) ribbon(pieceTrail[k], 7.f, 0.9f, 2.4f, vec3(0.07f, 0.065f, 0.06f), 0.75f);
+  // break-up pieces burning as they fall: a flame jet streaming a few metres off each one
+  if (airBreak) {
+    for (const WreckPiece& w : wreck) {
+      if (w.landed) continue;
+      float sp = length(w.v); if (sp < 1.f) continue;
+      float heat = w.fire * clampf(1.3f - crashTimer * 0.08f, 0.35f, 1.f);
+      vec3 vd = w.v / sp, toCam = normalize(fp.camPos - w.c);
+      vec3 ax = vd - toCam * dot(vd, toCam); float al = length(ax);
+      ax = al > 0.05f ? ax / al : cr;
+      vec3 ay = normalize(cross(ax, toCam));
+      float flick = 0.85f + 0.15f * sinf(realTime * 37.f + w.C.x * 13.f);
+      float L = clampf(sp * 0.025f, 2.5f, 11.f) * heat * flick * std::max(al, 0.3f), Wd = (0.45f + 0.35f * w.fire) * heat;
+      quadAx(add, w.c - ax * (L * 0.5f), ax * (L * 0.5f + Wd), ay * Wd, vec3(1.f, 0.55f, 0.18f) * 2.6f, heat, SPR_SPARK, 1.f);
+      quadAx(add, w.c - ax * (L * 0.35f), ax * (L * 0.35f + Wd * 2.f), ay * Wd * 2.2f, vec3(1.f, 0.4f, 0.1f) * 0.8f, heat * 0.6f, SPR_SPARK, 1.f);
     }
   }
   // particles
@@ -1806,7 +1830,21 @@ void Game::feedAudio() {
 void Game::update(float dt) {
   // the scene is always ray traced at the full display resolution (no dynamic resolution); the display is paced to 60 Hz
   fpsAvg = lerpf(fpsAvg, dt, 0.05f);
-  if (!headless && g_ren.ok && g_ren.renderScale != 1.f) g_ren.setRenderScale(1.f);
+  if (!headless && g_ren.ok) {   // ray-trace resolution: native, a fixed scale, or adjusted to hold 60 fps on the GPU
+    static const float fixedScale[5] = {1.f, 1.f, 0.85f, 0.75f, 0.67f};
+    float want = fixedScale[std::clamp(set.resMode, 0, 4)];
+    if (set.resMode == 1) {
+      autoScaleT += dt;
+      float gms = g_ren.gpuMs;
+      if (gms > 0 && autoScaleT > 0.4f) {
+        if (gms > 15.5f) { autoScale = std::max(0.5f, autoScale * std::sqrt(15.f / gms)); autoScaleT = 0; }
+        else if (gms < 12.f && autoScale < 1.f) { autoScale = std::min(1.f, autoScale + 0.05f); autoScaleT = 0; }
+      }
+      want = autoScale;
+    } else autoScale = 1.f;
+    want = floorf(want * 20.f + 0.5f) / 20.f;   // 5% steps: the targets are rebuilt only when it changes
+    if (fabsf(g_ren.renderScale - want) > 1e-3f) g_ren.setRenderScale(want);
+  }
   dt = std::min(dt, 0.05f);
   realTime += dt;
   updateBindCapture(dt);
@@ -1891,8 +1929,13 @@ void Game::render() {
                         g_ren.gpuMs > 0 ? fmt("%.1f ms", g_ren.gpuMs).c_str() : "n/a", g_ren.renderScale * 100.f,
                         (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale));
     t += fmt("   scenery %d drawn, %d chunks, %.1f ms CPU", g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs);
-    g_ren.rect(6 * s, 6 * s, 420 * s, 24 * s, vec3(0, 0, 0), 0.55f);
+    const float* pm = g_ren.passMs;
+    std::string t2 = fmt("GPU ms:  scenery+shadows %.1f   ray trace %.1f   TAA %.1f   sprites %.1f   bloom %.1f   shafts %.1f   composite %.1f",
+                         pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6]);
+    float tw = std::max(g_ren.textWidth(t, 14 * s), g_ren.textWidth(t2, 14 * s)) + 20 * s;
+    g_ren.rect(6 * s, 6 * s, tw, 46 * s, vec3(0, 0, 0), 0.6f);
     g_ren.text(14 * s, 10 * s, 14 * s, t, fpsAvg < 1.f / 57.f ? vec3(1, 0.5f, 0.3f) : vec3(0.5f, 1, 0.6f), 1, 0, false);
+    g_ren.text(14 * s, 30 * s, 14 * s, t2, vec3(0.75f, 0.85f, 1.f), 1, 0, false);
   }
   g_ren.uiEnd();
 }

@@ -52,7 +52,7 @@ int main() {
   std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRaytraceFS3 +
                    kRaytraceWraith + kRaytraceWraithCockpit;
   std::string h = "#version 330 core\n";
-  int bad = scan("raytrace.frag", rt) + scan("map.frag", kMapMain);
+  int bad = scan("raytrace.frag", rt) + scan("map.frag", kMapMain) + scan("disp.frag", kDispMain);
   bad += scan("fullscreen.vert", kFullscreenVS) + scan("sprite.vert", kSpriteVS) + scan("sprite.frag", kSpriteFS);
   bad += scan("down.frag", kDownFS) + scan("up.frag", kUpFS) + scan("raymask.frag", kRayMaskFS) + scan("ray.frag", kRayFS);
   bad += scan("taa.frag", kTaaFS) + scan("post.frag", kPostFS);

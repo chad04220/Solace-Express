@@ -64,6 +64,7 @@ struct FrameParams {
   vec3 flameLightPos, flameLight;  // a blast's light (radiance; zero when off), folded into the point lights
   struct PointLight { vec3 pos; float radius; vec3 col; float cosCut; vec3 dir; float shadow; };
   PointLight pl[12]; int plN = 0;
+  int dispMode = 0, dispCk = 0;   // cockpit display atlases this frame: bit 1 display pages, bit 2 instrument panel (cockpit type)
   float rwyLights = 0;   // airport lighting on (night / low visibility): 0..1   // point / spot lights: radiance, spot cutoff (-2 omni), shadow stop distance (0 none)
   float exposure = 1.0f, rainLens = 0, fade = 1, vignette = 0.6f, gLoad = 0;
   bool sealedCockpit = false;
@@ -83,7 +84,7 @@ public:
   GLuint minimapTex = 0;
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
-  static constexpr int kProgramCount = 11;
+  static constexpr int kProgramCount = 12;
   bool compilePrograms(std::atomic<int>* done);  // scene programs; safe on a worker thread with a shared context
   bool init(int w, int h);                       // everything else (runs compilePrograms itself if not done yet)
   GLuint makeTexture(const uint8_t* rgba, int w, int h);
@@ -118,6 +119,8 @@ public:
 
 private:
   GLuint progMap = 0, texMap = 0, fboMap = 0; int mapN = 0;
+  GLuint progDisp = 0, texPages = 0, texPanel = 0, fboDisp = 0;
+  void renderDisplays(const FrameParams& fp, bool panel);
   GLuint progRT = 0, progSprite = 0, progDown = 0, progUp = 0, progRayMask = 0, progRay = 0, progPost = 0, progUI = 0, progTAA = 0;
   static constexpr int kBloomMips = 6;
   GLuint fboMip[kBloomMips] = {}, texMip[kBloomMips] = {}; int mipW[kBloomMips] = {}, mipH[kBloomMips] = {};
@@ -134,6 +137,10 @@ private:
   GLuint gpuQ[4] = {0, 0, 0, 0}; bool gpuQUsed[4] = {false, false, false, false}; int gpuQi = 0;
 public:
   float gpuMs = -1.f;   // last measured GPU time of renderScene, ms (-1 = not known yet)
+  static constexpr int kPasses = 7;   // scenery+shadows, ray trace, TAA, sprites, bloom, light shafts, composite
+  float passMs[kPasses] = {};         // GPU time of each pass (timestamp queries, a few frames late)
+  GLuint stampQ[4][kPasses + 1] = {}; bool stampUsed[4] = {};
+  void stamp(int i) { if (stampQ[gpuQi][i]) glQueryCounter(stampQ[gpuQi][i], GL_TIMESTAMP); }
 private:
   vec3 prevCamPos, prevPlanePos; float prevCamRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1}, prevPlaneRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
   int rw = 0, rh = 0, bw = 0, bh = 0;

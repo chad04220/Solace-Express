@@ -47,6 +47,7 @@ struct Settings {
   bool invertPitch = false, showHints = true, metric = false, fullscreen = false, traffic = true;
   int radioStation = 0;
   float mouseSens = 1.0f;
+  int resMode = 0;   // 0 native, 1 auto (holds 60 fps), 2 85%, 3 75%, 4 67% (TAA upscales to the display)
   int keyBind[ACT_COUNT]; unsigned padBind[ACT_COUNT];
   Settings() { resetBindings(); }
   void resetBindings() { for (int i = 0; i < ACT_COUNT; i++) { keyBind[i] = kActions[i].key; padBind[i] = kActions[i].pad; } }
@@ -133,6 +134,7 @@ private:
   struct Debris { vec3 p, v, w; quat q; float size; bool charred, rest; float burn = 0; };   // burn: seconds it trails fire
   struct Pop { vec3 p, v; float t, R; int piece; };   // a delayed secondary explosion (on a wreck piece when piece >= 0)
   std::vector<Pop> pops;
+  std::vector<TipPt> pieceTrail[5];   // smoke trail of each falling break-up piece
   float boomT = -1, boomI = 0; vec3 boomP;           // the flash of the latest explosion lights the scene
   std::vector<WreckPiece> wreck;
   std::vector<Debris> debris;
@@ -213,7 +215,8 @@ private:
   float bindCaptureT = 0;
   std::vector<TipPt> tipTrail[2]; int tipSeg = 0; bool tipOn = false;
   int ctlScroll = 0; float ctlScrollAcc = 0;
-  float ckZoom = 1.f, ckZoomT = 1.f;   // cockpit view zoom (current, target)
+  float ckZoom = 1.f, ckZoomT = 1.f;
+  float autoScale = 1.f, autoScaleT = 0;   // dynamic resolution state   // cockpit view zoom (current, target)
   float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0; bool loadMap = false;   // pre-flight loading screen
   bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI

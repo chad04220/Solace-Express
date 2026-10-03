@@ -53,6 +53,8 @@ static void initRoads() {
   }
 }
 
+void sceneryInit() { initRoads(); }
+
 float roadDistance(float x, float z, int* segOut) {
   float best = 1e9f; int bi = -1, k = 0;
   for (const RoadSeg& r : g_roads) {
@@ -102,7 +104,7 @@ void World::bakeMask() {
   initRoads();
   mask.assign((size_t)MASK_N * MASK_N * 4, 0);
   roadId.assign((size_t)MASK_N * MASK_N * 2, 0);
-  for (int j = 0; j < MASK_N; j++)
+  parallelFor(MASK_N, [&](int j) {
     for (int i = 0; i < MASK_N; i++) {
       float x = -WORLD_HALF + (i + 0.5f) * MASK_TEXEL, z = -WORLD_HALF + (j + 0.5f) * MASK_TEXEL;
       float b[4]; sampleBase(x, z, b);
@@ -140,6 +142,7 @@ void World::bakeMask() {
       o[2] = (uint8_t)lroundf(clampf(urban, 0, 1) * 255.f);
       o[3] = (uint8_t)lroundf(clampf(a, 0, 1) * 255.f);
     }
+  });
 }
 
 void World::sampleMask(float x, float z, float out[4]) const {

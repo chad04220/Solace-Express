@@ -364,6 +364,62 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits, g_shaderCacheMisses);
     fclose(f);
   }
+  // Benchmark: AirXpress.exe --bench scene1,scene2,... [--size WxH] times each scene (wall clock with the GPU flushed,
+  // plus the GPU time of every pass) and writes bench.txt next to the exe
+  {
+    std::string cl = GetCommandLineA();
+    size_t k = cl.find("--bench ");
+    if (k != std::string::npos) {
+      std::string list = cl.substr(k + 8); list = list.substr(0, list.find(' ')) + ",";
+      int sw2 = 0, sh2 = 0; size_t kz = cl.find("--size ");
+      if (kz != std::string::npos) sscanf(cl.c_str() + kz + 7, "%dx%d", &sw2, &sh2);
+      if (kz != std::string::npos && cl.compare(kz + 7, 6, "native") == 0) { if (!g_fullscreen) toggleFullscreen(); }   // the whole desktop
+      else if (sw2 > 64 && sh2 > 64) {
+        if (g_fullscreen) toggleFullscreen();
+        RECT wr = {0, 0, sw2, sh2}; AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+        SetWindowPos(g_hwnd, nullptr, 0, 0, wr.right - wr.left, wr.bottom - wr.top, SWP_NOMOVE | SWP_NOZORDER);
+      }
+      { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } }
+      { RECT rc; GetClientRect(g_hwnd, &rc); if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom); }
+      if (s_swapInterval) s_swapInterval(0);   // unlocked: measure what the GPU can do
+      char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+      std::string dir(exe, n); dir = dir.substr(0, dir.find_last_of("\\/"));
+      std::string outName = "bench.txt"; size_t ko = cl.find("--out ");
+      if (ko != std::string::npos) { outName = cl.substr(ko + 6); outName = outName.substr(0, outName.find(' ')); }
+      FILE* bf = fopen((dir + "\\" + outName).c_str(), "w");
+      if (bf) fprintf(bf, "GPU: %s\nDesktop %dx%d, render %dx%d, quality %d\n\n", gpu.c_str(), GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), g_ren.W, g_ren.H, g_ren.quality);
+      g_ren.entSync = true;
+      for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
+        std::string sc = list.substr(a, b - a);
+        if (sc.empty()) continue;
+        MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
+        RECT rc; GetClientRect(g_hwnd, &rc);
+        if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
+        SetWindowTextA(g_hwnd, ("Air Xpress - benchmarking " + sc).c_str());
+        Game* g = new Game();
+        g->saveDir = game.saveDir;
+        g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
+        g_ren.entSync = false;
+        for (int i = 0; i < 40; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); }
+        glFinish();
+        LARGE_INTEGER f0, f1; QueryPerformanceCounter(&f0);
+        const int N = 120;
+        for (int i = 0; i < N; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); }
+        glFinish(); QueryPerformanceCounter(&f1);
+        double ms = (double)(f1.QuadPart - f0.QuadPart) / freq.QuadPart * 1000.0 / N;
+        if (bf) {
+          const float* pm = g_ren.passMs;
+          fprintf(bf, "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: scenery+shadows %.2f  raytrace %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n",
+                  sc.c_str(), ms, 1000.0 / ms, g_ren.gpuMs, pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6]);
+          fflush(bf);
+        }
+        g_ren.entSync = true;
+        delete g;
+      }
+      if (bf) fclose(bf);
+      return 0;
+    }
+  }
   // Development captures: AirXpress.exe --shots scene1,scene2,... [--size 1920x1080] renders each debug scene
   // (see Game::debugScene) with all scenery generated up front and saves shots\<scene>.png next to the exe.
   {

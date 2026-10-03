@@ -1,8 +1,100 @@
 // Air Xpress - environment entities: deterministic placement, chunk streaming and collisions
 #include "entities.h"
 #include "scenery.h"
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+#include <thread>
 
 Scenery g_scenery;
+
+// ---------------------------------------------------------------- worker pool for chunk generation
+struct Scenery::Async {
+  struct Job { int cx, cz, level, epoch; Chunk c; };
+  std::mutex m;
+  std::condition_variable cv;
+  std::deque<Job> todo;
+  std::vector<Job> done;
+  std::unordered_map<int, int> busy;   // chunk index -> level being generated (main thread only)
+  std::vector<std::thread> threads;
+  bool stop = false;
+  int epoch = 0;                       // bumped by clear(): results from before it are dropped
+};
+
+Scenery::Scenery() : async(new Async()) {
+  int hw = (int)std::thread::hardware_concurrency();
+  int n = std::clamp(hw - 1, 0, 6);    // leave the main / GL thread its own core
+  for (int t = 0; t < n; t++)
+    async->threads.emplace_back([this] {
+      Async& A = *async;
+      for (;;) {
+        Async::Job j;
+        {
+          std::unique_lock<std::mutex> lk(A.m);
+          A.cv.wait(lk, [&] { return A.stop || !A.todo.empty(); });
+          if (A.stop) return;
+          j = std::move(A.todo.front()); A.todo.pop_front();
+        }
+        generate(j.c, j.cx, j.cz, j.level);
+        std::lock_guard<std::mutex> lk(A.m);
+        A.done.push_back(std::move(j));
+      }
+    });
+}
+
+Scenery::~Scenery() {
+  { std::lock_guard<std::mutex> lk(async->m); async->stop = true; }
+  async->cv.notify_all();
+  for (auto& t : async->threads) t.join();
+}
+
+int Scenery::workers() const { return (int)async->threads.size(); }
+
+void Scenery::clear() {
+  chunks.clear();
+  std::lock_guard<std::mutex> lk(async->m);
+  async->todo.clear(); async->busy.clear(); async->epoch++;
+}
+
+bool Scenery::request(int cx, int cz, int level) {
+  Async& A = *async;
+  if (A.threads.empty() || cx < 0 || cz < 0 || cx >= NC || cz >= NC) return false;
+  int idx = cz * NC + cx;
+  auto it = A.busy.find(idx);
+  if (it != A.busy.end() && it->second >= level) return true;   // already on its way
+  Async::Job j{cx, cz, level, 0, {}};
+  if (Chunk* c = get(cx, cz)) { if (c->level >= level) return true; j.c = *c; }
+  {
+    std::lock_guard<std::mutex> lk(A.m);
+    // keep the queue short so it always holds the chunks nearest the camera, not ones requested frames ago
+    if ((int)A.todo.size() >= 2 * (int)A.threads.size()) return false;
+    j.epoch = A.epoch;
+    A.todo.push_back(std::move(j));
+  }
+  A.busy[idx] = level;
+  A.cv.notify_one();
+  return true;
+}
+
+void Scenery::pump(std::vector<int>& installed) {
+  Async& A = *async;
+  std::vector<Async::Job> got;
+  int epoch;
+  { std::lock_guard<std::mutex> lk(A.m); got.swap(A.done); epoch = A.epoch; }
+  if (chunks.empty()) chunks.resize((size_t)NC * NC);
+  for (Async::Job& j : got) {
+    int idx = j.cz * NC + j.cx;
+    auto it = A.busy.find(idx);
+    if (it != A.busy.end() && it->second <= j.level) A.busy.erase(it);
+    if (j.epoch != epoch) continue;
+    auto& p = chunks[idx];
+    if (p && p->level >= j.c.level) continue;   // generated synchronously in the meantime
+    int lastUse = p ? p->lastUse : 0;
+    p.reset(new Chunk(std::move(j.c)));
+    p->lastUse = lastUse;
+    installed.push_back(idx);
+  }
+}
 
 const EntKindInfo kEntInfo[EK_COUNT] = {
   {"Fir", 3.2f, 14.f, 3.2f}, {"Spruce", 2.6f, 20.f, 2.6f}, {"Pine", 3.6f, 16.f, 3.6f}, {"Oak", 5.0f, 11.f, 5.0f},

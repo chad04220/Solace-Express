@@ -242,8 +242,7 @@ void shadeWraithCockpit(inout Mat m, int mid, vec3 lp, vec3 ln, vec3 E){
     // 4x supersampled over the pixel's footprint on the glass, every element anti-aliased: crisp at any resolution
     float fp = gPixM/(q.y > -0.4 ? 0.07 : 0.055);
     gAA = fp*0.55;
-    vec3 sc = 0.25*(mfdPage(page, uv + vec2(-0.25, -0.75)*fp) + mfdPage(page, uv + vec2(0.75, -0.25)*fp)
-                  + mfdPage(page, uv + vec2(0.25, 0.75)*fp) + mfdPage(page, uv + vec2(-0.75, 0.25)*fp))*vec3(0.85, 1.0, 1.15);
+    vec3 sc = pageTex(page, uv, fp)*vec3(0.85, 1.0, 1.15);
     float edge = smoothstep(1.0, 0.93, max(abs(uv.x), abs(uv.y)));
     sc = sc*edge + vec3(0.008, 0.02, 0.035)*edge;
     m.alb = vec3(0.01); m.rough = 0.05; m.emit = sc*1.5; gDispPx = true;

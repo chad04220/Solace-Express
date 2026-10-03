@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <atomic>
+#include <thread>
 
 static const float PI = 3.14159265358979f;
 static const float DEG = PI / 180.0f;
@@ -103,4 +105,16 @@ struct Rng {
 
 inline std::string fmt(const char* f, ...) {
   char buf[1024]; va_list ap; va_start(ap, f); vsnprintf(buf, sizeof(buf), f, ap); va_end(ap); return buf;
+}
+
+// Runs f(i) for i in [0, n) across the CPU's cores (each index exactly once, in any order); returns when all are done
+template <class F> inline void parallelFor(int n, F&& f) {
+  int nt = std::max(1, std::min((int)std::thread::hardware_concurrency(), n));
+  if (nt <= 1) { for (int i = 0; i < n; i++) f(i); return; }
+  std::atomic<int> next{0};
+  auto run = [&]() { for (int i; (i = next.fetch_add(1)) < n;) f(i); };
+  std::vector<std::thread> ts;
+  for (int t = 1; t < nt; t++) ts.emplace_back(run);
+  run();
+  for (auto& t : ts) t.join();
 }

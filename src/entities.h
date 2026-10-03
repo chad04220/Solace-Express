@@ -63,9 +63,19 @@ public:
   int wreckRev = 0;   // bumps whenever something is destroyed (the renderer refreshes its shadow maps)
   // Drops tree-level data of chunks far from the camera and whole chunks further out
   void trim(vec3 cam, float keepDetail, float keepAll, int frame);
-  void clear() { chunks.clear(); }
+  void clear();
   size_t generated() const;
+  // Background generation on worker threads (generate() only reads g_world). request() queues a chunk and returns
+  // false when there are no workers or the queue is full; pump() installs finished chunks on the calling (main)
+  // thread and appends their indices (cz * NC + cx) to `installed`.
+  bool request(int cx, int cz, int level);
+  void pump(std::vector<int>& installed);
+  int workers() const;
+  Scenery();
+  ~Scenery();
 private:
+  struct Async;
+  std::unique_ptr<Async> async;
   std::vector<std::unique_ptr<Chunk>> chunks;
   std::unordered_map<int, std::vector<uint64_t>> wrecked;   // chunk index -> keys of destroyed entities
   std::unordered_map<uint64_t, int> hits;                   // damage taken so far

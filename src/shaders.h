@@ -1761,6 +1761,21 @@ float hudNum(vec2 q, float v, int nd, vec2 cell){
   return on;
 }
 float hudBox(vec2 q, vec2 c, vec2 h, float w){ vec2 d = abs(q - c) - h; return hudLine(abs(max(d.x, d.y)), w); }
+// cockpit displays, pre-drawn into a mipmapped texture this frame (see kDispMain)
+uniform sampler2D uDispTex; uniform sampler2D uPanelTex;   // display pages / instrument panel
+vec3 pageTex(int page, vec2 uv, float fp){   // fp: page uv units per screen pixel
+  if (abs(uv.x) > 1.0 || abs(uv.y) > 1.0) return vec3(0.0);
+  vec2 cell = vec2(float(page - (page/4)*4), float(page/4));
+  vec2 a = (cell + clamp(uv*0.5 + 0.5, 0.003, 0.997))/vec2(4.0, 2.0);
+  float lod = log2(max(fp*float(textureSize(uDispTex, 0).y)*0.25, 1e-4));
+  return textureLod(uDispTex, a, max(lod, 0.0)).rgb;
+}
+vec4 panelTex(vec2 q, float px){   // q: panel metres; px: metres per screen pixel; rgb premultiplied by coverage (a)
+  vec2 a = vec2((q.x + 0.16)/0.58, (q.y + 0.11)/0.22);
+  if (a.x < 0.0 || a.x > 1.0 || a.y < 0.0 || a.y > 1.0) return vec4(0.0);
+  float lod = log2(max(px*float(textureSize(uPanelTex, 0).x)/0.58, 1e-4));
+  return textureLod(uPanelTex, a, max(lod, 0.0));
+}
 )";
 static const char* kRaytraceDisplays = R"(// ---------------------------------------------------------------- cockpit displays and gauges
 // Every element is a signed distance anti-aliased over the pixel footprint gAA (in the caller's units, set per
@@ -3048,14 +3063,9 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
           bool pilot = lp.x*E.x >= 0.0;
           vec2 q = vec2(pilot ? lp.x - E.x : lp.x + E.x - coShift(E, ck), lp.y - (E.y - 0.32));
           float px = t*2.0*uTanHalf/uRes.y;   // panel metres per pixel
-          gAA = px*0.55;
-          vec3 ic = vec3(0.0); float cov = 0.0;
-          for (int si = 0; si < 4; si++) {
-            vec2 o = (vec2(si & 1, si >> 1) - 0.5)*px*0.7;
-            vec3 c4 = drawInstruments(q + o, ck, pilot);
-            if (c4.x >= 0.0) { ic += c4; cov += 1.0; }
-          }
-          if (cov > 0.0) { gDispPx = true; ic /= cov; float k = cov*0.25; m.alb = mix(m.alb, ic*0.25, k); m.emit = ic*(0.3 + 0.6*uNight)*k; m.rough = mix(m.rough, 0.12, k); }
+          vec4 pt = panelTex(q, px);
+          if (!pilot && ck < 2 && q.x > 0.16) pt = vec4(0.0);   // copilot: the six-pack only
+          if (pt.a > 0.003) { gDispPx = true; vec3 ic = pt.rgb/pt.a; float k = pt.a; m.alb = mix(m.alb, ic*0.25, k); m.emit = ic*(0.3 + 0.6*uNight)*k; m.rough = mix(m.rough, 0.12, k); }
         }
       }
       else if (mid == 11) { m.alb = lp.y < E.y - 1.0 ? vec3(0.08, 0.08, 0.09) : vec3(0.5, 0.49, 0.46); m.rough = 0.85; }
@@ -3147,8 +3157,7 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
           // 4x supersampled over this pixel's footprint on the panel: crisp at any display resolution
           float fp = t*uTanHalf*2.0/uRes.y/(mid == 45 ? 0.07 : 0.06);   // the true pixel size: TAA smooths the foreshortened axis
           gAA = fp*0.55;
-          vec3 sc = 0.25*(mfdPage(page, uv + vec2(-0.25, -0.75)*fp) + mfdPage(page, uv + vec2(0.75, -0.25)*fp)
-                        + mfdPage(page, uv + vec2(0.25, 0.75)*fp) + mfdPage(page, uv + vec2(-0.75, 0.25)*fp));
+          vec3 sc = pageTex(page, uv, fp);
           float edge = smoothstep(1.0, 0.92, max(abs(uv.x), abs(uv.y)));
           sc = sc*edge + vec3(0.01, 0.03, 0.04)*edge;                                         // dark-blue backlight
           m.alb = vec3(0.01); m.rough = 0.06; m.metal = 0.0; m.emit = sc*1.5; gDispPx = true;
@@ -3229,7 +3238,7 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
         else if (mid == 66) { tx = triSample(lp, ln, M_PLASTIC, 0.2, nT); m.alb = tx.rgb*0.12; m.rough = mix(tx.a, 0.45, 0.5); m.nrm = nT; }
         else if (mid == 67) {   // centre engine / systems display (glass cockpits)
           vec2 uv = vec2(lp.x/0.085, (lp.y - (E.y - 0.31))/0.085);
-          vec3 sc = ln.z > 0.5 ? mfdPage(0, uv)*smoothstep(1.0, 0.92, max(abs(uv.x), abs(uv.y))) : vec3(0.0);
+          vec3 sc = ln.z > 0.5 ? pageTex(0, uv, t*2.0*uTanHalf/uRes.y/0.085)*smoothstep(1.0, 0.92, max(abs(uv.x), abs(uv.y))) : vec3(0.0);
           m.alb = vec3(0.01); m.rough = 0.06; m.emit = (sc + vec3(0.005, 0.012, 0.02))*1.3;
         }
         else if (mid == 68) { tx = triSample(lp, ln, M_PLASTIC, 0.2, nT); m.alb = tx.rgb*vec3(0.55, 0.05, 0.04); m.rough = 0.35; m.nrm = nT; }
@@ -3311,18 +3320,14 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
   if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 5) { vec3 e = jetPlumes(ro, rd, t, jitter); col = col*gPlumeT + e; if (e.r + e.g + e.b > 0.03) taaFlag = min(taaFlag, 0.2); }
   if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 6) { vec3 e = wraithPlumes(ro, rd, t, jitter); col = col*gPlumeT + e; if (e.r + e.g + e.b > 0.03) taaFlag = min(taaFlag, 0.2); }
   if (!pod && uFxBeams + uFxBombs + uFxBlasts > 0) col = weaponsFx(col, ro, rd, t);
-  // clouds
-  vec4 cl = pod ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(ro, rd, t, jitter);
+  // clouds (a cloaked craft: the skin first, then one cloud march along the whole camera ray through it)
+  if (cloak) { col = cloakSkin(col, ckN, rd0, ckLp, ckLp.z - uWr[6].y + 0.8); col = applyFog(col, ro0, rd0, ckT); }
+  vec4 cl = pod ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(cloak ? ro0 : ro, cloak ? rd0 : rd, cloak ? t + ckT : t, jitter);
   col = col*cl.a + cl.rgb;
   bool wrCk = cockpitView && int(gM[0].z + 0.5) == 6;
   if (onScr) col = feed ? wrFeedOverlay(col, scrL) : wrCk ? wraithScreen(col, rd, scrId, scrL) : jetScreen(col, rd, scrId, scrL);
   if (wrCk) col += wrHolo(roV, rdV, pod ? t : h0.x);   // the hologram floats inside the cabin, in front of everything
-  if (cloak) {   // the skin, then the fog and cloud between the camera and the craft (the bent ray started on the skin)
-    col = cloakSkin(col, ckN, rd0, ckLp, ckLp.z - uWr[6].y + 0.8);
-    col = applyFog(col, ro0, rd0, ckT);
-    vec4 cf = traceClouds(ro0, rd0, ckT, jitter); col = col*cf.a + cf.rgb;
-    t += ckT; taaFlag = 0.5;
-  }
+  if (cloak) { t += ckT; taaFlag = 0.5; }
 #ifdef WR_CLIPATLAS
   col = wrClipAtlas(vUV); t = 1.0;
 #endif
@@ -3834,6 +3839,38 @@ void main(){
   vec3 col = acc*0.25*1.25;
   col = col/(1.0 + col*0.35);
   oColor = vec4(pow(clamp(col, 0.0, 1.0), vec3(1.0/2.2)), 1.0);
+}
+)";
+
+// Cockpit display atlas: every display page (research jets) or the whole light-aircraft instrument panel, drawn once
+// per frame into a texture that the ray tracer samples with mipmapped filtering. Keeps the gauge code out of the
+// ray tracer (smaller, faster shader) and gives crisp, stable screens at any size or angle.
+static const char* kDispMain = R"(
+uniform vec4 uDispMode;   // x: 0 display pages (4 x 2 atlas), 1 instrument panel; y: cockpit type
+uniform vec2 uDispRes;
+void main(){
+  vec2 px = gl_FragCoord.xy;
+  vec4 o = vec4(0.0);
+  if (uDispMode.x < 0.5) {
+    vec2 cell = vec2(uDispRes.x/4.0, uDispRes.y/2.0);
+    vec2 id = floor(px/cell); vec2 uv = (px - id*cell)/cell*2.0 - 1.0;
+    int page = int(id.x) + int(id.y)*4;
+    float fp = 2.0/cell.y; gAA = fp*0.6;
+    if (page < 7) o = vec4(0.25*(mfdPage(page, uv + vec2(-0.25, -0.75)*fp) + mfdPage(page, uv + vec2(0.75, -0.25)*fp)
+                               + mfdPage(page, uv + vec2(0.25, 0.75)*fp) + mfdPage(page, uv + vec2(-0.75, 0.25)*fp)), 1.0);
+  } else {   // panel coordinates (m): x -0.16 .. 0.42, y -0.11 .. 0.11; colour premultiplied by gauge coverage
+    float mpp = 0.58/uDispRes.x;
+    vec2 q = vec2(-0.16, -0.11) + px*mpp;
+    gAA = mpp*0.6;
+    vec3 acc = vec3(0.0); float cov = 0.0;
+    for (int si = 0; si < 4; si++) {
+      vec2 off = (vec2(si & 1, si >> 1) - 0.5)*mpp*0.7;
+      vec3 c4 = drawInstruments(q + off, int(uDispMode.y + 0.5), true);
+      if (c4.x >= 0.0) { acc += c4; cov += 1.0; }
+    }
+    o = vec4(acc*0.25, cov*0.25);
+  }
+  oColor = o;
 }
 )";
 

@@ -20,6 +20,7 @@ extern std::vector<RoadSeg> g_roads;
 float roadDistance(float x, float z, int* segOut = nullptr);
 float valueNoise(float x, float z);               // same as GLSL vnoise()
 float coverFbm(float x, float z, int oct);        // same as GLSL fbm2()
+void sceneryInit();  // build shared road tables before any threaded use
 void sceneryBaseMod(float x, float z, float& h, float& amp);  // flatten roads / towns in the base map
 
 

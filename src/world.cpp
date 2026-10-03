@@ -201,11 +201,13 @@ float airportInfluence(float x, float z) {
 void World::build() {
   airports.assign(std::begin(kAirports), std::end(kAirports));
   hm.resize((size_t)HM_N * HM_N * 4);
-  for (int j = 0; j < HM_N; j++)
+  sceneryInit();
+  parallelFor(HM_N, [&](int j) {   // rows are independent; spread over every core
     for (int i = 0; i < HM_N; i++) {
       float x = -WORLD_HALF + (i + 0.5f) * HM_TEXEL, z = -WORLD_HALF + (j + 0.5f) * HM_TEXEL;
       computeTexel(x, z, &hm[((size_t)j * HM_N + i) * 4]);
     }
+  });
   bakeMask();
   buildHMax();
   // Airport structures in runway-local frame (x = across, z = along runway); see Box kinds in world.h
@@ -248,7 +250,7 @@ void World::buildHMax() {
   const int TPC = HM_N / HMAX_N;  // texels per cell
   const float cs = 2.f * WORLD_HALF / HMAX_N;
   hmax[0].assign((size_t)HMAX_N * HMAX_N, 0.f);
-  for (int cj = 0; cj < HMAX_N; cj++)
+  parallelFor(HMAX_N, [&](int cj) {
     for (int ci = 0; ci < HMAX_N; ci++) {
       float b0 = -1e9f, b1 = 0.f, gmin = 1e9f;
       for (int j = cj * TPC - 1; j <= cj * TPC + TPC; j++)
@@ -269,6 +271,7 @@ void World::buildHMax() {
       (void)gmin;
       hmax[0][(size_t)cj * HMAX_N + ci] = std::max(top, 0.f) + 4.f;   // + crater rims
     }
+  });
   for (int L = 1; L < HMAX_LEVELS; L++) {
     int n = HMAX_N >> L, pn = n * 2;
     hmax[L].assign((size_t)n * n, 0.f);

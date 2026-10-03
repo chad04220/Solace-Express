@@ -16,6 +16,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 
 #define GL_FALSE 0
 #define GL_TIME_ELAPSED 0x88BF
+#define GL_TIMESTAMP 0x8E28
 #define GL_QUERY_RESULT 0x8866
 #define GL_QUERY_RESULT_AVAILABLE 0x8867
 #define GL_TRUE 1
@@ -159,6 +160,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
   X(void, glEndQuery, (GLenum)) \
   X(void, glGetQueryObjectiv, (GLuint, GLenum, GLint*)) \
   X(void, glGetQueryObjectui64v, (GLuint, GLenum, GLuint64*)) \
+  X(void, glQueryCounter, (GLuint, GLenum)) \
   X(void, glDrawArraysInstanced, (GLenum, GLint, GLsizei, GLsizei)) \
   X(void, glVertexAttribDivisor, (GLuint, GLuint)) \
   X(void, glDepthFunc, (GLenum)) \

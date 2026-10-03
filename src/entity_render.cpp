@@ -92,25 +92,41 @@ void Renderer::drawEntities(const FrameParams& fp) {
       if (c) c->lastUse = entFrame;
       if (!c || c->level < want) need.push_back({d, cx, cz, want});
     }
-  if (need.empty()) entPending = 0;
+  // a new chunk inside a shadow cascade's area makes that cascade re-render
+  auto added = [&](int cx, int cz) {
+    entGenCount++;
+    for (int c = 0; c < 2; c++) {
+      float r = (c == 0 ? R.sh0 : R.sh1) * 1.6f + 300.f;
+      float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
+      float ex = std::max(std::max(x0 - shCenter[c].x, shCenter[c].x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - shCenter[c].z, shCenter[c].z - z0 - Scenery::CH), 0.f);
+      if (ex < r && ez < r) shGen[c] = -1;
+    }
+  };
+  // chunks the worker threads finished since last frame
+  std::vector<int> got;
+  g_scenery.pump(got);
+  for (int idx : got) {
+    int cx = idx % Scenery::NC, cz = idx / Scenery::NC;
+    g_scenery.get(cx, cz)->lastUse = entFrame;
+    added(cx, cz);
+  }
+  if (!got.empty())   // drop the ones that just arrived from the list
+    need.erase(std::remove_if(need.begin(), need.end(), [](const Need& n) { Scenery::Chunk* c = g_scenery.get(n.cx, n.cz); return c && c->level >= n.level; }), need.end());
+  entPending = (int)need.size();
   if (!need.empty()) {
     std::sort(need.begin(), need.end(), [](const Need& a, const Need& b) { return a.d < b.d; });
     auto t0 = std::chrono::steady_clock::now();
-    int made = 0;
-    entPending = (int)need.size();
     for (const Need& n : need) {
+      // close chunks are generated here and now so they are never missing; the rest go to the worker threads
+      // (or, without workers, are generated here within the frame's time budget)
+      bool now = entSync || n.d <= 700.f;
+      if (!now && g_scenery.request(n.cx, n.cz, n.level)) continue;
+      if (!now && g_scenery.workers() > 0) break;   // queue full: ask again next frame
       double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
-      if (!entSync && n.d > 700.f && ms > entBudgetMs) break;   // close chunks are never left missing
-      entPending = (int)need.size() - ++made;
+      if (!now && ms > entBudgetMs) break;
       g_scenery.ensure(n.cx, n.cz, n.level)->lastUse = entFrame;
-      entGenCount++;
-      // a new chunk inside a shadow cascade's area makes that cascade re-render
-      for (int c = 0; c < 2; c++) {
-        float r = (c == 0 ? R.sh0 : R.sh1) * 1.6f + 300.f;
-        float x0 = Scenery::chunkX0(n.cx), z0 = Scenery::chunkX0(n.cz);
-        float ex = std::max(std::max(x0 - shCenter[c].x, shCenter[c].x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - shCenter[c].z, shCenter[c].z - z0 - Scenery::CH), 0.f);
-        if (ex < r && ez < r) shGen[c] = -1;
-      }
+      entPending--;
+      added(n.cx, n.cz);
     }
   }
   if (entFrame % 240 == 0) g_scenery.trim(cam, farDetail + 1200.f, farAll + 2500.f, entFrame);
