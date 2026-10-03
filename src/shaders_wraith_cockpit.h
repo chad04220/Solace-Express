@@ -375,6 +375,7 @@ bool wrFeedRay(vec3 sl, inout vec3 ro, inout vec3 rd){
 vec3 wrFeedOverlay(vec3 col, vec3 sl){
   vec3 q = sl - gM[22].xyz;
   vec2 uv = wrFloorUV(q).xy;
+  col = col/(1.0 + dot(col, vec3(0.3, 0.55, 0.15))*0.6);   // the sensor compresses highlights: a blast doesn't white it out
   col = mix(vec3(dot(col, vec3(0.3, 0.55, 0.15))), col, 0.55)*vec3(0.95, 1.05, 1.12);   // sensor look
   float aa = 0.006; gAA = aa;
   vec2 a = abs(uv);

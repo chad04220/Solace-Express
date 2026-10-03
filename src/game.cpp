@@ -1107,18 +1107,20 @@ void Game::fireball(vec3 c, vec3 baseV, float R, bool air, bool water) {
     bursts.push_back({c + vec3(0, 0.3f, 0), vec3(R * 3.f, 0, 0), vec3(0, 0, R * 3.f), vec3(0.8f, 0.9f, 1.f), 0.f});
     return;
   }
-  int nf = (int)clampf(R * 22.f, 40.f, 160.f);
-  for (int i = 0; i < nf; i++) {   // the fireball: fast core flames, slower outer billows that rise
+  int nf = (int)clampf(R * 9.f, 30.f, 90.f);
+  for (int i = 0; i < nf; i++) {   // the fireball: billows of flame thrown out, rising, cooling to soot
     vec3 d = sph(); if (!air) d.y = fabsf(d.y) * 0.8f + 0.15f;
     float k = r.range(0.f, 1.f);
-    vec3 col = lerp(vec3(1.f, 0.85f, 0.45f), vec3(1.f, 0.42f, 0.1f), k) * r.range(0.8f, 1.2f);
-    spawn(c + d * R * 0.25f * k, baseV * 0.6f + d * R * r.range(1.4f, 3.2f), r.range(0.7f, 1.6f), R * r.range(0.25f, 0.5f), R * r.range(0.3f, 0.7f), col, 0.16f, SPR_FIRE, 2.6f, r.range(2.f, 5.f));   // dim each: they build up, not blow out
+    vec3 col = lerp(vec3(1.f, 0.82f, 0.45f), vec3(1.f, 0.5f, 0.14f), k);
+    spawn(c + d * R * 0.3f * k, baseV * 0.6f + d * R * r.range(0.9f, 2.2f), r.range(1.1f, 2.3f), R * r.range(0.3f, 0.55f), R * r.range(0.35f, 0.75f), col, 0.9f, SPR_FLAME, 2.2f, r.range(3.f, 6.f));
   }
-  int ns = (int)clampf(R * 14.f, 25.f, 100.f);
-  for (int i = 0; i < ns; i++) {   // smoke: the column keeps climbing and spreading long after the flames
-    vec3 d = sph(); if (!air) d.y = fabsf(d.y) + 0.3f;
-    float g = r.range(0.06f, 0.16f);
-    spawn(c + d * R * 0.4f, baseV * 0.35f + d * R * r.range(0.4f, 1.2f) + plane.windVel * 0.5f, r.range(4.f, 9.f), R * r.range(0.35f, 0.6f), R * r.range(0.25f, 0.45f), vec3(g, g * 0.95f, g * 0.9f), r.range(0.45f, 0.7f), SPR_SMOKE, 0.6f, r.range(1.5f, 3.5f));
+  for (int i = 0; i < 8; i++)   // a little additive heat glow in the core
+    spawn(c + sph() * R * 0.2f, baseV * 0.6f, r.range(0.3f, 0.5f), R * 0.6f, R * 0.5f, vec3(1.f, 0.6f, 0.25f), 0.2f, SPR_FIRE, 2.f, 1.f);
+  int ns = (int)clampf(R * 6.f, 20.f, 60.f);
+  for (int i = 0; i < ns; i++) {   // smoke: a column that keeps climbing long after the flames
+    vec3 d = sph(); if (!air) { d.y = fabsf(d.y) + 0.6f; d.x *= 0.5f; d.z *= 0.5f; }
+    float g = r.range(0.05f, 0.13f);
+    spawn(c + d * R * 0.3f, baseV * 0.3f + d * R * r.range(0.3f, 0.8f) + plane.windVel * 0.5f, r.range(5.f, 10.f), R * r.range(0.3f, 0.5f), R * r.range(0.15f, 0.3f), vec3(g, g * 0.95f, g * 0.9f), r.range(0.4f, 0.6f), SPR_SMOKE, 0.5f, air ? 1.f : r.range(4.f, 7.f));
   }
   for (int i = 0; i < (int)clampf(R * 25.f, 50.f, 160.f); i++)   // sparks arcing out and falling
     spawn(c, baseV * 0.7f + sph() * r.range(15.f, 55.f) + vec3(0, r.range(0.f, 15.f), 0), r.range(0.8f, 2.4f), r.range(0.05f, 0.12f), -0.02f, vec3(1.f, 0.7f, 0.3f) * r.range(2.f, 5.f), 1.f, SPR_SPARK, 0.6f, -9.f);
@@ -1305,8 +1307,9 @@ void Game::updateWreck(float dt) {
       float heatT = clampf(1.3f - crashTimer * 0.08f, 0.35f, 1.f);
       for (int k = 0; k < n; k++) {
         vec3 tp = w.c - w.v * (dt * (float)k / n);
-        if (k % 4 == 0) spawn(tp, w.v * 0.04f, 3.f + (rand() % 100) * 0.015f, 1.1f + w.fire, 3.2f, vec3(0.06f, 0.055f, 0.05f), 0.32f, SPR_SMOKE, 1.f, 0.6f);
-        spawn(tp, w.v * 0.08f, 0.12f + (rand() % 100) * 0.0015f, (0.9f + w.fire * 0.6f) * heatT, -3.f, vec3(1.f, 0.45f, 0.12f), 0.35f * heatT, SPR_FIRE, 2.f, 0.f);
+        if (k % 3 == 0) spawn(tp, w.v * 0.04f, 4.f + (rand() % 100) * 0.02f, 1.2f + w.fire, 2.6f, vec3(0.055f, 0.05f, 0.045f), 0.45f, SPR_SMOKE, 1.f, 0.6f);
+        // the flame streams only a few metres off the piece (its life is set by the speed); the smoke trails on
+        if (k % 2 == 0) spawn(tp, w.v * 0.6f, clampf(6.f / std::max(length(w.v), 1.f), 0.03f, 0.3f), (0.9f + w.fire * 0.6f) * heatT, 2.f, vec3(1.f, 0.62f, 0.25f), 0.85f * heatT, SPR_FLAME, 0.f, 0.f);
       }
     } else w.v.y -= G * dt;
     w.v = w.v * expf(-0.08f * dt);
@@ -1730,6 +1733,13 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       vec3 ax = pl > 0.01f ? perp / pl : cr, ay = normalize(cross(ax, vd));
       quadAx(add, p.p - ax * (len * 0.5f), ax * (len * 0.5f + p.size), ay * p.size, p.col, fade, p.kind, 1.f);
     }
+    else if (p.kind == SPR_FLAME) {   // billowing flame: white-hot yellow, then deep red, then soot (alpha-blended)
+      float t = 1.f - fade;
+      vec3 hot = p.col * 3.f, red = vec3(1.f, 0.28f, 0.06f) * 1.3f, soot = vec3(0.05f, 0.045f, 0.04f);
+      vec3 col = t < 0.4f ? lerp(hot, red, t / 0.4f) : lerp(red, soot, std::min(1.f, (t - 0.4f) / 0.4f));
+      float al = p.alpha * smoothstepf(0.f, 0.06f, 1.f - fade + 0.02f) * (t < 0.8f ? 1.f : 1.f - (t - 0.8f) / 0.2f);
+      bill(alpha, p.p, std::max(p.size, 0.05f), col, al, p.kind, 1.f);
+    }
     else if (p.kind == SPR_FIRE) {   // flame cools from its spawn colour toward a deep red as it ages
       float cool = 1.f - fade;
       vec3 col = lerp(p.col, vec3(0.9f, 0.18f, 0.04f) * (p.col.x + p.col.y + p.col.z) * 0.4f, cool * cool);
@@ -1971,12 +1981,20 @@ void Game::debugScene(const std::string& name) {
     if (getenv("WRTHR")) { plane.ctl.throttle = (float)atof(getenv("WRTHR")); plane.apSpeed = 900.f; }
     if (getenv("WRSPD")) { plane.vel = plane.forward() * (float)atof(getenv("WRSPD")); plane.apSpeed = (float)atof(getenv("WRSPD")); }
     if (mode == 5) wraith.bayHold = 100.f;
-    if (mode == 7 || (mode == 8 && getenv("WRBOMB"))) { wraith.bombQueue = 1; wraith.armed = mode == 8; }
-    if (mode == 8 && getenv("WRBOMB")) camMode = 1;   // the floor screens show the bomb camera
+    // 9: cockpit looking down while a bomb falls (secs after release); 10: the same, secs after it goes off
+    bool bombCk = mode == 9 || mode == 10 || (mode == 8 && getenv("WRBOMB"));
+    if (mode == 7 || bombCk) { wraith.bombQueue = 1; wraith.armed = bombCk; }
     if (getenv("WRUFO")) { startUfo(); ufo.side = (float)atof(getenv("WRUFO")); }   // UFO alongside (side -1 / 1)
     float firstDrop = 0; vec3 blastAt;
-    int frames = (int)((mode == 3 ? 0.55f : mode == 7 ? 60.f : secs) * 60.f);
+    int frames = (int)((mode == 3 ? 0.55f : mode == 7 || mode == 10 ? 60.f : mode == 9 ? 30.f : secs) * 60.f);
+    float dropT = -1, boomAt = -1;
     for (int i = 0; i < frames; i++) {
+      if (mode == 9 || mode == 10) {
+        if (dropT < 0 && !wraith.bombs.empty()) dropT = realTime;
+        if (boomAt < 0 && !wraith.blasts.empty()) boomAt = realTime;
+        if (mode == 9 && dropT >= 0 && realTime - dropT > secs) break;
+        if (mode == 10 && boomAt >= 0 && realTime - boomAt > secs) break;
+      }
       realTime += 1 / 60.f; update(1 / 60.f);
       if (mode == 6) wraith.wantFire = true;   // trigger held
       if (getenv("WRTHR")) { plane.ctl.throttle = (float)atof(getenv("WRTHR")); plane.engineSpool = std::max(plane.engineSpool, plane.ctl.throttle * 0.98f); }
@@ -2005,7 +2023,7 @@ void Game::debugScene(const std::string& name) {
     for (auto& b : wraith.blasts) printf("wr: blast age %.2f R %.0f at %.0f %.0f %.0f particles %d\n", b.age, b.R, b.p.x, b.p.y, b.p.z, (int)particles.size());
     printf("wr: mode %d stealth %.2f lasers %.2f bay %.2f bombs %d blasts %d tilt %.2f %.2f %.2f %.2f thr %.2f\n", mode, wraith.stealth, wraith.lasers, wraith.bay, (int)wraith.bombs.size(), (int)wraith.blasts.size(),
            plane.podTilt[0], plane.podTilt[1], plane.podTilt[2], plane.podTilt[3], plane.podThr[0]);
-    if (mode == 8) { camMode = 1; lookYaw = yawD * DEG; lookPitch = pitD * DEG; camYaw = lookYaw; camPitch = lookPitch + 0.12f; return; }
+    if (mode == 8 || mode == 9 || mode == 10) { camMode = 1; lookYaw = yawD * DEG; lookPitch = pitD * DEG; camYaw = lookYaw; camPitch = lookPitch + 0.12f; return; }
     hudOn = false; dbgCam = true;
     float h = plane.heading() * DEG, yw = h + yawD * DEG, pt = pitD * DEG;
     vec3 focus = mode == 7 && firstDrop > 0 ? blastAt + vec3(0, 30.f, 0) : plane.pos;

@@ -391,7 +391,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         SetWindowTextA(g_hwnd, ("Air Xpress - rendering " + sc).c_str());
         Game* g = new Game();
         g->saveDir = game.saveDir;
-        g->initHeadless(); g->debugScene(sc);
+        g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
         for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
         for (int i = 0; i < 24; i++) g->render();   // TAA settles
         glFinish();

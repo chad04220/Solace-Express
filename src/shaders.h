@@ -3089,7 +3089,7 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
         else { m.alb = vec3(0.25, 0.02, 0.02); m.emit = bcn ? vec3(30.0, 1.5, 0.6) : vec3(0.0); }
       }
       else if (mid >= 80 && mid < 94) shadeWraith(m, mid, lp, ln, t);
-      else if (mid >= 61 && mid < 80 && int(gM[0].z + 0.5) == 6) { gPixM = t*uTanHalf*2.0/uRes.y/max(abs(dot(rd, n)), 0.3); shadeWraithCockpit(m, mid, lp, ln, E.xyz); }   // XR-11 cockpit
+      else if (mid >= 61 && mid < 80 && int(gM[0].z + 0.5) == 6) { gPixM = t*uTanHalf*2.0/uRes.y; shadeWraithCockpit(m, mid, lp, ln, E.xyz); }   // XR-11 cockpit
       else if (mid >= 30 && mid < 60) {  // XR-9 research jet surfaces
         vec3 nT; vec4 tx;
         float pulse = 0.75 + 0.25*sin(uTime*2.5);
@@ -3145,7 +3145,7 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
             page = mid == 52 ? 5 : 6; uv = vec2((cq.x - 0.02)/0.075*sign(qd.x), -(cq.z + 0.2)/0.06);
           }
           // 4x supersampled over this pixel's footprint on the panel: crisp at any display resolution
-          float fp = t*uTanHalf*2.0/uRes.y/max(abs(dot(rd, n)), 0.3)/(mid == 45 ? 0.07 : 0.06);
+          float fp = t*uTanHalf*2.0/uRes.y/(mid == 45 ? 0.07 : 0.06);   // the true pixel size: TAA smooths the foreshortened axis
           gAA = fp*0.55;
           vec3 sc = 0.25*(mfdPage(page, uv + vec2(-0.25, -0.75)*fp) + mfdPage(page, uv + vec2(0.75, -0.25)*fp)
                         + mfdPage(page, uv + vec2(0.25, 0.75)*fp) + mfdPage(page, uv + vec2(-0.75, 0.25)*fp));
@@ -3814,6 +3814,8 @@ void main(){
     vec2 wp = c0 + (vec2(si & 1, si >> 1) - 0.5)*foot*0.7;
     vec4 base = baseAt(wp);
     float h = terrainH(wp, 9);
+    // land cover comes from ~40 m mask cells: warp the material lookup so forest and field edges come out organic
+    vec2 mw = wp + (vec2(cn3(vec3(wp*0.012, 1.3)), cn3(vec3(wp*0.012, 7.9))) - 0.5)*70.0 + (vec2(cn3(vec3(wp*0.05, 3.1)), cn3(vec3(wp*0.05, 5.7))) - 0.5)*18.0;
     vec3 col;
     if (h < 0.0) {   // sea: turquoise shallows over sand, deepening to blue, a white surf line on the shore
       float dpt = -h;
@@ -3823,7 +3825,7 @@ void main(){
       col = mix(col, vec3(0.85, 0.9, 0.9), smoothstep(1.2, 0.0, dpt)*0.6);
     } else {
       vec3 n = terrainNormal(wp, tq);
-      Mat m = terrainMaterial(vec3(wp.x, h, wp.y), n, tq, base);
+      Mat m = terrainMaterial(vec3(mw.x, h, mw.y), n, tq, baseAt(mw));
       float sun = max(dot(n, L), 0.0);
       col = m.alb*(0.42 + 0.9*sun) + m.emit*0.0;
     }
@@ -3883,6 +3885,12 @@ void main(){
     float a = exp(-c.y*c.y*5.0)*smoothstep(1.0, 0.75, abs(c.x))*mix(0.45, 1.0, smoothstep(-1.0, 0.8, c.x));
     a = max(a - 0.02, 0.0);
     o = vec4(vCol.rgb*a*vCol.a, 0.0);
+  } else if (kind == 9) { // fireball billow: alpha-blended and self-lit (overlaps read as dense fire, not white)
+    float n = 0.72 + 0.28*sin(vWorld.x*0.55 + vWorld.y*0.8 + uTime*2.7)*sin(vWorld.z*0.6 - vWorld.y*0.5 + uTime*2.1);
+    float rr = r2/max(n, 0.3);
+    float a = smoothstep(1.0, 0.2, rr);
+    float core = smoothstep(0.6, 0.0, r2);
+    o = vec4(vCol.rgb*(0.8 + 0.5*core), vCol.a*a);
   } else if (kind == 8) { // vapour ribbon (lit): soft across its width (v), continuous along its length
     float a = smoothstep(1.0, 0.0, abs(c.y)); a *= a;
     float wisp = 0.85 + 0.15*sin(vWorld.x*0.9 + vWorld.z*1.3 + vWorld.y*0.7 + uTime*0.8);
