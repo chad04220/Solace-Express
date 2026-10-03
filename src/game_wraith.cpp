@@ -229,7 +229,7 @@ void Game::updateWraith(float dt) {
   for (size_t i = 0; i < W.bombs.size(); i++) {
     WraithState::Bomb& b = W.bombs[i];
     b.t += dt;
-    b.v += vec3(0, -G0, 0) * dt - b.v * (0.004f * length(b.v) * dt * 0.1f);
+    b.v += vec3(0, -G0, 0) * dt - b.v * (2e-5f * length(b.v) * dt);
     b.p += b.v * dt;
     if (frand() < 0.6f) spawn(b.p, b.v * 0.9f + rndDir() * 3.f, 0.4f, 0.25f, 0.5f, vec3(0.6f, 0.25f, 1.f) * 3.f, 1.f, SPR_SPARK, 2.f, 0.f);
     float g = groundAt(b.p);
@@ -277,6 +277,29 @@ void Game::wraithVisual(FrameParams& fp) {
     float* o = fx.blast[fx.blasts]; float* I = fx.blastI[fx.blasts]; fx.blasts++;
     o[0] = b.p.x; o[1] = b.p.y + b.R * 0.25f * e; o[2] = b.p.z; o[3] = b.R * (0.15f + 0.85f * e);
     I[0] = b.age; I[1] = 1.f; I[2] = 0; I[3] = 0;
+  }
+  // bomb impact prediction for the cockpit's floor and chin displays: a bomb released now, falling with the same
+  // physics as a real one (gravity, a little drag), until it meets the ground or the sea
+  fx.pip[3] = 0.f;
+  if (plane.spec && plane.spec->special == 2 && !plane.onGround && !crashed && camMode == 1) {
+    vec3 p = plane.pos + plane.q.rotate(kBayBomb - vec3(0, 0.25f, 0)), v = plane.vel + plane.up() * -3.f;
+    const float dt = 0.05f;
+    for (int i = 0; i < 1200; i++) {
+      v += vec3(0, -G0, 0) * dt - v * (2e-5f * length(v) * dt);
+      p += v * dt;
+      if (p.y < 2600.f) {
+        float g = groundAt(p);
+        if (p.y <= g) { fx.pip[0] = p.x; fx.pip[1] = g; fx.pip[2] = p.z; fx.pip[3] = 1.f; break; }
+      }
+    }
+  }
+  // belly camera: follows the newest bomb down and holds on its blast while it burns
+  fx.feed[3] = 0.f;
+  if (plane.spec && plane.spec->special == 2 && camMode == 1 && !crashed) {
+    const vec3* tgt = nullptr;
+    if (!W.blasts.empty() && W.blasts.back().age < 0.85f) tgt = &W.blasts.back().p;
+    else if (!W.bombs.empty()) tgt = &W.bombs.back().p;
+    if (tgt) { fx.feed[0] = tgt->x; fx.feed[1] = tgt->y; fx.feed[2] = tgt->z; fx.feed[3] = 1.f; }
   }
   // glassed craters join the crash crater (if any)
   for (size_t i = 0; i < W.craters.size() && fp.wreck.craterN < 24; i++) {

@@ -25,6 +25,8 @@ struct FxVisual {
   int beams = 0; float beamA[16][4], beamB[16][4]; // laser bolts: tail + radius, head + intensity
   int bombs = 0; float bomb[8][4];                 // dark-energy bombs: centre + radius
   int blasts = 0; float blast[6][4], blastI[6][4]; // detonations: centre + radius, age 0..1 + intensity
+  float pip[4] = {0, 0, 0, 0};                     // XR-11 bomb impact prediction: world point + valid
+  float feed[4] = {0, 0, 0, 0};                    // XR-11 belly camera target: world point + active
 };
 
 // One AI traffic aircraft for the ray tracer: 32 texels (see loadTraffic in shaders.h)

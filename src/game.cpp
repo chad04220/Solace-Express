@@ -1721,6 +1721,25 @@ void Game::debugScene(const std::string& name) {
   plane.starterTime = 0.01f; plane.engineRunning = true; plane.rpm = 1000; engineAutoStarted = true;
   {
     float px, pz, agl, hdg; char cm = 'c';
+    float bagl = 300, blook = -70, bafter = 0.25f;
+    if (sscanf(name.c_str(), "wrbomb_%f_%f_%f", &bagl, &blook, &bafter) >= 1) {   // XR-11 cockpit: drop a bomb and watch it go off through the glass floor
+      resCraft = kWraith; realTime = 20; resAirborne = true; resTime = 12.f; launchResearch();
+      plane.pos.y = std::max(g_world.height(plane.pos.x, plane.pos.z), 0.f) + bagl;
+      plane.apEngage(Plane::AP_HOLD, -1, wx); plane.apAlt = plane.pos.y; botControl = true;
+      wraith.armed = true;
+      for (int i = 0; i < 90; i++) { realTime += 1 / 60.f; update(1 / 60.f); }
+      wraith.bombQueue = 1;
+      float since = -1;
+      for (int i = 0; i < 60 * 40; i++) {
+        realTime += 1 / 60.f; update(1 / 60.f);
+        if (since < 0 && !wraith.blasts.empty()) since = 0;
+        if (since >= 0) { since += 1 / 60.f; if (since >= bafter) break; }
+        if (since < 0 && bafter < 0 && !wraith.bombs.empty() && wraith.bombs[0].t > -bafter) break;   // negative: a falling bomb
+      }
+      printf("wrbomb: bombs %d blasts %d pip %d\n", (int)wraith.bombs.size(), (int)wraith.blasts.size(), 0);
+      camMode = 1; lookYaw = 0; lookPitch = blook * DEG; camYaw = 0; camPitch = lookPitch + 0.12f; hudOn = true; toasts.clear(); hint.clear();
+      return;
+    }
     float fx, fz, fsec = 3, fpitch = 28, fyaw = 0;
     if (sscanf(name.c_str(), "lasertest_%f_%f_%f_%f_%f", &fx, &fz, &fsec, &fpitch, &fyaw) >= 2) {   // XR-11 firing at the ground ahead from a fixed hover
       resCraft = kWraith; realTime = 20; resAirborne = true; resTime = 12.f; launchResearch();

@@ -1,6 +1,7 @@
 // Air Xpress - OpenGL renderer: GPU ray tracer + sprites + post + UI
 #include "renderer.h"
 #include "shaders.h"
+#include "shaders_wraith_cockpit.h"
 #include "font_data.h"
 #include "scenery.h"
 #include <unordered_map>
@@ -295,7 +296,7 @@ void Renderer::genMinimap() {
 
 bool Renderer::init(int w, int h) {
   std::string vsFS = kFullscreenVS;
-  std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceFS3 + kRaytraceWraith;
+  std::string rt = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceFS3 + kRaytraceWraith + kRaytraceWraithCockpit;
   progRT = program(vsFS, rt, error);
   if (!progRT) { error = "Ray tracer shader: " + error; return false; }
   progSprite = program(kSpriteVS, kSpriteFS, error);
@@ -615,6 +616,8 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     if (fx.beams) { glUniform4fv(U(p, "uBeamA"), fx.beams, &fx.beamA[0][0]); glUniform4fv(U(p, "uBeamB"), fx.beams, &fx.beamB[0][0]); }
     if (fx.bombs) glUniform4fv(U(p, "uBombs"), fx.bombs, &fx.bomb[0][0]);
     if (fx.blasts) { glUniform4fv(U(p, "uBlast"), fx.blasts, &fx.blast[0][0]); glUniform4fv(U(p, "uBlastI"), fx.blasts, &fx.blastI[0][0]); }
+    glUniform4fv(U(p, "uPip"), 1, fx.pip);
+    glUniform4fv(U(p, "uFeed"), 1, fx.feed);
   }
   {   // entity G-buffer and the sun shadow cascades
     for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, texGB[i]); }

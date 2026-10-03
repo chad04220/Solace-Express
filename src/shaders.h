@@ -425,6 +425,7 @@ vec2 mapJet(vec3 p){
   return res;
 }
 vec2 mapWraith(vec3 p);
+vec2 mapWraithCockpit(vec3 p);
 vec2 mapPlane(vec3 p){
   if (int(gM[0].z + 0.5) == 5) return mapJet(p);
   if (int(gM[0].z + 0.5) == 6) return mapWraith(p);
@@ -2161,6 +2162,12 @@ void shadeWraith(inout Mat m, int mid, vec3 lp, vec3 ln, float t);
 vec3 wraithPlumes(vec3 ro, vec3 rd, float tmax, float jit);
 vec3 cloakSkin(vec3 world, vec3 n, vec3 rd, vec3 lp, float front);
 vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t);
+void shadeWraithCockpit(inout Mat m, int mid, vec3 lp, vec3 ln, vec3 E);
+vec3 wraithPodLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E);
+vec3 wrHolo(vec3 ro, vec3 rd, float tmax);
+vec3 wraithScreen(vec3 col, vec3 rd, int id, vec3 sl);
+bool wrFeedRay(vec3 sl, inout vec3 ro, inout vec3 rd);
+vec3 wrFeedOverlay(vec3 col, vec3 sl);
 vec3 jetPlumes(vec3 ro, vec3 rd, float tmax, float jit){
   if (gFlame.x < 0.02) return vec3(0.0);
   mat3 inv = transpose(uPlaneRot);
@@ -2194,7 +2201,7 @@ void main(){
     h0 = tracePlane(ro, rd, jet ? 6.0 : planeBound()*2.0);
     if (h0.x > 0.0) {
       int id0 = int(h0.y + 0.5);
-      if (jet && id0 >= 41 && id0 <= 43) { onScr = true; scrId = id0; scrL = transpose(uPlaneRot)*(ro + rd*h0.x - uPlanePos); }
+      if (jet && ((id0 >= 41 && id0 <= 43) || (id0 >= 61 && id0 <= 63))) { onScr = true; scrId = id0; scrL = transpose(uPlaneRot)*(ro + rd*h0.x - uPlanePos); }
       else { pod = true; tmax = h0.x + 0.05; }
     }
   }
@@ -2210,9 +2217,12 @@ void main(){
       }
     }
   }
+  // XR-11 belly camera: part of the glass floor shows a feed locked on the falling bomb or its blast
+  vec3 roV = ro, rdV = rd;
+  bool feed = onScr && scrId == 61 && int(gM[0].z + 0.5) == 6 && wrFeedRay(scrL, ro, rd);
   // environment entities: the raster pass already found the nearest tree / rock / building on this pixel
   vec4 g0 = vec4(0.0);
-  if (!pod && !onScr) g0 = texelFetch(uGB0, ivec2(gl_FragCoord.xy), 0);
+  if (!pod && !feed) g0 = texelFetch(uGB0, ivec2(gl_FragCoord.xy), 0);   // (the displays show the trees and buildings outside too)
   if (cloak) g0.x = g0.x > ckT ? g0.x - ckT : 0.0;   // seen through the cloak (the ray now starts on its skin)
   float tE = g0.x > 0.0 && g0.x < tmax ? g0.x : -1.0;
   float tT = pod ? -1.0 : traceTerrain(ro, rd, tE > 0.0 ? tE + 1.0 : tmax);
@@ -2447,6 +2457,7 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
         if (length(fq) < gM[16].z*0.25) m.alb = vec3(0.05);
       }
       if (mid >= 80 && mid < 100) shadeWraith(m, mid, lp, ln, t);
+      else if (mid >= 61 && mid < 80) shadeWraithCockpit(m, mid, lp, ln, E.xyz);   // XR-11 cockpit
       else if (mid >= 30 && mid < 60) {  // XR-9 research jet surfaces
         vec3 nT; vec4 tx;
         float pulse = 0.75 + 0.25*sin(uTime*2.5);
@@ -2608,11 +2619,11 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
         m.emit += vec3(1.0, 0.32, 0.06)*pow(clamp(burn*cut*0.9, 0.0, 1.0), 5.0)*(1.5 + sin(uTime*7.0 + lp.x*9.0))*3.0;
       }
       n = applyTS(n, m.nrm, interior ? 0.35 : 0.12);
-      bool podMat = mid >= 40 && mid < 60;
+      bool podMat = mid >= 40 && mid < 80;
       float sh = sunVis > 0.0 && !podMat ? (trafHit ? 1.0 : planeShadow(p + n*0.02, uSunDir)) * terrainShadow(p, uSunDir, 50.0) * cloudShadow(p) : 0.0;   // the sealed pod sees no sun
       if (podMat) {  // sealed research cockpit: lit only by its modelled fixtures, low and moody
         mat3 inv = transpose(gPR);
-        col = podLight(lp, inv*n, inv*(-rd), m, E.xyz)*interiorAO(lp, ln) + m.emit;
+        col = (int(gM[0].z + 0.5) == 6 ? wraithPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : podLight(lp, inv*n, inv*(-rd), m, E.xyz))*interiorAO(lp, ln) + m.emit;
       } else if (interior) {
         vec3 v = -rd; mat3 inv = transpose(gPR);
         float ao = interiorAO(lp, ln);
@@ -2658,7 +2669,9 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
   // clouds
   vec4 cl = pod ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(ro, rd, t, jitter);
   col = col*cl.a + cl.rgb;
-  if (onScr) col = jetScreen(col, rd, scrId, scrL);
+  bool wrCk = cockpitView && int(gM[0].z + 0.5) == 6;
+  if (onScr) col = feed ? wrFeedOverlay(col, scrL) : wrCk ? wraithScreen(col, rd, scrId, scrL) : jetScreen(col, rd, scrId, scrL);
+  if (wrCk) col += wrHolo(roV, rdV, pod ? t : h0.x);   // the hologram floats inside the cabin, in front of everything
   if (cloak) { col = cloakSkin(col, ckN, rd0, ckLp, ckLp.z - uWr[6].y + 0.8); t += ckT; taaFlag = 0.5; }
   if (any(isnan(col)) || any(isinf(col)) || !(col.r + col.g + col.b < 1e7)) col = vec3(0.0);
   oColor = vec4(clamp(col, vec3(0.0), vec3(3e4)), taaFlag);
@@ -2761,7 +2774,7 @@ vec2 wrPod(vec3 p, int i, float lim){
 }
 vec2 mapWraith(vec3 p){
   float gear = gPS.x, inside = gPS.w;
-  if (inside > 0.5) return mapJetCockpit(p);
+  if (inside > 0.5) return mapWraithCockpit(p);
   vec3 ap = vec3(abs(p.x), p.y, p.z);
   float sgn = p.x > 0.0 ? 1.0 : -1.0;
   float body = wrBody(p);
