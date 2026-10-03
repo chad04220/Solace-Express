@@ -2,6 +2,7 @@
 // exercising the real game loop (completion detection, scoring, payout, story progression).
 #include "../src/game.h"
 #include <cstdlib>
+#include <cmath>
 // attitude-based vertical-speed controller (same structure as the in-game autopilot)
 static float s_pI = 0;
 static void pitchFor(Plane& p, float vsT, float dt, float maxPitch = 14.f) {
@@ -15,6 +16,19 @@ struct GameTest {
     g_audio.init(48000);
     Game g; g.initHeadless(); g.botControl = true;
     int fails = 0;
+    // ---- sun: finite light for every second of the day, in clear and overcast weather
+    for (int wxi = 0; wxi < 2; wxi++) {
+      g.wx.cloudCover = wxi ? 1.f : 0.f; g.wx.storm = wxi == 1;
+      int bad = 0;
+      for (int sec = 0; sec < 86400; sec++) {
+        vec3 d, c; float n;
+        g.computeSun(sec / 3600.f, d, c, n);
+        if (!std::isfinite(c.x) || !std::isfinite(c.y) || !std::isfinite(c.z) || !std::isfinite(n) || c.x < 0 || c.y < 0 || c.z < 0 || c.x > 1.01f || c.y > 1.01f || c.z > 1.01f) bad++;
+      }
+      printf("Sun sweep (%s): %d bad samples\n", wxi ? "storm" : "clear", bad);
+      if (bad) fails++;
+    }
+    g.wx = Weather();
     // ---- Lesson 1: takeoff and fly through the rings
     g.startFlight(g_story[0], 0, Career::SRC_LESSON);
     const float dt = 1.f / 60.f;

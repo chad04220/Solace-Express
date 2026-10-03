@@ -98,7 +98,7 @@ vec3 skyColor(vec3 rd){
   float y = max(rd.y, 0.0);
   // optical depths (cheap analytic approximation of Rayleigh + Mie single scattering)
   float odV = 1.0/(y*1.4 + 0.075);
-  float odS = 1.0/(max(sunH, -0.08)*1.4 + 0.08);
+  float odS = 1.0/max(sunH*1.4 + 0.08, 0.02);   // positive and bounded once the sun is down (was negative just below the horizon)
   vec3 beta = vec3(0.10, 0.23, 0.56);
   vec3 sunExt = exp(-beta*odS*0.45);
   float mu = dot(rd, sd);

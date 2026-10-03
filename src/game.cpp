@@ -244,7 +244,7 @@ void Game::computeSun(float tod, vec3& dir, vec3& col, float& night) const {
   float a = (tod - 6.f) / 12.f * PI;
   dir = normalize(vec3(cosf(a), sinf(a) * 0.93f, 0.35f + 0.1f * sinf(a)));
   float y = dir.y;
-  float od = 1.f / (std::max(y, -0.08f) * 1.4f + 0.08f);
+  float od = 1.f / std::max(y * 1.4f + 0.08f, 0.02f);   // optical depth: positive and bounded (x50) once the sun is down
   col = vec3(expf(-0.10f * od * 0.45f), expf(-0.23f * od * 0.45f), expf(-0.56f * od * 0.45f)) * smoothstepf(-0.06f, 0.05f, y);
   col = col * (1.f - 0.75f * wx.cloudCover * wx.cloudCover) * (wx.storm ? 0.6f : 1.f);
   night = smoothstepf(0.06f, -0.14f, y);
