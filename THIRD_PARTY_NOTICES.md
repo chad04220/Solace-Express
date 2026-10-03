@@ -21,3 +21,7 @@ Stations listed in `radio_stations.txt` are third-party services streamed live a
 ## Everything else
 
 All other code, shaders, textures (procedurally generated at startup), audio (synthesised in real time), aircraft, map and campaign content are original to this project.
+
+## stb_image
+
+`src/third_party/stb_image.h` (v2.30) by Sean Barrett, used to load the loading-screen pictures. Public domain (Unlicense) or MIT, at your choice; see the end of the file.

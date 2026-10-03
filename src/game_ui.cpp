@@ -296,7 +296,9 @@ void Game::drawLoading() {
   auto li = loadImg.find(key);
   if (li == loadImg.end()) {
     unsigned tex = 0; int w = 0, h = 0; std::vector<uint8_t> px;
-    if (readPNG((assetDir + "/loading/" + key + ".png").c_str(), w, h, px)) tex = g_ren.makeTexture(px.data(), w, h);
+    // a picture rendered on this PC by render_loading.bat (.png) wins over the one that ships with the game (.jpg)
+    for (const char* ext : {".png", ".jpg"})
+      if (!tex && readImage((assetDir + "/loading/" + key + ext).c_str(), w, h, px)) tex = g_ren.makeTexture(px.data(), w, h);
     li = loadImg.emplace(key, tex).first;
   }
   unsigned pic = li->second;

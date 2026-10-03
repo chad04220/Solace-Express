@@ -1,6 +1,16 @@
 // Solace Express - OpenGL renderer: GPU ray tracer + sprites + post + UI
 #include "renderer.h"
 #include "shaders.h"
+#if defined(_MSC_VER)
+#pragma warning(push, 0)
+#endif
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_PNG
+#define STBI_ONLY_JPEG
+#include "third_party/stb_image.h"   // public domain (Sean Barrett): the loading-screen pictures
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 #include "shaders_wraith_cockpit.h"
 #include "entity_shaders.h"
 #include "font_data.h"
@@ -1344,53 +1354,13 @@ bool writePNG(const char* path, int W, int H, const std::vector<uint8_t>& px) {
   return true;
 }
 
-// Reads the PNGs writePNG makes (8-bit RGB, stored deflate blocks, no row filters) into RGBA, top row first. Anything
-// else (compressed or filtered data, other colour types) is refused rather than misread.
-bool readPNG(const char* path, int& W, int& H, std::vector<uint8_t>& rgba) {
-  FILE* f = fopen(path, "rb");
-  if (!f) return false;
-  std::vector<uint8_t> d;
-  { uint8_t buf[65536]; size_t n; while ((n = fread(buf, 1, sizeof buf, f)) > 0) d.insert(d.end(), buf, buf + n); }
-  fclose(f);
-  static const uint8_t sig[8] = {137, 80, 78, 71, 13, 10, 26, 10};
-  if (d.size() < 33 || memcmp(d.data(), sig, 8) != 0) return false;
-  auto be32 = [&](size_t o) { return (uint32_t)d[o] << 24 | (uint32_t)d[o + 1] << 16 | (uint32_t)d[o + 2] << 8 | d[o + 3]; };
-  std::vector<uint8_t> z;
-  W = H = 0;
-  for (size_t o = 8; o + 12 <= d.size();) {
-    uint32_t len = be32(o);
-    if (o + 12 + len > d.size()) return false;
-    const uint8_t* t = &d[o + 4]; const uint8_t* c = &d[o + 8];
-    if (!memcmp(t, "IHDR", 4)) {
-      W = (int)be32(o + 8); H = (int)be32(o + 12);
-      if (len < 13 || c[8] != 8 || c[9] != 2 || c[12] != 0 || W <= 0 || H <= 0 || W > 16384 || H > 16384) return false;
-    } else if (!memcmp(t, "IDAT", 4)) z.insert(z.end(), c, c + len);
-    else if (!memcmp(t, "IEND", 4)) break;
-    o += 12 + len;
-  }
-  if (W == 0 || z.size() < 2) return false;
-  std::vector<uint8_t> raw; raw.reserve((size_t)(W * 3 + 1) * H);
-  size_t o = 2;   // zlib header
-  for (;;) {
-    if (o + 5 > z.size()) return false;
-    uint8_t hdr = z[o];
-    if ((hdr >> 1) & 3) return false;   // only stored blocks
-    size_t n = z[o + 1] | (size_t)z[o + 2] << 8;
-    if (o + 5 + n > z.size()) return false;
-    raw.insert(raw.end(), z.begin() + o + 5, z.begin() + o + 5 + n);
-    o += 5 + n;
-    if (hdr & 1) break;
-  }
-  if (raw.size() < (size_t)(W * 3 + 1) * H) return false;
-  rgba.resize((size_t)W * H * 4);
-  for (int y = 0; y < H; y++) {
-    const uint8_t* row = &raw[(size_t)y * (W * 3 + 1)];
-    if (row[0] != 0) return false;   // only unfiltered rows
-    for (int x = 0; x < W; x++) {
-      uint8_t* q = &rgba[((size_t)y * W + x) * 4];
-      q[0] = row[1 + x * 3]; q[1] = row[2 + x * 3]; q[2] = row[3 + x * 3]; q[3] = 255;
-    }
-  }
+// PNG or JPEG into RGBA, top row first (stb_image)
+bool readImage(const char* path, int& W, int& H, std::vector<uint8_t>& rgba) {
+  int n = 0;
+  unsigned char* px = stbi_load(path, &W, &H, &n, 4);
+  if (!px) return false;
+  rgba.assign(px, px + (size_t)W * H * 4);
+  stbi_image_free(px);
   return true;
 }
 

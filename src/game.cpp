@@ -2428,11 +2428,19 @@ void Game::debugScene(const std::string& name) {
   // loading-screen pictures (--loadshots): loadshot_<CODE> an airport from an elevated three-quarter view with the aircraft
   // on its runway; loadshot_air_<n> aircraft n in flight, filmed from alongside. Afternoon light, a little cloud.
   if (name.compare(0, 13, "loadshot_air_") == 0) {
-    resCraft = std::clamp(atoi(name.c_str() + 13), 0, 8); resAirborne = true; resTime = 16.3f; resWx = 0; resAirport = 0;
+    static const char* kSpot[9] = {"MDB", "PMB", "ORC", "KLO", "FJH", "CAP", "PVI", "VCF", "LHK"};   // a different place each
+    int n = std::clamp(atoi(name.c_str() + 13), 0, 8);
+    resCraft = n; resAirborne = true; resTime = 16.3f; resWx = 0; resAirport = std::max(0, g_world.findAirport(kSpot[n]));
     launchResearch();
+    {   // at its own cruise speed, holding height (the research launch's 200 m/s tears a light aircraft apart)
+      const Airport& a = g_world.airports[resAirport];
+      vec3 p = a.pos() + a.dir() * 1500.f; p.y = std::max(a.elev, g_world.height(p.x, p.z)) + 450.f;
+      plane.reset(&kAircraft[n], p, a.heading, kAircraft[n].maxFuel, 85, true, kAircraft[n].cruise);
+      plane.ctl.throttle = 0.7f; botControl = true; plane.apEngage(Plane::AP_HOLD, -1, wx);
+    }
     wx.cloudCover = 0.3f; realTime = 20;
     for (int i = 0; i < 20; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
-    float size = std::max(plane.spec->span, plane.spec->fusLen), R = size * 2.2f + 8.f;
+    float size = std::max(plane.spec->span, plane.spec->fusLen), R = size * 1.5f + 6.f;
     dbgCam = true; dbgFollow = true;
     dbgFollowOff = plane.right() * (R * 0.85f) + plane.forward() * (R * 0.55f) + vec3(0, R * 0.16f, 0);
     toasts.clear(); hint.clear(); uiHidden = true; return;
@@ -2446,9 +2454,9 @@ void Game::debugScene(const std::string& name) {
     const Airport& a = g_world.airports[ai];
     vec3 ctr = a.pos(), d = a.dir(), r = normalize(cross(d, vec3(0, 1, 0)));
     float len = a.length;
-    vec3 cam = ctr + r * (len * 0.45f + 380.f) - d * (len * 0.55f + 250.f);
-    cam.y = std::max(a.elev, g_world.height(cam.x, cam.z)) + 170.f + len * 0.04f;
-    dbgCam = true; dbgFollow = false; dbgCamPos = cam; dbgCamLook = ctr + d * (len * 0.1f) + vec3(0, 10.f, 0);
+    vec3 cam = ctr + r * (len * 0.3f + 200.f) - d * (len * 0.4f + 120.f);
+    cam.y = std::max(a.elev, g_world.height(cam.x, cam.z)) + 90.f + len * 0.03f;
+    dbgCam = true; dbgFollow = false; dbgCamPos = cam; dbgCamLook = ctr + d * (len * 0.05f) + vec3(0, 5.f, 0);
     toasts.clear(); hint.clear(); uiHidden = true; return;
   }
   if (name.compare(0, 3, "apt") == 0 && name.size() >= 6) {   // on the runway of an airport: apt<CODE>, e.g. aptHFS
