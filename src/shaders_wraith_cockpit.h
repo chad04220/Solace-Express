@@ -109,7 +109,8 @@ vec2 mapWraithCockpit(vec3 p){
     slab = max(slab, (-cq.x*0.7 + cq.y) - 0.035);                      // chamfered inner edge
     slab = max(slab, (abs(cq.z) + abs(cq.x)*0.5) - 0.4);
     res = opU(res, vec2(slab, 65.0));
-    if (gCkSkip != 2) res = opU(res, vec2(max(max(abs(cq.x - 0.015) - 0.1, abs(cq.y - 0.041) - 0.0015), abs(cq.z - 0.12) - 0.2), 68.0));
+    // Aft touch area leaves the stick base and the throttle's full travel on solid console material.
+    if (gCkSkip != 2) res = opU(res, vec2(max(max(abs(cq.x - 0.015) - 0.1, abs(cq.y - 0.041) - 0.0015), abs(cq.z - 0.265) - 0.09), 68.0));
     vec3 mq = cq - vec3(0.015, 0.075, -0.24); mq.yz = rot2(mq.yz, -0.55);
     if (gCkSkip != 2) res = opU(res, vec2(max(wrShape(mq.xz, vec2(0.09, 0.055), 0.02), abs(mq.y) - 0.0015), 69.0));
     res = opU(res, vec2(sdBox(mq + vec3(0.0, 0.012, 0.0), vec3(0.105, 0.012, 0.07)), 65.0));
@@ -117,7 +118,7 @@ vec2 mapWraithCockpit(vec3 p){
   // side stick (right) follows pitch and roll; throttle (left) slides with the throttle
   {
     vec3 sb = q - vec3(0.5, -0.41, -0.06);
-    float st0 = sdBox(sb, vec3(0.05, 0.02, 0.08));
+    float st0 = sdRoundBox(sb, vec3(0.05, 0.02, 0.08), 0.004);
     vec3 st = sb; st.yz = rot2(st.yz, -cPitch*0.25); st.xy = rot2(st.xy, cRoll*0.25);
     float stick = min(st0, sdCapsule(st, vec3(0.0), vec3(0.0, 0.09, -0.01), 0.014));
     vec3 gq = st - vec3(0.0, 0.14, -0.015);
@@ -227,7 +228,7 @@ void shadeWraithCockpit(inout Mat m, int mid, vec3 lp, vec3 ln, vec3 E){
   } else if (mid == 67) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = mix(cyan, vio, 0.5 + 0.5*sin(q.z*6.0 - uTime*1.5))*1.6*pulse; }
   else if (mid == 68) {   // touch glass on the consoles
     vec3 cq = vec3(abs(q.x) - 0.56, q.y + 0.47, q.z + 0.12);
-    vec2 uv = vec2((cq.x - 0.015)/0.1, (cq.z - 0.12)/0.2)*0.5 + 0.5;
+    vec2 uv = vec2((cq.x - 0.015)/0.1, (cq.z - 0.265)/0.09)*0.5 + 0.5;
     m.alb = vec3(0.01); m.rough = 0.04; m.emit = wrUiPanel(uv, q.x > 0.0 ? 0.3 : 0.7)*1.5; gDispPx = true;
   } else if (mid == 69) {   // multi-function displays (dash and consoles)
     int page; vec2 uv;
@@ -336,7 +337,7 @@ vec3 wrClipAtlas(vec2 uv){
   else if (tile == 7) { q = wrPanePoint(WL_C, WL_N, vec3(0,0,-1), vec3(f*WL_S, 0.0)); inside = wrShape(f*WL_S, WL_S, 0.1); }
   else if (tile <= 9) { q = wrPanePoint(WB_C, WB_N, vec3(0,0,-1), vec3(f*WB_S, 0.0)); inside = wrShape(f*WB_S, WB_S, 0.07); }
   else if (tile <= 11) { skip = 2; vec2 m = f*vec2(0.15, 0.07); q = wrPanePoint(WD_C, WD_N, vec3(0,1,0), vec3(0.33 + m.x, m.y - 0.005, 0.003)); inside = wrShape(m, vec2(0.15, 0.07), 0.035); }
-  else if (tile <= 13) { skip = 2; vec2 m = f*vec2(0.1, 0.2); q = vec3(0.56 + 0.015 + m.x, 0.041 - 0.47, 0.12 + m.y - 0.12); inside = max(abs(m.x) - 0.1, abs(m.y) - 0.2); }
+  else if (tile <= 13) { skip = 2; vec2 m = f*vec2(0.1, 0.09); q = vec3(0.56 + 0.015 + m.x, 0.041 - 0.47, 0.265 + m.y - 0.12); inside = max(abs(m.x) - 0.1, abs(m.y) - 0.09); }
   else if (tile <= 15) { skip = 2; vec2 m = f*vec2(0.09, 0.055); vec3 mq = vec3(m.x, 0.0, m.y); mq.yz = rot2(mq.yz, 0.55);
     vec3 cq = mq + vec3(0.015, 0.075, -0.24); q = vec3(0.56 + cq.x, cq.y - 0.47, cq.z - 0.12); inside = wrShape(m, vec2(0.09, 0.055), 0.02); }
   else if (tile == 16) { skip = 2; vec2 m = f*vec2(0.28, 0.009); q = wrPanePoint(WD_C, WD_N, vec3(0,1,0), vec3(m.x, 0.083 + m.y, 0.001)); inside = max(abs(m.x) - 0.28, abs(m.y) - 0.009); }

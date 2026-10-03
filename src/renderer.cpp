@@ -154,7 +154,10 @@ static float pworley(float u, float v, int P, int seed, float* id = nullptr) {
 void Renderer::genCloudNoise() {
   auto hp = [](int x, int y, int z, int P) {
     x = ((x % P) + P) % P; y = ((y % P) + P) % P; z = ((z % P) + P) % P;
-    return hash2i(x * 73856093 ^ (z * 19349663) ^ (P * 7919), y * 83492791 + z * 2971);
+    // Hash mixing deliberately wraps at 32 bits; signed products would be undefined at these cell sizes.
+    uint32_t hx = uint32_t(x)*73856093u ^ (uint32_t(z)*19349663u) ^ (uint32_t(P)*7919u);
+    uint32_t hy = uint32_t(y)*83492791u + uint32_t(z)*2971u;
+    return hash2i(static_cast<int32_t>(hx), static_cast<int32_t>(hy));
   };
   auto s3 = [](float t) { return t * t * (3.f - 2.f * t); };
   auto vn2 = [&](float x, float y, int P) {

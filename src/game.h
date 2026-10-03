@@ -105,6 +105,7 @@ private:
   float fuelStart = 0;
   float timeAccel = 1;
   int camMode = 0; float camYaw = 0, camPitch = 0.12f, camDist = 0, camZoom = 1;
+  float camArm = 0, camArmV = 0, camSpd = 0;   // chase camera spring arm: length (m), its rate, smoothed airspeed
   float lookYaw = 0, lookPitch = 0;
   quat camQ; vec3 camPos; vec3 camVel;
   float propAngle = 0;

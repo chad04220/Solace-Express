@@ -4,7 +4,11 @@
 
 namespace {
 // ------------------------------------------------------------------ noise
-float hash3i(int x, int y, int z) { return hash2i(x * 73856093 ^ (z * 19349663), y * 83492791 + z * 2971); }
+float hash3i(int x, int y, int z) {
+  uint32_t hx = uint32_t(x)*73856093u ^ (uint32_t(z)*19349663u);
+  uint32_t hy = uint32_t(y)*83492791u + uint32_t(z)*2971u;
+  return hash2i(static_cast<int32_t>(hx), static_cast<int32_t>(hy));
+}
 float vnoise3(vec3 p) {
   int ix = (int)floorf(p.x), iy = (int)floorf(p.y), iz = (int)floorf(p.z);
   float fx = p.x - ix, fy = p.y - iy, fz = p.z - iz;

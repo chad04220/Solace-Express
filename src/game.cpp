@@ -277,7 +277,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   ufo = Ufo(); ufo.next = 180.f + (rand() % 1000) * 0.24f;   // first encounter after 3-7 minutes in the air
   paused = false; showMap = false; landed = completed = crashed = false;
   result = FlightResult();
-  timeAccel = 1; camMode = camMode == 1 ? 1 : 0; camYaw = 0; camPitch = 0.12f; camZoom = 1;
+  timeAccel = 1; camMode = camMode == 1 ? 1 : 0; camYaw = 0; camPitch = 0.12f; camZoom = 1; camArm = 0; camArmV = 0; camSpd = 0;
   lookYaw = 0; lookPitch = -0.13f;
   camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 3, 15));
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
@@ -810,7 +810,20 @@ void Game::updateCamera(float dt) {
     float yaw = atan2f(f.x, -f.z), pitch = asinf(clampf(f.y, -1, 1));
     quat target = quat::axisAngle(vec3(0, 1, 0), -yaw) * quat::axisAngle(vec3(1, 0, 0), pitch * 0.85f);
     camQ = slerp(camQ, target, 1.f - expf(-4.f * dt));
-    float dist = (size * 0.85f + 5.f) * camZoom;
+    // spring arm: it lengthens with airspeed (relative to the type's cruise) so the aircraft sits smaller on screen
+    // the faster it goes, stretches when the aircraft accelerates away and compresses when it slows, through a
+    // slightly under-damped spring
+    float base = (size * 0.85f + 5.f) * camZoom;
+    float spd = length(plane.vel), sPrev = camSpd;
+    camSpd = camArm <= 0.f ? spd : camSpd + (spd - camSpd) * (1.f - expf(-dt * 3.f));
+    float acc = dt > 1e-4f ? (camSpd - sPrev) / dt : 0.f;
+    float rel = spd / std::max(s.cruise, 20.f);
+    float armT = base * (0.9f + 0.45f * std::min(rel, 1.f) + 0.3f * clampf(rel - 1.f, 0.f, 2.f) + clampf(acc * 0.025f, -0.12f, 0.25f));
+    if (camArm <= 0.f) { camArm = armT; camArmV = 0; }
+    const float wn = 3.2f, zeta = 0.8f;   // natural frequency (rad/s), damping
+    camArmV += (wn * wn * (armT - camArm) - 2.f * zeta * wn * camArmV) * dt;
+    camArm += camArmV * dt;
+    float dist = std::max(camArm, base * 0.7f);
     quat orbit = camQ * quat::axisAngle(vec3(0, 1, 0), camYaw) * quat::axisAngle(vec3(1, 0, 0), -camPitch);
     camPos = plane.pos + orbit.rotate(vec3(0, 0, dist)) + vec3(0, s.fusRad * 0.6f, 0);
   } else if (camMode == 1) {
@@ -2487,6 +2500,20 @@ void Game::debugScene(const std::string& name) {
     dbgCam = true; dbgFollow = true;
     dbgFollowOff = plane.right() * (R * 0.85f) + plane.forward() * (R * 0.55f) + vec3(0, R * 0.16f, 0);
     toasts.clear(); hint.clear(); uiHidden = true; return;
+  }
+  if (name.compare(0, 4, "gav_") == 0) {   // an aircraft parked on the runway, orbit view: gav_<spec>_<yaw>_<pitch>_<dist>
+    int sp = 0; float yawD = 120, pitD = 10, dist = 0;
+    sscanf(name.c_str() + 4, "%d_%f_%f_%f", &sp, &yawD, &pitD, &dist);
+    sp = std::clamp(sp, 0, kNumAircraft - 1);
+    Contract c; c.from = g_world.findAirport("CAP"); c.to = g_world.findAirport("MDB"); c.title = "Aircraft check";
+    c.wx = Weather(); c.wx.timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 14.5f; c.wx.cloudCover = 0.2f; c.wx.visibility = 60000;
+    realTime = 20; startFlight(c, sp, Career::SRC_OWNED);
+    for (int i = 0; i < 30; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    if (dist <= 0) dist = kAircraft[sp].span * 1.15f;
+    float y = yawD * DEG, pt = pitD * DEG;
+    vec3 off = (plane.forward() * cosf(y) + plane.right() * sinf(y)) * (dist * cosf(pt)) + vec3(0, dist * sinf(pt), 0);
+    dbgCam = true; dbgFollow = true; dbgFollowOff = off; dbgCamPos = plane.pos + off; dbgCamLook = plane.pos;
+    toasts.clear(); hint.clear(); uiHidden = true; hudOn = false; camMode = 1; return;
   }
   if (name.compare(0, 4, "apv_") == 0 && name.size() >= 9) {   // airport detail views: apv_<CODE>_<view>_<hour>
     int ai = std::max(0, g_world.findAirport(name.substr(4, 3).c_str()));
