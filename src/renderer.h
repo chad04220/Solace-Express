@@ -17,6 +17,8 @@ struct PlaneVisual {
   float prop[2][4]; int propCount = 0;
   float hud[4] = {0, 0, 0, 0}, hud2[4] = {1, 0, 0, 0}, hudV[3] = {0, 0, -1}, hud3[4] = {0, 0, 0, 1000};  // research jet HUD data
   float flame[4] = {0, 0, 0, 0};  // research jet exhaust: spool, reheat, nozzle vector angle (rad), mach
+  float vapor[4] = {0, 0, 0, 0};  // transonic vapour cone: density, start z, start radius, length (body space)
+  int lensN = 0; float lensP[6][4] = {}, lensC[6][4] = {}, lensD[6][4] = {};   // light fixtures (body space): lens centre | emission | axis + tint
   float wr[7][4] = {};            // XR-11: pod tilts, yaw vanes, thrusts, pitch vanes | fan, bay, lasers, stealth | surfaces, laser fire | bomb, cloak front, armed
 };
 
@@ -52,7 +54,9 @@ struct FrameParams {
   WreckVisual wreck;
   FxVisual fx;
   vec3 landLightPos, landLightDir; float landLight = 0;
-  vec3 flameLightPos, flameLight;  // research jet exhaust light (radiance; zero when off)
+  vec3 flameLightPos, flameLight;  // a blast's light (radiance; zero when off), folded into the point lights
+  struct PointLight { vec3 pos; float radius; vec3 col; float cosCut; vec3 dir; float shadow; };
+  PointLight pl[12]; int plN = 0;   // point / spot lights: radiance, spot cutoff (-2 omni), shadow stop distance (0 none)
   float exposure = 1.0f, rainLens = 0, fade = 1, vignette = 0.6f, gLoad = 0;
   bool sealedCockpit = false;
   int trafficN = 0; TrafficVisual traffic[kMaxTrafficDrawn];
@@ -96,7 +100,10 @@ public:
   float entCpuMs = 0;                // CPU time of the entity pass (streaming + culling + submission)
 
 private:
-  GLuint progRT = 0, progSprite = 0, progBright = 0, progBlur = 0, progPost = 0, progUI = 0, progTAA = 0;
+  GLuint progRT = 0, progSprite = 0, progDown = 0, progUp = 0, progRayMask = 0, progRay = 0, progPost = 0, progUI = 0, progTAA = 0;
+  static constexpr int kBloomMips = 6;
+  GLuint fboMip[kBloomMips] = {}, texMip[kBloomMips] = {}; int mipW[kBloomMips] = {}, mipH[kBloomMips] = {};
+  GLuint fboRay[2] = {0, 0}, texRay[2] = {0, 0};
   GLuint vaoEmpty = 0, vaoSprite = 0, vboSprite = 0, vaoUI = 0, vboUI = 0;
   GLuint texHM = 0, texAlb = 0, texNrm = 0, texFont = 0, texMask = 0, texRoadId = 0, texData = 0, texHMax = 0;
   struct V4 { float x, y, z, w; };
@@ -111,7 +118,6 @@ public:
   float gpuMs = -1.f;   // last measured GPU time of renderScene, ms (-1 = not known yet)
 private:
   vec3 prevCamPos, prevPlanePos; float prevCamRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1}, prevPlaneRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
-  GLuint fboBloom[2] = {0, 0}, texBloom[2] = {0, 0};
   int rw = 0, rh = 0, bw = 0, bh = 0;
   float maxH = 2500;
   std::vector<UIVert> ui;

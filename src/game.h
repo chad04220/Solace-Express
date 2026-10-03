@@ -139,6 +139,7 @@ private:
   void wraithControls(float dt);
   void updateWraith(float dt);
   void wraithVisual(FrameParams& fp);
+  void buildLights(FrameParams& fp);
   void fireLaser();
   void updateBolts(float dt);
   void laserImpact(vec3 at, int craft, int entKind, const Ent* ent);

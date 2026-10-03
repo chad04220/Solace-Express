@@ -152,18 +152,28 @@ uniform vec4 uM[24]; uniform vec4 uPS; uniform vec4 uCtl; uniform vec4 uPr; unif
 uniform vec3 uColBase; uniform vec3 uColStripe;
 uniform vec4 uProp[2]; uniform int uPropCount;
 uniform vec3 uLandLightPos; uniform vec3 uLandLightDir; uniform float uLandLight;
+// point / spot lights (everything but the sun and moon): position + source radius | radiance + spot cutoff cosine
+// (-2 = omni) | spot axis + shadow flag (> 0: ray-traced aircraft shadow, stopping that far short of the light)
+uniform int uPLN; uniform vec4 uPLP[12]; uniform vec4 uPLC[12]; uniform vec4 uPLD[12];
+// the player aircraft's light fixtures (body space): lens centre | lens emission | outward axis + glass tint (0 red,
+// 1 green, 2 clear)
+uniform int uLensN; uniform vec4 uLensP[6]; uniform vec4 uLensC[6]; uniform vec4 uLensD[6];
 uniform vec4 uWr[7];   // XR-11 Wraith animation and weapons state (see mapWraith)
 uniform int uFxBeams; uniform vec4 uBeamA[16]; uniform vec4 uBeamB[16];   // laser bolts: tail + radius, head + intensity
 uniform int uFxBombs; uniform vec4 uBombs[8];                           // dark-energy bombs in flight: centre + radius
 uniform int uFxBlasts; uniform vec4 uBlast[6]; uniform vec4 uBlastI[6]; // detonations: centre + radius, age 0..1 + intensity
+uniform vec4 uVapor;   // transonic vapour cone: density, start z, start radius, length (body space)
 uniform vec4 uFlame; uniform vec3 uFlameLP; uniform vec3 uFlameLI;  // research jet exhaust: spool, reheat, vector angle, mach | light pos, radiance
 // Per-aircraft data the SDF and its shading read: your aircraft (uniforms) or a traffic aircraft (uTraffic row k:
 // texels 0-23 model, 24 position + bound radius, 25-27 rotation columns, 28 state, 29 controls, 30 base colour + prop
 // angle, 31 stripe colour + reheat)
 vec4 gM[24]; vec4 gPS; vec4 gCtl; vec3 gColBase; vec3 gColStripe; vec4 gFlame;
 uniform sampler2D uTraffic; uniform int uTrafficN;
-void loadMain(){ for (int i = 0; i < 24; i++) gM[i] = uM[i]; gPS = uPS; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; }
+bool gOwn = true;   // the globals hold the player's aircraft (not a traffic one)
+void loadMain(){ gOwn = true; for (int i = 0; i < 24; i++) gM[i] = uM[i]; gPS = uPS; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; }
+int gTrafK = 0;
 void loadTraffic(int k){
+  gOwn = false; gTrafK = k;
   for (int i = 0; i < 24; i++) gM[i] = texelFetch(uTraffic, ivec2(i, k), 0);
   gPS = texelFetch(uTraffic, ivec2(28, k), 0); gCtl = texelFetch(uTraffic, ivec2(29, k), 0);
   vec4 c0 = texelFetch(uTraffic, ivec2(30, k), 0), c1 = texelFetch(uTraffic, ivec2(31, k), 0);
@@ -180,6 +190,7 @@ const int M_BARK=25, M_PLANKS=26, M_LITTER=27, M_SHINGLES=28, M_SIDING=29;
 float sdBox(vec3 p, vec3 b){ vec3 q = abs(p)-b; return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0); }
 float sdRoundBox(vec3 p, vec3 b, float r){ vec3 q = abs(p)-b+r; return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r; }
 float sdCapsule(vec3 p, vec3 a, vec3 b, float r){ vec3 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0); return length(pa-ba*h)-r; }
+float sdTorus(vec3 p, vec2 t){ return length(vec2(length(p.xz) - t.x, p.y)) - t.y; }
 float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2){
   vec3 ba = b - a; float l2 = dot(ba,ba); float rr = r1 - r2; float a2 = l2 - rr*rr; float il2 = 1.0/l2;
   vec3 pa = p - a; float y = dot(pa,ba); float z = y - l2; vec3 xv = pa*l2 - ba*y; float x2 = dot(xv,xv);
@@ -366,12 +377,12 @@ vec2 mapJet(vec3 p){
     float s = ap.x, t = p.y - (-0.18 - s*0.035), c = p.z + 1.6;
     float wing = sdPanel(s, c, t, 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3);
     float elevon = sdSurface(s, c, t, 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3, -cPitch*0.3 - cRoll*sgn*0.3, 0.0);
-    float hole = length(ap.xz - vec2(2.5, 1.2)) - 0.62;
+    float hole = length(ap.xz - vec2(2.4, 2.2)) - 0.62;   // fully inside the wing, clear of the leading edge
     wing = max(min(wing, elevon), -hole);
     float d = smin(res.x, wing, 0.25);
     res = vec2(d, wing < res.x ? 31.0 : res.y);
     // fan: hub and louvres that swivel with the nozzles
-    vec3 fq = ap - vec3(2.5, -0.27, 1.2);
+    vec3 fq = ap - vec3(2.4, -0.264, 2.2);
     float fan = max(sdCapsule(fq, vec3(0.0, -0.03, 0.0), vec3(0.0, 0.03, 0.0), 0.16), -1.0);
     vec3 lq = fq; lq.z -= 0.17*clamp(floor(lq.z/0.17 + 0.5), -3.0, 3.0);
     lq.yz = rot2(lq.yz, noz*0.9);
@@ -399,9 +410,35 @@ vec2 mapJet(vec3 p){
     vec2 yz = rot2(q.yz, -a);
     vec3 nq = vec3(q.x, yz.x, yz.y - 0.5);
     float nzl = sdRoundBox(nq, vec3(0.44, 0.31, 0.5), 0.06);
-    nzl = max(nzl, -sdBox(nq - vec3(0.0, 0.0, 0.25), vec3(0.36, 0.23, 0.6)));
-    res = opU(res, vec2(nzl, 33.0));
-    res = opU(res, vec2(sdBox(nq - vec3(0.0, 0.0, -0.35), vec3(0.36, 0.23, 0.02)), 36.0));   // glowing turbine face
+    float cav = sdBox(nq - vec3(0.0, 0.0, 0.25), vec3(0.36, 0.23, 0.6));
+    res.x = max(res.x, -cav);   // the duct is hollow right down to the turbine: no airframe inside it
+    float nzlIn = -cav;   // the cavity walls (inside the duct) are soot-black, not the outer finish
+    nzl = max(nzl, nzlIn);
+    res = opU(res, vec2(nzl, nzlIn > sdRoundBox(nq, vec3(0.44, 0.31, 0.5), 0.06) - 0.001 ? 37.0 : 33.0));
+    // exhaust section, deepest first: the last turbine stage behind a hot tail cone, afterburner spray bars and two
+    // flame-holder rings, a ribbed liner, and the convergent-divergent flaps that form the 2D throat
+    if (cav < 0.05) {
+      vec3 iq = nq - vec3(0.0, 0.0, -0.35);
+      float ang = atan(iq.y, iq.x), rr = length(iq.xy);
+      float disc = max(sdBox(iq, vec3(0.36, 0.23, 0.02)), -iq.z - 0.02);
+      float blades = max(max(abs(fract(ang*23.0/6.2832 + rr*1.5) - 0.5)*rr*0.27 - 0.006, abs(iq.z - 0.03) - 0.012), rr - 0.225);
+      float hub = sdRoundCone(iq, vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, 0.24), 0.1, 0.02);
+      res = opU(res, vec2(min(min(disc, blades), hub), 36.0));
+      vec3 hq = nq - vec3(0.0, 0.0, -0.08);
+      float gut = min(sdTorus(hq.xzy, vec2(0.17, 0.012)), sdTorus(hq.xzy, vec2(0.085, 0.01)));          // V-gutter rings
+      vec2 bq = hq.xy; float ba = atan(bq.y, bq.x); ba = mod(ba + 0.3927, 0.7854) - 0.3927;
+      vec2 br2 = length(bq)*vec2(cos(ba), sin(ba));
+      float bars = max(sdBox(vec3(br2.x - 0.13, br2.y, hq.z + 0.04), vec3(0.11, 0.006, 0.006)), max(abs(nq.x) - 0.35, abs(nq.y) - 0.22));
+      res = opU(res, vec2(min(gut, bars), 37.0));
+      float wall = -cav;   // distance into the walls from the cavity
+      float ribs = max(abs(fract(nq.z/0.11) - 0.5)*0.11 - 0.01, -(wall + 0.012));
+      ribs = max(ribs, max(nq.z - 0.02, -0.3 - nq.z));
+      res = opU(res, vec2(ribs, 37.0));
+      // C-D flaps: the duct narrows to the throat at z 0.28, then opens slightly to the exit
+      float hz = 0.23 - 0.075*exp(-pow((nq.z - 0.28)/0.16, 2.0));
+      float flap = max(max((hz - abs(nq.y))*0.9, abs(nq.x) - 0.36), max(0.06 - nq.z, nq.z - 0.56));
+      res = opU(res, vec2(flap, 37.0));
+    }
   }
   // sensor canopy (opaque gold film) and LED strips along the chines and wing leading edges
   res = opU(res, vec2(sdEllipsoid(p - vec3(0.0, 0.5, -4.6), vec3(0.6, 0.42, 1.9)), 32.0));
@@ -426,7 +463,40 @@ vec2 mapJet(vec3 p){
 }
 vec2 mapWraith(vec3 p);
 vec2 mapWraithCockpit(vec3 p);
+vec2 mapPlaneBody(vec3 p);
+// light fixtures: a faired housing set into the airframe with a domed lens facing out along the light's axis
 vec2 mapPlane(vec3 p){
+  vec2 res = mapPlaneBody(p);
+  if (gPS.w > 0.5) return res;
+  if (!gOwn) {   // traffic: the same fixtures, placed from the packed model (wingtips, fin top, tail cone)
+    bool jet = int(gM[0].z + 0.5) == 5;
+    vec3 tip = jet ? vec3(5.67, -0.38, 4.4) : vec3(gM[9].x + 0.07, gM[10].x + gM[9].x*gM[10].z, gM[10].y + gM[9].w + gM[9].z*0.25);
+    vec3 fin = jet ? vec3(0.0, 0.67, 1.6) : vec3(0.0, gM[15].x + gM[14].x + 0.04, gM[15].y + gM[14].w + gM[14].z*0.4);
+    vec3 tl = jet ? vec3(0.0, 0.45, 7.6) : vec3(0.0, gM[8].w, gM[8].x + 0.03);
+    vec3 ap = vec3(abs(p.x), p.y, p.z);
+    for (int i = 0; i < 3; i++) {
+      vec3 c = i == 0 ? tip : (i == 1 ? fin : tl);
+      vec3 d = i == 0 ? vec3(1.0, 0.0, 0.0) : (i == 1 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0));
+      vec3 q = (i == 0 ? ap : p) - c;
+      if (dot(q, q) > 0.09) continue;
+      res = opU(res, vec2(sdRoundCone(q, -d*0.16, -d*0.025, 0.06, 0.05), 94.0));
+      res = opU(res, vec2(max(length(q + d*0.012) - 0.05, -dot(q, d) - 0.012), i == 0 ? (p.x < 0.0 ? 101.0 : 102.0) : (i == 1 ? 104.0 : 103.0)));
+    }
+    return res;
+  }
+  for (int i = 0; i < 6; i++) {
+    if (i >= uLensN) break;
+    vec3 q = p - uLensP[i].xyz;
+    if (dot(q, q) > 0.09) continue;
+    vec3 d = uLensD[i].xyz;
+    float housing = sdRoundCone(q, -d*0.16, -d*0.025, 0.06, 0.05);
+    float lens = max(length(q + d*0.012) - 0.05, -dot(q, d) - 0.012);
+    res = opU(res, vec2(housing, 94.0));
+    res = opU(res, vec2(lens, 95.0 + float(i)));
+  }
+  return res;
+}
+vec2 mapPlaneBody(vec3 p){
   if (int(gM[0].z + 0.5) == 5) return mapJet(p);
   if (int(gM[0].z + 0.5) == 6) return mapWraith(p);
   float L = gM[0].x; int gtype = int(gM[0].y + 0.5); int eng = int(gM[0].z + 0.5); float R = gM[0].w;
@@ -860,6 +930,8 @@ float trafficShadow(vec3 p){
   }
   return s;
 }
+float gShMax = 1e9;   // shadow rays toward a point light stop at it
+float gShK = 10.0;    // penumbra sharpness (sun: 10; a point light: its distance over its size)
 float pieceShadow(vec3 ro, vec3 rd, float br){
   vec3 oc = ro - gPP;
   float b = dot(oc, rd), c = dot(oc,oc) - br*br, h = b*b - c;
@@ -869,10 +941,10 @@ float pieceShadow(vec3 ro, vec3 rd, float br){
   float res = 1.0;
   for (int i=0;i<56;i++){
     float d = mapPiece(lo + ld*t).x;
-    res = min(res, 10.0*d/max(t,0.1));
+    res = min(res, gShK*d/max(t,0.1));
     if (res < 0.01) return 0.0;
     t += clamp(d, 0.03, 2.0);
-    if (t > t1) break;
+    if (t > min(t1, gShMax)) break;
   }
   return clamp(res, 0.0, 1.0);
 }
@@ -1167,18 +1239,28 @@ float entShadow(vec3 p, vec3 n){
 }
 
 // ---------------------------------------------------------------- clouds
+// Volumetric cumulus: a coverage field (2D) gives each cloud its footprint; a flat base and a billowing, rounded top
+// come from the height profile, two scales of 3D noise carve the billows, and fine 3D detail erodes only the thin
+// edges into wisps (the dense cores stay solid).
 float cloudDensity(vec3 p, int detail){
   float thick = 900.0 + 900.0*uCloudCover;
   float hf = (p.y - uCloudBase) / thick;
   if (hf < 0.0 || hf > 1.0) return 0.0;
   vec2 q = (p.xz + uWindOff) / 5200.0;
   float cov = fbm2(q, 4);
-  float shape = smoothstep(0.0, 0.12, hf) * smoothstep(1.0, 0.35 - 0.2*uCloudCover, hf);
+  float shape = smoothstep(0.0, 0.07, hf) * smoothstep(1.0, 0.4 - 0.22*uCloudCover, hf);
   float d = cov - (1.05 - uCloudCover*0.75) + shape*0.45 - 0.45;
-  if (d < -0.15) return 0.0;
-  if (detail > 0) d -= (vnoise3(p/320.0 + vec3(uTime*0.01)) - 0.5)*0.22 + (vnoise3(p/90.0) - 0.5)*0.08;
-  return clamp(d*3.2, 0.0, 1.0);
+  if (d < -0.2) return 0.0;
+  vec3 w = p + vec3(uWindOff.x, 0.0, uWindOff.y);
+  float bill = vnoise3(w/760.0)*0.6 + vnoise3(w/270.0)*0.4;
+  d += (bill - 0.55)*0.42*(0.55 + hf);                                       // billows, deeper towards the tops
+  if (detail > 0) {
+    float e = (vnoise3(w/95.0 + vec3(0.0, uTime*0.015, 0.0)) - 0.5)*0.17 + (vnoise3(w/36.0) - 0.5)*0.06;
+    d += e*(1.0 - smoothstep(0.0, 0.3, d));                                   // wispy edges, solid cores
+  }
+  return clamp(d*4.5, 0.0, 1.0);
 }
+float hgPhase(float c, float g){ float g2 = g*g; return (1.0 - g2)/(12.566*pow(max(1.0 + g2 - 2.0*g*c, 1e-4), 1.5)); }
 vec4 traceClouds(vec3 ro, vec3 rd, float tmax, float jitter){
   if (uCloudCover < 0.02) return vec4(0.0,0.0,0.0,1.0);
   float thick = 900.0 + 900.0*uCloudCover;
@@ -1191,26 +1273,33 @@ vec4 traceClouds(vec3 ro, vec3 rd, float tmax, float jitter){
   }
   t1 = min(t1, min(tmax, 45000.0));
   if (t1 <= t0) return vec4(0,0,0,1);
-  int N = uQuality > 1 ? 48 : (uQuality > 0 ? 32 : 20);
+  int N = uQuality > 1 ? 56 : (uQuality > 0 ? 40 : 24);
   float dt = (t1 - t0)/float(N);
   float T = 1.0; vec3 L = vec3(0.0);
   float mu = dot(rd, uSunDir);
-  float phase = mix(0.08, 0.35*pow(max(mu,0.0), 12.0) + 0.1, 0.6);
   vec3 sunC = uSunCol; vec3 amb = skyColor(vec3(0.0,1.0,0.0))*1.4 + vec3(0.05);
+  vec3 skyH = skyColor(normalize(vec3(rd.x, max(rd.y,0.02), rd.z)));
+  // phase: a strong forward lobe (silver linings towards the sun) plus some back-scatter
+  float ph0 = mix(hgPhase(mu, 0.8), hgPhase(mu, -0.25), 0.3);
+  float ph1 = mix(hgPhase(mu, 0.4), hgPhase(mu, -0.12), 0.3), ph2 = mix(hgPhase(mu, 0.2), hgPhase(mu, -0.06), 0.3);
   float t = t0 + dt*jitter;
-  for (int i=0;i<48;i++){
+  for (int i=0;i<56;i++){
     if (i >= N) break;
     vec3 p = ro + rd*t;
     float d = cloudDensity(p, 1);
     if (d > 0.01) {
-      float ds = cloudDensity(p + uSunDir*120.0, 0) + cloudDensity(p + uSunDir*350.0, 0)*0.5;
-      float sh = exp(-ds*2.2);
+      // light march towards the sun: optical depth through the cloud above this point
+      float od = (cloudDensity(p + uSunDir*60.0, 0)*60.0 + cloudDensity(p + uSunDir*160.0, 0)*100.0
+                + cloudDensity(p + uSunDir*340.0, 0)*180.0 + cloudDensity(p + uSunDir*650.0, 0)*310.0)*0.012;
+      // multiple scattering (three octaves, each less absorbed and less directional) and the powder darkening of
+      // thin edges seen side-on to the sun
+      vec3 ms = vec3(exp(-od)*ph0 + 0.5*exp(-od*0.5)*ph1 + 0.25*exp(-od*0.25)*ph2);
+      float powder = mix(1.0, 1.0 - exp(-d*7.0), 0.6*(1.0 - max(mu, 0.0)));
       float hf = clamp((p.y - uCloudBase)/thick, 0.0, 1.0);
-      vec3 c = sunC*sh*(phase*3.0)*(1.0 - exp(-d*4.0)) + amb*(0.35 + 0.65*hf)*(1.0 - 0.4*uStorm);
+      vec3 c = sunC*ms*powder*11.0 + amb*(0.3 + 0.7*hf)*(1.0 - 0.4*uStorm)*(0.75 + 0.25*exp(-od*0.3));
       c += vec3(0.8,0.85,1.0)*uLightning*2.0;
-      float a = 1.0 - exp(-d*dt*0.012);
+      float a = 1.0 - exp(-d*dt*0.016);
       float fogT = exp(-uFogB*t*0.6);
-      vec3 skyH = skyColor(normalize(vec3(rd.x, max(rd.y,0.02), rd.z)));
       L += T*a*mix(skyH, c, fogT);
       T *= 1.0 - a;
       if (T < 0.02) break;
@@ -1600,16 +1689,23 @@ vec3 shadeSurface(vec3 p, vec3 n, vec3 rd, Mat m, float shadow){
   vec3 r = reflect(rd, n);
   vec3 F = fresnelSchlick(max(dot(n, v), 0.0), mix(vec3(0.04), m.alb, m.metal));
   col += skyColor(normalize(vec3(r.x, abs(r.y), r.z)))*F*(1.0-m.rough)*(1.0-m.rough)*0.8;
-  // aircraft landing light
-  if (uLandLight > 0.0) {
-    vec3 lv = p - uLandLightPos; float ld = length(lv); vec3 l = lv/ld;
-    float cone = smoothstep(0.93, 0.985, dot(l, uLandLightDir));
-    col += pbr(n, v, -l, m.alb, m.rough, m.metal, vec3(1.0,0.95,0.85)*cone*uLandLight*9000.0/(ld*ld + 50.0));
-  }
-  // research jet exhaust plume light (flickering; lights the tail, the nozzles and the ground while hovering)
-  if (uFlameLI.x + uFlameLI.y + uFlameLI.z > 0.0) {
-    vec3 lv = uFlameLP - p; float d2 = dot(lv, lv);
-    col += pbr(n, v, lv*inversesqrt(max(d2, 1e-4)), m.alb, m.rough, m.metal, uFlameLI/(d2 + 1.5));
+  // point and spot lights (exhaust flames, landing lights, nav lights, beacon, strobes, blasts) with ray-traced
+  // shadows from the aircraft: shadow rays only where a light contributes visibly
+  for (int i = 0; i < 12; i++) {
+    if (i >= uPLN) break;
+    vec3 lv = uPLP[i].xyz - p; float d2 = dot(lv, lv), d = sqrt(d2); vec3 l = lv/max(d, 1e-4);
+    float ndl = dot(n, l);
+    if (ndl <= 0.0) continue;
+    vec3 E = uPLC[i].rgb/(d2 + uPLP[i].w*uPLP[i].w);
+    if (uPLC[i].w > -1.5) E *= smoothstep(uPLC[i].w, mix(uPLC[i].w, 1.0, 0.3), dot(-l, uPLD[i].xyz));
+    float lum = max(E.r, max(E.g, E.b))*ndl;
+    if (lum < 0.0015) continue;
+    if (uPLD[i].w > 0.0 && lum > 0.004) {
+      gShMax = d - uPLD[i].w; gShK = clamp(d/max(uPLP[i].w, 0.02), 6.0, 80.0);
+      E *= planeShadow(p + n*0.03, l);
+      gShMax = 1e9; gShK = 10.0;
+    }
+    col += pbr(n, v, l, m.alb, m.rough, m.metal, E);
   }
   col += m.emit;
   col += m.alb*vec3(0.7,0.75,1.0)*uLightning*0.4;
@@ -2142,49 +2238,66 @@ R"(vec3 jetScreen(vec3 col, vec3 rd, int id, vec3 sl){
   return mix(col, hc*1.6, clamp(hud, 0.0, 1.0)*0.85);
 }
 // ---------------------------------------------------------------- research jet exhaust plumes
-// Volumetric emission marched through each plume (body space). Dry thrust: a tight blue-white plasma cone.
-// Reheat: a long white-hot core in an amber envelope, threaded with bright Mach disks (shock diamonds),
-// with turbulent flicker scrolling downstream.
+// Volumetric emission marched through each plume (body space). Dry thrust is all but invisible, as on a real engine:
+// a faint heat-blue core and, at full power, a few pale shock cells. Reheat: a translucent blue-violet shell at the
+// nozzle, a train of white-yellow shock diamonds (Mach disks joined by the expansion / compression cones, spaced
+// wider as the pressure ratio climbs with Mach) inside an orange flame that flares, flickers and reddens downstream.
+float gPlumeT = 1.0;   // light from behind that gets through the flames (reheat gas and soot absorb a little)
 vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float jit){
   float sp = gFlame.x, ab = gFlame.y;
-  float L = mix(2.0, 6.0, sp) + 9.0*ab;
-  vec3 c = o + ax*(L*0.5); float br = L*0.5 + 0.9;
+  float L = mix(1.4, 3.0, sp*sp) + 9.5*ab;
+  vec3 c = o + ax*(L*0.5); float br = L*0.5 + 1.0;
   vec3 oc = lo - c; float b = dot(oc, ld), h = b*b - dot(oc, oc) + br*br;
   if (h <= 0.0) return vec3(0.0);
   h = sqrt(h); float t0 = max(-b - h, 0.0), t1 = min(-b + h, tmax);
   if (t1 <= t0) return vec3(0.0);
   vec3 ay = normalize(cross(ax, vec3(1.0, 0.0, 0.0)));
-  float spacing = 0.95 + 0.35*clamp(gFlame.w, 0.0, 2.5);
-  vec3 cOut = mix(vec3(0.12, 0.28, 1.0), vec3(1.0, 0.3, 0.05), ab);
-  vec3 cIn = mix(vec3(0.55, 0.8, 1.0), vec3(1.0, 0.7, 0.35), ab);
-  vec3 cDisk = vec3(0.75, 0.88, 1.0);
-  float dt = (t1 - t0)/32.0;
+  float spacing = 0.8 + 0.3*clamp(gFlame.w, 0.0, 2.5);
+  float hiDry = smoothstep(0.75, 1.0, sp)*(1.0 - ab);
+  // a camera inside the jet (chase view right behind in reheat) sees the flame ahead of it, not a glow all around
+  vec3 co = lo - o; float cax = dot(co, ax), crad = length(co - ax*cax);
+  float camIn = smoothstep(3.5, 1.5, crad)*smoothstep(-1.0, 0.5, cax)*smoothstep(L + 6.0, L, cax);
+  float dt = (t1 - t0)/40.0;
   vec3 acc = vec3(0.0);
-  for (int i = 0; i < 32; i++) {
+  for (int i = 0; i < 40; i++) {
     vec3 q = lo + ld*(t0 + (float(i) + jit)*dt) - o;
     float x = dot(q, ax);
     if (x < -0.05 || x > L) continue;
     float u = max(x, 0.0)/L;
     float nx = q.x, ny = dot(q, ay);
-    // 2D nozzle: a flat rectangular jet that rounds out and tapers downstream; shocks pinch the reheat plume
-    float ph = x/spacing;
-    float pinch = 1.0 - 0.18*ab*(0.5 + 0.5*cos(ph*6.2832))*(1.0 - u);
-    float wx = mix(0.40, 0.15, u)*pinch*(1.0 + 0.6*ab*u), wy = mix(0.27, 0.15, u)*pinch*(1.0 + 0.8*ab*u);
+    float cell = fract(x/spacing), ncell = x/spacing;
+    // 2D nozzle: a flat jet that rounds out and spreads downstream, pinched at every shock cell in reheat
+    float pinch = 1.0 - 0.14*ab*(0.5 + 0.5*cos(cell*6.2832))*(1.0 - u);
+    float wx = mix(0.37, 0.55, u)*(1.0 + 0.5*ab*u)*pinch, wy = mix(0.25, 0.55, u)*(1.0 + 0.5*ab*u)*pinch;
     float e2 = (nx*nx)/(wx*wx) + (ny*ny)/(wy*wy);
-    if (e2 > 9.0) continue;
-    float turb = vnoise(vec2(x*2.6 - uTime*48.0, nx*5.0 + ny*7.0)) * 0.6 + vnoise(vec2(x*6.0 - uTime*90.0, ny*11.0 - nx*6.0))*0.4;
-    float fall = smoothstep(0.0, 0.06, u + 0.02)*pow(1.0 - u, 1.4);
-    float env = exp(-e2*1.5)*smoothstep(0.25, 0.75, turb + 0.35*(1.0 - u));
-    float core = exp(-e2*4.0)*smoothstep(1.0, 0.2, u + 0.25*(1.0 - ab));
-    float disk = pow(0.5 + 0.5*cos((ph - 0.15)*6.2832), 8.0)*exp(-e2*3.0)*smoothstep(0.3, 0.8, ph)*(1.0 - smoothstep(0.3, 0.8, u));
-    vec3 e = cOut*env*(1.3 - 0.4*ab) + cIn*core*(7.0 - 1.0*ab) + cDisk*disk*(4.0*sp + 8.0*ab);
-    acc += e*fall*dt;
+    if (e2 > 4.0) continue;
+    float r = sqrt(e2);
+    float turb = vnoise(vec2(x*2.2 - uTime*55.0, nx*4.0 + ny*6.0))*0.65 + vnoise(vec2(x*5.5 - uTime*95.0, ny*9.0 - nx*7.0))*0.35;
+    float lip = smoothstep(-0.05, 0.08, x);
+    // shock diamonds: Mach disk mid-cell plus the converging / diverging cone edges, fading cell by cell
+    float dc = abs(cell - 0.5)*2.0;
+    float decay = exp(-ncell*0.38)*smoothstep(0.15, 0.6, ncell);
+    float bead = exp(-pow((cell - 0.5)/0.16, 2.0) - r*r*5.0);                      // the bright Mach disk region
+    float cones = exp(-pow((r - 0.55*(1.0 - dc) - 0.05)/0.06, 2.0))*smoothstep(0.9, 0.6, r)*0.35;
+    float diam = (bead + cones)*decay;
+    // reheat
+    float shell = exp(-pow((r - 0.8)/0.22, 2.0))*(1.0 - smoothstep(0.0, 0.3, u));
+    float flame = exp(-e2*1.3)*smoothstep(0.2, 0.75, turb + 0.45*(1.0 - u))*smoothstep(0.02, 0.18, u);
+    vec3 fCol = mix(vec3(1.0, 0.5, 0.14), vec3(0.85, 0.16, 0.04), smoothstep(0.4, 1.0, u));
+    vec3 e = ab*(vec3(0.75, 0.38, 0.95)*shell*0.9 + vec3(1.0, 0.8, 0.45)*diam*7.0 + fCol*flame*(4.0 - 2.4*u)
+                 + vec3(1.0, 0.62, 0.3)*exp(-e2*5.0)*(1.0 - smoothstep(0.0, 0.5, u))*1.2);
+    // dry: a faint heat-blue core, pale shock cells at full military power
+    e += (1.0 - ab)*(vec3(0.25, 0.45, 1.0)*exp(-e2*3.0)*(1.0 - u)*0.9*sp*sp + vec3(0.6, 0.75, 1.0)*diam*2.0*hiDry);
+    float tcam = t0 + (float(i) + jit)*dt;
+    acc += e*lip*pow(1.0 - u, 0.8)*mix(1.0, smoothstep(3.0, 14.0, tcam), camIn)*dt;
+    gPlumeT *= exp(-ab*(flame*0.9 + shell*0.3)*lip*dt);
   }
-  acc *= (0.25 + 0.75*sp)*(0.9 + 0.1*sin(uTime*63.0));
-  return acc/(1.0 + max(acc.r, max(acc.g, acc.b))*0.2);   // hue-preserving roll-off: looking down the plume stays amber
+  acc *= (0.9 + 0.1*sin(uTime*63.0))*0.35;
+  return acc/(1.0 + max(acc.r, max(acc.g, acc.b))*0.45);   // gentle hue-preserving roll-off keeps the orange orange
 }
 void shadeWraith(inout Mat m, int mid, vec3 lp, vec3 ln, float t);
 vec3 wraithPlumes(vec3 ro, vec3 rd, float tmax, float jit);
+vec3 vaporCone(vec3 col, vec3 ro, vec3 rd, float tmax, float jit);
 vec3 cloakSkin(vec3 world, vec3 n, vec3 rd, vec3 lp, float front);
 vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t);
 void shadeWraithCockpit(inout Mat m, int mid, vec3 lp, vec3 ln, vec3 E);
@@ -2483,7 +2596,23 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
         m.alb = mix(vec3(0.04), vec3(0.22), bl); m.metal = 0.9; m.rough = 0.3;
         if (length(fq) < gM[16].z*0.25) m.alb = vec3(0.05);
       }
-      if (mid >= 80 && mid < 100) shadeWraith(m, mid, lp, ln, t);
+      if (mid == 94) { m.alb = vec3(0.07, 0.07, 0.075); m.metal = 0.7; m.rough = 0.3; m.emit = vec3(0.0); }   // fixture housing
+      else if (mid >= 95 && mid <= 100) {   // lens: clear glossy dome over the lamp, tinted glass, glowing when lit
+        int li = mid - 95; float tint = uLensD[li].w;
+        m.alb = tint < 0.5 ? vec3(0.25, 0.02, 0.02) : tint < 1.5 ? vec3(0.02, 0.22, 0.06) : vec3(0.3);
+        m.metal = 0.0; m.rough = 0.04; m.nrm = vec3(0.0, 0.0, 1.0);
+        m.emit = uLensC[li].rgb;
+      }
+      else if (mid >= 101 && mid <= 104) {   // traffic fixtures: nav lights steady, strobes and beacon flashing
+        float k = float(gTrafK), lk = 3.0 + 40.0*uNight;
+        bool strobe = fract((uTime*0.77 + k*0.13)/1.3) < 0.05/1.3, bcn = fract(uTime + k*0.37) < 0.1;
+        m.metal = 0.0; m.rough = 0.04; m.nrm = vec3(0.0, 0.0, 1.0);
+        if (mid == 101) { m.alb = vec3(0.25, 0.02, 0.02); m.emit = vec3(1.0, 0.08, 0.04)*lk + (strobe ? vec3(20.0) : vec3(0.0)); }
+        else if (mid == 102) { m.alb = vec3(0.02, 0.22, 0.06); m.emit = vec3(0.1, 1.0, 0.25)*lk + (strobe ? vec3(20.0) : vec3(0.0)); }
+        else if (mid == 103) { m.alb = vec3(0.3); m.emit = vec3(1.0, 0.97, 0.9)*lk; }
+        else { m.alb = vec3(0.25, 0.02, 0.02); m.emit = bcn ? vec3(30.0, 1.5, 0.6) : vec3(0.0); }
+      }
+      else if (mid >= 80 && mid < 94) shadeWraith(m, mid, lp, ln, t);
       else if (mid >= 61 && mid < 80) shadeWraithCockpit(m, mid, lp, ln, E.xyz);   // XR-11 cockpit
       else if (mid >= 30 && mid < 60) {  // XR-9 research jet surfaces
         vec3 nT; vec4 tx;
@@ -2502,7 +2631,16 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
           m.alb = mix(m.alb, vec3(0.16, 0.11, 0.17), 0.4*heat);   // heat-tinted titanium
         } else if (mid == 34) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = gColStripe*(1.2 + 2.0*uNight)*pulse; }
         else if (mid == 35) { m.alb = vec3(0.06); m.metal = 0.8; m.rough = 0.35; m.emit = vec3(0.25, 0.6, 1.0)*gPS.y*gCtl.w*2.5; }
-        else if (mid == 36) { float ab = gFlame.y, sp = gFlame.x; m.alb = vec3(0.02); m.emit = mix(vec3(0.35, 0.6, 1.0), vec3(1.0, 0.82, 0.6), ab)*(0.3 + 9.0*sp*sp + 16.0*ab); }
+        else if (mid == 36) {   // turbine stage and tail cone: dark heat-blued metal glowing with the exhaust heat
+          float ab = gFlame.y, sp = gFlame.x;
+          m.alb = vec3(0.012, 0.011, 0.012); m.metal = 0.3; m.rough = 0.75;
+          m.emit = vec3(1.0, 0.32, 0.08)*(0.15*sp*sp) + mix(vec3(1.0, 0.45, 0.12), vec3(1.0, 0.8, 0.55), ab)*ab*3.5;
+        }
+        else if (mid == 37) {   // afterburner internals and liner: scorched metal, red-hot in reheat towards the turbine
+          float ab = gFlame.y, sp = gFlame.x, deep = smoothstep(0.6, -0.35, dot(lp - vec3(sign(lp.x)*0.82, -0.12, 7.75), vec3(0.0, -sin(gFlame.z), cos(gFlame.z))) - 0.5);
+          m.alb = vec3(0.014, 0.013, 0.012); m.metal = 0.2; m.rough = 0.85;   // soot-black
+          m.emit = vec3(1.0, 0.3, 0.07)*(0.05*sp*sp + 1.4*ab)*deep;
+        }
         else if (mid == 40) {  // sealed pod: carbon weave between structural ribs
           vec2 wv = floor(vec2(lp.x + lp.z, lp.y - lp.z)*55.0);
           tx = triSample(lp, ln, M_FABRIC, 4.0, nT); m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.3);
@@ -2690,8 +2828,9 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
     }
   }
   // research jet exhaust plumes (additive, depth-limited by the scene)
-  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 5) col += jetPlumes(ro, rd, t, jitter);
-  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 6) col += wraithPlumes(ro, rd, t, jitter);
+  if (uPlaneOn == 1 && uWreck == 0 && uVapor.x > 0.01) col = vaporCone(col, ro, rd, t, jitter);
+  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 5) { vec3 e = jetPlumes(ro, rd, t, jitter); col = col*gPlumeT + e; }
+  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 6) { vec3 e = wraithPlumes(ro, rd, t, jitter); col = col*gPlumeT + e; }
   if (!pod && uFxBeams + uFxBombs + uFxBlasts > 0) col = weaponsFx(col, ro, rd, t);
   // clouds
   vec4 cl = pod ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(ro, rd, t, jitter);
@@ -2797,13 +2936,28 @@ vec2 wrPod(vec3 p, int i, float lim){
       res = opU(res, vec2(sdBox(vq, vec3(0.01, zr*0.75, 0.07)), 84.0));
     }
   }
-  // tilt trunnion (fixed to the airframe, along x) and the lug ring on the pod
+  // rotating mounts: a bearing housing fixed to the pylon (front pods) or to both walls of the wing well (rear pods),
+  // a trunnion shaft, and a flanged hub on the pod whose bolt circle turns with the tilt
   vec3 tq = p - P;
-  float trun = sdCapsule(tq, vec3(-side*0.25, 0.0, 0.0), vec3(-side*0.85, 0.0, 0.0), 0.11);
-  res = opU(res, vec2(trun, 92.0));
-  res = opU(res, vec2(max(abs(length(q.yz) - 0.2) - 0.03, abs(q.x + side*0.5) - 0.06), 84.0));
-  // hydraulic tilt actuator: barrel on the pylon, chrome rod to a lug on the pod (its length follows the tilt)
-  vec3 anchor = P + vec3(-side*0.75, 0.42, -0.95);
+  int nEnd = i >= 2 ? 2 : 1;
+  for (int e = 0; e < 2; e++) {
+    if (e >= nEnd) break;
+    float ox = tq.x*(e == 0 ? -side : side);   // distance out from the pod's centre towards this mount
+    float rr2 = length(tq.yz);
+    float housing = max(rr2 - 0.19, abs(ox - 0.69) - 0.09);
+    housing = min(housing, max(rr2 - 0.235, abs(ox - 0.615) - 0.02));             // collar lip facing the pod
+    housing = max(housing, -max(rr2 - 0.1, abs(ox - 0.6) - 0.05));                // bore for the shaft
+    res = opU(res, vec2(housing, 80.0));
+    res = opU(res, vec2(max(rr2 - 0.09, abs(ox - 0.58) - 0.06), 92.0));          // trunnion shaft
+    vec3 fq = vec3(ox - 0.54, q.y, q.z);                                           // pod frame: turns with the tilt
+    float flange = max(length(fq.yz) - 0.3, abs(fq.x) - 0.018);
+    float bs = 6.28318/8.0, ba = atan(fq.z, fq.y); ba = mod(ba + bs*0.5, bs) - bs*0.5;
+    vec2 bp = length(fq.yz)*vec2(cos(ba), sin(ba)) - vec2(0.24, 0.0);
+    float bolts = max(length(bp) - 0.025, abs(fq.x - 0.022) - 0.014);
+    res = opU(res, vec2(min(flange, bolts), 84.0));
+  }
+  // hydraulic tilt actuator: barrel on the pylon (front) or the wing root (rear), chrome rod to a lug on the pod
+  vec3 anchor = P + (i < 2 ? vec3(-side*0.85, 0.05, -0.32) : vec3(-side*0.8, 0.0, -1.0));
   vec3 lugL = vec3(-side*0.42, 0.36, -0.75); lugL.yz = rot2(lugL.yz, tilt);
   vec3 lug = P + lugL;
   vec3 ad = lug - anchor; float al = length(ad);
@@ -2818,8 +2972,6 @@ vec2 mapWraith(vec3 p){
   float sgn = p.x > 0.0 ? 1.0 : -1.0;
   float body = wrBody(p);
   float W, yc, top, bot; wrSection(p.z, W, yc, top, bot);
-  // chine extensions (LERX) blend the fuselage into the wing
-  body = min(body, max(abs(p.y - yc + 0.02) - 0.05*(1.0 - smoothstep(0.0, 2.2, ap.x - W)), max(ap.x - W - 2.0 + (p.z + 4.0)*-0.5, max(-4.4 - p.z, p.z + 0.2))));
   vec2 res = vec2(body, 80.0);
   // caret intakes under the chines
   {
@@ -2883,22 +3035,29 @@ vec2 mapWraith(vec3 p){
     float defl = -uWr[5].x*0.45 - uWr[5].z*sgn*0.45;
     float wing = sdPanel(s, c, t, 5.2, 8.2, 1.35, 4.7, 0.035, 0.8, 1.9, 5.0);
     float elev = sdSurface(s, c, t, 5.2, 8.2, 1.35, 4.7, 0.035, 0.8, 1.9, 5.0, defl, 0.0);
+    // nacelle wells: the rear pods swing through slots in the wing (just wider than the pod, as long as its swing)
+    vec3 wq = vec3(ap.x - 2.75, p.y - 0.05, p.z - 3.45), fwq = vec3(ap.x - 2.35, p.y + 0.08, p.z + 3.3);
+    float well = min(max(abs(wq.x) - 0.6, length(wq.yz) - 1.45), max(abs(fwq.x) - 0.6, length(fwq.yz) - 1.45));
+    float rim = max(abs(well) - 0.03, wing - 0.025);   // titanium frame around each well
+    wing = max(wing, -well); elev = max(elev, -well);
     float w2 = min(wing, elev);
     float d = smin(res.x, w2, 0.12);
     res = vec2(d, w2 < res.x ? (wing < elev ? 80.0 : 81.0) : res.y);
+    res = opU(res, vec2(rim, 84.0));
   }
   // canted all-moving ruddervators (pitch and yaw mixed)
   {
     vec3 q = ap - vec3(1.05, top - 0.05, 4.4); q.xy = rot2(q.xy, 0.72);
     float dv = uWr[5].x*0.35 + uWr[5].y*sgn*0.35;
     q.xz = rot2(q.xz - vec2(0.0, 1.0), dv) + vec2(0.0, 1.0);
-    float fin = max(sdPanel(q.y, q.z, q.x, 2.3, 2.6, 1.1, 1.6, 0.04, 1.0, 0.0, 0.0), -q.y - 0.05);   // ends at its root
+    float fin = max(sdPanel(q.y + 0.75, q.z, q.x, 3.05, 2.6, 1.1, 1.6*3.05/2.3, 0.04, 1.0, 0.0, 0.0), -q.y - 0.75);   // root buried in the body
     res = opU(res, vec2(fin, 81.0));
   }
   // pylons for the pods: faceted struts from the airframe to each trunnion
   {
-    float fpy = sdBox(vec3(ap.x - 1.65, p.y - (-0.12), p.z + 3.3), vec3(0.42, 0.09, 0.42));
-    float rpy = sdBox(vec3(ap.x - 2.0, p.y - 0.0, p.z - 3.45), vec3(0.4, 0.1, 0.5));
+    float fpy = sdBox(vec3(ap.x - 1.42, p.y - (-0.1), p.z + 3.3), vec3(0.24, 0.08, 0.36));
+    fpy = max(fpy, (abs(p.y + 0.1) + abs(p.z + 3.3)*0.5) - 0.2);                         // faceted
+    float rpy = sdBox(vec3(ap.x - 1.75, p.y - 0.0, p.z - 3.45), vec3(0.4, 0.1, 0.45));
 )"
 R"(    res = opU(res, vec2(min(fpy, rpy), 80.0));
   }
@@ -2969,29 +3128,38 @@ void shadeWraith(inout Mat m, int mid, vec3 lp, vec3 ln, float t){
   else if (mid == 92) { m.alb = vec3(0.75, 0.76, 0.78); m.metal = 1.0; m.rough = 0.12; }
   else if (mid == 93) { m.alb = vec3(0.01); m.rough = 0.9; }
 }
-// four round plumes, one per pod (thrust fractions in uWr[2]): blue-violet plasma, white-hot and longer in boost
+// four round plasma jets, one per pod (thrust fractions in uWr[2]): a white-cyan core in a violet sheath that
+// swirls slowly, with bright standing shock rings; longer, hotter and tighter-ringed in boost
 vec3 plumeRound(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float sp, float ab, float jit){
-  float L = mix(1.5, 4.5, sp) + 7.0*ab;
-  vec3 c = o + ax*(L*0.5); float br = L*0.5 + 0.6;
+  float L = mix(3.0, 6.0, sp) + 8.0*ab;
+  vec3 c = o + ax*(L*0.5); float br = L*0.5 + 0.7;
   vec3 oc = lo - c; float b = dot(oc, ld), h = b*b - dot(oc, oc) + br*br;
   if (h <= 0.0) return vec3(0.0);
   h = sqrt(h); float t0 = max(-b - h, 0.0), t1 = min(-b + h, tmax);
   if (t1 <= t0) return vec3(0.0);
-  vec3 cOut = mix(vec3(0.3, 0.15, 1.0), vec3(1.0, 0.35, 0.8), ab), cIn = mix(vec3(0.6, 0.65, 1.0), vec3(1.0, 0.85, 1.0), ab);
-  float dt = (t1 - t0)/20.0; vec3 acc = vec3(0.0);
-  for (int i = 0; i < 20; i++) {
+  vec3 bx = normalize(cross(ax, abs(ax.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), by = cross(ax, bx);
+  float spacing = 0.75 - 0.2*ab;
+  float dt = (t1 - t0)/28.0; vec3 acc = vec3(0.0);
+  for (int i = 0; i < 28; i++) {
     vec3 q = lo + ld*(t0 + (float(i) + jit)*dt) - o;
     float x = dot(q, ax); if (x < -0.05 || x > L) continue;
     float u = max(x, 0.0)/L;
-    float rr = length(q - ax*x), w = mix(0.3, 0.12, u)*(1.0 + 0.7*ab*u);
-    float e2 = rr*rr/(w*w); if (e2 > 9.0) continue;
-    float ph = x/(0.7 + 0.25*ab);
-    float turb = vnoise(vec2(x*3.0 - uTime*50.0, rr*9.0))*0.6 + 0.4;
-    float fall = smoothstep(0.0, 0.06, u + 0.02)*pow(1.0 - u, 1.5);
-    float disk = pow(0.5 + 0.5*cos(ph*6.2832), 8.0)*exp(-e2*3.0)*(1.0 - u);
-    acc += (cOut*exp(-e2*1.5)*turb*1.4 + cIn*exp(-e2*4.0)*smoothstep(1.0, 0.25, u)*6.0 + vec3(0.8, 0.85, 1.0)*disk*(2.0*sp + 7.0*ab))*fall*dt;
+    vec3 rq = q - ax*x; float rr = length(rq);
+    float w = mix(0.33, 0.2, u)*(1.0 + 0.9*ab*u);
+    float r = rr/w; if (r > 2.2) continue;
+    float ang = atan(dot(rq, by), dot(rq, bx));
+    float helix = 0.5 + 0.5*sin(ang*3.0 - x*5.0 + uTime*24.0);
+    float flick = vnoise(vec2(x*3.0 - uTime*60.0, ang*2.0 + rr*6.0));
+    float cell = fract(x/spacing);
+    float ring = exp(-pow((cell - 0.5)/0.06, 2.0))*exp(-pow((r - 0.5)/0.2, 2.0))*exp(-x/spacing*0.35)*step(0.4, x/spacing);
+    float core = exp(-r*r*7.0)*pow(1.0 - u, 0.6);
+    float sheath = exp(-pow((r - 0.7)/0.3, 2.0))*(0.55 + 0.45*helix)*(0.6 + 0.4*flick);
+    vec3 shCol = mix(vec3(0.42, 0.22, 1.0), vec3(0.95, 0.3, 0.85), smoothstep(0.3, 1.0, u));
+    vec3 e = vec3(0.75, 0.92, 1.0)*core*(7.0 + 5.0*ab) + shCol*sheath*(2.6 + 1.6*ab) + vec3(0.8, 0.9, 1.0)*ring*(4.0 + 6.0*ab);
+    acc += e*smoothstep(-0.05, 0.08, x)*pow(1.0 - u, 1.2)*smoothstep(1.0, 4.0, t0 + (float(i) + jit)*dt)*dt;
+    gPlumeT *= exp(-(sheath*0.35 + core*0.5)*sp*dt);
   }
-  return acc*(0.3 + 0.7*sp);
+  return acc*(0.5 + 0.7*sp);
 }
 vec3 wraithPlumes(vec3 ro, vec3 rd, float tmax, float jit){
   if (gFlame.x < 0.02) return vec3(0.0);
@@ -3006,6 +3174,41 @@ vec3 wraithPlumes(vec3 ro, vec3 rd, float tmax, float jit){
     col += plumeRound(lo, ld, tmax, o, ax, clamp(th*1.3, 0.0, 1.0), gFlame.y, jit);
   }
   return col/(1.0 + max(col.r, max(col.g, col.b))*0.15);
+}
+// Transonic vapour cone (Prandtl-Glauert condensation): near Mach 1 in humid air the pressure drop behind the shock
+// condenses a shell of fog around the airframe. A sharp leading edge at the shock, a bell that flares and thins aft,
+// streaky and flickering, lit by the sun and the sky.
+vec3 vaporCone(vec3 col, vec3 ro, vec3 rd, float tmax, float jit){
+  mat3 inv = transpose(uPlaneRot);
+  vec3 lo = inv*(ro - uPlanePos), ld = inv*rd;
+  float z0 = uVapor.y, R0 = uVapor.z, Lc = uVapor.w;
+  vec3 c = vec3(0.0, 0.0, z0 + Lc*0.5); float br = length(vec2(R0*1.8, Lc*0.5 + 0.5));
+  vec3 oc = lo - c; float b = dot(oc, ld), h = b*b - dot(oc, oc) + br*br;
+  if (h <= 0.0) return col;
+  h = sqrt(h); float t0 = max(-b - h, 0.0), t1 = min(-b + h, tmax);
+  if (t1 <= t0) return col;
+  vec3 sunB = inv*uSunDir;
+  vec3 lit = uSunCol*(0.75 + 0.5*pow(max(dot(rd, uSunDir), 0.0), 6.0))*max(uSunDir.y + 0.1, 0.0)*1.3 + skyColor(vec3(0.0, 1.0, 0.0))*1.1 + vec3(0.02);
+  float dt = (t1 - t0)/24.0, T = 1.0; vec3 L = vec3(0.0);
+  for (int i = 0; i < 24; i++) {
+    vec3 q = lo + ld*(t0 + (float(i) + jit)*dt);
+    float z = q.z - z0;
+    if (z < -0.4 || z > Lc) continue;
+    float zn = max(z, 0.0)/Lc;
+    float rc = R0*(1.0 + 0.55*zn);
+    float r = length(q.xy);
+    float ang = atan(q.y, q.x);
+    float shell = exp(-pow((r - rc)/(0.16*rc), 2.0));
+    float front = smoothstep(-0.35, 0.05, z);                        // sharp edge at the shock
+    float aft = exp(-zn*2.6);
+    float streak = 0.35 + 0.65*vnoise(vec2(ang*9.0, zn*3.0 - uTime*6.0))*(0.7 + 0.3*vnoise(vec2(ang*31.0, uTime*20.0)));
+    float dens = uVapor.x*shell*front*aft*streak*streak*4.0;
+    float a = 1.0 - exp(-dens*dt);
+    float self = 0.75 + 0.25*clamp(dot(normalize(vec3(q.xy, 0.0) + 1e-4), sunB.xyz), -1.0, 1.0);   // sunny side brighter
+    L += T*a*lit*self; T *= 1.0 - a;
+    if (T < 0.02) break;
+  }
+  return col*T + L;
 }
 // cloaked skin: the world seen through the craft (already traced along the bent ray) with a faint glassy rim,
 // a shimmer of the hexagonal emitter lattice and a bright wavefront where the cloak is still spreading
@@ -3153,9 +3356,9 @@ void main(){
     float a = smoothstep(0.05, 0.0, abs(r - 0.88)) + 0.4*exp(-abs(r - 0.88)*12.0);
     a *= 1.0 - smoothstep(0.97, 1.0, r);
     o = vec4(vCol.rgb*a*vCol.a, 0.0);
-  } else if (kind == 7) { // spark: hot core with a small cross flare
-    float a = exp(-r2*14.0) + 0.5*exp(-abs(c.x)*22.0)*exp(-c.y*c.y*3.0) + 0.5*exp(-abs(c.y)*22.0)*exp(-c.x*c.x*3.0);
-    a = max(a - 0.02, 0.0)*(1.0 - smoothstep(0.7, 1.0, r2));
+  } else if (kind == 7) { // ember: a motion-blurred streak (x along the motion), brightest at its head
+    float a = exp(-c.y*c.y*5.0)*smoothstep(1.0, 0.75, abs(c.x))*mix(0.45, 1.0, smoothstep(-1.0, 0.8, c.x));
+    a = max(a - 0.02, 0.0);
     o = vec4(vCol.rgb*a*vCol.a, 0.0);
   } else if (kind == 3) { // rain streak
     float a = smoothstep(1.0, 0.0, abs(c.x)) * smoothstep(1.0, 0.6, abs(c.y));
@@ -3170,30 +3373,73 @@ void main(){
   float fog = exp(-vDist*uFogB*0.5);
   o.rgb *= fog; o.a *= mix(1.0, fog, 0.5);
   o.a *= soft; if (kind == 1 || kind == 2 || kind == 4 || kind == 6 || kind == 7) o.rgb *= soft;
+  if (kind == 1 || kind == 4 || kind == 7) o.rgb *= smoothstep(0.8, 4.0, vDist);   // glows right at the lens don't fill the view
   oColor = o;
 }
 )";
 
 // ------------------------------------------------------------------------------------------------
-static const char* kBrightFS = R"(#version 330 core
-in vec2 vUV; out vec4 oColor; uniform sampler2D uTex; uniform vec2 uTexel;
+// Bloom: a physically based mip chain. Each level is a 13-tap downsample of the one above (the first uses a Karis
+// average per 2x2 block so single bright pixels can't flicker into blobs); the levels are then combined back up with
+// a 3x3 tent filter. The composite mixes it in energy-conserving, with no threshold: every bright source glows by
+// the same physics, a lens-like soft halo that widens with brightness.
+static const char* kDownFS = R"(#version 330 core
+in vec2 vUV; out vec4 oColor; uniform sampler2D uTex; uniform vec2 uTexel; uniform int uFirst;
+vec3 s(vec2 o){ return texture(uTex, vUV + o*uTexel).rgb; }
+float karis(vec3 c){ return 1.0/(1.0 + dot(c, vec3(0.2126, 0.7152, 0.0722))); }
 void main(){
-  vec3 c = vec3(0.0);
-  for (int i=-1;i<=1;i++) for (int j=-1;j<=1;j++) c += texture(uTex, vUV + vec2(i,j)*uTexel).rgb;
-  c /= 9.0;
-  c = clamp(c, vec3(0.0), vec3(3e4));
-  float l = dot(c, vec3(0.2126,0.7152,0.0722));
-  if (!(l >= 0.0 && l < 1e6)) { oColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
-  oColor = vec4(c*smoothstep(1.2, 4.0, l)/max(l,1e-3)*min(l, 40.0)*0.25, 1.0);
+  vec3 a = s(vec2(-2.0, 2.0)), b = s(vec2(0.0, 2.0)), c = s(vec2(2.0, 2.0));
+  vec3 d = s(vec2(-2.0, 0.0)), e = s(vec2(0.0)), f = s(vec2(2.0, 0.0));
+  vec3 g = s(vec2(-2.0, -2.0)), h = s(vec2(0.0, -2.0)), i = s(vec2(2.0, -2.0));
+  vec3 j = s(vec2(-1.0, 1.0)), k = s(vec2(1.0, 1.0)), l = s(vec2(-1.0, -1.0)), m = s(vec2(1.0, -1.0));
+  vec3 r;
+  if (uFirst == 1) {
+    vec3 g0 = (j + k + l + m)*0.25, g1 = (a + b + d + e)*0.25, g2 = (b + c + e + f)*0.25, g3 = (d + e + g + h)*0.25, g4 = (e + f + h + i)*0.25;
+    float w0 = karis(g0)*0.5, w1 = karis(g1)*0.125, w2 = karis(g2)*0.125, w3 = karis(g3)*0.125, w4 = karis(g4)*0.125;
+    r = (g0*w0 + g1*w1 + g2*w2 + g3*w3 + g4*w4)/(w0 + w1 + w2 + w3 + w4);
+  } else r = e*0.125 + (a + c + g + i)*0.03125 + (b + d + f + h)*0.0625 + (j + k + l + m)*0.125;
+  float lum = dot(r, vec3(0.2126, 0.7152, 0.0722));
+  if (!(lum >= 0.0 && lum < 1e6)) r = vec3(0.0);
+  oColor = vec4(min(r, vec3(6e4)), 1.0);
 }
 )";
-static const char* kBlurFS = R"(#version 330 core
-in vec2 vUV; out vec4 oColor; uniform sampler2D uTex; uniform vec2 uDir;
+static const char* kUpFS = R"(#version 330 core
+in vec2 vUV; out vec4 oColor; uniform sampler2D uTex; uniform vec2 uTexel;
 void main(){
-  const float w[5] = float[](0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
-  vec3 c = texture(uTex, vUV).rgb*w[0];
-  for (int i=1;i<5;i++){ c += texture(uTex, vUV + uDir*float(i)*1.5).rgb*w[i]; c += texture(uTex, vUV - uDir*float(i)*1.5).rgb*w[i]; }
-  oColor = vec4(c, 1.0);
+  vec3 c = texture(uTex, vUV).rgb*4.0;
+  c += (texture(uTex, vUV + vec2(uTexel.x, 0.0)).rgb + texture(uTex, vUV - vec2(uTexel.x, 0.0)).rgb
+      + texture(uTex, vUV + vec2(0.0, uTexel.y)).rgb + texture(uTex, vUV - vec2(0.0, uTexel.y)).rgb)*2.0;
+  c += texture(uTex, vUV + uTexel).rgb + texture(uTex, vUV - uTexel).rgb
+     + texture(uTex, vUV + vec2(uTexel.x, -uTexel.y)).rgb + texture(uTex, vUV + vec2(-uTexel.x, uTexel.y)).rgb;
+  oColor = vec4(c/16.0, 1.0);
+}
+)";
+// Light shafts (crepuscular rays): bright, unobstructed sky and cloud around the sun is radially blurred towards
+// the sun's position on screen, so beams fan out through gaps in clouds, between hills and around the aircraft.
+static const char* kRayMaskFS = R"(#version 330 core
+in vec2 vUV; out vec4 oColor; uniform sampler2D uScene; uniform sampler2D uDepthTex; uniform vec2 uSun; uniform float uAsp;
+void main(){
+  vec3 c = texture(uScene, vUV).rgb;
+  float sky = step(9e5, texture(uDepthTex, vUV).r);
+  vec2 d = (vUV - uSun)*vec2(uAsp, 1.0);
+  float near = exp(-dot(d, d)*2.2);
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  if (!(l >= 0.0 && l < 1e6)) { oColor = vec4(0.0); return; }
+  oColor = vec4(c/(1.0 + l)*smoothstep(0.35, 1.4, l)*sky*near, 1.0);
+}
+)";
+static const char* kRayFS = R"(#version 330 core
+in vec2 vUV; out vec4 oColor; uniform sampler2D uTex; uniform vec2 uSun; uniform float uJitter;
+void main(){
+  const int N = 56;
+  vec2 dv = (uSun - vUV)/float(N)*0.92;
+  vec2 p = vUV + dv*uJitter;
+  vec3 acc = vec3(0.0); float decay = 1.0, wsum = 0.0;
+  for (int i = 0; i < N; i++) {
+    acc += texture(uTex, clamp(p, vec2(0.0), vec2(1.0))).rgb*decay;
+    wsum += decay; decay *= 0.965; p += dv;
+  }
+  oColor = vec4(acc/wsum*1.6, 1.0);
 }
 )";
 // Temporal anti-aliasing resolve: reprojects the previous frame (world points through the camera; aircraft pixels
@@ -3263,6 +3509,7 @@ in vec2 vUV; out vec4 oColor;
 uniform sampler2D uScene; uniform sampler2D uBloom; uniform float uExposure; uniform float uTime; uniform vec2 uRes;
 uniform float uRainLens; uniform vec2 uSunScreen; uniform float uSunVisible; uniform float uFade; uniform float uVignette; uniform float uGLoad;
 uniform sampler2D uDepthTex;   // scene depth: the sun glow and lens ghosts only appear when the sun itself is unobstructed
+uniform float uBloomK; uniform sampler2D uRays; uniform vec3 uRayK;   // bloom mix; light-shaft tint and strength
 vec3 aces(vec3 x){ const float a=2.51,b=0.03,c=2.43,d=0.59,e=0.14; return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0); }
 float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
 void main(){
@@ -3300,7 +3547,7 @@ void main(){
   vec3 wgt = -amp/6.5;   // CAS sharpness ~0.5
   vec3 sh = clamp((tM + (tN + tS + tE + tW)*wgt)/(1.0 + 4.0*wgt), 0.0, 0.99995);
   vec3 scene = sh/(1.0 - sh);
-  vec3 c = scene + texture(uBloom, uv).rgb*0.9;
+  vec3 c = mix(scene, texture(uBloom, uv).rgb/6.0, uBloomK) + texture(uRays, uv).rgb*uRayK;   // 6 bloom levels summed
   // subtle sun glare / lens flare ghosts
   if (uSunVisible > 0.0) {
     vec2 sd = uv - uSunScreen; sd.x *= uRes.x/uRes.y;

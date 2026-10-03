@@ -54,7 +54,8 @@ int main() {
   std::string h = "#version 330 core\n";
   int bad = scan("raytrace.frag", rt);
   bad += scan("fullscreen.vert", kFullscreenVS) + scan("sprite.vert", kSpriteVS) + scan("sprite.frag", kSpriteFS);
-  bad += scan("bright.frag", kBrightFS) + scan("blur.frag", kBlurFS) + scan("taa.frag", kTaaFS) + scan("post.frag", kPostFS);
+  bad += scan("down.frag", kDownFS) + scan("up.frag", kUpFS) + scan("raymask.frag", kRayMaskFS) + scan("ray.frag", kRayFS);
+  bad += scan("taa.frag", kTaaFS) + scan("post.frag", kPostFS);
   bad += scan("ui.vert", kUIVS) + scan("ui.frag", kUIFS);
   bad += scan("entity.vert", h + kEntVS) + scan("entity.frag", h + kEntFS1 + kEntFS2) + scan("entity_shadow.frag", h + kEntFS1 + kEntShadowFS);
   if (bad) { printf("FAIL: %d reserved word(s) used as identifiers\n", bad); return 1; }

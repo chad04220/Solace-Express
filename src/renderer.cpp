@@ -300,12 +300,14 @@ bool Renderer::init(int w, int h) {
   progRT = program(vsFS, rt, error);
   if (!progRT) { error = "Ray tracer shader: " + error; return false; }
   progSprite = program(kSpriteVS, kSpriteFS, error);
-  progBright = program(vsFS, kBrightFS, error);
-  progBlur = program(vsFS, kBlurFS, error);
+  progDown = program(vsFS, kDownFS, error);
+  progUp = program(vsFS, kUpFS, error);
+  progRayMask = program(vsFS, kRayMaskFS, error);
+  progRay = program(vsFS, kRayFS, error);
   progPost = program(vsFS, kPostFS, error);
   progTAA = program(vsFS, kTaaFS, error);
   progUI = program(kUIVS, kUIFS, error);
-  if (!progSprite || !progBright || !progBlur || !progPost || !progUI || !progTAA) { error = "Shader: " + error; return false; }
+  if (!progSprite || !progDown || !progUp || !progRayMask || !progRay || !progPost || !progUI || !progTAA) { error = "Shader: " + error; return false; }
 
   glGenVertexArrays(1, &vaoEmpty);
   glGenVertexArrays(1, &vaoSprite); glGenBuffers(1, &vboSprite);
@@ -443,11 +445,21 @@ void Renderer::createTargets() {
   glBindFramebuffer(GL_FRAMEBUFFER, fboSprite);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColor, 0);
   bw = std::max(16, W / 4); bh = std::max(16, H / 4);
-  for (int i = 0; i < 2; i++) {
-    makeTex(texBloom[i], bw, bh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
-    if (!fboBloom[i]) glGenFramebuffers(1, &fboBloom[i]);
-    glBindFramebuffer(GL_FRAMEBUFFER, fboBloom[i]);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texBloom[i], 0);
+  for (int i = 0; i < 2; i++) {   // light shafts at quarter resolution
+    makeTex(texRay[i], bw, bh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
+    if (!fboRay[i]) glGenFramebuffers(1, &fboRay[i]);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboRay[i]);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texRay[i], 0);
+    glClearColor(0, 0, 0, 0); glClear(GL_COLOR_BUFFER_BIT);
+  }
+  for (int i = 0; i < kBloomMips; i++) {   // bloom chain: 1/2 .. 1/64 resolution
+    mipW[i] = std::max(2, W >> (i + 1)); mipH[i] = std::max(2, H >> (i + 1));
+    makeTex(texMip[i], mipW[i], mipH[i], GL_R11F_G11F_B10F, GL_RGB, GL_FLOAT, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, texMip[i]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    if (!fboMip[i]) glGenFramebuffers(1, &fboMip[i]);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboMip[i]);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texMip[i], 0);
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -609,6 +621,9 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform3f(U(p, "uLandLightDir"), fp.landLightDir.x, fp.landLightDir.y, fp.landLightDir.z);
   glUniform1f(U(p, "uLandLight"), fp.landLight);
   glUniform4fv(U(p, "uFlame"), 1, pv.flame);
+  glUniform4fv(U(p, "uVapor"), 1, pv.vapor);
+  glUniform1i(U(p, "uLensN"), pv.lensN);
+  if (pv.lensN) { glUniform4fv(U(p, "uLensP"), pv.lensN, &pv.lensP[0][0]); glUniform4fv(U(p, "uLensC"), pv.lensN, &pv.lensC[0][0]); glUniform4fv(U(p, "uLensD"), pv.lensN, &pv.lensD[0][0]); }
   glUniform4fv(U(p, "uWr"), 7, &pv.wr[0][0]);
   {
     const FxVisual& fx = fp.fx;
@@ -631,6 +646,17 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glUniform4f(U(p, "uShFade"), shIdeal[0].x, shIdeal[0].z, shIdeal[1].x, shIdeal[1].z);
     glUniform4f(U(p, "uShFadeR"), shR[0] * kShFade0, shR[0] * kShFade1, shR[1] * kShFade0, shR[1] * kShFade1);
     glUniform1f(U(p, "uTreeFar"), entTreeFar);
+  }
+  {
+    float P[12][4], C[12][4], D[12][4];
+    for (int i = 0; i < fp.plN; i++) {
+      const auto& L = fp.pl[i];
+      P[i][0] = L.pos.x; P[i][1] = L.pos.y; P[i][2] = L.pos.z; P[i][3] = L.radius;
+      C[i][0] = L.col.x; C[i][1] = L.col.y; C[i][2] = L.col.z; C[i][3] = L.cosCut;
+      D[i][0] = L.dir.x; D[i][1] = L.dir.y; D[i][2] = L.dir.z; D[i][3] = L.shadow;
+    }
+    glUniform1i(U(p, "uPLN"), fp.plN);
+    if (fp.plN) { glUniform4fv(U(p, "uPLP"), fp.plN, &P[0][0]); glUniform4fv(U(p, "uPLC"), fp.plN, &C[0][0]); glUniform4fv(U(p, "uPLD"), fp.plN, &D[0][0]); }
   }
   glUniform3f(U(p, "uFlameLP"), fp.flameLightPos.x, fp.flameLightPos.y, fp.flameLightPos.z);
   glUniform3f(U(p, "uFlameLI"), fp.flameLight.x, fp.flameLight.y, fp.flameLight.z);
@@ -703,19 +729,45 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
 
   // ------------------------------------------------ bloom
   glBindVertexArray(vaoEmpty);
-  glViewport(0, 0, bw, bh);
-  glBindFramebuffer(GL_FRAMEBUFFER, fboBloom[0]);
-  glUseProgram(progBright);
-  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texColor);
-  glUniform1i(U(progBright, "uTex"), 0); glUniform2f(U(progBright, "uTexel"), 1.f / W * 1.5f, 1.f / H * 1.5f);
-  glDrawArrays(GL_TRIANGLES, 0, 3);
-  glUseProgram(progBlur);
-  glUniform1i(U(progBlur, "uTex"), 0);
-  for (int it = 0; it < 2; it++) {
-    glBindFramebuffer(GL_FRAMEBUFFER, fboBloom[1]); glBindTexture(GL_TEXTURE_2D, texBloom[0]);
-    glUniform2f(U(progBlur, "uDir"), 1.f / bw, 0); glDrawArrays(GL_TRIANGLES, 0, 3);
-    glBindFramebuffer(GL_FRAMEBUFFER, fboBloom[0]); glBindTexture(GL_TEXTURE_2D, texBloom[1]);
-    glUniform2f(U(progBlur, "uDir"), 0, 1.f / bh); glDrawArrays(GL_TRIANGLES, 0, 3);
+  glActiveTexture(GL_TEXTURE0);
+  glUseProgram(progDown);
+  glUniform1i(U(progDown, "uTex"), 0);
+  for (int i = 0; i < kBloomMips; i++) {
+    glBindFramebuffer(GL_FRAMEBUFFER, fboMip[i]); glViewport(0, 0, mipW[i], mipH[i]);
+    glBindTexture(GL_TEXTURE_2D, i == 0 ? texColor : texMip[i - 1]);
+    int sw = i == 0 ? W : mipW[i - 1], sh = i == 0 ? H : mipH[i - 1];
+    glUniform2f(U(progDown, "uTexel"), 1.f / sw, 1.f / sh); glUniform1i(U(progDown, "uFirst"), i == 0 ? 1 : 0);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+  }
+  glUseProgram(progUp);
+  glUniform1i(U(progUp, "uTex"), 0);
+  glEnable(GL_BLEND); glBlendFunc(GL_ONE, GL_ONE);
+  for (int i = kBloomMips - 1; i > 0; i--) {   // each level adds its blurred self to the next larger one
+    glBindFramebuffer(GL_FRAMEBUFFER, fboMip[i - 1]); glViewport(0, 0, mipW[i - 1], mipH[i - 1]);
+    glBindTexture(GL_TEXTURE_2D, texMip[i]);
+    glUniform2f(U(progUp, "uTexel"), 1.f / mipW[i], 1.f / mipH[i]);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+  }
+  glDisable(GL_BLEND);
+  // ------------------------------------------------ light shafts
+  float rsx = 0, rsy = 0; vec3 rsp = fp.camPos + fp.sunDir * 10000.f;
+  bool sunFront = dot(fp.sunDir, -fp.camBack) > 0.f && project(fp, rsp, rsx, rsy);
+  vec2 sunUV(rsx / W, 1.f - rsy / H);
+  float rayK = sunFront && !fp.sealedCockpit ? smoothstepf(-0.03f, 0.06f, fp.sunDir.y) * (1.f - 0.7f * smoothstepf(0.85f, 1.f, fp.cloudCover))
+             * (1.f - smoothstepf(0.6f, 1.6f, std::max(fabsf(sunUV.x - 0.5f), fabsf(sunUV.y - 0.5f)))) : 0.f;
+  if (rayK > 0.001f) {
+    glViewport(0, 0, bw, bh);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboRay[0]);
+    glUseProgram(progRayMask);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texColor); glUniform1i(U(progRayMask, "uScene"), 0);
+    glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progRayMask, "uDepthTex"), 1);
+    glUniform2f(U(progRayMask, "uSun"), sunUV.x, sunUV.y); glUniform1f(U(progRayMask, "uAsp"), (float)W / H);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboRay[1]);
+    glUseProgram(progRay);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texRay[0]); glUniform1i(U(progRay, "uTex"), 0);
+    glUniform2f(U(progRay, "uSun"), sunUV.x, sunUV.y); glUniform1f(U(progRay, "uJitter"), fmodf(fp.time * 61.8f, 1.f));
+    glDrawArrays(GL_TRIANGLES, 0, 3);
   }
 
   // ------------------------------------------------ composite to backbuffer
@@ -723,7 +775,11 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glViewport(0, 0, W, H);
   glUseProgram(progPost);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texColor); glUniform1i(U(progPost, "uScene"), 0);
-  glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, texBloom[0]); glUniform1i(U(progPost, "uBloom"), 1);
+  glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, texMip[0]); glUniform1i(U(progPost, "uBloom"), 1);
+  glActiveTexture(GL_TEXTURE0 + 3); glBindTexture(GL_TEXTURE_2D, texRay[1]); glUniform1i(U(progPost, "uRays"), 3);
+  glUniform1f(U(progPost, "uBloomK"), 0.05f);
+  vec3 rayTint = normalize(fp.sunCol + vec3(1e-3f)) * 0.55f * rayK;
+  glUniform3f(U(progPost, "uRayK"), rayTint.x, rayTint.y, rayTint.z);
   glUniform1f(U(progPost, "uExposure"), fp.exposure);
   glUniform1f(U(progPost, "uTime"), fp.time);
   glUniform2f(U(progPost, "uRes"), (float)W, (float)H);
