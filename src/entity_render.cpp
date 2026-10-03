@@ -96,7 +96,10 @@ void Renderer::drawEntities(const FrameParams& fp) {
   auto added = [&](int cx, int cz) {
     entGenCount++;
     for (int c = 0; c < 2; c++) {
-      float r = (c == 0 ? R.sh0 : R.sh1) * 1.6f + 300.f;
+      // only where its shadows can show: the shader fades each cascade out at kShFade1 of its radius, plus room for
+      // tall casters just outside. (A wider test re-rendered the far 4096^2 map nearly every frame in flight, since
+      // tree chunks keep streaming in a few km ahead.)
+      float r = (c == 0 ? R.sh0 : R.sh1) * kShFade1 + 300.f;
       float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
       float ex = std::max(std::max(x0 - shCenter[c].x, shCenter[c].x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - shCenter[c].z, shCenter[c].z - z0 - Scenery::CH), 0.f);
       if (ex < r && ez < r) shGen[c] = -1;
