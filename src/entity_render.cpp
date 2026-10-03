@@ -72,6 +72,7 @@ EntRanges rangesFor(int q) {
   return {7000, 1800, 3800, 18000, 18000, 360, 1800, 480, 2000, 1300, 5500, 520, 3600, 4096};
 }
 float rangeOf(const EntRanges& R, int k) {
+  if (k == EK_RWYLIGHT) return 1800.f;   // beyond this a glint sprite stands in
   if (k == EK_BUSH) return R.bush;
   if (entClass(k) == EC_TREE) return R.tree;
   if (k <= EK_SLAB) return R.rock;
@@ -233,7 +234,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
           // centre; a caster's shadow reaches h / tan(sun elevation) away), thinned like the trees themselves
           bool shKeep = !thin || fmodf(en.seed * 7.13f, 1.f) >= smoothstepf(far * 0.45f, far, d) * 0.92f;
           for (int c = 0; c < 2; c++)
-            if (inSh[c] && shKeep) {
+            if (inSh[c] && shKeep && k != EK_RWYLIGHT) {
               float sx = en.x - newCenter[c].x, sz = en.z - newCenter[c].z;
               float h = kEntInfo[k].h * en.sy, er = std::max(kEntInfo[k].hx * en.sx, kEntInfo[k].hz * en.sz) + h * shReach;
               float cr = cR[c] * kShFade1 + er; if (sx * sx + sz * sz > cr * cr) continue;
@@ -325,6 +326,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
     glUniform1i(glGetUniformLocation(progEnt, "uShadowPass"), 0);
     glUniform3f(glGetUniformLocation(progEnt, "uCam"), cam.x, cam.y, cam.z);
     glUniform1f(glGetUniformLocation(progEnt, "uNight"), fp.night);
+    glUniform1f(glGetUniformLocation(progEnt, "uRwyLights"), fp.rwyLights);
     glUniform1f(glGetUniformLocation(progEnt, "uWet"), fp.wet);
     glUniform1f(glGetUniformLocation(progEnt, "uSnow"), fp.snow);
     issue(progEnt, draws[0]);

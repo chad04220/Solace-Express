@@ -620,6 +620,19 @@ void buildBuilding(MB& mb, int kind, int lod) {
         mb.gable(-6.f, -3.4f, -4.f, 4.f, 4.f, 5.4f, true, 0.3f, P_ROOF, P_WALL); }
       break;
     }
+    case EK_RWYLIGHT: {   // elevated edge light: base plate, frangible stalk, glass globe over the lamp
+      if (lod == 2) break;
+      mb.cyl(vec3(0, -0.3f, 0), vec3(0, 0.04f, 0), 0.09f, 0.08f, 8, P_METAL, true, false);
+      mb.cyl(vec3(0, 0.04f, 0), vec3(0, 0.3f, 0), 0.022f, 0.02f, 6, P_METAL, false, false);
+      mb.cyl(vec3(0, 0.29f, 0), vec3(0, 0.33f, 0), 0.05f, 0.05f, 8, P_DARK, true, false);   // lamp holder
+      int seg = d0 ? 10 : 6;
+      for (int i = 0; i < 3; i++) {   // the globe, as three stacked frusta
+        float y0 = 0.33f + i * 0.03f, y1 = y0 + 0.03f;
+        float a0 = i / 3.f, a1 = (i + 1) / 3.f, r0 = 0.06f * sqrtf(std::max(0.f, 1.f - a0 * a0)), r1 = 0.06f * sqrtf(std::max(0.f, 1.f - a1 * a1));
+        mb.cyl(vec3(0, y0, 0), vec3(0, y1, 0), r0 + 0.002f, r1 + 0.002f, seg, P_RLAMP, i == 2, false);
+      }
+      break;
+    }
     case EK_GASSTATION: {
       mb.box(vec3(-8.f, -1.f, -7.f), vec3(8.f, 0.15f, 7.f), P_TRIM, 0x3F);                 // forecourt slab
       mb.box(vec3(-4.5f, 0.15f, -7.f), vec3(4.5f, 3.6f, -3.2f), P_WALL, 0x3B);           // kiosk

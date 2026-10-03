@@ -13,7 +13,7 @@ const EntKindInfo kEntInfo[EK_COUNT] = {
   {"Townhouses", 9.0f, 10.5f, 5.5f}, {"Shop", 7.0f, 5.5f, 7.0f}, {"Apartments", 9.0f, 22.f, 7.0f}, {"Office", 9.0f, 38.f, 9.0f},
   {"Tower", 10.f, 80.f, 10.f}, {"Skyscraper", 9.0f, 135.f, 9.0f}, {"Warehouse", 12.f, 8.5f, 9.0f}, {"Barn", 6.0f, 10.f, 9.0f},
   {"Silo", 3.0f, 19.f, 3.0f}, {"Church", 5.0f, 28.f, 13.f}, {"Water tower", 5.2f, 28.f, 5.2f}, {"Lighthouse", 3.4f, 27.f, 3.4f},
-  {"Gas station", 8.0f, 5.5f, 7.0f},
+  {"Gas station", 8.0f, 5.5f, 7.0f}, {"Runway light", 0.12f, 0.42f, 0.12f},
 };
 
 static inline float h2(int a, int b) { return hash2i(a, b); }
@@ -139,6 +139,29 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
   const int from = ch.level + 1;
 
   for (int L = from; L <= level; L++) {
+    // ---------------------------------------------------------------- airport lighting fixtures (L1): runway edge
+    // lights every 60 m (amber over the last 600 m of a paved runway), green / red threshold bars, approach lights
+    if (L == 1)
+      for (const Airport& a : g_world.airports) {
+        vec3 c = a.pos(), dir = a.dir(), rt(-dir.z, 0, dir.x);
+        float ext = a.length * 0.5f + 420.f;
+        if (c.x + ext < C.x0 || c.x - ext > C.x1 || c.z + ext < C.z0 || c.z - ext > C.z1) continue;
+        auto put = [&](vec3 p, int col) {
+          if (!C.inside(p.x, p.z)) return;
+          float y = std::max(g_world.height(p.x, p.z), a.elev - 0.5f);
+          C.out[EK_RWYLIGHT]->push_back({p.x, y, p.z, 0.f, 1.f, 1.f, 1.f, (float)col + 0.5f});
+        };
+        for (float u = -a.length * 0.5f; u <= a.length * 0.5f + 0.1f; u += 60.f)
+          for (int sd = -1; sd <= 1; sd += 2)
+            put(c + dir * u + rt * (sd * (a.width * 0.5f + 1.5f)), fabsf(u) > a.length * 0.5f - 600.f && a.size > 0 ? 1 : 0);
+        for (int end = -1; end <= 1; end += 2) {
+          for (float v = -a.width * 0.5f; v <= a.width * 0.5f + 0.01f; v += 3.f)
+            put(c + dir * (end * (a.length * 0.5f + 1.f)) + rt * v, end < 0 ? 2 : 3);
+          if (a.size > 0)
+            for (int k = 1; k <= 6; k++)
+              for (float v = -8.f; v <= 8.f; v += 4.f) put(c + dir * (end * (a.length * 0.5f + 60.f * k)) + rt * v, 0);
+        }
+      }
     // ---------------------------------------------------------------- town lots (buildings L1, garden trees L2)
     int i0 = (int)floorf(C.x0 / LOT) - 1, i1 = (int)floorf(C.x1 / LOT) + 1, j0 = (int)floorf(C.z0 / LOT) - 1, j1 = (int)floorf(C.z1 / LOT) + 1;
     for (int j = j0; j <= j1; j++)
@@ -379,6 +402,7 @@ int Scenery::collide(vec3 p, float r, Ent* entOut) {
       Chunk* ch = ensure(cx, cz, 2);
       if (!ch || ch->ents.empty() || p.y - r > ch->ymax || p.y + r < ch->ymin) continue;
       for (int k = 0; k < EK_COUNT; k++) {
+        if (k == EK_RWYLIGHT) continue;   // frangible airport fixtures
         const EntKindInfo& I = kEntInfo[k];
         int cls = entClass(k);
         for (uint32_t i = ch->off[k]; i < ch->off[k + 1]; i++) {

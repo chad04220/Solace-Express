@@ -34,7 +34,7 @@ void main(){
 static const char* kEntFS1 = R"(
 in vec3 vW; in vec3 vL; in vec3 vLN; in vec4 vAux; flat in vec4 vInst; flat in vec3 vScale;
 uniform sampler2DArray uAlb; uniform sampler2DArray uNrm;
-uniform int uKind; uniform vec3 uCam; uniform float uNight; uniform float uWet; uniform float uSnow; uniform float uTime;
+uniform int uKind; uniform vec3 uCam; uniform float uRwyLights; uniform float uNight; uniform float uWet; uniform float uSnow; uniform float uTime;
 const int M_GRASS=0, M_FOREST=1, M_ROCK=2, M_SAND=3, M_SNOW=4, M_ASPHALT=5, M_GRAVEL=6, M_DIRT=7;
 const int M_CONCRETE=8, M_TILES=9, M_SLATE=10, M_PLASTER=11, M_BRICK=12, M_LEAVES=13, M_NEEDLES=14, M_PAINT=15;
 const int M_METAL=16, M_CORRUGATED=22, M_BARK=25, M_PLANKS=26, M_LITTER=27, M_SHINGLES=28, M_SIDING=29;
@@ -42,7 +42,7 @@ const int K_FIR=0, K_SPRUCE=1, K_PINE=2, K_OAK=3, K_BIRCH=4, K_PALM=5, K_BUSH=6,
 const int K_HOUSE=13, K_HIP=14, K_LHOUSE=15, K_FARM=16, K_TOWNHOUSE=17, K_SHOP=18, K_APART=19, K_OFFICE=20, K_TOWER=21, K_SKY=22;
 const int K_WAREHOUSE=23, K_BARN=24, K_SILO=25, K_CHURCH=26, K_WATERTOWER=27, K_LIGHTHOUSE=28, K_GAS=29;
 const int P_BARK=0, P_LEAF=1, P_FROND=2, P_NEEDLE=3, P_ROCK=4, P_WALL=5, P_ROOF=6, P_TRIM=7, P_GLASS=8, P_METAL=9, P_DOOR=10, P_BRICK=11;
-const int P_AWNING=12, P_WOOD=13, P_DARK=14, P_LAMP=15, P_SIGN=16, P_CANOPY=17, P_LEAFCARD=18;
+const int P_AWNING=12, P_WOOD=13, P_DARK=14, P_LAMP=15, P_SIGN=16, P_CANOPY=17, P_LEAFCARD=18, P_RLAMP=19;
 float hsh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
 float hsh3(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7)))*43758.5453); }
 float vn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f*f*(3.0 - 2.0*f);
@@ -282,6 +282,12 @@ R"(    } else if (part == P_ROOF) {
     else if (part == P_AWNING) { alb = mix(pal(s2, vec3(0.7, 0.1, 0.1), vec3(0.1, 0.35, 0.2), vec3(0.15, 0.25, 0.55), vec3(0.8, 0.55, 0.1)), vec3(0.92), step(0.5, fract(lp.x/0.9))); rough = 0.85; }
     else if (part == P_DARK) { alb = triS(lp, n0, M_GRAVEL, 2.0, 0.5, nb, rough)*0.45; }
     else if (part == P_LAMP) { alb = vec3(0.1); rough = 0.05; cls = 3.0; emit = vec3(1.0, 0.9, 0.6)*(0.4 + 9.0*uNight)*(0.6 + 0.4*step(0.0, sin(atan(lp.z, lp.x) - uTime*1.2))); }
+    else if (part == P_RLAMP) {   // runway light globe: tinted glass, the lamp glowing through it when the lights are on
+      int ci = int(seed);
+      vec3 lc = ci == 1 ? vec3(1.0, 0.7, 0.25) : ci == 2 ? vec3(0.15, 1.0, 0.35) : ci == 3 ? vec3(1.0, 0.12, 0.08) : vec3(1.0, 0.93, 0.78);
+      alb = mix(vec3(0.6), lc, 0.5)*0.4; rough = 0.05; metal = 0.0; cls = 3.0;
+      emit = lc*uRwyLights*(1.0 + 7.0*smoothstep(0.0, 0.03, lp.y - 0.33));
+    }
     else if (part == P_SIGN) { alb = pal(s1, vec3(0.8, 0.1, 0.08), vec3(0.1, 0.3, 0.7), vec3(0.95, 0.75, 0.1), vec3(0.1, 0.55, 0.3)); rough = 0.4; emit = alb*uNight*2.5; }
     else if (part == P_CANOPY) { alb = vec3(0.92); if (n0.y < -0.5) emit = vec3(1.0, 0.98, 0.95)*uNight*3.0; if (abs(n0.y) < 0.5 && lp.y < 4.95) alb = pal(s1, vec3(0.8, 0.1, 0.08), vec3(0.1, 0.3, 0.7), vec3(0.95, 0.75, 0.1), vec3(0.1, 0.55, 0.3)); rough = 0.4; }
     if (uSnow > 0.05 && part != P_GLASS && part != P_ROOF) alb = mix(alb, vec3(0.9), smoothstep(0.6, 0.9, n0.y)*uSnow*0.8);

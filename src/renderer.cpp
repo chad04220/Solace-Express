@@ -656,6 +656,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
       D[i][0] = L.dir.x; D[i][1] = L.dir.y; D[i][2] = L.dir.z; D[i][3] = L.shadow;
     }
     glUniform1i(U(p, "uPLN"), fp.plN);
+    glUniform1f(U(p, "uRwyLights"), fp.rwyLights);
     if (fp.plN) { glUniform4fv(U(p, "uPLP"), fp.plN, &P[0][0]); glUniform4fv(U(p, "uPLC"), fp.plN, &C[0][0]); glUniform4fv(U(p, "uPLD"), fp.plN, &D[0][0]); }
   }
   glUniform3f(U(p, "uFlameLP"), fp.flameLightPos.x, fp.flameLightPos.y, fp.flameLightPos.z);

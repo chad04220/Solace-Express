@@ -14,6 +14,8 @@ enum EntKind {
   // buildings
   EK_HOUSE, EK_HOUSE_HIP, EK_HOUSE_L, EK_FARMHOUSE, EK_TOWNHOUSE, EK_SHOP, EK_APARTMENT, EK_OFFICE, EK_TOWER, EK_SKYSCRAPER,
   EK_WAREHOUSE, EK_BARN, EK_SILO, EK_CHURCH, EK_WATERTOWER, EK_LIGHTHOUSE, EK_GASSTATION,
+  // airport fixtures (seed = lamp colour: 0 white, 1 amber, 2 green, 3 red)
+  EK_RWYLIGHT,
   EK_COUNT
 };
 enum EntClass { EC_TREE = 0, EC_ROCK, EC_BUILDING };

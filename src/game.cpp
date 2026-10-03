@@ -755,7 +755,6 @@ void Game::launchResearch() {
 
 void Game::jetEffects(float dt) {
   const float thr = plane.ctl.throttle;
-  const float sp = plane.engineRunning ? plane.engineSpool : 0.f;
   float ab = plane.engineRunning ? smoothstepf(0.85f, 1.f, plane.engineSpool) : 0.f;
   bool wr = plane.spec->special == 2;
   vec3 exP[4], exD[4]; float exS[4];
@@ -1284,6 +1283,11 @@ FrameParams Game::buildFrame() {
     fp.landLightDir = normalize(plane.forward() - plane.up() * 0.1f);
     wraithVisual(fp);
     buildLights(fp);
+    {   // airport lighting: on at night and in low visibility
+      float lowVis = smoothstepf(8000.f, 2000.f, wx.visibility) + (wx.cloudCover > 0.8f ? 0.3f : 0.f);
+      float li = clampf(fp.night + lowVis * 0.6f + 0.12f, 0, 1);
+      fp.rwyLights = li > 0.15f ? li : 0.f;
+    }
     // craters flatten the scenery that stood in them (a plasma blast clears a far wider circle than its pit)
     // (laser scorch pits don't: what a bolt destroys is tracked one object at a time)
     g_scenery.craters.clear();
@@ -1357,25 +1361,27 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     float d = length(a.pos() - fp.camPos);
     if (d > 16000.f) continue;
     vec3 dir = a.dir(), rt(-dir.z, 0, dir.x);
-    float sz = std::max(0.5f, d * 0.0022f);
     if (lightI > 0.15f) {
       for (float u = -a.length * 0.5f; u <= a.length * 0.5f + 0.1f; u += 60.f)
         for (int sd = -1; sd <= 1; sd += 2) {
           vec3 p = a.pos() + dir * u + rt * (sd * (a.width * 0.5f + 1.5f)) + vec3(0, 0.4f, 0);
           vec3 col = fabsf(u) > a.length * 0.5f - 600.f && a.size > 0 ? vec3(1.f, 0.85f, 0.45f) : vec3(1.f, 0.92f, 0.75f);
-          bill(add, p, sz, col * (2.0f * lightI), 1.f, SPR_GLOW, 2.f);
+          float dl = length(p - fp.camPos);   // glints at range; close up the modelled fixture and its pool are the light
+          bill(add, p, std::max(0.04f, dl * 0.0011f), col * (2.0f * lightI) * (0.12f + 0.88f * smoothstepf(150.f, 1600.f, dl)), 1.f, SPR_GLOW, 2.f);
         }
       for (int end = -1; end <= 1; end += 2) {
         for (float v = -a.width * 0.5f; v <= a.width * 0.5f; v += 3.f) {
           vec3 p = a.pos() + dir * (end * (a.length * 0.5f + 1.f)) + rt * v + vec3(0, 0.4f, 0);
-          bill(add, p, sz, (end < 0 ? vec3(0.2f, 1.f, 0.3f) : vec3(1.f, 0.15f, 0.1f)) * 2.0f * lightI, 1.f, SPR_GLOW, 2.f);
+          float dl = length(p - fp.camPos);
+          bill(add, p, std::max(0.04f, dl * 0.0011f), (end < 0 ? vec3(0.2f, 1.f, 0.3f) : vec3(1.f, 0.15f, 0.1f)) * 2.0f * lightI * (0.12f + 0.88f * smoothstepf(150.f, 1600.f, dl)), 1.f, SPR_GLOW, 2.f);
         }
         if (a.size > 0 && night > 0.3f)
           for (int k = 1; k <= 6; k++)
             for (float v = -8.f; v <= 8.f; v += 4.f) {
               vec3 p = a.pos() + dir * (end * (a.length * 0.5f + 60.f * k)) + rt * v;
               p.y = std::max(g_world.height(p.x, p.z), a.elev) + 1.f;
-              bill(add, p, sz * 1.2f, vec3(1.f, 0.95f, 0.85f) * 2.5f * night, 1.f, SPR_GLOW, 3.f);
+              float dl = length(p - fp.camPos);
+              bill(add, p, std::max(0.05f, dl * 0.0013f), vec3(1.f, 0.95f, 0.85f) * 2.5f * night * (0.12f + 0.88f * smoothstepf(150.f, 1600.f, dl)), 1.f, SPR_GLOW, 3.f);
             }
       }
     }

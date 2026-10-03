@@ -56,7 +56,8 @@ struct FrameParams {
   vec3 landLightPos, landLightDir; float landLight = 0;
   vec3 flameLightPos, flameLight;  // a blast's light (radiance; zero when off), folded into the point lights
   struct PointLight { vec3 pos; float radius; vec3 col; float cosCut; vec3 dir; float shadow; };
-  PointLight pl[12]; int plN = 0;   // point / spot lights: radiance, spot cutoff (-2 omni), shadow stop distance (0 none)
+  PointLight pl[12]; int plN = 0;
+  float rwyLights = 0;   // airport lighting on (night / low visibility): 0..1   // point / spot lights: radiance, spot cutoff (-2 omni), shadow stop distance (0 none)
   float exposure = 1.0f, rainLens = 0, fade = 1, vignette = 0.6f, gLoad = 0;
   bool sealedCockpit = false;
   int trafficN = 0; TrafficVisual traffic[kMaxTrafficDrawn];

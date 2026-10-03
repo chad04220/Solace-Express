@@ -154,6 +154,7 @@ uniform vec4 uProp[2]; uniform int uPropCount;
 uniform vec3 uLandLightPos; uniform vec3 uLandLightDir; uniform float uLandLight;
 // point / spot lights (everything but the sun and moon): position + source radius | radiance + spot cutoff cosine
 // (-2 = omni) | spot axis + shadow flag (> 0: ray-traced aircraft shadow, stopping that far short of the light)
+uniform float uRwyLights;   // airport lighting on (night / low visibility)
 uniform int uPLN; uniform vec4 uPLP[12]; uniform vec4 uPLC[12]; uniform vec4 uPLD[12];
 // the player aircraft's light fixtures (body space): lens centre | lens emission | outward axis + glass tint (0 red,
 // 1 green, 2 clear)
@@ -1494,6 +1495,19 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bo
     if (u > hl - 100.0 && u < hl - 55.0) paint = max(paint, rwyDigits(vec2(-v, -(u - (hl - 78.0))), n1));
     m.alb = mix(m.alb, vec3(0.86), paint*0.92);
     m.rough = mix(m.rough, 0.55, paint);
+  }
+  // pools of light from the edge and threshold lights (lamps 0.35 m up on their stalks: E = I h / d^3)
+  if (uRwyLights > 0.01) {
+    float hl = 0.35;
+    float ku = clamp(floor((u + len*0.5)/60.0 + 0.5), 0.0, floor(len/60.0));
+    float du = u - (-len*0.5 + ku*60.0), dv = abs(v) - (wid*0.5 + 1.5);
+    float d2 = du*du + dv*dv + hl*hl;
+    vec3 lc = abs(-len*0.5 + ku*60.0) > len*0.5 - 600.0 && size > 0 ? vec3(1.0, 0.7, 0.25) : vec3(1.0, 0.93, 0.78);
+    vec3 E = lc*hl/(d2*sqrt(d2));
+    float tu = abs(u) - (len*0.5 + 1.0), tv = v - clamp(floor(v/3.0 + 0.5)*3.0, -wid*0.5, wid*0.5);
+    float t2 = tu*tu + tv*tv + hl*hl;
+    E += (u < 0.0 ? vec3(0.15, 1.0, 0.35) : vec3(1.0, 0.12, 0.08))*hl/(t2*sqrt(t2))*step(abs(v), wid*0.5 + 1.0);
+    m.emit += m.alb*E*uRwyLights*6.0;
   }
 }
 
