@@ -183,39 +183,39 @@ void Game::drawToasts() {
 // First thing on screen: the game's icon large in a rotating targeting ring, the title revealed letter by letter
 // over a moving perspective grid, and a segmented progress bar while the world is generated and the shaders are
 // compiled (or loaded from the cache). fade: 1 = fully shown, falls to 0 as it hands over to the main menu.
-void Game::drawIntro(float progress, const std::string& stage, float t, unsigned icon, float fade) {
-  float W = (float)g_ren.W, H = (float)g_ren.H, s = std::max(0.5f, H / 720.f);
+void Game::drawIntro(float progress, const std::string& stage, float t, unsigned icon, float fade, Renderer& R) {
+  float W = (float)R.W, H = (float)R.H, s = std::max(0.5f, H / 720.f);
   float e = clampf(t / 0.8f, 0, 1) * fade;   // fade in
-  g_ren.rectGrad(0, 0, W, H, vec3(0.012f, 0.03f, 0.055f), vec3(0.0f, 0.006f, 0.014f), 1.f);
+  R.rectGrad(0, 0, W, H, vec3(0.012f, 0.03f, 0.055f), vec3(0.0f, 0.006f, 0.014f), 1.f);
   // perspective grid floor scrolling toward the viewer
   float hz = H * 0.62f;
   for (int i = 0; i < 18; i++) {
     float z = fmodf(i + t * 0.9f, 18.f) / 18.f;
     float y = hz + (H - hz) * z * z;
-    g_ren.rect(0, y, W, 1.f * s, C_ACCENT, 0.12f * z * e);
+    R.rect(0, y, W, 1.f * s, C_ACCENT, 0.12f * z * e);
   }
-  for (int i = -14; i <= 14; i++) g_ren.line(W * 0.5f + i * 18 * s, hz, W * 0.5f + i * 150 * s, H, 1.f * s, C_ACCENT, 0.07f * e);
-  g_ren.rectGrad(0, hz - 60 * s, W, 70 * s, vec3(0.012f, 0.03f, 0.055f), vec3(0.03f, 0.1f, 0.16f), 0.6f * e);
+  for (int i = -14; i <= 14; i++) R.line(W * 0.5f + i * 18 * s, hz, W * 0.5f + i * 150 * s, H, 1.f * s, C_ACCENT, 0.07f * e);
+  R.rectGrad(0, hz - 60 * s, W, 70 * s, vec3(0.012f, 0.03f, 0.055f), vec3(0.03f, 0.1f, 0.16f), 0.6f * e);
   // drifting motes
   for (int i = 0; i < 60; i++) {
     float px = fmodf(hash2i(i, 3) * W + t * (8 + 20 * hash2i(i, 5)) * s, W), py = hash2i(i, 7) * H * 0.9f;
     float tw = 0.4f + 0.6f * sinf(t * (1.5f + hash2i(i, 9) * 2.f) + i);
-    g_ren.rect(px, py, 2 * s, 2 * s, C_ACCENT, 0.25f * tw * e, 1 * s);
+    R.rect(px, py, 2 * s, 2 * s, C_ACCENT, 0.25f * tw * e, 1 * s);
   }
   // icon in a halo with counter-rotating segmented rings
   float ic = 200 * s, cx = W * 0.5f, cy = H * 0.3f;
   float pulse = 0.5f + 0.5f * sinf(t * 2.2f);
   float pop = 1.f - powf(1.f - clampf((t - 0.1f) / 0.7f, 0, 1), 3.f);
   float isz = ic * (0.85f + 0.15f * pop);
-  g_ren.glow(cx - isz * 0.5f, cy - isz * 0.5f, isz, isz, vec3(1.f, 0.62f, 0.25f), (0.22f + 0.1f * pulse) * e, isz * 0.2f, 60 * s);
-  g_ren.glow(cx - isz * 0.5f, cy - isz * 0.5f, isz, isz, C_ACCENT, (0.18f + 0.08f * pulse) * e, isz * 0.2f, 26 * s);
+  R.glow(cx - isz * 0.5f, cy - isz * 0.5f, isz, isz, vec3(1.f, 0.62f, 0.25f), (0.22f + 0.1f * pulse) * e, isz * 0.2f, 60 * s);
+  R.glow(cx - isz * 0.5f, cy - isz * 0.5f, isz, isz, C_ACCENT, (0.18f + 0.08f * pulse) * e, isz * 0.2f, 26 * s);
   auto ring = [&](float r, int segs, float gap, float rot, float th, vec3 c, float a) {
     for (int k = 0; k < segs; k++) {
       float a0 = rot + k * 2 * PI / segs, a1 = a0 + (2 * PI / segs) * (1 - gap);
       int n = 10;
       for (int j = 0; j < n; j++) {
         float b0 = a0 + (a1 - a0) * j / n, b1 = a0 + (a1 - a0) * (j + 1) / n;
-        g_ren.line(cx + cosf(b0) * r, cy + sinf(b0) * r, cx + cosf(b1) * r, cy + sinf(b1) * r, th, c, a);
+        R.line(cx + cosf(b0) * r, cy + sinf(b0) * r, cx + cosf(b1) * r, cy + sinf(b1) * r, th, c, a);
       }
     }
   };
@@ -225,64 +225,64 @@ void Game::drawIntro(float progress, const std::string& stage, float t, unsigned
   ring(rr + 26 * s, 2, 0.7f, -t * 0.9f + 1.f, 1.f * s, vec3(1.f, 0.66f, 0.3f), 0.7f * e * pop);
   for (int k = 0; k < 4; k++) {   // ticks at the cardinal points
     float a = k * PI * 0.5f + PI * 0.25f;
-    g_ren.line(cx + cosf(a) * (rr + 34 * s), cy + sinf(a) * (rr + 34 * s), cx + cosf(a) * (rr + 46 * s), cy + sinf(a) * (rr + 46 * s), 2 * s, C_ACCENT, 0.7f * e * pop);
+    R.line(cx + cosf(a) * (rr + 34 * s), cy + sinf(a) * (rr + 34 * s), cx + cosf(a) * (rr + 46 * s), cy + sinf(a) * (rr + 46 * s), 2 * s, C_ACCENT, 0.7f * e * pop);
   }
-  if (icon) g_ren.image((GLuint)icon, cx - isz * 0.5f, cy - isz * 0.5f, isz, isz, 0, 0, 1, 1, e);
-  else g_ren.rect(cx - isz * 0.5f, cy - isz * 0.5f, isz, isz, vec3(0.05f, 0.1f, 0.18f), e, isz * 0.18f);
+  if (icon) R.image((GLuint)icon, cx - isz * 0.5f, cy - isz * 0.5f, isz, isz, 0, 0, 1, 1, e);
+  else R.rect(cx - isz * 0.5f, cy - isz * 0.5f, isz, isz, vec3(0.05f, 0.1f, 0.18f), e, isz * 0.18f);
   // a light sweep crossing the icon every few seconds
   float sw = fmodf(t * 0.45f, 1.6f);
   if (sw < 1.f) {
     float sx = cx - isz * 0.5f + isz * sw;
     float hh = isz * 0.8f * sinf(sw * PI);
-    g_ren.rect(sx - 3 * s, cy - hh * 0.5f, 6 * s, hh, vec3(1, 1, 1), 0.18f * e, 3 * s);
-    g_ren.glow(sx - 3 * s, cy - hh * 0.5f, 6 * s, hh, vec3(1, 1, 1), 0.12f * e, 3 * s, 14 * s);
+    R.rect(sx - 3 * s, cy - hh * 0.5f, 6 * s, hh, vec3(1, 1, 1), 0.18f * e, 3 * s);
+    R.glow(sx - 3 * s, cy - hh * 0.5f, 6 * s, hh, vec3(1, 1, 1), 0.12f * e, 3 * s, 14 * s);
   }
   // title: letters arrive one by one with a short glow
   const std::string title = "AIR XPRESS";
-  float ts = 64 * s, tw = g_ren.textWidth(title, ts) + (title.size() - 1) * 10 * s, tx = cx - tw * 0.5f, ty = cy + rr + 42 * s;
+  float ts = 64 * s, tw = R.textWidth(title, ts) + (title.size() - 1) * 10 * s, tx = cx - tw * 0.5f, ty = cy + rr + 42 * s;
   for (size_t i = 0; i < title.size(); i++) {
     float li = clampf((t - 0.5f - i * 0.07f) / 0.35f, 0, 1);
     std::string ch(1, title[i]);
-    float cw = g_ren.textWidth(ch, ts);
-    if (li > 0 && li < 1) g_ren.glow(tx, ty + 10 * s, cw, ts * 0.7f, C_ACCENT, 0.5f * (1 - li) * e, 4 * s, 18 * s);
-    g_ren.text(tx, ty - (1 - li) * 14 * s, ts, ch, mixc(C_ACCENT, C_TEXT, li), li * e, 0, true);
+    float cw = R.textWidth(ch, ts);
+    if (li > 0 && li < 1) R.glow(tx, ty + 10 * s, cw, ts * 0.7f, C_ACCENT, 0.5f * (1 - li) * e, 4 * s, 18 * s);
+    R.text(tx, ty - (1 - li) * 14 * s, ts, ch, mixc(C_ACCENT, C_TEXT, li), li * e, 0, true);
     tx += cw + 10 * s;
   }
   float ul = clampf((t - 1.2f) / 0.6f, 0, 1);
-  g_ren.rect(cx - tw * 0.5f * ul, ty + ts * 1.02f, tw * ul, 2 * s, C_ACCENT, 0.9f * e);
-  g_ren.glow(cx - tw * 0.5f * ul, ty + ts * 1.02f, tw * ul, 2 * s, C_ACCENT, 0.4f * e, 1 * s, 10 * s);
-  g_ren.text(cx, ty + ts * 1.02f + 14 * s, 15 * s, "P I L O T   C A R E E R   A C R O S S   T H E   S O L A C E   I S L A N D S", C_ACCENT, 0.85f * ul * e, 1, false);
+  R.rect(cx - tw * 0.5f * ul, ty + ts * 1.02f, tw * ul, 2 * s, C_ACCENT, 0.9f * e);
+  R.glow(cx - tw * 0.5f * ul, ty + ts * 1.02f, tw * ul, 2 * s, C_ACCENT, 0.4f * e, 1 * s, 10 * s);
+  R.text(cx, ty + ts * 1.02f + 14 * s, 15 * s, "P I L O T   C A R E E R   A C R O S S   T H E   S O L A C E   I S L A N D S", C_ACCENT, 0.85f * ul * e, 1, false);
   // progress bar: segmented track, glowing fill head, percentage and the current stage
   float bw = std::min(680 * s, W - 80 * s), bh = 10 * s, bx = cx - bw * 0.5f, by = H - 104 * s;
   float p = clampf(progress, 0, 1);
-  g_ren.text(bx, by - 30 * s, 14 * s, stage, C_TEXT, 0.9f * e, 0, false);
-  g_ren.text(bx + bw, by - 30 * s, 14 * s, fmt("%3.0f%%", p * 100), C_ACCENT, e, 2, false);
-  g_ren.rect(bx - 3 * s, by - 3 * s, bw + 6 * s, bh + 6 * s, C_ACCENT, 0.08f * e, 3 * s);
-  g_ren.rectOutline(bx - 3 * s, by - 3 * s, bw + 6 * s, bh + 6 * s, C_ACCENT, 0.35f * e, 3 * s, 1 * s);
+  R.text(bx, by - 30 * s, 14 * s, stage, C_TEXT, 0.9f * e, 0, false);
+  R.text(bx + bw, by - 30 * s, 14 * s, fmt("%3.0f%%", p * 100), C_ACCENT, e, 2, false);
+  R.rect(bx - 3 * s, by - 3 * s, bw + 6 * s, bh + 6 * s, C_ACCENT, 0.08f * e, 3 * s);
+  R.rectOutline(bx - 3 * s, by - 3 * s, bw + 6 * s, bh + 6 * s, C_ACCENT, 0.35f * e, 3 * s, 1 * s);
   int segs = 48; float gw = bw / segs;
   for (int k = 0; k < segs; k++) {
     float f = clampf(p * segs - k, 0, 1);
-    if (f <= 0) { g_ren.rect(bx + k * gw + 1 * s, by, gw - 2 * s, bh, C_ACCENT, 0.06f * e, 1 * s); continue; }
+    if (f <= 0) { R.rect(bx + k * gw + 1 * s, by, gw - 2 * s, bh, C_ACCENT, 0.06f * e, 1 * s); continue; }
     vec3 c = mixc(C_ACCENT * 0.7f, C_ACCENT, (float)k / segs);
-    g_ren.rect(bx + k * gw + 1 * s, by, (gw - 2 * s) * f, bh, c, e, 1 * s);
+    R.rect(bx + k * gw + 1 * s, by, (gw - 2 * s) * f, bh, c, e, 1 * s);
   }
   float hx = bx + bw * p;
   if (p > 0.001f && p < 0.999f) {
-    g_ren.glow(hx - 4 * s, by - 2 * s, 8 * s, bh + 4 * s, C_ACCENT, (0.5f + 0.3f * pulse) * e, 4 * s, 16 * s);
-    g_ren.rect(hx - 1.5f * s, by - 4 * s, 3 * s, bh + 8 * s, vec3(1, 1, 1), 0.9f * e, 1.5f * s);
+    R.glow(hx - 4 * s, by - 2 * s, 8 * s, bh + 4 * s, C_ACCENT, (0.5f + 0.3f * pulse) * e, 4 * s, 16 * s);
+    R.rect(hx - 1.5f * s, by - 4 * s, 3 * s, bh + 8 * s, vec3(1, 1, 1), 0.9f * e, 1.5f * s);
   }
   // a scanning shimmer travelling the filled part
   float shx = bx + fmodf(t * 260 * s, std::max(bw * p, 1.f));
-  if (p > 0.05f) g_ren.rect(shx, by, 18 * s, bh, vec3(1, 1, 1), 0.18f * e, 2 * s);
-  g_ren.text(cx, by + 24 * s, 12 * s, shaderFirstRun ? "First launch: the shaders are compiled for your GPU and cached, later launches start much faster" : "Shaders loaded from the cache",
+  if (p > 0.05f) R.rect(shx, by, 18 * s, bh, vec3(1, 1, 1), 0.18f * e, 2 * s);
+  R.text(cx, by + 24 * s, 12 * s, shaderFirstRun ? "First launch: the shaders are compiled for your GPU and cached, later launches start much faster" : "Shaders loaded from the cache",
              C_DIM, 0.75f * e, 1, false);
   // copyright
   {   // the font has no copyright sign: a ringed C ahead of the line
     const std::string cr = "2026 CDAIII.  ALL RIGHTS RESERVED.";
-    float cs = 12 * s, lw = g_ren.textWidth(cr, cs), d = 14 * s, x0 = cx - (lw + d + 6 * s) * 0.5f, y0 = H - 34 * s;
-    g_ren.rectOutline(x0, y0 - 1 * s, d, d, C_DIM, 0.7f * e, d * 0.5f, 1.2f * s);
-    g_ren.text(x0 + d * 0.5f, y0 + 1.5f * s, 9 * s, "C", C_DIM, 0.8f * e, 1, false);
-    g_ren.text(x0 + d + 6 * s, y0, cs, cr, C_DIM, 0.7f * e, 0, false);
+    float cs = 12 * s, lw = R.textWidth(cr, cs), d = 14 * s, x0 = cx - (lw + d + 6 * s) * 0.5f, y0 = H - 34 * s;
+    R.rectOutline(x0, y0 - 1 * s, d, d, C_DIM, 0.7f * e, d * 0.5f, 1.2f * s);
+    R.text(x0 + d * 0.5f, y0 + 1.5f * s, 9 * s, "C", C_DIM, 0.8f * e, 1, false);
+    R.text(x0 + d + 6 * s, y0, cs, cr, C_DIM, 0.7f * e, 0, false);
   }
 }
 

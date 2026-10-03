@@ -11,6 +11,8 @@
 #include <objbase.h>
 #include <thread>
 #include <atomic>
+#include <memory>
+#include <mutex>
 #include "game.h"
 
 // Ask hybrid-graphics laptops for the dedicated GPU: the integrated one may reject or take minutes over the ray tracer
@@ -267,6 +269,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
 
   // the intro shows the application icon large: its 256 px frame from the exe's resources
   GLuint iconTex = 0;
+  std::vector<uint8_t> iconPx;
   if (HICON hi = (HICON)LoadImageW(hInst, MAKEINTRESOURCEW(1), IMAGE_ICON, 256, 256, LR_DEFAULTCOLOR)) {
     ICONINFO ii = {};
     if (GetIconInfo(hi, &ii)) {
@@ -277,6 +280,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       if (ii.hbmColor && GetDIBits(sdc, ii.hbmColor, 0, 256, px.data(), &bi, DIB_RGB_COLORS) == 256) {
         for (size_t i = 0; i < px.size(); i += 4) std::swap(px[i], px[i + 2]);   // BGRA -> RGBA
         iconTex = g_ren.makeTexture(px.data(), 256, 256);
+        iconPx = px;
       }
       ReleaseDC(nullptr, sdc);
       if (ii.hbmColor) DeleteObject(ii.hbmColor);
@@ -313,20 +317,88 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     if (FILE* f = fopen((g_shaderCacheDir + "\\compile_time.txt").c_str(), "r")) { float v; if (fscanf(f, "%f", &v) == 1 && v > 1 && v < 3600) estRT = v; fclose(f); }
   LARGE_INTEGER freq, prev, now;
   QueryPerformanceFrequency(&freq); QueryPerformanceCounter(&prev);
-  LARGE_INTEGER t0 = prev; float shown = 0, compileSecs = 0;
+  LARGE_INTEGER t0 = prev; float compileSecs = 0;
+  // The intro animates on its own thread with its own GL context. That context shares nothing with the others, so
+  // nothing the loading work does in the driver (shader links on the worker context, texture uploads and the
+  // renderer's set-up on the main one) can stall it. The main thread only posts the progress target and stage.
+  struct Intro {
+    std::mutex m; std::string stage;
+    std::atomic<float> target{0.f};
+    std::atomic<int> state{0};          // 0 starting, 1 running, 2 fade out and stop, 3 stop now, 4 finished, -1 unavailable
+    std::thread th;
+  } intro;
+  intro.th = std::thread([&] {
+    HDC dcI = GetDC(g_hwnd);
+    int attrs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB, 3, WGL_CONTEXT_MINOR_VERSION_ARB, 3, WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB, 0};
+    HGLRC ctxI = createAttribs ? createAttribs(dcI, nullptr, attrs) : nullptr;
+    if (!ctxI || !wglMakeCurrent(dcI, ctxI)) { if (ctxI) wglDeleteContext(ctxI); intro.state = -1; return; }
+    if (s_swapInterval) s_swapInterval(s_vsyncDiv ? s_vsyncDiv : 0);
+    std::unique_ptr<Renderer> R(new Renderer());
+    RECT rc; GetClientRect(g_hwnd, &rc);
+    if (!R->initUI(std::max(64L, rc.right), std::max(64L, rc.bottom))) { wglMakeCurrent(nullptr, nullptr); wglDeleteContext(ctxI); intro.state = -1; return; }
+    GLuint ic = iconPx.empty() ? 0 : R->makeTexture(iconPx.data(), 256, 256);
+    int expected = 0; intro.state.compare_exchange_strong(expected, 1);
+    float shown = 0, fade = 1.f;
+    for (;;) {
+      int st = intro.state;
+      if (st == 3) break;
+      if (st == 2) { fade -= 1.f / 20.f; if (fade <= 0.f) break; }
+      LARGE_INTEGER n; QueryPerformanceCounter(&n);
+      float t = (float)(n.QuadPart - t0.QuadPart) / freq.QuadPart;
+      float target = intro.target;
+      shown = std::max(shown, shown + (target - shown) * 0.12f);
+      std::string stage; { std::lock_guard<std::mutex> lk(intro.m); stage = intro.stage; }
+      GetClientRect(g_hwnd, &rc);
+      if (rc.right > 0 && rc.bottom > 0) { R->W = rc.right; R->H = rc.bottom; }
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glViewport(0, 0, R->W, R->H); glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
+      R->uiBegin(); game.drawIntro(shown, stage, t, ic, fade, *R); R->uiEnd();
+      SwapBuffers(dcI);
+      if (!s_vsyncDiv) Sleep(14);
+    }
+    glFinish();
+    R.reset();
+    wglMakeCurrent(nullptr, nullptr);
+    wglDeleteContext(ctxI);   // takes the intro's textures and buffers with it
+    ReleaseDC(g_hwnd, dcI);
+    intro.state = 4;
+  });
+  while (intro.state == 0) Sleep(1);
+  const bool introThreaded = intro.state == 1;
+  if (!introThreaded) intro.th.join();
+  // falls back to drawing the intro on this thread if the intro context could not be made
+  float shownMain = 0;
   auto introFrame = [&](float target, const std::string& stage, float fade) {
     MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { if (m.message == WM_QUIT) game.quit = true; TranslateMessage(&m); DispatchMessageW(&m); }
     QueryPerformanceCounter(&now);
     float t = (float)(now.QuadPart - t0.QuadPart) / freq.QuadPart;
-    shown = std::max(shown, shown + (target - shown) * 0.12f);
+    if (introThreaded) {
+      intro.target = target;
+      { std::lock_guard<std::mutex> lk(intro.m); intro.stage = stage; }
+      Sleep(10);
+      return t;
+    }
+    shownMain = std::max(shownMain, shownMain + (target - shownMain) * 0.12f);
     RECT rc; GetClientRect(g_hwnd, &rc);
     if (rc.right > 0 && rc.bottom > 0) { g_ren.W = rc.right; g_ren.H = rc.bottom; }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, g_ren.W, g_ren.H); glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
-    g_ren.uiBegin(); game.drawIntro(shown, stage, t, iconTex, fade); g_ren.uiEnd();
+    g_ren.uiBegin(); game.drawIntro(shownMain, stage, t, iconTex, fade); g_ren.uiEnd();
     SwapBuffers(g_hdc);
     if (!s_vsyncDiv) Sleep(14);
     return t;
+  };
+  // ends the intro: `fade` plays its fade-out first; afterwards this thread owns the window's drawing again
+  auto stopIntro = [&](bool fade) {
+    if (!introThreaded) { if (fade) for (int i = 0; i < 20; i++) introFrame(1.f, "READY", 1.f - i / 20.f); return; }
+    if (intro.state != 1) return;
+    if (fade) { intro.target = 1.f; { std::lock_guard<std::mutex> lk(intro.m); intro.stage = "READY"; } }
+    intro.state = fade ? 2 : 3;
+    while (intro.state != 4) {   // keep the window responsive while it finishes
+      MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { if (m.message == WM_QUIT) game.quit = true; TranslateMessage(&m); DispatchMessageW(&m); }
+      Sleep(5);
+    }
+    intro.th.join();
   };
   for (;;) {
     QueryPerformanceCounter(&now);
@@ -349,8 +421,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (ctx2) wglDeleteContext(ctx2);
   if (dc2) ReleaseDC(hw2, dc2);
   if (hw2) DestroyWindow(hw2);
-  if (game.quit) return 0;
-  if (ctx2 && compileState != 1) { fatal(g_ren.error); return 1; }
+  if (game.quit) { stopIntro(false); return 0; }
+  if (ctx2 && compileState != 1) { stopIntro(false); fatal(g_ren.error); return 1; }
   if (!ctx2) introFrame(0.12f, cached ? "LOADING SHADERS FROM CACHE" : "COMPILING SHADERS (this can take a minute)", 1.f);
   if (g_shaderCacheMisses > 0 && ctx2 && !g_shaderCacheDir.empty())
     if (FILE* f = fopen((g_shaderCacheDir + "\\compile_time.txt").c_str(), "w")) { fprintf(f, "%.1f\n", compileSecs); fclose(f); }
@@ -359,9 +431,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   introFrame(0.97f, "PREPARING TEXTURES", 1.f);
   g_ren.renderScale = 1.0f; g_ren.quality = game.set.quality;
   GetClientRect(g_hwnd, &cr);
-  if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) { fatal(g_ren.error); return 1; }
+  if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) { stopIntro(false); fatal(g_ren.error); return 1; }
+  {
+    std::string cl = GetCommandLineA();
+    bool tool = cl.find("--bench ") != std::string::npos || cl.find("--shots ") != std::string::npos;
+    stopIntro(!tool);   // the bench and shot tools draw straight away; a normal start fades the intro out
+  }
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
-    fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits, g_shaderCacheMisses);
+    fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits.load(), g_shaderCacheMisses.load());
     fclose(f);
   }
   // Benchmark: AirXpress.exe --bench scene1,scene2,... [--size WxH] times each scene (wall clock with the GPU flushed,
@@ -458,7 +535,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       return 0;
     }
   }
-  for (int i = 0; i < 20; i++) introFrame(1.f, "READY", 1.f - i / 20.f);   // fade out to the main menu
   startAudio();
 
   QueryPerformanceCounter(&prev);

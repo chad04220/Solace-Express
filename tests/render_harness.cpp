@@ -150,7 +150,7 @@ void main(){
   g_ren.renderScale = getenv("RSCALE") ? (float)atof(getenv("RSCALE")) : 1.0f; g_ren.quality = 1;
   if (!g_ren.init(W, H)) { printf("init failed: %s\n", g_ren.error.c_str()); return 1; }
   g_ren.entSync = !getenv("ENTSTREAM");   // captures generate every scenery chunk in range up front
-  printf("renderer ok (shader cache: %d loaded, %d compiled)\n", g_shaderCacheHits, g_shaderCacheMisses);
+  printf("renderer ok (shader cache: %d loaded, %d compiled)\n", g_shaderCacheHits.load(), g_shaderCacheMisses.load());
   std::string scene = argc > 1 ? argv[1] : "default";
   if (scene.rfind("multi:", 0) == 0) {   // several scenes from one shader compile: multi:a,b,c
     std::string list = scene.substr(6) + ",";

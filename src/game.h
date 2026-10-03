@@ -70,7 +70,8 @@ public:
   std::string saveDir;
 
   void loadSettings();
-  void drawIntro(float progress, const std::string& stage, float t, unsigned icon, float fade);   // startup screen
+  // startup screen, drawn with the given renderer (the intro thread has its own, in its own GL context)
+  void drawIntro(float progress, const std::string& stage, float t, unsigned icon, float fade, Renderer& R = g_ren);
   bool shaderFirstRun = false;
   unsigned iconTex = 0;   // the application icon (intro screen, main menu)
   void init(bool buildWorld = true);   // buildWorld false: g_world.build() already ran (on the intro's worker thread)

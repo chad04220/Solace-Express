@@ -10,7 +10,8 @@
 
 Renderer g_ren;
 
-static std::unordered_map<std::string, GLint> s_uniCache;
+// per thread: the intro thread draws with its own GL context, whose program names can repeat the main one's
+static thread_local std::unordered_map<std::string, GLint> s_uniCache;
 static GLint U(GLuint prog, const char* name) {
   std::string k = std::to_string(prog) + ":" + name;
   auto it = s_uniCache.find(k);
@@ -35,7 +36,7 @@ static GLuint compile(GLenum type, const std::string& src, std::string& err) {
 // and a new game version, driver or GPU simply misses the cache and rebuilds it. A binary the driver rejects (or a
 // driver without the extension) falls back to compiling.
 std::string g_shaderCacheDir;
-int g_shaderCacheHits = 0, g_shaderCacheMisses = 0;
+std::atomic<int> g_shaderCacheHits{0}, g_shaderCacheMisses{0};
 static uint64_t fnv1a(const std::string& s, uint64_t h = 1469598103934665603ull) {
   for (unsigned char c : s) { h ^= c; h *= 1099511628211ull; }
   return h;
