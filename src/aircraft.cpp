@@ -1,4 +1,4 @@
-// Air Xpress - aircraft roster and 6-DOF flight model
+// Solace Express - aircraft roster and 6-DOF flight model
 #include "aircraft.h"
 #include "entities.h"
 #include "scenery.h"

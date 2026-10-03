@@ -1,4 +1,4 @@
-// Air Xpress - towns, roads, farmland, forests, rocks and buildings (CPU side; mirrored in shaders.h)
+// Solace Express - towns, roads, farmland, forests, rocks and buildings (CPU side; mirrored in shaders.h)
 #include "scenery.h"
 
 // ---------------------------------------------------------------- hand-placed settlements (metres)

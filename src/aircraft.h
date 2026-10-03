@@ -1,4 +1,4 @@
-// Air Xpress - aircraft specs and flight dynamics
+// Solace Express - aircraft specs and flight dynamics
 #pragma once
 #include "common.h"
 #include "world.h"

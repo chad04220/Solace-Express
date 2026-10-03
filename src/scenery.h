@@ -1,4 +1,4 @@
-// Air Xpress - scenery masks: towns, roads, farmland and forest patches, evaluated identically on the CPU
+// Solace Express - scenery masks: towns, roads, farmland and forest patches, evaluated identically on the CPU
 // (entity placement) and in the GPU ray tracer (ground materials). Trees, rocks and buildings: entities.h
 #pragma once
 #include "world.h"

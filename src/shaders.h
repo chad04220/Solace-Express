@@ -1,4 +1,4 @@
-// Air Xpress - GLSL shaders (GPU ray tracer, overlay sprites, post-processing, UI)
+// Solace Express - GLSL shaders (GPU ray tracer, overlay sprites, post-processing, UI)
 #pragma once
 
 static const char* kFullscreenVS = R"(#version 330 core
@@ -1227,8 +1227,9 @@ int airportAt(vec2 p, out vec2 uv){
 float seg7(vec2 q, int d){
   if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0) return 0.0;
   d = clamp(d, 0, 9);
-  int bits[10] = int[10](0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F);
-  int b = bits[d];
+  // a select chain, not a local array: NVIDIA gives every inlined copy of an indexed array its own scratch resource
+  int b = d < 5 ? (d == 0 ? 0x3F : d == 1 ? 0x06 : d == 2 ? 0x5B : d == 3 ? 0x4F : 0x66)
+                : (d == 5 ? 0x6D : d == 6 ? 0x7D : d == 7 ? 0x07 : d == 8 ? 0x7F : 0x6F);
   float w = 0.16; float on = 0.0;
   // a top, b top-right, c bottom-right, d bottom, e bottom-left, f top-left, g middle
   if ((b & 1) != 0 && q.y > 1.0 - w) on = 1.0;
@@ -1805,21 +1806,24 @@ float fontSoft(float s){ return clamp(0.06*gAA/s, 0.015, 0.3); }
 float chAdv(int c){ return (c == 32 || c == 46 || c == 58 || c == 73 || c == 39) ? 13.0 : (c == 77 || c == 87) ? 37.0 : (c == 45 || c == 47) ? 17.0 : (c == 76 || c == 70 || c == 69 || c == 84) ? 25.0 : 29.0; }
 // up to 8 characters (codes in a, b; 0 ends), cap height h, vertically centred on p.y = 0;
 // align 0: starts at p.x = 0, 1: centred, 2: ends at p.x = 0
+// character i of the eight in a, b (selects, not an indexed array: txt is inlined at hundreds of sites and NVIDIA
+// runs out of scratch resources when each copy carries its own array)
+int chAt(ivec4 a, ivec4 b, int i){ ivec4 v = i < 4 ? a : b; int j = i - (i < 4 ? 0 : 4); return j == 0 ? v.x : j == 1 ? v.y : j == 2 ? v.z : v.w; }
 float txt(vec2 p, float h, ivec4 a, ivec4 b, int align){
   float s = h/27.0;
   vec2 f = p/s + vec2(0.0, 13.5);
   if (f.y < -10.0 || f.y > 42.0) return 0.0;
-  int cs[8] = int[8](a.x, a.y, a.z, a.w, b.x, b.y, b.z, b.w);
   float tw = 0.0;
-  for (int i = 0; i < 8; i++) { if (cs[i] == 0) break; tw += chAdv(cs[i]); }
+  for (int i = 0; i < 8; i++) { int c = chAt(a, b, i); if (c == 0) break; tw += chAdv(c); }
   float x = align == 1 ? -tw*0.5 : align == 2 ? -tw : 0.0;
   if (f.x < x - 6.0 || f.x > x + tw + 6.0) return 0.0;
   float k = gTxtSoft; gTxtSoft = fontSoft(s);
   float on = 0.0;
   for (int i = 0; i < 8; i++) {
-    if (cs[i] == 0) break;
-    float w = chAdv(cs[i]);
-    if (f.x >= x - 4.0 && f.x < x + w + 4.0) on = max(on, glyphCov(f - vec2(x, 0.0), cs[i]));
+    int c = chAt(a, b, i);
+    if (c == 0) break;
+    float w = chAdv(c);
+    if (f.x >= x - 4.0 && f.x < x + w + 4.0) on = max(on, glyphCov(f - vec2(x, 0.0), c));
     x += w;
   }
   gTxtSoft = k;

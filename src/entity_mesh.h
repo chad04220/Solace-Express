@@ -1,4 +1,4 @@
-// Air Xpress - procedural meshes for the environment entities (three levels of detail per kind)
+// Solace Express - procedural meshes for the environment entities (three levels of detail per kind)
 #pragma once
 #include "entities.h"
 

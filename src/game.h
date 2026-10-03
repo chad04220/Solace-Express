@@ -1,4 +1,4 @@
-// Air Xpress - game state, flight session, cameras, effects, UI
+// Solace Express - game state, flight session, cameras, effects, UI
 #pragma once
 #include "common.h"
 #include <unordered_map>

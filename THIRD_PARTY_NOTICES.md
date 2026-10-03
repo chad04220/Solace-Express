@@ -16,7 +16,7 @@ THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
 
 ## Internet radio
 
-Stations listed in `radio_stations.txt` are third-party services streamed live at the player's request. Air Xpress does not host, cache or redistribute any audio. Check each station's terms before featuring them in marketing material.
+Stations listed in `radio_stations.txt` are third-party services streamed live at the player's request. Solace Express does not host, cache or redistribute any audio. Check each station's terms before featuring them in marketing material.
 
 ## Everything else
 

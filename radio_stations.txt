@@ -1,7 +1,7 @@
-# Air Xpress internet radio stations
+# Solace Express internet radio stations
 # stations-version 2
 # One per line:  Name|URL   (MP3 or AAC HTTP/HTTPS streams). Add your own below.
-# The game keeps its copy in %APPDATA%\AirXpress\radio_stations.txt - edit that one; new presets are merged in on updates.
+# The game keeps its copy in %APPDATA%\SolaceExpress\radio_stations.txt - edit that one; new presets are merged in on updates.
 SomaFM Groove Salad (ambient)|https://ice1.somafm.com/groovesalad-128-mp3
 SomaFM Drone Zone|https://ice1.somafm.com/dronezone-128-mp3
 SomaFM Secret Agent|https://ice1.somafm.com/secretagent-128-mp3

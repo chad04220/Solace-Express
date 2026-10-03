@@ -1,4 +1,4 @@
-// Air Xpress - game flow, flight session, cameras, particles, lights, audio feed
+// Solace Express - game flow, flight session, cameras, particles, lights, audio feed
 #include "game.h"
 #include "entities.h"
 #include "models.h"
@@ -169,7 +169,7 @@ static const std::pair<const char*, const char*> kDefaultStations[] = {
 static void writeStations(const std::string& path, const std::vector<std::pair<std::string, std::string>>& st) {
   FILE* f = fopen(path.c_str(), "w");
   if (!f) return;
-  fprintf(f, "# Air Xpress internet radio stations\n# stations-version %d\n# One per line:  Name|URL   (MP3 or AAC HTTP/HTTPS streams). Add your own below.\n", kStationsVersion);
+  fprintf(f, "# Solace Express internet radio stations\n# stations-version %d\n# One per line:  Name|URL   (MP3 or AAC HTTP/HTTPS streams). Add your own below.\n", kStationsVersion);
   for (auto& s : st) fprintf(f, "%s|%s\n", s.first.c_str(), s.second.c_str());
   fclose(f);
 }

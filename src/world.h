@@ -1,4 +1,4 @@
-// Air Xpress - world: hand-designed archipelago, terrain, airports, weather
+// Solace Express - world: hand-designed archipelago, terrain, airports, weather
 #pragma once
 #include "common.h"
 

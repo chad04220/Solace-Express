@@ -1,4 +1,4 @@
-// Air Xpress - Windows platform layer: window, OpenGL context, input, audio output
+// Solace Express - Windows platform layer: window, OpenGL context, input, audio output
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -184,7 +184,12 @@ static void pollPad(Input& in) {
 static std::string userDir() {
   char buf[MAX_PATH] = {};
   DWORD n = GetEnvironmentVariableA("APPDATA", buf, MAX_PATH);
-  std::string d = n ? std::string(buf) + "\\AirXpress" : std::string(".");
+  if (!n) return ".";
+  std::string d = std::string(buf) + "\\SolaceExpress";
+  // the game used to be called Air Xpress: carry its saves, settings, stations and shader cache over
+  std::string old = std::string(buf) + "\\AirXpress";
+  if (GetFileAttributesA(d.c_str()) == INVALID_FILE_ATTRIBUTES && GetFileAttributesA(old.c_str()) != INVALID_FILE_ATTRIBUTES)
+    if (!MoveFileExA(old.c_str(), d.c_str(), 0)) return old;   // in use or locked: keep using it as it is
   CreateDirectoryA(d.c_str(), nullptr);
   return d;
 }
@@ -201,13 +206,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   wc.lpfnWndProc = wndProc; wc.hInstance = hInst;
   wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
   wc.hIcon = LoadIcon(hInst, MAKEINTRESOURCE(1));
-  wc.lpszClassName = L"AirXpressWnd";
+  wc.lpszClassName = L"SolaceExpressWnd";
   RegisterClassExW(&wc);
   int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
   int ww = std::min(1600, sw * 4 / 5), wh = ww * 9 / 16;
   RECT r = {0, 0, ww, wh};
   AdjustWindowRect(&r, WS_OVERLAPPEDWINDOW, FALSE);
-  g_hwnd = CreateWindowExW(0, wc.lpszClassName, L"Air Xpress", WS_OVERLAPPEDWINDOW, (sw - (r.right - r.left)) / 2, (sh - (r.bottom - r.top)) / 2,
+  g_hwnd = CreateWindowExW(0, wc.lpszClassName, L"Solace Express", WS_OVERLAPPEDWINDOW, (sw - (r.right - r.left)) / 2, (sh - (r.bottom - r.top)) / 2,
                            r.right - r.left, r.bottom - r.top, nullptr, nullptr, hInst, nullptr);
   g_hdc = GetDC(g_hwnd);
   PIXELFORMATDESCRIPTOR pfd = {sizeof(pfd), 1, PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER, PFD_TYPE_RGBA, 32};
@@ -221,12 +226,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     int attrs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB, 3, WGL_CONTEXT_MINOR_VERSION_ARB, 3, WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB, 0};
     ctx = createAttribs(g_hdc, nullptr, attrs);
   }
-  if (!ctx) { MessageBoxA(g_hwnd, "Air Xpress needs an OpenGL 3.3 capable graphics driver.\nPlease update your graphics drivers.", "Air Xpress", MB_ICONERROR); return 1; }
+  if (!ctx) { MessageBoxA(g_hwnd, "Solace Express needs an OpenGL 3.3 capable graphics driver.\nPlease update your graphics drivers.", "Solace Express", MB_ICONERROR); return 1; }
   wglMakeCurrent(g_hdc, ctx);
   wglDeleteContext(legacy);
   g_opengl32 = LoadLibraryA("opengl32.dll");
   const char* missing = nullptr;
-  if (!glLoad(wglProc, &missing)) { MessageBoxA(g_hwnd, (std::string("Missing OpenGL function: ") + missing).c_str(), "Air Xpress", MB_ICONERROR); return 1; }
+  if (!glLoad(wglProc, &missing)) { MessageBoxA(g_hwnd, (std::string("Missing OpenGL function: ") + missing).c_str(), "Solace Express", MB_ICONERROR); return 1; }
   s_swapInterval = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
   if (auto ext = (PFNWGLGETEXTENSIONSSTRINGEXTPROC)wglGetProcAddress("wglGetExtensionsStringEXT")) { const char* e = ext(); s_tear = e && strstr(e, "WGL_EXT_swap_control_tear"); }
   timeBeginPeriod(1);   // 1 ms Sleep granularity for the frame limiter
@@ -262,7 +267,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   auto fatal = [&](const std::string& what) {
     FILE* f = fopen((game.saveDir + "\\error.log").c_str(), "w");
     if (f) { fprintf(f, "%s\nRenderer: %s\n", what.c_str(), (const char*)glGetString(GL_RENDERER)); fclose(f); }
-    MessageBoxA(g_hwnd, ("Graphics initialisation failed:\n" + what.substr(0, 1500)).c_str(), "Air Xpress", MB_ICONERROR);
+    MessageBoxA(g_hwnd, ("Graphics initialisation failed:\n" + what.substr(0, 1500)).c_str(), "Solace Express", MB_ICONERROR);
   };
   RECT cr; GetClientRect(g_hwnd, &cr);
   if (!g_ren.initUI(std::max(64L, cr.right), std::max(64L, cr.bottom))) { fatal(g_ren.error); return 1; }
@@ -292,7 +297,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   game.iconTex = iconTex;
   // Shaders compile on a worker thread with its own context (sharing objects with the main one) on a hidden
   // window, while another thread generates the world and the main thread animates the intro at 60 Hz.
-  WNDCLASSEXW wc2 = {sizeof(wc2)}; wc2.style = CS_OWNDC; wc2.lpfnWndProc = DefWindowProcW; wc2.hInstance = hInst; wc2.lpszClassName = L"AirXpressGL";
+  WNDCLASSEXW wc2 = {sizeof(wc2)}; wc2.style = CS_OWNDC; wc2.lpfnWndProc = DefWindowProcW; wc2.hInstance = hInst; wc2.lpszClassName = L"SolaceExpressGL";
   RegisterClassExW(&wc2);
   HWND hw2 = CreateWindowExW(0, wc2.lpszClassName, L"", WS_POPUP, 0, 0, 8, 8, nullptr, nullptr, hInst, nullptr);
   HDC dc2 = hw2 ? GetDC(hw2) : nullptr;
@@ -439,9 +444,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   }
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
     fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits.load(), g_shaderCacheMisses.load());
+    if (!g_ren.dispError.empty()) fprintf(f, "Display shader failed (cockpit screens disabled):\n%s\n", g_ren.dispError.c_str());
     fclose(f);
   }
-  // Benchmark: AirXpress.exe --bench scene1,scene2,... [--size WxH] times each scene (wall clock with the GPU flushed,
+  // Benchmark: SolaceExpress.exe --bench scene1,scene2,... [--size WxH] times each scene (wall clock with the GPU flushed,
   // plus the GPU time of every pass) and writes bench.txt next to the exe
   {
     std::string cl = GetCommandLineA();
@@ -472,7 +478,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
         RECT rc; GetClientRect(g_hwnd, &rc);
         if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
-        SetWindowTextA(g_hwnd, ("Air Xpress - benchmarking " + sc).c_str());
+        SetWindowTextA(g_hwnd, ("Solace Express - benchmarking " + sc).c_str());
         Game* g = new Game();
         g->saveDir = game.saveDir;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
@@ -497,7 +503,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       return 0;
     }
   }
-  // Development captures: AirXpress.exe --shots scene1,scene2,... [--size 1920x1080] renders each debug scene
+  // Development captures: SolaceExpress.exe --shots scene1,scene2,... [--size 1920x1080] renders each debug scene
   // (see Game::debugScene) with all scenery generated up front and saves shots\<scene>.png next to the exe.
   {
     std::string cl = GetCommandLineA();
@@ -521,7 +527,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
         RECT rc; GetClientRect(g_hwnd, &rc);
         if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
-        SetWindowTextA(g_hwnd, ("Air Xpress - rendering " + sc).c_str());
+        SetWindowTextA(g_hwnd, ("Solace Express - rendering " + sc).c_str());
         Game* g = new Game();
         g->saveDir = game.saveDir;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);

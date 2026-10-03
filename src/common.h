@@ -1,4 +1,4 @@
-// Air Xpress - shared math and utilities
+// Solace Express - shared math and utilities
 #pragma once
 #include <cmath>
 #include <cstdint>

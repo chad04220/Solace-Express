@@ -1,4 +1,4 @@
-// Air Xpress - renderer interface
+// Solace Express - renderer interface
 #pragma once
 #include <atomic>
 #include "common.h"
@@ -85,6 +85,7 @@ public:
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
   static constexpr int kProgramCount = 12;
+  std::string dispError;   // set when the cockpit display shader failed to build (the screens stay dark)
   bool compilePrograms(std::atomic<int>* done);  // scene programs; safe on a worker thread with a shared context
   bool init(int w, int h);                       // everything else (runs compilePrograms itself if not done yet)
   GLuint makeTexture(const uint8_t* rgba, int w, int h);

@@ -1,4 +1,4 @@
-// Air Xpress - procedural audio engine (engine synthesis, environment, effects, UI)
+// Solace Express - procedural audio engine (engine synthesis, environment, effects, UI)
 #pragma once
 #include "common.h"
 #include <atomic>

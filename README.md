@@ -1,4 +1,6 @@
-# Air Xpress
+# Solace Express
+
+*Formerly Air Xpress. On first launch, saves, settings and radio stations move from `%APPDATA%\AirXpress` to `%APPDATA%\SolaceExpress`.*
 
 A pilot-career flight game for Windows with a real-time **GPU ray-traced** world. You start as a student with a permit, earn your licences, rent small planes to haul cargo, rent bigger ones to fly passengers, then buy your own aircraft for longer, harder contracts: mountain strips, glaciers, volcano fields, night storms and finally your own airline.
 
@@ -130,7 +132,7 @@ The same menu has a second airframe (click **XR-11 WRAITH** or press Tab): a ste
 
 ## Internet radio
 
-Press **R** in flight, or use the **Radio** button in the hub. Stations come from `%APPDATA%\AirXpress\radio_stations.txt`, which is created on first run. Add one line per station:
+Press **R** in flight, or use the **Radio** button in the hub. Stations come from `%APPDATA%\SolaceExpress\radio_stations.txt`, which is created on first run. Add one line per station:
 
 ```
 My Station|https://example.com/stream.mp3
@@ -152,11 +154,11 @@ The presets include SomaFM, Radio Paradise and KEXP, plus free US East Coast pub
 
 **Startup.** The first thing on screen is the intro: the game's icon in a rotating ring, the title and a progress bar. The intro animates on its own thread with its own OpenGL context, separate from everything else, so loading never freezes it. While it plays, the shaders compile on a worker thread with another context and the world is generated on another thread (its heightmap, scenery masks and the terrain textures are split across every CPU core), so the screen keeps animating at 60 Hz. When both are done it fades into the main menu.
 
-Save data, settings and the radio list live in `%APPDATA%\AirXpress`. Compiled shaders are cached in a `shadercache` folder next to `AirXpress.exe` (or with the save data if the game folder is read-only): the first launch compiles them, later ones load the driver's binaries in a moment. A game update, driver update or different GPU simply rebuilds the cache.
+Save data, settings and the radio list live in `%APPDATA%\SolaceExpress`. Compiled shaders are cached in a `shadercache` folder next to `SolaceExpress.exe` (or with the save data if the game folder is read-only): the first launch compiles them, later ones load the driver's binaries in a moment. A game update, driver update or different GPU simply rebuilds the cache.
 
 **Performance.** The cloud and terrain noise fields are baked at startup into tileable textures (a 1024² coverage map and a 128³ noise volume), so the GPU samples them with its texture hardware instead of evaluating hashed noise per sample; the cloud march takes long strides through clear air and half the steps for water reflections. Scenery chunks that lie wholly in one level of detail are handed to the GPU in one block, and the vertex shader does the distance thinning per instance.
 
-**Laptops with two GPUs.** The game asks NVIDIA Optimus and AMD switchable graphics for the dedicated GPU. If it still starts on the integrated one (very slow loading, or a shader error at startup), set `AirXpress.exe` to *High performance* in Windows Settings → System → Display → Graphics. The intro screen shows the loading progress. Each launch writes that GPU's name to `%APPDATA%\AirXpress\startup.log`.
+**Laptops with two GPUs.** The game asks NVIDIA Optimus and AMD switchable graphics for the dedicated GPU. If it still starts on the integrated one (very slow loading, or a shader error at startup), set `SolaceExpress.exe` to *High performance* in Windows Settings → System → Display → Graphics. The intro screen shows the loading progress. Each launch writes that GPU's name to `%APPDATA%\SolaceExpress\startup.log`.
 
 ## Building
 
@@ -165,7 +167,7 @@ Save data, settings and the radio list live in `%APPDATA%\AirXpress`. Compiled s
 ```
 cmake -S . -B build -A x64
 cmake --build build --config Release
-build\Release\AirXpress.exe
+build\Release\SolaceExpress.exe
 ```
 
 ### MinGW-w64 (on Windows, or cross-compiling from Linux)
@@ -175,7 +177,7 @@ cmake -S . -B build-win -DCMAKE_TOOLCHAIN_FILE=cmake-mingw.cmake   # omit the to
 cmake --build build-win -j
 ```
 
-The GitHub Actions workflow (`.github/workflows/build.yml`) builds with MSVC, runs the tests, and uploads `AirXpress-windows-x64` as an artifact on every push. Pushing a `v*` tag attaches a zip to a GitHub Release.
+The GitHub Actions workflow (`.github/workflows/build.yml`) builds with MSVC, runs the tests, and uploads `SolaceExpress-windows-x64` as an artifact on every push. Pushing a `v*` tag attaches a zip to a GitHub Release.
 
 There are no third-party dependencies to install. The game only uses Win32, OpenGL, WinMM, XInput (loaded at runtime) and Media Foundation.
 

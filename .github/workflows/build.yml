@@ -33,22 +33,22 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist/AirXpress | Out-Null
-          Copy-Item build/Release/AirXpress.exe dist/AirXpress/
-          Copy-Item README.md, radio_stations.txt, THIRD_PARTY_NOTICES.md, render_shots.bat, benchmark.bat dist/AirXpress/
-          Compress-Archive -Path dist/AirXpress/* -DestinationPath dist/AirXpress-windows-x64.zip -Force
+          New-Item -ItemType Directory -Force -Path dist/SolaceExpress | Out-Null
+          Copy-Item build/Release/SolaceExpress.exe dist/SolaceExpress/
+          Copy-Item README.md, radio_stations.txt, THIRD_PARTY_NOTICES.md, render_shots.bat, benchmark.bat dist/SolaceExpress/
+          Compress-Archive -Path dist/SolaceExpress/* -DestinationPath dist/SolaceExpress-windows-x64.zip -Force
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AirXpress-windows-x64
-          path: dist/AirXpress/
+          name: SolaceExpress-windows-x64
+          path: dist/SolaceExpress/
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.release_tag || github.ref_name }}
-          name: Air Xpress ${{ inputs.release_tag || github.ref_name }}
+          name: Solace Express ${{ inputs.release_tag || github.ref_name }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
-          files: dist/AirXpress-windows-x64.zip
+          files: dist/SolaceExpress-windows-x64.zip

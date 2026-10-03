@@ -1,4 +1,4 @@
-// Air Xpress - hand-built aircraft geometry. Dimensions are metres in body coordinates (+z aft).
+// Solace Express - hand-built aircraft geometry. Dimensions are metres in body coordinates (+z aft).
 #include "models.h"
 #include "aircraft.h"
 

@@ -1,4 +1,4 @@
-// Air Xpress - XR-11 Wraith systems: the cloak, the retracting laser turrets, the bomb bay and the dark-energy
+// Solace Express - XR-11 Wraith systems: the cloak, the retracting laser turrets, the bomb bay and the dark-energy
 // weapons out in the world (laser bolts, plasma bombs, detonations and their glassed craters)
 #include "game.h"
 #include "entities.h"

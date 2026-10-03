@@ -1,4 +1,4 @@
-// Air Xpress - internet radio streaming (Windows Media Foundation on Windows)
+// Solace Express - internet radio streaming (Windows Media Foundation on Windows)
 #pragma once
 #include <string>
 

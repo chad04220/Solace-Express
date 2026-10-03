@@ -1,4 +1,4 @@
-// Air Xpress - XR-11 Wraith cockpit (GLSL, appended to the ray tracer after kRaytraceWraith)
+// Solace Express - XR-11 Wraith cockpit (GLSL, appended to the ray tracer after kRaytraceWraith)
 #pragma once
 
 // A faceted sealed cabin wrapped in see-through angular displays: a three-pane front wrap, tall side displays with aft

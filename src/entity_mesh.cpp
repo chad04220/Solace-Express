@@ -1,4 +1,4 @@
-// Air Xpress - procedural meshes for trees, rock formations and buildings
+// Solace Express - procedural meshes for trees, rock formations and buildings
 #include "entity_mesh.h"
 #include <map>
 

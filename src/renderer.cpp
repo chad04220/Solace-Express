@@ -1,4 +1,4 @@
-// Air Xpress - OpenGL renderer: GPU ray tracer + sprites + post + UI
+// Solace Express - OpenGL renderer: GPU ray tracer + sprites + post + UI
 #include "renderer.h"
 #include "shaders.h"
 #include "shaders_wraith_cockpit.h"
@@ -473,7 +473,8 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     progMap = program(vsFS, ms + kMapMain, error); step();
     if (!progMap) { error = "Map shader: " + error; return false; }
     progDisp = program(vsFS, ms + kDispMain, error); step();
-    if (!progDisp) { error = "Display shader: " + error; return false; }
+    // not fatal: without it the cockpit screens stay dark, but the game still runs (the error goes to startup.log)
+    if (!progDisp) { dispError = error; error.clear(); }
   }
   glFinish();   // everything complete before another context uses the programs
   return true;

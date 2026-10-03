@@ -1,4 +1,4 @@
-// Air Xpress - hand-designed archipelago "The Solace Islands"
+// Solace Express - hand-designed archipelago "The Solace Islands"
 #include "world.h"
 #include "scenery.h"
 

@@ -1,4 +1,4 @@
-// Air Xpress - per-aircraft 3D model definitions (shared by the ray tracer, cockpit camera and props)
+// Solace Express - per-aircraft 3D model definitions (shared by the ray tracer, cockpit camera and props)
 #pragma once
 #include "common.h"
 

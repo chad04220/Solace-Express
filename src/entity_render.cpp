@@ -1,4 +1,4 @@
-// Air Xpress - environment entity rendering: chunk streaming, culling, LOD selection, instanced G-buffer and
+// Solace Express - environment entity rendering: chunk streaming, culling, LOD selection, instanced G-buffer and
 // sun shadow-cascade passes. The ray tracer composites the G-buffer with the traced scene and lights it.
 #include "renderer.h"
 #include "entity_shaders.h"

@@ -1,4 +1,4 @@
-// Air Xpress - career progression and hand-designed story campaign
+// Solace Express - career progression and hand-designed story campaign
 #include "career.h"
 
 std::vector<Contract> g_story;
@@ -364,7 +364,7 @@ bool Career::sell(int fi, std::string* msg) {
 bool Career::save(const std::string& path) const {
   FILE* f = fopen(path.c_str(), "w");
   if (!f) return false;
-  fprintf(f, "airxpress_save 1\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\n",
+  fprintf(f, "solace_save 1\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\n",
           money, license, reputation, location, storyIndex, flights, landings, crashes, hours, bestLandingFpm, boardSeed, finished ? 1 : 0);
   for (auto& p : fleet) fprintf(f, "plane %s %d %f\n", kAircraft[p.spec].id, p.location, p.fuel);
   fclose(f);
@@ -375,7 +375,7 @@ bool Career::load(const std::string& path) {
   FILE* f = fopen(path.c_str(), "r");
   if (!f) return false;
   Career c; char key[64];
-  if (fscanf(f, "%63s %*d", key) != 1 || strcmp(key, "airxpress_save")) { fclose(f); return false; }
+  if (fscanf(f, "%63s %*d", key) != 1 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save"))) { fclose(f); return false; }
   while (fscanf(f, "%63s", key) == 1) {
     int fin = 0;
     if (!strcmp(key, "money")) (void)!fscanf(f, "%d", &c.money);

@@ -1,4 +1,4 @@
-// Air Xpress - menus, hub screens and flight HUD
+// Solace Express - menus, hub screens and flight HUD
 #include "game.h"
 
 // High-tech glass UI: deep navy panels, cyan accents, amber for warnings
@@ -238,7 +238,7 @@ void Game::drawIntro(float progress, const std::string& stage, float t, unsigned
     R.glow(sx - 3 * s, cy - hh * 0.5f, 6 * s, hh, vec3(1, 1, 1), 0.12f * e, 3 * s, 14 * s);
   }
   // title: letters arrive one by one with a short glow
-  const std::string title = "AIR XPRESS";
+  const std::string title = "SOLACE EXPRESS";
   float ts = 64 * s, tw = R.textWidth(title, ts) + (title.size() - 1) * 10 * s, tx = cx - tw * 0.5f, ty = cy + rr + 42 * s;
   for (size_t i = 0; i < title.size(); i++) {
     float li = clampf((t - 0.5f - i * 0.07f) / 0.35f, 0, 1);
@@ -364,7 +364,7 @@ void Game::drawMenu() {
     g_ren.image(iconTex, 60 * s, 90 * s, isz, isz);
     titleX += isz + 22 * s;
   }
-  g_ren.text(titleX, iconTex ? 92 * s : 86 * s, iconTex ? 62 * s : 74 * s, "AIR XPRESS", C_TEXT, 1, 0);
+  g_ren.text(titleX, iconTex ? 92 * s : 86 * s, iconTex ? 62 * s : 74 * s, "SOLACE EXPRESS", C_TEXT, 1, 0);
   g_ren.rect(64 * s, 166 * s, 120 * s, 3 * s, C_ACCENT, 1);
   g_ren.rect(190 * s, 167 * s, 220 * s, 1 * s, C_ACCENT, 0.35f);
   g_ren.text(64 * s, 178 * s, 20 * s, "Pilot career across the Solace Islands", C_ACCENT, 1, 0);
@@ -394,7 +394,7 @@ void Game::drawHub() {
   // top bar
   g_ren.rectGrad(0, 0, W, 64 * s, vec3(0.02f, 0.06f, 0.1f), vec3(0.0f, 0.02f, 0.04f), 0.9f);
   g_ren.rect(0, 64 * s - 1 * s, W, 1 * s, C_ACCENT, 0.4f);
-  g_ren.text(20 * s, 16 * s, 30 * s, "AIR XPRESS", C_TEXT, 1);
+  g_ren.text(20 * s, 16 * s, 30 * s, "SOLACE EXPRESS", C_TEXT, 1);
   g_ren.rect(22 * s, 50 * s, 60 * s, 2 * s, C_ACCENT, 1);
   const Airport& loc = g_world.airports[career.location];
   float x = 250 * s;
@@ -1751,7 +1751,7 @@ void Game::drawDebrief() {
   g_ren.text(px, py, 18 * s, "Total", C_TEXT, 1);
   g_ren.text(x + pw - 30 * s, py, 18 * s, fmtMoney(total), total >= 0 ? C_GOOD : C_BAD, 1, 2); py += 34 * s;
   if (career.license > licenseBefore) { fitText(px, py, pw - 60 * s, 22 * s, 14 * s, std::string("NEW LICENCE: ") + licenseName(career.license), C_WARN); py += 34 * s; }
-  if (career.finished && lastSuccess && contract.story && contract.id == g_story.back().id) { for (auto& l : wrap("You've completed the Air Xpress campaign. Congratulations, Captain!", pw - 60 * s, 18 * s)) { g_ren.text(px, py, 18 * s, l, C_ACCENT, 1); py += 24 * s; } }
+  if (career.finished && lastSuccess && contract.story && contract.id == g_story.back().id) { for (auto& l : wrap("You've completed the Solace Express campaign. Congratulations, Captain!", pw - 60 * s, 18 * s)) { g_ren.text(px, py, 18 * s, l, C_ACCENT, 1); py += 24 * s; } }
   if (button(x + pw - 230 * s, y + ph - 66 * s, 200 * s, 46 * s, "Continue", true, true) || in.pressed[K_ENTER]) { screen = SCR_HUB; hubTab = TAB_CONTRACTS; selContract = 0; selAircraft = -1; }
   if (!lastSuccess && button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, "Try again")) { Contract c = contract; startFlight(c, specIdx, career.canFly(c, specIdx) != Career::SRC_NONE ? career.canFly(c, specIdx) : source); }
 }

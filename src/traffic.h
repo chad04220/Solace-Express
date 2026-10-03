@@ -1,4 +1,4 @@
-// Air Xpress - AI traffic: airport circuits (park, taxi, take off, fly the pattern, land, taxi in), cruising
+// Solace Express - AI traffic: airport circuits (park, taxi, take off, fly the pattern, land, taxi in), cruising
 // traffic, XR-9 research formations ripping past, and an aerobatic display team.
 #pragma once
 #include "common.h"

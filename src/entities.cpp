@@ -1,4 +1,4 @@
-// Air Xpress - environment entities: deterministic placement, chunk streaming and collisions
+// Solace Express - environment entities: deterministic placement, chunk streaming and collisions
 #include "entities.h"
 #include "scenery.h"
 #include <condition_variable>
