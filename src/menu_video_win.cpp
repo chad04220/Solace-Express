@@ -1,6 +1,9 @@
 // Solace Express - the pre-rendered main-menu montage (see menu_video_win.h)
 #include "menu_video_win.h"
 #include "gl.h"
+#ifndef NOMINMAX
+#define NOMINMAX   // (windows.h would otherwise define min / max macros that break std::min / std::max)
+#endif
 #include <windows.h>
 #include <mfapi.h>
 #include <mfidl.h>
