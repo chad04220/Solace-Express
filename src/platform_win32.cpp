@@ -301,8 +301,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   // the ray tracer samples 20 textures in one fragment shader; OpenGL 3.3 only guarantees 16 (every current GPU has 32)
   GLint texUnits = 0; glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &texUnits);
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "w")) { fprintf(f, "GPU: %s\nFragment texture units: %d\n", gpu.c_str(), (int)texUnits); fclose(f); }
-  if (texUnits > 0 && texUnits < 20) {
-    MessageBoxA(g_hwnd, ("This graphics driver offers " + std::to_string(texUnits) + " texture units per shader; Solace Express needs 20.\n"
+  if (texUnits > 0 && texUnits < 21) {
+    MessageBoxA(g_hwnd, ("This graphics driver offers " + std::to_string(texUnits) + " texture units per shader; Solace Express needs 21.\n"
                          "Please update the graphics driver, or run the game on the dedicated GPU.").c_str(), "Solace Express", MB_ICONERROR);
     return 1;
   }

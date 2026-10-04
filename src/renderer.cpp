@@ -532,6 +532,7 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     { std::string e; progCloudComp = program(vsFS, kCloudCompFS, e); step(); }       // marches every pixel's clouds itself
     if (!progMap) { error = "Map shader: " + error; return false; }
     { std::string e; progCkMask = program(vsFS, kCockpitMaskFS, e); step(); }   // optional: without it nothing is masked
+    compileEnvelope(); step();   // optional: without it every pixel marches its terrain from the camera
     progDisp = program(vsFS, ms + kDispMain, error); step();
     // not fatal: without it the cockpit screens stay dark, but the game still runs (the error goes to startup.log)
     if (!progDisp) { dispError = error; error.clear(); }
@@ -747,6 +748,7 @@ bool Renderer::init(int w, int h) {
   genCloudNoise();
   genMinimap();
   if (!initEntities()) return false;
+  initEnvelope();
   W = w; H = h;
   createTargets();
   ok = true;
@@ -787,6 +789,7 @@ void Renderer::createRenderTargets() {
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, texCloudMask, 0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   createGBuffer();
+  createEnvelopeTarget();
 }
 
 // Display-resolution targets: TAA history + the upscaled scene that sprites, bloom and the composite work on
@@ -887,6 +890,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     jitX = (halton(hi, 2) - 0.5f) / rw; jitY = (halton(hi, 3) - 0.5f) / rh;
   }
   // ------------------------------------------------ environment entities: shadow cascades + G-buffer
+  drawEnvelope(fp);
   drawEntities(fp);
   bakeTerrainShadow(fp);
   if (fp.dispMode & 1) renderDisplays(fp, false);   // the cockpit display atlases, before the ray tracer samples them
@@ -920,6 +924,8 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, tshFront >= 0 ? texTSh[tshFront] : 0); glUniform1i(U(p, "uTSh"), 18);
   static const bool tshOff = getenv("TSHOFF") != nullptr;   // (debug: compare with per-pixel shadow rays)
   glUniform1i(U(p, "uTShOn"), tshFront >= 0 && !tshOff ? 1 : 0);
+  glActiveTexture(GL_TEXTURE0 + 20); glBindTexture(GL_TEXTURE_2D, envOn ? texEnv : 0); glUniform1i(U(p, "uEnv"), 20);
+  glUniform1i(U(p, "uEnvOn"), envOn ? 1 : 0);
   {   // AI traffic: one row of 32 texels per aircraft
     if (!texTraffic) {
       glGenTextures(1, &texTraffic); glBindTexture(GL_TEXTURE_2D, texTraffic);

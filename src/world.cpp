@@ -230,6 +230,7 @@ void World::build() {
   }
   bakeMask();
   buildHMax();
+  buildEnvelope();
   // Airport buildings are raster scenery entities now (airport_scenery.cpp); the ray-traced box list stays empty
   boxes.clear();
 }
@@ -277,6 +278,68 @@ void World::buildHMax() {
         hmax[L][(size_t)j * n + i] = std::max(std::max(P[(size_t)(2 * j) * pn + 2 * i], P[(size_t)(2 * j) * pn + 2 * i + 1]),
                                               std::max(P[(size_t)(2 * j + 1) * pn + 2 * i], P[(size_t)(2 * j + 1) * pn + 2 * i + 1]));
       }
+  }
+}
+
+// Terrain envelope. Vertex v sits on texel centre v; cell c spans texel centres c..c+1, where the base layer is exactly
+// the bilinear patch of its four texels. That patch lies within |a - b - c + d|/4 of either triangle pair over the cell,
+// and the detail adds at most (max amplitude) x (max fbm, sampled at the corners and centre, + the bound of the finer
+// octaves and of the sampling error, as in buildHMax). So with every vertex raised by the largest such allowance of the
+// cells around it, the triangles over a cell can only lie above the terrain there. Coarser levels bound whole blocks.
+void World::buildEnvelope() {
+  const int N = HM_N, NV = HM_N + 1;
+  auto H = [&](int i, int j, int c) { return hm[((size_t)std::clamp(j, 0, N - 1) * N + std::clamp(i, 0, N - 1)) * 4 + c]; };
+  auto fbmAt = [&](float x, float z) { return terrainFbm(x / DETAIL_SCALE, z / DETAIL_SCALE, 6); };
+  auto vx = [&](float i) { return -WORLD_HALF + (i + 0.5f) * HM_TEXEL; };
+  // detail amplitude near each vertex: the fbm is only needed where some cell around it has detail
+  std::vector<float> fV((size_t)NV * NV, 0.f);
+  parallelFor(NV, [&](int j) {
+    for (int i = 0; i < NV; i++) {
+      float b1 = 0.f;
+      for (int dj = -1; dj <= 1; dj++) for (int di = -1; di <= 1; di++) b1 = std::max(b1, H(i + di, j + dj, 1));
+      fV[(size_t)j * NV + i] = b1 >= 0.01f ? fbmAt(vx((float)i), vx((float)j)) : 0.f;
+    }
+  });
+  std::vector<float> D((size_t)N * N);   // allowance of each cell above the triangles through its corner heights
+  parallelFor(N, [&](int j) {
+    for (int i = 0; i < N; i++) {
+      float a = H(i, j, 0), b = H(i + 1, j, 0), c = H(i, j + 1, 0), d = H(i + 1, j + 1, 0);
+      float b1 = std::max(std::max(H(i, j, 1), H(i + 1, j, 1)), std::max(H(i, j + 1, 1), H(i + 1, j + 1, 1)));
+      float e = 0.f;
+      if (b1 >= 0.01f) {
+        float f = std::max(std::max(fV[(size_t)j * NV + i], fV[(size_t)j * NV + i + 1]), std::max(fV[(size_t)(j + 1) * NV + i], fV[(size_t)(j + 1) * NV + i + 1]));
+        f = std::max(f, fbmAt(vx(i + 0.5f), vx(j + 0.5f)));
+        e = b1 * std::max(f + 0.14f, 0.f);
+      }
+      D[(size_t)j * N + i] = fabsf(a - b - c + d) * 0.25f + e + 0.05f;
+    }
+  });
+  tpV0.assign((size_t)NV * NV, 0.f);
+  parallelFor(NV, [&](int j) {
+    for (int i = 0; i < NV; i++) {
+      float m = 0.f;
+      for (int dj = -1; dj <= 0; dj++) for (int di = -1; di <= 0; di++) {
+        int ci = i + di, cj = j + dj;
+        if (ci < 0 || cj < 0 || ci >= N || cj >= N) continue;
+        m = std::max(m, D[(size_t)cj * N + ci]);
+      }
+      tpV0[(size_t)j * NV + i] = H(i, j, 0) + m;
+    }
+  });
+  tpM[0].assign((size_t)N * N, 0.f);
+  parallelFor(N, [&](int j) {
+    for (int i = 0; i < N; i++)
+      tpM[0][(size_t)j * N + i] = std::max(std::max(tpV0[(size_t)j * NV + i], tpV0[(size_t)j * NV + i + 1]),
+                                           std::max(tpV0[(size_t)(j + 1) * NV + i], tpV0[(size_t)(j + 1) * NV + i + 1]));
+  });
+  for (int L = 1; L < TP_LEVELS; L++) {
+    int n = N >> L, pn = n * 2;
+    const std::vector<float>& P = tpM[L - 1];
+    tpM[L].assign((size_t)n * n, 0.f);
+    for (int j = 0; j < n; j++)
+      for (int i = 0; i < n; i++)
+        tpM[L][(size_t)j * n + i] = std::max(std::max(P[(size_t)(2 * j) * pn + 2 * i], P[(size_t)(2 * j) * pn + 2 * i + 1]),
+                                             std::max(P[(size_t)(2 * j + 1) * pn + 2 * i], P[(size_t)(2 * j + 1) * pn + 2 * i + 1]));
   }
 }
 

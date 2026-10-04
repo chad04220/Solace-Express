@@ -91,7 +91,7 @@ public:
   GLuint minimapTex = 0;
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
-  static constexpr int kProgramCount = 16;
+  static constexpr int kProgramCount = 17;
   float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
   // analysis tool (--analyze): exact per-pass times (the GPU is waited on at every pass boundary) and a build of the
   // ray tracer that writes its per-pixel work counters instead of colour
@@ -197,6 +197,17 @@ private:
   std::vector<Ent> entStage;
   int entFrame = 0, entGenCount = 0;
   bool initEntities();
+  // ---- terrain envelope mesh (terrain_envelope.cpp): where each pixel's exact terrain march starts
+  GLuint progEnv = 0, vaoEnv = 0, vboEnvInst = 0, texEnvV0 = 0, texEnvM = 0, fboEnv = 0, texEnv = 0, texEnvDepth = 0;
+  std::vector<float> envInst;
+  bool envOn = false;
+  bool compileEnvelope();
+  void initEnvelope();
+  void createEnvelopeTarget();
+  void drawEnvelope(const FrameParams& fp);
+public:
+  int envChunks = 0;
+private:
   void drawEntities(const FrameParams& fp);
   void createGBuffer();
 };

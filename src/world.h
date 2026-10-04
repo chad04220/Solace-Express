@@ -8,6 +8,8 @@ static const float HM_TEXEL = 2.0f * WORLD_HALF / HM_N;
 static const float DETAIL_SCALE = 2200.0f; // wavelength of the procedural detail layer
 static const int HMAX_N = 256;             // conservative max-height grid for ray-march skipping (mip chain)
 static const int HMAX_LEVELS = 5;
+static const int TP_LEVELS = 7;           // terrain envelope mesh: cell bounds from HM_N cells (level 0) to 32 per side
+static const int TP_CHUNK = 32;           // cells per side of one envelope mesh chunk
 
 enum Surface { SURF_ASPHALT = 0, SURF_GRASS, SURF_GRAVEL, SURF_SNOW, SURF_SAND };
 inline const char* surfaceName(int s) { static const char* n[] = {"Asphalt", "Grass", "Gravel", "Snow", "Sand"}; return n[s]; }
@@ -51,7 +53,11 @@ public:
   std::vector<uint8_t> mask; // RGBA8: road distance, building density, urbanness, farmland / sea-stack flag
   std::vector<float> hmax[HMAX_LEVELS];   // upper bound of the terrain per cell, level L has HMAX_N>>L cells per side
   void build();
+  // Terrain envelope (the rasterized stand-in that starts the exact terrain march): an upper bound of the rendered
+  // terrain at every vertex of the HM_N grid through the texel centres (tpV0, (HM_N+1)^2), and per cell (tpM[L])
+  std::vector<float> tpV0, tpM[TP_LEVELS];
   void buildHMax();
+  void buildEnvelope();
   void bakeMask();
   void sampleMask(float x, float z, float out[4]) const;   // manual bilinear (matches shader)
   void maskTexel(float x, float z, float out[4]) const;    // nearest texel (matches shader texelFetch)

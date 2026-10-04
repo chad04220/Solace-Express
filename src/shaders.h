@@ -1172,8 +1172,15 @@ uniform sampler2D uHMax;  // conservative max height per cell, mip L = 256>>L ce
 const int HMAXN = 256; const int HMAXL = 5;
 // Ray march the heightfield. Cells the ray passes entirely above (per the max-height mip chain) are skipped,
 // which keeps grazing rays over lowlands from running out of steps (they used to fall through to the sea).
+// gTStart: where the march may begin (the terrain envelope mesh on this pixel - see terrain_envelope.cpp); 1e30 means
+// the ray meets no terrain in the world. A start that turns out to be under the ground (it never should) is ignored.
+uniform sampler2D uEnv; uniform int uEnvOn;
+float gTStart = 1.0;
 float traceTerrain(vec3 ro, vec3 rd, float tmax){
   float t = 1.0;
+  if (gTStart > 1e29) return -1.0;
+  if (gTStart > t && gTStart < tmax) { vec3 ps = ro + rd*gTStart; if (ps.y > terrainH(ps.xz, 7)) t = gTStart; }
+  else if (gTStart >= tmax) return -1.0;
   if (ro.y > uMaxH) { if (rd.y >= 0.0) return -1.0; t = max(t, (ro.y - uMaxH)/(-rd.y)); }
   float lt = t, ldh = 0.0; bool skipped = true;
   int maxSteps = uQuality > 1 ? 360 : (uQuality > 0 ? 270 : 190);
@@ -3194,7 +3201,12 @@ void main(){
   if (!pod && !feed) g0 = texelFetch(uGB0, ivec2(gl_FragCoord.xy), 0);   // (the displays show the trees and buildings outside too)
   if (cloak) g0.x = g0.x > ckT ? g0.x - ckT : 0.0;   // seen through the cloak (the ray now starts on its skin)
   float tE = g0.x > 0.0 && g0.x < tmax ? g0.x : -1.0;
+  if (uEnvOn == 1 && !pod && !feed && !cloak) {   // the envelope was rasterized along exactly this pixel's ray
+    float te = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).r;
+    gTStart = te > 1e29 ? te : (te > 0.0 ? max(1.0, te*0.999 - 1.0) : 1.0);
+  }
   float tT = pod ? -1.0 : traceTerrain(ro, rd, tE > 0.0 ? tE + 1.0 : tmax);
+  gTStart = 1.0;
   float tW = (!pod && rd.y < 0.0 && ro.y > 0.0) ? -ro.y/rd.y : -1.0;
   vec3 bn; float bkind = 0.0; vec3 bl;
   vec2 bh = pod ? vec2(-1.0) : traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
