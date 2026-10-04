@@ -110,7 +110,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     }
   }
   // which cameras this frame
-  static const int perFrame = getenv("FEEDS") ? std::max(1, atoi(getenv("FEEDS"))) : 3;
+  static const int perFrame = getenv("FEEDS") ? std::max(1, atoi(getenv("FEEDS"))) : 2;
   const float ty = tanf(fp.fovY * 0.5f), tx = ty * W / std::max(H, 1);
   auto inView = [&](const FeedCamera& c) {   // its display's bounding sphere against the view frustum
     vec3 d = c.screen - fp.camPos;
