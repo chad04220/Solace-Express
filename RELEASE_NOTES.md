@@ -9,6 +9,10 @@
 - A pitot tube under the left wing, static wicks on the wingtips' trailing edges and a VHF blade antenna under the belly
 - Thin rims and bezels (air vents, instrument bezels) render more cleanly: every hit on the airframe now settles exactly onto the surface
 
+**Fixes**
+- The roof antenna is shaded as outside metal (it was lit like a cabin fitting)
+- Light fixture housings and lenses are shaded as outside parts: no longer dimmed like the cabin, or lit by the cockpit's LED strip at night
+
 **Performance**
 - AI traffic uses the aircraft hulls built at launch: rays that can't meet a traffic aircraft skip it entirely, and the rest start right at it
 - The terrain mesh only draws the chunks in view
