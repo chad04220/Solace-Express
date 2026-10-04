@@ -1,5 +1,11 @@
 ## What's new
 
+**Career menu redesign**
+- A cleaner, higher-tech career screen in the main menu's style: dark glass panels with hairline edges over the live scene, a drifting scan line, and the icon and title with the licence beneath
+- Bank, reputation and location as stat chips; numbered tabs with a gliding underline
+- Small upper-case labels in the detail lists, a framed route map, and speed / range / payload meters in the hangar
+- The settings page fits a 720p window without spilling off the panel
+
 **XR-9 Specter: no more VTOL**
 - The XR-9 is now a conventional runway jet: its nozzles no longer swivel down, so it can't hover or land vertically
 - The lift fans and their ducts in the wings are gone; the cranked delta wing is solid again

@@ -36,6 +36,17 @@ static void brackets(float x, float y, float w, float h, float L, float t, vec3 
 
 void Game::panel(float x, float y, float w, float h, float a) {
   float s = S(), r = 4 * s;
+  if (uiGlass) {   // dark glass over the live scene: hairline edge, a bright lead on the top edge, small corner ticks
+    a = std::min(1.f, a / 0.78f); r = 2 * s;
+    g_ren.glow(x, y, w, h, vec3(0, 0, 0), 0.25f * a, r, 18 * s);
+    g_ren.rectGrad(x, y, w, h, vec3(0.02f, 0.05f, 0.08f), vec3(0.004f, 0.014f, 0.028f), 0.66f * a, r);
+    g_ren.rectOutline(x, y, w, h, C_ACCENT, 0.11f * a, r, 1.f * s);
+    g_ren.rect(x, y, w, 1.f * s, C_ACCENT, 0.22f * a);
+    g_ren.glow(x, y - 0.5f * s, 64 * s, 2 * s, C_ACCENT, 0.35f * a, 1 * s, 6 * s);
+    g_ren.rect(x, y - 0.5f * s, 64 * s, 2 * s, C_ACCENT, 0.95f * a);
+    brackets(x - 1 * s, y - 1 * s, w + 2 * s, h + 2 * s, 7 * s, 1.5f * s, C_ACCENT, 0.45f * a);
+    return;
+  }
   a = std::min(1.f, a / 0.78f);
   g_ren.glow(x, y, w, h, vec3(0, 0, 0), 0.45f * a, r, 22 * s);
   g_ren.rectGrad(x, y, w, h, C_PANEL2, C_PANEL, 0.88f * a, r);
@@ -69,6 +80,16 @@ void Game::card(float x, float y, float w, float h, bool sel, bool hov, vec3 acc
   float s = S(), r = 4 * s;
   uint32_t id = uid(x, y, "card");
   float th = anim(id, hov ? 1.f : 0.f, 14), ts = anim(id + 7, sel ? 1.f : 0.f, 12);
+  if (uiGlass) {   // flat glass rows: brighter on hover, an accent edge and soft glow when selected
+    r = 2 * s;
+    if (ts > 0.01f) g_ren.glow(x, y, w, h, C_ACCENT, 0.14f * ts, r, 12 * s);
+    float k = std::max(th * 0.6f, ts);
+    g_ren.rectGrad(x, y, w, h, mixc(vec3(0.03f, 0.07f, 0.1f), vec3(0.05f, 0.15f, 0.22f), k), mixc(vec3(0.01f, 0.03f, 0.05f), vec3(0.02f, 0.08f, 0.12f), k), 0.42f + 0.38f * k, r);
+    g_ren.rectOutline(x, y, w, h, C_ACCENT, 0.06f + 0.22f * th + 0.5f * ts, r, 1.f * s);
+    g_ren.rect(x, y, 2 * s, h, accent, 0.35f + 0.65f * std::max(th, ts));
+    if (ts > 0.01f) { g_ren.rect(x + w - 26 * s, y + h - 1 * s, 26 * s, 1 * s, C_ACCENT, ts); float cx = x + w - 10 * s, cy = y + h * 0.5f; g_ren.line(cx - 4 * s, cy - 5 * s, cx, cy, 1.5f * s, C_ACCENT, ts); g_ren.line(cx, cy, cx - 4 * s, cy + 5 * s, 1.5f * s, C_ACCENT, ts); }
+    return;
+  }
   if (ts > 0.01f) g_ren.glow(x, y, w, h, C_ACCENT, 0.2f * ts, r, 10 * s);
   float k = std::max(th * 0.55f, ts);
   g_ren.rectGrad(x, y, w, h, mixc(vec3(0.035f, 0.07f, 0.11f), vec3(0.06f, 0.17f, 0.25f), k), mixc(vec3(0.02f, 0.045f, 0.07f), vec3(0.04f, 0.11f, 0.17f), k), 0.93f, r);
@@ -138,6 +159,9 @@ static std::string ellipsize(const std::string& str, float width, float size) {
   while (!t.empty() && t.back() == ' ') t.pop_back();
   return t + "...";
 }
+
+// A key in a key / value list: plain, or in the hub's glass style a small upper-case label
+static std::string upperS(std::string t) { for (char& c : t) c = (char)toupper((unsigned char)c); return t; }
 // Picks the largest font size (down to minSize) at which the text fits, then ellipsizes if it still doesn't
 static float fitText(float x, float y, float width, float size, float minSize, const std::string& str, vec3 col, float a = 1.f) {
   float sz = size;
@@ -407,41 +431,64 @@ void Game::drawMenu() {
 // ------------------------------------------------------------------ hub
 void Game::drawHub() {
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
-  // top bar
-  g_ren.rectGrad(0, 0, W, 64 * s, vec3(0.02f, 0.06f, 0.1f), vec3(0.0f, 0.02f, 0.04f), 0.9f);
-  g_ren.rect(0, 64 * s - 1 * s, W, 1 * s, C_ACCENT, 0.4f);
-  g_ren.text(20 * s, 16 * s, 30 * s, "SOLACE EXPRESS", C_TEXT, 1);
-  g_ren.rect(22 * s, 50 * s, 60 * s, 2 * s, C_ACCENT, 1);
-  const Airport& loc = g_world.airports[career.location];
-  float x = 250 * s;
-  auto stat = [&](float w, const char* k, const std::string& v, vec3 c, float vs) {
-    g_ren.rect(x - 14 * s, 14 * s, 1 * s, 36 * s, C_ACCENT, 0.3f);
-    g_ren.text(x, 12 * s, 12 * s, k, C_DIM, 1, 0, false);
-    g_ren.text(x, 30 * s, vs, ellipsize(v, w - 24 * s, vs), c, 1);
-    x += w;
-  };
-  stat(290 * s, "PILOT LICENCE", licenseName(career.license), C_TEXT, 18 * s);
-  stat(170 * s, "BANK", fmtMoney(career.money), career.money < 0 ? C_BAD : C_GOOD, 20 * s);
-  stat(130 * s, "REPUTATION", fmt("%d", career.reputation), C_ACCENT, 18 * s);
-  stat(std::max(160 * s, W - 20 * s - x), "LOCATION", fmt("%s  %s", loc.code, loc.name), C_TEXT, 18 * s);
-  // tabs with a sliding underline
-  const char* tabs[] = {"CONTRACTS", "HANGAR", "LOGBOOK", "SETTINGS"};
-  float tx = 20 * s, ty = 76 * s, tw = 150 * s;
-  g_ren.rectGrad(tx, ty, 4 * (tw + 10 * s) - 10 * s, 38 * s, vec3(0.02f, 0.06f, 0.1f), vec3(0.0f, 0.02f, 0.04f), 0.75f, 3 * s);
-  for (int i = 0; i < 4; i++) {
-    bool hov = hovered(tx, ty, tw, 38 * s);
-    float h = anim(uid(tx, ty, "tab"), hov ? 1.f : 0.f, 14);
-    if (h > 0.01f) g_ren.rectGrad(tx, ty, tw, 38 * s, vec3(0.05f, 0.16f, 0.24f), vec3(0.02f, 0.06f, 0.1f), 0.8f * h, 3 * s);
-    g_ren.text(tx + tw * 0.5f, ty + 11 * s, 16 * s, tabs[i], hubTab == i ? C_TEXT : mixc(C_DIM, C_TEXT, h), 1, 1, false);
-    if (hov && in.mPressed[0] && hubTab != i) { hubTab = i; g_audio.trigger(SFX_CLICK); }
-    tx += tw + 10 * s;
+  uiGlass = true;   // (panels and cards in the hub's glass style; reset at the end)
+  // atmosphere, as on the main menu: the live scene behind dark glass and a scan line drifting down
+  g_ren.rect(0, 0, W, H, vec3(0.0f, 0.01f, 0.02f), 0.28f);
+  float scan = fmodf(realTime * 60.f * s, H + 80 * s) - 40 * s;
+  g_ren.rectGrad(0, scan, W, 40 * s, vec3(0, 0, 0), C_ACCENT, 0.035f);
+  // header strip: icon, title and its underline, the licence beneath; bank, reputation and location on the right
+  g_ren.rectGrad(0, 0, W, 72 * s, vec3(0.01f, 0.035f, 0.06f), vec3(0.0f, 0.012f, 0.025f), 0.7f);
+  g_ren.rect(0, 72 * s, W, 1 * s, C_ACCENT, 0.18f);
+  float hx = 24 * s;
+  if (iconTex) {
+    float isz = 40 * s, pulse = 0.5f + 0.5f * sinf(realTime * 1.6f);
+    g_ren.glow(hx, 16 * s, isz, isz, vec3(1.f, 0.62f, 0.25f), 0.14f + 0.06f * pulse, isz * 0.2f, 12 * s);
+    g_ren.image(iconTex, hx, 16 * s, isz, isz);
+    hx += isz + 14 * s;
   }
-  float ux = anim(0x7ab5u, 20 * s + hubTab * (tw + 10 * s), 14);
-  g_ren.glow(ux + 10 * s, ty + 35 * s, tw - 20 * s, 3 * s, C_ACCENT, 0.5f, 1.5f * s, 8 * s);
-  g_ren.rect(ux + 10 * s, ty + 35 * s, tw - 20 * s, 3 * s, C_ACCENT, 1);
-  if (button(W - 300 * s, ty, 130 * s, 38 * s, showRadio ? "Radio <" : "Radio", true, showRadio)) showRadio = !showRadio;
-  if (button(W - 160 * s, ty, 140 * s, 38 * s, "Main Menu")) { screen = SCR_MENU; saveGame(); }
-  float cx = 20 * s, cy = 126 * s, cw = W - 40 * s, ch = H - 146 * s;
+  float tw = g_ren.text(hx, 13 * s, 26 * s, "SOLACE EXPRESS", C_TEXT, 1);
+  g_ren.rect(hx + 2 * s, 44 * s, 54 * s, 2 * s, C_ACCENT, 1);
+  g_ren.rect(hx + 60 * s, 44.5f * s, std::max(tw - 60 * s, 20 * s), 1 * s, C_ACCENT, 0.35f);
+  g_ren.text(hx + 2 * s, 50 * s, 12 * s, std::string("CAREER  //  ") + licenseName(career.license), C_ACCENT, 1, 0, false);
+  const Airport& loc = g_world.airports[career.location];
+  float rx = W - 24 * s;   // stat chips, laid out from the right edge
+  auto chip = [&](const char* k, const std::string& v, vec3 c, float maxW) {
+    float vs = 19 * s;
+    std::string vv = ellipsize(v, maxW, vs);
+    float w = std::max(g_ren.textWidth(vv, vs), g_ren.textWidth(k, 11 * s));
+    float x0 = rx - w;
+    g_ren.text(x0, 16 * s, 11 * s, k, C_DIM, 1, 0, false);
+    g_ren.text(x0, 31 * s, vs, vv, c, 1);
+    g_ren.rect(x0 - 18 * s, 18 * s, 1 * s, 34 * s, C_ACCENT, 0.25f);
+    rx = x0 - 36 * s;
+  };
+  chip("LOCATION", fmt("%s  %s", loc.code, loc.name), C_TEXT, std::max(140 * s, W * 0.26f));
+  chip("REPUTATION", fmt("%d", career.reputation), C_ACCENT, 120 * s);
+  chip("BANK", fmtMoney(career.money), career.money < 0 ? C_BAD : C_GOOD, 160 * s);
+  // tabs: numbered labels over a hairline, a glowing bar glides under the active one
+  const char* tabs[] = {"CONTRACTS", "HANGAR", "LOGBOOK", "SETTINGS"};
+  float tx = 24 * s, ty = 80 * s, tabW[4], tabX[4];
+  g_ren.rectGrad(0, 73 * s, W, 44 * s, vec3(0.008f, 0.028f, 0.05f), vec3(0.0f, 0.01f, 0.02f), 0.55f);   // glass band behind the tabs
+  for (int i = 0; i < 4; i++) {
+    std::string lab = fmt("%02d  %s", i + 1, tabs[i]);
+    float w = g_ren.textWidth(lab, 15 * s) + 28 * s;
+    tabX[i] = tx; tabW[i] = w;
+    bool hov = hovered(tx, ty, w, 34 * s);
+    float h = anim(uid(tx, ty, "tab"), hov ? 1.f : 0.f, 14);
+    if (h > 0.01f) g_ren.rectGrad(tx, ty, w, 34 * s, vec3(0.03f, 0.1f, 0.15f), vec3(0.01f, 0.04f, 0.07f), 0.5f * h, 2 * s);
+    vec3 tc = hubTab == i ? C_TEXT : mixc(C_DIM, C_TEXT, h);
+    g_ren.text(tx + 14 * s, ty + 9 * s, 15 * s, fmt("%02d", i + 1), hubTab == i ? C_ACCENT : C_ACCENT * 0.55f, 1, 0, false);
+    g_ren.text(tx + 14 * s + g_ren.textWidth("00  ", 15 * s), ty + 9 * s, 15 * s, tabs[i], tc, 1, 0, false);
+    if (hov && in.mPressed[0] && hubTab != i) { hubTab = i; g_audio.trigger(SFX_CLICK); }
+    tx += w + 6 * s;
+  }
+  g_ren.rect(24 * s, ty + 34 * s, tx - 30 * s, 1 * s, C_ACCENT, 0.15f);
+  float ux = anim(0x7ab5u, tabX[hubTab], 14), uw = anim(0x7ab6u, tabW[hubTab], 14);
+  g_ren.glow(ux + 8 * s, ty + 32 * s, uw - 16 * s, 3 * s, C_ACCENT, 0.5f, 1.5f * s, 8 * s);
+  g_ren.rect(ux + 8 * s, ty + 32 * s, uw - 16 * s, 3 * s, C_ACCENT, 1);
+  if (button(W - 280 * s, ty, 120 * s, 34 * s, showRadio ? "Radio <" : "Radio", true, showRadio)) showRadio = !showRadio;
+  if (button(W - 150 * s, ty, 126 * s, 34 * s, "Main Menu")) { screen = SCR_MENU; saveGame(); }
+  float cx = 24 * s, cy = 126 * s, cw = W - 48 * s, ch = H - 146 * s;
   switch (hubTab) {
     case TAB_CONTRACTS: drawHubContracts(cx, cy, cw, ch); break;
     case TAB_HANGAR: drawHubHangar(cx, cy, cw, ch); break;
@@ -449,6 +496,7 @@ void Game::drawHub() {
     default: { float pw = std::min(cw, (settingsPage == 1 ? 940 : 760) * s); panel(cx, cy, pw, ch); drawSettings(cx + 24 * s, cy + 20 * s, pw - 48 * s, ch - 40 * s); break; }
   }
   if (showRadio) drawRadioPanel(W - 460 * s, 126 * s);
+  uiGlass = false;
   if (in.pressed[K_ESC]) { if (showRadio) showRadio = false; else { screen = SCR_MENU; saveGame(); } }
 }
 
@@ -539,7 +587,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   for (auto& l : wrap(c.brief, textW, 16 * s)) { g_ren.text(px, py, 16 * s, l, C_TEXT, 0.92f); py += 22 * s; }
   py += 10 * s;
   auto row = [&](const std::string& k, const std::string& v, vec3 col = C_TEXT) {
-    g_ren.text(px, py, 15 * s, k, C_DIM, 1);
+    g_ren.text(px, py + 3 * s, 11.5f * s, upperS(k), C_DIM, 0.95f, 0, false);
     auto vl = wrap(v, textW - 130 * s, 15 * s);
     for (size_t i = 0; i < vl.size(); i++) { g_ren.text(px + 130 * s, py, 15 * s, vl[i], col, 1); py += (i + 1 < vl.size() ? 19 : 23) * s; }
     if (vl.empty()) py += 23 * s;
@@ -562,7 +610,13 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   if (c.ownedOnly) row("Requirement", "Your own aircraft", C_ACCENT);
   if (c.grantLicense > career.license) row("Reward", std::string("Earns ") + licenseName(c.grantLicense), C_ACCENT);
   if (c.from != career.location && c.type != CT_LESSON) { int pc = career.positioningCost(c); row("Positioning", pc ? fmt("Airline ticket to %s: %s", A.code, fmtMoney(pc).c_str()) : "Free courtesy ride", C_DIM); }
-  drawMapView(dx + dw - mapW - 22 * s, y + 60 * s, mapW, mapW, c.from, c.to, &c.wps);
+  {   // the route map in a hairline frame with corner ticks and a caption
+    float mx = dx + dw - mapW - 22 * s, my = y + 60 * s;
+    drawMapView(mx, my, mapW, mapW, c.from, c.to, &c.wps);
+    g_ren.rectOutline(mx - 4 * s, my - 4 * s, mapW + 8 * s, mapW + 8 * s, C_ACCENT, 0.2f, 2 * s, 1 * s);
+    brackets(mx - 4 * s, my - 4 * s, mapW + 8 * s, mapW + 8 * s, 10 * s, 1.5f * s, C_ACCENT, 0.8f);
+    g_ren.text(mx - 4 * s, my - 22 * s, 11.5f * s, fmt("ROUTE  //  %s > %s", g_world.airports[c.from].code, g_world.airports[c.to].code), C_ACCENT, 0.9f, 0, false);
+  }
   // aircraft selection
   py = std::max(py + 8 * s, y + 70 * s + mapW);
   header(px, py, iw, "CHOOSE AIRCRAFT"); py += 26 * s;
@@ -632,7 +686,24 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
   fitText(px, py, dw - 48 * s, 30 * s, 18 * s, a.name, C_TEXT); py += 42 * s;
   g_ren.text(px, py, 17 * s, ellipsize(a.role, dw - 48 * s, 17 * s), C_ACCENT, 1); py += 30 * s;
   header(px, py, dw - 48 * s, "SPECIFICATIONS"); py += 26 * s;
-  auto row = [&](const std::string& k, const std::string& v) { g_ren.text(px, py, 16 * s, k, C_DIM, 1); g_ren.text(px + 200 * s, py, 16 * s, ellipsize(v, dw - 248 * s, 16 * s), C_TEXT, 1); py += 26 * s; };
+  {   // performance meters against the best in the market
+    float best[3] = {0, 0, 0};
+    for (int i = 0; i < kNumAircraft; i++) { best[0] = std::max(best[0], kAircraft[i].cruise); best[1] = std::max(best[1], kAircraft[i].rangeKm); best[2] = std::max(best[2], kAircraft[i].cargoKg + kAircraft[i].pax * 90.f); }
+    float v[3] = {a.cruise / best[0], a.rangeKm / best[1], (a.cargoKg + a.pax * 90.f) / best[2]};
+    const char* lab[3] = {"SPEED", "RANGE", "PAYLOAD"};
+    float mw = (dw - 48 * s - 2 * 18 * s) / 3.f;
+    for (int k = 0; k < 3; k++) {
+      float mx = px + k * (mw + 18 * s), f = anim(0x6e70u + k * 17 + selHangar * 131, v[k], 8);
+      g_ren.text(mx, py, 11.5f * s, lab[k], C_DIM, 0.95f, 0, false);
+      g_ren.text(mx + mw, py, 11.5f * s, fmt("%.0f%%", v[k] * 100), C_ACCENT, 0.95f, 2, false);
+      for (int seg = 0; seg < 20; seg++) {   // segmented bar
+        float sx = mx + seg * (mw / 20.f), on = clampf(f * 20.f - seg, 0.f, 1.f);
+        g_ren.rect(sx, py + 18 * s, mw / 20.f - 2 * s, 6 * s, C_ACCENT, 0.12f + 0.8f * on, 1 * s);
+      }
+    }
+    py += 40 * s;
+  }
+  auto row = [&](const std::string& k, const std::string& v) { g_ren.text(px, py + 3 * s, 11.5f * s, upperS(k), C_DIM, 0.95f, 0, false); g_ren.text(px + 200 * s, py, 16 * s, ellipsize(v, dw - 248 * s, 16 * s), C_TEXT, 1); py += 26 * s; };
   const char* et[] = {"Piston", "Turboprop", "Turbofan"};
   row("Engines", fmt("%d x %s%s", a.engines, et[a.engineType], a.engineType == ENG_PISTON ? fmt(" (%d-cyl)", a.cylinders).c_str() : ""));
   row("Cruise speed", fmtSpeed(a.cruise));
@@ -672,7 +743,7 @@ void Game::drawHubLogbook(float x, float y, float w, float h) {
   float px = x + 24 * s, py = y + 20 * s;
   g_ren.text(px, py, 26 * s, "Pilot Logbook", C_TEXT, 1); py += 40 * s;
   header(px, py, lw - 48 * s, "RECORD"); py += 26 * s;
-  auto row = [&](const std::string& k, const std::string& v) { g_ren.text(px, py, 16 * s, k, C_DIM, 1); g_ren.text(px + 220 * s, py, 16 * s, ellipsize(v, lw - 268 * s, 16 * s), C_TEXT, 1); py += 27 * s; };
+  auto row = [&](const std::string& k, const std::string& v) { g_ren.text(px, py + 3 * s, 11.5f * s, upperS(k), C_DIM, 0.95f, 0, false); g_ren.text(px + 220 * s, py, 16 * s, ellipsize(v, lw - 268 * s, 16 * s), C_TEXT, 1); py += 27 * s; };
   row("Licence", licenseName(career.license));
   row("Flights", fmt("%d", career.flights));
   row("Successful landings", fmt("%d", career.landings));
@@ -741,6 +812,8 @@ void Game::drawSettings(float x, float y, float w, float h) {
   py += 44 * s;
   if (settingsPage == 1) { drawControls(x, py, w, y + h - py); return; }
   header(x, py, std::min(w, 620 * S()), "DISPLAY / AUDIO / CONTROLS"); py += 28 * s;
+  // eleven rows of controls: closer together when the panel is short (720p), so the last one stays inside it
+  const float rs = clampf((y + h - py - 60 * s - 26 * s) / 11.f, 34 * s, 42 * s);
   auto slider = [&](const std::string& label, float& v, float lo, float hi, float step, const std::string& disp) {
     g_ren.text(x, py + 6 * s, 16 * s, label, C_DIM, 1);
     if (button(x + 250 * s, py, 36 * s, 32 * s, "-")) v = clampf(v - step, lo, hi);
@@ -755,12 +828,12 @@ void Game::drawSettings(float x, float y, float w, float h) {
     if (hv && in.mDown[0]) v = lo + clampf((in.mx - x - 296 * s) / (200 * s), 0, 1) * (hi - lo);
     if (button(x + 506 * s, py, 36 * s, 32 * s, "+")) v = clampf(v + step, lo, hi);
     g_ren.text(x + 556 * s, py + 6 * s, 16 * s, disp, C_TEXT, 1);
-    py += 42 * s;
+    py += rs;
   };
   auto toggle = [&](const std::string& label, bool& v, const char* on, const char* off) {
     g_ren.text(x, py + 6 * s, 16 * s, label, C_DIM, 1);
     if (button(x + 250 * s, py, 200 * s, 32 * s, v ? on : off, true, v)) v = !v;
-    py += 42 * s;
+    py += rs;
   };
   g_ren.text(x, py + 6 * s, 16 * s, "Render resolution", C_DIM, 1);
   {
@@ -774,7 +847,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
   g_ren.text(x, py + 6 * s, 16 * s, "Ray tracing quality", C_DIM, 1);
   const char* q[] = {"Low", "Medium", "High"};
   for (int i = 0; i < 3; i++) if (button(x + 250 * s + i * 100 * s, py, 92 * s, 32 * s, q[i], true, set.quality == i)) { set.quality = i; g_ren.quality = i; }
-  py += 42 * s;
+  py += rs;
   slider("Master volume", set.master, 0, 1, 0.05f, fmt("%.0f%%", set.master * 100));
   slider("Engine volume", set.engineVol, 0, 1.5f, 0.05f, fmt("%.0f%%", set.engineVol * 100));
   slider("Effects volume", set.sfxVol, 0, 1.5f, 0.05f, fmt("%.0f%%", set.sfxVol * 100));
@@ -792,7 +865,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
   py += 6 * s;
   g_ren.text(x, py, 14 * s, "Settings are saved automatically. Edit radio_stations.txt in the save folder to add stations.", C_DIM, 0.8f);
   saveSettings();
-  (void)w; (void)h;
+  (void)w;
 }
 
 // Controls page: every rebindable action with its keyboard key and gamepad button. Click a cell and press the new

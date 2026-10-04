@@ -269,6 +269,7 @@ private:
   void hudPanel(float x, float y, float w, float h, float a = 1.f);
   void header(float x, float y, float w, const std::string& label);
   void card(float x, float y, float w, float h, bool sel, bool hov, vec3 accent);
+  bool uiGlass = false;   // the career hub's style: translucent glass panels and cards over the live scene
   float anim(uint32_t id, float target, float rate);
   std::unordered_map<uint32_t, float> uiAnim;
   float uiDt = 0.016f, uiLastT = 0;
