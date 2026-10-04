@@ -1172,14 +1172,18 @@ uniform int uTrafHullOn;   // the traffic's hulls (third channel of uEnv): where
 bool gTrafCamRay = false;   // the ray being traced is this pixel's camera ray
 vec2 traceTraffic(vec3 ro, vec3 rd, float tmax, out int idx){
   vec2 best = vec2(-1.0); idx = -1;
+  float hs = -1.0;   // where the hulls say traffic can begin on this ray (-1: no hull information)
   if (uTrafHullOn == 1 && gTrafCamRay) {
     float hv = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).b;
-    if (hv > 1e29) return best;
-    gPlStart = hv > 0.0 ? max(0.0, hv*0.999 - 0.1) : 0.0;
+    hs = hv > 1e29 ? 1e30 : (hv > 0.0 ? max(0.0, hv*0.999 - 0.1) : 0.0);
   }
   for (int k = 0; k < 12; k++) {
     if (k >= uTrafficN) break;
     vec4 P = texelFetch(uTraffic, ivec2(24, k), 0);
+    // the hull pass projects to 2 km (aircraft_hull.cpp): it speaks only for aircraft wholly inside that range
+    bool hulled = hs >= 0.0 && length(P.xyz - ro) + P.w < 1900.0;
+    if (hulled && hs > 1e29) continue;
+    gPlStart = hulled ? hs : 0.0;
     vec3 oc = ro - P.xyz; float b = dot(oc, rd), h = b*b - dot(oc, oc) + P.w*P.w;
 )"
 R"(    float lim = best.x > 0.0 ? best.x : tmax;

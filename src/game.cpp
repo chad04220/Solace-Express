@@ -107,6 +107,7 @@ void Game::loadSettings() {
   if (!f) return;
   char k[64]; float v;
   while (fscanf(f, "%63s %f", k, &v) == 2) {
+    if (!std::isfinite(v) || fabsf(v) > 1e6f) continue;   // a damaged value keeps the default
     std::string s = k;
     if (s == "renderScale") set.renderScale = 1.0f;   // old setting: rendering is now always at 100%
     else if (s == "quality") set.quality = (int)clampf(v, 0, 2);
@@ -266,6 +267,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   static bool dispWarned = false;   // say once if the cockpit display shader could not be built on this GPU
   if (!g_ren.dispError.empty() && !dispWarned && !headless) { dispWarned = true; toast("Cockpit display shader failed on this GPU (details in startup.log)", vec3(1.f, 0.45f, 0.35f)); }
   contract = c; specIdx = spec; source = src;
+  researchFlight = false;   // a career flight; launchResearch sets it again for its own
   wx = c.wx; timeOfDay = wx.timeOfDay;
   const AircraftSpec& s = kAircraft[spec];
   const Airport& a = g_world.airports[c.from];
@@ -800,6 +802,7 @@ void Game::updateLoading(float dt) {
   if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) {   // back out to where the flight was chosen
     dbgCam = false; g_ren.entBudgetMs = 2.5f;
     screen = researchFlight ? SCR_RESEARCH : SCR_HUB;
+    researchFlight = false;   // (nothing of the cancelled session carries into the next flight)
   }
 }
 
@@ -940,7 +943,7 @@ void Game::launchResearch() {
     plane.reset(&kAircraft[resCraft], p, plane.heading(), kAircraft[resCraft].maxFuel, 85, true, 200.f);
     plane.ctl.throttle = 0.7f; takeoffAnnounced = true;
     camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 4, 26));
-  } else toast(wr ? "F/V tilts the four thruster pods: full down for vertical takeoff" : "F/V swivels the nozzles: full down for vertical takeoff", vec3(0.7f, 0.9f, 1));
+  } else if (wr) toast("F/V tilts the four thruster pods: full down for vertical takeoff", vec3(0.7f, 0.9f, 1));
   prevMach = 0;
 }
 

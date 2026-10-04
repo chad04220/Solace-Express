@@ -37,3 +37,12 @@
 - The "take off again" reminder for unflown checkpoints can no longer be skipped at low frame rates
 - Settings are written only when something changes (and through a temp file), not every frame while the settings page is open
 - The settings page shows where radio_stations.txt lives
+- Saves: a damaged save is never rotated over a good backup, a failed save always leaves a loadable copy, and a cut-off save file is rejected (so the backup is used) instead of silently losing aircraft and logbook entries
+- Backing out of a research flight's loading screen no longer turns the next career flight into an uncredited research flight
+- An urgent tower call that cuts in (a takeoff or landing clearance, a go-around) now shows its text on screen like every other call
+- Alt+Enter only toggles fullscreen (it no longer also acts as Enter, e.g. launching a research flight or engaging autoland), and a disconnected gamepad releases everything it was holding
+- Distant aircraft (fly-by camera 400-700 m away, traffic beyond 2 km) no longer drop out of the picture
+- Turning your head or zooming in the cockpit no longer briefly hides scenery behind where the cabin was
+- Airport terminals and other large buildings are solid everywhere (they had holes near chunk edges and at corners), for both collisions and weapons
+- Laser and bomb hits on aircraft use the aircraft's whole hit sphere
+- AI traffic keeps clear of rising ground on approach and in the pattern; re-summoning the Spectre pair no longer disturbs a passing formation

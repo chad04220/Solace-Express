@@ -327,6 +327,13 @@ void Traffic::updateAirport(TrafficCraft& c, float dt, vec3 playerPos, bool play
       c.bank += clampf(clampf(err * 2.f, -0.35f, 0.35f) - c.bank, -0.5f * dt, 0.5f * dt);
       c.hdg = wrapPi(c.hdg + G * tanf(c.bank) / std::max(c.speed, 20.f) * dt);
       float altT = hRw + std::max(du, 0.f) * 0.0524f;
+      // the glide path never into rising ground short of the field: hold a clearance over it, and go around if the
+      // approach still ends up low over terrain
+      if (du > 500.f) {
+        float gnd = g_world.height(c.pos.x, c.pos.z);
+        altT = std::max(altT, gnd + gh + 40.f);
+        if (c.pos.y < gnd + gh + 20.f) { c.state = TrafficCraft::CLIMB; c.gear = 1; break; }
+      }
       float vsT = clampf(-c.speed * 0.0524f + (altT - c.pos.y) * 0.3f, -8.f, 4.f);
       float hab = c.pos.y - g_world.height(c.pos.x, c.pos.z) - gh;
       if (hab < 7.f) vsT = std::max(-1.2f, -0.15f * hab - 0.4f);   // flare
@@ -531,6 +538,7 @@ vec3 Traffic::escRel(int act, float t, float side, float* roll, bool* smoke) con
 
 void Traffic::spawnEscort(vec3 player, vec3 playerVel) {
   craft.erase(std::remove_if(craft.begin(), craft.end(), [](const TrafficCraft& c) { return c.role == TrafficCraft::ESCORT; }), craft.end());
+  relinkLeaders();   // (before anything reads a wingman's leader index again)
   vec3 f = playerVel; f.y = 0;
   escF = length(f) > 5.f ? normalize(playerVel) : vec3(0, 0, -1);
   escV = std::max(length(playerVel), 40.f); escLift = 0;
@@ -569,10 +577,15 @@ int Traffic::rayHit(vec3 a, vec3 d, float len, float& tHit) const {
   for (int i = 0; i < (int)craft.size(); i++) {
     const TrafficCraft& c = craft[i];
     if (!c.alive || c.role == TrafficCraft::ESCORT) continue;
+    // the segment's first point inside the aircraft's hit sphere (0 when it starts inside)
     float r = std::max(kAircraft[c.spec].span, kAircraft[c.spec].fusLen) * 0.45f;
-    float t = dot(c.pos - a, d);
-    if (t < 0 || t > tHit) continue;
-    if (length(c.pos - (a + d * t)) < r) { tHit = t; best = i; }
+    vec3 o = a - c.pos;
+    float b = dot(o, d), cc = dot(o, o) - r * r;
+    float t;
+    if (cc <= 0.f) t = 0.f;
+    else { float disc = b * b - cc; if (disc < 0.f || b > 0.f) continue; t = -b - sqrtf(disc); }
+    if (t > tHit) continue;
+    tHit = t; best = i;
   }
   return best;
 }
@@ -658,8 +671,10 @@ void Traffic::updateEscorts(float dt, vec3 player, vec3 playerVel) {
 // ------------------------------------------------------------------ update
 bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround, float playerSpan) {
   puffs.clear(); booms.clear(); flybys.clear(); radio.clear();
-  if (!enabled)   // traffic off in the settings: only a summoned display pair flies
+  if (!enabled) {   // traffic off in the settings: only a summoned display pair flies
     craft.erase(std::remove_if(craft.begin(), craft.end(), [](const TrafficCraft& c) { return c.role != TrafficCraft::ESCORT; }), craft.end());
+    relinkLeaders();
+  }
   t += dt;
   bool hitPlayer = false;
   updateEscorts(dt, player, playerVel);
@@ -751,6 +766,11 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
     // ground safety for anything flying
     float g = g_world.height(c.pos.x, c.pos.z);
     if (c.role != TrafficCraft::AIRPORT && c.pos.y < g + 30.f) { c.pos.y = g + 30.f; if (c.vel.y < 0) c.vel.y = 0; }
+    // airport traffic climbing out or in the pattern keeps clear of the ground too (final has its own check)
+    if (c.role == TrafficCraft::AIRPORT && (c.state == TrafficCraft::CLIMB || c.state == TrafficCraft::CIRCUIT) && c.pos.y < g + 30.f) {
+      const Airport& ap = g_world.airports[c.airport];   // (not over the field itself, where it has just lifted off)
+      if (length(vec2(c.pos.x - ap.x, c.pos.z - ap.z)) > ap.length * 0.5f + 400.f) { c.pos.y = g + 30.f; if (c.vel.y < 0) c.vel.y = 0; }
+    }
     // effects: display smoke, reheat embers
     if (c.smoke) {   // display smoke, spread along this frame's path so it draws a continuous ribbon
       int n = (int)clampf(c.speed * dt / 2.5f, 1.f, 6.f);
@@ -770,7 +790,13 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
     if (dist < (playerSpan + s.span) * 0.32f && !playerOnGround && c.role == TrafficCraft::AIRPORT && c.state >= TrafficCraft::CLIMB && c.state <= TrafficCraft::FINAL) hitPlayer = true;
   }
   craft.erase(std::remove_if(craft.begin(), craft.end(), [](const TrafficCraft& c) { return !c.alive; }), craft.end());
-  // leader indices shift when craft are removed: re-link wingmen by finding the craft spawned just before them
+  relinkLeaders();
+  return hitPlayer;
+}
+
+// leader indices shift when craft are removed: re-link wingmen by finding the craft spawned just before them. Called
+// right after every removal, before any wingman reads its leader again
+void Traffic::relinkLeaders() {
   for (size_t i = 0; i < craft.size(); i++) {
     TrafficCraft& c = craft[i];
     if (c.role != TrafficCraft::FORMATION && c.role != TrafficCraft::STUNT) continue;
@@ -780,7 +806,6 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
       c.leader = L;
     }
   }
-  return hitPlayer;
 }
 
 int Traffic::fillVisuals(vec3 camPos, TrafficVisual* out, int maxN, int* order) const {

@@ -154,6 +154,7 @@ private:
   void bakeTerrainShadow(const FrameParams& fp);            // analysis build of the ray tracer (built on demand)
   GLuint progCkMask = 0;           // cockpit occlusion mask for the scenery pass
   bool depthValid = false, ckMaskPrev = false;   // last frame's ray-traced depth is usable / was a cockpit view
+  vec3 ckLookPrev, ckUpPrev; float ckFovPrev = 0;   // last frame's view inside the cabin (the mask's validity, entity_render.cpp)
   void renderDisplays(const FrameParams& fp, bool panel);
   GLuint progRT = 0, progSprite = 0, progDown = 0, progUp = 0, progRayMask = 0, progRay = 0, progPost = 0, progUI = 0, progTAA = 0, progFeedRays = 0;
   static constexpr int kBloomMips = 6;
@@ -237,6 +238,7 @@ private:
     GLuint texRaw = 0, texDepth = 0, texCloudMask = 0, texCloud = 0, texCloudD = 0, fboCloud = 0, fboComp = 0, fboScene = 0;
     GLuint texGB[3] = {0, 0, 0}, texGBDepth = 0, fboGB = 0, texEnv = 0, texEnvDepth = 0, fboEnv = 0;
     bool depthValid = false, envOn = false, hullOn = false, trafHullOn = false, ckMaskPrev = false;
+    vec3 ckLookPrev, ckUpPrev; float ckFovPrev = 0;
     float jitX = 0, jitY = 0;
   };
   void swapView(ViewTargets& v);

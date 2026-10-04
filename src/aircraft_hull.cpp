@@ -313,6 +313,10 @@ void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key) {
   if (it == hulls.end()) return;
   HullMesh& H = it->second;
   if (!H.ok || !H.verts || !fboEnv) return;
+  // the projection below reaches kHullFar: an aircraft that may extend past it (a fly-by camera 400-700 m off) would be
+  // clipped from its own hull and vanish, so then the hull is left off and the ray tracer marches it as usual
+  static const float kHullFar = 400.f;
+  if (length(fp.plane.pos - fp.camPos) + 45.f > kHullFar * 0.95f) return;
   ensureHullTarget();
   glBindFramebuffer(GL_FRAMEBUFFER, fboHull);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texEnv, 0);
@@ -325,7 +329,7 @@ void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key) {
   glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);
   glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDisable(GL_CULL_FACE); glDisable(GL_BLEND);
   glUseProgram(progHull);
-  mat4 vp = viewProj(fp, 0.01f, 400.f);   // a near plane at 1 cm: in the cockpit the seats and controls are closer than 0.5 m
+  mat4 vp = viewProj(fp, 0.01f, kHullFar);   // a near plane at 1 cm: in the cockpit the seats and controls are closer than 0.5 m
   glUniformMatrix4fv(glGetUniformLocation(progHull, "uVP"), 1, GL_FALSE, vp.m);
   glUniform2f(glGetUniformLocation(progHull, "uJit"), jitX, jitY);
   glUniform3f(glGetUniformLocation(progHull, "uCam"), fp.camPos.x, fp.camPos.y, fp.camPos.z);

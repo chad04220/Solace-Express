@@ -27,7 +27,7 @@ int main() {
   const char* bad[] = {
     "solace_save 1\nlicense 1\nplane kestrel 999 70\n",                                   // fleet airport out of range
     "solace_save 1\n",                                                                    // header only
-    "solace_save 2\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // unknown version
+    "solace_save 3\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // unknown version
     "solace_save 1\nmoney 5\nlicense 9\nlocation 0\nstory 0\n",                           // bad license
     "solace_save 1\nmoney 5\nlicense 0\nlocation -3\nstory 0\n",                          // bad location
     "solace_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 999\n",                         // story past the end
@@ -66,6 +66,31 @@ int main() {
   // a second save keeps the first as .bak
   check(big.save(p), "second save");
   check(readFile(p + ".bak") == before, "previous save kept as .bak");
+  // every truncated prefix of a current save (cut at any line) is rejected, so the backup is used instead
+  {
+    Career t = r; t.fleet.push_back({2, 1, 30.f, 0.f}); t.flights = 31; t.hours = 16.5f;
+    check(t.save("save_test_trunc.sav"), "truncation source writes");
+    std::string full = readFile("save_test_trunc.sav");
+    int accepted = 0;
+    for (size_t k = 0; k + 1 < full.size(); k++) if (full[k] == '\n') {
+      writeFile("save_test_bad.sav", full.substr(0, k + 1).c_str());
+      Career c = r; if (c.load("save_test_bad.sav")) accepted++;
+    }
+    check(accepted == 0, "no truncated current save loads");
+    Career c; c.newGame(); check(c.load("save_test_trunc.sav") && c.fleet.size() == 2 && c.flights == 31, "the complete save loads");
+    remove("save_test_trunc.sav"); remove("save_test_trunc.sav.bak");
+  }
+  // recovered from the backup with a damaged primary: saving again never rotates the damaged file over the backup
+  {
+    std::string good = readFile(p);
+    writeFile(p, "solace_save 2\nmoney 5\n");   // damaged primary
+    Career c; c.newGame();
+    check(!c.load(p) && c.load(p + ".bak"), "damaged primary, good backup");
+    check(c.save(p), "save after recovery");
+    Career b; b.newGame(); check(b.load(p + ".bak"), "backup still loads after saving over a damaged primary");
+    Career m; m.newGame(); check(m.load(p), "new primary loads");
+    (void)good;
+  }
   remove(p.c_str()); remove((p + ".bak").c_str()); remove("save_test_bad.sav"); remove("save_test_old.sav");
   printf("save_test: %s (%d failures)\n", fails ? "FAIL" : "ok", fails);
   return fails ? 1 : 0;

@@ -266,19 +266,22 @@ void AtcVoice::say(const Tx& tx) {
   }
 }
 
+// Returns each started transmission exactly once: one started here, or one that cut in from say() since the last call
 AtcVoice::Tx AtcVoice::update(float dt) {
-  started = Tx();
-  if (busy()) return started;
-  playingPrio = -1;
-  idleT += dt;
-  if (!queue.empty() && idleT > 0.6f) {   // the most important waiting call, oldest first
-    size_t best = 0;
-    for (size_t i = 1; i < queue.size(); i++) if (queue[i].prio > queue[best].prio) best = i;
-    Tx tx = queue[best];
-    queue.erase(queue.begin() + best);
-    start(tx);
+  if (!busy()) {
+    playingPrio = -1;
+    idleT += dt;
+    if (started.ids.empty() && !queue.empty() && idleT > 0.6f) {   // the most important waiting call, oldest first
+      size_t best = 0;
+      for (size_t i = 1; i < queue.size(); i++) if (queue[i].prio > queue[best].prio) best = i;
+      Tx tx = queue[best];
+      queue.erase(queue.begin() + best);
+      start(tx);
+    }
   }
-  return started;
+  Tx out = std::move(started);
+  started = Tx();
+  return out;
 }
 
-void AtcVoice::cancel() { queue.clear(); if (busy()) g_audio.voiceStop(); playingPrio = -1; }
+void AtcVoice::cancel() { queue.clear(); started = Tx(); if (busy()) g_audio.voiceStop(); playingPrio = -1; }

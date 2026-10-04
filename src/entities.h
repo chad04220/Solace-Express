@@ -55,6 +55,7 @@ public:
     std::vector<Ent> ents;              // sorted by kind
     uint32_t off[EK_COUNT + 1] = {};    // ents[off[k], off[k+1]) are of kind k
     float ymin = 0, ymax = 0;           // vertical bounds of everything in the chunk
+    float reach = 0;                    // how far any entity's footprint extends past the chunk's square (m)
     int lastUse = 0;
   };
   Chunk* get(int cx, int cz);                        // nullptr when outside the world; never generates

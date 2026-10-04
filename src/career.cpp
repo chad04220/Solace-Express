@@ -397,14 +397,18 @@ bool Career::save(const std::string& path) const {
   std::string tmp = path + ".tmp";
   FILE* f = fopen(tmp.c_str(), "w");
   if (!f) return false;
-  bool ok = fprintf(f, "solace_save 1\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\n",
+  bool ok = fprintf(f, "solace_save 2\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\n",
                     money, license, reputation, location, storyIndex, flights, landings, crashes, hours, bestLandingFpm, boardSeed, finished ? 1 : 0) > 0;
+  ok = ok && fprintf(f, "fleet %d\n", (int)fleet.size()) > 0;
   for (auto& p : fleet) ok = ok && fprintf(f, "plane %s %d %f\n", kAircraft[p.spec].id, p.location, p.fuel) > 0;
-  fprintf(f, "end\n");
+  ok = ok && fprintf(f, "end\n") > 0;
   ok = ok && fflush(f) == 0 && !ferror(f);
   ok = (fclose(f) == 0) && ok;
   if (!ok) { remove(tmp.c_str()); return false; }
-  if (FILE* old = fopen(path.c_str(), "r")) { fclose(old); replaceFile(path, path + ".bak"); }
+  // the current save becomes the backup only if it is itself a good save: a damaged one (the game may have just
+  // recovered from the backup) must never replace the good backup. If the final replacement then fails, the
+  // backup still holds the last good career.
+  { Career probe; if (probe.load(path)) replaceFile(path, path + ".bak"); }
   if (!replaceFile(tmp, path)) { remove(tmp.c_str()); return false; }
   return true;
 }
@@ -416,26 +420,28 @@ bool Career::load(const std::string& path) {
   FILE* f = fopen(path.c_str(), "r");
   if (!f) return false;
   Career c; char key[64]; int ver = 0;
-  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver != 1) { fclose(f); return false; }
+  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 2) { fclose(f); return false; }
   const int nApt = (int)g_world.airports.size();
   bool ok = true;
-  unsigned have = 0;   // mandatory fields seen
+  unsigned have = 0;   // mandatory fields seen (version 2: every field, the fleet count and the end marker)
+  int fleetN = -1; bool ended = false;
   auto rdI = [&](int& v, unsigned bit) { ok = ok && fscanf(f, "%d", &v) == 1; have |= bit; };
   auto rdF = [&](float& v) { ok = ok && fscanf(f, "%f", &v) == 1 && std::isfinite(v); };
   while (ok && fscanf(f, "%63s", key) == 1) {
     int fin = 0;
     if (!strcmp(key, "money")) rdI(c.money, 1);
     else if (!strcmp(key, "license")) rdI(c.license, 2);
-    else if (!strcmp(key, "rep")) rdI(c.reputation, 0);
+    else if (!strcmp(key, "rep")) rdI(c.reputation, 16);
     else if (!strcmp(key, "location")) rdI(c.location, 4);
     else if (!strcmp(key, "story")) rdI(c.storyIndex, 8);
-    else if (!strcmp(key, "flights")) rdI(c.flights, 0);
-    else if (!strcmp(key, "landings")) rdI(c.landings, 0);
-    else if (!strcmp(key, "crashes")) rdI(c.crashes, 0);
-    else if (!strcmp(key, "hours")) rdF(c.hours);
-    else if (!strcmp(key, "best")) rdF(c.bestLandingFpm);
-    else if (!strcmp(key, "seed")) ok = fscanf(f, "%u", &c.boardSeed) == 1;
-    else if (!strcmp(key, "finished")) { rdI(fin, 0); c.finished = fin != 0; }
+    else if (!strcmp(key, "flights")) rdI(c.flights, 32);
+    else if (!strcmp(key, "landings")) rdI(c.landings, 64);
+    else if (!strcmp(key, "crashes")) rdI(c.crashes, 128);
+    else if (!strcmp(key, "hours")) { rdF(c.hours); have |= 256; }
+    else if (!strcmp(key, "best")) { rdF(c.bestLandingFpm); have |= 512; }
+    else if (!strcmp(key, "seed")) { ok = fscanf(f, "%u", &c.boardSeed) == 1; have |= 1024; }
+    else if (!strcmp(key, "finished")) { rdI(fin, 2048); c.finished = fin != 0; }
+    else if (!strcmp(key, "fleet")) ok = fscanf(f, "%d", &fleetN) == 1 && fleetN >= 0;
     else if (!strcmp(key, "plane")) {
       char id[64]; int loc = -1; float fuel = 0; int spec = -1;
       ok = fscanf(f, "%63s %d %f", id, &loc, &fuel) == 3;
@@ -443,10 +449,11 @@ bool Career::load(const std::string& path) {
       ok = ok && spec >= 0 && loc >= 0 && loc < nApt && std::isfinite(fuel);
       if (ok) c.fleet.push_back({spec, loc, std::clamp(fuel, 0.f, kAircraft[spec].maxFuel), 0.f});
     }
-    else if (!strcmp(key, "end")) break;   // older saves have no marker and end at EOF
+    else if (!strcmp(key, "end")) { ended = true; break; }   // version 1 saves may have no marker and end at EOF
     else ok = false;   // unknown key: not a file this version wrote
   }
   fclose(f);
+  if (ver >= 2) ok = ok && have == 4095 && ended && fleetN == (int)c.fleet.size();   // a truncated save is rejected
   ok = ok && (have & 15) == 15
        && c.license >= LIC_STUDENT && c.license <= LIC_ATP
        && c.location >= 0 && c.location < nApt

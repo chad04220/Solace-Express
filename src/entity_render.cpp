@@ -366,6 +366,17 @@ void Renderer::drawEntities(const FrameParams& fp) {
   // cockpit view: the screen area the cabin covered last frame is filled with the nearest depth first, so the scenery
   // behind the cabin walls fails the depth test before it is shaded (only the windows and displays draw it)
   bool ckView = fp.plane.on && fp.plane.PS[3] > 0.5f && fp.wreck.pieces == 0;
+  // last frame's cabin only stands for this frame's while the view inside the cabin holds still: the look direction
+  // (relative to the airframe) and the zoom. Any head turn or zoom skips the mask for the frame (it never hides scenery
+  // that a window has just uncovered)
+  {
+    const float* R = fp.plane.rot;   // body -> world, column-major: body axes are the columns
+    vec3 bx(R[0], R[1], R[2]), by(R[3], R[4], R[5]), bz(R[6], R[7], R[8]);
+    vec3 lb(dot(fp.camBack, bx), dot(fp.camBack, by), dot(fp.camBack, bz)), lu(dot(fp.camUp, bx), dot(fp.camUp, by), dot(fp.camUp, bz));
+    bool still = dot(lb, ckLookPrev) > 0.999998f && dot(lu, ckUpPrev) > 0.999998f && fabsf(fp.fovY - ckFovPrev) < 1e-4f;
+    ckLookPrev = lb; ckUpPrev = lu; ckFovPrev = fp.fovY;
+    if (!still) ckMaskPrev = false;
+  }
   if (ckView && ckMaskPrev && depthValid && progCkMask && !draws[0].empty()) {
     glUseProgram(progCkMask);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texDepth);

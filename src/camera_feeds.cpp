@@ -16,7 +16,7 @@ void Renderer::swapView(ViewTargets& v) {
   std::swap(texGBDepth, v.texGBDepth); std::swap(fboGB, v.fboGB);
   std::swap(texEnv, v.texEnv); std::swap(texEnvDepth, v.texEnvDepth); std::swap(fboEnv, v.fboEnv);
   std::swap(depthValid, v.depthValid); std::swap(envOn, v.envOn); std::swap(hullOn, v.hullOn); std::swap(trafHullOn, v.trafHullOn);
-  std::swap(ckMaskPrev, v.ckMaskPrev); std::swap(jitX, v.jitX); std::swap(jitY, v.jitY);
+  std::swap(ckMaskPrev, v.ckMaskPrev); std::swap(ckLookPrev, v.ckLookPrev); std::swap(ckUpPrev, v.ckUpPrev); std::swap(ckFovPrev, v.ckFovPrev); std::swap(jitX, v.jitX); std::swap(jitY, v.jitY);
 }
 
 // The pictures are only needed while the pilot can see the displays: the cockpit view of a research jet.

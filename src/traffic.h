@@ -74,6 +74,7 @@ private:
   void updateEscorts(float dt, vec3 player, vec3 playerVel);
   float escDur(int act) const;
   void escMark();
+  void relinkLeaders();
   vec3 escRel(int act, float t, float side, float* roll, bool* smoke) const;
   vec3 escF = vec3(0, 0, -1); float escV = 60.f, escLift = 0; int escNext = 0, escLeft = 0;
   void groundTaxi(TrafficCraft& c, float dt, float maxSpeed, vec3 playerPos, bool playerOnGround);

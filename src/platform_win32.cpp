@@ -93,9 +93,12 @@ static LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_DISPLAYCHANGE: case WM_EXITSIZEMOVE: if (s_swapInterval || !s_vsyncDiv) setupPacing(h); break;   // refresh rate / monitor may have changed
     case WM_SIZE: if (g_ren.ok) g_ren.resize(LOWORD(lp), HIWORD(lp)); return 0;
     case WM_KEYDOWN: case WM_SYSKEYDOWN:
+      if (msg == WM_SYSKEYDOWN && wp == VK_RETURN) {   // Alt+Enter: fullscreen only (the Enter never reaches the game)
+        if (!(lp & (1 << 30))) { toggleFullscreen(); setupPacing(h); if (g_game) g_game->set.fullscreen = g_fullscreen; }
+        return 0;
+      }
       if (in && wp < 256) { if (!(lp & (1 << 30))) in->pressed[wp] = true; in->down[wp] = true; }
       if (wp == VK_F10 || wp == VK_MENU) return 0;
-      if (msg == WM_SYSKEYDOWN && wp == VK_RETURN) { toggleFullscreen(); setupPacing(h); return 0; }
       break;
     case WM_KEYUP: case WM_SYSKEYUP:
       if (in && wp < 256) in->down[wp] = false;
@@ -176,7 +179,10 @@ static void stopAudio() {
 static void pollPad(Input& in) {
   if (!s_xinput) return;
   XState st = {};
-  if (s_xinput(0, &st) != 0) { in.pad = false; return; }
+  if (s_xinput(0, &st) != 0) {   // disconnected: nothing it was holding stays held
+    if (in.pad) { in.buttons = 0; in.lx = in.ly = in.rx = in.ry = in.lt = in.rt = 0; }
+    in.pad = false; return;
+  }
   in.pad = true;
   auto ax = [](SHORT v) { return clampf(v / 32767.f, -1, 1); };
   in.lx = ax(st.Gamepad.sThumbLX); in.ly = ax(st.Gamepad.sThumbLY); in.rx = ax(st.Gamepad.sThumbRX); in.ry = ax(st.Gamepad.sThumbRY);

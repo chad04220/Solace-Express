@@ -207,7 +207,8 @@ void putBuilding(Ctx& C, int kind, float x, float z, float yaw, float hw, float 
 // The lighthouse stands on the shore of Lighthouse Key: the low land point nearest the sea around the village
 bool lighthouseSite(float& lx, float& lz, float& yaw) {
   static int state = 0; static float sx = 0, sz = 0, sy = 0;
-  if (!state) {
+  static std::once_flag once;   // (the scenery workers ask at the same time: found once, then only read)
+  std::call_once(once, [&] {
     state = 2;
     const Town* T = nullptr;
     for (int i = 0; i < kNumTowns; i++) if (!strcmp(kTowns[i].name, "Lighthouse Key")) T = &kTowns[i];
@@ -221,7 +222,7 @@ bool lighthouseSite(float& lx, float& lz, float& yaw) {
           float score = r * 0.02f + fabsf(g - 7.f);
           if (score < best) { best = score; sx = x; sz = z; sy = atan2f(dx, dz); state = 1; }
         }
-  }
+  });
   lx = sx; lz = sz; yaw = sy;
   return state == 1;
 }
@@ -499,7 +500,8 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
     }
   }
   ch.ents.clear();
-  ch.ymin = 1e9f; ch.ymax = -1e9f;
+  ch.ymin = 1e9f; ch.ymax = -1e9f; ch.reach = 0;
+  const float x0 = chunkX0(cx), z0 = chunkX0(cz);
   for (int k = 0; k < EK_COUNT; k++) {
     // trees, bushes and small rocks in ascending order of their thinning key, so the renderer keeps a prefix of the
     // list when it thins a whole chunk out with distance (see entThinKey)
@@ -508,6 +510,8 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
     for (const Ent& e : lists[k]) {
       ch.ents.push_back(e);
       ch.ymin = std::min(ch.ymin, e.y); ch.ymax = std::max(ch.ymax, e.y + kEntInfo[k].h * e.sy);
+      float R = hypotf(kEntInfo[k].hx * e.sx, kEntInfo[k].hz * e.sz);   // (a big terminal reaches well into the next chunk)
+      ch.reach = std::max({ch.reach, x0 - (e.x - R), e.x + R - (x0 + CH), z0 - (e.z - R), e.z + R - (z0 + CH)});
     }
   }
   ch.off[EK_COUNT] = (uint32_t)ch.ents.size();
@@ -538,12 +542,33 @@ void Scenery::trim(vec3 cam, float keepDetail, float keepAll, int frame) {
 }
 
 // ------------------------------------------------------------------ collisions
+// Entities belong to the chunk holding their centre, but a large one (an airport terminal) reaches into its
+// neighbours. Queries visit every chunk within the largest reach any entity can have (entityPad: natural scenery stays
+// within 20 m, the airport buildings are measured from the layouts), and skip each chunk the query doesn't come within
+// that chunk's own reach of.
+static float outside(float v, float lo, float hi) { return v < lo ? lo - v : v > hi ? v - hi : 0.f; }
+static float entityPad() {
+  static float pad = 20.f;
+  static std::once_flag once;
+  std::call_once(once, [] {
+    std::vector<AptItem> items;
+    for (int i = 0; i < (int)g_world.airports.size(); i++) {
+      items.clear(); airportItems(i, items);
+      for (auto& it : items) pad = std::max(pad, hypotf(kEntInfo[it.kind].hx * it.e.sx, kEntInfo[it.kind].hz * it.e.sz) + 2.f);
+    }
+  });
+  return pad;
+}
 int Scenery::collide(vec3 p, float r, Ent* entOut) {
-  int c0x = chunkOf(p.x - r - 20.f), c1x = chunkOf(p.x + r + 20.f), c0z = chunkOf(p.z - r - 20.f), c1z = chunkOf(p.z + r + 20.f);
+  float pad = entityPad();
+  int c0x = chunkOf(p.x - r - pad), c1x = chunkOf(p.x + r + pad), c0z = chunkOf(p.z - r - pad), c1z = chunkOf(p.z + r + pad);
   for (int cz = c0z; cz <= c1z; cz++)
     for (int cx = c0x; cx <= c1x; cx++) {
+      float ox = outside(p.x, chunkX0(cx), chunkX0(cx) + CH), oz = outside(p.z, chunkX0(cz), chunkX0(cz) + CH);
+      if (ox * ox + oz * oz > (pad + r) * (pad + r)) continue;
       Chunk* ch = ensure(cx, cz, 2);
       if (!ch || ch->ents.empty() || p.y - r > ch->ymax || p.y + r < ch->ymin) continue;
+      if (ox * ox + oz * oz > (ch->reach + r) * (ch->reach + r) && (ox > 0 || oz > 0)) continue;   // (beyond this chunk's own reach)
       for (int k = 0; k < EK_COUNT; k++) {
         if (k == EK_RWYLIGHT || k == EK_PAPI) continue;   // frangible airport fixtures
         const EntKindInfo& I = kEntInfo[k];
@@ -551,8 +576,8 @@ int Scenery::collide(vec3 p, float r, Ent* entOut) {
         for (uint32_t i = ch->off[k]; i < ch->off[k + 1]; i++) {
           const Ent& e = ch->ents[i];
           float dx = p.x - e.x, dz = p.z - e.z, ly = p.y - e.y;
-          float R = std::max(I.hx * e.sx, I.hz * e.sz);
-          if (dx * dx + dz * dz > (R + r) * (R + r) * 1.5f || ly < -r - 1.f || ly > I.h * e.sy + r) continue;
+          float R = hypotf(I.hx * e.sx, I.hz * e.sz);   // the circle through the footprint's corners
+          if (dx * dx + dz * dz > (R + r) * (R + r) || ly < -r - 1.f || ly > I.h * e.sy + r) continue;
           if (destroyed(e)) continue;
           if (cls == EC_TREE) {
             // the crown (trunks alone are too thin to matter at flying speeds)
@@ -596,25 +621,30 @@ float Scenery::raycast(vec3 a, vec3 d, float L, int* kindOut, Ent* entOut) {
     t0 = tn; return true;
   };
   float best = -1.f; int bestK = 0; Ent bestE{};
-  float mx0 = std::min(a.x, b.x) - 30.f, mx1 = std::max(a.x, b.x) + 30.f, mz0 = std::min(a.z, b.z) - 30.f, mz1 = std::max(a.z, b.z) + 30.f;
+  float pad = entityPad() + r;   // (chunks and reach: see collide)
+  float sx0 = std::min(a.x, b.x), sx1 = std::max(a.x, b.x), sz0 = std::min(a.z, b.z), sz1 = std::max(a.z, b.z);
   float ylo = std::min(a.y, b.y) - r, yhi = std::max(a.y, b.y) + r;
-  for (int cz = chunkOf(mz0); cz <= chunkOf(mz1); cz++)
-    for (int cx = chunkOf(mx0); cx <= chunkOf(mx1); cx++) {
+  for (int cz = chunkOf(sz0 - pad); cz <= chunkOf(sz1 + pad); cz++)
+    for (int cx = chunkOf(sx0 - pad); cx <= chunkOf(sx1 + pad); cx++) {
+      float cx0 = chunkX0(cx), cz0 = chunkX0(cz);
+      float gx = std::max({cx0 - sx1, sx0 - (cx0 + CH), 0.f}), gz = std::max({cz0 - sz1, sz0 - (cz0 + CH), 0.f});   // box gap
+      if (gx * gx + gz * gz > pad * pad) continue;
       Chunk* ch = ensure(cx, cz, 2);
       if (!ch || ch->ents.empty() || ylo > ch->ymax || yhi < ch->ymin) continue;
+      if (gx * gx + gz * gz > (ch->reach + r) * (ch->reach + r)) continue;
       for (int k = 0; k < EK_COUNT; k++) {
         if (k == EK_RWYLIGHT || k == EK_PAPI) continue;
         const EntKindInfo& I = kEntInfo[k];
         int cls = entClass(k);
         for (uint32_t i = ch->off[k]; i < ch->off[k + 1]; i++) {
           const Ent& e = ch->ents[i];
-          float R = std::max(I.hx * e.sx, I.hz * e.sz) + r, H = I.h * e.sy;
+          float R = hypotf(I.hx * e.sx, I.hz * e.sz) + r, H = I.h * e.sy;
           // quick reject: horizontal distance from the segment, vertical range
           vec3 rel = vec3(e.x, 0, e.z) - vec3(a.x, 0, a.z);
           vec3 dh(d.x, 0, d.z); float dh2 = dot(dh, dh);
           float th = dh2 > 1e-8f ? clampf(dot(rel, dh) / dh2, 0.f, L) : 0.f;
           vec3 cp = vec3(a.x, 0, a.z) + dh * th;
-          if ((cp.x - e.x) * (cp.x - e.x) + (cp.z - e.z) * (cp.z - e.z) > R * R * 1.5f || yhi < e.y - 1.f || ylo > e.y + H + r) continue;
+          if ((cp.x - e.x) * (cp.x - e.x) + (cp.z - e.z) * (cp.z - e.z) > R * R || yhi < e.y - 1.f || ylo > e.y + H + r) continue;
           vec3 o = a - vec3(e.x, e.y, e.z);
           float t = -1.f;
           if (cls == EC_TREE) {   // crown: vertical cylinder from y0 to the top
