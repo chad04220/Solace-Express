@@ -3493,6 +3493,27 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
               rv = max(rv, (1.0 - smoothstep(0.005, 0.005 + px, fd))*smoothstep(0.012, 0.003, px)*step(-0.2, yr));
             }
             m.alb *= 1.0 - 0.32*sm; m.alb *= 1.0 + 0.12*rv; m.rough = mix(m.rough, 0.18, rv);
+            // registration on the rear fuselage sides, "SX-" and three letters (one set per type; each traffic
+            // aircraft its own), reading front to back from either side
+            int nwr = int(gM[20].x + 0.5);
+            float za = (nwr > 0 ? gM[20].z : WS.w) + 0.3, zb = gM[15].y - 0.15;
+            if (zb - za > 0.6 && abs(lp.x) > sec.x*0.45 && lp.z > za && lp.z < zb) {
+              vec3 sc = fusSection(0.5*(za + zb));
+              float hc = min(0.34, min(sc.y*0.5, (zb - za)/(6.0*0.7))), adv = hc*0.7, len = 6.0*adv;
+              float z0 = 0.5*(za + zb) - 0.5*len, base = sc.z + sc.y*0.32 - 0.5*hc;
+              float u = lp.x < 0.0 ? lp.z - z0 : z0 + len - lp.z, v = lp.y - base;
+              if (u > 0.0 && u < len && v > -0.2*hc && v < 1.2*hc) {
+                int ci = int(u/adv);
+                float hs = fract(sin(dot(vec3(gM[9].x, gM[0].x, gOwn ? 0.0 : float(gTrafK) + 1.0), vec3(12.9898, 78.233, 37.719)))*43758.5453);
+                int ch = ci == 0 ? 83 : ci == 1 ? 88 : ci == 2 ? 45 : 65 + int(fract(hs*float(3 + 7*ci))*25.99);
+                float s = hc/29.0;   // metres per font pixel
+                float soft = gTxtSoft; gTxtSoft = clamp(0.5*px/s, 0.09, 0.45);
+                float cov = glyphCov(vec2((u - float(ci)*adv - 0.5*adv)/s + 13.92, v/s), ch)*smoothstep(hc*0.3, hc*0.1, px);
+                gTxtSoft = soft;
+                vec3 ink = dot(m.alb, vec3(0.3, 0.55, 0.15)) > 0.35 ? vec3(0.05, 0.055, 0.065) : vec3(0.92);
+                m.alb = mix(m.alb, ink, cov);
+              }
+            }
           }
           float post = ck == 2 ? min(abs(lp.x) - 0.03, abs(abs(lp.x) - abs(E.x) - 0.42) - 0.035) : abs(lp.x) - 0.025;
           bool ws = lp.z > WS.x && lp.z < WS.y && lp.y > WS.z;

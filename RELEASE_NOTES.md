@@ -3,6 +3,7 @@
 **Aircraft detail**
 - Riveted skin panels: frames around the fuselage and stringer seams along it, with rivet rows beside each seam
 - Cabin door outlines and handles on both sides
+- Registrations painted on the rear fuselage (each traffic aircraft has its own)
 - Wing rib and spar seams with rivets, and a fuel cap on top of each wing
 - Single-engine aircraft: an oil-access door on the cowling and a ring of cowl fasteners
 - A pitot tube under the left wing, static wicks on the wingtips' trailing edges and a VHF blade antenna under the belly
