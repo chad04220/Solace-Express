@@ -85,6 +85,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_LEQUAL 0x0203
 #define GL_ALWAYS 0x0207
 #define GL_READ_FRAMEBUFFER 0x8CA8
+#define GL_DRAW_FRAMEBUFFER 0x8CA9
 #define GL_DEPTH_BUFFER_BIT 0x00000100
 #define GL_DEPTH_COMPONENT 0x1902
 #define GL_DEPTH_COMPONENT32F 0x8CAC
@@ -156,6 +157,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
   X(void, glGenFramebuffers, (GLsizei, GLuint*)) \
   X(void, glDeleteFramebuffers, (GLsizei, const GLuint*)) \
   X(void, glBindFramebuffer, (GLenum, GLuint)) \
+  X(void, glBlitFramebuffer, (GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum)) \
   X(void, glFramebufferTexture2D, (GLenum, GLenum, GLenum, GLuint, GLint)) \
   X(GLenum, glCheckFramebufferStatus, (GLenum)) \
   X(void, glDrawBuffers, (GLsizei, const GLenum*)) \

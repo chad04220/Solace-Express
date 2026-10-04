@@ -203,6 +203,38 @@ void Game::updateBombCam(float dt) {
   C.pos.y = std::max(C.pos.y, groundAt(C.pos) + 3.f);
 }
 
+// The research jets' cockpit cameras (feed_cameras.h): game objects riding on the airframe, each at its mount on the
+// skin and turned the way its display faces, plus the XR-11's bomb camera, which flies free. They exist while their
+// pictures are on show: in the cockpit view.
+void Game::buildFeedCameras(FrameParams& fp) {
+  fp.feedRig = 0;
+  const int rig = plane.spec ? feedRigOf(plane.spec->special) : 0;
+  if (!rig || camMode != 1 || crashed || !fp.plane.on) return;
+  fp.feedRig = rig;
+  const FeedMounts& fm = g_feedMounts[rig];
+  if (!fm.ok) return;   // the renderer measures the mounts the first time it sees the craft; the cameras go up next frame
+  FeedMount mt[kMaxFeeds];
+  const int n = feedRig(rig, g_ren.quality <= 0 ? 0.75f : g_ren.quality >= 2 ? 1.35f : 1.f, mt);
+  const float* R = fp.plane.rot;   // body -> world, column-major
+  auto toWorld = [&](vec3 v) { return vec3(R[0] * v.x + R[3] * v.y + R[6] * v.z, R[1] * v.x + R[4] * v.y + R[7] * v.z, R[2] * v.x + R[5] * v.y + R[8] * v.z); };
+  const vec3 E(fp.plane.M[22 * 4], fp.plane.M[22 * 4 + 1], fp.plane.M[22 * 4 + 2]);   // the eye (body frame)
+  for (int i = 0; i < n; i++) {
+    FeedCamera& c = fp.feeds[i];
+    c.on = true;
+    c.pos = fp.plane.pos + toWorld(E + mt[i].dir * (fm.skin[i] + 0.03f));   // the lens, 3 cm off the skin
+    c.right = toWorld(mt[i].right); c.up = toWorld(mt[i].up); c.back = toWorld(mt[i].back);
+    c.tanX = mt[i].tanX; c.tanY = mt[i].tanY; c.w = mt[i].w; c.h = mt[i].h;
+  }
+  if (rig == 2 && fp.fx.feed[3] > 0.5f) {   // the bomb camera, horizon level, framed like the footwell floor pane
+    const WraithState::BombCam& C = wraith.cam;
+    FeedCamera& c = fp.feeds[kFeedBombSlot];
+    vec3 f = normalize(C.look - C.pos), r = normalize(cross(f, vec3(0, 1, 0)) + vec3(1e-4f, 0, 0));
+    c.on = true; c.pos = C.pos; c.right = r; c.up = cross(r, f); c.back = -f;
+    c.tanY = C.tanHalf; c.tanX = C.tanHalf * mt[9].w / std::max(mt[9].h, 1);
+    c.w = mt[9].w; c.h = mt[9].h;
+  }
+}
+
 void Game::detonate(vec3 p, bool water) {
   WraithState& W = wraith;
   W.blasts.push_back({p, water ? 80.f : 100.f, 0.f, 7.f, water});
@@ -362,11 +394,10 @@ void Game::wraithVisual(FrameParams& fp) {
       }
     }
   }
-  // bomb camera: its view goes to the footwell floor screen while it exists
+  // bomb camera: its picture goes to the footwell floor screens while it exists (buildFeedCameras)
   fx.feed[3] = 0.f;
   if (plane.spec && plane.spec->special == 2 && camMode == 1 && !crashed && W.cam.on) {
     fx.feed[0] = W.cam.look.x; fx.feed[1] = W.cam.look.y; fx.feed[2] = W.cam.look.z; fx.feed[3] = 1.f;
-    fx.feedCam[0] = W.cam.pos.x; fx.feedCam[1] = W.cam.pos.y; fx.feedCam[2] = W.cam.pos.z; fx.feedCam[3] = W.cam.tanHalf;
   }
   // glassed craters join the crash crater (if any)
   for (size_t i = 0; i < W.craters.size() && fp.wreck.craterN < 24; i++) {

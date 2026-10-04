@@ -1,15 +1,14 @@
 // Solace Express - XR-11 Wraith cockpit (GLSL, appended to the ray tracer after kRaytraceWraith)
 #pragma once
 
-// A faceted sealed cabin wrapped in see-through angular displays: a three-pane front wrap, tall side displays with aft
-// displays behind them (to watch the flanks and the rear quarter), an
-// overhead pane, a sloped chin pane and a glass floor in the footwell. Every display re-traces the world along the
-// view ray, so looking down through the floor shows the ground, the bombs falling and the blasts below.
+// A faceted sealed cabin wrapped in angular displays: a three-pane front wrap, tall side displays with aft displays
+// behind them (to watch the flanks and the rear quarter), an overhead pane, a sloped chin pane and a glass floor in
+// the footwell. Each pane shows the picture of its own camera on the airframe, looking out the way the pane faces
+// (feed_cameras.h), so looking down at the floor shows the belly camera: the ground, the bombs falling, the blasts.
 // Screen ids: 41 front, 42 left, 43 right (side + aft displays), 61 floor, 62 overhead, 63 chin. Interior materials 64-79.
 static const char* kRaytraceWraithCockpit = R"(// ---------------------------------------------------------------- XR-11 cockpit
 uniform vec4 uPip;   // bomb impact prediction (world) + valid flag
 uniform vec4 uFeed;     // bomb camera look-at point (world) + active flag
-uniform vec4 uFeedCam;  // bomb camera position (world) + tan of its half field of view
 // a flat display pane: c centre, n facing the pilot, up hint, half size, corner chamfer. x = pane, y = raised bezel
 vec3 wrFrame(vec3 q, vec3 c, vec3 n, vec3 up){ vec3 t = normalize(cross(up, n)), b = cross(n, t); vec3 d = q - c; return vec3(dot(d, t), dot(d, b), dot(d, n)); }
 float wrShape(vec2 l, vec2 hs, float ch){ vec2 a = abs(l); return max(max(a.x - hs.x, a.y - hs.y), (a.x + a.y - (hs.x + hs.y - ch))*0.70711); }
@@ -360,17 +359,53 @@ vec3 wrFloorUV(vec3 q){
   if (q.z > 0.1) return vec3(wrFrame(vec3(abs(q.x), q.y, q.z), WB_C, WB_N, vec3(0,0,-1)).xy/WB_S*vec2(sign(q.x), 1.0), WB_S.x/WB_S.y);
   return vec3(wrFrame(q, WL_C, WL_N, vec3(0,0,-1)).xy/WL_S, WL_S.x/WL_S.y);
 }
-bool wrFeedRay(vec3 sl, inout vec3 ro, inout vec3 rd){
-  if (uFeed.w < 0.5) return false;
+// ---------------------------------------------------------------- camera feeds on the displays
+// Which camera feeds a point q (cockpit frame) on display id, and where on its picture ([-1, 1], y up). The slots and
+// the pane geometry are feed_cameras.h's (feedRig): a left pane's camera is the mirror of the right one, its picture
+// not mirrored.
+int feedSlot(int id, vec3 q, out vec2 uv){
+  float sx = q.x < 0.0 ? -1.0 : 1.0; bool L = q.x < 0.0;
+  if (int(gM[0].z + 0.5) == 5) {   // XR-9: the panoramic display (three cameras around the eye) and the side bays
+    if (id == 41) {
+      float r = length(q.xz), ang = atan(q.x, -q.z), seg = 0.8333333;
+      float k = clamp(floor(ang/seg + 0.5), -1.0, 1.0), a = ang - k*seg;
+      int s = int(k) + 1;
+      uv = vec2(tan(a)/uFeedR[s].w, (q.y - 0.02)/max(r, 0.1)/cos(a)/uFeedU[s].w);
+      return s;
+    }
+    uv = vec2((q.z - 0.24)/0.3*sx, (q.y - 0.04)/0.2);
+    return L ? 3 : 4;
+  }
+  vec3 aq = vec3(abs(q.x), q.y, q.z);
+  if (id == 41) {
+    vec3 f = wrFrame(q, WF_C, WF_N, vec3(0,1,0)), w = wrFrame(aq, WW_C, WW_N, vec3(0,1,0));
+    if (wrShape(f.xy, WF_S, 0.1) <= wrShape(w.xy, WW_S, 0.16)) { uv = f.xy/WF_S; return 0; }
+    uv = w.xy/WW_S*vec2(sx, 1.0); return L ? 1 : 2;
+  }
+  if (id == 42 || id == 43) {
+    vec3 f = wrFrame(aq, WS_C, WS_N, vec3(0,1,0)), a = wrFrame(aq, WA_C, WS_N, vec3(0,1,0));
+    if (wrShape(f.xy, WS_S, 0.13) <= wrShape(a.xy, WA_S, 0.11)) { uv = f.xy/WS_S*vec2(sx, 1.0); return L ? 3 : 4; }
+    uv = a.xy/WA_S*vec2(sx, 1.0); return L ? 5 : 6;
+  }
+  if (id == 62) { uv = wrFrame(q, WO_C, WO_N, vec3(0,0,-1)).xy/WO_S; return 7; }
+  if (id == 63) { uv = wrFrame(q, WC_C, WC_N, vec3(0,1,0)).xy/WC_S; return 8; }
+  if (q.z > 0.1) { uv = wrFrame(aq, WB_C, WB_N, vec3(0,0,-1)).xy/WB_S*vec2(sx, 1.0); return L ? 10 : 11; }
+  uv = wrFrame(q, WL_C, WL_N, vec3(0,0,-1)).xy/WL_S; return 9;
+}
+// The picture on a point of a display, and the camera's ray through it (rdc: the symbology is drawn conformal to it).
+// While the XR-11's bomb camera exists the floor panes show it instead of the belly cameras (bomb = true).
+vec3 feedScreen(int id, vec3 sl, out vec3 rdc, out bool bomb){
   vec3 q = sl - gM[22].xyz;
-  vec3 fu = wrFloorUV(q);
-  vec2 uv = fu.xy*vec2(fu.z, 1.0);
-  vec3 cam = uFeedCam.xyz;   // the separate bomb camera, horizon level
-  vec3 f = normalize(uFeed.xyz - cam);
-  vec3 r = normalize(cross(f, vec3(0.0, 1.0, 0.0)) + vec3(1e-4, 0.0, 0.0));
-  vec3 u = cross(r, f);
-  ro = cam; rd = normalize(f + (r*uv.x + u*uv.y)*uFeedCam.w);
-  return true;
+  vec2 uv; int s = feedSlot(id, q, uv);
+  bomb = int(gM[0].z + 0.5) == 6 && id == 61 && uFeed.w > 0.5 && uFeedB[12].w > 0.5;
+  if (bomb) { vec3 fu = wrFloorUV(q); uv = fu.xy*vec2(fu.z/(WL_S.x/WL_S.y), 1.0); s = 12; }
+  rdc = normalize(-uFeedB[s].xyz + uFeedR[s].xyz*(uv.x*uFeedR[s].w) + uFeedU[s].xyz*(uv.y*uFeedU[s].w));
+  if (uFeedOn == 0 || uFeedB[s].w < 0.5) return vec3(0.002, 0.004, 0.007);   // no picture yet: a dark panel
+  if (abs(uv.x) > 1.0 || abs(uv.y) > 1.0) return vec3(0.0);
+  vec4 T = uFeedTile[s];
+  vec2 hp = 0.5/vec2(textureSize(uFeedTex, 0));
+  vec2 auv = T.xy + clamp((uv*0.5 + 0.5)*T.zw, hp, T.zw - hp);
+  return textureLod(uFeedTex, auv, 0.0).rgb;
 }
 vec3 wrFeedOverlay(vec3 col, vec3 sl){
   vec3 q = sl - gM[22].xyz;

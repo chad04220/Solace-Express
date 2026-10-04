@@ -1,12 +1,14 @@
 // Solace Express - renderer interface
 #pragma once
 #include <chrono>
+#include <functional>
 #include <atomic>
 #include <unordered_map>
 #include "common.h"
 #include "gl.h"
 #include "world.h"
 #include "entity_mesh.h"
+#include "feed_cameras.h"
 
 struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft; };
 enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7, SPR_RIBBON = 8, SPR_FLAME = 9 };
@@ -31,7 +33,6 @@ struct FxVisual {
   int bombs = 0; float bomb[8][4];                 // dark-energy bombs: centre + radius
   int blasts = 0; float blast[6][4], blastI[6][4]; // detonations: centre + radius, age 0..1 + intensity
   float pip[4] = {0, 0, 0, 0};                     // XR-11 bomb impact prediction: world point + valid
-  float feedCam[4] = {0, 0, 0, 0.3f};             // XR-11 bomb camera: position + tan(half fov)
   float feed[4] = {0, 0, 0, 0};                    // XR-11 belly camera target: world point + active
 };
 
@@ -68,6 +69,8 @@ struct FrameParams {
   PlaneVisual plane;
   WreckVisual wreck;
   FxVisual fx;
+  FeedCamera feeds[kMaxFeeds];   // research jets: the cameras whose pictures the cockpit displays show (feed_cameras.h)
+  int feedRig = 0;               // their rig: 0 none, 1 XR-9, 2 XR-11
   vec3 landLightPos, landLightDir; float landLight = 0;
   vec3 flameLightPos, flameLight;  // a blast's light (radiance; zero when off), folded into the point lights
   struct PointLight { vec3 pos; float radius; vec3 col; float cosCut; vec3 dir; float shadow; };
@@ -226,6 +229,27 @@ private:
   void drawTrafficHulls(const FrameParams& fp);
   void ensureHullTarget();
   bool trafHullOn = false;
+  // camera feeds: each research-jet camera is drawn into a tile of the feed atlas, through the same passes as the main
+  // view (envelope, scenery G-buffer, ray tracer, clouds) on a second set of render targets of its own size
+  struct ViewTargets {
+    int W = 0, H = 0, rw = 0, rh = 0, cw = 0, ch = 0;
+    GLuint texRaw = 0, texDepth = 0, texCloudMask = 0, texCloud = 0, texCloudD = 0, fboCloud = 0, fboComp = 0, fboScene = 0;
+    GLuint texGB[3] = {0, 0, 0}, texGBDepth = 0, fboGB = 0, texEnv = 0, texEnvDepth = 0, fboEnv = 0;
+    bool depthValid = false, envOn = false, hullOn = false, trafHullOn = false, ckMaskPrev = false;
+    float jitX = 0, jitY = 0;
+  };
+  void swapView(ViewTargets& v);
+  ViewTargets feedView;                // (allocated at the largest picture; each camera uses its corner of it)
+  static constexpr int kFeedMaxW = 512, kFeedMaxH = 384, kFeedAtlasW = 2048, kFeedAtlasH = 1024;
+  GLuint texFeed = 0, fboFeed = 0;
+  float feedTile[kMaxFeeds][4] = {};   // atlas rectangle of each slot (uv: x0, y0, w, h)
+  int feedTileWH[kMaxFeeds][2] = {};
+  bool feedValid[kMaxFeeds] = {};      // its tile holds a picture
+  int feedNext = 0, feedRigNow = 0;
+  bool feedPass = false;               // drawing a camera feed (the scenery pass leaves streaming and shadows alone)
+  bool feedsWanted(const FrameParams& fp) const;
+  void measureFeedMounts(const FrameParams& fp);
+  void renderFeeds(const FrameParams& fp, const std::function<void(GLuint, const FrameParams&)>& setRT, const std::function<void(const FrameParams&, GLuint)>& trace);
   // offscreen frames (the launch prewarm): the composite and the UI go to a hidden target instead of the window
   GLuint fboOff = 0, texOff = 0; int offW = 0, offH = 0;
 public:

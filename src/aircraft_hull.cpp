@@ -297,12 +297,13 @@ bool Renderer::hullWanted(const FrameParams& fp) const {
 
 void Renderer::ensureHullTarget() {
   if (!fboHull) glGenFramebuffers(1, &fboHull);
-  if (!texHullDepth || hullDepthW != rw || hullDepthH != rh) {
+  if (!texHullDepth || hullDepthW < rw || hullDepthH < rh) {   // (only grows: the camera feeds draw smaller views)
+    int w = std::max(rw, hullDepthW), h = std::max(rh, hullDepthH);
     if (texHullDepth) glDeleteTextures(1, &texHullDepth);
     glGenTextures(1, &texHullDepth); glBindTexture(GL_TEXTURE_2D, texHullDepth);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, rw, rh, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    hullDepthW = rw; hullDepthH = rh;
+    hullDepthW = w; hullDepthH = h;
   }
 }
 

@@ -74,88 +74,92 @@ struct Draw { int kind, lod; size_t first; int count; };
 void Renderer::drawEntities(const FrameParams& fp) {
   if (!progEnt) return;
   auto tStart = std::chrono::steady_clock::now();
-  entFrame++;
-  const EntRanges R = rangesFor(quality);
+  // a camera feed (camera_feeds.cpp): only its G-buffer, at the shortest draw distances; streaming, the shadow
+  // cascades and the statistics stay the main view's
+  if (!feedPass) entFrame++;
+  const EntRanges R = rangesFor(feedPass ? 0 : quality);
   const float farAll = std::max(R.big, R.build) + 300.f, farDetail = std::max(std::max(R.tree, R.rock), R.bush) + 300.f;
   vec3 cam = fp.camPos;
   const int ccx = Scenery::chunkOf(cam.x), ccz = Scenery::chunkOf(cam.z);
   const int rad = (int)ceilf(farAll / Scenery::CH) + 1;
   // ------------------------------------------------ streaming: queue missing chunks by distance, generate within a time budget
   struct Need { float d; int cx, cz, level; };
-  std::vector<Need> need;
-  for (int dz = -rad; dz <= rad; dz++)
-    for (int dx = -rad; dx <= rad; dx++) {
-      int cx = ccx + dx, cz = ccz + dz;
-      if (cx < 0 || cz < 0 || cx >= Scenery::NC || cz >= Scenery::NC) continue;
-      float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
-      float ex = std::max(std::max(x0 - cam.x, cam.x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - cam.z, cam.z - z0 - Scenery::CH), 0.f);
-      float d = sqrtf(ex * ex + ez * ez);
-      int want = d < farDetail ? 2 : d < farAll ? 1 : 0;
-      if (!want) continue;
-      Scenery::Chunk* c = g_scenery.get(cx, cz);
-      if (c) c->lastUse = entFrame;
-      if (!c || c->level < want) need.push_back({d, cx, cz, want});
-    }
-  // a new chunk inside a shadow cascade's area makes that cascade re-render
-  auto added = [&](int cx, int cz) {
-    entGenCount++;
-    for (int c = 0; c < 2; c++) {
-      // only where its shadows can show: the shader fades each cascade out at kShFade1 of its radius, plus room for
-      // tall casters just outside. (A wider test re-rendered the far 4096^2 map nearly every frame in flight, since
-      // tree chunks keep streaming in a few km ahead.)
-      float r = (c == 0 ? R.sh0 : R.sh1) * kShFade1 + 300.f;
-      float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
-      float ex = std::max(std::max(x0 - shCenter[c].x, shCenter[c].x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - shCenter[c].z, shCenter[c].z - z0 - Scenery::CH), 0.f);
-      if (ex < r && ez < r) shGen[c] = -1;
-    }
-  };
-  // chunks the worker threads finished since last frame
-  std::vector<int> got;
-  g_scenery.pump(got);
-  for (int idx : got) {
-    int cx = idx % Scenery::NC, cz = idx / Scenery::NC;
-    g_scenery.get(cx, cz)->lastUse = entFrame;
-    added(cx, cz);
-  }
-  if (!got.empty())   // drop the ones that just arrived from the list
-    need.erase(std::remove_if(need.begin(), need.end(), [](const Need& n) { Scenery::Chunk* c = g_scenery.get(n.cx, n.cz); return c && c->level >= n.level; }), need.end());
-  entPending = (int)need.size();
-  if (!need.empty()) {
-    std::sort(need.begin(), need.end(), [](const Need& a, const Need& b) { return a.d < b.d; });
-    auto t0 = std::chrono::steady_clock::now();
-    for (const Need& n : need) {
-      // close chunks are generated here and now so they are never missing; the rest go to the worker threads
-      // (or, without workers, are generated here within the frame's time budget)
-      bool now = entSync || n.d <= 700.f;
-      if (!now && g_scenery.request(n.cx, n.cz, n.level)) continue;
-      if (!now && g_scenery.workers() > 0) break;   // queue full: ask again next frame
-      double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
-      if (!now && ms > entBudgetMs) break;
-      g_scenery.ensure(n.cx, n.cz, n.level)->lastUse = entFrame;
-      entPending--;
-      added(n.cx, n.cz);
-    }
-  }
-  // the next place the camera will cut to (the menu tour): its near chunks go to the worker threads now, and are kept
-  if (fp.prefetchOn && g_scenery.workers() > 0) {
-    vec3 pc = fp.prefetchPos;
-    const int pcx = Scenery::chunkOf(pc.x), pcz = Scenery::chunkOf(pc.z), prad = (int)ceilf(farDetail / Scenery::CH) + 1;
-    for (int dz = -prad; dz <= prad; dz++)
-      for (int dx = -prad; dx <= prad; dx++) {
-        int cx = pcx + dx, cz = pcz + dz;
+  if (!feedPass) {
+    std::vector<Need> need;
+    for (int dz = -rad; dz <= rad; dz++)
+      for (int dx = -rad; dx <= rad; dx++) {
+        int cx = ccx + dx, cz = ccz + dz;
         if (cx < 0 || cz < 0 || cx >= Scenery::NC || cz >= Scenery::NC) continue;
         float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
-        float ex = std::max(std::max(x0 - pc.x, pc.x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - pc.z, pc.z - z0 - Scenery::CH), 0.f);
+        float ex = std::max(std::max(x0 - cam.x, cam.x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - cam.z, cam.z - z0 - Scenery::CH), 0.f);
         float d = sqrtf(ex * ex + ez * ez);
-        int want = d < farDetail ? 2 : 0;
+        int want = d < farDetail ? 2 : d < farAll ? 1 : 0;
         if (!want) continue;
         Scenery::Chunk* c = g_scenery.get(cx, cz);
-        if (c) { c->lastUse = entFrame; if (c->level >= want) continue; }
-        if (!g_scenery.request(cx, cz, want)) break;   // queue full: more next frame
+        if (c) c->lastUse = entFrame;
+        if (!c || c->level < want) need.push_back({d, cx, cz, want});
       }
+    // a new chunk inside a shadow cascade's area makes that cascade re-render
+    auto added = [&](int cx, int cz) {
+      entGenCount++;
+      for (int c = 0; c < 2; c++) {
+        // only where its shadows can show: the shader fades each cascade out at kShFade1 of its radius, plus room for
+        // tall casters just outside. (A wider test re-rendered the far 4096^2 map nearly every frame in flight, since
+        // tree chunks keep streaming in a few km ahead.)
+        float r = (c == 0 ? R.sh0 : R.sh1) * kShFade1 + 300.f;
+        float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
+        float ex = std::max(std::max(x0 - shCenter[c].x, shCenter[c].x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - shCenter[c].z, shCenter[c].z - z0 - Scenery::CH), 0.f);
+        if (ex < r && ez < r) shGen[c] = -1;
+      }
+    };
+    // chunks the worker threads finished since last frame
+    std::vector<int> got;
+    g_scenery.pump(got);
+    for (int idx : got) {
+      int cx = idx % Scenery::NC, cz = idx / Scenery::NC;
+      g_scenery.get(cx, cz)->lastUse = entFrame;
+      added(cx, cz);
+    }
+    if (!got.empty())   // drop the ones that just arrived from the list
+      need.erase(std::remove_if(need.begin(), need.end(), [](const Need& n) { Scenery::Chunk* c = g_scenery.get(n.cx, n.cz); return c && c->level >= n.level; }), need.end());
+    entPending = (int)need.size();
+    if (!need.empty()) {
+      std::sort(need.begin(), need.end(), [](const Need& a, const Need& b) { return a.d < b.d; });
+      auto t0 = std::chrono::steady_clock::now();
+      for (const Need& n : need) {
+        // close chunks are generated here and now so they are never missing; the rest go to the worker threads
+        // (or, without workers, are generated here within the frame's time budget)
+        bool now = entSync || n.d <= 700.f;
+        if (!now && g_scenery.request(n.cx, n.cz, n.level)) continue;
+        if (!now && g_scenery.workers() > 0) break;   // queue full: ask again next frame
+        double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        if (!now && ms > entBudgetMs) break;
+        g_scenery.ensure(n.cx, n.cz, n.level)->lastUse = entFrame;
+        entPending--;
+        added(n.cx, n.cz);
+      }
+    }
+    // the next place the camera will cut to (the menu tour): its near chunks go to the worker threads now, and are kept
+    if (fp.prefetchOn && g_scenery.workers() > 0) {
+      vec3 pc = fp.prefetchPos;
+      const int pcx = Scenery::chunkOf(pc.x), pcz = Scenery::chunkOf(pc.z), prad = (int)ceilf(farDetail / Scenery::CH) + 1;
+      for (int dz = -prad; dz <= prad; dz++)
+        for (int dx = -prad; dx <= prad; dx++) {
+          int cx = pcx + dx, cz = pcz + dz;
+          if (cx < 0 || cz < 0 || cx >= Scenery::NC || cz >= Scenery::NC) continue;
+          float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
+          float ex = std::max(std::max(x0 - pc.x, pc.x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - pc.z, pc.z - z0 - Scenery::CH), 0.f);
+          float d = sqrtf(ex * ex + ez * ez);
+          int want = d < farDetail ? 2 : 0;
+          if (!want) continue;
+          Scenery::Chunk* c = g_scenery.get(cx, cz);
+          if (c) { c->lastUse = entFrame; if (c->level >= want) continue; }
+          if (!g_scenery.request(cx, cz, want)) break;   // queue full: more next frame
+        }
+    }
+    if (entFrame % 240 == 0) g_scenery.trim(cam, farDetail + 1200.f, farAll + 2500.f, entFrame);
+    entChunks = (int)g_scenery.generated();
   }
-  if (entFrame % 240 == 0) g_scenery.trim(cam, farDetail + 1200.f, farAll + 2500.f, entFrame);
-  entChunks = (int)g_scenery.generated();
 
   double tStream = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count();
   // ------------------------------------------------ frustum
@@ -180,7 +184,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
   float cR[2] = {R.sh0, R.sh1};
   bool shDirty[2] = {false, false};
   vec3 fwdH = normalize(vec3(-fp.camBack.x, 0, -fp.camBack.z) + vec3(1e-4f, 0, 0));
-  if (shRes != R.shRes) {   // (re)create the cascade maps
+  if (shRes != R.shRes && !feedPass) {   // (re)create the cascade maps
     shRes = R.shRes;
     for (int c = 0; c < 2; c++) {
       if (texSh[c]) glDeleteTextures(1, &texSh[c]);
@@ -202,9 +206,11 @@ void Renderer::drawEntities(const FrameParams& fp) {
     if (g_scenery.craters.size() != lastCraters || sum != lastSum) { shGen[0] = shGen[1] = -1; lastCraters = g_scenery.craters.size(); lastSum = sum; }
   }
   vec3 newCenter[2];
-  for (int c = 0; c < 2; c++) shIdeal[c] = cam + fwdH * (cR[c] * 0.45f);   // the shader fades shadows around these
-  entTreeFar = R.tree;
-  for (int c = 0; c < 2 && sunUp; c++) {
+  if (!feedPass) {
+    for (int c = 0; c < 2; c++) shIdeal[c] = cam + fwdH * (cR[c] * 0.45f);   // the shader fades shadows around these
+    entTreeFar = R.tree;
+  }
+  for (int c = 0; c < 2 && sunUp && !feedPass; c++) {
     newCenter[c] = shIdeal[c];
     float moved = length(vec3(newCenter[c].x - shCenter[c].x, 0, newCenter[c].z - shCenter[c].z));
     shAge[c]++;
@@ -298,8 +304,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
         draws[p].push_back({k, l, entStage.size(), (int)v.size()});
         entStage.insert(entStage.end(), v.begin(), v.end());
       }
-  entDrawn = 0;
-  for (auto& d : draws[0]) entDrawn += d.count;
+  if (!feedPass) { entDrawn = 0; for (auto& d : draws[0]) entDrawn += d.count; }
   glBindVertexArray(vaoEnt);
   glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
   glBufferData(GL_ARRAY_BUFFER, std::max<size_t>(entStage.size(), 1) * sizeof(Ent), entStage.empty() ? nullptr : entStage.data(), GL_STREAM_DRAW);
@@ -399,11 +404,11 @@ void Renderer::drawEntities(const FrameParams& fp) {
   glBindVertexArray(0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   static const bool dbg = getenv("ENTDBG") != nullptr;
-  if (dbg) {
+  if (dbg && !feedPass) {
     int nSh[2] = {0, 0};
     for (int c = 0; c < 2; c++) for (auto& d : draws[1 + c]) nSh[c] += d.count;
     printf("ent: stream %.2f gather %.2f total %.2f ms, %d view / %d+%d shadow inst, dirty %d%d\n", tStream, tGather - tStream,
       std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count(), entDrawn, nSh[0], nSh[1], (int)shDirty[0], (int)shDirty[1]);
   }
-  entCpuMs = lerpf(entCpuMs, (float)std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count(), 0.1f);
+  if (!feedPass) entCpuMs = lerpf(entCpuMs, (float)std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count(), 0.1f);
 }

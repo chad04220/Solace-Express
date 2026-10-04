@@ -920,11 +920,12 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glViewport(0, 0, rw, rh);
   glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
   stamp(1);
-  float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};
+  float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};   // (this frame's camera, for the TAA)
   static const bool cloudSplitOff = getenv("CLOUDSPLITOFF") != nullptr;   // (debug: every pixel marches its clouds in the ray tracer)
   const bool cloudSplit = !costMap && !cloudSplitOff && progClouds && progCloudComp && fp.cloudCover >= 0.02f;
-  // the ray tracer's uniforms and textures; the quarter-resolution cloud pass uses the same set
-  auto setRT = [&](GLuint p) {
+  // the ray tracer's uniforms and textures for a view (this frame's, or a camera feed's); the quarter-resolution
+  // cloud pass uses the same set
+  auto setRT = [&](GLuint p, const FrameParams& fp) {
   glUseProgram(p);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(U(p, "uAlb"), 1);
@@ -967,6 +968,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform2f(U(p, "uJit"), jitX, jitY);
   glUniform1f(U(p, "uSeed"), fmodf(frameNo * 0.618034f, 1.f));
   glUniform3f(U(p, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
+  float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};
   glUniformMatrix3fv(U(p, "uCamRot"), 1, GL_FALSE, cr);
   glUniform1f(U(p, "uTanHalf"), tanf(fp.fovY * 0.5f));
   glUniform1f(U(p, "uAspect"), (float)W / H);
@@ -1049,7 +1051,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     if (fx.bombs) glUniform4fv(U(p, "uBombs"), fx.bombs, &fx.bomb[0][0]);
     if (fx.blasts) { glUniform4fv(U(p, "uBlast"), fx.blasts, &fx.blast[0][0]); glUniform4fv(U(p, "uBlastI"), fx.blasts, &fx.blastI[0][0]); }
     glUniform4fv(U(p, "uPip"), 1, fx.pip);
-    glUniform4fv(U(p, "uFeed"), 1, fx.feed); glUniform4fv(U(p, "uFeedCam"), 1, fx.feedCam);
+    glUniform4fv(U(p, "uFeed"), 1, fx.feed);
   }
   {   // entity G-buffer and the sun shadow cascades
     for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, texGB[i]); }
@@ -1079,7 +1081,63 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform3f(U(p, "uFlameLP"), fp.flameLightPos.x, fp.flameLightPos.y, fp.flameLightPos.z);
   glUniform3f(U(p, "uFlameLI"), fp.flameLight.x, fp.flameLight.y, fp.flameLight.z);
   glUniform1i(U(p, "uCloudSplit"), cloudSplit ? 1 : 0);
+  {   // the research jets' displays: their cameras' pictures (camera_feeds.cpp)
+    float tile[kMaxFeeds][4], R[kMaxFeeds][4], Up[kMaxFeeds][4], B[kMaxFeeds][4];
+    bool any = false;
+    for (int k = 0; k < kMaxFeeds; k++) {
+      const FeedCamera& c = fp.feeds[k];
+      bool v = fp.feedRig > 0 && c.on && feedValid[k];
+      any = any || v;
+      for (int i = 0; i < 4; i++) tile[k][i] = feedTile[k][i];
+      R[k][0] = c.right.x; R[k][1] = c.right.y; R[k][2] = c.right.z; R[k][3] = c.tanX;
+      Up[k][0] = c.up.x; Up[k][1] = c.up.y; Up[k][2] = c.up.z; Up[k][3] = c.tanY;
+      B[k][0] = c.back.x; B[k][1] = c.back.y; B[k][2] = c.back.z; B[k][3] = v ? 1.f : 0.f;
+    }
+    glActiveTexture(GL_TEXTURE0 + 21); glBindTexture(GL_TEXTURE_2D, texFeed); glUniform1i(U(p, "uFeedTex"), 21);
+    glUniform1i(U(p, "uFeedOn"), fp.feedRig > 0 && any ? 1 : 0);
+    glUniform4fv(U(p, "uFeedTile"), kMaxFeeds, &tile[0][0]); glUniform4fv(U(p, "uFeedR"), kMaxFeeds, &R[0][0]);
+    glUniform4fv(U(p, "uFeedU"), kMaxFeeds, &Up[0][0]); glUniform4fv(U(p, "uFeedB"), kMaxFeeds, &B[0][0]);
+    glUniform1f(U(p, "uFeedSkip"), feedPass ? 0.03f : 0.f);   // a feed's camera sits just outside the skin
+  }
   };
+  // the ray trace of a view, then its clouds at a quarter of the pixels (composited over it)
+  auto trace = [&](const FrameParams& fp, GLuint prog) {
+    glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
+    glDrawBuffers(3, bufs);
+    glViewport(0, 0, rw, rh);
+    glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
+    setRT(prog, fp);
+    glBindVertexArray(vaoEmpty);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    depthValid = true;
+    if (cloudSplit) {
+      // clouds at a quarter of the pixels, along the rays of the depths just traced
+      glBindFramebuffer(GL_FRAMEBUFFER, fboCloud);
+      GLenum cb[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+      glDrawBuffers(2, cb);
+      glViewport(0, 0, cw, ch);
+      setRT(progClouds, fp);
+      glActiveTexture(GL_TEXTURE0 + 19); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progClouds, "uSceneDepth"), 19);
+      glUniform1i(U(progClouds, "uFrame"), (int)(frameNo & 3));
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+      // composite over the ray tracer's colour: colour x transmittance + in-scatter (its alpha, the TAA class, is kept)
+      glBindFramebuffer(GL_FRAMEBUFFER, fboComp);
+      GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
+      glViewport(0, 0, rw, rh);
+      glUseProgram(progCloudComp);
+      glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texCloud); glUniform1i(U(progCloudComp, "uCloud"), 0);
+      glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, texCloudD); glUniform1i(U(progCloudComp, "uCloudD"), 1);
+      glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progCloudComp, "uDepthTex"), 2);
+      glActiveTexture(GL_TEXTURE0 + 3); glBindTexture(GL_TEXTURE_2D, texCloudMask); glUniform1i(U(progCloudComp, "uMaskTex"), 3);
+      glUniform2f(U(progCloudComp, "uCloudHi"), (float)(cw - 1), (float)(ch - 1));
+      glEnable(GL_BLEND); glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+      glDisable(GL_BLEND);
+      glActiveTexture(GL_TEXTURE0);
+    }
+  };
+  // the research jets' cockpit cameras first: the displays show this frame's pictures
+  renderFeeds(fp, setRT, trace);
   // aircraft hull (rasterized; baked at the end of the frame that first needs it - see below)
   hullOn = false;
   const bool hullUse = hullWanted(fp);
@@ -1087,44 +1145,10 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   const uint64_t hullK = hullUse ? hullKey(fp, hullSlot) : 0;
   if (hullUse && hulls.count(hullK)) drawHull(fp, hullSlot, hullK);
   drawTrafficHulls(fp);
-  if (hullOn || trafHullOn) {
-    glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
-    glDrawBuffers(3, bufs);
-    glViewport(0, 0, rw, rh);
-    glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
-  }
-  GLuint prt = costMap && progRTCost ? progRTCost : progRT;
-  setRT(prt);
-  glBindVertexArray(vaoEmpty);
-  glDrawArrays(GL_TRIANGLES, 0, 3);
-  depthValid = true;
-  if (cloudSplit) {
-    // clouds at a quarter of the pixels, along the rays of the depths just traced
-    glBindFramebuffer(GL_FRAMEBUFFER, fboCloud);
-    GLenum cb[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-    glDrawBuffers(2, cb);
-    glViewport(0, 0, cw, ch);
-    setRT(progClouds);
-    glActiveTexture(GL_TEXTURE0 + 19); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progClouds, "uSceneDepth"), 19);
-    glUniform1i(U(progClouds, "uFrame"), (int)(frameNo & 3));
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    // composite over the ray tracer's colour: colour x transmittance + in-scatter (its alpha, the TAA class, is kept)
-    glBindFramebuffer(GL_FRAMEBUFFER, fboComp);
-    GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
-    glViewport(0, 0, rw, rh);
-    glUseProgram(progCloudComp);
-    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texCloud); glUniform1i(U(progCloudComp, "uCloud"), 0);
-    glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, texCloudD); glUniform1i(U(progCloudComp, "uCloudD"), 1);
-    glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progCloudComp, "uDepthTex"), 2);
-    glActiveTexture(GL_TEXTURE0 + 3); glBindTexture(GL_TEXTURE_2D, texCloudMask); glUniform1i(U(progCloudComp, "uMaskTex"), 3);
-    glEnable(GL_BLEND); glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    glDisable(GL_BLEND);
-    glActiveTexture(GL_TEXTURE0);
-  }
+  trace(fp, costMap && progRTCost ? progRTCost : progRT);
 
   // a new airframe or view: bake its hull with the ray tracer's own shape code (used from the next frame on)
-  if (hullUse && !hulls.count(hullK)) { setRT(progHullBake); bakeHull(fp, hullSlot, hullK); }
+  if (hullUse && !hulls.count(hullK)) { setRT(progHullBake, fp); bakeHull(fp, hullSlot, hullK); }
   stamp(2);
   // ------------------------------------------------ temporal AA resolve (before the sprites: particles never smear)
   {

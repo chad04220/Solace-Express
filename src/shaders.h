@@ -3214,7 +3214,11 @@ void shadeWraithCockpit(inout Mat m, int mid, vec3 lp, vec3 ln, vec3 E);
 vec3 wraithPodLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E);
 vec3 wrHolo(vec3 ro, vec3 rd, float tmax);
 vec3 wraithScreen(vec3 col, vec3 rd, int id, vec3 sl);
-bool wrFeedRay(vec3 sl, inout vec3 ro, inout vec3 rd);
+// research jet displays: each shows the picture of a camera on the airframe (camera_feeds.cpp, feed_cameras.h)
+uniform sampler2D uFeedTex; uniform int uFeedOn;
+uniform vec4 uFeedTile[13], uFeedR[13], uFeedU[13], uFeedB[13];   // atlas tile | right + tanX | up + tanY | back + has a picture
+uniform float uFeedSkip;   // drawing a camera's picture: its lens sits just outside the skin, the airframe march starts past it
+vec3 feedScreen(int id, vec3 sl, out vec3 rdc, out bool bomb);
 vec3 wrFeedOverlay(vec3 col, vec3 sl);
 float wrClip(vec3 lp, int mid);
 vec3 wrClipAtlas(vec2 uv);
@@ -3251,6 +3255,7 @@ void main(){
   // (0: march from the camera; the first uHullNear metres are always marched, the hull's faces there are ignored)
   float hullT = 0.0;
   if (uHullOn == 1 && uWreck == 0) { float hv = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).g; hullT = hv > 1e29 ? hv : (hv > 0.0 ? max(uHullNear, hv*0.999 - 0.1) : 0.0); }
+  if (uFeedSkip > 0.0 && hullT == 0.0) hullT = uFeedSkip;
   // The airframe along this camera ray, traced once for every use below (the cockpit, the cloak, the outside view):
   // each call site would be another inlined copy of the march and the airframe's distance.
   bool jetC = int(gM[0].z + 0.5) >= 5;
@@ -3283,6 +3288,19 @@ void main(){
       else { pod = true; tmax = h0.x + 0.05; }
     }
   }
+  if (onScr) {   // a display: its camera's picture, with the display's own look and symbology over it
+    bool bomb; vec3 rdc;
+    vec3 col = feedScreen(scrId, scrL, rdc, bomb);
+    bool wr = int(gM[0].z + 0.5) == 6;
+    col = bomb ? wrFeedOverlay(col, scrL) : wr ? wraithScreen(col, rdc, scrId, scrL) : jetScreen(col, rdc, scrId, scrL);
+    if (wr) col += wrHolo(ro, rd, h0.x);   // the hologram floats inside the cabin, in front of the displays
+    if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
+    oColor = vec4(clamp(col, vec3(0.0), vec3(3e4)), 0.0); oDepth = h0.x; oCloudMask = 0.0;
+#ifdef COST_MAP
+    oColor = gCost;
+#endif
+    return;
+  }
   // XR-11 cloak: a pixel on the cloaked craft sees the world behind it along a slightly bent ray
   bool cloak = false; vec3 ckN = vec3(0.0), ckLp = vec3(0.0), rd0 = rd, ro0 = ro; float ckT = 0.0;
   if (uWr[4].w > 0.001 && uPlaneOn == 1 && uWreck == 0 && !cockpitView && int(gM[0].z + 0.5) == 6) {
@@ -3295,15 +3313,13 @@ void main(){
       }
     }
   }
-  // XR-11 belly camera: part of the glass floor shows a feed locked on the falling bomb or its blast
   vec3 roV = ro, rdV = rd;
-  bool feed = onScr && scrId == 61 && int(gM[0].z + 0.5) == 6 && wrFeedRay(scrL, ro, rd);
   // environment entities: the raster pass already found the nearest tree / rock / building on this pixel
   vec4 g0 = vec4(0.0);
-  if (!pod && !feed) g0 = texelFetch(uGB0, ivec2(gl_FragCoord.xy), 0);   // (the displays show the trees and buildings outside too)
+  if (!pod) g0 = texelFetch(uGB0, ivec2(gl_FragCoord.xy), 0);
   if (cloak) g0.x = g0.x > ckT ? g0.x - ckT : 0.0;   // seen through the cloak (the ray now starts on its skin)
   float tE = g0.x > 0.0 && g0.x < tmax ? g0.x : -1.0;
-  if (uEnvOn == 1 && !pod && !feed && !cloak) {   // the envelope was rasterized along exactly this pixel's ray
+  if (uEnvOn == 1 && !pod && !cloak) {   // the envelope was rasterized along exactly this pixel's ray
     float te = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).r;
     gTStart = te > 1e29 ? te : (te > 0.0 ? max(1.0, te*0.999 - 1.0) : 1.0);
   }
@@ -3313,7 +3329,7 @@ void main(){
   vec3 bn; float bkind = 0.0; vec3 bl;
   vec2 bh = pod ? vec2(-1.0) : traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
   int trafK = -1; vec2 trafH = vec2(-1.0);
-  if (!pod && uTrafficN > 0) { gTrafCamRay = !feed && !cloak; trafH = traceTraffic(ro, rd, tmax, trafK); gTrafCamRay = false; loadMain(); pieceXf(hTopPiece); }
+  if (!pod && uTrafficN > 0) { gTrafCamRay = !cloak; trafH = traceTraffic(ro, rd, tmax, trafK); gTrafCamRay = false; loadMain(); pieceXf(hTopPiece); }
   vec2 ph = onScr || cloak || (cockpitView && !pod) ? vec2(-1.0) : (pod ? h0 : hTop);
   float t = 1e9; int hit = 0;
   if (tT > 0.0) { t = tT; hit = 1; }
@@ -3841,13 +3857,12 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
   // clouds (a cloaked craft: the skin first, then one cloud march along the whole camera ray through it)
   if (cloak) { col = cloakSkin(col, ckN, rd0, ckLp, ckLp.z - uWr[6].y + 0.8); col = applyFog(col, ro0, rd0, ckT); }
   // ordinary world pixels leave their clouds to the quarter-resolution cloud pass (composited before the TAA); the
-  // cabin, the display screens and the bomb feed (whose screen effects go on top of the clouds) march them here
+  // cabin marches them here
   bool wrCk = cockpitView && int(gM[0].z + 0.5) == 6;
-  bool cloudLater = uCloudSplit == 1 && !pod && !onScr && !feed && !wrCk;
+  bool cloudLater = uCloudSplit == 1 && !pod && !wrCk;
   vec4 cl = pod || cloudLater ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(cloak ? ro0 : ro, cloak ? rd0 : rd, cloak ? t + ckT : t, jitter);
   col = col*cl.a + cl.rgb;
   oCloudMask = cloudLater ? 1.0 : 0.0;
-  if (onScr) col = feed ? wrFeedOverlay(col, scrL) : wrCk ? wraithScreen(col, rd, scrId, scrL) : jetScreen(col, rd, scrId, scrL);
   if (wrCk) col += wrHolo(roV, rdV, pod ? t : h0.x);   // the hologram floats inside the cabin, in front of everything
   if (cloak) { t += ckT; taaFlag = 0.5; }
 #ifdef WR_CLIPATLAS
@@ -4415,7 +4430,7 @@ void main(){
 static const char* kCloudMain = R"(
 uniform sampler2D uSceneDepth; uniform int uFrame;
 void main(){
-  ivec2 full = textureSize(uSceneDepth, 0);
+  ivec2 full = ivec2(uRes);   // (the view's size: a camera feed uses a corner of larger targets)
   ivec2 fp2 = min(ivec2(gl_FragCoord.xy)*2 + ivec2(uFrame & 1, (uFrame >> 1) & 1), full - 1);
   float d = texelFetch(uSceneDepth, fp2, 0).r;
   vec2 uv = (vec2(fp2) + 0.5)/vec2(full);
@@ -4431,11 +4446,12 @@ void main(){
 static const char* kCloudCompFS = R"(#version 330 core
 in vec2 vUV; out vec4 oColor;
 uniform sampler2D uCloud; uniform sampler2D uCloudD; uniform sampler2D uDepthTex; uniform sampler2D uMaskTex;
+uniform vec2 uCloudHi;   // the last cloud texel of this view
 void main(){
   ivec2 p = ivec2(gl_FragCoord.xy);
   if (texelFetch(uMaskTex, p, 0).r < 0.5) discard;   // marched in the ray tracer
   float d = texelFetch(uDepthTex, p, 0).r, ld = log(max(d, 0.1));
-  ivec2 hi = textureSize(uCloud, 0) - 1;
+  ivec2 hi = ivec2(uCloudHi);
   vec2 lc = (vec2(p) + 0.5)*0.5 - 0.5;
   ivec2 b = ivec2(floor(lc)); vec2 f = lc - vec2(b);
   vec4 acc = vec4(0.0); float ws = 0.0;

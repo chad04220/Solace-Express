@@ -1546,6 +1546,7 @@ FrameParams Game::buildFrame() {
     fp.landLightPos = plane.pos + plane.forward() * (plane.spec->fusLen * 0.4f);
     fp.landLightDir = normalize(plane.forward() - plane.up() * 0.1f);
     wraithVisual(fp);
+    buildFeedCameras(fp);
     if (boomT >= 0 && boomT < 1.6f && !(length(fp.flameLight) > 0.f)) {   // an explosion's flash lights the scene, fading as the fireball cools
       float k = boomT < 0.08f ? boomT / 0.08f : expf(-(boomT - 0.08f) * 2.6f);
       fp.flameLightPos = boomP; fp.flameLight = vec3(1.f, 0.6f, 0.28f) * (boomI * k);

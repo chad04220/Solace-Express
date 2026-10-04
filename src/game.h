@@ -177,6 +177,7 @@ private:
   void wraithControls(float dt);
   void updateWraith(float dt);
   void wraithVisual(FrameParams& fp);
+  void buildFeedCameras(FrameParams& fp);
   void buildLights(FrameParams& fp);
   void fireLaser();
   void updateBolts(float dt);
