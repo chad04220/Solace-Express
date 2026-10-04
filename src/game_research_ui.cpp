@@ -240,8 +240,8 @@ void Game::drawResearch(const FrameParams& fp) {
       float by = py0 + ph + 26 * s;
       g_ren.rect(0, by - 6 * s, W, 64 * s, R_INK, 0.85f * g * A);
       g_ren.rect(0, by - 6 * s, W, 1 * s, R_GREEN, 0.6f * g * A); g_ren.rect(0, by + 58 * s, W, 1 * s, R_GREEN, 0.6f * g * A);
-      g_ren.text(W * 0.5f, by + 2 * s, 30 * s, decrypt("ACCESS GRANTED  //  PROJECT NIGHTGLASS", T - 3.75f, 0.012f), R_GREEN, g * A, 1, false);
-      g_ren.text(W * 0.5f, by + 38 * s, 12 * s, decrypt("SUBJECT VERIFIED  -  CLEARANCE OMEGA-BLACK  -  WELCOME BACK, CAPTAIN", T - 3.85f, 0.008f), R_TEXT, g * A, 1, false);
+      g_ren.text(W * 0.5f, by + 2 * s, 30 * s, decrypt("ACCESS GRANTED  //  PROJECT NIGHTGLASS", T - 3.75f, 0.006f), R_GREEN, g * A, 1, false);
+      g_ren.text(W * 0.5f, by + 38 * s, 12 * s, decrypt("SUBJECT VERIFIED  -  CLEARANCE OMEGA-BLACK  -  WELCOME BACK, CAPTAIN", T - 3.8f, 0.004f), R_TEXT, g * A, 1, false);
     }
     // shutters open into the terminal
     if (T > 4.35f) { float o = smoothstepf(4.35f, kIntro, T); g_ren.rect(0, 0, W, H * 0.5f * (1 - o), R_INK, 1); g_ren.rect(0, H - H * 0.5f * (1 - o), W, H * 0.5f * (1 - o), R_INK, 1); }
