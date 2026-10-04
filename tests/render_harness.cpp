@@ -149,9 +149,11 @@ void main(){
   if (getenv("SHADERCACHE")) g_shaderCacheDir = getenv("SHADERCACHE");   // test the program-binary cache
   g_ren.renderScale = getenv("RSCALE") ? (float)atof(getenv("RSCALE")) : 1.0f; g_ren.quality = 1;
   if (getenv("DBGOFF")) g_ren.dbgOff = atoi(getenv("DBGOFF"));   // switch ray tracer features off (Renderer::dbgOff bits)
+  auto tInit = std::chrono::steady_clock::now();
   if (!g_ren.init(W, H)) { printf("init failed: %s\n", g_ren.error.c_str()); return 1; }
   g_ren.entSync = !getenv("ENTSTREAM");   // captures generate every scenery chunk in range up front
-  printf("renderer ok (shader cache: %d loaded, %d compiled)\n", g_shaderCacheHits.load(), g_shaderCacheMisses.load());
+  printf("renderer ok (shader cache: %d loaded, %d compiled, %.0f s)\n", g_shaderCacheHits.load(), g_shaderCacheMisses.load(),
+         std::chrono::duration<double>(std::chrono::steady_clock::now() - tInit).count());
   std::string scene = argc > 1 ? argv[1] : "default";
   if (scene.rfind("multi:", 0) == 0) {   // several scenes from one shader compile: multi:a,b,c
     std::string list = scene.substr(6) + ",";
