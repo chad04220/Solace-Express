@@ -207,10 +207,9 @@ struct GameTest {
         for (int i = 0; i < 60 * 8; i++) { g.plane.ctl.throttle = 1.f; g.update(dt); }
         float held = length(g.plane.vel);
         printf("Parking brake at the start (%s): running=%d brake=%.1f speed after 8 s at full power %.2f m/s\n", kAircraft[sp].name, g.plane.engineRunning, g.plane.ctl.brake, held);
-        // set on every aircraft; it holds full power on all but the high-thrust STOL types (Bushmaster, Islander),
-        // whose static thrust beats their wheel brakes
-        bool stol = sp == 2 || sp == 3;
-        if (!(g.plane.engineRunning && g.plane.ctl.brake > 0.99f && (stol || held < 0.5f))) fails++;
+        // set on every aircraft, and it holds full power on all of them (a propeller's static thrust is limited by its
+        // disk, Plane::substep, so even the STOL types don't drag their brakes)
+        if (!(g.plane.engineRunning && g.plane.ctl.brake > 0.99f && held < 0.5f)) fails++;
       }
       g.botControl = true;
     }

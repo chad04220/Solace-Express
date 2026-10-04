@@ -171,6 +171,11 @@ void Plane::substep(float dt, const Weather& wx, float time) {
       float P = s.engines * s.power * engineSpool * (s.engineType == ENG_PISTON ? sigmaRho : powf(sigmaRho, 0.75f));
       float vf = std::max(0.f, -va.z);
       thrust = P * 0.8f / sqrtf(vf * vf + s.v0 * s.v0);
+      // a propeller can't make more thrust than momentum theory allows for its disk: T = FM (2 rho A P^2)^(1/3) per
+      // engine, figure of merit 0.75, diameter from the power it absorbs (1.75 m for a 110 kW trainer, 2.7 m for a
+      // Caravan) - it's what limits the static thrust, at speed the power-over-speed term is the smaller
+      float Pe = P / s.engines, D = 0.55f * powf(s.power / 1000.f, 0.25f), A = PI * D * D * 0.25f;
+      thrust = std::min(thrust, s.engines * 0.75f * cbrtf(2.f * density * A * Pe * Pe));
     }
     if (!s.special) fuel = std::max(0.f, fuel - fuelFlowMax() * (0.2f + 0.8f * ctl.throttle) * dt);
   }

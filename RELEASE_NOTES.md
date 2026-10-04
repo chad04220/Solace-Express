@@ -13,6 +13,7 @@
 **Aerodynamics from the airframe's shape**
 - Drag is now built up from each aircraft's geometry: the fuselage from its length and width, the wing and tails from their area and thickness, nacelles, struts, landing gear sized by the aircraft's weight (big unfaired tyres on the rough-field types), engine cooling, rivets and antennas. Skin friction follows the Reynolds number, so drag changes with speed, altitude and size like a real aircraft's. The lift slope and span efficiency come from the wing's aspect ratio, weight sets the induced drag, the wing's drag rises near its critical Mach number, and sideslip or a high angle of attack pushes the fuselage broadside through the air
 - Cruise speeds and climb rates now come out of the physics instead of being calibrated in, so some aircraft fly a little differently (the Bushmaster and Starling are faster, the Caravan and Q400 a little slower at low altitude)
+- Propellers are limited by their disk at low speed (momentum theory, the disk sized from the engine's power), so static thrust is realistic: every aircraft now holds full power on its parking brake, the Bushmaster and Islander included
 - More power for the trainers: the Kestrel T2 now has 110 kW (was 82) and the Wren 180 has 180 kW (was 135), roughly 1500 and 1750 ft/min of climb at sea level
 
 **Fixes**
