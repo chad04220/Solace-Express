@@ -1253,13 +1253,22 @@ void Game::drawHud(const FrameParams& fp) {
     }
   }
   // 3D target marker: a diamond on the target itself with a stalk to the ground below it (reads height at a glance);
-  // off-screen or behind, an arrow on the screen edge points the way to turn
-  {
+  // off-screen or behind, an arrow on the screen edge points the way to turn. Drawn last (drawMarker below), over the
+  // HUD panels, with its label on a dark backing: a target low on the screen sits where the panels are
+  auto drawMarker = [&]() {
+    auto label = [&](float x, float y, const std::string& t) {
+      float tw2 = g_ren.textWidth(t, 13 * s);
+      g_ren.rect(x - tw2 * 0.5f - 6 * s, y - 2 * s, tw2 + 12 * s, 19 * s, vec3(0.01f, 0.02f, 0.04f), 0.7f, 4 * s);
+      g_ren.text(x, y, 13 * s, t, mag, 1, 1);
+    };
     vec3 tgt3 = target; if (!toWp) tgt3.y = d.elev + 3.f;
     float sx, sy;
     vec3 rel3 = tgt3 - fp.camPos;
     float zc = dot(rel3, -fp.camBack);
-    bool onS = zc > 1.f && g_ren.project(fp, tgt3, sx, sy) && sx > 40 * s && sx < W - 40 * s && sy > 150 * s && sy < H - 40 * s;
+    // the clear band between the cards at the top and the instrument panels at the bottom: the diamond only inside it,
+    // the edge arrow kept on its border
+    const float bandT = 150 * s, bandB = H - 290 * s, bandC = 0.5f * (bandT + bandB), bandH = std::max(40 * s, 0.5f * (bandB - bandT));
+    bool onS = zc > 1.f && g_ren.project(fp, tgt3, sx, sy) && sx > 40 * s && sx < W - 40 * s && sy > bandT && sy < bandB;
     std::string lab = dist < 1000.f ? fmt("%.0f m", length(rel3)) : fmt("%.1f km", dist / 1000.f);
     if (toWp && fabsf(target.y - plane.pos.y) > 45.f) lab += fmt("  %s%s", target.y > plane.pos.y ? "+" : "-", fmtAlt(fabsf(target.y - plane.pos.y)).c_str());
     if (onS) {
@@ -1273,21 +1282,20 @@ void Game::drawHud(const FrameParams& fp) {
       g_ren.line(sx - r, sy, sx, sy - r, 2.5f * s, mag, 0.95f); g_ren.line(sx, sy - r, sx + r, sy, 2.5f * s, mag, 0.95f);
       g_ren.line(sx + r, sy, sx, sy + r, 2.5f * s, mag, 0.95f); g_ren.line(sx, sy + r, sx - r, sy, 2.5f * s, mag, 0.95f);
       g_ren.rect(sx - 2.5f * s, sy - 2.5f * s, 5 * s, 5 * s, mag, 1, 2.5f * s);
-      g_ren.text(sx, sy + r + 4 * s, 13 * s, lab, mag, 1, 1);
+      label(sx, sy + r + 4 * s, lab);
     } else {
       vec2 dir(dot(rel3, fp.camRight), -dot(rel3, fp.camUp));
       if (zc < 0) dir = vec2(dir.x >= 0 ? 1.f : -1.f, clampf(dir.y / (fabsf(dir.x) + fabsf(dir.y) + 1e-3f), -0.4f, 0.4f));   // behind: point to the side to turn
       { float dl = length(dir); dir = vec2(dir.x / dl, dir.y / dl); }
-      float ex2 = W * 0.5f + dir.x * (W * 0.5f - 70 * s), ey2 = H * 0.5f + dir.y * (H * 0.5f - 90 * s);
-      float t2 = std::min(fabsf((W * 0.5f - 70 * s) / std::max(fabsf(dir.x), 1e-3f)), fabsf((H * 0.5f - 90 * s) / std::max(fabsf(dir.y), 1e-3f)));
-      ex2 = W * 0.5f + dir.x * t2; ey2 = H * 0.5f + dir.y * t2;
+      float t2 = std::min(fabsf((W * 0.5f - 70 * s) / std::max(fabsf(dir.x), 1e-3f)), fabsf(bandH / std::max(fabsf(dir.y), 1e-3f)));
+      float ex2 = W * 0.5f + dir.x * t2, ey2 = bandC + dir.y * t2;
       vec2 pv(-dir.y, dir.x); float al = 16 * s;
       g_ren.rect(ex2 - 20 * s, ey2 - 20 * s, 40 * s, 40 * s, vec3(0.01f, 0.03f, 0.05f), 0.5f, 20 * s);
       g_ren.line(ex2 - dir.x * al * 0.6f + pv.x * al * 0.7f, ey2 - dir.y * al * 0.6f + pv.y * al * 0.7f, ex2 + dir.x * al * 0.6f, ey2 + dir.y * al * 0.6f, 3.5f * s, mag, 1);
       g_ren.line(ex2 - dir.x * al * 0.6f - pv.x * al * 0.7f, ey2 - dir.y * al * 0.6f - pv.y * al * 0.7f, ex2 + dir.x * al * 0.6f, ey2 + dir.y * al * 0.6f, 3.5f * s, mag, 1);
-      g_ren.text(ex2 - dir.x * 34 * s, ey2 - dir.y * 34 * s - 7 * s, 13 * s, lab, mag, 1, 1);
+      label(ex2 - dir.x * 34 * s, ey2 - dir.y * 34 * s - 7 * s, lab);
     }
-  }
+  };
   // ---- wind: dial with the wind relative to the nose (arrow points where it blows), speed, gusts and components
   {
     float wx0 = 16 * s, wy0 = camMode == 1 ? 120 * s : H - 210 * s - 60 * s - 86 * s;
@@ -1436,8 +1444,10 @@ void Game::drawHud(const FrameParams& fp) {
     float ly = hy + 28 * s;
     for (auto& l : wrap(hint, hw - 40 * s, 17 * s)) { g_ren.text(hx + 18 * s, ly, 17 * s, l, C_TEXT, 1); ly += 23 * s; }
   }
-  if (showRadio) drawRadioPanel(20 * s, 60 * s);
-  else if (radio.state() == Radio::PLAYING) g_ren.text(20 * s, 40 * s, 13 * s, "Radio: " + stations[std::clamp(set.radioStation, 0, (int)stations.size() - 1)].first, C_DIM, 0.8f);
+  drawMarker();
+  // (below the tower recall panel at the top left)
+  if (showRadio) drawRadioPanel(20 * s, 130 * s);
+  else if (radio.state() == Radio::PLAYING) g_ren.text(20 * s, 130 * s, 13 * s, "Radio: " + stations[std::clamp(set.radioStation, 0, (int)stations.size() - 1)].first, C_DIM, 0.8f);
 }
 
 // Liang-Barsky clip of a segment to a rectangle; false when fully outside
