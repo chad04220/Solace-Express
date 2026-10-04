@@ -100,6 +100,7 @@ void Plane::step(float dt, const Weather& wx, float time) {
   const int N = std::max(1, (int)ceilf(dt / (1.f / 240.f)));
   float h = dt / N;
   ev.touchdown = false;
+  apGustAdd = 0.5f * wx.gust + 2.f * wx.turbulence;   // the approach speed a pilot adds for gusts (half the gust factor)
   if (apOn) apGuidance(dt);
   for (int i = 0; i < N && !ev.crashed; i++) substep(h, wx, time + h * i);
   flightTime += dt;
@@ -799,7 +800,7 @@ void Plane::apGuidance(float dt) {
         ctl.flaps = approach(ctl.flaps, clampf(fl, 0.34f, 1.f), 0.3f, dt);
       }
       if (dist < F + 1500.f || high) ctl.gearDown = true;
-      apSpeed = dist > F ? vref * 1.3f : dist > F * 0.5f ? vref * 1.18f : vref * 1.06f;
+      apSpeed = (dist > F ? vref * 1.3f : dist > F * 0.5f ? vref * 1.18f : vref * 1.06f) + apGustAdd;
       if (dist < 2000.f && dist > 250.f && (fabsf(cross) > std::min(80.f, std::max(a.width * 0.5f, 12.f) + dist * 0.03f) || err > 40.f || err < -80.f)) { apStage = APS_GOAROUND; apStageT = 0; }
       { vec3 ahead = pos + vec3(ld.x, 0, ld.z) * 800.f; if (dist > 1200.f && pos.y < g_world.height(ahead.x, ahead.z) + 40.f) { apStage = APS_GOAROUND; apStageT = 0; } }
       // the XR-11 comes to a hover over the touchdown point instead of a fast landing roll

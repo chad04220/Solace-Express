@@ -572,6 +572,8 @@ void Renderer::bakeTerrainShadow(const FrameParams& fp) {
   GLuint p = progTShBake;
   glUseProgram(p);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
+  glActiveTexture(GL_TEXTURE0 + 6); glBindTexture(GL_TEXTURE_2D, texHMax); glUniform1i(U(p, "uHMax"), 6);
+  glActiveTexture(GL_TEXTURE0);
   glUniform1i(U(p, "uCraterN"), 0); glUniform1f(U(p, "uMaxH"), maxH);
   glUniform3f(U(p, "uBakeSun"), tshBakeSun.x, tshBakeSun.y, tshBakeSun.z);
   glUniform1f(U(p, "uBakeN"), (float)kTShN);
@@ -945,7 +947,9 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, tshFront >= 0 ? texTSh[tshFront] : 0); glUniform1i(U(p, "uTSh"), 18);
   static const bool tshOff = getenv("TSHOFF") != nullptr;   // (debug: compare with per-pixel shadow rays)
   glUniform1i(U(p, "uTShOn"), tshFront >= 0 && !tshOff ? 1 : 0);
-  glActiveTexture(GL_TEXTURE0 + 20); glBindTexture(GL_TEXTURE_2D, envOn ? texEnv : 0); glUniform1i(U(p, "uEnv"), 20);
+  // (bound whenever any of its channels is in use: the hull channels are written whether or not the terrain envelope
+  // was drawn this frame, and the terrain channel is only read under uEnvOn)
+  glActiveTexture(GL_TEXTURE0 + 20); glBindTexture(GL_TEXTURE_2D, envOn || hullOn || trafHullOn ? texEnv : 0); glUniform1i(U(p, "uEnv"), 20);
   glUniform1i(U(p, "uEnvOn"), envOn ? 1 : 0);
   glUniform1i(U(p, "uHullOn"), hullOn ? 1 : 0); glUniform1f(U(p, "uHullNear"), hullNear(fp));
   glUniform1i(U(p, "uTrafHullOn"), trafHullOn ? 1 : 0);

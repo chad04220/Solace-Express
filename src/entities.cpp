@@ -500,7 +500,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
     }
   }
   ch.ents.clear();
-  ch.ymin = 1e9f; ch.ymax = -1e9f; ch.reach = 0;
+  ch.ymin = 1e9f; ch.ymax = -1e9f; ch.reach = 0; ch.hmax = 0;
   const float x0 = chunkX0(cx), z0 = chunkX0(cz);
   for (int k = 0; k < EK_COUNT; k++) {
     // trees, bushes and small rocks in ascending order of their thinning key, so the renderer keeps a prefix of the
@@ -510,6 +510,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
     for (const Ent& e : lists[k]) {
       ch.ents.push_back(e);
       ch.ymin = std::min(ch.ymin, e.y); ch.ymax = std::max(ch.ymax, e.y + kEntInfo[k].h * e.sy);
+      ch.hmax = std::max(ch.hmax, kEntInfo[k].h * e.sy);
       float R = hypotf(kEntInfo[k].hx * e.sx, kEntInfo[k].hz * e.sz);   // (a big terminal reaches well into the next chunk)
       ch.reach = std::max({ch.reach, x0 - (e.x - R), e.x + R - (x0 + CH), z0 - (e.z - R), e.z + R - (z0 + CH)});
     }

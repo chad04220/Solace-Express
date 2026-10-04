@@ -3802,7 +3802,9 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
       if (sunVis > 0.0 && !podMat) {
         float tsh = (trafHit || uWreck > 0) ? terrainShadow(p, uSunDir, t) : uPlaneTSh;
         if (tsh > 0.0 && !trafHit) { gShMax = interior ? 3.5 : 1e9; tsh *= planeShadow(p + n*0.02, uSunDir); gShMax = 1e9; }
-        sh = tsh > 0.0 ? tsh*cloudShadow(p) : 0.0;
+        // (and the scenery's: an airframe parked by a hangar or under trees sits in the same shadow as the ground
+        // round it - the aircraft aren't in the scenery cascades, so this never shadows the airframe itself)
+        sh = tsh > 0.0 ? tsh*cloudShadow(p)*entShadow(p, n) : 0.0;
       }
       if (podMat) {  // sealed research cockpit: lit only by its modelled fixtures, low and moody
         mat3 inv = transpose(gPR);
@@ -4394,11 +4396,28 @@ void main(){
   float slope = uBakeSun.y/lxz;              // the sun ray's rise per horizontal metre
   float H = -6e4, D = 1.0;
   float t = 3.0*WH/uBakeN;                   // start past this texel's own ground
-  for (int i = 0; i < 80; i++) {
-    float y = terrainH(p + dir*t, 4) - t*slope;   // a point here must reach this height to see over that sample
+  // out to 30 km (a low sun's shadow from a distant range reaches that far) or the world's edge. Stretches whose
+  // conservative max height (the uHMax mip chain) can't rise above the horizon found so far are skipped whole, so
+  // the march spends its samples only where a blocker could be.
+  vec2 ird = vec2(abs(dir.x) > 1e-6 ? 1.0/dir.x : 1e9, abs(dir.y) > 1e-6 ? 1.0/dir.y : 1e9);
+  for (int i = 0; i < 240; i++) {
+    vec2 q = p + dir*t;
+    if (t > 30000.0 || abs(q.x) > WH || abs(q.y) > WH) break;
+    if (uMaxH - t*slope < H) break;          // nothing further away can rise above that
+    bool sk = false;
+    for (int L = HMAXL - 1; L >= 0; L--) {
+      int n = HMAXN >> L; float cs = 2.0*WH/float(n);
+      ivec2 ci = clamp(ivec2(floor((q + WH)/cs)), ivec2(0), ivec2(n - 1));
+      if (texelFetch(uHMax, ci, L).r - t*slope > H) continue;   // could raise the horizon somewhere in it: look closer
+      vec2 c0 = vec2(ci)*cs - WH;
+      vec2 te2 = (mix(c0, c0 + cs, step(0.0, dir)) - p)*ird;
+      float te = min(te2.x, te2.y);
+      if (te > t + 0.01) { t = te + 0.05; sk = true; break; }
+    }
+    if (sk) continue;
+    float y = terrainH(q, 4) - t*slope;      // a point here must reach this height to see over that sample
     if (y > H) { H = y; D = t; }
-    if (uMaxH - t*slope < H || t > 30000.0) break;   // nothing further away can rise above that
-    t += max(20.0, t*0.05);
+    t += max(20.0, t*0.03);
   }
   oColor = vec4(H, D, 0.0, 1.0);
 }

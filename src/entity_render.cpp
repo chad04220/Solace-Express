@@ -82,6 +82,12 @@ void Renderer::drawEntities(const FrameParams& fp) {
   vec3 cam = fp.camPos;
   const int ccx = Scenery::chunkOf(cam.x), ccz = Scenery::chunkOf(cam.z);
   const int rad = (int)ceilf(farAll / Scenery::CH) + 1;
+  // how far beyond a shadow cascade a chunk's casters can still throw shadow into it: its tallest caster times the
+  // shadow length per metre of height at this sun, plus how far footprints spill past the chunk. (A fixed pad
+  // dropped tall buildings whose chunk began just outside it before the per-caster test could accept them.)
+  const vec3 Lsun = normalize(fp.sunDir);
+  const float shReach = sqrtf(std::max(1.f - Lsun.y * Lsun.y, 0.f)) / std::max(Lsun.y, 0.15f);   // shadow length per metre of height
+  auto chunkShPad = [&](const Scenery::Chunk* ch) { return ch ? ch->hmax * shReach + ch->reach + 60.f : 300.f; };
   // ------------------------------------------------ streaming: queue missing chunks by distance, generate within a time budget
   struct Need { float d; int cx, cz, level; };
   if (!feedPass) {
@@ -106,7 +112,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
         // only where its shadows can show: the shader fades each cascade out at kShFade1 of its radius, plus room for
         // tall casters just outside. (A wider test re-rendered the far 4096^2 map nearly every frame in flight, since
         // tree chunks keep streaming in a few km ahead.)
-        float r = (c == 0 ? R.sh0 : R.sh1) * kShFade1 + 300.f;
+        float r = (c == 0 ? R.sh0 : R.sh1) * kShFade1 + std::max(300.f, chunkShPad(g_scenery.get(cx, cz)));
         float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
         float ex = std::max(std::max(x0 - shCenter[c].x, shCenter[c].x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - shCenter[c].z, shCenter[c].z - z0 - Scenery::CH), 0.f);
         if (ex < r && ez < r) shGen[c] = -1;
@@ -218,7 +224,6 @@ void Renderer::drawEntities(const FrameParams& fp) {
                  shGen[c] < 0 || shR[c] != cR[c] || shAge[c] > 600;
   }
 
-  const float shReach = sqrtf(std::max(1.f - L.y * L.y, 0.f)) / std::max(L.y, 0.15f);   // shadow length per metre of height
   // ------------------------------------------------ gather instances into (pass, kind, lod) buckets
   static std::vector<Ent> bucket[3][EK_COUNT][ENT_LODS];   // pass 0 view, 1/2 shadow cascades
   for (auto& a : bucket) for (auto& b : a) for (auto& v : b) v.clear();
@@ -239,10 +244,11 @@ void Renderer::drawEntities(const FrameParams& fp) {
       bool inSh[2] = {false, false};
       for (int c = 0; c < 2; c++)
         if (shDirty[c]) {
-          // the cascade box, swept along the sun direction (tall things outside it still cast into it)
-          float r = cR[c] + 60.f;
+          // the cascade box, grown by how far this chunk's tallest casters reach (tall things outside it still cast
+          // into it; the per-caster test below then keeps only those that do)
+          float r = cR[c] + std::max(210.f, chunkShPad(ch));
           float hx = std::max(std::max(x0 - newCenter[c].x, newCenter[c].x - x1), 0.f), hz = std::max(std::max(z0 - newCenter[c].z, newCenter[c].z - z1), 0.f);
-          inSh[c] = hx < r + 150.f && hz < r + 150.f;
+          inSh[c] = hx < r && hz < r;
         }
       if (!inView && !inSh[0] && !inSh[1]) continue;
       for (int k = 0; k < EK_COUNT; k++) {
