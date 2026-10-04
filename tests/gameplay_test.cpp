@@ -22,6 +22,22 @@ struct GameTest {
     bool voices = false;
 #endif
     static float abuf[2 * 4096];
+    if (voices) {   // the voice lines resolve for the game's messages, fixed and assembled from fragments
+      struct Case { const char* msg; const char* mission; bool pad, want; } cases[] = {
+        {"Checkpoint 2 of 6", "", false, true}, {"Flaps 33%", "", false, true}, {"Gear down", "", false, true},
+        {"Runway 05, Wind 050@4kt, scattered 4500ft, vis 10+km, 09:30", "", false, true}, {"MDB - Meadowbrook Field", "", false, true},
+        {"BUTTER!  42 fpm", "", false, true}, {"Gear collapsed - hit at 812 fpm", "", false, true}, {"SPLASH 2 - Wren 180 down", "", false, true},
+        {"3 aircraft caught in the blast", "", false, true}, {"ENGINE OFF - press I to restart", "", false, true}, {"STALL", "", false, true},
+        {"SPECTRE: That's the show - Specters breaking off. Fly safe!", "", false, true}, {"Pods 60 deg", "", false, true},
+        {"Nice! Hold a gentle climb about 7 degrees nose-up. Fly through the green rings.", "L1", false, true},
+        {"Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.", "L1", true, true},    // gamepad wording
+        {"Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.", "L1", false, false},  // not for keyboard
+        {"Engine running. Cleared for takeoff runway 05.", "", false, false},   // the towers clear takeoff
+        {"Something the packs never recorded", "", false, false}};
+      int bad = 0;
+      for (auto& c : cases) { AtcVoice::Tx tx; if (g.atc.resolve(c.msg, c.mission, c.pad, tx) != c.want) { printf("   resolve '%s' pad %d: expected %d\n", c.msg, c.pad, c.want); bad++; } }
+      printf("Voice line resolution (%d cases): %s\n", (int)(sizeof(cases) / sizeof(cases[0])), bad ? "FAIL" : "ok"); fails += bad > 0;
+    }
     static std::vector<int16_t> rec;   // ATCWAV=<file>: the mix the player hears, written out at the end
     auto audio = [&](float dt) {
       int n = std::min(4096, (int)(dt * 48000.f + 0.5f)); g_audio.render(abuf, n);
@@ -68,10 +84,11 @@ struct GameTest {
     printf("Lesson 1: screen=%d success=%d wp=%d/%zu t=%.0fs story=%d money=%d %s\n", g.screen, g.lastSuccess, g.wpIndex, g.contract.wps.size(), t, g.career.storyIndex, g.career.money, g.debriefTitle.c_str());
     if (!(g.screen == SCR_DEBRIEF && g.lastSuccess && g.career.storyIndex == 1)) fails++;
     if (voices) {   // the departure tower: greeting, takeoff clearance, then (a circuit lesson) remain in the pattern
-      auto& h = g.atc.history;
-      for (auto& x : h) printf("   tower: %s\n", x.c_str());
-      bool ok = h.size() >= 3 && h[0].find("Advise when ready to taxi") != std::string::npos && h[1].find("cleared for takeoff") != std::string::npos &&
-                h[2].find("Remain in the pattern") != std::string::npos;
+      std::vector<std::string> h;
+      for (auto& x : g.atc.history) { printf("   voice: %s\n", x.c_str()); if (x.rfind("TWR ", 0) == 0) h.push_back(x.substr(4)); }
+      // (the bot rolls 3 s in: then the takeoff clearance supersedes a greeting not yet said)
+      size_t k = !h.empty() && h[0].find("Advise when ready to taxi") != std::string::npos ? 1 : 0;
+      bool ok = h.size() >= k + 2 && h[k].find("cleared for takeoff") != std::string::npos && h[k + 1].find("Remain in the pattern") != std::string::npos;
       printf("Lesson 1 tower calls: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
     }
     // Lesson 1 ends in the air: no landing bonus or penalty may be applied
@@ -117,10 +134,11 @@ struct GameTest {
            g_world.airports[g.career.location].code, g.debriefTitle.c_str());
     for (auto& l : g.payout) printf("   %-30s %d\n", l.label.c_str(), l.amount);
     if (voices) {   // started inbound on a 3.5 km final: the approach call, then cleared to land, then exit the runway
-      const std::vector<std::string>& h = g.atc.history;
-      for (auto& x : h) printf("   tower: %s\n", x.c_str());
-      bool ok = h.size() >= 3 && h[0].find("straight-in runway") != std::string::npos && h[1].find("cleared to land") != std::string::npos &&
-                h[2].find("Exit the runway") != std::string::npos;
+      std::vector<std::string> h;
+      for (auto& x : g.atc.history) { printf("   voice: %s\n", x.c_str()); if (x.rfind("TWR ", 0) == 0) h.push_back(x.substr(4)); }
+      // (placed straight onto final, the approach call is superseded by the landing clearance before it can be said)
+      size_t k = !h.empty() && h[0].find("straight-in runway") != std::string::npos ? 1 : 0;
+      bool ok = h.size() >= k + 2 && h[k].find("cleared to land") != std::string::npos && h[k + 1].find("Exit the runway") != std::string::npos;
       printf("Arrival tower calls: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
     }
     if (!(g.screen == SCR_DEBRIEF && g.lastSuccess && g.career.location == c.to)) fails++;

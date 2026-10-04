@@ -6,6 +6,7 @@
 #include <cstring>
 #include <fstream>
 #include <iterator>
+#include <regex>
 #include <sstream>
 
 static const char* kVoiceName[AtcVoice::kVoices] = {"tower_north", "tower_coast", "tower_valley"};
@@ -20,10 +21,18 @@ bool AtcVoice::load(const std::string& d) {
     size_t a = ln.find('\t');
     if (a == std::string::npos) continue;
     if (ln[0] == '@') { lookup[ln.substr(1, a - 1)] = ln.substr(a + 1); continue; }
-    size_t b = ln.find('\t', a + 1);
-    Clip c; c.file = ln.substr(a + 1, b == std::string::npos ? std::string::npos : b - a - 1);
-    if (b != std::string::npos) c.words = ln.substr(b + 1);
-    clips[ln.substr(0, a)] = c;
+    std::vector<std::string> f;   // id, file, subtitle [, speaker, priority, kind, keyboard text, mission]
+    for (size_t p = 0;;) { size_t q = ln.find('\t', p); f.push_back(ln.substr(p, q == std::string::npos ? std::string::npos : q - p)); if (q == std::string::npos) break; p = q + 1; }
+    Clip c; c.file = f[1];
+    if (f.size() > 2) c.words = f[2];
+    if (f.size() >= 6) { c.speaker = f[3]; c.prio = atoi(f[4].c_str()); c.kind = f[5]; }
+    else c.kind = f[0].compare(0, 6, "tower.") == 0 ? "line" : "fragment";   // (tower pack: full calls are tower.*)
+    if (f.size() > 7) c.mission = f[7];
+    if (c.kind == "line" && !c.speaker.empty()) {
+      exact[c.words].push_back(f[0]);
+      if (f.size() > 6 && !f[6].empty()) padAlias[f[6]] = f[0];   // the line names gamepad buttons
+    }
+    clips[f[0]] = c;
   }
   return !clips.empty();
 }
@@ -36,6 +45,116 @@ std::string AtcVoice::digit(int v, int d) const {
   auto it = lookup.find(std::string(kVoiceName[v]) + ".digit." + std::to_string(d)); return it == lookup.end() ? std::string() : it->second;
 }
 std::string AtcVoice::text(const std::string& id) const { auto it = clips.find(id); return it == clips.end() ? std::string() : it->second.words; }
+std::string AtcVoice::atomO(const std::string& sp, const std::string& key) const {
+  auto it = lookup.find("atom." + sp + "." + key); return it == lookup.end() ? std::string() : it->second;
+}
+void AtcVoice::cardinal(const std::string& sp, long n, std::vector<std::string>& ids) const {   // number words
+  if (n < 0) { ids.push_back(atomO(sp, "minus")); n = -n; }
+  if (n < 20) { ids.push_back(atomO(sp, "n" + std::to_string(n))); return; }
+  if (n < 100) { ids.push_back(atomO(sp, "n" + std::to_string(n / 10 * 10))); if (n % 10) cardinal(sp, n % 10, ids); return; }
+  if (n < 1000) { cardinal(sp, n / 100, ids); ids.push_back(atomO(sp, "hundred")); if (n % 100) cardinal(sp, n % 100, ids); return; }
+  static const std::pair<long, const char*> scales[] = {{1000000000L, "billion"}, {1000000L, "million"}, {1000L, "thousand"}};
+  for (auto& sc : scales) if (n >= sc.first) { cardinal(sp, n / sc.first, ids); ids.push_back(atomO(sp, sc.second)); if (n % sc.first) cardinal(sp, n % sc.first, ids); return; }
+}
+
+// A port of the voice pack's reference resolver (resolve_message.py): the line recorded for a message the game shows,
+// or the message assembled from fragments (weather, flap / pod settings, checkpoints, landing ratings, warnings ...).
+bool AtcVoice::resolve(const std::string& msg, const std::string& mission, bool pad, Tx& out) const {
+  out = Tx(); out.text = msg;
+  auto finish = [&](const std::string& sp, int prio) {
+    for (auto& id : out.ids) if (id.empty() || !clips.count(id)) { out.ids.clear(); return false; }   // (a fragment the pack lacks)
+    out.prio = prio; out.radio = sp == "tower" || sp == "spectre";
+    return !out.ids.empty();
+  };
+  auto line = [&](const std::string& id) {
+    const Clip& c = clips.at(id);
+    out.ids = {id};
+    if (c.speaker == "aster" && (c.kind == "line") && (msg.rfind("Gear ", 0) == 0 || msg.rfind("Flaps ", 0) == 0)) out.group = "lever";
+    return finish(c.speaker, c.prio);
+  };
+  auto ex = exact.find(msg);
+  if (ex != exact.end()) {
+    const char* pref = mission == "L4" ? "rosa" : (mission == "L1" || mission == "L2" || mission == "L3") ? "instructor" : "aster";
+    std::string id = ex->second[0];
+    for (auto& c : ex->second) if (clips.at(c).speaker == pref) { id = c; break; }
+    if (id.compare(0, 10, "clearance.") == 0) return false;   // the takeoff clearance comes from the tower controllers
+    return line(id);
+  }
+  auto pa = padAlias.find(msg);   // a lesson hint whose recording names the gamepad's buttons: only with a gamepad
+  if (pa != padAlias.end()) return pad && line(pa->second);
+  std::smatch m;
+  auto digits = [&](const std::string& sp, const std::string& t) { for (char c : t) out.ids.push_back(atomO(sp, std::string("n") + c)); };
+  static const std::regex wxRe(R"(Runway (\d{2}), Wind (\d{3})@(\d+)kt(?: G(\d+))?, (clear|scattered|broken|overcast)(?: (\d+)ft)?, vis (10\+|\d+(?:\.\d+)?)km(?:, (rain|thunderstorms|snow))?, (\d{2}):(\d{2}))");
+  if (std::regex_match(msg, m, wxRe)) {
+    const std::string sp = "tower";
+    out.ids.push_back(atomO(sp, "runway")); digits(sp, m[1]); out.ids.push_back(atomO(sp, "wind")); digits(sp, m[2]);
+    out.ids.push_back(atomO(sp, "at")); cardinal(sp, std::stol(m[3]), out.ids); out.ids.push_back(atomO(sp, "knots"));
+    if (m[4].matched) { out.ids.push_back(atomO(sp, "gusting")); cardinal(sp, std::stol(m[4]), out.ids); }
+    out.ids.push_back(atomO(sp, m[5]));
+    if (m[6].matched) { cardinal(sp, std::stol(m[6]), out.ids); out.ids.push_back(atomO(sp, "feet")); }
+    out.ids.push_back(atomO(sp, "visibility"));
+    if (m[7] == "10+") out.ids.push_back(atomO(sp, "ten_plus_km"));
+    else {
+      std::string v = m[7]; size_t dp = v.find('.');
+      cardinal(sp, std::stol(v.substr(0, dp)), out.ids);
+      if (dp != std::string::npos) { out.ids.push_back(atomO(sp, "point")); digits(sp, v.substr(dp + 1)); }
+      out.ids.push_back(atomO(sp, "kilometres"));
+    }
+    if (m[8].matched) out.ids.push_back(atomO(sp, m[8]));
+    out.ids.push_back(atomO(sp, "time")); digits(sp, m[9]); digits(sp, m[10]); out.ids.push_back(atomO(sp, "hours"));
+    return finish(sp, 50);
+  }
+  static const std::regex flapRe(R"(Flaps (\d+)%)");
+  if (std::regex_match(msg, m, flapRe)) {
+    out.ids.push_back(atomO("aster", "flaps")); cardinal("aster", std::stol(m[1]), out.ids); out.ids.push_back(atomO("aster", "percent"));
+    out.group = "lever"; return finish("aster", 40);
+  }
+  static const std::regex podRe(R"((Pods|Thrust vector) (\d+) deg)");
+  if (std::regex_match(msg, m, podRe)) {
+    out.ids.push_back(atomO("nyx", m[1] == "Pods" ? "pods" : "thrust_vector")); cardinal("nyx", std::stol(m[2]), out.ids); out.ids.push_back(atomO("nyx", "degrees"));
+    out.group = "lever"; return finish("nyx", 40);
+  }
+  static const std::regex cpRe(R"(Checkpoint (\d+) of (\d+))");
+  if (std::regex_match(msg, m, cpRe)) {
+    out.ids.push_back(atomO("aster", "checkpoint")); cardinal("aster", std::stol(m[1]), out.ids); out.ids.push_back(atomO("aster", "of")); cardinal("aster", std::stol(m[2]), out.ids);
+    return finish("aster", 50);
+  }
+  static const std::regex ldgRe(R"((BUTTER!|Smooth landing|Good landing|Firm landing|HARD landing!)  ([+-]?\d+) fpm)");
+  if (std::regex_match(msg, m, ldgRe)) {
+    auto b = exact.find(m[1]);
+    if (b == exact.end()) return false;
+    out.ids.push_back(b->second[0]); cardinal("aster", std::stol(m[2]), out.ids); out.ids.push_back(atomO("aster", "feet_per_minute"));
+    return finish("aster", 35);
+  }
+  static const std::regex gearRe(R"(Gear collapsed - hit at ([+-]?\d+) fpm)");
+  if (std::regex_match(msg, m, gearRe)) {
+    out.ids.push_back(atomO("aster", "gear_collapsed_hit_at")); cardinal("aster", std::stol(m[1]), out.ids); out.ids.push_back(atomO("aster", "feet_per_minute"));
+    return finish("aster", 80);
+  }
+  static const std::regex splashRe(R"(SPLASH (\d+) - (.+) down)");
+  if (std::regex_match(msg, m, splashRe)) {
+    auto c = lookup.find("craft." + m[2].str());
+    if (c == lookup.end()) return false;
+    out.ids.push_back(atomO("nyx", "splash")); cardinal("nyx", std::stol(m[1]), out.ids); out.ids.push_back(atomO("nyx", "craft_" + c->second)); out.ids.push_back(atomO("nyx", "down"));
+    return finish("nyx", 45);
+  }
+  static const std::regex blastRe(R"((\d+) aircraft caught in the blast)");
+  if (std::regex_match(msg, m, blastRe)) { cardinal("nyx", std::stol(m[1]), out.ids); out.ids.push_back(atomO("nyx", "aircraft_in_blast")); return finish("nyx", 45); }
+  static const std::regex engRe(R"(ENGINE OFF - press (.+) to restart)");
+  if (std::regex_match(msg, m, engRe)) {
+    std::string key = m[1];
+    out.ids.push_back(atomO("aster", "engine_off_press"));
+    auto k = lookup.find("key." + key);
+    if (k != lookup.end()) out.ids.push_back(k->second);
+    else if (key.compare(0, 4, "KEY ") == 0 && lookup.count("key.KEY")) {
+      out.ids.push_back(lookup.at("key.KEY"));
+      for (char c : key.substr(4)) out.ids.push_back(c >= 'A' && c <= 'F' ? atomO("aster", std::string("hex_") + c) : atomO("aster", std::string("n") + c));
+    } else return false;
+    out.ids.push_back(atomO("aster", "to_restart"));
+    return finish("aster", 90);
+  }
+  return false;
+}
 
 // WAV: 16-bit PCM or 8-bit mu-law, mono, any rate; decoded to floats at the audio engine's rate
 static bool readWav(const std::string& path, std::vector<float>& out, int outRate) {
@@ -98,8 +217,10 @@ std::shared_ptr<std::vector<float>> AtcVoice::assemble(const Tx& tx) {
       out->push_back(hp * level * env);
     }
   };
-  squelch(0.06f, 0.18f, false);
-  out->insert(out->end(), (size_t)(0.04f * sr), 0.f);
+  // radio calls built from fragments get one squelch around the whole message (full radio lines carry their own)
+  bool sq = tx.radio;
+  if (sq) { sq = false; for (auto& id : tx.ids) { auto c = clips.find(id); if (c != clips.end() && c->second.kind != "line") sq = true; } }
+  if (sq) { squelch(0.06f, 0.18f, false); out->insert(out->end(), (size_t)(0.04f * sr), 0.f); }
   bool any = false;
   for (const std::string& id : tx.ids) {
     if (id.empty()) { out->insert(out->end(), (size_t)(0.22f * sr), 0.f); continue; }
@@ -109,8 +230,7 @@ std::shared_ptr<std::vector<float>> AtcVoice::assemble(const Tx& tx) {
     out->insert(out->end(), p->begin(), p->end());
     any = true;
   }
-  out->insert(out->end(), (size_t)(0.03f * sr), 0.f);
-  squelch(0.14f, 0.22f, true);
+  if (sq) { out->insert(out->end(), (size_t)(0.03f * sr), 0.f); squelch(0.14f, 0.22f, true); }
   if (!any) out->clear();
   return out;
 }
@@ -120,7 +240,7 @@ void AtcVoice::start(const Tx& tx) {
   if (buf->empty()) return;
   g_audio.voicePlay(buf);
   playingPrio = tx.prio; idleT = 0;
-  started = tx.text; history.push_back(tx.text);
+  started = tx; history.push_back((tx.subtitle ? "TWR " : "") + tx.text);
 }
 
 bool AtcVoice::busy() const { return g_audio.voiceBusy(); }
@@ -133,6 +253,8 @@ void AtcVoice::say(const Tx& tx) {
     start(tx);
     return;
   }
+  if (!tx.group.empty())   // a newer lever setting replaces the one still waiting to be said
+    queue.erase(std::remove_if(queue.begin(), queue.end(), [&](const Tx& q) { return q.group == tx.group; }), queue.end());
   queue.push_back(tx);
   if (queue.size() > 4) {   // never a long backlog of stale calls: drop the least important
     size_t worst = 0;
@@ -141,8 +263,8 @@ void AtcVoice::say(const Tx& tx) {
   }
 }
 
-std::string AtcVoice::update(float dt) {
-  started.clear();
+AtcVoice::Tx AtcVoice::update(float dt) {
+  started = Tx();
   if (busy()) return started;
   playingPrio = -1;
   idleT += dt;

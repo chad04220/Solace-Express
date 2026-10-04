@@ -226,8 +226,16 @@ private:
     float t = 0, waitT = 0;
     int dep = -1, arr = -1, call = 42;
     bool depRev = false, arrRev = false, airborne = false;
+    int spoken = 0;   // tower transmissions heard so far
   } atcF;
   void updateAtc(float dt);
+  // every in-flight message the voices may say: the toasts, the lesson hints (with the lesson's id), the warnings
+  struct CommsMsg { std::string text, mission; };
+  std::vector<CommsMsg> commsPending;
+  bool commsCrashSeen = false;
+  std::vector<std::string> hintsVoiced;   // the lesson hints said this flight
+  bool warnWas[4] = {}; float warnLastT[4] = {-99, -99, -99, -99};   // stall, pull up, gear, engine off: rising edges
+  void updateComms(float dt);
   int atcStation(int airport) const { return (airport * 7 + 2) % AtcVoice::kVoices; }   // each airport keeps one voice
   std::vector<std::pair<std::string, std::string>> stations;
   bool settingsFromPause = false;
@@ -255,7 +263,7 @@ private:
   void loadStations();
   int radioScroll = 0;
   void saveGame();
-  void toast(const std::string& s, vec3 col = vec3(1, 1, 1));
+  void toast(const std::string& s, vec3 col = vec3(1, 1, 1), bool voiced = true);   // voiced: a voice line says it, if the packs have one
   void startFlight(const Contract& c, int spec, Career::Source src);
   void endFlight(bool success, const std::string& reason, FlightOutcome outcome = OUT_CRASHED);
   void updateFlight(float dt);

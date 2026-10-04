@@ -1,4 +1,4 @@
-# Solace Express tower voices (tools/voice_import.py); id <tab> file <tab> text, or @lookup <tab> id
+# Solace Express voices (tools/voice_import.py): id <tab> file <tab> subtitle [<tab> speaker <tab> priority <tab> kind <tab> alias <tab> mission], or @lookup <tab> value
 symbol.tower_north.A	tower_north/symbol.tower_north.A.wav	Ay.
 symbol.tower_north.B	tower_north/symbol.tower_north.B.wav	Bee.
 symbol.tower_north.C	tower_north/symbol.tower_north.C.wav	See.
@@ -590,3 +590,776 @@ radio_digit.tower_valley.9	tower_valley/radio_digit.tower_valley.9.wav	niner.
 @tower_valley.alpha.X	phonetic.tower_valley.X
 @tower_valley.alpha.Y	phonetic.tower_valley.Y
 @tower_valley.alpha.Z	phonetic.tower_valley.Z
+lesson.L1.phase0	instructor/lesson.L1.phase0.wav	Tap D-pad Left to release the parking brake, then hold RT to add full throttle.	instructor	65	line	Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.	L1
+lesson.L1.phase1	instructor/lesson.L1.phase1.wav	Keep the nose on the centreline with LB/RB rudder. At 50 kt gently pull the left stick back to lift off.	instructor	65	line	Keep the nose on the centreline with Q/E rudder. At 50 kt gently pull back (S) to lift off.	L1
+lesson.L1.phase2	instructor/lesson.L1.phase2.wav	Nice! Hold a gentle climb about 7 degrees nose-up. Fly through the green rings.	instructor	65	line		L1
+lesson.L1.phase3	instructor/lesson.L1.phase3.wav	Reduce power slightly with LT once level and trim with D-pad Down/Up. Rings show the path.	instructor	65	line	Reduce power slightly (CTRL) once level and trim with [ and ]. Rings show the path.	L1
+lesson.L2.phase0	instructor/lesson.L2.phase0.wav	Release the parking brake with D-pad Left, hold RT for full power, and take off as in Lesson 1.	instructor	65	line	Release brakes (B), full power, and take off as in Lesson 1.	L2
+lesson.L2.phase1	instructor/lesson.L2.phase1.wav	Rudder to stay straight. Rotate at 50 kt.	instructor	65	line		L2
+lesson.L2.phase2	instructor/lesson.L2.phase2.wav	Climb through the rings. The pattern turns LEFT. Use gentle 20 degree banks.	instructor	65	line		L2
+lesson.L2.phase3	instructor/lesson.L2.phase3.wav	On downwind use LT to reduce power to about 60%, then press B for one notch of flaps.	instructor	65	line	On downwind reduce power to about 60% and set one notch of flaps (F).	L2
+lesson.L2.phase4	instructor/lesson.L2.phase4.wav	Turn final, press B until full flaps, and follow the PAPI lights: two white, two red is on glidepath.	instructor	65	line	Turn final, add full flaps (F), and follow the PAPI lights: two white, two red is on glidepath.	L2
+lesson.L2.phase5	instructor/lesson.L2.phase5.wav	Reduce power to idle over the threshold, then gently raise the nose to flare just above the runway.	instructor	65	line		L2
+lesson.L2.phase6	instructor/lesson.L2.phase6.wav	Hold A to brake to a full stop and complete the lesson.	instructor	65	line	Brake (B) to a full stop to complete the lesson.	L2
+lesson.L3.phase0	instructor/lesson.L3.phase0.wav	Release brakes and take off. The magenta arrow on the HUD points to your destination.	instructor	65	line		L3
+lesson.L3.phase1	instructor/lesson.L3.phase1.wav	Stay on the centreline.	instructor	65	line		L3
+lesson.L3.phase2	instructor/lesson.L3.phase2.wav	Climb to about 1,500 feet and head toward the arrow. Click the right stick for autopilot heading/altitude hold.	instructor	65	line	Climb to about 1,500 feet and head toward the arrow. Press Z for autopilot heading/altitude hold.	L3
+lesson.L3.phase3	instructor/lesson.L3.phase3.wav	Watch your fuel gauge and the distance readout. Press N to view the map.	instructor	65	line		L3
+lesson.L3.phase4	instructor/lesson.L3.phase4.wav	Harlan Farm runway 17 is short: slow to 60 kt, full flaps, aim for the very start of the strip.	instructor	65	line		L3
+lesson.L3.phase5	instructor/lesson.L3.phase5.wav	Flare gently and get the wheels down early.	instructor	65	line		L3
+lesson.L3.phase6	instructor/lesson.L3.phase6.wav	Hold A to brake to a full stop and finish.	instructor	65	line	Full stop with brakes (B) to finish.	L3
+lesson.L4.phase0	rosa/lesson.L4.phase0.wav	Final exam: take off when ready.	rosa	65	line		L4
+lesson.L4.phase1	rosa/lesson.L4.phase1.wav	Crosswind! Use rudder to stay on the centreline.	rosa	65	line		L4
+lesson.L4.phase2	rosa/lesson.L4.phase2.wav	Climb out and navigate to Orchard Valley.	rosa	65	line		L4
+lesson.L4.phase3	rosa/lesson.L4.phase3.wav	Plan your descent early - Orchard Valley sits at 690 ft.	rosa	65	line		L4
+lesson.L4.phase4	rosa/lesson.L4.phase4.wav	Crab into the wind on final. Just before touchdown, use rudder to align with the runway.	rosa	65	line		L4
+lesson.L4.phase5	rosa/lesson.L4.phase5.wav	Keep the upwind wing slightly low as you flare.	rosa	65	line		L4
+lesson.L4.phase6	rosa/lesson.L4.phase6.wav	Stop on the runway to complete the checkride.	rosa	65	line		L4
+radio.spectre.50e58a57b125	spectre/radio.spectre.50e58a57b125.wav	SPECTRE DISPLAY PAIR: Two Specters joining on your wing - enjoy the show!	spectre	45	line		
+radio.spectre.5f513f152f0d	spectre/radio.spectre.5f513f152f0d.wav	SPECTRE: That's the show - Specters breaking off. Fly safe!	spectre	45	line		
+radio.spectre.f055fe79a458	spectre/radio.spectre.f055fe79a458.wav	SPECTRE: You're on approach - we'll leave you to it. Specters out!	spectre	45	line		
+radio.spectre.5494711d80f3	spectre/radio.spectre.5494711d80f3.wav	SPECTRE: Smoke on... now. Tight formation, hold her steady.	spectre	45	line		
+radio.spectre.995c101f1c33	spectre/radio.spectre.995c101f1c33.wav	SPECTRE: Helix - we'll wrap you up. Don't flinch!	spectre	45	line		
+radio.spectre.32d95b24961f	spectre/radio.spectre.32d95b24961f.wav	SPECTRE: Opposition pass coming at you, knife-edge!	spectre	45	line		
+radio.spectre.44663451f855	spectre/radio.spectre.44663451f855.wav	SPECTRE: Back in formation. Nice flying, partner.	spectre	45	line		
+radio.spectre.3205cbc6bf66	spectre/radio.spectre.3205cbc6bf66.wav	SPECTRE: Synchronised loops off your nose - watch this.	spectre	45	line		
+radio.spectre.ca1924958744	spectre/radio.spectre.ca1924958744.wav	SPECTRE: Split and cross - one high, one low!	spectre	45	line		
+flight.aster.1da01aac21f6	aster/flight.aster.1da01aac21f6.wav	Any stick input hands control back	aster	40	line		
+flight.aster.98e0cfedf757	aster/flight.aster.98e0cfedf757.wav	Autopilot ON: the stick trims heading and altitude, throttle sets speed	aster	40	line		
+flight.aster.7dc83137b9f0	aster/flight.aster.7dc83137b9f0.wav	Pick an AUTOLAND airport on the GPS map to fly there	aster	40	line		
+flight.aster.531db133f303	aster/flight.aster.531db133f303.wav	Autopilot disconnected - your aircraft	aster	40	line		
+flight.aster.5793b8040fa2	aster/flight.aster.5793b8040fa2.wav	Autothrottle off - manual throttle	aster	40	line		
+research.nyx.a8550ed29895	nyx/research.nyx.a8550ed29895.wav	Pods 90 deg - VTOL hover	nyx	40	line		
+research.nyx.5bdcf9246c5c	nyx/research.nyx.5bdcf9246c5c.wav	Thrust vector 90 deg - VTOL hover	nyx	40	line		
+flight.aster.827caf719cc4	aster/flight.aster.827caf719cc4.wav	Gear lever is locked on the ground	aster	40	line		
+flight.aster.8d744c284940	aster/flight.aster.8d744c284940.wav	Gear down	aster	40	line		
+flight.aster.84b11ad116ac	aster/flight.aster.84b11ad116ac.wav	Gear up	aster	40	line		
+flight.aster.59084bfa5780	aster/flight.aster.59084bfa5780.wav	Autoland complete - parking brake set	aster	40	line		
+flight.aster.5b5696953300	aster/flight.aster.5b5696953300.wav	Parking brake SET	aster	40	line		
+flight.aster.7bcb717b3d53	aster/flight.aster.7bcb717b3d53.wav	Parking brake released	aster	40	line		
+flight.aster.cc912fa45e1a	aster/flight.aster.cc912fa45e1a.wav	Autopilot OFF	aster	40	line		
+flight.aster.c6b30308ac68	aster/flight.aster.c6b30308ac68.wav	Autopilot needs to be airborne	aster	40	line		
+flight.aster.704c5a3d24ba	aster/flight.aster.704c5a3d24ba.wav	Landing lights ON	aster	40	line		
+flight.aster.c2380ace78ac	aster/flight.aster.c2380ace78ac.wav	Landing lights OFF	aster	40	line		
+flight.aster.aaf9bd7eff8c	aster/flight.aster.aaf9bd7eff8c.wav	Engine start	aster	40	line		
+flight.aster.9775a0a0b0cd	aster/flight.aster.9775a0a0b0cd.wav	Time acceleration only available in cruise	aster	40	line		
+flight.aster.859b3a1b40bb	aster/flight.aster.859b3a1b40bb.wav	Starting engine...	aster	40	line		
+flight.aster.ce6408a8674b	aster/flight.aster.ce6408a8674b.wav	Time acceleration off	aster	40	line		
+flight.instructor.be2eb00d875a	instructor/flight.instructor.be2eb00d875a.wav	Engine running. Release the parking brake with B.	instructor	40	line		
+lesson_event.rosa.be2eb00d875a	rosa/lesson_event.rosa.be2eb00d875a.wav	Engine running. Release the parking brake with B.	rosa	60	line		
+flight.spectre.8e1c3feac92e	spectre/flight.spectre.8e1c3feac92e.wav	Spectre display pair: climb away from the field first	spectre	40	line		
+flight.aster.e5cc5a54dfec	aster/flight.aster.e5cc5a54dfec.wav	Positive climb!	aster	40	line		
+lesson_event.instructor.e5cc5a54dfec	instructor/lesson_event.instructor.e5cc5a54dfec.wav	Positive climb!	instructor	60	line		
+lesson_event.rosa.e5cc5a54dfec	rosa/lesson_event.rosa.e5cc5a54dfec.wav	Positive climb!	rosa	60	line		
+flight.aster.7a44031dc200	aster/flight.aster.7a44031dc200.wav	All checkpoints passed!	aster	40	line		
+flight.aster.61a4dca45ff1	aster/flight.aster.61a4dca45ff1.wav	LOW FUEL	aster	100	line		
+flight.aster.7e71a736df26	aster/flight.aster.7e71a736df26.wav	Checkpoints remaining - take off again to continue	aster	40	line		
+research.nyx.40f73b948f15	nyx/research.nyx.40f73b948f15.wav	XR-11 WRAITH // RESEARCH FLIGHT	nyx	40	line		
+research.nyx.66b2b06e84de	nyx/research.nyx.66b2b06e84de.wav	XR-9 SPECTER // RESEARCH FLIGHT	nyx	40	line		
+research.nyx.2110c8d235dc	nyx/research.nyx.2110c8d235dc.wav	F/V tilts the four thruster pods: full down for vertical takeoff	nyx	40	line		
+research.nyx.180fecf7b001	nyx/research.nyx.180fecf7b001.wav	F/V swivels the nozzles: full down for vertical takeoff	nyx	40	line		
+research.nyx.089b6e4c8963	nyx/research.nyx.089b6e4c8963.wav	MACH 1 - SONIC BOOM	nyx	40	line		
+research.nyx.80690dfe622a	nyx/research.nyx.80690dfe622a.wav	UNIDENTIFIED CONTACT	nyx	40	line		
+flight.aster.5f4f4f8afc6e	aster/flight.aster.5f4f4f8afc6e.wav	Engine noise muffled (headset ANR on)	aster	40	line		
+flight.aster.c44de169b0a6	aster/flight.aster.c44de169b0a6.wav	Headset ANR off	aster	40	line		
+flight.aster.db62da847cce	aster/flight.aster.db62da847cce.wav	Minimap shown	aster	40	line		
+flight.aster.a088c2031c25	aster/flight.aster.a088c2031c25.wav	Minimap hidden	aster	40	line		
+research.nyx.a3b165bde704	nyx/research.nyx.a3b165bde704.wav	CLOAK ENGAGED	nyx	40	line		
+research.nyx.bbe0fe158021	nyx/research.nyx.bbe0fe158021.wav	CLOAK DISENGAGED	nyx	40	line		
+research.nyx.3053d8a279e0	nyx/research.nyx.3053d8a279e0.wav	WEAPONS HOT - lasers out, bomb bay open	nyx	40	line		
+research.nyx.0bb56c83a190	nyx/research.nyx.0bb56c83a190.wav	WEAPONS SAFE - bay closed, lasers stowed	nyx	40	line		
+research.nyx.97dda70c3aa9	nyx/research.nyx.97dda70c3aa9.wav	The visitors don't appreciate that...	nyx	40	line		
+research.nyx.44c6513ae419	nyx/research.nyx.44c6513ae419.wav	PLASMA BOMB AWAY	nyx	40	line		
+accessibility.aster.aecf4d59e1d7	aster/accessibility.aster.aecf4d59e1d7.wav	Chase camera	aster	40	line		
+accessibility.aster.a1897d0828c4	aster/accessibility.aster.a1897d0828c4.wav	Cockpit view	aster	40	line		
+accessibility.aster.dc109d8711f8	aster/accessibility.aster.dc109d8711f8.wav	Orbit camera	aster	40	line		
+accessibility.aster.65e86bbeb19e	aster/accessibility.aster.65e86bbeb19e.wav	Flyby camera	aster	40	line		
+warning.aster.2b90db48eed2	aster/warning.aster.2b90db48eed2.wav	STALL	aster	100	line		
+warning.aster.1dde691c7929	aster/warning.aster.1dde691c7929.wav	PULL UP	aster	100	line		
+warning.aster.e8962ac898c3	aster/warning.aster.e8962ac898c3.wav	GEAR!	aster	100	line		
+warning.engine_off	aster/warning.engine_off.wav	ENGINE OFF - press {key} to restart	aster	90	line		
+warning.engine_off_default_I	aster/warning.engine_off_default_I.wav	ENGINE OFF - press I to restart	aster	90	line		
+outcome.aster.5fe2fc2ed461	aster/outcome.aster.5fe2fc2ed461.wav	Ditched in the sea	aster	80	line		
+outcome.aster.84ea7bddbcea	aster/outcome.aster.84ea7bddbcea.wav	Prop/nose strike	aster	80	line		
+outcome.aster.e8fd51153380	aster/outcome.aster.e8fd51153380.wav	Belly landing - gear was up	aster	80	line		
+outcome.aster.66b79290adec	aster/outcome.aster.66b79290adec.wav	Wingtip struck the ground	aster	80	line		
+outcome.aster.12d1e5e2c1c1	aster/outcome.aster.12d1e5e2c1c1.wav	Struck terrain	aster	80	line		
+outcome.aster.c5808587489b	aster/outcome.aster.c5808587489b.wav	Flew into terrain	aster	80	line		
+outcome.aster.334c4b1c7a2d	aster/outcome.aster.334c4b1c7a2d.wav	Landed off-airport on rough terrain	aster	80	line		
+outcome.aster.60c35c12007f	aster/outcome.aster.60c35c12007f.wav	Overturned on a steep slope	aster	80	line		
+outcome.aster.290dddf16868	aster/outcome.aster.290dddf16868.wav	Collided with a building	aster	80	line		
+outcome.aster.ed50097cc406	aster/outcome.aster.ed50097cc406.wav	Ploughed into the scrub	aster	80	line		
+outcome.aster.e1dec0a6a2a7	aster/outcome.aster.e1dec0a6a2a7.wav	Crashed into trees	aster	80	line		
+outcome.aster.14f425c74967	aster/outcome.aster.14f425c74967.wav	Hit a rock formation	aster	80	line		
+outcome.aster.5e022f61fec0	aster/outcome.aster.5e022f61fec0.wav	Collided with a silo	aster	80	line		
+outcome.aster.661fb23eda66	aster/outcome.aster.661fb23eda66.wav	Collided with a church	aster	80	line		
+outcome.aster.21928282295b	aster/outcome.aster.21928282295b.wav	Collided with a lighthouse	aster	80	line		
+outcome.aster.0712cf75d0e0	aster/outcome.aster.0712cf75d0e0.wav	Collided with a water tower	aster	80	line		
+outcome.aster.4d626dbcd0e6	aster/outcome.aster.4d626dbcd0e6.wav	Structural failure - overstressed airframe	aster	80	line		
+outcome.aster.3e3a0e823cec	aster/outcome.aster.3e3a0e823cec.wav	Flew beyond the charted area and ran out of options	aster	80	line		
+outcome.aster.5b94f3067fd0	aster/outcome.aster.5b94f3067fd0.wav	Mid-air collision	aster	80	line		
+outcome.aster.9fec3c273aa7	aster/outcome.aster.9fec3c273aa7.wav	Landed off-airport	aster	80	line		
+outcome.aster.57a064efdcb4	aster/outcome.aster.57a064efdcb4.wav	Out of fuel	aster	80	line		
+outcome.aster.61c7a8994f92	aster/outcome.aster.61c7a8994f92.wav	Out of fuel with checkpoints remaining	aster	80	line		
+landing.aster.e24aed972bc4	aster/landing.aster.e24aed972bc4.wav	BUTTER!	aster	35	line		
+landing.aster.6dfeed425b0f	aster/landing.aster.6dfeed425b0f.wav	Smooth landing	aster	35	line		
+landing.aster.4d449c6d053f	aster/landing.aster.4d449c6d053f.wav	Good landing	aster	35	line		
+landing.aster.3e49a00c83af	aster/landing.aster.3e49a00c83af.wav	Firm landing	aster	35	line		
+landing.aster.e6d9fb999466	aster/landing.aster.e6d9fb999466.wav	HARD landing!	aster	35	line		
+airport.MDB	tower/airport.MDB.wav	MDB - Meadowbrook Field	tower	40	line		
+divert.MDB	aster/divert.MDB.wav	Diverted to Meadowbrook Field	aster	40	line		
+autoland.MDB.05	aster/autoland.MDB.05.wav	Autopilot: AUTOLAND MDB runway 05	aster	40	line		
+autoland.MDB.23	aster/autoland.MDB.23.wav	Autopilot: AUTOLAND MDB runway 23	aster	40	line		
+airport.HFS	tower/airport.HFS.wav	HFS - Harlan Farm Strip	tower	40	line		
+divert.HFS	aster/divert.HFS.wav	Diverted to Harlan Farm Strip	aster	40	line		
+autoland.HFS.17	aster/autoland.HFS.17.wav	Autopilot: AUTOLAND HFS runway 17	aster	40	line		
+autoland.HFS.35	aster/autoland.HFS.35.wav	Autopilot: AUTOLAND HFS runway 35	aster	40	line		
+airport.PVI	tower/airport.PVI.wav	PVI - Port Verde International	tower	40	line		
+divert.PVI	aster/divert.PVI.wav	Diverted to Port Verde International	aster	40	line		
+autoland.PVI.09	aster/autoland.PVI.09.wav	Autopilot: AUTOLAND PVI runway 09	aster	40	line		
+autoland.PVI.27	aster/autoland.PVI.27.wav	Autopilot: AUTOLAND PVI runway 27	aster	40	line		
+airport.CAP	tower/airport.CAP.wav	CAP - Solace Capital	tower	40	line		
+divert.CAP	aster/divert.CAP.wav	Diverted to Solace Capital	aster	40	line		
+autoland.CAP.14	aster/autoland.CAP.14.wav	Autopilot: AUTOLAND CAP runway 14	aster	40	line		
+autoland.CAP.32	aster/autoland.CAP.32.wav	Autopilot: AUTOLAND CAP runway 32	aster	40	line		
+airport.CDR	tower/airport.CDR.wav	CDR - Cedar Ridge	tower	40	line		
+divert.CDR	aster/divert.CDR.wav	Diverted to Cedar Ridge	aster	40	line		
+autoland.CDR.36	aster/autoland.CDR.36.wav	Autopilot: AUTOLAND CDR runway 36	aster	40	line		
+autoland.CDR.18	aster/autoland.CDR.18.wav	Autopilot: AUTOLAND CDR runway 18	aster	40	line		
+airport.SMP	tower/airport.SMP.wav	SMP - Summit Pass	tower	40	line		
+divert.SMP	aster/divert.SMP.wav	Diverted to Summit Pass	aster	40	line		
+autoland.SMP.12	aster/autoland.SMP.12.wav	Autopilot: AUTOLAND SMP runway 12	aster	40	line		
+autoland.SMP.30	aster/autoland.SMP.30.wav	Autopilot: AUTOLAND SMP runway 30	aster	40	line		
+airport.NPT	tower/airport.NPT.wav	NPT - Northpoint	tower	40	line		
+divert.NPT	aster/divert.NPT.wav	Diverted to Northpoint	aster	40	line		
+autoland.NPT.07	aster/autoland.NPT.07.wav	Autopilot: AUTOLAND NPT runway 07	aster	40	line		
+autoland.NPT.25	aster/autoland.NPT.25.wav	Autopilot: AUTOLAND NPT runway 25	aster	40	line		
+airport.LHK	tower/airport.LHK.wav	LHK - Lighthouse Key	tower	40	line		
+divert.LHK	aster/divert.LHK.wav	Diverted to Lighthouse Key	aster	40	line		
+autoland.LHK.10	aster/autoland.LHK.10.wav	Autopilot: AUTOLAND LHK runway 10	aster	40	line		
+autoland.LHK.28	aster/autoland.LHK.28.wav	Autopilot: AUTOLAND LHK runway 28	aster	40	line		
+airport.GLR	tower/airport.GLR.wav	GLR - Gull Rock	tower	40	line		
+divert.GLR	aster/divert.GLR.wav	Diverted to Gull Rock	aster	40	line		
+autoland.GLR.08	aster/autoland.GLR.08.wav	Autopilot: AUTOLAND GLR runway 08	aster	40	line		
+autoland.GLR.26	aster/autoland.GLR.26.wav	Autopilot: AUTOLAND GLR runway 26	aster	40	line		
+airport.KLO	tower/airport.KLO.wav	KLO - Kaleo Regional	tower	40	line		
+divert.KLO	aster/divert.KLO.wav	Diverted to Kaleo Regional	aster	40	line		
+autoland.KLO.02	aster/autoland.KLO.02.wav	Autopilot: AUTOLAND KLO runway 02	aster	40	line		
+autoland.KLO.20	aster/autoland.KLO.20.wav	Autopilot: AUTOLAND KLO runway 20	aster	40	line		
+airport.PMB	tower/airport.PMB.wav	PMB - Palm Bay	tower	40	line		
+divert.PMB	aster/divert.PMB.wav	Diverted to Palm Bay	aster	40	line		
+autoland.PMB.11	aster/autoland.PMB.11.wav	Autopilot: AUTOLAND PMB runway 11	aster	40	line		
+autoland.PMB.29	aster/autoland.PMB.29.wav	Autopilot: AUTOLAND PMB runway 29	aster	40	line		
+airport.VCF	tower/airport.VCF.wav	VCF - Volcano Crater Field	tower	40	line		
+divert.VCF	aster/divert.VCF.wav	Diverted to Volcano Crater Field	aster	40	line		
+autoland.VCF.16	aster/autoland.VCF.16.wav	Autopilot: AUTOLAND VCF runway 16	aster	40	line		
+autoland.VCF.34	aster/autoland.VCF.34.wav	Autopilot: AUTOLAND VCF runway 34	aster	40	line		
+airport.FJH	tower/airport.FJH.wav	FJH - Fjordhaven	tower	40	line		
+divert.FJH	aster/divert.FJH.wav	Diverted to Fjordhaven	aster	40	line		
+autoland.FJH.09	aster/autoland.FJH.09.wav	Autopilot: AUTOLAND FJH runway 09	aster	40	line		
+autoland.FJH.27	aster/autoland.FJH.27.wav	Autopilot: AUTOLAND FJH runway 27	aster	40	line		
+airport.GLS	tower/airport.GLS.wav	GLS - Glacier Station	tower	40	line		
+divert.GLS	aster/divert.GLS.wav	Diverted to Glacier Station	aster	40	line		
+autoland.GLS.06	aster/autoland.GLS.06.wav	Autopilot: AUTOLAND GLS runway 06	aster	40	line		
+autoland.GLS.24	aster/autoland.GLS.24.wav	Autopilot: AUTOLAND GLS runway 24	aster	40	line		
+airport.FAR	tower/airport.FAR.wav	FAR - Far Isle	tower	40	line		
+divert.FAR	aster/divert.FAR.wav	Diverted to Far Isle	aster	40	line		
+autoland.FAR.14	aster/autoland.FAR.14.wav	Autopilot: AUTOLAND FAR runway 14	aster	40	line		
+autoland.FAR.32	aster/autoland.FAR.32.wav	Autopilot: AUTOLAND FAR runway 32	aster	40	line		
+airport.ORC	tower/airport.ORC.wav	ORC - Orchard Valley	tower	40	line		
+divert.ORC	aster/divert.ORC.wav	Diverted to Orchard Valley	aster	40	line		
+autoland.ORC.03	aster/autoland.ORC.03.wav	Autopilot: AUTOLAND ORC runway 03	aster	40	line		
+autoland.ORC.21	aster/autoland.ORC.21.wav	Autopilot: AUTOLAND ORC runway 21	aster	40	line		
+clearance.runway01	tower/clearance.runway01.wav	Engine running. Cleared for takeoff runway 01.	tower	55	line		
+clearance.runway02	tower/clearance.runway02.wav	Engine running. Cleared for takeoff runway 02.	tower	55	line		
+clearance.runway03	tower/clearance.runway03.wav	Engine running. Cleared for takeoff runway 03.	tower	55	line		
+clearance.runway04	tower/clearance.runway04.wav	Engine running. Cleared for takeoff runway 04.	tower	55	line		
+clearance.runway05	tower/clearance.runway05.wav	Engine running. Cleared for takeoff runway 05.	tower	55	line		
+clearance.runway06	tower/clearance.runway06.wav	Engine running. Cleared for takeoff runway 06.	tower	55	line		
+clearance.runway07	tower/clearance.runway07.wav	Engine running. Cleared for takeoff runway 07.	tower	55	line		
+clearance.runway08	tower/clearance.runway08.wav	Engine running. Cleared for takeoff runway 08.	tower	55	line		
+clearance.runway09	tower/clearance.runway09.wav	Engine running. Cleared for takeoff runway 09.	tower	55	line		
+clearance.runway10	tower/clearance.runway10.wav	Engine running. Cleared for takeoff runway 10.	tower	55	line		
+clearance.runway11	tower/clearance.runway11.wav	Engine running. Cleared for takeoff runway 11.	tower	55	line		
+clearance.runway12	tower/clearance.runway12.wav	Engine running. Cleared for takeoff runway 12.	tower	55	line		
+clearance.runway13	tower/clearance.runway13.wav	Engine running. Cleared for takeoff runway 13.	tower	55	line		
+clearance.runway14	tower/clearance.runway14.wav	Engine running. Cleared for takeoff runway 14.	tower	55	line		
+clearance.runway15	tower/clearance.runway15.wav	Engine running. Cleared for takeoff runway 15.	tower	55	line		
+clearance.runway16	tower/clearance.runway16.wav	Engine running. Cleared for takeoff runway 16.	tower	55	line		
+clearance.runway17	tower/clearance.runway17.wav	Engine running. Cleared for takeoff runway 17.	tower	55	line		
+clearance.runway18	tower/clearance.runway18.wav	Engine running. Cleared for takeoff runway 18.	tower	55	line		
+clearance.runway19	tower/clearance.runway19.wav	Engine running. Cleared for takeoff runway 19.	tower	55	line		
+clearance.runway20	tower/clearance.runway20.wav	Engine running. Cleared for takeoff runway 20.	tower	55	line		
+clearance.runway21	tower/clearance.runway21.wav	Engine running. Cleared for takeoff runway 21.	tower	55	line		
+clearance.runway22	tower/clearance.runway22.wav	Engine running. Cleared for takeoff runway 22.	tower	55	line		
+clearance.runway23	tower/clearance.runway23.wav	Engine running. Cleared for takeoff runway 23.	tower	55	line		
+clearance.runway24	tower/clearance.runway24.wav	Engine running. Cleared for takeoff runway 24.	tower	55	line		
+clearance.runway25	tower/clearance.runway25.wav	Engine running. Cleared for takeoff runway 25.	tower	55	line		
+clearance.runway26	tower/clearance.runway26.wav	Engine running. Cleared for takeoff runway 26.	tower	55	line		
+clearance.runway27	tower/clearance.runway27.wav	Engine running. Cleared for takeoff runway 27.	tower	55	line		
+clearance.runway28	tower/clearance.runway28.wav	Engine running. Cleared for takeoff runway 28.	tower	55	line		
+clearance.runway29	tower/clearance.runway29.wav	Engine running. Cleared for takeoff runway 29.	tower	55	line		
+clearance.runway30	tower/clearance.runway30.wav	Engine running. Cleared for takeoff runway 30.	tower	55	line		
+clearance.runway31	tower/clearance.runway31.wav	Engine running. Cleared for takeoff runway 31.	tower	55	line		
+clearance.runway32	tower/clearance.runway32.wav	Engine running. Cleared for takeoff runway 32.	tower	55	line		
+clearance.runway33	tower/clearance.runway33.wav	Engine running. Cleared for takeoff runway 33.	tower	55	line		
+clearance.runway34	tower/clearance.runway34.wav	Engine running. Cleared for takeoff runway 34.	tower	55	line		
+clearance.runway35	tower/clearance.runway35.wav	Engine running. Cleared for takeoff runway 35.	tower	55	line		
+clearance.runway36	tower/clearance.runway36.wav	Engine running. Cleared for takeoff runway 36.	tower	55	line		
+flaps.0	aster/flaps.0.wav	Flaps 0%	aster	40	line		
+flaps.33	aster/flaps.33.wav	Flaps 33%	aster	40	line		
+flaps.67	aster/flaps.67.wav	Flaps 67%	aster	40	line		
+flaps.100	aster/flaps.100.wav	Flaps 100%	aster	40	line		
+tilt.pods.0	nyx/tilt.pods.0.wav	Pods 0 deg	nyx	40	line		
+tilt.thrust_vector.0	nyx/tilt.thrust_vector.0.wav	Thrust vector 0 deg	nyx	40	line		
+tilt.pods.30	nyx/tilt.pods.30.wav	Pods 30 deg	nyx	40	line		
+tilt.thrust_vector.30	nyx/tilt.thrust_vector.30.wav	Thrust vector 30 deg	nyx	40	line		
+tilt.pods.60	nyx/tilt.pods.60.wav	Pods 60 deg	nyx	40	line		
+tilt.thrust_vector.60	nyx/tilt.thrust_vector.60.wav	Thrust vector 60 deg	nyx	40	line		
+time.1	aster/time.1.wav	Time x1	aster	40	line		
+time.2	aster/time.2.wav	Time x2	aster	40	line		
+time.4	aster/time.4.wav	Time x4	aster	40	line		
+checkpoint.1.3	aster/checkpoint.1.3.wav	Checkpoint 1 of 3	aster	50	line		
+checkpoint.2.3	aster/checkpoint.2.3.wav	Checkpoint 2 of 3	aster	50	line		
+checkpoint.1.4	aster/checkpoint.1.4.wav	Checkpoint 1 of 4	aster	50	line		
+checkpoint.2.4	aster/checkpoint.2.4.wav	Checkpoint 2 of 4	aster	50	line		
+checkpoint.3.4	aster/checkpoint.3.4.wav	Checkpoint 3 of 4	aster	50	line		
+checkpoint.1.6	aster/checkpoint.1.6.wav	Checkpoint 1 of 6	aster	50	line		
+checkpoint.2.6	aster/checkpoint.2.6.wav	Checkpoint 2 of 6	aster	50	line		
+checkpoint.3.6	aster/checkpoint.3.6.wav	Checkpoint 3 of 6	aster	50	line		
+checkpoint.4.6	aster/checkpoint.4.6.wav	Checkpoint 4 of 6	aster	50	line		
+checkpoint.5.6	aster/checkpoint.5.6.wav	Checkpoint 5 of 6	aster	50	line		
+destroyed.house	nyx/destroyed.house.wav	House destroyed	nyx	40	line		
+destroyed.bungalow	nyx/destroyed.bungalow.wav	Bungalow destroyed	nyx	40	line		
+destroyed.l_house	nyx/destroyed.l_house.wav	L-house destroyed	nyx	40	line		
+destroyed.farmhouse	nyx/destroyed.farmhouse.wav	Farmhouse destroyed	nyx	40	line		
+destroyed.townhouses	nyx/destroyed.townhouses.wav	Townhouses destroyed	nyx	40	line		
+destroyed.shop	nyx/destroyed.shop.wav	Shop destroyed	nyx	40	line		
+destroyed.apartments	nyx/destroyed.apartments.wav	Apartments destroyed	nyx	40	line		
+destroyed.office	nyx/destroyed.office.wav	Office destroyed	nyx	40	line		
+destroyed.tower	nyx/destroyed.tower.wav	Tower destroyed	nyx	40	line		
+destroyed.skyscraper	nyx/destroyed.skyscraper.wav	Skyscraper destroyed	nyx	40	line		
+destroyed.warehouse	nyx/destroyed.warehouse.wav	Warehouse destroyed	nyx	40	line		
+destroyed.barn	nyx/destroyed.barn.wav	Barn destroyed	nyx	40	line		
+destroyed.silo	nyx/destroyed.silo.wav	Silo destroyed	nyx	40	line		
+destroyed.church	nyx/destroyed.church.wav	Church destroyed	nyx	40	line		
+destroyed.water_tower	nyx/destroyed.water_tower.wav	Water tower destroyed	nyx	40	line		
+destroyed.lighthouse	nyx/destroyed.lighthouse.wav	Lighthouse destroyed	nyx	40	line		
+destroyed.gas_station	nyx/destroyed.gas_station.wav	Gas station destroyed	nyx	40	line		
+destroyed.runway_light	nyx/destroyed.runway_light.wav	Runway light destroyed	nyx	40	line		
+destroyed.papi_unit	nyx/destroyed.papi_unit.wav	PAPI unit destroyed	nyx	40	line		
+destroyed.hangar	nyx/destroyed.hangar.wav	Hangar destroyed	nyx	40	line		
+destroyed.arch_hangar	nyx/destroyed.arch_hangar.wav	Arch hangar destroyed	nyx	40	line		
+destroyed.t_hangars	nyx/destroyed.t_hangars.wav	T-hangars destroyed	nyx	40	line		
+destroyed.terminal	nyx/destroyed.terminal.wav	Terminal destroyed	nyx	40	line		
+destroyed.control_tower	nyx/destroyed.control_tower.wav	Control tower destroyed	nyx	40	line		
+destroyed.flight_centre	nyx/destroyed.flight_centre.wav	Flight centre destroyed	nyx	40	line		
+destroyed.fuel_tank	nyx/destroyed.fuel_tank.wav	Fuel tank destroyed	nyx	40	line		
+destroyed.fuel_pump	nyx/destroyed.fuel_pump.wav	Fuel pump destroyed	nyx	40	line		
+destroyed.windsock	nyx/destroyed.windsock.wav	Windsock destroyed	nyx	40	line		
+destroyed.beacon	nyx/destroyed.beacon.wav	Beacon destroyed	nyx	40	line		
+destroyed.parked_aircraft	nyx/destroyed.parked_aircraft.wav	Parked aircraft destroyed	nyx	40	line		
+destroyed.parked_airliner	nyx/destroyed.parked_airliner.wav	Parked airliner destroyed	nyx	40	line		
+destroyed.jet_bridge	nyx/destroyed.jet_bridge.wav	Jet bridge destroyed	nyx	40	line		
+destroyed.car	nyx/destroyed.car.wav	Car destroyed	nyx	40	line		
+destroyed.truck	nyx/destroyed.truck.wav	Truck destroyed	nyx	40	line		
+destroyed.fence	nyx/destroyed.fence.wav	Fence destroyed	nyx	40	line		
+destroyed.localizer	nyx/destroyed.localizer.wav	Localizer destroyed	nyx	40	line		
+destroyed.radar	nyx/destroyed.radar.wav	Radar destroyed	nyx	40	line		
+destroyed.mast	nyx/destroyed.mast.wav	Mast destroyed	nyx	40	line		
+destroyed.floodlight_mast	nyx/destroyed.floodlight_mast.wav	Floodlight mast destroyed	nyx	40	line		
+fragment.tower.n0	tower/fragment.tower.n0.wav	zero	tower	40	fragment		
+fragment.tower.n1	tower/fragment.tower.n1.wav	one	tower	40	fragment		
+fragment.tower.n2	tower/fragment.tower.n2.wav	two	tower	40	fragment		
+fragment.tower.n3	tower/fragment.tower.n3.wav	three	tower	40	fragment		
+fragment.tower.n4	tower/fragment.tower.n4.wav	four	tower	40	fragment		
+fragment.tower.n5	tower/fragment.tower.n5.wav	five	tower	40	fragment		
+fragment.tower.n6	tower/fragment.tower.n6.wav	six	tower	40	fragment		
+fragment.tower.n7	tower/fragment.tower.n7.wav	seven	tower	40	fragment		
+fragment.tower.n8	tower/fragment.tower.n8.wav	eight	tower	40	fragment		
+fragment.tower.n9	tower/fragment.tower.n9.wav	nine	tower	40	fragment		
+fragment.tower.n10	tower/fragment.tower.n10.wav	ten	tower	40	fragment		
+fragment.tower.n11	tower/fragment.tower.n11.wav	eleven	tower	40	fragment		
+fragment.tower.n12	tower/fragment.tower.n12.wav	twelve	tower	40	fragment		
+fragment.tower.n13	tower/fragment.tower.n13.wav	thirteen	tower	40	fragment		
+fragment.tower.n14	tower/fragment.tower.n14.wav	fourteen	tower	40	fragment		
+fragment.tower.n15	tower/fragment.tower.n15.wav	fifteen	tower	40	fragment		
+fragment.tower.n16	tower/fragment.tower.n16.wav	sixteen	tower	40	fragment		
+fragment.tower.n17	tower/fragment.tower.n17.wav	seventeen	tower	40	fragment		
+fragment.tower.n18	tower/fragment.tower.n18.wav	eighteen	tower	40	fragment		
+fragment.tower.n19	tower/fragment.tower.n19.wav	nineteen	tower	40	fragment		
+fragment.tower.n20	tower/fragment.tower.n20.wav	twenty	tower	40	fragment		
+fragment.tower.n30	tower/fragment.tower.n30.wav	thirty	tower	40	fragment		
+fragment.tower.n40	tower/fragment.tower.n40.wav	forty	tower	40	fragment		
+fragment.tower.n50	tower/fragment.tower.n50.wav	fifty	tower	40	fragment		
+fragment.tower.n60	tower/fragment.tower.n60.wav	sixty	tower	40	fragment		
+fragment.tower.n70	tower/fragment.tower.n70.wav	seventy	tower	40	fragment		
+fragment.tower.n80	tower/fragment.tower.n80.wav	eighty	tower	40	fragment		
+fragment.tower.n90	tower/fragment.tower.n90.wav	ninety	tower	40	fragment		
+fragment.tower.hundred	tower/fragment.tower.hundred.wav	hundred	tower	40	fragment		
+fragment.tower.thousand	tower/fragment.tower.thousand.wav	thousand	tower	40	fragment		
+fragment.tower.million	tower/fragment.tower.million.wav	million	tower	40	fragment		
+fragment.tower.billion	tower/fragment.tower.billion.wav	billion	tower	40	fragment		
+fragment.tower.point	tower/fragment.tower.point.wav	point	tower	40	fragment		
+fragment.tower.minus	tower/fragment.tower.minus.wav	minus	tower	40	fragment		
+fragment.tower.runway	tower/fragment.tower.runway.wav	Runway	tower	40	fragment		
+fragment.tower.wind	tower/fragment.tower.wind.wav	Wind	tower	40	fragment		
+fragment.tower.at	tower/fragment.tower.at.wav	at	tower	40	fragment		
+fragment.tower.knots	tower/fragment.tower.knots.wav	knots	tower	40	fragment		
+fragment.tower.gusting	tower/fragment.tower.gusting.wav	gusting	tower	40	fragment		
+fragment.tower.clear	tower/fragment.tower.clear.wav	clear	tower	40	fragment		
+fragment.tower.scattered	tower/fragment.tower.scattered.wav	scattered	tower	40	fragment		
+fragment.tower.broken	tower/fragment.tower.broken.wav	broken	tower	40	fragment		
+fragment.tower.overcast	tower/fragment.tower.overcast.wav	overcast	tower	40	fragment		
+fragment.tower.feet	tower/fragment.tower.feet.wav	feet	tower	40	fragment		
+fragment.tower.visibility	tower/fragment.tower.visibility.wav	visibility	tower	40	fragment		
+fragment.tower.ten_plus_km	tower/fragment.tower.ten_plus_km.wav	ten or more kilometres	tower	40	fragment		
+fragment.tower.kilometres	tower/fragment.tower.kilometres.wav	kilometres	tower	40	fragment		
+fragment.tower.rain	tower/fragment.tower.rain.wav	rain	tower	40	fragment		
+fragment.tower.thunderstorms	tower/fragment.tower.thunderstorms.wav	thunderstorms	tower	40	fragment		
+fragment.tower.snow	tower/fragment.tower.snow.wav	snow	tower	40	fragment		
+fragment.tower.time	tower/fragment.tower.time.wav	time	tower	40	fragment		
+fragment.tower.hours	tower/fragment.tower.hours.wav	hours	tower	40	fragment		
+fragment.aster.n0	aster/fragment.aster.n0.wav	zero	aster	40	fragment		
+fragment.aster.n1	aster/fragment.aster.n1.wav	one	aster	40	fragment		
+fragment.aster.n2	aster/fragment.aster.n2.wav	two	aster	40	fragment		
+fragment.aster.n3	aster/fragment.aster.n3.wav	three	aster	40	fragment		
+fragment.aster.n4	aster/fragment.aster.n4.wav	four	aster	40	fragment		
+fragment.aster.n5	aster/fragment.aster.n5.wav	five	aster	40	fragment		
+fragment.aster.n6	aster/fragment.aster.n6.wav	six	aster	40	fragment		
+fragment.aster.n7	aster/fragment.aster.n7.wav	seven	aster	40	fragment		
+fragment.aster.n8	aster/fragment.aster.n8.wav	eight	aster	40	fragment		
+fragment.aster.n9	aster/fragment.aster.n9.wav	nine	aster	40	fragment		
+fragment.aster.n10	aster/fragment.aster.n10.wav	ten	aster	40	fragment		
+fragment.aster.n11	aster/fragment.aster.n11.wav	eleven	aster	40	fragment		
+fragment.aster.n12	aster/fragment.aster.n12.wav	twelve	aster	40	fragment		
+fragment.aster.n13	aster/fragment.aster.n13.wav	thirteen	aster	40	fragment		
+fragment.aster.n14	aster/fragment.aster.n14.wav	fourteen	aster	40	fragment		
+fragment.aster.n15	aster/fragment.aster.n15.wav	fifteen	aster	40	fragment		
+fragment.aster.n16	aster/fragment.aster.n16.wav	sixteen	aster	40	fragment		
+fragment.aster.n17	aster/fragment.aster.n17.wav	seventeen	aster	40	fragment		
+fragment.aster.n18	aster/fragment.aster.n18.wav	eighteen	aster	40	fragment		
+fragment.aster.n19	aster/fragment.aster.n19.wav	nineteen	aster	40	fragment		
+fragment.aster.n20	aster/fragment.aster.n20.wav	twenty	aster	40	fragment		
+fragment.aster.n30	aster/fragment.aster.n30.wav	thirty	aster	40	fragment		
+fragment.aster.n40	aster/fragment.aster.n40.wav	forty	aster	40	fragment		
+fragment.aster.n50	aster/fragment.aster.n50.wav	fifty	aster	40	fragment		
+fragment.aster.n60	aster/fragment.aster.n60.wav	sixty	aster	40	fragment		
+fragment.aster.n70	aster/fragment.aster.n70.wav	seventy	aster	40	fragment		
+fragment.aster.n80	aster/fragment.aster.n80.wav	eighty	aster	40	fragment		
+fragment.aster.n90	aster/fragment.aster.n90.wav	ninety	aster	40	fragment		
+fragment.aster.hundred	aster/fragment.aster.hundred.wav	hundred	aster	40	fragment		
+fragment.aster.thousand	aster/fragment.aster.thousand.wav	thousand	aster	40	fragment		
+fragment.aster.million	aster/fragment.aster.million.wav	million	aster	40	fragment		
+fragment.aster.billion	aster/fragment.aster.billion.wav	billion	aster	40	fragment		
+fragment.aster.point	aster/fragment.aster.point.wav	point	aster	40	fragment		
+fragment.aster.minus	aster/fragment.aster.minus.wav	minus	aster	40	fragment		
+fragment.aster.flaps	aster/fragment.aster.flaps.wav	Flaps	aster	40	fragment		
+fragment.aster.percent	aster/fragment.aster.percent.wav	percent	aster	40	fragment		
+fragment.aster.checkpoint	aster/fragment.aster.checkpoint.wav	Checkpoint	aster	40	fragment		
+fragment.aster.of	aster/fragment.aster.of.wav	of	aster	40	fragment		
+fragment.aster.feet_per_minute	aster/fragment.aster.feet_per_minute.wav	feet per minute	aster	40	fragment		
+fragment.aster.gear_collapsed_hit_at	aster/fragment.aster.gear_collapsed_hit_at.wav	Gear collapsed. Hit at	aster	40	fragment		
+fragment.aster.engine_off_press	aster/fragment.aster.engine_off_press.wav	Engine off. Press	aster	40	fragment		
+fragment.aster.to_restart	aster/fragment.aster.to_restart.wav	to restart	aster	40	fragment		
+fragment.aster.hex_A	aster/fragment.aster.hex_A.wav	ay	aster	40	fragment		
+fragment.aster.hex_B	aster/fragment.aster.hex_B.wav	bee	aster	40	fragment		
+fragment.aster.hex_C	aster/fragment.aster.hex_C.wav	see	aster	40	fragment		
+fragment.aster.hex_D	aster/fragment.aster.hex_D.wav	dee	aster	40	fragment		
+fragment.aster.hex_E	aster/fragment.aster.hex_E.wav	ee	aster	40	fragment		
+fragment.aster.hex_F	aster/fragment.aster.hex_F.wav	eff	aster	40	fragment		
+fragment.nyx.n0	nyx/fragment.nyx.n0.wav	zero	nyx	40	fragment		
+fragment.nyx.n1	nyx/fragment.nyx.n1.wav	one	nyx	40	fragment		
+fragment.nyx.n2	nyx/fragment.nyx.n2.wav	two	nyx	40	fragment		
+fragment.nyx.n3	nyx/fragment.nyx.n3.wav	three	nyx	40	fragment		
+fragment.nyx.n4	nyx/fragment.nyx.n4.wav	four	nyx	40	fragment		
+fragment.nyx.n5	nyx/fragment.nyx.n5.wav	five	nyx	40	fragment		
+fragment.nyx.n6	nyx/fragment.nyx.n6.wav	six	nyx	40	fragment		
+fragment.nyx.n7	nyx/fragment.nyx.n7.wav	seven	nyx	40	fragment		
+fragment.nyx.n8	nyx/fragment.nyx.n8.wav	eight	nyx	40	fragment		
+fragment.nyx.n9	nyx/fragment.nyx.n9.wav	nine	nyx	40	fragment		
+fragment.nyx.n10	nyx/fragment.nyx.n10.wav	ten	nyx	40	fragment		
+fragment.nyx.n11	nyx/fragment.nyx.n11.wav	eleven	nyx	40	fragment		
+fragment.nyx.n12	nyx/fragment.nyx.n12.wav	twelve	nyx	40	fragment		
+fragment.nyx.n13	nyx/fragment.nyx.n13.wav	thirteen	nyx	40	fragment		
+fragment.nyx.n14	nyx/fragment.nyx.n14.wav	fourteen	nyx	40	fragment		
+fragment.nyx.n15	nyx/fragment.nyx.n15.wav	fifteen	nyx	40	fragment		
+fragment.nyx.n16	nyx/fragment.nyx.n16.wav	sixteen	nyx	40	fragment		
+fragment.nyx.n17	nyx/fragment.nyx.n17.wav	seventeen	nyx	40	fragment		
+fragment.nyx.n18	nyx/fragment.nyx.n18.wav	eighteen	nyx	40	fragment		
+fragment.nyx.n19	nyx/fragment.nyx.n19.wav	nineteen	nyx	40	fragment		
+fragment.nyx.n20	nyx/fragment.nyx.n20.wav	twenty	nyx	40	fragment		
+fragment.nyx.n30	nyx/fragment.nyx.n30.wav	thirty	nyx	40	fragment		
+fragment.nyx.n40	nyx/fragment.nyx.n40.wav	forty	nyx	40	fragment		
+fragment.nyx.n50	nyx/fragment.nyx.n50.wav	fifty	nyx	40	fragment		
+fragment.nyx.n60	nyx/fragment.nyx.n60.wav	sixty	nyx	40	fragment		
+fragment.nyx.n70	nyx/fragment.nyx.n70.wav	seventy	nyx	40	fragment		
+fragment.nyx.n80	nyx/fragment.nyx.n80.wav	eighty	nyx	40	fragment		
+fragment.nyx.n90	nyx/fragment.nyx.n90.wav	ninety	nyx	40	fragment		
+fragment.nyx.hundred	nyx/fragment.nyx.hundred.wav	hundred	nyx	40	fragment		
+fragment.nyx.thousand	nyx/fragment.nyx.thousand.wav	thousand	nyx	40	fragment		
+fragment.nyx.million	nyx/fragment.nyx.million.wav	million	nyx	40	fragment		
+fragment.nyx.billion	nyx/fragment.nyx.billion.wav	billion	nyx	40	fragment		
+fragment.nyx.point	nyx/fragment.nyx.point.wav	point	nyx	40	fragment		
+fragment.nyx.minus	nyx/fragment.nyx.minus.wav	minus	nyx	40	fragment		
+fragment.nyx.pods	nyx/fragment.nyx.pods.wav	Pods	nyx	40	fragment		
+fragment.nyx.thrust_vector	nyx/fragment.nyx.thrust_vector.wav	Thrust vector	nyx	40	fragment		
+fragment.nyx.degrees	nyx/fragment.nyx.degrees.wav	degrees	nyx	40	fragment		
+fragment.nyx.splash	nyx/fragment.nyx.splash.wav	Splash	nyx	40	fragment		
+fragment.nyx.down	nyx/fragment.nyx.down.wav	down	nyx	40	fragment		
+fragment.nyx.aircraft_in_blast	nyx/fragment.nyx.aircraft_in_blast.wav	aircraft caught in the blast	nyx	40	fragment		
+fragment.nyx.craft_kestrel	nyx/fragment.nyx.craft_kestrel.wav	Kestrel T2	nyx	40	fragment		
+fragment.nyx.craft_wren	nyx/fragment.nyx.craft_wren.wav	Wren 180	nyx	40	fragment		
+fragment.nyx.craft_bush	nyx/fragment.nyx.craft_bush.wav	Bushmaster STOL	nyx	40	fragment		
+fragment.nyx.craft_islander	nyx/fragment.nyx.craft_islander.wav	Islander Twin	nyx	40	fragment		
+fragment.nyx.craft_pelican	nyx/fragment.nyx.craft_pelican.wav	Pelican Caravan	nyx	40	fragment		
+fragment.nyx.craft_meridian	nyx/fragment.nyx.craft_meridian.wav	Meridian Q400	nyx	40	fragment		
+fragment.nyx.craft_starling	nyx/fragment.nyx.craft_starling.wav	Starling 500 Jet	nyx	40	fragment		
+fragment.nyx.craft_xr9	nyx/fragment.nyx.craft_xr9.wav	XR-9 Specter	nyx	40	fragment		
+fragment.nyx.craft_xr11	nyx/fragment.nyx.craft_xr11.wav	XR-11 Wraith	nyx	40	fragment		
+key.559aead0	aster/key.559aead0.wav	A key	aster	40	fragment		
+key.df7e70e5	aster/key.df7e70e5.wav	B key	aster	40	fragment		
+key.6b23c0d5	aster/key.6b23c0d5.wav	C key	aster	40	fragment		
+key.3f39d5c3	aster/key.3f39d5c3.wav	D key	aster	40	fragment		
+key.a9f51566	aster/key.a9f51566.wav	E key	aster	40	fragment		
+key.f67ab10a	aster/key.f67ab10a.wav	F key	aster	40	fragment		
+key.333e0a1e	aster/key.333e0a1e.wav	G key	aster	40	fragment		
+key.44bd7ae6	aster/key.44bd7ae6.wav	H key	aster	40	fragment		
+key.a83dd0cc	aster/key.a83dd0cc.wav	I key	aster	40	fragment		
+key.6da43b94	aster/key.6da43b94.wav	J key	aster	40	fragment		
+key.86be9a55	aster/key.86be9a55.wav	K key	aster	40	fragment		
+key.72dfcfb0	aster/key.72dfcfb0.wav	L key	aster	40	fragment		
+key.08f27188	aster/key.08f27188.wav	M key	aster	40	fragment		
+key.8ce86a6a	aster/key.8ce86a6a.wav	N key	aster	40	fragment		
+key.c4694f2e	aster/key.c4694f2e.wav	O key	aster	40	fragment		
+key.5c62e091	aster/key.5c62e091.wav	P key	aster	40	fragment		
+key.4ae81572	aster/key.4ae81572.wav	Q key	aster	40	fragment		
+key.8c257489	aster/key.8c257489.wav	R key	aster	40	fragment		
+key.8de0b3c4	aster/key.8de0b3c4.wav	S key	aster	40	fragment		
+key.e632b709	aster/key.e632b709.wav	T key	aster	40	fragment		
+key.a25513c7	aster/key.a25513c7.wav	U key	aster	40	fragment		
+key.de5a6f78	aster/key.de5a6f78.wav	V key	aster	40	fragment		
+key.fcb5f40d	aster/key.fcb5f40d.wav	W key	aster	40	fragment		
+key.4b68ab38	aster/key.4b68ab38.wav	X key	aster	40	fragment		
+key.18f5384d	aster/key.18f5384d.wav	Y key	aster	40	fragment		
+key.bbeebd87	aster/key.bbeebd87.wav	Z key	aster	40	fragment		
+key.5feceb66	aster/key.5feceb66.wav	0 key	aster	40	fragment		
+key.6b86b273	aster/key.6b86b273.wav	1 key	aster	40	fragment		
+key.d4735e3a	aster/key.d4735e3a.wav	2 key	aster	40	fragment		
+key.4e074085	aster/key.4e074085.wav	3 key	aster	40	fragment		
+key.4b227777	aster/key.4b227777.wav	4 key	aster	40	fragment		
+key.ef2d127d	aster/key.ef2d127d.wav	5 key	aster	40	fragment		
+key.e7f6c011	aster/key.e7f6c011.wav	6 key	aster	40	fragment		
+key.7902699b	aster/key.7902699b.wav	7 key	aster	40	fragment		
+key.2c624232	aster/key.2c624232.wav	8 key	aster	40	fragment		
+key.19581e27	aster/key.19581e27.wav	9 key	aster	40	fragment		
+key.deae2d4d	aster/key.deae2d4d.wav	F 1 key	aster	40	fragment		
+key.8e2de333	aster/key.8e2de333.wav	F 2 key	aster	40	fragment		
+key.7c96eb02	aster/key.7c96eb02.wav	F 3 key	aster	40	fragment		
+key.015b7913	aster/key.015b7913.wav	F 4 key	aster	40	fragment		
+key.6cd28ed3	aster/key.6cd28ed3.wav	F 5 key	aster	40	fragment		
+key.1c003eb2	aster/key.1c003eb2.wav	F 6 key	aster	40	fragment		
+key.d96b6ec7	aster/key.d96b6ec7.wav	F 7 key	aster	40	fragment		
+key.a39b6e51	aster/key.a39b6e51.wav	F 8 key	aster	40	fragment		
+key.6d39eec8	aster/key.6d39eec8.wav	F 9 key	aster	40	fragment		
+key.fd6991f3	aster/key.fd6991f3.wav	F 10 key	aster	40	fragment		
+key.e26fb6fa	aster/key.e26fb6fa.wav	F 11 key	aster	40	fragment		
+key.e3df0d3c	aster/key.e3df0d3c.wav	F 12 key	aster	40	fragment		
+key.e403096b	aster/key.e403096b.wav	numpad 0 key	aster	40	fragment		
+key.5972c4b1	aster/key.5972c4b1.wav	numpad 1 key	aster	40	fragment		
+key.a2715d05	aster/key.a2715d05.wav	numpad 2 key	aster	40	fragment		
+key.97c9d17d	aster/key.97c9d17d.wav	numpad 3 key	aster	40	fragment		
+key.42418e3c	aster/key.42418e3c.wav	numpad 4 key	aster	40	fragment		
+key.9eff936b	aster/key.9eff936b.wav	numpad 5 key	aster	40	fragment		
+key.fc580b0d	aster/key.fc580b0d.wav	numpad 6 key	aster	40	fragment		
+key.10cdfacc	aster/key.10cdfacc.wav	numpad 7 key	aster	40	fragment		
+key.56ee995b	aster/key.56ee995b.wav	numpad 8 key	aster	40	fragment		
+key.c1cd03be	aster/key.c1cd03be.wav	numpad 9 key	aster	40	fragment		
+key.1514c8dd	aster/key.1514c8dd.wav	BACKSPACE key	aster	40	fragment		
+key.125fd55e	aster/key.125fd55e.wav	TAB key	aster	40	fragment		
+key.d50187dd	aster/key.d50187dd.wav	ENTER key	aster	40	fragment		
+key.34f44616	aster/key.34f44616.wav	SHIFT key	aster	40	fragment		
+key.c8b33fbc	aster/key.c8b33fbc.wav	ALT key	aster	40	fragment		
+key.7ed62da8	aster/key.7ed62da8.wav	SPACE key	aster	40	fragment		
+key.e2cfd5e6	aster/key.e2cfd5e6.wav	PAGE UP key	aster	40	fragment		
+key.84a91b27	aster/key.84a91b27.wav	PAGE DOWN key	aster	40	fragment		
+key.b891f9e2	aster/key.b891f9e2.wav	END key	aster	40	fragment		
+key.36e65c39	aster/key.36e65c39.wav	HOME key	aster	40	fragment		
+key.2cba9d25	aster/key.2cba9d25.wav	LEFT key	aster	40	fragment		
+key.42cb4e6f	aster/key.42cb4e6f.wav	UP key	aster	40	fragment		
+key.c4ce3c7a	aster/key.c4ce3c7a.wav	RIGHT key	aster	40	fragment		
+key.d45b3383	aster/key.d45b3383.wav	DOWN key	aster	40	fragment		
+key.014413c2	aster/key.014413c2.wav	INSERT key	aster	40	fragment		
+key.65daeb37	aster/key.65daeb37.wav	DELETE key	aster	40	fragment		
+key.d2f9f713	aster/key.d2f9f713.wav	CAPS LOCK key	aster	40	fragment		
+key.bb69fc1c	aster/key.bb69fc1c.wav	Control key	aster	40	fragment		
+key.245843ab	aster/key.245843ab.wav	left bracket key	aster	40	fragment		
+key.cfae0d42	aster/key.cfae0d42.wav	right bracket key	aster	40	fragment		
+key.380918b9	aster/key.380918b9.wav	equals key	aster	40	fragment		
+key.3973e022	aster/key.3973e022.wav	minus key	aster	40	fragment		
+key.41b805ea	aster/key.41b805ea.wav	semicolon key	aster	40	fragment		
+key.d03502c4	aster/key.d03502c4.wav	comma key	aster	40	fragment		
+key.cdb4ee2a	aster/key.cdb4ee2a.wav	period key	aster	40	fragment		
+key.8a5edab2	aster/key.8a5edab2.wav	slash key	aster	40	fragment		
+key.8d33f520	aster/key.8d33f520.wav	backtick key	aster	40	fragment		
+key.a9253dc8	aster/key.a9253dc8.wav	backslash key	aster	40	fragment		
+key.265fda17	aster/key.265fda17.wav	apostrophe key	aster	40	fragment		
+key.496762f4	aster/key.496762f4.wav	numpad multiply key	aster	40	fragment		
+key.8e0b22fd	aster/key.8e0b22fd.wav	numpad plus key	aster	40	fragment		
+key.6c0d42b9	aster/key.6c0d42b9.wav	numpad minus key	aster	40	fragment		
+key.3b082bf0	aster/key.3b082bf0.wav	numpad decimal key	aster	40	fragment		
+key.a28b1b97	aster/key.a28b1b97.wav	numpad divide key	aster	40	fragment		
+key.d8156bae	aster/key.d8156bae.wav	unbound key	aster	40	fragment		
+key.5ca24005	aster/key.5ca24005.wav	key	aster	40	fragment		
+@atom.tower.n0	fragment.tower.n0
+@atom.tower.n1	fragment.tower.n1
+@atom.tower.n2	fragment.tower.n2
+@atom.tower.n3	fragment.tower.n3
+@atom.tower.n4	fragment.tower.n4
+@atom.tower.n5	fragment.tower.n5
+@atom.tower.n6	fragment.tower.n6
+@atom.tower.n7	fragment.tower.n7
+@atom.tower.n8	fragment.tower.n8
+@atom.tower.n9	fragment.tower.n9
+@atom.tower.n10	fragment.tower.n10
+@atom.tower.n11	fragment.tower.n11
+@atom.tower.n12	fragment.tower.n12
+@atom.tower.n13	fragment.tower.n13
+@atom.tower.n14	fragment.tower.n14
+@atom.tower.n15	fragment.tower.n15
+@atom.tower.n16	fragment.tower.n16
+@atom.tower.n17	fragment.tower.n17
+@atom.tower.n18	fragment.tower.n18
+@atom.tower.n19	fragment.tower.n19
+@atom.tower.n20	fragment.tower.n20
+@atom.tower.n30	fragment.tower.n30
+@atom.tower.n40	fragment.tower.n40
+@atom.tower.n50	fragment.tower.n50
+@atom.tower.n60	fragment.tower.n60
+@atom.tower.n70	fragment.tower.n70
+@atom.tower.n80	fragment.tower.n80
+@atom.tower.n90	fragment.tower.n90
+@atom.tower.hundred	fragment.tower.hundred
+@atom.tower.thousand	fragment.tower.thousand
+@atom.tower.million	fragment.tower.million
+@atom.tower.billion	fragment.tower.billion
+@atom.tower.point	fragment.tower.point
+@atom.tower.minus	fragment.tower.minus
+@atom.tower.runway	fragment.tower.runway
+@atom.tower.wind	fragment.tower.wind
+@atom.tower.at	fragment.tower.at
+@atom.tower.knots	fragment.tower.knots
+@atom.tower.gusting	fragment.tower.gusting
+@atom.tower.clear	fragment.tower.clear
+@atom.tower.scattered	fragment.tower.scattered
+@atom.tower.broken	fragment.tower.broken
+@atom.tower.overcast	fragment.tower.overcast
+@atom.tower.feet	fragment.tower.feet
+@atom.tower.visibility	fragment.tower.visibility
+@atom.tower.ten_plus_km	fragment.tower.ten_plus_km
+@atom.tower.kilometres	fragment.tower.kilometres
+@atom.tower.rain	fragment.tower.rain
+@atom.tower.thunderstorms	fragment.tower.thunderstorms
+@atom.tower.snow	fragment.tower.snow
+@atom.tower.time	fragment.tower.time
+@atom.tower.hours	fragment.tower.hours
+@atom.aster.n0	fragment.aster.n0
+@atom.aster.n1	fragment.aster.n1
+@atom.aster.n2	fragment.aster.n2
+@atom.aster.n3	fragment.aster.n3
+@atom.aster.n4	fragment.aster.n4
+@atom.aster.n5	fragment.aster.n5
+@atom.aster.n6	fragment.aster.n6
+@atom.aster.n7	fragment.aster.n7
+@atom.aster.n8	fragment.aster.n8
+@atom.aster.n9	fragment.aster.n9
+@atom.aster.n10	fragment.aster.n10
+@atom.aster.n11	fragment.aster.n11
+@atom.aster.n12	fragment.aster.n12
+@atom.aster.n13	fragment.aster.n13
+@atom.aster.n14	fragment.aster.n14
+@atom.aster.n15	fragment.aster.n15
+@atom.aster.n16	fragment.aster.n16
+@atom.aster.n17	fragment.aster.n17
+@atom.aster.n18	fragment.aster.n18
+@atom.aster.n19	fragment.aster.n19
+@atom.aster.n20	fragment.aster.n20
+@atom.aster.n30	fragment.aster.n30
+@atom.aster.n40	fragment.aster.n40
+@atom.aster.n50	fragment.aster.n50
+@atom.aster.n60	fragment.aster.n60
+@atom.aster.n70	fragment.aster.n70
+@atom.aster.n80	fragment.aster.n80
+@atom.aster.n90	fragment.aster.n90
+@atom.aster.hundred	fragment.aster.hundred
+@atom.aster.thousand	fragment.aster.thousand
+@atom.aster.million	fragment.aster.million
+@atom.aster.billion	fragment.aster.billion
+@atom.aster.point	fragment.aster.point
+@atom.aster.minus	fragment.aster.minus
+@atom.aster.flaps	fragment.aster.flaps
+@atom.aster.percent	fragment.aster.percent
+@atom.aster.checkpoint	fragment.aster.checkpoint
+@atom.aster.of	fragment.aster.of
+@atom.aster.feet_per_minute	fragment.aster.feet_per_minute
+@atom.aster.gear_collapsed_hit_at	fragment.aster.gear_collapsed_hit_at
+@atom.aster.engine_off_press	fragment.aster.engine_off_press
+@atom.aster.to_restart	fragment.aster.to_restart
+@atom.aster.hex_A	fragment.aster.hex_A
+@atom.aster.hex_B	fragment.aster.hex_B
+@atom.aster.hex_C	fragment.aster.hex_C
+@atom.aster.hex_D	fragment.aster.hex_D
+@atom.aster.hex_E	fragment.aster.hex_E
+@atom.aster.hex_F	fragment.aster.hex_F
+@atom.nyx.n0	fragment.nyx.n0
+@atom.nyx.n1	fragment.nyx.n1
+@atom.nyx.n2	fragment.nyx.n2
+@atom.nyx.n3	fragment.nyx.n3
+@atom.nyx.n4	fragment.nyx.n4
+@atom.nyx.n5	fragment.nyx.n5
+@atom.nyx.n6	fragment.nyx.n6
+@atom.nyx.n7	fragment.nyx.n7
+@atom.nyx.n8	fragment.nyx.n8
+@atom.nyx.n9	fragment.nyx.n9
+@atom.nyx.n10	fragment.nyx.n10
+@atom.nyx.n11	fragment.nyx.n11
+@atom.nyx.n12	fragment.nyx.n12
+@atom.nyx.n13	fragment.nyx.n13
+@atom.nyx.n14	fragment.nyx.n14
+@atom.nyx.n15	fragment.nyx.n15
+@atom.nyx.n16	fragment.nyx.n16
+@atom.nyx.n17	fragment.nyx.n17
+@atom.nyx.n18	fragment.nyx.n18
+@atom.nyx.n19	fragment.nyx.n19
+@atom.nyx.n20	fragment.nyx.n20
+@atom.nyx.n30	fragment.nyx.n30
+@atom.nyx.n40	fragment.nyx.n40
+@atom.nyx.n50	fragment.nyx.n50
+@atom.nyx.n60	fragment.nyx.n60
+@atom.nyx.n70	fragment.nyx.n70
+@atom.nyx.n80	fragment.nyx.n80
+@atom.nyx.n90	fragment.nyx.n90
+@atom.nyx.hundred	fragment.nyx.hundred
+@atom.nyx.thousand	fragment.nyx.thousand
+@atom.nyx.million	fragment.nyx.million
+@atom.nyx.billion	fragment.nyx.billion
+@atom.nyx.point	fragment.nyx.point
+@atom.nyx.minus	fragment.nyx.minus
+@atom.nyx.pods	fragment.nyx.pods
+@atom.nyx.thrust_vector	fragment.nyx.thrust_vector
+@atom.nyx.degrees	fragment.nyx.degrees
+@atom.nyx.splash	fragment.nyx.splash
+@atom.nyx.down	fragment.nyx.down
+@atom.nyx.aircraft_in_blast	fragment.nyx.aircraft_in_blast
+@atom.nyx.craft_kestrel	fragment.nyx.craft_kestrel
+@atom.nyx.craft_wren	fragment.nyx.craft_wren
+@atom.nyx.craft_bush	fragment.nyx.craft_bush
+@atom.nyx.craft_islander	fragment.nyx.craft_islander
+@atom.nyx.craft_pelican	fragment.nyx.craft_pelican
+@atom.nyx.craft_meridian	fragment.nyx.craft_meridian
+@atom.nyx.craft_starling	fragment.nyx.craft_starling
+@atom.nyx.craft_xr9	fragment.nyx.craft_xr9
+@atom.nyx.craft_xr11	fragment.nyx.craft_xr11
+@key.A	key.559aead0
+@key.B	key.df7e70e5
+@key.C	key.6b23c0d5
+@key.D	key.3f39d5c3
+@key.E	key.a9f51566
+@key.F	key.f67ab10a
+@key.G	key.333e0a1e
+@key.H	key.44bd7ae6
+@key.I	key.a83dd0cc
+@key.J	key.6da43b94
+@key.K	key.86be9a55
+@key.L	key.72dfcfb0
+@key.M	key.08f27188
+@key.N	key.8ce86a6a
+@key.O	key.c4694f2e
+@key.P	key.5c62e091
+@key.Q	key.4ae81572
+@key.R	key.8c257489
+@key.S	key.8de0b3c4
+@key.T	key.e632b709
+@key.U	key.a25513c7
+@key.V	key.de5a6f78
+@key.W	key.fcb5f40d
+@key.X	key.4b68ab38
+@key.Y	key.18f5384d
+@key.Z	key.bbeebd87
+@key.0	key.5feceb66
+@key.1	key.6b86b273
+@key.2	key.d4735e3a
+@key.3	key.4e074085
+@key.4	key.4b227777
+@key.5	key.ef2d127d
+@key.6	key.e7f6c011
+@key.7	key.7902699b
+@key.8	key.2c624232
+@key.9	key.19581e27
+@key.F1	key.deae2d4d
+@key.F2	key.8e2de333
+@key.F3	key.7c96eb02
+@key.F4	key.015b7913
+@key.F5	key.6cd28ed3
+@key.F6	key.1c003eb2
+@key.F7	key.d96b6ec7
+@key.F8	key.a39b6e51
+@key.F9	key.6d39eec8
+@key.F10	key.fd6991f3
+@key.F11	key.e26fb6fa
+@key.F12	key.e3df0d3c
+@key.NUM 0	key.e403096b
+@key.NUM 1	key.5972c4b1
+@key.NUM 2	key.a2715d05
+@key.NUM 3	key.97c9d17d
+@key.NUM 4	key.42418e3c
+@key.NUM 5	key.9eff936b
+@key.NUM 6	key.fc580b0d
+@key.NUM 7	key.10cdfacc
+@key.NUM 8	key.56ee995b
+@key.NUM 9	key.c1cd03be
+@key.BACKSPACE	key.1514c8dd
+@key.TAB	key.125fd55e
+@key.ENTER	key.d50187dd
+@key.SHIFT	key.34f44616
+@key.ALT	key.c8b33fbc
+@key.SPACE	key.7ed62da8
+@key.PAGE UP	key.e2cfd5e6
+@key.PAGE DOWN	key.84a91b27
+@key.END	key.b891f9e2
+@key.HOME	key.36e65c39
+@key.LEFT	key.2cba9d25
+@key.UP	key.42cb4e6f
+@key.RIGHT	key.c4ce3c7a
+@key.DOWN	key.d45b3383
+@key.INSERT	key.014413c2
+@key.DELETE	key.65daeb37
+@key.CAPS LOCK	key.d2f9f713
+@key.CTRL	key.bb69fc1c
+@key.[	key.245843ab
+@key.]	key.cfae0d42
+@key.=	key.380918b9
+@key.-	key.3973e022
+@key.;	key.41b805ea
+@key.,	key.d03502c4
+@key..	key.cdb4ee2a
+@key./	key.8a5edab2
+@key.`	key.8d33f520
+@key.\	key.a9253dc8
+@key.'	key.265fda17
+@key.NUM *	key.496762f4
+@key.NUM +	key.8e0b22fd
+@key.NUM -	key.6c0d42b9
+@key.NUM .	key.3b082bf0
+@key.NUM /	key.a28b1b97
+@key.--	key.d8156bae
+@key.KEY	key.5ca24005
+@craft.Kestrel T2	kestrel
+@craft.Wren 180	wren
+@craft.Bushmaster STOL	bush
+@craft.Islander Twin	islander
+@craft.Pelican Caravan	pelican
+@craft.Meridian Q400	meridian
+@craft.Starling 500 Jet	starling
+@craft.XR-9 Specter	xr9
+@craft.XR-11 Wraith	xr11

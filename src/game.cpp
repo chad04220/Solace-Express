@@ -237,8 +237,9 @@ void Game::initHeadless() { headless = true; career.newGame(); set.resMode = 0; 
 
 void Game::shutdown() { saveSettings(); radio.shutdown(); }
 
-void Game::toast(const std::string& s, vec3 col) {
+void Game::toast(const std::string& s, vec3 col, bool voiced) {
   toasts.push_back({s, 0.f, col});
+  if (voiced && (screen == SCR_FLIGHT || screen == SCR_LOADING)) commsPending.push_back({s, contract.id});
   if (toasts.size() > 5) toasts.erase(toasts.begin());
 }
 
@@ -296,7 +297,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadMap = false; dbgCam = dbgFollow = false;
   toast(fmt("%s - %s", a.code, a.name), vec3(0.7f, 0.9f, 1.0f));
   toast(fmt("Runway %02d, %s", a.rwyNumber(reverse), wx.describe().c_str()), vec3(0.8f, 0.8f, 0.8f));
-  atc.cancel(); atcF = AtcFlight();
+  atc.cancel(); atcF = AtcFlight(); hintsVoiced.clear(); commsPending.clear();
   atcF.dep = c.from; atcF.arr = c.to; atcF.depRev = reverse;
   { uint32_t h = 2166136261u; for (char ch : c.id) h = (h ^ (uint8_t)ch) * 16777619u; atcF.call = 10 + (int)(h % 90); }   // this flight's callsign number
   if (c.startAirborne) atcF.phase = 3;
@@ -335,7 +336,7 @@ int Game::computePhase() const {
   if (!plane.spec) return 0;
   float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
   if (touchedDown && plane.onGround) return 6;
-  if (plane.onGround && !takeoffAnnounced) return gs < 3.f ? 0 : 1;
+  if ((plane.onGround || flightClock < 1.f) && !takeoffAnnounced) return gs < 3.f ? 0 : 1;   // (settling onto the runway at the start)
   bool finalLeg = contract.wps.empty() || wpIndex >= (int)contract.wps.size() - 1;
   const Airport& d = dest();
   float dd = length(vec3(plane.pos.x - d.x, 0, plane.pos.z - d.z));
@@ -738,7 +739,10 @@ void Game::updateFlight(float dt) {
   phase = computePhase();
   if (contract.hints.size() > (size_t)phase && phase != lastHintPhase) {
     lastHintPhase = phase;
-    if (!contract.hints[phase].empty()) hint = contract.hints[phase];
+    if (!contract.hints[phase].empty()) {
+      hint = contract.hints[phase];
+      if (set.showHints && std::find(hintsVoiced.begin(), hintsVoiced.end(), hint) == hintsVoiced.end()) { hintsVoiced.push_back(hint); commsPending.push_back({hint, contract.id}); }   // each said once
+    }
   }
 }
 
@@ -1972,8 +1976,6 @@ void Game::updateAtc(float dt) {
   if (!atc.ok()) return;
   AtcFlight& F = atcF;
   F.t += dt; F.waitT += dt;
-  std::string said = atc.update(dt);
-  if (!said.empty()) toast("TOWER  " + said, vec3(0.55f, 1.f, 0.72f));
   if (F.dep < 0 || F.arr < 0) return;
   const float kt = MS_TO_KT;
   float agl = plane.agl(), gs = length(vec3(plane.vel.x, 0, plane.vel.z));
@@ -2004,13 +2006,13 @@ void Game::updateAtc(float dt) {
     case 0:   // on the ground at the departure airport: the greeting
       if (F.t > 2.5f) {
         const char* key = timeOfDay < 12.f ? "greeting_morning" : timeOfDay < 18.f ? "greeting_afternoon" : "greeting_evening";
-        AtcVoice::Tx tx; tx.ids.push_back(atc.line(vd, key)); tx.text = atc.text(tx.ids[0]); tx.prio = 10;
+        AtcVoice::Tx tx; tx.ids.push_back(atc.line(vd, key)); tx.text = atc.text(tx.ids[0]); tx.prio = 10; tx.subtitle = true; tx.group = "tower";
         atc.say(tx); F.phase = 1; F.waitT = 0;
       }
       break;
     case 1:   // lined up on the runway: cleared for takeoff (straight away if the aircraft is already rolling)
-      if ((F.waitT > 5.f && !atc.busy()) || gs > 4.f) {
-        AtcVoice::Tx tx; tx.prio = 90;
+      if ((F.spoken >= 1 && F.waitT > 4.f && !atc.busy()) || gs > 4.f) {   // (after the greeting has been heard)
+        AtcVoice::Tx tx; tx.prio = 90; tx.subtitle = true; tx.group = "tower";
         callsign(vd, tx.ids); tx.text = csTxt();
         wind(vd, tx.ids, tx.text);
         tx.ids.push_back(atc.atom(vd, "runway")); runway(vd, D.rwyNumber(F.depRev), tx.ids); tx.ids.push_back(atc.atom(vd, "cleared_takeoff"));
@@ -2020,7 +2022,7 @@ void Game::updateAtc(float dt) {
       break;
     case 2:   // climbing out, clear of the field: handed on (circuits stay with the tower)
       if (F.airborne && agl > 120.f && length(plane.pos - D.pos()) > 1500.f) {
-        AtcVoice::Tx tx; tx.prio = 40;
+        AtcVoice::Tx tx; tx.prio = 40; tx.subtitle = true; tx.group = "tower";
         if (F.dep == F.arr) { tx.ids.push_back(atc.line(vd, "remain_pattern")); tx.text = atc.text(tx.ids[0]); }
         else { tx.ids = {atc.line(vd, "contact_departure"), "", atc.line(vd, "good_day")}; tx.text = atc.text(tx.ids[0]) + " " + atc.text(tx.ids[2]); }
         atc.say(tx); F.phase = F.dep == F.arr ? 4 : 3; F.waitT = 0;
@@ -2051,7 +2053,7 @@ void Game::updateAtc(float dt) {
         float hdgAl = cosf((plane.heading() - head(F.arrRev)) * DEG);
         bool straight = along < -2000.f && lat < 0.4f * -along && hdgAl > 0.7f;
         int n = A.rwyNumber(F.arrRev);
-        AtcVoice::Tx tx; tx.prio = 60;
+        AtcVoice::Tx tx; tx.prio = 60; tx.subtitle = true; tx.group = "tower";
         callsign(va, tx.ids); tx.text = csTxt();
         tx.ids.push_back(atc.atom(va, straight ? "make_straight_in" : "enter_left_downwind")); runway(va, n, tx.ids);
         tx.ids.push_back(atc.atom(va, "report_final"));
@@ -2067,7 +2069,7 @@ void Game::updateAtc(float dt) {
       float hdgAl = cosf((plane.heading() - (A.heading + (F.arrRev ? 180.f : 0.f))) * DEG);
       if (F.airborne && !plane.onGround && along < 0.f && along > -6000.f && lat < 500.f && agl < 500.f && hdgAl > 0.82f) {
         int n = A.rwyNumber(F.arrRev);
-        AtcVoice::Tx tx; tx.prio = 90;
+        AtcVoice::Tx tx; tx.prio = 90; tx.subtitle = true; tx.group = "tower";
         callsign(va, tx.ids); tx.text = csTxt();
         wind(va, tx.ids, tx.text);
         tx.ids.push_back(atc.atom(va, "runway")); runway(va, n, tx.ids); tx.ids.push_back(atc.atom(va, "cleared_land"));
@@ -2079,13 +2081,48 @@ void Game::updateAtc(float dt) {
     case 5:   // cleared: the landing roll, or a go-around (climbing away again: a fresh approach call)
       if (plane.onGround && length(plane.pos - A.pos()) < 3000.f) {
         if (gs < 18.f) {
-          AtcVoice::Tx tx; tx.prio = 55; tx.ids.push_back(atc.line(va, "exit_when_able")); tx.text = atc.text(tx.ids[0]);
+          AtcVoice::Tx tx; tx.prio = 55; tx.subtitle = true; tx.group = "tower"; tx.ids.push_back(atc.line(va, "exit_when_able")); tx.text = atc.text(tx.ids[0]);
           atc.say(tx); F.phase = 6;
         }
       } else if (!plane.onGround && agl > 180.f && plane.vel.y > 2.f && F.waitT > 20.f) { F.phase = F.dep == F.arr ? 4 : 3; F.waitT = 0; }
       break;
     default: break;
   }
+}
+
+// The comms channel, every frame: what the game showed this frame is resolved to voice lines (AtcVoice::resolve)
+// and queued; the warnings speak on their rising edge (and again if they persist); the towers run their exchange.
+// Nothing stale is ever said: the queue is dropped on pause, at the end of the flight and when the aircraft
+// crashes (then only the crash itself is announced).
+void Game::updateComms(float dt) {
+  bool live = (screen == SCR_FLIGHT || screen == SCR_LOADING) && !paused;
+  if (!live) { atc.cancel(); commsPending.clear(); commsCrashSeen = false; return; }
+  if (!atc.ok()) { commsPending.clear(); return; }
+  if (crashed && !commsCrashSeen) { atc.cancel(); commsCrashSeen = true; }
+  if (!crashed) commsCrashSeen = false;
+  if (screen == SCR_FLIGHT && !crashed && flightClock > 2.f) {   // the HUD's warnings (game_ui.cpp), spoken as they come on
+    const AircraftSpec& spc = *plane.spec;
+    const Airport& d = g_world.airports[contract.to];
+    bool w[4] = {plane.stallWarn > 0.8f && !plane.onGround && plane.ias > 10.f,
+                 !plane.onGround && plane.agl() < 120 && plane.vel.y < -7.f,
+                 spc.retract && plane.gear < 0.99f && !plane.onGround && plane.agl() < 200 && length(plane.pos - d.pos()) < 4000.f && plane.ias < spc.vref * 1.5f,
+                 !plane.engineRunning && engineAutoStarted && plane.starterTime <= 0};
+    const char* say[4] = {"STALL", "PULL UP", "GEAR!", nullptr};
+    for (int i = 0; i < 4; i++) {
+      if (w[i] && (!warnWas[i] || realTime - warnLastT[i] > 8.f)) {
+        std::string m = say[i] ? say[i] : "ENGINE OFF - press " + keyName(set.keyBind[ACT_ENGINE]) + " to restart";
+        AtcVoice::Tx tx;
+        if (atc.resolve(m, contract.id, in.pad, tx)) { tx.prio = std::max(tx.prio, 95); atc.say(tx); }
+        warnLastT[i] = realTime;
+      }
+      warnWas[i] = w[i];
+    }
+  }
+  for (auto& m : commsPending) { AtcVoice::Tx tx; if (atc.resolve(m.text, m.mission, in.pad, tx)) atc.say(tx); }
+  commsPending.clear();
+  if (screen == SCR_FLIGHT && !crashed && !researchFlight) updateAtc(dt);
+  AtcVoice::Tx st = atc.update(dt);
+  if (!st.ids.empty() && st.subtitle) { toast("TOWER  " + st.text, vec3(0.55f, 1.f, 0.72f), false); atcF.spoken++; }
 }
 
 void Game::feedAudio() {
@@ -2195,8 +2232,7 @@ void Game::update(float dt) {
     if (screen == SCR_MENU) wx.cloudCover = menuShot(realTime).cloud;
     cloudOff = cloudOff + vec2(dt * 8.f, dt * 3.f);
   }
-  if (screen == SCR_FLIGHT && !paused && !crashed && !researchFlight) updateAtc(dt);
-  else atc.cancel();   // stale calls never play after a pause, a crash or the end of the flight
+  updateComms(dt);
   feedAudio();
 }
 

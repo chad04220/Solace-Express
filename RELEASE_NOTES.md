@@ -1,5 +1,10 @@
 ## What's new
 
+**Voices**
+- A cast of six on your headset: the instructor and the checkride examiner, airport and weather information, the Spectre display pilot, the cockpit assistant (checkpoints, flaps and gear, landing ratings, warnings, outcomes) and the research computer
+- Every line plays when the game shows its message; one comms queue puts warnings first, replaces outdated lever calls and says each lesson hint once
+- Hints that name gamepad buttons play only when you fly with a gamepad
+
 **Tower controllers on the radio**
 - Three recorded tower controller voices (North, Coast and Valley Tower); each airport keeps one
 - Calls come only from what's happening on your flight: a greeting, your takeoff clearance with the real wind, the handoff once you're clear (or "remain in the pattern" on circuits), straight-in or left-downwind joining instructions, the landing clearance on final, and "exit the runway when able" on the landing roll
