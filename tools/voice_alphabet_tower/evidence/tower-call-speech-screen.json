@@ -1,0 +1,965 @@
+{
+  "method": "faster-whisper small.en CPU int8, English, no transcript prompt or supplied reference words",
+  "checks": {
+    "tower.tower_north.greeting_morning": {
+      "id": "tower.tower_north.greeting_morning",
+      "expected": "Good morning. Advise when ready to taxi.",
+      "recognized": "Good morning. Advise when ready to taxi.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.greeting_morning.wav",
+      "sha256": "ed3e7802fcec064bc695183674e03b763b26e5aad2297cf2b4590f088dc32391"
+    },
+    "tower.tower_north.greeting_afternoon": {
+      "id": "tower.tower_north.greeting_afternoon",
+      "expected": "Good afternoon. Advise when ready to taxi.",
+      "recognized": "Good afternoon. Advise when ready to taxi.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.greeting_afternoon.wav",
+      "sha256": "ddd3e7115f867d400917216911c6ff5263412960ec06b8da8c3915360f53ce16"
+    },
+    "tower.tower_north.greeting_evening": {
+      "id": "tower.tower_north.greeting_evening",
+      "expected": "Good evening. Advise when ready to taxi.",
+      "recognized": "Good evening. Advise when ready to taxi.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.greeting_evening.wav",
+      "sha256": "2e9153b8217dabc16e67765eac0082966c6dea44c053019430b18bd1521c1ff4"
+    },
+    "tower.tower_north.aircraft_position": {
+      "id": "tower.tower_north.aircraft_position",
+      "expected": "Say your aircraft type and position.",
+      "recognized": "Say your aircraft type and position.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.aircraft_position.wav",
+      "sha256": "5fd72101592e4c7a087a1c607a73ed2972dcc7227e444e53a1309e34a5018cf5"
+    },
+    "tower.tower_north.repeat_callsign": {
+      "id": "tower.tower_north.repeat_callsign",
+      "expected": "Say again your call sign.",
+      "recognized": "Say again your call sign.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.repeat_callsign.wav",
+      "sha256": "5f9dc5b3e9916525fe505caa86ba6422daaa351b9e22390f2bc16477eba8e5d3"
+    },
+    "tower.tower_north.readback_hold": {
+      "id": "tower.tower_north.readback_hold",
+      "expected": "Read back the hold-short instruction.",
+      "recognized": "Read back the hold short instruction.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.readback_hold.wav",
+      "sha256": "d8bcdea1e97affae0e7cf850d43886e9a90b61bb4ce61e2520193d2ac322ecbb"
+    },
+    "tower.tower_north.standby": {
+      "id": "tower.tower_north.standby",
+      "expected": "Stand by.",
+      "recognized": "Stand by.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.standby.wav",
+      "sha256": "7b5e3dadd06b5b9f7336868ac56accade5dee15733914f2f2135877ec15331f6"
+    },
+    "tower.tower_north.hold_position": {
+      "id": "tower.tower_north.hold_position",
+      "expected": "Hold position.",
+      "recognized": "Hold position.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.hold_position.wav",
+      "sha256": "299c2e94ab7a4ac005983eb9342dd56cbcab7ba0542288445a2597666cadd810"
+    },
+    "tower.tower_north.hold_arrival": {
+      "id": "tower.tower_north.hold_arrival",
+      "expected": "Continue holding. Traffic is on final.",
+      "recognized": "Continue holding. Traffic is on final.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.hold_arrival.wav",
+      "sha256": "0a5eddd0d9967bb8add5e34276e25611b7107bb13caa2901854dd337873f9b18"
+    },
+    "tower.tower_north.hold_departure": {
+      "id": "tower.tower_north.hold_departure",
+      "expected": "Continue holding. A departure is rolling.",
+      "recognized": "Continue holding. A departure is rolling.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.hold_departure.wav",
+      "sha256": "cb57989d4c52ff00872c3f701365d0a406d7ff7d52d87f7dea85f6c53c9c6b2e"
+    },
+    "tower.tower_north.arrival_delay": {
+      "id": "tower.tower_north.arrival_delay",
+      "expected": "Expect a short delay for arriving traffic.",
+      "recognized": "Expect a short delay for arriving traffic.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.arrival_delay.wav",
+      "sha256": "296f7600738f6920356c092bbcaaae423c74d21a3e005cb2cf6d0c268f3d4fcc"
+    },
+    "tower.tower_north.report_ready": {
+      "id": "tower.tower_north.report_ready",
+      "expected": "Report ready for departure.",
+      "recognized": "Report ready for departure.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.report_ready.wav",
+      "sha256": "d3b1842b6ebc425ad06d58793856d67af21f15ab628fcf43a6d92529d859bb87"
+    },
+    "tower.tower_north.wake_caution": {
+      "id": "tower.tower_north.wake_caution",
+      "expected": "Caution, wake turbulence.",
+      "recognized": "Caution wake turbulence.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.wake_caution.wav",
+      "sha256": "b053e6d1e0a353c3afbf603eca988c987b73886c291317bf31a1d75c392ad6f1"
+    },
+    "tower.tower_north.cancel_takeoff": {
+      "id": "tower.tower_north.cancel_takeoff",
+      "expected": "Cancel takeoff clearance. Hold position.",
+      "recognized": "Cancel takeoff clearance, hold position.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.cancel_takeoff.wav",
+      "sha256": "b43467391fbfc5d683e649e03d851900ae3975df6f41ecf1692ca6ba667f201a"
+    },
+    "tower.tower_north.runway_heading": {
+      "id": "tower.tower_north.runway_heading",
+      "expected": "Fly runway heading.",
+      "recognized": "Fly runway heading.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.runway_heading.wav",
+      "sha256": "4ae4a2633701ce17e3922b0d4a36d91f8ccd9324250ba024043263e04dc391f1"
+    },
+    "tower.tower_north.remain_pattern": {
+      "id": "tower.tower_north.remain_pattern",
+      "expected": "Remain in the pattern.",
+      "recognized": "Remain in the pattern.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.remain_pattern.wav",
+      "sha256": "c58d5ebd90e81f34155a70d72a7587bed66b8078536bec6b66ca88fb37ff5e58"
+    },
+    "tower.tower_north.contact_departure": {
+      "id": "tower.tower_north.contact_departure",
+      "expected": "Contact departure.",
+      "recognized": "Contact Departure",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.contact_departure.wav",
+      "sha256": "f6e85c80d81c62a3a075b428ad1ecacdba8828825886b1bc183cd07554786dbf"
+    },
+    "tower.tower_north.frequency_change": {
+      "id": "tower.tower_north.frequency_change",
+      "expected": "Frequency change approved.",
+      "recognized": "Frequency change approved.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.frequency_change.wav",
+      "sha256": "f51ac6b51d0bf56f53b3c76c8fe934f1d705269f357d06b5ad9ed6fb83012bfd"
+    },
+    "tower.tower_north.report_downwind": {
+      "id": "tower.tower_north.report_downwind",
+      "expected": "Report downwind.",
+      "recognized": "Report Downwind.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.report_downwind.wav",
+      "sha256": "3f618c890f695d5b210bf913d58a6645f74cdb82fae80c1f8434692b445c8f52"
+    },
+    "tower.tower_north.report_base": {
+      "id": "tower.tower_north.report_base",
+      "expected": "Report base.",
+      "recognized": "Report base.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.report_base.wav",
+      "sha256": "efdefd2dbfc3f0b850e78a2e4ccd3d8b5224e00ef58f72b209608b269ab44d73"
+    },
+    "tower.tower_north.report_final": {
+      "id": "tower.tower_north.report_final",
+      "expected": "Report final.",
+      "recognized": "Report final.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.report_final.wav",
+      "sha256": "309a59988136d7f01a2901f7f4197ab6e7e42a3c339c63edd65135daade8c784"
+    },
+    "tower.tower_north.extend_downwind": {
+      "id": "tower.tower_north.extend_downwind",
+      "expected": "Extend downwind. I will call your base.",
+      "recognized": "Extend downwind. I will call your base.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.extend_downwind.wav",
+      "sha256": "44a289b8fa5c11fa04dd888a3947595f44bef938d287b02d2e195913f067605c"
+    },
+    "tower.tower_north.turn_base": {
+      "id": "tower.tower_north.turn_base",
+      "expected": "Turn base now.",
+      "recognized": "Turn base now.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.turn_base.wav",
+      "sha256": "b8410efff242bb5860bfc7d0f531743a58e6fd871bd90a529eca82744763e569"
+    },
+    "tower.tower_north.number_one": {
+      "id": "tower.tower_north.number_one",
+      "expected": "You are number one.",
+      "recognized": "You are number one.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.number_one.wav",
+      "sha256": "5469682a8011031ac45ecd31720e685580bd6cbe776f729108255720dba6d7f3"
+    },
+    "tower.tower_north.number_two": {
+      "id": "tower.tower_north.number_two",
+      "expected": "You are number two. Follow the aircraft ahead.",
+      "recognized": "You are number two. Follow the aircraft ahead.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.number_two.wav",
+      "sha256": "c20684df9e457f10d35ea6430fda5a98fad2cea23427adc053ad801d1916e081"
+    },
+    "tower.tower_north.continue_approach": {
+      "id": "tower.tower_north.continue_approach",
+      "expected": "Continue approach.",
+      "recognized": "Continue approach.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.continue_approach.wav",
+      "sha256": "4a2781c65cfc79e366e19802756dffd2884a375088d6e148178547509f263569"
+    },
+    "tower.tower_north.clearance_follows": {
+      "id": "tower.tower_north.clearance_follows",
+      "expected": "Continue approach. Landing clearance will follow.",
+      "recognized": "Continue approach. Landing clearance will follow.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.clearance_follows.wav",
+      "sha256": "340ac1515c6a5ef9a1de83426de29f5d66d49750d79cfe7db2dc5b7d0ab14623"
+    },
+    "tower.tower_north.runway_occupied": {
+      "id": "tower.tower_north.runway_occupied",
+      "expected": "Continue approach. The runway is occupied.",
+      "recognized": "Continue approach. The runway is occupied.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.runway_occupied.wav",
+      "sha256": "fc3a2204d7c84fd752fe73b86d3fe299c7cf7107ca7f98c53311446f516c6ad4"
+    },
+    "tower.tower_north.heavy_wake": {
+      "id": "tower.tower_north.heavy_wake",
+      "expected": "Caution, wake turbulence. Traffic ahead is a heavy aircraft.",
+      "recognized": "Caution wake turbulence. Traffic ahead is a heavy aircraft.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.heavy_wake.wav",
+      "sha256": "1e8e224733e84ef10a476cf7efc00c62e7a89aec7af2966b19d3bbde0fbeb1f3"
+    },
+    "tower.tower_north.go_around_heading": {
+      "id": "tower.tower_north.go_around_heading",
+      "expected": "Go around. Fly runway heading.",
+      "recognized": "Go around, fly runway heading.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.go_around_heading.wav",
+      "sha256": "2c03c4a14e8b2188d618be69247ef4584912bea5f35af0f101c16983d6c9922c"
+    },
+    "tower.tower_north.go_around_occupied": {
+      "id": "tower.tower_north.go_around_occupied",
+      "expected": "Go around. The runway is occupied.",
+      "recognized": "Go around. The runway is occupied.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.go_around_occupied.wav",
+      "sha256": "fec0e3738bf9f4fa4c6740cf8245fcc956a5c8c0e37c8c38de9ced900dcf863d"
+    },
+    "tower.tower_north.go_around_vehicle": {
+      "id": "tower.tower_north.go_around_vehicle",
+      "expected": "Go around. Vehicle on the runway.",
+      "recognized": "Go around, vehicle on the runway.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.go_around_vehicle.wav",
+      "sha256": "dfa75eae11995e01fad966d906def4b9c82d9dc05241a5219ba38acad06876aa"
+    },
+    "tower.tower_north.go_around_aircraft": {
+      "id": "tower.tower_north.go_around_aircraft",
+      "expected": "Go around. Aircraft on the runway.",
+      "recognized": "Go around, aircraft on the runway.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.go_around_aircraft.wav",
+      "sha256": "32b4c8cf18b52f7575c280854369e195001d08621ed4ba83de5032b4da66e68e"
+    },
+    "tower.tower_north.go_around_ability": {
+      "id": "tower.tower_north.go_around_ability",
+      "expected": "Are you able to go around?",
+      "recognized": "Are you able to go around?",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.go_around_ability.wav",
+      "sha256": "1ea6f91ee407c723164e445d3687ee7f5dc83657c200329848c56f89c861885b"
+    },
+    "tower.tower_north.exit_when_able": {
+      "id": "tower.tower_north.exit_when_able",
+      "expected": "Exit the runway when able.",
+      "recognized": "Exit the runway when able.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.exit_when_able.wav",
+      "sha256": "390678f37b7fb30f9452c29468ca61dd5d7d1de490dfece19e401c63bf2daaf4"
+    },
+    "tower.tower_north.report_clear": {
+      "id": "tower.tower_north.report_clear",
+      "expected": "Report clear of the runway.",
+      "recognized": "Report clear of the runway.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.report_clear.wav",
+      "sha256": "3c10eb4a54efa989c5c3877cb729431679b1fd966bda488e47bc08a47bee5ae9"
+    },
+    "tower.tower_north.hold_contact_ground": {
+      "id": "tower.tower_north.hold_contact_ground",
+      "expected": "Hold position. Contact ground.",
+      "recognized": "Hold position. Contact ground.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.hold_contact_ground.wav",
+      "sha256": "c3bd454431200e91c9b0f6ce93df36d33fa887b1358b84a29b356492521881cf"
+    },
+    "tower.tower_north.welcome_back": {
+      "id": "tower.tower_north.welcome_back",
+      "expected": "Welcome back.",
+      "recognized": "Welcome back.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.welcome_back.wav",
+      "sha256": "96041ca5e6e5af5f533b988b9895b8fb73879141637980c07e8af8e91ff70e5c"
+    },
+    "tower.tower_north.good_day": {
+      "id": "tower.tower_north.good_day",
+      "expected": "Good day.",
+      "recognized": "Good day.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.good_day.wav",
+      "sha256": "e05009dbef734ba995e8380ac428f8fdcd89f1caeb48bc73c2ab202aef8096dc"
+    },
+    "tower.tower_north.emergency_priority": {
+      "id": "tower.tower_north.emergency_priority",
+      "expected": "Emergency traffic has priority. Stand by.",
+      "recognized": "Emergency traffic has priority. Standby.",
+      "matched": true,
+      "audio_file": "audio/tower_north/tower.tower_north.emergency_priority.wav",
+      "sha256": "f629f212094f20b5e4ef30406a02870ca425d26185ec0415bcc9f11dc6216946"
+    },
+    "tower.tower_coast.greeting_morning": {
+      "id": "tower.tower_coast.greeting_morning",
+      "expected": "Good morning. Advise when ready to taxi.",
+      "recognized": "Good morning. Advise when ready to taxi.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.greeting_morning.wav",
+      "sha256": "fdb0676591eceeab9f55b4d197f8a3cfe387b37f88cfa37add2fd87e5d93adc6"
+    },
+    "tower.tower_coast.greeting_afternoon": {
+      "id": "tower.tower_coast.greeting_afternoon",
+      "expected": "Good afternoon. Advise when ready to taxi.",
+      "recognized": "Good afternoon. Advise when ready to taxi.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.greeting_afternoon.wav",
+      "sha256": "61d895e5a7344314dae39c99339de2c446b195f1b80eb43ed53bc60459376ee1"
+    },
+    "tower.tower_coast.greeting_evening": {
+      "id": "tower.tower_coast.greeting_evening",
+      "expected": "Good evening. Advise when ready to taxi.",
+      "recognized": "Good evening. Advise when ready to taxi.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.greeting_evening.wav",
+      "sha256": "0a4a3b537dc55a9c731fd1f45eaefde3e5b13f4dde56c31f43b344514c02177b"
+    },
+    "tower.tower_coast.aircraft_position": {
+      "id": "tower.tower_coast.aircraft_position",
+      "expected": "Say your aircraft type and position.",
+      "recognized": "Say your aircraft type and position.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.aircraft_position.wav",
+      "sha256": "523562eb665207c3af979e60861bc1a160f9452e5b51f617ace38dcd9f62b1fa"
+    },
+    "tower.tower_coast.repeat_callsign": {
+      "id": "tower.tower_coast.repeat_callsign",
+      "expected": "Say again your call sign.",
+      "recognized": "Say again your call sign.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.repeat_callsign.wav",
+      "sha256": "7da107e32644149629abb7b350fa12a55c308387dd6093d4239648f207f397ec"
+    },
+    "tower.tower_coast.readback_hold": {
+      "id": "tower.tower_coast.readback_hold",
+      "expected": "Read back the hold-short instruction.",
+      "recognized": "Read back the hold short instruction.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.readback_hold.wav",
+      "sha256": "3351e0a0bdd3cce3306f1933ac3aba11ac6461c8063c0540e2159866ad56bee5"
+    },
+    "tower.tower_coast.standby": {
+      "id": "tower.tower_coast.standby",
+      "expected": "Stand by.",
+      "recognized": "Stand by.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.standby.wav",
+      "sha256": "1633c65d4f148e6a0c283b25f38d242d766021c6d6eb261fd990a65615c1ea9b"
+    },
+    "tower.tower_coast.hold_position": {
+      "id": "tower.tower_coast.hold_position",
+      "expected": "Hold position.",
+      "recognized": "Hold position.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.hold_position.wav",
+      "sha256": "9f1b4dd6b0f2dd608e98158afb4e4884f9a84a4fafa90b0e0b982503973cedfc"
+    },
+    "tower.tower_coast.hold_arrival": {
+      "id": "tower.tower_coast.hold_arrival",
+      "expected": "Continue holding. Traffic is on final.",
+      "recognized": "Continue holding. Traffic is on final.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.hold_arrival.wav",
+      "sha256": "9672925a33852b9460e53a8854437ac5366e13700f159ce84bf2c56bd8ea73ad"
+    },
+    "tower.tower_coast.hold_departure": {
+      "id": "tower.tower_coast.hold_departure",
+      "expected": "Continue holding. A departure is rolling.",
+      "recognized": "Continue holding. A departure is rolling.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.hold_departure.wav",
+      "sha256": "402dabdcd3c5fe21943d247a04ea3ec0bbb4f32aa7ed162f06ebde60ccf9a42c"
+    },
+    "tower.tower_coast.arrival_delay": {
+      "id": "tower.tower_coast.arrival_delay",
+      "expected": "Expect a short delay for arriving traffic.",
+      "recognized": "Expect a short delay for arriving traffic.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.arrival_delay.wav",
+      "sha256": "e62cac9d9a3e1edf0947ec992640dc9d7fbafa4059287cd470cf2dde80f18c87"
+    },
+    "tower.tower_coast.report_ready": {
+      "id": "tower.tower_coast.report_ready",
+      "expected": "Report ready for departure.",
+      "recognized": "Report ready for departure.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.report_ready.wav",
+      "sha256": "d9815940b89ba496788ec747963c7bd15f6783a1eea1e91c691df10a4e11c018"
+    },
+    "tower.tower_coast.wake_caution": {
+      "id": "tower.tower_coast.wake_caution",
+      "expected": "Caution, wake turbulence.",
+      "recognized": "Caution, wake turbulence.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.wake_caution.wav",
+      "sha256": "45ac4a4675feff2a04a55cc534d118e25c09a99d498db1e82b5e631c7bfc9836"
+    },
+    "tower.tower_coast.cancel_takeoff": {
+      "id": "tower.tower_coast.cancel_takeoff",
+      "expected": "Cancel takeoff clearance. Hold position.",
+      "recognized": "Cancel takeoff clearance. Hold position.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.cancel_takeoff.wav",
+      "sha256": "12a4b5d1960cb9bc37d058fa4cc4db51eee735a3899f8d6dc64ad885e413433e"
+    },
+    "tower.tower_coast.runway_heading": {
+      "id": "tower.tower_coast.runway_heading",
+      "expected": "Fly runway heading.",
+      "recognized": "Fly runway heading",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.runway_heading.wav",
+      "sha256": "a1c03da89417d4337845e3c96dd2504ea6f3285d455f560f36fd329693d67749"
+    },
+    "tower.tower_coast.remain_pattern": {
+      "id": "tower.tower_coast.remain_pattern",
+      "expected": "Remain in the pattern.",
+      "recognized": "Remain in the pattern.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.remain_pattern.wav",
+      "sha256": "d479ee0b490c7ee722d07cc6b7e43b7b78f15d7cfb39b17b956c3399172f6799"
+    },
+    "tower.tower_coast.contact_departure": {
+      "id": "tower.tower_coast.contact_departure",
+      "expected": "Contact departure.",
+      "recognized": "Contact Departure.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.contact_departure.wav",
+      "sha256": "44368bfa2ac2b37bf9e7057673b7e060fcc2fe670c30de50b32079743ce34f0a"
+    },
+    "tower.tower_coast.frequency_change": {
+      "id": "tower.tower_coast.frequency_change",
+      "expected": "Frequency change approved.",
+      "recognized": "Frequency change approved.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.frequency_change.wav",
+      "sha256": "15b439231fb579d462b8d68aaed70ff0cd187b298a4d72cb3721ea81e8095931"
+    },
+    "tower.tower_coast.report_downwind": {
+      "id": "tower.tower_coast.report_downwind",
+      "expected": "Report downwind.",
+      "recognized": "Report Downwind.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.report_downwind.wav",
+      "sha256": "5c4d154332626c053cca395f9b55f64483cdb96cf0ea38621156df265c429a23"
+    },
+    "tower.tower_coast.report_base": {
+      "id": "tower.tower_coast.report_base",
+      "expected": "Report base.",
+      "recognized": "Report base.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.report_base.wav",
+      "sha256": "ee224b4a6c8f512b1a5ecd51dff113209953b3a4b34d919008085bc2e9dae491"
+    },
+    "tower.tower_coast.report_final": {
+      "id": "tower.tower_coast.report_final",
+      "expected": "Report final.",
+      "recognized": "Report final.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.report_final.wav",
+      "sha256": "00e253e86fe37e330c87d959af208cd5375b159826a2ad450178b3e35e446179"
+    },
+    "tower.tower_coast.extend_downwind": {
+      "id": "tower.tower_coast.extend_downwind",
+      "expected": "Extend downwind. I will call your base.",
+      "recognized": "Extend Downwind. I will call your base.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.extend_downwind.wav",
+      "sha256": "6782e35c5627e01e8ed859a37c872ae415bd2aff4eab902c503bc9fe3e248562"
+    },
+    "tower.tower_coast.turn_base": {
+      "id": "tower.tower_coast.turn_base",
+      "expected": "Turn base now.",
+      "recognized": "turn base now",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.turn_base.wav",
+      "sha256": "15f1fcece42d33c2c01aedef32cc0914d1e63aa700399f2d1c07209f18d02ea1"
+    },
+    "tower.tower_coast.number_one": {
+      "id": "tower.tower_coast.number_one",
+      "expected": "You are number one.",
+      "recognized": "You are number one",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.number_one.wav",
+      "sha256": "2e1f08db0342c806dcf9d7a9996ab1d891d859a2010a2f178cdda4c3a4ef1c09"
+    },
+    "tower.tower_coast.number_two": {
+      "id": "tower.tower_coast.number_two",
+      "expected": "You are number two. Follow the aircraft ahead.",
+      "recognized": "You are number two follow the aircraft ahead",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.number_two.wav",
+      "sha256": "fcbcc2345e8118e984ed3a95aca6fd9ea6ca75582e27e260dd83455c29489d51"
+    },
+    "tower.tower_coast.continue_approach": {
+      "id": "tower.tower_coast.continue_approach",
+      "expected": "Continue approach.",
+      "recognized": "Continue approach.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.continue_approach.wav",
+      "sha256": "e37d2a4e658f5e8186e2979fa43d6e73f12788037a42302ebeb109bd91605f49"
+    },
+    "tower.tower_coast.clearance_follows": {
+      "id": "tower.tower_coast.clearance_follows",
+      "expected": "Continue approach. Landing clearance will follow.",
+      "recognized": "Continue approach. Landing clearance will follow.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.clearance_follows.wav",
+      "sha256": "d7f37f6ff4137dcb1301fd2d83d85907168dea6d2df8764d4a815e932c2be46b"
+    },
+    "tower.tower_coast.runway_occupied": {
+      "id": "tower.tower_coast.runway_occupied",
+      "expected": "Continue approach. The runway is occupied.",
+      "recognized": "Continue approach. The runway is occupied.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.runway_occupied.wav",
+      "sha256": "7f83a750c3cacf912e688f540da3edc72fbaabdef020cf7f20f8a40ff72a8c74"
+    },
+    "tower.tower_coast.heavy_wake": {
+      "id": "tower.tower_coast.heavy_wake",
+      "expected": "Caution, wake turbulence. Traffic ahead is a heavy aircraft.",
+      "recognized": "Caution wake turbulence traffic ahead is a heavy aircraft",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.heavy_wake.wav",
+      "sha256": "cb2ab7547b2c2d088c4d6fba4dd709c7137dc2523be9f42b07a05ba247220676"
+    },
+    "tower.tower_coast.go_around_heading": {
+      "id": "tower.tower_coast.go_around_heading",
+      "expected": "Go around. Fly runway heading.",
+      "recognized": "Go around fly runway heading",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.go_around_heading.wav",
+      "sha256": "d1e3e21745c613aa86b3f947b163b85266cd7409265fee2dcbe663fc1096e5c2"
+    },
+    "tower.tower_coast.go_around_occupied": {
+      "id": "tower.tower_coast.go_around_occupied",
+      "expected": "Go around. The runway is occupied.",
+      "recognized": "Go around. The runway is occupied.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.go_around_occupied.wav",
+      "sha256": "714040ac84cca85859d1d691612ad9ac017d9b5e490cd29081213aa9a72181c7"
+    },
+    "tower.tower_coast.go_around_vehicle": {
+      "id": "tower.tower_coast.go_around_vehicle",
+      "expected": "Go around. Vehicle on the runway.",
+      "recognized": "Go around. Vehicle on the runway.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.go_around_vehicle.wav",
+      "sha256": "875f535c258f557b9d0895e7ec3efc40cf5ceb64d5d3d38abc242dcb77505833"
+    },
+    "tower.tower_coast.go_around_aircraft": {
+      "id": "tower.tower_coast.go_around_aircraft",
+      "expected": "Go around. Aircraft on the runway.",
+      "recognized": "Go around. Aircraft on the runway.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.go_around_aircraft.wav",
+      "sha256": "cf9944aa364d4d9d997c33b4756f9951835036a0942a103fc766425a452c9ee9"
+    },
+    "tower.tower_coast.go_around_ability": {
+      "id": "tower.tower_coast.go_around_ability",
+      "expected": "Are you able to go around?",
+      "recognized": "Are you able to go around?",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.go_around_ability.wav",
+      "sha256": "c74a8965ddf697a6d2ac96836adb23f04225116d5f6a4f01e5caaca666082d3c"
+    },
+    "tower.tower_coast.exit_when_able": {
+      "id": "tower.tower_coast.exit_when_able",
+      "expected": "Exit the runway when able.",
+      "recognized": "Exit the runway when able.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.exit_when_able.wav",
+      "sha256": "0ffa88fa409e8d8dff3e932ed5dbcf950317f04b19b05cd55a24c85204edbed0"
+    },
+    "tower.tower_coast.report_clear": {
+      "id": "tower.tower_coast.report_clear",
+      "expected": "Report clear of the runway.",
+      "recognized": "Report clear of the runway.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.report_clear.wav",
+      "sha256": "aa4c18f7d6c6922cb09baeaa18dd6b729d196558cd7b40de56606421c98769f3"
+    },
+    "tower.tower_coast.hold_contact_ground": {
+      "id": "tower.tower_coast.hold_contact_ground",
+      "expected": "Hold position. Contact ground.",
+      "recognized": "Hold position contact ground",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.hold_contact_ground.wav",
+      "sha256": "7cd3136ff2bbc32bb358eb258d209b89616835b104ab53b126930f8eaa13ca03"
+    },
+    "tower.tower_coast.welcome_back": {
+      "id": "tower.tower_coast.welcome_back",
+      "expected": "Welcome back.",
+      "recognized": "Welcome back.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.welcome_back.wav",
+      "sha256": "1674e895ea7c354ea6dc683f539d1974bb5516f0549d09d16a48da260da7d44e"
+    },
+    "tower.tower_coast.good_day": {
+      "id": "tower.tower_coast.good_day",
+      "expected": "Good day.",
+      "recognized": "Good day.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.good_day.wav",
+      "sha256": "3c42477bf743987d153fbce08cc405bc47b097713bfb52844be798cbeee60ed3"
+    },
+    "tower.tower_coast.emergency_priority": {
+      "id": "tower.tower_coast.emergency_priority",
+      "expected": "Emergency traffic has priority. Stand by.",
+      "recognized": "Emergency traffic has priority, stand by.",
+      "matched": true,
+      "audio_file": "audio/tower_coast/tower.tower_coast.emergency_priority.wav",
+      "sha256": "cb6dd997deddbf4ab4edbfff317d0680872bc81cda2ec8d77e6886a3ae2efd24"
+    },
+    "tower.tower_valley.greeting_morning": {
+      "id": "tower.tower_valley.greeting_morning",
+      "expected": "Good morning. Advise when ready to taxi.",
+      "recognized": "Good morning, advise when ready to taxi.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.greeting_morning.wav",
+      "sha256": "f06092ba5d0a607b3b56430ac37bb0dd577c71b6c177d1547fc7ce5e0247282a"
+    },
+    "tower.tower_valley.greeting_afternoon": {
+      "id": "tower.tower_valley.greeting_afternoon",
+      "expected": "Good afternoon. Advise when ready to taxi.",
+      "recognized": "Good afternoon, advise when ready to taxi",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.greeting_afternoon.wav",
+      "sha256": "707c7cce6d6eb5b779861386a2559a2426051e16d850a9b40b82b63cfab3d180"
+    },
+    "tower.tower_valley.greeting_evening": {
+      "id": "tower.tower_valley.greeting_evening",
+      "expected": "Good evening. Advise when ready to taxi.",
+      "recognized": "Good evening, advise when ready to taxi.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.greeting_evening.wav",
+      "sha256": "08db7306df3a01303b47abd7020c90a8c4525704dfc04cc9ed17b47df5529590"
+    },
+    "tower.tower_valley.aircraft_position": {
+      "id": "tower.tower_valley.aircraft_position",
+      "expected": "Say your aircraft type and position.",
+      "recognized": "Say your aircraft type and position.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.aircraft_position.wav",
+      "sha256": "231e942692d62e425fd2e370fde132b82f14c0fc450d9b45ec7588c55331675e"
+    },
+    "tower.tower_valley.repeat_callsign": {
+      "id": "tower.tower_valley.repeat_callsign",
+      "expected": "Say again your call sign.",
+      "recognized": "Say again your call sign.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.repeat_callsign.wav",
+      "sha256": "b100931f42561a3462a053e359fb9f7f3bf72684097671cceaa9fc1bcac436c8"
+    },
+    "tower.tower_valley.readback_hold": {
+      "id": "tower.tower_valley.readback_hold",
+      "expected": "Read back the hold-short instruction.",
+      "recognized": "Read back the hold short instruction.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.readback_hold.wav",
+      "sha256": "f7dcbf5d3f05ee24a123a3a6508074d0af04a80fc99084262de5b94d86e8cbf6"
+    },
+    "tower.tower_valley.standby": {
+      "id": "tower.tower_valley.standby",
+      "expected": "Stand by.",
+      "recognized": "Stand by.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.standby.wav",
+      "sha256": "d6b93504e3aa338f8fd766f742212dd777df7e4819fbd84a36b8d46ef2a558a3"
+    },
+    "tower.tower_valley.hold_position": {
+      "id": "tower.tower_valley.hold_position",
+      "expected": "Hold position.",
+      "recognized": "Hold position.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.hold_position.wav",
+      "sha256": "b96771eb4cda36f67afa0d6b9d1ab1987c86708fb5160b5951eb11cf786bc49a"
+    },
+    "tower.tower_valley.hold_arrival": {
+      "id": "tower.tower_valley.hold_arrival",
+      "expected": "Continue holding. Traffic is on final.",
+      "recognized": "Continue holding, traffic is on final.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.hold_arrival.wav",
+      "sha256": "5122ccdf45ba10c69fc9cab03cf531fbadc0dac7a409daef56e87ffff708094b"
+    },
+    "tower.tower_valley.hold_departure": {
+      "id": "tower.tower_valley.hold_departure",
+      "expected": "Continue holding. A departure is rolling.",
+      "recognized": "Continue holding, a departure is rolling.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.hold_departure.wav",
+      "sha256": "4ba4fd01fee9e23b58a10f52bf8070682abac44e0a8a821f83ac21857fa227fe"
+    },
+    "tower.tower_valley.arrival_delay": {
+      "id": "tower.tower_valley.arrival_delay",
+      "expected": "Expect a short delay for arriving traffic.",
+      "recognized": "Expect a short delay for arriving traffic.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.arrival_delay.wav",
+      "sha256": "189421cbd42add876cc6d2464ccf8b6f1f5bd3543e59941c44aec697ed2c7b1e"
+    },
+    "tower.tower_valley.report_ready": {
+      "id": "tower.tower_valley.report_ready",
+      "expected": "Report ready for departure.",
+      "recognized": "Report ready for departure.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.report_ready.wav",
+      "sha256": "7a1b8faea31d61153da94ee9a7fd0c4575f7f94df3ae98e0c3409c7d01f715ae"
+    },
+    "tower.tower_valley.wake_caution": {
+      "id": "tower.tower_valley.wake_caution",
+      "expected": "Caution, wake turbulence.",
+      "recognized": "Caution wake turbulence.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.wake_caution.wav",
+      "sha256": "afe48ee2ad1cb482f86bf754667462293017e0bb937a680e0461f3bfbc6cf840"
+    },
+    "tower.tower_valley.cancel_takeoff": {
+      "id": "tower.tower_valley.cancel_takeoff",
+      "expected": "Cancel takeoff clearance. Hold position.",
+      "recognized": "Cancel takeoff clearance, hold position.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.cancel_takeoff.wav",
+      "sha256": "99c4c9ca8a3159b25d45e29737cef590ebdd92cf89ac345424fdd363519d30ec"
+    },
+    "tower.tower_valley.runway_heading": {
+      "id": "tower.tower_valley.runway_heading",
+      "expected": "Fly runway heading.",
+      "recognized": "Fly runway heading",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.runway_heading.wav",
+      "sha256": "729ff22dbe06d1c75f7e8b7df9b5510c934e1abb8f4b3760cb98ddae52553aaf"
+    },
+    "tower.tower_valley.remain_pattern": {
+      "id": "tower.tower_valley.remain_pattern",
+      "expected": "Remain in the pattern.",
+      "recognized": "Remain in the pattern.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.remain_pattern.wav",
+      "sha256": "2fd305734511f131877f58f8019848a4d1ac135411955046fcf98097ff18b772"
+    },
+    "tower.tower_valley.contact_departure": {
+      "id": "tower.tower_valley.contact_departure",
+      "expected": "Contact departure.",
+      "recognized": "Contact departure",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.contact_departure.wav",
+      "sha256": "8b4cee573ba74d312b08928a17297e959e09be6dc366f40b8e5475e5b2f74aab"
+    },
+    "tower.tower_valley.frequency_change": {
+      "id": "tower.tower_valley.frequency_change",
+      "expected": "Frequency change approved.",
+      "recognized": "Frequency change approved.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.frequency_change.wav",
+      "sha256": "32d22558a6a559a31cbf9886d8ad7a33258ea83c5ef5eb4b21bc14b2f9ec895f"
+    },
+    "tower.tower_valley.report_downwind": {
+      "id": "tower.tower_valley.report_downwind",
+      "expected": "Report downwind.",
+      "recognized": "Report downwind.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.report_downwind.wav",
+      "sha256": "cd68276825d309ad64945a9f32d8c31c7a8812d821ff2f81e1a6ff60b69b883e"
+    },
+    "tower.tower_valley.report_base": {
+      "id": "tower.tower_valley.report_base",
+      "expected": "Report base.",
+      "recognized": "Report base.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.report_base.wav",
+      "sha256": "010f984471c1ad7a4dedd4e3f475fa7694f47564002c43f4ce9d7c79d7d0c975"
+    },
+    "tower.tower_valley.report_final": {
+      "id": "tower.tower_valley.report_final",
+      "expected": "Report final.",
+      "recognized": "Report final.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.report_final.wav",
+      "sha256": "600287c3e57855830fd47b317d4be9c085ec7306476811cae16a0f379c885847"
+    },
+    "tower.tower_valley.extend_downwind": {
+      "id": "tower.tower_valley.extend_downwind",
+      "expected": "Extend downwind. I will call your base.",
+      "recognized": "Extend downwind, I will call your base.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.extend_downwind.wav",
+      "sha256": "bde6b0ae02834f8fb901f80e3477284b8c9751915d01915db71be535ddb2ce18"
+    },
+    "tower.tower_valley.turn_base": {
+      "id": "tower.tower_valley.turn_base",
+      "expected": "Turn base now.",
+      "recognized": "Turn base now.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.turn_base.wav",
+      "sha256": "19e053e8142f70fb3839c0004cdb2abc527d5ea65dbc3952ca9975aa25999514"
+    },
+    "tower.tower_valley.number_one": {
+      "id": "tower.tower_valley.number_one",
+      "expected": "You are number one.",
+      "recognized": "You are number one",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.number_one.wav",
+      "sha256": "c858464b6fbd97204f46d2e49e2824b82d9a7315058ce7ab8c82387289c94c37"
+    },
+    "tower.tower_valley.number_two": {
+      "id": "tower.tower_valley.number_two",
+      "expected": "You are number two. Follow the aircraft ahead.",
+      "recognized": "You are number two follow the aircraft ahead",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.number_two.wav",
+      "sha256": "ef22c58823946c3695e7f547bab21a368bfc511b93ea4d3c4e19cf2204ce18a9"
+    },
+    "tower.tower_valley.continue_approach": {
+      "id": "tower.tower_valley.continue_approach",
+      "expected": "Continue approach.",
+      "recognized": "Continue approach.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.continue_approach.wav",
+      "sha256": "927fa1801415e328ed9ba8150ebaef2b803004d6e744156c543312ad25f5c035"
+    },
+    "tower.tower_valley.clearance_follows": {
+      "id": "tower.tower_valley.clearance_follows",
+      "expected": "Continue approach. Landing clearance will follow.",
+      "recognized": "Continue approach, landing clearance will follow.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.clearance_follows.wav",
+      "sha256": "38a64c634694057121777583ac30864ab4a9bb79924383bfd1e00b47be8625c8"
+    },
+    "tower.tower_valley.runway_occupied": {
+      "id": "tower.tower_valley.runway_occupied",
+      "expected": "Continue approach. The runway is occupied.",
+      "recognized": "Continue approach, the runway is occupied.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.runway_occupied.wav",
+      "sha256": "391e882fd0e321d75024b7f2a2e8d430ea0c450653a885c535719523572a947f"
+    },
+    "tower.tower_valley.heavy_wake": {
+      "id": "tower.tower_valley.heavy_wake",
+      "expected": "Caution, wake turbulence. Traffic ahead is a heavy aircraft.",
+      "recognized": "Caution wake turbulence. Traffic ahead is a heavy aircraft.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.heavy_wake.wav",
+      "sha256": "448dfa2e9019522b56f182aa3605985b55b5ee1e65867e91d47f899199fabc27"
+    },
+    "tower.tower_valley.go_around_heading": {
+      "id": "tower.tower_valley.go_around_heading",
+      "expected": "Go around. Fly runway heading.",
+      "recognized": "Go around fly runway heading",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.go_around_heading.wav",
+      "sha256": "84dfc9d143170b4de2e4c62844f4b5dc474f87c7f307ad230b4f837f9ac6d930"
+    },
+    "tower.tower_valley.go_around_occupied": {
+      "id": "tower.tower_valley.go_around_occupied",
+      "expected": "Go around. The runway is occupied.",
+      "recognized": "Go around the runway is occupied",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.go_around_occupied.wav",
+      "sha256": "03f2870c5ce983062b3201529b1a5ffee83a639f9c085b75300c9e4b26e9b372"
+    },
+    "tower.tower_valley.go_around_vehicle": {
+      "id": "tower.tower_valley.go_around_vehicle",
+      "expected": "Go around. Vehicle on the runway.",
+      "recognized": "Go around vehicle on the runway",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.go_around_vehicle.wav",
+      "sha256": "5eb30f9b8a4112a2a4579bed6163a7bafc00ec121d2d3c21fb207e62d5bc88ee"
+    },
+    "tower.tower_valley.go_around_aircraft": {
+      "id": "tower.tower_valley.go_around_aircraft",
+      "expected": "Go around. Aircraft on the runway.",
+      "recognized": "Go around, aircraft on the runway.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.go_around_aircraft.wav",
+      "sha256": "27d79afd0bbbda4a8cddc3c6ec2e004fff2a69deb93d1cc4cf8f02242095643a"
+    },
+    "tower.tower_valley.go_around_ability": {
+      "id": "tower.tower_valley.go_around_ability",
+      "expected": "Are you able to go around?",
+      "recognized": "Are you able to go around?",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.go_around_ability.wav",
+      "sha256": "9287f14173a9f604507593e7dc8826ccafb56b418f256f3724f14f41a5098fb9"
+    },
+    "tower.tower_valley.exit_when_able": {
+      "id": "tower.tower_valley.exit_when_able",
+      "expected": "Exit the runway when able.",
+      "recognized": "Exit the runway when able.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.exit_when_able.wav",
+      "sha256": "89091d70ac40b767d6dd50c637e6406f3c5a4ee15a8e94d9a86de4dee6c5dd90"
+    },
+    "tower.tower_valley.report_clear": {
+      "id": "tower.tower_valley.report_clear",
+      "expected": "Report clear of the runway.",
+      "recognized": "Report clear of the runway.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.report_clear.wav",
+      "sha256": "529d5a87005ee5f51652a99a2dbab92d8d0623af5d1f00a7669a3394dae7861b"
+    },
+    "tower.tower_valley.hold_contact_ground": {
+      "id": "tower.tower_valley.hold_contact_ground",
+      "expected": "Hold position. Contact ground.",
+      "recognized": "Hold position contact ground",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.hold_contact_ground.wav",
+      "sha256": "4f85fe1d21cc4c6aa7d78c595100943fb5a8e80ce8ffdc654a41b21eb1bfccb0"
+    },
+    "tower.tower_valley.welcome_back": {
+      "id": "tower.tower_valley.welcome_back",
+      "expected": "Welcome back.",
+      "recognized": "Welcome back.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.welcome_back.wav",
+      "sha256": "763b286979bbff2304f81faf3e85439df96d68698aea60d88bafa06d97323080"
+    },
+    "tower.tower_valley.good_day": {
+      "id": "tower.tower_valley.good_day",
+      "expected": "Good day.",
+      "recognized": "Good day.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.good_day.wav",
+      "sha256": "5112eac038b3efd66751788c103da40050a4bc0c3c028573cf0db5cd297aefe5"
+    },
+    "tower.tower_valley.emergency_priority": {
+      "id": "tower.tower_valley.emergency_priority",
+      "expected": "Emergency traffic has priority. Stand by.",
+      "recognized": "Emergency traffic has priority. Standby.",
+      "matched": true,
+      "audio_file": "audio/tower_valley/tower.tower_valley.emergency_priority.wav",
+      "sha256": "0286f400e543f26042bde8eb905aa02f4efa20815f1b1b07b774cb1e1fd84e07"
+    }
+  }
+}
