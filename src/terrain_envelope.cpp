@@ -97,7 +97,7 @@ void Renderer::createEnvelopeTarget() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   };
-  mk(texEnv, GL_RG32F, GL_RG);   // terrain start | aircraft hull start (aircraft_hull.cpp)
+  mk(texEnv, GL_RGBA32F, GL_RGBA);   // terrain start | aircraft hull start | traffic hulls' start (aircraft_hull.cpp) | -
   mk(texEnvDepth, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT);
   if (!fboEnv) glGenFramebuffers(1, &fboEnv);
   glBindFramebuffer(GL_FRAMEBUFFER, fboEnv);
@@ -128,6 +128,23 @@ void Renderer::drawEnvelope(const FrameParams& fp) {
   const float kSplit = 3.f;
   envInst.clear();
   float rootTop = 0.f; for (float m : g_world.tpM[TP_LEVELS - 1]) rootTop = std::max(rootTop, m);
+  // view frustum (left, right, bottom, top, near) from the jittered camera's matrix: a chunk wholly outside it can't
+  // be the first surface on any pixel's ray, so it and everything under it is skipped
+  mat4 vpc = viewProj(fp);
+  float pl[5][4];
+  for (int k = 0; k < 5; k++) {
+    int r = k / 2; float sg = (k & 1) ? -1.f : 1.f;
+    // (the side planes widened by 1% of the view, far more than the sub-pixel jitter)
+    for (int c = 0; c < 4; c++) pl[k][c] = (k == 4 ? vpc(3, c) + vpc(2, c) : 1.01f * vpc(3, c) + sg * vpc(r, c));
+  }
+  auto inView = [&](float x0, float x1, float y0, float y1, float z0, float z1) {
+    for (int k = 0; k < 5; k++) {   // the box corner furthest along each plane's normal must be inside it
+      float x = pl[k][0] >= 0 ? x1 : x0, y = pl[k][1] >= 0 ? y1 : y0, z = pl[k][2] >= 0 ? z1 : z0;
+      if (pl[k][0] * x + pl[k][1] * y + pl[k][2] * z + pl[k][3] < 0.f) return false;
+    }
+    return true;
+  };
+  int culled = 0;
   std::function<void(int, int, int)> visit = [&](int L, int ox, int oz) {
     int span = TP_CHUNK << L; float S = span * T;
     float x0 = -WORLD_HALF + 0.5f * T + ox * T, z0 = -WORLD_HALF + 0.5f * T + oz * T;
@@ -135,6 +152,7 @@ void Renderer::drawEnvelope(const FrameParams& fp) {
     int Lm = L + 5;   // the level whose single cell is this chunk
     float top = Lm < TP_LEVELS ? g_world.tpM[Lm][(size_t)(oz >> Lm) * (N >> Lm) + (ox >> Lm)] : rootTop;
     float dy = std::max(0.f, cam.y - top - rim);
+    if (!inView(x0, x0 + S, -800.f, top + rim + 1.f, z0, z0 + S)) { culled++; return; }
     if (L > 0 && dx * dx + dz * dz + dy * dy < kSplit * kSplit * S * S) {
       int h = span / 2;
       for (int k = 0; k < 4; k++) visit(L - 1, ox + (k & 1) * h, oz + (k >> 1) * h);
@@ -181,6 +199,6 @@ void Renderer::drawEnvelope(const FrameParams& fp) {
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
     int hit = 0, under = 0, none = 0; double sum = 0;
     for (float v : px) { if (v <= 0.f) under++; else if (v > 1e29f) none++; else { hit++; sum += v; } }
-    printf("envelope: %d chunks, %d tris; pixels: %d start (mean %.0f m), %d underside, %d none\n", n, n * perChunk / 3, hit, hit ? sum / hit : 0.0, under, none);
+    printf("envelope: %d chunks (%d culled), %d tris; pixels: %d start (mean %.0f m), %d underside, %d none\n", n, culled, n * perChunk / 3, hit, hit ? sum / hit : 0.0, under, none);
   }
 }

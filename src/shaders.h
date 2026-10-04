@@ -1152,6 +1152,7 @@ vec2 tracePlane(vec3 ro, vec3 rd, float tmax){
 }
 // The airframe along a camera ray, using the hull's start (hullT: 0 none, 1e30 no airframe on this ray): the first
 // uHullNear metres are marched as usual, then the march resumes where the hull says the airframe can begin.
+uniform sampler2D uEnv;   // per pixel: terrain start | airframe hull start | traffic hulls' start (terrain_envelope.cpp, aircraft_hull.cpp)
 uniform float uHullNear;
 vec2 tracePlaneHull(vec3 ro, vec3 rd, float tmax, float hullT){
   if (hullT <= 0.0) return tracePlane(ro, rd, tmax);
@@ -1165,8 +1166,15 @@ void trafficXf(int k){
   gPI = -1; gPC = vec3(0.0); gPP = texelFetch(uTraffic, ivec2(24, k), 0).xyz;
   gPR = mat3(texelFetch(uTraffic, ivec2(25, k), 0).xyz, texelFetch(uTraffic, ivec2(26, k), 0).xyz, texelFetch(uTraffic, ivec2(27, k), 0).xyz);
 }
+uniform int uTrafHullOn;   // the traffic's hulls (third channel of uEnv): where any traffic aircraft can begin on this ray
+bool gTrafCamRay = false;   // the ray being traced is this pixel's camera ray
 vec2 traceTraffic(vec3 ro, vec3 rd, float tmax, out int idx){
   vec2 best = vec2(-1.0); idx = -1;
+  if (uTrafHullOn == 1 && gTrafCamRay) {
+    float hv = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).b;
+    if (hv > 1e29) return best;
+    gPlStart = hv > 0.0 ? max(0.0, hv*0.999 - 0.1) : 0.0;
+  }
   for (int k = 0; k < 12; k++) {
     if (k >= uTrafficN) break;
     vec4 P = texelFetch(uTraffic, ivec2(24, k), 0);
@@ -1178,6 +1186,7 @@ R"(    float lim = best.x > 0.0 ? best.x : tmax;
     vec2 hh = tracePieceOnce(ro, rd, lim, P.w);
     if (hh.x > 0.0 && (best.x < 0.0 || hh.x < best.x)) { best = hh; idx = k; }
   }
+  gPlStart = 0.0;
   return best;
 }
 // soft contact / cast shadow blobs of traffic on the ground (the sun's projection of each aircraft)
@@ -1230,7 +1239,7 @@ const int HMAXN = 256; const int HMAXL = 5;
 // which keeps grazing rays over lowlands from running out of steps (they used to fall through to the sea).
 // gTStart: where the march may begin (the terrain envelope mesh on this pixel - see terrain_envelope.cpp); 1e30 means
 // the ray meets no terrain in the world. A start that turns out to be under the ground (it never should) is ignored.
-uniform sampler2D uEnv; uniform int uEnvOn; uniform int uHullOn;
+uniform int uEnvOn; uniform int uHullOn;
 float gTStart = 1.0;
 float traceTerrain(vec3 ro, vec3 rd, float tmax){
   float t = 1.0;
@@ -3287,7 +3296,7 @@ void main(){
   vec3 bn; float bkind = 0.0; vec3 bl;
   vec2 bh = pod ? vec2(-1.0) : traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
   int trafK = -1; vec2 trafH = vec2(-1.0);
-  if (!pod && uTrafficN > 0) { trafH = traceTraffic(ro, rd, tmax, trafK); loadMain(); }
+  if (!pod && uTrafficN > 0) { gTrafCamRay = !feed && !cloak; trafH = traceTraffic(ro, rd, tmax, trafK); gTrafCamRay = false; loadMain(); }
   vec2 ph = onScr || cloak || (cockpitView && !pod) ? vec2(-1.0) : (pod ? h0 : tracePlaneHull(ro, rd, tmax, feed ? 0.0 : hullT));
   float t = 1e9; int hit = 0;
   if (tT > 0.0) { t = tT; hit = 1; }

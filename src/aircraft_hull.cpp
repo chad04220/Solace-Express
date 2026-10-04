@@ -10,6 +10,7 @@
 // airframe, in any of the sampled states, may reach into it: its centre distance is under its half diagonal (with
 // room for the distance field's slack) plus the furthest a part moves between two sampled states.
 #include "renderer.h"
+#include "hull_mesh.h"
 #include <unordered_map>
 
 namespace {
@@ -25,14 +26,16 @@ void main(){
 )";
 const char* kHullFS = R"(
 in vec3 vW; uniform vec3 uCam; uniform float uFree; uniform int uPass;   // 0: inside faces only, 1: outside faces only
-out vec2 oT;   // written to the second channel only: distance along the pixel's ray, 0 on the hull's inside
+uniform int uChan;   // 1: the player's aircraft (second channel), 2: the traffic (third)
+out vec4 oT;   // distance along the pixel's ray, 0 on the hull's inside (only the channel being drawn is written)
 // Faces nearer than uFree are dropped: the ray tracer marches every ray that far itself (in the cockpit the eye sits
 // inside the hull's margins, a few centimetres from the cabin roof). Beyond it, a ray in empty space meets an outside
 // face first (nothing lies before it), and a ray inside solid space an inside face (it just keeps marching).
 void main(){
   float t = length(vW - uCam);
   if (t < uFree || gl_FrontFacing != (uPass == 1)) discard;
-  oT = vec2(0.0, gl_FrontFacing ? t : 0.0);
+  float v = gl_FrontFacing ? t : 0.0;
+  oT = uChan == 2 ? vec4(0.0, 0.0, v, 0.0) : vec4(0.0, v, 0.0, 0.0);
 }
 )";
 struct HullState { float ps[4], ctl[4]; };
@@ -186,65 +189,8 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
     if (mk == ~0ull) state[refine[r]] = 1;
     else if (mk) { state[refine[r]] = 2; mask[refine[r]] = mk; }
   }
-  // Faces between solid and empty space, as a watertight mesh: every corner is computed from integer lattice
-  // coordinates by one formula, so faces that meet share their edges bit for bit and rasterize without a pinhole. In
-  // the cockpit hull every face is laid on the 6.25 cm lattice (a 0.25 m face as its 16 parts), so no edge of a small
-  // face ever ends on the side of a big one either.
   std::vector<float> tri;
-  const float U = inside ? kS2 : kS1;   // lattice unit
-  auto quadL = [&](int cx, int cy, int cz, int a, int sg) {   // face of lattice cell (cx,cy,cz), outward along +-axis a
-    int c[3] = {cx, cy, cz}, u = (a + 1) % 3, v = (a + 2) % 3;
-    int pa = c[a] + (sg > 0 ? 1 : 0);
-    auto P = [&](int du, int dv) { int l[3]; l[a] = pa; l[u] = c[u] + du; l[v] = c[v] + dv; return vec3(org + l[0] * U, org + l[1] * U, org + l[2] * U); };
-    vec3 q0 = P(0, 0), q1 = P(1, 0), q2 = P(1, 1), q3 = P(0, 1);
-    vec3 o[6] = {q0, q1, q2, q0, q2, q3};
-    if (sg < 0) { std::swap(o[1], o[2]); std::swap(o[4], o[5]); }
-    for (auto& w : o) { tri.push_back(w.x); tri.push_back(w.y); tri.push_back(w.z); }
-  };
-  auto coarseFace = [&](int i, int j, int k, int a, int sg) {   // a whole 0.25 m face
-    if (!inside) { quadL(i, j, k, a, sg); return; }
-    for (int p = 0; p < 4; p++) for (int q = 0; q < 4; q++) {
-      int own[3]; own[a] = sg > 0 ? 3 : 0; own[(a + 1) % 3] = p; own[(a + 2) % 3] = q;
-      quadL(i * 4 + own[0], j * 4 + own[1], k * 4 + own[2], a, sg);
-    }
-  };
-  auto st1 = [&](int i, int j, int k) -> int { if (i < 0 || j < 0 || k < 0 || i >= n1 || j >= n1 || k >= n1) return 0; return state[((size_t)k * n1 + j) * n1 + i]; };
-  auto sub = [&](int i, int j, int k, int si, int sj, int sk) -> bool {   // is sub-voxel (si,sj,sk) of level-1 voxel (i,j,k) solid
-    int s = st1(i, j, k);
-    if (s != 2) return s == 1;
-    return (mask[((k * n1 + j) * n1 + i)] >> (si + sj * 4 + sk * 16)) & 1;
-  };
-  const int dirs[6][3] = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
-  for (int k = 0; k < n1; k++) for (int j = 0; j < n1; j++) for (int i = 0; i < n1; i++) {
-    int s = st1(i, j, k);
-    if (s == 0) continue;
-    for (int f = 0; f < 6; f++) {
-      int a = f / 2, sg = dirs[f][a];
-      int ni = i + dirs[f][0], nj = j + dirs[f][1], nk = k + dirs[f][2];
-      if (s == 1) {
-        int ns2 = st1(ni, nj, nk);
-        if (ns2 == 1) continue;
-        if (ns2 == 0) { coarseFace(i, j, k, a, sg); continue; }
-        for (int p = 0; p < 4; p++) for (int q = 0; q < 4; q++) {   // the neighbour's sub-voxels against this face
-          int sv[3]; sv[a] = sg > 0 ? 0 : 3; sv[(a + 1) % 3] = p; sv[(a + 2) % 3] = q;
-          if (sub(ni, nj, nk, sv[0], sv[1], sv[2])) continue;
-          int own[3] = {sv[0], sv[1], sv[2]}; own[a] = sg > 0 ? 3 : 0;
-          quadL(i * 4 + own[0], j * 4 + own[1], k * 4 + own[2], a, sg);
-        }
-      } else {
-        uint64_t mk = mask[(int)(((size_t)k * n1 + j) * n1 + i)];
-        for (int c = 0; c < 64; c++) {
-          if (!((mk >> c) & 1)) continue;
-          int sv[3] = {c & 3, (c >> 2) & 3, c >> 4};
-          int t[3] = {sv[0] + dirs[f][0], sv[1] + dirs[f][1], sv[2] + dirs[f][2]};
-          bool solid;
-          if (t[a] >= 0 && t[a] <= 3) solid = (mk >> (t[0] + t[1] * 4 + t[2] * 16)) & 1;
-          else { t[a] = (t[a] + 4) & 3; solid = sub(ni, nj, nk, t[0], t[1], t[2]); }
-          if (!solid) quadL(i * 4 + sv[0], j * 4 + sv[1], k * 4 + sv[2], a, sg);
-        }
-      }
-    }
-  }
+  hullFaces(n1, org, inside ? kS2 : kS1, inside, state, mask, tri);
   HullMesh& H = hulls[key];
   if (!H.vbo) glGenBuffers(1, &H.vbo);
   glBindBuffer(GL_ARRAY_BUFFER, H.vbo);
@@ -262,6 +208,70 @@ float Renderer::hullNear(const FrameParams& fp) const { return fp.plane.PS[3] > 
 bool Renderer::hullBaked(const FrameParams& fp) const {
   if (!hullWanted(fp)) return true;
   return hulls.count(hullKey(fp, fp.plane.PS[3] > 0.5f ? 1 : 0)) != 0;
+}
+
+// AI traffic flies the same light aircraft: each one's outside hull (baked at launch) drawn with its own transform into
+// the third channel, the nearest of them per pixel. Only when every traffic aircraft in view has one; else its march
+// starts from the camera as before.
+void Renderer::drawTrafficHulls(const FrameParams& fp) {
+  trafHullOn = false;
+  static const bool off = getenv("HULLOFF") != nullptr;
+  int n = std::min(fp.trafficN, kMaxTrafficDrawn);
+  if (off || n == 0 || !progHull || !fboEnv) return;
+  std::vector<const HullMesh*> hm(n);
+  for (int k = 0; k < n; k++) {
+    uint64_t h = 1469598103934665603ull;   // hullKey(slot 0) of this aircraft's model
+    const uint8_t* b = (const uint8_t*)fp.traffic[k].t;
+    for (size_t i = 0; i < sizeof(float) * 96; i++) { h ^= b[i]; h *= 1099511628211ull; }
+    auto it = hulls.find(h);
+    if (it == hulls.end() || !it->second.ok || !it->second.verts) {
+      static int warned = 0;
+      if (getenv("HULLDBG") && warned++ < 3) printf("traffic hulls: aircraft %d of %d has none (type %.0f)\n", k, n, fp.traffic[k].t[2]);
+      return;
+    }
+    hm[k] = &it->second;
+  }
+  ensureHullTarget();
+  glBindFramebuffer(GL_FRAMEBUFFER, fboHull);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texEnv, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texHullDepth, 0);
+  GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
+  glViewport(0, 0, rw, rh);
+  glColorMask(GL_FALSE, GL_FALSE, GL_TRUE, GL_FALSE);
+  float far[4] = {0, 0, 1e30f, 0};
+  glClearBufferfv(GL_COLOR, 0, far);
+  glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);
+  glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDisable(GL_BLEND);
+  glUseProgram(progHull);
+  mat4 vp = viewProj(fp, 0.01f, 2000.f);
+  glUniformMatrix4fv(glGetUniformLocation(progHull, "uVP"), 1, GL_FALSE, vp.m);
+  glUniform2f(glGetUniformLocation(progHull, "uJit"), jitX, jitY);
+  glUniform3f(glGetUniformLocation(progHull, "uCam"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
+  glUniform1f(glGetUniformLocation(progHull, "uFree"), 0.f);
+  glUniform1i(glGetUniformLocation(progHull, "uChan"), 2);
+  if (!vaoHull) glGenVertexArrays(1, &vaoHull);
+  glBindVertexArray(vaoHull);
+  GLint lp = glGetUniformLocation(progHull, "uPass");
+  for (int pass = 0; pass < 2; pass++) {   // all inside faces first, then all outside faces (see drawHull)
+    glUniform1i(lp, pass);
+    if (pass) { glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(1.f, 4.f); }
+    for (int k = 0; k < n; k++) {
+      const float* t = fp.traffic[k].t;
+      float rot[9] = {t[25 * 4], t[25 * 4 + 1], t[25 * 4 + 2], t[26 * 4], t[26 * 4 + 1], t[26 * 4 + 2], t[27 * 4], t[27 * 4 + 1], t[27 * 4 + 2]};
+      glUniformMatrix3fv(glGetUniformLocation(progHull, "uRot"), 1, GL_FALSE, rot);
+      glUniform3f(glGetUniformLocation(progHull, "uPos"), t[24 * 4], t[24 * 4 + 1], t[24 * 4 + 2]);
+      glBindBuffer(GL_ARRAY_BUFFER, hm[k]->vbo);
+      glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, (void*)0);
+      glDrawArrays(GL_TRIANGLES, 0, hm[k]->verts);
+    }
+  }
+  glDisable(GL_POLYGON_OFFSET_FILL);
+  glUniform1i(glGetUniformLocation(progHull, "uChan"), 1);
+  glBindVertexArray(0);
+  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+  glDisable(GL_DEPTH_TEST);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  trafHullOn = true;
 }
 
 uint64_t Renderer::hullKey(const FrameParams& fp, int slot) const {
@@ -284,12 +294,7 @@ bool Renderer::hullWanted(const FrameParams& fp) const {
   return !off && progHull && progHullBake && pv.on && fp.wreck.pieces == 0 && pv.M[2] < 4.5f;
 }
 
-void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key) {
-  hullOn = false;
-  auto it = hulls.find(key);
-  if (it == hulls.end()) return;
-  HullMesh& H = it->second;
-  if (!H.ok || !H.verts || !fboEnv) return;
+void Renderer::ensureHullTarget() {
   if (!fboHull) glGenFramebuffers(1, &fboHull);
   if (!texHullDepth || hullDepthW != rw || hullDepthH != rh) {
     if (texHullDepth) glDeleteTextures(1, &texHullDepth);
@@ -298,6 +303,15 @@ void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     hullDepthW = rw; hullDepthH = rh;
   }
+}
+
+void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key) {
+  hullOn = false;
+  auto it = hulls.find(key);
+  if (it == hulls.end()) return;
+  HullMesh& H = it->second;
+  if (!H.ok || !H.verts || !fboEnv) return;
+  ensureHullTarget();
   glBindFramebuffer(GL_FRAMEBUFFER, fboHull);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texEnv, 0);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texHullDepth, 0);

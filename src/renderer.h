@@ -223,6 +223,9 @@ private:
   bool hullWanted(const FrameParams& fp) const;
   float hullNear(const FrameParams& fp) const;
   void drawHull(const FrameParams& fp, int slot, uint64_t key);
+  void drawTrafficHulls(const FrameParams& fp);
+  void ensureHullTarget();
+  bool trafHullOn = false;
   // offscreen frames (the launch prewarm): the composite and the UI go to a hidden target instead of the window
   GLuint fboOff = 0, texOff = 0; int offW = 0, offH = 0;
 public:

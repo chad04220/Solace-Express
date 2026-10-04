@@ -945,6 +945,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glActiveTexture(GL_TEXTURE0 + 20); glBindTexture(GL_TEXTURE_2D, envOn ? texEnv : 0); glUniform1i(U(p, "uEnv"), 20);
   glUniform1i(U(p, "uEnvOn"), envOn ? 1 : 0);
   glUniform1i(U(p, "uHullOn"), hullOn ? 1 : 0); glUniform1f(U(p, "uHullNear"), hullNear(fp));
+  glUniform1i(U(p, "uTrafHullOn"), trafHullOn ? 1 : 0);
   {   // AI traffic: one row of 32 texels per aircraft
     if (!texTraffic) {
       glGenTextures(1, &texTraffic); glBindTexture(GL_TEXTURE_2D, texTraffic);
@@ -1084,8 +1085,9 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   const bool hullUse = hullWanted(fp);
   const int hullSlot = fp.plane.PS[3] > 0.5f ? 1 : 0;
   const uint64_t hullK = hullUse ? hullKey(fp, hullSlot) : 0;
-  if (hullUse && hulls.count(hullK)) {
-    drawHull(fp, hullSlot, hullK);
+  if (hullUse && hulls.count(hullK)) drawHull(fp, hullSlot, hullK);
+  drawTrafficHulls(fp);
+  if (hullOn || trafHullOn) {
     glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
     glDrawBuffers(3, bufs);
     glViewport(0, 0, rw, rh);
