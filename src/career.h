@@ -25,6 +25,7 @@ struct Contract {
   std::vector<std::string> hints;  // lesson hints by phase (see Game::phase)
   bool startAirborne = false;
   bool story = false;
+  int repBonusPct = 0;         // freelance: the reputation bonus already in the payout
 };
 
 struct OwnedPlane { int spec; int location; float fuel; float condition; };
@@ -43,6 +44,11 @@ struct FlightResult {
   float centerlineErr = 0;
   float fuelUsedKg = 0;
   int divertedTo = -1;          // OUT_DIVERTED: the airport the aircraft stopped at
+  // the arrival, for the debrief's coaching (-1: not recorded, e.g. no landing at the destination)
+  float thrKt = -1, thrAglM = -1;   // airspeed and height crossing the landing threshold
+  float tdPastThrM = -1;            // touchdown point past the threshold
+  float stopLeftM = -1, rwyLenM = 0;   // runway left ahead when the aircraft stopped, and the runway's length
+  int goArounds = 0;                // climbed away from a low approach without touching down
 };
 
 struct PayoutLine { std::string label; int amount; };
@@ -74,6 +80,11 @@ public:
   bool sell(int fleetIdx, std::string* msg);
   int positioningCost(const Contract& c) const;
   int ferryCost(const Contract& c, int specIdx) const;
+  // What a job is likely to be worth with an aircraft: time, fuel, the fees settle() will charge, the net, and its
+  // main difficulty (an estimate: the real flight decides)
+  struct Estimate { float minutes = 0, fuelKg = 0; int fees = 0, fuelCost = 0, net = 0; std::string challenge; };
+  Estimate estimate(const Contract& c, int specIdx, Source src) const;
+  int repBonusPct() const { return std::min(15, reputation / 4); }   // +1% per 4 reputation, at most +15%
   bool save(const std::string& path) const;
   bool load(const std::string& path);
 };

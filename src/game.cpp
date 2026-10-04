@@ -293,12 +293,12 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   lookYaw = 0; lookPitch = -0.13f;
   camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 3, 15));
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
-  takeoffAnnounced = c.startAirborne; touchedDown = false;   // (an airborne start has no takeoff to announce) touchdownFpm = 0; stillTimer = 0;
+  takeoffAnnounced = c.startAirborne; touchedDown = false; touchdownFpm = 0; stillTimer = 0;   // (an airborne start has no takeoff to announce)
   engineAutoStarted = false; startDelay = 1.2f;
   particles.clear(); bursts.clear(); pops.clear(); boomT = -1; for (auto& tt : pieceTrail) tt.clear(); trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0;
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
-  approachMinAgl = 1e9f;
+  approachMinAgl = 1e9f; thrPrevAlong = -1e9f; appLow = false; coaching.clear();
   apWasOn = false; apDest = -1; wraith = WraithState(); g_scenery.resetDamage();
   licenseBefore = career.license;
   // the player sees a loading screen while the scenery around the start is generated (tests fly straight away)
@@ -328,6 +328,7 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   result.late = contract.timeLimitMin > 0 && flightClock / 60.f > contract.timeLimitMin;
   result.landed = touchedDown && plane.onGround;
   if (!result.landed) result.touchdownFpm = 0;
+  coaching = landingCoaching();
   Contract c = contract;
   if (c.type == CT_FERRY) { c.story = false; }
   payout = career.settle(c, specIdx, source, result, &stars);
@@ -338,6 +339,26 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   if (!headless) saveGame();
   screen = SCR_DEBRIEF;
   paused = false; showMap = false;
+}
+
+// One coaching point from what was recorded on the arrival: the most important thing to work on, or what went well
+std::string Game::landingCoaching() const {
+  const FlightResult& r = result;
+  if (r.goArounds > 0 && touchedDown) return r.goArounds == 1 ? "Good call going around: a go-around is always the safe decision when an approach isn't working."
+                                                               : fmt("%d go-arounds: set up earlier - on the centreline, at approach speed, by 3 km out.", r.goArounds);
+  if (!result.landed || r.tdPastThrM < 0) return "";
+  float vref = plane.spec->vref * MS_TO_KT, fpm = touchdownFpm;
+  if (fpm > 600) return fmt("Touchdown at %.0f fpm: hold a steady 3 degree descent on power, then ease back to flare as the runway fills the windscreen.", fpm);
+  if (r.thrKt > vref * 1.3f) return fmt("You crossed the threshold at %.0f kt (aim for about %.0f): slow down earlier on final - extra speed floats and uses up runway.", r.thrKt, vref + 5.f);
+  if (r.tdPastThrM > r.rwyLenM * 0.45f) return fmt("You touched down %.0f m past the threshold, beyond the middle of the runway: aim for the first third.", r.tdPastThrM);
+  if (r.stopLeftM >= 0 && r.stopLeftM < r.rwyLenM * 0.12f) return fmt("You stopped with only %.0f m of runway to spare: brake firmly once all wheels are down.", std::max(0.f, r.stopLeftM));
+  if (r.thrKt > 0 && r.thrKt < vref * 0.95f) return fmt("Slow over the threshold (%.0f kt, near the stall): keep about %.0f kt until the flare.", r.thrKt, vref + 5.f);
+  if (r.thrAglM > 40.f) return fmt("High over the threshold (%.0f m): get down onto a 3 degree path earlier.", r.thrAglM);
+  std::string well = "Well flown";
+  if (r.thrKt > 0) well += fmt(": %.0f kt over the threshold", r.thrKt);
+  well += fmt(", down %.0f m in", r.tdPastThrM);
+  if (r.stopLeftM >= 0) well += fmt(", %.0f m to spare", r.stopLeftM);
+  return well + ".";
 }
 
 int Game::computePhase() const {
@@ -620,6 +641,23 @@ void Game::updateFlight(float dt) {
   if (!takeoffAnnounced && !plane.onGround && plane.agl() > 8.f) {
     takeoffAnnounced = true;
     toast("Positive climb!", vec3(0.7f, 1, 0.7f));
+  }
+  // the arrival at the destination, for the debrief's coaching: speed and height over the threshold of the runway
+  // end being flown towards, where it touched down, and any go-around from a low approach
+  if (!researchFlight) {
+    const Airport& A = g_world.airports[contract.to];
+    bool rev = dot(plane.vel, A.dir()) < 0.f;
+    vec3 ld = rev ? -A.dir() : A.dir(), rel = plane.pos - A.threshold(rev); rel.y = 0;
+    float along = dot(rel, ld), lat = fabsf(rel.x * ld.z - rel.z * ld.x);
+    float dA = length(vec3(plane.pos.x - A.pos().x, 0, plane.pos.z - A.pos().z));
+    if (!plane.onGround && lat < A.width * 2.f + 30.f && thrPrevAlong < 0.f && along >= 0.f && along < 300.f) {
+      result.thrKt = plane.ias * MS_TO_KT; result.thrAglM = plane.pos.y - A.elev - plane.gearHeight();
+    }
+    thrPrevAlong = lat < 600.f ? along : -1e9f;
+    if (!plane.onGround && dA < 3000.f && plane.agl() < 60.f) appLow = true;
+    if (appLow && !plane.onGround && plane.agl() > 150.f) { appLow = false; result.goArounds++; result.thrKt = -1; }
+    if (plane.ev.touchdown && takeoffAnnounced && lat < A.width && along > -50.f && along < A.length) { result.tdPastThrM = std::max(0.f, along); result.rwyLenM = A.length; }
+    if (plane.onGround) { appLow = false; if (result.tdPastThrM >= 0 && length(plane.vel) > 1.f) result.stopLeftM = A.length - along; }   // (while still rolling: its direction says which end)
   }
   // touchdown
   if (plane.ev.touchdown && takeoffAnnounced) {
@@ -2059,7 +2097,7 @@ void Game::updateAtc(float dt) {
         AtcVoice::Tx tx; tx.prio = 10; tx.subtitle = true; tx.group = "tower";
         tx.tag = callsign(vd, false, tx.ids, tx.text);
         tx.ids.push_back(atc.line(vd, key)); tx.text += atc.text(tx.ids.back());
-        atc.say(tx); F.phase = 1; F.waitT = 0;
+        tx.apt = F.dep; atc.say(tx); F.phase = 1; F.waitT = 0;
       }
       break;
     case 1:   // lined up on the runway: cleared for takeoff (straight away if the aircraft is already rolling)
@@ -2073,7 +2111,7 @@ void Game::updateAtc(float dt) {
             tx.tag = callsign(vd, false, tx.ids, tx.text);
             tx.ids.push_back(atc.line(vd, rt.departing ? "hold_departure" : rt.onRunway ? "hold_position" : "hold_arrival"));
             tx.text += atc.text(tx.ids.back());
-            atc.say(tx); F.trafficSaid = true; F.waitT = 0;
+            tx.apt = F.dep; atc.say(tx); F.trafficSaid = true; F.waitT = 0;
           }
           break;
         }
@@ -2082,7 +2120,7 @@ void Game::updateAtc(float dt) {
         wind(vd, tx.ids, tx.text);
         tx.ids.push_back(atc.atom(vd, "runway")); runway(vd, D.rwyNumber(F.depRev), tx.ids); tx.ids.push_back(atc.atom(vd, "cleared_takeoff"));
         tx.text += fmt("Runway %02d, cleared for takeoff.", D.rwyNumber(F.depRev));
-        atc.say(tx); F.phase = 2; F.trafficSaid = false; F.trafficT = 0;
+        tx.apt = F.dep; atc.say(tx); F.phase = 2; F.trafficSaid = false; F.trafficT = 0;
       }
       break;
     case 2:   // climbing out, clear of the field: handed on (circuits stay with the tower)
@@ -2090,7 +2128,7 @@ void Game::updateAtc(float dt) {
         AtcVoice::Tx tx; tx.prio = 40; tx.subtitle = true; tx.group = "tower";
         if (F.dep == F.arr) { tx.ids.push_back(atc.line(vd, "remain_pattern")); tx.text = atc.text(tx.ids[0]); }
         else { tx.ids = {atc.line(vd, "contact_departure"), "", atc.line(vd, "good_day")}; tx.text = atc.text(tx.ids[0]) + " " + atc.text(tx.ids[2]); }
-        atc.say(tx); F.phase = F.dep == F.arr ? 4 : 3; F.waitT = 0;
+        tx.apt = F.dep; atc.say(tx); F.phase = F.dep == F.arr ? 4 : 3; F.waitT = 0;
         if (F.dep == F.arr) F.arrRev = F.depRev;
       }
       break;
@@ -2131,7 +2169,7 @@ void Game::updateAtc(float dt) {
             tx.ids.push_back(""); tx.ids.push_back(atc.line(va, "wake_caution")); tx.text += " " + atc.text(tx.ids.back());
           }
         }
-        atc.say(tx); F.phase = 4; F.waitT = 0; F.trafficSaid = false;
+        tx.apt = F.arr; atc.say(tx); F.phase = 4; F.waitT = 0; F.trafficSaid = false;
       }
       break;
     }
@@ -2151,11 +2189,11 @@ void Game::updateAtc(float dt) {
           if (rt.onRunway && along > -700.f && agl < 90.f) {
             tx.prio = 99; tx.tag = callsign(va, true, tx.ids, tx.text);
             tx.ids.push_back(atc.line(va, "go_around_aircraft")); tx.text += atc.text(tx.ids.back());
-            atc.say(tx); F.phase = 5; F.waitT = 0; F.trafficSaid = false;
+            tx.apt = F.arr; atc.say(tx); F.phase = 5; F.waitT = 0; F.trafficSaid = false;
           } else if (!F.trafficSaid) {
             tx.prio = 80; tx.tag = callsign(va, true, tx.ids, tx.text);
             tx.ids.push_back(atc.line(va, rt.onRunway ? "runway_occupied" : "clearance_follows")); tx.text += atc.text(tx.ids.back());
-            atc.say(tx); F.trafficSaid = true;
+            tx.apt = F.arr; atc.say(tx); F.trafficSaid = true;
           }
           break;
         }
@@ -2164,7 +2202,7 @@ void Game::updateAtc(float dt) {
         wind(va, tx.ids, tx.text);
         tx.ids.push_back(atc.atom(va, "runway")); runway(va, n, tx.ids); tx.ids.push_back(atc.atom(va, "cleared_land"));
         tx.text += fmt("Runway %02d, cleared to land.", n);
-        atc.say(tx); F.phase = 5; F.waitT = 0; F.trafficSaid = false;
+        tx.apt = F.arr; atc.say(tx); F.phase = 5; F.waitT = 0; F.trafficSaid = false;
       } else if (F.airborne && plane.onGround && length(plane.pos - A.pos()) < 3000.f) F.phase = 5;   // landed without the clearance
       break;
     }
@@ -2172,9 +2210,9 @@ void Game::updateAtc(float dt) {
       if (plane.onGround && length(plane.pos - A.pos()) < 3000.f) {
         if (gs < 18.f) {
           AtcVoice::Tx tx; tx.prio = 55; tx.subtitle = true; tx.group = "tower"; tx.ids.push_back(atc.line(va, "exit_when_able")); tx.text = atc.text(tx.ids[0]);
-          atc.say(tx); F.phase = 6;
+          tx.apt = F.arr; atc.say(tx); F.phase = 6;
         }
-      } else if (!plane.onGround && agl > 180.f && plane.vel.y > 2.f && F.waitT > 20.f) { F.phase = F.dep == F.arr ? 4 : 3; F.waitT = 0; }
+      } else if (!plane.onGround && agl > 180.f && plane.vel.y > 2.f && F.waitT > 20.f) { F.phase = F.dep == F.arr ? 4 : 3; F.waitT = 0; F.lastValid = false; }   // (went around: the clearance no longer stands)
       break;
     default: break;
   }
@@ -2214,7 +2252,10 @@ void Game::updateComms(float dt) {
   // while someone is talking the music and the engine sit lower (a headset's comms priority): quick down, slow up
   voiceDuck = approach(voiceDuck, atc.busy() && live ? 1.f : 0.f, atc.busy() ? 6.f : 1.5f, dt);
   AtcVoice::Tx st = atc.update(dt);
-  if (!st.ids.empty() && st.subtitle) { toast("TOWER  " + st.text, vec3(0.55f, 1.f, 0.72f), false); atcF.spoken++; }
+  if (!st.ids.empty() && st.subtitle) {
+    toast("TOWER  " + st.text, vec3(0.55f, 1.f, 0.72f), false); atcF.spoken++;
+    atcF.lastCall = st.text; atcF.lastApt = st.apt; atcF.lastT = flightClock; atcF.lastValid = true;
+  }
   if (!st.ids.empty() && st.tag > 0) atcF.called[st.tag - 1] = true;
 }
 

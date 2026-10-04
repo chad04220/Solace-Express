@@ -28,6 +28,13 @@
 - The XR-9 has no flaps: F / V do nothing in it. It lands fast on its delta wing, at about 140 kt
 - Autoland flies the XR-9 down a normal approach, flare and rollout; the XR-11 still comes to a hover and lands vertically
 
+**Career: better decisions and feedback** (from Jimmy's and Codex's design review)
+- The job board estimates each job for the aircraft you pick: flight time, fees and fuel, and the net pay, plus the job's main challenge (a tight deadline, a short runway, a crosswind, fragile cargo, passengers...)
+- Reputation now pays: freelance clients add up to +15% for a reliable pilot
+- The debrief gives one coaching point from your arrival: speed and height over the threshold, where you touched down and how much runway was left (and credit for a good go-around)
+- A long, floated landing no longer earns the butter bonus, however soft
+- The latest tower instruction stays readable on the HUD (marked no longer valid after a go-around)
+
 **Fixes**
 - The takeoff clearance comes only from the tower now (the "Engine running" message no longer clears you)
 - No "Positive climb!" on flights that start in the air

@@ -136,6 +136,8 @@ private:
   void engageAutopilot();
   void cycleApDest(int dir);
   float approachMinAgl = 1e9f;
+  float thrPrevAlong = -1e9f; bool appLow = false;   // arrival recording (updateFlight): threshold crossing, go-arounds
+  std::string coaching;   // the debrief's one coaching point (endFlight)
 
   // effects
   std::vector<Particle> particles;
@@ -231,6 +233,9 @@ private:
     bool called[2] = {};   // departure / arrival tower: a call with the full registration has been heard (then abbreviated)
     bool trafficSaid = false;   // the current wait for traffic (hold for an arrival, runway occupied) has been called
     float trafficT = 0;         // how long that wait has lasted
+    // the latest tower instruction, for the HUD's recall line: its text, airport, when it was said, and whether it
+    // still stands (a go-around voids a landing clearance; it is never replayed or re-issued from here)
+    std::string lastCall; int lastApt = -1; float lastT = 0; bool lastValid = true;
   } atcF;
   void updateAtc(float dt);
   // every in-flight message the voices may say: the toasts, the lesson hints (with the lesson's id), the warnings
@@ -285,6 +290,7 @@ private:
   void menuBackgroundCamera(FrameParams& fp);
   void menuTour(FrameParams& fp);   // main menu: a tour of the islands
   int computePhase() const;
+  std::string landingCoaching() const;
   const Airport& dest() const { return g_world.airports[contract.to]; }
 
   // UI (game_ui.cpp)

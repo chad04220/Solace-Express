@@ -133,6 +133,13 @@ struct GameTest {
     printf("Landing: screen=%d success=%d touchdown=%.0f fpm  stars=%d  money %+d  location=%s  %s\n", g.screen, g.lastSuccess, tdFpm, g.stars, total,
            g_world.airports[g.career.location].code, g.debriefTitle.c_str());
     for (auto& l : g.payout) printf("   %-30s %d\n", l.label.c_str(), l.amount);
+    {   // the arrival was recorded for the debrief's coaching
+      const FlightResult& r = g.result;
+      printf("Arrival: %.0f kt / %.0f m over the threshold, down %.0f m in, %.0f m to spare of %.0f, go-arounds %d\n   coaching: %s\n",
+             r.thrKt, r.thrAglM, r.tdPastThrM, r.stopLeftM, r.rwyLenM, r.goArounds, g.coaching.c_str());
+      bool ok = r.thrKt > 30 && r.tdPastThrM >= 0 && r.stopLeftM > 0 && r.rwyLenM > 0 && r.goArounds == 0 && !g.coaching.empty();
+      printf("Arrival recorded for coaching: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
+    }
     if (voices) {   // started inbound on a 3.5 km final: the approach call, then cleared to land, then exit the runway
       std::vector<std::string> h;
       for (auto& x : g.atc.history) { printf("   voice: %s\n", x.c_str()); if (x.rfind("TWR ", 0) == 0) h.push_back(x.substr(4)); }
@@ -187,6 +194,7 @@ struct GameTest {
       }
       for (auto& x : g.atc.history) printf("   voice: %s\n", x.c_str());
       bool ok = towerSaid("runway is occupied") && towerSaid("Go around") && !towerSaid("cleared to land");
+      ok = ok && g.atcF.lastCall.find("Go around") != std::string::npos && g.atcF.lastValid && g.atcF.lastApt == c.to;   // the HUD recall line
       printf("Arrival with the runway occupied: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
     }
     g.set.traffic = trafficSet;

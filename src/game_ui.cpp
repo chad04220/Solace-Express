@@ -606,7 +606,18 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   if (c.cargoKg || c.pax) row("Load", c.pax ? fmt("%d passengers, %d kg", c.pax, c.cargoKg) : fmt("%d kg cargo%s", c.cargoKg, c.fragile ? " (FRAGILE)" : ""));
   if (c.timeLimitMin > 0) row("Deadline", fmt("%.0f minutes", c.timeLimitMin), C_BAD);
   row("Weather", c.wx.describe());
-  if (c.payout) row("Payment", fmtMoney(c.payout), C_GOOD);
+  if (c.payout) row("Payment", c.repBonusPct > 0 ? fmt("%s (incl. +%d%% reputation bonus)", fmtMoney(c.payout).c_str(), c.repBonusPct) : fmtMoney(c.payout), C_GOOD);
+  if (selAircraft >= 0 && selAircraft < kNumAircraft) {   // for the aircraft picked below (last frame's choice)
+    auto esrc = career.canFly(c, selAircraft);
+    if (esrc != Career::SRC_NONE) {
+      Career::Estimate e = career.estimate(c, selAircraft, esrc);
+      std::string costs = e.fees + e.fuelCost > 0 ? fmt(", %s costs", fmtMoney(e.fees + e.fuelCost).c_str()) : "";
+      if (c.payout > 0 || e.fees + e.fuelCost > 0)
+        row("Estimate", fmt("about %.0f min%s, net %s", e.minutes, costs.c_str(), fmtMoney(e.net).c_str()), e.net >= 0 ? C_GOOD : C_BAD);
+      else row("Estimate", fmt("about %.0f min", e.minutes));
+      if (!cd.free) row("Challenge", e.challenge, C_WARN);
+    }
+  }
   if (c.ownedOnly) row("Requirement", "Your own aircraft", C_ACCENT);
   if (c.grantLicense > career.license) row("Reward", std::string("Earns ") + licenseName(c.grantLicense), C_ACCENT);
   if (c.from != career.location && c.type != CT_LESSON) { int pc = career.positioningCost(c); row("Positioning", pc ? fmt("Airline ticket to %s: %s", A.code, fmtMoney(pc).c_str()) : "Free courtesy ride", C_DIM); }
@@ -1176,6 +1187,25 @@ void Game::drawHud(const FrameParams& fp) {
         vx += 18 * s;
       }
       g_ren.text(vx, cy + 41 * s, 19 * s, ellipsize(cols[i][1], (cw - 32 * s) / 4.f - 14 * s - (vx - colX), 19 * s), vc, 1, 0, false);
+    }
+    // tower recall: the latest instruction stays readable beside the card (text only: nothing is replayed or
+    // re-issued), dimmed and marked once a go-around has voided it
+    if (!atcF.lastCall.empty() && !researchFlight && atcF.lastApt >= 0) {
+      float rw = std::min(330 * s, cx - 24 * s);
+      if (rw > 160 * s) {
+        float rx = cx - 12 * s - rw, fs = 13 * s;
+        auto lines = wrap(atcF.lastCall, rw - 24 * s, fs);
+        if (lines.size() > 3) { lines.resize(3); lines[2] = ellipsize(lines[2] + " ...", rw - 24 * s, fs); }
+        float rh = 30 * s + lines.size() * (fs + 5 * s);
+        hudPanel(rx, cy, rw, rh);
+        int age = (int)std::max(0.f, flightClock - atcF.lastT);
+        vec3 tc = vec3(0.55f, 1.f, 0.72f);
+        g_ren.text(rx + 12 * s, cy + 7 * s, 11 * s, fmt("TWR  %s", g_world.airports[atcF.lastApt].code), tc, 1, 0, false);
+        g_ren.text(rx + rw - 12 * s, cy + 7 * s, 11 * s, atcF.lastValid ? fmt("%d:%02d AGO", age / 60, age % 60) : std::string("NO LONGER VALID"),
+                   atcF.lastValid ? C_DIM : C_WARN, 1, 2, false);
+        float ly = cy + 25 * s;
+        for (auto& l : lines) { g_ren.text(rx + 12 * s, ly, fs, l, atcF.lastValid ? C_TEXT : C_DIM, atcF.lastValid ? 1.f : 0.6f, 0, false); ly += fs + 5 * s; }
+      }
     }
     // heading tape: +-60 deg around the current heading, target caret, turn cue
     float tw = 380 * s, tx = W * 0.5f - tw * 0.5f, ty = cy + ch + 6 * s, th = 26 * s;
@@ -1829,6 +1859,13 @@ void Game::drawDebrief() {
   row("Max G", fmt("%.2f", plane.maxG));
   row("Max bank", fmt("%.0f deg", result.maxBank));
   row("Fuel used", fmt("%.0f kg", result.fuelUsedKg));
+  if (!coaching.empty()) {   // one coaching point from the arrival (Game::landingCoaching)
+    auto cl = wrap(coaching, pw - 60 * s - 30 * s, 15 * s);
+    if (cl.size() > 2) { cl.resize(2); cl[1] = ellipsize(cl[1] + " ...", pw - 90 * s, 15 * s); }
+    py += 4 * s;
+    g_ren.rect(px, py, 3 * s, cl.size() * 20 * s, C_ACCENT, 0.8f);
+    for (auto& l : cl) { g_ren.text(px + 12 * s, py, 15 * s, l, C_ACCENT, 0.95f); py += 20 * s; }
+  }
   py += 10 * s;
   header(px, py, pw - 60 * s, "SETTLEMENT"); py += 24 * s;
   int total = 0;

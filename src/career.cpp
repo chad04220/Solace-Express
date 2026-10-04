@@ -260,6 +260,35 @@ int Career::positioningCost(const Contract& c) const {
   return (int)(80 + 6 * g_world.distanceKm(location, c.from));
 }
 
+Career::Estimate Career::estimate(const Contract& c, int si, Source src) const {
+  const AircraftSpec& s = kAircraft[si];
+  Estimate e;
+  float km = contractKm(c);
+  // cruise for the route plus the arrival (~6 km), and about four minutes of taxi, takeoff, climb and landing
+  e.minutes = (km + 6.f) * 1000.f / s.cruise / 60.f + 4.f;
+  float flow = s.maxFuel / (s.rangeKm * 1000.f / s.cruise * 0.8f);   // as Plane::fuelFlowMax, at cruise power
+  e.fuelKg = s.special ? 0.f : flow * 0.84f * e.minutes * 60.f;
+  e.fuelCost = src == SRC_OWNED ? (int)(e.fuelKg * (s.engineType == ENG_PISTON ? 2.2f : 1.4f)) : 0;   // (rentals include fuel)
+  e.fees = positioningCost(c) + (src == SRC_OWNED ? ferryCost(c, si) : 0) + (src == SRC_RENT ? s.rentFee : 0);
+  e.net = c.payout - e.fees - e.fuelCost;
+  // the one thing most likely to cost stars or the job
+  const Airport& B = g_world.airports[c.to];
+  float need = s.runwayNeeded(B.elev);
+  float wkt = c.wx.windSpeed * MS_TO_KT, xw = 0;
+  { float d = (c.wx.windFrom - B.heading) * DEG; xw = fabsf(sinf(d)) * (wkt + c.wx.gust * MS_TO_KT); }
+  if (c.timeLimitMin > 0 && e.minutes > c.timeLimitMin * 0.75f) e.challenge = fmt("Tight deadline: %.0f min for about %.0f min of flying", c.timeLimitMin, e.minutes);
+  else if (c.wx.storm) e.challenge = "Thunderstorms on the route";
+  else if (B.length < need * 1.25f) e.challenge = fmt("Short runway at %s: %.0f m for the %.0f m you need", B.code, B.length, need);
+  else if (xw >= 12.f) e.challenge = fmt("Crosswind at %s: about %.0f kt", B.code, xw);
+  else if (c.fragile) e.challenge = "Fragile cargo: gentle manoeuvres and a soft landing";
+  else if (c.pax > 0) e.challenge = "Passengers: keep the bank under 45 degrees and the ride smooth";
+  else if (B.surface != SURF_ASPHALT) e.challenge = fmt("%s strip at %s", surfaceName(B.surface), B.code);
+  else if (c.timeLimitMin > 0) e.challenge = fmt("Deadline: %.0f minutes", c.timeLimitMin);
+  else if (c.wx.visibility < 8000.f) e.challenge = "Low visibility";
+  else e.challenge = "Straightforward";
+  return e;
+}
+
 int Career::ferryCost(const Contract& c, int si) const {
   int oi = ownedIndexFor(si);
   if (oi < 0 || fleet[oi].location == c.from) return 0;
@@ -291,6 +320,8 @@ void Career::refreshBoard() {
     if (canFly(c, si) == SRC_NONE) continue;
     float km = contractKm(c);
     c.payout = (int)((250 + km * (30 + c.cargoKg * 0.13f + c.pax * 16)) * r.range(0.9f, 1.15f)) / 10 * 10;
+    c.repBonusPct = repBonusPct();   // clients pay a reliable pilot a little more
+    c.payout = c.payout * (100 + c.repBonusPct) / 100 / 10 * 10;
     c.fragile = !pax && r.uni() < 0.15f;
     if (r.uni() < 0.15f) { c.timeLimitMin = ceilf(km * 1000.f / s.cruise / 60.f * 1.6f + 3); c.payout = c.payout * 13 / 10; }
     c.title = pax ? fmt("%s to %s", paxNames[r.next() % 8], g_world.airports[to].name) : fmt("%s to %s", cargoNames[r.next() % 10], g_world.airports[to].name);
@@ -335,7 +366,8 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
     if (c.payout > 0) L.push_back({"Contract payment", c.payout});
     // landing quality only counts when the flight actually ended with a touchdown
     if (r.landed) {
-      if (fpm < 150) { L.push_back({"Butter landing bonus", c.payout / 10}); }
+      bool longLdg = r.tdPastThrM >= 0 && r.rwyLenM > 0 && r.tdPastThrM > r.rwyLenM * 0.45f;   // floated half the runway
+      if (fpm < 150 && !longLdg) { L.push_back({"Butter landing bonus", c.payout / 10}); }
       else if (fpm > 600) { L.push_back({"Hard landing", -c.payout / 5}); st--; }
       else if (fpm > 350) { L.push_back({"Firm landing", -c.payout / 20}); }
     }
