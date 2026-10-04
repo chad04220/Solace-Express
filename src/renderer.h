@@ -91,7 +91,7 @@ public:
   GLuint minimapTex = 0;
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
-  static constexpr int kProgramCount = 17;
+  static constexpr int kProgramCount = 18;
   float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
   // analysis tool (--analyze): exact per-pass times (the GPU is waited on at every pass boundary) and a build of the
   // ray tracer that writes its per-pixel work counters instead of colour
@@ -109,7 +109,7 @@ public:
   void resize(int w, int h);
   void setRenderScale(float s);   // ray-trace resolution only: the TAA history stays at display resolution, no pop
   void renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites);
-  mat4 viewProj(const FrameParams& fp) const;
+  mat4 viewProj(const FrameParams& fp, float zNear = 0.5f, float zFar = 90000.f) const;
   bool project(const FrameParams& fp, vec3 p, float& sx, float& sy) const;  // to window pixels
 
   // ---- immediate-mode 2D UI
@@ -208,6 +208,18 @@ private:
 public:
   int envChunks = 0;
 private:
+  // ---- aircraft hull meshes (aircraft_hull.cpp): where each pixel's exact airframe march starts
+  struct HullMesh { uint64_t key = 0; GLuint vbo = 0; int verts = 0; bool ok = false; float free = 0; };
+  HullMesh hull[2];   // outside, cockpit
+  GLuint progHull = 0, progHullBake = 0, vaoHull = 0, texHPts = 0, texHOut = 0, fboHOut = 0, fboHull = 0, texHullDepth = 0;
+  int hullDepthW = 0, hullDepthH = 0;
+  bool hullOn = false;
+  bool compileHull(const std::string& bakeVS, const std::string& bakeFS);
+  void hullEval(const std::vector<vec3>& pts, std::vector<float>& out);
+  void bakeHull(const FrameParams& fp, int slot, uint64_t key);
+  uint64_t hullKey(const FrameParams& fp, int slot) const;
+  bool hullWanted(const FrameParams& fp) const;
+  void drawHull(const FrameParams& fp, int slot);
   void drawEntities(const FrameParams& fp);
   void createGBuffer();
 };

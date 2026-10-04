@@ -97,7 +97,7 @@ void Renderer::createEnvelopeTarget() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   };
-  mk(texEnv, GL_R32F, GL_RED);
+  mk(texEnv, GL_RG32F, GL_RG);   // terrain start | aircraft hull start (aircraft_hull.cpp)
   mk(texEnvDepth, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT);
   if (!fboEnv) glGenFramebuffers(1, &fboEnv);
   glBindFramebuffer(GL_FRAMEBUFFER, fboEnv);
@@ -145,8 +145,9 @@ void Renderer::drawEnvelope(const FrameParams& fp) {
   glBindFramebuffer(GL_FRAMEBUFFER, fboEnv);
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
   glViewport(0, 0, rw, rh);
-  float far = 1e30f;   // no mesh on this pixel: no terrain along its ray anywhere in the world
-  glClearBufferfv(GL_COLOR, 0, &far);
+  float far[4] = {1e30f, 0, 0, 0};   // no mesh on this pixel: no terrain along its ray anywhere in the world
+  glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_FALSE);   // (the second channel is the aircraft hull's)
+  glClearBufferfv(GL_COLOR, 0, far);
   glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);
   glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDisable(GL_CULL_FACE); glDisable(GL_BLEND);
   glUseProgram(progEnv);
@@ -167,6 +168,7 @@ void Renderer::drawEnvelope(const FrameParams& fp) {
   const int perChunk = TP_CHUNK * TP_CHUNK * 6 + 4 * TP_CHUNK * 6;
   glDrawArraysInstanced(GL_TRIANGLES, 0, perChunk, n);
   glBindVertexArray(0);
+  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
   glDisable(GL_DEPTH_TEST);
   glActiveTexture(GL_TEXTURE0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -175,7 +177,7 @@ void Renderer::drawEnvelope(const FrameParams& fp) {
   if (dbg) {   // how the mesh covers the screen: pixels with a start distance / underside / nothing
     std::vector<float> px((size_t)rw * rh);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fboEnv); glReadBuffer(GL_COLOR_ATTACHMENT0);
-    glReadPixels(0, 0, rw, rh, GL_RED, GL_FLOAT, px.data());
+    glReadPixels(0, 0, rw, rh, GL_RED, GL_FLOAT, px.data());   // (the first channel)
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
     int hit = 0, under = 0, none = 0; double sum = 0;
     for (float v : px) { if (v <= 0.f) under++; else if (v > 1e29f) none++; else { hit++; sum += v; } }

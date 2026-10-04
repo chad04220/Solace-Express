@@ -533,6 +533,7 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     if (!progMap) { error = "Map shader: " + error; return false; }
     { std::string e; progCkMask = program(vsFS, kCockpitMaskFS, e); step(); }   // optional: without it nothing is masked
     compileEnvelope(); step();   // optional: without it every pixel marches its terrain from the camera
+    compileHull(vsFS, ms + kHullBakeMain); step();     // optional: without it every pixel near the aircraft marches it from the camera
     progDisp = program(vsFS, ms + kDispMain, error); step();
     // not fatal: without it the cockpit screens stay dark, but the game still runs (the error goes to startup.log)
     if (!progDisp) { dispError = error; error.clear(); }
@@ -839,13 +840,13 @@ void Renderer::resize(int w, int h) {
   if (ok) createTargets();
 }
 
-mat4 Renderer::viewProj(const FrameParams& fp) const {
+mat4 Renderer::viewProj(const FrameParams& fp, float zNear, float zFar) const {
   mat4 view;
   view(0, 0) = fp.camRight.x; view(0, 1) = fp.camRight.y; view(0, 2) = fp.camRight.z;
   view(1, 0) = fp.camUp.x; view(1, 1) = fp.camUp.y; view(1, 2) = fp.camUp.z;
   view(2, 0) = fp.camBack.x; view(2, 1) = fp.camBack.y; view(2, 2) = fp.camBack.z;
   view(0, 3) = -dot(fp.camRight, fp.camPos); view(1, 3) = -dot(fp.camUp, fp.camPos); view(2, 3) = -dot(fp.camBack, fp.camPos);
-  return perspective(fp.fovY, (float)W / H, 0.5f, 90000.f) * view;
+  return perspective(fp.fovY, (float)W / H, zNear, zFar) * view;
 }
 
 bool Renderer::project(const FrameParams& fp, vec3 p, float& sx, float& sy) const {
@@ -926,6 +927,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform1i(U(p, "uTShOn"), tshFront >= 0 && !tshOff ? 1 : 0);
   glActiveTexture(GL_TEXTURE0 + 20); glBindTexture(GL_TEXTURE_2D, envOn ? texEnv : 0); glUniform1i(U(p, "uEnv"), 20);
   glUniform1i(U(p, "uEnvOn"), envOn ? 1 : 0);
+  glUniform1i(U(p, "uHullOn"), hullOn ? 1 : 0);
   {   // AI traffic: one row of 32 texels per aircraft
     if (!texTraffic) {
       glGenTextures(1, &texTraffic); glBindTexture(GL_TEXTURE_2D, texTraffic);
@@ -1060,6 +1062,18 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform3f(U(p, "uFlameLI"), fp.flameLight.x, fp.flameLight.y, fp.flameLight.z);
   glUniform1i(U(p, "uCloudSplit"), cloudSplit ? 1 : 0);
   };
+  // aircraft hull (rasterized; baked at the end of the frame that first needs it - see below)
+  hullOn = false;
+  const bool hullUse = hullWanted(fp);
+  const int hullSlot = fp.plane.PS[3] > 0.5f ? 1 : 0;
+  const uint64_t hullK = hullUse ? hullKey(fp, hullSlot) : 0;
+  if (hullUse && hull[hullSlot].key == hullK) {
+    drawHull(fp, hullSlot);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
+    glDrawBuffers(3, bufs);
+    glViewport(0, 0, rw, rh);
+    glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
+  }
   GLuint prt = costMap && progRTCost ? progRTCost : progRT;
   setRT(prt);
   glBindVertexArray(vaoEmpty);
@@ -1090,6 +1104,8 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glActiveTexture(GL_TEXTURE0);
   }
 
+  // a new airframe or view: bake its hull with the ray tracer's own shape code (used from the next frame on)
+  if (hullUse && hull[hullSlot].key != hullK) { setRT(progHullBake); bakeHull(fp, hullSlot, hullK); }
   stamp(2);
   // ------------------------------------------------ temporal AA resolve (before the sprites: particles never smear)
   {

@@ -1068,11 +1068,15 @@ vec3 planeNormal(vec3 p){ const vec2 k = vec2(1,-1); float e = 0.0025;
 
 float planeBound(){ return max(gM[0].x, gM[9].x*2.0)*0.55 + 1.5; }
 void pieceXf(int i){ gPI = i; if (i < 0) { gPP = uPlanePos; gPR = uPlaneRot; gPC = vec3(0.0); } else { gPP = uPcPos[i]; gPR = uPcRot[i]; gPC = uPcC[i]; } }
+// gPlStart: where the march along this ray may begin (the aircraft hull mesh - see aircraft_hull.cpp); 1e30: the ray
+// misses the hull, so the airframe too
+float gPlStart = 0.0;
 vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
+  if (gPlStart > 1e29) return vec2(-1.0);
   vec3 oc = ro - gPP;
   float b = dot(oc, rd), c = dot(oc,oc) - br*br, h = b*b - c;
   if (h < 0.0) return vec2(-1.0);
-  h = sqrt(h); float t0 = max(-b-h, 0.0), t1 = min(-b+h, tmax);
+  h = sqrt(h); float t0 = max(max(-b-h, 0.0), gPlStart), t1 = min(-b+h, tmax);
   if (t0 > t1) return vec2(-1.0);
   mat3 inv = transpose(gPR);
   vec3 lo = gPC + inv*(ro - gPP), ld = inv*rd;
@@ -1174,7 +1178,7 @@ const int HMAXN = 256; const int HMAXL = 5;
 // which keeps grazing rays over lowlands from running out of steps (they used to fall through to the sea).
 // gTStart: where the march may begin (the terrain envelope mesh on this pixel - see terrain_envelope.cpp); 1e30 means
 // the ray meets no terrain in the world. A start that turns out to be under the ground (it never should) is ignored.
-uniform sampler2D uEnv; uniform int uEnvOn;
+uniform sampler2D uEnv; uniform int uEnvOn; uniform int uHullOn;
 float gTStart = 1.0;
 float traceTerrain(vec3 ro, vec3 rd, float tmax){
   float t = 1.0;
@@ -3172,9 +3176,20 @@ void main(){
   // In any cockpit view the aircraft is traced first: a pixel that lands on the cabin (or on a wing seen through a
   // window) needs nothing from outside, so only rays leaving through the windows trace the world.
   bool pod = false, cockpitView = uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0; vec2 h0 = vec2(-1.0);
+  // the aircraft hull was rasterized along exactly this ray: start the airframe march where it is (0: on its inside)
+  float hullT = 0.0;
+  if (uHullOn == 1 && uWreck == 0) { float hv = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).g; hullT = hv > 1e29 ? hv : max(0.0, hv*0.999 - 0.1); }
   if (cockpitView) {
     bool jet = int(gM[0].z + 0.5) >= 5;
-    h0 = tracePlane(ro, rd, jet ? 6.0 : planeBound()*2.0);
+    gPlStart = hullT; h0 = tracePlane(ro, rd, jet ? 6.0 : planeBound()*2.0); gPlStart = 0.0;
+    if ((uDbg & 1024) != 0) {   // (debug: the hull's start against a march from the camera - red: the hull skipped a hit,
+      vec2 hf = tracePlane(ro, rd, jet ? 6.0 : planeBound()*2.0);   // blue: a hit moved, green: the hull found one the camera's march didn't)
+      vec3 dc = vec3(0.0);
+      if (hf.x > 0.0 && h0.x < 0.0) dc = vec3(1.0, 0.0, 0.0);
+      else if (hf.x < 0.0 && h0.x > 0.0) dc = vec3(0.0, 1.0, 0.0);
+      else if (hf.x > 0.0 && abs(hf.x - h0.x) > 0.01) dc = vec3(0.0, 0.3, 1.0)*clamp(abs(hf.x - h0.x)*10.0, 0.3, 1.0);
+      oColor = vec4(dc*50.0, 0.0); oDepth = 1.0; oCloudMask = 0.0; return;
+    }
     if (h0.x > 0.0) {
       int id0 = int(h0.y + 0.5);
       if (jet && ((id0 >= 41 && id0 <= 43) || (id0 >= 61 && id0 <= 63))) { onScr = true; scrId = id0; scrL = transpose(uPlaneRot)*(ro + rd*h0.x - uPlanePos); }
@@ -3212,7 +3227,9 @@ void main(){
   vec2 bh = pod ? vec2(-1.0) : traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
   int trafK = -1; vec2 trafH = vec2(-1.0);
   if (!pod && uTrafficN > 0) { trafH = traceTraffic(ro, rd, tmax, trafK); loadMain(); }
+  gPlStart = feed ? 0.0 : hullT;
   vec2 ph = onScr || cloak || (cockpitView && !pod) ? vec2(-1.0) : (pod ? h0 : tracePlane(ro, rd, tmax));
+  gPlStart = 0.0;
   float t = 1e9; int hit = 0;
   if (tT > 0.0) { t = tT; hit = 1; }
   if (tW > 0.0 && tW < t) { t = tW; hit = 2; }
@@ -4233,6 +4250,24 @@ void main(){
 )";
 // Quarter-resolution cloud pass: each texel marches the clouds along the camera ray of one of the four full-resolution
 // pixels it covers (rotating every frame), up to that pixel's scene depth; the depth goes out too, for the upsampling
+// Aircraft hull bake (aircraft_hull.cpp): the airframe's distance at each listed point (aircraft space), the least
+// over every listed state of the gear, flaps, steering and controls - so a hull built from it holds the airframe in
+// any of them
+static const char* kHullBakeMain = R"(
+uniform sampler2D uHPts; uniform int uHStN; uniform vec4 uHStPS[128]; uniform vec4 uHStCtl[128];
+void main(){
+  vec3 p = texelFetch(uHPts, ivec2(gl_FragCoord.xy), 0).xyz;
+  loadMain(); pieceXf(-1);
+  float d = 1e9;
+  for (int s = 0; s < 128; s++) {
+    if (s >= uHStN) break;
+    gPS = uHStPS[s]; gCtl = uHStCtl[s];
+    if (gPS.w > 0.5) loadCabinFit();
+    d = min(d, mapPlane(p).x);
+  }
+  oColor = vec4(d); oDepth = d; oCloudMask = 0.0;
+}
+)";
 static const char* kCloudMain = R"(
 uniform sampler2D uSceneDepth; uniform int uFrame;
 void main(){
