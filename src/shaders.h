@@ -3251,9 +3251,14 @@ void main(){
   // (0: march from the camera; the first uHullNear metres are always marched, the hull's faces there are ignored)
   float hullT = 0.0;
   if (uHullOn == 1 && uWreck == 0) { float hv = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).g; hullT = hv > 1e29 ? hv : (hv > 0.0 ? max(uHullNear, hv*0.999 - 0.1) : 0.0); }
+  // The airframe along this camera ray, traced once for every use below (the cockpit, the cloak, the outside view):
+  // each call site would be another inlined copy of the march and the airframe's distance.
+  bool jetC = int(gM[0].z + 0.5) >= 5;
+  vec2 hTop = tracePlaneHull(ro, rd, cockpitView ? (jetC ? 6.0 : planeBound()*2.0) : tmax, hullT);
+  int hTopPiece = gPI;   // (traffic tracing moves the piece transform; restored before shading)
   if (cockpitView) {
-    bool jet = int(gM[0].z + 0.5) >= 5;
-    h0 = tracePlaneHull(ro, rd, jet ? 6.0 : planeBound()*2.0, hullT);
+    bool jet = jetC;
+    h0 = hTop;
 #ifdef HULL_DEBUG
     if ((uDbg & 1024) != 0) {   // (debug: the hull's start against a march from the camera - red: the hull skipped a hit,
       vec2 hf = tracePlane(ro, rd, jet ? 6.0 : planeBound()*2.0);   // blue: a hit moved, green: the hull found one the camera's march didn't)
@@ -3281,7 +3286,7 @@ void main(){
   // XR-11 cloak: a pixel on the cloaked craft sees the world behind it along a slightly bent ray
   bool cloak = false; vec3 ckN = vec3(0.0), ckLp = vec3(0.0), rd0 = rd, ro0 = ro; float ckT = 0.0;
   if (uWr[4].w > 0.001 && uPlaneOn == 1 && uWreck == 0 && !cockpitView && int(gM[0].z + 0.5) == 6) {
-    vec2 hc = tracePlane(ro, rd, tmax);
+    vec2 hc = hTop;
     if (hc.x > 0.0) {
       vec3 hp = ro + rd*hc.x; ckLp = transpose(uPlaneRot)*(hp - uPlanePos);
       if (ckLp.z < uWr[6].y) {
@@ -3308,8 +3313,8 @@ void main(){
   vec3 bn; float bkind = 0.0; vec3 bl;
   vec2 bh = pod ? vec2(-1.0) : traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
   int trafK = -1; vec2 trafH = vec2(-1.0);
-  if (!pod && uTrafficN > 0) { gTrafCamRay = !feed && !cloak; trafH = traceTraffic(ro, rd, tmax, trafK); gTrafCamRay = false; loadMain(); }
-  vec2 ph = onScr || cloak || (cockpitView && !pod) ? vec2(-1.0) : (pod ? h0 : tracePlaneHull(ro, rd, tmax, feed ? 0.0 : hullT));
+  if (!pod && uTrafficN > 0) { gTrafCamRay = !feed && !cloak; trafH = traceTraffic(ro, rd, tmax, trafK); gTrafCamRay = false; loadMain(); pieceXf(hTopPiece); }
+  vec2 ph = onScr || cloak || (cockpitView && !pod) ? vec2(-1.0) : (pod ? h0 : hTop);
   float t = 1e9; int hit = 0;
   if (tT > 0.0) { t = tT; hit = 1; }
   if (tW > 0.0 && tW < t) { t = tW; hit = 2; }
