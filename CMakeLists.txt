@@ -9,7 +9,7 @@ endif()
 set(CORE_SOURCES
   src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp src/aircraft.cpp src/career.cpp)
 set(GAME_SOURCES
-  ${CORE_SOURCES} src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_wraith.cpp src/renderer.cpp src/entity_render.cpp src/terrain_envelope.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/entity_mesh.cpp src/gl.cpp src/audio.cpp src/models.cpp)
+  ${CORE_SOURCES} src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_wraith.cpp src/renderer.cpp src/entity_render.cpp src/terrain_envelope.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/entity_mesh.cpp src/gl.cpp src/audio.cpp src/models.cpp)
 
 if(WIN32)
   if(MINGW)

@@ -313,12 +313,18 @@ private:
   // hidden Confidential Research Model menu (U + I on the main menu) and free XR-9 flights
   bool researchFlight = false;
   int resAirport = 0, resWx = 0, resCraft = kResearchJet; bool resAirborne = true; float resTime = 12.f, resOpened = 0;
+  bool resAuthed = false, resDrag = false;   // biometric sequence passed this session; dragging the preview
+  float resYaw = 0.7f, resPitch = 0.15f, resZoom = 1.f, resSelT = -10.f, resIdleT = 10.f; int resLastCraft = -1;   // preview orbit, selection time
+  vec3 resPrevPos; quat resPrevQ;   // where the preview craft is (for the callouts)
   float prevMach = 0, prevAB = 0;
   // gamepad-driven menu cursor (left stick moves, A clicks, B backs out)
   float padCursorT = -100.f; bool padHoldA = false;
   void gamepadMenus(float dt);
   void drawPadCursor();
-  void drawResearch();
+  void drawResearch(const FrameParams& fp);   // game_research_ui.cpp
+  struct ResLayout { float lx, lw, rx, rw, top, bot, px0, px1, cx, cy, r; };   // the terminal's columns and preview ring
+  ResLayout researchLayout() const;
+  void researchPreviewCamera(FrameParams& fp);
   void launchResearch();
   void jetEffects(float dt);
   void drawMenu();

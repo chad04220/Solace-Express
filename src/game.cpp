@@ -1742,6 +1742,7 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
 
 void Game::menuBackgroundCamera(FrameParams& fp) {
   if (screen == SCR_MENU && !getenv("MENUORBIT")) { menuTour(fp); return; }
+  if (screen == SCR_RESEARCH) { researchPreviewCamera(fp); return; }
   // A Wren circles over the islands while the camera chases it in a slow arc
   static Plane demo;
   static bool initd = false;
@@ -1766,6 +1767,39 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
   fp.camBack = -fwd; fp.camRight = normalize(cross(fwd, vec3(0, 1, 0))); fp.camUp = cross(fp.camRight, fwd);
   fp.fovY = 50.f * DEG;
   fp.vignette = 0.9f;
+}
+
+// The preview: the selected craft hangs in the air over the chosen launch site, at the sortie's time of day, and the
+// camera orbits it (drag to turn, wheel to zoom) framed so it sits in the middle of the terminal's preview ring
+void Game::researchPreviewCamera(FrameParams& fp) {
+  static Plane demo;
+  const AircraftSpec& sp = kAircraft[resCraft];
+  if (demo.spec != &sp) demo.reset(&sp, vec3(0, 600, 0), 0, 50, 85, true, 150);
+  const Airport& a = g_world.airports[std::clamp(resAirport, 0, (int)g_world.airports.size() - 1)];
+  vec3 P = a.pos() + a.dir() * 1800.f + vec3(0, 0, 0);
+  P.y = std::max(a.elev, g_world.height(P.x, P.z)) + 420.f + 1.2f * sinf(realTime * 0.6f);
+  float hdg = a.heading + 180.f;   // facing back towards the field
+  demo.pos = P;
+  demo.q = quat::axisAngle(vec3(0, 1, 0), -hdg * DEG) * quat::axisAngle(vec3(0, 0, 1), 4.f * DEG * sinf(realTime * 0.35f)) * quat::axisAngle(vec3(1, 0, 0), 3.f * DEG);
+  demo.rpm = 0; demo.gear = 0; demo.flaps = 0; demo.nozzle = 0; demo.ctl = Controls(); demo.ctl.throttle = 0.55f;
+  demo.engineSpool = 0.55f; demo.n1 = 70.f;
+  fillPlaneVisual(fp.plane, demo, 0.f, false);
+  resPrevPos = P; resPrevQ = demo.q;
+  // orbit
+  ResLayout L = researchLayout();
+  float W = (float)g_ren.W, H = (float)g_ren.H;
+  float ext = std::max(sp.span, sp.fusLen) * 0.46f;   // (the craft fills the ring)
+  fp.fovY = 32.f * DEG;
+  float th = tanf(fp.fovY * 0.5f);
+  float D = (H * 0.5f / L.r) * ext / th / std::clamp(resZoom, 0.6f, 1.8f);
+  float yaw = resYaw + a.heading * DEG, pit = std::clamp(resPitch, -0.6f, 1.1f);
+  vec3 C = P + vec3(sinf(yaw) * cosf(pit), sinf(pit), -cosf(yaw) * cosf(pit)) * D;
+  vec3 f0 = normalize(P - C), r0 = normalize(cross(f0, vec3(0, 1, 0))), u0 = cross(r0, f0);
+  float nx = (L.cx - W * 0.5f) / (W * 0.5f), ny = (H * 0.5f - L.cy) / (H * 0.5f);
+  vec3 T = P - r0 * (nx * D * th * (W / H)) - u0 * (ny * D * th);   // aim off-centre so the craft lands in the ring
+  vec3 fwd = normalize(T - C);
+  fp.camPos = C; fp.camBack = -fwd; fp.camRight = normalize(cross(fwd, vec3(0, 1, 0))); fp.camUp = cross(fp.camRight, fwd);
+  fp.vignette = 0.75f;
 }
 
 void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, std::vector<SpriteVert>& add) {
@@ -2370,6 +2404,9 @@ void Game::update(float dt) {
     wx = Weather(); wx.cloudCover = 0.35f; wx.cloudBase = 1500; wx.visibility = 45000; wx.windSpeed = 4;
     timeOfDay = screen == SCR_MENU ? menuShot(realTime).tod : 15.8f;
     if (screen == SCR_MENU) wx.cloudCover = menuShot(realTime).cloud;
+    if (screen == SCR_RESEARCH) {   // the research preview shows the sortie's light and sky
+      timeOfDay = resTime; wx.cloudCover = resWx == 0 ? 0.15f : resWx == 1 ? 0.65f : 0.92f; wx.cloudBase = resWx == 2 ? 900.f : 1400.f;
+    }
     cloudOff = cloudOff + vec2(dt * 8.f, dt * 3.f);
   }
   updateComms(dt);
@@ -2388,7 +2425,7 @@ void Game::render() {
     case SCR_HUB: drawHub(); break;
     case SCR_FLIGHT: if (!uiHidden || paused || showMap) { drawHud(fp); drawMapOverlay(); } if (paused) drawPause(); break;
     case SCR_DEBRIEF: drawDebrief(); break;
-    case SCR_RESEARCH: drawResearch(); break;
+    case SCR_RESEARCH: drawResearch(fp); break;
     case SCR_LOADING: drawLoading(); break;
   }
   if (!(uiHidden && screen == SCR_FLIGHT && !paused)) drawToasts();
@@ -2486,8 +2523,15 @@ void Game::debugScene(const std::string& name) {
     printf("pad: A skips the career crash to the results: %s\n", wasCrash && screen == SCR_DEBRIEF ? "ok" : "FAIL");
     return;
   }
-  if (name == "research") { screen = SCR_RESEARCH; realTime = 20; resOpened = 15; return; }
-  if (name == "research11") { screen = SCR_RESEARCH; realTime = 20; resOpened = 15; resCraft = kWraith; return; }
+  if (name == "research" || name == "research11") {   // the terminal, settled (selection decrypted)
+    screen = SCR_RESEARCH; realTime = 30; resOpened = 20; resAuthed = true;
+    resCraft = name == "research11" ? kWraith : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
+    return;
+  }
+  if (name.rfind("researchscan", 0) == 0) {   // the biometric sequence at a moment: researchscan<tenths of a second>
+    screen = SCR_RESEARCH; realTime = 30; resAuthed = false; resOpened = realTime - atoi(name.c_str() + 12) / 10.f;
+    return;
+  }
   if (name.compare(0, 3, "wr_") == 0) {   // XR-11: wr_<mode>_<cam yaw>_<cam pitch>_<cam dist>_<seconds>
     // modes: 0 cruise, 1 hover, 2 parked, 3 cloak spreading, 4 cloaked, 5 turrets out + bay open, 6 lasers firing,
     // 7 plasma bomb (camera on the impact), 8 cockpit
