@@ -880,7 +880,7 @@ R"(    vec4 V0 = gM[14], V1 = gM[15];
     res = opU(res, vec2(length(p - vec3(0.0, V1.x + V0.x + 0.04, V1.y + V0.w + V0.z*0.4)) - 0.05, 19.0));
     vec3 sec = fusSection(0.2);
     float ant = sdRoundBox(p - vec3(0.0, sec.z + sec.y + 0.11, 0.2), vec3(0.006, 0.12, 0.05), 0.004);
-    res = opU(res, vec2(ant, 13.0));
+    res = opU(res, vec2(ant, 8.0));   // (8: exterior metal - 13 is a cockpit material, lit as if inside the cabin)
     float span = W0.x, rcd = W0.y, tcd = W0.z, swp = W0.w, thk = W1.w;
     {   // pitot tube under the left wing: a faired mast and the probe pointing into the airflow
       float ks = 0.62, ch = mix(rcd, tcd, ks), le = W1.y + swp*ks, sx = -span*ks;
