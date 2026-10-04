@@ -7,7 +7,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 set(CORE_SOURCES
-  src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp src/aircraft.cpp src/career.cpp)
+  src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/career.cpp)
 set(GAME_SOURCES
   ${CORE_SOURCES} src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_wraith.cpp src/renderer.cpp src/entity_render.cpp src/terrain_envelope.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/entity_mesh.cpp src/gl.cpp src/audio.cpp src/models.cpp)
 
@@ -36,6 +36,7 @@ add_executable(airport_layout_test tests/airport_layout_test.cpp ${CORE_SOURCES}
 add_executable(envelope_test tests/envelope_test.cpp ${CORE_SOURCES})
 add_executable(hull_test tests/hull_test.cpp)
 add_executable(entity_raycast_test tests/entity_raycast_test.cpp ${CORE_SOURCES})
+add_executable(autoland_sweep tests/autoland_sweep.cpp ${CORE_SOURCES})   # (not in ctest: a long benchmark, run by hand)
 if(MSVC)
   target_compile_definitions(flight_test PRIVATE _CRT_SECURE_NO_WARNINGS)
   target_compile_definitions(progression_test PRIVATE _CRT_SECURE_NO_WARNINGS)

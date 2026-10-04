@@ -33,7 +33,7 @@ struct Input {
 // (left stick pitch/roll, triggers throttle) and the arrow keys / PgUp / PgDn / Home / End stay as fixed alternates.
 enum Action {
   ACT_PITCH_DN = 0, ACT_PITCH_UP, ACT_ROLL_L, ACT_ROLL_R, ACT_YAW_L, ACT_YAW_R, ACT_THR_UP, ACT_THR_DN, ACT_TRIM_UP, ACT_TRIM_DN,
-  ACT_FLAPS_DN, ACT_FLAPS_UP, ACT_GEAR, ACT_BRAKE, ACT_PARK, ACT_AP, ACT_LIGHTS, ACT_ENGINE, ACT_TIME,
+  ACT_FLAPS_DN, ACT_FLAPS_UP, ACT_GEAR, ACT_BRAKE, ACT_PARK, ACT_AP, ACT_STUNT, ACT_LIGHTS, ACT_ENGINE, ACT_TIME,
   ACT_CAMERA, ACT_HUD, ACT_MAP, ACT_MINIMAP, ACT_RADIO, ACT_ANR, ACT_ZOOM,
   ACT_CLOAK, ACT_WEAPONS, ACT_FIRE, ACT_BOMB, ACT_COUNT
 };
@@ -135,6 +135,7 @@ private:
   vec2 cloudOff;
   int diversion = -1;
   bool apWasOn = false;
+  int stuntNext = 0;            // the next aerobatic figure the aerobatics key flies (Plane::Stunt)
   int apDest = -1;              // airport picked on the GPS for the autopilot to fly to and land at
   bool apCruising() const;
   void engageAutopilot();

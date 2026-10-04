@@ -128,24 +128,28 @@ int main() {
     for (int i = 0; i < 480 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, 0); mg = std::max(mg, p.gLoad); }
     ok = !p.ev.crashed && mg > 60.f; printf("XR-11 full pull at 600 m/s: %.0f g %s\n", mg, ok ? "ok" : "FAIL"); fails += !ok;
   }
-  // ---------------- autopilot: stable holds in turbulence, and autoland at Solace Capital for every aircraft
+  // ---------------- autopilot: stable holds in turbulence, and autoland at Solace Capital for every aircraft. The
+  // autopilot flies each type to its own envelope (steep banks, hard pulls): what's checked is that it gets there, settles,
+  // and never goes past the airframe's limits.
   for (int i = 0; i < 9; i++) {
     const AircraftSpec& s = kAircraft[i];
     Weather wx; wx.windSpeed = 7; wx.windFrom = 200; wx.turbulence = 0.25f; wx.gust = 2;
     Plane p; p.reset(&s, vec3(0, 1800, 2000), 30, s.maxFuel * 0.6f, 100, true, s.cruise * 0.85f);
     p.ctl.gearDown = !s.retract; p.gear = p.ctl.gearDown ? 1.f : 0.f; p.ctl.throttle = 0.7f;
     p.apEngage(Plane::AP_HOLD, -1, wx);
-    float maxBank = 0, rmsP = 0; int nP = 0;
+    float maxBank = 0, rmsP = 0, maxG = 1, minG = 1; int nP = 0;
     for (int k = 0; k < 120 * 60 && !p.ev.crashed; k++) {
       if (k == 10 * 60) { p.apHeading = wrapDeg360(p.apHeading + 90.f); p.apAlt += 200.f; }
       p.step(1 / 60.f, wx, k / 60.f);
-      if (k > 10 * 60) maxBank = std::max(maxBank, fabsf(p.bankDeg()));
+      if (k > 10 * 60) { maxBank = std::max(maxBank, fabsf(p.bankDeg())); maxG = std::max(maxG, p.gLoad); minG = std::min(minG, p.gLoad); }
       if (k > 90 * 60) { rmsP += p.w.z * p.w.z; nP++; }
     }
     float he = fabsf(wrapAngle((p.apHeading - p.heading()) * DEG) / DEG), ae = fabsf(p.apAlt - p.pos.y);
     rmsP = sqrtf(rmsP / std::max(nP, 1)) / DEG;
-    bool ok = !p.ev.crashed && he < 6.f && ae < 40.f && maxBank < (s.special ? 50.f : 38.f) && rmsP < 4.f;
-    printf("AP hold %-16s hdg err %4.1f  alt err %5.1f m  max bank %4.1f  roll-rate rms %4.2f deg/s  %s\n", s.name, he, ae, maxBank, rmsP, ok ? "ok" : "FAIL"); fails += !ok;
+    const PerfModel& P = Plane::perf(&s);
+    bool ok = !p.ev.crashed && he < 3.f && ae < 20.f && maxBank < 88.f && maxG < P.gLimit * 0.95f && minG > P.gNeg * 0.95f && rmsP < 4.f;
+    printf("AP hold %-16s hdg err %4.1f  alt err %5.1f m  max bank %4.1f  g %+.1f..%+.1f (limits %+.0f..%+.0f)  roll-rate rms %4.2f deg/s  %s\n", s.name, he, ae, maxBank,
+           minG, maxG, P.gNeg, P.gLimit, rmsP, ok ? "ok" : "FAIL"); fails += !ok;
   }
   {
     int ai = g_world.findAirport("CAP"); const Airport& A = g_world.airports[ai];
@@ -168,6 +172,31 @@ int main() {
       bool ok = !p.ev.crashed && p.apDone && td && tdVs < 3.0f && along < A.length * 0.5f && cross < A.width * 0.5f;
       printf("AP autoland %-16s %s after %4.0f s  touchdown %.1f m/s  stop %4.0f m from centre, %4.1f m off the centreline, go-arounds %d %s%s\n", s.name,
              p.apDone ? "landed" : "NOT DONE", k / 60.f, tdVs, along, cross, goArounds, p.ev.crashed ? p.ev.crashReason.c_str() : "", ok ? " ok" : " FAIL");
+      fails += !ok;
+    }
+  }
+  // ---------------- aerobatics: every figure on a light single, the airliner and the Wraith. It must set itself up,
+  // fly the figure inside the airframe's limits and level off into a hold on the heading the figure ends on.
+  for (int si : {0, 5, (int)kWraith}) {
+    const AircraftSpec& s = kAircraft[si];
+    const PerfModel& P = Plane::perf(&s);
+    Weather calm; calm.windSpeed = 0; calm.turbulence = 0;
+    for (int f = 0; f < Plane::STUNT_COUNT; f++) {
+      Plane p; p.reset(&s, vec3(-WORLD_HALF * 0.55f, 1500, WORLD_HALF * 0.55f), 90, s.maxFuel * 0.6f, 150, true, s.cruise * 0.8f);
+      if (g_world.height(p.pos.x, p.pos.z) > 200.f) p.pos.y = g_world.height(p.pos.x, p.pos.z) + 1500.f;
+      p.ctl.gearDown = !s.retract; p.gear = p.ctl.gearDown ? 1.f : 0.f; p.ctl.throttle = 0.7f;
+      p.apStuntBegin(f, calm);
+      float h0 = p.heading(), maxG = 1, minG = 1; bool flew = false; int k = 0;
+      for (; k < 240 * 60 && !p.ev.crashed && p.apMode == Plane::AP_STUNT; k++) {
+        p.step(1 / 60.f, calm, k / 60.f);
+        if (p.apStuntStep > 0) { if (!flew) h0 = p.heading(); flew = true; maxG = std::max(maxG, p.gLoad); minG = std::min(minG, p.gLoad); }
+      }
+      float turned = fabsf(wrapAngle((p.heading() - h0) * DEG) / DEG);
+      bool reverses = f == Plane::STUNT_IMMELMANN || f == Plane::STUNT_SPLIT_S || f == Plane::STUNT_WINGOVER;
+      bool ok = !p.ev.crashed && flew && p.apMode == Plane::AP_HOLD && p.apStuntAbort.empty() && maxG < P.gLimit && minG > P.gNeg &&
+                (reverses ? turned > 120.f : turned < 30.f) && fabsf(p.bankDeg()) < 20.f;
+      printf("Stunt %-16s %-12s %5.1f s  g %+5.1f..%+5.1f  heading change %3.0f  %s%s\n", s.name, Plane::stuntName(f), k / 60.f, minG, maxG, turned,
+             p.ev.crashed ? p.ev.crashReason.c_str() : p.apStuntAbort.c_str(), ok ? "  ok" : "  FAIL");
       fails += !ok;
     }
   }

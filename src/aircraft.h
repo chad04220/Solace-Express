@@ -44,6 +44,24 @@ static const int kWraith = 8;      // hidden XR-11 Wraith stealth aerobatic rese
 // XR-11 thruster pods (body coords, +z aft): front left, front right, rear left, rear right pivot points
 static const vec3 kWraithPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.08f, -3.3f), vec3(-2.75f, 0.05f, 3.45f), vec3(2.75f, 0.05f, 3.45f)};
 
+// What an aircraft can do, learned by flying it: Plane::perf() flies a few short test sorties through the flight model
+// (once per type, cached) and measures its envelope. The autopilot flies to these numbers, so it pushes every type to
+// its own limits and re-learns them by itself if the flight model changes.
+struct PerfModel {
+  float vs1 = 0, vs0 = 0;          // stall speed clean / full flap (m/s), from the wing's CLmax at the test weight
+  float vy = 0, roc = 0;           // best-climb speed and the climb rate there at full power (m/s)
+  float sinkIdle = 0;              // descent rate gliding at idle, full flap and gear, 1.25 Vs0 (m/s, positive down)
+  float rollRate = 0;              // roll rate at full aileron at cruise (rad/s; it scales with airspeed)
+  float gPerStick = 0;             // load factor change per unit of elevator at cruise (it scales with dynamic pressure)
+  float tG = 0;                    // how long the airframe takes to answer the elevator (s, step to peak g)
+  float qPerStick = 0, tQ = 0;     // pitch rate per unit of elevator at cruise (rad/s, scales with airspeed), time to it (s)
+  float tRoll = 0;                 // roll-mode time constant (s, full aileron to 63% of the roll rate)
+  float gPull = 0;                 // load factor a full aft stick reaches at cruise (before any limiter)
+  float gLimit = 0, gNeg = 0;      // structural limits (positive, negative)
+  float gUse = 0;                  // what the pilot may pull: within the structure, the stall and its pull authority
+  float bankMax = 0;               // steepest bank it may hold in a level turn (deg)
+};
+
 struct Controls {
   float pitch = 0, roll = 0, yaw = 0;  // -1..1 (pitch +1 = nose up, roll +1 = right, yaw +1 = right)
   float throttle = 0;                  // 0..1
@@ -77,17 +95,28 @@ public:
   vec3 windVel;               // current wind incl. gusts
   float density = 1.225f;
   // ---- autopilot: HOLD (heading / altitude / speed), NAV (to a chosen airport), APPR (approach, flare, rollout)
-  enum ApMode { AP_OFF = 0, AP_HOLD, AP_NAV, AP_APPR };
+  enum ApMode { AP_OFF = 0, AP_HOLD, AP_NAV, AP_APPR, AP_STUNT };
+  // aerobatic figures the autopilot flies (aircraft_stunt.cpp), each sized to this airframe's envelope
+  enum Stunt { STUNT_LOOP = 0, STUNT_ROLL, STUNT_BARREL, STUNT_IMMELMANN, STUNT_SPLIT_S, STUNT_CUBAN, STUNT_WINGOVER, STUNT_COUNT };
+  static const char* stuntName(int figure);
   enum ApStage { APS_NAV = 0, APS_FINAL, APS_FLARE, APS_ROLLOUT, APS_GOAROUND, APS_HOVER };
   bool apOn = false; int apMode = AP_OFF;
   float apHeading = 0, apAlt = 0, apSpeed = 0, apVS = 0; bool apUseVS = false;
-  float apPitchI = 0, apRollI = 0, apThrI = 0.5f, apXI = 0;
+  float apPitchI = 0, apRollI = 0, apThrI = 0.5f, apXI = 0, apGamI = 0, apTrimEst = 0, apFlareTau = 0;
   int apAirport = -1, apStage = 0, apLeg = 0; bool apRev = false; float apStageT = 0, apCruiseAlt = 0, apFinalLen = 8000;
   vec3 apLd, apTd;            // landing direction and touchdown point of the chosen runway end
   vec3 apHoldC; float apHoldR = 1500, apHoldAlt = 0, apIntAlt = 0; int apHoldDir = 1, apTurnDir = 0, apClimbDir = 0; float apGs = 0.0524f, apDrift = 0;   // descent orbit and intercept altitude
   bool apDone = false;        // an autoland just finished (the game sets the parking brake)
   std::string apStatus;       // one-line status for the HUD
   void apEngage(int mode, int airport, const Weather& wx);
+  // start a figure: the autopilot first gets the speed and height it needs (diving or climbing), then flies it and
+  // levels off into a hold. Any ground in the way aborts it into a recovery.
+  void apStuntBegin(int figure, const Weather& wx);
+  void apStuntStop();   // cut the figure short: recover to level flight (or just hold, while still setting up)
+  int apStunt = 0, apStuntStep = 0, apStuntDir = 1;   // figure, its step (0 setting up), roll direction
+  float apStuntAng = 0, apStuntT = 0, apStuntV = 0, apStuntN = 0, apStuntHdg = 0, apStuntSpeedAfter = 0, apStuntBank0 = 0;
+  vec3 apStuntRight0;          // the wing axis when the pull started: a figure keeps it, whatever the attitude
+  std::string apStuntAbort;   // why the last figure was cut short ("" if it wasn't)
   void apDisengage() { apOn = false; apMode = AP_OFF; apUseVS = false; }
   float maxG = 1, minG = 1;
   float flightTime = 0;
@@ -115,11 +144,16 @@ public:
   float cd0Value() const { return cd0; }
   // fly-by-wire rate command of the research craft: full-stick pitch and roll rates (rad/s)
   float fbwPitchMax(float V) const { V = std::max(V, 1.f); return spec->special == 2 ? clampf(80.f * G0 / V, 2.0f, 6.0f) : clampf(66.f * G0 / V, 1.8f, 5.2f); }
+  static const PerfModel& perf(const AircraftSpec* s);   // learned once per type (aircraft_perf.cpp)
   float fbwRollMax(float hover) const { return (spec->special == 2 ? 7.0f : 5.5f) * (1.f - 0.6f * hover); }
 private:
   void substep(float dt, const Weather& wx, float time);
   void apGuidance(float dt);
   void apControl(float dt);
+  bool apStuntFly(float dt);   // true when it flew the controls itself this step (false: setting up, normal loops)
+  void apRates(float qT, float pT, float rollCap, float nzMin, float nzMax, float dt);   // the shared inner loops
+  float apAltGain() const;   // altitude error -> climb rate (1/s), as fast as this airframe's pitch answers at this speed
+  float apPitchLag() const;  // how long this airframe's pitch takes to answer at this speed (s)
   float apPlan(int airport, bool rev, const Weather& wx, bool commit);
   void apHover(float dt);
   void wraithThrust(vec3& F, vec3& T, float podThrust, vec3 wd, vec3 Taero, vec3 surfMax, float dt);

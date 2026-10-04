@@ -37,6 +37,7 @@ const ActionInfo kActions[ACT_COUNT] = {
   {"flapsDown", "Flaps down / pods to VTOL", 1, 'F', PAD_B},    {"flapsUp", "Flaps up / pods forward", 1, 'V', PAD_X},
   {"gear", "Landing gear", 1, 'G', PAD_Y},                      {"brake", "Wheel brakes", 1, K_SPACE, PAD_A},
   {"parkingBrake", "Parking brake", 1, 'B', PAD_LEFT},          {"autopilot", "Autopilot", 1, 'Z', PAD_RS},
+  {"aerobatics", "Aerobatics: fly the next figure / stop", 1, 0xBA, 0},
   {"lights", "Landing lights", 1, 'L', 0},                      {"engine", "Engine start", 1, 'I', 0},
   {"timeAccel", "Time acceleration", 1, 'T', 0},
   {"camera", "Cycle camera", 2, 'C', PAD_BACK},                 {"hud", "Show / hide HUD", 2, 'H', 0},
@@ -430,7 +431,7 @@ void Game::flightControls(float dt) {
     padP = padP * fabsf(padP) * 0.4f + padP * 0.6f; padR = padR * fabsf(padR) * 0.4f + padR * 0.6f;
   }
   bool manual = fabsf(pitchIn) + fabsf(rollIn) > 0 || fabsf(padP) + fabsf(padR) > 0.3f;
-  bool apNav = plane.apOn && plane.apMode == Plane::AP_APPR;
+  bool apNav = plane.apOn && (plane.apMode == Plane::AP_APPR || plane.apMode == Plane::AP_STUNT);
   if (plane.apOn) {
     if (apNav) {   // flying a GPS route / autoland: any real stick input hands control back
       if (fabsf(pitchIn + padP) > 0.5f || fabsf(rollIn + padR) > 0.5f) {
@@ -504,6 +505,19 @@ void Game::flightControls(float dt) {
     if (plane.apOn) { plane.apDisengage(); g_audio.trigger(SFX_AP_DISC); toast("Autopilot OFF", vec3(1, 0.7f, 0.3f)); }
     else if (plane.onGround) toast("Autopilot needs to be airborne", vec3(1, 0.6f, 0.4f));
     else engageAutopilot();
+  }
+  // aerobatics: the autopilot flies the next figure, sized to this aircraft (it climbs or dives for the height and
+  // speed first); pressed again it stops the figure and recovers to level flight
+  if (actPressed(ACT_STUNT)) {
+    if (plane.onGround) toast("Aerobatics need to be airborne", vec3(1, 0.6f, 0.4f));
+    else if (plane.apOn && plane.apMode == Plane::AP_STUNT) { plane.apStuntStop(); toast("Aerobatics: recovering to level flight", vec3(1, 0.85f, 0.5f)); }
+    else {
+      plane.apStuntBegin(stuntNext, wx);
+      toast(fmt("Aerobatics: %s", Plane::stuntName(plane.apStunt)), vec3(0.6f, 1, 0.6f));
+      toast("Any stick input hands control back", vec3(0.8f, 0.8f, 0.8f));
+      stuntNext = (stuntNext + 1) % Plane::STUNT_COUNT;
+      g_audio.trigger(SFX_CLICK);
+    }
   }
   if (actPressed(ACT_LIGHTS)) { landingLight = !landingLight; toast(landingLight ? "Landing lights ON" : "Landing lights OFF"); }
   if (actPressed(ACT_ENGINE) && !plane.engineRunning && plane.fuel > 0) { plane.starterTime = 0.01f; toast("Engine start"); }
