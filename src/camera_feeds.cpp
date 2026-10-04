@@ -2,6 +2,7 @@
 #include "renderer.h"
 #include <algorithm>
 #include <cstdio>
+#include <cmath>
 
 FeedMounts g_feedMounts[3];
 
@@ -34,6 +35,10 @@ void Renderer::measureFeedMounts(const FrameParams& fp) {
   const int S = 240; const float step = 0.025f;   // out to 6 m
   std::vector<vec3> pts;
   for (int i = 0; i < n; i++) for (int s = 0; s < S; s++) pts.push_back(E + mt[i].dir * (s * step));
+  // the nose: along the centreline, ahead of the eye, from 1.2 m below it to 0.4 m above
+  const int NY = 17, NZ = 320; const float nstep = 0.04f;   // out to 12.8 m ahead
+  const size_t n0 = pts.size();
+  for (int j = 0; j < NY; j++) for (int s = 0; s < NZ; s++) pts.push_back(E + vec3(0.f, -1.2f + j * 0.1f, -s * nstep));
   float ps[4] = {fp.plane.PS[0], fp.plane.PS[1], fp.plane.PS[2], 0.f}, ctl[4] = {0, 0, 0, 0};   // the outside shape, controls centred
   glUniform1i(glGetUniformLocation(progHullBake, "uHStN"), 1);
   glUniform4fv(glGetUniformLocation(progHullBake, "uHStPS"), 1, ps);
@@ -46,9 +51,13 @@ void Renderer::measureFeedMounts(const FrameParams& fp) {
     for (int s = 0; s < S; s++) if (d[(size_t)i * S + s] < 0.f) last = s;
     fm.skin[i] = last < 0 ? 0.f : (last + 1) * step;
   }
+  fm.nose = vec3(0.f, 0.f, -fm.skin[0]);
+  float best = 0.f;
+  for (int j = 0; j < NY; j++) for (int s = 0; s < NZ; s++)
+    if (d[n0 + (size_t)j * NZ + s] < 0.f && s * nstep > best) { best = s * nstep; fm.nose = vec3(0.f, -1.2f + j * 0.1f, -(s + 1) * nstep); }
   fm.ok = true;
   static const bool dbg = getenv("FEEDDBG") != nullptr;
-  if (dbg) { printf("feed mounts (rig %d):", rig); for (int i = 0; i < n; i++) printf(" %.2f", fm.skin[i]); printf("\n"); }
+  if (dbg) { printf("feed mounts (rig %d):", rig); for (int i = 0; i < n; i++) printf(" %.2f", fm.skin[i]); printf("  nose %.2f %.2f\n", fm.nose.y, fm.nose.z); }
 }
 
 // Draw the cameras due this frame into their atlas tiles: the ones without a picture yet and the bomb camera first,
@@ -140,4 +149,15 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
   }
   feedPass = false;
   swapView(feedView);
+  static const char* dump = getenv("FEEDDUMP");   // (debug: write the atlas as it stands after this frame's feeds)
+  if (dump) {
+    std::vector<float> px((size_t)kFeedAtlasW * kFeedAtlasH * 4);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboFeed); glReadBuffer(GL_COLOR_ATTACHMENT0);
+    glReadPixels(0, 0, kFeedAtlasW, kFeedAtlasH, GL_RGBA, GL_FLOAT, px.data());
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    std::vector<uint8_t> rgb((size_t)kFeedAtlasW * kFeedAtlasH * 3);
+    for (size_t i = 0; i < (size_t)kFeedAtlasW * kFeedAtlasH; i++)
+      for (int c = 0; c < 3; c++) { float v = px[i * 4 + c]; v = v / (1.f + v); rgb[i * 3 + c] = (uint8_t)(255.f * powf(std::max(v, 0.f), 1.f / 2.2f)); }
+    writePNG(dump, kFeedAtlasW, kFeedAtlasH, rgb);
+  }
 }

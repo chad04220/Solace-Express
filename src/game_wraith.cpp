@@ -221,7 +221,8 @@ void Game::buildFeedCameras(FrameParams& fp) {
   for (int i = 0; i < n; i++) {
     FeedCamera& c = fp.feeds[i];
     c.on = true;
-    c.pos = fp.plane.pos + toWorld(E + mt[i].dir * (fm.skin[i] + 0.03f));   // the lens, 3 cm off the skin
+    vec3 lens = mt[i].nose ? fm.nose + vec3(0.f, 0.f, -0.03f) : mt[i].dir * (fm.skin[i] + 0.03f);   // 3 cm off the skin
+    c.pos = fp.plane.pos + toWorld(E + lens);
     c.right = toWorld(mt[i].right); c.up = toWorld(mt[i].up); c.back = toWorld(mt[i].back);
     c.tanX = mt[i].tanX; c.tanY = mt[i].tanY; c.w = mt[i].w; c.h = mt[i].h;
   }

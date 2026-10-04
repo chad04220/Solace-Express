@@ -25,6 +25,7 @@ struct FeedMount {
   vec3 right, up, back;      // the panel's frame: the picture is upright on the panel and keeps its left and right
   float tanX, tanY;
   int w, h;
+  bool nose = false;         // forward looking: mounted at the tip of the nose instead (the nose stays out of its picture)
 };
 
 inline int feedRigOf(int special) { return special == 1 ? 1 : special == 2 ? 2 : 0; }   // 1 XR-9, 2 XR-11
@@ -57,6 +58,7 @@ inline int feedRig(int rig, float quality, FeedMount out[kMaxFeeds]) {
       m.right = vec3(cosf(c), 0.f, sinf(c)); m.up = vec3(0, 1, 0); m.back = vec3(-sinf(c), 0.f, cosf(c));
       m.tanX = tx; m.tanY = ty;
       m.h = (int)(260.f * quality + 0.5f); m.w = (int)(m.h * tx / ty + 0.5f);
+      m.nose = true;
     }
     out[3] = feedPanel(vec3(0.635f, 0.04f, 0.24f), vec3(-1, 0, 0), vec3(0, 1, 0), vec2(0.3f, 0.2f), true, quality * 1.3f);
     out[4] = feedPanel(vec3(0.635f, 0.04f, 0.24f), vec3(-1, 0, 0), vec3(0, 1, 0), vec2(0.3f, 0.2f), false, quality * 1.3f);
@@ -78,12 +80,14 @@ inline int feedRig(int rig, float quality, FeedMount out[kMaxFeeds]) {
     out[9] = feedPanel(vec3(0.f, -0.775f, -0.66f), vec3(0, 1, 0), F, vec2(0.4f, 0.34f), false, quality);
     out[10] = feedPanel(vec3(0.47f, -0.705f, 0.4f), vec3(-0.3714f, 0.9285f, 0.f), F, vec2(0.14f, 0.2f), true, quality * 1.4f);
     out[11] = feedPanel(vec3(0.47f, -0.705f, 0.4f), vec3(-0.3714f, 0.9285f, 0.f), F, vec2(0.14f, 0.2f), false, quality * 1.4f);
+    out[0].nose = out[1].nose = out[2].nose = out[8].nose = true;   // the front wrap and the chin pane
     return 12;
   }
   return 0;
 }
 
-// Where each rig camera's lens sits: the distance from the eye along its dir to the outside of the skin, measured
-// once per craft from the airframe's own shape (Renderer::measureFeedMounts). Until then no camera is placed.
-struct FeedMounts { bool ok = false; float skin[kMaxFeeds] = {}; };
+// Where each rig camera's lens sits: the distance from the eye along its dir to the outside of the skin, and the tip
+// of the nose (cockpit frame) for the forward cameras, measured once per craft from the airframe's own shape
+// (Renderer::measureFeedMounts). Until then no camera is placed.
+struct FeedMounts { bool ok = false; float skin[kMaxFeeds] = {}; vec3 nose; };
 extern FeedMounts g_feedMounts[3];   // by rig
