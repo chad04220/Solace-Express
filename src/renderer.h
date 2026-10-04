@@ -10,7 +10,7 @@
 #include "entity_mesh.h"
 #include "feed_cameras.h"
 
-struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft; };
+struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft, bill = 0; };   // bill > 0: x,y,z is the centre of a camera-facing square of that half size
 enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7, SPR_RIBBON = 8, SPR_FLAME = 9 };
 
 struct PlaneVisual {
@@ -96,7 +96,7 @@ public:
   GLuint minimapTex = 0;
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
-  static constexpr int kProgramCount = 18;
+  static constexpr int kProgramCount = 19;
   float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
   // analysis tool (--analyze): exact per-pass times (the GPU is waited on at every pass boundary) and a build of the
   // ray tracer that writes its per-pixel work counters instead of colour
@@ -154,7 +154,7 @@ private:
   GLuint progCkMask = 0;           // cockpit occlusion mask for the scenery pass
   bool depthValid = false, ckMaskPrev = false;   // last frame's ray-traced depth is usable / was a cockpit view
   void renderDisplays(const FrameParams& fp, bool panel);
-  GLuint progRT = 0, progSprite = 0, progDown = 0, progUp = 0, progRayMask = 0, progRay = 0, progPost = 0, progUI = 0, progTAA = 0;
+  GLuint progRT = 0, progSprite = 0, progDown = 0, progUp = 0, progRayMask = 0, progRay = 0, progPost = 0, progUI = 0, progTAA = 0, progFeedRays = 0;
   static constexpr int kBloomMips = 6;
   GLuint fboMip[kBloomMips] = {}, texMip[kBloomMips] = {}; int mipW[kBloomMips] = {}, mipH[kBloomMips] = {};
   GLuint fboRay[2] = {0, 0}, texRay[2] = {0, 0};
@@ -250,7 +250,8 @@ private:
   bool feedPass = false;               // drawing a camera feed (the scenery pass leaves streaming and shadows alone)
   bool feedsWanted(const FrameParams& fp) const;
   void measureFeedMounts(const FrameParams& fp);
-  void renderFeeds(const FrameParams& fp, const std::function<void(GLuint, const FrameParams&)>& setRT, const std::function<void(const FrameParams&, GLuint)>& trace);
+  void renderFeeds(const FrameParams& fp, const std::function<void(GLuint, const FrameParams&)>& setRT, const std::function<void(const FrameParams&, GLuint)>& trace,
+                   const std::function<void(const FrameParams&)>& effects);
   // offscreen frames (the launch prewarm): the composite and the UI go to a hidden target instead of the window
   GLuint fboOff = 0, texOff = 0; int offW = 0, offH = 0;
 public:

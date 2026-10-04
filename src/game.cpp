@@ -1701,11 +1701,11 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
 }
 
 void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, std::vector<SpriteVert>& add) {
-  vec3 cr = fp.camRight, cu = fp.camUp;
+  vec3 cr = fp.camRight;
+  // billboards are turned to face whichever camera draws them (the main view or a cockpit camera) in the vertex shader
   auto bill = [&](std::vector<SpriteVert>& v, vec3 p, float s, vec3 col, float a, int kind, float soft) {
-    vec3 c0 = p - cr * s - cu * s, c1 = p + cr * s - cu * s, c2 = p + cr * s + cu * s, c3 = p - cr * s + cu * s;
-    SpriteVert q[4] = {{c0.x, c0.y, c0.z, 0, 0, col.x, col.y, col.z, a, (float)kind, soft}, {c1.x, c1.y, c1.z, 1, 0, col.x, col.y, col.z, a, (float)kind, soft},
-                       {c2.x, c2.y, c2.z, 1, 1, col.x, col.y, col.z, a, (float)kind, soft}, {c3.x, c3.y, c3.z, 0, 1, col.x, col.y, col.z, a, (float)kind, soft}};
+    SpriteVert q[4] = {{p.x, p.y, p.z, 0, 0, col.x, col.y, col.z, a, (float)kind, soft, s}, {p.x, p.y, p.z, 1, 0, col.x, col.y, col.z, a, (float)kind, soft, s},
+                       {p.x, p.y, p.z, 1, 1, col.x, col.y, col.z, a, (float)kind, soft, s}, {p.x, p.y, p.z, 0, 1, col.x, col.y, col.z, a, (float)kind, soft, s}};
     v.push_back(q[0]); v.push_back(q[1]); v.push_back(q[2]); v.push_back(q[0]); v.push_back(q[2]); v.push_back(q[3]);
   };
   auto quadAx = [&](std::vector<SpriteVert>& v, vec3 p, vec3 ax, vec3 ay, vec3 col, float a, int kind, float soft) {

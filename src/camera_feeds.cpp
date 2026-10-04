@@ -60,11 +60,10 @@ void Renderer::measureFeedMounts(const FrameParams& fp) {
   if (dbg) { printf("feed mounts (rig %d):", rig); for (int i = 0; i < n; i++) printf(" %.2f", fm.skin[i]); printf("  nose %.2f %.2f\n", fm.nose.y, fm.nose.z); }
 }
 
-// Draw the cameras due this frame into their atlas tiles, a few per frame: of the ones whose display is in view, the
-// bomb camera first, then those without a picture, then the oldest pictures (a display turned to comes up first;
-// each picture in view is a few frames old at most, like a real feed's latency).
+// Draw this frame's picture of every camera whose display is in view into its atlas tile (a display out of view keeps
+// its last picture and is redrawn as soon as it comes into view).
 void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuint, const FrameParams&)>& setRT,
-                           const std::function<void(const FrameParams&, GLuint)>& trace) {
+                           const std::function<void(const FrameParams&, GLuint)>& trace, const std::function<void(const FrameParams&)>& effects) {
   if (!feedsWanted(fp)) {
     if (feedRigNow) { for (bool& v : feedValid) v = false; feedRigNow = 0; }
     return;
@@ -110,7 +109,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     }
   }
   // which cameras this frame
-  static const int perFrame = getenv("FEEDS") ? std::max(1, atoi(getenv("FEEDS"))) : 2;
+  static const int perFrame = getenv("FEEDS") ? std::max(1, atoi(getenv("FEEDS"))) : kMaxFeeds;   // (FEEDS: a cap, for testing)
   const float ty = tanf(fp.fovY * 0.5f), tx = ty * W / std::max(H, 1);
   auto inView = [&](const FeedCamera& c) {   // its display's bounding sphere against the view frustum
     vec3 d = c.screen - fp.camPos;
@@ -135,7 +134,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     FrameParams cf = fp;   // the scene as this camera sees it: from outside the aircraft
     cf.camPos = c.pos; cf.camRight = c.right; cf.camUp = c.up; cf.camBack = c.back;
     cf.fovY = 2.f * atanf(c.tanY);
-    cf.plane.PS[3] = 0.f; cf.dispMode = 0; cf.feedRig = 0;
+    cf.plane.PS[3] = 0.f; cf.dispMode = 0; cf.feedRig = 0; cf.sealedCockpit = false;
     W = rw = feedTileWH[k][0]; H = rh = feedTileWH[k][1];
     cw = (rw + 1) / 2; ch = (rh + 1) / 2;
     jitX = jitY = 0.f;
@@ -145,6 +144,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     if (hullWanted(cf)) { uint64_t hk = hullKey(cf, 0); if (hulls.count(hk)) drawHull(cf, 0, hk); }
     drawTrafficHulls(cf);
     trace(cf, progRT);
+    effects(cf);   // the sprites (smoke, fire, sparks ...) and the light shafts
     // into its tile
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fboScene); glReadBuffer(GL_COLOR_ATTACHMENT0);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fboFeed);

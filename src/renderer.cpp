@@ -115,7 +115,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {kFullscreenVS, kCommonGLSL, kRaytraceFS, kRaytraceFS2, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRaytraceFS3, kRaytraceWraith, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kDownFS, kUpFS, kCockpitMaskFS, kRayMaskFS, kRayFS, kTaaFS, kPostFS, kUIVS, kUIFS, kRaytraceWraithCockpit, kEntVS, kEntFS1, kEntFS2, kEntShadowFS}) h = fnv1a(src, h);
+  for (const char* src : {kFullscreenVS, kCommonGLSL, kRaytraceFS, kRaytraceFS2, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRaytraceFS3, kRaytraceWraith, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kDownFS, kUpFS, kCockpitMaskFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kRaytraceWraithCockpit, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kHullBakeMain, kTShBakeMain}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -520,6 +520,7 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
   progUp = program(vsFS, kUpFS, error); step();
   progRayMask = program(vsFS, kRayMaskFS, error); step();
   progRay = program(vsFS, kRayFS, error); step();
+  progFeedRays = program(vsFS, kFeedRaysFS, error); step();
   progPost = program(vsFS, kPostFS, error); step();
   progTAA = program(vsFS, kTaaFS, error); step();
   if (!progSprite || !progDown || !progUp || !progRayMask || !progRay || !progPost || !progTAA) { error = "Shader: " + error; return false; }
@@ -681,6 +682,7 @@ bool Renderer::init(int w, int h) {
   glEnableVertexAttribArray(1); glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(SpriteVert), (void*)12);
   glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(SpriteVert), (void*)20);
   glEnableVertexAttribArray(3); glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(SpriteVert), (void*)36);
+  glEnableVertexAttribArray(4); glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(SpriteVert), (void*)44);
   glBindVertexArray(0);
 
   // heightmap
@@ -1136,8 +1138,79 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
       glActiveTexture(GL_TEXTURE0);
     }
   };
+  // the sprites (smoke, fire, sparks, rain, glints ...) over a view's picture; texRes: its depth texture's size
+  auto drawSprites = [&](const FrameParams& fp, float texW, float texH) {
+  glEnable(GL_BLEND);
+  glUseProgram(progSprite);
+  mat4 vp = viewProj(fp);
+  glUniformMatrix4fv(U(progSprite, "uViewProj"), 1, GL_FALSE, vp.m);
+  glUniform3f(U(progSprite, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
+  glUniform3f(U(progSprite, "uCamR"), fp.camRight.x, fp.camRight.y, fp.camRight.z);
+  glUniform3f(U(progSprite, "uCamU"), fp.camUp.x, fp.camUp.y, fp.camUp.z);
+  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progSprite, "uDepth"), 0);
+  glUniform2f(U(progSprite, "uRes"), texW, texH);
+  glUniform3f(U(progSprite, "uSunDir"), fp.sunDir.x, fp.sunDir.y, fp.sunDir.z);
+  glUniform3f(U(progSprite, "uSunCol"), fp.sunCol.x, fp.sunCol.y, fp.sunCol.z);
+  float amb = 0.08f + 0.35f * clampf(fp.sunDir.y + 0.1f, 0, 1);
+  glUniform3f(U(progSprite, "uAmb"), amb * 0.8f, amb * 0.9f, amb * 1.1f);
+  glUniform1f(U(progSprite, "uFogB"), fp.fogB);
+  glUniform1f(U(progSprite, "uTime"), fp.time);
+  glBindVertexArray(vaoSprite);
+  glBindBuffer(GL_ARRAY_BUFFER, vboSprite);
+  if (!alphaSprites.empty()) {
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);   // alpha keeps the pixel's class flag
+    glBufferData(GL_ARRAY_BUFFER, alphaSprites.size() * sizeof(SpriteVert), alphaSprites.data(), GL_STREAM_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, (GLsizei)alphaSprites.size());
+  }
+  if (!addSprites.empty()) {
+    glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
+    glBufferData(GL_ARRAY_BUFFER, addSprites.size() * sizeof(SpriteVert), addSprites.data(), GL_STREAM_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, (GLsizei)addSprites.size());
+  }
+  glDisable(GL_BLEND);
+  };
+  // a camera's picture gets the effects drawn after the ray trace too: the sprites and the light shafts
+  auto feedEffects = [&](const FrameParams& f) {
+    glBindFramebuffer(GL_FRAMEBUFFER, fboComp);   // (writes the ray tracer's colour)
+    GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
+    glViewport(0, 0, rw, rh);
+    drawSprites(f, (float)kFeedMaxW, (float)kFeedMaxH);
+    float rsx = 0, rsy = 0; vec3 rsp = f.camPos + f.sunDir * 10000.f;
+    bool sunFront = dot(f.sunDir, -f.camBack) > 0.f && project(f, rsp, rsx, rsy);
+    vec2 sunUV(rsx / W, 1.f - rsy / H);
+    float k = sunFront ? smoothstepf(-0.03f, 0.06f, f.sunDir.y) * (1.f - 0.7f * smoothstepf(0.85f, 1.f, f.cloudCover))
+            * (1.f - smoothstepf(0.6f, 1.6f, std::max(fabsf(sunUV.x - 0.5f), fabsf(sunUV.y - 0.5f)))) : 0.f;
+    if (k <= 0.001f || !progFeedRays) return;
+    int fw = std::min(std::max(16, rw / 4), bw), fh = std::min(std::max(16, rh / 4), bh);   // in a corner of the main view's shaft targets
+    glBindVertexArray(vaoEmpty);
+    glViewport(0, 0, fw, fh);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboRay[0]);
+    glUseProgram(progRayMask);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texRaw); glUniform1i(U(progRayMask, "uScene"), 0);
+    glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progRayMask, "uDepthTex"), 1);
+    glUniform2f(U(progRayMask, "uSun"), sunUV.x, sunUV.y); glUniform1f(U(progRayMask, "uAsp"), (float)W / H);
+    glUniform2f(U(progRayMask, "uUVS"), (float)rw / kFeedMaxW, (float)rh / kFeedMaxH);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboRay[1]);
+    glUseProgram(progRay);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texRay[0]); glUniform1i(U(progRay, "uTex"), 0);
+    glUniform2f(U(progRay, "uSun"), sunUV.x, sunUV.y); glUniform1f(U(progRay, "uJitter"), fmodf(f.time * 61.8f, 1.f));
+    glUniform2f(U(progRay, "uUVS"), (float)fw / bw, (float)fh / bh);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboComp);
+    glViewport(0, 0, rw, rh);
+    glUseProgram(progFeedRays);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texRay[1]); glUniform1i(U(progFeedRays, "uTex"), 0);
+    glUniform2f(U(progFeedRays, "uUVS"), (float)fw / bw, (float)fh / bh);
+    vec3 tint = normalize(f.sunCol + vec3(1e-3f)) * 0.55f * k;
+    glUniform3f(U(progFeedRays, "uRayK"), tint.x, tint.y, tint.z);
+    glEnable(GL_BLEND); glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDisable(GL_BLEND);
+    glActiveTexture(GL_TEXTURE0);
+  };
   // the research jets' cockpit cameras first: the displays show this frame's pictures
-  renderFeeds(fp, setRT, trace);
+  renderFeeds(fp, setRT, trace, feedEffects);
   // aircraft hull (rasterized; baked at the end of the frame that first needs it - see below)
   hullOn = false;
   const bool hullUse = hullWanted(fp);
@@ -1188,32 +1261,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glBindFramebuffer(GL_FRAMEBUFFER, fboSprite);
   GLenum one = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &one);
   glViewport(0, 0, W, H);
-  glEnable(GL_BLEND);
-  glUseProgram(progSprite);
-  mat4 vp = viewProj(fp);
-  glUniformMatrix4fv(U(progSprite, "uViewProj"), 1, GL_FALSE, vp.m);
-  glUniform3f(U(progSprite, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
-  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progSprite, "uDepth"), 0);
-  glUniform2f(U(progSprite, "uRes"), (float)W, (float)H);
-  glUniform3f(U(progSprite, "uSunDir"), fp.sunDir.x, fp.sunDir.y, fp.sunDir.z);
-  glUniform3f(U(progSprite, "uSunCol"), fp.sunCol.x, fp.sunCol.y, fp.sunCol.z);
-  float amb = 0.08f + 0.35f * clampf(fp.sunDir.y + 0.1f, 0, 1);
-  glUniform3f(U(progSprite, "uAmb"), amb * 0.8f, amb * 0.9f, amb * 1.1f);
-  glUniform1f(U(progSprite, "uFogB"), fp.fogB);
-  glUniform1f(U(progSprite, "uTime"), fp.time);
-  glBindVertexArray(vaoSprite);
-  glBindBuffer(GL_ARRAY_BUFFER, vboSprite);
-  if (!alphaSprites.empty()) {
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);   // alpha keeps the pixel's class flag
-    glBufferData(GL_ARRAY_BUFFER, alphaSprites.size() * sizeof(SpriteVert), alphaSprites.data(), GL_STREAM_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0, (GLsizei)alphaSprites.size());
-  }
-  if (!addSprites.empty()) {
-    glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
-    glBufferData(GL_ARRAY_BUFFER, addSprites.size() * sizeof(SpriteVert), addSprites.data(), GL_STREAM_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0, (GLsizei)addSprites.size());
-  }
-  glDisable(GL_BLEND);
+  drawSprites(fp, (float)W, (float)H);
 
   stamp(4);
   // ------------------------------------------------ bloom
@@ -1252,11 +1300,13 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texColor); glUniform1i(U(progRayMask, "uScene"), 0);
     glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progRayMask, "uDepthTex"), 1);
     glUniform2f(U(progRayMask, "uSun"), sunUV.x, sunUV.y); glUniform1f(U(progRayMask, "uAsp"), (float)W / H);
+    glUniform2f(U(progRayMask, "uUVS"), 1.f, 1.f);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindFramebuffer(GL_FRAMEBUFFER, fboRay[1]);
     glUseProgram(progRay);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texRay[0]); glUniform1i(U(progRay, "uTex"), 0);
     glUniform2f(U(progRay, "uSun"), sunUV.x, sunUV.y); glUniform1f(U(progRay, "uJitter"), fmodf(fp.time * 61.8f, 1.f));
+    glUniform2f(U(progRay, "uUVS"), 1.f, 1.f);
     glDrawArrays(GL_TRIANGLES, 0, 3);
   }
 

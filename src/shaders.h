@@ -4544,9 +4544,13 @@ void main(){
 
 static const char* kSpriteVS = R"(#version 330 core
 layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUV; layout(location=2) in vec4 aCol; layout(location=3) in vec2 aKind;
-uniform mat4 uViewProj; uniform vec3 uCamPos;
+layout(location=4) in float aBill;   // > 0: aPos is a billboard's centre, this its half size (it faces this view's camera)
+uniform mat4 uViewProj; uniform vec3 uCamPos; uniform vec3 uCamR; uniform vec3 uCamU;
 out vec2 vUV; out vec4 vCol; out float vDist; out vec2 vKind; out vec3 vWorld;
-void main(){ vUV = aUV; vCol = aCol; vKind = aKind; vWorld = aPos; vDist = length(aPos - uCamPos); gl_Position = uViewProj*vec4(aPos, 1.0); }
+void main(){
+  vec3 p = aPos + (uCamR*(aUV.x*2.0 - 1.0) + uCamU*(aUV.y*2.0 - 1.0))*aBill;
+  vUV = aUV; vCol = aCol; vKind = aKind; vWorld = p; vDist = length(p - uCamPos); gl_Position = uViewProj*vec4(p, 1.0);
+}
 )";
 static const char* kSpriteFS = R"(#version 330 core
 in vec2 vUV; in vec4 vCol; in float vDist; in vec2 vKind; in vec3 vWorld;
@@ -4674,9 +4678,10 @@ void main(){
 )";
 static const char* kRayMaskFS = R"(#version 330 core
 in vec2 vUV; out vec4 oColor; uniform sampler2D uScene; uniform sampler2D uDepthTex; uniform vec2 uSun; uniform float uAsp;
+uniform vec2 uUVS;   // the view's part of its textures (a camera feed uses a corner of larger ones)
 void main(){
-  vec3 c = texture(uScene, vUV).rgb;
-  float sky = step(9e5, texture(uDepthTex, vUV).r);
+  vec3 c = texture(uScene, vUV*uUVS).rgb;
+  float sky = step(9e5, texture(uDepthTex, vUV*uUVS).r);
   vec2 d = (vUV - uSun)*vec2(uAsp, 1.0);
   float near = exp(-dot(d, d)*2.2);
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
@@ -4685,18 +4690,23 @@ void main(){
 }
 )";
 static const char* kRayFS = R"(#version 330 core
-in vec2 vUV; out vec4 oColor; uniform sampler2D uTex; uniform vec2 uSun; uniform float uJitter;
+in vec2 vUV; out vec4 oColor; uniform sampler2D uTex; uniform vec2 uSun; uniform float uJitter; uniform vec2 uUVS;
 void main(){
   const int N = 56;
   vec2 dv = (uSun - vUV)/float(N)*0.92;
   vec2 p = vUV + dv*uJitter;
   vec3 acc = vec3(0.0); float decay = 1.0, wsum = 0.0;
   for (int i = 0; i < N; i++) {
-    acc += texture(uTex, clamp(p, vec2(0.0), vec2(1.0))).rgb*decay;
+    acc += texture(uTex, clamp(p, vec2(0.0), vec2(1.0))*uUVS).rgb*decay;
     wsum += decay; decay *= 0.965; p += dv;
   }
   oColor = vec4(acc/wsum*1.6, 1.0);
 }
+)";
+// A camera feed's light shafts, added over its picture (the main view adds its own in the composite)
+static const char* kFeedRaysFS = R"(#version 330 core
+in vec2 vUV; out vec4 oColor; uniform sampler2D uTex; uniform vec2 uUVS; uniform vec3 uRayK;
+void main(){ oColor = vec4(texture(uTex, vUV*uUVS).rgb*uRayK, 0.0); }
 )";
 // Temporal anti-aliasing resolve: reprojects the previous frame (world points through the camera; aircraft pixels
 // through the aircraft's own motion), clamps it to the current neighbourhood and blends. Averages away the per-frame
