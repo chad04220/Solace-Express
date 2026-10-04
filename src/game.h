@@ -72,6 +72,10 @@ public:
   void prewarm(const std::function<void(float, const std::string&)>& progress);
   int prewarmCraft = -1; bool prewarmInside = false;   // the menu tour shows this aircraft instead (prewarm only)
   bool wantFullscreenToggle = false;
+  // the pre-rendered menu montage (Windows: menu_video_win.cpp): returns the texture to show at this time, or 0 to
+  // ray trace the montage live; and sceneOnly, set while recording it (the scene without the menu on top)
+  std::function<unsigned(float)> menuVideo;
+  bool sceneOnly = false;
   void focusLost() { if (screen == SCR_FLIGHT && !crashed) paused = true; }   // the window lost focus: a flight pauses
   Settings set;
   std::string saveDir;

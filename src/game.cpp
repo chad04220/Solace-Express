@@ -2414,11 +2414,23 @@ void Game::update(float dt) {
 }
 
 void Game::render() {
-  FrameParams fp = buildFrame();
-  std::vector<SpriteVert> a, b;
-  buildSprites(fp, a, b);
-  g_ren.renderScene(fp, a, b);
+  // the main menu's montage from the pre-rendered video when there is one (the menu then costs next to nothing)
+  unsigned vid = screen == SCR_MENU && menuVideo && !sceneOnly ? menuVideo(realTime) : 0;
+  FrameParams fp;
+  if (!vid) {
+    fp = buildFrame();
+    std::vector<SpriteVert> a, b;
+    buildSprites(fp, a, b);
+    g_ren.renderScene(fp, a, b);
+  } else g_ren.clearScreen();
+  if (sceneOnly) return;
   g_ren.uiBegin();
+  if (vid) {   // cover the window, cropping the 16:9 picture as needed
+    float W = (float)g_ren.W, H = (float)g_ren.H, ar = 16.f / 9.f, sa = W / H;
+    float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
+    if (sa > ar) { float k = ar / sa; v0 = 0.5f - 0.5f * k; v1 = 0.5f + 0.5f * k; } else { float k = sa / ar; u0 = 0.5f - 0.5f * k; u1 = 0.5f + 0.5f * k; }
+    g_ren.image(vid, 0, 0, W, H, u0, v0, u1, v1, 1.f);
+  }
   uiDt = clampf(realTime - uiLastT, 0.f, 0.1f); uiLastT = realTime;
   switch (screen) {
     case SCR_MENU: drawMenu(); break;

@@ -1343,6 +1343,10 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
 }
 
 // ------------------------------------------------------------------ UI
+void Renderer::clearScreen() {
+  glBindFramebuffer(GL_FRAMEBUFFER, 0); glViewport(0, 0, W, H);
+  glDisable(GL_DEPTH_TEST); glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
+}
 void Renderer::uiBegin() { ui.clear(); curImg = 0; }
 
 static void quad(std::vector<UIVert>& v, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, vec3 c, float a, float mode, float hx = 0, float hy = 0, float p = 0, const vec3* c2 = nullptr) {

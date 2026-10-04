@@ -119,6 +119,7 @@ public:
   bool project(const FrameParams& fp, vec3 p, float& sx, float& sy) const;  // to window pixels
 
   // ---- immediate-mode 2D UI
+  void clearScreen();   // the window cleared to black (when no scene is drawn under the UI)
   void uiBegin();
   void rect(float x, float y, float w, float h, vec3 c, float a = 1.0f, float radius = 0.0f);
   void line(float x0, float y0, float x1, float y1, float th, vec3 c, float a = 1.0f);

@@ -81,6 +81,7 @@ things it can do headlessly.
 | `profile.bat` | what each ray-tracing feature costs |
 | `render_shots.bat` | screenshots of test scenes in `shots\` |
 | `render_loading.bat` | loading-screen pictures in `loading\` |
+| `render_menu.bat` | `menu.mp4`: the main-menu montage pre-rendered, played on the menu instead of the live ray tracing |
 
 Logs: `%APPDATA%\SolaceExpress\startup.log` (GPU, shader cache, shader errors). Saves and settings are in the same
 folder (`career.sav` with its `.bak`, `settings.cfg`, `radio_stations.txt`).
