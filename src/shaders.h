@@ -3457,7 +3457,7 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
       if (mid == 11) { vec3 sc = fusSection(lp.z); vec3 rad = vec3(lp.x, lp.y - sc.z, 0.0); if (dot(ln, rad) > 0.55*length(rad) && lp.y > gM[22].y - 0.9) mid = 1; }
       Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
       m.alb = gColBase; m.rough = 0.28;
-      bool interior = (mid >= 10 && mid <= 14) || mid >= 40;
+      bool interior = (mid >= 10 && mid <= 14) || (mid >= 40 && mid < 94);   // (94+: the light fixtures, outside)
       vec3 sec = fusSection(lp.z);
       vec4 WS = gM[23]; vec4 E = gM[22];
       int ck = int(gM[21].z + 0.5);
