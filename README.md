@@ -189,7 +189,7 @@ There are no third-party dependencies to install. The game only uses Win32, Open
 ctest --test-dir build -C Release      # flight model + campaign progression
 ```
 
-`tests/envelope_test.cpp` checks the terrain envelope never dips below the ground at any detail level, and `tests/hull_test.cpp` that the aircraft hull meshes are closed and consistently wound (a ray can't slip through). `tests/gameplay_test.cpp` (Linux dev build) flies Lesson 1 and a full approach and landing through the real game loop. `tests/render_harness.cpp` renders test frames headlessly with Mesa so you can check the shaders.
+`tests/envelope_test.cpp` checks the terrain envelope never dips below the ground at any detail level, and `tests/hull_test.cpp` that the aircraft hull meshes are closed and consistently wound (a ray can't slip through). `tests/gameplay_test.cpp` (Linux dev build) flies Lesson 1 and a full approach and landing through the real game loop. `tests/render_harness.cpp` renders test frames headlessly with Mesa so you can check the shaders. On Mesa's software renderer (llvmpipe) nearly all of a test render's time is compiling the ray tracer, so run it with `GALLIVM_PERF=nopt` (fast code generation: minutes instead of tens of minutes, near-identical images) and a roomy shader cache (`MESA_SHADER_CACHE_DIR=<dir> MESA_SHADER_CACHE_MAX_SIZE=8G`; once warm, a frame takes seconds). Pass several scenes as `multi:a,b,c` to share one compile, and add `~hulloff` or `~envoff` to a scene name to render it without the aircraft hulls or the terrain envelope in the same run, for side-by-side comparisons.
 
 ## Project layout
 
