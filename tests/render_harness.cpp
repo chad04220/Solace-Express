@@ -181,6 +181,11 @@ void main(){
                m[0] / (w * h), mx[0], m[1] / (w * h), mx[1], m[2] / (w * h), mx[2], m[3] / (w * h), mx[3]);
         g->render(); glFinish();
       }
+      if (getenv("DUMPRT")) {   // the ray tracer's raw output (debug modes that write values instead of colour)
+        std::vector<float> cm; int w = 0, h = 0; g_ren.readCostMap(cm, w, h);
+        std::string rp = "/tmp/claude-0/sp/raw_" + sc + ".f32";
+        if (FILE* f = fopen(rp.c_str(), "wb")) { fwrite(&w, 4, 1, f); fwrite(&h, 4, 1, f); fwrite(cm.data(), 4, cm.size(), f); fclose(f); }
+      }
       std::string out = "/tmp/claude-0/sp/shot_" + sc + ".ppm";
       g_ren.screenshot(out.c_str()); printf("wrote %s\n", out.c_str()); fflush(stdout);
       delete g;

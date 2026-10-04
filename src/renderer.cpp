@@ -944,7 +944,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform1i(U(p, "uTShOn"), tshFront >= 0 && !tshOff ? 1 : 0);
   glActiveTexture(GL_TEXTURE0 + 20); glBindTexture(GL_TEXTURE_2D, envOn ? texEnv : 0); glUniform1i(U(p, "uEnv"), 20);
   glUniform1i(U(p, "uEnvOn"), envOn ? 1 : 0);
-  glUniform1i(U(p, "uHullOn"), hullOn ? 1 : 0);
+  glUniform1i(U(p, "uHullOn"), hullOn ? 1 : 0); glUniform1f(U(p, "uHullNear"), hullNear(fp));
   {   // AI traffic: one row of 32 texels per aircraft
     if (!texTraffic) {
       glGenTextures(1, &texTraffic); glBindTexture(GL_TEXTURE_2D, texTraffic);

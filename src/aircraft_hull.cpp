@@ -26,8 +26,9 @@ void main(){
 const char* kHullFS = R"(
 in vec3 vW; uniform vec3 uCam; uniform float uFree; uniform int uPass;   // 0: inside faces only, 1: outside faces only
 out vec2 oT;   // written to the second channel only: distance along the pixel's ray, 0 on the hull's inside
-// Faces nearer than uFree are dropped: no part of the airframe is that close to the camera, so a ray may cross them
-// freely. Any face it then meets from inside solid space is a back face, and that pixel marches from the camera.
+// Faces nearer than uFree are dropped: the ray tracer marches every ray that far itself (in the cockpit the eye sits
+// inside the hull's margins, a few centimetres from the cabin roof). Beyond it, a ray in empty space meets an outside
+// face first (nothing lies before it), and a ray inside solid space an inside face (it just keeps marching).
 void main(){
   float t = length(vW - uCam);
   if (t < uFree || gl_FrontFacing != (uPass == 1)) discard;
@@ -185,20 +186,27 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
     if (mk == ~0ull) state[refine[r]] = 1;
     else if (mk) { state[refine[r]] = 2; mask[refine[r]] = mk; }
   }
-  // faces between solid and empty space; where a solid 0.25 m voxel meets a refined one, its face is split into the
-  // 16 sub-faces and only those in front of empty sub-voxels are kept, so the two resolutions join without a gap
+  // Faces between solid and empty space, as a watertight mesh: every corner is computed from integer lattice
+  // coordinates by one formula, so faces that meet share their edges bit for bit and rasterize without a pinhole. In
+  // the cockpit hull every face is laid on the 6.25 cm lattice (a 0.25 m face as its 16 parts), so no edge of a small
+  // face ever ends on the side of a big one either.
   std::vector<float> tri;
-  // face of a cube with centre c, half size h, outward along +-axis a. Faces of different sizes meet in T-junctions,
-  // where rasterization can leave pinholes a ray would slip through; each face reaches 2 mm past its edges to close
-  // them (more hull only ever starts a ray earlier).
-  auto quad = [&](vec3 c, int a, int sg, float h) {
-    int u = (a + 1) % 3, v = (a + 2) % 3;
-    vec3 base = c; (&base.x)[a] += sg * h;
-    vec3 eu, ev; (&eu.x)[u] = h + 0.002f; (&ev.x)[v] = h + 0.002f;
-    vec3 q0 = base - eu - ev, q1 = base + eu - ev, q2 = base + eu + ev, q3 = base - eu + ev;
+  const float U = inside ? kS2 : kS1;   // lattice unit
+  auto quadL = [&](int cx, int cy, int cz, int a, int sg) {   // face of lattice cell (cx,cy,cz), outward along +-axis a
+    int c[3] = {cx, cy, cz}, u = (a + 1) % 3, v = (a + 2) % 3;
+    int pa = c[a] + (sg > 0 ? 1 : 0);
+    auto P = [&](int du, int dv) { int l[3]; l[a] = pa; l[u] = c[u] + du; l[v] = c[v] + dv; return vec3(org + l[0] * U, org + l[1] * U, org + l[2] * U); };
+    vec3 q0 = P(0, 0), q1 = P(1, 0), q2 = P(1, 1), q3 = P(0, 1);
     vec3 o[6] = {q0, q1, q2, q0, q2, q3};
     if (sg < 0) { std::swap(o[1], o[2]); std::swap(o[4], o[5]); }
     for (auto& w : o) { tri.push_back(w.x); tri.push_back(w.y); tri.push_back(w.z); }
+  };
+  auto coarseFace = [&](int i, int j, int k, int a, int sg) {   // a whole 0.25 m face
+    if (!inside) { quadL(i, j, k, a, sg); return; }
+    for (int p = 0; p < 4; p++) for (int q = 0; q < 4; q++) {
+      int own[3]; own[a] = sg > 0 ? 3 : 0; own[(a + 1) % 3] = p; own[(a + 2) % 3] = q;
+      quadL(i * 4 + own[0], j * 4 + own[1], k * 4 + own[2], a, sg);
+    }
   };
   auto st1 = [&](int i, int j, int k) -> int { if (i < 0 || j < 0 || k < 0 || i >= n1 || j >= n1 || k >= n1) return 0; return state[((size_t)k * n1 + j) * n1 + i]; };
   auto sub = [&](int i, int j, int k, int si, int sj, int sk) -> bool {   // is sub-voxel (si,sj,sk) of level-1 voxel (i,j,k) solid
@@ -216,12 +224,12 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
       if (s == 1) {
         int ns2 = st1(ni, nj, nk);
         if (ns2 == 1) continue;
-        if (ns2 == 0) { quad(centre(kS1, i, j, k), a, sg, kS1 * 0.5f); continue; }
+        if (ns2 == 0) { coarseFace(i, j, k, a, sg); continue; }
         for (int p = 0; p < 4; p++) for (int q = 0; q < 4; q++) {   // the neighbour's sub-voxels against this face
           int sv[3]; sv[a] = sg > 0 ? 0 : 3; sv[(a + 1) % 3] = p; sv[(a + 2) % 3] = q;
           if (sub(ni, nj, nk, sv[0], sv[1], sv[2])) continue;
           int own[3] = {sv[0], sv[1], sv[2]}; own[a] = sg > 0 ? 3 : 0;
-          quad(centre(kS2, i * 4 + own[0], j * 4 + own[1], k * 4 + own[2]), a, sg, kS2 * 0.5f);
+          quadL(i * 4 + own[0], j * 4 + own[1], k * 4 + own[2], a, sg);
         }
       } else {
         uint64_t mk = mask[(int)(((size_t)k * n1 + j) * n1 + i)];
@@ -232,7 +240,7 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
           bool solid;
           if (t[a] >= 0 && t[a] <= 3) solid = (mk >> (t[0] + t[1] * 4 + t[2] * 16)) & 1;
           else { t[a] = (t[a] + 4) & 3; solid = sub(ni, nj, nk, t[0], t[1], t[2]); }
-          if (!solid) quad(centre(kS2, i * 4 + sv[0], j * 4 + sv[1], k * 4 + sv[2]), a, sg, kS2 * 0.5f);
+          if (!solid) quadL(i * 4 + sv[0], j * 4 + sv[1], k * 4 + sv[2], a, sg);
         }
       }
     }
@@ -243,12 +251,13 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
   glBufferData(GL_ARRAY_BUFFER, tri.size() * sizeof(float), tri.data(), GL_STATIC_DRAW);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   H.verts = (int)tri.size() / 3; H.key = key;
-  // the eye may sit in solid voxels (they reach up to ~17 cm from the airframe): nothing is nearer to it than the
-  // exact distance there, so the hull faces within that ball are ignored (see kHullFS)
-  H.ok = true; H.free = inside ? std::max(0.f, dEye / slack - 0.005f) : 0.f;
+  H.ok = true;
   if (getenv("HULLDBG")) printf("hull %s: %d states, %d+%d+%d points, %zu refined, %d triangles%s\n", inside ? "cockpit" : "outside", ns,
-                                n0 * n0 * n0, (int)c1.size(), (int)refine.size() * 64, refine.size(), H.verts / 3, H.free > 0.f ? " (clear ball at the eye)" : "");
+                                n0 * n0 * n0, (int)c1.size(), (int)refine.size() * 64, refine.size(), H.verts / 3, inside ? fmt(" (airframe %.3f m from the eye)", dEye).c_str() : "");
 }
+
+// how far every ray marches before the hull may let it skip ahead (cockpit: the cabin around the pilot's head)
+float Renderer::hullNear(const FrameParams& fp) const { return fp.plane.PS[3] > 0.5f ? 0.35f : 0.f; }
 
 bool Renderer::hullBaked(const FrameParams& fp) const {
   if (!hullWanted(fp)) return true;
@@ -304,14 +313,7 @@ void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key) {
   glUniformMatrix4fv(glGetUniformLocation(progHull, "uVP"), 1, GL_FALSE, vp.m);
   glUniform2f(glGetUniformLocation(progHull, "uJit"), jitX, jitY);
   glUniform3f(glGetUniformLocation(progHull, "uCam"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
-  // the clear ball was measured at the design eye; the camera may sit off it (head movement, zoom)
-  float freeR = 0.f;
-  if (slot == 1 && H.free > 0.f) {
-    const float* R = fp.plane.rot; vec3 dl = fp.camPos - fp.plane.pos;
-    vec3 lc(R[0] * dl.x + R[1] * dl.y + R[2] * dl.z, R[3] * dl.x + R[4] * dl.y + R[5] * dl.z, R[6] * dl.x + R[7] * dl.y + R[8] * dl.z);
-    freeR = std::max(0.f, H.free - length(lc - vec3(fp.plane.M[88], fp.plane.M[89], fp.plane.M[90])));
-  }
-  glUniform1f(glGetUniformLocation(progHull, "uFree"), freeR);
+  glUniform1f(glGetUniformLocation(progHull, "uFree"), hullNear(fp));
   glUniformMatrix3fv(glGetUniformLocation(progHull, "uRot"), 1, GL_FALSE, fp.plane.rot);
   glUniform3f(glGetUniformLocation(progHull, "uPos"), fp.plane.pos.x, fp.plane.pos.y, fp.plane.pos.z);
   if (!vaoHull) glGenVertexArrays(1, &vaoHull);

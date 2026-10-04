@@ -268,6 +268,13 @@ vec3 fusSection(float z){
 // Fuselage livery: a cheat line of constant width that follows the fuselage centreline (so it sweeps up with the
 // tail cone), fading in on the cowling and tapering only where the tail cone gets too slim to carry it, with a
 // pinstripe above it and a grey belly. Returns the paint colour; shared by the renderer and the geometry previewer.
+// Skin seams: 1 on a line of a family every `sp` (half width w), anti-aliased over the pixel's footprint px, fading
+// out where lines would crowd into the pixel; rivets: 1 on a row of dots every `ds` along a seam, offset `o` from it
+float seamLine(float x, float sp, float w, float px){ float d = abs(x - sp*floor(x/sp + 0.5)); return (1.0 - smoothstep(w, w + px, d))*smoothstep(sp*0.25, sp*0.06, px); }
+float rivetRow(float x, float y, float sp, float o, float ds, float px){
+  float dy = abs(abs(y - sp*floor(y/sp + 0.5)) - o), dx = abs(x - ds*floor(x/ds + 0.5));
+  return (1.0 - smoothstep(0.0028, 0.0028 + px, length(vec2(dx, dy))))*smoothstep(0.008, 0.002, px);
+}
 vec3 fuselagePaint(vec3 lp, vec3 sec){
   float hc = 0.0; for (int i = 2; i <= 7; i++) hc = max(hc, gM[i].z);   // cabin half height
   float w = min(hc*0.07, sec.y*0.32);                                     // half width of the cheat line
@@ -874,6 +881,36 @@ R"(    vec4 V0 = gM[14], V1 = gM[15];
     vec3 sec = fusSection(0.2);
     float ant = sdRoundBox(p - vec3(0.0, sec.z + sec.y + 0.11, 0.2), vec3(0.006, 0.12, 0.05), 0.004);
     res = opU(res, vec2(ant, 13.0));
+    float span = W0.x, rcd = W0.y, tcd = W0.z, swp = W0.w, thk = W1.w;
+    {   // pitot tube under the left wing: a faired mast and the probe pointing into the airflow
+      float ks = 0.62, ch = mix(rcd, tcd, ks), le = W1.y + swp*ks, sx = -span*ks;
+      float yu = W1.x + span*ks*W1.z - thk*ch*0.42;   // just inside the wing's underside at the quarter chord
+      vec3 mb = vec3(sx, yu - 0.1, le + ch*0.3);
+      vec3 q = p - mb;
+      if (dot(q, q) < 0.16) {
+        float pit = sdRoundBox(vec3(q.x, q.y - 0.055, q.z - 0.01), vec3(0.006, 0.06, 0.022), 0.005);
+        pit = min(pit, sdCapsule(q, vec3(0.0, 0.0, 0.02), vec3(0.0, 0.0, -0.2), 0.008));
+        res = opU(res, vec2(pit, 8.0));
+      }
+    }
+    {   // static dischargers: two wicks off each wing's trailing edge near the tip
+      float ks = 0.915, ch = mix(rcd, tcd, ks), te = W1.y + swp*ks + ch;
+      vec3 q = vec3(abs(p.x) - span*ks, p.y - (W1.x + span*ks*W1.z), p.z - te);
+      if (dot(q, q) < 0.09) {
+        float dz = (tcd - rcd)/span*0.035*span + swp/span*0.035*span;   // the trailing edge's slope over the wicks' spacing
+        float wk = min(sdCapsule(q, vec3(-0.035*span, 0.0, -dz - 0.01), vec3(-0.035*span, 0.0, -dz + 0.11), 0.0035),
+                       sdCapsule(q, vec3(0.035*span, 0.0, dz - 0.01), vec3(0.035*span, 0.0, dz + 0.11), 0.0035));
+        res = opU(res, vec2(wk, 6.0));
+      }
+    }
+    {   // VHF blade antenna under the belly, raked aft
+      float za = gM[23].w + 0.5; vec3 sb = fusSection(za);
+      vec3 q = p - vec3(0.0, sb.z - sb.y - 0.06, za);
+      if (dot(q, q) < 0.04) {
+        q.zy = rot2(q.zy, -0.35);
+        res = opU(res, vec2(sdRoundBox(q, vec3(0.004, 0.07, 0.035), 0.003), 8.0));
+      }
+    }
   }
   // ---------------- cockpit interior (only rendered from inside)
   // Ids: 10 panel (instruments drawn on it), 11 shell/floor, 12 seats, 13 controls, 14 glareshield & overhead,
@@ -1084,16 +1121,19 @@ vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
   bool jet = int(gM[0].z + 0.5) >= 5;   // XR-9 / XR-11: thin flattened shapes need finer steps
   int steps = gPS.w > 0.5 || jet ? 200 : 120;
   float relax = jet ? 0.65 : 0.8;
-  // started from the hull, just short of the surface: in the cabin the field overstates distances near the finest
-  // fittings (vent rims, bezels, the panel trimmed to the curved cowling), and a full step there can jump right past one
-  if (gPlStart > 0.0 && gPS.w > 0.5) relax = 0.5;
-  for (int i=0;i<200;i++){
-    if (i >= steps) break;
+  // A hit stops anywhere within the threshold of the surface, by an amount that depends on the steps that led there;
+  // on a thin rim or bezel that is enough to take the neighbouring face's normal. So it settles onto the surface with
+  // two full steps first (in the same loop: a second call of the airframe's distance would double the shader).
+  int settle = -1; float hitId = 0.0;
+  for (int i=0;i<202;i++){
+    if (i >= steps && settle < 0) break;
     vec2 d = mapPiece(lo + ld*t);
-    if (d.x < 0.0015*max(1.0, t*0.03)) return vec2(t, d.y);
+    if (settle >= 0) { t += d.x; settle++; if (settle == 2) return vec2(t, hitId); continue; }
+    if (d.x < 0.0015*max(1.0, t*0.03)) { hitId = d.y; settle = 1; t += d.x; continue; }
     t += d.x*relax;
     if (t > t1) break;
   }
+  if (settle >= 0) return vec2(t, hitId);
   return vec2(-1.0);
 }
 // Leaves gPI/gPP/gPR/gPC set to the piece that was hit (for shading)
@@ -1109,6 +1149,15 @@ vec2 tracePlane(vec3 ro, vec3 rd, float tmax){
   }
   pieceXf(bi);
   return best;
+}
+// The airframe along a camera ray, using the hull's start (hullT: 0 none, 1e30 no airframe on this ray): the first
+// uHullNear metres are marched as usual, then the march resumes where the hull says the airframe can begin.
+uniform float uHullNear;
+vec2 tracePlaneHull(vec3 ro, vec3 rd, float tmax, float hullT){
+  if (hullT <= 0.0) return tracePlane(ro, rd, tmax);
+  if (uHullNear > 0.0) { vec2 h = tracePlane(ro, rd, min(uHullNear, tmax)); if (h.x > 0.0) return h; }
+  gPlStart = hullT; vec2 h = tracePlane(ro, rd, tmax); gPlStart = 0.0;
+  return h;
 }
 // Other aircraft (AI traffic): bounding-sphere culled, then the same SDF march with that aircraft's data loaded.
 // Leaves the globals pointing at the closest hit's aircraft; the caller reloads with loadMain() / loadTraffic().
@@ -3180,11 +3229,12 @@ void main(){
   // window) needs nothing from outside, so only rays leaving through the windows trace the world.
   bool pod = false, cockpitView = uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0; vec2 h0 = vec2(-1.0);
   // the aircraft hull was rasterized along exactly this ray: start the airframe march where it is (0: on its inside)
+  // (0: march from the camera; the first uHullNear metres are always marched, the hull's faces there are ignored)
   float hullT = 0.0;
-  if (uHullOn == 1 && uWreck == 0) { float hv = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).g; hullT = hv > 1e29 ? hv : max(0.0, hv*0.999 - 0.1); }
+  if (uHullOn == 1 && uWreck == 0) { float hv = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).g; hullT = hv > 1e29 ? hv : (hv > 0.0 ? max(uHullNear, hv*0.999 - 0.1) : 0.0); }
   if (cockpitView) {
     bool jet = int(gM[0].z + 0.5) >= 5;
-    gPlStart = hullT; h0 = tracePlane(ro, rd, jet ? 6.0 : planeBound()*2.0); gPlStart = 0.0;
+    h0 = tracePlaneHull(ro, rd, jet ? 6.0 : planeBound()*2.0, hullT);
     if ((uDbg & 1024) != 0) {   // (debug: the hull's start against a march from the camera - red: the hull skipped a hit,
       vec2 hf = tracePlane(ro, rd, jet ? 6.0 : planeBound()*2.0);   // blue: a hit moved, green: the hull found one the camera's march didn't)
       vec3 dc = vec3(0.0);
@@ -3193,6 +3243,12 @@ void main(){
       else if (hf.x > 0.0 && abs(hf.x - h0.x) > 0.01) dc = vec3(0.0, 0.3, 1.0)*clamp(abs(hf.x - h0.x)*10.0, 0.3, 1.0);
       oColor = vec4(dc*50.0, 0.0); oDepth = 1.0; oCloudMask = 0.0;
       if ((uDbg & 2048) != 0) oColor = vec4(hullT, hf.x, h0.x, texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).g);   // (raw, for a readback)
+      if ((uDbg & 4096) != 0 && hf.x > 0.0) {   // (the 6.25 cm hull voxel holding the hit: its centre's distance, how far the hit is from it)
+        pieceXf(-1); vec3 lp = transpose(gPR)*(ro + rd*hf.x - gPP);
+        float org = -ceil(planeBound())*1.0; vec3 c = vec3(org) + (floor((lp - org)/0.0625) + 0.5)*0.0625;
+        oColor = vec4(mapPlane(c).x, length(c - lp), mapPlane(lp).x, float(int(mapPlane(lp).y + 0.5)));
+        oDepth = lp.x; oCloudMask = lp.y;
+      }
       return;
     }
     if (h0.x > 0.0) {
@@ -3232,9 +3288,7 @@ void main(){
   vec2 bh = pod ? vec2(-1.0) : traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
   int trafK = -1; vec2 trafH = vec2(-1.0);
   if (!pod && uTrafficN > 0) { trafH = traceTraffic(ro, rd, tmax, trafK); loadMain(); }
-  gPlStart = feed ? 0.0 : hullT;
-  vec2 ph = onScr || cloak || (cockpitView && !pod) ? vec2(-1.0) : (pod ? h0 : tracePlane(ro, rd, tmax));
-  gPlStart = 0.0;
+  vec2 ph = onScr || cloak || (cockpitView && !pod) ? vec2(-1.0) : (pod ? h0 : tracePlaneHull(ro, rd, tmax, feed ? 0.0 : hullT));
   float t = 1e9; int hit = 0;
   if (tT > 0.0) { t = tT; hit = 1; }
   if (tW > 0.0 && tW < t) { t = tW; hit = 2; }
@@ -3386,7 +3440,22 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
         bool body = lp.z > gM[1].x + 0.05 && lp.z < gM[8].x - 0.05 && abs(lp.x) < sec.x + 0.05 && abs(yr) < 1.05;
         if (body) {
           m.alb = fuselagePaint(lp, sec);
-          if (fract(lp.z/0.85) < 0.01) m.alb *= 0.8;
+          {   // skin panels: frames every 0.85 m around the body, stringer seams along it every 45 degrees round the
+              // section; rivet rows beside each; the cabin door's outline and handle on either side
+            float px = t*2.0*uTanHalf/uRes.y;
+            float rr = 0.5*(sec.x + sec.y), arc = atan(lp.y - sec.z, abs(lp.x))*rr;
+            float sm = max(seamLine(lp.z, 0.85, 0.0035, px), seamLine(arc, rr*0.7854, 0.0035, px));
+            float rv = max(rivetRow(arc, lp.z, 0.85, 0.018, 0.045, px), rivetRow(lp.z, arc, rr*0.7854, 0.018, 0.045, px));
+            float dz0 = WS.y + 0.03, dz1 = min(WS.w + 0.06, dz0 + 1.05), dy0 = sec.z - sec.y*0.5, dy1 = sec.z + sec.y*0.8 + 0.03;
+            if (abs(lp.x) > sec.x*0.55 && lp.z > dz0 - 0.05 && lp.z < dz1 + 0.05) {
+              vec2 dq = abs(vec2(lp.z - 0.5*(dz0 + dz1), lp.y - 0.5*(dy0 + dy1))) - 0.5*vec2(dz1 - dz0, dy1 - dy0) + 0.06;
+              float dd = length(max(dq, 0.0)) + min(max(dq.x, dq.y), 0.0) - 0.06;   // rounded-corner door outline
+              sm = max(sm, 1.0 - smoothstep(0.004, 0.004 + px, abs(dd)));
+              vec2 hq = abs(vec2(lp.z - (dz1 - 0.12), lp.y - (sec.z + 0.02))) - vec2(0.055, 0.012);
+              if (max(hq.x, hq.y) < 0.0) { m.alb = vec3(0.55, 0.56, 0.58); m.metal = 0.8; m.rough = 0.25; }   // handle
+            }
+            m.alb *= 1.0 - 0.32*sm; m.alb *= 1.0 + 0.12*rv; m.rough = mix(m.rough, 0.18, rv);
+          }
           float post = ck == 2 ? min(abs(lp.x) - 0.03, abs(abs(lp.x) - abs(E.x) - 0.42) - 0.035) : abs(lp.x) - 0.025;
           bool ws = lp.z > WS.x && lp.z < WS.y && lp.y > WS.z;
           float sideTop = sec.z + sec.y*0.78;
@@ -3414,7 +3483,18 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
         m.alb = gColBase*0.98;
         if (s > gM[9].x*0.9) m.alb = gColStripe;
         if (gM[19].w > 0.5 && cc < 0.045) { m.alb = vec3(0.06); m.rough = 0.6; }
-        if (fract(s/0.8) < 0.01 && cc > 0.05) m.alb *= 0.86;
+        {   // ribs every 0.8 m, the spars' seams along the span, rivets down them; a fuel cap on top of each wing
+          float px = t*2.0*uTanHalf/uRes.y;
+          float sm = seamLine(s, 0.8, 0.0035, px)*step(0.05, cc);
+          sm = max(sm, (1.0 - smoothstep(0.0035, 0.0035 + px, abs(cc - 0.22)*ch))*smoothstep(0.2, 0.05, px));
+          sm = max(sm, (1.0 - smoothstep(0.0035, 0.0035 + px, abs(cc - 0.68)*ch))*smoothstep(0.2, 0.05, px));
+          float rv = max(rivetRow(s, (cc - 0.22)*ch, 1e3, 0.0, 0.05, px), rivetRow(s, (cc - 0.68)*ch, 1e3, 0.0, 0.05, px));
+          m.alb *= 1.0 - 0.3*sm; m.alb *= 1.0 + 0.12*rv;
+          if (ln.y > 0.4) {
+            float fc = length(vec2(s - gM[9].x*0.42, (cc - 0.32)*ch));
+            if (fc < 0.045) { m.alb = vec3(0.6, 0.61, 0.63); m.metal = 0.85; m.rough = 0.3; if (fc > 0.036 || abs(lp.z - (gM[10].y + le + 0.32*ch)) < 0.005) m.alb *= 0.45; }
+          }
+        }
         if (gM[11].x > 0.5 && s < 1.6 && ln.y > 0.5 && cc < 0.7) m.alb *= 0.9;
       } else if (mid == 3) {
         m.alb = gColBase;

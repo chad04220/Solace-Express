@@ -211,7 +211,7 @@ public:
   int envChunks = 0;
 private:
   // ---- aircraft hull meshes (aircraft_hull.cpp): where each pixel's exact airframe march starts
-  struct HullMesh { uint64_t key = 0; GLuint vbo = 0; int verts = 0; bool ok = false; float free = 0; };
+  struct HullMesh { uint64_t key = 0; GLuint vbo = 0; int verts = 0; bool ok = false; };
   std::unordered_map<uint64_t, HullMesh> hulls;   // every airframe baked so far, outside and cockpit (keyed by hullKey)
   GLuint progHull = 0, progHullBake = 0, vaoHull = 0, texHPts = 0, texHOut = 0, fboHOut = 0, fboHull = 0, texHullDepth = 0;
   int hullDepthW = 0, hullDepthH = 0;
@@ -221,6 +221,7 @@ private:
   void bakeHull(const FrameParams& fp, int slot, uint64_t key);
   uint64_t hullKey(const FrameParams& fp, int slot) const;
   bool hullWanted(const FrameParams& fp) const;
+  float hullNear(const FrameParams& fp) const;
   void drawHull(const FrameParams& fp, int slot, uint64_t key);
   // offscreen frames (the launch prewarm): the composite and the UI go to a hidden target instead of the window
   GLuint fboOff = 0, texOff = 0; int offW = 0, offH = 0;
