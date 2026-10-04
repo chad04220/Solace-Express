@@ -44,6 +44,9 @@ std::string AtcVoice::atom(int v, const std::string& key) const {
 std::string AtcVoice::digit(int v, int d) const {
   auto it = lookup.find(std::string(kVoiceName[v]) + ".digit." + std::to_string(d)); return it == lookup.end() ? std::string() : it->second;
 }
+std::string AtcVoice::alpha(int v, char c) const {
+  auto it = lookup.find(std::string(kVoiceName[v]) + ".alpha." + std::string(1, c)); return it == lookup.end() ? std::string() : it->second;
+}
 std::string AtcVoice::text(const std::string& id) const { auto it = clips.find(id); return it == clips.end() ? std::string() : it->second.words; }
 std::string AtcVoice::atomO(const std::string& sp, const std::string& key) const {
   auto it = lookup.find("atom." + sp + "." + key); return it == lookup.end() ? std::string() : it->second;

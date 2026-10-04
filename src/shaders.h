@@ -164,6 +164,7 @@ uniform int uDebN; uniform vec4 uDeb[16]; uniform vec4 uDebQ[16];
 int gPI = -1; vec3 gPP; mat3 gPR; vec3 gPC;   // transform of the piece being traced / shaded
 uniform vec4 uM[24]; uniform vec4 uPS; uniform vec4 uCtl; uniform vec4 uPr; uniform vec4 uI0; uniform vec4 uI1; uniform vec4 uI2;
 uniform vec3 uColBase; uniform vec3 uColStripe;
+uniform vec3 uReg;   // the player's registration letters (character codes; registrationOf in aircraft.h)
 // copilot instrument cluster: the pilot's layout one seat over, shifted inboard so its bezel stays on the panel
 // (steam-gauge copilots get the six-pack only: engine gauges and radios stay with the pilot)
 vec2 coCluster(int ck){ return ck == 2 ? vec2(0.02, 0.2) : vec2(0.0, 0.16); }   // centre offset, half width
@@ -3501,8 +3502,8 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
               rv = max(rv, (1.0 - smoothstep(0.005, 0.005 + px, fd))*smoothstep(0.012, 0.003, px)*step(-0.2, yr));
             }
             m.alb *= 1.0 - 0.32*sm; m.alb *= 1.0 + 0.12*rv; m.rough = mix(m.rough, 0.18, rv);
-            // registration on the rear fuselage sides, "SX-" and three letters (one set per type; each traffic
-            // aircraft its own), reading front to back from either side
+            // registration on the rear fuselage sides, "SX-" and three letters (the player's from uReg, the one
+            // the towers call; each traffic aircraft its own), reading front to back from either side
             int nwr = int(gM[20].x + 0.5);
             float za = (nwr > 0 ? gM[20].z : WS.w) + 0.3, zb = gM[15].y - 0.15;
             if (zb - za > 0.6 && abs(lp.x) > sec.x*0.45 && lp.z > za && lp.z < zb) {
@@ -3513,7 +3514,7 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
               if (u > 0.0 && u < len && v > -0.2*hc && v < 1.2*hc) {
                 int ci = int(u/adv);
                 float hs = fract(sin(dot(vec3(gM[9].x, gM[0].x, gOwn ? 0.0 : float(gTrafK) + 1.0), vec3(12.9898, 78.233, 37.719)))*43758.5453);
-                int ch = ci == 0 ? 83 : ci == 1 ? 88 : ci == 2 ? 45 : 65 + int(fract(hs*float(3 + 7*ci))*25.99);
+                int ch = ci == 0 ? 83 : ci == 1 ? 88 : ci == 2 ? 45 : gOwn ? int(ci == 3 ? uReg.x : ci == 4 ? uReg.y : uReg.z) : 65 + int(fract(hs*float(3 + 7*ci))*25.99);
                 float s = hc/29.0;   // metres per font pixel
                 float soft = gTxtSoft; gTxtSoft = clamp(0.5*px/s, 0.09, 0.45);
                 float cov = glyphCov(vec2((u - float(ci)*adv - 0.5*adv)/s + 13.92, v/s), ch)*smoothstep(hc*0.3, hc*0.1, px);

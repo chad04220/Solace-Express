@@ -224,9 +224,12 @@ private:
   struct AtcFlight {
     int phase = 0;      // 0 greeting, 1 takeoff clearance, 2 handoff, 3 en route, 4 approach issued, 5 cleared to land, 6 done
     float t = 0, waitT = 0;
-    int dep = -1, arr = -1, call = 42;
+    int dep = -1, arr = -1;
     bool depRev = false, arrRev = false, airborne = false;
     int spoken = 0;   // tower transmissions heard so far
+    bool called[2] = {};   // departure / arrival tower: a call with the full registration has been heard (then abbreviated)
+    bool trafficSaid = false;   // the current wait for traffic (hold for an arrival, runway occupied) has been called
+    float trafficT = 0;         // how long that wait has lasted
   } atcF;
   void updateAtc(float dt);
   // every in-flight message the voices may say: the toasts, the lesson hints (with the lesson's id), the warnings

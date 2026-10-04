@@ -142,6 +142,54 @@ struct GameTest {
       printf("Arrival tower calls: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
     }
     if (!(g.screen == SCR_DEBRIEF && g.lastSuccess && g.career.location == c.to)) fails++;
+    // ---- the towers and the AI traffic: an aircraft on its landing roll down the runway
+    // a traffic aircraft on its landing roll, "along" metres past the threshold (held there: placed again every frame)
+    auto rollout = [&](int ai, float along) {
+      const Airport& ap = g_world.airports[ai];
+      TrafficCraft tc; tc.id = 9999; tc.spec = 0; tc.role = TrafficCraft::AIRPORT; tc.state = TrafficCraft::ROLLOUT; tc.airport = ai;
+      tc.pos = ap.threshold(false) + ap.dir() * along; tc.pos.y = ap.elev + 1.f; tc.speed = 9.f; tc.hdg = ap.heading * DEG;
+      for (auto& o : g.traffic.craft) if (o.id == 9999) { o = tc; return; }
+      g.traffic.craft.push_back(tc);
+    };
+    bool trafficSet = g.set.traffic; g.set.traffic = true;
+    auto towerSaid = [&](const char* what) {
+      for (auto& x : g.atc.history) if (x.rfind("TWR ", 0) == 0 && x.find(what) != std::string::npos) return true;
+      return false;
+    };
+    if (voices) {   // departure: lined up, traffic on the runway: hold; then cleared once it's gone
+      g.startFlight(g_story[0], 0, Career::SRC_LESSON);
+      g.traffic.craft.clear();
+      for (float tt = 0; tt < 30; tt += dt) { rollout(g.contract.from, 600.f); g.plane.ctl.brake = 1; g.plane.ctl.throttle = 0; g.update(dt); audio(dt); }
+      bool held = towerSaid("Hold position") && !towerSaid("cleared for takeoff");
+      g.set.traffic = false;   // (and the field empties)
+      for (float tt = 0; tt < 15; tt += dt) { g.plane.ctl.brake = 1; g.plane.ctl.throttle = 0; g.update(dt); audio(dt); }
+      bool cleared = towerSaid("cleared for takeoff");
+      for (auto& x : g.atc.history) printf("   voice: %s\n", x.c_str());
+      printf("Departure hold for traffic: %s\n", held && cleared ? "ok" : "FAIL"); fails += !(held && cleared);
+    }
+    if (voices) {   // arrival: the runway is occupied on final (continue), and still occupied on short final (go around)
+      g.career.location = g_world.findAirport("ORC");
+      g.startFlight(c, 1, Career::SRC_RENT);
+      g.plane.reset(&kAircraft[1], start, a.heading, 60, 150, true, kAircraft[1].vref + 6);
+      g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 3; g.atcF.airborne = true; g.atc.history.clear();
+      g.plane.ctl.flaps = 1.f; g.flapNotch = 1.f; s_pI = -2.f;
+      g.traffic.craft.clear(); g.set.traffic = true;
+      for (t = 0; t < 150 && g.screen == SCR_FLIGHT && !g.plane.onGround; t += dt) {
+        rollout(c.to, 300.f);
+        Plane& p = g.plane;
+        vec3 rel = p.pos - thr; float along = dot(vec3(rel.x, 0, rel.z), dir), lat = dot(vec3(rel.x, 0, rel.z), vec3(-dir.z, 0, dir.x));
+        float ideal = a.elev + std::max(0.f, (-along + 250.f)) * tanf(3.f * DEG);
+        float herr = wrapAngle((a.heading - clampf(lat * 0.08f, -20, 20) - p.heading()) * DEG) / DEG;
+        p.ctl.roll = clampf((clampf(herr * 2.f, -15, 15) - p.bankDeg()) * 0.05f + p.w.z * 0.3f, -1, 1);
+        pitchFor(p, clampf(-p.ias * tanf(3.f * DEG) + (ideal - p.pos.y) * 0.15f, -6, 1), dt);
+        p.ctl.throttle = clampf(0.35f + (p.spec->vref - p.ias) * 0.05f, 0, 1);
+        g.update(dt); audio(dt);
+      }
+      for (auto& x : g.atc.history) printf("   voice: %s\n", x.c_str());
+      bool ok = towerSaid("runway is occupied") && towerSaid("Go around") && !towerSaid("cleared to land");
+      printf("Arrival with the runway occupied: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
+    }
+    g.set.traffic = trafficSet;
     // ---- low frame rates keep simulated time: 5 s of 5 fps frames is 5 s of flight
     {
       g.startFlight(g_story[0], 0, Career::SRC_LESSON);

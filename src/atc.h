@@ -20,14 +20,16 @@ public:
   bool load(const std::string& dir);   // voice_index.txt; the clips are decoded on first use
   bool ok() const { return !clips.empty(); }
   // a transmission; "" in ids: a pause between sentences. radio: squelch around it; subtitle: show its text (the
-  // calls the game didn't already show); group: a newer call of the same group replaces a waiting one (levers)
-  struct Tx { std::vector<std::string> ids; std::string text; int prio = 0; bool radio = true, subtitle = false; std::string group; };
+  // calls the game didn't already show); group: a newer call of the same group replaces a waiting one (levers);
+  // tag: the caller's own marker, handed back when the transmission starts
+  struct Tx { std::vector<std::string> ids; std::string text; int prio = 0; bool radio = true, subtitle = false; std::string group; int tag = 0; };
   // the voice line (or the line assembled from fragments) for a message the game shows; mission: the lesson it
   // belongs to (picks the instructor or the examiner); pad: a gamepad is in use (lines that name its buttons)
   bool resolve(const std::string& message, const std::string& mission, bool pad, Tx& out) const;
   std::string line(int voice, const char* key) const;          // a full call, e.g. "greeting_morning"
   std::string atom(int voice, const std::string& key) const;   // a template fragment, e.g. "cleared_land"
   std::string digit(int voice, int d) const;                   // radio digit (tree, fife, niner)
+  std::string alpha(int voice, char c) const;                  // phonetic letter (Alfa .. Zulu)
   std::string text(const std::string& id) const;               // its words, for the subtitles
   void say(const Tx& tx);
   // starts the next queued transmission when the channel is free; returns it the frame it starts (empty ids if none)

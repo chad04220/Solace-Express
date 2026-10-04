@@ -9,6 +9,8 @@
 - Three recorded tower controller voices (North, Coast and Valley Tower); each airport keeps one
 - Calls come only from what's happening on your flight: a greeting, your takeoff clearance with the real wind, the handoff once you're clear (or "remain in the pattern" on circuits), straight-in or left-downwind joining instructions, the landing clearance on final, and "exit the runway when able" on the landing roll
 - Radio squelch around each call, the call text on screen, and nothing stale after a pause, crash or the end of a flight
+- The towers call you by the registration painted on your aircraft, the way real controllers do: in full on first contact ("Sierra X-ray Alfa Bravo Charlie"), then abbreviated ("Sierra Bravo Charlie")
+- The AI traffic is part of the exchange: hold for traffic on final or on the runway before takeoff, "number two, follow the aircraft ahead" (with a wake caution behind a much heavier aircraft), "continue approach, the runway is occupied", and a go-around call if it's still occupied on short final
 - A tower voice volume slider in Settings
 
 **Career menu redesign**

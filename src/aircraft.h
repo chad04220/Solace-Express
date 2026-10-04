@@ -30,6 +30,14 @@ struct AircraftSpec {
 };
 
 extern const AircraftSpec kAircraft[];
+// the aircraft's registration: "SX-" and three letters, painted on the rear fuselage (shaders.h, uReg) and the
+// call sign the towers use for it (Game::updateAtc)
+inline std::string registrationOf(const AircraftSpec& s) {
+  uint32_t h = 2166136261u; for (const char* c = s.id; *c; c++) h = (h ^ (uint8_t)*c) * 16777619u;
+  std::string r = "SX-";
+  for (int i = 0; i < 3; i++) { h = h * 1664525u + 1013904223u; r += (char)('A' + (h >> 8) % 26); }
+  return r;
+}
 extern const int kNumAircraft;   // career aircraft (market, rentals, contracts)
 static const int kResearchJet = 7; // hidden XR-9, only reachable from the research menu
 static const int kWraith = 8;      // hidden XR-11 Wraith stealth aerobatic research craft (research menu)

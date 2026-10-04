@@ -19,6 +19,7 @@ struct PlaneVisual {
   float M[24 * 4];          // model geometry (models.cpp packModel)
   float PS[4], Ctl[4], Pr[4], I0[4], I1[4], I2[4];  // state, controls, prop, instruments
   vec3 colBase, colStripe;
+  float reg[3] = {65, 65, 65};   // registration letters (character codes)
   float prop[2][4]; int propCount = 0;
   float hud[4] = {0, 0, 0, 0}, hud2[4] = {1, 0, 0, 0}, hudV[3] = {0, 0, -1}, hud3[4] = {0, 0, 0, 1000};  // research jet HUD data
   float flame[4] = {0, 0, 0, 0};  // research jet exhaust: spool, reheat, nozzle vector angle (rad), mach

@@ -299,7 +299,6 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   toast(fmt("Runway %02d, %s", a.rwyNumber(reverse), wx.describe().c_str()), vec3(0.8f, 0.8f, 0.8f));
   atc.cancel(); atcF = AtcFlight(); hintsVoiced.clear(); commsPending.clear();
   atcF.dep = c.from; atcF.arr = c.to; atcF.depRev = reverse;
-  { uint32_t h = 2166136261u; for (char ch : c.id) h = (h ^ (uint8_t)ch) * 16777619u; atcF.call = 10 + (int)(h % 90); }   // this flight's callsign number
   if (c.startAirborne) atcF.phase = 3;
 }
 
@@ -1470,6 +1469,7 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   pv.I1[2] = s.engineType == ENG_PISTON ? p.rpm / std::max(s.maxRpm, 1.f) : p.n1 / 100.f; pv.I1[3] = p.fuel / std::max(s.maxFuel, 1.f);
   pv.I2[0] = -p.q.rotate(p.w).y / DEG; pv.I2[1] = p.beta / DEG; pv.I2[2] = p.flaps; pv.I2[3] = p.gear;
   pv.colBase = s.colBase; pv.colStripe = s.colStripe;
+  { std::string r = registrationOf(s); for (int i = 0; i < 3; i++) pv.reg[i] = (float)r[3 + i]; }
   pv.propCount = modelProps(md, pv.prop);
   pv.hud[0] = p.ias; pv.hud[1] = p.pos.y; pv.hud[2] = p.heading(); pv.hud[3] = p.mach;
   pv.hud2[0] = p.gLoad; pv.hud2[1] = p.ctl.throttle; pv.hud2[2] = p.spec && p.spec->special == 1 ? jetNozzleAngle(p) / (0.5f * PI) : p.nozzle;   // XR-9: pitch vectoring (90 deg units) pv.hud2[3] = p.gear > 0.5f ? 1.f : 0.f;
@@ -1972,6 +1972,11 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
 // (or "remain in the pattern" for circuits), pattern-entry or straight-in instructions on the way into the
 // destination, the landing clearance once the aircraft is established on final for a runway, and "exit the runway"
 // on the landing roll. A go-around (climbing away after the clearance) brings a fresh approach call and clearance.
+// They call the aircraft by its registration (the one painted on it): in full on first contact with each tower, then
+// abbreviated (SX-ABC: "Sierra X-ray Alfa Bravo Charlie", then "Sierra Bravo Charlie"). The AI traffic at the field
+// is in the exchange too: a departure holds for traffic on final or on the runway, an arrival is told it is number two
+// behind an aircraft ahead of it on final (with a wake caution behind a much heavier one), the landing clearance waits
+// while the runway is occupied, and an aircraft still on the runway on short final means a go-around.
 void Game::updateAtc(float dt) {
   if (!atc.ok()) return;
   AtcFlight& F = atcF;
@@ -1980,8 +1985,30 @@ void Game::updateAtc(float dt) {
   const float kt = MS_TO_KT;
   float agl = plane.agl(), gs = length(vec3(plane.vel.x, 0, plane.vel.z));
   if (!plane.onGround && agl > 15.f) F.airborne = true;
-  auto callsign = [&](int v, std::vector<std::string>& ids) {
-    ids.push_back(atc.atom(v, "solace")); ids.push_back(atc.digit(v, F.call / 10)); ids.push_back(atc.digit(v, F.call % 10));
+  const std::string reg = registrationOf(*plane.spec);   // "SX-ABC"
+  auto callsign = [&](int v, bool arrival, std::vector<std::string>& ids, std::string& txt) {
+    int k = arrival && F.dep != F.arr;
+    bool full = !F.called[k];
+    std::string say = full ? reg.substr(0, 2) + reg.substr(3) : reg.substr(0, 1) + reg.substr(4);
+    for (char ch : say) ids.push_back(atc.alpha(v, ch));
+    ids.push_back("");
+    txt = (full ? reg : reg.substr(0, 1) + "-" + reg.substr(4)) + ", ";
+    return full ? k + 1 : 0;   // the Tx tag: updateComms marks the full form heard when it starts
+  };
+  // the AI traffic at an airport as its tower sees it: anything on the runway (lining up, on its takeoff run or its
+  // landing roll), and the nearest aircraft on final or turning onto it, with its distance from the field
+  struct RwyTraffic { bool onRunway = false, departing = false; const TrafficCraft* fin = nullptr; float finD = 1e9f; };
+  auto rwyTraffic = [&](int ai) {
+    RwyTraffic r; const Airport& ap = g_world.airports[ai];
+    for (auto& o : traffic.craft) {
+      if (!o.alive || o.role != TrafficCraft::AIRPORT || o.airport != ai) continue;
+      if (o.state == TrafficCraft::LINEUP || o.state == TrafficCraft::TAKEOFF) r.onRunway = r.departing = true;
+      if (o.state == TrafficCraft::ROLLOUT) r.onRunway = true;
+      vec3 d = o.pos - ap.pos(); d.y = 0;
+      bool fin = o.state == TrafficCraft::FINAL || (o.state == TrafficCraft::CIRCUIT && o.wp >= 3);
+      if (fin && length(d) < 7000.f && length(d) < r.finD) { r.fin = &o; r.finD = length(d); }
+    }
+    return r;
   };
   auto runway = [&](int v, int n, std::vector<std::string>& ids) { ids.push_back(atc.digit(v, n / 10)); ids.push_back(atc.digit(v, n % 10)); };
   auto wind = [&](int v, std::vector<std::string>& ids, std::string& txt) {   // the actual wind, or nothing when calm
@@ -1998,7 +2025,6 @@ void Game::updateAtc(float dt) {
     ids.push_back(atc.atom(v, "knots")); txt += " knots. ";
     ids.push_back("");
   };
-  auto csTxt = [&]() { return fmt("Solace %d, ", F.call); };
   const Airport& D = g_world.airports[F.dep];
   const Airport& A = g_world.airports[F.arr];
   int vd = atcStation(F.dep), va = atcStation(F.arr);
@@ -2006,18 +2032,33 @@ void Game::updateAtc(float dt) {
     case 0:   // on the ground at the departure airport: the greeting
       if (F.t > 2.5f) {
         const char* key = timeOfDay < 12.f ? "greeting_morning" : timeOfDay < 18.f ? "greeting_afternoon" : "greeting_evening";
-        AtcVoice::Tx tx; tx.ids.push_back(atc.line(vd, key)); tx.text = atc.text(tx.ids[0]); tx.prio = 10; tx.subtitle = true; tx.group = "tower";
+        AtcVoice::Tx tx; tx.prio = 10; tx.subtitle = true; tx.group = "tower";
+        tx.tag = callsign(vd, false, tx.ids, tx.text);
+        tx.ids.push_back(atc.line(vd, key)); tx.text += atc.text(tx.ids.back());
         atc.say(tx); F.phase = 1; F.waitT = 0;
       }
       break;
     case 1:   // lined up on the runway: cleared for takeoff (straight away if the aircraft is already rolling)
       if ((F.spoken >= 1 && F.waitT > 4.f && !atc.busy()) || gs > 4.f) {   // (after the greeting has been heard)
+        // traffic landing or departing first: hold (the clearance comes once it's clear, or after 90 s regardless)
+        RwyTraffic rt = rwyTraffic(F.dep);
+        if (gs <= 4.f && (rt.onRunway || (rt.fin && rt.finD < 4500.f)) && F.trafficT < 90.f) {
+          F.trafficT += dt;
+          if (!F.trafficSaid) {
+            AtcVoice::Tx tx; tx.prio = 85; tx.subtitle = true; tx.group = "tower";
+            tx.tag = callsign(vd, false, tx.ids, tx.text);
+            tx.ids.push_back(atc.line(vd, rt.departing ? "hold_departure" : rt.onRunway ? "hold_position" : "hold_arrival"));
+            tx.text += atc.text(tx.ids.back());
+            atc.say(tx); F.trafficSaid = true; F.waitT = 0;
+          }
+          break;
+        }
         AtcVoice::Tx tx; tx.prio = 90; tx.subtitle = true; tx.group = "tower";
-        callsign(vd, tx.ids); tx.text = csTxt();
+        tx.tag = callsign(vd, false, tx.ids, tx.text);
         wind(vd, tx.ids, tx.text);
         tx.ids.push_back(atc.atom(vd, "runway")); runway(vd, D.rwyNumber(F.depRev), tx.ids); tx.ids.push_back(atc.atom(vd, "cleared_takeoff"));
         tx.text += fmt("Runway %02d, cleared for takeoff.", D.rwyNumber(F.depRev));
-        atc.say(tx); F.phase = 2;
+        atc.say(tx); F.phase = 2; F.trafficSaid = false; F.trafficT = 0;
       }
       break;
     case 2:   // climbing out, clear of the field: handed on (circuits stay with the tower)
@@ -2054,11 +2095,19 @@ void Game::updateAtc(float dt) {
         bool straight = along < -2000.f && lat < 0.4f * -along && hdgAl > 0.7f;
         int n = A.rwyNumber(F.arrRev);
         AtcVoice::Tx tx; tx.prio = 60; tx.subtitle = true; tx.group = "tower";
-        callsign(va, tx.ids); tx.text = csTxt();
+        tx.tag = callsign(va, true, tx.ids, tx.text);
         tx.ids.push_back(atc.atom(va, straight ? "make_straight_in" : "enter_left_downwind")); runway(va, n, tx.ids);
         tx.ids.push_back(atc.atom(va, "report_final"));
         tx.text += straight ? fmt("Make straight-in runway %02d, report final.", n) : fmt("Enter left downwind runway %02d, report final.", n);
-        atc.say(tx); F.phase = 4; F.waitT = 0;
+        // the sequence: an aircraft on final closer in than this one lands first
+        RwyTraffic rt = rwyTraffic(F.arr);
+        if (rt.fin && rt.finD < dist) {
+          tx.ids.push_back(""); tx.ids.push_back(atc.line(va, "number_two")); tx.text += " " + atc.text(tx.ids.back());
+          if (kAircraft[rt.fin->spec].emptyMass > 2.5f * plane.spec->emptyMass) {
+            tx.ids.push_back(""); tx.ids.push_back(atc.line(va, "wake_caution")); tx.text += " " + atc.text(tx.ids.back());
+          }
+        }
+        atc.say(tx); F.phase = 4; F.waitT = 0; F.trafficSaid = false;
       }
       break;
     }
@@ -2069,13 +2118,30 @@ void Game::updateAtc(float dt) {
       float hdgAl = cosf((plane.heading() - (A.heading + (F.arrRev ? 180.f : 0.f))) * DEG);
       if (F.airborne && !plane.onGround && along < 0.f && along > -6000.f && lat < 500.f && agl < 500.f && hdgAl > 0.82f) {
         int n = A.rwyNumber(F.arrRev);
+        // the runway isn't free: an aircraft on it, or one ahead on final. Continue the approach until it is; still
+        // occupied on short final: go around
+        RwyTraffic rt = rwyTraffic(F.arr);
+        vec3 toA = A.pos() - plane.pos; toA.y = 0;
+        if (rt.onRunway || (rt.fin && rt.finD < length(toA) - 300.f)) {
+          AtcVoice::Tx tx; tx.subtitle = true; tx.group = "tower";
+          if (rt.onRunway && along > -700.f && agl < 90.f) {
+            tx.prio = 99; tx.tag = callsign(va, true, tx.ids, tx.text);
+            tx.ids.push_back(atc.line(va, "go_around_aircraft")); tx.text += atc.text(tx.ids.back());
+            atc.say(tx); F.phase = 5; F.waitT = 0; F.trafficSaid = false;
+          } else if (!F.trafficSaid) {
+            tx.prio = 80; tx.tag = callsign(va, true, tx.ids, tx.text);
+            tx.ids.push_back(atc.line(va, rt.onRunway ? "runway_occupied" : "clearance_follows")); tx.text += atc.text(tx.ids.back());
+            atc.say(tx); F.trafficSaid = true;
+          }
+          break;
+        }
         AtcVoice::Tx tx; tx.prio = 90; tx.subtitle = true; tx.group = "tower";
-        callsign(va, tx.ids); tx.text = csTxt();
+        tx.tag = callsign(va, true, tx.ids, tx.text);
         wind(va, tx.ids, tx.text);
         tx.ids.push_back(atc.atom(va, "runway")); runway(va, n, tx.ids); tx.ids.push_back(atc.atom(va, "cleared_land"));
         tx.text += fmt("Runway %02d, cleared to land.", n);
-        atc.say(tx); F.phase = 5; F.waitT = 0;
-      }
+        atc.say(tx); F.phase = 5; F.waitT = 0; F.trafficSaid = false;
+      } else if (F.airborne && plane.onGround && length(plane.pos - A.pos()) < 3000.f) F.phase = 5;   // landed without the clearance
       break;
     }
     case 5:   // cleared: the landing roll, or a go-around (climbing away again: a fresh approach call)
@@ -2123,6 +2189,7 @@ void Game::updateComms(float dt) {
   if (screen == SCR_FLIGHT && !crashed && !researchFlight) updateAtc(dt);
   AtcVoice::Tx st = atc.update(dt);
   if (!st.ids.empty() && st.subtitle) { toast("TOWER  " + st.text, vec3(0.55f, 1.f, 0.72f), false); atcF.spoken++; }
+  if (!st.ids.empty() && st.tag > 0) atcF.called[st.tag - 1] = true;
 }
 
 void Game::feedAudio() {
