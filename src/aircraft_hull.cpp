@@ -237,7 +237,7 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
       }
     }
   }
-  HullMesh& H = hull[slot];
+  HullMesh& H = hulls[key];
   if (!H.vbo) glGenBuffers(1, &H.vbo);
   glBindBuffer(GL_ARRAY_BUFFER, H.vbo);
   glBufferData(GL_ARRAY_BUFFER, tri.size() * sizeof(float), tri.data(), GL_STATIC_DRAW);
@@ -250,12 +250,18 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
                                 n0 * n0 * n0, (int)c1.size(), (int)refine.size() * 64, refine.size(), H.verts / 3, H.free > 0.f ? " (clear ball at the eye)" : "");
 }
 
+bool Renderer::hullBaked(const FrameParams& fp) const {
+  if (!hullWanted(fp)) return true;
+  return hulls.count(hullKey(fp, fp.plane.PS[3] > 0.5f ? 1 : 0)) != 0;
+}
+
 uint64_t Renderer::hullKey(const FrameParams& fp, int slot) const {
   const PlaneVisual& pv = fp.plane;
   uint64_t h = 1469598103934665603ull ^ (uint64_t)slot;
   auto mix = [&](const void* p, size_t n) { const uint8_t* b = (const uint8_t*)p; for (size_t i = 0; i < n; i++) { h ^= b[i]; h *= 1099511628211ull; } };
   mix(pv.M, sizeof(float) * 96);
-  if (slot == 0) { mix(&pv.lensN, sizeof(int)); mix(pv.lensP, sizeof(float) * 4 * pv.lensN); mix(pv.lensD, sizeof(float) * 4 * pv.lensN); }
+  // (not the light fixtures: their housings stand at most ~0.2 m proud of the airframe, inside the 0.25 m voxels'
+  // margin, so one hull serves the menu's airframe without them and the flight's with them)
   return h;
 }
 
@@ -264,14 +270,16 @@ uint64_t Renderer::hullKey(const FrameParams& fp, int slot) const {
 // fittings (vent rims, bezels) that the march from the eye happens to land on (HULLCOCKPIT turns it on to test).
 bool Renderer::hullWanted(const FrameParams& fp) const {
   const PlaneVisual& pv = fp.plane;
-  static const bool off = getenv("HULLOFF") != nullptr, cockpit = getenv("HULLCOCKPIT") != nullptr;
-  if (pv.PS[3] > 0.5f && !cockpit) return false;
+  static const bool off = getenv("HULLOFF") != nullptr;
+  if (pv.PS[3] > 0.5f && !hullCockpit) return false;
   return !off && progHull && progHullBake && pv.on && fp.wreck.pieces == 0 && pv.M[2] < 4.5f;
 }
 
-void Renderer::drawHull(const FrameParams& fp, int slot) {
+void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key) {
   hullOn = false;
-  HullMesh& H = hull[slot];
+  auto it = hulls.find(key);
+  if (it == hulls.end()) return;
+  HullMesh& H = it->second;
   if (!H.ok || !H.verts || !fboEnv) return;
   if (!fboHull) glGenFramebuffers(1, &fboHull);
   if (!texHullDepth || hullDepthW != rw || hullDepthH != rh) {

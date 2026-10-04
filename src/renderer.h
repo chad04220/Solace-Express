@@ -2,6 +2,7 @@
 #pragma once
 #include <chrono>
 #include <atomic>
+#include <unordered_map>
 #include "common.h"
 #include "gl.h"
 #include "world.h"
@@ -60,6 +61,7 @@ struct FrameParams {
   float time = 0;
   vec3 sunDir, sunCol; float night = 0;
   float planeTerrSh = 1.f;   // terrain's sun shadow at the player's aircraft (one value for the whole airframe, from the CPU)
+  bool prefetchOn = false; vec3 prefetchPos;   // scenery to have the worker threads build ahead (the menu tour's next place)
   float cloudCover = 0.3f, cloudBase = 1500, fogB = 0.0001f, wet = 0, snow = 0, lightning = 0, storm = 0;
   vec2 windOff;
   vec3 wind;   // surface wind velocity (m/s, the way the air moves): windsocks
@@ -210,7 +212,7 @@ public:
 private:
   // ---- aircraft hull meshes (aircraft_hull.cpp): where each pixel's exact airframe march starts
   struct HullMesh { uint64_t key = 0; GLuint vbo = 0; int verts = 0; bool ok = false; float free = 0; };
-  HullMesh hull[2];   // outside, cockpit
+  std::unordered_map<uint64_t, HullMesh> hulls;   // every airframe baked so far, outside and cockpit (keyed by hullKey)
   GLuint progHull = 0, progHullBake = 0, vaoHull = 0, texHPts = 0, texHOut = 0, fboHOut = 0, fboHull = 0, texHullDepth = 0;
   int hullDepthW = 0, hullDepthH = 0;
   bool hullOn = false;
@@ -219,7 +221,16 @@ private:
   void bakeHull(const FrameParams& fp, int slot, uint64_t key);
   uint64_t hullKey(const FrameParams& fp, int slot) const;
   bool hullWanted(const FrameParams& fp) const;
-  void drawHull(const FrameParams& fp, int slot);
+  void drawHull(const FrameParams& fp, int slot, uint64_t key);
+  // offscreen frames (the launch prewarm): the composite and the UI go to a hidden target instead of the window
+  GLuint fboOff = 0, texOff = 0; int offW = 0, offH = 0;
+public:
+  void setOffscreen(bool on);
+  bool hullBaked(const FrameParams& fp) const;   // the hull this frame wants is ready (or none is wanted)
+  bool hullCockpit = getenv("HULLCOCKPIT") != nullptr;   // cockpit hulls too (in testing)
+  bool tshPending() const { return tshBaking || tshFront < 0; }
+private:
+  GLuint screenFbo = 0;
   void drawEntities(const FrameParams& fp);
   void createGBuffer();
 };

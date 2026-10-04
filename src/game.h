@@ -1,5 +1,6 @@
 // Solace Express - game state, flight session, cameras, effects, UI
 #pragma once
+#include <functional>
 #include "common.h"
 #include <unordered_map>
 #include "world.h"
@@ -65,6 +66,10 @@ public:
   bool botControl = false;  // tests drive plane.ctl directly
   Input in;
   bool quit = false;
+  // launch: while the intro still shows, render the menu tour's first place offscreen until its scenery and shadows
+  // are in, and every light aircraft's hull is built (progress: fraction 0..1, what is being done)
+  void prewarm(const std::function<void(float, const std::string&)>& progress);
+  int prewarmCraft = -1; bool prewarmInside = false;   // the menu tour shows this aircraft instead (prewarm only)
   bool wantFullscreenToggle = false;
   Settings set;
   std::string saveDir;

@@ -189,6 +189,18 @@ void main(){
   }
   Game game;
   game.initHeadless();
+  if (scene == "prewarm") {   // the launch prewarm, then the menu's first frames as a player would see them open
+    game.debugScene("menu");
+    auto t0 = std::chrono::steady_clock::now();
+    game.prewarm([&](float f, const std::string& what) {
+      printf("prewarm %3.0f%%  %s  (%.1f s)\n", f * 100.f, what.c_str(), std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count()); fflush(stdout);
+    });
+    printf("prewarm: entities pending %d, hull ready %d\n", g_ren.entPending, 1);
+    for (int i = 0; i < 70; i++) { game.update(1.f / 60.f); game.render(); }   // into the first shot, past its fade-in
+    printf("menu: entities pending %d\n", g_ren.entPending);
+    g_ren.screenshot("/tmp/claude-0/sp/shot_prewarm.ppm"); printf("wrote shot_prewarm\n");
+    return 0;
+  }
   game.debugScene(scene);
   for (int i = 0; i < 3; i++) { game.update(1.f / 30.f); game.render(); }
   if (getenv("TAAM")) for (int i = 0, n = atoi(getenv("TAAM")); i < n; i++) { game.update(1.f / 60.f); game.render(); }   // moving frames

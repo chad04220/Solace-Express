@@ -1084,6 +1084,9 @@ vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
   bool jet = int(gM[0].z + 0.5) >= 5;   // XR-9 / XR-11: thin flattened shapes need finer steps
   int steps = gPS.w > 0.5 || jet ? 200 : 120;
   float relax = jet ? 0.65 : 0.8;
+  // started from the hull, just short of the surface: in the cabin the field overstates distances near the finest
+  // fittings (vent rims, bezels, the panel trimmed to the curved cowling), and a full step there can jump right past one
+  if (gPlStart > 0.0 && gPS.w > 0.5) relax = 0.5;
   for (int i=0;i<200;i++){
     if (i >= steps) break;
     vec2 d = mapPiece(lo + ld*t);

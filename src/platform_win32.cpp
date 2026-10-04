@@ -511,7 +511,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     if (d == 0 && compileState == 0) compileSecs = t;
     float sp = !ctx2 ? 0.f : compileState == 1 ? 1.f : d == 0 ? 0.8f * std::min(0.97f, 1.f - expf(-t / (estRT * 0.6f))) : 0.8f + 0.2f * (d - 1) / (Renderer::kProgramCount - 1);
     float wp = built ? 1.f : std::min(0.95f, t / 4.f);
-    float target = 0.12f * wp + 0.83f * sp;
+    float target = 0.1f * wp + 0.7f * sp;   // (the rest: textures, then the menu and the aircraft shells - see below)
     std::string stage = !ctx2 ? "PREPARING" : d == 0 ? (cached ? "LOADING SHADERS FROM CACHE" : "COMPILING RAY TRACING SHADERS")
                       : compileState == 0 ? "COMPILING SHADERS  " + std::to_string(d) + " / " + std::to_string(Renderer::kProgramCount) : "SHADERS READY";
     if (!built) stage += "   //   GENERATING THE SOLACE ISLANDS";
@@ -535,13 +535,17 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     if (FILE* f = fopen((g_shaderCacheDir + "\\compile_time.txt").c_str(), "w")) { fprintf(f, "%.1f\n", compileSecs); fclose(f); }
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   game.init(false);
-  introFrame(0.97f, "PREPARING TEXTURES", 1.f);
+  introFrame(0.82f, "PREPARING TEXTURES", 1.f);
   g_ren.renderScale = 1.0f; g_ren.quality = game.set.quality;
   GetClientRect(g_hwnd, &cr);
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) { stopIntro(false); fatal(g_ren.error); return 1; }
   {
     std::string cl = GetCommandLineA();
     bool tool = cl.find("--bench ") != std::string::npos || cl.find("--shots ") != std::string::npos || cl.find("--profile ") != std::string::npos || cl.find("--analyze") != std::string::npos || cl.find("--loadshots") != std::string::npos;
+    // a normal start loads the menu's first place and builds every aircraft's hull under the intro (rendered
+    // offscreen: the intro keeps the window), so the menu opens complete and no flight waits for a hull
+    if (!tool) game.prewarm([&](float f, const std::string& what) { introFrame(0.84f + 0.15f * f, what, 1.f); });
+    if (game.quit) { stopIntro(false); return 0; }
     stopIntro(!tool);   // the bench and shot tools draw straight away; a normal start fades the intro out
   }
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {

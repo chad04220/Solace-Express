@@ -1597,11 +1597,16 @@ static const MenuShot& menuShot(float t) { int n = (int)floorf(t / kMenuShotLen)
 void Game::menuTour(FrameParams& fp) {
   static Plane demo;
   static int lastCraft = -1;
-  const MenuShot& S = menuShot(realTime);
+  MenuShot S = menuShot(realTime);
+  if (prewarmCraft >= 0) S.craft = prewarmCraft;
   float u = realTime - floorf(realTime / kMenuShotLen) * kMenuShotLen;
   int ai = std::max(0, g_world.findAirport(S.ap));
   const Airport& a = g_world.airports[ai];
   if (lastCraft != S.craft) { demo.reset(&kAircraft[S.craft], a.pos() + vec3(0, 500, 0), 0, kAircraft[S.craft].maxFuel, 100, true, kAircraft[S.craft].cruise); lastCraft = S.craft; }
+  {   // the next place: its scenery is built in the background while this one plays
+    const MenuShot& N = menuShot(realTime + kMenuShotLen);
+    fp.prefetchOn = true; fp.prefetchPos = g_world.airports[std::max(0, g_world.findAirport(N.ap))].pos();
+  }
   // the aircraft passes over the airfield at mid-shot, on a heading turned from the runway's
   float hd = a.heading + S.turn;
   vec3 dir(sinf(hd * DEG), 0, -cosf(hd * DEG)), right = normalize(cross(dir, vec3(0, 1, 0)));
@@ -1617,7 +1622,7 @@ void Game::menuTour(FrameParams& fp) {
   demo.vel = dir * v; demo.onGround = false;
   demo.rpm = 2400; demo.gear = 0.f; demo.flaps = 0; demo.nozzle = 0; demo.ctl = Controls(); demo.ctl.throttle = 0.7f;
   demo.engineRunning = true; demo.engineSpool = 0.75f;
-  fillPlaneVisual(fp.plane, demo, realTime * 250.f, false);
+  fillPlaneVisual(fp.plane, demo, realTime * 250.f, prewarmInside);
   float size = std::max(demo.spec->span, demo.spec->fusLen), R = size * 2.4f + 10.f;
   vec3 up(0, 1, 0), cam, look;
   if (S.cam == 0) { cam = p + right * (R * 0.9f) + dir * (R * (0.45f - 0.03f * u)) + up * (R * 0.16f); look = p + dir * (size * 0.3f); fp.fovY = 50.f * DEG; }
@@ -1637,6 +1642,33 @@ void Game::menuTour(FrameParams& fp) {
   fp.camBack = -fwd; fp.camRight = normalize(cross(fwd, up)); fp.camUp = cross(fp.camRight, fwd);
   fp.vignette = 0.9f;
   fp.fade = smoothstepf(0.f, 0.9f, u) * smoothstepf(kMenuShotLen, kMenuShotLen - 0.9f, u);   // cut through black
+}
+
+void Game::prewarm(const std::function<void(float, const std::string&)>& progress) {
+  if (screen != SCR_MENU) return;
+  bool sync = g_ren.entSync;
+  // (offscreen only for these frames: the intro may draw through the same UI path in between)
+  auto frame = [&] { g_ren.setOffscreen(true); update(1.f / 60.f); render(); glFinish(); g_ren.setOffscreen(false); };
+  // the tour's first place: every scenery chunk in range, the shadow maps and the terrain shadow
+  g_ren.entSync = true;
+  realTime = 3.f;
+  progress(0.f, "LOADING THE MENU");
+  for (int i = 0; i < 12 && !quit; i++) {
+    realTime = 3.f; frame();
+    if (i >= 2 && g_ren.entPending == 0 && !g_ren.tshPending()) break;
+  }
+  g_ren.entSync = sync;
+  // every light aircraft's hull (outside, and the cockpit's when that is in use): a frame that wants one bakes it
+  std::vector<std::pair<int, bool>> todo;
+  for (int i = 0; i < kNumAircraft; i++) if (!kAircraft[i].special) { todo.push_back({i, false}); if (g_ren.hullCockpit) todo.push_back({i, true}); }
+  for (size_t k = 0; k < todo.size() && !quit; k++) {
+    prewarmCraft = todo[k].first; prewarmInside = todo[k].second;
+    progress(0.35f + 0.65f * k / todo.size(), std::string("BUILDING AIRCRAFT SHELLS  ") + kAircraft[prewarmCraft].name);
+    realTime = 3.f; frame();   // bakes it at the end of the frame, if this view uses one
+  }
+  prewarmCraft = -1; prewarmInside = false;
+  realTime = 0.f;
+  progress(1.f, "READY");
 }
 
 void Game::menuBackgroundCamera(FrameParams& fp) {

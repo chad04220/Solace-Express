@@ -563,7 +563,9 @@ void Renderer::bakeTerrainShadow(const FrameParams& fp) {
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
   GLenum b0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &b0);
   glViewport(0, 0, kTShN, kTShN);
-  int rows = tshFront < 0 ? kTShN : kTShRows;   // the very first bake in one go (it happens while loading)
+  // the very first bake in one go (it happens while loading), and the rest of one whenever the screen is black (the
+  // menu tour's cuts), so a new place never shows the last one's shadows
+  int rows = tshFront < 0 || fp.fade < 0.02f ? kTShN - tshRow : kTShRows;
   glEnable(GL_SCISSOR_TEST); glScissor(0, tshRow, kTShN, rows);
   glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
   GLuint p = progTShBake;
@@ -840,6 +842,21 @@ void Renderer::resize(int w, int h) {
   if (ok) createTargets();
 }
 
+void Renderer::setOffscreen(bool on) {
+  if (!on) { screenFbo = 0; return; }
+  if (!fboOff || offW != W || offH != H) {
+    if (!fboOff) { glGenFramebuffers(1, &fboOff); glGenTextures(1, &texOff); }
+    glBindTexture(GL_TEXTURE_2D, texOff);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, W, H, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboOff);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texOff, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    offW = W; offH = H;
+  }
+  screenFbo = fboOff;
+}
+
 mat4 Renderer::viewProj(const FrameParams& fp, float zNear, float zFar) const {
   mat4 view;
   view(0, 0) = fp.camRight.x; view(0, 1) = fp.camRight.y; view(0, 2) = fp.camRight.z;
@@ -1067,8 +1084,8 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   const bool hullUse = hullWanted(fp);
   const int hullSlot = fp.plane.PS[3] > 0.5f ? 1 : 0;
   const uint64_t hullK = hullUse ? hullKey(fp, hullSlot) : 0;
-  if (hullUse && hull[hullSlot].key == hullK) {
-    drawHull(fp, hullSlot);
+  if (hullUse && hulls.count(hullK)) {
+    drawHull(fp, hullSlot, hullK);
     glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
     glDrawBuffers(3, bufs);
     glViewport(0, 0, rw, rh);
@@ -1105,7 +1122,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   }
 
   // a new airframe or view: bake its hull with the ray tracer's own shape code (used from the next frame on)
-  if (hullUse && hull[hullSlot].key != hullK) { setRT(progHullBake); bakeHull(fp, hullSlot, hullK); }
+  if (hullUse && !hulls.count(hullK)) { setRT(progHullBake); bakeHull(fp, hullSlot, hullK); }
   stamp(2);
   // ------------------------------------------------ temporal AA resolve (before the sprites: particles never smear)
   {
@@ -1219,7 +1236,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
 
   stamp(6);
   // ------------------------------------------------ composite to backbuffer
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glBindFramebuffer(GL_FRAMEBUFFER, screenFbo);
   glViewport(0, 0, W, H);
   glUseProgram(progPost);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texColor); glUniform1i(U(progPost, "uScene"), 0);
@@ -1324,7 +1341,7 @@ void Renderer::image(GLuint tex, float x, float y, float w, float h, float u0, f
 
 void Renderer::flushUI() {
   if (ui.empty()) return;
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glBindFramebuffer(GL_FRAMEBUFFER, screenFbo);
   glViewport(0, 0, W, H);
   glEnable(GL_BLEND); glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
   glUseProgram(progUI);

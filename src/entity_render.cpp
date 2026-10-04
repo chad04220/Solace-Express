@@ -136,6 +136,24 @@ void Renderer::drawEntities(const FrameParams& fp) {
       added(n.cx, n.cz);
     }
   }
+  // the next place the camera will cut to (the menu tour): its near chunks go to the worker threads now, and are kept
+  if (fp.prefetchOn && g_scenery.workers() > 0) {
+    vec3 pc = fp.prefetchPos;
+    const int pcx = Scenery::chunkOf(pc.x), pcz = Scenery::chunkOf(pc.z), prad = (int)ceilf(farDetail / Scenery::CH) + 1;
+    for (int dz = -prad; dz <= prad; dz++)
+      for (int dx = -prad; dx <= prad; dx++) {
+        int cx = pcx + dx, cz = pcz + dz;
+        if (cx < 0 || cz < 0 || cx >= Scenery::NC || cz >= Scenery::NC) continue;
+        float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
+        float ex = std::max(std::max(x0 - pc.x, pc.x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - pc.z, pc.z - z0 - Scenery::CH), 0.f);
+        float d = sqrtf(ex * ex + ez * ez);
+        int want = d < farDetail ? 2 : 0;
+        if (!want) continue;
+        Scenery::Chunk* c = g_scenery.get(cx, cz);
+        if (c) { c->lastUse = entFrame; if (c->level >= want) continue; }
+        if (!g_scenery.request(cx, cz, want)) break;   // queue full: more next frame
+      }
+  }
   if (entFrame % 240 == 0) g_scenery.trim(cam, farDetail + 1200.f, farAll + 2500.f, entFrame);
   entChunks = (int)g_scenery.generated();
 
