@@ -271,10 +271,11 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   wx = c.wx; timeOfDay = wx.timeOfDay;
   const AircraftSpec& s = kAircraft[spec];
   const Airport& a = g_world.airports[c.from];
-  // runway into the wind (lessons keep the published runway so the rings line up)
+  // runway into the wind (lessons with rings keep the published runway so the rings line up; the ringless ones, like
+  // the cross-country and the checkride, take off into the wind like any other flight)
   float h0 = a.heading;
   bool reverse = false;
-  if (c.type != CT_LESSON) {
+  if (c.type != CT_LESSON || c.wps.empty()) {
     float hw0 = cosf((wx.windFrom - h0) * DEG), hw1 = cosf((wx.windFrom - h0 - 180.f) * DEG);
     reverse = hw1 > hw0;
   }
@@ -295,6 +296,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
   takeoffAnnounced = c.startAirborne; touchedDown = false; touchdownFpm = 0; stillTimer = 0;   // (an airborne start has no takeoff to announce)
   engineAutoStarted = false; startDelay = 1.2f;
+  parkingBrake = !c.startAirborne;   // a start on the ground is parked: the brake is released to roll
   particles.clear(); bursts.clear(); pops.clear(); boomT = -1; for (auto& tt : pieceTrail) tt.clear(); trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0;
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
@@ -489,8 +491,7 @@ void Game::flightControls(float dt) {
     else { c.gearDown = !c.gearDown; toast(c.gearDown ? "Gear down" : "Gear up", vec3(0.8f, 1, 0.8f)); }
   }
   // brakes: B / D-pad left = parking brake toggle, Space = wheel brakes
-  static bool parking = true;
-  if (flightClock < 0.05f) parking = plane.onGround;
+  bool& parking = parkingBrake;   // (set by startFlight for a start on the ground)
   if (plane.apDone) { plane.apDone = false; parking = true; toast("Autoland complete - parking brake set", vec3(0.5f, 1, 0.6f)); g_audio.trigger(SFX_AP_DISC, 0.7f); }
   if (plane.spec->special == 2) wraithControls(dt);
   if (actKeyP(ACT_PARK) || (!showMap && actPadP(ACT_PARK))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
@@ -556,7 +557,7 @@ void Game::updateFlight(float dt) {
     // starter catches: puff of smoke from the exhausts
     vec3 ex = plane.pos + plane.q.rotate(vec3(0.4f, -plane.spec->fusRad * 0.6f, -plane.spec->fusLen * 0.35f));
     for (int i = 0; i < 14; i++) spawn(ex, plane.q.rotate(vec3(0.8f + i * 0.05f, -0.5f, 2.f)) + vec3(0, 0.6f, 0), 2.5f, 0.6f, 1.6f, vec3(0.55f, 0.58f, 0.62f), 0.55f, SPR_SMOKE, 1.5f, 0.3f);
-    if (!takeoffAnnounced && contract.type == CT_LESSON) toast("Engine running. Release the parking brake with B.", vec3(0.7f, 1, 0.7f));
+    if (!takeoffAnnounced && contract.type == CT_LESSON) toast("Engine running. Release the parking brake with " + keyName(set.keyBind[ACT_PARK]) + ".", vec3(0.7f, 1, 0.7f));   // ("B" by default)
     else if (!takeoffAnnounced) toast("Engine running.", vec3(0.7f, 1, 0.7f));   // (the takeoff clearance is the tower's: updateAtc)
   }
   // gear / flap motor cues

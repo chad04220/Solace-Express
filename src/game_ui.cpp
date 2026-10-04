@@ -1758,7 +1758,7 @@ void Game::drawResearch() {
     row("Thrust / weight", "4.4 : 1 (reheat)");
     row("Top speed", "Mach 2.5+");
     row("Thrust vectoring", "2D nozzles, +-29 deg pitch");
-    row("Flight control", "Inertially damped FBW, 30 g, 315 deg/s roll");
+    row("Flight control", "Inertially damped FBW, 315 deg/s roll, airframe +50 / -25 g");
     row("Cockpit", "Sealed pod, synthetic-vision displays + HUD");
     row("Fuel", "Unrestricted (research cell)");
   }

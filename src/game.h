@@ -137,6 +137,7 @@ private:
   void cycleApDest(int dir);
   float approachMinAgl = 1e9f;
   float thrPrevAlong = -1e9f; bool appLow = false;   // arrival recording (updateFlight): threshold crossing, go-arounds
+  bool parkingBrake = true;
   std::string coaching;   // the debrief's one coaching point (endFlight)
 
   // effects

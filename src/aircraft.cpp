@@ -337,7 +337,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
       float vlong = dot(vc, wf), vlat = dot(vc, wr);
       float mu = rw >= 0 && !surfaceRough(g_world.airports[rw].surface) ? 0.8f : 0.55f;
       float rollRes = 0.015f + 0.06f * rough;
-      float brakeF = (c.kind <= 1 ? ctl.brake * 0.55f : 0.f);
+      float brakeF = (c.kind <= 1 ? ctl.brake * 0.7f : 0.f);   // (enough for the main wheels to hold full power when parked)
       f += wr * (-nF * mu * clampf(vlat / 0.4f, -1, 1));
       f += wf * (-nF * (rollRes + brakeF) * clampf(vlong / 0.3f, -1, 1));
     } else {

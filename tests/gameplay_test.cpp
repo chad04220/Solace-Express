@@ -198,6 +198,22 @@ struct GameTest {
       printf("Arrival with the runway occupied: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
     }
     g.set.traffic = trafficSet;
+    // ---- a lesson starts with the parking brake set: full throttle doesn't move the aircraft until it's released
+    {
+      g.botControl = false;
+      for (int sp = 0; sp < kNumAircraft; sp++) {   // every career aircraft, from a free flight at Solace Capital
+        Contract fc = g_story[0]; fc.forceAircraft = -1; fc.type = CT_FERRY; fc.from = fc.to = g_world.findAirport("CAP"); fc.wps.clear(); fc.hints.clear();
+        g.startFlight(sp == 0 ? g_story[0] : fc, sp, sp == 0 ? Career::SRC_LESSON : Career::SRC_RENT);
+        for (int i = 0; i < 60 * 8; i++) { g.plane.ctl.throttle = 1.f; g.update(dt); }
+        float held = length(g.plane.vel);
+        printf("Parking brake at the start (%s): running=%d brake=%.1f speed after 8 s at full power %.2f m/s\n", kAircraft[sp].name, g.plane.engineRunning, g.plane.ctl.brake, held);
+        // set on every aircraft; it holds full power on all but the high-thrust STOL types (Bushmaster, Islander),
+        // whose static thrust beats their wheel brakes
+        bool stol = sp == 2 || sp == 3;
+        if (!(g.plane.engineRunning && g.plane.ctl.brake > 0.99f && (stol || held < 0.5f))) fails++;
+      }
+      g.botControl = true;
+    }
     // ---- low frame rates keep simulated time: 5 s of 5 fps frames is 5 s of flight
     {
       g.startFlight(g_story[0], 0, Career::SRC_LESSON);
