@@ -168,7 +168,19 @@ void main(){
       if (sc.find("~envoff") != std::string::npos) g_ren.envOff = true;
       Game* g = new Game();
       g->initHeadless(); g->debugScene(base);
-      for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
+      for (int i = 0; i < 3; i++) {
+        static bool first = true;   // llvmpipe compiles each program at its first draw: where the first frame's time goes
+        g_ren.syncTiming = first;
+        auto t0 = std::chrono::steady_clock::now();
+        g->update(1.f / 30.f); g->render();
+        if (first) {
+          glFinish(); g_ren.syncTiming = false; first = false;
+          printf("first frame %.0f s: shadows/scenery %.0f, ray trace %.0f, taa %.0f, sprites %.0f, bloom %.0f, shafts %.0f, composite %.0f\n",
+                 std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), g_ren.passWall[0] / 1000, g_ren.passWall[1] / 1000,
+                 g_ren.passWall[2] / 1000, g_ren.passWall[3] / 1000, g_ren.passWall[4] / 1000, g_ren.passWall[5] / 1000, g_ren.passWall[6] / 1000);
+          fflush(stdout);
+        }
+      }
       for (int i = 0; i < 6; i++) g->render();
       glFinish();
       if (getenv("TIMEIT")) {   // average frame time over a few frames (GPU finished each time)
