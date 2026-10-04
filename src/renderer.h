@@ -245,7 +245,8 @@ private:
   float feedTile[kMaxFeeds][4] = {};   // atlas rectangle of each slot (uv: x0, y0, w, h)
   int feedTileWH[kMaxFeeds][2] = {};
   bool feedValid[kMaxFeeds] = {};      // its tile holds a picture
-  int feedNext = 0, feedRigNow = 0;
+  int feedAge[kMaxFeeds] = {};         // frames since its picture was drawn
+  int feedRigNow = 0;
   bool feedPass = false;               // drawing a camera feed (the scenery pass leaves streaming and shadows alone)
   bool feedsWanted(const FrameParams& fp) const;
   void measureFeedMounts(const FrameParams& fp);

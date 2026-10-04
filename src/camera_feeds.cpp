@@ -60,8 +60,9 @@ void Renderer::measureFeedMounts(const FrameParams& fp) {
   if (dbg) { printf("feed mounts (rig %d):", rig); for (int i = 0; i < n; i++) printf(" %.2f", fm.skin[i]); printf("  nose %.2f %.2f\n", fm.nose.y, fm.nose.z); }
 }
 
-// Draw the cameras due this frame into their atlas tiles: the ones without a picture yet and the bomb camera first,
-// then the others in turn, a few per frame (each picture a few frames old at most, like a real feed's latency).
+// Draw the cameras due this frame into their atlas tiles, a few per frame: of the ones whose display is in view, the
+// bomb camera first, then those without a picture, then the oldest pictures (a display turned to comes up first;
+// each picture in view is a few frames old at most, like a real feed's latency).
 void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuint, const FrameParams&)>& setRT,
                            const std::function<void(const FrameParams&, GLuint)>& trace) {
   if (!feedsWanted(fp)) {
@@ -110,16 +111,21 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
   }
   // which cameras this frame
   static const int perFrame = getenv("FEEDS") ? std::max(1, atoi(getenv("FEEDS"))) : 3;
-  std::vector<int> todo;
-  auto want = [&](int k) { if ((int)todo.size() < perFrame && fp.feeds[k].on && feedTileWH[k][0] > 0 && std::find(todo.begin(), todo.end(), k) == todo.end()) todo.push_back(k); };
-  if (fp.feeds[kFeedBombSlot].on) want(kFeedBombSlot);   // it flies fast: every frame
-  for (int k = 0; k < kMaxFeeds; k++) if (!feedValid[k]) want(k);
-  for (int i = 0; i < kMaxFeeds && (int)todo.size() < perFrame; i++) {
-    int k = (feedNext + i) % kMaxFeeds;
-    if (k == kFeedBombSlot) continue;
-    size_t before = todo.size(); want(k);
-    if (todo.size() > before) feedNext = (k + 1) % kMaxFeeds;
+  const float ty = tanf(fp.fovY * 0.5f), tx = ty * W / std::max(H, 1);
+  auto inView = [&](const FeedCamera& c) {   // its display's bounding sphere against the view frustum
+    vec3 d = c.screen - fp.camPos;
+    float z = -dot(d, fp.camBack), x = dot(d, fp.camRight), y = dot(d, fp.camUp);
+    if (z < -c.screenR) return false;
+    return fabsf(x) - tx * z < c.screenR * sqrtf(1.f + tx * tx) && fabsf(y) - ty * z < c.screenR * sqrtf(1.f + ty * ty);
+  };
+  std::vector<int> cand;
+  for (int k = 0; k < kMaxFeeds; k++) {
+    feedAge[k]++;
+    if (fp.feeds[k].on && feedTileWH[k][0] > 0 && inView(fp.feeds[k])) cand.push_back(k);
   }
+  auto rank = [&](int k) { return k == kFeedBombSlot ? 1 << 30 : !feedValid[k] ? (1 << 29) + feedAge[k] : feedAge[k]; };
+  std::stable_sort(cand.begin(), cand.end(), [&](int a, int b) { return rank(a) > rank(b); });
+  std::vector<int> todo(cand.begin(), cand.begin() + std::min((int)cand.size(), perFrame));
   if (todo.empty()) return;
 
   swapView(feedView);
@@ -145,7 +151,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     int x0 = (int)(feedTile[k][0] * kFeedAtlasW + 0.5f), y0 = (int)(feedTile[k][1] * kFeedAtlasH + 0.5f);
     glBlitFramebuffer(0, 0, rw, rh, x0, y0, x0 + rw, y0 + rh, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    feedValid[k] = true;
+    feedValid[k] = true; feedAge[k] = 0;
   }
   feedPass = false;
   swapView(feedView);

@@ -17,6 +17,7 @@ struct FeedCamera {
   vec3 pos, right, up, back;   // world; looks along -back
   float tanX = 0.5f, tanY = 0.4f;
   int w = 0, h = 0;            // its picture, in pixels
+  vec3 screen; float screenR = 0.f;   // where its display is (world centre and radius): only a display in view is kept live
 };
 
 // one camera of a rig, in the cockpit frame (eye at the origin, -z forward, +y up, body axes)
@@ -26,6 +27,7 @@ struct FeedMount {
   float tanX, tanY;
   int w, h;
   bool nose = false;         // forward looking: mounted at the tip of the nose instead (the nose stays out of its picture)
+  vec3 screen; float screenR = 0.f;   // its display: centre and radius
 };
 
 inline int feedRigOf(int special) { return special == 1 ? 1 : special == 2 ? 2 : 0; }   // 1 XR-9, 2 XR-11
@@ -40,6 +42,7 @@ inline FeedMount feedPanel(vec3 c, vec3 n, vec3 u, vec2 s, bool left, float qual
   float dist = fabsf(dot(c, n));
   FeedMount m;
   m.dir = normalize(c); m.right = t; m.up = b; m.back = n;
+  m.screen = c; m.screenR = length(s);
   m.tanY = 1.25f * s.y / dist; m.tanX = m.tanY * s.x / s.y;
   m.h = (int)(s.y * 600.f * quality + 0.5f); m.w = (int)(m.h * s.x / s.y + 0.5f);
   return m;
@@ -57,6 +60,7 @@ inline int feedRig(int rig, float quality, FeedMount out[kMaxFeeds]) {
       m.dir = vec3(sinf(c), 0.f, -cosf(c));
       m.right = vec3(cosf(c), 0.f, sinf(c)); m.up = vec3(0, 1, 0); m.back = vec3(-sinf(c), 0.f, cosf(c));
       m.tanX = tx; m.tanY = ty;
+      m.screen = vec3(sinf(c) * 0.64f, 0.02f, -cosf(c) * 0.64f); m.screenR = 0.42f;
       m.h = (int)(260.f * quality + 0.5f); m.w = (int)(m.h * tx / ty + 0.5f);
       m.nose = true;
     }
