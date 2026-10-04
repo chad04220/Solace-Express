@@ -3185,7 +3185,7 @@ void main(){
     if ((uDbg & 1024) != 0) {   // (debug: the hull's start against a march from the camera - red: the hull skipped a hit,
       vec2 hf = tracePlane(ro, rd, jet ? 6.0 : planeBound()*2.0);   // blue: a hit moved, green: the hull found one the camera's march didn't)
       vec3 dc = vec3(0.0);
-      if (hf.x > 0.0 && h0.x < 0.0) dc = vec3(1.0, 0.0, 0.0);
+      if (hf.x > 0.0 && h0.x < 0.0) dc = hullT > 1e29 ? vec3(1.0, 0.0, 0.0) : vec3(1.0, 1.0, 0.0);   // (yellow: skipped from a start)
       else if (hf.x < 0.0 && h0.x > 0.0) dc = vec3(0.0, 1.0, 0.0);
       else if (hf.x > 0.0 && abs(hf.x - h0.x) > 0.01) dc = vec3(0.0, 0.3, 1.0)*clamp(abs(hf.x - h0.x)*10.0, 0.3, 1.0);
       oColor = vec4(dc*50.0, 0.0); oDepth = 1.0; oCloudMask = 0.0; return;

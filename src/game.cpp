@@ -2513,7 +2513,9 @@ void Game::debugScene(const std::string& name) {
     float y = yawD * DEG, pt = pitD * DEG;
     vec3 off = (plane.forward() * cosf(y) + plane.right() * sinf(y)) * (dist * cosf(pt)) + vec3(0, dist * sinf(pt), 0);
     dbgCam = true; dbgFollow = true; dbgFollowOff = off; dbgCamPos = plane.pos + off; dbgCamLook = plane.pos;
-    toasts.clear(); hint.clear(); uiHidden = true; hudOn = false; camMode = 1; return;
+    toasts.clear(); hint.clear(); uiHidden = true; hudOn = false;
+    camMode = getenv("GAVOUT") ? 0 : 1;   // (the cabin model shows the interior through the windows; GAVOUT: the outside model)
+    return;
   }
   if (name.compare(0, 4, "apv_") == 0 && name.size() >= 9) {   // airport detail views: apv_<CODE>_<view>_<hour>
     int ai = std::max(0, g_world.findAirport(name.substr(4, 3).c_str()));

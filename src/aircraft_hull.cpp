@@ -24,13 +24,13 @@ void main(){
 }
 )";
 const char* kHullFS = R"(
-in vec3 vW; uniform vec3 uCam; uniform float uFree;
+in vec3 vW; uniform vec3 uCam; uniform float uFree; uniform int uPass;   // 0: inside faces only, 1: outside faces only
 out vec2 oT;   // written to the second channel only: distance along the pixel's ray, 0 on the hull's inside
 // Faces nearer than uFree are dropped: no part of the airframe is that close to the camera, so a ray may cross them
 // freely. Any face it then meets from inside solid space is a back face, and that pixel marches from the camera.
 void main(){
   float t = length(vW - uCam);
-  if (t < uFree) discard;
+  if (t < uFree || gl_FrontFacing != (uPass == 1)) discard;
   oT = vec2(0.0, gl_FrontFacing ? t : 0.0);
 }
 )";
@@ -259,10 +259,13 @@ uint64_t Renderer::hullKey(const FrameParams& fp, int slot) const {
   return h;
 }
 
-// light aircraft only (the research jets' shapes have more moving parts than these states cover); not wrecks
+// Light aircraft only (the research jets' shapes have more moving parts than these states cover), not wrecks, and
+// for now the outside views only: in the cabin a march started from the hull can still step over a few of the finest
+// fittings (vent rims, bezels) that the march from the eye happens to land on (HULLCOCKPIT turns it on to test).
 bool Renderer::hullWanted(const FrameParams& fp) const {
   const PlaneVisual& pv = fp.plane;
-  static const bool off = getenv("HULLON") == nullptr;   // (in testing: off unless HULLON is set)
+  static const bool off = getenv("HULLOFF") != nullptr, cockpit = getenv("HULLCOCKPIT") != nullptr;
+  if (pv.PS[3] > 0.5f && !cockpit) return false;
   return !off && progHull && progHullBake && pv.on && fp.wreck.pieces == 0 && pv.M[2] < 4.5f;
 }
 
@@ -306,7 +309,14 @@ void Renderer::drawHull(const FrameParams& fp, int slot) {
   if (!vaoHull) glGenVertexArrays(1, &vaoHull);
   glBindVertexArray(vaoHull); glBindBuffer(GL_ARRAY_BUFFER, H.vbo);
   glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, (void*)0);
+  // Where faces meet in the same plane (the 2 mm overlaps, voxels touching along an edge) an inside face and an
+  // outside face can lie at the same depth: the inside one must win, or a ray inside solid space would take the outside
+  // face for its start. So the inside faces go first, and the outside faces are pushed back a hair.
+  GLint lp = glGetUniformLocation(progHull, "uPass");
+  glUniform1i(lp, 0); glDrawArrays(GL_TRIANGLES, 0, H.verts);
+  glUniform1i(lp, 1); glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(1.f, 4.f);
   glDrawArrays(GL_TRIANGLES, 0, H.verts);
+  glDisable(GL_POLYGON_OFFSET_FILL);
   glBindVertexArray(0);
   glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
   glDisable(GL_DEPTH_TEST);
