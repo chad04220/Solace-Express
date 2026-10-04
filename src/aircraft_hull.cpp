@@ -286,8 +286,9 @@ uint64_t Renderer::hullKey(const FrameParams& fp, int slot) const {
 }
 
 // Light aircraft only (the research jets' shapes have more moving parts than these states cover), not wrecks, and
-// for now the outside views only: in the cabin a march started from the hull can still step over a few of the finest
-// fittings (vent rims, bezels) that the march from the eye happens to land on (HULLCOCKPIT turns it on to test).
+// the outside views only. In the cabin (HULLCOCKPIT turns it on) the image matches with the 1.2 m near segment, but
+// nearly every cockpit ray ends within that segment anyway: it saved only 2-6% of the aircraft march for a 100-160k
+// triangle hull per type, so the cabin stays on the plain march.
 bool Renderer::hullWanted(const FrameParams& fp) const {
   const PlaneVisual& pv = fp.plane;
   if (pv.PS[3] > 0.5f && !hullCockpit) return false;
