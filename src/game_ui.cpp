@@ -854,7 +854,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
   float rv = set.radioVol;
   slider("Radio volume", set.radioVol, 0, 1, 0.05f, fmt("%.0f%%", set.radioVol * 100));
   if (rv != set.radioVol) radio.setVolume(set.radioVol);
-  slider("Tower voice volume", set.atcVol, 0, 1, 0.05f, fmt("%.0f%%", set.atcVol * 100));
+  slider("Voice volume", set.atcVol, 0, 1, 0.05f, fmt("%.0f%%", set.atcVol * 100));
   slider("Mouse sensitivity", set.mouseSens, 0.2f, 3.f, 0.1f, fmt("%.1f", set.mouseSens));
   toggle("Pitch control", set.invertPitch, "Inverted", "Normal (S = nose up)");
   toggle("Units", set.metric, "Metric", "Aviation (kt / ft)");
@@ -864,7 +864,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
   toggle("Display", set.fullscreen, "Fullscreen", "Windowed");
   if (fs != set.fullscreen) wantFullscreenToggle = true;
   py += 6 * s;
-  g_ren.text(x, py, 14 * s, "Settings are saved automatically. Edit radio_stations.txt in the save folder to add stations.", C_DIM, 0.8f);
+  g_ren.text(x, py, 14 * s, ellipsize("Settings are saved automatically. To add radio stations, edit " + (saveDir.empty() ? std::string("radio_stations.txt in the game folder") : saveDir + "/radio_stations.txt"), w, 14 * s), C_DIM, 0.8f);
   saveSettings();
   (void)w;
 }

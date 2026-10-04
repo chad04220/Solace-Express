@@ -72,6 +72,7 @@ public:
   void prewarm(const std::function<void(float, const std::string&)>& progress);
   int prewarmCraft = -1; bool prewarmInside = false;   // the menu tour shows this aircraft instead (prewarm only)
   bool wantFullscreenToggle = false;
+  void focusLost() { if (screen == SCR_FLIGHT && !crashed) paused = true; }   // the window lost focus: a flight pauses
   Settings set;
   std::string saveDir;
   std::string assetDir = ".";                          // folder of the exe (pre-rendered loading pictures live in assetDir\loading)
@@ -239,6 +240,9 @@ private:
   std::vector<std::string> hintsVoiced;   // the lesson hints said this flight
   bool warnWas[4] = {}; float warnLastT[4] = {-99, -99, -99, -99};   // stall, pull up, gear, engine off: rising edges
   void updateComms(float dt);
+  float edgeWarnT = 0;   // chart-edge warning repeat
+  float voiceDuck = 0;   // 0..1: music and engine lowered while someone is talking
+  std::string settingsWritten;   // the settings file's last written contents (written again only when changed)
   int atcStation(int airport) const { return (airport * 7 + 2) % AtcVoice::kVoices; }   // each airport keeps one voice
   std::vector<std::pair<std::string, std::string>> stations;
   bool settingsFromPause = false;

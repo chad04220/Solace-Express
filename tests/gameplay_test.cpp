@@ -222,6 +222,24 @@ struct GameTest {
         if ((t.crashes != c.crashes) != wantCrash || repaired != wantCrash) fails++;
       }
     }
+    // ---- a diversion leaves you (and your aircraft) where you landed
+    {
+      Career t; t.newGame(); t.license = LIC_ATP;
+      int spec = 2, at = g_world.findAirport("CAP"); t.fleet.push_back({spec, g_story[4].from, kAircraft[spec].maxFuel, 0.f});
+      FlightResult r; r.outcome = OUT_DIVERTED; r.divertedTo = at; int st = 0;
+      t.settle(g_story[4], spec, Career::SRC_OWNED, r, &st);
+      bool ok = t.location == at && t.fleet[0].location == at;
+      printf("Diverted: career and aircraft at the diversion airport: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
+    }
+    if (voices) {   // the strips have no tower: a flight from Meadowbrook to Harlan Farm hears only Meadowbrook
+      g.startFlight(g_story[2], 0, Career::SRC_LESSON);   // L3: MDB -> HFS
+      g.atc.history.clear(); g.atcF.phase = 3; g.atcF.airborne = true;
+      const Airport& h = g_world.airports[g_story[2].to];
+      g.plane.reset(&kAircraft[0], h.threshold(false) - h.dir() * 3000.f + vec3(0, h.elev + 160.f, 0), h.heading, 60, 150, true, kAircraft[0].vref + 6);
+      for (float tt = 0; tt < 20; tt += dt) { g.update(dt); audio(dt); }
+      bool silent = true; for (auto& x : g.atc.history) if (x.rfind("TWR ", 0) == 0) silent = false;
+      printf("No tower at a farm strip: %s\n", silent ? "ok" : "FAIL"); fails += !silent;
+    }
     if (const char* wpath = getenv("ATCWAV")) if (FILE* f = fopen(wpath, "wb")) {
       uint32_t bytes = (uint32_t)(rec.size() * 2), v;
       fwrite("RIFF", 1, 4, f); v = 36 + bytes; fwrite(&v, 4, 1, f); fwrite("WAVEfmt ", 1, 8, f);

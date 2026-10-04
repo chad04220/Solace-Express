@@ -101,7 +101,10 @@ static LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
       if (in && wp < 256) in->down[wp] = false;
       if (wp == VK_F10 || wp == VK_MENU) return 0;
       break;
-    case WM_KILLFOCUS: if (in) memset(in->down, 0, sizeof(in->down)); break;
+    case WM_KILLFOCUS:   // switched away: nothing stays held, and a flight in progress pauses
+      if (in) { memset(in->down, 0, sizeof(in->down)); for (int b = 0; b < 3; b++) { if (in->mDown[b]) in->mReleased[b] = true; in->mDown[b] = false; } }
+      if (g_game) g_game->focusLost();
+      break;
     case WM_MOUSEMOVE: if (in) { float x = (float)(short)LOWORD(lp), y = (float)(short)HIWORD(lp); in->mdx += x - in->mx; in->mdy += y - in->my; in->mx = x; in->my = y; } return 0;
     case WM_LBUTTONDOWN: if (in) { in->mDown[0] = in->mPressed[0] = true; SetCapture(h); } return 0;
     case WM_LBUTTONUP: if (in) { in->mDown[0] = false; in->mReleased[0] = true; ReleaseCapture(); } return 0;

@@ -42,6 +42,7 @@ struct FlightResult {
   bool late = false;
   float centerlineErr = 0;
   float fuelUsedKg = 0;
+  int divertedTo = -1;          // OUT_DIVERTED: the airport the aircraft stopped at
 };
 
 struct PayoutLine { std::string label; int amount; };

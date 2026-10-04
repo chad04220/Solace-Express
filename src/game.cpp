@@ -132,14 +132,21 @@ void Game::loadSettings() {
   fclose(f);
 }
 
+// Written only when something changed (the settings page calls this every frame), through a temp file so an
+// interrupted write never leaves a half-written settings file.
 void Game::saveSettings() {
-  FILE* f = fopen(joinPath(saveDir, "settings.cfg").c_str(), "w");
-  if (!f) return;
-  fprintf(f, "renderScale %f\nquality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
+  std::string t = fmt("renderScale %f\nquality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
           set.renderScale, set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
-  fprintf(f, "renderRes %d\n", set.resMode);
-  for (int i = 0; i < ACT_COUNT; i++) fprintf(f, "key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
-  fclose(f);
+  t += fmt("renderRes %d\n", set.resMode);
+  for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
+  if (t == settingsWritten) return;
+  std::string path = joinPath(saveDir, "settings.cfg"), tmp = path + ".tmp";
+  FILE* f = fopen(tmp.c_str(), "w");
+  if (!f) return;
+  bool ok = fwrite(t.data(), 1, t.size(), f) == t.size();
+  ok = fclose(f) == 0 && ok;
+  if (ok) { remove(path.c_str()); ok = rename(tmp.c_str(), path.c_str()) == 0; }
+  if (ok) settingsWritten = t;
 }
 
 // Built-in presets. Bump kStationsVersion when adding presets: older station files get the new ones appended.
@@ -284,7 +291,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   lookYaw = 0; lookPitch = -0.13f;
   camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 3, 15));
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
-  takeoffAnnounced = false; touchedDown = false; touchdownFpm = 0; stillTimer = 0;
+  takeoffAnnounced = c.startAirborne; touchedDown = false;   // (an airborne start has no takeoff to announce) touchdownFpm = 0; stillTimer = 0;
   engineAutoStarted = false; startDelay = 1.2f;
   particles.clear(); bursts.clear(); pops.clear(); boomT = -1; for (auto& tt : pieceTrail) tt.clear(); trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0;
   lightning = 0; nextLightning = 6; thunderDelay = -1;
@@ -527,7 +534,7 @@ void Game::updateFlight(float dt) {
     vec3 ex = plane.pos + plane.q.rotate(vec3(0.4f, -plane.spec->fusRad * 0.6f, -plane.spec->fusLen * 0.35f));
     for (int i = 0; i < 14; i++) spawn(ex, plane.q.rotate(vec3(0.8f + i * 0.05f, -0.5f, 2.f)) + vec3(0, 0.6f, 0), 2.5f, 0.6f, 1.6f, vec3(0.55f, 0.58f, 0.62f), 0.55f, SPR_SMOKE, 1.5f, 0.3f);
     if (!takeoffAnnounced && contract.type == CT_LESSON) toast("Engine running. Release the parking brake with B.", vec3(0.7f, 1, 0.7f));
-    else if (!takeoffAnnounced) toast(fmt("Engine running. Cleared for takeoff runway %02d.", g_world.airports[contract.from].rwyNumber(cosf((plane.heading() - g_world.airports[contract.from].heading) * DEG) < 0)), vec3(0.7f, 1, 0.7f));
+    else if (!takeoffAnnounced) toast("Engine running.", vec3(0.7f, 1, 0.7f));   // (the takeoff clearance is the tower's: updateAtc)
   }
   // gear / flap motor cues
   if (prevGear > 0.99f && plane.gear < 0.99f) g_audio.trigger(SFX_GEAR_CLUNK, 0.6f);
@@ -665,6 +672,15 @@ void Game::updateFlight(float dt) {
     tipOn = vapK > 0.f;
   }
   if (plane.spec->special) jetEffects(simDt);
+  // the edge of the chart: warned well before it (past 1.2x the half-width the flight is lost)
+  {
+    float edge = std::max(fabsf(plane.pos.x), fabsf(plane.pos.z)) / WORLD_HALF;
+    edgeWarnT -= dt;
+    if (edge > 1.04f && edgeWarnT <= 0) {
+      edgeWarnT = 8.f; g_audio.trigger(SFX_BEEP);
+      toast(edge > 1.12f ? "LEAVING THE CHART - TURN BACK NOW" : "Approaching the edge of the chart - turn back", vec3(1, 0.5f, 0.2f));
+    }
+  }
   // GPS breadcrumb trail
   trailT += dt;
   if (trailT > 2.f && !plane.onGround) { trailT = 0; trail.push_back(vec2(plane.pos.x, plane.pos.z)); if (trail.size() > 500) trail.erase(trail.begin()); }
@@ -718,9 +734,9 @@ void Game::updateFlight(float dt) {
       float dA; int ap = g_world.nearestAirport(plane.pos.x, plane.pos.z, &dA);
       bool atField = ap >= 0 && dA < g_world.airports[ap].length * 0.5f + 600.f;
       if (wpIndex < (int)contract.wps.size()) {
-        if (stillTimer > 1.25f && stillTimer < 1.3f) toast("Checkpoints remaining - take off again to continue", vec3(1, 0.8f, 0.4f));
+        if (stillTimer >= 1.25f && stillTimer - dt < 1.25f) toast("Checkpoints remaining - take off again to continue", vec3(1, 0.8f, 0.4f));
       } else if (atField && ap == contract.to) { endFlight(true, ""); return; }
-      else if (atField) { endFlight(false, fmt("Diverted to %s", g_world.airports[ap].name), OUT_DIVERTED); return; }
+      else if (atField) { result.divertedTo = ap; endFlight(false, fmt("Diverted to %s", g_world.airports[ap].name), OUT_DIVERTED); return; }
       else if (stillTimer > 3.f) { endFlight(false, "Landed off-airport", OUT_OFF_AIRPORT); return; }
     }
   } else stillTimer = 0;
@@ -1972,6 +1988,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
 // (or "remain in the pattern" for circuits), pattern-entry or straight-in instructions on the way into the
 // destination, the landing clearance once the aircraft is established on final for a runway, and "exit the runway"
 // on the landing roll. A go-around (climbing away after the clearance) brings a fresh approach call and clearance.
+// Only fields with a tower (size 1 and up) talk; the strips are uncontrolled.
 // They call the aircraft by its registration (the one painted on it): in full on first contact with each tower, then
 // abbreviated (SX-ABC: "Sierra X-ray Alfa Bravo Charlie", then "Sierra Bravo Charlie"). The AI traffic at the field
 // is in the exchange too: a departure holds for traffic on final or on the runway, an arrival is told it is number two
@@ -2028,6 +2045,10 @@ void Game::updateAtc(float dt) {
   const Airport& D = g_world.airports[F.dep];
   const Airport& A = g_world.airports[F.arr];
   int vd = atcStation(F.dep), va = atcStation(F.arr);
+  // the smallest fields (farm strips, island and mountain strips: size 0) have no tower: nothing is said there, and a
+  // departure from one goes straight to the arrival exchange (if the destination has a tower)
+  if (F.phase <= 2 && D.size == 0) F.phase = 3;
+  if (F.phase >= 3 && A.size == 0) return;
   switch (F.phase) {
     case 0:   // on the ground at the departure airport: the greeting
       if (F.t > 2.5f) {
@@ -2187,6 +2208,8 @@ void Game::updateComms(float dt) {
   for (auto& m : commsPending) { AtcVoice::Tx tx; if (atc.resolve(m.text, m.mission, in.pad, tx)) atc.say(tx); }
   commsPending.clear();
   if (screen == SCR_FLIGHT && !crashed && !researchFlight) updateAtc(dt);
+  // while someone is talking the music and the engine sit lower (a headset's comms priority): quick down, slow up
+  voiceDuck = approach(voiceDuck, atc.busy() && live ? 1.f : 0.f, atc.busy() ? 6.f : 1.5f, dt);
   AtcVoice::Tx st = atc.update(dt);
   if (!st.ids.empty() && st.subtitle) { toast("TOWER  " + st.text, vec3(0.55f, 1.f, 0.72f), false); atcF.spoken++; }
   if (!st.ids.empty() && st.tag > 0) atcF.called[st.tag - 1] = true;
@@ -2194,7 +2217,12 @@ void Game::updateComms(float dt) {
 
 void Game::feedAudio() {
   AudioParams ap;
-  ap.master = set.master; ap.engineVol = set.engineVol; ap.sfxVol = set.sfxVol; ap.voiceVol = set.atcVol;
+  ap.master = set.master; ap.engineVol = set.engineVol * (1.f - 0.35f * voiceDuck); ap.sfxVol = set.sfxVol; ap.voiceVol = set.atcVol;
+  {   // the radio music, lowered under speech
+    static float sentVol = -1.f;
+    float rv = set.radioVol * (1.f - 0.65f * voiceDuck);
+    if (fabsf(rv - sentVol) > 0.01f || (rv != sentVol && (rv == set.radioVol || voiceDuck >= 1.f))) { radio.setVolume(rv); sentVol = rv; }
+  }
   static bool muffled = false;
   if (actKeyP(ACT_ANR) || (screen == SCR_FLIGHT && !paused && actPadP(ACT_ANR))) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
   ap.muffled = muffled;

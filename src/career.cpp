@@ -324,6 +324,10 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
       if (src == SRC_OWNED) { int oi = ownedIndexFor(si); if (oi >= 0) fleet[oi].condition = 1.f; }
     }
     reputation = std::max(0, reputation - 1);
+    if (r.outcome == OUT_DIVERTED && r.divertedTo >= 0) {   // you (and your aircraft) are where you landed
+      location = r.divertedTo;
+      if (src == SRC_OWNED) { int oi = ownedIndexFor(si); if (oi >= 0) fleet[oi].location = r.divertedTo; }
+    }
   } else {
     float fpm = fabsf(r.touchdownFpm);
     if (r.landed) { landings++; bestLandingFpm = std::min(bestLandingFpm, fpm); }
