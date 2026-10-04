@@ -3463,6 +3463,18 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
               vec2 hq = abs(vec2(lp.z - (dz1 - 0.12), lp.y - (sec.z + 0.02))) - vec2(0.055, 0.012);
               if (max(hq.x, hq.y) < 0.0) { m.alb = vec3(0.55, 0.56, 0.58); m.metal = 0.8; m.rough = 0.25; }   // handle
             }
+            // single engine: the cowling's oil-access door on top, and a ring of quarter-turn fasteners where the cowling
+            // meets the cabin
+            if (int(gM[0].z + 0.5) <= 1 && WS.x - gM[1].x > 0.8) {
+              float zc = gM[1].x + 0.25 + 0.35*(WS.x - gM[1].x - 0.8);   // the door's centre, a little behind the spinner
+              vec2 oq = abs(vec2(lp.x, lp.z - zc)) - vec2(0.12, 0.16) + 0.03;
+              float od = length(max(oq, 0.0)) + min(max(oq.x, oq.y), 0.0) - 0.03;
+              if (yr > 0.45) sm = max(sm, 1.0 - smoothstep(0.003, 0.003 + px, abs(od)));
+              float zs = WS.x - 0.12;   // the cowling's aft seam
+              sm = max(sm, (1.0 - smoothstep(0.003, 0.003 + px, abs(lp.z - zs)))*step(-0.2, yr));
+              float fd = length(vec2(arc - 0.09*floor(arc/0.09 + 0.5), lp.z - zs + 0.02));
+              rv = max(rv, (1.0 - smoothstep(0.005, 0.005 + px, fd))*smoothstep(0.012, 0.003, px)*step(-0.2, yr));
+            }
             m.alb *= 1.0 - 0.32*sm; m.alb *= 1.0 + 0.12*rv; m.rough = mix(m.rough, 0.18, rv);
           }
           float post = ck == 2 ? min(abs(lp.x) - 0.03, abs(abs(lp.x) - abs(E.x) - 0.42) - 0.035) : abs(lp.x) - 0.025;

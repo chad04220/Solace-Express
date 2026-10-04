@@ -202,8 +202,10 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
                                 n0 * n0 * n0, (int)c1.size(), (int)refine.size() * 64, refine.size(), H.verts / 3, inside ? fmt(" (airframe %.3f m from the eye)", dEye).c_str() : "");
 }
 
-// how far every ray marches before the hull may let it skip ahead (cockpit: the cabin around the pilot's head)
-float Renderer::hullNear(const FrameParams& fp) const { return fp.plane.PS[3] > 0.5f ? 0.35f : 0.f; }
+// How far every ray marches before the hull may let it skip ahead. In the cockpit that is the whole space around the
+// pilot (panel, glareshield, seats): those surfaces are found exactly as without a hull, edge for edge, and the hull
+// speeds up the long rays (out of the windows across the wings and struts, down the cabin).
+float Renderer::hullNear(const FrameParams& fp) const { return fp.plane.PS[3] > 0.5f ? 1.2f : 0.f; }
 
 bool Renderer::hullBaked(const FrameParams& fp) const {
   if (!hullWanted(fp)) return true;
