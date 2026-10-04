@@ -166,6 +166,7 @@ void main(){
       const bool hullOff0 = g_ren.hullOff, envOff0 = g_ren.envOff;
       if (sc.find("~hulloff") != std::string::npos) g_ren.hullOff = true;
       if (sc.find("~envoff") != std::string::npos) g_ren.envOff = true;
+      g_ren.resetTemporal();   // each shot starts from scratch: identical to rendering it alone
       Game* g = new Game();
       g->initHeadless(); g->debugScene(base);
       for (int i = 0; i < 3; i++) {

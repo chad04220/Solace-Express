@@ -235,6 +235,11 @@ public:
   bool hullOff = getenv("HULLOFF") != nullptr;           // debug: no hulls (every aircraft march starts from the camera)
   bool envOff = getenv("ENVOFF") != nullptr;             // debug: no terrain envelope (every pixel marches from the camera)
   bool tshPending() const { return tshBaking || tshFront < 0; }
+  void resetTemporal() {   // forget every frame-to-frame accumulation (TAA history, jitter/seed sequence, terrain-shadow bake):
+    frameNo = 0; histIdx = 0; histValid = false;   // the next frame renders as if it were the first (exact test comparisons)
+    tshFront = -1; tshBack = 0; tshRow = 0; tshBaking = false;
+    for (bool& v : shValid) v = false;   // shadow cascades re-render
+  }
 private:
   GLuint screenFbo = 0;
   void drawEntities(const FrameParams& fp);
