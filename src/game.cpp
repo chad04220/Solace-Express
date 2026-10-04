@@ -300,7 +300,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   particles.clear(); bursts.clear(); pops.clear(); boomT = -1; for (auto& tt : pieceTrail) tt.clear(); trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0;
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
-  approachMinAgl = 1e9f; thrPrevAlong = -1e9f; appLow = false; coaching.clear();
+  approachMinAgl = 1e9f; thrPrevAlong = -1e9f; appLow = false; appHigh = false; coaching.clear();
   apWasOn = false; apDest = -1; wraith = WraithState(); g_scenery.resetDamage();
   licenseBefore = career.license;
   // the player sees a loading screen while the scenery around the start is generated (tests fly straight away)
@@ -655,10 +655,13 @@ void Game::updateFlight(float dt) {
       result.thrKt = plane.ias * MS_TO_KT; result.thrAglM = plane.pos.y - A.elev - plane.gearHeight();
     }
     thrPrevAlong = lat < 600.f ? along : -1e9f;
-    if (!plane.onGround && dA < 3000.f && plane.agl() < 60.f) appLow = true;
+    // a go-around: down low on an approach (having been up and away first, and descending: not the climb-out from the
+    // same field) and then climbing back above 150 m without touching down
+    if (!plane.onGround && plane.agl() > 150.f) appHigh = true;
+    if (appHigh && !plane.onGround && dA < 3000.f && plane.agl() < 60.f && plane.vel.y < 0.f) appLow = true;
     if (appLow && !plane.onGround && plane.agl() > 150.f) { appLow = false; result.goArounds++; result.thrKt = -1; }
     if (plane.ev.touchdown && takeoffAnnounced && lat < A.width && along > -50.f && along < A.length) { result.tdPastThrM = std::max(0.f, along); result.rwyLenM = A.length; }
-    if (plane.onGround) { appLow = false; if (result.tdPastThrM >= 0 && length(plane.vel) > 1.f) result.stopLeftM = A.length - along; }   // (while still rolling: its direction says which end)
+    if (plane.onGround) { appLow = false; appHigh = false; if (result.tdPastThrM >= 0 && length(plane.vel) > 1.f) result.stopLeftM = A.length - along; }   // (while still rolling: its direction says which end)
   }
   // touchdown
   if (plane.ev.touchdown && takeoffAnnounced) {

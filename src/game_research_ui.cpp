@@ -21,6 +21,12 @@ std::string decrypt(const std::string& s, float t, float perChar = 0.018f) {
   }
   return o;
 }
+std::string ellipsize(const std::string& str, float width, float size) {
+  if (g_ren.textWidth(str, size) <= width) return str;
+  std::string t = str;
+  while (!t.empty() && g_ren.textWidth(t + "...", size) > width) t.pop_back();
+  return t + "...";
+}
 std::string hexWord(uint32_t v, int n) { static const char* d = "0123456789ABCDEF"; std::string o; for (int i = n - 1; i >= 0; i--) o += d[(v >> (i * 4)) & 15]; return o; }
 
 void ring(float cx, float cy, float r, float th, vec3 c, float a, int seg = 72, float a0 = 0.f, float a1 = 6.2832f) {
@@ -437,37 +443,39 @@ void Game::drawResearch(const FrameParams& fp) {
   {
     float y0 = L.bot + 16 * s, x0 = L.lx, x1 = W - 24 * s, h = H - y0 - 34 * s;
     slab(x0, y0, x1 - x0, h, s, ACC, e);
-    float cx = x0 + 16 * s, cy = y0 + 12 * s;
+    // laid out for a 1280 px wide bar and squeezed (fonts included) when the window is narrower, so nothing overlaps
+    const float hs = s * std::clamp((x1 - x0) / (1232.f * s), 0.55f, 1.f);
+    float cx = x0 + 16 * hs, cy = y0 + 12 * s;
     auto chip = [&](float x, float y, float w, float hh, const std::string& t, bool on) {
       bool hov = hovered(x, y, w, hh);
       g_ren.rect(x, y, w, hh, on ? ACC * 0.25f : R_INK, (on ? 0.9f : 0.7f) * e);
       g_ren.rectOutline(x, y, w, hh, ACC, (on ? 0.9f : hov ? 0.6f : 0.25f) * e, 0, 1 * s);
       if (on) g_ren.rect(x, y + hh - 2 * s, w, 2 * s, ACC, e);
-      g_ren.text(x + w * 0.5f, y + hh * 0.5f - 6.5f * s, 11.5f * s, t, on ? R_TEXT : R_DIM, e, 1, false);
+      g_ren.text(x + w * 0.5f, y + hh * 0.5f - 6.5f * s, 11.5f * hs, t, on ? R_TEXT : R_DIM, e, 1, false);
       return click(x, y, w, hh);
     };
     int na = (int)g_world.airports.size();
-    if (chip(cx, cy + 16 * s, 96 * s, 34 * s, "<  ABORT", false) || in.pressed[K_ESC]) { screen = SCR_MENU; return; }
-    cx += 112 * s;
+    if (chip(cx, cy + 16 * s, 96 * hs, 34 * s, "<  ABORT", false) || in.pressed[K_ESC]) { screen = SCR_MENU; return; }
+    cx += 112 * hs;
     // site
-    g_ren.text(cx, cy, 10 * s, "INSERTION SITE", R_DIM, e, 0, false);
+    g_ren.text(cx, cy, 10 * hs, "INSERTION SITE", R_DIM, e, 0, false);
     const Airport& a = g_world.airports[resAirport];
-    if (chip(cx, cy + 16 * s, 26 * s, 34 * s, "<", false) || in.pressed[K_LEFT]) resAirport = (resAirport + na - 1) % na;
-    g_ren.text(cx + 36 * s, cy + 16 * s, 16 * s, std::string(a.code) + "  " + a.name, R_TEXT, e, 0, false);
-    g_ren.text(cx + 36 * s, cy + 36 * s, 10 * s, fmt("RWY %02d/%02d  //  %.0f M %s  //  ELEV %.0f M", a.rwyNumber(false), a.rwyNumber(true), a.length, surfaceName(a.surface), a.elev), R_DIM, e, 0, false);
-    float sw = 290 * s;
-    if (chip(cx + sw, cy + 16 * s, 26 * s, 34 * s, ">", false) || in.pressed[K_RIGHT]) resAirport = (resAirport + 1) % na;
-    float c2 = cx + sw + 40 * s;
-    g_ren.text(c2, cy, 10 * s, "INSERTION", R_DIM, e, 0, false);
-    if (chip(c2, cy + 16 * s, 86 * s, 34 * s, "AIRBORNE", resAirborne)) resAirborne = true;
-    if (chip(c2 + 90 * s, cy + 16 * s, 76 * s, 34 * s, "RUNWAY", !resAirborne)) resAirborne = false;
-    float c3 = c2 + 182 * s;
-    g_ren.text(c3, cy, 10 * s, "ATMOSPHERE", R_DIM, e, 0, false);
+    float sw = 290 * hs;
+    if (chip(cx, cy + 16 * s, 26 * hs, 34 * s, "<", false) || in.pressed[K_LEFT]) resAirport = (resAirport + na - 1) % na;
+    g_ren.text(cx + 36 * hs, cy + 16 * s, 16 * hs, ellipsize(std::string(a.code) + "  " + a.name, sw - 44 * hs, 16 * hs), R_TEXT, e, 0, false);
+    g_ren.text(cx + 36 * hs, cy + 36 * s, 10 * hs, ellipsize(fmt("RWY %02d/%02d  //  %.0f M %s  //  ELEV %.0f M", a.rwyNumber(false), a.rwyNumber(true), a.length, surfaceName(a.surface), a.elev), sw - 44 * hs, 10 * hs), R_DIM, e, 0, false);
+    if (chip(cx + sw, cy + 16 * s, 26 * hs, 34 * s, ">", false) || in.pressed[K_RIGHT]) resAirport = (resAirport + 1) % na;
+    float c2 = cx + sw + 40 * hs;
+    g_ren.text(c2, cy, 10 * hs, "INSERTION", R_DIM, e, 0, false);
+    if (chip(c2, cy + 16 * s, 86 * hs, 34 * s, "AIRBORNE", resAirborne)) resAirborne = true;
+    if (chip(c2 + 90 * hs, cy + 16 * s, 76 * hs, 34 * s, "RUNWAY", !resAirborne)) resAirborne = false;
+    float c3 = c2 + 182 * hs;
+    g_ren.text(c3, cy, 10 * hs, "ATMOSPHERE", R_DIM, e, 0, false);
     const char* wxs[] = {"CLEAR", "OVERCAST", "STORM"};
-    for (int i = 0; i < 3; i++) if (chip(c3 + i * 80 * s, cy + 16 * s, 76 * s, 34 * s, wxs[i], resWx == i)) resWx = i;
+    for (int i = 0; i < 3; i++) if (chip(c3 + i * 80 * hs, cy + 16 * s, 76 * hs, 34 * s, wxs[i], resWx == i)) resWx = i;
     // time of day slider (the preview's light follows it)
-    float c4 = c3 + 256 * s, tw = std::max(70 * s, x1 - 16 * s - 226 * s - c4);
-    g_ren.text(c4, cy, 10 * s, fmt("LOCAL TIME  %02d:00", (int)resTime), R_DIM, e, 0, false);
+    float c4 = c3 + 256 * hs, tw = std::max(50 * hs, x1 - 16 * hs - 226 * hs - c4);
+    g_ren.text(c4, cy, 10 * hs, fmt("LOCAL TIME  %02d:00", (int)resTime), R_DIM, e, 0, false);
     {
       float f = (resTime - 5.f) / 16.f, by = cy + 31 * s;
       g_ren.rect(c4, by, tw, 3 * s, ACC, 0.15f * e);
@@ -476,14 +484,14 @@ void Game::drawResearch(const FrameParams& fp) {
       if (hovered(c4 - 6 * s, cy + 12 * s, tw + 12 * s, 36 * s) && in.mDown[0] && !resDrag) resTime = floorf(5.f + clampf((in.mx - c4) / tw, 0, 1) * 16.f + 0.5f);
     }
     // initiate / abort
-    float bw = 210 * s, bx = x1 - 16 * s - bw, bh = 46 * s, by = y0 + (h - bh) * 0.5f;
+    float bw = 210 * hs, bx = x1 - 16 * hs - bw, bh = 46 * s, by = y0 + (h - bh) * 0.5f;
     bool hov = hovered(bx, by, bw, bh);
     g_ren.rect(bx, by, bw, bh, ACC * (hov ? 0.45f : 0.3f), e);
     for (float st = fmodf(realTime * 30.f, 16 * s); st < bw; st += 16 * s) g_ren.line(bx + st, by + bh, bx + std::min(bw, st + 10 * s), by, 3 * s, ACC, 0.12f * e);
     g_ren.rectOutline(bx, by, bw, bh, ACC, e, 0, 1.5f * s);
     g_ren.glow(bx, by, bw, bh, ACC, (hov ? 0.35f : 0.15f) * e, 0, 14 * s);
-    g_ren.text(bx + bw * 0.5f, by + 9 * s, 16 * s, wr ? "INITIATE  XR-11" : "INITIATE  XR-9", R_TEXT, e, 1, false);
-    g_ren.text(bx + bw * 0.5f, by + 29 * s, 9 * s, "SORTIE NOT RECORDED IN LOGBOOK", R_DIM, e, 1, false);
+    g_ren.text(bx + bw * 0.5f, by + 9 * s, 16 * hs, wr ? "INITIATE  XR-11" : "INITIATE  XR-9", R_TEXT, e, 1, false);
+    g_ren.text(bx + bw * 0.5f, by + 29 * s, 9 * hs, "SORTIE NOT RECORDED IN LOGBOOK", R_DIM, e, 1, false);
     if (click(bx, by, bw, bh) || in.pressed[K_ENTER]) { launchResearch(); return; }
   }
   g_ren.text(W * 0.5f, H - 22 * s, 10.5f * s, in.pad ? "L-STICK CURSOR   A SELECT   X SWITCH AIRFRAME   R-STICK ROTATE   LB / RB SITE   START INITIATE   B ABORT"
