@@ -1100,20 +1100,28 @@ R"(    if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.31, pf 
   return res;
 }
 vec2 mapPiece(vec3 p){ vec2 d = mapPlane(p); if (gPI >= 0) d.x = max(d.x, sdBox(p - uPcC[gPI], uPcH[gPI])); return d; }
-vec3 planeNormal(vec3 p){ const vec2 k = vec2(1,-1); float e = 0.0025;
-  return normalize(k.xyy*mapPiece(p+k.xyy*e).x + k.yyx*mapPiece(p+k.yyx*e).x + k.yxy*mapPiece(p+k.yxy*e).x + k.xxx*mapPiece(p+k.xxx*e).x); }
+// (The airframe's distance is a very large function: every call written out is another inlined copy in the shader.
+// Its multi-tap users loop with a bound the compiler can't see through (gZero, 0 at run time), so they keep one copy.)
+int gZero = 0;
+vec3 planeNormal(vec3 p){ float e = 0.0025; vec3 n = vec3(0.0);
+  for (int i = gZero; i < 4; i++) {   // tetrahedron taps (1,-1,-1) (-1,-1,1) (-1,1,-1) (1,1,1), in that order
+    vec3 k = 2.0*vec3(float(((i + 3) >> 1) & 1), float((i >> 1) & 1), float(i & 1)) - 1.0;
+    n += k*mapPiece(p + k*e).x;
+  }
+  return normalize(n); }
 
 float planeBound(){ return max(gM[0].x, gM[9].x*2.0)*0.55 + 1.5; }
 void pieceXf(int i){ gPI = i; if (i < 0) { gPP = uPlanePos; gPR = uPlaneRot; gPC = vec3(0.0); } else { gPP = uPcPos[i]; gPR = uPcRot[i]; gPC = uPcC[i]; } }
 // gPlStart: where the march along this ray may begin (the aircraft hull mesh - see aircraft_hull.cpp); 1e30: the ray
 // misses the hull, so the airframe too
-float gPlStart = 0.0;
+// gPlNear: marched as usual up to there first (the hull's faces nearer than that were ignored), then the jump.
+float gPlStart = 0.0, gPlNear = 0.0;
 vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
-  if (gPlStart > 1e29) return vec2(-1.0);
+  if (gPlStart > 1e29 && gPlNear <= 0.0) return vec2(-1.0);
   vec3 oc = ro - gPP;
   float b = dot(oc, rd), c = dot(oc,oc) - br*br, h = b*b - c;
   if (h < 0.0) return vec2(-1.0);
-  h = sqrt(h); float t0 = max(max(-b-h, 0.0), gPlStart), t1 = min(-b+h, tmax);
+  h = sqrt(h); float t0 = max(-b-h, 0.0), t1 = min(-b+h, tmax);
   if (t0 > t1) return vec2(-1.0);
   mat3 inv = transpose(gPR);
   vec3 lo = gPC + inv*(ro - gPP), ld = inv*rd;
@@ -1127,6 +1135,7 @@ vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
   int settle = -1; float hitId = 0.0;
   for (int i=0;i<202;i++){
     if (i >= steps && settle < 0) break;
+    if (settle < 0 && t >= gPlNear && gPlStart > t) { if (gPlStart > 1e29) break; t = gPlStart; if (t > t1) break; }
     vec2 d = mapPiece(lo + ld*t);
     if (settle >= 0) { t += d.x; settle++; if (settle == 2) return vec2(t, hitId); continue; }
     if (d.x < 0.0015*max(1.0, t*0.03)) { hitId = d.y; settle = 1; t += d.x; continue; }
@@ -1155,9 +1164,9 @@ vec2 tracePlane(vec3 ro, vec3 rd, float tmax){
 uniform sampler2D uEnv;   // per pixel: terrain start | airframe hull start | traffic hulls' start (terrain_envelope.cpp, aircraft_hull.cpp)
 uniform float uHullNear;
 vec2 tracePlaneHull(vec3 ro, vec3 rd, float tmax, float hullT){
-  if (hullT <= 0.0) return tracePlane(ro, rd, tmax);
-  if (uHullNear > 0.0) { vec2 h = tracePlane(ro, rd, min(uHullNear, tmax)); if (h.x > 0.0) return h; }
-  gPlStart = hullT; vec2 h = tracePlane(ro, rd, tmax); gPlStart = 0.0;
+  if (hullT > 0.0) { gPlStart = hullT; gPlNear = uHullNear; }
+  vec2 h = tracePlane(ro, rd, tmax);   // (one call: each call site is another copy of the airframe's distance)
+  gPlStart = 0.0; gPlNear = 0.0;
   return h;
 }
 // Other aircraft (AI traffic): bounding-sphere culled, then the same SDF march with that aircraft's data loaded.
@@ -3058,7 +3067,7 @@ vec3 cabinLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E, float pz, float phw){
 float interiorAO(vec3 p, vec3 n){
   if ((uDbg & 512) != 0) return 1.0;
   float occ = 0.0, w = 1.0;
-  for (int i = 1; i <= 3; i++) { float h = 0.02*float(i*i); occ += (h - mapPlane(p + n*h).x)*w; w *= 0.55; }
+  for (int i = 1 + gZero; i <= 3; i++) { float h = 0.02*float(i*i); occ += (h - mapPlane(p + n*h).x)*w; w *= 0.55; }
   return clamp(1.0 - 3.5*occ, 0.3, 1.0);
 }
 )"
@@ -3223,6 +3232,7 @@ vec3 jetPlumes(vec3 ro, vec3 rd, float tmax, float jit){
   return col;
 }
 void main(){
+  gZero = min(uQuality, 0);
   loadMain();
   vec2 ndc = (vUV + uJit)*2.0 - 1.0;
   vec3 rd = normalize(uCamRot * vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, -1.0));
@@ -3244,6 +3254,7 @@ void main(){
   if (cockpitView) {
     bool jet = int(gM[0].z + 0.5) >= 5;
     h0 = tracePlaneHull(ro, rd, jet ? 6.0 : planeBound()*2.0, hullT);
+#ifdef HULL_DEBUG
     if ((uDbg & 1024) != 0) {   // (debug: the hull's start against a march from the camera - red: the hull skipped a hit,
       vec2 hf = tracePlane(ro, rd, jet ? 6.0 : planeBound()*2.0);   // blue: a hit moved, green: the hull found one the camera's march didn't)
       vec3 dc = vec3(0.0);
@@ -3260,6 +3271,7 @@ void main(){
       }
       return;
     }
+#endif
     if (h0.x > 0.0) {
       int id0 = int(h0.y + 0.5);
       if (jet && ((id0 >= 41 && id0 <= 43) || (id0 >= 61 && id0 <= 63))) { onScr = true; scrId = id0; scrL = transpose(uPlaneRot)*(ro + rd*h0.x - uPlanePos); }

@@ -472,7 +472,7 @@ GLuint Renderer::makeTexture(const uint8_t* rgba, int w, int h) {
 // objects, which are shared between contexts, so the platform layer can run it on a worker thread with its own
 // context while the intro screen animates. `done` counts finished programs (kProgramCount in all).
 std::string Renderer::rtSource(const char* defines) {
-  return std::string("#version 330 core\n") + defines + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + (getenv("CLIPATLAS") ? "#define WR_CLIPATLAS\n" : "") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRaytraceFS3 + kRaytraceWraith + kRaytraceWraithCockpit;
+  return std::string("#version 330 core\n") + defines + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + (getenv("CLIPATLAS") ? "#define WR_CLIPATLAS\n" : "") + (getenv("HULLDEBUG") ? "#define HULL_DEBUG\n" : "") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRaytraceFS3 + kRaytraceWraith + kRaytraceWraithCockpit;
 }
 
 // The analysis build of the ray tracer: the same shader with its work counters (COST) written out instead of colour
