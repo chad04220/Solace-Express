@@ -11,6 +11,7 @@
 #include "entities.h"
 #include "audio.h"
 #include "radio.h"
+#include "atc.h"
 
 // Virtual key codes (Windows VK values)
 enum {
@@ -44,7 +45,7 @@ std::string padName(unsigned bit);
 
 struct Settings {
   float renderScale = 1.0f; int quality = 1;   // renderScale: always 1 (full display resolution)
-  float master = 0.8f, engineVol = 1.0f, sfxVol = 0.9f, radioVol = 0.6f;
+  float master = 0.8f, engineVol = 1.0f, sfxVol = 0.9f, radioVol = 0.6f, atcVol = 0.9f;
   bool invertPitch = false, showHints = true, metric = false, fullscreen = false, traffic = true;
   int radioStation = 0;
   float mouseSens = 1.0f;
@@ -218,6 +219,16 @@ private:
   std::vector<Toast> toasts;
 
   Radio radio;
+  // tower controller: the voices (atc.h) and where this flight is in its exchange with the towers (updateAtc)
+  AtcVoice atc;
+  struct AtcFlight {
+    int phase = 0;      // 0 greeting, 1 takeoff clearance, 2 handoff, 3 en route, 4 approach issued, 5 cleared to land, 6 done
+    float t = 0, waitT = 0;
+    int dep = -1, arr = -1, call = 42;
+    bool depRev = false, arrRev = false, airborne = false;
+  } atcF;
+  void updateAtc(float dt);
+  int atcStation(int airport) const { return (airport * 7 + 2) % AtcVoice::kVoices; }   // each airport keeps one voice
   std::vector<std::pair<std::string, std::string>> stations;
   bool settingsFromPause = false;
   int settingsPage = 0;                    // 0 general, 1 controls

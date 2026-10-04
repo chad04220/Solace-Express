@@ -18,9 +18,13 @@ THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
 
 Stations listed in `radio_stations.txt` are third-party services streamed live at the player's request. Solace Express does not host, cache or redistribute any audio. Check each station's terms before featuring them in marketing material.
 
+## Tower controller voices (`voice/`)
+
+The North, Coast and Valley Tower voices were synthesised for this project with the Kokoro-82M v1.0 text-to-speech model (stock voices am_michael, af_sarah and bm_daniel) through kokoro-onnx, then radio-filtered. Kokoro-82M is licensed under the Apache License 2.0 and kokoro-onnx under the MIT License; both licence texts are in `voice/licenses/`. The recordings themselves are part of this project.
+
 ## Everything else
 
-All other code, shaders, textures (procedurally generated at startup), audio (synthesised in real time), aircraft, map and campaign content are original to this project.
+All other code, shaders, textures (procedurally generated at startup), audio (synthesised in real time, apart from the tower voices above), aircraft, map and campaign content are original to this project.
 
 ## stb_image
 

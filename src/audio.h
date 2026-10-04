@@ -2,6 +2,8 @@
 #pragma once
 #include "common.h"
 #include <atomic>
+#include <memory>
+#include <vector>
 
 struct AudioParams {
   bool inFlight = false;
@@ -16,6 +18,7 @@ struct AudioParams {
   bool paused = false;
   bool stallIsShaker = false;
   bool research = false; float nozzle = 0, mach = 0;   // XR-9 research craft voice
+  float voiceVol = 0.9f;   // ATC radio voice (headset: not muffled, not faded by the flight / pause mix)
 };
 
 enum Sfx { SFX_CLICK = 0, SFX_HOVER, SFX_CHIME, SFX_SUCCESS, SFX_FAIL, SFX_CASH, SFX_TOUCHDOWN, SFX_CRASH, SFX_THUNDER, SFX_BEEP, SFX_GEAR_CLUNK, SFX_AP_DISC, SFX_BOOM, SFX_UFO_ARRIVE, SFX_UFO_LAUGH, SFX_UFO_ZOOM, SFX_FLYBY, SFX_LASER, SFX_PLASMA, SFX_CLOAK, SFX_COUNT };
@@ -27,7 +30,13 @@ public:
   void setParams(const AudioParams& p);
   void trigger(int sfx, float intensity = 1.0f);
   void render(float* out, int frames);  // interleaved stereo, called from the audio thread
+  // Radio voice: one assembled transmission at a time at the engine's sample rate (replaces whatever is playing).
+  void voicePlay(std::shared_ptr<const std::vector<float>> pcm);
+  void voiceStop();
+  bool voiceBusy() const { return voiceActive.load(std::memory_order_relaxed); }
 private:
+  std::shared_ptr<const std::vector<float>> voicePending; bool voiceNew = false, voiceCut = false;
+  std::atomic<bool> voiceActive{false};
   struct Impl; Impl* impl = nullptr;
   std::atomic_flag lock = ATOMIC_FLAG_INIT;
   AudioParams pending; bool hasPending = false;

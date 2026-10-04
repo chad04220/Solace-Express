@@ -237,6 +237,7 @@ struct AudioEngine::Impl {
   OneShot shots[24];
   float thunderEnv = 0;
   Biquad thunderLP;
+  std::shared_ptr<const std::vector<float>> voice; size_t voicePos = 0;   // the radio transmission playing
 };
 
 void AudioEngine::init(int sr) {
@@ -250,6 +251,11 @@ void AudioEngine::init(int sr) {
 }
 
 void AudioEngine::setParams(const AudioParams& p) { acquire(); pending = p; hasPending = true; release(); }
+
+void AudioEngine::voicePlay(std::shared_ptr<const std::vector<float>> pcm) {
+  acquire(); voicePending = std::move(pcm); voiceNew = true; voiceCut = false; voiceActive.store(true); release();
+}
+void AudioEngine::voiceStop() { acquire(); voicePending.reset(); voiceNew = false; voiceCut = true; voiceActive.store(false); release(); }
 
 void AudioEngine::trigger(int sfx, float intensity) {
   acquire();
@@ -378,6 +384,8 @@ void AudioEngine::render(float* out, int frames) {
     for (auto& s : I.shots) if (!s.active) { startShot(s, trigQ[i], trigI[i], I.sr); break; }
   }
   trigN = 0;
+  if (voiceNew) { I.voice = std::move(voicePending); I.voicePos = 0; voiceNew = false; }
+  if (voiceCut) { I.voice.reset(); voiceCut = false; }
   release();
   const AudioParams& P = I.P;
   float sr = I.sr;
@@ -491,6 +499,10 @@ void AudioEngine::render(float* out, int frames) {
       sfx += v * (muffles ? lerpf(1.f, 0.5f, muff) : 1.f);
     }
     L += sfx * P.sfxVol; R += sfx * P.sfxVol;
+    if (I.voice) {   // the radio voice, centred
+      if (I.voicePos < I.voice->size()) { float v = (*I.voice)[I.voicePos++] * P.voiceVol; L += v; R += v; }
+      else { I.voice.reset(); voiceActive.store(false, std::memory_order_relaxed); }
+    }
     L = tanhf(L * P.master * 1.2f); R = tanhf(R * P.master * 1.2f);
     out[f * 2] = L; out[f * 2 + 1] = R;
   }

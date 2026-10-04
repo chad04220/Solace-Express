@@ -1,0 +1,592 @@
+# Solace Express tower voices (tools/voice_import.py); id <tab> file <tab> text, or @lookup <tab> id
+symbol.tower_north.A	tower_north/symbol.tower_north.A.wav	Ay.
+symbol.tower_north.B	tower_north/symbol.tower_north.B.wav	Bee.
+symbol.tower_north.C	tower_north/symbol.tower_north.C.wav	See.
+symbol.tower_north.D	tower_north/symbol.tower_north.D.wav	Dee.
+symbol.tower_north.E	tower_north/symbol.tower_north.E.wav	Ee.
+symbol.tower_north.F	tower_north/symbol.tower_north.F.wav	Eff.
+symbol.tower_north.G	tower_north/symbol.tower_north.G.wav	Gee.
+symbol.tower_north.H	tower_north/symbol.tower_north.H.wav	Aitch.
+symbol.tower_north.I	tower_north/symbol.tower_north.I.wav	Eye.
+symbol.tower_north.J	tower_north/symbol.tower_north.J.wav	Jay.
+symbol.tower_north.K	tower_north/symbol.tower_north.K.wav	Kay.
+symbol.tower_north.L	tower_north/symbol.tower_north.L.wav	Ell.
+symbol.tower_north.M	tower_north/symbol.tower_north.M.wav	Em.
+symbol.tower_north.N	tower_north/symbol.tower_north.N.wav	En.
+symbol.tower_north.O	tower_north/symbol.tower_north.O.wav	Oh.
+symbol.tower_north.P	tower_north/symbol.tower_north.P.wav	Pee.
+symbol.tower_north.Q	tower_north/symbol.tower_north.Q.wav	Cue.
+symbol.tower_north.R	tower_north/symbol.tower_north.R.wav	Ar.
+symbol.tower_north.S	tower_north/symbol.tower_north.S.wav	Ess.
+symbol.tower_north.T	tower_north/symbol.tower_north.T.wav	Tee.
+symbol.tower_north.U	tower_north/symbol.tower_north.U.wav	You.
+symbol.tower_north.V	tower_north/symbol.tower_north.V.wav	Vee.
+symbol.tower_north.W	tower_north/symbol.tower_north.W.wav	Double U.
+symbol.tower_north.X	tower_north/symbol.tower_north.X.wav	Ex.
+symbol.tower_north.Y	tower_north/symbol.tower_north.Y.wav	Why.
+symbol.tower_north.Z	tower_north/symbol.tower_north.Z.wav	Zee.
+symbol.tower_north.0	tower_north/symbol.tower_north.0.wav	zero.
+symbol.tower_north.1	tower_north/symbol.tower_north.1.wav	one.
+symbol.tower_north.2	tower_north/symbol.tower_north.2.wav	two.
+symbol.tower_north.3	tower_north/symbol.tower_north.3.wav	three.
+symbol.tower_north.4	tower_north/symbol.tower_north.4.wav	four.
+symbol.tower_north.5	tower_north/symbol.tower_north.5.wav	five.
+symbol.tower_north.6	tower_north/symbol.tower_north.6.wav	six.
+symbol.tower_north.7	tower_north/symbol.tower_north.7.wav	seven.
+symbol.tower_north.8	tower_north/symbol.tower_north.8.wav	eight.
+symbol.tower_north.9	tower_north/symbol.tower_north.9.wav	nine.
+symbol.tower_coast.A	tower_coast/symbol.tower_coast.A.wav	Ay.
+symbol.tower_coast.B	tower_coast/symbol.tower_coast.B.wav	Bee.
+symbol.tower_coast.C	tower_coast/symbol.tower_coast.C.wav	See.
+symbol.tower_coast.D	tower_coast/symbol.tower_coast.D.wav	Dee.
+symbol.tower_coast.E	tower_coast/symbol.tower_coast.E.wav	Ee.
+symbol.tower_coast.F	tower_coast/symbol.tower_coast.F.wav	Eff.
+symbol.tower_coast.G	tower_coast/symbol.tower_coast.G.wav	Gee.
+symbol.tower_coast.H	tower_coast/symbol.tower_coast.H.wav	Aitch.
+symbol.tower_coast.I	tower_coast/symbol.tower_coast.I.wav	Eye.
+symbol.tower_coast.J	tower_coast/symbol.tower_coast.J.wav	Jay.
+symbol.tower_coast.K	tower_coast/symbol.tower_coast.K.wav	Kay.
+symbol.tower_coast.L	tower_coast/symbol.tower_coast.L.wav	Ell.
+symbol.tower_coast.M	tower_coast/symbol.tower_coast.M.wav	Em.
+symbol.tower_coast.N	tower_coast/symbol.tower_coast.N.wav	En.
+symbol.tower_coast.O	tower_coast/symbol.tower_coast.O.wav	Oh.
+symbol.tower_coast.P	tower_coast/symbol.tower_coast.P.wav	Pee.
+symbol.tower_coast.Q	tower_coast/symbol.tower_coast.Q.wav	Cue.
+symbol.tower_coast.R	tower_coast/symbol.tower_coast.R.wav	Ar.
+symbol.tower_coast.S	tower_coast/symbol.tower_coast.S.wav	Ess.
+symbol.tower_coast.T	tower_coast/symbol.tower_coast.T.wav	Tee.
+symbol.tower_coast.U	tower_coast/symbol.tower_coast.U.wav	You.
+symbol.tower_coast.V	tower_coast/symbol.tower_coast.V.wav	Vee.
+symbol.tower_coast.W	tower_coast/symbol.tower_coast.W.wav	Double U.
+symbol.tower_coast.X	tower_coast/symbol.tower_coast.X.wav	Ex.
+symbol.tower_coast.Y	tower_coast/symbol.tower_coast.Y.wav	Why.
+symbol.tower_coast.Z	tower_coast/symbol.tower_coast.Z.wav	Zee.
+symbol.tower_coast.0	tower_coast/symbol.tower_coast.0.wav	zero.
+symbol.tower_coast.1	tower_coast/symbol.tower_coast.1.wav	one.
+symbol.tower_coast.2	tower_coast/symbol.tower_coast.2.wav	two.
+symbol.tower_coast.3	tower_coast/symbol.tower_coast.3.wav	three.
+symbol.tower_coast.4	tower_coast/symbol.tower_coast.4.wav	four.
+symbol.tower_coast.5	tower_coast/symbol.tower_coast.5.wav	five.
+symbol.tower_coast.6	tower_coast/symbol.tower_coast.6.wav	six.
+symbol.tower_coast.7	tower_coast/symbol.tower_coast.7.wav	seven.
+symbol.tower_coast.8	tower_coast/symbol.tower_coast.8.wav	eight.
+symbol.tower_coast.9	tower_coast/symbol.tower_coast.9.wav	nine.
+symbol.tower_valley.A	tower_valley/symbol.tower_valley.A.wav	Ay.
+symbol.tower_valley.B	tower_valley/symbol.tower_valley.B.wav	Bee.
+symbol.tower_valley.C	tower_valley/symbol.tower_valley.C.wav	See.
+symbol.tower_valley.D	tower_valley/symbol.tower_valley.D.wav	Dee.
+symbol.tower_valley.E	tower_valley/symbol.tower_valley.E.wav	Ee.
+symbol.tower_valley.F	tower_valley/symbol.tower_valley.F.wav	Eff.
+symbol.tower_valley.G	tower_valley/symbol.tower_valley.G.wav	Gee.
+symbol.tower_valley.H	tower_valley/symbol.tower_valley.H.wav	Aitch.
+symbol.tower_valley.I	tower_valley/symbol.tower_valley.I.wav	Eye.
+symbol.tower_valley.J	tower_valley/symbol.tower_valley.J.wav	Jay.
+symbol.tower_valley.K	tower_valley/symbol.tower_valley.K.wav	Kay.
+symbol.tower_valley.L	tower_valley/symbol.tower_valley.L.wav	Ell.
+symbol.tower_valley.M	tower_valley/symbol.tower_valley.M.wav	Em.
+symbol.tower_valley.N	tower_valley/symbol.tower_valley.N.wav	En.
+symbol.tower_valley.O	tower_valley/symbol.tower_valley.O.wav	Oh.
+symbol.tower_valley.P	tower_valley/symbol.tower_valley.P.wav	Pee.
+symbol.tower_valley.Q	tower_valley/symbol.tower_valley.Q.wav	Cue.
+symbol.tower_valley.R	tower_valley/symbol.tower_valley.R.wav	Ar.
+symbol.tower_valley.S	tower_valley/symbol.tower_valley.S.wav	Ess.
+symbol.tower_valley.T	tower_valley/symbol.tower_valley.T.wav	Tee.
+symbol.tower_valley.U	tower_valley/symbol.tower_valley.U.wav	You.
+symbol.tower_valley.V	tower_valley/symbol.tower_valley.V.wav	Vee.
+symbol.tower_valley.W	tower_valley/symbol.tower_valley.W.wav	Double U.
+symbol.tower_valley.X	tower_valley/symbol.tower_valley.X.wav	Ex.
+symbol.tower_valley.Y	tower_valley/symbol.tower_valley.Y.wav	Why.
+symbol.tower_valley.Z	tower_valley/symbol.tower_valley.Z.wav	Zed.
+symbol.tower_valley.0	tower_valley/symbol.tower_valley.0.wav	zero.
+symbol.tower_valley.1	tower_valley/symbol.tower_valley.1.wav	one.
+symbol.tower_valley.2	tower_valley/symbol.tower_valley.2.wav	two.
+symbol.tower_valley.3	tower_valley/symbol.tower_valley.3.wav	three.
+symbol.tower_valley.4	tower_valley/symbol.tower_valley.4.wav	four.
+symbol.tower_valley.5	tower_valley/symbol.tower_valley.5.wav	five.
+symbol.tower_valley.6	tower_valley/symbol.tower_valley.6.wav	six.
+symbol.tower_valley.7	tower_valley/symbol.tower_valley.7.wav	seven.
+symbol.tower_valley.8	tower_valley/symbol.tower_valley.8.wav	eight.
+symbol.tower_valley.9	tower_valley/symbol.tower_valley.9.wav	nine.
+tower.tower_north.greeting_morning	tower_north/tower.tower_north.greeting_morning.wav	Good morning. Advise when ready to taxi.
+tower.tower_north.greeting_afternoon	tower_north/tower.tower_north.greeting_afternoon.wav	Good afternoon. Advise when ready to taxi.
+tower.tower_north.greeting_evening	tower_north/tower.tower_north.greeting_evening.wav	Good evening. Advise when ready to taxi.
+tower.tower_north.aircraft_position	tower_north/tower.tower_north.aircraft_position.wav	Say your aircraft type and position.
+tower.tower_north.repeat_callsign	tower_north/tower.tower_north.repeat_callsign.wav	Say again your call sign.
+tower.tower_north.readback_hold	tower_north/tower.tower_north.readback_hold.wav	Read back the hold-short instruction.
+tower.tower_north.standby	tower_north/tower.tower_north.standby.wav	Stand by.
+tower.tower_north.hold_position	tower_north/tower.tower_north.hold_position.wav	Hold position.
+tower.tower_north.hold_arrival	tower_north/tower.tower_north.hold_arrival.wav	Continue holding. Traffic is on final.
+tower.tower_north.hold_departure	tower_north/tower.tower_north.hold_departure.wav	Continue holding. A departure is rolling.
+tower.tower_north.arrival_delay	tower_north/tower.tower_north.arrival_delay.wav	Expect a short delay for arriving traffic.
+tower.tower_north.report_ready	tower_north/tower.tower_north.report_ready.wav	Report ready for departure.
+tower.tower_north.wake_caution	tower_north/tower.tower_north.wake_caution.wav	Caution, wake turbulence.
+tower.tower_north.cancel_takeoff	tower_north/tower.tower_north.cancel_takeoff.wav	Cancel takeoff clearance. Hold position.
+tower.tower_north.runway_heading	tower_north/tower.tower_north.runway_heading.wav	Fly runway heading.
+tower.tower_north.remain_pattern	tower_north/tower.tower_north.remain_pattern.wav	Remain in the pattern.
+tower.tower_north.contact_departure	tower_north/tower.tower_north.contact_departure.wav	Contact departure.
+tower.tower_north.frequency_change	tower_north/tower.tower_north.frequency_change.wav	Frequency change approved.
+tower.tower_north.report_downwind	tower_north/tower.tower_north.report_downwind.wav	Report downwind.
+tower.tower_north.report_base	tower_north/tower.tower_north.report_base.wav	Report base.
+tower.tower_north.report_final	tower_north/tower.tower_north.report_final.wav	Report final.
+tower.tower_north.extend_downwind	tower_north/tower.tower_north.extend_downwind.wav	Extend downwind. I will call your base.
+tower.tower_north.turn_base	tower_north/tower.tower_north.turn_base.wav	Turn base now.
+tower.tower_north.number_one	tower_north/tower.tower_north.number_one.wav	You are number one.
+tower.tower_north.number_two	tower_north/tower.tower_north.number_two.wav	You are number two. Follow the aircraft ahead.
+tower.tower_north.continue_approach	tower_north/tower.tower_north.continue_approach.wav	Continue approach.
+tower.tower_north.clearance_follows	tower_north/tower.tower_north.clearance_follows.wav	Continue approach. Landing clearance will follow.
+tower.tower_north.runway_occupied	tower_north/tower.tower_north.runway_occupied.wav	Continue approach. The runway is occupied.
+tower.tower_north.heavy_wake	tower_north/tower.tower_north.heavy_wake.wav	Caution, wake turbulence. Traffic ahead is a heavy aircraft.
+tower.tower_north.go_around_heading	tower_north/tower.tower_north.go_around_heading.wav	Go around. Fly runway heading.
+tower.tower_north.go_around_occupied	tower_north/tower.tower_north.go_around_occupied.wav	Go around. The runway is occupied.
+tower.tower_north.go_around_vehicle	tower_north/tower.tower_north.go_around_vehicle.wav	Go around. Vehicle on the runway.
+tower.tower_north.go_around_aircraft	tower_north/tower.tower_north.go_around_aircraft.wav	Go around. Aircraft on the runway.
+tower.tower_north.go_around_ability	tower_north/tower.tower_north.go_around_ability.wav	Are you able to go around?
+tower.tower_north.exit_when_able	tower_north/tower.tower_north.exit_when_able.wav	Exit the runway when able.
+tower.tower_north.report_clear	tower_north/tower.tower_north.report_clear.wav	Report clear of the runway.
+tower.tower_north.hold_contact_ground	tower_north/tower.tower_north.hold_contact_ground.wav	Hold position. Contact ground.
+tower.tower_north.welcome_back	tower_north/tower.tower_north.welcome_back.wav	Welcome back.
+tower.tower_north.good_day	tower_north/tower.tower_north.good_day.wav	Good day.
+tower.tower_north.emergency_priority	tower_north/tower.tower_north.emergency_priority.wav	Emergency traffic has priority. Stand by.
+atc_atom.tower_north.runway	tower_north/atc_atom.tower_north.runway.wav	Runway
+atc_atom.tower_north.hold_short_runway	tower_north/atc_atom.tower_north.hold_short_runway.wav	Hold short of runway
+atc_atom.tower_north.line_up_wait	tower_north/atc_atom.tower_north.line_up_wait.wav	, line up and wait.
+atc_atom.tower_north.cleared_takeoff	tower_north/atc_atom.tower_north.cleared_takeoff.wav	, cleared for takeoff.
+atc_atom.tower_north.cleared_land	tower_north/atc_atom.tower_north.cleared_land.wav	, cleared to land.
+atc_atom.tower_north.cleared_option	tower_north/atc_atom.tower_north.cleared_option.wav	, cleared for the option.
+atc_atom.tower_north.cleared_touch_go	tower_north/atc_atom.tower_north.cleared_touch_go.wav	, cleared touch and go.
+atc_atom.tower_north.wind	tower_north/atc_atom.tower_north.wind.wav	Wind
+atc_atom.tower_north.at	tower_north/atc_atom.tower_north.at.wav	at
+atc_atom.tower_north.knots	tower_north/atc_atom.tower_north.knots.wav	knots.
+atc_atom.tower_north.gusting	tower_north/atc_atom.tower_north.gusting.wav	gusting
+atc_atom.tower_north.left	tower_north/atc_atom.tower_north.left.wav	left
+atc_atom.tower_north.right	tower_north/atc_atom.tower_north.right.wav	right
+atc_atom.tower_north.center	tower_north/atc_atom.tower_north.center.wav	center
+atc_atom.tower_north.enter_left_downwind	tower_north/atc_atom.tower_north.enter_left_downwind.wav	Enter left downwind for runway
+atc_atom.tower_north.enter_right_downwind	tower_north/atc_atom.tower_north.enter_right_downwind.wav	Enter right downwind for runway
+atc_atom.tower_north.make_straight_in	tower_north/atc_atom.tower_north.make_straight_in.wav	Make straight-in for runway
+atc_atom.tower_north.report_final	tower_north/atc_atom.tower_north.report_final.wav	, report final.
+atc_atom.tower_north.solace	tower_north/atc_atom.tower_north.solace.wav	Solace
+atc_atom.tower_north.tower	tower_north/atc_atom.tower_north.tower.wav	Tower
+atc_atom.tower_north.point	tower_north/atc_atom.tower_north.point.wav	point
+atc_atom.tower_north.feet	tower_north/atc_atom.tower_north.feet.wav	feet.
+atc_atom.tower_north.maintain	tower_north/atc_atom.tower_north.maintain.wav	Maintain
+atc_atom.tower_north.contact_ground_on	tower_north/atc_atom.tower_north.contact_ground_on.wav	Contact ground on
+atc_atom.tower_north.contact_departure_on	tower_north/atc_atom.tower_north.contact_departure_on.wav	Contact departure on
+atc_atom.tower_north.taxi_via	tower_north/atc_atom.tower_north.taxi_via.wav	Taxi via
+atc_atom.tower_north.then	tower_north/atc_atom.tower_north.then.wav	then
+atc_atom.tower_north.and	tower_north/atc_atom.tower_north.and.wav	and
+phonetic.tower_north.A	tower_north/phonetic.tower_north.A.wav	Alfa.
+phonetic.tower_north.B	tower_north/phonetic.tower_north.B.wav	Bravo.
+phonetic.tower_north.C	tower_north/phonetic.tower_north.C.wav	Charlie.
+phonetic.tower_north.D	tower_north/phonetic.tower_north.D.wav	Delta.
+phonetic.tower_north.E	tower_north/phonetic.tower_north.E.wav	Echo.
+phonetic.tower_north.F	tower_north/phonetic.tower_north.F.wav	Foxtrot.
+phonetic.tower_north.G	tower_north/phonetic.tower_north.G.wav	Golf.
+phonetic.tower_north.H	tower_north/phonetic.tower_north.H.wav	Hotel.
+phonetic.tower_north.I	tower_north/phonetic.tower_north.I.wav	India.
+phonetic.tower_north.J	tower_north/phonetic.tower_north.J.wav	Juliett.
+phonetic.tower_north.K	tower_north/phonetic.tower_north.K.wav	Kilo.
+phonetic.tower_north.L	tower_north/phonetic.tower_north.L.wav	Lima.
+phonetic.tower_north.M	tower_north/phonetic.tower_north.M.wav	Mike.
+phonetic.tower_north.N	tower_north/phonetic.tower_north.N.wav	November.
+phonetic.tower_north.O	tower_north/phonetic.tower_north.O.wav	Oscar.
+phonetic.tower_north.P	tower_north/phonetic.tower_north.P.wav	Papa.
+phonetic.tower_north.Q	tower_north/phonetic.tower_north.Q.wav	Quebec.
+phonetic.tower_north.R	tower_north/phonetic.tower_north.R.wav	Romeo.
+phonetic.tower_north.S	tower_north/phonetic.tower_north.S.wav	Sierra.
+phonetic.tower_north.T	tower_north/phonetic.tower_north.T.wav	Tango.
+phonetic.tower_north.U	tower_north/phonetic.tower_north.U.wav	Uniform.
+phonetic.tower_north.V	tower_north/phonetic.tower_north.V.wav	Victor.
+phonetic.tower_north.W	tower_north/phonetic.tower_north.W.wav	Whiskey.
+phonetic.tower_north.X	tower_north/phonetic.tower_north.X.wav	X-ray.
+phonetic.tower_north.Y	tower_north/phonetic.tower_north.Y.wav	Yankee.
+phonetic.tower_north.Z	tower_north/phonetic.tower_north.Z.wav	Zulu.
+radio_digit.tower_north.3	tower_north/radio_digit.tower_north.3.wav	tree.
+radio_digit.tower_north.5	tower_north/radio_digit.tower_north.5.wav	fife.
+radio_digit.tower_north.9	tower_north/radio_digit.tower_north.9.wav	niner.
+tower.tower_coast.greeting_morning	tower_coast/tower.tower_coast.greeting_morning.wav	Good morning. Advise when ready to taxi.
+tower.tower_coast.greeting_afternoon	tower_coast/tower.tower_coast.greeting_afternoon.wav	Good afternoon. Advise when ready to taxi.
+tower.tower_coast.greeting_evening	tower_coast/tower.tower_coast.greeting_evening.wav	Good evening. Advise when ready to taxi.
+tower.tower_coast.aircraft_position	tower_coast/tower.tower_coast.aircraft_position.wav	Say your aircraft type and position.
+tower.tower_coast.repeat_callsign	tower_coast/tower.tower_coast.repeat_callsign.wav	Say again your call sign.
+tower.tower_coast.readback_hold	tower_coast/tower.tower_coast.readback_hold.wav	Read back the hold-short instruction.
+tower.tower_coast.standby	tower_coast/tower.tower_coast.standby.wav	Stand by.
+tower.tower_coast.hold_position	tower_coast/tower.tower_coast.hold_position.wav	Hold position.
+tower.tower_coast.hold_arrival	tower_coast/tower.tower_coast.hold_arrival.wav	Continue holding. Traffic is on final.
+tower.tower_coast.hold_departure	tower_coast/tower.tower_coast.hold_departure.wav	Continue holding. A departure is rolling.
+tower.tower_coast.arrival_delay	tower_coast/tower.tower_coast.arrival_delay.wav	Expect a short delay for arriving traffic.
+tower.tower_coast.report_ready	tower_coast/tower.tower_coast.report_ready.wav	Report ready for departure.
+tower.tower_coast.wake_caution	tower_coast/tower.tower_coast.wake_caution.wav	Caution, wake turbulence.
+tower.tower_coast.cancel_takeoff	tower_coast/tower.tower_coast.cancel_takeoff.wav	Cancel takeoff clearance. Hold position.
+tower.tower_coast.runway_heading	tower_coast/tower.tower_coast.runway_heading.wav	Fly runway heading.
+tower.tower_coast.remain_pattern	tower_coast/tower.tower_coast.remain_pattern.wav	Remain in the pattern.
+tower.tower_coast.contact_departure	tower_coast/tower.tower_coast.contact_departure.wav	Contact departure.
+tower.tower_coast.frequency_change	tower_coast/tower.tower_coast.frequency_change.wav	Frequency change approved.
+tower.tower_coast.report_downwind	tower_coast/tower.tower_coast.report_downwind.wav	Report downwind.
+tower.tower_coast.report_base	tower_coast/tower.tower_coast.report_base.wav	Report base.
+tower.tower_coast.report_final	tower_coast/tower.tower_coast.report_final.wav	Report final.
+tower.tower_coast.extend_downwind	tower_coast/tower.tower_coast.extend_downwind.wav	Extend downwind. I will call your base.
+tower.tower_coast.turn_base	tower_coast/tower.tower_coast.turn_base.wav	Turn base now.
+tower.tower_coast.number_one	tower_coast/tower.tower_coast.number_one.wav	You are number one.
+tower.tower_coast.number_two	tower_coast/tower.tower_coast.number_two.wav	You are number two. Follow the aircraft ahead.
+tower.tower_coast.continue_approach	tower_coast/tower.tower_coast.continue_approach.wav	Continue approach.
+tower.tower_coast.clearance_follows	tower_coast/tower.tower_coast.clearance_follows.wav	Continue approach. Landing clearance will follow.
+tower.tower_coast.runway_occupied	tower_coast/tower.tower_coast.runway_occupied.wav	Continue approach. The runway is occupied.
+tower.tower_coast.heavy_wake	tower_coast/tower.tower_coast.heavy_wake.wav	Caution, wake turbulence. Traffic ahead is a heavy aircraft.
+tower.tower_coast.go_around_heading	tower_coast/tower.tower_coast.go_around_heading.wav	Go around. Fly runway heading.
+tower.tower_coast.go_around_occupied	tower_coast/tower.tower_coast.go_around_occupied.wav	Go around. The runway is occupied.
+tower.tower_coast.go_around_vehicle	tower_coast/tower.tower_coast.go_around_vehicle.wav	Go around. Vehicle on the runway.
+tower.tower_coast.go_around_aircraft	tower_coast/tower.tower_coast.go_around_aircraft.wav	Go around. Aircraft on the runway.
+tower.tower_coast.go_around_ability	tower_coast/tower.tower_coast.go_around_ability.wav	Are you able to go around?
+tower.tower_coast.exit_when_able	tower_coast/tower.tower_coast.exit_when_able.wav	Exit the runway when able.
+tower.tower_coast.report_clear	tower_coast/tower.tower_coast.report_clear.wav	Report clear of the runway.
+tower.tower_coast.hold_contact_ground	tower_coast/tower.tower_coast.hold_contact_ground.wav	Hold position. Contact ground.
+tower.tower_coast.welcome_back	tower_coast/tower.tower_coast.welcome_back.wav	Welcome back.
+tower.tower_coast.good_day	tower_coast/tower.tower_coast.good_day.wav	Good day.
+tower.tower_coast.emergency_priority	tower_coast/tower.tower_coast.emergency_priority.wav	Emergency traffic has priority. Stand by.
+atc_atom.tower_coast.runway	tower_coast/atc_atom.tower_coast.runway.wav	Runway
+atc_atom.tower_coast.hold_short_runway	tower_coast/atc_atom.tower_coast.hold_short_runway.wav	Hold short of runway
+atc_atom.tower_coast.line_up_wait	tower_coast/atc_atom.tower_coast.line_up_wait.wav	, line up and wait.
+atc_atom.tower_coast.cleared_takeoff	tower_coast/atc_atom.tower_coast.cleared_takeoff.wav	, cleared for takeoff.
+atc_atom.tower_coast.cleared_land	tower_coast/atc_atom.tower_coast.cleared_land.wav	, cleared to land.
+atc_atom.tower_coast.cleared_option	tower_coast/atc_atom.tower_coast.cleared_option.wav	, cleared for the option.
+atc_atom.tower_coast.cleared_touch_go	tower_coast/atc_atom.tower_coast.cleared_touch_go.wav	, cleared touch and go.
+atc_atom.tower_coast.wind	tower_coast/atc_atom.tower_coast.wind.wav	Wind
+atc_atom.tower_coast.at	tower_coast/atc_atom.tower_coast.at.wav	at
+atc_atom.tower_coast.knots	tower_coast/atc_atom.tower_coast.knots.wav	knots.
+atc_atom.tower_coast.gusting	tower_coast/atc_atom.tower_coast.gusting.wav	gusting
+atc_atom.tower_coast.left	tower_coast/atc_atom.tower_coast.left.wav	left
+atc_atom.tower_coast.right	tower_coast/atc_atom.tower_coast.right.wav	right
+atc_atom.tower_coast.center	tower_coast/atc_atom.tower_coast.center.wav	center
+atc_atom.tower_coast.enter_left_downwind	tower_coast/atc_atom.tower_coast.enter_left_downwind.wav	Enter left downwind for runway
+atc_atom.tower_coast.enter_right_downwind	tower_coast/atc_atom.tower_coast.enter_right_downwind.wav	Enter right downwind for runway
+atc_atom.tower_coast.make_straight_in	tower_coast/atc_atom.tower_coast.make_straight_in.wav	Make straight-in for runway
+atc_atom.tower_coast.report_final	tower_coast/atc_atom.tower_coast.report_final.wav	, report final.
+atc_atom.tower_coast.solace	tower_coast/atc_atom.tower_coast.solace.wav	Solace
+atc_atom.tower_coast.tower	tower_coast/atc_atom.tower_coast.tower.wav	Tower
+atc_atom.tower_coast.point	tower_coast/atc_atom.tower_coast.point.wav	point
+atc_atom.tower_coast.feet	tower_coast/atc_atom.tower_coast.feet.wav	feet.
+atc_atom.tower_coast.maintain	tower_coast/atc_atom.tower_coast.maintain.wav	Maintain
+atc_atom.tower_coast.contact_ground_on	tower_coast/atc_atom.tower_coast.contact_ground_on.wav	Contact ground on
+atc_atom.tower_coast.contact_departure_on	tower_coast/atc_atom.tower_coast.contact_departure_on.wav	Contact departure on
+atc_atom.tower_coast.taxi_via	tower_coast/atc_atom.tower_coast.taxi_via.wav	Taxi via
+atc_atom.tower_coast.then	tower_coast/atc_atom.tower_coast.then.wav	then
+atc_atom.tower_coast.and	tower_coast/atc_atom.tower_coast.and.wav	and
+phonetic.tower_coast.A	tower_coast/phonetic.tower_coast.A.wav	Alfa.
+phonetic.tower_coast.B	tower_coast/phonetic.tower_coast.B.wav	Bravo.
+phonetic.tower_coast.C	tower_coast/phonetic.tower_coast.C.wav	Charlie.
+phonetic.tower_coast.D	tower_coast/phonetic.tower_coast.D.wav	Delta.
+phonetic.tower_coast.E	tower_coast/phonetic.tower_coast.E.wav	Echo.
+phonetic.tower_coast.F	tower_coast/phonetic.tower_coast.F.wav	Foxtrot.
+phonetic.tower_coast.G	tower_coast/phonetic.tower_coast.G.wav	Golf.
+phonetic.tower_coast.H	tower_coast/phonetic.tower_coast.H.wav	Hotel.
+phonetic.tower_coast.I	tower_coast/phonetic.tower_coast.I.wav	India.
+phonetic.tower_coast.J	tower_coast/phonetic.tower_coast.J.wav	Juliett.
+phonetic.tower_coast.K	tower_coast/phonetic.tower_coast.K.wav	Kilo.
+phonetic.tower_coast.L	tower_coast/phonetic.tower_coast.L.wav	Lima.
+phonetic.tower_coast.M	tower_coast/phonetic.tower_coast.M.wav	Mike.
+phonetic.tower_coast.N	tower_coast/phonetic.tower_coast.N.wav	November.
+phonetic.tower_coast.O	tower_coast/phonetic.tower_coast.O.wav	Oscar.
+phonetic.tower_coast.P	tower_coast/phonetic.tower_coast.P.wav	Papa.
+phonetic.tower_coast.Q	tower_coast/phonetic.tower_coast.Q.wav	Quebec.
+phonetic.tower_coast.R	tower_coast/phonetic.tower_coast.R.wav	Romeo.
+phonetic.tower_coast.S	tower_coast/phonetic.tower_coast.S.wav	Sierra.
+phonetic.tower_coast.T	tower_coast/phonetic.tower_coast.T.wav	Tango.
+phonetic.tower_coast.U	tower_coast/phonetic.tower_coast.U.wav	Uniform.
+phonetic.tower_coast.V	tower_coast/phonetic.tower_coast.V.wav	Victor.
+phonetic.tower_coast.W	tower_coast/phonetic.tower_coast.W.wav	Whiskey.
+phonetic.tower_coast.X	tower_coast/phonetic.tower_coast.X.wav	X-ray.
+phonetic.tower_coast.Y	tower_coast/phonetic.tower_coast.Y.wav	Yankee.
+phonetic.tower_coast.Z	tower_coast/phonetic.tower_coast.Z.wav	Zulu.
+radio_digit.tower_coast.3	tower_coast/radio_digit.tower_coast.3.wav	tree.
+radio_digit.tower_coast.5	tower_coast/radio_digit.tower_coast.5.wav	fife.
+radio_digit.tower_coast.9	tower_coast/radio_digit.tower_coast.9.wav	niner.
+tower.tower_valley.greeting_morning	tower_valley/tower.tower_valley.greeting_morning.wav	Good morning. Advise when ready to taxi.
+tower.tower_valley.greeting_afternoon	tower_valley/tower.tower_valley.greeting_afternoon.wav	Good afternoon. Advise when ready to taxi.
+tower.tower_valley.greeting_evening	tower_valley/tower.tower_valley.greeting_evening.wav	Good evening. Advise when ready to taxi.
+tower.tower_valley.aircraft_position	tower_valley/tower.tower_valley.aircraft_position.wav	Say your aircraft type and position.
+tower.tower_valley.repeat_callsign	tower_valley/tower.tower_valley.repeat_callsign.wav	Say again your call sign.
+tower.tower_valley.readback_hold	tower_valley/tower.tower_valley.readback_hold.wav	Read back the hold-short instruction.
+tower.tower_valley.standby	tower_valley/tower.tower_valley.standby.wav	Stand by.
+tower.tower_valley.hold_position	tower_valley/tower.tower_valley.hold_position.wav	Hold position.
+tower.tower_valley.hold_arrival	tower_valley/tower.tower_valley.hold_arrival.wav	Continue holding. Traffic is on final.
+tower.tower_valley.hold_departure	tower_valley/tower.tower_valley.hold_departure.wav	Continue holding. A departure is rolling.
+tower.tower_valley.arrival_delay	tower_valley/tower.tower_valley.arrival_delay.wav	Expect a short delay for arriving traffic.
+tower.tower_valley.report_ready	tower_valley/tower.tower_valley.report_ready.wav	Report ready for departure.
+tower.tower_valley.wake_caution	tower_valley/tower.tower_valley.wake_caution.wav	Caution, wake turbulence.
+tower.tower_valley.cancel_takeoff	tower_valley/tower.tower_valley.cancel_takeoff.wav	Cancel takeoff clearance. Hold position.
+tower.tower_valley.runway_heading	tower_valley/tower.tower_valley.runway_heading.wav	Fly runway heading.
+tower.tower_valley.remain_pattern	tower_valley/tower.tower_valley.remain_pattern.wav	Remain in the pattern.
+tower.tower_valley.contact_departure	tower_valley/tower.tower_valley.contact_departure.wav	Contact departure.
+tower.tower_valley.frequency_change	tower_valley/tower.tower_valley.frequency_change.wav	Frequency change approved.
+tower.tower_valley.report_downwind	tower_valley/tower.tower_valley.report_downwind.wav	Report downwind.
+tower.tower_valley.report_base	tower_valley/tower.tower_valley.report_base.wav	Report base.
+tower.tower_valley.report_final	tower_valley/tower.tower_valley.report_final.wav	Report final.
+tower.tower_valley.extend_downwind	tower_valley/tower.tower_valley.extend_downwind.wav	Extend downwind. I will call your base.
+tower.tower_valley.turn_base	tower_valley/tower.tower_valley.turn_base.wav	Turn base now.
+tower.tower_valley.number_one	tower_valley/tower.tower_valley.number_one.wav	You are number one.
+tower.tower_valley.number_two	tower_valley/tower.tower_valley.number_two.wav	You are number two. Follow the aircraft ahead.
+tower.tower_valley.continue_approach	tower_valley/tower.tower_valley.continue_approach.wav	Continue approach.
+tower.tower_valley.clearance_follows	tower_valley/tower.tower_valley.clearance_follows.wav	Continue approach. Landing clearance will follow.
+tower.tower_valley.runway_occupied	tower_valley/tower.tower_valley.runway_occupied.wav	Continue approach. The runway is occupied.
+tower.tower_valley.heavy_wake	tower_valley/tower.tower_valley.heavy_wake.wav	Caution, wake turbulence. Traffic ahead is a heavy aircraft.
+tower.tower_valley.go_around_heading	tower_valley/tower.tower_valley.go_around_heading.wav	Go around. Fly runway heading.
+tower.tower_valley.go_around_occupied	tower_valley/tower.tower_valley.go_around_occupied.wav	Go around. The runway is occupied.
+tower.tower_valley.go_around_vehicle	tower_valley/tower.tower_valley.go_around_vehicle.wav	Go around. Vehicle on the runway.
+tower.tower_valley.go_around_aircraft	tower_valley/tower.tower_valley.go_around_aircraft.wav	Go around. Aircraft on the runway.
+tower.tower_valley.go_around_ability	tower_valley/tower.tower_valley.go_around_ability.wav	Are you able to go around?
+tower.tower_valley.exit_when_able	tower_valley/tower.tower_valley.exit_when_able.wav	Exit the runway when able.
+tower.tower_valley.report_clear	tower_valley/tower.tower_valley.report_clear.wav	Report clear of the runway.
+tower.tower_valley.hold_contact_ground	tower_valley/tower.tower_valley.hold_contact_ground.wav	Hold position. Contact ground.
+tower.tower_valley.welcome_back	tower_valley/tower.tower_valley.welcome_back.wav	Welcome back.
+tower.tower_valley.good_day	tower_valley/tower.tower_valley.good_day.wav	Good day.
+tower.tower_valley.emergency_priority	tower_valley/tower.tower_valley.emergency_priority.wav	Emergency traffic has priority. Stand by.
+atc_atom.tower_valley.runway	tower_valley/atc_atom.tower_valley.runway.wav	Runway
+atc_atom.tower_valley.hold_short_runway	tower_valley/atc_atom.tower_valley.hold_short_runway.wav	Hold short of runway
+atc_atom.tower_valley.line_up_wait	tower_valley/atc_atom.tower_valley.line_up_wait.wav	, line up and wait.
+atc_atom.tower_valley.cleared_takeoff	tower_valley/atc_atom.tower_valley.cleared_takeoff.wav	, cleared for takeoff.
+atc_atom.tower_valley.cleared_land	tower_valley/atc_atom.tower_valley.cleared_land.wav	, cleared to land.
+atc_atom.tower_valley.cleared_option	tower_valley/atc_atom.tower_valley.cleared_option.wav	, cleared for the option.
+atc_atom.tower_valley.cleared_touch_go	tower_valley/atc_atom.tower_valley.cleared_touch_go.wav	, cleared touch and go.
+atc_atom.tower_valley.wind	tower_valley/atc_atom.tower_valley.wind.wav	Wind
+atc_atom.tower_valley.at	tower_valley/atc_atom.tower_valley.at.wav	at
+atc_atom.tower_valley.knots	tower_valley/atc_atom.tower_valley.knots.wav	knots.
+atc_atom.tower_valley.gusting	tower_valley/atc_atom.tower_valley.gusting.wav	gusting
+atc_atom.tower_valley.left	tower_valley/atc_atom.tower_valley.left.wav	left
+atc_atom.tower_valley.right	tower_valley/atc_atom.tower_valley.right.wav	right
+atc_atom.tower_valley.center	tower_valley/atc_atom.tower_valley.center.wav	center
+atc_atom.tower_valley.enter_left_downwind	tower_valley/atc_atom.tower_valley.enter_left_downwind.wav	Enter left downwind for runway
+atc_atom.tower_valley.enter_right_downwind	tower_valley/atc_atom.tower_valley.enter_right_downwind.wav	Enter right downwind for runway
+atc_atom.tower_valley.make_straight_in	tower_valley/atc_atom.tower_valley.make_straight_in.wav	Make straight-in for runway
+atc_atom.tower_valley.report_final	tower_valley/atc_atom.tower_valley.report_final.wav	, report final.
+atc_atom.tower_valley.solace	tower_valley/atc_atom.tower_valley.solace.wav	Solace
+atc_atom.tower_valley.tower	tower_valley/atc_atom.tower_valley.tower.wav	Tower
+atc_atom.tower_valley.point	tower_valley/atc_atom.tower_valley.point.wav	point
+atc_atom.tower_valley.feet	tower_valley/atc_atom.tower_valley.feet.wav	feet.
+atc_atom.tower_valley.maintain	tower_valley/atc_atom.tower_valley.maintain.wav	Maintain
+atc_atom.tower_valley.contact_ground_on	tower_valley/atc_atom.tower_valley.contact_ground_on.wav	Contact ground on
+atc_atom.tower_valley.contact_departure_on	tower_valley/atc_atom.tower_valley.contact_departure_on.wav	Contact departure on
+atc_atom.tower_valley.taxi_via	tower_valley/atc_atom.tower_valley.taxi_via.wav	Taxi via
+atc_atom.tower_valley.then	tower_valley/atc_atom.tower_valley.then.wav	then
+atc_atom.tower_valley.and	tower_valley/atc_atom.tower_valley.and.wav	and
+phonetic.tower_valley.A	tower_valley/phonetic.tower_valley.A.wav	Alfa.
+phonetic.tower_valley.B	tower_valley/phonetic.tower_valley.B.wav	Bravo.
+phonetic.tower_valley.C	tower_valley/phonetic.tower_valley.C.wav	Charlie.
+phonetic.tower_valley.D	tower_valley/phonetic.tower_valley.D.wav	Delta.
+phonetic.tower_valley.E	tower_valley/phonetic.tower_valley.E.wav	Echo.
+phonetic.tower_valley.F	tower_valley/phonetic.tower_valley.F.wav	Foxtrot.
+phonetic.tower_valley.G	tower_valley/phonetic.tower_valley.G.wav	Golf.
+phonetic.tower_valley.H	tower_valley/phonetic.tower_valley.H.wav	Hotel.
+phonetic.tower_valley.I	tower_valley/phonetic.tower_valley.I.wav	India.
+phonetic.tower_valley.J	tower_valley/phonetic.tower_valley.J.wav	Juliett.
+phonetic.tower_valley.K	tower_valley/phonetic.tower_valley.K.wav	Kilo.
+phonetic.tower_valley.L	tower_valley/phonetic.tower_valley.L.wav	Lima.
+phonetic.tower_valley.M	tower_valley/phonetic.tower_valley.M.wav	Mike.
+phonetic.tower_valley.N	tower_valley/phonetic.tower_valley.N.wav	November.
+phonetic.tower_valley.O	tower_valley/phonetic.tower_valley.O.wav	Oscar.
+phonetic.tower_valley.P	tower_valley/phonetic.tower_valley.P.wav	Papa.
+phonetic.tower_valley.Q	tower_valley/phonetic.tower_valley.Q.wav	Quebec.
+phonetic.tower_valley.R	tower_valley/phonetic.tower_valley.R.wav	Romeo.
+phonetic.tower_valley.S	tower_valley/phonetic.tower_valley.S.wav	Sierra.
+phonetic.tower_valley.T	tower_valley/phonetic.tower_valley.T.wav	Tango.
+phonetic.tower_valley.U	tower_valley/phonetic.tower_valley.U.wav	Uniform.
+phonetic.tower_valley.V	tower_valley/phonetic.tower_valley.V.wav	Victor.
+phonetic.tower_valley.W	tower_valley/phonetic.tower_valley.W.wav	Whiskey.
+phonetic.tower_valley.X	tower_valley/phonetic.tower_valley.X.wav	X-ray.
+phonetic.tower_valley.Y	tower_valley/phonetic.tower_valley.Y.wav	Yankee.
+phonetic.tower_valley.Z	tower_valley/phonetic.tower_valley.Z.wav	Zulu.
+radio_digit.tower_valley.3	tower_valley/radio_digit.tower_valley.3.wav	tree.
+radio_digit.tower_valley.5	tower_valley/radio_digit.tower_valley.5.wav	fife.
+radio_digit.tower_valley.9	tower_valley/radio_digit.tower_valley.9.wav	niner.
+@tower_north.atom.runway	atc_atom.tower_north.runway
+@tower_north.atom.hold_short_runway	atc_atom.tower_north.hold_short_runway
+@tower_north.atom.line_up_wait	atc_atom.tower_north.line_up_wait
+@tower_north.atom.cleared_takeoff	atc_atom.tower_north.cleared_takeoff
+@tower_north.atom.cleared_land	atc_atom.tower_north.cleared_land
+@tower_north.atom.cleared_option	atc_atom.tower_north.cleared_option
+@tower_north.atom.cleared_touch_go	atc_atom.tower_north.cleared_touch_go
+@tower_north.atom.wind	atc_atom.tower_north.wind
+@tower_north.atom.at	atc_atom.tower_north.at
+@tower_north.atom.knots	atc_atom.tower_north.knots
+@tower_north.atom.gusting	atc_atom.tower_north.gusting
+@tower_north.atom.left	atc_atom.tower_north.left
+@tower_north.atom.right	atc_atom.tower_north.right
+@tower_north.atom.center	atc_atom.tower_north.center
+@tower_north.atom.enter_left_downwind	atc_atom.tower_north.enter_left_downwind
+@tower_north.atom.enter_right_downwind	atc_atom.tower_north.enter_right_downwind
+@tower_north.atom.make_straight_in	atc_atom.tower_north.make_straight_in
+@tower_north.atom.report_final	atc_atom.tower_north.report_final
+@tower_north.atom.solace	atc_atom.tower_north.solace
+@tower_north.atom.tower	atc_atom.tower_north.tower
+@tower_north.atom.point	atc_atom.tower_north.point
+@tower_north.atom.feet	atc_atom.tower_north.feet
+@tower_north.atom.maintain	atc_atom.tower_north.maintain
+@tower_north.atom.contact_ground_on	atc_atom.tower_north.contact_ground_on
+@tower_north.atom.contact_departure_on	atc_atom.tower_north.contact_departure_on
+@tower_north.atom.taxi_via	atc_atom.tower_north.taxi_via
+@tower_north.atom.then	atc_atom.tower_north.then
+@tower_north.atom.and	atc_atom.tower_north.and
+@tower_north.digit.0	symbol.tower_north.0
+@tower_north.digit.1	symbol.tower_north.1
+@tower_north.digit.2	symbol.tower_north.2
+@tower_north.digit.3	radio_digit.tower_north.3
+@tower_north.digit.4	symbol.tower_north.4
+@tower_north.digit.5	radio_digit.tower_north.5
+@tower_north.digit.6	symbol.tower_north.6
+@tower_north.digit.7	symbol.tower_north.7
+@tower_north.digit.8	symbol.tower_north.8
+@tower_north.digit.9	radio_digit.tower_north.9
+@tower_north.alpha.A	phonetic.tower_north.A
+@tower_north.alpha.B	phonetic.tower_north.B
+@tower_north.alpha.C	phonetic.tower_north.C
+@tower_north.alpha.D	phonetic.tower_north.D
+@tower_north.alpha.E	phonetic.tower_north.E
+@tower_north.alpha.F	phonetic.tower_north.F
+@tower_north.alpha.G	phonetic.tower_north.G
+@tower_north.alpha.H	phonetic.tower_north.H
+@tower_north.alpha.I	phonetic.tower_north.I
+@tower_north.alpha.J	phonetic.tower_north.J
+@tower_north.alpha.K	phonetic.tower_north.K
+@tower_north.alpha.L	phonetic.tower_north.L
+@tower_north.alpha.M	phonetic.tower_north.M
+@tower_north.alpha.N	phonetic.tower_north.N
+@tower_north.alpha.O	phonetic.tower_north.O
+@tower_north.alpha.P	phonetic.tower_north.P
+@tower_north.alpha.Q	phonetic.tower_north.Q
+@tower_north.alpha.R	phonetic.tower_north.R
+@tower_north.alpha.S	phonetic.tower_north.S
+@tower_north.alpha.T	phonetic.tower_north.T
+@tower_north.alpha.U	phonetic.tower_north.U
+@tower_north.alpha.V	phonetic.tower_north.V
+@tower_north.alpha.W	phonetic.tower_north.W
+@tower_north.alpha.X	phonetic.tower_north.X
+@tower_north.alpha.Y	phonetic.tower_north.Y
+@tower_north.alpha.Z	phonetic.tower_north.Z
+@tower_coast.atom.runway	atc_atom.tower_coast.runway
+@tower_coast.atom.hold_short_runway	atc_atom.tower_coast.hold_short_runway
+@tower_coast.atom.line_up_wait	atc_atom.tower_coast.line_up_wait
+@tower_coast.atom.cleared_takeoff	atc_atom.tower_coast.cleared_takeoff
+@tower_coast.atom.cleared_land	atc_atom.tower_coast.cleared_land
+@tower_coast.atom.cleared_option	atc_atom.tower_coast.cleared_option
+@tower_coast.atom.cleared_touch_go	atc_atom.tower_coast.cleared_touch_go
+@tower_coast.atom.wind	atc_atom.tower_coast.wind
+@tower_coast.atom.at	atc_atom.tower_coast.at
+@tower_coast.atom.knots	atc_atom.tower_coast.knots
+@tower_coast.atom.gusting	atc_atom.tower_coast.gusting
+@tower_coast.atom.left	atc_atom.tower_coast.left
+@tower_coast.atom.right	atc_atom.tower_coast.right
+@tower_coast.atom.center	atc_atom.tower_coast.center
+@tower_coast.atom.enter_left_downwind	atc_atom.tower_coast.enter_left_downwind
+@tower_coast.atom.enter_right_downwind	atc_atom.tower_coast.enter_right_downwind
+@tower_coast.atom.make_straight_in	atc_atom.tower_coast.make_straight_in
+@tower_coast.atom.report_final	atc_atom.tower_coast.report_final
+@tower_coast.atom.solace	atc_atom.tower_coast.solace
+@tower_coast.atom.tower	atc_atom.tower_coast.tower
+@tower_coast.atom.point	atc_atom.tower_coast.point
+@tower_coast.atom.feet	atc_atom.tower_coast.feet
+@tower_coast.atom.maintain	atc_atom.tower_coast.maintain
+@tower_coast.atom.contact_ground_on	atc_atom.tower_coast.contact_ground_on
+@tower_coast.atom.contact_departure_on	atc_atom.tower_coast.contact_departure_on
+@tower_coast.atom.taxi_via	atc_atom.tower_coast.taxi_via
+@tower_coast.atom.then	atc_atom.tower_coast.then
+@tower_coast.atom.and	atc_atom.tower_coast.and
+@tower_coast.digit.0	symbol.tower_coast.0
+@tower_coast.digit.1	symbol.tower_coast.1
+@tower_coast.digit.2	symbol.tower_coast.2
+@tower_coast.digit.3	radio_digit.tower_coast.3
+@tower_coast.digit.4	symbol.tower_coast.4
+@tower_coast.digit.5	radio_digit.tower_coast.5
+@tower_coast.digit.6	symbol.tower_coast.6
+@tower_coast.digit.7	symbol.tower_coast.7
+@tower_coast.digit.8	symbol.tower_coast.8
+@tower_coast.digit.9	radio_digit.tower_coast.9
+@tower_coast.alpha.A	phonetic.tower_coast.A
+@tower_coast.alpha.B	phonetic.tower_coast.B
+@tower_coast.alpha.C	phonetic.tower_coast.C
+@tower_coast.alpha.D	phonetic.tower_coast.D
+@tower_coast.alpha.E	phonetic.tower_coast.E
+@tower_coast.alpha.F	phonetic.tower_coast.F
+@tower_coast.alpha.G	phonetic.tower_coast.G
+@tower_coast.alpha.H	phonetic.tower_coast.H
+@tower_coast.alpha.I	phonetic.tower_coast.I
+@tower_coast.alpha.J	phonetic.tower_coast.J
+@tower_coast.alpha.K	phonetic.tower_coast.K
+@tower_coast.alpha.L	phonetic.tower_coast.L
+@tower_coast.alpha.M	phonetic.tower_coast.M
+@tower_coast.alpha.N	phonetic.tower_coast.N
+@tower_coast.alpha.O	phonetic.tower_coast.O
+@tower_coast.alpha.P	phonetic.tower_coast.P
+@tower_coast.alpha.Q	phonetic.tower_coast.Q
+@tower_coast.alpha.R	phonetic.tower_coast.R
+@tower_coast.alpha.S	phonetic.tower_coast.S
+@tower_coast.alpha.T	phonetic.tower_coast.T
+@tower_coast.alpha.U	phonetic.tower_coast.U
+@tower_coast.alpha.V	phonetic.tower_coast.V
+@tower_coast.alpha.W	phonetic.tower_coast.W
+@tower_coast.alpha.X	phonetic.tower_coast.X
+@tower_coast.alpha.Y	phonetic.tower_coast.Y
+@tower_coast.alpha.Z	phonetic.tower_coast.Z
+@tower_valley.atom.runway	atc_atom.tower_valley.runway
+@tower_valley.atom.hold_short_runway	atc_atom.tower_valley.hold_short_runway
+@tower_valley.atom.line_up_wait	atc_atom.tower_valley.line_up_wait
+@tower_valley.atom.cleared_takeoff	atc_atom.tower_valley.cleared_takeoff
+@tower_valley.atom.cleared_land	atc_atom.tower_valley.cleared_land
+@tower_valley.atom.cleared_option	atc_atom.tower_valley.cleared_option
+@tower_valley.atom.cleared_touch_go	atc_atom.tower_valley.cleared_touch_go
+@tower_valley.atom.wind	atc_atom.tower_valley.wind
+@tower_valley.atom.at	atc_atom.tower_valley.at
+@tower_valley.atom.knots	atc_atom.tower_valley.knots
+@tower_valley.atom.gusting	atc_atom.tower_valley.gusting
+@tower_valley.atom.left	atc_atom.tower_valley.left
+@tower_valley.atom.right	atc_atom.tower_valley.right
+@tower_valley.atom.center	atc_atom.tower_valley.center
+@tower_valley.atom.enter_left_downwind	atc_atom.tower_valley.enter_left_downwind
+@tower_valley.atom.enter_right_downwind	atc_atom.tower_valley.enter_right_downwind
+@tower_valley.atom.make_straight_in	atc_atom.tower_valley.make_straight_in
+@tower_valley.atom.report_final	atc_atom.tower_valley.report_final
+@tower_valley.atom.solace	atc_atom.tower_valley.solace
+@tower_valley.atom.tower	atc_atom.tower_valley.tower
+@tower_valley.atom.point	atc_atom.tower_valley.point
+@tower_valley.atom.feet	atc_atom.tower_valley.feet
+@tower_valley.atom.maintain	atc_atom.tower_valley.maintain
+@tower_valley.atom.contact_ground_on	atc_atom.tower_valley.contact_ground_on
+@tower_valley.atom.contact_departure_on	atc_atom.tower_valley.contact_departure_on
+@tower_valley.atom.taxi_via	atc_atom.tower_valley.taxi_via
+@tower_valley.atom.then	atc_atom.tower_valley.then
+@tower_valley.atom.and	atc_atom.tower_valley.and
+@tower_valley.digit.0	symbol.tower_valley.0
+@tower_valley.digit.1	symbol.tower_valley.1
+@tower_valley.digit.2	symbol.tower_valley.2
+@tower_valley.digit.3	radio_digit.tower_valley.3
+@tower_valley.digit.4	symbol.tower_valley.4
+@tower_valley.digit.5	radio_digit.tower_valley.5
+@tower_valley.digit.6	symbol.tower_valley.6
+@tower_valley.digit.7	symbol.tower_valley.7
+@tower_valley.digit.8	symbol.tower_valley.8
+@tower_valley.digit.9	radio_digit.tower_valley.9
+@tower_valley.alpha.A	phonetic.tower_valley.A
+@tower_valley.alpha.B	phonetic.tower_valley.B
+@tower_valley.alpha.C	phonetic.tower_valley.C
+@tower_valley.alpha.D	phonetic.tower_valley.D
+@tower_valley.alpha.E	phonetic.tower_valley.E
+@tower_valley.alpha.F	phonetic.tower_valley.F
+@tower_valley.alpha.G	phonetic.tower_valley.G
+@tower_valley.alpha.H	phonetic.tower_valley.H
+@tower_valley.alpha.I	phonetic.tower_valley.I
+@tower_valley.alpha.J	phonetic.tower_valley.J
+@tower_valley.alpha.K	phonetic.tower_valley.K
+@tower_valley.alpha.L	phonetic.tower_valley.L
+@tower_valley.alpha.M	phonetic.tower_valley.M
+@tower_valley.alpha.N	phonetic.tower_valley.N
+@tower_valley.alpha.O	phonetic.tower_valley.O
+@tower_valley.alpha.P	phonetic.tower_valley.P
+@tower_valley.alpha.Q	phonetic.tower_valley.Q
+@tower_valley.alpha.R	phonetic.tower_valley.R
+@tower_valley.alpha.S	phonetic.tower_valley.S
+@tower_valley.alpha.T	phonetic.tower_valley.T
+@tower_valley.alpha.U	phonetic.tower_valley.U
+@tower_valley.alpha.V	phonetic.tower_valley.V
+@tower_valley.alpha.W	phonetic.tower_valley.W
+@tower_valley.alpha.X	phonetic.tower_valley.X
+@tower_valley.alpha.Y	phonetic.tower_valley.Y
+@tower_valley.alpha.Z	phonetic.tower_valley.Z

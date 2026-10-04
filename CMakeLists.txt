@@ -9,7 +9,7 @@ endif()
 set(CORE_SOURCES
   src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp src/aircraft.cpp src/career.cpp)
 set(GAME_SOURCES
-  ${CORE_SOURCES} src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_wraith.cpp src/renderer.cpp src/entity_render.cpp src/terrain_envelope.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/entity_mesh.cpp src/gl.cpp src/audio.cpp src/models.cpp)
+  ${CORE_SOURCES} src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_wraith.cpp src/renderer.cpp src/entity_render.cpp src/terrain_envelope.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/entity_mesh.cpp src/gl.cpp src/audio.cpp src/models.cpp)
 
 if(WIN32)
   if(MINGW)
@@ -69,4 +69,5 @@ if(GLSLANG_VALIDATOR)
            -DOUT=${CMAKE_CURRENT_BINARY_DIR}/glsl -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/shader_check.cmake)
 endif()
 add_test(NAME entity_raycast COMMAND entity_raycast_test)
+target_compile_definitions(gameplay_test PRIVATE SOLACE_ASSETS="${CMAKE_SOURCE_DIR}/assets")
 add_test(NAME gameplay_loop COMMAND gameplay_test)

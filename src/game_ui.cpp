@@ -812,8 +812,8 @@ void Game::drawSettings(float x, float y, float w, float h) {
   py += 44 * s;
   if (settingsPage == 1) { drawControls(x, py, w, y + h - py); return; }
   header(x, py, std::min(w, 620 * S()), "DISPLAY / AUDIO / CONTROLS"); py += 28 * s;
-  // eleven rows of controls: closer together when the panel is short (720p), so the last one stays inside it
-  const float rs = clampf((y + h - py - 60 * s - 26 * s) / 11.f, 34 * s, 42 * s);
+  // twelve rows of controls: closer together when the panel is short (720p), so the last one stays inside it
+  const float rs = clampf((y + h - py - 60 * s - 26 * s) / 12.f, 34 * s, 42 * s);
   auto slider = [&](const std::string& label, float& v, float lo, float hi, float step, const std::string& disp) {
     g_ren.text(x, py + 6 * s, 16 * s, label, C_DIM, 1);
     if (button(x + 250 * s, py, 36 * s, 32 * s, "-")) v = clampf(v - step, lo, hi);
@@ -854,6 +854,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
   float rv = set.radioVol;
   slider("Radio volume", set.radioVol, 0, 1, 0.05f, fmt("%.0f%%", set.radioVol * 100));
   if (rv != set.radioVol) radio.setVolume(set.radioVol);
+  slider("Tower voice volume", set.atcVol, 0, 1, 0.05f, fmt("%.0f%%", set.atcVol * 100));
   slider("Mouse sensitivity", set.mouseSens, 0.2f, 3.f, 0.1f, fmt("%.1f", set.mouseSens));
   toggle("Pitch control", set.invertPitch, "Inverted", "Normal (S = nose up)");
   toggle("Units", set.metric, "Metric", "Aviation (kt / ft)");

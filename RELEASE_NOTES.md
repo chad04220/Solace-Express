@@ -1,5 +1,11 @@
 ## What's new
 
+**Tower controllers on the radio**
+- Three recorded tower controller voices (North, Coast and Valley Tower); each airport keeps one
+- Calls come only from what's happening on your flight: a greeting, your takeoff clearance with the real wind, the handoff once you're clear (or "remain in the pattern" on circuits), straight-in or left-downwind joining instructions, the landing clearance on final, and "exit the runway when able" on the landing roll
+- Radio squelch around each call, the call text on screen, and nothing stale after a pause, crash or the end of a flight
+- A tower voice volume slider in Settings
+
 **Career menu redesign**
 - A cleaner, higher-tech career screen in the main menu's style: dark glass panels with hairline edges over the live scene, a drifting scan line, and the icon and title with the licence beneath
 - Bank, reputation and location as stat chips; numbered tabs with a gliding underline

@@ -16,6 +16,17 @@ struct GameTest {
     g_audio.init(48000);
     Game g; g.initHeadless(); g.botControl = true;
     int fails = 0;
+#ifdef SOLACE_ASSETS
+    bool voices = g.atc.load(std::string(SOLACE_ASSETS) + "/voice");   // the tower voices (the audio is rendered below, as the audio thread would)
+#else
+    bool voices = false;
+#endif
+    static float abuf[2 * 4096];
+    static std::vector<int16_t> rec;   // ATCWAV=<file>: the mix the player hears, written out at the end
+    auto audio = [&](float dt) {
+      int n = std::min(4096, (int)(dt * 48000.f + 0.5f)); g_audio.render(abuf, n);
+      if (getenv("ATCWAV")) for (int i = 0; i < n * 2; i++) rec.push_back((int16_t)(clampf(abuf[i], -1, 1) * 32767));
+    };
     // ---- sun: finite light for every second of the day, in clear and overcast weather
     for (int wxi = 0; wxi < 2; wxi++) {
       g.wx.cloudCover = wxi ? 1.f : 0.f; g.wx.storm = wxi == 1;
@@ -51,11 +62,18 @@ struct GameTest {
         pitchFor(p, vsT, dt);
         p.ctl.yaw = 0;
       }
-      g.update(dt);
+      g.update(dt); audio(dt);
       if (getenv("TRACE") && fmodf(t, 3.f) < dt) printf("  t%3.0f gnd %d ias %5.1f agl %6.1f hdg %5.1f pitch %5.1f bank %5.1f vs %5.1f thr %.2f rpm %4.0f run %d\n", t, p.onGround, p.ias, p.agl(), p.heading(), p.pitchDeg(), p.bankDeg(), p.vel.y, p.ctl.throttle, p.rpm, p.engineRunning);
     }
     printf("Lesson 1: screen=%d success=%d wp=%d/%zu t=%.0fs story=%d money=%d %s\n", g.screen, g.lastSuccess, g.wpIndex, g.contract.wps.size(), t, g.career.storyIndex, g.career.money, g.debriefTitle.c_str());
     if (!(g.screen == SCR_DEBRIEF && g.lastSuccess && g.career.storyIndex == 1)) fails++;
+    if (voices) {   // the departure tower: greeting, takeoff clearance, then (a circuit lesson) remain in the pattern
+      auto& h = g.atc.history;
+      for (auto& x : h) printf("   tower: %s\n", x.c_str());
+      bool ok = h.size() >= 3 && h[0].find("Advise when ready to taxi") != std::string::npos && h[1].find("cleared for takeoff") != std::string::npos &&
+                h[2].find("Remain in the pattern") != std::string::npos;
+      printf("Lesson 1 tower calls: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
+    }
     // Lesson 1 ends in the air: no landing bonus or penalty may be applied
     for (auto& l : g.payout) if (l.label.find("landing") != std::string::npos) { printf("FAIL: landing line '%s' on an airborne finish\n", l.label.c_str()); fails++; }
 
@@ -71,6 +89,7 @@ struct GameTest {
     vec3 start = thr - dir * 3500.f; start.y = a.elev + 3500.f * tanf(3.f * DEG) + 15.f;
     g.plane.reset(&kAircraft[1], start, a.heading, 60, 150, true, kAircraft[1].vref + 6);
     g.takeoffAnnounced = true; g.engineAutoStarted = true;
+    g.atcF.phase = 3; g.atc.history.clear();   // (placed on final: an inbound start, as the game's airborne starts are)
     g.plane.ctl.flaps = 1.f; g.flapNotch = 1.f; s_pI = -2.f;
     float tdFpm = 0;
     for (t = 0; t < 300 && g.screen == SCR_FLIGHT; t += dt) {
@@ -89,7 +108,7 @@ struct GameTest {
         p.ctl.throttle = agl < 6.f ? 0.f : clampf(0.35f + (p.spec->vref - p.ias) * 0.05f, 0, 1);
         p.ctl.yaw = clampf(p.beta * 3.f, -1, 1);
       } else { p.ctl.throttle = 0; p.ctl.brake = 1; p.ctl.pitch = 0; p.ctl.roll = 0; p.ctl.yaw = 0; }
-      g.update(dt);
+      g.update(dt); audio(dt);
       if (getenv("TRACE") && fmodf(t, 0.5f) < dt && t < 14) printf("  t%4.1f gnd %d ias %5.1f agl %6.1f along %6.0f lat %5.1f pitch %5.1f vs %5.1f thr %.2f bank %5.1f ctlP %5.2f ctlR %5.2f flap %.2f alpha %5.1f\n", t, p.onGround, p.ias, agl, along, lat, p.pitchDeg(), p.vel.y, p.ctl.throttle, p.bankDeg(), p.ctl.pitch, p.ctl.roll, p.flaps, p.alpha/DEG);
       if (g.touchedDown && tdFpm == 0) tdFpm = g.touchdownFpm;
     }
@@ -97,6 +116,13 @@ struct GameTest {
     printf("Landing: screen=%d success=%d touchdown=%.0f fpm  stars=%d  money %+d  location=%s  %s\n", g.screen, g.lastSuccess, tdFpm, g.stars, total,
            g_world.airports[g.career.location].code, g.debriefTitle.c_str());
     for (auto& l : g.payout) printf("   %-30s %d\n", l.label.c_str(), l.amount);
+    if (voices) {   // started inbound on a 3.5 km final: the approach call, then cleared to land, then exit the runway
+      const std::vector<std::string>& h = g.atc.history;
+      for (auto& x : h) printf("   tower: %s\n", x.c_str());
+      bool ok = h.size() >= 3 && h[0].find("straight-in runway") != std::string::npos && h[1].find("cleared to land") != std::string::npos &&
+                h[2].find("Exit the runway") != std::string::npos;
+      printf("Arrival tower calls: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
+    }
     if (!(g.screen == SCR_DEBRIEF && g.lastSuccess && g.career.location == c.to)) fails++;
     // ---- low frame rates keep simulated time: 5 s of 5 fps frames is 5 s of flight
     {
@@ -129,6 +155,12 @@ struct GameTest {
         printf("  settle outcome %d: crashes %+d repairs %d\n", (int)o, t.crashes - c.crashes, repaired);
         if ((t.crashes != c.crashes) != wantCrash || repaired != wantCrash) fails++;
       }
+    }
+    if (const char* wpath = getenv("ATCWAV")) if (FILE* f = fopen(wpath, "wb")) {
+      uint32_t bytes = (uint32_t)(rec.size() * 2), v;
+      fwrite("RIFF", 1, 4, f); v = 36 + bytes; fwrite(&v, 4, 1, f); fwrite("WAVEfmt ", 1, 8, f);
+      uint32_t fmt[4] = {16, 1u | (2u << 16), 48000, 48000 * 4}; fwrite(fmt, 4, 4, f); uint16_t ba[2] = {4, 16}; fwrite(ba, 2, 2, f);
+      fwrite("data", 1, 4, f); fwrite(&bytes, 4, 1, f); fwrite(rec.data(), 2, rec.size(), f); fclose(f);
     }
     printf("%d failures\n", fails);
     return fails;
