@@ -147,12 +147,12 @@ struct TurbineVoice {
   }
 };
 
-// XR-9 research craft: a tuned, layered power voice instead of a raw jet roar.
+// XR-9 / XR-11 research craft: a tuned, layered power voice instead of a raw jet roar.
 //  - core: a warm harmonic stack (detuned left/right for width) whose pitch rises with spool
 //  - fan: soft high whine with two slowly beating partials
 //  - sub: deep sine + filtered rumble you feel more than hear
 //  - exhaust: band-shaped roar that opens up with thrust; reheat adds a broad, crackling, pulsing roar
-//  - lift fans: rhythmic blade-pass thrum when the nozzles swivel towards the hover
+//  - hover: rhythmic blade-pass thrum as the XR-11's pods tilt towards the hover
 struct ResearchVoice {
   float ph[6] = {}, sub = 0, fanPh[2] = {}, liftPh = 0, vib = 0, crackEnv = 0, pulse = 0, pulseT = 0;
   Noise nz;
@@ -204,7 +204,7 @@ struct ResearchVoice {
       crackEnv *= 0.995f;
       abV = (abLP.p(n2) * 1.3f * pulse + abBP.p(n2) * 1.8f + crackBP.p(n) * crackEnv * 0.35f) * ab;
     }
-    // lift fans in the hover
+    // the XR-11's pods in the hover
     float lift = 0;
     if (nozzle > 0.05f) {
       liftPh += (55.f + 30.f * spool) / sr; liftPh -= floorf(liftPh);

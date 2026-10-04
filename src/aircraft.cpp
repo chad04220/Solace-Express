@@ -36,7 +36,7 @@ const AircraftSpec kAircraft[] = {
    0.25f, 5.0f, 1.40f, 0.75f, 0.022f, 0.012f, 0.070f, 0.80f, 15000, 0, 55, 62, 200, 260, 1250, false, false, true,
    30000, 60000, 85000, 0.42f, 0.050f, 0.055f, LIC_ATP, 260000, 0,
    14.0f, 0.95f, -0.58f, 1.0f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f)},
-  // hidden research model: thrust-to-weight ~2.2, supersonic, VTOL thrust vectoring (see Plane::substep special path)
+  // hidden research model: thrust-to-weight ~2.2, supersonic, pitch thrust vectoring (see Plane::substep special path)
   {"xr9", "XR-9 Specter", "Confidential research model", ENG_JET, 2, 0, 0, 0, 0, 9000, 3000, 0, 0, 46.0f, 11.2f, 4.6f,
    0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 118000, 0, 60, 70, 420, 4000, 250, true, false, true,
    25000, 90000, 110000, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 0, 0,
@@ -184,7 +184,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
 
   // ---------------- configuration
   flaps = approach(flaps, ctl.flaps, s.special ? 0.5f : 0.6f, dt);
-  if (s.special) nozzle = flaps;   // the research jet's F/V keys swivel the thrust-vector nozzles instead of flaps
+  nozzle = s.special == 2 ? flaps : 0.f;   // the XR-11's F/V keys tilt its thruster pods instead of flaps
   if (s.retract) gear = clampf(gear + (ctl.gearDown ? 1.f : -1.f) * dt / 5.f, 0, 1);
   else gear = 1;
 
@@ -243,9 +243,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     stallWarn = smoothstepf(aStall - 5 * DEG, aStall - 1.5f * DEG, alpha);
   } else { alpha = 0; beta = 0; }
   if (s.special) {
-    // thrust-vectoring nozzles swivel from aft (0) to straight down (1) for vertical flight
-    float a = nozzle * 0.5f * PI;
-    if (s.special == 1) F += vec3(0, sinf(a), -cosf(a)) * thrust;
+    if (s.special == 1) F += vec3(0, 0, -thrust);   // XR-9: the nozzles vector in pitch only (no vertical flight)
     // fly-by-wire rate command through vectored thrust and reaction jets: authority independent of airspeed
     float Vt = std::max(V, 1.f);
     float hover = smoothstepf(0.3f, 0.7f, nozzle) * smoothstepf(70.f, 30.f, V);
@@ -522,7 +520,7 @@ void Plane::wraithThrust(vec3& F, vec3& T, float Tp, vec3 wd, vec3 Taero, vec3 s
 static float hdgErrDeg(float target, float cur) { return wrapAngle((target - cur) * DEG) / DEG; }
 static float len2(vec3 v) { return sqrtf(v.x * v.x + v.z * v.z); }
 
-// research jet vertical landing: nozzles down, pitch for the along-track speed, bank for the cross-track, throttle for
+// XR-11 vertical landing: nozzles down, pitch for the along-track speed, bank for the cross-track, throttle for
 // height, then straight down onto the touchdown point
 void Plane::apHover(float dt) {
   vec3 rr(-apLd.z, 0, apLd.x), rel = pos - apTd;
@@ -797,8 +795,8 @@ void Plane::apGuidance(float dt) {
       apSpeed = dist > F ? vref * 1.3f : dist > F * 0.5f ? vref * 1.18f : vref * 1.06f;
       if (dist < 2000.f && dist > 250.f && (fabsf(cross) > std::min(80.f, std::max(a.width * 0.5f, 12.f) + dist * 0.03f) || err > 40.f || err < -80.f)) { apStage = APS_GOAROUND; apStageT = 0; }
       { vec3 ahead = pos + vec3(ld.x, 0, ld.z) * 800.f; if (dist > 1200.f && pos.y < g_world.height(ahead.x, ahead.z) + 40.f) { apStage = APS_GOAROUND; apStageT = 0; } }
-      // the research jet comes to a hover over the touchdown point instead of a fast landing roll
-      if (s.special && dist < 1700.f && dist > 0.f && fabsf(cross) < 60.f) { apStage = APS_HOVER; apStageT = 0; apThrI = ctl.throttle; }
+      // the XR-11 comes to a hover over the touchdown point instead of a fast landing roll
+      if (s.special == 2 && dist < 1700.f && dist > 0.f && fabsf(cross) < 60.f) { apStage = APS_HOVER; apStageT = 0; apThrI = ctl.throttle; }
       float flareH = clampf(std::max(ias * 0.13f, -vel.y * 2.2f), 4.f, 14.f);
       if (hab < flareH && dist < 1500.f) { apStage = APS_FLARE; apStageT = 0; }
       if (onGround) { apStage = APS_ROLLOUT; apStageT = 0; }
@@ -873,7 +871,7 @@ void Plane::apControl(float dt) {
     apRollI = clampf(apRollI + (pT - pRate) * 0.006f * dt / vn, -0.3f, 0.3f);
     ctl.roll = clampf(apRollI + (pT - pRate) * 0.03f / vn, -0.6f, 0.6f);
   }
-  if (fbw) ctl.flaps = 0;   // the research jet's flap lever swivels its nozzles: keep them aft
+  if (fbw) ctl.flaps = 0;   // the research jets have no flaps (the XR-11's lever tilts its pods): keep it up
   // vertical: altitude -> vertical speed -> flight path -> pitch rate
   float vsUp = fbw ? 30.f : s.engineType == ENG_JET ? 12.f : s.engineType == ENG_TURBOPROP ? 6.f : 4.f;
   float vsT = apUseVS ? apVS : clampf((apAlt - pos.y) * 0.08f, -vsUp * 1.2f, vsUp);

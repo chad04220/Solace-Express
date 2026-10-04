@@ -380,7 +380,7 @@ float sdSurface(float s, float c, float t, float span, float rc, float tc, float
 }
 
 // ---------------- XR-9 Specter research jet (engine code 5): blended lifting body with chines, cranked delta with
-// elevons and lift fans, all-moving canards, canted twin fins, 2D thrust-vectoring nozzles, opaque sensor canopy.
+// elevons, all-moving canards, canted twin fins, 2D pitch-vectoring nozzles, opaque sensor canopy.
 // The cockpit is a sealed pod: the pilot sees outside only through the panoramic and side display screens.
 vec2 mapJetCockpit(vec3 p){
   vec4 E4 = gM[22]; vec3 q = p - E4.xyz;
@@ -477,7 +477,7 @@ R"(    res = opU(res, vec2(sdBox(cq - vec3(0.02, 0.051, -0.2), vec3(0.075, 0.002
   return res;
 }
 vec2 mapJet(vec3 p){
-  float gear = gPS.x, noz = gPS.y, inside = gPS.w;
+  float gear = gPS.x, inside = gPS.w;
   if (inside > 0.5) return mapJetCockpit(p);
   float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z;
   vec3 ap = vec3(abs(p.x), p.y, p.z);
@@ -488,22 +488,14 @@ vec2 mapJet(vec3 p){
   body = smin(body, sdRoundBox(ap - vec3(0.82, -0.12, 4.6), vec3(0.5, 0.42, 3.4), 0.3), 0.35); // engine bays
   body = max(body, -sdRoundBox(ap - vec3(0.95, -0.34, -1.4), vec3(0.3, 0.19, 0.62), 0.08));   // intakes
   vec2 res = vec2(body, 30.0);
-  // cranked delta wing with elevons and a lift fan in each wing
+  // cranked delta wing with elevons
   {
     float s = ap.x, t = p.y - (-0.18 - s*0.035), c = p.z + 1.6;
     float wing = sdPanel(s, c, t, 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3);
     float elevon = sdSurface(s, c, t, 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3, -cPitch*0.3 - cRoll*sgn*0.3, 0.0);
-    float hole = length(ap.xz - vec2(2.4, 2.2)) - 0.62;   // fully inside the wing, clear of the leading edge
-    wing = max(min(wing, elevon), -hole);
+    wing = min(wing, elevon);
     float d = smin(res.x, wing, 0.25);
     res = vec2(d, wing < res.x ? 31.0 : res.y);
-    // fan: hub and louvres that swivel with the nozzles
-    vec3 fq = ap - vec3(2.4, -0.264, 2.2);
-    float fan = max(sdCapsule(fq, vec3(0.0, -0.03, 0.0), vec3(0.0, 0.03, 0.0), 0.16), -1.0);
-    vec3 lq = fq; lq.z -= 0.17*clamp(floor(lq.z/0.17 + 0.5), -3.0, 3.0);
-    lq.yz = rot2(lq.yz, noz*0.9);
-    float lv = max(sdBox(lq, vec3(0.62, 0.05, 0.012)), length(fq.xz) - 0.6);
-    res = opU(res, vec2(min(fan, lv), 35.0));
   }
   // all-moving canards
   {
@@ -519,10 +511,10 @@ vec2 mapJet(vec3 p){
     float f2 = min(fin, rud);
     res = vec2(smin(res.x, f2, 0.12), f2 < res.x ? 31.0 : res.y);
   }
-  // 2D thrust-vectoring nozzles: swivel from aft to straight down, plus pitch vectoring
+  // 2D thrust-vectoring nozzles: they vector in pitch with the stick
   {
     vec3 q = ap - vec3(0.82, -0.12, 7.75);
-    float a = gFlame.z;   // = nozzle*90 deg - pitch*0.5 rad (vectoring)
+    float a = gFlame.z;   // = -pitch*0.5 rad (vectoring)
     vec2 yz = rot2(q.yz, -a);
     vec3 nq = vec3(q.x, yz.x, yz.y - 0.5);
     float nzl = sdRoundBox(nq, vec3(0.44, 0.31, 0.5), 0.06);
@@ -2720,7 +2712,7 @@ vec3 mfdPage(int page, vec2 uv){
     c = mfdTitle(c, uv, ivec4(80, 79, 87, 69), ivec4(82, 0, 0, 0));
     for (int b = 0; b < 4; b++) {
       float x0 = -0.66 + float(b)*0.44;
-      float lv = b == 0 ? thr : b == 1 ? 1.0 : b == 2 ? 0.35 + 0.6*spool : uHud2.z;
+      float lv = b == 0 ? thr : b == 1 ? 1.0 : b == 2 ? 0.35 + 0.6*spool : abs(uHud2.z);
       vec2 o = uv - vec2(x0, -0.12);
       float frame = sdRBox(o, vec2(0.1, 0.5), 0.02);
       vec3 bc = b == 2 && lv > 0.85 ? A : (b == 1 ? C : G);
@@ -2791,15 +2783,15 @@ vec3 mfdPage(int page, vec2 uv){
     c = mix(c, W, numC(uv - vec2(-0.6, -0.86), abs(degrees(bank)), 0.06, 0, 0));
     c = mix(c, W*0.8, txt4(uv - vec2(0.45, -0.86), 0.05, ivec4(80, 67, 72, 0), 0));
     c = mix(c, W, numC(uv - vec2(0.9, -0.86), degrees(pitch), 0.06, 2, 0));
-  } else if (page == 4) {   // VTOL: side view of the jet, nozzle angle scale, thrust vector, gear and hover status
-    c = mfdTitle(c, uv, ivec4(86, 84, 79, 76), ivec4(0));
+  } else if (page == 4) {   // TVC: side view of the jet, the nozzles' pitch-vector angle on a +-30 deg scale, gear, reheat
+    c = mfdTitle(c, uv, ivec4(84, 86, 67, 0), ivec4(0));
     vec2 o = uv - vec2(-0.2, 0.25);
     float body = sdRBox(o, vec2(0.48, 0.055), 0.05);
     body = min(body, sdTri(o, vec2(-0.48, 0.0), vec2(-0.68, -0.01), vec2(-0.48, 0.05)));
     body = min(body, sdTri(o, vec2(0.25, 0.05), vec2(0.42, 0.2), vec2(0.45, 0.05)));
     body = min(body, sdRBox(o - vec2(-0.2, 0.06), vec2(0.12, 0.035), 0.03));
     c = mix(c, C*0.12, aFill(body)); c = mix(c, C*0.85, aLine(body, lw*0.6));
-    float a = uHud2.z*1.5708;
+    float a = uHud2.z*1.5708;   // down positive
     vec2 np = o - vec2(0.42, -0.02);
     vec2 nd = vec2(cos(a), -sin(a));
     float noz = sdSeg(np, vec2(0.0), nd*0.14) - 0.035;
@@ -2810,14 +2802,14 @@ vec3 mfdPage(int page, vec2 uv){
     arrow = min(arrow, sdTri(np, nd*(ln + 0.09), nd*ln + vec2(nd.y, -nd.x)*0.045, nd*ln - vec2(nd.y, -nd.x)*0.045));
     c = mix(c, A*(0.6 + 0.4*thr), aFill(arrow));
     vec2 sq = uv - vec2(0.12, 0.23);
-    c = mix(c, G*0.4, dArc(sq, 0.62, 1.5708, 3.1416, lw*0.6));
-    for (int k = 0; k <= 3; k++) {
+    c = mix(c, G*0.4, dArc(sq, 0.62, 1.5708 - 0.5236, 1.5708 + 0.5236, lw*0.6));
+    for (int k = -1; k <= 1; k++) {
       float ta = 1.5708 + float(k)*0.5236;
       vec2 u = dirA(ta);
       c = mix(c, W*0.7, aStroke(sdSeg(sq, u*0.62, u*0.68), 2.0*(lw*0.4)));
-      c = mix(c, W*0.7, numC(sq - u*0.75, float(k)*30.0, 0.05, 1, 0));
+      c = mix(c, W*0.7, numC(sq - u*0.75, abs(float(k))*30.0, 0.05, 1, 0));
     }
-    vec2 u = dirA(1.5708 + a);
+    vec2 u = dirA(1.5708 + clamp(a, -0.5236, 0.5236));
     c = mix(c, A, aFill(sdTri(sq, u*0.6, u*0.52 + vec2(u.y, -u.x)*0.035, u*0.52 - vec2(u.y, -u.x)*0.035)));
     c = mix(c, W*0.7, txt4(uv - vec2(-0.86, -0.42), 0.055, ivec4(78, 79, 90, 0), 0));
     c = mix(c, W, numC(uv - vec2(-0.28, -0.42), degrees(a), 0.07, 2, 0));
@@ -2829,10 +2821,10 @@ vec3 mfdPage(int page, vec2 uv){
       c = mix(c, gc, txt(gq, 0.04, g == 0 ? ivec4(78, 79, 83, 69) : g == 1 ? ivec4(76, 69, 70, 84) : ivec4(82, 73, 71, 72), g == 2 ? ivec4(84, 0, 0, 0) : ivec4(0), 1));
     }
     float hb = sdRBox(uv - vec2(0.58, -0.7), vec2(0.28, 0.08), 0.03);
-    bool hov = uHud2.z > 0.99;
-    float pl = hov ? 0.8 + 0.2*sin(uTime*6.0) : 1.0;
-    c = mix(c, (hov ? C : G*0.3)*0.2, aFill(hb)); c = mix(c, (hov ? C : G*0.4)*pl, aLine(hb, lw*0.7));
-    c = mix(c, (hov ? C : G*0.4)*pl, txt(uv - vec2(0.58, -0.7), 0.055, ivec4(72, 79, 86, 69), ivec4(82, 0, 0, 0), 1));
+    bool rh = ab > 0.5;
+    float pl = rh ? 0.8 + 0.2*sin(uTime*6.0) : 1.0;
+    c = mix(c, (rh ? A : G*0.3)*0.2, aFill(hb)); c = mix(c, (rh ? A : G*0.4)*pl, aLine(hb, lw*0.7));
+    c = mix(c, (rh ? A : G*0.4)*pl, txt(uv - vec2(0.58, -0.7), 0.055, ivec4(82, 69, 72, 69), ivec4(65, 84, 0, 0), 1));
   } else if (page == 5) {   // G-METER and angle of attack
     c = mfdTitle(c, uv, ivec4(71, 32, 47, 32), ivec4(65, 79, 65, 0));
     float gv = uHud2.x;
@@ -3127,9 +3119,9 @@ R"(vec3 jetScreen(vec3 col, vec3 rd, int id, vec3 sl){
     hud = max(hud, step(length(h - vec2(-0.3895, -0.084)), 0.0025));          // Mach decimal point
     hud = max(hud, hudNum(h - vec2(-0.41, -0.13), abs(uHud2.x)*10.0, 3, vec2(0.014, 0.025)));
     hud = max(hud, step(length(h - vec2(-0.3705, -0.129)), 0.0025));          // G decimal point
-    vec2 nb = h - vec2(0.33, -0.16);                                          // nozzle angle arc
+    vec2 nb = h - vec2(0.33, -0.16);                                          // thrust-vector angle arc (+-30 deg)
     float na = atan(-nb.y, nb.x); float nr = length(nb);
-    hud = max(hud, hudLine(abs(nr - 0.06), px)*step(0.0, na)*step(na, 1.5708)*0.6);
+    hud = max(hud, hudLine(abs(nr - 0.06), px)*step(-0.5236, na)*step(na, 0.5236)*0.6);
     float nzA = uHud2.z*1.5708;
     hud = max(hud, hudLine(abs(nb.x*sin(nzA) + nb.y*cos(nzA)), px*1.5)*step(nr, 0.06)*step(0.0, nb.x*cos(nzA) - nb.y*sin(nzA)));
     hud = max(hud, step(abs(h.x + 0.36), 0.008)*step(-0.3, h.y)*step(h.y, -0.3 + 0.12*uHud2.y));   // throttle bar
@@ -3643,7 +3635,6 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
           float heat = gCtl.w*gCtl.w;
           m.alb = mix(m.alb, vec3(0.16, 0.11, 0.17), 0.4*heat);   // heat-tinted titanium
         } else if (mid == 34) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = gColStripe*(1.2 + 2.0*uNight)*pulse; }
-        else if (mid == 35) { m.alb = vec3(0.06); m.metal = 0.8; m.rough = 0.35; m.emit = vec3(0.25, 0.6, 1.0)*gPS.y*gCtl.w*2.5; }
         else if (mid == 36) {   // turbine stage and tail cone: dark heat-blued metal glowing with the exhaust heat
           float ab = gFlame.y, sp = gFlame.x;
           m.alb = vec3(0.012, 0.011, 0.012); m.metal = 0.3; m.rough = 0.75;
@@ -3694,7 +3685,7 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
           if (lp.y > E.y + 0.12 && abs(lp.x - E.x) < 0.1 && ln.z > 0.5) m.emit = gColStripe*1.2; }
         else if (mid == 47) { tx = triSample(lp, ln, M_RUBBER, 0.1, nT); m.alb = tx.rgb*0.3; m.rough = tx.a; m.metal = 0.1; m.nrm = nT; if (lp.y > E.y - 0.24 && ln.y > 0.3) m.emit = vec3(1.0, 0.45, 0.1)*0.8; }
         else if (mid == 48) { m.alb = vec3(0.1); m.emit = gColStripe*1.1*pulse; }
-        else if (mid == 49) {  // annunciator strip: GEAR, BRK, AB, VTOL, MACH, G, LOW ALT, SYS
+        else if (mid == 49) {  // annunciator strip: GEAR, BRK, AB, TVC, MACH, G, LOW ALT, SYS
           vec3 qd = lp - E.xyz; float an = atan(qd.x, -qd.z);
           int cell = int(clamp(floor((an + 0.62)/0.155), 0.0, 7.0));
           float cx = abs(fract((an + 0.62)/0.155) - 0.5), cy = abs(qd.y - 0.348)/0.016;
@@ -3703,7 +3694,7 @@ R"(        if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
           vec3 on = cell == 0 ? (uHud2.w > 0.5 ? vec3(0.2, 1.0, 0.3) : vec3(0.0)) :
                     cell == 1 ? vec3(0.0) :
                     cell == 2 ? vec3(1.0, 0.5, 0.1)*ab :
-                    cell == 3 ? vec3(0.2, 0.7, 1.0)*step(0.5, uHud2.z) :
+                    cell == 3 ? vec3(0.2, 0.7, 1.0)*step(0.1, abs(uHud2.z)) :   // thrust vectoring past 9 deg
                     cell == 4 ? vec3(0.4, 0.6, 1.0)*step(1.0, uHud.w) :
                     cell == 5 ? vec3(1.0, 0.15, 0.1)*step(9.0, abs(uHud2.x))*step(0.5, fract(uTime*3.0)) :
                     cell == 6 ? vec3(1.0, 0.15, 0.1)*step(uHud3.w, 60.0)*step(0.5, uHud2.z*0.0 + 1.0 - uHud2.w) :

@@ -1282,7 +1282,7 @@ void Game::drawHud(const FrameParams& fp) {
     erow("WEAPONS", wraith.lasers > 0.97f ? "HOT" : wraith.lasers > 0.01f ? "DEPLOYING" : "SAFE", wraith.lasers > 0.97f ? C_BAD : C_DIM);
     erow("PLASMA", wraith.bay > 0.05f ? "BAY OPEN" : wraith.bombLoaded >= 1.f ? "READY  (BKSP)" : "CONDENSING", wraith.bombLoaded >= 1.f ? VIO : C_WARN);
   }
-  else if (sp.special) { erow("NOZZLE", fmt("%.0f deg%s", plane.nozzle * 90, plane.nozzle > 0.99f ? "  VTOL" : "")); erow("MACH", fmt("%.2f", plane.mach)); }
+  else if (sp.special) { erow("TVC", fmt("%+.0f deg", -clampf(plane.ctl.pitch + plane.ctl.trim * 0.3f, -1, 1) * 0.5f / DEG)); erow("MACH", fmt("%.2f", plane.mach)); }
   else erow("FLAPS", fmt("%.0f%%", plane.flaps * 100));
   std::string gearS = !sp.retract ? "FIXED" : plane.gear > 0.99f ? "DOWN" : plane.gear < 0.01f ? "UP" : "TRANSIT";
   erow("GEAR", gearS, plane.gear > 0.99f ? C_GOOD : plane.gear < 0.01f ? C_DIM : C_WARN);
@@ -1643,16 +1643,16 @@ void Game::drawResearch() {
     row("Propulsion", "2 x turbofan, 472 kN with full reheat");
     row("Thrust / weight", "4.4 : 1 (reheat)");
     row("Top speed", "Mach 2.5+");
-    row("Thrust vectoring", "2D nozzles, 0 - 90 deg, VTOL");
+    row("Thrust vectoring", "2D nozzles, +-29 deg pitch");
     row("Flight control", "Inertially damped FBW, 30 g, 315 deg/s roll");
     row("Cockpit", "Sealed pod, synthetic-vision displays + HUD");
     row("Fuel", "Unrestricted (research cell)");
   }
   py += 10 * s;
   header(px, py, lw - 48 * s, "HANDLING NOTES"); py += 26 * s;
-  const char* notesJ[] = {"F / V   swivel nozzles: 0 = forward flight, 90 = hover",
-                         "Hover:  nozzles 90, ~65% throttle, stick to translate",
-                         "Hands off in the hover and the jet levels itself",
+  const char* notesJ[] = {"No flaps: land fast, about 140 kt, on the long runways",
+                         "The nozzles vector with the stick for extra pitch authority",
+                         "Fly-by-wire: the stick commands rotation, no g limiter",
                          "Above 85% throttle the afterburners light (2x thrust)",
                          "Mach 1 sets off a sonic boom - try it low over the sea",
                          "C cockpit view: you fly on the displays only"};

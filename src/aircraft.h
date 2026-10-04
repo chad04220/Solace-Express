@@ -25,7 +25,7 @@ struct AircraftSpec {
   // visual model
   float fusLen, fusRad, wingY, wingZ; int engLayout, tail;
   vec3 colBase, colStripe;
-  int special = 0;             // 1 = XR-9 research jet: fly-by-wire, thrust vectoring, VTOL nozzles, no fuel burn; 2 = XR-11 Wraith
+  int special = 0;             // 1 = XR-9 research jet: fly-by-wire, pitch thrust vectoring, no fuel burn; 2 = XR-11 Wraith
   float runwayNeeded(float elev) const { return runwayM * (1.0f + elev / 3000.0f); }
 };
 

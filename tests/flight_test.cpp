@@ -56,7 +56,7 @@ int main() {
     }
   }
   printf("control directions checked\n");
-  // XR-9 research jet: supersonic in level flight, stable hands-off hover, g limiter, roll authority
+  // XR-9 research jet: supersonic in level flight, no vertical flight, slow flight on approach, pull limits, roll authority
   {
     const AircraftSpec& s = kAircraft[kResearchJet];
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
@@ -66,23 +66,20 @@ int main() {
     for (int i = 0; i < 40 * 240 && !p.ev.crashed; i++) { p.ctl.pitch = clampf((3000 - p.pos.y) * 0.002f - p.vel.y * 0.01f, -1, 1); p.step(1 / 240.f, calm, i / 240.f); }
     bool ok = !p.ev.crashed && p.mach > 2.0f;
     printf("XR-9 level acceleration: Mach %.2f after 40 s %s\n", p.mach, ok ? "ok" : "FAIL"); fails += !ok;
-    p.reset(&s, vec3(0, 500, 0), 90, s.maxFuel, 85, true, 0); p.vel = vec3(); p.ctl.flaps = 1; p.flaps = p.nozzle = 1;
-    for (int i = 0; i < 30 * 240 && !p.ev.crashed; i++) { p.ctl.throttle = clampf(0.5f + (500 - p.pos.y) * 0.01f - p.vel.y * 0.05f, 0, 1); p.step(1 / 240.f, calm, i / 240.f); }
-    ok = !p.ev.crashed && fabsf(p.pos.y - 500) < 25 && length(p.vel) < 2.f && fabsf(p.bankDeg()) < 2.f;
-    printf("XR-9 hover: alt %.0f m, drift %.1f m/s, throttle %.2f %s\n", p.pos.y, length(p.vel), p.ctl.throttle, ok ? "ok" : "FAIL"); fails += !ok;
-    // pedal turn in the hover while still drifting at 35 m/s: the airflow sweeps round to the side and behind, which
-    // must not upset the attitude hold (the g limiter used to read reversed flow as a huge angle of attack)
-    for (float drift : {0.f, 35.f, 60.f}) {
-      p.reset(&s, vec3(0, 500, 0), 90, s.maxFuel, 85, true, 0); p.vel = p.forward() * drift; p.ctl.flaps = 1; p.flaps = p.nozzle = 1; p.ctl.yaw = 1;
-      float worst = 0;
-      for (int i = 0; i < 20 * 240 && !p.ev.crashed; i++) {
-        p.ctl.throttle = clampf(0.5f + (500 - p.pos.y) * 0.01f - p.vel.y * 0.05f, 0, 1);
-        p.step(1 / 240.f, calm, i / 240.f);
-        worst = std::max(worst, std::max(fabsf(p.pitchDeg()), fabsf(p.bankDeg())));
-      }
-      ok = !p.ev.crashed && worst < 5.f && fabsf(p.w.y) > 1.f;
-      printf("XR-9 hover pedal turn drifting %.0f m/s: worst attitude excursion %.1f deg %s\n", drift, worst, ok ? "ok" : "FAIL"); fails += !ok;
+    // no vertical flight: the flap lever does nothing and the nozzles stay aft, so at a standstill it simply falls
+    p.reset(&s, vec3(0, 500, 0), 90, s.maxFuel, 85, true, 0); p.vel = vec3(); p.ctl.flaps = 1; p.ctl.throttle = 0.7f;
+    for (int i = 0; i < 4 * 240 && !p.ev.crashed; i++) p.step(1 / 240.f, calm, i / 240.f);
+    ok = p.nozzle == 0.f && p.pos.y < 450.f;
+    printf("XR-9 cannot hover: nozzle %.2f, alt %.0f m after 4 s %s\n", p.nozzle, p.pos.y, ok ? "ok" : "FAIL"); fails += !ok;
+    // approach: gear down at about 145 kt it flies level on its wing alone
+    p.reset(&s, vec3(0, 600, 0), 90, s.maxFuel, 85, true, 75); p.ctl.gearDown = true; p.gear = 1;
+    for (int i = 0; i < 20 * 240 && !p.ev.crashed; i++) {
+      p.ctl.pitch = clampf((600 - p.pos.y) * 0.004f - p.vel.y * 0.03f - p.w.x * 0.5f, -1, 1);
+      p.ctl.throttle = clampf(0.3f + (75 - length(p.vel)) * 0.05f, 0, 1);
+      p.step(1 / 240.f, calm, i / 240.f);
     }
+    ok = !p.ev.crashed && fabsf(p.pos.y - 600) < 40 && fabsf(length(p.vel) - 75) < 10;
+    printf("XR-9 approach speed level flight: alt %.0f m, %.0f kt %s\n", p.pos.y, length(p.vel) * MS_TO_KT, ok ? "ok" : "FAIL"); fails += !ok;
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.pitch = 1;
     float gmax = 0;
     for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); gmax = std::max(gmax, p.gLoad); }

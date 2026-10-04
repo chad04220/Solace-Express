@@ -1,13 +1,9 @@
 ## What's new
 
-**Camera displays in the research jets**
-- Every cockpit display in the XR-9 and XR-11 is now a monitor for a real camera mounted on the airframe, instead of a see-through window
-- The forward cameras sit in the tip of the nose; the side, aft, overhead and belly cameras sit where their line of sight leaves the skin, each looking out the way its display faces
-- Each camera renders the whole scene from where it sits: terrain, trees and buildings, traffic, weapons, clouds, smoke, fire, sparks and every other particle effect, light shafts, and your own aircraft when it's in shot
-- Every camera whose display is in view renders a fresh picture every frame; displays out of view are skipped, and update the moment you look at them
-- Particles now face whichever camera draws them, so smoke and fire look right from every camera
-- The HUD symbology is drawn conformal to each camera's view
-- The XR-11's bomb camera is one of these cameras: while it flies, the floor displays show its picture
-
-**Under the hood**
-- Faster, more reliable headless test renders (see the README's testing notes)
+**XR-9 Specter: no more VTOL**
+- The XR-9 is now a conventional runway jet: its nozzles no longer swivel down, so it can't hover or land vertically
+- The lift fans and their ducts in the wings are gone; the cranked delta wing is solid again
+- The 2D nozzles still vector ±29° in pitch with the stick, for its high pitch rates
+- The cockpit's VTOL page is now a thrust-vectoring page (nozzle angle, gear, reheat), the HUD shows the thrust-vector angle and the annunciator lights TVC
+- The XR-9 has no flaps: F / V do nothing in it. It lands fast on its delta wing, at about 140 kt
+- Autoland flies the XR-9 down a normal approach, flare and rollout; the XR-11 still comes to a hover and lands vertically

@@ -436,10 +436,10 @@ void Game::flightControls(float dt) {
   // flaps
   auto flapToast = [&]() {
     if (plane.spec->special == 2) toast(flapNotch > 0.99f ? "Pods 90 deg - VTOL hover" : fmt("Pods %d deg", (int)lroundf(flapNotch * 90)), vec3(0.8f, 0.55f, 1));
-    else if (plane.spec->special) toast(flapNotch > 0.99f ? "Thrust vector 90 deg - VTOL hover" : fmt("Thrust vector %d deg", (int)lroundf(flapNotch * 90)), vec3(0.4f, 0.9f, 1));
     else toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1));
   };
   if (apNav) flapNotch = c.flaps;   // the autopilot runs the flaps on the approach
+  else if (plane.spec->special == 1) flapNotch = 0;   // the XR-9 has no flaps: a delta wing and canards
   else {
     if (actPressed(ACT_FLAPS_DN)) { flapNotch = std::min(1.f, flapNotch + 1.f / 3.f); flapToast(); }
     if (actPressed(ACT_FLAPS_UP)) { flapNotch = std::max(0.f, flapNotch - 1.f / 3.f); flapToast(); }
@@ -1462,7 +1462,7 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   pv.colBase = s.colBase; pv.colStripe = s.colStripe;
   pv.propCount = modelProps(md, pv.prop);
   pv.hud[0] = p.ias; pv.hud[1] = p.pos.y; pv.hud[2] = p.heading(); pv.hud[3] = p.mach;
-  pv.hud2[0] = p.gLoad; pv.hud2[1] = p.ctl.throttle; pv.hud2[2] = p.nozzle; pv.hud2[3] = p.gear > 0.5f ? 1.f : 0.f;
+  pv.hud2[0] = p.gLoad; pv.hud2[1] = p.ctl.throttle; pv.hud2[2] = p.spec && p.spec->special == 1 ? jetNozzleAngle(p) / (0.5f * PI) : p.nozzle;   // XR-9: pitch vectoring (90 deg units) pv.hud2[3] = p.gear > 0.5f ? 1.f : 0.f;
   vec3 vb = length(p.vel) > 2.f ? p.q.conj().rotate(normalize(p.vel)) : vec3(0, 0, -1);
   pv.hudV[0] = vb.x; pv.hudV[1] = vb.y; pv.hudV[2] = vb.z;
   pv.hud3[0] = p.engineSpool; pv.hud3[1] = p.alpha / DEG; pv.hud3[2] = p.vel.y; pv.hud3[3] = p.agl();
@@ -2243,7 +2243,7 @@ void Game::debugScene(const std::string& name) {
     if (!(mode == 7 && firstDrop > 0)) { dbgFollow = true; dbgFollowOff = dbgCamPos - plane.pos; }
     return;
   }
-  if (name == "rjet" || name == "rjetc" || name == "rhover" || name == "rjetl" || name == "rjetd" || name == "rjetr") { realTime = 20; resAirborne = name != "rhover"; launchResearch(); if (name == "rjetc" || name == "rjetl" || name == "rjetd" || name == "rjetr") camMode = 1; if (name == "rhover") { plane.ctl.flaps = 1; flapNotch = 1; plane.flaps = plane.nozzle = 1; plane.ctl.throttle = 0.7f; plane.engineRunning = true; plane.engineSpool = 0.7f; } for (int i = 0; i < 90; i++) { realTime += 1 / 30.f; update(1 / 30.f); } toasts.clear(); if (name == "rjetl") lookYaw = 1.75f; if (name == "rjetr") { lookYaw = -1.2f; lookPitch = -0.6f; } if (name == "rjetd") lookPitch = -0.75f; return; }
+  if (name == "rjet" || name == "rjetc" || name == "rjetl" || name == "rjetd" || name == "rjetr") { realTime = 20; resAirborne = true; launchResearch(); if (name == "rjetc" || name == "rjetl" || name == "rjetd" || name == "rjetr") camMode = 1; for (int i = 0; i < 90; i++) { realTime += 1 / 30.f; update(1 / 30.f); } toasts.clear(); if (name == "rjetl") lookYaw = 1.75f; if (name == "rjetr") { lookYaw = -1.2f; lookPitch = -0.6f; } if (name == "rjetd") lookPitch = -0.75f; return; }
   if (name == "radio") { loadStations(); screen = SCR_HUB; showRadio = true; realTime = 20; radioScroll = 6; return; }
   if (name.size() == 4 && name.compare(0, 3, "hub") == 0) { screen = SCR_HUB; hubTab = name[3] - '0'; realTime = 20; return; }
   Contract c = g_story[0];
@@ -2646,7 +2646,7 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
   }
   if (name == "gpsap" || name == "apfinal" || name == "apvtol") {   // autopilot: GPS autoland pick, then the approach
-    int sp = name == "apvtol" ? 7 : 4;
+    int sp = name == "apvtol" ? 8 : 4;   // (the XR-11: the research jet that lands vertically)
     plane.reset(&kAircraft[sp], vec3(-4000, 900, 9000), 40, kAircraft[sp].maxFuel, 100, true, kAircraft[sp].cruise * 0.8f);
     plane.engineRunning = true; plane.engineSpool = 0.7f; plane.ctl.throttle = 0.7f;
     takeoffAnnounced = true; engineAutoStarted = true; camQ = plane.q; hint.clear();
