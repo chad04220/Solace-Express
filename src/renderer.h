@@ -232,6 +232,8 @@ public:
   void setOffscreen(bool on);
   bool hullBaked(const FrameParams& fp) const;   // the hull this frame wants is ready (or none is wanted)
   bool hullCockpit = getenv("HULLCOCKPIT") != nullptr;   // cockpit hulls too (in testing)
+  bool hullOff = getenv("HULLOFF") != nullptr;           // debug: no hulls (every aircraft march starts from the camera)
+  bool envOff = getenv("ENVOFF") != nullptr;             // debug: no terrain envelope (every pixel marches from the camera)
   bool tshPending() const { return tshBaking || tshFront < 0; }
 private:
   GLuint screenFbo = 0;

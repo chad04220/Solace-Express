@@ -161,8 +161,13 @@ void main(){
       std::string sc = list.substr(a, b - a);
       if (sc.empty()) continue;
       if (getenv("ENTSYNC")) g_ren.entSync = true;   // deterministic scenery (for exact image comparisons)
+      // scene~hulloff / scene~envoff: that shot only with the switch on, so an A/B pair shares one shader compile
+      std::string base = sc.substr(0, sc.find('~'));
+      const bool hullOff0 = g_ren.hullOff, envOff0 = g_ren.envOff;
+      if (sc.find("~hulloff") != std::string::npos) g_ren.hullOff = true;
+      if (sc.find("~envoff") != std::string::npos) g_ren.envOff = true;
       Game* g = new Game();
-      g->initHeadless(); g->debugScene(sc);
+      g->initHeadless(); g->debugScene(base);
       for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
       for (int i = 0; i < 6; i++) g->render();
       glFinish();
@@ -190,6 +195,7 @@ void main(){
       }
       std::string out = "/tmp/claude-0/sp/shot_" + sc + ".ppm";
       g_ren.screenshot(out.c_str()); printf("wrote %s\n", out.c_str()); fflush(stdout);
+      g_ren.hullOff = hullOff0; g_ren.envOff = envOff0;
       delete g;
     }
     return 0;

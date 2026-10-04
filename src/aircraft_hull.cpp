@@ -217,9 +217,8 @@ bool Renderer::hullBaked(const FrameParams& fp) const {
 // starts from the camera as before.
 void Renderer::drawTrafficHulls(const FrameParams& fp) {
   trafHullOn = false;
-  static const bool off = getenv("HULLOFF") != nullptr;
   int n = std::min(fp.trafficN, kMaxTrafficDrawn);
-  if (off || n == 0 || !progHull || !fboEnv) return;
+  if (hullOff || n == 0 || !progHull || !fboEnv) return;
   std::vector<const HullMesh*> hm(n);
   for (int k = 0; k < n; k++) {
     uint64_t h = 1469598103934665603ull;   // hullKey(slot 0) of this aircraft's model
@@ -291,9 +290,8 @@ uint64_t Renderer::hullKey(const FrameParams& fp, int slot) const {
 // fittings (vent rims, bezels) that the march from the eye happens to land on (HULLCOCKPIT turns it on to test).
 bool Renderer::hullWanted(const FrameParams& fp) const {
   const PlaneVisual& pv = fp.plane;
-  static const bool off = getenv("HULLOFF") != nullptr;
   if (pv.PS[3] > 0.5f && !hullCockpit) return false;
-  return !off && progHull && progHullBake && pv.on && fp.wreck.pieces == 0 && pv.M[2] < 4.5f;
+  return !hullOff && progHull && progHullBake && pv.on && fp.wreck.pieces == 0 && pv.M[2] < 4.5f;
 }
 
 void Renderer::ensureHullTarget() {

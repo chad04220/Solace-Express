@@ -108,8 +108,7 @@ void Renderer::createEnvelopeTarget() {
 
 void Renderer::drawEnvelope(const FrameParams& fp) {
   envOn = false;
-  static const bool off = getenv("ENVOFF") != nullptr;   // (debug: every pixel marches from the camera)
-  if (off || !progEnv || !vaoEnv || !fboEnv || g_world.tpV0.empty()) return;
+  if (envOff || !progEnv || !vaoEnv || !fboEnv || g_world.tpV0.empty()) return;
   const int N = HM_N, NV = HM_N + 1;
   const float T = HM_TEXEL;
   vec3 cam = fp.camPos;
