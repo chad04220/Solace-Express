@@ -4,6 +4,6 @@ rem time of every pass, frame time against render resolution, what each ray-trac
 rem the ray tracer does per pixel (with heat maps). Writes analysis.txt and the "analysis" folder next to
 rem SolaceExpress.exe. Takes 5-10 minutes; the window title shows progress.
 cd /d "%~dp0"
-start "" /wait SolaceExpress.exe --analyze
+start "" /wait SolaceExpress.exe --analyze %*
 type analysis.txt
 pause

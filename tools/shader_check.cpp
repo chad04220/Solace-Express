@@ -23,6 +23,9 @@ int main(int argc, char** argv) {
     put(dir, "clouds.frag", ms + kCloudMain);
     put(dir, "hullbake.frag", ms + kHullBakeMain);
     put(dir, "displays.frag", ms + kDispMain);
+    put(dir, "terrain.vert", terrainVSAssembly("")); put(dir, "terrain.frag", terrainFSAssembly(""));
+    put(dir, "water.vert", waterVSAssembly("")); put(dir, "water.frag", waterFSAssembly(""));
+    put(dir, "light.frag", lightFSAssembly(""));
   }
   return 0;
 }

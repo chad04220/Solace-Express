@@ -22,6 +22,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_TRUE 1
 #define GL_TRIANGLES 0x0004
 #define GL_UNSIGNED_BYTE 0x1401
+#define GL_UNSIGNED_INT 0x1405
 #define GL_FLOAT 0x1406
 #define GL_HALF_FLOAT 0x140B
 #define GL_DEPTH_TEST 0x0B71
@@ -62,6 +63,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_R11F_G11F_B10F 0x8C3A
 #define GL_TEXTURE0 0x84C0
 #define GL_ARRAY_BUFFER 0x8892
+#define GL_ELEMENT_ARRAY_BUFFER 0x8893
 #define GL_STREAM_DRAW 0x88E0
 #define GL_STATIC_DRAW 0x88E4
 #define GL_DYNAMIC_DRAW 0x88E8
@@ -72,6 +74,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_FRAMEBUFFER 0x8D40
 #define GL_COLOR_ATTACHMENT0 0x8CE0
 #define GL_COLOR_ATTACHMENT1 0x8CE1
+#define GL_COLOR_ATTACHMENT3 0x8CE3
 #define GL_FRAMEBUFFER_COMPLETE 0x8CD5
 #define GL_COLOR_BUFFER_BIT 0x00004000
 #define GL_UNPACK_ALIGNMENT 0x0CF5
@@ -120,6 +123,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
   X(void, glPixelStorei, (GLenum, GLint)) \
   X(void, glReadPixels, (GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void*)) \
   X(void, glDrawArrays, (GLenum, GLint, GLsizei)) \
+  X(void, glDrawElements, (GLenum, GLsizei, GLenum, const void*)) \
   X(void, glReadBuffer, (GLenum)) \
   X(GLenum, glGetError, (void)) \
   X(const GLubyte*, glGetString, (GLenum)) \

@@ -12,7 +12,7 @@ void Renderer::swapView(ViewTargets& v) {
   std::swap(texRaw, v.texRaw); std::swap(texDepth, v.texDepth); std::swap(texCloudMask, v.texCloudMask);
   std::swap(texCloud, v.texCloud); std::swap(texCloudD, v.texCloudD); std::swap(fboCloud, v.fboCloud); std::swap(fboComp, v.fboComp);
   std::swap(fboScene, v.fboScene);
-  for (int i = 0; i < 3; i++) std::swap(texGB[i], v.texGB[i]);
+  for (int i = 0; i < 4; i++) std::swap(texGB[i], v.texGB[i]);
   std::swap(texGBDepth, v.texGBDepth); std::swap(fboGB, v.fboGB);
   std::swap(texEnv, v.texEnv); std::swap(texEnvDepth, v.texEnvDepth); std::swap(fboEnv, v.fboEnv);
   std::swap(depthValid, v.depthValid); std::swap(envOn, v.envOn); std::swap(hullOn, v.hullOn); std::swap(trafHullOn, v.trafHullOn);

@@ -22,7 +22,7 @@ bool Renderer::initEntities() {
   return true;
 }
 
-// G-buffer at the ray-trace resolution: (distance, octahedral normal, class) | albedo, roughness | emission, metal
+// G-buffer at the render resolution (kGBuffer): (distance, octahedral normal, class) | sqrt albedo, roughness | emission (HDR), metal | ambient occlusion
 void Renderer::createGBuffer() {
   auto mk = [&](GLuint& t, GLenum ifmt, GLenum fmt, GLenum type) {
     if (t) glDeleteTextures(1, &t);
@@ -33,11 +33,12 @@ void Renderer::createGBuffer() {
   };
   mk(texGB[0], GL_RGBA32F, GL_RGBA, GL_FLOAT);
   mk(texGB[1], GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
-  mk(texGB[2], GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
+  mk(texGB[2], GL_RGBA16F, GL_RGBA, GL_FLOAT);   // emission (HDR), metal
+  mk(texGB[3], GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);   // ambient occlusion, - (the raster passes' extras)
   mk(texGBDepth, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT);
   if (!fboGB) glGenFramebuffers(1, &fboGB);
   glBindFramebuffer(GL_FRAMEBUFFER, fboGB);
-  for (int i = 0; i < 3; i++) glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, texGB[i], 0);
+  for (int i = 0; i < 4; i++) glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, texGB[i], 0);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texGBDepth, 0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -366,8 +367,8 @@ void Renderer::drawEntities(const FrameParams& fp) {
 
   // ------------------------------------------------ G-buffer
   glBindFramebuffer(GL_FRAMEBUFFER, fboGB);
-  GLenum gb[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
-  glDrawBuffers(3, gb);
+  GLenum gb[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+  glDrawBuffers(4, gb);
   glViewport(0, 0, rw, rh);
   glClearColor(0, 0, 0, 0); glClearDepth(1.0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

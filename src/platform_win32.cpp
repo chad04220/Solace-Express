@@ -552,6 +552,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) { stopIntro(false); fatal(g_ren.error); return 1; }
   {
     std::string cl = GetCommandLineA();
+    if (cl.find("--raster") != std::string::npos) g_ren.mode = 1;   // the tools on the raster renderer (docs/RENDERER_REBUILD.md)
     bool tool = cl.find("--bench ") != std::string::npos || cl.find("--shots ") != std::string::npos || cl.find("--profile ") != std::string::npos || cl.find("--analyze") != std::string::npos || cl.find("--loadshots") != std::string::npos || cl.find("--menuvideo") != std::string::npos;
     // a normal start loads the menu's first place and builds every aircraft's hull under the intro (rendered
     // offscreen: the intro keeps the window), so the menu opens complete and no flight waits for a hull
@@ -599,7 +600,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
                   "takes ~2.2x as long at 100%% as at 67%% (2.2x the pixels), the per-pixel ray tracing is the bottleneck.\n");
       auto qpcMs = [&](LARGE_INTEGER a, LARGE_INTEGER b) { return (double)(b.QuadPart - a.QuadPart) / freq.QuadPart * 1000.0; };
       auto pump = [&] { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } };
-      static const char* kPassName[Renderer::kPasses] = {"scenery+shadows+displays", "ray trace", "TAA", "sprites", "bloom", "light shafts", "composite"};
+      static const char* kPassNameRT[Renderer::kPasses] = {"scenery+shadows+displays", "ray trace", "TAA", "sprites", "bloom", "light shafts", "composite"};
+      static const char* kPassNameRaster[Renderer::kPasses] = {"scenery+terrain+displays", "lighting+clouds", "TAA", "sprites", "bloom", "light shafts", "composite"};
+      const char* const* kPassName = g_ren.mode == 1 ? kPassNameRaster : kPassNameRT;
       static const struct { int bit; const char* name; } kFeat[] = {
         {1, "volumetric clouds"}, {2, "terrain shadows"}, {4, "scenery shadow maps"}, {8, "aircraft shadow"}, {16, "point lights"},
         {32, "cloud shadows"}, {64, "half terrain march steps"}, {128, "terrain materials"}, {256, "fog / aerial perspective"},
@@ -778,7 +781,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           double ms = (double)(f1.QuadPart - f0.QuadPart) / freq.QuadPart * 1000.0 / N;
           if (F.bit == 0) base = ms;
           if (pf) {
-            if (F.bit == 0) fprintf(pf, "  %-26s %7.2f ms   (scenery+shadows %.2f, ray trace %.2f)\n", F.name, ms, g_ren.passMs[0], g_ren.passMs[1]);
+            if (F.bit == 0) fprintf(pf, g_ren.mode == 1 ? "  %-26s %7.2f ms   (scenery+terrain %.2f, lighting %.2f)\n" : "  %-26s %7.2f ms   (scenery+shadows %.2f, ray trace %.2f)\n", F.name, ms, g_ren.passMs[0], g_ren.passMs[1]);
             else fprintf(pf, "  %-26s %7.2f ms   saves %6.2f ms\n", F.name, ms, base - ms);
             fflush(pf);
           }
@@ -835,7 +838,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         double ms = (double)(f1.QuadPart - f0.QuadPart) / freq.QuadPart * 1000.0 / N;
         if (bf) {
           const float* pm = g_ren.passMs;
-          fprintf(bf, "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: scenery+shadows %.2f  raytrace %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n",
+          fprintf(bf, g_ren.mode == 1 ? "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: scenery+terrain %.2f  lighting %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n"
+                              : "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: scenery+shadows %.2f  raytrace %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n",
                   sc.c_str(), ms, 1000.0 / ms, g_ren.gpuMs, pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6]);
           fflush(bf);
         }

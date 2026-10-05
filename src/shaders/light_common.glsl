@@ -28,7 +28,6 @@ float terrainShadow(vec3 ro, vec3 rd, float camT){
 uniform sampler2D uGB0; uniform sampler2D uGB1; uniform sampler2D uGB2;
 uniform int uShOn; uniform sampler2DShadow uShMap0; uniform sampler2DShadow uShMap1; uniform mat4 uShM0; uniform mat4 uShM1; uniform vec2 uShTexel;
 uniform vec4 uShFade; uniform vec4 uShFadeR;   // camera-anchored fade centres (xz, per cascade) and fade radii
-uniform float uTreeFar;
 vec3 octDec(vec2 e){ vec3 n = vec3(e.x, 1.0 - abs(e.x) - abs(e.y), e.y); if (n.y < 0.0) n.xz = (1.0 - abs(n.zx))*vec2(n.x >= 0.0 ? 1.0 : -1.0, n.z >= 0.0 ? 1.0 : -1.0); return normalize(n); }
 // sun shadow of trees, rocks and buildings (two cascades, 2x2 PCF in the comparison sampler; normal offset against acne)
 float shTap(sampler2DShadow m, vec3 q, float bias){ return texture(m, vec3(q.xy, q.z - bias)); }

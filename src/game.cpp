@@ -192,7 +192,8 @@ void Game::loadSettings() {
     else if (s == "radioStation") set.radioStation = (int)v;
     else if (s == "mouseSens") set.mouseSens = clampf(v, 0.2f, 3.f);
     else if (s == "renderRes") set.resMode = std::clamp((int)v, 0, 4);
-    else if (s == "fpsTarget") set.fpsTarget = std::clamp((int)v, 0, 240);   // (the old key, "resMode", defaulted to native: ignored)
+    else if (s == "fpsTarget") set.fpsTarget = std::clamp((int)v, 0, 240);
+    else if (s == "renderer") set.renderer = std::clamp((int)v, 0, 1);   // (the old key, "resMode", defaulted to native: ignored)
     else if (s.rfind("key.", 0) == 0 || s.rfind("pad.", 0) == 0)
       for (int i = 0; i < ACT_COUNT; i++)
         if (s.compare(4, std::string::npos, kActions[i].id) == 0) {
@@ -207,7 +208,7 @@ void Game::loadSettings() {
 void Game::saveSettings() {
   std::string t = fmt("quality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
-  t += fmt("renderRes %d\nfpsTarget %d\n", set.resMode, set.fpsTarget);
+  t += fmt("renderRes %d\nfpsTarget %d\nrenderer %d\n", set.resMode, set.fpsTarget, set.renderer);
   for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   if (t == settingsWritten) return;
   std::string path = joinPath(saveDir, "settings.cfg"), tmp = path + ".tmp";
@@ -295,6 +296,7 @@ void Game::init(bool buildWorld) {
   buildStory();
   loadSettings();
   wantPacing = true;   // (the frame-rate target from the settings)
+  g_ren.mode = set.renderer;
   loadStations();
   {   // every type's performance, learned by flying it, on threads side by side (the job board needs the career ones now)
     std::vector<std::thread> th;
@@ -2561,7 +2563,8 @@ void Game::render() {
                         (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale));
     t += fmt("   worst %.1f ms   target %d fps   scenery %d drawn, %d chunks, %.1f ms CPU", maxFrameMs, effectiveHz(), g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs);
     const float* pm = g_ren.passMs;
-    std::string t2 = fmt("GPU ms:  scenery+shadows %.1f   ray trace %.1f   TAA %.1f   sprites %.1f   bloom %.1f   shafts %.1f   composite %.1f",
+    std::string t2 = fmt(g_ren.mode == 1 ? "GPU ms:  scenery+terrain %.1f   lighting+clouds %.1f   TAA %.1f   sprites %.1f   bloom %.1f   shafts %.1f   composite %.1f"
+                                        : "GPU ms:  scenery+shadows %.1f   ray trace %.1f   TAA %.1f   sprites %.1f   bloom %.1f   shafts %.1f   composite %.1f",
                          pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6]);
     float tw = std::max(g_ren.textWidth(t, 14 * s), g_ren.textWidth(t2, 14 * s)) + 20 * s;
     g_ren.rect(6 * s, 6 * s, tw, 46 * s, vec3(0, 0, 0), 0.6f);

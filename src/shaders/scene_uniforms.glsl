@@ -52,16 +52,6 @@ vec4 gCab0, gCab1;  // seat half width, headrest y, dome-light y, armrest x | vi
 void loadCabinFit();
 uniform sampler2D uTraffic; uniform int uTrafficN;
 bool gOwn = true;   // the globals hold the player's aircraft (not a traffic one)
-void loadMain(){ gOwn = true; for (int i = 0; i < 24; i++) gM[i] = uM[i]; gPS = uPS; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; if (gPS.w > 0.5 && gM[0].z < 4.5) loadCabinFit(); }
-int gTrafK = 0;
-void loadTraffic(int k){
-  gOwn = false; gTrafK = k;
-  for (int i = 0; i < 24; i++) gM[i] = texelFetch(uTraffic, ivec2(i, k), 0);
-  gPS = texelFetch(uTraffic, ivec2(28, k), 0); gCtl = texelFetch(uTraffic, ivec2(29, k), 0);
-  vec4 c0 = texelFetch(uTraffic, ivec2(30, k), 0), c1 = texelFetch(uTraffic, ivec2(31, k), 0);
-  gColBase = c0.rgb; gColStripe = c1.rgb;
-  gFlame = vec4(gCtl.w, c1.w, gPS.y*1.5708 - gCtl.x*0.5, 0.0);
-}
 
 // ---------------------------------------------------------------- materials (texture array layers)
 const int M_GRASS=0, M_FOREST=1, M_ROCK=2, M_SAND=3, M_SNOW=4, M_ASPHALT=5, M_GRAVEL=6, M_DIRT=7;

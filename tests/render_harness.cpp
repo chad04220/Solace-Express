@@ -148,6 +148,7 @@ void main(){
   }
   if (getenv("SHADERCACHE")) g_shaderCacheDir = getenv("SHADERCACHE");   // test the program-binary cache
   g_ren.renderScale = getenv("RSCALE") ? (float)atof(getenv("RSCALE")) : 1.0f; g_ren.quality = 1;
+  if (getenv("RASTER")) g_ren.mode = 1;   // the raster renderer (docs/RENDERER_REBUILD.md)
   if (getenv("DBGOFF")) g_ren.dbgOff = atoi(getenv("DBGOFF"));   // switch ray tracer features off (Renderer::dbgOff bits)
   auto tInit = std::chrono::steady_clock::now();
   if (!g_ren.init(W, H)) { printf("init failed: %s\n", g_ren.error.c_str()); return 1; }

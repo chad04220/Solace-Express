@@ -4,9 +4,6 @@
 // Volumetric cumulus: a coverage field (2D) gives each cloud its footprint; a flat base and a billowing, rounded top
 // come from the height profile, two scales of 3D noise carve the billows, and fine 3D detail erodes only the thin
 // edges into wisps (the dense cores stay solid).
-uniform sampler2D uCloudCov; uniform sampler3D uNoise3;
-float cn3(vec3 x){ return textureLod(uNoise3, x*(1.0/32.0), 0.0).r; }   // vnoise3 from the baked volume
-float tfbm(vec2 x){ return textureLod(uCloudCov, x*(1.0/16.0), 0.0).r*0.9375; }   // fbm2(x, 4) from the baked map
 float cloudDensity(vec3 p, int detail){
   float thick = 900.0 + 900.0*uCloudCover;
   float hf = (p.y - uCloudBase) / thick;

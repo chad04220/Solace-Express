@@ -46,6 +46,7 @@ struct Settings {
   float mouseSens = 1.0f;
   int resMode = 1;   // 0 native, 1 auto (holds the frame-rate target, the default), 2 85%, 3 75%, 4 67% (TAA upscales to the display)
   int fpsTarget = 0;   // 0: the monitor's refresh rate (vsync); else a frame-rate cap (30 / 60 / 90 / 120 / 144 / 240)
+  int renderer = 0;    // 0 the ray tracer, 1 the raster renderer (docs/RENDERER_REBUILD.md)
   int keyBind[ACT_COUNT]; unsigned padBind[ACT_COUNT];
   Settings() { resetBindings(); }
   void resetBindings() { for (int i = 0; i < ACT_COUNT; i++) { keyBind[i] = kActions[i].key; padBind[i] = kActions[i].pad; } }

@@ -79,3 +79,33 @@ vec3 fuselagePaint(vec3 lp, vec3 sec){
 // An ellipse inset from the skin is a conservative fit for every rounded/boxy cabin cross-section.
 float cabinRoof(vec3 sec, float x){ float k = abs(x)/max(sec.x - 0.035, 0.01); return sec.z + (sec.y - 0.035)*sqrt(max(1.0 - k*k, 0.0)); }
 float cabinWidth(vec3 sec, float y){ float k = (y - sec.z)/max(sec.y - 0.035, 0.01); return (sec.x - 0.035)*sqrt(max(1.0 - k*k, 0.0)); }
+
+
+void loadCabinFit(){
+  vec3 E = gM[22].xyz;
+  float sw = clamp(cabinWidth(fusSection(E.z + 0.05), E.y - 0.8) - abs(E.x) - 0.015, 0.145, 0.21);
+  // headrest: mounted on top of the reclined seat back (centre ~4 cm above eye level, 45 cm aft); dropped altogether
+  // (-100) where the cabin roof wouldn't clear it by 8 cm
+  float hy = E.y + 0.057;   // along the reclined back's axis, just above its top (top at E.y - 0.046, E.z + 0.434)
+  if (cabinRoof(fusSection(E.z + 0.455), abs(E.x) + 0.11) < hy + 0.075 + 0.08) hy = -100.0;
+  float ly = cabinRoof(fusSection(E.z - 0.05), 0.09) - 0.035;
+  float wx = max(cabinWidth(fusSection(E.z - 0.15), E.y - 0.5) - 0.05, 0.2);
+  gCab0 = vec4(sw, hy, ly, wx);
+  vec3 vs = fusSection(E.z - 0.30); float hw = max(vs.x - 0.035, 0.01), hh = max(vs.y - 0.035, 0.01);   // visors: at the windshield top, ahead of the eye
+  float k = clamp(abs(E.x)/hw, 0.0, 0.95);
+  float slope = atan(hh*k/(hw*sqrt(max(1.0 - k*k, 0.01))));
+  float vy = cabinRoof(vs, abs(E.x)) - 0.05;
+  float oy = cabinRoof(fusSection(E.z - 0.2), 0.22) - 0.03;
+  float vx = min(gM[22].w - 0.07, cabinWidth(fusSection(gM[21].w), E.y - 0.19) - 0.04);
+  gCab1 = vec4(vy, slope, oy, max(vx, 0.1));
+}
+void loadMain(){ gOwn = true; for (int i = 0; i < 24; i++) gM[i] = uM[i]; gPS = uPS; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; if (gPS.w > 0.5 && gM[0].z < 4.5) loadCabinFit(); }
+int gTrafK = 0;
+void loadTraffic(int k){
+  gOwn = false; gTrafK = k;
+  for (int i = 0; i < 24; i++) gM[i] = texelFetch(uTraffic, ivec2(i, k), 0);
+  gPS = texelFetch(uTraffic, ivec2(28, k), 0); gCtl = texelFetch(uTraffic, ivec2(29, k), 0);
+  vec4 c0 = texelFetch(uTraffic, ivec2(30, k), 0), c1 = texelFetch(uTraffic, ivec2(31, k), 0);
+  gColBase = c0.rgb; gColStripe = c1.rgb;
+  gFlame = vec4(gCtl.w, c1.w, gPS.y*1.5708 - gCtl.x*0.5, 0.0);
+}

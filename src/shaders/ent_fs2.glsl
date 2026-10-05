@@ -1,6 +1,6 @@
 //! kEntFS2
 
-layout(location=0) out vec4 oG0; layout(location=1) out vec4 oG1; layout(location=2) out vec4 oG2;
+layout(location=0) out vec4 oG0; layout(location=1) out vec4 oG1; layout(location=2) out vec4 oG2; layout(location=3) out vec4 oG3;
 // triplanar sample in object space: linear albedo, roughness; bumped object-space normal
 vec3 triS(vec3 p, vec3 n, int layer, float sc, float bump, inout vec3 nb, out float rough){
   vec3 w = pow(abs(n), vec3(4.0)); w /= dot(w, vec3(1.0));
@@ -302,7 +302,8 @@ void main(){
   }
   vec3 wn = vec3(cy*nb.x + sy*nb.z, nb.y, -sy*nb.x + cy*nb.z);
   if (dot(wn, V) < -0.2) wn = normalize(wn + V*0.5);   // bumped normals must not face away from the camera
-  oG0 = vec4(dist, octEnc(normalize(wn)), cls);
+  oG0 = vec4(dist, octEnc(normalize(wn)), cls == 1.0 ? 4.0 : 3.0);   // GB_FOLIAGE / GB_ENTITY (kGBuffer)
   oG1 = vec4(sqrt(clamp(alb, 0.0, 1.0)), clamp(rough, 0.03, 1.0));
-  oG2 = vec4(sqrt(clamp(emit*0.125, 0.0, 1.0)), metal);
+  oG2 = vec4(max(emit, vec3(0.0)), metal);
+  oG3 = vec4(1.0, 0.0, 0.0, 0.0);
 }

@@ -10,7 +10,7 @@
 // The ray tracer: the whole scene in one fragment program. The GPS map, the terrain-shadow bake, the cloud pass,
 // the hull bake and the display atlas are built from the same source with main() renamed and their own main added.
 inline std::string rtAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kRtIO + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace + kTerrainTrace +
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace + kTerrainTrace +
          kMaterialCommon + kLightCommon + kClouds + kTerrainMaterial + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kPlaneMaterial + kWater + kRtShade + kRtMain;
@@ -23,5 +23,18 @@ inline std::string rtAssemblyNoMain(const std::string& defines) {
 }
 // The aircraft distance fields alone (tests/aircraft_visual_test.cpp adds its own main)
 inline std::string sdfAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kRtIO + kSceneUniforms + kPlaneCommon + kPlaneSDF + kWraithSDF + kWraithCockpitCommon + kWraithCockpitSDF;
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kWraithSDF + kWraithCockpitCommon + kWraithCockpitSDF;
+}
+
+// ---- the raster renderer's programs (raster_renderer.cpp, terrain_mesh.cpp)
+inline std::string terrainVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kCommonGLSL + kTerrainVS; }
+inline std::string terrainFSAssembly(const std::string& defines) {
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kMaterialCommon + kTerrainMaterial + kGBuffer + kGBWrite + kTerrainFS;
+}
+inline std::string waterVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kWaterVS; }
+inline std::string waterFSAssembly(const std::string& defines) {
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kMaterialCommon + kLightCommon + kClouds + kWater + kGBuffer + kGBWrite + kWaterFS;
+}
+inline std::string lightFSAssembly(const std::string& defines) {
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kMaterialCommon + kLightCommon + kClouds + kGBuffer + kLightFS;
 }

@@ -65,8 +65,8 @@ Shadows from the aircraft (on the ground, on itself, in the landing-light beam) 
 
 | id | content | gate |
 |---|---|---|
-| R0 | Split the uber shader into modules; extract `planeMaterial`, `waterShade`, terrain/entity/debris shading into functions. No behaviour change. | harness `multi:air,cockpit,night,storm,rjetc,wr_8_0_0_0_1` PSNR > 50 dB against HEAD |
-| R1a | Deferred world: terrain mesh, water, sky, entities, lighting pass, behind `Renderer::mode` | air/storm/night/mountain/menu by eye; owner `benchmark.bat` |
+| R0 | Split the uber shader into modules; extract `planeMaterial`, `waterShade`, terrain/entity/debris shading into functions. No behaviour change. | **done** (db08f7a): bit-identical on `multi:air,cockpit,night,storm,rjetc,wr_8_0_0_0_1` |
+| R1a | Deferred world: terrain mesh, water, sky, entities, lighting pass, behind `Renderer::mode` (Settings → Renderer; harness `RASTER=1`; tools `--raster`) | harness: air/mountain/storm/night/sunset match the ray tracer by eye (`RASTER=1 ./render_harness multi:...`, PSNR 27–35 dB with the aircraft absent); owner `benchmark.bat --raster` pending |
 | R1b | Objects pass (aircraft, traffic, wreck, debris, UFO) into the G-buffer; interior lighting; aircraft shadow proxy | cockpit, jcam, rjetc, wr_*, trf by eye; ctest |
 | R1c | Effects pass, cloak, feeds, timing stamps and tooling (F3, analyze, bench, profile) on the new path | wr_7/9/10, crash, airbreak; owner `analyze.bat` |
 | R2 | Aircraft meshes + rigs; aircraft and spot shadow maps | parity by eye at both ends of every part's travel; owner cockpit fps |

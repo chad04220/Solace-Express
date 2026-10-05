@@ -57,6 +57,7 @@ std::string shaderCacheStamp();   // fingerprint of all shader sources + the dri
 bool writePNG(const char* path, int w, int h, const std::vector<uint8_t>& rgbBottomUp);
 bool readImage(const char* path, int& w, int& h, std::vector<uint8_t>& rgbaTopDown);   // PNG or JPEG
 GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err);
+GLint U(GLuint prog, const char* name);   // a uniform's location (cached per program)
 
 struct FrameParams {
   vec3 camPos; vec3 camRight, camUp, camBack; float fovY = 1.0f;
@@ -94,12 +95,14 @@ public:
   float renderScale = 1.0f;
   int quality = 1;           // 0 low, 1 medium, 2 high
   int dbgOff = 0;            // profiling: ray tracer features switched off (uDbg bits)
+  int mode = 0;              // 0 the ray tracer, 1 the raster renderer (docs/RENDERER_REBUILD.md; needs rasterOk)
+  bool rasterOk = false;     // the raster renderer's programs built
   bool ok = false;
   std::string error;
   GLuint minimapTex = 0;
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
-  static constexpr int kProgramCount = 19;
+  static constexpr int kProgramCount = 22;
   float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
   // analysis tool (--analyze): exact per-pass times (the GPU is waited on at every pass boundary) and a build of the
   // ray tracer that writes its per-pixel work counters instead of colour
@@ -199,7 +202,7 @@ private:
   void genMinimap();
   // ---- environment entities: instanced meshes -> G-buffer (lit by the ray tracer) + sun shadow cascades
   GLuint progEnt = 0, progEntSh = 0, vaoEnt = 0, vboEntMesh = 0, vboEntInst = 0;
-  GLuint fboGB = 0, texGB[3] = {0, 0, 0}, texGBDepth = 0;
+  GLuint fboGB = 0, texGB[4] = {0, 0, 0, 0}, texGBDepth = 0;
   GLuint fboSh[2] = {0, 0}, texSh[2] = {0, 0}; int shRes = 0;
   // shadows fade between kShFade0 and kShFade1 x the cascade radius around shIdeal (camera-anchored, so a cached
   // map re-rendering never changes a pixel: each map covers at least 0.84 x its radius around that point)
@@ -242,7 +245,7 @@ private:
   struct ViewTargets {
     int W = 0, H = 0, rw = 0, rh = 0, cw = 0, ch = 0, allocW = 0, allocH = 0;
     GLuint texRaw = 0, texDepth = 0, texCloudMask = 0, texCloud = 0, texCloudD = 0, fboCloud = 0, fboComp = 0, fboScene = 0;
-    GLuint texGB[3] = {0, 0, 0}, texGBDepth = 0, fboGB = 0, texEnv = 0, texEnvDepth = 0, fboEnv = 0;
+    GLuint texGB[4] = {0, 0, 0, 0}, texGBDepth = 0, fboGB = 0, texEnv = 0, texEnvDepth = 0, fboEnv = 0;
     bool depthValid = false, envOn = false, hullOn = false, trafHullOn = false, ckMaskPrev = false;
     vec3 ckLookPrev, ckUpPrev; float ckFovPrev = 0;
     float jitX = 0, jitY = 0;
@@ -279,6 +282,25 @@ private:
   GLuint screenFbo = 0;
   void drawEntities(const FrameParams& fp);
   void createGBuffer();
+  // ---- the passes of a frame, shared by the ray tracer and the raster renderer (renderer.cpp)
+  bool cloudSplit = false;   // this frame's clouds come from the quarter-resolution cloud pass
+  const std::vector<SpriteVert>* curAlpha = nullptr; const std::vector<SpriteVert>* curAdd = nullptr;   // this frame's sprites
+  void setRT(GLuint p, const FrameParams& fp);          // the scene's uniforms and textures for a program
+  void traceRT(const FrameParams& fp, GLuint prog);     // the ray tracer over a view
+  void cloudPass(const FrameParams& fp);                // the clouds at a quarter of the pixels, composited over the lit view
+  void drawSprites(const FrameParams& fp, float texW, float texH, float uvsX, float uvsY);
+  void feedEffects(const FrameParams& f);
+  // ---- the raster renderer (raster_renderer.cpp, terrain_mesh.cpp)
+  GLuint progLight = 0, progTerrain = 0, progWater = 0;
+  GLuint vaoTerrain = 0, vboTerrainInst = 0, vaoWater = 0, vboWater = 0, iboWater = 0; int waterIdx = 0;
+  std::vector<float> terrInst; int terrChunks = 0;
+  bool compileRaster();
+  bool compileTerrainMesh();
+  void initTerrainMesh();
+  void selectTerrainChunks(const FrameParams& fp);
+  void drawTerrainMesh(const FrameParams& fp);
+  void rasterWorld(const FrameParams& fp);
+  void rasterLight(const FrameParams& fp);
 };
 
 extern Renderer g_ren;

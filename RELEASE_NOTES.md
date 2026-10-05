@@ -13,3 +13,6 @@
 - Resolution changes from the automatic scaler no longer cause a brief hitch (render buffers are kept at full size and the scaler just uses part of them)
 - Temporal anti-aliasing blends by elapsed time, so the image looks the same at any frame rate
 - F3 shows the worst frame of the last second and the target frame rate
+
+**Renderer (preview)**
+- Settings → *Renderer* can switch to the new rasterizer. It is being built in stages (docs/RENDERER_REBUILD.md): this release draws the terrain, the sea, the sky and the scenery with it and lights the frame in one pass; the aircraft, cockpits, traffic and effects are not drawn yet, so it is for comparing the world and its frame times (F3, `analyze.bat --raster`, `benchmark.bat --raster`). The ray tracer stays the default and is unchanged

@@ -22,14 +22,14 @@ vec3 entityShade(vec3 p, vec3 rd, float t, vec4 g0, float trafSh){
   // tree, rock or building from the G-buffer
   vec3 n = octDec(g0.yz);
   vec4 g1 = texelFetch(uGB1, ivec2(gl_FragCoord.xy), 0), g2 = texelFetch(uGB2, ivec2(gl_FragCoord.xy), 0);
-  Mat m; m.alb = g1.rgb*g1.rgb; m.rough = g1.a; m.metal = g2.a; m.emit = g2.rgb*g2.rgb*8.0; m.nrm = vec3(0,0,1);
+  Mat m; m.alb = g1.rgb*g1.rgb; m.rough = g1.a; m.metal = g2.a; m.emit = g2.rgb; m.nrm = vec3(0,0,1);
   int cls = int(g0.w + 0.5);
   float sh = sunVis > 0.0 ? terrainShadow(p + n*0.5 + vec3(0.0, 0.5, 0.0), uSunDir, t) : 0.0;
   if (sh > 0.0) sh *= entShadow(p, n)*cloudShadow(p);
   if (sh > 0.0 && t < 3000.0) sh *= planeShadow(p + n*0.2, uSunDir);
   sh *= trafSh;
   vec3 col = shadeSurface(p, n, rd, m, sh);
-  if (cls == 1) {   // foliage: light through the leaves when the sun is behind them, and a soft wrap
+  if (cls == 4) {   // foliage: light through the leaves when the sun is behind them, and a soft wrap
     float back = pow(max(dot(rd, uSunDir), 0.0), 3.0)*0.9 + 0.12*max(dot(-n, uSunDir), 0.0);
     col += m.alb*vec3(0.85, 1.0, 0.55)*uSunCol*sh*back*1.6;
   }

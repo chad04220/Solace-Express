@@ -1,5 +1,6 @@
 //! kTerrainMaterial
 //! The ground material: natural layers, forests, farmland, towns, roads, airport surfaces and markings, craters.
+uniform float uTreeFar;   // beyond this the forest is the ground texture alone (entity_render.cpp)
 vec3 terrainNormal(vec2 p, float t){
   float e = max(0.25, t*0.0012);
   int oct = t < 600.0 ? 11 : (t < 3000.0 ? 9 : 7);

@@ -1,0 +1,51 @@
+//! kTerrainVS
+//! The terrain mesh: a quadtree of 32 x 32-quad chunks around the camera (terrain_mesh.cpp picks them), every vertex
+//! set on the heightfield by the same terrainH the ray tracer marched and the physics stands on, with the octave count
+//! chosen by distance exactly as the ray tracer chose it. Where a chunk nears the distance at which its parent would
+//! be drawn instead, the vertices the parent lacks slide onto the parent's edges (CDLOD morphing), so chunks of
+//! different levels meet without cracks and without skirts. The normal comes from four more height samples.
+layout(location = 0) in vec4 aInst;   // chunk origin x, z (m), cell size (m), -
+uniform mat4 uVP; uniform vec2 uJit; uniform float uLogC; uniform vec3 uCamPos;
+uniform mat4 uPanoView; uniform vec2 uPano;   // a panoramic camera feed: projected onto its cylinder (the ray tracer's camRay)
+uniform float uSplit;                         // a chunk is split while the camera is within uSplit chunk sizes of it
+out vec3 vW; out vec3 vN;
+const int C = 32;
+int octAt(float d){ return d < 600.0 ? 11 : (d < 3000.0 ? 9 : (d < 12000.0 ? 7 : 5)); }   // (terrainNormal's thresholds)
+float hAt(vec2 xz, float d){ return terrainH(xz, octAt(d)); }
+void main(){
+  int id = gl_VertexID, cell = id/6, k = id - cell*6;
+  ivec2 o = k == 0 ? ivec2(0, 0) : (k == 1 || k == 4) ? ivec2(0, 1) : (k == 2 || k == 3) ? ivec2(1, 0) : ivec2(1, 1);
+  ivec2 g = ivec2(cell % C, cell / C) + o;   // grid vertex 0..32 (two triangles per cell, wound counter-clockwise seen from above)
+  float cs = aInst.z, S = cs*float(C);
+  vec2 xz = aInst.xy + vec2(g)*cs;
+  float dh = length(xz - uCamPos.xz);
+  float d0 = sqrt(dh*dh + uCamPos.y*uCamPos.y);   // (a first distance for the octave choice; the exact one needs the height)
+  float h = hAt(xz, d0);
+  float d = length(vec3(xz.x, h, xz.y) - uCamPos);
+  // morph: fully onto the parent's grid by the distance at which the parent stops splitting (uSplit x its size 2S),
+  // so a chunk of the next level across an edge, whose vertices all lie beyond that, matches edge for edge
+  float m = clamp((d - uSplit*S*1.25)/(uSplit*2.0*S*0.95 - uSplit*S*1.25), 0.0, 1.0);
+  bool ox = (g.x & 1) == 1, oy = (g.y & 1) == 1;
+  if (m > 0.0 && (ox || oy)) {
+    // the parent's edge through this vertex: between its two neighbours on the parent's grid (both odd: the
+    // parent's cell diagonal, which runs from (0, 1) to (1, 0) like every cell's)
+    vec2 a = ox && oy ? vec2(-cs, cs) : (ox ? vec2(-cs, 0.0) : vec2(0.0, -cs));
+    vec2 pa = xz + a, pb = xz - a;
+    float ha = hAt(pa, length(vec3(pa.x, h, pa.y) - uCamPos)), hb = hAt(pb, length(vec3(pb.x, h, pb.y) - uCamPos));
+    h = mix(h, 0.5*(ha + hb), m);
+  }
+  // the normal at the mesh's own resolution (widening with the morph)
+  float e = cs*(1.0 + m);
+  vec3 n = normalize(vec3(hAt(xz - vec2(e, 0.0), d) - hAt(xz + vec2(e, 0.0), d), 2.0*e, hAt(xz - vec2(0.0, e), d) - hAt(xz + vec2(0.0, e), d)));
+  vec3 wp = vec3(xz.x, h, xz.y);
+  vW = wp; vN = n;
+  gl_Position = uVP*vec4(wp, 1.0);
+  bool behind = false;
+  if (uPano.x > 0.0) {   // (the whole triangle is dropped where it reaches round behind the camera)
+    vec3 c = (uPanoView*vec4(wp, 1.0)).xyz; float a = atan(c.x, -c.z), dd = length(c);
+    gl_Position = vec4(a/uPano.x*dd, c.y/max(length(c.xz), 1e-3)/uPano.y*dd, 0.0, dd); behind = abs(a) > 1.9;
+  }
+  gl_Position.xy -= 2.0*uJit*gl_Position.w;   // the TAA's sub-pixel jitter
+  gl_Position.z = (log2(max(1e-6, 1.0 + gl_Position.w))*uLogC - 1.0)*gl_Position.w;   // logarithmic depth: 0.3 m .. 40 km
+  if (behind) gl_Position.z = 2.0*gl_Position.w;
+}
