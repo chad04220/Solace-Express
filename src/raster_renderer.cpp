@@ -71,6 +71,16 @@ void Renderer::rasterShadowProxy(const FrameParams& fp) {
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);
+  static const char* dump = getenv("PROXYDUMP");   // (debug: the proxy as an image - R sun, G/B/A the first three shadowed lights)
+  if (dump) {
+    std::vector<unsigned char> px((size_t)rw * rh * 4);
+    glReadBuffer(GL_COLOR_ATTACHMENT0); glReadPixels(0, 0, rw, rh, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+    if (FILE* f = fopen(dump, "wb")) {
+      fprintf(f, "P6\n%d %d\n255\n", rw, rh);
+      for (int y = rh - 1; y >= 0; y--) for (int x = 0; x < rw; x++) { const unsigned char* p = &px[((size_t)y * rw + x) * 4]; unsigned char c[3] = {p[1], p[2], p[3]}; fwrite(c, 1, 3, f); }
+      fclose(f);
+    }
+  }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -78,6 +88,7 @@ void Renderer::rasterShadowProxy(const FrameParams& fp) {
 // to overwrite anyway (the frame can't be read and written at once), then copied back
 void Renderer::rasterEffects(const FrameParams& fp) {
   if (rw > histW || rh > histH) return;   // (a camera feed larger than the main view: no scratch for it)
+  static const bool off = getenv("RASTERNOFX") != nullptr; if (off) return;   // (debug)
   const int cur = histIdx ^ 1;
   glBindFramebuffer(GL_FRAMEBUFFER, fboTAA[cur]);
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
