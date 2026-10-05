@@ -60,6 +60,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
            && (hullTri.empty() || fread(hullTri.data(), sizeof(float), hullTri.size(), f) == hullTri.size());
       fclose(f);
       if (!ok) { vb.clear(); ib.clear(); hullTri.clear(); }
+      else if (getenv("HULLDBG")) printf("mesh %s: from the cache (%zu vertices)\n", inside ? "cockpit" : "outside", vb.size() / 8);
     }
   }
   if (ib.empty()) {
@@ -265,15 +266,18 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   glBindVertexArray(pm.vao);
   // depth first, with nothing shaded: the skin's far side, the far wing and the cabin's hidden surfaces never run the
   // material shader
-  glUseProgram(progPlaneMeshDepth);
-  glUniformMatrix4fv(U(progPlaneMeshDepth, "uVP"), 1, GL_FALSE, vp.m);
-  glUniform2f(U(progPlaneMeshDepth, "uJit"), jitX, jitY);
-  glUniform1f(U(progPlaneMeshDepth, "uLogC"), logC);
-  glUniformMatrix3fv(U(progPlaneMeshDepth, "uRot"), 1, GL_FALSE, rot);
-  glUniform3f(U(progPlaneMeshDepth, "uPos"), pos.x, pos.y, pos.z);
-  glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-  glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
-  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+  static const bool noPre = getenv("MESHNOPRE") != nullptr;   // (debug: no depth pre-pass)
+  if (!noPre) {
+    glUseProgram(progPlaneMeshDepth);
+    glUniformMatrix4fv(U(progPlaneMeshDepth, "uVP"), 1, GL_FALSE, vp.m);
+    glUniform2f(U(progPlaneMeshDepth, "uJit"), jitX, jitY);
+    glUniform1f(U(progPlaneMeshDepth, "uLogC"), logC);
+    glUniformMatrix3fv(U(progPlaneMeshDepth, "uRot"), 1, GL_FALSE, rot);
+    glUniform3f(U(progPlaneMeshDepth, "uPos"), pos.x, pos.y, pos.z);
+    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+    glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+  }
   // then the materials on exactly the nearest surface
   setRT(progPlaneMesh, fp);
   for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, 0); }   // (the G-buffer is the target here, never read)
@@ -283,7 +287,7 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   glUniformMatrix3fv(U(progPlaneMesh, "uRot"), 1, GL_FALSE, rot);
   glUniform3f(U(progPlaneMesh, "uPos"), pos.x, pos.y, pos.z);
   glUniform1i(U(progPlaneMesh, "uMeshTraffic"), trafK);
-  glDepthFunc(GL_LEQUAL); glDepthMask(GL_FALSE);
+  if (!noPre) { glDepthFunc(GL_LEQUAL); glDepthMask(GL_FALSE); }
   glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
   glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
   glBindVertexArray(0);
