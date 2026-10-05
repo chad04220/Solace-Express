@@ -125,7 +125,11 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   noised(time * 1.9f, 4.4f, gv3, d1, d2);
   float turb = wx.turbulence * (1.f + 1.5f * smoothstepf(300.f, 0.f, altAgl) * (altAgl > 3 ? 1.f : 0.f));
   if (wx.storm) turb += 0.6f;
-  gust = vec3(gv * wx.gust * 0.7f, gv3 * turb * 2.2f, gv2 * wx.gust * 0.7f) + normalize(baseWind) * (std::max(0.f, gv) * wx.gust * 0.5f);
+  // (the vertical part fades in the last wingspan above the ground: the air can't flow through the surface, and the
+  // eddies there are about as big as the height - MIL-F-8785C's low-altitude scale L_w = h - so a wing averages out
+  // more of them the lower and wider it is)
+  float turbV = turb * clampf(altAgl / std::max(s.span, 8.f), 0.3f, 1.f);
+  gust = vec3(gv * wx.gust * 0.7f, gv3 * turbV * 2.2f, gv2 * wx.gust * 0.7f) + normalize(baseWind) * (std::max(0.f, gv) * wx.gust * 0.5f);
   windVel = baseWind + gust;
 
   // ---------------- engine
@@ -784,7 +788,13 @@ void Plane::apGuidance(float dt) {
       float L1 = std::max(length(vel), 30.f) * 14.f;
       if (fabsf(cross) < 200.f) apXI = clampf(apXI + cross * dt * 0.002f, -5.f, 5.f);
       apHeading = rwyHdg - clampf(atanf(cross / L1) / DEG * 1.2f + apXI, -40.f, 40.f) - apDrift;
-      float gsAlt = a.elev + gh + std::max(dist, 0.f) * gs + 1.f;
+      // the glidepath aims short of the touchdown point by the distance the flare floats (its time constant at this
+      // ground speed), so the wheels meet the runway at the touchdown point - but never closer than 60 m past the
+      // threshold
+      float fromThr = dot(td - (a.pos() - ld * (a.length * 0.5f)), ld);
+      float floatM = std::max(length(vec3(vel.x, 0, vel.z)), 20.f) * 1.3f * clampf(2.2f * apPitchLag(), 2.5f, 8.f);
+      float aimShift = clampf(floatM, 0.f, std::max(fromThr - 60.f, 0.f));
+      float gsAlt = a.elev + gh + std::max(dist - aimShift, 0.f) * gs + 1.f;
       float vg = std::max(vel.x * ld.x + vel.z * ld.z, 15.f);
       float err = gsAlt - pos.y;
       apUseVS = true;
@@ -803,8 +813,10 @@ void Plane::apGuidance(float dt) {
       apSpeed = (dist > F ? vref * 1.3f : dist > F * 0.5f ? vref * 1.18f : vref * 1.06f) + apGustAdd;
       if (dist < 2000.f && dist > 250.f && (fabsf(cross) > std::min(80.f, std::max(a.width * 0.5f, 12.f) + dist * 0.03f) || err > 40.f || err < -80.f)) { apStage = APS_GOAROUND; apStageT = 0; }
       { vec3 ahead = pos + vec3(ld.x, 0, ld.z) * 800.f; if (dist > 1200.f && pos.y < g_world.height(ahead.x, ahead.z) + 40.f) { apStage = APS_GOAROUND; apStageT = 0; } }
-      // the XR-11 comes to a hover over the touchdown point instead of a fast landing roll
-      if (s.special == 2 && dist < 1700.f && dist > 0.f && fabsf(cross) < 60.f) { apStage = APS_HOVER; apStageT = 0; apThrI = ctl.throttle; }
+      // the XR-11 comes to a hover over the touchdown point instead of a fast landing roll (starting to slow where it
+      // can stop at a gentle 2 m/s^2 - the hover allows twice that - from the ground speed it has, tailwind included)
+      float gsAl = std::max(vel.x * ld.x + vel.z * ld.z, 0.f);
+      if (s.special == 2 && dist < clampf(gsAl * gsAl / 4.f + 200.f, 1700.f, 6000.f) && dist > 0.f && fabsf(cross) < 60.f) { apStage = APS_HOVER; apStageT = 0; apThrI = ctl.throttle; }
       // flare height: enough for this airframe to rotate in time (a heavy one answers the elevator slowly)
       float lag = apPitchLag();
       float flareH = clampf(std::max(ias * 0.13f, -vel.y * (1.6f + 1.8f * lag)), 4.f, 30.f);
@@ -825,7 +837,20 @@ void Plane::apGuidance(float dt) {
       // the sink rate comes off exponentially as the height does, at a pace set when the flare starts: the height then
       // over the sink then (so it never asks for more sink than it has), no quicker than this airframe can follow
       if (apStageT <= dt * 1.5f) apFlareTau = std::max(clampf(2.2f * apPitchLag(), 2.5f, 8.f), hab / std::max(-vel.y, 0.5f));
-      apUseVS = true; apVS = -clampf(hab / std::max(apFlareTau, 1.f) + 0.25f, 0.3f, 2.5f);
+      // (settling, not skimming: a firmer end to the flare for a fast aircraft, whose every second of float is a long
+      // way down the runway, and firmer still the longer it floats)
+      {
+        float settle = std::min(clampf(0.4f + 0.008f * (ias - 40.f), 0.4f, 1.f) + 0.15f * std::max(apStageT - 2.f * apFlareTau, 0.f), 1.f);
+        // (on the height it will have when the airframe has answered: a slow-pitching jet otherwise follows the law a
+        // second late, and a second late at the bottom is the sink of a metre higher up)
+        float habAhead = std::max(hab + std::min(vel.y, 0.f) * apPitchLag(), 0.f);
+        float law = -clampf(habAhead / std::max(apFlareTau, 1.f) + settle, 0.4f, 2.5f);
+        // after a gust balloons it, more sink is asked for gradually (holding the attitude and letting it settle), not
+        // at once: a slow-pitching airframe that noses over to regain it can't round out a second time
+        if (apStageT <= dt * 1.5f) apFlareVs = std::max(vel.y, law);
+        apFlareVs = law > apFlareVs ? law : std::max(law, apFlareVs - 0.8f * dt);
+        apUseVS = true; apVS = apFlareVs;
+      }
       apSpeed = 0;
       if (onGround) { apStage = APS_ROLLOUT; apStageT = 0; }
       apStatus = fmt("FLARE  %s  RWY %02d", a.code, rwyN);
@@ -982,7 +1007,9 @@ void Plane::apControl(float dt) {
   float gT = asinf(clampf(vsT / spd, -0.95f, 0.95f)), g = asinf(clampf(vel.y / spd, -1.f, 1.f));
   // flight path: proportional plus integral (at 1 g any climb angle is an equilibrium, so the error alone won't close it)
   float kGam = flare ? std::min(1.2f, 2.f / tQv) : std::min(appr ? 0.8f : 1.6f, 1.f / tQv);   // (the flare wants the path bent now)
-  apGamI = clampf(apGamI + (gT - g) * kGam * 0.35f * dt, -0.05f, 0.05f);
+  // (held through the flare: a few seconds of rounding out from the approach sink would wind it up, and at a fast
+  // jet's speed a full integral is 0.4 g - enough to hold it level metres up, then drop it in)
+  if (!flare) apGamI = clampf(apGamI + (gT - g) * kGam * 0.35f * dt, -0.05f, 0.05f);
   float gDot = clampf((gT - g) * kGam + apGamI, -1.5f, 1.5f);
   float cb = cosf(clampf(bank, -85.f, 85.f) * DEG);
   float nzT = clampf((cosf(g) + spd / G0 * gDot) / std::max(cb, 0.1f), nzMin, nzMax);

@@ -196,7 +196,9 @@ void Renderer::drawEntities(const FrameParams& fp) {
       if (texSh[c]) glDeleteTextures(1, &texSh[c]);
       glGenTextures(1, &texSh[c]); glBindTexture(GL_TEXTURE_2D, texSh[c]);
       glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, shRes, shRes, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      // depth comparison in the sampler: one linear lookup is the 2x2 PCF the shader used to do with four fetches
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
       if (!fboSh[c]) glGenFramebuffers(1, &fboSh[c]);
       glBindFramebuffer(GL_FRAMEBUFFER, fboSh[c]);

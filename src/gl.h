@@ -83,6 +83,9 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_NONE 0
 #define GL_LESS 0x0201
 #define GL_LEQUAL 0x0203
+#define GL_TEXTURE_COMPARE_MODE 0x884C
+#define GL_TEXTURE_COMPARE_FUNC 0x884D
+#define GL_COMPARE_REF_TO_TEXTURE 0x884E
 #define GL_ALWAYS 0x0207
 #define GL_READ_FRAMEBUFFER 0x8CA8
 #define GL_DRAW_FRAMEBUFFER 0x8CA9

@@ -55,7 +55,7 @@ void main(){
 static const char* kEntFS1 = R"(
 in vec3 vW; in vec3 vL; in vec3 vLN; in vec4 vAux; flat in vec4 vInst; flat in vec3 vScale;
 uniform sampler2DArray uAlb; uniform sampler2DArray uNrm;
-uniform int uKind; uniform vec3 uCam; uniform float uRwyLights; uniform float uNight; uniform float uWet; uniform float uSnow; uniform float uTime;
+uniform int uKind; uniform int uShadowPass; uniform vec3 uCam; uniform float uRwyLights; uniform float uNight; uniform float uWet; uniform float uSnow; uniform float uTime;
 const int M_GRASS=0, M_FOREST=1, M_ROCK=2, M_SAND=3, M_SNOW=4, M_ASPHALT=5, M_GRAVEL=6, M_DIRT=7;
 const int M_CONCRETE=8, M_TILES=9, M_SLATE=10, M_PLASTER=11, M_BRICK=12, M_LEAVES=13, M_NEEDLES=14, M_PAINT=15;
 const int M_METAL=16, M_CORRUGATED=22, M_BARK=25, M_PLANKS=26, M_LITTER=27, M_SHINGLES=28, M_SIDING=29;
@@ -101,6 +101,9 @@ bool leafCut(float viewEdge){
     return best > 1.0;
   }
   if (part == P_FENCE) {   // chain link: real diamonds up close, a dithered see-through panel further away
+    // (in the sun's shadow maps a fixed pattern on the panel itself, about as dense as the mesh: the view-dependent
+    // cut-outs below would follow the camera and the frame-to-frame dither would make the shadow crawl)
+    if (uShadowPass != 0) return hsh(floor(vL.xy/0.12) + vInst.x*31.0) > 0.22;
     float d = length(uCam - vW);
     if (d < 35.0) { vec2 q = vec2(vL.x + vL.y, vL.x - vL.y)/0.17; vec2 f = abs(fract(q) - 0.5); return min(f.x, f.y) > 0.07*(1.0 + d/35.0); }
     return hsh(gl_FragCoord.xy + fract(uTime*7.31)*vec2(17.0, 41.0)) > 0.06 + 0.2*smoothstep(500.0, 40.0, d);

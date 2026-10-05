@@ -1320,19 +1320,12 @@ vec3 terrainNormal(vec2 p, float t){
 }
 // ---------------------------------------------------------------- environment entities (G-buffer from the raster pass)
 uniform sampler2D uGB0; uniform sampler2D uGB1; uniform sampler2D uGB2;
-uniform int uShOn; uniform sampler2D uShMap0; uniform sampler2D uShMap1; uniform mat4 uShM0; uniform mat4 uShM1; uniform vec2 uShTexel;
+uniform int uShOn; uniform sampler2DShadow uShMap0; uniform sampler2DShadow uShMap1; uniform mat4 uShM0; uniform mat4 uShM1; uniform vec2 uShTexel;
 uniform vec4 uShFade; uniform vec4 uShFadeR;   // camera-anchored fade centres (xz, per cascade) and fade radii
 uniform float uTreeFar;
 vec3 octDec(vec2 e){ vec3 n = vec3(e.x, 1.0 - abs(e.x) - abs(e.y), e.y); if (n.y < 0.0) n.xz = (1.0 - abs(n.zx))*vec2(n.x >= 0.0 ? 1.0 : -1.0, n.z >= 0.0 ? 1.0 : -1.0); return normalize(n); }
-// sun shadow of trees, rocks and buildings (two cascades, 4-tap PCF; normal offset against acne)
-float shTap(sampler2D m, vec3 q, float bias){
-  vec2 f = q.xy*float(textureSize(m, 0).x) - 0.5; vec2 i = floor(f); vec2 w = f - i;
-  float s = 0.0;
-  for (int k = 0; k < 4; k++) { vec2 o = vec2(k & 1, k >> 1);
-    float d = texelFetch(m, clamp(ivec2(i + o), ivec2(0), textureSize(m, 0) - 1), 0).r;
-    s += (q.z - bias <= d ? 1.0 : 0.0)*mix(1.0 - w.x, w.x, o.x)*mix(1.0 - w.y, w.y, o.y); }
-  return s;
-}
+// sun shadow of trees, rocks and buildings (two cascades, 2x2 PCF in the comparison sampler; normal offset against acne)
+float shTap(sampler2DShadow m, vec3 q, float bias){ return texture(m, vec3(q.xy, q.z - bias)); }
 float shCascade(int c, vec3 p, vec3 n){
   vec3 pp = p + n*(c == 0 ? uShTexel.x : uShTexel.y)*1.5;
   vec4 h = (c == 0 ? uShM0 : uShM1)*vec4(pp, 1.0);
@@ -3256,7 +3249,11 @@ void main(){
   // The airframe along this camera ray, traced once for every use below (the cockpit, the cloak, the outside view):
   // each call site would be another inlined copy of the march and the airframe's distance.
   bool jetC = int(gM[0].z + 0.5) >= 5;
-  vec2 hTop = tracePlaneHull(ro, rd, cockpitView ? (jetC ? 6.0 : planeBound()*2.0) : tmax, hullT);
+  // (outside the cockpit, no further than the nearest rasterized tree / rock / building: past it the airframe is hidden,
+  // the cloak's bent ray included)
+  float tOpq = tmax;
+  if (!cockpitView) { float gb = texelFetch(uGB0, ivec2(gl_FragCoord.xy), 0).x; if (gb > 0.0) tOpq = min(tmax, gb + 0.5); }
+  vec2 hTop = tracePlaneHull(ro, rd, cockpitView ? (jetC ? 6.0 : planeBound()*2.0) : tOpq, hullT);
   int hTopPiece = gPI;   // (traffic tracing moves the piece transform; restored before shading)
   if (cockpitView) {
     bool jet = jetC;
@@ -3326,7 +3323,6 @@ void main(){
   vec3 bn; float bkind = 0.0; vec3 bl;
   vec2 bh = pod ? vec2(-1.0) : traceBoxes(ro, rd, tT > 0.0 ? tT : tmax, bn, bkind, bl);
   int trafK = -1; vec2 trafH = vec2(-1.0);
-  if (!pod && uTrafficN > 0) { gTrafCamRay = !cloak; trafH = traceTraffic(ro, rd, tmax, trafK); gTrafCamRay = false; loadMain(); pieceXf(hTopPiece); }
   vec2 ph = onScr || cloak || (cockpitView && !pod) ? vec2(-1.0) : (pod ? h0 : hTop);
   float t = 1e9; int hit = 0;
   if (tT > 0.0) { t = tT; hit = 1; }
@@ -3334,6 +3330,8 @@ void main(){
   if (bh.x > 0.0 && bh.x < t) { t = bh.x; hit = 3; }
   if (tE > 0.0 && tE < t) { t = tE; hit = 5; }
   if (ph.x > 0.0 && ph.x < t) { t = ph.x; hit = 4; }
+  // traffic: only as far as the nearest opaque hit found so far
+  if (!pod && uTrafficN > 0) { gTrafCamRay = !cloak; trafH = traceTraffic(ro, rd, t < 1e8 ? t : tmax, trafK); gTrafCamRay = false; loadMain(); pieceXf(hTopPiece); }
   float tU = (uUfoOn == 1 && !pod) ? traceUfo(ro, rd, t < 1e8 ? t : tmax) : -1.0;
   bool ufoHit = tU > 0.0 && tU < t;
   if (ufoHit) { t = tU; hit = 8; }
