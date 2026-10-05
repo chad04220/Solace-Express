@@ -685,7 +685,6 @@ struct GameTest {
       std::vector<std::string> msgs;
       for (int i = 0; i < Game::kNumResCards; i++) {
         const Game::ResCard& C = Game::kResCards[i];
-        if (C.craft == kKestrel) continue;   // (the XR-15's lines await a recording)
         std::string nm = kAircraft[C.craft].name; for (char& ch : nm) ch = (char)toupper((unsigned char)ch);
         msgs.push_back(nm + " // TEST CARD " + C.title); msgs.push_back(nm + " // RESEARCH FLIGHT");
         for (int k = 0; k < C.n; k++) msgs.push_back(fmt("STEP %d of %d: %s", k + 1, C.n, C.steps[k].label));
@@ -702,7 +701,7 @@ struct GameTest {
                             "Rain has started", "Snow has set in", "Aerobatics: recovering to level flight", "Aerobatics need to be airborne",
                             "MACH 1 - SONIC BOOM", "CLOAK ENGAGED", "PLASMA BOMB AWAY", "Pods 90 deg - VTOL hover", "Thrust vector 90 deg - VTOL hover"}) msgs.push_back(m);
       for (int f = 0; f < Plane::STUNT_COUNT; f++) msgs.push_back(fmt("Aerobatics: %s", Plane::stuntName(f)));
-      int nAll = kKestrel;   // (the career fleet and the four voiced research craft; the XR-15's name line awaits a recording)
+      int nAll = kNumAircraft + 4;   // (the career fleet and the four research craft)
       for (int i = 0; i < nAll; i++) msgs.push_back(fmt("SPLASH %d - %s down", i + 1, kAircraft[i].name));
       bad = 0;
       for (auto& m : msgs) { AtcVoice::Tx tx; if (!g.atc.resolve(m, "", false, tx)) { printf("   no voice line for '%s'\n", m.c_str()); bad++; } }
