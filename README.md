@@ -218,3 +218,7 @@ src/game*.cpp      game flow, flight session, cameras, particles, lights, HUD an
 src/platform_win32.cpp, src/radio_win.cpp   Win32 window/input/audio output, Media Foundation radio
 tools/gen_font.py  regenerates the embedded SDF font atlas
 ```
+
+## Copyright
+
+Copyright (c) 2026 CDAIII. All rights reserved. See `LICENSE`; third-party components are listed in `THIRD_PARTY_NOTICES.md`.
