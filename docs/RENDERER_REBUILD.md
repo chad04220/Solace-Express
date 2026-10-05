@@ -35,6 +35,11 @@ split into those four from v3.18.1 on. The one number that stands out across the
 march of the aircraft's field toward the sun and the three brightest lights (the shadow proxy). At night the apron's lights make
 it the whole frame. First-run shader compile: 150.8 s with an empty cache, 11.5 s warm.
 
+Done in response (v3.18.1): `Renderer::rasterShadowMaps` renders the player's baked static mesh from the sun (orthographic about
+the airframe's bound, 1024², layer 0) and from the three brightest shadow-casting lights (perspective along each beam, layers
+1-3) into a depth array, and the moving hull into a mask; the shadow proxy reads the depth (3x3 PCF) and marches the field only
+under the mask (the gear, the surfaces, the props) and for the traffic. `SHMAPOFF=1` restores the old march for an A/B.
+
 ## 2. Target architecture
 
 Rasterize everything that has a surface; march only volumes (clouds, flames, blasts). Light once, in a small full-screen pass.

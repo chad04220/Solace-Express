@@ -311,6 +311,13 @@ private:
   void feedEffects(const FrameParams& f);
   // ---- the raster renderer (raster_renderer.cpp, terrain_mesh.cpp)
   GLuint progLight = 0, progObjects = 0, progShProxy = 0, progEffects = 0, progTerrain = 0, progWater = 0;
+  // the airframe shadow maps (raster_renderer.cpp): the player's baked static mesh rendered from the sun (layer 0,
+  // orthographic) and from the three brightest shadow-casting lights (layers 1-3, perspective along each beam); a
+  // second array marks where the moving hull is, so the proxy still marches the field for the gear, the surfaces and
+  // the props. uShOn: bit 0 the sun, bits 1-3 the light slots
+  GLuint progShMap = 0, progShMov = 0, texShMap = 0, texShMov = 0, fboShMap = 0; int shOn = 0; mat4 shMapVP[4];
+  static constexpr int kShMapRes = 1024;
+  void rasterShadowMaps(const FrameParams& fp);
   GLuint vaoTerrain = 0, vboTerrainInst = 0, vaoWater = 0, vboWater = 0, iboWater = 0; int waterIdx = 0;
   std::vector<float> terrInst; int terrChunks = 0;
   bool compileRaster();

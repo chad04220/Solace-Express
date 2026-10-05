@@ -15,6 +15,12 @@ bool Renderer::compileRaster() {
   if (!progShProxy) { error = "Shadow proxy shader: " + e; return false; }
   progEffects = linkProgramCached(kFullscreenVS, effectsFSAssembly(""), e);
   if (!progEffects) { error = "Effects shader: " + e; return false; }
+  // the airframe shadow maps: the baked mesh (and the moving hull) from a light, plain depth
+  static const char* kShMapVS = "#version 330 core\nlayout(location = 0) in vec3 aPos; uniform mat4 uVP; uniform mat3 uRot; uniform vec3 uPos;\nvoid main(){ gl_Position = uVP*vec4(uRot*aPos + uPos, 1.0); }\n";
+  progShMap = linkProgramCached(kShMapVS, "#version 330 core\nvoid main(){}\n", e);
+  if (!progShMap) { error = "Shadow map shader: " + e; return false; }
+  progShMov = linkProgramCached(kShMapVS, "#version 330 core\nout float oM; void main(){ oM = 1.0; }\n", e);
+  if (!progShMov) { error = "Shadow map (moving hull) shader: " + e; return false; }
   if (!compilePlaneMesh()) return false;
   return compileTerrainMesh();
 }
@@ -85,6 +91,100 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   }
 }
 
+static mat4 orthoMat(float l, float r, float b, float t, float n, float f) {
+  mat4 m; m(0, 0) = 2.f / (r - l); m(1, 1) = 2.f / (t - b); m(2, 2) = -2.f / (f - n);
+  m(0, 3) = -(r + l) / (r - l); m(1, 3) = -(t + b) / (t - b); m(2, 3) = -(f + n) / (f - n); return m;
+}
+// The airframe shadow maps: the player's baked static mesh seen from the sun and from the three brightest
+// shadow-casting lights, so the proxy below reads a depth instead of marching the field per pixel (the single biggest
+// cost of the raster frame on the owner's GPU: 55 ms at night, 36 ms in the cockpit). The moving parts are not in
+// the mesh: their hull is drawn into a mask and the proxy marches the field only there.
+void Renderer::rasterShadowMaps(const FrameParams& fp) {
+  shOn = 0;
+  static const bool off = getenv("SHMAPOFF") != nullptr;   // (debug / the analysis: the per-pixel march as before)
+  if (off || !progShMap || !planeMeshWanted(fp)) return;
+  auto pm = planeMeshes.find(hullKey(fp, 0));   // (the outside mesh, whichever view is drawn)
+  if (pm == planeMeshes.end() || !pm->second.ok || !pm->second.idx) return;
+  const PlaneVisual& pv = fp.plane;
+  const float R = std::max(pv.M[0], pv.M[9 * 4] * 2.f) * 0.55f + 1.5f;   // (planeBound in the shaders)
+  const vec3 c = pv.pos;
+  // which maps: the sun when up; the lights in the proxy's slots (gbShadowSlot: the brightest shadow-casting first)
+  int want = 0; int lightOf[4] = {-1, -1, -1, -1};
+  if (fp.sunDir.y > -0.05f) want |= 1;
+  for (int i = 0; i < fp.plN; i++) {
+    const FrameParams::PointLight& L = fp.pl[i];
+    if (L.shadow <= 0.f || L.cosCut <= 0.05f) continue;   // (an omnidirectional light has no beam to map: it keeps the march)
+    float li = std::max(L.col.x, std::max(L.col.y, L.col.z)); int slot = 0;
+    for (int k = 0; k < fp.plN; k++) {
+      if (k == i || fp.pl[k].shadow <= 0.f) continue;
+      float lk = std::max(fp.pl[k].col.x, std::max(fp.pl[k].col.y, fp.pl[k].col.z));
+      if (lk > li || (lk == li && k < i)) slot++;
+    }
+    if (slot < 3) { want |= 2 << slot; lightOf[1 + slot] = i; }
+  }
+  if (!want) return;
+  if (!texShMap) {
+    glGenTextures(1, &texShMap); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMap);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT24, kShMapRes, kShMapRes, 4, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glGenTextures(1, &texShMov); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMov);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_R8, kShMapRes, kShMapRes, 4, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    glGenFramebuffers(1, &fboShMap);
+  }
+  auto movIt = hulls.find(pm->second.movKey);
+  const HullMesh* mov = movIt != hulls.end() && movIt->second.ok && movIt->second.verts ? &movIt->second : nullptr;
+  glBindFramebuffer(GL_FRAMEBUFFER, fboShMap);
+  glViewport(0, 0, kShMapRes, kShMapRes);
+  glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
+  for (int layer = 0; layer < 4; layer++) {
+    if (!(want & (1 << layer))) continue;
+    mat4 vp;
+    if (layer == 0) {   // the sun: orthographic about the airframe, the ground beyond the far plane compared at depth 1
+      vec3 d = normalize(fp.sunDir), up = fabsf(d.y) < 0.99f ? vec3(0, 1, 0) : vec3(0, 0, 1);
+      vp = orthoMat(-R, R, -R, R, R, 3.f * R) * lookAt(c + d * (2.f * R), c, up);
+    } else {   // a lamp on the airframe: perspective along its beam, out to its reach
+      const FrameParams::PointLight& L = fp.pl[lightOf[layer]];
+      vec3 d = normalize(L.dir), up = fabsf(d.y) < 0.99f ? vec3(0, 1, 0) : vec3(0, 0, 1);
+      float half = acosf(clampf(L.cosCut, -1.f, 1.f)) + 0.12f;
+      float fov = std::min(2.f * half, 165.f * DEG);
+      vp = perspective(fov, 1.f, 0.2f, L.radius * 40.f + 400.f) * lookAt(L.pos, L.pos + d, up);
+    }
+    shMapVP[layer] = vp;
+    glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texShMap, 0, layer);
+    glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texShMov, 0, layer);
+    GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
+    glClearDepth(1.0); float zero[4] = {0, 0, 0, 0}; glClearBufferfv(GL_COLOR, 0, zero); glClear(GL_DEPTH_BUFFER_BIT);
+    // the static airframe: depth only
+    glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE); glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+    glUseProgram(progShMap);
+    glUniformMatrix4fv(U(progShMap, "uVP"), 1, GL_FALSE, vp.m);
+    glUniformMatrix3fv(U(progShMap, "uRot"), 1, GL_FALSE, pv.rot);
+    glUniform3f(U(progShMap, "uPos"), c.x, c.y, c.z);
+    glBindVertexArray(pm->second.vao);
+    glDrawElements(GL_TRIANGLES, pm->second.idx, GL_UNSIGNED_INT, nullptr);
+    // the moving hull: a mask, no depth
+    if (mov) {
+      glDisable(GL_DEPTH_TEST); glDepthMask(GL_FALSE); glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+      glUseProgram(progShMov);
+      glUniformMatrix4fv(U(progShMov, "uVP"), 1, GL_FALSE, vp.m);
+      glUniformMatrix3fv(U(progShMov, "uRot"), 1, GL_FALSE, pv.rot);
+      glUniform3f(U(progShMov, "uPos"), c.x, c.y, c.z);
+      if (!vaoHull) glGenVertexArrays(1, &vaoHull);
+      glBindVertexArray(vaoHull); glBindBuffer(GL_ARRAY_BUFFER, mov->vbo);
+      glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, (void*)0);
+      glDrawArrays(GL_TRIANGLES, 0, mov->verts);
+    }
+    shOn |= 1 << layer;
+  }
+  glBindVertexArray(0);
+  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); glDepthMask(GL_TRUE); glDisable(GL_DEPTH_TEST);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 // The airframes' shadows on the G-buffer's surfaces (the sun on the ground, the landing lights' beams): texGB[4]
 void Renderer::rasterShadowProxy(const FrameParams& fp) {
   glBindFramebuffer(GL_FRAMEBUFFER, fboShProxy);
@@ -92,6 +192,12 @@ void Renderer::rasterShadowProxy(const FrameParams& fp) {
   glViewport(0, 0, rw, rh);
   glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
   setRT(progShProxy, fp);
+  glUniform1i(U(progShProxy, "uAfShOn"), shOn);
+  if (shOn) {
+    glUniformMatrix4fv(U(progShProxy, "uAfShVP"), 4, GL_FALSE, shMapVP[0].m);
+    glActiveTexture(GL_TEXTURE0 + 26); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMap); glUniform1i(U(progShProxy, "uAfShMap"), 26);
+    glActiveTexture(GL_TEXTURE0 + 27); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMov); glUniform1i(U(progShProxy, "uAfShMov"), 27);
+  }
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);

@@ -1236,6 +1236,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     // ------------------------------------------------ the raster renderer: scenery, terrain and sea into the G-buffer, then one lighting pass
     rasterWorld(fp);
     bakeTerrainShadow(fp);
+    rasterShadowMaps(fp);   // (the airframe's shadow maps: the feeds' and the main view's proxy both read them)
     stamp(1);
     if (fp.dispMode & 1) renderDisplays(fp, false);   // the cockpit display atlases, before the objects pass samples them
     if (fp.dispMode & 2) renderDisplays(fp, true);

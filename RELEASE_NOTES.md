@@ -1,2 +1,4 @@
 ## What's new
 - diagnostics.bat: the benchmark files are written (the game's --out took the quote marks into the file name, so the v3.18.0 run had none), compile_time.txt is plain text, and the timing passes on the rasterizer are split in four (world and terrain shadow, displays and feeds, objects, airframe shadow proxy) in the analysis, the benchmark and F3.
+- Airframe shadow maps on the rasterizer: the aircraft's shadow on the ground and in its landing-light beams comes from depth maps of its baked mesh (the sun and the three brightest lights), in place of marching the airframe's distance field for every pixel, which the owner's run showed as the biggest single cost of the frame (55 ms at night, 36 ms in the cockpit, 7 ms in the air). The moving parts (gear, surfaces, props) keep the exact march, only where they are. The research jets (no baked mesh) and the traffic are unchanged.
+
