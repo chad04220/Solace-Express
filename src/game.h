@@ -119,6 +119,13 @@ private:
   float launchFuelKg = -1;       // the fuel chosen on the job card for the next flight (-1: the plan's default)
   float chosenFuel(const Contract& c, int spec, Career::Source src, const Career::LaunchPlan& p) const;   // what the tanks hold at take-off
   float jobClockBase = 0;        // seconds already on the job's clock from earlier legs (deadlines count from it)
+  // C7: one failure may be rolled for the flight (from the aircraft's condition), scheduled at a clock time; the gear
+  // kind waits for the next gear command instead. Tests and tools fly with the roll disarmed and fire failures themselves.
+  struct FailPlan { int kind = 0, engine = 0; float at = -1; bool fired = false; } failPlan;
+  bool failuresArmed = true;
+  void rollFailures(const Contract& c, int spec, Career::Source src);
+  void updateFailures(float dt);
+  void fireFailure(int kind, int engine);   // breaks it now, with the warning and the autopilot's reaction
   int attemptFrom = 0;           // where this attempt departed (an abandoned leg brings the load back there)
   GameScreen screen = SCR_MENU;
   int hubTab = TAB_CONTRACTS;

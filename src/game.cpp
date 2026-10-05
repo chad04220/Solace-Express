@@ -394,7 +394,64 @@ void Game::init(bool buildWorld) {
   camQ = quat();
 }
 
-void Game::initHeadless() { headless = true; career.newGame(); set.resMode = 0; }   // tools and tests render at the full resolution
+void Game::initHeadless() { headless = true; career.newGame(); set.resMode = 0; failuresArmed = false; }   // tools and tests render at the full resolution; nothing breaks unless the test breaks it
+
+// ------------------------------------------------------------------ failures (C7)
+void Game::rollFailures(const Contract& c, int spec, Career::Source src) {
+  failPlan = FailPlan();
+  if (!failuresArmed || c.startAirborne && c.type == CT_LESSON) return;
+  float chance = career.failureChance(src, spec);
+  if (chance <= 0.f) return;
+  // deterministic per attempt: the same flight retried after a crash gets the same roll, a new attempt a new one
+  uint32_t h = 2166136261u; for (char ch : c.id) h = (h ^ (uint8_t)ch) * 16777619u;
+  Rng r(h ^ (career.attempt * 2654435761u) ^ (uint32_t)spec * 97u);
+  if (r.uni() >= chance) return;
+  const AircraftSpec& s = kAircraft[spec];
+  // which: engines most often, the gear only on retractables, icing only in weather that can make it
+  float w[FAIL_COUNT] = {0, 3.f, 2.f, 1.5f, 1.2f, s.retract ? 1.5f : 0.f, 1.f, (c.wx.precip == 2 || (c.wx.cloudCover > 0.6f && c.wx.cloudBase > 1800.f)) ? 1.5f : 0.f};
+  float sum = 0; for (float x : w) sum += x;
+  float pick = r.uni() * sum; int kind = FAIL_ENGINE_PARTIAL;
+  for (int k = 1; k < FAIL_COUNT; k++) { if (pick < w[k]) { kind = k; break; } pick -= w[k]; }
+  failPlan.kind = kind; failPlan.engine = s.engines > 1 ? (int)(r.uni() * s.engines) % std::min(s.engines, 4) : 0;
+  float est = std::max(launchPlan.minutesEst * 60.f, 240.f);
+  failPlan.at = 90.f + r.uni() * clampf(est * 0.6f, 60.f, 1500.f);   // somewhere in the first part of the flight, never on the take-off roll
+}
+void Game::fireFailure(int kind, int engine) {
+  if (!plane.failNow(kind, engine)) return;
+  const AircraftSpec& s = *plane.spec;
+  std::string m = failureName(kind);
+  if ((kind == FAIL_ENGINE_PARTIAL || kind == FAIL_ENGINE_TOTAL) && s.engines > 1) m += fmt(" - engine %d", engine + 1);
+  if (kind == FAIL_GEAR_STUCK) m += plane.fail.gearStuck == 1 ? " UP" : " DOWN";
+  if (kind == FAIL_PITOT) m += " - airspeed unreliable";
+  if (kind == FAIL_ALTERNATOR) m += " - on battery, land soon";
+  toast(m, vec3(1, 0.45f, 0.35f), true);
+  g_audio.trigger(SFX_BEEP, 1.f);
+  if (plane.apOn && (kind == FAIL_ENGINE_TOTAL || kind == FAIL_ENGINE_PARTIAL || kind == FAIL_PITOT)) {
+    plane.apDisengage(); g_audio.trigger(SFX_AP_DISC); toast("Autopilot disconnected - " + std::string(failureName(kind)), vec3(1, 0.7f, 0.3f));
+  }
+  result.failureKinds |= 1 << kind;
+}
+void Game::updateFailures(float dt) {
+  (void)dt;
+  // ice: in cloud or precipitation below freezing it builds; clear warm air melts it (about 0 C above 2300 m, or in snow)
+  bool freezing = wx.precip == 2 || plane.pos.y > 2300.f;
+  float top = wx.cloudBase + 600.f + 1600.f * wx.cloudCover;
+  bool inCloud = wx.cloudCover > 0.45f && plane.pos.y > wx.cloudBase && plane.pos.y < top;
+  bool wet = inCloud || (wx.precip > 0 && plane.pos.y < top);
+  plane.iceFeed = !failuresArmed && plane.fail.ice <= 0.f ? 0.f : (wet && freezing) ? 1.f : (!wet && !freezing) ? -1.f : 0.f;
+  if (plane.fail.ice > 0.05f) result.failureKinds |= 1 << FAIL_ICING;
+  if (plane.fail.alternator && plane.fail.avionicsDark()) {
+    if (plane.apOn) { plane.apDisengage(); g_audio.trigger(SFX_AP_DISC); toast("Autopilot off - battery flat", vec3(1, 0.7f, 0.3f)); }
+    if (showMap) { showMap = false; toast("GPS dark - battery flat", vec3(1, 0.45f, 0.35f)); }
+  }
+  if (failPlan.kind == 0 || failPlan.fired || crashed || plane.onGround) return;
+  if (failPlan.kind == FAIL_GEAR_STUCK) {   // waits for the gear to be commanded the other way
+    bool wantMove = (plane.ctl.gearDown && plane.gear < 0.99f) || (!plane.ctl.gearDown && plane.gear > 0.01f);
+    if (flightClock < failPlan.at || !wantMove) return;
+  } else if (flightClock < failPlan.at || plane.agl() < 120.f) return;
+  failPlan.fired = true;
+  fireFailure(failPlan.kind, failPlan.engine);
+}
 
 void Game::shutdown() { saveSettings(); radio.shutdown(); }
 
@@ -443,6 +500,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   plane.reset(&s, start, hdg, fuel, payloadKg, c.startAirborne, s.cruise);
   plane.apComfort = true;   // a career flight: the autopilot flies for the passengers and the load (the stick is never limited)
   fuelStart = plane.fuel;
+  rollFailures(c, spec, src);
   isolatedFlight = false; jobClockBase = 0; attemptFrom = c.from;
   wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0;
   traffic.reset();
@@ -588,6 +646,7 @@ bool Game::apCruising() const {
 }
 
 void Game::engageAutopilot() {
+  if (plane.fail.avionicsDark()) { toast("Autopilot unavailable - battery flat", vec3(1, 0.45f, 0.35f)); return; }
   if (apDest >= 0) {
     plane.apEngage(Plane::AP_NAV, apDest, wx);
     const Airport& a = g_world.airports[apDest];
@@ -677,6 +736,7 @@ void Game::flightControls(float dt) {
   if ((actKeyP(ACT_GEAR) || gearPad || (!showMap && (in.buttonsPressed & PAD_RIGHT))) && plane.spec->retract) {
     if (plane.onGround && c.gearDown) toast("Gear lever is locked on the ground", vec3(1, 0.6f, 0.4f));
     else { c.gearDown = !c.gearDown; toast(c.gearDown ? "Gear down" : "Gear up", vec3(0.8f, 1, 0.8f)); }
+    if (plane.fail.gearStuck) toast(plane.fail.gearStuck == 1 ? "Gear won't come down - it's stuck up" : "Gear won't retract - it's stuck down", vec3(1, 0.45f, 0.35f));
   }
   // brakes: B / D-pad left = parking brake toggle, Space = wheel brakes
   bool& parking = parkingBrake;   // (set by startFlight for a start on the ground)
@@ -752,9 +812,11 @@ void Game::updateFlight(float dt) {
   float simDt = dt * timeAccel;
   vec3 prevPos = plane.pos;
   if (!crashed) {
+    updateFailures(simDt);
     plane.step(simDt, wx, gameTime);
     flightClock += simDt;
     timeOfDay += simDt / 3600.f;
+    if (plane.ev.bellyLanding && !result.bellyLanding) { result.bellyLanding = true; toast("Belly landing - hold it straight", vec3(1, 0.6f, 0.3f)); g_audio.trigger(SFX_CRASH, 0.4f); }
   }
   gameTime += simDt;
   if (plane.engineRunning && !wasRunning) {
@@ -2559,6 +2621,7 @@ void Game::feedAudio() {
     ap.rpm = s.engineType == ENG_JET ? plane.n1 : plane.rpm; ap.maxRpm = s.maxRpm; ap.n1 = plane.n1;
     ap.spool = plane.engineSpool; ap.throttle = plane.engineRunning ? plane.ctl.throttle : 0.f;
     ap.running = plane.engineRunning; ap.cranking = !plane.engineRunning && plane.starterTime > 0;
+    for (int e = 0; e < 4; e++) ap.engineHealth[e] = plane.fail.engineHealth[e];
     ap.airspeed = plane.airspeed; ap.groundSpeed = length(vec3(plane.vel.x, 0, plane.vel.z)); ap.onGround = plane.onGround; ap.rough = plane.groundRough;
     ap.stallWarn = plane.onGround ? 0.f : plane.stallWarn; ap.stallIsShaker = s.engineType == ENG_JET || s.license == LIC_ATP;
     ap.gearMoving = plane.gear > 0.01f && plane.gear < 0.99f; ap.flapsMoving = fabsf(plane.flaps - plane.ctl.flaps) > 0.02f;
@@ -2631,7 +2694,7 @@ void Game::update(float dt) {
       else if (paused && settingsFromPause && !(in.buttonsPressed & PAD_START)) settingsFromPause = false;   // B / Esc: back to the pause menu
       else { paused = !paused; settingsFromPause = false; }
     }
-    if (!paused && actPressed(ACT_MAP)) { showMap = !showMap; g_audio.trigger(SFX_CLICK); }
+    if (!paused && actPressed(ACT_MAP)) { if (plane.fail.avionicsDark() && !showMap) toast("GPS dark - battery flat", vec3(1, 0.45f, 0.35f)); else { showMap = !showMap; g_audio.trigger(SFX_CLICK); } }
     if (showMap && !paused) {   // GPS open: Tab / D-pad pick the autoland airport, Enter / A engages the autopilot to it
       if (in.pressed[K_TAB] || (in.buttonsPressed & PAD_RIGHT)) cycleApDest(in.down[K_SHIFT] ? -1 : 1);
       if (in.buttonsPressed & PAD_LEFT) cycleApDest(-1);

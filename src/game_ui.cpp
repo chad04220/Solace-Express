@@ -840,6 +840,21 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
         std::string m; bool ok = false; commit([&](Career& k) { ok = k.refuel((int)fi, &m); }); if (ok) g_audio.trigger(SFX_CASH); hubMsg = m; hubMsgTime = 4;
       }
     }
+    if (f.location == career.location && f.condition < 0.97f) {   // a service restores the condition (worn aircraft break more often)
+      int cost = career.serviceCost((int)fi);
+      if (button(px + dw - 48 * s - 310 * s, py - 4 * s, 150 * s, 26 * s, fmt("Service %s", fmtMoney(cost).c_str()), !commitBlocked() && career.money >= cost, false)) {
+        std::string m; bool ok = false; commit([&](Career& k) { ok = k.service((int)fi, &m); }); if (ok) g_audio.trigger(SFX_CASH); hubMsg = m; hubMsgTime = 4;
+      }
+    }
+    py += 26 * s;
+  }
+  if (!career.fleet.empty()) {   // hull insurance: a premium out of every settlement, and the repairs after a failure or a belly landing are covered
+    py += 6 * s;
+    if (button(px, py - 4 * s, 220 * s, 26 * s, career.insured ? "Insurance: ON" : "Insurance: OFF", !commitBlocked(), false)) {
+      commit([](Career& k) { k.insured = !k.insured; }); hubMsg = career.insured ? "Hull insurance on: repairs after a failure are covered, a premium comes off each flight." : "Hull insurance off: you pay for repairs."; hubMsgTime = 4;
+    }
+    int prem = 0; for (auto& f : career.fleet) prem = std::max(prem, career.insurancePremium(f.spec));
+    g_ren.text(px + 230 * s, py, 13 * s, fmt("premium up to %s per flight; covers repairs after a failure or a belly landing", fmtMoney(prem).c_str()), C_DIM, 1);
     py += 26 * s;
   }
 }
@@ -1552,7 +1567,21 @@ void Game::drawHud(const FrameParams& fp) {
   bool nearDest = length(plane.pos - d.pos()) < 4000.f;
   if (!plane.onGround && plane.agl() < 120 && plane.vel.y < -7.f && flash) { g_ren.text(W * 0.5f, wy, 40 * s, "PULL UP", C_BAD, 1, 1); wy += 48 * s; }
   if (spc.retract && plane.gear < 0.99f && !plane.onGround && plane.agl() < 200 && nearDest && plane.ias < spc.vref * 1.5f && flash) { g_ren.text(W * 0.5f, wy, 36 * s, "GEAR!", C_WARN, 1, 1); wy += 44 * s; }
-  if (!plane.engineRunning && engineAutoStarted && plane.starterTime <= 0 && flash) g_ren.text(W * 0.5f, wy, 26 * s, "ENGINE OFF - press " + keyName(set.keyBind[ACT_ENGINE]) + " to restart", C_BAD, 1, 1);
+  if (!plane.engineRunning && engineAutoStarted && plane.starterTime <= 0 && flash && !plane.glideOnly()) { g_ren.text(W * 0.5f, wy, 26 * s, "ENGINE OFF - press " + keyName(set.keyBind[ACT_ENGINE]) + " to restart", C_BAD, 1, 1); wy += 32 * s; }
+  {   // failure annunciators (C7): steady, under the flashing warnings
+    const Failures& F = plane.fail;
+    std::vector<std::pair<std::string, vec3>> ann;
+    for (int e = 0; e < spc.engines && e < 4; e++) {
+      if (F.engineHealth[e] <= 0.f) ann.push_back({spc.engines > 1 ? fmt("ENGINE %d FAILED", e + 1) : plane.glideOnly() ? fmt("ENGINE FAILURE - glide %.0f:1, best glide %.0f kt", plane.glideRatio(), Plane::perf(&spc).vy * MS_TO_KT * 1.1f) : "ENGINE FAILED", C_BAD});
+      else if (F.engineHealth[e] < 0.999f) ann.push_back({spc.engines > 1 ? fmt("ENGINE %d POWER LOSS", e + 1) : "ENGINE POWER LOSS", C_WARN});
+    }
+    if (F.alternator) ann.push_back({F.avionicsDark() ? std::string("BATTERY FLAT - no autopilot, no GPS") : fmt("ALTERNATOR - battery %.0f%%", F.battery * 100.f), F.avionicsDark() ? C_BAD : C_WARN});
+    if (F.pitot) ann.push_back({"PITOT BLOCKED - airspeed unreliable, fly attitude and power", C_WARN});
+    if (F.gearStuck) ann.push_back({F.gearStuck == 1 ? "GEAR STUCK UP - belly landing: paved runway, wings level, slow" : "GEAR STUCK DOWN - slower, more fuel", F.gearStuck == 1 ? C_BAD : C_WARN});
+    if (F.flapAsym) ann.push_back({"FLAP ASYMMETRY - hold the wing up with aileron", C_WARN});
+    if (F.ice > 0.05f) ann.push_back({fmt("ICING %.0f%% - leave the cloud, keep the speed up", F.ice * 100.f), F.ice > 0.5f ? C_BAD : C_WARN});
+    for (auto& a : ann) { g_ren.text(W * 0.5f, wy, 20 * s, a.first, a.second, 0.95f, 1); wy += 26 * s; }
+  }
   // instructor hint
   if (set.showHints && !hint.empty() && !crashed) {
     float hw = std::min(760 * s, W - 40 * s);
@@ -1652,11 +1681,14 @@ void Game::drawGps() {
     vec2 lp(C.x + rp * 0.7071f, C.y + rp * 0.7071f);
     if (inside(lp, 20 * s)) g_ren.text(lp.x + 4 * s, lp.y - 14 * s, 11 * s, fmt("%.1f km", rr / 1000.f), C_ACCENT, 0.8f * e, 0, false);
   }
-  // fuel range ring
+  // fuel range ring (with every engine stopped: the glide range from this height instead)
   float rangeM = plane.rangeLeftKm() * 1000.f;
+  bool gliding = plane.glideOnly() && !plane.onGround;
+  if (gliding) rangeM = std::max(0.f, plane.agl() - 60.f) * plane.glideRatio() * 0.85f;   // (a margin for the turns and the pattern)
   {
     float rp = rangeM * k; int n = 120;
-    for (int i = 0; i < n; i += 2) { float a0 = i * 6.2832f / n + T * 0.05f, a1 = (i + 1) * 6.2832f / n + T * 0.05f; seg(vec2(C.x + cosf(a0) * rp, C.y + sinf(a0) * rp), vec2(C.x + cosf(a1) * rp, C.y + sinf(a1) * rp), 2 * s, C_WARN, 0.55f); }
+    for (int i = 0; i < n; i += 2) { float a0 = i * 6.2832f / n + T * 0.05f, a1 = (i + 1) * 6.2832f / n + T * 0.05f; seg(vec2(C.x + cosf(a0) * rp, C.y + sinf(a0) * rp), vec2(C.x + cosf(a1) * rp, C.y + sinf(a1) * rp), 2 * s, gliding ? C_BAD : C_WARN, 0.55f); }
+    if (gliding) { vec2 lp(C.x, C.y - rp); if (inside(lp, 20 * s)) g_ren.text(lp.x, lp.y - 16 * s, 12 * s, fmt("GLIDE %.1f km", rangeM / 1000.f), C_BAD, 0.9f * e, 1, false); }
   }
   // breadcrumb trail
   for (size_t i = 0; i < trail.size(); i++) { vec2 p = toS(trail[i].x, trail[i].y); if (inside(p, 2 * s)) g_ren.rect(p.x - 1.5f * s, p.y - 1.5f * s, 3 * s, 3 * s, C_ACCENT, (0.25f + 0.6f * (float)i / trail.size()) * e, 1.5f * s); }

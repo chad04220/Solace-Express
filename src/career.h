@@ -57,6 +57,9 @@ struct FlightResult {
   bool shutDownAtStand = false;     // stopped clear of the runway, engine off, parking brake set
   bool holdViolated = false;        // moved off (or took off) while told to hold
   bool landedAgainstGoAround = false;   // touched down after the tower said go around
+  // C7: what broke on the flight (bits 1 << FailureKind) and whether it ended on its belly
+  int failureKinds = 0;
+  bool bellyLanding = false;
 };
 
 struct PayoutLine { std::string label; int amount; };
@@ -93,6 +96,16 @@ public:
   void refreshBoard();
   // Which aircraft can fly a contract and how it would be sourced
   enum Source { SRC_NONE = 0, SRC_LESSON, SRC_RENT, SRC_OWNED };
+  // Failures and maintenance (C7). An owned aircraft wears with the hours and the hard landings; its condition sets
+  // the chance something breaks on a flight (rentals a fixed low chance, lessons none). Repairs after a failure or a
+  // belly landing are charged unless the insurance (a premium per flight) is on; a service restores the condition.
+  bool insured = false;
+  float failureChance(Source src, int specIdx) const;   // probability that one thing breaks on the next flight
+  int insurancePremium(int specIdx) const { return std::max(40, kAircraft[specIdx].price / 500 / 10 * 10); }
+  int serviceCost(int fleetIdx) const;
+  bool service(int fleetIdx, std::string* msg);
+  void wear(std::vector<PayoutLine>& L, int specIdx, Source src, const FlightResult& r);   // condition loss, repairs, premium
+  static int repairCost(int specIdx, int failureKinds, bool belly);
   Source canFly(const Contract& c, int specIdx, std::string* why = nullptr) const;
   int ownedIndexFor(int specIdx) const;
   // Settle a finished flight; returns lines for the debrief

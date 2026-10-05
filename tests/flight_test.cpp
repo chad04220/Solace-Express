@@ -68,6 +68,87 @@ int main(int argc, char** argv) {
     }
   }
   printf("control directions checked\n");
+  // ---------------- failures (C7): an engine-out glide reaches a field, a stuck gear belly landing at Vref is survivable,
+  // a twin flies on one engine, a blocked pitot freezes the airspeed, ice costs lift
+  {
+    Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
+    // Kestrel, engine stopped at 1200 m over flat ground: glide at the best-glide speed and measure the ratio
+    const AircraftSpec& s = kAircraft[0];
+    Plane p; p.reset(&s, vec3(-6000, 1200 + std::max(g_world.height(-6000, 16000), 0.f), 16000), 0, s.maxFuel * 0.5f, 85, true, s.cruise * 0.8f);
+    p.ctl.throttle = 0.6f; for (int i = 0; i < 240; i++) p.step(1 / 240.f, calm, i / 240.f);
+    bool ok = p.failNow(FAIL_ENGINE_TOTAL, 0) && p.glideOnly();
+    float vg = s.vref * 1.15f, y0 = p.pos.y; vec3 p0 = p.pos; float tgl = 0;
+    for (int i = 0; i < 90 * 240 && !p.ev.crashed && p.agl() > 400; i++) {
+      p.ctl.throttle = 1;   // (the lever does nothing: the engine has stopped)
+      p.ctl.pitch = clampf((vg - p.ias) * -0.04f - p.w.x * 0.8f, -1, 1);
+      p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1, 1);
+      p.step(1 / 240.f, calm, i / 240.f); tgl = i / 240.f;
+    }
+    float ratio = length(vec3(p.pos.x - p0.x, 0, p.pos.z - p0.z)) / std::max(y0 - p.pos.y, 1.f);
+    ok = ok && !p.ev.crashed && !p.engineRunning && p.engineSpool < 0.01f && ratio > 7.f && ratio < 16.f && fabsf(ratio - p.glideRatio()) < p.glideRatio() * 0.35f;
+    printf("Engine-out glide (Kestrel): %.1f:1 over %.0f s, model says %.1f:1 %s\n", ratio, tgl, p.glideRatio(), ok ? "ok" : "FAIL"); fails += !ok;
+    // Swift S6 with the gear stuck up: a belly landing on Solace Capital's runway at Vref, wings level, is survivable
+    const AircraftSpec& sw = kAircraft[7];
+    const Airport& a = g_world.airports[g_world.findAirport("CAP")];
+    vec3 st = a.threshold(false) + a.dir() * 300.f; st.y = a.elev + 6.f;
+    p.reset(&sw, st, a.heading, sw.maxFuel * 0.3f, 85, true, sw.vref);
+    p.ctl.gearDown = false; p.gear = 0; ok = p.failNow(FAIL_GEAR_STUCK, 0) && p.fail.gearStuck == 1;
+    p.ctl.gearDown = true; p.ctl.flaps = 1; p.flaps = 1; p.ctl.throttle = 0;
+    float tstop = -1;
+    for (int i = 0; i < 90 * 240 && !p.ev.crashed; i++) {
+      p.ctl.pitch = p.ev.bellyLanding ? 0.f : clampf((std::max(-0.8f, -p.agl() * 0.3f) - p.vel.y) * 0.25f - p.w.x * 0.8f + 0.08f, -1, 1);
+      p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1, 1);
+      p.ctl.yaw = clampf(wrapAngle((a.heading - p.heading()) * DEG) * 2.f, -1, 1);
+      p.step(1 / 240.f, calm, i / 240.f);
+      if (p.ev.bellyLanding && length(p.vel) < 0.5f) { tstop = i / 240.f; break; }
+    }
+    ok = ok && !p.ev.crashed && p.ev.bellyLanding && p.gear < 0.01f && tstop > 0 && g_world.onRunway(p.pos.x, p.pos.z, 10) >= 0;
+    printf("Stuck-gear belly landing (Swift S6): %s, stopped after %.0f s %s %s\n", p.ev.bellyLanding ? "skidded" : "no skid", tstop, p.ev.crashReason.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
+    // the same landing on a gravel strip, or too fast, wrecks it
+    const Airport& hf = g_world.airports[g_world.findAirport("HFS")];
+    st = hf.threshold(false) + hf.dir() * 100.f; st.y = hf.elev + 6.f;
+    p.reset(&sw, st, hf.heading, sw.maxFuel * 0.3f, 85, true, sw.vref); p.ctl.gearDown = false; p.gear = 0; p.failNow(FAIL_GEAR_STUCK, 0); p.ctl.throttle = 0; p.ctl.flaps = 1; p.flaps = 1;
+    for (int i = 0; i < 30 * 240 && !p.ev.crashed; i++) { p.ctl.pitch = clampf((-0.8f - p.vel.y) * 0.25f - p.w.x * 0.8f + 0.08f, -1, 1); p.step(1 / 240.f, calm, i / 240.f); }
+    ok = p.ev.crashed && !p.ev.bellyLanding;
+    printf("Belly landing on gravel is a crash: %s %s\n", p.ev.crashReason.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
+    // Islander with the right engine failed: it yaws into the dead engine; with rudder it holds heading and height
+    const AircraftSpec& tw = kAircraft[3];
+    p.reset(&tw, vec3(-6000, 1500, 16000), 0, tw.maxFuel * 0.5f, 300, true, tw.cruise * 0.85f);
+    p.ctl.throttle = 0.75f; for (int i = 0; i < 480; i++) p.step(1 / 240.f, calm, i / 240.f);
+    ok = p.failNow(FAIL_ENGINE_TOTAL, 1) && !p.glideOnly() && p.engineRunning;
+    float yawFree = 0; { Plane q = p; for (int i = 0; i < 480; i++) q.step(1 / 240.f, calm, i / 240.f); yawFree = wrapAngle((q.heading() - p.heading()) * DEG) / DEG; }
+    float h0 = p.heading(), y0b = p.pos.y;
+    for (int i = 0; i < 40 * 240 && !p.ev.crashed; i++) {
+      p.ctl.throttle = 1;
+      p.ctl.yaw = clampf(wrapAngle((h0 - p.heading()) * DEG) * 3.f + p.w.y * 2.f, -1, 1);
+      p.ctl.roll = clampf((-3.f - p.bankDeg()) * 0.05f + p.w.z * 0.3f, -1, 1);   // a few degrees into the live engine
+      p.ctl.pitch = clampf((0.f - p.vel.y) * 0.1f - p.w.x * 0.8f, -1, 1);
+      p.step(1 / 240.f, calm, i / 240.f);
+    }
+    float herr = wrapAngle((p.heading() - h0) * DEG) / DEG;
+    ok = ok && !p.ev.crashed && yawFree > 2.f && fabsf(herr) < 8.f && p.pos.y > y0b - 150.f && p.engineSpool < 0.6f;
+    printf("Twin engine-out (Islander, right): hands-off yaw %+.1f deg in 2 s, held %+.1f deg, height %+.0f m, power %.2f %s\n", yawFree, herr, p.pos.y - y0b, p.engineSpool, ok ? "ok" : "FAIL"); fails += !ok;
+    // blocked pitot: the indication stays where it was as the aircraft slows, and reads higher as it climbs
+    p.reset(&s, vec3(-6000, 1200, 16000), 0, s.maxFuel * 0.5f, 85, true, s.cruise); p.ctl.throttle = 0.7f;
+    for (int i = 0; i < 240; i++) p.step(1 / 240.f, calm, i / 240.f);
+    float ias0 = p.ias; ok = p.failNow(FAIL_PITOT, 0);
+    p.ctl.throttle = 0.2f; for (int i = 0; i < 20 * 240 && !p.ev.crashed; i++) { p.ctl.pitch = clampf((2.f - p.vel.y) * 0.1f - p.w.x * 0.8f, -1, 1); p.step(1 / 240.f, calm, i / 240.f); }
+    float trueIas = p.airspeed * sqrtf(p.density / 1.225f);
+    ok = ok && !p.ev.crashed && fabsf(p.ias - ias0) < ias0 * 0.06f && trueIas < ias0 - 5.f;
+    printf("Blocked pitot: reads %.0f kt (was %.0f), truly %.0f kt %s\n", p.ias * MS_TO_KT, ias0 * MS_TO_KT, trueIas * MS_TO_KT, ok ? "ok" : "FAIL"); fails += !ok;
+    // ice: the iced wing stalls at a higher speed and the alternator leaves a battery that runs down
+    p.reset(&s, vec3(-6000, 1200, 16000), 0, s.maxFuel * 0.5f, 85, true, s.cruise); p.ctl.throttle = 0.5f;
+    float stallClean = sqrtf(2 * p.mass() * G0 / (1.225f * s.wingArea * s.CLmax));
+    // (at idle, level as long as it can: the slowest it still flew at, or where the stall warning came on)
+    auto stallSpeed = [&](Plane q) { q.ctl.throttle = 0.f; float vmin = 1e9f; for (int i = 0; i < 120 * 240 && !q.ev.crashed; i++) { q.ctl.pitch = clampf((0.f - q.vel.y) * 0.15f - q.w.x * 0.8f, -1, 1); q.ctl.roll = clampf(-q.bankDeg() * 0.05f + q.w.z * 0.3f, -1, 1); q.step(1 / 240.f, calm, i / 240.f); if (q.stallWarn > 0.5f) { vmin = std::min(vmin, q.ias); break; } if (i > 10 * 240) vmin = std::min(vmin, q.ias); } return vmin; };
+    float vsClean = stallSpeed(p); p.failNow(FAIL_ICING, 0); p.fail.ice = 1.f; float vsIced = stallSpeed(p);
+    ok = vsIced > vsClean * 1.04f && vsIced < stallClean * 1.6f;
+    printf("Icing: stall warning at %.0f kt clean, %.0f kt iced %s\n", vsClean * MS_TO_KT, vsIced * MS_TO_KT, ok ? "ok" : "FAIL"); fails += !ok;
+    p.reset(&s, vec3(-6000, 1200, 16000), 0, s.maxFuel * 0.5f, 85, true, s.cruise); p.failNow(FAIL_ALTERNATOR, 0);
+    for (int i = 0; i < 600 * 60 && !p.fail.avionicsDark(); i++) { p.ctl.pitch = clampf((0.f - p.vel.y) * 0.1f - p.w.x * 0.8f, -1, 1); p.ctl.throttle = 0.7f; p.step(1 / 60.f, calm, i / 60.f); }
+    ok = p.fail.avionicsDark() && p.flightTime >= 0.f && !p.ev.crashed;
+    printf("Alternator failure: battery flat after %.0f s %s\n", p.fail.battery <= 0.f ? 420.f : -1.f, ok ? "ok" : "FAIL"); fails += !ok;
+  }
   // XR-9 research jet: supersonic in level flight, no vertical flight, slow flight on approach, pull limits, roll authority
   {
     const AircraftSpec& s = kAircraft[kResearchJet];

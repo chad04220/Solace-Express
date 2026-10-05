@@ -556,6 +556,7 @@ std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan
   J.at = at; J.state = JobState::RECOVERY;
   location = at;
   if (J.src == SRC_OWNED) { int oi = ownedIndexFor(J.spec); if (oi >= 0) fleet[oi].location = at; }
+  wear(L, J.spec, J.src, r);
   payLoan(L);
   int total = 0; for (auto& l : L) total += l.amount;
   money += total;
@@ -673,10 +674,12 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
       if (c.grantLicense > license) { license = c.grantLicense; }
       if (storyIndex >= (int)g_story.size()) finished = true;
     }
+    if (c.payout > 0 && r.failureKinds && r.landed) { L.push_back({"Emergency handled", c.payout * 15 / 100}); reputation++; }
     location = c.to;
     if (src == SRC_OWNED) { int oi = ownedIndexFor(si); if (oi >= 0) fleet[oi].location = c.to; }
     boardSeed++;
   }
+  if (r.outcome != OUT_CRASHED) wear(L, si, src, r);
   payLoan(L);
   int total = 0; for (auto& l : L) total += l.amount;
   money += total;
@@ -721,6 +724,60 @@ bool Career::buyUsed(int si, std::string* msg) {
   *msg = fmt("Bought a used %s for $%d: it's seen some hours. Waiting at %s with half tanks.", s.name, price, g_world.airports[location].code);
   refreshBoard();
   return true;
+}
+float Career::failureChance(Source src, int si) const {
+  if (src == SRC_LESSON || src == SRC_NONE || kAircraft[si].special) return 0.f;
+  if (src == SRC_RENT) return 0.02f;
+  int oi = ownedIndexFor(si);
+  float cond = oi >= 0 ? clampf(fleet[oi].condition, 0.f, 1.f) : 1.f;
+  return clampf(0.05f * (1.5f - cond), 0.025f, 0.08f);   // 2.5% as new, 7.5% worn out
+}
+int Career::serviceCost(int fi) const {
+  if (fi < 0 || fi >= (int)fleet.size()) return 0;
+  const AircraftSpec& s = kAircraft[fleet[fi].spec];
+  return (int)(s.price * 0.05f * (1.f - clampf(fleet[fi].condition, 0.f, 1.f))) / 10 * 10 + 50;
+}
+bool Career::service(int fi, std::string* msg) {
+  if (fi < 0 || fi >= (int)fleet.size()) return false;
+  if (fleet[fi].location != location) { *msg = "The aircraft isn't here."; return false; }
+  int cost = serviceCost(fi);
+  if (money < cost) { *msg = fmt("Not enough money ($%d)", cost); return false; }
+  money -= cost; fleet[fi].condition = 1.f;
+  *msg = fmt("%s serviced for $%d: as new.", kAircraft[fleet[fi].spec].name, cost);
+  return true;
+}
+int Career::repairCost(int si, int kinds, bool belly) {
+  const AircraftSpec& s = kAircraft[si];
+  float f = belly ? 0.08f : 0.f;
+  if (kinds & (1 << FAIL_ENGINE_TOTAL)) f += 0.04f;
+  if (kinds & (1 << FAIL_ENGINE_PARTIAL)) f += 0.015f;
+  if (kinds & (1 << FAIL_ALTERNATOR)) f += 0.006f;
+  if (kinds & (1 << FAIL_PITOT)) f += 0.002f;
+  if (kinds & (1 << FAIL_GEAR_STUCK)) f += 0.012f;
+  if (kinds & (1 << FAIL_FLAP_ASYM)) f += 0.008f;
+  return f > 0 ? std::max(60, (int)(s.price * f) / 10 * 10) : 0;
+}
+void Career::wear(std::vector<PayoutLine>& L, int si, Source src, const FlightResult& r) {
+  const AircraftSpec& s = kAircraft[si];
+  int repair = repairCost(si, r.failureKinds, r.bellyLanding);
+  std::string what;
+  for (int k = 1; k < FAIL_COUNT; k++) if (r.failureKinds & (1 << k)) { if (!what.empty()) what += ", "; what += failureName(k); }
+  if (r.bellyLanding) { if (!what.empty()) what += ", "; what += "belly landing"; }
+  if (src == SRC_OWNED) {
+    int oi = ownedIndexFor(si);
+    if (oi >= 0) {
+      float loss = r.flightMin / 60.f * 0.015f;   // 1.5% an hour
+      float fpm = fabsf(r.touchdownFpm);
+      if (r.landed && fpm > 600) loss += 0.08f; else if (r.landed && fpm > 350) loss += 0.03f;
+      if (r.bellyLanding) loss += 0.3f;
+      fleet[oi].condition = clampf(fleet[oi].condition - loss, 0.05f, 1.f);
+      if (repair) {
+        if (insured) L.push_back({"Repairs covered by insurance (" + what + ")", 0});
+        else L.push_back({"Repairs: " + what, -repair});
+      }
+      if (insured) L.push_back({"Insurance premium", -insurancePremium(si)});
+    }
+  } else if (src == SRC_RENT && r.bellyLanding) L.push_back({"Insurance deductible (belly landing)", -(300 + s.rentFee * 2)});
 }
 void Career::payLoan(std::vector<PayoutLine>& L) {
   if (!loan.open()) return;
@@ -771,6 +828,7 @@ bool Career::save(const std::string& path) const {
   ok = ok && fprintf(f, "fleet %d\n", (int)fleet.size()) > 0;
   for (auto& p : fleet) ok = ok && fprintf(f, "plane %s %d %f %f\n", kAircraft[p.spec].id, p.location, p.fuel, p.condition) > 0;
   if (loan.open()) ok = ok && fprintf(f, "loan %s %d %d %d %f\n", kAircraft[loan.spec].id, loan.balance, loan.payment, loan.missed, loan.rate) > 0;
+  ok = ok && fprintf(f, "insured %d\n", insured ? 1 : 0) > 0;
   if (job) {   // the open job: its state, then its contract (a story contract by id, a freelance one in full)
     const JobState& J = *job;
     ok = ok && fprintf(f, "job %d %s %d %d %d %d %f %f %f %f %d %f %d %d %u\n", (int)J.state, kAircraft[J.spec].id, (int)J.src, J.at, J.legs, J.wpDone, J.jobClockMin,
@@ -840,6 +898,7 @@ bool Career::load(const std::string& path) {
       ok = ok && spec >= 0 && loc >= 0 && loc < nApt && std::isfinite(fuel);
       if (ok) c.fleet.push_back({spec, loc, std::clamp(fuel, 0.f, kAircraft[spec].maxFuel), std::clamp(cond, 0.f, 1.f)});
     }
+    else if (!strcmp(key, "insured")) { int v = 0; ok = fscanf(f, "%d", &v) == 1 && (v == 0 || v == 1); c.insured = v == 1; }
     else if (!strcmp(key, "loan")) {
       char id[64]; Loan l;
       ok = fscanf(f, "%63s %d %d %d %f", id, &l.balance, &l.payment, &l.missed, &l.rate) == 5 && l.balance >= 0 && l.payment >= 0 && l.missed >= 0 && l.missed < 3 && std::isfinite(l.rate);

@@ -88,6 +88,25 @@ struct FlightEvents {
   bool touchdown = false; float touchdownVs = 0; float touchdownSpeed = 0;
   bool crashed = false; std::string crashReason;
   bool tailStrike = false;
+  bool bellyLanding = false;   // the aircraft is skidding on its belly (gear up or stuck) - survivable on a runway at approach speed
+};
+
+// What can break on an aircraft (C7). The game rolls them per flight from the aircraft's condition and fires them with
+// Plane::fail(); the flight model applies them every step. One bit per kind (FAIL_ENGINE_* per engine index in
+// engineHealth), the whole set describes the aircraft's state for the HUD, the audio and the settlement.
+enum FailureKind { FAIL_NONE = 0, FAIL_ENGINE_PARTIAL, FAIL_ENGINE_TOTAL, FAIL_ALTERNATOR, FAIL_PITOT, FAIL_GEAR_STUCK, FAIL_FLAP_ASYM, FAIL_ICING, FAIL_COUNT };
+inline const char* failureName(int k) { static const char* n[] = {"", "Engine power loss", "Engine failure", "Alternator failure", "Pitot blocked", "Landing gear stuck", "Flap asymmetry", "Airframe icing"}; return n[k]; }
+struct Failures {
+  float engineHealth[4] = {1, 1, 1, 1};   // per engine: 1 sound, 0.5 running rough at half power, 0 stopped
+  bool alternator = false;               // the battery alone feeds the avionics: it runs down in a few minutes
+  float battery = 1;                     // 1 full .. 0 flat (avionics dark: no autopilot, no GPS)
+  bool pitot = false; float pitotIas = 0, pitotRho = 1.225f;   // blocked: the airspeed indication is frozen at what it read (it then reads like an altimeter)
+  int gearStuck = 0;                     // 0 no, 1 stuck up (won't extend), 2 stuck down (won't retract)
+  bool flapAsym = false; float flapAt = 0;   // one flap stopped where it was: a rolling moment with the deflection
+  float ice = 0;                         // 0..1 airframe ice: lift lost, drag added (grows in cloud below freezing, melts in warm air)
+  bool any() const { for (float h : engineHealth) if (h < 1) return true; return alternator || pitot || gearStuck || flapAsym || ice > 0.05f; }
+  bool avionicsDark() const { return alternator && battery <= 0.f; }
+  int enginesOut(int n) const { int k = 0; for (int i = 0; i < n && i < 4; i++) if (engineHealth[i] <= 0.f) k++; return k; }
 };
 
 class Plane {
@@ -143,6 +162,13 @@ public:
   float podTilt[4] = {0, 0, 0, 0}, podYaw[4] = {0, 0, 0, 0}, podThr[4] = {0, 0, 0, 0}, podVane[4] = {0, 0, 0, 0}, fanAngle = 0;
   vec3 surf;
   FlightEvents ev;
+  Failures fail;
+  float iceFeed = 0;   // set by the game each step: 1 in cloud or precipitation below freezing, -1 in clear warm air
+  // break something now (FailureKind; the engine index for the engine kinds). Returns false when it can't apply
+  // (a jet has no pitot ice? it does; a fixed-gear aircraft has no gear to stick; a research craft never fails)
+  bool failNow(int kind, int engine = 0);
+  bool glideOnly() const { return spec && fail.enginesOut(spec->engines) >= spec->engines; }   // every engine stopped
+  float glideRatio() const;   // best L/D of this airframe, clean (for the HUD's glide range)
   Rng rng;
 
   void reset(const AircraftSpec* s, vec3 position, float headingDeg, float fuelKg, float payloadKg, bool airborne, float speed = 0);

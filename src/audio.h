@@ -10,6 +10,7 @@ struct AudioParams {
   int engineType = 0, engines = 1, cylinders = 4, blades = 2;
   float rpm = 0, maxRpm = 2600, n1 = 0, spool = 0, throttle = 0;
   bool running = false, cranking = false;
+  float engineHealth[4] = {1, 1, 1, 1};   // per engine: 1 sound; below it a piston misfires and a turbine's n1 sags (C7)
   float airspeed = 0, groundSpeed = 0; bool onGround = false; float rough = 0;
   float stallWarn = 0; bool gearMoving = false, flapsMoving = false; float gearDown = 1, flaps = 0;
   bool interior = false, muffled = false;

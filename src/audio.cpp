@@ -50,7 +50,7 @@ struct PistonVoice {
     nz.s = seed * 7 + 1;
   }
   // returns {engine, prop} contributions
-  void tick(float sr, float rpm, float load, int cyl, int blades, float propRpm, bool running, bool cranking, float& eng, float& prop, int blockPos) {
+  void tick(float sr, float rpm, float load, int cyl, int blades, float propRpm, bool running, bool cranking, float& eng, float& prop, int blockPos, float health = 1.f) {
     float rps = rpm / 60.f;
     phase += rps / sr;
     if (phase >= 2.f) phase -= 2.f;  // full four-stroke cycle = 2 revolutions
@@ -64,6 +64,9 @@ struct PistonVoice {
       if (running) {
         float irregular = 1.f + (nz.w() * 0.5f) * (0.25f * smoothstepf(1400.f, 650.f, rpm));
         float amp = (0.48f + 0.52f * load) * cylBias[ci] * irregular;
+        // a sick engine drops cylinders: a firing event skipped at random (more the worse it is), the next one louder
+        if (health < 0.999f && nz.w() * 0.5f + 0.5f < (1.f - health) * 0.7f) { amp *= 0.08f; popEnv = 1.f; }
+        else if (popEnv > 0.5f) { amp *= 1.35f; popEnv = 0; }
         exc = amp;
         noiseEnv = amp * (0.6f + 0.4f * load);
       } else if (cranking) {
@@ -408,10 +411,12 @@ void AudioEngine::render(float* out, int frames) {
       for (int e = 0; e < ne; e++) {
         float det = e == 0 ? 1.f : 1.0065f;  // unsynchronised twins beat slowly
         if (P.engineType == 0)
-          I.pv[e].tick(sr, rpm * det, load, std::max(P.cylinders, 2), std::max(P.blades, 2), rpm * det, P.running, P.cranking, eng[e], prop[e], bp);
+          I.pv[e].tick(sr, rpm * det * (P.engineHealth[e] <= 0.f ? 0.f : 1.f), load, std::max(P.cylinders, 2), std::max(P.blades, 2), rpm * det, P.running && P.engineHealth[e] > 0.f, P.cranking, eng[e], prop[e], bp, P.engineHealth[e]);
         else {
           float propRpm = P.engineType == 1 ? rpm * det : 0.f;
-          I.tv[e].tick(sr, P.engineType == 2, n1 * det, spool, propRpm, std::max(P.blades, 2), eng[e], prop[e], bp);
+          float hn = P.engineHealth[e];   // a failed turbine's n1 rolls back to a windmill, a sick one sags and wavers
+          float n1e = hn <= 0.f ? std::min(n1, 12.f) : n1 * det * (hn < 0.999f ? 0.55f + 0.45f * hn + 0.04f * sinf(bp * 0.0007f) : 1.f);
+          I.tv[e].tick(sr, P.engineType == 2, n1e, spool * std::max(hn, 0.f), propRpm * std::max(hn, 0.f), std::max(P.blades, 2), eng[e], prop[e], bp);
         }
       }
       // cabin/exterior tone shaping

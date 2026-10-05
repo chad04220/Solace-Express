@@ -90,6 +90,27 @@ float Plane::fuelFlowMax() const {
   return spec->maxFuel / (rangeS * 0.8f);
 }
 float Plane::rangeLeftKm() const { return fuel / (fuelFlowMax() * 0.8f) * spec->cruise / 1000.f; }
+float Plane::glideRatio() const {   // clean best L/D from the aircraft's own drag build-up (gear as it is)
+  if (!spec) return 8.f;
+  const AeroModel& a = aeroModel(*spec);
+  float cd0g = cd0 + a.gearDq / spec->wingArea * gear + 0.025f * fail.ice;
+  return clampf(0.5f * sqrtf(PI * a.e * a.AR / std::max(cd0g, 0.01f)), 4.f, 25.f);
+}
+bool Plane::failNow(int kind, int engine) {
+  if (!spec || spec->special) return false;   // the research craft are maintained by the programme
+  const AircraftSpec& s = *spec;
+  engine = std::clamp(engine, 0, std::max(0, std::min(s.engines, 4) - 1));
+  switch (kind) {
+    case FAIL_ENGINE_PARTIAL: fail.engineHealth[engine] = std::min(fail.engineHealth[engine], 0.45f); return true;
+    case FAIL_ENGINE_TOTAL: fail.engineHealth[engine] = 0.f; if (fail.enginesOut(s.engines) >= s.engines) { engineRunning = false; starterTime = 0; } return true;
+    case FAIL_ALTERNATOR: fail.alternator = true; return true;
+    case FAIL_PITOT: fail.pitot = true; fail.pitotIas = ias; fail.pitotRho = density; return true;
+    case FAIL_GEAR_STUCK: if (!s.retract) return false; fail.gearStuck = gear < 0.5f ? 1 : 2; gear = gear < 0.5f ? 0.f : 1.f; return true;
+    case FAIL_FLAP_ASYM: fail.flapAsym = true; fail.flapAt = flaps; return true;
+    case FAIL_ICING: fail.ice = std::max(fail.ice, 0.3f); return true;
+    default: return false;
+  }
+}
 
 void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float fuelKg, float payloadKg, bool airborne, float speed) {
   spec = s; pos = position; fuel = fuelKg; payload = payloadKg;
@@ -97,6 +118,7 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   q = quat::axisAngle(vec3(0, 1, 0), -headingDeg * DEG);
   w = vec3(); ctl = Controls(); ev = FlightEvents(); apComfort = false; sceneryHits = true; brakeHold = 0;
   flaps = 0; gear = 1; rpm = 0; n1 = 0; engineSpool = 0; maxG = minG = 1; flightTime = 0;
+  fail = Failures(); iceFeed = 0;
   apDisengage(); apDone = false; apPitchI = 0; gust = vec3(); rng = Rng(77);
   // drag comes from the airframe's shape (aero.cpp), evaluated every step at the speed and air density of the moment
   cd0 = aeroCD0(aeroModel(*s), *s, std::max(speed, 30.f), 1.225f, speed / 340.f);
@@ -171,13 +193,22 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     if (starterTime > (s.engineType == ENG_PISTON ? 1.6f : 3.0f) && hasFuel) engineRunning = true;
   }
   if (!hasFuel) engineRunning = false;
+  // failures: the engines' health scales the power they make (a stopped engine makes none and, on a single, the
+  // engine is simply off; on a twin the dead engine's side yaws the aircraft). The battery runs down without the
+  // alternator; ice builds on the airframe in cloud below freezing and melts off in warm air.
+  float healthSum = 0; for (int i = 0; i < s.engines && i < 4; i++) healthSum += fail.engineHealth[i];
+  float health = s.engines > 0 ? healthSum / s.engines : 1.f;
+  if (fail.enginesOut(s.engines) >= s.engines && s.engines > 0) { engineRunning = false; starterTime = 0; }
+  if (fail.alternator) fail.battery = std::max(0.f, fail.battery - dt / 420.f);   // seven minutes of battery
+  fail.ice = clampf(fail.ice + (iceFeed > 0 ? dt / 240.f : iceFeed < 0 ? -dt / 90.f : 0.f), 0.f, 1.f);
   float spoolRate = s.engineType == ENG_PISTON ? 3.0f : (s.engineType == ENG_TURBOPROP ? 0.7f : (s.special ? 1.6f : 0.45f));
-  float target = engineRunning ? ctl.throttle : 0.f;
+  float target = engineRunning ? ctl.throttle * health : 0.f;
   engineSpool = approach(engineSpool, target, spoolRate, dt);
   vec3 vaW = vel - windVel;
   vec3 va = q.conj().rotate(vaW);
   float V = length(va);
   airspeed = V; ias = V * sqrtf(sigmaRho);
+  if (fail.pitot) ias = fail.pitotIas * sqrtf(fail.pitotRho / std::max(density, 0.1f));   // a blocked pitot: the reading climbs with altitude and falls with descent, never with speed
   if (s.engineType == ENG_PISTON) {
     float tr = engineRunning ? s.idleRpm + (s.maxRpm * 0.86f - s.idleRpm) * powf(engineSpool, 0.7f) + s.maxRpm * 0.12f * clampf(-va.z / s.cruise, 0, 1.3f) * sqrtf(engineSpool)
                              : (starterTime > 0 && !engineRunning ? 180.f + 40.f * sinf(time * 9.f) : clampf(-va.z * 18.f, 0, 1500));
@@ -218,10 +249,11 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   }
 
   // ---------------- configuration
-  flaps = approach(flaps, ctl.flaps, s.special ? 0.5f : 0.6f, dt);
+  if (fail.flapAsym) flaps = fail.flapAt;   // the stopped flap holds the pair where they were
+  else flaps = approach(flaps, ctl.flaps, s.special ? 0.5f : 0.6f, dt);
   nozzle = s.special == 2 ? flaps : 0.f;   // the XR-11's F/V keys tilt its thruster pods instead of flaps
-  if (s.retract) gear = clampf(gear + (ctl.gearDown ? 1.f : -1.f) * dt / 5.f, 0, 1);
-  else gear = 1;
+  if (s.retract && fail.gearStuck == 0) gear = clampf(gear + (ctl.gearDown ? 1.f : -1.f) * dt / 5.f, 0, 1);
+  else if (!s.retract) gear = 1;
 
   // ---------------- aerodynamics
   vec3 F(0, 0, 0), T(0, 0, 0);  // body-frame force and torque
@@ -237,10 +269,11 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     // lift: the wing's slope from its aspect ratio and the fuselage, steepening with Mach (Prandtl-Glauert)
     float CLa = aeroCLa(aero, std::min(mach, 0.9f));
     float cl0 = s.CL0 + s.flapCL * flaps;
-    float aStall = (s.CLmax + s.flapCL * flaps * 0.95f - cl0) / CLa;
+    float iceCL = 1.f - 0.3f * fail.ice;   // iced: the wing stalls earlier and at a lower CLmax
+    float aStall = (s.CLmax * iceCL + s.flapCL * flaps * 0.95f - cl0) / CLa;
     float aNeg = (-1.1f - cl0) / CLa;
     float sig = std::max(smoothstepf(aStall, aStall + 5 * DEG, alpha), smoothstepf(-aNeg, -aNeg + 5 * DEG, -alpha));
-    float CL = (1 - sig) * clampf(cl0 + CLa * alpha, -1.2f, s.CLmax + s.flapCL * flaps) + sig * 1.05f * sinf(2 * alpha);
+    float CL = (1 - sig) * clampf(cl0 + CLa * alpha, -1.2f, s.CLmax * iceCL + s.flapCL * flaps) + sig * 1.05f * sinf(2 * alpha);
     float ge = 1.f;
     if (altAgl < s.span) ge = 1.f + 0.12f * (1.f - altAgl / s.span);
     CL *= ge;
@@ -251,6 +284,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     float sb = sinf(beta), sa = sinf(alpha) * smoothstepf(8.f * DEG, 20.f * DEG, fabsf(alpha));
     float crossCD = 0.72f * (sb * sb * aero.sideArea + sa * sa * aero.planArea) / s.wingArea;
     float CD = cd0 + aero.gearDq / s.wingArea * gear + s.flapCD * flaps + CL * CL / (PI * aero.e * AR) / ge + sig * (0.35f + 1.1f * sinf(alpha) * sinf(alpha)) + crossCD;
+    CD += 0.025f * fail.ice;   // the ice's roughness and shape
     if (s.special) CD += 0.022f * smoothstepf(0.86f, 1.04f, mach) - 0.007f * smoothstepf(1.2f, 2.2f, mach);  // transonic drag rise
     else CD += aeroWave(aero, mach, CL);                                                                      // the wing section's drag rise
     float CY = -0.7f * beta;
@@ -274,6 +308,13 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     float Cl = -0.10f * beta - 0.55f * ph + 0.08f * rh + s.ailPow * ctl.roll * ctlEff;
     float Cn = 0.09f * beta - 0.16f * rh + s.rudPow * ctl.yaw * (1.f + wash) - 0.012f * ctl.roll;
     if (s.engines == 1 && s.engineType != ENG_JET) Cn -= 0.008f * engineSpool * smoothstepf(45.f, 10.f, V);
+    if (fail.flapAsym) Cl += 0.035f * flaps;   // the flap still out on the left lifts that wing: it rolls right, held with aileron
+    if (s.engines == 2 && !s.special) {   // a twin with an engine out: the live engine's thrust yaws it towards the dead one (and rolls it a little)
+      float asym = (fail.engineHealth[0] - fail.engineHealth[1]) * 0.5f;   // +: the right engine is the weak one
+      float arm = s.span * 0.2f, Fe = thrust * (s.engines > 0 ? 1.f : 0.f);
+      Cn += asym * Fe * arm / std::max(qbar * s.wingArea * s.span, 1.f) * 0.9f;   // (positive Cn: nose right)
+      Cl -= asym * 0.015f * engineSpool;
+    }
     // stall wing-drop
     if (sig > 0.3f) { float dv, a, b; noised(time * 0.8f, 2.2f, dv, a, b); Cl += sig * 0.04f * dv; }
     float L = Cl * qbar * s.wingArea * s.span, M = Cm * qbar * s.wingArea * s.chord, Nn = Cn * qbar * s.wingArea * s.span;
@@ -348,20 +389,35 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     vec3 vc = vel + q.rotate(cross(w, c.p));
     float spd = length(vel);
     if (water && spd > 1.f) { ev.crashed = true; ev.crashReason = "Ditched in the sea"; return; }
+    bool bellySkid = false;
     if (c.kind >= 3) {
+      // a belly landing (gear up or stuck) is survivable: on a paved runway, wings level, at approach speed and
+      // sinking gently, the aircraft skids on its belly and nose and stops; it is damaged, not wrecked
+      if ((c.kind == 3 || c.kind == 5 || c.kind == 6) && !wheels && !s.taildragger && s.special == 0) {   // (a low wing's tips touch too: they scrape along with the belly)
+        int rw = g_world.onRunway(pw.x, pw.z, 4);
+        bool gentle = -vc.y < 2.5f && fabsf(bankDeg()) < 8.f && spd < s.vref * 1.35f && fabsf(pitchDeg()) < 12.f;
+        if (ev.bellyLanding || (rw >= 0 && !surfaceRough(g_world.airports[rw].surface) && gentle)) { ev.bellyLanding = true; bellySkid = true; }
+      }
       if (c.kind == 4 && wheels && spd > 5) { ev.tailStrike = true; }
-      else if (spd > 2.5f) {
+      else if (spd > 2.5f && !bellySkid) {
         ev.crashed = true;
         ev.crashReason = c.kind == 3 ? (wheels ? "Prop/nose strike" : "Belly landing - gear was up") : c.kind == 5 ? "Wingtip struck the ground" : c.kind == 6 ? "Belly landing - gear was up" : "Struck terrain";
         if (!onGround && altAgl > 3) ev.crashReason = "Flew into terrain";
         return;
       }
+      if (bellySkid && -vc.y > 4.6f) { ev.crashed = true; ev.crashReason = fmt("Belly landing too hard - hit at %.0f fpm", -vc.y * 196.85f); return; }
     }
     if (c.kind <= 2 && -vc.y > 4.6f) { ev.crashed = true; ev.crashReason = fmt("Gear collapsed - hit at %.0f fpm", -vc.y * 196.85f); return; }
     // spring/damper normal force (world up)
     float nF = std::max(0.f, kSpring * pen - cDamp * vc.y);
     if (c.kind >= 3) nF *= 2.f;
     vec3 f(0, nF, 0);
+    if (bellySkid) {   // the belly and the nose grind along the runway: heavy friction against the motion, and it counts as on the ground
+      vec3 vh(vc.x, 0, vc.z); float vl = length(vh);
+      if (vl > 0.3f) f = f - vh * (nF * 0.55f / vl);
+      anyWheel = true; roughSum += 0.8f;
+      if (engineRunning && s.engineType != ENG_JET) { for (float& hh : fail.engineHealth) hh = 0.f; engineRunning = false; }   // the propeller strikes
+    }
     if (c.kind <= 2) {
       anyWheel = true;
       int rw = g_world.onRunway(pw.x, pw.z, 2);

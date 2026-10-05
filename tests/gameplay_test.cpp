@@ -437,6 +437,60 @@ struct GameTest {
         if ((t.crashes != c.crashes) != wantCrash || repaired != wantCrash) fails++;
       }
     }
+    // ---- engine-out landing (C7): the engine stops on a 2.2 km final in an owned Wren; the pilot glides it in. The
+    // flight succeeds, the settlement pays the emergency bonus and charges the repair (or the insurance covers it),
+    // and the aircraft's condition falls with the hours
+    for (int ins = 0; ins < 2; ins++) {
+      g.career.newGame(); g.pendingCareer.reset(); g.career.license = LIC_PPL; g.career.storyIndex = 4; g.career.location = g_world.findAirport("ORC");
+      g.career.money = 50000; g.career.fleet.push_back({1, g.career.location, kAircraft[1].maxFuel, 1.f}); g.career.insured = ins == 1;
+      int money0 = g.career.money;
+      Contract c = g_story[4]; c.wx.windSpeed = 1; c.wx.gust = 0; c.wx.turbulence = 0.02f;
+      g.startFlight(c, 1, Career::SRC_OWNED);
+      const Airport& a = g_world.airports[c.to];
+      vec3 dir = a.dir(), thr = a.threshold(false);
+      vec3 start = thr - dir * 2200.f; start.y = a.elev + 300.f;
+      g.plane.reset(&kAircraft[1], start, a.heading, 60, 150, true, kAircraft[1].vref * 1.2f);
+      g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 3;
+      g.plane.ctl.throttle = 0.5f; g.update(dt);
+      g.fireFailure(FAIL_ENGINE_TOTAL, 0);
+      bool glide = g.plane.glideOnly() && !g.plane.engineRunning && (g.result.failureKinds & (1 << FAIL_ENGINE_TOTAL));
+      s_pI = -2.f; float tdFpm = 0;
+      for (t = 0; t < 240 && g.screen == SCR_FLIGHT; t += dt) {
+        Plane& p = g.plane;
+        vec3 rel = p.pos - thr;
+        float along = dot(vec3(rel.x, 0, rel.z), dir), lat = dot(vec3(rel.x, 0, rel.z), vec3(-dir.z, 0, dir.x));
+        float agl = p.pos.y - a.elev;
+        if (!p.onGround && !g.touchedDown) {
+          float hdgT = a.heading - clampf(lat * 0.08f, -20, 20), herr = wrapAngle((hdgT - p.heading()) * DEG) / DEG;
+          p.ctl.roll = clampf((clampf(herr * 2.f, -15, 15) - p.bankDeg()) * 0.05f + p.w.z * 0.3f, -1, 1);
+          // the glide: the speed decides the pitch (best glide, then Vref over the fence), flaps only when the field is made
+          float vT = -along > 900.f ? p.spec->vref * 1.15f : p.spec->vref * 1.05f;
+          if (-along < 700.f && agl < 120.f) { p.ctl.flaps = 1.f; g.flapNotch = 1.f; }
+          float vsT = agl < 7.f ? -0.6f : clampf(-4.f + (vT - p.ias) * -0.6f, -8.f, -0.5f);
+          pitchFor(p, vsT, dt);
+          p.ctl.throttle = 1.f;   // (nothing answers)
+          p.ctl.yaw = clampf(p.beta * 3.f, -1, 1);
+        } else { p.ctl.throttle = 0; p.ctl.brake = 1; p.ctl.pitch = 0; p.ctl.roll = 0; p.ctl.yaw = 0; }
+        g.update(dt);
+        if (g.touchedDown && tdFpm == 0) tdFpm = g.touchdownFpm;
+      }
+      bool repair = false, covered = false, emergency = false; int premium = 0;
+      for (auto& l : g.payout) { if (l.label.rfind("Repairs:", 0) == 0) repair = l.amount < 0; if (l.label.find("covered by insurance") != std::string::npos) covered = true; if (l.label == "Emergency handled") emergency = l.amount > 0; if (l.label == "Insurance premium") premium = -l.amount; }
+      float cond = g.career.fleet.empty() ? -1.f : g.career.fleet[0].condition;
+      bool ok = glide && g.screen == SCR_DEBRIEF && g.lastSuccess && g.career.location == c.to && emergency && cond > 0.f && cond < 1.f
+                && (ins ? covered && !repair && premium > 0 : repair && !covered && premium == 0);
+      printf("Engine-out landing (%s): success=%d touchdown %.0f fpm, emergency bonus %d, repair %d, covered %d, premium %d, condition %.3f, money %+d %s\n",
+             ins ? "insured" : "uninsured", g.lastSuccess, tdFpm, emergency, repair, covered, premium, cond, g.career.money - money0, ok ? "ok" : "FAIL");
+      if (!ok) for (auto& l : g.payout) printf("   %-40s %d\n", l.label.c_str(), l.amount);
+      fails += !ok;
+    }
+    {   // the roll: lessons never break; an owned aircraft's chance rises as its condition falls; a service restores it
+      Career k; k.newGame(); k.license = LIC_CPL; k.money = 100000; k.fleet.push_back({1, k.location, kAircraft[1].maxFuel, 1.f});
+      float pNew = k.failureChance(Career::SRC_OWNED, 1); k.fleet[0].condition = 0.3f; float pWorn = k.failureChance(Career::SRC_OWNED, 1);
+      std::string m; bool sv = k.service(0, &m);
+      bool ok = k.failureChance(Career::SRC_LESSON, 0) == 0.f && pNew > 0.f && pWorn > pNew * 1.5f && sv && k.fleet[0].condition == 1.f && k.money < 100000 && k.failureChance(Career::SRC_RENT, 1) > 0.f;
+      printf("Failure chance: new %.3f, worn %.3f, lesson 0, serviced (%s) %s\n", pNew, pWorn, m.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
+    }
     // ---- a diversion leaves you (and your aircraft) where you landed
     {
       Career t; t.newGame(); t.license = LIC_ATP;
