@@ -227,17 +227,28 @@ public:
 private:
   // ---- aircraft hull meshes (aircraft_hull.cpp): where each pixel's exact airframe march starts
   struct HullMesh { uint64_t key = 0; GLuint vbo = 0; int verts = 0; bool ok = false; };
+  // the aircraft mesh (aircraft_mesh.cpp): the static part of the airframe baked from its field, and the hull of the
+  // part that moves (the march's start on the raster path, where the mesh leaves off)
+  struct PlaneMesh { uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; };
+  std::unordered_map<uint64_t, PlaneMesh> planeMeshes;
+  GLuint progPlaneMesh = 0;
+  bool compilePlaneMesh();
+  bool planeMeshWanted(const FrameParams& fp) const;
+  void bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key);
+  void drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm);
   std::unordered_map<uint64_t, HullMesh> hulls;   // every airframe baked so far, outside and cockpit (keyed by hullKey)
   GLuint progHull = 0, progHullBake = 0, vaoHull = 0, texHPts = 0, texHOut = 0, fboHOut = 0, fboHull = 0, texHullDepth = 0;
   int hullDepthW = 0, hullDepthH = 0;
   bool hullOn = false;
   bool compileHull(const std::string& bakeVS, const std::string& bakeFS);
   void hullEval(const std::vector<vec3>& pts, std::vector<float>& out);
+  void hullEval4(const std::vector<vec3>& pts, std::vector<float>& out);
   void bakeHull(const FrameParams& fp, int slot, uint64_t key);
   uint64_t hullKey(const FrameParams& fp, int slot) const;
   bool hullWanted(const FrameParams& fp) const;
   float hullNear(const FrameParams& fp) const;
-  void drawHull(const FrameParams& fp, int slot, uint64_t key);
+  void drawHull(const FrameParams& fp, int slot, uint64_t key, float nearOverride = -1.f);
+  float hullNearNow = 0.f;   // the hull pass's near distance this frame (uHullNear): hullNear(fp), or a mesh's moving hull's own
   void drawTrafficHulls(const FrameParams& fp);
   void ensureHullTarget();
   bool trafHullOn = false;
@@ -272,6 +283,7 @@ public:
   bool hullBaked(const FrameParams& fp) const;   // the hull this frame wants is ready (or none is wanted)
   bool hullCockpit = getenv("HULLCOCKPIT") != nullptr;   // cockpit hulls too (in testing)
   bool hullOff = getenv("HULLOFF") != nullptr;           // debug: no hulls (every aircraft march starts from the camera)
+  bool meshOff = getenv("MESHOFF") != nullptr;           // debug: no aircraft meshes on the raster path (the whole airframe marches)
   bool envOff = getenv("ENVOFF") != nullptr;             // debug: no terrain envelope (every pixel marches from the camera)
   bool tshPending() const { return tshBaking || tshFront < 0; }
   void resetTemporal() {   // forget every frame-to-frame accumulation (TAA history, jitter/seed sequence, terrain-shadow bake):

@@ -38,9 +38,6 @@ void main(){
   oT = uChan == 2 ? vec4(0.0, 0.0, v, 0.0) : vec4(0.0, v, 0.0, 0.0);
 }
 )";
-struct HullState { float ps[4], ctl[4]; };
-const float kS0 = 1.f, kS1 = 0.25f, kS2 = 0.0625f;   // cell sizes of the three levels
-float halfDiag(float s) { return s * 0.8660254f; }
 }
 
 bool Renderer::compileHull(const std::string& bakeVS, const std::string& bakeFS) {
@@ -52,9 +49,17 @@ bool Renderer::compileHull(const std::string& bakeVS, const std::string& bakeFS)
 
 // distances of a list of aircraft-space points (the bake program and its uniforms are already bound)
 void Renderer::hullEval(const std::vector<vec3>& pts, std::vector<float>& out) {
+  std::vector<float> o4;
+  hullEval4(pts, o4);
+  out.resize(pts.size());
+  for (size_t i = 0; i < pts.size(); i++) out[i] = o4[i * 4];
+}
+// the bake program's four outputs per point (kHullBakeMain: by uHMode the distance | distance, material id, cabin AO
+// | the normal)
+void Renderer::hullEval4(const std::vector<vec3>& pts, std::vector<float>& out) {
   const int TW = 512;
   int n = (int)pts.size(), rows = (n + TW - 1) / TW;
-  out.assign(n, 1e9f);
+  out.assign((size_t)n * 4, 1e9f);
   if (!n) return;
   std::vector<float> buf((size_t)TW * rows * 4, 1e4f);
   for (int i = 0; i < n; i++) { buf[(size_t)i * 4] = pts[i].x; buf[(size_t)i * 4 + 1] = pts[i].y; buf[(size_t)i * 4 + 2] = pts[i].z; }
@@ -67,7 +72,7 @@ void Renderer::hullEval(const std::vector<vec3>& pts, std::vector<float>& out) {
   glUniform1i(glGetUniformLocation(progHullBake, "uHPts"), 19);
   glActiveTexture(GL_TEXTURE0 + 18);   // (the result texture is only created here; it is not sampled)
   glBindTexture(GL_TEXTURE_2D, texHOut);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, TW, rows, 0, GL_RED, GL_FLOAT, nullptr);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, TW, rows, 0, GL_RGBA, GL_FLOAT, nullptr);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glBindFramebuffer(GL_FRAMEBUFFER, fboHOut);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texHOut, 0);
@@ -83,16 +88,16 @@ void Renderer::hullEval(const std::vector<vec3>& pts, std::vector<float>& out) {
     glDisable(GL_SCISSOR_TEST);
     glFinish();
   }
-  std::vector<float> res((size_t)TW * rows);
+  std::vector<float> res((size_t)TW * rows * 4);
   glReadBuffer(GL_COLOR_ATTACHMENT0);
-  glReadPixels(0, 0, TW, rows, GL_RED, GL_FLOAT, res.data());
+  glReadPixels(0, 0, TW, rows, GL_RGBA, GL_FLOAT, res.data());
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   // leave units 18 and 19 as the other passes expect them (18: the baked terrain shadow, read without rebinding by
   // the passes that run before the ray tracer sets its textures)
   glActiveTexture(GL_TEXTURE0 + 19); glBindTexture(GL_TEXTURE_2D, 0);
   glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, tshFront >= 0 ? texTSh[tshFront] : 0);
   glActiveTexture(GL_TEXTURE0);
-  for (int i = 0; i < n; i++) out[i] = res[i];
+  std::copy(res.begin(), res.begin() + (size_t)n * 4, out.begin());
 }
 
 // Bake the hull of the current airframe into slot (0 outside, 1 cockpit). The bake program is bound with the ray
@@ -102,34 +107,15 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
   const float* M = pv.M;   // 24 vec4
   auto m = [&](int i, int c) { return M[i * 4 + c]; };
   bool inside = slot == 1;
-  bool retract = (int)(m(0, 1) + 0.5f) >= 3;
   // the states: each moving part swept through its range (the others at rest), the yoke through pull x turn
-  std::vector<HullState> st;
-  auto add = [&](float gear, float flaps, float steer, float p, float r, float y, float thr) {
-    st.push_back({{gear, flaps, steer, inside ? 1.f : 0.f}, {p, r, y, thr}});
-  };
-  if (retract) {   // dense where the doors swing (the first fifth of the travel), then every 1/16
-    for (int i = 0; i <= 8; i++) add(0.025f * i, 0, 0, 0, 0, 0, 0);
-    for (int i = 1; i <= 13; i++) add(0.2f + 0.8f * i / 13.f, 0, 0, 0, 0, 0, 0);
-  } else add(1, 0, 0, 0, 0, 0, 0);
-  for (int i = 0; i <= 8; i++) {
-    float u = i / 8.f, s = u * 2.f - 1.f;
-    add(1, u, 0, 0, 0, 0, 0);                // flaps
-    add(1, 0, 0.45f * s, 0, 0, 0, 0);        // nose / tail wheel steering
-    add(1, 0, 0, s, 0, 0, 0);                // elevator (and the yoke's pull)
-    add(1, 0, 0, 0, s, 0, 0);                // ailerons (and the yoke's turn)
-    add(1, 0, 0, 0, 0, s, 0);                // rudder and pedals
-  }
-  if (inside) {
-    for (int i = 0; i <= 4; i++) for (int k = 0; k <= 4; k++) add(1, 0, 0, i * 0.5f - 1.f, k * 0.5f - 1.f, 0, 0);   // yoke
-    for (int i = 0; i <= 4; i++) add(1, 0, 0, 0, 0, 0, i * 0.25f);                                                  // throttle
-  }
-  int ns = std::min((int)st.size(), 128);
+  std::vector<HullState> st = hullStateList(M, inside);
+  int ns = (int)st.size();
   std::vector<float> sps(128 * 4, 0.f), sct(128 * 4, 0.f);
   for (int i = 0; i < ns; i++) for (int c = 0; c < 4; c++) { sps[i * 4 + c] = st[i].ps[c]; sct[i * 4 + c] = st[i].ctl[c]; }
   glUniform1i(glGetUniformLocation(progHullBake, "uHStN"), ns);
   glUniform4fv(glGetUniformLocation(progHullBake, "uHStPS"), 128, sps.data());
   glUniform4fv(glGetUniformLocation(progHullBake, "uHStCtl"), 128, sct.data());
+  glUniform1i(glGetUniformLocation(progHullBake, "uHMode"), 0);
 
   const float slack = 1.3f;   // the distance field may overstate distances by up to ~25%
   const float d1 = slack * halfDiag(kS1) + 0.05f + 0.02f;   // 0.25 m voxels: + half the largest step between states
@@ -139,8 +125,8 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
   int n0 = 2 * (int)ceilf(br / kS0); float org = -n0 * 0.5f * kS0;   // cube of level-0 cells around the origin
   int n1 = n0 * 4;
   // the cabin (cockpit hull only), in level-1 cells
-  float E[4] = {m(22, 0), m(22, 1), m(22, 2), m(22, 3)}, pz = m(21, 3);
-  float cb0[3] = {-1.1f, E[1] - 1.25f, std::min(pz, E[2]) - 0.7f}, cb1[3] = {1.1f, E[1] + 0.5f, E[2] + 1.6f};
+  float E[4] = {m(22, 0), m(22, 1), m(22, 2), m(22, 3)};
+  float cb0[3], cb1[3]; cabinBox(M, cb0, cb1);
   auto inCabin = [&](int i, int j, int k) {
     if (!inside) return false;
     float lo[3] = {org + i * kS1, org + j * kS1, org + k * kS1};
@@ -307,8 +293,9 @@ void Renderer::ensureHullTarget() {
   }
 }
 
-void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key) {
+void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key, float nearOverride) {
   hullOn = false;
+  hullNearNow = nearOverride >= 0.f ? nearOverride : hullNear(fp);
   auto it = hulls.find(key);
   if (it == hulls.end()) return;
   HullMesh& H = it->second;
@@ -333,7 +320,7 @@ void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key) {
   glUniformMatrix4fv(glGetUniformLocation(progHull, "uVP"), 1, GL_FALSE, vp.m);
   glUniform2f(glGetUniformLocation(progHull, "uJit"), jitX, jitY);
   glUniform3f(glGetUniformLocation(progHull, "uCam"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
-  glUniform1f(glGetUniformLocation(progHull, "uFree"), hullNear(fp));
+  glUniform1f(glGetUniformLocation(progHull, "uFree"), hullNearNow);
   glUniformMatrix3fv(glGetUniformLocation(progHull, "uRot"), 1, GL_FALSE, fp.plane.rot);
   glUniform3f(glGetUniformLocation(progHull, "uPos"), fp.plane.pos.x, fp.plane.pos.y, fp.plane.pos.z);
   if (!vaoHull) glGenVertexArrays(1, &vaoHull);

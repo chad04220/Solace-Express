@@ -3,8 +3,49 @@
 // With `fine`, every face is laid on the sub-voxel lattice (unit U = the sub-voxel size), else on the voxel lattice.
 #pragma once
 #include "common.h"
+#include <algorithm>
 #include <unordered_map>
 #include <vector>
+
+// The airframe's moving parts' states the hull bake and the mesh bake sweep: the gear, flaps, steering and the
+// controls (and in the cockpit the yoke and the throttle) each through their range, the others at rest. M: the
+// packed model (models.cpp packModel), inside: the cockpit field. The first state is the rest state.
+struct HullState { float ps[4], ctl[4]; };
+const float kS0 = 1.f, kS1 = 0.25f, kS2 = 0.0625f;   // cell sizes of the three voxel levels
+inline float halfDiag(float s) { return s * 0.8660254f; }
+inline std::vector<HullState> hullStateList(const float* M, bool inside) {
+  std::vector<HullState> st;
+  auto add = [&](float gear, float flaps, float steer, float p, float r, float y, float thr) {
+    st.push_back({{gear, flaps, steer, inside ? 1.f : 0.f}, {p, r, y, thr}});
+  };
+  bool retract = (int)(M[1] + 0.5f) >= 3;
+  add(1, 0, 0, 0, 0, 0, 0);   // rest: gear down, flaps up, controls centred
+  if (retract) {   // dense where the doors swing (the first fifth of the travel), then every 1/16
+    for (int i = 0; i <= 8; i++) add(0.025f * i, 0, 0, 0, 0, 0, 0);
+    for (int i = 1; i <= 12; i++) add(0.2f + 0.8f * i / 13.f, 0, 0, 0, 0, 0, 0);
+  }
+  for (int i = 0; i <= 8; i++) {
+    float u = i / 8.f, s = u * 2.f - 1.f;
+    add(1, u, 0, 0, 0, 0, 0);                // flaps
+    add(1, 0, 0.45f * s, 0, 0, 0, 0);        // nose / tail wheel steering
+    add(1, 0, 0, s, 0, 0, 0);                // elevator (and the yoke's pull)
+    add(1, 0, 0, 0, s, 0, 0);                // ailerons (and the yoke's turn)
+    add(1, 0, 0, 0, 0, s, 0);                // rudder and pedals
+  }
+  if (inside) {
+    for (int i = 0; i <= 4; i++) for (int k = 0; k <= 4; k++) add(1, 0, 0, i * 0.5f - 1.f, k * 0.5f - 1.f, 0, 0);   // yoke
+    for (int i = 0; i <= 4; i++) add(1, 0, 0, 0, 0, 0, i * 0.25f);                                                  // throttle
+  }
+  if (st.size() > 128) st.resize(128);
+  return st;
+}
+// the cabin's box (body space), where the cockpit hull refines to 6.25 cm voxels
+inline void cabinBox(const float* M, float* lo, float* hi) {
+  auto m = [&](int i, int c) { return M[i * 4 + c]; };
+  float E[3] = {m(22, 0), m(22, 1), m(22, 2)}, pz = m(21, 3);
+  lo[0] = -1.1f; lo[1] = E[1] - 1.25f; lo[2] = std::min(pz, E[2]) - 0.7f;
+  hi[0] = 1.1f; hi[1] = E[1] + 0.5f; hi[2] = E[2] + 1.6f;
+}
 
 inline void hullFaces(int n1, float org, float U, bool fine, const std::vector<uint8_t>& state,
                       const std::unordered_map<int, uint64_t>& mask, std::vector<float>& tri) {

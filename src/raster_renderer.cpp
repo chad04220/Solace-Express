@@ -15,6 +15,7 @@ bool Renderer::compileRaster() {
   if (!progShProxy) { error = "Shadow proxy shader: " + e; return false; }
   progEffects = linkProgramCached(kFullscreenVS, effectsFSAssembly(""), e);
   if (!progEffects) { error = "Effects shader: " + e; return false; }
+  if (!compilePlaneMesh()) return false;
   return compileTerrainMesh();
 }
 
@@ -38,10 +39,17 @@ void Renderer::rasterWorld(const FrameParams& fp) {
 // player's aircraft starts its march on its rasterized hull, as in the ray tracer.
 void Renderer::rasterObjects(const FrameParams& fp) {
   hullOn = false;
-  const bool hullUse = hullWanted(fp) && fp.pano <= 0.f;   // (the hulls are flat rasters: a panorama camera marches without them)
-  const int hullSlot = fp.plane.PS[3] > 0.5f ? 1 : 0;
-  const uint64_t hullK = hullUse ? hullKey(fp, hullSlot) : 0;
-  if (hullUse && hulls.count(hullK)) drawHull(fp, hullSlot, hullK);
+  const int slot = fp.plane.PS[3] > 0.5f ? 1 : 0;
+  // the player's aircraft as a mesh where it never moves (aircraft_mesh.cpp): then only its moving parts are marched,
+  // from the hull round them; without one, the whole airframe is marched from its full hull as the ray tracer does
+  const bool meshUse = planeMeshWanted(fp) && fp.pano <= 0.f;
+  const uint64_t meshK = meshUse ? hullKey(fp, slot) : 0;
+  auto pm = meshUse ? planeMeshes.find(meshK) : planeMeshes.end();
+  const bool meshOn = pm != planeMeshes.end() && pm->second.ok;
+  const bool hullUse = !meshOn && hullWanted(fp) && fp.pano <= 0.f;   // (the hulls are flat rasters: a panorama camera marches without them)
+  const uint64_t hullK = hullUse ? hullKey(fp, slot) : 0;
+  if (meshOn) drawHull(fp, slot, pm->second.movKey, pm->second.eyeInMov ? -1.f : 0.f);
+  else if (hullUse && hulls.count(hullK)) drawHull(fp, slot, hullK);
   if (fp.pano <= 0.f) drawTrafficHulls(fp); else trafHullOn = false;
   glBindFramebuffer(GL_FRAMEBUFFER, fboGB);
   GLenum gb[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
@@ -49,16 +57,21 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   glViewport(0, 0, rw, rh);
   glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
   glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
+  if (meshOn) drawPlaneMesh(fp, pm->second);
   setRT(progObjects, fp);
   for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, 0); }   // (the G-buffer is the target here, never read)
   glUniform1f(U(progObjects, "uLogC"), 2.f / log2f(40000.f + 1.f));
+  glUniform1i(U(progObjects, "uMeshOn"), meshOn ? 1 : 0);
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);
   glDisable(GL_DEPTH_TEST);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  // a new airframe or view: bake its hull with the ray tracer's own shape code (used from the next frame on)
-  if (hullUse && !feedPass && !hulls.count(hullK)) { setRT(progHullBake, fp); bakeHull(fp, hullSlot, hullK); }
+  // a new airframe or view: bake its mesh (or its hull) with the ray tracer's own shape code (used from the next frame on)
+  if (!feedPass) {
+    if (meshUse && pm == planeMeshes.end()) { setRT(progHullBake, fp); bakePlaneMesh(fp, slot, meshK); }
+    else if (hullUse && !hulls.count(hullK)) { setRT(progHullBake, fp); bakeHull(fp, slot, hullK); }
+  }
 }
 
 // The airframes' shadows on the G-buffer's surfaces (the sun on the ground, the landing lights' beams): texGB[4]

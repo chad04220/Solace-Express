@@ -8,6 +8,7 @@
 //! and the cameras' pictures, as in the ray tracer, not from the sun.
 in vec2 vUV;
 uniform float uLogC;
+uniform int uMeshOn;   // the player's aircraft is drawn as a mesh where it never moves: march only where its moving hull says
 void main(){
   gZero = min(uQuality, 0);
   loadMain();
@@ -22,7 +23,9 @@ void main(){
   if (uHullOn == 1 && uWreck == 0) { float hv = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).g; hullT = hv > 1e29 ? hv : (hv > 0.0 ? max(uHullNear, hv*0.999 - 0.1) : 0.0); }
   if (uFeedSkip > 0.0 && hullT == 0.0) hullT = uFeedSkip;
   bool jetC = int(gM[0].z + 0.5) >= 5;
-  vec2 hTop = tracePlaneHull(ro, rd, cockpitView ? (jetC ? 6.0 : planeBound()*2.0) : tmax, hullT);
+  // (the player's aircraft as a mesh: only a pixel its moving hull covers has anything left to march - and in the
+  // cockpit the first uHullNear metres from the eye, whose hull faces the hull pass drops, as the ray tracer does)
+  vec2 hTop = uMeshOn == 1 && (uHullOn == 0 || (hullT > 1e29 && uHullNear <= 0.0)) ? vec2(-1.0) : tracePlaneHull(ro, rd, cockpitView ? (jetC ? 6.0 : planeBound()*2.0) : tmax, hullT);
   int hTopPiece = gPI;   // (traffic tracing moves the piece transform; restored before shading)
   if (cockpitView && hTop.x > 0.0) {
     int id0 = int(hTop.y + 0.5);
@@ -81,26 +84,6 @@ void main(){
     return;
   }
   // the aircraft, a traffic aircraft or a wreck piece (gP* hold the transform of the piece that was hit)
-  int mid = int(ph.y + 0.5);
-  Mat m; vec3 n, lp, ln; bool interior, podMat;
-  gDispPx = false;
-  planeMaterial(p, rd, t, mid, trafHit, m, n, lp, ln, interior, podMat);
-  int flags = (trafHit || uWreck > 0) ? GBF_MOVING : GBF_RIGID;
-  if (pod || interior || podMat) {   // the cockpit: lit by its own fixtures and the sun through the windows (rt_shade.glsl)
-    vec3 col = planeLight(p, rd, t, mid, m, n, lp, ln, interior, podMat, trafHit);
-    if (pod && wr) col += wrHolo(ro, rd, t);   // the hologram floats inside the cabin, in front of everything
-    if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
-    gbWritePrelit(t, n, pod ? GB_POD : GB_CABIN, clamp(col, vec3(0.0), vec3(3e4)));
-    oG3 = vec4(1.0, 1.0, 1.0, float(flags + (gDispPx ? GBF_DISPLAY : 0))/255.0);
-    return;
-  }
-  // the exterior: the sun's shadow terms the lighting pass can't compute - the terrain's is one value for the whole
-  // intact airframe (from the CPU), the airframe's own is a march through the field
-  float tsh = 1.0, self = 1.0;
-  if (sunVis > 0.0) {
-    tsh = (trafHit || uWreck > 0) ? terrainShadow(p, uSunDir, t) : uPlaneTSh;
-    if (tsh > 0.0 && !trafHit) self = planeShadow(p + n*0.02, uSunDir);
-  }
-  gbWrite(t, n, trafHit ? GB_TRAFFIC : uWreck > 0 ? GB_WRECK : GB_PLANE, m, 1.0);
-  oG3 = vec4(1.0, self, tsh, float(flags + (mid <= 5 ? GBF_GLINT : 0) + (gDispPx ? GBF_DISPLAY : 0))/255.0);
+  vec3 lp0 = gPC + transpose(gPR)*(p - gPP);
+  planeToGB(p, rd, t, int(ph.y + 0.5), planeNormal(lp0), pod, trafHit, -1.0);
 }

@@ -29,6 +29,8 @@ int main(int argc, char** argv) {
     put(dir, "objects.frag", objectsFSAssembly(""));
     put(dir, "shadow_proxy.frag", shadowProxyFSAssembly(""));
     put(dir, "effects.frag", effectsFSAssembly(""));
+    put(dir, "plane_mesh.vert", planeMeshVSAssembly(""));
+    put(dir, "plane_mesh.frag", planeMeshFSAssembly(""));
   }
   return 0;
 }

@@ -157,8 +157,10 @@ float lightShadow(int i, vec3 p, vec3 n, vec3 l, float d){
 }
 
 // Cheap ambient occlusion from the cockpit's own distance field (3 taps along the normal)
+float gInteriorAO = -1.0;   // the mesh pass: the cabin's ambient occlusion baked per vertex (-1: tap the field)
 float interiorAO(vec3 p, vec3 n){
   if ((uDbg & 512) != 0) return 1.0;
+  if (gInteriorAO >= 0.0) return gInteriorAO;
   float occ = 0.0, w = 1.0;
   for (int i = 1 + gZero; i <= 3; i++) { float h = 0.02*float(i*i); occ += (h - mapPlane(p + n*h).x)*w; w *= 0.55; }
   return clamp(1.0 - 3.5*occ, 0.3, 1.0);

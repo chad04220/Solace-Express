@@ -6,10 +6,16 @@
 // distance field returned (11 becomes 1 on the cabin top from outside), trafHit: a traffic aircraft (the globals hold
 // it). Out: the material, the shading normal (world), the body-space point and normal, and the two lighting classes:
 // a cabin interior (sun through the windows and the cabin fixtures) or a sealed research pod (fixtures only).
+void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 lnIn, out Mat m, out vec3 n, out vec3 lp, out vec3 ln, out bool interior, out bool podMat);
 void planeMaterial(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, out Mat m, out vec3 n, out vec3 lp, out vec3 ln, out bool interior, out bool podMat){
+  vec3 lp0 = gPC + transpose(gPR)*(p - gPP);
+  planeMaterialN(p, rd, t, mid, trafHit, planeNormal(lp0), m, n, lp, ln, interior, podMat);
+}
+// (the same with the body-space normal given: the mesh pass carries it per vertex, the march computes it from the field)
+void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 lnIn, out Mat m, out vec3 n, out vec3 lp, out vec3 ln, out bool interior, out bool podMat){
   mat3 inv = transpose(gPR);
   lp = gPC + inv*(p - gPP);
-  ln = planeNormal(lp);
+  ln = lnIn;
   n = gPR*ln;
   if (mid == 11) { vec3 sc = fusSection(lp.z); vec3 rad = vec3(lp.x, lp.y - sc.z, 0.0); if (dot(ln, rad) > 0.55*length(rad) && lp.y > gM[22].y - 0.9) mid = 1; }
   m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
