@@ -5,7 +5,7 @@
 // diamond wing with a forward-swept trailing edge and elevons, canted all-moving ruddervators, four tilting thruster
 // pods on pylons (intake fans, iris nozzles, vectoring vanes, trunnions and hydraulic tilt actuators), a belly bomb
 // bay with clamshell doors and the bomb in its cradle, and two laser turrets that drop out of the forward chines.
-// uWr: [0] pod tilt, [1] pod yaw vane, [2] pod thrust, [3] pod pitch vane, [4] fan angle, bay, lasers, stealth,
+// gWr (uWr, or a bake state): [0] pod tilt, [1] pod yaw vane, [2] pod thrust, [3] pod pitch vane, [4] fan angle, bay, lasers, stealth,
 // [5] elevon, ruddervator, roll surfaces, laser fire, [6] bomb loaded, cloak sweep, weapons armed, -
 const vec3 WR_POD[4] = vec3[4](vec3(-2.35, -0.08, -3.3), vec3(2.35, -0.08, -3.3), vec3(-2.75, 0.05, 3.45), vec3(2.75, 0.05, 3.45));
 float wrOct(vec2 q){ q = abs(q); return max(max(q.x, q.y), (q.x + q.y)*0.70711); }
@@ -33,7 +33,7 @@ float wrBody(vec3 p){
 vec2 wrPod(vec3 p, int i, float lim){
   vec3 P = WR_POD[i];
   if (length(p - P) - 2.2 > lim) return vec2(1e5, 0.0);
-  float tilt = uWr[0][i], yawv = uWr[1][i], thr = uWr[2][i], vane = uWr[3][i];
+  float tilt = gWr[0][i], yawv = gWr[1][i], thr = gWr[2][i], vane = gWr[3][i];
   float side = P.x > 0.0 ? 1.0 : -1.0;
   vec3 q = p - P; q.yz = rot2(q.yz, -tilt);
   // faceted nacelle: an octagonal shell that tapers aft, open at both ends
@@ -48,7 +48,7 @@ vec2 wrPod(vec3 p, int i, float lim){
   res = opU(res, vec2(max(abs(oc - R + 0.035) - 0.035, abs(q.z + 1.33) - 0.025 - 0.02*abs(fract(atan(q.y, q.x)*1.273) - 0.5)), 84.0));
   // intake fan: hub and 14 twisted blades turning with the spool
   float r = length(q.xy);
-  float a = atan(q.y, q.x) + uWr[4].x*(side > 0.0 ? 1.0 : -1.0);
+  float a = atan(q.y, q.x) + gWr[4].x*(side > 0.0 ? 1.0 : -1.0);
   float sec = 6.28318/14.0; float aa = mod(a + sec*0.5, sec) - sec*0.5;
   vec2 bp = rot2(vec2(r*aa, q.z + 0.86), 0.65);
   float blade = max(max(abs(bp.x) - 0.11, abs(bp.y) - 0.012), max(r - (R - 0.08), 0.1 - r));
@@ -126,7 +126,7 @@ vec2 mapWraith(vec3 p){
     res = opU(res, vec2(max(sdBox(iq - vec3(0.0, 0.0, 0.25), vec3(0.24, 0.13, 0.7)), -face - 0.04), 93.0));
   }
   // bomb bay: clamshell doors hinged at the outer edges, cavity with frames, the bomb in its cradle
-  float bay = uWr[4].y;
+  float bay = gWr[4].y;
   {
     float by = bot + 0.005;
     vec3 cq = vec3(p.x, p.y - (by + 0.24), p.z - 0.1);
@@ -138,7 +138,7 @@ vec2 mapWraith(vec3 p){
     vec2 dr = rot2(dq.xy, -bay*1.75);
     float door = sdRoundBox(vec3(dr.x + 0.265, dr.y + 0.014, dq.z), vec3(0.265, 0.014, 1.66), 0.004);
     res = opU(res, vec2(door, 81.0));
-    float bl = uWr[6].x;
+    float bl = gWr[6].x;
     if (bl > 0.01) {
       vec3 bc = vec3(0.0, by + 0.27, 0.1);
       res = opU(res, vec2(length(p - bc) - 0.29*bl, 89.0));
@@ -147,7 +147,7 @@ vec2 mapWraith(vec3 p){
     }
   }
   // laser turrets: a hatch opens in each forward chine and the emitter drops out on its arm
-  float las = uWr[4].z;
+  float las = gWr[4].z;
   if (length(ap - vec3(0.95, -0.45, -5.1)) < 2.0 + res.x) {
     vec3 lq = ap - vec3(0.95, yc - 0.18, -5.1);
     float well = sdBox(lq, vec3(0.2, 0.17, 0.5));
@@ -176,7 +176,7 @@ vec2 mapWraith(vec3 p){
   // cranked diamond wing with a forward-swept trailing edge and elevons
   {
     float s = ap.x - 1.0, t = p.y - (yc - 0.02 - s*0.012), c = p.z + 3.0;
-    float defl = -uWr[5].x*0.45 - uWr[5].z*sgn*0.45;
+    float defl = -gWr[5].x*0.45 - gWr[5].z*sgn*0.45;
     float wing = sdPanel(s, c, t, 5.2, 8.2, 1.35, 4.7, 0.035, 0.8, 1.9, 5.0);
     float elev = sdSurface(s, c, t, 5.2, 8.2, 1.35, 4.7, 0.035, 0.8, 1.9, 5.0, defl, 0.0);
     // nacelle wells: the rear pods swing through slots in the wing (just wider than the pod, as long as its swing)
@@ -195,7 +195,7 @@ vec2 mapWraith(vec3 p){
     vec3 q = ap - vec3(1.05, top - 0.05, 4.4); q.xy = rot2(q.xy, 0.72);
     // (the surface's thickness axis points outboard and down: pulling back swings both trailing edges up and inboard,
     // right rudder swings the right one out and the left one in)
-    float dv = -uWr[5].x*0.35 + uWr[5].y*sgn*0.35;
+    float dv = -gWr[5].x*0.35 + gWr[5].y*sgn*0.35;
     float fs = q.y + 0.75, span = 3.05, fsw = 1.6*3.05/2.3, hinge = 0.68, s0 = 0.14, s1 = span*0.95;
     float fin = max(sdPanel(fs, q.z, q.x, span, 2.6, 1.1, fsw, 0.04, hinge, s0, s1), -fs);   // root buried in the body
     float rv = sdSurface(fs, q.z, q.x, span, 2.6, 1.1, fsw, 0.04, hinge, s0, s1, -dv*1.4, 0.0);

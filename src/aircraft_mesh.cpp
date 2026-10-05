@@ -32,10 +32,11 @@ bool Renderer::compilePlaneMesh() {
   return true;
 }
 
-// the light aircraft (the research jets' fields animate differently and are marched as before)
+// every aircraft but a cloaked XR-11 and a wreck
 bool Renderer::planeMeshWanted(const FrameParams& fp) const {
   const PlaneVisual& pv = fp.plane;
-  return !meshOff && progPlaneMesh && progHullBake && pv.on && fp.wreck.pieces == 0 && pv.M[2] < 4.5f;
+  bool cloaked = (int)(pv.M[2] + 0.5f) == 6 && pv.wr[4][3] > 0.001f;   // (the cloak sees through the skin: that frame marches as before)
+  return !meshOff && progPlaneMesh && progHullBake && pv.on && fp.wreck.pieces == 0 && !cloaked;
 }
 
 void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
@@ -65,11 +66,13 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     // ---- the field's states, on the bake program (bound by the caller)
     std::vector<HullState> st = hullStateList(M, inside);
     const int ns = (int)st.size();
-    std::vector<float> sps(128 * 4, 0.f), sct(128 * 4, 0.f);
-    for (int i = 0; i < ns; i++) for (int c = 0; c < 4; c++) { sps[i * 4 + c] = st[i].ps[c]; sct[i * 4 + c] = st[i].ctl[c]; }
+    std::vector<float> sps(128 * 4, 0.f), sct(128 * 4, 0.f), swr(128 * 4, 0.f), swr2(128 * 4, 0.f);
+    for (int i = 0; i < ns; i++) for (int c = 0; c < 4; c++) { sps[i * 4 + c] = st[i].ps[c]; sct[i * 4 + c] = st[i].ctl[c]; swr[i * 4 + c] = st[i].wr[c]; swr2[i * 4 + c] = st[i].wr2[c]; }
     glUniform1i(U(progHullBake, "uHStN"), ns);
     glUniform4fv(U(progHullBake, "uHStPS"), 128, sps.data());
     glUniform4fv(U(progHullBake, "uHStCtl"), 128, sct.data());
+    glUniform4fv(U(progHullBake, "uHStWr"), 128, swr.data());
+    glUniform4fv(U(progHullBake, "uHStWr2"), 128, swr2.data());
     auto mode = [&](int m, int s) { glUniform1i(U(progHullBake, "uHMode"), m); glUniform1i(U(progHullBake, "uHState"), s); };
     const float slack = 1.3f;   // the field may overstate distances by up to ~25%
     float L = M[0], span = M[9 * 4];

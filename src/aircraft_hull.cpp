@@ -110,11 +110,13 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
   // the states: each moving part swept through its range (the others at rest), the yoke through pull x turn
   std::vector<HullState> st = hullStateList(M, inside);
   int ns = (int)st.size();
-  std::vector<float> sps(128 * 4, 0.f), sct(128 * 4, 0.f);
-  for (int i = 0; i < ns; i++) for (int c = 0; c < 4; c++) { sps[i * 4 + c] = st[i].ps[c]; sct[i * 4 + c] = st[i].ctl[c]; }
+  std::vector<float> sps(128 * 4, 0.f), sct(128 * 4, 0.f), swr(128 * 4, 0.f), swr2(128 * 4, 0.f);
+  for (int i = 0; i < ns; i++) for (int c = 0; c < 4; c++) { sps[i * 4 + c] = st[i].ps[c]; sct[i * 4 + c] = st[i].ctl[c]; swr[i * 4 + c] = st[i].wr[c]; swr2[i * 4 + c] = st[i].wr2[c]; }
   glUniform1i(glGetUniformLocation(progHullBake, "uHStN"), ns);
   glUniform4fv(glGetUniformLocation(progHullBake, "uHStPS"), 128, sps.data());
   glUniform4fv(glGetUniformLocation(progHullBake, "uHStCtl"), 128, sct.data());
+  glUniform4fv(glGetUniformLocation(progHullBake, "uHStWr"), 128, swr.data());
+  glUniform4fv(glGetUniformLocation(progHullBake, "uHStWr2"), 128, swr2.data());
   glUniform1i(glGetUniformLocation(progHullBake, "uHMode"), 0);
 
   const float slack = 1.3f;   // the distance field may overstate distances by up to ~25%

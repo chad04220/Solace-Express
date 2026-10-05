@@ -15,7 +15,7 @@ void main(){
   vec2 ndc = (vUV + uJit)*2.0 - 1.0;
   vec3 rd = camRay(ndc), ro = uCamPos;
   float tmax = 80000.0;
-  bool onScr = false; int scrId = 0; vec3 scrL = vec3(0.0);
+  bool onScr = false;   // a research jet's display from the pilot's seat
   // pod: a pixel on the aircraft in a cockpit view - shaded from the cockpit alone, no fog, no clouds (rt_main.glsl)
   bool pod = false, cockpitView = uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0;
   // the aircraft hull was rasterized along exactly this ray: start the airframe march where it is (0: on its inside)
@@ -29,7 +29,7 @@ void main(){
   int hTopPiece = gPI;   // (traffic tracing moves the piece transform; restored before shading)
   if (cockpitView && hTop.x > 0.0) {
     int id0 = int(hTop.y + 0.5);
-    if (jetC && ((id0 >= 41 && id0 <= 43) || (id0 >= 61 && id0 <= 63))) { onScr = true; scrId = id0; scrL = transpose(uPlaneRot)*(ro + rd*hTop.x - uPlanePos); }
+    if (jetC && ((id0 >= 41 && id0 <= 43) || (id0 >= 61 && id0 <= 63))) onScr = true;
     else pod = true;
   }
   // the cloaked part of the XR-11 is see-through: its own pass draws it over the lit frame
@@ -72,18 +72,8 @@ void main(){
     oG3 = vec4(1.0, 1.0, sunVis > 0.0 ? terrainShadow(p + dn*0.05, uSunDir, t) : 0.0, float(GBF_MOVING)/255.0);
     return;
   }
-  bool wr = int(gM[0].z + 0.5) == 6;
-  if (onScr) {   // a display: its camera's picture, with the display's own look and symbology over it
-    bool bomb; vec3 rdc;
-    vec3 col = feedScreen(scrId, scrL, rdc, bomb);
-    col = bomb ? wrFeedOverlay(col, scrL) : wr ? wraithScreen(col, rdc, scrId, scrL) : jetScreen(col, rdc, scrId, scrL);
-    if (wr) col += wrHolo(ro, rd, t);   // the hologram floats inside the cabin, in front of the displays
-    if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
-    gbWritePrelit(t, -rd, GB_DISPLAY, clamp(col, vec3(0.0), vec3(3e4)));
-    oG3 = vec4(1.0, 1.0, 1.0, float(GBF_DISPLAY)/255.0);
-    return;
-  }
-  // the aircraft, a traffic aircraft or a wreck piece (gP* hold the transform of the piece that was hit)
+  // the aircraft, a traffic aircraft or a wreck piece (gP* hold the transform of the piece that was hit); a display
+  // in a research jet's cockpit shows its camera's picture (plane_gb.glsl)
   vec3 lp0 = gPC + transpose(gPR)*(p - gPP);
-  planeToGB(p, rd, t, int(ph.y + 0.5), planeNormal(lp0), pod, trafHit, -1.0);
+  planeToGB(p, rd, t, int(ph.y + 0.5), planeNormal(lp0), pod || onScr, trafHit, -1.0);
 }

@@ -6,6 +6,18 @@
 void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHit, float aoIn){
   float sunVis = smoothstep(-0.05, 0.05, uSunDir.y);
   bool wr = int(gM[0].z + 0.5) == 6;
+  // a research jet's display from the pilot's seat: its camera's picture, with the display's own look and symbology
+  if (pod && int(gM[0].z + 0.5) >= 5 && ((mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63))) {
+    vec3 scrL = transpose(uPlaneRot)*(p - uPlanePos);
+    bool bomb; vec3 rdc;
+    vec3 col = feedScreen(mid, scrL, rdc, bomb);
+    col = bomb ? wrFeedOverlay(col, scrL) : wr ? wraithScreen(col, rdc, mid, scrL) : jetScreen(col, rdc, mid, scrL);
+    if (wr) col += wrHolo(uCamPos, rd, t);   // the hologram floats inside the cabin, in front of the displays
+    if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
+    gbWritePrelit(t, -rd, GB_DISPLAY, clamp(col, vec3(0.0), vec3(3e4)));
+    oG3 = vec4(1.0, 1.0, 1.0, float(GBF_DISPLAY)/255.0);
+    return;
+  }
   Mat m; vec3 n, lp, lnOut; bool interior, podMat;
   gDispPx = false;
   planeMaterialN(p, rd, t, mid, trafHit, ln, m, n, lp, lnOut, interior, podMat);

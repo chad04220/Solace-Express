@@ -4,8 +4,17 @@
 //! (a hull built from it holds the airframe in any of them); 4: the greatest; 1: the distance in state uHState; 2: in
 //! that state the distance, the material id and the cabin's ambient occlusion; 3: in that state the surface normal.
 
-uniform sampler2D uHPts; uniform int uHStN; uniform vec4 uHStPS[128]; uniform vec4 uHStCtl[128];
+uniform sampler2D uHPts; uniform int uHStN; uniform vec4 uHStPS[128]; uniform vec4 uHStCtl[128]; uniform vec4 uHStWr[128]; uniform vec4 uHStWr2[128];
 uniform int uHMode; uniform int uHState;
+// one of the listed states: the gear / flaps / steering / cabin, the controls, and the XR-11's pods, vanes, fan, bay,
+// turrets and bomb (its surfaces follow the controls)
+void hullState(int s){
+  gPS = uHStPS[s]; gCtl = uHStCtl[s];
+  vec4 w = uHStWr[s], w2 = uHStWr2[s];
+  gWr[0] = vec4(w.x); gWr[1] = vec4(w.y); gWr[2] = vec4(w.z); gWr[3] = vec4(w.w);
+  gWr[4] = vec4(w2.x, w2.y, w2.z, 0.0); gWr[5] = vec4(gCtl.x, gCtl.z, gCtl.y, 0.0); gWr[6] = vec4(w2.w, 0.0, 0.0, 0.0);
+  if (gPS.w > 0.5) loadCabinFit();
+}
 void main(){
   vec3 p = texelFetch(uHPts, ivec2(gl_FragCoord.xy), 0).xyz;
   loadMain(); pieceXf(-1);
@@ -14,15 +23,13 @@ void main(){
     float d = uHMode == 0 ? 1e9 : -1e9;
     for (int s = 0; s < 128; s++) {
       if (s >= uHStN) break;
-      gPS = uHStPS[s]; gCtl = uHStCtl[s];
-      if (gPS.w > 0.5) loadCabinFit();
+      hullState(s);
       float ds = mapPlane(p).x;
       d = uHMode == 0 ? min(d, ds) : max(d, ds);
     }
     o = vec4(d, 0.0, 0.0, 0.0);
   } else {
-    gPS = uHStPS[uHState]; gCtl = uHStCtl[uHState];
-    if (gPS.w > 0.5) loadCabinFit();
+    hullState(uHState);
     if (uHMode == 1) o = vec4(mapPlane(p).x, 0.0, 0.0, 0.0);
     else if (uHMode == 2) { vec2 r = mapPlane(p); vec3 n = planeNormal(p); o = vec4(r.x, r.y, gPS.w > 0.5 ? interiorAO(p, n) : 1.0, 0.0); }
     else o = vec4(planeNormal(p), 0.0);

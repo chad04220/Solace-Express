@@ -47,6 +47,7 @@ uniform vec4 uFlame; uniform vec3 uFlameLP; uniform vec3 uFlameLI;  // research 
 // texels 0-23 model, 24 position + bound radius, 25-27 rotation columns, 28 state, 29 controls, 30 base colour + prop
 // angle, 31 stripe colour + reheat)
 vec4 gM[24]; vec4 gPS; vec4 gCtl; vec3 gColBase; vec3 gColStripe; vec4 gFlame;
+vec4 gWr[7];   // the XR-11's animation state the field reads (uWr, or a bake's state)
 // Fitted cabin mounts, cached when the model is loaded rather than at every ray-march sample.
 vec4 gCab0, gCab1;  // seat half width, headrest y, dome-light y, armrest x | visor y / slope, overhead y, vent x
 void loadCabinFit();
