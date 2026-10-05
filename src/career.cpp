@@ -257,7 +257,7 @@ Career::Source Career::canFly(const Contract& c, int si, std::string* why) const
 }
 
 int Career::positioningCost(const Contract& c) const {
-  if (c.from == location || c.type == CT_LESSON) return 0;
+  if (c.from == location || c.type == CT_LESSON || c.courtesy) return 0;
   if (money < 1500) return 0;  // courtesy ride when broke - never softlock
   return (int)(80 + 6 * g_world.distanceKm(location, c.from));
 }
@@ -416,6 +416,60 @@ int Career::ferryCost(const Contract& c, int si) const {
   return (int)(150 + 12 * g_world.distanceKm(fleet[oi].location, c.from));
 }
 
+int Career::netQuick(const Contract& c, int si, Source src) const {
+  const AircraftSpec& s = kAircraft[si];
+  int fees = positioningCost(c) + (src == SRC_OWNED ? ferryCost(c, si) : 0) + (src == SRC_RENT ? s.rentFee : 0);
+  int fuel = 0;
+  if (src == SRC_OWNED) {   // the owned aircraft's fuel for the distance at cruise, as the plan would estimate it
+    float flow = s.maxFuel / (s.rangeKm * 1000.f / s.cruise * 0.8f);
+    float minutes = (contractKm(c) + 6.f) * 1000.f / (s.cruise * 0.85f) / 60.f;
+    fuel = (int)(flow * 0.84f * minutes * 60.f * (s.engineType == ENG_PISTON ? 2.2f : 1.4f));
+  }
+  return c.payout - fees - fuel;
+}
+bool Career::earningPath() const {
+  const Contract* st = nextStory();
+  if (st && st->forceAircraft >= 0) return true;   // a free lesson
+  for (auto& c : board)
+    for (int i = 0; i < kNumAircraft; i++) { Source src = canFly(c, i); if (src != SRC_NONE && netQuick(c, i, src) > 0) return true; }
+  return false;
+}
+Contract Career::recoveryContract() const {
+  Contract c; c.type = CT_CARGO; c.cargoKg = 40; c.minLicense = LIC_PPL; c.courtesy = true;
+  c.wx = W(220, 4, 0, 0.05f, 0.2f, 4500, 40, 0, false, 10.5f);
+  // the licensed aircraft the player can rent (or owns), cheapest hire first
+  std::vector<int> types;
+  for (int i = 0; i < kNumAircraft; i++) if (license >= kAircraft[i].license && license >= LIC_PPL && (kAircraft[i].rentFee > 0 || ownedIndexFor(i) >= 0)) types.push_back(i);
+  std::sort(types.begin(), types.end(), [](int a, int b) { return kAircraft[a].rentFee < kAircraft[b].rentFee; });
+  if (types.empty()) return c;
+  // from the nearest field one of them can use, to the nearest other field it can use
+  float bestD = 1e30f; int bestFrom = -1, bestTo = -1, bestSpec = -1;
+  for (int si : types) {
+    const AircraftSpec& s = kAircraft[si];
+    for (int a = 0; a < (int)g_world.airports.size(); a++) {
+      if (!runwayOK(s, g_world.airports[a])) continue;
+      float dHome = g_world.distanceKm(location, a);
+      for (int b = 0; b < (int)g_world.airports.size(); b++) {
+        if (b == a || !runwayOK(s, g_world.airports[b])) continue;
+        float km = g_world.distanceKm(a, b);
+        if (km > s.rangeKm * 0.5f) continue;
+        float score = dHome * 4.f + km;   // close to home first, then a short hop
+        if (score < bestD) { bestD = score; bestFrom = a; bestTo = b; bestSpec = si; }
+      }
+    }
+  }
+  if (bestFrom < 0) return c;
+  const AircraftSpec& s = kAircraft[bestSpec];
+  c.from = bestFrom; c.to = bestTo; c.id = fmt("R%u_%d", boardSeed, bestFrom);
+  c.title = fmt("Mail run to %s", g_world.airports[bestTo].name);
+  c.brief = fmt("The postal service needs a light mail sack flown from %s to %s. %s", g_world.airports[bestFrom].name, g_world.airports[bestTo].name,
+                bestFrom == location ? "No deadline, fair weather." : "They'll drive you to the field. No deadline, fair weather.");
+  // net at least $150 after the hire and a hard landing (-20%): payout >= (150 + hire) / 0.8, rounded up to $10
+  int hire = ownedIndexFor(bestSpec) >= 0 ? 0 : (int)s.rentFee;
+  c.payout = ((int)((150 + hire) / 0.8f) + 9) / 10 * 10;
+  c.payout = std::max(c.payout, (int)(200 + g_world.distanceKm(bestFrom, bestTo) * 20) / 10 * 10);
+  return c;
+}
 void Career::refreshBoard() {
   board.clear();
   Rng r(boardSeed * 2654435761u + location * 97 + 13);
@@ -423,7 +477,7 @@ void Career::refreshBoard() {
   std::vector<int> access;
   for (int i = 0; i < kNumAircraft; i++)
     if (license >= kAircraft[i].license && license >= LIC_PPL && (kAircraft[i].rentFee > 0 || ownedIndexFor(i) >= 0)) access.push_back(i);
-  if (access.empty()) return;
+  if (access.empty()) { if (!earningPath()) { Contract rc = recoveryContract(); if (rc.payout > 0) board.push_back(rc); } return; }
   const char* cargoNames[] = {"Medical supplies", "Mail sacks", "Fresh produce", "Machine parts", "Fishing gear", "Coffee beans", "Newspapers", "Spare tyres", "Wine crates", "Lab samples"};
   const char* paxNames[] = {"Business travellers", "Holiday makers", "Wedding party", "Surveyors", "Film crew", "Tour group", "Island residents", "Students"};
   int tries = 0;
@@ -454,6 +508,7 @@ void Career::refreshBoard() {
     for (auto& b : board) if (b.to == c.to && b.type == c.type) dup = true;
     if (!dup) board.push_back(c);
   }
+  if (!earningPath()) { Contract rc = recoveryContract(); if (rc.payout > 0) board.insert(board.begin(), rc); }
 }
 
 Career::JobPolicy Career::policyOf(const Contract& c) {
@@ -617,8 +672,8 @@ bool Career::save(const std::string& path) const {
     bool story = false; for (auto& s : g_story) if (s.id == c.id) story = true;
     if (story) ok = ok && fprintf(f, "story_contract %s\n", c.id.c_str()) > 0;
     else {
-      ok = ok && fprintf(f, "contract %s %d %d %d %d %d %d %f %d %d %d %d %d %d %d %d\n", c.id.c_str(), c.type, c.from, c.to, c.cargoKg, c.pax, c.payout, c.timeLimitMin,
-                         c.minLicense, c.ownedOnly ? 1 : 0, c.fragile ? 1 : 0, c.startAirborne ? 1 : 0, c.repBonusPct, c.chapter, c.grantLicense, c.forceAircraft) > 0;
+      ok = ok && fprintf(f, "contract %s %d %d %d %d %d %d %f %d %d %d %d %d %d %d %d %d\n", c.id.c_str(), c.type, c.from, c.to, c.cargoKg, c.pax, c.payout, c.timeLimitMin,
+                         c.minLicense, c.ownedOnly ? 1 : 0, c.fragile ? 1 : 0, c.startAirborne ? 1 : 0, c.repBonusPct, c.chapter, c.grantLicense, c.forceAircraft, c.courtesy ? 1 : 0) > 0;
       const Weather& w = c.wx;
       ok = ok && fprintf(f, "wx %f %f %f %f %f %f %f %d %d %f\n", w.windFrom, w.windSpeed, w.gust, w.turbulence, w.cloudCover, w.cloudBase, w.visibility, w.precip, w.storm ? 1 : 0, w.timeOfDay) > 0;
       ok = ok && fprintf(f, "wps %d\n", (int)c.wps.size()) > 0;
@@ -698,9 +753,10 @@ bool Career::load(const std::string& path) {
       ok = ok && found; if (ok) c.job->c = *found;
     }
     else if (!strcmp(key, "contract")) {
-      Contract k; char id[64]; int own = 0, fr = 0, sa = 0;
-      ok = c.job && fscanf(f, "%63s %d %d %d %d %d %d %f %d %d %d %d %d %d %d %d", id, &k.type, &k.from, &k.to, &k.cargoKg, &k.pax, &k.payout, &k.timeLimitMin,
-                           &k.minLicense, &own, &fr, &sa, &k.repBonusPct, &k.chapter, &k.grantLicense, &k.forceAircraft) == 16;
+      Contract k; char id[64]; int own = 0, fr = 0, sa = 0, cy = 0;
+      ok = c.job && fscanf(f, "%63s %d %d %d %d %d %d %f %d %d %d %d %d %d %d %d %d", id, &k.type, &k.from, &k.to, &k.cargoKg, &k.pax, &k.payout, &k.timeLimitMin,
+                           &k.minLicense, &own, &fr, &sa, &k.repBonusPct, &k.chapter, &k.grantLicense, &k.forceAircraft, &cy) == 17;
+      k.courtesy = cy != 0;
       ok = ok && k.type >= 0 && k.type <= CT_FERRY && k.from >= 0 && k.from < nApt && k.to >= 0 && k.to < nApt && k.cargoKg >= 0 && k.pax >= 0 && std::isfinite(k.timeLimitMin)
            && k.minLicense >= LIC_STUDENT && k.minLicense <= LIC_ATP;
       if (ok) { k.id = id; k.ownedOnly = own != 0; k.fragile = fr != 0; k.startAirborne = sa != 0; k.story = false; c.job->c = k; }

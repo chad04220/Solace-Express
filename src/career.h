@@ -27,6 +27,7 @@ struct Contract {
   bool startAirborne = false;
   bool story = false;
   int repBonusPct = 0;         // freelance: the reputation bonus already in the payout
+  bool courtesy = false;       // the client flies you to the departure (no positioning ticket): the recovery job
 };
 
 struct OwnedPlane { int spec; int location; float fuel; float condition; };
@@ -132,6 +133,14 @@ public:
   // the load delivered: the payment once, lateness against the job clock, the deductions from the whole job
   std::vector<PayoutLine> settleJob(const FlightResult& r, const LaunchPlan& plan, int* stars);
   void releaseJob();          // CANCELLED: the load stays where it is, nothing is charged
+  // There is always a way to earn: a board job the player can fly for a positive net, or a free lesson next in the
+  // story. When neither holds (a strip no rentable aircraft can use, a licence the board has nothing for, a balance
+  // that can't cover the fees) the board gets a recovery job: light mail, no deadline, mild daylight weather, a
+  // rentable licensed aircraft, from the nearest field such an aircraft can use (a courtesy ride there), paying a
+  // net of at least $150 after the fees and a hard landing.
+  bool earningPath() const;
+  int netQuick(const Contract& c, int specIdx, Source src) const;   // payout less the fees and a fuel estimate (no autopilot planning)
+  Contract recoveryContract() const;   // (.payout == 0 when none can be made: no licensed aircraft can use any field)
   void useFlownTime(LaunchPlan& e, const Contract& c, float minutes, float fuelKg = -1) const;
   void finishPlan(LaunchPlan& e, const Contract& c, float minutes, float fuelKg = -1) const;
   std::vector<PayoutLine> settle(const Contract& c, int specIdx, Source src, const FlightResult& r, int* stars, const LaunchPlan* plan = nullptr);
