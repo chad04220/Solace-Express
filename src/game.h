@@ -105,7 +105,13 @@ private:
   bool commitBlocked() const { return pendingCareer.has_value(); }
   float retryT = 0;
   std::string saveWhy;      // why the last commit could not be saved
-  void beginCareerFlight(const Contract& c, int spec, Career::Source src);   // marks the attempt open in the save, then startFlight
+  void beginCareerFlight(const Contract& c, int spec, Career::Source src);   // marks the attempt open in the save, accepts the job, then startFlight
+  void continueJob(int spec, Career::Source src);    // the next leg of the open job, from where its load is
+  void releaseJob();                                 // the open job cancelled: the load stays where it is, nothing charged
+  void practiseApproach(int spec, Career::Source src);   // a flight to the job's destination that touches nothing in the career
+  bool isolatedFlight = false;   // a practice flight: endFlight returns to the hub without any settlement
+  float jobClockBase = 0;        // seconds already on the job's clock from earlier legs (deadlines count from it)
+  int attemptFrom = 0;           // where this attempt departed (an abandoned leg brings the load back there)
   GameScreen screen = SCR_MENU;
   int hubTab = TAB_CONTRACTS;
   float gameTime = 0, realTime = 0;

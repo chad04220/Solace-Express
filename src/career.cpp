@@ -456,6 +456,60 @@ void Career::refreshBoard() {
   }
 }
 
+Career::JobPolicy Career::policyOf(const Contract& c) {
+  if (c.type == CT_FERRY) return POL_UNSET;                              // a free flight is not a job
+  if (c.forceAircraft >= 0 || c.grantLicense >= 0 || c.type == CT_LESSON) return POL_RETAKE;   // lessons and checkrides are flown whole
+  if (c.type == CT_MEDEVAC) return POL_MEDEVAC;
+  if (c.timeLimitMin > 0 || c.type == CT_VIP) return POL_RESUME_CLOCK;
+  return POL_RESUME;
+}
+void Career::accept(const Contract& c, int si, Source src, const LaunchPlan& p) {
+  JobState j; j.c = c; j.plan = p; j.spec = si; j.src = src; j.state = JobState::ACTIVE; j.at = c.from; j.id = ++attempt;
+  job = j;
+}
+std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan& p, int at, int recoveryFee, const char* recoveryLabel) {
+  std::vector<PayoutLine> L;
+  if (!job) return L;
+  JobState& J = *job;
+  const AircraftSpec& s = kAircraft[J.spec];
+  if (!J.positioningPaid && p.positioning) { L.push_back({"Positioning ticket to " + std::string(g_world.airports[J.c.from].code), -p.positioning}); }
+  J.positioningPaid = true;
+  if (!J.hirePaid && p.hire) L.push_back({"Rental: " + std::string(s.name), -p.hire});
+  J.hirePaid = true;
+  int fuelCost = (int)(r.fuelUsedKg * (s.engineType == ENG_PISTON ? 2.2f : 1.4f));
+  if (J.src == SRC_OWNED && fuelCost) { L.push_back({"Fuel (this leg)", -fuelCost}); J.fuelBilledKg += r.fuelUsedKg; }
+  if (recoveryFee) L.push_back({recoveryLabel, -recoveryFee});
+  flights++; hours += r.flightMin / 60.f;
+  if (r.landed) { landings++; bestLandingFpm = std::min(bestLandingFpm, fabsf(r.touchdownFpm)); }
+  J.jobClockMin += r.flightMin; J.legs++;
+  J.maxG = std::max(J.maxG, r.maxG); J.minG = std::min(J.minG, r.minG); J.maxBank = std::max(J.maxBank, r.maxBank);
+  if (J.c.fragile && (r.maxG > 2.0f || r.minG < 0.0f || (r.landed && fabsf(r.touchdownFpm) > 400))) J.fragileHit = true;
+  J.at = at; J.state = JobState::RECOVERY;
+  location = at;
+  if (J.src == SRC_OWNED) { int oi = ownedIndexFor(J.spec); if (oi >= 0) fleet[oi].location = at; }
+  int total = 0; for (auto& l : L) total += l.amount;
+  money += total;
+  refreshBoard();
+  return L;
+}
+std::vector<PayoutLine> Career::settleJob(const FlightResult& r, const LaunchPlan& p, int* stars) {
+  if (!job) { *stars = 0; return {}; }
+  JobState J = *job;
+  // the whole job's record: the hardest moments of every leg, lateness against the job clock, the fees still unpaid
+  FlightResult w = r;
+  w.maxG = std::max(J.maxG, r.maxG); w.minG = std::min(J.minG, r.minG); w.maxBank = std::max(J.maxBank, r.maxBank);
+  w.late = J.c.timeLimitMin > 0 && J.jobClockMin + r.flightMin > J.c.timeLimitMin;
+  if (J.fragileHit && J.c.fragile) w.maxG = std::max(w.maxG, 2.01f);   // (a leg already damaged it)
+  LaunchPlan q = p;
+  if (J.positioningPaid) q.positioning = 0;
+  if (J.hirePaid) q.hire = 0;
+  job.reset();
+  Contract c = J.c;
+  auto L = settle(c, J.spec, J.src, w, stars, &q);
+  return L;
+}
+void Career::releaseJob() { job.reset(); refreshBoard(); }
+
 std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, const FlightResult& r, int* stars, const LaunchPlan* plan) {
   std::vector<PayoutLine> L;
   const AircraftSpec& s = kAircraft[si];
@@ -554,6 +608,24 @@ bool Career::save(const std::string& path) const {
                     money, license, reputation, location, storyIndex, flights, landings, crashes, hours, bestLandingFpm, boardSeed, finished ? 1 : 0, attempt, attemptOpen ? 1 : 0) > 0;
   ok = ok && fprintf(f, "fleet %d\n", (int)fleet.size()) > 0;
   for (auto& p : fleet) ok = ok && fprintf(f, "plane %s %d %f\n", kAircraft[p.spec].id, p.location, p.fuel) > 0;
+  if (job) {   // the open job: its state, then its contract (a story contract by id, a freelance one in full)
+    const JobState& J = *job;
+    ok = ok && fprintf(f, "job %d %s %d %d %d %d %f %f %f %f %d %f %d %d %u\n", (int)J.state, kAircraft[J.spec].id, (int)J.src, J.at, J.legs, J.wpDone, J.jobClockMin,
+                       J.maxG, J.minG, J.maxBank, J.fragileHit ? 1 : 0, J.fuelBilledKg, J.hirePaid ? 1 : 0, J.positioningPaid ? 1 : 0, J.id) > 0;
+    ok = ok && fprintf(f, "plan %d %d %d %d %f %f %f\n", J.plan.positioning, J.plan.ferry, J.plan.hire, (int)J.plan.fuel, J.plan.fuelKgEst, J.plan.minutesEst, J.plan.minutesSigma) > 0;
+    const Contract& c = J.c;
+    bool story = false; for (auto& s : g_story) if (s.id == c.id) story = true;
+    if (story) ok = ok && fprintf(f, "story_contract %s\n", c.id.c_str()) > 0;
+    else {
+      ok = ok && fprintf(f, "contract %s %d %d %d %d %d %d %f %d %d %d %d %d %d %d %d\n", c.id.c_str(), c.type, c.from, c.to, c.cargoKg, c.pax, c.payout, c.timeLimitMin,
+                         c.minLicense, c.ownedOnly ? 1 : 0, c.fragile ? 1 : 0, c.startAirborne ? 1 : 0, c.repBonusPct, c.chapter, c.grantLicense, c.forceAircraft) > 0;
+      const Weather& w = c.wx;
+      ok = ok && fprintf(f, "wx %f %f %f %f %f %f %f %d %d %f\n", w.windFrom, w.windSpeed, w.gust, w.turbulence, w.cloudCover, w.cloudBase, w.visibility, w.precip, w.storm ? 1 : 0, w.timeOfDay) > 0;
+      ok = ok && fprintf(f, "wps %d\n", (int)c.wps.size()) > 0;
+      for (auto& p : c.wps) ok = ok && fprintf(f, "wp %f %f %f\n", p.x, p.z, p.alt) > 0;
+      ok = ok && fprintf(f, "title %d %s\nbrief %d %s\n", (int)c.title.size(), c.title.c_str(), (int)c.brief.size(), c.brief.c_str()) > 0;
+    }
+  }
   ok = ok && fprintf(f, "end\n") > 0;
   ok = ok && fflush(f) == 0 && !ferror(f);
   ok = (fclose(f) == 0) && ok;
@@ -604,11 +676,55 @@ bool Career::load(const std::string& path) {
       ok = ok && spec >= 0 && loc >= 0 && loc < nApt && std::isfinite(fuel);
       if (ok) c.fleet.push_back({spec, loc, std::clamp(fuel, 0.f, kAircraft[spec].maxFuel), 0.f});
     }
+    else if (!strcmp(key, "job")) {   // (version 3) the open job, followed by its plan and contract lines
+      JobState J; char id[64]; int st = 0, src = 0, fh = 0, hp = 0, pp = 0;
+      ok = fscanf(f, "%d %63s %d %d %d %d %f %f %f %f %d %f %d %d %u", &st, id, &src, &J.at, &J.legs, &J.wpDone, &J.jobClockMin, &J.maxG, &J.minG, &J.maxBank, &fh, &J.fuelBilledKg, &hp, &pp, &J.id) == 15;
+      J.spec = -1; for (int i = 0; ok && i < kNumAircraft; i++) if (!strcmp(kAircraft[i].id, id)) J.spec = i;
+      ok = ok && J.spec >= 0 && st >= 0 && st <= 5 && src >= 0 && src <= 3 && J.at >= 0 && J.at < nApt && J.legs >= 0 && J.wpDone >= 0
+           && std::isfinite(J.jobClockMin) && std::isfinite(J.maxG) && std::isfinite(J.minG) && std::isfinite(J.maxBank) && std::isfinite(J.fuelBilledKg);
+      J.state = (JobState::State)st; J.src = (Source)src; J.fragileHit = fh != 0; J.hirePaid = hp != 0; J.positioningPaid = pp != 0;
+      J.spec = std::max(J.spec, 0);
+      if (ok) { c.job = J; c.job->c.id.clear(); }
+    }
+    else if (!strcmp(key, "plan")) {
+      int fuel = 0; LaunchPlan p;
+      ok = c.job && fscanf(f, "%d %d %d %d %f %f %f", &p.positioning, &p.ferry, &p.hire, &fuel, &p.fuelKgEst, &p.minutesEst, &p.minutesSigma) == 7 && fuel >= 0 && fuel <= 2
+           && std::isfinite(p.fuelKgEst) && std::isfinite(p.minutesEst) && std::isfinite(p.minutesSigma);
+      if (ok) { p.fuel = (LaunchPlan::FuelPolicy)fuel; p.spec = c.job->spec; p.src = c.job->src; c.job->plan = p; }
+    }
+    else if (!strcmp(key, "story_contract")) {
+      char id[64]; ok = c.job && fscanf(f, "%63s", id) == 1;
+      const Contract* found = nullptr; for (auto& s : g_story) if (s.id == id) found = &s;
+      ok = ok && found; if (ok) c.job->c = *found;
+    }
+    else if (!strcmp(key, "contract")) {
+      Contract k; char id[64]; int own = 0, fr = 0, sa = 0;
+      ok = c.job && fscanf(f, "%63s %d %d %d %d %d %d %f %d %d %d %d %d %d %d %d", id, &k.type, &k.from, &k.to, &k.cargoKg, &k.pax, &k.payout, &k.timeLimitMin,
+                           &k.minLicense, &own, &fr, &sa, &k.repBonusPct, &k.chapter, &k.grantLicense, &k.forceAircraft) == 16;
+      ok = ok && k.type >= 0 && k.type <= CT_FERRY && k.from >= 0 && k.from < nApt && k.to >= 0 && k.to < nApt && k.cargoKg >= 0 && k.pax >= 0 && std::isfinite(k.timeLimitMin)
+           && k.minLicense >= LIC_STUDENT && k.minLicense <= LIC_ATP;
+      if (ok) { k.id = id; k.ownedOnly = own != 0; k.fragile = fr != 0; k.startAirborne = sa != 0; k.story = false; c.job->c = k; }
+    }
+    else if (!strcmp(key, "wx")) {
+      Weather w; int precip = 0, storm = 0;
+      ok = c.job && fscanf(f, "%f %f %f %f %f %f %f %d %d %f", &w.windFrom, &w.windSpeed, &w.gust, &w.turbulence, &w.cloudCover, &w.cloudBase, &w.visibility, &precip, &storm, &w.timeOfDay) == 10;
+      ok = ok && std::isfinite(w.windFrom) && std::isfinite(w.windSpeed) && std::isfinite(w.gust) && std::isfinite(w.turbulence) && std::isfinite(w.cloudCover) && std::isfinite(w.cloudBase)
+           && std::isfinite(w.visibility) && std::isfinite(w.timeOfDay) && precip >= 0 && precip <= 2;
+      if (ok) { w.precip = precip; w.storm = storm != 0; c.job->c.wx = w; }
+    }
+    else if (!strcmp(key, "wps")) { int n = 0; ok = c.job && fscanf(f, "%d", &n) == 1 && n >= 0 && n <= 64; if (ok) c.job->c.wps.clear(); }
+    else if (!strcmp(key, "wp")) { Waypoint p; ok = c.job && fscanf(f, "%f %f %f", &p.x, &p.z, &p.alt) == 3 && std::isfinite(p.x) && std::isfinite(p.z) && std::isfinite(p.alt); if (ok) c.job->c.wps.push_back(p); }
+    else if (!strcmp(key, "title") || !strcmp(key, "brief")) {
+      int n = 0; ok = c.job && fscanf(f, "%d", &n) == 1 && n >= 0 && n < 4096 && fgetc(f) == ' ';
+      std::string s; for (int i = 0; ok && i < n; i++) { int ch = fgetc(f); if (ch == EOF) ok = false; else s += (char)ch; }
+      if (ok) { if (!strcmp(key, "title")) c.job->c.title = s; else c.job->c.brief = s; }
+    }
     else if (!strcmp(key, "end")) { ended = true; break; }   // version 1 saves may have no marker and end at EOF
     else ok = false;   // unknown key: not a file this version wrote
   }
   fclose(f);
   if (ver >= 2) ok = ok && have == 4095 && ended && fleetN == (int)c.fleet.size();   // a truncated save is rejected
+  if (c.job && (c.job->c.id.empty() || c.job->c.to < 0 || c.job->c.to >= nApt)) ok = false;   // a job needs its contract
   ok = ok && (have & 15) == 15
        && c.license >= LIC_STUDENT && c.license <= LIC_ATP
        && c.location >= 0 && c.location < nApt

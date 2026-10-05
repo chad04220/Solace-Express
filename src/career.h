@@ -3,6 +3,7 @@
 #include "common.h"
 #include "world.h"
 #include "aircraft.h"
+#include <optional>
 
 enum ContractType { CT_LESSON = 0, CT_CARGO, CT_PAX, CT_MEDEVAC, CT_VIP, CT_TOUR, CT_FERRY };
 inline const char* contractTypeName(int t) { static const char* n[] = {"Lesson", "Cargo", "Passengers", "Medevac", "VIP Charter", "Scenic Tour", "Free Flight"}; return n[t]; }
@@ -100,6 +101,37 @@ public:
     bool mayBeLate(float timeLimitMin) const { return timeLimitMin > 0 && minutesEst + minutesSigma > timeLimitMin; }
   };
   LaunchPlan plan(const Contract& c, int specIdx, Source src) const;
+  // A job is a contract accepted and not yet settled. A flight that ends short of the destination (a diversion, a
+  // field landing, an abandoned leg) closes a leg: that leg's costs are charged, the clock and the load's treatment
+  // carry over, and the job waits at the airport the load is at for the next leg. The payment comes once, when the
+  // load reaches the destination.
+  struct JobState {
+    Contract c;                 // the terms, frozen at acceptance
+    LaunchPlan plan;            // the quote of the first leg
+    int spec = 0; Source src = SRC_NONE;
+    enum State { READY = 0, ACTIVE, RECOVERY, DONE, FAILED, CANCELLED } state = READY;
+    int at = 0;                 // the airport the load / party is at now
+    int legs = 0, wpDone = 0;
+    float jobClockMin = 0;      // cumulative simulated minutes against the deadline
+    float maxG = 1, minG = 1, maxBank = 0; bool fragileHit = false;
+    float fuelBilledKg = 0;
+    bool hirePaid = false, positioningPaid = false;
+    uint32_t id = 0;
+    Contract continuation() const { Contract k = c; k.from = at; k.startAirborne = false; return k; }   // the next leg's contract
+  };
+  std::optional<JobState> job;   // one at a time
+  // what happens to a contract when a leg ends short: whole retake (lessons, checkrides), resume (the usual), resume
+  // against the running clock (timed, VIP), resume with the destination requirement kept (medevac)
+  enum JobPolicy { POL_UNSET = 0, POL_RESUME, POL_RETAKE, POL_RESUME_CLOCK, POL_MEDEVAC };
+  static JobPolicy policyOf(const Contract& c);
+  static bool resumable(const Contract& c) { JobPolicy p = policyOf(c); return p != POL_RETAKE && p != POL_UNSET; }
+  void accept(const Contract& c, int specIdx, Source src, const LaunchPlan& plan);   // -> a job, ACTIVE at c.from
+  // a leg that ended short: this leg's costs (fees not yet paid, this leg's fuel for an owned aircraft, a recovery fee
+  // when the load had to be brought to an airport), the clock and the aggregates carried, the job RECOVERY at "at"
+  std::vector<PayoutLine> closeLeg(const FlightResult& r, const LaunchPlan& plan, int at, int recoveryFee, const char* recoveryLabel);
+  // the load delivered: the payment once, lateness against the job clock, the deductions from the whole job
+  std::vector<PayoutLine> settleJob(const FlightResult& r, const LaunchPlan& plan, int* stars);
+  void releaseJob();          // CANCELLED: the load stays where it is, nothing is charged
   void useFlownTime(LaunchPlan& e, const Contract& c, float minutes, float fuelKg = -1) const;
   void finishPlan(LaunchPlan& e, const Contract& c, float minutes, float fuelKg = -1) const;
   std::vector<PayoutLine> settle(const Contract& c, int specIdx, Source src, const FlightResult& r, int* stars, const LaunchPlan* plan = nullptr);

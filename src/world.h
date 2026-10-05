@@ -25,6 +25,7 @@ struct Airport {
   int surface;
   int size;          // 0 = strip, 1 = regional, 2 = international
   const char* blurb;
+  bool hospital = false;   // a hospital by the field (medevac destinations; set in World::build)
   // derived
   vec3 dir() const { float h = heading * DEG; return vec3(sinf(h), 0, -cosf(h)); }
   vec3 pos() const { return vec3(x, elev, z); }

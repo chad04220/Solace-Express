@@ -310,8 +310,38 @@ bool Game::retryCommit() {
 // A career flight: the save marks the attempt open first (a crash to desktop mid-flight then shows on the next start
 // that a flight was interrupted), then the flight starts
 void Game::beginCareerFlight(const Contract& c, int spec, Career::Source src) {
-  if (!commitBlocked()) commit([](Career& k) { k.attempt++; k.attemptOpen = true; });
+  Career::LaunchPlan p = career.plan(c, spec, src);
+  if (!commitBlocked()) commit([&](Career& k) {
+    k.attempt++; k.attemptOpen = true;
+    if (Career::resumable(c)) k.accept(c, spec, src, p); else k.job.reset();   // (lessons and checkrides are flown whole: no job)
+  });
   startFlight(c, spec, src);
+}
+void Game::continueJob(int spec, Career::Source src) {
+  if (!career.job || career.job->state != Career::JobState::RECOVERY || commitBlocked()) return;
+  Contract c = career.job->continuation();
+  commit([&](Career& k) {
+    Career::JobState& J = *k.job;
+    if (spec != J.spec || src != J.src) J.hirePaid = false;   // a different aircraft: a new hire
+    J.spec = spec; J.src = src; J.state = Career::JobState::ACTIVE; k.attempt++; k.attemptOpen = true;
+  });
+  startFlight(c, spec, src);
+  if (career.job) {   // (the committed job: the leg carries on from its checkpoints and clock)
+    wpIndex = std::min(career.job->wpDone, (int)c.wps.size()); jobClockBase = career.job->jobClockMin * 60.f;
+    if (career.job->hirePaid) launchPlan.hire = 0;
+  }
+}
+void Game::releaseJob() {
+  if (!career.job || commitBlocked()) return;
+  commit([](Career& k) { k.releaseJob(); });
+  hubMsg = "Job released: the load stays where it is."; hubMsgTime = 4;
+}
+void Game::practiseApproach(int spec, Career::Source src) {
+  if (!career.job) return;
+  Contract c; c.id = "PRACTICE"; c.title = "Practice: " + career.job->c.title; c.type = CT_FERRY; c.from = career.job->at; c.to = career.job->c.to; c.wx = career.job->c.wx;
+  c.brief = "An approach flown for practice: nothing here counts for the job or the career.";
+  startFlight(c, spec, src);
+  isolatedFlight = true;
 }
 
 void Game::init(bool buildWorld) {
@@ -392,6 +422,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   plane.reset(&s, start, hdg, fuel, payloadKg, c.startAirborne, s.cruise);
   plane.apComfort = true;   // a career flight: the autopilot flies for the passengers and the load (the stick is never limited)
   fuelStart = plane.fuel;
+  isolatedFlight = false; jobClockBase = 0; attemptFrom = c.from;
   wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0;
   traffic.reset();
   ufo = Ufo(); ufo.next = 180.f + sparkRng.uni() * 240.f;   // first encounter after 3-7 minutes in the air
@@ -427,6 +458,7 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
     if (!reason.empty()) toast(reason, success ? vec3(0.6f, 1, 0.7f) : vec3(1, 0.5f, 0.4f));
     return;
   }
+  debriefTitle.clear();
   result.success = success;
   result.outcome = success ? OUT_SUCCESS : outcome;
   result.failReason = reason;
@@ -434,19 +466,41 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   result.maxG = plane.maxG; result.minG = plane.minG;
   result.fuelUsedKg = std::max(0.f, fuelStart - plane.fuel);
   result.touchdownFpm = touchdownFpm;
-  result.late = contract.timeLimitMin > 0 && flightClock / 60.f > contract.timeLimitMin;
+  result.late = contract.timeLimitMin > 0 && (jobClockBase + flightClock) / 60.f > contract.timeLimitMin;
   result.landed = touchedDown && plane.onGround;
   if (!result.landed) result.touchdownFpm = 0;
   coaching = landingCoaching();
+  if (isolatedFlight) {   // a practice flight: back to the hub, nothing settled
+    isolatedFlight = false; paused = false; showMap = false; screen = SCR_HUB; hubTab = TAB_CONTRACTS;
+    toast(success ? "Practice flight complete" : reason.empty() ? "Practice flight over" : reason, success ? vec3(0.6f, 1, 0.7f) : vec3(1, 0.5f, 0.4f));
+    return;
+  }
   Contract c = contract;
   if (c.type == CT_FERRY) { c.story = false; }
   // the settlement is one transaction: the career only changes when the save succeeds; a failed save keeps the
   // settled copy pending (the debrief shows it, and offers the retry), and a retry can never pay twice
   { std::vector<PayoutLine> lines; int st = 0;
-    commit([&](Career& k) { lines = k.settle(c, specIdx, source, result, &st, &launchPlan); k.attemptOpen = false; });
-    payout = lines; stars = st; }
+    bool jobLeg = career.job && career.job->state == Career::JobState::ACTIVE && career.job->c.id == c.id;
+    bool jobGoesOn = false;
+    commit([&](Career& k) {
+      k.attemptOpen = false;
+      if (!jobLeg) { lines = k.settle(c, specIdx, source, result, &st, &launchPlan); k.job.reset(); return; }
+      const AircraftSpec& s = kAircraft[specIdx];
+      if (success) { lines = k.settleJob(result, launchPlan, &st); return; }
+      // a leg that ended short: the job carries on where the load is (a crash or running dry in the air ends it)
+      if (outcome == OUT_DIVERTED && result.divertedTo >= 0) { lines = k.closeLeg(result, launchPlan, result.divertedTo, 0, ""); jobGoesOn = true; }
+      else if (outcome == OUT_OFF_AIRPORT && result.landed) {   // the load is brought by road to the nearest airport
+        int ap = g_world.nearestAirport(plane.pos.x, plane.pos.z);
+        lines = k.closeLeg(result, launchPlan, std::max(ap, 0), source == Career::SRC_LESSON ? 0 : 150 + (int)s.rentFee, "Aircraft and load recovered from the field"); jobGoesOn = true;
+      } else if (outcome == OUT_ABANDONED && !crashed) {   // the load goes back to where this leg began
+        lines = k.closeLeg(result, launchPlan, attemptFrom, source == Career::SRC_LESSON ? 0 : 150 + (int)s.rentFee, "Load returned to the departure"); jobGoesOn = true;
+      } else { lines = k.settle(c, specIdx, source, result, &st, &launchPlan); k.job.reset(); }
+    });
+    payout = lines; stars = st;
+    if (jobGoesOn && career.job) debriefTitle = fmt("%s - job continues from %s", reason.c_str(), g_world.airports[career.job->at].code);
+  }
   lastSuccess = success;
-  debriefTitle = success ? (c.type == CT_FERRY ? "Flight complete" : "Contract complete!") : (reason.empty() ? "Flight failed" : reason);
+  if (debriefTitle.empty()) debriefTitle = success ? (c.type == CT_FERRY ? "Flight complete" : "Contract complete!") : (reason.empty() ? "Flight failed" : reason);
   g_audio.trigger(success ? SFX_SUCCESS : SFX_FAIL);
   if (success && c.payout > 0) g_audio.trigger(SFX_CASH);
   screen = SCR_DEBRIEF;
@@ -874,7 +928,12 @@ void Game::updateFlight(float dt) {
               vec3(0.3f, 1.f, 0.6f) * r.range(2.f, 4.f), 1.f, SPR_SPARK, 0.6f, 0.f);
       }
     }
-    if (length(plane.pos - wp) < 110.f) {
+    float cpDist = length(plane.pos - wp);
+    {   // the closest approach of this frame's movement to the ring centre: a fast aircraft can't skip through a ring
+      vec3 d = plane.pos - prevPos; float L2 = dot(d, d);
+      if (L2 > 1e-4f) { float u = clampf(dot(wp - prevPos, d) / L2, 0.f, 1.f); cpDist = std::min(cpDist, length(wp - (prevPos + d * u))); }
+    }
+    if (cpDist < 110.f) {
       // gate burst: shockwave + a shower of sparks flung outward
       if (ringGeom(wpIndex, gc, gx, gy)) {
         bursts.push_back({gc, gx, gy, vec3(0.3f, 1.f, 0.6f), 0.f});

@@ -530,8 +530,11 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   float lw = std::min(w * 0.36f, 470 * s);
   panel(x, y, lw, h);
   // build card list: story, free flight, freelance
-  struct Card { const Contract* c; bool story; bool free; };
+  struct Card { const Contract* c; bool story; bool free; bool job = false; };
   std::vector<Card> cards;
+  static Contract jobCont;   // the open job's next leg (pinned on top while the job waits for it)
+  const bool openJob = career.job && career.job->state == Career::JobState::RECOVERY;
+  if (openJob) { jobCont = career.job->continuation(); cards.push_back({&jobCont, false, false, true}); }
   const Contract* st = career.nextStory();
   if (st) cards.push_back({st, true, false});
   cards.push_back({nullptr, false, true});
@@ -544,14 +547,14 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     if (cy + chh > y + h - 8 * s) break;
     bool sel = i == selContract;
     bool hov = hovered(x + 10 * s, cy, lw - 20 * s, chh);
-    card(x + 10 * s, cy, lw - 20 * s, chh, sel, hov, cards[i].story ? C_WARN : C_ACCENT);
+    card(x + 10 * s, cy, lw - 20 * s, chh, sel, hov, cards[i].job ? C_GOOD : cards[i].story ? C_WARN : C_ACCENT);
     if (hov && in.mPressed[0]) { selContract = i; selAircraft = -1; g_audio.trigger(SFX_CLICK); }
     if (cards[i].free) {
       fitText(x + 24 * s, cy + 9 * s, lw - 48 * s, 18 * s, 13 * s, "Free Flight / Ferry", C_TEXT);
       g_ren.text(x + 24 * s, cy + 36 * s, 14 * s, ellipsize("Fly anywhere for fun or to reposition. No pay.", lw - 48 * s, 14 * s), C_DIM, 1);
     } else {
       const Contract& c = *cards[i].c;
-      std::string tag = cards[i].story ? fmt("STORY CH.%d  ", c.chapter) : "";
+      std::string tag = cards[i].job ? fmt("JOB CONTINUES  LEG %d  ", career.job->legs + 1) : cards[i].story ? fmt("STORY CH.%d  ", c.chapter) : "";
       float cardW = lw - 62 * s;
       fitText(x + 24 * s, cy + 9 * s, cardW, 17 * s, 13 * s, tag + c.title, cards[i].story ? C_WARN : C_TEXT);
       std::string sub = fmt("%s  %s > %s  %.0f km", contractTypeName(c.type), g_world.airports[c.from].code, g_world.airports[c.to].code, g_world.distanceKm(c.from, c.to));
@@ -585,6 +588,12 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     py += 8 * s;
   }
   for (auto& l : wrap(c.brief, textW, 16 * s)) { g_ren.text(px, py, 16 * s, l, C_TEXT, 0.92f); py += 22 * s; }
+  if (cd.job) {   // where the job stands: legs flown, the clock, the load's place
+    const Career::JobState& J = *career.job;
+    std::string so = fmt("The load is at %s after %d leg%s (%.0f min on the clock%s). Fly it on to %s to be paid; release it and it stays here.",
+                         g_world.airports[J.at].name, J.legs, J.legs == 1 ? "" : "s", J.jobClockMin, c.timeLimitMin > 0 ? fmt(" of %.0f", c.timeLimitMin).c_str() : "", g_world.airports[c.to].name);
+    for (auto& l : wrap(so, textW, 15 * s)) { g_ren.text(px, py, 15 * s, l, C_GOOD, 0.95f); py += 20 * s; }
+  }
   py += 10 * s;
   auto row = [&](const std::string& k, const std::string& v, vec3 col = C_TEXT) {
     g_ren.text(px, py + 3 * s, 11.5f * s, upperS(k), C_DIM, 0.95f, 0, false);
@@ -677,16 +686,22 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     if (src == Career::SRC_NONE) selAircraft = -1;
   }
   if (selAircraft < 0) selAircraft = firstOk;
-  bool can = selAircraft >= 0 && !commitBlocked();
-  if (button(dx + dw - 262 * s, y + h - 62 * s, 240 * s, 46 * s, commitBlocked() ? "Save pending" : can ? "FLY!" : "No suitable aircraft", can, can)) {
+  bool otherWhileJob = openJob && !cd.job && !cd.free;   // (another job waits until this one is delivered or released)
+  bool can = selAircraft >= 0 && !commitBlocked() && !otherWhileJob;
+  if (cd.job) {
+    if (button(dx + dw - 262 * s - 2 * 150 * s, y + h - 62 * s, 140 * s, 46 * s, "Release job", !commitBlocked(), false)) releaseJob();
+    if (button(dx + dw - 262 * s - 150 * s, y + h - 62 * s, 140 * s, 46 * s, "Practise", can, false) && selAircraft >= 0) practiseApproach(selAircraft, career.canFly(c, selAircraft));
+  }
+  if (button(dx + dw - 262 * s, y + h - 62 * s, 240 * s, 46 * s, commitBlocked() ? "Save pending" : otherWhileJob ? "Job in progress" : can ? (cd.job ? "CONTINUE" : "FLY!") : "No suitable aircraft", can, can)) {
     auto src = career.canFly(c, selAircraft);
     if (c.type == CT_FERRY && src == Career::SRC_NONE) src = Career::SRC_LESSON;
     if (c.type == CT_FERRY && src == Career::SRC_RENT) {}
     Contract go = c;
     if (go.type == CT_FERRY) { go.from = career.location; }
-    beginCareerFlight(go, selAircraft, src);
+    if (cd.job) continueJob(selAircraft, src); else beginCareerFlight(go, selAircraft, src);
   }
   if (commitBlocked()) g_ren.text(px, y + h - 50 * s, 14 * s, "Your last result isn't saved yet (" + saveWhy + "). Retrying...", C_BAD, 1);
+  else if (otherWhileJob) g_ren.text(px, y + h - 50 * s, 14 * s, "Deliver or release the job in progress first (its card is at the top).", C_WARN, 1);
   else if (!can) g_ren.text(px, y + h - 50 * s, 14 * s, "Tip: check the Hangar to buy an aircraft, or earn your next licence through the story.", C_DIM, 1);
 }
 
@@ -1207,7 +1222,7 @@ void Game::drawHud(const FrameParams& fp) {
     if (researchFlight) obj = fmt("FREE ROAM  -  MACH %.2f", plane.mach);
     g_ren.text(cx + 16 * s, cy + 7 * s, 12 * s, ellipsize(obj, cw * 0.55f, 12 * s), mag, 1, 0, false);
     std::string extra;
-    if (contract.timeLimitMin > 0) { float left = contract.timeLimitMin * 60 - flightClock; extra = left > 0 ? fmt("DEADLINE %d:%02d", (int)left / 60, (int)left % 60) : "LATE!"; }
+    if (contract.timeLimitMin > 0) { float left = contract.timeLimitMin * 60 - jobClockBase - flightClock; extra = left > 0 ? fmt("DEADLINE %d:%02d", (int)left / 60, (int)left % 60) : "LATE!"; }
     if (timeAccel > 1) extra += fmt("%sTIME x%.0f", extra.empty() ? "" : "   ", timeAccel);
     g_ren.text(cx + cw - 16 * s, cy + 7 * s, 12 * s, extra.empty() ? ellipsize(contract.title, cw * 0.4f, 12 * s) : extra, extra.empty() ? C_DIM : C_WARN, 1, 2, false);
     // four readouts: distance, bearing, altitude to go (climb / descend cue), time en route
@@ -1708,7 +1723,7 @@ void Game::drawGps() {
   float etaH = timeOfDay + (gs > 10 ? remain / gs / 3600.f : 0);
   kv("ETA DEST", gs > 10 ? fmt("%02d:%02d LCL", ((int)etaH) % 24, (int)(fmodf(etaH, 1.f) * 60)) : "--:--");
   kv("ROUTE LEFT", fmt("%.1f km", remain / 1000.f));
-  if (contract.timeLimitMin > 0) { float left = contract.timeLimitMin * 60 - flightClock; kv("DEADLINE", left > 0 ? fmt("%d:%02d", (int)left / 60, (int)left % 60) : "LATE", left > 120 ? C_TEXT : C_BAD); }
+  if (contract.timeLimitMin > 0) { float left = contract.timeLimitMin * 60 - jobClockBase - flightClock; kv("DEADLINE", left > 0 ? fmt("%d:%02d", (int)left / 60, (int)left % 60) : "LATE", left > 120 ? C_TEXT : C_BAD); }
   py += 4 * s;
   header(px, py, vw, "AIRCRAFT"); py += 24 * s;
   kv("GS / TRK", fmt("%s  %03.0f", fmtSpeed(gs).c_str(), trk));

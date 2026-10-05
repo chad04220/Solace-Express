@@ -336,6 +336,50 @@ struct GameTest {
       printf("Transactions: marker pending %d, settlement pending %d, retry saved %d, no double pay %d: %s\n", flagged, pend, saved, once, flagged && pend && saved && once ? "ok" : "FAIL");
       fails += !(flagged && pend && saved && once);
     }
+    // ---- resumable jobs: a diversion closes a leg (the hire charged once, no payment, no reputation loss), the job
+    //      survives a save and reload, the next leg continues from the diversion airport and the delivery pays once;
+    //      a release leaves the load where it is; a crash ends the job with repairs
+    {
+      Game& q = g;
+      int from = g_world.findAirport("ORC"), via = g_world.findAirport("CAP"), to = g_world.findAirport("MDB");
+      Contract c; c.id = "JOBTEST"; c.title = "Test freight"; c.type = CT_CARGO; c.from = from; c.to = to; c.cargoKg = 40; c.payout = 1000; c.minLicense = LIC_PPL; c.wx = Weather();
+      auto fresh = [&] { q.pendingCareer.reset(); q.career.newGame(); q.career.money = 5000; q.career.license = LIC_PPL; q.career.location = from; q.career.reputation = 5; q.saveDir = "."; };
+      auto landAt = [&](int ap) { q.plane.pos = g_world.airports[ap].pos() + vec3(0, 0.1f, 0); q.plane.onGround = true; q.touchedDown = true; q.takeoffAnnounced = true; q.plane.vel = vec3(0, 0, 0); };
+      const int hire = (int)kAircraft[1].rentFee;
+      fresh();
+      q.beginCareerFlight(c, 1, Career::SRC_RENT);
+      bool accepted = q.career.job && q.career.job->state == Career::JobState::ACTIVE && q.career.job->at == from;
+      int m0 = q.career.money;
+      q.plane.maxG = 1.6f; landAt(via); q.result.divertedTo = via;
+      q.endFlight(false, "Diverted to Solace Capital", OUT_DIVERTED);
+      bool leg1 = q.career.job && q.career.job->state == Career::JobState::RECOVERY && q.career.job->at == via && q.career.job->legs == 1
+                  && q.career.location == via && q.career.money == m0 - hire && q.career.reputation == 5 && q.career.job->maxG >= 1.6f && q.career.job->hirePaid;
+      // quit and reload: the job comes back whole
+      Career r; r.newGame(); bool reloaded = r.load("career.sav") && r.job && r.job->state == Career::JobState::RECOVERY && r.job->at == via && r.job->c.id == "JOBTEST" && r.job->c.payout == 1000 && r.job->legs == 1;
+      q.career = r;
+      q.continueJob(1, Career::SRC_RENT);
+      bool leg2start = q.career.job && q.career.job->state == Career::JobState::ACTIVE && q.contract.from == via && q.launchPlan.hire == 0 && q.screen != SCR_HUB;
+      int m1 = q.career.money;
+      landAt(to);
+      q.endFlight(true, "", OUT_SUCCESS);
+      bool delivered = !q.career.job && q.career.location == to && q.career.money >= m1 + 1000 && q.career.money <= m1 + 1100 && q.career.flights == 2 && q.lastSuccess;
+      bool paidOnce = true; int pays = 0; for (auto& l : q.payout) if (l.label == "Contract payment") pays++; paidOnce = pays == 1;
+      // release: the load stays at the diversion airport, nothing charged
+      fresh(); q.beginCareerFlight(c, 1, Career::SRC_RENT); landAt(via); q.result.divertedTo = via; q.endFlight(false, "Diverted", OUT_DIVERTED);
+      int m2 = q.career.money; q.releaseJob();
+      bool released = !q.career.job && q.career.money == m2 && q.career.location == via;
+      // a crash ends the job: repairs (the deductible on a rental) and a crash on the record
+      fresh(); q.beginCareerFlight(c, 1, Career::SRC_RENT); q.crashed = true; q.endFlight(false, "Crashed", OUT_CRASHED);
+      bool crashEnds = !q.career.job && q.career.crashes == 1;
+      // a lesson is never a job
+      fresh(); q.beginCareerFlight(g_story[0], 0, Career::SRC_LESSON); bool noJob = !q.career.job; q.endFlight(false, "x", OUT_ABANDONED);
+      remove("career.sav"); remove("career.sav.bak"); q.saveDir.clear(); q.pendingCareer.reset(); q.career.newGame();
+      bool ok = accepted && leg1 && reloaded && leg2start && delivered && paidOnce && released && crashEnds && noJob;
+      if (!leg1) printf("  leg1: job %d state %d at %d legs %d loc %d money %d (want %d) rep %d maxG %.2f hirePaid %d\n", (int)(bool)q.career.job, q.career.job ? (int)q.career.job->state : -1, q.career.job ? q.career.job->at : -1, q.career.job ? q.career.job->legs : -1, q.career.location, q.career.money, m0 - hire, q.career.reputation, q.career.job ? q.career.job->maxG : 0.f, q.career.job ? (int)q.career.job->hirePaid : 0);
+      printf("Resumable job: accepted %d, leg closed %d, reloaded %d, continued %d, delivered %d, paid once %d, released %d, crash ends %d, lesson no job %d: %s\n",
+             accepted, leg1, reloaded, leg2start, delivered, paidOnce, released, crashEnds, noJob, ok ? "ok" : "FAIL");
+      fails += !ok;
+    }
     // ---- settle: only crashes count as crashes and cost repairs
     {
       Career c; c.newGame(); c.money = 100000; c.license = LIC_ATP;

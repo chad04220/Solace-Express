@@ -41,6 +41,17 @@ int main() {
     int net = 0; for (auto& l : lines) net += l.amount;
     printf("%-3s %-42s %-17s %6.1fkm net %7d  bank %8d  lic %d\n", k.id.c_str(), k.title.c_str(), kAircraft[best].name, g_world.distanceKm(k.from, k.to), net, c.money, c.license);
   }
+  // every story contract has a continuation policy: lessons and checkrides are retaken whole, timed jobs and the
+  // VIP charter resume against their clock, the medevac resumes with its destination, the rest resume
+  for (auto& k : g_story) {
+    Career::JobPolicy p = Career::policyOf(k);
+    bool want = p != Career::POL_UNSET
+      && ((k.forceAircraft >= 0 || k.grantLicense >= 0) ? p == Career::POL_RETAKE : true)
+      && (k.type == CT_MEDEVAC ? p == Career::POL_MEDEVAC : true)
+      && ((k.type == CT_VIP || (k.timeLimitMin > 0 && k.forceAircraft < 0 && k.grantLicense < 0 && k.type != CT_MEDEVAC)) ? p == Career::POL_RESUME_CLOCK : true);
+    if (!want) { printf("  !! %s: continuation policy %d doesn't fit the contract\n", k.id.c_str(), (int)p); problems++; }
+  }
+  if (Career::policyOf(g_story[0]) != Career::POL_RETAKE || Career::policyOf(g_story[3]) != Career::POL_RETAKE) { printf("  !! L1 / L4 must be retaken whole\n"); problems++; }
   printf("Total extra freelance money needed: $%ld, problems: %d, finished=%d\n", grind, problems, c.finished);
   // Freelance board must never be empty once licensed
   for (int ap = 0; ap < (int)g_world.airports.size(); ap++) {

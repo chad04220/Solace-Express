@@ -200,6 +200,7 @@ float airportInfluence(float x, float z) {
 
 void World::build() {
   airports.assign(std::begin(kAirports), std::end(kAirports));
+  for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
   hm.resize((size_t)HM_N * HM_N * 4);
   sceneryInit();
   parallelFor(HM_N, [&](int j) {   // rows are independent; spread over every core

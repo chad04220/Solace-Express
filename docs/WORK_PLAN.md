@@ -21,12 +21,12 @@ Line numbers in §2 are from `f8b8537` and no longer match: re-grep the identifi
 | A1 cheaper terrain normals | superseded: the terrain is a mesh with vertex normals (R1a) | — |
 | C2 learned performance drives quotes | done | 2205011 |
 | E5.1–3 input contexts, release-to-rearm, controller loss | done | e052d72 |
-| B1 WASAPI audio | **next** | — |
+| B1 WASAPI audio | done | 555e49f |
 | A5 temporal upsampling (TAAU) | open: the TAA upscales (A7) but with no reconstruction filter; revisit after the owner's raster numbers | — |
 | A6 UBO for scene parameters | open; cheap once the uniform set settles after R3 | — |
-| E2 transactions, save v3, attempt marker | **next** | — |
+| E2 transactions, save v3, attempt marker | done | aefdbe5 |
 | A8 steps 1–2 lighting / terrain pass | done as R1a | 1be93c2 |
-| E3 resumable jobs | open (after E2) | — |
+| E3 resumable jobs | done (all ten steps; the hospital flag on CAP/NPT/PVI is data for a later alternate policy) | E3 commit |
 | A8 steps 3–5 aircraft pass, traffic, cloak, feeds | done as R1b/R1c | 0fe987d, ce5ca42, fe31039 |
 | A9 shadow maps for the aircraft | partly: the proxy pass (R1b); real maps are R2's remaining item | — |
 | E4 earning-path guarantee | open (after E3) | — |
