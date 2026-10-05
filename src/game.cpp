@@ -689,6 +689,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   isolatedFlight = false; jobClockBase = 0; attemptFrom = c.from;
   wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0;
   surveyT = surveyInT = 0; minimumsChecked = false; minimumsGoArounds = 0; trialT0 = trialT1 = -1;
+  hudPrevIas = 0; hudTrend = 0;
   traffic.reset();
   ufo = Ufo(); ufo.next = 180.f + sparkRng.uni() * 240.f;   // first encounter after 3-7 minutes in the air
   paused = false; showMap = false; landed = completed = crashed = false;

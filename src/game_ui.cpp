@@ -235,7 +235,7 @@ void Game::drawToasts() {
   bool flightRail = screen == SCR_FLIGHT && hudOn && !(showMap && uiAnim.count(0x6e61u) && uiAnim[0x6e61u] > 0.6f);
   if (screen != SCR_FLIGHT) y = g_ren.H - 120 * s;
   if (flightRail) {   // the right message column: newest at the top, each sliding in from the screen's edge
-    float rail = (camMode == 1 ? 16.f : kHudRail + 12.f) * s, rw = std::min(kHudMsgW * s, g_ren.W * 0.5f - rail - 120 * s), rx = g_ren.W - rail - rw;
+    float rail = (camMode == 1 ? 16.f : kHudRail + 28.f) * s, rw = std::min(kHudMsgW * s, g_ren.W * 0.5f - rail - 160 * s), rx = g_ren.W - rail - rw;
     float yy = std::max((kHudBand + 12) * s, hudMsgNext);
     int shown = 0;
     for (int i = (int)toasts.size() - 1; i >= 0 && shown < 4; i--, shown++) {
@@ -1620,9 +1620,10 @@ void Game::drawHud(const FrameParams& fp) {
         if (major && fabsf(y - mid) > 14 * s) g_ren.text(x + rail - 22 * s, y - 6 * s, 11 * s, fmt("%d", t), C_TEXT, 0.85f, 2, false);
       }
       // the readout box with its pointer, the trend (where the speed will be in 6 s), Mach and ground speed
-      float trend = (plane.ias - hudPrevIas) / std::max(uiDt, 1e-3f) * 6.f * unit; hudPrevIas = plane.ias;
-      hudTrend = hudTrend + (trend - hudTrend) * (1.f - expf(-4.f * uiDt));
-      float ty2 = Y(v + hudTrend); if (fabsf(hudTrend) > 1.f) { g_ren.rect(x + rail - 7 * s, std::min(mid, ty2), 3 * s, fabsf(ty2 - mid), C_ACCENT, 0.9f); hudDart(x + rail - 5.5f * s, ty2, 0.f, ty2 < mid ? -1.f : 1.f, 7 * s, 4 * s, C_ACCENT, 0.95f, false); }
+      float trend = hudPrevIas > 0.f && uiDt > 1e-4f && uiDt < 0.5f ? (plane.ias - hudPrevIas) / uiDt * 6.f * unit : 0.f; hudPrevIas = plane.ias;
+      hudTrend = clampf(hudTrend + (trend - hudTrend) * (1.f - expf(-4.f * uiDt)), -span * 0.7f, span * 0.7f);
+      float ty2 = clampf(Y(v + hudTrend), railTop + 14 * s, railBot - 14 * s);
+      if (fabsf(hudTrend) > 1.f) { g_ren.rect(x + rail - 7 * s, std::min(mid, ty2), 3 * s, fabsf(ty2 - mid), C_ACCENT, 0.9f); hudDart(x + rail - 5.5f * s, ty2, 0.f, ty2 < mid ? -1.f : 1.f, 7 * s, 4 * s, C_ACCENT, 0.95f, false); }
       float bw = rail - 14 * s;
       g_ren.rect(x + 4 * s, mid - 15 * s, bw, 30 * s, vec3(0.0f, 0.02f, 0.04f), 0.95f, 3 * s);
       g_ren.rectOutline(x + 4 * s, mid - 15 * s, bw, 30 * s, stall ? C_BAD : C_ACCENT, 0.8f, 3 * s, 1.5f * s);
@@ -1848,7 +1849,7 @@ void Game::drawHud(const FrameParams& fp) {
     if (F.gearStuck) ann.push_back({F.gearStuck == 1 ? "GEAR STUCK UP  belly landing: paved, level, slow" : "GEAR STUCK DOWN  slower, more fuel", F.gearStuck == 1 ? C_BAD : C_WARN});
     if (F.flapAsym) ann.push_back({"FLAP ASYMMETRY  hold the wing up", C_WARN});
     if (F.ice > 0.05f) ann.push_back({fmt("ICING %.0f%%  leave the cloud, keep speed", F.ice * 100.f), F.ice > 0.5f ? C_BAD : C_WARN});
-    float rw = std::min(kHudMsgW * s, W * 0.5f - rail - 120 * s), rx = W - (cockpit ? 16 * s : rail + 12 * s) - rw;
+    float rw = std::min(kHudMsgW * s, W * 0.5f - rail - 160 * s), rx = W - (cockpit ? 16 * s : rail + 28 * s) - rw;
     float ay = msgTop;
     for (auto& a : ann) {
       g_ren.rectGrad(rx, ay, rw, 22 * s, vec3(0.05f, 0.01f, 0.0f), vec3(0.02f, 0.0f, 0.0f), 0.65f, 3 * s);
@@ -1873,7 +1874,7 @@ void Game::drawHud(const FrameParams& fp) {
     float sx, sy;
     vec3 rel3 = tgt3 - fp.camPos;
     float zc = dot(rel3, -fp.camBack);
-    const float bandT = band + 100 * s, bandB = cockpit ? H - 70 * s : (showMinimap ? tilesTop - 168 * s - 60 * s : tilesTop - 40 * s), bandC = 0.5f * (bandT + bandB), bandH = std::max(40 * s, 0.5f * (bandB - bandT));
+    const float bandT = band + 100 * s, bandB = cockpit ? H - 70 * s : tilesTop - 40 * s, bandC = 0.5f * (bandT + bandB), bandH = std::max(40 * s, 0.5f * (bandB - bandT));
     bool onS = zc > 1.f && g_ren.project(fp, tgt3, sx, sy) && sx > rail + 20 * s && sx < W - rail - 20 * s && sy > bandT && sy < bandB;
     std::string lab = dist < 1000.f ? fmt("%.0f m", length(rel3)) : fmt("%.1f km", dist / 1000.f);
     if (toWp && fabsf(target.y - plane.pos.y) > 45.f) lab += fmt("  %s%s", target.y > plane.pos.y ? "+" : "-", fmtAlt(fabsf(target.y - plane.pos.y)).c_str());
@@ -1895,6 +1896,10 @@ void Game::drawHud(const FrameParams& fp) {
       { float dl = length(dir); dir = vec2(dir.x / dl, dir.y / dl); }
       float t2 = std::min(fabsf((W * 0.5f - rail - 50 * s) / std::max(fabsf(dir.x), 1e-3f)), fabsf(bandH / std::max(fabsf(dir.y), 1e-3f)));
       float ex2 = W * 0.5f + dir.x * t2, ey2 = bandC + dir.y * t2;
+      if (showMinimap && !cockpit) {   // the pointer keeps off the minimap: lifted above it when they would meet
+        float mm = 168 * s, mx0 = W - rail - 16 * s - mm - 30 * s, my0 = tilesTop - mm - 34 * s - 30 * s;
+        if (ex2 > mx0 && ey2 > my0) ey2 = my0;
+      }
       g_ren.rect(ex2 - 20 * s, ey2 - 20 * s, 40 * s, 40 * s, vec3(0.01f, 0.03f, 0.05f), 0.5f, 20 * s);
       hudRing(ex2, ey2, 19 * s, 1.2f * s, mag, 0.5f, 32);
       float pulse2 = 1.f + 0.12f * sinf(realTime * 5.f);
