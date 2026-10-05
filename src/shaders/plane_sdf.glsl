@@ -663,10 +663,11 @@ vec2 mapPlaneBody(vec3 p){
       res = opU(res, vec2(belt, 69.0));
       res = opU(res, vec2(sdRoundBox(vec3(sp.x, sp.y - (E.y - 0.73), sp.z - (E.z - 0.055)), vec3(0.03, 0.02, 0.006), 0.004), 60.0));   // buckle
     }
-    // control yokes: pull moves toward the pilot, roll right turns the yoke clockwise
+    // control yokes: pull moves toward the pilot, roll right turns the yoke clockwise - both yokes alike (each in the
+    // pilot's own frame, not a mirror image: the copilot's turns the same way, as the linked controls do)
     {
       float pull = cPitch*0.075;
-      vec3 yp = vec3(abs(p.x) - abs(E.x), p.y - (E.y - 0.43), p.z - pz);
+      vec3 yp = vec3(-(p.x - sign(p.x)*abs(E.x)), p.y - (E.y - 0.43), p.z - pz);
       if (sdBox(yp - vec3(0.0, 0.0, 0.17), vec3(0.19, 0.19, 0.2)) < res.x) {
       res = opU(res, vec2(sdCapsule(yp, vec3(0.0, 0.0, 0.02), vec3(0.0, 0.0, 0.2 + pull), 0.017), 60.0));
       res = opU(res, vec2(sdCylX(yp.zyx - vec3(0.05, 0.0, 0.0), 0.03, 0.012), 66.0));            // shaft collar

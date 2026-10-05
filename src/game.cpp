@@ -1833,7 +1833,7 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   g_ren.entSync = sync;
   // every light aircraft's hull (outside, and the cockpit's when that is in use): a frame that wants one bakes it
   std::vector<std::pair<int, bool>> todo;
-  for (int i = 0; i < kNumAircraft; i++) if (!kAircraft[i].special) { todo.push_back({i, false}); if (g_ren.hullCockpit) todo.push_back({i, true}); }
+  for (int i = 0; i < kNumAircraft; i++) if (!kAircraft[i].special) { todo.push_back({i, false}); if (g_ren.hullCockpit || g_ren.mode == 1) todo.push_back({i, true}); }
   for (size_t k = 0; k < todo.size() && !quit; k++) {
     prewarmCraft = todo[k].first; prewarmInside = todo[k].second;
     progress(0.35f + 0.65f * k / todo.size(), std::string("BUILDING AIRCRAFT SHELLS  ") + kAircraft[prewarmCraft].name);
@@ -2887,13 +2887,14 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < 5; i++) updateCamera(1 / 60.f);
     toasts.clear(); return;
   }
-  if (name.compare(0, 3, "ckv") == 0) {   // cockpit view of aircraft N: ckv<N>_<look yaw deg>_<look pitch deg>_<hour>
-    int idx = 0; float ly = 0, lpch = -8, hour = 11; sscanf(name.c_str() + 3, "%d_%f_%f_%f", &idx, &ly, &lpch, &hour);
+  if (name.compare(0, 3, "ckv") == 0) {   // cockpit view of aircraft N: ckv<N>_<look yaw deg>_<look pitch deg>_<hour>[_<roll input -1..1>]
+    int idx = 0; float ly = 0, lpch = -8, hour = 11, roll = 0; sscanf(name.c_str() + 3, "%d_%f_%f_%f_%f", &idx, &ly, &lpch, &hour, &roll);
     if (idx == kResearchJet) { resAirborne = true; resTime = hour; launchResearch(); }
     else { timeOfDay = hour; plane.reset(&kAircraft[idx], vec3(-4000, 600, 9000), 40, kAircraft[idx].maxFuel, 100, true, kAircraft[idx].cruise); camQ = plane.q; takeoffAnnounced = true; }
     camMode = 1; hint.clear(); toasts.clear();
     for (int i = 0; i < 4; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     lookYaw = ly * DEG; lookPitch = lpch * DEG; camYaw = lookYaw; camPitch = lookPitch + 0.12f;
+    plane.ctl.roll = roll; botControl = roll != 0.f;   // (a held roll input: the yokes turn)
     toasts.clear(); hint.clear(); return;
   }
   if (name.compare(0, 3, "trf") == 0) {   // AI traffic: trf<seconds>_<view> at Solace Capital; view 0 = airport overview, k = chase craft k-1

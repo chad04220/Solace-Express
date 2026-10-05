@@ -201,15 +201,13 @@ bool Renderer::hullBaked(const FrameParams& fp) const {
 // AI traffic flies the same light aircraft: each one's outside hull (baked at launch) drawn with its own transform into
 // the third channel, the nearest of them per pixel. Only when every traffic aircraft in view has one; else its march
 // starts from the camera as before.
-void Renderer::drawTrafficHulls(const FrameParams& fp) {
+void Renderer::drawTrafficHulls(const FrameParams& fp, const PlaneMesh* const* meshes) {
   trafHullOn = false;
   int n = std::min(fp.trafficN, kMaxTrafficDrawn);
   if (hullOff || n == 0 || !progHull || !fboEnv) return;
   std::vector<const HullMesh*> hm(n);
   for (int k = 0; k < n; k++) {
-    uint64_t h = 1469598103934665603ull;   // hullKey(slot 0) of this aircraft's model
-    const uint8_t* b = (const uint8_t*)fp.traffic[k].t;
-    for (size_t i = 0; i < sizeof(float) * 96; i++) { h ^= b[i]; h *= 1099511628211ull; }
+    uint64_t h = meshes && meshes[k] ? meshes[k]->movKey : trafficModelKey(fp.traffic[k].t);   // its moving hull, or its full one
     auto it = hulls.find(h);
     if (it == hulls.end() || !it->second.ok || !it->second.verts) {
       static int warned = 0;

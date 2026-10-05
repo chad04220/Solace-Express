@@ -235,7 +235,8 @@ private:
   bool compilePlaneMesh();
   bool planeMeshWanted(const FrameParams& fp) const;
   void bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key);
-  void drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm);
+  void drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const float* rot, const vec3& pos, int trafK);
+  uint64_t trafficModelKey(const float* t) const;   // hullKey(slot 0) of a traffic aircraft's model
   std::unordered_map<uint64_t, HullMesh> hulls;   // every airframe baked so far, outside and cockpit (keyed by hullKey)
   GLuint progHull = 0, progHullBake = 0, vaoHull = 0, texHPts = 0, texHOut = 0, fboHOut = 0, fboHull = 0, texHullDepth = 0;
   int hullDepthW = 0, hullDepthH = 0;
@@ -249,7 +250,7 @@ private:
   float hullNear(const FrameParams& fp) const;
   void drawHull(const FrameParams& fp, int slot, uint64_t key, float nearOverride = -1.f);
   float hullNearNow = 0.f;   // the hull pass's near distance this frame (uHullNear): hullNear(fp), or a mesh's moving hull's own
-  void drawTrafficHulls(const FrameParams& fp);
+  void drawTrafficHulls(const FrameParams& fp, const PlaneMesh* const* meshes = nullptr);   // meshes[k]: that traffic's mesh (its moving hull is drawn instead)
   void ensureHullTarget();
   bool trafHullOn = false;
   // camera feeds: each research-jet camera is drawn into a tile of the feed atlas, through the same passes as the main

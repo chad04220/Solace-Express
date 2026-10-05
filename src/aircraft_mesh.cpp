@@ -251,8 +251,9 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   PM.ok = true;
 }
 
-// The static airframe into the G-buffer (the target, viewport and depth test are the caller's)
-void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm) {
+// A static airframe into the G-buffer (the target, viewport and depth test are the caller's): the player's aircraft
+// (trafK -1) or traffic aircraft k, placed by rot / pos
+void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const float* rot, const vec3& pos, int trafK) {
   if (!pm.ok || !pm.idx) return;
   setRT(progPlaneMesh, fp);
   for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, 0); }   // (the G-buffer is the target here, never read)
@@ -260,10 +261,18 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm) {
   glUniformMatrix4fv(U(progPlaneMesh, "uVP"), 1, GL_FALSE, vp.m);
   glUniform2f(U(progPlaneMesh, "uJit"), jitX, jitY);
   glUniform1f(U(progPlaneMesh, "uLogC"), 2.f / log2f(40000.f + 1.f));
-  glUniformMatrix3fv(U(progPlaneMesh, "uRot"), 1, GL_FALSE, fp.plane.rot);
-  glUniform3f(U(progPlaneMesh, "uPos"), fp.plane.pos.x, fp.plane.pos.y, fp.plane.pos.z);
+  glUniformMatrix3fv(U(progPlaneMesh, "uRot"), 1, GL_FALSE, rot);
+  glUniform3f(U(progPlaneMesh, "uPos"), pos.x, pos.y, pos.z);
+  glUniform1i(U(progPlaneMesh, "uMeshTraffic"), trafK);
   glBindVertexArray(pm.vao);
   glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
   glBindVertexArray(0);
   glActiveTexture(GL_TEXTURE0);
+}
+
+uint64_t Renderer::trafficModelKey(const float* t) const {
+  uint64_t h = 1469598103934665603ull;
+  const uint8_t* b = (const uint8_t*)t;
+  for (size_t i = 0; i < sizeof(float) * 96; i++) { h ^= b[i]; h *= 1099511628211ull; }
+  return h;
 }

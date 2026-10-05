@@ -50,14 +50,25 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   const uint64_t hullK = hullUse ? hullKey(fp, slot) : 0;
   if (meshOn) drawHull(fp, slot, pm->second.movKey, pm->second.eyeInMov ? -1.f : 0.f);
   else if (hullUse && hulls.count(hullK)) drawHull(fp, slot, hullK);
-  if (fp.pano <= 0.f) drawTrafficHulls(fp); else trafHullOn = false;
+  // the traffic: the same light aircraft, each with its model's mesh when one is baked (then its hull is the moving
+  // parts' too), else its full hull
+  const PlaneMesh* trafMesh[kMaxTrafficDrawn] = {};
+  const int trafN = std::min(fp.trafficN, kMaxTrafficDrawn);
+  if (!meshOff && progPlaneMesh) for (int k = 0; k < trafN; k++) { auto it = planeMeshes.find(trafficModelKey(fp.traffic[k].t)); if (it != planeMeshes.end() && it->second.ok) trafMesh[k] = &it->second; }
+  if (fp.pano <= 0.f) drawTrafficHulls(fp, trafMesh); else trafHullOn = false;
   glBindFramebuffer(GL_FRAMEBUFFER, fboGB);
   GLenum gb[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
   glDrawBuffers(4, gb);
   glViewport(0, 0, rw, rh);
   glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
   glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
-  if (meshOn) drawPlaneMesh(fp, pm->second);
+  if (meshOn) drawPlaneMesh(fp, pm->second, fp.plane.rot, fp.plane.pos, -1);
+  for (int k = 0; k < trafN; k++) {
+    if (!trafMesh[k]) continue;
+    const float* t = fp.traffic[k].t;
+    float rot[9] = {t[25 * 4], t[25 * 4 + 1], t[25 * 4 + 2], t[26 * 4], t[26 * 4 + 1], t[26 * 4 + 2], t[27 * 4], t[27 * 4 + 1], t[27 * 4 + 2]};
+    drawPlaneMesh(fp, *trafMesh[k], rot, vec3(t[24 * 4], t[24 * 4 + 1], t[24 * 4 + 2]), k);
+  }
   setRT(progObjects, fp);
   for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, 0); }   // (the G-buffer is the target here, never read)
   glUniform1f(U(progObjects, "uLogC"), 2.f / log2f(40000.f + 1.f));
