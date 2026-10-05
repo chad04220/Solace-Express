@@ -889,7 +889,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
     for (int i = 0; i < 2; i++)
       if (button(x + 250 * s + i * 170 * s, py, 164 * s, 32 * s, rn[i], i == 0 || g_ren.rasterOk, set.renderer == i)) { set.renderer = i; g_ren.mode = i; }
     py += 36 * s;
-    g_ren.text(x + 250 * s, py, 12.5f * s, g_ren.mode == 1 ? "the new rasterizer, being built: terrain, sea and scenery so far; aircraft, cockpits and effects follow (F3 shows its passes)"
+    g_ren.text(x + 250 * s, py, 12.5f * s, g_ren.mode == 1 ? "the new rasterizer, being built: everything draws on it; the aircraft still march their distance fields (F3 shows its passes)"
                                                            : "the ray tracer, as before", C_DIM, 0.85f, 0, false);
     py += 24 * s;
   }

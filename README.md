@@ -209,7 +209,8 @@ src/career.*       licences, story campaign, freelance generator, economy, save/
 src/shaders/*.glsl GLSL modules, embedded at build time: scene uniforms, aircraft distance fields and materials, terrain,
                    water, clouds, lighting, the ray tracer's main, sprites, TAA, post, UI; src/shaders.h assembles the programs.
                    The raster renderer's: gbuffer / gb_write (the G-buffer layout), terrain_vs / terrain_fs (the CDLOD terrain
-                   mesh), water_vs / water_fs, objects_fs (aircraft, traffic, debris, UFO into the G-buffer), light_fs
+                   mesh), water_vs / water_fs, objects_fs (aircraft, traffic, debris, UFO into the G-buffer), shadow_proxy_fs
+                   (the airframes' shadows for the lighting pass), light_fs, effects_fs (plumes, props, weapons, cloak, hologram)
 src/raster_renderer.cpp, src/terrain_mesh.cpp   the raster renderer (Settings -> Renderer; docs/RENDERER_REBUILD.md)
 src/entities.*     environment entities: tree/rock/building placement in streamed chunks, collisions
 src/entity_mesh.*  procedural tree, rock and building meshes (3 LODs each)
