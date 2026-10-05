@@ -695,15 +695,16 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
   panel(x, y, lw, h);
   float cy = y + 16 * s;
   header(x + 16 * s, cy, lw - 32 * s, "AIRCRAFT MARKET"); cy += 30 * s;
+  // the cards share the panel: full size when they fit, squeezed (fonts included) when the market has grown
+  const float chh = clampf((y + h - 12 * s - cy - 8 * s * (kNumAircraft - 1)) / kNumAircraft, 34 * s, 54 * s), f = chh / (54 * s);
   for (int i = 0; i < kNumAircraft; i++) {
-    float chh = 54 * s;
     bool sel = selHangar == i, hov = hovered(x + 10 * s, cy, lw - 20 * s, chh);
     card(x + 10 * s, cy, lw - 20 * s, chh, sel, hov, C_ACCENT);
     if (hov && in.mPressed[0]) { selHangar = i; g_audio.trigger(SFX_CLICK); }
     bool owned = career.ownedIndexFor(i) >= 0;
-    g_ren.text(x + 24 * s, cy + 8 * s, 17 * s, kAircraft[i].name, C_TEXT, 1);
-    g_ren.text(x + 24 * s, cy + 31 * s, 13 * s, kAircraft[i].role, C_DIM, 1);
-    g_ren.text(x + lw - (sel ? 34 : 24) * s, cy + 18 * s, 15 * s, owned ? "OWNED" : fmtMoney(kAircraft[i].price), owned ? C_GOOD : C_WARN, 1, 2);
+    g_ren.text(x + 24 * s, cy + 8 * f * s, 17 * f * s, kAircraft[i].name, C_TEXT, 1);
+    g_ren.text(x + 24 * s, cy + 31 * f * s, 13 * f * s, kAircraft[i].role, C_DIM, 1);
+    g_ren.text(x + lw - (sel ? 34 : 24) * s, cy + 18 * f * s, 15 * f * s, owned ? "OWNED" : fmtMoney(kAircraft[i].price), owned ? C_GOOD : C_WARN, 1, 2);
     cy += chh + 8 * s;
   }
   float dx = x + lw + 16 * s, dw = w - lw - 16 * s;
