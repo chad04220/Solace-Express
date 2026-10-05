@@ -11,6 +11,8 @@ bool Renderer::compileRaster() {
   if (!progLight) { error = "Lighting shader: " + e; return false; }
   progObjects = linkProgramCached(kFullscreenVS, objectsFSAssembly(""), e);
   if (!progObjects) { error = "Objects shader: " + e; return false; }
+  progShProxy = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly(""), e);
+  if (!progShProxy) { error = "Shadow proxy shader: " + e; return false; }
   return compileTerrainMesh();
 }
 
@@ -34,11 +36,11 @@ void Renderer::rasterWorld(const FrameParams& fp) {
 // player's aircraft starts its march on its rasterized hull, as in the ray tracer.
 void Renderer::rasterObjects(const FrameParams& fp) {
   hullOn = false;
-  const bool hullUse = hullWanted(fp);
+  const bool hullUse = hullWanted(fp) && fp.pano <= 0.f;   // (the hulls are flat rasters: a panorama camera marches without them)
   const int hullSlot = fp.plane.PS[3] > 0.5f ? 1 : 0;
   const uint64_t hullK = hullUse ? hullKey(fp, hullSlot) : 0;
   if (hullUse && hulls.count(hullK)) drawHull(fp, hullSlot, hullK);
-  drawTrafficHulls(fp);
+  if (fp.pano <= 0.f) drawTrafficHulls(fp); else trafHullOn = false;
   glBindFramebuffer(GL_FRAMEBUFFER, fboGB);
   GLenum gb[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
   glDrawBuffers(4, gb);
@@ -54,7 +56,20 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   glDisable(GL_DEPTH_TEST);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   // a new airframe or view: bake its hull with the ray tracer's own shape code (used from the next frame on)
-  if (hullUse && !hulls.count(hullK)) { setRT(progHullBake, fp); bakeHull(fp, hullSlot, hullK); }
+  if (hullUse && !feedPass && !hulls.count(hullK)) { setRT(progHullBake, fp); bakeHull(fp, hullSlot, hullK); }
+}
+
+// The airframes' shadows on the G-buffer's surfaces (the sun on the ground, the landing lights' beams): texGB[4]
+void Renderer::rasterShadowProxy(const FrameParams& fp) {
+  glBindFramebuffer(GL_FRAMEBUFFER, fboShProxy);
+  GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
+  glViewport(0, 0, rw, rh);
+  glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
+  setRT(progShProxy, fp);
+  glBindVertexArray(vaoEmpty);
+  glDrawArrays(GL_TRIANGLES, 0, 3);
+  glActiveTexture(GL_TEXTURE0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Renderer::rasterLight(const FrameParams& fp) {
@@ -65,6 +80,7 @@ void Renderer::rasterLight(const FrameParams& fp) {
   glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
   setRT(progLight, fp);
   glActiveTexture(GL_TEXTURE0 + 22); glBindTexture(GL_TEXTURE_2D, texGB[3]); glUniform1i(U(progLight, "uGB3"), 22);
+  glActiveTexture(GL_TEXTURE0 + 23); glBindTexture(GL_TEXTURE_2D, texGB[4]); glUniform1i(U(progLight, "uShProxy"), 23);
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);

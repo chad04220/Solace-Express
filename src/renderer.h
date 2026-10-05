@@ -202,7 +202,7 @@ private:
   void genMinimap();
   // ---- environment entities: instanced meshes -> G-buffer (lit by the ray tracer) + sun shadow cascades
   GLuint progEnt = 0, progEntSh = 0, vaoEnt = 0, vboEntMesh = 0, vboEntInst = 0;
-  GLuint fboGB = 0, texGB[4] = {0, 0, 0, 0}, texGBDepth = 0;
+  GLuint fboGB = 0, texGB[5] = {0, 0, 0, 0, 0}, texGBDepth = 0, fboShProxy = 0;   // (texGB[4]: the raster renderer's shadow proxy)
   GLuint fboSh[2] = {0, 0}, texSh[2] = {0, 0}; int shRes = 0;
   // shadows fade between kShFade0 and kShFade1 x the cascade radius around shIdeal (camera-anchored, so a cached
   // map re-rendering never changes a pixel: each map covers at least 0.84 x its radius around that point)
@@ -245,7 +245,7 @@ private:
   struct ViewTargets {
     int W = 0, H = 0, rw = 0, rh = 0, cw = 0, ch = 0, allocW = 0, allocH = 0;
     GLuint texRaw = 0, texDepth = 0, texCloudMask = 0, texCloud = 0, texCloudD = 0, fboCloud = 0, fboComp = 0, fboScene = 0;
-    GLuint texGB[4] = {0, 0, 0, 0}, texGBDepth = 0, fboGB = 0, texEnv = 0, texEnvDepth = 0, fboEnv = 0;
+    GLuint texGB[5] = {0, 0, 0, 0, 0}, texGBDepth = 0, fboGB = 0, fboShProxy = 0, texEnv = 0, texEnvDepth = 0, fboEnv = 0;
     bool depthValid = false, envOn = false, hullOn = false, trafHullOn = false, ckMaskPrev = false;
     vec3 ckLookPrev, ckUpPrev; float ckFovPrev = 0;
     float jitX = 0, jitY = 0;
@@ -291,7 +291,7 @@ private:
   void drawSprites(const FrameParams& fp, float texW, float texH, float uvsX, float uvsY);
   void feedEffects(const FrameParams& f);
   // ---- the raster renderer (raster_renderer.cpp, terrain_mesh.cpp)
-  GLuint progLight = 0, progObjects = 0, progTerrain = 0, progWater = 0;
+  GLuint progLight = 0, progObjects = 0, progShProxy = 0, progTerrain = 0, progWater = 0;
   GLuint vaoTerrain = 0, vboTerrainInst = 0, vaoWater = 0, vboWater = 0, iboWater = 0; int waterIdx = 0;
   std::vector<float> terrInst; int terrChunks = 0;
   bool compileRaster();
@@ -301,6 +301,7 @@ private:
   void drawTerrainMesh(const FrameParams& fp);
   void rasterWorld(const FrameParams& fp);
   void rasterObjects(const FrameParams& fp);
+  void rasterShadowProxy(const FrameParams& fp);
   void rasterLight(const FrameParams& fp);
 };
 

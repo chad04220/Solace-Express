@@ -1238,7 +1238,10 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     bakeTerrainShadow(fp);
     if (fp.dispMode & 1) renderDisplays(fp, false);   // the cockpit display atlases, before the objects pass samples them
     if (fp.dispMode & 2) renderDisplays(fp, true);
+    // the research jets' cockpit cameras: the same passes on their own targets, before the objects pass draws the screens
+    renderFeeds(fp, [this](GLuint p, const FrameParams& f) { setRT(p, f); }, [this](const FrameParams& f, GLuint) { rasterShadowProxy(f); rasterLight(f); cloudPass(f); }, [this](const FrameParams& f) { feedEffects(f); });
     rasterObjects(fp);
+    rasterShadowProxy(fp);
     stamp(1);
     rasterLight(fp);
     cloudPass(fp);

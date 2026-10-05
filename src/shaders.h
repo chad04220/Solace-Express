@@ -42,6 +42,11 @@ inline std::string objectsFSAssembly(const std::string& defines) {
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kPlaneMaterial + kPlaneLight + kGBuffer + kGBWrite + kObjectsFS;
 }
+// the shadow proxy: the airframe fields' shadows on what is in the G-buffer, for the lighting pass
+inline std::string shadowProxyFSAssembly(const std::string& defines) {
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace +
+         kMaterialCommon + kLightCommon + kGBuffer + kShadowProxyFS;
+}
 inline std::string lightFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kMaterialCommon + kLightCommon + kClouds + kGBuffer + kLightFS;
 }

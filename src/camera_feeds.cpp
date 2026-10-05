@@ -12,8 +12,8 @@ void Renderer::swapView(ViewTargets& v) {
   std::swap(texRaw, v.texRaw); std::swap(texDepth, v.texDepth); std::swap(texCloudMask, v.texCloudMask);
   std::swap(texCloud, v.texCloud); std::swap(texCloudD, v.texCloudD); std::swap(fboCloud, v.fboCloud); std::swap(fboComp, v.fboComp);
   std::swap(fboScene, v.fboScene);
-  for (int i = 0; i < 4; i++) std::swap(texGB[i], v.texGB[i]);
-  std::swap(texGBDepth, v.texGBDepth); std::swap(fboGB, v.fboGB);
+  for (int i = 0; i < 5; i++) std::swap(texGB[i], v.texGB[i]);
+  std::swap(texGBDepth, v.texGBDepth); std::swap(fboGB, v.fboGB); std::swap(fboShProxy, v.fboShProxy);
   std::swap(texEnv, v.texEnv); std::swap(texEnvDepth, v.texEnvDepth); std::swap(fboEnv, v.fboEnv);
   std::swap(depthValid, v.depthValid); std::swap(envOn, v.envOn); std::swap(hullOn, v.hullOn); std::swap(trafHullOn, v.trafHullOn);
   std::swap(ckMaskPrev, v.ckMaskPrev); std::swap(ckLookPrev, v.ckLookPrev); std::swap(ckUpPrev, v.ckUpPrev); std::swap(ckFovPrev, v.ckFovPrev); std::swap(jitX, v.jitX); std::swap(jitY, v.jitY);
@@ -143,13 +143,16 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     W = rw = feedTileWH[k][0]; H = rh = feedTileWH[k][1];
     cw = (rw + 1) / 2; ch = (rh + 1) / 2;
     jitX = jitY = 0.f;
-    // (the terrain envelope and the hulls are flat rasters that only speed up the march: a panorama marches without them)
-    if (cf.pano > 0.f) { envOn = false; trafHullOn = false; } else drawEnvelope(cf);
-    drawEntities(cf);
-    hullOn = false;
-    if (cf.pano <= 0.f) {
-      if (hullWanted(cf)) { uint64_t hk = hullKey(cf, 0); if (hulls.count(hk)) drawHull(cf, 0, hk); }
-      drawTrafficHulls(cf);
+    if (mode == 1 && rasterOk) { rasterWorld(cf); rasterObjects(cf); }   // (the raster renderer: trace() is its lighting pass)
+    else {
+      // (the terrain envelope and the hulls are flat rasters that only speed up the march: a panorama marches without them)
+      if (cf.pano > 0.f) { envOn = false; trafHullOn = false; } else drawEnvelope(cf);
+      drawEntities(cf);
+      hullOn = false;
+      if (cf.pano <= 0.f) {
+        if (hullWanted(cf)) { uint64_t hk = hullKey(cf, 0); if (hulls.count(hk)) drawHull(cf, 0, hk); }
+        drawTrafficHulls(cf);
+      }
     }
     trace(cf, progRT);
     effects(cf);   // the sprites (smoke, fire, sparks ...) and the light shafts

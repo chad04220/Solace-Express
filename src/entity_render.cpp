@@ -36,6 +36,10 @@ void Renderer::createGBuffer() {
   mk(texGB[2], GL_RGBA16F, GL_RGBA, GL_FLOAT);   // emission (HDR), metal
   mk(texGB[3], GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);   // ambient occlusion, - (the raster passes' extras)
   mk(texGBDepth, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT);
+  mk(texGB[4], GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);   // the raster renderer's shadow proxy (kShadowProxyFS), its own target
+  if (!fboShProxy) glGenFramebuffers(1, &fboShProxy);
+  glBindFramebuffer(GL_FRAMEBUFFER, fboShProxy);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texGB[4], 0);
   if (!fboGB) glGenFramebuffers(1, &fboGB);
   glBindFramebuffer(GL_FRAMEBUFFER, fboGB);
   for (int i = 0; i < 4; i++) glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, texGB[i], 0);
