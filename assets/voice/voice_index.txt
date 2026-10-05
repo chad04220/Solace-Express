@@ -654,8 +654,8 @@ lesson_event.rosa.e5cc5a54dfec	rosa/lesson_event.rosa.e5cc5a54dfec.wav	Positive 
 flight.aster.7a44031dc200	aster/flight.aster.7a44031dc200.wav	All checkpoints passed!	aster	40	line		
 flight.aster.61a4dca45ff1	aster/flight.aster.61a4dca45ff1.wav	LOW FUEL	aster	100	line		
 flight.aster.7e71a736df26	aster/flight.aster.7e71a736df26.wav	Checkpoints remaining - take off again to continue	aster	40	line		
-research.nyx.40f73b948f15	nyx/research.nyx.40f73b948f15.wav	XR-11 WRAITH // RESEARCH FLIGHT	nyx	40	line		
-research.nyx.66b2b06e84de	nyx/research.nyx.66b2b06e84de.wav	XR-9 SPECTER // RESEARCH FLIGHT	nyx	40	line		
+research.nyx.40f73b948f15	nyx/research.nyx.40f73b948f15.wav	XR-40 WRAITH // RESEARCH FLIGHT	nyx	40	line		
+research.nyx.66b2b06e84de	nyx/research.nyx.66b2b06e84de.wav	XR-30 SPECTER // RESEARCH FLIGHT	nyx	40	line		
 research.nyx.2110c8d235dc	nyx/research.nyx.2110c8d235dc.wav	F/V tilts the four thruster pods: full down for vertical takeoff	nyx	40	line		
 research.nyx.180fecf7b001	nyx/research.nyx.180fecf7b001.wav	F/V swivels the nozzles: full down for vertical takeoff	nyx	40	line		
 research.nyx.089b6e4c8963	nyx/research.nyx.089b6e4c8963.wav	MACH 1 - SONIC BOOM	nyx	40	line		
@@ -1015,8 +1015,8 @@ fragment.nyx.craft_islander	nyx/fragment.nyx.craft_islander.wav	Islander Twin	ny
 fragment.nyx.craft_pelican	nyx/fragment.nyx.craft_pelican.wav	Pelican Caravan	nyx	40	fragment		
 fragment.nyx.craft_meridian	nyx/fragment.nyx.craft_meridian.wav	Meridian Q400	nyx	40	fragment		
 fragment.nyx.craft_starling	nyx/fragment.nyx.craft_starling.wav	Starling 500 Jet	nyx	40	fragment		
-fragment.nyx.craft_xr9	nyx/fragment.nyx.craft_xr9.wav	XR-9 Specter	nyx	40	fragment		
-fragment.nyx.craft_xr11	nyx/fragment.nyx.craft_xr11.wav	XR-11 Wraith	nyx	40	fragment		
+fragment.nyx.craft_xr9	nyx/fragment.nyx.craft_xr9.wav	XR-30 Specter	nyx	40	fragment		
+fragment.nyx.craft_xr11	nyx/fragment.nyx.craft_xr11.wav	XR-40 Wraith	nyx	40	fragment		
 key.559aead0	aster/key.559aead0.wav	A key	aster	40	fragment		
 key.df7e70e5	aster/key.df7e70e5.wav	B key	aster	40	fragment		
 key.6b23c0d5	aster/key.6b23c0d5.wav	C key	aster	40	fragment		
@@ -1361,5 +1361,5 @@ key.5ca24005	aster/key.5ca24005.wav	key	aster	40	fragment
 @craft.Pelican Caravan	pelican
 @craft.Meridian Q400	meridian
 @craft.Starling 500 Jet	starling
-@craft.XR-9 Specter	xr9
-@craft.XR-11 Wraith	xr11
+@craft.XR-30 Specter	xr9
+@craft.XR-40 Wraith	xr11

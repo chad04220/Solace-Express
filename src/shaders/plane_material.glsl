@@ -233,8 +233,8 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     else { m.alb = vec3(0.25, 0.02, 0.02); m.emit = bcn ? vec3(30.0, 1.5, 0.6) : vec3(0.0); }
   }
   else if (mid >= 80 && mid < 94) shadeWraith(m, mid, lp, ln, t);
-  else if (mid >= 61 && mid < 80 && int(gM[0].z + 0.5) == 6) { gPixM = t*uTanHalf*2.0/uRes.y; shadeWraithCockpit(m, mid, lp, ln, E.xyz); }   // XR-11 cockpit
-  else if (mid >= 30 && mid < 60) {  // XR-9 research jet surfaces
+  else if (mid >= 61 && mid < 80 && int(gM[0].z + 0.5) == 6) { gPixM = t*uTanHalf*2.0/uRes.y; shadeWraithCockpit(m, mid, lp, ln, E.xyz); }   // XR-40 cockpit
+  else if (mid >= 30 && mid < 60) {  // XR-30 research jet surfaces
     vec3 nT; vec4 tx;
     float pulse = 0.75 + 0.25*sin(uTime*2.5);
     if (mid == 30 || mid == 31) {

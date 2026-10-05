@@ -26,7 +26,13 @@ struct AircraftSpec {
   // visual model
   float fusLen, fusRad, wingY, wingZ; int engLayout, tail;
   vec3 colBase, colStripe;
-  int special = 0;             // 1 = XR-9 research jet: fly-by-wire, pitch thrust vectoring, no fuel burn; 2 = XR-11 Wraith
+  int special = 0;             // 1 = XR-30 research jet: fly-by-wire, pitch thrust vectoring, no fuel burn; 2 = XR-40 Wraith
+  // the research craft's performance tier (0: a conventional type). Below 1 the type is held just under the sound
+  // barrier by its drag rise; above 1 the engines have reheat and the drag rise is the research jets'. gPos / gNeg are
+  // the structural limits (0: the type's defaults); the airframe takes a sustained overstress before it lets go
+  float designMach = 0, gPos = 0, gNeg = 0;
+  float gLimitPos() const { return gPos > 0 ? gPos : special == 2 ? 90.f : special ? 50.f : 5.8f; }
+  float gLimitNeg() const { return gNeg < 0 ? gNeg : special == 2 ? -45.f : special ? -25.f : -3.f; }
   // the runway it needs: the longer of its learned take-off and landing distances at full weight (Plane::perf), 15% to
   // spare, longer with the field's elevation (runwayM until the type has been learned, and for the research jets)
   float runwayNeeded(float elev) const;
@@ -48,11 +54,11 @@ inline std::string registrationOf(const AircraftSpec& s) {
 extern const int kNumAircraft;   // career aircraft (market, rentals, contracts)
 static const int kOsprey = 8;       // the Osprey C6: the only type with its own cabin trim in the field (plane_sdf.glsl)
 // the research craft (hidden from the career, only reachable from the research terminal), after the career types
-static const int kNightjar = 9;     // XR-8 Nightjar: a conventional twin jet (special 0, the generic field and flight model)
-static const int kResearchJet = 10; // XR-9 Specter
-static const int kMantis = 11;      // XR-10 Mantis: forward-swept systems demonstrator (special 0; the generic field)
-static const int kWraith = 12;      // XR-11 Wraith stealth aerobatic research craft
-// XR-11 thruster pods (body coords, +z aft): front left, front right, rear left, rear right pivot points
+static const int kNightjar = 9;     // XR-10 Nightjar: a conventional twin jet (special 0, the generic field and flight model)
+static const int kResearchJet = 10; // XR-30 Specter
+static const int kMantis = 11;      // XR-20 Mantis: forward-swept systems demonstrator (special 0; the generic field)
+static const int kWraith = 12;      // XR-40 Wraith stealth aerobatic research craft
+// XR-40 thruster pods (body coords, +z aft): front left, front right, rear left, rear right pivot points
 static const vec3 kWraithPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.08f, -3.3f), vec3(-2.75f, 0.05f, 3.45f), vec3(2.75f, 0.05f, 3.45f)};
 
 // What an aircraft can do, learned by flying it: Plane::perf() flies a few short test sorties through the flight model
@@ -155,9 +161,10 @@ public:
   std::string apStuntAbort;   // why the last figure was cut short ("" if it wasn't)
   void apDisengage() { apOn = false; apMode = AP_OFF; apUseVS = false; }
   float maxG = 1, minG = 1;
+  float overG = 0;   // sustained overstress (grows past the structural limit, decays within it; the airframe fails at 1)
   float flightTime = 0;
   float mach = 0, nozzle = 0;  // research jet: Mach number, thrust-vector nozzle angle 0 (aft) .. 1 (straight down)
-  // XR-11: each pod's pitch tilt (rad, 0 = thrust aft, pi/2 = thrust down, incl. vane vectoring), yaw vane (rad),
+  // XR-40: each pod's pitch tilt (rad, 0 = thrust aft, pi/2 = thrust down, incl. vane vectoring), yaw vane (rad),
   // thrust fraction of full boost, fan angle; control-surface deflections (-1..1: pitch, yaw, roll) as allocated
   float podTilt[4] = {0, 0, 0, 0}, podYaw[4] = {0, 0, 0, 0}, podThr[4] = {0, 0, 0, 0}, podVane[4] = {0, 0, 0, 0}, fanAngle = 0;
   vec3 surf;

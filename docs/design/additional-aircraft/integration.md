@@ -1,20 +1,20 @@
 # Integration handoff
 
-Owner-authorized scope: two new aircraft; detailed landing gear and wheels on both and all nine existing aircraft; a lower, smoothly blended XR-9 canopy exterior; rotating wheels on every wheeled vehicle. Native new-aircraft definitions and separately requested shared model edits are independent review items. Base: `db08f7aa334cf3e7c04ed99c6f5caa5bdca63ca6`.
+Owner-authorized scope: two new aircraft; detailed landing gear and wheels on both and all nine existing aircraft; a lower, smoothly blended XR-30 canopy exterior; rotating wheels on every wheeled vehicle. Native new-aircraft definitions and separately requested shared model edits are independent review items. Base: `db08f7aa334cf3e7c04ed99c6f5caa5bdca63ca6`.
 
 ## New aircraft
 
-Use [authoring.md](authoring.md), which follows the supplied brief's per-aircraft output format and computed self-checks. Paste Swift's `AircraftSpec` and `ModelDef` rows at aligned index 7, followed by Nightjar at aligned index 8, immediately before the original XR-9 rows. Update `kResearchJet` to 9 and `kWraith` to 10. Leave both old research types last; the native array-length-minus-two calculation then yields nine career aircraft. Original career indices 0..6 remain unchanged. Retain stable IDs `swift_s6` and `xr8_nightjar`.
+Use [authoring.md](authoring.md), which follows the supplied brief's per-aircraft output format and computed self-checks. Paste Swift's `AircraftSpec` and `ModelDef` rows at aligned index 7, followed by Nightjar at aligned index 8, immediately before the original XR-30 rows. Update `kResearchJet` to 9 and `kWraith` to 10. Leave both old research types last; the native array-length-minus-two calculation then yields nine career aircraft. Original career indices 0..6 remain unchanged. Retain stable IDs `swift_s6` and `xr10_nightjar`.
 
 Do not copy the laboratory count override or temporary slots 9/10 into production. `Plane::perf` / `aeroModel` index their caches from actual pointers into `kAircraft[]`; the lab appends real entries, rather than using detached local structs.
 
-Swift is a costlier, faster, longer-range PPL touring choice above the Wren, with retractable gear and paved-runway operation. Nightjar is an optional ATP civil research platform with equipment space, ordinary fuel and aerodynamic limits. Both use `special=0`; neither depends on the XR-9 or Wraith physics/cockpit route. Economy values are design proposals, with performance verified separately. No authored mission or research programme is implied by adding the row.
+Swift is a costlier, faster, longer-range PPL touring choice above the Wren, with retractable gear and paved-runway operation. Nightjar is an optional ATP civil research platform with equipment space, ordinary fuel and aerodynamic limits. Both use `special=0`; neither depends on the XR-30 or Wraith physics/cockpit route. Economy values are design proposals, with performance verified separately. No authored mission or research programme is implied by adding the row.
 
 `AircraftSpec.wingY` and `wingZ` in the supplied brief disagree with the pinned source's coarse-contact convention. The rows match the actual code: height divided by `fusRad`, and wingtip quarter-chord z. `ModelDef` contains the root position in metres. Retracting nose gear in `packModel` uses `max(-.36*L, st[3].z+.35)`, while the coarse physics contact still uses `-.36*L`. These pre-existing source/documentation mismatches are called out in authoring.md; the model review does not change the solver or contact positions.
 
 ## Fleet gear and wheel patch
 
-Shared changes are limited to `src/shaders/plane_sdf.glsl`, `wraith_sdf.glsl`, and `plane_material.glsl`. All existing aircraft rows, wheel radii, contact envelopes, steering equations, deployment paths, gear selectors and model packing stay unchanged. The same finish is used by Kestrel, Wren, Bushmaster, Islander, Pelican, Meridian, Starling, XR-9, XR-11 and both candidates, with geometry appropriate to fixed spring legs, tailwheel gear, single retracts and paired nacelle/research wheels. Spats receive a hub access opening.
+Shared changes are limited to `src/shaders/plane_sdf.glsl`, `wraith_sdf.glsl`, and `plane_material.glsl`. All existing aircraft rows, wheel radii, contact envelopes, steering equations, deployment paths, gear selectors and model packing stay unchanged. The same finish is used by Kestrel, Wren, Bushmaster, Islander, Pelican, Meridian, Starling, XR-30, XR-40 and both candidates, with geometry appropriate to fixed spring legs, tailwheel gear, single retracts and paired nacelle/research wheels. Spats receive a hub access opening.
 
 The patch adds metal wheel rims, projecting axle caps and inboard brake discs to mains; oleo sleeves, torque links and short diagonal drag braces to appropriate legs; and scaled collars to fixed/tailwheel gear. Fine grooves, recess rings and six-bolt hub patterns are evaluated once during surface shading, not as extra solids in every ray step. Existing material IDs 6 (rubber) and 8 (metal) are reused. Helpers use conservative local bounds relative to the current nearest distance.
 
@@ -22,7 +22,7 @@ The patch adds metal wheel rims, projecting axle caps and inboard brake discs to
 
 For the forthcoming mesh renderer, attach added leg details to the existing leg part, wheel rims/discs to the existing wheel part, and tread/bolt patterns to the wheel's rest-frame UV/material coordinates. Reuse the same gear and steering rigs as their parent parts. This patch targets today's SDF files; its manual deployment formulas are not a new Tier B aircraft or a substitute for the upcoming PART/rig contract. Do not bake moving details into the static body.
 
-## XR-9 canopy exterior
+## XR-30 canopy exterior
 
 Only `mapJet`'s exterior opaque sensor-canopy primitive/union changes. Centre y falls from 0.50 to 0.44 m; vertical radius from 0.42 to 0.37 m; crown falls 0.11 m. Half-width increases from 0.60 to 0.62 m and half-length from 1.90 to 2.00 m. A 0.16 m smooth union blends the shoulder into the existing airframe, below the brief's 0.35 m blend limit. Material 32, the sealed interior, pilot eye, feed-camera panes and feed cameras are unchanged. The canopy is closed static geometry and remains inside the existing plane bound.
 

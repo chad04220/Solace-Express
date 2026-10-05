@@ -1,5 +1,5 @@
 //! kPlaneScreens
-//! The XR-9's display look and head-up symbology.
+//! The XR-30's display look and head-up symbology.
 vec3 jetScreen(vec3 col, vec3 rd, int id, vec3 sl){
   vec3 E = gM[22].xyz; vec3 q = sl - E;
   // display look: slight contrast and cool grade, scanlines, darkened edges

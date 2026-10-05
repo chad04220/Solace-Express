@@ -5,13 +5,13 @@
 #include "entities.h"
 #include "models.h"
 
-// XR-9 wingtip (body frame) matching mapJet's cranked delta in shaders.h
+// XR-30 wingtip (body frame) matching mapJet's cranked delta in shaders.h
 static const vec3 kJetWingTip(5.62f, -0.38f, 4.4f);
-// XR-9 nozzle swivel (0 aft .. 90 deg down) plus pitch vectoring; mirrored by mapJet and the exhaust plumes
+// XR-30 nozzle swivel (0 aft .. 90 deg down) plus pitch vectoring; mirrored by mapJet and the exhaust plumes
 static float jetNozzleAngle(const Plane& p) { return p.nozzle * 0.5f * PI - clampf(p.ctl.pitch + p.ctl.trim * 0.3f, -1, 1) * 0.5f; }
 static const vec3 kWraithWingTip(6.2f, -0.24f, 2.0f);
-// research craft exhaust exits and jet directions (body coords): XR-9 two 2D nozzles, XR-11 four pods.
-// strength: that exhaust's share of the thrust (1 = the XR-9's)
+// research craft exhaust exits and jet directions (body coords): XR-30 two 2D nozzles, XR-40 four pods.
+// strength: that exhaust's share of the thrust (1 = the XR-30's)
 static int jetExhausts(const Plane& p, vec3* pos, vec3* dir, float* strength) {
   if (p.spec->special == 2) {
     for (int i = 0; i < 4; i++) {
@@ -28,7 +28,7 @@ static int jetExhausts(const Plane& p, vec3* pos, vec3* dir, float* strength) {
 }
 
 // ------------------------------------------------------------------ control bindings
-const char* const kActionGroups[] = {"FLIGHT", "SYSTEMS", "VIEW / COMMS", "XR-11 WRAITH"};
+const char* const kActionGroups[] = {"FLIGHT", "SYSTEMS", "VIEW / COMMS", "XR-40 WRAITH"};
 const ActionInfo kActions[ACT_COUNT] = {
   {"pitchDown", "Pitch down (nose down)", 0, 'W', 0},          {"pitchUp", "Pitch up (nose up)", 0, 'S', 0},
   {"rollLeft", "Roll left", 0, 'A', 0},                         {"rollRight", "Roll right", 0, 'D', 0},
@@ -178,6 +178,7 @@ void Game::loadSettings() {
     if (!std::isfinite(v) || fabsf(v) > 1e6f) continue;   // a damaged value keeps the default
     std::string s = k;
     if (s == "renderScale") continue;   // old setting (the renderer scales itself)
+    else if (s.rfind("rescard.", 0) == 0) { if (v > 0.5f) resDone.insert(s.substr(8)); }
     else if (s == "quality") set.quality = (int)clampf(v, 0, 2);
     else if (s == "master") set.master = clampf(v, 0, 1);
     else if (s == "engineVol") set.engineVol = clampf(v, 0, 1.5f);
@@ -215,6 +216,7 @@ void Game::saveSettings() {
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
   t += fmt("renderRes %d\nfpsTarget %d\nrenderer %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.renderer, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
   for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
+  for (const std::string& id : resDone) t += "rescard." + id + " 1\n";
   if (t == settingsWritten) return;
   std::string path = joinPath(saveDir, "settings.cfg"), tmp = path + ".tmp";
   FILE* f = fopen(tmp.c_str(), "w");
@@ -458,6 +460,38 @@ void Game::updateJobMeters(float dt, float gs) {
     }
   }
   if (c.type == CT_NIGHT && plane.ev.touchdown) result.landingLightOn = landingLight;
+}
+// the research test card: the current step's condition, held for its time where it asks one, then the next
+void Game::updateResearchCard(float dt) {
+  if (!researchFlight || resCard < 0 || resCardDone || crashed || resCard >= kNumResCards) return;
+  const ResCard& C = kResCards[resCard];
+  if (resStep >= C.n) return;
+  const ResStep& st = C.steps[resStep];
+  bool air = !plane.onGround, inst = false;
+  float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
+  switch (st.kind) {
+    case RS_MACH: inst = air && plane.mach >= st.v; break;
+    case RS_ALT: inst = plane.pos.y >= st.v; break;
+    case RS_G: inst = air && plane.gLoad >= st.v; break;
+    case RS_NEGG: inst = air && plane.gLoad <= st.v; break;
+    case RS_ROLL: inst = air && fabsf(plane.w.z) / DEG >= st.v; break;
+    case RS_SLOW: inst = air && plane.agl() > 150.f && plane.ias <= st.v; break;
+    case RS_STALL: inst = air && plane.agl() > 600.f && plane.stallWarn > 0.9f; break;
+    case RS_CLIMB: inst = air && plane.vel.y >= st.v; break;
+    case RS_HOVER: inst = air && plane.nozzle > 0.7f && length(plane.vel) < 4.f && plane.agl() > 4.f; break;
+    case RS_VLAND: inst = plane.onGround && touchedDown && plane.nozzle > 0.7f && gs < 1.f && touchdownFpm < 400.f; break;
+    case RS_CLOAK: inst = wraith.stealth >= 0.95f; break;
+    case RS_LASER: inst = wraith.shots >= (int)st.v; break;
+    case RS_BOMB: inst = wraith.dropped >= (int)st.v; break;
+    case RS_LAND: { float dA; int ap = g_world.nearestAirport(plane.pos.x, plane.pos.z, &dA); inst = plane.onGround && touchedDown && gs < 2.f && ap == resAirport && dA < g_world.airports[ap].length * 0.5f + 600.f; } break;
+  }
+  resHold = inst ? resHold + dt : 0.f;
+  if (!inst || resHold < st.hold) return;
+  resStep++; resHold = 0;
+  if (resStep >= C.n) {
+    resCardDone = true; resDone.insert(C.id); saveSettings();
+    toast(fmt("TEST CARD %s COMPLETE - %s SIGNED OFF", C.id, C.title), vec3(0.5f, 1.f, 0.6f)); g_audio.trigger(SFX_SUCCESS);
+  } else { toast(fmt("STEP %d of %d: %s", resStep + 1, C.n, C.steps[resStep].label), vec3(0.9f, 0.9f, 0.6f)); g_audio.trigger(SFX_CHIME, 0.8f); }
 }
 void Game::fireFailure(int kind, int engine) {
   if (!plane.failNow(kind, engine)) return;
@@ -739,7 +773,7 @@ void Game::flightControls(float dt) {
     c.roll = approach(c.roll, tr, rate, dt);
   }
   (void)manual;
-  // XR-11 weapons hot: the bumpers fire and bomb, so the rudder is frozen until weapons are safe again
+  // XR-40 weapons hot: the bumpers fire and bomb, so the rudder is frozen until weapons are safe again
   if (plane.spec->special == 2 && wraith.armed && !plane.onGround) { yawIn = 0; padY = 0; }
   c.yaw = approach(c.yaw, clampf(yawIn + padY, -1, 1), 4.f, dt);
   // throttle
@@ -768,14 +802,14 @@ void Game::flightControls(float dt) {
     else toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1));
   };
   if (apNav) flapNotch = c.flaps;   // the autopilot runs the flaps on the approach
-  else if (plane.spec->special == 1) flapNotch = 0;   // the XR-9 has no flaps: a delta wing and canards
+  else if (plane.spec->special == 1) flapNotch = 0;   // the XR-30 has no flaps: a delta wing and canards
   else {
     if (actPressed(ACT_FLAPS_DN)) { flapNotch = std::min(1.f, flapNotch + 1.f / 3.f); flapToast(); }
     if (actPressed(ACT_FLAPS_UP)) { flapNotch = std::max(0.f, flapNotch - 1.f / 3.f); flapToast(); }
   }
   c.flaps = flapNotch;
   // gear
-  bool wrAir = plane.spec->special == 2 && !plane.onGround;   // XR-11 in the air: gamepad Y is weapons hot / safe instead of the gear
+  bool wrAir = plane.spec->special == 2 && !plane.onGround;   // XR-40 in the air: gamepad Y is weapons hot / safe instead of the gear
   bool gearPad = actPadP(ACT_GEAR) && !(wrAir && set.padBind[ACT_GEAR] == set.padBind[ACT_WEAPONS]);
   if ((actKeyP(ACT_GEAR) || gearPad || (!showMap && (in.buttonsPressed & PAD_RIGHT))) && plane.spec->retract) {
     if (plane.onGround && c.gearDown) toast("Gear lever is locked on the ground", vec3(1, 0.6f, 0.4f));
@@ -856,6 +890,7 @@ void Game::updateFlight(float dt) {
   vec3 prevPos = plane.pos;
   if (!crashed) {
     updateFailures(simDt);
+    updateResearchCard(simDt);
     plane.step(simDt, wx, gameTime);
     flightClock += simDt;
     timeOfDay += simDt / 3600.f;
@@ -913,7 +948,7 @@ void Game::updateFlight(float dt) {
   }
   {
     // g-force tunnel: a faint red tint from the first noticeable g that slowly closes into the full ring as the load
-    // nears the airframe's limit (regular aircraft 1.8 -> 6 g, the XR-9's damped cell 4 -> 50 g; negative g from
+    // nears the airframe's limit (regular aircraft 1.8 -> 6 g, the XR-30's damped cell 4 -> 50 g; negative g from
     // -0.5 g). It builds over ~1 s and recovers over ~1.5 s
     bool jet = plane.spec->special != 0;
     float gp = smoothstepf(jet ? 4.f : 1.8f, jet ? 50.f : 6.f, plane.gLoad), gn = smoothstepf(jet ? -2.f : -0.5f, jet ? -25.f : -3.f, plane.gLoad);
@@ -1221,7 +1256,7 @@ void Game::updateCamera(float dt) {
     camPos = plane.pos + orbit.rotate(vec3(0, 0, dist)) + vec3(0, s.fusRad * 0.6f, 0);
   } else if (camMode == 1) {
     if (drag || in.pad) { lookYaw = camYaw; lookPitch = camPitch - 0.12f; }
-    else { float rest = plane.spec->special ? -0.24f : -0.13f;   // XR-9: rest the view so the instrument console is in sight
+    else { float rest = plane.spec->special ? -0.24f : -0.13f;   // XR-30: rest the view so the instrument console is in sight
       // head-look: the eyes lead a turn a little (into the bank, and towards the nose when it pitches up)
       float leadYaw = set.headLook && !plane.onGround ? clampf(-plane.bankDeg() / 60.f, -1.f, 1.f) * 0.30f : 0.f;
       float leadPitch = set.headLook && !plane.onGround ? clampf(plane.pitchDeg() / 30.f, -0.5f, 0.5f) * 0.10f : 0.f;
@@ -1291,13 +1326,16 @@ void Game::drawPadCursor() {
   }
 }
 
-// ------------------------------------------------------------------ XR-9 research flights
+// ------------------------------------------------------------------ XR-30 research flights
 void Game::launchResearch() {
   Contract c;
   bool wr = resCraft == kWraith;
   const AircraftSpec& rs = kAircraft[resCraft];
-  std::string num = rs.name; num = num.substr(0, num.find(' '));   // "XR-9"
+  std::string num = rs.name; num = num.substr(0, num.find(' '));   // "XR-30"
   c.id = num; c.id.erase(std::remove(c.id.begin(), c.id.end(), '-'), c.id.end()); c.title = num + " Research Flight"; c.type = CT_FERRY;
+  if (resCard >= 0 && kResCards[resCard].craft != resCraft) resCard = -1;
+  if (resCard >= 0) c.title = std::string(kResCards[resCard].id) + "  " + kResCards[resCard].title;
+  resStep = 0; resHold = 0; resBest = 0; resCardDone = false;
   c.from = c.to = resAirport; c.payout = 0;
   c.wx = Weather(); c.wx.timeOfDay = resTime; c.wx.windSpeed = 3; c.wx.turbulence = 0.05f;
   if (resWx == 0) { c.wx.cloudCover = 0.15f; c.wx.visibility = 60000; }
@@ -1306,7 +1344,8 @@ void Game::launchResearch() {
   startFlight(c, resCraft, Career::SRC_OWNED);
   researchFlight = true;
   toasts.clear();
-  { std::string nm = rs.name; for (char& ch : nm) ch = (char)toupper((unsigned char)ch); toast(nm + " // RESEARCH FLIGHT", wr ? vec3(0.75f, 0.45f, 1.f) : rs.special ? vec3(0.4f, 0.9f, 1) : vec3(0.35f, 0.95f, 0.8f)); }
+  { std::string nm = rs.name; for (char& ch : nm) ch = (char)toupper((unsigned char)ch); toast(nm + (resCard >= 0 ? std::string(" // TEST CARD ") + kResCards[resCard].title : std::string(" // RESEARCH FLIGHT")), wr ? vec3(0.75f, 0.45f, 1.f) : rs.special ? vec3(0.4f, 0.9f, 1) : vec3(0.35f, 0.95f, 0.8f)); }
+  if (resCard >= 0) toast(fmt("STEP 1 of %d: %s", kResCards[resCard].n, kResCards[resCard].steps[0].label), vec3(0.9f, 0.9f, 0.6f));
   if (resAirborne) {
     const Airport& a = g_world.airports[resAirport];
     vec3 p = plane.pos + a.dir() * 1500.f; p.y = std::max(a.elev, g_world.height(p.x, p.z)) + 900.f;
@@ -1325,12 +1364,12 @@ void Game::jetEffects(float dt) {
   int nEx = jetExhausts(plane, exP, exD, exS);
   auto frand = [] { return (rand() % 1000) * 0.001f; };
   // The plume itself is ray-marched in the shader; particles add the hot debris it sheds: blue plasma sparks when
-  // dry, a storm of amber embers in reheat (violet on the XR-11). Spread over the frame's flight path so they stream.
+  // dry, a storm of amber embers in reheat (violet on the XR-40). Spread over the frame's flight path so they stream.
   for (int s = 0; s < nEx; s++) {
     vec3 exDir = plane.q.rotate(exD[s]);
     vec3 r = normalize(cross(exDir, plane.up()) + plane.right() * 1e-3f), u = cross(r, exDir);
     vec3 ex = plane.pos + plane.q.rotate(exP[s]);
-    float rate = wr ? 0.f : 25.f * ab;    // embers per second per nozzle: reheat only (dry jets and the XR-11's plasma shed none)
+    float rate = wr ? 0.f : 25.f * ab;    // embers per second per nozzle: reheat only (dry jets and the XR-40's plasma shed none)
     int n = (int)(rate * dt + frand());
     for (int i = 0; i < n; i++) {
       float k = frand(), hot = frand();
@@ -1353,7 +1392,7 @@ void Game::jetEffects(float dt) {
       vec3 r = normalize(cross(exDir, plane.up()) + plane.right() * 1e-3f), u = cross(r, exDir);
       vec3 ex = plane.pos + plane.q.rotate(exP[s]) + exDir * 0.2f;
       spawn(ex, plane.vel + exDir * 30.f, 0.35f, 0.6f, 9.f, vec3(1.f, 0.7f, 0.4f) * 1.5f, 1.f, SPR_SHOCK, 0.f, 0.f);
-      for (int i = 0; i < (wr ? 0 : 30); i++) {   // the XR-11's plasma lights with the shock ring alone
+      for (int i = 0; i < (wr ? 0 : 30); i++) {   // the XR-40's plasma lights with the shock ring alone
         vec3 j = r * (frand() - 0.5f) + u * (frand() - 0.5f);
         spawn(ex, plane.vel + exDir * (60.f + 120.f * frand()) + j * 70.f, 0.25f + 0.3f * frand(), 0.12f, -0.2f, vec3(1.f, 0.75f, 0.4f) * 4.f, 1.f, SPR_SPARK, 2.f, 0.f);
       }
@@ -1400,7 +1439,7 @@ void Game::buildLights(FrameParams& fp) {
   const AircraftSpec& s = *plane.spec;
   const ModelDef& md = kModels[plane.spec - kAircraft];
   float t = realTime, night = fp.night;
-  float dark = s.special == 2 ? 1.f - wraith.stealth : 1.f;   // a cloaked XR-11 runs dark
+  float dark = s.special == 2 ? 1.f - wraith.stealth : 1.f;   // a cloaked XR-40 runs dark
   auto W = [&](vec3 b) { return plane.pos + plane.q.rotate(b); };
   auto lens = [&](vec3 b, vec3 axis, int tint, vec3 emit) {
     int i = fp.plane.lensN; if (i >= 6) return;
@@ -1422,7 +1461,7 @@ void Game::buildLights(FrameParams& fp) {
   vec3 tail = s.special == 2 ? vec3(0, -0.1f, 7.86f) : s.special ? vec3(0, 0.45f, 7.6f) : modelTailTip(md);
   vec3 bcn = s.special == 2 ? vec3(0, 0.53f, 1.6f) : s.special ? vec3(0, 0.67f, 1.6f) : modelFinTop(md);
   vec3 ldg;   // left landing light, in the wing leading edge
-  if (s.special == 2) ldg = vec3(-0.2f, -0.38f, -6.6f);   // XR-11: under the chin, ahead of the pods, turrets and gear
+  if (s.special == 2) ldg = vec3(-0.2f, -0.38f, -6.6f);   // XR-40: under the chin, ahead of the pods, turrets and gear
   else if (s.special) ldg = vec3(-1.8f, -0.26f, 0.15f);
   else { float k = 0.3f, x = md.wing[0] * k; ldg = vec3(-x, md.wing[4] + x * tanf(md.wing[6] * DEG), md.wing[5] + md.wing[3] * k - 0.02f); }
   bool on = plane.engineRunning || plane.onGround;
@@ -1484,7 +1523,7 @@ void Game::updateUfo(float dt) {
   vec3 r(-f.z, 0, f.x), u(0, 1, 0);
   float span = plane.spec->span;
   vec3 hold = r * (ufo.side * (span * 0.5f + 15.f)) + u * -0.6f + f * 2.f;         // station alongside, cabin at eye level
-  vec3 from = -f * 250.f + u * 60.f + r * (ufo.side * 520.f);                       // swoops in from the rear quarter and above (in view of the XR-11's aft displays)
+  vec3 from = -f * 250.f + u * 60.f + r * (ufo.side * 520.f);                       // swoops in from the rear quarter and above (in view of the XR-40's aft displays)
   float k = smoothstepf(0.f, 6.5f, t);
   vec3 off = from + (hold - from) * k;
   off.y += sinf(t * 1.7f) * 0.6f + sinf(t * 0.9f) * 0.4f;                           // floating bob
@@ -1585,7 +1624,7 @@ void Game::breakUp(vec3 impactVel, bool water, bool air) {
   auto box = [](vec3 lo, vec3 hi, vec3& C, vec3& H) { C = (lo + hi) * 0.5f; H = (hi - lo) * 0.5f; };
   vec3 lo[5] = {vec3(-xs, y0, z0), vec3(-xr, y0, zA), vec3(-xs, wy0, zA), vec3(xr, wy0, zA), vec3(-xs, y0, zB)};
   vec3 hi[5] = {vec3(xs, y1, zA), vec3(xr, y1, zB), vec3(-xr, wy1, zB), vec3(xs, wy1, zB), vec3(xs, y1, z1)};
-  if (plane.spec->special) {   // XR-9: its own airframe (mapJet) - nose, centre, tail and both outer wings, no overlaps
+  if (plane.spec->special) {   // XR-30: its own airframe (mapJet) - nose, centre, tail and both outer wings, no overlaps
     const float y0j = -1.7f, y1j = 2.9f;
     vec3 jl[5] = {vec3(-2.2f, y0j, -9.6f), vec3(-2.2f, y0j, -3.f), vec3(-5.9f, -1.1f, -3.f), vec3(2.2f, -1.1f, -3.f), vec3(-2.2f, y0j, 3.6f)};
     vec3 jh[5] = {vec3(2.2f, y1j, -3.f), vec3(2.2f, y1j, 3.6f), vec3(-2.2f, 0.8f, 6.1f), vec3(5.9f, 0.8f, 6.1f), vec3(2.2f, y1j, 9.6f)};
@@ -1865,7 +1904,7 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   { std::string r = registrationOf(s); for (int i = 0; i < 3; i++) pv.reg[i] = (float)r[3 + i]; }
   pv.propCount = modelProps(md, pv.prop);
   pv.hud[0] = p.ias; pv.hud[1] = p.pos.y; pv.hud[2] = p.heading(); pv.hud[3] = p.mach;
-  pv.hud2[0] = p.gLoad; pv.hud2[1] = p.ctl.throttle; pv.hud2[2] = p.spec && p.spec->special == 1 ? jetNozzleAngle(p) / (0.5f * PI) : p.nozzle;   // XR-9: pitch vectoring (90 deg units) pv.hud2[3] = p.gear > 0.5f ? 1.f : 0.f;
+  pv.hud2[0] = p.gLoad; pv.hud2[1] = p.ctl.throttle; pv.hud2[2] = p.spec && p.spec->special == 1 ? jetNozzleAngle(p) / (0.5f * PI) : p.nozzle;   // XR-30: pitch vectoring (90 deg units) pv.hud2[3] = p.gear > 0.5f ? 1.f : 0.f;
   vec3 vb = length(p.vel) > 2.f ? p.q.conj().rotate(normalize(p.vel)) : vec3(0, 0, -1);
   pv.hudV[0] = vb.x; pv.hudV[1] = vb.y; pv.hudV[2] = vb.z;
   pv.hud3[0] = p.engineSpool; pv.hud3[1] = p.alpha / DEG; pv.hud3[2] = p.vel.y; pv.hud3[3] = p.agl();
@@ -1987,12 +2026,12 @@ FrameParams Game::buildFrame() {
 struct MenuShot { const char* ap; int craft; float tod, cloud; int cam; float alt, turn; };
 static const MenuShot kMenuShots[] = {
   {"PVI", 3, 9.0f, 0.30f, 0, 260.f, 35.f},    // west-coast port, morning, side chase
-  {"VCF", 7, 17.6f, 0.25f, 1, 520.f, -20.f},  // the volcano at sunset, an XR-9 roaring past a fixed camera
+  {"VCF", 7, 17.6f, 0.25f, 1, 520.f, -20.f},  // the volcano at sunset, an XR-30 roaring past a fixed camera
   {"PMB", 1, 12.5f, 0.20f, 3, 150.f, 60.f},   // the lagoon at noon, trailing chase
   {"SMP", 4, 16.5f, 0.35f, 0, 320.f, -45.f},  // the Spine mountains
   {"CAP", 5, 19.1f, 0.30f, 2, 650.f, 15.f},   // the capital at dusk, lights coming on, high orbit
   {"FJH", 2, 11.0f, 0.45f, 1, 260.f, 80.f},   // the fjord
-  {"LHK", 8, 7.0f, 0.25f, 0, 200.f, -70.f},   // Lighthouse Key at dawn, the XR-11
+  {"LHK", 8, 7.0f, 0.25f, 0, 200.f, -70.f},   // Lighthouse Key at dawn, the XR-40
   {"MDB", 0, 14.0f, 0.35f, 3, 210.f, 25.f},   // Meadowbrook farmland
 };
 static const float kMenuShotLen = 16.f;
@@ -2239,9 +2278,9 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     float dcam = length(plane.pos - fp.camPos);
     float ls = std::max(0.05f, dcam * 0.0012f);   // distant glints only: up close the modelled lens is the light
     float glint = 0.2f + 0.8f * smoothstepf(20.f, 110.f, dcam);
-    float navI = (0.6f + 2.5f * night) * (1.f - wraith.stealth) * glint;   // a cloaked XR-11 runs dark
+    float navI = (0.6f + 2.5f * night) * (1.f - wraith.stealth) * glint;   // a cloaked XR-40 runs dark
     const ModelDef& md = kModels[plane.spec - kAircraft];
-    bool jet = s.special != 0;   // the XR-9 is an SDF of its own: its lights don't follow the generic model layout
+    bool jet = s.special != 0;   // the XR-30 is an SDF of its own: its lights don't follow the generic model layout
     vec3 tip = s.special == 2 ? kWraithWingTip : jet ? kJetWingTip : modelWingTip(md);
     vec3 lt = plane.pos + plane.q.rotate(vec3(-tip.x, tip.y, tip.z)), rtp = plane.pos + plane.q.rotate(tip);
     if (camMode != 1) {
@@ -2253,7 +2292,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       if (!plane.onGround && wraith.stealth < 0.5f && (st < 0.05f || (st > 0.12f && st < 0.16f))) { bill(add, lt, ls * 3.f, vec3(4.f) * glint, 1, SPR_GLOW, 0.3f); bill(add, rtp, ls * 3.f, vec3(4.f) * glint, 1, SPR_GLOW, 0.3f); }
     }
     // AI traffic lights: nav lights, beacon, strobes when airborne, landing lights on the runway and on approach,
-    // reheat glow on XR-9 formations
+    // reheat glow on XR-30 formations
     for (const TrafficCraft& c : traffic.craft) {
       float dc = length(c.pos - fp.camPos);
       if (dc > 9000.f) continue;
@@ -2713,7 +2752,7 @@ void Game::update(float dt) {
   updateBindCapture(dt);
   armInputs();
   // gamepad: both bumpers held together for a second hides the whole flight UI; again brings it back (not while the
-  // XR-11's weapons are armed: the bumpers are its triggers then; the pause menu has the same switch)
+  // XR-40's weapons are armed: the bumpers are its triggers then; the pause menu has the same switch)
   bool bumpersFree = !(screen == SCR_FLIGHT && plane.spec && plane.spec->special == 2 && wraith.armed);
   if (in.pad && bumpersFree && (in.buttons & PAD_LB) && (in.buttons & PAD_RB)) {
     bumperHold += dt;
@@ -2840,7 +2879,7 @@ void Game::debugScene(const std::string& name) {
   if (name == "menu") { screen = SCR_MENU; realTime = 20; return; }
   if (name.compare(0, 5, "menuT") == 0) { screen = SCR_MENU; realTime = (float)atof(name.c_str() + 5); return; }   // the menu tour at t seconds
   if (name == "hub") { screen = SCR_HUB; realTime = 20; return; }
-  if (name.compare(0, 4, "jcam") == 0) {  // XR-9 close-up from an orbit angle: jcam<yaw deg>_<pitch deg>
+  if (name.compare(0, 4, "jcam") == 0) {  // XR-30 close-up from an orbit angle: jcam<yaw deg>_<pitch deg>
     float yawD = 0, pitD = 10, thrP = -1, nozP = 0, zoom = 0.55f, tod = -1; sscanf(name.c_str() + 4, "%f_%f_%f_%f_%f_%f", &yawD, &pitD, &thrP, &nozP, &zoom, &tod);
     if (tod >= 0) resTime = tod;
     resAirborne = true; realTime = 20; launchResearch(); wx.cloudCover = 0.3f;
@@ -2859,7 +2898,7 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < 5; i++) updateCamera(0.1f);
     toasts.clear(); return;
   }
-  if (name == "vapour") {  // XR-9 pulling g near the cloud base: wingtip vapour must trail behind the tips
+  if (name == "vapour") {  // XR-30 pulling g near the cloud base: wingtip vapour must trail behind the tips
     resAirborne = true; realTime = 20; launchResearch(); wx.cloudBase = 300; wx.cloudCover = 0.2f;
     plane.vel = plane.forward() * 280.f; plane.ctl.throttle = 0.9f; botControl = true; plane.ctl.pitch = 0.6f; plane.ctl.gearDown = false; plane.gear = 0;
     for (int i = 0; i < 40; i++) { realTime += 1 / 60.f; update(1 / 60.f); }
@@ -2902,16 +2941,16 @@ void Game::debugScene(const std::string& name) {
     printf("pad: A skips the career crash to the results: %s\n", wasCrash && screen == SCR_DEBRIEF ? "ok" : "FAIL");
     return;
   }
-  if (name == "research" || name == "research11" || name == "research8" || name == "research10") {   // the terminal, settled (selection decrypted)
+  if (name == "research" || name == "research40" || name == "research10" || name == "research20") {   // the terminal, settled (selection decrypted)
     screen = SCR_RESEARCH; realTime = 30; resOpened = 20; resAuthed = true;
-    resCraft = name == "research11" ? kWraith : name == "research8" ? kNightjar : name == "research10" ? kMantis : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
+    resCraft = name == "research40" ? kWraith : name == "research10" ? kNightjar : name == "research20" ? kMantis : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
     return;
   }
   if (name.rfind("researchscan", 0) == 0) {   // the biometric sequence at a moment: researchscan<tenths of a second>
     screen = SCR_RESEARCH; realTime = 30; resAuthed = false; resOpened = realTime - atoi(name.c_str() + 12) / 10.f;
     return;
   }
-  if (name.compare(0, 3, "wr_") == 0) {   // XR-11: wr_<mode>_<cam yaw>_<cam pitch>_<cam dist>_<seconds>
+  if (name.compare(0, 3, "wr_") == 0) {   // XR-40: wr_<mode>_<cam yaw>_<cam pitch>_<cam dist>_<seconds>
     // modes: 0 cruise, 1 hover, 2 parked, 3 cloak spreading, 4 cloaked, 5 turrets out + bay open, 6 lasers firing,
     // 7 plasma bomb (camera on the impact), 8 cockpit
     int mode = 0; float yawD = 210, pitD = 12, dist = 30, secs = 1.5f;
@@ -3024,7 +3063,7 @@ void Game::debugScene(const std::string& name) {
   {
     float px, pz, agl, hdg; char cm = 'c';
     float bagl = 300, blook = -70, bafter = 0.25f;
-    if (sscanf(name.c_str(), "wrbomb_%f_%f_%f", &bagl, &blook, &bafter) >= 1) {   // XR-11 cockpit: drop a bomb and watch it go off through the glass floor
+    if (sscanf(name.c_str(), "wrbomb_%f_%f_%f", &bagl, &blook, &bafter) >= 1) {   // XR-40 cockpit: drop a bomb and watch it go off through the glass floor
       resCraft = kWraith; realTime = 20; resAirborne = true; resTime = 12.f; launchResearch();
       plane.pos.y = std::max(g_world.height(plane.pos.x, plane.pos.z), 0.f) + bagl;
       plane.apEngage(Plane::AP_HOLD, -1, wx); plane.apAlt = plane.pos.y; botControl = true;
@@ -3043,7 +3082,7 @@ void Game::debugScene(const std::string& name) {
       return;
     }
     float fx, fz, fsec = 3, fpitch = 28, fyaw = 0;
-    if (sscanf(name.c_str(), "lasertest_%f_%f_%f_%f_%f", &fx, &fz, &fsec, &fpitch, &fyaw) >= 2) {   // XR-11 firing at the ground ahead from a fixed hover
+    if (sscanf(name.c_str(), "lasertest_%f_%f_%f_%f_%f", &fx, &fz, &fsec, &fpitch, &fyaw) >= 2) {   // XR-40 firing at the ground ahead from a fixed hover
       resCraft = kWraith; realTime = 20; resAirborne = true; resTime = 12.f; launchResearch();
       float g = std::max(g_world.height(fx, fz), 0.f);
       vec3 pos(fx, g + 70.f, fz);
@@ -3107,7 +3146,7 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < (name == "rings" ? 60 : 42); i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     return;
   }
-  if (name.compare(0, 8, "airbreak") == 0) {   // XR-9 overstressed at speed: breaks up in the air; airbreak<seconds after>
+  if (name.compare(0, 8, "airbreak") == 0) {   // XR-30 overstressed at speed: breaks up in the air; airbreak<seconds after>
     bool cessna = name.size() > 8 && name[8] == 'c';   // airbreakc<s>: a light aircraft pushed over hard in a dive instead
     float after = name.size() > 8 + cessna ? atof(name.c_str() + 8 + cessna) : 3.f;
     resAirborne = true; realTime = 20; launchResearch(); hudOn = false;
@@ -3232,7 +3271,7 @@ void Game::debugScene(const std::string& name) {
     printf("ufo: t %.1f hatch %.2f laugh %.2f wave %.2f, %.1f m from the player\n", ufo.t, ufo.hatch, ufo.laugh, ufo.wave, length(ufo.pos - plane.pos));
     return;
   }
-  if (name.compare(0, 3, "xrf") == 0) {   // XR-9 formation pass: xrf<seconds after spawn>; camera at the player looking at the leader
+  if (name.compare(0, 3, "xrf") == 0) {   // XR-30 formation pass: xrf<seconds after spawn>; camera at the player looking at the leader
     float secs = 20; sscanf(name.c_str() + 3, "%f", &secs);
     plane.reset(&kAircraft[1], vec3(-4000, 700, 9000), 40, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
     takeoffAnnounced = true; camQ = plane.q; hint.clear(); timeOfDay = 14.f;
@@ -3380,7 +3419,7 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
   }
   if (name == "gpsap" || name == "apfinal" || name == "apvtol") {   // autopilot: GPS autoland pick, then the approach
-    int sp = name == "apvtol" ? 8 : 4;   // (the XR-11: the research jet that lands vertically)
+    int sp = name == "apvtol" ? 8 : 4;   // (the XR-40: the research jet that lands vertically)
     plane.reset(&kAircraft[sp], vec3(-4000, 900, 9000), 40, kAircraft[sp].maxFuel, 100, true, kAircraft[sp].cruise * 0.8f);
     plane.engineRunning = true; plane.engineSpool = 0.7f; plane.ctl.throttle = 0.7f;
     takeoffAnnounced = true; engineAutoStarted = true; camQ = plane.q; hint.clear();

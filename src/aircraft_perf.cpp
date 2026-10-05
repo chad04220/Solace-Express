@@ -36,7 +36,7 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
   const float W = (s.emptyMass + fuel + payload) * G0, rho = 1.225f * expf(-1200.f / 8500.f);
   P.vs1 = sqrtf(2.f * W / (rho * s.wingArea * s.CLmax));
   P.vs0 = sqrtf(2.f * W / (rho * s.wingArea * (s.CLmax + s.flapCL)));
-  P.gLimit = s.special == 2 ? 90.f : s.special ? 50.f : 5.8f; P.gNeg = s.special == 2 ? -45.f : s.special ? -25.f : -3.f;
+  P.gLimit = s.gLimitPos(); P.gNeg = s.gLimitNeg();
   // provisional numbers, used by the inner loops while the test sorties below fly
   P.vy = s.vref * 1.4f; P.roc = s.special ? 30.f : s.engineType == ENG_JET ? 12.f : 4.f; P.sinkIdle = 4.f;
   P.rollRate = s.special ? 5.f : 1.f; P.gPerStick = 3.f; P.tG = 1.f; P.tRoll = 0.5f; P.qPerStick = 0.6f; P.tQ = 0.5f; P.gPull = P.gLimit; P.gUse = std::min(P.gLimit * 0.8f, 3.8f); P.bankMax = 60.f;

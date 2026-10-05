@@ -1,5 +1,5 @@
 //! kPlaneSDF
-//! The aircraft distance fields: light aircraft and airliners from the packed model (mapPlaneBody), the XR-9 (mapJet) and
+//! The aircraft distance fields: light aircraft and airliners from the packed model (mapPlaneBody), the XR-30 (mapJet) and
 //! its sealed cockpit (mapJetCockpit), and the light fixtures (mapPlane).
 // Landing-gear bay: with the gear out (open > 0) a dark well is cut into the skin above the opening (c: centre of the
 // opening, h: half width / half length, depth upwards) and two doors, hinged along the bay's long edges, swing down.
@@ -97,7 +97,7 @@ vec2 gearLegDetails(vec3 p, vec2 res, vec3 upper, vec3 lower, float shaft, bool 
   return opU(res, vec2(metal, 8.0));
 }
 
-// ---------------- XR-9 Specter research jet (engine code 5): blended lifting body with chines, cranked delta with
+// ---------------- XR-30 Specter research jet (engine code 5): blended lifting body with chines, cranked delta with
 // elevons, all-moving canards, canted twin fins, 2D pitch-vectoring nozzles, opaque sensor canopy.
 // The cockpit is a sealed pod: the pilot sees outside only through the panoramic and side display screens.
 vec2 mapJetCockpit(vec3 p){

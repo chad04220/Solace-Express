@@ -1,5 +1,5 @@
 //! kWraithCockpitMaterial
-//! The XR-11 cockpit's materials, hologram, camera-feed display mapping and head-up symbology.
+//! The XR-40 cockpit's materials, hologram, camera-feed display mapping and head-up symbology.
 // ---------------------------------------------------------------- materials
 float wrHex(vec2 p, out vec2 id){   // distance to the edge of a hexagonal cell (0 at the edge)
   vec2 r = vec2(1.0, 1.7320508), h = r*0.5;
@@ -127,7 +127,7 @@ vec3 wrFloorUV(vec3 q){
 // not mirrored.
 int feedSlot(int id, vec3 q, out vec2 uv){
   float sx = q.x < 0.0 ? -1.0 : 1.0; bool L = q.x < 0.0;
-  if (int(gM[0].z + 0.5) == 5) {   // XR-9: the panoramic display (one panoramic camera) and the side bays
+  if (int(gM[0].z + 0.5) == 5) {   // XR-30: the panoramic display (one panoramic camera) and the side bays
     if (id == 41) { uv = vec2(0.0); return 0; }   // the panoramic display: one panoramic camera (feedScreen maps it)
     uv = vec2((q.z - 0.24)/0.3*sx, (q.y - 0.04)/0.2);
     return L ? 3 : 4;
@@ -148,7 +148,7 @@ int feedSlot(int id, vec3 q, out vec2 uv){
   uv = wrFrame(q, WL_C, WL_N, vec3(0,0,-1)).xy/WL_S; return 9;
 }
 // The picture on a point of a display, and the camera's ray through it (rdc: the symbology is drawn conformal to it).
-// While the XR-11's bomb camera exists the floor panes show it instead of the belly cameras (bomb = true).
+// While the XR-40's bomb camera exists the floor panes show it instead of the belly cameras (bomb = true).
 vec3 feedScreen(int id, vec3 sl, out vec3 rdc, out bool bomb){
   vec3 q = sl - gM[22].xyz;
   vec2 uv; int s = feedSlot(id, q, uv);

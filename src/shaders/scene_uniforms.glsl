@@ -37,7 +37,7 @@ uniform int uPLN; uniform vec4 uPLP[12]; uniform vec4 uPLC[12]; uniform vec4 uPL
 // the player aircraft's light fixtures (body space): lens centre | lens emission | outward axis + glass tint (0 red,
 // 1 green, 2 clear)
 uniform int uLensN; uniform vec4 uLensP[6]; uniform vec4 uLensC[6]; uniform vec4 uLensD[6];
-uniform vec4 uWr[7];   // XR-11 Wraith animation and weapons state (see mapWraith)
+uniform vec4 uWr[7];   // XR-40 Wraith animation and weapons state (see mapWraith)
 uniform int uFxBeams; uniform vec4 uBeamA[16]; uniform vec4 uBeamB[16];   // laser bolts: tail + radius, head + intensity
 uniform int uFxBombs; uniform vec4 uBombs[8];                           // dark-energy bombs in flight: centre + radius
 uniform int uFxBlasts; uniform vec4 uBlast[6]; uniform vec4 uBlastI[6]; // detonations: centre + radius, age 0..1 + intensity
@@ -51,7 +51,7 @@ int gModelId = -1;
 uniform vec3 uWheel;   // the player's wheels' roll (main left, main right, nose / tail), from the simulation
 vec3 gWheel;           // the wheels' roll of the aircraft loaded (the player's, or a traffic aircraft's from its rotation columns' .w)
 vec4 gM[24]; vec4 gPS; vec4 gCtl; vec3 gColBase; vec3 gColStripe; vec4 gFlame;
-vec4 gWr[7];   // the XR-11's animation state the field reads (uWr, or a bake's state)
+vec4 gWr[7];   // the XR-40's animation state the field reads (uWr, or a bake's state)
 // Fitted cabin mounts, cached when the model is loaded rather than at every ray-march sample.
 vec4 gCab0, gCab1;  // seat half width, headrest y, dome-light y, armrest x | visor y / slope, overhead y, vent x
 void loadCabinFit();

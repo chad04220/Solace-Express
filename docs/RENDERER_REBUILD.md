@@ -28,7 +28,7 @@ G-buffer pass  : terrain mesh | water | entities | aircraft parts | debris | UFO
 lighting pass  : sky | sun with cascades + terrain-shadow bake + cloud shadow | ambient | moon
                  | point lights (shadow maps for the flagged ones) | emission | interior fixtures | fog
 clouds         : quarter-resolution march along texDepth + composite              existing
-effects pass   : the cloaked XR-11 refracts the lit frame (screen space), prop discs, vapour cone, plumes, weapons, hologram
+effects pass   : the cloaked XR-40 refracts the lit frame (screen space), prop discs, vapour cone, plumes, weapons, hologram
                  (effects_fs, into the free TAA history texture and copied back)
 TAA, sprites, bloom, light shafts, post                                         existing
 ```

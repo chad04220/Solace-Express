@@ -32,7 +32,7 @@ void main(){
     if (jetC && ((id0 >= 41 && id0 <= 43) || (id0 >= 61 && id0 <= 63))) onScr = true;
     else pod = true;
   }
-  // the cloaked part of the XR-11 is see-through: its own pass draws it over the lit frame
+  // the cloaked part of the XR-40 is see-through: its own pass draws it over the lit frame
   vec2 ph = hTop;
   if (uWr[4].w > 0.001 && uPlaneOn == 1 && uWreck == 0 && !cockpitView && int(gM[0].z + 0.5) == 6 && ph.x > 0.0) {
     vec3 lp0 = transpose(uPlaneRot)*(ro + rd*ph.x - uPlanePos);

@@ -1,5 +1,5 @@
 // Solace Express - AI traffic: airport circuits (park, taxi, take off, fly the pattern, land, taxi in), cruising
-// traffic, XR-9 research formations ripping past, and an aerobatic display team.
+// traffic, XR-30 research formations ripping past, and an aerobatic display team.
 #pragma once
 #include "common.h"
 #include "wheel_motion.h"
@@ -51,7 +51,7 @@ public:
   // O+P entertainment: a pair of XR-9s flies a display around the player until dismissed or the player lands
   void spawnEscort(vec3 player, vec3 playerVel);
   void dismissEscort();
-  // XR-11 weapons: the first aircraft a segment passes through (not the escort pair), and everything inside a blast
+  // XR-40 weapons: the first aircraft a segment passes through (not the escort pair), and everything inside a blast
   int rayHit(vec3 a, vec3 d, float len, float& tHit) const;
   int destroyNear(vec3 c, float R, std::vector<vec3>& where);
   bool escortActive() const { return count(TrafficCraft::ESCORT) > 0 && escAct != ESC_LEAVE; }

@@ -95,7 +95,7 @@ const ModelDef kModels[] = {
   2,-0.55f,1.45f,0.25f,0.27f,0.22f, // two large cabin windows per side
   vec3(-0.34f,0.74f,-1.90f),1, // left pilot eye; analog twin cockpit
   -3.05f,-2.62f,0.40f,-0.65f }, // windshield and pilot side windows
-  // ---------------------------------------------------------------- XR-8 Nightjar (civil twin-jet research demonstrator; generic field)
+  // ---------------------------------------------------------------- XR-10 Nightjar (civil twin-jet research demonstrator; generic field)
   { // Eight closed stations; enough roof height for the offset glass-cockpit eye.
   {{-8.30f,.035f,.035f,-.035f},{-6.65f,.28f,.22f,-.030f},
   {-5.05f,.56f,.49f,-.010f},{-3.55f,.77f,.79f,.045f},
@@ -109,7 +109,7 @@ const ModelDef kModels[] = {
   4,.35f,0,                                        // wing/body retracts; no cargo pod
   0,0.0f,0.0f,0.0f,0.0f,0.0f,                       // no passenger windows
   vec3(-.42f,.59f,-3.30f),2,-5.45f,-4.23f,.30f,-2.20f }, // glass cockpit; avoid centre-display overlap using data
-  // ---------------------------------------------------------------- XR-9 Specter (research jet; custom SDF in the shader, engine code 5)
+  // ---------------------------------------------------------------- XR-30 Specter (research jet; custom SDF in the shader, engine code 5)
   { {{-9.00f,.04f,.03f,-.05f},{-7.60f,.40f,.22f,-.02f},{-5.60f,.82f,.48f,.06f},{-3.60f,1.05f,.62f,.08f},{0.0f,1.15f,.60f,.05f},{3.50f,1.25f,.55f,0},{6.60f,1.15f,.45f,-.02f},{8.20f,.95f,.40f,-.02f}}, .45f,
     {5.60f,7.20f,1.20f,5.60f,-.20f,-1.60f,-2.0f,.045f}, 0,0,0,.82f, 0,0,
     {1.90f,1.60f,.55f,1.10f,.05f,-6.60f,0}, 0,
@@ -118,7 +118,7 @@ const ModelDef kModels[] = {
     4, .38f, 0,
     0, 0,0,0,0,0,
     vec3(0,.62f,-4.70f), 3, -6.0f,-4.9f,.5f,-4.0f },
-  // ---------------------------------------------------------------- XR-10 Mantis (forward-swept demonstrator; generic field like the XR-8)
+  // ---------------------------------------------------------------- XR-20 Mantis (forward-swept demonstrator; generic field like the XR-10)
   { // eight stations, nose to tail: a slim round body with the cockpit well forward
     {{-8.0f,.07f,.07f,.05f},{-6.3f,.44f,.44f,.05f},{-4.8f,.79f,.79f,.05f},{-3.9f,.98f,.98f,.05f},
      {-.3f,1.02f,1.02f,.04f},{2.65f,1.05f,1.05f,.04f},{6.1f,.40f,.40f,.20f},{8.0f,.07f,.07f,.28f}}, 1.0f,
@@ -131,7 +131,7 @@ const ModelDef kModels[] = {
     0,0.0f,0.0f,0.0f,0.0f,0.0f,
     vec3(0.0f,.65f,-3.35f),2,                          // glass cockpit
     -4.95f,-4.45f,.45f,-2.7f },
-  // ---------------------------------------------------------------- XR-11 Wraith (stealth research craft; faceted SDF in the shader, engine code 6)
+  // ---------------------------------------------------------------- XR-40 Wraith (stealth research craft; faceted SDF in the shader, engine code 6)
   { {{-8.40f,.04f,.03f,-.05f},{-7.00f,.45f,.24f,-.02f},{-5.20f,.85f,.48f,.05f},{-3.20f,1.10f,.58f,.06f},{0.0f,1.25f,.58f,.04f},{3.20f,1.30f,.52f,0},{6.00f,1.05f,.42f,-.02f},{7.80f,.80f,.32f,-.02f}}, .25f,
     {6.20f,7.60f,1.40f,5.40f,-.15f,-2.30f,0.0f,.04f}, 0,0,0,.82f, 0,0,
     {0,0,0,0,0,0,0}, 0,

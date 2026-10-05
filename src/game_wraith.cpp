@@ -1,4 +1,4 @@
-// Solace Express - XR-11 Wraith systems: the cloak, the retracting laser turrets, the bomb bay and the dark-energy
+// Solace Express - XR-40 Wraith systems: the cloak, the retracting laser turrets, the bomb bay and the dark-energy
 // weapons out in the world (laser bolts, plasma bombs, detonations and their glassed craters)
 #include "game.h"
 #include "entities.h"
@@ -66,7 +66,7 @@ void Game::wraithControls(float dt) {
 // streaks away from the turret, however fast the Wraith is flying.
 void Game::fireLaser() {
   WraithState& W = wraith;
-  int s = W.laserSide; W.laserSide ^= 1;
+  int s = W.laserSide; W.laserSide ^= 1; W.shots++;
   vec3 a = plane.pos + plane.q.rotate(kLaserLens[s]);
   vec3 aim = plane.pos + plane.forward() * 650.f;   // the two turrets converge 650 m ahead
   vec3 d = normalize(aim - a);
@@ -204,7 +204,7 @@ void Game::updateBombCam(float dt) {
 }
 
 // The research jets' cockpit cameras (feed_cameras.h): game objects riding on the airframe, each at its mount on the
-// skin and turned the way its display faces, plus the XR-11's bomb camera, which flies free. They exist while their
+// skin and turned the way its display faces, plus the XR-40's bomb camera, which flies free. They exist while their
 // pictures are on show: in the cockpit view.
 void Game::buildFeedCameras(FrameParams& fp) {
   fp.feedRig = 0;
@@ -317,7 +317,7 @@ void Game::updateWraith(float dt) {
   if (W.bombQueue > 0 && W.bay > 0.95f && W.bombLoaded >= 1.f && !plane.onGround) {
     vec3 p = plane.pos + plane.q.rotate(kBayBomb - vec3(0, 0.25f, 0));
     W.bombs.push_back({p, plane.vel + plane.up() * -3.f, 0.f});
-    W.bombLoaded = 0; W.bombQueue--; W.bayHold = 0.6f;
+    W.bombLoaded = 0; W.bombQueue--; W.bayHold = 0.6f; W.dropped++;
     g_audio.trigger(SFX_GEAR_CLUNK, 0.6f);
     toast("PLASMA BOMB AWAY", vec3(0.7f, 0.4f, 1.f));
   }

@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
     for (int ai = 0; ai < nAp; ai++) {
       const Airport& A = g_world.airports[ai];
       if (!s.special && !runwayOK(s, A)) continue;   // the career never sends it there
-      if (s.special && (A.length < 1400.f || A.surface != SURF_ASPHALT) && si == kResearchJet) continue;   // (the XR-9 needs a long hard runway)
+      if (s.special && (A.length < 1400.f || A.surface != SURF_ASPHALT) && si == kResearchJet) continue;   // (the XR-30 needs a long hard runway)
       for (int wi = 0; wi < 3; wi++)
         for (int st = 0; st < 2; st++, idx++) {
           if (idx % count != slice) continue;

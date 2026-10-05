@@ -28,16 +28,16 @@ struct PlaneVisual {
   float flame[4] = {0, 0, 0, 0};  // research jet exhaust: spool, reheat, nozzle vector angle (rad), mach
   float vapor[4] = {0, 0, 0, 0};  // transonic vapour cone: density, start z, start radius, length (body space)
   int lensN = 0; float lensP[6][4] = {}, lensC[6][4] = {}, lensD[6][4] = {};   // light fixtures (body space): lens centre | emission | axis + tint
-  float wr[7][4] = {};            // XR-11: pod tilts, yaw vanes, thrusts, pitch vanes | fan, bay, lasers, stealth | surfaces, laser fire | bomb, cloak front, armed
+  float wr[7][4] = {};            // XR-40: pod tilts, yaw vanes, thrusts, pitch vanes | fan, bay, lasers, stealth | surfaces, laser fire | bomb, cloak front, armed
 };
 
-// XR-11 weapons in the world (see weaponsFx in shaders.h)
+// XR-40 weapons in the world (see weaponsFx in shaders.h)
 struct FxVisual {
   int beams = 0; float beamA[16][4], beamB[16][4]; // laser bolts: tail + radius, head + intensity
   int bombs = 0; float bomb[8][4];                 // dark-energy bombs: centre + radius
   int blasts = 0; float blast[6][4], blastI[6][4]; // detonations: centre + radius, age 0..1 + intensity
-  float pip[4] = {0, 0, 0, 0};                     // XR-11 bomb impact prediction: world point + valid
-  float feed[4] = {0, 0, 0, 0};                    // XR-11 belly camera target: world point + active
+  float pip[4] = {0, 0, 0, 0};                     // XR-40 bomb impact prediction: world point + valid
+  float feed[4] = {0, 0, 0, 0};                    // XR-40 belly camera target: world point + active
 };
 
 // One AI traffic aircraft for the ray tracer: 32 texels (see loadTraffic in shaders.h)
@@ -78,7 +78,7 @@ struct FrameParams {
   WreckVisual wreck;
   FxVisual fx;
   FeedCamera feeds[kMaxFeeds];   // research jets: the cameras whose pictures the cockpit displays show (feed_cameras.h)
-  int feedRig = 0;               // their rig: 0 none, 1 XR-9, 2 XR-11
+  int feedRig = 0;               // their rig: 0 none, 1 XR-30, 2 XR-40
   vec3 landLightPos, landLightDir; float landLight = 0;
   vec3 flameLightPos, flameLight;  // a blast's light (radiance; zero when off), folded into the point lights
   struct PointLight { vec3 pos; float radius; vec3 col; float cosCut; vec3 dir; float shadow; };
@@ -88,7 +88,7 @@ struct FrameParams {
   float exposure = 1.0f, rainLens = 0, fade = 1, vignette = 0.6f, gLoad = 0;
   bool sealedCockpit = false;
   int trafficN = 0; TrafficVisual traffic[kMaxTrafficDrawn];
-  bool ufoOn = false; vec3 ufoPos; float ufoRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1}, ufoAnim[4] = {0, 0, 0, 0};   // UFO encounter   // XR-9 cockpit view: no sun glare (the pilot sees the sun only on the displays)   // gLoad: g-force tunnel 0..1
+  bool ufoOn = false; vec3 ufoPos; float ufoRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1}, ufoAnim[4] = {0, 0, 0, 0};   // UFO encounter   // XR-30 cockpit view: no sun glare (the pilot sees the sun only on the displays)   // gLoad: g-force tunnel 0..1
 };
 
 struct UIVert { float x, y, u, v, r, g, b, a, mode, hx, hy, p; };

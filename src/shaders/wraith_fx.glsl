@@ -1,5 +1,5 @@
 //! kWraithFx
-//! The XR-11's plasma plumes, the transonic vapour cone, the cloak skin and the weapons effects.
+//! The XR-40's plasma plumes, the transonic vapour cone, the cloak skin and the weapons effects.
 // four round plasma jets, one per pod (thrust fractions in uWr[2]): a white-cyan core in a violet sheath that
 // swirls slowly, with bright standing shock rings; longer, hotter and tighter-ringed in boost
 vec3 plumeRound(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float sp, float ab, float jit){
@@ -96,7 +96,7 @@ vec3 cloakSkin(vec3 world, vec3 n, vec3 rd, vec3 lp, float front){
   col += gColStripe*exp(-abs(front)*6.0)*1.5*step(front, 50.0);   // the wavefront of the cloak sweeping along the craft
   return col;
 }
-// ---------------------------------------------------------------- XR-11 weapons in the world
+// ---------------------------------------------------------------- XR-40 weapons in the world
 // Laser bolts: a white-hot core in a crimson sheath, glowing along the beam (closest approach of the view ray to
 // each beam segment, cut by the scene depth). Dark-energy bombs: black spheres wrapped in crawling violet plasma
 // with a halo. Detonations: an expanding shell of violet fire around a collapsing black core, a flat shock ring

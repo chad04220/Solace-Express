@@ -1,6 +1,6 @@
 //! kWraithMaterial
-//! The XR-11's surface materials.
-// XR-11 surfaces (PBR texture sets): radar-absorbent faceted skin with sawtooth panel seams, smoked gold canopy,
+//! The XR-40's surface materials.
+// XR-40 surfaces (PBR texture sets): radar-absorbent faceted skin with sawtooth panel seams, smoked gold canopy,
 // heat-tinted titanium nozzles and vanes, glowing turbine cores, violet cloak-emitter strips, a dark bay, the
 // dark-energy bomb, laser housings and their emitter lenses, chrome actuator rods
 void shadeWraith(inout Mat m, int mid, vec3 lp, vec3 ln, float t){

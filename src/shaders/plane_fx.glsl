@@ -1,5 +1,5 @@
 //! kPlaneFx
-//! The XR-9's exhaust plumes (volumetric emission marched through each jet).
+//! The XR-30's exhaust plumes (volumetric emission marched through each jet).
 // ---------------------------------------------------------------- research jet exhaust plumes
 // Volumetric emission marched through each plume (body space). Dry thrust: a blue core whose length and brightness
 // follow the throttle, an orange-tipped flame from mid power and pale shock cells towards full military power. Reheat
@@ -21,7 +21,7 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float jit){
   vec3 co = lo - o; float cax = dot(co, ax), crad = length(co - ax*cax);
   float camIn = smoothstep(3.5, 1.5, crad)*smoothstep(-1.0, 0.5, cax)*smoothstep(L + 6.0, L, cax);
   float dt = (t1 - t0)/28.0;   // 28 jittered steps (the TAA smooths the rest): 40 made the plume pixels the costliest
-  vec3 acc = vec3(0.0);        // on screen behind the XR-9
+  vec3 acc = vec3(0.0);        // on screen behind the XR-30
   for (int i = 0; i < 28; i++) {
     COST(3);
     vec3 q = lo + ld*(t0 + (float(i) + jit)*dt) - o;

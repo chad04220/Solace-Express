@@ -140,7 +140,7 @@ bool Game::button(float x, float y, float w, float h, const std::string& label, 
   return false;
 }
 
-static std::vector<std::string> wrap(const std::string& s, float width, float size) {
+std::vector<std::string> wrap(const std::string& s, float width, float size) {   // (shared with the research terminal)
   std::vector<std::string> lines; std::string cur, word;
   auto flush = [&]() {
     if (word.empty()) return;
@@ -1300,11 +1300,12 @@ void Game::drawHud(const FrameParams& fp) {
     float cw = 560 * s, ch = 70 * s, cx = W * 0.5f - cw * 0.5f, cy = 8 * s;
     hudPanel(cx, cy, cw, ch);
     std::string obj = toWp ? fmt("CHECKPOINT %d / %d", wpIndex + 1, (int)contract.wps.size()) : fmt("LAND  %s  %s", d.code, d.name);
-    if (researchFlight) obj = fmt("FREE ROAM  -  MACH %.2f", plane.mach);
+    if (researchFlight) obj = resCard >= 0 ? fmt("%s  -  %s", kResCards[resCard].id, resCardDone ? "CARD COMPLETE" : fmt("STEP %d/%d  %s", resStep + 1, kResCards[resCard].n, kResCards[resCard].steps[std::min(resStep, kResCards[resCard].n - 1)].label).c_str()) : fmt("FREE ROAM  -  MACH %.2f", plane.mach);
     g_ren.text(cx + 16 * s, cy + 7 * s, 12 * s, ellipsize(obj, cw * 0.55f, 12 * s), mag, 1, 0, false);
     std::string extra;
     if (contract.timeLimitMin > 0) { float left = contract.timeLimitMin * 60 - jobClockBase - flightClock; extra = left > 0 ? fmt("DEADLINE %d:%02d", (int)left / 60, (int)left % 60) : "LATE!"; }
     if (timeAccel > 1) extra += fmt("%sTIME x%.0f", extra.empty() ? "" : "   ", timeAccel);
+    if (researchFlight && resCard >= 0 && !resCardDone) extra = resStepText(kResCards[resCard].steps[std::min(resStep, kResCards[resCard].n - 1)]) + (resHold > 0 ? fmt("  (%.0f s)", resHold) : "");
     g_ren.text(cx + cw - 16 * s, cy + 7 * s, 12 * s, extra.empty() ? ellipsize(contract.title, cw * 0.4f, 12 * s) : extra, extra.empty() ? C_DIM : C_WARN, 1, 2, false);
     // four readouts: distance, bearing, altitude to go (climb / descend cue), time en route
     float dAlt = toWp ? target.y - plane.pos.y : 0.f;
@@ -1513,7 +1514,7 @@ void Game::drawHud(const FrameParams& fp) {
   float extra = plane.spec->special == 2 ? 66 * s : plane.spec->special ? 22 * s : 0;
   hudPanel(ex, ey - extra, 270 * s, 220 * s + extra);
   ey -= extra;
-  header(ex + 14 * s, ey + 10 * s, 242 * s, plane.spec->special == 2 ? "XR-11 SYSTEMS" : plane.spec->special ? "XR-9 SYSTEMS" : "SYSTEMS");
+  header(ex + 14 * s, ey + 10 * s, 242 * s, plane.spec->special == 2 ? "XR-40 SYSTEMS" : plane.spec->special ? "XR-30 SYSTEMS" : "SYSTEMS");
   float ty = ey + 34 * s;
   auto erow = [&](const std::string& k, const std::string& v, vec3 c = C_TEXT) { g_ren.text(ex + 14 * s, ty, 15 * s, k, C_DIM, 1); g_ren.text(ex + 256 * s, ty, 15 * s, v, c, 1, 2); ty += 22 * s; };
   const AircraftSpec& sp = *plane.spec;

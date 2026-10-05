@@ -263,7 +263,7 @@ struct GameTest {
     }
     // ---- E5: input contexts and re-arming. A held from the menu into the flight doesn't brake until it's released
     // and pressed again; A held across leaving the pause menu doesn't either; LB+RB doesn't hide the UI while the
-    // XR-11's weapons are armed; losing the controller in flight pauses it
+    // XR-40's weapons are armed; losing the controller in flight pauses it
     {
       g.botControl = false;
       Contract fc = g_story[0]; fc.forceAircraft = -1; fc.type = CT_FERRY; fc.from = fc.to = g_world.findAirport("CAP"); fc.wps.clear(); fc.hints.clear();
@@ -286,12 +286,12 @@ struct GameTest {
       bool ok3 = g.paused;
       printf("Controller lost in flight: paused %d: %s\n", g.paused, ok3 ? "ok" : "FAIL"); fails += !ok3;
       g.paused = false;
-      // the XR-11 armed: both bumpers held 1.5 s
+      // the XR-40 armed: both bumpers held 1.5 s
       g.resCraft = kWraith; g.resAirborne = true; g.launchResearch(); g.wraith.armed = true;
       bool hid0 = g.uiHidden;
       for (int i = 0; i < 90; i++) { pad(PAD_LB | PAD_RB, i == 0 ? (PAD_LB | PAD_RB) : 0); g.update(dt); }
       bool ok4 = g.uiHidden == hid0;
-      printf("LB+RB held with the XR-11 armed: UI hidden %d -> %d: %s\n", hid0, g.uiHidden, ok4 ? "ok" : "FAIL"); fails += !ok4;
+      printf("LB+RB held with the XR-40 armed: UI hidden %d -> %d: %s\n", hid0, g.uiHidden, ok4 ? "ok" : "FAIL"); fails += !ok4;
       pad(0, 0); g.in.pad = false; g.update(dt); g.paused = false;
       g.botControl = true;
     }

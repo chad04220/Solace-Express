@@ -3,7 +3,7 @@
 #include "common.h"
 #include "aircraft.h"
 
-// The XR-9 and XR-11 cockpits are sealed: the pilot sees outside only through display panels, and every panel shows
+// The XR-30 and XR-40 cockpits are sealed: the pilot sees outside only through display panels, and every panel shows
 // the picture of a real camera mounted on the airframe. A camera is a game object with its own position and
 // orientation in the world, field of view and resolution (FeedCamera, in FrameParams). The renderer draws the scene
 // from each one into a tile of its feed atlas (a few cameras per frame, in turn) and the panels show those tiles.
@@ -11,7 +11,7 @@
 // A rig lists a craft's cameras by slot. The shader's feedScreen (shaders_wraith_cockpit.h) maps a point on a panel
 // to the same slot, so the pane geometry below must match the shader's.
 static const int kMaxFeeds = 13;
-static const int kFeedBombSlot = 12;   // XR-11: the bomb camera (a free-flying camera, not on the airframe)
+static const int kFeedBombSlot = 12;   // XR-40: the bomb camera (a free-flying camera, not on the airframe)
 
 struct FeedCamera {
   bool on = false;
@@ -33,7 +33,7 @@ struct FeedMount {
   vec3 screen; float screenR = 0.f;   // its display: centre and radius
 };
 
-inline int feedRigOf(const AircraftSpec* s) { if (!s) return 0; int sp = s->special; return sp == 1 ? 1 : sp == 2 ? 2 : 0; }   // 1 XR-9, 2 XR-11
+inline int feedRigOf(const AircraftSpec* s) { if (!s) return 0; int sp = s->special; return sp == 1 ? 1 : sp == 2 ? 2 : 0; }   // 1 XR-30, 2 XR-40
 
 // A flat panel: centre c, normal n (facing the pilot), "up" hint u, half size s; mirrored to the left side when
 // left. The camera looks out through it (along -n, with the panel's own axes) and the display shows it as a window
@@ -67,7 +67,7 @@ inline FeedMount feedPanel(vec3 c, vec3 n, vec3 u, vec2 s, bool left, float foca
 // pictures' resolution: the displays are as sharp as the screen they're seen on)
 inline int feedRig(int rig, float focal, FeedMount out[kMaxFeeds]) {
   if (rig == 1) {
-    // XR-9: a panoramic display on a cylinder around the eye (r 0.64 m, +-1.25 rad, y 0.02 +- 0.30), shown by one
+    // XR-30: a panoramic display on a cylinder around the eye (r 0.64 m, +-1.25 rad, y 0.02 +- 0.30), shown by one
     // panoramic camera at the nose whose picture is that same cylinder (slots 1 and 2 are unused); a side display bay
     // either side
     {
@@ -84,7 +84,7 @@ inline int feedRig(int rig, float focal, FeedMount out[kMaxFeeds]) {
     return 5;
   }
   if (rig == 2) {
-    // XR-11: the curved front display (a cylinder r 1.0 m about (0, 0.07, -0.15), y 0.07 +- 0.33, spanning +-0.74 rad
+    // XR-40: the curved front display (a cylinder r 1.0 m about (0, 0.07, -0.15), y 0.07 +- 0.33, spanning +-0.74 rad
     // from the eye) shows one wide camera at the nose, looking straight ahead (slots 1 and 2 are unused); then the
     // side and aft displays, overhead, chin, footwell floor and the floor panes beside the seat (the shader's WF / WS /
     // WA / WO / WC / WL / WB)

@@ -71,7 +71,7 @@ void main(){
 #endif
     return;
   }
-  // XR-11 cloak: a pixel on the cloaked craft sees the world behind it along a slightly bent ray
+  // XR-40 cloak: a pixel on the cloaked craft sees the world behind it along a slightly bent ray
   bool cloak = false; vec3 ckN = vec3(0.0), ckLp = vec3(0.0), rd0 = rd, ro0 = ro; float ckT = 0.0;
   if (uWr[4].w > 0.001 && uPlaneOn == 1 && uWreck == 0 && !cockpitView && int(gM[0].z + 0.5) == 6) {
     vec2 hc = hTop;

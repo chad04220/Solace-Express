@@ -32,7 +32,7 @@ bool Renderer::compilePlaneMesh() {
   return true;
 }
 
-// every aircraft but a cloaked XR-11 and a wreck
+// every aircraft but a cloaked XR-40 and a wreck
 bool Renderer::planeMeshWanted(const FrameParams& fp) const {
   const PlaneVisual& pv = fp.plane;
   bool cloaked = (int)(pv.M[2] + 0.5f) == 6 && pv.wr[4][3] > 0.001f;   // (the cloak sees through the skin: that frame marches as before)

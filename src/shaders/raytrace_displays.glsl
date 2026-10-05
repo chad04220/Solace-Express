@@ -486,7 +486,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
   }
   return vec3(-1.0);
 }
-// ---------------------------------------------------------------- XR-9 / XR-11 multi-function display pages
+// ---------------------------------------------------------------- XR-30 / XR-40 multi-function display pages
 // uv spans [-1, 1] across the glass; gAA is set by the caller to this pixel's footprint in uv units
 vec3 mfdTitle(vec3 c, vec2 uv, ivec4 a, ivec4 b){
   const vec3 C = vec3(0.3, 0.8, 1.0);

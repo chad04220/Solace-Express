@@ -1,6 +1,6 @@
 //! kWraithSDF
-//! The XR-11 Wraith airframe distance field: body, pods, bay, turrets, wing, tail, gear.
-// ---------------------------------------------------------------- XR-11 Wraith (engine code 6)
+//! The XR-40 Wraith airframe distance field: body, pods, bay, turrets, wing, tail, gear.
+// ---------------------------------------------------------------- XR-40 Wraith (engine code 6)
 // Faceted stealth airframe: diamond-section fuselage with sharp chines, caret intakes, a faceted canopy, a cranked
 // diamond wing with a forward-swept trailing edge and elevons, canted all-moving ruddervators, four tilting thruster
 // pods on pylons (intake fans, iris nozzles, vectoring vanes, trunnions and hydraulic tilt actuators), a belly bomb

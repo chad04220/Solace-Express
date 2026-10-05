@@ -18,7 +18,7 @@ struct AudioParams {
   float master = 0.8f, engineVol = 1.0f, sfxVol = 1.0f;
   bool paused = false;
   bool stallIsShaker = false;
-  bool research = false; float nozzle = 0, mach = 0;   // XR-9 research craft voice
+  bool research = false; float nozzle = 0, mach = 0;   // XR-30 research craft voice
   float voiceVol = 0.9f;   // ATC radio voice (headset: not muffled, not faded by the flight / pause mix)
 };
 

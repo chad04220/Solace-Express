@@ -28,7 +28,7 @@ You are an aircraft designer for **Solace Express**, a C++17 / OpenGL 3.3 flight
 |---|---|---|
 | Flight model + career + livery table | `src/aircraft.cpp` → `const AircraftSpec kAircraft[]` | Struct in `src/aircraft.h` |
 | 3D model table | `src/models.cpp` → `const ModelDef kModels[]` | Struct in `src/models.h` |
-| Row count rule | `kNumAircraft = sizeof(kAircraft)/sizeof(kAircraft[0]) - 4` | The **last four rows are the hidden research craft** (`xr8_nightjar`, `xr9`, `xr10`, `xr11`; `kNightjar`, `kResearchJet`, `kMantis`, `kWraith` in aircraft.h). New career aircraft must be inserted **before** the `xr8_nightjar` row in **both** tables, in the **same position**, because the tables are index-aligned (`kModels[spec - kAircraft]`). |
+| Row count rule | `kNumAircraft = sizeof(kAircraft)/sizeof(kAircraft[0]) - 4` | The **last four rows are the hidden research craft** (`xr10_nightjar`, `xr30_specter`, `xr20_mantis`, `xr40_wraith`; `kNightjar`, `kResearchJet`, `kMantis`, `kWraith` in aircraft.h). New career aircraft must be inserted **before** the `xr10_nightjar` row in **both** tables, in the **same position**, because the tables are index-aligned (`kModels[spec - kAircraft]`). |
 | Research craft indices | `src/aircraft.h` → `kResearchJet = 7`, `kWraith = 8` | Inserting N career rows before them means these two constants must be increased by N. Say so explicitly in your output. |
 | Save files | by `id` string | `id` must be unique, lowercase ASCII, stable forever. |
 
@@ -59,7 +59,7 @@ struct AircraftSpec {
   // visual / aero geometry
   float fusLen, fusRad, wingY, wingZ; int engLayout, tail;   // fuselage length and max half-height (m); wing root height above CG and root LE z (m); engLayout 0 nose, 1 wing nacelles, 2 aft fuselage; tail 0 conventional, 1 T-tail
   vec3 colBase, colStripe;     // livery: base paint and accent (cheat line, wingtips, fin flash)
-  int special = 0;             // 0 for every career aircraft (and the XR-8). 1 and 2 are the research jets. Never use.
+  int special = 0;             // 0 for every career aircraft (and the XR-10). 1 and 2 are the research jets. Never use.
 };
 ```
 
@@ -69,6 +69,8 @@ Column header used in the table (keep it as a comment above your row):
 // id, name, role, eng, n, cyl, blades, idle, max, empty, fuel, cargo, pax, S, b, c, CL0, CLa, CLmax, flapCL, CD0, gearCD, flapCD, e,
 // power, v0, vr, vref, cruise, range, runway, rough, tail, retract, Ixx, Iyy, Izz, elev, ail, rud, lic, price, rent,
 // fusLen, fusRad, wingY, wingZ, engLayout, tail, colBase, colStripe
+// (optional trailing fields after `special`: designMach - 0 conventional, below 1 held just under the barrier, above 1 reheat
+//  and the research drag rise; gPos / gNeg - structural limits, 0 for the type's defaults)
 ```
 
 Reference rows (exact, from the game):
@@ -172,7 +174,7 @@ The integrator runs: `cmake --build build && ctest --test-dir build` (flight mod
 
 ## 6. Tier B — hand-built airframes (only when Tier A cannot express the shape)
 
-The XR-9 and XR-11 (`mapJet` in `src/shaders/plane_sdf.glsl`, `mapWraith` in `wraith_sdf.glsl`) are hand-written GLSL signed-distance functions (the XR-8 and XR-10 use the generic field: a hand-built one for the XR-10 was tried and cost 4x the frame in the terminal preview, so it went back to Tier A). A Tier B aircraft is a new such function. It costs integration work (dispatch, material ids, part table), so propose it only with a reason. The rules below exist because the rebuilt renderer **bakes meshes from the function at load**; break them and the bake produces holes, slivers or frozen animation.
+The XR-30 and XR-40 (`mapJet` in `src/shaders/plane_sdf.glsl`, `mapWraith` in `wraith_sdf.glsl`) are hand-written GLSL signed-distance functions (the XR-10 and XR-20 use the generic field: a hand-built one for the XR-20 was tried and cost 4x the frame in the terminal preview, so it went back to Tier A). A Tier B aircraft is a new such function. It costs integration work (dispatch, material ids, part table), so propose it only with a reason. The rules below exist because the rebuilt renderer **bakes meshes from the function at load**; break them and the bake produces holes, slivers or frozen animation.
 
 The `PART(...)`, `partOn(id)` and `rig*(p, id)` helpers in rule 5 are the renderer rebuild's contract, not yet functions in the tree: write to the contract, and the integrator maps it onto whichever shader version is current. Everything else in this section (primitives, globals, material ids) exists today.
 
@@ -198,10 +200,10 @@ Design brief: 3–6 sentences. Real-world analogue(s), dimensions, why it fits t
 
 Self-check: the table from §5 with your numbers.
 
-Integration notes: index to insert at (before `xr9`), new values of kResearchJet/kWraith, anything the integrator must know.
+Integration notes: index to insert at (before `xr30_specter`), new values of kResearchJet/kWraith, anything the integrator must know.
 
 ```cpp
-// aircraft.cpp — insert before the xr9 row
+// aircraft.cpp — insert before the xr30_specter row
 { ...AircraftSpec row... },
 ```
 

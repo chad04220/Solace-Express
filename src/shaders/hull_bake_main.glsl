@@ -6,7 +6,7 @@
 
 uniform sampler2D uHPts; uniform int uHStN; uniform vec4 uHStPS[128]; uniform vec4 uHStCtl[128]; uniform vec4 uHStWr[128]; uniform vec4 uHStWr2[128];
 uniform int uHMode; uniform int uHState;
-// one of the listed states: the gear / flaps / steering / cabin, the controls, and the XR-11's pods, vanes, fan, bay,
+// one of the listed states: the gear / flaps / steering / cabin, the controls, and the XR-40's pods, vanes, fan, bay,
 // turrets and bomb (its surfaces follow the controls)
 void hullState(int s){
   gPS = uHStPS[s]; gCtl = uHStCtl[s];

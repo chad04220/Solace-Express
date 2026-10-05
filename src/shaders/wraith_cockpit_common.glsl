@@ -1,6 +1,6 @@
 //! kWraithCockpitCommon
-//! The XR-11 cockpit's display panes: their frames, shapes and edges, shared by its distance field and its materials.
-// ---------------------------------------------------------------- XR-11 cockpit
+//! The XR-40 cockpit's display panes: their frames, shapes and edges, shared by its distance field and its materials.
+// ---------------------------------------------------------------- XR-40 cockpit
 uniform vec4 uPip;   // bomb impact prediction (world) + valid flag
 uniform vec4 uFeed;     // bomb camera look-at point (world) + active flag
 // a flat display pane: c centre, n facing the pilot, up hint, half size, corner chamfer. x = pane, y = raised bezel

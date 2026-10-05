@@ -375,7 +375,7 @@ Medevac (hard clock; patient tolerance meter: g > 1.5, bank > 30°, touchdown > 
 `CT_TRIAL`: canyon gate runs (Spine), spot landing (distance to mark, fpm, stop), STOL contest at Summit Pass, formation run with the Spectre pair; local leaderboard per trial; daily seeded gate course. Reuse `ringGeom`/`bursts`.
 
 #### C13 · Surface NIGHTGLASS  *(small)*
-Main-menu entry (after the campaign, or from the start with a "does not count" confirmation) and a short objective chain for the XR-9/XR-11.
+Main-menu entry (after the campaign, or from the start with a "does not count" confirmation) and a short objective chain for the XR-30/XR-40.
 
 #### C14 · Options  *(small)*
 FOV slider (game.cpp:1627–1629), frame-rate target (A7), head-look toggle, colour-blind HUD palette, UI scale, HUD-off default per camera.

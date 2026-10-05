@@ -79,7 +79,7 @@ vec3 fixtureLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 a, vec3 b, vec3 c, float k
   float beam = dot(dir, dir) > 0.5 ? smoothstep(0.2, 0.75, dot(-d/dl, dir)) : 1.0;   // recessed: lights only the way its lens faces
   return pbr(n, v, d/dl, m.alb, max(m.rough, 0.18), m.metal, c*(9.4*beam/(1.0 + dl*dl*k)));
 }
-// XR-9 sealed pod: panoramic display, two warm ceiling light bars, cyan spine and console strips, amber footwell, MFDs
+// XR-30 sealed pod: panoramic display, two warm ceiling light bars, cyan spine and console strips, amber footwell, MFDs
 vec3 podLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E){
   vec3 L = m.alb*vec3(0.03, 0.04, 0.055);                                       // faint bounce
   L += fixtureLight(p, n, v, m, E + vec3(-0.45, 0.02, -0.47), E + vec3(0.45, 0.02, -0.47), vec3(0.42, 0.55, 0.68)*0.55, 6.0, vec3(0.0, 0.0, 1.0));

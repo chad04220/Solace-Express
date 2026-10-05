@@ -10,7 +10,7 @@
 // The airframe's moving parts' states the hull bake and the mesh bake sweep: the gear, flaps, steering and the
 // controls (and in the cockpit the yoke and the throttle) each through their range, the others at rest. M: the
 // packed model (models.cpp packModel), inside: the cockpit field. The first state is the rest state.
-struct HullState { float ps[4], ctl[4], wr[4] = {0, 0, 0, 0}, wr2[4] = {0, 0, 0, 0}; };   // wr: pod tilt, yaw vane, thrust, pitch vane; wr2: fan angle, bay, lasers, bomb loaded (the XR-11)
+struct HullState { float ps[4], ctl[4], wr[4] = {0, 0, 0, 0}, wr2[4] = {0, 0, 0, 0}; };   // wr: pod tilt, yaw vane, thrust, pitch vane; wr2: fan angle, bay, lasers, bomb loaded (the XR-40)
 const float kS0 = 1.f, kS1 = 0.25f, kS2 = 0.0625f;   // cell sizes of the three voxel levels
 inline float halfDiag(float s) { return s * 0.8660254f; }
 inline std::vector<HullState> hullStateList(const float* M, bool inside) {
@@ -36,7 +36,7 @@ inline std::vector<HullState> hullStateList(const float* M, bool inside) {
     for (int i = 0; i <= 4; i++) for (int k = 0; k <= 4; k++) add(1, 0, 0, i * 0.5f - 1.f, k * 0.5f - 1.f, 0, 0);   // yoke / stick
     for (int i = 0; i <= 4; i++) add(1, 0, 0, 0, 0, 0, i * 0.25f);                                                  // throttle
   }
-  if ((int)(M[2] + 0.5f) == 6 && !inside) {   // the XR-11: its pods, vanes, fan, bay, turrets and bomb
+  if ((int)(M[2] + 0.5f) == 6 && !inside) {   // the XR-40: its pods, vanes, fan, bay, turrets and bomb
     auto addWr = [&](float tilt, float yawv, float thr, float vane, float fan, float bay, float las, float bomb) {
       HullState h = {{1, 0, 0, 0}, {0, 0, 0, 0}, {tilt, yawv, thr, vane}, {fan, bay, las, bomb}};
       st.push_back(h);

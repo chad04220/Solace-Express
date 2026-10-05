@@ -1,5 +1,5 @@
 //! kEffectsFS
-//! The raster renderer's effects pass, over the lit and clouded frame: the XR-11's cloak (its cloaked part shows the
+//! The raster renderer's effects pass, over the lit and clouded frame: the XR-40's cloak (its cloaked part shows the
 //! frame behind it along a slightly bent ray, with the skin's shimmer), the propeller discs, the vapour cone, the
 //! research jets' exhaust plumes (over the clouds, as in the ray tracer), the weapons and the cockpit hologram -
 //! composed in the ray tracer's order, with its TAA classes. Reads the frame and writes a copy of it.
@@ -19,7 +19,7 @@ void main(){
   float jitter = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))) + uSeed);   // interleaved gradient noise, rotated per frame
   bool cockpitView = uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0;
   int type = int(gM[0].z + 0.5);
-  // XR-11 cloak: a pixel on the cloaked craft (left out of the G-buffer) sees the frame behind it along a bent ray
+  // XR-40 cloak: a pixel on the cloaked craft (left out of the G-buffer) sees the frame behind it along a bent ray
   if (uWr[4].w > 0.001 && uPlaneOn == 1 && uWreck == 0 && !cockpitView && type == 6 && uPano.x <= 0.0) {
     float hullT = 0.0;
     if (uHullOn == 1) { float hv = texelFetch(uEnv, px, 0).g; hullT = hv > 1e29 ? hv : (hv > 0.0 ? max(uHullNear, hv*0.999 - 0.1) : 0.0); }

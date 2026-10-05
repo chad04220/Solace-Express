@@ -28,7 +28,7 @@ vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
   mat3 inv = transpose(gPR);
   vec3 lo = gPC + inv*(ro - gPP), ld = inv*rd;
   float t = t0;
-  bool jet = int(gM[0].z + 0.5) >= 5;   // XR-9 / XR-11: thin flattened shapes need finer steps
+  bool jet = int(gM[0].z + 0.5) >= 5;   // XR-30 / XR-40: thin flattened shapes need finer steps
   int steps = gPS.w > 0.5 || jet ? 200 : 120;
   float relax = jet ? 0.65 : 0.8;
   // A hit stops anywhere within the threshold of the surface, by an amount that depends on the steps that led there;
@@ -147,7 +147,7 @@ float planeShadow(vec3 ro, vec3 rd){
   if (uWreck == 0) { pieceXf(-1); res = pieceShadow(ro, rd, planeBound(), 40); }
   else for (int i = 0; i < 5; i++) { if (i >= uWreck) break; pieceXf(i); res = min(res, pieceShadow(ro, rd, length(uPcH[i]) + 0.3, 40)); }
   gPI = keep; gPP = kP; gPR = kR; gPC = kC;
-  return mix(res, 1.0, uWr[4].w*0.88);   // a cloaked XR-11 barely darkens the ground
+  return mix(res, 1.0, uWr[4].w*0.88);   // a cloaked XR-40 barely darkens the ground
 }
 float lightShadow(int i, vec3 p, vec3 n, vec3 l, float d){
   gShMax = d - uPLD[i].w; gShK = clamp(d/max(uPLP[i].w, 0.02), 6.0, 80.0);

@@ -2,6 +2,7 @@
 #pragma once
 #include <functional>
 #include <optional>
+#include <set>
 #include "common.h"
 #include <unordered_map>
 #include <future>
@@ -200,7 +201,7 @@ private:
   // UFO encounter: pulls up alongside, opens its hatch on two dancing aliens, laughs, waves and zooms off
   struct Ufo { bool on = false; float t = 0, next = 0, side = 1, hatch = 0, laugh = 0, wave = 0; vec3 pos, fwd, right, up; bool sfxLaugh = false, sfxZoom = false; };
   float escortSummon = 0; bool escortLatch = false;   // O + P held: the Spectre display pair
-  // XR-11 Wraith systems: cloak, retracting laser turrets, bomb bay and the dark-energy weapons in the world
+  // XR-40 Wraith systems: cloak, retracting laser turrets, bomb bay and the dark-energy weapons in the world
   struct WraithState {
     bool cloakOn = false; float stealth = 0, front = -12.f, padATap = 9.f;        // cloak: strength 0..1 and the wavefront along the craft (body z)
     bool armed = false; float lasers = 0;                          // turrets deployed 0..1
@@ -217,6 +218,7 @@ private:
     std::vector<Crater> scorch;   // small laser craters (most recent 16)
     int wrecked = 0;              // trees, rocks and buildings destroyed
     int kills = 0;
+    int shots = 0, dropped = 0;   // laser bolts fired, bombs released (the test cards count them)
   } wraith;
   void wraithControls(float dt);
   void updateWraith(float dt);
@@ -235,7 +237,7 @@ private:
   float ufoSummon = 0;          // J + K held while flying summons the UFO after a second
   Ufo ufo;
   void startUfo();
-  void updateUfo(float dt);   // debug scenes: free camera               // AI aircraft: airport circuits, cruisers, XR-9 formations, display team
+  void updateUfo(float dt);   // debug scenes: free camera               // AI aircraft: airport circuits, cruisers, XR-30 formations, display team
   float fpsAvg = 1.f / 60.f; bool showPerf = false;   // F3: frame-rate / GPU time / resolution overlay              // smoothed g-force screen-edge effect 0..1          // broke up in flight: pieces tumble down before anything hits the ground
   float crashEndT = 7.5f;         // crashTimer at which the results screen comes up
   void updateWreck(float dt);
@@ -363,7 +365,7 @@ private:
   float gpsRange = 12000.f, gpsRangeTarget = 12000.f;
   std::vector<vec2> trail; float trailT = 0;
   void drawGps();
-  // hidden Confidential Research Model menu (U + I on the main menu) and free XR-9 flights
+  // hidden Confidential Research Model menu (U + I on the main menu) and free XR-30 flights
   bool researchFlight = false;
   float lastDt = 1.f / 60.f;     // the last frame's real time step (the renderer's frame-rate independent blending)
   float maxFrameMs = 0, maxFrameWin = 0, maxFrameT = 0;   // the worst frame time over the last second (F3)
@@ -375,6 +377,16 @@ private:
   std::future<std::pair<float, float>> quoteJob; std::string quoteJobKey;
   void applyQuote(const Contract& c, Career::LaunchPlan& e, bool start);
   int resAirport = 0, resWx = 0, resCraft = kResearchJet; bool resAirborne = true; float resTime = 12.f, resOpened = 0;
+  // research test cards: each asks a craft for its limits or exercises one of its systems, step by step. The table is
+  // in game_research_ui.cpp; the flight tracks the current step here and a finished card is remembered in settings.cfg.
+  enum ResStepKind { RS_MACH = 0, RS_ALT, RS_G, RS_NEGG, RS_ROLL, RS_SLOW, RS_STALL, RS_CLIMB, RS_HOVER, RS_VLAND, RS_CLOAK, RS_LASER, RS_BOMB, RS_LAND };
+  struct ResStep { int kind; float v, hold; const char* label; };
+  struct ResCard { int craft; const char* id; const char* title; const char* brief; ResStep steps[5]; int n; };
+  static const ResCard kResCards[]; static const int kNumResCards;
+  int resCard = -1, resStep = 0; float resHold = 0, resBest = 0; bool resCardDone = false;
+  std::set<std::string> resDone;   // finished card ids
+  void updateResearchCard(float dt);
+  std::string resStepText(const ResStep& st) const;   // "MACH 2.70 x 10 s" and the like
   bool resAuthed = false, resDrag = false;   // biometric sequence passed this session; dragging the preview
   float resYaw = 0.7f, resPitch = 0.15f, resZoom = 1.f, resSelT = -10.f, resIdleT = 10.f; int resLastCraft = -1;   // preview orbit, selection time
   vec3 resPrevPos; quat resPrevQ;   // where the preview craft is (for the callouts)

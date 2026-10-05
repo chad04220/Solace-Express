@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
   }
   Weather wx; wx.windSpeed = 0; wx.gust = 0; wx.turbulence = 0;
   int fails = 0;
-  if (strcmp(kAircraft[kOsprey].id, "osprey_c6") != 0 || strcmp(kAircraft[kNightjar].id, "xr8_nightjar") != 0 || strcmp(kAircraft[kResearchJet].id, "xr9") != 0 || strcmp(kAircraft[kMantis].id, "xr10") != 0 || strcmp(kAircraft[kWraith].id, "xr11") != 0) { printf("aircraft indices (kOsprey / kNightjar / kResearchJet / kMantis / kWraith) don't match the table\n"); return 1; }
+  if (strcmp(kAircraft[kOsprey].id, "osprey_c6") != 0 || strcmp(kAircraft[kNightjar].id, "xr10_nightjar") != 0 || strcmp(kAircraft[kResearchJet].id, "xr30_specter") != 0 || strcmp(kAircraft[kMantis].id, "xr20_mantis") != 0 || strcmp(kAircraft[kWraith].id, "xr40_wraith") != 0) { printf("aircraft indices (kOsprey / kNightjar / kResearchJet / kMantis / kWraith) don't match the table\n"); return 1; }
   for (int ai = 0; ai < kNumAircraft; ai++) {
     const AircraftSpec& s = kAircraft[ai];
     int apIdx = g_world.findAirport("CAP");
@@ -149,7 +149,33 @@ int main(int argc, char** argv) {
     ok = p.fail.avionicsDark() && p.flightTime >= 0.f && !p.ev.crashed;
     printf("Alternator failure: battery flat after %.0f s %s\n", p.fail.battery <= 0.f ? 420.f : -1.f, ok ? "ok" : "FAIL"); fails += !ok;
   }
-  // XR-9 research jet: supersonic in level flight, no vertical flight, slow flight on approach, pull limits, roll authority
+  // ---------------- the research register's performance tiers: the XR-10 just subsonic, the XR-20 supersonic, the XR-30
+  // and the XR-40 above them in that order; and the structure takes a short overstress but not a sustained one
+  {
+    Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
+    auto topMach = [&](int idx, float alt) {
+      const AircraftSpec& s = kAircraft[idx];
+      Plane p; p.reset(&s, vec3(-40000, alt, 0), 90, s.maxFuel * 0.7f, 85, true, 200); p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0;
+      float m = 0;
+      for (int i = 0; i < 100 * 240 && !p.ev.crashed; i++) { p.ctl.pitch = clampf((alt - p.pos.y) * 0.002f - p.vel.y * 0.01f - p.w.x * 0.3f, -1, 1); p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1, 1); p.step(1 / 240.f, calm, i / 240.f); m = std::max(m, p.mach); }
+      return m;
+    };
+    float m8 = topMach(kNightjar, 8000.f), m10 = topMach(kMantis, 8000.f), m9 = topMach(kResearchJet, 8000.f), m11 = topMach(kWraith, 8000.f);
+    bool ok = m8 > 0.93f && m8 < 1.0f && m10 > 1.7f && m10 < 2.2f && m9 > 2.5f && m9 > m10 + 0.4f && m11 > 4.0f && m11 > m9 + 0.8f;
+    printf("Research tiers at 8 km: XR-10 Mach %.2f  XR-20 Mach %.2f  XR-30 Mach %.2f  XR-40 Mach %.2f %s\n", m8, m10, m9, m11, ok ? "ok" : "FAIL"); fails += !ok;
+    // the overstress: the XR-30 (limited to 40 g) rides 15% over for four seconds while the stress builds (it bleeds
+    // its speed before the airframe gives), and a full pull at Mach 3 takes it past twice the limit: that snaps it
+    const AircraftSpec& s9 = kAircraft[kResearchJet];
+    Plane p; p.reset(&s9, vec3(0, 6000, 0), 90, s9.maxFuel * 0.5f, 85, true, 700); p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0;
+    float gmax = 0, ogMax = 0;
+    for (int i = 0; i < 4 * 240 && !p.ev.crashed; i++) { p.ctl.pitch = clampf((50.f - p.gLoad) * 0.1f, -1, 1); p.step(1 / 240.f, calm, i / 240.f); gmax = std::max(gmax, p.gLoad); ogMax = std::max(ogMax, p.overG); }
+    bool held = !p.ev.crashed && gmax > 44.f && ogMax > 0.35f && ogMax < 1.f;
+    p.reset(&s9, vec3(0, 6000, 0), 90, s9.maxFuel * 0.5f, 85, true, 1000); p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0; p.ctl.pitch = 1;
+    float g2 = 0; for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); g2 = std::max(g2, p.gLoad); }
+    ok = held && p.ev.crashed && p.ev.crashReason.find("Structural") != std::string::npos;
+    printf("Sustained overstress (XR-30): %.1f g held, stress %.2f of the way to failure, intact; full pull at Mach 3 peaks %.0f g and %s %s\n", gmax, ogMax, g2, p.ev.crashed ? "snaps" : "holds", ok ? "ok" : "FAIL"); fails += !ok;
+  }
+  // XR-30 research jet: supersonic in level flight, no vertical flight, slow flight on approach, pull limits, roll authority
   {
     const AircraftSpec& s = kAircraft[kResearchJet];
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
@@ -157,13 +183,13 @@ int main(int argc, char** argv) {
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 200);
     p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0;
     for (int i = 0; i < 40 * 240 && !p.ev.crashed; i++) { p.ctl.pitch = clampf((3000 - p.pos.y) * 0.002f - p.vel.y * 0.01f, -1, 1); p.step(1 / 240.f, calm, i / 240.f); }
-    bool ok = !p.ev.crashed && p.mach > 2.0f;
-    printf("XR-9 level acceleration: Mach %.2f after 40 s %s\n", p.mach, ok ? "ok" : "FAIL"); fails += !ok;
+    bool ok = !p.ev.crashed && p.mach > 2.4f;
+    printf("XR-30 level acceleration: Mach %.2f after 40 s %s\n", p.mach, ok ? "ok" : "FAIL"); fails += !ok;
     // no vertical flight: the flap lever does nothing and the nozzles stay aft, so at a standstill it simply falls
     p.reset(&s, vec3(0, 500, 0), 90, s.maxFuel, 85, true, 0); p.vel = vec3(); p.ctl.flaps = 1; p.ctl.throttle = 0.7f;
     for (int i = 0; i < 4 * 240 && !p.ev.crashed; i++) p.step(1 / 240.f, calm, i / 240.f);
     ok = p.nozzle == 0.f && p.pos.y < 450.f;
-    printf("XR-9 cannot hover: nozzle %.2f, alt %.0f m after 4 s %s\n", p.nozzle, p.pos.y, ok ? "ok" : "FAIL"); fails += !ok;
+    printf("XR-30 cannot hover: nozzle %.2f, alt %.0f m after 4 s %s\n", p.nozzle, p.pos.y, ok ? "ok" : "FAIL"); fails += !ok;
     // approach: gear down at about 145 kt it flies level on its wing alone
     p.reset(&s, vec3(0, 600, 0), 90, s.maxFuel, 85, true, 75); p.ctl.gearDown = true; p.gear = 1;
     for (int i = 0; i < 20 * 240 && !p.ev.crashed; i++) {
@@ -172,35 +198,35 @@ int main(int argc, char** argv) {
       p.step(1 / 240.f, calm, i / 240.f);
     }
     ok = !p.ev.crashed && fabsf(p.pos.y - 600) < 40 && fabsf(length(p.vel) - 75) < 10;
-    printf("XR-9 approach speed level flight: alt %.0f m, %.0f kt %s\n", p.pos.y, length(p.vel) * MS_TO_KT, ok ? "ok" : "FAIL"); fails += !ok;
+    printf("XR-30 approach speed level flight: alt %.0f m, %.0f kt %s\n", p.pos.y, length(p.vel) * MS_TO_KT, ok ? "ok" : "FAIL"); fails += !ok;
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.pitch = 1;
     float gmax = 0;
     for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); gmax = std::max(gmax, p.gLoad); }
     ok = !p.ev.crashed && gmax < 50.f && gmax > 10.f;
-    printf("XR-9 full-back pull: peak %.1f g %s\n", gmax, ok ? "ok" : "FAIL"); fails += !ok;
+    printf("XR-30 full-back pull: peak %.1f g %s\n", gmax, ok ? "ok" : "FAIL"); fails += !ok;
     // no g limiter: a full pull at Mach 1.8 overstresses the airframe and it fails
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 620); p.ctl.throttle = 1; p.ctl.pitch = 1;
     for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) p.step(1 / 240.f, calm, i / 240.f);
     ok = p.ev.crashed && p.ev.crashReason.find("Structural") != std::string::npos;
-    printf("XR-9 unlimited pull at Mach 1.8 breaks the airframe: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
+    printf("XR-30 unlimited pull at Mach 1.8 breaks the airframe: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 340); p.ctl.throttle = 1; p.ctl.pitch = 1;
     float rate = 0;
     for (int i = 0; i < 2 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); rate = std::max(rate, p.w.x / DEG); }
     ok = !p.ev.crashed && rate > 100.f;
-    printf("XR-9 pitch rate at Mach 1: %.0f deg/s %s\n", rate, ok ? "ok" : "FAIL"); fails += !ok;
+    printf("XR-30 pitch rate at Mach 1: %.0f deg/s %s\n", rate, ok ? "ok" : "FAIL"); fails += !ok;
     // stick snapped from full back to full forward: the vectoring nozzles reverse the pitch rate quickly
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.pitch = 1;
     for (int i = 0; i < 120; i++) p.step(1 / 240.f, calm, i / 240.f);
     p.ctl.pitch = -1; float trev = -1;
     for (int i = 0; i < 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); if (trev < 0 && p.w.x < -60 * DEG) trev = i / 240.f; }
     ok = !p.ev.crashed && trev > 0 && trev < 0.3f;
-    printf("XR-9 pitch reversal to -60 deg/s: %.2f s %s\n", trev, ok ? "ok" : "FAIL"); fails += !ok;
+    printf("XR-30 pitch reversal to -60 deg/s: %.2f s %s\n", trev, ok ? "ok" : "FAIL"); fails += !ok;
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.roll = 1;
     for (int i = 0; i < 240; i++) p.step(1 / 240.f, calm, i / 240.f);
     ok = -p.w.z / DEG > 250.f;
-    printf("XR-9 roll rate %.0f deg/s %s\n", -p.w.z / DEG, ok ? "ok" : "FAIL"); fails += !ok;
+    printf("XR-30 roll rate %.0f deg/s %s\n", -p.w.z / DEG, ok ? "ok" : "FAIL"); fails += !ok;
   }
-  // ---------------- XR-11 Wraith: four-pod VTOL hover, top speed, roll rate and the structural g it can pull
+  // ---------------- XR-40 Wraith: four-pod VTOL hover, top speed, roll rate and the structural g it can pull
   {
     const AircraftSpec& s = kAircraft[kWraith];
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
@@ -208,18 +234,18 @@ int main(int argc, char** argv) {
     float I = 0.45f;
     for (int i = 0; i < 60 * 30; i++) { I = clampf(I - p.vel.y * 0.004f / 60.f * 60.f * 0.05f, 0.f, 1.f); p.ctl.throttle = clampf(I - p.vel.y * 0.04f, 0.f, 1.f); p.step(1 / 60.f, calm, i / 60.f); }
     bool ok = !p.ev.crashed && fabsf(p.vel.y) < 1.f && fabsf(p.pitchDeg()) < 2.f && fabsf(p.bankDeg()) < 2.f && length(vec3(p.vel.x, 0, p.vel.z)) < 2.f;
-    printf("XR-11 hover: throttle %.2f vs %.2f m/s pitch %.1f bank %.1f drift %.1f m/s %s\n", p.ctl.throttle, p.vel.y, p.pitchDeg(), p.bankDeg(), length(vec3(p.vel.x, 0, p.vel.z)), ok ? "ok" : "FAIL"); fails += !ok;
+    printf("XR-40 hover: throttle %.2f vs %.2f m/s pitch %.1f bank %.1f drift %.1f m/s %s\n", p.ctl.throttle, p.vel.y, p.pitchDeg(), p.bankDeg(), length(vec3(p.vel.x, 0, p.vel.z)), ok ? "ok" : "FAIL"); fails += !ok;
     p.ctl.roll = 0.6f; for (int i = 0; i < 60; i++) p.step(1 / 60.f, calm, 0);
-    ok = -p.w.z / DEG > 25.f; printf("XR-11 hover roll rate (pod thrust differential) %.0f deg/s %s\n", -p.w.z / DEG, ok ? "ok" : "FAIL"); fails += !ok;
+    ok = -p.w.z / DEG > 25.f; printf("XR-40 hover roll rate (pod thrust differential) %.0f deg/s %s\n", -p.w.z / DEG, ok ? "ok" : "FAIL"); fails += !ok;
     p.reset(&s, vec3(-46000, 4000, 0), 90, s.maxFuel, 85, true, 300); p.ctl.throttle = 1; p.apEngage(Plane::AP_HOLD, -1, calm); p.apSpeed = 0;
     for (int i = 0; i < 60 * 40; i++) p.step(1 / 60.f, calm, 0);
-    ok = !p.ev.crashed && p.mach > 3.0f; printf("XR-11 top speed Mach %.2f at %.0f m %s %s\n", p.mach, p.pos.y, p.ev.crashReason.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
+    ok = !p.ev.crashed && p.mach > 4.0f; printf("XR-40 top speed Mach %.2f at %.0f m %s %s\n", p.mach, p.pos.y, p.ev.crashReason.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 250); p.ctl.throttle = 0.8f; p.ctl.roll = 1;
     for (int i = 0; i < 240; i++) p.step(1 / 240.f, calm, 0);
-    ok = -p.w.z / DEG > 330.f; printf("XR-11 roll rate %.0f deg/s %s\n", -p.w.z / DEG, ok ? "ok" : "FAIL"); fails += !ok;
+    ok = -p.w.z / DEG > 330.f; printf("XR-40 roll rate %.0f deg/s %s\n", -p.w.z / DEG, ok ? "ok" : "FAIL"); fails += !ok;
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 600); p.ctl.throttle = 0.8f; p.ctl.pitch = 1; float mg = 0;
     for (int i = 0; i < 480 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, 0); mg = std::max(mg, p.gLoad); }
-    ok = !p.ev.crashed && mg > 60.f; printf("XR-11 full pull at 600 m/s: %.0f g %s\n", mg, ok ? "ok" : "FAIL"); fails += !ok;
+    ok = !p.ev.crashed && mg > 60.f; printf("XR-40 full pull at 600 m/s: %.0f g %s\n", mg, ok ? "ok" : "FAIL"); fails += !ok;
   }
   // ---------------- autopilot: stable holds in turbulence, and autoland at Solace Capital for every aircraft. The
   // autopilot flies each type to its own envelope (steep banks, hard pulls): what's checked is that it gets there, settles,

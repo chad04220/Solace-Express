@@ -1,5 +1,5 @@
 //! kWraithCockpitSDF
-//! The XR-11 cockpit distance field and its clipping checks.
+//! The XR-40 cockpit distance field and its clipping checks.
 int gCkSkip = 0;   // clipping checks: 1 = without the displays, 2 = without the gauges
 vec2 mapWraithCockpit(vec3 p){
   vec4 E4 = gM[22]; vec3 q = p - E4.xyz;

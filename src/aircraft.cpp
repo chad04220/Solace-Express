@@ -39,7 +39,7 @@ const AircraftSpec kAircraft[] = {
    0.25f, 5.0f, 1.40f, 0.75f, 0.022f, 0.012f, 0.070f, 0.80f, 15000, 0, 55, 62, 200, 260, 1250, false, false, true,
    30000, 60000, 85000, 0.42f, 0.050f, 0.055f, LIC_ATP, 260000, 0,
    14.0f, 0.95f, -0.58f, 1.0f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f)},
-  // ---- Codex's aircraft (docs/design/additional-aircraft, proposals on codex/*): Swift S6, Osprey C6, XR-8 Nightjar
+  // ---- Codex's aircraft (docs/design/additional-aircraft, proposals on codex/*): Swift S6, Osprey C6, XR-10 Nightjar
   // Swift S6: four-seat retractable touring piston
   {"swift_s6", "Swift S6", "Retractable low-wing tourer", ENG_PISTON, 1, 6, 3, 700.0f, 2700.0f,
   980.0f, 180.0f, 420.0f, 3, 17.10f, 11.40f, 1.552f,
@@ -54,36 +54,36 @@ const AircraftSpec kAircraft[] = {
   9000.0f, 10800.0f, 19800.0f, 0.41f, 0.056f, 0.062f, LIC_CPL, 68000, 650,
   9.8f, 0.90f, -0.68f, -0.80f, 1, 0, vec3(0.91f, 0.88f, 0.79f), vec3(0.82f, 0.24f, 0.06f), 0},
   // ---- the research craft (kNumAircraft stops here)
-  // XR-8 Nightjar: conventional twin-jet research demonstrator (special 0: the generic flight model and field)
-  {"xr8_nightjar", "XR-8 Nightjar", "Tapered-wing research demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
+  // XR-10 Nightjar: conventional twin-jet research demonstrator (special 0: the generic flight model and field)
+  {"xr10_nightjar", "XR-10 Nightjar", "Tapered-wing research demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
   5700.0f, 1300.0f, 100.0f, 0, 38.18f, 16.60f, 2.508f,
   0.15f, 4.6f, 1.55f, 0.55f, 0.020f, 0.010f, 0.045f, 0.80f,
-  12500.0f, 0.0f, 43.0f, 50.0f, 150.0f, 240.0f, 1250.0f, false, false, true,
-  60000.0f, 86000.0f, 146000.0f, 0.42f, 0.060f, 0.065f, LIC_ATP, 340000, 0,
+  26000.0f, 0.0f, 43.0f, 50.0f, 240.0f, 240.0f, 1250.0f, false, false, true,
+  52000.0f, 80000.0f, 130000.0f, 0.33f, 0.085f, 0.065f, LIC_ATP, 340000, 0,
   16.30f, 0.80f, -0.9375f, -1.145f, 2, 0,
-  vec3(0.14f, 0.18f, 0.20f), vec3(0.20f, 0.78f, 0.70f), 0},
+  vec3(0.14f, 0.18f, 0.20f), vec3(0.20f, 0.78f, 0.70f), 0, 0.96f, 9.f, -4.f},
   // hidden research model: thrust-to-weight ~2.2, supersonic, pitch thrust vectoring (see Plane::substep special path)
-  {"xr9", "XR-9 Specter", "Confidential research model", ENG_JET, 2, 0, 0, 0, 0, 9000, 3000, 0, 0, 46.0f, 11.2f, 4.6f,
-   0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 118000, 0, 60, 70, 420, 4000, 250, true, false, true,
+  {"xr30_specter", "XR-30 Specter", "Confidential research model", ENG_JET, 2, 0, 0, 0, 0, 9000, 3000, 0, 0, 46.0f, 11.2f, 4.6f,
+   0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 132000, 0, 60, 70, 420, 4000, 250, true, false, true,
    25000, 90000, 110000, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 0, 0,
-   17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1},
-  // XR-10 Mantis: forward-swept twin-jet systems demonstrator (Codex's proposal; special 0: the generic flight model and
-  // the generic field, like the XR-8). Its foreplanes are the model's horizontal tail placed forward.
-  {"xr10", "XR-10 Mantis", "Forward-swept systems demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
+   17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1, 2.7f, 40.f, -20.f},
+  // XR-20 Mantis: forward-swept twin-jet systems demonstrator (Codex's proposal; special 0: the generic flight model and
+  // the generic field, like the XR-10). Its foreplanes are the model's horizontal tail placed forward.
+  {"xr20_mantis", "XR-20 Mantis", "Forward-swept systems demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
    6100.0f, 1800.0f, 0.0f, 0, 30.0f, 13.2f, 2.27f,
    0.25f, 5.0f, 1.55f, 0.60f, 0.026f, 0.012f, 0.070f, 0.78f,
-   15000.0f, 0.0f, 50.0f, 58.0f, 190.0f, 210.0f, 1350.0f, false, false, true,
-   42000.0f, 92000.0f, 134000.0f, 0.42f, 0.055f, 0.060f, LIC_ATP, 480000, 0,
-   16.0f, 1.05f, -0.62f, 0.65f, 2, 0, vec3(0.065f, 0.085f, 0.105f), vec3(0.95f, 0.43f, 0.055f), 0},
+   30000.0f, 0.0f, 55.0f, 62.0f, 300.0f, 900.0f, 1350.0f, false, false, true,
+   30000.0f, 70000.0f, 100000.0f, 0.45f, 0.070f, 0.070f, LIC_ATP, 480000, 0,
+   16.0f, 1.05f, -0.62f, 0.65f, 2, 0, vec3(0.065f, 0.085f, 0.105f), vec3(0.95f, 0.43f, 0.055f), 0, 1.9f, 14.f, -6.f},
   // hidden stealth aerobatic research model: four tilting thruster pods (power = one pod's dry thrust), T/W ~2.2 dry
   // and ~4.6 boosted, structure good for +90 / -45 g (see Plane::wraithThrust)
-  {"xr11", "XR-11 Wraith", "Stealth aerobatic research model", ENG_JET, 4, 0, 0, 0, 0, 10500, 3000, 0, 0, 52.0f, 12.4f, 5.2f,
-   0.03f, 3.4f, 1.60f, 0.0f, 0.012f, 0.010f, 0.0f, 0.72f, 62000, 0, 60, 70, 480, 5000, 200, true, false, true,
+  {"xr40_wraith", "XR-40 Wraith", "Stealth aerobatic research model", ENG_JET, 4, 0, 0, 0, 0, 10500, 3000, 0, 0, 52.0f, 12.4f, 5.2f,
+   0.03f, 3.4f, 1.60f, 0.0f, 0.012f, 0.010f, 0.0f, 0.72f, 72000, 0, 60, 70, 480, 5000, 200, true, false, true,
    30000, 80000, 100000, 0.90f, 0.090f, 0.070f, LIC_STUDENT, 0, 0,
-   16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.075f, 0.08f, 0.09f), vec3(0.72f, 0.3f, 1.0f), 2},
+   16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.075f, 0.08f, 0.09f), vec3(0.72f, 0.3f, 1.0f), 2, 4.3f, 90.f, -45.f},
 };
 // clang-format on
-const int kNumAircraft = sizeof(kAircraft) / sizeof(kAircraft[0]) - 4;  // the research craft (XR-8, XR-9, XR-10, XR-11) are not part of the career
+const int kNumAircraft = sizeof(kAircraft) / sizeof(kAircraft[0]) - 4;  // the research craft (XR-10, XR-30, XR-20, XR-40) are not part of the career
 
 float Plane::fuelFlowMax() const {
   float rangeS = spec->rangeKm * 1000.f / spec->cruise;
@@ -118,7 +118,7 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   q = quat::axisAngle(vec3(0, 1, 0), -headingDeg * DEG);
   w = vec3(); ctl = Controls(); ev = FlightEvents(); apComfort = false; sceneryHits = true; brakeHold = 0;
   flaps = 0; gear = 1; rpm = 0; n1 = 0; engineSpool = 0; maxG = minG = 1; flightTime = 0;
-  fail = Failures(); iceFeed = 0;
+  fail = Failures(); iceFeed = 0; overG = 0;
   apDisengage(); apDone = false; apPitchI = 0; gust = vec3(); rng = Rng(77);
   // drag comes from the airframe's shape (aero.cpp), evaluated every step at the speed and air density of the moment
   cd0 = aeroCD0(aeroModel(*s), *s, std::max(speed, 30.f), 1.225f, speed / 340.f);
@@ -232,6 +232,11 @@ void Plane::substep(float dt, const Weather& wx, float time) {
       // two afterburning turbofans: dry up to 85% throttle, reheat above (2x thrust at 100%, T/W ~4.4)
       float ab = smoothstepf(0.85f, 1.0f, engineSpool);
       thrust = s.engines * s.power * powf(sigmaRho, 0.6f) * (0.82f * engineSpool + 1.18f * ab);   // full reheat doubles thrust
+    } else if (s.engineType == ENG_JET && s.designMach > 1.f) {
+      // a supersonic research type on conventional controls: dry up to 85% throttle, reheat above, and ram
+      // compression keeps the thrust up with Mach
+      float ab = smoothstepf(0.85f, 1.0f, engineSpool);
+      thrust = s.engines * s.power * powf(sigmaRho, 0.6f) * (0.82f * engineSpool + 1.18f * ab) * (1.f + 0.15f * std::min(V / 340.f, 2.5f));
     } else if (s.engineType == ENG_JET) {
       float mach = V / 340.f;
       thrust = s.engines * s.power * engineSpool * powf(sigmaRho, 0.75f) * (1.f - 0.3f * mach);
@@ -251,13 +256,13 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   // ---------------- configuration
   if (fail.flapAsym) flaps = fail.flapAt;   // the stopped flap holds the pair where they were
   else flaps = approach(flaps, ctl.flaps, s.special ? 0.5f : 0.6f, dt);
-  nozzle = s.special == 2 ? flaps : 0.f;   // the XR-11's F/V keys tilt its thruster pods instead of flaps
+  nozzle = s.special == 2 ? flaps : 0.f;   // the XR-40's F/V keys tilt its thruster pods instead of flaps
   if (s.retract && fail.gearStuck == 0) gear = clampf(gear + (ctl.gearDown ? 1.f : -1.f) * dt / 5.f, 0, 1);
   else if (!s.retract) gear = 1;
 
   // ---------------- aerodynamics
   vec3 F(0, 0, 0), T(0, 0, 0);  // body-frame force and torque
-  vec3 Taero(0, 0, 0), surfMax(0, 0, 0);   // XR-11: passive aerodynamic torque and full-deflection surface authority
+  vec3 Taero(0, 0, 0), surfMax(0, 0, 0);   // XR-40: passive aerodynamic torque and full-deflection surface authority
   const AeroModel& aero = aeroModel(s);
   const float AR = aero.AR;
   stallWarn = 0;
@@ -285,8 +290,13 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     float crossCD = 0.72f * (sb * sb * aero.sideArea + sa * sa * aero.planArea) / s.wingArea;
     float CD = cd0 + aero.gearDq / s.wingArea * gear + s.flapCD * flaps + CL * CL / (PI * aero.e * AR) / ge + sig * (0.35f + 1.1f * sinf(alpha) * sinf(alpha)) + crossCD;
     CD += 0.025f * fail.ice;   // the ice's roughness and shape
-    if (s.special) CD += 0.022f * smoothstepf(0.86f, 1.04f, mach) - 0.007f * smoothstepf(1.2f, 2.2f, mach);  // transonic drag rise
-    else CD += aeroWave(aero, mach, CL);                                                                      // the wing section's drag rise
+    if (s.special || s.designMach > 1.f) {   // the research jets: a transonic drag rise, easing supersonic, and a wall near the design Mach
+      CD += 0.022f * smoothstepf(0.86f, 1.04f, mach) - 0.007f * smoothstepf(1.2f, 2.2f, mach);
+      if (s.designMach > 0.f) { float over = mach - s.designMach; if (over > 0.f) CD += 0.5f * over * over; }
+    } else if (s.designMach > 0.f) {   // the barely-subsonic type: its section is clean to the design Mach, then the wall is steep
+      float x = mach - (s.designMach - 0.04f);
+      CD += x > 0.f ? 30.f * x * x * x : 0.f;
+    } else CD += aeroWave(aero, mach, CL);                                                                     // the wing section's drag rise
     float CY = -0.7f * beta;
     vec3 liftDir = normalize(cross(vec3(1, 0, 0), va));
     vec3 dragDir = va * (-1.f / V);
@@ -320,7 +330,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     float L = Cl * qbar * s.wingArea * s.span, M = Cm * qbar * s.wingArea * s.chord, Nn = Cn * qbar * s.wingArea * s.span;
     if (!s.special) T += vec3(M, -Nn, -L);
     else if (s.special == 2) {
-      // XR-11: the airframe's own stability and damping act on it; the fly-by-wire decides the surface deflections
+      // XR-40: the airframe's own stability and damping act on it; the fly-by-wire decides the surface deflections
       float Cm0 = Cma * (alpha - aCruise) * 0.4f + Cmq * 0.35f * qh, Cl0 = -0.10f * beta - 0.55f * ph + 0.08f * rh, Cn0 = 0.09f * beta - 0.16f * rh;
       Taero = vec3(Cm0 * qbar * s.wingArea * s.chord, -Cn0 * qbar * s.wingArea * s.span, -Cl0 * qbar * s.wingArea * s.span);
       surfMax = vec3(s.elevPow * s.chord, s.rudPow * s.span, s.ailPow * s.span) * (qbar * s.wingArea * ctlEff);
@@ -329,12 +339,12 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     stallWarn = smoothstepf(aStall - 5 * DEG, aStall - 1.5f * DEG, alpha);
   } else { alpha = 0; beta = 0; }
   if (s.special) {
-    if (s.special == 1) F += vec3(0, 0, -thrust);   // XR-9: the nozzles vector in pitch only (no vertical flight)
+    if (s.special == 1) F += vec3(0, 0, -thrust);   // XR-30: the nozzles vector in pitch only (no vertical flight)
     // fly-by-wire rate command through vectored thrust and reaction jets: authority independent of airspeed
     float Vt = std::max(V, 1.f);
     float hover = smoothstepf(0.3f, 0.7f, nozzle) * smoothstepf(70.f, 30.f, V);
     // pitch authority comes from the vectoring nozzles (+-29 deg of deflection, doubled in v1.7): ~110 deg/s at Mach 1
-    bool wr = s.special == 2;   // XR-11: ~80 g at full stick, 400 deg/s roll
+    bool wr = s.special == 2;   // XR-40: ~80 g at full stick, 400 deg/s roll
     float pMax = fbwPitchMax(Vt);
     float rMax = fbwRollMax(hover), yMax = wr ? 1.8f : 1.4f;
     vec3 wd(ctl.pitch * pMax + ctl.trim * 0.15f, -ctl.yaw * yMax, -ctl.roll * rMax);
@@ -502,7 +512,14 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   vec3 accBody = q.conj().rotate(acc + vec3(0, G0, 0));
   gLoad = accBody.y / G0;
   if (!onGround) { maxG = std::max(maxG, gLoad); minG = std::min(minG, gLoad); }
-  if (!anyWheel && (s.special == 2 ? (gLoad > 90.f || gLoad < -45.f) : s.special ? (gLoad > 50.f || gLoad < -25.f) : (gLoad > 5.8f || gLoad < -3.f))) { ev.crashed = true; ev.crashReason = "Structural failure - overstressed airframe"; return; }
+  {   // structure: past the limit the airframe takes a sustained overstress (20% over for five seconds, double for one)
+    // before it lets go; far past it (2x) it fails at once. Within the limit the stress relaxes.
+    float gp = s.gLimitPos(), gn = s.gLimitNeg();
+    float over = gLoad > gp ? gLoad / gp - 1.f : gLoad < gn ? gLoad / gn - 1.f : -0.5f;
+    overG = clampf(overG + over * dt, 0.f, 2.f);
+    bool snap = gLoad > gp * 2.f || gLoad < gn * 2.f;
+    if (!anyWheel && (overG >= 1.f || snap)) { ev.crashed = true; ev.crashReason = "Structural failure - overstressed airframe"; return; }
+  }
   vel += acc * dt;
   pos += vel * dt;
   // inertia scales with loading
@@ -523,7 +540,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   if (apOn) apControl(dt);
 }
 
-// ------------------------------------------------------------------ XR-11 Wraith thruster pods
+// ------------------------------------------------------------------ XR-40 Wraith thruster pods
 // Four pods pivot from thrust-aft (0) to thrust-down (pi/2). Each carries vanes that deflect its jet in pitch and yaw,
 // and can trim its own thrust. The fly-by-wire turns the stick's rate demand into an angular acceleration, takes
 // what the control surfaces can give (authority grows with dynamic pressure), then solves for the pod controls that
@@ -637,7 +654,7 @@ void Plane::wraithThrust(vec3& F, vec3& T, float Tp, vec3 wd, vec3 Taero, vec3 s
 static float hdgErrDeg(float target, float cur) { return wrapAngle((target - cur) * DEG) / DEG; }
 static float len2(vec3 v) { return sqrtf(v.x * v.x + v.z * v.z); }
 
-// XR-11 vertical landing: nozzles down, pitch for the along-track speed, bank for the cross-track, throttle for
+// XR-40 vertical landing: nozzles down, pitch for the along-track speed, bank for the cross-track, throttle for
 // height, then straight down onto the touchdown point
 void Plane::apHover(float dt) {
   vec3 rr(-apLd.z, 0, apLd.x), rel = pos - apTd;
@@ -917,7 +934,7 @@ void Plane::apGuidance(float dt) {
       apSpeed = (dist > F ? vref * 1.3f : dist > F * 0.5f ? vref * 1.18f : vref * 1.06f) + apGustAdd;
       if (dist < 2000.f && dist > 250.f && (fabsf(cross) > std::min(80.f, std::max(a.width * 0.5f, 12.f) + dist * 0.03f) || err > 40.f || err < -80.f)) { apStage = APS_GOAROUND; apStageT = 0; }
       { vec3 ahead = pos + vec3(ld.x, 0, ld.z) * 800.f; if (dist > 1200.f && pos.y < g_world.height(ahead.x, ahead.z) + 40.f) { apStage = APS_GOAROUND; apStageT = 0; } }
-      // the XR-11 comes to a hover over the touchdown point instead of a fast landing roll (starting to slow where it
+      // the XR-40 comes to a hover over the touchdown point instead of a fast landing roll (starting to slow where it
       // can stop at a gentle 2 m/s^2 - the hover allows twice that - from the ground speed it has, tailwind included)
       float gsAl = std::max(vel.x * ld.x + vel.z * ld.z, 0.f);
       if (s.special == 2 && dist < clampf(gsAl * gsAl / 4.f + 200.f, 1700.f, 6000.f) && dist > 0.f && fabsf(cross) < 60.f) { apStage = APS_HOVER; apStageT = 0; apThrI = ctl.throttle; }
@@ -1098,7 +1115,7 @@ void Plane::apControl(float dt) {
   if (apComfort) rollCap = std::min(rollCap, 15.f * DEG);
   float kBank = std::min(appr ? 1.5f : 3.f, 0.7f / P.tRoll);           // bank loop no faster than the roll mode
   float pT = clampf((bankT - bank) * DEG * kBank, -rollCap, rollCap);
-  if (fbw) ctl.flaps = 0;   // the research jets have no flaps (the XR-11's lever tilts its pods): keep it up
+  if (fbw) ctl.flaps = 0;   // the research jets have no flaps (the XR-40's lever tilts its pods): keep it up
   // vertical: altitude -> climb rate -> flight path -> load factor -> elevator
   float vsUp = std::max(P.roc * 1.1f, 2.f), vsDn = std::max(spd * 0.42f, vsUp);   // dives up to ~25 deg
   if (apComfort) { vsUp = std::min(vsUp, std::max(0.6f * P.roc, 1.5f)); vsDn = std::min(vsDn, std::max(spd * 0.1f, 4.f)); }
