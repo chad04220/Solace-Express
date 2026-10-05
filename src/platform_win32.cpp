@@ -884,7 +884,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           glFinish();
           LARGE_INTEGER f0, f1; QueryPerformanceCounter(&f0);
           const int N = 60;
-          for (int i = 0; i < N; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); }
+          for (int i = 0; i < N; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); pumpB(); }
           glFinish(); QueryPerformanceCounter(&f1);
           double ms = (double)(f1.QuadPart - f0.QuadPart) / freq.QuadPart * 1000.0 / N;
           if (F.bit == 0) base = ms;
@@ -941,11 +941,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         g->saveDir = game.saveDir;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
         g_ren.entSync = false;
-        for (int i = 0; i < 40; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); }
+        auto pumpB = [] { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } };   // (the window answers between frames: no "Not Responding" on a slow scene)
+        for (int i = 0; i < 40; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); pumpB(); }
         glFinish();
         LARGE_INTEGER f0, f1; QueryPerformanceCounter(&f0);
         const int N = 120;
-        for (int i = 0; i < N; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); }
+        for (int i = 0; i < N; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); pumpB(); }
         glFinish(); QueryPerformanceCounter(&f1);
         double ms = (double)(f1.QuadPart - f0.QuadPart) / freq.QuadPart * 1000.0 / N;
         if (bf) {
