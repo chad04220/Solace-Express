@@ -4,3 +4,4 @@
 - Swift S6 and Osprey C6 join the career fleet (Codex's proposals); the Osprey has its own cabin trim.
 - Rotating wheels on every wheeled aircraft and ground vehicle; gear detail across the fleet; XR-9 canopy lowered.
 - Both GA yokes turn the same way; the XR-11's ruddervators now answer pull-back correctly.
+- The visitors: Codex's crew and craft. Jointed visitors with modelled hands and faces and pressure suits, a saucer with a real pressure cabin, inspection covers, shrouded drives and a hatch that rides out on a carrier; both visitors and the floor are there at every phase of the encounter, on both renderers.
