@@ -13,6 +13,7 @@ void hullState(int s){
   vec4 w = uHStWr[s], w2 = uHStWr2[s];
   gWr[0] = vec4(w.x); gWr[1] = vec4(w.y); gWr[2] = vec4(w.z); gWr[3] = vec4(w.w);
   gWr[4] = vec4(w2.x, w2.y, w2.z, 0.0); gWr[5] = vec4(gCtl.x, gCtl.z, gCtl.y, 0.0); gWr[6] = vec4(w2.w, 0.0, 0.0, 0.0);
+  if (int(gM[0].z + 0.5) == 8) { gWr[0] = w; gWr[1] = w2; }   // FX-27 Gatling: doors, carrier and rotor
   if (gPS.w > 0.5) loadCabinFit();
 }
 void main(){

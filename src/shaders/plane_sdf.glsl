@@ -300,6 +300,7 @@ vec2 mapJet(vec3 p){
   return res;
 }
 vec2 mapWraith(vec3 p);
+vec2 mapKestrelFX27(vec3 p);
 vec2 mapWraithCockpit(vec3 p);
 vec2 mapPlaneBody(vec3 p);
 // light fixtures: a faired housing set into the airframe with a domed lens facing out along the light's axis
@@ -394,6 +395,7 @@ const int kOspreyModel = 8;   // (aircraft.h kOsprey)
 vec2 mapPlaneBody(vec3 p){
   if (int(gM[0].z + 0.5) == 5) return mapJet(p);
   if (int(gM[0].z + 0.5) == 6) return mapWraith(p);
+  if (int(gM[0].z + 0.5) == 8) return mapKestrelFX27(p);
   float L = gM[0].x; int gtype = int(gM[0].y + 0.5); int eng = int(gM[0].z + 0.5); float R = gM[0].w;
   float gear = gPS.x, flaps = gPS.y, steer = gPS.z, inside = gPS.w;
   float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z, cThr = gCtl.w;

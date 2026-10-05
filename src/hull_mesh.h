@@ -32,7 +32,8 @@ inline std::vector<HullState> hullStateList(const float* M, bool inside) {
     add(1, 0, 0, 0, s, 0, 0);                // ailerons (and the yoke's turn)
     add(1, 0, 0, 0, 0, s, 0);                // rudder and pedals
   }
-  if (inside) {
+  // The FX27 open-view cockpit is visible outside too: bake the combined stick/throttle sweeps in both slots.
+  if (inside || (int)(M[2] + 0.5f) == 8) {
     for (int i = 0; i <= 4; i++) for (int k = 0; k <= 4; k++) add(1, 0, 0, i * 0.5f - 1.f, k * 0.5f - 1.f, 0, 0);   // yoke / stick
     for (int i = 0; i <= 4; i++) add(1, 0, 0, 0, 0, 0, i * 0.25f);                                                  // throttle
   }
@@ -47,6 +48,17 @@ inline std::vector<HullState> hullStateList(const float* M, bool inside) {
     for (int i = 1; i <= 7; i++) addWr(0, 0, 0, 0, i * 0.7854f, 0, 0, 1);              // the fans round
     for (int i = 1; i <= 4; i++) { addWr(0, 0, 0, 0, 0, i * 0.25f, 0, 1); addWr(0, 0, 0, 0, 0, 0, i * 0.25f, 1); }   // bay, turrets
     addWr(0, 0, 0, 0, 0, 1, 0, 0);                                                     // bay open, bomb away
+  }
+  if ((int)(M[2] + 0.5f) == 8) {   // FX27: sequenced bay/carrier and actual rotor geometry, visible in either view slot
+    auto addKg = [&](float door, float carrier, float angle) {
+      HullState h = {{1, 0, 0, inside ? 1.f : 0.f}, {0, 0, 0, 0}, {door, carrier, angle, 0}, {0, 0, 0, 0}};
+      st.push_back(h);
+    };
+    for (int i = 1; i <= 6; ++i) addKg(i/6.f, 0, 0);                   // doors clear before the carrier moves
+    for (int i = 1; i <= 5; ++i) for (int r = 0; r < 2; ++r)
+      addKg(1, i/5.f, r*PI/6.f);                                      // both radial envelope orientations throughout the slide
+    for (int i = 0; i < 8; ++i) addKg(1, 1, i*PI/24.f);               // one complete sixfold rotor period
+    for (int i = 0; i < 4; ++i) addKg(0, 0, i*PI/12.f);               // rotor may stop at any angle before stowing
   }
   if (st.size() > 128) st.resize(128);
   return st;

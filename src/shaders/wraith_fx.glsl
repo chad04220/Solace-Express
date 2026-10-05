@@ -105,6 +105,7 @@ vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t){
   for (int i = 0; i < 16; i++) {
     if (i >= uFxBeams) break;
     vec3 a = uBeamA[i].xyz, b = uBeamB[i].xyz; float r = uBeamA[i].w, I = uBeamB[i].w;
+    bool tracer = r < 0.0; r = abs(r);   // a gun round: a hot yellow-white streak with a short amber glow, no flicker
     vec3 u = b - a; float L = length(u); u /= max(L, 1e-3);
     vec3 w0 = ro - a; float bb = dot(rd, u), dd = dot(rd, w0), ee = dot(u, w0), den = 1.0 - bb*bb;
     float sR = den > 1e-5 ? (bb*ee - dd)/den : 0.0, sB = den > 1e-5 ? (ee - bb*dd)/den : ee;
@@ -113,7 +114,8 @@ vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t){
     float d = length(ro + rd*sR - (a + u*sB));
     float core = exp(-d*d/(r*r*0.25)), halo = pow(r*r/(d*d + r*r), 1.6);
     float flick = 0.85 + 0.15*sin(uTime*90.0 + sB*0.3);
-    col += (vec3(1.0, 0.9, 0.95)*core*6.0 + vec3(1.0, 0.08, 0.2)*halo*1.6)*I*flick;
+    col += tracer ? (vec3(1.0, 0.95, 0.75)*core*7.0 + vec3(1.0, 0.55, 0.12)*halo*0.9)*I
+                  : (vec3(1.0, 0.9, 0.95)*core*6.0 + vec3(1.0, 0.08, 0.2)*halo*1.6)*I*flick;
   }
   for (int i = 0; i < 8; i++) {
     if (i >= uFxBombs) break;

@@ -1723,10 +1723,15 @@ void Game::drawHud(const FrameParams& fp) {
     std::string gearS = !sp.retract ? "FIXED" : plane.gear > 0.99f ? "DOWN" : plane.gear < 0.01f ? "UP" : "TRANSIT";
     tiles.push_back({"GEAR", gearS, !sp.retract ? C_DIM : plane.gear > 0.99f ? C_GOOD : plane.gear < 0.01f ? C_DIM : C_WARN, sp.retract ? plane.gear : -1.f});
     tiles.push_back({"TRIM", fmt("%+.0f", plane.ctl.trim * 100), C_TEXT, -1.f});
+    if (plane.spec - kAircraft == kPeregrine) {   // the belly Gatling's state
+      const char* st = kestrel.firing ? "FIRING" : !kestrel.deployed ? (kestrel.door > 0 ? "STOWING" : "SAFE") :
+                       kestrel.carrier < 1 ? "DEPLOYING" : plane.onGround ? "GND SAFE" : (plane.gear > .02f || plane.ctl.gearDown) ? "GEAR LOCK" : kestrel.spin > 0 ? "SPINNING" : "READY";
+      tiles.push_back({"GATLING", st, kestrel.firing ? C_WARN : kestrel.deployed ? C_ACCENT : C_DIM, kestrel.deployed ? (float)kestrel.spin : -1.f});
+    }
     int rows = ((int)tiles.size() + tileCols - 1) / tileCols;
     float bx = W - tileCols * tileW - (tileCols - 1) * tileGap - 14 * s, by = H - stripH - 10 * s - rows * tileH - (rows - 1) * tileGap;
     hudStrip(bx - 8 * s, by - 20 * s, tileCols * tileW + (tileCols - 1) * tileGap + 16 * s, rows * tileH + (rows - 1) * tileGap + 28 * s, 0.9f);
-    g_ren.text(bx, by - 15 * s, 9.5f * s, sp.special == 2 ? "XR-40 SYSTEMS" : sp.special ? "XR-30 SYSTEMS" : "SYSTEMS", C_ACCENT, 0.9f, 0, false);
+    g_ren.text(bx, by - 15 * s, 9.5f * s, sp.special == 2 ? "XR-40 SYSTEMS" : sp.special ? "XR-30 SYSTEMS" : (&sp - kAircraft == kPeregrine) ? "XR-15 SYSTEMS" : "SYSTEMS", C_ACCENT, 0.9f, 0, false);
     for (size_t i = 0; i < tiles.size(); i++) {
       float x = bx + (i % tileCols) * (tileW + tileGap), y = by + (i / tileCols) * (tileH + tileGap);
       g_ren.rect(x, y, tileW, tileH, vec3(0.0f, 0.02f, 0.04f), 0.55f, 3 * s);

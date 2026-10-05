@@ -54,7 +54,7 @@ void main(){
 #endif
     if (h0.x > 0.0) {
       int id0 = int(h0.y + 0.5);
-      if (jet && ((id0 >= 41 && id0 <= 43) || (id0 >= 61 && id0 <= 63))) { onScr = true; scrId = id0; scrL = transpose(uPlaneRot)*(ro + rd*h0.x - uPlanePos); }
+      if (jet && int(gM[0].z + 0.5) != 8 && ((id0 >= 41 && id0 <= 43) || (id0 >= 61 && id0 <= 63))) { onScr = true; scrId = id0; scrL = transpose(uPlaneRot)*(ro + rd*h0.x - uPlanePos); }
       else { pod = true; tmax = h0.x + 0.05; }
     }
   }

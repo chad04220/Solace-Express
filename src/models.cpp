@@ -140,15 +140,15 @@ const ModelDef kModels[] = {
     4, .40f, 0,
     0, 0,0,0,0,0,
     vec3(0,.58f,-4.30f), 3, -5.6f,-4.5f,.5f,-3.6f },
-  // ---------------------------------------------------------------- XR-15 Kestrel (Codex's FX-27 proxy on the generic field)
+  // ---------------------------------------------------------------- XR-15 Peregrine (Codex's FX-27: custom swept / chined field, engine code 8)
   { // closed 18.2 m body, broad shoulders and a raised single-seat canopy
     {{-9.10f,.06f,.05f,0.0f},{-7.0f,.45f,.28f,.03f},{-5.30f,.95f,.48f,.15f},{-3.80f,1.25f,1.20f,.23f},
      {-.60f,1.58f,.95f,.05f},{3.50f,1.65f,.78f,0.0f},{7.50f,1.0f,.45f,.10f},{9.10f,.07f,.07f,.10f}}, .42f,
     {7.0f,5.70f,1.157143f,4.20f,-.35f,-2.50f,0.0f,.10f}, // 14 m span, 48 m2 planform, swept low wing
     0,0.0f,0.0f,.58f,0,0,
     {3.60f,2.45f,.85f,1.80f,.15f,5.0f,0.0f},0,          // conventional aft stabilators
-    {2.30f,2.80f,1.0f,1.60f,.55f,4.60f},                // the fin proxy (the canted pair of the custom field drawn as one)
-    4,.86f,-.10f,.62f,1.20f,7.0f,0.0f,0.0f,            // closely paired rear jets, exits at z = 8.2 m
+    {2.30f,2.80f,1.0f,1.60f,.55f,4.60f},                // twin canted fins share this proxy
+    8,.86f,-.10f,.62f,1.20f,7.0f,0.0f,0.0f,            // closely paired rear jets, exits at z = 8.2 m
     4,.38f,0,                                          // retractable tricycle gear; no cargo pod
     0,0.0f,0.0f,0.0f,0.0f,0.0f,                       // no passenger windows
     vec3(0.0f,1.30f,-3.80f),2,                          // centred single-seat glass cockpit
@@ -214,6 +214,7 @@ void packModel(const AircraftSpec& s, int idx, float gh, float o[24 * 4]) {
   float mz = m.gear == 3 ? m.nacZ0 + m.nacLen * 0.6f : s.taildragger ? -0.10f * L : 0.04f * L;
   // retracting nose gear: behind the nose taper, where the full section begins, so its bay lies flush on the belly
   float nz = m.gear >= 3 ? std::max(-0.36f * L, m.st[3][0] + 0.35f) : -0.36f * L;
+  if (idx == kPeregrine) { track = kPeregrineGearTrack; mz = kPeregrineMainGearZ; nz = kPeregrineNoseGearZ; }   // the XR-15's wells are in its field
   put(18, track, m.wheelR, mz, nz);
   put(19, gh, 0.45f * L, s.taildragger ? 1.f : 0.f, (float)m.deice);
   put(20, (float)m.winCount, m.winZ0, m.winZ1, m.winY);
@@ -224,5 +225,8 @@ void packModel(const AircraftSpec& s, int idx, float gh, float o[24 * 4]) {
 }
 
 vec3 modelWingTip(const ModelDef& m) { return vec3(m.wing[0] + 0.02f, m.wing[4] + m.wing[0] * tanf(m.wing[6] * DEG), m.wing[5] + m.wing[3] + m.wing[2] * 0.25f); }
-vec3 modelFinTop(const ModelDef& m) { return vec3(0, m.vt[4] + m.vt[0] + 0.04f, m.vt[5] + m.vt[3] + m.vt[2] * 0.4f); }
+vec3 modelFinTop(const ModelDef& m) {
+  if (m.engine == 8) return vec3(2.175f, 2.874f, 6.70f);   // the XR-15's beacon on the starboard canted fin (kestrel_sdf.glsl)
+  return vec3(0, m.vt[4] + m.vt[0] + 0.04f, m.vt[5] + m.vt[3] + m.vt[2] * 0.4f);
+}
 vec3 modelTailTip(const ModelDef& m) { return vec3(0, m.st[7][3], m.st[7][0] + 0.03f); }

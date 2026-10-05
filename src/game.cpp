@@ -727,7 +727,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
   approachMinAgl = 1e9f; thrPrevAlong = -1e9f; appLow = false; appHigh = false; coaching.clear();
-  apWasOn = false; apDest = -1; wraith = WraithState(); g_scenery.resetDamage();
+  apWasOn = false; apDest = -1; wraith = WraithState(); kestrel = KestrelGatlingState(); kestrelInput = KestrelGatlingInput(); g_scenery.resetDamage();
   licenseBefore = career.license;
   // the player sees a loading screen while the scenery around the start is generated (tests fly straight away)
   screen = headless ? SCR_FLIGHT : SCR_LOADING;
@@ -909,6 +909,10 @@ void Game::flightControls(float dt) {
   (void)manual;
   // XR-40 weapons hot: the bumpers fire and bomb, so the rudder is frozen until weapons are safe again
   if (plane.spec->special == 2 && wraith.armed && !plane.onGround) { yawIn = 0; padY = 0; }
+  if (plane.spec - kAircraft == kPeregrine && kestrel.deployed && !plane.onGround) {   // the XR-15's fire bumper is the gun's while deployed; the keyboard rudder stays
+    if (set.padBind[ACT_YAW_L] == set.padBind[ACT_FIRE] && actPad(ACT_YAW_L)) padY += 1.f;
+    if (set.padBind[ACT_YAW_R] == set.padBind[ACT_FIRE] && actPad(ACT_YAW_R)) padY -= 1.f;
+  }
   c.yaw = approach(c.yaw, clampf(yawIn + padY, -1, 1), 4.f, dt);
   // throttle
   float thr = 0;
@@ -943,7 +947,7 @@ void Game::flightControls(float dt) {
   }
   c.flaps = flapNotch;
   // gear
-  bool wrAir = plane.spec->special == 2 && !plane.onGround;   // XR-40 in the air: gamepad Y is weapons hot / safe instead of the gear
+  bool wrAir = (plane.spec->special == 2 || plane.spec - kAircraft == kPeregrine) && !plane.onGround;   // XR-40 / XR-15 in the air: gamepad Y is weapons hot / safe instead of the gear
   bool gearPad = actPadP(ACT_GEAR) && !(wrAir && set.padBind[ACT_GEAR] == set.padBind[ACT_WEAPONS]);
   if ((actKeyP(ACT_GEAR) || gearPad || (!showMap && (in.buttonsPressed & PAD_RIGHT))) && plane.spec->retract) {
     if (plane.onGround && c.gearDown) toast("Gear lever is locked on the ground", vec3(1, 0.6f, 0.4f));
@@ -954,6 +958,7 @@ void Game::flightControls(float dt) {
   bool& parking = parkingBrake;   // (set by startFlight for a start on the ground)
   if (plane.apDone) { plane.apDone = false; parking = true; toast("Autoland complete - parking brake set", vec3(0.5f, 1, 0.6f)); g_audio.trigger(SFX_AP_DISC, 0.7f); }
   if (plane.spec->special == 2) wraithControls(dt);
+  else if (plane.spec - kAircraft == kPeregrine) kestrelControls(dt);
   if (actKeyP(ACT_PARK) || (!showMap && actPadP(ACT_PARK))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
   float wb = actDown(ACT_BRAKE) ? 1.f : 0.f;
   if (wb > 0 && parking && plane.onGround && length(plane.vel) > 2.f) parking = false;
@@ -1062,6 +1067,7 @@ void Game::updateFlight(float dt) {
   for (auto& f : traffic.puffs) spawn(f.p, f.v, f.life, f.size, f.grow, f.col, f.alpha, f.kind, 1.f, 0.f);
   for (auto& b : traffic.booms) g_audio.trigger(SFX_BOOM, b.second);
   updateWraith(simDt);
+  updateKestrel(simDt);
   for (float f : traffic.flybys) g_audio.trigger(SFX_FLYBY, f);
   for (auto& m : traffic.radio) toast(m, vec3(1.f, 0.78f, 0.3f));
   // entertainment: O + P held for a second while flying summons the Spectre display pair (again: sends them home).
@@ -2075,8 +2081,8 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   pv.PS[0] = p.gear; pv.PS[1] = p.flaps; pv.PS[2] = steer; pv.PS[3] = inside ? 1.f : 0.f;
   pv.Ctl[0] = clampf(p.ctl.pitch + p.ctl.trim * 0.3f, -1, 1); pv.Ctl[1] = clampf(p.ctl.roll, -1, 1); pv.Ctl[2] = clampf(p.ctl.yaw, -1, 1); pv.Ctl[3] = p.ctl.throttle;
   float blur = s.engineType == ENG_JET ? 1.f : smoothstepf(250.f, 700.f, p.rpm);
-  float wr = s.special ? .38f : md.wheelR;
-  float nr = s.special ? .33f : s.taildragger ? .10f : md.gear == 3 ? wr*.75f : wr*.85f;
+  float wr = idx == kPeregrine ? .38f : s.special ? .38f : md.wheelR;   // (the XR-15 has four equal tyres: its twin nose pair is not the generic small nose wheel)
+  float nr = idx == kPeregrine ? .38f : s.special ? .33f : s.taildragger ? .10f : md.gear == 3 ? wr*.75f : wr*.85f;
   pv.model = (int)(p.spec - kAircraft);
   pv.wheel[0] = p.wheelMotion[0].angle(wr); pv.wheel[1] = p.wheelMotion[1].angle(wr); pv.wheel[2] = p.wheelMotion[2].angle(nr);
   pv.Pr[0] = propAngle; pv.Pr[1] = blur; pv.Pr[2] = (float)std::max(s.blades, 2); pv.Pr[3] = 0;
@@ -2172,6 +2178,7 @@ FrameParams Game::buildFrame() {
     fp.landLightPos = plane.pos + plane.forward() * (plane.spec->fusLen * 0.4f);
     fp.landLightDir = normalize(plane.forward() - plane.up() * 0.1f);
     wraithVisual(fp);
+    kestrelVisual(fp);
     buildFeedCameras(fp);
     if (boomT >= 0 && boomT < 1.6f && !(length(fp.flameLight) > 0.f)) {   // an explosion's flash lights the scene, fading as the fireball cools
       float k = boomT < 0.08f ? boomT / 0.08f : expf(-(boomT - 0.08f) * 2.6f);
@@ -2287,7 +2294,7 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   g_ren.entSync = sync;
   // every light aircraft's hull (outside, and the cockpit's when that is in use): a frame that wants one bakes it
   std::vector<std::pair<int, bool>> todo;
-  for (int i = 0; i <= kKestrel; i++) if (!kAircraft[i].special) { todo.push_back({i, false}); if (g_ren.hullCockpit || g_ren.mode == 1) todo.push_back({i, true}); }
+  for (int i = 0; i <= kPeregrine; i++) if (!kAircraft[i].special) { todo.push_back({i, false}); if (g_ren.hullCockpit || g_ren.mode == 1) todo.push_back({i, true}); }
   for (size_t k = 0; k < todo.size() && !quit; k++) {
     prewarmCraft = todo[k].first; prewarmInside = todo[k].second;
     progress(0.35f + 0.65f * k / todo.size(), std::string("BUILDING AIRCRAFT SHELLS  ") + kAircraft[prewarmCraft].name);
@@ -2946,6 +2953,8 @@ void Game::update(float dt) {
   // gamepad: both bumpers held together for a second hides the whole flight UI; again brings it back (not while the
   // XR-40's weapons are armed: the bumpers are its triggers then; the pause menu has the same switch)
   bool bumpersFree = !(screen == SCR_FLIGHT && plane.spec && plane.spec->special == 2 && wraith.armed);
+  if (screen == SCR_FLIGHT && plane.spec && plane.spec - kAircraft == kPeregrine && kestrel.deployed) bumpersFree = false;
+  if (plane.spec && plane.spec - kAircraft == kPeregrine && (paused || showMap || showRadio)) { kestrel.inhibit(); kestrelInput.enabled = false; }
   if (in.pad && bumpersFree && (in.buttons & PAD_LB) && (in.buttons & PAD_RB)) {
     bumperHold += dt;
     if (bumperHold >= 1.f && !bumperFired) { bumperFired = true; uiHidden = !uiHidden; g_audio.trigger(SFX_CLICK); }
@@ -3142,7 +3151,7 @@ void Game::debugScene(const std::string& name) {
   }
   if (name == "research" || name == "research40" || name == "research10" || name == "research20" || name == "research15") {   // the terminal, settled (selection decrypted)
     screen = SCR_RESEARCH; realTime = 30; resOpened = 20; resAuthed = true;
-    resCraft = name == "research40" ? kWraith : name == "research10" ? kNightjar : name == "research20" ? kMantis : name == "research15" ? kKestrel : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
+    resCraft = name == "research40" ? kWraith : name == "research10" ? kNightjar : name == "research20" ? kMantis : name == "research15" ? kPeregrine : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
     return;
   }
   if (name.rfind("researchscan", 0) == 0) {   // the biometric sequence at a moment: researchscan<tenths of a second>
@@ -3520,7 +3529,7 @@ void Game::debugScene(const std::string& name) {
   if (name.compare(0, 4, "gav_") == 0) {   // an aircraft parked on the runway, orbit view: gav_<spec>_<yaw>_<pitch>_<dist>
     int sp = 0; float yawD = 120, pitD = 10, dist = 0;
     sscanf(name.c_str() + 4, "%d_%f_%f_%f", &sp, &yawD, &pitD, &dist);
-    sp = std::clamp(sp, 0, kKestrel);
+    sp = std::clamp(sp, 0, kPeregrine);
     Contract c; c.from = g_world.findAirport("CAP"); c.to = g_world.findAirport("MDB"); c.title = "Aircraft check";
     c.wx = Weather(); c.wx.timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 14.5f; c.wx.cloudCover = 0.2f; c.wx.visibility = 60000;
     realTime = 20; startFlight(c, sp, Career::SRC_OWNED);
