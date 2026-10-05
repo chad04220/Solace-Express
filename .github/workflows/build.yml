@@ -50,7 +50,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist/SolaceExpress | Out-Null
           Copy-Item build/Release/SolaceExpress.exe dist/SolaceExpress/
-          Copy-Item README.md, radio_stations.txt, THIRD_PARTY_NOTICES.md, render_shots.bat, benchmark.bat, profile.bat, analyze.bat, render_loading.bat, render_menu.bat dist/SolaceExpress/
+          Copy-Item README.md, radio_stations.txt, THIRD_PARTY_NOTICES.md, render_shots.bat, benchmark.bat, profile.bat, analyze.bat, render_loading.bat, render_menu.bat, report.bat dist/SolaceExpress/
           New-Item -ItemType Directory -Force -Path dist/SolaceExpress/loading | Out-Null
           Copy-Item assets/loading/*.jpg dist/SolaceExpress/loading/
           Copy-Item -Recurse assets/voice dist/SolaceExpress/voice
