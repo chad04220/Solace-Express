@@ -127,6 +127,7 @@ vec3 wrFloorUV(vec3 q){
 // not mirrored.
 int feedSlot(int id, vec3 q, out vec2 uv){
   float sx = q.x < 0.0 ? -1.0 : 1.0; bool L = q.x < 0.0;
+  if (int(gM[0].z + 0.5) == 7) { uv = vec2(0.0); return q.z < -0.5 ? 0 : (L ? 1 : 2); }   // XR-10: the front pane and the two side panes (windows: feedScreen maps them)
   if (int(gM[0].z + 0.5) == 5) {   // XR-9: the panoramic display (one panoramic camera) and the side bays
     if (id == 41) { uv = vec2(0.0); return 0; }   // the panoramic display: one panoramic camera (feedScreen maps it)
     uv = vec2((q.z - 0.24)/0.3*sx, (q.y - 0.04)/0.2);

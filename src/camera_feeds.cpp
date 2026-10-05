@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <cmath>
 
-FeedMounts g_feedMounts[3];
+FeedMounts g_feedMounts[4];
 
 // Exchange the render targets (and the per-view state that goes with them) with v: every pass then draws for v's view.
 void Renderer::swapView(ViewTargets& v) {

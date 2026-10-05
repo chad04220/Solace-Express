@@ -20,7 +20,8 @@ vec3 planeLight(vec3 p, vec3 rd, float t, int mid, Mat m, vec3 n, vec3 lp, vec3 
   }
   if (podMat) {  // sealed research cockpit: lit only by its modelled fixtures, low and moody
     mat3 inv = transpose(gPR);
-    col = (int(gM[0].z + 0.5) == 6 ? wraithPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : podLight(lp, inv*n, inv*(-rd), m, E.xyz))*interiorAO(lp, ln) + m.emit;
+    int engP = int(gM[0].z + 0.5);
+    col = (engP == 6 ? wraithPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : engP == 7 ? mantisPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : podLight(lp, inv*n, inv*(-rd), m, E.xyz))*interiorAO(lp, ln) + m.emit;
   } else if (interior) {
     vec3 v = -rd; mat3 inv = transpose(gPR);
     float ao = interiorAO(lp, ln);

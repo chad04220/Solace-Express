@@ -28,7 +28,7 @@ You are an aircraft designer for **Solace Express**, a C++17 / OpenGL 3.3 flight
 |---|---|---|
 | Flight model + career + livery table | `src/aircraft.cpp` → `const AircraftSpec kAircraft[]` | Struct in `src/aircraft.h` |
 | 3D model table | `src/models.cpp` → `const ModelDef kModels[]` | Struct in `src/models.h` |
-| Row count rule | `kNumAircraft = sizeof(kAircraft)/sizeof(kAircraft[0]) - 3` | The **last three rows are the hidden research craft** (`xr8_nightjar`, `xr9`, `xr11`; `kNightjar`, `kResearchJet`, `kWraith` in aircraft.h). New career aircraft must be inserted **before** the `xr8_nightjar` row in **both** tables, in the **same position**, because the tables are index-aligned (`kModels[spec - kAircraft]`). |
+| Row count rule | `kNumAircraft = sizeof(kAircraft)/sizeof(kAircraft[0]) - 4` | The **last four rows are the hidden research craft** (`xr8_nightjar`, `xr9`, `xr10`, `xr11`; `kNightjar`, `kResearchJet`, `kMantis`, `kWraith` in aircraft.h). New career aircraft must be inserted **before** the `xr8_nightjar` row in **both** tables, in the **same position**, because the tables are index-aligned (`kModels[spec - kAircraft]`). |
 | Research craft indices | `src/aircraft.h` → `kResearchJet = 7`, `kWraith = 8` | Inserting N career rows before them means these two constants must be increased by N. Say so explicitly in your output. |
 | Save files | by `id` string | `id` must be unique, lowercase ASCII, stable forever. |
 
@@ -172,7 +172,7 @@ The integrator runs: `cmake --build build && ctest --test-dir build` (flight mod
 
 ## 6. Tier B — hand-built airframes (only when Tier A cannot express the shape)
 
-The two research jets (`mapJet`, `mapWraith` in `src/shaders/raytrace_fs.glsl` and `raytrace_wraith*.glsl`) are hand-written GLSL signed-distance functions. A Tier B aircraft is a new such function. It costs integration work (dispatch, material ids, part table), so propose it only with a reason. The rules below exist because the rebuilt renderer **bakes meshes from the function at load**; break them and the bake produces holes, slivers or frozen animation.
+The research jets (`mapJet` in `src/shaders/plane_sdf.glsl`, `mapWraith` in `wraith_sdf.glsl`, `mapMantis` in `mantis_sdf.glsl`) are hand-written GLSL signed-distance functions; the Mantis is the worked example of a part/rig-structured one (engine code 7, dispatched from `mapPlaneBody`). A Tier B aircraft is a new such function. It costs integration work (dispatch, material ids, part table), so propose it only with a reason. The rules below exist because the rebuilt renderer **bakes meshes from the function at load**; break them and the bake produces holes, slivers or frozen animation.
 
 The `PART(...)`, `partOn(id)` and `rig*(p, id)` helpers in rule 5 are the renderer rebuild's contract, not yet functions in the tree: write to the contract, and the integrator maps it onto whichever shader version is current. Everything else in this section (primitives, globals, material ids) exists today.
 

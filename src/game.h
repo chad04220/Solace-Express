@@ -46,7 +46,7 @@ struct Settings {
   float mouseSens = 1.0f;
   int resMode = 1;   // 0 native, 1 auto (holds the frame-rate target, the default), 2 85%, 3 75%, 4 67% (TAA upscales to the display)
   int fpsTarget = 0;   // 0: the monitor's refresh rate (vsync); else a frame-rate cap (30 / 60 / 90 / 120 / 144 / 240)
-  int renderer = 0;    // 0 the ray tracer, 1 the raster renderer (docs/RENDERER_REBUILD.md)
+  int renderer = 1;    // 1 the raster renderer (the default, docs/RENDERER_REBUILD.md), 0 the ray tracer
   int keyBind[ACT_COUNT]; unsigned padBind[ACT_COUNT];
   Settings() { resetBindings(); }
   void resetBindings() { for (int i = 0; i < ACT_COUNT; i++) { keyBind[i] = kActions[i].key; padBind[i] = kActions[i].pad; } }
@@ -183,6 +183,11 @@ private:
     int wrecked = 0;              // trees, rocks and buildings destroyed
     int kills = 0;
   } wraith;
+  struct MantisState {   // XR-10 systems: the store bay (doors, the two dart cradles, the internal store) and what is aboard
+    bool bayOpen = false; float bay = 0, cradle = 0, store = 0; float aboard[3] = {1, 1, 1}; int dropping = 0;
+  } mantis;
+  void mantisControls(float dt);
+  void updateMantis(float dt);
   void wraithControls(float dt);
   void updateWraith(float dt);
   void wraithVisual(FrameParams& fp);

@@ -7,7 +7,7 @@
 namespace {
 const vec3 R_ICE(0.42f, 0.93f, 1.f), R_DIM(0.36f, 0.55f, 0.66f), R_TEXT(0.88f, 0.97f, 1.f), R_RED(1.f, 0.27f, 0.24f);
 const vec3 R_AMBER(1.f, 0.72f, 0.26f), R_GREEN(0.4f, 1.f, 0.62f), R_VIOLET(0.8f, 0.5f, 1.f), R_INK(0.0f, 0.015f, 0.03f);
-const vec3 R_TEAL(0.3f, 0.95f, 0.8f);
+const vec3 R_TEAL(0.3f, 0.95f, 0.8f), R_EMBER(1.f, 0.58f, 0.22f);
 const char* kGlyphs = "0123456789ABCDEF#%&@$*+=<>/\\|";
 
 // the airframes on the register, in the order of their cards (the XR number order); every craft-specific piece of
@@ -44,6 +44,14 @@ const ResCraftInfo kResCraft[] = {
    60.f, -30.f, 30.f, 50.f, -25.f, 2.5f, 0.42f,
    {"No flaps: land fast, ~140 kt, long runways", "Nozzles vector with the stick for pitch", "FBW commands rotation - no g limiter",
     "Reheat lights above 85% throttle (2x thrust)", "C: cockpit view flies on the displays"}, "XR9"},
+  {kMantis, "NG-XR10-M  //  BLK 2", "XR-10", "MANTIS", R_EMBER, {0.35f, 0.55f, 0.7f}, "FORWARD-SWEPT SYSTEMS DEMONSTRATOR",
+   {{"CONFIGURATION", "Forward-swept wing, all-moving canards", -1}, {"PROPULSION", "2 x turbofan, 30 kN total", 0.1f},
+    {"THRUST / WEIGHT", "0.38 : 1", 0.08f}, {"TOP SPEED", "Mach 0.75", 0.2f},
+    {"STORES", "Internal bay, 2 recessed cradles", 0.5f}, {"ROLL RATE", "180 deg/s", 0.45f},
+    {"AIRFRAME", "+7 / -3 g", 0.08f}, {"ENDURANCE", "1,800 kg fuel, 210 km", 0.25f}},
+   10.f, -5.f, 5.f, 7.f, -3.f, 0.85f, 0.26f,
+   {"Y opens the store bay and lowers the cradles", "Enter / LMB releases a dart, Bksp the internal store", "Released shapes are inert test articles",
+    "Three camera panes: nose and either side", "Canards and forward sweep: brisk in pitch, land ~115 kt"}, "XR10"},
   {kWraith, "NG-XR11-W  //  BLK 1", "XR-11", "WRAITH", R_VIOLET, {1.f, 0.97f, 0.06f}, "STEALTH AEROBATIC RESEARCH MODEL",
    {{"CONFIGURATION", "Faceted body, diamond wing, V-tail", -1}, {"PROPULSION", "4 x tilting pods, 520 kN boosted", 0.8f},
     {"THRUST / WEIGHT", "2.2 dry, 4.6 boosted", 0.7f}, {"TOP SPEED", "Mach 3.6+", 1.f},
@@ -121,6 +129,12 @@ void silhouette(int craft, float cx, float cy, float sc, vec3 c, float a, float 
       float px = kWraithPods[i].x / 6.4f, py = kWraithPods[i].z / 8.2f;
       g_ren.rectOutline(cx + px * sc - 0.07f * sc, cy + py * sc - 0.14f * sc, 0.14f * sc, 0.28f * sc, c, a, 0.06f * sc, th);
     }
+  } else if (craft == kMantis) {   // forward-swept wing, canards, single fin, two aft engines
+    static const float body[] = {0.f, -1.f, 0.1f, -0.75f, 0.12f, -0.45f, 0.36f, -0.5f, 0.38f, -0.42f, 0.14f, -0.3f, 0.14f, 0.02f, 0.95f, -0.2f, 0.98f, -0.08f, 0.26f, 0.42f, 0.15f, 0.7f, 0.12f, 0.94f, 0.f, 0.96f};
+    mirror(body, 13);
+    for (int side = -1; side <= 1; side += 2)
+      g_ren.rectOutline(cx + side * 0.2f * sc - 0.05f * sc, cy + 0.42f * sc, 0.1f * sc, 0.3f * sc, c, a, 0.04f * sc, th);
+    g_ren.line(cx, cy + 0.55f * sc, cx, cy + 0.98f * sc, th, c, a);
   } else if (craft == kResearchJet) {
     static const float body[] = {0.f, -1.f, 0.1f, -0.7f, 0.16f, -0.35f, 0.42f, -0.42f, 0.2f, -0.18f, 0.5f, 0.28f, 0.98f, 0.52f, 0.92f, 0.66f, 0.3f, 0.7f, 0.2f, 0.92f, 0.f, 0.92f};
     mirror(body, 11);
@@ -420,6 +434,8 @@ void Game::drawResearch(const FrameParams& fp) {
                      {kWraithPods[2], "POD 3  //  VECTORING VANES", -1}, {vec3(6.2f, -0.24f, 2.0f), "FACETED SKIN  //  CLOAK MESH", 1}};
     else if (resCraft == kResearchJet) calls = {{vec3(0, 0, -fl), "SYNTHETIC-VISION POD", -1}, {vec3(2.1f, 0.1f, -4.4f), "CANARD  //  ALL-MOVING", 1},
                   {vec3(5.62f, -0.38f, 4.4f), "CRANKED DELTA  //  NO FLAPS", 1}, {vec3(-0.82f, -0.12f, 7.75f), "2D NOZZLE  //  +-29 DEG", -1}};
+    else if (resCraft == kMantis) calls = {{vec3(0, 0, -fl), "NOSE CAMERA  //  SENSOR SUITE", -1}, {vec3(1.72f, -0.15f, -3.6f), "CANARD  //  ALL-MOVING TITANIUM", 1},
+                                          {vec3(6.52f, -0.62f, -0.1f), "FORWARD SWEEP  //  AMBER DATUMS", 1}, {vec3(0, -0.94f, 1.6f), "STORE BAY  //  2 CRADLES", -1}};
     else {   // a conventional airframe: its parts from the parametric model
       const ModelDef& md = kModels[resCraft];
       vec3 tip = modelWingTip(md), fin = modelFinTop(md);

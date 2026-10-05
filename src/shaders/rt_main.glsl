@@ -54,7 +54,8 @@ void main(){
 #endif
     if (h0.x > 0.0) {
       int id0 = int(h0.y + 0.5);
-      if (jet && ((id0 >= 41 && id0 <= 43) || (id0 >= 61 && id0 <= 63))) { onScr = true; scrId = id0; scrL = transpose(uPlaneRot)*(ro + rd*h0.x - uPlanePos); }
+      bool mantis = int(gM[0].z + 0.5) == 7;
+      if ((jet && !mantis && ((id0 >= 41 && id0 <= 43) || (id0 >= 61 && id0 <= 63))) || (mantis && id0 == 112)) { onScr = true; scrId = id0; scrL = transpose(uPlaneRot)*(ro + rd*h0.x - uPlanePos); }
       else { pod = true; tmax = h0.x + 0.05; }
     }
   }
@@ -62,7 +63,7 @@ void main(){
     bool bomb; vec3 rdc;
     vec3 col = feedScreen(scrId, scrL, rdc, bomb);
     bool wr = int(gM[0].z + 0.5) == 6;
-    col = bomb ? wrFeedOverlay(col, scrL) : wr ? wraithScreen(col, rdc, scrId, scrL) : jetScreen(col, rdc, scrId, scrL);
+    col = bomb ? wrFeedOverlay(col, scrL) : wr ? wraithScreen(col, rdc, scrId, scrL) : int(gM[0].z + 0.5) == 7 ? mantisScreen(col, rdc, scrId, scrL) : jetScreen(col, rdc, scrId, scrL);
     if (wr) col += wrHolo(ro, rd, h0.x);   // the hologram floats inside the cabin, in front of the displays
     if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
     oColor = vec4(clamp(col, vec3(0.0), vec3(3e4)), 0.0); oDepth = h0.x; oCloudMask = 0.0;

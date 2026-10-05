@@ -403,7 +403,8 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     m.alb = mix(m.alb, vec3(0.025, 0.022, 0.02), k); m.rough = mix(m.rough, 0.95, k); m.metal *= 1.0 - k;
     m.emit += vec3(1.0, 0.32, 0.06)*pow(clamp(burn*cut*0.9, 0.0, 1.0), 5.0)*(1.5 + sin(uTime*7.0 + lp.x*9.0))*3.0;
   }
-  if (mid == 6 || mid == 8) m = gearFinish(lp, mid, m, t*2.0*uTanHalf/uRes.y);
+  if ((mid == 6 || mid == 8) && int(gM[0].z + 0.5) != 7) m = gearFinish(lp, mid, m, t*2.0*uTanHalf/uRes.y);   // (the Mantis has its own gear)
+  if (int(gM[0].z + 0.5) == 7) mantisMaterial(m, mid, lp, ln, interior);   // the XR-10: its titanium, datums, panes and cabin
   if (gModelId == 8) {   // the Osprey C6's cabin: ivory composite, copper trim, tobacco leather, cocoa textile (its own fittings and the shared ones)
     if (mid >= 120 && mid <= 124) {
       m.alb = ospreyCabinAlbedo(mid); m.metal = mid == 121 ? 0.85 : 0.0; m.rough = mid == 121 ? 0.3 : mid == 122 ? 0.5 : mid == 124 ? 0.2 : 0.75; m.nrm = vec3(0.0, 0.0, 1.0);
@@ -413,5 +414,6 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     else if (mid == 63) m.alb = vec3(0.72, 0.66, 0.53); else if (mid == 69) m.alb = vec3(0.062, 0.040, 0.028);
   }
   n = applyTS(n, m.nrm, interior ? 0.35 : 0.12);
-  podMat = mid >= 40 && mid < 80 && int(gM[0].z + 0.5) >= 5 && !trafHit;   // research jets only: light aircraft use ids 60+ for their cockpits
+  int engM = int(gM[0].z + 0.5);
+  podMat = !trafHit && ((mid >= 40 && mid < 80 && engM >= 5 && engM != 7) || (engM == 7 && mantisCabinCavity(lp) < 0.02));   // research jets only: light aircraft use ids 60+ for their cockpits; the Mantis: whatever sits in its cabin cavity
 }

@@ -28,7 +28,7 @@ static int jetExhausts(const Plane& p, vec3* pos, vec3* dir, float* strength) {
 }
 
 // ------------------------------------------------------------------ control bindings
-const char* const kActionGroups[] = {"FLIGHT", "SYSTEMS", "VIEW / COMMS", "XR-11 WRAITH"};
+const char* const kActionGroups[] = {"FLIGHT", "SYSTEMS", "VIEW / COMMS", "XR-11 WRAITH / XR-10 MANTIS"};
 const ActionInfo kActions[ACT_COUNT] = {
   {"pitchDown", "Pitch down (nose down)", 0, 'W', 0},          {"pitchUp", "Pitch up (nose up)", 0, 'S', 0},
   {"rollLeft", "Roll left", 0, 'A', 0},                         {"rollRight", "Roll right", 0, 'D', 0},
@@ -381,7 +381,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
   approachMinAgl = 1e9f; thrPrevAlong = -1e9f; appLow = false; appHigh = false; coaching.clear();
-  apWasOn = false; apDest = -1; wraith = WraithState(); g_scenery.resetDamage();
+  apWasOn = false; apDest = -1; wraith = WraithState(); mantis = MantisState(); g_scenery.resetDamage();
   licenseBefore = career.license;
   // the player sees a loading screen while the scenery around the start is generated (tests fly straight away)
   screen = headless ? SCR_FLIGHT : SCR_LOADING;
@@ -574,6 +574,7 @@ void Game::flightControls(float dt) {
   bool& parking = parkingBrake;   // (set by startFlight for a start on the ground)
   if (plane.apDone) { plane.apDone = false; parking = true; toast("Autoland complete - parking brake set", vec3(0.5f, 1, 0.6f)); g_audio.trigger(SFX_AP_DISC, 0.7f); }
   if (plane.spec->special == 2) wraithControls(dt);
+  else if (plane.spec - kAircraft == kMantis) mantisControls(dt);
   if (actKeyP(ACT_PARK) || (!showMap && actPadP(ACT_PARK))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
   float wb = actDown(ACT_BRAKE) ? 1.f : 0.f;
   if (wb > 0 && parking && plane.onGround && length(plane.vel) > 2.f) parking = false;
@@ -677,6 +678,7 @@ void Game::updateFlight(float dt) {
   for (auto& f : traffic.puffs) spawn(f.p, f.v, f.life, f.size, f.grow, f.col, f.alpha, f.kind, 1.f, 0.f);
   for (auto& b : traffic.booms) g_audio.trigger(SFX_BOOM, b.second);
   updateWraith(simDt);
+  updateMantis(simDt);
   for (float f : traffic.flybys) g_audio.trigger(SFX_FLYBY, f);
   for (auto& m : traffic.radio) toast(m, vec3(1.f, 0.78f, 0.3f));
   // entertainment: O + P held for a second while flying summons the Spectre display pair (again: sends them home).
@@ -1680,7 +1682,7 @@ FrameParams Game::buildFrame() {
     fillPlaneVisual(fp.plane, plane, propAngle, camMode == 1);
     if (camMode == 1 && wreck.empty()) {   // cockpit view: draw this frame's display / gauge atlas
       fp.dispCk = kModels[plane.spec - kAircraft].cockpit;
-      fp.dispMode = plane.spec->special ? 1 : fp.dispCk == 2 ? 3 : 2;   // glass cockpits: panel + the centre display page
+      fp.dispMode = plane.spec->special ? 1 : plane.spec - kAircraft == kMantis ? 0 : fp.dispCk == 2 ? 3 : 2;   // glass cockpits: panel + the centre display page (the Mantis: camera panes only)
     }
     {   // transonic vapour cone: strongest just below Mach 1 in humid low-level air
       float M = plane.mach, humid = clampf(0.35f + 0.45f * wx.cloudCover + (wx.precip ? 0.3f : 0.f), 0.f, 1.f) * smoothstepf(11000.f, 1500.f, plane.pos.y);
@@ -1741,7 +1743,7 @@ FrameParams Game::buildFrame() {
     if (craterR > 0) g_scenery.craters.push_back(vec3(craterX, craterZ, craterR * 1.5f));
     for (const auto& c : wraith.craters) g_scenery.craters.push_back(vec3(c.x, c.z, c.R * 4.f));
     fp.rainLens = camMode == 1 && wx.precip == 1 ? 1.f : 0.f;
-    fp.sealedCockpit = camMode == 1 && plane.spec->special && !crashed;
+    fp.sealedCockpit = camMode == 1 && (plane.spec->special || plane.spec - kAircraft == kMantis) && !crashed;   // (the Mantis: a sealed camera cockpit too)
     fp.trafficN = traffic.fillVisuals(fp.camPos, fp.traffic, kMaxTrafficDrawn, nullptr);
     fp.ufoOn = ufo.on && length(ufo.pos - fp.camPos) < 20000.f;
     if (fp.ufoOn) {
@@ -2668,9 +2670,9 @@ void Game::debugScene(const std::string& name) {
     printf("pad: A skips the career crash to the results: %s\n", wasCrash && screen == SCR_DEBRIEF ? "ok" : "FAIL");
     return;
   }
-  if (name == "research" || name == "research11" || name == "research8") {   // the terminal, settled (selection decrypted)
+  if (name == "research" || name == "research11" || name == "research8" || name == "research10") {   // the terminal, settled (selection decrypted)
     screen = SCR_RESEARCH; realTime = 30; resOpened = 20; resAuthed = true;
-    resCraft = name == "research11" ? kWraith : name == "research8" ? kNightjar : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
+    resCraft = name == "research11" ? kWraith : name == "research8" ? kNightjar : name == "research10" ? kMantis : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
     return;
   }
   if (name.rfind("researchscan", 0) == 0) {   // the biometric sequence at a moment: researchscan<tenths of a second>

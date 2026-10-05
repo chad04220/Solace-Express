@@ -1,6 +1,7 @@
 // Solace Express - camera feeds for the research jets' cockpit displays
 #pragma once
 #include "common.h"
+#include "aircraft.h"
 
 // The XR-9 and XR-11 cockpits are sealed: the pilot sees outside only through display panels, and every panel shows
 // the picture of a real camera mounted on the airframe. A camera is a game object with its own position and
@@ -32,7 +33,7 @@ struct FeedMount {
   vec3 screen; float screenR = 0.f;   // its display: centre and radius
 };
 
-inline int feedRigOf(int special) { return special == 1 ? 1 : special == 2 ? 2 : 0; }   // 1 XR-9, 2 XR-11
+inline int feedRigOf(const AircraftSpec* s) { if (!s) return 0; int sp = s->special; return sp == 1 ? 1 : sp == 2 ? 2 : (s - kAircraft) == kMantis ? 3 : 0; }   // 1 XR-9, 2 XR-11, 3 XR-10
 
 // A flat panel: centre c, normal n (facing the pilot), "up" hint u, half size s; mirrored to the left side when
 // left. The camera looks out through it (along -n, with the panel's own axes) and the display shows it as a window
@@ -108,6 +109,14 @@ inline int feedRig(int rig, float focal, FeedMount out[kMaxFeeds]) {
     out[0].nose = out[1].nose = out[2].nose = out[8].nose = true;   // the front camera and the chin pane
     return 12;
   }
+  if (rig == 3) {   // XR-10: a flat front pane and a pane either side of the seat (mantis_sdf.glsl part 40, material 112)
+    const vec3 Y(0, 1, 0);
+    out[0] = feedPanel(vec3(0.f, -0.24f, -0.773f), vec3(0, 0, 1), Y, vec2(0.41f, 0.177f), false, focal);
+    out[1] = feedPanel(vec3(0.547f, -0.285f, -0.16f), vec3(-1, 0, 0), Y, vec2(0.37f, 0.172f), true, focal);
+    out[2] = feedPanel(vec3(0.547f, -0.285f, -0.16f), vec3(-1, 0, 0), Y, vec2(0.37f, 0.172f), false, focal);
+    out[0].nose = true;
+    return 3;
+  }
   return 0;
 }
 
@@ -115,4 +124,4 @@ inline int feedRig(int rig, float focal, FeedMount out[kMaxFeeds]) {
 // of the nose (cockpit frame) for the forward cameras, measured once per craft from the airframe's own shape
 // (Renderer::measureFeedMounts). Until then no camera is placed.
 struct FeedMounts { bool ok = false; float skin[kMaxFeeds] = {}; vec3 nose; };
-extern FeedMounts g_feedMounts[3];   // by rig
+extern FeedMounts g_feedMounts[4];   // by rig

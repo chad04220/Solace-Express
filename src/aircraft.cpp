@@ -67,6 +67,14 @@ const AircraftSpec kAircraft[] = {
    0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 118000, 0, 60, 70, 420, 4000, 250, true, false, true,
    25000, 90000, 110000, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 0, 0,
    17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1},
+  // XR-10 Mantis: forward-swept twin-jet systems demonstrator (Codex's proposal; special 0: the generic flight model with
+  // its own field, engine code 7 in models.cpp). Its foreplanes are folded into the tail proxy for the physics.
+  {"xr10", "XR-10 Mantis", "Forward-swept systems demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
+   6100.0f, 1800.0f, 0.0f, 0, 30.0f, 13.2f, 2.27f,
+   0.25f, 5.0f, 1.55f, 0.60f, 0.026f, 0.012f, 0.070f, 0.78f,
+   15000.0f, 0.0f, 50.0f, 58.0f, 190.0f, 210.0f, 1350.0f, false, false, true,
+   42000.0f, 92000.0f, 134000.0f, 0.42f, 0.055f, 0.060f, LIC_ATP, 480000, 0,
+   16.0f, 1.05f, -0.62f, 0.65f, 2, 0, vec3(0.065f, 0.085f, 0.105f), vec3(0.95f, 0.43f, 0.055f), 0},
   // hidden stealth aerobatic research model: four tilting thruster pods (power = one pod's dry thrust), T/W ~2.2 dry
   // and ~4.6 boosted, structure good for +90 / -45 g (see Plane::wraithThrust)
   {"xr11", "XR-11 Wraith", "Stealth aerobatic research model", ENG_JET, 4, 0, 0, 0, 0, 10500, 3000, 0, 0, 52.0f, 12.4f, 5.2f,
@@ -75,7 +83,7 @@ const AircraftSpec kAircraft[] = {
    16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.075f, 0.08f, 0.09f), vec3(0.72f, 0.3f, 1.0f), 2},
 };
 // clang-format on
-const int kNumAircraft = sizeof(kAircraft) / sizeof(kAircraft[0]) - 3;  // the research craft (XR-8, XR-9, XR-11) are not part of the career
+const int kNumAircraft = sizeof(kAircraft) / sizeof(kAircraft[0]) - 4;  // the research craft (XR-8, XR-9, XR-10, XR-11) are not part of the career
 
 float Plane::fuelFlowMax() const {
   float rangeS = spec->rangeKm * 1000.f / spec->cruise;

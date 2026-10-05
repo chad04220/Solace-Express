@@ -12,7 +12,7 @@
 inline std::string rtAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace + kTerrainTrace +
          kMaterialCommon + kLightCommon + kClouds + kTerrainMaterial + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
-         kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
+         kFeeds + kPlaneFx + kWraithSDF + kMantisSDF + kWraithMaterial + kMantisMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kPlaneMaterial + kWater + kRtShade + kPlaneLight + kRtMain;
 }
 // The same with main() renamed, for a program that adds its own main
@@ -23,7 +23,7 @@ inline std::string rtAssemblyNoMain(const std::string& defines) {
 }
 // The aircraft distance fields alone (tests/aircraft_visual_test.cpp adds its own main)
 inline std::string sdfAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kWraithSDF + kWraithCockpitCommon + kWraithCockpitSDF;
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kWraithSDF + kMantisSDF + kWraithCockpitCommon + kWraithCockpitSDF;
 }
 
 // ---- the raster renderer's programs (raster_renderer.cpp, terrain_mesh.cpp)
@@ -39,7 +39,7 @@ inline std::string waterFSAssembly(const std::string& defines) {
 inline std::string objectsFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
-         kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
+         kFeeds + kPlaneFx + kWraithSDF + kMantisSDF + kWraithMaterial + kMantisMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kPlaneMaterial + kPlaneLight + kGBuffer + kGBWrite + kPlaneGB + kObjectsFS;
 }
 // the aircraft mesh pass: the objects pass's materials and lighting classes on the baked static airframe
@@ -47,19 +47,19 @@ inline std::string planeMeshVSAssembly(const std::string& defines) { return std:
 inline std::string planeMeshFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
-         kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
+         kFeeds + kPlaneFx + kWraithSDF + kMantisSDF + kWraithMaterial + kMantisMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kPlaneMaterial + kPlaneLight + kGBuffer + kGBWrite + kPlaneGB + kPlaneMeshFS;
 }
 // the shadow proxy: the airframe fields' shadows on what is in the G-buffer, for the lighting pass
 inline std::string shadowProxyFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace +
-         kWraithSDF + kWraithCockpitCommon + kWraithCockpitSDF + kMaterialCommon + kLightCommon + kGBuffer + kShadowProxyFS;
+         kWraithSDF + kMantisSDF + kWraithCockpitCommon + kWraithCockpitSDF + kMaterialCommon + kLightCommon + kGBuffer + kShadowProxyFS;
 }
 // the effects pass: the ray tracer's effects over the lit frame (its cloak needs the airframe's field)
 inline std::string effectsFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
-         kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
+         kFeeds + kPlaneFx + kWraithSDF + kMantisSDF + kWraithMaterial + kMantisMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kGBuffer + kEffectsFS;
 }
 inline std::string lightFSAssembly(const std::string& defines) {
