@@ -18,6 +18,7 @@
 class AtcVoice {
 public:
   static const int kVoices = 3;
+  static const int kHazard = 95;   // priority from which a transmission interrupts any routine one
   bool load(const std::string& dir);   // voice_index.txt; the clips are decoded on first use
   bool ok() const { return !clips.empty(); }
   // a transmission; "" in ids: a pause between sentences. radio: squelch around it; subtitle: show its text (the
@@ -34,6 +35,9 @@ public:
   std::string digit(int voice, int d) const;                   // radio digit (tree, fife, niner)
   std::string alpha(int voice, char c) const;                  // phonetic letter (Alfa .. Zulu)
   std::string text(const std::string& id) const;               // its words, for the subtitles
+  bool has(const std::string& id) const { return clips.count(id) > 0; }   // an indexed clip
+  bool decodes(const std::string& id);                         // its file loads (tests: every indexed clip)
+  std::vector<std::string> indexed() const;                    // every clip id
   void say(const Tx& tx);
   // starts the next queued transmission when the channel is free; returns it the frame it starts (empty ids if none)
   Tx update(float dt);

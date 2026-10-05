@@ -18,6 +18,7 @@ struct GameTest {
     int fails = 0;
 #ifdef SOLACE_ASSETS
     bool voices = g.atc.load(std::string(SOLACE_ASSETS) + "/voice");   // the tower voices (the audio is rendered below, as the audio thread would)
+    if (!voices) { printf("Voice index: FAIL (assets/voice/voice_index.txt did not load; the voice checks below need it)\n"); fails++; }
 #else
     bool voices = false;
 #endif
@@ -165,7 +166,7 @@ struct GameTest {
     };
     if (voices) {   // departure: lined up, traffic on the runway: hold; then cleared once it's gone
       g.startFlight(g_story[0], 0, Career::SRC_LESSON);
-      g.traffic.craft.clear();
+      g.traffic.craft.clear(); g.commsPending.clear();   // (without the airport and weather announcements: the exchange is timed against the traffic)
       for (float tt = 0; tt < 30; tt += dt) { rollout(g.contract.from, 600.f); g.plane.ctl.brake = 1; g.plane.ctl.throttle = 0; g.update(dt); audio(dt); }
       bool held = towerSaid("Hold position") && !towerSaid("cleared for takeoff");
       g.set.traffic = false;   // (and the field empties)
@@ -671,6 +672,60 @@ struct GameTest {
       for (float tt = 0; tt < 20; tt += dt) { g.update(dt); audio(dt); }
       bool silent = true; for (auto& x : g.atc.history) if (x.rfind("TWR ", 0) == 0) silent = false;
       printf("No tower at a farm strip: %s\n", silent ? "ok" : "FAIL"); fails += !silent;
+    }
+    if (voices) {   // every indexed clip decodes; the research cards, failure annunciators, aerobatics and every craft's SPLASH line resolve
+      int bad = 0, n = 0;
+      for (auto& id : g.atc.indexed()) { n++; if (!g.atc.decodes(id)) { if (bad < 5) printf("   clip does not decode: %s\n", id.c_str()); bad++; } }
+      printf("Voice clips decode (%d): %s\n", n, bad ? "FAIL" : "ok"); fails += bad > 0;
+      std::vector<std::string> msgs;
+      for (int i = 0; i < Game::kNumResCards; i++) {
+        const Game::ResCard& C = Game::kResCards[i];
+        std::string nm = kAircraft[C.craft].name; for (char& ch : nm) ch = (char)toupper((unsigned char)ch);
+        msgs.push_back(nm + " // TEST CARD " + C.title); msgs.push_back(nm + " // RESEARCH FLIGHT");
+        for (int k = 0; k < C.n; k++) msgs.push_back(fmt("STEP %d of %d: %s", k + 1, C.n, C.steps[k].label));
+        msgs.push_back(fmt("TEST CARD %s COMPLETE - %s SIGNED OFF", C.id, C.title));
+      }
+      for (int e = 1; e <= 4; e++) { msgs.push_back(fmt("ENGINE %d FAILED", e)); msgs.push_back(fmt("ENGINE %d POWER LOSS", e)); }
+      for (const char* m : {"ENGINE FAILED", "ENGINE POWER LOSS", "ENGINE FAILURE  glide 12:1, best 85 kt", "ENGINE FAILURE  glide 9:1, best 120 kt",
+                            "ALTERNATOR  battery 60%", "ALTERNATOR  battery 7%", "BATTERY FLAT  no autopilot, no GPS", "PITOT BLOCKED  airspeed unreliable",
+                            "GEAR STUCK UP  belly landing: paved, level, slow", "GEAR STUCK DOWN  slower, more fuel", "FLAP ASYMMETRY  hold the wing up",
+                            "ICING 30%  leave the cloud, keep speed", "ICING 100%  leave the cloud, keep speed",
+                            "Autopilot disconnected - Engine failure", "Autopilot off - battery flat", "GPS dark - battery flat", "Gear won't come down - it's stuck up",
+                            "Belly landing - hold it straight", "Belly landing too hard - hit at 812 fpm", "Belly landing too hard - hit at -1250 fpm",
+                            "Autopilot: the wind has shifted - now runway 05 at MDB", "Autopilot: the wind has shifted - now runway 23 at ORC",
+                            "Rain has started", "Snow has set in", "Aerobatics: recovering to level flight", "Aerobatics need to be airborne",
+                            "MACH 1 - SONIC BOOM", "CLOAK ENGAGED", "PLASMA BOMB AWAY", "Pods 90 deg - VTOL hover", "Thrust vector 90 deg - VTOL hover"}) msgs.push_back(m);
+      for (int f = 0; f < Plane::STUNT_COUNT; f++) msgs.push_back(fmt("Aerobatics: %s", Plane::stuntName(f)));
+      int nAll = kNumAircraft + 4;   // (the career fleet and the four research craft)
+      for (int i = 0; i < nAll; i++) msgs.push_back(fmt("SPLASH %d - %s down", i + 1, kAircraft[i].name));
+      bad = 0;
+      for (auto& m : msgs) { AtcVoice::Tx tx; if (!g.atc.resolve(m, "", false, tx)) { printf("   no voice line for '%s'\n", m.c_str()); bad++; } }
+      printf("Voice coverage (%d messages): %s\n", (int)msgs.size(), bad ? "FAIL" : "ok"); fails += bad > 0;
+      // exact pod settings coalesce like the dynamic ones; the compact HUD label speaks the fuller recorded line
+      AtcVoice::Tx tx;
+      bool pods = g.atc.resolve("Pods 90 deg - VTOL hover", "", false, tx) && tx.group == "lever";
+      bool alias = g.atc.resolve("BATTERY FLAT  no autopilot, no GPS", "", false, tx) && tx.ids.size() == 1 && g.atc.text(tx.ids[0]) == "BATTERY FLAT - no autopilot, no GPS";
+      printf("Pod setting grouped %d, HUD alias spoken in full %d: %s\n", pods, alias, pods && alias ? "ok" : "FAIL"); fails += !(pods && alias);
+    }
+    if (voices) {   // the startup announcements survive startFlight's comms reset; a mechanical engine failure gives glide guidance, not restart advice
+      Contract c = g_story[4]; c.wx = Weather();
+      g.startFlight(c, 1, Career::SRC_OWNED);
+      int pend = (int)g.commsPending.size();
+      bool announced = pend >= 2 && g.commsPending[0].text.find(g_world.airports[c.from].code) == 0 && g.commsPending[1].text.rfind("Runway ", 0) == 0;
+      const Airport& a = g_world.airports[c.to];
+      vec3 start = a.threshold(false) - a.dir() * 3000.f; start.y = a.elev + 400.f;
+      g.plane.reset(&kAircraft[1], start, a.heading, 60, 150, true, kAircraft[1].vref * 1.2f);
+      g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 3; g.flightClock = 5.f;
+      g.atc.historyLimit = 0; g.atc.history.clear();
+      for (float t = 0; t < 1.f; t += dt) { g.update(dt); audio(dt); }
+      g.fireFailure(FAIL_ENGINE_TOTAL, 0);
+      for (float t = 0; t < 14.f; t += dt) { g.plane.ctl.pitch = 0.1f; g.update(dt); audio(dt); }
+      bool restart = false, glide = false;
+      for (auto& x : g.atc.history) { if (x.find("ENGINE OFF - press") != std::string::npos) restart = true; if (x.find("ENGINE FAILURE") != std::string::npos || x.find("Engine failure") != std::string::npos) glide = true; }
+      for (auto& x : g.atc.history) printf("   voice: %s\n", x.c_str());
+      bool ok = announced && !restart && glide;
+      printf("Startup announcements pending %d, engine failure spoken %d, restart advice %d: %s\n", announced, glide, restart, ok ? "ok" : "FAIL"); fails += !ok;
+      g.screen = SCR_MENU; g.update(dt);
     }
     if (voices) {   // E6: a tower call made for one flight state is dropped if the state has moved on before it is said
       bool hints0 = g.set.showHints; g.set.showHints = false;   // (no instructor lines competing for the channel)

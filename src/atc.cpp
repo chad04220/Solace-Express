@@ -12,7 +12,7 @@
 static const char* kVoiceName[AtcVoice::kVoices] = {"tower_north", "tower_coast", "tower_valley"};
 
 bool AtcVoice::load(const std::string& d) {
-  dir = d; clips.clear(); lookup.clear();
+  dir = d; clips.clear(); lookup.clear(); exact.clear(); padAlias.clear();   // (a reload with removed ids leaves no stale references)
   std::ifstream f(dir + "/voice_index.txt");
   if (!f) return false;
   std::string ln;
@@ -72,10 +72,18 @@ bool AtcVoice::resolve(const std::string& msg, const std::string& mission, bool 
   auto line = [&](const std::string& id) {
     const Clip& c = clips.at(id);
     out.ids = {id};
-    if (c.speaker == "aster" && (c.kind == "line") && (msg.rfind("Gear ", 0) == 0 || msg.rfind("Flaps ", 0) == 0)) out.group = "lever";
+    if (c.kind == "line" && (msg.rfind("Gear ", 0) == 0 || msg.rfind("Flaps ", 0) == 0 || msg.rfind("Pods ", 0) == 0 || msg.rfind("Thrust vector ", 0) == 0)) out.group = "lever";   // settings: the newest replaces a waiting one
     return finish(c.speaker, c.prio);
   };
-  auto ex = exact.find(msg);
+  // the HUD's compact annunciators are spoken as their fuller recorded lines
+  static const std::unordered_map<std::string, std::string> hudAlias = {
+    {"BATTERY FLAT  no autopilot, no GPS", "BATTERY FLAT - no autopilot, no GPS"},
+    {"PITOT BLOCKED  airspeed unreliable", "PITOT BLOCKED - airspeed unreliable, fly attitude and power"},
+    {"GEAR STUCK UP  belly landing: paved, level, slow", "GEAR STUCK UP - belly landing: paved runway, wings level, slow"},
+    {"GEAR STUCK DOWN  slower, more fuel", "GEAR STUCK DOWN - slower, more fuel"},
+    {"FLAP ASYMMETRY  hold the wing up", "FLAP ASYMMETRY - hold the wing up with aileron"}};
+  auto ha = hudAlias.find(msg);
+  auto ex = exact.find(ha != hudAlias.end() ? ha->second : msg);
   if (ex != exact.end()) {
     const char* pref = mission == "L4" ? "rosa" : (mission == "L1" || mission == "L2" || mission == "L3") ? "instructor" : "aster";
     std::string id = ex->second[0];
@@ -133,6 +141,31 @@ bool AtcVoice::resolve(const std::string& msg, const std::string& mission, bool 
   if (std::regex_match(msg, m, gearRe)) {
     out.ids.push_back(atomO("aster", "gear_collapsed_hit_at")); cardinal("aster", std::stol(m[1]), out.ids); out.ids.push_back(atomO("aster", "feet_per_minute"));
     return finish("aster", 80);
+  }
+  static const std::regex windShiftRe(R"(Autopilot: the wind has shifted - now runway (\d{2}) at ([A-Z]{3}))");
+  if (std::regex_match(msg, m, windShiftRe)) {
+    out.ids.push_back(atomO("aster", "wind_shift_runway")); digits("aster", m[1]); out.ids.push_back(atomO("aster", "at")); out.ids.push_back(atomO("aster", "airport_" + m[2].str()));
+    return finish("aster", 60);
+  }
+  static const std::regex bellyRe(R"(Belly landing too hard - hit at ([+-]?\d+) fpm)");
+  if (std::regex_match(msg, m, bellyRe)) {
+    out.ids.push_back(atomO("aster", "belly_landing_too_hard_hit_at")); cardinal("aster", std::stol(m[1]), out.ids); out.ids.push_back(atomO("aster", "feet_per_minute"));
+    return finish("aster", 60);
+  }
+  static const std::regex glideRe(R"(ENGINE FAILURE(?: - |  )glide (\d+):1, best(?: glide)? (\d+) kt)");
+  if (std::regex_match(msg, m, glideRe)) {
+    out.ids.push_back(atomO("aster", "engine_failure_glide")); cardinal("aster", std::stol(m[1]), out.ids); out.ids.push_back(atomO("aster", "to_one_best_glide")); cardinal("aster", std::stol(m[2]), out.ids); out.ids.push_back(atomO("aster", "knots"));
+    return finish("aster", 95);
+  }
+  static const std::regex altRe(R"(ALTERNATOR(?: - |  )battery (\d+)%)");
+  if (std::regex_match(msg, m, altRe)) {
+    out.ids.push_back(atomO("aster", "alternator_battery")); cardinal("aster", std::stol(m[1]), out.ids); out.ids.push_back(atomO("aster", "percent"));
+    out.group = "alternator"; return finish("aster", 80);
+  }
+  static const std::regex iceRe(R"(ICING (\d+)%(?: - |  )leave the cloud, keep (?:the speed up|speed))");
+  if (std::regex_match(msg, m, iceRe)) {
+    out.ids.push_back(atomO("aster", "icing")); cardinal("aster", std::stol(m[1]), out.ids); out.ids.push_back(atomO("aster", "percent")); out.ids.push_back(atomO("aster", "leave_cloud_keep_speed"));
+    out.group = "icing"; return finish("aster", 80);
   }
   static const std::regex splashRe(R"(SPLASH (\d+) - (.+) down)");
   if (std::regex_match(msg, m, splashRe)) {
@@ -196,6 +229,9 @@ static bool readWav(const std::string& path, std::vector<float>& out, int outRat
   return true;
 }
 
+bool AtcVoice::decodes(const std::string& id) { const std::vector<float>* p = pcm(id); return p && !p->empty(); }
+std::vector<std::string> AtcVoice::indexed() const { std::vector<std::string> v; v.reserve(clips.size()); for (auto& c : clips) v.push_back(c.first); return v; }
+
 const std::vector<float>* AtcVoice::pcm(const std::string& id) {
   auto it = clips.find(id);
   if (it == clips.end()) return nullptr;
@@ -252,7 +288,8 @@ bool AtcVoice::busy() const { return g_audio.voiceBusy(); }
 void AtcVoice::say(const Tx& tx) {
   if (!ok()) return;
   if (valid && !valid(tx)) { dropped++; return; }   // already overtaken by events: never queued
-  if (busy() && tx.prio >= playingPrio + 30) {   // urgent: cut in (a go-around over a routine call)
+  // urgent: cut in (a go-around over a routine call; a hazard, 95 and up, over anything routine such as a landing clearance)
+  if (busy() && (tx.prio >= playingPrio + 30 || (tx.prio >= kHazard && playingPrio < kHazard))) {
     g_audio.voiceStop();
     queue.clear();
     start(tx);

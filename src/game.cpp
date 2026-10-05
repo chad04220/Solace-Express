@@ -609,7 +609,7 @@ void Game::fireFailure(int kind, int engine) {
   if (kind == FAIL_GEAR_STUCK) m += plane.fail.gearStuck == 1 ? " UP" : " DOWN";
   if (kind == FAIL_PITOT) m += " - airspeed unreliable";
   if (kind == FAIL_ALTERNATOR) m += " - on battery, land soon";
-  toast(m, vec3(1, 0.45f, 0.35f), true);
+  toast(m, vec3(1, 0.45f, 0.35f), false);   // (shown; the annunciator speaks the failure with its guidance, updateComms)
   g_audio.trigger(SFX_BEEP, 1.f);
   if (plane.apOn && (kind == FAIL_ENGINE_TOTAL || kind == FAIL_ENGINE_PARTIAL || kind == FAIL_PITOT)) {
     plane.apDisengage(); g_audio.trigger(SFX_AP_DISC); toast("Autopilot disconnected - " + std::string(failureName(kind)), vec3(1, 0.7f, 0.3f));
@@ -639,6 +639,24 @@ void Game::updateFailures(float dt) {
 }
 
 void Game::shutdown() { saveSettings(); radio.shutdown(); }
+
+std::vector<Game::Annunciator> Game::hudAnnunciators() const {
+  const Failures& F = plane.fail;
+  const AircraftSpec& spc = *plane.spec;
+  std::vector<Annunciator> ann;
+  for (int e = 0; e < spc.engines && e < 4; e++) {
+    std::string slot = "engine" + std::to_string(e + 1);
+    if (F.engineHealth[e] <= 0.f)
+      ann.push_back({spc.engines > 1 ? fmt("ENGINE %d FAILED", e + 1) : plane.glideOnly() ? fmt("ENGINE FAILURE  glide %.0f:1, best %.0f kt", plane.glideRatio(), Plane::perf(&spc).vy * MS_TO_KT * 1.1f) : std::string("ENGINE FAILED"), slot, "failed", true});
+    else if (F.engineHealth[e] < 0.999f) ann.push_back({spc.engines > 1 ? fmt("ENGINE %d POWER LOSS", e + 1) : std::string("ENGINE POWER LOSS"), slot, "loss", false});
+  }
+  if (F.alternator) ann.push_back({F.avionicsDark() ? std::string("BATTERY FLAT  no autopilot, no GPS") : fmt("ALTERNATOR  battery %.0f%%", F.battery * 100.f), "alternator", F.avionicsDark() ? "flat" : "battery", F.avionicsDark()});
+  if (F.pitot) ann.push_back({"PITOT BLOCKED  airspeed unreliable", "pitot", "blocked", false});
+  if (F.gearStuck) ann.push_back({F.gearStuck == 1 ? "GEAR STUCK UP  belly landing: paved, level, slow" : "GEAR STUCK DOWN  slower, more fuel", "gear", F.gearStuck == 1 ? "up" : "down", F.gearStuck == 1});
+  if (F.flapAsym) ann.push_back({"FLAP ASYMMETRY  hold the wing up", "flaps", "asym", false});
+  if (F.ice > 0.05f) ann.push_back({fmt("ICING %.0f%%  leave the cloud, keep speed", F.ice * 100.f), "ice", F.ice > 0.5f ? "severe" : "icing", F.ice > 0.5f});
+  return ann;
+}
 
 void Game::toast(const std::string& s, vec3 col, bool voiced) {
   toasts.push_back({s, 0.f, col});
@@ -710,10 +728,11 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   // the player sees a loading screen while the scenery around the start is generated (tests fly straight away)
   screen = headless ? SCR_FLIGHT : SCR_LOADING;
   loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadMap = false; dbgCam = dbgFollow = false;
+  atc.cancel(); atcF = AtcFlight(); hintsVoiced.clear(); commsPending.clear();   // (the last flight's calls go before this one's announcements)
+  atc.valid = [this](const AtcVoice::Tx& t) { return t.key < 0 || t.key == atcKey(); };
+  failVoiced.clear();
   toast(fmt("%s - %s", a.code, a.name), vec3(0.7f, 0.9f, 1.0f));
   toast(fmt("Runway %02d, %s", a.rwyNumber(reverse), wx.describe().c_str()), vec3(0.8f, 0.8f, 0.8f));
-  atc.cancel(); atcF = AtcFlight(); hintsVoiced.clear(); commsPending.clear();
-  atc.valid = [this](const AtcVoice::Tx& t) { return t.key < 0 || t.key == atcKey(); };
   atcF.dep = c.from; atcF.arr = c.to; atcF.depRev = reverse;
   if (c.startAirborne) atcF.phase = 3;
 }
@@ -2806,7 +2825,7 @@ void Game::updateComms(float dt) {
     bool w[4] = {plane.stallWarn > 0.8f && !plane.onGround && plane.ias > 10.f,
                  !plane.onGround && plane.agl() < 120 && plane.vel.y < -7.f,
                  spc.retract && plane.gear < 0.99f && !plane.onGround && plane.agl() < 200 && length(plane.pos - d.pos()) < 4000.f && plane.ias < spc.vref * 1.5f,
-                 !plane.engineRunning && engineAutoStarted && plane.starterTime <= 0};
+                 !plane.engineRunning && engineAutoStarted && plane.starterTime <= 0 && !plane.glideOnly()};   // (a failed engine has no restart to advise)
     const char* say[4] = {"STALL", "PULL UP", "GEAR!", nullptr};
     for (int i = 0; i < 4; i++) {
       if (w[i] && (!warnWas[i] || realTime - warnLastT[i] > 8.f)) {
@@ -2816,6 +2835,14 @@ void Game::updateComms(float dt) {
         warnLastT[i] = realTime;
       }
       warnWas[i] = w[i];
+    }
+    // the failure annunciators (hudAnnunciators), spoken when they come on or change severity: each wording once
+    for (auto& a : hudAnnunciators()) {
+      auto it = failVoiced.find(a.slot);
+      if (it != failVoiced.end() && it->second == a.key) continue;
+      failVoiced[a.slot] = a.key;
+      AtcVoice::Tx tx;
+      if (atc.resolve(a.text, contract.id, in.pad, tx)) atc.say(tx);
     }
   }
   for (auto& m : commsPending) { AtcVoice::Tx tx; if (atc.resolve(m.text, m.mission, in.pad, tx)) atc.say(tx); }

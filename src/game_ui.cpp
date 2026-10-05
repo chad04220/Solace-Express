@@ -1838,24 +1838,15 @@ void Game::drawHud(const FrameParams& fp) {
     }
   }
   {   // annunciators (C7), bottom of the right message column, steady, each with its own lamp
-    const Failures& F = plane.fail;
-    std::vector<std::pair<std::string, vec3>> ann;
-    for (int e = 0; e < spc.engines && e < 4; e++) {
-      if (F.engineHealth[e] <= 0.f) ann.push_back({spc.engines > 1 ? fmt("ENGINE %d FAILED", e + 1) : plane.glideOnly() ? fmt("ENGINE FAILURE  glide %.0f:1, best %.0f kt", plane.glideRatio(), Plane::perf(&spc).vy * MS_TO_KT * 1.1f) : "ENGINE FAILED", C_BAD});
-      else if (F.engineHealth[e] < 0.999f) ann.push_back({spc.engines > 1 ? fmt("ENGINE %d POWER LOSS", e + 1) : "ENGINE POWER LOSS", C_WARN});
-    }
-    if (F.alternator) ann.push_back({F.avionicsDark() ? std::string("BATTERY FLAT  no autopilot, no GPS") : fmt("ALTERNATOR  battery %.0f%%", F.battery * 100.f), F.avionicsDark() ? C_BAD : C_WARN});
-    if (F.pitot) ann.push_back({"PITOT BLOCKED  airspeed unreliable", C_WARN});
-    if (F.gearStuck) ann.push_back({F.gearStuck == 1 ? "GEAR STUCK UP  belly landing: paved, level, slow" : "GEAR STUCK DOWN  slower, more fuel", F.gearStuck == 1 ? C_BAD : C_WARN});
-    if (F.flapAsym) ann.push_back({"FLAP ASYMMETRY  hold the wing up", C_WARN});
-    if (F.ice > 0.05f) ann.push_back({fmt("ICING %.0f%%  leave the cloud, keep speed", F.ice * 100.f), F.ice > 0.5f ? C_BAD : C_WARN});
+    std::vector<Annunciator> ann = hudAnnunciators();
     float rw = std::min(kHudMsgW * s, W * 0.5f - rail - 160 * s), rx = W - (cockpit ? 16 * s : rail + 28 * s) - rw;
     float ay = msgTop;
     for (auto& a : ann) {
       g_ren.rectGrad(rx, ay, rw, 22 * s, vec3(0.05f, 0.01f, 0.0f), vec3(0.02f, 0.0f, 0.0f), 0.65f, 3 * s);
-      g_ren.rect(rx, ay, 3 * s, 22 * s, a.second, 0.95f);
-      g_ren.rect(rx + rw - 10 * s, ay + 8 * s, 5 * s, 5 * s, a.second, 0.6f + 0.4f * (fmodf(realTime, 1.f) < 0.5f ? 1.f : 0.f), 2.5f * s);
-      g_ren.text(rx + 10 * s, ay + 5 * s, 11 * s, ellipsize(a.first, rw - 28 * s, 11 * s), a.second, 0.95f, 0, false);
+      vec3 ac = a.bad ? C_BAD : C_WARN;
+      g_ren.rect(rx, ay, 3 * s, 22 * s, ac, 0.95f);
+      g_ren.rect(rx + rw - 10 * s, ay + 8 * s, 5 * s, 5 * s, ac, 0.6f + 0.4f * (fmodf(realTime, 1.f) < 0.5f ? 1.f : 0.f), 2.5f * s);
+      g_ren.text(rx + 10 * s, ay + 5 * s, 11 * s, ellipsize(a.text, rw - 28 * s, 11 * s), ac, 0.95f, 0, false);
       ay += 26 * s;
     }
     hudMsgNext = ay + (ann.empty() ? 0.f : 6 * s);   // (the toasts stack under the annunciators: drawToasts)

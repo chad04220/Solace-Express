@@ -1363,3 +1363,184 @@ key.5ca24005	aster/key.5ca24005.wav	key	aster	40	fragment
 @craft.Starling 500 Jet	starling
 @craft.XR-30 Specter	xr9
 @craft.XR-40 Wraith	xr11
+fragment.nyx.craft_swift	nyx/fragment.nyx.craft_swift.wav	Swift S6	nyx	40	fragment		
+fragment.nyx.craft_osprey	nyx/fragment.nyx.craft_osprey.wav	Osprey C6	nyx	40	fragment		
+fragment.nyx.craft_xr10_nightjar	nyx/fragment.nyx.craft_xr10_nightjar.wav	XR-10 Nightjar	nyx	40	fragment		
+fragment.nyx.craft_xr20_mantis	nyx/fragment.nyx.craft_xr20_mantis.wav	XR-20 Mantis	nyx	40	fragment		
+research.nyx.f421606213a1	nyx/research.nyx.f421606213a1.wav	XR-10 NIGHTJAR // RESEARCH FLIGHT	nyx	40	line		
+research.nyx.98c32f6d770d	nyx/research.nyx.98c32f6d770d.wav	XR-20 MANTIS // RESEARCH FLIGHT	nyx	40	line		
+research.nyx.5e5473bb44be	nyx/research.nyx.5e5473bb44be.wav	XR-10 NIGHTJAR // TEST CARD TRANSONIC DASH	nyx	40	line		
+research.nyx.f1786f8430a4	nyx/research.nyx.f1786f8430a4.wav	TEST CARD XR10-1 COMPLETE - TRANSONIC DASH SIGNED OFF	nyx	40	line		
+research.nyx.a3abc88eb60a	nyx/research.nyx.a3abc88eb60a.wav	STEP 1 of 3: Hold Mach 0.95	nyx	40	line		
+research.nyx.01e1d7754e99	nyx/research.nyx.01e1d7754e99.wav	STEP 2 of 3: Climb through 11,000 m	nyx	40	line		
+research.nyx.9c1cec5d8454	nyx/research.nyx.9c1cec5d8454.wav	STEP 3 of 3: Land back at the range	nyx	40	line		
+research.nyx.5a131b659e77	nyx/research.nyx.5a131b659e77.wav	XR-10 NIGHTJAR // TEST CARD AGILITY	nyx	40	line		
+research.nyx.21052a006afe	nyx/research.nyx.21052a006afe.wav	TEST CARD XR10-2 COMPLETE - AGILITY SIGNED OFF	nyx	40	line		
+research.nyx.3bc5e702dff6	nyx/research.nyx.3bc5e702dff6.wav	STEP 1 of 4: Roll at 170 deg/s	nyx	40	line		
+research.nyx.f76b2c38b4a8	nyx/research.nyx.f76b2c38b4a8.wav	STEP 2 of 4: Pull 8 g	nyx	40	line		
+research.nyx.de913c35b6b8	nyx/research.nyx.de913c35b6b8.wav	STEP 3 of 4: Push to -3 g	nyx	40	line		
+research.nyx.63bbeba4dc59	nyx/research.nyx.63bbeba4dc59.wav	STEP 4 of 4: Land back at the range	nyx	40	line		
+research.nyx.dc66658330de	nyx/research.nyx.dc66658330de.wav	XR-10 NIGHTJAR // TEST CARD SLOW FLIGHT	nyx	40	line		
+research.nyx.be6c99107e5f	nyx/research.nyx.be6c99107e5f.wav	TEST CARD XR10-3 COMPLETE - SLOW FLIGHT SIGNED OFF	nyx	40	line		
+research.nyx.d94b9be0ae11	nyx/research.nyx.d94b9be0ae11.wav	STEP 1 of 3: Hold 115 kt (above 150 m)	nyx	40	line		
+research.nyx.747b89cc1ee7	nyx/research.nyx.747b89cc1ee7.wav	STEP 2 of 3: Stall warning above 600 m	nyx	40	line		
+research.nyx.fb7f941d47d3	nyx/research.nyx.fb7f941d47d3.wav	XR-20 MANTIS // TEST CARD SUPERSONIC	nyx	40	line		
+research.nyx.491824bb301c	nyx/research.nyx.491824bb301c.wav	TEST CARD XR20-1 COMPLETE - SUPERSONIC SIGNED OFF	nyx	40	line		
+research.nyx.5713ae00d94f	nyx/research.nyx.5713ae00d94f.wav	STEP 1 of 3: Hold Mach 1.8	nyx	40	line		
+research.nyx.729feea58158	nyx/research.nyx.729feea58158.wav	STEP 2 of 3: Climb through 15,000 m	nyx	40	line		
+research.nyx.a38d3d667d2a	nyx/research.nyx.a38d3d667d2a.wav	XR-20 MANTIS // TEST CARD CANARD AGILITY	nyx	40	line		
+research.nyx.4a586ab0418c	nyx/research.nyx.4a586ab0418c.wav	TEST CARD XR20-2 COMPLETE - CANARD AGILITY SIGNED OFF	nyx	40	line		
+research.nyx.a094be7d0677	nyx/research.nyx.a094be7d0677.wav	STEP 1 of 4: Roll at 250 deg/s	nyx	40	line		
+research.nyx.bd42af7457ce	nyx/research.nyx.bd42af7457ce.wav	STEP 2 of 4: Pull 12 g	nyx	40	line		
+research.nyx.64f491fc75d8	nyx/research.nyx.64f491fc75d8.wav	STEP 3 of 4: Push to -5 g	nyx	40	line		
+research.nyx.2e802011c3b7	nyx/research.nyx.2e802011c3b7.wav	XR-20 MANTIS // TEST CARD HIGH ALPHA	nyx	40	line		
+research.nyx.67809a8a8bf6	nyx/research.nyx.67809a8a8bf6.wav	TEST CARD XR20-3 COMPLETE - HIGH ALPHA SIGNED OFF	nyx	40	line		
+research.nyx.1a5cbc011bb1	nyx/research.nyx.1a5cbc011bb1.wav	STEP 1 of 4: Stall warning above 600 m	nyx	40	line		
+research.nyx.a8aa73183f07	nyx/research.nyx.a8aa73183f07.wav	STEP 2 of 4: Hold 135 kt (above 150 m)	nyx	40	line		
+research.nyx.3510ef84951a	nyx/research.nyx.3510ef84951a.wav	STEP 3 of 4: Climb at 120 m/s	nyx	40	line		
+research.nyx.481c9ddbb6fd	nyx/research.nyx.481c9ddbb6fd.wav	XR-30 SPECTER // TEST CARD MACH 2.7	nyx	40	line		
+research.nyx.726c288d8543	nyx/research.nyx.726c288d8543.wav	TEST CARD XR30-1 COMPLETE - MACH 2.7 SIGNED OFF	nyx	40	line		
+research.nyx.e5abb4eb9d76	nyx/research.nyx.e5abb4eb9d76.wav	STEP 1 of 3: Hold Mach 2.7	nyx	40	line		
+research.nyx.5b94f8258218	nyx/research.nyx.5b94f8258218.wav	STEP 2 of 3: Climb through 20,000 m	nyx	40	line		
+research.nyx.99ced8b9b035	nyx/research.nyx.99ced8b9b035.wav	XR-30 SPECTER // TEST CARD VECTORED PULL	nyx	40	line		
+research.nyx.75ec8efb62dc	nyx/research.nyx.75ec8efb62dc.wav	TEST CARD XR30-2 COMPLETE - VECTORED PULL SIGNED OFF	nyx	40	line		
+research.nyx.8fdcc5617a0d	nyx/research.nyx.8fdcc5617a0d.wav	STEP 1 of 4: Pull 35 g	nyx	40	line		
+research.nyx.41484182eed6	nyx/research.nyx.41484182eed6.wav	STEP 2 of 4: Push to -15 g	nyx	40	line		
+research.nyx.be06edbd0355	nyx/research.nyx.be06edbd0355.wav	STEP 3 of 4: Roll at 300 deg/s	nyx	40	line		
+research.nyx.81d213cd0801	nyx/research.nyx.81d213cd0801.wav	XR-30 SPECTER // TEST CARD ZOOM CLIMB	nyx	40	line		
+research.nyx.1fbbf3521476	nyx/research.nyx.1fbbf3521476.wav	TEST CARD XR30-3 COMPLETE - ZOOM CLIMB SIGNED OFF	nyx	40	line		
+research.nyx.58dbbcf548c3	nyx/research.nyx.58dbbcf548c3.wav	STEP 1 of 3: Climb at 300 m/s	nyx	40	line		
+research.nyx.2c27d9905fe8	nyx/research.nyx.2c27d9905fe8.wav	STEP 2 of 3: Climb through 28,000 m	nyx	40	line		
+research.nyx.c68aeb72ef56	nyx/research.nyx.c68aeb72ef56.wav	XR-40 WRAITH // TEST CARD MACH 4	nyx	40	line		
+research.nyx.28803147b1fd	nyx/research.nyx.28803147b1fd.wav	TEST CARD XR40-1 COMPLETE - MACH 4 SIGNED OFF	nyx	40	line		
+research.nyx.4de47b13be66	nyx/research.nyx.4de47b13be66.wav	STEP 1 of 3: Hold Mach 4.0	nyx	40	line		
+research.nyx.16bd245c55a0	nyx/research.nyx.16bd245c55a0.wav	STEP 2 of 3: Climb through 25,000 m	nyx	40	line		
+research.nyx.81274a29ddb1	nyx/research.nyx.81274a29ddb1.wav	XR-40 WRAITH // TEST CARD VERTICAL FLIGHT	nyx	40	line		
+research.nyx.77a205d4e301	nyx/research.nyx.77a205d4e301.wav	TEST CARD XR40-2 COMPLETE - VERTICAL FLIGHT SIGNED OFF	nyx	40	line		
+research.nyx.f7c3995854aa	nyx/research.nyx.f7c3995854aa.wav	STEP 1 of 2: Hover for 10 s	nyx	40	line		
+research.nyx.fcdc57575f14	nyx/research.nyx.fcdc57575f14.wav	STEP 2 of 2: Land vertically	nyx	40	line		
+research.nyx.bfae07063723	nyx/research.nyx.bfae07063723.wav	XR-40 WRAITH // TEST CARD SYSTEMS	nyx	40	line		
+research.nyx.d06b64a1661a	nyx/research.nyx.d06b64a1661a.wav	TEST CARD XR40-3 COMPLETE - SYSTEMS SIGNED OFF	nyx	40	line		
+research.nyx.78baa9cec85c	nyx/research.nyx.78baa9cec85c.wav	STEP 1 of 4: Cloak for 10 s	nyx	40	line		
+research.nyx.e8f1b0d31993	nyx/research.nyx.e8f1b0d31993.wav	STEP 2 of 4: Fire 6 laser bolts	nyx	40	line		
+research.nyx.3c784eb876aa	nyx/research.nyx.3c784eb876aa.wav	STEP 3 of 4: Release a plasma bomb	nyx	40	line		
+research.nyx.b7a7ec6dbb6c	nyx/research.nyx.b7a7ec6dbb6c.wav	XR-40 WRAITH // TEST CARD EXTREMES	nyx	40	line		
+research.nyx.58211501e3ad	nyx/research.nyx.58211501e3ad.wav	TEST CARD XR40-4 COMPLETE - EXTREMES SIGNED OFF	nyx	40	line		
+research.nyx.ad1521dba439	nyx/research.nyx.ad1521dba439.wav	STEP 1 of 4: Pull 80 g	nyx	40	line		
+research.nyx.4abcac3d963e	nyx/research.nyx.4abcac3d963e.wav	STEP 2 of 4: Push to -40 g	nyx	40	line		
+research.nyx.f0d16f91fcd8	nyx/research.nyx.f0d16f91fcd8.wav	STEP 3 of 4: Roll at 380 deg/s	nyx	40	line		
+toast.aster.9f248aded886	aster/toast.aster.9f248aded886.wav	Below minimums and not lined up - GO AROUND	aster	95	line		
+toast.aster.22693bd3b444	aster/toast.aster.22693bd3b444.wav	Runway in sight	aster	40	line		
+toast.aster.d0792f1878ef	aster/toast.aster.d0792f1878ef.wav	Snow has set in	aster	35	line		
+toast.aster.51c56bd7dfff	aster/toast.aster.51c56bd7dfff.wav	Rain has started	aster	35	line		
+toast.aster.8d7a52c36591	aster/toast.aster.8d7a52c36591.wav	The rain has stopped	aster	35	line		
+toast.aster.1cb929cfd433	aster/toast.aster.1cb929cfd433.wav	Autopilot off - battery flat	aster	80	line		
+toast.aster.9c8119500459	aster/toast.aster.9c8119500459.wav	GPS dark - battery flat	aster	80	line		
+toast.aster.81d432591023	aster/toast.aster.81d432591023.wav	Autopilot unavailable - battery flat	aster	80	line		
+toast.aster.94dfc901cb70	aster/toast.aster.94dfc901cb70.wav	Gear won't come down - it's stuck up	aster	80	line		
+toast.aster.6a835dc64ddb	aster/toast.aster.6a835dc64ddb.wav	Gear won't retract - it's stuck down	aster	80	line		
+toast.aster.3cfb4ac21bc6	aster/toast.aster.3cfb4ac21bc6.wav	Aerobatics need to be airborne	aster	40	line		
+toast.aster.c4bceb3a55f8	aster/toast.aster.c4bceb3a55f8.wav	Aerobatics: recovering to level flight	aster	40	line		
+toast.aster.1a1c67b3f132	aster/toast.aster.1a1c67b3f132.wav	Belly landing - hold it straight	aster	80	line		
+toast.aster.ee41d1bac38a	aster/toast.aster.ee41d1bac38a.wav	Engine running.	aster	35	line		
+toast.aster.73f67591df9e	aster/toast.aster.73f67591df9e.wav	LEAVING THE CHART - TURN BACK NOW	aster	95	line		
+toast.aster.7e3e9dbe345f	aster/toast.aster.7e3e9dbe345f.wav	Approaching the edge of the chart - turn back	aster	95	line		
+failure.aster.4f9c6cef7c67	aster/failure.aster.4f9c6cef7c67.wav	Engine power loss	aster	95	line		
+failure.aster.9509e7259249	aster/failure.aster.9509e7259249.wav	Engine power loss - engine 1	aster	95	line		
+failure.aster.40a93da4a377	aster/failure.aster.40a93da4a377.wav	Engine power loss - engine 2	aster	95	line		
+failure.aster.5bacf5611344	aster/failure.aster.5bacf5611344.wav	Engine power loss - engine 3	aster	95	line		
+failure.aster.012201f3358d	aster/failure.aster.012201f3358d.wav	Engine power loss - engine 4	aster	95	line		
+failure.aster.f517b50d142e	aster/failure.aster.f517b50d142e.wav	Engine failure	aster	95	line		
+failure.aster.58540f9b4d22	aster/failure.aster.58540f9b4d22.wav	Engine failure - engine 1	aster	95	line		
+failure.aster.808aedf3e4ba	aster/failure.aster.808aedf3e4ba.wav	Engine failure - engine 2	aster	95	line		
+failure.aster.0d304437a5f2	aster/failure.aster.0d304437a5f2.wav	Engine failure - engine 3	aster	95	line		
+failure.aster.4c5799d48669	aster/failure.aster.4c5799d48669.wav	Engine failure - engine 4	aster	95	line		
+failure.aster.1c0060c3bacc	aster/failure.aster.1c0060c3bacc.wav	Alternator failure - on battery, land soon	aster	80	line		
+failure.aster.e94d8d2980a8	aster/failure.aster.e94d8d2980a8.wav	Pitot blocked - airspeed unreliable	aster	80	line		
+failure.aster.9f01cde30fe6	aster/failure.aster.9f01cde30fe6.wav	Landing gear stuck UP	aster	80	line		
+failure.aster.ad662cacaaa4	aster/failure.aster.ad662cacaaa4.wav	Landing gear stuck DOWN	aster	80	line		
+failure.aster.14e5e5d90402	aster/failure.aster.14e5e5d90402.wav	Flap asymmetry	aster	80	line		
+failure.aster.d9e75e522344	aster/failure.aster.d9e75e522344.wav	Airframe icing	aster	80	line		
+failure.aster.54e0106d1945	aster/failure.aster.54e0106d1945.wav	Autopilot disconnected - Engine power loss	aster	95	line		
+failure.aster.5d5ff56fac6c	aster/failure.aster.5d5ff56fac6c.wav	Autopilot disconnected - Engine failure	aster	95	line		
+failure.aster.a91358be5159	aster/failure.aster.a91358be5159.wav	Autopilot disconnected - Pitot blocked	aster	80	line		
+aerobatics.aster.0e83b3f7bfc6	aster/aerobatics.aster.0e83b3f7bfc6.wav	Aerobatics: LOOP	aster	35	line		
+aerobatics.aster.6dfac652c87b	aster/aerobatics.aster.6dfac652c87b.wav	Aerobatics: AILERON ROLL	aster	35	line		
+aerobatics.aster.c59f89882bb4	aster/aerobatics.aster.c59f89882bb4.wav	Aerobatics: BARREL ROLL	aster	35	line		
+aerobatics.aster.32b55b855263	aster/aerobatics.aster.32b55b855263.wav	Aerobatics: IMMELMANN	aster	35	line		
+aerobatics.aster.34bec6123b8a	aster/aerobatics.aster.34bec6123b8a.wav	Aerobatics: SPLIT-S	aster	35	line		
+aerobatics.aster.f3a0d6d73213	aster/aerobatics.aster.f3a0d6d73213.wav	Aerobatics: CUBAN EIGHT	aster	35	line		
+aerobatics.aster.75810d747135	aster/aerobatics.aster.75810d747135.wav	Aerobatics: WINGOVER	aster	35	line		
+hud_failure.aster.108d3a53cd2d	aster/hud_failure.aster.108d3a53cd2d.wav	ENGINE FAILED	aster	95	line		
+hud_failure.aster.d8003eabe221	aster/hud_failure.aster.d8003eabe221.wav	BATTERY FLAT - no autopilot, no GPS	aster	80	line		
+hud_failure.aster.b6ea2f113f66	aster/hud_failure.aster.b6ea2f113f66.wav	PITOT BLOCKED - airspeed unreliable, fly attitude and power	aster	80	line		
+hud_failure.aster.9b71bca05406	aster/hud_failure.aster.9b71bca05406.wav	GEAR STUCK UP - belly landing: paved runway, wings level, slow	aster	80	line		
+hud_failure.aster.f90ec8fc37e8	aster/hud_failure.aster.f90ec8fc37e8.wav	GEAR STUCK DOWN - slower, more fuel	aster	80	line		
+hud_failure.aster.ca9bef142256	aster/hud_failure.aster.ca9bef142256.wav	FLAP ASYMMETRY - hold the wing up with aileron	aster	80	line		
+hud_failure.aster.4cd03b4b82fe	aster/hud_failure.aster.4cd03b4b82fe.wav	ENGINE 1 FAILED	aster	95	line		
+hud_failure.aster.86e948d1071f	aster/hud_failure.aster.86e948d1071f.wav	ENGINE 1 POWER LOSS	aster	95	line		
+hud_failure.aster.acf2213873e2	aster/hud_failure.aster.acf2213873e2.wav	ENGINE 2 FAILED	aster	95	line		
+hud_failure.aster.24ca78456eb5	aster/hud_failure.aster.24ca78456eb5.wav	ENGINE 2 POWER LOSS	aster	95	line		
+hud_failure.aster.408106242f5b	aster/hud_failure.aster.408106242f5b.wav	ENGINE 3 FAILED	aster	95	line		
+hud_failure.aster.32a45ec95624	aster/hud_failure.aster.32a45ec95624.wav	ENGINE 3 POWER LOSS	aster	95	line		
+hud_failure.aster.7d54a9db0913	aster/hud_failure.aster.7d54a9db0913.wav	ENGINE 4 FAILED	aster	95	line		
+hud_failure.aster.2d0b8a56c62e	aster/hud_failure.aster.2d0b8a56c62e.wav	ENGINE 4 POWER LOSS	aster	95	line		
+fragment.aster.wind_shift_runway	aster/fragment.aster.wind_shift_runway.wav	Autopilot. The wind has shifted. Now runway	aster	40	fragment		
+fragment.aster.at	aster/fragment.aster.at.wav	at	aster	40	fragment		
+fragment.aster.belly_landing_too_hard_hit_at	aster/fragment.aster.belly_landing_too_hard_hit_at.wav	Belly landing too hard. Hit at	aster	40	fragment		
+fragment.aster.engine_failure_glide	aster/fragment.aster.engine_failure_glide.wav	Engine failure. Glide ratio	aster	40	fragment		
+fragment.aster.to_one_best_glide	aster/fragment.aster.to_one_best_glide.wav	to one. Best glide	aster	40	fragment		
+fragment.aster.knots	aster/fragment.aster.knots.wav	knots	aster	40	fragment		
+fragment.aster.alternator_battery	aster/fragment.aster.alternator_battery.wav	Alternator failure. Battery	aster	40	fragment		
+fragment.aster.icing	aster/fragment.aster.icing.wav	Icing	aster	40	fragment		
+fragment.aster.leave_cloud_keep_speed	aster/fragment.aster.leave_cloud_keep_speed.wav	Leave the cloud. Keep the speed up	aster	40	fragment		
+fragment.aster.airport_MDB	aster/fragment.aster.airport_MDB.wav	Meadowbrook Field	aster	40	fragment		
+fragment.aster.airport_HFS	aster/fragment.aster.airport_HFS.wav	Harlan Farm Strip	aster	40	fragment		
+fragment.aster.airport_PVI	aster/fragment.aster.airport_PVI.wav	Port Verde International	aster	40	fragment		
+fragment.aster.airport_CAP	aster/fragment.aster.airport_CAP.wav	Solace Capital	aster	40	fragment		
+fragment.aster.airport_CDR	aster/fragment.aster.airport_CDR.wav	Cedar Ridge	aster	40	fragment		
+fragment.aster.airport_SMP	aster/fragment.aster.airport_SMP.wav	Summit Pass	aster	40	fragment		
+fragment.aster.airport_NPT	aster/fragment.aster.airport_NPT.wav	Northpoint	aster	40	fragment		
+fragment.aster.airport_LHK	aster/fragment.aster.airport_LHK.wav	Lighthouse Key	aster	40	fragment		
+fragment.aster.airport_GLR	aster/fragment.aster.airport_GLR.wav	Gull Rock	aster	40	fragment		
+fragment.aster.airport_KLO	aster/fragment.aster.airport_KLO.wav	Kaleo Regional	aster	40	fragment		
+fragment.aster.airport_PMB	aster/fragment.aster.airport_PMB.wav	Palm Bay	aster	40	fragment		
+fragment.aster.airport_VCF	aster/fragment.aster.airport_VCF.wav	Volcano Crater Field	aster	40	fragment		
+fragment.aster.airport_FJH	aster/fragment.aster.airport_FJH.wav	Fjordhaven	aster	40	fragment		
+fragment.aster.airport_GLS	aster/fragment.aster.airport_GLS.wav	Glacier Station	aster	40	fragment		
+fragment.aster.airport_FAR	aster/fragment.aster.airport_FAR.wav	Far Isle	aster	40	fragment		
+fragment.aster.airport_ORC	aster/fragment.aster.airport_ORC.wav	Orchard Valley	aster	40	fragment		
+hud_failure.aster.627723aa234e	aster/hud_failure.aster.627723aa234e.wav	ENGINE POWER LOSS	aster	95	line		
+@atom.nyx.craft_swift_s6	fragment.nyx.craft_swift
+@craft.Swift S6	swift_s6
+@atom.nyx.craft_osprey_c6	fragment.nyx.craft_osprey
+@craft.Osprey C6	osprey_c6
+@atom.nyx.craft_xr10_nightjar	fragment.nyx.craft_xr10_nightjar
+@craft.XR-10 Nightjar	xr10_nightjar
+@atom.nyx.craft_xr20_mantis	fragment.nyx.craft_xr20_mantis
+@craft.XR-20 Mantis	xr20_mantis
+@atom.aster.wind_shift_runway	fragment.aster.wind_shift_runway
+@atom.aster.at	fragment.aster.at
+@atom.aster.belly_landing_too_hard_hit_at	fragment.aster.belly_landing_too_hard_hit_at
+@atom.aster.engine_failure_glide	fragment.aster.engine_failure_glide
+@atom.aster.to_one_best_glide	fragment.aster.to_one_best_glide
+@atom.aster.knots	fragment.aster.knots
+@atom.aster.alternator_battery	fragment.aster.alternator_battery
+@atom.aster.icing	fragment.aster.icing
+@atom.aster.leave_cloud_keep_speed	fragment.aster.leave_cloud_keep_speed
+@atom.aster.airport_MDB	fragment.aster.airport_MDB
+@atom.aster.airport_HFS	fragment.aster.airport_HFS
+@atom.aster.airport_PVI	fragment.aster.airport_PVI
+@atom.aster.airport_CAP	fragment.aster.airport_CAP
+@atom.aster.airport_CDR	fragment.aster.airport_CDR
+@atom.aster.airport_SMP	fragment.aster.airport_SMP
+@atom.aster.airport_NPT	fragment.aster.airport_NPT
+@atom.aster.airport_LHK	fragment.aster.airport_LHK
+@atom.aster.airport_GLR	fragment.aster.airport_GLR
+@atom.aster.airport_KLO	fragment.aster.airport_KLO
+@atom.aster.airport_PMB	fragment.aster.airport_PMB
+@atom.aster.airport_VCF	fragment.aster.airport_VCF
+@atom.aster.airport_FJH	fragment.aster.airport_FJH
+@atom.aster.airport_GLS	fragment.aster.airport_GLS
+@atom.aster.airport_FAR	fragment.aster.airport_FAR
+@atom.aster.airport_ORC	fragment.aster.airport_ORC

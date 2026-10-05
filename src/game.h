@@ -306,6 +306,11 @@ private:
   bool commsCrashSeen = false;
   std::vector<std::string> hintsVoiced;   // the lesson hints said this flight
   bool warnWas[4] = {}; float warnLastT[4] = {-99, -99, -99, -99};   // stall, pull up, gear, engine off: rising edges
+  // a failure annunciator (C7): the HUD draws text, comms speak it when its state (slot -> key) comes on or changes
+  // severity, never for the numbers alone (battery and ice percentages move every frame)
+  struct Annunciator { std::string text, slot, key; bool bad; };
+  std::vector<Annunciator> hudAnnunciators() const;
+  std::map<std::string, std::string> failVoiced;   // slot -> the state key last spoken this flight
   void updateComms(float dt);
   float edgeWarnT = 0;   // chart-edge warning repeat
   float voiceDuck = 0;   // 0..1: music and engine lowered while someone is talking
