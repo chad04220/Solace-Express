@@ -550,18 +550,28 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   float lw = std::min(w * 0.36f, 470 * s);
   panel(x, y, lw, h);
   // build card list: story, free flight, freelance
-  struct Card { const Contract* c; bool story; bool free; bool job = false; };
+  struct Card { const Contract* c; bool story; bool free; bool job = false; int trial = -1; };
   std::vector<Card> cards;
   static Contract jobCont;   // the open job's next leg (pinned on top while the job waits for it)
   const bool openJob = career.job && career.job->state == Career::JobState::RECOVERY;
-  if (openJob) { jobCont = career.job->continuation(); cards.push_back({&jobCont, false, false, true}); }
-  const Contract* st = career.nextStory();
-  if (st) cards.push_back({st, true, false});
-  cards.push_back({nullptr, false, true});
-  for (auto& c : career.board) cards.push_back({&c, false, false});
+  if (hubList == 1) { for (int k = 0; k < TR_COUNT; k++) cards.push_back({nullptr, false, false, false, k}); }
+  else {
+    if (openJob) { jobCont = career.job->continuation(); cards.push_back({&jobCont, false, false, true}); }
+    const Contract* st = career.nextStory();
+    if (st) cards.push_back({st, true, false});
+    cards.push_back({nullptr, false, true});
+    for (auto& c : career.board) cards.push_back({&c, false, false});
+  }
   selContract = std::clamp(selContract, 0, (int)cards.size() - 1);
   float cy = y + 14 * s;
-  header(x + 16 * s, cy, lw - 32 * s, ellipsize(career.finished ? "CAMPAIGN COMPLETE - FREELANCE JOBS CONTINUE" : "AVAILABLE WORK", lw - 60 * s, 13 * s)); cy += 28 * s;
+  {   // the list switch: the work, or the trials (off the books, scored on a local board)
+    float sw = (lw - 40 * s) * 0.5f;
+    if (button(x + 16 * s, cy - 4 * s, sw, 26 * s, hubList == 0 ? "WORK" : "work", true, hubList == 0) && hubList != 0) { hubList = 0; selContract = 0; selAircraft = -1; }
+    if (button(x + 24 * s + sw, cy - 4 * s, sw, 26 * s, hubList == 1 ? "TRIALS" : "trials", true, hubList == 1) && hubList != 1) { hubList = 1; selContract = 0; selAircraft = -1; }
+    cy += 32 * s;
+  }
+  if (hubList == 0) { header(x + 16 * s, cy, lw - 32 * s, ellipsize(career.finished ? "CAMPAIGN COMPLETE - FREELANCE JOBS CONTINUE" : "AVAILABLE WORK", lw - 60 * s, 13 * s)); cy += 28 * s; }
+  else { header(x + 16 * s, cy, lw - 32 * s, "TRIALS  -  OFF THE BOOKS, LOCAL BEST TIMES"); cy += 28 * s; }
   for (int i = 0; i < (int)cards.size(); i++) {
     float chh = 66 * s;
     if (cy + chh > y + h - 8 * s) break;
@@ -569,7 +579,12 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     bool hov = hovered(x + 10 * s, cy, lw - 20 * s, chh);
     card(x + 10 * s, cy, lw - 20 * s, chh, sel, hov, cards[i].job ? C_GOOD : cards[i].story ? C_WARN : C_ACCENT);
     if (hov && in.mPressed[0]) { selContract = i; selAircraft = -1; launchFuelKg = -1; g_audio.trigger(SFX_CLICK); }
-    if (cards[i].free) {
+    if (cards[i].trial >= 0) {
+      int k = cards[i].trial;
+      auto it = trialBest.find(trialId(k));
+      fitText(x + 24 * s, cy + 9 * s, lw - 48 * s, 18 * s, 13 * s, std::string("TRIAL  ") + trialName(k), C_TEXT);
+      g_ren.text(x + 24 * s, cy + 36 * s, 14 * s, ellipsize(it != trialBest.end() && !it->second.empty() ? "Best: " + trialScore(k, it->second[0]) : "No time set yet", lw - 48 * s, 14 * s), it != trialBest.end() ? C_GOOD : C_DIM, 1);
+    } else if (cards[i].free) {
       fitText(x + 24 * s, cy + 9 * s, lw - 48 * s, 18 * s, 13 * s, "Free Flight / Ferry", C_TEXT);
       g_ren.text(x + 24 * s, cy + 36 * s, 14 * s, ellipsize("Fly anywhere for fun or to reposition. No pay.", lw - 48 * s, 14 * s), C_DIM, 1);
     } else {
@@ -597,6 +612,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     free.wx.windFrom = (float)((career.flights * 77) % 360); free.wx.windSpeed = 3.f; free.wx.cloudCover = 0.35f;
     cd.c = &free;
   }
+  if (cd.trial >= 0) { free = trialContract(cd.trial); cd.c = &free; }
   const Contract& c = *cd.c;
   float px = dx + 22 * s, py = y + 18 * s, iw = dw - 44 * s;
   float mapW = std::min(iw * 0.42f, h * 0.48f);
@@ -636,6 +652,13 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   if (c.timeLimitMin > 0) row("Deadline", fmt("%.0f minutes", c.timeLimitMin), C_BAD);
   row("Weather", c.wx.describe());
   if (c.wxShift) row("Forecast", "by arrival: " + c.wxEnd.describe(), C_WARN);
+  if (cd.trial >= 0) {   // the local board
+    auto it = trialBest.find(trialId(cd.trial));
+    std::string b;
+    if (it != trialBest.end()) for (size_t i = 0; i < it->second.size(); i++) b += (i ? "   " : "") + fmt("%d. %s", (int)i + 1, trialScore(cd.trial, it->second[i]).c_str());
+    row("Best", b.empty() ? "no time set yet" : b, C_GOOD);
+    row("Counts for", "nothing: no pay, no fees, no logbook entry", C_DIM);
+  }
   if (c.payout) row("Payment", c.repBonusPct > 0 ? fmt("%s (incl. +%d%% reputation bonus)", fmtMoney(c.payout).c_str(), c.repBonusPct) : fmtMoney(c.payout), C_GOOD);
   if (selAircraft >= 0 && selAircraft < kNumAircraft) {   // for the aircraft picked below (last frame's choice)
     auto esrc = career.canFly(c, selAircraft);
@@ -709,7 +732,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   for (int i = 0; i < kNumAircraft; i++) {
     std::string why;
     auto src = career.canFly(c, i, &why);
-    if (c.type == CT_FERRY && src == Career::SRC_NONE && career.license == LIC_STUDENT && i == 0) src = Career::SRC_LESSON;
+    if ((c.type == CT_FERRY || c.type == CT_TRIAL) && src == Career::SRC_NONE && career.license == LIC_STUDENT && i == 0) src = Career::SRC_LESSON;
     if (src != Career::SRC_NONE && firstOk < 0) firstOk = i;
     float rx = px + (i % 2) * (colW + 10 * s), ry = py + (i / 2) * (rowH + 6 * s);
     if (ry + rowH > y + h - 70 * s) break;
@@ -729,7 +752,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   }
   if (selAircraft >= 0) {
     auto src = career.canFly(c, selAircraft);
-    if (c.type == CT_FERRY && src == Career::SRC_NONE && career.license == LIC_STUDENT && selAircraft == 0) src = Career::SRC_LESSON;
+    if ((c.type == CT_FERRY || c.type == CT_TRIAL) && src == Career::SRC_NONE && career.license == LIC_STUDENT && selAircraft == 0) src = Career::SRC_LESSON;
     if (src == Career::SRC_NONE) selAircraft = -1;
   }
   if (selAircraft < 0) selAircraft = firstOk;
@@ -746,11 +769,11 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   }
   if (button(dx + dw - 262 * s, y + h - 62 * s, 240 * s, 46 * s, commitBlocked() ? "Save pending" : otherWhileJob ? "Job in progress" : overweight ? "Overweight" : can ? (cd.job ? "CONTINUE" : "FLY!") : "No suitable aircraft", can, can)) {
     auto src = career.canFly(c, selAircraft);
-    if (c.type == CT_FERRY && src == Career::SRC_NONE) src = Career::SRC_LESSON;
-    if (c.type == CT_FERRY && src == Career::SRC_RENT) {}
+    if ((c.type == CT_FERRY || c.type == CT_TRIAL) && src == Career::SRC_NONE) src = Career::SRC_LESSON;
     Contract go = c;
     if (go.type == CT_FERRY) { go.from = career.location; }
-    if (cd.job) continueJob(selAircraft, src); else beginCareerFlight(go, selAircraft, src);
+    if (cd.trial >= 0) { startFlight(go, selAircraft, src); isolatedFlight = true; }   // (a trial: off the books)
+    else if (cd.job) continueJob(selAircraft, src); else beginCareerFlight(go, selAircraft, src);
   }
   if (commitBlocked()) g_ren.text(px, y + h - 50 * s, 14 * s, "Your last result isn't saved yet (" + saveWhy + "). Retrying...", C_BAD, 1);
   else if (otherWhileJob) g_ren.text(px, y + h - 50 * s, 14 * s, "Deliver or release the job in progress first (its card is at the top).", C_WARN, 1);

@@ -8,8 +8,8 @@
 // C6: the freelance board posts medevacs (a patient who must be flown gently and fast), VIP charters (a live comfort
 // meter), night freight (both ends lit, the landing light on for the touchdown), low-visibility runs (cloud base and
 // visibility at minimums: be lined up when you break out, or go around) and surveys (a ring pattern at one altitude)
-enum ContractType { CT_LESSON = 0, CT_CARGO, CT_PAX, CT_MEDEVAC, CT_VIP, CT_TOUR, CT_FERRY, CT_NIGHT, CT_IFR, CT_SURVEY, CT_COUNT };
-inline const char* contractTypeName(int t) { static const char* n[] = {"Lesson", "Cargo", "Passengers", "Medevac", "VIP Charter", "Scenic Tour", "Free Flight", "Night Freight", "Low-Vis Run", "Survey"}; return n[t]; }
+enum ContractType { CT_LESSON = 0, CT_CARGO, CT_PAX, CT_MEDEVAC, CT_VIP, CT_TOUR, CT_FERRY, CT_NIGHT, CT_IFR, CT_SURVEY, CT_TRIAL, CT_COUNT };
+inline const char* contractTypeName(int t) { static const char* n[] = {"Lesson", "Cargo", "Passengers", "Medevac", "VIP Charter", "Scenic Tour", "Free Flight", "Night Freight", "Low-Vis Run", "Survey", "Trial"}; return n[t]; }
 
 struct Waypoint { float x, z, alt; };  // alt = metres MSL (ring centre)
 

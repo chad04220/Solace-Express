@@ -1,5 +1,6 @@
 // Solace Express - game flow, flight session, cameras, particles, lights, audio feed
 #include "game.h"
+#include <ctime>
 #include <thread>
 #include "airport_layout.h"
 #include "entities.h"
@@ -179,6 +180,7 @@ void Game::loadSettings() {
     std::string s = k;
     if (s == "renderScale") continue;   // old setting (the renderer scales itself)
     else if (s.rfind("rescard.", 0) == 0) { if (v > 0.5f) resDone.insert(s.substr(8)); }
+    else if (s.rfind("trial.", 0) == 0) { size_t dot = s.rfind('.'); if (dot > 6 && v >= 0.f) { auto& L = trialBest[s.substr(6, dot - 6)]; L.push_back(v); std::sort(L.begin(), L.end()); if (L.size() > 5) L.resize(5); } }
     else if (s == "quality") set.quality = (int)clampf(v, 0, 2);
     else if (s == "master") set.master = clampf(v, 0, 1);
     else if (s == "engineVol") set.engineVol = clampf(v, 0, 1.5f);
@@ -217,6 +219,7 @@ void Game::saveSettings() {
   t += fmt("renderRes %d\nfpsTarget %d\nrenderer %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.renderer, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
   for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   for (const std::string& id : resDone) t += "rescard." + id + " 1\n";
+  for (auto& tb : trialBest) for (size_t i = 0; i < tb.second.size(); i++) t += fmt("trial.%s.%d %f\n", tb.first.c_str(), (int)i, tb.second[i]);
   if (t == settingsWritten) return;
   std::string path = joinPath(saveDir, "settings.cfg"), tmp = path + ".tmp";
   FILE* f = fopen(tmp.c_str(), "w");
@@ -525,6 +528,58 @@ void Game::updateWeather(float dt) {
     }
   }
 }
+// ------------------------------------------------------------------ trials (C12)
+Contract Game::trialContract(int kind) const {
+  Contract c; c.type = CT_TRIAL; c.payout = 0; c.minLicense = LIC_STUDENT; c.id = trialId(kind); c.title = trialName(kind);
+  int home = career.location;
+  c.from = c.to = home;
+  c.wx = Weather(); c.wx.windSpeed = 3.f; c.wx.cloudCover = 0.3f; c.wx.timeOfDay = 10.f;
+  if (kind == TR_STOL) { int smp = g_world.findAirport("SMP"); if (smp >= 0) c.from = c.to = smp; }
+  const Airport& A = g_world.airports[c.from];
+  if (kind == TR_SPOT) c.brief = fmt("Take off, fly a circuit and put the wheels down as close as you can to the mark 300 m past the threshold at %s, as softly as you can. Score: metres from the mark plus a quarter of the touchdown rate in fpm. Lower is better.", A.name);
+  else if (kind == TR_STOL) c.brief = "Summit Pass, 600 m of gravel at 5,400 ft. Take off, come round and land as short as you can: the score is the landing roll from touchdown to a stop. Lower is better. The Bushmaster is the natural choice.";
+  else {
+    // the gate course: eight rings out from the runway, each bending a little, hugging the ground
+    uint32_t seed = kind == TR_DAILY ? (uint32_t)(time(nullptr) / 86400) * 2654435761u : 0x5eedu + (uint32_t)home * 131u;
+    Rng r(seed);
+    vec3 p = A.pos() + A.dir() * 1800.f; float hdg = atan2f(A.dir().x, -A.dir().z);
+    for (int k = 0; k < 8; k++) {
+      hdg += (r.uni() - 0.5f) * 0.9f;
+      p = p + vec3(sinf(hdg), 0, -cosf(hdg)) * 1100.f;
+      float hmax = 0; for (int q = 0; q < 8; q++) { float a = q * 0.785f; hmax = std::max(hmax, g_world.height(p.x + cosf(a) * 250.f, p.z + sinf(a) * 250.f)); }
+      float alt = std::max(hmax, A.elev) + 140.f + r.uni() * 80.f;
+      c.wps.push_back({p.x, p.z, alt});
+    }
+    c.brief = kind == TR_DAILY ? fmt("Today's course: eight gates laid out from %s, new every day. The clock runs from the first gate to the last; land back here when you are through. Lower is better.", A.name)
+                               : fmt("Eight gates low over the country out of %s. The clock runs from the first gate to the last; land back here when you are through. Lower is better.", A.name);
+  }
+  return c;
+}
+std::string Game::trialScore(int kind, float v) const {
+  if (v < 0) return "DNF";
+  if (kind == TR_SPOT) return fmt("%.0f pts", v);
+  if (kind == TR_STOL) return fmt("%.0f m roll", v);
+  return fmt("%d:%02d.%d", (int)v / 60, (int)v % 60, (int)(v * 10) % 10);
+}
+void Game::finishTrial(bool success) {
+  int kind = -1; for (int k = 0; k < TR_COUNT; k++) if (contract.id == trialId(k)) kind = k;
+  if (kind < 0) return;
+  float score = -1;
+  if (success && result.landed) {
+    if (kind == TR_SPOT && result.tdPastThrM >= 0) score = fabsf(result.tdPastThrM - 300.f) + fabsf(touchdownFpm) * 0.25f;
+    else if (kind == TR_STOL && result.tdPastThrM >= 0 && result.stopLeftM >= 0) score = std::max(0.f, result.rwyLenM - result.tdPastThrM - result.stopLeftM);
+    else if ((kind == TR_GATES || kind == TR_DAILY) && trialT0 >= 0 && trialT1 > trialT0 && wpIndex >= (int)contract.wps.size()) score = trialT1 - trialT0;
+  }
+  std::string msg = std::string(trialName(kind)) + ": " + trialScore(kind, score);
+  if (score >= 0) {
+    auto& L = trialBest[contract.id];
+    L.push_back(score); std::sort(L.begin(), L.end()); if (L.size() > 5) L.resize(5);
+    int rank = 1; for (float v : L) { if (v < score) rank++; }
+    msg += rank == 1 ? "  -  a new best!" : fmt("  -  rank %d (best %s)", rank, trialScore(kind, L[0]).c_str());
+    saveSettings();
+  }
+  hubMsg = msg; hubMsgTime = 8;
+}
 void Game::fireFailure(int kind, int engine) {
   if (!plane.failNow(kind, engine)) return;
   const AircraftSpec& s = *plane.spec;
@@ -612,7 +667,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   rollFailures(c, spec, src);
   isolatedFlight = false; jobClockBase = 0; attemptFrom = c.from;
   wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0;
-  surveyT = surveyInT = 0; minimumsChecked = false; minimumsGoArounds = 0;
+  surveyT = surveyInT = 0; minimumsChecked = false; minimumsGoArounds = 0; trialT0 = trialT1 = -1;
   traffic.reset();
   ufo = Ufo(); ufo.next = 180.f + sparkRng.uni() * 240.f;   // first encounter after 3-7 minutes in the air
   paused = false; showMap = false; landed = completed = crashed = false;
@@ -663,7 +718,8 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   result.landed = touchedDown && plane.onGround;
   if (!result.landed) result.touchdownFpm = 0;
   coaching = landingCoaching();
-  if (isolatedFlight) {   // a practice flight: back to the hub, nothing settled
+  if (isolatedFlight) {   // a practice flight or a trial: back to the hub, nothing settled
+    if (contract.type == CT_TRIAL) finishTrial(success);
     isolatedFlight = false; paused = false; showMap = false; screen = SCR_HUB; hubTab = TAB_CONTRACTS;
     toast(success ? "Practice flight complete" : reason.empty() ? "Practice flight over" : reason, success ? vec3(0.6f, 1, 0.7f) : vec3(1, 0.5f, 0.4f));
     return;
@@ -1146,6 +1202,7 @@ void Game::updateFlight(float dt) {
         }
       }
       wpIndex++;
+      if (contract.type == CT_TRIAL) { if (wpIndex == 1) trialT0 = flightClock; if (wpIndex >= (int)contract.wps.size()) trialT1 = flightClock; }
       g_audio.trigger(SFX_CHIME);
       toast(wpIndex < (int)contract.wps.size() ? fmt("Checkpoint %d of %d", wpIndex, (int)contract.wps.size()) : "All checkpoints passed!", vec3(0.5f, 1, 0.7f));
       if (contract.wps.size() && wpIndex >= (int)contract.wps.size() && contract.id == "L1") { endTimer = 2.f; }

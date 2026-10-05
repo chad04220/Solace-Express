@@ -7,3 +7,4 @@
 - Menus by keyboard and gamepad: the arrow keys and the D-pad move a focus ring between buttons, Enter / Space / A press one; the mouse or the stick takes over the moment it moves.
 - Tower calls that events have overtaken (a go-around, a runway change, a phase gone by) are dropped instead of being read out late; after a pause the recall line says the instruction was given before it.
 - The research terminal has a main-menu entry: open once the campaign is flown, before that behind a reminder that nothing there counts.
+- Trials: the contracts tab has a TRIALS list. A spot landing (metres from the mark plus the touchdown rate), the STOL contest at Summit Pass (the landing roll), a gate run of eight low rings out of your home field and a daily course that changes with the date (the clock from the first gate to the last). They are off the books, and each keeps its five best on the card.

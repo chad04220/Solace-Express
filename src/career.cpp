@@ -571,7 +571,7 @@ void Career::refreshBoard() {
 }
 
 Career::JobPolicy Career::policyOf(const Contract& c) {
-  if (c.type == CT_FERRY) return POL_UNSET;                              // a free flight is not a job
+  if (c.type == CT_FERRY || c.type == CT_TRIAL) return POL_UNSET;        // a free flight or a trial is not a job
   if (c.forceAircraft >= 0 || c.grantLicense >= 0 || c.type == CT_LESSON) return POL_RETAKE;   // lessons and checkrides are flown whole
   if (c.type == CT_MEDEVAC) return POL_MEDEVAC;
   if (c.timeLimitMin > 0 || c.type == CT_VIP) return POL_RESUME_CLOCK;

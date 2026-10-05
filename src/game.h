@@ -124,6 +124,18 @@ private:
   // kind waits for the next gear command instead. Tests and tools fly with the roll disarmed and fire failures themselves.
   struct FailPlan { int kind = 0, engine = 0; float at = -1; bool fired = false; } failPlan;
   bool failuresArmed = true;
+  // C12 trials: flights against the clock or the tape, off the books, with a local leaderboard per trial
+  // (settings.cfg: trial.<id>.<rank> score). Spot landing and the STOL contest score the touchdown; the gate runs
+  // score the time from the first gate to the last; the daily course is the gate run seeded by the date.
+  enum TrialKind { TR_SPOT = 0, TR_STOL, TR_GATES, TR_DAILY, TR_COUNT };
+  Contract trialContract(int kind) const;
+  std::map<std::string, std::vector<float>> trialBest;
+  float trialT0 = -1, trialT1 = -1;
+  int hubList = 0;   // the contracts tab's card list: 0 work, 1 trials
+  void finishTrial(bool success);
+  static const char* trialName(int kind) { static const char* n[] = {"Spot landing", "STOL contest", "Gate run", "Daily gate course"}; return n[kind]; }
+  static const char* trialId(int kind) { static const char* n[] = {"T_SPOT", "T_STOL", "T_GATES", "T_DAILY"}; return n[kind]; }
+  std::string trialScore(int kind, float v) const;   // "14 m from the mark", "212 m roll", "1:42"
   // C6 job meters: the patient / VIP comfort, the survey band time, the low-vis minimums check
   float surveyT = 0, surveyInT = 0; bool minimumsChecked = false; int minimumsGoArounds = 0;
   void updateJobMeters(float dt, float gs);

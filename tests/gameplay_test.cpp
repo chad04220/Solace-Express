@@ -596,6 +596,34 @@ struct GameTest {
       printf("Dynamic weather: wind turned %.0f deg, %.0f kt, rain %d, autopilot re-picked the runway at %.0f s (rev %d -> %d): %s\n", turned, g.wx.windSpeed * MS_TO_KT, rained, tRe, rev0, g.plane.apRev, ok ? "ok" : "FAIL"); fails += !ok;
       g.endFlight(false, "x", OUT_ABANDONED); g.career.newGame(); g.pendingCareer.reset();
     }
+    // ---- trials (C12): the gate courses clear the ground, the spot landing and the STOL contest score the touchdown,
+    // the board keeps the five best in order, and a trial never touches the career
+    {
+      g.career.newGame(); g.pendingCareer.reset(); g.career.location = g_world.findAirport("CAP");
+      bool ok = true;
+      for (int k : {Game::TR_GATES, Game::TR_DAILY}) {
+        Contract c = g.trialContract(k);
+        if (c.wps.size() != 8 || c.type != CT_TRIAL) ok = false;
+        for (auto& w : c.wps) if (w.alt < g_world.height(w.x, w.z) + 100.f) { printf("   gate low at %.0f,%.0f\n", w.x, w.z); ok = false; }
+      }
+      Contract sp = g.trialContract(Game::TR_SPOT), st = g.trialContract(Game::TR_STOL);
+      ok = ok && sp.from == g.career.location && st.from == g_world.findAirport("SMP") && sp.payout == 0;
+      int money0 = g.career.money, flights0 = g.career.flights;
+      g.startFlight(sp, 0, Career::SRC_LESSON); g.isolatedFlight = true;
+      g.result.landed = true; g.result.tdPastThrM = 340.f; g.touchdownFpm = 160.f; g.touchedDown = true;
+      g.endFlight(true, "", OUT_SUCCESS);
+      auto& L = g.trialBest["T_SPOT"];
+      bool scored = L.size() == 1 && fabsf(L[0] - (40.f + 40.f)) < 0.5f && g.screen == SCR_HUB && g.career.money == money0 && g.career.flights == flights0;
+      g.startFlight(sp, 0, Career::SRC_LESSON); g.isolatedFlight = true; g.result.landed = true; g.result.tdPastThrM = 305.f; g.touchdownFpm = 100.f; g.touchedDown = true; g.endFlight(true, "", OUT_SUCCESS);
+      bool sorted = L.size() == 2 && L[0] < L[1] && fabsf(L[0] - 30.f) < 0.5f;
+      g.startFlight(st, 2, Career::SRC_RENT); g.isolatedFlight = true; g.result.landed = true; g.result.tdPastThrM = 60.f; g.result.stopLeftM = 350.f; g.result.rwyLenM = 600.f; g.touchedDown = true; g.endFlight(true, "", OUT_SUCCESS);
+      bool roll = g.trialBest["T_STOL"].size() == 1 && fabsf(g.trialBest["T_STOL"][0] - 190.f) < 0.5f;
+      g.startFlight(g.trialContract(Game::TR_GATES), 0, Career::SRC_LESSON); g.isolatedFlight = true; g.trialT0 = 10.f; g.trialT1 = 112.f; g.wpIndex = 8; g.result.landed = true; g.touchedDown = true; g.endFlight(true, "", OUT_SUCCESS);
+      bool gates = g.trialBest["T_GATES"].size() == 1 && fabsf(g.trialBest["T_GATES"][0] - 102.f) < 0.01f && g.hubMsg.find("1:42") != std::string::npos;
+      ok = ok && scored && sorted && roll && gates;
+      printf("Trials: courses %d, spot scored %d, board sorted %d, STOL roll %d, gate time %d (%s): %s\n", ok || true, scored, sorted, roll, gates, g.hubMsg.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
+      g.trialBest.clear();
+    }
     // ---- a diversion leaves you (and your aircraft) where you landed
     {
       Career t; t.newGame(); t.license = LIC_ATP;
