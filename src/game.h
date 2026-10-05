@@ -47,7 +47,7 @@ struct Settings {
   int radioStation = 0;
   float mouseSens = 1.0f;
   int resMode = 1;   // 0 native, 1 auto (holds the frame-rate target, the default), 2 85%, 3 75%, 4 67% (TAA upscales to the display)
-  int fpsTarget = 0;   // 0: the monitor's refresh rate (vsync); else a frame-rate cap (30 / 60 / 90 / 120 / 144 / 240)
+  int fpsTarget = 60;   // the frame-rate cap (30 / 60 / 90 / 120 / 144 / 240); 0: the monitor's refresh rate (vsync). 60 by default: a 240 Hz screen would otherwise ask for 240 fps
   int renderer = 1;    // 1 the raster renderer (the default, docs/RENDERER_REBUILD.md), 0 the ray tracer
   float fov = 55;      // the outside views' vertical field of view (degrees); the cockpit's is 19 wider
   bool headLook = true;   // the cockpit view leans into turns when nothing else moves it

@@ -14,7 +14,8 @@ rem The full run:
 rem   1. system report: GPU and driver, CPU, memory, Windows, monitors with their refresh rates
 rem   2. first-run shader compile time on the rasterizer (the shader cache is set aside and restored afterwards)
 rem   3. benchmark on the rasterizer (the default renderer) at 1920x1080 and at your native resolution: frame time and
-rem      the GPU time of every pass for each scene, including the new HUD, the research craft, the cockpits and the UFO
+rem      the GPU time of every pass for each scene (the HUD, the cockpit, night); then the research craft and their
+rem      cockpits in their own file (the heaviest scenes: if one stalls the GPU, the rest of the numbers are already written)
 rem   4. the same benchmark on the ray tracer at 1920x1080, for comparison
 rem   5. the pass-by-pass analysis on the rasterizer (CPU vs GPU, resolution scaling, per-pixel work with heat maps)
 rem   6. screenshots on the rasterizer: the HUD with every warning lit, the research terminal and craft, the cockpits,
@@ -28,7 +29,8 @@ if not exist SolaceExpress.exe (
 )
 set VER=unknown
 if exist VERSION.txt set /p VER=<VERSION.txt
-set SCENES=menu,air,storm,night,cockpit,hud,rjetc,wr_8_0_0_0_1,research10,research20,research40,ckv11_0_-10_12,ufo13_0,hub1
+set SCENES=menu,air,storm,night,cockpit,hud,hub1
+set RSCENES=research10,research20,research40,rjet,wr_8_0_0_0_1,rjetc,ckv11_0_-10_12,ufo13_0
 set MODE=%~1
 if /i "%MODE%"=="menu" goto menu
 if /i "%MODE%"=="loading" goto loading
@@ -75,6 +77,8 @@ start "" /wait SolaceExpress.exe --raster --bench %SCENES% --size 1920x1080 --ou
 echo [3/7] Benchmark on the rasterizer, native resolution ...
 start "" /wait SolaceExpress.exe --raster --bench %SCENES% --size native --out %OUT%\bench_raster_native.txt
 if /i "%MODE%"=="quick" goto logs
+echo [3/7] Benchmark on the rasterizer, the research craft (their cockpits are the heaviest scenes: last, in their own file) ...
+start "" /wait SolaceExpress.exe --raster --bench %RSCENES% --size 1920x1080 --out %OUT%\bench_raster_research_1080p.txt
 echo [4/7] Benchmark on the ray tracer, 1920x1080 (for comparison) ...
 start "" /wait SolaceExpress.exe --rt --bench %SCENES% --size 1920x1080 --out %OUT%\bench_rt_1080p.txt
 echo [5/7] Analysis on the rasterizer (5-10 minutes) ...

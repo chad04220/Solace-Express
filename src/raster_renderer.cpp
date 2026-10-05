@@ -103,7 +103,9 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
   shOn = 0;
   static const bool off = getenv("SHMAPOFF") != nullptr;   // (debug / the analysis: the per-pixel march as before)
   if (off || !progShMap || !planeMeshWanted(fp)) return;
-  auto pm = planeMeshes.find(hullKey(fp, 0));   // (the outside mesh, whichever view is drawn)
+  // the outside mesh, or in the cockpit the cabin mesh (the same airframe with its windows cut: an occluder all the same)
+  auto pm = planeMeshes.find(hullKey(fp, 0));
+  if (pm == planeMeshes.end() || !pm->second.ok || !pm->second.idx) pm = planeMeshes.find(hullKey(fp, fp.plane.PS[3] > 0.5f ? 1 : 0));
   if (pm == planeMeshes.end() || !pm->second.ok || !pm->second.idx) return;
   const PlaneVisual& pv = fp.plane;
   const float R = std::max(pv.M[0], pv.M[9 * 4] * 2.f) * 0.55f + 1.5f;   // (planeBound in the shaders)
@@ -113,7 +115,8 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
   if (fp.sunDir.y > -0.05f) want |= 1;
   for (int i = 0; i < fp.plN; i++) {
     const FrameParams::PointLight& L = fp.pl[i];
-    if (L.shadow <= 0.f || L.cosCut <= 0.05f) continue;   // (an omnidirectional light has no beam to map: it keeps the march)
+    if (L.shadow <= 0.f) continue;
+    if (L.cosCut <= 0.05f && length(L.pos - c) < R * 1.1f) continue;   // (an omnidirectional lamp on the airframe itself: no view to map, it keeps the march)
     float li = std::max(L.col.x, std::max(L.col.y, L.col.z)); int slot = 0;
     for (int k = 0; k < fp.plN; k++) {
       if (k == i || fp.pl[k].shadow <= 0.f) continue;
@@ -146,11 +149,17 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
     if (layer == 0) {   // the sun: orthographic about the airframe, the ground beyond the far plane compared at depth 1
       vec3 d = normalize(fp.sunDir), up = fabsf(d.y) < 0.99f ? vec3(0, 1, 0) : vec3(0, 0, 1);
       vp = orthoMat(-R, R, -R, R, R, 3.f * R) * lookAt(c + d * (2.f * R), c, up);
-    } else {   // a lamp on the airframe: perspective along its beam, out to its reach
+    } else {
       const FrameParams::PointLight& L = fp.pl[lightOf[layer]];
-      vec3 d = normalize(L.dir), up = fabsf(d.y) < 0.99f ? vec3(0, 1, 0) : vec3(0, 0, 1);
-      float half = acosf(clampf(L.cosCut, -1.f, 1.f)) + 0.12f;
-      float fov = std::min(2.f * half, 165.f * DEG);
+      float dc = length(L.pos - c);
+      vec3 d, up; float fov;
+      if (L.cosCut > 0.05f && dc < R * 1.1f) {   // a lamp on the airframe: perspective along its beam, out to its reach
+        d = normalize(L.dir); up = fabsf(d.y) < 0.99f ? vec3(0, 1, 0) : vec3(0, 0, 1);
+        fov = std::min(2.f * (acosf(clampf(L.cosCut, -1.f, 1.f)) + 0.12f), 165.f * DEG);
+      } else {   // a light on the ground (the apron's, the runway's): looking at the airframe, wide enough for its bound
+        d = normalize(c - L.pos); up = fabsf(d.y) < 0.99f ? vec3(0, 1, 0) : vec3(0, 0, 1);
+        fov = std::min(2.f * asinf(clampf(R / std::max(dc, R * 1.001f), 0.f, 1.f)) + 0.1f, 165.f * DEG);
+      }
       vp = perspective(fov, 1.f, 0.2f, L.radius * 40.f + 400.f) * lookAt(L.pos, L.pos + d, up);
     }
     shMapVP[layer] = vp;
