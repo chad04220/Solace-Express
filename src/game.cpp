@@ -914,7 +914,13 @@ void Game::updateLoading(float dt) {
     if (loadT > 0.05f) loadPend0 = std::max(loadPend0, pend);
     float prog = loadPend0 > 0 ? 1.f - (float)pend / loadPend0 : clampf(loadT / 0.8f, 0.f, 1.f);
     loadShown = std::max(loadShown, loadShown + (prog - loadShown) * (1.f - expf(-dt * 8.f)));
-    if (pend == 0 && loadT > 0.8f) { loadReadyT = loadT; loadShown = 1.f; g_ren.entBudgetMs = 2.5f; }
+    if (pend == 0 && loadT > (researchFlight ? 0.15f : 0.8f)) { loadReadyT = loadT; loadShown = 1.f; g_ren.entBudgetMs = 2.5f; }
+    // a research sortie: the preview has already streamed its airport, so the flight opens at once (no establishing shot)
+    if (loadReadyT >= 0 && researchFlight && !headless) {
+      screen = SCR_FLIGHT; dbgCam = false;
+      if (!resAirborne) { camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 3, 15)); }
+      return;
+    }
   } else {
     // establishing shot: a slow orbit round the aircraft on the ground, or a camera flying alongside in the air
     float t = loadT - loadReadyT, size = std::max(plane.spec->span, plane.spec->fusLen);
@@ -1874,13 +1880,23 @@ void Game::researchPreviewCamera(FrameParams& fp) {
   const AircraftSpec& sp = kAircraft[resCraft];
   if (demo.spec != &sp) demo.reset(&sp, vec3(0, 600, 0), 0, 50, 85, true, 150);
   const Airport& a = g_world.airports[std::clamp(resAirport, 0, (int)g_world.airports.size() - 1)];
-  vec3 P = a.pos() + a.dir() * 1800.f + vec3(0, 0, 0);
-  P.y = std::max(a.elev, g_world.height(P.x, P.z)) + 420.f + 1.2f * sinf(realTime * 0.6f);
-  float hdg = a.heading + 180.f;   // facing back towards the field
-  demo.pos = P;
-  demo.q = quat::axisAngle(vec3(0, 1, 0), -hdg * DEG) * quat::axisAngle(vec3(0, 0, 1), 4.f * DEG * sinf(realTime * 0.35f)) * quat::axisAngle(vec3(1, 0, 0), 3.f * DEG);
-  demo.rpm = 0; demo.gear = 0; demo.flaps = 0; demo.nozzle = 0; demo.ctl = Controls(); demo.ctl.throttle = 0.55f;
-  demo.engineSpool = 0.55f; demo.n1 = 70.f;
+  vec3 P; float hdg;
+  if (resAirborne) {   // hanging in the air over the field, facing back towards it
+    P = a.pos() + a.dir() * 1800.f;
+    P.y = std::max(a.elev, g_world.height(P.x, P.z)) + 420.f + 1.2f * sinf(realTime * 0.6f);
+    hdg = a.heading + 180.f;
+    demo.q = quat::axisAngle(vec3(0, 1, 0), -hdg * DEG) * quat::axisAngle(vec3(0, 0, 1), 4.f * DEG * sinf(realTime * 0.35f)) * quat::axisAngle(vec3(1, 0, 0), 3.f * DEG);
+    demo.gear = 0; demo.ctl = Controls(); demo.ctl.throttle = 0.55f; demo.engineSpool = 0.55f; demo.n1 = 70.f; demo.onGround = false;
+  } else {   // parked where the flight starts: the runway's threshold, into the sortie's wind (startFlight's choice)
+    float hw0 = cosf((270.f - a.heading) * DEG), hw1 = cosf((270.f - a.heading - 180.f) * DEG);   // (a research sortie's wind is from 270)
+    bool reverse = hw1 > hw0;
+    hdg = reverse ? a.heading + 180.f : a.heading;
+    P = a.threshold(reverse) + (reverse ? -a.dir() : a.dir()) * 30.f;
+    demo.q = quat::axisAngle(vec3(0, 1, 0), -hdg * DEG);
+    demo.gear = 1; demo.ctl = Controls(); demo.ctl.throttle = 0.f; demo.engineSpool = 0.f; demo.n1 = 0.f; demo.onGround = true;
+    P.y = std::max(a.elev, g_world.height(P.x, P.z)) + demo.gearHeight() + (sp.taildragger ? 0.25f : 0.05f);
+  }
+  demo.pos = P; demo.rpm = 0; demo.flaps = 0; demo.nozzle = 0;
   fillPlaneVisual(fp.plane, demo, 0.f, false);
   resPrevPos = P; resPrevQ = demo.q;
   // orbit
@@ -1891,7 +1907,9 @@ void Game::researchPreviewCamera(FrameParams& fp) {
   float th = tanf(fp.fovY * 0.5f);
   float D = (H * 0.5f / L.r) * ext / th / std::clamp(resZoom, 0.6f, 1.8f);
   float yaw = resYaw + a.heading * DEG, pit = std::clamp(resPitch, -0.6f, 1.1f);
+  if (!resAirborne) pit = std::max(pit, 0.04f);   // (on the ground the camera never dips below the apron)
   vec3 C = P + vec3(sinf(yaw) * cosf(pit), sinf(pit), -cosf(yaw) * cosf(pit)) * D;
+  if (!resAirborne) C.y = std::max(C.y, g_world.height(C.x, C.z) + 1.6f);
   vec3 f0 = normalize(P - C), r0 = normalize(cross(f0, vec3(0, 1, 0))), u0 = cross(r0, f0);
   float nx = (L.cx - W * 0.5f) / (W * 0.5f), ny = (H * 0.5f - L.cy) / (H * 0.5f);
   vec3 T = P - r0 * (nx * D * th * (W / H)) - u0 * (ny * D * th);   // aim off-centre so the craft lands in the ring
@@ -2520,8 +2538,10 @@ void Game::update(float dt) {
 }
 
 void Game::render() {
-  // the main menu's montage from the pre-rendered video when there is one (the menu then costs next to nothing)
-  unsigned vid = screen == SCR_MENU && menuVideo && !sceneOnly ? menuVideo(realTime) : 0;
+  // the main menu's and the career hub's montage from the pre-rendered video when there is one (those screens then
+  // cost next to nothing). The research menu stays live: its preview is the sortie's own airport, so the scenery the
+  // flight opens with streams in while the player chooses
+  unsigned vid = (screen == SCR_MENU || screen == SCR_HUB) && menuVideo && !sceneOnly ? menuVideo(realTime) : 0;
   FrameParams fp;
   if (!vid) {
     fp = buildFrame();
