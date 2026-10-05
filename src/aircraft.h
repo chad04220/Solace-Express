@@ -50,7 +50,7 @@ static const int kOsprey = 8;       // the Osprey C6: the only type with its own
 // the research craft (hidden from the career, only reachable from the research terminal), after the career types
 static const int kNightjar = 9;     // XR-8 Nightjar: a conventional twin jet (special 0, the generic field and flight model)
 static const int kResearchJet = 10; // XR-9 Specter
-static const int kMantis = 11;      // XR-10 Mantis: forward-swept systems demonstrator (special 0; its own field, engine code 7)
+static const int kMantis = 11;      // XR-10 Mantis: forward-swept systems demonstrator (special 0; the generic field)
 static const int kWraith = 12;      // XR-11 Wraith stealth aerobatic research craft
 // XR-11 thruster pods (body coords, +z aft): front left, front right, rear left, rear right pivot points
 static const vec3 kWraithPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.08f, -3.3f), vec3(-2.75f, 0.05f, 3.45f), vec3(2.75f, 0.05f, 3.45f)};

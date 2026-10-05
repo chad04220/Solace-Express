@@ -6,13 +6,13 @@
 void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHit, float aoIn){
   float sunVis = smoothstep(-0.05, 0.05, uSunDir.y);
   int eng = int(gM[0].z + 0.5);
-  bool wr = eng == 6, mantis = eng == 7;
+  bool wr = eng == 6;
   // a research jet's display from the pilot's seat: its camera's picture, with the display's own look and symbology
-  if (pod && ((eng >= 5 && !mantis && ((mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63))) || (mantis && mid == 112))) {
+  if (pod && eng >= 5 && ((mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63))) {
     vec3 scrL = transpose(uPlaneRot)*(p - uPlanePos);
     bool bomb; vec3 rdc;
     vec3 col = feedScreen(mid, scrL, rdc, bomb);
-    col = bomb ? wrFeedOverlay(col, scrL) : wr ? wraithScreen(col, rdc, mid, scrL) : mantis ? mantisScreen(col, rdc, mid, scrL) : jetScreen(col, rdc, mid, scrL);
+    col = bomb ? wrFeedOverlay(col, scrL) : wr ? wraithScreen(col, rdc, mid, scrL) : jetScreen(col, rdc, mid, scrL);
     if (wr) col += wrHolo(uCamPos, rd, t);   // the hologram floats inside the cabin, in front of the displays
     if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
     gbWritePrelit(t, -rd, GB_DISPLAY, clamp(col, vec3(0.0), vec3(3e4)));

@@ -118,18 +118,18 @@ const ModelDef kModels[] = {
     4, .38f, 0,
     0, 0,0,0,0,0,
     vec3(0,.62f,-4.70f), 3, -6.0f,-4.9f,.5f,-4.0f },
-  // ---------------------------------------------------------------- XR-10 Mantis (forward-swept demonstrator; its own SDF in mantis_sdf.glsl, engine code 7)
-  { // eight hull proxy stations, nose to tail (the field is its own; these size the physics and the lights)
+  // ---------------------------------------------------------------- XR-10 Mantis (forward-swept demonstrator; generic field like the XR-8)
+  { // eight stations, nose to tail: a slim round body with the cockpit well forward
     {{-8.0f,.07f,.07f,.05f},{-6.3f,.44f,.44f,.05f},{-4.8f,.79f,.79f,.05f},{-3.9f,.98f,.98f,.05f},
      {-.3f,1.02f,1.02f,.04f},{2.65f,1.05f,1.05f,.04f},{6.1f,.40f,.40f,.20f},{8.0f,.07f,.07f,.28f}}, 1.0f,
-    {6.6f,3.15f,1.35f,-2.48f,-.62f,.65f,0.0f,.10f},   // forward-swept wing proxy
+    {6.6f,3.15f,1.35f,-2.48f,-.62f,.65f,0.0f,.10f},   // forward-swept wing (negative LE sweep at the tip)
     0,0.0f,0.0f,.52f,0,0,
-    {2.75f,1.18f,1.18f,0.0f,-.15f,-4.19f,0.0f},0,      // the canards stand in for the tail proxy
+    {2.75f,1.18f,1.18f,0.0f,-.15f,-4.19f,0.0f},0,      // the canards: the horizontal tail placed forward
     {2.3f,1.84f,1.10f,.80f,.20f,4.30f},
-    7,1.55f,.05f,.48f,1.73f,3.07f,0.0f,0.0f,          // custom field; conventional twin-jet physics
+    4,1.55f,.05f,.48f,1.73f,3.07f,0.0f,0.0f,          // aft twin jets
     4,.26f,0,
     0,0.0f,0.0f,0.0f,0.0f,0.0f,
-    vec3(0.0f,.65f,-3.35f),2,                          // sealed camera cockpit
+    vec3(0.0f,.65f,-3.35f),2,                          // glass cockpit
     -4.95f,-4.45f,.45f,-2.7f },
   // ---------------------------------------------------------------- XR-11 Wraith (stealth research craft; faceted SDF in the shader, engine code 6)
   { {{-8.40f,.04f,.03f,-.05f},{-7.00f,.45f,.24f,-.02f},{-5.20f,.85f,.48f,.05f},{-3.20f,1.10f,.58f,.06f},{0.0f,1.25f,.58f,.04f},{3.20f,1.30f,.52f,0},{6.00f,1.05f,.42f,-.02f},{7.80f,.80f,.32f,-.02f}}, .25f,

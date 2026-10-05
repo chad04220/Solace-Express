@@ -67,8 +67,8 @@ const AircraftSpec kAircraft[] = {
    0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 118000, 0, 60, 70, 420, 4000, 250, true, false, true,
    25000, 90000, 110000, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 0, 0,
    17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1},
-  // XR-10 Mantis: forward-swept twin-jet systems demonstrator (Codex's proposal; special 0: the generic flight model with
-  // its own field, engine code 7 in models.cpp). Its foreplanes are folded into the tail proxy for the physics.
+  // XR-10 Mantis: forward-swept twin-jet systems demonstrator (Codex's proposal; special 0: the generic flight model and
+  // the generic field, like the XR-8). Its foreplanes are the model's horizontal tail placed forward.
   {"xr10", "XR-10 Mantis", "Forward-swept systems demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
    6100.0f, 1800.0f, 0.0f, 0, 30.0f, 13.2f, 2.27f,
    0.25f, 5.0f, 1.55f, 0.60f, 0.026f, 0.012f, 0.070f, 0.78f,

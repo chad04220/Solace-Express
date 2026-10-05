@@ -354,55 +354,9 @@ void Game::updateWraith(float dt) {
   W.blasts.erase(std::remove_if(W.blasts.begin(), W.blasts.end(), [](const WraithState::Blast& b) { return b.age >= 1.f; }), W.blasts.end());
 }
 
-// ------------------------------------------------------------------ XR-10 Mantis: the store bay
-// Y opens the bay: the doors swing, then the two dart cradles lower out of their recesses. Enter / LMB releases a dart
-// (port first), Backspace the internal store; a released shape is an inert test article and simply leaves the
-// airframe (there is no weapon behind it). The doors won't close over a store still in the opening.
-void Game::mantisControls(float dt) {
-  MantisState& M = mantis;
-  bool air = !plane.onGround && !crashed;
-  if (actKeyP(ACT_WEAPONS) || (air && actPadP(ACT_WEAPONS))) {
-    M.bayOpen = !M.bayOpen;
-    toast(M.bayOpen ? "BAY OPEN - cradles deploying" : "BAY CLOSING - cradles stowed", vec3(1.f, 0.62f, 0.25f));
-    g_audio.trigger(SFX_GEAR_CLUNK, 0.6f);
-  }
-  bool padHot = air && in.pad && M.bayOpen;
-  bool ready = M.bayOpen && M.bay > 0.95f;
-  if (ready && M.cradle > 0.9f && (actKeyP(ACT_FIRE) || (in.mPressed[0] && !showMap) || (padHot && actPadP(ACT_FIRE)))) {
-    int k = M.aboard[0] > 0.5f ? 0 : M.aboard[1] > 0.5f ? 1 : -1;
-    if (k >= 0) { M.aboard[k] = 0.f; toast(k == 0 ? "PORT DART RELEASED (inert test article)" : "STARBOARD DART RELEASED (inert test article)", vec3(1.f, 0.62f, 0.25f)); g_audio.trigger(SFX_GEAR_CLUNK, 0.5f); }
-    else toast("CRADLES EMPTY", vec3(0.9f, 0.5f, 0.3f));
-  }
-  if (ready && M.aboard[2] > 0.5f && M.dropping == 0 && (actKeyP(ACT_BOMB) || in.mPressed[2] || (padHot && actPadP(ACT_BOMB)))) {
-    M.dropping = 1; toast("INTERNAL STORE RELEASED (inert test article)", vec3(1.f, 0.62f, 0.25f)); g_audio.trigger(SFX_GEAR_CLUNK, 0.7f);
-  }
-  (void)dt;
-}
-void Game::updateMantis(float dt) {
-  if (!plane.spec || plane.spec - kAircraft != kMantis) return;
-  MantisState& M = mantis;
-  float bayTo = M.bayOpen || M.store > 0.01f ? 1.f : 0.f;   // (the doors wait for the store to clear)
-  M.bay = clampf(M.bay + (bayTo - M.bay > 0 ? 1.f : -1.f) * dt / 1.6f, 0.f, 1.f);
-  if (fabsf(M.bay - bayTo) < 0.01f) M.bay = bayTo;
-  float crTo = M.bayOpen && M.bay > 0.95f ? 1.f : 0.f;
-  if (!M.bayOpen) crTo = 0.f;
-  M.cradle = clampf(M.cradle + (crTo - M.cradle > 0 ? 1.f : -1.f) * dt / 1.2f, 0.f, 1.f);
-  if (fabsf(M.cradle - crTo) < 0.01f) M.cradle = crTo;
-  if (M.dropping == 1) {
-    M.store = clampf(M.store + dt / 0.7f, 0.f, 1.f);
-    if (M.store >= 1.f) { M.aboard[2] = 0.f; M.store = 0.f; M.dropping = 2; }
-  }
-}
 void Game::wraithVisual(FrameParams& fp) {
   const WraithState& W = wraith;
   PlaneVisual& pv = fp.plane;
-  if (plane.spec && plane.spec - kAircraft == kMantis && pv.on) {   // the XR-10's channels (mantis_sdf.glsl)
-    const MantisState& M = mantis;
-    pv.wr[0][0] = M.bay; pv.wr[0][1] = M.cradle; pv.wr[0][2] = M.cradle; pv.wr[0][3] = M.store;
-    pv.wr[1][0] = M.aboard[0]; pv.wr[1][1] = M.aboard[1]; pv.wr[1][2] = M.aboard[2]; pv.wr[1][3] = 0.f;
-    if (const char* e = getenv("MTBAY")) { float v = (float)atof(e); pv.wr[0][0] = v; pv.wr[0][1] = pv.wr[0][2] = v; }   // (render checks: hold the bay open)
-    return;
-  }
   if (plane.spec && plane.spec->special == 2 && pv.on) {
     for (int i = 0; i < 4; i++) { pv.wr[0][i] = plane.podTilt[i]; pv.wr[1][i] = plane.podYaw[i]; pv.wr[2][i] = plane.engineRunning ? plane.podThr[i] : 0.f; pv.wr[3][i] = plane.podVane[i]; }
     if (plane.onGround && !plane.engineRunning) for (int i = 0; i < 4; i++) pv.wr[0][i] = plane.nozzle * 0.5f * PI;

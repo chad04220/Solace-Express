@@ -48,16 +48,6 @@ inline std::vector<HullState> hullStateList(const float* M, bool inside) {
     for (int i = 1; i <= 4; i++) { addWr(0, 0, 0, 0, 0, i * 0.25f, 0, 1); addWr(0, 0, 0, 0, 0, 0, i * 0.25f, 1); }   // bay, turrets
     addWr(0, 0, 0, 0, 0, 1, 0, 0);                                                     // bay open, bomb away
   }
-  if ((int)(M[2] + 0.5f) == 7 && !inside) {   // the XR-10: its bay doors, the two cradles and the internal store, then the stores gone
-    auto addMt = [&](float bay, float cl, float cr, float store, float aboardL, float aboardR, float aboardS) {
-      HullState h = {{1, 0, 0, 0}, {0, 0, 0, 0}, {bay, cl, cr, store}, {aboardL, aboardR, aboardS, 0}};
-      st.push_back(h);
-    };
-    for (int i = 1; i <= 6; i++) addMt(i / 6.f, 0, 0, 0, 1, 1, 1);                  // the doors swing
-    for (int i = 1; i <= 4; i++) addMt(1, i * 0.25f, i * 0.25f, 0, 1, 1, 1);         // the cradles deploy
-    for (int i = 1; i <= 4; i++) addMt(1, 1, 1, i * 0.25f, 1, 1, 1);                 // the store drops out
-    addMt(1, 1, 1, 0, 0, 0, 0); addMt(0, 0, 0, 0, 0, 0, 0);                          // everything released, open and closed
-  }
   if (st.size() > 128) st.resize(128);
   return st;
 }

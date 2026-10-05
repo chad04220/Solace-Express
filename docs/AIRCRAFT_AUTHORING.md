@@ -172,7 +172,7 @@ The integrator runs: `cmake --build build && ctest --test-dir build` (flight mod
 
 ## 6. Tier B — hand-built airframes (only when Tier A cannot express the shape)
 
-The research jets (`mapJet` in `src/shaders/plane_sdf.glsl`, `mapWraith` in `wraith_sdf.glsl`, `mapMantis` in `mantis_sdf.glsl`) are hand-written GLSL signed-distance functions; the Mantis is the worked example of a part/rig-structured one (engine code 7, dispatched from `mapPlaneBody`). A Tier B aircraft is a new such function. It costs integration work (dispatch, material ids, part table), so propose it only with a reason. The rules below exist because the rebuilt renderer **bakes meshes from the function at load**; break them and the bake produces holes, slivers or frozen animation.
+The XR-9 and XR-11 (`mapJet` in `src/shaders/plane_sdf.glsl`, `mapWraith` in `wraith_sdf.glsl`) are hand-written GLSL signed-distance functions (the XR-8 and XR-10 use the generic field: a hand-built one for the XR-10 was tried and cost 4x the frame in the terminal preview, so it went back to Tier A). A Tier B aircraft is a new such function. It costs integration work (dispatch, material ids, part table), so propose it only with a reason. The rules below exist because the rebuilt renderer **bakes meshes from the function at load**; break them and the bake produces holes, slivers or frozen animation.
 
 The `PART(...)`, `partOn(id)` and `rig*(p, id)` helpers in rule 5 are the renderer rebuild's contract, not yet functions in the tree: write to the contract, and the integrator maps it onto whichever shader version is current. Everything else in this section (primitives, globals, material ids) exists today.
 

@@ -47,11 +47,11 @@ const ResCraftInfo kResCraft[] = {
   {kMantis, "NG-XR10-M  //  BLK 2", "XR-10", "MANTIS", R_EMBER, {0.35f, 0.55f, 0.7f}, "FORWARD-SWEPT SYSTEMS DEMONSTRATOR",
    {{"CONFIGURATION", "Forward sweep, all-moving canards", -1}, {"PROPULSION", "2 x turbofan, 30 kN total", 0.1f},
     {"THRUST / WEIGHT", "0.38 : 1", 0.08f}, {"TOP SPEED", "Mach 0.75", 0.2f},
-    {"STORES", "Internal bay, 2 recessed cradles", 0.5f}, {"ROLL RATE", "180 deg/s", 0.45f},
+    {"SYSTEMS", "Fly-by-wire research suite", 0.5f}, {"ROLL RATE", "180 deg/s", 0.45f},
     {"AIRFRAME", "+7 / -3 g", 0.08f}, {"ENDURANCE", "1,800 kg fuel, 210 km", 0.25f}},
    10.f, -5.f, 5.f, 7.f, -3.f, 0.85f, 0.26f,
-   {"Y opens the store bay and lowers the cradles", "Enter / LMB releases a dart, Bksp the internal store", "Released shapes are inert test articles",
-    "Three camera panes: nose and either side", "Brisk in pitch; land at ~115 kt"}, "XR10"},
+   {"Canards ahead of a forward-swept wing: brisk in pitch", "Conventional controls, flaps and retractable gear", "Glass cockpit with a view out",
+    "Flies like a hot career jet; no vectoring", "Land at ~115 kt with full flap"}, "XR10"},
   {kWraith, "NG-XR11-W  //  BLK 1", "XR-11", "WRAITH", R_VIOLET, {1.f, 0.97f, 0.06f}, "STEALTH AEROBATIC RESEARCH MODEL",
    {{"CONFIGURATION", "Faceted body, diamond wing, V-tail", -1}, {"PROPULSION", "4 x tilting pods, 520 kN boosted", 0.8f},
     {"THRUST / WEIGHT", "2.2 dry, 4.6 boosted", 0.7f}, {"TOP SPEED", "Mach 3.6+", 1.f},
@@ -434,8 +434,6 @@ void Game::drawResearch(const FrameParams& fp) {
                      {kWraithPods[2], "POD 3  //  VECTORING VANES", -1}, {vec3(6.2f, -0.24f, 2.0f), "FACETED SKIN  //  CLOAK MESH", 1}};
     else if (resCraft == kResearchJet) calls = {{vec3(0, 0, -fl), "SYNTHETIC-VISION POD", -1}, {vec3(2.1f, 0.1f, -4.4f), "CANARD  //  ALL-MOVING", 1},
                   {vec3(5.62f, -0.38f, 4.4f), "CRANKED DELTA  //  NO FLAPS", 1}, {vec3(-0.82f, -0.12f, 7.75f), "2D NOZZLE  //  +-29 DEG", -1}};
-    else if (resCraft == kMantis) calls = {{vec3(0, 0, -fl), "NOSE CAMERA  //  SENSOR SUITE", -1}, {vec3(1.72f, -0.15f, -3.6f), "CANARD  //  ALL-MOVING TITANIUM", 1},
-                                          {vec3(6.52f, -0.62f, -0.1f), "FORWARD SWEEP  //  AMBER DATUMS", 1}, {vec3(0, -0.94f, 1.6f), "STORE BAY  //  2 CRADLES", -1}};
     else {   // a conventional airframe: its parts from the parametric model
       const ModelDef& md = kModels[resCraft];
       vec3 tip = modelWingTip(md), fin = modelFinTop(md);

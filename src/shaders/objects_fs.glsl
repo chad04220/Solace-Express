@@ -29,8 +29,7 @@ void main(){
   int hTopPiece = gPI;   // (traffic tracing moves the piece transform; restored before shading)
   if (cockpitView && hTop.x > 0.0) {
     int id0 = int(hTop.y + 0.5);
-    bool mantis = int(gM[0].z + 0.5) == 7;
-    if ((jetC && !mantis && ((id0 >= 41 && id0 <= 43) || (id0 >= 61 && id0 <= 63))) || (mantis && id0 == 112)) onScr = true;
+    if (jetC && ((id0 >= 41 && id0 <= 43) || (id0 >= 61 && id0 <= 63))) onScr = true;
     else pod = true;
   }
   // the cloaked part of the XR-11 is see-through: its own pass draws it over the lit frame

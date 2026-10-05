@@ -215,11 +215,6 @@ private:
     int wrecked = 0;              // trees, rocks and buildings destroyed
     int kills = 0;
   } wraith;
-  struct MantisState {   // XR-10 systems: the store bay (doors, the two dart cradles, the internal store) and what is aboard
-    bool bayOpen = false; float bay = 0, cradle = 0, store = 0; float aboard[3] = {1, 1, 1}; int dropping = 0;
-  } mantis;
-  void mantisControls(float dt);
-  void updateMantis(float dt);
   void wraithControls(float dt);
   void updateWraith(float dt);
   void wraithVisual(FrameParams& fp);
