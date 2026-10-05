@@ -26,6 +26,7 @@ int main(int argc, char** argv) {
     put(dir, "terrain.vert", terrainVSAssembly("")); put(dir, "terrain.frag", terrainFSAssembly(""));
     put(dir, "water.vert", waterVSAssembly("")); put(dir, "water.frag", waterFSAssembly(""));
     put(dir, "light.frag", lightFSAssembly(""));
+    put(dir, "objects.frag", objectsFSAssembly(""));
   }
   return 0;
 }

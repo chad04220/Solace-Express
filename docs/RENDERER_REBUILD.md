@@ -42,10 +42,10 @@ The lighting pass writes exactly what the ray tracer wrote (`texRaw` colour + TA
 | GB0 | RGBA32F | view distance, octahedral normal (2), class + flags |
 | GB1 | RGBA8 | sqrt(albedo), roughness |
 | GB2 | RGBA16F | emission (HDR), metalness |
-| GB3 | RGBA8 | ambient occlusion, spare |
+| GB3 | RGBA8 | ambient occlusion, the surface's own sun shadow, the terrain's sun shadow at it (airframes: from the objects pass), flags: glint / display pixel / TAA moving / TAA rigid |
 | depth | D32F | logarithmic depth (the entity shader's `uLogC` encoding), shared by every raster pass |
 
-Classes: 0 sky, 1 terrain, 2 water (prelit), 3 entity, 4 foliage, 5 aircraft exterior, 6 cabin interior (sun through the windows + fixture lights), 7 sealed pod interior (fixture lights only), 8 display / prelit emissive, 9 debris, 10 UFO, 11 wreck. TAA class per pixel as today (1 world, 0.5 rigid with the aircraft, 0.2 moving, 0.55 display, 0 none).
+Classes: 0 sky, 1 terrain, 2 water (prelit), 3 entity, 4 foliage, 5 aircraft exterior, 6 cabin interior seen from outside (prelit: sun through the windows + fixture lights, then fog), 7 the aircraft in a cockpit view (prelit, no fog, no clouds), 8 display (prelit), 9 debris, 10 UFO, 11 wreck, 12 traffic. The cockpit classes are lit in the objects pass by the same `planeLight` the ray tracer uses, because their light comes from the cabin fixtures and the airframe's own field, not from anything the lighting pass can see; everything else is lit deferred. TAA class per pixel from the flags (1 world, 0.5 rigid with the aircraft, 0.2 moving, 0.55 display, 0 none).
 
 ### Terrain
 

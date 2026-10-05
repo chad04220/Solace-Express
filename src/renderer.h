@@ -291,7 +291,7 @@ private:
   void drawSprites(const FrameParams& fp, float texW, float texH, float uvsX, float uvsY);
   void feedEffects(const FrameParams& f);
   // ---- the raster renderer (raster_renderer.cpp, terrain_mesh.cpp)
-  GLuint progLight = 0, progTerrain = 0, progWater = 0;
+  GLuint progLight = 0, progObjects = 0, progTerrain = 0, progWater = 0;
   GLuint vaoTerrain = 0, vboTerrainInst = 0, vaoWater = 0, vboWater = 0, iboWater = 0; int waterIdx = 0;
   std::vector<float> terrInst; int terrChunks = 0;
   bool compileRaster();
@@ -300,6 +300,7 @@ private:
   void selectTerrainChunks(const FrameParams& fp);
   void drawTerrainMesh(const FrameParams& fp);
   void rasterWorld(const FrameParams& fp);
+  void rasterObjects(const FrameParams& fp);
   void rasterLight(const FrameParams& fp);
 };
 

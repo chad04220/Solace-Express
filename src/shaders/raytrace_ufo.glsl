@@ -103,15 +103,16 @@ float traceUfo(vec3 ro, vec3 rd, float tmax){
   }
   return -1.0;
 }
-vec3 shadeUfo(vec3 p, vec3 rd, float t){
+// The UFO's surface at a hit: its material and normal (cabin: a pixel inside the dome, lit by the dance floor too)
+void ufoMaterial(vec3 p, vec3 rd, float t, out Mat m, out vec3 n, out bool cabin){
   mat3 inv = transpose(uUfoRot);
   vec3 lp = inv*(p - uUfoPos);
   const vec2 k = vec2(1, -1); float e = 0.004;
   vec3 ln = normalize(k.xyy*mapUfo(lp + k.xyy*e).x + k.yyx*mapUfo(lp + k.yyx*e).x + k.yxy*mapUfo(lp + k.yxy*e).x + k.xxx*mapUfo(lp + k.xxx*e).x);
   int mid = int(mapUfo(lp).y + 0.5);
-  vec3 n = uUfoRot*ln;
+  n = uUfoRot*ln;
   float T = uUfoAnim.y, r = length(lp.xz), ang = atan(lp.z, lp.x);
-  Mat m; m.alb = vec3(0.7); m.rough = 0.3; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0, 0, 1);
+  m.alb = vec3(0.7); m.rough = 0.3; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0, 0, 1);
   vec3 nT; vec4 tx;
   vec3 disco = 0.5 + 0.5*cos(T*3.0 + vec3(0.0, 2.1, 4.2));
   if (mid == 70) {        // polished hull: brushed metal with concentric and radial panel lines, glowing portholes
@@ -135,12 +136,15 @@ vec3 shadeUfo(vec3 p, vec3 rd, float t){
   else if (mid == 73) { m.alb = vec3(0.005); m.rough = 0.04; m.metal = 0.0; }
   else if (mid == 74) { m.alb = vec3(0.25, 0.02, 0.05); m.rough = 0.6; }
   n = applyTS(n, m.nrm, 0.2);
-  float sh = cloudShadow(p);
-  vec3 col = shadeSurface(p, n, rd, m, sh);
-  // cabin interior lit by the disco floor and a cool ceiling light
-  if (mid >= 72 && mid <= 74 || mid == 77) {
+  // cabin interior lit by the disco floor and a cool ceiling light (carried as emission: it needs no sun)
+  cabin = mid >= 72 && mid <= 74 || mid == 77;
+  if (cabin) {
     vec3 L1 = normalize(uUfoRot*vec3(0.0, 1.0, 0.0));
-    col += m.alb*(disco*0.8*max(dot(n, -L1), 0.0) + vec3(0.6, 0.9, 1.0)*0.7*max(dot(n, L1), 0.0) + 0.15);
+    m.emit += m.alb*(disco*0.8*max(dot(n, -L1), 0.0) + vec3(0.6, 0.9, 1.0)*0.7*max(dot(n, L1), 0.0) + 0.15);
   }
-  return col;
+}
+vec3 shadeUfo(vec3 p, vec3 rd, float t){
+  Mat m; vec3 n; bool cabin;
+  ufoMaterial(p, rd, t, m, n, cabin);
+  return shadeSurface(p, n, rd, m, cloudShadow(p));
 }

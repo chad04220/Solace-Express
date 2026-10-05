@@ -1236,8 +1236,9 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     // ------------------------------------------------ the raster renderer: scenery, terrain and sea into the G-buffer, then one lighting pass
     rasterWorld(fp);
     bakeTerrainShadow(fp);
-    if (fp.dispMode & 1) renderDisplays(fp, false);
+    if (fp.dispMode & 1) renderDisplays(fp, false);   // the cockpit display atlases, before the objects pass samples them
     if (fp.dispMode & 2) renderDisplays(fp, true);
+    rasterObjects(fp);
     stamp(1);
     rasterLight(fp);
     cloudPass(fp);

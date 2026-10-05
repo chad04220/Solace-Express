@@ -7,7 +7,7 @@ const int HMAXN = 256; const int HMAXL = 5;
 // which keeps grazing rays over lowlands from running out of steps (they used to fall through to the sea).
 // gTStart: where the march may begin (the terrain envelope mesh on this pixel - see terrain_envelope.cpp); 1e30 means
 // the ray meets no terrain in the world. A start that turns out to be under the ground (it never should) is ignored.
-uniform int uEnvOn; uniform int uHullOn;
+uniform int uEnvOn;
 float gTStart = 1.0;
 float traceTerrain(vec3 ro, vec3 rd, float tmax){
   float t = 1.0;

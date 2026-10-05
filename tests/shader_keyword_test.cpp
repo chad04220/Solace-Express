@@ -52,7 +52,7 @@ int main() {
   std::string rt = rtAssembly("");
   std::string h = "#version 330 core\n";
   int bad = scan("raytrace.frag", rt) + scan("map.frag", kMapMain) + scan("disp.frag", kDispMain);
-  bad += scan("terrain.vert", terrainVSAssembly("")) + scan("terrain.frag", terrainFSAssembly("")) + scan("water.vert", waterVSAssembly("")) + scan("water.frag", waterFSAssembly("")) + scan("light.frag", lightFSAssembly(""));
+  bad += scan("terrain.vert", terrainVSAssembly("")) + scan("terrain.frag", terrainFSAssembly("")) + scan("water.vert", waterVSAssembly("")) + scan("water.frag", waterFSAssembly("")) + scan("light.frag", lightFSAssembly("")) + scan("objects.frag", objectsFSAssembly(""));
   bad += scan("fullscreen.vert", kFullscreenVS) + scan("sprite.vert", kSpriteVS) + scan("sprite.frag", kSpriteFS);
   bad += scan("down.frag", kDownFS) + scan("up.frag", kUpFS) + scan("raymask.frag", kRayMaskFS) + scan("ray.frag", kRayFS);
   bad += scan("taa.frag", kTaaFS) + scan("post.frag", kPostFS);

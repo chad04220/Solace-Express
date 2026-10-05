@@ -13,7 +13,7 @@ inline std::string rtAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace + kTerrainTrace +
          kMaterialCommon + kLightCommon + kClouds + kTerrainMaterial + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
-         kPlaneMaterial + kWater + kRtShade + kRtMain;
+         kPlaneMaterial + kWater + kRtShade + kPlaneLight + kRtMain;
 }
 // The same with main() renamed, for a program that adds its own main
 inline std::string rtAssemblyNoMain(const std::string& defines) {
@@ -34,6 +34,13 @@ inline std::string terrainFSAssembly(const std::string& defines) {
 inline std::string waterVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kWaterVS; }
 inline std::string waterFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kMaterialCommon + kLightCommon + kClouds + kWater + kGBuffer + kGBWrite + kWaterFS;
+}
+// the objects pass: the ray tracer's aircraft, traffic, debris and UFO code, writing the G-buffer (no terrain march, no clouds)
+inline std::string objectsFSAssembly(const std::string& defines) {
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace +
+         kMaterialCommon + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
+         kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
+         kPlaneMaterial + kPlaneLight + kGBuffer + kGBWrite + kObjectsFS;
 }
 inline std::string lightFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kMaterialCommon + kLightCommon + kClouds + kGBuffer + kLightFS;

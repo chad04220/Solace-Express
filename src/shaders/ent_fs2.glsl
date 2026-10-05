@@ -305,5 +305,5 @@ void main(){
   oG0 = vec4(dist, octEnc(normalize(wn)), cls == 1.0 ? 4.0 : 3.0);   // GB_FOLIAGE / GB_ENTITY (kGBuffer)
   oG1 = vec4(sqrt(clamp(alb, 0.0, 1.0)), clamp(rough, 0.03, 1.0));
   oG2 = vec4(max(emit, vec3(0.0)), metal);
-  oG3 = vec4(1.0, 0.0, 0.0, 0.0);
+  oG3 = vec4(1.0, 1.0, 1.0, 0.0);
 }
