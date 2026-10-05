@@ -193,7 +193,9 @@ vec2 mapWraith(vec3 p){
   // swing on their hinge line instead of the whole fin turning
   {
     vec3 q = ap - vec3(1.05, top - 0.05, 4.4); q.xy = rot2(q.xy, 0.72);
-    float dv = uWr[5].x*0.35 + uWr[5].y*sgn*0.35;
+    // (the surface's thickness axis points outboard and down: pulling back swings both trailing edges up and inboard,
+    // right rudder swings the right one out and the left one in)
+    float dv = -uWr[5].x*0.35 + uWr[5].y*sgn*0.35;
     float fs = q.y + 0.75, span = 3.05, fsw = 1.6*3.05/2.3, hinge = 0.68, s0 = 0.14, s1 = span*0.95;
     float fin = max(sdPanel(fs, q.z, q.x, span, 2.6, 1.1, fsw, 0.04, hinge, s0, s1), -fs);   // root buried in the body
     float rv = sdSurface(fs, q.z, q.x, span, 2.6, 1.1, fsw, 0.04, hinge, s0, s1, -dv*1.4, 0.0);
