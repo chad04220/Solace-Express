@@ -1,0 +1,78 @@
+{
+  "aircraft": "Osprey C6",
+  "baseline": "a298771",
+  "checks": {
+    "schema_field_counts": true,
+    "wing_loading": true,
+    "rotate_ratio": true,
+    "approach_ratio": true,
+    "speed_order": true,
+    "power_loading": true,
+    "inertias": true,
+    "station_order": true,
+    "tip_closure": true,
+    "length_radius_span": true,
+    "wing_area": true,
+    "wing_thickness": true,
+    "prop_clearance": true,
+    "eye_clearance": true,
+    "windshield_before_panel": true,
+    "floor_above_wing": true,
+    "gear_bay_clear_of_controls": true,
+    "matching_wing_root": true,
+    "gear_supported": true,
+    "windows_inside": true,
+    "conventional_controls": true,
+    "tier_a": true,
+    "career": true
+  },
+  "measurements": {
+    "reference_mass_kg": 2450.0,
+    "game_full_load_85kg_people_mass_kg": 2420.0,
+    "wing_loading_N_m2": 1068.2,
+    "vs1_m_s": 32.511070375638155,
+    "vs0_m_s": 26.680268639837145,
+    "rotate_ratio": 1.1319226357004304,
+    "approach_ratio": 1.3118308691892406,
+    "cruise_approach_ratio": 2.1142857142857143,
+    "power_loading_kg_kW": 6.805555555555555,
+    "inertia_reference": [
+      11301.36,
+      10588.410000000002,
+      21889.770000000004
+    ],
+    "inertia_supplied": [
+      9000.0,
+      10800.0,
+      19800.0
+    ],
+    "wing_trapezoid_area_m2": 22.32,
+    "area_difference_percent": 0.7999999999999987,
+    "gear_height_m": 1.9200000000000002,
+    "prop_ground_clearance_m": 0.33000000000000007,
+    "prop_fuselage_lateral_gap_m": 0.5299999999999998,
+    "eye_centreline_roof_clearance_m": 0.25,
+    "eye_roof_clearance_m": 0.10092578324423418,
+    "eye_side_clearance_m": 0.37999999999999995,
+    "panel_z_m": -2.58,
+    "panel_half_width_m": 0.6436861467712569,
+    "floor_y_m": -0.3400000000000001,
+    "wing_root_conservative_upper_y_m": -0.38750000000000007,
+    "floor_wing_clearance_m": 0.04749999999999999,
+    "main_gear_xz": [
+      1.612,
+      0.392
+    ],
+    "wing_LE_TE_at_main_gear_z": [
+      -0.657,
+      1.359
+    ],
+    "main_bay_aft_z_m": 0.7619999999999999,
+    "main_bay_min_fixed_hinge_z_m": 0.8316593548387097,
+    "main_bay_fixed_panel_clearance_m": 0.06965935483870977,
+    "main_bay_previous_clearance_m": -0.48034064516129027,
+    "spec_model_wing_z_match": true
+  },
+  "all_passed": true,
+  "scope": "Analytic checks parsed from delivered rows; no simulation assertions implied."
+}

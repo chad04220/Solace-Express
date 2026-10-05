@@ -1,0 +1,2192 @@
+[
+  {
+    "name": "floor cassette",
+    "center": [
+      0,
+      -0.385,
+      -3.35
+    ],
+    "half": [
+      0.38,
+      0.025,
+      0.7
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "seat floor rail",
+    "center": [
+      -0.205,
+      -0.32,
+      -2.99
+    ],
+    "half": [
+      0.022,
+      0.045,
+      0.28
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.008
+  },
+  {
+    "name": "seat floor rail",
+    "center": [
+      0.205,
+      -0.32,
+      -2.99
+    ],
+    "half": [
+      0.022,
+      0.045,
+      0.28
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.008
+  },
+  {
+    "name": "seat pan carbon shell",
+    "center": [
+      0,
+      -0.205,
+      -2.98
+    ],
+    "half": [
+      0.275,
+      0.045,
+      0.3
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "seat pan cushion",
+    "center": [
+      0,
+      -0.14,
+      -2.98
+    ],
+    "half": [
+      0.235,
+      0.055,
+      0.265
+    ],
+    "kind": "box",
+    "material": 114,
+    "radius": 0.025
+  },
+  {
+    "name": "seat back shell",
+    "center": [
+      0,
+      0.175,
+      -2.615
+    ],
+    "half": [
+      0.28,
+      0.32,
+      0.055
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "seat back pad",
+    "center": [
+      0,
+      0.175,
+      -2.68
+    ],
+    "half": [
+      0.218,
+      0.3,
+      0.04
+    ],
+    "kind": "box",
+    "material": 114,
+    "radius": 0.018
+  },
+  {
+    "name": "lumbar side bolster",
+    "center": [
+      -0.25,
+      0.04,
+      -2.755
+    ],
+    "half": [
+      0.035,
+      0.175,
+      0.09
+    ],
+    "kind": "box",
+    "material": 114,
+    "radius": 0.016
+  },
+  {
+    "name": "pan side bolster",
+    "center": [
+      -0.245,
+      -0.1,
+      -2.99
+    ],
+    "half": [
+      0.022,
+      0.055,
+      0.23
+    ],
+    "kind": "box",
+    "material": 114,
+    "radius": 0.015
+  },
+  {
+    "name": "shoulder harness",
+    "center": [
+      -0.1,
+      0.205,
+      -2.726
+    ],
+    "half": [
+      0.026,
+      0.265,
+      0.01
+    ],
+    "kind": "box",
+    "material": 116,
+    "radius": 0.004
+  },
+  {
+    "name": "harness lower diagonal",
+    "center": [
+      -0.0775,
+      -0.0825,
+      -2.778
+    ],
+    "half": [
+      0.036500000000000005,
+      0.0415,
+      0.06600000000000004
+    ],
+    "kind": "capsule",
+    "material": 116,
+    "radius": 0.014,
+    "a": [
+      -0.1,
+      -0.055,
+      -2.726
+    ],
+    "b": [
+      -0.055,
+      -0.11,
+      -2.83
+    ]
+  },
+  {
+    "name": "lap webbing",
+    "center": [
+      -0.115,
+      -0.075,
+      -2.86
+    ],
+    "half": [
+      0.09,
+      0.01,
+      0.032
+    ],
+    "kind": "box",
+    "material": 116,
+    "radius": 0.004
+  },
+  {
+    "name": "lumbar side bolster",
+    "center": [
+      0.25,
+      0.04,
+      -2.755
+    ],
+    "half": [
+      0.035,
+      0.175,
+      0.09
+    ],
+    "kind": "box",
+    "material": 114,
+    "radius": 0.016
+  },
+  {
+    "name": "pan side bolster",
+    "center": [
+      0.245,
+      -0.1,
+      -2.99
+    ],
+    "half": [
+      0.022,
+      0.055,
+      0.23
+    ],
+    "kind": "box",
+    "material": 114,
+    "radius": 0.015
+  },
+  {
+    "name": "shoulder harness",
+    "center": [
+      0.1,
+      0.205,
+      -2.726
+    ],
+    "half": [
+      0.026,
+      0.265,
+      0.01
+    ],
+    "kind": "box",
+    "material": 116,
+    "radius": 0.004
+  },
+  {
+    "name": "harness lower diagonal",
+    "center": [
+      0.0775,
+      -0.0825,
+      -2.778
+    ],
+    "half": [
+      0.036500000000000005,
+      0.0415,
+      0.06600000000000004
+    ],
+    "kind": "capsule",
+    "material": 116,
+    "radius": 0.014,
+    "a": [
+      0.1,
+      -0.055,
+      -2.726
+    ],
+    "b": [
+      0.055,
+      -0.11,
+      -2.83
+    ]
+  },
+  {
+    "name": "lap webbing",
+    "center": [
+      0.115,
+      -0.075,
+      -2.86
+    ],
+    "half": [
+      0.09,
+      0.01,
+      0.032
+    ],
+    "kind": "box",
+    "material": 116,
+    "radius": 0.004
+  },
+  {
+    "name": "harness release buckle",
+    "center": [
+      0,
+      -0.07,
+      -2.84
+    ],
+    "half": [
+      0.036,
+      0.018,
+      0.04
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.008
+  },
+  {
+    "name": "buckle release face",
+    "center": [
+      0,
+      -0.05,
+      -2.84
+    ],
+    "half": [
+      0.025,
+      0.009,
+      0.027
+    ],
+    "kind": "box",
+    "material": 111,
+    "radius": 0.004
+  },
+  {
+    "name": "headrest shell",
+    "center": [
+      0,
+      0.562,
+      -2.69
+    ],
+    "half": [
+      0.178,
+      0.1,
+      0.065
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "headrest cushion",
+    "center": [
+      0,
+      0.562,
+      -2.762
+    ],
+    "half": [
+      0.15,
+      0.083,
+      0.022
+    ],
+    "kind": "box",
+    "material": 114,
+    "radius": 0.014
+  },
+  {
+    "name": "headrest datum",
+    "center": [
+      -0.075,
+      0.58,
+      -2.788
+    ],
+    "half": [
+      0.013,
+      0.045,
+      0.009
+    ],
+    "kind": "box",
+    "material": 115,
+    "radius": 0.004
+  },
+  {
+    "name": "headrest datum",
+    "center": [
+      0.075,
+      0.58,
+      -2.788
+    ],
+    "half": [
+      0.013,
+      0.045,
+      0.009
+    ],
+    "kind": "box",
+    "material": 115,
+    "radius": 0.004
+  },
+  {
+    "name": "pitch fixed pivot socket",
+    "center": [
+      0.32,
+      -0.315,
+      -3.15
+    ],
+    "half": [
+      0.05,
+      0.06,
+      0.055
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "throttle fixed pivot socket",
+    "center": [
+      -0.37,
+      -0.3025,
+      -3.12
+    ],
+    "half": [
+      0.05,
+      0.0725,
+      0.055
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "pedal fixed slider rail",
+    "center": [
+      -0.17,
+      -0.335,
+      -3.9
+    ],
+    "half": [
+      0.03,
+      0.022,
+      0.24
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.008
+  },
+  {
+    "name": "pedal fixed slider rail",
+    "center": [
+      0.17,
+      -0.335,
+      -3.9
+    ],
+    "half": [
+      0.03,
+      0.022,
+      0.24
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.008
+  },
+  {
+    "name": "side avionics console",
+    "center": [
+      -0.488,
+      -0.16,
+      -3.49
+    ],
+    "half": [
+      0.067,
+      0.07,
+      0.37
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "side service touch slab",
+    "center": [
+      -0.489,
+      -0.08,
+      -3.66
+    ],
+    "half": [
+      0.049,
+      0.012,
+      0.13
+    ],
+    "kind": "box",
+    "material": 117,
+    "radius": 0.008
+  },
+  {
+    "name": "static test key",
+    "center": [
+      -0.489,
+      -0.075,
+      -3.4
+    ],
+    "half": [
+      0.029,
+      0.015,
+      0.019
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.005
+  },
+  {
+    "name": "static test key",
+    "center": [
+      -0.489,
+      -0.075,
+      -3.34
+    ],
+    "half": [
+      0.029,
+      0.015,
+      0.019
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.005
+  },
+  {
+    "name": "static test key",
+    "center": [
+      -0.489,
+      -0.075,
+      -3.28
+    ],
+    "half": [
+      0.029,
+      0.015,
+      0.019
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.005
+  },
+  {
+    "name": "console amber task strip",
+    "center": [
+      -0.42,
+      -0.095,
+      -3.66
+    ],
+    "half": [
+      0.01,
+      0.01,
+      0.17999999999999994
+    ],
+    "kind": "capsule",
+    "material": 115,
+    "radius": 0.01,
+    "a": [
+      -0.42,
+      -0.095,
+      -3.83
+    ],
+    "b": [
+      -0.42,
+      -0.095,
+      -3.49
+    ]
+  },
+  {
+    "name": "rear vent housing",
+    "center": [
+      -0.384,
+      0.12,
+      -2.66
+    ],
+    "half": [
+      0.065,
+      0.16,
+      0.04
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "rear vent louver",
+    "center": [
+      -0.384,
+      -0.005,
+      -2.708
+    ],
+    "half": [
+      0.05,
+      0.01,
+      0.01
+    ],
+    "kind": "box",
+    "material": 118,
+    "radius": 0.004
+  },
+  {
+    "name": "rear vent louver",
+    "center": [
+      -0.384,
+      0.045,
+      -2.708
+    ],
+    "half": [
+      0.05,
+      0.01,
+      0.01
+    ],
+    "kind": "box",
+    "material": 118,
+    "radius": 0.004
+  },
+  {
+    "name": "rear vent louver",
+    "center": [
+      -0.384,
+      0.095,
+      -2.708
+    ],
+    "half": [
+      0.05,
+      0.01,
+      0.01
+    ],
+    "kind": "box",
+    "material": 118,
+    "radius": 0.004
+  },
+  {
+    "name": "rear vent louver",
+    "center": [
+      -0.384,
+      0.145,
+      -2.708
+    ],
+    "half": [
+      0.05,
+      0.01,
+      0.01
+    ],
+    "kind": "box",
+    "material": 118,
+    "radius": 0.004
+  },
+  {
+    "name": "rear vent louver",
+    "center": [
+      -0.384,
+      0.195,
+      -2.708
+    ],
+    "half": [
+      0.05,
+      0.01,
+      0.01
+    ],
+    "kind": "box",
+    "material": 118,
+    "radius": 0.004
+  },
+  {
+    "name": "rear vent louver",
+    "center": [
+      -0.384,
+      0.245,
+      -2.708
+    ],
+    "half": [
+      0.05,
+      0.01,
+      0.01
+    ],
+    "kind": "box",
+    "material": 118,
+    "radius": 0.004
+  },
+  {
+    "name": "side structural longeron",
+    "center": [
+      -0.552,
+      0.095,
+      -3.455
+    ],
+    "half": [
+      0.018,
+      0.018,
+      0.5330000000000001
+    ],
+    "kind": "capsule",
+    "material": 119,
+    "radius": 0.018,
+    "a": [
+      -0.552,
+      0.095,
+      -3.97
+    ],
+    "b": [
+      -0.552,
+      0.095,
+      -2.94
+    ]
+  },
+  {
+    "name": "side avionics console",
+    "center": [
+      0.488,
+      -0.16,
+      -3.49
+    ],
+    "half": [
+      0.067,
+      0.07,
+      0.37
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "side service touch slab",
+    "center": [
+      0.489,
+      -0.08,
+      -3.66
+    ],
+    "half": [
+      0.049,
+      0.012,
+      0.13
+    ],
+    "kind": "box",
+    "material": 117,
+    "radius": 0.008
+  },
+  {
+    "name": "static test key",
+    "center": [
+      0.489,
+      -0.075,
+      -3.4
+    ],
+    "half": [
+      0.029,
+      0.015,
+      0.019
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.005
+  },
+  {
+    "name": "static test key",
+    "center": [
+      0.489,
+      -0.075,
+      -3.34
+    ],
+    "half": [
+      0.029,
+      0.015,
+      0.019
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.005
+  },
+  {
+    "name": "static test key",
+    "center": [
+      0.489,
+      -0.075,
+      -3.28
+    ],
+    "half": [
+      0.029,
+      0.015,
+      0.019
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.005
+  },
+  {
+    "name": "console amber task strip",
+    "center": [
+      0.42,
+      -0.095,
+      -3.66
+    ],
+    "half": [
+      0.01,
+      0.01,
+      0.17999999999999994
+    ],
+    "kind": "capsule",
+    "material": 115,
+    "radius": 0.01,
+    "a": [
+      0.42,
+      -0.095,
+      -3.83
+    ],
+    "b": [
+      0.42,
+      -0.095,
+      -3.49
+    ]
+  },
+  {
+    "name": "rear vent housing",
+    "center": [
+      0.384,
+      0.12,
+      -2.66
+    ],
+    "half": [
+      0.065,
+      0.16,
+      0.04
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "rear vent louver",
+    "center": [
+      0.384,
+      -0.005,
+      -2.708
+    ],
+    "half": [
+      0.05,
+      0.01,
+      0.01
+    ],
+    "kind": "box",
+    "material": 118,
+    "radius": 0.004
+  },
+  {
+    "name": "rear vent louver",
+    "center": [
+      0.384,
+      0.045,
+      -2.708
+    ],
+    "half": [
+      0.05,
+      0.01,
+      0.01
+    ],
+    "kind": "box",
+    "material": 118,
+    "radius": 0.004
+  },
+  {
+    "name": "rear vent louver",
+    "center": [
+      0.384,
+      0.095,
+      -2.708
+    ],
+    "half": [
+      0.05,
+      0.01,
+      0.01
+    ],
+    "kind": "box",
+    "material": 118,
+    "radius": 0.004
+  },
+  {
+    "name": "rear vent louver",
+    "center": [
+      0.384,
+      0.145,
+      -2.708
+    ],
+    "half": [
+      0.05,
+      0.01,
+      0.01
+    ],
+    "kind": "box",
+    "material": 118,
+    "radius": 0.004
+  },
+  {
+    "name": "rear vent louver",
+    "center": [
+      0.384,
+      0.195,
+      -2.708
+    ],
+    "half": [
+      0.05,
+      0.01,
+      0.01
+    ],
+    "kind": "box",
+    "material": 118,
+    "radius": 0.004
+  },
+  {
+    "name": "rear vent louver",
+    "center": [
+      0.384,
+      0.245,
+      -2.708
+    ],
+    "half": [
+      0.05,
+      0.01,
+      0.01
+    ],
+    "kind": "box",
+    "material": 118,
+    "radius": 0.004
+  },
+  {
+    "name": "side structural longeron",
+    "center": [
+      0.552,
+      0.095,
+      -3.455
+    ],
+    "half": [
+      0.018,
+      0.018,
+      0.5330000000000001
+    ],
+    "kind": "capsule",
+    "material": 119,
+    "radius": 0.018,
+    "a": [
+      0.552,
+      0.095,
+      -3.97
+    ],
+    "b": [
+      0.552,
+      0.095,
+      -2.94
+    ]
+  },
+  {
+    "name": "arch leg",
+    "center": [
+      -0.555,
+      0.24,
+      -3.02
+    ],
+    "half": [
+      0.02,
+      0.19999999999999998,
+      0.02
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.02,
+    "a": [
+      -0.555,
+      0.06,
+      -3.02
+    ],
+    "b": [
+      -0.555,
+      0.42,
+      -3.02
+    ]
+  },
+  {
+    "name": "arch chamfer",
+    "center": [
+      -0.46,
+      0.5475,
+      -3.02
+    ],
+    "half": [
+      0.11500000000000003,
+      0.14750000000000002,
+      0.02
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.02,
+    "a": [
+      -0.555,
+      0.42,
+      -3.02
+    ],
+    "b": [
+      -0.365,
+      0.675,
+      -3.02
+    ]
+  },
+  {
+    "name": "arch leg",
+    "center": [
+      0.555,
+      0.24,
+      -3.02
+    ],
+    "half": [
+      0.02,
+      0.19999999999999998,
+      0.02
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.02,
+    "a": [
+      0.555,
+      0.06,
+      -3.02
+    ],
+    "b": [
+      0.555,
+      0.42,
+      -3.02
+    ]
+  },
+  {
+    "name": "arch chamfer",
+    "center": [
+      0.46,
+      0.5475,
+      -3.02
+    ],
+    "half": [
+      0.11500000000000003,
+      0.14750000000000002,
+      0.02
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.02,
+    "a": [
+      0.555,
+      0.42,
+      -3.02
+    ],
+    "b": [
+      0.365,
+      0.675,
+      -3.02
+    ]
+  },
+  {
+    "name": "arch crown",
+    "center": [
+      0.0,
+      0.675,
+      -3.02
+    ],
+    "half": [
+      0.385,
+      0.02,
+      0.02
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.02,
+    "a": [
+      -0.365,
+      0.675,
+      -3.02
+    ],
+    "b": [
+      0.365,
+      0.675,
+      -3.02
+    ]
+  },
+  {
+    "name": "ceiling task housing",
+    "center": [
+      -0.215,
+      0.731,
+      -3.58
+    ],
+    "half": [
+      0.07,
+      0.02,
+      0.2
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "ceiling task diffuser",
+    "center": [
+      -0.215,
+      0.706,
+      -3.58
+    ],
+    "half": [
+      0.045,
+      0.01,
+      0.17
+    ],
+    "kind": "box",
+    "material": 115,
+    "radius": 0.005
+  },
+  {
+    "name": "ceiling task housing",
+    "center": [
+      0.215,
+      0.731,
+      -3.58
+    ],
+    "half": [
+      0.07,
+      0.02,
+      0.2
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "ceiling task diffuser",
+    "center": [
+      0.215,
+      0.706,
+      -3.58
+    ],
+    "half": [
+      0.045,
+      0.01,
+      0.17
+    ],
+    "kind": "box",
+    "material": 115,
+    "radius": 0.005
+  },
+  {
+    "name": "instrument blade",
+    "center": [
+      0,
+      0.05,
+      -4.055
+    ],
+    "half": [
+      0.435,
+      0.175,
+      0.045
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "instrument surround",
+    "center": [
+      -0.266,
+      0.07,
+      -4.0
+    ],
+    "half": [
+      0.14,
+      0.115,
+      0.025
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.008
+  },
+  {
+    "name": "instrument face",
+    "center": [
+      -0.266,
+      0.07,
+      -3.97
+    ],
+    "half": [
+      0.118,
+      0.093,
+      0.012
+    ],
+    "kind": "box",
+    "material": 117,
+    "radius": 0.008
+  },
+  {
+    "name": "static switch stem",
+    "center": [
+      -0.18,
+      -0.1,
+      -3.982
+    ],
+    "half": [
+      0.011,
+      0.011,
+      0.0259999999999999
+    ],
+    "kind": "capsule",
+    "material": 119,
+    "radius": 0.011,
+    "a": [
+      -0.18,
+      -0.1,
+      -3.997
+    ],
+    "b": [
+      -0.18,
+      -0.1,
+      -3.967
+    ]
+  },
+  {
+    "name": "static switch stem",
+    "center": [
+      -0.25,
+      -0.1,
+      -3.982
+    ],
+    "half": [
+      0.011,
+      0.011,
+      0.0259999999999999
+    ],
+    "kind": "capsule",
+    "material": 119,
+    "radius": 0.011,
+    "a": [
+      -0.25,
+      -0.1,
+      -3.997
+    ],
+    "b": [
+      -0.25,
+      -0.1,
+      -3.967
+    ]
+  },
+  {
+    "name": "static switch stem",
+    "center": [
+      -0.32,
+      -0.1,
+      -3.982
+    ],
+    "half": [
+      0.011,
+      0.011,
+      0.0259999999999999
+    ],
+    "kind": "capsule",
+    "material": 119,
+    "radius": 0.011,
+    "a": [
+      -0.32,
+      -0.1,
+      -3.997
+    ],
+    "b": [
+      -0.32,
+      -0.1,
+      -3.967
+    ]
+  },
+  {
+    "name": "switch guard",
+    "center": [
+      -0.27,
+      -0.145,
+      -3.98
+    ],
+    "half": [
+      0.12,
+      0.01,
+      0.025
+    ],
+    "kind": "box",
+    "material": 111,
+    "radius": 0.004
+  },
+  {
+    "name": "instrument surround",
+    "center": [
+      0.266,
+      0.07,
+      -4.0
+    ],
+    "half": [
+      0.14,
+      0.115,
+      0.025
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.008
+  },
+  {
+    "name": "instrument face",
+    "center": [
+      0.266,
+      0.07,
+      -3.97
+    ],
+    "half": [
+      0.118,
+      0.093,
+      0.012
+    ],
+    "kind": "box",
+    "material": 117,
+    "radius": 0.008
+  },
+  {
+    "name": "static switch stem",
+    "center": [
+      0.18,
+      -0.1,
+      -3.982
+    ],
+    "half": [
+      0.011,
+      0.011,
+      0.0259999999999999
+    ],
+    "kind": "capsule",
+    "material": 119,
+    "radius": 0.011,
+    "a": [
+      0.18,
+      -0.1,
+      -3.997
+    ],
+    "b": [
+      0.18,
+      -0.1,
+      -3.967
+    ]
+  },
+  {
+    "name": "static switch stem",
+    "center": [
+      0.25,
+      -0.1,
+      -3.982
+    ],
+    "half": [
+      0.011,
+      0.011,
+      0.0259999999999999
+    ],
+    "kind": "capsule",
+    "material": 119,
+    "radius": 0.011,
+    "a": [
+      0.25,
+      -0.1,
+      -3.997
+    ],
+    "b": [
+      0.25,
+      -0.1,
+      -3.967
+    ]
+  },
+  {
+    "name": "static switch stem",
+    "center": [
+      0.32,
+      -0.1,
+      -3.982
+    ],
+    "half": [
+      0.011,
+      0.011,
+      0.0259999999999999
+    ],
+    "kind": "capsule",
+    "material": 119,
+    "radius": 0.011,
+    "a": [
+      0.32,
+      -0.1,
+      -3.997
+    ],
+    "b": [
+      0.32,
+      -0.1,
+      -3.967
+    ]
+  },
+  {
+    "name": "switch guard",
+    "center": [
+      0.27,
+      -0.145,
+      -3.98
+    ],
+    "half": [
+      0.12,
+      0.01,
+      0.025
+    ],
+    "kind": "box",
+    "material": 111,
+    "radius": 0.004
+  },
+  {
+    "name": "center systems panel",
+    "center": [
+      0,
+      0.05,
+      -3.99
+    ],
+    "half": [
+      0.082,
+      0.112,
+      0.027
+    ],
+    "kind": "box",
+    "material": 113,
+    "radius": 0.008
+  },
+  {
+    "name": "center annunciator",
+    "center": [
+      0,
+      -0.025,
+      -3.953
+    ],
+    "half": [
+      0.051,
+      0.012,
+      0.011
+    ],
+    "kind": "box",
+    "material": 115,
+    "radius": 0.004
+  },
+  {
+    "name": "center annunciator",
+    "center": [
+      0,
+      0.025,
+      -3.953
+    ],
+    "half": [
+      0.051,
+      0.012,
+      0.011
+    ],
+    "kind": "box",
+    "material": 115,
+    "radius": 0.004
+  },
+  {
+    "name": "center annunciator",
+    "center": [
+      0,
+      0.075,
+      -3.953
+    ],
+    "half": [
+      0.051,
+      0.012,
+      0.011
+    ],
+    "kind": "box",
+    "material": 115,
+    "radius": 0.004
+  },
+  {
+    "name": "center annunciator",
+    "center": [
+      0,
+      0.125,
+      -3.953
+    ],
+    "half": [
+      0.051,
+      0.012,
+      0.011
+    ],
+    "kind": "box",
+    "material": 115,
+    "radius": 0.004
+  },
+  {
+    "name": "front camera slab",
+    "center": [
+      0,
+      0.41,
+      -4.135
+    ],
+    "half": [
+      0.41,
+      0.177,
+      0.012
+    ],
+    "kind": "box",
+    "material": 112,
+    "radius": 0.006
+  },
+  {
+    "name": "front pane side frame",
+    "center": [
+      -0.428,
+      0.41,
+      -4.128
+    ],
+    "half": [
+      0.012,
+      0.19,
+      0.023
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.004
+  },
+  {
+    "name": "front pane side frame",
+    "center": [
+      0.428,
+      0.41,
+      -4.128
+    ],
+    "half": [
+      0.012,
+      0.19,
+      0.023
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.004
+  },
+  {
+    "name": "front pane horizontal frame",
+    "center": [
+      0,
+      0.215,
+      -4.128
+    ],
+    "half": [
+      0.436,
+      0.01,
+      0.023
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.004
+  },
+  {
+    "name": "front pane horizontal frame",
+    "center": [
+      0,
+      0.605,
+      -4.128
+    ],
+    "half": [
+      0.436,
+      0.01,
+      0.023
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.004
+  },
+  {
+    "name": "side camera slab",
+    "center": [
+      -0.559,
+      0.365,
+      -3.51
+    ],
+    "half": [
+      0.012,
+      0.172,
+      0.37
+    ],
+    "kind": "box",
+    "material": 112,
+    "radius": 0.006
+  },
+  {
+    "name": "side pane end frame",
+    "center": [
+      -0.551,
+      0.365,
+      -3.896
+    ],
+    "half": [
+      0.023,
+      0.185,
+      0.01
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.004
+  },
+  {
+    "name": "side pane end frame",
+    "center": [
+      -0.551,
+      0.365,
+      -3.124
+    ],
+    "half": [
+      0.023,
+      0.185,
+      0.01
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.004
+  },
+  {
+    "name": "side pane horizontal frame",
+    "center": [
+      -0.551,
+      0.176,
+      -3.51
+    ],
+    "half": [
+      0.023,
+      0.011,
+      0.39
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.004
+  },
+  {
+    "name": "side pane horizontal frame",
+    "center": [
+      -0.551,
+      0.554,
+      -3.51
+    ],
+    "half": [
+      0.023,
+      0.011,
+      0.39
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.004
+  },
+  {
+    "name": "side camera slab",
+    "center": [
+      0.559,
+      0.365,
+      -3.51
+    ],
+    "half": [
+      0.012,
+      0.172,
+      0.37
+    ],
+    "kind": "box",
+    "material": 112,
+    "radius": 0.006
+  },
+  {
+    "name": "side pane end frame",
+    "center": [
+      0.551,
+      0.365,
+      -3.896
+    ],
+    "half": [
+      0.023,
+      0.185,
+      0.01
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.004
+  },
+  {
+    "name": "side pane end frame",
+    "center": [
+      0.551,
+      0.365,
+      -3.124
+    ],
+    "half": [
+      0.023,
+      0.185,
+      0.01
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.004
+  },
+  {
+    "name": "side pane horizontal frame",
+    "center": [
+      0.551,
+      0.176,
+      -3.51
+    ],
+    "half": [
+      0.023,
+      0.011,
+      0.39
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.004
+  },
+  {
+    "name": "side pane horizontal frame",
+    "center": [
+      0.551,
+      0.554,
+      -3.51
+    ],
+    "half": [
+      0.023,
+      0.011,
+      0.39
+    ],
+    "kind": "box",
+    "material": 119,
+    "radius": 0.004
+  },
+  {
+    "name": "ceiling fixture carrier",
+    "center": [
+      -0.215,
+      0.6950000000000001,
+      -3.3
+    ],
+    "half": [
+      0.014,
+      0.03399999999999996,
+      0.29400000000000004
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.014,
+    "a": [
+      -0.215,
+      0.715,
+      -3.58
+    ],
+    "b": [
+      -0.215,
+      0.675,
+      -3.02
+    ]
+  },
+  {
+    "name": "console floor outrigger",
+    "center": [
+      -0.405,
+      -0.2825,
+      -3.75
+    ],
+    "half": [
+      0.08299999999999998,
+      0.10049999999999999,
+      0.018
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.018,
+    "a": [
+      -0.47,
+      -0.2,
+      -3.75
+    ],
+    "b": [
+      -0.34,
+      -0.365,
+      -3.75
+    ]
+  },
+  {
+    "name": "sill console support",
+    "center": [
+      -0.551,
+      -0.0325,
+      -3.75
+    ],
+    "half": [
+      0.017,
+      0.14350000000000002,
+      0.016
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.016,
+    "a": [
+      -0.55,
+      -0.16,
+      -3.75
+    ],
+    "b": [
+      -0.552,
+      0.095,
+      -3.75
+    ]
+  },
+  {
+    "name": "console floor outrigger",
+    "center": [
+      -0.405,
+      -0.2825,
+      -3.35
+    ],
+    "half": [
+      0.08299999999999998,
+      0.10049999999999999,
+      0.018
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.018,
+    "a": [
+      -0.47,
+      -0.2,
+      -3.35
+    ],
+    "b": [
+      -0.34,
+      -0.365,
+      -3.35
+    ]
+  },
+  {
+    "name": "sill console support",
+    "center": [
+      -0.551,
+      -0.0325,
+      -3.35
+    ],
+    "half": [
+      0.017,
+      0.14350000000000002,
+      0.016
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.016,
+    "a": [
+      -0.55,
+      -0.16,
+      -3.35
+    ],
+    "b": [
+      -0.552,
+      0.095,
+      -3.35
+    ]
+  },
+  {
+    "name": "pane sill bracket",
+    "center": [
+      -0.5515000000000001,
+      0.1325,
+      -3.8
+    ],
+    "half": [
+      0.0155,
+      0.052500000000000005,
+      0.015
+    ],
+    "kind": "capsule",
+    "material": 119,
+    "radius": 0.015,
+    "a": [
+      -0.551,
+      0.17,
+      -3.8
+    ],
+    "b": [
+      -0.552,
+      0.095,
+      -3.8
+    ]
+  },
+  {
+    "name": "pane sill bracket",
+    "center": [
+      -0.5515000000000001,
+      0.1325,
+      -3.2
+    ],
+    "half": [
+      0.0155,
+      0.052500000000000005,
+      0.015
+    ],
+    "kind": "capsule",
+    "material": 119,
+    "radius": 0.015,
+    "a": [
+      -0.551,
+      0.17,
+      -3.2
+    ],
+    "b": [
+      -0.552,
+      0.095,
+      -3.2
+    ]
+  },
+  {
+    "name": "instrument floor support",
+    "center": [
+      -0.3,
+      -0.23249999999999998,
+      -4.0
+    ],
+    "half": [
+      0.018,
+      0.1505,
+      0.0379999999999998
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.018,
+    "a": [
+      -0.3,
+      -0.1,
+      -4.02
+    ],
+    "b": [
+      -0.3,
+      -0.365,
+      -3.98
+    ]
+  },
+  {
+    "name": "vent seat bracket",
+    "center": [
+      -0.315,
+      0.12,
+      -2.65
+    ],
+    "half": [
+      0.081,
+      0.016,
+      0.016
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.016,
+    "a": [
+      -0.25,
+      0.12,
+      -2.65
+    ],
+    "b": [
+      -0.38,
+      0.12,
+      -2.65
+    ]
+  },
+  {
+    "name": "ceiling fixture carrier",
+    "center": [
+      0.215,
+      0.6950000000000001,
+      -3.3
+    ],
+    "half": [
+      0.014,
+      0.03399999999999996,
+      0.29400000000000004
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.014,
+    "a": [
+      0.215,
+      0.715,
+      -3.58
+    ],
+    "b": [
+      0.215,
+      0.675,
+      -3.02
+    ]
+  },
+  {
+    "name": "console floor outrigger",
+    "center": [
+      0.405,
+      -0.2825,
+      -3.75
+    ],
+    "half": [
+      0.08299999999999998,
+      0.10049999999999999,
+      0.018
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.018,
+    "a": [
+      0.47,
+      -0.2,
+      -3.75
+    ],
+    "b": [
+      0.34,
+      -0.365,
+      -3.75
+    ]
+  },
+  {
+    "name": "sill console support",
+    "center": [
+      0.551,
+      -0.0325,
+      -3.75
+    ],
+    "half": [
+      0.017,
+      0.14350000000000002,
+      0.016
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.016,
+    "a": [
+      0.55,
+      -0.16,
+      -3.75
+    ],
+    "b": [
+      0.552,
+      0.095,
+      -3.75
+    ]
+  },
+  {
+    "name": "console floor outrigger",
+    "center": [
+      0.405,
+      -0.2825,
+      -3.35
+    ],
+    "half": [
+      0.08299999999999998,
+      0.10049999999999999,
+      0.018
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.018,
+    "a": [
+      0.47,
+      -0.2,
+      -3.35
+    ],
+    "b": [
+      0.34,
+      -0.365,
+      -3.35
+    ]
+  },
+  {
+    "name": "sill console support",
+    "center": [
+      0.551,
+      -0.0325,
+      -3.35
+    ],
+    "half": [
+      0.017,
+      0.14350000000000002,
+      0.016
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.016,
+    "a": [
+      0.55,
+      -0.16,
+      -3.35
+    ],
+    "b": [
+      0.552,
+      0.095,
+      -3.35
+    ]
+  },
+  {
+    "name": "pane sill bracket",
+    "center": [
+      0.5515000000000001,
+      0.1325,
+      -3.8
+    ],
+    "half": [
+      0.0155,
+      0.052500000000000005,
+      0.015
+    ],
+    "kind": "capsule",
+    "material": 119,
+    "radius": 0.015,
+    "a": [
+      0.551,
+      0.17,
+      -3.8
+    ],
+    "b": [
+      0.552,
+      0.095,
+      -3.8
+    ]
+  },
+  {
+    "name": "pane sill bracket",
+    "center": [
+      0.5515000000000001,
+      0.1325,
+      -3.2
+    ],
+    "half": [
+      0.0155,
+      0.052500000000000005,
+      0.015
+    ],
+    "kind": "capsule",
+    "material": 119,
+    "radius": 0.015,
+    "a": [
+      0.551,
+      0.17,
+      -3.2
+    ],
+    "b": [
+      0.552,
+      0.095,
+      -3.2
+    ]
+  },
+  {
+    "name": "instrument floor support",
+    "center": [
+      0.3,
+      -0.23249999999999998,
+      -4.0
+    ],
+    "half": [
+      0.018,
+      0.1505,
+      0.0379999999999998
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.018,
+    "a": [
+      0.3,
+      -0.1,
+      -4.02
+    ],
+    "b": [
+      0.3,
+      -0.365,
+      -3.98
+    ]
+  },
+  {
+    "name": "vent seat bracket",
+    "center": [
+      0.315,
+      0.12,
+      -2.65
+    ],
+    "half": [
+      0.081,
+      0.016,
+      0.016
+    ],
+    "kind": "capsule",
+    "material": 113,
+    "radius": 0.016,
+    "a": [
+      0.25,
+      0.12,
+      -2.65
+    ],
+    "b": [
+      0.38,
+      0.12,
+      -2.65
+    ]
+  }
+]

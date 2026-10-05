@@ -1,0 +1,179 @@
+{
+  "neutral": {
+    "mirror_pairs": 80000,
+    "max_distance_error_m": 0.0
+  },
+  "unequal_stores": {
+    "mirror_pairs": 80000,
+    "max_distance_error_m": 0.0
+  },
+  "gear_half": {
+    "mirror_pairs": 80000,
+    "max_distance_error_m": 0.0
+  },
+  "gear_down": {
+    "mirror_pairs": 80000,
+    "max_distance_error_m": 0.0
+  },
+  "pitch_flaps": {
+    "mirror_pairs": 80000,
+    "max_distance_error_m": 0.0
+  },
+  "roll_yaw": {
+    "mirror_pairs": 80000,
+    "max_distance_error_m": 0.0
+  },
+  "bay_half": {
+    "mirror_pairs": 80000,
+    "max_distance_error_m": 0.0
+  },
+  "bay_open": {
+    "mirror_pairs": 80000,
+    "max_distance_error_m": 0.0
+  },
+  "wing_fill_12": {
+    "interior_parent_points": 1001,
+    "unfilled_points": 0
+  },
+  "wing_fill_14": {
+    "interior_parent_points": 6666,
+    "unfilled_points": 0
+  },
+  "rudder_fill": {
+    "interior_parent_points": 11488,
+    "unfilled_points": 0
+  },
+  "bay_closed_skin": {
+    "points": 60000,
+    "holes": 0
+  },
+  "gear_closed_skin_23": {
+    "points": 6000,
+    "holes": 0
+  },
+  "gear_closed_skin_24": {
+    "points": 6000,
+    "holes": 0
+  },
+  "gear_closed_skin_25": {
+    "points": 6000,
+    "holes": 0
+  },
+  "hinge_12": {
+    "split_plane_m": 0.620000000040995,
+    "target": 0.62
+  },
+  "hinge_13": {
+    "split_plane_m": 0.620000000040995,
+    "target": 0.62
+  },
+  "hinge_14": {
+    "split_plane_m": 0.6200000000409951,
+    "target": 0.62
+  },
+  "hinge_15": {
+    "split_plane_m": 0.6200000000409951,
+    "target": 0.62
+  },
+  "hinge_16": {
+    "split_plane_m": 0.4900003011780098,
+    "target": 0.49
+  },
+  "motion_clearance_12": {
+    "volume_probes": 28035,
+    "states": 9,
+    "maximum_penetration_m": 0.0
+  },
+  "motion_clearance_13": {
+    "volume_probes": 27576,
+    "states": 9,
+    "maximum_penetration_m": 0.0
+  },
+  "motion_clearance_14": {
+    "volume_probes": 74529,
+    "states": 9,
+    "maximum_penetration_m": 0.0
+  },
+  "motion_clearance_15": {
+    "volume_probes": 74178,
+    "states": 9,
+    "maximum_penetration_m": 0.0
+  },
+  "motion_clearance_16": {
+    "volume_probes": 59400,
+    "states": 9,
+    "maximum_penetration_m": 0.0
+  },
+  "closed_cabin": {
+    "boundary_rays": 6000,
+    "max_boundary_residual_m": 4.470348358154297e-07,
+    "minimum_parent_hull_margin_m": 0.07014838606119156
+  },
+  "engine_join_-1": {
+    "path_points": 300,
+    "maximum_distance_m": -0.11999999731779099
+  },
+  "engine_join_1": {
+    "path_points": 300,
+    "maximum_distance_m": -0.11999999731779099
+  },
+  "carrier_guide_capture_32": {
+    "states": 21,
+    "guide_tips_per_state": 2,
+    "maximum_tip_center_distance_m": 0.0020000338554382324,
+    "tip_radius_m": 0.024,
+    "minimum_tip_overlap_m": 0.021999966144561768
+  },
+  "carrier_guide_capture_33": {
+    "states": 21,
+    "guide_tips_per_state": 2,
+    "maximum_tip_center_distance_m": 0.0020000338554382324,
+    "tip_radius_m": 0.024,
+    "minimum_tip_overlap_m": 0.021999966144561768
+  },
+  "camera_mounts": {
+    "exterior_distance_m": [
+      0.12209395319223404,
+      0.15807199478149414,
+      0.15807199478149414
+    ],
+    "hull_distance_m": [
+      0.12209395319223404,
+      0.15807199478149414,
+      0.15807199478149414
+    ],
+    "minimum_external_clearance_m": 0.12209395319223404
+  }
+}
+{'id': 41, 'state_samples': 81, 'surface_samples': 7360, 'minimum_static_clearance_m': 0.01200000000000001, 'closest_static_component': 'seat pan carbon shell', 'worst_state': -1.0, 'minimum_cavity_clearance_m': 0.237, 'intentional_mount_overlap_exempt': 'pitch fixed pivot socket', 'pass_no_unintended_collision': True}
+{'id': 42, 'state_samples': 81, 'surface_samples': 7360, 'minimum_static_clearance_m': 0.014000000000000012, 'closest_static_component': 'side avionics console', 'worst_state': 0.6375000000000001, 'minimum_cavity_clearance_m': 0.24137867460063714, 'intentional_mount_overlap_exempt': 'throttle fixed pivot socket', 'pass_no_unintended_collision': True}
+{'id': 43, 'state_samples': 81, 'surface_samples': 13126, 'minimum_static_clearance_m': 0.012000000058011343, 'closest_static_component': 'instrument floor support', 'worst_state': -0.725, 'minimum_cavity_clearance_m': 0.17955215601628374, 'intentional_mount_overlap_exempt': 'pedal fixed slider rail', 'pass_no_unintended_collision': True}
+{'id': 44, 'state_samples': 81, 'surface_samples': 13126, 'minimum_static_clearance_m': 0.012000000058011343, 'closest_static_component': 'instrument floor support', 'worst_state': -0.875, 'minimum_cavity_clearance_m': 0.17955215601628374, 'intentional_mount_overlap_exempt': 'pedal fixed slider rail', 'pass_no_unintended_collision': True}
+{
+  "mass_kg": 7990,
+  "wing_loading_Nm2": 2612.7300000000005,
+  "stall_clean_ms": 52.460010162292015,
+  "stall_flap_ms": 44.542541111569314,
+  "vr_ms": 50,
+  "vr_ratio": 1.1225223966176727,
+  "vref_ms": 58,
+  "vref_ratio": 1.3021259800765004,
+  "cruise_ms": 190,
+  "cruise_ratio": 3.2758620689655173,
+  "thrust_weight": 0.3827414237215479,
+  "Ixx_ref": 41765.327999999994,
+  "Iyy_ref": 92044.8,
+  "Izz_ref": 133810.128,
+  "planeBound": 10.3,
+  "wing_projected_plan_area_sample_m2": 28.70546875,
+  "spec_wing_area_m2": 30.0,
+  "wing_area_error_pct": -4.315104166666662,
+  "deployed_tyre_bottom_y": -2.115,
+  "physics_gear_height": 2.115,
+  "registered_parts": 31,
+  "geometry_time_dependency": false,
+  "flight_tests": "PASS isolated conventional flight suite at nominal7900kg and max7990kg; full game Tier B rendering/registry not integrated",
+  "bounds": "analytic conservative part enclosures inside radius10.3; see AUTHORING"
+}
+Enforced analytical/state/row-drift assertions PASS
+Interior containment and control sweep assertions PASS

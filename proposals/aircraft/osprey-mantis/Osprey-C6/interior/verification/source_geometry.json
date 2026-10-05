@@ -1,0 +1,33 @@
+{
+  "units": "metres",
+  "pilot_eye": [
+    -0.34,
+    0.74,
+    -1.9
+  ],
+  "wingroot_z": -0.8,
+  "passenger_seat_count": 4,
+  "row_centres_z": [
+    -0.38,
+    0.54
+  ],
+  "passenger_row_z_extents": [
+    [
+      -0.625,
+      -0.064833
+    ],
+    [
+      0.295,
+      0.855167
+    ]
+  ],
+  "row_to_row_gap": 0.359833,
+  "conservative_pilot_aft_z": -1.386573,
+  "first_passenger_front_z": -0.625,
+  "pilot_to_first_passenger_z_gap": 0.761573,
+  "sewn_channel_min_nominal_thickness": 0.008,
+  "containment_constraint": "max(distance,sdFuselage(p)+.090)",
+  "forward_brow_top_y": 0.599,
+  "pilot_eye_y": 0.74,
+  "scope": "Source-envelope arithmetic, distinct from runtime sampled shader checks. Rounded features and clipping taper; no certification."
+}

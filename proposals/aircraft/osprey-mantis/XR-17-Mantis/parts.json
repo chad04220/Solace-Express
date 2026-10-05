@@ -1,0 +1,564 @@
+{
+  "name": "XR-17 Mantis",
+  "coordinate_system": "+x right,+y up,+z aft; metres",
+  "parts": [
+    {
+      "id": 0,
+      "name": "pressure hull and permanent cavities",
+      "kind": "STATIC"
+    },
+    {
+      "id": 1,
+      "name": "fixed wings and rear fin",
+      "kind": "STATIC"
+    },
+    {
+      "id": 2,
+      "name": "fixed jet nacelles and sensor details",
+      "kind": "STATIC"
+    },
+    {
+      "id": 10,
+      "name": "port all-moving canard",
+      "kind": "HINGE",
+      "pivot": [
+        -0.85,
+        -0.15,
+        -3.6
+      ],
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "state": "gCtl.x",
+      "k": 0.22,
+      "c": 0
+    },
+    {
+      "id": 11,
+      "name": "starboard all-moving canard",
+      "kind": "HINGE",
+      "pivot": [
+        0.85,
+        -0.15,
+        -3.6
+      ],
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "state": "gCtl.x",
+      "k": 0.22,
+      "c": 0
+    },
+    {
+      "id": 12,
+      "name": "port aileron",
+      "kind": "HINGE",
+      "pivot": [
+        -4.753838379808,
+        -0.62,
+        1.023220897856
+      ],
+      "axis": [
+        -0.9363291776,
+        0,
+        -0.3511234416
+      ],
+      "state": "gCtl.y",
+      "k": -0.3,
+      "c": 0
+    },
+    {
+      "id": 13,
+      "name": "starboard aileron",
+      "kind": "HINGE",
+      "pivot": [
+        4.753838379808,
+        -0.62,
+        1.023220897856
+      ],
+      "axis": [
+        0.9363291776,
+        0,
+        -0.3511234416
+      ],
+      "state": "gCtl.y",
+      "k": -0.3,
+      "c": 0
+    },
+    {
+      "id": 14,
+      "name": "port flap",
+      "kind": "HINGE",
+      "pivot": [
+        -2.609644563104,
+        -0.62,
+        1.82729357912
+      ],
+      "axis": [
+        -0.9363291776,
+        0,
+        -0.3511234416
+      ],
+      "state": "gPS.y",
+      "k": -0.48,
+      "c": 0
+    },
+    {
+      "id": 15,
+      "name": "starboard flap",
+      "kind": "HINGE",
+      "pivot": [
+        2.609644563104,
+        -0.62,
+        1.82729357912
+      ],
+      "axis": [
+        0.9363291776,
+        0,
+        -0.3511234416
+      ],
+      "state": "gPS.y",
+      "k": 0.48,
+      "c": 0
+    },
+    {
+      "id": 16,
+      "name": "rudder",
+      "kind": "HINGE",
+      "pivot": [
+        0,
+        1.3875898,
+        5.63044957
+      ],
+      "axis": [
+        0,
+        0.939693,
+        -0.34202
+      ],
+      "state": "gCtl.z",
+      "k": 0.3,
+      "c": 0
+    },
+    {
+      "id": 20,
+      "name": "landing gear 20",
+      "kind": "SLIDE",
+      "rest_center": [
+        -1.6,
+        -0.28,
+        0.6
+      ],
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "state": "gPS.x",
+      "k": 1.295,
+      "c": 0
+    },
+    {
+      "id": 21,
+      "name": "landing gear 21",
+      "kind": "SLIDE",
+      "rest_center": [
+        1.6,
+        -0.28,
+        0.6
+      ],
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "state": "gPS.x",
+      "k": 1.295,
+      "c": 0
+    },
+    {
+      "id": 22,
+      "name": "landing gear 22",
+      "kind": "SLIDE",
+      "rest_center": [
+        0,
+        -0.28,
+        -5.76
+      ],
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "state": "gPS.x",
+      "k": 1.295,
+      "c": 0
+    },
+    {
+      "id": 26,
+      "name": "telescopic upper support 26",
+      "kind": "STRETCH",
+      "rest_length": 0.25,
+      "pivot": [
+        -1.6,
+        -0.35,
+        0.6
+      ],
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "state": "gPS.x",
+      "k": 1.295,
+      "c": 0.25
+    },
+    {
+      "id": 27,
+      "name": "telescopic upper support 27",
+      "kind": "STRETCH",
+      "rest_length": 0.25,
+      "pivot": [
+        1.6,
+        -0.35,
+        0.6
+      ],
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "state": "gPS.x",
+      "k": 1.295,
+      "c": 0.25
+    },
+    {
+      "id": 28,
+      "name": "telescopic upper support 28",
+      "kind": "STRETCH",
+      "rest_length": 0.25,
+      "pivot": [
+        0,
+        -0.35,
+        -5.76
+      ],
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "state": "gPS.x",
+      "k": 1.295,
+      "c": 0.25
+    },
+    {
+      "id": 23,
+      "name": "gear shutter 23",
+      "kind": "SLIDE",
+      "rest_center": [
+        -1.6,
+        -0.84,
+        0.6
+      ],
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "state": "gPS.x",
+      "k": 0.64,
+      "c": 0
+    },
+    {
+      "id": 24,
+      "name": "gear shutter 24",
+      "kind": "SLIDE",
+      "rest_center": [
+        1.6,
+        -0.84,
+        0.6
+      ],
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "state": "gPS.x",
+      "k": 0.64,
+      "c": 0
+    },
+    {
+      "id": 25,
+      "name": "gear shutter 25",
+      "kind": "SLIDE",
+      "rest_center": [
+        0,
+        -0.84,
+        -5.76
+      ],
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "state": "gPS.x",
+      "k": 1.06,
+      "c": 0
+    },
+    {
+      "id": 30,
+      "name": "bay door port",
+      "kind": "HINGE",
+      "pivot": [
+        -0.59,
+        -0.94,
+        1.6
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "state": "uCustom[0]",
+      "k": -1.38,
+      "c": 0
+    },
+    {
+      "id": 31,
+      "name": "bay door starboard",
+      "kind": "HINGE",
+      "pivot": [
+        0.59,
+        -0.94,
+        1.6
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "state": "uCustom[0]",
+      "k": 1.38,
+      "c": 0
+    },
+    {
+      "id": 32,
+      "name": "recessed missile cradle 32",
+      "kind": "SLIDE",
+      "side": -1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "state": "uCustom[1]",
+      "k": 0.48,
+      "c": 0
+    },
+    {
+      "id": 33,
+      "name": "recessed missile cradle 33",
+      "kind": "SLIDE",
+      "side": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "state": "uCustom[2]",
+      "k": 0.48,
+      "c": 0
+    },
+    {
+      "id": 34,
+      "name": "fictional dart missile 34",
+      "kind": "SLIDE",
+      "side": -1,
+      "visibility_channel": 4,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "state": "uCustom[1]",
+      "k": 0.48,
+      "c": 0
+    },
+    {
+      "id": 35,
+      "name": "fictional dart missile 35",
+      "kind": "SLIDE",
+      "side": 1,
+      "visibility_channel": 5,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "state": "uCustom[2]",
+      "k": 0.48,
+      "c": 0
+    },
+    {
+      "id": 36,
+      "name": "internal fictional gravity store",
+      "kind": "SLIDE",
+      "visibility_channel": 6,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "state": "uCustom[3]",
+      "k": 0.9,
+      "c": 0
+    },
+    {
+      "id": 40,
+      "name": "sealed cockpit shell instruments and seat",
+      "kind": "STATIC"
+    },
+    {
+      "id": 41,
+      "name": "pitch stick",
+      "kind": "HINGE",
+      "pivot": [
+        0.32,
+        -0.23,
+        -3.15
+      ],
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "state": "gCtl.x",
+      "k": 0.2,
+      "c": 0
+    },
+    {
+      "id": 42,
+      "name": "throttle lever",
+      "kind": "HINGE",
+      "pivot": [
+        -0.37,
+        -0.2,
+        -3.12
+      ],
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "state": "gCtl.w",
+      "k": -0.6,
+      "c": 0.3
+    },
+    {
+      "id": 43,
+      "name": "rudder pedal 43",
+      "kind": "SLIDE",
+      "side": -1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "state": "gCtl.z",
+      "k": -0.06,
+      "c": 0
+    },
+    {
+      "id": 44,
+      "name": "rudder pedal 44",
+      "kind": "SLIDE",
+      "side": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "state": "gCtl.z",
+      "k": 0.06,
+      "c": 0
+    }
+  ],
+  "channels": {
+    "0": "bay opening 0..1",
+    "1": "port missile cradle deployment 0..1",
+    "2": "starboard missile cradle deployment 0..1",
+    "3": "bomb ejection animation 0..1",
+    "4": "port missile occupancy: 1 present, 0 released (runtime part visibility only)",
+    "5": "starboard missile occupancy: 1 present, 0 released",
+    "6": "bomb occupancy: 1 present, 0 released",
+    "7": "reserved, must be zero"
+  }
+}

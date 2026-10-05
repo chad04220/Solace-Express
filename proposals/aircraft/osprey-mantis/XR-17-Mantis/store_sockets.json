@@ -1,0 +1,77 @@
+{
+  "coordinate_system": "body-space +x right,+y up,+z aft, metres",
+  "store_definition": "fictional low-detail game object visuals only; no real weapon engineering",
+  "slots": [
+    {
+      "id": "port_dart",
+      "part": 34,
+      "parent_rig": 34,
+      "rest_attachment": [
+        -1.08,
+        -0.72,
+        -1.85
+      ],
+      "forward": [
+        0,
+        0,
+        -1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "deploy_channel": 1,
+      "occupied_channel": 4,
+      "release_rule": "deploy==1; copy current world transform to external projectile, then occupancy=0 atomically"
+    },
+    {
+      "id": "starboard_dart",
+      "part": 35,
+      "parent_rig": 35,
+      "rest_attachment": [
+        1.08,
+        -0.72,
+        -1.85
+      ],
+      "forward": [
+        0,
+        0,
+        -1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "deploy_channel": 2,
+      "occupied_channel": 5,
+      "release_rule": "deploy==1; copy current world transform to external projectile, then occupancy=0 atomically"
+    },
+    {
+      "id": "internal_store",
+      "part": 36,
+      "parent_rig": 36,
+      "rest_attachment": [
+        0,
+        -0.7,
+        1.6
+      ],
+      "forward": [
+        0,
+        0,
+        -1
+      ],
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "eject_channel": 3,
+      "occupied_channel": 6,
+      "release_rule": "require bay channel0==1; interpolate eject channel3 to1; copy world transform then occupancy=0 atomically"
+    }
+  ],
+  "transform_contract": "world=T_aircraft * forwardRig(part,state) * T_rest_attachment. Hinge forward: pivot+R(axis,angle)*(p-pivot). Slide forward: p+axis*distance. No projectile motion stays in aircraft SDF after release.",
+  "physics": "No guidance, damage, explosions, ammunition, inventory, release input or weapon mass model implemented."
+}

@@ -1,0 +1,78 @@
+Kestrel T2       cd0 0.0219  liftoff   130m @29.8m/s (need  400)  climb   6.5m/s  cruise  58.8m/s (spec  50) a=-1.1  stall 22.4  fuelRange 34km 
+Wren 180         cd0 0.0225  liftoff   233m @36.1m/s (need  450)  climb   6.0m/s  cruise  64.5m/s (spec  60) a=-0.3  stall 27.7  fuelRange 56km 
+Bushmaster STOL  cd0 0.0199  liftoff   151m @31.9m/s (need  220)  climb   7.7m/s  cruise  66.0m/s (spec  55) a=-1.7  stall 22.4  fuelRange 60km 
+Islander Twin    cd0 0.0218  liftoff   275m @37.5m/s (need  420)  climb   5.2m/s  cruise  65.0m/s (spec  65) a= 0.2  stall 30.3  fuelRange 74km 
+Pelican Caravan  cd0 0.0195  liftoff   493m @44.9m/s (need  550)  climb   4.9m/s  cruise  73.1m/s (spec  85) a= 1.1  stall 37.4  fuelRange 109km 
+Meridian Q400    cd0 0.0231  liftoff   875m @63.7m/s (need 1100)  climb   8.0m/s  cruise 127.4m/s (spec 140) a= 0.1  stall 57.6  fuelRange 134km 
+Starling 500 Jet cd0 0.0168  liftoff   420m @58.3m/s (need 1250)  climb  16.4m/s  cruise 232.3m/s (spec 200) a=-1.8  stall 48.1  fuelRange 216km 
+Osprey C6        cd0 0.0229  liftoff   153m @34.6m/s (need  550)  climb   8.3m/s  cruise  82.6m/s (spec  74) a=-1.4  stall 28.0  fuelRange 94km 
+control directions checked
+XR-9 level acceleration: Mach 2.47 after 40 s ok
+XR-9 cannot hover: nozzle 0.00, alt 434 m after 4 s ok
+XR-9 approach speed level flight: alt 600 m, 154 kt ok
+XR-9 full-back pull: peak 17.8 g ok
+XR-9 unlimited pull at Mach 1.8 breaks the airframe: ok
+XR-9 pitch rate at Mach 1: 257 deg/s ok
+XR-9 pitch reversal to -60 deg/s: 0.06 s ok
+XR-9 roll rate 315 deg/s ok
+XR-11 hover: throttle 0.66 vs 0.00 m/s pitch -0.0 bank 0.0 drift 0.0 m/s ok
+XR-11 hover roll rate (pod thrust differential) 96 deg/s ok
+XR-11 top speed Mach 4.03 at 4000 m  ok
+XR-11 roll rate 401 deg/s ok
+XR-11 full pull at 600 m/s: 88 g ok
+AP hold Kestrel T2       hdg err  0.0  alt err   0.1 m  max bank 54.5  g +0.3..+2.1 (limits -3..+6)  roll-rate rms 1.38 deg/s  ok
+AP hold Wren 180         hdg err  0.0  alt err   0.0 m  max bank 56.3  g +0.3..+2.3 (limits -3..+6)  roll-rate rms 1.41 deg/s  ok
+AP hold Bushmaster STOL  hdg err  0.0  alt err   0.1 m  max bank 71.7  g +0.6..+3.8 (limits -3..+6)  roll-rate rms 1.43 deg/s  ok
+AP hold Islander Twin    hdg err  0.0  alt err   0.0 m  max bank 59.4  g +0.4..+2.4 (limits -3..+6)  roll-rate rms 1.48 deg/s  ok
+AP hold Pelican Caravan  hdg err  0.0  alt err   0.0 m  max bank 62.1  g +0.2..+2.7 (limits -3..+6)  roll-rate rms 1.55 deg/s  ok
+AP hold Meridian Q400    hdg err  0.0  alt err   0.3 m  max bank 63.7  g -0.1..+3.0 (limits -3..+6)  roll-rate rms 1.72 deg/s  ok
+AP hold Starling 500 Jet hdg err  0.0  alt err   0.0 m  max bank 73.2  g +0.2..+5.0 (limits -3..+6)  roll-rate rms 2.03 deg/s  ok
+AP hold Osprey C6        hdg err  0.0  alt err   0.0 m  max bank 68.1  g +0.2..+3.1 (limits -3..+6)  roll-rate rms 1.53 deg/s  ok
+AP hold XR-9 Specter     hdg err  0.0  alt err   0.0 m  max bank 87.0  g -2.9..+37.5 (limits -25..+50)  roll-rate rms 0.00 deg/s  ok
+AP comfort hold Kestrel T2       hdg err  0.0  max bank 25.6  g 0.85..1.27  ok
+AP comfort route Kestrel T2       landed after  627 s  en-route max bank 25.1  g 0.85..1.24  ok
+AP comfort hold Wren 180         hdg err  0.0  max bank 25.5  g 0.84..1.24  ok
+AP comfort route Wren 180         landed after  596 s  en-route max bank 25.1  g 0.85..1.24  ok
+AP comfort hold Bushmaster STOL  hdg err  0.0  max bank 25.6  g 0.85..1.24  ok
+AP comfort route Bushmaster STOL  landed after  658 s  en-route max bank 25.2  g 0.85..1.24  ok
+AP comfort hold Islander Twin    hdg err  0.0  max bank 25.4  g 0.85..1.24  ok
+AP comfort route Islander Twin    landed after  581 s  en-route max bank 25.1  g 0.84..1.23  ok
+AP comfort hold Pelican Caravan  hdg err  0.0  max bank 25.3  g 0.85..1.24  ok
+AP comfort route Pelican Caravan  landed after  572 s  en-route max bank 25.1  g 0.86..1.25  ok
+AP comfort hold Meridian Q400    hdg err  0.0  max bank 25.1  g 0.86..1.26  ok
+AP comfort route Meridian Q400    landed after  433 s  en-route max bank 25.1  g 0.83..1.27  ok
+AP comfort hold Starling 500 Jet hdg err  0.0  max bank 25.0  g 0.85..1.25  ok
+AP comfort route Starling 500 Jet landed after  355 s  en-route max bank 25.0  g 0.84..1.24  ok
+AP comfort hold Osprey C6        hdg err  0.0  max bank 25.3  g 0.85..1.24  ok
+AP comfort route Osprey C6        landed after  581 s  en-route max bank 25.1  g 0.84..1.25  ok
+AP autoland Kestrel T2       landed after  493 s  touchdown 0.7 m/s  stop  949 m from centre,  1.6 m off the centreline, go-arounds 0  ok
+AP autoland Wren 180         landed after  529 s  touchdown 0.6 m/s  stop  931 m from centre,  1.6 m off the centreline, go-arounds 0  ok
+AP autoland Bushmaster STOL  landed after  535 s  touchdown 0.8 m/s  stop  958 m from centre,  1.7 m off the centreline, go-arounds 0  ok
+AP autoland Islander Twin    landed after  446 s  touchdown 0.8 m/s  stop  955 m from centre,  2.6 m off the centreline, go-arounds 0  ok
+AP autoland Pelican Caravan  landed after  458 s  touchdown 0.6 m/s  stop  853 m from centre,  2.0 m off the centreline, go-arounds 0  ok
+AP autoland Meridian Q400    landed after  353 s  touchdown 0.8 m/s  stop  364 m from centre,  2.6 m off the centreline, go-arounds 0  ok
+AP autoland Starling 500 Jet landed after  348 s  touchdown 0.8 m/s  stop  343 m from centre,  0.7 m off the centreline, go-arounds 0  ok
+AP autoland Osprey C6        landed after  481 s  touchdown 0.6 m/s  stop  900 m from centre,  2.4 m off the centreline, go-arounds 0  ok
+AP autoland XR-9 Specter     landed after  223 s  touchdown 1.0 m/s  stop  485 m from centre,  0.0 m off the centreline, go-arounds 0  ok
+Stunt Kestrel T2       LOOP          23.0 s  g  +1.0.. +4.5  heading change   0    ok
+Stunt Kestrel T2       AILERON ROLL  14.3 s  g  -0.9.. +3.4  heading change   6    ok
+Stunt Kestrel T2       BARREL ROLL   22.8 s  g  +0.9.. +4.3  heading change   7    ok
+Stunt Kestrel T2       IMMELMANN     23.0 s  g  -0.4.. +4.2  heading change 180    ok
+Stunt Kestrel T2       SPLIT-S       12.7 s  g  -0.8.. +4.6  heading change 174    ok
+Stunt Kestrel T2       CUBAN EIGHT   39.4 s  g  -0.5.. +4.5  heading change   2    ok
+Stunt Kestrel T2       WINGOVER      17.1 s  g  +1.0.. +2.9  heading change 174    ok
+Stunt Meridian Q400    LOOP          42.5 s  g  +1.0.. +4.6  heading change   0    ok
+Stunt Meridian Q400    AILERON ROLL  21.6 s  g  -0.8.. +3.2  heading change   7    ok
+Stunt Meridian Q400    BARREL ROLL   36.4 s  g  +1.0.. +4.2  heading change   2    ok
+Stunt Meridian Q400    IMMELMANN     41.0 s  g  -0.4.. +4.2  heading change 180    ok
+Stunt Meridian Q400    SPLIT-S       25.2 s  g  -0.7.. +4.7  heading change 174    ok
+Stunt Meridian Q400    CUBAN EIGHT   71.2 s  g  -0.3.. +4.5  heading change   4    ok
+Stunt Meridian Q400    WINGOVER      31.0 s  g  +1.0.. +3.2  heading change 179    ok
+Stunt XR-11 Wraith     LOOP          11.3 s  g  +1.0..+28.2  heading change   0    ok
+Stunt XR-11 Wraith     AILERON ROLL   1.3 s  g  -6.6..+16.4  heading change   0    ok
+Stunt XR-11 Wraith     BARREL ROLL    6.3 s  g  +0.7..+19.5  heading change   1    ok
+Stunt XR-11 Wraith     IMMELMANN      5.5 s  g  -7.3..+28.2  heading change 180    ok
+Stunt XR-11 Wraith     SPLIT-S      139.3 s  g  -1.4.. +6.6  heading change 177    ok
+Stunt XR-11 Wraith     CUBAN EIGHT   21.3 s  g  -0.1..+28.2  heading change  13    ok
+Stunt XR-11 Wraith     WINGOVER       7.6 s  g  -1.0..+21.4  heading change 167    ok
+0 failures

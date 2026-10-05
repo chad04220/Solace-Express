@@ -1,0 +1,6 @@
+{
+  "AircraftSpec.inc": "27045d497e7f43ce87f46d11a78a0cf0a4198c4c67cfb3f00ab73609a4fa5e0e",
+  "ModelDef.inc": "f9704622baf92258779884dfacdcaf761c42762f8433215a01424bd36dbe75c4",
+  "validate.py": "11bb74b8b5c6830d910a21de668cce367835edcc77b8c737334ed6f410273d0e",
+  "verification/aircraft_visual_test.cpp": "ec5e1fd625523a2be832d6301046eb9afdf2a6ba4f8ce6adba531f6761b760bd"
+}

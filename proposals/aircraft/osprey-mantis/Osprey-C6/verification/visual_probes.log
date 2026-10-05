@@ -1,0 +1,13 @@
+Failed to create /home/agent/.cache/mesa_shader_cache for shader cache (Read-only file system)---disabling.
+Failed to create /home/agent/.cache/mesa_shader_cache_db for shader cache (Read-only file system)---disabling.
+Renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+../previews/osprey_c6-aft.ppm
+../previews/osprey_c6-overhead.ppm
+../previews/osprey_c6-transition.ppm
+../previews/osprey_c6-gearbelly.ppm
+../previews/osprey_c6-gearside.ppm
+../previews/osprey_c6-gearfront.ppm
+Rendered 6 production geometry views.
+HEADREST osprey_c6: 0 skin intersections; worst clearance 1.0000 m
+ENDCAP osprey_c6: maximum seam jump 0.000202 m
+Geometry checks: 0 failures

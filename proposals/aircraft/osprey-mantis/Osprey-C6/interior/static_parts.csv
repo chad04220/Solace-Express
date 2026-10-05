@@ -1,0 +1,20 @@
+part,material_id,repetition,location_metres,construction,static
+copper_dashboard_brow,121,1,"0 .590 -2.516","round box half extents .48 .009 .008 radius .004",yes
+ivory_pilot_sills,120,mirror_x,"+/-.598 .125 -1.93","round box .023 .080 .47 radius .016",yes
+copper_sill_insets,121,mirror_x,"+/-.570 .154 -1.93","round box .009 .008 .40 radius .004",yes
+cocoa_door_pockets,123,mirror_x,"+/-.580 -.090 -1.90","round box .025 .100 .245 minus recessed opening",yes
+aft_floor,120,1,"0 -.330 .075","round box .53 .014 1.435 radius .008",yes
+centre_aisle_runner,123,1,"0 -.308 .15","round box .095 .008 1.31 radius .004",yes
+runner_edge_strips,121,mirror_x,"+/-.109 -.306 .15","round box .004 .008 1.31 radius .004",yes
+passenger_cushions,122,2_rows_mirror_x,"+/-.325 -.105 row_z=-.38 or .54","round box .173 .065 .245 radius .035",yes
+passenger_back_shell,120,2_rows_mirror_x,"+/-.325 .20 row_z+.235","recline -.12 rad; round box .163 .255 .050 radius .035",yes
+passenger_back_pad,122,2_rows_mirror_x,"same local back frame; local z=-.052","round box .133 .220 .018 radius .018",yes
+passenger_headrest,122,2_rows_mirror_x,"+/-.325 .480 row_z+.270","round box .100 .055 .045 radius .028",yes
+back_sewn_channels,123,12,"three per back local x=-.072 0 +.072 z=-.073","round box .004 .180 .004 radius .004",yes
+seat_frames,121,8,"each seat local x=+/-.118 y=-.247","round box .013 .064 .175 radius .008",yes
+static_lap_straps,123,4,"each seat local 0 -.028 -.025","round box .142 .010 .015 radius .006",yes
+lap_buckles,121,4,"each seat local 0 -.015 -.025","round box .024 .008 .022 radius .006",yes
+low_cabin_liners,120,mirror_x,"+/-.585 .040 .20","round box .022 .190 1.19 radius .018",yes
+liner_copper_rail,121,mirror_x,"+/-.557 .202 .20","round box .008 .008 1.14 radius .004",yes
+aft_luggage_wall,120,1,"0 .23 1.548","round box .405 .340 .014 radius .025",yes
+luggage_wall_inlay,123,1,"0 .23 1.525","round box .215 .140 .008 radius .016",yes

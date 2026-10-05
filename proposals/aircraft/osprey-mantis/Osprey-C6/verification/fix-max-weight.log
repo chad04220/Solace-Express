@@ -1,0 +1,15 @@
+Osprey C6        cd0 0.0229  liftoff   347m @40.9m/s (need  550)  climb   5.7m/s  cruise  79.6m/s (spec  74) a=-0.4  stall 32.3  fuelRange 92km 
+control directions checked
+XR-9 level acceleration: Mach 2.47 after 40 s ok
+XR-9 cannot hover: nozzle 0.00, alt 434 m after 4 s ok
+XR-9 approach speed level flight: alt 600 m, 154 kt ok
+XR-9 full-back pull: peak 17.8 g ok
+XR-9 unlimited pull at Mach 1.8 breaks the airframe: ok
+XR-9 pitch rate at Mach 1: 257 deg/s ok
+XR-9 pitch reversal to -60 deg/s: 0.06 s ok
+XR-9 roll rate 315 deg/s ok
+AP hold Osprey C6        hdg err  0.0  alt err   0.1 m  max bank 66.9  g -0.1..+2.3 (limits -3..+6)  roll-rate rms 1.49 deg/s  ok
+AP comfort hold Osprey C6        hdg err  0.0  max bank 25.4  g 0.84..1.25  ok
+AP comfort route Osprey C6        landed after  582 s  en-route max bank 25.8  g 0.84..1.25  ok
+AP autoland Osprey C6        landed after  481 s  touchdown 0.7 m/s  stop  932 m from centre,  2.9 m off the centreline, go-arounds 0  ok
+0 failures

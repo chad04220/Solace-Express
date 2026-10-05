@@ -1,0 +1,6 @@
+Renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+Rendered 0 production geometry views.
+HEADREST osprey_c6: 0 skin intersections; worst clearance 1.0000 m
+ENDCAP osprey_c6: maximum seam jump 0.000202 m
+OSPREY STATIC CABIN: 2211840 volume samples, 145368 occupied; 27 pitch/roll/yaw poses; 0 control intersections; minimum sampled control gap 0.149767 m; 0 containment failures
+Geometry checks: 0 failures

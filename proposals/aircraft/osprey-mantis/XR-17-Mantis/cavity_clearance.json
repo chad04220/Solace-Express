@@ -1,0 +1,583 @@
+{
+  "method": "Exact convex roundBox cavity signed distance at all primitive AABB corners. Contains all geometry, conservative for rounded boxes/capsules.",
+  "component_count": 115,
+  "minimum_guaranteed_clearance_m": 0.010918071425236375,
+  "all_inside": true,
+  "rows": [
+    {
+      "name": "floor cassette",
+      "max_cavity_sdf_m": -0.086393202250021,
+      "guaranteed_clearance_m": 0.086393202250021
+    },
+    {
+      "name": "seat floor rail",
+      "max_cavity_sdf_m": -0.135,
+      "guaranteed_clearance_m": 0.135
+    },
+    {
+      "name": "seat floor rail",
+      "max_cavity_sdf_m": -0.135,
+      "guaranteed_clearance_m": 0.135
+    },
+    {
+      "name": "seat pan carbon shell",
+      "max_cavity_sdf_m": -0.25,
+      "guaranteed_clearance_m": 0.25
+    },
+    {
+      "name": "seat pan cushion",
+      "max_cavity_sdf_m": -0.30500000000000005,
+      "guaranteed_clearance_m": 0.30500000000000005
+    },
+    {
+      "name": "seat back shell",
+      "max_cavity_sdf_m": -0.26,
+      "guaranteed_clearance_m": 0.26
+    },
+    {
+      "name": "seat back pad",
+      "max_cavity_sdf_m": -0.3400000000000001,
+      "guaranteed_clearance_m": 0.3400000000000001
+    },
+    {
+      "name": "lumbar side bolster",
+      "max_cavity_sdf_m": -0.365,
+      "guaranteed_clearance_m": 0.365
+    },
+    {
+      "name": "pan side bolster",
+      "max_cavity_sdf_m": -0.34500000000000003,
+      "guaranteed_clearance_m": 0.34500000000000003
+    },
+    {
+      "name": "shoulder harness",
+      "max_cavity_sdf_m": -0.3500000000000001,
+      "guaranteed_clearance_m": 0.3500000000000001
+    },
+    {
+      "name": "harness lower diagonal",
+      "max_cavity_sdf_m": -0.376,
+      "guaranteed_clearance_m": 0.376
+    },
+    {
+      "name": "lap webbing",
+      "max_cavity_sdf_m": -0.41500000000000004,
+      "guaranteed_clearance_m": 0.41500000000000004
+    },
+    {
+      "name": "lumbar side bolster",
+      "max_cavity_sdf_m": -0.365,
+      "guaranteed_clearance_m": 0.365
+    },
+    {
+      "name": "pan side bolster",
+      "max_cavity_sdf_m": -0.34500000000000003,
+      "guaranteed_clearance_m": 0.34500000000000003
+    },
+    {
+      "name": "shoulder harness",
+      "max_cavity_sdf_m": -0.3500000000000001,
+      "guaranteed_clearance_m": 0.3500000000000001
+    },
+    {
+      "name": "harness lower diagonal",
+      "max_cavity_sdf_m": -0.376,
+      "guaranteed_clearance_m": 0.376
+    },
+    {
+      "name": "lap webbing",
+      "max_cavity_sdf_m": -0.41500000000000004,
+      "guaranteed_clearance_m": 0.41500000000000004
+    },
+    {
+      "name": "harness release buckle",
+      "max_cavity_sdf_m": -0.41200000000000003,
+      "guaranteed_clearance_m": 0.41200000000000003
+    },
+    {
+      "name": "buckle release face",
+      "max_cavity_sdf_m": -0.44100000000000006,
+      "guaranteed_clearance_m": 0.44100000000000006
+    },
+    {
+      "name": "headrest shell",
+      "max_cavity_sdf_m": -0.15800000000000003,
+      "guaranteed_clearance_m": 0.15800000000000003
+    },
+    {
+      "name": "headrest cushion",
+      "max_cavity_sdf_m": -0.17500000000000004,
+      "guaranteed_clearance_m": 0.17500000000000004
+    },
+    {
+      "name": "headrest datum",
+      "max_cavity_sdf_m": -0.19500000000000006,
+      "guaranteed_clearance_m": 0.19500000000000006
+    },
+    {
+      "name": "headrest datum",
+      "max_cavity_sdf_m": -0.19500000000000006,
+      "guaranteed_clearance_m": 0.19500000000000006
+    },
+    {
+      "name": "pitch fixed pivot socket",
+      "max_cavity_sdf_m": -0.1225833518600869,
+      "guaranteed_clearance_m": 0.1225833518600869
+    },
+    {
+      "name": "throttle fixed pivot socket",
+      "max_cavity_sdf_m": -0.10844355629253627,
+      "guaranteed_clearance_m": 0.10844355629253627
+    },
+    {
+      "name": "pedal fixed slider rail",
+      "max_cavity_sdf_m": -0.13567558977584365,
+      "guaranteed_clearance_m": 0.13567558977584365
+    },
+    {
+      "name": "pedal fixed slider rail",
+      "max_cavity_sdf_m": -0.13567558977584365,
+      "guaranteed_clearance_m": 0.13567558977584365
+    },
+    {
+      "name": "side avionics console",
+      "max_cavity_sdf_m": -0.09131072271370971,
+      "guaranteed_clearance_m": 0.09131072271370971
+    },
+    {
+      "name": "side service touch slab",
+      "max_cavity_sdf_m": -0.11199999999999999,
+      "guaranteed_clearance_m": 0.11199999999999999
+    },
+    {
+      "name": "static test key",
+      "max_cavity_sdf_m": -0.132,
+      "guaranteed_clearance_m": 0.132
+    },
+    {
+      "name": "static test key",
+      "max_cavity_sdf_m": -0.132,
+      "guaranteed_clearance_m": 0.132
+    },
+    {
+      "name": "static test key",
+      "max_cavity_sdf_m": -0.132,
+      "guaranteed_clearance_m": 0.132
+    },
+    {
+      "name": "console amber task strip",
+      "max_cavity_sdf_m": -0.22000000000000003,
+      "guaranteed_clearance_m": 0.22000000000000003
+    },
+    {
+      "name": "rear vent housing",
+      "max_cavity_sdf_m": -0.201,
+      "guaranteed_clearance_m": 0.201
+    },
+    {
+      "name": "rear vent louver",
+      "max_cavity_sdf_m": -0.21600000000000003,
+      "guaranteed_clearance_m": 0.21600000000000003
+    },
+    {
+      "name": "rear vent louver",
+      "max_cavity_sdf_m": -0.21600000000000003,
+      "guaranteed_clearance_m": 0.21600000000000003
+    },
+    {
+      "name": "rear vent louver",
+      "max_cavity_sdf_m": -0.21600000000000003,
+      "guaranteed_clearance_m": 0.21600000000000003
+    },
+    {
+      "name": "rear vent louver",
+      "max_cavity_sdf_m": -0.21600000000000003,
+      "guaranteed_clearance_m": 0.21600000000000003
+    },
+    {
+      "name": "rear vent louver",
+      "max_cavity_sdf_m": -0.21600000000000003,
+      "guaranteed_clearance_m": 0.21600000000000003
+    },
+    {
+      "name": "rear vent louver",
+      "max_cavity_sdf_m": -0.21600000000000003,
+      "guaranteed_clearance_m": 0.21600000000000003
+    },
+    {
+      "name": "side structural longeron",
+      "max_cavity_sdf_m": -0.07999999999999996,
+      "guaranteed_clearance_m": 0.07999999999999996
+    },
+    {
+      "name": "side avionics console",
+      "max_cavity_sdf_m": -0.09131072271370971,
+      "guaranteed_clearance_m": 0.09131072271370971
+    },
+    {
+      "name": "side service touch slab",
+      "max_cavity_sdf_m": -0.11199999999999999,
+      "guaranteed_clearance_m": 0.11199999999999999
+    },
+    {
+      "name": "static test key",
+      "max_cavity_sdf_m": -0.132,
+      "guaranteed_clearance_m": 0.132
+    },
+    {
+      "name": "static test key",
+      "max_cavity_sdf_m": -0.132,
+      "guaranteed_clearance_m": 0.132
+    },
+    {
+      "name": "static test key",
+      "max_cavity_sdf_m": -0.132,
+      "guaranteed_clearance_m": 0.132
+    },
+    {
+      "name": "console amber task strip",
+      "max_cavity_sdf_m": -0.22000000000000003,
+      "guaranteed_clearance_m": 0.22000000000000003
+    },
+    {
+      "name": "rear vent housing",
+      "max_cavity_sdf_m": -0.201,
+      "guaranteed_clearance_m": 0.201
+    },
+    {
+      "name": "rear vent louver",
+      "max_cavity_sdf_m": -0.21600000000000003,
+      "guaranteed_clearance_m": 0.21600000000000003
+    },
+    {
+      "name": "rear vent louver",
+      "max_cavity_sdf_m": -0.21600000000000003,
+      "guaranteed_clearance_m": 0.21600000000000003
+    },
+    {
+      "name": "rear vent louver",
+      "max_cavity_sdf_m": -0.21600000000000003,
+      "guaranteed_clearance_m": 0.21600000000000003
+    },
+    {
+      "name": "rear vent louver",
+      "max_cavity_sdf_m": -0.21600000000000003,
+      "guaranteed_clearance_m": 0.21600000000000003
+    },
+    {
+      "name": "rear vent louver",
+      "max_cavity_sdf_m": -0.21600000000000003,
+      "guaranteed_clearance_m": 0.21600000000000003
+    },
+    {
+      "name": "rear vent louver",
+      "max_cavity_sdf_m": -0.21600000000000003,
+      "guaranteed_clearance_m": 0.21600000000000003
+    },
+    {
+      "name": "side structural longeron",
+      "max_cavity_sdf_m": -0.07999999999999996,
+      "guaranteed_clearance_m": 0.07999999999999996
+    },
+    {
+      "name": "arch leg",
+      "max_cavity_sdf_m": -0.07499999999999996,
+      "guaranteed_clearance_m": 0.07499999999999996
+    },
+    {
+      "name": "arch chamfer",
+      "max_cavity_sdf_m": -0.010918071425236375,
+      "guaranteed_clearance_m": 0.010918071425236375
+    },
+    {
+      "name": "arch leg",
+      "max_cavity_sdf_m": -0.07499999999999996,
+      "guaranteed_clearance_m": 0.07499999999999996
+    },
+    {
+      "name": "arch chamfer",
+      "max_cavity_sdf_m": -0.010918071425236375,
+      "guaranteed_clearance_m": 0.010918071425236375
+    },
+    {
+      "name": "arch crown",
+      "max_cavity_sdf_m": -0.1196056723534023,
+      "guaranteed_clearance_m": 0.1196056723534023
+    },
+    {
+      "name": "ceiling task housing",
+      "max_cavity_sdf_m": -0.06900000000000006,
+      "guaranteed_clearance_m": 0.06900000000000006
+    },
+    {
+      "name": "ceiling task diffuser",
+      "max_cavity_sdf_m": -0.10400000000000009,
+      "guaranteed_clearance_m": 0.10400000000000009
+    },
+    {
+      "name": "ceiling task housing",
+      "max_cavity_sdf_m": -0.06900000000000006,
+      "guaranteed_clearance_m": 0.06900000000000006
+    },
+    {
+      "name": "ceiling task diffuser",
+      "max_cavity_sdf_m": -0.10400000000000009,
+      "guaranteed_clearance_m": 0.10400000000000009
+    },
+    {
+      "name": "instrument blade",
+      "max_cavity_sdf_m": -0.21447513412728608,
+      "guaranteed_clearance_m": 0.21447513412728608
+    },
+    {
+      "name": "instrument surround",
+      "max_cavity_sdf_m": -0.244,
+      "guaranteed_clearance_m": 0.244
+    },
+    {
+      "name": "instrument face",
+      "max_cavity_sdf_m": -0.266,
+      "guaranteed_clearance_m": 0.266
+    },
+    {
+      "name": "static switch stem",
+      "max_cavity_sdf_m": -0.389,
+      "guaranteed_clearance_m": 0.389
+    },
+    {
+      "name": "static switch stem",
+      "max_cavity_sdf_m": -0.389,
+      "guaranteed_clearance_m": 0.389
+    },
+    {
+      "name": "static switch stem",
+      "max_cavity_sdf_m": -0.319,
+      "guaranteed_clearance_m": 0.319
+    },
+    {
+      "name": "switch guard",
+      "max_cavity_sdf_m": -0.26,
+      "guaranteed_clearance_m": 0.26
+    },
+    {
+      "name": "instrument surround",
+      "max_cavity_sdf_m": -0.244,
+      "guaranteed_clearance_m": 0.244
+    },
+    {
+      "name": "instrument face",
+      "max_cavity_sdf_m": -0.266,
+      "guaranteed_clearance_m": 0.266
+    },
+    {
+      "name": "static switch stem",
+      "max_cavity_sdf_m": -0.389,
+      "guaranteed_clearance_m": 0.389
+    },
+    {
+      "name": "static switch stem",
+      "max_cavity_sdf_m": -0.389,
+      "guaranteed_clearance_m": 0.389
+    },
+    {
+      "name": "static switch stem",
+      "max_cavity_sdf_m": -0.319,
+      "guaranteed_clearance_m": 0.319
+    },
+    {
+      "name": "switch guard",
+      "max_cavity_sdf_m": -0.26,
+      "guaranteed_clearance_m": 0.26
+    },
+    {
+      "name": "center systems panel",
+      "max_cavity_sdf_m": -0.3829999999999998,
+      "guaranteed_clearance_m": 0.3829999999999998
+    },
+    {
+      "name": "center annunciator",
+      "max_cavity_sdf_m": -0.43600000000000017,
+      "guaranteed_clearance_m": 0.43600000000000017
+    },
+    {
+      "name": "center annunciator",
+      "max_cavity_sdf_m": -0.43600000000000017,
+      "guaranteed_clearance_m": 0.43600000000000017
+    },
+    {
+      "name": "center annunciator",
+      "max_cavity_sdf_m": -0.43600000000000017,
+      "guaranteed_clearance_m": 0.43600000000000017
+    },
+    {
+      "name": "center annunciator",
+      "max_cavity_sdf_m": -0.43600000000000017,
+      "guaranteed_clearance_m": 0.43600000000000017
+    },
+    {
+      "name": "front camera slab",
+      "max_cavity_sdf_m": -0.19134925200404385,
+      "guaranteed_clearance_m": 0.19134925200404385
+    },
+    {
+      "name": "front pane side frame",
+      "max_cavity_sdf_m": -0.1622806715422794,
+      "guaranteed_clearance_m": 0.1622806715422794
+    },
+    {
+      "name": "front pane side frame",
+      "max_cavity_sdf_m": -0.1622806715422794,
+      "guaranteed_clearance_m": 0.1622806715422794
+    },
+    {
+      "name": "front pane horizontal frame",
+      "max_cavity_sdf_m": -0.19625906629537476,
+      "guaranteed_clearance_m": 0.19625906629537476
+    },
+    {
+      "name": "front pane horizontal frame",
+      "max_cavity_sdf_m": -0.15520335920957476,
+      "guaranteed_clearance_m": 0.15520335920957476
+    },
+    {
+      "name": "side camera slab",
+      "max_cavity_sdf_m": -0.07742743068022831,
+      "guaranteed_clearance_m": 0.07742743068022831
+    },
+    {
+      "name": "side pane end frame",
+      "max_cavity_sdf_m": -0.07260581304505365,
+      "guaranteed_clearance_m": 0.07260581304505365
+    },
+    {
+      "name": "side pane end frame",
+      "max_cavity_sdf_m": -0.07260581304505365,
+      "guaranteed_clearance_m": 0.07260581304505365
+    },
+    {
+      "name": "side pane horizontal frame",
+      "max_cavity_sdf_m": -0.07599999999999996,
+      "guaranteed_clearance_m": 0.07599999999999996
+    },
+    {
+      "name": "side pane horizontal frame",
+      "max_cavity_sdf_m": -0.06962321243514377,
+      "guaranteed_clearance_m": 0.06962321243514377
+    },
+    {
+      "name": "side camera slab",
+      "max_cavity_sdf_m": -0.07742743068022831,
+      "guaranteed_clearance_m": 0.07742743068022831
+    },
+    {
+      "name": "side pane end frame",
+      "max_cavity_sdf_m": -0.07260581304505365,
+      "guaranteed_clearance_m": 0.07260581304505365
+    },
+    {
+      "name": "side pane end frame",
+      "max_cavity_sdf_m": -0.07260581304505365,
+      "guaranteed_clearance_m": 0.07260581304505365
+    },
+    {
+      "name": "side pane horizontal frame",
+      "max_cavity_sdf_m": -0.07599999999999996,
+      "guaranteed_clearance_m": 0.07599999999999996
+    },
+    {
+      "name": "side pane horizontal frame",
+      "max_cavity_sdf_m": -0.06962321243514377,
+      "guaranteed_clearance_m": 0.06962321243514377
+    },
+    {
+      "name": "ceiling fixture carrier",
+      "max_cavity_sdf_m": -0.09100000000000008,
+      "guaranteed_clearance_m": 0.09100000000000008
+    },
+    {
+      "name": "console floor outrigger",
+      "max_cavity_sdf_m": -0.06678610237077334,
+      "guaranteed_clearance_m": 0.06678610237077334
+    },
+    {
+      "name": "sill console support",
+      "max_cavity_sdf_m": -0.08199999999999996,
+      "guaranteed_clearance_m": 0.08199999999999996
+    },
+    {
+      "name": "console floor outrigger",
+      "max_cavity_sdf_m": -0.06678610237077334,
+      "guaranteed_clearance_m": 0.06678610237077334
+    },
+    {
+      "name": "sill console support",
+      "max_cavity_sdf_m": -0.08199999999999996,
+      "guaranteed_clearance_m": 0.08199999999999996
+    },
+    {
+      "name": "pane sill bracket",
+      "max_cavity_sdf_m": -0.08299999999999996,
+      "guaranteed_clearance_m": 0.08299999999999996
+    },
+    {
+      "name": "pane sill bracket",
+      "max_cavity_sdf_m": -0.08299999999999996,
+      "guaranteed_clearance_m": 0.08299999999999996
+    },
+    {
+      "name": "instrument floor support",
+      "max_cavity_sdf_m": -0.11699999999999999,
+      "guaranteed_clearance_m": 0.11699999999999999
+    },
+    {
+      "name": "vent seat bracket",
+      "max_cavity_sdf_m": -0.254,
+      "guaranteed_clearance_m": 0.254
+    },
+    {
+      "name": "ceiling fixture carrier",
+      "max_cavity_sdf_m": -0.09100000000000008,
+      "guaranteed_clearance_m": 0.09100000000000008
+    },
+    {
+      "name": "console floor outrigger",
+      "max_cavity_sdf_m": -0.06678610237077334,
+      "guaranteed_clearance_m": 0.06678610237077334
+    },
+    {
+      "name": "sill console support",
+      "max_cavity_sdf_m": -0.08199999999999996,
+      "guaranteed_clearance_m": 0.08199999999999996
+    },
+    {
+      "name": "console floor outrigger",
+      "max_cavity_sdf_m": -0.06678610237077334,
+      "guaranteed_clearance_m": 0.06678610237077334
+    },
+    {
+      "name": "sill console support",
+      "max_cavity_sdf_m": -0.08199999999999996,
+      "guaranteed_clearance_m": 0.08199999999999996
+    },
+    {
+      "name": "pane sill bracket",
+      "max_cavity_sdf_m": -0.08299999999999996,
+      "guaranteed_clearance_m": 0.08299999999999996
+    },
+    {
+      "name": "pane sill bracket",
+      "max_cavity_sdf_m": -0.08299999999999996,
+      "guaranteed_clearance_m": 0.08299999999999996
+    },
+    {
+      "name": "instrument floor support",
+      "max_cavity_sdf_m": -0.11699999999999999,
+      "guaranteed_clearance_m": 0.11699999999999999
+    },
+    {
+      "name": "vent seat bracket",
+      "max_cavity_sdf_m": -0.254,
+      "guaranteed_clearance_m": 0.254
+    }
+  ]
+}

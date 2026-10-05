@@ -1,0 +1,132 @@
+[
+  {
+    "id": 110,
+    "name": "exposed titanium",
+    "albedo": [
+      0.34,
+      0.39,
+      0.43
+    ],
+    "roughness": 0.35,
+    "metalness": 0.8,
+    "emission": 0,
+    "pattern": "fine longitudinal brushed lines, shading only"
+  },
+  {
+    "id": 111,
+    "name": "amber test datum",
+    "albedo": [
+      0.95,
+      0.43,
+      0.055
+    ],
+    "roughness": 0.48,
+    "metalness": 0,
+    "emission": 0,
+    "pattern": "solid amber, no animation"
+  },
+  {
+    "id": 112,
+    "name": "camera pane",
+    "albedo": [
+      0.035,
+      0.17,
+      0.2
+    ],
+    "roughness": 0.22,
+    "metalness": 0,
+    "emission": 0.35,
+    "pattern": "Opaque camera placeholder with STATIC label and calibration reticle; no live camera or telemetry until renderer integration"
+  },
+  {
+    "id": 113,
+    "name": "graphite instrument structure",
+    "albedo": [
+      0.035,
+      0.045,
+      0.054
+    ],
+    "roughness": 0.48,
+    "metalness": 0,
+    "emission": 0,
+    "pattern": "See materials_preview.glsl for static-only material shading. No animation."
+  },
+  {
+    "id": 114,
+    "name": "charcoal technical upholstery",
+    "albedo": [
+      0.11,
+      0.125,
+      0.135
+    ],
+    "roughness": 0.48,
+    "metalness": 0,
+    "emission": 0,
+    "pattern": "See materials_preview.glsl for static-only material shading. No animation."
+  },
+  {
+    "id": 115,
+    "name": "amber task-light diffuser",
+    "albedo": [
+      1,
+      0.48,
+      0.08
+    ],
+    "roughness": 0.48,
+    "metalness": 0,
+    "emission": 0.6,
+    "pattern": "See materials_preview.glsl for static-only material shading. No animation."
+  },
+  {
+    "id": 116,
+    "name": "ochre harness webbing",
+    "albedo": [
+      0.41,
+      0.29,
+      0.13
+    ],
+    "roughness": 0.48,
+    "metalness": 0,
+    "emission": 0,
+    "pattern": "See materials_preview.glsl for static-only material shading. No animation."
+  },
+  {
+    "id": 117,
+    "name": "static illustrative reference instruments",
+    "albedo": [
+      0.015,
+      0.035,
+      0.042
+    ],
+    "roughness": 0.48,
+    "metalness": 0,
+    "emission": 0.25,
+    "pattern": "See materials_preview.glsl for static-only material shading. No animation."
+  },
+  {
+    "id": 118,
+    "name": "vent louver graphite",
+    "albedo": [
+      0.009,
+      0.014,
+      0.017
+    ],
+    "roughness": 0.48,
+    "metalness": 0,
+    "emission": 0,
+    "pattern": "See materials_preview.glsl for static-only material shading. No animation."
+  },
+  {
+    "id": 119,
+    "name": "bezel brushed aluminum",
+    "albedo": [
+      0.25,
+      0.29,
+      0.31
+    ],
+    "roughness": 0.48,
+    "metalness": 0.5,
+    "emission": 0,
+    "pattern": "See materials_preview.glsl for static-only material shading. No animation."
+  }
+]

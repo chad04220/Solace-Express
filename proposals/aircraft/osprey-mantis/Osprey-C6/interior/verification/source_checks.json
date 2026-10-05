@@ -1,0 +1,13 @@
+{
+  "checks": {
+    "module_entry_point": true,
+    "static_no_control_or_time_reads": true,
+    "actual_fuselage_clip": true,
+    "unique_id_range": true,
+    "four_passenger_seats": true,
+    "material_albedo_defined": true,
+    "no_aircraft_row_fields": true
+  },
+  "module_sha256": "308723f4be450bcc626e0a94b92ddad66c4c0073e3c2f1028670b8a3cecb09d0",
+  "passed": true
+}

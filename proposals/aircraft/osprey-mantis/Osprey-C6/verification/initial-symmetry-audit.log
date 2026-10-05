@@ -1,0 +1,10 @@
+Renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+../release/previews/osprey_c6-ortho-front.ppm
+../release/previews/osprey_c6-ortho-rear.ppm
+../release/previews/osprey_c6-ortho-top.ppm
+../release/previews/osprey_c6-ortho-underside.ppm
+Rendered 4 production geometry views.
+HEADREST osprey_c6: 0 skin intersections; worst clearance 1.0000 m
+ENDCAP osprey_c6: maximum seam jump 0.000202 m
+MIRROR osprey_c6: 1769472 paired field samples, 6 gear states x 3 reflected control states x 2 flap states; max error 0.000000000 m; 36 failures
+Geometry checks: 1 failures

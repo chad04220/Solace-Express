@@ -1,0 +1,15 @@
+XR-17 Mantis     cd0 0.0175  liftoff   666m @63.3m/s (need 1350)  climb  13.8m/s  cruise 223.8m/s (spec 190) a=-1.9  stall 51.2  fuelRange 165km 
+control directions checked
+XR-9 level acceleration: Mach 2.47 after 40 s ok
+XR-9 cannot hover: nozzle 0.00, alt 434 m after 4 s ok
+XR-9 approach speed level flight: alt 600 m, 154 kt ok
+XR-9 full-back pull: peak 17.8 g ok
+XR-9 unlimited pull at Mach 1.8 breaks the airframe: ok
+XR-9 pitch rate at Mach 1: 257 deg/s ok
+XR-9 pitch reversal to -60 deg/s: 0.06 s ok
+XR-9 roll rate 315 deg/s ok
+AP hold XR-17 Mantis     hdg err  0.0  alt err   0.1 m  max bank 83.5  g -0.9..+4.8 (limits -3..+6)  roll-rate rms 1.98 deg/s  ok
+AP comfort hold XR-17 Mantis     hdg err  0.0  max bank 25.0  g 0.86..1.26  ok
+AP comfort route XR-17 Mantis     landed after  349 s  en-route max bank 25.1  g 0.84..1.24  ok
+AP autoland XR-17 Mantis     landed after  343 s  touchdown 1.0 m/s  stop  484 m from centre,  0.5 m off the centreline, go-arounds 0  ok
+0 failures

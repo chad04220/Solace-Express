@@ -1,0 +1,32 @@
+{
+  "front": {
+    "differing_pixels": 12,
+    "total_pixels": 768000,
+    "difference_bbox": [
+      210,
+      437,
+      749,
+      442
+    ]
+  },
+  "rear": {
+    "differing_pixels": 12,
+    "total_pixels": 768000,
+    "difference_bbox": [
+      210,
+      437,
+      749,
+      442
+    ]
+  },
+  "top": {
+    "differing_pixels": 0,
+    "total_pixels": 768000,
+    "difference_bbox": null
+  },
+  "underside": {
+    "differing_pixels": 0,
+    "total_pixels": 768000,
+    "difference_bbox": null
+  }
+}

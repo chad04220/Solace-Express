@@ -1,0 +1,151 @@
+{
+  "status": "PASS",
+  "method": "actual GLSL executed with RGBA32F distance readback in software Mesa; deterministic probes, not a watertight mesh proof",
+  "checks": {
+    "neutral": {
+      "mirror_pairs": 80000,
+      "max_distance_error_m": 0.0
+    },
+    "unequal_stores": {
+      "mirror_pairs": 80000,
+      "max_distance_error_m": 0.0
+    },
+    "gear_half": {
+      "mirror_pairs": 80000,
+      "max_distance_error_m": 0.0
+    },
+    "gear_down": {
+      "mirror_pairs": 80000,
+      "max_distance_error_m": 0.0
+    },
+    "pitch_flaps": {
+      "mirror_pairs": 80000,
+      "max_distance_error_m": 0.0
+    },
+    "roll_yaw": {
+      "mirror_pairs": 80000,
+      "max_distance_error_m": 0.0
+    },
+    "bay_half": {
+      "mirror_pairs": 80000,
+      "max_distance_error_m": 0.0
+    },
+    "bay_open": {
+      "mirror_pairs": 80000,
+      "max_distance_error_m": 0.0
+    },
+    "wing_fill_12": {
+      "interior_parent_points": 1001,
+      "unfilled_points": 0
+    },
+    "wing_fill_14": {
+      "interior_parent_points": 6666,
+      "unfilled_points": 0
+    },
+    "rudder_fill": {
+      "interior_parent_points": 11488,
+      "unfilled_points": 0
+    },
+    "bay_closed_skin": {
+      "points": 60000,
+      "holes": 0
+    },
+    "gear_closed_skin_23": {
+      "points": 6000,
+      "holes": 0
+    },
+    "gear_closed_skin_24": {
+      "points": 6000,
+      "holes": 0
+    },
+    "gear_closed_skin_25": {
+      "points": 6000,
+      "holes": 0
+    },
+    "hinge_12": {
+      "split_plane_m": 0.620000000040995,
+      "target": 0.62
+    },
+    "hinge_13": {
+      "split_plane_m": 0.620000000040995,
+      "target": 0.62
+    },
+    "hinge_14": {
+      "split_plane_m": 0.6200000000409951,
+      "target": 0.62
+    },
+    "hinge_15": {
+      "split_plane_m": 0.6200000000409951,
+      "target": 0.62
+    },
+    "hinge_16": {
+      "split_plane_m": 0.4900003011780098,
+      "target": 0.49
+    },
+    "motion_clearance_12": {
+      "volume_probes": 28035,
+      "states": 9,
+      "maximum_penetration_m": 0.0
+    },
+    "motion_clearance_13": {
+      "volume_probes": 27576,
+      "states": 9,
+      "maximum_penetration_m": 0.0
+    },
+    "motion_clearance_14": {
+      "volume_probes": 74529,
+      "states": 9,
+      "maximum_penetration_m": 0.0
+    },
+    "motion_clearance_15": {
+      "volume_probes": 74178,
+      "states": 9,
+      "maximum_penetration_m": 0.0
+    },
+    "motion_clearance_16": {
+      "volume_probes": 59400,
+      "states": 9,
+      "maximum_penetration_m": 0.0
+    },
+    "closed_cabin": {
+      "boundary_rays": 6000,
+      "max_boundary_residual_m": 4.470348358154297e-07,
+      "minimum_parent_hull_margin_m": 0.07014838606119156
+    },
+    "engine_join_-1": {
+      "path_points": 300,
+      "maximum_distance_m": -0.11999999731779099
+    },
+    "engine_join_1": {
+      "path_points": 300,
+      "maximum_distance_m": -0.11999999731779099
+    },
+    "carrier_guide_capture_32": {
+      "states": 21,
+      "guide_tips_per_state": 2,
+      "maximum_tip_center_distance_m": 0.0020000338554382324,
+      "tip_radius_m": 0.024,
+      "minimum_tip_overlap_m": 0.021999966144561768
+    },
+    "carrier_guide_capture_33": {
+      "states": 21,
+      "guide_tips_per_state": 2,
+      "maximum_tip_center_distance_m": 0.0020000338554382324,
+      "tip_radius_m": 0.024,
+      "minimum_tip_overlap_m": 0.021999966144561768
+    },
+    "camera_mounts": {
+      "exterior_distance_m": [
+        0.12209395319223404,
+        0.15807199478149414,
+        0.15807199478149414
+      ],
+      "hull_distance_m": [
+        0.12209395319223404,
+        0.15807199478149414,
+        0.15807199478149414
+      ],
+      "minimum_external_clearance_m": 0.12209395319223404
+    }
+  }
+}

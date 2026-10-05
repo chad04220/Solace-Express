@@ -1,0 +1,25 @@
+Test project /workspace/shared/solace-civilian/test-copy/build-cmake
+      Start  1: flight_model
+      Start  9: gameplay_loop
+ 1/10 Test  #9: gameplay_loop ....................   Passed   12.31 sec
+      Start  8: entity_raycast
+ 2/10 Test  #8: entity_raycast ...................   Passed    5.19 sec
+      Start  7: hull_mesh
+ 3/10 Test  #1: flight_model .....................   Passed   21.25 sec
+      Start  2: campaign_progression
+ 4/10 Test  #7: hull_mesh ........................   Passed    4.33 sec
+      Start 10: terrain_shadow_bake
+ 5/10 Test #10: terrain_shadow_bake ..............   Passed    3.28 sec
+      Start  6: terrain_envelope
+ 6/10 Test  #2: campaign_progression .............   Passed    4.97 sec
+      Start  4: career_saves
+ 7/10 Test  #6: terrain_envelope .................   Passed    2.70 sec
+      Start  5: airport_layouts
+ 8/10 Test  #4: career_saves .....................   Passed    3.01 sec
+      Start  3: shader_keywords
+ 9/10 Test  #3: shader_keywords ..................   Passed    0.01 sec
+10/10 Test  #5: airport_layouts ..................   Passed    2.02 sec
+
+100% tests passed out of 10
+
+Total Test time (real) =  29.83 sec

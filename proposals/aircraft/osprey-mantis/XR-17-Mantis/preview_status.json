@@ -1,0 +1,6 @@
+{
+  "shader_compile": "PASS",
+  "renderer": "system Mesa software GL EGL",
+  "views": 22,
+  "in_game": false
+}

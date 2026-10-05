@@ -1,0 +1,50 @@
+{
+  "method": "Dense analytic geometry surface sampling at81 state positions; true inverse of rigHinge used for world points. Fixed bearing sockets and pedal slider tracks intentionally overlap at mechanical mating interfaces; only matching mount excluded. Sampling is evidence, not a continuous mathematical proof.",
+  "all_pass": true,
+  "results": [
+    {
+      "id": 41,
+      "state_samples": 81,
+      "surface_samples": 7360,
+      "minimum_static_clearance_m": 0.01200000000000001,
+      "closest_static_component": "seat pan carbon shell",
+      "worst_state": -1.0,
+      "minimum_cavity_clearance_m": 0.237,
+      "intentional_mount_overlap_exempt": "pitch fixed pivot socket",
+      "pass_no_unintended_collision": true
+    },
+    {
+      "id": 42,
+      "state_samples": 81,
+      "surface_samples": 7360,
+      "minimum_static_clearance_m": 0.014000000000000012,
+      "closest_static_component": "side avionics console",
+      "worst_state": 0.6375000000000001,
+      "minimum_cavity_clearance_m": 0.24137867460063714,
+      "intentional_mount_overlap_exempt": "throttle fixed pivot socket",
+      "pass_no_unintended_collision": true
+    },
+    {
+      "id": 43,
+      "state_samples": 81,
+      "surface_samples": 13126,
+      "minimum_static_clearance_m": 0.012000000058011343,
+      "closest_static_component": "instrument floor support",
+      "worst_state": -0.725,
+      "minimum_cavity_clearance_m": 0.17955215601628374,
+      "intentional_mount_overlap_exempt": "pedal fixed slider rail",
+      "pass_no_unintended_collision": true
+    },
+    {
+      "id": 44,
+      "state_samples": 81,
+      "surface_samples": 13126,
+      "minimum_static_clearance_m": 0.012000000058011343,
+      "closest_static_component": "instrument floor support",
+      "worst_state": -0.875,
+      "minimum_cavity_clearance_m": 0.17955215601628374,
+      "intentional_mount_overlap_exempt": "pedal fixed slider rail",
+      "pass_no_unintended_collision": true
+    }
+  ]
+}

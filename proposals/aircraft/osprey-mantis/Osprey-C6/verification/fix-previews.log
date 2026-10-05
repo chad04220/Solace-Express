@@ -1,0 +1,17 @@
+Renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+../release/previews/osprey_c6-front.ppm
+../release/previews/osprey_c6-side.ppm
+../release/previews/osprey_c6-rear.ppm
+../release/previews/osprey_c6-top.ppm
+../release/previews/osprey_c6-belly.ppm
+../release/previews/osprey_c6-controls.ppm
+../release/previews/osprey_c6-controls-negative.ppm
+../release/previews/osprey_c6-transition.ppm
+../release/previews/osprey_c6-retracted.ppm
+../release/previews/osprey_c6-gearbelly.ppm
+../release/previews/osprey_c6-gearside.ppm
+../release/previews/osprey_c6-gearfront.ppm
+Rendered 12 production geometry views.
+HEADREST osprey_c6: 0 skin intersections; worst clearance 1.0000 m
+ENDCAP osprey_c6: maximum seam jump 0.000202 m
+Geometry checks: 0 failures

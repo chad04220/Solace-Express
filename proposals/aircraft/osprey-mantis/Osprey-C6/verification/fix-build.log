@@ -1,0 +1,30 @@
+[  1%] Building CXX object CMakeFiles/progression_test.dir/src/aircraft.cpp.o
+[  2%] Building CXX object CMakeFiles/flight_test.dir/src/aircraft.cpp.o
+[  3%] Linking CXX executable flight_test
+[ 10%] Built target flight_test
+[ 11%] Built target shaders_gen
+[ 12%] Building CXX object CMakeFiles/save_test.dir/src/aircraft.cpp.o
+[ 13%] Linking CXX executable progression_test
+[ 20%] Built target progression_test
+[ 21%] Building CXX object CMakeFiles/airport_layout_test.dir/src/aircraft.cpp.o
+[ 22%] Linking CXX executable save_test
+[ 23%] Linking CXX executable airport_layout_test
+[ 30%] Built target save_test
+[ 31%] Building CXX object CMakeFiles/envelope_test.dir/src/aircraft.cpp.o
+[ 38%] Built target airport_layout_test
+[ 40%] Built target hull_test
+[ 41%] Building CXX object CMakeFiles/entity_raycast_test.dir/src/aircraft.cpp.o
+[ 42%] Linking CXX executable envelope_test
+[ 42%] Linking CXX executable entity_raycast_test
+[ 50%] Built target entity_raycast_test
+[ 58%] Built target envelope_test
+[ 59%] Building CXX object CMakeFiles/autoland_sweep.dir/src/aircraft.cpp.o
+[ 60%] Building CXX object CMakeFiles/gameplay_test.dir/src/aircraft.cpp.o
+[ 61%] Linking CXX executable autoland_sweep
+[ 68%] Built target autoland_sweep
+[ 70%] Built target shader_check
+[ 76%] Built target terrain_shadow_test
+[ 78%] Built target shader_keyword_test
+[ 79%] Building CXX object CMakeFiles/gameplay_test.dir/src/models.cpp.o
+[ 80%] Linking CXX executable gameplay_test
+[100%] Built target gameplay_test
