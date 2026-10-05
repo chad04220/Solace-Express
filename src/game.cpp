@@ -110,7 +110,7 @@ void Game::loadSettings() {
   while (fscanf(f, "%63s %f", k, &v) == 2) {
     if (!std::isfinite(v) || fabsf(v) > 1e6f) continue;   // a damaged value keeps the default
     std::string s = k;
-    if (s == "renderScale") set.renderScale = 1.0f;   // old setting: rendering is now always at 100%
+    if (s == "renderScale") continue;   // old setting (the renderer scales itself)
     else if (s == "quality") set.quality = (int)clampf(v, 0, 2);
     else if (s == "master") set.master = clampf(v, 0, 1);
     else if (s == "engineVol") set.engineVol = clampf(v, 0, 1.5f);
@@ -137,8 +137,8 @@ void Game::loadSettings() {
 // Written only when something changed (the settings page calls this every frame), through a temp file so an
 // interrupted write never leaves a half-written settings file.
 void Game::saveSettings() {
-  std::string t = fmt("renderScale %f\nquality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
-          set.renderScale, set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
+  std::string t = fmt("quality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
+          set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
   t += fmt("renderRes %d\n", set.resMode);
   for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   if (t == settingsWritten) return;
@@ -288,7 +288,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   fuelStart = plane.fuel;
   wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0;
   traffic.reset();
-  ufo = Ufo(); ufo.next = 180.f + (rand() % 1000) * 0.24f;   // first encounter after 3-7 minutes in the air
+  ufo = Ufo(); ufo.next = 180.f + sparkRng.uni() * 240.f;   // first encounter after 3-7 minutes in the air
   paused = false; showMap = false; landed = completed = crashed = false;
   result = FlightResult();
   timeAccel = 1; camMode = camMode == 1 ? 1 : 0; camYaw = 0; camPitch = 0.12f; camZoom = 1; camArm = 0; camArmV = 0; camSpd = 0;

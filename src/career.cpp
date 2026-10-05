@@ -362,7 +362,7 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
   } else {
     float fpm = fabsf(r.touchdownFpm);
     if (r.landed) { landings++; bestLandingFpm = std::min(bestLandingFpm, fpm); }
-    float mult = 1.f; int st = 3;
+    int st = 3;
     if (c.payout > 0) L.push_back({"Contract payment", c.payout});
     // landing quality only counts when the flight actually ended with a touchdown
     if (r.landed) {
@@ -374,7 +374,6 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
     if (r.late) { L.push_back({"Late delivery", -c.payout / 2}); st--; }
     if (c.pax > 0 && (r.maxBank > 45 || r.maxG > 1.9f || r.minG < 0.2f)) { L.push_back({"Passenger discomfort", -c.payout * 15 / 100}); st--; }
     if (c.fragile && (r.maxG > 2.0f || r.minG < 0.0f || (r.landed && fpm > 400))) { L.push_back({"Fragile cargo damaged", -c.payout * 4 / 10}); st--; }
-    (void)mult;
     *stars = std::max(1, st);
     reputation += *stars;
     if (c.story) {
