@@ -28,8 +28,8 @@ G-buffer pass  : terrain mesh | water | entities | aircraft parts | debris | UFO
 lighting pass  : sky | sun with cascades + terrain-shadow bake + cloud shadow | ambient | moon
                  | point lights (shadow maps for the flagged ones) | emission | interior fixtures | fog
 clouds         : quarter-resolution march along texDepth + composite              existing
-effects pass   : plumes, vapour cone, weapons, hologram, prop discs over proxy volumes
-cloak pass     : the cloaked XR-11 refracts the lit scene
+effects pass   : the cloaked XR-11 refracts the lit frame (screen space), prop discs, vapour cone, plumes, weapons, hologram
+                 (effects_fs, into the free TAA history texture and copied back)
 TAA, sprites, bloom, light shafts, post                                         existing
 ```
 
@@ -55,7 +55,7 @@ Quadtree of 32×32-quad chunks (the envelope mesh's structure) extended below th
 
 Milestone R1 keeps the distance-field march for the aircraft, but in its own small program: a full-screen pass that starts from the rasterized hull and writes the G-buffer with depth, so it competes fairly with terrain and scenery and never runs the terrain or cloud code. Milestone R2 replaces the march with triangle meshes extracted from the same distance fields at load time (dual contouring, 1.5 cm outside, 8 mm in the cabin, finer for antennas and wicks), one mesh per moving part, animated by a rig table that mirrors the distance field's own formulas (`sdSurface` hinges with Fowler slide, gear translation, door hinges, yoke stretch and turn, pod tilt, fan spin, iris petals, vanes, actuators, hatches). Normals and ambient occlusion are baked from the field; materials stay the procedural functions keyed by material id and body-space position, so seams, rivets, registrations, displays and gauges look as they do now. Traffic draws the same meshes instanced; wreck pieces clip the mesh to their box in the fragment shader. Meshes are cached on disk keyed by the shader fingerprint.
 
-Shadows from the aircraft (on the ground, on itself, in the landing-light beam) become shadow maps once the meshes exist: a third sun cascade centred on the aircraft and a small map per flagged spot light. Until then (R1) a proxy pass runs the distance-field shadow march only over the screen region the aircraft can shadow.
+Shadows from the aircraft (on the ground, on itself, in the landing-light beam) become shadow maps once the meshes exist: a third sun cascade centred on the aircraft and a small map per flagged spot light. Until then (R1) a proxy pass (`shadow_proxy_fs`) runs the distance-field shadow march over the G-buffer's surfaces - each march starts with a bounding-sphere test, so pixels away from the aircraft cost almost nothing - into one RGBA8 texture: the sun's shadow of the player's aircraft and the traffic on the ground, and the airframe in the beams of the three brightest shadow-casting lights (`gbShadowSlot`), which the lighting pass reads in `lightShadow`.
 
 ### Lighting pass
 
@@ -67,8 +67,8 @@ Shadows from the aircraft (on the ground, on itself, in the landing-light beam) 
 |---|---|---|
 | R0 | Split the uber shader into modules; extract `planeMaterial`, `waterShade`, terrain/entity/debris shading into functions. No behaviour change. | **done** (db08f7a): bit-identical on `multi:air,cockpit,night,storm,rjetc,wr_8_0_0_0_1` |
 | R1a | Deferred world: terrain mesh, water, sky, entities, lighting pass, behind `Renderer::mode` (Settings → Renderer; harness `RASTER=1`; tools `--raster`) | harness: air/mountain/storm/night/sunset match the ray tracer by eye (`RASTER=1 ./render_harness multi:...`, PSNR 27–35 dB with the aircraft absent); owner `benchmark.bat --raster` pending |
-| R1b | Objects pass (aircraft, traffic, wreck, debris, UFO) into the G-buffer; interior lighting; camera feeds; aircraft shadow proxy | harness: cockpit, rjetc, wr_8, trf25_0, ufo13_0, night match the ray tracer by eye; ctest; owner cockpit / rjetc fps pending |
-| R1c | Effects pass (prop discs, vapour cone, plumes, weapons, hologram) and the cloak over the lit frame; timing stamps and tooling (F3, analyze, bench, profile) on the new path | harness wr_6 (cloak) / wr_7 (plumes) / wr_9, rjetc, air by eye; owner `analyze.bat --raster` |
+| R1b | Objects pass (aircraft, traffic, wreck, debris, UFO) into the G-buffer; interior lighting; camera feeds; aircraft shadow proxy | **done** on the harness: cockpit, rjetc, wr_8, trf25_0, ufo13_0, night match the ray tracer by eye; ctest; owner cockpit / rjetc fps pending |
+| R1c | Effects pass (prop discs, vapour cone, plumes, weapons, hologram) and the cloak over the lit frame; timing stamps and tooling (F3, analyze, bench, profile) on the new path | **done** on the harness: wr_3/wr_4 (cloak), wr_6 (lasers, plumes), wr_7 (plasma dome), wr_9, rjetc, air, night match the ray tracer by eye (one intended difference: the ray tracer skipped the plume segment between the camera and a cloaked skin, the raster path shows it); owner `analyze.bat --raster` pending |
 | R2 | Aircraft meshes + rigs; aircraft and spot shadow maps | parity by eye at both ends of every part's travel; owner cockpit fps |
 | R3 | Sky probe, cloud reprojection, entity draw caching, terrain in the near cascade; delete the ray tracer | owner benchmark ≥ 60 fps in air/night/cockpit; sign-off |
 
