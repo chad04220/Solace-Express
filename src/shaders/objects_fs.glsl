@@ -57,9 +57,9 @@ void main(){
   gl_FragDepth = (log2(max(1e-6, 1.0 + w))*uLogC - 1.0)*0.5 + 0.5;
   float sunVis = smoothstep(-0.05, 0.05, uSunDir.y);
   if (hit == 8) {   // the UFO
-    Mat m; vec3 n; bool cabin;
-    ufoMaterial(p, rd, t, m, n, cabin);
-    gbWrite(t, n, GB_UFO, m, 1.0);
+    Mat m; vec3 n; bool cabin; float ao;
+    ufoMaterial(p, rd, t, m, n, cabin, ao);
+    gbWrite(t, n, GB_UFO, m, ao);
     oG3 = vec4(1.0, 1.0, 1.0, float(GBF_MOVING)/255.0);
     return;
   }

@@ -3039,7 +3039,7 @@ void Game::debugScene(const std::string& name) {
   if (name.compare(0, 4, "gav_") == 0) {   // an aircraft parked on the runway, orbit view: gav_<spec>_<yaw>_<pitch>_<dist>
     int sp = 0; float yawD = 120, pitD = 10, dist = 0;
     sscanf(name.c_str() + 4, "%d_%f_%f_%f", &sp, &yawD, &pitD, &dist);
-    sp = std::clamp(sp, 0, kNumAircraft - 1);
+    sp = std::clamp(sp, 0, kWraith);
     Contract c; c.from = g_world.findAirport("CAP"); c.to = g_world.findAirport("MDB"); c.title = "Aircraft check";
     c.wx = Weather(); c.wx.timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 14.5f; c.wx.cloudCover = 0.2f; c.wx.visibility = 60000;
     realTime = 20; startFlight(c, sp, Career::SRC_OWNED);
