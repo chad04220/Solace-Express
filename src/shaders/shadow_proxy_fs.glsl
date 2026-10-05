@@ -1,7 +1,7 @@
 //! kShadowProxyFS
 //! The raster renderer's shadow proxy: what the airframes' distance fields shadow on the surfaces already in the
 //! G-buffer - the player's aircraft and the traffic in the sun on the ground and the scenery (R), and the airframe in
-//! the beams of the first three shadow-casting point lights, the landing lights (G, B, A) - marched exactly as the ray
+//! the beams of the three brightest shadow-casting point lights, the landing lights (G, B, A) - marched exactly as the ray
 //! tracer did, so the lighting pass can stay free of the fields. Each march begins with a bounding-sphere test, so
 //! away from the aircraft a pixel costs almost nothing. (R2 replaces this with shadow maps from the aircraft meshes.)
 in vec2 vUV; out vec4 oColor;
@@ -22,13 +22,13 @@ void main(){
     sunS = planeShadow(p + n*0.2, uSunDir);
     if (uTrafficN > 0) sunS *= trafficShadow(p);
   }
-  vec3 ls = vec3(1.0); int slot = 0;
+  vec3 ls = vec3(1.0);
   for (int i = 0; i < 12; i++) {
-    if (i >= uPLN || slot >= 3) break;
-    if (uPLD[i].w <= 0.0) continue;
+    if (i >= uPLN) break;
+    int slot = gbShadowSlot(i);
+    if (slot < 0) continue;
     vec3 L = uPLP[i].xyz - p; float d = length(L);
     if (d < uPLP[i].w*40.0 + 400.0) ls[slot] = lightShadow(i, p, n, L/d, d);   // (beyond the beam's reach nothing is lit to shadow)
-    slot++;
   }
   oColor = vec4(sunS, ls);
 }

@@ -6,13 +6,12 @@
 //! only gets the aerial perspective. Writes what the ray tracer wrote: colour + TAA class, view distance, and the
 //! cloud mask for the quarter-resolution cloud pass.
 uniform sampler2D uGB3;   // (uGB0..2: light_common)
-uniform sampler2D uShProxy;   // the airframes' shadows on this pixel (kShadowProxyFS): the sun's, the first three shadow-casting lights'
+uniform sampler2D uShProxy;   // the airframes' shadows on this pixel (kShadowProxyFS): the sun's, the three brightest shadow-casting lights'
 vec4 gShProxy = vec4(1.0);
-// the aircraft's shadow in a point light's beam, from the proxy (the slot: the light's rank among the shadow-casting ones)
+// the aircraft's shadow in a point light's beam, from the proxy (gbShadowSlot: the three brightest shadow-casting lights)
 float lightShadow(int i, vec3 p, vec3 n, vec3 l, float d){
-  int slot = 0;
-  for (int k = 0; k < 12; k++) { if (k >= i) break; if (uPLD[k].w > 0.0) slot++; }
-  return slot < 3 ? gShProxy[1 + slot] : 1.0;
+  int slot = gbShadowSlot(i);
+  return slot < 0 ? 1.0 : gShProxy[1 + slot];
 }
 void main(){
   ivec2 px = ivec2(gl_FragCoord.xy);
