@@ -1,5 +1,1 @@
 ## What's new
-- One tool instead of seven: `diagnostics.bat` next to the exe runs the whole performance check (system report with GPU, driver, CPU, memory and monitor refresh rates; first-run shader compile time with the cache set aside; the benchmarks on the rasterizer at 1080p and native and on the ray tracer; the pass analysis with heat maps; screenshots of the HUD, the research craft, the cockpits and the menus; the logs) and zips it to send over. `quick` runs only the benchmarks, `shots` only the pictures, `menu` and `loading` render the menu video and the loading pictures. The old analyze, benchmark, profile, render_* and report batch files are gone from the release.
-- A fifth trial, the formation run: take off, climb above 300 m and the Spectre display pair joins you for three minutes of their show; the seconds you spend out of a steady platform (steep bank, hard g, a quick roll) are your score, lower is better, the five best kept on the card.
-- Gamepad: the shoulder buttons step through the hub's tabs. F3 also counts particles, debris, wreck pieces, traffic and the comms history.
-
