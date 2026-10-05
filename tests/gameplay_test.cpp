@@ -261,6 +261,40 @@ struct GameTest {
       printf("ATC history after the flights so far: %zu lines (limit %zu): %s\n", g.atc.history.size(), g.atc.historyLimit, g.atc.history.size() <= 64 ? "ok" : "FAIL");
       fails += g.atc.history.size() > 64;
     }
+    // ---- E5: input contexts and re-arming. A held from the menu into the flight doesn't brake until it's released
+    // and pressed again; A held across leaving the pause menu doesn't either; LB+RB doesn't hide the UI while the
+    // XR-11's weapons are armed; losing the controller in flight pauses it
+    {
+      g.botControl = false;
+      Contract fc = g_story[0]; fc.forceAircraft = -1; fc.type = CT_FERRY; fc.from = fc.to = g_world.findAirport("CAP"); fc.wps.clear(); fc.hints.clear();
+      auto pad = [&](unsigned held, unsigned pressed) { g.in.pad = true; g.in.buttons = held; g.in.buttonsPressed = pressed; };
+      g.screen = SCR_HUB; g.paused = false;
+      pad(PAD_A, PAD_A); g.update(dt); pad(PAD_A, 0); g.update(dt);   // A pressed on a menu, still held
+      g.startFlight(fc, 0, Career::SRC_RENT); g.parkingBrake = false;
+      float held = 0; for (int i = 0; i < 30; i++) { pad(PAD_A, 0); g.update(dt); held = std::max(held, g.plane.ctl.brake); }
+      pad(0, 0); g.update(dt);
+      pad(PAD_A, PAD_A); g.update(dt); float again = g.plane.ctl.brake;
+      bool ok1 = held == 0.f && again > 0.5f;
+      printf("A held from the menu into the flight: brake %.1f while held, %.1f when pressed again: %s\n", held, again, ok1 ? "ok" : "FAIL"); fails += !ok1;
+      pad(0, 0); g.update(dt);
+      g.paused = true; pad(0, 0); g.update(dt); pad(PAD_A, PAD_A); g.update(dt);   // A pressed in the pause menu...
+      g.paused = false; float leak = 0; for (int i = 0; i < 10; i++) { pad(PAD_A, 0); g.update(dt); leak = std::max(leak, g.plane.ctl.brake); }   // ...held after resuming
+      bool ok2 = leak == 0.f;
+      printf("A held across leaving the pause menu: brake %.1f: %s\n", leak, ok2 ? "ok" : "FAIL"); fails += !ok2;
+      pad(0, 0); g.update(dt);
+      g.in.pad = false; g.update(dt);
+      bool ok3 = g.paused;
+      printf("Controller lost in flight: paused %d: %s\n", g.paused, ok3 ? "ok" : "FAIL"); fails += !ok3;
+      g.paused = false;
+      // the XR-11 armed: both bumpers held 1.5 s
+      g.resCraft = kWraith; g.resAirborne = true; g.launchResearch(); g.wraith.armed = true;
+      bool hid0 = g.uiHidden;
+      for (int i = 0; i < 90; i++) { pad(PAD_LB | PAD_RB, i == 0 ? (PAD_LB | PAD_RB) : 0); g.update(dt); }
+      bool ok4 = g.uiHidden == hid0;
+      printf("LB+RB held with the XR-11 armed: UI hidden %d -> %d: %s\n", hid0, g.uiHidden, ok4 ? "ok" : "FAIL"); fails += !ok4;
+      pad(0, 0); g.in.pad = false; g.update(dt); g.paused = false;
+      g.botControl = true;
+    }
     // ---- low frame rates keep simulated time: 5 s of 5 fps frames is 5 s of flight
     {
       g.startFlight(g_story[0], 0, Career::SRC_LESSON);

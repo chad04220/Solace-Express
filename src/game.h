@@ -264,10 +264,21 @@ private:
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI
   // bound action state: keyboard key or gamepad button
   std::string expandHint(const std::string& raw) const;   // {actionId} tokens -> the bound keys
-  bool actKey(int a) const { int k = set.keyBind[a]; return k > 0 && k < 256 && in.down[k]; }
-  bool actKeyP(int a) const { int k = set.keyBind[a]; return k > 0 && k < 256 && in.pressed[k]; }
-  bool actPad(int a) const { return in.pad && (in.buttons & set.padBind[a]); }
-  bool actPadP(int a) const { return in.pad && (in.buttonsPressed & set.padBind[a]); }
+  // input contexts: who gets the input this frame, in priority order (a key-binding capture, a dialog, the pause
+  // menu, a menu screen, a flight overlay - GPS or radio - then the flight). An action works only in the contexts in
+  // kActionCtx; on a change of context every held key and button is ignored until it's released (no A held through
+  // the loading screen braking, no Resume press firing the lasers)
+  enum InputCtx { CTX_BIND, CTX_DIALOG, CTX_PAUSE, CTX_SCREEN, CTX_OVERLAY, CTX_FLIGHT };
+  InputCtx ctx = CTX_SCREEN, lastCtx = CTX_SCREEN;
+  bool keyUnarmed[256] = {}; unsigned padUnarmed = 0; bool padWas = false;
+  InputCtx inputContext() const;
+  static unsigned actionCtxMask(int a);
+  void armInputs();
+  bool actOk(int a) const;
+  bool actKey(int a) const { int k = set.keyBind[a]; return actOk(a) && k > 0 && k < 256 && in.down[k]; }
+  bool actKeyP(int a) const { int k = set.keyBind[a]; return actOk(a) && k > 0 && k < 256 && in.pressed[k]; }
+  bool actPad(int a) const { return actOk(a) && in.pad && (in.buttons & set.padBind[a]); }
+  bool actPadP(int a) const { return actOk(a) && in.pad && (in.buttonsPressed & set.padBind[a]); }
   bool actDown(int a) const { return actKey(a) || actPad(a); }
   bool actPressed(int a) const { return actKeyP(a) || actPadP(a); }
   bool confirmNew = false;

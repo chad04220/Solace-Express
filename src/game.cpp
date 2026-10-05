@@ -69,6 +69,44 @@ std::string keyName(int vk) {
 // A lesson hint's {actionId} tokens (kActions ids) as the keys bound now. With the default bindings this is the text
 // the voice lines were recorded from (AtcVoice matches it); after a rebind it no longer matches any recording, so the
 // hint is shown and never spoken naming the old key.
+// ------------------------------------------------------------------ input contexts
+// where each action works: the flight actions in flight; the stick, rudder and throttle also with the GPS or radio
+// open (they're flying the aircraft), but not the buttons those overlays use themselves (D-pad, A); the radio in the
+// pause menu too
+unsigned Game::actionCtxMask(int a) {
+  const unsigned F = 1u << Game::CTX_FLIGHT, O = 1u << Game::CTX_OVERLAY, P = 1u << Game::CTX_PAUSE;
+  switch (a) {
+    case ACT_PITCH_DN: case ACT_PITCH_UP: case ACT_ROLL_L: case ACT_ROLL_R: case ACT_YAW_L: case ACT_YAW_R:
+    case ACT_THR_UP: case ACT_THR_DN: case ACT_MAP: case ACT_HUD: case ACT_CAMERA: case ACT_ZOOM: case ACT_FIRE: return F | O;
+    case ACT_RADIO: case ACT_ANR: return F | O | P;
+    default: return F;
+  }
+}
+Game::InputCtx Game::inputContext() const {
+  if (bindCapture >= 0) return CTX_BIND;
+  if (confirmNew) return CTX_DIALOG;
+  if (screen != SCR_FLIGHT) return CTX_SCREEN;
+  if (paused) return CTX_PAUSE;
+  if (showMap || showRadio) return CTX_OVERLAY;
+  return CTX_FLIGHT;
+}
+bool Game::actOk(int a) const { return (actionCtxMask(a) >> ctx) & 1u; }
+// on a change of context everything held is set aside until released; a controller lost in flight pauses it (and
+// coming back doesn't resume: the player does, from the pause menu)
+void Game::armInputs() {
+  ctx = inputContext();
+  if (ctx != lastCtx) {
+    for (int k = 0; k < 256; k++) if (in.down[k]) keyUnarmed[k] = true;
+    padUnarmed |= in.buttons;
+    lastCtx = ctx;
+  }
+  for (int k = 0; k < 256; k++) { if (!in.down[k]) keyUnarmed[k] = false; if (keyUnarmed[k]) in.down[k] = in.pressed[k] = false; }
+  padUnarmed &= in.buttons;
+  in.buttons &= ~padUnarmed; in.buttonsPressed &= ~padUnarmed;
+  if (padWas && !in.pad && screen == SCR_FLIGHT && !paused) { paused = true; settingsFromPause = false; toast("Controller disconnected - paused. Reconnect it, or carry on with the keyboard", vec3(1, 0.85f, 0.5f)); }
+  padWas = in.pad;
+}
+
 std::string Game::expandHint(const std::string& raw) const {
   std::string out;
   for (size_t i = 0; i < raw.size(); i++) {
@@ -2406,6 +2444,7 @@ void Game::update(float dt) {
   dt = std::min(dt, 0.05f);
   realTime += dt;
   updateBindCapture(dt);
+  armInputs();
   // gamepad: both bumpers held together for a second hides the whole flight UI; again brings it back (not while the
   // XR-11's weapons are armed: the bumpers are its triggers then; the pause menu has the same switch)
   bool bumpersFree = !(screen == SCR_FLIGHT && plane.spec && plane.spec->special == 2 && wraith.armed);
