@@ -62,7 +62,7 @@ Integration notes: insert at **index 7**, before `xr9`, in both arrays. For the 
 
 Harness views to look at: `gav_7_120_10_0`, `gav_7_210_5_0`, `gav_7_60_35_0`, `ckv7_0_-8_11`, `ckv7_-60_-20_11`. Regenerate the README performance row with `flight_test --table` after insertion; nominal speeds are design values, not the learned table.
 
-### XR-14 Nightjar — Civil twin jet research demonstrator
+### XR-8 Nightjar — Civil twin jet research demonstrator
 
 Design brief: Nightjar combines an X-29-inspired tapered wing silhouette with the slender body and aft nacelles of a small business jet. It is a fictional, conventional aerodynamic test aircraft: its leading edge is nearly straight, while its quarter-chord line sweeps mildly forward. The 16.30 m body, 16.60 m span, graphite/teal paint, large fin and raised conventional tailplane distinguish it from the fleet without a custom distance function. Its ATP licence, 340,000 purchase price, 240 km design range and 1,250 m nominal runway place it above the Starling as an optional equipment-carrying test platform, with no passenger seats. The offset glass cockpit uses ordinary windows and instruments; the aircraft has normal fuel, control and structural limits.
 
@@ -87,14 +87,14 @@ Self-check:
 | Cabin / wing | roof clearance ≥ 0.08 m; floor above root wing top | Checked with the native monotone station spline and conservative root half-thickness; see validation report |
 | Gear wells | wing present across the full opening at derived track | Both ends of each main bay lie between the local leading and trailing edges; see validation report |
 
-Integration notes: insert at **index 8**, before `xr9`, in both arrays. For the set, Swift is 7, Nightjar is 8, `kResearchJet = 9`, `kWraith = 10`, and automatic `kNumAircraft` becomes 9. Keep the original XR-9 / XR-11 rows last, and keep IDs `xr14_nightjar` stable. The laboratory appends candidates at 9 / 10 solely to leave production indices unchanged during testing; do not copy that laboratory count override into the game. See the source-verified coordinate correction below.
+Integration notes: insert at **index 8**, before `xr9`, in both arrays. For the set, Swift is 7, Nightjar is 8, `kResearchJet = 9`, `kWraith = 10`, and automatic `kNumAircraft` becomes 9. Keep the original XR-9 / XR-11 rows last, and keep IDs `xr8_nightjar` stable. The laboratory appends candidates at 9 / 10 solely to leave production indices unchanged during testing; do not copy that laboratory count override into the game. See the source-verified coordinate correction below.
 
 ```cpp
 // aircraft.cpp — insert before xr9, after Swift. Tier A civil research demonstrator; special=0.
 // id, name, role, eng, n, cyl, blades, idle, max, empty, fuel, cargo, pax, S, b, c, CL0, CLa, CLmax, flapCL, CD0, gearCD, flapCD, e,
 // power, v0, vr, vref, cruise, range, runway, rough, tail, retract, Ixx, Iyy, Izz, elev, ail, rud, lic, price, rent,
 // fusLen, fusRad, wingY, wingZ, engLayout, tail, colBase, colStripe
-{"xr14_nightjar", "XR-14 Nightjar", "Tapered-wing research demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
+{"xr8_nightjar", "XR-8 Nightjar", "Tapered-wing research demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
  5700.0f, 1300.0f, 100.0f, 0, 38.18f, 16.60f, 2.508f,
  0.15f, 4.6f, 1.55f, 0.55f, 0.020f, 0.010f, 0.045f, 0.80f,
  12500.0f, 0.0f, 43.0f, 50.0f, 150.0f, 240.0f, 1250.0f, false, false, true,

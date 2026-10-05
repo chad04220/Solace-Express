@@ -14,7 +14,7 @@ Current-layout tests pass **12/12 suites**, including the **110 candidate flight
 
 ![Swift S6 in the current game renderer](evidence/previews/swift-s6-front-r0.png)
 
-![XR-14 Nightjar in the current game renderer](evidence/previews/xr14-nightjar-front-r0.png)
+![XR-8 Nightjar in the current game renderer](evidence/previews/xr14-nightjar-front-r0.png)
 
 Guide angles and interiors: [Swift](evidence/previews/swift-s6-guide.png), [Nightjar](evidence/previews/xr14-nightjar-guide.png). These six-view sheets use the source-verified 3b renderer and final native rows; R0 front images use the current shader modules.
 
@@ -34,7 +34,7 @@ Each sheet shows the main and nose/tail wheel. Detailed geometry and finish use 
 | XR-9 Specter | [Main / paired nose](evidence/previews/xr9-specter-gear.png) |
 | XR-11 Wraith | [Main / paired nose](evidence/previews/xr11-wraith-gear.png) |
 | Swift S6 | [Main / nose](evidence/previews/swift-s6-gear.png) |
-| XR-14 Nightjar | [Main / nose](evidence/previews/xr14-nightjar-gear.png) |
+| XR-8 Nightjar | [Main / nose](evidence/previews/xr14-nightjar-gear.png) |
 
 ## XR-9 exterior canopy
 

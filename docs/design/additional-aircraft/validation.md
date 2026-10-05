@@ -9,7 +9,7 @@ The deliverable is two native Tier A aircraft definitions, shared gear/wheel fin
 - The guide's actual insertion order was separately rehearsed: Swift index 7, Nightjar 8, XR-9 9, XR-11 10, automatic career count 9. All **11 suites passed**, including the entire candidate matrix, career progression, saves and gameplay. That rehearsal remains explicitly labeled 3b, and the optional adapter reproduces it on the current source.
 - Current R0 with optional wheel integration: **12/12 suites pass**, including all 110 flight cases and 138 wheel checks. The entire candidate flight CSV is byte-for-byte identical to the pre-animation output, corroborating that cosmetic wheel state does not change flight forces/results.
 
-| Result | Swift S6 | XR-14 Nightjar |
+| Result | Swift S6 | XR-8 Nightjar |
 |---|---:|---:|
 | Guide maximum mass | 1,940 kg | 7,190 kg |
 | Guide Vs1 / Vs0 | 33.185 / 27.345 m/s | 44.113 / 37.898 m/s |

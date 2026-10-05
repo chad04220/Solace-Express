@@ -4,7 +4,7 @@ Owner-authorized scope: two new aircraft; detailed landing gear and wheels on bo
 
 ## New aircraft
 
-Use [authoring.md](authoring.md), which follows the supplied brief's per-aircraft output format and computed self-checks. Paste Swift's `AircraftSpec` and `ModelDef` rows at aligned index 7, followed by Nightjar at aligned index 8, immediately before the original XR-9 rows. Update `kResearchJet` to 9 and `kWraith` to 10. Leave both old research types last; the native array-length-minus-two calculation then yields nine career aircraft. Original career indices 0..6 remain unchanged. Retain stable IDs `swift_s6` and `xr14_nightjar`.
+Use [authoring.md](authoring.md), which follows the supplied brief's per-aircraft output format and computed self-checks. Paste Swift's `AircraftSpec` and `ModelDef` rows at aligned index 7, followed by Nightjar at aligned index 8, immediately before the original XR-9 rows. Update `kResearchJet` to 9 and `kWraith` to 10. Leave both old research types last; the native array-length-minus-two calculation then yields nine career aircraft. Original career indices 0..6 remain unchanged. Retain stable IDs `swift_s6` and `xr8_nightjar`.
 
 Do not copy the laboratory count override or temporary slots 9/10 into production. `Plane::perf` / `aeroModel` index their caches from actual pointers into `kAircraft[]`; the lab appends real entries, rather than using detached local structs.
 

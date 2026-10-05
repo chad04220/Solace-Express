@@ -1070,7 +1070,9 @@ void Game::drawPadCursor() {
 void Game::launchResearch() {
   Contract c;
   bool wr = resCraft == kWraith;
-  c.id = wr ? "XR11" : "XR9"; c.title = wr ? "XR-11 Research Flight" : "XR-9 Research Flight"; c.type = CT_FERRY;
+  const AircraftSpec& rs = kAircraft[resCraft];
+  std::string num = rs.name; num = num.substr(0, num.find(' '));   // "XR-9"
+  c.id = num; c.id.erase(std::remove(c.id.begin(), c.id.end(), '-'), c.id.end()); c.title = num + " Research Flight"; c.type = CT_FERRY;
   c.from = c.to = resAirport; c.payout = 0;
   c.wx = Weather(); c.wx.timeOfDay = resTime; c.wx.windSpeed = 3; c.wx.turbulence = 0.05f;
   if (resWx == 0) { c.wx.cloudCover = 0.15f; c.wx.visibility = 60000; }
@@ -1079,7 +1081,7 @@ void Game::launchResearch() {
   startFlight(c, resCraft, Career::SRC_OWNED);
   researchFlight = true;
   toasts.clear();
-  toast(wr ? "XR-11 WRAITH // RESEARCH FLIGHT" : "XR-9 SPECTER // RESEARCH FLIGHT", wr ? vec3(0.75f, 0.45f, 1.f) : vec3(0.4f, 0.9f, 1));
+  { std::string nm = rs.name; for (char& ch : nm) ch = (char)toupper((unsigned char)ch); toast(nm + " // RESEARCH FLIGHT", wr ? vec3(0.75f, 0.45f, 1.f) : rs.special ? vec3(0.4f, 0.9f, 1) : vec3(0.35f, 0.95f, 0.8f)); }
   if (resAirborne) {
     const Airport& a = g_world.airports[resAirport];
     vec3 p = plane.pos + a.dir() * 1500.f; p.y = std::max(a.elev, g_world.height(p.x, p.z)) + 900.f;
@@ -1837,7 +1839,7 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   g_ren.entSync = sync;
   // every light aircraft's hull (outside, and the cockpit's when that is in use): a frame that wants one bakes it
   std::vector<std::pair<int, bool>> todo;
-  for (int i = 0; i < kNumAircraft; i++) if (!kAircraft[i].special) { todo.push_back({i, false}); if (g_ren.hullCockpit || g_ren.mode == 1) todo.push_back({i, true}); }
+  for (int i = 0; i <= kWraith; i++) if (!kAircraft[i].special) { todo.push_back({i, false}); if (g_ren.hullCockpit || g_ren.mode == 1) todo.push_back({i, true}); }
   for (size_t k = 0; k < todo.size() && !quit; k++) {
     prewarmCraft = todo[k].first; prewarmInside = todo[k].second;
     progress(0.35f + 0.65f * k / todo.size(), std::string("BUILDING AIRCRAFT SHELLS  ") + kAircraft[prewarmCraft].name);
@@ -2666,9 +2668,9 @@ void Game::debugScene(const std::string& name) {
     printf("pad: A skips the career crash to the results: %s\n", wasCrash && screen == SCR_DEBRIEF ? "ok" : "FAIL");
     return;
   }
-  if (name == "research" || name == "research11") {   // the terminal, settled (selection decrypted)
+  if (name == "research" || name == "research11" || name == "research8") {   // the terminal, settled (selection decrypted)
     screen = SCR_RESEARCH; realTime = 30; resOpened = 20; resAuthed = true;
-    resCraft = name == "research11" ? kWraith : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
+    resCraft = name == "research11" ? kWraith : name == "research8" ? kNightjar : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
     return;
   }
   if (name.rfind("researchscan", 0) == 0) {   // the biometric sequence at a moment: researchscan<tenths of a second>

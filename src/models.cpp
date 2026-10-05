@@ -95,7 +95,7 @@ const ModelDef kModels[] = {
   2,-0.55f,1.45f,0.25f,0.27f,0.22f, // two large cabin windows per side
   vec3(-0.34f,0.74f,-1.90f),1, // left pilot eye; analog twin cockpit
   -3.05f,-2.62f,0.40f,-0.65f }, // windshield and pilot side windows
-  // ---------------------------------------------------------------- XR-14 Nightjar (civil twin-jet research demonstrator; generic field)
+  // ---------------------------------------------------------------- XR-8 Nightjar (civil twin-jet research demonstrator; generic field)
   { // Eight closed stations; enough roof height for the offset glass-cockpit eye.
   {{-8.30f,.035f,.035f,-.035f},{-6.65f,.28f,.22f,-.030f},
   {-5.05f,.56f,.49f,-.010f},{-3.55f,.77f,.79f,.045f},

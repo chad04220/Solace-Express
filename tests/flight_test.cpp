@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
   }
   Weather wx; wx.windSpeed = 0; wx.gust = 0; wx.turbulence = 0;
   int fails = 0;
-  if (strcmp(kAircraft[kOsprey].id, "osprey_c6") != 0 || strcmp(kAircraft[kResearchJet].id, "xr9") != 0 || strcmp(kAircraft[kWraith].id, "xr11") != 0) { printf("aircraft indices (kOsprey / kResearchJet / kWraith) don't match the table\n"); return 1; }
+  if (strcmp(kAircraft[kOsprey].id, "osprey_c6") != 0 || strcmp(kAircraft[kNightjar].id, "xr8_nightjar") != 0 || strcmp(kAircraft[kResearchJet].id, "xr9") != 0 || strcmp(kAircraft[kWraith].id, "xr11") != 0) { printf("aircraft indices (kOsprey / kNightjar / kResearchJet / kWraith) don't match the table\n"); return 1; }
   for (int ai = 0; ai < kNumAircraft; ai++) {
     const AircraftSpec& s = kAircraft[ai];
     int apIdx = g_world.findAirport("CAP");

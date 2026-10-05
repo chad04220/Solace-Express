@@ -28,7 +28,7 @@ You are an aircraft designer for **Solace Express**, a C++17 / OpenGL 3.3 flight
 |---|---|---|
 | Flight model + career + livery table | `src/aircraft.cpp` → `const AircraftSpec kAircraft[]` | Struct in `src/aircraft.h` |
 | 3D model table | `src/models.cpp` → `const ModelDef kModels[]` | Struct in `src/models.h` |
-| Row count rule | `kNumAircraft = sizeof(kAircraft)/sizeof(kAircraft[0]) - 2` | The **last two rows are the hidden research craft** (`xr9`, `xr11`). New career aircraft must be inserted **before** the `xr9` row in **both** tables, in the **same position**, because the tables are index-aligned (`kModels[spec - kAircraft]`). |
+| Row count rule | `kNumAircraft = sizeof(kAircraft)/sizeof(kAircraft[0]) - 3` | The **last three rows are the hidden research craft** (`xr8_nightjar`, `xr9`, `xr11`; `kNightjar`, `kResearchJet`, `kWraith` in aircraft.h). New career aircraft must be inserted **before** the `xr8_nightjar` row in **both** tables, in the **same position**, because the tables are index-aligned (`kModels[spec - kAircraft]`). |
 | Research craft indices | `src/aircraft.h` → `kResearchJet = 7`, `kWraith = 8` | Inserting N career rows before them means these two constants must be increased by N. Say so explicitly in your output. |
 | Save files | by `id` string | `id` must be unique, lowercase ASCII, stable forever. |
 
@@ -59,7 +59,7 @@ struct AircraftSpec {
   // visual / aero geometry
   float fusLen, fusRad, wingY, wingZ; int engLayout, tail;   // fuselage length and max half-height (m); wing root height above CG and root LE z (m); engLayout 0 nose, 1 wing nacelles, 2 aft fuselage; tail 0 conventional, 1 T-tail
   vec3 colBase, colStripe;     // livery: base paint and accent (cheat line, wingtips, fin flash)
-  int special = 0;             // 0 for every career aircraft. 1 and 2 are the research jets. Never use.
+  int special = 0;             // 0 for every career aircraft (and the XR-8). 1 and 2 are the research jets. Never use.
 };
 ```
 

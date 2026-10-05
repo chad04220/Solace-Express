@@ -39,7 +39,7 @@ const AircraftSpec kAircraft[] = {
    0.25f, 5.0f, 1.40f, 0.75f, 0.022f, 0.012f, 0.070f, 0.80f, 15000, 0, 55, 62, 200, 260, 1250, false, false, true,
    30000, 60000, 85000, 0.42f, 0.050f, 0.055f, LIC_ATP, 260000, 0,
    14.0f, 0.95f, -0.58f, 1.0f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f)},
-  // ---- Codex's aircraft (docs/design/additional-aircraft, proposals on codex/*): Swift S6, Osprey C6, XR-14 Nightjar
+  // ---- Codex's aircraft (docs/design/additional-aircraft, proposals on codex/*): Swift S6, Osprey C6, XR-8 Nightjar
   // Swift S6: four-seat retractable touring piston
   {"swift_s6", "Swift S6", "Retractable low-wing tourer", ENG_PISTON, 1, 6, 3, 700.0f, 2700.0f,
   980.0f, 180.0f, 420.0f, 3, 17.10f, 11.40f, 1.552f,
@@ -53,8 +53,9 @@ const AircraftSpec kAircraft[] = {
   0.30f, 4.9f, 1.65f, 0.80f, 0.028f, 0.006f, 0.060f, 0.78f, 180000.0f, 24.0f, 30.2f, 35.0f, 74.0f, 110.0f, 550.0f, false, false, true,
   9000.0f, 10800.0f, 19800.0f, 0.41f, 0.056f, 0.062f, LIC_CPL, 68000, 650,
   9.8f, 0.90f, -0.68f, -0.80f, 1, 0, vec3(0.91f, 0.88f, 0.79f), vec3(0.82f, 0.24f, 0.06f), 0},
-  // XR-14 Nightjar: conventional twin-jet research demonstrator (special 0: the generic flight model and field)
-  {"xr14_nightjar", "XR-14 Nightjar", "Tapered-wing research demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
+  // ---- the research craft (kNumAircraft stops here)
+  // XR-8 Nightjar: conventional twin-jet research demonstrator (special 0: the generic flight model and field)
+  {"xr8_nightjar", "XR-8 Nightjar", "Tapered-wing research demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
   5700.0f, 1300.0f, 100.0f, 0, 38.18f, 16.60f, 2.508f,
   0.15f, 4.6f, 1.55f, 0.55f, 0.020f, 0.010f, 0.045f, 0.80f,
   12500.0f, 0.0f, 43.0f, 50.0f, 150.0f, 240.0f, 1250.0f, false, false, true,
@@ -74,7 +75,7 @@ const AircraftSpec kAircraft[] = {
    16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.075f, 0.08f, 0.09f), vec3(0.72f, 0.3f, 1.0f), 2},
 };
 // clang-format on
-const int kNumAircraft = sizeof(kAircraft) / sizeof(kAircraft[0]) - 2;  // the research craft are not part of the career
+const int kNumAircraft = sizeof(kAircraft) / sizeof(kAircraft[0]) - 3;  // the research craft (XR-8, XR-9, XR-11) are not part of the career
 
 float Plane::fuelFlowMax() const {
   float rangeS = spec->rangeKm * 1000.f / spec->cruise;

@@ -2,11 +2,59 @@
 // airframe selection with a live ray-traced 3D preview of the chosen craft, its decrypted specification and
 // manoeuvre envelope, and the sortie parameters.
 #include "game.h"
+#include "models.h"
 
 namespace {
 const vec3 R_ICE(0.42f, 0.93f, 1.f), R_DIM(0.36f, 0.55f, 0.66f), R_TEXT(0.88f, 0.97f, 1.f), R_RED(1.f, 0.27f, 0.24f);
 const vec3 R_AMBER(1.f, 0.72f, 0.26f), R_GREEN(0.4f, 1.f, 0.62f), R_VIOLET(0.8f, 0.5f, 1.f), R_INK(0.0f, 0.015f, 0.03f);
+const vec3 R_TEAL(0.3f, 0.95f, 0.8f);
 const char* kGlyphs = "0123456789ABCDEF#%&@$*+=<>/\\|";
+
+// the airframes on the register, in the order of their cards (the XR number order); every craft-specific piece of
+// the terminal reads from here, so a new research craft is one more row
+struct SpecRow { const char* k; const char* v; float bar; };
+struct ResCraftInfo {
+  int idx;                 // index into kAircraft
+  const char* code;        // the programme code on the card
+  const char* num;         // "XR-9"
+  const char* name;        // "SPECTER"
+  vec3 colour;             // the terminal's accent while it is selected
+  float bars[3];           // velocity, agility, signature (0..1)
+  const char* title;       // the decrypted specification title
+  SpecRow rows[8];
+  float nTop, nBot, nStep; // the envelope chart's scale
+  float nMax, nMin, vMax, ms;   // the envelope: load limits, top Mach, the Mach of the 1 g stall
+  const char* notes[5];    // handling directives
+  const char* contractId;
+};
+const ResCraftInfo kResCraft[] = {
+  {kNightjar, "NG-XR8-N  //  BLK 0", "XR-8", "NIGHTJAR", R_TEAL, {0.3f, 0.35f, 0.92f}, "CONVENTIONAL TWIN-JET DEMONSTRATOR",
+   {{"CONFIGURATION", "Tapered low wing, conventional tail", -1}, {"PROPULSION", "2 x turbofan, 25 kN total", 0.08f},
+    {"THRUST / WEIGHT", "0.45 : 1", 0.1f}, {"TOP SPEED", "Mach 0.8", 0.22f},
+    {"VECTORING", "None - conventional controls", 0.f}, {"ROLL RATE", "120 deg/s", 0.3f},
+    {"AIRFRAME", "+6 / -3 g", 0.07f}, {"ENDURANCE", "1,300 kg fuel, 1,250 km", 0.3f}},
+   10.f, -5.f, 5.f, 6.f, -3.f, 0.9f, 0.25f,
+   {"Conventional controls: no FBW, no vectoring", "Flaps and gear as any jet: ~150 kt over the fence", "Fuel burns: a 1,300 kg cell, plan the sortie",
+    "Long hard runways only", "The programme's flying testbed for sensors and skins"}, "XR8"},
+  {kResearchJet, "NG-XR9-S  //  BLK 3", "XR-9", "SPECTER", R_ICE, {0.7f, 0.72f, 0.45f}, "HYPERSONIC-CAPABLE RESEARCH MODEL",
+   {{"CONFIGURATION", "Lifting body, cranked delta, canards", -1}, {"PROPULSION", "2 x turbofan, 472 kN full reheat", 0.72f},
+    {"THRUST / WEIGHT", "4.4 : 1 with reheat", 0.66f}, {"TOP SPEED", "Mach 2.5+", 0.69f},
+    {"VECTORING", "2D nozzles, +-29 deg pitch", 0.4f}, {"ROLL RATE", "315 deg/s", 0.78f},
+    {"AIRFRAME", "+50 / -25 g", 0.55f}, {"ENDURANCE", "Unrestricted research cell", 1.f}},
+   60.f, -30.f, 30.f, 50.f, -25.f, 2.5f, 0.42f,
+   {"No flaps: land fast, ~140 kt, long runways", "Nozzles vector with the stick for pitch", "FBW commands rotation - no g limiter",
+    "Reheat lights above 85% throttle (2x thrust)", "C: cockpit view flies on the displays"}, "XR9"},
+  {kWraith, "NG-XR11-W  //  BLK 1", "XR-11", "WRAITH", R_VIOLET, {1.f, 0.97f, 0.06f}, "STEALTH AEROBATIC RESEARCH MODEL",
+   {{"CONFIGURATION", "Faceted body, diamond wing, V-tail", -1}, {"PROPULSION", "4 x tilting pods, 520 kN boosted", 0.8f},
+    {"THRUST / WEIGHT", "2.2 dry, 4.6 boosted", 0.7f}, {"TOP SPEED", "Mach 3.6+", 1.f},
+    {"VTOL", "Pods tilt 0 - 90 deg, vanes", 1.f}, {"ROLL RATE", "400 deg/s", 1.f},
+    {"AIRFRAME", "+90 / -45 g", 1.f}, {"SIGNATURE", "Active refractive cloak", 0.06f}},
+   100.f, -50.f, 50.f, 90.f, -45.f, 3.6f, 0.32f,
+   {"F / V tilt the pods: 0 forward, 90 hover", "X or double-tap brake: cloak", "Y weapons hot: lasers LMB/Enter, bomb Bksp",
+    "Slow on low power the pods do the flying", "Airframe holds +90 / -45 g"}, "XR11"},
+};
+const int kNumResCraft = sizeof(kResCraft) / sizeof(kResCraft[0]);
+int resCraftSlot(int idx) { for (int k = 0; k < kNumResCraft; k++) if (kResCraft[k].idx == idx) return k; return 1; }
 
 uint32_t hsh(uint32_t x) { x ^= x >> 16; x *= 0x7feb352dU; x ^= x >> 15; x *= 0x846ca68bU; x ^= x >> 16; return x; }
 float rnd01(uint32_t i) { return (hsh(i) & 0xffffff) / 16777216.f; }
@@ -73,11 +121,17 @@ void silhouette(int craft, float cx, float cy, float sc, vec3 c, float a, float 
       float px = kWraithPods[i].x / 6.4f, py = kWraithPods[i].z / 8.2f;
       g_ren.rectOutline(cx + px * sc - 0.07f * sc, cy + py * sc - 0.14f * sc, 0.14f * sc, 0.28f * sc, c, a, 0.06f * sc, th);
     }
-  } else {
+  } else if (craft == kResearchJet) {
     static const float body[] = {0.f, -1.f, 0.1f, -0.7f, 0.16f, -0.35f, 0.42f, -0.42f, 0.2f, -0.18f, 0.5f, 0.28f, 0.98f, 0.52f, 0.92f, 0.66f, 0.3f, 0.7f, 0.2f, 0.92f, 0.f, 0.92f};
     mirror(body, 11);
     g_ren.line(cx - 0.08f * sc, cy + 0.92f * sc, cx - 0.08f * sc, cy + 0.98f * sc, th, c, a);
     g_ren.line(cx + 0.08f * sc, cy + 0.92f * sc, cx + 0.08f * sc, cy + 0.98f * sc, th, c, a);
+  } else {   // a conventional twin jet (the XR-8): tapered wing, tailplane, two aft engines
+    static const float body[] = {0.f, -1.f, 0.11f, -0.72f, 0.13f, -0.18f, 0.95f, 0.34f, 0.93f, 0.46f, 0.15f, 0.42f, 0.14f, 0.72f, 0.44f, 0.86f, 0.42f, 0.94f, 0.1f, 0.92f, 0.f, 0.96f};
+    mirror(body, 11);
+    for (int side = -1; side <= 1; side += 2)
+      g_ren.rectOutline(cx + side * 0.2f * sc - 0.045f * sc, cy + 0.5f * sc, 0.09f * sc, 0.24f * sc, c, a, 0.04f * sc, th);
+    g_ren.line(cx, cy + 0.62f * sc, cx, cy + 0.98f * sc, th, c, a);
   }
 }
 }
@@ -100,7 +154,8 @@ void Game::drawResearch(const FrameParams& fp) {
   if (resAuthed && realTime - resOpened < kIntro - 0.6f) resOpened = realTime - (kIntro - 0.6f);   // returning: just the resume flash
   float T = realTime - resOpened;
   bool wr = resCraft == kWraith;
-  vec3 ACC = wr ? R_VIOLET : R_ICE;
+  const ResCraftInfo& RC = kResCraft[resCraftSlot(resCraft)];
+  vec3 ACC = RC.colour;
   // ------------------------------------------------------------------ biometric access sequence
   if (T < kIntro) {
     bool skip = in.mPressed[0] || in.pressed[K_ENTER] || in.pressed[' '] || in.pressed[K_ESC];
@@ -282,37 +337,38 @@ void Game::drawResearch(const FrameParams& fp) {
   // ------------------------------------------------------------------ left: airframe cards
   {
     float x = L.lx, y = L.top, w = L.lw;
-    tag(x, y, s, "AIRFRAMES  //  02 ON REGISTER", ACC, e); y += 22 * s;
-    for (int k = 0; k < 2; k++) {
-      int craft = k ? kWraith : kResearchJet;
-      bool sel = resCraft == craft, hov = hovered(x, y, w, 150 * s);
-      vec3 c = k ? R_VIOLET : R_ICE;
-      float h = 150 * s;
+    tag(x, y, s, fmt("AIRFRAMES  //  %02d ON REGISTER", kNumResCraft), ACC, e); y += 22 * s;
+    // the cards share the column with the programme log: full size when they fit, squeezed (fonts included) when not
+    float h = clampf((L.bot - y - 12 * s * (kNumResCraft - 1) - 70 * s) / kNumResCraft, 84 * s, 150 * s), f = h / (150 * s);
+    for (int k = 0; k < kNumResCraft; k++) {
+      const ResCraftInfo& C = kResCraft[k];
+      int craft = C.idx;
+      bool sel = resCraft == craft, hov = hovered(x, y, w, h);
+      vec3 c = C.colour;
       float lift = anim(0x5e10 + k, sel ? 1.f : hov ? 0.5f : 0.f, 10.f);
       g_ren.rectGrad(x, y, w, h, c * (0.05f + 0.08f * lift), vec3(0, 0.01f, 0.02f), 0.85f * e);
       g_ren.rectOutline(x, y, w, h, c, (0.18f + 0.5f * lift) * e, 0, 1 * s);
       if (sel) { corners(x - 3 * s, y - 3 * s, w + 6 * s, h + 6 * s, 14 * s, 2 * s, c, e); g_ren.glow(x, y, w, h, c, 0.12f * e, 0, 14 * s); }
       // a glint that runs across the selected card
       if (sel) { float gx = x + fmodf(realTime * 0.6f, 1.6f) * w - 0.3f * w; if (gx > x && gx < x + w - 30 * s) g_ren.rect(gx, y + 1, 30 * s, h - 2, c, 0.05f * e); }
-      g_ren.text(x + 14 * s, y + 10 * s, 10.5f * s, k ? "NG-XR11-W  //  BLK 1" : "NG-XR9-S  //  BLK 3", R_DIM, e, 0, false);
-      g_ren.text(x + 14 * s, y + 26 * s, 34 * s, k ? "XR-11" : "XR-9", sel ? R_TEXT : c, e, 0, false);
-      g_ren.text(x + 14 * s, y + 66 * s, 14 * s, k ? "WRAITH" : "SPECTER", c, e, 0, false);
-      silhouette(craft, x + w - 58 * s, y + 58 * s, 44 * s, c, (0.45f + 0.5f * lift) * e, 1.3f * s);
+      g_ren.text(x + 14 * s, y + 10 * f * s, 10.5f * f * s, C.code, R_DIM, e, 0, false);
+      g_ren.text(x + 14 * s, y + 26 * f * s, 34 * f * s, C.num, sel ? R_TEXT : c, e, 0, false);
+      g_ren.text(x + 14 * s, y + 66 * f * s, 14 * f * s, C.name, c, e, 0, false);
+      silhouette(craft, x + w - 58 * f * s, y + 58 * f * s, 44 * f * s, c, (0.45f + 0.5f * lift) * e, 1.3f * s);
       const char* bl[3] = {"VELOCITY", "AGILITY", "SIGNATURE"};
-      float bv[2][3] = {{0.7f, 0.72f, 0.45f}, {1.f, 0.97f, 0.06f}};
       for (int b = 0; b < 3; b++) {
-        float by = y + 92 * s + b * 17 * s;
-        g_ren.text(x + 14 * s, by, 10 * s, bl[b], R_DIM, e, 0, false);
+        float by = y + (92 + b * 17) * f * s;
+        g_ren.text(x + 14 * s, by, 10 * f * s, bl[b], R_DIM, e, 0, false);
         float bx = x + 90 * s, bw = w - 104 * s;
         for (int q = 0; q < 20; q++) {
-          bool on = q < (int)(bv[k][b] * 20 + 0.5f);
-          g_ren.rect(bx + q * bw / 20.f, by + 2 * s, bw / 20.f - 2 * s, 8 * s, b == 2 ? R_AMBER : c, (on ? 0.85f : 0.12f) * e);
+          bool on = q < (int)(C.bars[b] * 20 + 0.5f);
+          g_ren.rect(bx + q * bw / 20.f, by + 2 * s, bw / 20.f - 2 * s, 8 * f * s, b == 2 ? R_AMBER : c, (on ? 0.85f : 0.12f) * e);
         }
       }
       if (click(x, y, w, h)) resCraft = craft;
       y += h + 12 * s;
     }
-    if (in.pressed[K_TAB] || (in.buttonsPressed & PAD_X)) resCraft = wr ? kResearchJet : kWraith;
+    if (in.pressed[K_TAB] || (in.buttonsPressed & PAD_X)) resCraft = kResCraft[(resCraftSlot(resCraft) + 1) % kNumResCraft].idx;
     // programme telemetry: a slow scroll of cryptic log lines
     tag(x, y + 4 * s, s, "PROGRAMME LOG", ACC, e); y += 26 * s;
     int rows = (int)((L.bot - y) / (15 * s));
@@ -362,8 +418,14 @@ void Game::drawResearch(const FrameParams& fp) {
     float fl = kAircraft[resCraft].fusLen * 0.5f;
     if (wr) calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  PASSIVE", -1}, {kWraithPods[1], "POD 2  //  130 kN  0-90 DEG", 1},
                      {kWraithPods[2], "POD 3  //  VECTORING VANES", -1}, {vec3(6.2f, -0.24f, 2.0f), "FACETED SKIN  //  CLOAK MESH", 1}};
-    else calls = {{vec3(0, 0, -fl), "SYNTHETIC-VISION POD", -1}, {vec3(2.1f, 0.1f, -4.4f), "CANARD  //  ALL-MOVING", 1},
+    else if (resCraft == kResearchJet) calls = {{vec3(0, 0, -fl), "SYNTHETIC-VISION POD", -1}, {vec3(2.1f, 0.1f, -4.4f), "CANARD  //  ALL-MOVING", 1},
                   {vec3(5.62f, -0.38f, 4.4f), "CRANKED DELTA  //  NO FLAPS", 1}, {vec3(-0.82f, -0.12f, 7.75f), "2D NOZZLE  //  +-29 DEG", -1}};
+    else {   // a conventional airframe: its parts from the parametric model
+      const ModelDef& md = kModels[resCraft];
+      vec3 tip = modelWingTip(md), fin = modelFinTop(md);
+      calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  TEST RADAR", -1}, {tip, "TAPERED WING  //  SLOTTED FLAPS", 1},
+               {vec3(-md.nacX, md.nacY, md.nacZ0 + md.nacLen * 0.5f), "TURBOFAN  //  12.5 kN", -1}, {fin, "CONVENTIONAL TAIL", 1}};
+    }
     float ca = e * smoothstepf(0.6f, 1.3f, selT);
     int ci = 0;
     for (auto& c : calls) {
@@ -387,17 +449,8 @@ void Game::drawResearch(const FrameParams& fp) {
     tag(x, y, s, "SPECIFICATION  //  DECRYPTED", ACC, e); y += 24 * s;
     slab(x, y, w, L.bot - y, s, ACC, e);
     float px = x + 14 * s, iw = w - 28 * s, py = y + 12 * s;
-    g_ren.text(px, py, 11 * s, decrypt(wr ? "STEALTH AEROBATIC RESEARCH MODEL" : "HYPERSONIC-CAPABLE RESEARCH MODEL", selT, 0.01f), ACC, e, 0, false); py += 18 * s;
-    struct Row { const char* k; const char* v; float bar; };
-    static const Row j[] = {{"CONFIGURATION", "Lifting body, cranked delta, canards", -1}, {"PROPULSION", "2 x turbofan, 472 kN full reheat", 0.72f},
-                            {"THRUST / WEIGHT", "4.4 : 1 with reheat", 0.66f}, {"TOP SPEED", "Mach 2.5+", 0.69f},
-                            {"VECTORING", "2D nozzles, +-29 deg pitch", 0.4f}, {"ROLL RATE", "315 deg/s", 0.78f},
-                            {"AIRFRAME", "+50 / -25 g", 0.55f}, {"ENDURANCE", "Unrestricted research cell", 1.f}};
-    static const Row w11[] = {{"CONFIGURATION", "Faceted body, diamond wing, V-tail", -1}, {"PROPULSION", "4 x tilting pods, 520 kN boosted", 0.8f},
-                              {"THRUST / WEIGHT", "2.2 dry, 4.6 boosted", 0.7f}, {"TOP SPEED", "Mach 3.6+", 1.f},
-                              {"VTOL", "Pods tilt 0 - 90 deg, vanes", 1.f}, {"ROLL RATE", "400 deg/s", 1.f},
-                              {"AIRFRAME", "+90 / -45 g", 1.f}, {"SIGNATURE", "Active refractive cloak", 0.06f}};
-    const Row* rows = wr ? w11 : j;
+    g_ren.text(px, py, 11 * s, decrypt(RC.title, selT, 0.01f), ACC, e, 0, false); py += 18 * s;
+    const SpecRow* rows = RC.rows;
     for (int i = 0; i < 8; i++) {
       float rt = selT - 0.1f - i * 0.06f;
       g_ren.text(px, py, 10 * s, rows[i].k, R_DIM, e, 0, false);
@@ -415,12 +468,12 @@ void Game::drawResearch(const FrameParams& fp) {
     float ch = std::min(120 * s, L.bot - py - 120 * s);
     if (ch > 50 * s) {
       float gx0 = px + 26 * s, gw = iw - 30 * s, gy0 = py, gh = ch;
-      float mMax = 4.f, nTop = wr ? 100.f : 60.f, nBot = wr ? -50.f : -30.f, nStep = wr ? 50.f : 30.f;   // each craft on its own scale
+      float mMax = RC.vMax > 1.5f ? 4.f : 1.f, nTop = RC.nTop, nBot = RC.nBot, nStep = RC.nStep;   // each craft on its own scale
       auto X = [&](float m) { return gx0 + m / mMax * gw; };
       auto Y = [&](float n) { return gy0 + (nTop - n) / (nTop - nBot) * gh; };
-      for (int m = 0; m <= 4; m++) { g_ren.rect(X((float)m), gy0, 1, gh, R_DIM, 0.18f * e); g_ren.text(X((float)m), gy0 + gh + 3 * s, 9 * s, fmt("M%d", m), R_DIM, e, 1, false); }
+      for (int m = 0; m <= 4; m++) { float mm = m * mMax / 4.f; g_ren.rect(X(mm), gy0, 1, gh, R_DIM, 0.18f * e); g_ren.text(X(mm), gy0 + gh + 3 * s, 9 * s, mMax > 1.5f ? fmt("M%d", m) : fmt("M%.2f", mm), R_DIM, e, 1, false); }
       for (float n = nBot; n <= nTop + 0.1f; n += nStep) { g_ren.rect(gx0, Y(n), gw, 1, R_DIM, n == 0 ? 0.4f : 0.18f * e); g_ren.text(gx0 - 4 * s, Y(n) - 5 * s, 9 * s, fmt("%+.0f", n), R_DIM, e, 2, false); }
-      float nMax = wr ? 90.f : 50.f, nMin = wr ? -45.f : -25.f, vMax = wr ? 3.6f : 2.5f, ms = wr ? 0.32f : 0.42f;
+      float nMax = RC.nMax, nMin = RC.nMin, vMax = RC.vMax, ms = RC.ms;
       std::vector<std::pair<float, float>> env;
       for (int i = 0; i <= 20; i++) { float m = ms + (vMax - ms) * i / 20.f; env.push_back({m, std::min(nMax, (m / ms) * (m / ms))}); }
       for (int i = 20; i >= 0; i--) { float m = ms + (vMax - ms) * i / 20.f; env.push_back({m, std::max(nMin, -(m / ms) * (m / ms) * 0.5f)}); }
@@ -433,11 +486,7 @@ void Game::drawResearch(const FrameParams& fp) {
       py += gh + 22 * s;
     }
     tag(px, py, s, "HANDLING DIRECTIVES", ACC, e); py += 20 * s;
-    static const char* nJ[] = {"No flaps: land fast, ~140 kt, long runways", "Nozzles vector with the stick for pitch", "FBW commands rotation - no g limiter",
-                               "Reheat lights above 85% throttle (2x thrust)", "C: cockpit view flies on the displays"};
-    static const char* nW[] = {"F / V tilt the pods: 0 forward, 90 hover", "X or double-tap brake: cloak", "Y weapons hot: lasers LMB/Enter, bomb Bksp",
-                               "Slow on low power the pods do the flying", "Airframe holds +90 / -45 g"};
-    for (int i = 0; i < 5 && py < L.bot - 16 * s; i++) { g_ren.text(px, py, 11 * s, std::string("> ") + (wr ? nW : nJ)[i], R_DIM, e, 0, false); py += 16 * s; }
+    for (int i = 0; i < 5 && py < L.bot - 16 * s; i++) { g_ren.text(px, py, 11 * s, std::string("> ") + RC.notes[i], R_DIM, e, 0, false); py += 16 * s; }
   }
   // ------------------------------------------------------------------ bottom: sortie parameters
   {
@@ -490,7 +539,7 @@ void Game::drawResearch(const FrameParams& fp) {
     for (float st = fmodf(realTime * 30.f, 16 * s); st < bw; st += 16 * s) g_ren.line(bx + st, by + bh, bx + std::min(bw, st + 10 * s), by, 3 * s, ACC, 0.12f * e);
     g_ren.rectOutline(bx, by, bw, bh, ACC, e, 0, 1.5f * s);
     g_ren.glow(bx, by, bw, bh, ACC, (hov ? 0.35f : 0.15f) * e, 0, 14 * s);
-    g_ren.text(bx + bw * 0.5f, by + 9 * s, 16 * hs, wr ? "INITIATE  XR-11" : "INITIATE  XR-9", R_TEXT, e, 1, false);
+    g_ren.text(bx + bw * 0.5f, by + 9 * s, 16 * hs, std::string("INITIATE  ") + RC.num, R_TEXT, e, 1, false);
     g_ren.text(bx + bw * 0.5f, by + 29 * s, 9 * hs, "SORTIE NOT RECORDED IN LOGBOOK", R_DIM, e, 1, false);
     if (click(bx, by, bw, bh) || in.pressed[K_ENTER]) { launchResearch(); return; }
   }
