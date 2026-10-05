@@ -528,6 +528,27 @@ void Game::updateWeather(float dt) {
     }
   }
 }
+// your airline's scheduled flights (C11): when a route's line passes within 15 km of you and none of its flights
+// is in the air, one appears on the line a way off and flies on to the route's destination in the company livery
+void Game::airlineTraffic(float dt) {
+  airlineTrafficT -= dt;
+  if (airlineTrafficT > 0 || researchFlight || career.airline.routes.empty() || !traffic.enabled || plane.onGround) return;
+  airlineTrafficT = 20.f;
+  for (size_t ri = 0; ri < career.airline.routes.size(); ri++) {
+    const Career::Route& r = career.airline.routes[ri];
+    if (r.fleetIdx < 0 || r.fleetIdx >= (int)career.fleet.size() || traffic.routeFlying((int)ri)) continue;
+    vec3 a = g_world.airports[r.from].pos(), b = g_world.airports[r.to].pos(); a.y = b.y = 0;
+    vec3 ab = b - a; float L = length(ab); if (L < 1.f) continue;
+    vec3 p0 = vec3(plane.pos.x, 0, plane.pos.z);
+    float t = clampf(dot(p0 - a, ab) / (L * L), 0.05f, 0.95f);
+    vec3 q = a + ab * t; float dist = length(q - p0);
+    if (dist > 15000.f || dist < 2500.f) continue;
+    float alt = std::max(g_world.height(q.x, q.z), 0.f) + 900.f + 150.f * (ri % 3);
+    traffic.spawnRoute(career.fleet[r.fleetIdx].spec, vec3(q.x, alt, q.z), r.to, (int)ri);
+    break;
+  }
+}
+
 // ------------------------------------------------------------------ trials (C12)
 Contract Game::trialContract(int kind) const {
   Contract c; c.type = CT_TRIAL; c.payout = 0; c.minLicense = LIC_STUDENT; c.id = trialId(kind); c.title = trialName(kind);
@@ -1010,6 +1031,7 @@ void Game::updateFlight(float dt) {
   updateUfo(simDt);
   // AI traffic
   traffic.enabled = set.traffic;
+  airlineTraffic(simDt);
   if (traffic.update(simDt, plane.pos, plane.vel, plane.onGround || crashed, plane.spec->span) && !crashed && !plane.ev.crashed) {
     plane.ev.crashed = true; plane.ev.crashReason = "Mid-air collision";
   }

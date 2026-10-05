@@ -433,6 +433,8 @@ private:
   void drawHubLogbook(float x, float y, float w, float h);
   void drawHubAirline(float x, float y, float w, float h);
   int airSelPlane = 0, airSelDest = 0, airSelPilot = 0;   // the airline tab's route set-up
+  float airlineTrafficT = 0;
+  void airlineTraffic(float dt);   // your routes' scheduled flights appear as traffic along their lines
   void drawSettings(float x, float y, float w, float h);
   void drawControls(float x, float y, float w, float h);
   void updateBindCapture(float dt);
