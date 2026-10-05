@@ -588,7 +588,9 @@ void Renderer::bakeTerrainShadow(const FrameParams& fp) {
 void Renderer::renderDisplays(const FrameParams& fp, bool panel) {
   GLuint& tex = panel ? texPanel : texPages;
   if (!progDisp && tex) return;   // no display shader: the screens stay as cleared below (dark)
-  int w = 2048, h = panel ? 776 : 1024;
+  // 1080 lines on every display: each research-jet page is a 1080 x 1080 cell of the 4 x 2 atlas, and the light
+  // aircraft's instrument panel is 1080 texels tall (0.58 x 0.22 m)
+  int w = panel ? 2848 : 4320, h = panel ? 1080 : 2160;
   if (!tex) {
     glGenTextures(1, &tex); glBindTexture(GL_TEXTURE_2D, tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
