@@ -234,6 +234,11 @@ vec2 mapWraith(vec3 p){
     tyres = min(tyres, sdRoundCylX(vec3(abs(p.x) - 0.1, p.y, p.z) - vec3(0.0, nc.y, nc.z), 0.33, 0.07, 0.04));
     res = opU(res, vec2(legs, 8.0));
     res = opU(res, vec2(tyres, 6.0));
+    res = gearWheelDetails(ap - wc, res, wr, 0.13, true);
+    res = gearLegDetails(ap, res, vec3(G0.x*0.8, -0.3, G0.z), wc + vec3(-0.1, 0.05, 0.0), 0.07, true);
+    vec3 nq = vec3(abs(p.x) - 0.1, p.y, p.z) - nc;
+    res = gearWheelDetails(nq, res, 0.33, 0.07, false);
+    res = gearLegDetails(p, res, vec3(0.0, -0.35, G0.w), nc + vec3(0.0, 0.1, 0.0), 0.06, true);
   }
   return res;
 }
