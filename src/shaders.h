@@ -1195,23 +1195,9 @@ R"(    float lim = best.x > 0.0 ? best.x : tmax;
   gPlStart = 0.0;
   return best;
 }
-// soft contact / cast shadow blobs of traffic on the ground (the sun's projection of each aircraft)
-float trafficShadow(vec3 p){
-  float s = 1.0;
-  for (int k = 0; k < 12; k++) {
-    if (k >= uTrafficN) break;
-    vec4 P = texelFetch(uTraffic, ivec2(24, k), 0);
-    float hgt = P.y - p.y;
-    if (hgt < -2.0 || hgt > 300.0) continue;
-    vec3 c = P.xyz - uSunDir*(hgt/max(uSunDir.y, 0.15));
-    float d = length((p - c).xz)/(P.w*0.42);
-    s *= mix(0.4 + 0.5*smoothstep(0.0, 300.0, hgt), 1.0, smoothstep(0.55, 1.0, d));
-  }
-  return s;
-}
 float gShMax = 1e9;   // shadow rays toward a point light stop at it
 float gShK = 10.0;    // penumbra sharpness (sun: 10; a point light: its distance over its size)
-float pieceShadow(vec3 ro, vec3 rd, float br){
+float pieceShadow(vec3 ro, vec3 rd, float br, int steps){
   vec3 oc = ro - gPP;
   float b = dot(oc, rd), c = dot(oc,oc) - br*br, h = b*b - c;
   if (h < 0.0 || -b + sqrt(max(h,0.0)) < 0.0) return 1.0;
@@ -1219,6 +1205,7 @@ float pieceShadow(vec3 ro, vec3 rd, float br){
   mat3 inv = transpose(gPR); vec3 lo = gPC + inv*(ro - gPP), ld = inv*rd;
   float res = 1.0;
   for (int i=0;i<40;i++){   // (was 56: the aircraft's self-shadow cost 16 ms a frame in the light aircraft's cockpit)
+    if (i >= steps) break;
     float d = mapPiece(lo + ld*t).x;
     res = min(res, gShK*d/max(t,0.1));
     if (res < 0.02) return 0.0;
@@ -1227,12 +1214,30 @@ float pieceShadow(vec3 ro, vec3 rd, float br){
   }
   return clamp(res, 0.0, 1.0);
 }
+// the sun's shadow of the traffic: marched through each aircraft's own shape like the player's, but only where the
+// ray towards the sun crosses that aircraft's bounding sphere (a few hundred pixels each), so it costs next to nothing
+// elsewhere. Leaves the aircraft data loaded as it found it.
+float trafficShadow(vec3 p){
+  float s = 1.0; bool moved = false;
+  bool own = gOwn; int tk = gTrafK; int keep = gPI; vec3 kP = gPP; mat3 kR = gPR; vec3 kC = gPC;
+  for (int k = 0; k < 12; k++) {
+    if (k >= uTrafficN) break;
+    vec4 P = texelFetch(uTraffic, ivec2(24, k), 0);
+    vec3 oc = p - P.xyz; float b = dot(oc, uSunDir), h = b*b - dot(oc, oc) + P.w*P.w;
+    if (h < 0.0 || -b + sqrt(h) < 0.0) continue;
+    loadTraffic(k); trafficXf(k); moved = true;
+    s *= pieceShadow(p, uSunDir, P.w, 24);   // (traffic is seen from further off than the player's aircraft: a coarser march)
+    if (s < 0.02) break;
+  }
+  if (moved) { if (own) loadMain(); else loadTraffic(tk); gPI = keep; gPP = kP; gPR = kR; gPC = kC; }
+  return s;
+}
 float planeShadow(vec3 ro, vec3 rd){
   if (uPlaneOn == 0 || (uDbg & 8) != 0) return 1.0;
   int keep = gPI; vec3 kP = gPP; mat3 kR = gPR; vec3 kC = gPC;
   float res = 1.0;
-  if (uWreck == 0) { pieceXf(-1); res = pieceShadow(ro, rd, planeBound()); }
-  else for (int i = 0; i < 5; i++) { if (i >= uWreck) break; pieceXf(i); res = min(res, pieceShadow(ro, rd, length(uPcH[i]) + 0.3)); }
+  if (uWreck == 0) { pieceXf(-1); res = pieceShadow(ro, rd, planeBound(), 40); }
+  else for (int i = 0; i < 5; i++) { if (i >= uWreck) break; pieceXf(i); res = min(res, pieceShadow(ro, rd, length(uPcH[i]) + 0.3, 40)); }
   gPI = keep; gPP = kP; gPR = kR; gPC = kC;
   return mix(res, 1.0, uWr[4].w*0.88);   // a cloaked XR-11 barely darkens the ground
 }
@@ -3349,6 +3354,8 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
   else {
     vec3 p = ro + rd*t;
     float sunVis = smoothstep(-0.05, 0.05, uSunDir.y);
+    // (one call site for the ground and the scenery: each is another inlined copy of the aircraft's shape)
+    float trafSh = uTrafficN > 0 && (hit == 1 || hit == 5) && sunVis > 0.0 ? trafficShadow(p) : 1.0;
     if (hit == 1) {
       vec3 n = terrainNormal(p.xz, t);
       vec4 base = baseAt(p.xz);
@@ -3357,7 +3364,7 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
       float sh = sunVis > 0.0 ? terrainShadow(p + n*0.5, uSunDir, t) : 0.0;
       if (sh > 0.0) sh *= entShadow(p, n);
       if (t < 3000.0) sh *= planeShadow(p + n*0.2, uSunDir);
-      if (uTrafficN > 0) sh *= trafficShadow(p);
+      sh *= trafSh;
       sh *= cloudShadow(p);
       col = shadeSurface(p, ns, rd, m, sh);
     } else if (hit == 2) {
@@ -3403,7 +3410,7 @@ R"(  if (hit == 0) { col = skyColor(rd); t = 1e6; }
       float sh = sunVis > 0.0 ? terrainShadow(p + n*0.5 + vec3(0.0, 0.5, 0.0), uSunDir, t) : 0.0;
       if (sh > 0.0) sh *= entShadow(p, n)*cloudShadow(p);
       if (sh > 0.0 && t < 3000.0) sh *= planeShadow(p + n*0.2, uSunDir);
-      if (uTrafficN > 0) sh *= trafficShadow(p);
+      sh *= trafSh;
       col = shadeSurface(p, n, rd, m, sh);
       if (cls == 1) {   // foliage: light through the leaves when the sun is behind them, and a soft wrap
         float back = pow(max(dot(rd, uSunDir), 0.0), 3.0)*0.9 + 0.12*max(dot(-n, uSunDir), 0.0);
@@ -3847,17 +3854,23 @@ R"(          if (abs(fract(lp.y*6.0) - 0.5) < 0.012) m.alb *= 0.6;              
   }
   // research jet exhaust plumes (additive, depth-limited by the scene)
   if (uPlaneOn == 1 && uWreck == 0 && uVapor.x > 0.01) { vec3 c0 = col; col = vaporCone(col, ro, rd, t, jitter); if (dot(abs(col - c0), vec3(1.0)) > 0.02) taaFlag = min(taaFlag, 0.2); }
-  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 5) { vec3 e = jetPlumes(ro, rd, t, jitter); col = col*gPlumeT + e; if (e.r + e.g + e.b > 0.03) taaFlag = min(taaFlag, 0.2); }
-  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 6) { vec3 e = wraithPlumes(ro, rd, t, jitter); col = col*gPlumeT + e; if (e.r + e.g + e.b > 0.03) taaFlag = min(taaFlag, 0.2); }
+  // (the research jets' flames are laid over the clouds below, not under them: the clouds on this ray lie mostly
+  // beyond the aircraft, and composited afterwards they covered the reheat and the pods' plasma)
+  vec3 plE = vec3(0.0); float plT = 1.0;
+  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 5) { plE = jetPlumes(ro, rd, t, jitter); plT = gPlumeT; }
+  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && int(gM[0].z + 0.5) == 6) { plE = wraithPlumes(ro, rd, t, jitter); plT = gPlumeT; }
+  bool plume = plE.r + plE.g + plE.b > 0.01 || plT < 0.99;
+  if (plE.r + plE.g + plE.b > 0.03) taaFlag = min(taaFlag, 0.2);
   if (!pod && uFxBeams + uFxBombs + uFxBlasts > 0) col = weaponsFx(col, ro, rd, t);
   // clouds (a cloaked craft: the skin first, then one cloud march along the whole camera ray through it)
   if (cloak) { col = cloakSkin(col, ckN, rd0, ckLp, ckLp.z - uWr[6].y + 0.8); col = applyFog(col, ro0, rd0, ckT); }
   // ordinary world pixels leave their clouds to the quarter-resolution cloud pass (composited before the TAA); the
   // cabin marches them here
   bool wrCk = cockpitView && int(gM[0].z + 0.5) == 6;
-  bool cloudLater = uCloudSplit == 1 && !pod && !wrCk;
+  bool cloudLater = uCloudSplit == 1 && !pod && !wrCk && !plume;   // (a plume pixel marches its own, to go under the flame)
   vec4 cl = pod || cloudLater ? vec4(0.0, 0.0, 0.0, 1.0) : traceClouds(cloak ? ro0 : ro, cloak ? rd0 : rd, cloak ? t + ckT : t, jitter);
   col = col*cl.a + cl.rgb;
+  if (plume) col = col*plT + plE;
   oCloudMask = cloudLater ? 1.0 : 0.0;
   if (wrCk) col += wrHolo(roV, rdV, pod ? t : h0.x);   // the hologram floats inside the cabin, in front of everything
   if (cloak) { t += ckT; taaFlag = 0.5; }

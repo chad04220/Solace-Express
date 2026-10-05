@@ -214,7 +214,10 @@ void Game::buildFeedCameras(FrameParams& fp) {
   const FeedMounts& fm = g_feedMounts[rig];
   if (!fm.ok) return;   // the renderer measures the mounts the first time it sees the craft; the cameras go up next frame
   FeedMount mt[kMaxFeeds];
-  const int n = feedRig(rig, g_ren.quality <= 0 ? 0.75f : g_ren.quality >= 2 ? 1.35f : 1.f, mt);
+  // (the displays as sharp as a 1080p screen at the cockpit's field of view, or the window's own when it's larger -
+  // up to 1440p; three quarters of that on the lowest quality)
+  const float lines = clampf((float)g_ren.H, 1080.f, 1440.f) * (g_ren.quality <= 0 ? 0.75f : 1.f);
+  const int n = feedRig(rig, lines * 0.5f / tanf(37.f * DEG), mt);
   const float* R = fp.plane.rot;   // body -> world, column-major
   auto toWorld = [&](vec3 v) { return vec3(R[0] * v.x + R[3] * v.y + R[6] * v.z, R[1] * v.x + R[4] * v.y + R[7] * v.z, R[2] * v.x + R[5] * v.y + R[8] * v.z); };
   const vec3 E(fp.plane.M[22 * 4], fp.plane.M[22 * 4 + 1], fp.plane.M[22 * 4 + 2]);   // the eye (body frame)

@@ -33,23 +33,36 @@ struct FeedMount {
 inline int feedRigOf(int special) { return special == 1 ? 1 : special == 2 ? 2 : 0; }   // 1 XR-9, 2 XR-11
 
 // A flat panel: centre c, normal n (facing the pilot), "up" hint u, half size s; mirrored to the left side when
-// left. The camera looks out through it (along -n) with the panel's own axes, about a quarter wider than the panel
-// looks from the eye.
-inline FeedMount feedPanel(vec3 c, vec3 n, vec3 u, vec2 s, bool left, float quality) {
+// left. The camera looks out through it (along -n, with the panel's own axes) and the display shows it as a window
+// would: the shader lays each point of the picture where the pilot's eye sees that direction through the panel
+// (feedScreen), so the camera's field of view is exactly what the panel covers from the eye, and its picture has the
+// main view's pixel density there (focal: the main view's focal length in pixels).
+inline FeedMount feedPanel(vec3 c, vec3 n, vec3 u, vec2 s, bool left, float focal) {
   if (left) { c.x = -c.x; n.x = -n.x; }
   n = normalize(n);
   vec3 t = normalize(cross(u, n)), b = cross(n, t);
-  float dist = fabsf(dot(c, n));
+  // aimed through the middle of the panel as the eye sees it (a panel seen at a slant: overhead, floor), so a
+  // symmetric picture wastes little; upright on the panel
+  vec3 p4[4], a(0.f);
+  for (int i = 0; i < 4; i++) { p4[i] = c + t * (i & 1 ? s.x : -s.x) + b * (i & 2 ? s.y : -s.y); a = a + normalize(p4[i]); }
+  a = normalize(a);
+  vec3 r = normalize(t - a * dot(t, a)), up = cross(-a, r);
   FeedMount m;
-  m.dir = normalize(c); m.right = t; m.up = b; m.back = n;
+  m.dir = normalize(c); m.right = r; m.up = up; m.back = -a;
   m.screen = c; m.screenR = length(s);
-  m.tanY = 1.25f * s.y / dist; m.tanX = m.tanY * s.x / s.y;
-  m.h = (int)(s.y * 600.f * quality + 0.5f); m.w = (int)(m.h * s.x / s.y + 0.5f);
+  float tx = 0.f, ty = 0.f;
+  for (int i = 0; i < 4; i++) {
+    float z = std::max(dot(p4[i], a), 0.05f);
+    tx = std::max(tx, fabsf(dot(p4[i], r)) / z); ty = std::max(ty, fabsf(dot(p4[i], up)) / z);
+  }
+  m.tanX = tx * 1.02f; m.tanY = ty * 1.02f;
+  m.w = (int)(2.f * m.tanX * focal + 0.5f); m.h = (int)(2.f * m.tanY * focal + 0.5f);
   return m;
 }
 
-// the rig of a research jet (empty for anything else); quality scales the pictures' resolution
-inline int feedRig(int rig, float quality, FeedMount out[kMaxFeeds]) {
+// the rig of a research jet (empty for anything else); focal: the main view's focal length in pixels (sets the
+// pictures' resolution: the displays are as sharp as the screen they're seen on)
+inline int feedRig(int rig, float focal, FeedMount out[kMaxFeeds]) {
   if (rig == 1) {
     // XR-9: a panoramic display on a cylinder around the eye (r 0.64 m, +-1.25 rad, y 0.02 +- 0.30), fed by three
     // cameras 0.833 rad apart (each a third of it), and a side display bay either side
@@ -61,30 +74,37 @@ inline int feedRig(int rig, float quality, FeedMount out[kMaxFeeds]) {
       m.right = vec3(cosf(c), 0.f, sinf(c)); m.up = vec3(0, 1, 0); m.back = vec3(-sinf(c), 0.f, cosf(c));
       m.tanX = tx; m.tanY = ty;
       m.screen = vec3(sinf(c) * 0.64f, 0.02f, -cosf(c) * 0.64f); m.screenR = 0.42f;
-      m.h = (int)(260.f * quality + 0.5f); m.w = (int)(m.h * tx / ty + 0.5f);
+      m.w = (int)(2.f * tx * focal + 0.5f); m.h = (int)(2.f * ty * focal + 0.5f);
       m.nose = true;
     }
-    out[3] = feedPanel(vec3(0.635f, 0.04f, 0.24f), vec3(-1, 0, 0), vec3(0, 1, 0), vec2(0.3f, 0.2f), true, quality * 1.3f);
-    out[4] = feedPanel(vec3(0.635f, 0.04f, 0.24f), vec3(-1, 0, 0), vec3(0, 1, 0), vec2(0.3f, 0.2f), false, quality * 1.3f);
+    out[3] = feedPanel(vec3(0.635f, 0.04f, 0.24f), vec3(-1, 0, 0), vec3(0, 1, 0), vec2(0.3f, 0.2f), true, focal);
+    out[4] = feedPanel(vec3(0.635f, 0.04f, 0.24f), vec3(-1, 0, 0), vec3(0, 1, 0), vec2(0.3f, 0.2f), false, focal);
     return 5;
   }
   if (rig == 2) {
-    // XR-11: front panel and its two wings, side and aft displays, overhead, chin, footwell floor and the floor panes
-    // beside the seat (the shader's WF / WW / WS / WA / WO / WC / WL / WB panes)
+    // XR-11: the curved front display (a cylinder r 1.0 m about (0, 0.07, -0.15), y 0.07 +- 0.33, spanning +-0.74 rad
+    // from the eye) shows one wide camera at the nose, looking straight ahead (slots 1 and 2 are unused); then the
+    // side and aft displays, overhead, chin, footwell floor and the floor panes beside the seat (the shader's WF / WS /
+    // WA / WO / WC / WL / WB)
     const vec3 Y(0, 1, 0), F(0, 0, -1);
-    out[0] = feedPanel(vec3(0.f, 0.07f, -1.2f), vec3(0.f, 0.2425f, 0.9701f), Y, vec2(0.4f, 0.33f), false, quality);
-    out[1] = feedPanel(vec3(0.6f, 0.07f, -0.93f), vec3(-0.7686f, 0.1774f, 0.6147f), Y, vec2(0.24f, 0.33f), true, quality);
-    out[2] = feedPanel(vec3(0.6f, 0.07f, -0.93f), vec3(-0.7686f, 0.1774f, 0.6147f), Y, vec2(0.24f, 0.33f), false, quality);
-    out[3] = feedPanel(vec3(0.8f, -0.075f, -0.4f), vec3(-1, 0, 0), Y, vec2(0.34f, 0.345f), true, quality);
-    out[4] = feedPanel(vec3(0.8f, -0.075f, -0.4f), vec3(-1, 0, 0), Y, vec2(0.34f, 0.345f), false, quality);
-    out[5] = feedPanel(vec3(0.8f, -0.075f, 0.34f), vec3(-1, 0, 0), Y, vec2(0.25f, 0.345f), true, quality);
-    out[6] = feedPanel(vec3(0.8f, -0.075f, 0.34f), vec3(-1, 0, 0), Y, vec2(0.25f, 0.345f), false, quality);
-    out[7] = feedPanel(vec3(0.f, 0.403f, -0.55f), vec3(0, -1, 0), F, vec2(0.42f, 0.36f), false, quality);
-    out[8] = feedPanel(vec3(0.f, -0.5f, -1.0f), vec3(0.f, 0.7509f, 0.6604f), Y, vec2(0.38f, 0.2f), false, quality);
-    out[9] = feedPanel(vec3(0.f, -0.775f, -0.66f), vec3(0, 1, 0), F, vec2(0.4f, 0.34f), false, quality);
-    out[10] = feedPanel(vec3(0.47f, -0.705f, 0.4f), vec3(-0.3714f, 0.9285f, 0.f), F, vec2(0.14f, 0.2f), true, quality * 1.4f);
-    out[11] = feedPanel(vec3(0.47f, -0.705f, 0.4f), vec3(-0.3714f, 0.9285f, 0.f), F, vec2(0.14f, 0.2f), false, quality * 1.4f);
-    out[0].nose = out[1].nose = out[2].nose = out[8].nose = true;   // the front wrap and the chin pane
+    {
+      FeedMount& m = out[0];
+      m.dir = F; m.right = vec3(1, 0, 0); m.up = Y; m.back = vec3(0, 0, 1);
+      m.tanX = 0.93f; m.tanY = 0.36f;   // what the display covers, seen from the eye
+      m.screen = vec3(0.f, 0.07f, -1.0f); m.screenR = 1.0f;
+      m.w = (int)(2.f * m.tanX * focal + 0.5f); m.h = (int)(2.f * m.tanY * focal + 0.5f);
+      for (int k = 1; k <= 2; k++) { out[k] = m; out[k].w = out[k].h = 0; }   // (no camera: the atlas skips it)
+    }
+    out[3] = feedPanel(vec3(0.8f, -0.075f, -0.4f), vec3(-1, 0, 0), Y, vec2(0.34f, 0.345f), true, focal);
+    out[4] = feedPanel(vec3(0.8f, -0.075f, -0.4f), vec3(-1, 0, 0), Y, vec2(0.34f, 0.345f), false, focal);
+    out[5] = feedPanel(vec3(0.8f, -0.075f, 0.34f), vec3(-1, 0, 0), Y, vec2(0.25f, 0.345f), true, focal);
+    out[6] = feedPanel(vec3(0.8f, -0.075f, 0.34f), vec3(-1, 0, 0), Y, vec2(0.25f, 0.345f), false, focal);
+    out[7] = feedPanel(vec3(0.f, 0.403f, -0.55f), vec3(0, -1, 0), F, vec2(0.42f, 0.36f), false, focal);
+    out[8] = feedPanel(vec3(0.f, -0.5f, -1.0f), vec3(0.f, 0.7509f, 0.6604f), Y, vec2(0.38f, 0.2f), false, focal);
+    out[9] = feedPanel(vec3(0.f, -0.775f, -0.66f), vec3(0, 1, 0), F, vec2(0.4f, 0.34f), false, focal);
+    out[10] = feedPanel(vec3(0.47f, -0.705f, 0.4f), vec3(-0.3714f, 0.9285f, 0.f), F, vec2(0.14f, 0.2f), true, focal);
+    out[11] = feedPanel(vec3(0.47f, -0.705f, 0.4f), vec3(-0.3714f, 0.9285f, 0.f), F, vec2(0.14f, 0.2f), false, focal);
+    out[0].nose = out[1].nose = out[2].nose = out[8].nose = true;   // the front camera and the chin pane
     return 12;
   }
   return 0;

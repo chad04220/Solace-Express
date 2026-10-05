@@ -1,7 +1,7 @@
 // Solace Express - XR-11 Wraith cockpit (GLSL, appended to the ray tracer after kRaytraceWraith)
 #pragma once
 
-// A faceted sealed cabin wrapped in angular displays: a three-pane front wrap, tall side displays with aft displays
+// A faceted sealed cabin wrapped in angular displays: one wide curved front display, tall side displays with aft displays
 // behind them (to watch the flanks and the rear quarter), an overhead pane, a sloped chin pane and a glass floor in
 // the footwell. Each pane shows the picture of its own camera on the airframe, looking out the way the pane faces
 // (feed_cameras.h), so looking down at the floor shows the belly camera: the ground, the bombs falling, the blasts.
@@ -18,8 +18,12 @@ vec2 wrPane(vec3 q, vec3 c, vec3 n, vec3 up, vec2 hs, float ch){
   return vec2(max(s, abs(l.z) - 0.004), max(max(s - 0.034, -s), abs(l.z - 0.006) - 0.013));
 }
 // pane layout (cabin frame: eye at the origin, -z forward)
-const vec3 WF_C = vec3(0.0, 0.07, -1.2);    const vec3 WF_N = vec3(0.0, 0.2425, 0.9701);  const vec2 WF_S = vec2(0.4, 0.33);
-const vec3 WW_C = vec3(0.6, 0.07, -0.93);   const vec3 WW_N = vec3(-0.7686, 0.1774, 0.6147); const vec2 WW_S = vec2(0.24, 0.33);
+// the front display: one seamless panorama on a vertical cylinder ahead of the pilot (centre WF_C, radius WF_R), its
+// outline in (arc length, height): half width WF_S.x, half height WF_S.y, the upper corners cut along the cabin's
+// octagonal section. Fed by one wide camera at the nose (feed_cameras.h).
+const vec3 WF_C = vec3(0.0, 0.07, -0.15);   const float WF_R = 1.0;  const vec2 WF_S = vec2(0.84, 0.33);
+vec3 wrFront(vec3 q){ vec2 d = q.xz - WF_C.xz; return vec3(WF_R*atan(d.x, -d.y), q.y - WF_C.y, WF_R - length(d)); }   // arc, height, depth
+float wrFrontShape(vec3 q, vec2 l){ return max(max(abs(l.x) - WF_S.x, abs(l.y) - WF_S.y), abs(q.x) + q.y + 0.18 - 1.2); }
 const vec3 WS_C = vec3(0.8, -0.075, -0.4);  const vec3 WS_N = vec3(-1.0, 0.0, 0.0);      const vec2 WS_S = vec2(0.34, 0.345);
 const vec3 WA_C = vec3(0.8, -0.075, 0.34);  const vec2 WA_S = vec2(0.25, 0.345);   // aft side displays (same facing as WS)
 const vec3 WO_C = vec3(0.0, 0.403, -0.55);  const vec3 WO_N = vec3(0.0, -1.0, 0.0);       const vec2 WO_S = vec2(0.42, 0.36);
@@ -29,11 +33,7 @@ const vec3 WD_C = vec3(0.0, -0.34, -0.99);  const vec3 WD_N = vec3(0.0, 0.6, 0.8
 const vec3 WB_C = vec3(0.47, -0.705, 0.4);   const vec3 WB_N = vec3(-0.3714, 0.9285, 0.0); const vec2 WB_S = vec2(0.14, 0.2);
 // distance (negative inside) to the edge of the display a point lies on, for the HUD frame and vignette
 float wrScreenEdge(vec3 q, int id){
-  if (id == 41) {
-    float c = wrShape(wrFrame(q, WF_C, WF_N, vec3(0,1,0)).xy, WF_S, 0.1);
-    vec3 aq = vec3(abs(q.x), q.y, q.z);
-    return min(c, wrShape(wrFrame(aq, WW_C, WW_N, vec3(0,1,0)).xy, WW_S, 0.16));
-  }
+  if (id == 41) return wrFrontShape(q, wrFront(q).xy);
   if (id == 42 || id == 43) { vec3 aq = vec3(abs(q.x), q.y, q.z);
     return min(wrShape(wrFrame(aq, WS_C, WS_N, vec3(0,1,0)).xy, WS_S, 0.13), wrShape(wrFrame(aq, WA_C, WS_N, vec3(0,1,0)).xy, WA_S, 0.11)); }
   if (id == 61) return q.z > 0.1 ? wrShape(wrFrame(vec3(abs(q.x), q.y, q.z), WB_C, WB_N, vec3(0,0,-1)).xy, WB_S, 0.07) : wrShape(wrFrame(q, WL_C, WL_N, vec3(0,0,-1)).xy, WL_S, 0.1);
@@ -58,8 +58,8 @@ vec2 mapWraithCockpit(vec3 p){
   ribs = max(ribs, 0.56 - aq.x);   // side walls only: the floor glass and the overhead pane stay clear
   res = opU(res, vec2(ribs, 65.0));
   // displays and their raised chamfered frames
-  vec2 sF = wrPane(q, WF_C, WF_N, vec3(0,1,0), WF_S, 0.1);
-  vec2 sW = wrPane(aq, WW_C, WW_N, vec3(0,1,0), WW_S, 0.16);
+  vec2 sF; { vec3 l = wrFront(q); float sh = wrFrontShape(q, l.xy);
+    sF = vec2(max(sh, abs(l.z) - 0.004), max(max(sh - 0.034, -sh), abs(l.z - 0.006) - 0.013)); }
   vec2 sS = wrPane(aq, WS_C, WS_N, vec3(0,1,0), WS_S, 0.13);
   vec2 sA = wrPane(aq, WA_C, WS_N, vec3(0,1,0), WA_S, 0.11);
   sS = vec2(min(sS.x, sA.x), min(sS.y, sA.y));
@@ -69,12 +69,12 @@ vec2 mapWraithCockpit(vec3 p){
   vec2 sB = wrPane(aq, WB_C, WB_N, vec3(0,0,-1), WB_S, 0.07);   // floor panes either side of the seat, behind the consoles
   sL = vec2(min(sL.x, sB.x), min(sL.y, sB.y));
   if (gCkSkip != 1) {
-  res = opU(res, vec2(min(sF.x, sW.x), 41.0));
+  res = opU(res, vec2(sF.x, 41.0));
   res = opU(res, vec2(sS.x, sx < 0.0 ? 42.0 : 43.0));
   res = opU(res, vec2(sO.x, 62.0));
   res = opU(res, vec2(sC.x, 63.0));
   res = opU(res, vec2(sL.x, 61.0));
-  res = opU(res, vec2(min(min(min(sF.y, sW.y), min(sS.y, sO.y)), min(sC.y, sL.y)), 65.0));
+  res = opU(res, vec2(min(min(min(sF.y, sS.y), sO.y), min(sC.y, sL.y)), 65.0));
   }
   // glass floor: a grid of thin titanium ribs over the pane
   {
@@ -328,8 +328,8 @@ vec3 wrClipAtlas(vec2 uv){
   vec2 g = uv*vec2(6.0, 5.0); int tile = int(floor(g.y))*6 + int(floor(g.x)); vec2 f = fract(g)*2.2 - 1.1;   // f in [-1.1, 1.1]; the top row stays clear for the game HUD
   vec3 q; float inside; int skip = 1;
   float sgn = (tile == 1 || tile == 3 || tile == 8 || tile == 10 || tile == 12 || tile == 14 || tile == 17) ? -1.0 : 1.0;
-  if (tile == 0) { q = wrPanePoint(WF_C, WF_N, vec3(0,1,0), vec3(f*WF_S, 0.0)); inside = wrShape(f*WF_S, WF_S, 0.1); }
-  else if (tile <= 2) { q = wrPanePoint(WW_C, WW_N, vec3(0,1,0), vec3(f*WW_S, 0.0)); inside = wrShape(f*WW_S, WW_S, 0.16); }
+  if (tile == 0) { vec2 l = f*WF_S; float a = l.x/WF_R; q = vec3(WF_C.x + sin(a)*WF_R, WF_C.y + l.y, WF_C.z - cos(a)*WF_R); inside = wrFrontShape(q, l); }
+  else if (tile <= 2) return vec3(0.02);
   else if (tile <= 4) { q = wrPanePoint(WS_C, WS_N, vec3(0,1,0), vec3(f*WS_S, 0.0)); inside = wrShape(f*WS_S, WS_S, 0.13); }
   else if (tile == 5) { q = wrPanePoint(WO_C, WO_N, vec3(0,0,-1), vec3(f*WO_S, 0.0)); inside = wrShape(f*WO_S, WO_S, 0.12); }
   else if (tile == 6) { q = wrPanePoint(WC_C, WC_N, vec3(0,1,0), vec3(f*WC_S, 0.0)); inside = wrShape(f*WC_S, WC_S, 0.07); }
@@ -377,10 +377,9 @@ int feedSlot(int id, vec3 q, out vec2 uv){
     return L ? 3 : 4;
   }
   vec3 aq = vec3(abs(q.x), q.y, q.z);
-  if (id == 41) {
-    vec3 f = wrFrame(q, WF_C, WF_N, vec3(0,1,0)), w = wrFrame(aq, WW_C, WW_N, vec3(0,1,0));
-    if (wrShape(f.xy, WF_S, 0.1) <= wrShape(w.xy, WW_S, 0.16)) { uv = f.xy/WF_S; return 0; }
-    uv = w.xy/WW_S*vec2(sx, 1.0); return L ? 1 : 2;
+  if (id == 41) {   // the front display: one wide camera, the picture laid on it as seen from the eye
+    uv = vec2(q.x/uFeedR[0].w, q.y/uFeedU[0].w)/max(-q.z, 0.1);
+    return 0;
   }
   if (id == 42 || id == 43) {
     vec3 f = wrFrame(aq, WS_C, WS_N, vec3(0,1,0)), a = wrFrame(aq, WA_C, WS_N, vec3(0,1,0));
@@ -399,6 +398,10 @@ vec3 feedScreen(int id, vec3 sl, out vec3 rdc, out bool bomb){
   vec2 uv; int s = feedSlot(id, q, uv);
   bomb = int(gM[0].z + 0.5) == 6 && id == 61 && uFeed.w > 0.5 && uFeedB[12].w > 0.5;
   if (bomb) { vec3 fu = wrFloorUV(q); uv = fu.xy*vec2(fu.z/(WL_S.x/WL_S.y), 1.0); s = 12; }
+  else {   // a window: the point of the picture the eye sees through this point of the display (feed_cameras.h)
+    vec3 d = uPlaneRot*q; float z = max(dot(d, -uFeedB[s].xyz), 1e-3);
+    uv = vec2(dot(d, uFeedR[s].xyz)/uFeedR[s].w, dot(d, uFeedU[s].xyz)/uFeedU[s].w)/z;
+  }
   rdc = normalize(-uFeedB[s].xyz + uFeedR[s].xyz*(uv.x*uFeedR[s].w) + uFeedU[s].xyz*(uv.y*uFeedU[s].w));
   if (uFeedOn == 0 || uFeedB[s].w < 0.5) return vec3(0.002, 0.004, 0.007);   // no picture yet: a dark panel
   if (abs(uv.x) > 1.0 || abs(uv.y) > 1.0) return vec3(0.0);
@@ -488,28 +491,20 @@ vec3 wraithScreen(vec3 col, vec3 rd, int id, vec3 sl){
     if (st > 0.01) { float ca = atan(h.y + 0.3, h.x); float cr = length(h + vec2(0.0, 0.3));
       viol = max(viol, hudLine(abs(cr - 0.05), px*1.3)*step(-1.5708 - st*3.1416, ca - 1.5708)*step(ca - 1.5708, -1.5708 + st*3.1416) ); }
   } else if (id == 61 || id == 63) {
-    // bomb impact prediction: a diamond on the ground with the blast ring, and a fall line from the bay
+    // bomb impact prediction: a diamond on the ground and its range
     if (uPip.w > 0.5) {
       vec3 dd = normalize(uPip.xyz - uCamPos);
       vec3 u = normalize(cross(dd, vec3(0.0, 1.0, 0.0) + vec3(1e-4, 0.0, 0.0))), v = cross(u, dd);
       float dz = dot(rd, dd);
       if (dz > 0.5) {
         vec2 s = vec2(dot(rd, u), dot(rd, v))/dz;
-        float rng = length(uPip.xyz - uCamPos), ring = 100.0/rng;
+        float rng = length(uPip.xyz - uCamPos);
         float dia = abs(abs(s.x) + abs(s.y) - 0.022);
         float on = uWr[4].y > 0.9 ? 1.0 : 0.55;
         warn = max(warn, hudLine(dia, px*1.3)*on);
-        warn = max(warn, hudLine(abs(length(s) - ring), px)*step(0.5, fract(atan(s.y, s.x)*6.0/3.1416))*on);
         warn = max(warn, step(length(s), 0.003)*on);
         hud = max(hud, hudNum(s - vec2(0.03, -0.012), rng, 4, vec2(0.012, 0.02)));
       }
-    }
-    // ground-stabilised range rings under the craft
-    if (id == 61) {
-      float tdown = (uCamPos.y - max(uPip.y, 0.0))/max(-rd.y, 0.05);
-      vec3 g = uCamPos + rd*tdown;
-      float rr = length(g.xz - uCamPos.xz);
-      hud = max(hud, hudLine(abs(fract(rr/100.0 + 0.5) - 0.5)*100.0, 0.06*tdown*px*20.0)*0.35*step(rd.y, -0.1));
     }
   } else if (id == 62) {
     // overhead: a heading ring

@@ -244,7 +244,7 @@ private:
   };
   void swapView(ViewTargets& v);
   ViewTargets feedView;                // (allocated at the largest picture; each camera uses its corner of it)
-  static constexpr int kFeedMaxW = 512, kFeedMaxH = 384, kFeedAtlasW = 2048, kFeedAtlasH = 1024;
+  static constexpr int kFeedMaxW = 2048, kFeedMaxH = 1024, kFeedAtlasW = 4096, kFeedAtlasH = 3072;
   GLuint texFeed = 0, fboFeed = 0;
   float feedTile[kMaxFeeds][4] = {};   // atlas rectangle of each slot (uv: x0, y0, w, h)
   int feedTileWH[kMaxFeeds][2] = {};
