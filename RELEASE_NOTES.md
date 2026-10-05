@@ -5,3 +5,4 @@
 - Checkpoints count the closest approach of each frame's movement, so a fast aircraft can't slip through a ring between frames.
 - Scoring from the record: touchdown zone, centreline, stable approach, fuel reserve and a shutdown clear of the runway earn a little; floating past the midpoint and landing on fumes cost. Tower compliance: taking off against a hold or landing against a go-around costs pay and reputation; the instruction's state shows beside the recall line.
 - There is always a way to earn: when no board job pays and no free lesson is next, a recovery mail run appears (courtesy ride to the field, fair weather, no deadline).
+- Options: a field-of-view slider (the cockpit is 19 degrees wider), UI scale, head-look (the cockpit view leans into turns), a blue / orange HUD palette for colour-blind pilots, and the HUD key remembers on / off per camera view.

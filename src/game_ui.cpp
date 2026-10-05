@@ -3,7 +3,9 @@
 
 // High-tech glass UI: deep navy panels, cyan accents, amber for warnings
 static const vec3 C_PANEL(0.015f, 0.035f, 0.06f), C_PANEL2(0.04f, 0.085f, 0.13f), C_ACCENT(0.32f, 0.86f, 1.0f), C_WARN(1.0f, 0.72f, 0.22f);
-static const vec3 C_TEXT(0.93f, 0.97f, 1.0f), C_DIM(0.56f, 0.68f, 0.79f), C_GOOD(0.42f, 1.0f, 0.68f), C_BAD(1.0f, 0.4f, 0.38f);
+static const vec3 C_TEXT(0.93f, 0.97f, 1.0f), C_DIM(0.56f, 0.68f, 0.79f);
+static vec3 C_GOOD(0.42f, 1.0f, 0.68f), C_BAD(1.0f, 0.4f, 0.38f);   // (the colour-blind palette swaps these for blue / orange)
+static void applyPalette(bool cb) { C_GOOD = cb ? vec3(0.35f, 0.72f, 1.0f) : vec3(0.42f, 1.0f, 0.68f); C_BAD = cb ? vec3(1.0f, 0.58f, 0.12f) : vec3(1.0f, 0.4f, 0.38f); }
 static const vec3 C_BTN(0.04f, 0.09f, 0.14f), C_BTN_HI(0.07f, 0.2f, 0.29f), C_INK(0.01f, 0.05f, 0.08f);
 
 static uint32_t uid(float x, float y, const std::string& s) {
@@ -15,7 +17,8 @@ static uint32_t uid(float x, float y, const std::string& s) {
 }
 static vec3 mixc(vec3 a, vec3 b, float t) { return a + (b - a) * t; }
 
-float Game::S() const { return std::max(0.6f, g_ren.H / 720.f); }
+void Game::applyUiPalette() { applyPalette(set.cbHud); }
+float Game::S() const { return std::max(0.6f, g_ren.H / 720.f) * set.uiScale; }
 
 bool Game::hovered(float x, float y, float w, float h) const { return in.mx >= x && in.mx < x + w && in.my >= y && in.my < y + h; }
 
@@ -928,6 +931,11 @@ void Game::drawSettings(float x, float y, float w, float h) {
   if (rv != set.radioVol) radio.setVolume(set.radioVol);
   slider("Voice volume", set.atcVol, 0, 1, 0.05f, fmt("%.0f%%", set.atcVol * 100));
   slider("Mouse sensitivity", set.mouseSens, 0.2f, 3.f, 0.1f, fmt("%.1f", set.mouseSens));
+  slider("Field of view", set.fov, 45.f, 75.f, 1.f, fmt("%.0f deg outside, %.0f in the cockpit", set.fov, set.fov + 19.f));
+  slider("UI scale", set.uiScale, 0.8f, 1.4f, 0.05f, fmt("%.0f%%", set.uiScale * 100));
+  toggle("Head-look", set.headLook, "Leans into turns", "Fixed ahead");
+  { bool cb = set.cbHud; toggle("HUD palette", set.cbHud, "Blue / orange (colour-blind)", "Green / red"); if (cb != set.cbHud) applyPalette(set.cbHud); }
+  g_ren.text(x + 250 * s, py - 2 * s, 12.5f * s, "The HUD key remembers on / off for each camera view.", C_DIM, 0.85f, 0, false); py += 20 * s;
   toggle("Pitch control", set.invertPitch, "Inverted", "Normal (S = nose up)");
   toggle("Units", set.metric, "Metric", "Aviation (kt / ft)");
   toggle("Instructor hints", set.showHints, "Shown", "Hidden");

@@ -33,8 +33,8 @@ Line numbers in §2 are from `f8b8537` and no longer match: re-grep the identifi
 | E5.4 menu focus navigation | open | — |
 | A12 go/no-go | decided: meshes done as R2a–c (bake by state sweep, not per part) | 9546382 |
 | D1 + E6 FlightSession split, clocks, ATC validity | open | — |
-| C9 scoring lines from recorded data | done | C9/C10 commit |
-| C10 ATC compliance | done; landing against a go-around is charged (-50%, -rep) rather than failing the leg, so a resumable job is not stranded at its destination | C9/C10 commit |
+| C9 scoring lines from recorded data | done | 224fa0e |
+| C10 ATC compliance | done; landing against a go-around is charged (-50%, -rep) rather than failing the leg, so a resumable job is not stranded at its destination | 224fa0e |
 | A10 water reflection probe | → R3 | — |
 | A11 cloud march | → R3 | — |
 | A2 baked partial fbm | superseded by the terrain mesh | — |
@@ -49,7 +49,7 @@ Line numbers in §2 are from `f8b8537` and no longer match: re-grep the identifi
 | C11 airline layer | open (after C5, C7, E3) | — |
 | C12 challenge modes | open | — |
 | C13 surface NIGHTGLASS | open; the terminal now holds four craft | — |
-| C14 options (FOV, head-look, colour-blind HUD, UI scale) | open; the frame-rate target exists (A7) | — |
+| C14 options (FOV, head-look, colour-blind HUD, UI scale, HUD per camera) | done | C14 commit |
 
 Order from here: B1 → E2 → E3 → E4 → C9/C10 → C14 → A6 → A5 → A3 → D1+E6 → C3 → C5 → C7 → C6 → C8 → E5.4 → C12/C13 → C11; B3 and A3 wait on report.bat numbers.
 

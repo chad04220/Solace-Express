@@ -48,6 +48,11 @@ struct Settings {
   int resMode = 1;   // 0 native, 1 auto (holds the frame-rate target, the default), 2 85%, 3 75%, 4 67% (TAA upscales to the display)
   int fpsTarget = 0;   // 0: the monitor's refresh rate (vsync); else a frame-rate cap (30 / 60 / 90 / 120 / 144 / 240)
   int renderer = 1;    // 1 the raster renderer (the default, docs/RENDERER_REBUILD.md), 0 the ray tracer
+  float fov = 55;      // the outside views' vertical field of view (degrees); the cockpit's is 19 wider
+  bool headLook = true;   // the cockpit view leans into turns when nothing else moves it
+  bool cbHud = false;     // colour-blind palette: good / bad as blue / orange instead of green / red
+  float uiScale = 1.f;    // on top of the window-height scale
+  bool hudCam[4] = {true, true, true, true};   // the HUD on or off, remembered per camera
   int keyBind[ACT_COUNT]; unsigned padBind[ACT_COUNT];
   Settings() { resetBindings(); }
   void resetBindings() { for (int i = 0; i < ACT_COUNT; i++) { keyBind[i] = kActions[i].key; padBind[i] = kActions[i].pad; } }
@@ -82,6 +87,7 @@ public:
   std::string assetDir = ".";                          // folder of the exe (pre-rendered loading pictures live in assetDir\loading)
 
   void loadSettings();
+  void applyUiPalette();   // the HUD / UI good-bad colours from the settings (game_ui.cpp)
   // startup screen, drawn with the given renderer (the intro thread has its own, in its own GL context)
   void drawIntro(float progress, const std::string& stage, float t, unsigned icon, float fade, Renderer& R = g_ren);
   bool shaderFirstRun = false;

@@ -194,6 +194,11 @@ void Game::loadSettings() {
     else if (s == "renderRes") set.resMode = std::clamp((int)v, 0, 4);
     else if (s == "fpsTarget") set.fpsTarget = std::clamp((int)v, 0, 240);
     else if (s == "renderer") set.renderer = std::clamp((int)v, 0, 1);   // (the old key, "resMode", defaulted to native: ignored)
+    else if (s == "fov") set.fov = clampf(v, 40.f, 80.f);
+    else if (s == "headLook") set.headLook = v != 0;
+    else if (s == "cbHud") set.cbHud = v != 0;
+    else if (s == "uiScale") set.uiScale = clampf(v, 0.8f, 1.4f);
+    else if (s.rfind("hudCam", 0) == 0 && s.size() == 7 && s[6] >= '0' && s[6] <= '3') set.hudCam[s[6] - '0'] = v != 0;
     else if (s.rfind("key.", 0) == 0 || s.rfind("pad.", 0) == 0)
       for (int i = 0; i < ACT_COUNT; i++)
         if (s.compare(4, std::string::npos, kActions[i].id) == 0) {
@@ -208,7 +213,7 @@ void Game::loadSettings() {
 void Game::saveSettings() {
   std::string t = fmt("quality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
-  t += fmt("renderRes %d\nfpsTarget %d\nrenderer %d\n", set.resMode, set.fpsTarget, set.renderer);
+  t += fmt("renderRes %d\nfpsTarget %d\nrenderer %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.renderer, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
   for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   if (t == settingsWritten) return;
   std::string path = joinPath(saveDir, "settings.cfg"), tmp = path + ".tmp";
@@ -348,6 +353,7 @@ void Game::init(bool buildWorld) {
   if (buildWorld) g_world.build();
   buildStory();
   loadSettings();
+  applyUiPalette();
   wantPacing = true;   // (the frame-rate target from the settings)
   g_ren.mode = g_ren.modeForce >= 0 ? g_ren.modeForce : set.renderer;
   loadStations();
@@ -1048,6 +1054,7 @@ void Game::updateCamera(float dt) {
   if (!plane.spec) return;
   if (actPressed(ACT_CAMERA)) {
     camMode = (camMode + 1) % 4; camYaw = 0; camPitch = 0.12f; lookYaw = 0; lookPitch = -0.13f;
+    hudOn = set.hudCam[camMode];   // (the HUD as it was last left in this view)
     static const char* names[] = {"Chase camera", "Cockpit view", "Orbit camera", "Flyby camera"};
     toast(names[camMode]);
     if (camMode == 3) camPos = plane.pos + normalize(vec3(plane.vel.x, 0, plane.vel.z) + vec3(0.01f, 0, 0)) * 350.f + plane.right() * 40.f + vec3(0, 12, 0);
@@ -1094,7 +1101,10 @@ void Game::updateCamera(float dt) {
   } else if (camMode == 1) {
     if (drag || in.pad) { lookYaw = camYaw; lookPitch = camPitch - 0.12f; }
     else { float rest = plane.spec->special ? -0.24f : -0.13f;   // XR-9: rest the view so the instrument console is in sight
-      lookYaw = approach(lookYaw, 0, 2.f, dt); lookPitch = approach(lookPitch, rest, 2.f, dt); camYaw = lookYaw; camPitch = lookPitch + 0.12f; }
+      // head-look: the eyes lead a turn a little (into the bank, and towards the nose when it pitches up)
+      float leadYaw = set.headLook && !plane.onGround ? clampf(-plane.bankDeg() / 60.f, -1.f, 1.f) * 0.30f : 0.f;
+      float leadPitch = set.headLook && !plane.onGround ? clampf(plane.pitchDeg() / 30.f, -0.5f, 0.5f) * 0.10f : 0.f;
+      lookYaw = approach(lookYaw, leadYaw, 2.f, dt); lookPitch = approach(lookPitch, rest + leadPitch, 2.f, dt); camYaw = lookYaw; camPitch = lookPitch + 0.12f; }
     camPos = plane.pos + plane.q.rotate(kModels[plane.spec - kAircraft].eye);
   } else if (camMode == 2) {
     float dist = (size * 1.4f + 8.f) * camZoom;
@@ -1811,9 +1821,9 @@ FrameParams Game::buildFrame() {
     fp.camBack = -fwd;
     fp.camRight = normalize(cross(fwd, upRef));
     fp.camUp = cross(fp.camRight, fwd);
-    fp.fovY = (camMode == 1 ? 74.f : 55.f) * DEG;
+    fp.fovY = (camMode == 1 ? set.fov + 19.f : set.fov) * DEG;
     if (camMode == 3) fp.fovY = clampf(2.f * atanf(std::max(plane.spec->span, plane.spec->fusLen) * (botControl ? 0.42f : 1.5f) / length(plane.pos - camPos)), 4.f * DEG, 60.f * DEG);
-    if (camMode == 1) fp.fovY = 2.f * atanf(tanf(37.f * DEG) / ckZoom);   // cockpit zoom: lean in to read the displays
+    if (camMode == 1) fp.fovY = 2.f * atanf(tanf((set.fov + 19.f) * 0.5f * DEG) / ckZoom);   // cockpit zoom: lean in to read the displays
     fp.landLight = landingLight && plane.engineRunning ? (0.3f + 0.7f * fp.night) : 0.f;
     fp.landLightPos = plane.pos + plane.forward() * (plane.spec->fusLen * 0.4f);
     fp.landLightDir = normalize(plane.forward() - plane.up() * 0.1f);
@@ -2611,7 +2621,7 @@ void Game::update(float dt) {
       if (in.buttonsPressed & PAD_LEFT) cycleApDest(-1);
       if ((in.pressed[K_ENTER] || (in.buttonsPressed & PAD_A)) && apDest >= 0 && !plane.onGround) engageAutopilot();
     } else if (actPressed(ACT_MINIMAP)) { showMinimap = !showMinimap; toast(showMinimap ? "Minimap shown" : "Minimap hidden"); }
-    if (actPressed(ACT_HUD)) hudOn = !hudOn;
+    if (actPressed(ACT_HUD)) { hudOn = !hudOn; set.hudCam[std::clamp(camMode, 0, 3)] = hudOn; }
     if (!paused) {
       int nSim = std::max(1, (int)ceilf(simDt / 0.05f - 1e-4f));
       Input frameIn; bool saved = false;   // key presses act once: the catch-up steps see the held state without the press edges
