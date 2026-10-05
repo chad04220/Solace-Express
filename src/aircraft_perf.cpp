@@ -22,10 +22,10 @@ vec3 seaPoint() {
 
 const PerfModel& Plane::perf(const AircraftSpec* sp) {
   static PerfModel cache[16]; static int state[16] = {};   // 0 not learned, 1 learning (provisional numbers), 2 learned
-  static std::recursive_mutex m;
+  static std::recursive_mutex m[16];   // (one per type: different types can be learned on different threads at once)
   int idx = (int)(sp - kAircraft);
-  std::lock_guard<std::recursive_mutex> lk(m);
   if (idx < 0 || idx >= 16) { static PerfModel none; return none; }
+  std::lock_guard<std::recursive_mutex> lk(m[idx]);
   if (state[idx]) return cache[idx];   // (while learning, the test sorties fly on the provisional numbers below)
   state[idx] = 1;
   const AircraftSpec& s = *sp;
@@ -100,6 +100,67 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
   }
   // 3. idle descent, full flap and gear at 1.25 Vs0 (or Vref)
   P.sinkIdle = std::max(0.5f, -excessPower(std::max(P.vs0 * 1.25f, s.vref * 0.95f), true, 0.f, 16.f));
+  // 4. cruise: level at 1500 m on the altitude hold, 75% power, mid weight; the true airspeed it settles at
+  {
+    Plane p; p.reset(&s, seaPoint() + vec3(0, 1500.f, 0), 90.f, s.maxFuel * 0.5f, s.cargoKg * 0.5f, true, s.cruise);
+    p.ctl.gearDown = !s.retract; p.gear = p.ctl.gearDown ? 1.f : 0.f; p.engineRunning = true; p.engineSpool = 0.75f;
+    p.apEngage(Plane::AP_HOLD, -1, calm); p.apSpeed = 0; p.apAlt = p.pos.y; p.apHeading = p.heading();
+    float sum = 0; int n = 0;
+    for (int k = 0; k < 150 * 30 && !p.ev.crashed; k++) { p.ctl.throttle = 0.75f; p.step(1 / 30.f, calm, k / 30.f); if (k > 120 * 30) { sum += length(p.vel); n++; } }
+    P.cruiseV = n ? sum / n : s.cruise;
+  }
+  // 5. the take-off and landing rolls at full weight on a paved runway (Solace Capital), brought to sea level
+  if (!s.special) {
+    const Airport& a = g_world.airports[std::max(g_world.findAirport("CAP"), 0)];
+    const float mtowLoad = s.cargoKg, elevK = 1.f + a.elev / 3000.f;
+    {
+      Plane p; vec3 st = a.threshold(false) + a.dir() * 30.f; st.y = a.elev + 3.f;
+      p.reset(&s, st, a.heading, s.maxFuel, mtowLoad, false);
+      p.engineRunning = true; p.engineSpool = 0.f; p.sceneryHits = false;
+      vec3 p0;
+      float t = 0;
+      for (; t < 2.f; t += 1 / 60.f) { p.ctl.brake = 1; p.step(1 / 60.f, calm, t); }
+      p0 = p.pos; P.toRoll = -1;
+      for (; t < 120.f && !p.ev.crashed; t += 1 / 60.f) {
+        p.ctl.brake = 0; p.ctl.throttle = 1; p.ctl.flaps = s.taildragger ? 0.3f : 0.2f;
+        if (p.ias > s.vr) p.ctl.pitch = clampf((10.f - p.pitchDeg()) * 0.08f - p.w.x * 0.5f, -1, 1);
+        else if (s.taildragger && p.ias > s.vr * 0.5f) p.ctl.pitch = -0.3f;
+        p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1, 1);
+        p.ctl.yaw = clampf(wrapAngle((a.heading - p.heading()) * DEG) * 3.f, -1, 1);
+        p.step(1 / 60.f, calm, t);
+        if (!p.onGround && p.agl() > 1.f) { P.toRoll = length(vec3(p.pos.x - p0.x, 0, p.pos.z - p0.z)) / elevK; break; }   // (the ground roll to lift-off)
+      }
+    }
+    {
+      // full flap, idle, then the brakes as hard as the type takes (a taildragger brakes gently, as the autopilot's
+      // rollout does); Vs0 at this weight and the field's air
+      float W = (s.emptyMass + s.maxFuel + mtowLoad) * G0, rho = 1.225f * expf(-a.elev / 8500.f);
+      float vs0 = sqrtf(2.f * W / (rho * s.wingArea * (s.CLmax + s.flapCL)));
+      Plane p; vec3 st = a.threshold(false) + a.dir() * 200.f; st.y = a.elev;
+      p.reset(&s, st, a.heading, s.maxFuel, mtowLoad, false);
+      p.sceneryHits = false;
+      for (int i = 0; i < 60; i++) p.step(1 / 60.f, calm, 0.f);   // (settled on its wheels)
+      // (the roll starts at touchdown, 1.1 Vs0: the approach at 1.3 Vs0 is the air segment below)
+      p.vel = p.forward() * (vs0 * 1.1f); p.ctl.flaps = 1; p.flaps = 1; p.ctl.throttle = 0; p.engineRunning = true;
+      vec3 p0 = p.pos; P.ldgRoll = -1;
+      for (float t = 0; t < 120.f && !p.ev.crashed; t += 1 / 60.f) {
+        // (a taildragger is held tail-up while fast - in its three-point attitude it would fly again - then stick back)
+        p.ctl.throttle = 0; p.ctl.brake = s.taildragger ? 0.55f : 1.f; p.ctl.pitch = s.taildragger ? (p.ias > s.vref * 0.8f ? -0.35f : 0.4f) : 0.f;
+        p.ctl.yaw = clampf(wrapAngle((a.heading - p.heading()) * DEG) * 3.f, -1, 1);
+        p.step(1 / 60.f, calm, t);
+        // (the landing distance: the approach path from 15 m over the threshold - 3 deg, or the 6.5 deg the autopilot
+        // flies a STOL type at (Plane::apPlan) - then this ground roll)
+        float air = 15.f / tanf((s.runwayM < 300.f ? 6.5f : 3.f) * DEG);
+        if (length(p.vel) < 0.5f) { P.ldgRoll = (air + length(vec3(p.pos.x - p0.x, 0, p.pos.z - p0.z))) / elevK; break; }
+      }
+    }
+  }
   state[idx] = 2;
   return P;
+}
+
+float AircraftSpec::runwayNeeded(float elev) const {
+  const PerfModel& P = Plane::perf(this);
+  float base = special || P.toRoll <= 0 || P.ldgRoll <= 0 ? runwayM : std::max(P.toRoll, P.ldgRoll) * 1.15f;
+  return base * (1.0f + elev / 3000.0f);
 }

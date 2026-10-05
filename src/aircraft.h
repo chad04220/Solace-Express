@@ -26,7 +26,9 @@ struct AircraftSpec {
   float fusLen, fusRad, wingY, wingZ; int engLayout, tail;
   vec3 colBase, colStripe;
   int special = 0;             // 1 = XR-9 research jet: fly-by-wire, pitch thrust vectoring, no fuel burn; 2 = XR-11 Wraith
-  float runwayNeeded(float elev) const { return runwayM * (1.0f + elev / 3000.0f); }
+  // the runway it needs: the longer of its learned take-off and landing distances at full weight (Plane::perf), 15% to
+  // spare, longer with the field's elevation (runwayM until the type has been learned, and for the research jets)
+  float runwayNeeded(float elev) const;
 };
 
 extern const AircraftSpec kAircraft[];
@@ -60,6 +62,8 @@ struct PerfModel {
   float gLimit = 0, gNeg = 0;      // structural limits (positive, negative)
   float gUse = 0;                  // what the pilot may pull: within the structure, the stall and its pull authority
   float bankMax = 0;               // steepest bank it may hold in a level turn (deg)
+  float cruiseV = 0;               // level true airspeed at 75% power, 1500 m, mid weight (m/s)
+  float toRoll = 0, ldgRoll = 0;   // at full weight, sea level, no wind: ground roll to lift-off, and landing distance from 15 m (3 deg path at 1.3 Vs0) to a stop on the brakes (m)
 };
 
 struct Controls {

@@ -249,7 +249,7 @@ Career::Source Career::canFly(const Contract& c, int si, std::string* why) const
     if (!surfaceOK(s, a.surface)) return no(fmt("Cannot use %s runway at %s", surfaceName(a.surface), a.code));
     if (a.length < s.runwayNeeded(a.elev)) return no(fmt("%s runway too short (%.0f m, needs %.0f m)", a.code, a.length, s.runwayNeeded(a.elev)));
   }
-  if (c.timeLimitMin > 0 && km * 1000.f / s.cruise / 60.f > c.timeLimitMin * 0.8f) return no(fmt("Too slow to make the %.0f minute deadline", c.timeLimitMin));
+  if (c.timeLimitMin > 0 && km * 1000.f / Plane::perf(&s).cruiseV / 60.f > c.timeLimitMin * 0.8f) return no(fmt("Too slow to make the %.0f minute deadline", c.timeLimitMin));
   if (ownedIndexFor(si) >= 0) return SRC_OWNED;
   if (c.ownedOnly) return no("Client requires your own aircraft");
   if (s.rentFee <= 0) return no("Not available for rent - buy one in the Hangar");
@@ -444,7 +444,7 @@ void Career::refreshBoard() {
     c.repBonusPct = repBonusPct();   // clients pay a reliable pilot a little more
     c.payout = c.payout * (100 + c.repBonusPct) / 100 / 10 * 10;
     c.fragile = !pax && r.uni() < 0.15f;
-    if (r.uni() < 0.15f) { c.timeLimitMin = ceilf(km * 1000.f / s.cruise / 60.f * 1.6f + 3); c.payout = c.payout * 13 / 10; }
+    if (r.uni() < 0.15f) { c.timeLimitMin = ceilf(km * 1000.f / Plane::perf(&s).cruiseV / 60.f * 1.6f + 3); c.payout = c.payout * 13 / 10; }
     c.title = pax ? fmt("%s to %s", paxNames[r.next() % 8], g_world.airports[to].name) : fmt("%s to %s", cargoNames[r.next() % 10], g_world.airports[to].name);
     c.brief = fmt("Freelance job posted at %s. Distance %.0f km.", g_world.airports[location].name, km);
     float tod = r.range(7.f, 19.5f);

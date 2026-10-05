@@ -44,15 +44,17 @@ A pilot-career flight game for Windows with a real-time **GPU ray-traced** world
 
 ## Aircraft
 
-| Aircraft | Type | Seats / Cargo | Range | Runway | Licence |
-|---|---|---|---|---|---|
-| Kestrel T2 | 2-seat trainer (4-cyl) | 1 / 120 kg | 45 km | 400 m | Student |
-| Wren 180 | 4-seat tourer (6-cyl) | 3 / 320 kg | 70 km | 450 m | PPL |
-| Bushmaster STOL | Taildragger bush plane | 4 / 480 kg | 60 km | 220 m, gravel/snow | CPL |
-| Islander Twin | Twin-piston utility | 9 / 900 kg | 90 km | 420 m, gravel/snow | CPL |
-| Pelican Caravan | Single turboprop | 12 / 1,400 kg | 130 km | 550 m, gravel/snow | CPL |
-| Meridian Q400 | Twin-turboprop airliner | 40 / 4,500 kg | 170 km | 1,100 m paved | ATP |
-| Starling 500 | Twin-jet business jet | 7 / 700 kg | 260 km | 1,250 m paved | ATP |
+| Aircraft | Type | Seats / Cargo | Range | Cruise | Take-off roll | Landing distance | Runway | Licence |
+|---|---|---|---|---|---|---|---|---|
+| Kestrel T2 | Two-seat trainer | 1 / 120 kg | 45 km | 116 kt | 98 m | 349 m | 401 m paved | Student |
+| Wren 180 | Four-seat tourer | 3 / 320 kg | 70 km | 128 kt | 176 m | 380 m | 437 m paved | PPL |
+| Bushmaster STOL | Backcountry taildragger | 4 / 480 kg | 72 km | 131 kt | 103 m | 224 m | 257 m, gravel/snow | CPL |
+| Islander Twin | Nine-seat utility twin | 9 / 900 kg | 90 km | 129 kt | 251 m | 398 m | 458 m, gravel/snow | CPL |
+| Pelican Caravan | Single turboprop hauler | 12 / 1400 kg | 130 km | 149 kt | 481 m | 451 m | 553 m, gravel/snow | CPL |
+| Meridian Q400 | Regional turboprop airliner | 40 / 4500 kg | 170 km | 266 kt | 981 m | 646 m | 1129 m paved | ATP |
+| Starling 500 Jet | Light business jet | 7 / 700 kg | 260 km | 469 kt | 427 m | 540 m | 621 m paved | ATP |
+
+Cruise, take-off roll and landing distance are what each aircraft actually does in the flight model (learned by flying it: `flight_test --table`); the runway it needs is the longer of the two at full weight, 15% to spare, longer at high fields.
 
 ## Controls
 

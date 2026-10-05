@@ -1,8 +1,19 @@
+#include <string>
 // Headless flight-model checks: take-off roll, climb, cruise, stall per aircraft.
 #include "../src/aircraft.h"
 #include <cstdlib>
-int main() {
+int main(int argc, char** argv) {
   g_world.build();
+  if (argc > 1 && std::string(argv[1]) == "--table") {   // the README's aircraft table, from the learned performance
+    printf("| Aircraft | Type | Seats / Cargo | Range | Cruise | Take-off roll | Landing distance | Runway | Licence |\n|---|---|---|---|---|---|---|---|---|\n");
+    static const char* lic[] = {"Student", "PPL", "CPL", "ATP"};
+    for (int i = 0; i < kNumAircraft; i++) {
+      const AircraftSpec& s = kAircraft[i]; const PerfModel& P = Plane::perf(&s);
+      printf("| %s | %s | %d / %.0f kg | %.0f km | %.0f kt | %.0f m | %.0f m | %.0f m%s | %s |\n", s.name, s.role, s.pax, s.cargoKg, s.rangeKm, P.cruiseV * MS_TO_KT,
+             P.toRoll, P.ldgRoll, s.runwayNeeded(0), s.roughOK ? ", gravel/snow" : " paved", lic[s.license]);
+    }
+    return 0;
+  }
   Weather wx; wx.windSpeed = 0; wx.gust = 0; wx.turbulence = 0;
   int fails = 0;
   for (int ai = 0; ai < kNumAircraft; ai++) {

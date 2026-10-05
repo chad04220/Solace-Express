@@ -1,5 +1,6 @@
 // Solace Express - game flow, flight session, cameras, particles, lights, audio feed
 #include "game.h"
+#include <thread>
 #include "airport_layout.h"
 #include "entities.h"
 #include "models.h"
@@ -255,6 +256,11 @@ void Game::init(bool buildWorld) {
   buildStory();
   loadSettings();
   loadStations();
+  {   // every type's performance, learned by flying it, on threads side by side (the job board needs the career ones now)
+    std::vector<std::thread> th;
+    for (int i = 0; i < kNumAircraft; i++) th.emplace_back([i] { Plane::perf(&kAircraft[i]); });
+    for (auto& t : th) t.join();
+  }
   career.newGame();
   std::string sav = joinPath(saveDir, "career.sav");
   hasSave = career.load(sav);
