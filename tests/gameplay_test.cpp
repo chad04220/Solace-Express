@@ -614,6 +614,34 @@ struct GameTest {
       bool silent = true; for (auto& x : g.atc.history) if (x.rfind("TWR ", 0) == 0) silent = false;
       printf("No tower at a farm strip: %s\n", silent ? "ok" : "FAIL"); fails += !silent;
     }
+    if (voices) {   // E6: a tower call made for one flight state is dropped if the state has moved on before it is said
+      bool hints0 = g.set.showHints; g.set.showHints = false;   // (no instructor lines competing for the channel)
+      g.startFlight(g_story[2], 0, Career::SRC_LESSON); g.atc.history.clear(); g.atc.dropped = 0;
+      AtcVoice::Tx stale; stale.ids = {g.atc.line(0, "greeting_morning")}; stale.text = "stale clearance"; stale.prio = 70; stale.key = 999;   // (a state the flight is no longer in)
+      AtcVoice::Tx fresh = stale; fresh.text = "fresh call"; fresh.key = -1; fresh.prio = 60;   // (both ahead of the instructor's hints, the stale one first)
+      g.atc.say(stale); g.atc.say(fresh);
+      for (float tt = 0; tt < 30; tt += dt) { g.update(dt); audio(dt); }   // (the instructor's own line goes first; the channel is one at a time)
+      bool saidFresh = false, saidStale = false; for (auto& h : g.atc.history) { if (h.find("fresh call") != std::string::npos) saidFresh = true; if (h.find("stale clearance") != std::string::npos) saidStale = true; }
+      bool ok = g.atc.dropped >= 1 && saidFresh && !saidStale;
+      printf("Stale tower call dropped, fresh one said (dropped %d, fresh %d, stale %d): %s\n", g.atc.dropped, saidFresh, saidStale, ok ? "ok" : "FAIL"); fails += !ok;
+      g.endFlight(false, "x", OUT_ABANDONED); g.career.newGame(); g.pendingCareer.reset(); g.set.showHints = hints0;
+    }
+    {   // E5.4: the arrow keys walk the registered buttons: the first press takes the top-left one, the next the nearest below
+      g.screen = SCR_MENU; g.paused = false; g.in = Input(); g.focusNav = false; g.focusScreen = -1;
+      auto buttons = [&]() { g.focusList = {{11u, 100.f, 300.f, 200.f, 40.f}, {22u, 100.f, 400.f, 200.f, 40.f}, {33u, 400.f, 300.f, 200.f, 40.f}}; };
+      buttons(); g.focusNavigate(); g.in.endFrame();              // (a frame with the buttons drawn)
+      buttons(); g.in.pressed[K_DOWN] = true; g.focusNavigate(); g.in.endFrame();
+      bool first = g.focusNav && g.focusId == 11u;
+      buttons(); g.in.pressed[K_DOWN] = true; g.focusNavigate(); g.in.endFrame();
+      bool down = g.focusId == 22u;
+      buttons(); g.in.pressed[K_UP] = true; g.focusNavigate(); g.in.endFrame();
+      buttons(); g.in.pressed[K_RIGHT] = true; g.focusNavigate(); g.in.endFrame();
+      bool right = g.focusId == 33u;
+      buttons(); g.in.mdx = 5.f; g.focusNavigate(); g.in.endFrame();
+      bool mouse = !g.focusNav;
+      bool ok = first && down && right && mouse;
+      printf("Menu focus navigation: first %d, down %d, right %d, mouse releases %d: %s\n", first, down, right, mouse, ok ? "ok" : "FAIL"); fails += !ok;
+    }
     if (const char* wpath = getenv("ATCWAV")) if (FILE* f = fopen(wpath, "wb")) {
       uint32_t bytes = (uint32_t)(rec.size() * 2), v;
       fwrite("RIFF", 1, 4, f); v = 36 + bytes; fwrite(&v, 4, 1, f); fwrite("WAVEfmt ", 1, 8, f);

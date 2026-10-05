@@ -36,6 +36,14 @@ const ResCraftInfo kResCraft[] = {
    12.f, -6.f, 6.f, 9.f, -4.f, 0.98f, 0.25f,
    {"Conventional controls: no FBW, no vectoring", "Flaps and gear as any jet: ~150 kt over the fence", "Fuel burns: a 1,300 kg cell, plan the sortie",
     "Long hard runways only", "The programme's flying testbed for sensors and skins"}, "XR10"},
+  {kMantis, "NG-XR20-M  //  BLK 2", "XR-20", "MANTIS", R_EMBER, {0.35f, 0.55f, 0.7f}, "FORWARD-SWEPT SYSTEMS DEMONSTRATOR",
+   {{"CONFIGURATION", "Forward sweep, all-moving canards", -1}, {"PROPULSION", "2 x turbofan, 30 kN total", 0.1f},
+    {"THRUST / WEIGHT", "1.9 : 1 with reheat", 0.4f}, {"TOP SPEED", "Mach 2.0", 0.5f},
+    {"SYSTEMS", "Reheat, canards, forward sweep", 0.5f}, {"ROLL RATE", "280 deg/s", 0.7f},
+    {"AIRFRAME", "+14 / -6 g", 0.16f}, {"ENDURANCE", "1,800 kg fuel, 900 km", 0.3f}},
+   16.f, -8.f, 8.f, 14.f, -6.f, 2.0f, 0.3f,
+   {"Canards ahead of a forward-swept wing: brisk in pitch", "Reheat above 85% throttle: supersonic with height", "Conventional controls, flaps and retractable gear",
+    "Good for +14 / -6 g; a short overstress is survivable", "Land at ~120 kt with full flap"}, "XR20"},
   {kResearchJet, "NG-XR30-S  //  BLK 3", "XR-30", "SPECTER", R_ICE, {0.7f, 0.72f, 0.45f}, "HYPERSONIC-CAPABLE RESEARCH MODEL",
    {{"CONFIGURATION", "Lifting body, cranked delta, canards", -1}, {"PROPULSION", "2 x turbofan, 472 kN full reheat", 0.72f},
     {"THRUST / WEIGHT", "4.9 : 1 with reheat", 0.7f}, {"TOP SPEED", "Mach 2.8", 0.7f},
@@ -44,14 +52,6 @@ const ResCraftInfo kResCraft[] = {
    50.f, -25.f, 25.f, 40.f, -20.f, 2.8f, 0.42f,
    {"No flaps: land fast, ~140 kt, long runways", "Nozzles vector with the stick for pitch", "FBW commands rotation - no g limiter",
     "Reheat lights above 85% throttle (2x thrust)", "C: cockpit view flies on the displays"}, "XR30"},
-  {kMantis, "NG-XR20-M  //  BLK 2", "XR-20", "MANTIS", R_EMBER, {0.35f, 0.55f, 0.7f}, "FORWARD-SWEPT SYSTEMS DEMONSTRATOR",
-   {{"CONFIGURATION", "Forward sweep, all-moving canards", -1}, {"PROPULSION", "2 x turbofan, 30 kN total", 0.1f},
-    {"THRUST / WEIGHT", "1.9 : 1 with reheat", 0.4f}, {"TOP SPEED", "Mach 2.0", 0.5f},
-    {"SYSTEMS", "Reheat, canards, forward sweep", 0.5f}, {"ROLL RATE", "280 deg/s", 0.7f},
-    {"AIRFRAME", "+14 / -6 g", 0.16f}, {"ENDURANCE", "1,800 kg fuel, 900 km", 0.3f}},
-   16.f, -8.f, 8.f, 14.f, -6.f, 2.0f, 0.3f,
-   {"Canards ahead of a forward-swept wing: brisk in pitch", "Conventional controls, flaps and retractable gear", "Glass cockpit with a view out",
-    "Flies like a hot career jet; no vectoring", "Land at ~115 kt with full flap"}, "XR20"},
   {kWraith, "NG-XR40-W  //  BLK 1", "XR-40", "WRAITH", R_VIOLET, {1.f, 0.97f, 0.06f}, "STEALTH AEROBATIC RESEARCH MODEL",
    {{"CONFIGURATION", "Faceted body, diamond wing, V-tail", -1}, {"PROPULSION", "4 x tilting pods, 520 kN boosted", 0.8f},
     {"THRUST / WEIGHT", "2.6 dry, 5.4 boosted", 0.8f}, {"TOP SPEED", "Mach 4.4", 1.f},
@@ -406,7 +406,9 @@ void Game::drawResearch(const FrameParams& fp) {
     float x = L.lx, y = L.top, w = L.lw;
     tag(x, y, s, fmt("AIRFRAMES  //  %02d ON REGISTER", kNumResCraft), ACC, e); y += 22 * s;
     // the cards share the column with the programme log: full size when they fit, squeezed (fonts included) when not
-    float h = clampf((L.bot - y - 12 * s * (kNumResCraft - 1) - 70 * s) / kNumResCraft, 84 * s, 150 * s), f = h / (150 * s);
+    int nCardsSel = 0; for (int i = 0; i < kNumResCards; i++) if (kResCards[i].craft == resCraft) nCardsSel++;
+    float listH = 30 * s + 18 * s * (nCardsSel + 1) + 40 * s;   // the test-card list under the airframes (its rows, the brief)
+    float h = clampf((L.bot - y - 12 * s * (kNumResCraft - 1) - listH) / kNumResCraft, 64 * s, 150 * s), f = h / (150 * s);
     for (int k = 0; k < kNumResCraft; k++) {
       const ResCraftInfo& C = kResCraft[k];
       int craft = C.idx;
@@ -440,14 +442,14 @@ void Game::drawResearch(const FrameParams& fp) {
     if (resCard >= 0 && kResCards[resCard].craft != resCraft) resCard = -1;
     int nDone = 0, nCards = 0; for (int i = 0; i < kNumResCards; i++) if (kResCards[i].craft == resCraft) { nCards++; if (resDone.count(kResCards[i].id)) nDone++; }
     tag(x, y + 4 * s, s, fmt("TEST CARDS  //  %d OF %d SIGNED OFF", nDone, nCards), ACC, e); y += 26 * s;
-    float rh = std::min(22 * s, (L.bot - y) / (nCards + 1.5f));
+    float rh = clampf((L.bot - y - 40 * s) / (nCards + 1), 12 * s, 20 * s), fs = std::min(10.5f * s, rh * 0.62f);
     auto cardRow = [&](int idx, const char* num, const char* title, bool done) {
       bool sel = resCard == idx, hov = hovered(x, y, w, rh);
       if (sel || hov) g_ren.rect(x, y, w, rh, ACC, (sel ? 0.18f : 0.08f) * e);
       if (sel) g_ren.rect(x, y, 2 * s, rh, ACC, e);
-      g_ren.text(x + 8 * s, y + rh * 0.5f - 5.5f * s, 10.5f * s, num, done ? R_GREEN : R_DIM, e, 0, false);
-      g_ren.text(x + 62 * s, y + rh * 0.5f - 5.5f * s, 10.5f * s, title, sel ? R_TEXT : done ? R_GREEN : ACC, e, 0, false);
-      if (done) g_ren.text(x + w - 8 * s, y + rh * 0.5f - 5.5f * s, 10.5f * s, "SIGNED", R_GREEN, e, 2, false);
+      g_ren.text(x + 8 * s, y + rh * 0.5f - fs * 0.52f, fs, num, done ? R_GREEN : R_DIM, e, 0, false);
+      g_ren.text(x + 62 * s, y + rh * 0.5f - fs * 0.52f, fs, title, sel ? R_TEXT : done ? R_GREEN : ACC, e, 0, false);
+      if (done) g_ren.text(x + w - 8 * s, y + rh * 0.5f - fs * 0.52f, fs, "SIGNED", R_GREEN, e, 2, false);
       if (click(x, y, w, rh)) resCard = idx;
       y += rh;
     };

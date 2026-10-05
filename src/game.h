@@ -135,6 +135,7 @@ private:
   int hubTab = TAB_CONTRACTS;
   float gameTime = 0, realTime = 0;
   bool hasSave = false;
+  bool confirmRes = false;   // the main menu asked whether to enter the research terminal before the campaign is done
   bool headless = false;
 
   // flight session
@@ -283,7 +284,9 @@ private:
     std::string lastCall; int lastApt = -1; float lastT = 0; bool lastValid = true;
     // the instructions compliance is scored on: a hold (where the aircraft was told to wait) and a go-around
     bool holding = false; vec3 holdPos; bool goAround = false;
+    bool lastBeforePause = false;   // the recall line was said before a pause: labelled so
   } atcF;
+  int atcKey() const { return atcF.phase * 4 + (atcF.depRev ? 1 : 0) + (atcF.arrRev ? 2 : 0); }   // E6: a tower call is valid while this is what it was made for
   void updateAtc(float dt);
   // every in-flight message the voices may say: the toasts, the lesson hints (with the lesson's id), the warnings
   struct CommsMsg { std::string text, mission; };
@@ -356,6 +359,13 @@ private:
   float S() const;  // UI scale
   bool button(float x, float y, float w, float h, const std::string& label, bool enabled = true, bool highlight = false);
   bool hovered(float x, float y, float w, float h) const;
+  // E5.4: keyboard / D-pad focus through the menus. Every enabled button registers itself for the frame; the arrow
+  // keys (outside flight) and the D-pad move the focus to the nearest button in that direction, Enter / Space / A
+  // press it. Moving the mouse hands control back to the cursor.
+  struct Focusable { uint32_t id; float x, y, w, h; };
+  std::vector<Focusable> focusList, focusPrev;
+  uint32_t focusId = 0; bool focusNav = false; int focusScreen = -1;
+  void focusNavigate();
   void panel(float x, float y, float w, float h, float a = 0.78f);
   void hudPanel(float x, float y, float w, float h, float a = 1.f);
   void header(float x, float y, float w, const std::string& label);

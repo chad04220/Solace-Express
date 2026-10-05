@@ -251,6 +251,7 @@ bool AtcVoice::busy() const { return g_audio.voiceBusy(); }
 
 void AtcVoice::say(const Tx& tx) {
   if (!ok()) return;
+  if (valid && !valid(tx)) { dropped++; return; }   // already overtaken by events: never queued
   if (busy() && tx.prio >= playingPrio + 30) {   // urgent: cut in (a go-around over a routine call)
     g_audio.voiceStop();
     queue.clear();
@@ -277,6 +278,7 @@ AtcVoice::Tx AtcVoice::update(float dt) {
       for (size_t i = 1; i < queue.size(); i++) if (queue[i].prio > queue[best].prio) best = i;
       Tx tx = queue[best];
       queue.erase(queue.begin() + best);
+      if (valid && !valid(tx)) { dropped++; return update(0.f); }   // overtaken by events (a go-around, a runway change, a phase gone by): never said
       start(tx);
     }
   }

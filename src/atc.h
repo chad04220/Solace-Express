@@ -1,6 +1,7 @@
 // Solace Express - tower controller voices
 #pragma once
 #include "common.h"
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -22,7 +23,9 @@ public:
   // a transmission; "" in ids: a pause between sentences. radio: squelch around it; subtitle: show its text (the
   // calls the game didn't already show); group: a newer call of the same group replaces a waiting one (levers);
   // tag: the caller's own marker, handed back when the transmission starts
-  struct Tx { std::vector<std::string> ids; std::string text; int prio = 0; bool radio = true, subtitle = false; std::string group; int tag = 0, apt = -1; };
+  struct Tx { std::vector<std::string> ids; std::string text; int prio = 0; bool radio = true, subtitle = false; std::string group; int tag = 0, apt = -1;
+              int key = -1; };   // validity: the flight state the call was made for (Game::atcKey); stale when it starts -> dropped
+  std::function<bool(const Tx&)> valid;   // the game's check, run when a queued transmission is about to start
   // the voice line (or the line assembled from fragments) for a message the game shows; mission: the lesson it
   // belongs to (picks the instructor or the examiner); pad: a gamepad is in use (lines that name its buttons)
   bool resolve(const std::string& message, const std::string& mission, bool pad, Tx& out) const;
@@ -37,6 +40,7 @@ public:
   void cancel();
   bool busy() const;
   std::vector<std::string> history;   // every transmission started, in order; the towers' prefixed "TWR " (tests)
+  int dropped = 0;                    // stale transmissions never started
   size_t historyLimit = 64;           // the newest this many are kept (0: all, for tests)
 private:
   struct Clip { std::string file, words, speaker, kind, mission; int prio = 40; std::vector<float> pcm; bool loaded = false; };

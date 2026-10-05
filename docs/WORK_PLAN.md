@@ -48,7 +48,7 @@ Line numbers in §2 are from `f8b8537` and no longer match: re-grep the identifi
 | C8 dynamic weather | done: Contract.wxEnd / wxShift (about 30% of freelance jobs carry a front: wind backs or veers 70-180 deg, strength, cloud, visibility, rain or snow), the flight drifts from wx to wxEnd over the estimated time with a slow wander, the tower and the HUD read the current wind, the brief shows the forecast and names a wind shift as the challenge, the autopilot re-plans the approach for the other runway end while there is room (the planner now weighs the wind against the distance flown round, not its square); save v3 keeps the forecast (wx2); gameplay_test wind-shift case, save_test round trip | C8 commit |
 | C11 airline layer | open (after C5, C7, E3) | — |
 | C12 challenge modes | open | — |
-| C13 surface NIGHTGLASS | open; the terminal now holds four craft | — |
+| C13 surface NIGHTGLASS | done: a main-menu entry (open once the campaign is flown, before that behind a "nothing there counts" confirmation); the research test cards are the objective chain per craft; the U + I combo stays | C13 commit |
 | C14 options (FOV, head-look, colour-blind HUD, UI scale, HUD per camera) | done | ca6cb95 |
 
 Order from here: B1 → E2 → E3 → E4 → C9/C10 → C14 → A6 → A5 → A3 → D1+E6 → C3 → C5 → C7 → C6 → C8 → E5.4 → C12/C13 → C11; B3 and A3 wait on report.bat numbers.

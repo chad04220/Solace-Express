@@ -636,6 +636,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   toast(fmt("%s - %s", a.code, a.name), vec3(0.7f, 0.9f, 1.0f));
   toast(fmt("Runway %02d, %s", a.rwyNumber(reverse), wx.describe().c_str()), vec3(0.8f, 0.8f, 0.8f));
   atc.cancel(); atcF = AtcFlight(); hintsVoiced.clear(); commsPending.clear();
+  atc.valid = [this](const AtcVoice::Tx& t) { return t.key < 0 || t.key == atcKey(); };
   atcF.dep = c.from; atcF.arr = c.to; atcF.depRev = reverse;
   if (c.startAirborne) atcF.phase = 3;
 }
@@ -1315,11 +1316,8 @@ void Game::gamepadMenus(float dt) {
   if (!in.pad || !menus) { if (padHoldA && !(in.buttons & PAD_A)) { in.mDown[0] = false; padHoldA = false; } return; }
   auto dz = [](float v) { return fabsf(v) < 0.15f ? 0.f : (v - (v > 0 ? 0.15f : -0.15f)) / 0.85f; };
   float sx = dz(in.lx), sy = dz(in.ly);
-  if (in.buttons & (PAD_LEFT | PAD_RIGHT | PAD_UP | PAD_DOWN)) {  // D-pad nudges the cursor too
-    sx += ((in.buttons & PAD_RIGHT) ? 0.6f : 0.f) - ((in.buttons & PAD_LEFT) ? 0.6f : 0.f);
-    sy += ((in.buttons & PAD_UP) ? 0.6f : 0.f) - ((in.buttons & PAD_DOWN) ? 0.6f : 0.f);
-  }
   bool active = fabsf(sx) + fabsf(sy) > 0 || (in.buttonsPressed & (PAD_A | PAD_B));
+  if (fabsf(sx) + fabsf(sy) > 0) focusNav = false;   // (the stick drives the cursor; the D-pad drives the focus: focusNavigate)
   if (active) {
     if (padCursorT < realTime - 50.f) { in.mx = g_ren.W * 0.5f; in.my = g_ren.H * 0.5f; }   // first use: start centred
     padCursorT = realTime;
@@ -1327,7 +1325,7 @@ void Game::gamepadMenus(float dt) {
   float speed = 1100.f * S() * dt;
   in.mx = clampf(in.mx + sx * fabsf(sx) * speed * 1.4f + sx * speed * 0.3f, 0.f, (float)g_ren.W - 1);
   in.my = clampf(in.my - sy * fabsf(sy) * speed * 1.4f - sy * speed * 0.3f, 0.f, (float)g_ren.H - 1);
-  if (in.buttonsPressed & PAD_A) { in.mPressed[0] = true; in.mDown[0] = true; padHoldA = true; }
+  if (in.buttonsPressed & PAD_A) { if (focusNav) in.pressed[K_ENTER] = true; else { in.mPressed[0] = true; in.mDown[0] = true; padHoldA = true; } }
   if (padHoldA && !(in.buttons & PAD_A)) { in.mDown[0] = false; in.mReleased[0] = true; padHoldA = false; }
   if (in.buttonsPressed & PAD_B) {
     in.pressed[K_ESC] = true;
@@ -1342,6 +1340,42 @@ void Game::gamepadMenus(float dt) {
     if (in.buttonsPressed & PAD_RB) resAirport = (resAirport + 1) % n;
     if (in.buttonsPressed & PAD_LB) resAirport = (resAirport + n - 1) % n;
   }
+}
+
+// the focus moves with the arrow keys (menus, the hub, the results, the pause screen; the research terminal keeps
+// its own left / right for the site) and with the D-pad everywhere a menu is up; the mouse takes over again when it moves
+void Game::focusNavigate() {
+  focusPrev.swap(focusList); focusList.clear();
+  bool menus = screen != SCR_FLIGHT || paused || crashed;
+  int scr = screen * 4 + (paused ? 1 : 0) + (screen == SCR_HUB ? hubTab * 8 : 0);
+  if (!menus) { focusNav = false; return; }
+  if (scr != focusScreen) { focusScreen = scr; focusNav = false; }
+  if (fabsf(in.mdx) + fabsf(in.mdy) > 0.5f || in.mPressed[0]) focusNav = false;
+  bool keys = screen != SCR_RESEARCH;
+  int dx = 0, dy = 0;
+  if ((keys && in.pressed[K_LEFT]) || (in.buttonsPressed & PAD_LEFT)) dx = -1;
+  if ((keys && in.pressed[K_RIGHT]) || (in.buttonsPressed & PAD_RIGHT)) dx = 1;
+  if ((keys && in.pressed[K_UP]) || (in.buttonsPressed & PAD_UP)) dy = -1;
+  if ((keys && in.pressed[K_DOWN]) || (in.buttonsPressed & PAD_DOWN)) dy = 1;
+  if (!dx && !dy) { if (focusNav) { bool still = false; for (auto& f : focusPrev) if (f.id == focusId) still = true; if (!still && !focusPrev.empty()) focusId = focusPrev[0].id; } return; }
+  if (focusPrev.empty()) return;
+  const Focusable* cur = nullptr; for (auto& f : focusPrev) if (f.id == focusId) cur = &f;
+  if (!focusNav || !cur) {   // first press: the top-left button
+    const Focusable* best = &focusPrev[0];
+    for (auto& f : focusPrev) if (f.y + f.x * 0.02f < best->y + best->x * 0.02f) best = &f;
+    focusNav = true; focusId = best->id; g_audio.trigger(SFX_HOVER, 0.5f); return;
+  }
+  float cx = cur->x + cur->w * 0.5f, cy = cur->y + cur->h * 0.5f;
+  const Focusable* best = nullptr; float bestScore = 1e18f;
+  for (auto& f : focusPrev) {
+    if (f.id == focusId) continue;
+    float fx = f.x + f.w * 0.5f, fy = f.y + f.h * 0.5f, ddx = fx - cx, ddy = fy - cy;
+    float along = dx ? ddx * dx : ddy * dy, across = dx ? fabsf(ddy) : fabsf(ddx);
+    if (along <= 1.f) continue;
+    float score = along + across * 2.5f;
+    if (score < bestScore) { bestScore = score; best = &f; }
+  }
+  if (best) { focusId = best->id; g_audio.trigger(SFX_HOVER, 0.5f); }
 }
 
 void Game::drawPadCursor() {
@@ -2552,7 +2586,7 @@ void Game::updateAtc(float dt) {
         AtcVoice::Tx tx; tx.prio = 10; tx.subtitle = true; tx.group = "tower";
         tx.tag = callsign(vd, false, tx.ids, tx.text);
         tx.ids.push_back(atc.line(vd, key)); tx.text += atc.text(tx.ids.back());
-        tx.apt = F.dep; atc.say(tx); F.phase = 1; F.waitT = 0;
+        tx.apt = F.dep; F.phase = 1; tx.key = atcKey(); atc.say(tx); F.waitT = 0;
       }
       break;
     case 1:   // lined up on the runway: cleared for takeoff (straight away if the aircraft is already rolling)
@@ -2566,7 +2600,7 @@ void Game::updateAtc(float dt) {
             tx.tag = callsign(vd, false, tx.ids, tx.text);
             tx.ids.push_back(atc.line(vd, rt.departing ? "hold_departure" : rt.onRunway ? "hold_position" : "hold_arrival"));
             tx.text += atc.text(tx.ids.back());
-            tx.apt = F.dep; atc.say(tx); F.trafficSaid = true; F.waitT = 0;
+            tx.apt = F.dep; tx.key = atcKey(); atc.say(tx); F.trafficSaid = true; F.waitT = 0;
             F.holding = true; F.holdPos = plane.pos;
           }
           break;
@@ -2577,7 +2611,7 @@ void Game::updateAtc(float dt) {
         wind(vd, tx.ids, tx.text);
         tx.ids.push_back(atc.atom(vd, "runway")); runway(vd, D.rwyNumber(F.depRev), tx.ids); tx.ids.push_back(atc.atom(vd, "cleared_takeoff"));
         tx.text += fmt("Runway %02d, cleared for takeoff.", D.rwyNumber(F.depRev));
-        tx.apt = F.dep; atc.say(tx); F.phase = 2; F.trafficSaid = false; F.trafficT = 0;
+        tx.apt = F.dep; F.phase = 2; tx.key = atcKey(); atc.say(tx); F.trafficSaid = false; F.trafficT = 0;
       }
       break;
     case 2:   // climbing out, clear of the field: handed on (circuits stay with the tower)
@@ -2585,7 +2619,7 @@ void Game::updateAtc(float dt) {
         AtcVoice::Tx tx; tx.prio = 40; tx.subtitle = true; tx.group = "tower";
         if (F.dep == F.arr) { tx.ids.push_back(atc.line(vd, "remain_pattern")); tx.text = atc.text(tx.ids[0]); }
         else { tx.ids = {atc.line(vd, "contact_departure"), "", atc.line(vd, "good_day")}; tx.text = atc.text(tx.ids[0]) + " " + atc.text(tx.ids[2]); }
-        tx.apt = F.dep; atc.say(tx); F.phase = F.dep == F.arr ? 4 : 3; F.waitT = 0;
+        tx.apt = F.dep; F.phase = F.dep == F.arr ? 4 : 3; tx.key = atcKey(); atc.say(tx); F.waitT = 0;
         if (F.dep == F.arr) F.arrRev = F.depRev;
       }
       break;
@@ -2626,7 +2660,7 @@ void Game::updateAtc(float dt) {
             tx.ids.push_back(""); tx.ids.push_back(atc.line(va, "wake_caution")); tx.text += " " + atc.text(tx.ids.back());
           }
         }
-        tx.apt = F.arr; atc.say(tx); F.phase = 4; F.waitT = 0; F.trafficSaid = false;
+        tx.apt = F.arr; F.phase = 4; tx.key = atcKey(); atc.say(tx); F.waitT = 0; F.trafficSaid = false;
       }
       break;
     }
@@ -2646,11 +2680,11 @@ void Game::updateAtc(float dt) {
           if (rt.onRunway && along > -700.f && agl < 90.f) {
             tx.prio = 99; tx.tag = callsign(va, true, tx.ids, tx.text);
             tx.ids.push_back(atc.line(va, "go_around_aircraft")); tx.text += atc.text(tx.ids.back());
-            tx.apt = F.arr; atc.say(tx); F.phase = 5; F.waitT = 0; F.trafficSaid = false; F.goAround = true;
+            tx.apt = F.arr; F.phase = 5; tx.key = atcKey(); atc.say(tx); F.waitT = 0; F.trafficSaid = false; F.goAround = true;
           } else if (!F.trafficSaid) {
             tx.prio = 80; tx.tag = callsign(va, true, tx.ids, tx.text);
             tx.ids.push_back(atc.line(va, rt.onRunway ? "runway_occupied" : "clearance_follows")); tx.text += atc.text(tx.ids.back());
-            tx.apt = F.arr; atc.say(tx); F.trafficSaid = true;
+            tx.apt = F.arr; tx.key = atcKey(); atc.say(tx); F.trafficSaid = true;
           }
           break;
         }
@@ -2659,7 +2693,7 @@ void Game::updateAtc(float dt) {
         wind(va, tx.ids, tx.text);
         tx.ids.push_back(atc.atom(va, "runway")); runway(va, n, tx.ids); tx.ids.push_back(atc.atom(va, "cleared_land"));
         tx.text += fmt("Runway %02d, cleared to land.", n);
-        tx.apt = F.arr; atc.say(tx); F.phase = 5; F.waitT = 0; F.trafficSaid = false;
+        tx.apt = F.arr; F.phase = 5; tx.key = atcKey(); atc.say(tx); F.waitT = 0; F.trafficSaid = false;
       } else if (F.airborne && plane.onGround && length(plane.pos - A.pos()) < 3000.f) F.phase = 5;   // landed without the clearance
       break;
     }
@@ -2667,7 +2701,7 @@ void Game::updateAtc(float dt) {
       if (plane.onGround && length(plane.pos - A.pos()) < 3000.f) {
         if (gs < 18.f) {
           AtcVoice::Tx tx; tx.prio = 55; tx.subtitle = true; tx.group = "tower"; tx.ids.push_back(atc.line(va, "exit_when_able")); tx.text = atc.text(tx.ids[0]);
-          tx.apt = F.arr; atc.say(tx); F.phase = 6;
+          tx.apt = F.arr; F.phase = 6; tx.key = atcKey(); atc.say(tx);
         }
       } else if (!plane.onGround && agl > 180.f && plane.vel.y > 2.f && F.waitT > 20.f) { F.phase = F.dep == F.arr ? 4 : 3; F.waitT = 0; F.lastValid = false; F.goAround = false; }   // (went around: the clearance no longer stands)
       if (F.goAround && !plane.onGround && agl > 150.f && plane.vel.y > 1.f) F.goAround = false;   // (complied: climbing away)
@@ -2797,6 +2831,7 @@ void Game::update(float dt) {
   if (in.pressed[K_F11]) wantFullscreenToggle = true;
   if (in.pressed[0x72]) showPerf = !showPerf;   // F3
   gamepadMenus(dt);
+  focusNavigate();
   bool padCombo = in.pad && (in.buttons & PAD_LS) && (in.buttons & PAD_RS) && (in.buttonsPressed & (PAD_LS | PAD_RS));
   if (screen == SCR_MENU && ((in.down['U'] && in.down['I'] && (in.pressed['U'] || in.pressed['I'])) || padCombo)) {
     screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP);
@@ -2807,7 +2842,7 @@ void Game::update(float dt) {
     if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_START)) {
       if (showMap) showMap = false; else if (showRadio) showRadio = false;
       else if (paused && settingsFromPause && !(in.buttonsPressed & PAD_START)) settingsFromPause = false;   // B / Esc: back to the pause menu
-      else { paused = !paused; settingsFromPause = false; }
+      else { paused = !paused; settingsFromPause = false; if (paused && !atcF.lastCall.empty()) atcF.lastBeforePause = true; }
     }
     if (!paused && actPressed(ACT_MAP)) { if (plane.fail.avionicsDark() && !showMap) toast("GPS dark - battery flat", vec3(1, 0.45f, 0.35f)); else { showMap = !showMap; g_audio.trigger(SFX_CLICK); } }
     if (showMap && !paused) {   // GPS open: Tab / D-pad pick the autoland airport, Enter / A engages the autopilot to it

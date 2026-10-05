@@ -103,8 +103,10 @@ void Game::card(float x, float y, float w, float h, bool sel, bool hov, vec3 acc
 
 bool Game::button(float x, float y, float w, float h, const std::string& label, bool enabled, bool highlight) {
   float s = S(), r = 4 * s;
-  bool hov = enabled && hovered(x, y, w, h);
   uint32_t id = uid(x, y, label);
+  bool focused = focusNav && focusId == id && enabled;
+  if (enabled) focusList.push_back({id, x, y, w, h});
+  bool hov = enabled && (hovered(x, y, w, h) || focused);
   float t = anim(id, hov ? 1.f : 0.f, 14);
   float pr = anim(id ^ 0x5bd1e995u, hov && in.mDown[0] ? 1.f : 0.f, 30);
   vec3 tc;
@@ -136,7 +138,10 @@ bool Game::button(float x, float y, float w, float h, const std::string& label, 
   if (pr > 0.01f) g_ren.rect(x, y, w, h, vec3(1, 1, 1), 0.18f * pr, r);
   float ts = std::min(h * 0.46f, 18 * S());
   g_ren.text(x + w * 0.5f, y + (h - ts) * 0.5f - ts * 0.08f + pr * 1.f * s, ts, label, tc, 1.f, 1, false);
-  if (hov && in.mPressed[0]) { g_audio.trigger(SFX_CLICK); return true; }
+  if (focused) g_ren.rectOutline(x - 3 * s, y - 3 * s, w + 6 * s, h + 6 * s, C_ACCENT, 0.7f + 0.3f * sinf(realTime * 6.f), r + 2 * s, 2.f * s);
+  if (focused && (in.pressed[K_ENTER] || in.pressed[' '])) { in.pressed[K_ENTER] = in.pressed[' '] = false; g_audio.trigger(SFX_CLICK); return true; }
+  if (hov && !focused && in.mPressed[0]) { g_audio.trigger(SFX_CLICK); return true; }
+  if (focused && in.mPressed[0] && hovered(x, y, w, h)) { g_audio.trigger(SFX_CLICK); return true; }
   return false;
 }
 
@@ -427,6 +432,18 @@ void Game::drawMenu() {
   if (button(60 * s, y, bw, bh, "Settings")) { screen = SCR_HUB; hubTab = TAB_SETTINGS; settingsPage = 0; }
   y += bh + 14 * s;
   if (button(60 * s, y, bw, bh, "Controls")) { screen = SCR_HUB; hubTab = TAB_SETTINGS; settingsPage = 1; }
+  y += bh + 14 * s;
+  {   // Project NIGHTGLASS: open once the campaign is flown; before that behind a word that nothing there counts
+    bool open = career.finished;
+    if (!confirmRes) {
+      if (button(60 * s, y, bw, bh, open ? "Project NIGHTGLASS" : "Project NIGHTGLASS  (research)")) { if (open) { screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP); } else confirmRes = true; }
+    } else {
+      g_ren.text(60 * s, y - 18 * s, 13 * s, "Research flights are off the books: nothing there counts for the career.", C_WARN, 1, 0);
+      if (button(60 * s, y, bw * 0.48f, bh, "Enter", true, true)) { confirmRes = false; screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP); }
+      if (button(60 * s + bw * 0.52f, y, bw * 0.48f, bh, "Cancel")) confirmRes = false;
+    }
+    if (in.pressed[K_ESC]) confirmRes = false;
+  }
   y += bh + 14 * s;
   if (button(60 * s, y, bw, bh, "Quit")) quit = true;
 }
@@ -1345,7 +1362,7 @@ void Game::drawHud(const FrameParams& fp) {
         int age = (int)std::max(0.f, flightClock - atcF.lastT);
         vec3 tc = vec3(0.55f, 1.f, 0.72f);
         g_ren.text(rx + 12 * s, cy + 7 * s, 11 * s, fmt("TWR  %s", g_world.airports[atcF.lastApt].code), tc, 1, 0, false);
-        g_ren.text(rx + rw - 12 * s, cy + 7 * s, 11 * s, atcF.goAround ? std::string("GO AROUND - COMPLY") : atcF.holding ? std::string("HOLD - WAIT") : atcF.lastValid ? fmt("%d:%02d AGO", age / 60, age % 60) : std::string("NO LONGER VALID"),
+        g_ren.text(rx + rw - 12 * s, cy + 7 * s, 11 * s, atcF.goAround ? std::string("GO AROUND - COMPLY") : atcF.holding ? std::string("HOLD - WAIT") : atcF.lastValid ? fmt("%d:%02d AGO%s", age / 60, age % 60, atcF.lastBeforePause ? "  (BEFORE PAUSE)" : "") : std::string("NO LONGER VALID"),
                    atcF.goAround || atcF.holding ? C_BAD : atcF.lastValid ? C_DIM : C_WARN, 1, 2, false);
         float ly = cy + 25 * s;
         for (auto& l : lines) { g_ren.text(rx + 12 * s, ly, fs, l, atcF.lastValid ? C_TEXT : C_DIM, atcF.lastValid ? 1.f : 0.6f, 0, false); ly += fs + 5 * s; }
