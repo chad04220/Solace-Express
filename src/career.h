@@ -70,6 +70,7 @@ struct FlightResult {
   // landing light at touchdown (night freight); an approach continued below minimums without being lined up (low-vis);
   // the share of the survey pattern flown inside the altitude band
   float patient = 1.f, comfort = 1.f;
+  int wpDone = 0;               // checkpoints passed this leg (a resumable job carries them)
   bool landingLightOn = true;
   bool belowMinimumsUnaligned = false;
   float surveyInBand = 1.f;
@@ -177,7 +178,8 @@ public:
     float jobClockMin = 0;      // cumulative simulated minutes against the deadline
     float maxG = 1, minG = 1, maxBank = 0; bool fragileHit = false;
     float fuelBilledKg = 0;
-    bool hirePaid = false, positioningPaid = false;
+    bool hirePaid = false, positioningPaid = false, ferryPaid = false;
+    float patient = 1.f, comfort = 1.f;   // the ride so far (medevac, VIP): the next leg carries on from it
     uint32_t id = 0;
     Contract continuation() const { Contract k = c; k.from = at; k.startAirborne = false; return k; }   // the next leg's contract
   };

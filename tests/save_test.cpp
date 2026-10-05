@@ -67,6 +67,22 @@ int main() {
       d.payLoan(L); check(d.loan.balance == bal - d.loan.payment && !L.empty() && L.back().amount == -d.loan.payment, "a settlement takes one payment");
       d.money = -1000000; for (int i = 0; i < 3; i++) { L.clear(); d.payLoan(L); }
       check(!d.loan.open() && d.fleet.size() == 1, "three missed payments repossess the aircraft and close the loan");
+      // QA C1: the airline's routes follow the fleet through a repossession (the lost aircraft's route closes, the
+      // others' indices move down) and the save after it still loads
+      Career e = b; e.license = LIC_ATP; e.money = -1000000;
+      int fin = e.ownedIndexFor(e.loan.spec), other = fin == 0 ? 1 : 0;
+      e.airline.pilots.push_back({"T. Pilot", 2, 400});
+      e.airline.routes.push_back({other, e.fleet[other].location, 3, 0, 0, 0});
+      for (int i = 0; i < 3; i++) { L.clear(); e.payLoan(L); }
+      bool routeFollows = e.fleet.size() == 1 && e.airline.routes.size() == 1 && e.airline.routes[0].fleetIdx == 0;
+      check(routeFollows, "a repossession moves the other aircraft's route down with it");
+      check(e.save("save_test_repo.sav"), "the save after a repossession writes");
+      Career e2; e2.newGame(); check(e2.load("save_test_repo.sav") && e2.airline.routes.size() == 1 && e2.airline.routes[0].fleetIdx == 0, "...and loads");
+      remove("save_test_repo.sav"); remove("save_test_repo.sav.bak");
+      Career f2 = b; f2.license = LIC_ATP; f2.money = -1000000; int fin2 = f2.ownedIndexFor(f2.loan.spec);
+      f2.airline.pilots.push_back({"T. Pilot", 2, 400}); f2.airline.routes.push_back({fin2, f2.fleet[fin2].location, 3, 0, 0, 0});
+      for (int i = 0; i < 3; i++) { L.clear(); f2.payLoan(L); }
+      check(f2.fleet.size() == 1 && f2.airline.routes.empty(), "a repossessed aircraft's own route closes");
     }
     remove("save_test_loan.sav"); remove("save_test_loan.sav.bak"); remove("save_test_v2b.sav");
   }

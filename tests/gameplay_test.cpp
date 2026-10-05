@@ -372,13 +372,35 @@ struct GameTest {
       // a crash ends the job: repairs (the deductible on a rental) and a crash on the record
       fresh(); q.beginCareerFlight(c, 1, Career::SRC_RENT); q.crashed = true; q.endFlight(false, "Crashed", OUT_CRASHED);
       bool crashEnds = !q.career.job && q.career.crashes == 1;
+      // QA C3 / C4 / C6: the leg carries its checkpoints, the patient's state and charges the ferry once
+      Contract mv = c; mv.id = "MEDTEST"; mv.type = CT_MEDEVAC; mv.payout = 2000; mv.wps.push_back({g_world.airports[via].x, g_world.airports[via].z, 500.f}); mv.wps.push_back({g_world.airports[to].x, g_world.airports[to].z, 500.f});
+      fresh(); q.career.fleet.push_back({1, to, kAircraft[1].maxFuel, 1.f});   // (an owned Wren parked at the destination: a ferry to the departure)
+      q.beginCareerFlight(mv, 1, Career::SRC_OWNED);
+      int ferryQuote = q.launchPlan.ferry;
+      q.wpIndex = 1; q.result.wpDone = 1; q.result.patient = 0.16f;
+      int m3 = q.career.money; landAt(via); q.result.divertedTo = via; q.endFlight(false, "Diverted", OUT_DIVERTED);
+      bool carried = q.career.job && q.career.job->wpDone == 1 && fabsf(q.career.job->patient - 0.16f) < 1e-3f && q.career.job->ferryPaid;
+      int ferryLines = 0; for (auto& l : q.payout) if (l.label.rfind("Ferry", 0) == 0) ferryLines++;
+      bool ferryOnce = ferryQuote > 0 && ferryLines == 1 && q.career.money <= m3 - ferryQuote + 1;
+      q.continueJob(1, Career::SRC_OWNED);
+      bool resumed = q.career.job && q.wpIndex == 1 && fabsf(q.result.patient - 0.16f) < 1e-3f && q.launchPlan.ferry == 0;
+      landAt(to); q.endFlight(true, "", OUT_SUCCESS);
+      bool noBonus = true; for (auto& l : q.payout) { if (l.label.rfind("Ferry", 0) == 0) ferryLines++; if (l.label.find("good shape") != std::string::npos) noBonus = false; }
+      bool legState = carried && ferryOnce && resumed && noBonus && ferryLines == 1;
+      if (!legState) printf("  leg state: carried %d (wp %d patient %.2f ferryPaid %d) ferryOnce %d (quote %d lines %d) resumed %d noBonus %d\n", carried, q.career.job ? q.career.job->wpDone : -1, q.career.job ? q.career.job->patient : -1.f, q.career.job ? (int)q.career.job->ferryPaid : -1, ferryOnce, ferryQuote, ferryLines, resumed, noBonus);
+      // QA C2: a session that ends inside a leg leaves the job waiting where the leg began (RECOVERY), not stranded ACTIVE
+      fresh(); q.beginCareerFlight(c, 1, Career::SRC_RENT);
+      { Career r2; r2.newGame(); bool okl = r2.load("career.sav"); bool interrupted = okl && r2.attemptOpen && r2.job && r2.job->state == Career::JobState::ACTIVE;
+        q.career = r2; q.pendingCareer.reset();
+        q.commit([](Career& k) { k.attemptOpen = false; if (k.job && k.job->state == Career::JobState::ACTIVE) k.job->state = Career::JobState::RECOVERY; });   // (what Game::init does on such a save)
+        legState = legState && interrupted && q.career.job && q.career.job->state == Career::JobState::RECOVERY && q.career.job->at == from; }
       // a lesson is never a job
       fresh(); q.beginCareerFlight(g_story[0], 0, Career::SRC_LESSON); bool noJob = !q.career.job; q.endFlight(false, "x", OUT_ABANDONED);
       remove("career.sav"); remove("career.sav.bak"); q.saveDir.clear(); q.pendingCareer.reset(); q.career.newGame();
-      bool ok = accepted && leg1 && reloaded && leg2start && delivered && paidOnce && released && crashEnds && noJob;
+      bool ok = accepted && leg1 && reloaded && leg2start && delivered && paidOnce && released && crashEnds && noJob && legState;
       if (!leg1) printf("  leg1: job %d state %d at %d legs %d loc %d money %d (want %d) rep %d maxG %.2f hirePaid %d\n", (int)(bool)q.career.job, q.career.job ? (int)q.career.job->state : -1, q.career.job ? q.career.job->at : -1, q.career.job ? q.career.job->legs : -1, q.career.location, q.career.money, m0 - hire, q.career.reputation, q.career.job ? q.career.job->maxG : 0.f, q.career.job ? (int)q.career.job->hirePaid : 0);
-      printf("Resumable job: accepted %d, leg closed %d, reloaded %d, continued %d, delivered %d, paid once %d, released %d, crash ends %d, lesson no job %d: %s\n",
-             accepted, leg1, reloaded, leg2start, delivered, paidOnce, released, crashEnds, noJob, ok ? "ok" : "FAIL");
+      printf("Resumable job: accepted %d, leg closed %d, reloaded %d, continued %d, delivered %d, paid once %d, released %d, crash ends %d, lesson no job %d, leg state carried %d: %s\n",
+             accepted, leg1, reloaded, leg2start, delivered, paidOnce, released, crashEnds, noJob, legState, ok ? "ok" : "FAIL");
       fails += !ok;
     }
     // ---- scoring and compliance lines from the recorded arrival

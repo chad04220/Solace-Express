@@ -590,6 +590,8 @@ std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan
   J.positioningPaid = true;
   if (!J.hirePaid && p.hire) L.push_back({"Rental: " + std::string(s.name), -p.hire});
   J.hirePaid = true;
+  if (!J.ferryPaid && p.ferry) L.push_back({"Ferry service for your " + std::string(s.name), -p.ferry});   // (the positioning of an owned aircraft: charged once, on the first leg)
+  J.ferryPaid = true;
   if (J.src == SRC_OWNED) {
     int oi = ownedIndexFor(J.spec);
     if (p.fuel == LaunchPlan::FUEL_PURCHASED) {
@@ -605,6 +607,8 @@ std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan
   if (r.landed) { landings++; bestLandingFpm = std::min(bestLandingFpm, fabsf(r.touchdownFpm)); }
   J.jobClockMin += r.flightMin; J.legs++;
   J.maxG = std::max(J.maxG, r.maxG); J.minG = std::min(J.minG, r.minG); J.maxBank = std::max(J.maxBank, r.maxBank);
+  J.patient = std::min(J.patient, r.patient); J.comfort = std::min(J.comfort, r.comfort);   // (the ride so far: the next leg starts from it)
+  J.wpDone = std::max(J.wpDone, r.wpDone);
   if (J.c.fragile && (r.maxG > 2.0f || r.minG < 0.0f || (r.landed && fabsf(r.touchdownFpm) > 400))) J.fragileHit = true;
   J.at = at; J.state = JobState::RECOVERY;
   location = at;
@@ -624,10 +628,12 @@ std::vector<PayoutLine> Career::settleJob(const FlightResult& r, const LaunchPla
   FlightResult w = r;
   w.maxG = std::max(J.maxG, r.maxG); w.minG = std::min(J.minG, r.minG); w.maxBank = std::max(J.maxBank, r.maxBank);
   w.late = J.c.timeLimitMin > 0 && J.jobClockMin + r.flightMin > J.c.timeLimitMin;
+  w.patient = std::min(J.patient, r.patient); w.comfort = std::min(J.comfort, r.comfort);
   if (J.fragileHit && J.c.fragile) w.maxG = std::max(w.maxG, 2.01f);   // (a leg already damaged it)
   LaunchPlan q = p;
   if (J.positioningPaid) q.positioning = 0;
   if (J.hirePaid) q.hire = 0;
+  if (J.ferryPaid) q.ferry = 0;
   job.reset();
   Contract c = J.c;
   auto L = settle(c, J.spec, J.src, w, stars, &q);
@@ -973,6 +979,10 @@ void Career::payLoan(std::vector<PayoutLine>& L) {
     loan.missed++;
     if (loan.missed >= 3) {
       L.push_back({fmt("%s repossessed: three payments missed", kAircraft[loan.spec].name), 0});
+      // the airline loses the aircraft with it: its route goes, the routes of the aircraft after it move down (as a sale)
+      int ri = routeOf(oi);
+      if (ri >= 0) { L.push_back({"Its airline route is closed", 0}); airline.routes.erase(airline.routes.begin() + ri); }
+      for (auto& rt : airline.routes) if (rt.fleetIdx > oi) rt.fleetIdx--;
       fleet.erase(fleet.begin() + oi); loan = Loan();
     } else L.push_back({fmt("Loan payment missed (%d of 3 before repossession)", loan.missed), 0});
   }
@@ -1018,6 +1028,7 @@ bool Career::save(const std::string& path) const {
     const JobState& J = *job;
     ok = ok && fprintf(f, "job %d %s %d %d %d %d %f %f %f %f %d %f %d %d %u\n", (int)J.state, kAircraft[J.spec].id, (int)J.src, J.at, J.legs, J.wpDone, J.jobClockMin,
                        J.maxG, J.minG, J.maxBank, J.fragileHit ? 1 : 0, J.fuelBilledKg, J.hirePaid ? 1 : 0, J.positioningPaid ? 1 : 0, J.id) > 0;
+    ok = ok && fprintf(f, "job2 %f %f %d\n", J.patient, J.comfort, J.ferryPaid ? 1 : 0) > 0;
     ok = ok && fprintf(f, "plan %d %d %d %d %f %f %f %f %d\n", J.plan.positioning, J.plan.ferry, J.plan.hire, (int)J.plan.fuel, J.plan.fuelKgEst, J.plan.minutesEst, J.plan.minutesSigma, J.plan.fuelUpliftKg, J.plan.fuelCostEst) > 0;
     const Contract& c = J.c;
     bool story = false; for (auto& s : g_story) if (s.id == c.id) story = true;
@@ -1104,6 +1115,11 @@ bool Career::load(const std::string& path) {
       J.state = (JobState::State)st; J.src = (Source)src; J.fragileHit = fh != 0; J.hirePaid = hp != 0; J.positioningPaid = pp != 0;
       J.spec = std::max(J.spec, 0);
       if (ok) { c.job = J; c.job->c.id.clear(); }
+    }
+    else if (!strcmp(key, "job2")) {   // the leg's carried ride and fees (saves before this line had none: the defaults stand)
+      float pa = 1, co = 1; int fp = 0;
+      ok = fscanf(f, "%f %f %d", &pa, &co, &fp) == 3 && std::isfinite(pa) && std::isfinite(co);
+      if (ok && c.job) { c.job->patient = clampf(pa, 0.f, 1.f); c.job->comfort = clampf(co, 0.f, 1.f); c.job->ferryPaid = fp != 0; }
     }
     else if (!strcmp(key, "plan")) {
       int fuel = 0; LaunchPlan p;

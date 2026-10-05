@@ -343,15 +343,21 @@ void Game::beginCareerFlight(const Contract& c, int spec, Career::Source src) {
 void Game::continueJob(int spec, Career::Source src) {
   if (!career.job || career.job->state != Career::JobState::RECOVERY || commitBlocked()) return;
   Contract c = career.job->continuation();
-  commit([&](Career& k) {
+  bool took = commit([&](Career& k) {
     Career::JobState& J = *k.job;
     if (spec != J.spec || src != J.src) J.hirePaid = false;   // a different aircraft: a new hire
     J.spec = spec; J.src = src; J.state = Career::JobState::ACTIVE; k.attempt++; k.attemptOpen = true;
   });
+  if (!took || !career.job || career.job->state != Career::JobState::ACTIVE) {   // the save did not take: the job stays as it was, nothing flies on a stale career
+    hubMsg = "The career could not be saved: the leg was not started. Retry the save first."; hubMsgTime = 5;
+    return;
+  }
   startFlight(c, spec, src);
-  if (career.job) {   // (the committed job: the leg carries on from its checkpoints and clock)
-    wpIndex = std::min(career.job->wpDone, (int)c.wps.size()); jobClockBase = career.job->jobClockMin * 60.f;
+  {   // the committed job: the leg carries on from its checkpoints, its clock and the ride so far
+    wpIndex = std::min(career.job->wpDone, (int)c.wps.size()); result.wpDone = wpIndex; jobClockBase = career.job->jobClockMin * 60.f;
+    result.patient = career.job->patient; result.comfort = career.job->comfort;
     if (career.job->hirePaid) launchPlan.hire = 0;
+    if (career.job->ferryPaid) launchPlan.ferry = 0;
   }
 }
 void Game::releaseJob() {
@@ -386,7 +392,8 @@ void Game::init(bool buildWorld) {
   if (!hasSave && career.load(sav + ".bak")) { hasSave = true; toast("Career save was damaged: restored the previous save"); }
   if (hasSave && career.attemptOpen) {   // the last session ended inside a flight: the career stands as it was before it
     toast(fmt("Your last flight was interrupted: you are back at %s", g_world.airports[career.location].name), vec3(1.f, 0.8f, 0.4f));
-    commit([](Career& k) { k.attemptOpen = false; });
+    // an accepted job whose leg never ended waits where the leg began (the hub's recovery card offers it again)
+    commit([](Career& k) { k.attemptOpen = false; if (k.job && k.job->state == Career::JobState::ACTIVE) k.job->state = Career::JobState::RECOVERY; });
   }
   if (!hasSave) {
     career.newGame();
@@ -1261,7 +1268,7 @@ void Game::updateFlight(float dt) {
                 (k % 3 ? vec3(0.4f, 1.f, 0.7f) : vec3(1.f, 1.f, 0.8f)) * r.range(2.f, 5.f), 1.f, SPR_SPARK, 1.4f, -3.f);
         }
       }
-      wpIndex++;
+      wpIndex++; result.wpDone = wpIndex;
       if (contract.type == CT_TRIAL) { if (wpIndex == 1) trialT0 = flightClock; if (wpIndex >= (int)contract.wps.size()) trialT1 = flightClock; }
       g_audio.trigger(SFX_CHIME);
       toast(wpIndex < (int)contract.wps.size() ? fmt("Checkpoint %d of %d", wpIndex, (int)contract.wps.size()) : "All checkpoints passed!", vec3(0.5f, 1, 0.7f));

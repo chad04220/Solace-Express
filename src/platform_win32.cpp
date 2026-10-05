@@ -660,6 +660,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   {
     std::string cl = GetCommandLineA();
     if (cl.find("--raster") != std::string::npos) g_ren.mode = g_ren.modeForce = 1;   // the tools on the raster renderer (docs/RENDERER_REBUILD.md)
+    if (cl.find("--rt") != std::string::npos) g_ren.mode = g_ren.modeForce = 0;         // ... or on the ray tracer (the settings' choice otherwise)
     bool tool = cl.find("--bench ") != std::string::npos || cl.find("--shots ") != std::string::npos || cl.find("--profile ") != std::string::npos || cl.find("--analyze") != std::string::npos || cl.find("--loadshots") != std::string::npos || cl.find("--menuvideo") != std::string::npos;
     // a normal start loads the menu's first place and builds every aircraft's hull under the intro (rendered
     // offscreen: the intro keeps the window), so the menu opens complete and no flight waits for a hull
@@ -927,7 +928,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         else outName = outName.substr(0, outName.find(' '));
       }
       FILE* bf = fopen((dir + "\\" + outName).c_str(), "w");
-      if (bf) fprintf(bf, "GPU: %s\nDesktop %dx%d, render %dx%d, quality %d\n\n", gpu.c_str(), GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), g_ren.W, g_ren.H, g_ren.quality);
+      if (bf) fprintf(bf, "GPU: %s\nDesktop %dx%d, render %dx%d, quality %d, renderer %s\n\n", gpu.c_str(), GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), g_ren.W, g_ren.H, g_ren.quality, g_ren.mode == 1 ? "rasterizer" : "ray tracer");
       g_ren.entSync = true;
       for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
         std::string sc = list.substr(a, b - a);

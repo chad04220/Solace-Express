@@ -143,6 +143,7 @@ void Game::card(float x, float y, float w, float h, bool sel, bool hov, vec3 acc
   if (ts > 0.01f) { float cx = x + w - 10 * s, cy = y + h * 0.5f; g_ren.line(cx - 5 * s, cy - 6 * s, cx, cy, 2 * s, C_ACCENT, ts); g_ren.line(cx, cy, cx - 5 * s, cy + 6 * s, 2 * s, C_ACCENT, ts); }
 }
 
+static std::string ellipsize(const std::string& str, float width, float size);
 bool Game::button(float x, float y, float w, float h, const std::string& label, bool enabled, bool highlight) {
   float s = S(), r = 4 * s;
   uint32_t id = uid(x, y, label);
@@ -179,7 +180,8 @@ bool Game::button(float x, float y, float w, float h, const std::string& label, 
   }
   if (pr > 0.01f) g_ren.rect(x, y, w, h, vec3(1, 1, 1), 0.18f * pr, r);
   float ts = std::min(h * 0.46f, 18 * S());
-  g_ren.text(x + w * 0.5f, y + (h - ts) * 0.5f - ts * 0.08f + pr * 1.f * s, ts, label, tc, 1.f, 1, false);
+  { float tw = g_ren.textWidth(label, ts), room = w - 16 * s; if (tw > room && tw > 0.f) ts = std::max(ts * room / tw, 9 * s); }   // (a long label shrinks to fit)
+  g_ren.text(x + w * 0.5f, y + (h - ts) * 0.5f - ts * 0.08f + pr * 1.f * s, ts, ellipsize(label, w - 12 * s, ts), tc, 1.f, 1, false);
   if (focused) g_ren.rectOutline(x - 3 * s, y - 3 * s, w + 6 * s, h + 6 * s, C_ACCENT, 0.7f + 0.3f * sinf(realTime * 6.f), r + 2 * s, 2.f * s);
   if (focused && (in.pressed[K_ENTER] || in.pressed[' '])) { in.pressed[K_ENTER] = in.pressed[' '] = false; g_audio.trigger(SFX_CLICK); return true; }
   if (hov && !focused && in.mPressed[0]) { g_audio.trigger(SFX_CLICK); return true; }

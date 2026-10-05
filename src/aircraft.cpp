@@ -983,7 +983,11 @@ void Plane::apGuidance(float dt) {
       // bounced back into the air: fly it down again (a rollout's controls would leave it to the gusts)
       if (!onGround && hab > 0.6f && apStageT < 8.f) { apStage = APS_FLARE; apStageT = 0; break; }
       apStatus = fmt("ROLLOUT  %s  %.0f kt", a.code, length(vel) * MS_TO_KT);
-      if (length(vel) < 2.5f) { apDisengage(); apDone = true; ctl.brake = 1; apStatus = "AUTOLAND COMPLETE"; }
+      if (length(vel) < 2.5f) {   // stopped: complete only on the runway; past its end the autoland is over but not a success
+        float fromThr = along + clampf(a.length * 0.12f, 80.f, 300.f);   // (td sits past the threshold)
+        bool onRwy = fromThr >= -5.f && fromThr <= a.length + 5.f && fabsf(cross) <= std::max(a.width * 0.5f, 12.f) + 8.f;
+        apDisengage(); apDone = true; ctl.brake = 1; apStatus = onRwy ? "AUTOLAND COMPLETE" : "AUTOLAND  STOPPED PAST THE RUNWAY";
+      }
       break;
     case APS_HOVER: {
       float vAl = vel.x * ld.x + vel.z * ld.z;
