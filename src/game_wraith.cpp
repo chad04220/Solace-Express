@@ -227,7 +227,7 @@ void Game::buildFeedCameras(FrameParams& fp) {
     vec3 lens = mt[i].nose ? fm.nose + vec3(0.f, 0.f, -0.03f) : mt[i].dir * (fm.skin[i] + 0.03f);   // 3 cm off the skin
     c.pos = fp.plane.pos + toWorld(E + lens);
     c.right = toWorld(mt[i].right); c.up = toWorld(mt[i].up); c.back = toWorld(mt[i].back);
-    c.tanX = mt[i].tanX; c.tanY = mt[i].tanY; c.w = mt[i].w; c.h = mt[i].h;
+    c.tanX = mt[i].tanX; c.tanY = mt[i].tanY; c.pano = mt[i].pano; c.w = mt[i].w; c.h = mt[i].h;
     c.screen = fp.plane.pos + toWorld(E + mt[i].screen); c.screenR = mt[i].screenR;
   }
   if (rig == 2 && fp.fx.feed[3] > 0.5f) {   // the bomb camera, horizon level, framed like the footwell floor pane

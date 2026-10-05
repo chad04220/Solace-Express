@@ -134,15 +134,23 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     FrameParams cf = fp;   // the scene as this camera sees it: from outside the aircraft
     cf.camPos = c.pos; cf.camRight = c.right; cf.camUp = c.up; cf.camBack = c.back;
     cf.fovY = 2.f * atanf(c.tanY);
+    if (c.pano > 0.f) {   // a panorama: the ray tracer and the scenery project onto its cylinder; the flat frustum only culls
+      cf.pano = c.pano; cf.panoTanY = c.tanY;
+      float asp = (float)feedTileWH[k][0] / std::max(feedTileWH[k][1], 1);
+      cf.fovY = 2.f * atanf(std::max(c.tanY / cosf(std::min(c.pano, 1.45f)), tanf(std::min(c.pano, 1.45f)) / asp) * 1.05f);
+    }
     cf.plane.PS[3] = 0.f; cf.dispMode = 0; cf.feedRig = 0; cf.sealedCockpit = false;
     W = rw = feedTileWH[k][0]; H = rh = feedTileWH[k][1];
     cw = (rw + 1) / 2; ch = (rh + 1) / 2;
     jitX = jitY = 0.f;
-    drawEnvelope(cf);
+    // (the terrain envelope and the hulls are flat rasters that only speed up the march: a panorama marches without them)
+    if (cf.pano > 0.f) { envOn = false; trafHullOn = false; } else drawEnvelope(cf);
     drawEntities(cf);
     hullOn = false;
-    if (hullWanted(cf)) { uint64_t hk = hullKey(cf, 0); if (hulls.count(hk)) drawHull(cf, 0, hk); }
-    drawTrafficHulls(cf);
+    if (cf.pano <= 0.f) {
+      if (hullWanted(cf)) { uint64_t hk = hullKey(cf, 0); if (hulls.count(hk)) drawHull(cf, 0, hk); }
+      drawTrafficHulls(cf);
+    }
     trace(cf, progRT);
     effects(cf);   // the sprites (smoke, fire, sparks ...) and the light shafts
     // into its tile

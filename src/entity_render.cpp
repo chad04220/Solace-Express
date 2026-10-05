@@ -406,6 +406,8 @@ void Renderer::drawEntities(const FrameParams& fp) {
     glUseProgram(progEnt);
     bindMats(progEnt);
     glUniformMatrix4fv(glGetUniformLocation(progEnt, "uVP"), 1, GL_FALSE, vp.m);
+    { mat4 v = viewMat(fp); glUniformMatrix4fv(glGetUniformLocation(progEnt, "uPanoView"), 1, GL_FALSE, v.m); }
+    glUniform2f(glGetUniformLocation(progEnt, "uPano"), fp.pano, fp.panoTanY);
     glUniform2f(glGetUniformLocation(progEnt, "uJit"), jitX, jitY);
     glUniform1f(glGetUniformLocation(progEnt, "uLogC"), 2.f / log2f(40000.f + 1.f));
     glUniform1f(glGetUniformLocation(progEnt, "uTime"), fp.time);

@@ -864,12 +864,15 @@ void Renderer::setOffscreen(bool on) {
 }
 
 mat4 Renderer::viewProj(const FrameParams& fp, float zNear, float zFar) const {
+  return perspective(fp.fovY, (float)W / H, zNear, zFar) * viewMat(fp);
+}
+mat4 Renderer::viewMat(const FrameParams& fp) const {
   mat4 view;
   view(0, 0) = fp.camRight.x; view(0, 1) = fp.camRight.y; view(0, 2) = fp.camRight.z;
   view(1, 0) = fp.camUp.x; view(1, 1) = fp.camUp.y; view(1, 2) = fp.camUp.z;
   view(2, 0) = fp.camBack.x; view(2, 1) = fp.camBack.y; view(2, 2) = fp.camBack.z;
   view(0, 3) = -dot(fp.camRight, fp.camPos); view(1, 3) = -dot(fp.camUp, fp.camPos); view(2, 3) = -dot(fp.camBack, fp.camPos);
-  return perspective(fp.fovY, (float)W / H, zNear, zFar) * view;
+  return view;
 }
 
 bool Renderer::project(const FrameParams& fp, vec3 p, float& sx, float& sy) const {
@@ -978,8 +981,9 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform3f(U(p, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
   float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};
   glUniformMatrix3fv(U(p, "uCamRot"), 1, GL_FALSE, cr);
-  glUniform1f(U(p, "uTanHalf"), tanf(fp.fovY * 0.5f));
+  glUniform1f(U(p, "uTanHalf"), fp.pano > 0.f ? fp.panoTanY : tanf(fp.fovY * 0.5f));   // (a panorama: the pixel footprints)
   glUniform1f(U(p, "uAspect"), (float)W / H);
+  glUniform2f(U(p, "uPano"), fp.pano, fp.panoTanY);
   glUniform1f(U(p, "uMaxH"), maxH);
   glUniform1i(U(p, "uQuality"), quality); glUniform1i(U(p, "uDbg"), dbgOff);
   glUniform1f(U(p, "uTime"), fp.time);
@@ -1098,7 +1102,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
       bool v = fp.feedRig > 0 && c.on && feedValid[k];
       any = any || v;
       for (int i = 0; i < 4; i++) tile[k][i] = feedTile[k][i];
-      R[k][0] = c.right.x; R[k][1] = c.right.y; R[k][2] = c.right.z; R[k][3] = c.tanX;
+      R[k][0] = c.right.x; R[k][1] = c.right.y; R[k][2] = c.right.z; R[k][3] = c.pano > 0.f ? -c.pano : c.tanX;   // (negative: a panorama's half angle)
       Up[k][0] = c.up.x; Up[k][1] = c.up.y; Up[k][2] = c.up.z; Up[k][3] = c.tanY;
       B[k][0] = c.back.x; B[k][1] = c.back.y; B[k][2] = c.back.z; B[k][3] = v ? 1.f : 0.f;
     }
@@ -1151,6 +1155,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUseProgram(progSprite);
   mat4 vp = viewProj(fp);
   glUniformMatrix4fv(U(progSprite, "uViewProj"), 1, GL_FALSE, vp.m);
+  { mat4 v = viewMat(fp); glUniformMatrix4fv(U(progSprite, "uPanoView"), 1, GL_FALSE, v.m); glUniform2f(U(progSprite, "uPano"), fp.pano, fp.panoTanY); }
   glUniform3f(U(progSprite, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
   glUniform3f(U(progSprite, "uCamR"), fp.camRight.x, fp.camRight.y, fp.camRight.z);
   glUniform3f(U(progSprite, "uCamU"), fp.camUp.x, fp.camUp.y, fp.camUp.z);
@@ -1182,6 +1187,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
     glViewport(0, 0, rw, rh);
     drawSprites(f, (float)kFeedMaxW, (float)kFeedMaxH);
+    if (f.pano > 0.f) return;   // (the light shafts work in a flat picture)
     float rsx = 0, rsy = 0; vec3 rsp = f.camPos + f.sunDir * 10000.f;
     bool sunFront = dot(f.sunDir, -f.camBack) > 0.f && project(f, rsp, rsx, rsy);
     vec2 sunUV(rsx / W, 1.f - rsy / H);

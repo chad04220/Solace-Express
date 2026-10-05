@@ -60,6 +60,7 @@ GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::stri
 
 struct FrameParams {
   vec3 camPos; vec3 camRight, camUp, camBack; float fovY = 1.0f;
+  float pano = 0.f, panoTanY = 0.f;   // > 0: a panoramic (cylindrical) camera feed: its half angle (rad) and vertical extent (fovY then only culls)
   float time = 0;
   vec3 sunDir, sunCol; float night = 0;
   float planeTerrSh = 1.f;   // terrain's sun shadow at the player's aircraft (one value for the whole airframe, from the CPU)
@@ -116,6 +117,7 @@ public:
   void setRenderScale(float s);   // ray-trace resolution only: the TAA history stays at display resolution, no pop
   void renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites);
   mat4 viewProj(const FrameParams& fp, float zNear = 0.5f, float zFar = 90000.f) const;
+  mat4 viewMat(const FrameParams& fp) const;   // world -> camera (x right, y up, z back)
   bool project(const FrameParams& fp, vec3 p, float& sx, float& sy) const;  // to window pixels
 
   // ---- immediate-mode 2D UI

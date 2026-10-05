@@ -145,6 +145,11 @@ layout(location=1) out float oDepth;
 layout(location=2) out float oCloudMask;   // 1: this pixel's clouds are left to the quarter-resolution cloud pass
 uniform int uCloudSplit;
 uniform vec2 uRes; uniform vec3 uCamPos; uniform mat3 uCamRot; uniform float uTanHalf; uniform float uAspect;
+uniform vec2 uPano;   // x > 0: a panoramic camera (a cylinder around it: x the half angle, y the vertical extent at unit distance)
+vec3 camRay(vec2 ndc){
+  if (uPano.x > 0.0) { float a = ndc.x*uPano.x; return normalize(uCamRot*vec3(sin(a), ndc.y*uPano.y, -cos(a))); }
+  return normalize(uCamRot*vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, -1.0));
+}
 uniform vec2 uJit; uniform float uSeed;  // TAA: sub-pixel jitter (uv units) and a per-frame noise seed
 uniform float uMaxH; uniform int uQuality;
 uniform int uDbg;
@@ -3234,7 +3239,7 @@ void main(){
   gZero = min(uQuality, 0);
   loadMain();
   vec2 ndc = (vUV + uJit)*2.0 - 1.0;
-  vec3 rd = normalize(uCamRot * vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, -1.0));
+  vec3 rd = camRay(ndc);
   vec3 ro = uCamPos;
   float jitter = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))) + uSeed);   // interleaved gradient noise, rotated per frame
   float tmax = 80000.0;
@@ -4461,7 +4466,7 @@ void main(){
   float d = texelFetch(uSceneDepth, fp2, 0).r;
   vec2 uv = (vec2(fp2) + 0.5)/vec2(full);
   vec2 ndc = (uv + uJit)*2.0 - 1.0;
-  vec3 rd = normalize(uCamRot * vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, -1.0));
+  vec3 rd = camRay(ndc);
   float jitter = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))) + uSeed);
   oColor = traceClouds(uCamPos, rd, d, jitter);
   oDepth = d;
@@ -4572,10 +4577,13 @@ static const char* kSpriteVS = R"(#version 330 core
 layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUV; layout(location=2) in vec4 aCol; layout(location=3) in vec2 aKind;
 layout(location=4) in float aBill;   // > 0: aPos is a billboard's centre, this its half size (it faces this view's camera)
 uniform mat4 uViewProj; uniform vec3 uCamPos; uniform vec3 uCamR; uniform vec3 uCamU;
+uniform mat4 uPanoView; uniform vec2 uPano;   // a panoramic camera feed (see camRay): projected onto its cylinder
 out vec2 vUV; out vec4 vCol; out float vDist; out vec2 vKind; out vec3 vWorld;
 void main(){
   vec3 p = aPos + (uCamR*(aUV.x*2.0 - 1.0) + uCamU*(aUV.y*2.0 - 1.0))*aBill;
   vUV = aUV; vCol = aCol; vKind = aKind; vWorld = p; vDist = length(p - uCamPos); gl_Position = uViewProj*vec4(p, 1.0);
+  if (uPano.x > 0.0) { vec3 c = (uPanoView*vec4(p, 1.0)).xyz; float a = atan(c.x, -c.z), d = length(c);
+    gl_Position = vec4(a/uPano.x*d, c.y/max(length(c.xz), 1e-3)/uPano.y*d, abs(a) > 1.9 ? 2.0*d : 0.98*d, d); }
 }
 )";
 static const char* kSpriteFS = R"(#version 330 core

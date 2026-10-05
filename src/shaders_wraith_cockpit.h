@@ -365,14 +365,8 @@ vec3 wrFloorUV(vec3 q){
 // not mirrored.
 int feedSlot(int id, vec3 q, out vec2 uv){
   float sx = q.x < 0.0 ? -1.0 : 1.0; bool L = q.x < 0.0;
-  if (int(gM[0].z + 0.5) == 5) {   // XR-9: the panoramic display (three cameras around the eye) and the side bays
-    if (id == 41) {
-      float r = length(q.xz), ang = atan(q.x, -q.z), seg = 0.8333333;
-      float k = clamp(floor(ang/seg + 0.5), -1.0, 1.0), a = ang - k*seg;
-      int s = int(k) + 1;
-      uv = vec2(tan(a)/uFeedR[s].w, (q.y - 0.02)/max(r, 0.1)/cos(a)/uFeedU[s].w);
-      return s;
-    }
+  if (int(gM[0].z + 0.5) == 5) {   // XR-9: the panoramic display (one panoramic camera) and the side bays
+    if (id == 41) { uv = vec2(0.0); return 0; }   // the panoramic display: one panoramic camera (feedScreen maps it)
     uv = vec2((q.z - 0.24)/0.3*sx, (q.y - 0.04)/0.2);
     return L ? 3 : 4;
   }
@@ -399,10 +393,13 @@ vec3 feedScreen(int id, vec3 sl, out vec3 rdc, out bool bomb){
   bomb = int(gM[0].z + 0.5) == 6 && id == 61 && uFeed.w > 0.5 && uFeedB[12].w > 0.5;
   if (bomb) { vec3 fu = wrFloorUV(q); uv = fu.xy*vec2(fu.z/(WL_S.x/WL_S.y), 1.0); s = 12; }
   else {   // a window: the point of the picture the eye sees through this point of the display (feed_cameras.h)
-    vec3 d = uPlaneRot*q; float z = max(dot(d, -uFeedB[s].xyz), 1e-3);
-    uv = vec2(dot(d, uFeedR[s].xyz)/uFeedR[s].w, dot(d, uFeedU[s].xyz)/uFeedU[s].w)/z;
+    vec3 d = uPlaneRot*q; float x = dot(d, uFeedR[s].xyz), y = dot(d, uFeedU[s].xyz), z = dot(d, -uFeedB[s].xyz);
+    if (uFeedR[s].w < 0.0) uv = vec2(atan(x, z)/(-uFeedR[s].w), y/max(length(vec2(x, z)), 1e-3)/uFeedU[s].w);   // a panorama
+    else uv = vec2(x/uFeedR[s].w, y/uFeedU[s].w)/max(z, 1e-3);
   }
-  rdc = normalize(-uFeedB[s].xyz + uFeedR[s].xyz*(uv.x*uFeedR[s].w) + uFeedU[s].xyz*(uv.y*uFeedU[s].w));
+  if (uFeedR[s].w < 0.0) { float a = uv.x*(-uFeedR[s].w);
+    rdc = normalize(-uFeedB[s].xyz*cos(a) + uFeedR[s].xyz*sin(a) + uFeedU[s].xyz*(uv.y*uFeedU[s].w)); }
+  else rdc = normalize(-uFeedB[s].xyz + uFeedR[s].xyz*(uv.x*uFeedR[s].w) + uFeedU[s].xyz*(uv.y*uFeedU[s].w));
   if (uFeedOn == 0 || uFeedB[s].w < 0.5) return vec3(0.002, 0.004, 0.007);   // no picture yet: a dark panel
   if (abs(uv.x) > 1.0 || abs(uv.y) > 1.0) return vec3(0.0);
   vec4 T = uFeedTile[s];

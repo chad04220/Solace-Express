@@ -8,6 +8,7 @@ layout(location=3) in vec4 iA; layout(location=4) in vec4 iB;   // position + ya
 uniform mat4 uVP; uniform vec2 uJit; uniform float uLogC; uniform float uTime; uniform int uKind; uniform int uShadowPass;
 uniform vec3 uCamV; uniform float uFar; uniform float uThin; uniform float uThinRef;   // view pass: per-instance distance thinning (entKeep)
 uniform vec3 uWind;   // surface wind velocity (windsocks)
+uniform mat4 uPanoView; uniform vec2 uPano;   // a panoramic camera feed: projected onto its cylinder (the ray tracer's camRay)
 out vec3 vW; out vec3 vL; out vec3 vLN; out vec4 vAux;
 flat out vec4 vInst;   // seed, yaw, scale y, instance height
 flat out vec3 vScale;
@@ -44,9 +45,15 @@ void main(){
   vW = wp; vL = lp; vLN = ln; vAux = aAux;
   vInst = vec4(iB.w, iA.w, iB.y, iA.y); vScale = iB.xyz;
   gl_Position = uVP*vec4(wp, 1.0);
+  bool behind = false;
+  if (uShadowPass == 0 && uPano.x > 0.0) {   // (the whole triangle is dropped where it reaches round behind the camera)
+    vec3 c = (uPanoView*vec4(wp, 1.0)).xyz; float a = atan(c.x, -c.z), d = length(c);
+    gl_Position = vec4(a/uPano.x*d, c.y/max(length(c.xz), 1e-3)/uPano.y*d, 0.0, d); behind = abs(a) > 1.9;
+  }
   if (uShadowPass == 0) {
     gl_Position.xy -= 2.0*uJit*gl_Position.w;   // the ray tracer's sub-pixel jitter
     gl_Position.z = (log2(max(1e-6, 1.0 + gl_Position.w))*uLogC - 1.0)*gl_Position.w;   // logarithmic depth: 0.3 m .. 40 km
+    if (behind) gl_Position.z = 2.0*gl_Position.w;
   }
 }
 )";

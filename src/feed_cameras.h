@@ -16,6 +16,7 @@ struct FeedCamera {
   bool on = false;
   vec3 pos, right, up, back;   // world; looks along -back
   float tanX = 0.5f, tanY = 0.4f;
+  float pano = 0.f;            // > 0: a panoramic camera, its picture on a cylinder round it: this half angle (rad) across
   int w = 0, h = 0;            // its picture, in pixels
   vec3 screen; float screenR = 0.f;   // where its display is (world centre and radius): only a display in view is kept live
 };
@@ -25,6 +26,7 @@ struct FeedMount {
   vec3 dir;                  // from the eye through the middle of its panel: the lens sits where this leaves the skin
   vec3 right, up, back;      // the panel's frame: the picture is upright on the panel and keeps its left and right
   float tanX, tanY;
+  float pano = 0.f;          // > 0: panoramic (see FeedCamera)
   int w, h;
   bool nose = false;         // forward looking: mounted at the tip of the nose instead (the nose stays out of its picture)
   vec3 screen; float screenR = 0.f;   // its display: centre and radius
@@ -64,18 +66,17 @@ inline FeedMount feedPanel(vec3 c, vec3 n, vec3 u, vec2 s, bool left, float foca
 // pictures' resolution: the displays are as sharp as the screen they're seen on)
 inline int feedRig(int rig, float focal, FeedMount out[kMaxFeeds]) {
   if (rig == 1) {
-    // XR-9: a panoramic display on a cylinder around the eye (r 0.64 m, +-1.25 rad, y 0.02 +- 0.30), fed by three
-    // cameras 0.833 rad apart (each a third of it), and a side display bay either side
-    const float seg = 1.25f * 2.f / 3.f, tx = tanf(seg * 0.5f), ty = (0.30f / 0.64f) / cosf(seg * 0.5f);
-    for (int k = 0; k < 3; k++) {
-      float c = (k - 1) * seg;
-      FeedMount& m = out[k];
-      m.dir = vec3(sinf(c), 0.f, -cosf(c));
-      m.right = vec3(cosf(c), 0.f, sinf(c)); m.up = vec3(0, 1, 0); m.back = vec3(-sinf(c), 0.f, cosf(c));
-      m.tanX = tx; m.tanY = ty;
-      m.screen = vec3(sinf(c) * 0.64f, 0.02f, -cosf(c) * 0.64f); m.screenR = 0.42f;
-      m.w = (int)(2.f * tx * focal + 0.5f); m.h = (int)(2.f * ty * focal + 0.5f);
+    // XR-9: a panoramic display on a cylinder around the eye (r 0.64 m, +-1.25 rad, y 0.02 +- 0.30), shown by one
+    // panoramic camera at the nose whose picture is that same cylinder (slots 1 and 2 are unused); a side display bay
+    // either side
+    {
+      FeedMount& m = out[0];
+      m.dir = vec3(0, 0, -1); m.right = vec3(1, 0, 0); m.up = vec3(0, 1, 0); m.back = vec3(0, 0, 1);
+      m.pano = 1.25f * 1.01f; m.tanY = 0.32f / 0.64f * 1.02f; m.tanX = tanf(1.25f);
+      m.screen = vec3(0.f, 0.02f, -0.64f); m.screenR = 0.9f;
+      m.w = (int)(2.f * m.pano * focal + 0.5f); m.h = (int)(2.f * m.tanY * focal + 0.5f);
       m.nose = true;
+      for (int k = 1; k <= 2; k++) { out[k] = m; out[k].w = out[k].h = 0; }   // (no camera: the atlas skips it)
     }
     out[3] = feedPanel(vec3(0.635f, 0.04f, 0.24f), vec3(-1, 0, 0), vec3(0, 1, 0), vec2(0.3f, 0.2f), true, focal);
     out[4] = feedPanel(vec3(0.635f, 0.04f, 0.24f), vec3(-1, 0, 0), vec3(0, 1, 0), vec2(0.3f, 0.2f), false, focal);
