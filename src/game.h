@@ -123,6 +123,9 @@ private:
   // kind waits for the next gear command instead. Tests and tools fly with the roll disarmed and fire failures themselves.
   struct FailPlan { int kind = 0, engine = 0; float at = -1; bool fired = false; } failPlan;
   bool failuresArmed = true;
+  // C6 job meters: the patient / VIP comfort, the survey band time, the low-vis minimums check
+  float surveyT = 0, surveyInT = 0; bool minimumsChecked = false; int minimumsGoArounds = 0;
+  void updateJobMeters(float dt, float gs);
   void rollFailures(const Contract& c, int spec, Career::Source src);
   void updateFailures(float dt);
   void fireFailure(int kind, int engine);   // breaks it now, with the warning and the autopilot's reaction

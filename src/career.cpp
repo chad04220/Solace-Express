@@ -368,6 +368,11 @@ void Career::finishPlan(LaunchPlan& e, const Contract& c, float minutes, float f
   else if (c.wx.storm) e.challenge = "Thunderstorms on the route";
   else if (B.length < need * 1.25f) e.challenge = fmt("Short runway at %s: %.0f m for the %.0f m you need", B.code, B.length, need);
   else if (xw >= 12.f) e.challenge = fmt("Crosswind at %s: about %.0f kt", B.code, xw);
+  else if (c.type == CT_MEDEVAC) e.challenge = "Medevac: under 1.5 g and 30 deg of bank, a soft touchdown, and the clock";
+  else if (c.type == CT_VIP) e.challenge = "VIP: a limousine ride - gentle banks, no bumps, a soft touchdown";
+  else if (c.type == CT_NIGHT) e.challenge = "Night: lit fields, landing light on for the touchdown";
+  else if (c.type == CT_IFR) e.challenge = fmt("Low visibility: cloud base %.0f ft, %.1f km - lined up when you break out, or go around", (c.wx.cloudBase - B.elev) * M_TO_FT, c.wx.visibility / 1000.f);
+  else if (c.type == CT_SURVEY) e.challenge = fmt("Survey: six checkpoints at %.0f ft, held within 150 ft", c.wps.empty() ? 0.f : c.wps[0].alt * M_TO_FT);
   else if (c.fragile) e.challenge = "Fragile cargo: gentle manoeuvres and a soft landing";
   else if (c.pax > 0) e.challenge = "Passengers: keep the bank under 45 degrees and the ride smooth";
   else if (B.surface != SURF_ASPHALT) e.challenge = fmt("%s strip at %s", surfaceName(B.surface), B.code);
@@ -492,24 +497,60 @@ void Career::refreshBoard() {
     int to = r.next() % g_world.airports.size();
     if (to == location) continue;
     Contract c; c.from = location; c.to = to; c.id = fmt("F%u_%d", boardSeed, (int)board.size());
+    const Airport& A = g_world.airports[location]; const Airport& B = g_world.airports[to];
     bool pax = s.pax >= 2 && license >= LIC_CPL && (r.next() & 1);
     c.type = pax ? CT_PAX : CT_CARGO;
-    if (pax) { c.pax = std::max(1, (int)(s.pax * r.range(0.4f, 1.0f))); c.cargoKg = c.pax * 15; }
+    // the special kinds (C6), where the licence, the aircraft and the airports allow them: about a third of the board
+    { float u = r.uni();
+      if (u < 0.08f && license >= LIC_CPL && B.hospital && s.pax >= 1) c.type = CT_MEDEVAC;
+      else if (u < 0.15f && license >= LIC_CPL && s.pax >= 4) c.type = CT_VIP;
+      else if (u < 0.23f && A.size >= 1 && B.size >= 1) c.type = CT_NIGHT;
+      else if (u < 0.30f && license >= LIC_CPL && B.size >= 1 && B.surface == SURF_ASPHALT && fabsf(A.elev - B.elev) < 60.f) c.type = CT_IFR;   // (one cloud base for both fields)
+      else if (u < 0.37f && license >= LIC_PPL) c.type = CT_SURVEY;
+      pax = c.type == CT_PAX || c.type == CT_VIP; }
+    if (c.type == CT_MEDEVAC) { c.pax = 1; c.cargoKg = 60; }
+    else if (c.type == CT_SURVEY) { c.pax = 1; c.cargoKg = 40; }
+    else if (pax) { c.pax = std::max(1, (int)(s.pax * r.range(0.4f, 1.0f))); c.cargoKg = c.pax * 15; }
     else c.cargoKg = std::max(20, (int)(s.cargoKg * r.range(0.35f, 0.95f)) / 10 * 10);
-    c.minLicense = pax ? LIC_CPL : LIC_PPL;
+    c.minLicense = (c.type == CT_PAX || c.type == CT_VIP || c.type == CT_MEDEVAC || c.type == CT_IFR) ? LIC_CPL : LIC_PPL;
+    if (c.type == CT_SURVEY) {   // a ring of six checkpoints over the country between the two fields, flown at one altitude
+      vec3 mid = (A.pos() + B.pos()) * 0.5f; float rad = clampf(g_world.distanceKm(location, to) * 1000.f * 0.2f, 1500.f, 4000.f);
+      float hmax = 0; for (int k = 0; k < 12; k++) { float a = k * 0.5236f; hmax = std::max(hmax, g_world.height(mid.x + cosf(a) * rad, mid.z + sinf(a) * rad)); }
+      float alt = std::max(hmax, std::max(A.elev, B.elev)) + 450.f;
+      float a0 = atan2f(B.z - A.z, B.x - A.x);
+      for (int k = 0; k < 6; k++) { float a = a0 + k * 1.0472f; c.wps.push_back({mid.x + cosf(a) * rad, mid.z + sinf(a) * rad, alt}); }
+    }
     if (canFly(c, si) == SRC_NONE) continue;
     float km = contractKm(c);
     c.payout = (int)((250 + km * (30 + c.cargoKg * 0.13f + c.pax * 16)) * r.range(0.9f, 1.15f)) / 10 * 10;
+    if (c.type == CT_MEDEVAC) { c.payout = c.payout * 2; c.timeLimitMin = ceilf(km * 1000.f / Plane::perf(&s).cruiseV / 60.f * 1.5f + 4); }
+    else if (c.type == CT_VIP) c.payout = c.payout * 17 / 10;
+    else if (c.type == CT_NIGHT) c.payout = c.payout * 13 / 10;
+    else if (c.type == CT_IFR) c.payout = c.payout * 15 / 10;
+    else if (c.type == CT_SURVEY) c.payout = c.payout * 14 / 10 + 300;
     { int chapter = nextStory() ? nextStory()->chapter : 5; c.payout = (int)(c.payout * (1.f + 0.35f * chapter)) / 10 * 10; }   // the work pays more as the career advances (pacing)
     c.repBonusPct = repBonusPct();   // clients pay a reliable pilot a little more
     c.payout = c.payout * (100 + c.repBonusPct) / 100 / 10 * 10;
-    c.fragile = !pax && r.uni() < 0.15f;
-    if (r.uni() < 0.15f) { c.timeLimitMin = ceilf(km * 1000.f / Plane::perf(&s).cruiseV / 60.f * 1.6f + 3); c.payout = c.payout * 13 / 10; }
-    c.title = pax ? fmt("%s to %s", paxNames[r.next() % 8], g_world.airports[to].name) : fmt("%s to %s", cargoNames[r.next() % 10], g_world.airports[to].name);
-    c.brief = fmt("Freelance job posted at %s. Distance %.0f km.", g_world.airports[location].name, km);
-    float tod = r.range(7.f, 19.5f);
+    bool plain = c.type == CT_CARGO || c.type == CT_PAX;
+    c.fragile = c.type == CT_CARGO && r.uni() < 0.15f;
+    if (plain && r.uni() < 0.15f) { c.timeLimitMin = ceilf(km * 1000.f / Plane::perf(&s).cruiseV / 60.f * 1.6f + 3); c.payout = c.payout * 13 / 10; }
+    const char* vipNames[] = {"A minister", "A film star", "The island's governor", "A racing driver", "An opera singer", "A football squad's captain"};
+    const char* medNames[] = {"Burns patient", "Diver with the bends", "Heart attack", "Road accident casualty", "Premature baby and nurse", "Stroke patient"};
+    const char* surveyNames[] = {"Forestry survey", "Coastline mapping", "Power-line inspection", "Flood survey", "Pipeline patrol", "Wildlife count"};
+    switch (c.type) {
+      case CT_MEDEVAC: c.title = fmt("Medevac: %s to %s", medNames[r.next() % 6], B.name); c.brief = fmt("A patient at %s needs the hospital at %s within %.0f minutes. Keep it under 1.5 g and 30 degrees of bank, and the touchdown soft: the patient's condition is on the HUD.", A.name, B.name, c.timeLimitMin); break;
+      case CT_VIP: c.title = fmt("VIP: %s to %s", vipNames[r.next() % 6], B.name); c.brief = fmt("%s and party, %d aboard, expect a limousine ride to %s. The comfort meter on the HUD drops with every steep bank, bump and firm touchdown; a delighted client pays extra.", vipNames[(r.next() % 6)], c.pax, B.name); break;
+      case CT_NIGHT: c.title = fmt("Night freight to %s", B.name); c.brief = fmt("%s for the morning at %s, flown overnight between two lit fields. Have the landing light on for the touchdown.", cargoNames[r.next() % 10], B.name); break;
+      case CT_IFR: c.title = fmt("Low-vis run to %s", B.name); c.brief = fmt("%s to %s under a low overcast in poor visibility. Fly the approach on the instruments: if you are not lined up with the runway when you break out, go around.", cargoNames[r.next() % 10], B.name); break;
+      case CT_SURVEY: c.title = fmt("%s near %s", surveyNames[r.next() % 6], B.name); c.brief = fmt("Fly the six survey checkpoints in order, holding %.0f ft within 150 ft, then land at %s. Pay follows the share of the pattern flown in the band.", c.wps[0].alt * M_TO_FT, B.name); break;
+      default: c.title = pax ? fmt("%s to %s", paxNames[r.next() % 8], B.name) : fmt("%s to %s", cargoNames[r.next() % 10], B.name); c.brief = fmt("Freelance job posted at %s. Distance %.0f km.", A.name, km); break;
+    }
+    float tod = c.type == CT_NIGHT ? (r.uni() < 0.5f ? r.range(21.f, 23.9f) : r.range(0.f, 5.f)) : r.range(7.f, 19.5f);
     c.wx = W(r.range(0, 360), r.range(0, 14), r.uni() < 0.3f ? r.range(3, 10) : 0, r.range(0.05f, 0.35f), r.range(0, 0.8f), r.range(2500, 7000), r.range(12, 50),
              r.uni() < 0.15f ? (g_world.airports[to].z < -20000 ? 2 : 1) : 0, false, tod);
+    if (c.type == CT_IFR) { c.wx.cloudCover = 0.95f; c.wx.cloudBase = r.range(300.f, 600.f) / M_TO_FT + B.elev; c.wx.visibility = r.range(1500.f, 3000.f); c.wx.precip = r.uni() < 0.5f ? 1 : 0; c.wx.windSpeed = std::min(c.wx.windSpeed, 6.f / MS_TO_KT); }
+    if (c.type == CT_SURVEY) { c.wx.cloudCover = std::min(c.wx.cloudCover, 0.4f); c.wx.cloudBase = std::max(c.wx.cloudBase, c.wps[0].alt + 300.f); c.wx.gust = 0; c.wx.turbulence = std::min(c.wx.turbulence, 0.12f); }
+    if (c.type == CT_MEDEVAC || c.type == CT_VIP) { c.wx.gust = std::min(c.wx.gust, 4.f / MS_TO_KT); c.wx.storm = false; }
     bool dup = false;
     for (auto& b : board) if (b.to == c.to && b.type == c.type) dup = true;
     if (!dup) board.push_back(c);
@@ -666,6 +707,28 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
     if (c.payout > 0 && r.holdViolated) { L.push_back({"Took off against a hold instruction", -c.payout / 10}); reputation = std::max(0, reputation - 1); st--; }
     if (c.payout > 0 && r.landedAgainstGoAround) { L.push_back({"Landed against a go-around instruction", -c.payout / 2}); reputation = std::max(0, reputation - 1); st--; }
     if (c.pax > 0 && (r.maxBank > 45 || r.maxG > 1.9f || r.minG < 0.2f)) { L.push_back({"Passenger discomfort", -c.payout * 15 / 100}); st--; }
+    if (c.payout > 0) {   // the job types' own scoring (C6)
+      if (c.type == CT_MEDEVAC) {
+        if (r.patient < 0.35f) { L.push_back({fmt("Patient in distress (%.0f%%)", r.patient * 100.f), -c.payout * 40 / 100}); st -= 2; reputation = std::max(0, reputation - 1); }
+        else if (r.patient < 0.7f) { L.push_back({fmt("Rough ride for the patient (%.0f%%)", r.patient * 100.f), -c.payout * 20 / 100}); st--; }
+        else if (r.patient > 0.9f && !r.late) L.push_back({"Patient delivered in good shape", c.payout * 10 / 100});
+      }
+      if (c.type == CT_VIP) {
+        if (r.comfort < 0.4f) { L.push_back({fmt("VIP displeased (comfort %.0f%%)", r.comfort * 100.f), -c.payout * 30 / 100}); st--; }
+        else if (r.comfort < 0.7f) L.push_back({fmt("VIP unimpressed (comfort %.0f%%)", r.comfort * 100.f), -c.payout * 10 / 100});
+        else if (r.comfort > 0.9f) { L.push_back({"VIP delighted: a tip", c.payout * 15 / 100}); reputation++; }
+      }
+      if (c.type == CT_NIGHT && r.landed && !r.landingLightOn) { L.push_back({"Landed without the landing light", -c.payout * 10 / 100}); st--; }
+      if (c.type == CT_IFR) {
+        if (r.belowMinimumsUnaligned) { L.push_back({"Continued below minimums without the runway lined up", -c.payout * 25 / 100}); st--; reputation = std::max(0, reputation - 1); }
+        else if (r.landed) L.push_back({"Approach flown to minimums", c.payout * 5 / 100});
+      }
+      if (c.type == CT_SURVEY) {
+        int pct = (int)(clampf(r.surveyInBand, 0.f, 1.f) * 100.f + 0.5f);
+        if (pct < 95) { L.push_back({fmt("Survey altitude held %d%% of the pattern", pct), -c.payout * (100 - pct) * 6 / 1000}); if (pct < 60) st--; }
+        else L.push_back({"Survey altitude held", c.payout * 5 / 100});
+      }
+    }
     if (c.fragile && (r.maxG > 2.0f || r.minG < 0.0f || (r.landed && fpm > 400))) { L.push_back({"Fragile cargo damaged", -c.payout * 4 / 10}); st--; }
     *stars = std::max(1, st);
     reputation += *stars;

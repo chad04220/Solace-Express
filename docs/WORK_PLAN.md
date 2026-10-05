@@ -44,7 +44,7 @@ Line numbers in §2 are from `f8b8537` and no longer match: re-grep the identifi
 | A12 bake the aircraft to meshes | done differently (R2) | — |
 | A13 terrain clipmap | done as R1a's CDLOD terrain | — |
 | B3 drop the helper-process shader compile | open: needs the owner's first-run compile time on the rasterizer (startup.log in report.bat) | — |
-| C6 freelance job types | open (after C1, E3) | — |
+| C6 freelance job types | done: medevac (patient meter, hospital destinations, hard clock), VIP charter (comfort meter, tip), night freight (lit fields, landing light), low-vis run (cloud base and visibility at minimums, alignment check when breaking out, go-around clears it), survey (six-ring pattern at one altitude, pay by time in band); each posts by licence, aircraft and fields, names its challenge and deductions on the card, and scores its own lines; gameplay_test generator sweep, scoring lines, medevac flights gentle and steep | C6 commit |
 | C8 dynamic weather | open | — |
 | C11 airline layer | open (after C5, C7, E3) | — |
 | C12 challenge modes | open | — |

@@ -416,6 +416,49 @@ void Game::rollFailures(const Contract& c, int spec, Career::Source src) {
   float est = std::max(launchPlan.minutesEst * 60.f, 240.f);
   failPlan.at = 90.f + r.uni() * clampf(est * 0.6f, 60.f, 1500.f);   // somewhere in the first part of the flight, never on the take-off roll
 }
+// The job types' live records (C6): the medevac patient and the VIP's comfort drift down with g, bank, turbulence
+// bumps and a firm touchdown; the survey counts its time in the altitude band between the first and the last
+// checkpoint; the low-vis run checks the alignment the first time the aircraft comes below minimums near the
+// destination (a go-around afterwards clears it); night freight notes the landing light at touchdown.
+void Game::updateJobMeters(float dt, float gs) {
+  (void)gs;
+  const Contract& c = contract;
+  if (researchFlight || isolatedFlight || crashed) return;
+  bool air = !plane.onGround && takeoffAnnounced;
+  if (c.type == CT_MEDEVAC || c.type == CT_VIP) {
+    float& m = c.type == CT_MEDEVAC ? result.patient : result.comfort;
+    float gLim = c.type == CT_MEDEVAC ? 1.5f : 1.3f, bankLim = 30.f;
+    float rate = 0;
+    if (air) {
+      rate += std::max(0.f, plane.gLoad - gLim) * 0.08f + std::max(0.f, (c.type == CT_MEDEVAC ? 0.6f : 0.75f) - plane.gLoad) * 0.08f;
+      rate += std::max(0.f, fabsf(plane.bankDeg()) - bankLim) * 0.003f;
+      rate += std::max(0.f, wx.turbulence - 0.25f) * 0.01f;
+    }
+    if (plane.ev.touchdown && fabsf(plane.ev.touchdownVs) * 196.85f > 300.f) m -= (fabsf(plane.ev.touchdownVs) * 196.85f - 300.f) / 1500.f;
+    m = clampf(m - rate * dt, 0.f, 1.f);
+  }
+  if (c.type == CT_SURVEY && !c.wps.empty() && air && wpIndex > 0 && wpIndex < (int)c.wps.size()) {
+    surveyT += dt; if (fabsf(plane.pos.y - c.wps[0].alt) <= 46.f) surveyInT += dt;
+    result.surveyInBand = surveyT > 1.f ? surveyInT / surveyT : 1.f;
+  }
+  if (c.type == CT_IFR && air) {
+    const Airport& A = g_world.airports[c.to];
+    float dA = length(vec3(plane.pos.x - A.pos().x, 0, plane.pos.z - A.pos().z));
+    if (result.goArounds > minimumsGoArounds) { minimumsGoArounds = result.goArounds; minimumsChecked = false; result.belowMinimumsUnaligned = false; }
+    float minimums = std::max(60.f, wx.cloudBase - A.elev - 30.f);
+    if (!minimumsChecked && dA < 8000.f && plane.pos.y - A.elev < minimums) {
+      minimumsChecked = true;
+      bool rev = dot(plane.vel, A.dir()) < 0.f;
+      vec3 ld = rev ? -A.dir() : A.dir(), rel = plane.pos - A.threshold(rev); rel.y = 0;
+      float lat = fabsf(rel.x * ld.z - rel.z * ld.x);
+      float hErr = fabsf(wrapAngle((atan2f(ld.x, -ld.z) - plane.heading() * DEG))) / DEG;
+      bool aligned = lat < A.width * 1.5f + 25.f && hErr < 20.f;
+      if (!aligned) { result.belowMinimumsUnaligned = true; toast("Below minimums and not lined up - GO AROUND", vec3(1, 0.45f, 0.35f), true); }
+      else toast("Runway in sight", vec3(0.6f, 1, 0.7f));
+    }
+  }
+  if (c.type == CT_NIGHT && plane.ev.touchdown) result.landingLightOn = landingLight;
+}
 void Game::fireFailure(int kind, int engine) {
   if (!plane.failNow(kind, engine)) return;
   const AircraftSpec& s = *plane.spec;
@@ -503,6 +546,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   rollFailures(c, spec, src);
   isolatedFlight = false; jobClockBase = 0; attemptFrom = c.from;
   wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0;
+  surveyT = surveyInT = 0; minimumsChecked = false; minimumsGoArounds = 0;
   traffic.reset();
   ufo = Ufo(); ufo.next = 180.f + sparkRng.uni() * 240.f;   // first encounter after 3-7 minutes in the air
   paused = false; showMap = false; landed = completed = crashed = false;
@@ -946,6 +990,7 @@ void Game::updateFlight(float dt) {
   if (!plane.onGround) result.maxBank = std::max(result.maxBank, fabsf(plane.bankDeg()));
   // rolling dust / spray
   float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
+  updateJobMeters(dt, gs);
   if (plane.onGround && plane.groundRough > 0.3f && gs > 4.f) {
     dustAccum += dt * gs * 0.6f;
     int rw = g_world.onRunway(plane.pos.x, plane.pos.z, 3);

@@ -491,6 +491,85 @@ struct GameTest {
       bool ok = k.failureChance(Career::SRC_LESSON, 0) == 0.f && pNew > 0.f && pWorn > pNew * 1.5f && sv && k.fleet[0].condition == 1.f && k.money < 100000 && k.failureChance(Career::SRC_RENT, 1) > 0.f;
       printf("Failure chance: new %.3f, worn %.3f, lesson 0, serviced (%s) %s\n", pNew, pWorn, m.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
     }
+    // ---- freelance job types (C6): the board posts each kind where the licence and the fields allow it, the special
+    // kinds are well formed, each kind's scoring lines fire from the record, and a medevac flown gently delivers its
+    // patient in good shape
+    {
+      int seen[CT_COUNT] = {}; bool wellFormed = true; int boards = 0;
+      Career k; k.newGame(); k.license = LIC_CPL; k.money = 500000;
+      for (int loc = 0; loc < (int)g_world.airports.size(); loc++) for (int seed = 0; seed < 12; seed++) {
+        k.location = loc; k.boardSeed = 1000 + seed * 7 + loc; k.refreshBoard(); boards++;
+        for (auto& c : k.board) {
+          if (c.type < 0 || c.type >= CT_COUNT) { wellFormed = false; continue; }
+          seen[c.type]++;
+          const Airport& A = g_world.airports[c.from]; const Airport& B = g_world.airports[c.to];
+          if (c.type == CT_MEDEVAC && !(B.hospital && c.timeLimitMin > 0 && c.pax == 1)) { printf("   bad medevac %s\n", c.title.c_str()); wellFormed = false; }
+          if (c.type == CT_NIGHT && !(A.size >= 1 && B.size >= 1 && (c.wx.timeOfDay >= 21.f || c.wx.timeOfDay <= 5.f))) { printf("   bad night job %s tod %.1f\n", c.title.c_str(), c.wx.timeOfDay); wellFormed = false; }
+          if (c.type == CT_IFR && !(c.wx.cloudCover > 0.9f && c.wx.visibility <= 3000.f && c.wx.cloudBase - B.elev >= 80.f && c.wx.cloudBase - B.elev <= 190.f)) { printf("   bad low-vis job %s base %.0f vis %.0f\n", c.title.c_str(), c.wx.cloudBase - B.elev, c.wx.visibility); wellFormed = false; }
+          if (c.type == CT_SURVEY) { if (c.wps.size() != 6) wellFormed = false; for (auto& w : c.wps) if (w.alt < g_world.height(w.x, w.z) + 200.f || fabsf(w.alt - c.wps[0].alt) > 0.5f) { printf("   survey ring low or uneven %s\n", c.title.c_str()); wellFormed = false; } }
+          if (c.type == CT_VIP && c.pax < 1) wellFormed = false;
+        }
+      }
+      bool ok = wellFormed && seen[CT_MEDEVAC] > 0 && seen[CT_VIP] > 0 && seen[CT_NIGHT] > 0 && seen[CT_IFR] > 0 && seen[CT_SURVEY] > 0 && seen[CT_CARGO] > seen[CT_SURVEY];
+      printf("Freelance job types over %d boards: cargo %d pax %d medevac %d vip %d night %d low-vis %d survey %d, well formed %d: %s\n", boards, seen[CT_CARGO], seen[CT_PAX], seen[CT_MEDEVAC], seen[CT_VIP], seen[CT_NIGHT], seen[CT_IFR], seen[CT_SURVEY], wellFormed, ok ? "ok" : "FAIL"); fails += !ok;
+      // a PPL sees no medevac, VIP or low-vis work
+      Career p; p.newGame(); p.license = LIC_PPL; int bad = 0;
+      for (int seed = 0; seed < 30; seed++) { p.boardSeed = 50 + seed; p.refreshBoard(); for (auto& c : p.board) if (c.type == CT_MEDEVAC || c.type == CT_VIP || c.type == CT_IFR) bad++; }
+      printf("PPL board keeps the CPL kinds off: %s\n", bad ? "FAIL" : "ok"); fails += bad > 0;
+    }
+    {   // scoring lines per type
+      auto has = [](const std::vector<PayoutLine>& L, const char* sub) { for (auto& l : L) if (l.label.find(sub) != std::string::npos) return true; return false; };
+      Career base; base.newGame(); base.license = LIC_ATP; base.money = 100000;
+      Contract c = g_story[4]; c.story = false; c.payout = 2000; c.timeLimitMin = 0; c.pax = 1; c.cargoKg = 50;
+      FlightResult good; good.success = true; good.landed = true; good.touchdownFpm = 150; good.flightMin = 10; good.tdPastThrM = 300; good.rwyLenM = 1500; good.centerlineErr = 1.f;
+      int st = 0; bool ok = true; std::vector<PayoutLine> L;
+      c.type = CT_MEDEVAC; { Career t = base; L = t.settle(c, 1, Career::SRC_RENT, good, &st); ok = ok && has(L, "good shape") && st == 3; }
+      { FlightResult r = good; r.patient = 0.2f; Career t = base; L = t.settle(c, 1, Career::SRC_RENT, r, &st); ok = ok && has(L, "distress") && st <= 1; }
+      c.type = CT_VIP; { Career t = base; L = t.settle(c, 1, Career::SRC_RENT, good, &st); ok = ok && has(L, "delighted"); }
+      { FlightResult r = good; r.comfort = 0.3f; Career t = base; L = t.settle(c, 1, Career::SRC_RENT, r, &st); ok = ok && has(L, "displeased"); }
+      c.type = CT_NIGHT; c.pax = 0; { FlightResult r = good; r.landingLightOn = false; Career t = base; L = t.settle(c, 1, Career::SRC_RENT, r, &st); ok = ok && has(L, "landing light"); }
+      c.type = CT_IFR; { FlightResult r = good; r.belowMinimumsUnaligned = true; Career t = base; L = t.settle(c, 1, Career::SRC_RENT, r, &st); ok = ok && has(L, "below minimums"); }
+      { Career t = base; L = t.settle(c, 1, Career::SRC_RENT, good, &st); ok = ok && has(L, "to minimums"); }
+      c.type = CT_SURVEY; { FlightResult r = good; r.surveyInBand = 0.5f; Career t = base; L = t.settle(c, 1, Career::SRC_RENT, r, &st); ok = ok && has(L, "held 50%"); int amt = 0; for (auto& l : L) if (l.label.find("held 50%") != std::string::npos) amt = l.amount; ok = ok && amt == -2000 * 50 * 6 / 1000; }
+      { Career t = base; L = t.settle(c, 1, Career::SRC_RENT, good, &st); ok = ok && has(L, "altitude held"); }
+      printf("Job type scoring lines: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
+      if (!ok) for (auto& l : L) printf("   %-40s %d\n", l.label.c_str(), l.amount);
+    }
+    {   // a medevac flown gently: the patient meter stays high and the bonus is paid; a hard touchdown costs it
+      for (int rough = 0; rough < 2; rough++) {
+        g.career.newGame(); g.pendingCareer.reset(); g.career.license = LIC_CPL; g.career.storyIndex = 4; g.career.location = g_world.findAirport("ORC");
+        Contract c = g_story[4]; c.story = false; c.type = CT_MEDEVAC; c.pax = 1; c.cargoKg = 60; c.timeLimitMin = 0; c.title = "Medevac test";
+        c.wx.windSpeed = 2; c.wx.gust = 0; c.wx.turbulence = 0.05f;
+        g.startFlight(c, 1, Career::SRC_RENT);
+        const Airport& a = g_world.airports[c.to];
+        vec3 dir = a.dir(), thr = a.threshold(false);
+        vec3 start = thr - dir * 3500.f; start.y = a.elev + 3500.f * tanf(3.f * DEG) + 15.f;
+        g.plane.reset(&kAircraft[1], start, a.heading, 60, 150, true, kAircraft[1].vref + 6);
+        g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 3;
+        g.plane.ctl.flaps = 1.f; g.flapNotch = 1.f; s_pI = -2.f;
+        for (t = 0; t < 300 && g.screen == SCR_FLIGHT; t += dt) {
+          Plane& p = g.plane;
+          vec3 rel = p.pos - thr;
+          float along = dot(vec3(rel.x, 0, rel.z), dir), lat = dot(vec3(rel.x, 0, rel.z), vec3(-dir.z, 0, dir.x));
+          float agl = p.pos.y - a.elev;
+          if (!p.onGround && !g.touchedDown) {
+            float ideal = a.elev + std::max(0.f, (-along + 250.f)) * tanf(3.f * DEG);
+            float hdgT = a.heading - clampf(lat * 0.08f, -20, 20), herr = wrapAngle((hdgT - p.heading()) * DEG) / DEG;
+            p.ctl.roll = clampf((clampf(herr * 2.f, -15, 15) - p.bankDeg()) * 0.05f + p.w.z * 0.3f, -1, 1);
+            float vsT = agl < 7.f ? -0.7f : clampf(-p.ias * tanf(3.f * DEG) + (ideal - p.pos.y) * 0.15f, -6, 1);
+            if (rough && t > 2.f && t < 6.5f) p.ctl.roll = clampf((48.f - p.bankDeg()) * 0.05f + p.w.z * 0.3f, -1, 1);   // (a steep bank the patient feels)
+            pitchFor(p, vsT, dt);
+            p.ctl.throttle = agl < 6.f ? 0.f : clampf(0.35f + (p.spec->vref - p.ias) * 0.05f, 0, 1);
+            p.ctl.yaw = clampf(p.beta * 3.f, -1, 1);
+          } else { p.ctl.throttle = 0; p.ctl.brake = 1; p.ctl.pitch = 0; p.ctl.roll = 0; p.ctl.yaw = 0; }
+          g.update(dt);
+        }
+        bool bonus = false, hit = false;
+        for (auto& l : g.payout) { if (l.label.find("good shape") != std::string::npos) bonus = true; if (l.label.find("patient") != std::string::npos || l.label.find("Patient in") != std::string::npos) hit = true; }
+        bool ok = g.screen == SCR_DEBRIEF && (rough ? g.result.patient < 0.9f : (g.lastSuccess && g.result.patient > 0.9f && bonus && !hit));
+        printf("Medevac flight (%s): touchdown %.0f fpm, patient %.0f%%, bonus %d: %s\n", rough ? "steep bank" : "gentle", g.touchdownFpm, g.result.patient * 100.f, bonus, ok ? "ok" : "FAIL"); fails += !ok;
+      }
+    }
     // ---- a diversion leaves you (and your aircraft) where you landed
     {
       Career t; t.newGame(); t.license = LIC_ATP;

@@ -664,6 +664,9 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
         if (c.timeLimitMin > 0) rules += "late: -50%";
         if (c.pax > 0) rules += std::string(rules.empty() ? "" : ", ") + "passengers: -15% past 45 deg bank or 1.9 g";
         if (c.fragile) rules += std::string(rules.empty() ? "" : ", ") + "fragile: -40% past 2 g or a 400 fpm touchdown";
+        const char* own = c.type == CT_MEDEVAC ? "patient under 70%: -20%, under 35%: -40%; over 90% on time: +10%" : c.type == CT_VIP ? "comfort under 70%: -10%, under 40%: -30%; over 90%: +15% tip"
+                        : c.type == CT_NIGHT ? "landing light off at touchdown: -10%" : c.type == CT_IFR ? "below minimums not lined up: -25%; flown to minimums: +5%" : c.type == CT_SURVEY ? "-0.6% per 1% of the pattern outside the band; all in: +5%" : nullptr;
+        if (own) rules += std::string(rules.empty() ? "" : ", ") + own;
         if (!rules.empty()) row("Deductions", rules, C_DIM);
       }
       if (!cd.free) row("Challenge", e.challenge, C_WARN);
@@ -1819,6 +1822,14 @@ void Game::drawGps() {
   kv("ETA DEST", gs > 10 ? fmt("%02d:%02d LCL", ((int)etaH) % 24, (int)(fmodf(etaH, 1.f) * 60)) : "--:--");
   kv("ROUTE LEFT", fmt("%.1f km", remain / 1000.f));
   if (contract.timeLimitMin > 0) { float left = contract.timeLimitMin * 60 - jobClockBase - flightClock; kv("DEADLINE", left > 0 ? fmt("%d:%02d", (int)left / 60, (int)left % 60) : "LATE", left > 120 ? C_TEXT : C_BAD); }
+  {   // the job's own meter (C6)
+    auto bar = [&](const char* k, float v) { std::string b; int n = (int)(clampf(v, 0.f, 1.f) * 10.f + 0.5f); for (int i = 0; i < 10; i++) b += i < n ? "|" : "."; kv(k, fmt("%s %.0f%%", b.c_str(), v * 100.f), v > 0.7f ? C_GOOD : v > 0.4f ? C_WARN : C_BAD); };
+    if (contract.type == CT_MEDEVAC) bar("PATIENT", result.patient);
+    if (contract.type == CT_VIP) bar("COMFORT", result.comfort);
+    if (contract.type == CT_SURVEY && !contract.wps.empty()) { float dAlt = plane.pos.y - contract.wps[0].alt; kv("SURVEY ALT", fmt("%s %s", fmtAlt(contract.wps[0].alt).c_str(), fabsf(dAlt) <= 46.f ? "IN BAND" : dAlt > 0 ? "HIGH" : "LOW"), fabsf(dAlt) <= 46.f ? C_GOOD : C_BAD); if (surveyT > 1.f) kv("IN BAND", fmt("%.0f%%", result.surveyInBand * 100.f), result.surveyInBand > 0.9f ? C_GOOD : C_WARN); }
+    if (contract.type == CT_IFR) kv("MINIMUMS", fmt("%s AGL", fmtAlt(std::max(60.f, wx.cloudBase - g_world.airports[contract.to].elev - 30.f)).c_str()), result.belowMinimumsUnaligned ? C_BAD : C_TEXT);
+    if (contract.type == CT_NIGHT) kv("LDG LIGHT", landingLight ? "ON" : "OFF", landingLight ? C_GOOD : C_WARN);
+  }
   py += 4 * s;
   header(px, py, vw, "AIRCRAFT"); py += 24 * s;
   kv("GS / TRK", fmt("%s  %03.0f", fmtSpeed(gs).c_str(), trk));

@@ -5,8 +5,11 @@
 #include "aircraft.h"
 #include <optional>
 
-enum ContractType { CT_LESSON = 0, CT_CARGO, CT_PAX, CT_MEDEVAC, CT_VIP, CT_TOUR, CT_FERRY };
-inline const char* contractTypeName(int t) { static const char* n[] = {"Lesson", "Cargo", "Passengers", "Medevac", "VIP Charter", "Scenic Tour", "Free Flight"}; return n[t]; }
+// C6: the freelance board posts medevacs (a patient who must be flown gently and fast), VIP charters (a live comfort
+// meter), night freight (both ends lit, the landing light on for the touchdown), low-visibility runs (cloud base and
+// visibility at minimums: be lined up when you break out, or go around) and surveys (a ring pattern at one altitude)
+enum ContractType { CT_LESSON = 0, CT_CARGO, CT_PAX, CT_MEDEVAC, CT_VIP, CT_TOUR, CT_FERRY, CT_NIGHT, CT_IFR, CT_SURVEY, CT_COUNT };
+inline const char* contractTypeName(int t) { static const char* n[] = {"Lesson", "Cargo", "Passengers", "Medevac", "VIP Charter", "Scenic Tour", "Free Flight", "Night Freight", "Low-Vis Run", "Survey"}; return n[t]; }
 
 struct Waypoint { float x, z, alt; };  // alt = metres MSL (ring centre)
 
@@ -60,6 +63,13 @@ struct FlightResult {
   // C7: what broke on the flight (bits 1 << FailureKind) and whether it ended on its belly
   int failureKinds = 0;
   bool bellyLanding = false;
+  // C6: the job types' own records. patient / comfort run from 1 down as the ride gets rough (medevac, VIP); the
+  // landing light at touchdown (night freight); an approach continued below minimums without being lined up (low-vis);
+  // the share of the survey pattern flown inside the altitude band
+  float patient = 1.f, comfort = 1.f;
+  bool landingLightOn = true;
+  bool belowMinimumsUnaligned = false;
+  float surveyInBand = 1.f;
 };
 
 struct PayoutLine { std::string label; int amount; };
