@@ -47,6 +47,13 @@ inline std::string shadowProxyFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kLightCommon + kGBuffer + kShadowProxyFS;
 }
+// the effects pass: the ray tracer's effects over the lit frame (its cloak needs the airframe's field)
+inline std::string effectsFSAssembly(const std::string& defines) {
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace +
+         kMaterialCommon + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
+         kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
+         kGBuffer + kEffectsFS;
+}
 inline std::string lightFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kMaterialCommon + kLightCommon + kClouds + kGBuffer + kLightFS;
 }

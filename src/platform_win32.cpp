@@ -601,7 +601,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       auto qpcMs = [&](LARGE_INTEGER a, LARGE_INTEGER b) { return (double)(b.QuadPart - a.QuadPart) / freq.QuadPart * 1000.0; };
       auto pump = [&] { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } };
       static const char* kPassNameRT[Renderer::kPasses] = {"scenery+shadows+displays", "ray trace", "TAA", "sprites", "bloom", "light shafts", "composite"};
-      static const char* kPassNameRaster[Renderer::kPasses] = {"scenery+terrain+objects", "lighting+clouds", "TAA", "sprites", "bloom", "light shafts", "composite"};
+      static const char* kPassNameRaster[Renderer::kPasses] = {"scenery+terrain+objects", "lighting+clouds+effects", "TAA", "sprites", "bloom", "light shafts", "composite"};
       const char* const* kPassName = g_ren.mode == 1 ? kPassNameRaster : kPassNameRT;
       static const struct { int bit; const char* name; } kFeat[] = {
         {1, "volumetric clouds"}, {2, "terrain shadows"}, {4, "scenery shadow maps"}, {8, "aircraft shadow"}, {16, "point lights"},

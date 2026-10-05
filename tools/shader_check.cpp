@@ -28,6 +28,7 @@ int main(int argc, char** argv) {
     put(dir, "light.frag", lightFSAssembly(""));
     put(dir, "objects.frag", objectsFSAssembly(""));
     put(dir, "shadow_proxy.frag", shadowProxyFSAssembly(""));
+    put(dir, "effects.frag", effectsFSAssembly(""));
   }
   return 0;
 }

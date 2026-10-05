@@ -816,7 +816,7 @@ void Renderer::createTargets() {
   createRenderTargets();
   makeTex(texColor, W, H, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
   for (int i = 0; i < 2; i++) {
-    makeTex(texHist[i], W, H, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
+    makeTex(texHist[i], W, H, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR); histW = W; histH = H;
     if (!fboTAA[i]) glGenFramebuffers(1, &fboTAA[i]);
     glBindFramebuffer(GL_FRAMEBUFFER, fboTAA[i]);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texHist[i], 0);
@@ -1239,12 +1239,13 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     if (fp.dispMode & 1) renderDisplays(fp, false);   // the cockpit display atlases, before the objects pass samples them
     if (fp.dispMode & 2) renderDisplays(fp, true);
     // the research jets' cockpit cameras: the same passes on their own targets, before the objects pass draws the screens
-    renderFeeds(fp, [this](GLuint p, const FrameParams& f) { setRT(p, f); }, [this](const FrameParams& f, GLuint) { rasterShadowProxy(f); rasterLight(f); cloudPass(f); }, [this](const FrameParams& f) { feedEffects(f); });
+    renderFeeds(fp, [this](GLuint p, const FrameParams& f) { setRT(p, f); }, [this](const FrameParams& f, GLuint) { rasterShadowProxy(f); rasterLight(f); cloudPass(f); rasterEffects(f); }, [this](const FrameParams& f) { feedEffects(f); });
     rasterObjects(fp);
     rasterShadowProxy(fp);
     stamp(1);
     rasterLight(fp);
     cloudPass(fp);
+    rasterEffects(fp);
     stamp(2);
   } else {
     drawEnvelope(fp);

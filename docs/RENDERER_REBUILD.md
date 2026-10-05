@@ -68,7 +68,7 @@ Shadows from the aircraft (on the ground, on itself, in the landing-light beam) 
 | R0 | Split the uber shader into modules; extract `planeMaterial`, `waterShade`, terrain/entity/debris shading into functions. No behaviour change. | **done** (db08f7a): bit-identical on `multi:air,cockpit,night,storm,rjetc,wr_8_0_0_0_1` |
 | R1a | Deferred world: terrain mesh, water, sky, entities, lighting pass, behind `Renderer::mode` (Settings → Renderer; harness `RASTER=1`; tools `--raster`) | harness: air/mountain/storm/night/sunset match the ray tracer by eye (`RASTER=1 ./render_harness multi:...`, PSNR 27–35 dB with the aircraft absent); owner `benchmark.bat --raster` pending |
 | R1b | Objects pass (aircraft, traffic, wreck, debris, UFO) into the G-buffer; interior lighting; camera feeds; aircraft shadow proxy | harness: cockpit, rjetc, wr_8, trf25_0, ufo13_0, night match the ray tracer by eye; ctest; owner cockpit / rjetc fps pending |
-| R1c | Effects pass, cloak, feeds, timing stamps and tooling (F3, analyze, bench, profile) on the new path | wr_7/9/10, crash, airbreak; owner `analyze.bat` |
+| R1c | Effects pass (prop discs, vapour cone, plumes, weapons, hologram) and the cloak over the lit frame; timing stamps and tooling (F3, analyze, bench, profile) on the new path | harness wr_6 (cloak) / wr_7 (plumes) / wr_9, rjetc, air by eye; owner `analyze.bat --raster` |
 | R2 | Aircraft meshes + rigs; aircraft and spot shadow maps | parity by eye at both ends of every part's travel; owner cockpit fps |
 | R3 | Sky probe, cloud reprojection, entity draw caching, terrain in the near cascade; delete the ray tracer | owner benchmark ≥ 60 fps in air/night/cockpit; sign-off |
 

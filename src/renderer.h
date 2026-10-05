@@ -174,7 +174,7 @@ private:
   // temporal AA: the ray tracer writes texRaw; the resolve blends it with the reprojected history into texHist[cur] + texColor
   GLuint texRaw = 0, texHist[2] = {0, 0}, fboTAA[2] = {0, 0};
   GLuint texTraffic = 0;
-  int histIdx = 0, frameNo = 0; bool histValid = false;
+  int histIdx = 0, frameNo = 0, histW = 0, histH = 0; bool histValid = false;   // (histW/H: the history textures' size)
   // GPU frame time from a ring of timer queries (read a few frames late so the CPU never waits on them)
   GLuint gpuQ[4] = {0, 0, 0, 0}; bool gpuQUsed[4] = {false, false, false, false}; int gpuQi = 0;
 public:
@@ -291,7 +291,7 @@ private:
   void drawSprites(const FrameParams& fp, float texW, float texH, float uvsX, float uvsY);
   void feedEffects(const FrameParams& f);
   // ---- the raster renderer (raster_renderer.cpp, terrain_mesh.cpp)
-  GLuint progLight = 0, progObjects = 0, progShProxy = 0, progTerrain = 0, progWater = 0;
+  GLuint progLight = 0, progObjects = 0, progShProxy = 0, progEffects = 0, progTerrain = 0, progWater = 0;
   GLuint vaoTerrain = 0, vboTerrainInst = 0, vaoWater = 0, vboWater = 0, iboWater = 0; int waterIdx = 0;
   std::vector<float> terrInst; int terrChunks = 0;
   bool compileRaster();
@@ -302,6 +302,7 @@ private:
   void rasterWorld(const FrameParams& fp);
   void rasterObjects(const FrameParams& fp);
   void rasterShadowProxy(const FrameParams& fp);
+  void rasterEffects(const FrameParams& fp);
   void rasterLight(const FrameParams& fp);
 };
 
