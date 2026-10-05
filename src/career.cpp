@@ -500,6 +500,7 @@ void Career::refreshBoard() {
     if (canFly(c, si) == SRC_NONE) continue;
     float km = contractKm(c);
     c.payout = (int)((250 + km * (30 + c.cargoKg * 0.13f + c.pax * 16)) * r.range(0.9f, 1.15f)) / 10 * 10;
+    { int chapter = nextStory() ? nextStory()->chapter : 5; c.payout = (int)(c.payout * (1.f + 0.35f * chapter)) / 10 * 10; }   // the work pays more as the career advances (pacing)
     c.repBonusPct = repBonusPct();   // clients pay a reliable pilot a little more
     c.payout = c.payout * (100 + c.repBonusPct) / 100 / 10 * 10;
     c.fragile = !pax && r.uni() < 0.15f;
@@ -555,6 +556,7 @@ std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan
   J.at = at; J.state = JobState::RECOVERY;
   location = at;
   if (J.src == SRC_OWNED) { int oi = ownedIndexFor(J.spec); if (oi >= 0) fleet[oi].location = at; }
+  payLoan(L);
   int total = 0; for (auto& l : L) total += l.amount;
   money += total;
   refreshBoard();
@@ -675,6 +677,7 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
     if (src == SRC_OWNED) { int oi = ownedIndexFor(si); if (oi >= 0) fleet[oi].location = c.to; }
     boardSeed++;
   }
+  payLoan(L);
   int total = 0; for (auto& l : L) total += l.amount;
   money += total;
   refreshBoard();
@@ -687,18 +690,63 @@ bool Career::buy(int si, std::string* msg) {
   if (license < s.license) { *msg = std::string("Requires ") + licenseName(s.license); return false; }
   if (money < s.price) { *msg = fmt("Not enough money ($%d needed)", s.price); return false; }
   money -= s.price;
-  fleet.push_back({si, location, s.maxFuel, 0.f});
+  fleet.push_back({si, location, s.maxFuel, 1.f});
   *msg = fmt("Purchased %s! It's waiting at %s.", s.name, g_world.airports[location].code);
   refreshBoard();
   return true;
 }
 
+bool Career::finance(int si, std::string* msg) {
+  const AircraftSpec& s = kAircraft[si];
+  if (ownedIndexFor(si) >= 0) { *msg = "You already own one."; return false; }
+  if (license < s.license) { *msg = std::string("Requires ") + licenseName(s.license); return false; }
+  if (loan.open()) { *msg = "One loan at a time: finish paying for your " + std::string(kAircraft[loan.spec].name) + " first."; return false; }
+  int down = downPayment(si);
+  if (money < down) { *msg = fmt("Not enough for the down payment ($%d)", down); return false; }
+  money -= down;
+  loan.spec = si; loan.rate = loanRate(); loan.balance = (int)((s.price - down) * (1.f + loan.rate)); loan.payment = loanPayment(si); loan.missed = 0;
+  fleet.push_back({si, location, s.maxFuel, 1.f});
+  *msg = fmt("Financed %s: $%d down, $%d per flight for %d flights (%.0f%% interest). It's waiting at %s.", s.name, down, loan.payment, kLoanTerm, loan.rate * 100.f, g_world.airports[location].code);
+  refreshBoard();
+  return true;
+}
+bool Career::buyUsed(int si, std::string* msg) {
+  const AircraftSpec& s = kAircraft[si];
+  if (ownedIndexFor(si) >= 0) { *msg = "You already own one."; return false; }
+  if (license < s.license) { *msg = std::string("Requires ") + licenseName(s.license); return false; }
+  int price = usedPrice(si);
+  if (money < price) { *msg = fmt("Not enough money ($%d needed)", price); return false; }
+  money -= price;
+  fleet.push_back({si, location, s.maxFuel * 0.5f, 0.65f});
+  *msg = fmt("Bought a used %s for $%d: it's seen some hours. Waiting at %s with half tanks.", s.name, price, g_world.airports[location].code);
+  refreshBoard();
+  return true;
+}
+void Career::payLoan(std::vector<PayoutLine>& L) {
+  if (!loan.open()) return;
+  int oi = ownedIndexFor(loan.spec);
+  if (oi < 0) { loan = Loan(); return; }   // (sold: the sale settled it)
+  int due = std::min(loan.payment, loan.balance);
+  int total = 0; for (auto& l : L) total += l.amount;
+  if (money + total >= due) {
+    L.push_back({fmt("Loan payment on the %s (%d left)", kAircraft[loan.spec].name, std::max(0, (loan.balance - due + loan.payment - 1) / std::max(loan.payment, 1))), -due});
+    loan.balance -= due; loan.missed = 0;
+    if (loan.balance <= 0) { L.push_back({"Loan paid off - the aircraft is yours", 0}); loan = Loan(); }
+  } else {
+    loan.missed++;
+    if (loan.missed >= 3) {
+      L.push_back({fmt("%s repossessed: three payments missed", kAircraft[loan.spec].name), 0});
+      fleet.erase(fleet.begin() + oi); loan = Loan();
+    } else L.push_back({fmt("Loan payment missed (%d of 3 before repossession)", loan.missed), 0});
+  }
+}
 bool Career::sell(int fi, std::string* msg) {
   if (fi < 0 || fi >= (int)fleet.size()) return false;
   const AircraftSpec& s = kAircraft[fleet[fi].spec];
-  int val = s.price * 7 / 10;
+  int val = (int)(s.price * 7 / 10 * (0.6f + 0.4f * clampf(fleet[fi].condition, 0.f, 1.f)));
   money += val;
   *msg = fmt("Sold %s for $%d.", s.name, val);
+  if (loan.open() && loan.spec == fleet[fi].spec) { money -= loan.balance; *msg += fmt(" The loan's $%d balance was settled from it.", loan.balance); loan = Loan(); }
   fleet.erase(fleet.begin() + fi);
   refreshBoard();
   return true;
@@ -721,7 +769,8 @@ bool Career::save(const std::string& path) const {
   bool ok = fprintf(f, "solace_save 3\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\nattempt %u\nattempt_open %d\n",
                     money, license, reputation, location, storyIndex, flights, landings, crashes, hours, bestLandingFpm, boardSeed, finished ? 1 : 0, attempt, attemptOpen ? 1 : 0) > 0;
   ok = ok && fprintf(f, "fleet %d\n", (int)fleet.size()) > 0;
-  for (auto& p : fleet) ok = ok && fprintf(f, "plane %s %d %f\n", kAircraft[p.spec].id, p.location, p.fuel) > 0;
+  for (auto& p : fleet) ok = ok && fprintf(f, "plane %s %d %f %f\n", kAircraft[p.spec].id, p.location, p.fuel, p.condition) > 0;
+  if (loan.open()) ok = ok && fprintf(f, "loan %s %d %d %d %f\n", kAircraft[loan.spec].id, loan.balance, loan.payment, loan.missed, loan.rate) > 0;
   if (job) {   // the open job: its state, then its contract (a story contract by id, a freelance one in full)
     const JobState& J = *job;
     ok = ok && fprintf(f, "job %d %s %d %d %d %d %f %f %f %f %d %f %d %d %u\n", (int)J.state, kAircraft[J.spec].id, (int)J.src, J.at, J.legs, J.wpDone, J.jobClockMin,
@@ -784,11 +833,19 @@ bool Career::load(const std::string& path) {
     else if (!strcmp(key, "attempt_open")) { int ao = 0; ok = fscanf(f, "%d", &ao) == 1 && (ao == 0 || ao == 1); c.attemptOpen = ao != 0; }
     else if (!strcmp(key, "fleet")) ok = fscanf(f, "%d", &fleetN) == 1 && fleetN >= 0;
     else if (!strcmp(key, "plane")) {
-      char id[64]; int loc = -1; float fuel = 0; int spec = -1;
+      char id[64]; int loc = -1; float fuel = 0, cond = 1.f; int spec = -1;
       ok = fscanf(f, "%63s %d %f", id, &loc, &fuel) == 3;
+      { long pos = ftell(f); float cv = 0; if (fscanf(f, "%f", &cv) == 1 && std::isfinite(cv)) cond = cv; else fseek(f, pos, SEEK_SET); }   // (version 3 adds the condition)
       for (int i = 0; ok && i < kNumAircraft; i++) if (!strcmp(kAircraft[i].id, id)) spec = i;
       ok = ok && spec >= 0 && loc >= 0 && loc < nApt && std::isfinite(fuel);
-      if (ok) c.fleet.push_back({spec, loc, std::clamp(fuel, 0.f, kAircraft[spec].maxFuel), 0.f});
+      if (ok) c.fleet.push_back({spec, loc, std::clamp(fuel, 0.f, kAircraft[spec].maxFuel), std::clamp(cond, 0.f, 1.f)});
+    }
+    else if (!strcmp(key, "loan")) {
+      char id[64]; Loan l;
+      ok = fscanf(f, "%63s %d %d %d %f", id, &l.balance, &l.payment, &l.missed, &l.rate) == 5 && l.balance >= 0 && l.payment >= 0 && l.missed >= 0 && l.missed < 3 && std::isfinite(l.rate);
+      l.spec = -1; for (int i = 0; ok && i < kNumAircraft; i++) if (!strcmp(kAircraft[i].id, id)) l.spec = i;
+      ok = ok && l.spec >= 0;
+      if (ok) c.loan = l;
     }
     else if (!strcmp(key, "job")) {   // (version 3) the open job, followed by its plan and contract lines
       JobState J; char id[64]; int st = 0, src = 0, fh = 0, hp = 0, pp = 0;

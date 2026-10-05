@@ -75,6 +75,17 @@ public:
   uint32_t boardSeed = 1;
   bool finished = false;
   uint32_t attempt = 0;        // monotonic per career: one per flight begun
+  // Financing: one loan at a time, on one aircraft. A quarter down, the rest plus interest in equal payments taken
+  // at every settlement (success or not); three payments missed in a row and the aircraft is repossessed.
+  struct Loan { int spec = -1; int balance = 0; int payment = 0; int missed = 0; float rate = 0.1f; bool open() const { return spec >= 0 && balance > 0; } } loan;
+  static const int kLoanTerm = 24;   // payments
+  float loanRate() const { return clampf(0.12f - reputation * 0.0015f, 0.08f, 0.12f); }   // 12% down to 8% with reputation
+  int downPayment(int specIdx) const { return kAircraft[specIdx].price / 4; }
+  int loanPayment(int specIdx) const { int p = kAircraft[specIdx].price - downPayment(specIdx); return (int)((p * (1.f + loanRate())) / kLoanTerm) / 10 * 10 + 10; }
+  bool finance(int specIdx, std::string* msg);    // the aircraft on a loan
+  bool buyUsed(int specIdx, std::string* msg);    // a used one at 65%, at two thirds condition
+  int usedPrice(int specIdx) const { return kAircraft[specIdx].price * 65 / 100 / 10 * 10; }
+  void payLoan(std::vector<PayoutLine>& L);       // one payment at a settlement (called by settle / closeLeg)
   bool attemptOpen = false;    // a flight was in progress when this career was saved (the save before the flight)
 
   void newGame();

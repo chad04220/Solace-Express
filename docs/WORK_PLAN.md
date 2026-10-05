@@ -39,8 +39,8 @@ Line numbers in §2 are from `f8b8537` and no longer match: re-grep the identifi
 | A11 cloud march | → R3 | — |
 | A2 baked partial fbm | superseded by the terrain mesh | — |
 | C3 fuel and payload planning | done: maxMass, fuel price per airport, FUEL_PURCHASED for owned aircraft, the card's fuel choice, hangar refuel; the progression test checks every story contract's fuel with full tanks (at least 5% over the flown quote) and weight | C3 commit |
-| C5 financing and pacing | open | — |
-| C7 failures and maintenance | open (after C3) | — |
+| C5 financing and pacing | done: one loan at a time (a quarter down, 8–12% by reputation, 24 payments taken at settlements, three missed → repossession, a sale settles the balance), used aircraft at 65% with condition 0.65 and half tanks, freelance pay × (1 + 0.35·chapter); the progression money model finances when it can't pay cash (grind ≤ 5 jobs); save v3 keeps the loan and condition | C5 commit |
+| C7 failures and maintenance | open (next) | — |
 | A12 bake the aircraft to meshes | done differently (R2) | — |
 | A13 terrain clipmap | done as R1a's CDLOD terrain | — |
 | B3 drop the helper-process shader compile | open: needs the owner's first-run compile time on the rasterizer (startup.log in report.bat) | — |

@@ -4,7 +4,7 @@
 int main() {
   g_world.build(); buildStory();
   Career c; c.newGame();
-  int problems = 0; long grind = 0;
+  int problems = 0; long grind = 0; int loans = 0;
   for (size_t i = 0; i < g_story.size(); i++) {
     const Contract& k = g_story[i];
     // terrain clearance along route legs
@@ -32,8 +32,16 @@ int main() {
     }
     if (best < 0) { printf("  !! %s: NO aircraft can fly this contract (SOFTLOCK)\n", k.id.c_str()); problems++; continue; }
     if (needBuy) {
-      if (c.money < kAircraft[best].price) { long sh = kAircraft[best].price - c.money; grind += sh; printf("  .. grind $%ld to buy %s\n", sh, kAircraft[best].name); c.money = kAircraft[best].price; }
-      std::string m; c.buy(best, &m);
+      // the money model takes the loan when it can't pay cash: a quarter down, the rest per flight (C5). Grind, where
+      // it remains, is the shortfall on the down payment; it must stay within a handful of freelance jobs.
+      std::string m;
+      if (c.money >= kAircraft[best].price) c.buy(best, &m);
+      else {
+        int down = c.downPayment(best);
+        if (c.money < down) { long sh = down - c.money; grind += sh; printf("  .. grind $%ld for the down payment on %s\n", sh, kAircraft[best].name); c.money = down; }
+        if (!c.finance(best, &m)) { printf("  !! %s: finance(%s) refused: %s\n", k.id.c_str(), kAircraft[best].name, m.c_str()); problems++; c.money = kAircraft[best].price; c.buy(best, &m); }
+        else loans++;
+      }
     }
     {   // fuel and weight: the estimate with a quarter to spare fits the tanks, and the aircraft stays under its limit with it
       Career::Source src0 = c.canFly(k, best);
@@ -66,7 +74,11 @@ int main() {
     if (!want) { printf("  !! %s: continuation policy %d doesn't fit the contract\n", k.id.c_str(), (int)p); problems++; }
   }
   if (Career::policyOf(g_story[0]) != Career::POL_RETAKE || Career::policyOf(g_story[3]) != Career::POL_RETAKE) { printf("  !! L1 / L4 must be retaken whole\n"); problems++; }
-  printf("Total extra freelance money needed: $%ld, problems: %d, finished=%d\n", grind, problems, c.finished);
+  // financing pacing: with the loan the whole story needs at most a few freelance jobs of grind in total (a good
+  // freelance job nets about $1500 early on), and no loan may still be open with payments missed at the end
+  if (grind > 5 * 1500) { printf("  !! the story needs $%ld of freelance grind even with financing (> 5 jobs)\n", grind); problems++; }
+  if (c.loan.open() && c.loan.missed > 0) { printf("  !! the story ends with %d loan payments missed\n", c.loan.missed); problems++; }
+  printf("Total extra freelance money needed: $%ld (%d loans taken), problems: %d, finished=%d\n", grind, loans, problems, c.finished);
   // Freelance board must never be empty once licensed
   for (int ap = 0; ap < (int)g_world.airports.size(); ap++) {
     Career t; t.newGame(); t.license = surfaceRough(g_world.airports[ap].surface) && g_world.airports[ap].surface != SURF_GRASS && g_world.airports[ap].surface != SURF_SAND ? LIC_CPL : LIC_PPL; t.location = ap; t.refreshBoard();

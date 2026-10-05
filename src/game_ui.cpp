@@ -802,6 +802,21 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
       hubMsg = m; hubMsgTime = 4;
     }
     if (!can) g_ren.text(px + 260 * s, py + 14 * s, 15 * s, commitBlocked() ? "Last result not saved yet - retrying" : career.license < a.license ? std::string("Requires ") + licenseName(a.license) : "Not enough money", C_BAD, 1);
+    py += 54 * s;
+    {   // the other ways in: a loan (a quarter down, the rest per flight) and a used one at 65%
+      bool lic = career.license >= a.license && !commitBlocked();
+      bool canFin = lic && !career.loan.open() && career.money >= career.downPayment(selHangar);
+      if (button(px, py, 240 * s, 40 * s, fmt("Finance: %s down", fmtMoney(career.downPayment(selHangar)).c_str()), canFin, false)) {
+        std::string m; bool ok = false; commit([&](Career& k) { ok = k.finance(selHangar, &m); }); if (ok) g_audio.trigger(SFX_CASH); hubMsg = m; hubMsgTime = 5;
+      }
+      g_ren.text(px + 250 * s, py + 2 * s, 13 * s, career.loan.open() ? "One loan at a time" : fmt("then %s per flight for %d flights (%.0f%% interest)", fmtMoney(career.loanPayment(selHangar)).c_str(), Career::kLoanTerm, career.loanRate() * 100.f), C_DIM, 1);
+      bool canUsed = lic && career.money >= career.usedPrice(selHangar);
+      if (button(px, py + 46 * s, 240 * s, 40 * s, fmt("Buy used: %s", fmtMoney(career.usedPrice(selHangar)).c_str()), canUsed, false)) {
+        std::string m; bool ok = false; commit([&](Career& k) { ok = k.buyUsed(selHangar, &m); }); if (ok) g_audio.trigger(SFX_CASH); hubMsg = m; hubMsgTime = 5;
+      }
+      g_ren.text(px + 250 * s, py + 48 * s, 13 * s, "two thirds condition, half tanks: cheaper to buy, dearer to keep", C_DIM, 1);
+      py += 46 * s;
+    }
   } else {
     g_ren.text(px, py, 16 * s, fmt("Parked at %s", g_world.airports[career.fleet[oi].location].name), C_GOOD, 1);
     py += 30 * s;
@@ -814,10 +829,11 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
   }
   py += 70 * s;
   header(px, py, dw - 48 * s, "YOUR FLEET"); py += 26 * s;
+  if (career.loan.open()) { g_ren.text(px, py, 14 * s, ellipsize(fmt("Loan on the %s: %s left, %s per flight%s", kAircraft[career.loan.spec].name, fmtMoney(career.loan.balance).c_str(), fmtMoney(career.loan.payment).c_str(), career.loan.missed ? fmt(", %d payment%s missed", career.loan.missed, career.loan.missed > 1 ? "s" : "").c_str() : ""), dw - 48 * s, 14 * s), career.loan.missed ? C_BAD : C_WARN, 1); py += 22 * s; }
   if (career.fleet.empty()) g_ren.text(px, py, 15 * s, "You don't own any aircraft yet. Rentals are available everywhere.", C_DIM, 1);
   for (size_t fi = 0; fi < career.fleet.size(); fi++) {
     const OwnedPlane& f = career.fleet[fi]; const AircraftSpec& fs = kAircraft[f.spec];
-    g_ren.text(px, py, 15 * s, ellipsize(fmt("%s  -  at %s, %.0f%% fuel", fs.name, g_world.airports[f.location].code, 100.f * f.fuel / std::max(fs.maxFuel, 1.f)), dw - 200 * s, 15 * s), C_TEXT, 1);
+    g_ren.text(px, py, 15 * s, ellipsize(fmt("%s  -  at %s, %.0f%% fuel, condition %.0f%%", fs.name, g_world.airports[f.location].code, 100.f * f.fuel / std::max(fs.maxFuel, 1.f), 100.f * f.condition), dw - 200 * s, 15 * s), C_TEXT, 1);
     if (f.location == career.location && f.fuel < fs.maxFuel - 1.f) {
       int cost = (int)((fs.maxFuel - f.fuel) * career.fuelPrice(career.location, f.spec));
       if (button(px + dw - 48 * s - 150 * s, py - 4 * s, 150 * s, 26 * s, fmt("Fill up %s", fmtMoney(cost).c_str()), !commitBlocked() && career.money >= cost, false)) {

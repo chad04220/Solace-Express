@@ -1,6 +1,7 @@
 // Career save robustness: damaged or incomplete saves are rejected without touching the live career, a failed write
 // reports false and leaves the previous save intact, and a good save round-trips.
 #include "../src/career.h"
+#include <cmath>
 #include <cstdio>
 #include <string>
 #ifdef _WIN32
@@ -31,6 +32,25 @@ int main() {
     writeFile("save_test_bad.sav", "solace_save 3\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nattempt 3\nattempt_open 7\nfleet 0\nend\n");
     Career x = r; check(!x.load("save_test_bad.sav"), "a marker that isn't 0 or 1 is rejected");
     remove("save_test_v3.sav"); remove("save_test_v3.sav.bak"); remove("save_test_v2.sav");
+  }
+  {   // version 3: a loan and the aircraft's condition round-trip; a plane line without the condition (v2) reads as new
+    Career a = live; a.money = 100000; a.license = LIC_CPL; std::string m;
+    check(a.finance(3, &m) && a.loan.open() && a.loan.spec == 3 && a.fleet.size() == 2, "finance opens a loan and adds the aircraft");
+    check(!a.finance(4, &m), "only one loan at a time");
+    a.fleet[0].condition = 0.4f;
+    check(a.save("save_test_loan.sav"), "loan save writes");
+    Career b; b.newGame(); check(b.load("save_test_loan.sav"), "loan save loads");
+    check(b.loan.open() && b.loan.spec == 3 && b.loan.balance == a.loan.balance && b.loan.payment == a.loan.payment && b.loan.missed == 0 && std::fabs(b.loan.rate - a.loan.rate) < 1e-4f, "round trip keeps the loan");
+    check(b.fleet.size() == 2 && std::fabs(b.fleet[0].condition - 0.4f) < 1e-4f && std::fabs(b.fleet[1].condition - 1.f) < 1e-4f, "round trip keeps the condition");
+    writeFile("save_test_v2b.sav", "solace_save 2\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nfleet 1\nplane kestrel 1 20\nend\n");
+    Career v2; v2.newGame(); check(v2.load("save_test_v2b.sav") && v2.fleet.size() == 1 && v2.fleet[0].condition > 0.99f && !v2.loan.open(), "v2 plane line reads as a new aircraft without a loan");
+    {   // a payment comes off each settlement; three missed payments repossess the aircraft
+      Career d = b; std::vector<PayoutLine> L; int bal = d.loan.balance; d.money = 1000000;
+      d.payLoan(L); check(d.loan.balance == bal - d.loan.payment && !L.empty() && L.back().amount == -d.loan.payment, "a settlement takes one payment");
+      d.money = -1000000; for (int i = 0; i < 3; i++) { L.clear(); d.payLoan(L); }
+      check(!d.loan.open() && d.fleet.size() == 1, "three missed payments repossess the aircraft and close the loan");
+    }
+    remove("save_test_loan.sav"); remove("save_test_loan.sav.bak"); remove("save_test_v2b.sav");
   }
 
   // each of these must be rejected and leave the career as it was
