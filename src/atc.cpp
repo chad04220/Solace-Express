@@ -244,6 +244,7 @@ void AtcVoice::start(const Tx& tx) {
   g_audio.voicePlay(buf);
   playingPrio = tx.prio; idleT = 0;
   started = tx; history.push_back((tx.subtitle ? "TWR " : "") + tx.text);
+  if (historyLimit && history.size() > historyLimit) history.erase(history.begin(), history.begin() + (history.size() - historyLimit));
 }
 
 bool AtcVoice::busy() const { return g_audio.voiceBusy(); }

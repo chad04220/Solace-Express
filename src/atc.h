@@ -37,6 +37,7 @@ public:
   void cancel();
   bool busy() const;
   std::vector<std::string> history;   // every transmission started, in order; the towers' prefixed "TWR " (tests)
+  size_t historyLimit = 64;           // the newest this many are kept (0: all, for tests)
 private:
   struct Clip { std::string file, words, speaker, kind, mission; int prio = 40; std::vector<float> pcm; bool loaded = false; };
   std::unordered_map<std::string, Clip> clips;

@@ -65,6 +65,34 @@ std::string keyName(int vk) {
   return fmt("KEY %02X", vk);
 }
 
+// A lesson hint's {actionId} tokens (kActions ids) as the keys bound now. With the default bindings this is the text
+// the voice lines were recorded from (AtcVoice matches it); after a rebind it no longer matches any recording, so the
+// hint is shown and never spoken naming the old key.
+std::string Game::expandHint(const std::string& raw) const {
+  std::string out;
+  for (size_t i = 0; i < raw.size(); i++) {
+    size_t e = raw[i] == '{' ? raw.find('}', i) : std::string::npos;
+    int a = -1;
+    if (e != std::string::npos) { std::string id = raw.substr(i + 1, e - i - 1); for (int k = 0; k < ACT_COUNT; k++) if (id == kActions[k].id) a = k; }
+    if (a < 0) { out += raw[i]; continue; }
+    out += keyName(set.keyBind[a]); i = e;
+  }
+  return out;
+}
+
+// The flown time for a job's plan when it's in; else (start) a background flight is begun for it if none is running
+void Game::applyQuote(const Contract& c, Career::LaunchPlan& e, bool start) {
+  if (quoteJob.valid() && quoteJob.wait_for(std::chrono::seconds(0)) == std::future_status::ready) quoteFlown[quoteJobKey] = quoteJob.get();
+  std::string key = fmt("%s|%d|%d|%d", c.id.c_str(), e.spec, c.from, c.to);
+  auto it = quoteFlown.find(key);
+  if (it != quoteFlown.end()) { career.useFlownTime(e, c, it->second.first, it->second.second); return; }
+  if (!start || quoteJob.valid() || c.forceAircraft >= 0) return;   // (lessons are flown by hand: the quick estimate stands)
+  Plane::perf(&kAircraft[e.spec]);   // (learned here first: the worker then only reads it)
+  quoteJobKey = key;
+  Contract cc = c; int spec = e.spec;
+  quoteJob = std::async(std::launch::async, [cc, spec] { float fuel = -1; float m = simulateFlightMinutes(cc, spec, &fuel); return std::make_pair(m, fuel); });
+}
+
 std::string padName(unsigned bit) {
   static const char* n[] = {"A", "B", "X", "Y", "LB", "RB", "VIEW", "MENU", "D-PAD UP", "D-PAD DOWN", "D-PAD LEFT", "D-PAD RIGHT", "LS CLICK", "RS CLICK"};
   for (int i = 0; i < 14; i++) if (bit & (1u << i)) return n[i];
@@ -268,6 +296,8 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   static bool dispWarned = false;   // say once if the cockpit display shader could not be built on this GPU
   if (!g_ren.dispError.empty() && !dispWarned && !headless) { dispWarned = true; toast("Cockpit display shader failed on this GPU (details in startup.log)", vec3(1.f, 0.45f, 0.35f)); }
   contract = c; specIdx = spec; source = src;
+  launchPlan = career.plan(c, spec, src);   // the quote this flight is settled against (fees exactly as shown)
+  applyQuote(c, launchPlan, false);
   researchFlight = false;   // a career flight; launchResearch sets it again for its own
   wx = c.wx; timeOfDay = wx.timeOfDay;
   const AircraftSpec& s = kAircraft[spec];
@@ -335,7 +365,7 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   coaching = landingCoaching();
   Contract c = contract;
   if (c.type == CT_FERRY) { c.story = false; }
-  payout = career.settle(c, specIdx, source, result, &stars);
+  payout = career.settle(c, specIdx, source, result, &stars, &launchPlan);
   lastSuccess = success;
   debriefTitle = success ? (c.type == CT_FERRY ? "Flight complete" : "Contract complete!") : (reason.empty() ? "Flight failed" : reason);
   g_audio.trigger(success ? SFX_SUCCESS : SFX_FAIL);
@@ -555,12 +585,14 @@ void Game::updateFlight(float dt) {
     if (startDelay <= 0) { engineAutoStarted = true; plane.starterTime = 0.01f; toast("Starting engine..."); }
   }
   bool wasRunning = plane.engineRunning;
-  float simDt = dt * timeAccel;
+  // (time acceleration is switched off before this frame's step, not after it: a 4x frame on the approach was one
+  // too many)
   if (timeAccel > 1) {
     float dd = length(vec3(plane.pos.x - dest().x, 0, plane.pos.z - dest().z));
     bool approach = plane.apOn && plane.apMode == Plane::AP_APPR && plane.apStage != Plane::APS_NAV;
     if ((!apCruising() && (plane.agl() < 250.f || dd < 3500.f)) || approach || plane.onGround || crashed) { timeAccel = 1; toast("Time acceleration off"); }
   }
+  float simDt = dt * timeAccel;
   vec3 prevPos = plane.pos;
   if (!crashed) {
     plane.step(simDt, wx, gameTime);
@@ -814,7 +846,7 @@ void Game::updateFlight(float dt) {
   if (contract.hints.size() > (size_t)phase && phase != lastHintPhase) {
     lastHintPhase = phase;
     if (!contract.hints[phase].empty()) {
-      hint = contract.hints[phase];
+      hint = expandHint(contract.hints[phase]);
       if (set.showHints && std::find(hintsVoiced.begin(), hintsVoiced.end(), hint) == hintsVoiced.end()) { hintsVoiced.push_back(hint); commsPending.push_back({hint, contract.id}); }   // each said once
     }
   }
@@ -2368,8 +2400,10 @@ void Game::update(float dt) {
   dt = std::min(dt, 0.05f);
   realTime += dt;
   updateBindCapture(dt);
-  // gamepad: both bumpers held together for a second hides the whole flight UI; again brings it back
-  if (in.pad && (in.buttons & PAD_LB) && (in.buttons & PAD_RB)) {
+  // gamepad: both bumpers held together for a second hides the whole flight UI; again brings it back (not while the
+  // XR-11's weapons are armed: the bumpers are its triggers then; the pause menu has the same switch)
+  bool bumpersFree = !(screen == SCR_FLIGHT && plane.spec && plane.spec->special == 2 && wraith.armed);
+  if (in.pad && bumpersFree && (in.buttons & PAD_LB) && (in.buttons & PAD_RB)) {
     bumperHold += dt;
     if (bumperHold >= 1.f && !bumperFired) { bumperFired = true; uiHidden = !uiHidden; g_audio.trigger(SFX_CLICK); }
   } else { bumperHold = 0; bumperFired = false; }
@@ -3019,7 +3053,7 @@ void Game::debugScene(const std::string& name) {
   if (name == "top") { camMode = 2; camYaw = 0.3f; camPitch = 1.35f; camZoom = 4.f; }
   if (name == "orbit") { camMode = 2; camYaw = 2.3f; camPitch = 0.25f; camZoom = 0.6f; timeOfDay = 9.0f; }
   for (int i = 0; i < 30; i++) updateCamera(0.1f);
-  if (name == "hud") hint = contract.hints.size() ? contract.hints[2] : "";
+  if (name == "hud") hint = contract.hints.size() ? expandHint(contract.hints[2]) : "";
   if (name == "gps" || name == "pause" || name == "minimap") {
     plane.reset(&kAircraft[1], vec3(-4000, 600, 9000), 40, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
     takeoffAnnounced = true; camQ = plane.q; hint.clear(); toasts.clear();

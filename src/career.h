@@ -75,21 +75,45 @@ public:
   Source canFly(const Contract& c, int specIdx, std::string* why = nullptr) const;
   int ownedIndexFor(int specIdx) const;
   // Settle a finished flight; returns lines for the debrief
-  std::vector<PayoutLine> settle(const Contract& c, int specIdx, Source src, const FlightResult& r, int* stars);
+  // (plan: the launch plan the flight was started with - its fixed fees are charged exactly as quoted; without one
+  // they are worked out now)
+
   bool buy(int specIdx, std::string* msg);
   bool sell(int fleetIdx, std::string* msg);
   int positioningCost(const Contract& c) const;
   int ferryCost(const Contract& c, int specIdx) const;
-  // What a job is likely to be worth with an aircraft: time, fuel, the fees settle() will charge, the net, and its
-  // main difficulty (an estimate: the real flight decides)
-  struct Estimate { float minutes = 0, fuelKg = 0; int fees = 0, fuelCost = 0, net = 0; std::string challenge; };
-  Estimate estimate(const Contract& c, int specIdx, Source src) const;
+  // The launch plan of a job with an aircraft: what it will cost (the fixed fees, quoted exactly and charged as quoted
+  // by settle), how long it will take and the fuel (estimates, with their uncertainty), the net and the main difficulty.
+  // One plan is used by the job card, the launch and the settlement.
+  struct LaunchPlan {
+    int spec = 0; Source src = SRC_NONE; int startAirport = 0;
+    int positioning = 0, ferry = 0, hire = 0;          // fixed, quoted exactly at acceptance
+    enum FuelPolicy { FUEL_INCLUDED, FUEL_BILL_CONSUMED, FUEL_PURCHASED } fuel = FUEL_INCLUDED;
+    float fuelKgEst = 0, minutesEst = 0, minutesSigma = 0;
+    int fuelCostEst = 0, net = 0;                      // net = payout - fixed fees - fuelCostEst
+    std::string challenge;
+    float tCruise = 0, tClimb = 0, tOrbit = 0, tApproach = 0;   // the estimate's parts (min): en route, climbing, the descent orbit, the approach
+    bool flown = false;   // minutesEst is the job flown on the autopilot in the background (else the quick estimate)
+    int fees() const { return positioning + ferry + hire; }
+    bool mayBeLate(float timeLimitMin) const { return timeLimitMin > 0 && minutesEst + minutesSigma > timeLimitMin; }
+  };
+  LaunchPlan plan(const Contract& c, int specIdx, Source src) const;
+  void useFlownTime(LaunchPlan& e, const Contract& c, float minutes, float fuelKg = -1) const;
+  void finishPlan(LaunchPlan& e, const Contract& c, float minutes, float fuelKg = -1) const;
+  std::vector<PayoutLine> settle(const Contract& c, int specIdx, Source src, const FlightResult& r, int* stars, const LaunchPlan* plan = nullptr);
+  using Estimate = LaunchPlan;
+  LaunchPlan estimate(const Contract& c, int specIdx, Source src) const { return plan(c, specIdx, src); }
   int repBonusPct() const { return std::min(15, reputation / 4); }   // +1% per 4 reputation, at most +15%
   bool save(const std::string& path) const;
   bool load(const std::string& path);
 };
 
 extern std::vector<Contract> g_story;
+// The job flown headless on the career autopilot (as startFlight sets it up: the runway into the wind, full tanks,
+// the load), a scripted takeoff, the checkpoints in turn, then the autopilot's approach and landing: the minutes it
+// takes, or a negative number if it didn't get there. About half a second of CPU: callers run it off the UI thread.
+float simulateFlightMinutes(const Contract& c, int specIdx, float* fuelKgOut = nullptr);
+extern float kEstK[5];   // the flight-time estimate's fitted weights (Career::plan)
 void buildStory();
 bool surfaceOK(const AircraftSpec& s, int surface);
 bool runwayOK(const AircraftSpec& s, const Airport& a);

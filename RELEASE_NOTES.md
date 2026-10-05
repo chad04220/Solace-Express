@@ -2,6 +2,11 @@
 
 **Autopilot and handling**
 - On career flights the autopilot now flies for the passengers and the load: up to 25 degrees of bank, 0.8-1.3 g, gentle roll and climb rates, so it never earns a passenger-discomfort or fragile-cargo penalty. Your own stick is never limited, and aerobatics and the research jets keep the full envelope
+- Job quotes are honest: the job card flies the job on the autopilot in the background (the same flight model, the runway into the wind, your load, the checkpoints, the arrival and landing) and quotes that time and fuel, within a few percent of the real flight (a quick estimate shows for the first second or two). It lists payment, operating costs (hire, positioning, ferry, fuel) and the estimated net, the time with its uncertainty, the deductions that apply, and warns when a deadline may be missed. The fees on the debrief are exactly the ones quoted
+- Terrain clearance and range checks follow the route's checkpoints, not just the straight line
+- Lesson hints name the keys you've bound; a recording that names a key you rebound is never played (the hint is shown instead)
+- "Hide flight UI" in the pause menu (LB+RB still works, except while the XR-11's weapons are armed: the bumpers are its triggers)
+- Time acceleration switches off before an approach frame, not one frame after; the radio log no longer grows without bound
 - Parking brakes hold dead still at full power (static friction); before, every aircraft crept forward slightly
 
 **XR-11 cockpit**

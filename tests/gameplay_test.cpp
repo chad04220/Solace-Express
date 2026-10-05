@@ -213,6 +213,54 @@ struct GameTest {
       }
       g.botControl = true;
     }
+    // ---- E1: the quote is honest. A4 (the Minister's Jet, an owned Starling) flown on the autopilot after a scripted
+    // takeoff lands within the quoted time +- its uncertainty; the job card's plan is the one the flight settles with
+    {
+      Career keep = g.career;
+      int a4 = -1; for (size_t i = 0; i < g_story.size(); i++) if (g_story[i].id == "A4") a4 = (int)i;
+      const Contract& c = g_story[a4];
+      int spec = -1; for (int i = 0; i < kNumAircraft; i++) if (std::string(kAircraft[i].id) == "starling") spec = i;
+      g.career.license = LIC_ATP; g.career.location = c.from; g.career.money = 500000;
+      g.career.fleet.clear(); g.career.fleet.push_back({spec, c.from, kAircraft[spec].maxFuel, 0.f});
+      Career::LaunchPlan pl = g.career.plan(c, spec, Career::SRC_OWNED);
+      float quick = pl.minutesEst, simFuel = -1, sim = simulateFlightMinutes(c, spec, &simFuel);
+      g.career.useFlownTime(pl, c, sim, simFuel);
+      g.startFlight(c, spec, Career::SRC_OWNED);
+      const AircraftSpec& s = kAircraft[spec];
+      Plane& p = g.plane; bool ap = false;
+      for (int k = 0; k < 30 * 60 * 40 && g.screen == SCR_FLIGHT; k++) {
+        if (!ap) {
+          p.ctl.brake = 0; p.ctl.throttle = 1; p.ctl.flaps = 0.15f;
+          p.ctl.pitch = p.ias > s.vref * 0.95f ? clampf(0.08f * (10.f - p.pitchDeg()), -1, 1) : 0.f;
+          if (p.agl() > 150.f) { p.ctl.flaps = 0; p.ctl.gearDown = false; p.apEngage(Plane::AP_NAV, c.to, g.wx); p.apComfort = true; ap = true; }
+        }
+        g.update(1.f / 30.f);
+      }
+      float flown = g.flightClock / 60.f;
+      bool ok = g.result.success && pl.flown && fabsf(flown - pl.minutesEst) <= pl.minutesSigma && g.launchPlan.fees() == pl.fees();
+      printf("   A4 quick estimate %.1f min (en route %.1f, climb %.1f, approach %.1f); flown in the background %.1f min\n", quick, pl.tCruise, pl.tClimb, pl.tApproach, sim);
+      printf("A4 on the autopilot: flown %.1f min, quoted %.1f +- %.1f min (limit %.0f), success %d: %s\n", flown, pl.minutesEst, pl.minutesSigma, c.timeLimitMin,
+             g.result.success, ok ? "ok" : "FAIL");
+      fails += !ok;
+      g.career = keep;
+    }
+    // ---- E1: lesson hints name the keys bound now, and no recording names a key the player rebound; the ATC history
+    // stays bounded over long sessions
+    {
+      const std::string raw = g_story[0].hints[0];
+      std::string def = g.expandHint(raw);
+      int keep = g.set.keyBind[ACT_PARK]; g.set.keyBind[ACT_PARK] = 'P';
+      std::string reb = g.expandHint(raw);
+      g.set.keyBind[ACT_PARK] = keep;
+      AtcVoice::Tx tx;
+      bool defVoiced = !voices || g.atc.resolve(def, "L1", false, tx) || g.atc.resolve(def, "L1", true, tx);
+      bool rebVoiced = voices && (g.atc.resolve(reb, "L1", false, tx) || g.atc.resolve(reb, "L1", true, tx));
+      bool ok = def.find("Press B ") != std::string::npos && reb.find("Press P ") != std::string::npos && reb.find("Press B ") == std::string::npos && !rebVoiced && defVoiced;
+      printf("Hint after rebinding the parking brake: \"%s\" voiced %d (default voiced %d): %s\n", reb.c_str(), rebVoiced, defVoiced, ok ? "ok" : "FAIL");
+      fails += !ok;
+      printf("ATC history after the flights so far: %zu lines (limit %zu): %s\n", g.atc.history.size(), g.atc.historyLimit, g.atc.history.size() <= 64 ? "ok" : "FAIL");
+      fails += g.atc.history.size() > 64;
+    }
     // ---- low frame rates keep simulated time: 5 s of 5 fps frames is 5 s of flight
     {
       g.startFlight(g_story[0], 0, Career::SRC_LESSON);

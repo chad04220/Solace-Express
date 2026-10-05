@@ -610,11 +610,27 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   if (selAircraft >= 0 && selAircraft < kNumAircraft) {   // for the aircraft picked below (last frame's choice)
     auto esrc = career.canFly(c, selAircraft);
     if (esrc != Career::SRC_NONE) {
-      Career::Estimate e = career.estimate(c, selAircraft, esrc);
-      std::string costs = e.fees + e.fuelCost > 0 ? fmt(", %s costs", fmtMoney(e.fees + e.fuelCost).c_str()) : "";
-      if (c.payout > 0 || e.fees + e.fuelCost > 0)
-        row("Estimate", fmt("about %.0f min%s, net %s", e.minutes, costs.c_str(), fmtMoney(e.net).c_str()), e.net >= 0 ? C_GOOD : C_BAD);
-      else row("Estimate", fmt("about %.0f min", e.minutes));
+      // (the plan runs the autopilot's approach planner: cached for this job, aircraft and career state)
+      static std::string planKey; static Career::LaunchPlan e;
+      std::string key = fmt("%s|%d|%d|%d|%d|%u", c.id.c_str(), selAircraft, (int)esrc, career.location, career.money < 1500, career.boardSeed);
+      if (key != planKey) { e = career.plan(c, selAircraft, esrc); planKey = key; }
+      if (!e.flown) applyQuote(c, e, true);   // (the flown time replaces the quick estimate when it's in)
+      int ops = e.fees() + e.fuelCostEst;
+      if (c.payout > 0 || ops > 0) {
+        std::string parts;
+        auto part = [&](const char* n, int v) { if (v) parts += (parts.empty() ? "" : ", ") + fmt("%s %s", n, fmtMoney(v).c_str()); };
+        part("hire", e.hire); part("positioning", e.positioning); part("ferry", e.ferry); part("fuel ~", e.fuelCostEst);
+        row("Operating costs", ops ? fmt("%s (%s)", fmtMoney(ops).c_str(), parts.c_str()) : std::string(e.fuel == Career::LaunchPlan::FUEL_INCLUDED ? "none - fuel included" : "none"), C_DIM);
+        row("Est. net", fmtMoney(e.net), e.net >= 0 ? C_GOOD : C_BAD);
+      }
+      row("Est. time", fmt("about %.0f min (+- %.0f)%s", e.minutesEst, e.minutesSigma, e.flown || c.forceAircraft >= 0 ? "" : "  - flying it on the autopilot..."), e.mayBeLate(c.timeLimitMin) ? C_BAD : C_TEXT);
+      if (c.payout > 0) {
+        std::string rules;
+        if (c.timeLimitMin > 0) rules += "late: -50%";
+        if (c.pax > 0) rules += std::string(rules.empty() ? "" : ", ") + "passengers: -15% past 45 deg bank or 1.9 g";
+        if (c.fragile) rules += std::string(rules.empty() ? "" : ", ") + "fragile: -40% past 2 g or a 400 fpm touchdown";
+        if (!rules.empty()) row("Deductions", rules, C_DIM);
+      }
       if (!cd.free) row("Challenge", e.challenge, C_WARN);
     }
   }
@@ -1729,7 +1745,8 @@ void Game::drawPause() {
   if (button(x + 30 * s, by, bw * 0.48f, bh, "Settings")) { settingsFromPause = true; settingsPage = 0; }
   if (button(x + 30 * s + bw * 0.52f, by, bw * 0.48f, bh, "Controls")) { settingsFromPause = true; settingsPage = 1; }
   by += bh + 12 * s;
-  if (button(x + 30 * s, by, bw, bh, showRadio ? "Hide radio" : "Radio")) showRadio = !showRadio;
+  if (button(x + 30 * s, by, bw * 0.48f, bh, showRadio ? "Hide radio" : "Radio")) showRadio = !showRadio;
+  if (button(x + 30 * s + bw * 0.52f, by, bw * 0.48f, bh, uiHidden ? "Show flight UI" : "Hide flight UI")) uiHidden = !uiHidden;   // (also LB+RB held)
   by += bh + 12 * s;
   if (button(x + 30 * s, by, bw, bh, researchFlight ? "End research flight" : "Abandon flight")) endFlight(false, researchFlight ? "" : "Abandoned flight", OUT_ABANDONED);
   if (showRadio) drawRadioPanel(20 * s, 60 * s);

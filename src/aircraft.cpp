@@ -63,7 +63,7 @@ float Plane::rangeLeftKm() const { return fuel / (fuelFlowMax() * 0.8f) * spec->
 void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float fuelKg, float payloadKg, bool airborne, float speed) {
   spec = s; pos = position; fuel = fuelKg; payload = payloadKg;
   q = quat::axisAngle(vec3(0, 1, 0), -headingDeg * DEG);
-  w = vec3(); ctl = Controls(); ev = FlightEvents(); apComfort = false; brakeHold = 0;
+  w = vec3(); ctl = Controls(); ev = FlightEvents(); apComfort = false; sceneryHits = true; brakeHold = 0;
   flaps = 0; gear = 1; rpm = 0; n1 = 0; engineSpool = 0; maxG = minG = 1; flightTime = 0;
   apDisengage(); apDone = false; apPitchI = 0; gust = vec3(); rng = Rng(77);
   // drag comes from the airframe's shape (aero.cpp), evaluated every step at the speed and air density of the moment
@@ -394,7 +394,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     }
   }
   // trees, rock formations and buildings (separate entities standing on the terrain)
-  if (altAgl < 200.f) {
+  if (altAgl < 200.f && sceneryHits) {
     int hk = g_scenery.collide(pos, s.span * 0.12f);
     for (size_t i = 0; !hk && i < cs.size(); i++) hk = g_scenery.collide(pos + q.rotate(cs[i].p), 0.3f);
     if (hk) {

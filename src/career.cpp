@@ -54,10 +54,10 @@ void buildStory() {
      .brief("Welcome to Meadowbrook Flight Academy! Today you'll fly the Kestrel trainer for the first time. "
             "Release the brakes, apply full power, rotate gently at 50 knots and climb straight ahead through the rings.")
      .wp(wpRel("MDB", 2.2f, 0, 150)).wp(wpRel("MDB", 4.0f, 0, 300)).wp(wpRel("MDB", 5.5f, -0.6f, 380))
-     .hints({"Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.",
+     .hints({"Press {parkingBrake} to release the parking brake, then hold {throttleUp} (or gamepad RT) to add full throttle.",
              "Keep the nose on the centreline with Q/E rudder. At 50 kt gently pull back (S) to lift off.",
              "Nice! Hold a gentle climb about 7 degrees nose-up. Fly through the green rings.",
-             "Reduce power slightly (CTRL) once level and trim with [ and ]. Rings show the path.",
+             "Reduce power slightly ({throttleDown}) once level and trim with {trimDown} and {trimUp}. Rings show the path.",
              "", "", ""});
     add(s); }
   { S s("L2", 0, CT_LESSON, "MDB", "MDB", "Lesson 2: Traffic Pattern and Landing");
@@ -69,8 +69,8 @@ void buildStory() {
      .hints({"Release brakes (B), full power, and take off as in Lesson 1.",
              "Rudder to stay straight. Rotate at 50 kt.",
              "Climb through the rings. The pattern turns LEFT. Use gentle 20 degree banks.",
-             "On downwind reduce power to about 60% and set one notch of flaps (F).",
-             "Turn final, add full flaps (F), and follow the PAPI lights: two white, two red is on glidepath.",
+             "On downwind reduce power to about 60% and set one notch of flaps ({flapsDown}).",
+             "Turn final, add full flaps ({flapsDown}), and follow the PAPI lights: two white, two red is on glidepath.",
              "Reduce power to idle over the threshold, then gently raise the nose to flare just above the runway.",
              "Brake (B) to a full stop to complete the lesson."});
     add(s); }
@@ -80,8 +80,8 @@ void buildStory() {
             "Grass is slower, so touch down early and brake firmly.")
      .hints({"Release brakes and take off. The magenta arrow on the HUD points to your destination.",
              "Stay on the centreline.",
-             "Climb to about 1,500 feet and head toward the arrow. Press Z for autopilot heading/altitude hold.",
-             "Watch your fuel gauge and the distance readout. Press N to view the map.",
+             "Climb to about 1,500 feet and head toward the arrow. Press {autopilot} for autopilot heading/altitude hold.",
+             "Watch your fuel gauge and the distance readout. Press {gpsMap} to view the map.",
              "Harlan Farm runway 17 is short: slow to 60 kt, full flaps, aim for the very start of the strip.",
              "Flare gently and get the wheels down early.",
              "Full stop with brakes (B) to finish."});
@@ -183,7 +183,7 @@ void buildStory() {
      .brief("A full cabin to Port Verde across the Spine. Sunset over the sea."); add(s); }
   { S s("A4", 4, CT_VIP, "PVI", "FAR", "The Minister's Jet");
     s.load(150, 5).pay(110000).lic(LIC_ATP).owned().limit(12).wx(W(130, 8, 0, 0.1f, 0.2f, 6000, 50, 0, false, 11.5f))
-     .brief("The Minister needs to reach Far Isle in 12 minutes, in comfort. Only a jet will do: the Starling 500."); add(s); }
+     .brief("The Minister needs to reach Far Isle in 12 minutes, in comfort. Only a jet will do: the Starling 500. The autopilot's full arrival takes too long: fly the approach straight in."); add(s); }
   { S s("A5", 4, CT_PAX, "FAR", "NPT", "Storm Run");
     s.load(500, 30).pay(85000).lic(LIC_ATP).wx(W(200, 20, 12, 0.6f, 0.95f, 1800, 6, 1, true, 16.0f))
      .brief("Thunderstorms across the islands. Crews are grounded everywhere but you. Get your passengers to Northpoint."); add(s); }
@@ -204,6 +204,12 @@ bool surfaceOK(const AircraftSpec& s, int surface) {
 }
 bool runwayOK(const AircraftSpec& s, const Airport& a) { return surfaceOK(s, a.surface) && a.length >= s.runwayNeeded(a.elev); }
 
+// the flight-time estimate's weights: a constant (taxi, takeoff, landing roll) and the en-route, climb, orbit and
+// approach parts (Career::plan)
+// (fitted to 53 autopilot flights of the story and freelance jobs: on 35 other freelance flights the median error is
+// 10% and three in four are within 15%. The orbit's own term fitted to zero: its time is already in the approach)
+float kEstK[5] = {1.24f, 1.03f, 0.43f, 0.f, 1.21f};
+
 static float contractKm(const Contract& c) {
   float km = g_world.distanceKm(c.from, c.to);
   if (!c.wps.empty()) {
@@ -223,6 +229,7 @@ int Career::ownedIndexFor(int specIdx) const {
   return -1;
 }
 
+static float routeTopOf(const Contract& c);
 Career::Source Career::canFly(const Contract& c, int si, std::string* why) const {
   const AircraftSpec& s = kAircraft[si];
   auto no = [&](const std::string& w) { if (why) *why = w; return SRC_NONE; };
@@ -234,12 +241,7 @@ Career::Source Career::canFly(const Contract& c, int si, std::string* why) const
   float km = contractKm(c);
   // the route plus the arrival (descent, intercept and final: ~6 km) and the climb over the highest ground on the way
   // (~8 km of cruise fuel per 1000 m), with a 20% reserve
-  float top = 0;
-  {
-    vec3 p0 = g_world.airports[c.from].pos(), p1 = g_world.airports[c.to].pos();
-    for (int i = 0; i <= 40; i++) { vec3 q = p0 + (p1 - p0) * (i / 40.f); top = std::max(top, g_world.height(q.x, q.z)); }
-    top = std::max(0.f, top + 350.f - p0.y);
-  }
+  float top = std::max(0.f, routeTopOf(c) + 350.f - g_world.airports[c.from].elev);   // (along the checkpoints too)
   float needKm = (km + 6.f + top * 0.008f) * 1.2f;
   if (s.rangeKm < needKm) return no(fmt("Range %.0f km too short (need %.0f km incl. approach and reserve)", s.rangeKm, needKm));
   for (int ap : {c.from, c.to}) {
@@ -260,23 +262,104 @@ int Career::positioningCost(const Contract& c) const {
   return (int)(80 + 6 * g_world.distanceKm(location, c.from));
 }
 
-Career::Estimate Career::estimate(const Contract& c, int si, Source src) const {
+// The route the flight takes: departure, the checkpoints, the destination
+static std::vector<vec3> routePoints(const Contract& c) {
+  std::vector<vec3> r; r.push_back(g_world.airports[c.from].pos());
+  for (auto& w : c.wps) r.push_back(vec3(w.x, 0, w.z));
+  r.push_back(g_world.airports[c.to].pos());
+  return r;
+}
+// the highest ground under the route (sampled every ~500 m along each leg, checkpoints included)
+static float routeTop(const std::vector<vec3>& r) {
+  float top = 0;
+  for (size_t k = 0; k + 1 < r.size(); k++) {
+    int n = std::max(2, (int)(length(r[k + 1] - r[k]) / 500.f));
+    for (int i = 0; i <= n; i++) { vec3 q = r[k] + (r[k + 1] - r[k]) * (i / (float)n); top = std::max(top, g_world.height(q.x, q.z)); }
+  }
+  return top;
+}
+
+// The time estimate follows the autopilot's own plan for the arrival (Plane::apPlan: the runway end, the descent
+// orbit, the intercept and the final), as a player on the autopilot flies it: en route at 0.85 x cruise with the wind
+// along each leg, the climb to the cruise level (clear of the route's high ground) at the career autopilot's gentle
+// climb rate, the height still to lose in the orbit when the route is too short to descend on the way, and the
+// approach from the orbit down the final. The weights are fitted to autopilot flights of the story and freelance
+// jobs (tests/gameplay_test.cpp checks A4): flight time within about 15% (minutesSigma).
+static float routeTopOf(const Contract& c) { return routeTop(routePoints(c)); }
+
+Career::LaunchPlan Career::plan(const Contract& c, int si, Source src) const {
   const AircraftSpec& s = kAircraft[si];
-  Estimate e;
-  float km = contractKm(c);
-  // cruise for the route plus the arrival (~6 km), and about four minutes of taxi, takeoff, climb and landing
-  e.minutes = (km + 6.f) * 1000.f / s.cruise / 60.f + 4.f;
-  float flow = s.maxFuel / (s.rangeKm * 1000.f / s.cruise * 0.8f);   // as Plane::fuelFlowMax, at cruise power
-  e.fuelKg = s.special ? 0.f : flow * 0.84f * e.minutes * 60.f;
-  e.fuelCost = src == SRC_OWNED ? (int)(e.fuelKg * (s.engineType == ENG_PISTON ? 2.2f : 1.4f)) : 0;   // (rentals include fuel)
-  e.fees = positioningCost(c) + (src == SRC_OWNED ? ferryCost(c, si) : 0) + (src == SRC_RENT ? s.rentFee : 0);
-  e.net = c.payout - e.fees - e.fuelCost;
-  // the one thing most likely to cost stars or the job
+  LaunchPlan e; e.spec = si; e.src = src; e.startAirport = c.from;
+  e.positioning = positioningCost(c);
+  e.ferry = src == SRC_OWNED ? ferryCost(c, si) : 0;
+  e.hire = src == SRC_RENT ? s.rentFee : 0;
+  e.fuel = src == SRC_OWNED ? LaunchPlan::FUEL_BILL_CONSUMED : LaunchPlan::FUEL_INCLUDED;
+  const Airport& A = g_world.airports[c.from];
   const Airport& B = g_world.airports[c.to];
+  std::vector<vec3> route = routePoints(c);
+  // the autopilot's arrival plan, from the last leg's start
+  Plane pl;
+  vec3 last = route[route.size() - 2];
+  vec3 st = route.size() > 2 ? last : A.pos();
+  st.y = std::max(g_world.height(st.x, st.z), A.elev) + 150.f;
+  vec3 dir = B.pos() - st; dir.y = 0;
+  pl.reset(&s, st, atan2f(dir.x, -dir.z) / DEG, s.maxFuel * 0.7f, 100, true, s.cruise * 0.8f);
+  pl.apComfort = true;
+  pl.apEngage(Plane::AP_NAV, c.to, c.wx);
+  const PerfModel& P = Plane::perf(&s);
+  vec3 C = pl.apHoldC; C.y = 0;
+  float R = pl.apHoldR, vh = std::max(s.vref * 1.45f, std::min(s.cruise * 0.6f, s.vref * 1.8f));
+  // en route: every leg, the last one to the orbit
+  route.back() = C;
+  float wf = c.wx.windFrom * DEG;
+  vec3 wind = vec3(-sinf(wf), 0, cosf(wf)) * c.wx.windSpeed * 0.8f;   // (the wind aloft the route sees, on average)
+  float tEn = 0, dist = 0;
+  for (size_t k = 0; k + 1 < route.size(); k++) {
+    vec3 d = route[k + 1] - route[k]; d.y = 0; float L = length(d);
+    if (k + 2 == route.size()) L = std::max(L - R, 0.f);
+    if (L < 1.f) continue;
+    float gs = std::max(s.cruise * 0.85f + dot(wind, d / length(d)), s.cruise * 0.4f);
+    tEn += L / gs; dist += L;
+  }
+  e.tCruise = tEn / 60.f;
+  // the climb to the cruise level (as Plane::apEngage sets it) at the comfort climb rate
+  float cruiseAlt = std::max(std::max(routeTop(routePoints(c)) + 350.f, pl.apHoldAlt), A.elev + 150.f);
+  float climbRate = std::max(std::min(P.roc * 1.1f, std::max(0.6f * P.roc, 1.5f)), 0.5f);
+  e.tClimb = std::max(cruiseAlt - (A.elev + 150.f), 0.f) / climbRate / 60.f;
+  // height still to lose at the orbit: the en-route descent profile runs at 6% (Plane::apGuidance)
+  float atOrbit = std::min(cruiseAlt, pl.apHoldAlt + dist * 0.06f);
+  e.tOrbit = std::max(atOrbit - pl.apHoldAlt - 60.f, 0.f) / std::max(vh * 0.1f, 3.f) / 60.f;
+  // the approach: out of the orbit to the intercept, the intercept leg and the final
+  vec3 ld = pl.apRev ? B.dir() * -1.f : B.dir();
+  vec3 td = B.threshold(pl.apRev); td.y = 0;
+  vec3 qi = td - ld * (pl.apFinalLen + 1500.f);
+  float app = length(C - qi) + R * 1.6f + 1500.f;
+  e.tApproach = (app / vh + pl.apFinalLen / (s.vref * 1.15f)) / 60.f;
+  e.minutesEst = kEstK[0] + kEstK[1] * e.tCruise + kEstK[2] * e.tClimb + kEstK[3] * e.tOrbit + kEstK[4] * e.tApproach;
+  finishPlan(e, c, e.minutesEst);
+  return e;
+}
+
+// the plan's time made the flown one (simulateFlightMinutes), and everything that follows from the time
+void Career::useFlownTime(LaunchPlan& e, const Contract& c, float minutes, float fuelKg) const {
+  if (minutes > 0) { e.flown = true; finishPlan(e, c, minutes, fuelKg); }
+}
+
+void Career::finishPlan(LaunchPlan& e, const Contract& c, float minutes, float fuelKg) const {
+  const AircraftSpec& s = kAircraft[e.spec];
+  const Airport& B = g_world.airports[c.to];
+  e.minutesEst = minutes;
+  e.minutesSigma = 0.15f * e.minutesEst;
+  float flow = s.maxFuel / (s.rangeKm * 1000.f / s.cruise * 0.8f);   // as Plane::fuelFlowMax, at cruise power
+  e.fuelKgEst = s.special ? 0.f : fuelKg >= 0 ? fuelKg : flow * 0.84f * e.minutesEst * 60.f;
+  e.fuelCostEst = e.fuel == LaunchPlan::FUEL_BILL_CONSUMED ? (int)(e.fuelKgEst * (s.engineType == ENG_PISTON ? 2.2f : 1.4f)) : 0;
+  e.net = c.payout - e.fees() - e.fuelCostEst;
+  // the one thing most likely to cost stars or the job
   float need = s.runwayNeeded(B.elev);
   float wkt = c.wx.windSpeed * MS_TO_KT, xw = 0;
   { float d = (c.wx.windFrom - B.heading) * DEG; xw = fabsf(sinf(d)) * (wkt + c.wx.gust * MS_TO_KT); }
-  if (c.timeLimitMin > 0 && e.minutes > c.timeLimitMin * 0.75f) e.challenge = fmt("Tight deadline: %.0f min for about %.0f min of flying", c.timeLimitMin, e.minutes);
+  if (c.timeLimitMin > 0 && e.mayBeLate(c.timeLimitMin)) e.challenge = fmt("May miss the deadline: %.0f min for %.0f +- %.0f min of flying", c.timeLimitMin, e.minutesEst, e.minutesSigma);
+  else if (c.timeLimitMin > 0 && e.minutesEst > c.timeLimitMin * 0.75f) e.challenge = fmt("Tight deadline: %.0f min for about %.0f min of flying", c.timeLimitMin, e.minutesEst);
   else if (c.wx.storm) e.challenge = "Thunderstorms on the route";
   else if (B.length < need * 1.25f) e.challenge = fmt("Short runway at %s: %.0f m for the %.0f m you need", B.code, B.length, need);
   else if (xw >= 12.f) e.challenge = fmt("Crosswind at %s: about %.0f kt", B.code, xw);
@@ -286,7 +369,45 @@ Career::Estimate Career::estimate(const Contract& c, int si, Source src) const {
   else if (c.timeLimitMin > 0) e.challenge = fmt("Deadline: %.0f minutes", c.timeLimitMin);
   else if (c.wx.visibility < 8000.f) e.challenge = "Low visibility";
   else e.challenge = "Straightforward";
-  return e;
+}
+
+float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut) {
+  const AircraftSpec& s = kAircraft[si];
+  const Airport& a = g_world.airports[c.from];
+  Weather wx = c.wx;
+  float h0 = a.heading;
+  bool reverse = false;
+  if (c.type != CT_LESSON || c.wps.empty()) {
+    float hw0 = cosf((wx.windFrom - h0) * DEG), hw1 = cosf((wx.windFrom - h0 - 180.f) * DEG);
+    reverse = hw1 > hw0;
+  }
+  vec3 start = a.threshold(reverse) + (reverse ? -a.dir() : a.dir()) * 30.f;
+  Plane p; p.reset(&s, start, reverse ? h0 + 180.f : h0, s.maxFuel, (float)c.cargoKg + c.pax * 85.f + 85.f, c.startAirborne, s.cruise);
+  p.apComfort = true; p.sceneryHits = false;
+  if (!c.startAirborne) { p.engineRunning = true; p.engineSpool = 0.f; }
+  const float dt = 1 / 30.f;
+  float t = c.startAirborne ? 0.f : 4.f;   // (the engine start and the brake release before the roll)
+  size_t wp = 0; int phase = c.startAirborne ? 1 : 0;   // 0 takeoff roll and initial climb, 1 the checkpoints, 2 the approach
+  for (int k = 0; k < 60 * 60 * 30; k++) {
+    if (phase == 0) {
+      p.ctl.brake = 0; p.ctl.throttle = 1; p.ctl.gearDown = true; p.ctl.flaps = s.retract ? 0.15f : 0.1f;
+      p.ctl.pitch = p.ias > s.vref * 0.95f ? clampf(0.08f * (10.f - p.pitchDeg()), -1, 1) : 0.f;
+      if (p.agl() > 120.f) { p.ctl.flaps = 0; if (s.retract) p.ctl.gearDown = false; phase = 1; }
+    }
+    if (phase == 1) {
+      if (wp < c.wps.size()) {   // the checkpoints in turn, on the hold modes at each one's height
+        vec3 d(c.wps[wp].x - p.pos.x, 0, c.wps[wp].z - p.pos.z);
+        if (p.apMode != Plane::AP_HOLD || !p.apOn) { p.apEngage(Plane::AP_HOLD, -1, wx); p.apComfort = true; p.apSpeed = s.cruise * 0.85f; }
+        p.apHeading = wrapDeg360(atan2f(d.x, -d.z) / DEG); p.apAlt = c.wps[wp].alt; p.apUseVS = false;
+        if (length(d) < 300.f) wp++;
+      } else { p.apEngage(Plane::AP_NAV, c.to, wx); p.apComfort = true; phase = 2; }
+    }
+    p.step(dt, wx, t);
+    t += dt;
+    if (p.ev.crashed) return -1.f;
+    if (phase == 2 && p.apDone) { if (fuelKgOut) *fuelKgOut = s.maxFuel - p.fuel; return t / 60.f; }
+  }
+  return -1.f;
 }
 
 int Career::ferryCost(const Contract& c, int si) const {
@@ -335,13 +456,14 @@ void Career::refreshBoard() {
   }
 }
 
-std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, const FlightResult& r, int* stars) {
+std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, const FlightResult& r, int* stars, const LaunchPlan* plan) {
   std::vector<PayoutLine> L;
   const AircraftSpec& s = kAircraft[si];
-  int pos = positioningCost(c), ferry = src == SRC_OWNED ? ferryCost(c, si) : 0;
+  int pos = plan ? plan->positioning : positioningCost(c), ferry = plan ? plan->ferry : src == SRC_OWNED ? ferryCost(c, si) : 0;
+  int hire = plan ? plan->hire : src == SRC_RENT ? s.rentFee : 0;
   if (pos) L.push_back({"Positioning ticket to " + std::string(g_world.airports[c.from].code), -pos});
   if (ferry) L.push_back({"Ferry service for your " + std::string(s.name), -ferry});
-  if (src == SRC_RENT) L.push_back({"Rental: " + std::string(s.name), -s.rentFee});
+  if (hire) L.push_back({"Rental: " + std::string(s.name), -hire});
   int fuelCost = (int)(r.fuelUsedKg * (s.engineType == ENG_PISTON ? 2.2f : 1.4f));
   if (src == SRC_OWNED && fuelCost) L.push_back({"Fuel", -fuelCost});
   *stars = 0;

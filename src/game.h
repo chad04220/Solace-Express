@@ -3,6 +3,8 @@
 #include <functional>
 #include "common.h"
 #include <unordered_map>
+#include <future>
+#include <map>
 #include "world.h"
 #include "aircraft.h"
 #include "traffic.h"
@@ -261,6 +263,7 @@ private:
   bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI
   // bound action state: keyboard key or gamepad button
+  std::string expandHint(const std::string& raw) const;   // {actionId} tokens -> the bound keys
   bool actKey(int a) const { int k = set.keyBind[a]; return k > 0 && k < 256 && in.down[k]; }
   bool actKeyP(int a) const { int k = set.keyBind[a]; return k > 0 && k < 256 && in.pressed[k]; }
   bool actPad(int a) const { return in.pad && (in.buttons & set.padBind[a]); }
@@ -310,6 +313,12 @@ private:
   void drawGps();
   // hidden Confidential Research Model menu (U + I on the main menu) and free XR-9 flights
   bool researchFlight = false;
+  Career::LaunchPlan launchPlan;   // the job's launch plan, made at startFlight: settle() charges its fees
+  // quotes: each job flown headless on the autopilot in the background, one at a time (simulateFlightMinutes); the
+  // card shows the quick estimate until the flown time is in
+  std::map<std::string, std::pair<float, float>> quoteFlown;   // job|aircraft -> minutes, fuel kg (minutes < 0: didn't get there)
+  std::future<std::pair<float, float>> quoteJob; std::string quoteJobKey;
+  void applyQuote(const Contract& c, Career::LaunchPlan& e, bool start);
   int resAirport = 0, resWx = 0, resCraft = kResearchJet; bool resAirborne = true; float resTime = 12.f, resOpened = 0;
   bool resAuthed = false, resDrag = false;   // biometric sequence passed this session; dragging the preview
   float resYaw = 0.7f, resPitch = 0.15f, resZoom = 1.f, resSelT = -10.f, resIdleT = 10.f; int resLastCraft = -1;   // preview orbit, selection time
