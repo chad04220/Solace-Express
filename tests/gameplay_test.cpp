@@ -396,6 +396,33 @@ struct GameTest {
       printf("Scoring lines: airmanship rewarded %d, violations charged %d: %s\n", okGood, okPoor, okGood && okPoor ? "ok" : "FAIL");
       fails += !(okGood && okPoor);
     }
+    // ---- fuel is bought at uplift for an owned aircraft and what is left stays in its tanks
+    {
+      Game& q = g;
+      int from = g_world.findAirport("ORC"), to = g_world.findAirport("MDB");
+      Contract c; c.id = "FUELTEST"; c.title = "Fuel test"; c.type = CT_CARGO; c.from = from; c.to = to; c.cargoKg = 40; c.payout = 1000; c.minLicense = LIC_PPL; c.wx = Weather();
+      q.pendingCareer.reset(); q.career.newGame(); q.career.money = 50000; q.career.license = LIC_PPL; q.career.location = from; q.saveDir.clear();
+      q.career.fleet.push_back({1, from, 20.f, 0.f});   // an owned Wren with 20 kg in the tanks
+      q.launchFuelKg = -1;
+      q.beginCareerFlight(c, 1, Career::SRC_OWNED);
+      float fuel0 = q.plane.fuel, uplift = q.launchPlan.fuelUpliftKg; int cost = q.launchPlan.fuelCostEst;
+      bool planned = fuel0 > 20.f && fabsf(uplift - (fuel0 - 20.f)) < 1.f && cost > 0 && fabsf(cost - uplift * q.career.fuelPrice(from, 1)) < 2.f;
+      q.plane.fuel = fuel0 * 0.6f;   // (the flight burns 40%)
+      q.plane.pos = g_world.airports[to].pos() + vec3(0, 0.1f, 0); q.plane.onGround = true; q.touchedDown = true; q.takeoffAnnounced = true;
+      int m0 = q.career.money;
+      q.endFlight(true, "", OUT_SUCCESS);
+      bool billed = false; for (auto& l : q.payout) if (l.label.rfind("Fuel uplift", 0) == 0 && l.amount == -cost) billed = true;
+      bool kept = !q.career.fleet.empty() && fabsf(q.career.fleet[0].fuel - fuel0 * 0.6f) < 0.5f;
+      bool noConsumption = true; for (auto& l : q.payout) if (l.label == "Fuel") noConsumption = false;
+      // choosing less fuel on the card: the arrows' value is what the tanks hold at take-off
+      q.career.fleet[0].location = from; q.career.location = from; q.launchFuelKg = kAircraft[1].maxFuel * 0.5f;
+      q.beginCareerFlight(c, 1, Career::SRC_OWNED);
+      bool chosen = fabsf(q.plane.fuel - kAircraft[1].maxFuel * 0.5f) < 0.5f && q.launchFuelKg < 0;
+      q.endFlight(false, "x", OUT_ABANDONED); q.career.newGame(); q.pendingCareer.reset();
+      bool ok = planned && billed && kept && noConsumption && chosen;
+      printf("Fuel planning: uplift quoted %d, billed as quoted %d, remainder kept %d, no consumption bill %d, chosen fuel loaded %d: %s (money %+d)\n", planned, billed, kept, noConsumption, chosen, ok ? "ok" : "FAIL", q.career.money - m0);
+      fails += !ok;
+    }
     // ---- settle: only crashes count as crashes and cost repairs
     {
       Career c; c.newGame(); c.money = 100000; c.license = LIC_ATP;

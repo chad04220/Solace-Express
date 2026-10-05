@@ -22,7 +22,7 @@ Line numbers in §2 are from `f8b8537` and no longer match: re-grep the identifi
 | C2 learned performance drives quotes | done | 2205011 |
 | E5.1–3 input contexts, release-to-rearm, controller loss | done | e052d72 |
 | B1 WASAPI audio | done | 555e49f |
-| A5 temporal upsampling (TAAU) | open: the TAA upscales (A7) but with no reconstruction filter; revisit after the owner's raster numbers | — |
+| A5 temporal upsampling (TAAU) | done: 16-point Halton jitter, Gaussian reconstruction with confidence, widened clip; harness `air` at 0.67 vs 1.0 measures 33.8 dB converged (the same as before: the neighbourhood clamp bounds what can accumulate), indistinguishable by eye | A5 commit |
 | A6 UBO for scene parameters | open; cheap once the uniform set settles after R3 | — |
 | E2 transactions, save v3, attempt marker | done | aefdbe5 |
 | A8 steps 1–2 lighting / terrain pass | done as R1a | 1be93c2 |
@@ -38,7 +38,7 @@ Line numbers in §2 are from `f8b8537` and no longer match: re-grep the identifi
 | A10 water reflection probe | → R3 | — |
 | A11 cloud march | → R3 | — |
 | A2 baked partial fbm | superseded by the terrain mesh | — |
-| C3 fuel and payload planning | open (after E1; plan carries FUEL_PURCHASED already) | — |
+| C3 fuel and payload planning | done: maxMass, fuel price per airport, FUEL_PURCHASED for owned aircraft, the card's fuel choice, hangar refuel; the progression test checks every story contract's fuel with full tanks (at least 5% over the flown quote) and weight | C3 commit |
 | C5 financing and pacing | open | — |
 | C7 failures and maintenance | open (after C3) | — |
 | A12 bake the aircraft to meshes | done differently (R2) | — |
@@ -49,7 +49,7 @@ Line numbers in §2 are from `f8b8537` and no longer match: re-grep the identifi
 | C11 airline layer | open (after C5, C7, E3) | — |
 | C12 challenge modes | open | — |
 | C13 surface NIGHTGLASS | open; the terminal now holds four craft | — |
-| C14 options (FOV, head-look, colour-blind HUD, UI scale, HUD per camera) | done | C14 commit |
+| C14 options (FOV, head-look, colour-blind HUD, UI scale, HUD per camera) | done | ca6cb95 |
 
 Order from here: B1 → E2 → E3 → E4 → C9/C10 → C14 → A6 → A5 → A3 → D1+E6 → C3 → C5 → C7 → C6 → C8 → E5.4 → C12/C13 → C11; B3 and A3 wait on report.bat numbers.
 

@@ -26,6 +26,8 @@ struct Airport {
   int size;          // 0 = strip, 1 = regional, 2 = international
   const char* blurb;
   bool hospital = false;   // a hospital by the field (medevac destinations; set in World::build)
+  // fuel costs more the further the bowser had to come: hubs x1, regional fields x1.15, strips x1.4, snow and gravel x1.8
+  float fuelPriceMult() const { float m = size >= 2 ? 1.f : size == 1 ? 1.15f : 1.4f; return (surface == SURF_SNOW || surface == SURF_GRAVEL) ? std::max(m, 1.8f) : m; }
   // derived
   vec3 dir() const { float h = heading * DEG; return vec3(sinf(h), 0, -cosf(h)); }
   vec3 pos() const { return vec3(x, elev, z); }

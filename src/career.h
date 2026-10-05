@@ -44,7 +44,7 @@ struct FlightResult {
   float touchdownFpm = 0, maxG = 1, minG = 1, maxBank = 0, flightMin = 0;
   bool late = false;
   float centerlineErr = 0;
-  float fuelUsedKg = 0;
+  float fuelUsedKg = 0, fuelLeftKg = -1;   // (fuelLeftKg < 0: not recorded; an owned aircraft keeps what is left)
   int divertedTo = -1;          // OUT_DIVERTED: the airport the aircraft stopped at
   // the arrival, for the debrief's coaching (-1: not recorded, e.g. no landing at the destination)
   float thrKt = -1, thrAglM = -1;   // airspeed and height crossing the landing threshold
@@ -100,6 +100,7 @@ public:
     int positioning = 0, ferry = 0, hire = 0;          // fixed, quoted exactly at acceptance
     enum FuelPolicy { FUEL_INCLUDED, FUEL_BILL_CONSUMED, FUEL_PURCHASED } fuel = FUEL_INCLUDED;
     float fuelKgEst = 0, minutesEst = 0, minutesSigma = 0;
+    float fuelUpliftKg = 0;    // FUEL_PURCHASED: what is bought at the departure (the tanks' shortfall to the chosen fuel)
     int fuelCostEst = 0, net = 0;                      // net = payout - fixed fees - fuelCostEst
     std::string challenge;
     float tCruise = 0, tClimb = 0, tOrbit = 0, tApproach = 0;   // the estimate's parts (min): en route, climbing, the descent orbit, the approach
@@ -147,6 +148,11 @@ public:
   bool earningPath() const;
   int netQuick(const Contract& c, int specIdx, Source src) const;   // payout less the fees and a fuel estimate (no autopilot planning)
   Contract recoveryContract() const;   // (.payout == 0 when none can be made: no licensed aircraft can use any field)
+  // fuel for an owned aircraft is bought at the departure: the plan's fuel cost becomes the uplift (the shortfall of
+  // its tanks to the fuel chosen for the flight, at that airport's price); a rental comes with its tanks full
+  void planFuel(LaunchPlan& e, const Contract& c, float fuelKg) const;
+  float fuelPrice(int airport, int specIdx) const { return kAircraft[specIdx].fuelPriceBase() * g_world.airports[airport].fuelPriceMult(); }
+  bool refuel(int fleetIdx, std::string* msg);   // the hangar: fill the owned aircraft parked here at this airport's price
   void useFlownTime(LaunchPlan& e, const Contract& c, float minutes, float fuelKg = -1) const;
   void finishPlan(LaunchPlan& e, const Contract& c, float minutes, float fuelKg = -1) const;
   std::vector<PayoutLine> settle(const Contract& c, int specIdx, Source src, const FlightResult& r, int* stars, const LaunchPlan* plan = nullptr);

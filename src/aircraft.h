@@ -30,6 +30,10 @@ struct AircraftSpec {
   // the runway it needs: the longer of its learned take-off and landing distances at full weight (Plane::perf), 15% to
   // spare, longer with the field's elevation (runwayM until the type has been learned, and for the research jets)
   float runwayNeeded(float elev) const;
+  // the most it may weigh at take-off: full tanks and a full load don't go together (three quarters of the fuel with
+  // everything aboard, or all of it with a lighter load)
+  float maxMass() const { return emptyMass + maxFuel * 0.75f + cargoKg + pax * 85.f + 85.f; }
+  float fuelPriceBase() const { return engineType == ENG_PISTON ? 2.2f : 1.4f; }   // $ per kg at a hub
 };
 
 extern const AircraftSpec kAircraft[];

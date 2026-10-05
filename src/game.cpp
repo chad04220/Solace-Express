@@ -314,8 +314,21 @@ bool Game::retryCommit() {
 }
 // A career flight: the save marks the attempt open first (a crash to desktop mid-flight then shows on the next start
 // that a flight was interrupted), then the flight starts
+// The fuel at take-off: what was chosen on the card, else the plan's estimate with a quarter to spare (never less
+// than an owned aircraft already holds, never more than the tanks)
+float Game::chosenFuel(const Contract& c, int spec, Career::Source src, const Career::LaunchPlan& p) const {
+  const AircraftSpec& s = kAircraft[spec];
+  if (s.special) return s.maxFuel;
+  if (launchFuelKg > 0) return std::min(launchFuelKg, s.maxFuel);
+  float have = 0.f;
+  if (src == Career::SRC_OWNED) { int oi = career.ownedIndexFor(spec); if (oi >= 0) have = career.fleet[oi].fuel; }
+  if (src != Career::SRC_OWNED) return s.maxFuel;   // a rental comes full (the weight limit may still ask for less)
+  (void)c;
+  return std::min(std::max(p.fuelKgEst * 1.25f, have), s.maxFuel);
+}
 void Game::beginCareerFlight(const Contract& c, int spec, Career::Source src) {
   Career::LaunchPlan p = career.plan(c, spec, src);
+  career.planFuel(p, c, chosenFuel(c, spec, src, p));
   if (!commitBlocked()) commit([&](Career& k) {
     k.attempt++; k.attemptOpen = true;
     if (Career::resumable(c)) k.accept(c, spec, src, p); else k.job.reset();   // (lessons and checkrides are flown whole: no job)
@@ -408,6 +421,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   if (!g_ren.dispError.empty() && !dispWarned && !headless) { dispWarned = true; toast("Cockpit display shader failed on this GPU (details in startup.log)", vec3(1.f, 0.45f, 0.35f)); }
   contract = c; specIdx = spec; source = src;
   launchPlan = career.plan(c, spec, src);   // the quote this flight is settled against (fees exactly as shown)
+  career.planFuel(launchPlan, c, chosenFuel(c, spec, src, launchPlan));
   applyQuote(c, launchPlan, false);
   researchFlight = false;   // a career flight; launchResearch sets it again for its own
   wx = c.wx; timeOfDay = wx.timeOfDay;
@@ -424,7 +438,8 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   float hdg = reverse ? h0 + 180.f : h0;
   vec3 start = a.threshold(reverse) + (reverse ? -a.dir() : a.dir()) * 30.f;
   float payloadKg = (float)c.cargoKg + c.pax * 85.f + 85.f;
-  float fuel = s.maxFuel;
+  float fuel = chosenFuel(c, spec, src, launchPlan);
+  launchFuelKg = -1;
   plane.reset(&s, start, hdg, fuel, payloadKg, c.startAirborne, s.cruise);
   plane.apComfort = true;   // a career flight: the autopilot flies for the passengers and the load (the stick is never limited)
   fuelStart = plane.fuel;
@@ -471,6 +486,7 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   result.flightMin = flightClock / 60.f;
   result.maxG = plane.maxG; result.minG = plane.minG;
   result.fuelUsedKg = std::max(0.f, fuelStart - plane.fuel);
+  result.fuelLeftKg = std::max(0.f, plane.fuel);
   result.fuelLeftFrac = plane.spec->maxFuel > 0 ? clampf(plane.fuel / plane.spec->maxFuel, 0.f, 1.f) : 1.f;
   result.shutDownAtStand = success && plane.onGround && !plane.engineRunning && parkingBrake && g_world.onRunway(plane.pos.x, plane.pos.z, 6.f) < 0;
   result.touchdownFpm = touchdownFpm;
@@ -2574,7 +2590,7 @@ void Game::update(float dt) {
         // (the GPU budget of the frame-rate target, with 8% to spare; up again only with a quarter of it free)
         float budget = 1000.f / effectiveHz() * 0.92f;
         if (gms > budget) { autoScale = std::max(0.5f, autoScale * std::sqrt(budget * 0.97f / gms)); autoScaleT = 0; }
-        else if (gms < budget * 0.77f && autoScale < 1.f) { autoScale = std::min(1.f, autoScale + 0.05f); autoScaleT = 0; }
+        else if (gms < budget * 0.75f && autoScale < 1.f) { autoScale = std::min(1.f, autoScale + 0.05f); autoScaleT = 0; }   // (up again only with a quarter of the budget free)
       }
       want = autoScale;
     } else autoScale = 1.f;

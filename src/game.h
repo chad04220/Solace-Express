@@ -116,6 +116,8 @@ private:
   void releaseJob();                                 // the open job cancelled: the load stays where it is, nothing charged
   void practiseApproach(int spec, Career::Source src);   // a flight to the job's destination that touches nothing in the career
   bool isolatedFlight = false;   // a practice flight: endFlight returns to the hub without any settlement
+  float launchFuelKg = -1;       // the fuel chosen on the job card for the next flight (-1: the plan's default)
+  float chosenFuel(const Contract& c, int spec, Career::Source src, const Career::LaunchPlan& p) const;   // what the tanks hold at take-off
   float jobClockBase = 0;        // seconds already on the job's clock from earlier legs (deadlines count from it)
   int attemptFrom = 0;           // where this attempt departed (an abandoned leg brings the load back there)
   GameScreen screen = SCR_MENU;
@@ -292,7 +294,7 @@ private:
   std::vector<TipPt> tipTrail[2]; int tipSeg = 0; bool tipOn = false;
   int ctlScroll = 0; float ctlScrollAcc = 0;
   float ckZoom = 1.f, ckZoomT = 1.f;
-  float autoScale = 1.f, autoScaleT = 0;   // dynamic resolution state   // cockpit view zoom (current, target)
+  float autoScale = 0.75f, autoScaleT = 0;   // (starts at three quarters: the upscaler makes it hard to tell, and the first frames are the slow ones)   // dynamic resolution state   // cockpit view zoom (current, target)
   float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0; bool loadMap = false;   // pre-flight loading screen
   bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI

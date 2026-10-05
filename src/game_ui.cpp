@@ -551,7 +551,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     bool sel = i == selContract;
     bool hov = hovered(x + 10 * s, cy, lw - 20 * s, chh);
     card(x + 10 * s, cy, lw - 20 * s, chh, sel, hov, cards[i].job ? C_GOOD : cards[i].story ? C_WARN : C_ACCENT);
-    if (hov && in.mPressed[0]) { selContract = i; selAircraft = -1; g_audio.trigger(SFX_CLICK); }
+    if (hov && in.mPressed[0]) { selContract = i; selAircraft = -1; launchFuelKg = -1; g_audio.trigger(SFX_CLICK); }
     if (cards[i].free) {
       fitText(x + 24 * s, cy + 9 * s, lw - 48 * s, 18 * s, 13 * s, "Free Flight / Ferry", C_TEXT);
       g_ren.text(x + 24 * s, cy + 36 * s, 14 * s, ellipsize("Fly anywhere for fun or to reposition. No pay.", lw - 48 * s, 14 * s), C_DIM, 1);
@@ -636,6 +636,29 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
         row("Est. net", fmtMoney(e.net), e.net >= 0 ? C_GOOD : C_BAD);
       }
       row("Est. time", fmt("about %.0f min (+- %.0f)%s", e.minutesEst, e.minutesSigma, e.flown || c.forceAircraft >= 0 ? "" : "  - flying it on the autopilot..."), e.mayBeLate(c.timeLimitMin) ? C_BAD : C_TEXT);
+      {   // fuel and weight: the tanks at take-off (arrows: 5% of the tanks a step), the take-off weight against the
+          // limit, the roll it needs here, and the uplift's price for an owned aircraft
+        const AircraftSpec& sp = kAircraft[selAircraft];
+        if (!sp.special) {
+          float fuel = chosenFuel(c, selAircraft, esrc, e);
+          float payload = (float)c.cargoKg + c.pax * 85.f + 85.f, mass = sp.emptyMass + fuel + payload;
+          bool heavy = mass > sp.maxMass() + 0.5f;
+          const PerfModel& P = Plane::perf(&sp);
+          float sigma = expf(-g_world.airports[c.from].elev / 8500.f);
+          float roll = P.toRoll > 0 ? P.toRoll * (mass / sp.maxMass()) * (mass / sp.maxMass()) / sigma : 0.f;
+          Career::LaunchPlan ef = e; career.planFuel(ef, c, fuel);
+          std::string v = fmt("%.0f kg (%.0f%%)  -  take-off %.0f of %.0f kg%s", fuel, 100.f * fuel / sp.maxFuel, mass, sp.maxMass(), heavy ? "  OVERWEIGHT" : "");
+          if (roll > 0) v += fmt(", roll ~%.0f m", roll);
+          if (ef.fuel == Career::LaunchPlan::FUEL_PURCHASED) v += ef.fuelUpliftKg > 0.5f ? fmt(", uplift %.0f kg for %s", ef.fuelUpliftKg, fmtMoney(ef.fuelCostEst).c_str()) : " (tanks hold it)";
+          if (button(px + 130 * s - 36 * s, py - 4 * s, 28 * s, 24 * s, "<")) launchFuelKg = std::max(sp.maxFuel * 0.1f, fuel - sp.maxFuel * 0.05f);
+          if (button(px + textW - 30 * s, py - 4 * s, 28 * s, 24 * s, ">")) launchFuelKg = std::min(sp.maxFuel, fuel + sp.maxFuel * 0.05f);
+          float pyRow = py;
+          row("Fuel", v, heavy ? C_BAD : C_TEXT);
+          (void)pyRow;
+          float est = e.fuelKgEst;
+          if (est > 0) { float res = (fuel - est) / est; row("", res < 0.f ? fmt("%.0f kg short of the estimate: expect to run dry", est - fuel) : fmt("reserve +%.0f%% over the estimate of %.0f kg", res * 100.f, est), res < 0.1f ? C_BAD : res < 0.25f ? C_WARN : C_DIM); }
+        }
+      }
       if (c.payout > 0) {
         std::string rules;
         if (c.timeLimitMin > 0) rules += "late: -50%";
@@ -672,7 +695,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     bool sel = selAircraft == i;
     bool hov = hovered(rx, ry, colW, rowH) && src != Career::SRC_NONE;
     card(rx, ry, colW, rowH, sel, hov, src == Career::SRC_NONE ? C_DIM * 0.4f : src == Career::SRC_OWNED ? C_GOOD : C_ACCENT);
-    if (hov && in.mPressed[0]) { selAircraft = i; g_audio.trigger(SFX_CLICK); }
+    if (hov && in.mPressed[0]) { selAircraft = i; launchFuelKg = -1; g_audio.trigger(SFX_CLICK); }
     g_ren.text(rx + 10 * s, ry + 7 * s, 15 * s, kAircraft[i].name, src == Career::SRC_NONE ? C_DIM * 0.6f : C_TEXT, 1);
     std::string st;
     if (src == Career::SRC_LESSON) st = "School aircraft";
@@ -690,12 +713,17 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   }
   if (selAircraft < 0) selAircraft = firstOk;
   bool otherWhileJob = openJob && !cd.job && !cd.free;   // (another job waits until this one is delivered or released)
-  bool can = selAircraft >= 0 && !commitBlocked() && !otherWhileJob;
+  bool overweight = false;
+  if (selAircraft >= 0) {
+    const AircraftSpec& sp = kAircraft[selAircraft]; auto esrc = career.canFly(c, selAircraft);
+    if (!sp.special && esrc != Career::SRC_NONE) { Career::LaunchPlan e0 = career.plan(c, selAircraft, esrc); float fuel = chosenFuel(c, selAircraft, esrc, e0); overweight = sp.emptyMass + fuel + c.cargoKg + c.pax * 85.f + 85.f > sp.maxMass() + 0.5f; }
+  }
+  bool can = selAircraft >= 0 && !commitBlocked() && !otherWhileJob && !overweight;
   if (cd.job) {
     if (button(dx + dw - 262 * s - 2 * 150 * s, y + h - 62 * s, 140 * s, 46 * s, "Release job", !commitBlocked(), false)) releaseJob();
     if (button(dx + dw - 262 * s - 150 * s, y + h - 62 * s, 140 * s, 46 * s, "Practise", can, false) && selAircraft >= 0) practiseApproach(selAircraft, career.canFly(c, selAircraft));
   }
-  if (button(dx + dw - 262 * s, y + h - 62 * s, 240 * s, 46 * s, commitBlocked() ? "Save pending" : otherWhileJob ? "Job in progress" : can ? (cd.job ? "CONTINUE" : "FLY!") : "No suitable aircraft", can, can)) {
+  if (button(dx + dw - 262 * s, y + h - 62 * s, 240 * s, 46 * s, commitBlocked() ? "Save pending" : otherWhileJob ? "Job in progress" : overweight ? "Overweight" : can ? (cd.job ? "CONTINUE" : "FLY!") : "No suitable aircraft", can, can)) {
     auto src = career.canFly(c, selAircraft);
     if (c.type == CT_FERRY && src == Career::SRC_NONE) src = Career::SRC_LESSON;
     if (c.type == CT_FERRY && src == Career::SRC_RENT) {}
@@ -705,6 +733,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   }
   if (commitBlocked()) g_ren.text(px, y + h - 50 * s, 14 * s, "Your last result isn't saved yet (" + saveWhy + "). Retrying...", C_BAD, 1);
   else if (otherWhileJob) g_ren.text(px, y + h - 50 * s, 14 * s, "Deliver or release the job in progress first (its card is at the top).", C_WARN, 1);
+  else if (overweight) g_ren.text(px, y + h - 50 * s, 14 * s, "Over the take-off weight limit: take less fuel (the arrows by the fuel row), or a bigger aircraft.", C_BAD, 1);
   else if (!can) g_ren.text(px, y + h - 50 * s, 14 * s, "Tip: check the Hangar to buy an aircraft, or earn your next licence through the story.", C_DIM, 1);
 }
 
@@ -786,7 +815,17 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
   py += 70 * s;
   header(px, py, dw - 48 * s, "YOUR FLEET"); py += 26 * s;
   if (career.fleet.empty()) g_ren.text(px, py, 15 * s, "You don't own any aircraft yet. Rentals are available everywhere.", C_DIM, 1);
-  for (auto& f : career.fleet) { g_ren.text(px, py, 15 * s, ellipsize(fmt("%s  -  at %s", kAircraft[f.spec].name, g_world.airports[f.location].code), dw - 48 * s, 15 * s), C_TEXT, 1); py += 22 * s; }
+  for (size_t fi = 0; fi < career.fleet.size(); fi++) {
+    const OwnedPlane& f = career.fleet[fi]; const AircraftSpec& fs = kAircraft[f.spec];
+    g_ren.text(px, py, 15 * s, ellipsize(fmt("%s  -  at %s, %.0f%% fuel", fs.name, g_world.airports[f.location].code, 100.f * f.fuel / std::max(fs.maxFuel, 1.f)), dw - 200 * s, 15 * s), C_TEXT, 1);
+    if (f.location == career.location && f.fuel < fs.maxFuel - 1.f) {
+      int cost = (int)((fs.maxFuel - f.fuel) * career.fuelPrice(career.location, f.spec));
+      if (button(px + dw - 48 * s - 150 * s, py - 4 * s, 150 * s, 26 * s, fmt("Fill up %s", fmtMoney(cost).c_str()), !commitBlocked() && career.money >= cost, false)) {
+        std::string m; bool ok = false; commit([&](Career& k) { ok = k.refuel((int)fi, &m); }); if (ok) g_audio.trigger(SFX_CASH); hubMsg = m; hubMsgTime = 4;
+      }
+    }
+    py += 26 * s;
+  }
 }
 
 void Game::drawHubLogbook(float x, float y, float w, float h) {

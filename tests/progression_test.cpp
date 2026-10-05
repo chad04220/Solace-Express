@@ -35,6 +35,20 @@ int main() {
       if (c.money < kAircraft[best].price) { long sh = kAircraft[best].price - c.money; grind += sh; printf("  .. grind $%ld to buy %s\n", sh, kAircraft[best].name); c.money = kAircraft[best].price; }
       std::string m; c.buy(best, &m);
     }
+    {   // fuel and weight: the estimate with a quarter to spare fits the tanks, and the aircraft stays under its limit with it
+      Career::Source src0 = c.canFly(k, best);
+      Career::LaunchPlan pl = c.plan(k, best, src0 == Career::SRC_NONE ? Career::SRC_RENT : src0);
+      const AircraftSpec& s = kAircraft[best];
+      // (lessons fly the school aircraft with its tanks full and pay nothing: no fuel question there). The quick estimate
+      // is pessimistic; where it says the tanks are too small, the quote the card really shows (the job flown on the
+      // autopilot) decides. A story contract must leave at least 5% of reserve over that with full tanks.
+      float est = pl.fuelKgEst;
+      if (k.forceAircraft < 0 && est * 1.25f > s.maxFuel) { float flown = -1; float mins = simulateFlightMinutes(k, best, &flown); if (mins > 0 && flown > 0) est = flown; }
+      float need = std::min(est * 1.25f, s.maxFuel), payload = (float)k.cargoKg + k.pax * 85.f + 85.f;
+      if (k.forceAircraft < 0 && est * 1.05f > s.maxFuel) { printf("  !! %s: %s needs %.0f kg of fuel, tanks hold %.0f: no reserve\n", k.id.c_str(), s.name, est, s.maxFuel); problems++; }
+      if (s.emptyMass + std::min(need, s.maxFuel) + payload > s.maxMass() + 0.5f) { printf("  !! %s: %s over the take-off weight at minimum fuel (%.0f > %.0f kg)\n", k.id.c_str(), s.name, s.emptyMass + need + payload, s.maxMass()); problems++; }
+      if (src0 == Career::SRC_OWNED) c.money -= pl.fuelCostEst;   // (the money model includes the fuel bought)
+    }
     FlightResult r; r.success = true; r.landed = k.id != "L1"; r.touchdownFpm = 250; r.flightMin = 8;
     int stars; auto src = c.canFly(k, best);
     auto lines = c.settle(k, best, src, r, &stars);

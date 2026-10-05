@@ -293,7 +293,7 @@ Career::LaunchPlan Career::plan(const Contract& c, int si, Source src) const {
   e.positioning = positioningCost(c);
   e.ferry = src == SRC_OWNED ? ferryCost(c, si) : 0;
   e.hire = src == SRC_RENT ? s.rentFee : 0;
-  e.fuel = src == SRC_OWNED ? LaunchPlan::FUEL_BILL_CONSUMED : LaunchPlan::FUEL_INCLUDED;
+  e.fuel = src == SRC_OWNED ? LaunchPlan::FUEL_PURCHASED : LaunchPlan::FUEL_INCLUDED;
   const Airport& A = g_world.airports[c.from];
   const Airport& B = g_world.airports[c.to];
   std::vector<vec3> route = routePoints(c);
@@ -352,7 +352,12 @@ void Career::finishPlan(LaunchPlan& e, const Contract& c, float minutes, float f
   e.minutesSigma = 0.15f * e.minutesEst;
   float flow = s.maxFuel / (s.rangeKm * 1000.f / s.cruise * 0.8f);   // as Plane::fuelFlowMax, at cruise power
   e.fuelKgEst = s.special ? 0.f : fuelKg >= 0 ? fuelKg : flow * 0.84f * e.minutesEst * 60.f;
-  e.fuelCostEst = e.fuel == LaunchPlan::FUEL_BILL_CONSUMED ? (int)(e.fuelKgEst * (s.engineType == ENG_PISTON ? 2.2f : 1.4f)) : 0;
+  if (e.fuel == LaunchPlan::FUEL_PURCHASED) {   // bought at the departure: the estimate's fuel with a quarter to spare, less what the tanks hold
+    int oi = ownedIndexFor(e.spec);
+    float have = oi >= 0 ? fleet[oi].fuel : 0.f;
+    e.fuelUpliftKg = std::max(0.f, std::min(e.fuelKgEst * 1.25f, s.maxFuel) - have);
+    e.fuelCostEst = (int)(e.fuelUpliftKg * fuelPrice(c.from, e.spec));
+  } else e.fuelCostEst = e.fuel == LaunchPlan::FUEL_BILL_CONSUMED ? (int)(e.fuelKgEst * s.fuelPriceBase()) : 0;
   e.net = c.payout - e.fees() - e.fuelCostEst;
   // the one thing most likely to cost stars or the job
   float need = s.runwayNeeded(B.elev);
@@ -423,7 +428,7 @@ int Career::netQuick(const Contract& c, int si, Source src) const {
   if (src == SRC_OWNED) {   // the owned aircraft's fuel for the distance at cruise, as the plan would estimate it
     float flow = s.maxFuel / (s.rangeKm * 1000.f / s.cruise * 0.8f);
     float minutes = (contractKm(c) + 6.f) * 1000.f / (s.cruise * 0.85f) / 60.f;
-    fuel = (int)(flow * 0.84f * minutes * 60.f * (s.engineType == ENG_PISTON ? 2.2f : 1.4f));
+    fuel = (int)(flow * 0.84f * minutes * 60.f * fuelPrice(c.from, si));
   }
   return c.payout - fees - fuel;
 }
@@ -531,8 +536,16 @@ std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan
   J.positioningPaid = true;
   if (!J.hirePaid && p.hire) L.push_back({"Rental: " + std::string(s.name), -p.hire});
   J.hirePaid = true;
-  int fuelCost = (int)(r.fuelUsedKg * (s.engineType == ENG_PISTON ? 2.2f : 1.4f));
-  if (J.src == SRC_OWNED && fuelCost) { L.push_back({"Fuel (this leg)", -fuelCost}); J.fuelBilledKg += r.fuelUsedKg; }
+  if (J.src == SRC_OWNED) {
+    int oi = ownedIndexFor(J.spec);
+    if (p.fuel == LaunchPlan::FUEL_PURCHASED) {
+      if (p.fuelCostEst) { L.push_back({fmt("Fuel uplift at %s (%.0f kg)", g_world.airports[J.c.from].code, p.fuelUpliftKg), -p.fuelCostEst}); J.fuelBilledKg += p.fuelUpliftKg; }
+      if (oi >= 0 && r.fuelLeftKg >= 0) fleet[oi].fuel = std::clamp(r.fuelLeftKg, 0.f, s.maxFuel);
+    } else {
+      int fuelCost = (int)(r.fuelUsedKg * s.fuelPriceBase());
+      if (fuelCost) { L.push_back({"Fuel (this leg)", -fuelCost}); J.fuelBilledKg += r.fuelUsedKg; }
+    }
+  }
   if (recoveryFee) L.push_back({recoveryLabel, -recoveryFee});
   flights++; hours += r.flightMin / 60.f;
   if (r.landed) { landings++; bestLandingFpm = std::min(bestLandingFpm, fabsf(r.touchdownFpm)); }
@@ -564,6 +577,28 @@ std::vector<PayoutLine> Career::settleJob(const FlightResult& r, const LaunchPla
   return L;
 }
 void Career::releaseJob() { job.reset(); refreshBoard(); }
+void Career::planFuel(LaunchPlan& e, const Contract& c, float fuelKg) const {
+  if (e.fuel != LaunchPlan::FUEL_PURCHASED) return;
+  const AircraftSpec& s = kAircraft[e.spec];
+  int oi = ownedIndexFor(e.spec);
+  float have = oi >= 0 ? fleet[oi].fuel : 0.f;
+  e.fuelUpliftKg = std::max(0.f, std::min(fuelKg, s.maxFuel) - have);
+  e.fuelCostEst = (int)(e.fuelUpliftKg * fuelPrice(c.from, e.spec));
+  e.net = c.payout - e.fees() - e.fuelCostEst;
+}
+bool Career::refuel(int fi, std::string* msg) {
+  if (fi < 0 || fi >= (int)fleet.size()) return false;
+  OwnedPlane& p = fleet[fi];
+  const AircraftSpec& s = kAircraft[p.spec];
+  if (p.location != location) { *msg = fmt("Your %s is at %s, not here.", s.name, g_world.airports[p.location].code); return false; }
+  float need = std::max(0.f, s.maxFuel - p.fuel);
+  int cost = (int)(need * fuelPrice(location, p.spec));
+  if (need < 1.f) { *msg = "Tanks are already full."; return false; }
+  if (money < cost) { *msg = fmt("Not enough money (%s for %.0f kg)", fmt("$%d", cost).c_str(), need); return false; }
+  money -= cost; p.fuel = s.maxFuel;
+  *msg = fmt("Refuelled %s: %.0f kg for $%d.", s.name, need, cost);
+  return true;
+}
 
 std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, const FlightResult& r, int* stars, const LaunchPlan* plan) {
   std::vector<PayoutLine> L;
@@ -573,8 +608,16 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
   if (pos) L.push_back({"Positioning ticket to " + std::string(g_world.airports[c.from].code), -pos});
   if (ferry) L.push_back({"Ferry service for your " + std::string(s.name), -ferry});
   if (hire) L.push_back({"Rental: " + std::string(s.name), -hire});
-  int fuelCost = (int)(r.fuelUsedKg * (s.engineType == ENG_PISTON ? 2.2f : 1.4f));
-  if (src == SRC_OWNED && fuelCost) L.push_back({"Fuel", -fuelCost});
+  if (src == SRC_OWNED) {
+    int oi = ownedIndexFor(si);
+    if (plan && plan->fuel == LaunchPlan::FUEL_PURCHASED) {   // bought at the departure, as quoted; the tanks keep what is left
+      if (plan->fuelCostEst) L.push_back({fmt("Fuel uplift at %s (%.0f kg)", g_world.airports[c.from].code, plan->fuelUpliftKg), -plan->fuelCostEst});
+      if (oi >= 0 && r.fuelLeftKg >= 0) fleet[oi].fuel = std::clamp(r.fuelLeftKg, 0.f, s.maxFuel);
+    } else {
+      int fuelCost = (int)(r.fuelUsedKg * s.fuelPriceBase());
+      if (fuelCost) L.push_back({"Fuel", -fuelCost});
+    }
+  }
   *stars = 0;
   flights++; hours += r.flightMin / 60.f;
   if (!r.success) {
@@ -683,7 +726,7 @@ bool Career::save(const std::string& path) const {
     const JobState& J = *job;
     ok = ok && fprintf(f, "job %d %s %d %d %d %d %f %f %f %f %d %f %d %d %u\n", (int)J.state, kAircraft[J.spec].id, (int)J.src, J.at, J.legs, J.wpDone, J.jobClockMin,
                        J.maxG, J.minG, J.maxBank, J.fragileHit ? 1 : 0, J.fuelBilledKg, J.hirePaid ? 1 : 0, J.positioningPaid ? 1 : 0, J.id) > 0;
-    ok = ok && fprintf(f, "plan %d %d %d %d %f %f %f\n", J.plan.positioning, J.plan.ferry, J.plan.hire, (int)J.plan.fuel, J.plan.fuelKgEst, J.plan.minutesEst, J.plan.minutesSigma) > 0;
+    ok = ok && fprintf(f, "plan %d %d %d %d %f %f %f %f %d\n", J.plan.positioning, J.plan.ferry, J.plan.hire, (int)J.plan.fuel, J.plan.fuelKgEst, J.plan.minutesEst, J.plan.minutesSigma, J.plan.fuelUpliftKg, J.plan.fuelCostEst) > 0;
     const Contract& c = J.c;
     bool story = false; for (auto& s : g_story) if (s.id == c.id) story = true;
     if (story) ok = ok && fprintf(f, "story_contract %s\n", c.id.c_str()) > 0;
@@ -759,8 +802,8 @@ bool Career::load(const std::string& path) {
     }
     else if (!strcmp(key, "plan")) {
       int fuel = 0; LaunchPlan p;
-      ok = c.job && fscanf(f, "%d %d %d %d %f %f %f", &p.positioning, &p.ferry, &p.hire, &fuel, &p.fuelKgEst, &p.minutesEst, &p.minutesSigma) == 7 && fuel >= 0 && fuel <= 2
-           && std::isfinite(p.fuelKgEst) && std::isfinite(p.minutesEst) && std::isfinite(p.minutesSigma);
+      ok = c.job && fscanf(f, "%d %d %d %d %f %f %f %f %d", &p.positioning, &p.ferry, &p.hire, &fuel, &p.fuelKgEst, &p.minutesEst, &p.minutesSigma, &p.fuelUpliftKg, &p.fuelCostEst) == 9 && fuel >= 0 && fuel <= 2
+           && std::isfinite(p.fuelKgEst) && std::isfinite(p.minutesEst) && std::isfinite(p.minutesSigma) && std::isfinite(p.fuelUpliftKg);
       if (ok) { p.fuel = (LaunchPlan::FuelPolicy)fuel; p.spec = c.job->spec; p.src = c.job->src; c.job->plan = p; }
     }
     else if (!strcmp(key, "story_contract")) {
