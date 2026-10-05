@@ -465,6 +465,8 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   result.flightMin = flightClock / 60.f;
   result.maxG = plane.maxG; result.minG = plane.minG;
   result.fuelUsedKg = std::max(0.f, fuelStart - plane.fuel);
+  result.fuelLeftFrac = plane.spec->maxFuel > 0 ? clampf(plane.fuel / plane.spec->maxFuel, 0.f, 1.f) : 1.f;
+  result.shutDownAtStand = success && plane.onGround && !plane.engineRunning && parkingBrake && g_world.onRunway(plane.pos.x, plane.pos.z, 6.f) < 0;
   result.touchdownFpm = touchdownFpm;
   result.late = contract.timeLimitMin > 0 && (jobClockBase + flightClock) / 60.f > contract.timeLimitMin;
   result.landed = touchedDown && plane.onGround;
@@ -841,7 +843,8 @@ void Game::updateFlight(float dt) {
     if (!plane.onGround && plane.agl() > 150.f) appHigh = true;
     if (appHigh && !plane.onGround && dA < 3000.f && plane.agl() < 60.f && plane.vel.y < 0.f) appLow = true;
     if (appLow && !plane.onGround && plane.agl() > 150.f) { appLow = false; result.goArounds++; result.thrKt = -1; }
-    if (plane.ev.touchdown && takeoffAnnounced && lat < A.width && along > -50.f && along < A.length) { result.tdPastThrM = std::max(0.f, along); result.rwyLenM = A.length; }
+    if (plane.ev.touchdown && takeoffAnnounced && lat < A.width && along > -50.f && along < A.length) { result.tdPastThrM = std::max(0.f, along); result.rwyLenM = A.length; result.centerlineErr = lat; }
+    if (plane.ev.touchdown && takeoffAnnounced && atcF.goAround) result.landedAgainstGoAround = true;
     if (plane.onGround) { appLow = false; appHigh = false; if (result.tdPastThrM >= 0 && length(plane.vel) > 1.f) result.stopLeftM = A.length - along; }   // (while still rolling: its direction says which end)
   }
   // touchdown
@@ -2291,6 +2294,7 @@ void Game::updateAtc(float dt) {
   const float kt = MS_TO_KT;
   float agl = plane.agl(), gs = length(vec3(plane.vel.x, 0, plane.vel.z));
   if (!plane.onGround && agl > 15.f) F.airborne = true;
+  if (F.holding && F.phase == 1 && (length(plane.pos - F.holdPos) > 40.f || F.airborne)) { result.holdViolated = true; F.holding = false; }   // (moved off the hold, or took off)
   const std::string reg = registrationOf(*plane.spec);   // "SX-ABC"
   auto callsign = [&](int v, bool arrival, std::vector<std::string>& ids, std::string& txt) {
     int k = arrival && F.dep != F.arr;
@@ -2360,9 +2364,11 @@ void Game::updateAtc(float dt) {
             tx.ids.push_back(atc.line(vd, rt.departing ? "hold_departure" : rt.onRunway ? "hold_position" : "hold_arrival"));
             tx.text += atc.text(tx.ids.back());
             tx.apt = F.dep; atc.say(tx); F.trafficSaid = true; F.waitT = 0;
+            F.holding = true; F.holdPos = plane.pos;
           }
           break;
         }
+        F.holding = false;
         AtcVoice::Tx tx; tx.prio = 90; tx.subtitle = true; tx.group = "tower";
         tx.tag = callsign(vd, false, tx.ids, tx.text);
         wind(vd, tx.ids, tx.text);
@@ -2437,7 +2443,7 @@ void Game::updateAtc(float dt) {
           if (rt.onRunway && along > -700.f && agl < 90.f) {
             tx.prio = 99; tx.tag = callsign(va, true, tx.ids, tx.text);
             tx.ids.push_back(atc.line(va, "go_around_aircraft")); tx.text += atc.text(tx.ids.back());
-            tx.apt = F.arr; atc.say(tx); F.phase = 5; F.waitT = 0; F.trafficSaid = false;
+            tx.apt = F.arr; atc.say(tx); F.phase = 5; F.waitT = 0; F.trafficSaid = false; F.goAround = true;
           } else if (!F.trafficSaid) {
             tx.prio = 80; tx.tag = callsign(va, true, tx.ids, tx.text);
             tx.ids.push_back(atc.line(va, rt.onRunway ? "runway_occupied" : "clearance_follows")); tx.text += atc.text(tx.ids.back());
@@ -2460,7 +2466,8 @@ void Game::updateAtc(float dt) {
           AtcVoice::Tx tx; tx.prio = 55; tx.subtitle = true; tx.group = "tower"; tx.ids.push_back(atc.line(va, "exit_when_able")); tx.text = atc.text(tx.ids[0]);
           tx.apt = F.arr; atc.say(tx); F.phase = 6;
         }
-      } else if (!plane.onGround && agl > 180.f && plane.vel.y > 2.f && F.waitT > 20.f) { F.phase = F.dep == F.arr ? 4 : 3; F.waitT = 0; F.lastValid = false; }   // (went around: the clearance no longer stands)
+      } else if (!plane.onGround && agl > 180.f && plane.vel.y > 2.f && F.waitT > 20.f) { F.phase = F.dep == F.arr ? 4 : 3; F.waitT = 0; F.lastValid = false; F.goAround = false; }   // (went around: the clearance no longer stands)
+      if (F.goAround && !plane.onGround && agl > 150.f && plane.vel.y > 1.f) F.goAround = false;   // (complied: climbing away)
       break;
     default: break;
   }

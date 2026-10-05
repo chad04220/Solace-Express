@@ -362,7 +362,7 @@ struct GameTest {
       int m1 = q.career.money;
       landAt(to);
       q.endFlight(true, "", OUT_SUCCESS);
-      bool delivered = !q.career.job && q.career.location == to && q.career.money >= m1 + 1000 && q.career.money <= m1 + 1100 && q.career.flights == 2 && q.lastSuccess;
+      bool delivered = !q.career.job && q.career.location == to && q.career.money >= m1 + 1000 && q.career.money <= m1 + 1200 && q.career.flights == 2 && q.lastSuccess;
       bool paidOnce = true; int pays = 0; for (auto& l : q.payout) if (l.label == "Contract payment") pays++; paidOnce = pays == 1;
       // release: the load stays at the diversion airport, nothing charged
       fresh(); q.beginCareerFlight(c, 1, Career::SRC_RENT); landAt(via); q.result.divertedTo = via; q.endFlight(false, "Diverted", OUT_DIVERTED);
@@ -379,6 +379,22 @@ struct GameTest {
       printf("Resumable job: accepted %d, leg closed %d, reloaded %d, continued %d, delivered %d, paid once %d, released %d, crash ends %d, lesson no job %d: %s\n",
              accepted, leg1, reloaded, leg2start, delivered, paidOnce, released, crashEnds, noJob, ok ? "ok" : "FAIL");
       fails += !ok;
+    }
+    // ---- scoring and compliance lines from the recorded arrival
+    {
+      Career c; c.newGame(); c.money = 100000; c.license = LIC_ATP; c.reputation = 10;
+      int spec = 1; c.fleet.push_back({spec, g_story[4].from, kAircraft[spec].maxFuel, 0.f});
+      auto has = [](const std::vector<PayoutLine>& L, const char* label) { for (auto& l : L) if (l.label == label) return true; return false; };
+      FlightResult good; good.success = true; good.landed = true; good.touchdownFpm = 200; good.flightMin = 10; good.tdPastThrM = 300; good.rwyLenM = 1500; good.centerlineErr = 1.f;
+      good.thrKt = kAircraft[spec].vref * MS_TO_KT + 4.f; good.thrAglM = 15.f; good.fuelLeftFrac = 0.4f; good.shutDownAtStand = true;
+      int st = 0; Career t = c; auto L = t.settle(g_story[4], spec, Career::SRC_OWNED, good, &st);
+      bool okGood = has(L, "Touchdown in the zone") && has(L, "On the centreline") && has(L, "Stable approach") && has(L, "Taxied clear and shut down") && has(L, "Fuel reserve kept") && t.reputation > c.reputation;
+      FlightResult poor = good; poor.tdPastThrM = 900; poor.centerlineErr = 6.f; poor.thrKt = kAircraft[spec].vref * MS_TO_KT + 30.f; poor.fuelLeftFrac = 0.02f; poor.shutDownAtStand = false; poor.holdViolated = true; poor.landedAgainstGoAround = true;
+      Career u = c; L = u.settle(g_story[4], spec, Career::SRC_OWNED, poor, &st);
+      bool okPoor = has(L, "Floated past the midpoint") && !has(L, "On the centreline") && !has(L, "Stable approach") && has(L, "Landed on fumes") && has(L, "Took off against a hold instruction")
+                    && has(L, "Landed against a go-around instruction") && u.reputation < c.reputation;
+      printf("Scoring lines: airmanship rewarded %d, violations charged %d: %s\n", okGood, okPoor, okGood && okPoor ? "ok" : "FAIL");
+      fails += !(okGood && okPoor);
     }
     // ---- settle: only crashes count as crashes and cost repairs
     {

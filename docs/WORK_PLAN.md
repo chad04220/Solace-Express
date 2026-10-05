@@ -26,15 +26,15 @@ Line numbers in §2 are from `f8b8537` and no longer match: re-grep the identifi
 | A6 UBO for scene parameters | open; cheap once the uniform set settles after R3 | — |
 | E2 transactions, save v3, attempt marker | done | aefdbe5 |
 | A8 steps 1–2 lighting / terrain pass | done as R1a | 1be93c2 |
-| E3 resumable jobs | done (all ten steps; the hospital flag on CAP/NPT/PVI is data for a later alternate policy) | E3 commit |
+| E3 resumable jobs | done (all ten steps; the hospital flag on CAP/NPT/PVI is data for a later alternate policy) | fe220e8 |
 | A8 steps 3–5 aircraft pass, traffic, cloak, feeds | done as R1b/R1c | 0fe987d, ce5ca42, fe31039 |
 | A9 shadow maps for the aircraft | partly: the proxy pass (R1b); real maps are R2's remaining item | — |
-| E4 earning-path guarantee | open (after E3) | — |
+| E4 earning-path guarantee | done (640-state sweep in the progression test) | ac7aa73 |
 | E5.4 menu focus navigation | open | — |
 | A12 go/no-go | decided: meshes done as R2a–c (bake by state sweep, not per part) | 9546382 |
 | D1 + E6 FlightSession split, clocks, ATC validity | open | — |
-| C9 scoring lines from recorded data | open (small) | — |
-| C10 ATC compliance | open (small) | — |
+| C9 scoring lines from recorded data | done | C9/C10 commit |
+| C10 ATC compliance | done; landing against a go-around is charged (-50%, -rep) rather than failing the leg, so a resumable job is not stranded at its destination | C9/C10 commit |
 | A10 water reflection probe | → R3 | — |
 | A11 cloud march | → R3 | — |
 | A2 baked partial fbm | superseded by the terrain mesh | — |

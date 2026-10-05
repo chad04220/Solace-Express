@@ -603,6 +603,22 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
       else if (fpm > 350) { L.push_back({"Firm landing", -c.payout / 20}); }
     }
     if (r.late) { L.push_back({"Late delivery", -c.payout / 2}); st--; }
+    if (c.payout > 0 && r.landed) {   // airmanship on the arrival, from what was recorded (a needed go-around costs nothing)
+      bool zone = r.tdPastThrM >= 0 && r.rwyLenM > 0 && r.tdPastThrM <= r.rwyLenM / 3.f;
+      bool longLdg = r.tdPastThrM >= 0 && r.rwyLenM > 0 && r.tdPastThrM > r.rwyLenM * 0.5f;
+      if (zone) L.push_back({"Touchdown in the zone", c.payout * 5 / 100});
+      else if (longLdg) L.push_back({"Floated past the midpoint", -c.payout * 5 / 100});
+      if (r.tdPastThrM >= 0 && r.centerlineErr >= 0 && r.centerlineErr < 2.f) L.push_back({"On the centreline", c.payout * 2 / 100});
+      float vref = s.vref * MS_TO_KT;
+      if (r.thrKt > 0 && r.thrKt >= vref - 5.f && r.thrKt <= vref + 15.f && r.thrAglM >= 9.f && r.thrAglM <= 24.5f) L.push_back({"Stable approach", c.payout * 3 / 100});
+      if (r.shutDownAtStand) L.push_back({"Taxied clear and shut down", c.payout * 2 / 100});
+    }
+    if (c.payout > 0 && !s.special) {
+      if (r.fuelLeftFrac >= 0.15f) L.push_back({"Fuel reserve kept", c.payout * 2 / 100});
+      else if (r.fuelLeftFrac < 0.05f) { L.push_back({"Landed on fumes", -c.payout / 10}); reputation = std::max(0, reputation - 1); }
+    }
+    if (c.payout > 0 && r.holdViolated) { L.push_back({"Took off against a hold instruction", -c.payout / 10}); reputation = std::max(0, reputation - 1); st--; }
+    if (c.payout > 0 && r.landedAgainstGoAround) { L.push_back({"Landed against a go-around instruction", -c.payout / 2}); reputation = std::max(0, reputation - 1); st--; }
     if (c.pax > 0 && (r.maxBank > 45 || r.maxG > 1.9f || r.minG < 0.2f)) { L.push_back({"Passenger discomfort", -c.payout * 15 / 100}); st--; }
     if (c.fragile && (r.maxG > 2.0f || r.minG < 0.0f || (r.landed && fpm > 400))) { L.push_back({"Fragile cargo damaged", -c.payout * 4 / 10}); st--; }
     *stars = std::max(1, st);

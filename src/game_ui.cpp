@@ -1262,8 +1262,8 @@ void Game::drawHud(const FrameParams& fp) {
         int age = (int)std::max(0.f, flightClock - atcF.lastT);
         vec3 tc = vec3(0.55f, 1.f, 0.72f);
         g_ren.text(rx + 12 * s, cy + 7 * s, 11 * s, fmt("TWR  %s", g_world.airports[atcF.lastApt].code), tc, 1, 0, false);
-        g_ren.text(rx + rw - 12 * s, cy + 7 * s, 11 * s, atcF.lastValid ? fmt("%d:%02d AGO", age / 60, age % 60) : std::string("NO LONGER VALID"),
-                   atcF.lastValid ? C_DIM : C_WARN, 1, 2, false);
+        g_ren.text(rx + rw - 12 * s, cy + 7 * s, 11 * s, atcF.goAround ? std::string("GO AROUND - COMPLY") : atcF.holding ? std::string("HOLD - WAIT") : atcF.lastValid ? fmt("%d:%02d AGO", age / 60, age % 60) : std::string("NO LONGER VALID"),
+                   atcF.goAround || atcF.holding ? C_BAD : atcF.lastValid ? C_DIM : C_WARN, 1, 2, false);
         float ly = cy + 25 * s;
         for (auto& l : lines) { g_ren.text(rx + 12 * s, ly, fs, l, atcF.lastValid ? C_TEXT : C_DIM, atcF.lastValid ? 1.f : 0.6f, 0, false); ly += fs + 5 * s; }
       }

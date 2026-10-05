@@ -51,6 +51,12 @@ struct FlightResult {
   float tdPastThrM = -1;            // touchdown point past the threshold
   float stopLeftM = -1, rwyLenM = 0;   // runway left ahead when the aircraft stopped, and the runway's length
   int goArounds = 0;                // climbed away from a low approach without touching down
+  // the rest of the record the settlement scores (C9 / C10): fuel left at the end (fraction of the tanks), a
+  // shutdown off the runway with the brake set, and the tower's instructions ignored
+  float fuelLeftFrac = 1.f;
+  bool shutDownAtStand = false;     // stopped clear of the runway, engine off, parking brake set
+  bool holdViolated = false;        // moved off (or took off) while told to hold
+  bool landedAgainstGoAround = false;   // touched down after the tower said go around
 };
 
 struct PayoutLine { std::string label; int amount; };

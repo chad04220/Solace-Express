@@ -263,6 +263,8 @@ private:
     // the latest tower instruction, for the HUD's recall line: its text, airport, when it was said, and whether it
     // still stands (a go-around voids a landing clearance; it is never replayed or re-issued from here)
     std::string lastCall; int lastApt = -1; float lastT = 0; bool lastValid = true;
+    // the instructions compliance is scored on: a hold (where the aircraft was told to wait) and a go-around
+    bool holding = false; vec3 holdPos; bool goAround = false;
   } atcF;
   void updateAtc(float dt);
   // every in-flight message the voices may say: the toasts, the lesson hints (with the lesson's id), the warnings
