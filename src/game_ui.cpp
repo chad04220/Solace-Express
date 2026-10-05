@@ -415,9 +415,9 @@ void Game::drawMenu() {
   }
   if (in.pressed[K_ESC]) confirmNew = false;
   if (!confirmNew) {
-    if (button(60 * s, y, bw, bh, "New Career", true, !hasSave)) { if (hasSave) confirmNew = true; else { career.newGame(); saveGame(); screen = SCR_HUB; } }
+    if (button(60 * s, y, bw, bh, "New Career", true, !hasSave)) { if (hasSave) confirmNew = true; else { pendingCareer.reset(); career.newGame(); saveGame(); screen = SCR_HUB; } }
   } else {
-    if (button(60 * s, y, bw * 0.48f, bh, "Overwrite!", true, true)) { career.newGame(); saveGame(); confirmNew = false; screen = SCR_HUB; }
+    if (button(60 * s, y, bw * 0.48f, bh, "Overwrite!", true, true)) { pendingCareer.reset(); career.newGame(); saveGame(); confirmNew = false; screen = SCR_HUB; }
     if (button(60 * s + bw * 0.52f, y, bw * 0.48f, bh, "Cancel")) confirmNew = false;
   }
   y += bh + 14 * s;
@@ -487,7 +487,7 @@ void Game::drawHub() {
   g_ren.glow(ux + 8 * s, ty + 32 * s, uw - 16 * s, 3 * s, C_ACCENT, 0.5f, 1.5f * s, 8 * s);
   g_ren.rect(ux + 8 * s, ty + 32 * s, uw - 16 * s, 3 * s, C_ACCENT, 1);
   if (button(W - 280 * s, ty, 120 * s, 34 * s, showRadio ? "Radio <" : "Radio", true, showRadio)) showRadio = !showRadio;
-  if (button(W - 150 * s, ty, 126 * s, 34 * s, "Main Menu")) { screen = SCR_MENU; saveGame(); }
+  if (button(W - 150 * s, ty, 126 * s, 34 * s, "Main Menu")) { screen = SCR_MENU; if (!retryCommit()) {} else saveGame(); }
   float cx = 24 * s, cy = 126 * s, cw = W - 48 * s, ch = H - 146 * s;
   switch (hubTab) {
     case TAB_CONTRACTS: drawHubContracts(cx, cy, cw, ch); break;
@@ -497,7 +497,7 @@ void Game::drawHub() {
   }
   if (showRadio) drawRadioPanel(W - 460 * s, 126 * s);
   uiGlass = false;
-  if (in.pressed[K_ESC]) { if (showRadio) showRadio = false; else { screen = SCR_MENU; saveGame(); } }
+  if (in.pressed[K_ESC]) { if (showRadio) showRadio = false; else { screen = SCR_MENU; if (retryCommit()) saveGame(); } }
 }
 
 void Game::drawMapView(float x, float y, float w, float h, int from, int to, const std::vector<Waypoint>* wps) {
@@ -677,16 +677,17 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     if (src == Career::SRC_NONE) selAircraft = -1;
   }
   if (selAircraft < 0) selAircraft = firstOk;
-  bool can = selAircraft >= 0;
-  if (button(dx + dw - 262 * s, y + h - 62 * s, 240 * s, 46 * s, can ? "FLY!" : "No suitable aircraft", can, can)) {
+  bool can = selAircraft >= 0 && !commitBlocked();
+  if (button(dx + dw - 262 * s, y + h - 62 * s, 240 * s, 46 * s, commitBlocked() ? "Save pending" : can ? "FLY!" : "No suitable aircraft", can, can)) {
     auto src = career.canFly(c, selAircraft);
     if (c.type == CT_FERRY && src == Career::SRC_NONE) src = Career::SRC_LESSON;
     if (c.type == CT_FERRY && src == Career::SRC_RENT) {}
     Contract go = c;
     if (go.type == CT_FERRY) { go.from = career.location; }
-    startFlight(go, selAircraft, src);
+    beginCareerFlight(go, selAircraft, src);
   }
-  if (!can) g_ren.text(px, y + h - 50 * s, 14 * s, "Tip: check the Hangar to buy an aircraft, or earn your next licence through the story.", C_DIM, 1);
+  if (commitBlocked()) g_ren.text(px, y + h - 50 * s, 14 * s, "Your last result isn't saved yet (" + saveWhy + "). Retrying...", C_BAD, 1);
+  else if (!can) g_ren.text(px, y + h - 50 * s, 14 * s, "Tip: check the Hangar to buy an aircraft, or earn your next licence through the story.", C_DIM, 1);
 }
 
 void Game::drawHubHangar(float x, float y, float w, float h) {
@@ -746,16 +747,22 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
   py += 14 * s;
   int oi = career.ownedIndexFor(selHangar);
   if (oi < 0) {
-    bool can = career.money >= a.price && career.license >= a.license;
+    bool can = career.money >= a.price && career.license >= a.license && !commitBlocked();
     if (button(px, py, 240 * s, 46 * s, fmt("Buy for %s", fmtMoney(a.price).c_str()), can, can)) {
-      std::string m; if (career.buy(selHangar, &m)) { g_audio.trigger(SFX_CASH); saveGame(); } hubMsg = m; hubMsgTime = 4;
+      std::string m; bool bought = false;
+      commit([&](Career& k) { bought = k.buy(selHangar, &m); });
+      if (bought) g_audio.trigger(SFX_CASH);
+      hubMsg = m; hubMsgTime = 4;
     }
-    if (!can) g_ren.text(px + 260 * s, py + 14 * s, 15 * s, career.license < a.license ? std::string("Requires ") + licenseName(a.license) : "Not enough money", C_BAD, 1);
+    if (!can) g_ren.text(px + 260 * s, py + 14 * s, 15 * s, commitBlocked() ? "Last result not saved yet - retrying" : career.license < a.license ? std::string("Requires ") + licenseName(a.license) : "Not enough money", C_BAD, 1);
   } else {
     g_ren.text(px, py, 16 * s, fmt("Parked at %s", g_world.airports[career.fleet[oi].location].name), C_GOOD, 1);
     py += 30 * s;
-    if (button(px, py, 240 * s, 46 * s, fmt("Sell for %s", fmtMoney(a.price * 7 / 10).c_str()))) {
-      std::string m; if (career.sell(oi, &m)) { g_audio.trigger(SFX_CASH); saveGame(); } hubMsg = m; hubMsgTime = 4;
+    if (button(px, py, 240 * s, 46 * s, fmt("Sell for %s", fmtMoney(a.price * 7 / 10).c_str()), !commitBlocked(), !commitBlocked())) {
+      std::string m; bool sold = false;
+      commit([&](Career& k) { sold = k.sell(oi, &m); });
+      if (sold) g_audio.trigger(SFX_CASH);
+      hubMsg = m; hubMsgTime = 4;
     }
   }
   py += 70 * s;
@@ -1821,6 +1828,10 @@ void Game::drawDebrief() {
   g_ren.text(x + pw - 30 * s, py, 18 * s, fmtMoney(total), total >= 0 ? C_GOOD : C_BAD, 1, 2); py += 34 * s;
   if (career.license > licenseBefore) { fitText(px, py, pw - 60 * s, 22 * s, 14 * s, std::string("NEW LICENCE: ") + licenseName(career.license), C_WARN); py += 34 * s; }
   if (career.finished && lastSuccess && contract.story && contract.id == g_story.back().id) { for (auto& l : wrap("You've completed the Solace Express campaign. Congratulations, Captain!", pw - 60 * s, 18 * s)) { g_ren.text(px, py, 18 * s, l, C_ACCENT, 1); py += 24 * s; } }
-  if (button(x + pw - 230 * s, y + ph - 66 * s, 200 * s, 46 * s, "Continue", true, true) || in.pressed[K_ENTER]) { screen = SCR_HUB; hubTab = TAB_CONTRACTS; selContract = 0; selAircraft = -1; }
-  if (!lastSuccess && button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, "Try again")) { Contract c = contract; startFlight(c, specIdx, career.canFly(c, specIdx) != Career::SRC_NONE ? career.canFly(c, specIdx) : source); }
+  if (commitBlocked()) {   // the settlement above is what will be saved; until it is, the career stands as before the flight
+    fitText(px, y + ph - 100 * s, pw - 60 * s, 20 * s, 13 * s, "NOT SAVED YET: " + saveWhy, C_BAD);
+    if (button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, "Retry save")) retryCommit();
+  }
+  if (button(x + pw - 230 * s, y + ph - 66 * s, 200 * s, 46 * s, "Continue", true, true) || in.pressed[K_ENTER]) { retryCommit(); screen = SCR_HUB; hubTab = TAB_CONTRACTS; selContract = 0; selAircraft = -1; }
+  if (!lastSuccess && !commitBlocked() && button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, "Try again")) { Contract c = contract; beginCareerFlight(c, specIdx, career.canFly(c, specIdx) != Career::SRC_NONE ? career.canFly(c, specIdx) : source); }
 }

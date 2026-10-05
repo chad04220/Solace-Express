@@ -290,6 +290,29 @@ void Game::saveGame() {
   if (career.save(joinPath(saveDir, "career.sav"))) hasSave = true;
   else toast("Couldn't save the career (disk full or folder not writable)", vec3(1.f, 0.4f, 0.3f));
 }
+bool Game::commit(const std::function<void(Career&)>& change) {
+  Career cand = pendingCareer ? *pendingCareer : career;
+  change(cand);
+  if (headless && saveDir.empty()) { career = cand; pendingCareer.reset(); return true; }   // (tests: no disk)
+  if (cand.save(joinPath(saveDir, "career.sav"))) { career = cand; pendingCareer.reset(); hasSave = true; saveWhy.clear(); return true; }
+  pendingCareer = cand; retryT = 0;
+  saveWhy = "Couldn't save the career (disk full or folder not writable)";
+  toast(saveWhy + " - will retry", vec3(1.f, 0.4f, 0.3f));
+  return false;
+}
+bool Game::retryCommit() {
+  if (!pendingCareer) return true;
+  if (!pendingCareer->save(joinPath(saveDir, "career.sav"))) return false;
+  career = *pendingCareer; pendingCareer.reset(); hasSave = true; saveWhy.clear();
+  toast("Career saved", vec3(0.6f, 1.f, 0.7f));
+  return true;
+}
+// A career flight: the save marks the attempt open first (a crash to desktop mid-flight then shows on the next start
+// that a flight was interrupted), then the flight starts
+void Game::beginCareerFlight(const Contract& c, int spec, Career::Source src) {
+  if (!commitBlocked()) commit([](Career& k) { k.attempt++; k.attemptOpen = true; });
+  startFlight(c, spec, src);
+}
 
 void Game::init(bool buildWorld) {
   if (buildWorld) g_world.build();
@@ -307,6 +330,10 @@ void Game::init(bool buildWorld) {
   std::string sav = joinPath(saveDir, "career.sav");
   hasSave = career.load(sav);
   if (!hasSave && career.load(sav + ".bak")) { hasSave = true; toast("Career save was damaged: restored the previous save"); }
+  if (hasSave && career.attemptOpen) {   // the last session ended inside a flight: the career stands as it was before it
+    toast(fmt("Your last flight was interrupted: you are back at %s", g_world.airports[career.location].name), vec3(1.f, 0.8f, 0.4f));
+    commit([](Career& k) { k.attemptOpen = false; });
+  }
   if (!hasSave) {
     career.newGame();
     // keep an unreadable save aside rather than overwriting it with a new career
@@ -413,12 +440,15 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   coaching = landingCoaching();
   Contract c = contract;
   if (c.type == CT_FERRY) { c.story = false; }
-  payout = career.settle(c, specIdx, source, result, &stars, &launchPlan);
+  // the settlement is one transaction: the career only changes when the save succeeds; a failed save keeps the
+  // settled copy pending (the debrief shows it, and offers the retry), and a retry can never pay twice
+  { std::vector<PayoutLine> lines; int st = 0;
+    commit([&](Career& k) { lines = k.settle(c, specIdx, source, result, &st, &launchPlan); k.attemptOpen = false; });
+    payout = lines; stars = st; }
   lastSuccess = success;
   debriefTitle = success ? (c.type == CT_FERRY ? "Flight complete" : "Contract complete!") : (reason.empty() ? "Flight failed" : reason);
   g_audio.trigger(success ? SFX_SUCCESS : SFX_FAIL);
   if (success && c.payout > 0) g_audio.trigger(SFX_CASH);
-  if (!headless) saveGame();
   screen = SCR_DEBRIEF;
   paused = false; showMap = false;
 }
@@ -2450,6 +2480,10 @@ void Game::feedAudio() {
 
 // ------------------------------------------------------------------ main update / render
 void Game::update(float dt) {
+  if (pendingCareer && (screen == SCR_HUB || screen == SCR_DEBRIEF || screen == SCR_MENU)) {   // a settlement or purchase that couldn't be saved: tried again now and then
+    retryT += dt;
+    if (retryT > 3.f) { retryT = 0; retryCommit(); }
+  }
   // the ray-trace resolution: native, a fixed scale, or adjusted to hold the frame-rate target (Settings)
   fpsAvg = lerpf(fpsAvg, dt, 1.f - expf(-dt * 3.f));   // (a third of a second, whatever the frame rate)
   maxFrameWin = std::max(maxFrameWin, dt); maxFrameT += dt;

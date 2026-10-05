@@ -313,6 +313,29 @@ struct GameTest {
       printf("Dry with checkpoints left: screen=%d outcome=%d crashes %+d (%s)\n", g.screen, (int)g.result.outcome, g.career.crashes - crashes0, g.debriefTitle.c_str());
       if (g.screen != SCR_DEBRIEF || g.result.outcome != OUT_OUT_OF_FUEL || g.career.crashes != crashes0) fails++;
     }
+    // ---- transactions: a settlement that can't be saved leaves the career untouched and pending; the retry saves it
+    //      once and a second retry can't pay again
+    {
+      Game& q = g;
+      q.career.newGame(); q.career.money = 5000; q.career.license = LIC_PPL; q.career.location = g_story[4].from;
+      q.pendingCareer.reset();
+      q.saveDir = "no_such_dir_gameplay/x";   // (a save folder that can't be written)
+      Contract c = g_story[4]; c.wx = Weather();
+      q.beginCareerFlight(c, 1, Career::SRC_RENT);
+      bool flagged = !q.career.attemptOpen && q.commitBlocked();   // the attempt marker couldn't be saved either: pending, the career as before
+      q.plane.pos = g_world.airports[c.to].pos() + vec3(0, 0.1f, 0); q.plane.onGround = true; q.touchedDown = true; q.takeoffAnnounced = true;
+      int before = q.career.money;
+      q.endFlight(true, "", OUT_SUCCESS);
+      bool pend = q.commitBlocked() && q.career.money == before && q.screen == SCR_DEBRIEF && !q.payout.empty();
+      q.saveDir = ".";
+      bool saved = q.retryCommit() && !q.commitBlocked();
+      int after = q.career.money;
+      bool once = q.retryCommit() && q.career.money == after && after != before && !q.career.attemptOpen;
+      remove("career.sav"); remove("career.sav.bak");
+      q.saveDir.clear(); q.pendingCareer.reset();
+      printf("Transactions: marker pending %d, settlement pending %d, retry saved %d, no double pay %d: %s\n", flagged, pend, saved, once, flagged && pend && saved && once ? "ok" : "FAIL");
+      fails += !(flagged && pend && saved && once);
+    }
     // ---- settle: only crashes count as crashes and cost repairs
     {
       Career c; c.newGame(); c.money = 100000; c.license = LIC_ATP;

@@ -22,12 +22,22 @@ int main() {
   Career r; r.newGame();
   check(r.load(p), "good save loads");
   check(r.money == -1234 && r.storyIndex == 5 && r.license == LIC_PPL && r.fleet.size() == 1 && r.fleet[0].location == 2, "round trip keeps the values (including a negative balance)");
+  {   // version 3: the attempt counter and the open-attempt marker round-trip; a version 2 file (no marker) still loads
+    Career a = live; a.attempt = 17; a.attemptOpen = true;
+    check(a.save("save_test_v3.sav"), "v3 save writes");
+    Career b; b.newGame(); check(b.load("save_test_v3.sav") && b.attempt == 17 && b.attemptOpen, "v3 round trip keeps the attempt marker");
+    writeFile("save_test_v2.sav", "solace_save 2\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nfleet 1\nplane kestrel 1 20\nend\n");
+    Career v2; v2.newGame(); check(v2.load("save_test_v2.sav") && v2.money == 900 && v2.attempt == 0 && !v2.attemptOpen, "v2 save loads with the marker closed");
+    writeFile("save_test_bad.sav", "solace_save 3\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nattempt 3\nattempt_open 7\nfleet 0\nend\n");
+    Career x = r; check(!x.load("save_test_bad.sav"), "a marker that isn't 0 or 1 is rejected");
+    remove("save_test_v3.sav"); remove("save_test_v3.sav.bak"); remove("save_test_v2.sav");
+  }
 
   // each of these must be rejected and leave the career as it was
   const char* bad[] = {
     "solace_save 1\nlicense 1\nplane kestrel 999 70\n",                                   // fleet airport out of range
     "solace_save 1\n",                                                                    // header only
-    "solace_save 3\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // unknown version
+    "solace_save 4\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // unknown version
     "solace_save 1\nmoney 5\nlicense 9\nlocation 0\nstory 0\n",                           // bad license
     "solace_save 1\nmoney 5\nlicense 0\nlocation -3\nstory 0\n",                          // bad location
     "solace_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 999\n",                         // story past the end

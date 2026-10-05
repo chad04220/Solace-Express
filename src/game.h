@@ -1,6 +1,7 @@
 // Solace Express - game state, flight session, cameras, effects, UI
 #pragma once
 #include <functional>
+#include <optional>
 #include "common.h"
 #include <unordered_map>
 #include <future>
@@ -95,6 +96,16 @@ public:
 private:
   // ---------------------------------------------------------------- state
   Career career;
+  // Every change to the career is a transaction: the change is made on a copy, the copy is saved, and only a saved
+  // copy becomes the career. A failed save leaves the career as it was and keeps the copy as pending, to be retried
+  // (on the debrief, on entering the hub); meanwhile nothing else may commit (Accept / Buy / Sell are disabled).
+  std::optional<Career> pendingCareer;
+  bool commit(const std::function<void(Career&)>& change);   // true: saved (or no save wanted)
+  bool retryCommit();
+  bool commitBlocked() const { return pendingCareer.has_value(); }
+  float retryT = 0;
+  std::string saveWhy;      // why the last commit could not be saved
+  void beginCareerFlight(const Contract& c, int spec, Career::Source src);   // marks the attempt open in the save, then startFlight
   GameScreen screen = SCR_MENU;
   int hubTab = TAB_CONTRACTS;
   float gameTime = 0, realTime = 0;

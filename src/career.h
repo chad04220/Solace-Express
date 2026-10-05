@@ -66,6 +66,8 @@ public:
   std::vector<Contract> board;  // freelance jobs at current location
   uint32_t boardSeed = 1;
   bool finished = false;
+  uint32_t attempt = 0;        // monotonic per career: one per flight begun
+  bool attemptOpen = false;    // a flight was in progress when this career was saved (the save before the flight)
 
   void newGame();
   const Contract* nextStory() const;

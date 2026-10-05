@@ -550,8 +550,8 @@ bool Career::save(const std::string& path) const {
   std::string tmp = path + ".tmp";
   FILE* f = fopen(tmp.c_str(), "w");
   if (!f) return false;
-  bool ok = fprintf(f, "solace_save 2\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\n",
-                    money, license, reputation, location, storyIndex, flights, landings, crashes, hours, bestLandingFpm, boardSeed, finished ? 1 : 0) > 0;
+  bool ok = fprintf(f, "solace_save 3\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\nattempt %u\nattempt_open %d\n",
+                    money, license, reputation, location, storyIndex, flights, landings, crashes, hours, bestLandingFpm, boardSeed, finished ? 1 : 0, attempt, attemptOpen ? 1 : 0) > 0;
   ok = ok && fprintf(f, "fleet %d\n", (int)fleet.size()) > 0;
   for (auto& p : fleet) ok = ok && fprintf(f, "plane %s %d %f\n", kAircraft[p.spec].id, p.location, p.fuel) > 0;
   ok = ok && fprintf(f, "end\n") > 0;
@@ -573,7 +573,7 @@ bool Career::load(const std::string& path) {
   FILE* f = fopen(path.c_str(), "r");
   if (!f) return false;
   Career c; char key[64]; int ver = 0;
-  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 2) { fclose(f); return false; }
+  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 3) { fclose(f); return false; }
   const int nApt = (int)g_world.airports.size();
   bool ok = true;
   unsigned have = 0;   // mandatory fields seen (version 2: every field, the fleet count and the end marker)
@@ -594,6 +594,8 @@ bool Career::load(const std::string& path) {
     else if (!strcmp(key, "best")) { rdF(c.bestLandingFpm); have |= 512; }
     else if (!strcmp(key, "seed")) { ok = fscanf(f, "%u", &c.boardSeed) == 1; have |= 1024; }
     else if (!strcmp(key, "finished")) { rdI(fin, 2048); c.finished = fin != 0; }
+    else if (!strcmp(key, "attempt")) ok = fscanf(f, "%u", &c.attempt) == 1;
+    else if (!strcmp(key, "attempt_open")) { int ao = 0; ok = fscanf(f, "%d", &ao) == 1 && (ao == 0 || ao == 1); c.attemptOpen = ao != 0; }
     else if (!strcmp(key, "fleet")) ok = fscanf(f, "%d", &fleetN) == 1 && fleetN >= 0;
     else if (!strcmp(key, "plane")) {
       char id[64]; int loc = -1; float fuel = 0; int spec = -1;
