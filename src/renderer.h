@@ -20,6 +20,7 @@ struct PlaneVisual {
   float M[24 * 4];          // model geometry (models.cpp packModel)
   float PS[4], Ctl[4], Pr[4], I0[4], I1[4], I2[4];  // state, controls, prop, instruments
   float wheel[3] = {};      // the wheels' roll (radians about body +x): main left, main right, nose / tail (Plane::wheelMotion)
+  int model = -1;           // the type (index into kAircraft): the field reads it for a type's own fittings (kOsprey)
   vec3 colBase, colStripe;
   float reg[3] = {65, 65, 65};   // registration letters (character codes)
   float prop[2][4]; int propCount = 0;

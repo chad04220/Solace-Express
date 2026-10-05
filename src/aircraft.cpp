@@ -39,6 +39,28 @@ const AircraftSpec kAircraft[] = {
    0.25f, 5.0f, 1.40f, 0.75f, 0.022f, 0.012f, 0.070f, 0.80f, 15000, 0, 55, 62, 200, 260, 1250, false, false, true,
    30000, 60000, 85000, 0.42f, 0.050f, 0.055f, LIC_ATP, 260000, 0,
    14.0f, 0.95f, -0.58f, 1.0f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f)},
+  // ---- Codex's aircraft (docs/design/additional-aircraft, proposals on codex/*): Swift S6, Osprey C6, XR-14 Nightjar
+  // Swift S6: four-seat retractable touring piston
+  {"swift_s6", "Swift S6", "Retractable low-wing tourer", ENG_PISTON, 1, 6, 3, 700.0f, 2700.0f,
+  980.0f, 180.0f, 420.0f, 3, 17.10f, 11.40f, 1.552f,
+  0.28f, 4.9f, 1.65f, 0.78f, 0.025f, 0.010f, 0.052f, 0.80f,
+  260000.0f, 23.0f, 31.0f, 36.0f, 76.0f, 140.0f, 600.0f, false, false, true,
+  7600.0f, 6500.0f, 14100.0f, 0.42f, 0.065f, 0.068f, LIC_PPL, 68000, 600,
+  8.60f, 0.66f, -1.121212f, -0.155f, 0, 0,
+  vec3(0.91f, 0.88f, 0.80f), vec3(0.13f, 0.26f, 0.32f), 0},
+  // Osprey C6: six-seat coastal charter piston twin (its cabin trim: plane_sdf.glsl mapOspreyCabinTrim, by kOsprey)
+  {"osprey_c6", "Osprey C6", "Six-seat coastal charter twin", ENG_PISTON, 2, 6, 3, 700.0f, 2700.0f, 1420.0f, 220.0f, 270.0f, 5, 22.5f, 12.4f, 1.82f,
+  0.30f, 4.9f, 1.65f, 0.80f, 0.028f, 0.006f, 0.060f, 0.78f, 180000.0f, 24.0f, 30.2f, 35.0f, 74.0f, 110.0f, 550.0f, false, false, true,
+  9000.0f, 10800.0f, 19800.0f, 0.41f, 0.056f, 0.062f, LIC_CPL, 68000, 650,
+  9.8f, 0.90f, -0.68f, -0.80f, 1, 0, vec3(0.91f, 0.88f, 0.79f), vec3(0.82f, 0.24f, 0.06f), 0},
+  // XR-14 Nightjar: conventional twin-jet research demonstrator (special 0: the generic flight model and field)
+  {"xr14_nightjar", "XR-14 Nightjar", "Tapered-wing research demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
+  5700.0f, 1300.0f, 100.0f, 0, 38.18f, 16.60f, 2.508f,
+  0.15f, 4.6f, 1.55f, 0.55f, 0.020f, 0.010f, 0.045f, 0.80f,
+  12500.0f, 0.0f, 43.0f, 50.0f, 150.0f, 240.0f, 1250.0f, false, false, true,
+  60000.0f, 86000.0f, 146000.0f, 0.42f, 0.060f, 0.065f, LIC_ATP, 340000, 0,
+  16.30f, 0.80f, -0.9375f, -1.145f, 2, 0,
+  vec3(0.14f, 0.18f, 0.20f), vec3(0.20f, 0.78f, 0.70f), 0},
   // hidden research model: thrust-to-weight ~2.2, supersonic, pitch thrust vectoring (see Plane::substep special path)
   {"xr9", "XR-9 Specter", "Confidential research model", ENG_JET, 2, 0, 0, 0, 0, 9000, 3000, 0, 0, 46.0f, 11.2f, 4.6f,
    0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 118000, 0, 60, 70, 420, 4000, 250, true, false, true,

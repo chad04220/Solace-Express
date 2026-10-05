@@ -42,8 +42,9 @@ inline std::string registrationOf(const AircraftSpec& s) {
   return r;
 }
 extern const int kNumAircraft;   // career aircraft (market, rentals, contracts)
-static const int kResearchJet = 7; // hidden XR-9, only reachable from the research menu
-static const int kWraith = 8;      // hidden XR-11 Wraith stealth aerobatic research craft (research menu)
+static const int kOsprey = 8;       // the Osprey C6: the only type with its own cabin trim in the field (plane_sdf.glsl)
+static const int kResearchJet = 10; // hidden XR-9, only reachable from the research menu
+static const int kWraith = 11;      // hidden XR-11 Wraith stealth aerobatic research craft (research menu)
 // XR-11 thruster pods (body coords, +z aft): front left, front right, rear left, rear right pivot points
 static const vec3 kWraithPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.08f, -3.3f), vec3(-2.75f, 0.05f, 3.45f), vec3(2.75f, 0.05f, 3.45f)};
 

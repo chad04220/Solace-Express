@@ -68,6 +68,47 @@ const ModelDef kModels[] = {
     4, .33f, 0,
     6, -3.8f,1.2f,.20f,.17f,.21f,
     vec3(-.42f,.40f,-4.75f), 2, -5.95f,-4.95f,.22f,-4.4f },
+  // ---------------------------------------------------------------- Swift S6 (low-wing retractable tourer)
+  { // Eight closed nose-to-tail fuselage stations: z, half width, half height, centre y.
+  {{-4.35f,.10f,.09f,-.055f},{-4.10f,.35f,.31f,-.060f},
+  {-2.95f,.49f,.41f,-.035f},{-1.90f,.62f,.66f,.075f},
+  {-.25f,.63f,.65f,.105f},{1.55f,.43f,.43f,.160f},
+  {3.70f,.14f,.18f,.270f},{4.25f,.055f,.075f,.315f}}, .94f, // elliptical cabin
+  {5.70f,1.98f,1.02f,.72f,-.74f,-1.13f,5.0f,.125f}, // low tapered wing; spar below floor
+  0,0.0f,.34f,.57f,0,0,                               // no struts; winglets; 57% flaps
+  {1.90f,1.08f,.62f,.40f,.28f,3.06f,0.0f},0,           // conventional horizontal tail
+  {1.55f,1.55f,.55f,.76f,.23f,2.70f},                  // fin and rudder
+  0,0.0f,0.0f,0.0f,0.0f,0.0f,.13f,1.03f,             // nose piston; spinner and prop
+  4,.28f,0,                                         // wing/body retracts; no cargo pod
+  1,.35f,1.45f,.24f,.28f,.205f,                       // one passenger window per side
+  vec3(-.32f,.52f,-1.40f),0,-2.80f,-2.14f,.31f,.50f }, // left-seat analog; windshield ahead of panel
+  // ---------------------------------------------------------------- Osprey C6 (six-seat piston twin)
+  { // Fuselage stations: pointed luggage nose, six-seat cabin, tapered tailcone.
+  {{-4.90f,0.06f,0.06f,-0.06f},{-4.45f,0.37f,0.35f,-0.04f},{-3.10f,0.63f,0.67f,0.03f},{-2.10f,0.72f,0.90f,0.09f},
+  {0.55f,0.72f,0.90f,0.09f},{2.15f,0.49f,0.58f,0.16f},{4.25f,0.16f,0.24f,0.30f},{4.90f,0.06f,0.08f,0.34f}}, 0.72f,
+  {6.20f,2.25f,1.35f,0.55f,-0.68f,-0.80f,4.0f,0.13f},
+  0,0.0f,0.0f,0.59f,0,1, // no struts/winglets/slats; flaps to 59%; de-ice boots
+  {2.15f,1.35f,0.85f,0.28f,0.34f,3.15f,0.0f},0, // conventional horizontal tail
+  {1.85f,1.65f,0.65f,0.85f,0.32f,2.80f}, // tapered swept fin
+  2,2.30f,-0.54f,0.40f,-1.50f,2.60f,0.16f,1.05f, // twin three-blade piston nacelles
+  4,0.29f,0, // retract into low wing/body; no cargo pod
+  2,-0.55f,1.45f,0.25f,0.27f,0.22f, // two large cabin windows per side
+  vec3(-0.34f,0.74f,-1.90f),1, // left pilot eye; analog twin cockpit
+  -3.05f,-2.62f,0.40f,-0.65f }, // windshield and pilot side windows
+  // ---------------------------------------------------------------- XR-14 Nightjar (civil twin-jet research demonstrator; generic field)
+  { // Eight closed stations; enough roof height for the offset glass-cockpit eye.
+  {{-8.30f,.035f,.035f,-.035f},{-6.65f,.28f,.22f,-.030f},
+  {-5.05f,.56f,.49f,-.010f},{-3.55f,.77f,.79f,.045f},
+  {-.30f,.93f,.80f,.075f},{3.10f,.78f,.72f,.075f},
+  {6.75f,.28f,.33f,.155f},{8.00f,.065f,.090f,.225f}}, .77f,
+  {8.30f,3.50f,1.10f,.08f,-.75f,-1.50f,2.0f,.11f},   // near-straight LE, mildly forward quarter-chord; 11% thick
+  0,0.0f,.42f,.58f,0,0,                              // winglets; 58% flaps; no special surfaces
+  {2.65f,1.55f,.80f,.48f,.83f,5.72f,0.0f},0,          // conventional raised horizontal tail
+  {2.22f,2.28f,.77f,1.40f,.55f,4.85f},                // tall swept fin
+  4,1.63f,.16f,.45f,2.54f,3.37f,0.0f,0.0f,            // ordinary aft twin jets and generated pylons
+  4,.35f,0,                                        // wing/body retracts; no cargo pod
+  0,0.0f,0.0f,0.0f,0.0f,0.0f,                       // no passenger windows
+  vec3(-.42f,.59f,-3.30f),2,-5.45f,-4.23f,.30f,-2.20f }, // glass cockpit; avoid centre-display overlap using data
   // ---------------------------------------------------------------- XR-9 Specter (research jet; custom SDF in the shader, engine code 5)
   { {{-9.00f,.04f,.03f,-.05f},{-7.60f,.40f,.22f,-.02f},{-5.60f,.82f,.48f,.06f},{-3.60f,1.05f,.62f,.08f},{0.0f,1.15f,.60f,.05f},{3.50f,1.25f,.55f,0},{6.60f,1.15f,.45f,-.02f},{8.20f,.95f,.40f,-.02f}}, .45f,
     {5.60f,7.20f,1.20f,5.60f,-.20f,-1.60f,-2.0f,.045f}, 0,0,0,.82f, 0,0,

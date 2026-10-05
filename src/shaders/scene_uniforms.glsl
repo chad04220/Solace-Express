@@ -46,6 +46,8 @@ uniform vec4 uFlame; uniform vec3 uFlameLP; uniform vec3 uFlameLI;  // research 
 // Per-aircraft data the SDF and its shading read: your aircraft (uniforms) or a traffic aircraft (uTraffic row k:
 // texels 0-23 model, 24 position + bound radius, 25-27 rotation columns, 28 state, 29 controls, 30 base colour + prop
 // angle, 31 stripe colour + reheat)
+uniform int uModelId;   // the player's type (index into kAircraft; -1 unknown): the Osprey's cabin trim is gated by it
+int gModelId = -1;
 uniform vec3 uWheel;   // the player's wheels' roll (main left, main right, nose / tail), from the simulation
 vec3 gWheel;           // the wheels' roll of the aircraft loaded (the player's, or a traffic aircraft's from its rotation columns' .w)
 vec4 gM[24]; vec4 gPS; vec4 gCtl; vec3 gColBase; vec3 gColStripe; vec4 gFlame;
