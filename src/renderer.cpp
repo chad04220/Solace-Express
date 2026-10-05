@@ -496,7 +496,7 @@ bool Renderer::readCostMap(std::vector<float>& out, int& w, int& h) {
 }
 
 // Exact pass timing for the analysis tool: wait for the GPU at every pass boundary
-static_assert(Renderer::kPasses == 7, "passWall holds kPasses entries");
+static_assert(Renderer::kPasses == 10, "passWall holds kPasses entries");
 void Renderer::syncStamp(int i) {
   glFinish();
   auto now = std::chrono::steady_clock::now();
@@ -1236,29 +1236,34 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     // ------------------------------------------------ the raster renderer: scenery, terrain and sea into the G-buffer, then one lighting pass
     rasterWorld(fp);
     bakeTerrainShadow(fp);
+    stamp(1);
     if (fp.dispMode & 1) renderDisplays(fp, false);   // the cockpit display atlases, before the objects pass samples them
     if (fp.dispMode & 2) renderDisplays(fp, true);
     // the research jets' cockpit cameras: the same passes on their own targets, before the objects pass draws the screens
     renderFeeds(fp, [this](GLuint p, const FrameParams& f) { setRT(p, f); }, [this](const FrameParams& f, GLuint) { rasterShadowProxy(f); rasterLight(f); cloudPass(f); rasterEffects(f); }, [this](const FrameParams& f) { feedEffects(f); });
+    stamp(2);
     rasterObjects(fp);
+    stamp(3);
     rasterShadowProxy(fp);
-    stamp(1);
+    stamp(4);
     rasterLight(fp);
     cloudPass(fp);
     rasterEffects(fp);
-    stamp(2);
+    stamp(5);
   } else {
     drawEnvelope(fp);
     drawEntities(fp);
     bakeTerrainShadow(fp);
+    stamp(1);
     if (fp.dispMode & 1) renderDisplays(fp, false);   // the cockpit display atlases, before the ray tracer samples them
     if (fp.dispMode & 2) renderDisplays(fp, true);
+    stamp(2);
     // ------------------------------------------------ ray trace
     glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
     glDrawBuffers(3, bufs);
     glViewport(0, 0, rw, rh);
     glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
-    stamp(1);
+    stamp(3); stamp(4);   // (the raster path's objects and shadow proxy passes: nothing here)
     // the research jets' cockpit cameras first: the displays show this frame's pictures
     renderFeeds(fp, [this](GLuint p, const FrameParams& f) { setRT(p, f); }, [this](const FrameParams& f, GLuint pr) { traceRT(f, pr); cloudPass(f); }, [this](const FrameParams& f) { feedEffects(f); });
     // aircraft hull (rasterized; baked at the end of the frame that first needs it - see below)
@@ -1273,7 +1278,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
 
     // a new airframe or view: bake its hull with the ray tracer's own shape code (used from the next frame on)
     if (hullUse && !hulls.count(hullK)) { setRT(progHullBake, fp); bakeHull(fp, hullSlot, hullK); }
-    stamp(2);
+    stamp(5);
   }
   // ------------------------------------------------ temporal AA resolve (before the sprites: particles never smear)
   {
@@ -1310,14 +1315,14 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     if (pv2.on) { prevPlanePos = pv2.pos; memcpy(prevPlaneRot, pv2.rot, sizeof prevPlaneRot); }
   }
 
-  stamp(3);
+  stamp(6);
   // ------------------------------------------------ sprites
   glBindFramebuffer(GL_FRAMEBUFFER, fboSprite);
   GLenum one = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &one);
   glViewport(0, 0, W, H);
   drawSprites(fp, (float)W, (float)H, (float)rw / allocW, (float)rh / allocH);   // (the depth is in the ray tracer's corner)
 
-  stamp(4);
+  stamp(7);
   // ------------------------------------------------ bloom
   glBindVertexArray(vaoEmpty);
   glActiveTexture(GL_TEXTURE0);
@@ -1340,7 +1345,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glDrawArrays(GL_TRIANGLES, 0, 3);
   }
   glDisable(GL_BLEND);
-  stamp(5);
+  stamp(8);
   // ------------------------------------------------ light shafts
   float rsx = 0, rsy = 0; vec3 rsp = fp.camPos + fp.sunDir * 10000.f;
   bool sunFront = dot(fp.sunDir, -fp.camBack) > 0.f && project(fp, rsp, rsx, rsy);
@@ -1364,7 +1369,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glDrawArrays(GL_TRIANGLES, 0, 3);
   }
 
-  stamp(6);
+  stamp(9);
   // ------------------------------------------------ composite to backbuffer
   glBindFramebuffer(GL_FRAMEBUFFER, screenFbo);
   glViewport(0, 0, W, H);

@@ -177,9 +177,9 @@ void main(){
         g->update(1.f / 30.f); g->render();
         if (first) {
           glFinish(); g_ren.syncTiming = false; first = false;
-          printf("first frame %.0f s: shadows/scenery %.0f, ray trace %.0f, taa %.0f, sprites %.0f, bloom %.0f, shafts %.0f, composite %.0f\n",
-                 std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), g_ren.passWall[0] / 1000, g_ren.passWall[1] / 1000,
-                 g_ren.passWall[2] / 1000, g_ren.passWall[3] / 1000, g_ren.passWall[4] / 1000, g_ren.passWall[5] / 1000, g_ren.passWall[6] / 1000);
+          printf("first frame %.0f s: passes", std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count());
+          for (int p = 0; p < Renderer::kPasses; p++) printf(" %.0f", g_ren.passWall[p] / 1000);
+          printf("\n");
           fflush(stdout);
         }
       }

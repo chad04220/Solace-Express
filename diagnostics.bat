@@ -62,21 +62,21 @@ if defined CACHE (
   move /y "%CACHE%" "%CACHE%.aside" >nul
 )
 if exist "%APPDATA%\SolaceExpress\startup.log" del /q "%APPDATA%\SolaceExpress\startup.log"
-powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--raster --bench menu --size 1920x1080 --out \"%OUT%\compile_run.txt\"' -Wait }; ('first run with an empty shader cache: {0:N1} s (compiles the shaders, then times the menu scene once)' -f $t.TotalSeconds) | Tee-Object -FilePath '%OUT%\compile_time.txt'"
+powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--raster --bench menu --size 1920x1080 --out %OUT%\compile_run.txt' -Wait }; $line = ('first run with an empty shader cache: {0:N1} s (compiles the shaders, then times the menu scene once)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::WriteAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
 if exist "%APPDATA%\SolaceExpress\startup.log" copy /y "%APPDATA%\SolaceExpress\startup.log" "%OUT%\startup_firstrun.log" >nul
-powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--raster --bench menu --size 1920x1080 --out \"%OUT%\compile_run2.txt\"' -Wait }; ('second run with the cache warm: {0:N1} s' -f $t.TotalSeconds) | Tee-Object -Append -FilePath '%OUT%\compile_time.txt'"
+powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--raster --bench menu --size 1920x1080 --out %OUT%\compile_run2.txt' -Wait }; $line = ('second run with the cache warm: {0:N1} s' -f $t.TotalSeconds); Write-Host $line; [IO.File]::AppendAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
 if defined CACHE (
   if exist "%CACHE%" rmdir /s /q "%CACHE%.aside"
   if not exist "%CACHE%" move /y "%CACHE%.aside" "%CACHE%" >nul
 )
 
 echo [3/7] Benchmark on the rasterizer, 1920x1080 ...
-start "" /wait SolaceExpress.exe --raster --bench %SCENES% --size 1920x1080 --out "%OUT%\bench_raster_1080p.txt"
+start "" /wait SolaceExpress.exe --raster --bench %SCENES% --size 1920x1080 --out %OUT%\bench_raster_1080p.txt
 echo [3/7] Benchmark on the rasterizer, native resolution ...
-start "" /wait SolaceExpress.exe --raster --bench %SCENES% --size native --out "%OUT%\bench_raster_native.txt"
+start "" /wait SolaceExpress.exe --raster --bench %SCENES% --size native --out %OUT%\bench_raster_native.txt
 if /i "%MODE%"=="quick" goto logs
 echo [4/7] Benchmark on the ray tracer, 1920x1080 (for comparison) ...
-start "" /wait SolaceExpress.exe --bench %SCENES% --size 1920x1080 --out "%OUT%\bench_rt_1080p.txt"
+start "" /wait SolaceExpress.exe --bench %SCENES% --size 1920x1080 --out %OUT%\bench_rt_1080p.txt
 echo [5/7] Analysis on the rasterizer (5-10 minutes) ...
 start "" /wait SolaceExpress.exe --raster --analyze
 if exist analysis.txt move /y analysis.txt "%OUT%\analysis_raster.txt" >nul

@@ -707,8 +707,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
                   "takes ~2.2x as long at 100%% as at 67%% (2.2x the pixels), the per-pixel ray tracing is the bottleneck.\n");
       auto qpcMs = [&](LARGE_INTEGER a, LARGE_INTEGER b) { return (double)(b.QuadPart - a.QuadPart) / freq.QuadPart * 1000.0; };
       auto pump = [&] { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } };
-      static const char* kPassNameRT[Renderer::kPasses] = {"scenery+shadows+displays", "ray trace", "TAA", "sprites", "bloom", "light shafts", "composite"};
-      static const char* kPassNameRaster[Renderer::kPasses] = {"scenery+terrain+objects", "lighting+clouds+effects", "TAA", "sprites", "bloom", "light shafts", "composite"};
+      static const char* kPassNameRT[Renderer::kPasses] = {"scenery+shadows", "displays", "-", "-", "ray trace+clouds", "TAA", "sprites", "bloom", "light shafts", "composite"};
+      static const char* kPassNameRaster[Renderer::kPasses] = {"world+terrain shadow", "displays+feeds", "objects (airframes)", "airframe shadow proxy", "lighting+clouds+effects", "TAA", "sprites", "bloom", "light shafts", "composite"};
       const char* const* kPassName = g_ren.mode == 1 ? kPassNameRaster : kPassNameRT;
       static const struct { int bit; const char* name; } kFeat[] = {
         {1, "volumetric clouds"}, {2, "terrain shadows"}, {4, "scenery shadow maps"}, {8, "aircraft shadow"}, {16, "point lights"},
@@ -888,7 +888,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           double ms = (double)(f1.QuadPart - f0.QuadPart) / freq.QuadPart * 1000.0 / N;
           if (F.bit == 0) base = ms;
           if (pf) {
-            if (F.bit == 0) fprintf(pf, g_ren.mode == 1 ? "  %-26s %7.2f ms   (scenery+terrain %.2f, lighting %.2f)\n" : "  %-26s %7.2f ms   (scenery+shadows %.2f, ray trace %.2f)\n", F.name, ms, g_ren.passMs[0], g_ren.passMs[1]);
+            if (F.bit == 0) fprintf(pf, g_ren.mode == 1 ? "  %-26s %7.2f ms   (world %.2f, objects %.2f, shadow proxy %.2f, lighting %.2f)\n" : "  %-26s %7.2f ms   (scenery+shadows %.2f, displays %.2f, -, ray trace %.2f)\n", F.name, ms, g_ren.passMs[0], g_ren.mode == 1 ? g_ren.passMs[2] : g_ren.passMs[1], g_ren.mode == 1 ? g_ren.passMs[3] : g_ren.passMs[4], g_ren.passMs[4]);
             else fprintf(pf, "  %-26s %7.2f ms   saves %6.2f ms\n", F.name, ms, base - ms);
             fflush(pf);
           }
@@ -921,7 +921,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
       std::string dir(exe, n); dir = dir.substr(0, dir.find_last_of("\\/"));
       std::string outName = "bench.txt"; size_t ko = cl.find("--out ");
-      if (ko != std::string::npos) { outName = cl.substr(ko + 6); outName = outName.substr(0, outName.find(' ')); }
+      if (ko != std::string::npos) {
+        outName = cl.substr(ko + 6);
+        if (!outName.empty() && outName[0] == '"') { outName = outName.substr(1); outName = outName.substr(0, outName.find('"')); }   // (a quoted path)
+        else outName = outName.substr(0, outName.find(' '));
+      }
       FILE* bf = fopen((dir + "\\" + outName).c_str(), "w");
       if (bf) fprintf(bf, "GPU: %s\nDesktop %dx%d, render %dx%d, quality %d\n\n", gpu.c_str(), GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), g_ren.W, g_ren.H, g_ren.quality);
       g_ren.entSync = true;
@@ -945,9 +949,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         double ms = (double)(f1.QuadPart - f0.QuadPart) / freq.QuadPart * 1000.0 / N;
         if (bf) {
           const float* pm = g_ren.passMs;
-          fprintf(bf, g_ren.mode == 1 ? "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: scenery+terrain %.2f  lighting %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n"
-                              : "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: scenery+shadows %.2f  raytrace %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n",
-                  sc.c_str(), ms, 1000.0 / ms, g_ren.gpuMs, pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6]);
+          fprintf(bf, g_ren.mode == 1 ? "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: world %.2f  displays %.2f  objects %.2f  shadow proxy %.2f  lighting %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n"
+                              : "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: scenery+shadows %.2f  displays %.2f  (%.2f %.2f)  raytrace %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n",
+                  sc.c_str(), ms, 1000.0 / ms, g_ren.gpuMs, pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9]);
           fflush(bf);
         }
         g_ren.entSync = true;

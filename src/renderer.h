@@ -111,7 +111,7 @@ public:
   float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
   // analysis tool (--analyze): exact per-pass times (the GPU is waited on at every pass boundary) and a build of the
   // ray tracer that writes its per-pixel work counters instead of colour
-  bool syncTiming = false; double passWall[7] = {};   // (kPasses)
+  bool syncTiming = false; double passWall[10] = {};   // (kPasses)
   bool costMap = false;
   bool buildCostProgram();
   bool readCostMap(std::vector<float>& out, int& w, int& h);
@@ -184,7 +184,7 @@ private:
   GLuint gpuQ[4] = {0, 0, 0, 0}; bool gpuQUsed[4] = {false, false, false, false}; int gpuQi = 0;
 public:
   float gpuMs = -1.f;   // last measured GPU time of renderScene, ms (-1 = not known yet)
-  static constexpr int kPasses = 7;   // scenery+shadows, ray trace, TAA, sprites, bloom, light shafts, composite
+  static constexpr int kPasses = 10;   // world | displays+feeds | objects | airframe shadow proxy | lighting+clouds+effects (the ray tracer: scenery | displays | - | - | ray trace+clouds), then TAA, sprites, bloom, light shafts, composite
   float passMs[kPasses] = {};         // GPU time of each pass (timestamp queries, a few frames late)
   GLuint stampQ[4][kPasses + 1] = {}; bool stampUsed[4] = {};
   void stamp(int i) { if (syncTiming) syncStamp(i); else if (stampQ[gpuQi][i]) glQueryCounter(stampQ[gpuQi][i], GL_TIMESTAMP); }

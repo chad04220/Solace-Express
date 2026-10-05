@@ -18,6 +18,23 @@ Owner's measurements, v3.10.0, RTX 3070 Laptop, 1920×1080, quality 2 (`analyze.
 
 Switching features off saves little each (clouds 2 ms, aircraft shadow 2.5 ms in `air`): the cost is the shader itself. One fragment program holds the terrain march, the airframe distance field, the clouds, the lights with their shadow marches and every material. It needs so many registers that the GPU runs few pixels at once, and it pays for the most complex path on every pixel. Patching it item by item (work plan A1/A3/A4/A8/A9) was estimated at 1.5–2×; the rebuild targets a steady 60+ fps at 1080p in every scene.
 
+## 1b. Owner's measurements on the rasterizer, v3.18.0 (RTX 3070 Laptop, 1920x1061, quality 2, `diagnostics.bat`)
+
+| scene | frame (raster) | frame (ray tracer, v3.15) | first pass | airframe shadow off saves |
+|---|---|---|---|---|
+| menu | 19.2 ms (52 fps) | 26.0 | 19.2 ms (9.5 ms CPU gathering 10,039 instances from 987 chunks) | 1.9 ms |
+| air | 33.2 (30) | 42.4 | 30.7 | 7.2 ms (29%) |
+| storm | 22.6 (44) | 31.0 | 20.2 | 4.1 ms (20%) |
+| night | 81.1 (12) | 49.6 | 78.4 | 55.4 ms (69%) |
+| cockpit | 160.4 (6) | 220.9 | 158.8 | 36.3 ms (23%) |
+| rjet | 31.4 (32) | 44.2 | 22.8 | 5.0 ms (23%) |
+
+Resolution scaling: 100% costs 1.5-2.0x of 67% (2.2x the pixels), so the first pass is per-pixel bound with a fixed cost besides.
+The first pass lumped the world, the display atlases and feeds, the objects (airframe) pass and the airframe shadow proxy; it is
+split into those four from v3.18.1 on. The one number that stands out across the table is the airframe shadow: the per-pixel
+march of the aircraft's field toward the sun and the three brightest lights (the shadow proxy). At night the apron's lights make
+it the whole frame. First-run shader compile: 150.8 s with an empty cache, 11.5 s warm.
+
 ## 2. Target architecture
 
 Rasterize everything that has a surface; march only volumes (clouds, flames, blasts). Light once, in a small full-screen pass.
