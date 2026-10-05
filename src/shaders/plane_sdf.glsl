@@ -89,6 +89,32 @@ float sdSurface(float s, float c, float t, float span, float rc, float tc, float
   return length(max(b, 0.0)) + min(max(b.x, max(b.y, b.z)), 0.0) - 0.003;
 }
 
+// Shared fleet gear geometry. The original wheel envelope and contact centres stay intact.
+// Fine tread, recess rings and bolt heads are shaded once at a hit, not in every ray step.
+vec2 gearWheelDetails(vec3 q, vec2 res, float r, float h, bool braked){
+  if (sdBox(q, vec3(h + 0.08, r*0.69 + 0.04, r*0.69 + 0.04)) >= res.x) return res;
+  vec3 face = vec3(abs(q.x) - h - 0.004, q.yz);
+  float rim = sdRoundCylX(face, r*0.55, 0.018, 0.007);
+  float cap = sdRoundCylX(face - vec3(0.020, 0.0, 0.0), r*0.23, 0.020, 0.008);
+  float metal = min(rim, cap);
+  if (braked) metal = min(metal, sdRoundCylX(q + vec3(h + 0.022, 0.0, 0.0), r*0.65, 0.012, 0.005));
+  return opU(res, vec2(metal, 8.0));
+}
+vec2 gearLegDetails(vec3 p, vec2 res, vec3 upper, vec3 lower, float shaft, bool oleo){
+  vec3 centre = (upper + lower)*0.5;
+  if (sdBox(p - centre, abs(upper - lower)*0.5 + vec3(0.32, 0.15, 0.32)) >= res.x) return res;
+  float metal = sdCapsule(p, mix(upper, lower, 0.86), mix(upper, lower, 0.97), shaft*1.45);
+  if (oleo) {
+    metal = min(metal, sdCapsule(p, mix(upper, lower, 0.12), mix(upper, lower, 0.53), shaft*1.5));
+    float scale = clamp(shaft/0.06, 0.65, 1.5);
+    vec3 elbow = mix(upper, lower, 0.72) + vec3(0.0, 0.0, 0.12*scale);
+    metal = min(metal, sdCapsule(p, mix(upper, lower, 0.56), elbow, 0.013*scale));
+    metal = min(metal, sdCapsule(p, elbow, mix(upper, lower, 0.87), 0.013*scale));
+    metal = min(metal, sdCapsule(p, upper + vec3(-0.18*scale, 0.0, -0.18*scale), mix(upper, lower, 0.37), 0.020*scale));
+  }
+  return opU(res, vec2(metal, 8.0));
+}
+
 // ---------------- XR-9 Specter research jet (engine code 5): blended lifting body with chines, cranked delta with
 // elevons, all-moving canards, canted twin fins, 2D pitch-vectoring nozzles, opaque sensor canopy.
 // The cockpit is a sealed pod: the pilot sees outside only through the panoramic and side display screens.
@@ -258,7 +284,9 @@ vec2 mapJet(vec3 p){
     }
   }
   // sensor canopy (opaque gold film) and LED strips along the chines and wing leading edges
-  res = opU(res, vec2(sdEllipsoid(p - vec3(0.0, 0.5, -4.6), vec3(0.6, 0.42, 1.9)), 32.0));
+  // Lower the crown by 11 cm and blend the shoulders, retaining the opaque sensor film.
+  float canopy = sdEllipsoid(p - vec3(0.0, 0.44, -4.6), vec3(0.62, 0.37, 2.0));
+  res = vec2(smin(res.x, canopy, 0.16), canopy < res.x ? 32.0 : res.y);
   float led = sdCapsule(ap, vec3(1.55, -0.12, -2.6), vec3(0.35, -0.08, -7.6), 0.022);
   led = min(led, sdCapsule(ap, vec3(1.3, -0.24, -0.25), vec3(5.45, -0.39, 3.9), 0.02));
   led = min(led, sdCapsule(ap, vec3(0.62, 0.62, -3.0), vec3(0.3, 0.72, 2.0), 0.015));
@@ -281,6 +309,11 @@ vec2 mapJet(vec3 p){
     tyres = min(tyres, sdRoundCylX(vec3(abs(p.x) - 0.1, p.y, p.z) - vec3(0.0, nc.y, nc.z), 0.33, 0.07, 0.04));
     res = opU(res, vec2(legs, 8.0));
     res = opU(res, vec2(tyres, 6.0));
+    res = gearWheelDetails(ap - wc, res, wr, 0.13, true);
+    res = gearLegDetails(ap, res, vec3(G0.x*0.8, -0.3, G0.z), wc + vec3(-0.1, 0.05, 0.0), 0.07, true);
+    vec3 nq = vec3(abs(p.x) - 0.1, p.y, p.z) - nc;
+    res = gearWheelDetails(nq, res, 0.33, 0.07, false);
+    res = gearLegDetails(p, res, vec3(0.0, -0.35, G0.w), nc + vec3(0.0, 0.1, 0.0), 0.06, true);
   }
   return res;
 }
@@ -559,16 +592,37 @@ vec2 mapPlaneBody(vec3 p){
                             : sdRoundCylX(q - nc, nwr, 0.055, 0.035);
       if (gtype == 0) { float sp = sdEllipsoid(q - nc - vec3(0.0, 0.05, 0.06), vec3(0.1, nwr*1.12, nwr*2.2)); spats = min(spats, max(sp, -(q.y - (nc.y - nwr*0.5)))); }
       legs = min(legs, nl); tyres = min(tyres, nt);
+      if (!retract || gear >= 0.06) {
+        float halfWidth = gtype == 3 ? 0.07 : 0.055;
+        vec3 wheelQ = gtype == 3 ? vec3(abs(q.x) - 0.15, q.yz) - nc : q - nc;
+        res = gearWheelDetails(wheelQ, res, nwr, halfWidth, false);
+        res = gearLegDetails(q, res, vec3(0.0, secN.z - secN.y*0.7, -0.05), nc + vec3(0.0, nwr*0.9, 0.0), gtype >= 3 ? 0.07 : 0.035, true);
+        if (gtype == 0) spats = max(spats, -sdCylX(q - nc, nwr*0.54, 0.12));
+      }
     } else {
       vec3 q = p - vec3(0.0, 0.0, tz); q.xz = rot2(q.xz, -steer);
       vec3 tsec = fusSection(tz - 0.3);
       vec3 tc = vec3(0.0, -gh + 0.11*L + 0.1, 0.0);
       legs = min(legs, sdCapsule(q, vec3(0.0, tsec.z - tsec.y*0.6, -0.3), tc + vec3(0.0, 0.03, -0.05), 0.02));
       tyres = min(tyres, sdRoundCylX(q - tc, 0.1, 0.035, 0.02));
+      res = gearWheelDetails(q - tc, res, 0.1, 0.035, false);
+      res = gearLegDetails(q, res, vec3(0.0, tsec.z - tsec.y*0.6, -0.3), tc + vec3(0.0, 0.03, -0.05), 0.02, false);
     }
     if (retract && gear < 0.06) { legs = 1e5; tyres = 1e5; }
     res = opU(res, vec2(legs, 8.0));
     res = opU(res, vec2(tyres, 6.0));
+    if (!retract || gear >= 0.06) {
+      float halfWidth = gtype == 3 ? 0.11 : gtype == 0 ? 0.065 : gtype == 1 ? 0.09 : gtype == 2 ? 0.14 : 0.1;
+      vec3 wheelQ = ap - wc;
+      if (gtype == 3) wheelQ.x = abs(wheelQ.x) - 0.22;
+      res = gearWheelDetails(wheelQ, res, wr, halfWidth, true);
+      if (gtype == 0) spats = max(spats, -sdCylX(ap - wc, wr*0.54, 0.12));
+      vec3 mount = gtype == 3 ? vec3(track, nsec.x, mz) : gtype >= 4 ? vec3(track, gM[10].x + track*gM[10].z - 0.1 + lift*0.2, mz) :
+                   vec3(secM.x*(gtype == 2 ? 0.8 : gtype == 0 ? 0.75 : 0.7), secM.z - secM.y*(gtype == 1 ? 0.85 : 0.8), mz);
+      vec3 ankle = gtype >= 3 ? wc + vec3(0.0, 0.05, 0.0) : gtype == 2 ? wc : wc + vec3(gtype == 0 ? -0.06 : -0.08, gtype == 1 ? 0.06 : 0.04, 0.0);
+      float shaft = gtype == 3 ? 0.09 : gtype >= 4 ? 0.06 : gtype == 1 ? 0.045 : 0.03;
+      res = gearLegDetails(ap, res, mount, ankle, shaft, retract);
+    }
     res = opU(res, vec2(spats, 1.0));
   }
   // ---------------- small details: nav lights, beacon, antennas, pitot

@@ -1,0 +1,16 @@
+aircraft wheel coverage: swift_s6
+aircraft wheel coverage: xr14_nightjar
+aircraft wheel coverage: kestrel
+aircraft wheel coverage: wren
+aircraft wheel coverage: bush
+aircraft wheel coverage: islander
+aircraft wheel coverage: pelican
+aircraft wheel coverage: meridian
+aircraft wheel coverage: starling
+aircraft wheel coverage: xr9
+aircraft wheel coverage: xr11
+ground wheel coverage: Parked aircraft (3 wheels, LOD0/1)
+ground wheel coverage: Parked airliner (6 wheels, LOD0/1)
+ground wheel coverage: Car (4 wheels, LOD0/1)
+ground wheel coverage: Truck (6 wheels, LOD0/1)
+wheel animation: 138/138 checks passed

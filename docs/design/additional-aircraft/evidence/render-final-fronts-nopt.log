@@ -1,0 +1,4 @@
+renderer=llvmpipe (LLVM 20.1.2, 256 bits)
+programs linked, shader-cache hits=0 misses=21
+saved aircraft_lab/renders-final/swift-s6-front.png, GL errors=0
+saved aircraft_lab/renders-final/xr14-nightjar-front.png, GL errors=0

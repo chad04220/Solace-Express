@@ -1,0 +1,23 @@
+{
+  "parent": "db08f7aa334cf3e7c04ed99c6f5caa5bdca63ca6",
+  "verified_file_count": 124,
+  "changed_files": [
+    {
+      "path": "src/shaders/plane_material.glsl",
+      "parent_sha": "77ba4fc0b59d0fc383c67f0c37371f71e9ffde56",
+      "review_sha": "242a67f7c914996dbff41d45fa1a43d4c4773401"
+    },
+    {
+      "path": "src/shaders/plane_sdf.glsl",
+      "parent_sha": "4afbd54086d6379231d659602bda10842ce0ee9a",
+      "review_sha": "6dc7d51ab1ff7f583ae5fe86a85a4db1ee85e0c6"
+    },
+    {
+      "path": "src/shaders/wraith_sdf.glsl",
+      "parent_sha": "44952d973431647906b8fa42bdc96e14bfd28f6b",
+      "review_sha": "bf389fccc4c6decdb18b056b29ebcb82ff766b40"
+    }
+  ],
+  "missing_files": [],
+  "other_source_files_match_parent": true
+}

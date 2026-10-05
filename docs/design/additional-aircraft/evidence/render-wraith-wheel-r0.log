@@ -1,0 +1,4 @@
+renderer=llvmpipe (LLVM 20.1.2, 256 bits)
+programs linked, shader-cache hits=21 misses=0
+saved aircraft_lab/wraith-wheel-r0-fixed/xr11-wraith-wheel-nose-half-zero.png, GL errors=0
+saved aircraft_lab/wraith-wheel-r0-fixed/xr11-wraith-wheel-nose-half-quarter.png, GL errors=0

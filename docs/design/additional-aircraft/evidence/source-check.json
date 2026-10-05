@@ -1,0 +1,22 @@
+{
+  "parent": "3bde64c6ecbe45e1c755459ec93119207ff8e02b",
+  "verified_file_count": 105,
+  "changed_files": [
+    {
+      "path": "src/shaders/raytrace_fs.glsl",
+      "parent_sha": "19867eb80690f8aa3c72f080179c9272fe96c000",
+      "review_sha": "7c964598e4168cbf59e0b04f8e23bdfd676c25fd"
+    },
+    {
+      "path": "src/shaders/raytrace_fs3.glsl",
+      "parent_sha": "4571d70d1d0db5777d8942d97730a51e62dd5597",
+      "review_sha": "14362a761a561a2520ad382a99032f1c94a3b8c6"
+    },
+    {
+      "path": "src/shaders/raytrace_wraith.glsl",
+      "parent_sha": "efcee476f1162fdcbe35be3b7ae254aaf636f9cc",
+      "review_sha": "4fc4049e7c7b84cbfdf91ab2fb90460c17459ca2"
+    }
+  ],
+  "other_source_files_match_parent": true
+}

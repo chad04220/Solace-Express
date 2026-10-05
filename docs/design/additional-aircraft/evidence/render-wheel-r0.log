@@ -1,0 +1,17 @@
+renderer=llvmpipe (LLVM 20.1.2, 256 bits)
+programs linked, shader-cache hits=13 misses=8
+saved aircraft_lab/renders-r0/swift-s6-front.png, GL errors=0
+saved aircraft_lab/renders-r0/swift-s6-canopy-side.png, GL errors=0
+saved aircraft_lab/renders-r0/swift-s6-canopy-front.png, GL errors=0
+saved aircraft_lab/renders-r0/swift-s6-wheel-main-zero.png, GL errors=0
+saved aircraft_lab/renders-r0/swift-s6-wheel-main-quarter.png, GL errors=0
+saved aircraft_lab/renders-r0/xr14-nightjar-front.png, GL errors=0
+saved aircraft_lab/renders-r0/xr14-nightjar-canopy-side.png, GL errors=0
+saved aircraft_lab/renders-r0/xr14-nightjar-canopy-front.png, GL errors=0
+saved aircraft_lab/renders-r0/xr14-nightjar-wheel-main-zero.png, GL errors=0
+saved aircraft_lab/renders-r0/xr14-nightjar-wheel-main-quarter.png, GL errors=0
+saved aircraft_lab/renders-r0/xr9-specter-front.png, GL errors=0
+saved aircraft_lab/renders-r0/xr9-specter-canopy-side.png, GL errors=0
+saved aircraft_lab/renders-r0/xr9-specter-canopy-front.png, GL errors=0
+saved aircraft_lab/renders-r0/xr9-specter-wheel-main-zero.png, GL errors=0
+saved aircraft_lab/renders-r0/xr9-specter-wheel-main-quarter.png, GL errors=0

@@ -1,0 +1,13 @@
+# Appended only by prepare_lab.py to its isolated source copy.
+add_executable(aircraft_candidate_test prototypes/aircraft/flight_probe.cpp ${CORE_SOURCES} src/models.cpp)
+target_include_directories(aircraft_candidate_test PRIVATE src prototypes/aircraft)
+if(MSVC)
+  target_compile_definitions(aircraft_candidate_test PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+add_test(NAME aircraft_candidates COMMAND aircraft_candidate_test ${CMAKE_BINARY_DIR}/candidate-flights.csv)
+if(UNIX AND NOT APPLE)
+  add_executable(aircraft_candidate_render prototypes/aircraft/render_probe.cpp ${GAME_SOURCES} src/radio_stub.cpp)
+  target_include_directories(aircraft_candidate_render PRIVATE src prototypes/aircraft)
+  target_link_libraries(aircraft_candidate_render PRIVATE ${CMAKE_DL_LIBS})
+  add_dependencies(aircraft_candidate_render shaders_gen)
+endif()

@@ -1,0 +1,4 @@
+renderer=llvmpipe (LLVM 20.1.2, 256 bits)
+programs linked, shader-cache hits=15 misses=6
+saved aircraft_lab/canopy-before/xr9-specter-canopy-side.png, GL errors=0
+saved aircraft_lab/canopy-before/xr9-specter-canopy-front.png, GL errors=0

@@ -1,0 +1,29 @@
+Test project /workspace/scratch/b91cb9ba6eae/aircraft_lab/build-wheel
+      Start  3: shader_keywords
+      Start 12: wheel_animation
+ 1/12 Test  #3: shader_keywords ..................   Passed    0.01 sec
+      Start 11: aircraft_candidates
+ 2/12 Test #12: wheel_animation ..................   Passed    5.86 sec
+      Start  1: flight_model
+ 3/12 Test  #1: flight_model .....................   Passed   16.88 sec
+      Start  9: gameplay_loop
+ 4/12 Test  #9: gameplay_loop ....................   Passed    9.96 sec
+      Start  8: entity_raycast
+ 5/12 Test  #8: entity_raycast ...................   Passed    4.14 sec
+      Start  2: campaign_progression
+ 6/12 Test  #2: campaign_progression .............   Passed    3.18 sec
+      Start  7: hull_mesh
+ 7/12 Test #11: aircraft_candidates ..............   Passed   43.76 sec
+      Start  4: career_saves
+ 8/12 Test  #7: hull_mesh ........................   Passed    3.93 sec
+      Start  6: terrain_envelope
+ 9/12 Test  #4: career_saves .....................   Passed    2.64 sec
+      Start 10: terrain_shadow_bake
+10/12 Test  #6: terrain_envelope .................   Passed    2.50 sec
+      Start  5: airport_layouts
+11/12 Test  #5: airport_layouts ..................   Passed    2.34 sec
+12/12 Test #10: terrain_shadow_bake ..............   Passed    2.53 sec
+
+100% tests passed out of 12
+
+Total Test time (real) =  48.95 sec

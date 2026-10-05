@@ -1,0 +1,378 @@
+{
+  "base": "3bde64c6ecbe45e1c755459ec93119207ff8e02b",
+  "renderer": "llvmpipe LLVM 20.1.2, 256 bits",
+  "width": 960,
+  "height": 600,
+  "images": [
+    {
+      "path": "renders/3b-authoring/swift-s6-gav-60-35.png",
+      "sha256": "b41c46a9b0004c9817118762843507c23608829a3a61f2dcb9ef197a46bbbd1b",
+      "bytes": 1008054
+    },
+    {
+      "path": "renders/3b-authoring/swift-s6-gav-120-10.png",
+      "sha256": "57a5e50e9354159552894dbdac5f5afcad7aa72bde50f1719fda837ab1ecc5f6",
+      "bytes": 878421
+    },
+    {
+      "path": "renders/3b-authoring/xr14-nightjar-gav-60-35.png",
+      "sha256": "3d7da9a8ed38eccea2752c6a6e8c5dfc28bbee7d9a44c30e1744b64639519696",
+      "bytes": 985328
+    },
+    {
+      "path": "renders/3b-authoring/swift-s6-cockpit.png",
+      "sha256": "182a2983e9d233f5e81be6a42df1acb6e1e5c4d52c7419022c105d7e620edadc",
+      "bytes": 797362
+    },
+    {
+      "path": "renders/3b-authoring/xr14-nightjar-gav-210-5.png",
+      "sha256": "8b3377569edf7bab20fca789b61f9255a0161982f419164da810d7d571f68007",
+      "bytes": 820286
+    },
+    {
+      "path": "renders/3b-authoring/xr14-nightjar-gav-120-10.png",
+      "sha256": "360ea45be9d75695ae9b52efc4ffe2f1fdff36f5b259cf6cacf80dba37ca15f0",
+      "bytes": 873061
+    },
+    {
+      "path": "renders/3b-authoring/swift-s6-cockpit-down.png",
+      "sha256": "e25e1369bcd04000249a56f5f8ad6d7283016a3864d692bc662cab89e4604007",
+      "bytes": 876537
+    },
+    {
+      "path": "renders/3b-authoring/xr14-nightjar-cockpit-left.png",
+      "sha256": "0d989acc07258609bb75eb6fc765ce1582b58c722ecf913d8c2ad754f51187b6",
+      "bytes": 789018
+    },
+    {
+      "path": "renders/3b-authoring/swift-s6-cockpit-left.png",
+      "sha256": "89fcec01c36cdff0803018ba747e20615cf919542e1493c0c8d83d9e88944d84",
+      "bytes": 803087
+    },
+    {
+      "path": "renders/3b-authoring/xr14-nightjar-cockpit.png",
+      "sha256": "5c20e08b0509a50c69e62da7d68596c990e8e267bc1b66efbd153ecddf631205",
+      "bytes": 785627
+    },
+    {
+      "path": "renders/3b-authoring/xr14-nightjar-cockpit-down.png",
+      "sha256": "216d7eb33a01f9fa9fd218e733544a05db5b1337eca52ae4d2f6d92e70fb26b3",
+      "bytes": 879935
+    },
+    {
+      "path": "renders/3b-authoring/swift-s6-gav-210-5.png",
+      "sha256": "3ff7611cd240c627389102d1049fa52411b9d845358e93555e7c628afd294857",
+      "bytes": 812214
+    },
+    {
+      "path": "renders/3b-fleet-gear/starling-gear-main-half.png",
+      "sha256": "3a05c0e39c6557a5d119fa41f0ac364a33cba3807e3889bd0d67c8d86768ef97",
+      "bytes": 767981
+    },
+    {
+      "path": "renders/3b-fleet-gear/wren-gear-main.png",
+      "sha256": "7c55e474c5949a3cee88f5495a495d0b776799ad2810bc538efd75833e35e9c3",
+      "bytes": 735902
+    },
+    {
+      "path": "renders/3b-fleet-gear/kestrel-flight.png",
+      "sha256": "d68c261b960812a117ae8e5925933776dcc14cb98a784523e8c65ece9e519657",
+      "bytes": 741753
+    },
+    {
+      "path": "renders/3b-fleet-gear/kestrel-gear-nose-turn.png",
+      "sha256": "1c214b89e43df6a4a70fbfba1afef51eb35da28c022197d12bd8fe5dada5b37d",
+      "bytes": 708345
+    },
+    {
+      "path": "renders/3b-fleet-gear/pelican-gear-nose.png",
+      "sha256": "e196d6105c3f8924e183275980cfcb4098f35e33338e49dcef803b09676c2a92",
+      "bytes": 709429
+    },
+    {
+      "path": "renders/3b-fleet-gear/swift-s6-gear-main.png",
+      "sha256": "64aabc76077783e1c2263637577beffee3ad136ede93b7433e531ac782b9373b",
+      "bytes": 736466
+    },
+    {
+      "path": "renders/3b-fleet-gear/meridian-gear-main.png",
+      "sha256": "76b364bf8e069a4a6644d894652206fedfc35d494727cec2b0e6483c0c16884e",
+      "bytes": 742934
+    },
+    {
+      "path": "renders/3b-fleet-gear/starling-gear-nose-turn.png",
+      "sha256": "70b691f93ce9a646d5958dfeaefec894472702f9a0d5740add5a7639f87ac920",
+      "bytes": 65577
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr9-specter-gear-main.png",
+      "sha256": "3884154a1ee52a000997757648ed0c44ca7b6c5d5080378a1ca8aefa600c7bb3",
+      "bytes": 783139
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr9-specter-gear-nose.png",
+      "sha256": "af79426e2957d90bde89465cefd61ea0c9b781ad34d9adecd4257fe564642c55",
+      "bytes": 740747
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr9-specter-flight.png",
+      "sha256": "44ef6a7d66bc076c63e7b84c62946426667bcf16442f1c304df06f8a87506e1c",
+      "bytes": 730309
+    },
+    {
+      "path": "renders/3b-fleet-gear/starling-gear-nose-half.png",
+      "sha256": "2b12c1bd024f8a37d67b876c8a4a6190196e4cf8d6ff5fa566bf5a692456c39d",
+      "bytes": 695533
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr9-specter-gear-nose-half.png",
+      "sha256": "59a1e509ec1fbb272914af9d88192cbf6f0d0382baf35be4819ae6bb1bcd4db0",
+      "bytes": 714952
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr9-specter-gear-main-half.png",
+      "sha256": "57d1573f52accb6f2b6a509d24a3b7ac55699db9a20bfe3a1deb59eaccab3a1c",
+      "bytes": 745891
+    },
+    {
+      "path": "renders/3b-fleet-gear/kestrel-gear-main.png",
+      "sha256": "88ab1fe53b39295061c16576efb97fecfb5053c1412f7377dcc7a5fbc614eefe",
+      "bytes": 716152
+    },
+    {
+      "path": "renders/3b-fleet-gear/wren-flight.png",
+      "sha256": "55d668be5e9f1ba603dae1c653600cb8c0fd0d2654d680972a55f50bf8bfdcc8",
+      "bytes": 740674
+    },
+    {
+      "path": "renders/3b-fleet-gear/meridian-gear-nose.png",
+      "sha256": "2d62d9239403cd1690385ffdadef5dea67a2f788f342ecdbb1615b51a1f8a34f",
+      "bytes": 693477
+    },
+    {
+      "path": "renders/3b-fleet-gear/pelican-flight.png",
+      "sha256": "b0288a792a4a3a3ebc56c6142e7deda599cf1da8e75c4558f7306ce4ab66f285",
+      "bytes": 744881
+    },
+    {
+      "path": "renders/3b-fleet-gear/starling-gear-nose.png",
+      "sha256": "c354ed9b36e7375a86a93a20193a413a1f4a4aa81a0770f9e4b32694278d06f0",
+      "bytes": 726559
+    },
+    {
+      "path": "renders/3b-fleet-gear/islander-flight.png",
+      "sha256": "28b5359715f53ee69e6ea6eebe143dcb9f59b46ba3c890eed4371cd9516f993e",
+      "bytes": 738546
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr14-nightjar-gear-main-half.png",
+      "sha256": "b1ff0fde0acc1581643f7c81d0b346d15b704e79162b3ccf058b301a924f56c2",
+      "bytes": 707288
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr9-specter-gear-nose-turn.png",
+      "sha256": "af79426e2957d90bde89465cefd61ea0c9b781ad34d9adecd4257fe564642c55",
+      "bytes": 740747
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr11-wraith-gear-nose-half.png",
+      "sha256": "3c1aeeb9e40a111f562c3f673ba1a5a8f0a83cafaea8f69f12034cc644fa228d",
+      "bytes": 398944
+    },
+    {
+      "path": "renders/3b-fleet-gear/pelican-gear-nose-turn.png",
+      "sha256": "7b5d33e2f9f7755d1f94265f33ea45573d044a06e4ea69116fdabda03966d6d3",
+      "bytes": 710721
+    },
+    {
+      "path": "renders/3b-fleet-gear/bushmaster-gear-nose-turn.png",
+      "sha256": "09bfeb4012292f05991a592b866a3962a55dc83904a10d0d19fad880ed9da0ec",
+      "bytes": 739575
+    },
+    {
+      "path": "renders/3b-fleet-gear/swift-s6-gear-main-half.png",
+      "sha256": "17d4f10f3697133f9f734fa8a705bc31507551eda6490307924c564004faa2ef",
+      "bytes": 649673
+    },
+    {
+      "path": "renders/3b-fleet-gear/meridian-flight.png",
+      "sha256": "2cfead9e3f1cee4bc84398fc88a9de3ec75436857f5c2f8085ad03f6c5b5a6c0",
+      "bytes": 739971
+    },
+    {
+      "path": "renders/3b-fleet-gear/wren-gear-nose-turn.png",
+      "sha256": "63d6e983629d95967351f8ad20c382ca58e2dd8ac82eac2a53a5b8b6b5789dcd",
+      "bytes": 722713
+    },
+    {
+      "path": "renders/3b-fleet-gear/bushmaster-flight.png",
+      "sha256": "6b09936c14d04a2b75d32efd42e3d26c47589eb8d716250791ebad79289bceb1",
+      "bytes": 811865
+    },
+    {
+      "path": "renders/3b-fleet-gear/swift-s6-gear-nose.png",
+      "sha256": "7e9aca82bce915e3516801af8763c03741cdc8f866a22dbf96b4a5375b6c840d",
+      "bytes": 704694
+    },
+    {
+      "path": "renders/3b-fleet-gear/wren-gear-nose.png",
+      "sha256": "b39622132ee07077b6ab1930cae5c68bc97e681ae7b8a9353476ad627135b729",
+      "bytes": 722969
+    },
+    {
+      "path": "renders/3b-fleet-gear/swift-s6-gear-nose-turn.png",
+      "sha256": "56c02639b95881075db4c70a5bd88b70e409daf0a1a3ad07043a5c4697d67a0e",
+      "bytes": 705874
+    },
+    {
+      "path": "renders/3b-fleet-gear/swift-s6-flight.png",
+      "sha256": "75b14c6a8185edb5f6dfcb0b29dd7b258609c522b5310c6f8c0515d0253e89d1",
+      "bytes": 739580
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr11-wraith-gear-main-half.png",
+      "sha256": "030afc8a72b18d5f7a62087f7b609d9c364356a93f63f3a42fe0de662e9f7f6a",
+      "bytes": 723048
+    },
+    {
+      "path": "renders/3b-fleet-gear/meridian-gear-nose-half.png",
+      "sha256": "a384b546082c7df6beb084ceedf9e556cdc06129c39179da84e8d8253360eb94",
+      "bytes": 589842
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr11-wraith-gear-nose-turn.png",
+      "sha256": "60287f58b3e5e8ff9b57a8de1841ebe7645b50f13c6a25f919ab05f912e7e8c0",
+      "bytes": 747060
+    },
+    {
+      "path": "renders/3b-fleet-gear/bushmaster-gear-nose.png",
+      "sha256": "0ab80a058f93c7178e8b124d7ab94fc9707518fcd256d3d219743ba16fef15b9",
+      "bytes": 739349
+    },
+    {
+      "path": "renders/3b-fleet-gear/meridian-gear-main-half.png",
+      "sha256": "9de0649d0359dce85e31746f2807048d480b41173bd2f8471cb45b0cea1e257d",
+      "bytes": 677326
+    },
+    {
+      "path": "renders/3b-fleet-gear/islander-gear-nose-turn.png",
+      "sha256": "5d03e515d23aef7d6ab6fb8edb438d58fa487d9225a73a7c96c3f5fb16dd6f56",
+      "bytes": 754545
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr14-nightjar-gear-nose.png",
+      "sha256": "0d4efdac1a96c7df4d40b4415770d368b75f70a7edd4e42a109008bd48596bcb",
+      "bytes": 730465
+    },
+    {
+      "path": "renders/3b-fleet-gear/pelican-gear-main.png",
+      "sha256": "da071db1fefef32525ebac3bbce463be7249e15a417571038e1f70c40de65c6a",
+      "bytes": 720698
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr11-wraith-gear-nose.png",
+      "sha256": "60287f58b3e5e8ff9b57a8de1841ebe7645b50f13c6a25f919ab05f912e7e8c0",
+      "bytes": 747060
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr11-wraith-gear-main.png",
+      "sha256": "2a075454bba30505058a726336a9121b9dd8b499da32ad65289b8e1bd9a5f7fe",
+      "bytes": 782533
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr14-nightjar-flight.png",
+      "sha256": "c97abbcad4ddc4cda14ede9c545345bac503bfab518d0a597b483d8636ba0783",
+      "bytes": 741240
+    },
+    {
+      "path": "renders/3b-fleet-gear/islander-gear-nose.png",
+      "sha256": "6459521c06d3304813f265cfdd0d1d555aae3464a8d47c495feb65bfe70ae9c5",
+      "bytes": 753613
+    },
+    {
+      "path": "renders/3b-fleet-gear/swift-s6-gear-nose-half.png",
+      "sha256": "1052e45425a257003ba18664c66b9740c7f1cd94209c56923d6e281a14c4851b",
+      "bytes": 667778
+    },
+    {
+      "path": "renders/3b-fleet-gear/islander-gear-main.png",
+      "sha256": "67563a98e9da29690f84900f45dc157ad43524fdcb3c3e2ce856e364668f0f80",
+      "bytes": 768815
+    },
+    {
+      "path": "renders/3b-fleet-gear/starling-flight.png",
+      "sha256": "3b4ba83485f73855d8b1d473948e6f2ea71d6bf3f7b26d6c332b83f5a61c25df",
+      "bytes": 739859
+    },
+    {
+      "path": "renders/3b-fleet-gear/bushmaster-gear-main.png",
+      "sha256": "5ef976f66696a5d8197777418e5a1a1af5a30cc3e1aa3143d884fda7e6042df0",
+      "bytes": 757333
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr14-nightjar-gear-main.png",
+      "sha256": "fa24cc2b0365a5107ae9dd3ed04373e92a297023621fe729d53df488d4f58e7c",
+      "bytes": 763638
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr14-nightjar-gear-nose-half.png",
+      "sha256": "b7eebb84ddd6894076d298956d39ac63fed1407b0423a81d675bec97d7b0094b",
+      "bytes": 693717
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr14-nightjar-gear-nose-turn.png",
+      "sha256": "7b349d2bab360c956c4408754ca4de37732b8615107af0841744332cbaa71c43",
+      "bytes": 731063
+    },
+    {
+      "path": "renders/3b-fleet-gear/kestrel-gear-nose.png",
+      "sha256": "0f99c29d15159f0e2a48f01605a9fa5ccc96eb61d019758b8734a9d6d0417b8f",
+      "bytes": 704587
+    },
+    {
+      "path": "renders/3b-fleet-gear/xr11-wraith-flight.png",
+      "sha256": "c9cadc0a4e8562a94c8d6d069a336f501e269aeb41f1d180e154e817750f00a2",
+      "bytes": 736537
+    },
+    {
+      "path": "renders/3b-fleet-gear/meridian-gear-nose-turn.png",
+      "sha256": "439f0e008abe8a3dac9c4c3b3b26bc1fa33607cc5ccd8e2b906115849b432f9a",
+      "bytes": 693543
+    },
+    {
+      "path": "renders/3b-fleet-gear/starling-gear-main.png",
+      "sha256": "2c6fcc4f33c124937baae6f0c1694e72538a27ab0c9908dc81ee1f51b9dc8fdc",
+      "bytes": 793573
+    },
+    {
+      "path": "renders/3b-canopy-before/xr9-specter-canopy-side.png",
+      "sha256": "3118a9a7cac921a0c3cf20c23f4ec6e553ba077e7257e085b46026c9fa0daf1a",
+      "bytes": 734504
+    },
+    {
+      "path": "renders/3b-canopy-before/xr9-specter-canopy-front.png",
+      "sha256": "933f80082c888068cc71d74ec9c1af8c7f045d3287ad251d167e4dbf15d2d4b5",
+      "bytes": 589961
+    },
+    {
+      "path": "renders/3b-canopy-after/xr9-specter-canopy-side.png",
+      "sha256": "0bd9564003fb0b0a3091f26dff2f7ba5d016b09773d678b7ab302dc14c6deeea",
+      "bytes": 738234
+    },
+    {
+      "path": "renders/3b-canopy-after/xr9-specter-canopy-front.png",
+      "sha256": "4218cd603f3e778506cd6ba22e92ce184e01e9bef306a1db68df88162063dccc",
+      "bytes": 803134
+    },
+    {
+      "path": "renders/3b-fronts/swift-s6-front.png",
+      "sha256": "768438292f427eb04d990fd9a8c89568db1fa2a5aa697bec5139e47c7cb046b6",
+      "bytes": 962978
+    },
+    {
+      "path": "renders/3b-fronts/xr14-nightjar-front.png",
+      "sha256": "a7b5532e3e681593bb50a4824ac83472363760e7c26af9ead9b836b8cd081297",
+      "bytes": 969638
+    }
+  ]
+}

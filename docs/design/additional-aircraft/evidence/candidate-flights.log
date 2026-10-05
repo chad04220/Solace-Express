@@ -1,0 +1,115 @@
+guide swift_s6: PASS; max mass 1940 kg, loading 1112.95 N/m2, stalls 33.185/27.345 m/s, rotate ratio 1.134, power/thrust loading 7.462, inertia reference 7563.7/6456.7/14020.4; roof clearance 0.091 m, spar clearance 0.056 m, wheel well -0.016..0.704 within wing -0.943..0.788
+geometry/performance swift_s6: PASS, clean stall 28.45, landing stall 23.44, best climb 11.11 m/s at 46.80 m/s
+control swift_s6 axis0: PASS, 32.353 degrees
+control swift_s6 axis1: PASS, 15.946 degrees
+control swift_s6 axis2: PASS, 26.464 degrees
+comfort hold swift_s6: PASS, heading error 0.00 deg, altitude error 0.08 m, bank 25.32 deg, g 0.854..1.241
+comfort route swift_s6: PASS, 581.2s, touchdown 0.64 m/s, bank 25.24 deg, g 0.835..1.249
+swift_s6 PVI wind0 start0 load0: PASS 552.0s touchdown 0.66
+swift_s6 PVI wind0 start0 load1: PASS 563.3s touchdown 0.78
+swift_s6 PVI wind0 start1 load0: PASS 207.2s touchdown 0.64
+swift_s6 PVI wind0 start1 load1: PASS 208.6s touchdown 0.79
+swift_s6 PVI wind1 start0 load0: PASS 635.2s touchdown 0.75
+swift_s6 PVI wind1 start0 load1: PASS 635.9s touchdown 0.78
+swift_s6 PVI wind1 start1 load0: PASS 215.5s touchdown 0.81
+swift_s6 PVI wind1 start1 load1: PASS 216.8s touchdown 0.90
+swift_s6 PVI wind2 start0 load0: PASS 531.5s touchdown 0.76
+swift_s6 PVI wind2 start0 load1: PASS 536.3s touchdown 0.28
+swift_s6 PVI wind2 start1 load0: PASS 191.6s touchdown 0.73
+swift_s6 PVI wind2 start1 load1: PASS 193.6s touchdown 1.33
+swift_s6 CAP wind0 start0 load0: PASS 575.4s touchdown 0.63
+swift_s6 CAP wind0 start0 load1: PASS 577.0s touchdown 0.77
+swift_s6 CAP wind0 start1 load0: PASS 518.8s touchdown 0.64
+swift_s6 CAP wind0 start1 load1: PASS 517.2s touchdown 0.77
+swift_s6 CAP wind1 start0 load0: PASS 607.0s touchdown 0.74
+swift_s6 CAP wind1 start0 load1: PASS 604.2s touchdown 0.68
+swift_s6 CAP wind1 start1 load0: PASS 520.0s touchdown 0.61
+swift_s6 CAP wind1 start1 load1: PASS 518.0s touchdown 0.78
+swift_s6 CAP wind2 start0 load0: PASS 569.4s touchdown 0.89
+swift_s6 CAP wind2 start0 load1: PASS 567.7s touchdown 0.25
+swift_s6 CAP wind2 start1 load0: PASS 584.7s touchdown 1.24
+swift_s6 CAP wind2 start1 load1: PASS 603.7s touchdown 1.09
+swift_s6 NPT wind0 start0 load0: PASS 377.8s touchdown 0.61
+swift_s6 NPT wind0 start0 load1: PASS 252.7s touchdown 0.75
+swift_s6 NPT wind0 start1 load0: PASS 299.1s touchdown 0.64
+swift_s6 NPT wind0 start1 load1: PASS 299.5s touchdown 0.80
+swift_s6 NPT wind1 start0 load0: PASS 382.5s touchdown 0.80
+swift_s6 NPT wind1 start0 load1: PASS 365.0s touchdown 0.81
+swift_s6 NPT wind1 start1 load0: PASS 305.5s touchdown 0.56
+swift_s6 NPT wind1 start1 load1: PASS 190.7s touchdown 1.02
+swift_s6 NPT wind2 start0 load0: PASS 322.7s touchdown 0.80
+swift_s6 NPT wind2 start0 load1: PASS 290.5s touchdown 1.50
+swift_s6 NPT wind2 start1 load0: PASS 241.6s touchdown 1.13
+swift_s6 NPT wind2 start1 load1: PASS 245.8s touchdown 1.78
+swift_s6 CDR wind0 start0 load0: PASS 534.4s touchdown 0.66
+swift_s6 CDR wind0 start0 load1: PASS 590.0s touchdown 0.76
+swift_s6 CDR wind0 start1 load0: PASS 199.1s touchdown 0.61
+swift_s6 CDR wind0 start1 load1: PASS 199.6s touchdown 0.76
+swift_s6 CDR wind1 start0 load0: PASS 580.8s touchdown 0.68
+swift_s6 CDR wind1 start0 load1: PASS 579.8s touchdown 0.92
+swift_s6 CDR wind1 start1 load0: PASS 208.6s touchdown 0.63
+swift_s6 CDR wind1 start1 load1: PASS 209.6s touchdown 0.74
+swift_s6 CDR wind2 start0 load0: PASS 542.2s touchdown 1.14
+swift_s6 CDR wind2 start0 load1: PASS 549.2s touchdown 0.91
+swift_s6 CDR wind2 start1 load0: PASS 181.4s touchdown 1.38
+swift_s6 CDR wind2 start1 load1: PASS 180.9s touchdown 1.72
+swift_s6 full-power takeoff load0: PASS; liftoff 158.6m (limit 540.0), 25m AGL at 419m, 14.7s
+swift_s6 full-power takeoff load1: PASS; liftoff 415.5m (limit 540.0), 25m AGL at 927m, 28.4s
+guide xr14_nightjar: PASS; max mass 7190 kg, loading 1847.40 N/m2, stalls 44.113/37.898 m/s, rotate ratio 1.135, power/thrust loading 0.354, inertia reference 59438.3/85964.0/145402.3; roof clearance 0.087 m, spar clearance 0.067 m, wheel well 0.222..1.082 within wing -1.479..1.397
+geometry/performance xr14_nightjar: PASS, clean stall 45.46, landing stall 39.05, best climb 25.98 m/s at 117.50 m/s
+control xr14_nightjar axis0: PASS, 37.310 degrees
+control xr14_nightjar axis1: PASS, 15.383 degrees
+control xr14_nightjar axis2: PASS, 25.154 degrees
+comfort hold xr14_nightjar: PASS, heading error 0.00 deg, altitude error 0.02 m, bank 25.07 deg, g 0.861..1.248
+comfort route xr14_nightjar: PASS, 406.2s, touchdown 0.97 m/s, bank 25.13 deg, g 0.836..1.252
+xr14_nightjar PVI wind0 start0 load0: PASS 511.0s touchdown 1.02
+xr14_nightjar PVI wind0 start0 load1: PASS 513.2s touchdown 1.05
+xr14_nightjar PVI wind0 start1 load0: PASS 240.3s touchdown 0.99
+xr14_nightjar PVI wind0 start1 load1: PASS 239.9s touchdown 1.02
+xr14_nightjar PVI wind1 start0 load0: PASS 383.5s touchdown 0.78
+xr14_nightjar PVI wind1 start0 load1: PASS 383.4s touchdown 0.82
+xr14_nightjar PVI wind1 start1 load0: PASS 259.5s touchdown 1.06
+xr14_nightjar PVI wind1 start1 load1: PASS 259.7s touchdown 1.10
+xr14_nightjar PVI wind2 start0 load0: PASS 354.1s touchdown 1.95
+xr14_nightjar PVI wind2 start0 load1: PASS 354.1s touchdown 2.17
+xr14_nightjar PVI wind2 start1 load0: PASS 233.4s touchdown 1.60
+xr14_nightjar PVI wind2 start1 load1: PASS 233.4s touchdown 1.62
+xr14_nightjar CAP wind0 start0 load0: PASS 444.9s touchdown 1.04
+xr14_nightjar CAP wind0 start0 load1: PASS 444.5s touchdown 1.07
+xr14_nightjar CAP wind0 start1 load0: PASS 529.3s touchdown 1.01
+xr14_nightjar CAP wind0 start1 load1: PASS 525.5s touchdown 1.04
+xr14_nightjar CAP wind1 start0 load0: PASS 333.1s touchdown 1.08
+xr14_nightjar CAP wind1 start0 load1: PASS 333.2s touchdown 1.10
+xr14_nightjar CAP wind1 start1 load0: PASS 378.3s touchdown 1.06
+xr14_nightjar CAP wind1 start1 load1: PASS 378.2s touchdown 1.07
+xr14_nightjar CAP wind2 start0 load0: PASS 392.5s touchdown 1.70
+xr14_nightjar CAP wind2 start0 load1: PASS 392.9s touchdown 1.84
+xr14_nightjar CAP wind2 start1 load0: PASS 394.0s touchdown 1.76
+xr14_nightjar CAP wind2 start1 load1: PASS 393.9s touchdown 1.80
+xr14_nightjar NPT wind0 start0 load0: PASS 233.0s touchdown 0.94
+xr14_nightjar NPT wind0 start0 load1: PASS 231.9s touchdown 0.93
+xr14_nightjar NPT wind0 start1 load0: PASS 170.5s touchdown 1.05
+xr14_nightjar NPT wind0 start1 load1: PASS 170.8s touchdown 1.06
+xr14_nightjar NPT wind1 start0 load0: PASS 230.5s touchdown 1.26
+xr14_nightjar NPT wind1 start0 load1: PASS 229.8s touchdown 1.27
+xr14_nightjar NPT wind1 start1 load0: PASS 174.0s touchdown 0.84
+xr14_nightjar NPT wind1 start1 load1: PASS 174.2s touchdown 0.85
+xr14_nightjar NPT wind2 start0 load0: PASS 303.2s touchdown 2.15
+xr14_nightjar NPT wind2 start0 load1: PASS 303.5s touchdown 2.19
+xr14_nightjar NPT wind2 start1 load0: PASS 394.9s touchdown 2.53
+xr14_nightjar NPT wind2 start1 load1: PASS 394.9s touchdown 2.60
+xr14_nightjar CDR wind0 start0 load0: PASS 597.1s touchdown 0.92
+xr14_nightjar CDR wind0 start0 load1: PASS 600.8s touchdown 0.98
+xr14_nightjar CDR wind0 start1 load0: PASS 167.3s touchdown 0.97
+xr14_nightjar CDR wind0 start1 load1: PASS 167.7s touchdown 0.98
+xr14_nightjar CDR wind1 start0 load0: PASS 487.1s touchdown 0.96
+xr14_nightjar CDR wind1 start0 load1: PASS 487.8s touchdown 0.93
+xr14_nightjar CDR wind1 start1 load0: PASS 170.5s touchdown 0.90
+xr14_nightjar CDR wind1 start1 load1: PASS 170.7s touchdown 0.95
+xr14_nightjar CDR wind2 start0 load0: PASS 334.6s touchdown 1.53
+xr14_nightjar CDR wind2 start0 load1: PASS 335.1s touchdown 1.50
+xr14_nightjar CDR wind2 start1 load0: PASS 155.9s touchdown 1.62
+xr14_nightjar CDR wind2 start1 load1: PASS 155.9s touchdown 1.70
+xr14_nightjar full-power takeoff load0: PASS; liftoff 598.1m (limit 1125.0), 25m AGL at 1125m, 29.3s
+xr14_nightjar full-power takeoff load1: PASS; liftoff 624.8m (limit 1125.0), 25m AGL at 1171m, 30.2s
+candidate flight checks: 110/110 passed

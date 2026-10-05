@@ -1,0 +1,16 @@
+{
+  "src/aircraft.h": "6acc8373d8e00e718273a6c478528c7d016790d1",
+  "src/aircraft.cpp": "f96d7e4dfaedacc0b7b643692d54900c5e84b757",
+  "src/traffic.h": "812c5459d739dfcd98f93ff7b6ca91b9f5e44763",
+  "src/traffic.cpp": "fd232800cef6b350fbf145beb895bd6c93b7c139",
+  "src/game.cpp": "8df782aa0c0fa900a64ddb0329d02f97b73cd9ff",
+  "src/renderer.h": "33c1b2afbf982742817dbb52bec656a4d9c6fd69",
+  "src/renderer.cpp": "9bd761d28ce5e3fabadf5554730df6ff95087f32",
+  "src/entity_mesh.h": "e97d4f8bd5a344fae6a72027f3d19056f93388c6",
+  "src/entity_mesh.cpp": "8e60dcb8d37594729cfb0f0a16df533f5f40267b",
+  "src/entity_render.cpp": "66b62be4908c043d2cfdc76c388fab942fb1e629",
+  "src/shaders/scene_uniforms.glsl": "af5b55b424028ae7a92eba159dd3ba0bb85ad4ab",
+  "src/shaders/plane_material.glsl": "242a67f7c914996dbff41d45fa1a43d4c4773401",
+  "src/shaders/ent_vs.glsl": "3438ad94116d21ba87d62f73b3309c1e23343e77",
+  "src/shaders/ent_fs2.glsl": "0f73b050244de3dd464d6ebc3dae8307f97cc660"
+}

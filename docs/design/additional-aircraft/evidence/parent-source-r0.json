@@ -1,0 +1,502 @@
+{
+  "parent": "db08f7aa334cf3e7c04ed99c6f5caa5bdca63ca6",
+  "tree": "de8f823dc61d41678710a4d3f4a8e5b6a362fe4a",
+  "files": [
+    {
+      "path": "CMakeLists.txt",
+      "sha": "549523aef93558ed00d0efc7be66d493928e18c1"
+    },
+    {
+      "path": "src/aero.cpp",
+      "sha": "7fd3aef68e833450b9d66d6ed867c0e75b84b8ee"
+    },
+    {
+      "path": "src/aero.h",
+      "sha": "02ee113a1f1630126a5af46a30da2e027eca58d4"
+    },
+    {
+      "path": "src/aircraft.cpp",
+      "sha": "f96d7e4dfaedacc0b7b643692d54900c5e84b757"
+    },
+    {
+      "path": "src/aircraft.h",
+      "sha": "6acc8373d8e00e718273a6c478528c7d016790d1"
+    },
+    {
+      "path": "src/aircraft_hull.cpp",
+      "sha": "3179f106d21e0db097d44f0c70bc33868246a6c4"
+    },
+    {
+      "path": "src/aircraft_perf.cpp",
+      "sha": "ebb037ca4495bf1b4c472e597e33d77a6fa9f9eb"
+    },
+    {
+      "path": "src/aircraft_stunt.cpp",
+      "sha": "fe817d7e620dcdcbf568bb05ea572815a7d22048"
+    },
+    {
+      "path": "src/airport_layout.h",
+      "sha": "9991f2a8a8bf4a24c19571f947cbcea96ef42c6a"
+    },
+    {
+      "path": "src/airport_scenery.cpp",
+      "sha": "9b37690c182ed1c1ed9bf14fd1abb12972b6e64a"
+    },
+    {
+      "path": "src/atc.cpp",
+      "sha": "56888f2de3316e48197f6cf5a9d5b36b4d11668d"
+    },
+    {
+      "path": "src/atc.h",
+      "sha": "cc09e98862d2506967b0bab96f839f641334fc3a"
+    },
+    {
+      "path": "src/audio.cpp",
+      "sha": "cd6e25b128d885bfe6ab91fe033f4d2d7c5e6646"
+    },
+    {
+      "path": "src/audio.h",
+      "sha": "9954555b957520a8b521c0053bf53a010302b774"
+    },
+    {
+      "path": "src/camera_feeds.cpp",
+      "sha": "46a8b9edfb760a7c122c5b7d78fe608baf344625"
+    },
+    {
+      "path": "src/career.cpp",
+      "sha": "46a408947b32c95d6ec2fe3dc7fad8bfc62c9b3d"
+    },
+    {
+      "path": "src/career.h",
+      "sha": "ef2b0452c4c375ca09d38a46f353b43c812c6c40"
+    },
+    {
+      "path": "src/common.h",
+      "sha": "b57e0c7dfed9013b85b161ab8061d5425abf1ec8"
+    },
+    {
+      "path": "src/entities.cpp",
+      "sha": "84fbd9be0aca680fe88773affd0e5f4737b8b1e1"
+    },
+    {
+      "path": "src/entities.h",
+      "sha": "a8efc76ac99936b3a7dd38bd28634cc8ae0163f3"
+    },
+    {
+      "path": "src/entity_mesh.cpp",
+      "sha": "8e60dcb8d37594729cfb0f0a16df533f5f40267b"
+    },
+    {
+      "path": "src/entity_mesh.h",
+      "sha": "e97d4f8bd5a344fae6a72027f3d19056f93388c6"
+    },
+    {
+      "path": "src/entity_render.cpp",
+      "sha": "66b62be4908c043d2cfdc76c388fab942fb1e629"
+    },
+    {
+      "path": "src/entity_shaders.h",
+      "sha": "cc18b3cf64ee6e9d7eeba2462866ba2192b73ab6"
+    },
+    {
+      "path": "src/feed_cameras.h",
+      "sha": "3495eccde020f9b3bd4c39d08638c9202aba2073"
+    },
+    {
+      "path": "src/font_data.h",
+      "sha": "719a171feff505a8672548853ccc376d2c2ce711"
+    },
+    {
+      "path": "src/game.cpp",
+      "sha": "8df782aa0c0fa900a64ddb0329d02f97b73cd9ff"
+    },
+    {
+      "path": "src/game.h",
+      "sha": "c31a5122f85c8309a70a831dcf74e4286d4202b9"
+    },
+    {
+      "path": "src/game_research_ui.cpp",
+      "sha": "86a0d6e7e2390904e14742f0a243b87befa4ced9"
+    },
+    {
+      "path": "src/game_ui.cpp",
+      "sha": "7dd2cb469b67a47b02d591ea505526c3345ed649"
+    },
+    {
+      "path": "src/game_wraith.cpp",
+      "sha": "847e11ce9509d1baa1c44d5eceab99254556355e"
+    },
+    {
+      "path": "src/gl.cpp",
+      "sha": "8827a166d9e9e9edfd29d50f19d8201ff7b2bf68"
+    },
+    {
+      "path": "src/gl.h",
+      "sha": "bfc7f1f195459a38ccac5467e965c88536d43ea5"
+    },
+    {
+      "path": "src/hull_mesh.h",
+      "sha": "8a03f2b8f33add530fc0688a294a3bab555cefe8"
+    },
+    {
+      "path": "src/keys.h",
+      "sha": "b96ef029a7793adcd4f04cb87f1d6bf3ef5004d5"
+    },
+    {
+      "path": "src/menu_video_win.cpp",
+      "sha": "82b0d503c4a179f037f89479f6a2d7753711cd7c"
+    },
+    {
+      "path": "src/menu_video_win.h",
+      "sha": "967feaa82a5f043e944051fcdb8475d1c94f7964"
+    },
+    {
+      "path": "src/models.cpp",
+      "sha": "d67f5bca6e325e37f8ab379acd9fcfa09d28225a"
+    },
+    {
+      "path": "src/models.h",
+      "sha": "8407557637bff95d2b86dd5105bb80d0d1cc6984"
+    },
+    {
+      "path": "src/platform_win32.cpp",
+      "sha": "ee0a4ee67b8e0dd0f034adc4924d27154f76703d"
+    },
+    {
+      "path": "src/radio.h",
+      "sha": "916cd49745544be825ad2252d36fca6eec945052"
+    },
+    {
+      "path": "src/radio_stub.cpp",
+      "sha": "dee725bc09f4c9b443929bd3b81671852ea968f8"
+    },
+    {
+      "path": "src/radio_win.cpp",
+      "sha": "5b57b28a62c0b39675da8e8f11ab9b4dc4261360"
+    },
+    {
+      "path": "src/renderer.cpp",
+      "sha": "9bd761d28ce5e3fabadf5554730df6ff95087f32"
+    },
+    {
+      "path": "src/renderer.h",
+      "sha": "33c1b2afbf982742817dbb52bec656a4d9c6fd69"
+    },
+    {
+      "path": "src/scenery.cpp",
+      "sha": "f174b7551608395a471657cdbe37b77444004bd3"
+    },
+    {
+      "path": "src/scenery.h",
+      "sha": "22b037d5ca3f93580627152cc1129298598b9e9b"
+    },
+    {
+      "path": "src/shaders.h",
+      "sha": "9028f50871f3c44f6f1df11a0a098ca1bc9509f2"
+    },
+    {
+      "path": "src/shaders/cloud_comp_fs.glsl",
+      "sha": "fb809bc7b5975f3047d4ce51d9b124014c7e4c93"
+    },
+    {
+      "path": "src/shaders/cloud_main.glsl",
+      "sha": "ba62015f2e163db5fbd538e19db381921d40c23c"
+    },
+    {
+      "path": "src/shaders/clouds.glsl",
+      "sha": "5170f2937f0e56d51613c87c315cc2b9fd6f5b85"
+    },
+    {
+      "path": "src/shaders/cockpit_mask_fs.glsl",
+      "sha": "bf2bbf43b3b76454bdd9c4de10c8c00577fa639b"
+    },
+    {
+      "path": "src/shaders/common.glsl",
+      "sha": "5e0ac260ec6ee780acde050b573be0e667f794c0"
+    },
+    {
+      "path": "src/shaders/disp_main.glsl",
+      "sha": "de2642767437da2aa733b37eefa9749147d7866f"
+    },
+    {
+      "path": "src/shaders/down_fs.glsl",
+      "sha": "c63ad7534a8ccb69d83f4e6b56356fdc7fdb632d"
+    },
+    {
+      "path": "src/shaders/ent_fs1.glsl",
+      "sha": "539158165ef197a939594a960ac750fd0bbb8832"
+    },
+    {
+      "path": "src/shaders/ent_fs2.glsl",
+      "sha": "0f73b050244de3dd464d6ebc3dae8307f97cc660"
+    },
+    {
+      "path": "src/shaders/ent_shadow_fs.glsl",
+      "sha": "e8cf6cde86f8bee1096e474a106fb71d89428d9b"
+    },
+    {
+      "path": "src/shaders/ent_vs.glsl",
+      "sha": "3438ad94116d21ba87d62f73b3309c1e23343e77"
+    },
+    {
+      "path": "src/shaders/feed_rays_fs.glsl",
+      "sha": "406d95af48251ba9fece3c55c816c24cd7217bf8"
+    },
+    {
+      "path": "src/shaders/feeds.glsl",
+      "sha": "3a274311b0fb0595a6d302a84370239d25de9f16"
+    },
+    {
+      "path": "src/shaders/fullscreen_vs.glsl",
+      "sha": "8c5bda407d4a8a753ffb2e33c23ac9a3aca077b0"
+    },
+    {
+      "path": "src/shaders/hull_bake_main.glsl",
+      "sha": "5cc4035b64e8e934edd1085be425a48937cc9405"
+    },
+    {
+      "path": "src/shaders/light_common.glsl",
+      "sha": "0d2812267f1cda84277e240321945fc0f85ca8f8"
+    },
+    {
+      "path": "src/shaders/map_main.glsl",
+      "sha": "ec793b86861bf5dee9bd0f45badceb9bda537835"
+    },
+    {
+      "path": "src/shaders/material_common.glsl",
+      "sha": "a262801220fae55f36f669ac76d6d3b7af9a261f"
+    },
+    {
+      "path": "src/shaders/plane_common.glsl",
+      "sha": "1a74c51d7b43c453972d0691d56ec69cc34e83c0"
+    },
+    {
+      "path": "src/shaders/plane_fx.glsl",
+      "sha": "bed611a89f2c80ea63f0a07a0c522ed450fe91ee"
+    },
+    {
+      "path": "src/shaders/plane_material.glsl",
+      "sha": "77ba4fc0b59d0fc383c67f0c37371f71e9ffde56"
+    },
+    {
+      "path": "src/shaders/plane_screens.glsl",
+      "sha": "07bbe45dd4396b6872072c5ad0381eebf7adb7ec"
+    },
+    {
+      "path": "src/shaders/plane_sdf.glsl",
+      "sha": "4afbd54086d6379231d659602bda10842ce0ee9a"
+    },
+    {
+      "path": "src/shaders/plane_trace.glsl",
+      "sha": "eefbe4586f69dc889b9ae2a354f9578afc053926"
+    },
+    {
+      "path": "src/shaders/post_fs.glsl",
+      "sha": "9cda68675e3ad2c7ad21781d04092a5e219a40c4"
+    },
+    {
+      "path": "src/shaders/ray_fs.glsl",
+      "sha": "519f5f4824f27403a4289b669ba5216fa539a680"
+    },
+    {
+      "path": "src/shaders/ray_mask_fs.glsl",
+      "sha": "e07a8627396651fba708d937f86b420a7fdf72d0"
+    },
+    {
+      "path": "src/shaders/raytrace_displays.glsl",
+      "sha": "3b526d1880c297469bf6894c2fb80fc270a5eb57"
+    },
+    {
+      "path": "src/shaders/raytrace_text.glsl",
+      "sha": "a29f4296509ee768b080350e2596bf5f488e442b"
+    },
+    {
+      "path": "src/shaders/raytrace_ufo.glsl",
+      "sha": "678d0a8a310edcda822d5078752d01087ee0d92b"
+    },
+    {
+      "path": "src/shaders/rt_io.glsl",
+      "sha": "fbbc860306fa5de1e804b4dc9ee6e4365ad70e7e"
+    },
+    {
+      "path": "src/shaders/rt_main.glsl",
+      "sha": "97a4fcbf6455e9bf89c2bca36c65d7b537a7c9c9"
+    },
+    {
+      "path": "src/shaders/rt_prims.glsl",
+      "sha": "f352d6c04070c41f735c372672f298e13a837268"
+    },
+    {
+      "path": "src/shaders/rt_shade.glsl",
+      "sha": "e8add18a7698e7e1dfdd10ee4005ce76107d9aef"
+    },
+    {
+      "path": "src/shaders/scene_uniforms.glsl",
+      "sha": "af5b55b424028ae7a92eba159dd3ba0bb85ad4ab"
+    },
+    {
+      "path": "src/shaders/sprite_fs.glsl",
+      "sha": "9f34bbf8115dd5da0e8d83ce44abb6f4ec22b888"
+    },
+    {
+      "path": "src/shaders/sprite_vs.glsl",
+      "sha": "556394ec9ba504546328b79efeade40b584b7c5e"
+    },
+    {
+      "path": "src/shaders/taa_fs.glsl",
+      "sha": "8be8dfde749ffaf9588c43c179b81d4dec6669e4"
+    },
+    {
+      "path": "src/shaders/terrain_material.glsl",
+      "sha": "7a54d7a12789ed0d0136e756d46a968d9292def7"
+    },
+    {
+      "path": "src/shaders/terrain_trace.glsl",
+      "sha": "f4e3d8922eccf0ccdf16764227ed7a411b648d32"
+    },
+    {
+      "path": "src/shaders/tsh_bake_main.glsl",
+      "sha": "771bfafb680b91e52e4ca29fe719f159d38c5631"
+    },
+    {
+      "path": "src/shaders/ui_fs.glsl",
+      "sha": "2cca1d02fd5ed4f70923ce6893dcff91b49d0f82"
+    },
+    {
+      "path": "src/shaders/ui_vs.glsl",
+      "sha": "e3e5d196296bd02e4b27e907aa8cac8eb878c0c4"
+    },
+    {
+      "path": "src/shaders/up_fs.glsl",
+      "sha": "03449bb9a6d3e4a28f9c0395c10af6f4b6c6db93"
+    },
+    {
+      "path": "src/shaders/water.glsl",
+      "sha": "8b0e8c16e936e942d236f55c04e86b7688fbc078"
+    },
+    {
+      "path": "src/shaders/wraith_cockpit_common.glsl",
+      "sha": "79d8c6b3e7d9726d38ef9f3ae7b717626e8d800a"
+    },
+    {
+      "path": "src/shaders/wraith_cockpit_material.glsl",
+      "sha": "b13d002f2ce76fb8bf8539bffa73d0cc50de3608"
+    },
+    {
+      "path": "src/shaders/wraith_cockpit_sdf.glsl",
+      "sha": "7772f954ef42d71682052abe5bd6f76e3b167607"
+    },
+    {
+      "path": "src/shaders/wraith_fx.glsl",
+      "sha": "1d7633cbf579e3b78fafc3c308fe179ba7bda35d"
+    },
+    {
+      "path": "src/shaders/wraith_material.glsl",
+      "sha": "ab01260e1a7ef417dda615b22cabb2e3e951c3e2"
+    },
+    {
+      "path": "src/shaders/wraith_sdf.glsl",
+      "sha": "44952d973431647906b8fa42bdc96e14bfd28f6b"
+    },
+    {
+      "path": "src/shaders_wraith_cockpit.h",
+      "sha": "af3a38b23e1b38a8d55318d0b4b4d24c215b0630"
+    },
+    {
+      "path": "src/terrain_envelope.cpp",
+      "sha": "a4ff168f2d6b0521a4136394f4a8beace8d3a175"
+    },
+    {
+      "path": "src/third_party/stb_image.h",
+      "sha": "9eedabedc45b3e6fd88fae6f14a160b4d53272ec"
+    },
+    {
+      "path": "src/traffic.cpp",
+      "sha": "fd232800cef6b350fbf145beb895bd6c93b7c139"
+    },
+    {
+      "path": "src/traffic.h",
+      "sha": "812c5459d739dfcd98f93ff7b6ca91b9f5e44763"
+    },
+    {
+      "path": "src/world.cpp",
+      "sha": "e4a547e3196dde80aca4baf7357f1a8f998f45b6"
+    },
+    {
+      "path": "src/world.h",
+      "sha": "dc28f35107cc135858c0af0392c0a34d60795b31"
+    },
+    {
+      "path": "tests/aircraft_visual_test.cpp",
+      "sha": "04f8d1797c22dd3aa8c9eda353d0842ad36c1411"
+    },
+    {
+      "path": "tests/airport_layout_test.cpp",
+      "sha": "f424445d96836bb96fe59ccafb1600a7480988d4"
+    },
+    {
+      "path": "tests/autoland_sweep.cpp",
+      "sha": "1b530f3163bafe3ee58cc148e96ee4371387acf7"
+    },
+    {
+      "path": "tests/entity_raycast_test.cpp",
+      "sha": "0aadf9d8173a7d7db71371856556801145ecc114"
+    },
+    {
+      "path": "tests/envelope_test.cpp",
+      "sha": "31887402de95c65cf20bf21825ca5f998721318d"
+    },
+    {
+      "path": "tests/flight_test.cpp",
+      "sha": "7d7660575a39647dfc3c66e1fb130e6ca036cee6"
+    },
+    {
+      "path": "tests/gameplay_test.cpp",
+      "sha": "a02242a3aaf44cc6c93f49c4174f105c9a480fba"
+    },
+    {
+      "path": "tests/hull_test.cpp",
+      "sha": "f36daa4472aad9e676e2a7b3d5bba4208e39d950"
+    },
+    {
+      "path": "tests/progression_test.cpp",
+      "sha": "5cf62277e7c8157aedb29c3e2416ed0a2af1c9e5"
+    },
+    {
+      "path": "tests/render_harness.cpp",
+      "sha": "629ba0f06f1344f6f52931bedf47c1437e668b29"
+    },
+    {
+      "path": "tests/save_test.cpp",
+      "sha": "6761311beb90fef3ec050a8b4a44af329b18c6b7"
+    },
+    {
+      "path": "tests/shader_keyword_test.cpp",
+      "sha": "2ba1f6a9b10e60403c1879804361ecf08a872583"
+    },
+    {
+      "path": "tests/terrain_shadow_test.cpp",
+      "sha": "dee52ca384898055d6c15625d66baef6c3e37b10"
+    },
+    {
+      "path": "tools/embed_shaders.cmake",
+      "sha": "50f72cdcfeb41f3c2d31fbd603d64086379e153e"
+    },
+    {
+      "path": "tools/gen_font.py",
+      "sha": "b2e9aaf35d559a3b727189673462608ed3c55ad2"
+    },
+    {
+      "path": "tools/shader_check.cmake",
+      "sha": "c7e4a79b131fd7ed4478d345d18898180487280c"
+    },
+    {
+      "path": "tools/shader_check.cpp",
+      "sha": "03d39eb7933595e21c988ad82ad8738c7b7242dc"
+    },
+    {
+      "path": "tools/voice_import.py",
+      "sha": "90b10a099f0e7c4cd2d70b951e890877a15b7227"
+    }
+  ]
+}

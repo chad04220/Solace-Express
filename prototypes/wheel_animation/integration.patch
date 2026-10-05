@@ -1,0 +1,527 @@
+diff --git a/src/aircraft.h b/src/aircraft.h
+--- a/src/aircraft.h
++++ b/src/aircraft.h
+@@ -2,6 +2,7 @@
+ #pragma once
+ #include "common.h"
+ #include "world.h"
++#include "wheel_motion.h"
+ 
+ enum EngineType { ENG_PISTON = 0, ENG_TURBOPROP, ENG_JET };
+ enum License { LIC_STUDENT = 0, LIC_PPL, LIC_CPL, LIC_ATP };
+@@ -93,6 +94,7 @@
+   float rpm = 0, n1 = 0;      // engine state (spooled)
+   float engineSpool = 0;      // 0..1 actual power fraction
+   bool engineRunning = false; float starterTime = 0;
++  WheelMotion wheelMotion[3]; // main left, main right, nose/tail; cosmetic simulation state
+   bool onGround = false, wasOnGround = false;
+   bool sceneryHits = true;   // collide with trees and buildings (off for the quote's background flight: the scenery isn't thread-safe)
+   bool apComfort = false;   // the autopilot flies for passengers (career flights): gentle bank, g, roll and climb; the stick is never limited
+diff --git a/src/aircraft.cpp b/src/aircraft.cpp
+--- a/src/aircraft.cpp
++++ b/src/aircraft.cpp
+@@ -62,6 +62,7 @@
+ 
+ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float fuelKg, float payloadKg, bool airborne, float speed) {
+   spec = s; pos = position; fuel = fuelKg; payload = payloadKg;
++  for (auto& wheel : wheelMotion) wheel.reset();
+   q = quat::axisAngle(vec3(0, 1, 0), -headingDeg * DEG);
+   w = vec3(); ctl = Controls(); ev = FlightEvents(); apComfort = false; sceneryHits = true; brakeHold = 0;
+   flaps = 0; gear = 1; rpm = 0; n1 = 0; engineSpool = 0; maxG = minG = 1; flightTime = 0;
+@@ -297,6 +298,7 @@
+   cs.push_back({vec3(s.span * 0.5f, s.wingY * R, s.wingZ), 5});
+   cs.push_back({vec3(0, -R, 0), 6});                    // belly
+ 
++  bool wheelContact[3] = {}; float wheelSpeed[3] = {};
+   bool anyWheel = false;
+   float roughSum = 0;
+   vec3 Fw(0, 0, 0), Tw(0, 0, 0);  // world force, body torque
+@@ -351,6 +353,7 @@
+       wf = normalize(wf);
+       vec3 wr = cross(wf, vec3(0, 1, 0));
+       float vlong = dot(vc, wf), vlat = dot(vc, wr);
++      wheelContact[c.kind] = true; wheelSpeed[c.kind] = vlong;
+       float mu = rw >= 0 && !surfaceRough(g_world.airports[rw].surface) ? 0.8f : 0.55f;
+       float rollRes = 0.015f + 0.06f * rough;
+       float brakeF = (c.kind <= 1 ? ctl.brake * 0.7f : 0.f);   // (enough for the main wheels to hold full power when parked)
+@@ -374,6 +377,7 @@
+   // (what was left of the creep is pushed back next step too: the held force converges on the steady push, so the
+   // wheels stop dead instead of creeping a step's acceleration)
+   if (holdN > 0) brakeHold = clampf(brakeHold + holdV / holdN * m / dt * 0.5f, -m * 30.f, m * 30.f); else brakeHold = 0;
++  for (int i = 0; i < 3; ++i) wheelMotion[i].step(dt, wheelSpeed[i], wheelContact[i], i < 2 ? ctl.brake : 0.f);
+   wasOnGround = onGround;
+   onGround = anyWheel;
+   groundRough = anyWheel ? roughSum / 3.f : 0.f;
+diff --git a/src/traffic.h b/src/traffic.h
+--- a/src/traffic.h
++++ b/src/traffic.h
+@@ -2,6 +2,7 @@
+ // traffic, XR-9 research formations ripping past, and an aerobatic display team.
+ #pragma once
+ #include "common.h"
++#include "wheel_motion.h"
+ #include <vector>
+ #include <string>
+ 
+@@ -17,6 +18,7 @@
+   float speed = 0, vs = 0;    // along-track speed and vertical speed (m/s)
+   float gear = 1, flaps = 0, throttle = 0.2f, propAngle = 0, ab = 0;
+   float ctlPitch = 0, ctlRoll = 0, ctlYaw = 0;
++  WheelMotion wheelMotion[3]; // same rolling state as the player
+   float timer = 0;
+   int airport = -1, stand = 0;
+   std::vector<vec3> path; int wp = 0;   // taxi / circuit waypoints (world, y = target altitude when flying)
+diff --git a/src/traffic.cpp b/src/traffic.cpp
+--- a/src/traffic.cpp
++++ b/src/traffic.cpp
+@@ -710,7 +710,7 @@
+     if (!c.alive) continue;
+     const AircraftSpec& s = kAircraft[c.spec];
+     c.propAngle = fmodf(c.propAngle + (8.f + 50.f * c.throttle) * dt, 2 * PI * 50.f);
+-    vec3 pos0 = c.pos;   // for the swept collision test below
++    vec3 pos0 = c.pos; quat q0 = c.q; // also the previous contact pose for wheel travel
+     float dist = length(c.pos - player);
+     if (c.leader >= 0) {   // wingman: rigid formation on the leader
+       TrafficCraft& L = craft[c.leader];
+@@ -771,6 +771,22 @@
+       const Airport& ap = g_world.airports[c.airport];   // (not over the field itself, where it has just lifted off)
+       if (length(vec2(c.pos.x - ap.x, c.pos.z - ap.z)) > ap.length * 0.5f + 400.f) { c.pos.y = g + 30.f; if (c.vel.y < 0) c.vel.y = 0; }
+     }
++    // Per-wheel contact travel, including differential travel while turning. Never derive spin from airspeed.
++    const float track = std::max(1.2f, s.span*0.13f), gh = gearH(s), len = s.fusLen;
++    vec3 cp[3] = {vec3(-track,-gh,s.taildragger?-.10f*len:.04f*len),
++                  vec3(track,-gh,s.taildragger?-.10f*len:.04f*len),
++                  s.taildragger?vec3(0,-gh+.11f*len,.45f*len):vec3(0,-gh,-.36f*len)};
++    float steer = s.special ? 0.f : c.ctlYaw*.45f*smoothstepf(30.f,4.f,c.speed)*(s.taildragger?-1.f:1.f);
++    vec3 fw = q0.rotate(vec3(0,0,-1)) + c.q.rotate(vec3(0,0,-1)); fw.y = 0;
++    fw = length(fw)>1e-5f ? normalize(fw) : c.q.rotate(vec3(0,0,-1));
++    for (int wi=0;wi<3;++wi) {
++      vec3 pt = c.pos+c.q.rotate(cp[wi]), old = pos0+q0.rotate(cp[wi]);
++      bool contact = c.role==TrafficCraft::AIRPORT && c.gear>.95f &&
++                     pt.y <= g_world.height(pt.x,pt.z)+.08f;
++      vec3 wf = wi==2 ? quat::axisAngle(vec3(0,1,0),-steer).rotate(fw) : fw;
++      float roll = dt>0.f ? dot(pt-old,wf)/dt : 0.f;
++      c.wheelMotion[wi].step(dt,roll,contact);
++    }
+     // effects: display smoke, reheat embers
+     if (c.smoke) {   // display smoke, spread along this frame's path so it draws a continuous ribbon
+       int n = (int)clampf(c.speed * dt / 2.5f, 1.f, 6.f);
+@@ -824,8 +840,16 @@
+     packModel(s, c.spec, gearH(s), t);
+     float bound = std::max(t[0], t[36] * 2.f) * 0.55f + 1.5f;
+     vec3 r = c.q.rotate(vec3(1, 0, 0)), u = c.q.rotate(vec3(0, 1, 0)), b = c.q.rotate(vec3(0, 0, 1));
+-    float v[32] = {c.pos.x, c.pos.y, c.pos.z, bound, r.x, r.y, r.z, 0, u.x, u.y, u.z, 0, b.x, b.y, b.z, 0,
+-                   c.spec == kResearchJet ? 0.f : c.gear, c.flaps, 0, 0, c.ctlPitch, c.ctlRoll, c.ctlYaw, c.throttle,
++    const ModelDef& m=kModels[c.spec];
++    float wr=s.special?.38f:m.wheelR;
++    float nr=s.special?.33f:s.taildragger?.10f:m.gear==3?wr*.75f:wr*.85f;
++    float steer=s.special?0.f:c.ctlYaw*.45f*smoothstepf(30.f,4.f,c.speed)*(s.taildragger?-1.f:1.f);
++    // The rotation-column .w components were unused; the existing 32-texel traffic stride stays unchanged.
++    float v[32] = {c.pos.x, c.pos.y, c.pos.z, bound,
++                   r.x, r.y, r.z, c.wheelMotion[0].angle(wr),
++                   u.x, u.y, u.z, c.wheelMotion[1].angle(wr),
++                   b.x, b.y, b.z, c.wheelMotion[2].angle(nr),
++                   c.spec == kResearchJet ? 0.f : c.gear, c.flaps, steer, 0, c.ctlPitch, c.ctlRoll, c.ctlYaw, c.throttle,
+                    c.colBase.x, c.colBase.y, c.colBase.z, c.propAngle, c.colStripe.x, c.colStripe.y, c.colStripe.z, c.ab};
+     for (int i = 0; i < 32; i++) t[96 + i] = v[i];
+   }
+diff --git a/src/game.cpp b/src/game.cpp
+--- a/src/game.cpp
++++ b/src/game.cpp
+@@ -1617,6 +1617,9 @@
+   pv.PS[0] = p.gear; pv.PS[1] = p.flaps; pv.PS[2] = steer; pv.PS[3] = inside ? 1.f : 0.f;
+   pv.Ctl[0] = clampf(p.ctl.pitch + p.ctl.trim * 0.3f, -1, 1); pv.Ctl[1] = clampf(p.ctl.roll, -1, 1); pv.Ctl[2] = clampf(p.ctl.yaw, -1, 1); pv.Ctl[3] = p.ctl.throttle;
+   float blur = s.engineType == ENG_JET ? 1.f : smoothstepf(250.f, 700.f, p.rpm);
++  float wr = s.special ? .38f : md.wheelR;
++  float nr = s.special ? .33f : s.taildragger ? .10f : md.gear == 3 ? wr*.75f : wr*.85f;
++  pv.wheel[0] = p.wheelMotion[0].angle(wr); pv.wheel[1] = p.wheelMotion[1].angle(wr); pv.wheel[2] = p.wheelMotion[2].angle(nr);
+   pv.Pr[0] = propAngle; pv.Pr[1] = blur; pv.Pr[2] = (float)std::max(s.blades, 2); pv.Pr[3] = 0;
+   pv.I0[0] = p.ias * MS_TO_KT; pv.I0[1] = p.pos.y * M_TO_FT; pv.I0[2] = p.heading(); pv.I0[3] = p.vel.y * 196.85f;
+   pv.I1[0] = p.pitchDeg(); pv.I1[1] = p.bankDeg();
+diff --git a/src/renderer.h b/src/renderer.h
+--- a/src/renderer.h
++++ b/src/renderer.h
+@@ -8,6 +8,7 @@
+ #include "gl.h"
+ #include "world.h"
+ #include "entity_mesh.h"
++#include "ground_vehicle.h"
+ #include "feed_cameras.h"
+ 
+ struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft, bill = 0; };   // bill > 0: x,y,z is the centre of a camera-facing square of that half size
+@@ -18,6 +19,7 @@
+   vec3 pos; float rot[9];  // body->world, column-major
+   float M[24 * 4];          // model geometry (models.cpp packModel)
+   float PS[4], Ctl[4], Pr[4], I0[4], I1[4], I2[4];  // state, controls, prop, instruments
++  float wheel[3] = {}; // radians about local +X; main L/R and nose/tail
+   vec3 colBase, colStripe;
+   float reg[3] = {65, 65, 65};   // registration letters (character codes)
+   float prop[2][4]; int propCount = 0;
+@@ -59,6 +61,7 @@
+ GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err);
+ 
+ struct FrameParams {
++  std::vector<GroundVehicleVisual> groundVehicles; // explicitly driven vehicles only; no automatic scenery motion
+   vec3 camPos; vec3 camRight, camUp, camBack; float fovY = 1.0f;
+   float dt = 1.f / 60.f;   // this frame's real time step (frame-rate independent blending: the TAA)
+   float pano = 0.f, panoTanY = 0.f;   // > 0: a panoramic (cylindrical) camera feed: its half angle (rad) and vertical extent (fovY then only culls)
+@@ -208,6 +211,7 @@
+   mat4 shVP[2]; vec3 shCenter[2], shSun[2]; bool shValid[2] = {false, false}; int shGen[2] = {-1, -1}, shAge[2] = {0, 0}; float shR[2] = {0, 0};
+   EntMeshRange entRange[EK_COUNT];
+   std::vector<Ent> entStage;
++  uint64_t groundShadowKey[2] = {};
+   int entFrame = 0, entGenCount = 0;
+   bool initEntities();
+   // ---- terrain envelope mesh (terrain_envelope.cpp): where each pixel's exact terrain march starts
+diff --git a/src/renderer.cpp b/src/renderer.cpp
+--- a/src/renderer.cpp
++++ b/src/renderer.cpp
+@@ -1025,7 +1025,7 @@
+     glUniform3f(U(p, "uPlanePos"), pv.pos.x, pv.pos.y, pv.pos.z);
+     glUniformMatrix3fv(U(p, "uPlaneRot"), 1, GL_FALSE, pv.rot);
+     glUniform4fv(U(p, "uM"), 24, pv.M);
+-    glUniform4fv(U(p, "uPS"), 1, pv.PS); glUniform4fv(U(p, "uCtl"), 1, pv.Ctl); glUniform4fv(U(p, "uPr"), 1, pv.Pr);
++    glUniform4fv(U(p, "uPS"), 1, pv.PS); glUniform4fv(U(p, "uCtl"), 1, pv.Ctl); glUniform4fv(U(p, "uPr"), 1, pv.Pr); glUniform3f(U(p, "uWheel"), pv.wheel[0], pv.wheel[1], pv.wheel[2]);
+     glUniform4fv(U(p, "uI0"), 1, pv.I0); glUniform4fv(U(p, "uI1"), 1, pv.I1); glUniform4fv(U(p, "uI2"), 1, pv.I2);
+     glUniform3f(U(p, "uColBase"), pv.colBase.x, pv.colBase.y, pv.colBase.z);
+     glUniform3f(U(p, "uColStripe"), pv.colStripe.x, pv.colStripe.y, pv.colStripe.z);
+diff --git a/src/entity_mesh.h b/src/entity_mesh.h
+--- a/src/entity_mesh.h
++++ b/src/entity_mesh.h
+@@ -7,7 +7,7 @@
+ // surface parts (see the entity G-buffer shader)
+ enum EntPart { P_BARK = 0, P_LEAF, P_FROND, P_NEEDLE, P_ROCK, P_WALL, P_ROOF, P_TRIM, P_GLASS, P_METAL, P_DOOR, P_BRICK,
+                P_AWNING, P_WOOD, P_DARK, P_LAMP, P_SIGN, P_CANOPY, P_LEAFCARD, P_RLAMP, P_PAPI,
+-               P_PAINT, P_STRIPE, P_SOCK, P_BEACON, P_FENCE, P_OBST };
++               P_PAINT, P_STRIPE, P_SOCK, P_BEACON, P_FENCE, P_OBST, P_WHEEL0, P_WHEEL1, P_WHEEL2, P_WHEEL3, P_WHEEL4, P_WHEEL5 };
+ static const int ENT_LODS = 3;
+ struct EntMeshRange { int first[ENT_LODS], count[ENT_LODS]; };
+ void buildEntityMeshes(std::vector<EVert>& out, EntMeshRange ranges[EK_COUNT]);
+diff --git a/src/entity_mesh.cpp b/src/entity_mesh.cpp
+--- a/src/entity_mesh.cpp
++++ b/src/entity_mesh.cpp
+@@ -23,6 +23,7 @@
+ // ------------------------------------------------------------------ mesh builder
+ struct MB {
+   std::vector<EVert>& o;
++  int wheelSlot = 0;
+   explicit MB(std::vector<EVert>& v) : o(v) {}
+   void vert(vec3 p, vec3 n, int part, float ao = 1, float u = 0, float v = 0) { o.push_back({p.x, p.y, p.z, n.x, n.y, n.z, (float)part, ao, u, v}); }
+   // flat triangle; the normal is flipped to face away from ref (a point inside the solid)
+@@ -684,7 +685,12 @@
+   }
+ }
+ // wheel: a short cylinder across x
+-void wheel(MB& mb, vec3 c, float r, float w, int segs) { mb.cyl(c - vec3(w * 0.5f, 0, 0), c + vec3(w * 0.5f, 0, 0), r, r, segs, P_DARK, true, true); }
++void wheel(MB& mb, vec3 c, float r, float w, int segs) {
++  const size_t start=mb.o.size();
++  mb.cyl(c-vec3(w*.5f,0,0),c+vec3(w*.5f,0,0),r,r,segs,P_WHEEL0+mb.wheelSlot++,true,true);
++  // Wheel vertices alone use the auxiliary fields as radius + pivot Y/Z. Ent and EVert strides stay unchanged.
++  for(size_t i=start;i<mb.o.size();++i) { mb.o[i].ao=r;mb.o[i].u=c.y;mb.o[i].v=c.z; }
++}
+ 
+ void buildAirportKind(MB& mb, int kind, int lod) {
+   bool d0 = lod == 0, d1 = lod <= 1;
+@@ -926,6 +932,7 @@
+   MB mb(out);
+   for (int k = 0; k < EK_COUNT; k++)
+     for (int l = 0; l < ENT_LODS; l++) {
++      mb.wheelSlot = 0;
+       ranges[k].first[l] = (int)out.size();
+       int cls = entClass(k);
+       if (k >= EK_HANGAR) buildAirportKind(mb, k, l);
+diff --git a/src/entity_render.cpp b/src/entity_render.cpp
+--- a/src/entity_render.cpp
++++ b/src/entity_render.cpp
+@@ -68,7 +68,7 @@
+   else if (c == EC_ROCK) { l0 = R.r0 * (k >= EK_OUTCROP ? 2.5f : 1.f); l1 = R.r1 * (k >= EK_OUTCROP ? 3.f : 1.f); }
+   else { l0 = R.b0; l1 = R.b1; }
+ }
+-struct Draw { int kind, lod; size_t first; int count; };
++struct Draw { int kind, lod; size_t first; int count; int vehicle = -1; };
+ }  // namespace
+ 
+ void Renderer::drawEntities(const FrameParams& fp) {
+@@ -226,6 +226,13 @@
+                  shGen[c] < 0 || shR[c] != cR[c] || shAge[c] > 600;
+   }
+ 
++  // Refresh only cascades affected by a changed dynamic vehicle. Removing a vehicle refreshes its old shadow.
++  uint64_t nextGroundKey[2] = {};
++  for(int c=0;c<2 && sunUp && !feedPass;++c) {
++    vec3 center=shDirty[c]?newCenter[c]:shCenter[c];
++    nextGroundKey[c]=groundVehicleShadowKey(fp.groundVehicles,center,cR[c],shReach);
++    if(nextGroundKey[c]!=groundShadowKey[c]) shDirty[c]=true;
++  }
+   // ------------------------------------------------ gather instances into (pass, kind, lod) buckets
+   static std::vector<Ent> bucket[3][EK_COUNT][ENT_LODS];   // pass 0 view, 1/2 shadow cascades
+   for (auto& a : bucket) for (auto& b : a) for (auto& v : b) v.clear();
+@@ -312,13 +319,29 @@
+         draws[p].push_back({k, l, entStage.size(), (int)v.size()});
+         entStage.insert(entStage.end(), v.begin(), v.end());
+       }
++  // Dynamic vehicles use the same meshes/Ent instance layout, with a separate pose per small draw.
++  for(int vi=0;vi<(int)fp.groundVehicles.size();++vi) {
++    const auto& v=fp.groundVehicles[vi];if(!validGroundVehicle(v)) continue;
++    const Ent& e=v.entity;int k=v.kind;float d=length(vec3(e.x,e.y,e.z)-cam),l0,l1;lodLimits(R,k,l0,l1);
++    int lod=d<l0?0:d<l1?1:2;
++    size_t first=entStage.size();entStage.push_back(e);
++    if(d<rangeOf(R,k) && entRange[k].count[lod]>0) draws[0].push_back({k,lod,first,1,vi});
++    for(int c=0;c<2 && sunUp && !feedPass;++c) {
++      const auto& info=kEntInfo[k];float pad=std::max(info.hx*e.sx,info.hz*e.sz)+info.h*e.sy*shReach+60.f;
++      if(shDirty[c] && std::fabs(e.x-newCenter[c].x)<cR[c]+pad && std::fabs(e.z-newCenter[c].z)<cR[c]+pad)
++        draws[1+c].push_back({k,0,first,1,vi});
++    }
++  }
+   if (!feedPass) { entDrawn = 0; for (auto& d : draws[0]) entDrawn += d.count; }
+   glBindVertexArray(vaoEnt);
+   glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
+   glBufferData(GL_ARRAY_BUFFER, std::max<size_t>(entStage.size(), 1) * sizeof(Ent), entStage.empty() ? nullptr : entStage.data(), GL_STREAM_DRAW);
+   auto issue = [&](GLuint prog, const std::vector<Draw>& list) {
+     GLint uk = glGetUniformLocation(prog, "uKind"), uf = glGetUniformLocation(prog, "uFar"), ut = glGetUniformLocation(prog, "uThin"), ur = glGetUniformLocation(prog, "uThinRef");
++    GLint uw0=glGetUniformLocation(prog,"uWheel0"),uw1=glGetUniformLocation(prog,"uWheel1");
+     for (const Draw& d : list) {
++      if(d.vehicle>=0) { const float* a=fp.groundVehicles[d.vehicle].angle;glUniform4fv(uw0,1,a);glUniform2f(uw1,a[4],a[5]); }
++      else { glUniform4f(uw0,0,0,0,0);glUniform2f(uw1,0,0); }
+       glUniform1f(uf, rangeOf(R, d.kind)); glUniform1f(ut, entThins(d.kind) ? 1.f : 0.f); glUniform1f(ur, entThinRef(d.kind));
+       glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent)));
+       glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent) + 16));
+@@ -361,6 +384,7 @@
+     glUniform3f(glGetUniformLocation(progEntSh, "uWind"), fp.wind.x, fp.wind.y, fp.wind.z);
+     glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(1.5f, 2.f);
+     issue(progEntSh, draws[1 + c]);
++    groundShadowKey[c]=nextGroundKey[c];
+     glDisable(GL_POLYGON_OFFSET_FILL);
+   }
+ 
+diff --git a/src/shaders/scene_uniforms.glsl b/src/shaders/scene_uniforms.glsl
+--- a/src/shaders/scene_uniforms.glsl
++++ b/src/shaders/scene_uniforms.glsl
+@@ -17,6 +17,7 @@
+ uniform int uWreck; uniform vec3 uPcPos[5]; uniform mat3 uPcRot[5]; uniform vec3 uPcC[5]; uniform vec3 uPcH[5];
+ uniform int uDebN; uniform vec4 uDeb[16]; uniform vec4 uDebQ[16];
+ int gPI = -1; vec3 gPP; mat3 gPR; vec3 gPC;   // transform of the piece being traced / shaded
++uniform vec3 uWheel; // player wheel pose, advanced by simulation
+ uniform vec4 uM[24]; uniform vec4 uPS; uniform vec4 uCtl; uniform vec4 uPr; uniform vec4 uI0; uniform vec4 uI1; uniform vec4 uI2;
+ uniform vec3 uColBase; uniform vec3 uColStripe;
+ uniform vec3 uReg;   // the player's registration letters (character codes; registrationOf in aircraft.h)
+@@ -46,16 +47,18 @@
+ // Per-aircraft data the SDF and its shading read: your aircraft (uniforms) or a traffic aircraft (uTraffic row k:
+ // texels 0-23 model, 24 position + bound radius, 25-27 rotation columns, 28 state, 29 controls, 30 base colour + prop
+ // angle, 31 stripe colour + reheat)
++vec3 gWheel;
+ vec4 gM[24]; vec4 gPS; vec4 gCtl; vec3 gColBase; vec3 gColStripe; vec4 gFlame;
+ // Fitted cabin mounts, cached when the model is loaded rather than at every ray-march sample.
+ vec4 gCab0, gCab1;  // seat half width, headrest y, dome-light y, armrest x | visor y / slope, overhead y, vent x
+ void loadCabinFit();
+ uniform sampler2D uTraffic; uniform int uTrafficN;
+ bool gOwn = true;   // the globals hold the player's aircraft (not a traffic one)
+-void loadMain(){ gOwn = true; for (int i = 0; i < 24; i++) gM[i] = uM[i]; gPS = uPS; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; if (gPS.w > 0.5 && gM[0].z < 4.5) loadCabinFit(); }
++void loadMain(){ gOwn = true; gWheel = uWheel; for (int i = 0; i < 24; i++) gM[i] = uM[i]; gPS = uPS; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; if (gPS.w > 0.5 && gM[0].z < 4.5) loadCabinFit(); }
+ int gTrafK = 0;
+ void loadTraffic(int k){
+   gOwn = false; gTrafK = k;
++  gWheel = vec3(texelFetch(uTraffic,ivec2(25,k),0).w,texelFetch(uTraffic,ivec2(26,k),0).w,texelFetch(uTraffic,ivec2(27,k),0).w);
+   for (int i = 0; i < 24; i++) gM[i] = texelFetch(uTraffic, ivec2(i, k), 0);
+   gPS = texelFetch(uTraffic, ivec2(28, k), 0); gCtl = texelFetch(uTraffic, ivec2(29, k), 0);
+   vec4 c0 = texelFetch(uTraffic, ivec2(30, k), 0), c1 = texelFetch(uTraffic, ivec2(31, k), 0);
+diff --git a/src/shaders/plane_material.glsl b/src/shaders/plane_material.glsl
+--- a/src/shaders/plane_material.glsl
++++ b/src/shaders/plane_material.glsl
+@@ -36,7 +36,10 @@
+ Mat gearFinish(vec3 p, int material, Mat m, float footprint){
+   if (gPS.x < 0.06) return m;
+   float h; bool braked; vec4 f = gearWheelFrame(p, h, braked);
+-  vec3 q = f.xyz; float r = f.w, rad = length(q.yz);
++  vec3 q = f.xyz;
++  float angle = braked ? (p.x < 0.0 ? gWheel.x : gWheel.y) : gWheel.z;
++  q.yz = rot2(q.yz, -angle); // inverse SPIN in the deployed/steered wheel rest frame
++  float r = f.w, rad = length(q.yz);
+   if (abs(q.x) > h + 0.065 || rad > r + 0.025) return m;
+   float px = max(0.0008, footprint);
+   if (material == 6) {
+diff --git a/src/shaders/ent_vs.glsl b/src/shaders/ent_vs.glsl
+--- a/src/shaders/ent_vs.glsl
++++ b/src/shaders/ent_vs.glsl
+@@ -2,6 +2,7 @@
+ 
+ layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNrm; layout(location=2) in vec4 aAux;   // part, ao, u, v
+ layout(location=3) in vec4 iA; layout(location=4) in vec4 iB;   // position + yaw | scale + seed
++uniform vec4 uWheel0; uniform vec2 uWheel1; // dynamic packet; all zero for parked scenery
+ uniform mat4 uVP; uniform vec2 uJit; uniform float uLogC; uniform float uTime; uniform int uKind; uniform int uShadowPass;
+ uniform vec3 uCamV; uniform float uFar; uniform float uThin; uniform float uThinRef;   // view pass: per-instance distance thinning (entKeep)
+ uniform vec3 uWind;   // surface wind velocity (windsocks)
+@@ -14,7 +15,15 @@
+     float d = length(iA.xyz - uCamV);
+     if (fract(iB.w*7.13) >= min(1.0, uThinRef*uThinRef/max(d*d, 1.0)) || d >= uFar) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+   }
+-  vec3 lp = aPos*iB.xyz;
++  vec3 posed=aPos, posedN=aNrm;
++  int wheel=int(aAux.x+.5)-27;
++  if(wheel>=0 && wheel<6) {
++    float a=wheel<4?uWheel0[wheel]:uWheel1[wheel-4], c=cos(a),s=sin(a);
++    vec2 q=aPos.yz-aAux.zw;
++    posed.yz=aAux.zw+vec2(c*q.x-s*q.y,s*q.x+c*q.y);
++    posedN.yz=vec2(c*aNrm.y-s*aNrm.z,s*aNrm.y+c*aNrm.z);
++  }
++  vec3 lp = posed*iB.xyz;
+   // foliage sways a little in the wind, more towards the top and the frond tips
+   if (uKind <= 6 && (aAux.x < 3.5 || aAux.x > 17.5) && uShadowPass == 0) {
+     float h = max(aPos.y, 0.0)/14.0;
+@@ -23,7 +32,7 @@
+   }
+   float c = cos(iA.w), s = sin(iA.w);
+   vec3 wp = vec3(c*lp.x + s*lp.z, lp.y, -s*lp.x + c*lp.z) + iA.xyz;
+-  vec3 ln = normalize(aNrm/iB.xyz);
++  vec3 ln = normalize(posedN/iB.xyz);
+   if (uKind == 40 && abs(aAux.x - 23.0) < 0.5) {
+     // windsock: the sock (modelled along +x from the pole top) streams downwind, filling out by ~15 kt and drooping
+     // when calm, with a little flutter. Built straight in world space, then expressed back in the instance frame.
+@@ -39,7 +48,7 @@
+     ln = vec3(c*wn.x - s*wn.z, wn.y, s*wn.x + c*wn.z);
+     lp = aPos;
+   }
+-  vW = wp; vL = lp; vLN = ln; vAux = aAux;
++  vW = wp; vL = wheel>=0 && wheel<6 ? aPos*iB.xyz : lp; vLN = ln; vAux = aAux;
+   vInst = vec4(iB.w, iA.w, iB.y, iA.y); vScale = iB.xyz;
+   gl_Position = uVP*vec4(wp, 1.0);
+   bool behind = false;
+diff --git a/src/shaders/ent_fs2.glsl b/src/shaders/ent_fs2.glsl
+--- a/src/shaders/ent_fs2.glsl
++++ b/src/shaders/ent_fs2.glsl
+@@ -183,6 +183,18 @@
+     else if (part == P_LAMP) { alb = vec3(0.9); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.93, 0.8)*(0.15 + 10.0*uNight); }
+     else if (part == P_SIGN) { alb = uKind == K_PUMP ? vec3(0.75, 0.1, 0.06) : vec3(0.08, 0.22, 0.55); rough = 0.4; emit = alb*uNight*2.5; }
+     else if (part == P_CANOPY) { alb = vec3(0.9); if (n0.y < -0.5) emit = vec3(1.0, 0.97, 0.9)*uNight*2.5; rough = 0.4; }
++    else if(part>=27 && part<33) {
++      // Finish follows the wheel's rest coordinates; its mesh/normal rotate together in both passes.
++      vec2 q=mp.yz-vAux.zw;float r=max(vAux.y,.01),rad=length(q)/r;
++      float aa=max(fwidth(rad),.002);
++      alb=vec3(.025);rough=.85;
++      if(abs(n0.x)>.85 && rad<.62) {
++        alb=vec3(.48,.50,.53);metal=.8;rough=.3;
++        float a=atan(q.y,q.x),sector=1.04719755;
++        float spoke=.5+.5*cos(a*6.0);alb*=mix(.32,1.0,smoothstep(.35,.65,spoke));
++        float hub=1.0-smoothstep(.18,.18+aa,rad);alb=mix(alb,vec3(.6),hub);
++      }
++    }
+     else if (part == P_DARK) { alb = uKind == K_GAPLANE || uKind == K_AIRLINER || uKind == K_CAR || uKind == K_TRUCK ? vec3(0.03) : triS(lp, n0, M_GRAVEL, 2.0, 0.5, nb, rough)*0.4; rough = 0.8; }
+     else { alb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nb, rough)*vec3(0.88, 0.86, 0.82); }   // P_TRIM: concrete
+     if (uSnow > 0.05 && part != P_GLASS && part != P_ROOF) alb = mix(alb, vec3(0.9), smoothstep(0.6, 0.9, n0.y)*uSnow*0.8);
+diff --git a/src/wheel_motion.h b/src/wheel_motion.h
+new file mode 100644
+--- /dev/null
++++ b/src/wheel_motion.h
+@@ -0,0 +1,36 @@
++// Shared cosmetic rolling state. Does not alter contacts, friction or flight forces.
++#ifndef SOLACE_PREPARED_WHEEL_MOTION_H
++#define SOLACE_PREPARED_WHEEL_MOTION_H
++#include <cmath>
++#include <algorithm>
++
++struct WheelMotion {
++  // Keep signed travel in double precision; resolve radians at the real visual tyre radius.
++  // This keeps AircraftSpec/ModelDef and save files unchanged and avoids long-flight float drift.
++  double travel = 0.0;
++  float speed = 0.f;
++  void reset() { travel = 0.0; speed = 0.f; }
++  void step(float dt, float rollingSpeed, bool contact, float brake = 0.f) {
++    if (!(dt > 0.f) || !std::isfinite(dt) || !std::isfinite(rollingSpeed)) return;
++    if (contact) {
++      // Braking changes ground velocity in the existing solver. Do not artificially freeze a rolling tyre.
++      speed = std::fabs(rollingSpeed) < 0.01f ? 0.f : rollingSpeed;
++      travel += double(speed) * dt;
++    } else {
++      // An unloaded wheel coasts, rather than following airspeed. Main-wheel brakes arrest it faster.
++      float b = std::isfinite(brake) ? std::clamp(brake, 0.f, 1.f) : 0.f;
++      const double rate = 0.125 + 20.0 * b;
++      const double decay = std::exp(-rate * dt);
++      travel += double(speed) * (-std::expm1(-rate * dt)) / rate;
++      speed = float(speed * decay);
++      if (std::fabs(speed) < 0.001f) speed = 0.f;
++    }
++  }
++  // Positive rotation around local +X. Aircraft face -Z; airport scenery faces +Z.
++  float angle(float radius, float forwardSign = -1.f) const {
++    if (!(radius > 0.f) || !std::isfinite(radius) || !std::isfinite(travel)) return 0.f;
++    return float(std::remainder(forwardSign * travel / radius, 6.2831853071795864769));
++  }
++};
++
++#endif
+diff --git a/src/ground_vehicle.h b/src/ground_vehicle.h
+new file mode 100644
+--- /dev/null
++++ b/src/ground_vehicle.h
+@@ -0,0 +1,71 @@
++// Prepared dynamic draw packet; existing airport furniture remains stationary.
++#ifndef SOLACE_PREPARED_GROUND_VEHICLE_H
++#define SOLACE_PREPARED_GROUND_VEHICLE_H
++#include "entities.h"
++#include "wheel_motion.h"
++#include <array>
++#include <cstring>
++
++struct GroundWheel { vec3 center; float radius; };
++struct GroundWheelLayout { std::array<GroundWheel, 6> wheel{}; int count = 0; };
++inline GroundWheelLayout groundWheelLayout(int kind) {
++  GroundWheelLayout l;
++  auto add = [&](float x, float y, float z, float r) { l.wheel[l.count++] = {vec3(x,y,z),r}; };
++  if (kind == EK_GA_PLANE) { add(-1.25f,.27f,1.f,.27f); add(1.25f,.27f,1.f,.27f); add(0,.22f,3.45f,.22f); }
++  if (kind == EK_AIRLINER) {
++    for (int s : {-1,1}) for (int w : {-1,1}) add(s*3.8f+w*.4f,.57f,-1.2f,.57f);
++    for (int w : {-1,1}) add(w*.22f,.38f,14.6f,.38f);
++  }
++  if (kind == EK_CAR) for (int i=0;i<4;++i) add(i&1?.8f:-.8f,.31f,i&2?1.35f:-1.35f,.31f);
++  if (kind == EK_TRUCK) for (int i=0;i<6;++i) add(i&1?1.f:-1.f,.48f,i<2?3.4f:i<4?-2.4f:-3.6f,.48f);
++  return l;
++}
++struct GroundVehicleVisual { int kind = EK_CAR; Ent entity{}; float angle[6] = {}; };
++inline bool validGroundVehicle(const GroundVehicleVisual& v) {
++  const Ent& e=v.entity;
++  return groundWheelLayout(v.kind).count>0 && e.sx>0 && e.sy>0 && e.sz>0 &&
++    std::isfinite(e.x) && std::isfinite(e.y) && std::isfinite(e.z) && std::isfinite(e.yaw) &&
++    std::isfinite(e.sx) && std::isfinite(e.sy) && std::isfinite(e.sz);
++}
++struct GroundVehicleMotion {
++  std::array<WheelMotion,6> wheels{};
++  void reset() { for (auto& w:wheels) w.reset(); }
++  // A future ground driver calls this once per SIMULATION tick, using actual velocity and yaw rate.
++  // Camera feeds/shadow passes only consume visual(); they never advance animation.
++  void step(int kind,const Ent& e,vec3 velocity,float yawRate,float dt) {
++    const auto l=groundWheelLayout(kind);
++    const float c=cosf(e.yaw),s=sinf(e.yaw);
++    const vec3 forward(s,0,c);
++    for(int i=0;i<l.count;++i) {
++      const vec3 p=l.wheel[i].center;
++      vec3 local(p.x*e.sx,p.y*e.sy,p.z*e.sz);
++      vec3 v=cross(vec3(0,yawRate,0),local);
++      vec3 world(c*v.x+s*v.z,v.y,-s*v.x+c*v.z);
++      wheels[i].step(dt,dot(velocity+world,forward),true);
++    }
++  }
++  GroundVehicleVisual visual(int kind,const Ent& e) const {
++    GroundVehicleVisual v; v.kind=kind; v.entity=e;
++    const auto l=groundWheelLayout(kind);
++    // Roll radius scales with the ground-plane Z extent. Non-uniform Y/Z makes an elliptical tyre;
++    // game furniture uses circular tyres. The prepared driver should retain sy == sz.
++    for(int i=0;i<l.count;++i) v.angle[i]=wheels[i].angle(l.wheel[i].radius*e.sz,1.f);
++    return v;
++  }
++};
++inline uint64_t groundVehicleShadowKey(const std::vector<GroundVehicleVisual>& v,vec3 center,float radius,float reach) {
++  uint64_t h=1469598103934665603ULL;
++  auto add=[&](uint32_t x){h=(h^x)*1099511628211ULL;};
++  auto f=[&](float x){uint32_t u;std::memcpy(&u,&x,sizeof(u));add(u);};
++  for(const auto& p:v) {
++    if(!validGroundVehicle(p)) continue;
++    const auto& e=p.entity;const auto& k=kEntInfo[p.kind];
++    const float pad=std::max(k.hx*e.sx,k.hz*e.sz)+k.h*e.sy*reach+60.f;
++    if(std::fabs(e.x-center.x)>radius+pad || std::fabs(e.z-center.z)>radius+pad) continue;
++    add(uint32_t(p.kind));f(e.x);f(e.y);f(e.z);f(e.yaw);f(e.sx);f(e.sy);f(e.sz);
++    for(float a:p.angle) f(a);
++  }
++  return h;
++}
++
++#endif

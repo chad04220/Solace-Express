@@ -1,0 +1,19 @@
+{
+  "base": "3bde64c6ecbe45e1c755459ec93119207ff8e02b",
+  "source": "/workspace/scratch/b91cb9ba6eae/aircraft_lab/source",
+  "stage": "/workspace/scratch/b91cb9ba6eae/aircraft_lab/stage-career",
+  "candidate_slots": {
+    "swift_s6": 7,
+    "xr14_nightjar": 8
+  },
+  "career_insertion_rehearsal": true,
+  "production_career_count": 9,
+  "source_checkout_modified_by_preparer": false,
+  "staged_changes": [
+    "insert two specs before xr9",
+    "insert two models before xr9",
+    "bump research indices; automatic career count 9",
+    "use the separate fleet-gear and XR-9 canopy changes",
+    "add optional laboratory targets"
+  ]
+}

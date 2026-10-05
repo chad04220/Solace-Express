@@ -1,0 +1,10 @@
+renderer=llvmpipe (LLVM 20.1.2, 256 bits)
+programs linked, shader-cache hits=21 misses=0
+saved aircraft_lab/wheels-ground-r0/ground-ga-zero.png, GL errors=0
+saved aircraft_lab/wheels-ground-r0/ground-ga-quarter.png, GL errors=0
+saved aircraft_lab/wheels-ground-r0/ground-airliner-zero.png, GL errors=0
+saved aircraft_lab/wheels-ground-r0/ground-airliner-quarter.png, GL errors=0
+saved aircraft_lab/wheels-ground-r0/ground-car-zero.png, GL errors=0
+saved aircraft_lab/wheels-ground-r0/ground-car-quarter.png, GL errors=0
+saved aircraft_lab/wheels-ground-r0/ground-truck-zero.png, GL errors=0
+saved aircraft_lab/wheels-ground-r0/ground-truck-quarter.png, GL errors=0

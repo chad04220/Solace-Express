@@ -1,0 +1,14 @@
+renderer=llvmpipe (LLVM 20.1.2, 256 bits)
+programs linked, shader-cache hits=15 misses=6
+saved aircraft_lab/renders-guide-final/swift-s6-gav-120-10.png, GL errors=0
+saved aircraft_lab/renders-guide-final/swift-s6-gav-210-5.png, GL errors=0
+saved aircraft_lab/renders-guide-final/swift-s6-gav-60-35.png, GL errors=0
+saved aircraft_lab/renders-guide-final/swift-s6-cockpit.png, GL errors=0
+saved aircraft_lab/renders-guide-final/swift-s6-cockpit-left.png, GL errors=0
+saved aircraft_lab/renders-guide-final/swift-s6-cockpit-down.png, GL errors=0
+saved aircraft_lab/renders-guide-final/xr14-nightjar-gav-120-10.png, GL errors=0
+saved aircraft_lab/renders-guide-final/xr14-nightjar-gav-210-5.png, GL errors=0
+saved aircraft_lab/renders-guide-final/xr14-nightjar-gav-60-35.png, GL errors=0
+saved aircraft_lab/renders-guide-final/xr14-nightjar-cockpit.png, GL errors=0
+saved aircraft_lab/renders-guide-final/xr14-nightjar-cockpit-left.png, GL errors=0
+saved aircraft_lab/renders-guide-final/xr14-nightjar-cockpit-down.png, GL errors=0
