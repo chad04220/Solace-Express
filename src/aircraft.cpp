@@ -62,6 +62,7 @@ float Plane::rangeLeftKm() const { return fuel / (fuelFlowMax() * 0.8f) * spec->
 
 void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float fuelKg, float payloadKg, bool airborne, float speed) {
   spec = s; pos = position; fuel = fuelKg; payload = payloadKg;
+  for (auto& wheel : wheelMotion) wheel.reset();
   q = quat::axisAngle(vec3(0, 1, 0), -headingDeg * DEG);
   w = vec3(); ctl = Controls(); ev = FlightEvents(); apComfort = false; sceneryHits = true; brakeHold = 0;
   flaps = 0; gear = 1; rpm = 0; n1 = 0; engineSpool = 0; maxG = minG = 1; flightTime = 0;
@@ -297,6 +298,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   cs.push_back({vec3(s.span * 0.5f, s.wingY * R, s.wingZ), 5});
   cs.push_back({vec3(0, -R, 0), 6});                    // belly
 
+  bool wheelContact[3] = {}; float wheelSpeed[3] = {};
   bool anyWheel = false;
   float roughSum = 0;
   vec3 Fw(0, 0, 0), Tw(0, 0, 0);  // world force, body torque
@@ -351,6 +353,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
       wf = normalize(wf);
       vec3 wr = cross(wf, vec3(0, 1, 0));
       float vlong = dot(vc, wf), vlat = dot(vc, wr);
+      wheelContact[c.kind] = true; wheelSpeed[c.kind] = vlong;
       float mu = rw >= 0 && !surfaceRough(g_world.airports[rw].surface) ? 0.8f : 0.55f;
       float rollRes = 0.015f + 0.06f * rough;
       float brakeF = (c.kind <= 1 ? ctl.brake * 0.7f : 0.f);   // (enough for the main wheels to hold full power when parked)
@@ -374,6 +377,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   // (what was left of the creep is pushed back next step too: the held force converges on the steady push, so the
   // wheels stop dead instead of creeping a step's acceleration)
   if (holdN > 0) brakeHold = clampf(brakeHold + holdV / holdN * m / dt * 0.5f, -m * 30.f, m * 30.f); else brakeHold = 0;
+  for (int i = 0; i < 3; ++i) wheelMotion[i].step(dt, wheelSpeed[i], wheelContact[i], i < 2 ? ctl.brake : 0.f);
   wasOnGround = onGround;
   onGround = anyWheel;
   groundRough = anyWheel ? roughSum / 3.f : 0.f;

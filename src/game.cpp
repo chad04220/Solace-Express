@@ -1625,6 +1625,9 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   pv.PS[0] = p.gear; pv.PS[1] = p.flaps; pv.PS[2] = steer; pv.PS[3] = inside ? 1.f : 0.f;
   pv.Ctl[0] = clampf(p.ctl.pitch + p.ctl.trim * 0.3f, -1, 1); pv.Ctl[1] = clampf(p.ctl.roll, -1, 1); pv.Ctl[2] = clampf(p.ctl.yaw, -1, 1); pv.Ctl[3] = p.ctl.throttle;
   float blur = s.engineType == ENG_JET ? 1.f : smoothstepf(250.f, 700.f, p.rpm);
+  float wr = s.special ? .38f : md.wheelR;
+  float nr = s.special ? .33f : s.taildragger ? .10f : md.gear == 3 ? wr*.75f : wr*.85f;
+  pv.wheel[0] = p.wheelMotion[0].angle(wr); pv.wheel[1] = p.wheelMotion[1].angle(wr); pv.wheel[2] = p.wheelMotion[2].angle(nr);
   pv.Pr[0] = propAngle; pv.Pr[1] = blur; pv.Pr[2] = (float)std::max(s.blades, 2); pv.Pr[3] = 0;
   pv.I0[0] = p.ias * MS_TO_KT; pv.I0[1] = p.pos.y * M_TO_FT; pv.I0[2] = p.heading(); pv.I0[3] = p.vel.y * 196.85f;
   pv.I1[0] = p.pitchDeg(); pv.I1[1] = p.bankDeg();

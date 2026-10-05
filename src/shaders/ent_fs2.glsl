@@ -183,6 +183,18 @@ void main(){
     else if (part == P_LAMP) { alb = vec3(0.9); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.93, 0.8)*(0.15 + 10.0*uNight); }
     else if (part == P_SIGN) { alb = uKind == K_PUMP ? vec3(0.75, 0.1, 0.06) : vec3(0.08, 0.22, 0.55); rough = 0.4; emit = alb*uNight*2.5; }
     else if (part == P_CANOPY) { alb = vec3(0.9); if (n0.y < -0.5) emit = vec3(1.0, 0.97, 0.9)*uNight*2.5; rough = 0.4; }
+    else if(part>=27 && part<33) {
+      // Finish follows the wheel's rest coordinates; its mesh/normal rotate together in both passes.
+      vec2 q=mp.yz-vAux.zw;float r=max(vAux.y,.01),rad=length(q)/r;
+      float aa=max(fwidth(rad),.002);
+      alb=vec3(.025);rough=.85;
+      if(abs(n0.x)>.85 && rad<.62) {
+        alb=vec3(.48,.50,.53);metal=.8;rough=.3;
+        float a=atan(q.y,q.x),sector=1.04719755;
+        float spoke=.5+.5*cos(a*6.0);alb*=mix(.32,1.0,smoothstep(.35,.65,spoke));
+        float hub=1.0-smoothstep(.18,.18+aa,rad);alb=mix(alb,vec3(.6),hub);
+      }
+    }
     else if (part == P_DARK) { alb = uKind == K_GAPLANE || uKind == K_AIRLINER || uKind == K_CAR || uKind == K_TRUCK ? vec3(0.03) : triS(lp, n0, M_GRAVEL, 2.0, 0.5, nb, rough)*0.4; rough = 0.8; }
     else { alb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nb, rough)*vec3(0.88, 0.86, 0.82); }   // P_TRIM: concrete
     if (uSnow > 0.05 && part != P_GLASS && part != P_ROOF) alb = mix(alb, vec3(0.9), smoothstep(0.6, 0.9, n0.y)*uSnow*0.8);

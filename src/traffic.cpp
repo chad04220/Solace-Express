@@ -710,7 +710,7 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
     if (!c.alive) continue;
     const AircraftSpec& s = kAircraft[c.spec];
     c.propAngle = fmodf(c.propAngle + (8.f + 50.f * c.throttle) * dt, 2 * PI * 50.f);
-    vec3 pos0 = c.pos;   // for the swept collision test below
+    vec3 pos0 = c.pos; quat q0 = c.q; // also the previous contact pose for wheel travel
     float dist = length(c.pos - player);
     if (c.leader >= 0) {   // wingman: rigid formation on the leader
       TrafficCraft& L = craft[c.leader];
@@ -771,6 +771,22 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
       const Airport& ap = g_world.airports[c.airport];   // (not over the field itself, where it has just lifted off)
       if (length(vec2(c.pos.x - ap.x, c.pos.z - ap.z)) > ap.length * 0.5f + 400.f) { c.pos.y = g + 30.f; if (c.vel.y < 0) c.vel.y = 0; }
     }
+    // Per-wheel contact travel, including differential travel while turning. Never derive spin from airspeed.
+    const float track = std::max(1.2f, s.span*0.13f), gh = gearH(s), len = s.fusLen;
+    vec3 cp[3] = {vec3(-track,-gh,s.taildragger?-.10f*len:.04f*len),
+                  vec3(track,-gh,s.taildragger?-.10f*len:.04f*len),
+                  s.taildragger?vec3(0,-gh+.11f*len,.45f*len):vec3(0,-gh,-.36f*len)};
+    float steer = s.special ? 0.f : c.ctlYaw*.45f*smoothstepf(30.f,4.f,c.speed)*(s.taildragger?-1.f:1.f);
+    vec3 fw = q0.rotate(vec3(0,0,-1)) + c.q.rotate(vec3(0,0,-1)); fw.y = 0;
+    fw = length(fw)>1e-5f ? normalize(fw) : c.q.rotate(vec3(0,0,-1));
+    for (int wi=0;wi<3;++wi) {
+      vec3 pt = c.pos+c.q.rotate(cp[wi]), old = pos0+q0.rotate(cp[wi]);
+      bool contact = c.role==TrafficCraft::AIRPORT && c.gear>.95f &&
+                     pt.y <= g_world.height(pt.x,pt.z)+.08f;
+      vec3 wf = wi==2 ? quat::axisAngle(vec3(0,1,0),-steer).rotate(fw) : fw;
+      float roll = dt>0.f ? dot(pt-old,wf)/dt : 0.f;
+      c.wheelMotion[wi].step(dt,roll,contact);
+    }
     // effects: display smoke, reheat embers
     if (c.smoke) {   // display smoke, spread along this frame's path so it draws a continuous ribbon
       int n = (int)clampf(c.speed * dt / 2.5f, 1.f, 6.f);
@@ -824,8 +840,16 @@ int Traffic::fillVisuals(vec3 camPos, TrafficVisual* out, int maxN, int* order) 
     packModel(s, c.spec, gearH(s), t);
     float bound = std::max(t[0], t[36] * 2.f) * 0.55f + 1.5f;
     vec3 r = c.q.rotate(vec3(1, 0, 0)), u = c.q.rotate(vec3(0, 1, 0)), b = c.q.rotate(vec3(0, 0, 1));
-    float v[32] = {c.pos.x, c.pos.y, c.pos.z, bound, r.x, r.y, r.z, 0, u.x, u.y, u.z, 0, b.x, b.y, b.z, 0,
-                   c.spec == kResearchJet ? 0.f : c.gear, c.flaps, 0, 0, c.ctlPitch, c.ctlRoll, c.ctlYaw, c.throttle,
+    const ModelDef& m=kModels[c.spec];
+    float wr=s.special?.38f:m.wheelR;
+    float nr=s.special?.33f:s.taildragger?.10f:m.gear==3?wr*.75f:wr*.85f;
+    float steer=s.special?0.f:c.ctlYaw*.45f*smoothstepf(30.f,4.f,c.speed)*(s.taildragger?-1.f:1.f);
+    // The rotation-column .w components were unused; the existing 32-texel traffic stride stays unchanged.
+    float v[32] = {c.pos.x, c.pos.y, c.pos.z, bound,
+                   r.x, r.y, r.z, c.wheelMotion[0].angle(wr),
+                   u.x, u.y, u.z, c.wheelMotion[1].angle(wr),
+                   b.x, b.y, b.z, c.wheelMotion[2].angle(nr),
+                   c.spec == kResearchJet ? 0.f : c.gear, c.flaps, steer, 0, c.ctlPitch, c.ctlRoll, c.ctlYaw, c.throttle,
                    c.colBase.x, c.colBase.y, c.colBase.z, c.propAngle, c.colStripe.x, c.colStripe.y, c.colStripe.z, c.ab};
     for (int i = 0; i < 32; i++) t[96 + i] = v[i];
   }

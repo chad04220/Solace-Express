@@ -2,6 +2,7 @@
 #pragma once
 #include "common.h"
 #include "world.h"
+#include "wheel_motion.h"
 
 enum EngineType { ENG_PISTON = 0, ENG_TURBOPROP, ENG_JET };
 enum License { LIC_STUDENT = 0, LIC_PPL, LIC_CPL, LIC_ATP };
@@ -93,6 +94,7 @@ public:
   float rpm = 0, n1 = 0;      // engine state (spooled)
   float engineSpool = 0;      // 0..1 actual power fraction
   bool engineRunning = false; float starterTime = 0;
+  WheelMotion wheelMotion[3]; // main left, main right, nose/tail; cosmetic simulation state
   bool onGround = false, wasOnGround = false;
   bool sceneryHits = true;   // collide with trees and buildings (off for the quote's background flight: the scenery isn't thread-safe)
   bool apComfort = false;   // the autopilot flies for passengers (career flights): gentle bank, g, roll and climb; the stick is never limited

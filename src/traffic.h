@@ -2,6 +2,7 @@
 // traffic, XR-9 research formations ripping past, and an aerobatic display team.
 #pragma once
 #include "common.h"
+#include "wheel_motion.h"
 #include <vector>
 #include <string>
 
@@ -17,6 +18,7 @@ struct TrafficCraft {
   float speed = 0, vs = 0;    // along-track speed and vertical speed (m/s)
   float gear = 1, flaps = 0, throttle = 0.2f, propAngle = 0, ab = 0;
   float ctlPitch = 0, ctlRoll = 0, ctlYaw = 0;
+  WheelMotion wheelMotion[3]; // same rolling state as the player
   float timer = 0;
   int airport = -1, stand = 0;
   std::vector<vec3> path; int wp = 0;   // taxi / circuit waypoints (world, y = target altitude when flying)

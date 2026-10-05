@@ -73,7 +73,7 @@ void lodLimits(const EntRanges& R, int k, float& l0, float& l1) {
   else if (c == EC_ROCK) { l0 = R.r0 * (k >= EK_OUTCROP ? 2.5f : 1.f); l1 = R.r1 * (k >= EK_OUTCROP ? 3.f : 1.f); }
   else { l0 = R.b0; l1 = R.b1; }
 }
-struct Draw { int kind, lod; size_t first; int count; };
+struct Draw { int kind, lod; size_t first; int count; int vehicle = -1; };
 }  // namespace
 
 void Renderer::drawEntities(const FrameParams& fp) {
@@ -231,6 +231,13 @@ void Renderer::drawEntities(const FrameParams& fp) {
                  shGen[c] < 0 || shR[c] != cR[c] || shAge[c] > 600;
   }
 
+  // Refresh only cascades affected by a changed dynamic vehicle. Removing a vehicle refreshes its old shadow.
+  uint64_t nextGroundKey[2] = {};
+  for(int c=0;c<2 && sunUp && !feedPass;++c) {
+    vec3 center=shDirty[c]?newCenter[c]:shCenter[c];
+    nextGroundKey[c]=groundVehicleShadowKey(fp.groundVehicles,center,cR[c],shReach);
+    if(nextGroundKey[c]!=groundShadowKey[c]) shDirty[c]=true;
+  }
   // ------------------------------------------------ gather instances into (pass, kind, lod) buckets
   static std::vector<Ent> bucket[3][EK_COUNT][ENT_LODS];   // pass 0 view, 1/2 shadow cascades
   for (auto& a : bucket) for (auto& b : a) for (auto& v : b) v.clear();
@@ -317,13 +324,29 @@ void Renderer::drawEntities(const FrameParams& fp) {
         draws[p].push_back({k, l, entStage.size(), (int)v.size()});
         entStage.insert(entStage.end(), v.begin(), v.end());
       }
+  // Dynamic vehicles use the same meshes/Ent instance layout, with a separate pose per small draw.
+  for(int vi=0;vi<(int)fp.groundVehicles.size();++vi) {
+    const auto& v=fp.groundVehicles[vi];if(!validGroundVehicle(v)) continue;
+    const Ent& e=v.entity;int k=v.kind;float d=length(vec3(e.x,e.y,e.z)-cam),l0,l1;lodLimits(R,k,l0,l1);
+    int lod=d<l0?0:d<l1?1:2;
+    size_t first=entStage.size();entStage.push_back(e);
+    if(d<rangeOf(R,k) && entRange[k].count[lod]>0) draws[0].push_back({k,lod,first,1,vi});
+    for(int c=0;c<2 && sunUp && !feedPass;++c) {
+      const auto& info=kEntInfo[k];float pad=std::max(info.hx*e.sx,info.hz*e.sz)+info.h*e.sy*shReach+60.f;
+      if(shDirty[c] && std::fabs(e.x-newCenter[c].x)<cR[c]+pad && std::fabs(e.z-newCenter[c].z)<cR[c]+pad)
+        draws[1+c].push_back({k,0,first,1,vi});
+    }
+  }
   if (!feedPass) { entDrawn = 0; for (auto& d : draws[0]) entDrawn += d.count; }
   glBindVertexArray(vaoEnt);
   glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
   glBufferData(GL_ARRAY_BUFFER, std::max<size_t>(entStage.size(), 1) * sizeof(Ent), entStage.empty() ? nullptr : entStage.data(), GL_STREAM_DRAW);
   auto issue = [&](GLuint prog, const std::vector<Draw>& list) {
     GLint uk = glGetUniformLocation(prog, "uKind"), uf = glGetUniformLocation(prog, "uFar"), ut = glGetUniformLocation(prog, "uThin"), ur = glGetUniformLocation(prog, "uThinRef");
+    GLint uw0=glGetUniformLocation(prog,"uWheel0"),uw1=glGetUniformLocation(prog,"uWheel1");
     for (const Draw& d : list) {
+      if(d.vehicle>=0) { const float* a=fp.groundVehicles[d.vehicle].angle;glUniform4fv(uw0,1,a);glUniform2f(uw1,a[4],a[5]); }
+      else { glUniform4f(uw0,0,0,0,0);glUniform2f(uw1,0,0); }
       glUniform1f(uf, rangeOf(R, d.kind)); glUniform1f(ut, entThins(d.kind) ? 1.f : 0.f); glUniform1f(ur, entThinRef(d.kind));
       glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent)));
       glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent) + 16));
@@ -366,6 +389,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
     glUniform3f(glGetUniformLocation(progEntSh, "uWind"), fp.wind.x, fp.wind.y, fp.wind.z);
     glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(1.5f, 2.f);
     issue(progEntSh, draws[1 + c]);
+    groundShadowKey[c]=nextGroundKey[c];
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 

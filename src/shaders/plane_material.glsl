@@ -36,7 +36,10 @@ vec4 gearWheelFrame(vec3 p, out float halfWidth, out bool braked){
 Mat gearFinish(vec3 p, int material, Mat m, float footprint){
   if (gPS.x < 0.06) return m;
   float h; bool braked; vec4 f = gearWheelFrame(p, h, braked);
-  vec3 q = f.xyz; float r = f.w, rad = length(q.yz);
+  vec3 q = f.xyz;
+  float angle = braked ? (p.x < 0.0 ? gWheel.x : gWheel.y) : gWheel.z;
+  q.yz = rot2(q.yz, -angle); // inverse SPIN in the deployed/steered wheel rest frame
+  float r = f.w, rad = length(q.yz);
   if (abs(q.x) > h + 0.065 || rad > r + 0.025) return m;
   float px = max(0.0008, footprint);
   if (material == 6) {

@@ -23,6 +23,7 @@ float fbm3(vec3 p, int oct) { float s = 0, a = 0.5f, n = 0; for (int i = 0; i < 
 // ------------------------------------------------------------------ mesh builder
 struct MB {
   std::vector<EVert>& o;
+  int wheelSlot = 0;
   explicit MB(std::vector<EVert>& v) : o(v) {}
   void vert(vec3 p, vec3 n, int part, float ao = 1, float u = 0, float v = 0) { o.push_back({p.x, p.y, p.z, n.x, n.y, n.z, (float)part, ao, u, v}); }
   // flat triangle; the normal is flipped to face away from ref (a point inside the solid)
@@ -684,7 +685,12 @@ void archShell(MB& mb, float hw, float h, float z0, float z1, int segs, int part
   }
 }
 // wheel: a short cylinder across x
-void wheel(MB& mb, vec3 c, float r, float w, int segs) { mb.cyl(c - vec3(w * 0.5f, 0, 0), c + vec3(w * 0.5f, 0, 0), r, r, segs, P_DARK, true, true); }
+void wheel(MB& mb, vec3 c, float r, float w, int segs) {
+  const size_t start=mb.o.size();
+  mb.cyl(c-vec3(w*.5f,0,0),c+vec3(w*.5f,0,0),r,r,segs,P_WHEEL0+mb.wheelSlot++,true,true);
+  // Wheel vertices alone use the auxiliary fields as radius + pivot Y/Z. Ent and EVert strides stay unchanged.
+  for(size_t i=start;i<mb.o.size();++i) { mb.o[i].ao=r;mb.o[i].u=c.y;mb.o[i].v=c.z; }
+}
 
 void buildAirportKind(MB& mb, int kind, int lod) {
   bool d0 = lod == 0, d1 = lod <= 1;
@@ -926,6 +932,7 @@ void buildEntityMeshes(std::vector<EVert>& out, EntMeshRange ranges[EK_COUNT]) {
   MB mb(out);
   for (int k = 0; k < EK_COUNT; k++)
     for (int l = 0; l < ENT_LODS; l++) {
+      mb.wheelSlot = 0;
       ranges[k].first[l] = (int)out.size();
       int cls = entClass(k);
       if (k >= EK_HANGAR) buildAirportKind(mb, k, l);

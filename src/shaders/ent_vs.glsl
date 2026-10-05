@@ -2,6 +2,7 @@
 
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNrm; layout(location=2) in vec4 aAux;   // part, ao, u, v
 layout(location=3) in vec4 iA; layout(location=4) in vec4 iB;   // position + yaw | scale + seed
+uniform vec4 uWheel0; uniform vec2 uWheel1; // dynamic packet; all zero for parked scenery
 uniform mat4 uVP; uniform vec2 uJit; uniform float uLogC; uniform float uTime; uniform int uKind; uniform int uShadowPass;
 uniform vec3 uCamV; uniform float uFar; uniform float uThin; uniform float uThinRef;   // view pass: per-instance distance thinning (entKeep)
 uniform vec3 uWind;   // surface wind velocity (windsocks)
@@ -14,7 +15,15 @@ void main(){
     float d = length(iA.xyz - uCamV);
     if (fract(iB.w*7.13) >= min(1.0, uThinRef*uThinRef/max(d*d, 1.0)) || d >= uFar) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   }
-  vec3 lp = aPos*iB.xyz;
+  vec3 posed=aPos, posedN=aNrm;
+  int wheel=int(aAux.x+.5)-27;
+  if(wheel>=0 && wheel<6) {
+    float a=wheel<4?uWheel0[wheel]:uWheel1[wheel-4], c=cos(a),s=sin(a);
+    vec2 q=aPos.yz-aAux.zw;
+    posed.yz=aAux.zw+vec2(c*q.x-s*q.y,s*q.x+c*q.y);
+    posedN.yz=vec2(c*aNrm.y-s*aNrm.z,s*aNrm.y+c*aNrm.z);
+  }
+  vec3 lp = posed*iB.xyz;
   // foliage sways a little in the wind, more towards the top and the frond tips
   if (uKind <= 6 && (aAux.x < 3.5 || aAux.x > 17.5) && uShadowPass == 0) {
     float h = max(aPos.y, 0.0)/14.0;
@@ -23,7 +32,7 @@ void main(){
   }
   float c = cos(iA.w), s = sin(iA.w);
   vec3 wp = vec3(c*lp.x + s*lp.z, lp.y, -s*lp.x + c*lp.z) + iA.xyz;
-  vec3 ln = normalize(aNrm/iB.xyz);
+  vec3 ln = normalize(posedN/iB.xyz);
   if (uKind == 40 && abs(aAux.x - 23.0) < 0.5) {
     // windsock: the sock (modelled along +x from the pole top) streams downwind, filling out by ~15 kt and drooping
     // when calm, with a little flutter. Built straight in world space, then expressed back in the instance frame.
@@ -39,7 +48,7 @@ void main(){
     ln = vec3(c*wn.x - s*wn.z, wn.y, s*wn.x + c*wn.z);
     lp = aPos;
   }
-  vW = wp; vL = lp; vLN = ln; vAux = aAux;
+  vW = wp; vL = wheel>=0 && wheel<6 ? aPos*iB.xyz : lp; vLN = ln; vAux = aAux;
   vInst = vec4(iB.w, iA.w, iB.y, iA.y); vScale = iB.xyz;
   gl_Position = uVP*vec4(wp, 1.0);
   bool behind = false;

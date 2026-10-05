@@ -8,6 +8,7 @@
 #include "gl.h"
 #include "world.h"
 #include "entity_mesh.h"
+#include "ground_vehicle.h"
 #include "feed_cameras.h"
 
 struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft, bill = 0; };   // bill > 0: x,y,z is the centre of a camera-facing square of that half size
@@ -18,6 +19,7 @@ struct PlaneVisual {
   vec3 pos; float rot[9];  // body->world, column-major
   float M[24 * 4];          // model geometry (models.cpp packModel)
   float PS[4], Ctl[4], Pr[4], I0[4], I1[4], I2[4];  // state, controls, prop, instruments
+  float wheel[3] = {};      // the wheels' roll (radians about body +x): main left, main right, nose / tail (Plane::wheelMotion)
   vec3 colBase, colStripe;
   float reg[3] = {65, 65, 65};   // registration letters (character codes)
   float prop[2][4]; int propCount = 0;
@@ -60,6 +62,7 @@ GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::stri
 GLint U(GLuint prog, const char* name);   // a uniform's location (cached per program)
 
 struct FrameParams {
+  std::vector<GroundVehicleVisual> groundVehicles;   // explicitly driven ground vehicles (none yet: the airport furniture is parked)
   vec3 camPos; vec3 camRight, camUp, camBack; float fovY = 1.0f;
   float dt = 1.f / 60.f;   // this frame's real time step (frame-rate independent blending: the TAA)
   float pano = 0.f, panoTanY = 0.f;   // > 0: a panoramic (cylindrical) camera feed: its half angle (rad) and vertical extent (fovY then only culls)
@@ -212,6 +215,7 @@ private:
   mat4 shVP[2]; vec3 shCenter[2], shSun[2]; bool shValid[2] = {false, false}; int shGen[2] = {-1, -1}, shAge[2] = {0, 0}; float shR[2] = {0, 0};
   EntMeshRange entRange[EK_COUNT];
   std::vector<Ent> entStage;
+  uint64_t groundShadowKey[2] = {};   // the driven vehicles each cascade last drew (a change re-renders it)
   int entFrame = 0, entGenCount = 0;
   bool initEntities();
   // ---- terrain envelope mesh (terrain_envelope.cpp): where each pixel's exact terrain march starts
