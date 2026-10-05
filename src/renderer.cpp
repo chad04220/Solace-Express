@@ -1224,7 +1224,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   frameNo++;
   {
     auto halton = [](int i, int b) { float f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i /= b; } return r; };
-    int hi = (frameNo % 8) + 1;
+    int hi = (frameNo % 16) + 1;   // (16 points: the upscaler needs every output pixel visited)
     jitX = (halton(hi, 2) - 0.5f) / rw; jitY = (halton(hi, 3) - 0.5f) / rh;
   }
   // ------------------------------------------------ environment entities: shadow cascades + G-buffer

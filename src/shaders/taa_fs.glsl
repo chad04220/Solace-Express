@@ -27,16 +27,26 @@ void main(){
   ivec2 ip = up ? clamp(ivec2(floor(ruv*uRawRes)), ivec2(0), ivec2(uRawRes) - 1) : ivec2(gl_FragCoord.xy);
   vec4 cur = texelFetch(uRaw, ip, 0);
   float flag = cur.a;
-  if (up) cur.rgb = texture(uRaw, ruv*uRawUVS).rgb;   // (the ray tracer's picture fills a corner of its target)
-  vec3 m1 = vec3(0.0), m2 = vec3(0.0), cy = toY(cur.rgb);
+  // upscaling: this output pixel is reconstructed from the 3x3 render samples around it, each weighted by a Gaussian
+  // of its distance in output pixels (sigma 0.45 of the upscale ratio); the weights' sum is the confidence that a
+  // sample landed near this pixel this frame (the jitter walks the samples over every output pixel in turn)
+  vec2 sp = ruv*uRawRes, c0 = floor(sp - 0.5) + 0.5, ratio = uRes/uRawRes;
+  float sig = 0.45*ratio.x, wsum = 0.0; vec3 csum = vec3(0.0);
+  vec3 m1 = vec3(0.0), m2 = vec3(0.0);
   float fmin = flag, fmax = flag;   // pixel classes around this one (a silhouette edge holds both)
   for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
-    vec4 nb = texelFetch(uRaw, clamp(ip + ivec2(i, j), ivec2(0), ivec2(uRawRes) - 1), 0);
+    vec2 sc = c0 + vec2(float(i), float(j));
+    ivec2 ipx = up ? clamp(ivec2(floor(sc)), ivec2(0), ivec2(uRawRes) - 1) : clamp(ip + ivec2(i, j), ivec2(0), ivec2(uRawRes) - 1);
+    vec4 nb = texelFetch(uRaw, ipx, 0);
     vec3 y = toY(nb.rgb);
     m1 += y; m2 += y*y;
     fmin = min(fmin, nb.a); fmax = max(fmax, nb.a);
+    if (up) { vec2 d = (sc - sp)*ratio; float w = exp(-dot(d, d)/(2.0*sig*sig)); csum += nb.rgb*w; wsum += w; }
   }
   m1 /= 9.0; vec3 sd = sqrt(max(m2/9.0 - m1*m1, 0.0));
+  float conf = 1.0;
+  if (up) { cur.rgb = csum/max(wsum, 1e-4); conf = clamp(wsum, 0.0, 1.0); }
+  vec3 cy = toY(cur.rgb);
   float t = texelFetch(uDepth, ip, 0).r;
   vec2 ndc = vUV*2.0 - 1.0;
   vec3 rd = normalize(uCamRot*vec3(ndc.x*uTanHalf*uAspect, ndc.y*uTanHalf, -1.0));
@@ -53,10 +63,12 @@ void main(){
   if (valid) {
     vec3 hy = toY(histCR(puv));
     float k = flag > 0.9 ? 1.25 : 0.9;                  // tighter clamp for moving parts
+    k += (1.0 - conf)*0.5;                              // (an uncertain reconstruction trusts the history's detail more)
     hy = clamp(hy, m1 - k*sd - 0.002, m1 + k*sd + 0.002);
     float motion = length((puv - vUV)*uRes)/clamp(uDt*60.0, 0.05, 4.0);   // (pixels per 1/60 s)
     float hflag = texture(uHist, puv).a;   // what the history pixel was: aircraft, world or a moving effect
     float a = mix(0.08, 0.3, clamp(motion/12.0, 0.0, 1.0));   // fast motion: lean on the new frame, less smear
+    a *= mix(0.35, 1.0, conf);                                   // (a sample that missed this pixel adds little)
     a = 1.0 - pow(1.0 - a, clamp(uDt*60.0, 0.05, 4.0));        // (the same smoothing in time at any frame rate)
     if (flag < 0.4) a = max(a, 0.4);
     // disocclusion (a wing sweeping off the sky): drop the stale history - but only when no neighbour shares the
