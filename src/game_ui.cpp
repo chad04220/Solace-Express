@@ -236,8 +236,9 @@ void Game::drawToasts() {
   if (screen != SCR_FLIGHT) y = g_ren.H - 120 * s;
   if (flightRail) {   // the right message column: newest at the top, each sliding in from the screen's edge
     float rail = (camMode == 1 ? 16.f : kHudRail + 12.f) * s, rw = std::min(kHudMsgW * s, g_ren.W * 0.5f - rail - 120 * s), rx = g_ren.W - rail - rw;
-    float yy = (kHudBand + 12) * s;
-    for (int i = (int)toasts.size() - 1; i >= 0; i--) {
+    float yy = std::max((kHudBand + 12) * s, hudMsgNext);
+    int shown = 0;
+    for (int i = (int)toasts.size() - 1; i >= 0 && shown < 4; i--, shown++) {
       auto& t = toasts[i];
       float a = clampf(std::min(t.t * 4.f, (5.f - t.t) * 1.5f), 0, 1);
       float slide = (1.f - clampf(t.t * 5.f, 0, 1)) * 40 * s;
@@ -1556,13 +1557,6 @@ void Game::drawHud(const FrameParams& fp) {
     if (timeAccel > 1) extra += fmt("%sTIME x%.0f", extra.empty() ? "" : "   ", timeAccel);
     if (researchFlight && resCard >= 0 && !resCardDone) { extra = resStepText(kResCards[resCard].steps[std::min(resStep, kResCards[resCard].n - 1)]) + (resHold > 0 ? fmt("  (%.0f s)", resHold) : ""); ec = C_ACCENT; }
     if (!extra.empty()) g_ren.text(rx, 40 * s, 11.5f * s, extra, ec, 1, 2, false);
-    float apx = rx - 110 * s;
-    if (plane.apOn) {
-      std::string ap = "AP  " + plane.apStatus; float apw = std::max(60 * s, std::min(g_ren.textWidth(ap, 11.5f * s) + 20 * s, apx - (W * 0.5f + tw * 0.5f) - 12 * s));
-      float ax = apx - apw;
-      g_ren.rect(ax, 10 * s, apw, 22 * s, vec3(0.0f, 0.03f, 0.05f), 0.8f, 2 * s); g_ren.rect(ax, 10 * s, 3 * s, 22 * s, APC, 0.95f);
-      g_ren.text(ax + 10 * s, 14 * s, 11.5f * s, ellipsize(ap, apw - 16 * s, 11.5f * s), APC, 1, 0, false);
-    }
   }
   // ================================================================ warnings: icons under the band, the edges lit
   bool stall = (plane.stallWarn > 0.8f && !plane.onGround && plane.ias > 10.f) || hudDemo;
@@ -1596,7 +1590,11 @@ void Game::drawHud(const FrameParams& fp) {
     if (engOff && n) g_ren.text(W * 0.5f, iy + isz + 22 * s, 11 * s, "press " + keyName(set.keyBind[ACT_ENGINE]) + " to restart", C_DIM, 0.9f, 1, false);
   }
   // ================================================================ the rails
-  float railTop = band + 10 * s, railBot = H - (cockpit ? 60 * s : 250 * s), railH = railBot - railTop;
+  const float stripH = cockpit ? 0.f : 46 * s, pfd = 148 * s;
+  const float tileW = 80 * s, tileH = 38 * s, tileGap = 5 * s; const int tileCols = 4;
+  int tileRows = spc.special == 2 ? 3 : 2;
+  const float tilesTop = H - stripH - 10 * s - tileRows * tileH - (tileRows - 1) * tileGap;
+  float railTop = band + 10 * s, railBot = cockpit ? H - 60 * s : std::min(H - stripH - pfd - 18 * s, tilesTop - 30 * s), railH = railBot - railTop;
   if (!cockpit && railH > 160 * s) {
     // ---- left: the speed tape
     {
@@ -1611,7 +1609,7 @@ void Game::drawHud(const FrameParams& fp) {
         float y0 = clampf(Y(vs), railTop + 2 * s, railBot - 2 * s), y1 = clampf(Y(vs * 1.15f), railTop + 2 * s, railBot - 2 * s), yb = railBot - 2 * s;
         if (yb > y0) g_ren.rect(x + rail - 10 * s, y0, 6 * s, yb - y0, C_BAD, 0.75f);
         if (y0 > y1) g_ren.rect(x + rail - 10 * s, y1, 6 * s, y0 - y1, C_WARN, 0.75f);
-        float yr = Y(spc.vref * unit); if (yr > railTop + 4 * s && yr < railBot - 4 * s) { g_ren.rect(x + rail - 22 * s, yr - 1 * s, 12 * s, 2 * s, C_GOOD, 0.9f); g_ren.text(x + rail - 24 * s, yr - 12 * s, 9 * s, "REF", C_GOOD, 0.9f, 2, false); }
+        float yr = Y(spc.vref * unit); if (yr > railTop + 4 * s && yr < railBot - 4 * s) { g_ren.rect(x + rail - 22 * s, yr - 1 * s, 12 * s, 2 * s, C_GOOD, 0.9f); g_ren.text(x + 6 * s, yr - 5 * s, 9 * s, "REF", C_GOOD, 0.9f, 0, false); }
       }
       int step = set.metric ? 20 : 10;
       for (int t = (int)floorf((v - span) / step) * step; t <= v + span; t += step) {
@@ -1670,69 +1668,36 @@ void Game::drawHud(const FrameParams& fp) {
       g_ren.text(x + rail - 8 * s, railBot - 16 * s, 11 * s, fmt("%+.0f", vsv), C_TEXT, 1, 2, false);
     }
   }
-  // ================================================================ bottom-left: attitude, approach needles, wind
+  // ================================================================ bottom-left: the attitude ball and the approach needles
   if (!cockpit) {
-    float pfd = 176 * s, px = 16 * s, py = H - pfd - 56 * s;
+    float px = 16 * s, py = H - stripH - pfd - 8 * s;
     drawPFD(px, py, pfd);
-    {   // the approach needles beside the attitude ball (only with the checkpoints flown, lined up with a runway end)
-      float best = 1e9f; vec3 thr, ldir; bool found = false;
-      for (int end = 0; end < 2; end++) {
-        vec3 dir = end ? -d.dir() : d.dir(); vec3 th = d.threshold(end == 1); vec3 rel3 = plane.pos - th;
-        float along = -dot(vec3(rel3.x, 0, rel3.z), dir); if (along < 0) continue;
-        float lat = fabsf(dot(vec3(rel3.x, 0, rel3.z), vec3(-dir.z, 0, dir.x)));
-        if (along < 9000 && lat < along * 0.35f + 300 && along < best && (wpIndex >= (int)contract.wps.size())) { best = along; thr = th; ldir = dir; found = true; }
-      }
-      if (found && !plane.onGround && best > 100) {
-        vec3 rel3 = plane.pos - thr; float along = best + 300.f, ideal = d.elev + tanf(3.f * DEG) * along;
-        float dev = (plane.pos.y - ideal) / std::max(along * 0.0122f, 8.f);
-        float lat = dot(vec3(rel3.x, 0, rel3.z), vec3(-ldir.z, 0, ldir.x)) / std::max(along * 0.0175f, 10.f);
-        float gx = px + pfd + 10 * s, gy = py + pfd * 0.5f;
-        g_ren.rect(gx, py + 14 * s, 12 * s, pfd - 28 * s, vec3(0, 0, 0), 0.5f, 6 * s);
-        for (int k = -2; k <= 2; k++) if (k) hudRing(gx + 6 * s, gy - k * (pfd - 28 * s) / 5.f, 2 * s, 1 * s, C_TEXT, 0.6f, 10);
-        g_ren.rect(gx + 1 * s, gy - 1 * s, 10 * s, 2 * s, vec3(1, 1, 1), 1);
-        float dy = clampf(-dev, -2.5f, 2.5f) * (pfd - 28 * s) / 5.f;
-        g_ren.rect(gx + 1 * s, gy - dy - 5 * s, 10 * s, 10 * s, mag, 1, 5 * s);
-        float lx = px + pfd * 0.5f, ly = py + pfd + 6 * s;
-        g_ren.rect(lx - pfd * 0.4f, ly, pfd * 0.8f, 10 * s, vec3(0, 0, 0), 0.5f, 5 * s);
-        float dx = clampf(-lat, -2.5f, 2.5f) * pfd * 0.4f / 2.5f;
-        g_ren.rect(lx + dx - 5 * s, ly, 10 * s, 10 * s, mag, 1, 5 * s);
-        std::string gp = dev > 1.f ? "HIGH" : dev < -1.f ? "LOW" : "ON PATH";
-        g_ren.text(gx + 6 * s, py + 2 * s, 9.5f * s, "G/S", C_DIM, 1, 1, false);
-        g_ren.text(gx + 6 * s, py + pfd - 10 * s, 9.5f * s, gp, dev < -1.5f ? C_BAD : C_TEXT, 1, 1, false);
-      }
+    float best = 1e9f; vec3 thr, ldir; bool found = false;
+    for (int end = 0; end < 2; end++) {
+      vec3 dir = end ? -d.dir() : d.dir(); vec3 th = d.threshold(end == 1); vec3 rel3 = plane.pos - th;
+      float along = -dot(vec3(rel3.x, 0, rel3.z), dir); if (along < 0) continue;
+      float lat = fabsf(dot(vec3(rel3.x, 0, rel3.z), vec3(-dir.z, 0, dir.x)));
+      if (along < 9000 && lat < along * 0.35f + 300 && along < best && (wpIndex >= (int)contract.wps.size())) { best = along; thr = th; ldir = dir; found = true; }
     }
-    {   // the wind: a small dial and the components, to the right of the attitude ball
-      float wx0 = px + pfd + 40 * s, wy0 = py + 10 * s, pw = 206 * s, ph = 64 * s;
-      hudStrip(wx0, wy0, pw, ph, 0.9f);
-      vec3 wv = plane.windVel; float ws = length(vec3(wv.x, 0, wv.z)); float from = wrapDeg360(atan2f(-wv.x, wv.z) / DEG);
-      float cxw = wx0 + 30 * s, cyw = wy0 + ph * 0.5f, R = 22 * s;
-      hudRing(cxw, cyw, R, 1.2f * s, C_ACCENT, 0.5f, 36);
-      for (int k = 0; k < 8; k++) { float a = k * PI / 4; g_ren.line(cxw + sinf(a) * R * 0.8f, cyw - cosf(a) * R * 0.8f, cxw + sinf(a) * R, cyw - cosf(a) * R, (k % 2 ? 1.f : 1.8f) * s, C_TEXT, 0.55f); }
-      g_ren.rect(cxw - 2.5f * s, cyw - R + 3 * s, 5 * s, 5 * s, C_TEXT, 0.9f, 2.5f * s);
-      g_ren.text(wx0 + 62 * s, wy0 + 7 * s, 9.5f * s, "WIND", C_DIM, 1, 0, false);
-      if (ws > 0.5f) {
-        float rel = (from - hdg) * DEG; vec2 src(sinf(rel), -cosf(rel)), dv(-src.x, -src.y), pv(-dv.y, dv.x);
-        float x0 = cxw + src.x * R * 0.72f, y0 = cyw + src.y * R * 0.72f, x1 = cxw + dv.x * R * 0.78f, y1 = cyw + dv.y * R * 0.78f;
-        (void)pv;
-        vec3 wc(0.45f, 0.85f, 1.f);
-        float wscale = clampf(ws / 12.f, 0.5f, 1.f);   // a stiffer wind, a heavier arrow
-        g_ren.glow(cxw - R, cyw - R, 2 * R, 2 * R, wc, 0.08f * wscale, R, 6 * s);
-        hudArrow(x0, y0, x1, y1, (1.6f + 1.6f * wscale) * s, 9 * s, (4.f + 2.f * wscale) * s, wc, 1.f);
-        float hw = ws * cosf(rel), xw = ws * sinf(rel);
-        std::string g = wx.gust > 0.5f ? fmt(" G%.0f", (wx.windSpeed + wx.gust) * (set.metric ? 3.6f : MS_TO_KT)) : "";
-        g_ren.text(wx0 + 62 * s, wy0 + 19 * s, 15 * s, fmt("%03.0f / %s", from, fmtSpeed(ws).c_str()) + g, C_TEXT, 1, 0, false);
-        g_ren.text(wx0 + 62 * s, wy0 + 42 * s, 10.5f * s, fmt("%s %s  X %s %s", hw >= 0 ? "HEAD" : "TAIL", fmtSpeed(fabsf(hw)).c_str(), fmtSpeed(fabsf(xw)).c_str(), xw >= 0 ? "R" : "L"), fabsf(xw) > 7.f ? C_WARN : C_DIM, 1, 0, false);
-      } else g_ren.text(wx0 + 62 * s, wy0 + 21 * s, 15 * s, "CALM", C_TEXT, 1, 0, false);
-      // g and the structure under it: a bar from 0 to the limit, the limit marked
-      float gy0 = wy0 + ph + 8 * s;
-      hudStrip(wx0, gy0, pw, 30 * s, 0.9f);
-      float gl = spc.gLimitPos(), gf = clampf(plane.gLoad / gl, -0.3f, 1.2f);
-      g_ren.text(wx0 + 8 * s, gy0 + 9 * s, 10 * s, fmt("G %.1f", plane.gLoad), plane.gLoad > gl * 0.85f ? C_BAD : C_TEXT, 1, 0, false);
-      float bx = wx0 + 62 * s, bwid = pw - 72 * s;
-      g_ren.rect(bx, gy0 + 13 * s, bwid, 4 * s, C_ACCENT, 0.15f);
-      g_ren.rect(bx, gy0 + 13 * s, bwid * clampf(gf, 0.f, 1.f), 4 * s, gf > 0.85f ? C_BAD : gf > 0.6f ? C_WARN : C_ACCENT, 0.95f);
-      g_ren.rect(bx + bwid - 1 * s, gy0 + 9 * s, 2 * s, 12 * s, C_BAD, 0.8f);
-      if (plane.overG > 0.05f) g_ren.rect(bx, gy0 + 20 * s, bwid * clampf(plane.overG, 0.f, 1.f), 2 * s, C_BAD, 0.9f);   // the stress building towards failure
+    if (found && !plane.onGround && best > 100) {
+      vec3 rel3 = plane.pos - thr; float along = best + 300.f, ideal = d.elev + tanf(3.f * DEG) * along;
+      float dev = (plane.pos.y - ideal) / std::max(along * 0.0122f, 8.f);
+      float lat = dot(vec3(rel3.x, 0, rel3.z), vec3(-ldir.z, 0, ldir.x)) / std::max(along * 0.0175f, 10.f);
+      float gx = px + pfd + 10 * s, gy = py + pfd * 0.5f;
+      g_ren.rect(gx, py + 14 * s, 12 * s, pfd - 28 * s, vec3(0, 0, 0), 0.5f, 6 * s);
+      for (int k = -2; k <= 2; k++) if (k) hudRing(gx + 6 * s, gy - k * (pfd - 28 * s) / 5.f, 2 * s, 1 * s, C_TEXT, 0.6f, 10);
+      g_ren.rect(gx + 1 * s, gy - 1 * s, 10 * s, 2 * s, vec3(1, 1, 1), 1);
+      float dy = clampf(-dev, -2.5f, 2.5f) * (pfd - 28 * s) / 5.f;
+      g_ren.rect(gx + 1 * s, gy - dy - 5 * s, 10 * s, 10 * s, mag, 1, 5 * s);
+      float lx = gx + 30 * s, ly = gy - 5 * s, lw = 120 * s;
+      g_ren.rect(lx, ly, lw, 10 * s, vec3(0, 0, 0), 0.5f, 5 * s);
+      for (int k = -2; k <= 2; k++) if (k) hudRing(lx + lw * 0.5f + k * lw / 5.f, ly + 5 * s, 2 * s, 1 * s, C_TEXT, 0.6f, 10);
+      float dx = clampf(-lat, -2.5f, 2.5f) * lw * 0.5f / 2.5f;
+      g_ren.rect(lx + lw * 0.5f + dx - 5 * s, ly, 10 * s, 10 * s, mag, 1, 5 * s);
+      std::string gp = dev > 1.f ? "HIGH" : dev < -1.f ? "LOW" : "ON PATH";
+      g_ren.text(lx, ly - 16 * s, 9.5f * s, "LOC", C_DIM, 1, 0, false);
+      g_ren.text(gx + 6 * s, py + 2 * s, 9.5f * s, "G/S", C_DIM, 1, 1, false);
+      g_ren.text(lx, ly + 16 * s, 11 * s, gp, dev < -1.5f ? C_BAD : C_TEXT, 1, 0, false);
     }
   }
   // ================================================================ bottom-right: the systems tiles
@@ -1744,7 +1709,7 @@ void Game::drawHud(const FrameParams& fp) {
     if (sp.engineType == ENG_PISTON) tiles.push_back({"RPM", plane.engineRunning ? fmt("%.0f", plane.rpm) : (plane.starterTime > 0 ? "CRANK" : "OFF"), plane.engineRunning ? C_TEXT : C_BAD, plane.engineRunning ? clampf(plane.rpm / sp.maxRpm, 0.f, 1.f) : 0.f});
     else tiles.push_back({"N1", plane.engineRunning ? fmt("%.1f%%", plane.n1) : (plane.starterTime > 0 ? fmt("ST %.0f", plane.n1) : "OFF"), plane.engineRunning ? C_TEXT : C_BAD, clampf(plane.n1 / 100.f, 0.f, 1.f)});
     float fuelFrac = plane.fuel / std::max(sp.maxFuel, 1.f);
-    if (sp.special) tiles.push_back({"FUEL", "CELL", C_ACCENT, 1.f});
+    if (sp.special) { tiles.push_back({"FUEL", "CELL", C_ACCENT, 1.f}); tiles.push_back({"MACH", fmt("%.2f", plane.mach), plane.mach > sp.designMach * 0.95f ? C_WARN : C_TEXT, -1.f}); }
     else { tiles.push_back({"FUEL", fmt("%.0f%%", fuelFrac * 100), fuelFrac < 0.15f ? C_BAD : C_TEXT, fuelFrac}); tiles.push_back({"RANGE", fmt("%.0f km", plane.rangeLeftKm()), fuelFrac < 0.15f ? C_BAD : C_TEXT, -1.f}); }
     if (sp.special == 2) {
       const vec3 VIO(0.8f, 0.5f, 1.f);
@@ -1757,40 +1722,98 @@ void Game::drawHud(const FrameParams& fp) {
     std::string gearS = !sp.retract ? "FIXED" : plane.gear > 0.99f ? "DOWN" : plane.gear < 0.01f ? "UP" : "TRANSIT";
     tiles.push_back({"GEAR", gearS, !sp.retract ? C_DIM : plane.gear > 0.99f ? C_GOOD : plane.gear < 0.01f ? C_DIM : C_WARN, sp.retract ? plane.gear : -1.f});
     tiles.push_back({"TRIM", fmt("%+.0f", plane.ctl.trim * 100), C_TEXT, -1.f});
-    int cols = 3, rows = ((int)tiles.size() + cols - 1) / cols;
-    float tw = 92 * s, th = 44 * s, gap = 6 * s;
-    float bx = W - cols * tw - (cols - 1) * gap - 16 * s, by = H - rows * th - (rows - 1) * gap - 16 * s - 26 * s;
-    hudStrip(bx - 10 * s, by - 24 * s, cols * tw + (cols - 1) * gap + 20 * s, rows * th + (rows - 1) * gap + 24 * s + 36 * s, 0.9f);
-    g_ren.text(bx, by - 18 * s, 10 * s, sp.special == 2 ? "XR-40 SYSTEMS" : sp.special ? "XR-30 SYSTEMS" : "SYSTEMS", C_ACCENT, 0.9f, 0, false);
+    int rows = ((int)tiles.size() + tileCols - 1) / tileCols;
+    float bx = W - tileCols * tileW - (tileCols - 1) * tileGap - 14 * s, by = H - stripH - 10 * s - rows * tileH - (rows - 1) * tileGap;
+    hudStrip(bx - 8 * s, by - 20 * s, tileCols * tileW + (tileCols - 1) * tileGap + 16 * s, rows * tileH + (rows - 1) * tileGap + 28 * s, 0.9f);
+    g_ren.text(bx, by - 15 * s, 9.5f * s, sp.special == 2 ? "XR-40 SYSTEMS" : sp.special ? "XR-30 SYSTEMS" : "SYSTEMS", C_ACCENT, 0.9f, 0, false);
     for (size_t i = 0; i < tiles.size(); i++) {
-      float x = bx + (i % cols) * (tw + gap), y = by + (i / cols) * (th + gap);
-      g_ren.rect(x, y, tw, th, vec3(0.0f, 0.02f, 0.04f), 0.55f, 3 * s);
-      g_ren.rectOutline(x, y, tw, th, C_ACCENT, 0.14f, 3 * s, 1 * s);
-      g_ren.text(x + 7 * s, y + 5 * s, 9.5f * s, tiles[i].k, C_DIM, 1, 0, false);
-      g_ren.text(x + 7 * s, y + 18 * s, 14 * s, ellipsize(tiles[i].v, tw - 14 * s, 14 * s), tiles[i].c, 1, 0, false);
-      if (tiles[i].bar >= 0.f) { g_ren.rect(x + 7 * s, y + th - 7 * s, tw - 14 * s, 2.5f * s, C_ACCENT, 0.15f); g_ren.rect(x + 7 * s, y + th - 7 * s, (tw - 14 * s) * clampf(tiles[i].bar, 0.f, 1.f), 2.5f * s, tiles[i].c, 0.9f); }
+      float x = bx + (i % tileCols) * (tileW + tileGap), y = by + (i / tileCols) * (tileH + tileGap);
+      g_ren.rect(x, y, tileW, tileH, vec3(0.0f, 0.02f, 0.04f), 0.55f, 3 * s);
+      g_ren.rectOutline(x, y, tileW, tileH, C_ACCENT, 0.14f, 3 * s, 1 * s);
+      g_ren.text(x + 6 * s, y + 4 * s, 9 * s, tiles[i].k, C_DIM, 1, 0, false);
+      g_ren.text(x + 6 * s, y + 16 * s, 13 * s, ellipsize(tiles[i].v, tileW - 12 * s, 13 * s), tiles[i].c, 1, 0, false);
+      if (tiles[i].bar >= 0.f) { g_ren.rect(x + 6 * s, y + tileH - 6 * s, tileW - 12 * s, 2.5f * s, C_ACCENT, 0.15f); g_ren.rect(x + 6 * s, y + tileH - 6 * s, (tileW - 12 * s) * clampf(tiles[i].bar, 0.f, 1.f), 2.5f * s, tiles[i].c, 0.9f); }
     }
-    // status chips under the tiles: brake, lights, autopilot
-    float cy = by + rows * (th + gap) + 2 * s, cx = bx;
-    auto chip = [&](const std::string& t, vec3 c, bool on) {
-      float w = g_ren.textWidth(t, 10 * s) + 14 * s;
-      g_ren.rect(cx, cy, w, 18 * s, on ? c * 0.3f : vec3(0.0f, 0.02f, 0.04f), on ? 0.9f : 0.5f, 2 * s);
-      g_ren.rectOutline(cx, cy, w, 18 * s, c, on ? 0.9f : 0.2f, 2 * s, 1 * s);
-      g_ren.text(cx + 7 * s, cy + 4 * s, 10 * s, t, on ? C_TEXT : C_DIM, on ? 1.f : 0.6f, 0, false);
-      cx += w + 6 * s;
-    };
-    chip("BRAKE", C_WARN, plane.ctl.brake > 0.5f); chip("LDG LT", C_ACCENT, landingLight); chip("AP", APC, plane.apOn);
-    if (plane.apOn) { std::string apl = plane.apMode == Plane::AP_APPR ? "AUTOLAND" : plane.apMode == Plane::AP_NAV ? "NAV" : fmt("%03.0f / %s", wrapDeg360(plane.apHeading), fmtAlt(plane.apAlt).c_str()); g_ren.text(cx, cy + 4 * s, 10 * s, ellipsize(apl, W - 16 * s - cx, 10 * s), APC, 0.9f, 0, false); }
+  }
+  // ================================================================ the bottom strip: wind, the instructor, g and the mode chips
+  if (!cockpit) {
+    float sy = H - stripH;
+    hudStrip(0, sy, W, stripH, 1.f);
+    // left: the wind dial and its numbers
+    {
+      vec3 wv = plane.windVel; float ws = length(vec3(wv.x, 0, wv.z)); float from = wrapDeg360(atan2f(-wv.x, wv.z) / DEG);
+      float cxw = 30 * s, cyw = sy + stripH * 0.5f, R = 17 * s;
+      hudRing(cxw, cyw, R, 1.2f * s, C_ACCENT, 0.5f, 32);
+      for (int k = 0; k < 8; k++) { float a = k * PI / 4; g_ren.line(cxw + sinf(a) * R * 0.78f, cyw - cosf(a) * R * 0.78f, cxw + sinf(a) * R, cyw - cosf(a) * R, (k % 2 ? 1.f : 1.6f) * s, C_TEXT, 0.5f); }
+      g_ren.rect(cxw - 2 * s, cyw - R + 2 * s, 4 * s, 4 * s, C_TEXT, 0.9f, 2 * s);
+      g_ren.text(58 * s, sy + 6 * s, 9 * s, "WIND", C_DIM, 1, 0, false);
+      if (ws > 0.5f) {
+        float rel = (from - hdg) * DEG; vec2 src(sinf(rel), -cosf(rel)), dv(-src.x, -src.y);
+        vec3 wc(0.45f, 0.85f, 1.f); float wscale = clampf(ws / 12.f, 0.5f, 1.f);
+        hudArrow(cxw + src.x * R * 0.72f, cyw + src.y * R * 0.72f, cxw + dv.x * R * 0.8f, cyw + dv.y * R * 0.8f, (1.4f + 1.4f * wscale) * s, 8 * s, (3.5f + 2.f * wscale) * s, wc, 1.f);
+        float hw = ws * cosf(rel), xw = ws * sinf(rel);
+        std::string g = wx.gust > 0.5f ? fmt(" G%.0f", (wx.windSpeed + wx.gust) * (set.metric ? 3.6f : MS_TO_KT)) : "";
+        g_ren.text(58 * s, sy + 16 * s, 14 * s, fmt("%03.0f / %s", from, fmtSpeed(ws).c_str()) + g, C_TEXT, 1, 0, false);
+        g_ren.text(58 * s + 118 * s, sy + 6 * s, 9 * s, "COMPONENTS", C_DIM, 1, 0, false);
+        g_ren.text(58 * s + 118 * s, sy + 17 * s, 12 * s, fmt("%s %s   X %s %s", hw >= 0 ? "HEAD" : "TAIL", fmtSpeed(fabsf(hw)).c_str(), fmtSpeed(fabsf(xw)).c_str(), xw >= 0 ? "R" : "L"), fabsf(xw) > 7.f ? C_WARN : C_DIM, 1, 0, false);
+      } else g_ren.text(58 * s, sy + 16 * s, 14 * s, "CALM", C_TEXT, 1, 0, false);
+    }
+    // right: g against the structure, then the mode chips and the autopilot's words
+    float rx = W - 14 * s;
+    {
+      float gl = spc.gLimitPos(), gf = clampf(plane.gLoad / gl, -0.3f, 1.2f);
+      float bwid = 90 * s, bx = rx - bwid;
+      g_ren.text(rx, sy + 6 * s, 9 * s, "G LOAD", C_DIM, 1, 2, false);
+      g_ren.text(bx - 8 * s, sy + 15 * s, 14 * s, fmt("%.1f", plane.gLoad), plane.gLoad > gl * 0.85f ? C_BAD : C_TEXT, 1, 2, false);
+      g_ren.rect(bx, sy + 22 * s, bwid, 4 * s, C_ACCENT, 0.15f);
+      g_ren.rect(bx, sy + 22 * s, bwid * clampf(gf, 0.f, 1.f), 4 * s, gf > 0.85f ? C_BAD : gf > 0.6f ? C_WARN : C_ACCENT, 0.95f);
+      g_ren.rect(bx + bwid - 1 * s, sy + 18 * s, 2 * s, 12 * s, C_BAD, 0.8f);
+      if (plane.overG > 0.05f) g_ren.rect(bx, sy + 30 * s, bwid * clampf(plane.overG, 0.f, 1.f), 2 * s, C_BAD, 0.9f);
+      g_ren.text(bx + bwid, sy + 30 * s, 8.5f * s, fmt("+%.0f", gl), C_DIM, 0.8f, 2, false);
+      rx = bx - 50 * s;
+    }
+    {
+      float cx = rx, cy = sy + 13 * s;
+      auto chip = [&](const std::string& t, vec3 c, bool on) {
+        float w = g_ren.textWidth(t, 10 * s) + 14 * s; cx -= w;
+        g_ren.rect(cx, cy, w, 20 * s, on ? c * 0.3f : vec3(0.0f, 0.02f, 0.04f), on ? 0.9f : 0.5f, 2 * s);
+        g_ren.rectOutline(cx, cy, w, 20 * s, c, on ? 0.9f : 0.2f, 2 * s, 1 * s);
+        g_ren.text(cx + 7 * s, cy + 5 * s, 10 * s, t, on ? C_TEXT : C_DIM, on ? 1.f : 0.6f, 0, false);
+        cx -= 6 * s;
+      };
+      chip("LDG LT", C_ACCENT, landingLight); chip("BRAKE", C_WARN, plane.ctl.brake > 0.5f); chip("AP", APC, plane.apOn);
+      if (plane.apOn) { std::string ap = plane.apStatus; float aw = g_ren.textWidth(ap, 11 * s); cx -= aw; g_ren.text(cx, sy + 17 * s, 11 * s, ap, APC, 1, 0, false); cx -= 10 * s; }
+      rx = cx;
+    }
+    // centre: the instructor
+    if (set.showHints && !hint.empty() && !crashed) {
+      float hx0 = 330 * s, hx1 = rx - 24 * s, hw = hx1 - hx0;
+      if (hw > 200 * s) {
+        auto lines = wrap(hint, hw - 70 * s, 12.5f * s);
+        if (lines.size() > 2) { lines.resize(2); lines[1] = ellipsize(lines[1] + " ...", hw - 70 * s, 12.5f * s); }
+        g_ren.rect(hx0, sy + 6 * s, 3 * s, stripH - 12 * s, C_GOOD, 1);
+        g_ren.text(hx0 + 12 * s, sy + 5 * s, 8.5f * s, "INSTRUCTOR", C_GOOD, 1, 0, false);
+        float ly = sy + (lines.size() == 1 ? 15 * s : 7 * s) + 7 * s;
+        for (auto& l : lines) { g_ren.text(hx0 + 64 * s, ly, 12.5f * s, l, C_TEXT, 1, 0, false); ly += 16 * s; }
+      }
+    }
   } else if (!spc.special) {
     // cockpit view: the 3D panel carries the instruments; a compact readout strip along the bottom edge
     std::string ro = fmt("IAS %s   ALT %s   VS %+.0f   THR %.0f%%   FLAPS %.0f%%   %s   FUEL %.0f%%", fmtSpeed(plane.ias).c_str(), fmtAlt(plane.pos.y).c_str(),
                          plane.vel.y * 196.85f, plane.ctl.throttle * 100, plane.flaps * 100,
                          !spc.retract ? "GEAR FIXED" : plane.gear > 0.99f ? "GEAR DOWN" : plane.gear < 0.01f ? "GEAR UP" : "GEAR TRANSIT", plane.fuel / spc.maxFuel * 100);
-    if (plane.apOn) ro += "   AP";
+    if (plane.apOn) ro += "   AP " + plane.apStatus;
     if (plane.ctl.brake > 0.5f) ro += "   BRAKE";
     float tw = g_ren.textWidth(ro, 14 * s) + 30 * s;
     hudStrip(W * 0.5f - tw * 0.5f, H - 34 * s, tw, 28 * s, 0.9f);
     g_ren.text(W * 0.5f, H - 28 * s, 14 * s, ro, C_TEXT, 0.95f, 1, false);
+    if (set.showHints && !hint.empty() && !crashed) {
+      float hw = std::min(760 * s, W - 40 * s); auto lines = wrap(hint, hw - 40 * s, 14 * s); if (lines.size() > 2) lines.resize(2);
+      float hh = 24 * s + lines.size() * 18 * s, hx = W * 0.5f - hw * 0.5f, hy = H - 34 * s - hh - 8 * s;
+      g_ren.rectGrad(hx, hy, hw, hh, vec3(0.02f, 0.08f, 0.06f), vec3(0.0f, 0.03f, 0.02f), 0.72f, 3 * s); g_ren.rect(hx, hy, 3 * s, hh, C_GOOD, 1);
+      g_ren.text(hx + 14 * s, hy + 5 * s, 9 * s, "INSTRUCTOR", C_GOOD, 1, 0, false);
+      float ly = hy + 18 * s; for (auto& l : lines) { g_ren.text(hx + 14 * s, ly, 14 * s, l, C_TEXT, 1); ly += 18 * s; }
+    }
   }
   // ================================================================ the message rails
   // left, inboard of the speed tape: the tower's last call. Right, inboard of the altitude tape: the failure
@@ -1826,7 +1849,7 @@ void Game::drawHud(const FrameParams& fp) {
     if (F.flapAsym) ann.push_back({"FLAP ASYMMETRY  hold the wing up", C_WARN});
     if (F.ice > 0.05f) ann.push_back({fmt("ICING %.0f%%  leave the cloud, keep speed", F.ice * 100.f), F.ice > 0.5f ? C_BAD : C_WARN});
     float rw = std::min(kHudMsgW * s, W * 0.5f - rail - 120 * s), rx = W - (cockpit ? 16 * s : rail + 12 * s) - rw;
-    float ay = msgTop + 4 * (26 * s) + 8 * s;   // (under the room the toasts take)
+    float ay = msgTop;
     for (auto& a : ann) {
       g_ren.rectGrad(rx, ay, rw, 22 * s, vec3(0.05f, 0.01f, 0.0f), vec3(0.02f, 0.0f, 0.0f), 0.65f, 3 * s);
       g_ren.rect(rx, ay, 3 * s, 22 * s, a.second, 0.95f);
@@ -1834,28 +1857,11 @@ void Game::drawHud(const FrameParams& fp) {
       g_ren.text(rx + 10 * s, ay + 5 * s, 11 * s, ellipsize(a.first, rw - 28 * s, 11 * s), a.second, 0.95f, 0, false);
       ay += 26 * s;
     }
+    hudMsgNext = ay + (ann.empty() ? 0.f : 6 * s);   // (the toasts stack under the annunciators: drawToasts)
   }
-  // the instructor's hint: a low strip along the bottom edge, between the corner instruments
-  if (set.showHints && !hint.empty() && !crashed) {
-    float hx0 = cockpit ? 16 * s : 420 * s, hx1 = cockpit ? W - 16 * s : W - 330 * s;
-    float hw = std::min(760 * s, hx1 - hx0);
-    if (hw > 240 * s) {
-      auto lines = wrap(hint, hw - 40 * s, 15 * s);
-      if (lines.size() > 2) { lines.resize(2); lines[1] = ellipsize(lines[1] + " ...", hw - 40 * s, 15 * s); }
-      float hh = 30 * s + lines.size() * 20 * s;
-      float hx = hx0 + (hx1 - hx0 - hw) * 0.5f, hy = H - hh - (cockpit ? 40 * s : 14 * s);
-      g_ren.rectGrad(hx, hy, hw, hh, vec3(0.02f, 0.08f, 0.06f), vec3(0.0f, 0.03f, 0.02f), 0.72f, 3 * s);
-      g_ren.rectOutline(hx, hy, hw, hh, C_GOOD, 0.3f, 3 * s, 1.f * s);
-      g_ren.rect(hx, hy, 3 * s, hh, C_GOOD, 1);
-      g_ren.text(hx + 16 * s, hy + 7 * s, 10 * s, "INSTRUCTOR  //  COMMS", C_GOOD, 1, 0, false);
-      float ly = hy + 22 * s;
-      for (auto& l : lines) { g_ren.text(hx + 16 * s, ly, 15 * s, l, C_TEXT, 1); ly += 20 * s; }
-    }
-  }
-  // minimap, inboard of the altitude tape under the message column
-  float mm = 190 * s;
-  float range = clampf(dist * 1.3f, 3000.f, 20000.f);
-  if (showMinimap) drawMinimap(W - rail - 16 * s - mm, railBot - mm - 16 * s, mm, range);
+  // minimap: inboard of the altitude tape, above the systems tiles
+  if (showMinimap && !cockpit) { float mm = 168 * s, range = clampf(dist * 1.3f, 3000.f, 20000.f); drawMinimap(W - rail - 16 * s - mm, tilesTop - mm - 34 * s, mm, range); }
+  else if (showMinimap) { float mm = 168 * s, range = clampf(dist * 1.3f, 3000.f, 20000.f); drawMinimap(W - 24 * s - mm, H - 60 * s - mm, mm, range); }
   // ================================================================ the target in the world (last, over the panels)
   {
     auto label = [&](float x, float y, const std::string& t) {
@@ -1867,7 +1873,7 @@ void Game::drawHud(const FrameParams& fp) {
     float sx, sy;
     vec3 rel3 = tgt3 - fp.camPos;
     float zc = dot(rel3, -fp.camBack);
-    const float bandT = band + 100 * s, bandB = H - (cockpit ? 70 : 250) * s, bandC = 0.5f * (bandT + bandB), bandH = std::max(40 * s, 0.5f * (bandB - bandT));
+    const float bandT = band + 100 * s, bandB = cockpit ? H - 70 * s : (showMinimap ? tilesTop - 168 * s - 60 * s : tilesTop - 40 * s), bandC = 0.5f * (bandT + bandB), bandH = std::max(40 * s, 0.5f * (bandB - bandT));
     bool onS = zc > 1.f && g_ren.project(fp, tgt3, sx, sy) && sx > rail + 20 * s && sx < W - rail - 20 * s && sy > bandT && sy < bandB;
     std::string lab = dist < 1000.f ? fmt("%.0f m", length(rel3)) : fmt("%.1f km", dist / 1000.f);
     if (toWp && fabsf(target.y - plane.pos.y) > 45.f) lab += fmt("  %s%s", target.y > plane.pos.y ? "+" : "-", fmtAlt(fabsf(target.y - plane.pos.y)).c_str());

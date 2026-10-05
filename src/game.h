@@ -443,6 +443,7 @@ private:
   void hudWarnIcon(int kind, float cx, float cy, float sz, vec3 c, float a);
   float hudPrevIas = 0, hudTrend = 0;   // the speed tape's trend vector
   bool hudDemo = false;                 // harness: every warning lit (scene hud with HUDDEMO=1)
+  float hudMsgNext = 0;                 // where the right message column continues under the annunciators
   void drawPFD(float x, float y, float size);
   void drawMinimap(float x, float y, float size, float rangeM);
   void drawMapOverlay();
