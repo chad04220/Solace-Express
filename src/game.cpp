@@ -2287,7 +2287,7 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   g_ren.entSync = sync;
   // every light aircraft's hull (outside, and the cockpit's when that is in use): a frame that wants one bakes it
   std::vector<std::pair<int, bool>> todo;
-  for (int i = 0; i <= kWraith; i++) if (!kAircraft[i].special) { todo.push_back({i, false}); if (g_ren.hullCockpit || g_ren.mode == 1) todo.push_back({i, true}); }
+  for (int i = 0; i <= kKestrel; i++) if (!kAircraft[i].special) { todo.push_back({i, false}); if (g_ren.hullCockpit || g_ren.mode == 1) todo.push_back({i, true}); }
   for (size_t k = 0; k < todo.size() && !quit; k++) {
     prewarmCraft = todo[k].first; prewarmInside = todo[k].second;
     progress(0.35f + 0.65f * k / todo.size(), std::string("BUILDING AIRCRAFT SHELLS  ") + kAircraft[prewarmCraft].name);
@@ -3140,9 +3140,9 @@ void Game::debugScene(const std::string& name) {
     printf("pad: A skips the career crash to the results: %s\n", wasCrash && screen == SCR_DEBRIEF ? "ok" : "FAIL");
     return;
   }
-  if (name == "research" || name == "research40" || name == "research10" || name == "research20") {   // the terminal, settled (selection decrypted)
+  if (name == "research" || name == "research40" || name == "research10" || name == "research20" || name == "research15") {   // the terminal, settled (selection decrypted)
     screen = SCR_RESEARCH; realTime = 30; resOpened = 20; resAuthed = true;
-    resCraft = name == "research40" ? kWraith : name == "research10" ? kNightjar : name == "research20" ? kMantis : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
+    resCraft = name == "research40" ? kWraith : name == "research10" ? kNightjar : name == "research20" ? kMantis : name == "research15" ? kKestrel : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
     return;
   }
   if (name.rfind("researchscan", 0) == 0) {   // the biometric sequence at a moment: researchscan<tenths of a second>
@@ -3520,7 +3520,7 @@ void Game::debugScene(const std::string& name) {
   if (name.compare(0, 4, "gav_") == 0) {   // an aircraft parked on the runway, orbit view: gav_<spec>_<yaw>_<pitch>_<dist>
     int sp = 0; float yawD = 120, pitD = 10, dist = 0;
     sscanf(name.c_str() + 4, "%d_%f_%f_%f", &sp, &yawD, &pitD, &dist);
-    sp = std::clamp(sp, 0, kWraith);
+    sp = std::clamp(sp, 0, kKestrel);
     Contract c; c.from = g_world.findAirport("CAP"); c.to = g_world.findAirport("MDB"); c.title = "Aircraft check";
     c.wx = Weather(); c.wx.timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 14.5f; c.wx.cloudCover = 0.2f; c.wx.visibility = 60000;
     realTime = 20; startFlight(c, sp, Career::SRC_OWNED);

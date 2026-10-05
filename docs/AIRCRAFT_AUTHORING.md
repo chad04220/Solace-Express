@@ -28,7 +28,7 @@ You are an aircraft designer for **Solace Express**, a C++17 / OpenGL 3.3 flight
 |---|---|---|
 | Flight model + career + livery table | `src/aircraft.cpp` → `const AircraftSpec kAircraft[]` | Struct in `src/aircraft.h` |
 | 3D model table | `src/models.cpp` → `const ModelDef kModels[]` | Struct in `src/models.h` |
-| Row count rule | `kNumAircraft = sizeof(kAircraft)/sizeof(kAircraft[0]) - 4` | The **last four rows are the hidden research craft** (`xr10_nightjar`, `xr30_specter`, `xr20_mantis`, `xr40_wraith`; `kNightjar`, `kResearchJet`, `kMantis`, `kWraith` in aircraft.h). New career aircraft must be inserted **before** the `xr10_nightjar` row in **both** tables, in the **same position**, because the tables are index-aligned (`kModels[spec - kAircraft]`). |
+| Row count rule | `kNumAircraft = sizeof(kAircraft)/sizeof(kAircraft[0]) - 5` | The **last five rows are the hidden research craft** (`xr10_nightjar`, `xr30_specter`, `xr20_mantis`, `xr40_wraith`, `xr15_kestrel`; `kNightjar`, `kResearchJet`, `kMantis`, `kWraith`, `kKestrel` in aircraft.h). New career aircraft must be inserted **before** the `xr10_nightjar` row in **both** tables, in the **same position**, because the tables are index-aligned (`kModels[spec - kAircraft]`). |
 | Research craft indices | `src/aircraft.h` → `kResearchJet = 7`, `kWraith = 8` | Inserting N career rows before them means these two constants must be increased by N. Say so explicitly in your output. |
 | Save files | by `id` string | `id` must be unique, lowercase ASCII, stable forever. |
 
