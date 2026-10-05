@@ -58,9 +58,7 @@ static const int kNightjar = 9;     // XR-10 Nightjar: a conventional twin jet (
 static const int kResearchJet = 10; // XR-30 Specter
 static const int kMantis = 11;      // XR-20 Mantis: forward-swept systems demonstrator (special 0; the generic field)
 static const int kWraith = 12;      // XR-40 Wraith stealth aerobatic research craft
-static const int kPeregrine = 13;     // XR-15 Peregrine: swept-wing supersonic demonstrator (special 0; Codex's FX-27 field, engine code 8)
-// its telescopic gear: shared by the contact solver and the packed shader data (kestrel_sdf.glsl)
-static const float kPeregrineGearTrack = 1.85f, kPeregrineMainGearZ = 0.70f, kPeregrineNoseGearZ = -5.80f;
+static const int kKestrel = 13;     // XR-15 Kestrel: swept-wing supersonic demonstrator (special 0; the generic field), Codex's FX-27 airframe
 // XR-40 thruster pods (body coords, +z aft): front left, front right, rear left, rear right pivot points
 static const vec3 kWraithPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.08f, -3.3f), vec3(-2.75f, 0.05f, 3.45f), vec3(2.75f, 0.05f, 3.45f)};
 

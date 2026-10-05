@@ -787,11 +787,10 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
       if (length(vec2(c.pos.x - ap.x, c.pos.z - ap.z)) > ap.length * 0.5f + 400.f) { c.pos.y = g + 30.f; if (c.vel.y < 0) c.vel.y = 0; }
     }
     // Per-wheel contact travel, including differential travel while turning. Never derive spin from airspeed.
-    const bool kestrel = c.spec == kPeregrine;
-    const float track = kestrel ? kPeregrineGearTrack : std::max(1.2f, s.span*0.13f), gh = gearH(s), len = s.fusLen;
-    const float mainZ = kestrel ? kPeregrineMainGearZ : s.taildragger ? -.10f*len : .04f*len;
-    vec3 cp[3] = {vec3(-track,-gh,mainZ),vec3(track,-gh,mainZ),
-                  s.taildragger?vec3(0,-gh+.11f*len,.45f*len):vec3(0,-gh,kestrel?kPeregrineNoseGearZ:-.36f*len)};
+    const float track = std::max(1.2f, s.span*0.13f), gh = gearH(s), len = s.fusLen;
+    vec3 cp[3] = {vec3(-track,-gh,s.taildragger?-.10f*len:.04f*len),
+                  vec3(track,-gh,s.taildragger?-.10f*len:.04f*len),
+                  s.taildragger?vec3(0,-gh+.11f*len,.45f*len):vec3(0,-gh,-.36f*len)};
     float steer = s.special ? 0.f : c.ctlYaw*.45f*smoothstepf(30.f,4.f,c.speed)*(s.taildragger?-1.f:1.f);
     vec3 fw = q0.rotate(vec3(0,0,-1)) + c.q.rotate(vec3(0,0,-1)); fw.y = 0;
     fw = length(fw)>1e-5f ? normalize(fw) : c.q.rotate(vec3(0,0,-1));
@@ -857,8 +856,8 @@ int Traffic::fillVisuals(vec3 camPos, TrafficVisual* out, int maxN, int* order) 
     float bound = std::max(t[0], t[36] * 2.f) * 0.55f + 1.5f;
     vec3 r = c.q.rotate(vec3(1, 0, 0)), u = c.q.rotate(vec3(0, 1, 0)), b = c.q.rotate(vec3(0, 0, 1));
     const ModelDef& m=kModels[c.spec];
-    float wr=c.spec==kPeregrine?.38f:s.special?.38f:m.wheelR;
-    float nr=c.spec==kPeregrine?.38f:s.special?.33f:s.taildragger?.10f:m.gear==3?wr*.75f:wr*.85f;
+    float wr=s.special?.38f:m.wheelR;
+    float nr=s.special?.33f:s.taildragger?.10f:m.gear==3?wr*.75f:wr*.85f;
     float steer=s.special?0.f:c.ctlYaw*.45f*smoothstepf(30.f,4.f,c.speed)*(s.taildragger?-1.f:1.f);
     // The rotation-column .w components were unused; the existing 32-texel traffic stride stays unchanged.
     float v[32] = {c.pos.x, c.pos.y, c.pos.z, bound,

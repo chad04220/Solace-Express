@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
   }
   Weather wx; wx.windSpeed = 0; wx.gust = 0; wx.turbulence = 0;
   int fails = 0;
-  if (strcmp(kAircraft[kOsprey].id, "osprey_c6") != 0 || strcmp(kAircraft[kNightjar].id, "xr10_nightjar") != 0 || strcmp(kAircraft[kResearchJet].id, "xr30_specter") != 0 || strcmp(kAircraft[kMantis].id, "xr20_mantis") != 0 || strcmp(kAircraft[kWraith].id, "xr40_wraith") != 0 || strcmp(kAircraft[kPeregrine].id, "xr15_peregrine") != 0) { printf("aircraft indices (kOsprey / kNightjar / kResearchJet / kMantis / kWraith) don't match the table\n"); return 1; }
+  if (strcmp(kAircraft[kOsprey].id, "osprey_c6") != 0 || strcmp(kAircraft[kNightjar].id, "xr10_nightjar") != 0 || strcmp(kAircraft[kResearchJet].id, "xr30_specter") != 0 || strcmp(kAircraft[kMantis].id, "xr20_mantis") != 0 || strcmp(kAircraft[kWraith].id, "xr40_wraith") != 0 || strcmp(kAircraft[kKestrel].id, "xr15_kestrel") != 0) { printf("aircraft indices (kOsprey / kNightjar / kResearchJet / kMantis / kWraith) don't match the table\n"); return 1; }
   for (int ai = 0; ai < kNumAircraft; ai++) {
     const AircraftSpec& s = kAircraft[ai];
     int apIdx = g_world.findAirport("CAP");
@@ -160,7 +160,7 @@ int main(int argc, char** argv) {
       for (int i = 0; i < 100 * 240 && !p.ev.crashed; i++) { p.ctl.pitch = clampf((alt - p.pos.y) * 0.002f - p.vel.y * 0.01f - p.w.x * 0.3f, -1, 1); p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1, 1); p.step(1 / 240.f, calm, i / 240.f); m = std::max(m, p.mach); }
       return m;
     };
-    float m8 = topMach(kNightjar, 8000.f), m15 = topMach(kPeregrine, 8000.f), m10 = topMach(kMantis, 8000.f), m9 = topMach(kResearchJet, 8000.f), m11 = topMach(kWraith, 8000.f);
+    float m8 = topMach(kNightjar, 8000.f), m15 = topMach(kKestrel, 8000.f), m10 = topMach(kMantis, 8000.f), m9 = topMach(kResearchJet, 8000.f), m11 = topMach(kWraith, 8000.f);
     bool ok = m8 > 0.93f && m8 < 1.0f && m15 > 1.3f && m15 < 1.6f && m10 > 1.7f && m10 < 2.2f && m9 > 2.5f && m9 > m10 + 0.4f && m11 > 4.0f && m11 > m9 + 0.8f;
     printf("Research tiers at 8 km: XR-10 Mach %.2f  XR-15 Mach %.2f  XR-20 Mach %.2f  XR-30 Mach %.2f  XR-40 Mach %.2f %s\n", m8, m15, m10, m9, m11, ok ? "ok" : "FAIL"); fails += !ok;
     // the overstress: the XR-30 (limited to 40 g) rides 15% over for four seconds while the stress builds (it bleeds

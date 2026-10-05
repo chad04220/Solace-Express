@@ -277,7 +277,6 @@ static void startShot(OneShot& s, int type, float inten, float sr) {
     case SFX_UFO_ZOOM: s.f1.set(BP, 1800, 0.8f, sr); break;
     case SFX_FLYBY: s.f1.set(BP, 2200, 0.7f, sr); s.f2.set(LP, 320, 0.7f, sr); s.f3.set(BP, 900, 0.9f, sr); break;
     case SFX_LASER: s.f1.set(BP, 3200, 1.2f, sr); break;
-    case SFX_GATLING: s.f1.set(LP, 2200, 0.9f, sr); break;
     case SFX_PLASMA: s.f1.set(LP, 180, 0.7f, sr); s.f2.set(LP, 60, 0.8f, sr); s.f3.set(HP, 26, 0.7f, sr); s.f4.set(BP, 1400, 0.8f, sr); break;
     case SFX_CLOAK: s.f1.set(BP, 2500, 0.6f, sr); break;
     case SFX_GEAR_CLUNK: s.f1.set(LP, 300, 1.0f, sr); break;
@@ -358,11 +357,6 @@ static bool runShot(OneShot& s, float sr, float& out) {
       float env = smoothstepf(0.f, 0.004f, t) * expf(-t * 22.f);
       float sq = sinf(s.ph) > 0 ? 1.f : -1.f;
       v = (sq * 0.35f + sinf(s.ph2) * 0.4f + s.f1.p(s.nz.w()) * 0.6f * expf(-t * 40.f)) * env * 0.32f * s.intensity; alive = t < 0.3f; break; }
-    case SFX_GATLING: {      // a rotary gun's round: a sharp crack of filtered noise over a short low thump
-      float f = 150.f * expf(-t * 28.f) + 55.f;
-      s.ph += 2 * PI * f * dt;
-      float env = smoothstepf(0.f, 0.0015f, t) * expf(-t * 38.f);
-      v = (s.f1.p(s.nz.w()) * 0.9f + sinf(s.ph) * 0.55f * expf(-t * 20.f)) * env * 0.5f * s.intensity; alive = t < 0.14f; break; }
     case SFX_PLASMA: {       // dark-energy detonation: an inhaled rising whine, then a deep implosion-thump and a long rolling roar
       float suck = smoothstepf(0.f, 0.35f, t) * smoothstepf(0.45f, 0.38f, t);
       float fw = 200.f + 2400.f * smoothstepf(0.f, 0.42f, t);

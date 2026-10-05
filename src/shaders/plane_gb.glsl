@@ -8,7 +8,7 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
   int eng = int(gM[0].z + 0.5);
   bool wr = eng == 6;
   // a research jet's display from the pilot's seat: its camera's picture, with the display's own look and symbology
-  if (pod && eng >= 5 && eng != 8 && ((mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63))) {
+  if (pod && eng >= 5 && ((mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63))) {
     vec3 scrL = transpose(uPlaneRot)*(p - uPlanePos);
     bool bomb; vec3 rdc;
     vec3 col = feedScreen(mid, scrL, rdc, bomb);

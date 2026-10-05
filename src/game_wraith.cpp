@@ -9,7 +9,6 @@ vec3 rndDir() { vec3 d(frand() - 0.5f, frand() - 0.5f, frand() - 0.5f); return l
 // laser emitter lens tips (body coords) once the turrets are fully out
 const vec3 kLaserLens[2] = {vec3(-0.95f, -0.68f, -6.44f), vec3(0.95f, -0.68f, -6.44f)};
 const float kBoltSpeed = 2000.f, kBoltStreak = 55.f, kBoltRange = 4500.f;   // muzzle speed (added to the craft's), streak, range
-const float kTracerStreak = 14.f;   // a gun round's streak (the XR-15's Gatling)
 // the bomb in its cradle (body coords)
 const vec3 kBayBomb(0.f, -0.31f, 0.1f);
 float groundAt(vec3 p) { return std::max(g_world.height(p.x, p.z), 0.f); }
@@ -158,7 +157,7 @@ void Game::updateBolts(float dt) {
       if (along > 0 && along < (tHit >= 0 ? tHit : segL) && length(rel - sd * along) < 9.f) { ufo.t = 23.f; toast("The visitors don't appreciate that...", vec3(0.4f, 1.f, 0.6f)); }
     }
     if (tHit >= 0) { b.h = a + sd * tHit; b.hit = true; laserImpact(b.h, craft, ek, ek ? &hitEnt : nullptr); }
-    else { b.h = a + b.v * dt; b.len = std::min(b.tracer ? kTracerStreak : kBoltStreak, b.len + kBoltSpeed * dt); }
+    else { b.h = a + b.v * dt; b.len = std::min(kBoltStreak, b.len + kBoltSpeed * dt); }
   }
   W.bolts.erase(std::remove_if(W.bolts.begin(), W.bolts.end(), [](const WraithState::Bolt& b) { return b.age > b.life || (b.hit && b.len <= 0.f); }), W.bolts.end());
 }
@@ -374,7 +373,7 @@ void Game::wraithVisual(FrameParams& fp) {
     vec3 tail = b.h - b.d * b.len;   // the streak trails along the aim line (it leaves the lens in the craft's frame)
     float k = clampf((b.life - b.age) / 0.25f, 0.f, 1.f);
     float* A = fx.beamA[fx.beams]; float* B = fx.beamB[fx.beams];
-    A[0] = tail.x; A[1] = tail.y; A[2] = tail.z; A[3] = b.tracer ? -0.075f : 0.22f;   // (a negative radius: the shader draws a tracer)
+    A[0] = tail.x; A[1] = tail.y; A[2] = tail.z; A[3] = 0.22f;
     B[0] = b.h.x; B[1] = b.h.y; B[2] = b.h.z; B[3] = k;
     fx.beams++;
   }

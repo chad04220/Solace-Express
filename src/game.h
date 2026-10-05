@@ -16,7 +16,6 @@
 #include "audio.h"
 #include "radio.h"
 #include "atc.h"
-#include "kestrel_gatling.h"
 #include "keys.h"
 
 struct Input {
@@ -227,7 +226,7 @@ private:
     bool fireLatch = true;   // a click / Enter still held from the launch menu doesn't fire (or arm) until released
     float laserCD = 0, laserGlow = 0; int laserSide = 0;
     float bay = 0, bayHold = 0, bombLoaded = 1; int bombQueue = 0;  // bomb bay doors, bomb in the cradle 0..1, pending drops
-    struct Bolt { vec3 h, v, d; float len, age, life; bool hit; bool tracer = false; };   // head, world velocity, aim; streak length behind the head; tracer: a gun round (the XR-15)
+    struct Bolt { vec3 h, v, d; float len, age, life; bool hit; };   // head, world velocity, aim; streak length behind the head
     bool wantFire = false;
     struct Bomb { vec3 p, v; float t; };
     struct Blast { vec3 p; float R, age, dur; bool water; };
@@ -242,12 +241,6 @@ private:
   void wraithControls(float dt);
   void updateWraith(float dt);
   void wraithVisual(FrameParams& fp);
-  // the XR-15's belly Gatling (game_kestrel.cpp): Codex's sequenced doors, carrier and rotor; tracer rounds on the bolt path
-  KestrelGatlingState kestrel;
-  KestrelGatlingInput kestrelInput;
-  void kestrelControls(float dt);
-  void updateKestrel(float dt);
-  void kestrelVisual(FrameParams& fp);
   void buildFeedCameras(FrameParams& fp);
   void buildLights(FrameParams& fp);
   void fireLaser();

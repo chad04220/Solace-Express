@@ -36,14 +36,14 @@ const ResCraftInfo kResCraft[] = {
    12.f, -6.f, 6.f, 9.f, -4.f, 0.98f, 0.25f,
    {"Conventional controls: no FBW, no vectoring", "Flaps and gear as any jet: ~150 kt over the fence", "Fuel burns: a 1,300 kg cell, plan the sortie",
     "Long hard runways only", "The programme's flying testbed for sensors and skins"}, "XR10"},
-  {kPeregrine, "NG-XR15-P  //  BLK 0", "XR-15", "PEREGRINE", R_COPPER, {0.33f, 0.45f, 0.75f}, "SWEPT-WING SUPERSONIC DEMONSTRATOR",
+  {kKestrel, "NG-XR15-K  //  BLK 0", "XR-15", "KESTREL", R_COPPER, {0.33f, 0.45f, 0.75f}, "SWEPT-WING SUPERSONIC DEMONSTRATOR",
    {{"CONFIGURATION", "Chined forebody, swept wing, canted fins", -1}, {"PROPULSION", "2 x turbofan, 80 kN dry", 0.2f},
     {"THRUST / WEIGHT", "1.2 : 1 with reheat", 0.3f}, {"TOP SPEED", "Mach 1.4", 0.38f},
-    {"SYSTEMS", "Reheat, belly Gatling", 0.45f}, {"ROLL RATE", "240 deg/s", 0.6f},
+    {"SYSTEMS", "Reheat, conventional controls", 0.3f}, {"ROLL RATE", "240 deg/s", 0.6f},
     {"AIRFRAME", "+11 / -5 g", 0.12f}, {"ENDURANCE", "3,500 kg fuel, 700 km", 0.5f}},
    14.f, -7.f, 7.f, 11.f, -5.f, 1.45f, 0.28f,
-   {"Y deploys / safes the belly Gatling; fire LMB / Enter", "Airborne pad: Y deploys, RB fires, D-right gear", "Reheat above 85% throttle: supersonic with height",
-    "Gun needs the gear up; good for +11 / -5 g", "Land at ~115 kt with full flap, long runways"}, "XR15"},
+   {"The heavy one: 10.5 t, wing loading to match", "Reheat above 85% throttle: supersonic with height", "Conventional controls, flaps and retractable gear",
+    "Good for +11 / -5 g; a short overstress is survivable", "Land at ~115 kt with full flap, long runways"}, "XR15"},
   {kMantis, "NG-XR20-M  //  BLK 2", "XR-20", "MANTIS", R_EMBER, {0.35f, 0.55f, 0.7f}, "FORWARD-SWEPT SYSTEMS DEMONSTRATOR",
    {{"CONFIGURATION", "Forward sweep, all-moving canards", -1}, {"PROPULSION", "2 x turbofan, 30 kN total", 0.1f},
     {"THRUST / WEIGHT", "1.9 : 1 with reheat", 0.4f}, {"TOP SPEED", "Mach 2.0", 0.5f},
@@ -137,7 +137,7 @@ void silhouette(int craft, float cx, float cy, float sc, vec3 c, float a, float 
       float px = kWraithPods[i].x / 6.4f, py = kWraithPods[i].z / 8.2f;
       g_ren.rectOutline(cx + px * sc - 0.07f * sc, cy + py * sc - 0.14f * sc, 0.14f * sc, 0.28f * sc, c, a, 0.06f * sc, th);
     }
-  } else if (craft == kPeregrine) {   // broad chined forebody, swept wing, twin canted tails and close-set nozzles
+  } else if (craft == kKestrel) {   // broad chined forebody, swept wing, twin canted tails and close-set nozzles
     static const float body[] = {0.f, -1.f, .11f, -.78f, .18f, -.44f, .28f, -.25f, .77f, .18f, .77f, .31f,
                                  .28f, .36f, .40f, .70f, .35f, .86f, .17f, .76f, .14f, .90f, 0.f, 1.f};
     mirror(body, 12);
@@ -188,14 +188,12 @@ const Game::ResCard Game::kResCards[] = {
    {{RS_ROLL, 170.f, 0.f, "Roll at 170 deg/s"}, {RS_G, 8.f, 0.f, "Pull 8 g"}, {RS_NEGG, -3.f, 0.f, "Push to -3 g"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
   {kNightjar, "XR10-3", "SLOW FLIGHT", "Low-speed handling above 150 m: hold 115 kt for 8 s, then take it into the stall warning above 600 m and recover.",
    {{RS_SLOW, 59.f, 8.f, "Hold 115 kt (above 150 m)"}, {RS_STALL, 0, 0, "Stall warning above 600 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
-  {kPeregrine, "XR15-1", "SUPERSONIC DASH", "Reheat the Peregrine through the sound barrier: hold Mach 1.35 for 15 s (it needs height), climb through 13,000 m, land.",
+  {kKestrel, "XR15-1", "SUPERSONIC DASH", "Reheat the Kestrel through the sound barrier: hold Mach 1.35 for 15 s (it needs height), climb through 13,000 m, land.",
    {{RS_MACH, 1.35f, 15.f, "Hold Mach 1.35"}, {RS_ALT, 13000.f, 0.f, "Climb through 13,000 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
-  {kPeregrine, "XR15-2", "HEAVY AGILITY", "Ten tonnes on a swept wing: a 200 deg/s roll, 10 g, then -4 g. The airframe is good for +11 / -5 with a short overstress.",
+  {kKestrel, "XR15-2", "HEAVY AGILITY", "Ten tonnes on a swept wing: a 200 deg/s roll, 10 g, then -4 g. The airframe is good for +11 / -5 with a short overstress.",
    {{RS_ROLL, 200.f, 0.f, "Roll at 200 deg/s"}, {RS_G, 10.f, 0.f, "Pull 10 g"}, {RS_NEGG, -4.f, 0.f, "Push to -4 g"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
-  {kPeregrine, "XR15-3", "SLOW AND HEAVY", "The wing loading shows low and slow: 125 kt held for 8 s above 150 m, into the stall warning above 600 m, then a 90 m/s climb on reheat.",
+  {kKestrel, "XR15-3", "SLOW AND HEAVY", "The wing loading shows low and slow: 125 kt held for 8 s above 150 m, into the stall warning above 600 m, then a 90 m/s climb on reheat.",
    {{RS_SLOW, 64.f, 8.f, "Hold 125 kt (above 150 m)"}, {RS_STALL, 0, 0, "Stall warning above 600 m"}, {RS_CLIMB, 90.f, 3.f, "Climb at 90 m/s"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
-  {kPeregrine, "XR15-4", "GUN RUN", "Deploy the belly Gatling (Y: doors, then the carrier), spin it up and put 60 rounds downrange, then safe it and land.",
-   {{RS_LASER, 60.f, 0.f, "Fire 60 rounds"}, {RS_LAND, 0, 0, "Land back at the range"}}, 2},
   {kMantis, "XR20-1", "SUPERSONIC", "Reheat and go: hold Mach 1.8 for 15 s (it needs height: the air thins the drag), climb through 15,000 m, land.",
    {{RS_MACH, 1.8f, 15.f, "Hold Mach 1.8"}, {RS_ALT, 15000.f, 0.f, "Climb through 15,000 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
   {kMantis, "XR20-2", "CANARD AGILITY", "The forward-swept wing and canards: a 250 deg/s roll, 12 g, then -5 g. Good for +14 / -6 with a short overstress.",
@@ -525,10 +523,10 @@ void Game::drawResearch(const FrameParams& fp) {
                      {kWraithPods[2], "POD 3  //  VECTORING VANES", -1}, {vec3(6.2f, -0.24f, 2.0f), "FACETED SKIN  //  CLOAK MESH", 1}};
     else if (resCraft == kResearchJet) calls = {{vec3(0, 0, -fl), "SYNTHETIC-VISION POD", -1}, {vec3(2.1f, 0.1f, -4.4f), "CANARD  //  ALL-MOVING", 1},
                   {vec3(5.62f, -0.38f, 4.4f), "CRANKED DELTA  //  NO FLAPS", 1}, {vec3(-0.82f, -0.12f, 7.75f), "2D NOZZLE  //  +-29 DEG", -1}};
-    else if (resCraft == kPeregrine) {
+    else if (resCraft == kKestrel) {
       const ModelDef& md = kModels[resCraft];
       calls = {{vec3(1.25f, .20f, -3.80f), "CHINED FOREBODY  //  SINGLE SEAT", -1}, {modelWingTip(md), "SWEPT WING  //  IVORY DATUM", 1},
-               {vec3(0.f, -.95f, -1.50f), "BELLY GATLING  //  6 BARRELS", -1}, {modelFinTop(md), "CANTED FINS  //  TWIN REAR JETS", 1}};
+               {vec3(-md.nacX, md.nacY, md.nacZ0 + md.nacLen * 0.5f), "TWIN REAR JETS  //  80 kN DRY", -1}, {modelFinTop(md), "CANTED FINS", 1}};
     } else {   // a conventional airframe: its parts from the parametric model
       const ModelDef& md = kModels[resCraft];
       vec3 tip = modelWingTip(md), fin = modelFinTop(md);

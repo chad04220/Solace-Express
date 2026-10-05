@@ -81,10 +81,10 @@ const AircraftSpec kAircraft[] = {
    0.03f, 3.4f, 1.60f, 0.0f, 0.012f, 0.010f, 0.0f, 0.72f, 72000, 0, 60, 70, 480, 5000, 200, true, false, true,
    30000, 80000, 100000, 0.90f, 0.090f, 0.070f, LIC_STUDENT, 0, 0,
    16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.075f, 0.08f, 0.09f), vec3(0.72f, 0.3f, 1.0f), 2, 4.3f, 90.f, -45.f},
-  // XR-15 Peregrine: Codex's FX-27 swept-wing demonstrator (broad chines, twin canted fins, two close-set rear jets) on
+  // XR-15 Kestrel: Codex's FX-27 swept-wing demonstrator (broad chines, twin canted fins, two close-set rear jets) on
   // the generic flight model and field like the XR-10 and XR-20. The tier between them: reheat and a Mach 1.4 wall,
   // +11 / -5 g. Slate paint with ivory datum panels.
-  {"xr15_peregrine", "XR-15 Peregrine", "Swept-wing supersonic demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
+  {"xr15_kestrel", "XR-15 Kestrel", "Swept-wing supersonic demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
    10500.0f, 3500.0f, 0.0f, 0, 48.0f, 14.0f, 3.428571f,
    0.18f, 4.2f, 1.60f, 0.70f, 0.023f, 0.012f, 0.065f, 0.78f,
    40000.0f, 0.0f, 51.0f, 59.0f, 260.0f, 700.0f, 1400.0f, false, false, true,
