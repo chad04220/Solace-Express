@@ -539,7 +539,7 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     // not fatal: without it the cockpit screens stay dark, but the game still runs (the error goes to startup.log)
     if (!progDisp) { dispError = error; error.clear(); }
     rasterOk = compileRaster(); step(); step(); step();   // optional: without them the ray tracer stays (startup.log says why)
-    if (!rasterOk) { error.clear(); }
+    if (!rasterOk) { if (getenv("RASTERDBG")) fprintf(stderr, "raster programs failed: %s\n", error.c_str()); error.clear(); }
   }
   glFinish();   // everything complete before another context uses the programs
   return true;

@@ -1,4 +1,4 @@
-# ctest: dump every ray-tracing program's source (shader_check) and validate each with glslangValidator
+# ctest: dump every program's source (shader_check) and validate and link each with glslangValidator
 file(MAKE_DIRECTORY ${OUT})
 execute_process(COMMAND ${CHECK} ${OUT} RESULT_VARIABLE r)
 if(NOT r EQUAL 0)
@@ -6,7 +6,7 @@ if(NOT r EQUAL 0)
 endif()
 file(GLOB shaders ${OUT}/*.frag)
 foreach(f ${shaders})
-  execute_process(COMMAND ${VALIDATOR} ${f} RESULT_VARIABLE r OUTPUT_VARIABLE o ERROR_VARIABLE e)
+  execute_process(COMMAND ${VALIDATOR} -l ${f} RESULT_VARIABLE r OUTPUT_VARIABLE o ERROR_VARIABLE e)   # (-l links: an unresolved function fails here, not on the GPU)
   if(NOT r EQUAL 0)
     message(FATAL_ERROR "${f}:\n${o}${e}")
   endif()
