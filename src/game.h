@@ -63,7 +63,7 @@ struct TipPt { vec3 p; float age, a; int seg; };   // wingtip vapour ribbon poin
 struct Particle { vec3 p, v; float life, maxLife, size, grow; vec3 col; float alpha; int kind; float drag, buoy; bool instant = false; bool fresh = true; };  // instant: no fade-in (trails)
 
 enum GameScreen { SCR_MENU = 0, SCR_HUB, SCR_FLIGHT, SCR_DEBRIEF, SCR_RESEARCH, SCR_LOADING };
-enum HubTab { TAB_CONTRACTS = 0, TAB_HANGAR, TAB_LOGBOOK, TAB_SETTINGS };
+enum HubTab { TAB_CONTRACTS = 0, TAB_HANGAR, TAB_AIRLINE, TAB_LOGBOOK, TAB_SETTINGS };
 
 class Game {
   friend struct GameTest;
@@ -431,6 +431,8 @@ private:
   void drawHubContracts(float x, float y, float w, float h);
   void drawHubHangar(float x, float y, float w, float h);
   void drawHubLogbook(float x, float y, float w, float h);
+  void drawHubAirline(float x, float y, float w, float h);
+  int airSelPlane = 0, airSelDest = 0, airSelPilot = 0;   // the airline tab's route set-up
   void drawSettings(float x, float y, float w, float h);
   void drawControls(float x, float y, float w, float h);
   void updateBindCapture(float dt);

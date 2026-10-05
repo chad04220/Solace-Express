@@ -486,10 +486,11 @@ void Game::drawHub() {
   chip("REPUTATION", fmt("%d", career.reputation), C_ACCENT, 120 * s);
   chip("BANK", fmtMoney(career.money), career.money < 0 ? C_BAD : C_GOOD, 160 * s);
   // tabs: numbered labels over a hairline, a glowing bar glides under the active one
-  const char* tabs[] = {"CONTRACTS", "HANGAR", "LOGBOOK", "SETTINGS"};
-  float tx = 24 * s, ty = 80 * s, tabW[4], tabX[4];
+  const char* tabs[] = {"CONTRACTS", "HANGAR", "AIRLINE", "LOGBOOK", "SETTINGS"};
+  const int nTabs = 5;
+  float tx = 24 * s, ty = 80 * s, tabW[5], tabX[5];
   g_ren.rectGrad(0, 73 * s, W, 44 * s, vec3(0.008f, 0.028f, 0.05f), vec3(0.0f, 0.01f, 0.02f), 0.55f);   // glass band behind the tabs
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < nTabs; i++) {
     std::string lab = fmt("%02d  %s", i + 1, tabs[i]);
     float w = g_ren.textWidth(lab, 15 * s) + 28 * s;
     tabX[i] = tx; tabW[i] = w;
@@ -512,6 +513,7 @@ void Game::drawHub() {
   switch (hubTab) {
     case TAB_CONTRACTS: drawHubContracts(cx, cy, cw, ch); break;
     case TAB_HANGAR: drawHubHangar(cx, cy, cw, ch); break;
+    case TAB_AIRLINE: drawHubAirline(cx, cy, cw, ch); break;
     case TAB_LOGBOOK: drawHubLogbook(cx, cy, cw, ch); break;
     default: { float pw = std::min(cw, (settingsPage == 1 ? 940 : 760) * s); panel(cx, cy, pw, ch); drawSettings(cx + 24 * s, cy + 20 * s, pw - 48 * s, ch - 40 * s); break; }
   }
@@ -877,7 +879,7 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
   if (career.fleet.empty()) g_ren.text(px, py, 15 * s, "You don't own any aircraft yet. Rentals are available everywhere.", C_DIM, 1);
   for (size_t fi = 0; fi < career.fleet.size(); fi++) {
     const OwnedPlane& f = career.fleet[fi]; const AircraftSpec& fs = kAircraft[f.spec];
-    g_ren.text(px, py, 15 * s, ellipsize(fmt("%s  -  at %s, %.0f%% fuel, condition %.0f%%", fs.name, g_world.airports[f.location].code, 100.f * f.fuel / std::max(fs.maxFuel, 1.f), 100.f * f.condition), dw - 200 * s, 15 * s), C_TEXT, 1);
+    g_ren.text(px, py, 15 * s, ellipsize(fmt("%s  -  at %s, %.0f%% fuel, condition %.0f%%%s", fs.name, g_world.airports[f.location].code, 100.f * f.fuel / std::max(fs.maxFuel, 1.f), 100.f * f.condition, career.routeOf((int)fi) >= 0 ? "  -  on an airline route" : ""), dw - 200 * s, 15 * s), career.routeOf((int)fi) >= 0 ? C_ACCENT : C_TEXT, 1);
     if (f.location == career.location && f.fuel < fs.maxFuel - 1.f) {
       int cost = (int)((fs.maxFuel - f.fuel) * career.fuelPrice(career.location, f.spec));
       if (button(px + dw - 48 * s - 150 * s, py - 4 * s, 150 * s, 26 * s, fmt("Fill up %s", fmtMoney(cost).c_str()), !commitBlocked() && career.money >= cost, false)) {
@@ -901,6 +903,86 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
     g_ren.text(px + 230 * s, py, 13 * s, fmt("premium up to %s per flight; covers repairs after a failure or a belly landing", fmtMoney(prem).c_str()), C_DIM, 1);
     py += 26 * s;
   }
+}
+
+// ------------------------------------------------------------------ the airline tab (C11)
+void Game::drawHubAirline(float x, float y, float w, float h) {
+  float s = S();
+  float lw = std::min(w * 0.5f, 620 * s);
+  panel(x, y, lw, h); panel(x + lw + 16 * s, y, w - lw - 16 * s, h);
+  float px = x + 20 * s, py = y + 16 * s, iw = lw - 40 * s;
+  header(px, py, iw, "YOUR ROUTES"); py += 28 * s;
+  if (!career.airlineOpen()) {
+    for (auto& l : wrap("The airline opens with your Airline Transport licence (chapter 5 of the story). Then your own aircraft fly routes with hired pilots while you fly your own work: every flight you settle is a day of theirs.", iw, 15 * s)) { g_ren.text(px, py, 15 * s, l, C_DIM, 1); py += 21 * s; }
+    return;
+  }
+  g_ren.text(px, py, 14 * s, fmt("Earned so far %s   -   %d incident%s   -   %d pilot%s on the payroll", fmtMoney(career.airline.earned).c_str(), career.airline.incidents, career.airline.incidents == 1 ? "" : "s", (int)career.airline.pilots.size(), career.airline.pilots.size() == 1 ? "" : "s"), C_DIM, 1); py += 26 * s;
+  if (career.airline.routes.empty()) { g_ren.text(px, py, 15 * s, "No routes yet. Set one up on the right: an aircraft of yours, a destination, a pilot.", C_DIM, 1); py += 24 * s; }
+  for (size_t ri = 0; ri < career.airline.routes.size(); ri++) {
+    const Career::Route& r = career.airline.routes[ri];
+    if (r.fleetIdx < 0 || r.fleetIdx >= (int)career.fleet.size()) continue;
+    const AircraftSpec& sp = kAircraft[career.fleet[r.fleetIdx].spec];
+    std::string pl = r.pilot >= 0 && r.pilot < (int)career.airline.pilots.size() ? career.airline.pilots[r.pilot].name : "-";
+    g_ren.text(px, py, 15 * s, ellipsize(fmt("%s   %s > %s   %s", sp.name, g_world.airports[r.from].code, g_world.airports[r.to].code, pl.c_str()), iw - 160 * s, 15 * s), C_TEXT, 1);
+    g_ren.text(px, py + 18 * s, 12.5f * s, fmt("%d flight%s, %s net, about %s a flight; condition %.0f%%", r.flights, r.flights == 1 ? "" : "s", fmtMoney(r.earned).c_str(), fmtMoney(career.routeRevenue(r) - career.routeFuelCost(r) - (r.pilot >= 0 ? career.airline.pilots[r.pilot].wage : 0)).c_str(), 100.f * career.fleet[r.fleetIdx].condition), C_DIM, 1);
+    if (button(px + iw - 110 * s, py - 2 * s, 110 * s, 28 * s, "Recall", !commitBlocked(), false)) { std::string m; bool ok = false; commit([&](Career& k) { ok = k.recallRoute((int)ri, &m); }); hubMsg = m; hubMsgTime = 4; }
+    py += 42 * s;
+  }
+  py += 8 * s;
+  header(px, py, iw, "LOG"); py += 26 * s;
+  if (career.airline.log.empty()) { g_ren.text(px, py, 13 * s, "Nothing to report.", C_DIM, 1); py += 18 * s; }
+  for (int i = (int)career.airline.log.size() - 1; i >= 0 && py < y + h - 20 * s; i--) { g_ren.text(px, py, 13 * s, ellipsize(career.airline.log[i], iw, 13 * s), C_WARN, 1); py += 18 * s; }
+  // ---- right: set up a route, the pilots
+  float rx = x + lw + 36 * s, ry = y + 16 * s, rw = w - lw - 16 * s - 40 * s;
+  header(rx, ry, rw, "SET UP A ROUTE"); ry += 30 * s;
+  std::vector<int> freePlanes; for (size_t fi = 0; fi < career.fleet.size(); fi++) if (career.routeOf((int)fi) < 0) freePlanes.push_back((int)fi);
+  if (freePlanes.empty()) { g_ren.text(rx, ry, 15 * s, "Every aircraft you own is on a route (or you own none). Buy another in the Hangar.", C_DIM, 1); ry += 24 * s; }
+  else {
+    airSelPlane = std::clamp(airSelPlane, 0, (int)freePlanes.size() - 1);
+    int fi = freePlanes[airSelPlane]; const OwnedPlane& f = career.fleet[fi]; const AircraftSpec& sp = kAircraft[f.spec];
+    auto pick = [&](const char* k, const std::string& v, int& idx, int n) {
+      g_ren.text(rx, ry + 5 * s, 12 * s, k, C_DIM, 1, 0, false);
+      if (button(rx + 110 * s, ry, 30 * s, 28 * s, "<")) idx = (idx + n - 1) % std::max(n, 1);
+      g_ren.text(rx + 148 * s, ry + 6 * s, 15 * s, ellipsize(v, rw - 200 * s, 15 * s), C_TEXT, 1);
+      if (button(rx + rw - 30 * s, ry, 30 * s, 28 * s, ">")) idx = (idx + 1) % std::max(n, 1);
+      ry += 36 * s;
+    };
+    pick("AIRCRAFT", fmt("%s at %s", sp.name, g_world.airports[f.location].code), airSelPlane, (int)freePlanes.size());
+    int na = (int)g_world.airports.size();
+    airSelDest = (airSelDest % na + na) % na; if (airSelDest == f.location) airSelDest = (airSelDest + 1) % na;
+    Contract c; c.from = f.location; c.to = airSelDest; c.type = CT_CARGO; std::string why; bool okRoute = career.canFly(c, f.spec, &why) != Career::SRC_NONE;
+    pick("DESTINATION", fmt("%s %s%s", g_world.airports[airSelDest].code, g_world.airports[airSelDest].name, okRoute ? "" : "  -  no"), airSelDest, na);
+    if (!okRoute) { g_ren.text(rx, ry, 12.5f * s, ellipsize(why, rw, 12.5f * s), C_BAD, 1); ry += 18 * s; }
+    std::vector<int> freePilots; for (size_t pi = 0; pi < career.airline.pilots.size(); pi++) { bool busy = false; for (auto& r : career.airline.routes) if (r.pilot == (int)pi) busy = true; if (!busy) freePilots.push_back((int)pi); }
+    if (freePilots.empty()) { g_ren.text(rx, ry + 5 * s, 12 * s, "PILOT", C_DIM, 1, 0, false); g_ren.text(rx + 148 * s, ry + 6 * s, 15 * s, "none free - hire one below", C_WARN, 1); ry += 36 * s; }
+    else {
+      airSelPilot = std::clamp(airSelPilot, 0, (int)freePilots.size() - 1);
+      const Career::Pilot& p = career.airline.pilots[freePilots[airSelPilot]];
+      pick("PILOT", fmt("%s  (rating %d, %s a flight)", p.name.c_str(), p.rating, fmtMoney(p.wage).c_str()), airSelPilot, (int)freePilots.size());
+      Career::Route prev; prev.fleetIdx = fi; prev.from = f.location; prev.to = airSelDest; prev.pilot = freePilots[airSelPilot];
+      g_ren.text(rx, ry, 13 * s, fmt("About %s a flight: fares %s, fuel %s, wage %s", fmtMoney(career.routeRevenue(prev) - career.routeFuelCost(prev) - p.wage).c_str(), fmtMoney(career.routeRevenue(prev)).c_str(), fmtMoney(career.routeFuelCost(prev)).c_str(), fmtMoney(p.wage).c_str()), C_DIM, 1); ry += 24 * s;
+      if (button(rx, ry, 200 * s, 36 * s, "Assign route", okRoute && !commitBlocked(), okRoute)) { std::string m; bool ok = false; int pi = freePilots[airSelPilot]; commit([&](Career& k) { ok = k.assignRoute(fi, airSelDest, pi, &m); }); if (ok) g_audio.trigger(SFX_CASH); hubMsg = m; hubMsgTime = 5; }
+      ry += 46 * s;
+    }
+  }
+  ry += 10 * s;
+  header(rx, ry, rw, "PILOTS"); ry += 28 * s;
+  for (size_t pi = 0; pi < career.airline.pilots.size(); pi++) {
+    const Career::Pilot& p = career.airline.pilots[pi];
+    bool busy = false; for (auto& r : career.airline.routes) if (r.pilot == (int)pi) busy = true;
+    g_ren.text(rx, ry + 4 * s, 14 * s, fmt("%s   rating %d   %s a flight%s", p.name.c_str(), p.rating, fmtMoney(p.wage).c_str(), busy ? "   (on a route)" : ""), C_TEXT, 1);
+    if (!busy && button(rx + rw - 90 * s, ry, 90 * s, 26 * s, "Let go", !commitBlocked(), false)) { std::string m; commit([&](Career& k) { k.firePilot((int)pi, &m); }); hubMsg = m; hubMsgTime = 4; }
+    ry += 30 * s;
+  }
+  g_ren.text(rx, ry + 4 * s, 12 * s, "FOR HIRE", C_DIM, 1, 0, false); ry += 22 * s;
+  auto cands = career.pilotCandidates();
+  for (size_t ci = 0; ci < cands.size() && ry < y + h - 40 * s; ci++) {
+    const Career::Pilot& p = cands[ci];
+    g_ren.text(rx, ry + 4 * s, 14 * s, fmt("%s   rating %d   %s a flight", p.name.c_str(), p.rating, fmtMoney(p.wage).c_str()), C_DIM, 1);
+    if (button(rx + rw - 90 * s, ry, 90 * s, 26 * s, "Hire", !commitBlocked() && career.airline.pilots.size() < 6, false)) { std::string m; Career::Pilot cp = p; commit([&](Career& k) { k.hirePilot(cp, &m); }); hubMsg = m; hubMsgTime = 4; }
+    ry += 30 * s;
+  }
+  g_ren.text(rx, std::min(ry + 6 * s, y + h - 24 * s), 12 * s, "Rating 3 fills the cabin and rarely bends anything; rating 1 is cheap and has incidents. Insurance covers their repairs too.", C_DIM, 1);
 }
 
 void Game::drawHubLogbook(float x, float y, float w, float h) {

@@ -250,7 +250,7 @@ Career::Source Career::canFly(const Contract& c, int si, std::string* why) const
     if (a.length < s.runwayNeeded(a.elev)) return no(fmt("%s runway too short (%.0f m, needs %.0f m)", a.code, a.length, s.runwayNeeded(a.elev)));
   }
   if (c.timeLimitMin > 0 && km * 1000.f / Plane::perf(&s).cruiseV / 60.f > c.timeLimitMin * 0.8f) return no(fmt("Too slow to make the %.0f minute deadline", c.timeLimitMin));
-  if (ownedIndexFor(si) >= 0) return SRC_OWNED;
+  if (ownedIndexFor(si) >= 0) { if (routeOf(ownedIndexFor(si)) >= 0) return no("On an airline route - recall it in the Airline tab"); return SRC_OWNED; }
   if (c.ownedOnly) return no("Client requires your own aircraft");
   if (s.rentFee <= 0) return no("Not available for rent - buy one in the Hangar");
   return SRC_RENT;
@@ -610,6 +610,7 @@ std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan
   location = at;
   if (J.src == SRC_OWNED) { int oi = ownedIndexFor(J.spec); if (oi >= 0) fleet[oi].location = at; }
   wear(L, J.spec, J.src, r);
+  airlineTick(L);
   payLoan(L);
   int total = 0; for (auto& l : L) total += l.amount;
   money += total;
@@ -755,6 +756,7 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
     boardSeed++;
   }
   if (r.outcome != OUT_CRASHED) wear(L, si, src, r);
+  airlineTick(L);
   payLoan(L);
   int total = 0; for (auto& l : L) total += l.amount;
   money += total;
@@ -800,6 +802,109 @@ bool Career::buyUsed(int si, std::string* msg) {
   refreshBoard();
   return true;
 }
+// ------------------------------------------------------------------ the airline (C11)
+int Career::routeOf(int fi) const { for (size_t i = 0; i < airline.routes.size(); i++) if (airline.routes[i].fleetIdx == fi) return (int)i; return -1; }
+int Career::routeRevenue(const Route& r) const {
+  if (r.fleetIdx < 0 || r.fleetIdx >= (int)fleet.size()) return 0;
+  const AircraftSpec& s = kAircraft[fleet[r.fleetIdx].spec];
+  float km = g_world.distanceKm(r.from, r.to);
+  float load = r.pilot >= 0 && r.pilot < (int)airline.pilots.size() ? 0.5f + 0.17f * airline.pilots[r.pilot].rating : 0.5f;   // 0.67 / 0.84 / 1.0
+  float gross = km * (s.pax * 4.5f + s.cargoKg * 0.02f) * load + 60.f;   // (a 28 km Q400 leg grosses about $5,900 with a full cabin)
+  return (int)gross / 10 * 10;
+}
+int Career::routeFuelCost(const Route& r) const {
+  if (r.fleetIdx < 0 || r.fleetIdx >= (int)fleet.size()) return 0;
+  const AircraftSpec& s = kAircraft[fleet[r.fleetIdx].spec];
+  float km = g_world.distanceKm(r.from, r.to) + 8.f;
+  float kg = s.maxFuel / std::max(s.rangeKm, 1.f) * km * 1.1f;
+  return (int)(kg * s.fuelPriceBase() * 1.1f);
+}
+std::vector<Career::Pilot> Career::pilotCandidates() const {
+  static const char* names[] = {"A. Okafor", "M. Lindqvist", "R. Tanaka", "S. Delgado", "J. Mbeki", "E. Novak", "T. Haddad", "L. Marchetti", "K. Oyelaran", "P. Svensson", "D. Achebe", "N. Kowalski"};
+  std::vector<Pilot> out;
+  Rng r(boardSeed * 7919u + 17u);
+  for (int i = 0; i < 3; i++) {
+    Pilot p; p.name = names[(r.next() + i * 5) % 12]; p.rating = 1 + (int)(r.uni() * 2.99f); p.wage = p.rating == 1 ? 120 : p.rating == 2 ? 220 : 360;
+    bool dup = false; for (auto& q : out) if (q.name == p.name) dup = true; for (auto& q : airline.pilots) if (q.name == p.name) dup = true;
+    if (dup) p.name = std::string(names[(r.next() + 7) % 12]) + " II";
+    out.push_back(p);
+  }
+  return out;
+}
+bool Career::hirePilot(const Pilot& p, std::string* msg) {
+  if (!airlineOpen()) { *msg = "The airline opens with your Airline Transport licence."; return false; }
+  if (airline.pilots.size() >= 6) { *msg = "Six pilots is the payroll's limit."; return false; }
+  for (auto& q : airline.pilots) if (q.name == p.name) { *msg = p.name + " already flies for you."; return false; }
+  airline.pilots.push_back(p); boardSeed++;
+  *msg = fmt("%s hired: rating %d, $%d a flight.", p.name.c_str(), p.rating, p.wage);
+  return true;
+}
+bool Career::firePilot(int pi, std::string* msg) {
+  if (pi < 0 || pi >= (int)airline.pilots.size()) return false;
+  for (auto& r : airline.routes) if (r.pilot == pi) { *msg = airline.pilots[pi].name + " is flying a route: recall it first."; return false; }
+  *msg = airline.pilots[pi].name + " let go.";
+  airline.pilots.erase(airline.pilots.begin() + pi);
+  for (auto& r : airline.routes) if (r.pilot > pi) r.pilot--;
+  return true;
+}
+bool Career::assignRoute(int fi, int to, int pilot, std::string* msg) {
+  if (!airlineOpen()) { *msg = "The airline opens with your Airline Transport licence."; return false; }
+  if (fi < 0 || fi >= (int)fleet.size()) return false;
+  if (routeOf(fi) >= 0) { *msg = "That aircraft is already on a route."; return false; }
+  if (pilot < 0 || pilot >= (int)airline.pilots.size()) { *msg = "Hire a pilot first."; return false; }
+  for (auto& r : airline.routes) if (r.pilot == pilot) { *msg = airline.pilots[pilot].name + " is already flying a route."; return false; }
+  int from = fleet[fi].location;
+  if (to == from) { *msg = "Pick another destination."; return false; }
+  const AircraftSpec& s = kAircraft[fleet[fi].spec];
+  Contract c; c.from = from; c.to = to; c.type = CT_CARGO;
+  std::string why;
+  if (canFly(c, fleet[fi].spec, &why) == SRC_NONE && why.find("airline route") == std::string::npos) { *msg = "That aircraft can't fly the route: " + why; return false; }
+  Route r; r.fleetIdx = fi; r.from = from; r.to = to; r.pilot = pilot;
+  airline.routes.push_back(r);
+  *msg = fmt("%s on the %s - %s route with %s.", s.name, g_world.airports[from].code, g_world.airports[to].code, airline.pilots[pilot].name.c_str());
+  return true;
+}
+bool Career::recallRoute(int ri, std::string* msg) {
+  if (ri < 0 || ri >= (int)airline.routes.size()) return false;
+  const Route& r = airline.routes[ri];
+  *msg = fmt("%s recalled: it waits at %s.", kAircraft[fleet[r.fleetIdx].spec].name, g_world.airports[fleet[r.fleetIdx].location].code);
+  airline.routes.erase(airline.routes.begin() + ri);
+  return true;
+}
+void Career::airlineTick(std::vector<PayoutLine>& L) {
+  if (airline.routes.empty()) return;
+  Rng r(boardSeed * 48271u + flights * 7u + 3u);
+  int net = 0, flown = 0;
+  for (auto& rt : airline.routes) {
+    if (rt.fleetIdx < 0 || rt.fleetIdx >= (int)fleet.size() || rt.pilot < 0 || rt.pilot >= (int)airline.pilots.size()) continue;
+    OwnedPlane& p = fleet[rt.fleetIdx]; const AircraftSpec& s = kAircraft[p.spec]; const Pilot& pl = airline.pilots[rt.pilot];
+    int gross = routeRevenue(rt), fuel = routeFuelCost(rt), wage = pl.wage;
+    float km = g_world.distanceKm(rt.from, rt.to);
+    p.condition = clampf(p.condition - (km * 1000.f / Plane::perf(&s).cruiseV / 3600.f) * 0.015f - (pl.rating == 1 ? 0.01f : 0.f), 0.05f, 1.f);
+    int repair = 0;
+    float pInc = (0.09f - 0.03f * pl.rating) * (1.5f - p.condition);   // a weak pilot in a worn aircraft: up to ~9% a flight
+    if (r.uni() < pInc) {
+      repair = std::max(80, (int)(s.price * (0.004f + 0.012f * r.uni())) / 10 * 10);
+      airline.incidents++;
+      const char* what[] = {"hard landing", "bird strike", "gear scrape", "engine over-temp", "wing-tip strike on the stand"};
+      std::string w = what[r.next() % 5];
+      if (insured) { L.push_back({fmt("Airline: %s - %s, repairs covered", s.name, w.c_str()), -insurancePremium(p.spec)}); airline.log.push_back(fmt("%s: %s (insured)", pl.name.c_str(), w.c_str())); repair = 0; }
+      else { L.push_back({fmt("Airline: %s - %s, repairs", s.name, w.c_str()), -repair}); airline.log.push_back(fmt("%s: %s, $%d", pl.name.c_str(), w.c_str(), repair)); }
+      p.condition = clampf(p.condition - 0.04f, 0.05f, 1.f);
+    }
+    int flightNet = gross - fuel - wage;
+    net += flightNet - repair; flown++;
+    rt.flights++; rt.earned += flightNet;
+    std::swap(rt.from, rt.to); p.location = rt.from;   // it flew the leg and waits at the other end
+    p.fuel = s.maxFuel * 0.6f;
+  }
+  if (flown) {
+    L.push_back({fmt("Airline: %d route flight%s (fares less fuel and wages)", flown, flown == 1 ? "" : "s"), net});
+    airline.earned += net;
+    if (airline.log.size() > 8) airline.log.erase(airline.log.begin(), airline.log.begin() + (airline.log.size() - 8));
+  }
+}
+
 float Career::failureChance(Source src, int si) const {
   if (src == SRC_LESSON || src == SRC_NONE || kAircraft[si].special) return 0.f;
   if (src == SRC_RENT) return 0.02f;
@@ -874,6 +979,8 @@ void Career::payLoan(std::vector<PayoutLine>& L) {
 }
 bool Career::sell(int fi, std::string* msg) {
   if (fi < 0 || fi >= (int)fleet.size()) return false;
+  if (routeOf(fi) >= 0) { *msg = "It's flying a route: recall it first."; return false; }
+  for (auto& rt : airline.routes) if (rt.fleetIdx > fi) rt.fleetIdx--;
   const AircraftSpec& s = kAircraft[fleet[fi].spec];
   int val = (int)(s.price * 7 / 10 * (0.6f + 0.4f * clampf(fleet[fi].condition, 0.f, 1.f)));
   money += val;
@@ -904,6 +1011,9 @@ bool Career::save(const std::string& path) const {
   for (auto& p : fleet) ok = ok && fprintf(f, "plane %s %d %f %f\n", kAircraft[p.spec].id, p.location, p.fuel, p.condition) > 0;
   if (loan.open()) ok = ok && fprintf(f, "loan %s %d %d %d %f\n", kAircraft[loan.spec].id, loan.balance, loan.payment, loan.missed, loan.rate) > 0;
   ok = ok && fprintf(f, "insured %d\n", insured ? 1 : 0) > 0;
+  for (auto& p : airline.pilots) { std::string n = p.name; for (char& ch : n) if (ch == ' ') ch = '_'; ok = ok && fprintf(f, "pilot %s %d %d\n", n.c_str(), p.rating, p.wage) > 0; }
+  for (auto& r : airline.routes) ok = ok && fprintf(f, "route %d %d %d %d %d %d\n", r.fleetIdx, r.from, r.to, r.pilot, r.flights, r.earned) > 0;
+  if (!airline.routes.empty() || !airline.pilots.empty() || airline.earned) ok = ok && fprintf(f, "airline %d %d\n", airline.earned, airline.incidents) > 0;
   if (job) {   // the open job: its state, then its contract (a story contract by id, a freelance one in full)
     const JobState& J = *job;
     ok = ok && fprintf(f, "job %d %s %d %d %d %d %f %f %f %f %d %f %d %d %u\n", (int)J.state, kAircraft[J.spec].id, (int)J.src, J.at, J.legs, J.wpDone, J.jobClockMin,
@@ -975,6 +1085,9 @@ bool Career::load(const std::string& path) {
       if (ok) c.fleet.push_back({spec, loc, std::clamp(fuel, 0.f, kAircraft[spec].maxFuel), std::clamp(cond, 0.f, 1.f)});
     }
     else if (!strcmp(key, "insured")) { int v = 0; ok = fscanf(f, "%d", &v) == 1 && (v == 0 || v == 1); c.insured = v == 1; }
+    else if (!strcmp(key, "pilot")) { char n[64]; Pilot p; ok = fscanf(f, "%63s %d %d", n, &p.rating, &p.wage) == 3 && p.rating >= 1 && p.rating <= 3 && p.wage >= 0 && c.airline.pilots.size() < 6; if (ok) { p.name = n; for (char& ch : p.name) if (ch == '_') ch = ' '; c.airline.pilots.push_back(p); } }
+    else if (!strcmp(key, "route")) { Route r; ok = fscanf(f, "%d %d %d %d %d %d", &r.fleetIdx, &r.from, &r.to, &r.pilot, &r.flights, &r.earned) == 6 && r.fleetIdx >= 0 && r.from >= 0 && r.from < nApt && r.to >= 0 && r.to < nApt && r.pilot >= 0 && r.flights >= 0; if (ok) c.airline.routes.push_back(r); }
+    else if (!strcmp(key, "airline")) ok = fscanf(f, "%d %d", &c.airline.earned, &c.airline.incidents) == 2;
     else if (!strcmp(key, "loan")) {
       char id[64]; Loan l;
       ok = fscanf(f, "%63s %d %d %d %f", id, &l.balance, &l.payment, &l.missed, &l.rate) == 5 && l.balance >= 0 && l.payment >= 0 && l.missed >= 0 && l.missed < 3 && std::isfinite(l.rate);
@@ -1032,6 +1145,7 @@ bool Career::load(const std::string& path) {
   }
   fclose(f);
   if (ver >= 2) ok = ok && have == 4095 && ended && fleetN == (int)c.fleet.size();   // a truncated save is rejected
+  for (auto& r : c.airline.routes) if (r.fleetIdx >= (int)c.fleet.size() || r.pilot >= (int)c.airline.pilots.size()) ok = false;   // (a route needs its aircraft and pilot)
   if (c.job && (c.job->c.id.empty() || c.job->c.to < 0 || c.job->c.to >= nApt)) ok = false;   // a job needs its contract
   ok = ok && (have & 15) == 15
        && c.license >= LIC_STUDENT && c.license <= LIC_ATP

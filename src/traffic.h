@@ -31,6 +31,7 @@ struct TrafficCraft {
   float escSide = 1, escBlend = 0; vec3 escUp = vec3(0, 1, 0), escRel, escFrom;   // escort: which side of the player it works, smoothed lift direction
   bool alive = true;
   int id = 0;
+  int routeTag = -1;          // one of the player's airline routes, flying in the type's own livery (Traffic::spawnRoute)
 };
 
 struct TrafficPuff { vec3 p, v, col; float life, size, grow, alpha; int kind; };
@@ -50,6 +51,9 @@ public:
   int count(int role) const;
   // O+P entertainment: a pair of XR-9s flies a display around the player until dismissed or the player lands
   void spawnEscort(vec3 player, vec3 playerVel);
+  // the player's airline (C11): a scheduled flight of the given type, from "at" towards the destination airport, tagged
+  void spawnRoute(int spec, vec3 at, int destAirport, int tag);
+  bool routeFlying(int tag) const { for (auto& c : craft) if (c.alive && c.routeTag == tag) return true; return false; }
   void dismissEscort();
   // XR-40 weapons: the first aircraft a segment passes through (not the escort pair), and everything inside a blast
   int rayHit(vec3 a, vec3 d, float len, float& tHit) const;

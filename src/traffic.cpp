@@ -122,6 +122,21 @@ void Traffic::spawnCruiser(vec3 player) {
   craft.push_back(c);
 }
 
+void Traffic::spawnRoute(int spec, vec3 at, int destAirport, int tag) {
+  TrafficCraft c; c.id = nextId++;
+  c.spec = spec; c.role = TrafficCraft::CRUISER; c.state = TrafficCraft::FLY; c.routeTag = tag;
+  const Airport& d = g_world.airports[destAirport];
+  c.pos = at;
+  vec3 aim = d.pos() - c.pos; aim.y = 0;
+  c.hdg = atan2f(aim.x, -aim.z);
+  c.speed = kAircraft[spec].cruise; c.gear = kAircraft[spec].retract ? 0.f : 1.f; c.throttle = 0.75f;
+  vec3 tgt = d.pos(); tgt.y = std::max(c.pos.y, d.elev + 500.f);
+  c.path = {tgt}; c.wp = 0;
+  c.colBase = kAircraft[spec].colBase; c.colStripe = kAircraft[spec].colStripe;   // the company livery: the type's own colours
+  attitudeToQuat(c);
+  craft.push_back(c);
+}
+
 void Traffic::spawnFormation(vec3 player, vec3 playerVel) {
   int n = rnd() < 0.5f ? 2 : 3;
   float a = rnd(0, 2 * PI);

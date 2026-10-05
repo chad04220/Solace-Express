@@ -121,6 +121,23 @@ public:
   static int repairCost(int specIdx, int failureKinds, bool belly);
   Source canFly(const Contract& c, int specIdx, std::string* why = nullptr) const;
   int ownedIndexFor(int specIdx) const;
+  // The airline (C11, chapter 5): with the ATP you put your own aircraft on routes with hired pilots. Each of your own
+  // settlements is a tick of the airline's day: every route flies once (revenue by the load the type carries and the
+  // pilot's load factor, minus fuel and the pilot's wage), the aircraft wears and swaps ends, and a weak pilot has
+  // incidents (repairs, insured or not). An aircraft on a route can't be flown by you until it is recalled.
+  struct Pilot { std::string name; int rating = 1; int wage = 120; };   // rating 1..3
+  struct Route { int fleetIdx = -1, from = 0, to = 0, pilot = -1, flights = 0, earned = 0; };
+  struct Airline { std::vector<Pilot> pilots; std::vector<Route> routes; int earned = 0, incidents = 0; std::vector<std::string> log; } airline;
+  bool airlineOpen() const { return license >= LIC_ATP; }
+  int routeOf(int fleetIdx) const;                     // the route the aircraft is on (-1 none)
+  int routeRevenue(const Route& r) const;              // one flight's gross (before fuel and wage)
+  int routeFuelCost(const Route& r) const;
+  std::vector<Pilot> pilotCandidates() const;          // three to hire, from the board seed
+  bool hirePilot(const Pilot& p, std::string* msg);
+  bool firePilot(int pi, std::string* msg);
+  bool assignRoute(int fleetIdx, int to, int pilot, std::string* msg);
+  bool recallRoute(int ri, std::string* msg);
+  void airlineTick(std::vector<PayoutLine>& L);        // called by settle / closeLeg
   // Settle a finished flight; returns lines for the debrief
   // (plan: the launch plan the flight was started with - its fixed fees are charged exactly as quoted; without one
   // they are worked out now)

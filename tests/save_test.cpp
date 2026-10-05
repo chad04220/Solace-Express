@@ -50,6 +50,15 @@ int main() {
       Career k2; k2.newGame(); check(k2.load("save_test_wx2.sav") && k2.job && k2.job->c.wxShift && std::fabs(k2.job->c.wxEnd.windFrom - 123.f) < 1e-3f && k2.job->c.wxEnd.precip == 2, "round trip keeps the forecast");
       remove("save_test_wx2.sav"); remove("save_test_wx2.sav.bak");
     }
+    {   // the airline: pilots, routes and the totals round-trip; a route without its aircraft is rejected
+      Career al = live; al.license = LIC_ATP; al.fleet.push_back({5, 2, 1000.f, 0.9f}); std::string m;
+      Career::Pilot p; p.name = "A. Okafor"; p.rating = 2; p.wage = 220; al.hirePilot(p, &m); check(al.assignRoute(1, 3, 0, &m), m.c_str()); al.airline.earned = 1234; al.airline.incidents = 2;
+      check(al.save("save_test_air.sav"), "airline save writes");
+      Career b2; b2.newGame(); check(b2.load("save_test_air.sav") && b2.airline.pilots.size() == 1 && b2.airline.pilots[0].name == "A. Okafor" && b2.airline.pilots[0].rating == 2 && b2.airline.routes.size() == 1 && b2.airline.routes[0].fleetIdx == 1 && b2.airline.routes[0].to == 3 && b2.airline.earned == 1234 && b2.airline.incidents == 2, "round trip keeps the airline");
+      writeFile("save_test_air_bad.sav", "solace_save 3\nmoney 900\nlicense 3\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nattempt 3\nattempt_open 0\nfleet 0\nroute 0 1 2 0 0 0\nend\n");
+      Career x2 = r; check(!x2.load("save_test_air_bad.sav"), "a route without its aircraft is rejected");
+      remove("save_test_air.sav"); remove("save_test_air.sav.bak"); remove("save_test_air_bad.sav");
+    }
     { Career i2 = a; i2.insured = true; check(i2.save("save_test_ins.sav"), "insured save writes"); Career j; j.newGame(); check(j.load("save_test_ins.sav") && j.insured && !b.insured, "round trip keeps the insurance"); remove("save_test_ins.sav"); remove("save_test_ins.sav.bak"); }
     writeFile("save_test_v2b.sav", "solace_save 2\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nfleet 1\nplane kestrel 1 20\nend\n");
     Career v2; v2.newGame(); check(v2.load("save_test_v2b.sav") && v2.fleet.size() == 1 && v2.fleet[0].condition > 0.99f && !v2.loan.open(), "v2 plane line reads as a new aircraft without a loan");
