@@ -7,6 +7,8 @@
 #endif
 #include <windows.h>
 #include <mmsystem.h>
+#include <mmdeviceapi.h>
+#include <audioclient.h>
 #include <shellapi.h>
 #include <objbase.h>
 #include <thread>
@@ -122,16 +124,22 @@ static LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   return DefWindowProcW(h, msg, wp, lp);
 }
 
-// ------------------------------------------------------------------ audio output (waveOut, dedicated thread)
+// ------------------------------------------------------------------ audio output (WASAPI, waveOut as the fallback)
+// The mixer (g_audio.render) is pulled by a dedicated thread. WASAPI shared mode, event driven, 10 ms buffer, float
+// stereo at 48 kHz with the engine converting to the device's own format: about 10-20 ms of latency. If the device goes
+// away (headphones unplugged, default device changed) the stream is reopened on the new default; if WASAPI can't be
+// opened at all the old waveOut path (4 x 20 ms) carries on as before.
+static std::atomic<bool> s_audioRun{true};
+static HANDLE s_audioThread = nullptr;
+static HANDLE s_audioEvent = nullptr;
+// -- waveOut
 static const int kAudioBuffers = 4, kAudioFrames = 960;  // 20 ms per buffer at 48 kHz
 static HWAVEOUT s_waveOut = nullptr;
 static WAVEHDR s_hdr[kAudioBuffers];
 static int16_t s_pcm[kAudioBuffers][kAudioFrames * 2];
-static HANDLE s_audioEvent = nullptr;
-static std::atomic<bool> s_audioRun{true};
-static HANDLE s_audioThread = nullptr;
+static bool s_wasapi = false;
 
-static DWORD WINAPI audioThread(LPVOID) {
+static DWORD WINAPI waveOutThread(LPVOID) {
   SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
   static float buf[kAudioFrames * 2];
   while (s_audioRun) {
@@ -146,13 +154,10 @@ static DWORD WINAPI audioThread(LPVOID) {
   }
   return 0;
 }
-
-static bool startAudio() {
-  g_audio.init(48000);
+static bool startWaveOut() {
   WAVEFORMATEX wf = {};
   wf.wFormatTag = WAVE_FORMAT_PCM; wf.nChannels = 2; wf.nSamplesPerSec = 48000; wf.wBitsPerSample = 16;
   wf.nBlockAlign = 4; wf.nAvgBytesPerSec = 48000 * 4;
-  s_audioEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
   if (waveOutOpen(&s_waveOut, WAVE_MAPPER, &wf, (DWORD_PTR)s_audioEvent, 0, CALLBACK_EVENT) != MMSYSERR_NOERROR) return false;
   for (int i = 0; i < kAudioBuffers; i++) {
     memset(&s_hdr[i], 0, sizeof(WAVEHDR));
@@ -161,8 +166,109 @@ static bool startAudio() {
     waveOutPrepareHeader(s_waveOut, &s_hdr[i], sizeof(WAVEHDR));
     waveOutWrite(s_waveOut, &s_hdr[i], sizeof(WAVEHDR));
   }
-  s_audioThread = CreateThread(nullptr, 0, audioThread, nullptr, 0, nullptr);
+  s_audioThread = CreateThread(nullptr, 0, waveOutThread, nullptr, 0, nullptr);
   return true;
+}
+
+// -- WASAPI (the interfaces by their GUIDs: no uuid library needed on MinGW)
+static const GUID kClsidMMDeviceEnumerator = {0xBCDE0395, 0xE52F, 0x467C, {0x8E, 0x3D, 0xC4, 0x57, 0x92, 0x91, 0x69, 0x2E}};
+static const GUID kIidIMMDeviceEnumerator = {0xA95664D2, 0x9614, 0x4F35, {0xA7, 0x46, 0xDE, 0x8D, 0xB6, 0x36, 0x17, 0xE6}};
+static const GUID kIidIAudioClient = {0x1CB9AD4C, 0xDBFA, 0x4C32, {0xB1, 0x78, 0xC2, 0xF5, 0x68, 0xA7, 0x03, 0xB2}};
+static const GUID kIidIAudioRenderClient = {0xF294ACFC, 0x3146, 0x4483, {0xA7, 0xBF, 0xAD, 0xDC, 0xA7, 0xC2, 0x60, 0xE2}};
+static const GUID kSubFormatFloat = {0x00000003, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71}};   // KSDATAFORMAT_SUBTYPE_IEEE_FLOAT
+#ifndef AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
+#define AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM 0x80000000
+#endif
+#ifndef AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY
+#define AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY 0x08000000
+#endif
+struct WasapiOut {
+  IAudioClient* client = nullptr; IAudioRenderClient* render = nullptr;
+  UINT32 bufferFrames = 0;
+  void close() {
+    if (client) client->Stop();
+    if (render) { render->Release(); render = nullptr; }
+    if (client) { client->Release(); client = nullptr; }
+    bufferFrames = 0;
+  }
+  // the default render endpoint, shared mode, 10 ms, our float stereo 48 kHz converted by the engine
+  bool open() {
+    close();
+    IMMDeviceEnumerator* en = nullptr;
+    if (FAILED(CoCreateInstance(kClsidMMDeviceEnumerator, nullptr, CLSCTX_ALL, kIidIMMDeviceEnumerator, (void**)&en)) || !en) return false;
+    IMMDevice* dev = nullptr;
+    HRESULT hr = en->GetDefaultAudioEndpoint(eRender, eConsole, &dev);
+    en->Release();
+    if (FAILED(hr) || !dev) return false;
+    hr = dev->Activate(kIidIAudioClient, CLSCTX_ALL, nullptr, (void**)&client);
+    dev->Release();
+    if (FAILED(hr) || !client) { client = nullptr; return false; }
+    WAVEFORMATEXTENSIBLE wf = {};
+    wf.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE; wf.Format.nChannels = 2; wf.Format.nSamplesPerSec = 48000;
+    wf.Format.wBitsPerSample = 32; wf.Format.nBlockAlign = 8; wf.Format.nAvgBytesPerSec = 48000 * 8; wf.Format.cbSize = 22;
+    wf.Samples.wValidBitsPerSample = 32; wf.dwChannelMask = 3; wf.SubFormat = kSubFormatFloat;
+    const DWORD flags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
+    hr = client->Initialize(AUDCLNT_SHAREMODE_SHARED, flags, 100000 /* 10 ms, in 100 ns */, 0, &wf.Format, nullptr);
+    if (FAILED(hr)) { close(); return false; }
+    if (FAILED(client->SetEventHandle(s_audioEvent)) || FAILED(client->GetBufferSize(&bufferFrames)) || bufferFrames == 0) { close(); return false; }
+    if (FAILED(client->GetService(kIidIAudioRenderClient, (void**)&render)) || !render) { close(); return false; }
+    // silence in the whole buffer first, so the stream starts clean
+    BYTE* data = nullptr;
+    if (SUCCEEDED(render->GetBuffer(bufferFrames, &data)) && data) render->ReleaseBuffer(bufferFrames, AUDCLNT_BUFFERFLAGS_SILENT);
+    if (FAILED(client->Start())) { close(); return false; }
+    return true;
+  }
+  // one event's worth: fill whatever the device has consumed. false: the device is gone (reopen)
+  bool pump() {
+    UINT32 padding = 0;
+    HRESULT hr = client->GetCurrentPadding(&padding);
+    if (FAILED(hr)) return hr != AUDCLNT_E_DEVICE_INVALIDATED && hr != AUDCLNT_E_SERVICE_NOT_RUNNING;
+    UINT32 frames = bufferFrames > padding ? bufferFrames - padding : 0;
+    if (frames == 0) return true;
+    BYTE* data = nullptr;
+    hr = render->GetBuffer(frames, &data);
+    if (FAILED(hr) || !data) return hr != AUDCLNT_E_DEVICE_INVALIDATED && hr != AUDCLNT_E_SERVICE_NOT_RUNNING;
+    g_audio.render((float*)data, (int)frames);
+    render->ReleaseBuffer(frames, 0);
+    return true;
+  }
+};
+static WasapiOut s_wo;
+static DWORD WINAPI wasapiThread(LPVOID) {
+  CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+  SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+  int lost = 0;
+  while (s_audioRun) {
+    if (!s_wo.client) {   // the device went away: reopen on the new default, trying every half second
+      if (s_wo.open()) lost = 0;
+      else { Sleep(500); if (++lost > 120) Sleep(2000); continue; }
+    }
+    WaitForSingleObject(s_audioEvent, 200);
+    if (!s_audioRun) break;
+    if (!s_wo.pump()) s_wo.close();
+  }
+  s_wo.close();
+  CoUninitialize();
+  return 0;
+}
+
+static bool startAudio() {
+  g_audio.init(48000);
+  s_audioEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+  // WASAPI first (opened on the mixer thread itself so the COM apartment is its own); the main thread only checks it
+  // can be opened once, so a machine without it falls straight back to waveOut
+  {
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    WasapiOut probe;
+    bool ok = probe.open();
+    probe.close();
+    if (ok) {
+      s_wasapi = true;
+      s_audioThread = CreateThread(nullptr, 0, wasapiThread, nullptr, 0, nullptr);
+      return true;
+    }
+  }
+  return startWaveOut();
 }
 
 static void stopAudio() {
@@ -176,6 +282,7 @@ static void stopAudio() {
   if (s_waveOut) { waveOutReset(s_waveOut); for (int i = 0; i < kAudioBuffers; i++) waveOutUnprepareHeader(s_waveOut, &s_hdr[i], sizeof(WAVEHDR)); waveOutClose(s_waveOut); s_waveOut = nullptr; }
   if (s_audioEvent) { CloseHandle(s_audioEvent); s_audioEvent = nullptr; }
 }
+const char* audioBackendName() { return s_wasapi ? "WASAPI (shared, 10 ms)" : "waveOut (4 x 20 ms)"; }
 
 // ------------------------------------------------------------------ gamepad
 static void pollPad(Input& in) {
@@ -991,6 +1098,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   MenuVideoPlayer menuVideo;
   if (menuVideo.open(game.assetDir + "\\menu.mp4")) game.menuVideo = [&menuVideo](float t) { return menuVideo.frame(t); };
   startAudio();
+  if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) { fprintf(f, "Audio: %s\n", audioBackendName()); fclose(f); }
 
   QueryPerformanceCounter(&prev);
   while (!game.quit) {
