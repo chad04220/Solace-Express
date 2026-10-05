@@ -25,6 +25,9 @@ struct Contract {
   int grantLicense = -1;
   int forceAircraft = -1;      // lessons use a specific aircraft (free)
   Weather wx;
+  // C8: where the weather is going. With wxShift the conditions drift from wx to wxEnd over the flight's estimated
+  // time (wind direction and strength, cloud, visibility, precipitation); the brief shows the forecast
+  Weather wxEnd; bool wxShift = false;
   std::vector<Waypoint> wps;
   std::vector<std::string> hints;  // lesson hints by phase (see Game::phase)
   bool startAirborne = false;

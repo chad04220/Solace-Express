@@ -618,6 +618,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   if (c.cargoKg || c.pax) row("Load", c.pax ? fmt("%d passengers, %d kg", c.pax, c.cargoKg) : fmt("%d kg cargo%s", c.cargoKg, c.fragile ? " (FRAGILE)" : ""));
   if (c.timeLimitMin > 0) row("Deadline", fmt("%.0f minutes", c.timeLimitMin), C_BAD);
   row("Weather", c.wx.describe());
+  if (c.wxShift) row("Forecast", "by arrival: " + c.wxEnd.describe(), C_WARN);
   if (c.payout) row("Payment", c.repBonusPct > 0 ? fmt("%s (incl. +%d%% reputation bonus)", fmtMoney(c.payout).c_str(), c.repBonusPct) : fmtMoney(c.payout), C_GOOD);
   if (selAircraft >= 0 && selAircraft < kNumAircraft) {   // for the aircraft picked below (last frame's choice)
     auto esrc = career.canFly(c, selAircraft);

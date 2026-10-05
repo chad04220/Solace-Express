@@ -45,7 +45,7 @@ Line numbers in §2 are from `f8b8537` and no longer match: re-grep the identifi
 | A13 terrain clipmap | done as R1a's CDLOD terrain | — |
 | B3 drop the helper-process shader compile | open: needs the owner's first-run compile time on the rasterizer (startup.log in report.bat) | — |
 | C6 freelance job types | done: medevac (patient meter, hospital destinations, hard clock), VIP charter (comfort meter, tip), night freight (lit fields, landing light), low-vis run (cloud base and visibility at minimums, alignment check when breaking out, go-around clears it), survey (six-ring pattern at one altitude, pay by time in band); each posts by licence, aircraft and fields, names its challenge and deductions on the card, and scores its own lines; gameplay_test generator sweep, scoring lines, medevac flights gentle and steep | C6 commit |
-| C8 dynamic weather | open | — |
+| C8 dynamic weather | done: Contract.wxEnd / wxShift (about 30% of freelance jobs carry a front: wind backs or veers 70-180 deg, strength, cloud, visibility, rain or snow), the flight drifts from wx to wxEnd over the estimated time with a slow wander, the tower and the HUD read the current wind, the brief shows the forecast and names a wind shift as the challenge, the autopilot re-plans the approach for the other runway end while there is room (the planner now weighs the wind against the distance flown round, not its square); save v3 keeps the forecast (wx2); gameplay_test wind-shift case, save_test round trip | C8 commit |
 | C11 airline layer | open (after C5, C7, E3) | — |
 | C12 challenge modes | open | — |
 | C13 surface NIGHTGLASS | open; the terminal now holds four craft | — |

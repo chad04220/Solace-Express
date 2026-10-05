@@ -142,6 +142,9 @@ private:
   Contract contract;
   int specIdx = 0; Career::Source source = Career::SRC_NONE;
   Weather wx;
+  Weather wxStart;   // C8: the flight's weather drifts from the contract's wx to its wxEnd (updateWeather)
+  float apRepickT = 0;
+  void updateWeather(float dt);
   float timeOfDay = 12;
   int wpIndex = 0;
   float flightClock = 0, crashTimer = 0, endTimer = 0;

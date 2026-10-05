@@ -366,6 +366,8 @@ void Career::finishPlan(LaunchPlan& e, const Contract& c, float minutes, float f
   if (c.timeLimitMin > 0 && e.mayBeLate(c.timeLimitMin)) e.challenge = fmt("May miss the deadline: %.0f min for %.0f +- %.0f min of flying", c.timeLimitMin, e.minutesEst, e.minutesSigma);
   else if (c.timeLimitMin > 0 && e.minutesEst > c.timeLimitMin * 0.75f) e.challenge = fmt("Tight deadline: %.0f min for about %.0f min of flying", c.timeLimitMin, e.minutesEst);
   else if (c.wx.storm) e.challenge = "Thunderstorms on the route";
+  else if (c.wxShift && fabsf(wrapAngle((c.wxEnd.windFrom - c.wx.windFrom) * DEG)) / DEG > 100.f && c.wxEnd.windSpeed * MS_TO_KT >= 8.f) e.challenge = fmt("Wind shift forecast: %03.0f at %.0f kt by arrival - expect the other runway", wrapDeg360(c.wxEnd.windFrom), c.wxEnd.windSpeed * MS_TO_KT);
+  else if (c.wxShift && c.wxEnd.cloudBase < 700.f && c.wxEnd.cloudCover > 0.6f) e.challenge = fmt("Weather closing in: cloud base %.0f ft by arrival", c.wxEnd.cloudBase * M_TO_FT);
   else if (B.length < need * 1.25f) e.challenge = fmt("Short runway at %s: %.0f m for the %.0f m you need", B.code, B.length, need);
   else if (xw >= 12.f) e.challenge = fmt("Crosswind at %s: about %.0f kt", B.code, xw);
   else if (c.type == CT_MEDEVAC) e.challenge = "Medevac: under 1.5 g and 30 deg of bank, a soft touchdown, and the clock";
@@ -548,6 +550,16 @@ void Career::refreshBoard() {
     float tod = c.type == CT_NIGHT ? (r.uni() < 0.5f ? r.range(21.f, 23.9f) : r.range(0.f, 5.f)) : r.range(7.f, 19.5f);
     c.wx = W(r.range(0, 360), r.range(0, 14), r.uni() < 0.3f ? r.range(3, 10) : 0, r.range(0.05f, 0.35f), r.range(0, 0.8f), r.range(2500, 7000), r.range(12, 50),
              r.uni() < 0.15f ? (g_world.airports[to].z < -20000 ? 2 : 1) : 0, false, tod);
+    if (r.uni() < 0.3f && c.type != CT_IFR && c.type != CT_SURVEY) {   // a front on the way: the wind backs or veers, the cloud and the visibility change
+      c.wxShift = true; c.wxEnd = c.wx;
+      c.wxEnd.windFrom = wrapDeg360(c.wx.windFrom + (r.uni() < 0.5f ? -1.f : 1.f) * r.range(70.f, 180.f));
+      c.wxEnd.windSpeed = clampf(c.wx.windSpeed + r.range(-4.f, 8.f) / MS_TO_KT, 1.f / MS_TO_KT, 24.f / MS_TO_KT);
+      c.wxEnd.gust = r.uni() < 0.4f ? r.range(3.f, 9.f) / MS_TO_KT : 0.f;
+      c.wxEnd.cloudCover = clampf(c.wx.cloudCover + r.range(-0.4f, 0.5f), 0.f, 0.95f);
+      c.wxEnd.cloudBase = clampf(c.wx.cloudBase + r.range(-500.f, 300.f), 450.f, 2500.f);
+      c.wxEnd.visibility = clampf(c.wx.visibility * r.range(0.5f, 1.3f), 4000.f, 60000.f);
+      if (c.wxEnd.cloudCover > 0.6f && r.uni() < 0.4f) c.wxEnd.precip = g_world.airports[to].z < -20000 ? 2 : 1;
+    }
     if (c.type == CT_IFR) { c.wx.cloudCover = 0.95f; c.wx.cloudBase = r.range(300.f, 600.f) / M_TO_FT + B.elev; c.wx.visibility = r.range(1500.f, 3000.f); c.wx.precip = r.uni() < 0.5f ? 1 : 0; c.wx.windSpeed = std::min(c.wx.windSpeed, 6.f / MS_TO_KT); }
     if (c.type == CT_SURVEY) { c.wx.cloudCover = std::min(c.wx.cloudCover, 0.4f); c.wx.cloudBase = std::max(c.wx.cloudBase, c.wps[0].alt + 300.f); c.wx.gust = 0; c.wx.turbulence = std::min(c.wx.turbulence, 0.12f); }
     if (c.type == CT_MEDEVAC || c.type == CT_VIP) { c.wx.gust = std::min(c.wx.gust, 4.f / MS_TO_KT); c.wx.storm = false; }
@@ -905,6 +917,7 @@ bool Career::save(const std::string& path) const {
                          c.minLicense, c.ownedOnly ? 1 : 0, c.fragile ? 1 : 0, c.startAirborne ? 1 : 0, c.repBonusPct, c.chapter, c.grantLicense, c.forceAircraft, c.courtesy ? 1 : 0) > 0;
       const Weather& w = c.wx;
       ok = ok && fprintf(f, "wx %f %f %f %f %f %f %f %d %d %f\n", w.windFrom, w.windSpeed, w.gust, w.turbulence, w.cloudCover, w.cloudBase, w.visibility, w.precip, w.storm ? 1 : 0, w.timeOfDay) > 0;
+      if (c.wxShift) { const Weather& v = c.wxEnd; ok = ok && fprintf(f, "wx2 %f %f %f %f %f %f %f %d %d %f\n", v.windFrom, v.windSpeed, v.gust, v.turbulence, v.cloudCover, v.cloudBase, v.visibility, v.precip, v.storm ? 1 : 0, v.timeOfDay) > 0; }
       ok = ok && fprintf(f, "wps %d\n", (int)c.wps.size()) > 0;
       for (auto& p : c.wps) ok = ok && fprintf(f, "wp %f %f %f\n", p.x, p.z, p.alt) > 0;
       ok = ok && fprintf(f, "title %d %s\nbrief %d %s\n", (int)c.title.size(), c.title.c_str(), (int)c.brief.size(), c.brief.c_str()) > 0;
@@ -999,12 +1012,13 @@ bool Career::load(const std::string& path) {
            && k.minLicense >= LIC_STUDENT && k.minLicense <= LIC_ATP;
       if (ok) { k.id = id; k.ownedOnly = own != 0; k.fragile = fr != 0; k.startAirborne = sa != 0; k.story = false; c.job->c = k; }
     }
-    else if (!strcmp(key, "wx")) {
+    else if (!strcmp(key, "wx") || !strcmp(key, "wx2")) {
+      bool end = key[2] == '2';
       Weather w; int precip = 0, storm = 0;
       ok = c.job && fscanf(f, "%f %f %f %f %f %f %f %d %d %f", &w.windFrom, &w.windSpeed, &w.gust, &w.turbulence, &w.cloudCover, &w.cloudBase, &w.visibility, &precip, &storm, &w.timeOfDay) == 10;
       ok = ok && std::isfinite(w.windFrom) && std::isfinite(w.windSpeed) && std::isfinite(w.gust) && std::isfinite(w.turbulence) && std::isfinite(w.cloudCover) && std::isfinite(w.cloudBase)
            && std::isfinite(w.visibility) && std::isfinite(w.timeOfDay) && precip >= 0 && precip <= 2;
-      if (ok) { w.precip = precip; w.storm = storm != 0; c.job->c.wx = w; }
+      if (ok) { w.precip = precip; w.storm = storm != 0; if (end) { c.job->c.wxEnd = w; c.job->c.wxShift = true; } else c.job->c.wx = w; }
     }
     else if (!strcmp(key, "wps")) { int n = 0; ok = c.job && fscanf(f, "%d", &n) == 1 && n >= 0 && n <= 64; if (ok) c.job->c.wps.clear(); }
     else if (!strcmp(key, "wp")) { Waypoint p; ok = c.job && fscanf(f, "%f %f %f", &p.x, &p.z, &p.alt) == 3 && std::isfinite(p.x) && std::isfinite(p.z) && std::isfinite(p.alt); if (ok) c.job->c.wps.push_back(p); }

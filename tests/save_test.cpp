@@ -42,6 +42,14 @@ int main() {
     Career b; b.newGame(); check(b.load("save_test_loan.sav"), "loan save loads");
     check(b.loan.open() && b.loan.spec == 3 && b.loan.balance == a.loan.balance && b.loan.payment == a.loan.payment && b.loan.missed == 0 && std::fabs(b.loan.rate - a.loan.rate) < 1e-4f, "round trip keeps the loan");
     check(b.fleet.size() == 2 && std::fabs(b.fleet[0].condition - 0.4f) < 1e-4f && std::fabs(b.fleet[1].condition - 1.f) < 1e-4f, "round trip keeps the condition");
+    {   // a job whose contract carries a forecast keeps it (wx2)
+      Career j = live; j.license = LIC_CPL; j.boardSeed = 77; j.refreshBoard();
+      Contract fc = j.board.empty() ? Contract() : j.board[0]; fc.id = "F77_0"; fc.wxShift = true; fc.wxEnd = fc.wx; fc.wxEnd.windFrom = 123.f; fc.wxEnd.precip = 2;
+      Career::LaunchPlan pl = j.plan(fc, 1, Career::SRC_RENT); j.accept(fc, 1, Career::SRC_RENT, pl);
+      check(j.save("save_test_wx2.sav"), "forecast save writes");
+      Career k2; k2.newGame(); check(k2.load("save_test_wx2.sav") && k2.job && k2.job->c.wxShift && std::fabs(k2.job->c.wxEnd.windFrom - 123.f) < 1e-3f && k2.job->c.wxEnd.precip == 2, "round trip keeps the forecast");
+      remove("save_test_wx2.sav"); remove("save_test_wx2.sav.bak");
+    }
     { Career i2 = a; i2.insured = true; check(i2.save("save_test_ins.sav"), "insured save writes"); Career j; j.newGame(); check(j.load("save_test_ins.sav") && j.insured && !b.insured, "round trip keeps the insurance"); remove("save_test_ins.sav"); remove("save_test_ins.sav.bak"); }
     writeFile("save_test_v2b.sav", "solace_save 2\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nfleet 1\nplane kestrel 1 20\nend\n");
     Career v2; v2.newGame(); check(v2.load("save_test_v2b.sav") && v2.fleet.size() == 1 && v2.fleet[0].condition > 0.99f && !v2.loan.open(), "v2 plane line reads as a new aircraft without a loan");

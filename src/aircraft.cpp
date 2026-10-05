@@ -762,7 +762,9 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
       if (cost < bestCost) { bestCost = cost; bestC = c; bestAlt = hAlt; }
     }
   vec3 from(sinf(wx.windFrom * DEG), 0, -cosf(wx.windFrom * DEG));
-  float score = dot(ld, from) * wx.windSpeed * 40.f - bestCost - (F0 - F) * 0.3f - len2(bestC - pos) * 0.02f - blocked
+  // (the wind weighs 40 per m/s of headwind, the distance to the entry 0.02 per metre: a 10 kt wind is worth about
+  //  10 km of flying round to the other end, a light one isn't)
+  float score = dot(ld, from) * wx.windSpeed * 40.f - bestCost - (F0 - F) * 0.3f - length(bestC - pos) * 0.02f - blocked
               - (atanf(gs) / DEG - 3.f) * 150.f;
   if (commit) {
     apRev = rev; apFinalLen = F; apGs = gs; apHoldC = bestC; apHoldC.y = 0; apHoldR = R; apHoldAlt = bestAlt; apIntAlt = intAlt;

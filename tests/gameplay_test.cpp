@@ -570,6 +570,32 @@ struct GameTest {
         printf("Medevac flight (%s): touchdown %.0f fpm, patient %.0f%%, bonus %d: %s\n", rough ? "steep bank" : "gentle", g.touchdownFpm, g.result.patient * 100.f, bonus, ok ? "ok" : "FAIL"); fails += !ok;
       }
     }
+    // ---- dynamic weather (C8): the wind swings round over the flight; on the autopilot the approach is re-planned
+    // for the other runway end while there is room, and the tower reads the current wind
+    {
+      g.career.newGame(); g.pendingCareer.reset(); g.career.license = LIC_CPL; g.career.location = g_world.findAirport("ORC");
+      Contract c = g_story[4]; c.story = false; c.timeLimitMin = 0;
+      const Airport& B = g_world.airports[c.to];
+      c.wx.windFrom = B.heading; c.wx.windSpeed = 6.f; c.wx.gust = 0; c.wx.turbulence = 0.02f;   // on the nose for the first runway end
+      c.wxShift = true; c.wxEnd = c.wx; c.wxEnd.windFrom = wrapDeg360(B.heading + 180.f); c.wxEnd.windSpeed = 9.f; c.wxEnd.precip = 1; c.wxEnd.cloudCover = 0.8f;
+      g.startFlight(c, 1, Career::SRC_RENT);
+      g.launchPlan.minutesEst = 2.f;   // (a short flight: the front arrives in about two minutes)
+      vec3 start = B.pos() - B.dir() * 14000.f; start.y = B.elev + 900.f;
+      g.plane.reset(&kAircraft[1], start, B.heading, 60, 150, true, kAircraft[1].cruise * 0.8f);
+      g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 3;
+      g.plane.apEngage(Plane::AP_NAV, c.to, g.wx);
+      bool rev0 = g.plane.apRev;
+      float wind0 = g.wx.windFrom; bool repicked = false, rained = false; float tRe = -1;
+      for (t = 0; t < 300 && g.screen == SCR_FLIGHT; t += dt) {
+        g.update(dt);
+        if (g.plane.apRev != rev0 && !repicked) { repicked = true; tRe = t; }
+        if (g.wx.precip == 1) rained = true;
+      }
+      float turned = fabsf(wrapAngle((g.wx.windFrom - wind0) * DEG)) / DEG;
+      bool ok = !rev0 && repicked && turned > 150.f && rained && g.wx.windSpeed > 8.f;
+      printf("Dynamic weather: wind turned %.0f deg, %.0f kt, rain %d, autopilot re-picked the runway at %.0f s (rev %d -> %d): %s\n", turned, g.wx.windSpeed * MS_TO_KT, rained, tRe, rev0, g.plane.apRev, ok ? "ok" : "FAIL"); fails += !ok;
+      g.endFlight(false, "x", OUT_ABANDONED); g.career.newGame(); g.pendingCareer.reset();
+    }
     // ---- a diversion leaves you (and your aircraft) where you landed
     {
       Career t; t.newGame(); t.license = LIC_ATP;

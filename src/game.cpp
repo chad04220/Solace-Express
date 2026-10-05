@@ -493,6 +493,38 @@ void Game::updateResearchCard(float dt) {
     toast(fmt("TEST CARD %s COMPLETE - %s SIGNED OFF", C.id, C.title), vec3(0.5f, 1.f, 0.6f)); g_audio.trigger(SFX_SUCCESS);
   } else { toast(fmt("STEP %d of %d: %s", resStep + 1, C.n, C.steps[resStep].label), vec3(0.9f, 0.9f, 0.6f)); g_audio.trigger(SFX_CHIME, 0.8f); }
 }
+// Dynamic weather (C8): the conditions drift from the contract's weather to its forecast over the flight's estimated
+// time (and a little beyond: the front keeps moving), with a slow wander on top; everything that reads wx (the flight
+// model, the tower, the HUD) sees the current state. On the autopilot, a wind that has swung to favour the other
+// runway end re-plans the approach while there is still room.
+void Game::updateWeather(float dt) {
+  if (researchFlight || !contract.wxShift) return;
+  float T = std::max(launchPlan.minutesEst * 60.f, 120.f) * 1.1f;
+  float f = smoothstepf(0.f, 1.f, clampf((jobClockBase + flightClock) / T, 0.f, 1.f));
+  const Weather& a = wxStart; const Weather& b = contract.wxEnd;
+  float wander = 6.f * sinf(gameTime * 0.011f) + 3.f * sinf(gameTime * 0.037f + 1.f);
+  wx.windFrom = wrapDeg360(a.windFrom + wrapAngle((b.windFrom - a.windFrom) * DEG) / DEG * f + wander * f);
+  wx.windSpeed = a.windSpeed + (b.windSpeed - a.windSpeed) * f + 0.4f * sinf(gameTime * 0.023f) * f;
+  wx.gust = a.gust + (b.gust - a.gust) * f;
+  wx.turbulence = a.turbulence + (b.turbulence - a.turbulence) * f;
+  wx.cloudCover = a.cloudCover + (b.cloudCover - a.cloudCover) * f;
+  wx.cloudBase = a.cloudBase + (b.cloudBase - a.cloudBase) * f;
+  wx.visibility = a.visibility + (b.visibility - a.visibility) * f;
+  if (f > 0.5f && (wx.precip != b.precip || wx.storm != b.storm)) { wx.precip = b.precip; wx.storm = b.storm; toast(b.precip == 2 ? "Snow has set in" : b.precip == 1 ? "Rain has started" : "The rain has stopped", vec3(0.8f, 0.8f, 0.8f)); }
+  apRepickT = std::max(0.f, apRepickT - dt);
+  if (plane.apOn && (plane.apMode == Plane::AP_NAV || plane.apMode == Plane::AP_APPR) && plane.apStage == Plane::APS_NAV && plane.apAirport >= 0 && apRepickT <= 0.f) {
+    const Airport& A = g_world.airports[plane.apAirport];
+    float hw = cosf((wx.windFrom - A.heading) * DEG) * wx.windSpeed, hwR = -hw;   // headwind component on each end (m/s)
+    bool better = plane.apRev ? hw > hwR + 2.5f : hwR > hw + 2.5f;   // the other end has 5 kt more headwind
+    float dA = length(vec3(plane.pos.x - A.pos().x, 0, plane.pos.z - A.pos().z));
+    if (better && dA > 6000.f) {   // (the planner weighs the wind against the flying round: it may keep the end it has)
+      bool was = plane.apRev;
+      plane.apEngage(plane.apMode, plane.apAirport, wx);
+      apRepickT = plane.apRev != was ? 90.f : 8.f;
+      if (plane.apRev != was) toast(fmt("Autopilot: the wind has shifted - now runway %02d at %s", A.rwyNumber(plane.apRev), A.code), vec3(0.6f, 1, 0.6f));
+    }
+  }
+}
 void Game::fireFailure(int kind, int engine) {
   if (!plane.failNow(kind, engine)) return;
   const AircraftSpec& s = *plane.spec;
@@ -558,7 +590,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   career.planFuel(launchPlan, c, chosenFuel(c, spec, src, launchPlan));
   applyQuote(c, launchPlan, false);
   researchFlight = false;   // a career flight; launchResearch sets it again for its own
-  wx = c.wx; timeOfDay = wx.timeOfDay;
+  wx = c.wx; wxStart = c.wx; timeOfDay = wx.timeOfDay; apRepickT = 0;
   const AircraftSpec& s = kAircraft[spec];
   const Airport& a = g_world.airports[c.from];
   // runway into the wind (lessons with rings keep the published runway so the rings line up; the ringless ones, like
@@ -889,6 +921,7 @@ void Game::updateFlight(float dt) {
   float simDt = dt * timeAccel;
   vec3 prevPos = plane.pos;
   if (!crashed) {
+    updateWeather(simDt);
     updateFailures(simDt);
     updateResearchCard(simDt);
     plane.step(simDt, wx, gameTime);
