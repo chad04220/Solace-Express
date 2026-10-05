@@ -12,6 +12,16 @@ if(SANITIZE AND NOT MSVC)
   add_link_options(-fsanitize=address,undefined)
 endif()
 
+# GLSL sources (src/shaders/*.glsl) embedded as C++ constants in gen/shaders_gen.h at build time
+set(SHADER_GEN ${CMAKE_BINARY_DIR}/gen/shaders_gen.h)
+file(GLOB SHADER_SRCS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/shaders/*.glsl)
+add_custom_command(OUTPUT ${SHADER_GEN}
+  COMMAND ${CMAKE_COMMAND} -DSRC_DIR=${CMAKE_SOURCE_DIR}/src/shaders -DOUT=${SHADER_GEN} -P ${CMAKE_SOURCE_DIR}/tools/embed_shaders.cmake
+  DEPENDS ${SHADER_SRCS} ${CMAKE_SOURCE_DIR}/tools/embed_shaders.cmake
+  COMMENT "Embedding GLSL shaders")
+add_custom_target(shaders_gen DEPENDS ${SHADER_GEN})
+include_directories(${CMAKE_BINARY_DIR}/gen)
+
 set(CORE_SOURCES
   src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/career.cpp)
 set(GAME_SOURCES
@@ -88,3 +98,10 @@ if(UNIX AND NOT APPLE)   # the terrain-shadow bake shader run on software GL thr
   target_link_libraries(terrain_shadow_test PRIVATE ${CMAKE_DL_LIBS})
   add_test(NAME terrain_shadow_bake COMMAND terrain_shadow_test)
 endif()
+
+# everything that includes the shader headers waits for the generated constants
+foreach(t SolaceExpress gameplay_test shader_keyword_test shader_check terrain_shadow_test)
+  if(TARGET ${t})
+    add_dependencies(${t} shaders_gen)
+  endif()
+endforeach()
