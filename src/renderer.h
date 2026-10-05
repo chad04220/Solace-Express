@@ -96,6 +96,7 @@ public:
   int quality = 1;           // 0 low, 1 medium, 2 high
   int dbgOff = 0;            // profiling: ray tracer features switched off (uDbg bits)
   int mode = 0;              // 0 the ray tracer, 1 the raster renderer (docs/RENDERER_REBUILD.md; needs rasterOk)
+  int modeForce = -1;        // the tools' --raster / the harness' RASTER: overrides the setting whenever the game applies it
   bool rasterOk = false;     // the raster renderer's programs built
   bool ok = false;
   std::string error;

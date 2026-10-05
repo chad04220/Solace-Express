@@ -552,7 +552,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) { stopIntro(false); fatal(g_ren.error); return 1; }
   {
     std::string cl = GetCommandLineA();
-    if (cl.find("--raster") != std::string::npos) g_ren.mode = 1;   // the tools on the raster renderer (docs/RENDERER_REBUILD.md)
+    if (cl.find("--raster") != std::string::npos) g_ren.mode = g_ren.modeForce = 1;   // the tools on the raster renderer (docs/RENDERER_REBUILD.md)
     bool tool = cl.find("--bench ") != std::string::npos || cl.find("--shots ") != std::string::npos || cl.find("--profile ") != std::string::npos || cl.find("--analyze") != std::string::npos || cl.find("--loadshots") != std::string::npos || cl.find("--menuvideo") != std::string::npos;
     // a normal start loads the menu's first place and builds every aircraft's hull under the intro (rendered
     // offscreen: the intro keeps the window), so the menu opens complete and no flight waits for a hull

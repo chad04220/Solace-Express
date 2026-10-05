@@ -296,7 +296,7 @@ void Game::init(bool buildWorld) {
   buildStory();
   loadSettings();
   wantPacing = true;   // (the frame-rate target from the settings)
-  g_ren.mode = set.renderer;
+  g_ren.mode = g_ren.modeForce >= 0 ? g_ren.modeForce : set.renderer;
   loadStations();
   {   // every type's performance, learned by flying it, on threads side by side (the job board needs the career ones now)
     std::vector<std::thread> th;
