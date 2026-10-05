@@ -302,6 +302,9 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   vec3 Fw(0, 0, 0), Tw(0, 0, 0);  // world force, body torque
   float kSpring = s.emptyMass * 2.2f * G0 / 0.10f, cDamp = 2.f * 0.8f * sqrtf(kSpring * s.emptyMass * 0.6f);
   vec3 fwdW = forward();
+  int nBraked = 0;
+  for (const Contact& c : cs) if (c.kind <= 1) nBraked++;
+  float holdV = 0; int holdN = 0;   // the held wheels' creep this step (it trims brakeHold)
   for (const Contact& c : cs) {
     vec3 pw = pos + q.rotate(c.p);
     float gy = g_world.height(pw.x, pw.z, 7);
@@ -352,7 +355,14 @@ void Plane::substep(float dt, const Weather& wx, float time) {
       float rollRes = 0.015f + 0.06f * rough;
       float brakeF = (c.kind <= 1 ? ctl.brake * 0.7f : 0.f);   // (enough for the main wheels to hold full power when parked)
       f += wr * (-nF * mu * clampf(vlat / 0.4f, -1, 1));
-      f += wf * (-nF * (rollRes + brakeF) * clampf(vlong / 0.3f, -1, 1));
+      if (brakeF > 0.35f && fabsf(vlong) < 0.3f) {
+        // parked / held on the brakes: static friction - the wheel holds against whatever pushes it (power, slope)
+        // up to the tyre's grip, and slips only past it (a linear ramp to zero at rest let full power creep)
+        float hold = -(vlong * m / dt + brakeHold) / std::max(nBraked, 1);
+        holdV += vlong; holdN++;
+        float muS = (rough > 0.3f ? 0.7f : 0.9f) * ctl.brake;
+        f += wf * clampf(hold, -nF * muS, nF * muS);
+      } else f += wf * (-nF * (rollRes + brakeF) * clampf(vlong / 0.3f, -1, 1));
     } else {
       // sliding structure: heavy friction
       vec3 vh(vc.x, 0, vc.z);
@@ -361,6 +371,9 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     Fw += f;
     Tw += cross(c.p, q.conj().rotate(f));
   }
+  // (what was left of the creep is pushed back next step too: the held force converges on the steady push, so the
+  // wheels stop dead instead of creeping a step's acceleration)
+  if (holdN > 0) brakeHold = clampf(brakeHold + holdV / holdN * m / dt * 0.5f, -m * 30.f, m * 30.f); else brakeHold = 0;
   wasOnGround = onGround;
   onGround = anyWheel;
   groundRough = anyWheel ? roughSum / 3.f : 0.f;
@@ -983,12 +996,11 @@ void Plane::apControl(float dt) {
   float turnT = clampf(herr * DEG * std::min(appr ? 0.25f : 0.6f, 0.25f / P.tRoll), -maxTurn, maxTurn);
   float bankT = clampf(atanf(turnT * spd / G0) / DEG, -bankMax, bankMax);
   if (flare) bankT = clampf(bankT, -4.f, 4.f);
-  float bank = bankDeg(), pRate = -w.z;                                  // rad/s, positive right
+  float bank = bankDeg();
   float rollCap = (fbw ? fbwRollMax(0.f) : P.rollRate * clampf(V / s.cruise, 0.25f, 2.f)) * 0.95f;
   rollCap *= clampf(2.f / std::max(gLoad, 0.5f), 0.35f, 1.f);         // unload, roll, pull: no full-rate rolls under load
   float kBank = std::min(appr ? 1.5f : 3.f, 0.7f / P.tRoll);           // bank loop no faster than the roll mode
   float pT = clampf((bankT - bank) * DEG * kBank, -rollCap, rollCap);
-  (void)pRate;
   if (fbw) ctl.flaps = 0;   // the research jets have no flaps (the XR-11's lever tilts its pods): keep it up
   // vertical: altitude -> climb rate -> flight path -> load factor -> elevator
   float vsUp = std::max(P.roc * 1.1f, 2.f), vsDn = std::max(spd * 0.42f, vsUp);   // dives up to ~25 deg

@@ -205,11 +205,11 @@ struct GameTest {
         Contract fc = g_story[0]; fc.forceAircraft = -1; fc.type = CT_FERRY; fc.from = fc.to = g_world.findAirport("CAP"); fc.wps.clear(); fc.hints.clear();
         g.startFlight(sp == 0 ? g_story[0] : fc, sp, sp == 0 ? Career::SRC_LESSON : Career::SRC_RENT);
         for (int i = 0; i < 60 * 8; i++) { g.plane.ctl.throttle = 1.f; g.update(dt); }
-        float held = length(g.plane.vel);
+        float held = length(vec3(g.plane.vel.x, 0.f, g.plane.vel.z));
         printf("Parking brake at the start (%s): running=%d brake=%.1f speed after 8 s at full power %.2f m/s\n", kAircraft[sp].name, g.plane.engineRunning, g.plane.ctl.brake, held);
         // set on every aircraft, and it holds full power on all of them (a propeller's static thrust is limited by its
         // disk, Plane::substep, so even the STOL types don't drag their brakes)
-        if (!(g.plane.engineRunning && g.plane.ctl.brake > 0.99f && held < 0.5f)) fails++;
+        if (!(g.plane.engineRunning && g.plane.ctl.brake > 0.99f && held < 0.02f)) fails++;   // (static friction: no creep)
       }
       g.botControl = true;
     }
