@@ -191,7 +191,8 @@ void Game::loadSettings() {
     else if (s == "fullscreen") set.fullscreen = v != 0;
     else if (s == "radioStation") set.radioStation = (int)v;
     else if (s == "mouseSens") set.mouseSens = clampf(v, 0.2f, 3.f);
-    else if (s == "renderRes") set.resMode = std::clamp((int)v, 0, 4);   // (the old key, "resMode", defaulted to native: ignored)
+    else if (s == "renderRes") set.resMode = std::clamp((int)v, 0, 4);
+    else if (s == "fpsTarget") set.fpsTarget = std::clamp((int)v, 0, 240);   // (the old key, "resMode", defaulted to native: ignored)
     else if (s.rfind("key.", 0) == 0 || s.rfind("pad.", 0) == 0)
       for (int i = 0; i < ACT_COUNT; i++)
         if (s.compare(4, std::string::npos, kActions[i].id) == 0) {
@@ -206,7 +207,7 @@ void Game::loadSettings() {
 void Game::saveSettings() {
   std::string t = fmt("quality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
-  t += fmt("renderRes %d\n", set.resMode);
+  t += fmt("renderRes %d\nfpsTarget %d\n", set.resMode, set.fpsTarget);
   for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   if (t == settingsWritten) return;
   std::string path = joinPath(saveDir, "settings.cfg"), tmp = path + ".tmp";
@@ -293,6 +294,7 @@ void Game::init(bool buildWorld) {
   if (buildWorld) g_world.build();
   buildStory();
   loadSettings();
+  wantPacing = true;   // (the frame-rate target from the settings)
   loadStations();
   {   // every type's performance, learned by flying it, on threads side by side (the job board needs the career ones now)
     std::vector<std::thread> th;
@@ -1636,7 +1638,7 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
 
 FrameParams Game::buildFrame() {
   FrameParams fp;
-  fp.time = realTime;
+  fp.time = realTime; fp.dt = std::max(lastDt, 1e-4f);
   computeSun(timeOfDay, fp.sunDir, fp.sunCol, fp.night);
   {   // terrain's soft sun shadow at the aircraft: the same march as the shader's terrainShadow, done once here instead
       // of for every pixel of the airframe and cockpit
@@ -2420,8 +2422,10 @@ void Game::feedAudio() {
 
 // ------------------------------------------------------------------ main update / render
 void Game::update(float dt) {
-  // the scene is always ray traced at the full display resolution (no dynamic resolution); the display is paced to 60 Hz
-  fpsAvg = lerpf(fpsAvg, dt, 0.05f);
+  // the ray-trace resolution: native, a fixed scale, or adjusted to hold the frame-rate target (Settings)
+  fpsAvg = lerpf(fpsAvg, dt, 1.f - expf(-dt * 3.f));   // (a third of a second, whatever the frame rate)
+  maxFrameWin = std::max(maxFrameWin, dt); maxFrameT += dt;
+  if (maxFrameT >= 1.f) { maxFrameMs = maxFrameWin * 1000.f; maxFrameWin = 0; maxFrameT = 0; }
   if (!headless && g_ren.ok) {   // ray-trace resolution: native, a fixed scale, or adjusted to hold 60 fps on the GPU
     static const float fixedScale[5] = {1.f, 1.f, 0.85f, 0.75f, 0.67f};
     float want = fixedScale[std::clamp(set.resMode, 0, 4)];
@@ -2429,8 +2433,10 @@ void Game::update(float dt) {
       autoScaleT += dt;
       float gms = g_ren.gpuMs;
       if (gms > 0 && autoScaleT > 0.4f) {
-        if (gms > 15.5f) { autoScale = std::max(0.5f, autoScale * std::sqrt(15.f / gms)); autoScaleT = 0; }
-        else if (gms < 12.f && autoScale < 1.f) { autoScale = std::min(1.f, autoScale + 0.05f); autoScaleT = 0; }
+        // (the GPU budget of the frame-rate target, with 8% to spare; up again only with a quarter of it free)
+        float budget = 1000.f / effectiveHz() * 0.92f;
+        if (gms > budget) { autoScale = std::max(0.5f, autoScale * std::sqrt(budget * 0.97f / gms)); autoScaleT = 0; }
+        else if (gms < budget * 0.77f && autoScale < 1.f) { autoScale = std::min(1.f, autoScale + 0.05f); autoScaleT = 0; }
       }
       want = autoScale;
     } else autoScale = 1.f;
@@ -2442,6 +2448,7 @@ void Game::update(float dt) {
   // timers just use the clamped step.
   float simDt = std::min(dt, 0.25f);
   dt = std::min(dt, 0.05f);
+  lastDt = dt;
   realTime += dt;
   updateBindCapture(dt);
   armInputs();
@@ -2552,13 +2559,13 @@ void Game::render() {
     std::string t = fmt("%.0f fps  %.1f ms   GPU %s   res %.0f%% (%dx%d)", 1.f / std::max(fpsAvg, 1e-4f), fpsAvg * 1000.f,
                         g_ren.gpuMs > 0 ? fmt("%.1f ms", g_ren.gpuMs).c_str() : "n/a", g_ren.renderScale * 100.f,
                         (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale));
-    t += fmt("   scenery %d drawn, %d chunks, %.1f ms CPU", g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs);
+    t += fmt("   worst %.1f ms   target %d fps   scenery %d drawn, %d chunks, %.1f ms CPU", maxFrameMs, effectiveHz(), g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs);
     const float* pm = g_ren.passMs;
     std::string t2 = fmt("GPU ms:  scenery+shadows %.1f   ray trace %.1f   TAA %.1f   sprites %.1f   bloom %.1f   shafts %.1f   composite %.1f",
                          pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6]);
     float tw = std::max(g_ren.textWidth(t, 14 * s), g_ren.textWidth(t2, 14 * s)) + 20 * s;
     g_ren.rect(6 * s, 6 * s, tw, 46 * s, vec3(0, 0, 0), 0.6f);
-    g_ren.text(14 * s, 10 * s, 14 * s, t, fpsAvg < 1.f / 57.f ? vec3(1, 0.5f, 0.3f) : vec3(0.5f, 1, 0.6f), 1, 0, false);
+    g_ren.text(14 * s, 10 * s, 14 * s, t, fpsAvg > 1.05f / effectiveHz() ? vec3(1, 0.5f, 0.3f) : vec3(0.5f, 1, 0.6f), 1, 0, false);
     g_ren.text(14 * s, 30 * s, 14 * s, t2, vec3(0.75f, 0.85f, 1.f), 1, 0, false);
   }
   g_ren.uiEnd();

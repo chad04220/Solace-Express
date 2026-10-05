@@ -8,7 +8,7 @@ FeedMounts g_feedMounts[3];
 
 // Exchange the render targets (and the per-view state that goes with them) with v: every pass then draws for v's view.
 void Renderer::swapView(ViewTargets& v) {
-  std::swap(W, v.W); std::swap(H, v.H); std::swap(rw, v.rw); std::swap(rh, v.rh); std::swap(cw, v.cw); std::swap(ch, v.ch);
+  std::swap(W, v.W); std::swap(H, v.H); std::swap(rw, v.rw); std::swap(rh, v.rh); std::swap(cw, v.cw); std::swap(ch, v.ch); std::swap(allocW, v.allocW); std::swap(allocH, v.allocH);
   std::swap(texRaw, v.texRaw); std::swap(texDepth, v.texDepth); std::swap(texCloudMask, v.texCloudMask);
   std::swap(texCloud, v.texCloud); std::swap(texCloudD, v.texCloudD); std::swap(fboCloud, v.fboCloud); std::swap(fboComp, v.fboComp);
   std::swap(fboScene, v.fboScene);

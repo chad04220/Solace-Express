@@ -27,7 +27,7 @@ void Renderer::createGBuffer() {
   auto mk = [&](GLuint& t, GLenum ifmt, GLenum fmt, GLenum type) {
     if (t) glDeleteTextures(1, &t);
     glGenTextures(1, &t); glBindTexture(GL_TEXTURE_2D, t);
-    glTexImage2D(GL_TEXTURE_2D, 0, ifmt, rw, rh, 0, fmt, type, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, ifmt, W, H, 0, fmt, type, nullptr);   // (full view size: the render scale uses a corner)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   };

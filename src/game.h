@@ -44,7 +44,8 @@ struct Settings {
   bool invertPitch = false, showHints = true, metric = false, fullscreen = false, traffic = true;
   int radioStation = 0;
   float mouseSens = 1.0f;
-  int resMode = 1;   // 0 native, 1 auto (holds 60 fps, the default), 2 85%, 3 75%, 4 67% (TAA upscales to the display)
+  int resMode = 1;   // 0 native, 1 auto (holds the frame-rate target, the default), 2 85%, 3 75%, 4 67% (TAA upscales to the display)
+  int fpsTarget = 0;   // 0: the monitor's refresh rate (vsync); else a frame-rate cap (30 / 60 / 90 / 120 / 144 / 240)
   int keyBind[ACT_COUNT]; unsigned padBind[ACT_COUNT];
   Settings() { resetBindings(); }
   void resetBindings() { for (int i = 0; i < ACT_COUNT; i++) { keyBind[i] = kActions[i].key; padBind[i] = kActions[i].pad; } }
@@ -67,6 +68,8 @@ public:
   void prewarm(const std::function<void(float, const std::string&)>& progress);
   int prewarmCraft = -1; bool prewarmInside = false;   // the menu tour shows this aircraft instead (prewarm only)
   bool wantFullscreenToggle = false;
+  int monitorHz = 60;            // the display's refresh rate (the platform layer sets it)
+  bool wantPacing = false;       // the frame-rate target changed: the platform layer re-applies its pacing
   // the pre-rendered menu montage (Windows: menu_video_win.cpp): returns the texture to show at this time, or 0 to
   // ray trace the montage live; and sceneOnly, set while recording it (the scene without the menu on top)
   std::function<unsigned(float)> menuVideo;
@@ -324,6 +327,9 @@ private:
   void drawGps();
   // hidden Confidential Research Model menu (U + I on the main menu) and free XR-9 flights
   bool researchFlight = false;
+  float lastDt = 1.f / 60.f;     // the last frame's real time step (the renderer's frame-rate independent blending)
+  float maxFrameMs = 0, maxFrameWin = 0, maxFrameT = 0;   // the worst frame time over the last second (F3)
+  int effectiveHz() const { return set.fpsTarget > 0 ? set.fpsTarget : std::max(monitorHz, 30); }
   Career::LaunchPlan launchPlan;   // the job's launch plan, made at startFlight: settle() charges its fees
   // quotes: each job flown headless on the autopilot in the background, one at a time (simulateFlightMinutes); the
   // card shows the quick estimate until the flown time is in

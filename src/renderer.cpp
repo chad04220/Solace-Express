@@ -775,15 +775,22 @@ static void makeTex(GLuint& t, int w, int h, GLenum ifmt, GLenum fmt, GLenum typ
 }
 
 // Render-resolution targets: the ray tracer's colour (+ TAA class in alpha) and depth
-void Renderer::createRenderTargets() {
-  rw = std::max(64, (int)(W * renderScale)); rh = std::max(64, (int)(H * renderScale));
-  makeTex(texRaw, rw, rh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
-  makeTex(texDepth, rw, rh, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST);
-  makeTex(texCloudMask, rw, rh, GL_R8, GL_RED, GL_UNSIGNED_BYTE, GL_NEAREST);
-  depthValid = false;
+// The ray-tracing resolution's targets are allocated at the full view size once; a render scale below 1 draws into
+// their lower-left rw x rh (setRenderScale only moves that corner: no reallocation, no hitch). Passes that read them
+// by pixel need nothing; the ones that sample by normalized coordinates scale by rw/W (uUVS / uRawUVS).
+void Renderer::scaleDims() {
+  rw = std::max(64, std::min(W, (int)(W * renderScale))); rh = std::max(64, std::min(H, (int)(H * renderScale)));
   cw = (rw + 1) / 2; ch = (rh + 1) / 2;
-  makeTex(texCloud, cw, ch, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST);
-  makeTex(texCloudD, cw, ch, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST);
+}
+void Renderer::createRenderTargets() {
+  scaleDims();
+  allocW = W; allocH = H;
+  makeTex(texRaw, W, H, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
+  makeTex(texDepth, W, H, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST);
+  makeTex(texCloudMask, W, H, GL_R8, GL_RED, GL_UNSIGNED_BYTE, GL_NEAREST);
+  depthValid = false;
+  makeTex(texCloud, (W + 1) / 2, (H + 1) / 2, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST);
+  makeTex(texCloudD, (W + 1) / 2, (H + 1) / 2, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST);
   if (!fboCloud) glGenFramebuffers(1, &fboCloud);
   glBindFramebuffer(GL_FRAMEBUFFER, fboCloud);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texCloud, 0);
@@ -839,7 +846,7 @@ void Renderer::createTargets() {
 void Renderer::setRenderScale(float s) {
   if (fabsf(s - renderScale) < 1e-4f) return;
   renderScale = s;
-  if (ok) createRenderTargets();
+  if (ok) { scaleDims(); depthValid = false; }   // (the targets stay: only the part drawn changes)
 }
 
 void Renderer::resize(int w, int h) {
@@ -1150,7 +1157,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     }
   };
   // the sprites (smoke, fire, sparks, rain, glints ...) over a view's picture; texRes: its depth texture's size
-  auto drawSprites = [&](const FrameParams& fp, float texW, float texH) {
+  auto drawSprites = [&](const FrameParams& fp, float texW, float texH, float uvsX, float uvsY) {
   glEnable(GL_BLEND);
   glUseProgram(progSprite);
   mat4 vp = viewProj(fp);
@@ -1161,6 +1168,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform3f(U(progSprite, "uCamU"), fp.camUp.x, fp.camUp.y, fp.camUp.z);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progSprite, "uDepth"), 0);
   glUniform2f(U(progSprite, "uRes"), texW, texH);
+  glUniform2f(U(progSprite, "uUVS"), uvsX, uvsY);
   glUniform3f(U(progSprite, "uSunDir"), fp.sunDir.x, fp.sunDir.y, fp.sunDir.z);
   glUniform3f(U(progSprite, "uSunCol"), fp.sunCol.x, fp.sunCol.y, fp.sunCol.z);
   float amb = 0.08f + 0.35f * clampf(fp.sunDir.y + 0.1f, 0, 1);
@@ -1186,7 +1194,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glBindFramebuffer(GL_FRAMEBUFFER, fboComp);   // (writes the ray tracer's colour)
     GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
     glViewport(0, 0, rw, rh);
-    drawSprites(f, (float)kFeedMaxW, (float)kFeedMaxH);
+    drawSprites(f, (float)kFeedMaxW, (float)kFeedMaxH, 1.f, 1.f);
     if (f.pano > 0.f) return;   // (the light shafts work in a flat picture)
     float rsx = 0, rsy = 0; vec3 rsp = f.camPos + f.sunDir * 10000.f;
     bool sunFront = dot(f.sunDir, -f.camBack) > 0.f && project(f, rsp, rsx, rsy);
@@ -1249,8 +1257,10 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D, texHist[histIdx]); glUniform1i(U(progTAA, "uHist"), 2);
     glUniform2f(U(progTAA, "uRes"), (float)W, (float)H);
     glUniform2f(U(progTAA, "uRawRes"), (float)rw, (float)rh);
+    glUniform2f(U(progTAA, "uRawUVS"), (float)rw / allocW, (float)rh / allocH);
     glUniform2f(U(progTAA, "uJit"), jitX, jitY);
     glUniform1f(U(progTAA, "uHistValid"), histValid ? 1.f : 0.f);
+    glUniform1f(U(progTAA, "uDt"), fp.dt);
     glUniform3f(U(progTAA, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
     glUniformMatrix3fv(U(progTAA, "uCamRot"), 1, GL_FALSE, cr);
     glUniform3f(U(progTAA, "uPrevCamPos"), prevCamPos.x, prevCamPos.y, prevCamPos.z);
@@ -1274,7 +1284,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glBindFramebuffer(GL_FRAMEBUFFER, fboSprite);
   GLenum one = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &one);
   glViewport(0, 0, W, H);
-  drawSprites(fp, (float)W, (float)H);
+  drawSprites(fp, (float)W, (float)H, (float)rw / allocW, (float)rh / allocH);   // (the depth is in the ray tracer's corner)
 
   stamp(4);
   // ------------------------------------------------ bloom
@@ -1313,7 +1323,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texColor); glUniform1i(U(progRayMask, "uScene"), 0);
     glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progRayMask, "uDepthTex"), 1);
     glUniform2f(U(progRayMask, "uSun"), sunUV.x, sunUV.y); glUniform1f(U(progRayMask, "uAsp"), (float)W / H);
-    glUniform2f(U(progRayMask, "uUVS"), 1.f, 1.f);
+    glUniform2f(U(progRayMask, "uUVS"), (float)rw / allocW, (float)rh / allocH);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindFramebuffer(GL_FRAMEBUFFER, fboRay[1]);
     glUseProgram(progRay);
@@ -1345,6 +1355,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   bool vis = fp.sunDir.y > -0.02f && project(fp, sp, sx, sy) && sx > -0.2f * W && sx < 1.2f * W && sy > -0.2f * H && sy < 1.2f * H;
   glUniform2f(U(progPost, "uSunScreen"), sx / W, 1.f - sy / H);
   glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progPost, "uDepthTex"), 2);
+  glUniform2f(U(progPost, "uDepthUVS"), (float)rw / allocW, (float)rh / allocH);
   glUniform1f(U(progPost, "uSunVisible"), vis && !fp.sealedCockpit ? (1.f - smoothstepf(0.5f, 0.9f, fp.cloudCover)) * smoothstepf(-0.02f, 0.1f, fp.sunDir.y) : 0.f);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);

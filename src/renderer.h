@@ -60,6 +60,7 @@ GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::stri
 
 struct FrameParams {
   vec3 camPos; vec3 camRight, camUp, camBack; float fovY = 1.0f;
+  float dt = 1.f / 60.f;   // this frame's real time step (frame-rate independent blending: the TAA)
   float pano = 0.f, panoTanY = 0.f;   // > 0: a panoramic (cylindrical) camera feed: its half angle (rad) and vertical extent (fovY then only culls)
   float time = 0;
   vec3 sunDir, sunCol; float night = 0;
@@ -189,6 +190,8 @@ private:
   void flushUI();
   void createTargets();
   void createRenderTargets();
+  void scaleDims();
+  int allocW = 0, allocH = 0;   // the size the ray-tracing resolution's targets were made at (rw x rh is its lower-left part)
   float jitX = 0, jitY = 0;
   void genMaterials();
   void genCloudNoise();   // tileable cloud coverage (2D) and billow / detail noise (3D) textures
@@ -237,7 +240,7 @@ private:
   // camera feeds: each research-jet camera is drawn into a tile of the feed atlas, through the same passes as the main
   // view (envelope, scenery G-buffer, ray tracer, clouds) on a second set of render targets of its own size
   struct ViewTargets {
-    int W = 0, H = 0, rw = 0, rh = 0, cw = 0, ch = 0;
+    int W = 0, H = 0, rw = 0, rh = 0, cw = 0, ch = 0, allocW = 0, allocH = 0;
     GLuint texRaw = 0, texDepth = 0, texCloudMask = 0, texCloud = 0, texCloudD = 0, fboCloud = 0, fboComp = 0, fboScene = 0;
     GLuint texGB[3] = {0, 0, 0}, texGBDepth = 0, fboGB = 0, texEnv = 0, texEnvDepth = 0, fboEnv = 0;
     bool depthValid = false, envOn = false, hullOn = false, trafHullOn = false, ckMaskPrev = false;

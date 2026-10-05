@@ -2,9 +2,9 @@
 #version 330 core
 in vec2 vUV; in vec4 vCol; in float vDist; in vec2 vKind; in vec3 vWorld;
 out vec4 oColor;
-uniform sampler2D uDepth; uniform vec2 uRes; uniform vec3 uSunDir; uniform vec3 uSunCol; uniform vec3 uAmb; uniform float uFogB; uniform float uTime;
+uniform sampler2D uDepth; uniform vec2 uRes; uniform vec2 uUVS; uniform vec3 uSunDir; uniform vec3 uSunCol; uniform vec3 uAmb; uniform float uFogB; uniform float uTime;
 void main(){
-  float sceneT = texture(uDepth, gl_FragCoord.xy/uRes).r;
+  float sceneT = texture(uDepth, gl_FragCoord.xy/uRes*uUVS).r;
   int kind = int(vKind.x + 0.5);
   float soft = clamp((sceneT - vDist)/max(vKind.y, 0.05), 0.0, 1.0);
   if (soft <= 0.0) discard;

@@ -3,7 +3,7 @@
 in vec2 vUV; out vec4 oColor;
 uniform sampler2D uScene; uniform sampler2D uBloom; uniform float uExposure; uniform float uTime; uniform vec2 uRes;
 uniform float uRainLens; uniform vec2 uSunScreen; uniform float uSunVisible; uniform float uFade; uniform float uVignette; uniform float uGLoad;
-uniform sampler2D uDepthTex;   // scene depth: the sun glow and lens ghosts only appear when the sun itself is unobstructed
+uniform sampler2D uDepthTex; uniform vec2 uDepthUVS;   // scene depth (in the ray tracer's corner of its target): the sun glow and lens ghosts only appear when the sun itself is unobstructed
 uniform float uBloomK; uniform sampler2D uRays; uniform vec3 uRayK;   // bloom mix; light-shaft tint and strength
 vec3 aces(vec3 x){ const float a=2.51,b=0.03,c=2.43,d=0.59,e=0.14; return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0); }
 float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
@@ -14,7 +14,7 @@ void main(){
     for (int k = 0; k < 5; k++) {
       vec2 o = k == 0 ? vec2(0.0) : vec2(k == 1 ? 1.0 : (k == 2 ? -1.0 : 0.0), k == 3 ? 1.0 : (k == 4 ? -1.0 : 0.0))*0.006;
       vec2 su = clamp(uSunScreen + o, vec2(0.001), vec2(0.999));
-      open += step(9e5, texture(uDepthTex, su).r);
+      open += step(9e5, texture(uDepthTex, su*uDepthUVS).r);
     }
     bool onScreen = all(greaterThan(uSunScreen, vec2(0.0))) && all(lessThan(uSunScreen, vec2(1.0)));
     sunVis *= onScreen ? open/5.0 : 1.0;

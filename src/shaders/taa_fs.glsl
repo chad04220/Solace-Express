@@ -5,7 +5,7 @@
 #version 330 core
 in vec2 vUV; layout(location=0) out vec4 oHist; layout(location=1) out vec4 oColor;
 uniform sampler2D uRaw; uniform sampler2D uDepth; uniform sampler2D uHist; uniform vec2 uRes; uniform float uHistValid;
-uniform vec2 uRawRes; uniform vec2 uJit;   // ray-trace resolution (<= uRes: temporal upscaling) and this frame's jitter
+uniform vec2 uRawRes; uniform vec2 uRawUVS; uniform vec2 uJit; uniform float uDt;   // (this frame's time step: the blend is per 1/60 s)   // ray-trace resolution (<= uRes: temporal upscaling) and this frame's jitter
 uniform vec3 uCamPos; uniform mat3 uCamRot; uniform vec3 uPrevCamPos; uniform mat3 uPrevCamRot; uniform float uTanHalf; uniform float uAspect;
 uniform vec3 uPlanePos; uniform mat3 uPlaneRot; uniform vec3 uPrevPlanePos; uniform mat3 uPrevPlaneRot;
 vec3 toY(vec3 c){ c = c/(1.0 + max(c.r, max(c.g, c.b))); return vec3(0.25*c.r + 0.5*c.g + 0.25*c.b, 0.5*c.r - 0.5*c.b, -0.25*c.r + 0.5*c.g - 0.25*c.b); }
@@ -27,7 +27,7 @@ void main(){
   ivec2 ip = up ? clamp(ivec2(floor(ruv*uRawRes)), ivec2(0), ivec2(uRawRes) - 1) : ivec2(gl_FragCoord.xy);
   vec4 cur = texelFetch(uRaw, ip, 0);
   float flag = cur.a;
-  if (up) cur.rgb = texture(uRaw, ruv).rgb;
+  if (up) cur.rgb = texture(uRaw, ruv*uRawUVS).rgb;   // (the ray tracer's picture fills a corner of its target)
   vec3 m1 = vec3(0.0), m2 = vec3(0.0), cy = toY(cur.rgb);
   float fmin = flag, fmax = flag;   // pixel classes around this one (a silhouette edge holds both)
   for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
@@ -54,9 +54,10 @@ void main(){
     vec3 hy = toY(histCR(puv));
     float k = flag > 0.9 ? 1.25 : 0.9;                  // tighter clamp for moving parts
     hy = clamp(hy, m1 - k*sd - 0.002, m1 + k*sd + 0.002);
-    float motion = length((puv - vUV)*uRes);
+    float motion = length((puv - vUV)*uRes)/clamp(uDt*60.0, 0.05, 4.0);   // (pixels per 1/60 s)
     float hflag = texture(uHist, puv).a;   // what the history pixel was: aircraft, world or a moving effect
     float a = mix(0.08, 0.3, clamp(motion/12.0, 0.0, 1.0));   // fast motion: lean on the new frame, less smear
+    a = 1.0 - pow(1.0 - a, clamp(uDt*60.0, 0.05, 4.0));        // (the same smoothing in time at any frame rate)
     if (flag < 0.4) a = max(a, 0.4);
     // disocclusion (a wing sweeping off the sky): drop the stale history - but only when no neighbour shares the
     // history's class, so jittered silhouette edges keep accumulating and stay anti-aliased

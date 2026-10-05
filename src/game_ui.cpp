@@ -864,11 +864,23 @@ void Game::drawSettings(float x, float y, float w, float h) {
   };
   g_ren.text(x, py + 6 * s, 16 * s, "Render resolution", C_DIM, 1);
   {
-    const char* rm[] = {"Native", "Auto 60", "85%", "75%", "67%"};
+    const char* rm[] = {"Native", "Auto", "85%", "75%", "67%"};
     for (int i = 0; i < 5; i++) if (button(x + 250 * s + i * 78 * s, py, 72 * s, 32 * s, rm[i], true, set.resMode == i)) set.resMode = i;
     py += 36 * s;
     g_ren.text(x + 250 * s, py, 12.5f * s, fmt("ray traced at %dx%d (%.0f%%), upscaled to %dx%d by the temporal AA", (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale),
                g_ren.renderScale * 100.f, g_ren.W, g_ren.H), C_DIM, 0.85f, 0, false);
+    py += 24 * s;
+  }
+  g_ren.text(x, py + 6 * s, 16 * s, "Frame rate", C_DIM, 1);
+  {
+    static const int fr[] = {0, 30, 60, 90, 120, 144, 240};
+    for (int i = 0; i < 7; i++) {
+      std::string l = fr[i] ? fmt("%d", fr[i]) : std::string("Display");
+      if (button(x + 250 * s + i * 62 * s, py, 58 * s, 32 * s, l, true, set.fpsTarget == fr[i])) { set.fpsTarget = fr[i]; wantPacing = true; }
+    }
+    py += 36 * s;
+    g_ren.text(x + 250 * s, py, 12.5f * s, fmt("%s: %.0f fps now, GPU %s%s", set.fpsTarget ? fmt("capped at %d", set.fpsTarget).c_str() : fmt("the display's %d Hz, on vsync", monitorHz).c_str(),
+               1.f / std::max(fpsAvg, 1e-4f), g_ren.gpuMs > 0 ? fmt("%.1f ms", g_ren.gpuMs).c_str() : "n/a", set.resMode == 1 ? " (Auto resolution holds this rate)" : ""), C_DIM, 0.85f, 0, false);
     py += 24 * s;
   }
   g_ren.text(x, py + 6 * s, 16 * s, "Ray tracing quality", C_DIM, 1);

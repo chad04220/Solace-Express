@@ -31,13 +31,14 @@ typedef HGLRC(WINAPI* PFNWGLCREATECONTEXTATTRIBSARBPROC)(HDC, HGLRC, const int*)
 typedef BOOL(WINAPI* PFNWGLSWAPINTERVALEXTPROC)(int);
 typedef const char*(WINAPI* PFNWGLGETEXTENSIONSSTRINGEXTPROC)(void);
 
-// ------------------------------------------------------------------ 60 Hz frame pacing
-// On 60/120/180/240 Hz displays vsync runs every 1st/2nd/3rd/4th refresh (adaptive when WGL_EXT_swap_control_tear is
-// available, so a late frame tears once instead of halving to 30 fps); on other refresh rates a precise software
-// limiter holds 60 fps.
+// ------------------------------------------------------------------ frame pacing
+// The frame-rate target (Settings): 0 runs at the monitor's refresh rate on vsync (adaptive when
+// WGL_EXT_swap_control_tear is available, so a late frame tears once instead of halving the rate); a number caps the
+// frame rate with a precise software limiter and vsync off.
 static PFNWGLSWAPINTERVALEXTPROC s_swapInterval = nullptr;
 static bool s_tear = false;
-static int s_vsyncDiv = 0;   // > 0: swap interval that gives 60 Hz; 0: software limiter
+static int s_limitHz = 0;   // > 0: the software limiter's rate; 0: vsync paces
+static Game* s_pacingGame = nullptr;
 static void setupPacing(HWND hwnd) {
   int hz = 60;
   MONITORINFOEXA mi; mi.cbSize = sizeof mi;
@@ -45,10 +46,10 @@ static void setupPacing(HWND hwnd) {
     DEVMODEA dm; ZeroMemory(&dm, sizeof dm); dm.dmSize = sizeof dm;
     if (EnumDisplaySettingsA(mi.szDevice, ENUM_CURRENT_SETTINGS, &dm) && dm.dmDisplayFrequency > 1) hz = (int)dm.dmDisplayFrequency;
   }
-  int div = 0;
-  for (int d = 1; d <= 4; d++) if (abs(hz - 60 * d) <= 1) div = d;
-  s_vsyncDiv = s_swapInterval ? div : 0;
-  if (s_swapInterval) s_swapInterval(s_vsyncDiv ? (s_tear ? -s_vsyncDiv : s_vsyncDiv) : 0);
+  int target = s_pacingGame ? s_pacingGame->set.fpsTarget : 0;
+  if (s_pacingGame) s_pacingGame->monitorHz = hz;
+  if (target <= 0 && s_swapInterval) { s_limitHz = 0; s_swapInterval(s_tear ? -1 : 1); }
+  else { s_limitHz = target > 0 ? target : hz; if (s_swapInterval) s_swapInterval(0); }
 }
 
 // ------------------------------------------------------------------ XInput (loaded dynamically)
@@ -91,7 +92,7 @@ static LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   Input* in = g_game ? &g_game->in : nullptr;
   switch (msg) {
     case WM_CLOSE: if (g_game) g_game->quit = true; return 0;
-    case WM_DISPLAYCHANGE: case WM_EXITSIZEMOVE: if (s_swapInterval || !s_vsyncDiv) setupPacing(h); break;   // refresh rate / monitor may have changed
+    case WM_DISPLAYCHANGE: case WM_EXITSIZEMOVE: setupPacing(h); break;   // refresh rate / monitor may have changed
     case WM_SIZE: if (g_ren.ok) g_ren.resize(LOWORD(lp), HIWORD(lp)); return 0;
     case WM_KEYDOWN: case WM_SYSKEYDOWN:
       if (msg == WM_SYSKEYDOWN && wp == VK_RETURN) {   // Alt+Enter: fullscreen only (the Enter never reaches the game)
@@ -259,7 +260,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   SetProcessDPIAware();
   timeBeginPeriod(1);
   static Game game;
-  g_game = &game;
+  g_game = &game; s_pacingGame = &game;
   game.saveDir = userDir();
   { char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);   // pictures etc. live next to the exe
     std::string d(exe, n); size_t sl = d.find_last_of("\\/"); game.assetDir = sl == std::string::npos ? std::string(".") : d.substr(0, sl); }
@@ -445,7 +446,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     int attrs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB, 3, WGL_CONTEXT_MINOR_VERSION_ARB, 3, WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB, 0};
     HGLRC ctxI = createAttribs ? createAttribs(dcI, nullptr, attrs) : nullptr;
     if (!ctxI || !wglMakeCurrent(dcI, ctxI)) { if (ctxI) wglDeleteContext(ctxI); intro.state = -1; return; }
-    if (s_swapInterval) s_swapInterval(s_vsyncDiv ? s_vsyncDiv : 0);
+    if (s_swapInterval) s_swapInterval(1);   // (the intro runs on vsync)
     std::unique_ptr<Renderer> R(new Renderer());
     RECT rc; GetClientRect(g_hwnd, &rc);
     if (!R->initUI(std::max(64L, rc.right), std::max(64L, rc.bottom))) { wglMakeCurrent(nullptr, nullptr); wglDeleteContext(ctxI); intro.state = -1; return; }
@@ -467,7 +468,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       glViewport(0, 0, R->W, R->H); glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
       R->uiBegin(); game.drawIntro(shown, stage, t, ic, fade, *R); R->uiEnd();
       SwapBuffers(dcI);
-      if (!s_vsyncDiv) Sleep(14);
+      if (!s_swapInterval) Sleep(14);
     }
     glFinish();
     R.reset();
@@ -498,7 +499,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     glViewport(0, 0, g_ren.W, g_ren.H); glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
     g_ren.uiBegin(); game.drawIntro(shownMain, stage, t, iconTex, fade); g_ren.uiEnd();
     SwapBuffers(g_hdc);
-    if (!s_vsyncDiv) Sleep(14);
+    if (!s_swapInterval || s_limitHz > 0) Sleep(14);
     return t;
   };
   // ends the intro: `fade` plays its fade-out first; afterwards this thread owns the window's drawing again
@@ -1001,9 +1002,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       game.update(dt);
       game.render();
       SwapBuffers(g_hdc);
-      if (!s_vsyncDiv) {   // software 60 fps limiter: sleep most of the way, spin the last ~2 ms
+      if (s_limitHz > 0) {   // software limiter: sleep most of the way, spin the last ~2 ms
         static LONGLONG deadline = 0;
-        const LONGLONG period = freq.QuadPart / 60;
+        const LONGLONG period = freq.QuadPart / s_limitHz;
         LARGE_INTEGER t; QueryPerformanceCounter(&t);
         deadline += period;
         if (deadline < t.QuadPart - period || deadline > t.QuadPart + 2 * period) deadline = t.QuadPart;   // fell behind / first frame: resync
@@ -1015,6 +1016,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         }
       }
     } else Sleep(16);
+    if (game.wantPacing) { game.wantPacing = false; setupPacing(g_hwnd); }
     if (game.wantFullscreenToggle) { game.wantFullscreenToggle = false; toggleFullscreen(); game.set.fullscreen = g_fullscreen; setupPacing(g_hwnd); }
     game.in.endFrame();
   }
