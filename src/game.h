@@ -439,6 +439,10 @@ private:
   void drawControls(float x, float y, float w, float h);
   void updateBindCapture(float dt);
   void drawHud(const FrameParams& fp);
+  void hudStrip(float x, float y, float w, float h, float a = 1.f);
+  void hudWarnIcon(int kind, float cx, float cy, float sz, vec3 c, float a);
+  float hudPrevIas = 0, hudTrend = 0;   // the speed tape's trend vector
+  bool hudDemo = false;                 // harness: every warning lit (scene hud with HUDDEMO=1)
   void drawPFD(float x, float y, float size);
   void drawMinimap(float x, float y, float size, float rangeM);
   void drawMapOverlay();

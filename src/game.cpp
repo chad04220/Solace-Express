@@ -3280,6 +3280,17 @@ void Game::debugScene(const std::string& name) {
     takeoffAnnounced = true;
     camQ = plane.q;
     if (name == "cockpit") camMode = 1;
+    if (name == "hud") {   // HUDDEMO=1: every warning, a tower call, failures and messages lit, to look at the layout
+      if (getenv("HUDDEMO")) {
+        hudDemo = true;
+        atcF.lastCall = "Wren Alfa Bravo, runway 05, wind 040 at 8, cleared to land."; atcF.lastApt = contract.to; atcF.lastT = flightClock - 42.f;
+        plane.fail.engineHealth[0] = 0.4f; plane.fail.alternator = true; plane.fail.battery = 0.6f; plane.fail.ice = 0.3f;
+        toast("Checkpoint 2 of 6", vec3(0.5f, 1, 0.7f)); toast("Gear down", vec3(0.8f, 1, 0.8f)); toast("Time acceleration off", vec3(0.8f, 0.8f, 0.8f));
+        hint = "Hold a steady 3 degree descent on power, then ease back to flare as the runway fills the windscreen.";
+        plane.apOn = true; plane.apMode = Plane::AP_HOLD; plane.apHeading = hdg + 25.f; plane.apAlt = 900.f; plane.apStatus = fmt("HDG %03.0f  ALT %.0f", hdg + 25.f, 900.f * M_TO_FT);
+        showMinimap = true;
+      }
+    }
   }
   if (name == "rings" || name == "ringburst") {
     vec3 c, ax, ay; ringGeom(0, c, ax, ay);
