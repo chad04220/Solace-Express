@@ -621,8 +621,13 @@ struct GameTest {
       bool roll = g.trialBest["T_STOL"].size() == 1 && fabsf(g.trialBest["T_STOL"][0] - 190.f) < 0.5f;
       g.startFlight(g.trialContract(Game::TR_GATES), 0, Career::SRC_LESSON); g.isolatedFlight = true; g.trialT0 = 10.f; g.trialT1 = 112.f; g.wpIndex = 8; g.result.landed = true; g.touchedDown = true; g.endFlight(true, "", OUT_SUCCESS);
       bool gates = g.trialBest["T_GATES"].size() == 1 && fabsf(g.trialBest["T_GATES"][0] - 102.f) < 0.01f && g.hubMsg.find("1:42") != std::string::npos;
-      ok = ok && scored && sorted && roll && gates;
-      printf("Trials: courses %d, spot scored %d, board sorted %d, STOL roll %d, gate time %d (%s): %s\n", ok || true, scored, sorted, roll, gates, g.hubMsg.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
+      // the formation run: the score is the time out of a steady platform once the three minutes are up; cut short, no score
+      Contract fr = g.trialContract(Game::TR_FORMATION);
+      g.startFlight(fr, 0, Career::SRC_LESSON); g.isolatedFlight = true; g.formT = 180.f; g.formLost = 12.5f; g.result.landed = true; g.touchedDown = true; g.endFlight(true, "", OUT_SUCCESS);
+      g.startFlight(fr, 0, Career::SRC_LESSON); g.isolatedFlight = true; g.formT = 90.f; g.formLost = 1.f; g.result.landed = true; g.touchedDown = true; g.endFlight(true, "", OUT_SUCCESS);
+      bool form = fr.from == g.career.location && g.trialBest["T_FORM"].size() == 1 && fabsf(g.trialBest["T_FORM"][0] - 12.5f) < 0.01f && g.hubMsg.find("DNF") != std::string::npos;
+      ok = ok && scored && sorted && roll && gates && form;
+      printf("Trials: courses %d, spot scored %d, board sorted %d, STOL roll %d, gate time %d, formation %d (%s): %s\n", ok || true, scored, sorted, roll, gates, form, g.hubMsg.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
       g.trialBest.clear();
     }
     // ---- the airline (C11): with the ATP, a hired pilot flies an owned aircraft on a route; each of your settlements is a

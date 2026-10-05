@@ -550,6 +550,7 @@ void Game::airlineTraffic(float dt) {
 }
 
 // ------------------------------------------------------------------ trials (C12)
+const float Game::kFormationRunS = 180.f;
 Contract Game::trialContract(int kind) const {
   Contract c; c.type = CT_TRIAL; c.payout = 0; c.minLicense = LIC_STUDENT; c.id = trialId(kind); c.title = trialName(kind);
   int home = career.location;
@@ -558,6 +559,7 @@ Contract Game::trialContract(int kind) const {
   if (kind == TR_STOL) { int smp = g_world.findAirport("SMP"); if (smp >= 0) c.from = c.to = smp; }
   const Airport& A = g_world.airports[c.from];
   if (kind == TR_SPOT) c.brief = fmt("Take off, fly a circuit and put the wheels down as close as you can to the mark 300 m past the threshold at %s, as softly as you can. Score: metres from the mark plus a quarter of the touchdown rate in fpm. Lower is better.", A.name);
+  else if (kind == TR_FORMATION) c.brief = fmt("Take off from %s and climb above 300 m: the Spectre display pair joins you and flies its show around you for three minutes. Hold a steady platform for them - wings near level, no yanking, no diving at the ground - and land back here when they bow out. Score: the seconds you spent out of a steady platform. Lower is better.", A.name);
   else if (kind == TR_STOL) c.brief = "Summit Pass, 600 m of gravel at 5,400 ft. Take off, come round and land as short as you can: the score is the landing roll from touchdown to a stop. Lower is better. The Bushmaster is the natural choice.";
   else {
     // the gate course: eight rings out from the runway, each bending a little, hugging the ground
@@ -580,6 +582,7 @@ std::string Game::trialScore(int kind, float v) const {
   if (v < 0) return "DNF";
   if (kind == TR_SPOT) return fmt("%.0f pts", v);
   if (kind == TR_STOL) return fmt("%.0f m roll", v);
+  if (kind == TR_FORMATION) return fmt("%.0f s out", v);
   return fmt("%d:%02d.%d", (int)v / 60, (int)v % 60, (int)(v * 10) % 10);
 }
 void Game::finishTrial(bool success) {
@@ -590,6 +593,7 @@ void Game::finishTrial(bool success) {
     if (kind == TR_SPOT && result.tdPastThrM >= 0) score = fabsf(result.tdPastThrM - 300.f) + fabsf(touchdownFpm) * 0.25f;
     else if (kind == TR_STOL && result.tdPastThrM >= 0 && result.stopLeftM >= 0) score = std::max(0.f, result.rwyLenM - result.tdPastThrM - result.stopLeftM);
     else if ((kind == TR_GATES || kind == TR_DAILY) && trialT0 >= 0 && trialT1 > trialT0 && wpIndex >= (int)contract.wps.size()) score = trialT1 - trialT0;
+    else if (kind == TR_FORMATION && formT >= kFormationRunS) score = formLost;
   }
   std::string msg = std::string(trialName(kind)) + ": " + trialScore(kind, score);
   if (score >= 0) {
@@ -706,7 +710,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   rollFailures(c, spec, src);
   isolatedFlight = false; jobClockBase = 0; attemptFrom = c.from;
   wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0;
-  surveyT = surveyInT = 0; minimumsChecked = false; minimumsGoArounds = 0; trialT0 = trialT1 = -1;
+  surveyT = surveyInT = 0; minimumsChecked = false; minimumsGoArounds = 0; trialT0 = trialT1 = -1; formT = formLost = 0; formDone = false;
   hudPrevIas = 0; hudTrend = 0;
   traffic.reset();
   ufo = Ufo(); ufo.next = 180.f + sparkRng.uni() * 240.f;   // first encounter after 3-7 minutes in the air
@@ -1077,6 +1081,20 @@ void Game::updateFlight(float dt) {
     (void)na;
     bool onApproach = plane.apOn && plane.apMode == Plane::AP_APPR && plane.apStage != Plane::APS_NAV && plane.apStage != Plane::APS_GOAROUND;
     traffic.escortStop = crashed || plane.onGround || onApproach || (plane.agl() < 150.f && dn < 4000.f);
+    // the formation run (C12): the pair joins once the player is up; the run clocks the time with them alongside and
+    // the time the player was not a steady platform (steep bank, hard g, a quick roll)
+    if (contract.type == CT_TRIAL && contract.id == trialId(TR_FORMATION) && !formDone) {
+      if (flying && !traffic.escortActive() && !traffic.escortStop && plane.agl() > 300.f && formT <= 0.f) { traffic.spawnEscort(plane.pos, plane.vel); g_audio.trigger(SFX_CHIME, 0.8f); }
+      if (traffic.escortActive() && traffic.escAct != Traffic::ESC_JOIN) {
+        formT += simDt;
+        bool steady = fabsf(plane.bankDeg()) < 35.f && fabsf(plane.gLoad - 1.f) < 0.5f && fabsf(plane.w.z) < 0.7f && !plane.onGround;
+        if (!steady) formLost += simDt;
+        if (formT >= kFormationRunS) {
+          formDone = true; traffic.dismissEscort();
+          toast(fmt("Formation run complete - %.0f s out of a steady platform. Land back at %s.", formLost, g_world.airports[contract.to].code), vec3(0.5f, 1.f, 0.6f)); g_audio.trigger(SFX_SUCCESS);
+        }
+      }
+    }
   }
   {
     // g-force tunnel: a faint red tint from the first noticeable g that slowly closes into the full ring as the load
@@ -2939,6 +2957,11 @@ void Game::update(float dt) {
   if (in.pressed[0x72]) showPerf = !showPerf;   // F3
   gamepadMenus(dt);
   focusNavigate();
+  if (screen == SCR_HUB && in.pad && !((in.buttons & PAD_LB) && (in.buttons & PAD_RB))) {   // the shoulders step through the hub's tabs
+    const int nTabs = TAB_SETTINGS + 1;
+    if (in.buttonsPressed & PAD_RB) { hubTab = (hubTab + 1) % nTabs; g_audio.trigger(SFX_CLICK); }
+    if (in.buttonsPressed & PAD_LB) { hubTab = (hubTab + nTabs - 1) % nTabs; g_audio.trigger(SFX_CLICK); }
+  }
   bool padCombo = in.pad && (in.buttons & PAD_LS) && (in.buttons & PAD_RS) && (in.buttonsPressed & (PAD_LS | PAD_RS));
   if (screen == SCR_MENU && ((in.down['U'] && in.down['I'] && (in.pressed['U'] || in.pressed['I'])) || padCombo)) {
     screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP);
@@ -3036,6 +3059,7 @@ void Game::render() {
                         g_ren.gpuMs > 0 ? fmt("%.1f ms", g_ren.gpuMs).c_str() : "n/a", g_ren.renderScale * 100.f,
                         (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale));
     t += fmt("   worst %.1f ms   target %d fps   scenery %d drawn, %d chunks, %.1f ms CPU", maxFrameMs, effectiveHz(), g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs);
+    t += fmt("   particles %d  debris %d  wreck %d  traffic %d  comms %d", (int)particles.size(), (int)debris.size(), (int)wreck.size(), (int)traffic.craft.size(), (int)atc.history.size());
     const float* pm = g_ren.passMs;
     std::string t2 = fmt(g_ren.mode == 1 ? "GPU ms:  scenery+terrain %.1f   lighting+clouds %.1f   TAA %.1f   sprites %.1f   bloom %.1f   shafts %.1f   composite %.1f"
                                         : "GPU ms:  scenery+shadows %.1f   ray trace %.1f   TAA %.1f   sprites %.1f   bloom %.1f   shafts %.1f   composite %.1f",
