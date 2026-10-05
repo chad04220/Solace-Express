@@ -63,7 +63,7 @@ float Plane::rangeLeftKm() const { return fuel / (fuelFlowMax() * 0.8f) * spec->
 void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float fuelKg, float payloadKg, bool airborne, float speed) {
   spec = s; pos = position; fuel = fuelKg; payload = payloadKg;
   q = quat::axisAngle(vec3(0, 1, 0), -headingDeg * DEG);
-  w = vec3(); ctl = Controls(); ev = FlightEvents();
+  w = vec3(); ctl = Controls(); ev = FlightEvents(); apComfort = false; brakeHold = 0;
   flaps = 0; gear = 1; rpm = 0; n1 = 0; engineSpool = 0; maxG = minG = 1; flightTime = 0;
   apDisengage(); apDone = false; apPitchI = 0; gust = vec3(); rng = Rng(77);
   // drag comes from the airframe's shape (aero.cpp), evaluated every step at the speed and air density of the moment
@@ -980,6 +980,9 @@ void Plane::apControl(float dt) {
   float stallG = (V / vsFl) * (V / vsFl) * 0.9f;
   float nzMax = std::min(P.gLimit - gustG - P.gLimit * 0.03f, stallG), nzMin = std::max(P.gNeg + gustG + 0.3f, -stallG * 0.5f);
   nzMax = std::max(nzMax, 1.05f);
+  // comfort (career flights): what a passenger or a fragile load accepts - the autopilot only, never the stick
+  // (commanded inside 0.85..1.25 g so the response - which overshoots a little - stays within 0.8..1.3)
+  if (apComfort && !flare) { nzMax = std::min(nzMax, 1.25f); nzMin = std::max(nzMin, 0.85f); }
   // lateral: heading error -> turn rate -> bank -> roll rate -> aileron
   // (steer the direction the aircraft is moving through the air, heading plus sideslip: the nose swings with every
   // yaw oscillation, chasing it feeds a Dutch roll)
@@ -989,9 +992,11 @@ void Plane::apControl(float dt) {
   // (the steepest bank that still leaves load factor to spare for climbing: a quarter more than level flight needs, half
   // more when well below the altitude it wants)
   float reserve = !apUseVS && apAlt - pos.y > 80.f ? 1.5f : 1.25f;
+  if (apComfort) reserve = std::min(reserve, 1.12f);   // (a 25 deg bank needs 1.1 g: the comfort ceiling leaves little to climb with)
   float bankMax = acosf(std::min(0.99f, reserve / std::max(nzMax, 1.01f))) / DEG;
   if (appr) bankMax = std::min(bankMax, agl() < 150.f ? 20.f : 35.f);
   bankMax = clampf(bankMax, 10.f, 85.f);
+  if (apComfort && !appr) bankMax = std::min(bankMax, 25.f);   // (the final approach keeps its own 20 / 35 deg)
   float maxTurn = G0 * tanf(bankMax * DEG) / spd;                       // rad/s
   float turnT = clampf(herr * DEG * std::min(appr ? 0.25f : 0.6f, 0.25f / P.tRoll), -maxTurn, maxTurn);
   float bankT = clampf(atanf(turnT * spd / G0) / DEG, -bankMax, bankMax);
@@ -999,11 +1004,13 @@ void Plane::apControl(float dt) {
   float bank = bankDeg();
   float rollCap = (fbw ? fbwRollMax(0.f) : P.rollRate * clampf(V / s.cruise, 0.25f, 2.f)) * 0.95f;
   rollCap *= clampf(2.f / std::max(gLoad, 0.5f), 0.35f, 1.f);         // unload, roll, pull: no full-rate rolls under load
+  if (apComfort) rollCap = std::min(rollCap, 15.f * DEG);
   float kBank = std::min(appr ? 1.5f : 3.f, 0.7f / P.tRoll);           // bank loop no faster than the roll mode
   float pT = clampf((bankT - bank) * DEG * kBank, -rollCap, rollCap);
   if (fbw) ctl.flaps = 0;   // the research jets have no flaps (the XR-11's lever tilts its pods): keep it up
   // vertical: altitude -> climb rate -> flight path -> load factor -> elevator
   float vsUp = std::max(P.roc * 1.1f, 2.f), vsDn = std::max(spd * 0.42f, vsUp);   // dives up to ~25 deg
+  if (apComfort) { vsUp = std::min(vsUp, std::max(0.6f * P.roc, 1.5f)); vsDn = std::min(vsDn, std::max(spd * 0.1f, 4.f)); }
   float tQv = pitchLag(P, s, V);                                        // (the airframe answers slower at low speed)
   float kAlt = apAltGain();                                            // outer loops slower than the g loop
   float vsT = apUseVS ? apVS : clampf((apAlt - pos.y) * kAlt, -vsDn, vsUp * 3.f);

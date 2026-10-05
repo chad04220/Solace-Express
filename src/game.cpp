@@ -285,6 +285,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   float payloadKg = (float)c.cargoKg + c.pax * 85.f + 85.f;
   float fuel = s.maxFuel;
   plane.reset(&s, start, hdg, fuel, payloadKg, c.startAirborne, s.cruise);
+  plane.apComfort = true;   // a career flight: the autopilot flies for the passengers and the load (the stick is never limited)
   fuelStart = plane.fuel;
   wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0;
   traffic.reset();

@@ -90,6 +90,7 @@ public:
   float engineSpool = 0;      // 0..1 actual power fraction
   bool engineRunning = false; float starterTime = 0;
   bool onGround = false, wasOnGround = false;
+  bool apComfort = false;   // the autopilot flies for passengers (career flights): gentle bank, g, roll and climb; the stick is never limited
   float brakeHold = 0;   // the steady push the parked brakes are holding (N along the nose), learned while held
   float groundRough = 0;      // 0 asphalt .. 1 rough (for audio/vibration)
   float alpha = 0, beta = 0, airspeed = 0, ias = 0, gLoad = 1, stallWarn = 0;

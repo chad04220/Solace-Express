@@ -1,5 +1,9 @@
 ## What's new
 
+**Autopilot and handling**
+- On career flights the autopilot now flies for the passengers and the load: up to 25 degrees of bank, 0.8-1.3 g, gentle roll and climb rates, so it never earns a passenger-discomfort or fragile-cargo penalty. Your own stick is never limited, and aerobatics and the research jets keep the full envelope
+- Parking brakes hold dead still at full power (static friction); before, every aircraft crept forward slightly
+
 **XR-11 cockpit**
 - One wide curved front display replaces the three front panes, fed by a single new camera at the nose
 - Every display is now a true window: each camera looks out exactly where the pilot's eye looks through that display, so the front, side, aft, overhead, chin and floor views line up with each other and with the world

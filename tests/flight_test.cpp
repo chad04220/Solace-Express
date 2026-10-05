@@ -151,6 +151,40 @@ int main() {
     printf("AP hold %-16s hdg err %4.1f  alt err %5.1f m  max bank %4.1f  g %+.1f..%+.1f (limits %+.0f..%+.0f)  roll-rate rms %4.2f deg/s  %s\n", s.name, he, ae, maxBank,
            minG, maxG, P.gNeg, P.gLimit, rmsP, ok ? "ok" : "FAIL"); fails += !ok;
   }
+  // ---------------- comfort law (career flights): the autopilot keeps passengers comfortable - bank <= 25 deg,
+  // 0.8..1.3 g - in a 150 deg turn on HOLD and on a NAV route to a landing (the final approach keeps its own limits)
+  for (int i = 0; i < kNumAircraft; i++) {
+    const AircraftSpec& s = kAircraft[i];
+    Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
+    Plane p; p.reset(&s, vec3(0, 1800, 2000), 30, s.maxFuel * 0.6f, 100, true, s.cruise * 0.85f);
+    p.ctl.gearDown = !s.retract; p.gear = p.ctl.gearDown ? 1.f : 0.f; p.ctl.throttle = 0.7f;
+    p.apComfort = true; p.apEngage(Plane::AP_HOLD, -1, calm);
+    float maxBank = 0, maxG = 1, minG = 1;
+    for (int k = 0; k < 240 * 60 && !p.ev.crashed; k++) {   // (a 150 deg turn at 25 deg of bank takes the jet ~2.5 min)
+      if (k == 10 * 60) { p.apHeading = wrapDeg360(p.apHeading + 150.f); p.apAlt += 150.f; }
+      p.step(1 / 60.f, calm, k / 60.f);
+      if (k > 10 * 60) { maxBank = std::max(maxBank, fabsf(p.bankDeg())); maxG = std::max(maxG, p.gLoad); minG = std::min(minG, p.gLoad); }
+    }
+    float he = fabsf(wrapAngle((p.apHeading - p.heading()) * DEG) / DEG);
+    bool ok = !p.ev.crashed && he < 3.f && maxBank <= 26.f && maxG <= 1.3f && minG >= 0.8f;
+    printf("AP comfort hold %-16s hdg err %4.1f  max bank %4.1f  g %.2f..%.2f  %s\n", s.name, he, maxBank, minG, maxG, ok ? "ok" : "FAIL"); fails += !ok;
+    // route to Solace Capital and land: comfortable all the way to the final approach
+    int ai = g_world.findAirport("CAP"); const Airport& A = g_world.airports[ai];
+    vec3 side(-A.dir().z, 0, A.dir().x);
+    vec3 start = A.pos() + side * 14000.f + A.dir() * 3000.f; start.y = std::max(A.elev + 1200.f, g_world.height(start.x, start.z) + 500.f);
+    Plane q; q.reset(&s, start, wrapDeg360(A.heading + 120.f), s.maxFuel, 100, true, s.cruise * 0.85f);
+    q.ctl.gearDown = !s.retract; q.gear = q.ctl.gearDown ? 1.f : 0.f; q.ctl.throttle = 0.7f;
+    q.apComfort = true; q.apEngage(Plane::AP_NAV, ai, calm);
+    maxBank = 0; maxG = 1; minG = 1;
+    int k = 0;
+    for (; k < 1500 * 60 && !q.ev.crashed && !q.apDone; k++) {
+      q.step(1 / 60.f, calm, k / 60.f);
+      if (k > 5 * 60 && q.apStage == Plane::APS_NAV) { maxBank = std::max(maxBank, fabsf(q.bankDeg())); maxG = std::max(maxG, q.gLoad); minG = std::min(minG, q.gLoad); }
+    }
+    ok = !q.ev.crashed && q.apDone && maxBank <= 26.f && maxG <= 1.3f && minG >= 0.8f;
+    printf("AP comfort route %-16s %s after %4.0f s  en-route max bank %4.1f  g %.2f..%.2f  %s\n", s.name, q.apDone ? "landed" : "NOT DONE", k / 60.f, maxBank, minG, maxG, ok ? "ok" : "FAIL");
+    fails += !ok;
+  }
   {
     int ai = g_world.findAirport("CAP"); const Airport& A = g_world.airports[ai];
     for (int i = 0; i < 9; i++) {
