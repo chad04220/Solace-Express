@@ -30,13 +30,11 @@ Line numbers in §2 are from `f8b8537` and no longer match: re-grep the identifi
 | A8 steps 3–5 aircraft pass, traffic, cloak, feeds | done as R1b/R1c | 0fe987d, ce5ca42, fe31039 |
 | A9 shadow maps for the aircraft | partly: the proxy pass (R1b); real maps are R2's remaining item | — |
 | E4 earning-path guarantee | done (640-state sweep in the progression test) | ac7aa73 |
-| E5.4 menu focus navigation | open | — |
 | A12 go/no-go | decided: meshes done as R2a–c (bake by state sweep, not per part) | 9546382 |
-| D1 + E6 FlightSession split, clocks, ATC validity | open | — |
 | C9 scoring lines from recorded data | done | 224fa0e |
 | C10 ATC compliance | done; landing against a go-around is charged (-50%, -rep) rather than failing the leg, so a resumable job is not stranded at its destination | 224fa0e |
-| A10 water reflection probe | → R3 | — |
-| A11 cloud march | → R3 | — |
+| A10 water reflection probe | → R3 (the sky probe) | — |
+| A11 cloud march | → R3 (cloud reprojection) | — |
 | A2 baked partial fbm | superseded by the terrain mesh | — |
 | C3 fuel and payload planning | done: maxMass, fuel price per airport, FUEL_PURCHASED for owned aircraft, the card's fuel choice, hangar refuel; the progression test checks every story contract's fuel with full tanks (at least 5% over the flown quote) and weight | C3 commit |
 | C5 financing and pacing | done: one loan at a time (a quarter down, 8–12% by reputation, 24 payments taken at settlements, three missed → repossession, a sale settles the balance), used aircraft at 65% with condition 0.65 and half tanks, freelance pay × (1 + 0.35·chapter); the progression money model finances when it can't pay cash (grind ≤ 5 jobs); save v3 keeps the loan and condition | C5 commit |
@@ -50,8 +48,10 @@ Line numbers in §2 are from `f8b8537` and no longer match: re-grep the identifi
 | C12 challenge modes | done: a TRIALS list in the contracts tab (spot landing scored on the metres from the mark and the touchdown rate, the STOL contest at Summit Pass on the landing roll, a gate run of eight low rings out of the home field and a daily course seeded by the date on the time from the first gate to the last); flown off the books (no pay, fees or logbook), the five best per trial kept in settings.cfg and shown on the card; gameplay_test courses / scoring / board | C12 commit |
 | C13 surface NIGHTGLASS | done: a main-menu entry (open once the campaign is flown, before that behind a "nothing there counts" confirmation); the research test cards are the objective chain per craft; the U + I combo stays | C13 commit |
 | C14 options (FOV, head-look, colour-blind HUD, UI scale, HUD per camera) | done | ca6cb95 |
+| R2 aircraft meshes from the field | done on the harness (docs/RENDERER_REBUILD.md); the aircraft shadow maps stay with R3 | — |
+| R3 sky probe, cloud reprojection, entity draw caching, delete the ray tracer | open: waits for the owner's benchmark (report.bat) and sign-off; A10 / A11 fold into it | — |
 
-Order from here: B1 → E2 → E3 → E4 → C9/C10 → C14 → A6 → A5 → A3 → D1+E6 → C3 → C5 → C7 → C6 → C8 → E5.4 → C12/C13 → C11; B3 and A3 wait on report.bat numbers.
+Status: every item that can be finished without the owner's GPU is done (through C11). Still open, all gated on the owner's `report.bat` numbers from v3.15.0 or later: A3 (instrument atlas split), B3 (helper-process compile), A6 (UBO after R3) and R3 itself (sky probe, cloud reprojection, entity draw caching, and deleting the ray tracer after the owner signs off the rasterizer). D1 (the FlightSession extraction) is deliberately not done: a pure refactor with regression risk and no player-visible gain.
 
 ---
 
