@@ -231,7 +231,7 @@ private:
   // part that moves (the march's start on the raster path, where the mesh leaves off)
   struct PlaneMesh { uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; };
   std::unordered_map<uint64_t, PlaneMesh> planeMeshes;
-  GLuint progPlaneMesh = 0;
+  GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0;   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
   bool compilePlaneMesh();
   bool planeMeshWanted(const FrameParams& fp) const;
   void bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key);
