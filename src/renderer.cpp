@@ -115,7 +115,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {kFullscreenVS, kCommonGLSL, kRaytraceFS, kRaytraceFS2, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRaytraceFS3, kRaytraceWraith, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kDownFS, kUpFS, kCockpitMaskFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kRaytraceWraithCockpit, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kHullBakeMain, kTShBakeMain}) h = fnv1a(src, h);
+  for (const char* src : {kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kWraithCockpitSDF, kWraithCockpitMaterial, kPlaneMaterial, kWater, kRtShade, kRtMain, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kDownFS, kUpFS, kCockpitMaskFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kHullBakeMain, kTShBakeMain}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -472,7 +472,7 @@ GLuint Renderer::makeTexture(const uint8_t* rgba, int w, int h) {
 // objects, which are shared between contexts, so the platform layer can run it on a worker thread with its own
 // context while the intro screen animates. `done` counts finished programs (kProgramCount in all).
 std::string Renderer::rtSource(const char* defines) {
-  return std::string("#version 330 core\n") + defines + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + (getenv("CLIPATLAS") ? "#define WR_CLIPATLAS\n" : "") + (getenv("HULLDEBUG") ? "#define HULL_DEBUG\n" : "") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRaytraceFS3 + kRaytraceWraith + kRaytraceWraithCockpit;
+  return rtAssembly(std::string(defines) + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + (getenv("CLIPATLAS") ? "#define WR_CLIPATLAS\n" : "") + (getenv("HULLDEBUG") ? "#define HULL_DEBUG\n" : ""));
 }
 
 // The analysis build of the ray tracer: the same shader with its work counters (COST) written out instead of colour

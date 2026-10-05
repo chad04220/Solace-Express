@@ -14,8 +14,7 @@ static void put(const std::string& dir, const char* name, const std::string& src
 int main(int argc, char** argv) {
   std::string dir = argc > 1 ? argv[1] : ".";
   for (int dbg = 0; dbg < 2; dbg++) {
-    std::string rt = std::string("#version 330 core\n") + (dbg ? "#define HULL_DEBUG\n" : "") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceText +
-                     kRaytraceDisplays + kRaytraceFS3 + kRaytraceWraith + kRaytraceWraithCockpit;
+    std::string rt = rtAssembly(dbg ? "#define HULL_DEBUG\n" : "");
     put(dir, dbg ? "raytrace_debug.frag" : "raytrace.frag", rt);
     if (dbg) continue;
     std::string ms = rt; size_t m = ms.find("void main("); if (m != std::string::npos) ms.replace(m, 10, "void mainRT(");

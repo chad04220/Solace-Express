@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
   g_world.build();
   buildStory();
   if (argc > 1 && std::string(argv[1]) == "gauges") {   // display atlas: every gauge and MFD page, without the ray tracer
-    std::string fs = std::string("#version 330 core\n") + kCommonGLSL + kRaytraceFS + kRaytraceFS2 + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + [] { std::string f3 = kRaytraceFS3; size_t m = f3.find("void main("); if (m != std::string::npos) f3.replace(m, 10, "void mainRT("); return f3; }() + kRaytraceWraith + kRaytraceWraithCockpit + R"(
+    std::string fs = rtAssemblyNoMain("") + R"(
 
 uniform int uMode;
 void main(){

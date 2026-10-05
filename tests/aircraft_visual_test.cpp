@@ -166,9 +166,9 @@ int main(int argc,char**argv) {
   if(!initGL(W,H)) { puts("EGL failed"); return 2; }
   printf("Renderer: %s\n",glGetString(GL_RENDERER));
   std::string defines;
-  if(std::string(kRaytraceFS).find("vec4 gCab0")!=std::string::npos)defines+="#define FIT_PATCH\n";
-  if(std::string(kRaytraceWraithCockpit).find("abs(cq.z - 0.265)")!=std::string::npos)defines+="#define TOUCH_PATCH\n";
-  std::string fs=std::string("#version 330 core\n")+defines+kCommonGLSL+prefix(kRaytraceFS,"vec2 mapPiece(")+prefix(kRaytraceWraith,"// XR-11 surfaces")+prefix(kRaytraceWraithCockpit,"// ---------------------------------------------------------------- materials")+inspection;
+  if(std::string(kSceneUniforms).find("vec4 gCab0")!=std::string::npos)defines+="#define FIT_PATCH\n";
+  if(std::string(kWraithCockpitSDF).find("abs(cq.z - 0.265)")!=std::string::npos)defines+="#define TOUCH_PATCH\n";
+  std::string fs=sdfAssembly(defines)+inspection;
   GLuint prog=program(fs),vao; glGenVertexArrays(1,&vao); glBindVertexArray(vao); glUseProgram(prog); glViewport(0,0,W,H);
   auto loc=[&](const char* n){ return glGetUniformLocation(prog,n); };
   auto v3=[&](const char* n,vec3 v){ glUniform3f(loc(n),v.x,v.y,v.z); };

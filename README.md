@@ -206,7 +206,8 @@ src/aircraft_perf.cpp   each type's envelope, learned by flying it (the autopilo
 src/aircraft_stunt.cpp  aerobatic figures on the autopilot
 src/aero.*         aerodynamics from the airframe's geometry (drag build-up, lift slope, span efficiency)
 src/career.*       licences, story campaign, freelance generator, economy, save/load
-src/shaders.h      GLSL: ray tracer (terrain/water/clouds/aircraft SDF/airport buildings), sprites, post, UI
+src/shaders/*.glsl GLSL modules, embedded at build time: scene uniforms, aircraft distance fields and materials, terrain,
+                   water, clouds, lighting, the ray tracer's main, sprites, TAA, post, UI; src/shaders.h assembles the programs
 src/entities.*     environment entities: tree/rock/building placement in streamed chunks, collisions
 src/entity_mesh.*  procedural tree, rock and building meshes (3 LODs each)
 src/entity_render.cpp, src/entity_shaders.h   instanced G-buffer + shadow-cascade passes, culling, LOD
