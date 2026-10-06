@@ -16,11 +16,12 @@
 #include <cmath>
 #include <cstdio>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 5;   // (bump with the format)
+const uint32_t kMeshMagic = 0x4d455348u + 6;   // (bump with the format)
 }
 
 bool Renderer::compilePlaneMesh() {
@@ -124,82 +125,141 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       mode(1, s); hullEval(candP, d);
       for (size_t q = 0; q < cand.size(); q++) if (fabsf(d[q] - dRest[q]) > 0.008f) moving[q] = 1;
     }
+    // ---- and in the cabin, what is too thin for the lattice: a plate or a rod under ~2.5 cells through (the sun
+    // visors, a grab handle, a lens rim) comes off the 1.56 cm lattice as a wavy, notched shape. Those cells, and a
+    // ring of one cell round them, are meshed again on a lattice twice as fine, as a patch laid over the first mesh:
+    // the first leaves the thin cells out and sinks its ring 3 mm into the wall, so the patch wins the depth test
+    // there without a flicker and no crack opens between the two (the exterior keeps its trailing edges and
+    // antennas as they are: a cabin is seen from a metre, an airframe from twenty)
+    std::vector<uint8_t> thin(cand.size(), 0); int nThin = 0;
+    if (inside) {
+      std::vector<float> cn; mode(3, 0); hullEval4(candP, cn);
+      std::vector<vec3> behind(cand.size());
+      for (size_t q = 0; q < cand.size(); q++) { vec3 n(cn[q * 4], cn[q * 4 + 1], cn[q * 4 + 2]); behind[q] = candP[q] - n * (dRest[q] + 2.f * kH); }
+      std::vector<float> dIn; mode(1, 0); hullEval(behind, dIn);
+      for (size_t q = 0; q < cand.size(); q++) if (!moving[q] && fabsf(dRest[q]) < band && dIn[q] > -0.5f * kH) { thin[q] = 1; nThin++; }
+    }
     std::unordered_map<int, uint8_t> cellMov;   // level-2 index -> moving
     for (size_t q = 0; q < cand.size(); q++) cellMov[cand[q]] = moving[q];
-    // ---- the lattice corners of the static band cells, each once
-    std::unordered_map<int64_t, int> corner;   // lattice coords -> sample index
-    std::vector<vec3> cpts;
-    std::vector<int> staticCells;
+    // ---- the static band cells: the coarse mesh's (all but the thin ones; 2: in the ring round a thin cell), and the
+    // fine patch's (the thin ones and their ring)
+    std::unordered_set<int> thinSet;
+    for (size_t q = 0; q < cand.size(); q++) if (thin[q]) thinSet.insert(cand[q]);
+    auto nearThin = [&](int id) {
+      int i2 = id % n2, j2 = (id / n2) % n2, k2 = id / (n2 * n2);
+      for (int dz = -1; dz <= 1; dz++) for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
+        int i = i2 + dx, j = j2 + dy, k = k2 + dz;
+        if (i < 0 || j < 0 || k < 0 || i >= n2 || j >= n2 || k >= n2) continue;
+        if (thinSet.count((k * n2 + j) * n2 + i)) return true;
+      }
+      return false;
+    };
+    std::vector<std::pair<int, uint8_t>> coarseCells, fineCells;
     for (size_t q = 0; q < cand.size(); q++) {
       if (moving[q] || fabsf(dRest[q]) >= band) continue;
-      staticCells.push_back(cand[q]);
-      int id = cand[q], i2 = id % n2, j2 = (id / n2) % n2, k2 = id / (n2 * n2);
-      for (int z = 0; z <= 4; z++) for (int y = 0; y <= 4; y++) for (int x = 0; x <= 4; x++) {
-        int lx = i2 * 4 + x, ly = j2 * 4 + y, lz = k2 * 4 + z;
-        int64_t kk = key3(lx, ly, lz);
-        if (corner.count(kk)) continue;
-        corner[kk] = (int)cpts.size();
-        cpts.push_back(vec3(org + lx * kH, org + ly * kH, org + lz * kH));
-      }
+      bool ring = !thin[q] && nearThin(cand[q]);
+      if (!thin[q]) coarseCells.push_back({cand[q], (uint8_t)(ring ? 2 : 1)});
+      if (thin[q] || ring) fineCells.push_back({cand[q], 1});
     }
-    std::vector<float> cv; mode(1, 0); hullEval(cpts, cv);
-    auto cval = [&](int lx, int ly, int lz, float& v) { auto it = corner.find(key3(lx, ly, lz)); if (it == corner.end()) return false; v = cv[it->second]; return true; };
-    // ---- surface nets: one vertex per lattice cube the surface crosses, at the mean of its edge crossings
-    std::unordered_map<int64_t, int> cubeV;   // cube coords -> vertex
-    std::vector<vec3> vpos;
-    const int ce[12][2] = {{0, 1}, {1, 3}, {2, 3}, {0, 2}, {4, 5}, {5, 7}, {6, 7}, {4, 6}, {0, 4}, {1, 5}, {3, 7}, {2, 6}};   // corner bit x + 2y + 4z
-    for (int id : staticCells) {
-      int i2 = id % n2, j2 = (id / n2) % n2, k2 = id / (n2 * n2);
-      for (int z = 0; z < 4; z++) for (int y = 0; y < 4; y++) for (int x = 0; x < 4; x++) {
-        int cx = i2 * 4 + x, cy = j2 * 4 + y, cz = k2 * 4 + z;
-        float v[8]; bool ok = true;
-        for (int c = 0; c < 8 && ok; c++) ok = cval(cx + (c & 1), cy + ((c >> 1) & 1), cz + (c >> 2), v[c]);
-        if (!ok) continue;
-        int neg = 0; for (int c = 0; c < 8; c++) if (v[c] < 0.f) neg++;
-        if (neg == 0 || neg == 8) continue;
-        vec3 sum; int cnt = 0;
-        for (int e = 0; e < 12; e++) {
-          int a = ce[e][0], b = ce[e][1];
-          if ((v[a] < 0.f) == (v[b] < 0.f)) continue;
-          float t = v[a] / (v[a] - v[b]);
-          vec3 pa(org + (cx + (a & 1)) * kH, org + (cy + ((a >> 1) & 1)) * kH, org + (cz + (a >> 2)) * kH);
-          vec3 pb(org + (cx + (b & 1)) * kH, org + (cy + ((b >> 1) & 1)) * kH, org + (cz + (b >> 2)) * kH);
-          sum = sum + pa + (pb - pa) * t; cnt++;
+    // ---- surface nets over a set of cells on a lattice of `sub` steps per cell: one vertex per lattice cube the
+    // surface crosses, at the mean of its edge crossings, pulled onto the surface; a quad round every lattice edge the
+    // surface crosses, between the four cubes that share it, wound with the field's normal
+    size_t nLattice = 0;
+    auto nets = [&](const std::vector<std::pair<int, uint8_t>>& cells, int sub, float sink) {
+      const float h = kS2 / sub;
+      std::unordered_map<int64_t, int> corner;   // lattice coords -> sample index
+      std::vector<vec3> cpts;
+      for (auto& ce : cells) {
+        int id = ce.first, i2 = id % n2, j2 = (id / n2) % n2, k2 = id / (n2 * n2);
+        for (int z = 0; z <= sub; z++) for (int y = 0; y <= sub; y++) for (int x = 0; x <= sub; x++) {
+          int lx = i2 * sub + x, ly = j2 * sub + y, lz = k2 * sub + z;
+          int64_t kk = key3(lx, ly, lz);
+          if (corner.count(kk)) continue;
+          corner[kk] = (int)cpts.size();
+          cpts.push_back(vec3(org + lx * h, org + ly * h, org + lz * h));
         }
-        cubeV[key3(cx, cy, cz)] = (int)vpos.size();
-        vpos.push_back(sum * (1.f / cnt));
       }
-    }
-    // ---- the vertices' normals, material ids and cabin ambient occlusion from the field; each is pulled onto the surface
-    std::vector<float> vn; mode(3, 0); hullEval4(vpos, vn);
-    for (size_t q = 0; q < vpos.size(); q++) { vec3 n(vn[q * 4], vn[q * 4 + 1], vn[q * 4 + 2]); vn[q * 4] = n.x; vn[q * 4 + 1] = n.y; vn[q * 4 + 2] = n.z; }
-    mode(2, 0); hullEval4(vpos, d4);
-    for (size_t q = 0; q < vpos.size(); q++) vpos[q] = vpos[q] - vec3(vn[q * 4], vn[q * 4 + 1], vn[q * 4 + 2]) * std::max(-kH, std::min(kH, d4[q * 4]));
-    vb.resize(vpos.size() * 8);
-    for (size_t q = 0; q < vpos.size(); q++) {
-      float* o = &vb[q * 8];
-      o[0] = vpos[q].x; o[1] = vpos[q].y; o[2] = vpos[q].z; o[3] = vn[q * 4]; o[4] = vn[q * 4 + 1]; o[5] = vn[q * 4 + 2];
-      o[6] = floorf(d4[q * 4 + 1] + 0.5f); o[7] = inside ? d4[q * 4 + 2] : 1.f;
-    }
-    // ---- the faces: a quad round every lattice edge the surface crosses, between the four cubes that share it,
-    // wound with the field's normal
-    auto cube = [&](int x, int y, int z, int& out) { auto it = cubeV.find(key3(x, y, z)); if (it == cubeV.end()) return false; out = it->second; return true; };
-    auto quad = [&](int a, int b, int c, int dq) {
-      vec3 nAvg(vb[a * 8 + 3] + vb[b * 8 + 3] + vb[c * 8 + 3] + vb[dq * 8 + 3], vb[a * 8 + 4] + vb[b * 8 + 4] + vb[c * 8 + 4] + vb[dq * 8 + 4], vb[a * 8 + 5] + vb[b * 8 + 5] + vb[c * 8 + 5] + vb[dq * 8 + 5]);
-      vec3 fn = cross(vpos[b] - vpos[a], vpos[c] - vpos[a]) + cross(vpos[c] - vpos[a], vpos[dq] - vpos[a]);
-      if (dot(fn, nAvg) < 0.f) std::swap(b, dq);
-      ib.push_back(a); ib.push_back(b); ib.push_back(c); ib.push_back(a); ib.push_back(c); ib.push_back(dq);
+      nLattice += cpts.size();
+      std::vector<float> cv; mode(1, 0); hullEval(cpts, cv);
+      auto cval = [&](int lx, int ly, int lz, float& v) { auto it = corner.find(key3(lx, ly, lz)); if (it == corner.end()) return false; v = cv[it->second]; return true; };
+      std::unordered_map<int64_t, int> cubeV;   // cube coords -> vertex (local)
+      std::vector<vec3> vpos; std::vector<int> vcube; std::vector<uint8_t> vsink;   // (each vertex's cube, and whether its cell sinks)
+      const int ce[12][2] = {{0, 1}, {1, 3}, {2, 3}, {0, 2}, {4, 5}, {5, 7}, {6, 7}, {4, 6}, {0, 4}, {1, 5}, {3, 7}, {2, 6}};   // corner bit x + 2y + 4z
+      for (auto& cl : cells) {
+        int id = cl.first, i2 = id % n2, j2 = (id / n2) % n2, k2 = id / (n2 * n2);
+        for (int z = 0; z < sub; z++) for (int y = 0; y < sub; y++) for (int x = 0; x < sub; x++) {
+          int cx = i2 * sub + x, cy = j2 * sub + y, cz = k2 * sub + z;
+          float v[8]; bool ok = true;
+          for (int c = 0; c < 8 && ok; c++) ok = cval(cx + (c & 1), cy + ((c >> 1) & 1), cz + (c >> 2), v[c]);
+          if (!ok) continue;
+          int neg = 0; for (int c = 0; c < 8; c++) if (v[c] < 0.f) neg++;
+          if (neg == 0 || neg == 8) continue;
+          vec3 sum; int cnt = 0;
+          for (int e = 0; e < 12; e++) {
+            int a = ce[e][0], b = ce[e][1];
+            if ((v[a] < 0.f) == (v[b] < 0.f)) continue;
+            float t = v[a] / (v[a] - v[b]);
+            vec3 pa(org + (cx + (a & 1)) * h, org + (cy + ((a >> 1) & 1)) * h, org + (cz + (a >> 2)) * h);
+            vec3 pb(org + (cx + (b & 1)) * h, org + (cy + ((b >> 1) & 1)) * h, org + (cz + (b >> 2)) * h);
+            sum = sum + pa + (pb - pa) * t; cnt++;
+          }
+          cubeV[key3(cx, cy, cz)] = (int)vpos.size();
+          vpos.push_back(sum * (1.f / cnt)); vcube.push_back(cx); vcube.push_back(cy); vcube.push_back(cz); vsink.push_back(cl.second == 2);
+        }
+      }
+      // the vertices' normals, material ids and cabin ambient occlusion from the field; each is pulled onto the
+      // surface in three steps (the field is a bound where parts are cut from one another, so one pull by its value
+      // falls short by a varying fraction of a cell), and stays within its own cube (at a sharp edge the normal is one
+      // face's or the other's: a vertex pulled a whole cell onto the wrong face zigzagged the edge)
+      std::vector<float> vn, d4;
+      for (int it = 0; it < 3; it++) {
+        mode(3, 0); hullEval4(vpos, vn);
+        mode(2, 0); hullEval4(vpos, d4);
+        for (size_t q = 0; q < vpos.size(); q++) {
+          vec3 p = vpos[q] - vec3(vn[q * 4], vn[q * 4 + 1], vn[q * 4 + 2]) * std::max(-h, std::min(h, d4[q * 4]));
+          const float m = 0.25f * h;
+          float lo[3] = {org + vcube[q * 3] * h - m, org + vcube[q * 3 + 1] * h - m, org + vcube[q * 3 + 2] * h - m};
+          p.x = std::max(lo[0], std::min(lo[0] + h + 2.f * m, p.x)); p.y = std::max(lo[1], std::min(lo[1] + h + 2.f * m, p.y)); p.z = std::max(lo[2], std::min(lo[2] + h + 2.f * m, p.z));
+          vpos[q] = p;
+        }
+      }
+      mode(3, 0); hullEval4(vpos, vn);
+      mode(2, 0); hullEval4(vpos, d4);
+      if (getenv("HULLDBG")) {   // how far off the surface the vertices still sit
+        int n2mm = 0, n5mm = 0; float mx = 0.f;
+        for (size_t q = 0; q < vpos.size(); q++) { float a = fabsf(d4[q * 4]); mx = std::max(mx, a); if (a > 0.002f) n2mm++; if (a > 0.005f) n5mm++; }
+        printf("mesh %s (lattice %.2f cm): %zu vertices off the surface: %d > 2 mm, %d > 5 mm, max %.1f mm\n", inside ? "cockpit" : "outside", h * 100.f, vpos.size(), n2mm, n5mm, mx * 1000.f);
+      }
+      // the ring round the fine patch sinks into the wall (along the normal, away from the cabin), so the patch is in
+      // front of it wherever the two lay the same surface
+      for (size_t q = 0; q < vpos.size(); q++) if (vsink[q]) vpos[q] = vpos[q] - vec3(vn[q * 4], vn[q * 4 + 1], vn[q * 4 + 2]) * sink;
+      const int base = (int)(vb.size() / 8);
+      vb.resize(vb.size() + vpos.size() * 8);
+      for (size_t q = 0; q < vpos.size(); q++) {
+        float* o = &vb[(base + q) * 8];
+        o[0] = vpos[q].x; o[1] = vpos[q].y; o[2] = vpos[q].z; o[3] = vn[q * 4]; o[4] = vn[q * 4 + 1]; o[5] = vn[q * 4 + 2];
+        o[6] = floorf(d4[q * 4 + 1] + 0.5f); o[7] = inside ? d4[q * 4 + 2] : 1.f;
+      }
+      auto cube = [&](int x, int y, int z, int& out) { auto it = cubeV.find(key3(x, y, z)); if (it == cubeV.end()) return false; out = it->second; return true; };
+      auto quad = [&](int a, int b, int c, int dq) {
+        vec3 nAvg(vn[a * 4] + vn[b * 4] + vn[c * 4] + vn[dq * 4], vn[a * 4 + 1] + vn[b * 4 + 1] + vn[c * 4 + 1] + vn[dq * 4 + 1], vn[a * 4 + 2] + vn[b * 4 + 2] + vn[c * 4 + 2] + vn[dq * 4 + 2]);
+        vec3 fn = cross(vpos[b] - vpos[a], vpos[c] - vpos[a]) + cross(vpos[c] - vpos[a], vpos[dq] - vpos[a]);
+        if (dot(fn, nAvg) < 0.f) std::swap(b, dq);
+        ib.push_back(base + a); ib.push_back(base + b); ib.push_back(base + c); ib.push_back(base + a); ib.push_back(base + c); ib.push_back(base + dq);
+      };
+      for (auto& kv : cubeV) {
+        int64_t k = kv.first;
+        int cx = (int)((k >> 42) & 0x1fffff) - 4096, cy = (int)((k >> 21) & 0x1fffff) - 4096, cz = (int)(k & 0x1fffff) - 4096;
+        float v0, vx, vy, vz;
+        if (!cval(cx, cy, cz, v0)) continue;
+        int a = kv.second, b, c, dq;
+        if (cval(cx + 1, cy, cz, vx) && (v0 < 0.f) != (vx < 0.f) && cube(cx, cy - 1, cz, b) && cube(cx, cy - 1, cz - 1, c) && cube(cx, cy, cz - 1, dq)) quad(a, b, c, dq);
+        if (cval(cx, cy + 1, cz, vy) && (v0 < 0.f) != (vy < 0.f) && cube(cx, cy, cz - 1, b) && cube(cx - 1, cy, cz - 1, c) && cube(cx - 1, cy, cz, dq)) quad(a, b, c, dq);
+        if (cval(cx, cy, cz + 1, vz) && (v0 < 0.f) != (vz < 0.f) && cube(cx - 1, cy, cz, b) && cube(cx - 1, cy - 1, cz, c) && cube(cx, cy - 1, cz, dq)) quad(a, b, c, dq);
+      }
     };
-    for (auto& kv : cubeV) {
-      int64_t k = kv.first;
-      int cx = (int)((k >> 42) & 0x1fffff) - 4096, cy = (int)((k >> 21) & 0x1fffff) - 4096, cz = (int)(k & 0x1fffff) - 4096;
-      float v0, vx, vy, vz;
-      if (!cval(cx, cy, cz, v0)) continue;
-      int a = kv.second, b, c, dq;
-      if (cval(cx + 1, cy, cz, vx) && (v0 < 0.f) != (vx < 0.f) && cube(cx, cy - 1, cz, b) && cube(cx, cy - 1, cz - 1, c) && cube(cx, cy, cz - 1, dq)) quad(a, b, c, dq);
-      if (cval(cx, cy + 1, cz, vy) && (v0 < 0.f) != (vy < 0.f) && cube(cx, cy, cz - 1, b) && cube(cx - 1, cy, cz - 1, c) && cube(cx - 1, cy, cz, dq)) quad(a, b, c, dq);
-      if (cval(cx, cy, cz + 1, vz) && (v0 < 0.f) != (vz < 0.f) && cube(cx - 1, cy, cz, b) && cube(cx - 1, cy - 1, cz, c) && cube(cx, cy - 1, cz, dq)) quad(a, b, c, dq);
-    }
+    nets(coarseCells, 4, 0.003f);
+    if (!fineCells.empty()) nets(fineCells, 8, 0.f);
     // ---- the hull of what moves: the moving 6.25 cm cells, each grown by one cell, as faces on the fine lattice (a
     // 0.25 m margin round the yoke's sweep reached the pilot's eye and every cockpit ray started inside the hull: all
     // of them marched; on the fine lattice the hull is the yoke's, the levers' and the pedals' own)
@@ -228,8 +288,8 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     }
     if (getenv("HULLDBG")) {
       int nmov = 0; for (uint8_t m : moving) nmov += m;
-      printf("mesh %s: %d states, %zu band cells (%d moving), %zu lattice samples, %zu vertices, %zu triangles, moving hull %zu triangles\n",
-             inside ? "cockpit" : "outside", ns, cand.size(), nmov, cpts.size(), vpos.size(), ib.size() / 3, hullTri.size() / 9);
+      printf("mesh %s: %d states, %zu band cells (%d moving, %d thin), %zu lattice samples, %zu vertices, %zu triangles, moving hull %zu triangles\n",
+             inside ? "cockpit" : "outside", ns, cand.size(), nmov, nThin, nLattice, vb.size() / 8, ib.size() / 3, hullTri.size() / 9);
     }
     if (!path.empty()) {   // (the eye flag rides at the end of the hull's floats)
       if (FILE* f = fopen(path.c_str(), "wb")) {

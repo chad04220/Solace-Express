@@ -64,9 +64,11 @@ void main(){
   // the raster passes' logarithmic depth of the view depth along the camera's axis (a panorama: the distance itself)
   float w = uPano.x > 0.0 ? t : -t*dot(rd, uCamRot[2]);
   gl_FragDepth = (log2(max(1e-6, 1.0 + w))*uLogC - 1.0)*0.5 + 0.5;
-  // at or behind the surface already drawn (the march that ran into the mesh's own panel): the depth test would drop it
-  // after the shading below; dropped here, unshaded
-  if (uSceneZOn == 1 && gl_FragDepth >= texelFetch(uSceneZ, ivec2(gl_FragCoord.xy), 0).r - 2e-7) discard;
+  // at or behind the surface already drawn, or within a hair of it (the march that ran into the mesh's own panel or
+  // roof: the same surface, which the mesh keeps - re-shaded by the march it showed the moving hull's cells as blocks):
+  // the depth test would drop it after the shading below; dropped here, unshaded. 3e-5 of the log depth is ~0.6 mm
+  // at arm's length; a moving part in front of the mesh is farther than that
+  if (uSceneZOn == 1 && gl_FragDepth >= texelFetch(uSceneZ, ivec2(gl_FragCoord.xy), 0).r - 3e-5) discard;
   float sunVis = smoothstep(-0.05, 0.05, uSunDir.y);
   if (hit == 8) {   // the UFO
     Mat m; vec3 n; bool cabin; float ao;
