@@ -676,6 +676,25 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     if (!g_ren.dispError.empty()) fprintf(f, "Display shader failed (cockpit screens disabled):\n%s\n", g_ren.dispError.c_str());
     fclose(f);
   }
+  // Every aircraft body (outside and cockpit, the research craft's too) built or loaded before the tools draw a scene:
+  // the benchmark then never times a body being built, nor a traffic aircraft marched for want of its mesh, and the
+  // screenshots show the meshes the game shows. Returns how many were built from scratch and the seconds it took.
+  auto buildBodies = [&](int& built, double& secs) {
+    Game* g = new Game();
+    g->saveDir = game.saveDir;
+    g->initHeadless(); g->iconTex = iconTex;
+    const int b0 = g_ren.bakeBuilt;
+    LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0);
+    g_ren.bakeYield = [] { pumpB(); };
+    g->prewarm([](float f, const std::string& what) {
+      SetWindowTextA(g_hwnd, ("Solace Express - building the aircraft bodies " + std::to_string((int)(f * 100.f)) + "%  (" + what + ")").c_str());
+      pumpB();
+    }, true);
+    g_ren.bakeYield = nullptr;
+    QueryPerformanceCounter(&t1);
+    built = g_ren.bakeBuilt - b0; secs = (double)(t1.QuadPart - t0.QuadPart) / freq.QuadPart;
+    delete g;
+  };
   // Analysis: SolaceExpress.exe --analyze [scenes] - a thorough look at where the frame time goes, written to
   // analysis.txt (with a picture of each scene in the "analysis" folder), all at 1920x1080: CPU vs GPU (update /
   // submit / wait), exact per-pass GPU times (the GPU is waited on at each pass boundary), frame time against render
@@ -697,6 +716,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       CreateDirectoryA((dir + "\\analysis").c_str(), nullptr);
       FILE* af = fopen((dir + "\\analysis.txt").c_str(), "w");
       if (!af) return 1;
+      { int built = 0; double secs = 0; buildBodies(built, secs); }   // (as the game's launch does: the traffic drawn from its meshes, as in flight)
       fprintf(af, "Solace Express performance analysis\nGPU: %s\nCPU threads: %u   Quality: %d   Window: %dx%d\n",
               gpu.c_str(), std::thread::hardware_concurrency(), g_ren.quality, g_ren.W, g_ren.H);
       fprintf(af, "\nHow to read this: 'ms' is wall-clock time per frame with the GPU finished (vsync off). Per-pass times are\n"
@@ -860,25 +880,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       return 0;
     }
   }
-  // Every aircraft body (outside and cockpit, the research craft's too) built or loaded before the tools draw a scene:
-  // the benchmark then never times a body being built, nor a traffic aircraft marched for want of its mesh, and the
-  // screenshots show the meshes the game shows. Returns how many were built from scratch and the seconds it took.
-  auto buildBodies = [&](int& built, double& secs) {
-    Game* g = new Game();
-    g->saveDir = game.saveDir;
-    g->initHeadless(); g->iconTex = iconTex;
-    const int b0 = g_ren.bakeBuilt;
-    LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0);
-    g_ren.bakeYield = [] { pumpB(); };
-    g->prewarm([](float f, const std::string& what) {
-      SetWindowTextA(g_hwnd, ("Solace Express - building the aircraft bodies " + std::to_string((int)(f * 100.f)) + "%  (" + what + ")").c_str());
-      pumpB();
-    }, true);
-    g_ren.bakeYield = nullptr;
-    QueryPerformanceCounter(&t1);
-    built = g_ren.bakeBuilt - b0; secs = (double)(t1.QuadPart - t0.QuadPart) / freq.QuadPart;
-    delete g;
-  };
   // Benchmark: SolaceExpress.exe --bench scene1,scene2,... [--size WxH] times each scene (wall clock with the GPU flushed,
   // plus the GPU time of every pass) and writes bench.txt next to the exe
   {
