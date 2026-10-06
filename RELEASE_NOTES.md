@@ -1,3 +1,1 @@
 ## What's new
-- The game compiles its aircraft shaders about three times faster on first start after an update. Each shader now carries one copy of the aircraft's shape for each job instead of up to nine, which also leaves the aircraft passes lighter for the graphics card while you fly.
-- Fixed a slowdown from v3.23.0: with the landing gear now a solid part, traffic aircraft fell back to being traced pixel by pixel, which cost frame rate near busy airports. Traffic is drawn from its meshes again, and the aircraft tracing pass is skipped entirely when nothing on screen needs it, which is the usual case flying a light aircraft.
