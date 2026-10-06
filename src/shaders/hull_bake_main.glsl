@@ -24,30 +24,36 @@ void main(){
   vec3 p = texelFetch(uHPts, ivec2(gl_FragCoord.xy), 0).xyz;
   loadMain(); pieceXf(-1);
   gPartMode = uHPart;
-  vec4 o = vec4(0.0);
-  if (uHMode == 0 || uHMode == 4) {   // (4: the greatest distance over the states)
-    float d = uHMode == 0 ? 1e9 : -1e9;
-    for (int s = 0; s < 128; s++) {
-      if (s >= uHStN) break;
-      hullState(s);
-      float ds = mapPlane(p).x;
-      d = uHMode == 0 ? min(d, ds) : max(d, ds);
-    }
-    o = vec4(d, 0.0, 0.0, 0.0);
-  } else {
-    hullState(uHState);
-    if (uHMode == 1) o = vec4(mapPlane(p).x, 0.0, 0.0, 0.0);
-    else if (uHMode == 2) {
-      vec2 r = mapPlane(p); vec3 n = planeNormal(p); float ao = 1.0;
+  gZero = min(uQuality, 0);
+  // one call each of the field, its normal and the occlusion, whatever the mode (each call written out is another
+  // copy of the airframe's distance in the program): the field in the loop over the states (modes 0 and 4 all of
+  // them, the others uHState alone)
+  bool all = uHMode == 0 || uHMode == 4;
+  int s0 = all ? 0 : uHState, sn = all ? uHStN : 1;
+  float d = uHMode == 4 ? -1e9 : 1e9; vec2 r = vec2(0.0);
+  for (int i = gZero; i < 128; i++) {
+    if (i >= sn) break;
+    hullState(s0 + i);
+    if (uHMode == 3) break;   // (the normal alone)
+    r = mapPlane(p);
+    d = uHMode == 4 ? max(d, r.x) : min(d, r.x);
+  }
+  vec4 o = vec4(d, 0.0, 0.0, 0.0);
+  if (uHMode == 2 || uHMode == 3) {
+    vec3 n = planeNormal(p);
+    if (uHMode == 3) o = vec4(n, 0.0);
+    else {
+      float ao = 1.0;
       if (gPS.w > 0.5) {
+        vec3 ap = p, an = n;
         if (uHPart >= 0) {   // a part's occlusion in the cabin about it, at its rest pose
           Pose X = partPose(uHPart, uHPartSide); gPartMode = -1;
-          ao = interiorAO(X.R*p + X.T, X.R*n);
-        } else ao = interiorAO(p, n);
+          ap = X.R*p + X.T; an = X.R*n;
+        }
+        ao = interiorAO(ap, an);
       }
       o = vec4(r.x, r.y, ao, 0.0);
     }
-    else o = vec4(planeNormal(p), 0.0);
   }
   oColor = o; oDepth = o.x; oCloudMask = 0.0;
 }
