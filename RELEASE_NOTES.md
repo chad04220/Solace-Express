@@ -6,3 +6,6 @@
 - **Cloaking the XR-40 no longer costs frame rate.** With the cloak on, the craft is still drawn from its mesh, with
   only its cloaked part left see-through for the cloak's shimmer. Before, cloaking switched the whole craft to the slow
   per-pixel pass (about a third of the aircraft pass on the test renderer).
+- **Sound follows your default output device.** Switch Windows' default output (say from speakers to a headset) while
+  the game runs and the sound moves to it within a second. Before, it kept playing on the old device unless that one
+  was unplugged.

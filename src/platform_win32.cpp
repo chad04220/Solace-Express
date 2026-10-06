@@ -185,12 +185,30 @@ static const GUID kSubFormatFloat = {0x00000003, 0x0000, 0x0010, {0x80, 0x00, 0x
 struct WasapiOut {
   IAudioClient* client = nullptr; IAudioRenderClient* render = nullptr;
   UINT32 bufferFrames = 0;
+  std::wstring devId;   // the endpoint the stream is on (a change of the default moves it: defaultChanged)
   void close() {
     if (client) client->Stop();
     if (render) { render->Release(); render = nullptr; }
     if (client) { client->Release(); client = nullptr; }
-    bufferFrames = 0;
+    bufferFrames = 0; devId.clear();
   }
+  // the default render endpoint's id ("" when there is none)
+  static std::wstring defaultId() {
+    std::wstring r;
+    IMMDeviceEnumerator* en = nullptr;
+    if (FAILED(CoCreateInstance(kClsidMMDeviceEnumerator, nullptr, CLSCTX_ALL, kIidIMMDeviceEnumerator, (void**)&en)) || !en) return r;
+    IMMDevice* dev = nullptr;
+    if (SUCCEEDED(en->GetDefaultAudioEndpoint(eRender, eConsole, &dev)) && dev) {
+      LPWSTR id = nullptr;
+      if (SUCCEEDED(dev->GetId(&id)) && id) { r = id; CoTaskMemFree(id); }
+      dev->Release();
+    }
+    en->Release();
+    return r;
+  }
+  // Windows' default output moved to another device that is still there (the old one is not invalidated, so the stream
+  // would play on it): the caller reopens on the new default
+  bool defaultChanged() const { std::wstring d = defaultId(); return !d.empty() && !devId.empty() && d != devId; }
   // the default render endpoint, shared mode, 10 ms, our float stereo 48 kHz converted by the engine
   bool open() {
     close();
@@ -200,9 +218,10 @@ struct WasapiOut {
     HRESULT hr = en->GetDefaultAudioEndpoint(eRender, eConsole, &dev);
     en->Release();
     if (FAILED(hr) || !dev) return false;
+    { LPWSTR id = nullptr; if (SUCCEEDED(dev->GetId(&id)) && id) { devId = id; CoTaskMemFree(id); } }
     hr = dev->Activate(kIidIAudioClient, CLSCTX_ALL, nullptr, (void**)&client);
     dev->Release();
-    if (FAILED(hr) || !client) { client = nullptr; return false; }
+    if (FAILED(hr) || !client) { client = nullptr; devId.clear(); return false; }
     WAVEFORMATEXTENSIBLE wf = {};
     wf.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE; wf.Format.nChannels = 2; wf.Format.nSamplesPerSec = 48000;
     wf.Format.wBitsPerSample = 32; wf.Format.nBlockAlign = 8; wf.Format.nAvgBytesPerSec = 48000 * 8; wf.Format.cbSize = 22;
@@ -238,6 +257,7 @@ static DWORD WINAPI wasapiThread(LPVOID) {
   CoInitializeEx(nullptr, COINIT_MULTITHREADED);
   SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
   int lost = 0;
+  ULONGLONG nextCheck = GetTickCount64() + 1000;
   while (s_audioRun) {
     if (!s_wo.client) {   // the device went away: reopen on the new default, trying every half second
       if (s_wo.open()) lost = 0;
@@ -245,7 +265,11 @@ static DWORD WINAPI wasapiThread(LPVOID) {
     }
     WaitForSingleObject(s_audioEvent, 200);
     if (!s_audioRun) break;
-    if (!s_wo.pump()) s_wo.close();
+    if (!s_wo.pump()) { s_wo.close(); continue; }
+    if (GetTickCount64() >= nextCheck) {   // once a second: follow a change of Windows' default output device
+      nextCheck = GetTickCount64() + 1000;
+      if (s_wo.defaultChanged()) s_wo.close();
+    }
   }
   s_wo.close();
   CoUninitialize();
