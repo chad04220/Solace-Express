@@ -3558,9 +3558,9 @@ void Game::debugScene(const std::string& name) {
     dbgFollowOff = plane.right() * (R * 0.85f) + plane.forward() * (R * 0.55f) + vec3(0, R * 0.16f, 0);
     toasts.clear(); hint.clear(); uiHidden = true; return;
   }
-  if (name.compare(0, 4, "gav_") == 0) {   // an aircraft parked on the runway, orbit view: gav_<spec>_<yaw>_<pitch>_<dist>
-    int sp = 0; float yawD = 120, pitD = 10, dist = 0;
-    sscanf(name.c_str() + 4, "%d_%f_%f_%f", &sp, &yawD, &pitD, &dist);
+  if (name.compare(0, 4, "gav_") == 0) {   // an aircraft parked on the runway, orbit view: gav_<spec>_<yaw>_<pitch>_<dist>[_<gear>]
+    int sp = 0; float yawD = 120, pitD = 10, dist = 0, gearAt = -1;
+    sscanf(name.c_str() + 4, "%d_%f_%f_%f_%f", &sp, &yawD, &pitD, &dist, &gearAt);
     sp = std::clamp(sp, 0, kWraith);
     Contract c; c.from = g_world.findAirport("CAP"); c.to = g_world.findAirport("MDB"); c.title = "Aircraft check";
     c.wx = Weather(); c.wx.timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 14.5f; c.wx.cloudCover = 0.2f; c.wx.visibility = 60000;
@@ -3577,6 +3577,9 @@ void Game::debugScene(const std::string& name) {
       botControl = true; plane.ctl.pitch = cp; plane.ctl.roll = cr; plane.ctl.yaw = cy; plane.ctl.flaps = cf; plane.flaps = cf;
       const int n = getenv("GAVCTLN") ? atoi(getenv("GAVCTLN")) : 60;   // (the settle time: the controls' smoothing)
       for (int i = 0; i < n; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    }
+    if (gearAt >= 0) {   // (the gear held part way: lifted clear of the runway for the few frames that follow)
+      plane.gear = std::min(gearAt, 1.f); plane.ctl.gearDown = gearAt >= 0.5f; plane.pos.y += 2.f; plane.vel = vec3();
     }
     return;
   }

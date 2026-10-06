@@ -26,7 +26,7 @@
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 11;   // (bump with the format)
+const uint32_t kMeshMagic = 0x4d455348u + 12;   // (bump with the format)
 const float kMeshShell = 0.004f;   // the fine patch's shell stands this far outside the surface (plane_mesh_fs.glsl marches the rest)
 // the rigid parts a cockpit has (plane_parts.glsl PT_*) and each one's instances: x which seat or side, y which pedal
 struct PartInst { int type; float sx, sy; };
@@ -99,6 +99,23 @@ bool wraithPartBox(int type, vec3& lo, vec3& hi, float& h) {
   }
   return false;
 }
+// a gear part's box (its own frame) to survey for its tight one, and its lattice (plane_parts.glsl PT_GEAR_*): generous,
+// from the model's numbers - the legs' mounts and the bays' heights come from the field itself
+bool gearPartBox(int type, const float* M, vec3& lo, vec3& hi, float& h) {
+  auto m = [&](int i, int c) { return M[i * 4 + c]; };
+  const float track = m(18, 0), wr = m(18, 1), mz = m(18, 2), gh = m(19, 0);
+  const int gtype = (int)(m(0, 1) + 0.5f);
+  switch (type) {
+    case 33: lo = vec3(track - 0.5f, -gh - 0.1f, mz - wr - 0.6f); hi = vec3(track + 0.5f, 1.5f, mz + wr + 0.6f); h = 0.005f; return true;
+    case 34: lo = vec3(-0.45f, -gh - 0.1f, -1.0f); hi = vec3(0.45f, 1.5f, 1.0f); h = 0.005f; return true;
+    case 35: lo = vec3(-0.3f, -gh - 0.1f, -0.8f); hi = vec3(0.3f, 1.2f, 0.6f); h = 0.004f; return true;
+    case 36: if (gtype == 4) { lo = vec3(-2.5f, -0.06f, -0.06f); hi = vec3(2.5f, 0.03f, wr + 0.2f); }
+             else { lo = vec3(-0.06f, -0.06f, -wr - 0.2f); hi = vec3(0.5f, 0.03f, wr + 0.2f); }
+             h = 0.004f; return true;
+    case 37: lo = vec3(-0.06f, -0.06f, -wr - 0.2f); hi = vec3(0.4f, 0.03f, wr + 0.2f); h = 0.004f; return true;
+  }
+  return false;
+}
 int partList(const float* M, bool inside, PartInst* out) {
   const int eng = (int)(M[2] + 0.5f);
   int n = 0;
@@ -118,6 +135,11 @@ int partList(const float* M, bool inside, PartInst* out) {
   if (eng < 5) {   // the light aircraft's (and the XR-10's and XR-20's) control surfaces, outside and from the cockpit
     for (int s = -1; s <= 1; s += 2) { out[n++] = {11, (float)s, 0}; out[n++] = {12, (float)s, 0}; out[n++] = {13, (float)s, 0}; }   // flap, aileron, elevator
     out[n++] = {14, 0, 0};   // rudder
+    // and their gear: a retracting main leg a side and its bay's two doors; the nose wheel (and its doors) or the tail wheel
+    const int gtype = (int)(M[1] + 0.5f); const bool tail = M[19 * 4 + 2] > 0.5f;
+    if (gtype >= 3) for (int s = -1; s <= 1; s += 2) { out[n++] = {33, (float)s, 0}; out[n++] = {36, (float)s, -1}; out[n++] = {36, (float)s, 1}; }
+    if (tail) out[n++] = {35, 0, 0};
+    else { out[n++] = {34, 0, 0}; if (gtype >= 3) { out[n++] = {37, 0, -1}; out[n++] = {37, 0, 1}; } }
   }
   if (eng == 5 && !inside) {   // the XR-30: elevons, canards, rudders
     for (int s = -1; s <= 1; s += 2) { out[n++] = {30, (float)s, 0}; out[n++] = {31, (float)s, 0}; out[n++] = {32, (float)s, 0}; }
@@ -444,7 +466,20 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         // part's from a 1 cm survey of +-0.35 m about its own origin (2 mm lattice: seen from arm's length)
         vec3 lo(1e9f, 1e9f, 1e9f), hi(-1e9f, -1e9f, -1e9f);
         float h = 0.002f;
+        vec3 glo, ghi;
         if (wraithPartBox(type, lo, hi, h)) { lo = lo - vec3(2.f * h, 2.f * h, 2.f * h); hi = hi + vec3(2.f * h, 2.f * h, 2.f * h); }
+        else if (gearPartBox(type, M, glo, ghi, h)) {   // a 2 cm survey of the generous box for the tight one
+          const float hc = 0.02f;
+          const int sx = (int)ceilf((ghi.x - glo.x) / hc) + 1, sy = (int)ceilf((ghi.y - glo.y) / hc) + 1, sz = (int)ceilf((ghi.z - glo.z) / hc) + 1;
+          std::vector<vec3> sp; std::vector<float> sd;
+          for (int k = 0; k < sz; k++) for (int j = 0; j < sy; j++) for (int i = 0; i < sx; i++) sp.push_back(vec3(glo.x + i * hc, glo.y + j * hc, glo.z + k * hc));
+          mode(1, 0); hullEval(sp, sd);
+          bool any = false;
+          for (size_t q = 0; q < sp.size(); q++) if (sd[q] < hc) { any = true; lo = vec3(std::min(lo.x, sp[q].x), std::min(lo.y, sp[q].y), std::min(lo.z, sp[q].z)); hi = vec3(std::max(hi.x, sp[q].x), std::max(hi.y, sp[q].y), std::max(hi.z, sp[q].z)); }
+          if (!any) continue;
+          const float mg = hc + 2.f * h;
+          lo = lo - vec3(mg, mg, mg); hi = hi + vec3(mg, mg, mg);
+        }
         else if (partIsSurface(type)) {
           if (!surfaceBox(type, M, lo, hi)) continue;
           h = 0.006f; lo = lo - vec3(2.f * h, 2.f * h, 2.f * h); hi = hi + vec3(2.f * h, 2.f * h, 2.f * h);

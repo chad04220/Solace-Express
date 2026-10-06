@@ -82,12 +82,27 @@ GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::stri
       }
     }
   }
+  static const bool timed = getenv("SHADERTIME") != nullptr;   // (debug: each program's compile and link time, and the start of its entry point)
+  if (const char* dd = getenv("SHADERDUMP")) {   // (debug: each program's sources, numbered, to time and cut down outside the game)
+    static int dumped = 0; char nm[512];
+    for (int k = 0; k < 2; k++) {
+      snprintf(nm, sizeof(nm), "%s/%02d.%s", dd, dumped, k ? "fs" : "vs");
+      if (FILE* fo = fopen(nm, "wb")) { const std::string& src = k ? fs : vs; fwrite(src.data(), 1, src.size(), fo); fclose(fo); }
+    }
+    dumped++;
+  }
+  auto t0 = std::chrono::steady_clock::now();
   GLuint v = compile(GL_VERTEX_SHADER, vs, err), f = compile(GL_FRAGMENT_SHADER, fs, err);
   if (!v || !f) return 0;
   GLuint p = glCreateProgram(); glAttachShader(p, v); glAttachShader(p, f);
   if (cache) glProgramParameteri(p, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, 1);
   glLinkProgram(p);
   GLint ok = 0; glGetProgramiv(p, GL_LINK_STATUS, &ok);
+  if (timed) {
+    size_t m = fs.rfind("void main()"); std::string tag = m == std::string::npos ? fs.substr(0, 60) : fs.substr(m, 90);
+    for (char& c : tag) if (c == '\n') c = ' ';
+    fprintf(stderr, "shader %6.1f s  fs %7zu bytes  %s\n", std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), fs.size(), tag.c_str());
+  }
   if (!ok) { char log[8192]; glGetProgramInfoLog(p, sizeof(log), nullptr, log); err += log; return 0; }
   glDeleteShader(v); glDeleteShader(f);
   g_shaderCacheMisses++;
@@ -504,7 +519,7 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     { std::string e; progClouds = program(vsFS, ms + kCloudMain, e); step(); }       // optional: without them no clouds
     { std::string e; progCloudComp = program(vsFS, kCloudCompFS, e); step(); }
     if (!progMap) { error = "Map shader: " + error; return false; }
-    compileHull(vsFS, ms + kHullBakeMain); step();
+    compileHull(vsFS, worldLibAssembly(std::string(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + "#define PART_BAKE\n") + kHullBakeMain); step();   // (the bake alone evaluates a part by its id: PART_BAKE)
     progDisp = program(vsFS, ms + kDispMain, error); step();
     // not fatal: without it the cockpit screens stay dark, but the game still runs (the error goes to startup.log)
     if (!progDisp) { dispError = error; error.clear(); }

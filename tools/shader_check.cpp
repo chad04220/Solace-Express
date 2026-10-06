@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     put(dir, "map.frag", ms + kMapMain);
     put(dir, "tshbake.frag", ms + kTShBakeMain);
     put(dir, "clouds.frag", ms + kCloudMain);
-    put(dir, "hullbake.frag", ms + kHullBakeMain);
+    put(dir, "hullbake.frag", worldLibAssembly("#define PART_BAKE\n") + kHullBakeMain);
     put(dir, "displays.frag", ms + kDispMain);
     put(dir, "terrain.vert", terrainVSAssembly("")); put(dir, "terrain.frag", terrainFSAssembly(""));
     put(dir, "water.vert", waterVSAssembly("")); put(dir, "water.frag", waterFSAssembly(""));

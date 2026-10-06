@@ -15,7 +15,10 @@ const int PT_YOKE_SHAFT = 0, PT_YOKE_WHEEL = 1, PT_PEDAL = 2, PT_THR_KNOB = 3, P
           PT_WR_PODF = 15, PT_WR_PODR = 16, PT_WR_FAN = 17, PT_WR_VANEC = 18, PT_WR_VANEO = 19, PT_WR_VANEY = 20,
           PT_WR_PETAL = 21, PT_WR_DOOR = 22, PT_WR_BOMB = 23, PT_WR_HATCH = 24, PT_WR_TURRET = 25, PT_WR_MUZZLE = 26,
           PT_WR_ARM = 27, PT_WR_ELEVON = 28, PT_WR_RUDV = 29,
-          PT_JT_ELEVON = 30, PT_JT_CANARD = 31, PT_JT_RUDDER = 32;   // the XR-30's (plane_sdf.glsl jtPartField)
+          PT_JT_ELEVON = 30, PT_JT_CANARD = 31, PT_JT_RUDDER = 32,   // the XR-30's (plane_sdf.glsl jtPartField)
+          // the landing gear of the aircraft drawn from the packed model (plane_sdf.glsl gearPartField): a retracting main
+          // leg with its wheels, the nose and tail wheels (steered), the bays' doors
+          PT_GEAR_MAIN = 33, PT_GEAR_NOSE = 34, PT_GEAR_TAIL = 35, PT_GEAR_MDOOR = 36, PT_GEAR_NDOOR = 37;
 const vec3 WRP_POD[4] = vec3[4](vec3(-2.35, -0.08, -3.3), vec3(2.35, -0.08, -3.3), vec3(-2.75, 0.05, 3.45), vec3(2.75, 0.05, 3.45));   // (wraith_sdf.glsl WR_POD)
 int gPartMode = -1;   // -1: the whole aircraft, its parts posed; -2: without its parts; >= 0: that part alone, in its own frame
 struct Pose { mat3 R; vec3 T; };   // (R is a rotation for the cockpit parts; for a control surface an affine map: its deflection
@@ -115,6 +118,114 @@ Pose wrPartPose(int k, vec2 sd){
   }
   return X;
 }
+// turboprop nacelle section at body z (mirrors the engine code: a front cone to 30% of the length, then a rear cone
+// that rises towards the wing and shrinks to 35%): returns (centre y, radius)
+vec2 nacSection(float z){
+  vec4 N0 = gM[16], N1 = gM[17];
+  float nr = N0.z, z0 = N0.w, len = N1.x, z1 = z0 + len*0.3;
+  if (z < z1) { float s = clamp((z - z0)/max(z1 - z0, 0.01), 0.0, 1.0); return vec2(N0.y + 0.02*s, mix(nr*0.72, nr, s)); }
+  float wingY = gM[10].x + N0.x*gM[10].z, s = clamp((z - z1)/max(len*0.7, 0.01), 0.0, 1.0);
+  return vec2(N0.y + mix(0.02, wingY - N0.y - nr*0.25, s), mix(nr, nr*0.35, s));
+}
+Pose poseMul(Pose a, Pose b){ Pose X; X.R = a.R*b.R; X.T = a.R*b.T + a.T; return X; }
+// The landing gear (the packed model's: gM[18] track, wheel radius, main and nose stations; gM[19] gear height, tail
+// wheel station, taildragger). The legs travel until gear 0.2, then the doors close over them.
+float gearUp(){ return clamp((1.0 - gPS.x)*1.25, 0.0, 1.0); }
+float gearDoorAngle(){ return smoothstep(0.0, 0.2, gPS.x)*1.45; }
+// A wing-retracting main (type 4) folds inboard about a fore-and-aft hinge, until the leg lies along the wing (its
+// dihedral) and the wheel lies flat under the wing root, in a streamlined fairing: raised straight up it came through
+// the top of a wing a third as thick as the wheel is tall, and even flat the wheel (20 cm across its tyre) is thicker
+// than these wings where the gear stands (7 to 15 cm). The hinge is placed so the folded wheel's top stays 2 cm under
+// the upper skin; the fairing's floor (its doors) runs 4 cm under the wheel, parallel to the wing.
+float wingHalf(float s, float z){   // the wing's half thickness at span s and body z (sdPanel: an uneven capsule from the LE radius to the TE radius)
+  vec4 W0 = gM[9], W1 = gM[10];
+  float kk = clamp(s/W0.x, 0.0, 1.0), ch = mix(W0.y, W0.z, kk), le = W1.y + W0.w*kk;
+  float r1 = W1.w*ch*0.5, r2 = max(0.004*ch, 0.005);
+  return mix(r1, r2, clamp((z - le - r1)/max(ch - r1 - r2, 0.01), 0.0, 1.0));
+}
+struct GearFold { vec3 H; float legLen, dl, xf, floor0; };   // (floor0: the fairing floor's height at x 0, rising with the dihedral)
+GearFold gearFold(){
+  vec4 G0 = gM[18], G1 = gM[19], W1 = gM[10];
+  float track = G0.x, wr = G0.y, mz = G0.z, wy = wr - G1.x, dl = atan(W1.z);
+  float yh = W1.x + track*W1.z, legLen = 0.0, xf = track;
+  for (int i = 0; i < 4; i++) {   // (the hinge's height sets the leg's length, which sets where the wheel folds to)
+    legLen = yh - wy; xf = track - legLen*cos(dl);
+    yh = W1.x + xf*W1.z + wingHalf(xf, mz) - 0.12 + legLen*sin(dl);
+  }
+  GearFold f; f.legLen = yh - wy; f.dl = dl; f.xf = track - f.legLen*cos(dl); f.H = vec3(track, yh, mz);
+  f.floor0 = (yh - f.legLen*sin(dl) - 0.14) - f.xf*W1.z;
+  return f;
+}
+vec3 gearHinge(){ return gearFold().H; }
+float gearFoldAngle(){ return gearUp()*(atan(gM[10].z) - 1.5707963); }
+// the fairing and its well (the right side's; F: well -> body): x spanwise, y up from the fairing's floor, z fore and
+// aft from the gear's station; x0..x1, +-hz, depth up to 2 cm under the upper skin
+struct GearWell { Pose F; float x0, x1, hz, depth; };
+GearWell gearFoldWellOf(GearFold f){
+  vec4 G0 = gM[18], W1 = gM[10];
+  float track = G0.x, wr = G0.y, mz = G0.z;
+  GearWell g;
+  g.x1 = track + 0.12; g.x0 = max(f.xf - wr - 0.05, 0.05); g.hz = wr + 0.07;
+  g.F.R = mat3(1.0, W1.z, 0.0,  0.0, 1.0, 0.0,  0.0, 0.0, 1.0);
+  g.F.T = vec3(0.0, f.floor0, mz);
+  g.depth = 0.14 + 0.1;   // (the floor to the folded wheel's top: 2 cm under the upper skin)
+  return g;
+}
+GearWell gearFoldWell(){ return gearFoldWellOf(gearFold()); }
+// sdSurface's hinge line (body z) at span s: the flaps' and ailerons'
+float wingHingeZ(float s){ vec4 W0 = gM[9], W1 = gM[10]; float k = clamp(s/W0.x, 0.0, 1.0); return W1.y + W0.w*k + 0.74*mix(W0.y, W0.z, k); }
+// how far back a folding main's fairing may reach, over its span (from the root to its outboard end; the hinge line is
+// straight in the span, so its ends bound it), clear of the flap's hinge line
+float gearFairAft(){ return min(wingHingeZ(0.0), wingHingeZ(gM[18].x + 0.12)) - 0.03; }
+// These mains stand about where the flaps hinge (and the fold keeps the wheel's station): where the fairing's
+// trailing end (gearFoldWellOf's hz and its rounding) would reach under the flap, the flap starts just outboard of
+// the fairing instead and the wing root over it stays fixed, so a lowered flap never cuts through the folded gear
+bool gearFlapOutboard(){ return int(gM[0].y + 0.5) == 4 && gM[18].z + gM[18].y + 0.1 > gearFairAft(); }
+float flapRoot(){ float fr = 0.55*gM[0].w; return gearFlapOutboard() ? max(fr, gM[18].x + 0.16) : fr; }
+// a bay the wheel rises straight into (the nose wheel's; type 3's mains', in the nacelle): the opening's centre at the
+// skin height of its hinges, its half width and length, its depth above that, and how far the cut reaches below it to
+// open a curved belly between the hinges
+struct VBay { vec3 c; vec2 h; float depth, below; };
+VBay gearVBay(bool nose){
+  vec4 G0 = gM[18]; int gtype = int(gM[0].y + 0.5);
+  float track = G0.x, wr = G0.y, mz = G0.z, nz = G0.w;
+  VBay b;
+  if (nose) {
+    vec3 sN = fusSection(nz); float nw = gtype == 3 ? wr*0.75 : wr*0.85, nx = gtype == 3 ? 0.3 : 0.14;
+    float ey = sN.y*sqrt(max(1.0 - nx*nx/(sN.x*sN.x), 0.0));   // (the belly's height at the hinges: an elliptic section)
+    b.c = vec3(0.0, sN.z - ey, nz); b.h = vec2(nx, nw + 0.08); b.depth = 2.0*nw + 0.15 + sN.y - ey; b.below = sN.y - ey + 0.03;
+  } else {
+    vec2 ns = nacSection(mz); float rr = ns.y, hx = min(0.38, rr*0.7), hy = sqrt(max(rr*rr - hx*hx, 0.0)), sk = ns.x - hy;
+    b.c = vec3(track, sk, mz); b.h = vec2(hx, wr + 0.08); b.depth = (ns.x - ns.y + 0.03) + 2.0*wr - sk + 0.1; b.below = rr - hy + 0.03;
+  }
+  return b;
+}
+// the gear's parts' poses (sd.x: the side, sd.y: which door)
+Pose gearPartPose(int k, vec2 sd){
+  vec4 G0 = gM[18], G1 = gM[19];
+  int gtype = int(gM[0].y + 0.5);
+  float mz = G0.z, nz = G0.w, gh = G1.x;
+  float up = gtype >= 3 ? gearUp() : 0.0, a = gearDoorAngle();
+  mat3 S = partMirror(sd.x);
+  Pose X; X.R = mat3(1.0); X.T = vec3(0.0);
+  if (k == PT_GEAR_MAIN) {
+    if (gtype == 3) { vec2 ns = nacSection(mz); X.R = S; X.T = S*vec3(0.0, up*(ns.x - ns.y + 0.03 + gh), 0.0); }
+    else { vec3 H = gearHinge(); mat3 Rf = partRxy(gearFoldAngle()); X.R = S*Rf; X.T = S*(H - Rf*H); }
+  } else if (k == PT_GEAR_NOSE) { X.R = partRxz(gPS.z); X.T = vec3(0.0, up*(gh - gM[0].w*0.6), nz); }
+  else if (k == PT_GEAR_TAIL) { X.R = partRxz(gPS.z); X.T = vec3(0.0, 0.0, G1.y); }
+  else if (k == PT_GEAR_MDOOR && gtype == 4) {   // the fold well's doors, hinged along its long edges fore and aft
+    GearWell g = gearFoldWell();
+    float s = sd.y, ca = cos(a), sa = sin(a);
+    Pose D; D.R = mat3(1.0, 0.0, 0.0,  0.0, ca, -s*sa,  0.0, -sa, -s*ca); D.T = vec3(0.5*(g.x0 + g.x1), 0.0, s*g.hz);
+    X = poseMul(g.F, D); X.R = S*X.R; X.T = S*X.T;
+  } else {   // a vertical bay's doors, hinged along its sides
+    VBay b = gearVBay(k == PT_GEAR_NDOOR);
+    float s = sd.y;
+    X.R = partMirror(-s)*partRxy(-a); X.T = b.c + vec3(s*b.h.x, 0.0, 0.0);
+    if (k == PT_GEAR_MDOOR) { X.R = S*X.R; X.T = S*X.T; }
+  }
+  return X;
+}
 mat3 partLever(float a){ float c = cos(a), s = sin(a); return mat3(1.0, 0.0, 0.0, 0.0, c, -s, 0.0, s, c); }   // local +y along (0, cos a, -sin a)
 // the light aircraft's centre pedestal (plane_sdf.glsl): its centre, half width, half height and half depth
 void partPedestal(out vec3 pc, out float pw, out float ph, out float pd){
@@ -130,8 +241,9 @@ float partPedalY(){
   float floorY = max(E.y - 1.06, sP.z - (sP.y - 0.035)*sqrt(1.0 - kx*kx) + 0.03);
   return max(E.y - 0.98, floorY + 0.09);
 }
-// sd: the instance (x: which seat or which side, -1 or 1; y: the left or right pedal of the pair)
-Pose partPose(int k, vec2 sd){
+// sd: the instance (x: which seat or which side, -1 or 1; y: the left or right pedal of the pair). The cockpit's
+// controls and the light aircraft's surfaces (the airframe field places the cockpit's in place: partAt below)
+Pose partPoseCockpit(int k, vec2 sd){
   vec4 E = gM[22]; float pz = gM[21].w;
   float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z, cThr = gCtl.w;
   Pose X; X.R = mat3(1.0); X.T = vec3(0.0);
@@ -175,32 +287,46 @@ Pose partPose(int k, vec2 sd){
     mat3 D; vec3 d; surfDefl(V0.x, V0.y, V0.z, V0.w, 0.66, -cYaw*0.42, 0.0, D, d);
     X.R = B*D*A; X.T = B*(D*a + d) + b;
   }
-  else if (k >= PT_WR_PODF && k <= PT_WR_RUDV) X = wrPartPose(k, sd);
-  else if (k == PT_JT_ELEVON) {   // the wing's frame (s, c, t) = (|x|, z + 1.6, y + 0.18 + 0.035 s)
-    mat3 Ar = mat3(1.0, 0.0, 0.035, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0); vec3 a = vec3(0.0, 1.6, 0.18);
-    mat3 D; vec3 d; surfDefl(5.6, 7.2, 1.2, 5.6, 0.84, -cPitch*0.3 - cRoll*sd.x*0.3, 0.0, D, d);
-    X = surfPoseAffine(Ar, Ar*partMirror(sd.x), a, D, d);
-  } else if (k == PT_JT_CANARD) {   // all-moving, about its spanwise pivot
-    mat3 S = partMirror(sd.x);
-    X.R = S*partRyz(-cPitch*0.3); X.T = S*vec3(0.6, -0.02, -6.4);
-  } else if (k == PT_JT_RUDDER) {   // the canted fin's frame
-    float C = cos(0.42), Sn = sin(0.42);
-    mat3 Ar = mat3(Sn, 0.0, C,   C, 0.0, -Sn,   0.0, 1.0, 0.0); vec3 a = vec3(-Sn - 0.3*C, -4.6, -C + 0.3*Sn);
-    mat3 D; vec3 d; surfDefl(2.3, 2.6, 1.0, 1.9, 0.7, -cYaw*0.4*sd.x, 0.0, D, d);
-    X = surfPoseAffine(Ar, Ar*partMirror(sd.x), a, D, d);
-  }
   else if (k == PT_WR_PEDAL) {
     X.R = mat3(sd.x, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
     X.T = E.xyz + vec3(sd.x*0.16, -0.63, -0.78 - sd.x*cYaw*0.04);   // (right rudder, yaw > 0, pushes the right pedal forward, -z: it pulled it back)
   }
   return X;
 }
-#ifndef PART_POSE_ONLY
+// the XR-30's surfaces
+Pose jtPartPose(int k, vec2 sd){
+  float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z;
+  Pose X;
+  if (k == PT_JT_ELEVON) {   // the wing's frame (s, c, t) = (|x|, z + 1.6, y + 0.18 + 0.035 s)
+    mat3 Ar = mat3(1.0, 0.0, 0.035, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0); vec3 a = vec3(0.0, 1.6, 0.18);
+    mat3 D; vec3 d; surfDefl(5.6, 7.2, 1.2, 5.6, 0.84, -cPitch*0.3 - cRoll*sd.x*0.3, 0.0, D, d);
+    X = surfPoseAffine(Ar, Ar*partMirror(sd.x), a, D, d);
+  } else if (k == PT_JT_CANARD) {   // all-moving, about its spanwise pivot
+    mat3 S = partMirror(sd.x);
+    X.R = S*partRyz(-cPitch*0.3); X.T = S*vec3(0.6, -0.02, -6.4);
+  } else {   // the rudder, in the canted fin's frame
+    float C = cos(0.42), Sn = sin(0.42);
+    mat3 Ar = mat3(Sn, 0.0, C,   C, 0.0, -Sn,   0.0, 1.0, 0.0); vec3 a = vec3(-Sn - 0.3*C, -4.6, -C + 0.3*Sn);
+    mat3 D; vec3 d; surfDefl(2.3, 2.6, 1.0, 1.9, 0.7, -cYaw*0.4*sd.x, 0.0, D, d);
+    X = surfPoseAffine(Ar, Ar*partMirror(sd.x), a, D, d);
+  }
+  return X;
+}
+// any part's pose (the pose pass, the bake): each family's own function, so a call site that places one family never
+// inlines the others' code
+Pose partPose(int k, vec2 sd){
+  if (k >= PT_WR_PODF && k <= PT_WR_RUDV) return wrPartPose(k, sd);
+  if (k >= PT_JT_ELEVON && k <= PT_JT_RUDDER) return jtPartPose(k, sd);
+  if (k >= PT_GEAR_MAIN && k <= PT_GEAR_NDOOR) return gearPartPose(k, sd);
+  return partPoseCockpit(k, sd);
+}
+#ifdef PART_BAKE
+vec2 gearPartField(int k, vec3 l);   // (plane_sdf.glsl)
 vec2 wrPartField(int k, vec3 l);   // (wraith_sdf.glsl)
 vec2 jtPartField(int k, vec3 l);   // (plane_sdf.glsl)
 #endif
-// each part's shape in its own frame: distance and material id
-vec2 partField(int k, vec3 l){
+// each part's shape in its own frame: distance and material id (the cockpit's controls and the light aircraft's surfaces)
+vec2 partFieldCockpit(int k, vec3 l){
   vec2 res = vec2(1e9, 0.0);
   if (k == PT_YOKE_SHAFT) res = vec2(sdCapsule(l, vec3(0.0, 0.0, -0.06), vec3(0.0, 0.0, 0.2), 0.017), 60.0);   // (it slides through the panel)
   else if (k == PT_YOKE_WHEEL) {
@@ -239,7 +365,7 @@ vec2 partField(int k, vec3 l){
   } else if (k == PT_FLAP || k == PT_AILERON) {   // at rest, the right wing's (body space)
     vec4 W0 = gM[9], W1 = gM[10], W2 = gM[11];
     float span = W0.x, sv = l.x, t = l.y - (W1.x + sv*W1.z), c = l.z - W1.y;
-    float fus0 = 0.55*gM[0].w, flapEnd = span*W2.w, ailEnd = span*0.94;
+    float fus0 = flapRoot(), flapEnd = span*W2.w, ailEnd = span*0.94;
     res = vec2(k == PT_FLAP ? sdSurface(sv, c, t, span, W0.y, W0.z, W0.w, W1.w, 0.74, fus0, flapEnd, 0.0, 0.0)
                             : sdSurface(sv, c, t, span, W0.y, W0.z, W0.w, W1.w, 0.74, flapEnd + 0.03, ailEnd, 0.0, 0.0), 2.0);
   } else if (k == PT_ELEVATOR) {
@@ -255,15 +381,21 @@ vec2 partField(int k, vec3 l){
     ped = min(ped, sdCapsule(l, vec3(0.0, -0.07, 0.02), vec3(0.0, -0.12, 0.1), 0.012));
     res = vec2(ped, 71.0);
   }
-#ifndef PART_POSE_ONLY
-  else if (k >= PT_WR_PODF && k <= PT_WR_RUDV) res = wrPartField(k, l);
-  else if (k >= PT_JT_ELEVON && k <= PT_JT_RUDDER) res = jtPartField(k, l);
-#endif
   return res;
 }
-// a part in the whole aircraft's field: at its pose, or left out (the static bake)
+#ifdef PART_BAKE
+// any part's shape (the mesh bake only, PART_BAKE: one part alone in its own frame)
+vec2 partField(int k, vec3 l){
+  if (k >= PT_WR_PODF && k <= PT_WR_RUDV) return wrPartField(k, l);
+  if (k >= PT_JT_ELEVON && k <= PT_JT_RUDDER) return jtPartField(k, l);
+  if (k >= PT_GEAR_MAIN && k <= PT_GEAR_NDOOR) return gearPartField(k, l);
+  return partFieldCockpit(k, l);
+}
+#endif
+// a part in the whole aircraft's field: at its pose, or left out (the static bake). The cockpit's controls (rotations)
 vec2 partAt(vec2 res, int k, vec2 sd, vec3 p){
   if (gPartMode != -1) return res;
-  Pose X = partPose(k, sd);
-  return opU(res, partField(k, transpose(X.R)*(p - X.T)));
+  Pose X = partPoseCockpit(k, sd);
+  return opU(res, partFieldCockpit(k, transpose(X.R)*(p - X.T)));
 }
+

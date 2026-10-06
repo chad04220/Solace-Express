@@ -21,18 +21,19 @@ inline std::vector<HullState> hullStateList(const float* M, bool inside, bool me
   std::vector<HullState> st;
   const int eng = (int)(M[2] + 0.5f);
   const bool partsOnly = meshBake && eng != 5;   // (the XR-30's elevator sweep also vectors its nozzles: kept)
+  const bool gearParts = meshBake && eng < 5;    // (the packed model's gear and nose wheel are rigid parts too: the XR-30's and XR-40's gear is their own)
   auto add = [&](float gear, float flaps, float steer, float p, float r, float y, float thr) {
     st.push_back({{gear, flaps, steer, inside ? 1.f : 0.f}, {p, r, y, thr}});
   };
   bool retract = (int)(M[1] + 0.5f) >= 3;
   add(1, 0, 0, 0, 0, 0, 0);   // rest: gear down, flaps up, controls centred
-  if (retract) {   // dense where the doors swing (the first fifth of the travel), then every 1/16
+  if (retract && !gearParts) {   // dense where the doors swing (the first fifth of the travel), then every 1/16
     for (int i = 0; i <= 8; i++) add(0.025f * i, 0, 0, 0, 0, 0, 0);
     for (int i = 1; i <= 12; i++) add(0.2f + 0.8f * i / 13.f, 0, 0, 0, 0, 0, 0);
   }
   for (int i = 0; i <= 8; i++) {
     float u = i / 8.f, s = u * 2.f - 1.f;
-    add(1, 0, 0.45f * s, 0, 0, 0, 0);        // nose / tail wheel steering
+    if (!gearParts) add(1, 0, 0.45f * s, 0, 0, 0, 0);   // nose / tail wheel steering
     if (!partsOnly) add(1, 0, 0, s, 0, 0, 0);   // elevator (and the yoke's pull)
     if (meshBake) continue;
     add(1, u, 0, 0, 0, 0, 0);                // flaps
