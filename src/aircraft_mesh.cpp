@@ -26,8 +26,7 @@
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 12;   // (bump with the format)
-const float kMeshShell = 0.004f;   // the fine patch's shell stands this far outside the surface (plane_mesh_fs.glsl marches the rest)
+const uint32_t kMeshMagic = 0x4d455348u + 13;   // (bump with the format)
 // the rigid parts a cockpit has (plane_parts.glsl PT_*) and each one's instances: x which seat or side, y which pedal
 struct PartInst { int type; float sx, sy; };
 const int kMaxPartInst = 96;
@@ -166,8 +165,6 @@ bool Renderer::compilePlaneMesh() {
   if (!progPlaneMeshDepth) { error = "Aircraft mesh depth shader: " + e; return false; }
   progPartPose = linkProgramCached(kFullscreenVS, partPoseFSAssembly(), e);
   if (!progPartPose) { error = "Cockpit part pose shader: " + e; return false; }
-  progPlaneMeshFine = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly("#extension GL_ARB_conservative_depth : enable\n#define MESH_REFINE\n"), e);
-  if (!progPlaneMeshFine) { error = "Aircraft mesh fine patch shader: " + e; return false; }
   // the screens alone, depth only (the bomb camera's pane excepted while it shows a picture)
   progPlaneMeshScr = linkProgramCached(planeMeshVSAssembly(""), "#version 330 core\nflat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; uniform int uBombPane;\nvoid main(){ int mid = int(vId + 0.5); bool scr = (mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63); if (!scr || (uBombPane == 1 && mid == 61)) discard; }\n", e);
   if (!progPlaneMeshScr) { error = "Aircraft mesh screen shader: " + e; return false; }
@@ -193,7 +190,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   // the cache
   std::string path;
   if (!g_shaderCacheDir.empty()) {
-    static const std::string stamp = shaderCacheStamp();
+    static const std::string stamp = meshCacheStamp();
     char name[64]; snprintf(name, sizeof name, "/mesh_%016llx_%s.bin", (unsigned long long)key, stamp.c_str());
     path = g_shaderCacheDir + name;
     if (FILE* f = fopen(path.c_str(), "rb")) {
@@ -377,9 +374,8 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       // the ring round the fine patch sinks into the wall (along the normal, away from the cabin), so the patch is in
       // front of it wherever the two lay the same surface
       for (size_t q = 0; q < vpos.size(); q++) if (vsink[q]) vpos[q] = vpos[q] - vec3(vn[q * 4], vn[q * 4 + 1], vn[q * 4 + 2]) * sink;
-      // the fine patch is a shell a little outside the surface: its fragment shader marches the field the last few
-      // millimetres to the surface itself and drops the fragments whose ray misses it, so its edges are the field's
-      // own at any resolution (plane_mesh_fs.glsl MESH_REFINE)
+      // (inflate: the surface moved that far outward. The fine patch lies on the surface itself: it was once a shell 4 mm
+      // out whose fragments marched the whole aircraft's field to the surface, 130 ms a frame in the cockpit)
       if (inflate > 0.f) for (size_t q = 0; q < vpos.size(); q++) vpos[q] = vpos[q] + vec3(vn[q * 4], vn[q * 4 + 1], vn[q * 4 + 2]) * inflate;
       const int base = (int)(vb.size() / 8);
       vb.resize(vb.size() + vpos.size() * 8);
@@ -411,10 +407,9 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     nets(coarseCells, 4, 0.003f, 0.f);
     fineStart = (uint32_t)ib.size();
     const size_t fineV = vb.size() / 8;   // (the fine patch's vertices are its own, after the coarse mesh's)
-    if (!fineCells.empty()) nets(fineCells, 8, 0.f, kMeshShell);
+    if (!fineCells.empty()) nets(fineCells, 8, 0.f, 0.f);
     // simplified (mesh_simplify.h): flat panels to a few triangles, curves to within 1 mm (the cabin's 0.4 mm: seen
-    // from half a metre); the fine patch apart (a shell 4 mm out, whose pixels march to the surface: 0.4 mm keeps it
-    // outside). On worker threads, while the GPU goes on with the hull and the parts (vb, ib and fineStart are not
+    // from half a metre); the fine patch apart, to the same 0.4 mm. On worker threads, while the GPU goes on with the hull and the parts (vb, ib and fineStart are not
     // touched again until they are joined, below)
     const size_t rawTris = ib.size() / 3;
     std::vector<float> vbF(vb.begin() + fineV * 8, vb.end()); vb.resize(fineV * 8);
@@ -608,7 +603,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, ib.size() * sizeof(uint32_t), ib.data(), GL_STATIC_DRAW);
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-  PM.idx = (int)ib.size(); PM.idxFine = (int)fineStart;
+  PM.idx = (int)ib.size();
   // the rigid parts, each a mesh of its own (validated: a damaged cache drops the parts, never reads past its end)
   for (auto& P : PM.parts) { if (P.vao) glDeleteVertexArrays(1, &P.vao); if (P.vbo) glDeleteBuffers(1, &P.vbo); if (P.ibo) glDeleteBuffers(1, &P.ibo); }
   PM.parts.clear();
@@ -771,7 +766,7 @@ void Renderer::drawPlaneMeshDepth(const FrameParams& fp, const PlaneMesh& pm, co
     glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, scrSkip ? texScrDepth : 0); glUniform1i(U(progPlaneMeshDepth, "uScrDepth"), 29);
     glUniform1i(U(progPlaneMeshDepth, "uPartInst"), -1);
     glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-    glDrawElements(GL_TRIANGLES, pm.idxFine, GL_UNSIGNED_INT, nullptr);
+    glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
     drawPlaneParts(pm, progPlaneMeshDepth, trafK);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
   }
@@ -802,25 +797,9 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, scrSkip ? texScrDepth : 0); glUniform1i(U(progPlaneMesh, "uScrDepth"), 29);
   glUniform1i(U(progPlaneMesh, "uPartInst"), -1);
   if (!noPre) { glDepthFunc(GL_LEQUAL); glDepthMask(GL_FALSE); }
-  glDrawElements(GL_TRIANGLES, pm.idxFine, GL_UNSIGNED_INT, nullptr);
+  glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);   // (the airframe and the cabin's fine patch, which lies on the surface: one draw)
   drawPlaneParts(pm, progPlaneMesh, trafK);   // (its moving parts, each at its pose)
   glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
-  // the fine patch over the cabin's thin parts: a shell whose fragments march the field to the surface and write its
-  // depth (no pre-pass: the shell's depth is not the surface's)
-  if (pm.idx > pm.idxFine && progPlaneMeshFine) {
-    setRT(progPlaneMeshFine, fp);
-    for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, 0); }
-    glUniformMatrix4fv(U(progPlaneMeshFine, "uVP"), 1, GL_FALSE, vp.m);
-    glUniform2f(U(progPlaneMeshFine, "uJit"), jitX, jitY);
-    glUniform1f(U(progPlaneMeshFine, "uLogC"), logC);
-    glUniformMatrix3fv(U(progPlaneMeshFine, "uRot"), 1, GL_FALSE, rot);
-    glUniform3f(U(progPlaneMeshFine, "uPos"), pos.x, pos.y, pos.z);
-    glUniform1i(U(progPlaneMeshFine, "uPartInst"), -1);
-    glUniform1i(U(progPlaneMeshFine, "uMeshTraffic"), trafK);
-    glUniform1i(U(progPlaneMeshFine, "uScrSkip"), scrSkip ? 1 : 0);
-    glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, scrSkip ? texScrDepth : 0); glUniform1i(U(progPlaneMeshFine, "uScrDepth"), 29);
-    glDrawElements(GL_TRIANGLES, pm.idx - pm.idxFine, GL_UNSIGNED_INT, (const void*)(uintptr_t)((size_t)pm.idxFine * sizeof(uint32_t)));
-  }
   glBindVertexArray(0);
   glActiveTexture(GL_TEXTURE0);
 }

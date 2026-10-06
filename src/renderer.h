@@ -56,6 +56,7 @@ struct WreckVisual {
 // Shader programs, compiled once and then loaded from the driver-binary cache in g_shaderCacheDir (empty: no cache)
 extern std::string g_shaderCacheDir;
 extern std::atomic<int> g_shaderCacheHits, g_shaderCacheMisses;   // bumped from several GL threads at startup
+std::string meshCacheStamp();     // fingerprint of the sources the aircraft mesh bake depends on + the driver
 std::string shaderCacheStamp();   // fingerprint of all shader sources + the driver (current context needed)
 bool writePNG(const char* path, int w, int h, const std::vector<uint8_t>& rgbBottomUp);
 bool readImage(const char* path, int& w, int& h, std::vector<uint8_t>& rgbaTopDown);   // PNG or JPEG
@@ -231,9 +232,9 @@ private:
   // the aircraft mesh (aircraft_mesh.cpp): the static part of the airframe baked from its field, and the hull of the
   // part that moves (the march's start on the raster path, where the mesh leaves off)
   struct PartMesh { int type = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; };   // a cockpit's rigid moving part, in its own frame (plane_parts.glsl)
-  struct PlaneMesh { std::vector<PartMesh> parts; uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0, idxFine = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; };
+  struct PlaneMesh { std::vector<PartMesh> parts; uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; };
   std::unordered_map<uint64_t, PlaneMesh> planeMeshes;
-  GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0, progPlaneMeshFine = 0, progPlaneMeshScr = 0, texScrDepth = 0, fboScrDepth = 0; int scrDepthW = 0, scrDepthH = 0;   // (progPlaneMeshScr / texScrDepth: the research craft's screens' depth, the cabin mesh clipped at and behind them: the screens are holes to the world)   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
+  GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0, progPlaneMeshScr = 0, texScrDepth = 0, fboScrDepth = 0; int scrDepthW = 0, scrDepthH = 0;   // (progPlaneMeshScr / texScrDepth: the research craft's screens' depth, the cabin mesh clipped at and behind them: the screens are holes to the world)   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
   bool compilePlaneMesh();
   bool planeMeshWanted(const FrameParams& fp) const;
   void bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key);

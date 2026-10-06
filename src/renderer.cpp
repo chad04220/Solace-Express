@@ -141,6 +141,18 @@ std::string shaderCacheStamp() {
   return b;
 }
 
+// The aircraft bodies' cache key: only the sources the mesh bake's results come from (the aircraft fields, their
+// normals and cabin occlusion, the bake's own main) and the driver, so an update that changes the terrain, the
+// lighting or the UI keeps every built body (each costs seconds on the GPU; a launch builds about twenty)
+std::string meshCacheStamp() {
+  uint64_t h = 1469598103934665603ull;
+  for (const char* src : {kCommonGLSL, kRtIO, kViewUniforms, kSceneUniforms, kPlaneCommon, kPlaneParts, kPlaneSDF, kPlaneTrace, kWraithSDF, kWraithCockpitCommon, kWraithCockpitSDF, kHullBakeMain}) h = fnv1a(src, h);
+  auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
+  h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
+  char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
+  return b;
+}
+
 // ------------------------------------------------------------------ procedural PBR materials
 static const int TS = 512;
 static float pnoise(float x, float y, int P, int seed) {

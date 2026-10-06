@@ -28,7 +28,6 @@ int main(int argc, char** argv) {
     put(dir, "effects.frag", effectsFSAssembly(""));
     put(dir, "plane_mesh.vert", planeMeshVSAssembly(""));
     put(dir, "plane_mesh.frag", planeMeshFSAssembly(""));
-    put(dir, "plane_mesh_fine.frag", planeMeshFSAssembly("#extension GL_ARB_conservative_depth : enable\n#define MESH_REFINE\n"));
     put(dir, "part_pose.frag", partPoseFSAssembly());
   }
   return 0;
