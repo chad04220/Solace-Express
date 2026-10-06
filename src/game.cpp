@@ -334,27 +334,35 @@ float Game::chosenFuel(const Contract& c, int spec, Career::Source src, const Ca
   (void)c;
   return std::min(std::max(p.fuelKgEst * 1.25f, have), s.maxFuel);
 }
+// A launch's save is its precondition: when it fails, nothing flies and the launch is not left pending to be saved
+// later (a retried save would then record an open flight that never started); the card's button tries again
+bool Game::commitLaunch(const std::function<void(Career&)>& change) {
+  if (commitBlocked()) { hubMsg = "Your last result isn't saved yet: retry the save first."; hubMsgTime = 5; return false; }
+  if (commit(change)) return true;
+  pendingCareer.reset(); saveWhy.clear();
+  hubMsg = "The career could not be saved (disk full or folder not writable): the flight was not started. Try again."; hubMsgTime = 6;
+  return false;
+}
 void Game::beginCareerFlight(const Contract& c, int spec, Career::Source src) {
   Career::LaunchPlan p = career.plan(c, spec, src);
   career.planFuel(p, c, chosenFuel(c, spec, src, p));
-  if (!commitBlocked()) commit([&](Career& k) {
+  if (!commitLaunch([&](Career& k) {
     k.attempt++; k.attemptOpen = true;
-    if (Career::resumable(c)) k.accept(c, spec, src, p); else k.job.reset();   // (lessons and checkrides are flown whole: no job)
-  });
+    // (lessons and checkrides are flown whole: no job; a free flight leaves a job waiting at its stop as it is)
+    if (Career::resumable(c)) k.accept(c, spec, src, p);
+    else if (!(k.job && k.job->state == Career::JobState::RECOVERY)) k.job.reset();
+  })) return;
   startFlight(c, spec, src);
 }
 void Game::continueJob(int spec, Career::Source src) {
-  if (!career.job || career.job->state != Career::JobState::RECOVERY || commitBlocked()) return;
+  if (!career.job || career.job->state != Career::JobState::RECOVERY) return;
   Contract c = career.job->continuation();
-  bool took = commit([&](Career& k) {
+  bool took = commitLaunch([&](Career& k) {
     Career::JobState& J = *k.job;
     if (spec != J.spec || src != J.src) J.hirePaid = false;   // a different aircraft: a new hire
     J.spec = spec; J.src = src; J.state = Career::JobState::ACTIVE; k.attempt++; k.attemptOpen = true;
   });
-  if (!took || !career.job || career.job->state != Career::JobState::ACTIVE) {   // the save did not take: the job stays as it was, nothing flies on a stale career
-    hubMsg = "The career could not be saved: the leg was not started. Retry the save first."; hubMsgTime = 5;
-    return;
-  }
+  if (!took || !career.job || career.job->state != Career::JobState::ACTIVE) return;   // the save did not take: the job stays as it was, nothing flies on a stale career
   startFlight(c, spec, src);
   {   // the committed job: the leg carries on from its checkpoints, its clock and the ride so far
     wpIndex = std::min(career.job->wpDone, (int)c.wps.size()); result.wpDone = wpIndex; jobClockBase = career.job->jobClockMin * 60.f;
@@ -362,6 +370,18 @@ void Game::continueJob(int spec, Career::Source src) {
     if (career.job->hirePaid) launchPlan.hire = 0;
     if (career.job->ferryPaid) launchPlan.ferry = 0;
   }
+}
+// The debrief's second button: a job waiting at its stop flies on from there with its clock, ride and paid fees (as
+// the hub's Continue does); anything else (a lesson, a checkride, a job that ended) is flown again from the start
+void Game::retryFromDebrief() {
+  if (career.job && career.job->state == Career::JobState::RECOVERY) {
+    const auto sc = career.canFly(career.job->continuation(), specIdx);
+    continueJob(specIdx, sc != Career::SRC_NONE ? sc : career.job->src);
+  } else {
+    Contract c = contract; const auto sc = career.canFly(c, specIdx);
+    beginCareerFlight(c, specIdx, sc != Career::SRC_NONE ? sc : source);
+  }
+  if (screen == SCR_DEBRIEF) { screen = SCR_HUB; hubTab = TAB_CONTRACTS; }   // (the launch didn't take: its message is on the hub)
 }
 void Game::releaseJob() {
   if (!career.job || commitBlocked()) return;
@@ -787,7 +807,11 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
     bool jobGoesOn = false;
     commit([&](Career& k) {
       k.attemptOpen = false;
-      if (!jobLeg) { lines = k.settle(c, specIdx, source, result, &st, &launchPlan); k.job.reset(); return; }
+      if (!jobLeg) {   // (a free flight flown while a job waits at its stop: the job stays as it is)
+        lines = k.settle(c, specIdx, source, result, &st, &launchPlan);
+        if (!(k.job && k.job->state == Career::JobState::RECOVERY)) k.job.reset();
+        return;
+      }
       const AircraftSpec& s = kAircraft[specIdx];
       if (success) { lines = k.settleJob(result, launchPlan, &st); return; }
       // a leg that ended short: the job carries on where the load is (a crash or running dry in the air ends it)
@@ -1360,6 +1384,10 @@ void Game::updateLoading(float dt) {
   }
   if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) {   // back out to where the flight was chosen
     dbgCam = false; g_ren.entBudgetMs = 2.5f;
+    // a career flight that never left the loading screen: its attempt closes and its job waits at its stop, as after
+    // an interrupted session (nothing is charged: no leg was flown); an unsaved close shows as pending and blocks launches
+    if (career.attemptOpen && !isolatedFlight && !researchFlight)
+      commit([](Career& k) { k.attemptOpen = false; if (k.job && k.job->state == Career::JobState::ACTIVE) k.job->state = Career::JobState::RECOVERY; });
     screen = researchFlight ? SCR_RESEARCH : SCR_HUB;
     researchFlight = false;   // (nothing of the cancelled session carries into the next flight)
   }

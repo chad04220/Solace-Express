@@ -2289,5 +2289,6 @@ void Game::drawDebrief() {
     if (button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, "Retry save")) retryCommit();
   }
   if (button(x + pw - 230 * s, y + ph - 66 * s, 200 * s, 46 * s, "Continue", true, true) || in.pressed[K_ENTER]) { retryCommit(); screen = SCR_HUB; hubTab = TAB_CONTRACTS; selContract = 0; selAircraft = -1; }
-  if (!lastSuccess && !commitBlocked() && button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, "Try again")) { Contract c = contract; beginCareerFlight(c, specIdx, career.canFly(c, specIdx) != Career::SRC_NONE ? career.canFly(c, specIdx) : source); }
+  const bool jobWaits = career.job && career.job->state == Career::JobState::RECOVERY;
+  if (!lastSuccess && !commitBlocked() && button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, jobWaits ? "Continue job" : "Try again")) retryFromDebrief();
 }

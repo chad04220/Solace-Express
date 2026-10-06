@@ -3,6 +3,7 @@
 #include "../src/game.h"
 #include <cstdlib>
 #include <cmath>
+#include <filesystem>
 // attitude-based vertical-speed controller (same structure as the in-game autopilot)
 static float s_pI = 0;
 static void pitchFor(Plane& p, float vsT, float dt, float maxPitch = 14.f) {
@@ -322,8 +323,10 @@ struct GameTest {
       q.pendingCareer.reset();
       q.saveDir = "no_such_dir_gameplay/x";   // (a save folder that can't be written)
       Contract c = g_story[4]; c.wx = Weather();
+      const int scr0 = q.screen;
       q.beginCareerFlight(c, 1, Career::SRC_RENT);
-      bool flagged = !q.career.attemptOpen && q.commitBlocked();   // the attempt marker couldn't be saved either: pending, the career as before
+      bool flagged = !q.career.attemptOpen && !q.commitBlocked() && q.screen == scr0;   // the attempt marker couldn't be saved: nothing flies, nothing pends
+      q.saveDir.clear(); q.beginCareerFlight(c, 1, Career::SRC_RENT); q.saveDir = "no_such_dir_gameplay/x";   // (launched; the settlement's save then fails)
       q.plane.pos = g_world.airports[c.to].pos() + vec3(0, 0.1f, 0); q.plane.onGround = true; q.touchedDown = true; q.takeoffAnnounced = true;
       int before = q.career.money;
       q.endFlight(true, "", OUT_SUCCESS);
@@ -812,6 +815,43 @@ struct GameTest {
       bool mouse = !g.focusNav;
       bool ok = first && down && right && mouse;
       printf("Menu focus navigation: first %d, down %d, right %d, mouse releases %d: %s\n", first, down, right, mouse, ok ? "ok" : "FAIL"); fails += !ok;
+    }
+    {   // the career's launches and their saves (the review of v3.24.0, R4-R6): a launch whose save fails flies nothing and
+        // leaves nothing pending; a cancelled loading screen leaves the job waiting at its stop; a free flight beside a
+        // waiting job leaves it as it is, at launch and at settlement; the debrief's retry flies a waiting job on
+      namespace fs = std::filesystem;
+      const fs::path root = fs::temp_directory_path() / "solace_lifecycle_test";
+      std::error_code ec; fs::remove_all(root, ec); fs::create_directories(root, ec);
+      const std::string bad = (root / "absent" / "x").string(), good = root.string();
+      auto fresh = [&](Game& q) { q.initHeadless(); q.career.license = LIC_PPL; q.career.storyIndex = 4; q.screen = SCR_HUB; };
+      auto waitingJob = [&](Game& q) {
+        const Contract c = g_story[4]; auto p = q.career.plan(c, 1, Career::SRC_RENT); q.career.accept(c, 1, Career::SRC_RENT, p);
+        q.career.job->state = Career::JobState::RECOVERY; q.career.job->jobClockMin = 5; q.career.job->comfort = 0.3f; q.career.job->legs = 1; q.career.job->hirePaid = true;
+      };
+      Contract freeF; freeF.id = "FREE"; freeF.type = CT_FERRY; freeF.from = g_story[4].from; freeF.to = g_story[4].to;
+      bool newFail, resumeFail, cancel, freeKeep, retryKeep;
+      { Game q; fresh(q); q.saveDir = bad; q.beginCareerFlight(g_story[4], 1, Career::SRC_RENT);
+        newFail = q.screen == SCR_HUB && !q.pendingCareer && !q.career.job && !q.career.attemptOpen; }
+      { Game q; fresh(q); waitingJob(q); q.saveDir = bad; q.continueJob(1, Career::SRC_RENT);
+        bool held = q.screen == SCR_HUB && !q.pendingCareer && q.career.job && q.career.job->state == Career::JobState::RECOVERY;
+        q.saveDir = good; q.retryCommit();
+        resumeFail = held && q.career.job && q.career.job->state == Career::JobState::RECOVERY && !q.career.attemptOpen; }
+      { Game q; fresh(q); q.beginCareerFlight(g_story[4], 1, Career::SRC_RENT);
+        q.screen = SCR_LOADING; q.in.pressed[K_ESC] = true; q.updateLoading(0.1f); q.in.endFrame();
+        cancel = q.screen == SCR_HUB && q.career.job && q.career.job->state == Career::JobState::RECOVERY && !q.career.attemptOpen; }
+      { Game q; fresh(q); waitingJob(q); const std::string id = q.career.job->c.id;
+        q.beginCareerFlight(freeF, 1, Career::SRC_RENT);
+        bool atLaunch = q.career.job && q.career.job->c.id == id;
+        q.endFlight(false, "Abandoned", OUT_ABANDONED);
+        freeKeep = atLaunch && q.career.job && q.career.job->c.id == id && q.career.job->state == Career::JobState::RECOVERY && q.career.job->jobClockMin == 5.f; }
+      { Game q; fresh(q); waitingJob(q); q.specIdx = 1; q.source = Career::SRC_RENT; q.contract = q.career.job->c; q.screen = SCR_DEBRIEF;
+        q.retryFromDebrief();
+        retryKeep = q.career.job && q.career.job->state == Career::JobState::ACTIVE && q.career.job->jobClockMin == 5.f && q.career.job->legs == 1 && q.career.job->comfort == 0.3f && q.career.job->hirePaid; }
+      fs::remove_all(root, ec);
+      bool ok = newFail && resumeFail && cancel && freeKeep && retryKeep;
+      printf("Career launches: failed save flies nothing %d, failed continue keeps the job %d, cancelled loading %d, free flight keeps the job %d, debrief retry continues %d: %s\n",
+             newFail, resumeFail, cancel, freeKeep, retryKeep, ok ? "ok" : "FAIL");
+      fails += !ok;
     }
     if (const char* wpath = getenv("ATCWAV")) if (FILE* f = fopen(wpath, "wb")) {
       uint32_t bytes = (uint32_t)(rec.size() * 2), v;

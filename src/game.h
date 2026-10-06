@@ -108,6 +108,8 @@ private:
   // (on the debrief, on entering the hub); meanwhile nothing else may commit (Accept / Buy / Sell are disabled).
   std::optional<Career> pendingCareer;
   bool commit(const std::function<void(Career&)>& change);   // true: saved (or no save wanted)
+  bool commitLaunch(const std::function<void(Career&)>& change);   // a launch's save: on failure nothing pends and nothing flies
+  void retryFromDebrief();   // the debrief's Try again / Continue job
   bool retryCommit();
   bool commitBlocked() const { return pendingCareer.has_value(); }
   float retryT = 0;
