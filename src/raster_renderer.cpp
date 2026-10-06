@@ -9,12 +9,16 @@ bool Renderer::compileRaster() {
   std::string e;
   progLight = linkProgramCached(kFullscreenVS, lightFSAssembly(""), e);
   if (!progLight) { error = "Lighting shader: " + e; return false; }
-  progObjects = linkProgramCached(kFullscreenVS, objectsFSAssembly(""), e);
-  if (!progObjects) { error = "Objects shader: " + e; return false; }
-  progShProxy = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly(""), e);
-  if (!progShProxy) { error = "Shadow proxy shader: " + e; return false; }
-  progEffects = linkProgramCached(kFullscreenVS, effectsFSAssembly(""), e);
-  if (!progEffects) { error = "Effects shader: " + e; return false; }
+  for (int v = 0; v < 2; v++) {   // (every aircraft, then the light aircraft alone: pickAfPrograms)
+    const std::string d = v ? "#define AF_LIGHT\n" : "";
+    progObjectsV[v] = linkProgramCached(kFullscreenVS, objectsFSAssembly(d), e);
+    if (!progObjectsV[v]) { error = "Objects shader: " + e; return false; }
+    progShProxyV[v] = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly(d), e);
+    if (!progShProxyV[v]) { error = "Shadow proxy shader: " + e; return false; }
+    progEffectsV[v] = linkProgramCached(kFullscreenVS, effectsFSAssembly(d), e);
+    if (!progEffectsV[v]) { error = "Effects shader: " + e; return false; }
+  }
+  progObjects = progObjectsV[0]; progShProxy = progShProxyV[0]; progEffects = progEffectsV[0];
   // the airframe shadow maps: the baked mesh (and the moving hull) from a light, plain depth
   static const char* kShMapVS = "#version 330 core\nlayout(location = 0) in vec3 aPos; uniform mat4 uVP; uniform mat3 uRot; uniform vec3 uPos;\n"
     "uniform sampler2D uPartPose; uniform int uPartInst;\n"   // (a cockpit's rigid part at its pose: plane_mesh_vs.glsl)
@@ -26,6 +30,17 @@ bool Renderer::compileRaster() {
   if (!progShMov) { error = "Shadow map (moving hull) shader: " + e; return false; }
   if (!compilePlaneMesh()) return false;
   return compileTerrainMesh();
+}
+
+// The light build of the airframe programs when nothing in the frame is a research jet (engine code 5 or 6): the
+// player's aircraft (its wreck too) and every traffic aircraft drawn
+void Renderer::pickAfPrograms(const FrameParams& fp) {
+  bool research = fp.plane.M[2] > 4.5f;
+  for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); k++) research = research || fp.traffic[k].t[2] > 4.5f;
+  static const bool all = getenv("AF_ALL") != nullptr;   // (debug: every aircraft build always)
+  const int v = research || all ? 0 : 1;
+  progObjects = progObjectsV[v]; progShProxy = progShProxyV[v]; progEffects = progEffectsV[v];
+  if (progPlaneMeshV[v]) progPlaneMesh = progPlaneMeshV[v];   // (the mesh draws pick theirs per aircraft: drawPlaneMesh)
 }
 
 // The rigid parts' poses for this view: the player's aircraft's and the traffic's (computed again by the objects pass:

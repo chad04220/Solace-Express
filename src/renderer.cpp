@@ -1200,6 +1200,7 @@ void Renderer::feedEffects(const FrameParams& f) {
 
 void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites) {
   curAlpha = &alphaSprites; curAdd = &addSprites;
+  pickAfPrograms(fp);
   if (!gpuQ[0]) glGenQueries(4, gpuQ);
   {
     int rq = (gpuQi + 1) % 4;   // issued three frames ago

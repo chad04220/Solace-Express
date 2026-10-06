@@ -29,6 +29,11 @@ int main(int argc, char** argv) {
     put(dir, "plane_mesh.vert", planeMeshVSAssembly(""));
     put(dir, "plane_mesh.frag", planeMeshFSAssembly(""));
     put(dir, "part_pose.frag", partPoseFSAssembly());
+    // the light-aircraft builds (AF_LIGHT: Renderer::pickAfPrograms)
+    put(dir, "objects_light.frag", objectsFSAssembly("#define AF_LIGHT\n"));
+    put(dir, "shadow_proxy_light.frag", shadowProxyFSAssembly("#define AF_LIGHT\n"));
+    put(dir, "effects_light.frag", effectsFSAssembly("#define AF_LIGHT\n"));
+    put(dir, "plane_mesh_light.frag", planeMeshFSAssembly("#define AF_LIGHT\n"));
   }
   return 0;
 }

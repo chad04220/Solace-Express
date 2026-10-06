@@ -7,7 +7,7 @@
 vec4 gearWheelFrame(vec3 p, out float halfWidth, out bool braked){
   vec4 G0 = gM[18], G1 = gM[19];
   int kind = int(gM[0].y + 0.5), engine = int(gM[0].z + 0.5);
-  bool research = engine >= 5, retract = kind >= 3;
+  bool research = RESEARCH_ON && engine >= 5, retract = kind >= 3;
   float up = retract ? 1.0 - gPS.x : 0.0, gh = G1.x, R = gM[0].w;
   float wr = research ? 0.38 : G0.y;
   float upY = -R*0.6;
@@ -232,9 +232,9 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     else if (mid == 103) { m.alb = vec3(0.3); m.emit = vec3(1.0, 0.97, 0.9)*lk; }
     else { m.alb = vec3(0.25, 0.02, 0.02); m.emit = bcn ? vec3(30.0, 1.5, 0.6) : vec3(0.0); }
   }
-  else if (mid >= 80 && mid < 94) shadeWraith(m, mid, lp, ln, t);
-  else if (mid >= 61 && mid < 80 && int(gM[0].z + 0.5) == 6) { gPixM = t*uTanHalf*2.0/uRes.y; shadeWraithCockpit(m, mid, lp, ln, E.xyz); }   // XR-40 cockpit
-  else if (mid >= 30 && mid < 60) {  // XR-30 research jet surfaces
+  else if (RESEARCH_ON && mid >= 80 && mid < 94) shadeWraith(m, mid, lp, ln, t);
+  else if (RESEARCH_ON && mid >= 61 && mid < 80 && int(gM[0].z + 0.5) == 6) { gPixM = t*uTanHalf*2.0/uRes.y; shadeWraithCockpit(m, mid, lp, ln, E.xyz); }   // XR-40 cockpit
+  else if (RESEARCH_ON && mid >= 30 && mid < 60) {  // XR-30 research jet surfaces
     vec3 nT; vec4 tx;
     float pulse = 0.75 + 0.25*sin(uTime*2.5);
     if (mid == 30 || mid == 31) {
@@ -414,5 +414,5 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
   }
   n = applyTS(n, m.nrm, interior ? 0.35 : 0.12);
   int engM = int(gM[0].z + 0.5);
-  podMat = !trafHit && mid >= 40 && mid < 80 && engM >= 5;   // research jets only: light aircraft use ids 60+ for their cockpits
+  podMat = RESEARCH_ON && !trafHit && mid >= 40 && mid < 80 && engM >= 5;   // research jets only: light aircraft use ids 60+ for their cockpits
 }

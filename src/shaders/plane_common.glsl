@@ -1,6 +1,13 @@
 //! kPlaneCommon
 //! Aircraft geometry helpers shared by the distance fields and the materials: primitives, the fuselage section spline,
 //! livery paint, skin seams and rivets, the cabin fit.
+// AF_LIGHT: a program for the light aircraft and airliners alone. The research jets' fields, materials, displays
+// and lights become dead code the compiler drops, so every pixel of the big shared passes pays for less code.
+#ifdef AF_LIGHT
+#define RESEARCH_ON false
+#else
+#define RESEARCH_ON true
+#endif
 float sdBox(vec3 p, vec3 b){ vec3 q = abs(p)-b; return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0); }
 float sdRoundBox(vec3 p, vec3 b, float r){ vec3 q = abs(p)-b+r; return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r; }
 float sdCapsule(vec3 p, vec3 a, vec3 b, float r){ vec3 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0); return length(pa-ba*h)-r; }

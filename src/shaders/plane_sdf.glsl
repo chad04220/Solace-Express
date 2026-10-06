@@ -389,7 +389,6 @@ vec2 mapJet(vec3 p){
   led = min(led, sdCapsule(ap, vec3(1.3, -0.24, -0.25), vec3(5.45, -0.39, 3.9), 0.02));
   led = min(led, sdCapsule(ap, vec3(0.62, 0.62, -3.0), vec3(0.3, 0.72, 2.0), 0.015));
   res = opU(res, vec2(led, 34.0));
-  res = jtGear(p, ap, res, 0.8, 0.06);
   return res;
 }
 vec2 mapWraith(vec3 p);
@@ -401,7 +400,7 @@ vec2 mapPlane(vec3 p){
   vec2 res = mapPlaneBody(p);
   if (gPS.w > 0.5 || gPartMode >= 0) return res;   // (a rigid part's bake: its own frame, no lamp housings)
   if (!gOwn) {   // traffic: the same fixtures, placed from the packed model (wingtips, fin top, tail cone)
-    bool jet = int(gM[0].z + 0.5) == 5;
+    bool jet = RESEARCH_ON && int(gM[0].z + 0.5) == 5;
     vec3 tip = jet ? vec3(5.67, -0.38, 4.4) : vec3(gM[9].x + 0.07, gM[10].x + gM[9].x*gM[10].z, gM[10].y + gM[9].w + gM[9].z*0.25);
     vec3 fin = jet ? vec3(0.0, 0.67, 1.6) : vec3(0.0, gM[15].x + gM[14].x + 0.04, gM[15].y + gM[14].w + gM[14].z*0.4);
     vec3 tl = jet ? vec3(0.0, 0.45, 7.6) : vec3(0.0, gM[8].w, gM[8].x + 0.03);
@@ -488,8 +487,14 @@ vec2 mapPlaneBody(vec3 p){
 #ifdef PART_BAKE
   if (gPartMode >= 0) return partField(gPartMode, p);   // (the mesh bake: one rigid part alone, in its own frame)
 #endif
-  if (int(gM[0].z + 0.5) == 5) return mapJet(p);
-  if (int(gM[0].z + 0.5) == 6) return mapWraith(p);
+  {   // the research jets: their own airframes, then their gear - the same for both, called once here so the program
+      // carries one copy of it (written into each airframe it was two, and the march's every pixel paid for the size)
+    int engJ = int(gM[0].z + 0.5);
+    if (RESEARCH_ON && (engJ == 5 || engJ == 6)) {
+      vec2 r = engJ == 5 ? mapJet(p) : mapWraith(p);
+      return gPS.w > 0.5 ? r : jtGear(p, vec3(abs(p.x), p.y, p.z), r, engJ == 6 ? 0.7 : 0.8, engJ == 6 ? 0.03 : 0.06);
+    }
+  }
   float L = gM[0].x; int gtype = int(gM[0].y + 0.5); int eng = int(gM[0].z + 0.5); float R = gM[0].w;
   float gear = gPS.x, flaps = gPS.y, steer = gPS.z, inside = gPS.w;
   float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z, cThr = gCtl.w;

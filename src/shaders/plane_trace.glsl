@@ -28,7 +28,7 @@ vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
   mat3 inv = transpose(gPR);
   vec3 lo = gPC + inv*(ro - gPP), ld = inv*rd;
   float t = t0;
-  bool jet = int(gM[0].z + 0.5) >= 5;   // XR-30 / XR-40: thin flattened shapes need finer steps
+  bool jet = RESEARCH_ON && int(gM[0].z + 0.5) >= 5;   // XR-30 / XR-40: thin flattened shapes need finer steps
   int steps = gPS.w > 0.5 || jet ? 200 : 120;
   float relax = jet ? 0.65 : 0.8;
   // A hit stops anywhere within the threshold of the surface, by an amount that depends on the steps that led there;

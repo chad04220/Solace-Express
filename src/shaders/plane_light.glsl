@@ -26,7 +26,7 @@ vec3 planeLight(vec3 p, vec3 rd, float t, int mid, Mat m, vec3 n, vec3 lp, vec3 
   // the aircraft aren't in the scenery cascades, so this never shadows the airframe itself)
   float sh = sunSh > 0.0 && !podMat ? sunSh*cloudShadow(p)*entShadow(p, n) : 0.0;
   float ao = podMat || interior ? interiorAO(lp, ln) : 1.0;   // (one call: the occlusion taps the field outside the mesh pass)
-  if (podMat) {  // sealed research cockpit: lit only by its modelled fixtures, low and moody
+  if (RESEARCH_ON && podMat) {  // sealed research cockpit: lit only by its modelled fixtures, low and moody
     mat3 inv = transpose(gPR);
     int engP = int(gM[0].z + 0.5);
     col = (engP == 6 ? wraithPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : podLight(lp, inv*n, inv*(-rd), m, E.xyz))*ao + m.emit;

@@ -18,7 +18,7 @@ void main(){
   vec3 rd = camRay(ndc), ro = uCamPos;
   float jitter = fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))) + uSeed);   // interleaved gradient noise, rotated per frame
   bool cockpitView = uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0;
-  int type = int(gM[0].z + 0.5);
+  int type = RESEARCH_ON ? int(gM[0].z + 0.5) : 0;
   // XR-40 cloak: a pixel on the cloaked craft (left out of the G-buffer) sees the frame behind it along a bent ray
   if (uWr[4].w > 0.001 && uPlaneOn == 1 && uWreck == 0 && !cockpitView && type == 6 && uPano.x <= 0.0) {
     float hullT = 0.0;

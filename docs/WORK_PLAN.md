@@ -10,7 +10,8 @@ docs/RENDERER_REBUILD.md; the owner-side tool is the one `diagnostics.bat` in th
 |---|---|
 | A3 instrument atlas static/dynamic split | deferred: the display pass is 0.2-0.8 ms on the owner's GPU (v3.27.1); worth it only if it grows |
 | A6 UBO for scene parameters | deferred: every scene is GPU-bound on the owner's machine (CPU submit 7-8 ms under a longer GPU frame) |
-| Per-family aircraft shaders, tiled light culling | deferred: low value now that every benchmark scene runs at 60 fps or better |
+| Per-family aircraft shaders | partly done (v3.29.0): a light-aircraft build (AF_LIGHT) of the objects, shadow proxy, effects and mesh programs without the research jets' code, used whenever none is in the frame (the mesh per aircraft). A research-only build is the remaining step if the jet cockpits need it |
+| Tiled light culling | deferred: low value now that every benchmark scene runs at 60 fps or better |
 | A10 / A11 water sky probe, cloud reprojection | deferred: the lighting and cloud passes are 1-3 ms; worth it only if the owner's diagnostics show them growing |
 | Review visuals (cockpit framing, materials, vegetation, coast) | open, cheap changes only (the owner prefers performance and gameplay); the XR-20's cockpit framing is done |
 | Cockpit mesh: pale wedges under the wing roots | open: seen from some cockpits (the Osprey's) where big simplified triangles span a crease; predates the dual-contouring bake |

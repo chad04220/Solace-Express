@@ -174,8 +174,11 @@ int partList(const float* M, bool inside, PartInst* out) {
 
 bool Renderer::compilePlaneMesh() {
   std::string e;
-  progPlaneMesh = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(""), e);
-  if (!progPlaneMesh) { error = "Aircraft mesh shader: " + e; return false; }
+  for (int v = 0; v < 2; v++) {   // (every aircraft, then the light aircraft alone: pickAfPrograms)
+    progPlaneMeshV[v] = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(v ? "#define AF_LIGHT\n" : ""), e);
+    if (!progPlaneMeshV[v]) { error = "Aircraft mesh shader: " + e; return false; }
+  }
+  progPlaneMesh = progPlaneMeshV[0];
   // the depth pre-pass; with uScrSkip the fragments at or behind a screen (texScrDepth) are dropped: the screens are holes
   // (uCloakZ: a cloaked XR-40's sweeping front, body z - what lies ahead of it is see-through and writes no depth; -1e9 none)
   progPlaneMeshDepth = linkProgramCached(planeMeshVSAssembly(""), "#version 330 core\nflat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; uniform int uScrSkip; uniform sampler2D uScrDepth; uniform float uCloakZ; uniform mat3 uRot; uniform vec3 uPos;\nvoid main(){ if (uScrSkip == 1 && gl_FragCoord.z >= texelFetch(uScrDepth, ivec2(gl_FragCoord.xy), 0).r - 2e-7) discard; if (uCloakZ > -1e8 && (transpose(uRot)*(vW - uPos)).z < uCloakZ) discard; }\n", e);
@@ -835,22 +838,26 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   mat4 vp = viewProj(fp, 0.01f, 2000.f);
   const float logC = 2.f / log2f(40000.f + 1.f);
   const bool scrSkip = screenWindows && trafK < 0 && fp.plane.PS[3] > 0.5f && (int)(fp.plane.M[2] + 0.5f) >= 5 && progPlaneMeshScr;
+  // (this aircraft's own build of the program: the light aircraft's leaves the research jets out - pickAfPrograms)
+  const float eng = trafK >= 0 ? fp.traffic[trafK].t[2] : fp.plane.M[2];
+  static const bool all = getenv("AF_ALL") != nullptr;
+  const GLuint prog = progPlaneMeshV[eng > 4.5f || all || !progPlaneMeshV[1] ? 0 : 1];
   glBindVertexArray(pm.vao);
   // then the materials on exactly the nearest surface
-  setRT(progPlaneMesh, fp);
+  setRT(prog, fp);
   for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, 0); }   // (the G-buffer is the target here, never read)
-  glUniformMatrix4fv(U(progPlaneMesh, "uVP"), 1, GL_FALSE, vp.m);
-  glUniform2f(U(progPlaneMesh, "uJit"), jitX, jitY);
-  glUniform1f(U(progPlaneMesh, "uLogC"), logC);
-  glUniformMatrix3fv(U(progPlaneMesh, "uRot"), 1, GL_FALSE, rot);
-  glUniform3f(U(progPlaneMesh, "uPos"), pos.x, pos.y, pos.z);
-  glUniform1i(U(progPlaneMesh, "uMeshTraffic"), trafK);
-  glUniform1i(U(progPlaneMesh, "uScrSkip"), scrSkip ? 1 : 0);
-  glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, scrSkip ? texScrDepth : 0); glUniform1i(U(progPlaneMesh, "uScrDepth"), 29);
-  glUniform1i(U(progPlaneMesh, "uPartInst"), -1);
+  glUniformMatrix4fv(U(prog, "uVP"), 1, GL_FALSE, vp.m);
+  glUniform2f(U(prog, "uJit"), jitX, jitY);
+  glUniform1f(U(prog, "uLogC"), logC);
+  glUniformMatrix3fv(U(prog, "uRot"), 1, GL_FALSE, rot);
+  glUniform3f(U(prog, "uPos"), pos.x, pos.y, pos.z);
+  glUniform1i(U(prog, "uMeshTraffic"), trafK);
+  glUniform1i(U(prog, "uScrSkip"), scrSkip ? 1 : 0);
+  glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, scrSkip ? texScrDepth : 0); glUniform1i(U(prog, "uScrDepth"), 29);
+  glUniform1i(U(prog, "uPartInst"), -1);
   if (!noPre) { glDepthFunc(GL_LEQUAL); glDepthMask(GL_FALSE); }
   glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);   // (the airframe and the cabin's fine patch, which lies on the surface: one draw)
-  drawPlaneParts(pm, progPlaneMesh, trafK);   // (its moving parts, each at its pose)
+  drawPlaneParts(pm, prog, trafK);   // (its moving parts, each at its pose)
   glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
   glBindVertexArray(0);
   glActiveTexture(GL_TEXTURE0);

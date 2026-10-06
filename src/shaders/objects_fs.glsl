@@ -28,7 +28,7 @@ void main(){
   float hullT = 0.0;
   if (uHullOn == 1 && uWreck == 0) { float hv = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).g; hullT = hv > 1e29 ? hv : (hv > 0.0 ? max(uHullNear, hv*0.999 - 0.1) : 0.0); }
   if (uFeedSkip > 0.0 && hullT == 0.0) hullT = uFeedSkip;
-  bool jetC = int(gM[0].z + 0.5) >= 5;
+  bool jetC = RESEARCH_ON && int(gM[0].z + 0.5) >= 5;
   // (the player's aircraft as a mesh: only a pixel its moving hull covers has anything left to march - and in the
   // cockpit the first uHullNear metres from the eye, whose hull faces the hull pass drops)
   float hullEnd = min(cockpitView ? (jetC ? 6.0 : planeBound()*2.0) : tmax, tmax);
@@ -44,7 +44,7 @@ void main(){
   }
   // the cloaked part of the XR-40 is see-through: its own pass draws it over the lit frame
   vec2 ph = hTop;
-  if (uWr[4].w > 0.001 && uPlaneOn == 1 && uWreck == 0 && !cockpitView && int(gM[0].z + 0.5) == 6 && ph.x > 0.0) {
+  if (RESEARCH_ON && uWr[4].w > 0.001 && uPlaneOn == 1 && uWreck == 0 && !cockpitView && int(gM[0].z + 0.5) == 6 && ph.x > 0.0) {
     vec3 lp0 = transpose(uPlaneRot)*(ro + rd*ph.x - uPlanePos);
     if (lp0.z < uWr[6].y) ph = vec2(-1.0);
   }

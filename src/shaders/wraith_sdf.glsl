@@ -245,7 +245,7 @@ vec2 mapWraith(vec3 p){
   float led = sdCapsule(ap, vec3(1.18, yc + 0.0, -4.0), vec3(0.15, -0.2, -8.0), 0.018);
   led = min(led, sdCapsule(ap, vec3(1.25, -0.12, -2.7), vec3(6.1, -0.18, 1.95), 0.016));
   res = opU(res, vec2(led, 87.0));
-  res = jtGear(p, ap, res, 0.7, 0.03);   // the retractable tricycle gear (plane_sdf.glsl: the XR-30's, in this airframe's bays)
+  // (the retractable tricycle gear: plane_sdf.glsl jtGear, the XR-30's in this airframe's bays, added by mapPlaneBody)
   return res;
 }
 // The XR-40's rigid parts at rest, each in its own frame (plane_parts.glsl partPose places them): the right-hand pods'

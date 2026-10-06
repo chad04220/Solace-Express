@@ -13,7 +13,7 @@ void main(){
   vec3 p = vW;
   // the cloaked part of the XR-40 (behind the cloak's sweeping front) is see-through: the effects pass draws it over the
   // lit frame, so the G-buffer keeps what lies behind it
-  if (!traf && uWr[4].w > 0.001 && int(gM[0].z + 0.5) == 6 && gPS.w < 0.5 && uWreck == 0 && (transpose(uPlaneRot)*(p - uPlanePos)).z < uWr[6].y) discard;
+  if (RESEARCH_ON && !traf && uWr[4].w > 0.001 && int(gM[0].z + 0.5) == 6 && gPS.w < 0.5 && uWreck == 0 && (transpose(uPlaneRot)*(p - uPlanePos)).z < uWr[6].y) discard;
   vec3 d = p - uCamPos; float t = length(d); vec3 rd = d/max(t, 1e-6);
   vec3 ln = normalize(vN);
   int mid = int(vId + 0.5);

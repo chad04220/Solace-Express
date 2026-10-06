@@ -324,6 +324,11 @@ private:
   void feedEffects(const FrameParams& f);
   // ---- the raster renderer (raster_renderer.cpp, terrain_mesh.cpp)
   GLuint progLight = 0, progObjects = 0, progShProxy = 0, progEffects = 0, progTerrain = 0, progWater = 0;
+  // The big airframe programs in two builds: [0] every aircraft, [1] AF_LIGHT - without the research jets' code
+  // (plane_common.glsl RESEARCH_ON), so each pixel pays for less. pickAfPrograms points progObjects, progShProxy,
+  // progEffects and progPlaneMesh at the light build whenever no research jet is in the frame.
+  GLuint progObjectsV[2] = {}, progShProxyV[2] = {}, progEffectsV[2] = {}, progPlaneMeshV[2] = {};
+  void pickAfPrograms(const FrameParams& fp);
   // the airframe shadow maps (raster_renderer.cpp): the player's baked static mesh rendered from the sun (layer 0,
   // orthographic) and from the three brightest shadow-casting lights (layers 1-3, perspective along each beam); a
   // second array marks where the moving hull is, so the proxy still marches the field there (the XR-30's nozzles, the
