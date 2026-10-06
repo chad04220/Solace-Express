@@ -150,6 +150,8 @@ public:
   vec3 apHoldC; float apHoldR = 1500, apHoldAlt = 0, apIntAlt = 0; int apHoldDir = 1, apTurnDir = 0, apClimbDir = 0; float apGs = 0.0524f, apDrift = 0;   // descent orbit and intercept altitude
   bool apDone = false;        // an autoland just finished (the game sets the parking brake)
   std::string apStatus;       // one-line status for the HUD
+  std::string apPlanWhy;   // after apPlan: why that runway end is unsafe ("" safe): too short for the wind, too high to descend onto
+  std::string apDecline;   // set by apEngage when neither end is safe: the autoland is declined (the autopilot holds instead), and why
   void apEngage(int mode, int airport, const Weather& wx);
   // start a figure: the autopilot first gets the speed and height it needs (diving or climbing), then flies it and
   // levels off into a hold. Any ground in the way aborts it into a recovery.

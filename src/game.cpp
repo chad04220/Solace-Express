@@ -899,7 +899,8 @@ void Game::engageAutopilot() {
   if (apDest >= 0) {
     plane.apEngage(Plane::AP_NAV, apDest, wx);
     const Airport& a = g_world.airports[apDest];
-    toast(fmt("Autopilot: AUTOLAND %s runway %02d", a.code, a.rwyNumber(plane.apRev)), vec3(0.6f, 1, 0.6f));
+    if (!plane.apDecline.empty()) toast("Autopilot: unable to autoland at " + plane.apDecline + " - holding heading and height", vec3(1, 0.75f, 0.35f));
+    else toast(fmt("Autopilot: AUTOLAND %s runway %02d", a.code, a.rwyNumber(plane.apRev)), vec3(0.6f, 1, 0.6f));
     toast("Any stick input hands control back", vec3(0.8f, 0.8f, 0.8f));
   } else {
     plane.apEngage(Plane::AP_HOLD, -1, wx);

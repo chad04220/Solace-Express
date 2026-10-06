@@ -154,7 +154,10 @@ void Plane::step(float dt, const Weather& wx, float time) {
   const int N = std::max(1, (int)ceilf(dt / (1.f / 240.f)));
   float h = dt / N;
   ev.touchdown = false;
-  apGustAdd = 0.5f * wx.gust + 2.f * wx.turbulence;   // the approach speed a pilot adds for gusts (half the gust factor)
+  // the approach speed a pilot adds for gusts (half the gust factor) - into a headwind; with the wind behind, none (it
+  // only lengthens the landing: QA F1's overruns touched down at 77 m/s ground speed on a 62 m/s reference)
+  apGustAdd = 0.5f * wx.gust + 2.f * wx.turbulence;
+  if (apMode == AP_APPR) apGustAdd *= clampf(1.f + dot(apLd, vec3(sinf(wx.windFrom * DEG), 0, -cosf(wx.windFrom * DEG))) * wx.windSpeed / 4.f, 0.f, 1.f);
   if (apOn) apGuidance(dt);
   for (int i = 0; i < N && !ev.crashed; i++) substep(h, wx, time + h * i);
   flightTime += dt;
@@ -702,9 +705,20 @@ void Plane::apEngage(int mode, int airport, const Weather& wx) {
   apHeading = heading(); apAlt = pos.y; apSpeed = std::max(spd0, spec->vref * 1.3f);
   apPitchI = 0; apRollI = 0; apThrI = ctl.throttle; apXI = 0; apGamI = 0; apTrimEst = ctl.pitch; apUseVS = false;
   apAirport = airport; apStage = APS_NAV; apStageT = 0; apLeg = 0; apTurnDir = 0; apClimbDir = 0;
+  apDecline.clear();
   if (mode >= AP_NAV && airport >= 0) {
-    // runway end: the better of the two plans (terrain on the approach, headwind, and how far away it is)
-    bool rev = apPlan(airport, true, wx, false) > apPlan(airport, false, wx, false);
+    // runway end: the better of the two plans (terrain on the approach, headwind, how far away it is, and whether the
+    // aircraft can stop on it and get down to it at all). Neither safe: the autoland is declined, said why, and the
+    // autopilot holds heading and height - the pilot lands by hand or picks another field (QA F1: committing to either
+    // end at Cedar Ridge in a gusty quartering wind ended in an overrun or in go-arounds into the hills)
+    float sRev = apPlan(airport, true, wx, false); std::string whyRev = apPlanWhy;
+    float sFwd = apPlan(airport, false, wx, false); std::string whyFwd = apPlanWhy;
+    if (!whyRev.empty() && !whyFwd.empty()) {
+      apDecline = g_world.airports[airport].code + std::string(": ") + (whyFwd == whyRev ? whyFwd : whyFwd + " / " + whyRev);
+      apMode = AP_HOLD; apAirport = -1;
+      return;
+    }
+    bool rev = whyFwd.empty() == whyRev.empty() ? sRev > sFwd : whyFwd.empty() ? false : true;
     apPlan(airport, rev, wx, true);
     const Airport& a = g_world.airports[airport];
     // cruise: clear the highest ground on the way by 350 m, and at least 700 m above the field
@@ -769,8 +783,36 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   vec3 from(sinf(wx.windFrom * DEG), 0, -cosf(wx.windFrom * DEG));
   // (the wind weighs 40 per m/s of headwind, the distance to the entry 0.02 per metre: a 10 kt wind is worth about
   //  10 km of flying round to the other end, a light one isn't)
-  float score = dot(ld, from) * wx.windSpeed * 40.f - bestCost - (F0 - F) * 0.3f - length(bestC - pos) * 0.02f - blocked
-              - (atanf(gs) / DEG - 3.f) * 150.f;
+  // the landing distance this end needs with the wind behind: a field the type is sent to fits its still-air landing
+  // (that much is the career's choice: runwayOK); what a tailwind adds is the touchdown ground speed squared - the
+  // tailwind and half its gusts on the autopilot's approach speed. The still-air distance is the learned one (from 15 m,
+  // aircraft_perf.cpp) x1.6 - the autopilot crosses the fence above 1.3 Vs0 and floats a little; measured on the
+  // Starling at Cedar Ridge - in the field's thinner air, and never taken as more than 90% of the runway. With the wind
+  // ahead or across, nothing is added (QA F1: the Starling overran Cedar Ridge's 1,000 m with a 4-7 m/s tailwind)
+  const float hw = dot(ld, from) * wx.windSpeed;
+  const float tw = hw < 0.f ? -hw + 0.5f * wx.gust : 0.f;
+  const float vap = std::max(s.vref * 1.06f, 10.f), vg = vap + tw;
+  const float sigma = expf(-a.elev / 8500.f);
+  const float stillAir = std::min(1.6f * perf(&s).ldgRoll / sigma, a.length * 0.9f);
+  // (jets only: the propeller types touch down slower and float little - the sweep's gusty tailwind landings stopped
+  // by mid-runway, at Orchard Valley's 800 m too - where the jets ran off the end)
+  const float ldgNeed = s.engineType == ENG_JET && tw > 0.f && stillAir > 0.f ? stillAir * (vg / vap) * (vg / vap) : 0.f;
+  const float stopShort = ldgNeed > 0.f ? ldgNeed - a.length * 0.95f : 0.f;
+  // ...and whether it can get down to the glidepath from the hold: it leaves the orbit at its height and descends from
+  // there, may not go below the intercept altitude until the gate, and goes around if still 80 m high 2 km out.
+  // What it can lose on the way: nine tenths of its steepest final descent (the guidance's limit) at the approach
+  // ground speed
+  const float vsMax = s.engineType == ENG_JET ? 10.f : 6.f, vgApp = std::max(s.vref * 1.2f - hw, 20.f);
+  auto lose = [&](float d) { return std::max(d, 0.f) / vgApp * vsMax * 0.9f; };
+  const float gp2k = a.elev + gh + 2000.f * gs, gpF = a.elev + gh + F * gs;
+  const float legOut = len2(bestC - (td - ld * (F + 1500.f))) + 1500.f;   // (from leaving the orbit to the gate: the guidance descends all the way)
+  const float hAtGate = std::max(bestAlt - lose(legOut), std::max(intAlt, gpF));
+  const float highAt2k = hAtGate - lose(F - 2000.f) - (gp2k + 75.f);
+  apPlanWhy = stopShort > 0.f ? fmt("runway too short with this wind (%.0f of %.0f m)", ldgNeed, a.length)
+            : highAt2k > 0.f ? "terrain keeps the approach too high to descend onto" : "";
+  float score = hw * 40.f - bestCost - (F0 - F) * 0.3f - length(bestC - pos) * 0.02f - blocked
+              - (atanf(gs) / DEG - 3.f) * 150.f - (stopShort > 0.f ? 20000.f + stopShort * 20.f : 0.f) - (highAt2k > 0.f ? 20000.f + highAt2k * 20.f : 0.f);
+  if (getenv("APDBG")) printf("apPlan %s rev %d: F %.0f gs %.2f deg blocked %.0f wind %+.1f cost %.0f landing %.0f of %.0f m, %.0f m high at 2 km, score %.0f %s (hold %.0f m above the field, leg %.0f m)\n", a.code, (int)rev, F, atanf(gs) / DEG, blocked, hw, bestCost, ldgNeed, a.length, highAt2k, score, apPlanWhy.c_str(), bestAlt - a.elev, legOut);
   if (commit) {
     apRev = rev; apFinalLen = F; apGs = gs; apHoldC = bestC; apHoldC.y = 0; apHoldR = R; apHoldAlt = bestAlt; apIntAlt = intAlt;
     apLd = ld; apTd = td;
@@ -783,7 +825,7 @@ void Plane::apGuidance(float dt) {
   apStageT += dt;
   bool jet = s.engineType == ENG_JET;
   if (apMode != AP_APPR || apAirport < 0) {   // (hold: altitude unless a vertical speed was asked for, apUseVS)
-    apStatus = fmt("HOLD  HDG %03.0f  ALT %.0f ft  SPD %.0f kt", wrapDeg360(apHeading), apAlt * M_TO_FT, apSpeed * MS_TO_KT);
+    apStatus = (apDecline.empty() ? std::string() : "UNABLE AUTOLAND " + apDecline + "  //  ") + fmt("HOLD  HDG %03.0f  ALT %.0f ft  SPD %.0f kt", wrapDeg360(apHeading), apAlt * M_TO_FT, apSpeed * MS_TO_KT);
     return;
   }
   const Airport& a = g_world.airports[apAirport];
@@ -927,6 +969,10 @@ void Plane::apGuidance(float dt) {
       float err = gsAlt - pos.y;
       apUseVS = true;
       apVS = err > 25.f ? 0.3f : clampf(-vg * gs + err * apAltGain(), jet ? -10.f : -6.f, 3.f);
+      // low down, never chase the glidepath faster than its own descent (and 1 m/s more at 60 m, none by 15 m): after a
+      // gust balloons it near the ground it lands a little long rather than dive for the path - a slow-pitching airframe
+      // that nosed over to regain it met the flare at 5 m/s (QA F1: the XR-10's hard landings at Northpoint, Far Isle)
+      if (hab < 60.f) apVS = std::max(apVS, -(vg * gs + clampf((hab - 15.f) / 45.f, 0.f, 1.f)));
       // outside the gate the glideslope can run below the safe intercept altitude: hold that until the gate
       if (dist > F && pos.y < apIntAlt + 30.f) apVS = std::max(apVS, clampf((apIntAlt - pos.y) * 0.1f, -1.f, 3.f));
       bool high = err < -40.f && dist < F + 1000.f;   // above the glideslope: configure early for the drag
@@ -939,8 +985,13 @@ void Plane::apGuidance(float dt) {
       }
       if (dist < F + 1500.f || high) ctl.gearDown = true;
       apSpeed = (dist > F ? vref * 1.3f : dist > F * 0.5f ? vref * 1.18f : vref * 1.06f) + apGustAdd;
-      if (dist < 2000.f && dist > 250.f && (fabsf(cross) > std::min(80.f, std::max(a.width * 0.5f, 12.f) + dist * 0.03f) || err > 40.f || err < -80.f)) { apStage = APS_GOAROUND; apStageT = 0; }
-      { vec3 ahead = pos + vec3(ld.x, 0, ld.z) * 800.f; if (dist > 1200.f && pos.y < g_world.height(ahead.x, ahead.z) + 40.f) { apStage = APS_GOAROUND; apStageT = 0; } }
+      if (dist < 2000.f && dist > 250.f && (fabsf(cross) > std::min(80.f, std::max(a.width * 0.5f, 12.f) + dist * 0.03f) || err > 40.f || err < -80.f)) {
+        if (getenv("APDBG")) printf("  go-around at %.0f m: cross %.0f, %.0f m %s the glidepath\n", dist, cross, fabsf(err), err > 0.f ? "below" : "above");
+        apStage = APS_GOAROUND; apStageT = 0;
+      }
+      { vec3 ahead = pos + vec3(ld.x, 0, ld.z) * 800.f; if (dist > 1200.f && pos.y < g_world.height(ahead.x, ahead.z) + 40.f) {
+        if (getenv("APDBG")) printf("  go-around at %.0f m: ground ahead (%.0f m below, %.0f m above the field)\n", dist, pos.y - g_world.height(ahead.x, ahead.z), pos.y - a.elev);
+        apStage = APS_GOAROUND; apStageT = 0; } }
       // the XR-40 comes to a hover over the touchdown point instead of a fast landing roll (starting to slow where it
       // can stop at a gentle 2 m/s^2 - the hover allows twice that - from the ground speed it has, tailwind included)
       float gsAl = std::max(vel.x * ld.x + vel.z * ld.z, 0.f);
@@ -968,7 +1019,8 @@ void Plane::apGuidance(float dt) {
       // (settling, not skimming: a firmer end to the flare for a fast aircraft, whose every second of float is a long
       // way down the runway, and firmer still the longer it floats)
       {
-        float settle = std::min(clampf(0.4f + 0.008f * (ias - 40.f), 0.4f, 1.f) + 0.15f * std::max(apStageT - 2.f * apFlareTau, 0.f), 1.f);
+        float settle = std::min(clampf(0.4f + 0.008f * (ias - 40.f), 0.4f, 1.f) + 0.15f * std::max(apStageT - 2.f * apFlareTau, 0.f), 1.f)
+                     + 0.8f * clampf(along / 250.f, 0.f, 1.f);   // (floating past the aim point: put it down, runway is running out)
         // (on the height it will have when the airframe has answered: a slow-pitching jet otherwise follows the law a
         // second late, and a second late at the bottom is the sink of a metre higher up)
         float habAhead = std::max(hab + std::min(vel.y, 0.f) * apPitchLag(), 0.f);
@@ -1081,6 +1133,9 @@ void Plane::apControl(float dt) {
     he = hdgErrDeg(atan2f(apLd.x, -apLd.z) / DEG - clampf(cross * 0.6f, -10.f, 10.f), heading());
     ctl.yaw = clampf(he * 0.08f + w.y / DEG * 0.12f, -1.f, 1.f);   // steer for the centreline, damp the yaw rate
     ctl.brake = clampf((apStageT - 0.6f) * 1.2f, 0.f, s.taildragger ? 0.55f : 1.f);
+    // flaps up once it is down to stay: the wing stops carrying the weight and the brakes get their grip (at 64 m/s the
+    // Starling's full flaps held it to 1.5 m/s^2 of braking for its first ten seconds, and it ran off Meadowbrook's end)
+    if (apStageT > 1.f) ctl.flaps = 0.f;
     return;
   }
   if (apMode == AP_APPR && apStage == APS_HOVER) { apHover(dt); return; }
