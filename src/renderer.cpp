@@ -115,7 +115,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kWraithCockpitSDF, kWraithCockpitMaterial, kPlaneMaterial, kWater, kRtShade, kRtMain, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kDownFS, kUpFS, kCockpitMaskFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
+  for (const char* src : {kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kWraithCockpitSDF, kWraithCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -468,33 +468,6 @@ GLuint Renderer::makeTexture(const uint8_t* rgba, int w, int h) {
   return t;
 }
 
-// Compiles and links every scene program (or loads it from the binary cache). Touches only shader and program
-// objects, which are shared between contexts, so the platform layer can run it on a worker thread with its own
-// context while the intro screen animates. `done` counts finished programs (kProgramCount in all).
-std::string Renderer::rtSource(const char* defines) {
-  return rtAssembly(std::string(defines) + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + (getenv("CLIPATLAS") ? "#define WR_CLIPATLAS\n" : "") + (getenv("HULLDEBUG") ? "#define HULL_DEBUG\n" : ""));
-}
-
-// The analysis build of the ray tracer: the same shader with its work counters (COST) written out instead of colour
-bool Renderer::buildCostProgram() {
-  if (progRTCost) return true;
-  std::string e;
-  progRTCost = program(kFullscreenVS, rtSource("#define COST_MAP\n"), e);
-  if (!progRTCost) error = "Analysis shader: " + e;
-  return progRTCost != 0;
-}
-
-// The work counters of the last ray-traced frame (RGBA per pixel, bottom row first), at the render resolution
-bool Renderer::readCostMap(std::vector<float>& out, int& w, int& h) {
-  if (!fboScene) return false;
-  w = rw; h = rh; out.resize((size_t)w * h * 4);
-  glBindFramebuffer(GL_READ_FRAMEBUFFER, fboScene);
-  glReadBuffer(GL_COLOR_ATTACHMENT0);
-  glReadPixels(0, 0, w, h, GL_RGBA, GL_FLOAT, out.data());
-  glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-  return true;
-}
-
 // Exact pass timing for the analysis tool: wait for the GPU at every pass boundary
 static_assert(Renderer::kPasses == 11, "passWall holds kPasses entries");
 void Renderer::syncStamp(int i) {
@@ -504,13 +477,12 @@ void Renderer::syncStamp(int i) {
   syncT = now;
 }
 
+// Compiles and links every scene program (or loads it from the binary cache). Touches only shader and program
+// objects, which are shared between contexts, so the platform layer can run it on a worker thread with its own
+// context while the intro screen animates. `done` counts finished programs (kProgramCount in all).
 bool Renderer::compilePrograms(std::atomic<int>* done) {
   auto step = [&]() { if (done) done->fetch_add(1); };
   std::string vsFS = kFullscreenVS;
-  std::string rt = rtSource("");
-  progRT = program(vsFS, rt, error);
-  if (!progRT) { error = "Ray tracer shader: " + error; return false; }
-  step();
   std::string hdr = "#version 330 core\n";
   progEnt = program(hdr + kEntVS, hdr + kEntFS1 + kEntFS2, error); step();
   progEntSh = program(hdr + kEntVS, hdr + kEntFS1 + kEntShadowFS, error); step();
@@ -524,22 +496,20 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
   progPost = program(vsFS, kPostFS, error); step();
   progTAA = program(vsFS, kTaaFS, error); step();
   if (!progSprite || !progDown || !progUp || !progRayMask || !progRay || !progPost || !progTAA) { error = "Shader: " + error; return false; }
-  {   // GPS aerial imagery: the ray tracer's source (main renamed) + a top-down terrain pass
-    std::string ms = rt; size_t m = ms.find("void main(");
-    if (m != std::string::npos) ms.replace(m, 10, "void mainRT(");
+  {   // the programs built on the shared scene library (shaders.h worldLibAssembly), each with its own main: the GPS
+    // aerial imagery, the terrain-shadow bake, the clouds, the hull and mesh bakes, the cockpit display atlases
+    std::string ms = worldLibAssembly(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "");
     progMap = program(vsFS, ms + kMapMain, error); step();
-    { std::string e; progTShBake = program(vsFS, ms + kTShBakeMain, e); step(); }   // optional: without it, per-pixel shadow rays
-    { std::string e; progClouds = program(vsFS, ms + kCloudMain, e); step(); }       // optional: without them the ray tracer
-    { std::string e; progCloudComp = program(vsFS, kCloudCompFS, e); step(); }       // marches every pixel's clouds itself
+    { std::string e; progTShBake = program(vsFS, ms + kTShBakeMain, e); step(); }   // optional: without it the terrain casts no sun shadow
+    { std::string e; progClouds = program(vsFS, ms + kCloudMain, e); step(); }       // optional: without them no clouds
+    { std::string e; progCloudComp = program(vsFS, kCloudCompFS, e); step(); }
     if (!progMap) { error = "Map shader: " + error; return false; }
-    { std::string e; progCkMask = program(vsFS, kCockpitMaskFS, e); step(); }   // optional: without it nothing is masked
-    compileEnvelope(); step();   // optional: without it every pixel marches its terrain from the camera
-    compileHull(vsFS, ms + kHullBakeMain); step();     // optional: without it every pixel near the aircraft marches it from the camera
+    compileHull(vsFS, ms + kHullBakeMain); step();
     progDisp = program(vsFS, ms + kDispMain, error); step();
     // not fatal: without it the cockpit screens stay dark, but the game still runs (the error goes to startup.log)
     if (!progDisp) { dispError = error; error.clear(); }
-    rasterOk = compileRaster(); step(); step(); step();   // optional: without them the ray tracer stays (startup.log says why)
-    if (!rasterOk) { if (getenv("RASTERDBG")) fprintf(stderr, "raster programs failed: %s\n", error.c_str()); error.clear(); }
+    if (!compileRaster()) return false;   // (the renderer itself: its error names the program)
+    step(); step(); step();
   }
   glFinish();   // everything complete before another context uses the programs
   return true;
@@ -679,7 +649,7 @@ void Renderer::renderMap(float cx, float cz, float half, int N) {
 
 bool Renderer::init(int w, int h) {
   if (!initUI(w, h)) return false;
-  if (!progRT && !compilePrograms(nullptr)) return false;
+  if (!progTAA && !compilePrograms(nullptr)) return false;
 
   glGenVertexArrays(1, &vaoEmpty);
   glGenVertexArrays(1, &vaoSprite); glGenBuffers(1, &vboSprite);
@@ -759,7 +729,6 @@ bool Renderer::init(int w, int h) {
   genCloudNoise();
   genMinimap();
   if (!initEntities()) return false;
-  initEnvelope();
   initTerrainMesh();
   W = w; H = h;
   createTargets();
@@ -808,7 +777,7 @@ void Renderer::createRenderTargets() {
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, texCloudMask, 0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   createGBuffer();
-  createEnvelopeTarget();
+  createHullTarget();
 }
 
 // Display-resolution targets: TAA history + the upscaled scene that sprites, bloom and the composite work on
@@ -918,8 +887,8 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUniform1i(U(p, "uTShOn"), tshFront >= 0 && !tshOff ? 1 : 0);
   // (bound whenever any of its channels is in use: the hull channels are written whether or not the terrain envelope
   // was drawn this frame, and the terrain channel is only read under uEnvOn)
-  glActiveTexture(GL_TEXTURE0 + 20); glBindTexture(GL_TEXTURE_2D, envOn || hullOn || trafHullOn ? texEnv : 0); glUniform1i(U(p, "uEnv"), 20);
-  glUniform1i(U(p, "uEnvOn"), envOn ? 1 : 0);
+  glActiveTexture(GL_TEXTURE0 + 20); glBindTexture(GL_TEXTURE_2D, hullOn || trafHullOn ? texEnv : 0); glUniform1i(U(p, "uEnv"), 20);
+  glUniform1i(U(p, "uEnvOn"), 0);   // (the terrain envelope was the ray tracer's)
   glUniform1i(U(p, "uScrWin"), screenWindows ? 1 : 0);
   glUniform1i(U(p, "uAfShOn"), shOn);   // the airframe shadow maps (af_shmap.glsl), for the proxy and the airframe's own lighting
   if (shOn) {
@@ -1086,18 +1055,6 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
 }
 
 // the ray trace of a view into the scene targets
-void Renderer::traceRT(const FrameParams& fp, GLuint prog) {
-  GLenum bufs[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
-  glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
-  glDrawBuffers(3, bufs);
-  glViewport(0, 0, rw, rh);
-  glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
-  setRT(prog, fp);
-  glBindVertexArray(vaoEmpty);
-  glDrawArrays(GL_TRIANGLES, 0, 3);
-  depthValid = true;
-}
-
 // the clouds at a quarter of the pixels, along the rays of the depths just written, composited over the lit view
 void Renderer::cloudPass(const FrameParams& fp) {
   if (!cloudSplit) return;
@@ -1235,62 +1192,29 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     jitX = (halton(hi, 2) - 0.5f) / rw; jitY = (halton(hi, 3) - 0.5f) / rh;
   }
   // ------------------------------------------------ environment entities: shadow cascades + G-buffer
-  static const bool cloudSplitOff = getenv("CLOUDSPLITOFF") != nullptr;   // (debug: every pixel marches its clouds in the ray tracer)
-  cloudSplit = !costMap && !cloudSplitOff && progClouds && progCloudComp && fp.cloudCover >= 0.02f;
+  static const bool cloudSplitOff = getenv("CLOUDSPLITOFF") != nullptr;   // (debug: no clouds)
+  cloudSplit = !cloudSplitOff && progClouds && progCloudComp && fp.cloudCover >= 0.02f;
   GLenum bufs[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
   float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};   // (this frame's camera, for the TAA)
-  if (mode == 1 && rasterOk) {
-    // ------------------------------------------------ the raster renderer: scenery, terrain and sea into the G-buffer, then one lighting pass
-    rasterWorld(fp);
-    bakeTerrainShadow(fp);
-    rasterShadowMaps(fp);   // (the airframe's shadow maps: the feeds' and the main view's proxy both read them)
-    stamp(1);
-    if ((fp.dispMode & 1) && (!texPages || (frameNo & 1) == 0)) renderDisplays(fp, false);   // the cockpit display atlases, before the objects pass samples them (the research jets' pages at 30 Hz: 9 Mpx and their mips a frame)
-    if (fp.dispMode & 2) renderDisplays(fp, true);
-    stamp(2);
-    // the research jets' cockpit cameras: the same passes on their own targets, before the objects pass draws the screens
-    renderFeeds(fp, [this](GLuint p, const FrameParams& f) { setRT(p, f); }, [this](const FrameParams& f, GLuint) { rasterShadowProxy(f); rasterLight(f); cloudPass(f); rasterEffects(f); }, [this](const FrameParams& f) { feedEffects(f); });
-    stamp(3);
-    rasterObjects(fp);
-    stamp(4);
-    rasterShadowProxy(fp);
-    stamp(5);
-    rasterLight(fp);
-    cloudPass(fp);
-    rasterEffects(fp);
-    stamp(6);
-  } else {
-    shOn = 0;   // (no airframe shadow maps on the ray tracer: the airframe lighting marches as before)
-    drawEnvelope(fp);
-    earlyMesh = nullptr;   // (the ray tracer marches the airframe: no mesh depth opens its G-buffer)
-    drawEntities(fp);
-    bakeTerrainShadow(fp);
-    stamp(1);
-    if (fp.dispMode & 1) renderDisplays(fp, false);   // the cockpit display atlases, before the ray tracer samples them
-    if (fp.dispMode & 2) renderDisplays(fp, true);
-    stamp(2);
-    // ------------------------------------------------ ray trace
-    glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
-    glDrawBuffers(3, bufs);
-    glViewport(0, 0, rw, rh);
-    glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
-    stamp(3); stamp(4); stamp(5);   // (the raster path's feeds, objects and shadow proxy passes: nothing here)
-    // the research jets' cockpit cameras first: the displays show this frame's pictures
-    renderFeeds(fp, [this](GLuint p, const FrameParams& f) { setRT(p, f); }, [this](const FrameParams& f, GLuint pr) { traceRT(f, pr); cloudPass(f); }, [this](const FrameParams& f) { feedEffects(f); });
-    // aircraft hull (rasterized; baked at the end of the frame that first needs it - see below)
-    hullOn = false;
-    const bool hullUse = hullWanted(fp);
-    const int hullSlot = fp.plane.PS[3] > 0.5f ? 1 : 0;
-    const uint64_t hullK = hullUse ? hullKey(fp, hullSlot) : 0;
-    if (hullUse && hulls.count(hullK)) drawHull(fp, hullSlot, hullK);
-    drawTrafficHulls(fp);
-    traceRT(fp, costMap && progRTCost ? progRTCost : progRT);
-    cloudPass(fp);
-
-    // a new airframe or view: bake its hull with the ray tracer's own shape code (used from the next frame on)
-    if (hullUse && !hulls.count(hullK)) { setRT(progHullBake, fp); bakeHull(fp, hullSlot, hullK); }
-    stamp(6);
-  }
+  // ------------------------------------------------ the raster renderer: scenery, terrain and sea into the G-buffer, then one lighting pass
+  rasterWorld(fp);
+  bakeTerrainShadow(fp);
+  rasterShadowMaps(fp);   // (the airframe's shadow maps: the feeds' and the main view's proxy both read them)
+  stamp(1);
+  if ((fp.dispMode & 1) && (!texPages || (frameNo & 1) == 0)) renderDisplays(fp, false);   // the cockpit display atlases, before the objects pass samples them (the research jets' pages at 30 Hz: 9 Mpx and their mips a frame)
+  if (fp.dispMode & 2) renderDisplays(fp, true);
+  stamp(2);
+  // the research jets' cockpit cameras: the same passes on their own targets, before the objects pass draws the screens
+  renderFeeds(fp, [this](GLuint p, const FrameParams& f) { setRT(p, f); }, [this](const FrameParams& f, GLuint) { rasterShadowProxy(f); rasterLight(f); cloudPass(f); rasterEffects(f); }, [this](const FrameParams& f) { feedEffects(f); });
+  stamp(3);
+  rasterObjects(fp);
+  stamp(4);
+  rasterShadowProxy(fp);
+  stamp(5);
+  rasterLight(fp);
+  cloudPass(fp);
+  rasterEffects(fp);
+  stamp(6);
   // ------------------------------------------------ temporal AA resolve (before the sprites: particles never smear)
   {
     int cur = histIdx ^ 1;

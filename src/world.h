@@ -56,7 +56,7 @@ public:
   std::vector<uint8_t> mask; // RGBA8: road distance, building density, urbanness, farmland / sea-stack flag
   std::vector<float> hmax[HMAX_LEVELS];   // upper bound of the terrain per cell, level L has HMAX_N>>L cells per side
   void build();
-  // Terrain envelope (the rasterized stand-in that starts the exact terrain march): an upper bound of the rendered
+  // Terrain envelope (the terrain mesh culls its chunks with it, terrain_mesh.cpp): an upper bound of the rendered
   // terrain at every vertex of the HM_N grid through the texel centres (tpV0, (HM_N+1)^2), and per cell (tpM[L])
   std::vector<float> tpV0, tpM[TP_LEVELS];
   void buildHMax();

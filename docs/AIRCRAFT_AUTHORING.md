@@ -7,7 +7,7 @@ You are an aircraft designer for **Solace Express**, a C++17 / OpenGL 3.3 flight
 ## 0. TL;DR for the model
 
 - Every aircraft is **two C++ table rows**: an `AircraftSpec` (flight model, career data, livery) and a `ModelDef` (3D shape parameters). There are no mesh files, no textures, no external assets. Geometry is a parametric signed-distance model evaluated by the renderer; shading is procedural.
-- The renderer is being rebuilt from a per-pixel ray tracer into a rasterizer. **The rebuilt renderer bakes triangle meshes from the same parametric model at load time**, so a correctly written table row works in both the current and the new renderer with zero changes. That is what "easily implemented" means here: stay inside the parametric model (Tier A below).
+- The renderer is a rasterizer that **bakes triangle meshes from the parametric model at load time**, so a correctly written table row works with zero renderer changes. That is what "easily implemented" means here: stay inside the parametric model (Tier A below).
 - Hand-written distance-field airframes (Tier B, how the two research jets are built) are only for shapes the parametric model cannot express. They are accepted only if they follow the part/rig rules in §6, because the mesh bake needs them.
 - Output format is fixed (§7). Always include the self-check table (§5). Never invent fields, never reorder fields, never change existing rows.
 

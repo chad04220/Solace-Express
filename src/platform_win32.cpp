@@ -18,7 +18,7 @@
 #include "game.h"
 #include "menu_video_win.h"
 
-// Ask hybrid-graphics laptops for the dedicated GPU: the integrated one may reject or take minutes over the ray tracer
+// Ask hybrid-graphics laptops for the dedicated GPU: the integrated one may reject or take minutes over the big scene shaders
 extern "C" {
 __declspec(dllexport) DWORD NvOptimusEnablement = 1;
 __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
@@ -321,7 +321,7 @@ static std::string userDir() {
 
 // Child process: SolaceExpress.exe --build-shader-cache "<dir>" compiles every program into the binary cache and
 // exits, reporting progress on stdout ("<programs done>" lines, then "m <programs compiled>"). The game runs the long
-// first-time compile this way because NVIDIA's driver holds a process-wide lock while it links the ray tracer: no
+// first-time compile this way because NVIDIA's driver holds a process-wide lock while it links the big scene programs: no
 // thread of the compiling process, whatever its context, can draw until it lets go, so the intro froze. A separate
 // process has its own driver state, and the game then loads the finished programs from the cache in a moment.
 static int buildShaderCacheChild(HINSTANCE hInst, const std::string& dir) {
@@ -420,7 +420,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
 
   // startup.log names the GPU in use (support aid)
   std::string gpu = std::string((const char*)glGetString(GL_RENDERER)) + " / " + (const char*)glGetString(GL_VERSION);
-  // the ray tracer samples 22 textures in one fragment shader; OpenGL 3.3 only guarantees 16 (every current GPU has 32)
+  // the scene programs sample up to 31 texture units in one fragment shader; OpenGL 3.3 only guarantees 16 (every current GPU has 32)
   GLint texUnits = 0; glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &texUnits);
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "w")) { fprintf(f, "GPU: %s\nFragment texture units: %d\n", gpu.c_str(), (int)texUnits); fclose(f); }
   if (texUnits > 0 && texUnits < 22) {
@@ -536,7 +536,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     wglMakeCurrent(nullptr, nullptr);
     compileState = ok ? 1 : 2;
   });
-  // the ray tracer is most of the work: its progress is estimated from the last measured compile time
+  // the first, biggest programs are most of the work: their progress is estimated from the last measured compile time
   float estRT = cached ? 1.5f : 40.f;
   if (!cached && !g_shaderCacheDir.empty())
     if (FILE* f = fopen((g_shaderCacheDir + "\\compile_time.txt").c_str(), "r")) { float v; if (fscanf(f, "%f", &v) == 1 && v > 1 && v < 3600) estRT = v; fclose(f); }
@@ -634,7 +634,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     float sp = !ctx2 ? 0.f : compileState == 1 ? 1.f : d == 0 ? 0.8f * std::min(0.97f, 1.f - expf(-t / (estRT * 0.6f))) : 0.8f + 0.2f * (d - 1) / (Renderer::kProgramCount - 1);
     float wp = built ? 1.f : std::min(0.95f, t / 4.f);
     float target = 0.1f * wp + 0.7f * sp;   // (the rest: textures, then the menu and the aircraft shells - see below)
-    std::string stage = !ctx2 ? "PREPARING" : d == 0 ? (cached ? "LOADING SHADERS FROM CACHE" : "COMPILING RAY TRACING SHADERS")
+    std::string stage = !ctx2 ? "PREPARING" : d == 0 ? (cached ? "LOADING SHADERS FROM CACHE" : "COMPILING SHADERS")
                       : compileState == 0 ? "COMPILING SHADERS  " + std::to_string(d) + " / " + std::to_string(Renderer::kProgramCount) : "SHADERS READY";
     if (!built) stage += "   //   GENERATING THE SOLACE ISLANDS";
     introFrame(target, stage, 1.f);
@@ -663,8 +663,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) { stopIntro(false); fatal(g_ren.error); return 1; }
   {
     std::string cl = GetCommandLineA();
-    if (cl.find("--raster") != std::string::npos) g_ren.mode = g_ren.modeForce = 1;   // the tools on the raster renderer (docs/RENDERER_REBUILD.md)
-    if (cl.find("--rt") != std::string::npos) g_ren.mode = g_ren.modeForce = 0;         // ... or on the ray tracer (the settings' choice otherwise)
+    // (--raster, from older scripts, is accepted and ignored: there is one renderer)
     bool tool = cl.find("--bench ") != std::string::npos || cl.find("--shots ") != std::string::npos || cl.find("--profile ") != std::string::npos || cl.find("--analyze") != std::string::npos || cl.find("--loadshots") != std::string::npos || cl.find("--menuvideo") != std::string::npos;
     // a normal start loads the menu's first place and builds every aircraft's hull under the intro (rendered
     // offscreen: the intro keeps the window), so the menu opens complete and no flight waits for a hull
@@ -678,11 +677,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     fclose(f);
   }
   // Analysis: SolaceExpress.exe --analyze [scenes] - a thorough look at where the frame time goes, written to
-  // analysis.txt (heat maps of the ray tracer's per-pixel work in the "analysis" folder), all at 1920x1080:
-  //   CPU vs GPU (update / submit / wait), exact per-pass GPU times (the GPU is waited on at each pass boundary),
-  //   frame time against render resolution (does it scale with pixel count?), what each ray tracer feature costs,
-  //   and the per-pixel work the ray tracer does (terrain samples, aircraft distance-field samples, cloud steps,
-  //   effect / light steps), averaged and drawn as heat maps.
+  // analysis.txt (with a picture of each scene in the "analysis" folder), all at 1920x1080: CPU vs GPU (update /
+  // submit / wait), exact per-pass GPU times (the GPU is waited on at each pass boundary), frame time against render
+  // resolution (does it scale with pixel count?) and what each feature costs.
   {
     std::string cl = GetCommandLineA();
     size_t k = cl.find("--analyze");
@@ -700,21 +697,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       CreateDirectoryA((dir + "\\analysis").c_str(), nullptr);
       FILE* af = fopen((dir + "\\analysis.txt").c_str(), "w");
       if (!af) return 1;
-      SetWindowTextA(g_hwnd, "Solace Express - analysis: building the counting ray tracer (about a minute)");
-      LARGE_INTEGER c0, c1; QueryPerformanceCounter(&c0);
-      bool haveCost = g_ren.buildCostProgram();
-      QueryPerformanceCounter(&c1);
       fprintf(af, "Solace Express performance analysis\nGPU: %s\nCPU threads: %u   Quality: %d   Window: %dx%d\n",
               gpu.c_str(), std::thread::hardware_concurrency(), g_ren.quality, g_ren.W, g_ren.H);
-      fprintf(af, "Counting ray tracer: %s (%.1f s)\n", haveCost ? "built" : ("FAILED - " + g_ren.error.substr(0, 300)).c_str(), (double)(c1.QuadPart - c0.QuadPart) / freq.QuadPart);
       fprintf(af, "\nHow to read this: 'ms' is wall-clock time per frame with the GPU finished (vsync off). Per-pass times are\n"
                   "exact (the GPU is waited on between passes, which adds a little overhead). Resolution scaling: if a frame\n"
-                  "takes ~2.2x as long at 100%% as at 67%% (2.2x the pixels), the per-pixel ray tracing is the bottleneck.\n");
+                  "takes ~2.2x as long at 100%% as at 67%% (2.2x the pixels), the per-pixel work is the bottleneck.\n");
       auto qpcMs = [&](LARGE_INTEGER a, LARGE_INTEGER b) { return (double)(b.QuadPart - a.QuadPart) / freq.QuadPart * 1000.0; };
       auto pump = [&] { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } };
-      static const char* kPassNameRT[Renderer::kPasses] = {"scenery+shadows", "displays", "-", "-", "-", "ray trace+clouds", "TAA", "sprites", "bloom", "light shafts", "composite"};
-      static const char* kPassNameRaster[Renderer::kPasses] = {"world+terrain shadow", "displays", "camera feeds", "objects (airframes)", "airframe shadow proxy", "lighting+clouds+effects", "TAA", "sprites", "bloom", "light shafts", "composite"};
-      const char* const* kPassName = g_ren.mode == 1 ? kPassNameRaster : kPassNameRT;
+      static const char* kPassName[Renderer::kPasses] = {"world+terrain shadow", "displays", "camera feeds", "objects (airframes)", "airframe shadow proxy", "lighting+clouds+effects", "TAA", "sprites", "bloom", "light shafts", "composite"};
       static const struct { int bit; const char* name; } kFeat[] = {
         {1, "volumetric clouds"}, {2, "terrain shadows"}, {4, "scenery shadow maps"}, {8, "aircraft shadow"}, {16, "point lights"},
         {32, "cloud shadows"}, {64, "half terrain march steps"}, {128, "terrain materials"}, {256, "fog / aerial perspective"},
@@ -772,7 +762,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         double ms100 = 0, ms67 = 0;
         {
           static const struct { float scale; const char* name; } kRes[] = {{1.f, "100%"}, {0.85f, " 85%"}, {0.75f, " 75%"}, {0.67f, " 67%"}};
-          fprintf(af, "Render resolution (ray trace + TAA at a fraction of 1920x1080, upscaled):\n");
+          fprintf(af, "Render resolution (the passes + TAA at a fraction of 1920x1080, upscaled):\n");
           for (const auto& R : kRes) {
             g_ren.setRenderScale(R.scale); frames(4);
             double ms = timed(30);
@@ -783,13 +773,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           g_ren.setRenderScale(1.f); frames(4);
           double r = ms67 > 0 ? ms100 / ms67 : 0;
           fprintf(af, "  -> 100%% takes %.2fx as long as 67%% (2.23x the pixels): %s\n", r,
-                  r > 1.8 ? "per-pixel ray tracing dominates" : r > 1.35 ? "mostly per-pixel, with a fixed cost besides" : "a fixed per-frame cost dominates (not pixel work)");
+                  r > 1.8 ? "per-pixel work dominates" : r > 1.35 ? "mostly per-pixel, with a fixed cost besides" : "a fixed per-frame cost dominates (not pixel work)");
         }
         // 4. features
         std::string top; double topSave = 0;
         {
           double base = timed(30);
-          fprintf(af, "Ray tracer features (frame time with it switched off; base %.2f ms):\n", base);
+          fprintf(af, "Features (frame time with it switched off; base %.2f ms):\n", base);
           for (const auto& F : kFeat) {
             g_ren.dbgOff = F.bit;
             double ms = timed(30);
@@ -798,58 +788,23 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
             if (base - ms > topSave) { topSave = base - ms; top = F.name; }
           }
         }
-        // 5. per-pixel work of the ray tracer
-        if (haveCost && g_ren.mode != 1) {   // (the counting program is the ray tracer's: on the rasterizer there is nothing to count this way)
-          g_ren.costMap = true; frames(2); glFinish();
-          std::vector<float> cm; int w = 0, h = 0;
-          g_ren.readCostMap(cm, w, h);
-          g_ren.costMap = false;
-          static const char* kCat[4] = {"terrain height samples", "aircraft shape samples", "cloud march steps", "effect / light steps"};
-          size_t np = (size_t)w * h;
-          fprintf(af, "Ray tracer work per pixel (%dx%d):            mean     95th pct      max\n", w, h);
-          float p95v[4] = {};
-          for (int c = 0; c < 4; c++) {
-            std::vector<float> v(np); double sum = 0; float mx = 0;
-            for (size_t i = 0; i < np; i++) { v[i] = cm[i * 4 + c]; sum += v[i]; mx = std::max(mx, v[i]); }
-            std::nth_element(v.begin(), v.begin() + np * 95 / 100, v.end());
-            p95v[c] = v[np * 95 / 100];
-            fprintf(af, "  %-26s           %8.1f %10.0f %10.0f\n", kCat[c], sum / np, p95v[c], mx);
-          }
-          // heat maps: the four counters side by side (2x2), each scaled to its own 95th percentile
-          int hw = w / 2, hh = h / 2;
-          std::vector<uint8_t> img((size_t)w * h * 3, 0);
-          for (int c = 0; c < 4; c++) {
-            int ox = (c & 1) * hw, oy = (c < 2 ? 1 : 0) * hh;   // bottom-up rows: the first two on the top row
-            float sc2 = p95v[c] > 0 ? 1.f / p95v[c] : 0.f;
-            for (int y = 0; y < hh; y++)
-              for (int x = 0; x < hw; x++) {
-                float vv = cm[((size_t)(y * 2) * w + x * 2) * 4 + c] * sc2;
-                float t = std::min(vv, 1.5f) / 1.5f;   // black -> blue -> red -> yellow -> white
-                float r = std::min(1.f, t * 2.2f), gg = std::max(0.f, std::min(1.f, t * 2.2f - 0.9f)), bl = t < 0.3f ? t * 3.f : std::max(0.f, 1.f - (t - 0.3f) * 3.f) + std::max(0.f, t * 3.f - 2.f);
-                uint8_t* o = &img[((size_t)(oy + y) * w + ox + x) * 3];
-                o[0] = (uint8_t)(r * 255); o[1] = (uint8_t)(gg * 255); o[2] = (uint8_t)(std::min(bl, 1.f) * 255);
-              }
-          }
-          writePNG((dir + "\\analysis\\" + sc + "_work.png").c_str(), w, h, img);
-          fprintf(af, "  (heat map: analysis\\%s_work.png - top left terrain, top right aircraft, bottom left clouds, bottom right effects)\n", sc.c_str());
-        }
         // a picture of the scene for reference
         frames(3); glFinish();
         g_ren.screenshotPNG((dir + "\\analysis\\" + sc + ".png").c_str());
-        double rt = passSum[1];
+        double rt = passSum[3];   // (the objects pass: the airframes)
         sums.push_back({sc, ms100, rt, ms67 > 0 ? ms100 / ms67 : 0, top});
         fflush(af);
         delete g;
       }
       fprintf(af, "\n==================== summary ====================\n");
-      fprintf(af, "%-16s %9s %9s %12s  %s\n", "scene", "frame ms", "RT ms", "100%/67%", "most expensive feature");
+      fprintf(af, "%-16s %9s %9s %12s  %s\n", "scene", "frame ms", "objects", "100%/67%", "most expensive feature");
       for (auto& S : sums) fprintf(af, "%-16s %9.2f %9.2f %12.2f  %s\n", S.sc.c_str(), S.ms, S.rt, S.scale, S.top.c_str());
       fclose(af);
       return 0;
     }
   }
   // Profile: SolaceExpress.exe --profile scene1,scene2,... renders each scene at 1920x1080 once normally and once with
-  // each ray tracer feature switched off (Renderer::dbgOff), and writes profile.txt next to the exe: what every
+  // each feature switched off (Renderer::dbgOff), and writes profile.txt next to the exe: what every
   // feature costs on this GPU
   {
     std::string cl = GetCommandLineA();
@@ -893,7 +848,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           double ms = (double)(f1.QuadPart - f0.QuadPart) / freq.QuadPart * 1000.0 / N;
           if (F.bit == 0) base = ms;
           if (pf) {
-            if (F.bit == 0) fprintf(pf, g_ren.mode == 1 ? "  %-26s %7.2f ms   (world %.2f, objects %.2f, shadow proxy %.2f, lighting %.2f)\n" : "  %-26s %7.2f ms   (scenery+shadows %.2f, displays %.2f, -, ray trace %.2f)\n", F.name, ms, g_ren.passMs[0], g_ren.mode == 1 ? g_ren.passMs[2] : g_ren.passMs[1], g_ren.mode == 1 ? g_ren.passMs[3] : g_ren.passMs[4], g_ren.passMs[4]);
+            if (F.bit == 0) fprintf(pf, "  %-26s %7.2f ms   (world %.2f, objects %.2f, shadow proxy %.2f, lighting %.2f)\n", F.name, ms, g_ren.passMs[0], g_ren.passMs[3], g_ren.passMs[4], g_ren.passMs[5]);
             else fprintf(pf, "  %-26s %7.2f ms   saves %6.2f ms\n", F.name, ms, base - ms);
             fflush(pf);
           }
@@ -956,7 +911,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         else outName = outName.substr(0, outName.find(' '));
       }
       FILE* bf = fopen((dir + "\\" + outName).c_str(), "w");
-      if (bf) fprintf(bf, "GPU: %s\nDesktop %dx%d, render %dx%d, quality %d, renderer %s\n\n", gpu.c_str(), GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), g_ren.W, g_ren.H, g_ren.quality, g_ren.mode == 1 ? "rasterizer" : "ray tracer");
+      if (bf) fprintf(bf, "GPU: %s\nDesktop %dx%d, render %dx%d, quality %d\n\n", gpu.c_str(), GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), g_ren.W, g_ren.H, g_ren.quality);
       if (cl.find("--nobodies") == std::string::npos) {   // (--nobodies: the shader compile timing alone)
         int built = 0; double secs = 0;
         buildBodies(built, secs);
@@ -998,8 +953,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         double ms = (double)(f1.QuadPart - f0.QuadPart) / freq.QuadPart * 1000.0 / N;
         if (bf) {
           const float* pm = g_ren.passMs;
-          fprintf(bf, g_ren.mode == 1 ? "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: world %.2f  displays %.2f  feeds %.2f  objects %.2f  shadow proxy %.2f  lighting %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n"
-                              : "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: scenery+shadows %.2f  displays %.2f  (%.2f %.2f %.2f)  raytrace %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n",
+          fprintf(bf, "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: world %.2f  displays %.2f  feeds %.2f  objects %.2f  shadow proxy %.2f  lighting %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n",
                   sc.c_str(), ms, 1000.0 / ms, g_ren.gpuMs, pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9], pm[10]);
           fprintf(bf, "%-22s (warmed %d frames until built; %d bodies built during it)\n", "", warm, warmBakes);
           fflush(bf);
@@ -1061,7 +1015,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   }
   // The menu montage as a video: SolaceExpress.exe --menuvideo [--kbps N] renders the whole montage loop (8 shots,
   // 128 s) offline at 1920x1080 and 30 fps, every frame with its scenery complete, and encodes it to menu.mp4 next to
-  // the exe (H.264, 5 Mbps by default: about 80 MB). The main menu then plays that instead of ray tracing the montage.
+  // the exe (H.264, 5 Mbps by default: about 80 MB). The main menu then plays that instead of rendering the montage live.
   {
     std::string cl = GetCommandLineA();
     if (cl.find("--menuvideo") != std::string::npos) {

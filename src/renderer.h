@@ -99,7 +99,6 @@ public:
   float renderScale = 1.0f;
   int quality = 1;           // 0 low, 1 medium, 2 high
   int dbgOff = 0;            // profiling: ray tracer features switched off (uDbg bits)
-  int mode = 0;              // 0 the ray tracer, 1 the raster renderer (docs/RENDERER_REBUILD.md; needs rasterOk)
   bool screenWindows = getenv("SCREENFEEDS") == nullptr;   // the research craft's displays are windows (no camera feeds but the bomb camera's; SCREENFEEDS=1 brings the cameras back)
   int bakeCount = 0;   // airframe meshes and hulls baked or loaded so far (the research terminal's warm-up waits for a frame that bakes nothing)
   int bakeBuilt = 0;   // of them, built from scratch (not loaded from the mesh cache): the diagnostics report it
@@ -109,22 +108,16 @@ public:
   std::chrono::steady_clock::time_point bakeYieldAt{};
   bool bakeDue() { auto now = std::chrono::steady_clock::now(); if (now - bakeYieldAt < std::chrono::milliseconds(30)) return false; bakeYieldAt = now; return true; }
   void bakeTick() { if (bakeYield && bakeDue()) bakeYield(); }
-  int modeForce = -1;        // the tools' --raster / the harness' RASTER: overrides the setting whenever the game applies it
-  bool rasterOk = false;     // the raster renderer's programs built
   bool ok = false;
   std::string error;
   GLuint minimapTex = 0;
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
-  static constexpr int kProgramCount = 22;
+  static constexpr int kProgramCount = 19;
   float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
   // analysis tool (--analyze): exact per-pass times (the GPU is waited on at every pass boundary) and a build of the
   // ray tracer that writes its per-pixel work counters instead of colour
   bool syncTiming = false; double passWall[11] = {};   // (kPasses)
-  bool costMap = false;
-  bool buildCostProgram();
-  bool readCostMap(std::vector<float>& out, int& w, int& h);
-  std::string rtSource(const char* defines);
   std::string dispError;   // set when the cockpit display shader failed to build (the screens stay dark)
   bool compilePrograms(std::atomic<int>* done);  // scene programs; safe on a worker thread with a shared context
   bool init(int w, int h);                       // everything else (runs compilePrograms itself if not done yet)
@@ -164,7 +157,6 @@ private:
   GLuint progMap = 0, texMap = 0, fboMap = 0; int mapN = 0;
   GLuint progDisp = 0, texPages = 0, texPanel = 0, fboDisp = 0;
   std::chrono::steady_clock::time_point syncT;
-  GLuint progRTCost = 0;
   // quarter-resolution clouds: the cloud march, its full-resolution composite, their targets
   GLuint progClouds = 0, progCloudComp = 0, texCloud = 0, texCloudD = 0, fboCloud = 0, texCloudMask = 0, fboComp = 0;
   int cw = 0, ch = 0;
@@ -173,11 +165,9 @@ private:
   int tshFront = -1, tshBack = 0, tshRow = 0; bool tshBaking = false; vec3 tshSun, tshBakeSun;
   static constexpr int kTShN = 2048, kTShRows = 64;   // texels per side, rows baked per frame
   void bakeTerrainShadow(const FrameParams& fp);            // analysis build of the ray tracer (built on demand)
-  GLuint progCkMask = 0;           // cockpit occlusion mask for the scenery pass
-  bool depthValid = false, ckMaskPrev = false;   // last frame's ray-traced depth is usable / was a cockpit view
-  vec3 ckLookPrev, ckUpPrev; float ckFovPrev = 0;   // last frame's view inside the cabin (the mask's validity, entity_render.cpp)
+  bool depthValid = false;   // the depth target holds a frame
   void renderDisplays(const FrameParams& fp, bool panel);
-  GLuint progRT = 0, progSprite = 0, progDown = 0, progUp = 0, progRayMask = 0, progRay = 0, progPost = 0, progUI = 0, progTAA = 0, progFeedRays = 0;
+  GLuint progSprite = 0, progDown = 0, progUp = 0, progRayMask = 0, progRay = 0, progPost = 0, progUI = 0, progTAA = 0, progFeedRays = 0;
   static constexpr int kBloomMips = 6;
   GLuint fboMip[kBloomMips] = {}, texMip[kBloomMips] = {}; int mipW[kBloomMips] = {}, mipH[kBloomMips] = {};
   GLuint fboRay[2] = {0, 0}, texRay[2] = {0, 0};
@@ -229,13 +219,9 @@ private:
   int entFrame = 0, entGenCount = 0;
   bool initEntities();
   // ---- terrain envelope mesh (terrain_envelope.cpp): where each pixel's exact terrain march starts
-  GLuint progEnv = 0, vaoEnv = 0, vboEnvInst = 0, texEnvV0 = 0, texEnvM = 0, fboEnv = 0, texEnv = 0, texEnvDepth = 0;
+  GLuint fboEnv = 0, texEnv = 0, texEnvDepth = 0;   // the hull passes' target (createHullTarget)
   std::vector<float> envInst;
-  bool envOn = false;
-  bool compileEnvelope();
-  void initEnvelope();
-  void createEnvelopeTarget();
-  void drawEnvelope(const FrameParams& fp);
+  void createHullTarget();
 public:
   int envChunks = 0;
 private:
@@ -283,8 +269,7 @@ private:
     int W = 0, H = 0, rw = 0, rh = 0, cw = 0, ch = 0, allocW = 0, allocH = 0;
     GLuint texRaw = 0, texDepth = 0, texCloudMask = 0, texCloud = 0, texCloudD = 0, fboCloud = 0, fboComp = 0, fboScene = 0;
     GLuint texGB[5] = {0, 0, 0, 0, 0}, texGBDepth = 0, fboGB = 0, fboShProxy = 0, texEnv = 0, texEnvDepth = 0, fboEnv = 0;
-    bool depthValid = false, envOn = false, hullOn = false, trafHullOn = false, ckMaskPrev = false;
-    vec3 ckLookPrev, ckUpPrev; float ckFovPrev = 0;
+    bool depthValid = false, hullOn = false, trafHullOn = false;
     float jitX = 0, jitY = 0;
   };
   void swapView(ViewTargets& v);
@@ -306,10 +291,8 @@ private:
 public:
   void setOffscreen(bool on);
   bool hullBaked(const FrameParams& fp) const;   // the hull this frame wants is ready (or none is wanted)
-  bool hullCockpit = getenv("HULLCOCKPIT") != nullptr;   // cockpit hulls too (in testing)
   bool hullOff = getenv("HULLOFF") != nullptr;           // debug: no hulls (every aircraft march starts from the camera)
   bool meshOff = getenv("MESHOFF") != nullptr;           // debug: no aircraft meshes on the raster path (the whole airframe marches)
-  bool envOff = getenv("ENVOFF") != nullptr;             // debug: no terrain envelope (every pixel marches from the camera)
   bool tshPending() const { return tshBaking || tshFront < 0; }
   void resetTemporal() {   // forget every frame-to-frame accumulation (TAA history, jitter/seed sequence, terrain-shadow bake):
     frameNo = 0; histIdx = 0; histValid = false;   // the next frame renders as if it were the first (exact test comparisons)
@@ -324,7 +307,6 @@ private:
   bool cloudSplit = false;   // this frame's clouds come from the quarter-resolution cloud pass
   const std::vector<SpriteVert>* curAlpha = nullptr; const std::vector<SpriteVert>* curAdd = nullptr;   // this frame's sprites
   void setRT(GLuint p, const FrameParams& fp);          // the scene's uniforms and textures for a program
-  void traceRT(const FrameParams& fp, GLuint prog);     // the ray tracer over a view
   void cloudPass(const FrameParams& fp);                // the clouds at a quarter of the pixels, composited over the lit view
   void drawSprites(const FrameParams& fp, float texW, float texH, float uvsX, float uvsY);
   void feedEffects(const FrameParams& f);

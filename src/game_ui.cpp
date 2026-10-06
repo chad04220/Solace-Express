@@ -1143,7 +1143,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
     const char* rm[] = {"Native", "Auto", "85%", "75%", "67%"};
     for (int i = 0; i < 5; i++) if (button(x + 250 * s + i * 78 * s, py, 72 * s, 32 * s, rm[i], true, set.resMode == i)) set.resMode = i;
     py += 36 * s;
-    g_ren.text(x + 250 * s, py, 12.5f * s, fmt("%s at %dx%d (%.0f%%), upscaled to %dx%d by the temporal AA", g_ren.mode == 1 ? "rasterized" : "ray traced", (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale),
+    g_ren.text(x + 250 * s, py, 12.5f * s, fmt("rendered at %dx%d (%.0f%%), upscaled to %dx%d by the temporal AA", (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale),
                g_ren.renderScale * 100.f, g_ren.W, g_ren.H), C_DIM, 0.85f, 0, false);
     py += 24 * s;
   }
@@ -1159,17 +1159,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
                1.f / std::max(fpsAvg, 1e-4f), g_ren.gpuMs > 0 ? fmt("%.1f ms", g_ren.gpuMs).c_str() : "n/a", set.resMode == 1 ? " (Auto resolution holds this rate)" : ""), C_DIM, 0.85f, 0, false);
     py += 24 * s;
   }
-  g_ren.text(x, py + 6 * s, 16 * s, "Renderer", C_DIM, 1);
-  {
-    const char* rn[] = {"Ray traced (legacy)", "Rasterized"};
-    for (int i = 0; i < 2; i++)
-      if (button(x + 250 * s + i * 170 * s, py, 164 * s, 32 * s, rn[i], i == 0 || g_ren.rasterOk, set.renderer == i)) { set.renderer = i; g_ren.mode = i; }
-    py += 36 * s;
-    g_ren.text(x + 250 * s, py, 12.5f * s, g_ren.mode == 1 ? "the rasterizer (the default): the world as meshes, the aircraft as baked meshes with their fields for the detail (F3 shows its passes)"
-                                                           : "the original ray tracer, kept while the rasterizer settles", C_DIM, 0.85f, 0, false);
-    py += 24 * s;
-  }
-  g_ren.text(x, py + 6 * s, 16 * s, "Ray tracing quality", C_DIM, 1);
+  g_ren.text(x, py + 6 * s, 16 * s, "Render quality", C_DIM, 1);
   const char* q[] = {"Low", "Medium", "High"};
   for (int i = 0; i < 3; i++) if (button(x + 250 * s + i * 100 * s, py, 92 * s, 32 * s, q[i], true, set.quality == i)) { set.quality = i; g_ren.quality = i; }
   py += rs;

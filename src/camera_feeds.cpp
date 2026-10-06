@@ -15,13 +15,13 @@ void Renderer::swapView(ViewTargets& v) {
   for (int i = 0; i < 5; i++) std::swap(texGB[i], v.texGB[i]);
   std::swap(texGBDepth, v.texGBDepth); std::swap(fboGB, v.fboGB); std::swap(fboShProxy, v.fboShProxy);
   std::swap(texEnv, v.texEnv); std::swap(texEnvDepth, v.texEnvDepth); std::swap(fboEnv, v.fboEnv);
-  std::swap(depthValid, v.depthValid); std::swap(envOn, v.envOn); std::swap(hullOn, v.hullOn); std::swap(trafHullOn, v.trafHullOn);
-  std::swap(ckMaskPrev, v.ckMaskPrev); std::swap(ckLookPrev, v.ckLookPrev); std::swap(ckUpPrev, v.ckUpPrev); std::swap(ckFovPrev, v.ckFovPrev); std::swap(jitX, v.jitX); std::swap(jitY, v.jitY);
+  std::swap(depthValid, v.depthValid); std::swap(hullOn, v.hullOn); std::swap(trafHullOn, v.trafHullOn);
+  std::swap(jitX, v.jitX); std::swap(jitY, v.jitY);
 }
 
 // The pictures are only needed while the pilot can see the displays: the cockpit view of a research jet.
 bool Renderer::feedsWanted(const FrameParams& fp) const {
-  return fp.feedRig > 0 && fp.plane.on && fp.plane.PS[3] > 0.5f && fp.wreck.pieces == 0 && progRT;
+  return fp.feedRig > 0 && fp.plane.on && fp.plane.PS[3] > 0.5f && fp.wreck.pieces == 0 && progLight;
 }
 
 // Where each camera's lens sits: from the eye out along its direction, the first point outside the airframe's skin
@@ -155,7 +155,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     FrameParams cf = fp;   // the scene as this camera sees it: from outside the aircraft
     cf.camPos = c.pos; cf.camRight = c.right; cf.camUp = c.up; cf.camBack = c.back;
     cf.fovY = 2.f * atanf(c.tanY);
-    if (c.pano > 0.f) {   // a panorama: the ray tracer and the scenery project onto its cylinder; the flat frustum only culls
+    if (c.pano > 0.f) {   // a panorama: the scenery and the passes project onto its cylinder; the flat frustum only culls
       cf.pano = c.pano; cf.panoTanY = c.tanY;
       float asp = (float)feedTileWH[k][0] / std::max(feedTileWH[k][1], 1);
       cf.fovY = 2.f * atanf(std::max(c.tanY / cosf(std::min(c.pano, 1.45f)), tanf(std::min(c.pano, 1.45f)) / asp) * 1.05f);
@@ -164,18 +164,8 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     W = rw = feedTileWH[k][0]; H = rh = feedTileWH[k][1];
     cw = (rw + 1) / 2; ch = (rh + 1) / 2;
     jitX = jitY = 0.f;
-    if (mode == 1 && rasterOk) { rasterWorld(cf); rasterObjects(cf); }   // (the raster renderer: trace() is its lighting pass)
-    else {
-      // (the terrain envelope and the hulls are flat rasters that only speed up the march: a panorama marches without them)
-      if (cf.pano > 0.f) { envOn = false; trafHullOn = false; } else drawEnvelope(cf);
-      drawEntities(cf);
-      hullOn = false;
-      if (cf.pano <= 0.f) {
-        if (hullWanted(cf)) { uint64_t hk = hullKey(cf, 0); if (hulls.count(hk)) drawHull(cf, 0, hk); }
-        drawTrafficHulls(cf);
-      }
-    }
-    trace(cf, progRT);
+    rasterWorld(cf); rasterObjects(cf);
+    trace(cf, 0);   // (its lighting, clouds and effects passes)
     effects(cf);   // the sprites (smoke, fire, sparks ...) and the light shafts
     // into its tile
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fboScene); glReadBuffer(GL_COLOR_ATTACHMENT0);

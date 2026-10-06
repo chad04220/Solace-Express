@@ -7,19 +7,14 @@
 // defines every function before its first use. Everything that builds them - the game, the shader checker, the
 // keyword test, the geometry previewer - takes the list from here, so they always check what the game runs.
 
-// The ray tracer: the whole scene in one fragment program. The GPS map, the terrain-shadow bake, the cloud pass,
-// the hull bake and the display atlas are built from the same source with main() renamed and their own main added.
-inline std::string rtAssembly(const std::string& defines) {
+// The shared library of scene functions (terrain heights and materials, the clouds, the aircraft fields and
+// materials, the cockpit displays, the lights): no main. The GPS map, the terrain-shadow bake, the cloud pass, the
+// hull bake and the display atlas each add their own main to it.
+inline std::string worldLibAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts + kPlaneSDF + kPlaneTrace + kTerrainTrace +
          kMaterialCommon + kLightCommon + kClouds + kTerrainMaterial + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
-         kPlaneMaterial + kWater + kRtShade + kAfShMap + kPlaneLight + kRtMain;
-}
-// The same with main() renamed, for a program that adds its own main
-inline std::string rtAssemblyNoMain(const std::string& defines) {
-  std::string s = rtAssembly(defines); size_t m = s.find("void main(");
-  if (m != std::string::npos) s.replace(m, 10, "void mainRT(");
-  return s;
+         kPlaneMaterial + kWater + kAfShMap + kPlaneLight;
 }
 // The aircraft distance fields alone (tests/aircraft_visual_test.cpp adds its own main)
 inline std::string sdfAssembly(const std::string& defines) {

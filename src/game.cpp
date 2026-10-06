@@ -198,7 +198,7 @@ void Game::loadSettings() {
     else if (s == "mouseSens") set.mouseSens = clampf(v, 0.2f, 3.f);
     else if (s == "renderRes") set.resMode = std::clamp((int)v, 0, 4);
     else if (s == "fpsTarget") set.fpsTarget = std::clamp((int)v, 0, 240);
-    else if (s == "renderer") set.renderer = std::clamp((int)v, 0, 1);   // (the old key, "resMode", defaulted to native: ignored)
+    else if (s == "renderer") {}   // (the old renderer choice: there is one renderer now)
     else if (s == "fov") set.fov = clampf(v, 40.f, 80.f);
     else if (s == "headLook") set.headLook = v != 0;
     else if (s == "cbHud") set.cbHud = v != 0;
@@ -218,7 +218,7 @@ void Game::loadSettings() {
 void Game::saveSettings() {
   std::string t = fmt("quality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
-  t += fmt("renderRes %d\nfpsTarget %d\nrenderer %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.renderer, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
+  t += fmt("renderRes %d\nfpsTarget %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
   for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   for (const std::string& id : resDone) t += "rescard." + id + " 1\n";
   for (auto& tb : trialBest) for (size_t i = 0; i < tb.second.size(); i++) t += fmt("trial.%s.%d %f\n", tb.first.c_str(), (int)i, tb.second[i]);
@@ -382,7 +382,6 @@ void Game::init(bool buildWorld) {
   loadSettings();
   applyUiPalette();
   wantPacing = true;   // (the frame-rate target from the settings)
-  g_ren.mode = g_ren.modeForce >= 0 ? g_ren.modeForce : set.renderer;
   loadStations();
   {   // every type's performance, learned by flying it, on threads side by side (the job board needs the career ones now)
     std::vector<std::thread> th;
@@ -2298,7 +2297,7 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   // every light aircraft's body (outside, and the cockpit's when that is in use; with allCraft the research jets' too):
   // a frame that wants one bakes it, or loads it from the cache
   std::vector<std::pair<int, bool>> todo;
-  for (int i = 0; i <= kWraith; i++) if (allCraft || !kAircraft[i].special) { todo.push_back({i, false}); if (g_ren.hullCockpit || g_ren.mode == 1) todo.push_back({i, true}); }
+  for (int i = 0; i <= kWraith; i++) if (allCraft || !kAircraft[i].special) { todo.push_back({i, false}); todo.push_back({i, true}); }
   for (size_t k = 0; k < todo.size() && !quit; k++) {
     prewarmCraft = todo[k].first; prewarmInside = todo[k].second;
     progress(0.35f + 0.65f * k / todo.size(), std::string(todo[k].second ? "BUILDING AIRCRAFT BODIES  COCKPIT  " : "BUILDING AIRCRAFT BODIES  ") + kAircraft[prewarmCraft].name);
@@ -3104,8 +3103,7 @@ void Game::render() {
     t += fmt("   worst %.1f ms   target %d fps   scenery %d drawn, %d chunks, %.1f ms CPU", maxFrameMs, effectiveHz(), g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs);
     t += fmt("   particles %d  debris %d  wreck %d  traffic %d  comms %d", (int)particles.size(), (int)debris.size(), (int)wreck.size(), (int)traffic.craft.size(), (int)atc.history.size());
     const float* pm = g_ren.passMs;
-    std::string t2 = fmt(g_ren.mode == 1 ? "GPU ms:  world %.1f   displays %.1f   feeds %.1f   objects %.1f   shadow proxy %.1f   lighting+clouds %.1f   TAA %.1f   sprites %.1f   bloom %.1f   shafts %.1f   composite %.1f"
-                                        : "GPU ms:  scenery+shadows %.1f   displays %.1f   (%.1f %.1f %.1f)   ray trace %.1f   TAA %.1f   sprites %.1f   bloom %.1f   shafts %.1f   composite %.1f",
+    std::string t2 = fmt("GPU ms:  world %.1f   displays %.1f   feeds %.1f   objects %.1f   shadow proxy %.1f   lighting+clouds %.1f   TAA %.1f   sprites %.1f   bloom %.1f   shafts %.1f   composite %.1f",
                          pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9], pm[10]);
     float tw = std::max(g_ren.textWidth(t, 14 * s), g_ren.textWidth(t2, 14 * s)) + 20 * s;
     g_ren.rect(6 * s, 6 * s, tw, 46 * s, vec3(0, 0, 0), 0.6f);

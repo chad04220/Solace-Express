@@ -48,10 +48,10 @@ static int scan(const char* name, const std::string& src) {
 }
 
 int main() {
-  // same assembly as Renderer::init: line numbers match the driver's error log
-  std::string rt = rtAssembly("");
+  // the same assemblies as Renderer::compilePrograms and the raster passes: line numbers match the driver's error log
+  std::string lib = worldLibAssembly("");
   std::string h = "#version 330 core\n";
-  int bad = scan("raytrace.frag", rt) + scan("map.frag", kMapMain) + scan("disp.frag", kDispMain);
+  int bad = scan("scene_lib.frag", lib) + scan("map.frag", kMapMain) + scan("disp.frag", kDispMain);
   bad += scan("terrain.vert", terrainVSAssembly("")) + scan("terrain.frag", terrainFSAssembly("")) + scan("water.vert", waterVSAssembly("")) + scan("water.frag", waterFSAssembly("")) + scan("light.frag", lightFSAssembly("")) + scan("objects.frag", objectsFSAssembly("")) + scan("shadow_proxy.frag", shadowProxyFSAssembly("")) + scan("effects.frag", effectsFSAssembly("")) + scan("plane_mesh.vert", planeMeshVSAssembly("")) + scan("plane_mesh.frag", planeMeshFSAssembly(""));
   bad += scan("fullscreen.vert", kFullscreenVS) + scan("sprite.vert", kSpriteVS) + scan("sprite.frag", kSpriteFS);
   bad += scan("down.frag", kDownFS) + scan("up.frag", kUpFS) + scan("raymask.frag", kRayMaskFS) + scan("ray.frag", kRayFS);

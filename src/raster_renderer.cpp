@@ -1,4 +1,4 @@
-// Solace Express - the raster renderer (Renderer::mode == 1): a deferred pipeline that draws every surface with the
+// Solace Express - the renderer: a deferred pipeline that draws every surface with the
 // rasterizer and lights the frame once. Shared with the ray tracer: the scenery pass and its shadow cascades, the
 // terrain-shadow bake, the display atlases, the cloud pass, and everything after the lit frame (TAA, sprites, bloom,
 // light shafts, post). See docs/RENDERER_REBUILD.md.
@@ -32,8 +32,6 @@ bool Renderer::compileRaster() {
 // distance) and texCloudMask, exactly what the ray tracer writes, so the clouds, the TAA and everything after run as before.
 void Renderer::rasterWorld(const FrameParams& fp) {
   // scenery: its shadow cascades and the G-buffer, which it clears (entity_render.cpp)
-  envOn = false;   // (the terrain envelope is the ray tracer's)
-  ckMaskPrev = false;   // (so is last frame's cabin mask: here the cabin itself is drawn into that depth and would fail it)
   // the player's baked mesh opens the G-buffer's depth (drawEntities, right after the clear): see rasterObjects
   earlyMesh = nullptr; partPoseN = 0; partPosePM = nullptr;
   if (planeMeshWanted(fp) && fp.pano <= 0.f) {   // the cockpit's rigid parts: their poses for every draw this frame

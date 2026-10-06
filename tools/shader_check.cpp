@@ -1,4 +1,4 @@
-// Writes the ray tracer and the programs built from it (as Renderer::compilePrograms assembles them) to files, so a
+// Writes the scene programs (as Renderer::compilePrograms and the raster passes assemble them) to files, so a
 // GLSL validator can check them in seconds: g++ -std=c++17 -Isrc tools/shader_check.cpp -o shader_check &&
 // ./shader_check outdir && glslangValidator outdir/*.frag
 #include <cstdio>
@@ -13,11 +13,8 @@ static void put(const std::string& dir, const char* name, const std::string& src
 
 int main(int argc, char** argv) {
   std::string dir = argc > 1 ? argv[1] : ".";
-  for (int dbg = 0; dbg < 2; dbg++) {
-    std::string rt = rtAssembly(dbg ? "#define HULL_DEBUG\n" : "");
-    put(dir, dbg ? "raytrace_debug.frag" : "raytrace.frag", rt);
-    if (dbg) continue;
-    std::string ms = rt; size_t m = ms.find("void main("); if (m != std::string::npos) ms.replace(m, 10, "void mainRT(");
+  {
+    std::string ms = worldLibAssembly("");
     put(dir, "map.frag", ms + kMapMain);
     put(dir, "tshbake.frag", ms + kTShBakeMain);
     put(dir, "clouds.frag", ms + kCloudMain);
@@ -31,6 +28,8 @@ int main(int argc, char** argv) {
     put(dir, "effects.frag", effectsFSAssembly(""));
     put(dir, "plane_mesh.vert", planeMeshVSAssembly(""));
     put(dir, "plane_mesh.frag", planeMeshFSAssembly(""));
+    put(dir, "plane_mesh_fine.frag", planeMeshFSAssembly("#extension GL_ARB_conservative_depth : enable\n#define MESH_REFINE\n"));
+    put(dir, "part_pose.frag", partPoseFSAssembly());
   }
   return 0;
 }

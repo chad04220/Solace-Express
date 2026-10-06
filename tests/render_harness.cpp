@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
   g_world.build();
   buildStory();
   if (argc > 1 && std::string(argv[1]) == "gauges") {   // display atlas: every gauge and MFD page, without the ray tracer
-    std::string fs = rtAssemblyNoMain("") + R"(
+    std::string fs = worldLibAssembly("") + R"(
 
 uniform int uMode;
 void main(){
@@ -148,7 +148,6 @@ void main(){
   }
   if (getenv("SHADERCACHE")) g_shaderCacheDir = getenv("SHADERCACHE");   // test the program-binary cache
   g_ren.renderScale = getenv("RSCALE") ? (float)atof(getenv("RSCALE")) : 1.0f; g_ren.quality = 1;
-  if (getenv("RASTER")) g_ren.mode = g_ren.modeForce = 1;   // the raster renderer (docs/RENDERER_REBUILD.md)
   if (getenv("DBGOFF")) g_ren.dbgOff = atoi(getenv("DBGOFF"));   // switch ray tracer features off (Renderer::dbgOff bits)
   auto tInit = std::chrono::steady_clock::now();
   if (!g_ren.init(W, H)) { printf("init failed: %s\n", g_ren.error.c_str()); return 1; }
@@ -164,9 +163,8 @@ void main(){
       if (getenv("ENTSYNC")) g_ren.entSync = true;   // deterministic scenery (for exact image comparisons)
       // scene~hulloff / scene~envoff: that shot only with the switch on, so an A/B pair shares one shader compile
       std::string base = sc.substr(0, sc.find('~'));
-      const bool hullOff0 = g_ren.hullOff, envOff0 = g_ren.envOff;
+      const bool hullOff0 = g_ren.hullOff;
       if (sc.find("~hulloff") != std::string::npos) g_ren.hullOff = true;
-      if (sc.find("~envoff") != std::string::npos) g_ren.envOff = true;
       g_ren.resetTemporal();   // each shot starts from scratch: identical to rendering it alone
       Game* g = new Game();
       g->initHeadless(); g->debugScene(base);
@@ -193,23 +191,9 @@ void main(){
         printf("time %s: %.0f ms/frame\n", sc.c_str(), std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 4);
         fflush(stdout);
       }
-      if (getenv("COSTMAP") && g_ren.buildCostProgram()) {   // the analysis build's per-pixel work counters
-        g_ren.costMap = true; g->render(); glFinish(); g_ren.costMap = false;
-        std::vector<float> cm; int w = 0, h = 0; g_ren.readCostMap(cm, w, h);
-        double m[4] = {}; float mx[4] = {};
-        for (size_t i = 0; i < (size_t)w * h; i++) for (int c = 0; c < 4; c++) { m[c] += cm[i * 4 + c]; mx[c] = std::max(mx[c], cm[i * 4 + c]); }
-        printf("cost %s %dx%d: terrain %.1f (max %.0f)  aircraft %.1f (max %.0f)  clouds %.1f (max %.0f)  fx %.1f (max %.0f)\n", sc.c_str(), w, h,
-               m[0] / (w * h), mx[0], m[1] / (w * h), mx[1], m[2] / (w * h), mx[2], m[3] / (w * h), mx[3]);
-        g->render(); glFinish();
-      }
-      if (getenv("DUMPRT")) {   // the ray tracer's raw output (debug modes that write values instead of colour)
-        std::vector<float> cm; int w = 0, h = 0; g_ren.readCostMap(cm, w, h);
-        std::string rp = "/tmp/claude-0/sp/raw_" + sc + ".f32";
-        if (FILE* f = fopen(rp.c_str(), "wb")) { fwrite(&w, 4, 1, f); fwrite(&h, 4, 1, f); fwrite(cm.data(), 4, cm.size(), f); fclose(f); }
-      }
       std::string out = "/tmp/claude-0/sp/shot_" + sc + ".ppm";
       g_ren.screenshot(out.c_str()); printf("wrote %s\n", out.c_str()); fflush(stdout);
-      g_ren.hullOff = hullOff0; g_ren.envOff = envOff0;
+      g_ren.hullOff = hullOff0;
       delete g;
     }
     return 0;

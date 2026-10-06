@@ -306,7 +306,7 @@ uint64_t Renderer::hullKey(const FrameParams& fp, int slot) const {
 // triangle hull per type, so the cabin stays on the plain march.
 bool Renderer::hullWanted(const FrameParams& fp) const {
   const PlaneVisual& pv = fp.plane;
-  if (pv.PS[3] > 0.5f && !hullCockpit) return false;
+  if (pv.PS[3] > 0.5f) return false;   // (the cockpit is drawn from its mesh)
   return !hullOff && progHull && progHullBake && pv.on && fp.wreck.pieces == 0 && pv.M[2] < 4.5f;
 }
 
@@ -390,4 +390,23 @@ void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key, float nea
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   hullOn = true;
+}
+
+// The hull passes' target (aircraft_hull.cpp drawHull): per pixel the aircraft hull's start, the traffic hulls' start
+// and the moving hull's exit, with its own depth; full view size (the render scale uses a corner)
+void Renderer::createHullTarget() {
+  auto mk = [&](GLuint& t, GLenum ifmt, GLenum fmt) {
+    if (t) glDeleteTextures(1, &t);
+    glGenTextures(1, &t); glBindTexture(GL_TEXTURE_2D, t);
+    glTexImage2D(GL_TEXTURE_2D, 0, ifmt, W, H, 0, fmt, GL_FLOAT, nullptr);   // (full view size: the render scale uses a corner)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  };
+  mk(texEnv, GL_RGBA32F, GL_RGBA);   // - | aircraft hull start | traffic hulls' start | the moving hull's exit
+  mk(texEnvDepth, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT);
+  if (!fboEnv) glGenFramebuffers(1, &fboEnv);
+  glBindFramebuffer(GL_FRAMEBUFFER, fboEnv);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texEnv, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texEnvDepth, 0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

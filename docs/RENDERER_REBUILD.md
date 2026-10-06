@@ -1,5 +1,7 @@
 # Renderer rebuild: from one ray-tracing shader to a deferred rasterizer
 
+**Status (v3.22.0): done. The ray tracer, its per-pixel terrain march and the terrain envelope pass are deleted; the rasterizer is the only renderer. The notes below are the history of the rebuild; the ray-tracer numbers in them are the baseline it was measured against.**
+
 Working notes for the rebuild. The flight model, career, ATC, audio, UI and the `FrameParams` interface between the game and the renderer stay as they are; only `Renderer::renderScene` and the shaders behind it change. Each milestone ships behind a switch, is compared against the ray tracer in the test harness, and is measured by the owner on the real GPU before the next one starts.
 
 ## 1. Why
@@ -102,7 +104,7 @@ Owner checks are posted as exact `.bat` runs and shot lists; the harness runs on
 
 Kept unchanged: `FrameParams`, the game, the display atlases (`renderDisplays`), the terrain-shadow bake, the entity meshes and cascades, clouds, TAA, sprites, bloom, light shafts, post, the UI, the GPS map, the hull bake machinery (reused to sample the fields for mesh extraction).
 
-Removed at the end of R3, after the owner signs off: the uber ray tracer and its per-pixel terrain march, the terrain envelope pass, the hull-start pass, `traceBoxes` (already dead: airport buildings are scenery entities).
+Removed in v3.22.0: the uber ray tracer and its per-pixel terrain march, the terrain envelope pass, the cabin mask, the counting (analysis) build, the renderer setting. The programs that were built from the ray tracer's source (the GPS map, the terrain-shadow bake, the clouds, the hull bake, the display atlases) are built on a shared library assembly without its entry point (`worldLibAssembly`). Still to go: the hull-start pass and the per-pixel march of the moving surfaces, when every moving part is a rigid mesh.
 
 ## 5. Risks
 
