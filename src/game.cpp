@@ -1,5 +1,6 @@
 // Solace Express - game flow, flight session, cameras, particles, lights, audio feed
 #include "game.h"
+#include <chrono>
 #include <ctime>
 #include <thread>
 #include "airport_layout.h"
@@ -2338,9 +2339,10 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
 
 // The preview: the selected craft hangs in the air over the chosen launch site, at the sortie's time of day, and the
 // camera orbits it (drag to turn, wheel to zoom) framed so it sits in the middle of the terminal's preview ring
+int resCraftCount(); int resCraftAt(int k);   // game_research_ui.cpp
 void Game::researchPreviewCamera(FrameParams& fp) {
   static Plane demo;
-  const AircraftSpec& sp = kAircraft[resCraft];
+  const AircraftSpec& sp = kAircraft[resWarmCraft >= 0 ? resWarmCraft : resCraft];   // (warming up: every craft in turn)
   if (demo.spec != &sp) demo.reset(&sp, vec3(0, 600, 0), 0, 50, 85, true, 150);
   const Airport& a = g_world.airports[std::clamp(resAirport, 0, (int)g_world.airports.size() - 1)];
   vec3 P; float hdg;
@@ -2360,7 +2362,7 @@ void Game::researchPreviewCamera(FrameParams& fp) {
     P.y = std::max(a.elev, g_world.height(P.x, P.z)) + demo.gearHeight() + (sp.taildragger ? 0.25f : 0.05f);
   }
   demo.pos = P; demo.rpm = 0; demo.flaps = 0; demo.nozzle = 0;
-  fillPlaneVisual(fp.plane, demo, 0.f, resWarm && resWarmFrames == 3);   // (one warm frame as the cockpit: its cabin shell bakes now, not when the sortie opens)
+  fillPlaneVisual(fp.plane, demo, 0.f, resWarm && resWarmCk);   // (warming up, each craft's cockpit for a frame too: its cabin shell bakes now, not when the sortie opens)
   resPrevPos = P; resPrevQ = demo.q;
   // orbit
   ResLayout L = researchLayout();
@@ -2979,7 +2981,7 @@ void Game::update(float dt) {
   if (screen == SCR_RESEARCH && resWarm) {   // warming: the scenery streams flat out, the previewed craft's shells bake; done when a frame bakes nothing and nothing is pending
     g_ren.entBudgetMs = 14.f;
     bool baked = g_ren.bakeCount != resBakeSeen; resBakeSeen = g_ren.bakeCount;
-    if (resWarmFrames > 4 && !baked && g_ren.entPending == 0 && !g_ren.tshPending()) { resWarm = false; g_ren.entBudgetMs = 2.5f; }
+    if (resWarmFrames > 2 * resCraftCount() + 3 && !baked && g_ren.entPending == 0 && !g_ren.tshPending()) { resWarm = false; resWarmCraft = -1; resWarmCk = false; g_ren.entBudgetMs = 2.5f; }
   }
   if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
   radio.poll();
@@ -3041,9 +3043,18 @@ void Game::render() {
   if (screen == SCR_RESEARCH && resWarm) {
     if (resWarmFrames == 0) vid = 1;
     resWarmFrames++;
+    // every research craft, outside and from the cockpit, one a frame: each one's shells bake now behind the boot
+    // screen, so picking one in the terminal never stalls on a bake (the XR-40's, with the most moving parts, froze
+    // the game for seconds when it was first selected); then the selected craft again
+    const int item = resWarmFrames - 2, nItems = 2 * resCraftCount();
+    resWarmCraft = item >= 0 && item < nItems ? resCraftAt(item / 2) : -1;
+    resWarmCk = item >= 0 && item < nItems && (item & 1);
     g_ren.bakeYield = [this] {
       GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
-      realTime += 1.f / 30.f;
+      // (the sequence runs on the real clock: a frame from inside a bake moves it on by the time that has passed)
+      static auto last = std::chrono::steady_clock::now();
+      auto now = std::chrono::steady_clock::now();
+      realTime += std::min(0.1f, std::chrono::duration<float>(now - last).count()); last = now;
       g_ren.clearScreen();
       FrameParams f0; g_ren.uiBegin(); drawResearch(f0); g_ren.uiEnd();
       if (platformPresent) platformPresent();

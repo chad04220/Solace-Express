@@ -40,6 +40,7 @@ void Renderer::measureFeedMounts(const FrameParams& fp) {
   const size_t n0 = pts.size();
   for (int j = 0; j < NY; j++) for (int s = 0; s < NZ; s++) pts.push_back(E + vec3(0.f, -1.2f + j * 0.1f, -s * nstep));
   float ps[4] = {fp.plane.PS[0], fp.plane.PS[1], fp.plane.PS[2], 0.f}, ctl[4] = {0, 0, 0, 0};   // the outside shape, controls centred
+  glUniform1i(glGetUniformLocation(progHullBake, "uHPart"), -1);
   glUniform1i(glGetUniformLocation(progHullBake, "uHStN"), 1);
   glUniform4fv(glGetUniformLocation(progHullBake, "uHStPS"), 1, ps);
   glUniform4fv(glGetUniformLocation(progHullBake, "uHStCtl"), 1, ctl);

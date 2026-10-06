@@ -106,6 +106,13 @@ void Renderer::hullEval4(const std::vector<vec3>& pts, std::vector<float>& out) 
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glDisable(GL_SCISSOR_TEST);
     glFinish();
+    if (bakeYield && bakeDue()) {   // a frame from inside the bake, then this pass's state back
+      bakeYield();
+      glBindFramebuffer(GL_FRAMEBUFFER, fboHOut); glDrawBuffers(1, &c0);
+      glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST);
+      glBindVertexArray(vaoEmpty);
+      glActiveTexture(GL_TEXTURE0 + 19); glBindTexture(GL_TEXTURE_2D, texHPts);
+    }
   }
   std::vector<float> res((size_t)TW * rows * 4);
   glReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -117,7 +124,7 @@ void Renderer::hullEval4(const std::vector<vec3>& pts, std::vector<float>& out) 
   glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, tshFront >= 0 ? texTSh[tshFront] : 0);
   glActiveTexture(GL_TEXTURE0);
   std::copy(res.begin(), res.begin() + (size_t)n * 4, out.begin());
-  if (bakeYield) bakeYield();
+  bakeTick();
 }
 
 // Bake the hull of the current airframe into slot (0 outside, 1 cockpit). The bake program is bound with the ray
@@ -133,6 +140,7 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
   int ns = (int)st.size();
   std::vector<float> sps(128 * 4, 0.f), sct(128 * 4, 0.f), swr(128 * 4, 0.f), swr2(128 * 4, 0.f);
   for (int i = 0; i < ns; i++) for (int c = 0; c < 4; c++) { sps[i * 4 + c] = st[i].ps[c]; sct[i * 4 + c] = st[i].ctl[c]; swr[i * 4 + c] = st[i].wr[c]; swr2[i * 4 + c] = st[i].wr2[c]; }
+  glUniform1i(glGetUniformLocation(progHullBake, "uHPart"), -1);   // (the whole aircraft, its rigid parts posed in each state)
   glUniform1i(glGetUniformLocation(progHullBake, "uHStN"), ns);
   glUniform4fv(glGetUniformLocation(progHullBake, "uHStPS"), 128, sps.data());
   glUniform4fv(glGetUniformLocation(progHullBake, "uHStCtl"), 128, sct.data());

@@ -171,13 +171,9 @@ vec2 mapJetCockpit(vec3 p){
   // side stick (right) follows pitch and roll; throttle grip (left) slides with the throttle
   {
     vec3 sb = q - vec3(0.42, -0.375, -0.02);
-    float stick = sdRoundBox(sb, vec3(0.045, 0.02, 0.07), 0.015);
-    vec3 st = sb; st.yz = rot2(st.yz, -cPitch*0.25); st.xy = rot2(st.xy, cRoll*0.25);
-    stick = min(stick, sdCapsule(st, vec3(0.0), vec3(0.0, 0.11, -0.01), 0.016));
-    stick = min(stick, sdRoundBox(st - vec3(0.0, 0.15, -0.01), vec3(0.021, 0.042, 0.027), 0.015));
-    vec3 tq = q - vec3(-0.42, -0.34, -0.02 + 0.12*(0.5 - cThr));
-    stick = min(stick, sdRoundBox(tq, vec3(0.03, 0.04, 0.05), 0.02));
-    res = opU(res, vec2(stick, 47.0));
+    res = opU(res, vec2(sdRoundBox(sb, vec3(0.045, 0.02, 0.07), 0.015), 47.0));   // the stick's base
+    res = partAt(res, PT_JET_STICK, vec2(0.0), p);   // the stick and the throttle grip: rigid parts (plane_parts.glsl)
+    res = partAt(res, PT_JET_THR, vec2(0.0), p);
   }
   // LED strips: ceiling spine, under the display bezel, along both consoles, footwell
   float led = sdCapsule(q, vec3(0.0, 0.50, -0.55), vec3(0.0, 0.60, 0.65), 0.01);
@@ -392,6 +388,7 @@ vec3 ospreyCabinAlbedo(int id) {
 }
 const int kOspreyModel = 8;   // (aircraft.h kOsprey)
 vec2 mapPlaneBody(vec3 p){
+  if (gPartMode >= 0) return partField(gPartMode, p);   // (the mesh bake: one rigid part alone, in its own frame)
   if (int(gM[0].z + 0.5) == 5) return mapJet(p);
   if (int(gM[0].z + 0.5) == 6) return mapWraith(p);
   float L = gM[0].x; int gtype = int(gM[0].y + 0.5); int eng = int(gM[0].z + 0.5); float R = gM[0].w;
@@ -778,20 +775,12 @@ vec2 mapPlaneBody(vec3 p){
     // control yokes: pull moves toward the pilot, roll right turns the yoke clockwise - both yokes alike (each in the
     // pilot's own frame, not a mirror image: the copilot's turns the same way, as the linked controls do)
     {
-      float pull = cPitch*0.075;
-      vec3 yp = vec3(-(p.x - sign(p.x)*abs(E.x)), p.y - (E.y - 0.43), p.z - pz);
+      float pull = cPitch*0.075, ys = p.x < 0.0 ? -1.0 : 1.0;
+      vec3 yp = vec3(-(p.x - ys*abs(E.x)), p.y - (E.y - 0.43), p.z - pz);
       if (sdBox(yp - vec3(0.0, 0.0, 0.17), vec3(0.19, 0.19, 0.2)) < res.x) {
-      res = opU(res, vec2(sdCapsule(yp, vec3(0.0, 0.0, 0.02), vec3(0.0, 0.0, 0.2 + pull), 0.017), 60.0));
       res = opU(res, vec2(sdCylX(yp.zyx - vec3(0.05, 0.0, 0.0), 0.03, 0.012), 66.0));            // shaft collar
-      vec3 hp = yp - vec3(0.0, 0.0, 0.22 + pull);
-      hp.xy = rot2(hp.xy, cRoll*0.75);
-      float hub = sdRoundBox(hp, vec3(0.06, 0.03, 0.022), 0.015);
-      float horns = sdCapsule(vec3(abs(hp.x), hp.yz), vec3(0.05, 0.0, 0.0), vec3(0.118, 0.012, 0.0), 0.016);
-      float grips = sdCapsule(vec3(abs(hp.x), hp.yz), vec3(0.124, 0.0, 0.0), vec3(0.13, 0.095, 0.0), 0.02);
-      res = opU(res, vec2(smin(hub, horns, 0.02), 66.0));
-      res = opU(res, vec2(grips, 61.0));
-      res = opU(res, vec2(length(vec3(abs(hp.x) - 0.128, hp.y - 0.105, hp.z + 0.004)) - 0.009, 68.0));   // PTT / trim switches
-      res = opU(res, vec2(sdCylX(hp.zyx + vec3(0.024, 0.0, 0.0), 0.02, 0.003), 60.0));              // hub badge
+      res = partAt(res, PT_YOKE_SHAFT, vec2(ys, 0.0), p);   // the shaft and the wheel: rigid parts (plane_parts.glsl)
+      res = partAt(res, PT_YOKE_WHEEL, vec2(ys, 0.0), p);
       }
     }
     // rudder pedals with toe brakes on metal arms: right rudder pushes the right pedal forward
@@ -802,14 +791,8 @@ vec2 mapPlaneBody(vec3 p){
       float floorY = max(E.y - 1.06, sP.z - (sP.y - 0.035)*sqrt(1.0 - kx*kx) + 0.03);
       float pyc = max(E.y - 0.98, floorY + 0.09);
       if (sdBox(vec3(abs(p.x) - abs(E.x), p.y - pyc - 0.075, p.z - pz - 0.15), vec3(0.18, 0.19, 0.21)) < res.x) {
-      vec3 pp = vec3(p.x - sign(p.x)*abs(E.x), p.y - pyc, p.z - pz - 0.2);
-      float side = sign(pp.x);
-      pp.z += side*cYaw*0.06;
-      pp.x = abs(pp.x) - 0.1;
-      vec3 pr = pp; pr.yz = rot2(pr.yz, 0.5);
-      float psz = ck == 0 ? 0.8 : 1.0;   // smaller pedals in the cramped light-aircraft footwells
-      res = opU(res, vec2(sdRoundBox(pr, vec3(0.045, 0.08, 0.01)*psz, 0.008), 61.0));
-      res = opU(res, vec2(sdCapsule(pp, vec3(0.0, 0.05, -0.03), vec3(0.0, 0.2, -0.21), 0.011), 60.0));   // arm up to the footwell wall
+      float ps = p.x < 0.0 ? -1.0 : 1.0;
+      res = partAt(res, PT_PEDAL, vec2(ps, p.x - ps*abs(E.x) < 0.0 ? -1.0 : 1.0), p);   // (a rigid part: plane_parts.glsl)
       }
     }
     // footwell wall: closes the space between the floor and the panel's lower edge; the pedals hang from it
@@ -828,22 +811,12 @@ vec2 mapPlaneBody(vec3 p){
       res = opU(res, vec2(sdCylX(tw, 0.075, 0.012), 66.0));
       res = opU(res, vec2(sdRoundCylX((p - vec3(0.0, pc.y + ph + 0.012, pc.z + pd*0.4)).yxz, 0.035, 0.012, 0.004), 66.0));   // fuel selector
       if (ck == 0) {
-        float zt = pz + 0.05 + 0.1*(1.0 - cThr);
-        float thr = min(sdCapsule(p, vec3(0.0, E.y - 0.5, pz + 0.04), vec3(0.0, E.y - 0.5, zt), 0.006), length(p - vec3(0.0, E.y - 0.5, zt)) - 0.022);
-        res = opU(res, vec2(thr, 66.0));
+        res = partAt(res, PT_THR_KNOB, vec2(0.0), p);   // (a rigid part: plane_parts.glsl)
         float mix_ = min(sdCapsule(p, vec3(0.06, E.y - 0.55, pz + 0.04), vec3(0.06, E.y - 0.55, pz + 0.08), 0.005), length(p - vec3(0.06, E.y - 0.55, pz + 0.085)) - 0.018);
         res = opU(res, vec2(mix_, 68.0));
       } else {
-        float a = mix(-0.55, 0.6, cThr);
-        vec3 piv = vec3(0.0, pc.y + ph - 0.02, pc.z - pd*0.35);
-        vec3 tip = piv + vec3(0.0, 0.16*cos(a), -0.16*sin(a));
-        vec3 lp2 = vec3(abs(p.x) - 0.035, p.y, p.z);
-        res = opU(res, vec2(sdCapsule(lp2, piv, tip, 0.008), 60.0));
-        res = opU(res, vec2(sdRoundBox(lp2 - tip, vec3(0.03, 0.014, 0.02), 0.009), 66.0));
-        float fa = mix(0.3, -0.5, gPS.y);
-        vec3 fp = vec3(p.x - pw*0.6, p.y, p.z) - vec3(0.0, pc.y + ph - 0.02, pc.z + pd*0.1);
-        vec3 ft = vec3(0.0, 0.11*cos(fa), -0.11*sin(fa));
-        res = opU(res, vec2(min(sdCapsule(fp, vec3(0.0), ft, 0.006), sdRoundBox(fp - ft, vec3(0.022, 0.006, 0.012), 0.004)), 60.0));
+        res = partAt(res, PT_THR_LEVER, vec2(p.x < 0.0 ? -1.0 : 1.0, 0.0), p);   // the throttle levers and the flap lever: rigid parts (plane_parts.glsl)
+        res = partAt(res, PT_FLAP_LEVER, vec2(0.0), p);
       }
       }
     }

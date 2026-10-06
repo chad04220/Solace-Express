@@ -16,7 +16,10 @@ bool Renderer::compileRaster() {
   progEffects = linkProgramCached(kFullscreenVS, effectsFSAssembly(""), e);
   if (!progEffects) { error = "Effects shader: " + e; return false; }
   // the airframe shadow maps: the baked mesh (and the moving hull) from a light, plain depth
-  static const char* kShMapVS = "#version 330 core\nlayout(location = 0) in vec3 aPos; uniform mat4 uVP; uniform mat3 uRot; uniform vec3 uPos;\nvoid main(){ gl_Position = uVP*vec4(uRot*aPos + uPos, 1.0); }\n";
+  static const char* kShMapVS = "#version 330 core\nlayout(location = 0) in vec3 aPos; uniform mat4 uVP; uniform mat3 uRot; uniform vec3 uPos;\n"
+    "uniform sampler2D uPartPose; uniform int uPartInst;\n"   // (a cockpit's rigid part at its pose: plane_mesh_vs.glsl)
+    "void main(){ vec3 p = aPos; if (uPartInst >= 0) { int b = uPartInst*4; p = mat3(texelFetch(uPartPose, ivec2(b, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 1, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 2, 0), 0).xyz)*aPos + texelFetch(uPartPose, ivec2(b + 3, 0), 0).xyz; }\n"
+    "  gl_Position = uVP*vec4(uRot*p + uPos, 1.0); }\n";
   progShMap = linkProgramCached(kShMapVS, "#version 330 core\nvoid main(){}\n", e);
   if (!progShMap) { error = "Shadow map shader: " + e; return false; }
   progShMov = linkProgramCached(kShMapVS, "#version 330 core\nout float oM; void main(){ oM = 1.0; }\n", e);
@@ -31,6 +34,17 @@ void Renderer::rasterWorld(const FrameParams& fp) {
   // scenery: its shadow cascades and the G-buffer, which it clears (entity_render.cpp)
   envOn = false;   // (the terrain envelope is the ray tracer's)
   ckMaskPrev = false;   // (so is last frame's cabin mask: here the cabin itself is drawn into that depth and would fail it)
+  // the player's baked mesh opens the G-buffer's depth (drawEntities, right after the clear): see rasterObjects
+  earlyMesh = nullptr; partPoseN = 0; partPosePM = nullptr;
+  if (planeMeshWanted(fp) && fp.pano <= 0.f) {   // the cockpit's rigid parts: their poses for every draw this frame
+    auto pm = planeMeshes.find(hullKey(fp, fp.plane.PS[3] > 0.5f ? 1 : 0));
+    if (pm != planeMeshes.end() && pm->second.ok) computePartPoses(fp, pm->second);
+  }
+  static const bool noEarly = getenv("NOEARLY") != nullptr;   // (debug A/B: the mesh's depth only in the objects pass, as before)
+  if (!noEarly && planeMeshWanted(fp) && fp.pano <= 0.f) {
+    auto pm = planeMeshes.find(hullKey(fp, fp.plane.PS[3] > 0.5f ? 1 : 0));
+    if (pm != planeMeshes.end() && pm->second.ok && pm->second.idx) earlyMesh = &pm->second;
+  }
   drawEntities(fp);
   // the ground and the sea, depth-tested against the scenery
   glBindFramebuffer(GL_FRAMEBUFFER, fboGB);
@@ -73,7 +87,8 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   glViewport(0, 0, rw, rh);
   glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
   glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
-  if (meshOn) drawPlaneMesh(fp, pm->second, fp.plane.rot, fp.plane.pos, -1);
+  if (meshOn) drawPlaneMesh(fp, pm->second, fp.plane.rot, fp.plane.pos, -1, earlyMesh == &pm->second);   // (its depth is in since the frame began)
+  earlyMesh = nullptr;
   for (int k = 0; k < trafN; k++) {
     if (!trafMesh[k]) continue;
     const float* t = fp.traffic[k].t;
@@ -134,9 +149,10 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
   shOn = 0;
   static const bool off = getenv("SHMAPOFF") != nullptr;   // (debug / the analysis: the per-pixel march as before)
   if (off || !progShMap || !planeMeshWanted(fp)) return;
-  // the outside mesh, or in the cockpit the cabin mesh (the same airframe with its windows cut: an occluder all the same)
-  auto pm = planeMeshes.find(hullKey(fp, 0));
-  if (pm == planeMeshes.end() || !pm->second.ok || !pm->second.idx) pm = planeMeshes.find(hullKey(fp, fp.plane.PS[3] > 0.5f ? 1 : 0));
+  // (in the cockpit the cabin mesh first: its controls, seats and panel shade the cabin, and its windows let the sun in)
+  const int slot = fp.plane.PS[3] > 0.5f ? 1 : 0;
+  auto pm = planeMeshes.find(hullKey(fp, slot));
+  if (pm == planeMeshes.end() || !pm->second.ok || !pm->second.idx) pm = planeMeshes.find(hullKey(fp, 0));
   if (pm == planeMeshes.end() || !pm->second.ok || !pm->second.idx) return;
   const PlaneVisual& pv = fp.plane;
   const float R = std::max(pv.M[0], pv.M[9 * 4] * 2.f) * 0.55f + 1.5f;   // (planeBound in the shaders)
@@ -205,8 +221,10 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
     glUniformMatrix4fv(U(progShMap, "uVP"), 1, GL_FALSE, vp.m);
     glUniformMatrix3fv(U(progShMap, "uRot"), 1, GL_FALSE, pv.rot);
     glUniform3f(U(progShMap, "uPos"), c.x, c.y, c.z);
+    glUniform1i(U(progShMap, "uPartInst"), -1);
     glBindVertexArray(pm->second.vao);
     glDrawElements(GL_TRIANGLES, pm->second.idx, GL_UNSIGNED_INT, nullptr);
+    drawPlaneParts(pm->second, progShMap);   // (the cockpit's controls at their pose: no longer marched under a mask)
     // the moving hull: a mask, no depth
     if (mov) {
       glDisable(GL_DEPTH_TEST); glDepthMask(GL_FALSE); glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -214,6 +232,7 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
       glUniformMatrix4fv(U(progShMov, "uVP"), 1, GL_FALSE, vp.m);
       glUniformMatrix3fv(U(progShMov, "uRot"), 1, GL_FALSE, pv.rot);
       glUniform3f(U(progShMov, "uPos"), c.x, c.y, c.z);
+      glUniform1i(U(progShMov, "uPartInst"), -1);
       if (!vaoHull) glGenVertexArrays(1, &vaoHull);
       glBindVertexArray(vaoHull); glBindBuffer(GL_ARRAY_BUFFER, mov->vbo);
       glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, (void*)0);

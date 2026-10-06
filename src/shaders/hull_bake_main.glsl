@@ -3,9 +3,11 @@
 //! (aircraft space). uHMode 0: the least distance over every listed state of the gear, flaps, steering and controls
 //! (a hull built from it holds the airframe in any of them); 4: the greatest; 1: the distance in state uHState; 2: in
 //! that state the distance, the material id and the cabin's ambient occlusion; 3: in that state the surface normal.
+//! uHPart picks what is evaluated (plane_parts.glsl gPartMode).
 
 uniform sampler2D uHPts; uniform int uHStN; uniform vec4 uHStPS[128]; uniform vec4 uHStCtl[128]; uniform vec4 uHStWr[128]; uniform vec4 uHStWr2[128];
 uniform int uHMode; uniform int uHState;
+uniform int uHPart; uniform vec2 uHPartSide;   // -1 the whole aircraft, -2 without its rigid parts, >= 0 that part alone in its own frame (plane_parts.glsl); the side: its rest instance, for the ambient occlusion
 // one of the listed states: the gear / flaps / steering / cabin, the controls, and the XR-40's pods, vanes, fan, bay,
 // turrets and bomb (its surfaces follow the controls)
 void hullState(int s){
@@ -21,6 +23,7 @@ void hullState(int s){
 void main(){
   vec3 p = texelFetch(uHPts, ivec2(gl_FragCoord.xy), 0).xyz;
   loadMain(); pieceXf(-1);
+  gPartMode = uHPart;
   vec4 o = vec4(0.0);
   if (uHMode == 0 || uHMode == 4) {   // (4: the greatest distance over the states)
     float d = uHMode == 0 ? 1e9 : -1e9;
@@ -34,7 +37,16 @@ void main(){
   } else {
     hullState(uHState);
     if (uHMode == 1) o = vec4(mapPlane(p).x, 0.0, 0.0, 0.0);
-    else if (uHMode == 2) { vec2 r = mapPlane(p); vec3 n = planeNormal(p); o = vec4(r.x, r.y, gPS.w > 0.5 ? interiorAO(p, n) : 1.0, 0.0); }
+    else if (uHMode == 2) {
+      vec2 r = mapPlane(p); vec3 n = planeNormal(p); float ao = 1.0;
+      if (gPS.w > 0.5) {
+        if (uHPart >= 0) {   // a part's occlusion in the cabin about it, at its rest pose
+          Pose X = partPose(uHPart, uHPartSide); gPartMode = -1;
+          ao = interiorAO(X.R*p + X.T, X.R*n);
+        } else ao = interiorAO(p, n);
+      }
+      o = vec4(r.x, r.y, ao, 0.0);
+    }
     else o = vec4(planeNormal(p), 0.0);
   }
   oColor = o; oDepth = o.x; oCloudMask = 0.0;

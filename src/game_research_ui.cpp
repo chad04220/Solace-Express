@@ -219,15 +219,16 @@ void Game::drawResearch(const FrameParams& fp) {
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   const float kIntro = 4.9f;
   if (resAuthed && realTime - resOpened < kIntro - 0.6f) resOpened = realTime - (kIntro - 0.6f);   // returning: just the resume flash
-  if (resWarm && realTime - resOpened > kIntro - 0.9f) resOpened = realTime - (kIntro - 0.9f);   // (warming up: the sequence holds on its last stage until the craft and the airport are ready)
+  const float kGranted = 4.3f;   // the ACCESS GRANTED page, complete, before the shutters open
+  if (resWarm && realTime - resOpened > kGranted) resOpened = realTime - kGranted;   // (warming up: the sequence plays to the granted page and holds there until every craft and the site are ready)
   float T = realTime - resOpened;
   bool wr = resCraft == kWraith;
   const ResCraftInfo& RC = kResCraft[resCraftSlot(resCraft)];
   vec3 ACC = RC.colour;
   // ------------------------------------------------------------------ biometric access sequence
   if (T < kIntro) {
-    bool skip = in.mPressed[0] || in.pressed[K_ENTER] || in.pressed[' '] || in.pressed[K_ESC];
-    if (skip && T > 0.3f && !resWarm) { resOpened = realTime - kIntro; in.mPressed[0] = false; in.pressed[K_ENTER] = in.pressed[K_ESC] = false; resAuthed = true; return; }
+    // (no skip: the sequence is the terminal's warm-up, and it opens the terminal itself when the craft are ready)
+    in.mPressed[0] = false; in.pressed[K_ENTER] = in.pressed[K_ESC] = in.pressed[' '] = false;
     // stage cues
     static float lastT = 99.f;
     auto cue = [&](float at, int sfx, float v) { if (lastT < at && T >= at) g_audio.trigger(sfx, v); };
@@ -250,7 +251,7 @@ void Game::drawResearch(const FrameParams& fp) {
     g_ren.text(W - 40 * s, 50 * s, 13 * s, "CLEARANCE REQUIRED: OMEGA-BLACK", R_RED, A * (fmodf(T, 0.8f) < 0.55f ? 1.f : 0.4f), 2, false);
     if (resWarm) {   // what the terminal is doing behind the sequence
       const char* what = g_ren.entPending > 0 ? "STREAMING THE SITE" : "COMPILING AIRFRAME SHELLS";
-      g_ren.text(W * 0.5f, H - 46 * s, 12 * s, fmt("INITIALIZING  //  %s  //  %s %s", what, kAircraft[resCraft].name, fmodf(T, 0.6f) < 0.4f ? "..." : "   "), R_ICE, A * 0.8f, 1, false);
+      g_ren.text(W * 0.5f, H - 46 * s, 12 * s, fmt("INITIALIZING  //  %s  //  %s %s", what, kAircraft[resWarmCraft >= 0 ? resWarmCraft : resCraft].name, fmodf(T, 0.6f) < 0.4f ? "..." : "   "), R_ICE, A * 0.8f, 1, false);
     }
     float pw = std::min(360 * s, (W - 120 * s) / 3.f), ph = std::min(400 * s, H - 230 * s), py0 = 100 * s;
     float gap = (W - 3 * pw) / 4.f;
@@ -378,7 +379,6 @@ void Game::drawResearch(const FrameParams& fp) {
     }
     // shutters open into the terminal
     if (T > 4.35f) { float o = smoothstepf(4.35f, kIntro, T); g_ren.rect(0, 0, W, H * 0.5f * (1 - o), R_INK, 1); g_ren.rect(0, H - H * 0.5f * (1 - o), W, H * 0.5f * (1 - o), R_INK, 1); }
-    g_ren.text(W * 0.5f, H - 24 * s, 11 * s, "CLICK  /  ENTER  /  A   TO SKIP", R_DIM, 0.6f * A, 1, false);
     return;
   }
   resAuthed = true;
@@ -634,3 +634,7 @@ void Game::drawResearch(const FrameParams& fp) {
              R_DIM, 0.75f * e, 1, false);
   if (fmodf(realTime, 1.4f) < 1.0f) g_ren.text(W - 24 * s, H - 22 * s, 10.5f * s, "CLASSIFIED", R_RED, 0.85f * e, 2, false);
 }
+
+// the research craft in the terminal's order, for its warm-up (game.cpp): outside the file's unnamed namespace
+int resCraftCount() { return kNumResCraft; }
+int resCraftAt(int k) { return k >= 0 && k < kNumResCraft ? kResCraft[k].idx : -1; }

@@ -10,7 +10,7 @@
 // The ray tracer: the whole scene in one fragment program. The GPS map, the terrain-shadow bake, the cloud pass,
 // the hull bake and the display atlas are built from the same source with main() renamed and their own main added.
 inline std::string rtAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace + kTerrainTrace +
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts + kPlaneSDF + kPlaneTrace + kTerrainTrace +
          kMaterialCommon + kLightCommon + kClouds + kTerrainMaterial + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kPlaneMaterial + kWater + kRtShade + kAfShMap + kPlaneLight + kRtMain;
@@ -23,7 +23,7 @@ inline std::string rtAssemblyNoMain(const std::string& defines) {
 }
 // The aircraft distance fields alone (tests/aircraft_visual_test.cpp adds its own main)
 inline std::string sdfAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kWraithSDF + kWraithCockpitCommon + kWraithCockpitSDF;
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts + kPlaneSDF + kWraithSDF + kWraithCockpitCommon + kWraithCockpitSDF;
 }
 
 // ---- the raster renderer's programs (raster_renderer.cpp, terrain_mesh.cpp)
@@ -37,27 +37,38 @@ inline std::string waterFSAssembly(const std::string& defines) {
 }
 // the objects pass: the ray tracer's aircraft, traffic, debris and UFO code, writing the G-buffer (no terrain march, no clouds)
 inline std::string objectsFSAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace +
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kPlaneMaterial + kAfShMap + kPlaneLight + kGBuffer + kGBWrite + kPlaneGB + kObjectsFS;
 }
+// the rigid parts' poses (plane_parts.glsl partPose), once a frame into a small texture the part draws read
+inline std::string partPoseFSAssembly() {
+  return std::string("#version 330 core\n") + kCommonGLSL + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts +
+         "uniform int uPPK[16]; uniform vec2 uPPS[16];\n"
+         "void main(){\n"
+         "  int x = int(gl_FragCoord.x), i = x/4, c = x - i*4;\n"
+         "  loadMain();\n"
+         "  Pose X = partPose(uPPK[i], uPPS[i]);\n"
+         "  oColor = vec4(c == 0 ? X.R[0] : c == 1 ? X.R[1] : c == 2 ? X.R[2] : X.T, 1.0); oDepth = 0.0; oCloudMask = 0.0;\n"
+         "}\n";
+}
 // the aircraft mesh pass: the objects pass's materials and lighting classes on the baked static airframe
 inline std::string planeMeshVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kPlaneMeshVS; }
 inline std::string planeMeshFSAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace +
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kPlaneMaterial + kAfShMap + kPlaneLight + kGBuffer + kGBWrite + kPlaneGB + kPlaneMeshFS;
 }
 // the shadow proxy: the airframe fields' shadows on what is in the G-buffer, for the lighting pass
 inline std::string shadowProxyFSAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace +
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts + kPlaneSDF + kPlaneTrace +
          kWraithSDF + kWraithCockpitCommon + kWraithCockpitSDF + kMaterialCommon + kLightCommon + kGBuffer + kAfShMap + kShadowProxyFS;
 }
 // the effects pass: the ray tracer's effects over the lit frame (its cloak needs the airframe's field)
 inline std::string effectsFSAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneSDF + kPlaneTrace +
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kGBuffer + kEffectsFS;

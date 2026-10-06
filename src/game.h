@@ -151,7 +151,7 @@ private:
   float gameTime = 0, realTime = 0;
   bool hasSave = false;
   bool confirmRes = false;   // the main menu asked whether to enter the research terminal before the campaign is done
-  bool resWarm = false; int resWarmFrames = 0, resBakeSeen = 0;   // the research terminal warming up behind its boot screen (the craft's shells, the airport's scenery)
+  bool resWarm = false; int resWarmFrames = 0, resBakeSeen = 0; int resWarmCraft = -1; bool resWarmCk = false;   // (resWarmCraft / resWarmCk: the craft and view the warm-up frame shows, -1 the selected one)   // the research terminal warming up behind its boot screen (the craft's shells, the airport's scenery)
   bool headless = false;
 
   // flight session

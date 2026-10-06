@@ -5,10 +5,17 @@
 //! the fragment shader asks the field there.
 layout(location = 0) in vec3 aPos; layout(location = 1) in vec3 aNrm; layout(location = 2) in float aId; layout(location = 3) in float aAo;
 uniform mat4 uVP; uniform vec2 uJit; uniform float uLogC; uniform mat3 uRot; uniform vec3 uPos;
+uniform sampler2D uPartPose; uniform int uPartInst;   // a rigid part's instance (its pose: 4 texels from kPartPoseFS), or -1 the airframe
 out vec3 vW; out vec3 vN; flat out float vId; out float vIdS; out float vAo;
 void main(){
-  vW = uRot*aPos + uPos;
-  vN = aNrm; vId = aId; vIdS = aId; vAo = aAo;
+  vec3 pos = aPos, nrm = aNrm;
+  if (uPartInst >= 0) {
+    int b = uPartInst*4;
+    mat3 R = mat3(texelFetch(uPartPose, ivec2(b, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 1, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 2, 0), 0).xyz);
+    pos = R*aPos + texelFetch(uPartPose, ivec2(b + 3, 0), 0).xyz; nrm = R*aNrm;
+  }
+  vW = uRot*pos + uPos;
+  vN = nrm; vId = aId; vIdS = aId; vAo = aAo;
   gl_Position = uVP*vec4(vW, 1.0);
   gl_Position.xy -= 2.0*uJit*gl_Position.w;   // the TAA's sub-pixel jitter
   gl_Position.z = (log2(max(1e-6, 1.0 + gl_Position.w))*uLogC - 1.0)*gl_Position.w;   // logarithmic depth (the raster passes')

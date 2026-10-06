@@ -103,6 +103,11 @@ public:
   bool screenWindows = getenv("SCREENFEEDS") == nullptr;   // the research craft's displays are windows (no camera feeds but the bomb camera's; SCREENFEEDS=1 brings the cameras back)
   int bakeCount = 0;   // airframe meshes and hulls baked so far (the research terminal's warm-up waits for a frame that bakes nothing)
   std::function<void()> bakeYield;   // called between the bake's evaluation batches (the benchmark answers the window's messages during a long bake)
+  // a long bake shows a frame (bakeYield) about every 30 ms of real time: between its GPU bands and inside its long CPU
+  // loops, so a screen drawn from the callback (the research terminal's boot sequence) never freezes
+  std::chrono::steady_clock::time_point bakeYieldAt{};
+  bool bakeDue() { auto now = std::chrono::steady_clock::now(); if (now - bakeYieldAt < std::chrono::milliseconds(30)) return false; bakeYieldAt = now; return true; }
+  void bakeTick() { if (bakeYield && bakeDue()) bakeYield(); }
   int modeForce = -1;        // the tools' --raster / the harness' RASTER: overrides the setting whenever the game applies it
   bool rasterOk = false;     // the raster renderer's programs built
   bool ok = false;
@@ -237,13 +242,21 @@ private:
   struct HullMesh { uint64_t key = 0; GLuint vbo = 0; int verts = 0; bool ok = false; };
   // the aircraft mesh (aircraft_mesh.cpp): the static part of the airframe baked from its field, and the hull of the
   // part that moves (the march's start on the raster path, where the mesh leaves off)
-  struct PlaneMesh { uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0, idxFine = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; };
+  struct PartMesh { int type = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; };   // a cockpit's rigid moving part, in its own frame (plane_parts.glsl)
+  struct PlaneMesh { std::vector<PartMesh> parts; uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0, idxFine = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; };
   std::unordered_map<uint64_t, PlaneMesh> planeMeshes;
   GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0, progPlaneMeshFine = 0, progPlaneMeshScr = 0, texScrDepth = 0, fboScrDepth = 0; int scrDepthW = 0, scrDepthH = 0;   // (progPlaneMeshScr / texScrDepth: the research craft's screens' depth, the cabin mesh clipped at and behind them: the screens are holes to the world)   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
   bool compilePlaneMesh();
   bool planeMeshWanted(const FrameParams& fp) const;
   void bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key);
-  void drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const float* rot, const vec3& pos, int trafK);
+  void drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const float* rot, const vec3& pos, int trafK, bool depthDone = false);
+  void drawPlaneMeshDepth(const FrameParams& fp, const PlaneMesh& pm, const float* rot, const vec3& pos, int trafK);
+  // the rigid parts' poses this frame (computePartPoses: kPartPoseFS into texPartPose, 4 texels an instance), read
+  // by every part draw's vertex shader
+  GLuint progPartPose = 0, texPartPose = 0, fboPartPose = 0; int partPoseN = 0; const PlaneMesh* partPosePM = nullptr; int partPoseType[16] = {}; float partPoseSide[32] = {};
+  void computePartPoses(const FrameParams& fp, const PlaneMesh& pm);
+  void drawPlaneParts(const PlaneMesh& pm, GLuint prog);   // (the program bound, its uniforms set: each part instance at its pose)
+  const PlaneMesh* earlyMesh = nullptr;   // the player's mesh whose depth opens this frame's G-buffer (rasterWorld; drawEntities draws it)
   uint64_t trafficModelKey(const float* t) const;   // hullKey(slot 0) of a traffic aircraft's model
   std::unordered_map<uint64_t, HullMesh> hulls;   // every airframe baked so far, outside and cockpit (keyed by hullKey)
   GLuint progHull = 0, progHullBake = 0, vaoHull = 0, texHPts = 0, texHOut = 0, fboHOut = 0, fboHull = 0, texHullDepth = 0;

@@ -425,6 +425,15 @@ void Renderer::drawEntities(const FrameParams& fp) {
     glBindVertexArray(vaoEnt); glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
   }
   ckMaskPrev = ckView;
+  // the raster path: the player's aircraft is the nearest thing in the frame (in the cockpit, half the screen), so its
+  // baked mesh's depth goes in before anything else and everything behind the cabin walls or the airframe fails the
+  // depth test before it is shaded (the scenery here, the terrain and the sea after; the mesh is shaded later, in the
+  // objects pass, on exactly this depth)
+  if (earlyMesh) {
+    glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE); glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
+    drawPlaneMeshDepth(fp, *earlyMesh, fp.plane.rot, fp.plane.pos, -1);
+    glBindVertexArray(vaoEnt); glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
+  }
   if (!draws[0].empty()) {
     // near detail levels first, and buildings and rocks before trees: the big near occluders fill the depth buffer
     // early, so less of what lies behind them gets shaded

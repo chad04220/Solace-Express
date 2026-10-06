@@ -77,18 +77,9 @@ vec2 mapWraithCockpit(vec3 p){
   // side stick (right) follows pitch and roll; throttle (left) slides with the throttle
   {
     vec3 sb = q - vec3(0.5, -0.41, -0.06);
-    float st0 = sdRoundBox(sb, vec3(0.05, 0.02, 0.08), 0.004);
-    vec3 st = sb; st.yz = rot2(st.yz, -cPitch*0.25); st.xy = rot2(st.xy, cRoll*0.25);
-    float stick = min(st0, sdCapsule(st, vec3(0.0), vec3(0.0, 0.09, -0.01), 0.014));
-    vec3 gq = st - vec3(0.0, 0.14, -0.015);
-    float grip = max(sdBox(gq, vec3(0.022, 0.05, 0.03)), (abs(gq.x) + abs(gq.z))*0.70711 - 0.03);   // faceted grip
-    grip = min(grip, sdBox(gq - vec3(0.0, 0.055, -0.01), vec3(0.018, 0.012, 0.022)));
-    res = opU(res, vec2(min(stick, grip), 70.0));
-    res = opU(res, vec2(sdCapsule(gq - vec3(0.0, 0.066, -0.016), vec3(-0.008, 0.0, 0.0), vec3(0.008, 0.0, 0.0), 0.006), 67.0));   // trigger lights
-    vec3 tq = q - vec3(-0.5, -0.38, -0.08 + 0.13*(0.5 - cThr));
-    float thr = max(sdBox(tq, vec3(0.032, 0.045, 0.06)), (abs(tq.y) + abs(tq.z))*0.70711 - 0.07);
-    res = opU(res, vec2(thr, 70.0));
-    res = opU(res, vec2(sdBox(tq - vec3(0.0, 0.046, -0.02), vec3(0.02, 0.002, 0.03)), 67.0));
+    res = opU(res, vec2(sdRoundBox(sb, vec3(0.05, 0.02, 0.08), 0.004), 70.0));   // the stick's base
+    res = partAt(res, PT_WR_STICK, vec2(0.0), p);   // the stick and the throttle: rigid parts (plane_parts.glsl)
+    res = partAt(res, PT_WR_THR, vec2(0.0), p);
     res = opU(res, vec2(sdBox(q - vec3(-0.5, -0.425, -0.08), vec3(0.008, 0.004, 0.11)), 75.0));   // throttle slot
   }
   // fighter seat: angular shell, bolsters, a headrest with glowing slits; titanium rails down to the floor
@@ -109,10 +100,7 @@ vec2 mapWraithCockpit(vec3 p){
   }
   // rudder pedals over the glass floor
   {
-    vec3 pq = vec3(aq.x - 0.16, q.y + 0.63, q.z + 0.78 - sx*gCtl.z*0.04);
-    float ped = max(sdBox(pq, vec3(0.05, 0.075, 0.012)), (abs(pq.x) + abs(pq.y))*0.70711 - 0.08);
-    ped = min(ped, sdCapsule(pq, vec3(0.0, -0.07, 0.02), vec3(0.0, -0.12, 0.1), 0.012));
-    res = opU(res, vec2(ped, 71.0));
+    res = partAt(res, PT_WR_PEDAL, vec2(sx, 0.0), p);   // (a rigid part: plane_parts.glsl)
   }
   // overhead switch rail behind the overhead pane: faceted toggles and status lights
   {

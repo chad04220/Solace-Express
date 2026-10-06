@@ -163,6 +163,10 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
   X(void, glUniformMatrix3fv, (GLint, GLsizei, GLboolean, const GLfloat*)) \
   X(void, glUniformMatrix4fv, (GLint, GLsizei, GLboolean, const GLfloat*)) \
   X(void, glGenVertexArrays, (GLsizei, GLuint*)) \
+  X(void, glDeleteVertexArrays, (GLsizei, const GLuint*)) \
+  X(void, glDeleteBuffers, (GLsizei, const GLuint*)) \
+  X(void, glUniform1iv, (GLint, GLsizei, const GLint*)) \
+  X(void, glUniform2fv, (GLint, GLsizei, const GLfloat*)) \
   X(void, glBindVertexArray, (GLuint)) \
   X(void, glGenBuffers, (GLsizei, GLuint*)) \
   X(void, glBindBuffer, (GLenum, GLuint)) \
