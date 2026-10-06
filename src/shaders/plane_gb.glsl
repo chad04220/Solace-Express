@@ -35,11 +35,16 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
     return;
   }
   // the exterior: the sun's shadow terms the lighting pass can't compute - the terrain's is one value for the whole
-  // intact airframe (from the CPU), the airframe's own is a march through the field
+  // intact airframe (from the CPU); the airframe's own from its sun shadow map (the baked mesh and its rigid parts),
+  // a march through the field only where the moving parts' mask says one may lie between, or with no map this frame
   float tsh = 1.0, self = 1.0;
   if (sunVis > 0.0) {
     tsh = (trafHit || uWreck > 0) ? terrainShadow(p, uSunDir, t) : uPlaneTSh;
-    if (tsh > 0.0 && !trafHit) self = planeShadow(p + n*0.02, uSunDir);
+    if (tsh > 0.0 && !trafHit) {
+      float ndl = dot(n, uSunDir);
+      float ms = (uAfShOn & 1) != 0 && uWreck == 0 ? (ndl < 0.05 ? 0.0 : shMapLookupB(0, p, n, 1.0 + 2.0*(1.0 - ndl))) : -1.0;
+      self = ms >= 0.0 ? ms : planeShadow(p + n*0.02, uSunDir);
+    }
   }
   gbWrite(t, n, trafHit ? GB_TRAFFIC : uWreck > 0 ? GB_WRECK : GB_PLANE, m, 1.0);
   oG3 = vec4(1.0, self, tsh, float(flags + (mid <= 5 ? GBF_GLINT : 0) + (gDispPx ? GBF_DISPLAY : 0))/255.0);
