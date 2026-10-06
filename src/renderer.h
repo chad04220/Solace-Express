@@ -335,6 +335,9 @@ private:
   // XR-40's). uShOn: bit 0 the sun, bits 1-3 the light slots. Layers 4 + k: traffic aircraft k's sun shadow from its
   // mesh (trafShOn bit k), so the proxy marches only the traffic that still has moving parts
   GLuint progShMap = 0, progShMov = 0, texShMap = 0, texShMov = 0, fboShMap = 0; int shOn = 0; mat4 shMapVP[4];
+  bool shMovOn = false;   // the player's maps carry a moving-hull mask this frame (the proxy marches the field there)
+  GLuint progShProxyMaps = 0;   // the shadow proxy without any field: every shadow this frame from a map (proxyNeedsMarch)
+  bool proxyNeedsMarch(const FrameParams& fp) const;
   int trafShOn = 0; mat4 trafShVP[kMaxTrafficDrawn];
   static constexpr int kShMapRes = 1024, kShLayers = 4 + kMaxTrafficDrawn;
   void ensureShadowMaps();

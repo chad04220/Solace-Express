@@ -1,1 +1,3 @@
 ## What's new
+- Fixes a slowdown in v3.29.0: the aircraft shadow pass cost about 2 ms more per frame on NVIDIA in daylight scenes (0.3 → 2.3 ms in the menu, the air and the hub). It now has a third, small build with no aircraft shape code in it. That build runs whenever every aircraft shadow in the frame comes from a shadow map, which is most of the time in daylight. On the test renderer the shadow pass at an airport with traffic dropped from 42 to 12 ms, with the picture unchanged.
+- Traffic aircraft up to 6 km away (was 3 km) now get shadow maps, so a high aircraft's shadow on nearby ground no longer needs the slow path.

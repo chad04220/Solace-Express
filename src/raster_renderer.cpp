@@ -19,6 +19,8 @@ bool Renderer::compileRaster() {
     if (!progEffectsV[v]) { error = "Effects shader: " + e; return false; }
   }
   progObjects = progObjectsV[0]; progShProxy = progShProxyV[0]; progEffects = progEffectsV[0];
+  progShProxyMaps = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly("#define AF_LIGHT\n#define PROXY_MAPS_ONLY\n"), e);
+  if (!progShProxyMaps) { error = "Shadow proxy (maps) shader: " + e; return false; }
   // the airframe shadow maps: the baked mesh (and the moving hull) from a light, plain depth
   static const char* kShMapVS = "#version 330 core\nlayout(location = 0) in vec3 aPos; uniform mat4 uVP; uniform mat3 uRot; uniform vec3 uPos;\n"
     "uniform sampler2D uPartPose; uniform int uPartInst;\n"   // (a cockpit's rigid part at its pose: plane_mesh_vs.glsl)
@@ -207,7 +209,7 @@ void Renderer::rasterTrafficShadowMaps(const FrameParams& fp) {
   for (int k = 0; k < n; k++) {
     const float* t = fp.traffic[k].t;
     const vec3 c(t[24 * 4], t[24 * 4 + 1], t[24 * 4 + 2]); const float R = t[24 * 4 + 3];
-    if (length(c - fp.camPos) > 3000.f + R) continue;   // (the proxy shades the ground out to 3 km)
+    if (length(c - fp.camPos) > 6000.f + R) continue;   // (the proxy shades the ground out to 3 km; one 3 km up, low sun, casts that far)
     auto pm = planeMeshes.find(trafficModelKey(t));
     if (pm == planeMeshes.end() || !pm->second.ok || !pm->second.idx) continue;
     auto mv = hulls.find(pm->second.movKey);
@@ -245,7 +247,7 @@ void Renderer::rasterTrafficShadowMaps(const FrameParams& fp) {
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 void Renderer::rasterShadowMaps(const FrameParams& fp) {
-  shOn = 0;
+  shOn = 0; shMovOn = false;
   static const bool off = getenv("SHMAPOFF") != nullptr;   // (debug / the analysis: the per-pixel march as before)
   if (off || !progShMap || !planeMeshWanted(fp)) return;
   // (in the cockpit the cabin mesh first: its controls, seats and panel shade the cabin, and its windows let the sun in)
@@ -327,10 +329,44 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
       glDrawArrays(GL_TRIANGLES, 0, mov->verts);
     }
     shOn |= 1 << layer;
+    if (mov) shMovOn = true;
   }
   glBindVertexArray(0);
   glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); glDepthMask(GL_TRUE); glDisable(GL_DEPTH_TEST);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+// Whether any shadow the proxy draws this frame has to be marched through a field: the player's (no map for the sun
+// or for a shadowed light in a proxy slot - gbuffer.glsl gbShadowSlot - or a moving-hull mask in the maps) or a
+// traffic aircraft's near enough to shadow the ground the proxy shades, without a map. Else the proxy's small build
+// runs, with no field in it: on the owner's GPU the march's code alone made every pixel of the pass slower.
+bool Renderer::proxyNeedsMarch(const FrameParams& fp) const {
+  static const bool all = getenv("PROXYMARCH") != nullptr;   // (debug: always the full proxy)
+  if (all || !progShProxyMaps) return true;
+  const bool sun = fp.sunDir.y > -0.05f;
+  if (fp.plane.on) {
+    if (shMovOn || (sun && !(shOn & 1))) return true;
+    for (int i = 0; i < fp.plN; i++) {
+      if (fp.pl[i].shadow <= 0.f) continue;
+      const float li = std::max(fp.pl[i].col.x, std::max(fp.pl[i].col.y, fp.pl[i].col.z)); int slot = 0;
+      for (int k = 0; k < fp.plN; k++) {
+        if (k == i || fp.pl[k].shadow <= 0.f) continue;
+        const float lk = std::max(fp.pl[k].col.x, std::max(fp.pl[k].col.y, fp.pl[k].col.z));
+        if (lk > li || (lk == li && k < i)) slot++;
+      }
+      // (an airframe's own omni lamp - its nav lights - has no map; by day its light on the ground is lost under the
+      // sun's, so its shadow there is too)
+      const bool navByDay = fp.pl[i].cosCut <= 0.05f && length(fp.pl[i].pos - fp.plane.pos) < 40.f && fp.sunDir.y > 0.08f;
+      if (slot < 3 && !(shOn & (2 << slot)) && !navByDay) return true;
+    }
+  }
+  if (sun)
+    for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); k++) {
+      const float* t = fp.traffic[k].t;
+      const vec3 c(t[24 * 4], t[24 * 4 + 1], t[24 * 4 + 2]);
+      if (!(trafShOn & (1 << k)) && length(c - fp.camPos) <= 6000.f + t[24 * 4 + 3]) return true;
+    }
+  return false;
 }
 
 // The airframes' shadows on the G-buffer's surfaces (the sun on the ground, the landing lights' beams): texGB[4]
@@ -339,7 +375,7 @@ void Renderer::rasterShadowProxy(const FrameParams& fp) {
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
   glViewport(0, 0, rw, rh);
   glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
-  setRT(progShProxy, fp);   // (the airframe shadow maps: setRT)
+  setRT(proxyNeedsMarch(fp) ? progShProxy : progShProxyMaps, fp);   // (the airframe shadow maps: setRT)
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);
