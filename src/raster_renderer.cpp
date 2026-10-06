@@ -30,6 +30,7 @@ bool Renderer::compileRaster() {
 void Renderer::rasterWorld(const FrameParams& fp) {
   // scenery: its shadow cascades and the G-buffer, which it clears (entity_render.cpp)
   envOn = false;   // (the terrain envelope is the ray tracer's)
+  ckMaskPrev = false;   // (so is last frame's cabin mask: here the cabin itself is drawn into that depth and would fail it)
   drawEntities(fp);
   // the ground and the sea, depth-tested against the scenery
   glBindFramebuffer(GL_FRAMEBUFFER, fboGB);
@@ -166,6 +167,7 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
     glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texShMap, 0, layer);
     glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texShMov, 0, layer);
     GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
+    glDepthMask(GL_TRUE); glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);   // (the previous layer's hull pass left depth writes off: a clear obeys the masks)
     glClearDepth(1.0); float zero[4] = {0, 0, 0, 0}; glClearBufferfv(GL_COLOR, 0, zero); glClear(GL_DEPTH_BUFFER_BIT);
     // the static airframe: depth only
     glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE); glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);

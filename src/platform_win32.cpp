@@ -101,7 +101,7 @@ static LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         if (!(lp & (1 << 30))) { toggleFullscreen(); setupPacing(h); if (g_game) g_game->set.fullscreen = g_fullscreen; }
         return 0;
       }
-      if (in && wp < 256) { if (!(lp & (1 << 30))) in->pressed[wp] = true; in->down[wp] = true; }
+      if (in && wp < 256 && !(lp & (1 << 30))) { in->pressed[wp] = true; in->down[wp] = true; }   // (autorepeat changes nothing: a key set aside on a context change stays aside until released)
       if (wp == VK_F10 || wp == VK_MENU) return 0;
       break;
     case WM_KEYUP: case WM_SYSKEYUP:

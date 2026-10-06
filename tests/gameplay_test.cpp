@@ -648,8 +648,13 @@ struct GameTest {
       g.startFlight(fr, 0, Career::SRC_LESSON); g.isolatedFlight = true; g.formT = 180.f; g.formLost = 12.5f; g.result.landed = true; g.touchedDown = true; g.endFlight(true, "", OUT_SUCCESS);
       g.startFlight(fr, 0, Career::SRC_LESSON); g.isolatedFlight = true; g.formT = 90.f; g.formLost = 1.f; g.result.landed = true; g.touchedDown = true; g.endFlight(true, "", OUT_SUCCESS);
       bool form = fr.from == g.career.location && g.trialBest["T_FORM"].size() == 1 && fabsf(g.trialBest["T_FORM"][0] - 12.5f) < 0.01f && g.hubMsg.find("DNF") != std::string::npos;
-      ok = ok && scored && sorted && roll && gates && form;
-      printf("Trials: courses %d, spot scored %d, board sorted %d, STOL roll %d, gate time %d, formation %d (%s): %s\n", ok || true, scored, sorted, roll, gates, form, g.hubMsg.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
+      // QA S6: the settings file is read twice at startup (once early for fullscreen): the trial boards stay the file's
+      std::string sd = g.saveDir; g.saveDir = "."; g.settingsWritten.clear(); g.saveSettings();
+      size_t nSpot = g.trialBest["T_SPOT"].size(); g.loadSettings(); g.loadSettings();
+      bool twice = g.trialBest["T_SPOT"].size() == nSpot && g.trialBest["T_FORM"].size() == 1 && nSpot == 2;
+      remove("./settings.cfg"); g.saveDir = sd; g.settingsWritten.clear();
+      ok = ok && scored && sorted && roll && gates && form && twice;
+      printf("Trials: courses %d, spot scored %d, board sorted %d, STOL roll %d, gate time %d, formation %d, settings read twice %d (%s): %s\n", ok || true, scored, sorted, roll, gates, form, twice, g.hubMsg.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
       g.trialBest.clear();
     }
     // ---- the airline (C11): with the ATP, a hired pilot flies an owned aircraft on a route; each of your settlements is a
@@ -677,10 +682,36 @@ struct GameTest {
       // incidents: a rating-1 pilot in a worn aircraft, many days
       Career w = k; w.fleet[0].condition = 0.4f; Career::Pilot weak; weak.name = "T. Test"; weak.rating = 1; weak.wage = 120; w.hirePilot(weak, &m); int wp = (int)w.airline.pilots.size() - 1;
       bool reassigned = w.assignRoute(0, w.fleet[0].location == pvi ? cap : pvi, wp, &m);
-      for (int i = 0; i < 60; i++) { std::vector<PayoutLine> LL; w.flights++; w.boardSeed++; w.airlineTick(LL); }
-      bool incidents = reassigned && w.airline.incidents > 0 && w.airline.routes[0].flights == 60;
+      bool once = true;   // QA S5: a repair is its own line; the route line is the fares less fuel and wages (the repair not taken twice)
+      for (int i = 0; i < 60; i++) {
+        std::vector<PayoutLine> LL; int e0 = w.airline.routes[0].earned; w.flights++; w.boardSeed++; w.airlineTick(LL);
+        for (auto& l : LL) if (l.label.find("route flight") != std::string::npos && l.amount != w.airline.routes[0].earned - e0) once = false;
+      }
+      bool incidents = reassigned && w.airline.incidents > 0 && w.airline.routes[0].flights == 60 && once;
       bool ok = noLic && hired && assigned && blocked && ticked && recalled && incidents;
-      printf("Airline: licence gate %d, hired %d, assigned %d, aircraft locked %d, tick %d (net %d), recall %d, incidents %d over 60 days: %s\n", noLic, hired, assigned, blocked, ticked, airNet, recalled, w.airline.incidents, ok ? "ok" : "FAIL"); fails += !ok;
+      printf("Airline: licence gate %d, hired %d, assigned %d, aircraft locked %d, tick %d (net %d), recall %d, incidents %d over 60 days (repair charged once %d): %s\n", noLic, hired, assigned, blocked, ticked, airNet, recalled, w.airline.incidents, once, ok ? "ok" : "FAIL"); fails += !ok;
+    }
+    // ---- QA S7: the VIP's comfort (and the patient) ride simulated time: a minute of turbulence at 4x costs what it
+    // costs at 1x (the meters ran on real time, a quarter of the damage)
+    {
+      float dmg[2] = {0, 0};
+      for (int k = 0; k < 2; k++) {
+        float accel = k == 0 ? 1.f : 4.f;
+        Contract v = g_story[4]; v.story = false; v.type = CT_VIP; v.pax = 1; v.payout = 2000; v.wx.turbulence = 0.5f; v.wx.windSpeed = 4; v.wx.gust = 0;
+        g.career.license = LIC_CPL; g.career.location = v.from;
+        g.startFlight(v, 1, Career::SRC_RENT); g.isolatedFlight = false;
+        const Airport& d = g_world.airports[v.to];
+        vec3 pos = d.threshold(false) - d.dir() * 30000.f; pos.y = d.elev + 1500.f;
+        g.plane.reset(&kAircraft[1], pos, d.heading, 60, 150, true, kAircraft[1].vref + 15);
+        g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 3; g.atcF.airborne = true;
+        g.plane.apOn = true; g.plane.apMode = Plane::AP_HOLD; g.plane.apHeading = d.heading; g.plane.apAlt = pos.y; g.plane.apSpeed = kAircraft[1].vref + 15;
+        g.timeAccel = accel;
+        for (float st = 0; st < 60.f && g.screen == SCR_FLIGHT; st += dt * accel) g.update(dt);
+        dmg[k] = 1.f - g.result.comfort;
+        g.endFlight(false, "test", OUT_CRASHED); g.screen = SCR_HUB; g.timeAccel = 1;
+      }
+      bool ok = dmg[0] > 0.01f && fabsf(dmg[1] / std::max(dmg[0], 1e-6f) - 1.f) < 0.25f;
+      printf("Job meters at 1x / 4x: comfort lost %.3f / %.3f over a simulated minute: %s\n", dmg[0], dmg[1], ok ? "ok" : "FAIL"); fails += !ok;
     }
     // ---- a diversion leaves you (and your aircraft) where you landed
     {

@@ -899,7 +899,7 @@ void Career::airlineTick(std::vector<PayoutLine>& L) {
       p.condition = clampf(p.condition - 0.04f, 0.05f, 1.f);
     }
     int flightNet = gross - fuel - wage;
-    net += flightNet - repair; flown++;
+    net += flightNet; flown++;   // (the repair is its own line above: not taken from the route total as well)
     rt.flights++; rt.earned += flightNet;
     std::swap(rt.from, rt.to); p.location = rt.from;   // it flew the leg and waits at the other end
     p.fuel = s.maxFuel * 0.6f;
@@ -1003,7 +1003,7 @@ bool Career::sell(int fi, std::string* msg) {
 
 // Saves go to a sibling temp file first; only a fully written, flushed and closed file replaces the career, and the
 // previous save is kept as <path>.bak. A failed write leaves the old save untouched and reports false.
-static bool replaceFile(const std::string& from, const std::string& to) {
+bool replaceFile(const std::string& from, const std::string& to) {
 #ifdef _WIN32
   return MoveFileExA(from.c_str(), to.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
 #else
@@ -1137,7 +1137,7 @@ bool Career::load(const std::string& path) {
       ok = c.job && fscanf(f, "%63s %d %d %d %d %d %d %f %d %d %d %d %d %d %d %d %d", id, &k.type, &k.from, &k.to, &k.cargoKg, &k.pax, &k.payout, &k.timeLimitMin,
                            &k.minLicense, &own, &fr, &sa, &k.repBonusPct, &k.chapter, &k.grantLicense, &k.forceAircraft, &cy) == 17;
       k.courtesy = cy != 0;
-      ok = ok && k.type >= 0 && k.type <= CT_FERRY && k.from >= 0 && k.from < nApt && k.to >= 0 && k.to < nApt && k.cargoKg >= 0 && k.pax >= 0 && std::isfinite(k.timeLimitMin)
+      ok = ok && k.type >= 0 && k.type < CT_COUNT && k.from >= 0 && k.from < nApt && k.to >= 0 && k.to < nApt && k.cargoKg >= 0 && k.pax >= 0 && std::isfinite(k.timeLimitMin)
            && k.minLicense >= LIC_STUDENT && k.minLicense <= LIC_ATP;
       if (ok) { k.id = id; k.ownedOnly = own != 0; k.fragile = fr != 0; k.startAirborne = sa != 0; k.story = false; c.job->c = k; }
     }

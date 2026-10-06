@@ -174,6 +174,7 @@ static std::string joinPath(const std::string& d, const char* f) { return d.empt
 void Game::loadSettings() {
   FILE* f = fopen(joinPath(saveDir, "settings.cfg").c_str(), "r");
   if (!f) return;
+  resDone.clear(); trialBest.clear();   // (read twice at startup: the lists are the file's, not appended to)
   char k[64]; float v;
   while (fscanf(f, "%63s %f", k, &v) == 2) {
     if (!std::isfinite(v) || fabsf(v) > 1e6f) continue;   // a damaged value keeps the default
@@ -226,7 +227,8 @@ void Game::saveSettings() {
   if (!f) return;
   bool ok = fwrite(t.data(), 1, t.size(), f) == t.size();
   ok = fclose(f) == 0 && ok;
-  if (ok) { remove(path.c_str()); ok = rename(tmp.c_str(), path.c_str()) == 0; }
+  if (ok) ok = replaceFile(tmp, path);   // (in one step: a crash between a remove and a rename left no settings at all)
+  if (!ok) remove(tmp.c_str());
   if (ok) settingsWritten = t;
 }
 
@@ -1182,7 +1184,7 @@ void Game::updateFlight(float dt) {
   if (!plane.onGround) result.maxBank = std::max(result.maxBank, fabsf(plane.bankDeg()));
   // rolling dust / spray
   float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
-  updateJobMeters(dt, gs);
+  updateJobMeters(simDt, gs);   // (simulated time: at 4x the patient rides four seconds of turbulence a frame)
   if (plane.onGround && plane.groundRough > 0.3f && gs > 4.f) {
     dustAccum += dt * gs * 0.6f;
     int rw = g_world.onRunway(plane.pos.x, plane.pos.z, 3);

@@ -5,9 +5,9 @@
 namespace {
 // a patch of open sea away from the islands for the test sorties (flat, no terrain to hit)
 vec3 seaPoint() {
-  static vec3 p; static bool found = false;
-  if (!found) {
-    found = true; p = vec3(WORLD_HALF * 0.75f, 0, WORLD_HALF * 0.75f);
+  // (found once, whole, before any caller reads it: the aircraft learn their envelopes on several threads at once)
+  static const vec3 p = [] {
+    vec3 p(WORLD_HALF * 0.75f, 0, WORLD_HALF * 0.75f);
     for (int i = 0; i < 400; i++) {
       float a = i * 2.39996f, r = WORLD_HALF * (0.35f + 0.4f * (i % 7) / 6.f);
       vec3 q(cosf(a) * r, 0, sinf(a) * r);
@@ -15,7 +15,8 @@ vec3 seaPoint() {
       for (int k = -2; k <= 2 && sea; k++) for (int j = -2; j <= 2 && sea; j++) sea = g_world.height(q.x + k * 1500.f, q.z + j * 1500.f) < -2.f;
       if (sea) { p = q; break; }
     }
-  }
+    return p;
+  }();
   return p;
 }
 }

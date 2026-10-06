@@ -67,9 +67,10 @@ if exist "%APPDATA%\SolaceExpress\startup.log" del /q "%APPDATA%\SolaceExpress\s
 powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--raster --bench menu --size 1920x1080 --out %OUT%\compile_run.txt' -Wait }; $line = ('first run with an empty shader cache: {0:N1} s (compiles the shaders, then times the menu scene once)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::WriteAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
 if exist "%APPDATA%\SolaceExpress\startup.log" copy /y "%APPDATA%\SolaceExpress\startup.log" "%OUT%\startup_firstrun.log" >nul
 powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--raster --bench menu --size 1920x1080 --out %OUT%\compile_run2.txt' -Wait }; $line = ('second run with the cache warm: {0:N1} s' -f $t.TotalSeconds); Write-Host $line; [IO.File]::AppendAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
-if defined CACHE (
-  if exist "%CACHE%" rmdir /s /q "%CACHE%.aside"
-  if not exist "%CACHE%" move /y "%CACHE%.aside" "%CACHE%" >nul
+if defined CACHE if exist "%CACHE%.aside" (
+  rem the two runs rebuilt a fresh cache: the original (with its mesh bakes) comes back in its place
+  if exist "%CACHE%" rmdir /s /q "%CACHE%"
+  move /y "%CACHE%.aside" "%CACHE%" >nul
 )
 
 echo [3/7] Benchmark on the rasterizer, 1920x1080 ...

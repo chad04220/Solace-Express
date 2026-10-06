@@ -467,7 +467,7 @@ void AudioEngine::render(float* out, int frames) {
         roll += sinf(I.motorPh * 2 * PI * 45.f / sr) * I.bumpEnv * 0.5f;
         I.bumpEnv *= 0.9985f;
       }
-      I.motorPh += 1.f;
+      I.motorPh += 1.f; if (I.motorPh >= sr) I.motorPh -= sr;   // (45 Hz: whole cycles per second of samples, so the wrap is seamless; a float counting on loses its steps after six minutes)
       float body = (wind + gearR + roll) * 0.9f;
       el += body; er += body;
       // muffle (headset ANR) on the engine/airframe bus
@@ -506,7 +506,7 @@ void AudioEngine::render(float* out, int frames) {
     L += sfx * P.sfxVol; R += sfx * P.sfxVol;
     if (I.voice) {   // the radio voice, centred
       if (I.voicePos < I.voice->size()) { float v = (*I.voice)[I.voicePos++] * P.voiceVol; L += v; R += v; }
-      else { I.voice.reset(); voiceActive.store(false, std::memory_order_relaxed); }
+      else { I.voice.reset(); acquire(); if (!voiceNew) voiceActive.store(false, std::memory_order_relaxed); release(); }   // (a line queued meanwhile keeps the engine busy)
     }
     L = tanhf(L * P.master * 1.2f); R = tanhf(R * P.master * 1.2f);
     out[f * 2] = L; out[f * 2 + 1] = R;

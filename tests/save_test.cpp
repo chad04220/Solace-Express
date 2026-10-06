@@ -86,6 +86,19 @@ int main() {
     }
     remove("save_test_loan.sav"); remove("save_test_loan.sav.bak"); remove("save_test_v2b.sav");
   }
+  {   // QA S1: a committed freelance job of every type round-trips (the night, IFR and survey types were rejected on load)
+    for (int ty = CT_LESSON; ty < CT_COUNT; ty++) {
+      if (ty == CT_TRIAL) continue;
+      Career j; j.newGame(); j.license = LIC_ATP; j.money = 50000;
+      Career::JobState J; J.c.id = fmt("job_%d", ty); J.c.type = (ContractType)ty; J.c.from = 0; J.c.to = 1; J.c.payout = 900; J.c.timeLimitMin = 90; J.c.story = false;
+      J.spec = 1; J.src = Career::SRC_RENT; J.state = Career::JobState::ACTIVE; J.at = 0; J.id = 7;
+      j.job = J;
+      std::string p = fmt("save_test_job%d.sav", ty);
+      bool ok = j.save(p); Career r2; r2.newGame(); ok = ok && r2.load(p) && r2.job && r2.job->c.type == ty && r2.job->c.id == J.c.id;
+      check(ok, fmt("a job of type %d saves and loads", ty).c_str());
+      remove(p.c_str()); remove((p + ".bak").c_str());
+    }
+  }
 
   // each of these must be rejected and leave the career as it was
   const char* bad[] = {
