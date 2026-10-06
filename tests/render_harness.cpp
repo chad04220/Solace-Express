@@ -234,6 +234,7 @@ void main(){
   if (getenv("TAAF")) for (int i = 0, n = atoi(getenv("TAAF")); i < n; i++) game.render();   // extra static frames: let TAA converge
   glFinish();
   if (getenv("BENCH")) {
+    for (float& m : g_ren.passMs) m = 0.f;   // (the smoothed pass times start clean: the warm-up frames' bakes stay out of them)
     auto t0 = std::chrono::steady_clock::now();
     int frames = atoi(getenv("BENCH"));
     for (int i = 0; i < frames; i++) game.render();

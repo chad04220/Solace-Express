@@ -115,7 +115,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kWraithCockpitSDF, kWraithCockpitMaterial, kPlaneMaterial, kWater, kRtShade, kRtMain, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kDownFS, kUpFS, kCockpitMaskFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kHullBakeMain, kTShBakeMain}) h = fnv1a(src, h);
+  for (const char* src : {kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kWraithCockpitSDF, kWraithCockpitMaterial, kPlaneMaterial, kWater, kRtShade, kRtMain, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kDownFS, kUpFS, kCockpitMaskFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -920,6 +920,12 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   // was drawn this frame, and the terrain channel is only read under uEnvOn)
   glActiveTexture(GL_TEXTURE0 + 20); glBindTexture(GL_TEXTURE_2D, envOn || hullOn || trafHullOn ? texEnv : 0); glUniform1i(U(p, "uEnv"), 20);
   glUniform1i(U(p, "uEnvOn"), envOn ? 1 : 0);
+  glUniform1i(U(p, "uAfShOn"), shOn);   // the airframe shadow maps (af_shmap.glsl), for the proxy and the airframe's own lighting
+  if (shOn) {
+    glUniformMatrix4fv(U(p, "uAfShVP"), 4, GL_FALSE, shMapVP[0].m);
+    glActiveTexture(GL_TEXTURE0 + 26); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMap); glUniform1i(U(p, "uAfShMap"), 26);
+    glActiveTexture(GL_TEXTURE0 + 27); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMov); glUniform1i(U(p, "uAfShMov"), 27);
+  }
   glUniform1i(U(p, "uHullOn"), hullOn ? 1 : 0); glUniform1f(U(p, "uHullNear"), hullOn ? hullNearNow : hullNear(fp)); glUniform1i(U(p, "uHullExitOn"), hullOn && hullExitOn ? 1 : 0);
   glUniform1i(U(p, "uTrafHullOn"), trafHullOn ? 1 : 0);
   {   // AI traffic: one row of 32 texels per aircraft
@@ -1238,7 +1244,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     bakeTerrainShadow(fp);
     rasterShadowMaps(fp);   // (the airframe's shadow maps: the feeds' and the main view's proxy both read them)
     stamp(1);
-    if (fp.dispMode & 1) renderDisplays(fp, false);   // the cockpit display atlases, before the objects pass samples them
+    if ((fp.dispMode & 1) && (!texPages || (frameNo & 1) == 0)) renderDisplays(fp, false);   // the cockpit display atlases, before the objects pass samples them (the research jets' pages at 30 Hz: 9 Mpx and their mips a frame)
     if (fp.dispMode & 2) renderDisplays(fp, true);
     // the research jets' cockpit cameras: the same passes on their own targets, before the objects pass draws the screens
     renderFeeds(fp, [this](GLuint p, const FrameParams& f) { setRT(p, f); }, [this](const FrameParams& f, GLuint) { rasterShadowProxy(f); rasterLight(f); cloudPass(f); rasterEffects(f); }, [this](const FrameParams& f) { feedEffects(f); });
@@ -1252,6 +1258,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     rasterEffects(fp);
     stamp(5);
   } else {
+    shOn = 0;   // (no airframe shadow maps on the ray tracer: the airframe lighting marches as before)
     drawEnvelope(fp);
     drawEntities(fp);
     bakeTerrainShadow(fp);

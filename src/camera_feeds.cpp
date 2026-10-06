@@ -92,12 +92,21 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     renderScale = rs;
     swapView(feedView);
   }
+  // The pictures' resolution: the game sizes each camera at the main view's pixel density (feed_cameras.h); the
+  // feeds draw at a fraction of it - the front display (the window the pilot flies by) and the bomb camera at 0.6,
+  // the side, aft, overhead and floor panels at 0.45 (three quarters of that on the lowest quality). The displays
+  // are small on the screen and sample the atlas bilinearly; at full density the XR-40's twelve panels added four to
+  // six main views' worth of pixels to every frame (49 ms of its 100 ms cockpit frame on the owner's GPU).
+  static const float kFront = getenv("FEEDK0") ? (float)atof(getenv("FEEDK0")) : 0.6f, kSide = getenv("FEEDK") ? (float)atof(getenv("FEEDK")) : 0.45f;
+  const float qk = quality <= 0 ? 0.75f : 1.f;
+  auto scaleOf = [&](int k) { return (k == 0 || k == kFeedBombSlot ? kFront : kSide) * qk; };
   // atlas layout: the slots in order, packed in rows (a tile changes size: its picture is redrawn)
   {
     int x = 0, y = 0, rowH = 0;
     for (int k = 0; k < kMaxFeeds; k++) {
       const FeedCamera& c = fp.feeds[k];
-      int w = c.on ? std::min(c.w, (int)kFeedMaxW) : 0, h = c.on ? std::min(c.h, (int)kFeedMaxH) : 0;
+      const float sk = scaleOf(k);
+      int w = c.on ? std::min((int)(c.w * sk + 0.5f), (int)kFeedMaxW) : 0, h = c.on ? std::min((int)(c.h * sk + 0.5f), (int)kFeedMaxH) : 0;
       if (!c.on || w < 8 || h < 8) { feedValid[k] = false; feedTileWH[k][0] = feedTileWH[k][1] = 0; continue; }
       if (x + w + 2 > kFeedAtlasW) { x = 0; y += rowH + 2; rowH = 0; }
       if (y + h > kFeedAtlasH) { feedValid[k] = false; continue; }
@@ -122,9 +131,19 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     feedAge[k]++;
     if (fp.feeds[k].on && feedTileWH[k][0] > 0 && inView(fp.feeds[k])) cand.push_back(k);
   }
-  auto rank = [&](int k) { return k == kFeedBombSlot ? 1 << 30 : !feedValid[k] ? (1 << 29) + feedAge[k] : feedAge[k]; };
+  // which of them this frame: the front display and the bomb camera every frame (the pilot flies by them), a
+  // picture that has none yet next, then the rest in turn by age, within a pixel budget (about half a 1080p view)
+  auto rank = [&](int k) { return k == kFeedBombSlot ? 1 << 30 : k == 0 ? (1 << 30) - 1 : !feedValid[k] ? (1 << 29) + feedAge[k] : feedAge[k]; };
   std::stable_sort(cand.begin(), cand.end(), [&](int a, int b) { return rank(a) > rank(b); });
-  std::vector<int> todo(cand.begin(), cand.begin() + std::min((int)cand.size(), perFrame));
+  static const long budgetPx = getenv("FEEDPX") ? atol(getenv("FEEDPX")) : 1000000;
+  std::vector<int> todo; long spent = 0;
+  for (int k : cand) {
+    long px = (long)feedTileWH[k][0] * feedTileWH[k][1];
+    bool always = k == 0 || k == kFeedBombSlot || !feedValid[k];
+    if (!always && !todo.empty() && spent + px > budgetPx) continue;
+    if ((int)todo.size() >= perFrame) break;
+    todo.push_back(k); spent += px;
+  }
   if (todo.empty()) return;
 
   swapView(feedView);

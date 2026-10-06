@@ -13,7 +13,18 @@ vec3 planeLight(vec3 p, vec3 rd, float t, int mid, Mat m, vec3 n, vec3 lp, vec3 
   float sh = 0.0;
   if (sunVis > 0.0 && !podMat) {
     float tsh = (trafHit || uWreck > 0) ? terrainShadow(p, uSunDir, t) : uPlaneTSh;
-    if (tsh > 0.0 && !trafHit) { gShMax = interior ? 3.5 : 1e9; tsh *= planeShadow(p + n*0.02, uSunDir); gShMax = 1e9; }
+    if (tsh > 0.0 && !trafHit) {
+      // the airframe's own shadow (and the sun through the cabin windows): from its sun shadow map on the raster path;
+      // the march of the field only under the moving parts' mask, and on the ray tracer
+      // (the map settles the pixels it is sure of - lit or shadowed, nearly all of them; its edge texels, where it
+      // would show its blocks, and the moving parts' mask take the march; a surface the sun grazes or faces away
+      // from takes nothing from it in any case)
+      float ndl = dot(n, uSunDir);
+      float ms = (uAfShOn & 1) != 0 && uWreck == 0 ? (ndl < (interior ? 0.3 : 0.08) ? 0.0 : shMapLookupB(0, p, n, 1.0 + 2.0*(1.0 - ndl))) : -1.0;   // (inside, a surface the sun barely faces is lit by the fixtures and the ambient alone: its thin frames alias in the map)
+      if (ms >= 0.995) {}
+      else if (ms >= 0.0 && ms <= 0.005) tsh = 0.0;
+      else { gShMax = interior ? 3.5 : 1e9; tsh *= planeShadow(p + n*0.02, uSunDir); gShMax = 1e9; }
+    }
     // (and the scenery's: an airframe parked by a hangar or under trees sits in the same shadow as the ground
     // round it - the aircraft aren't in the scenery cascades, so this never shadows the airframe itself)
     sh = tsh > 0.0 ? tsh*cloudShadow(p)*entShadow(p, n) : 0.0;

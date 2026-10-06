@@ -6,23 +6,6 @@
 //! comes from shadow maps instead (rasterShadowMaps: the sun in layer 0, the three lights in 1-3); the field is marched
 //! only where the moving parts' hull lies in the map, and for the traffic.
 in vec2 vUV; out vec4 oColor;
-uniform sampler2DArray uAfShMap;   // depth from the light
-uniform sampler2DArray uAfShMov;   // the moving parts' hull from the light (1: march the field here)
-uniform mat4 uAfShVP[4]; uniform int uAfShOn;
-// 1 lit, 0 shadowed (soft between), or -1: the field decides (a moving part may be here)
-float shMapLookup(int layer, vec3 p, vec3 n){
-  vec4 q = uAfShVP[layer]*vec4(p + n*0.06, 1.0);
-  if (q.w <= 0.0) return 1.0;
-  vec3 u = q.xyz/q.w*0.5 + 0.5;
-  if (u.x < 0.0 || u.x > 1.0 || u.y < 0.0 || u.y > 1.0) return 1.0;   // outside the map: nothing of the airframe between
-  if (texture(uAfShMov, vec3(u.xy, float(layer))).r > 0.5) return -1.0;
-  float z = min(u.z, 1.0), bias = layer == 0 ? 0.0012 : 0.0006;
-  vec2 ts = 1.0/vec2(textureSize(uAfShMap, 0).xy);
-  float s = 0.0;
-  for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++)
-    s += texture(uAfShMap, vec3(u.xy + vec2(float(dx), float(dy))*ts, float(layer))).r >= z - bias ? 1.0 : 0.0;
-  return s/9.0;
-}
 void main(){
   gZero = min(uQuality, 0);
   loadMain();
