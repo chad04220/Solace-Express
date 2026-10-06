@@ -463,7 +463,7 @@ struct GameTest {
         if ((t.crashes != c.crashes) != wantCrash || repaired != wantCrash) fails++;
       }
     }
-    // ---- engine-out landing (C7): the engine stops on a 2.2 km final in an owned Wren; the pilot glides it in. The
+    // ---- engine-out landing (C7): the engine stops on a 2.8 km final in an owned Wren; the pilot glides it in. The
     // flight succeeds, the settlement pays the emergency bonus and charges the repair (or the insurance covers it),
     // and the aircraft's condition falls with the hours
     for (int ins = 0; ins < 2; ins++) {
@@ -474,7 +474,7 @@ struct GameTest {
       g.startFlight(c, 1, Career::SRC_OWNED);
       const Airport& a = g_world.airports[c.to];
       vec3 dir = a.dir(), thr = a.threshold(false);
-      vec3 start = thr - dir * 2200.f; start.y = a.elev + 300.f;
+      vec3 start = thr - dir * 2800.f; start.y = a.elev + 300.f;   // (the glide from here reaches the runway's first half)
       g.plane.reset(&kAircraft[1], start, a.heading, 60, 150, true, kAircraft[1].vref * 1.2f);
       g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 3;
       g.plane.ctl.throttle = 0.5f; g.update(dt);
@@ -681,6 +681,14 @@ struct GameTest {
       bool line = false; int airNet = 0; for (auto& l : L) if (l.label.find("Airline:") != std::string::npos) { line = true; airNet += l.amount; }
       bool ticked = line && k.airline.routes[0].flights == 1 && k.fleet[0].location == pvi && k.airline.routes[0].from == pvi && k.fleet[0].condition < 1.f && k.money - money0 == airNet + (L.empty() ? 0 : 0) - 0 + (k.money - money0 - airNet);
       ticked = line && k.airline.routes[0].flights == 1 && k.fleet[0].location == pvi && k.fleet[0].condition < 1.f;
+      bool noAbort = true;   // (the review of v3.24.0, R3: flights abandoned before take-off, or off-field, fly no route)
+      for (int i = 0; i < 3; i++) {
+        FlightResult ab; ab.outcome = i == 2 ? OUT_OFF_AIRPORT : OUT_ABANDONED; ab.flightMin = i == 0 ? 0.f : 4.f; ab.landed = i == 2;
+        const int f0 = k.airline.routes[0].flights; auto LA = k.settle(c, 1, Career::SRC_RENT, ab, &st);
+        for (auto& l : LA) if (l.label.find("Airline:") != std::string::npos) noAbort = false;
+        noAbort = noAbort && k.airline.routes[0].flights == f0;
+      }
+      ticked = ticked && noAbort;
       bool recalled = k.recallRoute(0, &m) && k.routeOf(0) < 0 && k.canFly(big, spec, &why) == Career::SRC_OWNED;
       // incidents: a rating-1 pilot in a worn aircraft, many days
       Career w = k; w.fleet[0].condition = 0.4f; Career::Pilot weak; weak.name = "T. Test"; weak.rating = 1; weak.wage = 120; w.hirePilot(weak, &m); int wp = (int)w.airline.pilots.size() - 1;
@@ -851,6 +859,42 @@ struct GameTest {
       bool ok = newFail && resumeFail && cancel && freeKeep && retryKeep;
       printf("Career launches: failed save flies nothing %d, failed continue keeps the job %d, cancelled loading %d, free flight keeps the job %d, debrief retry continues %d: %s\n",
              newFail, resumeFail, cancel, freeKeep, retryKeep, ok ? "ok" : "FAIL");
+      fails += !ok;
+    }
+    {   // an arrival is a landing on the destination's runway (the review of v3.24.0, R2): stopped 400 m beside it is an
+        // off-field landing; a runway touchdown then a taxi to the apron 150 m off the centreline delivers
+      auto arrive = [&](float lateral, int td) {
+        Game q; q.initHeadless(); q.career.license = LIC_PPL; q.career.storyIndex = 4; q.botControl = true; q.set.traffic = false;
+        Contract c = g_story[4]; c.wx = Weather(); c.wx.windSpeed = 0; c.wx.gust = 0; c.wx.turbulence = 0; c.wps.clear();
+        q.beginCareerFlight(c, 0, Career::SRC_RENT);
+        const Airport& a = g_world.airports[c.to]; vec3 d = a.dir(); vec3 loc = a.pos() + vec3(-d.z, 0, d.x) * lateral;
+        loc.y = g_world.height(loc.x, loc.z) + q.plane.gearHeight() - 0.035f;
+        q.takeoffAnnounced = true; q.touchedDown = true; q.touchdownFpm = 100; q.engineAutoStarted = true; q.plane.sceneryHits = false;
+        q.tdRunway = td == -3 ? c.to : td;
+        for (int i = 0; i < 100 && q.screen == SCR_FLIGHT; i++) {
+          q.plane.pos = loc; q.plane.vel = vec3(); q.plane.w = vec3(); q.plane.q = quat::axisAngle(vec3(0, 1, 0), -a.heading * DEG);
+          q.plane.onGround = true; q.plane.ctl = Controls(); q.plane.ctl.brake = 1; q.plane.ctl.gearDown = true; q.update(0.05f);
+        }
+        return q.screen == SCR_DEBRIEF && q.lastSuccess;
+      };
+      bool beside = !arrive(400.f, -2), besideTd = !arrive(400.f, -1), apron = arrive(150.f, -3), onRwy = arrive(0.f, -2);
+      bool ok = beside && besideTd && apron && onRwy;
+      printf("Arrivals: 400 m beside the runway refused %d (touched down there %d), runway then apron delivers %d, stopped on the runway delivers %d: %s\n",
+             beside, besideTd, apron, onRwy, ok ? "ok" : "FAIL");
+      fails += !ok;
+    }
+    {   // a checkride's standard gates its licence (the review of v3.24.0, R8): 600 fpm passes, just over fails, as do a
+        // take-off against a hold and a landing against a go-around; a failed one leaves the licence and the story as they were
+      int ride = -1; for (int i = 0; i < (int)g_story.size() && ride < 0; i++) if (g_story[i].grantLicense == LIC_PPL) ride = i;
+      auto fly = [&](float fpm, bool hold, bool ga) {
+        Career k; k.newGame(); k.storyIndex = ride;
+        FlightResult r; r.success = true; r.landed = true; r.touchdownFpm = fpm; r.holdViolated = hold; r.landedAgainstGoAround = ga; r.fuelLeftFrac = 0.6f; r.flightMin = 20;
+        int st = 0; k.settle(g_story[ride], 0, Career::SRC_LESSON, r, &st);
+        return k.license == LIC_PPL && k.storyIndex == ride + 1;
+      };
+      bool pass = fly(600.f, false, false), hard = !fly(601.f, false, false), hold = !fly(200.f, true, false), ga = !fly(200.f, false, true), all = !fly(700.f, true, true);
+      bool ok = ride >= 0 && pass && hard && hold && ga && all;
+      printf("Checkride standard: 600 fpm passes %d, 601 fpm fails %d, hold violation fails %d, go-around ignored fails %d, all three fail %d: %s\n", pass, hard, hold, ga, all, ok ? "ok" : "FAIL");
       fails += !ok;
     }
     if (const char* wpath = getenv("ATCWAV")) if (FILE* f = fopen(wpath, "wb")) {

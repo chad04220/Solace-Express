@@ -184,6 +184,7 @@ private:
   float prevGear = 1, prevFlaps = 0;
   bool takeoffAnnounced = false;
   float touchdownFpm = 0; bool touchedDown = false;
+  int tdRunway = -2;   // the airport whose runway the last touchdown was on (-1: off every runway; -2: none this flight)
   int runwayReverse = 0;
   float stillTimer = 0;
   bool engineAutoStarted = false;

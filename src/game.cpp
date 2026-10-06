@@ -749,7 +749,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   lookYaw = 0; lookPitch = -0.13f;
   camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 3, 15));
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
-  takeoffAnnounced = c.startAirborne; touchedDown = false; touchdownFpm = 0; stillTimer = 0;   // (an airborne start has no takeoff to announce)
+  takeoffAnnounced = c.startAirborne; touchedDown = false; touchdownFpm = 0; stillTimer = 0; tdRunway = -2;   // (an airborne start has no takeoff to announce)
   engineAutoStarted = false; startDelay = 1.2f;
   parkingBrake = !c.startAirborne;   // a start on the ground is parked: the brake is released to roll
   particles.clear(); bursts.clear(); pops.clear(); boomT = -1; for (auto& tt : pieceTrail) tt.clear(); trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0;
@@ -791,6 +791,10 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   result.late = contract.timeLimitMin > 0 && (jobClockBase + flightClock) / 60.f > contract.timeLimitMin;
   result.landed = touchedDown && plane.onGround;
   if (!result.landed) result.touchdownFpm = 0;
+  if (success && !isolatedFlight) {   // a checkride flown short of its standard is a fail, whatever else went well
+    const std::string f = Career::checkrideFault(contract, result);
+    if (!f.empty()) { success = false; result.success = false; result.outcome = OUT_CHECKRIDE_FAILED; result.failReason = "Checkride not passed: " + f; debriefTitle = result.failReason; }
+  }
   coaching = landingCoaching();
   if (isolatedFlight) {   // a practice flight or a trial: back to the hub, nothing settled
     if (contract.type == CT_TRIAL) finishTrial(success);
@@ -1195,6 +1199,7 @@ void Game::updateFlight(float dt) {
   if (plane.ev.touchdown && takeoffAnnounced) {
     float fpm = -plane.ev.touchdownVs * 196.85f;
     touchdownFpm = fpm; touchedDown = true;
+    tdRunway = g_world.onRunway(plane.pos.x, plane.pos.z, 10.f);   // (the arrival's evidence: the last touchdown's runway, or -1 off every runway)
     g_audio.trigger(SFX_TOUCHDOWN, clampf(fpm / 600.f, 0.15f, 1.f));
     std::string r = fpm < 120 ? "BUTTER!" : fpm < 250 ? "Smooth landing" : fpm < 450 ? "Good landing" : fpm < 650 ? "Firm landing" : "HARD landing!";
     toast(fmt("%s  %.0f fpm", r.c_str(), fpm), fpm < 450 ? vec3(0.6f, 1, 0.6f) : vec3(1, 0.6f, 0.3f));
@@ -1312,11 +1317,15 @@ void Game::updateFlight(float dt) {
     if (stillTimer > 1.2f) {
       float dA; int ap = g_world.nearestAirport(plane.pos.x, plane.pos.z, &dA);
       bool atField = ap >= 0 && dA < g_world.airports[ap].length * 0.5f + 600.f;
+      // an arrival is a landing on that field's runway (taxiing off to the apron afterwards is fine): the last
+      // touchdown's runway, or where it stands when no touchdown was seen (a flight placed on the ground); stopping
+      // near a field after landing beside or beyond its runway is an off-field landing, the load recovered by road
+      const int rwy = tdRunway != -2 ? tdRunway : g_world.onRunway(plane.pos.x, plane.pos.z, 10.f);
       if (wpIndex < (int)contract.wps.size()) {
         if (stillTimer >= 1.25f && stillTimer - dt < 1.25f) toast("Checkpoints remaining - take off again to continue", vec3(1, 0.8f, 0.4f));
-      } else if (atField && ap == contract.to) { endFlight(true, ""); return; }
-      else if (atField) { result.divertedTo = ap; endFlight(false, fmt("Diverted to %s", g_world.airports[ap].name), OUT_DIVERTED); return; }
-      else if (stillTimer > 3.f) { endFlight(false, "Landed off-airport", OUT_OFF_AIRPORT); return; }
+      } else if (atField && rwy == ap && ap == contract.to) { endFlight(true, ""); return; }
+      else if (atField && rwy == ap) { result.divertedTo = ap; endFlight(false, fmt("Diverted to %s", g_world.airports[ap].name), OUT_DIVERTED); return; }
+      else if (stillTimer > 3.f) { endFlight(false, atField ? "Landed off the runway" : "Landed off-airport", OUT_OFF_AIRPORT); return; }
     }
   } else stillTimer = 0;
   if (plane.fuel <= 0 && plane.onGround && gs < 1.f && !takeoffAnnounced) { endFlight(false, "Out of fuel", OUT_OUT_OF_FUEL); return; }

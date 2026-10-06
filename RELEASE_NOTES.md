@@ -15,3 +15,12 @@
   from scratch).
 - **A flight only starts once it is saved.** If the career can't be saved when you press Fly (disk full, folder not
   writable), the flight doesn't start and nothing is left half-saved; press Fly again.
+- **A delivery means landing on the runway.** Stopping near the destination after touching down beside or beyond
+  its runway no longer completes the job: it counts as an off-field landing, and the load is recovered by road as
+  before. Landing on the runway and then taxiing to the apron still delivers; so does a diversion to another
+  field's runway.
+- **Your airline flies when you do.** A route only flies, and pays, for your flights that took off and landed on a
+  runway (at the destination or diverted). Starting and abandoning a flight no longer earns route income.
+- **Checkrides have a standard.** A checkride with a hard landing (over 600 fpm), a take-off against a hold or a
+  landing against a go-around is failed: no licence, the story waits, and the debrief offers it again. The
+  briefings say so.

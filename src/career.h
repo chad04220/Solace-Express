@@ -40,7 +40,7 @@ struct OwnedPlane { int spec; int location; float fuel; float condition; };
 
 // How a flight ended. Only a crash counts against the record and costs repairs; a safe diversion, an off-airport
 // landing, running dry on the ground or abandoning the job just fail the contract.
-enum FlightOutcome { OUT_SUCCESS = 0, OUT_ABANDONED, OUT_DIVERTED, OUT_OFF_AIRPORT, OUT_OUT_OF_FUEL, OUT_CRASHED };
+enum FlightOutcome { OUT_SUCCESS = 0, OUT_ABANDONED, OUT_DIVERTED, OUT_OFF_AIRPORT, OUT_OUT_OF_FUEL, OUT_CRASHED, OUT_CHECKRIDE_FAILED };
 
 struct FlightResult {
   bool success = false;
@@ -139,6 +139,8 @@ public:
   bool assignRoute(int fleetIdx, int to, int pilot, std::string* msg);
   bool recallRoute(int ri, std::string* msg);
   void airlineTick(std::vector<PayoutLine>& L);        // called by settle / closeLeg
+  static bool routeFlightQualifies(const FlightResult& r);
+  static std::string checkrideFault(const Contract& c, const FlightResult& r);   // why a checkride is not passed ("" passed, or not a checkride)   // whether a flight of yours advances the airline's routes
   // Settle a finished flight; returns lines for the debrief
   // (plan: the launch plan the flight was started with - its fixed fees are charged exactly as quoted; without one
   // they are worked out now)

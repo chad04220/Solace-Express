@@ -89,7 +89,7 @@ void buildStory() {
   { S s("L4", 0, CT_LESSON, "HFS", "ORC", "Checkride: Private Pilot License");
     s.lesson().pay(400).grant(LIC_PPL).wx(W(330, 11, 5, 0.25f, 0.5f, 3000, 25, 0, false, 15.5f))
      .brief("Examiner Rosa Vance will ride with you to Orchard Valley. There's a gusty crosswind today. "
-            "Land on the runway without a hard landing to earn your Private Pilot License.")
+            "Land on the runway without a hard landing (over 600 fpm) and keep to the tower's instructions to earn your Private Pilot License.")
      .hints({"Final exam: take off when ready.", "Crosswind! Use rudder to stay on the centreline.",
              "Climb out and navigate to Orchard Valley.", "Plan your descent early - Orchard Valley sits at 690 ft.",
              "Crab into the wind on final. Just before touchdown, use rudder to align with the runway.",
@@ -121,7 +121,7 @@ void buildStory() {
   { S s("C8", 1, CT_CARGO, "CDR", "NPT", "Checkride: Commercial Pilot");
     s.load(50, 0).pay(2500).lic(LIC_PPL).grant(LIC_CPL).wx(W(20, 10, 4, 0.2f, 0.85f, 1100, 5, 1, false, 18.5f))
      .brief("Your commercial checkride. Fly to Northpoint in low cloud and rain with 5 km visibility. "
-            "Stay below the clouds, follow the GPS, and land safely. Pass to earn your Commercial Pilot License."); add(s); }
+            "Stay below the clouds, follow the GPS, and land safely: no hard landing (over 600 fpm), and keep to the tower's instructions. Pass to earn your Commercial Pilot License."); add(s); }
   // ------------------------------------------------------------ Chapter 2: Commercial (passengers, bigger rentals)
   { S s("P1", 2, CT_PAX, "NPT", "PVI", "First Passengers");
     s.load(30, 3).pay(2600).lic(LIC_CPL).wx(W(330, 8, 0, 0.1f, 0.3f, 4000, 35, 0, false, 10.0f))
@@ -170,7 +170,7 @@ void buildStory() {
      .brief("Guests for the Far Isle resort's grand opening. 52 km over open water - golden hour on arrival."); add(s); }
   { S s("O8", 3, CT_PAX, "FAR", "KLO", "Checkride: Airline Transport Pilot");
     s.load(100, 6).pay(18000).lic(LIC_CPL).owned().grant(LIC_ATP).wx(W(110, 14, 8, 0.4f, 0.9f, 1500, 6, 1, false, 21.0f))
-     .brief("Your ATP checkride: a night flight to Kaleo in rain and gusty crosswind. Use the runway lights and PAPI."); add(s); }
+     .brief("Your ATP checkride: a night flight to Kaleo in rain and gusty crosswind. Use the runway lights and PAPI. The examiner fails a hard landing (over 600 fpm) or a tower instruction ignored."); add(s); }
   // ------------------------------------------------------------ Chapter 4: Airline captain
   { S s("A1", 4, CT_PAX, "KLO", "CAP", "Solace Regional: Launch Day");
     s.load(600, 36).pay(55000).lic(LIC_ATP).wx(W(60, 9, 0, 0.15f, 0.35f, 4500, 40, 0, false, 9.0f))
@@ -614,7 +614,7 @@ std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan
   location = at;
   if (J.src == SRC_OWNED) { int oi = ownedIndexFor(J.spec); if (oi >= 0) fleet[oi].location = at; }
   wear(L, J.spec, J.src, r);
-  airlineTick(L);
+  if (routeFlightQualifies(r)) airlineTick(L);
   payLoan(L);
   int total = 0; for (auto& l : L) total += l.amount;
   money += total;
@@ -683,7 +683,13 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
   }
   *stars = 0;
   flights++; hours += r.flightMin / 60.f;
-  if (!r.success) {
+  const std::string crFault = r.success ? checkrideFault(c, r) : std::string();
+  if (!r.success || !crFault.empty()) {
+    if (!crFault.empty() || r.outcome == OUT_CHECKRIDE_FAILED) {   // landed at the field: you (and the aircraft) are there
+      L.push_back({"Checkride not passed: " + (crFault.empty() ? checkrideFault(c, r) : crFault), 0});
+      location = c.to;
+      if (src == SRC_OWNED) { int oi = ownedIndexFor(si); if (oi >= 0) fleet[oi].location = c.to; }
+    }
     if (r.outcome == OUT_OFF_AIRPORT && src != SRC_LESSON) L.push_back({"Aircraft recovery from the field", -(150 + s.rentFee)});
     if (r.outcome == OUT_CRASHED) {
       crashes++;
@@ -762,7 +768,7 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
     boardSeed++;
   }
   if (r.outcome != OUT_CRASHED) wear(L, si, src, r);
-  airlineTick(L);
+  if (routeFlightQualifies(r)) airlineTick(L);
   payLoan(L);
   int total = 0; for (auto& l : L) total += l.amount;
   money += total;
@@ -876,6 +882,23 @@ bool Career::recallRoute(int ri, std::string* msg) {
   *msg = fmt("%s recalled: it waits at %s.", kAircraft[fleet[r.fleetIdx].spec].name, g_world.airports[fleet[r.fleetIdx].location].code);
   airline.routes.erase(airline.routes.begin() + ri);
   return true;
+}
+// The airline flies its routes once for each of your flights that got somewhere: one that took off and landed on a
+// runway, at its destination or diverted. Abandoned, crashed and off-field flights, and starts that never left the
+// ground, fly none (the review of v3.24.0, R3: three zero-time aborts earned $24,696)
+// A checkride's standard, as its briefing states it: landed, no hard landing (over 600 fpm, the settlement's own
+// line), and the tower's instructions kept (no take-off against a hold, no landing against a go-around). The examiner
+// fails anything short of it: no licence, the story waits, the checkride is flown again (the review of v3.24.0, R8)
+std::string Career::checkrideFault(const Contract& c, const FlightResult& r) {
+  if (c.grantLicense < 0) return "";
+  if (!r.landed) return "no landing";
+  if (fabsf(r.touchdownFpm) > 600.f) return fmt("hard landing (%.0f fpm)", fabsf(r.touchdownFpm));
+  if (r.holdViolated) return "took off against a hold instruction";
+  if (r.landedAgainstGoAround) return "landed against a go-around instruction";
+  return "";
+}
+bool Career::routeFlightQualifies(const FlightResult& r) {
+  return r.landed && r.flightMin > 0.f && (r.outcome == OUT_SUCCESS || r.outcome == OUT_DIVERTED);
 }
 void Career::airlineTick(std::vector<PayoutLine>& L) {
   if (airline.routes.empty()) return;
