@@ -3572,6 +3572,11 @@ void Game::debugScene(const std::string& name) {
     dbgCam = true; dbgFollow = true; dbgFollowOff = off; dbgCamPos = plane.pos + off; dbgCamLook = plane.pos;
     toasts.clear(); hint.clear(); uiHidden = true; hudOn = false;
     camMode = getenv("GAVOUT") ? 0 : 1;   // (the cabin model shows the interior through the windows; GAVOUT: the outside model)
+    if (const char* cs = getenv("GAVCTL")) {   // (debug: the controls held at pitch,roll,yaw,flaps - the surfaces' directions)
+      float cp = 0, cr = 0, cy = 0, cf = 0; sscanf(cs, "%f,%f,%f,%f", &cp, &cr, &cy, &cf);
+      botControl = true; plane.ctl.pitch = cp; plane.ctl.roll = cr; plane.ctl.yaw = cy; plane.ctl.flaps = cf; plane.flaps = cf;
+      for (int i = 0; i < 60; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    }
     return;
   }
   if (name.compare(0, 4, "apv_") == 0 && name.size() >= 9) {   // airport detail views: apv_<CODE>_<view>_<hour>

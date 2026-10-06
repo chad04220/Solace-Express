@@ -23,14 +23,43 @@
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 8;   // (bump with the format)
+const uint32_t kMeshMagic = 0x4d455348u + 9;   // (bump with the format)
 const float kMeshShell = 0.004f;   // the fine patch's shell stands this far outside the surface (plane_mesh_fs.glsl marches the rest)
 // the rigid parts a cockpit has (plane_parts.glsl PT_*) and each one's instances: x which seat or side, y which pedal
 struct PartInst { int type; float sx, sy; };
+const int kMaxPartInst = 32;
+bool partIsSurface(int type) { return type >= 11 && type <= 14; }
+// a control surface's box at rest (the right side's, body space), from the model's numbers (plane_parts.glsl partField)
+bool surfaceBox(int type, const float* M, vec3& lo, vec3& hi) {
+  auto m = [&](int i, int c) { return M[i * 4 + c]; };
+  const float R = m(0, 3);
+  float span, rc, tc, sw, yOff, zOff, dih = 0.f, s0, s1, hf; bool fin = false;
+  if (type == 11 || type == 12) {
+    span = m(9, 0); rc = m(9, 1); tc = m(9, 2); sw = m(9, 3); yOff = m(10, 0); zOff = m(10, 1); dih = m(10, 2); hf = 0.74f;
+    const float flapEnd = span * m(11, 3);
+    if (type == 11) { s0 = 0.55f * R; s1 = flapEnd; } else { s0 = flapEnd + 0.03f; s1 = span * 0.94f; }
+  } else if (type == 13) {
+    span = m(12, 0); rc = m(12, 1); tc = m(12, 2); sw = m(12, 3); yOff = m(13, 0); zOff = m(13, 1); dih = m(13, 2); hf = 0.68f; s0 = 0.12f; s1 = span * 0.98f;
+  } else {
+    span = m(14, 0); rc = m(14, 1); tc = m(14, 2); sw = m(14, 3); yOff = m(15, 0); zOff = m(15, 1); hf = 0.66f;
+    s0 = m(13, 3) > 0.5f ? 0.05f : 0.08f * span; s1 = span * 0.97f; fin = true;
+  }
+  if (!(span > 0.f) || s1 <= s0) return false;
+  float c0 = 1e9f, c1 = -1e9f;
+  for (float sv : {s0, s1}) { float k = std::clamp(sv / span, 0.f, 1.f), ch = rc + (tc - rc) * k, le = sw * k; c0 = std::min(c0, le + ch * hf); c1 = std::max(c1, le + ch); }
+  const float tt = 0.12f, mg = 0.03f;
+  if (!fin) { lo = vec3(s0 - mg, yOff + std::min(dih * s0, dih * s1) - tt, zOff + c0 - mg); hi = vec3(s1 + mg, yOff + std::max(dih * s0, dih * s1) + tt, zOff + c1 + mg); }
+  else { lo = vec3(-tt, yOff + s0 - mg, zOff + c0 - mg); hi = vec3(tt, yOff + s1 + mg, zOff + c1 + mg); }
+  return true;
+}
 int partList(const float* M, bool inside, PartInst* out) {
-  if (!inside) return 0;
   const int eng = (int)(M[2] + 0.5f);
   int n = 0;
+  if (eng < 5) {   // the light aircraft's (and the XR-10's and XR-20's) control surfaces, outside and from the cockpit
+    for (int s = -1; s <= 1; s += 2) { out[n++] = {11, (float)s, 0}; out[n++] = {12, (float)s, 0}; out[n++] = {13, (float)s, 0}; }   // flap, aileron, elevator
+    out[n++] = {14, 0, 0};   // rudder
+  }
+  if (!inside) return n;
   if (eng == 5) { out[n++] = {6, 0, 0}; out[n++] = {7, 0, 0}; return n; }                      // the XR-30: stick, throttle
   if (eng == 6) { out[n++] = {8, 0, 0}; out[n++] = {9, 0, 0}; out[n++] = {10, -1, 0}; out[n++] = {10, 1, 0}; return n; }   // the XR-40: and its pedals
   if (eng > 6) return 0;
@@ -325,7 +354,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     // ---- the rigid parts (plane_parts.glsl), each alone in its own frame at rest: a 1 cm survey finds its box, then
     // surface nets on a 2 mm lattice over it, every vertex pulled onto the surface as above
     {
-      PartInst pl[16]; const int np = partList(M, inside, pl);
+      PartInst pl[kMaxPartInst]; const int np = partList(M, inside, pl);
       std::vector<int> done;
       for (int pi = 0; pi < np; pi++) {
         const int type = pl[pi].type;
@@ -333,15 +362,24 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         done.push_back(type);
         glUniform1i(U(progHullBake, "uHPart"), type);
         glUniform2f(U(progHullBake, "uHPartSide"), pl[pi].sx, pl[pi].sy);
-        const float hc = 0.01f; const int nc = 71;
-        std::vector<vec3> sp; std::vector<float> sd;
-        for (int k = 0; k < nc; k++) for (int j = 0; j < nc; j++) for (int i = 0; i < nc; i++) sp.push_back(vec3((i - 35) * hc, (j - 35) * hc, (k - 35) * hc));
-        mode(1, 0); hullEval(sp, sd);
-        vec3 lo(1e9f, 1e9f, 1e9f), hi(-1e9f, -1e9f, -1e9f); bool any = false;
-        for (size_t q = 0; q < sp.size(); q++) if (sd[q] < hc) { any = true; lo = vec3(std::min(lo.x, sp[q].x), std::min(lo.y, sp[q].y), std::min(lo.z, sp[q].z)); hi = vec3(std::max(hi.x, sp[q].x), std::max(hi.y, sp[q].y), std::max(hi.z, sp[q].z)); }
-        if (!any) continue;
-        const float h = 0.002f, mg = hc + 2.f * h;
-        lo = lo - vec3(mg, mg, mg); hi = hi + vec3(mg, mg, mg);
+        // its box: a control surface's from the model's numbers (6 mm lattice: seen from metres away); a cockpit
+        // part's from a 1 cm survey of +-0.35 m about its own origin (2 mm lattice: seen from arm's length)
+        vec3 lo(1e9f, 1e9f, 1e9f), hi(-1e9f, -1e9f, -1e9f);
+        float h = 0.002f;
+        if (partIsSurface(type)) {
+          if (!surfaceBox(type, M, lo, hi)) continue;
+          h = 0.006f; lo = lo - vec3(2.f * h, 2.f * h, 2.f * h); hi = hi + vec3(2.f * h, 2.f * h, 2.f * h);
+        } else {
+          const float hc = 0.01f; const int nc = 71;
+          std::vector<vec3> sp; std::vector<float> sd;
+          for (int k = 0; k < nc; k++) for (int j = 0; j < nc; j++) for (int i = 0; i < nc; i++) sp.push_back(vec3((i - 35) * hc, (j - 35) * hc, (k - 35) * hc));
+          mode(1, 0); hullEval(sp, sd);
+          bool any = false;
+          for (size_t q = 0; q < sp.size(); q++) if (sd[q] < hc) { any = true; lo = vec3(std::min(lo.x, sp[q].x), std::min(lo.y, sp[q].y), std::min(lo.z, sp[q].z)); hi = vec3(std::max(hi.x, sp[q].x), std::max(hi.y, sp[q].y), std::max(hi.z, sp[q].z)); }
+          if (!any) continue;
+          const float mg = hc + 2.f * h;
+          lo = lo - vec3(mg, mg, mg); hi = hi + vec3(mg, mg, mg);
+        }
         const int nx = (int)ceilf((hi.x - lo.x) / h) + 1, ny = (int)ceilf((hi.y - lo.y) / h) + 1, nz = (int)ceilf((hi.z - lo.z) / h) + 1;
         std::vector<vec3> cp((size_t)nx * ny * nz); std::vector<float> cv;
         for (int k = 0; k < nz; k++) for (int j = 0; j < ny; j++) for (int i = 0; i < nx; i++) cp[((size_t)k * ny + j) * nx + i] = vec3(lo.x + i * h, lo.y + j * h, lo.z + k * h);
@@ -481,47 +519,64 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   PM.ok = true;
 }
 
-// The cockpit's rigid parts' poses for this frame (plane_parts.glsl partPose, the field's own): one texel row, four
-// texels an instance (R's columns, T), drawn by kPartPoseFS from the aircraft's uniforms
-void Renderer::computePartPoses(const FrameParams& fp, const PlaneMesh& pm) {
-  partPoseN = 0; partPosePM = nullptr;
-  if (pm.parts.empty() || !progPartPose) return;
-  PartInst pl[16]; const int np = partList(fp.plane.M, fp.plane.PS[3] > 0.5f, pl);
-  for (int i = 0; i < np && partPoseN < 16; i++) {
-    bool have = false; for (auto& P : pm.parts) have = have || P.type == pl[i].type;
-    if (!have) continue;
-    partPoseType[partPoseN] = pl[i].type; partPoseSide[partPoseN * 2] = pl[i].sx; partPoseSide[partPoseN * 2 + 1] = pl[i].sy; partPoseN++;
-  }
-  if (!partPoseN) return;
+// The rigid parts' poses for this frame (plane_parts.glsl partPose, the field's own): the player's aircraft's and each
+// traffic aircraft's (by its own controls), four texels an instance (R's columns, T), drawn by kPartPoseFS from the
+// aircraft's uniforms or its traffic row
+void Renderer::computePartPoses(const FrameParams& fp, const PlaneMesh* player, const PlaneMesh* const* traffic) {
+  for (auto& o : poseOwner) o = PoseOwner();
+  poseType.clear();
+  if (!progPartPose) return;
+  std::vector<float> info;
+  auto add = [&](int owner, const PlaneMesh* pm, const float* M, bool inside) {
+    if (!pm || pm->parts.empty()) return;
+    PartInst pl[kMaxPartInst]; const int np = partList(M, inside, pl);
+    PoseOwner& O = poseOwner[owner]; O.pm = pm; O.base = (int)poseType.size(); O.n = 0;
+    for (int i = 0; i < np && (int)poseType.size() < kMaxPoseInst; i++) {
+      bool have = false; for (auto& P : pm->parts) have = have || P.type == pl[i].type;
+      if (!have) continue;
+      poseType.push_back(pl[i].type); O.n++;
+      info.insert(info.end(), {(float)pl[i].type, (float)owner, pl[i].sx, pl[i].sy});
+    }
+  };
+  add(0, player, fp.plane.M, fp.plane.PS[3] > 0.5f);
+  for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); k++) if (traffic && traffic[k]) add(k + 1, traffic[k], fp.traffic[k].t, false);
+  const int n = (int)poseType.size();
+  if (!n) { for (auto& o : poseOwner) o = PoseOwner(); return; }
   if (!texPartPose) {
     glGenTextures(1, &texPartPose); glBindTexture(GL_TEXTURE_2D, texPartPose);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 64, 1, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, kMaxPoseInst * 4, 1, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glGenTextures(1, &texPartInfo); glBindTexture(GL_TEXTURE_2D, texPartInfo);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, kMaxPoseInst, 1, 0, GL_RGBA, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
     glGenFramebuffers(1, &fboPartPose); glBindFramebuffer(GL_FRAMEBUFFER, fboPartPose);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texPartPose, 0);
   }
+  glBindTexture(GL_TEXTURE_2D, texPartInfo);
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, n, 1, GL_RGBA, GL_FLOAT, info.data());
   GLint prevFbo = 0; glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
   glBindFramebuffer(GL_FRAMEBUFFER, fboPartPose);
   { GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0); }
-  glViewport(0, 0, partPoseN * 4, 1);
+  glViewport(0, 0, n * 4, 1);
   glDisable(GL_DEPTH_TEST); glDisable(GL_BLEND);
   setRT(progPartPose, fp);
-  glUniform1iv(U(progPartPose, "uPPK"), partPoseN, partPoseType);
-  glUniform2fv(U(progPartPose, "uPPS"), partPoseN, partPoseSide);
+  glActiveTexture(GL_TEXTURE0 + 31); glBindTexture(GL_TEXTURE_2D, texPartInfo); glUniform1i(U(progPartPose, "uPPInfo"), 31);
   glBindVertexArray(vaoEmpty); glDrawArrays(GL_TRIANGLES, 0, 3); glBindVertexArray(0);
+  glActiveTexture(GL_TEXTURE0 + 31); glBindTexture(GL_TEXTURE_2D, 0); glActiveTexture(GL_TEXTURE0);
   glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
   glViewport(0, 0, rw, rh);
-  partPosePM = &pm;
 }
 
-// Each rigid part instance of the player's cockpit at this frame's pose, with the bound program (its other uniforms
-// and the depth state the caller's); nothing when the poses are not this mesh's
-void Renderer::drawPlaneParts(const PlaneMesh& pm, GLuint prog) {
-  if (partPosePM != &pm || !partPoseN) return;
+// Each rigid part instance of an aircraft (trafK -1 the player's, else traffic aircraft k) at this frame's pose, with
+// the bound program (its other uniforms and the depth state the caller's); nothing when the poses are not this mesh's
+void Renderer::drawPlaneParts(const PlaneMesh& pm, GLuint prog, int trafK) {
+  if (trafK < -1 || trafK >= kMaxTrafficDrawn) return;
+  const PoseOwner& O = poseOwner[trafK + 1];
+  if (O.pm != &pm || !O.n) return;
   glActiveTexture(GL_TEXTURE0 + 30); glBindTexture(GL_TEXTURE_2D, texPartPose); glUniform1i(U(prog, "uPartPose"), 30);
-  for (int i = 0; i < partPoseN; i++) {
-    const PartMesh* P = nullptr; for (auto& q : pm.parts) if (q.type == partPoseType[i]) P = &q;
+  for (int i = O.base; i < O.base + O.n; i++) {
+    const PartMesh* P = nullptr; for (auto& q : pm.parts) if (q.type == poseType[i]) P = &q;
     if (!P || !P->idx) continue;
     glUniform1i(U(prog, "uPartInst"), i);
     glBindVertexArray(P->vao);
@@ -591,7 +646,7 @@ void Renderer::drawPlaneMeshDepth(const FrameParams& fp, const PlaneMesh& pm, co
     glUniform1i(U(progPlaneMeshDepth, "uPartInst"), -1);
     glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
     glDrawElements(GL_TRIANGLES, pm.idxFine, GL_UNSIGNED_INT, nullptr);
-    if (trafK < 0) drawPlaneParts(pm, progPlaneMeshDepth);
+    drawPlaneParts(pm, progPlaneMeshDepth, trafK);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
   }
   glBindVertexArray(0);
@@ -622,7 +677,7 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   glUniform1i(U(progPlaneMesh, "uPartInst"), -1);
   if (!noPre) { glDepthFunc(GL_LEQUAL); glDepthMask(GL_FALSE); }
   glDrawElements(GL_TRIANGLES, pm.idxFine, GL_UNSIGNED_INT, nullptr);
-  if (trafK < 0) drawPlaneParts(pm, progPlaneMesh);   // (the cockpit's controls, each at its pose)
+  drawPlaneParts(pm, progPlaneMesh, trafK);   // (its moving parts, each at its pose)
   glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
   // the fine patch over the cabin's thin parts: a shell whose fragments march the field to the surface and write its
   // depth (no pre-pass: the shell's depth is not the surface's)

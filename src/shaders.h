@@ -40,11 +40,13 @@ inline std::string objectsFSAssembly(const std::string& defines) {
 // the rigid parts' poses (plane_parts.glsl partPose), once a frame into a small texture the part draws read
 inline std::string partPoseFSAssembly() {
   return std::string("#version 330 core\n") + kCommonGLSL + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts +
-         "uniform int uPPK[16]; uniform vec2 uPPS[16];\n"
+         "uniform sampler2D uPPInfo;   // per instance: its part type, its owner (0 the player's aircraft, k + 1 traffic k), its side\n"
          "void main(){\n"
          "  int x = int(gl_FragCoord.x), i = x/4, c = x - i*4;\n"
-         "  loadMain();\n"
-         "  Pose X = partPose(uPPK[i], uPPS[i]);\n"
+         "  vec4 info = texelFetch(uPPInfo, ivec2(i, 0), 0);\n"
+         "  int owner = int(info.y + 0.5);\n"
+         "  if (owner > 0) loadTraffic(owner - 1); else loadMain();\n"
+         "  Pose X = partPose(int(info.x + 0.5), info.zw);\n"
          "  oColor = vec4(c == 0 ? X.R[0] : c == 1 ? X.R[1] : c == 2 ? X.R[2] : X.T, 1.0); oDepth = 0.0; oCloudMask = 0.0;\n"
          "}\n";
 }

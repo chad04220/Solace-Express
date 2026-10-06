@@ -867,6 +867,12 @@ bool Renderer::project(const FrameParams& fp, vec3 p, float& sx, float& sy) cons
 // ------------------------------------------------ the passes of a frame (the ray tracer and the raster renderer share them)
 // the scene's uniforms and textures for a program (the ray tracer, the cloud pass, the raster passes) and a view: this
 // frame's or a camera feed's
+// (GLERR: a draw that fails validation - samplers of two types on one unit, say - draws nothing and says nothing)
+void Renderer::reportGLError(int stampIdx) {
+  for (GLenum e = glGetError(), n = 0; e != 0 && n < 8; e = glGetError(), n++)
+    fprintf(stderr, "GL error 0x%04x in the passes before timestamp %d (frame %d)\n", (unsigned)e, stampIdx, frameNo);
+}
+
 void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUseProgram(p);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
@@ -891,11 +897,11 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUniform1i(U(p, "uEnvOn"), 0);   // (the terrain envelope was the ray tracer's)
   glUniform1i(U(p, "uScrWin"), screenWindows ? 1 : 0);
   glUniform1i(U(p, "uAfShOn"), shOn);   // the airframe shadow maps (af_shmap.glsl), for the proxy and the airframe's own lighting
-  if (shOn) {
-    glUniformMatrix4fv(U(p, "uAfShVP"), 4, GL_FALSE, shMapVP[0].m);
-    glActiveTexture(GL_TEXTURE0 + 26); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMap); glUniform1i(U(p, "uAfShMap"), 26);
-    glActiveTexture(GL_TEXTURE0 + 27); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMov); glUniform1i(U(p, "uAfShMov"), 27);
-  }
+  if (shOn) glUniformMatrix4fv(U(p, "uAfShVP"), 4, GL_FALSE, shMapVP[0].m);
+  // (the array samplers always on their own units, maps or not: left at unit 0 beside uHM - a 2D sampler - every draw
+  // of the program fails validation and draws nothing: the objects pass lost wrecks, debris, the UFO and the march)
+  glActiveTexture(GL_TEXTURE0 + 26); glBindTexture(GL_TEXTURE_2D_ARRAY, shOn ? texShMap : 0); glUniform1i(U(p, "uAfShMap"), 26);
+  glActiveTexture(GL_TEXTURE0 + 27); glBindTexture(GL_TEXTURE_2D_ARRAY, shOn ? texShMov : 0); glUniform1i(U(p, "uAfShMov"), 27);
   glUniform1i(U(p, "uHullOn"), hullOn ? 1 : 0); glUniform1f(U(p, "uHullNear"), hullOn ? hullNearNow : hullNear(fp)); glUniform1i(U(p, "uHullExitOn"), hullOn && hullExitOn ? 1 : 0);
   glUniform1i(U(p, "uTrafHullOn"), trafHullOn ? 1 : 0);
   {   // AI traffic: one row of 32 texels per aircraft

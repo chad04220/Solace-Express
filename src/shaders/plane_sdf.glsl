@@ -60,16 +60,7 @@ float sdPanel(float s, float c, float t, float span, float rc, float tc, float s
   return max(d, -s - 0.02);
 }
 // Hinged control surface behind the hinge line. defl = geometry rotation (radians) in the (t, c) plane.
-float sdSurface(float s, float c, float t, float span, float rc, float tc, float sweep, float th, float hingeF, float s0, float s1, float defl, float slide){
-  float k = clamp(s/span, 0.0, 1.0);
-  float ch = mix(rc, tc, k); float le = sweep*k;
-  vec2 q = vec2(t, c - (le + ch*hingeF + 0.008 + slide*ch));
-  q = rot2(q, -defl);
-  float len = ch*(1.0 - hingeF) - 0.01;
-  float halfT = max(th*ch*0.5*(0.42 - 0.38*clamp(q.y/len, 0.0, 1.0)), 0.004);
-  vec3 b = vec3(max(s0 - s, s - s1), abs(q.x) - halfT, max(-q.y, q.y - len));
-  return length(max(b, 0.0)) + min(max(b.x, max(b.y, b.z)), 0.0) - 0.003;
-}
+// (sdSurface, the hinged control surface: plane_parts.glsl)
 
 // Shared fleet gear geometry. The original wheel envelope and contact centres stay intact.
 // Fine tread, recess rings and bolt heads are shaded once at a hit, not in every ray step.
@@ -432,9 +423,10 @@ vec2 mapPlaneBody(vec3 p){
     float sgn = p.x > 0.0 ? 1.0 : -1.0;
     float fus0 = 0.55*R, flapEnd = span*W2.w, ailEnd = span*0.94;
     float wing = sdPanel(s, c, t, span, rc, tc, sw, th, 0.74, fus0, ailEnd);
-    float flap = sdSurface(s, c, t, span, rc, tc, sw, th, 0.74, fus0, flapEnd, flaps*0.62, flaps*0.1);
+    // (the flaps and ailerons are rigid parts with meshes of their own: the airframe bake leaves them out, plane_parts.glsl)
+    float flap = gPartMode == -2 ? 1e9 : sdSurface(s, c, t, span, rc, tc, sw, th, 0.74, fus0, flapEnd, flaps*0.62, flaps*0.1);
     // right aileron TE goes UP for right roll; left goes down
-    float ail = sdSurface(s, c, t, span, rc, tc, sw, th, 0.74, flapEnd + 0.03, ailEnd, -cRoll*sgn*0.33, 0.0);
+    float ail = gPartMode == -2 ? 1e9 : sdSurface(s, c, t, span, rc, tc, sw, th, 0.74, flapEnd + 0.03, ailEnd, -cRoll*sgn*0.33, 0.0);
     float wd = min(wing, min(flap, ail));
     if (W2.z > 0.01) {  // winglet
       float wl = sdPanel(t - 0.02, c - sw - tc*0.15, s - span + 0.05, W2.z, tc*0.85, tc*0.4, 0.55, 0.09, 1.0, 0.0, 0.0);
@@ -473,13 +465,13 @@ vec2 mapPlaneBody(vec3 p){
     float rud0 = hasT > 0.5 ? 0.05 : 0.08*h;
     float fin = sdPanel(s, c, t, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97);
     // right rudder (yaw +) swings the trailing edge to the right (+x)
-    float rud = sdSurface(s, c, t, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97, -cYaw*0.42, 0.0);
+    float rud = gPartMode == -2 ? 1e9 : sdSurface(s, c, t, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97, -cYaw*0.42, 0.0);   // (rudder and elevators: rigid parts too)
     float tail = min(fin, rud);
     vec4 H0 = gM[12], H1 = gM[13];
     float hs = abs(p.x), ht = p.y - (H1.x + hs*H1.z), hc = p.z - H1.y;
     float stab = sdPanel(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98);
     // pulling back (pitch +) raises the elevator trailing edge
-    float elev = sdSurface(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98, -cPitch*0.4, 0.0);
+    float elev = gPartMode == -2 ? 1e9 : sdSurface(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98, -cPitch*0.4, 0.0);
     tail = min(tail, min(stab, elev));
     if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + H0.y*0.45), vec3(0.18, 0.2, H0.y*0.55)), 0.08);
     float d = smin(res.x, tail, 0.12*R);

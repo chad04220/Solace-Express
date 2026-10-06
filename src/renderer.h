@@ -186,7 +186,9 @@ public:
   static constexpr int kPasses = 11;   // world | displays | feeds | objects | airframe shadow proxy | lighting+clouds+effects (the ray tracer: scenery | displays | - | - | - | ray trace+clouds), then TAA, sprites, bloom, light shafts, composite
   float passMs[kPasses] = {};         // GPU time of each pass (timestamp queries, a few frames late)
   GLuint stampQ[4][kPasses + 1] = {}; bool stampUsed[4] = {};
-  void stamp(int i) { if (syncTiming) syncStamp(i); else if (stampQ[gpuQi][i]) glQueryCounter(stampQ[gpuQi][i], GL_TIMESTAMP); }
+  void stamp(int i) { if (glErrCheck) reportGLError(i); if (syncTiming) syncStamp(i); else if (stampQ[gpuQi][i]) glQueryCounter(stampQ[gpuQi][i], GL_TIMESTAMP); }
+  bool glErrCheck = getenv("GLERR") != nullptr;   // debug: print any GL error raised by the passes before each timestamp
+  void reportGLError(int stampIdx);
   void syncStamp(int i);
 private:
   vec3 prevCamPos, prevPlanePos; float prevCamRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1}, prevPlaneRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
@@ -238,11 +240,17 @@ private:
   void bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key);
   void drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const float* rot, const vec3& pos, int trafK, bool depthDone = false);
   void drawPlaneMeshDepth(const FrameParams& fp, const PlaneMesh& pm, const float* rot, const vec3& pos, int trafK);
-  // the rigid parts' poses this frame (computePartPoses: kPartPoseFS into texPartPose, 4 texels an instance), read
+  // the rigid parts' poses this frame (computePartPoses: kPartPoseFS into texPartPose, 4 texels an instance, from the
+  // instance list in texPartInfo), for the player's aircraft (owner 0) and each traffic aircraft k (owner k + 1); read
   // by every part draw's vertex shader
-  GLuint progPartPose = 0, texPartPose = 0, fboPartPose = 0; int partPoseN = 0; const PlaneMesh* partPosePM = nullptr; int partPoseType[16] = {}; float partPoseSide[32] = {};
-  void computePartPoses(const FrameParams& fp, const PlaneMesh& pm);
-  void drawPlaneParts(const PlaneMesh& pm, GLuint prog);   // (the program bound, its uniforms set: each part instance at its pose)
+  static constexpr int kMaxPoseInst = 256;
+  struct PoseOwner { const PlaneMesh* pm = nullptr; int base = 0, n = 0; };
+  PoseOwner poseOwner[1 + kMaxTrafficDrawn];
+  std::vector<int> poseType;   // each instance's part type
+  GLuint progPartPose = 0, texPartPose = 0, texPartInfo = 0, fboPartPose = 0;
+  void computePartPoses(const FrameParams& fp, const PlaneMesh* player, const PlaneMesh* const* traffic);
+  void updatePartPoses(const FrameParams& fp);
+  void drawPlaneParts(const PlaneMesh& pm, GLuint prog, int trafK);   // (the program bound, its uniforms set: each part instance at its pose)
   const PlaneMesh* earlyMesh = nullptr;   // the player's mesh whose depth opens this frame's G-buffer (rasterWorld; drawEntities draws it)
   uint64_t trafficModelKey(const float* t) const;   // hullKey(slot 0) of a traffic aircraft's model
   std::unordered_map<uint64_t, HullMesh> hulls;   // every airframe baked so far, outside and cockpit (keyed by hullKey)

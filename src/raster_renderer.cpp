@@ -28,16 +28,26 @@ bool Renderer::compileRaster() {
   return compileTerrainMesh();
 }
 
+// The rigid parts' poses for this view: the player's aircraft's and the traffic's (computed again by the objects pass:
+// a camera feed in between computes its own)
+void Renderer::updatePartPoses(const FrameParams& fp) {
+  const PlaneMesh* player = nullptr; const PlaneMesh* traf[kMaxTrafficDrawn] = {};
+  if (planeMeshWanted(fp) && fp.pano <= 0.f) {
+    auto pm = planeMeshes.find(hullKey(fp, fp.plane.PS[3] > 0.5f ? 1 : 0));
+    if (pm != planeMeshes.end() && pm->second.ok) player = &pm->second;
+  }
+  if (!meshOff && progPlaneMesh && fp.pano <= 0.f)
+    for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); k++) { auto it = planeMeshes.find(trafficModelKey(fp.traffic[k].t)); if (it != planeMeshes.end() && it->second.ok) traf[k] = &it->second; }
+  computePartPoses(fp, player, traf);
+}
+
 // The lit frame for a view from the G-buffer the raster passes filled: into texRaw (colour + TAA class), texDepth (view
 // distance) and texCloudMask, exactly what the ray tracer writes, so the clouds, the TAA and everything after run as before.
 void Renderer::rasterWorld(const FrameParams& fp) {
   // scenery: its shadow cascades and the G-buffer, which it clears (entity_render.cpp)
   // the player's baked mesh opens the G-buffer's depth (drawEntities, right after the clear): see rasterObjects
-  earlyMesh = nullptr; partPoseN = 0; partPosePM = nullptr;
-  if (planeMeshWanted(fp) && fp.pano <= 0.f) {   // the cockpit's rigid parts: their poses for every draw this frame
-    auto pm = planeMeshes.find(hullKey(fp, fp.plane.PS[3] > 0.5f ? 1 : 0));
-    if (pm != planeMeshes.end() && pm->second.ok) computePartPoses(fp, pm->second);
-  }
+  earlyMesh = nullptr;
+  updatePartPoses(fp);   // (the rigid parts' poses for this view)
   static const bool noEarly = getenv("NOEARLY") != nullptr;   // (debug A/B: the mesh's depth only in the objects pass, as before)
   if (!noEarly && planeMeshWanted(fp) && fp.pano <= 0.f) {
     auto pm = planeMeshes.find(hullKey(fp, fp.plane.PS[3] > 0.5f ? 1 : 0));
@@ -58,6 +68,7 @@ void Renderer::rasterWorld(const FrameParams& fp) {
 // player's aircraft starts its march on its rasterized hull, as in the ray tracer.
 void Renderer::rasterObjects(const FrameParams& fp) {
   hullOn = false;
+  updatePartPoses(fp);
   const int slot = fp.plane.PS[3] > 0.5f ? 1 : 0;
   // the player's aircraft as a mesh where it never moves (aircraft_mesh.cpp): then only its moving parts are marched,
   // from the hull round them; without one, the whole airframe is marched from its full hull as the ray tracer does
@@ -222,7 +233,7 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
     glUniform1i(U(progShMap, "uPartInst"), -1);
     glBindVertexArray(pm->second.vao);
     glDrawElements(GL_TRIANGLES, pm->second.idx, GL_UNSIGNED_INT, nullptr);
-    drawPlaneParts(pm->second, progShMap);   // (the cockpit's controls at their pose: no longer marched under a mask)
+    drawPlaneParts(pm->second, progShMap, -1);   // (its moving parts at their pose: no longer marched under a mask)
     // the moving hull: a mask, no depth
     if (mov) {
       glDisable(GL_DEPTH_TEST); glDepthMask(GL_FALSE); glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -249,13 +260,7 @@ void Renderer::rasterShadowProxy(const FrameParams& fp) {
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
   glViewport(0, 0, rw, rh);
   glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
-  setRT(progShProxy, fp);
-  glUniform1i(U(progShProxy, "uAfShOn"), shOn);
-  if (shOn) {
-    glUniformMatrix4fv(U(progShProxy, "uAfShVP"), 4, GL_FALSE, shMapVP[0].m);
-    glActiveTexture(GL_TEXTURE0 + 26); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMap); glUniform1i(U(progShProxy, "uAfShMap"), 26);
-    glActiveTexture(GL_TEXTURE0 + 27); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMov); glUniform1i(U(progShProxy, "uAfShMov"), 27);
-  }
+  setRT(progShProxy, fp);   // (the airframe shadow maps: setRT)
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);
