@@ -15,13 +15,13 @@ const float kS0 = 1.f, kS1 = 0.25f, kS2 = 0.0625f;   // cell sizes of the three 
 inline float halfDiag(float s) { return s * 0.8660254f; }
 // meshBake: the list for the static mesh's bake (aircraft_mesh.cpp), whose field leaves the rigid parts out
 // (plane_parts.glsl): a sweep that moves nothing but parts is dropped - the light aircraft's flaps, control surfaces and
-// cockpit controls, the XR-40's surfaces, vanes, iris, fans, bay doors and bomb (the XR-30's surfaces are still in
-// its field). Fewer states, a proportionally shorter bake.
+// cockpit controls, the XR-40's surfaces, vanes, iris, fans, bay doors and bomb, the XR-30's surfaces, nozzles and
+// gear. Fewer states, a proportionally shorter bake.
 inline std::vector<HullState> hullStateList(const float* M, bool inside, bool meshBake = false) {
   std::vector<HullState> st;
   const int eng = (int)(M[2] + 0.5f);
-  const bool partsOnly = meshBake && eng != 5;   // (the XR-30's elevator sweep also vectors its nozzles: kept)
-  const bool gearParts = meshBake && eng < 5;    // (the packed model's gear and nose wheel are rigid parts too: the XR-30's and XR-40's gear is their own)
+  const bool partsOnly = meshBake;                 // (the XR-30's nozzles, which its elevator sweep vectors, are parts too)
+  const bool gearParts = meshBake;                 // (the packed model's gear and nose wheel are rigid parts, and the XR-30's and XR-40's own)
   auto add = [&](float gear, float flaps, float steer, float p, float r, float y, float thr) {
     st.push_back({{gear, flaps, steer, inside ? 1.f : 0.f}, {p, r, y, thr}});
   };
@@ -49,8 +49,7 @@ inline std::vector<HullState> hullStateList(const float* M, bool inside, bool me
       HullState h = {{1, 0, 0, 0}, {0, 0, 0, 0}, {tilt, yawv, thr, vane}, {fan, bay, las, bomb}};
       st.push_back(h);
     };
-    for (int i = 1; i <= 8; i++) addWr(i / 8.f, 0, 0, 0, 0, 0, 0, 1);                 // pod tilt (the actuators)
-    for (int i = 1; i <= 4; i++) if (partsOnly) addWr(0, 0, 0, 0, 0, 0, i * 0.25f, 1);   // the turrets' wells
+    if (!partsOnly) for (int i = 1; i <= 8; i++) addWr(i / 8.f, 0, 0, 0, 0, 0, 0, 1);   // pod tilt (the actuators: rigid parts too)
     if (!partsOnly) for (int i = 0; i <= 4; i++) { float s = i * 0.5f - 1.f; addWr(0, s, 0, 0, 0, 0, 0, 1); addWr(0, 0, 0, s, 0, 0, 0, 1); }   // vanes
     if (!partsOnly) {
       for (int i = 1; i <= 4; i++) addWr(0, 0, i * 0.4f, 0, 0, 0, 0, 1);                 // thrust (the iris)
@@ -59,7 +58,7 @@ inline std::vector<HullState> hullStateList(const float* M, bool inside, bool me
       addWr(0, 0, 0, 0, 0, 1, 0, 0);                                                     // bay open, bomb away
     }
   }
-  if ((int)(M[2] + 0.5f) == 5 && !inside) {   // the XR-30: its nozzles vector from level to the hover setting (wr[0] = the angle)
+  if ((int)(M[2] + 0.5f) == 5 && !inside && !meshBake) {   // the XR-30: its nozzles vector from level to the hover setting (wr[0] = the angle)
     for (int i = 1; i <= 6; i++) { HullState h = {{1, 0, 0, 0}, {0, 0, 0, 0}, {1.5707963f * i / 6.f, 0, 0, 0}, {0, 0, 0, 0}}; st.push_back(h); }
     for (int s = -1; s <= 1; s += 2) { HullState h = {{1, 0, 0, 0}, {(float)s, 0, 0, 0}, {1.5707963f, 0, 0, 0}, {0, 0, 0, 0}}; st.push_back(h); }
   }

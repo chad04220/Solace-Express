@@ -3601,7 +3601,9 @@ void Game::debugScene(const std::string& name) {
     sp = std::clamp(sp, 0, kWraith);
     Contract c; c.from = g_world.findAirport("CAP"); c.to = g_world.findAirport("MDB"); c.title = "Aircraft check";
     c.wx = Weather(); c.wx.timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 14.5f; c.wx.cloudCover = 0.2f; c.wx.visibility = 60000;
-    realTime = 20; startFlight(c, sp, Career::SRC_OWNED);
+    realTime = 20;
+    if (kAircraft[sp].special) { resCraft = sp; resAirport = c.from; resAirborne = false; resTime = c.wx.timeOfDay; resWx = 0; resCard = -1; launchResearch(); }   // (the research craft as their flights show them)
+    else startFlight(c, sp, Career::SRC_OWNED);
     for (int i = 0; i < 30; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     if (dist <= 0) dist = kAircraft[sp].span * 1.15f;
     float y = yawD * DEG, pt = pitD * DEG;

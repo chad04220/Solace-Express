@@ -247,7 +247,7 @@ private:
   // the rigid parts' poses this frame (computePartPoses: kPartPoseFS into texPartPose, 4 texels an instance, from the
   // instance list in texPartInfo), for the player's aircraft (owner 0) and each traffic aircraft k (owner k + 1); read
   // by every part draw's vertex shader
-  static constexpr int kMaxPoseInst = 256;
+  static constexpr int kMaxPoseInst = 512;
   struct PoseOwner { const PlaneMesh* pm = nullptr; int base = 0, n = 0; };
   PoseOwner poseOwner[1 + kMaxTrafficDrawn];
   std::vector<int> poseType;   // each instance's part type

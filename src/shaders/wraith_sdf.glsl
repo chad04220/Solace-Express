@@ -128,14 +128,13 @@ vec2 wrPod(vec3 p, int i, float lim){
     res = opU(res, vec2(housing, 80.0));
     res = opU(res, vec2(max(rr2 - 0.09, abs(ox - 0.58) - 0.06), 92.0));          // trunnion shaft
   }
-  // hydraulic tilt actuator: barrel on the pylon (front) or the wing root (rear), chrome rod to a lug on the pod
-  vec3 anchor = P + (i < 2 ? vec3(-side*0.85, 0.05, -0.32) : vec3(-side*0.8, 0.0, -1.0));
-  vec3 lugL = vec3(-side*0.42, 0.36, -0.75); lugL.yz = rot2(lugL.yz, tilt);
-  vec3 lug = P + lugL;
-  vec3 ad = lug - anchor; float al = length(ad);
-  vec3 axis = ad/max(al, 1e-4); float barrel = min(0.6, al*0.65);
-  float act = min(sdCapsule(p, anchor, anchor + axis*barrel, 0.07), sdCapsule(p, anchor + axis*max(barrel - 0.05, 0.0), lug, 0.035));
-  res = opU(res, vec2(act, 92.0));
+  // hydraulic tilt actuator: barrel on the pylon (front) or the wing root (rear), chrome rod to a lug on the pod; a
+  // rigid part (plane_parts.glsl wrActEnds: it stretches along its axis as the pod tilts)
+  if (gPartMode != -2) {
+    vec3 anchor, lug; wrActEnds(i, tilt, anchor, lug);
+    vec3 ad = lug - anchor; float al = max(length(ad), 1e-4); vec3 axis = ad/al;
+    res = opU(res, vec2(min(sdCapsule(p, anchor, anchor + axis*0.65*al, 0.07), sdCapsule(p, anchor + axis*0.6*al, lug, 0.035)), 92.0));
+  }
   return res;
 }
 vec2 mapWraith(vec3 p){
@@ -179,7 +178,7 @@ vec2 mapWraith(vec3 p){
   if (length(ap - vec3(0.95, -0.45, -5.1)) < 2.0 + res.x) {
     vec3 lq = ap - vec3(0.95, WR_TUR_YC - 0.18, -5.1);   // (one frame for the whole turret: its parts are rigid)
     float well = sdBox(lq, vec3(0.2, 0.17, 0.5));
-    if (las > 0.02) res.x = max(res.x, -well);
+    res.x = max(res.x, -well);   // (always open: the hatch, a rigid part, closes over it)
     if (gPartMode != -2) {   // (the hatch, the emitter and its arm: rigid parts with meshes of their own)
     vec3 hq = lq - vec3(0.2, -0.17, 0.0); hq.xy = rot2(hq.xy, las*1.9);
     res = opU(res, vec2(sdRoundBox(hq + vec3(0.2, -0.012, 0.0), vec3(0.2, 0.012, 0.5), 0.004), 81.0));
@@ -246,30 +245,7 @@ vec2 mapWraith(vec3 p){
   float led = sdCapsule(ap, vec3(1.18, yc + 0.0, -4.0), vec3(0.15, -0.2, -8.0), 0.018);
   led = min(led, sdCapsule(ap, vec3(1.25, -0.12, -2.7), vec3(6.1, -0.18, 1.95), 0.016));
   res = opU(res, vec2(led, 87.0));
-  // retractable tricycle gear
-  {   // gear bays: mains outboard, nose bay with twin doors
-    vec4 G0 = gM[18];
-    float open = smoothstep(0.0, 0.2, gear);
-    res = gearBay(ap, res, vec3(G0.x, -0.21, G0.z), vec2(0.2, 0.46), 0.7, 0.03, open);    // skin heights measured
-    res = gearBay(p, res, vec3(0.0, -0.43, G0.w), vec2(0.24, 0.42), 0.7, 0.05, open);
-  }
-  if (gear > 0.06) {
-    vec4 G0 = gM[18], G1 = gM[19];
-    float gh = G1.x, wr = 0.38, lift = (1.0 - gear)*(gh - 0.19);   // wheels fold up flush with the belly (skin at -0.21)
-    vec3 wc = vec3(G0.x, -gh + wr + lift, G0.z);
-    float legs = sdCapsule(ap, vec3(G0.x*0.8, -0.3, G0.z), wc + vec3(-0.1, 0.05, 0.0), 0.07);
-    float tyres = sdRoundCylX(ap - wc, wr, 0.13, 0.06);
-    vec3 nc = vec3(0.0, -gh + 0.33 + lift, G0.w);
-    legs = min(legs, sdCapsule(p, vec3(0.0, -0.35, G0.w), nc + vec3(0.0, 0.1, 0.0), 0.06));
-    tyres = min(tyres, sdRoundCylX(vec3(abs(p.x) - 0.1, p.y, p.z) - vec3(0.0, nc.y, nc.z), 0.33, 0.07, 0.04));
-    res = opU(res, vec2(legs, 8.0));
-    res = opU(res, vec2(tyres, 6.0));
-    res = gearWheelDetails(ap - wc, res, wr, 0.13, true);
-    res = gearLegDetails(ap, res, vec3(G0.x*0.8, -0.3, G0.z), wc + vec3(-0.1, 0.05, 0.0), 0.07, true);
-    vec3 nq = vec3(abs(p.x) - 0.1, p.y, p.z) - nc;
-    res = gearWheelDetails(nq, res, 0.33, 0.07, false);
-    res = gearLegDetails(p, res, vec3(0.0, -0.35, G0.w), nc + vec3(0.0, 0.1, 0.0), 0.06, true);
-  }
+  res = jtGear(p, ap, res, 0.7, 0.03);   // the retractable tricycle gear (plane_sdf.glsl: the XR-30's, in this airframe's bays)
   return res;
 }
 // The XR-40's rigid parts at rest, each in its own frame (plane_parts.glsl partPose places them): the right-hand pods'
@@ -295,6 +271,7 @@ vec2 wrPartField(int k, vec3 l){
     return opU(vec2(sdRoundBox(l, vec3(0.13, 0.1, 0.32), 0.035), 90.0), vec2(min(barrel, rings), 92.0));
   }
   if (k == PT_WR_ARM) return vec2(sdCapsule(l, vec3(0.0), vec3(0.0, -0.38, -0.25), 0.045), 90.0);
+  if (k == PT_WR_ACT) return vec2(min(sdCapsule(l, vec3(0.0), vec3(0.0, 0.0, 0.65), 0.07), sdCapsule(l, vec3(0.0, 0.0, 0.6), vec3(0.0, 0.0, 1.0), 0.035)), 92.0);
   if (k == PT_WR_ELEVON) {
     float s = l.x - 1.0, t = l.y - (-0.1 - 0.02 - s*0.012), c = l.z + 3.0;
     float elev = sdSurface(s, c, t, 5.2, 8.2, 1.35, 4.7, 0.035, 0.8, 1.9, 5.0, 0.0, 0.0);

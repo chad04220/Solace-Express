@@ -18,7 +18,14 @@ const int PT_YOKE_SHAFT = 0, PT_YOKE_WHEEL = 1, PT_PEDAL = 2, PT_THR_KNOB = 3, P
           PT_JT_ELEVON = 30, PT_JT_CANARD = 31, PT_JT_RUDDER = 32,   // the XR-30's (plane_sdf.glsl jtPartField)
           // the landing gear of the aircraft drawn from the packed model (plane_sdf.glsl gearPartField): a retracting main
           // leg with its wheels, the nose and tail wheels (steered), the bays' doors
-          PT_GEAR_MAIN = 33, PT_GEAR_NOSE = 34, PT_GEAR_TAIL = 35, PT_GEAR_MDOOR = 36, PT_GEAR_NDOOR = 37;
+          PT_GEAR_MAIN = 33, PT_GEAR_NOSE = 34, PT_GEAR_TAIL = 35, PT_GEAR_MDOOR = 36, PT_GEAR_NDOOR = 37,
+          // the rest of the XR-30's moving pieces (plane_sdf.glsl jtPartField): its two vectoring nozzles, its gear's struts
+          // (they shorten as they retract), wheels and bay doors
+          // (the gear's struts, wheels and doors serve the XR-40 too: it has the same gear in other bays)
+          PT_JT_NOZZLE = 38, PT_JT_LEGM = 39, PT_JT_WHEELM = 40, PT_JT_LEGN = 41, PT_JT_WHEELN = 42, PT_JT_DOORM = 43, PT_JT_DOORN = 44,
+          PT_WR_ACT = 45;   // the XR-40's pods' hydraulic tilt actuators (stretched along their axis as the pods tilt)
+bool partIsJet(int k){ return (k >= PT_JT_ELEVON && k <= PT_JT_RUDDER) || (k >= PT_JT_NOZZLE && k <= PT_JT_DOORN); }
+bool partIsWraith(int k){ return (k >= PT_WR_PODF && k <= PT_WR_RUDV) || k == PT_WR_ACT; }
 const vec3 WRP_POD[4] = vec3[4](vec3(-2.35, -0.08, -3.3), vec3(2.35, -0.08, -3.3), vec3(-2.75, 0.05, 3.45), vec3(2.75, 0.05, 3.45));   // (wraith_sdf.glsl WR_POD)
 int gPartMode = -1;   // -1: the whole aircraft, its parts posed; -2: without its parts; >= 0: that part alone, in its own frame
 struct Pose { mat3 R; vec3 T; };   // (R is a rotation for the cockpit parts; for a control surface an affine map: its deflection
@@ -71,10 +78,23 @@ mat3 partMirror(float sx){ return mat3(sx, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.
 Pose surfPoseAffine(mat3 Ar, mat3 As, vec3 a, mat3 D, vec3 d){
   mat3 Bi = inverse(As); Pose X; X.R = Bi*D*Ar; X.T = Bi*(D*a + d - a); return X;
 }
+// a pod's tilt actuator: its barrel's anchor on the pylon (front pods) or the wing root (rear), the rod's lug on the pod
+void wrActEnds(int i, float tilt, out vec3 A, out vec3 L){
+  vec3 P = WRP_POD[i]; float side = P.x > 0.0 ? 1.0 : -1.0;
+  A = P + (i < 2 ? vec3(-side*0.85, 0.05, -0.32) : vec3(-side*0.8, 0.0, -1.0));
+  vec3 l = vec3(-side*0.42, 0.36, -0.75); l.yz = rot2(l.yz, tilt); L = P + l;
+}
 // The XR-40's parts (sd.x: the pod, 0-3, or the side, -1 / 1; sd.y: which vane or petal). A pod's pieces ride its
 // tilt about the trunnion axis (x) through its pivot; the left pods' nacelles are the right ones' mirror image
 Pose wrPartPose(int k, vec2 sd){
   Pose X; X.R = mat3(1.0); X.T = vec3(0.0);
+  if (k == PT_WR_ACT) {   // its unit-length mesh along z, laid from the anchor to the lug (any roll about the axis: it is round)
+    vec3 A, L; wrActEnds(int(sd.x + 0.5), gWr[0][int(sd.x + 0.5)], A, L);
+    vec3 d = L - A; float al = max(length(d), 1e-4); vec3 a = d/al;
+    vec3 v = normalize(cross(a, vec3(1.0, 0.0, 0.0))), u = cross(v, a);
+    X.R = mat3(u, v, a*al); X.T = A;
+    return X;
+  }
   if (k <= PT_WR_PETAL) {
     int i = int(sd.x + 0.5); vec3 P = WRP_POD[i]; float side = P.x > 0.0 ? 1.0 : -1.0;
     mat3 Rt = partRyz(gWr[0][i]);
@@ -293,10 +313,47 @@ Pose partPoseCockpit(int k, vec2 sd){
   }
   return X;
 }
-// the XR-30's surfaces
+// the research jets' gear bays (the XR-30's and the XR-40's: the same gear, in bays at their own skin heights): a bay's
+// centre at the skin (the right main's), its half width and half length
+vec3 jtBayC(bool nose){
+  bool wr = int(gM[0].z + 0.5) == 6;
+  return nose ? vec3(0.0, wr ? -0.43 : -0.39, gM[18].w) : vec3(gM[18].x, wr ? -0.21 : -0.355, gM[18].z);
+}
+const vec2 JT_MAIN_BAY_H = vec2(0.2, 0.46), JT_NOSE_BAY_H = vec2(0.24, 0.42);
+// how far the gear has risen: it rises straight up, the struts shortening and the wheels sliding (the XR-40's folds
+// flush with its belly)
+float jtGearLift(){ return (1.0 - gPS.x)*(gM[19].x - (int(gM[0].z + 0.5) == 6 ? 0.19 : 0.5)); }
+// a strut from its fixed mount A to its foot B (rest), shortened along y by the lift; below 6% extension the gear is
+// stowed and drawn as nothing (as the field draws it): the pose collapses to the mount
+Pose jtStrutPose(vec3 A, vec3 B, mat3 S){
+  float show = gPS.x > 0.06 ? 1.0 : 1e-3, k = (B.y + jtGearLift() - A.y)/min(B.y - A.y, -1e-3);
+  mat3 D = show*mat3(1.0, 0.0, 0.0,  0.0, k, 0.0,  0.0, 0.0, 1.0);
+  Pose X; X.R = S*D; X.T = S*(A - D*A); return X;
+}
+Pose jtWheelPose(vec3 C, mat3 S){
+  float show = gPS.x > 0.06 ? 1.0 : 1e-3;
+  Pose X; X.R = S*mat3(show); X.T = S*(C + vec3(0.0, jtGearLift(), 0.0) - show*C); return X;
+}
+// a bay's door (hinged as the light aircraft's vertical bays' are: gearPartPose)
+Pose jtDoorPose(vec3 c, vec2 h, float s, mat3 S){
+  Pose X; X.R = S*partMirror(-s)*partRxy(-gearDoorAngle()); X.T = S*(c + vec3(s*h.x, 0.0, 0.0)); return X;
+}
+// the XR-30's surfaces, nozzles and gear
 Pose jtPartPose(int k, vec2 sd){
   float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z;
   Pose X;
+  if (k >= PT_JT_NOZZLE) {
+    vec4 G0 = gM[18]; float gh = gM[19].x;
+    mat3 S = partMirror(sd.x);
+    if (k == PT_JT_NOZZLE) { X.R = S*partRyz(gFlame.z); X.T = S*vec3(0.82, -0.12, 7.75); }   // (about its front edge, by the vectoring angle)
+    else if (k == PT_JT_LEGM) X = jtStrutPose(vec3(G0.x*0.8, -0.3, G0.z), vec3(G0.x - 0.1, -gh + 0.43, G0.z), S);
+    else if (k == PT_JT_WHEELM) X = jtWheelPose(vec3(G0.x, -gh + 0.38, G0.z), S);
+    else if (k == PT_JT_LEGN) X = jtStrutPose(vec3(0.0, -0.35, G0.w), vec3(0.0, -gh + 0.43, G0.w), mat3(1.0));
+    else if (k == PT_JT_WHEELN) X = jtWheelPose(vec3(0.0, -gh + 0.33, G0.w), mat3(1.0));
+    else if (k == PT_JT_DOORM) X = jtDoorPose(jtBayC(false), JT_MAIN_BAY_H, sd.y, S);
+    else X = jtDoorPose(jtBayC(true), JT_NOSE_BAY_H, sd.y, mat3(1.0));
+    return X;
+  }
   if (k == PT_JT_ELEVON) {   // the wing's frame (s, c, t) = (|x|, z + 1.6, y + 0.18 + 0.035 s)
     mat3 Ar = mat3(1.0, 0.0, 0.035, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0); vec3 a = vec3(0.0, 1.6, 0.18);
     mat3 D; vec3 d; surfDefl(5.6, 7.2, 1.2, 5.6, 0.84, -cPitch*0.3 - cRoll*sd.x*0.3, 0.0, D, d);
@@ -315,8 +372,8 @@ Pose jtPartPose(int k, vec2 sd){
 // any part's pose (the pose pass, the bake): each family's own function, so a call site that places one family never
 // inlines the others' code
 Pose partPose(int k, vec2 sd){
-  if (k >= PT_WR_PODF && k <= PT_WR_RUDV) return wrPartPose(k, sd);
-  if (k >= PT_JT_ELEVON && k <= PT_JT_RUDDER) return jtPartPose(k, sd);
+  if (partIsWraith(k)) return wrPartPose(k, sd);
+  if (partIsJet(k)) return jtPartPose(k, sd);
   if (k >= PT_GEAR_MAIN && k <= PT_GEAR_NDOOR) return gearPartPose(k, sd);
   return partPoseCockpit(k, sd);
 }
@@ -386,8 +443,8 @@ vec2 partFieldCockpit(int k, vec3 l){
 #ifdef PART_BAKE
 // any part's shape (the mesh bake only, PART_BAKE: one part alone in its own frame)
 vec2 partField(int k, vec3 l){
-  if (k >= PT_WR_PODF && k <= PT_WR_RUDV) return wrPartField(k, l);
-  if (k >= PT_JT_ELEVON && k <= PT_JT_RUDDER) return jtPartField(k, l);
+  if (partIsWraith(k)) return wrPartField(k, l);
+  if (partIsJet(k)) return jtPartField(k, l);
   if (k >= PT_GEAR_MAIN && k <= PT_GEAR_NDOOR) return gearPartField(k, l);
   return partFieldCockpit(k, l);
 }

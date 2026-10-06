@@ -247,9 +247,90 @@ vec2 mapJetCockpit(vec3 p){
   }
   return res;
 }
+// the XR-30's nozzle in its own frame (x across, z aft from its front edge, the pivot; plane_parts.glsl jtPartPose
+// turns it by the vectoring angle): the 2D duct's walls, soot-black inside, the afterburner's flame-holder rings and
+// spray bars, a ribbed liner and the convergent-divergent flaps that form the throat. The last turbine stage behind it
+// is the airframe's (jtTurbine)
+vec2 jtNozzleShape(vec3 l){
+  vec3 nq = l - vec3(0.0, 0.0, 0.5);
+  float box = sdRoundBox(nq, vec3(0.44, 0.31, 0.5), 0.06);
+  float cav = sdBox(nq - vec3(0.0, 0.0, 0.25), vec3(0.36, 0.23, 0.6));
+  float nzlIn = -cav;
+  vec2 res = vec2(max(box, nzlIn), nzlIn > box - 0.001 ? 37.0 : 33.0);
+  if (cav < 0.05) {
+    vec3 hq = nq - vec3(0.0, 0.0, -0.08);
+    float gut = min(sdTorus(hq.xzy, vec2(0.17, 0.012)), sdTorus(hq.xzy, vec2(0.085, 0.01)));          // V-gutter rings
+    vec2 bq = hq.xy; float ba = atan(bq.y, bq.x); ba = mod(ba + 0.3927, 0.7854) - 0.3927;
+    vec2 br2 = length(bq)*vec2(cos(ba), sin(ba));
+    float bars = max(sdBox(vec3(br2.x - 0.13, br2.y, hq.z + 0.04), vec3(0.11, 0.006, 0.006)), max(abs(nq.x) - 0.35, abs(nq.y) - 0.22));
+    res = opU(res, vec2(min(gut, bars), 37.0));
+    float ribs = max(abs(fract(nq.z/0.11) - 0.5)*0.11 - 0.01, -(nzlIn + 0.012));
+    ribs = max(ribs, max(nq.z - 0.02, -0.3 - nq.z));
+    res = opU(res, vec2(ribs, 37.0));
+    // the C-D flaps: the duct narrows to the throat at z 0.28, then opens slightly to the exit
+    float hz = 0.23 - 0.075*exp(-pow((nq.z - 0.28)/0.16, 2.0));
+    float flap = max(max((hz - abs(nq.y))*0.9, abs(nq.x) - 0.36), max(0.06 - nq.z, nq.z - 0.56));
+    res = opU(res, vec2(flap, 37.0));
+  }
+  return res;
+}
+// the duct the nozzle continues, cut into the airframe at its rest angle (l: the right nozzle's frame at rest), with
+// the last turbine stage behind a hot tail cone deep in it
+vec2 jtTurbine(vec2 res, vec3 l){
+  vec3 nq = l - vec3(0.0, 0.0, 0.5);
+  float cav = sdBox(nq - vec3(0.0, 0.0, 0.25), vec3(0.36, 0.23, 0.6));
+  res.x = max(res.x, -cav);   // (the duct is hollow right down to the turbine: no airframe inside it)
+  if (cav < 0.05) {
+    vec3 iq = nq - vec3(0.0, 0.0, -0.35);
+    float ang = atan(iq.y, iq.x), rr = length(iq.xy);
+    float disc = max(sdBox(iq, vec3(0.36, 0.23, 0.02)), -iq.z - 0.02);
+    float blades = max(max(abs(fract(ang*23.0/6.2832 + rr*1.5) - 0.5)*rr*0.27 - 0.006, abs(iq.z - 0.03) - 0.012), rr - 0.225);
+    float hub = sdRoundCone(iq, vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, 0.24), 0.1, 0.02);
+    res = opU(res, vec2(min(min(disc, blades), hub), 36.0));
+  }
+  return res;
+}
+// its gear (body space, right side): a strut from its mount A to its foot B, a main wheel (wq: from its centre), the
+// nose's twin wheels (nq: from their axle's centre)
+vec2 jtStrut(vec3 l, vec3 A, vec3 B, float r){
+  return gearLegDetails(l, vec2(sdCapsule(l, A, B, r), 8.0), A, B, r, true);
+}
+vec2 jtMainWheel(vec3 wq){ return gearWheelDetails(wq, vec2(sdRoundCylX(wq, 0.38, 0.13, 0.06), 6.0), 0.38, 0.13, true); }
+vec2 jtNoseWheels(vec3 nq){ vec3 q = vec3(abs(nq.x) - 0.1, nq.yz); return gearWheelDetails(q, vec2(sdRoundCylX(q, 0.33, 0.07, 0.04), 6.0), 0.33, 0.07, false); }
+// the research jets' retractable tricycle gear (the XR-30's and the XR-40's): the bays' wells cut into the airframe;
+// the doors over them, the struts and the wheels rigid parts (plane_parts.glsl jtPartPose: the gear rises straight
+// up, its struts shortening, and is stowed below 6% extension). mainDepth, mainBelow: the main wells' depth and how
+// far their cut reaches below the skin
+vec2 jtGear(vec3 p, vec3 ap, vec2 res, float mainDepth, float mainBelow){
+  vec4 G0 = gM[18];
+  vec3 cm = jtBayC(false), cn = jtBayC(true);
+  res = gearWell(ap, res, cm, JT_MAIN_BAY_H, mainDepth, mainBelow);
+  res = gearWell(p, res, cn, JT_NOSE_BAY_H, 0.7, 0.05);
+  if (gPartMode != -1) return res;
+  float a = gearDoorAngle(), sm = ap.x > cm.x ? 1.0 : -1.0, sn = p.x > 0.0 ? 1.0 : -1.0;   // (the near door of each bay, by the side of its centre line)
+  res = opU(res, vec2(gearDoorV(transpose(partMirror(-sm)*partRxy(-a))*(ap - cm - vec3(sm*JT_MAIN_BAY_H.x, 0.0, 0.0)), JT_MAIN_BAY_H), 5.0));
+  res = opU(res, vec2(gearDoorV(transpose(partMirror(-sn)*partRxy(-a))*(p - cn - vec3(sn*JT_NOSE_BAY_H.x, 0.0, 0.0)), JT_NOSE_BAY_H), 5.0));
+  if (gPS.x > 0.06) {
+    float gh = gM[19].x, lift = jtGearLift();
+    vec3 wc = vec3(G0.x, -gh + 0.38 + lift, G0.z), nc = vec3(0.0, -gh + 0.33 + lift, G0.w);
+    res = opU(res, jtStrut(ap, vec3(G0.x*0.8, -0.3, G0.z), wc + vec3(-0.1, 0.05, 0.0), 0.07));
+    res = opU(res, jtMainWheel(ap - wc));
+    res = opU(res, jtStrut(p, vec3(0.0, -0.35, G0.w), nc + vec3(0.0, 0.1, 0.0), 0.06));
+    res = opU(res, jtNoseWheels(p - nc));
+  }
+  return res;
+}
 // the XR-30's rigid parts at rest (plane_parts.glsl places them): the right elevon and rudder (body space), the right
-// canard in its pivot's frame
+// canard in its pivot's frame, the nozzle in its own frame, the gear extended (body space), a door in its hinge's frame
 vec2 jtPartField(int k, vec3 l){
+  vec4 G0 = gM[18]; float gh = gM[19].x;
+  if (k == PT_JT_NOZZLE) return jtNozzleShape(l);
+  if (k == PT_JT_LEGM) return jtStrut(l, vec3(G0.x*0.8, -0.3, G0.z), vec3(G0.x - 0.1, -gh + 0.43, G0.z), 0.07);
+  if (k == PT_JT_WHEELM) return jtMainWheel(l - vec3(G0.x, -gh + 0.38, G0.z));
+  if (k == PT_JT_LEGN) return jtStrut(l, vec3(0.0, -0.35, G0.w), vec3(0.0, -gh + 0.43, G0.w), 0.06);
+  if (k == PT_JT_WHEELN) return jtNoseWheels(l - vec3(0.0, -gh + 0.33, G0.w));
+  if (k == PT_JT_DOORM) return vec2(gearDoorV(l, JT_MAIN_BAY_H), 5.0);
+  if (k == PT_JT_DOORN) return vec2(gearDoorV(l, JT_NOSE_BAY_H), 5.0);
   if (k == PT_JT_ELEVON) return vec2(sdSurface(l.x, l.z + 1.6, l.y - (-0.18 - l.x*0.035), 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3, 0.0, 0.0), 31.0);
   if (k == PT_JT_CANARD) return vec2(sdPanel(l.x, l.z + 0.6, l.y, 1.5, 1.5, 0.45, 1.0, 0.05, 1.0, 0.0, 0.0), 31.0);
   if (k == PT_JT_RUDDER) {
@@ -293,42 +374,12 @@ vec2 mapJet(vec3 p){
     float f2 = min(fin, rud);
     res = vec2(smin(res.x, f2, 0.12), f2 < res.x ? 31.0 : res.y);
   }
-  // 2D thrust-vectoring nozzles: they vector in pitch with the stick
+  // 2D thrust-vectoring nozzles, rigid parts (plane_parts.glsl jtPartPose): they vector in pitch about their front
+  // edge with the stick (and down to the hover setting). The duct and the turbine at its end are the airframe's
   {
-    vec3 q = ap - vec3(0.82, -0.12, 7.75);
-    float a = gFlame.z;   // = -pitch*0.5 rad (vectoring)
-    vec2 yz = rot2(q.yz, -a);
-    vec3 nq = vec3(q.x, yz.x, yz.y - 0.5);
-    float nzl = sdRoundBox(nq, vec3(0.44, 0.31, 0.5), 0.06);
-    float cav = sdBox(nq - vec3(0.0, 0.0, 0.25), vec3(0.36, 0.23, 0.6));
-    res.x = max(res.x, -cav);   // the duct is hollow right down to the turbine: no airframe inside it
-    float nzlIn = -cav;   // the cavity walls (inside the duct) are soot-black, not the outer finish
-    nzl = max(nzl, nzlIn);
-    res = opU(res, vec2(nzl, nzlIn > sdRoundBox(nq, vec3(0.44, 0.31, 0.5), 0.06) - 0.001 ? 37.0 : 33.0));
-    // exhaust section, deepest first: the last turbine stage behind a hot tail cone, afterburner spray bars and two
-    // flame-holder rings, a ribbed liner, and the convergent-divergent flaps that form the 2D throat
-    if (cav < 0.05) {
-      vec3 iq = nq - vec3(0.0, 0.0, -0.35);
-      float ang = atan(iq.y, iq.x), rr = length(iq.xy);
-      float disc = max(sdBox(iq, vec3(0.36, 0.23, 0.02)), -iq.z - 0.02);
-      float blades = max(max(abs(fract(ang*23.0/6.2832 + rr*1.5) - 0.5)*rr*0.27 - 0.006, abs(iq.z - 0.03) - 0.012), rr - 0.225);
-      float hub = sdRoundCone(iq, vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, 0.24), 0.1, 0.02);
-      res = opU(res, vec2(min(min(disc, blades), hub), 36.0));
-      vec3 hq = nq - vec3(0.0, 0.0, -0.08);
-      float gut = min(sdTorus(hq.xzy, vec2(0.17, 0.012)), sdTorus(hq.xzy, vec2(0.085, 0.01)));          // V-gutter rings
-      vec2 bq = hq.xy; float ba = atan(bq.y, bq.x); ba = mod(ba + 0.3927, 0.7854) - 0.3927;
-      vec2 br2 = length(bq)*vec2(cos(ba), sin(ba));
-      float bars = max(sdBox(vec3(br2.x - 0.13, br2.y, hq.z + 0.04), vec3(0.11, 0.006, 0.006)), max(abs(nq.x) - 0.35, abs(nq.y) - 0.22));
-      res = opU(res, vec2(min(gut, bars), 37.0));
-      float wall = -cav;   // distance into the walls from the cavity
-      float ribs = max(abs(fract(nq.z/0.11) - 0.5)*0.11 - 0.01, -(wall + 0.012));
-      ribs = max(ribs, max(nq.z - 0.02, -0.3 - nq.z));
-      res = opU(res, vec2(ribs, 37.0));
-      // C-D flaps: the duct narrows to the throat at z 0.28, then opens slightly to the exit
-      float hz = 0.23 - 0.075*exp(-pow((nq.z - 0.28)/0.16, 2.0));
-      float flap = max(max((hz - abs(nq.y))*0.9, abs(nq.x) - 0.36), max(0.06 - nq.z, nq.z - 0.56));
-      res = opU(res, vec2(flap, 37.0));
-    }
+    vec3 l = ap - vec3(0.82, -0.12, 7.75);
+    res = jtTurbine(res, l);
+    if (gPartMode == -1) res = opU(res, jtNozzleShape(vec3(l.x, rot2(l.yz, -gFlame.z))));
   }
   // sensor canopy (opaque gold film) and LED strips along the chines and wing leading edges
   // Lower the crown by 11 cm and blend the shoulders, retaining the opaque sensor film.
@@ -338,30 +389,7 @@ vec2 mapJet(vec3 p){
   led = min(led, sdCapsule(ap, vec3(1.3, -0.24, -0.25), vec3(5.45, -0.39, 3.9), 0.02));
   led = min(led, sdCapsule(ap, vec3(0.62, 0.62, -3.0), vec3(0.3, 0.72, 2.0), 0.015));
   res = opU(res, vec2(led, 34.0));
-  // retractable tricycle gear
-  {   // gear bays: mains outboard, nose bay with twin doors
-    vec4 G0 = gM[18];
-    float open = smoothstep(0.0, 0.2, gear);
-    res = gearBay(ap, res, vec3(G0.x, -0.355, G0.z), vec2(0.2, 0.46), 0.8, 0.06, open);   // skin heights measured
-    res = gearBay(p, res, vec3(0.0, -0.39, G0.w), vec2(0.24, 0.42), 0.7, 0.05, open);
-  }
-  if (gear > 0.06) {
-    vec4 G0 = gM[18], G1 = gM[19];
-    float gh = G1.x, wr = 0.38, lift = (1.0 - gear)*(gh - 0.5);
-    vec3 wc = vec3(G0.x, -gh + wr + lift, G0.z);
-    float legs = sdCapsule(ap, vec3(G0.x*0.8, -0.3, G0.z), wc + vec3(-0.1, 0.05, 0.0), 0.07);
-    float tyres = sdRoundCylX(ap - wc, wr, 0.13, 0.06);
-    vec3 nc = vec3(0.0, -gh + 0.33 + lift, G0.w);
-    legs = min(legs, sdCapsule(p, vec3(0.0, -0.35, G0.w), nc + vec3(0.0, 0.1, 0.0), 0.06));
-    tyres = min(tyres, sdRoundCylX(vec3(abs(p.x) - 0.1, p.y, p.z) - vec3(0.0, nc.y, nc.z), 0.33, 0.07, 0.04));
-    res = opU(res, vec2(legs, 8.0));
-    res = opU(res, vec2(tyres, 6.0));
-    res = gearWheelDetails(ap - wc, res, wr, 0.13, true);
-    res = gearLegDetails(ap, res, vec3(G0.x*0.8, -0.3, G0.z), wc + vec3(-0.1, 0.05, 0.0), 0.07, true);
-    vec3 nq = vec3(abs(p.x) - 0.1, p.y, p.z) - nc;
-    res = gearWheelDetails(nq, res, 0.33, 0.07, false);
-    res = gearLegDetails(p, res, vec3(0.0, -0.35, G0.w), nc + vec3(0.0, 0.1, 0.0), 0.06, true);
-  }
+  res = jtGear(p, ap, res, 0.8, 0.06);
   return res;
 }
 vec2 mapWraith(vec3 p);

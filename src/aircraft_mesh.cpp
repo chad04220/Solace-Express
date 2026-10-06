@@ -29,7 +29,7 @@ const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
 const uint32_t kMeshMagic = 0x4d455348u + 13;   // (bump with the format)
 // the rigid parts a cockpit has (plane_parts.glsl PT_*) and each one's instances: x which seat or side, y which pedal
 struct PartInst { int type; float sx, sy; };
-const int kMaxPartInst = 96;
+const int kMaxPartInst = 128;
 bool partIsSurface(int type) { return type >= 11 && type <= 14; }
 // a control surface's box at rest (the right side's, body space), from the model's numbers (plane_parts.glsl partField)
 bool surfaceBox(int type, const float* M, vec3& lo, vec3& hi) {
@@ -72,6 +72,7 @@ bool wraithPartBox(int type, vec3& lo, vec3& hi, float& h) {
     case 26: lo = vec3(-0.06f, -0.08f, -1.15f); hi = vec3(0.06f, 0.04f, -0.66f); h = 0.003f; return true;
     case 27: lo = vec3(-0.05f, -0.43f, -0.3f); hi = vec3(0.05f, 0.05f, 0.05f); h = 0.003f; return true;
     case 28: lo = vec3(2.87f, -0.25f, 2.77f); hi = vec3(6.03f, -0.06f, 4.46f); h = 0.006f; return true;
+    case 45: lo = vec3(-0.08f, -0.08f, -0.08f); hi = vec3(0.08f, 0.08f, 1.08f); h = 0.003f; return true;   // a tilt actuator (unit length: its pose stretches it)
     case 30: lo = vec3(1.17f, -0.44f, 4.5f); hi = vec3(5.33f, -0.15f, 5.6f); h = 0.006f; return true;    // the XR-30's elevon
     case 31: lo = vec3(-0.04f, -0.06f, -0.63f); hi = vec3(1.54f, 0.06f, 0.93f); h = 0.005f; return true;   // its canard
     case 32: {   // its rudder: the (span, chord, thickness) box through the canted fin's frame (jtPartField)
@@ -98,7 +99,8 @@ bool wraithPartBox(int type, vec3& lo, vec3& hi, float& h) {
   }
   return false;
 }
-// a gear part's box (its own frame) to survey for its tight one, and its lattice (plane_parts.glsl PT_GEAR_*): generous,
+// a gear part's box (its own frame) to survey for its tight one, and its lattice (plane_parts.glsl PT_GEAR_*, and the
+// XR-30's nozzles and gear, PT_JT_NOZZLE on): generous,
 // from the model's numbers - the legs' mounts and the bays' heights come from the field itself
 bool gearPartBox(int type, const float* M, vec3& lo, vec3& hi, float& h) {
   auto m = [&](int i, int c) { return M[i * 4 + c]; };
@@ -112,13 +114,20 @@ bool gearPartBox(int type, const float* M, vec3& lo, vec3& hi, float& h) {
              else { lo = vec3(-0.06f, -0.06f, -wr - 0.2f); hi = vec3(0.5f, 0.03f, wr + 0.2f); }
              h = 0.004f; return true;
     case 37: lo = vec3(-0.06f, -0.06f, -wr - 0.2f); hi = vec3(0.4f, 0.03f, wr + 0.2f); h = 0.004f; return true;
+    // the XR-30's (plane_sdf.glsl jtPartField): a nozzle in its own frame, the gear extended (body space), a door
+    case 38: lo = vec3(-0.56f, -0.44f, -0.12f); hi = vec3(0.56f, 0.44f, 1.2f); h = 0.005f; return true;
+    case 39: lo = vec3(track * 0.8f - 0.3f, -gh - 0.1f, mz - 0.45f); hi = vec3(track + 0.25f, 0.f, mz + 0.45f); h = 0.005f; return true;
+    case 40: lo = vec3(track - 0.35f, -gh - 0.15f, mz - 0.55f); hi = vec3(track + 0.35f, -gh + 0.95f, mz + 0.55f); h = 0.005f; return true;
+    case 41: lo = vec3(-0.3f, -gh - 0.1f, m(18, 3) - 0.45f); hi = vec3(0.3f, 0.f, m(18, 3) + 0.45f); h = 0.005f; return true;
+    case 42: lo = vec3(-0.35f, -gh - 0.15f, m(18, 3) - 0.5f); hi = vec3(0.35f, -gh + 0.85f, m(18, 3) + 0.5f); h = 0.004f; return true;
+    case 43: case 44: lo = vec3(-0.06f, -0.06f, -0.5f); hi = vec3(0.32f, 0.03f, 0.5f); h = 0.004f; return true;
   }
   return false;
 }
 int partList(const float* M, bool inside, PartInst* out) {
   const int eng = (int)(M[2] + 0.5f);
   int n = 0;
-  if (eng == 6 && !inside) {   // the XR-40: per pod its nacelle, fan, vanes and ten iris petals; the bay doors, the bomb, the turrets, the elevons and ruddervators
+  if (eng == 6 && !inside) {   // the XR-40: per pod its nacelle, fan, vanes, ten iris petals and tilt actuator; the bay doors, the bomb, the turrets, the elevons and ruddervators, the gear
     for (int i = 0; i < 4; i++) {
       out[n++] = {i < 2 ? 15 : 16, (float)i, 0}; out[n++] = {17, (float)i, 0}; out[n++] = {18, (float)i, 0};
       for (int k = -1; k <= 1; k += 2) { out[n++] = {19, (float)i, (float)k}; out[n++] = {20, (float)i, (float)k}; }
@@ -128,7 +137,10 @@ int partList(const float* M, bool inside, PartInst* out) {
     for (int s = -1; s <= 1; s += 2) {
       out[n++] = {22, (float)s, 0}; out[n++] = {24, (float)s, 0}; out[n++] = {25, (float)s, 0}; out[n++] = {26, (float)s, 0}; out[n++] = {27, (float)s, 0};
       out[n++] = {28, (float)s, 0}; out[n++] = {29, (float)s, 0};
+      out[n++] = {39, (float)s, 0}; out[n++] = {40, (float)s, 0}; out[n++] = {43, (float)s, -1}; out[n++] = {43, (float)s, 1};   // its gear (the XR-30's parts)
     }
+    out[n++] = {41, 0, 0}; out[n++] = {42, 0, 0}; out[n++] = {44, 0, -1}; out[n++] = {44, 0, 1};
+    for (int i = 0; i < 4; i++) out[n++] = {45, (float)i, 0};   // the pods' tilt actuators
     return n;
   }
   if (eng < 5) {   // the light aircraft's (and the XR-10's and XR-20's) control surfaces, outside and from the cockpit
@@ -140,8 +152,12 @@ int partList(const float* M, bool inside, PartInst* out) {
     if (tail) out[n++] = {35, 0, 0};
     else { out[n++] = {34, 0, 0}; if (gtype >= 3) { out[n++] = {37, 0, -1}; out[n++] = {37, 0, 1}; } }
   }
-  if (eng == 5 && !inside) {   // the XR-30: elevons, canards, rudders
-    for (int s = -1; s <= 1; s += 2) { out[n++] = {30, (float)s, 0}; out[n++] = {31, (float)s, 0}; out[n++] = {32, (float)s, 0}; }
+  if (eng == 5 && !inside) {   // the XR-30: elevons, canards, rudders, nozzles; its gear's struts, wheels and bay doors
+    for (int s = -1; s <= 1; s += 2) {
+      out[n++] = {30, (float)s, 0}; out[n++] = {31, (float)s, 0}; out[n++] = {32, (float)s, 0}; out[n++] = {38, (float)s, 0};
+      out[n++] = {39, (float)s, 0}; out[n++] = {40, (float)s, 0}; out[n++] = {43, (float)s, -1}; out[n++] = {43, (float)s, 1};
+    }
+    out[n++] = {41, 0, 0}; out[n++] = {42, 0, 0}; out[n++] = {44, 0, -1}; out[n++] = {44, 0, 1};
     return n;
   }
   if (!inside) return n;
