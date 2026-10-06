@@ -355,6 +355,9 @@ static int buildShaderCacheChild(HINSTANCE hInst, const std::string& dir) {
   return ok ? 0 : 1;
 }
 
+// the benchmark loops: the window answers its messages between frames (no "Not Responding" on a slow scene)
+static void pumpB() { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } }
+
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   {
     std::string cl = GetCommandLineA();
@@ -941,7 +944,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         g->saveDir = game.saveDir;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
         g_ren.entSync = false;
-        auto pumpB = [] { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } };   // (the window answers between frames: no "Not Responding" on a slow scene)
         for (int i = 0; i < 40; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); pumpB(); }
         glFinish();
         LARGE_INTEGER f0, f1; QueryPerformanceCounter(&f0);
