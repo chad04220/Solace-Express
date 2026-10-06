@@ -73,7 +73,7 @@ public:
   bool quit = false;
   // launch: while the intro still shows, render the menu tour's first place offscreen until its scenery and shadows
   // are in, and every light aircraft's hull is built (progress: fraction 0..1, what is being done)
-  void prewarm(const std::function<void(float, const std::string&)>& progress);
+  void prewarm(const std::function<void(float, const std::string&)>& progress, bool allCraft = false);   // (allCraft: the research craft too - the diagnostics)
   int prewarmCraft = -1; bool prewarmInside = false;   // the menu tour shows this aircraft instead (prewarm only)
   bool wantFullscreenToggle = false;
   std::function<void()> platformPresent;   // swaps the window's buffers and answers its messages (platform_win32 sets it): a frame shown from inside a long bake

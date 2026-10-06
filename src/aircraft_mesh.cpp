@@ -98,6 +98,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     }
   }
   if (ib.empty()) {
+    bakeBuilt++;
     // ---- the field's states, on the bake program (bound by the caller)
     std::vector<HullState> st = hullStateList(M, inside);
     const int ns = (int)st.size();

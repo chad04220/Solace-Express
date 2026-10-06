@@ -2281,7 +2281,7 @@ void Game::menuTour(FrameParams& fp) {
   fp.fade = smoothstepf(0.f, 0.9f, u) * smoothstepf(kMenuShotLen, kMenuShotLen - 0.9f, u);   // cut through black
 }
 
-void Game::prewarm(const std::function<void(float, const std::string&)>& progress) {
+void Game::prewarm(const std::function<void(float, const std::string&)>& progress, bool allCraft) {
   if (screen != SCR_MENU) return;
   bool sync = g_ren.entSync;
   // (offscreen only for these frames: the intro may draw through the same UI path in between)
@@ -2295,12 +2295,13 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
     if (i >= 2 && g_ren.entPending == 0 && !g_ren.tshPending()) break;
   }
   g_ren.entSync = sync;
-  // every light aircraft's hull (outside, and the cockpit's when that is in use): a frame that wants one bakes it
+  // every light aircraft's body (outside, and the cockpit's when that is in use; with allCraft the research jets' too):
+  // a frame that wants one bakes it, or loads it from the cache
   std::vector<std::pair<int, bool>> todo;
-  for (int i = 0; i <= kWraith; i++) if (!kAircraft[i].special) { todo.push_back({i, false}); if (g_ren.hullCockpit || g_ren.mode == 1) todo.push_back({i, true}); }
+  for (int i = 0; i <= kWraith; i++) if (allCraft || !kAircraft[i].special) { todo.push_back({i, false}); if (g_ren.hullCockpit || g_ren.mode == 1) todo.push_back({i, true}); }
   for (size_t k = 0; k < todo.size() && !quit; k++) {
     prewarmCraft = todo[k].first; prewarmInside = todo[k].second;
-    progress(0.35f + 0.65f * k / todo.size(), std::string("BUILDING AIRCRAFT SHELLS  ") + kAircraft[prewarmCraft].name);
+    progress(0.35f + 0.65f * k / todo.size(), std::string(todo[k].second ? "BUILDING AIRCRAFT BODIES  COCKPIT  " : "BUILDING AIRCRAFT BODIES  ") + kAircraft[prewarmCraft].name);
     realTime = 3.f; frame();   // bakes it at the end of the frame, if this view uses one
   }
   prewarmCraft = -1; prewarmInside = false;

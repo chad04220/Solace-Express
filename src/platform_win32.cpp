@@ -905,6 +905,25 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       return 0;
     }
   }
+  // Every aircraft body (outside and cockpit, the research craft's too) built or loaded before the tools draw a scene:
+  // the benchmark then never times a body being built, nor a traffic aircraft marched for want of its mesh, and the
+  // screenshots show the meshes the game shows. Returns how many were built from scratch and the seconds it took.
+  auto buildBodies = [&](int& built, double& secs) {
+    Game* g = new Game();
+    g->saveDir = game.saveDir;
+    g->initHeadless(); g->iconTex = iconTex;
+    const int b0 = g_ren.bakeBuilt;
+    LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0);
+    g_ren.bakeYield = [] { pumpB(); };
+    g->prewarm([](float f, const std::string& what) {
+      SetWindowTextA(g_hwnd, ("Solace Express - building the aircraft bodies " + std::to_string((int)(f * 100.f)) + "%  (" + what + ")").c_str());
+      pumpB();
+    }, true);
+    g_ren.bakeYield = nullptr;
+    QueryPerformanceCounter(&t1);
+    built = g_ren.bakeBuilt - b0; secs = (double)(t1.QuadPart - t0.QuadPart) / freq.QuadPart;
+    delete g;
+  };
   // Benchmark: SolaceExpress.exe --bench scene1,scene2,... [--size WxH] times each scene (wall clock with the GPU flushed,
   // plus the GPU time of every pass) and writes bench.txt next to the exe
   {
@@ -938,6 +957,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       }
       FILE* bf = fopen((dir + "\\" + outName).c_str(), "w");
       if (bf) fprintf(bf, "GPU: %s\nDesktop %dx%d, render %dx%d, quality %d, renderer %s\n\n", gpu.c_str(), GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), g_ren.W, g_ren.H, g_ren.quality, g_ren.mode == 1 ? "rasterizer" : "ray tracer");
+      if (cl.find("--nobodies") == std::string::npos) {   // (--nobodies: the shader compile timing alone)
+        int built = 0; double secs = 0;
+        buildBodies(built, secs);
+        if (bf) { fprintf(bf, "aircraft bodies: %d built from scratch in %.1f s (the rest loaded from the cache)\n\n", built, secs); fflush(bf); }
+      }
       g_ren.entSync = true;
       for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
         std::string sc = list.substr(a, b - a);
@@ -954,7 +978,16 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         g->saveDir = game.saveDir;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
         g_ren.entSync = false;
-        for (int i = 0; i < 40; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); pumpB(); }
+        // warm until the scene is built: at least 40 frames, then until 20 frames in a row bake nothing and stream
+        // nothing (a body, the scenery, the terrain shadow), at most 1200
+        int warm = 0, quiet = 0; const int bakes0 = g_ren.bakeCount;
+        for (; warm < 1200 && quiet < 20; warm++) {
+          const int bc = g_ren.bakeCount;
+          g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); pumpB();
+          const bool busy = g_ren.bakeCount != bc || g_ren.entPending > 0 || g_ren.tshPending();
+          quiet = warm >= 39 && !busy ? quiet + 1 : 0;
+        }
+        const int warmBakes = g_ren.bakeCount - bakes0;
         g_ren.bakeYield = nullptr;
         SetWindowTextA(g_hwnd, ("Solace Express - benchmarking " + sc).c_str());
         glFinish();
@@ -968,6 +1001,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           fprintf(bf, g_ren.mode == 1 ? "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: world %.2f  displays %.2f  feeds %.2f  objects %.2f  shadow proxy %.2f  lighting %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n"
                               : "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: scenery+shadows %.2f  displays %.2f  (%.2f %.2f %.2f)  raytrace %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n",
                   sc.c_str(), ms, 1000.0 / ms, g_ren.gpuMs, pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9], pm[10]);
+          fprintf(bf, "%-22s (warmed %d frames until built; %d bodies built during it)\n", "", warm, warmBakes);
           fflush(bf);
         }
         g_ren.entSync = true;
@@ -1093,6 +1127,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
       std::string dir(exe, n); dir = dir.substr(0, dir.find_last_of("\\/")) + "\\shots";
       CreateDirectoryA(dir.c_str(), nullptr);
+      { int built = 0; double secs = 0; buildBodies(built, secs); }
       g_ren.entSync = true;
       for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
         std::string sc = list.substr(a, b - a);

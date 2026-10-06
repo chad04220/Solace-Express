@@ -101,7 +101,8 @@ public:
   int dbgOff = 0;            // profiling: ray tracer features switched off (uDbg bits)
   int mode = 0;              // 0 the ray tracer, 1 the raster renderer (docs/RENDERER_REBUILD.md; needs rasterOk)
   bool screenWindows = getenv("SCREENFEEDS") == nullptr;   // the research craft's displays are windows (no camera feeds but the bomb camera's; SCREENFEEDS=1 brings the cameras back)
-  int bakeCount = 0;   // airframe meshes and hulls baked so far (the research terminal's warm-up waits for a frame that bakes nothing)
+  int bakeCount = 0;   // airframe meshes and hulls baked or loaded so far (the research terminal's warm-up waits for a frame that bakes nothing)
+  int bakeBuilt = 0;   // of them, built from scratch (not loaded from the mesh cache): the diagnostics report it
   std::function<void()> bakeYield;   // called between the bake's evaluation batches (the benchmark answers the window's messages during a long bake)
   // a long bake shows a frame (bakeYield) about every 30 ms of real time: between its GPU bands and inside its long CPU
   // loops, so a screen drawn from the callback (the research terminal's boot sequence) never freezes

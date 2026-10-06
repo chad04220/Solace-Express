@@ -12,7 +12,11 @@ rem   diagnostics.bat loading   renders the loading-screen pictures (the "loadin
 rem
 rem The full run:
 rem   1. system report: GPU and driver, CPU, memory, Windows, monitors with their refresh rates
-rem   2. first-run shader compile time on the rasterizer (the shader cache is set aside and restored afterwards)
+rem   2. first-run shader compile time on the rasterizer (the shader cache is set aside), then the time to build every
+rem      aircraft body from scratch with the shaders cached
+rem   Diagnostics v2: every benchmark and screenshot run first builds (or loads) every aircraft body, outside and
+rem   cockpit, the research craft's too, and each scene warms until nothing is being built or streamed before it is
+rem   timed: no number includes a body being built or a traffic aircraft drawn the slow way for want of its body.
 rem   3. benchmark on the rasterizer (the default renderer), full screen at 1920x1080: frame time and
 rem      the GPU time of every pass for each scene (the HUD, the cockpit, night); then the research craft and their
 rem      cockpits in their own file (the heaviest scenes: if one stalls the GPU, the rest of the numbers are already written)
@@ -40,7 +44,7 @@ if /i "%MODE%"=="shots" goto shots
 
 echo [1/6] System report ...
 set INFO=%OUT%\system.txt
-echo Solace Express %VER% > "%INFO%"
+echo Solace Express %VER%  (diagnostics v2) > "%INFO%"
 echo date %DATE% %TIME% >> "%INFO%"
 powershell -NoProfile -Command ^
   "$o = @();" ^
@@ -54,7 +58,7 @@ powershell -NoProfile -Command ^
   "$o | Out-File -Append -Encoding utf8 '%INFO%'" 2>nul
 type "%INFO%"
 
-echo [2/6] First-run shader compile time on the rasterizer (the cache is set aside) ...
+echo [2/6] First-run shader compile time, then every aircraft body built from scratch (the cache is set aside) ...
 set CACHE=
 if exist shadercache set CACHE=shadercache
 if not defined CACHE if exist "%APPDATA%\SolaceExpress\shadercache" set CACHE=%APPDATA%\SolaceExpress\shadercache
@@ -63,13 +67,13 @@ if defined CACHE (
   move /y "%CACHE%" "%CACHE%.aside" >nul
 )
 if exist "%APPDATA%\SolaceExpress\startup.log" del /q "%APPDATA%\SolaceExpress\startup.log"
-powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--raster --bench menu --size 1920x1080 --out %OUT%\compile_run.txt' -Wait }; $line = ('first run with an empty shader cache: {0:N1} s (compiles the shaders, then times the menu scene once)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::WriteAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
+powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--raster --bench menu --nobodies --size 1920x1080 --out %OUT%\compile_run.txt' -Wait }; $line = ('first run with an empty shader cache: {0:N1} s (compiles the shaders, then times the menu scene once; no aircraft bodies built)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::WriteAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
 if exist "%APPDATA%\SolaceExpress\startup.log" copy /y "%APPDATA%\SolaceExpress\startup.log" "%OUT%\startup_firstrun.log" >nul
-powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--raster --bench menu --size 1920x1080 --out %OUT%\compile_run2.txt' -Wait }; $line = ('second run with the cache warm: {0:N1} s' -f $t.TotalSeconds); Write-Host $line; [IO.File]::AppendAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
+powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--raster --bench menu --size 1920x1080 --out %OUT%\compile_run2.txt' -Wait }; $line = ('second run, shaders cached, every aircraft body built from scratch: {0:N1} s (the body build alone is in compile_run2.txt)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::AppendAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
 if defined CACHE if exist "%CACHE%.aside" (
-  rem the two runs rebuilt a fresh cache: the original (with its mesh bakes) comes back in its place
-  if exist "%CACHE%" rmdir /s /q "%CACHE%"
-  move /y "%CACHE%.aside" "%CACHE%" >nul
+  rem the two runs built a fresh cache with this version's shaders and every aircraft body: it stays, the old one goes
+  rem (it is put back only if the runs left no cache)
+  if exist "%CACHE%" (rmdir /s /q "%CACHE%.aside") else (move /y "%CACHE%.aside" "%CACHE%" >nul)
 )
 
 echo [3/6] Benchmark on the rasterizer, full screen 1920x1080 ...
