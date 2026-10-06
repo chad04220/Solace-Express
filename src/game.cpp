@@ -3575,7 +3575,8 @@ void Game::debugScene(const std::string& name) {
     if (const char* cs = getenv("GAVCTL")) {   // (debug: the controls held at pitch,roll,yaw,flaps - the surfaces' directions)
       float cp = 0, cr = 0, cy = 0, cf = 0; sscanf(cs, "%f,%f,%f,%f", &cp, &cr, &cy, &cf);
       botControl = true; plane.ctl.pitch = cp; plane.ctl.roll = cr; plane.ctl.yaw = cy; plane.ctl.flaps = cf; plane.flaps = cf;
-      for (int i = 0; i < 60; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+      const int n = getenv("GAVCTLN") ? atoi(getenv("GAVCTLN")) : 60;   // (the settle time: the controls' smoothing)
+      for (int i = 0; i < n; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     }
     return;
   }

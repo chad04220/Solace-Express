@@ -190,6 +190,35 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 4 * 240 && !p.ev.crashed; i++) p.step(1 / 240.f, calm, i / 240.f);
     ok = p.nozzle == 0.f && p.pos.y < 450.f;
     printf("XR-30 cannot hover: nozzle %.2f, alt %.0f m after 4 s %s\n", p.nozzle, p.pos.y, ok ? "ok" : "FAIL"); fails += !ok;
+    // on the runway: full stick in every axis at a standstill leaves it on its wheels (its fly-by-wire tipped it onto
+    // its tail or a wingtip - "Struck terrain" - with no airspeed at all), and a full-throttle roll with the stick
+    // held back from the start still rotates and climbs away
+    {
+      const Airport& a = g_world.airports[g_world.findAirport("CAP")];
+      vec3 st = a.threshold(false) + a.dir() * 30.f; st.y = a.elev + 3.f;
+      Weather still; still.windSpeed = 0; still.turbulence = 0; still.gust = 0;
+      bool parked = true;
+      for (float sp : {1.f, -1.f}) {
+        p.reset(&s, st, a.heading, s.maxFuel, 85, false); p.starterTime = 0.01f;
+        float t = 0;
+        for (; t < 4; t += 1 / 120.f) p.step(1 / 120.f, still, t);
+        p.ctl.pitch = sp; p.ctl.roll = sp; p.ctl.yaw = sp;
+        for (; t < 7 && !p.ev.crashed; t += 1 / 120.f) p.step(1 / 120.f, still, t);
+        parked = parked && !p.ev.crashed && p.onGround;
+      }
+      p.reset(&s, st, a.heading, s.maxFuel, 85, false); p.starterTime = 0.01f;
+      float t = 0;
+      for (; t < 4; t += 1 / 120.f) p.step(1 / 120.f, still, t);
+      p.ctl.brake = 0; p.ctl.throttle = 1; p.ctl.pitch = 1;
+      for (; t < 60 && !p.ev.crashed && p.agl() < 100; t += 1 / 120.f) {
+        if (!p.onGround) p.ctl.pitch = clampf((12.f - p.pitchDeg()) * 0.08f - p.w.x * 0.5f, -1, 1);
+        p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1, 1);
+        p.step(1 / 120.f, still, t);
+      }
+      ok = parked && !p.ev.crashed && p.agl() >= 100;
+      printf("XR-30 on the runway: full stick parked %s, stick-back takeoff %s (%.0f m AGL) %s\n", parked ? "stays on its wheels" : "CRASHED",
+             p.ev.crashed ? p.ev.crashReason.c_str() : "climbs away", p.agl(), ok ? "ok" : "FAIL"); fails += !ok;
+    }
     // approach: gear down at about 145 kt it flies level on its wing alone
     p.reset(&s, vec3(0, 600, 0), 90, s.maxFuel, 85, true, 75); p.ctl.gearDown = true; p.gear = 1;
     for (int i = 0; i < 20 * 240 && !p.ev.crashed; i++) {

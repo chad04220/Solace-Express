@@ -180,6 +180,17 @@ vec2 mapJetCockpit(vec3 p){
   }
   return res;
 }
+// the XR-30's rigid parts at rest (plane_parts.glsl places them): the right elevon and rudder (body space), the right
+// canard in its pivot's frame
+vec2 jtPartField(int k, vec3 l){
+  if (k == PT_JT_ELEVON) return vec2(sdSurface(l.x, l.z + 1.6, l.y - (-0.18 - l.x*0.035), 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3, 0.0, 0.0), 31.0);
+  if (k == PT_JT_CANARD) return vec2(sdPanel(l.x, l.z + 0.6, l.y, 1.5, 1.5, 0.45, 1.0, 0.05, 1.0, 0.0, 0.0), 31.0);
+  if (k == PT_JT_RUDDER) {
+    vec3 q = l - vec3(1.0, 0.3, 4.6); q.xy = rot2(q.xy, 0.42);
+    return vec2(sdSurface(q.y, q.z, q.x, 2.3, 2.6, 1.0, 1.9, 0.05, 0.7, 0.15, 2.2, 0.0, 0.0), 31.0);
+  }
+  return vec2(1e9, 0.0);
+}
 vec2 mapJet(vec3 p){
   float gear = gPS.x, inside = gPS.w;
   if (inside > 0.5) return mapJetCockpit(p);
@@ -196,13 +207,13 @@ vec2 mapJet(vec3 p){
   {
     float s = ap.x, t = p.y - (-0.18 - s*0.035), c = p.z + 1.6;
     float wing = sdPanel(s, c, t, 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3);
-    float elevon = sdSurface(s, c, t, 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3, -cPitch*0.3 - cRoll*sgn*0.3, 0.0);
+    float elevon = gPartMode == -2 ? 1e9 : sdSurface(s, c, t, 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3, -cPitch*0.3 - cRoll*sgn*0.3, 0.0);   // (elevons, canards, rudders: rigid parts)
     wing = min(wing, elevon);
     float d = smin(res.x, wing, 0.25);
     res = vec2(d, wing < res.x ? 31.0 : res.y);
   }
   // all-moving canards
-  {
+  if (gPartMode != -2) {
     vec3 q = ap - vec3(0.6, -0.02, -6.4); q.yz = rot2(q.yz, cPitch*0.3);
     float can = sdPanel(q.x, q.z + 0.6, q.y, 1.5, 1.5, 0.45, 1.0, 0.05, 1.0, 0.0, 0.0);
     res = opU(res, vec2(can, 31.0));
@@ -211,7 +222,7 @@ vec2 mapJet(vec3 p){
   {
     vec3 q = ap - vec3(1.0, 0.3, 4.6); q.xy = rot2(q.xy, 0.42);
     float fin = sdPanel(q.y, q.z, q.x, 2.3, 2.6, 1.0, 1.9, 0.05, 0.7, 0.15, 2.2);
-    float rud = sdSurface(q.y, q.z, q.x, 2.3, 2.6, 1.0, 1.9, 0.05, 0.7, 0.15, 2.2, -cYaw*0.4*sgn, 0.0);
+    float rud = gPartMode == -2 ? 1e9 : sdSurface(q.y, q.z, q.x, 2.3, 2.6, 1.0, 1.9, 0.05, 0.7, 0.15, 2.2, -cYaw*0.4*sgn, 0.0);
     float f2 = min(fin, rud);
     res = vec2(smin(res.x, f2, 0.12), f2 < res.x ? 31.0 : res.y);
   }
@@ -293,7 +304,7 @@ vec2 mapPlaneBody(vec3 p);
 vec2 mapPlane(vec3 p){
   COST(1);
   vec2 res = mapPlaneBody(p);
-  if (gPS.w > 0.5) return res;
+  if (gPS.w > 0.5 || gPartMode >= 0) return res;   // (a rigid part's bake: its own frame, no lamp housings)
   if (!gOwn) {   // traffic: the same fixtures, placed from the packed model (wingtips, fin top, tail cone)
     bool jet = int(gM[0].z + 0.5) == 5;
     vec3 tip = jet ? vec3(5.67, -0.38, 4.4) : vec3(gM[9].x + 0.07, gM[10].x + gM[9].x*gM[10].z, gM[10].y + gM[9].w + gM[9].z*0.25);

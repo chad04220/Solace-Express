@@ -24,7 +24,7 @@ jobs:
       - name: Configure (GCC, ASan + UBSan)
         run: cmake -S . -B build -DSANITIZE=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
       - name: Build
-        run: cmake --build build --parallel 4 --target flight_test progression_test save_test airport_layout_test envelope_test hull_test entity_raycast_test gameplay_test encounter_timing_test shader_keyword_test
+        run: cmake --build build --parallel 4 --target flight_test progression_test save_test airport_layout_test envelope_test hull_test mesh_simplify_test entity_raycast_test gameplay_test encounter_timing_test shader_keyword_test
       - name: Test
         env:
           ASAN_OPTIONS: detect_leaks=0

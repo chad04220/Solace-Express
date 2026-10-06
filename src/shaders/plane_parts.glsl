@@ -9,7 +9,14 @@
 //! and the ray tracer see exactly the shapes the meshes show.
 const int PT_YOKE_SHAFT = 0, PT_YOKE_WHEEL = 1, PT_PEDAL = 2, PT_THR_KNOB = 3, PT_THR_LEVER = 4, PT_FLAP_LEVER = 5,
           PT_JET_STICK = 6, PT_JET_THR = 7, PT_WR_STICK = 8, PT_WR_THR = 9, PT_WR_PEDAL = 10,
-          PT_FLAP = 11, PT_AILERON = 12, PT_ELEVATOR = 13, PT_RUDDER = 14;   // (the light aircraft's control surfaces)
+          PT_FLAP = 11, PT_AILERON = 12, PT_ELEVATOR = 13, PT_RUDDER = 14,   // (the light aircraft's control surfaces)
+          // the XR-40's (wraith_sdf.glsl wrPartField): its four pods' nacelles, fans, vanes and iris petals, the bay
+          // doors and the bomb, the laser turrets' hatches, emitters, barrel tips and arms, the elevons and ruddervators
+          PT_WR_PODF = 15, PT_WR_PODR = 16, PT_WR_FAN = 17, PT_WR_VANEC = 18, PT_WR_VANEO = 19, PT_WR_VANEY = 20,
+          PT_WR_PETAL = 21, PT_WR_DOOR = 22, PT_WR_BOMB = 23, PT_WR_HATCH = 24, PT_WR_TURRET = 25, PT_WR_MUZZLE = 26,
+          PT_WR_ARM = 27, PT_WR_ELEVON = 28, PT_WR_RUDV = 29,
+          PT_JT_ELEVON = 30, PT_JT_CANARD = 31, PT_JT_RUDDER = 32;   // the XR-30's (plane_sdf.glsl jtPartField)
+const vec3 WRP_POD[4] = vec3[4](vec3(-2.35, -0.08, -3.3), vec3(2.35, -0.08, -3.3), vec3(-2.75, 0.05, 3.45), vec3(2.75, 0.05, 3.45));   // (wraith_sdf.glsl WR_POD)
 int gPartMode = -1;   // -1: the whole aircraft, its parts posed; -2: without its parts; >= 0: that part alone, in its own frame
 struct Pose { mat3 R; vec3 T; };   // (R is a rotation for the cockpit parts; for a control surface an affine map: its deflection
                                    // about a swept, tapered hinge shears it a little, exactly as sdSurface does)
@@ -54,6 +61,60 @@ Pose surfPose(float sgn, float yOff, float zOff, float dih, float span, float rc
 }
 mat3 partRyz(float b){ float c = cos(b), s = sin(b); return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c); }   // (as rot2 on .yz)
 mat3 partRxy(float a){ float c = cos(a), s = sin(a); return mat3(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0); }  // (as rot2 on .xy)
+mat3 partRxz(float b){ float c = cos(b), s = sin(b); return mat3(c, 0.0, s, 0.0, 1.0, 0.0, -s, 0.0, c); }  // (as rot2 on .xz)
+mat3 partMirror(float sx){ return mat3(sx, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0); }
+// a hinged surface in a general affine frame (u = A*p + a: span, chord, thickness), the rest mesh the right side's:
+// As is the frame on this side (the same offsets), D, d its deflection (surfDefl)
+Pose surfPoseAffine(mat3 Ar, mat3 As, vec3 a, mat3 D, vec3 d){
+  mat3 Bi = inverse(As); Pose X; X.R = Bi*D*Ar; X.T = Bi*(D*a + d - a); return X;
+}
+// The XR-40's parts (sd.x: the pod, 0-3, or the side, -1 / 1; sd.y: which vane or petal). A pod's pieces ride its
+// tilt about the trunnion axis (x) through its pivot; the left pods' nacelles are the right ones' mirror image
+Pose wrPartPose(int k, vec2 sd){
+  Pose X; X.R = mat3(1.0); X.T = vec3(0.0);
+  if (k <= PT_WR_PETAL) {
+    int i = int(sd.x + 0.5); vec3 P = WRP_POD[i]; float side = P.x > 0.0 ? 1.0 : -1.0;
+    mat3 Rt = partRyz(gWr[0][i]);
+    X.T = P;
+    if (k == PT_WR_PODF || k == PT_WR_PODR) X.R = Rt*partMirror(side);
+    else if (k == PT_WR_FAN) X.R = Rt*partRxy(-gWr[4].x*side);
+    else if (k == PT_WR_VANEC || k == PT_WR_VANEO) { X.R = Rt*partRyz(gWr[3][i]*1.4); X.T = P + Rt*vec3(0.0, sd.y*0.13, 1.42); }
+    else if (k == PT_WR_VANEY) { X.R = Rt*partRxz(gWr[1][i]*1.4*side); X.T = P + Rt*vec3(sd.y*0.11, 0.0, 1.5); }
+    else {   // a petal: turned round the nozzle to its place, and about its root by the thrust (baked at half thrust)
+      float rootR = 0.52 - 0.07*smoothstep(-0.2, 1.3, 0.95) - 0.05;
+      float exitR = 0.28 + 0.1*clamp(gWr[2][i], 0.0, 1.0);
+      float al = atan(exitR - rootR, 0.42) - atan(0.33 - rootR, 0.42);
+      vec3 root = vec3(rootR, 0.0, 0.95);
+      mat3 Rp = partRxz(-al), Rz = partRxy(sd.y*0.62831853);
+      X.R = Rt*Rz*Rp; X.T = P + Rt*Rz*(root - Rp*root);
+    }
+    return X;
+  }
+  mat3 S = partMirror(sd.x);
+  float las = gWr[4].z;
+  vec3 L0 = vec3(0.95, -0.1 - 0.12*0.0025443 - 0.18, -5.1);   // (wraith_sdf.glsl: the turret's frame)
+  if (k == PT_WR_DOOR) { X.R = S*partRxy(gWr[4].y*1.75); X.T = S*vec3(0.53, -0.575, 0.1); }
+  else if (k == PT_WR_BOMB) { X.R = mat3(max(gWr[6].x, 1e-3)); X.T = vec3(0.0, -0.305, 0.1); }
+  else if (k == PT_WR_HATCH) { X.R = S*partRxy(-las*1.9); X.T = S*(L0 + vec3(0.2, -0.17, 0.0)); }
+  else if (k == PT_WR_TURRET) { X.R = S; X.T = S*(L0 + vec3(0.0, -0.38*las, -0.25*las)); }
+  else if (k == PT_WR_MUZZLE) { X.R = S; X.T = S*(L0 + vec3(0.0, -0.38*las, -0.25*las + 0.15*(1.0 - las))); }
+  else if (k == PT_WR_ARM) {   // (it telescopes: scaled along its own axis)
+    vec3 u = normalize(vec3(0.0, -0.38, -0.25));
+    X.R = S*(mat3(1.0) + (max(las, 1e-3) - 1.0)*outerProduct(u, u)); X.T = S*(L0 + vec3(0.0, 0.05, 0.1));
+  } else if (k == PT_WR_ELEVON) {   // the wing's frame (s, c, t) = (|x| - 1, z + 3, y + 0.12 + 0.012 s)
+    mat3 Ar = mat3(1.0, 0.0, 0.012, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0); vec3 a = vec3(-1.0, 3.0, 0.108);
+    mat3 D; vec3 d; surfDefl(5.2, 8.2, 1.35, 4.7, 0.8, -gWr[5].x*0.45 - gWr[5].z*sd.x*0.45, 0.0, D, d);
+    X = surfPoseAffine(Ar, Ar*S, a, D, d);
+  } else if (k == PT_WR_RUDV) {   // the canted fin's frame: (span, chord, thickness) from the body, its root line following the tail's taper
+    float C = cos(0.72), Sn = sin(0.72);
+    mat3 Ar = mat3(Sn, 0.0, C,   C, 0.0, -Sn,   0.05*C, 1.0, -0.05*Sn);
+    vec3 a = vec3(-1.05*Sn - 0.67*C + 0.75, -4.4, -1.05*C + 0.67*Sn);
+    float dv = -gWr[5].x*0.35 + gWr[5].y*sd.x*0.35;
+    mat3 D; vec3 d; surfDefl(3.05, 2.6, 1.1, 1.6*3.05/2.3, 0.68, -dv*1.4, 0.0, D, d);
+    X = surfPoseAffine(Ar, Ar*S, a, D, d);
+  }
+  return X;
+}
 mat3 partLever(float a){ float c = cos(a), s = sin(a); return mat3(1.0, 0.0, 0.0, 0.0, c, -s, 0.0, s, c); }   // local +y along (0, cos a, -sin a)
 // the light aircraft's centre pedestal (plane_sdf.glsl): its centre, half width, half height and half depth
 void partPedestal(out vec3 pc, out float pw, out float ph, out float pd){
@@ -114,12 +175,30 @@ Pose partPose(int k, vec2 sd){
     mat3 D; vec3 d; surfDefl(V0.x, V0.y, V0.z, V0.w, 0.66, -cYaw*0.42, 0.0, D, d);
     X.R = B*D*A; X.T = B*(D*a + d) + b;
   }
+  else if (k >= PT_WR_PODF && k <= PT_WR_RUDV) X = wrPartPose(k, sd);
+  else if (k == PT_JT_ELEVON) {   // the wing's frame (s, c, t) = (|x|, z + 1.6, y + 0.18 + 0.035 s)
+    mat3 Ar = mat3(1.0, 0.0, 0.035, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0); vec3 a = vec3(0.0, 1.6, 0.18);
+    mat3 D; vec3 d; surfDefl(5.6, 7.2, 1.2, 5.6, 0.84, -cPitch*0.3 - cRoll*sd.x*0.3, 0.0, D, d);
+    X = surfPoseAffine(Ar, Ar*partMirror(sd.x), a, D, d);
+  } else if (k == PT_JT_CANARD) {   // all-moving, about its spanwise pivot
+    mat3 S = partMirror(sd.x);
+    X.R = S*partRyz(-cPitch*0.3); X.T = S*vec3(0.6, -0.02, -6.4);
+  } else if (k == PT_JT_RUDDER) {   // the canted fin's frame
+    float C = cos(0.42), Sn = sin(0.42);
+    mat3 Ar = mat3(Sn, 0.0, C,   C, 0.0, -Sn,   0.0, 1.0, 0.0); vec3 a = vec3(-Sn - 0.3*C, -4.6, -C + 0.3*Sn);
+    mat3 D; vec3 d; surfDefl(2.3, 2.6, 1.0, 1.9, 0.7, -cYaw*0.4*sd.x, 0.0, D, d);
+    X = surfPoseAffine(Ar, Ar*partMirror(sd.x), a, D, d);
+  }
   else if (k == PT_WR_PEDAL) {
     X.R = mat3(sd.x, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
     X.T = E.xyz + vec3(sd.x*0.16, -0.63, -0.78 - sd.x*cYaw*0.04);   // (right rudder, yaw > 0, pushes the right pedal forward, -z: it pulled it back)
   }
   return X;
 }
+#ifndef PART_POSE_ONLY
+vec2 wrPartField(int k, vec3 l);   // (wraith_sdf.glsl)
+vec2 jtPartField(int k, vec3 l);   // (plane_sdf.glsl)
+#endif
 // each part's shape in its own frame: distance and material id
 vec2 partField(int k, vec3 l){
   vec2 res = vec2(1e9, 0.0);
@@ -176,6 +255,10 @@ vec2 partField(int k, vec3 l){
     ped = min(ped, sdCapsule(l, vec3(0.0, -0.07, 0.02), vec3(0.0, -0.12, 0.1), 0.012));
     res = vec2(ped, 71.0);
   }
+#ifndef PART_POSE_ONLY
+  else if (k >= PT_WR_PODF && k <= PT_WR_RUDV) res = wrPartField(k, l);
+  else if (k >= PT_JT_ELEVON && k <= PT_JT_RUDDER) res = jtPartField(k, l);
+#endif
   return res;
 }
 // a part in the whole aircraft's field: at its pose, or left out (the static bake)

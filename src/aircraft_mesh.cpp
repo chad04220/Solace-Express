@@ -13,21 +13,24 @@
 #include "renderer.h"
 #include "shaders.h"
 #include "hull_mesh.h"
+#include "mesh_simplify.h"
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
+#include <thread>
+#include <memory>
 
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 9;   // (bump with the format)
+const uint32_t kMeshMagic = 0x4d455348u + 11;   // (bump with the format)
 const float kMeshShell = 0.004f;   // the fine patch's shell stands this far outside the surface (plane_mesh_fs.glsl marches the rest)
 // the rigid parts a cockpit has (plane_parts.glsl PT_*) and each one's instances: x which seat or side, y which pedal
 struct PartInst { int type; float sx, sy; };
-const int kMaxPartInst = 32;
+const int kMaxPartInst = 96;
 bool partIsSurface(int type) { return type >= 11 && type <= 14; }
 // a control surface's box at rest (the right side's, body space), from the model's numbers (plane_parts.glsl partField)
 bool surfaceBox(int type, const float* M, vec3& lo, vec3& hi) {
@@ -52,12 +55,73 @@ bool surfaceBox(int type, const float* M, vec3& lo, vec3& hi) {
   else { lo = vec3(-tt, yOff + s0 - mg, zOff + c0 - mg); hi = vec3(tt, yOff + s1 + mg, zOff + c1 + mg); }
   return true;
 }
+// an XR-40 part's box in its own frame and the lattice it is meshed on (plane_parts.glsl PT_WR_*, wraith_sdf.glsl
+// wrPartField): the nacelles at 8 mm (each a metre across), the fan at 5 mm, the small vanes, petals and turret pieces
+// at 3-4 mm, the doors, the bomb and the control surfaces at 6 mm
+bool wraithPartBox(int type, vec3& lo, vec3& hi, float& h) {
+  switch (type) {
+    case 15: case 16: lo = vec3(-0.62f, -0.58f, -1.42f); hi = vec3(0.62f, 0.58f, 1.34f); h = 0.008f; return true;
+    case 17: lo = vec3(-0.46f, -0.46f, -1.13f); hi = vec3(0.46f, 0.46f, -0.59f); h = 0.005f; return true;
+    case 18: lo = vec3(-0.31f, -0.026f, -0.09f); hi = vec3(0.31f, 0.026f, 0.09f); h = 0.003f; return true;
+    case 19: lo = vec3(-0.25f, -0.026f, -0.09f); hi = vec3(0.25f, 0.026f, 0.09f); h = 0.003f; return true;
+    case 20: lo = vec3(-0.024f, -0.26f, -0.085f); hi = vec3(0.024f, 0.26f, 0.085f); h = 0.003f; return true;
+    case 21: lo = vec3(0.24f, -0.17f, 0.92f); hi = vec3(0.5f, 0.17f, 1.4f); h = 0.004f; return true;
+    case 22: lo = vec3(-0.545f, -0.04f, -1.68f); hi = vec3(0.015f, 0.012f, 1.68f); h = 0.006f; return true;
+    case 23: lo = vec3(-0.31f, -0.31f, -0.31f); hi = vec3(0.31f, 0.31f, 0.31f); h = 0.006f; return true;
+    case 24: lo = vec3(-0.415f, -0.014f, -0.515f); hi = vec3(0.015f, 0.036f, 0.515f); h = 0.004f; return true;
+    case 25: lo = vec3(-0.175f, -0.145f, -0.94f); hi = vec3(0.175f, 0.145f, 0.365f); h = 0.004f; return true;
+    case 26: lo = vec3(-0.06f, -0.08f, -1.15f); hi = vec3(0.06f, 0.04f, -0.66f); h = 0.003f; return true;
+    case 27: lo = vec3(-0.05f, -0.43f, -0.3f); hi = vec3(0.05f, 0.05f, 0.05f); h = 0.003f; return true;
+    case 28: lo = vec3(2.87f, -0.25f, 2.77f); hi = vec3(6.03f, -0.06f, 4.46f); h = 0.006f; return true;
+    case 30: lo = vec3(1.17f, -0.44f, 4.5f); hi = vec3(5.33f, -0.15f, 5.6f); h = 0.006f; return true;    // the XR-30's elevon
+    case 31: lo = vec3(-0.04f, -0.06f, -0.63f); hi = vec3(1.54f, 0.06f, 0.93f); h = 0.005f; return true;   // its canard
+    case 32: {   // its rudder: the (span, chord, thickness) box through the canted fin's frame (jtPartField)
+      const float C = cosf(0.42f), S = sinf(0.42f);
+      lo = vec3(1e9f, 1e9f, 1e9f); hi = vec3(-1e9f, -1e9f, -1e9f);
+      for (int c = 0; c < 8; c++) {
+        float sv = (c & 1) ? 2.25f : 0.1f, ch = (c & 2) ? 2.95f : 1.8f, t = (c & 4) ? 0.06f : -0.06f;
+        float x = 1.f + C * t + S * sv, y = 0.3f - S * t + C * sv, z = ch + 4.6f;
+        lo = vec3(std::min(lo.x, x), std::min(lo.y, y), std::min(lo.z, z)); hi = vec3(std::max(hi.x, x), std::max(hi.y, y), std::max(hi.z, z));
+      }
+      h = 0.006f; return true;
+    }
+    case 29: {   // the right ruddervator: its (span, chord, thickness) box through the canted fin's frame (wrPartField)
+      const float C = cosf(0.72f), S = sinf(0.72f);
+      lo = vec3(1e9f, 1e9f, 1e9f); hi = vec3(-1e9f, -1e9f, -1e9f);
+      for (int c = 0; c < 8; c++) {
+        float fs = (c & 1) ? 2.95f : 0.1f, ch = (c & 2) ? 3.25f : 1.75f, t = (c & 4) ? 0.07f : -0.07f;
+        float z = ch + 4.4f, qy = fs - 0.75f;
+        float x = C * t + S * qy + 1.05f, y = -S * t + C * qy + 0.67f - 0.05f * z;
+        lo = vec3(std::min(lo.x, x), std::min(lo.y, y), std::min(lo.z, z)); hi = vec3(std::max(hi.x, x), std::max(hi.y, y), std::max(hi.z, z));
+      }
+      h = 0.006f; return true;
+    }
+  }
+  return false;
+}
 int partList(const float* M, bool inside, PartInst* out) {
   const int eng = (int)(M[2] + 0.5f);
   int n = 0;
+  if (eng == 6 && !inside) {   // the XR-40: per pod its nacelle, fan, vanes and ten iris petals; the bay doors, the bomb, the turrets, the elevons and ruddervators
+    for (int i = 0; i < 4; i++) {
+      out[n++] = {i < 2 ? 15 : 16, (float)i, 0}; out[n++] = {17, (float)i, 0}; out[n++] = {18, (float)i, 0};
+      for (int k = -1; k <= 1; k += 2) { out[n++] = {19, (float)i, (float)k}; out[n++] = {20, (float)i, (float)k}; }
+      for (int j = 0; j < 10; j++) out[n++] = {21, (float)i, (float)j};
+    }
+    out[n++] = {23, 0, 0};
+    for (int s = -1; s <= 1; s += 2) {
+      out[n++] = {22, (float)s, 0}; out[n++] = {24, (float)s, 0}; out[n++] = {25, (float)s, 0}; out[n++] = {26, (float)s, 0}; out[n++] = {27, (float)s, 0};
+      out[n++] = {28, (float)s, 0}; out[n++] = {29, (float)s, 0};
+    }
+    return n;
+  }
   if (eng < 5) {   // the light aircraft's (and the XR-10's and XR-20's) control surfaces, outside and from the cockpit
     for (int s = -1; s <= 1; s += 2) { out[n++] = {11, (float)s, 0}; out[n++] = {12, (float)s, 0}; out[n++] = {13, (float)s, 0}; }   // flap, aileron, elevator
     out[n++] = {14, 0, 0};   // rudder
+  }
+  if (eng == 5 && !inside) {   // the XR-30: elevons, canards, rudders
+    for (int s = -1; s <= 1; s += 2) { out[n++] = {30, (float)s, 0}; out[n++] = {31, (float)s, 0}; out[n++] = {32, (float)s, 0}; }
+    return n;
   }
   if (!inside) return n;
   if (eng == 5) { out[n++] = {6, 0, 0}; out[n++] = {7, 0, 0}; return n; }                      // the XR-30: stick, throttle
@@ -129,7 +193,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   if (ib.empty()) {
     bakeBuilt++;
     // ---- the field's states, on the bake program (bound by the caller)
-    std::vector<HullState> st = hullStateList(M, inside);
+    std::vector<HullState> st = hullStateList(M, inside, true);   // (the sweeps that move only rigid parts dropped)
     const int ns = (int)st.size();
     std::vector<float> sps(128 * 4, 0.f), sct(128 * 4, 0.f), swr(128 * 4, 0.f), swr2(128 * 4, 0.f);
     for (int i = 0; i < ns; i++) for (int c = 0; c < 4; c++) { sps[i * 4 + c] = st[i].ps[c]; sct[i * 4 + c] = st[i].ctl[c]; swr[i * 4 + c] = st[i].wr[c]; swr2[i * 4 + c] = st[i].wr2[c]; }
@@ -324,7 +388,18 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     };
     nets(coarseCells, 4, 0.003f, 0.f);
     fineStart = (uint32_t)ib.size();
+    const size_t fineV = vb.size() / 8;   // (the fine patch's vertices are its own, after the coarse mesh's)
     if (!fineCells.empty()) nets(fineCells, 8, 0.f, kMeshShell);
+    // simplified (mesh_simplify.h): flat panels to a few triangles, curves to within 1 mm (the cabin's 0.4 mm: seen
+    // from half a metre); the fine patch apart (a shell 4 mm out, whose pixels march to the surface: 0.4 mm keeps it
+    // outside). On worker threads, while the GPU goes on with the hull and the parts (vb, ib and fineStart are not
+    // touched again until they are joined, below)
+    const size_t rawTris = ib.size() / 3;
+    std::vector<float> vbF(vb.begin() + fineV * 8, vb.end()); vb.resize(fineV * 8);
+    std::vector<uint32_t> ibF(ib.begin() + fineStart, ib.end()); ib.resize(fineStart);
+    for (uint32_t& i : ibF) i -= (uint32_t)fineV;
+    std::thread simpStatic([&vb, &ib, inside] { size_t e = ib.size(); simplifyMesh(vb, ib, e, inside ? 0.0004f : 0.001f); });
+    std::thread simpFine([&vbF, &ibF] { size_t e = ibF.size(); simplifyMesh(vbF, ibF, e, 0.0004f); });
     // ---- the hull of what moves: the moving 6.25 cm cells, each grown by one cell, as faces on the fine lattice (a
     // 0.25 m margin round the yoke's sweep reached the pilot's eye and every cockpit ray started inside the hull: all
     // of them marched; on the fine lattice the hull is the yoke's, the levers' and the pedals' own)
@@ -353,6 +428,9 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     }
     // ---- the rigid parts (plane_parts.glsl), each alone in its own frame at rest: a 1 cm survey finds its box, then
     // surface nets on a 2 mm lattice over it, every vertex pulled onto the surface as above
+    // (each part meshed here is simplified on a thread of its own and added to the blob once all are done, in order)
+    struct PartOut { int type; std::vector<float> vb; std::vector<uint32_t> ib; size_t raw; };
+    std::vector<std::unique_ptr<PartOut>> partOut; std::vector<std::thread> partSimp;
     {
       PartInst pl[kMaxPartInst]; const int np = partList(M, inside, pl);
       std::vector<int> done;
@@ -366,7 +444,8 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         // part's from a 1 cm survey of +-0.35 m about its own origin (2 mm lattice: seen from arm's length)
         vec3 lo(1e9f, 1e9f, 1e9f), hi(-1e9f, -1e9f, -1e9f);
         float h = 0.002f;
-        if (partIsSurface(type)) {
+        if (wraithPartBox(type, lo, hi, h)) { lo = lo - vec3(2.f * h, 2.f * h, 2.f * h); hi = hi + vec3(2.f * h, 2.f * h, 2.f * h); }
+        else if (partIsSurface(type)) {
           if (!surfaceBox(type, M, lo, hi)) continue;
           h = 0.006f; lo = lo - vec3(2.f * h, 2.f * h, 2.f * h); hi = hi + vec3(2.f * h, 2.f * h, 2.f * h);
         } else {
@@ -442,14 +521,26 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
           if ((v0 < 0.f) != (C(i, j, k + 1) < 0.f) && cubeAt(i - 1, j, k, b) && cubeAt(i - 1, j - 1, k, c) && cubeAt(i, j - 1, k, dq)) quad(a, b, c, dq);
         }
         if (pib.empty()) continue;
-        partBlob.push_back((uint32_t)type); partBlob.push_back((uint32_t)pvb.size()); partBlob.push_back((uint32_t)pib.size());
-        size_t at = partBlob.size(); partBlob.resize(at + pvb.size());
-        memcpy(&partBlob[at], pvb.data(), pvb.size() * sizeof(float));
-        partBlob.insert(partBlob.end(), pib.begin(), pib.end());
         if (getenv("HULLDBG")) printf("mesh part %d: %d x %d x %d lattice, %zu vertices, %zu triangles\n", type, nx, ny, nz, vp.size(), pib.size() / 3);
+        // simplified as the airframe is (the cockpit's controls to 0.3 mm, the exterior's parts to 0.8 mm)
+        partOut.push_back(std::make_unique<PartOut>(PartOut{type, std::move(pvb), std::move(pib), 0}));
+        PartOut* po = partOut.back().get(); po->raw = po->ib.size() / 3;
+        partSimp.emplace_back([po, inside] { size_t pe = po->ib.size(); simplifyMesh(po->vb, po->ib, pe, inside ? 0.0003f : 0.0008f); });
       }
       glUniform1i(U(progHullBake, "uHPart"), -1);
     }
+    simpStatic.join(); simpFine.join();
+    fineStart = (uint32_t)ib.size();
+    { const uint32_t off = (uint32_t)(vb.size() / 8); vb.insert(vb.end(), vbF.begin(), vbF.end()); for (uint32_t i : ibF) ib.push_back(i + off); }
+    for (auto& th : partSimp) th.join();
+    for (auto& po : partOut) {
+      partBlob.push_back((uint32_t)po->type); partBlob.push_back((uint32_t)po->vb.size()); partBlob.push_back((uint32_t)po->ib.size());
+      size_t at = partBlob.size(); partBlob.resize(at + po->vb.size());
+      memcpy(&partBlob[at], po->vb.data(), po->vb.size() * sizeof(float));
+      partBlob.insert(partBlob.end(), po->ib.begin(), po->ib.end());
+      if (getenv("HULLDBG")) printf("mesh part %d simplified: %zu -> %zu triangles\n", po->type, po->raw, po->ib.size() / 3);
+    }
+    if (getenv("HULLDBG")) printf("mesh %s simplified: %zu -> %zu triangles\n", inside ? "cockpit" : "outside", rawTris, ib.size() / 3);
     if (getenv("HULLDBG")) {
       int nmov = 0; for (uint8_t m : moving) nmov += m;
       printf("mesh %s: %d states, %zu band cells (%d moving, %d thin), %zu lattice samples, %zu vertices, %zu triangles, moving hull %zu triangles\n",

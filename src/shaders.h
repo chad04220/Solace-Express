@@ -39,7 +39,7 @@ inline std::string objectsFSAssembly(const std::string& defines) {
 }
 // the rigid parts' poses (plane_parts.glsl partPose), once a frame into a small texture the part draws read
 inline std::string partPoseFSAssembly() {
-  return std::string("#version 330 core\n") + kCommonGLSL + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts +
+  return std::string("#version 330 core\n#define PART_POSE_ONLY\n") + kCommonGLSL + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts +
          "uniform sampler2D uPPInfo;   // per instance: its part type, its owner (0 the player's aircraft, k + 1 traffic k), its side\n"
          "void main(){\n"
          "  int x = int(gl_FragCoord.x), i = x/4, c = x - i*4;\n"

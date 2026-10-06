@@ -348,6 +348,11 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     float pMax = fbwPitchMax(Vt);
     float rMax = fbwRollMax(hover), yMax = wr ? 1.8f : 1.4f;
     vec3 wd(ctl.pitch * pMax + ctl.trim * 0.15f, -ctl.yaw * yMax, -ctl.roll * rMax);
+    // the XR-30 on its wheels: its nozzles and jets cannot lever the airframe about the main gear until the wing carries
+    // some of the weight (full back stick at a standstill sat it on its tail - "Struck terrain" - and full roll on a
+    // wingtip, before the takeoff roll had begun);
+    // the authority comes in with the takeoff roll and is whole well before rotation (60 m/s)
+    if (s.special == 1 && onGround) { float ga = smoothstepf(25.f, 55.f, V); wd.x *= ga; wd.z *= ga; }   // (and roll: a wingtip)
     if (hover > 0) {  // hands-off attitude hold while hovering
       if (fabsf(ctl.pitch) < 0.05f) wd.x += hover * 2.2f * (0.f - pitchDeg()) * DEG;
       if (fabsf(ctl.roll) < 0.05f) wd.z += hover * 2.2f * bankDeg() * DEG;
