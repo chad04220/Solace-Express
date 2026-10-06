@@ -41,7 +41,7 @@ void main(){
   bool ground = cls == GB_TERRAIN || cls == GB_ENTITY || cls == GB_FOLIAGE;
   if (ground && uSunDir.y > -0.05 && t < 3000.0) {
     float m = (uAfShOn & 1) != 0 ? shMapLookup(0, p, n) : -1.0;
-    sunS = m >= 0.0 ? m : planeShadow(p + n*0.2, uSunDir);
+    sunS = m >= 0.0 ? mix(m, 1.0, uWr[4].w*0.88) : planeShadow(p + n*0.2, uSunDir);   // (a cloaked XR-40 barely darkens the ground: planeShadow's own fade)
     if (uTrafficN > 0) sunS *= trafficShadow(p)*trafficShadowMaps(p, n);
   }
   vec3 ls = vec3(1.0);

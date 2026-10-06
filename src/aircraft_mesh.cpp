@@ -177,7 +177,8 @@ bool Renderer::compilePlaneMesh() {
   progPlaneMesh = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(""), e);
   if (!progPlaneMesh) { error = "Aircraft mesh shader: " + e; return false; }
   // the depth pre-pass; with uScrSkip the fragments at or behind a screen (texScrDepth) are dropped: the screens are holes
-  progPlaneMeshDepth = linkProgramCached(planeMeshVSAssembly(""), "#version 330 core\nflat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; uniform int uScrSkip; uniform sampler2D uScrDepth;\nvoid main(){ if (uScrSkip == 1 && gl_FragCoord.z >= texelFetch(uScrDepth, ivec2(gl_FragCoord.xy), 0).r - 2e-7) discard; }\n", e);
+  // (uCloakZ: a cloaked XR-40's sweeping front, body z - what lies ahead of it is see-through and writes no depth; -1e9 none)
+  progPlaneMeshDepth = linkProgramCached(planeMeshVSAssembly(""), "#version 330 core\nflat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; uniform int uScrSkip; uniform sampler2D uScrDepth; uniform float uCloakZ; uniform mat3 uRot; uniform vec3 uPos;\nvoid main(){ if (uScrSkip == 1 && gl_FragCoord.z >= texelFetch(uScrDepth, ivec2(gl_FragCoord.xy), 0).r - 2e-7) discard; if (uCloakZ > -1e8 && (transpose(uRot)*(vW - uPos)).z < uCloakZ) discard; }\n", e);
   if (!progPlaneMeshDepth) { error = "Aircraft mesh depth shader: " + e; return false; }
   progPartPose = linkProgramCached(kFullscreenVS, partPoseFSAssembly(), e);
   if (!progPartPose) { error = "Cockpit part pose shader: " + e; return false; }
@@ -187,11 +188,10 @@ bool Renderer::compilePlaneMesh() {
   return true;
 }
 
-// every aircraft but a cloaked XR-40 and a wreck
+// every aircraft but a wreck
 bool Renderer::planeMeshWanted(const FrameParams& fp) const {
   const PlaneVisual& pv = fp.plane;
-  bool cloaked = (int)(pv.M[2] + 0.5f) == 6 && pv.wr[4][3] > 0.001f;   // (the cloak sees through the skin: that frame marches as before)
-  return !meshOff && progPlaneMesh && progHullBake && pv.on && fp.wreck.pieces == 0 && !cloaked;
+  return !meshOff && progPlaneMesh && progHullBake && pv.on && fp.wreck.pieces == 0;   // (a cloaked XR-40 too: the mesh passes leave its cloaked part out)
 }
 
 void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
@@ -779,6 +779,11 @@ void Renderer::drawPlaneMeshDepth(const FrameParams& fp, const PlaneMesh& pm, co
     glUniformMatrix3fv(U(progPlaneMeshDepth, "uRot"), 1, GL_FALSE, rot);
     glUniform3f(U(progPlaneMeshDepth, "uPos"), pos.x, pos.y, pos.z);
     glUniform1i(U(progPlaneMeshDepth, "uScrSkip"), scrSkip ? 1 : 0);
+    {   // a cloaked XR-40 (the player's, outside): its front's body z, as the mesh pass's own test
+      const PlaneVisual& pv = fp.plane;
+      const bool ck = trafK < 0 && (int)(pv.M[2] + 0.5f) == 6 && pv.wr[4][3] > 0.001f && pv.PS[3] < 0.5f;
+      glUniform1f(U(progPlaneMeshDepth, "uCloakZ"), ck ? pv.wr[6][1] : -1e9f);
+    }
     glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, scrSkip ? texScrDepth : 0); glUniform1i(U(progPlaneMeshDepth, "uScrDepth"), 29);
     glUniform1i(U(progPlaneMeshDepth, "uPartInst"), -1);
     glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
