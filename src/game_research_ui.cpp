@@ -411,8 +411,11 @@ void Game::drawResearch(const FrameParams& fp) {
     float x = L.lx, y = L.top, w = L.lw;
     tag(x, y, s, fmt("AIRFRAMES  //  %02d ON REGISTER", kNumResCraft), ACC, e); y += 22 * s;
     // the cards share the column with the programme log: full size when they fit, squeezed (fonts included) when not
-    int nCardsSel = 0; for (int i = 0; i < kNumResCards; i++) if (kResCards[i].craft == resCraft) nCardsSel++;
-    float listH = 30 * s + 18 * s * (nCardsSel + 1) + 40 * s;   // the test-card list under the airframes (its rows, the brief)
+    // the test-card list under the airframes (its rows, the brief), sized for the craft with the most cards: the
+    // airframe boxes keep one size whichever is selected (the XR-40's fourth card shrank them all)
+    int nCardsMax = 0;
+    for (int k = 0; k < kNumResCraft; k++) { int n = 0; for (int i = 0; i < kNumResCards; i++) if (kResCards[i].craft == kResCraft[k].idx) n++; nCardsMax = std::max(nCardsMax, n); }
+    float listH = 30 * s + 18 * s * (nCardsMax + 1) + 40 * s;
     float h = clampf((L.bot - y - 12 * s * (kNumResCraft - 1) - listH) / kNumResCraft, 64 * s, 150 * s), f = h / (150 * s);
     for (int k = 0; k < kNumResCraft; k++) {
       const ResCraftInfo& C = kResCraft[k];
