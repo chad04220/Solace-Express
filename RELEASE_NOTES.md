@@ -9,3 +9,5 @@
   everywhere. Before, the shadow edges and window frames were worked out ray by ray, which cost about 19 ms a frame
   on an RTX 3070 Laptop (the v3.25.0 analysis, "aircraft shadow"). On the test renderer the cockpit's aircraft pass
   drops 18% and the picture is unchanged apart from a few frame edges.
+- **Traffic in the air casts its shadow again.** An aircraft's shadow on ground farther below it than its shadow map
+  reaches was dropped (found by the v3.24.0 review). The ground under it now looks up the map like any other point.

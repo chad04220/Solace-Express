@@ -17,9 +17,11 @@ float trafficShadowMaps(vec3 p, vec3 n){
     if ((uTrafShOn & (1 << k)) == 0) continue;
     vec4 q = uTrafShVP[k]*vec4(p + n*0.1, 1.0);
     vec3 u = q.xyz/q.w*0.5 + 0.5;
-    if (u.x <= 0.0 || u.x >= 1.0 || u.y <= 0.0 || u.y >= 1.0 || u.z >= 1.0) continue;   // (outside its map: nothing of it between)
-    float lit = 0.0;
-    for (int j = 0; j < 4; j++) lit += texture(uAfShMap, vec3(u.xy + (vec2(float(j & 1), float(j >> 1)) - 0.5)*ts, float(4 + k))).r >= u.z - 0.002 ? 1.0 : 0.0;
+    if (u.x <= 0.0 || u.x >= 1.0 || u.y <= 0.0 || u.y >= 1.0) continue;   // (outside its map: nothing of it between)
+    // (a receiver beyond the map's far plane - the ground under an aircraft in the air - is behind everything the map
+    // holds: its depth is clamped just short of the cleared 1.0, so any occluder shadows it and an empty texel doesn't)
+    float z = min(u.z, 0.999), lit = 0.0;
+    for (int j = 0; j < 4; j++) lit += texture(uAfShMap, vec3(u.xy + (vec2(float(j & 1), float(j >> 1)) - 0.5)*ts, float(4 + k))).r >= z - 0.002 ? 1.0 : 0.0;
     s *= lit*0.25;
   }
   return s;
