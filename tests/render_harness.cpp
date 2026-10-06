@@ -156,6 +156,7 @@ void main(){
          std::chrono::duration<double>(std::chrono::steady_clock::now() - tInit).count());
   std::string scene = argc > 1 ? argv[1] : "default";
   if (scene.rfind("multi:", 0) == 0) {   // several scenes from one shader compile: multi:a,b,c
+    if (getenv("PREWARM")) { Game* pw = new Game(); pw->initHeadless(); pw->debugScene("menu"); pw->prewarm([](float, const std::string&) {}); delete pw; }   // (every body built once, for all the shots)
     std::string list = scene.substr(6) + ",";
     for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
       std::string sc = list.substr(a, b - a);
@@ -212,6 +213,7 @@ void main(){
     g_ren.screenshot("/tmp/claude-0/sp/shot_prewarm.ppm"); printf("wrote shot_prewarm\n");
     return 0;
   }
+  if (getenv("PREWARM")) game.prewarm([](float, const std::string&) {});   // (every aircraft's body built first, as the game's launch does: the traffic drawn from meshes)
   game.debugScene(scene);
   for (int i = 0; i < 3; i++) { game.update(1.f / 30.f); game.render(); }
   if (getenv("TAAM")) for (int i = 0, n = atoi(getenv("TAAM")); i < n; i++) { game.update(1.f / 60.f); game.render(); }   // moving frames

@@ -20,10 +20,14 @@
 
 Renderer g_ren;
 
-// per thread: the intro thread draws with its own GL context, whose program names can repeat the main one's
-static thread_local std::unordered_map<std::string, GLint> s_uniCache;
+// per thread: the intro thread draws with its own GL context, whose program names can repeat the main one's. Keyed by
+// the program and the name's address: every caller passes a string literal (static storage, so the address names the
+// spelling for the program's life), and a frame's few thousand lookups build no strings
+struct UniKey { GLuint p; const char* n; bool operator==(const UniKey& o) const { return p == o.p && n == o.n; } };
+struct UniKeyHash { size_t operator()(const UniKey& k) const { return std::hash<const void*>()(k.n) ^ ((size_t)k.p * 0x9E3779B97F4A7C15ull); } };
+static thread_local std::unordered_map<UniKey, GLint, UniKeyHash> s_uniCache;
 GLint U(GLuint prog, const char* name) {
-  std::string k = std::to_string(prog) + ":" + name;
+  const UniKey k{prog, name};
   auto it = s_uniCache.find(k);
   if (it != s_uniCache.end()) return it->second;
   GLint l = glGetUniformLocation(prog, name);
@@ -915,7 +919,9 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   if (shOn) glUniformMatrix4fv(U(p, "uAfShVP"), 4, GL_FALSE, shMapVP[0].m);
   // (the array samplers always on their own units, maps or not: left at unit 0 beside uHM - a 2D sampler - every draw
   // of the program fails validation and draws nothing: the objects pass lost wrecks, debris, the UFO and the march)
-  glActiveTexture(GL_TEXTURE0 + 26); glBindTexture(GL_TEXTURE_2D_ARRAY, shOn ? texShMap : 0); glUniform1i(U(p, "uAfShMap"), 26);
+  glUniform1i(U(p, "uTrafShOn"), trafShOn);   // the traffic's sun shadow maps (layers 4 + k), for the proxy
+  if (trafShOn) glUniformMatrix4fv(U(p, "uTrafShVP"), kMaxTrafficDrawn, GL_FALSE, trafShVP[0].m);
+  glActiveTexture(GL_TEXTURE0 + 26); glBindTexture(GL_TEXTURE_2D_ARRAY, shOn || trafShOn ? texShMap : 0); glUniform1i(U(p, "uAfShMap"), 26);
   glActiveTexture(GL_TEXTURE0 + 27); glBindTexture(GL_TEXTURE_2D_ARRAY, shOn ? texShMov : 0); glUniform1i(U(p, "uAfShMov"), 27);
   glUniform1i(U(p, "uHullOn"), hullOn ? 1 : 0); glUniform1f(U(p, "uHullNear"), hullOn ? hullNearNow : hullNear(fp)); glUniform1i(U(p, "uHullExitOn"), hullOn && hullExitOn ? 1 : 0);
   glUniform1i(U(p, "uTrafHullOn"), trafHullOn ? 1 : 0);
@@ -1221,6 +1227,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   rasterWorld(fp);
   bakeTerrainShadow(fp);
   rasterShadowMaps(fp);   // (the airframe's shadow maps: the feeds' and the main view's proxy both read them)
+  rasterTrafficShadowMaps(fp);
   stamp(1);
   if ((fp.dispMode & 1) && (!texPages || (frameNo & 1) == 0)) renderDisplays(fp, false);   // the cockpit display atlases, before the objects pass samples them (the research jets' pages at 30 Hz: 9 Mpx and their mips a frame)
   if (fp.dispMode & 2) renderDisplays(fp, true);

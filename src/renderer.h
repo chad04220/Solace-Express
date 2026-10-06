@@ -60,7 +60,7 @@ std::string shaderCacheStamp();   // fingerprint of all shader sources + the dri
 bool writePNG(const char* path, int w, int h, const std::vector<uint8_t>& rgbBottomUp);
 bool readImage(const char* path, int& w, int& h, std::vector<uint8_t>& rgbaTopDown);   // PNG or JPEG
 GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err);
-GLint U(GLuint prog, const char* name);   // a uniform's location (cached per program)
+GLint U(GLuint prog, const char* name);   // a uniform's location (cached per program; name must be a string literal)
 
 struct FrameParams {
   std::vector<GroundVehicleVisual> groundVehicles;   // explicitly driven ground vehicles (none yet: the airport furniture is parked)
@@ -321,11 +321,15 @@ private:
   GLuint progLight = 0, progObjects = 0, progShProxy = 0, progEffects = 0, progTerrain = 0, progWater = 0;
   // the airframe shadow maps (raster_renderer.cpp): the player's baked static mesh rendered from the sun (layer 0,
   // orthographic) and from the three brightest shadow-casting lights (layers 1-3, perspective along each beam); a
-  // second array marks where the moving hull is, so the proxy still marches the field for the gear, the surfaces and
-  // the props. uShOn: bit 0 the sun, bits 1-3 the light slots
+  // second array marks where the moving hull is, so the proxy still marches the field there (the XR-30's nozzles, the
+  // XR-40's). uShOn: bit 0 the sun, bits 1-3 the light slots. Layers 4 + k: traffic aircraft k's sun shadow from its
+  // mesh (trafShOn bit k), so the proxy marches only the traffic that still has moving parts
   GLuint progShMap = 0, progShMov = 0, texShMap = 0, texShMov = 0, fboShMap = 0; int shOn = 0; mat4 shMapVP[4];
-  static constexpr int kShMapRes = 1024;
+  int trafShOn = 0; mat4 trafShVP[kMaxTrafficDrawn];
+  static constexpr int kShMapRes = 1024, kShLayers = 4 + kMaxTrafficDrawn;
+  void ensureShadowMaps();
   void rasterShadowMaps(const FrameParams& fp);
+  void rasterTrafficShadowMaps(const FrameParams& fp);
   GLuint iboTerrain = 0, vaoTerrain = 0, vboTerrainInst = 0, vaoWater = 0, vboWater = 0, iboWater = 0; int waterIdx = 0;
   std::vector<float> terrInst; int terrChunks = 0;
   bool compileRaster();

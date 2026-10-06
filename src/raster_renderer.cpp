@@ -166,6 +166,69 @@ static mat4 orthoMat(float l, float r, float b, float t, float n, float f) {
 // shadow-casting lights, so the proxy below reads a depth instead of marching the field per pixel (the single biggest
 // cost of the raster frame on the owner's GPU: 55 ms at night, 36 ms in the cockpit). The moving parts are not in
 // the mesh: their hull is drawn into a mask and the proxy marches the field only there.
+void Renderer::ensureShadowMaps() {
+  if (texShMap) return;
+  glGenTextures(1, &texShMap); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMap);
+  glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT24, kShMapRes, kShMapRes, kShLayers, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glGenTextures(1, &texShMov); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMov);
+  glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_R8, kShMapRes, kShMapRes, 4, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);   // (the player's layers only)
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+  glGenFramebuffers(1, &fboShMap);
+}
+// The traffic's sun shadows: each traffic aircraft drawn as a mesh with nothing left to march (its moving hull empty)
+// into a layer of its own (4 + k), orthographic from the sun about it, so the shadow proxy looks its shadow on the
+// ground up instead of marching its field per pixel (the proxy's largest cost at a busy airport)
+void Renderer::rasterTrafficShadowMaps(const FrameParams& fp) {
+  trafShOn = 0;
+  static const bool off = getenv("SHMAPOFF") != nullptr;
+  const int n = std::min(fp.trafficN, kMaxTrafficDrawn);
+  if (off || !progShMap || n == 0 || fp.sunDir.y <= -0.05f || meshOff || fp.pano > 0.f) return;
+  vec3 d = normalize(fp.sunDir), up = fabsf(d.y) < 0.99f ? vec3(0, 1, 0) : vec3(0, 0, 1);
+  bool bound = false;
+  for (int k = 0; k < n; k++) {
+    const float* t = fp.traffic[k].t;
+    const vec3 c(t[24 * 4], t[24 * 4 + 1], t[24 * 4 + 2]); const float R = t[24 * 4 + 3];
+    if (length(c - fp.camPos) > 3000.f + R) continue;   // (the proxy shades the ground out to 3 km)
+    auto pm = planeMeshes.find(trafficModelKey(t));
+    if (pm == planeMeshes.end() || !pm->second.ok || !pm->second.idx) continue;
+    auto mv = hulls.find(pm->second.movKey);
+    if (mv == hulls.end() || !mv->second.ok || mv->second.verts) continue;   // (moving parts the mesh lacks: the march stays)
+    if (!bound) {
+      ensureShadowMaps();
+      glBindFramebuffer(GL_FRAMEBUFFER, fboShMap);
+      glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 0, 0, 0);
+      { GLenum none = GL_NONE; glDrawBuffers(1, &none); }
+      glViewport(0, 0, kShMapRes, kShMapRes);
+      glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
+      glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE); glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+      glUseProgram(progShMap);
+      glUniform1i(U(progShMap, "uPartInst"), -1);
+      bound = true;
+    }
+    const mat4 vp = orthoMat(-R, R, -R, R, R, 3.f * R) * lookAt(c + d * (2.f * R), c, up);
+    trafShVP[k] = vp;
+    glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texShMap, 0, 4 + k);
+    glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);
+    float rot[9] = {t[25 * 4], t[25 * 4 + 1], t[25 * 4 + 2], t[26 * 4], t[26 * 4 + 1], t[26 * 4 + 2], t[27 * 4], t[27 * 4 + 1], t[27 * 4 + 2]};
+    glUseProgram(progShMap);
+    glUniformMatrix4fv(U(progShMap, "uVP"), 1, GL_FALSE, vp.m);
+    glUniformMatrix3fv(U(progShMap, "uRot"), 1, GL_FALSE, rot);
+    glUniform3f(U(progShMap, "uPos"), c.x, c.y, c.z);
+    glUniform1i(U(progShMap, "uPartInst"), -1);
+    glBindVertexArray(pm->second.vao);
+    glDrawElements(GL_TRIANGLES, pm->second.idx, GL_UNSIGNED_INT, nullptr);
+    drawPlaneParts(pm->second, progShMap, k);   // (its control surfaces and gear at their pose)
+    trafShOn |= 1 << k;
+  }
+  if (!bound) return;
+  glBindVertexArray(0);
+  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); glDepthMask(GL_TRUE); glDisable(GL_DEPTH_TEST);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
 void Renderer::rasterShadowMaps(const FrameParams& fp) {
   shOn = 0;
   static const bool off = getenv("SHMAPOFF") != nullptr;   // (debug / the analysis: the per-pixel march as before)
@@ -194,18 +257,7 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
     if (slot < 3) { want |= 2 << slot; lightOf[1 + slot] = i; }
   }
   if (!want) return;
-  if (!texShMap) {
-    glGenTextures(1, &texShMap); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMap);
-    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT24, kShMapRes, kShMapRes, 4, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glGenTextures(1, &texShMov); glBindTexture(GL_TEXTURE_2D_ARRAY, texShMov);
-    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_R8, kShMapRes, kShMapRes, 4, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
-    glGenFramebuffers(1, &fboShMap);
-  }
+  ensureShadowMaps();
   auto movIt = hulls.find(pm->second.movKey);
   const HullMesh* mov = movIt != hulls.end() && movIt->second.ok && movIt->second.verts ? &movIt->second : nullptr;
   glBindFramebuffer(GL_FRAMEBUFFER, fboShMap);

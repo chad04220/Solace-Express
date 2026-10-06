@@ -127,11 +127,13 @@ float pieceShadow(vec3 ro, vec3 rd, float br, int steps){
 // the sun's shadow of the traffic: marched through each aircraft's own shape like the player's, but only where the
 // ray towards the sun crosses that aircraft's bounding sphere (a few hundred pixels each), so it costs next to nothing
 // elsewhere. Leaves the aircraft data loaded as it found it.
+uniform int uTrafShOn;   // bit k: traffic aircraft k's sun shadow comes from its shadow map (the shadow proxy), not this march
 float trafficShadow(vec3 p){
   float s = 1.0; bool moved = false;
   bool own = gOwn; int tk = gTrafK; int keep = gPI; vec3 kP = gPP; mat3 kR = gPR; vec3 kC = gPC;
   for (int k = 0; k < 12; k++) {
     if (k >= uTrafficN) break;
+    if ((uTrafShOn & (1 << k)) != 0) continue;
     vec4 P = texelFetch(uTraffic, ivec2(24, k), 0);
     vec3 oc = p - P.xyz; float b = dot(oc, uSunDir), h = b*b - dot(oc, oc) + P.w*P.w;
     if (h < 0.0 || -b + sqrt(h) < 0.0) continue;
