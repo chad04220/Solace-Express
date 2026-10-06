@@ -30,19 +30,21 @@ void main(){
   // (no facing test: the shell's far side marches away from the surface and is dropped as a miss, or lies behind the
   // near side; a test by the vertex normal or by the winding, both of which turn over at a sharp rim, dropped near-side
   // fragments there as streaks and bites)
-  float dd = mapPiece(lq).x, tt = 0.0, dmin = dd, tbest = 0.0; bool gone = false;
-  for (int i = 0; i < 16; i++) {
+  // (the field is asked in one place, the loop - each call written out is another copy of it in the shader; the
+  // nearest point's material comes with it)
+  float tt = 0.0, dmin = 1e9, tbest = 0.0, idBest = vId; bool gone = false;
+  for (int i = gZero; i < 17; i++) {
+    vec2 r = mapPiece(lq + lrd*tt); float dd = r.x;
+    if (dd < dmin) { dmin = dd; tbest = tt; idBest = r.y; }
+    else if (dd > 6e-3 && dmin > 1.2e-3) { gone = true; break; }   // past the edge, and moving away
     if (dd < 1e-4) break;
     float step = i == 0 ? min(dd/max(-dot(lrd, ln), 0.2), 2.0*dd) : dd;   // (the first step at most twice the safe one: at a plate's rim the shell's normal is the rim's, and a step by its cosine jumped clear past the edge)
     tt += min(step, 0.03);
     if (tt > 0.08) { gone = true; break; }
-    dd = mapPiece(lq + lrd*tt).x;
-    if (dd < dmin) { dmin = dd; tbest = tt; }
-    else if (dd > 6e-3 && dmin > 1.2e-3) { gone = true; break; }   // past the edge, and moving away
   }
   if (gone && dmin > 1.2e-3) discard;
   p += rd*tbest; t += tbest;
-  if (abs(vIdS - vId) > 1e-3) mid = int(mapPiece(lq + lrd*tbest).y + 0.5);
+  if (abs(vIdS - vId) > 1e-3) mid = int(idBest + 0.5);
   float w = uPano.x > 0.0 ? t : -t*dot(rd, uCamRot[2]);
   gl_FragDepth = (log2(max(1e-6, 1.0 + w))*uLogC - 1.0)*0.5 + 0.5;
 #else

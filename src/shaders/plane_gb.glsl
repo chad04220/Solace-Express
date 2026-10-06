@@ -24,9 +24,17 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
   gDispPx = false;
   planeMaterialN(p, rd, t, mid, trafHit, ln, m, n, lp, lnOut, interior, podMat);
   int flags = (trafHit || uWreck > 0) ? GBF_MOVING : GBF_RIGID;
+  // the sun's shadow terms: the terrain's is one value for the whole intact airframe (from the CPU); the airframe's own
+  // from its sun shadow map, marched only where the map can't say (plane_light.glsl afSunSelf: one call for the
+  // exterior and the cabin)
+  float tsh = 1.0, self = 1.0;
+  if (sunVis > 0.0 && !podMat) {
+    tsh = (trafHit || uWreck > 0) ? terrainShadow(p, uSunDir, t) : uPlaneTSh;
+    if (tsh > 0.0 && !trafHit) self = afSunSelf(p, n, interior);
+  }
   if (pod || interior || podMat) {   // the cockpit: lit by its own fixtures and the sun through the windows (plane_light.glsl)
     gInteriorAO = aoIn;
-    vec3 col = planeLight(p, rd, t, mid, m, n, lp, lnOut, interior, podMat, trafHit);
+    vec3 col = planeLight(p, rd, t, mid, m, n, lp, lnOut, interior, podMat, sunVis > 0.0 ? tsh*self : 0.0);
     gInteriorAO = -1.0;
     if (pod && wr) col += wrHolo(uCamPos, rd, t);   // the hologram floats inside the cabin, in front of everything
     if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
@@ -34,18 +42,7 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
     oG3 = vec4(1.0, 1.0, 1.0, float(flags + (gDispPx ? GBF_DISPLAY : 0))/255.0);
     return;
   }
-  // the exterior: the sun's shadow terms the lighting pass can't compute - the terrain's is one value for the whole
-  // intact airframe (from the CPU); the airframe's own from its sun shadow map (the baked mesh and its rigid parts),
-  // a march through the field only where the moving parts' mask says one may lie between, or with no map this frame
-  float tsh = 1.0, self = 1.0;
-  if (sunVis > 0.0) {
-    tsh = (trafHit || uWreck > 0) ? terrainShadow(p, uSunDir, t) : uPlaneTSh;
-    if (tsh > 0.0 && !trafHit) {
-      float ndl = dot(n, uSunDir);
-      float ms = (uAfShOn & 1) != 0 && uWreck == 0 ? (ndl < 0.05 ? 0.0 : shMapLookupB(0, p, n, 1.0 + 2.0*(1.0 - ndl))) : -1.0;
-      self = ms >= 0.0 ? ms : planeShadow(p + n*0.02, uSunDir);
-    }
-  }
+  // the exterior: the lighting pass shades it with the sun's shadow terms it can't compute itself (G3)
   gbWrite(t, n, trafHit ? GB_TRAFFIC : uWreck > 0 ? GB_WRECK : GB_PLANE, m, 1.0);
   oG3 = vec4(1.0, self, tsh, float(flags + (mid <= 5 ? GBF_GLINT : 0) + (gDispPx ? GBF_DISPLAY : 0))/255.0);
 }

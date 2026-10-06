@@ -40,7 +40,7 @@ void main(){
     if (max(E.r, max(E.g, E.b))*ndl <= 0.004) continue;
     {
       float m = (uAfShOn & (2 << slot)) != 0 ? shMapLookup(1 + slot, p, n) : -1.0;
-      ls[slot] = m >= 0.0 ? m : lightShadow(i, p, n, l, d);
+      ls[slot] = m >= 0.0 ? m : planeLightShadow(i, p, n, l, d);
     }
   }
   oColor = vec4(sunS, ls);

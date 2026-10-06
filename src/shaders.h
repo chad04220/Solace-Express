@@ -53,7 +53,7 @@ inline std::string partPoseFSAssembly() {
 // the aircraft mesh pass: the objects pass's materials and lighting classes on the baked static airframe
 inline std::string planeMeshVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kPlaneMeshVS; }
 inline std::string planeMeshFSAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts + kPlaneSDF + kPlaneTrace +
+  return std::string("#version 330 core\n") + defines + "#define AF_MESH\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kPlaneMaterial + kAfShMap + kPlaneLight + kGBuffer + kGBWrite + kPlaneGB + kPlaneMeshFS;

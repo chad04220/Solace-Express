@@ -50,13 +50,13 @@ vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
 // Leaves gPI/gPP/gPR/gPC set to the piece that was hit (for shading)
 vec2 tracePlane(vec3 ro, vec3 rd, float tmax){
   if (uPlaneOn == 0) return vec2(-1.0);
-  if (uWreck == 0) { pieceXf(-1); return tracePieceOnce(ro, rd, tmax, planeBound()); }
-  vec2 best = vec2(-1.0); int bi = 0;
-  for (int i = 0; i < 5; i++) {
-    if (i >= uWreck) break;
-    pieceXf(i);
-    vec2 h = tracePieceOnce(ro, rd, best.x > 0.0 ? best.x : tmax, length(uPcH[i]) + 0.3);
-    if (h.x > 0.0 && (best.x < 0.0 || h.x < best.x)) { best = h; bi = i; }
+  vec2 best = vec2(-1.0); int bi = uWreck == 0 ? -1 : 0;
+  for (int i = gZero; i < 5; i++) {   // the intact airframe, or each wreck piece (one call of the march for both)
+    if (i >= max(uWreck, 1)) break;
+    int k = uWreck == 0 ? -1 : i;
+    pieceXf(k);
+    vec2 h = tracePieceOnce(ro, rd, best.x > 0.0 ? best.x : tmax, k < 0 ? planeBound() : length(uPcH[i]) + 0.3);
+    if (h.x > 0.0 && (best.x < 0.0 || h.x < best.x)) { best = h; bi = k; }
   }
   pieceXf(bi);
   return best;
@@ -144,12 +144,19 @@ float planeShadow(vec3 ro, vec3 rd){
   if (uPlaneOn == 0 || (uDbg & 8) != 0) return 1.0;
   int keep = gPI; vec3 kP = gPP; mat3 kR = gPR; vec3 kC = gPC;
   float res = 1.0;
-  if (uWreck == 0) { pieceXf(-1); res = pieceShadow(ro, rd, planeBound(), 40); }
-  else for (int i = 0; i < 5; i++) { if (i >= uWreck) break; pieceXf(i); res = min(res, pieceShadow(ro, rd, length(uPcH[i]) + 0.3, 40)); }
+  for (int i = gZero; i < 5; i++) {   // the intact airframe, or each wreck piece (one call of the march for both)
+    if (i >= max(uWreck, 1) || res < 0.02) break;
+    int k = uWreck == 0 ? -1 : i;
+    pieceXf(k); res = min(res, pieceShadow(ro, rd, k < 0 ? planeBound() : length(uPcH[i]) + 0.3, 40));
+  }
   gPI = keep; gPP = kP; gPR = kR; gPC = kC;
   return mix(res, 1.0, uWr[4].w*0.88);   // a cloaked XR-40 barely darkens the ground
 }
-float lightShadow(int i, vec3 p, vec3 n, vec3 l, float d){
+// shadeSurface's hook in the aircraft's own passes (a cockpit view lights the airframe there): an aircraft's own lights
+// hardly ever shadow it, and every march written out is another copy of the airframe's distance in the shader. The
+// airframe's shadow on the world in a light's beam is the shadow proxy's (planeLightShadow)
+float lightShadow(int i, vec3 p, vec3 n, vec3 l, float d){ return 1.0; }
+float planeLightShadow(int i, vec3 p, vec3 n, vec3 l, float d){
   gShMax = d - uPLD[i].w; gShK = clamp(d/max(uPLP[i].w, 0.02), 6.0, 80.0);
   float s = planeShadow(p + n*0.03, l);
   gShMax = 1e9; gShK = 10.0;
@@ -161,6 +168,9 @@ float gInteriorAO = -1.0;   // the mesh pass: the cabin's ambient occlusion bake
 float interiorAO(vec3 p, vec3 n){
   if ((uDbg & 512) != 0) return 1.0;
   if (gInteriorAO >= 0.0) return gInteriorAO;
+#ifdef AF_MESH
+  return 1.0;   // (the mesh pass: the cabin's occlusion is baked per vertex - a mesh without it has no cabin)
+#endif
   float occ = 0.0, w = 1.0;
   for (int i = 1 + gZero; i <= 3; i++) { float h = 0.02*float(i*i); occ += (h - mapPlane(p + n*h).x)*w; w *= 0.55; }
   return clamp(1.0 - 3.5*occ, 0.3, 1.0);
