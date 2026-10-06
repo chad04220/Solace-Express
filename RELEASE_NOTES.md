@@ -22,3 +22,6 @@
     down to the glidepath. When neither end is safe (the Starling or XR-20 at Cedar Ridge in a gusty quartering
     wind), it says "unable to autoland" with the reason and holds heading and height, so you can land by hand or
     divert, instead of running off the end or going around into the hills.
+- **Straighter cockpit edges.** The cockpit's window frames, struts and bezels were built with wavy, saw-toothed edges.
+  The cockpit bake now places each corner of the mesh on the real edge (dual contouring), so they come out straight.
+  The cockpit bodies are rebuilt once on the first launch.

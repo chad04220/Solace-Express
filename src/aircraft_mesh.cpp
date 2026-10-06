@@ -26,7 +26,7 @@
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 13;   // (bump with the format)
+const uint32_t kMeshMagic = 0x4d455348u + 14;   // (bump with the format, or with what the bake makes of the field: the cockpit's sharp edges, +14)
 // the rigid parts a cockpit has (plane_parts.glsl PT_*) and each one's instances: x which seat or side, y which pedal
 struct PartInst { int type; float sx, sy; };
 const int kMaxPartInst = 128;
@@ -340,6 +340,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       auto cval = [&](int lx, int ly, int lz, float& v) { auto it = corner.find(key3(lx, ly, lz)); if (it == corner.end()) return false; v = cv[it->second]; return true; };
       std::unordered_map<int64_t, int> cubeV;   // cube coords -> vertex (local)
       std::vector<vec3> vpos; std::vector<int> vcube; std::vector<uint8_t> vsink;   // (each vertex's cube, and whether its cell sinks)
+      std::vector<vec3> xpt; std::vector<int> xv;   // (in the cockpit: every edge crossing and its vertex, for the sharp edges below)
       const int ce[12][2] = {{0, 1}, {1, 3}, {2, 3}, {0, 2}, {4, 5}, {5, 7}, {6, 7}, {4, 6}, {0, 4}, {1, 5}, {3, 7}, {2, 6}};   // corner bit x + 2y + 4z
       for (auto& cl : cells) {
         if ((&cl - &cells[0]) % 1024 == 0) bakeTick();
@@ -359,9 +360,39 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
             vec3 pa(org + (cx + (a & 1)) * h, org + (cy + ((a >> 1) & 1)) * h, org + (cz + (a >> 2)) * h);
             vec3 pb(org + (cx + (b & 1)) * h, org + (cy + ((b >> 1) & 1)) * h, org + (cz + (b >> 2)) * h);
             sum = sum + pa + (pb - pa) * t; cnt++;
+            if (inside) { xpt.push_back(pa + (pb - pa) * t); xv.push_back((int)vpos.size()); }
           }
           cubeV[key3(cx, cy, cz)] = (int)vpos.size();
           vpos.push_back(sum * (1.f / cnt)); vcube.push_back(cx); vcube.push_back(cy); vcube.push_back(cz); vsink.push_back(cl.second == 2);
+        }
+      }
+      // In the cockpit, seen from a metre: each vertex where the planes through its edge crossings meet, along the
+      // field's normals there (dual contouring), instead of at the crossings' mean - on a sharp edge (a window frame's
+      // lip, a strut's rim, a bezel) the mean sits off the edge and the edge zigzags with the lattice; where two faces
+      // meet the planes put it on the edge itself, a flat face or a gentle curve takes it to the mean as before. A
+      // small pull to the mean keeps an under-determined vertex (a flat face's, a crease's along its line) in place
+      if (inside && !xpt.empty()) {
+        std::vector<float> xn; mode(3, 0); hullEval4(xpt, xn);
+        std::vector<double> A(vpos.size() * 6, 0.0), B(vpos.size() * 3, 0.0);
+        for (size_t i = 0; i < xpt.size(); i++) {
+          const int q = xv[i]; const vec3 c = vpos[q], pp = xpt[i] - c;
+          const double nx = xn[i * 4], ny = xn[i * 4 + 1], nz = xn[i * 4 + 2], nd = nx * pp.x + ny * pp.y + nz * pp.z;
+          double* a = &A[q * 6]; a[0] += nx * nx; a[1] += nx * ny; a[2] += nx * nz; a[3] += ny * ny; a[4] += ny * nz; a[5] += nz * nz;
+          double* b = &B[q * 3]; b[0] += nx * nd; b[1] += ny * nd; b[2] += nz * nd;
+        }
+        const double lam = 0.05;
+        for (size_t q = 0; q < vpos.size(); q++) {
+          const double* a = &A[q * 6]; const double* b = &B[q * 3];
+          const double m00 = a[0] + lam, m01 = a[1], m02 = a[2], m11 = a[3] + lam, m12 = a[4], m22 = a[5] + lam;
+          const double c00 = m11 * m22 - m12 * m12, c01 = m02 * m12 - m01 * m22, c02 = m01 * m12 - m02 * m11;
+          const double det = m00 * c00 + m01 * c01 + m02 * c02;
+          if (fabs(det) < 1e-12) continue;
+          const double c11 = m00 * m22 - m02 * m02, c12 = m01 * m02 - m00 * m12, c22 = m00 * m11 - m01 * m01;
+          vec3 x((float)((c00 * b[0] + c01 * b[1] + c02 * b[2]) / det), (float)((c01 * b[0] + c11 * b[1] + c12 * b[2]) / det), (float)((c02 * b[0] + c12 * b[1] + c22 * b[2]) / det));
+          vec3 p = vpos[q] + x;
+          const float lo[3] = {org + vcube[q * 3] * h, org + vcube[q * 3 + 1] * h, org + vcube[q * 3 + 2] * h};   // (within its own cube)
+          p.x = std::max(lo[0], std::min(lo[0] + h, p.x)); p.y = std::max(lo[1], std::min(lo[1] + h, p.y)); p.z = std::max(lo[2], std::min(lo[2] + h, p.z));
+          vpos[q] = p;
         }
       }
       // the vertices' normals, material ids and cabin ambient occlusion from the field; each is pulled onto the
