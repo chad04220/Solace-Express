@@ -144,6 +144,7 @@ public:
   // they are worked out now)
 
   bool buy(int specIdx, std::string* msg);
+  int saleValue(int fi) const;   // what selling fleet[fi] pays before any loan is settled from it (the button shows this)
   bool sell(int fleetIdx, std::string* msg);
   int positioningCost(const Contract& c) const;
   int ferryCost(const Contract& c, int specIdx) const;

@@ -987,12 +987,16 @@ void Career::payLoan(std::vector<PayoutLine>& L) {
     } else L.push_back({fmt("Loan payment missed (%d of 3 before repossession)", loan.missed), 0});
   }
 }
+int Career::saleValue(int fi) const {
+  if (fi < 0 || fi >= (int)fleet.size()) return 0;
+  return (int)(kAircraft[fleet[fi].spec].price * 7 / 10 * (0.6f + 0.4f * clampf(fleet[fi].condition, 0.f, 1.f)));
+}
 bool Career::sell(int fi, std::string* msg) {
   if (fi < 0 || fi >= (int)fleet.size()) return false;
   if (routeOf(fi) >= 0) { *msg = "It's flying a route: recall it first."; return false; }
   for (auto& rt : airline.routes) if (rt.fleetIdx > fi) rt.fleetIdx--;
   const AircraftSpec& s = kAircraft[fleet[fi].spec];
-  int val = (int)(s.price * 7 / 10 * (0.6f + 0.4f * clampf(fleet[fi].condition, 0.f, 1.f)));
+  const int val = saleValue(fi);
   money += val;
   *msg = fmt("Sold %s for $%d.", s.name, val);
   if (loan.open() && loan.spec == fleet[fi].spec) { money -= loan.balance; *msg += fmt(" The loan's $%d balance was settled from it.", loan.balance); loan = Loan(); }

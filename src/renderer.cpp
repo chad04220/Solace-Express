@@ -1381,7 +1381,7 @@ void Renderer::clearScreen() {
   glBindFramebuffer(GL_FRAMEBUFFER, 0); glViewport(0, 0, W, H);
   glDisable(GL_DEPTH_TEST); glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
 }
-void Renderer::uiBegin() { ui.clear(); curImg = 0; }
+void Renderer::uiBegin() { ui.clear(); curImg = 0; uiClipOn = false; }
 
 static void quad(std::vector<UIVert>& v, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, vec3 c, float a, float mode, float hx = 0, float hy = 0, float p = 0, const vec3* c2 = nullptr) {
   vec3 b = c2 ? *c2 : c;
@@ -1465,7 +1465,12 @@ void Renderer::flushUI() {
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, curImg ? curImg : texFont); glUniform1i(U(progUI, "uImg"), 1);
   glBindVertexArray(vaoUI); glBindBuffer(GL_ARRAY_BUFFER, vboUI);
   glBufferData(GL_ARRAY_BUFFER, ui.size() * sizeof(UIVert), ui.data(), GL_STREAM_DRAW);
+  if (uiClipOn) {
+    const int x0 = (int)floorf(uiClipBox[0]), x1 = (int)ceilf(uiClipBox[2]), y0 = (int)floorf(uiClipBox[1]), y1 = (int)ceilf(uiClipBox[3]);
+    glEnable(GL_SCISSOR_TEST); glScissor(x0, H - y1, std::max(0, x1 - x0), std::max(0, y1 - y0));
+  }
   glDrawArrays(GL_TRIANGLES, 0, (GLsizei)ui.size());
+  glDisable(GL_SCISSOR_TEST);
   glActiveTexture(GL_TEXTURE0);
   ui.clear();
 }

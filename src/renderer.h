@@ -144,6 +144,9 @@ public:
   void image(GLuint tex, float x, float y, float w, float h, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1, float a = 1.0f);
   void uiEnd();
   void flushUIPublic() { flushUI(); }
+  // UI clipping (screen pixels, y down): what is drawn until uiClipOff() shows only inside the box
+  void uiClip(float x0, float y0, float x1, float y1) { flushUI(); uiClipOn = true; uiClipBox[0] = x0; uiClipBox[1] = y0; uiClipBox[2] = x1; uiClipBox[3] = y1; }
+  void uiClipOff() { flushUI(); uiClipOn = false; }
   bool screenshot(const char* path);
   bool screenshotPNG(const char* path);
   // environment entities: entSync generates every chunk in range before drawing (headless captures)
@@ -196,6 +199,7 @@ private:
   float maxH = 2500;
   std::vector<UIVert> ui;
   GLuint curImg = 0;
+  bool uiClipOn = false; float uiClipBox[4] = {0, 0, 0, 0};
   void flushUI();
   void createTargets();
   void createRenderTargets();

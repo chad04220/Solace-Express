@@ -679,6 +679,18 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     for (auto& l : tl) { g_ren.text(px, py, 24 * s, l, cd.story ? C_WARN : C_TEXT, 1); py += 31 * s; }
     py += 8 * s;
   }
+  // The briefing and its figures scroll (mouse wheel) in a region of their own above the aircraft chooser, whose rows
+  // keep their place at the panel's foot: a long briefing never pushes the chooser off the panel or runs under it
+  const float chooserH = 26 * s + ((kNumAircraft + 1) / 2) * (30 * s + 6 * s);
+  const float chooserTop = std::min(std::max(y + h - 70 * s - chooserH, y + 70 * s + mapW + 8 * s), y + h - 70 * s - 26 * s - 2 * (30 * s + 6 * s));
+  const float detTop = py, detBot = chooserTop - 10 * s;
+  static float detScroll = 0.f, detMax = 0.f; static int detFor = -1;
+  if (detFor != hubList * 1000 + selContract) { detFor = hubList * 1000 + selContract; detScroll = 0.f; detMax = 0.f; }
+  if (hovered(px, detTop, textW, detBot - detTop) && in.wheel != 0) { detScroll -= in.wheel * 48.f * s; in.wheel = 0; }
+  detScroll = std::clamp(detScroll, 0.f, detMax);
+  auto inView = [&](float yy, float hh) { return yy >= detTop && yy + hh <= detBot; };   // (a control scrolled out of the region is neither drawn nor clickable)
+  g_ren.uiClip(px - 4 * s, detTop, px + textW + 4 * s, detBot);
+  py -= detScroll;
   for (auto& l : wrap(c.brief, textW, 16 * s)) { g_ren.text(px, py, 16 * s, l, C_TEXT, 0.92f); py += 22 * s; }
   if (cd.job) {   // where the job stands: legs flown, the clock, the load's place
     const Career::JobState& J = *career.job;
@@ -694,10 +706,10 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     if (vl.empty()) py += 23 * s;
   };
   if (cd.free) {
-    if (button(px + 130 * s, py - 4 * s, 34 * s, 28 * s, "<")) { do freeDest = (freeDest + (int)g_world.airports.size() - 1) % g_world.airports.size(); while (freeDest == career.location); }
+    if (inView(py - 4 * s, 28 * s) && button(px + 130 * s, py - 4 * s, 34 * s, 28 * s, "<")) { do freeDest = (freeDest + (int)g_world.airports.size() - 1) % g_world.airports.size(); while (freeDest == career.location); }
     g_ren.text(px, py, 15 * s, "Destination", C_DIM, 1);
     g_ren.text(px + 172 * s, py + 1 * s, 15 * s, ellipsize(fmt("%s %s", g_world.airports[freeDest].code, g_world.airports[freeDest].name), textW - 172 * s - 48 * s, 15 * s), C_ACCENT, 1);
-    if (button(px + textW - 40 * s, py - 4 * s, 34 * s, 28 * s, ">")) { do freeDest = (freeDest + 1) % g_world.airports.size(); while (freeDest == career.location); }
+    if (inView(py - 4 * s, 28 * s) && button(px + textW - 40 * s, py - 4 * s, 34 * s, 28 * s, ">")) { do freeDest = (freeDest + 1) % g_world.airports.size(); while (freeDest == career.location); }
     py += 30 * s;
   }
   const Airport& A = g_world.airports[c.from]; const Airport& B = g_world.airports[c.to];
@@ -747,8 +759,8 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
           std::string v = fmt("%.0f kg (%.0f%%)  -  take-off %.0f of %.0f kg%s", fuel, 100.f * fuel / sp.maxFuel, mass, sp.maxMass(), heavy ? "  OVERWEIGHT" : "");
           if (roll > 0) v += fmt(", roll ~%.0f m", roll);
           if (ef.fuel == Career::LaunchPlan::FUEL_PURCHASED) v += ef.fuelUpliftKg > 0.5f ? fmt(", uplift %.0f kg for %s", ef.fuelUpliftKg, fmtMoney(ef.fuelCostEst).c_str()) : " (tanks hold it)";
-          if (button(px + 130 * s - 36 * s, py - 4 * s, 28 * s, 24 * s, "<")) launchFuelKg = std::max(sp.maxFuel * 0.1f, fuel - sp.maxFuel * 0.05f);
-          if (button(px + textW - 30 * s, py - 4 * s, 28 * s, 24 * s, ">")) launchFuelKg = std::min(sp.maxFuel, fuel + sp.maxFuel * 0.05f);
+          if (inView(py - 4 * s, 24 * s) && button(px + 130 * s - 36 * s, py - 4 * s, 28 * s, 24 * s, "<")) launchFuelKg = std::max(sp.maxFuel * 0.1f, fuel - sp.maxFuel * 0.05f);
+          if (inView(py - 4 * s, 24 * s) && button(px + textW - 30 * s, py - 4 * s, 28 * s, 24 * s, ">")) launchFuelKg = std::min(sp.maxFuel, fuel + sp.maxFuel * 0.05f);
           float pyRow = py;
           row("Fuel", v, heavy ? C_BAD : C_TEXT);
           (void)pyRow;
@@ -772,6 +784,13 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   if (c.ownedOnly) row("Requirement", "Your own aircraft", C_ACCENT);
   if (c.grantLicense > career.license) row("Reward", std::string("Earns ") + licenseName(c.grantLicense), C_ACCENT);
   if (c.from != career.location && c.type != CT_LESSON) { int pc = career.positioningCost(c); row("Positioning", pc ? fmt("Airline ticket to %s: %s", A.code, fmtMoney(pc).c_str()) : "Free courtesy ride", C_DIM); }
+  g_ren.uiClipOff();
+  detMax = std::max(0.f, py + detScroll - detBot);   // (how far the region scrolls: next frame's limit)
+  if (detMax > 0.f) {   // a thin bar beside the text: where the view is in the briefing
+    const float trackH = detBot - detTop, barH = std::max(20 * s, trackH * trackH / (trackH + detMax));
+    g_ren.rect(px + textW + 8 * s, detTop, 3 * s, trackH, C_ACCENT, 0.12f);
+    g_ren.rect(px + textW + 8 * s, detTop + (trackH - barH) * detScroll / detMax, 3 * s, barH, C_ACCENT, 0.7f);
+  }
   {   // the route map in a hairline frame with corner ticks and a caption
     float mx = dx + dw - mapW - 22 * s, my = y + 60 * s;
     drawMapView(mx, my, mapW, mapW, c.from, c.to, &c.wps);
@@ -780,18 +799,29 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     g_ren.text(mx - 4 * s, my - 22 * s, 11.5f * s, fmt("ROUTE  //  %s > %s", g_world.airports[c.from].code, g_world.airports[c.to].code), C_ACCENT, 0.9f, 0, false);
   }
   // aircraft selection
-  py = std::max(py + 8 * s, y + 70 * s + mapW);
-  header(px, py, iw, "CHOOSE AIRCRAFT"); py += 26 * s;
+  py = chooserTop;
+  header(px, py, iw, "CHOOSE AIRCRAFT"); const float chooserY = py; py += 26 * s;
+  // every aircraft's eligibility first, then the flyable ones listed ahead of the rest: a panel too short for all the
+  // rows drops unavailable aircraft, never one the job can be flown in (the review of v3.24.0: an owned Starling, the
+  // seventh row, went unseen and unselectable on a long briefing)
   int firstOk = -1;
+  Career::Source srcs[kNumAircraft]; std::string whys[kNumAircraft];
+  int order[kNumAircraft], nOrder = 0;
+  for (int i = 0; i < kNumAircraft; i++) {
+    srcs[i] = career.canFly(c, i, &whys[i]);
+    if ((c.type == CT_FERRY || c.type == CT_TRIAL) && srcs[i] == Career::SRC_NONE && career.license == LIC_STUDENT && i == 0) srcs[i] = Career::SRC_LESSON;
+    if (srcs[i] != Career::SRC_NONE) { order[nOrder++] = i; if (firstOk < 0) firstOk = i; }
+  }
+  for (int i = 0; i < kNumAircraft; i++) if (srcs[i] == Career::SRC_NONE) order[nOrder++] = i;
   float rowH = 30 * s;
   float colW = (iw - 10 * s) * 0.5f;
-  for (int i = 0; i < kNumAircraft; i++) {
-    std::string why;
-    auto src = career.canFly(c, i, &why);
-    if ((c.type == CT_FERRY || c.type == CT_TRIAL) && src == Career::SRC_NONE && career.license == LIC_STUDENT && i == 0) src = Career::SRC_LESSON;
-    if (src != Career::SRC_NONE && firstOk < 0) firstOk = i;
-    float rx = px + (i % 2) * (colW + 10 * s), ry = py + (i / 2) * (rowH + 6 * s);
-    if (ry + rowH > y + h - 70 * s) break;
+  int hidden = 0;
+  for (int j = 0; j < kNumAircraft; j++) {
+    const int i = order[j];
+    const std::string& why = whys[i];
+    const auto src = srcs[i];
+    float rx = px + (j % 2) * (colW + 10 * s), ry = py + (j / 2) * (rowH + 6 * s);
+    if (ry + rowH > y + h - 70 * s) { hidden = kNumAircraft - j; break; }
     bool sel = selAircraft == i;
     bool hov = hovered(rx, ry, colW, rowH) && src != Career::SRC_NONE;
     card(rx, ry, colW, rowH, sel, hov, src == Career::SRC_NONE ? C_DIM * 0.4f : src == Career::SRC_OWNED ? C_GOOD : C_ACCENT);
@@ -806,12 +836,15 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     while (g_ren.textWidth(st, sts) > colW * 0.55f && st.size() > 4) st = st.substr(0, st.size() - 4) + "...";
     g_ren.text(rx + colW - (sel ? 22 : 10) * s, ry + 9 * s, sts, st, src == Career::SRC_NONE ? C_BAD * 0.8f : src == Career::SRC_OWNED ? C_GOOD : C_WARN, 1, 2);
   }
-  if (selAircraft >= 0) {
-    auto src = career.canFly(c, selAircraft);
-    if ((c.type == CT_FERRY || c.type == CT_TRIAL) && src == Career::SRC_NONE && career.license == LIC_STUDENT && selAircraft == 0) src = Career::SRC_LESSON;
-    if (src == Career::SRC_NONE) selAircraft = -1;
-  }
+  if (selAircraft >= 0 && (selAircraft >= kNumAircraft || srcs[selAircraft] == Career::SRC_NONE)) selAircraft = -1;
   if (selAircraft < 0) selAircraft = firstOk;
+  {   // what didn't fit, on the header's line; the chosen aircraft named there whenever its own row is among it
+    bool selShown = false;
+    for (int j = 0; j < kNumAircraft - hidden; j++) selShown |= order[j] == selAircraft;
+    std::string note = hidden > 0 ? fmt("+%d not available here", hidden) : std::string();
+    if (selAircraft >= 0 && !selShown) note = std::string("flying the ") + kAircraft[selAircraft].name + (note.empty() ? "" : "   " + note);
+    if (!note.empty()) g_ren.text(px + iw, chooserY + 2 * s, 12 * s, note, selAircraft >= 0 && !selShown ? C_GOOD : C_DIM, 1, 2);
+  }
   bool otherWhileJob = openJob && !cd.job && !cd.free;   // (another job waits until this one is delivered or released)
   bool overweight = false;
   if (selAircraft >= 0) {
@@ -920,7 +953,10 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
   } else {
     g_ren.text(px, py, 16 * s, fmt("Parked at %s", g_world.airports[career.fleet[oi].location].name), C_GOOD, 1);
     py += 30 * s;
-    if (button(px, py, 240 * s, 46 * s, fmt("Sell for %s", fmtMoney(a.price * 7 / 10).c_str()), !commitBlocked(), !commitBlocked())) {
+    const int saleVal = career.saleValue(oi);   // (the same figure the sale pays: condition counts; a loan on it is settled from it)
+    const bool saleLoan = career.loan.open() && career.loan.spec == career.fleet[oi].spec;
+    if (saleLoan) g_ren.text(px + 250 * s, py + 24 * s, 13 * s, fmt("its loan's %s is repaid from it: %s to you", fmtMoney(career.loan.balance).c_str(), fmtMoney(saleVal - career.loan.balance).c_str()), C_DIM, 1);
+    if (button(px, py, 240 * s, 46 * s, fmt("Sell for %s", fmtMoney(saleVal).c_str()), !commitBlocked(), !commitBlocked())) {
       std::string m; bool sold = false;
       commit([&](Career& k) { sold = k.sell(oi, &m); });
       if (sold) g_audio.trigger(SFX_CASH);
@@ -2181,7 +2217,7 @@ void Game::drawPause() {
 void Game::drawDebrief() {
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.35f);
-  float pw = std::min(720 * s, W - 40 * s), ph = std::min(600 * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
+  float pw = std::min(720 * s, W - 40 * s), ph = std::min(760 * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
   panel(x, y, pw, ph, 0.95f);
   float px = x + 30 * s, py = y + 24 * s;
   for (auto& l : wrap(debriefTitle, pw - 60 * s, 28 * s)) { g_ren.text(px, py, 28 * s, l, lastSuccess ? C_GOOD : C_BAD, 1); py += 34 * s; }
@@ -2213,17 +2249,41 @@ void Game::drawDebrief() {
   }
   py += 10 * s;
   header(px, py, pw - 60 * s, "SETTLEMENT"); py += 24 * s;
+  // the foot of the panel, from the buttons up: the unsaved notice, the campaign's end, a new licence and the total stay
+  // put; the settlement's lines scroll (mouse wheel) in what is left above them (the review of v3.24.0, R9: eleven
+  // lines ran into the buttons)
+  const bool campaignEnd = career.finished && lastSuccess && contract.story && contract.id == g_story.back().id;
+  const auto campaignLines = campaignEnd ? wrap("You've completed the Solace Express campaign. Congratulations, Captain!", pw - 60 * s, 18 * s) : std::vector<std::string>();
+  const bool newLic = career.license > licenseBefore;
+  const float campY = (commitBlocked() ? y + ph - 108 * s : y + ph - 76 * s) - campaignLines.size() * 24 * s;
+  const float licY = campY - (newLic ? 34 * s : 0.f), totalY = licY - 34 * s;
+  const float rowsTop = py, rowsBot = rowsTop + std::max(1.f, floorf((totalY - 12 * s - rowsTop) / (24 * s))) * 24 * s;   // (whole lines: the wheel moves two)
   int total = 0;
+  for (auto& l : payout) total += l.amount;
+  static float payScroll = 0.f; static std::string payFor;
+  const std::string payKey = debriefTitle + "|" + contract.id + "|" + std::to_string(payout.size()) + "|" + std::to_string(total);
+  if (payKey != payFor) { payFor = payKey; payScroll = 0.f; }
+  const float payMax = std::max(0.f, payout.size() * 24 * s - (rowsBot - rowsTop));
+  if (hovered(x, rowsTop, pw, rowsBot - rowsTop) && in.wheel != 0) { payScroll -= in.wheel * 48.f * s; in.wheel = 0; }
+  payScroll = std::clamp(payScroll, 0.f, payMax);
+  g_ren.uiClip(x, rowsTop - 2 * s, x + pw, rowsBot);
+  py = rowsTop - payScroll;
   for (auto& l : payout) {
     float vw = g_ren.text(x + pw - 30 * s, py, 16 * s, fmtMoney(l.amount), l.amount >= 0 ? C_GOOD : C_BAD, 1, 2);
     g_ren.text(px, py, 16 * s, ellipsize(l.label, pw - 80 * s - vw, 16 * s), C_TEXT, 1);
-    total += l.amount; py += 24 * s;
+    py += 24 * s;
   }
-  g_ren.rect(px, py + 2 * s, pw - 60 * s, 1 * s, C_ACCENT, 0.5f); py += 10 * s;
-  g_ren.text(px, py, 18 * s, "Total", C_TEXT, 1);
-  g_ren.text(x + pw - 30 * s, py, 18 * s, fmtMoney(total), total >= 0 ? C_GOOD : C_BAD, 1, 2); py += 34 * s;
-  if (career.license > licenseBefore) { fitText(px, py, pw - 60 * s, 22 * s, 14 * s, std::string("NEW LICENCE: ") + licenseName(career.license), C_WARN); py += 34 * s; }
-  if (career.finished && lastSuccess && contract.story && contract.id == g_story.back().id) { for (auto& l : wrap("You've completed the Solace Express campaign. Congratulations, Captain!", pw - 60 * s, 18 * s)) { g_ren.text(px, py, 18 * s, l, C_ACCENT, 1); py += 24 * s; } }
+  g_ren.uiClipOff();
+  if (payMax > 0.f) {   // a thin bar at the panel's edge: where the view is in the lines
+    const float trackH = rowsBot - rowsTop, barH = std::max(20 * s, trackH * trackH / (trackH + payMax));
+    g_ren.rect(x + pw - 18 * s, rowsTop, 3 * s, trackH, C_ACCENT, 0.12f);
+    g_ren.rect(x + pw - 18 * s, rowsTop + (trackH - barH) * payScroll / payMax, 3 * s, barH, C_ACCENT, 0.7f);
+  }
+  g_ren.rect(px, totalY - 8 * s, pw - 60 * s, 1 * s, C_ACCENT, 0.5f);
+  g_ren.text(px, totalY, 18 * s, "Total", C_TEXT, 1);
+  g_ren.text(x + pw - 30 * s, totalY, 18 * s, fmtMoney(total), total >= 0 ? C_GOOD : C_BAD, 1, 2);
+  if (newLic) fitText(px, licY, pw - 60 * s, 22 * s, 14 * s, std::string("NEW LICENCE: ") + licenseName(career.license), C_WARN);
+  { float cy = campY; for (auto& l : campaignLines) { g_ren.text(px, cy, 18 * s, l, C_ACCENT, 1); cy += 24 * s; } }
   if (commitBlocked()) {   // the settlement above is what will be saved; until it is, the career stands as before the flight
     fitText(px, y + ph - 100 * s, pw - 60 * s, 20 * s, 13 * s, "NOT SAVED YET: " + saveWhy, C_BAD);
     if (button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, "Retry save")) retryCommit();

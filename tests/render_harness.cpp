@@ -24,6 +24,27 @@ struct GameTest {
     else if (what == "settings") { g.hubTab = TAB_SETTINGS; g.settingsPage = 0; g.drawHub(); }
     else if (what == "pause") { g.drawPause(); }
     else if (what == "menu") { g.drawMenu(); }
+    else if (what == "debrief") {   // a story delivery's settlement with eleven lines and a new licence (the review of v3.24.0, R9)
+      g.career.storyIndex = 3; g.contract = g_story[3]; g.lastSuccess = true; g.stars = 2; g.debriefTitle = "Delivered";
+      g.result.landed = true; g.touchdownFpm = 240; g.flightClock = 1312; g.licenseBefore = LIC_STUDENT; g.career.license = LIC_PPL;
+      const char* lines[] = {"Contract payment", "Reputation bonus", "On time", "Passenger comfort", "Rental fee", "Positioning", "Fuel uplift", "Landing fee", "Loan payment", "Airline: CAP - NPT route", "Pilot wages"};
+      int amt[] = {24000, 2400, 1200, -900, -1800, -350, -720, -150, -2100, 8232, -1900};
+      for (int i = 0; i < 11; i++) g.payout.push_back({lines[i], amt[i]});
+      g.screen = SCR_DEBRIEF; g.drawDebrief();
+    }
+    else if (what.rfind("contracts_", 0) == 0) {   // a story job's briefing at ATP with one owned Starling at its airport (the review of v3.24.0, R1)
+      const std::string id = what.substr(10);
+      for (int i = 0; i < (int)g_story.size(); i++) if (g_story[i].id == id) g.career.storyIndex = i;
+      const Contract* st = g.career.nextStory();
+      g.career.license = LIC_ATP; g.career.money = 1000000; g.career.location = st ? st->from : 0;
+      g.career.fleet.push_back({6, g.career.location, 1000, 1});
+      g.hubTab = TAB_CONTRACTS; g.selContract = 0; g.selAircraft = -1;
+      for (int f = 0; f < 3; f++) {   // (the frame after the automatic choice adds its cost and fuel rows)
+        if (f) { g_ren.uiEnd(); glClear(GL_COLOR_BUFFER_BIT); g_ren.uiBegin(); }
+        g.drawHub();
+        printf("contracts %s frame %d: selected aircraft %d\n", id.c_str(), f, g.selAircraft);
+      }
+    }
   }
 };
 
