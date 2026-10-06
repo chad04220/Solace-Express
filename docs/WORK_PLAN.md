@@ -1,6 +1,6 @@
 # Solace Express — Work Plan
 
-The owner's work plan from v3.9.4 (`f8b8537`), cut down to what is still open (2026-10-06, v3.24.0). Every finished
+The owner's work plan from v3.9.4 (`f8b8537`), cut down to what is still open (2026-10-06, v3.27.1). Every finished
 item, with its spec, is in this file's history (`git log -p docs/WORK_PLAN.md`). The renderer rebuild is
 docs/RENDERER_REBUILD.md; the owner-side tool is the one `diagnostics.bat` in the release zip (docs/COLLABORATION.md).
 
@@ -8,11 +8,16 @@ docs/RENDERER_REBUILD.md; the owner-side tool is the one `diagnostics.bat` in th
 
 | Item | Status |
 |---|---|
-| A3 instrument atlas static/dynamic split | open: decided by the owner's next diagnostics run, which times the cockpit display atlases as a pass of their own |
-| A6 UBO for scene parameters | open: cheap now that the uniform set has settled |
-| R3 the rest of the rebuild | open: rigid meshes for the last moving geometry (the XR-30's vectoring nozzles, the XR-40's actuators and gear), so the objects pass's per-pixel aircraft march and the shadow proxy's march can go; then the sky probe (A10) and cloud reprojection (A11) |
-| F1 gusty autoland (QA v3.18.0) | open: six cases (the Starling at CDR overruns with a tailwind the planner accepts; Nightjar and Mantis hard touchdowns; a Specter gear collapse). A stopping-distance penalty plus a go-around sent the Starling into Cedar Ridge's terrain and was backed out; the fix needs the planner to weigh the other end's terrain against the tailwind, or to decline the field, and a retune of the heavy jet's flare in gusts. Codex's probes (autoland_starling_probe / autoland_research_probe in its QA package) reproduce all six |
-| W1 WASAPI device change (QA v3.19.0) | open: audio does not follow a change of the default output device (needs IMMNotificationClient; owner-tested only) |
+| A3 instrument atlas static/dynamic split | deferred: the display pass is 0.2-0.8 ms on the owner's GPU (v3.27.1); worth it only if it grows |
+| A6 UBO for scene parameters | deferred: every scene is GPU-bound on the owner's machine (CPU submit 7-8 ms under a longer GPU frame) |
+| Per-family aircraft shaders, tiled light culling | deferred: low value now that every benchmark scene runs at 60 fps or better |
+| A10 / A11 water sky probe, cloud reprojection | deferred: the lighting and cloud passes are 1-3 ms; worth it only if the owner's diagnostics show them growing |
+| Review visuals (cockpit framing, materials, vegetation, coast) | open, cheap changes only (the owner prefers performance and gameplay); the XR-20's cockpit framing is done |
+| Cockpit mesh: pale wedges under the wing roots | open: seen from some cockpits (the Osprey's) where big simplified triangles span a crease; predates the dual-contouring bake |
+
+Done since v3.24.0 and kept out of this list: R3's moving parts (every aircraft, the research jets' nozzles, gear and
+actuators included: no moving hull is left), the cloaked XR-40 on its mesh, F1's gusty autoland (the sweep lands or
+declines every case), W1's audio device change, the review's career findings (R1-R6, R8-R10).
 
 Decided, not planned: D1 (the FlightSession / CrashFx / Comms extraction from `Game`: a pure refactor with regression
 risk and no player-visible gain) and B3 (the first-run compile stays on the helper process).
