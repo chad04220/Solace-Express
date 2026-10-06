@@ -3,20 +3,14 @@
 //! the clouds' shadows on the exterior; the cabin's fixtures and the sun through the windows inside; the sealed research
 //! cockpit from its fixtures alone. Shared by the objects pass and the aircraft mesh pass (plane_gb.glsl).
 // The airframe's own shadow of the sun at a point on it: from its sun shadow map on the raster path; the march of the
-// field only where the map can't say - under the moving parts' mask, with no map this frame, and inside the cabin on
-// the map's edge texels and thin frames (the map settles nearly all pixels, lit or shadowed; a surface the sun grazes
-// or faces away from takes nothing from it in any case). One call for the exterior and the cabin alike: each march
-// written out is another copy of the airframe's distance in the shader
+// field only where the map can't say - under the moving parts' mask, or with no map this frame (inside the cabin a
+// surface the sun grazes or faces away from takes nothing from it in any case). Inside, the map's soft value is used
+// as it is, frames and edges too: marching there cost the cockpit view ~19 ms on an RTX 3070 Laptop (v3.25.0). One
+// call for the exterior and the cabin alike: each march written out is another copy of the airframe's distance
 float afSunSelf(vec3 p, vec3 n, bool interior){
   float ndl = dot(n, uSunDir);
   float ms = (uAfShOn & 1) != 0 && uWreck == 0 ? (ndl < (interior ? 0.3 : 0.05) ? 0.0 : shMapLookupB(0, p, n, 1.0 + 2.0*(1.0 - ndl))) : -1.0;   // (inside, a surface the sun barely faces is lit by the fixtures and the ambient alone: its thin frames alias in the map)
-  if (ms >= 0.0 && interior) {
-    // (inside, an occluder within ~0.3 m of the receiver is a thin frame or the receiver's own far side: the map's
-    // texels alias along it, so the march decides there - a small share of the cabin's pixels)
-    bool thin = ms < 0.995 && gShMapOcc*2.0*planeBound() < 0.3;
-    if (ms >= 0.995) return 1.0;
-    if (ms <= 0.005 && !thin) return 0.0;
-  } else if (ms >= 0.0) return ms;
+  if (ms >= 0.0) return ms;
   gShMax = interior ? 3.5 : 1e9;   // (inside, the ray only needs to get out through the cabin and the wing above it)
   float s = planeShadow(p + n*0.02, uSunDir);
   gShMax = 1e9;
