@@ -31,8 +31,11 @@ out vec4 oT;   // distance along the pixel's ray, 0 on the hull's inside (only t
 // Faces nearer than uFree are dropped: the ray tracer marches every ray that far itself (in the cockpit the eye sits
 // inside the hull's margins, a few centimetres from the cabin roof). Beyond it, a ray in empty space meets an outside
 // face first (nothing lies before it), and a ray inside solid space an inside face (it just keeps marching).
+// Pass 2 (the player's moving hull): the farthest inside face along the ray into the fourth channel (MAX blending), the
+// end of the hull volume: past it nothing moves on this ray, so the march stops there and the mesh is the airframe.
 void main(){
   float t = length(vW - uCam);
+  if (uPass == 2) { if (gl_FrontFacing) discard; oT = vec4(0.0, 0.0, 0.0, t); return; }
   if (t < uFree || gl_FrontFacing != (uPass == 1)) discard;
   float v = gl_FrontFacing ? t : 0.0;
   oT = uChan == 2 ? vec4(0.0, 0.0, v, 0.0) : vec4(0.0, v, 0.0, 0.0);
@@ -310,8 +313,8 @@ void Renderer::ensureHullTarget() {
   }
 }
 
-void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key, float nearOverride) {
-  hullOn = false;
+void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key, float nearOverride, bool exitToo) {
+  hullOn = false; hullExitOn = false;
   hullNearNow = nearOverride >= 0.f ? nearOverride : hullNear(fp);
   auto it = hulls.find(key);
   if (it == hulls.end()) return;
@@ -327,9 +330,10 @@ void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key, float nea
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texHullDepth, 0);
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
   glViewport(0, 0, rw, rh);
-  glColorMask(GL_FALSE, GL_TRUE, GL_FALSE, GL_FALSE);
-  float far[4] = {0, 1e30f, 0, 0};   // no hull on this pixel: no aircraft along its ray
+  glColorMask(GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE);
+  float far[4] = {0, 1e30f, 0, 0};   // no hull on this pixel: no aircraft along its ray (fourth channel: no hull end, 0)
   glClearBufferfv(GL_COLOR, 0, far);
+  glColorMask(GL_FALSE, GL_TRUE, GL_FALSE, GL_FALSE);
   glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);
   glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDisable(GL_CULL_FACE); glDisable(GL_BLEND);
   glUseProgram(progHull);
@@ -351,6 +355,13 @@ void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key, float nea
   glUniform1i(lp, 1); glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(1.f, 4.f);
   glDrawArrays(GL_TRIANGLES, 0, H.verts);
   glDisable(GL_POLYGON_OFFSET_FILL);
+  if (exitToo) {   // the end of the hull volume on each ray: the farthest inside face, no depth test, MAX-blended into the fourth channel
+    glDisable(GL_DEPTH_TEST); glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
+    glEnable(GL_BLEND); glBlendEquation(GL_MAX); glBlendFunc(GL_ONE, GL_ONE);
+    glUniform1i(lp, 2); glDrawArrays(GL_TRIANGLES, 0, H.verts);
+    glDisable(GL_BLEND); glBlendEquation(GL_FUNC_ADD); glEnable(GL_DEPTH_TEST);
+    hullExitOn = true;
+  }
   glBindVertexArray(0);
   glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
   glDisable(GL_DEPTH_TEST);

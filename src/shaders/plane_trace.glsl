@@ -64,7 +64,7 @@ vec2 tracePlane(vec3 ro, vec3 rd, float tmax){
 // The airframe along a camera ray, using the hull's start (hullT: 0 none, 1e30 no airframe on this ray): the first
 // uHullNear metres are marched as usual, then the march resumes where the hull says the airframe can begin.
 uniform sampler2D uEnv;   // per pixel: terrain start | airframe hull start | traffic hulls' start (terrain_envelope.cpp, aircraft_hull.cpp)
-uniform float uHullNear; uniform int uHullOn;
+uniform float uHullNear; uniform int uHullOn; uniform int uHullExitOn;   // (uHullExitOn: uEnv's fourth channel holds the end of the hull volume on this ray)
 vec2 tracePlaneHull(vec3 ro, vec3 rd, float tmax, float hullT){
   if (hullT > 0.0) { gPlStart = hullT; gPlNear = uHullNear; }
   vec2 h = tracePlane(ro, rd, tmax);   // (one call: each call site is another copy of the airframe's distance)

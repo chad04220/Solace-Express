@@ -51,6 +51,8 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_RGBA 0x1908
 #define GL_R8 0x8229
 #define GL_DEPTH_COMPONENT24 0x81A6
+#define GL_FUNC_ADD 0x8006
+#define GL_MAX 0x8008
 #define GL_R32F 0x822E
 #define GL_RG8 0x822B
 #define GL_RG 0x8227
@@ -134,6 +136,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
   X(void, glActiveTexture, (GLenum)) \
   X(void, glGenerateMipmap, (GLenum)) \
   X(void, glBlendFuncSeparate, (GLenum, GLenum, GLenum, GLenum)) \
+  X(void, glBlendEquation, (GLenum)) \
   X(GLuint, glCreateShader, (GLenum)) \
   X(void, glShaderSource, (GLuint, GLsizei, const GLchar* const*, const GLint*)) \
   X(void, glCompileShader, (GLuint)) \

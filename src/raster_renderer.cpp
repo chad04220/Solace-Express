@@ -55,7 +55,10 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   const bool meshOn = pm != planeMeshes.end() && pm->second.ok;
   const bool hullUse = !meshOn && hullWanted(fp) && fp.pano <= 0.f;   // (the hulls are flat rasters: a panorama camera marches without them)
   const uint64_t hullK = hullUse ? hullKey(fp, slot) : 0;
-  if (meshOn) drawHull(fp, slot, pm->second.movKey, pm->second.eyeInMov ? -1.f : 0.f);
+  // (with the mesh the hull is the moving parts' only: no near segment even with the eye inside it - a ray starting inside
+  // reads 0 and marches from the eye - and the march ends where the ray leaves the moving volume: the cabin's
+  // panel, roof and seats are the mesh's, and the yoke's pixels alone march, as deep as the yoke's hull)
+  if (meshOn) drawHull(fp, slot, pm->second.movKey, 0.f, true);
   else if (hullUse && hulls.count(hullK)) drawHull(fp, slot, hullK);
   // the traffic: the same light aircraft, each with its model's mesh when one is baked (then its hull is the moving
   // parts' too), else its full hull

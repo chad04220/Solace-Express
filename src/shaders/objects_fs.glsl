@@ -25,7 +25,9 @@ void main(){
   bool jetC = int(gM[0].z + 0.5) >= 5;
   // (the player's aircraft as a mesh: only a pixel its moving hull covers has anything left to march - and in the
   // cockpit the first uHullNear metres from the eye, whose hull faces the hull pass drops, as the ray tracer does)
-  vec2 hTop = uMeshOn == 1 && (uHullOn == 0 || (hullT > 1e29 && uHullNear <= 0.0)) ? vec2(-1.0) : tracePlaneHull(ro, rd, cockpitView ? (jetC ? 6.0 : planeBound()*2.0) : tmax, hullT);
+  float hullEnd = cockpitView ? (jetC ? 6.0 : planeBound()*2.0) : tmax;
+  if (uMeshOn == 1 && uHullOn == 1 && uHullExitOn == 1 && uWreck == 0) { float he = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).a; if (he > 0.0) hullEnd = min(hullEnd, he*1.002 + 0.05); }
+  vec2 hTop = uMeshOn == 1 && (uHullOn == 0 || (hullT > 1e29 && uHullNear <= 0.0)) ? vec2(-1.0) : tracePlaneHull(ro, rd, hullEnd, hullT);
   int hTopPiece = gPI;   // (traffic tracing moves the piece transform; restored before shading)
   if (cockpitView && hTop.x > 0.0) {
     int id0 = int(hTop.y + 0.5);

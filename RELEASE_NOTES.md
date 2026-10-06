@@ -1,1 +1,2 @@
 ## What's new
+- Cockpit view on the rasterizer: the cabin comes from its baked mesh and only the moving controls' pixels march the field, and only as deep as the moving parts reach (every cockpit pixel used to march the first 1.2 m of the field: the 72 ms objects pass in the cockpit benchmark). The hull pass writes where each ray leaves the moving volume and the march stops there, in flight as well.

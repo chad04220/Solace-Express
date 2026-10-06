@@ -920,7 +920,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   // was drawn this frame, and the terrain channel is only read under uEnvOn)
   glActiveTexture(GL_TEXTURE0 + 20); glBindTexture(GL_TEXTURE_2D, envOn || hullOn || trafHullOn ? texEnv : 0); glUniform1i(U(p, "uEnv"), 20);
   glUniform1i(U(p, "uEnvOn"), envOn ? 1 : 0);
-  glUniform1i(U(p, "uHullOn"), hullOn ? 1 : 0); glUniform1f(U(p, "uHullNear"), hullOn ? hullNearNow : hullNear(fp));
+  glUniform1i(U(p, "uHullOn"), hullOn ? 1 : 0); glUniform1f(U(p, "uHullNear"), hullOn ? hullNearNow : hullNear(fp)); glUniform1i(U(p, "uHullExitOn"), hullOn && hullExitOn ? 1 : 0);
   glUniform1i(U(p, "uTrafHullOn"), trafHullOn ? 1 : 0);
   {   // AI traffic: one row of 32 texels per aircraft
     if (!texTraffic) {

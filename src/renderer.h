@@ -254,7 +254,8 @@ private:
   uint64_t hullKey(const FrameParams& fp, int slot) const;
   bool hullWanted(const FrameParams& fp) const;
   float hullNear(const FrameParams& fp) const;
-  void drawHull(const FrameParams& fp, int slot, uint64_t key, float nearOverride = -1.f);
+  void drawHull(const FrameParams& fp, int slot, uint64_t key, float nearOverride = -1.f, bool exitToo = false);
+  bool hullExitOn = false;   // the hull pass wrote the hull volume's end per ray (uEnv's fourth channel): the march stops there
   float hullNearNow = 0.f;   // the hull pass's near distance this frame (uHullNear): hullNear(fp), or a mesh's moving hull's own
   void drawTrafficHulls(const FrameParams& fp, const PlaneMesh* const* meshes = nullptr);   // meshes[k]: that traffic's mesh (its moving hull is drawn instead)
   void ensureHullTarget();
