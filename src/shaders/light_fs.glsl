@@ -1,9 +1,9 @@
 //! kLightFS
-//! The lighting pass: one full-screen program reads the G-buffer and shades every pixel the way the ray tracer did -
+//! The lighting pass: one full-screen program reads the G-buffer and shades every pixel -
 //! the sky where nothing was drawn; otherwise the sun through the terrain-shadow bake, the scenery shadow cascades and
 //! the cloud shadow (an airframe: its own shadow and the terrain's from the objects pass), ambient, moonlight, the sky
 //! reflection, the point lights, emission and the aerial perspective. A prelit pixel (the sea, a display, the cockpit)
-//! only gets the aerial perspective. Writes what the ray tracer wrote: colour + TAA class, view distance, and the
+//! only gets the aerial perspective. Writes colour + TAA class, view distance, and the
 //! cloud mask for the quarter-resolution cloud pass.
 uniform sampler2D uGB3;   // (uGB0..2: light_common)
 uniform sampler2D uShProxy;   // the airframes' shadows on this pixel (kShadowProxyFS): the sun's, the three brightest shadow-casting lights'

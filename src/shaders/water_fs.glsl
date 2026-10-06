@@ -1,5 +1,5 @@
 //! kWaterFS
-//! The sea surface, shaded here as the ray tracer shaded it (waves, Fresnel sky and cloud reflection, depth colour,
+//! The sea surface, shaded here (waves, Fresnel sky and cloud reflection, depth colour,
 //! foam, sun glint) and written prelit: the lighting pass adds only the aerial perspective.
 in vec3 vW;
 float lightShadow(int i, vec3 p, vec3 n, vec3 l, float d){ return 1.0; }   // (shadeSurface's hook; the sea never calls it)

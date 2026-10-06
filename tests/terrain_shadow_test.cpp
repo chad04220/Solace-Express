@@ -42,7 +42,7 @@ int main() {
   setvbuf(stdout, nullptr, _IONBF, 0);
   if (!initGL()) { puts("terrain shadow bake: no EGL here, skipped"); return 0; }
   g_world.build();
-  // the bake shader with what it uses from the ray tracer: the common terrain code and the max-height mip chain
+  // the bake shader with what it uses from the shared shader code: the common terrain code and the max-height mip chain
   std::string fs = std::string("#version 330 core\n") + kCommonGLSL + "layout(location=0) out vec4 oColor; uniform float uMaxH;\n" +
                    "uniform sampler2D uHMax; const int HMAXN = " + std::to_string(HMAX_N) + "; const int HMAXL = " + std::to_string(HMAX_LEVELS) + ";\n" + kTShBakeMain;
   GLuint vs = compile(GL_VERTEX_SHADER, kFullscreenVS), f = compile(GL_FRAGMENT_SHADER, fs);

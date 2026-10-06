@@ -1,5 +1,5 @@
 // Solace Express - the renderer: a deferred pipeline that draws every surface with the
-// rasterizer and lights the frame once. Shared with the ray tracer: the scenery pass and its shadow cascades, the
+// rasterizer and lights the frame once. Its parts: the scenery pass and its shadow cascades, the
 // terrain-shadow bake, the display atlases, the cloud pass, and everything after the lit frame (TAA, sprites, bloom,
 // light shafts, post). See docs/RENDERER_REBUILD.md.
 #include "renderer.h"
@@ -42,7 +42,7 @@ void Renderer::updatePartPoses(const FrameParams& fp) {
 }
 
 // The lit frame for a view from the G-buffer the raster passes filled: into texRaw (colour + TAA class), texDepth (view
-// distance) and texCloudMask, exactly what the ray tracer writes, so the clouds, the TAA and everything after run as before.
+// distance) and texCloudMask, so the clouds, the TAA and everything after run as before.
 void Renderer::rasterWorld(const FrameParams& fp) {
   // scenery: its shadow cascades and the G-buffer, which it clears (entity_render.cpp)
   // the player's baked mesh opens the G-buffer's depth (drawEntities, right after the clear): see rasterObjects
@@ -65,13 +65,13 @@ void Renderer::rasterWorld(const FrameParams& fp) {
 
 // The aircraft, the traffic, wreck pieces, debris and the UFO: marched through their distance fields by a full-screen
 // pass that writes the G-buffer with depth (the terrain and the scenery occlude them through the depth test). The
-// player's aircraft starts its march on its rasterized hull, as in the ray tracer.
+// player's aircraft starts its march on its rasterized hull.
 void Renderer::rasterObjects(const FrameParams& fp) {
   hullOn = false;
   updatePartPoses(fp);
   const int slot = fp.plane.PS[3] > 0.5f ? 1 : 0;
   // the player's aircraft as a mesh where it never moves (aircraft_mesh.cpp): then only its moving parts are marched,
-  // from the hull round them; without one, the whole airframe is marched from its full hull as the ray tracer does
+  // from the hull round them; without one, the whole airframe is marched from its full hull
   const bool meshUse = planeMeshWanted(fp) && fp.pano <= 0.f;
   const uint64_t meshK = meshUse ? hullKey(fp, slot) : 0;
   auto pm = meshUse ? planeMeshes.find(meshK) : planeMeshes.end();
@@ -151,7 +151,7 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   glActiveTexture(GL_TEXTURE0);
   glDisable(GL_DEPTH_TEST);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  // a new airframe or view: bake its mesh (or its hull) with the ray tracer's own shape code (used from the next frame on)
+  // a new airframe or view: bake its mesh (or its hull) with the shaders' own shape code (used from the next frame on)
   if (!feedPass) {
     if (meshUse && pm == planeMeshes.end()) { setRT(progHullBake, fp); bakePlaneMesh(fp, slot, meshK); }
     else if (hullUse && !hulls.count(hullK)) { setRT(progHullBake, fp); bakeHull(fp, slot, hullK); }

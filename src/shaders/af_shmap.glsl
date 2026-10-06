@@ -3,7 +3,7 @@
 //! (layer 0) and from the three brightest shadow-casting lights (1-3), with the moving parts' hull as a mask. Read by
 //! the shadow proxy (the airframe's shadow on the ground), and by the airframe's own lighting for its self-shadow and
 //! the sun through the cabin windows (plane_light.glsl), in place of a march of the field per pixel. uAfShOn: which
-//! layers hold a map this frame (0 on the ray tracer).
+//! layers hold a map this frame.
 uniform sampler2DArray uAfShMap;   // depth from the light
 uniform sampler2DArray uAfShMov;   // the moving parts' hull from the light (1: march the field here)
 uniform mat4 uAfShVP[4]; uniform int uAfShOn;

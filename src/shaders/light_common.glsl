@@ -1,5 +1,5 @@
 //! kLightCommon
-//! Lighting shared by the ray tracer and the raster passes: the baked terrain sun shadow, the scenery shadow cascades,
+//! Lighting shared by the raster passes: the baked terrain sun shadow, the scenery shadow cascades,
 //! PBR, ambient, the cockpit fixture lights, surface shading with the point lights, and the aerial perspective.
 uniform sampler2D uTSh; uniform int uTShOn;   // baked terrain sun shadow (see kTShBakeMain)
 float terrainShadow(vec3 ro, vec3 rd, float camT){
@@ -121,8 +121,8 @@ vec3 wraithPodLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E){
   return L;
 }
 
-// the aircraft's shadow in point light i's beam at p (d from the light along l): the ray tracer marches the airframe,
-// the raster passes read their shadow maps
+// the aircraft's shadow in point light i's beam at p (d from the light along l): each pass defines its own (the
+// lighting pass reads the shadow proxy; the aircraft passes leave their own lights' shadows out)
 float lightShadow(int i, vec3 p, vec3 n, vec3 l, float d);
 vec3 shadeSurface(vec3 p, vec3 n, vec3 rd, Mat m, float shadow){
   vec3 v = -rd;
@@ -135,7 +135,7 @@ vec3 shadeSurface(vec3 p, vec3 n, vec3 rd, Mat m, float shadow){
   vec3 r = reflect(rd, n);
   vec3 F = fresnelSchlick(max(dot(n, v), 0.0), mix(vec3(0.04), m.alb, m.metal));
   col += skyColor(normalize(vec3(r.x, abs(r.y), r.z)))*F*(1.0-m.rough)*(1.0-m.rough)*0.8;
-  // point and spot lights (exhaust flames, landing lights, nav lights, beacon, strobes, blasts) with ray-traced
+  // point and spot lights (exhaust flames, landing lights, nav lights, beacon, strobes, blasts) with the aircraft's
   // shadows from the aircraft: shadow rays only where a light contributes visibly
   for (int i = 0; i < 12; i++) {
     if (i >= uPLN || (uDbg & 16) != 0) break;

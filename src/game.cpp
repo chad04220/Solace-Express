@@ -1618,7 +1618,7 @@ void Game::jetEffects(float dt) {
 }
 
 // ------------------------------------------------------------------ lights
-// Every light but the sun and moon is a point (or spot) light with ray-traced shadows from the aircraft, and sits in
+// Every light but the sun and moon is a point (or spot) light with the aircraft's shadows, and sits in
 // a modelled fixture: a faired housing with a domed lens (nav lights in the wingtips and tail cone, the strobes
 // flashing through the wingtip lenses, a beacon on top, landing lights in the wing leading edges). The exhaust has a
 // light in each flame just behind its nozzle, so the nozzles and the airframe throw shadows from it.
@@ -1753,7 +1753,7 @@ float Game::wreckGround(float x, float z) const {
   return g;
 }
 
-// Splits the airframe into nose, centre section, both wings and tail (each the ray-traced model clipped to a
+// Splits the airframe into nose, centre section, both wings and tail (each the aircraft's field clipped to a
 // body-space box), throws them apart with the impact energy, scatters skin fragments and digs a crater.
 // A layered explosion: a white-hot flash that lights the scene, a fireball of flame cooling from yellow to deep red
 // as it billows out and rises, a dark smoke column that keeps climbing and spreading after the flames die, arcing
@@ -2924,11 +2924,11 @@ void Game::update(float dt) {
     retryT += dt;
     if (retryT > 3.f) { retryT = 0; retryCommit(); }
   }
-  // the ray-trace resolution: native, a fixed scale, or adjusted to hold the frame-rate target (Settings)
+  // the render resolution: native, a fixed scale, or adjusted to hold the frame-rate target (Settings)
   fpsAvg = lerpf(fpsAvg, dt, 1.f - expf(-dt * 3.f));   // (a third of a second, whatever the frame rate)
   maxFrameWin = std::max(maxFrameWin, dt); maxFrameT += dt;
   if (maxFrameT >= 1.f) { maxFrameMs = maxFrameWin * 1000.f; maxFrameWin = 0; maxFrameT = 0; }
-  if (!headless && g_ren.ok) {   // ray-trace resolution: native, a fixed scale, or adjusted to hold 60 fps on the GPU
+  if (!headless && g_ren.ok) {   // render resolution: native, a fixed scale, or adjusted to hold 60 fps on the GPU
     static const float fixedScale[5] = {1.f, 1.f, 0.85f, 0.75f, 0.67f};
     float want = fixedScale[std::clamp(set.resMode, 0, 4)];
     if (set.resMode == 1) {

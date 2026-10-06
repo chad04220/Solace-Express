@@ -2,7 +2,7 @@
 //! ------------------------------------------------------------------------------------------------
 //! Shared noise + terrain (must match world.cpp exactly)
 
-// Work counters for the analysis build of the ray tracer (analyze.bat): each COST(k) counts one unit of the expensive
+// Work counters for an analysis build (COST_MAP): each COST(k) counts one unit of the expensive
 // work of category k in this pixel - 0 terrain height samples, 1 aircraft distance-field samples, 2 cloud march
 // steps, 3 effect / light steps. In the game build they compile to nothing.
 #ifdef COST_MAP

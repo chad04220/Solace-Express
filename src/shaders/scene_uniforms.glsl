@@ -32,7 +32,7 @@ float coShift(vec4 E, int ck){
 uniform vec4 uProp[2]; uniform int uPropCount;
 uniform vec3 uLandLightPos; uniform vec3 uLandLightDir; uniform float uLandLight;
 // point / spot lights (everything but the sun and moon): position + source radius | radiance + spot cutoff cosine
-// (-2 = omni) | spot axis + shadow flag (> 0: ray-traced aircraft shadow, stopping that far short of the light)
+// (-2 = omni) | spot axis + shadow flag (> 0: casts the aircraft's shadow, stopping that far short of the light)
 uniform float uRwyLights;   // airport lighting on (night / low visibility)
 uniform int uPLN; uniform vec4 uPLP[12]; uniform vec4 uPLC[12]; uniform vec4 uPLD[12];
 // the player aircraft's light fixtures (body space): lens centre | lens emission | outward axis + glass tint (0 red,

@@ -5,7 +5,7 @@
 #version 330 core
 in vec2 vUV; layout(location=0) out vec4 oHist; layout(location=1) out vec4 oColor;
 uniform sampler2D uRaw; uniform sampler2D uDepth; uniform sampler2D uHist; uniform vec2 uRes; uniform float uHistValid;
-uniform vec2 uRawRes; uniform vec2 uRawUVS; uniform vec2 uJit; uniform float uDt;   // (this frame's time step: the blend is per 1/60 s)   // ray-trace resolution (<= uRes: temporal upscaling) and this frame's jitter
+uniform vec2 uRawRes; uniform vec2 uRawUVS; uniform vec2 uJit; uniform float uDt;   // (this frame's time step: the blend is per 1/60 s)   // render resolution (<= uRes: temporal upscaling) and this frame's jitter
 uniform vec3 uCamPos; uniform mat3 uCamRot; uniform vec3 uPrevCamPos; uniform mat3 uPrevCamRot; uniform float uTanHalf; uniform float uAspect;
 uniform vec3 uPlanePos; uniform mat3 uPlaneRot; uniform vec3 uPrevPlanePos; uniform mat3 uPrevPlaneRot;
 vec3 toY(vec3 c){ c = c/(1.0 + max(c.r, max(c.g, c.b))); return vec3(0.25*c.r + 0.5*c.g + 0.25*c.b, 0.5*c.r - 0.5*c.b, -0.25*c.r + 0.5*c.g - 0.25*c.b); }

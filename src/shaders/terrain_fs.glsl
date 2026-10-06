@@ -1,5 +1,5 @@
 //! kTerrainFS
-//! The ground's material into the G-buffer (terrainMaterial, as the ray tracer shaded it), lit later by the lighting pass.
+//! The ground's material into the G-buffer (terrainMaterial), lit later by the lighting pass.
 in vec3 vW; in vec3 vN;
 void main(){
   vec3 p = vW; vec3 rd = p - uCamPos; float t = length(rd);

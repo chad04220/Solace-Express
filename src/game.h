@@ -79,7 +79,7 @@ public:
   int monitorHz = 60;            // the display's refresh rate (the platform layer sets it)
   bool wantPacing = false;       // the frame-rate target changed: the platform layer re-applies its pacing
   // the pre-rendered menu montage (Windows: menu_video_win.cpp): returns the texture to show at this time, or 0 to
-  // ray trace the montage live; and sceneOnly, set while recording it (the scene without the menu on top)
+  // render the montage live; and sceneOnly, set while recording it (the scene without the menu on top)
   std::function<unsigned(float)> menuVideo;
   bool sceneOnly = false;
   void focusLost() { if (screen == SCR_FLIGHT && !crashed) paused = true; }   // the window lost focus: a flight pauses

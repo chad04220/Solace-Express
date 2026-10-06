@@ -1,4 +1,4 @@
-// Solace Express - OpenGL renderer: GPU ray tracer + sprites + post + UI
+// Solace Express - OpenGL renderer: deferred rasterizer + sprites + post + UI
 #include "renderer.h"
 #include "shaders.h"
 #if defined(_MSC_VER)
@@ -761,8 +761,8 @@ static void makeTex(GLuint& t, int w, int h, GLenum ifmt, GLenum fmt, GLenum typ
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
-// Render-resolution targets: the ray tracer's colour (+ TAA class in alpha) and depth
-// The ray-tracing resolution's targets are allocated at the full view size once; a render scale below 1 draws into
+// Render-resolution targets: the lit colour (+ TAA class in alpha) and depth
+// The render resolution's targets are allocated at the full view size once; a render scale below 1 draws into
 // their lower-left rw x rh (setRenderScale only moves that corner: no reallocation, no hitch). Passes that read them
 // by pixel need nothing; the ones that sample by normalized coordinates scale by rw/W (uUVS / uRawUVS).
 void Renderer::scaleDims() {
@@ -782,7 +782,7 @@ void Renderer::createRenderTargets() {
   glBindFramebuffer(GL_FRAMEBUFFER, fboCloud);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texCloud, 0);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texCloudD, 0);
-  if (!fboComp) glGenFramebuffers(1, &fboComp);   // the composite writes the ray tracer's colour only
+  if (!fboComp) glGenFramebuffers(1, &fboComp);   // the composite writes the lit colour only
   glBindFramebuffer(GL_FRAMEBUFFER, fboComp);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texRaw, 0);
   if (!fboScene) glGenFramebuffers(1, &fboScene);
@@ -879,8 +879,8 @@ bool Renderer::project(const FrameParams& fp, vec3 p, float& sx, float& sy) cons
   return true;
 }
 
-// ------------------------------------------------ the passes of a frame (the ray tracer and the raster renderer share them)
-// the scene's uniforms and textures for a program (the ray tracer, the cloud pass, the raster passes) and a view: this
+// ------------------------------------------------ the passes of a frame
+// the scene's uniforms and textures for a program (the cloud pass, the raster passes) and a view: this
 // frame's or a camera feed's
 // (GLERR: a draw that fails validation - samplers of two types on one unit, say - draws nothing and says nothing)
 void Renderer::reportGLError(int stampIdx) {
@@ -900,7 +900,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glActiveTexture(GL_TEXTURE0 + 14); glBindTexture(GL_TEXTURE_3D, texNoise3); glUniform1i(U(p, "uNoise3"), 14);
   glActiveTexture(GL_TEXTURE0 + 15); glBindTexture(GL_TEXTURE_2D, texFont); glUniform1i(U(p, "uFontTex"), 15);
   // units 0-15 are all taken (10 and 12 by the G-buffer and the far shadow cascade below): the display atlases use
-  // 16 and 17 (every GL 3.3 GPU that runs the ray tracer has at least 32)
+  // 16 and 17 (every GL 3.3 GPU has at least 32)
   glActiveTexture(GL_TEXTURE0 + 16); glBindTexture(GL_TEXTURE_2D, texPages); glUniform1i(U(p, "uDispTex"), 16);
   glActiveTexture(GL_TEXTURE0 + 17); glBindTexture(GL_TEXTURE_2D, texPanel); glUniform1i(U(p, "uPanelTex"), 17);
   glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, tshFront >= 0 ? texTSh[tshFront] : 0); glUniform1i(U(p, "uTSh"), 18);
@@ -909,7 +909,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   // (bound whenever any of its channels is in use: the hull channels are written whether or not the terrain envelope
   // was drawn this frame, and the terrain channel is only read under uEnvOn)
   glActiveTexture(GL_TEXTURE0 + 20); glBindTexture(GL_TEXTURE_2D, hullOn || trafHullOn ? texEnv : 0); glUniform1i(U(p, "uEnv"), 20);
-  glUniform1i(U(p, "uEnvOn"), 0);   // (the terrain envelope was the ray tracer's)
+  glUniform1i(U(p, "uEnvOn"), 0);   // (the terrain envelope is gone)
   glUniform1i(U(p, "uScrWin"), screenWindows ? 1 : 0);
   glUniform1i(U(p, "uAfShOn"), shOn);   // the airframe shadow maps (af_shmap.glsl), for the proxy and the airframe's own lighting
   if (shOn) glUniformMatrix4fv(U(p, "uAfShVP"), 4, GL_FALSE, shMapVP[0].m);
@@ -1075,7 +1075,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   }
 }
 
-// the ray trace of a view into the scene targets
+// a view into the scene targets
 // the clouds at a quarter of the pixels, along the rays of the depths just written, composited over the lit view
 void Renderer::cloudPass(const FrameParams& fp) {
   if (!cloudSplit) return;
@@ -1088,7 +1088,7 @@ void Renderer::cloudPass(const FrameParams& fp) {
   glActiveTexture(GL_TEXTURE0 + 19); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progClouds, "uSceneDepth"), 19);
   glUniform1i(U(progClouds, "uFrame"), (int)(frameNo & 3));
   glDrawArrays(GL_TRIANGLES, 0, 3);
-  // composite over the ray tracer's colour: colour x transmittance + in-scatter (its alpha, the TAA class, is kept)
+  // composite over the lit colour: colour x transmittance + in-scatter (its alpha, the TAA class, is kept)
   glBindFramebuffer(GL_FRAMEBUFFER, fboComp);
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
   glViewport(0, 0, rw, rh);
@@ -1138,9 +1138,9 @@ void Renderer::drawSprites(const FrameParams& fp, float texW, float texH, float 
   glDisable(GL_BLEND);
 }
 
-// a camera's picture gets the effects drawn after the ray trace too: the sprites and the light shafts
+// a camera's picture gets the effects drawn after the lighting too: the sprites and the light shafts
 void Renderer::feedEffects(const FrameParams& f) {
-  glBindFramebuffer(GL_FRAMEBUFFER, fboComp);   // (writes the ray tracer's colour)
+  glBindFramebuffer(GL_FRAMEBUFFER, fboComp);   // (writes the lit colour)
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
   glViewport(0, 0, rw, rh);
   drawSprites(f, (float)kFeedMaxW, (float)kFeedMaxH, 1.f, 1.f);
@@ -1276,7 +1276,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glBindFramebuffer(GL_FRAMEBUFFER, fboSprite);
   GLenum one = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &one);
   glViewport(0, 0, W, H);
-  drawSprites(fp, (float)W, (float)H, (float)rw / allocW, (float)rh / allocH);   // (the depth is in the ray tracer's corner)
+  drawSprites(fp, (float)W, (float)H, (float)rw / allocW, (float)rh / allocH);   // (the depth is in the render resolution's corner)
 
   stamp(8);
   // ------------------------------------------------ bloom

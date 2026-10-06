@@ -232,7 +232,7 @@ void World::build() {
   bakeMask();
   buildHMax();
   buildEnvelope();
-  // Airport buildings are raster scenery entities now (airport_scenery.cpp); the ray-traced box list stays empty
+  // Airport buildings are raster scenery entities now (airport_scenery.cpp); the old analytic box list stays empty
   boxes.clear();
 }
 

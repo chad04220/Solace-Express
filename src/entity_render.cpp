@@ -1,5 +1,5 @@
 // Solace Express - environment entity rendering: chunk streaming, culling, LOD selection, instanced G-buffer and
-// sun shadow-cascade passes. The ray tracer composites the G-buffer with the traced scene and lights it.
+// sun shadow-cascade passes. The lighting pass lights the G-buffer.
 #include "renderer.h"
 #include "entity_shaders.h"
 #include <chrono>

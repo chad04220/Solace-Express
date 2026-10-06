@@ -1,8 +1,8 @@
 //! kEffectsFS
 //! The raster renderer's effects pass, over the lit and clouded frame: the XR-40's cloak (its cloaked part shows the
 //! frame behind it along a slightly bent ray, with the skin's shimmer), the propeller discs, the vapour cone, the
-//! research jets' exhaust plumes (over the clouds, as in the ray tracer), the weapons and the cockpit hologram -
-//! composed in the ray tracer's order, with its TAA classes. Reads the frame and writes a copy of it.
+//! research jets' exhaust plumes (over the clouds), the weapons and the cockpit hologram -
+//! composed in order, with their TAA classes. Reads the frame and writes a copy of it.
 in vec2 vUV; out vec4 oColor;
 uniform sampler2D uRawTex; uniform sampler2D uSceneDepth;
 void main(){

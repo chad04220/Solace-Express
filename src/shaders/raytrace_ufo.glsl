@@ -312,10 +312,10 @@ float traceUfo(vec3 ro, vec3 rd, float tmax){
   }
   return -1.0;
 }
-// The UFO's surface at a hit: its material and normal, for the ray tracer (shadeUfo) and the objects pass alike.
+// The UFO's surface at a hit: its material and normal, for the objects pass.
 // cabin: a pixel inside the dome (a visitor or the floor), which carries the dance floor's and the ceiling lamps'
 // light as emission so it needs no sun; ao: the floor's close-range contact occlusion under the visitors' boots
-// (three bounded taps; the objects pass writes it to the G-buffer, the ray tracer applies it once here).
+// (three bounded taps; the objects pass writes it to the G-buffer).
 void ufoMaterial(vec3 p, vec3 rd, float t, out Mat m, out vec3 n, out bool cabin, out float ao){
   mat3 inv = transpose(uUfoRot);
   vec3 lp = inv*(p - uUfoPos);

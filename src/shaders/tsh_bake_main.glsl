@@ -1,12 +1,12 @@
 //! kTShBakeMain
 //! ------------------------------------------------------------------------------------------------
-//! Overlay pass: world-space sprites (particles, lights, rings) depth-tested against the ray-traced depth
-//! GPS aerial imagery: the ray tracer's own terrain material seen straight down (the full ray-tracer source is linked
-//! in with its main() renamed, so the map is exactly the world you fly over), hill-shaded from the north-west like a
+//! Overlay pass: world-space sprites (particles, lights, rings) depth-tested against the scene's depth
+//! GPS aerial imagery: the world's own terrain material seen straight down (the shared shader library, so the map
+//! is exactly the world you fly over), hill-shaded from the north-west like a
 //! satellite photo. 4 samples per texel; rendered into a texture only when the map view moves or zooms.
 //! Terrain sun-shadow bake (world space, one texel per ~39 m): for the sun direction, the height a point above this
 //! texel must reach to see over all the terrain towards the sun (x), and the distance to the terrain that sets it
-//! (y, which sets the soft shadow's penumbra). The ray tracer's terrainShadow() reads it instead of marching a shadow
+//! (y, which sets the soft shadow's penumbra). terrainShadow() reads it instead of marching a shadow
 //! ray for every pixel. Rendered in bands of rows over several frames, and only when the sun has moved.
 
 uniform vec3 uBakeSun; uniform float uBakeN;

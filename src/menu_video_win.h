@@ -2,7 +2,7 @@
 //
 // render_menu.bat runs SolaceExpress.exe --menuvideo, which renders the montage offline and encodes it with
 // MenuVideoWriter (H.264 in an .mp4). When that file sits next to the exe, MenuVideoPlayer plays it on the main menu
-// in place of the live ray-traced montage: decoded on a background thread, uploaded to a texture each frame.
+// in place of the live montage: decoded on a background thread, uploaded to a texture each frame.
 #pragma once
 #include <cstdint>
 #include <string>

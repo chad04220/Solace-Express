@@ -1,12 +1,12 @@
 //! kTerrainVS
 //! The terrain mesh: a quadtree of 32 x 32-quad chunks around the camera (terrain_mesh.cpp picks them), every vertex
-//! set on the heightfield by the same terrainH the ray tracer marched and the physics stands on, with the octave count
-//! chosen by distance exactly as the ray tracer chose it. Where a chunk nears the distance at which its parent would
+//! set on the heightfield by the same terrainH the physics stands on, with the octave count
+//! chosen by distance. Where a chunk nears the distance at which its parent would
 //! be drawn instead, the vertices the parent lacks slide onto the parent's edges (CDLOD morphing), so chunks of
 //! different levels meet without cracks and without skirts. The normal comes from four more height samples.
 layout(location = 0) in vec4 aInst;   // chunk origin x, z (m), cell size (m), -
 uniform mat4 uVP; uniform vec2 uJit; uniform float uLogC; uniform vec3 uCamPos;
-uniform mat4 uPanoView; uniform vec2 uPano;   // a panoramic camera feed: projected onto its cylinder (the ray tracer's camRay)
+uniform mat4 uPanoView; uniform vec2 uPano;   // a panoramic camera feed: projected onto its cylinder (camRay)
 uniform float uSplit;                         // a chunk is split while the camera is within uSplit chunk sizes of it
 out vec3 vW; out vec3 vN;
 const int C = 32;

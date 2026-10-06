@@ -21,14 +21,14 @@ out vec3 vW;
 void main(){
   vW = uRot*aPos + uPos;
   gl_Position = uVP*vec4(vW, 1.0);
-  gl_Position.xy -= 2.0*uJit*gl_Position.w;   // the ray tracer's sub-pixel jitter
+  gl_Position.xy -= 2.0*uJit*gl_Position.w;   // the frame's sub-pixel jitter
 }
 )";
 const char* kHullFS = R"(
 in vec3 vW; uniform vec3 uCam; uniform float uFree; uniform int uPass;   // 0: inside faces only, 1: outside faces only
 uniform int uChan;   // 1: the player's aircraft (second channel), 2: the traffic (third)
 out vec4 oT;   // distance along the pixel's ray, 0 on the hull's inside (only the channel being drawn is written)
-// Faces nearer than uFree are dropped: the ray tracer marches every ray that far itself (in the cockpit the eye sits
+// Faces nearer than uFree are dropped: the objects pass marches every ray that far itself (in the cockpit the eye sits
 // inside the hull's margins, a few centimetres from the cabin roof). Beyond it, a ray in empty space meets an outside
 // face first (nothing lies before it), and a ray inside solid space an inside face (it just keeps marching).
 // Pass 2 (the player's moving hull): the farthest inside face along the ray into the fourth channel (MAX blending), the
@@ -119,7 +119,7 @@ void Renderer::hullEval4(const std::vector<vec3>& pts, std::vector<float>& out) 
   glReadPixels(0, 0, TW, rows, GL_RGBA, GL_FLOAT, res.data());
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   // leave units 18 and 19 as the other passes expect them (18: the baked terrain shadow, read without rebinding by
-  // the passes that run before the ray tracer sets its textures)
+  // the passes that run before the objects pass sets its textures)
   glActiveTexture(GL_TEXTURE0 + 19); glBindTexture(GL_TEXTURE_2D, 0);
   glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, tshFront >= 0 ? texTSh[tshFront] : 0);
   glActiveTexture(GL_TEXTURE0);
@@ -334,7 +334,7 @@ void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key, float nea
   HullMesh& H = it->second;
   if (!H.ok || !H.verts || !fboEnv) return;
   // the projection below reaches kHullFar: an aircraft that may extend past it (a fly-by camera 400-700 m off) would be
-  // clipped from its own hull and vanish, so then the hull is left off and the ray tracer marches it as usual
+  // clipped from its own hull and vanish, so then the hull is left off and the objects pass marches it without one
   static const float kHullFar = 400.f;
   if (length(fp.plane.pos - fp.camPos) + 45.f > kHullFar * 0.95f) return;
   ensureHullTarget();

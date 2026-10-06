@@ -1,7 +1,7 @@
 //! kDispMain
 //! Cockpit display atlas: every display page (research jets) or the whole light-aircraft instrument panel, drawn once
-//! per frame into a texture that the ray tracer samples with mipmapped filtering. Keeps the gauge code out of the
-//! ray tracer (smaller, faster shader) and gives crisp, stable screens at any size or angle.
+//! per frame into a texture that the aircraft passes sample with mipmapped filtering. Keeps the gauge code out of the
+//! aircraft passes (smaller, faster shaders) and gives crisp, stable screens at any size or angle.
 
 uniform vec4 uDispMode;   // x: 0 display pages (4 x 2 atlas), 1 instrument panel; y: cockpit type
 uniform vec2 uDispRes;

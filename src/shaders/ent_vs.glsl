@@ -6,7 +6,7 @@ uniform vec4 uWheel0; uniform vec2 uWheel1; // dynamic packet; all zero for park
 uniform mat4 uVP; uniform vec2 uJit; uniform float uLogC; uniform float uTime; uniform int uKind; uniform int uShadowPass;
 uniform vec3 uCamV; uniform float uFar; uniform float uThin; uniform float uThinRef;   // view pass: per-instance distance thinning (entKeep)
 uniform vec3 uWind;   // surface wind velocity (windsocks)
-uniform mat4 uPanoView; uniform vec2 uPano;   // a panoramic camera feed: projected onto its cylinder (the ray tracer's camRay)
+uniform mat4 uPanoView; uniform vec2 uPano;   // a panoramic camera feed: projected onto its cylinder (camRay)
 out vec3 vW; out vec3 vL; out vec3 vLN; out vec4 vAux;
 flat out vec4 vInst;   // seed, yaw, scale y, instance height
 flat out vec3 vScale;
@@ -57,7 +57,7 @@ void main(){
     gl_Position = vec4(a/uPano.x*d, c.y/max(length(c.xz), 1e-3)/uPano.y*d, 0.0, d); behind = abs(a) > 1.9;
   }
   if (uShadowPass == 0) {
-    gl_Position.xy -= 2.0*uJit*gl_Position.w;   // the ray tracer's sub-pixel jitter
+    gl_Position.xy -= 2.0*uJit*gl_Position.w;   // the frame's sub-pixel jitter
     gl_Position.z = (log2(max(1e-6, 1.0 + gl_Position.w))*uLogC - 1.0)*gl_Position.w;   // logarithmic depth: 0.3 m .. 40 km
     if (behind) gl_Position.z = 2.0*gl_Position.w;
   }

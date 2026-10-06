@@ -6,7 +6,7 @@
 //! (plane_sdf.glsl, wraith_cockpit_sdf.glsl); the mesh bake (aircraft_mesh.cpp) leaves the parts out of the airframe
 //! (gPartMode -2) and bakes each part alone in its own frame (gPartMode = the part), and the raster passes draw each
 //! part's mesh at the pose a small pass computes once a frame from these same functions (kPartPoseFS) - the march
-//! and the ray tracer see exactly the shapes the meshes show.
+//! and the objects pass see exactly the shapes the meshes show.
 const int PT_YOKE_SHAFT = 0, PT_YOKE_WHEEL = 1, PT_PEDAL = 2, PT_THR_KNOB = 3, PT_THR_LEVER = 4, PT_FLAP_LEVER = 5,
           PT_JET_STICK = 6, PT_JET_THR = 7, PT_WR_STICK = 8, PT_WR_THR = 9, PT_WR_PEDAL = 10,
           PT_FLAP = 11, PT_AILERON = 12, PT_ELEVATOR = 13, PT_RUDDER = 14,   // (the light aircraft's control surfaces)

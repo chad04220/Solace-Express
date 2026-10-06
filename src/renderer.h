@@ -40,7 +40,7 @@ struct FxVisual {
   float feed[4] = {0, 0, 0, 0};                    // XR-40 belly camera target: world point + active
 };
 
-// One AI traffic aircraft for the ray tracer: 32 texels (see loadTraffic in shaders.h)
+// One AI traffic aircraft for the shaders: 32 texels (see loadTraffic in shaders.h)
 struct TrafficVisual { float t[32 * 4]; };
 static const int kMaxTrafficDrawn = 12;
 
@@ -98,7 +98,7 @@ public:
   int W = 0, H = 0;          // window size
   float renderScale = 1.0f;
   int quality = 1;           // 0 low, 1 medium, 2 high
-  int dbgOff = 0;            // profiling: ray tracer features switched off (uDbg bits)
+  int dbgOff = 0;            // profiling: renderer features switched off (uDbg bits)
   bool screenWindows = getenv("SCREENFEEDS") == nullptr;   // the research craft's displays are windows (no camera feeds but the bomb camera's; SCREENFEEDS=1 brings the cameras back)
   int bakeCount = 0;   // airframe meshes and hulls baked or loaded so far (the research terminal's warm-up waits for a frame that bakes nothing)
   int bakeBuilt = 0;   // of them, built from scratch (not loaded from the mesh cache): the diagnostics report it
@@ -115,8 +115,7 @@ public:
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
   static constexpr int kProgramCount = 19;
   float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
-  // analysis tool (--analyze): exact per-pass times (the GPU is waited on at every pass boundary) and a build of the
-  // ray tracer that writes its per-pixel work counters instead of colour
+  // analysis tool (--analyze, the harness's BENCHWALL): exact per-pass times (the GPU is waited on at every pass boundary)
   bool syncTiming = false; double passWall[11] = {};   // (kPasses)
   std::string dispError;   // set when the cockpit display shader failed to build (the screens stay dark)
   bool compilePrograms(std::atomic<int>* done);  // scene programs; safe on a worker thread with a shared context
@@ -125,7 +124,7 @@ public:
   void renderMap(float cx, float cz, float half, int N);   // GPS aerial image into mapTex()
   GLuint mapTex() const { return texMap; }
   void resize(int w, int h);
-  void setRenderScale(float s);   // ray-trace resolution only: the TAA history stays at display resolution, no pop
+  void setRenderScale(float s);   // the render resolution only: the TAA history stays at display resolution, no pop
   void renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites);
   mat4 viewProj(const FrameParams& fp, float zNear = 0.5f, float zFar = 90000.f) const;
   mat4 viewMat(const FrameParams& fp) const;   // world -> camera (x right, y up, z back)
@@ -160,11 +159,11 @@ private:
   // quarter-resolution clouds: the cloud march, its full-resolution composite, their targets
   GLuint progClouds = 0, progCloudComp = 0, texCloud = 0, texCloudD = 0, fboCloud = 0, texCloudMask = 0, fboComp = 0;
   int cw = 0, ch = 0;
-  // baked terrain sun shadow (world space): front = the one the ray tracer reads, back = the one being baked
+  // baked terrain sun shadow (world space): front = the one the shaders read, back = the one being baked
   GLuint progTShBake = 0, texTSh[2] = {0, 0}, fboTSh = 0;
   int tshFront = -1, tshBack = 0, tshRow = 0; bool tshBaking = false; vec3 tshSun, tshBakeSun;
   static constexpr int kTShN = 2048, kTShRows = 64;   // texels per side, rows baked per frame
-  void bakeTerrainShadow(const FrameParams& fp);            // analysis build of the ray tracer (built on demand)
+  void bakeTerrainShadow(const FrameParams& fp);            // the terrain sun-shadow bake, a band of rows a frame
   bool depthValid = false;   // the depth target holds a frame
   void renderDisplays(const FrameParams& fp, bool panel);
   GLuint progSprite = 0, progDown = 0, progUp = 0, progRayMask = 0, progRay = 0, progPost = 0, progUI = 0, progTAA = 0, progFeedRays = 0;
@@ -175,7 +174,7 @@ private:
   GLuint texHM = 0, texAlb = 0, texNrm = 0, texFont = 0, texMask = 0, texRoadId = 0, texData = 0, texHMax = 0;
   struct V4 { float x, y, z, w; };
   GLuint fboScene = 0, texColor = 0, texDepth = 0, fboSprite = 0;
-  // temporal AA: the ray tracer writes texRaw; the resolve blends it with the reprojected history into texHist[cur] + texColor
+  // temporal AA: the lighting pass writes texRaw; the resolve blends it with the reprojected history into texHist[cur] + texColor
   GLuint texRaw = 0, texHist[2] = {0, 0}, fboTAA[2] = {0, 0};
   GLuint texTraffic = 0;
   int histIdx = 0, frameNo = 0, histW = 0, histH = 0; bool histValid = false;   // (histW/H: the history textures' size)
@@ -183,7 +182,7 @@ private:
   GLuint gpuQ[4] = {0, 0, 0, 0}; bool gpuQUsed[4] = {false, false, false, false}; int gpuQi = 0;
 public:
   float gpuMs = -1.f;   // last measured GPU time of renderScene, ms (-1 = not known yet)
-  static constexpr int kPasses = 11;   // world | displays | feeds | objects | airframe shadow proxy | lighting+clouds+effects (the ray tracer: scenery | displays | - | - | - | ray trace+clouds), then TAA, sprites, bloom, light shafts, composite
+  static constexpr int kPasses = 11;   // world | displays | feeds | objects | airframe shadow proxy | lighting+clouds+effects, then TAA, sprites, bloom, light shafts, composite
   float passMs[kPasses] = {};         // GPU time of each pass (timestamp queries, a few frames late)
   GLuint stampQ[4][kPasses + 1] = {}; bool stampUsed[4] = {};
   void stamp(int i) { if (glErrCheck) reportGLError(i); if (syncTiming) syncStamp(i); else if (stampQ[gpuQi][i]) glQueryCounter(stampQ[gpuQi][i], GL_TIMESTAMP); }
@@ -200,13 +199,13 @@ private:
   void createTargets();
   void createRenderTargets();
   void scaleDims();
-  int allocW = 0, allocH = 0;   // the size the ray-tracing resolution's targets were made at (rw x rh is its lower-left part)
+  int allocW = 0, allocH = 0;   // the size the render resolution's targets were made at (rw x rh is its lower-left part)
   float jitX = 0, jitY = 0;
   void genMaterials();
   void genCloudNoise();   // tileable cloud coverage (2D) and billow / detail noise (3D) textures
   GLuint texCloudCov = 0, texNoise3 = 0;
   void genMinimap();
-  // ---- environment entities: instanced meshes -> G-buffer (lit by the ray tracer) + sun shadow cascades
+  // ---- environment entities: instanced meshes -> G-buffer (lit by the lighting pass) + sun shadow cascades
   GLuint progEnt = 0, progEntSh = 0, vaoEnt = 0, vboEntMesh = 0, vboEntInst = 0;
   GLuint fboGB = 0, texGB[5] = {0, 0, 0, 0, 0}, texGBDepth = 0, fboShProxy = 0;   // (texGB[4]: the raster renderer's shadow proxy)
   GLuint fboSh[2] = {0, 0}, texSh[2] = {0, 0}; int shRes = 0;
@@ -272,7 +271,7 @@ private:
   void ensureHullTarget();
   bool trafHullOn = false;
   // camera feeds: each research-jet camera is drawn into a tile of the feed atlas, through the same passes as the main
-  // view (envelope, scenery G-buffer, ray tracer, clouds) on a second set of render targets of its own size
+  // view (scenery G-buffer, objects, lighting, clouds) on a second set of render targets of its own size
   struct ViewTargets {
     int W = 0, H = 0, rw = 0, rh = 0, cw = 0, ch = 0, allocW = 0, allocH = 0;
     GLuint texRaw = 0, texDepth = 0, texCloudMask = 0, texCloud = 0, texCloudD = 0, fboCloud = 0, fboComp = 0, fboScene = 0;
@@ -311,7 +310,7 @@ private:
   GLuint screenFbo = 0;
   void drawEntities(const FrameParams& fp);
   void createGBuffer();
-  // ---- the passes of a frame, shared by the ray tracer and the raster renderer (renderer.cpp)
+  // ---- the passes of a frame (renderer.cpp)
   bool cloudSplit = false;   // this frame's clouds come from the quarter-resolution cloud pass
   const std::vector<SpriteVert>* curAlpha = nullptr; const std::vector<SpriteVert>* curAdd = nullptr;   // this frame's sprites
   void setRT(GLuint p, const FrameParams& fp);          // the scene's uniforms and textures for a program

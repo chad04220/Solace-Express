@@ -1,5 +1,5 @@
 //! kRtPrims
-//! Analytic primitives for the ray tracer: boxes, cylinders, convex solids, the debris chunks and the (unused) airport boxes.
+//! Analytic primitives: boxes, cylinders, convex solids, the debris chunks and the (unused) airport boxes.
 // ---------------------------------------------------------------- analytic primitives
 // slab test against an AABB; returns (tNear, tFar), normal of the entry face
 vec2 iBox(vec3 ro, vec3 rd, vec3 bmin, vec3 bmax, out vec3 n){

@@ -5,7 +5,7 @@
 //! shades them. What only the fields know goes into GB3: ambient occlusion, the airframe's own sun shadow, the
 //! terrain's sun shadow at the airframe, and the GBF_* flags. The cockpit (the sealed pod, the cabin seen from the
 //! pilot's seat) and the research jets' display screens come out prelit: their light comes from their own fixtures
-//! and the cameras' pictures, as in the ray tracer, not from the sun.
+//! and the cameras' pictures, not from the sun.
 in vec2 vUV;
 uniform float uLogC;
 uniform int uMeshOn;   // the player's aircraft is drawn as a mesh where it never moves: march only where its moving hull says
@@ -30,7 +30,7 @@ void main(){
   if (uFeedSkip > 0.0 && hullT == 0.0) hullT = uFeedSkip;
   bool jetC = int(gM[0].z + 0.5) >= 5;
   // (the player's aircraft as a mesh: only a pixel its moving hull covers has anything left to march - and in the
-  // cockpit the first uHullNear metres from the eye, whose hull faces the hull pass drops, as the ray tracer does)
+  // cockpit the first uHullNear metres from the eye, whose hull faces the hull pass drops)
   float hullEnd = min(cockpitView ? (jetC ? 6.0 : planeBound()*2.0) : tmax, tmax);
   if (uMeshOn == 1 && uHullOn == 1 && uHullExitOn == 1 && uWreck == 0) { float he = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).a; if (he > 0.0) hullEnd = min(hullEnd, he*1.002 + 0.05); }
   // nothing of the airframe to march: no moving hull on this ray, or its hull begins behind the surface already drawn

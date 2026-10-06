@@ -78,7 +78,7 @@ One batch file, `diagnostics.bat`, next to `SolaceExpress.exe`:
 
 | Run | What it produces |
 |---|---|
-| `diagnostics.bat` | the full run, zipped as `diagnostics_<version>.zip`: system report (GPU, driver, CPU, memory, Windows, monitors and refresh rates), first-run shader compile time with the cache set aside, benchmarks on the rasterizer at 1080p and native and on the ray tracer at 1080p (frame time and the GPU time of every pass per scene), the pass-by-pass analysis with heat maps, screenshots (HUD with every warning lit, research terminal and craft, cockpits, hangar, menu), `startup.log` and `settings.cfg` |
+| `diagnostics.bat` | the full run, zipped as `diagnostics_<version>.zip`: system report (GPU, driver, CPU, memory, Windows, monitors and refresh rates), first-run shader compile time with the cache set aside, benchmarks full screen at 1920x1080 (frame time and the GPU time of every pass per scene; the research craft in their own file), the pass-by-pass analysis, screenshots (HUD with every warning lit, research terminal and craft, cockpits, hangar, menu), `startup.log` and `settings.cfg` |
 | `diagnostics.bat quick` | the system report and the rasterizer benchmarks only (about 3 minutes) |
 | `diagnostics.bat shots` | the screenshots only |
 | `diagnostics.bat menu [kbps]` | `menu.mp4`: the main-menu montage pre-rendered, played on the menu instead of rendering it live |
