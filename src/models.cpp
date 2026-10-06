@@ -129,7 +129,8 @@ const ModelDef kModels[] = {
     4,1.55f,.05f,.48f,1.73f,3.07f,0.0f,0.0f,          // aft twin jets
     4,.26f,0,
     0,0.0f,0.0f,0.0f,0.0f,0.0f,
-    vec3(0.0f,.65f,-3.35f),2,                          // glass cockpit
+    vec3(-.42f,.65f,-3.35f),2,                         // glass cockpit, the left seat (the generic cabin is a two-seat one: on its
+                                                        // centre line the pilot sat between the seats, behind the centre display)
     -4.95f,-4.45f,.45f,-2.7f },
   // ---------------------------------------------------------------- XR-40 Wraith (stealth research craft; faceted SDF in the shader, engine code 6)
   { {{-8.40f,.04f,.03f,-.05f},{-7.00f,.45f,.24f,-.02f},{-5.20f,.85f,.48f,.05f},{-3.20f,1.10f,.58f,.06f},{0.0f,1.25f,.58f,.04f},{3.20f,1.30f,.52f,0},{6.00f,1.05f,.42f,-.02f},{7.80f,.80f,.32f,-.02f}}, .25f,

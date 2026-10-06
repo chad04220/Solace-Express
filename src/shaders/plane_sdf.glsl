@@ -732,7 +732,8 @@ vec2 mapPlaneBody(vec3 p){
     // the nose wheel (steered by the pedals, raised with the gear) or the tail wheel
     if (gPartMode == -1) {
       mat3 Rs = partRxz(steer);
-      if (G1.z < 0.5) res = opU(res, gearNoseShape(transpose(Rs)*(p - vec3(0.0, retract ? gearUp()*(gh - R*0.6) : 0.0, gM[18].w))));
+      float ns = gearNoseShow();
+      if (G1.z < 0.5 && ns > 0.01) res = opU(res, gearNoseShape(transpose(Rs)*(p - vec3(0.0, retract ? gearUp()*(gh - R*0.6) : 0.0, gM[18].w))/ns)*vec2(ns, 1.0));
       else res = opU(res, gearTailShape(transpose(Rs)*(p - vec3(0.0, 0.0, G1.y))));
     }
   }

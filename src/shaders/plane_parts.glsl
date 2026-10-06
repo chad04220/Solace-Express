@@ -152,6 +152,12 @@ Pose poseMul(Pose a, Pose b){ Pose X; X.R = a.R*b.R; X.T = a.R*b.T + a.T; return
 // wheel station, taildragger). The legs travel until gear 0.2, then the doors close over them.
 float gearUp(){ return clamp((1.0 - gPS.x)*1.25, 0.0, 1.0); }
 float gearDoorAngle(){ return smoothstep(0.0, 0.2, gPS.x)*1.45; }
+// In the cockpit view a nose wheel that rises into the cabin (its station behind the instrument panel: the XR-20's,
+// whose cockpit sits right over its nose gear) would stand stowed in front of the pilot: it shrinks away as it rises
+float gearNoseShow(){
+  bool inCabin = gPS.w > 0.5 && int(gM[0].y + 0.5) >= 3 && gM[18].w > gM[21].w - 0.2;
+  return inCabin ? 1.0 - smoothstep(0.3, 0.8, gearUp()) : 1.0;
+}
 // A wing-retracting main (type 4) folds inboard about a fore-and-aft hinge, until the leg lies along the wing (its
 // dihedral) and the wheel lies flat under the wing root, in a streamlined fairing: raised straight up it came through
 // the top of a wing a third as thick as the wheel is tall, and even flat the wheel (20 cm across its tyre) is thicker
@@ -231,7 +237,7 @@ Pose gearPartPose(int k, vec2 sd){
   if (k == PT_GEAR_MAIN) {
     if (gtype == 3) { vec2 ns = nacSection(mz); X.R = S; X.T = S*vec3(0.0, up*(ns.x - ns.y + 0.03 + gh), 0.0); }
     else { vec3 H = gearHinge(); mat3 Rf = partRxy(gearFoldAngle()); X.R = S*Rf; X.T = S*(H - Rf*H); }
-  } else if (k == PT_GEAR_NOSE) { X.R = partRxz(gPS.z); X.T = vec3(0.0, up*(gh - gM[0].w*0.6), nz); }
+  } else if (k == PT_GEAR_NOSE) { X.R = partRxz(gPS.z)*max(gearNoseShow(), 1e-3); X.T = vec3(0.0, up*(gh - gM[0].w*0.6), nz); }
   else if (k == PT_GEAR_TAIL) { X.R = partRxz(gPS.z); X.T = vec3(0.0, 0.0, G1.y); }
   else if (k == PT_GEAR_MDOOR && gtype == 4) {   // the fold well's doors, hinged along its long edges fore and aft
     GearWell g = gearFoldWell();

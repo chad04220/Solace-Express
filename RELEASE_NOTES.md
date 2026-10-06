@@ -9,3 +9,7 @@
 - **Sound follows your default output device.** Switch Windows' default output (say from speakers to a headset) while
   the game runs and the sound moves to it within a second. Before, it kept playing on the old device unless that one
   was unplugged.
+- **XR-20 Mantis cockpit: nothing in the way.** The pilot sat on the centre line of a two-seat cabin, between the seats
+  and right behind the centre display, with the stowed nose wheel standing in the cabin beside it: the panel and the
+  stick were hidden behind a blue column. The pilot now sits in the left seat like the XR-10's, and a nose wheel
+  that stows into the cabin is no longer drawn there from the cockpit.
