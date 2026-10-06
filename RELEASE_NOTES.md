@@ -1,3 +1,1 @@
 ## What's new
-- Faster airframe shading for the light aircraft and airliners: the big airframe shaders now come in two builds, and when no XR-30 or XR-40 is in the frame the game uses the build without the research jets' code. Each pixel runs less code; on the test renderer the UFO encounter's objects pass took half the time and the airframe shadows 40% less. Each aircraft's mesh is shaded with its own build. The first launch after updating compiles four more shaders (once; they are cached).
-- The research jets' landing gear is now built once in the shader for both jets, instead of once in each jet.
