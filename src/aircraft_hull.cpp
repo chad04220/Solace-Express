@@ -61,6 +61,22 @@ void Renderer::hullEval4(const std::vector<vec3>& pts, std::vector<float>& out) 
   int n = (int)pts.size(), rows = (n + TW - 1) / TW;
   out.assign((size_t)n * 4, 1e9f);
   if (!n) return;
+  // the point list as a 512-wide texture: no taller than the device allows (the Q400's lattice is 22 million points,
+  // 43 thousand rows; a texture past GL_MAX_TEXTURE_SIZE is refused and the bake read back stale data: Codex's
+  // fleet review), and no taller than 8192 rows in any case, in batches evaluated one after the other
+  static GLint maxTex = 0;
+  if (!maxTex) { glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTex); if (maxTex < 1024) maxTex = 1024; }
+  const int maxRows = std::min(maxTex, 8192);
+  if (rows > maxRows) {
+    std::vector<vec3> part; std::vector<float> po;
+    for (int at = 0; at < n; at += TW * maxRows) {
+      int cnt = std::min(n - at, TW * maxRows);
+      part.assign(pts.begin() + at, pts.begin() + at + cnt);
+      hullEval4(part, po);
+      std::copy(po.begin(), po.begin() + (size_t)cnt * 4, out.begin() + (size_t)at * 4);
+    }
+    return;
+  }
   std::vector<float> buf((size_t)TW * rows * 4, 1e4f);
   for (int i = 0; i < n; i++) { buf[(size_t)i * 4] = pts[i].x; buf[(size_t)i * 4 + 1] = pts[i].y; buf[(size_t)i * 4 + 2] = pts[i].z; }
   if (!texHPts) {
@@ -98,6 +114,7 @@ void Renderer::hullEval4(const std::vector<vec3>& pts, std::vector<float>& out) 
   glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, tshFront >= 0 ? texTSh[tshFront] : 0);
   glActiveTexture(GL_TEXTURE0);
   std::copy(res.begin(), res.begin() + (size_t)n * 4, out.begin());
+  if (bakeYield) bakeYield();
 }
 
 // Bake the hull of the current airframe into slot (0 outside, 1 cockpit). The bake program is bound with the ray

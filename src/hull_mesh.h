@@ -48,6 +48,10 @@ inline std::vector<HullState> hullStateList(const float* M, bool inside) {
     for (int i = 1; i <= 4; i++) { addWr(0, 0, 0, 0, 0, i * 0.25f, 0, 1); addWr(0, 0, 0, 0, 0, 0, i * 0.25f, 1); }   // bay, turrets
     addWr(0, 0, 0, 0, 0, 1, 0, 0);                                                     // bay open, bomb away
   }
+  if ((int)(M[2] + 0.5f) == 5 && !inside) {   // the XR-30: its nozzles vector from level to the hover setting (wr[0] = the angle)
+    for (int i = 1; i <= 6; i++) { HullState h = {{1, 0, 0, 0}, {0, 0, 0, 0}, {1.5707963f * i / 6.f, 0, 0, 0}, {0, 0, 0, 0}}; st.push_back(h); }
+    for (int s = -1; s <= 1; s += 2) { HullState h = {{1, 0, 0, 0}, {(float)s, 0, 0, 0}, {1.5707963f, 0, 0, 0}, {0, 0, 0, 0}}; st.push_back(h); }
+  }
   if (st.size() > 128) st.resize(128);
   return st;
 }

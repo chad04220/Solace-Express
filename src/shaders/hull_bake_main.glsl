@@ -13,6 +13,9 @@ void hullState(int s){
   vec4 w = uHStWr[s], w2 = uHStWr2[s];
   gWr[0] = vec4(w.x); gWr[1] = vec4(w.y); gWr[2] = vec4(w.z); gWr[3] = vec4(w.w);
   gWr[4] = vec4(w2.x, w2.y, w2.z, 0.0); gWr[5] = vec4(gCtl.x, gCtl.z, gCtl.y, 0.0); gWr[6] = vec4(w2.w, 0.0, 0.0, 0.0);
+  // the XR-30's 2D nozzles read gFlame.z (the vectoring angle: the hover setting less half the stick): swept here, so the
+  // bake sees them move (they were classed static, baked at the first frame's angle)
+  if (int(gM[0].z + 0.5) == 5) gFlame.z = w.x - gCtl.x*0.5;
   if (gPS.w > 0.5) loadCabinFit();
 }
 void main(){

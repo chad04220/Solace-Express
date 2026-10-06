@@ -55,6 +55,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_RG8 0x822B
 #define GL_RG 0x8227
 #define GL_MAX_TEXTURE_IMAGE_UNITS 0x8872
+#define GL_MAX_TEXTURE_SIZE 0x0D33
 #define GL_RG32F 0x8230
 #define GL_TEXTURE_BASE_LEVEL 0x813C
 #define GL_TEXTURE_MAX_LEVEL 0x813D

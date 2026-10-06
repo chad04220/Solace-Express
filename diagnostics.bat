@@ -13,14 +13,13 @@ rem
 rem The full run:
 rem   1. system report: GPU and driver, CPU, memory, Windows, monitors with their refresh rates
 rem   2. first-run shader compile time on the rasterizer (the shader cache is set aside and restored afterwards)
-rem   3. benchmark on the rasterizer (the default renderer) at 1920x1080 and at your native resolution: frame time and
+rem   3. benchmark on the rasterizer (the default renderer), full screen at 1920x1080: frame time and
 rem      the GPU time of every pass for each scene (the HUD, the cockpit, night); then the research craft and their
 rem      cockpits in their own file (the heaviest scenes: if one stalls the GPU, the rest of the numbers are already written)
-rem   4. the same benchmark on the ray tracer at 1920x1080, for comparison
-rem   5. the pass-by-pass analysis on the rasterizer (CPU vs GPU, resolution scaling, per-pixel work with heat maps)
-rem   6. screenshots on the rasterizer: the HUD with every warning lit, the research terminal and craft, the cockpits,
+rem   4. the pass-by-pass analysis on the rasterizer (CPU vs GPU, resolution scaling, per-pixel work with heat maps)
+rem   5. screenshots on the rasterizer: the HUD with every warning lit, the research terminal and craft, the cockpits,
 rem      the hangar, the menu
-rem   7. startup.log (GPU, texture units, shader programs compiled, audio backend) and the settings file
+rem   6. startup.log (GPU, texture units, shader programs compiled, audio backend) and the settings file
 cd /d "%~dp0"
 if not exist SolaceExpress.exe (
   echo SolaceExpress.exe is not in this folder. Put diagnostics.bat next to it and run it again.
@@ -39,7 +38,7 @@ if exist "%OUT%" rmdir /s /q "%OUT%"
 mkdir "%OUT%"
 if /i "%MODE%"=="shots" goto shots
 
-echo [1/7] System report ...
+echo [1/6] System report ...
 set INFO=%OUT%\system.txt
 echo Solace Express %VER% > "%INFO%"
 echo date %DATE% %TIME% >> "%INFO%"
@@ -55,7 +54,7 @@ powershell -NoProfile -Command ^
   "$o | Out-File -Append -Encoding utf8 '%INFO%'" 2>nul
 type "%INFO%"
 
-echo [2/7] First-run shader compile time on the rasterizer (the cache is set aside) ...
+echo [2/6] First-run shader compile time on the rasterizer (the cache is set aside) ...
 set CACHE=
 if exist shadercache set CACHE=shadercache
 if not defined CACHE if exist "%APPDATA%\SolaceExpress\shadercache" set CACHE=%APPDATA%\SolaceExpress\shadercache
@@ -73,16 +72,12 @@ if defined CACHE if exist "%CACHE%.aside" (
   move /y "%CACHE%.aside" "%CACHE%" >nul
 )
 
-echo [3/7] Benchmark on the rasterizer, 1920x1080 ...
-start "" /wait SolaceExpress.exe --raster --bench %SCENES% --size 1920x1080 --out %OUT%\bench_raster_1080p.txt
-echo [3/7] Benchmark on the rasterizer, native resolution ...
-start "" /wait SolaceExpress.exe --raster --bench %SCENES% --size native --out %OUT%\bench_raster_native.txt
+echo [3/6] Benchmark on the rasterizer, full screen 1920x1080 ...
+start "" /wait SolaceExpress.exe --raster --bench %SCENES% --size 1920x1080 --fullscreen --out %OUT%\bench_raster_1080p.txt
 if /i "%MODE%"=="quick" goto logs
-echo [3/7] Benchmark on the rasterizer, the research craft (their cockpits are the heaviest scenes: last, in their own file) ...
-start "" /wait SolaceExpress.exe --raster --bench %RSCENES% --size 1920x1080 --out %OUT%\bench_raster_research_1080p.txt
-echo [4/7] Benchmark on the ray tracer, 1920x1080 (for comparison) ...
-start "" /wait SolaceExpress.exe --rt --bench %SCENES% --size 1920x1080 --out %OUT%\bench_rt_1080p.txt
-echo [5/7] Analysis on the rasterizer (5-10 minutes) ...
+echo [3/6] Benchmark on the rasterizer, the research craft (their cockpits are the heaviest scenes: last, in their own file) ...
+start "" /wait SolaceExpress.exe --raster --bench %RSCENES% --size 1920x1080 --fullscreen --out %OUT%\bench_raster_research_1080p.txt
+echo [4/6] Analysis on the rasterizer (5-10 minutes) ...
 start "" /wait SolaceExpress.exe --raster --analyze
 if exist analysis.txt move /y analysis.txt "%OUT%\analysis_raster.txt" >nul
 if exist analysis (
@@ -91,7 +86,7 @@ if exist analysis (
 )
 
 :shots
-echo [6/7] Screenshots on the rasterizer ...
+echo [5/6] Screenshots on the rasterizer ...
 set HUDDEMO=1
 set GAVOUT=1
 set MTBAY=1
@@ -106,7 +101,7 @@ if exist shots (
 if /i "%MODE%"=="shots" goto finish
 
 :logs
-echo [7/7] Logs and settings ...
+echo [6/6] Logs and settings ...
 if exist "%APPDATA%\SolaceExpress\startup.log" copy /y "%APPDATA%\SolaceExpress\startup.log" "%OUT%\startup.log" >nul
 if exist "%APPDATA%\SolaceExpress\settings.cfg" copy /y "%APPDATA%\SolaceExpress\settings.cfg" "%OUT%\settings.cfg" >nul
 

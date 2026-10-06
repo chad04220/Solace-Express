@@ -537,6 +537,8 @@ vec2 mapPlaneBody(vec3 p){
       float nac = sdRoundCone(np, vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, len), nr, nr*0.78);
       float inlet = sdCapsule(np, vec3(0.0, 0.0, -0.4), vec3(0.0, 0.0, 0.18), nr*0.82);
       nac = max(nac, -inlet);
+      float exhaust = sdCapsule(np, vec3(0.0, 0.0, len - 0.15), vec3(0.0, 0.0, len + 1.0), nr*0.6);   // (the tailpipe: the cone below sat sealed inside the cap)
+      nac = max(nac, -exhaust);
       res = opU(res, vec2(nac, 5.0));
       float fan = sdCapsule(np, vec3(0.0, 0.0, 0.2), vec3(0.0, 0.0, 0.3), nr*0.83);
       res = opU(res, vec2(fan, 21.0));
@@ -879,7 +881,7 @@ vec2 mapPlaneBody(vec3 p){
     }
     // overhead console: dome light and two map lights (modelled lenses - the cabin's night lighting)
     {
-      vec3 oc = p - vec3(0.0, gCab0.z, E.z - 0.05);
+      vec3 oc = p - vec3(0.0, ck == 2 ? gCab1.z - 0.075 : gCab0.z, E.z - 0.05);   // (under the glass cockpit's overhead plate, which hid its lenses)
       if (sdBox(oc, vec3(0.12, 0.06, 0.22)) < res.x) {
       res = opU(res, vec2(sdRoundBox(oc, vec3(0.09, 0.025, 0.18), 0.015), 14.0));
       res = opU(res, vec2(sdRoundCylX((oc + vec3(0.0, 0.024, 0.02)).yxz, 0.04, 0.004, 0.002), 64.0));

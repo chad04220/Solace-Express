@@ -916,8 +916,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       if (kz != std::string::npos && cl.compare(kz + 7, 6, "native") == 0) { if (!g_fullscreen) toggleFullscreen(); }   // the whole desktop
       else if (sw2 > 64 && sh2 > 64) {
         if (g_fullscreen) toggleFullscreen();
-        RECT wr = {0, 0, sw2, sh2}; AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
-        SetWindowPos(g_hwnd, nullptr, 0, 0, wr.right - wr.left, wr.bottom - wr.top, SWP_NOMOVE | SWP_NOZORDER);
+        if (cl.find("--fullscreen") != std::string::npos) {   // borderless at the monitor's origin, exactly the requested size (1920x1080 fills a 1080p screen)
+          SetWindowLong(g_hwnd, GWL_STYLE, (GetWindowLong(g_hwnd, GWL_STYLE) & ~WS_OVERLAPPEDWINDOW) | WS_POPUP | WS_VISIBLE);
+          SetWindowPos(g_hwnd, HWND_TOP, 0, 0, sw2, sh2, SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+        } else {
+          RECT wr = {0, 0, sw2, sh2}; AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+          SetWindowPos(g_hwnd, nullptr, 0, 0, wr.right - wr.left, wr.bottom - wr.top, SWP_NOMOVE | SWP_NOZORDER);
+        }
       }
       { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } }
       { RECT rc; GetClientRect(g_hwnd, &rc); if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom); }
@@ -940,11 +945,17 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         RECT rc; GetClientRect(g_hwnd, &rc);
         if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
         SetWindowTextA(g_hwnd, ("Solace Express - benchmarking " + sc).c_str());
+        // a scene's first frame may bake an airframe's meshes (the XR-30's, a minute or more): the bake pumps the window's
+        // messages between its batches, so Windows doesn't mark the game "Not Responding" and freeze the screen
+        static std::string bakingScene; bakingScene = sc; static bool bakeNoted = false; bakeNoted = false;
+        g_ren.bakeYield = [] { if (!bakeNoted) { bakeNoted = true; SetWindowTextA(g_hwnd, ("Solace Express - baking the airframe meshes for " + bakingScene + " (once; cached afterwards)").c_str()); } pumpB(); };
         Game* g = new Game();
         g->saveDir = game.saveDir;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
         g_ren.entSync = false;
         for (int i = 0; i < 40; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); pumpB(); }
+        g_ren.bakeYield = nullptr;
+        SetWindowTextA(g_hwnd, ("Solace Express - benchmarking " + sc).c_str());
         glFinish();
         LARGE_INTEGER f0, f1; QueryPerformanceCounter(&f0);
         const int N = 120;

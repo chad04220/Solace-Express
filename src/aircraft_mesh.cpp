@@ -20,7 +20,7 @@
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 3;   // (bump with the format)
+const uint32_t kMeshMagic = 0x4d455348u + 4;   // (bump with the format)
 }
 
 bool Renderer::compilePlaneMesh() {
