@@ -100,6 +100,8 @@ public:
   int quality = 1;           // 0 low, 1 medium, 2 high
   int dbgOff = 0;            // profiling: ray tracer features switched off (uDbg bits)
   int mode = 0;              // 0 the ray tracer, 1 the raster renderer (docs/RENDERER_REBUILD.md; needs rasterOk)
+  bool screenWindows = getenv("SCREENFEEDS") == nullptr;   // the research craft's displays are windows (no camera feeds but the bomb camera's; SCREENFEEDS=1 brings the cameras back)
+  int bakeCount = 0;   // airframe meshes and hulls baked so far (the research terminal's warm-up waits for a frame that bakes nothing)
   std::function<void()> bakeYield;   // called between the bake's evaluation batches (the benchmark answers the window's messages during a long bake)
   int modeForce = -1;        // the tools' --raster / the harness' RASTER: overrides the setting whenever the game applies it
   bool rasterOk = false;     // the raster renderer's programs built

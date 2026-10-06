@@ -27,7 +27,7 @@ bool Renderer::compilePlaneMesh() {
   std::string e;
   progPlaneMesh = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(""), e);
   if (!progPlaneMesh) { error = "Aircraft mesh shader: " + e; return false; }
-  progPlaneMeshDepth = linkProgramCached(planeMeshVSAssembly(""), "#version 330 core\nvoid main(){}\n", e);
+  progPlaneMeshDepth = linkProgramCached(planeMeshVSAssembly(""), "#version 330 core\nflat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; uniform int uScrSkip;\nvoid main(){ int mid = int(vId + 0.5); if (uScrSkip == 1 && ((mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63))) discard; }\n", e);
   if (!progPlaneMeshDepth) { error = "Aircraft mesh depth shader: " + e; return false; }
   return true;
 }
@@ -40,6 +40,7 @@ bool Renderer::planeMeshWanted(const FrameParams& fp) const {
 }
 
 void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
+  bakeCount++;
   const PlaneVisual& pv = fp.plane;
   const float* M = pv.M;
   const bool inside = slot == 1;
@@ -281,6 +282,9 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
     glUniform1f(U(progPlaneMeshDepth, "uLogC"), logC);
     glUniformMatrix3fv(U(progPlaneMeshDepth, "uRot"), 1, GL_FALSE, rot);
     glUniform3f(U(progPlaneMeshDepth, "uPos"), pos.x, pos.y, pos.z);
+    // the research craft's displays as windows: no depth for them either (the bomb camera's pane excepted while it shows)
+    bool scrSkip = screenWindows && trafK < 0 && fp.plane.PS[3] > 0.5f && (int)(fp.plane.M[2] + 0.5f) >= 5 && !(fp.fx.feed[3] > 0.5f);
+    glUniform1i(U(progPlaneMeshDepth, "uScrSkip"), scrSkip ? 1 : 0);
     glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
     glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);

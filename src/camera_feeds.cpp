@@ -129,6 +129,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
   std::vector<int> cand;
   for (int k = 0; k < kMaxFeeds; k++) {
     feedAge[k]++;
+    if (screenWindows && k != kFeedBombSlot) continue;   // the displays are windows: no camera but the bomb's
     if (fp.feeds[k].on && feedTileWH[k][0] > 0 && inView(fp.feeds[k])) cand.push_back(k);
   }
   // which of them this frame: the front display and the bomb camera every frame (the pilot flies by them), a

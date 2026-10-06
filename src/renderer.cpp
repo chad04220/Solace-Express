@@ -920,6 +920,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   // was drawn this frame, and the terrain channel is only read under uEnvOn)
   glActiveTexture(GL_TEXTURE0 + 20); glBindTexture(GL_TEXTURE_2D, envOn || hullOn || trafHullOn ? texEnv : 0); glUniform1i(U(p, "uEnv"), 20);
   glUniform1i(U(p, "uEnvOn"), envOn ? 1 : 0);
+  glUniform1i(U(p, "uScrWin"), screenWindows ? 1 : 0);
   glUniform1i(U(p, "uAfShOn"), shOn);   // the airframe shadow maps (af_shmap.glsl), for the proxy and the airframe's own lighting
   if (shOn) {
     glUniformMatrix4fv(U(p, "uAfShVP"), 4, GL_FALSE, shMapVP[0].m);

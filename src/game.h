@@ -149,7 +149,9 @@ private:
   int hubTab = TAB_CONTRACTS;
   float gameTime = 0, realTime = 0;
   bool hasSave = false;
-  bool confirmRes = false;   // the main menu asked whether to enter the research terminal before the campaign is done
+  bool confirmRes = false;
+  bool resWarm = false; int resWarmFrames = 0, resBakeSeen = 0;   // the research terminal warming up behind its boot screen (the craft's shells, the airport's scenery)
+  std::function<void()> platformPresent;   // swaps the window's buffers and answers its messages (platform_win32): a frame shown from inside a long bake   // the main menu asked whether to enter the research terminal before the campaign is done
   bool headless = false;
 
   // flight session

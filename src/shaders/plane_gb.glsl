@@ -12,6 +12,7 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
     vec3 scrL = transpose(uPlaneRot)*(p - uPlanePos);
     bool bomb; vec3 rdc;
     vec3 col = feedScreen(mid, scrL, rdc, bomb);
+    if (uScrWin == 1 && !bomb) discard;   // a window: the world drawn before the airframe stays
     col = bomb ? wrFeedOverlay(col, scrL) : wr ? wraithScreen(col, rdc, mid, scrL) : jetScreen(col, rdc, mid, scrL);
     if (wr) col += wrHolo(uCamPos, rd, t);   // the hologram floats inside the cabin, in front of the displays
     if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);

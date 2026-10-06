@@ -495,16 +495,7 @@ void Game::drawMenu() {
   if (button(60 * s, y, bw, bh, "Settings")) { screen = SCR_HUB; hubTab = TAB_SETTINGS; settingsPage = 0; }
   y += bh + 14 * s;
   if (button(60 * s, y, bw, bh, "Controls")) { screen = SCR_HUB; hubTab = TAB_SETTINGS; settingsPage = 1; }
-  y += bh + 14 * s;
-  {   // Project NIGHTGLASS: open once the campaign is flown; before that behind a word that nothing there counts
-    bool open = career.finished;
-    if (!confirmRes) {
-      if (button(60 * s, y, bw, bh, open ? "Project NIGHTGLASS" : "Project NIGHTGLASS  (research)")) { if (open) { screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP); } else confirmRes = true; }
-    } else {
-      g_ren.text(60 * s, y - 18 * s, 13 * s, "Research flights are off the books: nothing there counts for the career.", C_WARN, 1, 0);
-      if (button(60 * s, y, bw * 0.48f, bh, "Enter", true, true)) { confirmRes = false; screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP); }
-      if (button(60 * s + bw * 0.52f, y, bw * 0.48f, bh, "Cancel")) confirmRes = false;
-    }
+  {   // (Project NIGHTGLASS has no button: the terminal opens on the held combo - the sticks on the pad, U + I on the keyboard)
     if (in.pressed[K_ESC]) confirmRes = false;
   }
   y += bh + 14 * s;

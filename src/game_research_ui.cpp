@@ -219,6 +219,7 @@ void Game::drawResearch(const FrameParams& fp) {
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   const float kIntro = 4.9f;
   if (resAuthed && realTime - resOpened < kIntro - 0.6f) resOpened = realTime - (kIntro - 0.6f);   // returning: just the resume flash
+  if (resWarm && realTime - resOpened > kIntro - 0.9f) resOpened = realTime - (kIntro - 0.9f);   // (warming up: the sequence holds on its last stage until the craft and the airport are ready)
   float T = realTime - resOpened;
   bool wr = resCraft == kWraith;
   const ResCraftInfo& RC = kResCraft[resCraftSlot(resCraft)];
@@ -226,7 +227,7 @@ void Game::drawResearch(const FrameParams& fp) {
   // ------------------------------------------------------------------ biometric access sequence
   if (T < kIntro) {
     bool skip = in.mPressed[0] || in.pressed[K_ENTER] || in.pressed[' '] || in.pressed[K_ESC];
-    if (skip && T > 0.3f) { resOpened = realTime - kIntro; in.mPressed[0] = false; in.pressed[K_ENTER] = in.pressed[K_ESC] = false; resAuthed = true; return; }
+    if (skip && T > 0.3f && !resWarm) { resOpened = realTime - kIntro; in.mPressed[0] = false; in.pressed[K_ENTER] = in.pressed[K_ESC] = false; resAuthed = true; return; }
     // stage cues
     static float lastT = 99.f;
     auto cue = [&](float at, int sfx, float v) { if (lastT < at && T >= at) g_audio.trigger(sfx, v); };
@@ -247,6 +248,10 @@ void Game::drawResearch(const FrameParams& fp) {
     }
     g_ren.text(W - 40 * s, 30 * s, 13 * s, "SESSION " + hexWord(hsh((uint32_t)resOpened * 7 + 3), 8), R_DIM, A, 2, false);
     g_ren.text(W - 40 * s, 50 * s, 13 * s, "CLEARANCE REQUIRED: OMEGA-BLACK", R_RED, A * (fmodf(T, 0.8f) < 0.55f ? 1.f : 0.4f), 2, false);
+    if (resWarm) {   // what the terminal is doing behind the sequence
+      const char* what = g_ren.entPending > 0 ? "STREAMING THE SITE" : "COMPILING AIRFRAME SHELLS";
+      g_ren.text(W * 0.5f, H - 46 * s, 12 * s, fmt("INITIALIZING  //  %s  //  %s %s", what, kAircraft[resCraft].name, fmodf(T, 0.6f) < 0.4f ? "..." : "   "), R_ICE, A * 0.8f, 1, false);
+    }
     float pw = std::min(360 * s, (W - 120 * s) / 3.f), ph = std::min(400 * s, H - 230 * s), py0 = 100 * s;
     float gap = (W - 3 * pw) / 4.f;
     // ---- 1: fingerprint

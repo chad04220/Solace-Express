@@ -58,9 +58,11 @@ void main(){
       else { pod = true; tmax = h0.x + 0.05; }
     }
   }
+  bool scrBomb = false; vec3 scrRdc = vec3(0.0); vec3 scrCol = vec3(0.0);
+  if (onScr) { scrCol = feedScreen(scrId, scrL, scrRdc, scrBomb); if (uScrWin == 1 && !scrBomb) onScr = false; }   // (a window: the ray goes on to the world)
   if (onScr) {   // a display: its camera's picture, with the display's own look and symbology over it
-    bool bomb; vec3 rdc;
-    vec3 col = feedScreen(scrId, scrL, rdc, bomb);
+    bool bomb = scrBomb; vec3 rdc = scrRdc;
+    vec3 col = scrCol;
     bool wr = int(gM[0].z + 0.5) == 6;
     col = bomb ? wrFeedOverlay(col, scrL) : wr ? wraithScreen(col, rdc, scrId, scrL) : jetScreen(col, rdc, scrId, scrL);
     if (wr) col += wrHolo(ro, rd, h0.x);   // the hologram floats inside the cabin, in front of the displays

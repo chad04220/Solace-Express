@@ -123,6 +123,7 @@ void Renderer::hullEval4(const std::vector<vec3>& pts, std::vector<float>& out) 
 // Bake the hull of the current airframe into slot (0 outside, 1 cockpit). The bake program is bound with the ray
 // tracer's uniforms for this frame.
 void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
+  bakeCount++;
   const PlaneVisual& pv = fp.plane;
   const float* M = pv.M;   // 24 vec4
   auto m = [&](int i, int c) { return M[i * 4 + c]; };

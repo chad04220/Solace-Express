@@ -2360,7 +2360,7 @@ void Game::researchPreviewCamera(FrameParams& fp) {
     P.y = std::max(a.elev, g_world.height(P.x, P.z)) + demo.gearHeight() + (sp.taildragger ? 0.25f : 0.05f);
   }
   demo.pos = P; demo.rpm = 0; demo.flaps = 0; demo.nozzle = 0;
-  fillPlaneVisual(fp.plane, demo, 0.f, false);
+  fillPlaneVisual(fp.plane, demo, 0.f, resWarm && resWarmFrames == 3);   // (one warm frame as the cockpit: its cabin shell bakes now, not when the sortie opens)
   resPrevPos = P; resPrevQ = demo.q;
   // orbit
   ResLayout L = researchLayout();
@@ -2974,6 +2974,12 @@ void Game::update(float dt) {
   bool padCombo = in.pad && (in.buttons & PAD_LS) && (in.buttons & PAD_RS) && (in.buttonsPressed & (PAD_LS | PAD_RS));
   if (screen == SCR_MENU && ((in.down['U'] && in.down['I'] && (in.pressed['U'] || in.pressed['I'])) || padCombo)) {
     screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP);
+    resWarm = true; resWarmFrames = 0; resBakeSeen = g_ren.bakeCount;   // the terminal's boot screen shows at once; the craft and its airport warm behind it
+  }
+  if (screen == SCR_RESEARCH && resWarm) {   // warming: the scenery streams flat out, the previewed craft's shells bake; done when a frame bakes nothing and nothing is pending
+    g_ren.entBudgetMs = 14.f;
+    bool baked = g_ren.bakeCount != resBakeSeen; resBakeSeen = g_ren.bakeCount;
+    if (resWarmFrames > 4 && !baked && g_ren.entPending == 0 && !g_ren.tshPending()) { resWarm = false; g_ren.entBudgetMs = 2.5f; }
   }
   if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
   radio.poll();
@@ -3029,15 +3035,31 @@ void Game::render() {
   // flight opens with streams in while the player chooses
   unsigned vid = (screen == SCR_MENU || screen == SCR_HUB) && menuVideo && !sceneOnly ? menuVideo(realTime) : 0;
   FrameParams fp;
+  // the research terminal warming up: its first frame is the boot screen alone (nothing of the scene, so it is on the
+  // screen the instant the combo is held); the frames after it draw the preview, which streams the airport and bakes
+  // the craft's shells - during a bake the renderer calls back and the boot screen is drawn and shown from inside it
+  if (screen == SCR_RESEARCH && resWarm) {
+    if (resWarmFrames == 0) vid = 1;
+    resWarmFrames++;
+    g_ren.bakeYield = [this] {
+      GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+      realTime += 1.f / 30.f;
+      g_ren.clearScreen();
+      FrameParams f0; g_ren.uiBegin(); drawResearch(f0); g_ren.uiEnd();
+      if (platformPresent) platformPresent();
+      glUseProgram((GLuint)prog);
+    };
+  } else if (g_ren.bakeYield && screen != SCR_RESEARCH) g_ren.bakeYield = nullptr;
   if (!vid) {
     fp = buildFrame();
     std::vector<SpriteVert> a, b;
     buildSprites(fp, a, b);
     g_ren.renderScene(fp, a, b);
   } else g_ren.clearScreen();
+  if (screen == SCR_RESEARCH && !resWarm) g_ren.bakeYield = nullptr;
   if (sceneOnly) return;
   g_ren.uiBegin();
-  if (vid) {   // cover the window, cropping the 16:9 picture as needed
+  if (vid > 1) {   // cover the window, cropping the 16:9 picture as needed
     float W = (float)g_ren.W, H = (float)g_ren.H, ar = 16.f / 9.f, sa = W / H;
     float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
     if (sa > ar) { float k = ar / sa; v0 = 0.5f - 0.5f * k; v1 = 0.5f + 0.5f * k; } else { float k = sa / ar; u0 = 0.5f - 0.5f * k; u1 = 0.5f + 0.5f * k; }

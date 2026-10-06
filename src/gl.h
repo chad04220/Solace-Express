@@ -24,6 +24,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_UNSIGNED_BYTE 0x1401
 #define GL_UNSIGNED_INT 0x1405
 #define GL_UNSIGNED_SHORT 0x1403
+#define GL_CURRENT_PROGRAM 0x8B8D
 #define GL_FLOAT 0x1406
 #define GL_HALF_FLOAT 0x140B
 #define GL_DEPTH_TEST 0x0B71

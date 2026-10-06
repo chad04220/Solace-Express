@@ -2,6 +2,7 @@
 //! Scene uniforms shared by every scene program: quality / debug switches, materials, airports, the player aircraft
 //! (packed model, state, controls, lights, weapons) and the traffic, with the globals that hold the aircraft being shaded.
 uniform float uMaxH; uniform int uQuality;
+uniform int uScrWin;   // 1: the research craft's displays are windows (a screen pixel lets the world through; only the bomb camera's picture is drawn)
 uniform int uDbg;
 uniform float uPlaneTSh;   // terrain's sun shadow at the player's aircraft (computed once per frame on the CPU)   // profiling: each set bit switches one feature off (see Renderer::dbgOff)
 uniform sampler2DArray uAlb; uniform sampler2DArray uNrm;

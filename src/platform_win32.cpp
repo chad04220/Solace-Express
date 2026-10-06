@@ -416,6 +416,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   ShowWindow(g_hwnd, SW_SHOW);
   game.loadSettings();   // early, for fullscreen during the intro (Game::init loads them again)
   if (game.set.fullscreen) { toggleFullscreen(); setupPacing(g_hwnd); }
+  game.platformPresent = [] { SwapBuffers(g_hdc); pumpB(); };   // (a frame shown from inside a long bake: the research terminal's boot screen)
 
   // startup.log names the GPU in use (support aid)
   std::string gpu = std::string((const char*)glGetString(GL_RENDERER)) + " / " + (const char*)glGetString(GL_VERSION);
