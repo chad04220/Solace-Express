@@ -76,6 +76,7 @@ public:
   void prewarm(const std::function<void(float, const std::string&)>& progress);
   int prewarmCraft = -1; bool prewarmInside = false;   // the menu tour shows this aircraft instead (prewarm only)
   bool wantFullscreenToggle = false;
+  std::function<void()> platformPresent;   // swaps the window's buffers and answers its messages (platform_win32 sets it): a frame shown from inside a long bake
   int monitorHz = 60;            // the display's refresh rate (the platform layer sets it)
   bool wantPacing = false;       // the frame-rate target changed: the platform layer re-applies its pacing
   // the pre-rendered menu montage (Windows: menu_video_win.cpp): returns the texture to show at this time, or 0 to
@@ -149,9 +150,8 @@ private:
   int hubTab = TAB_CONTRACTS;
   float gameTime = 0, realTime = 0;
   bool hasSave = false;
-  bool confirmRes = false;
+  bool confirmRes = false;   // the main menu asked whether to enter the research terminal before the campaign is done
   bool resWarm = false; int resWarmFrames = 0, resBakeSeen = 0;   // the research terminal warming up behind its boot screen (the craft's shells, the airport's scenery)
-  std::function<void()> platformPresent;   // swaps the window's buffers and answers its messages (platform_win32): a frame shown from inside a long bake   // the main menu asked whether to enter the research terminal before the campaign is done
   bool headless = false;
 
   // flight session
