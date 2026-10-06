@@ -9,12 +9,18 @@
 in vec2 vUV;
 uniform float uLogC;
 uniform int uMeshOn;   // the player's aircraft is drawn as a mesh where it never moves: march only where its moving hull says
+uniform sampler2D uSceneZ; uniform int uSceneZOn;   // the G-buffer's depth before this pass (the terrain, the scenery, the meshes): nothing marches past it
 void main(){
   gZero = min(uQuality, 0);
   loadMain();
   vec2 ndc = (vUV + uJit)*2.0 - 1.0;
   vec3 rd = camRay(ndc), ro = uCamPos;
   float tmax = 80000.0;
+  if (uSceneZOn == 1) {   // (the raster passes' logarithmic depth, back to a distance along this ray; a hair past the surface already drawn, so a march reaching it hits and stops rather than creeping up to a cut)
+    float dz = texelFetch(uSceneZ, ivec2(gl_FragCoord.xy), 0).r;
+    if (dz < 1.0) { float w = exp2(dz*2.0/uLogC) - 1.0; float ts = uPano.x > 0.0 ? w : w/max(-dot(rd, uCamRot[2]), 1e-4); tmax = min(tmax, ts*1.002 + 0.02); }
+  }
+  if (tmax <= 0.0) discard;
   bool onScr = false;   // a research jet's display from the pilot's seat
   // pod: a pixel on the aircraft in a cockpit view - shaded from the cockpit alone, no fog, no clouds (rt_main.glsl)
   bool pod = false, cockpitView = uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0;
@@ -25,9 +31,11 @@ void main(){
   bool jetC = int(gM[0].z + 0.5) >= 5;
   // (the player's aircraft as a mesh: only a pixel its moving hull covers has anything left to march - and in the
   // cockpit the first uHullNear metres from the eye, whose hull faces the hull pass drops, as the ray tracer does)
-  float hullEnd = cockpitView ? (jetC ? 6.0 : planeBound()*2.0) : tmax;
+  float hullEnd = min(cockpitView ? (jetC ? 6.0 : planeBound()*2.0) : tmax, tmax);
   if (uMeshOn == 1 && uHullOn == 1 && uHullExitOn == 1 && uWreck == 0) { float he = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).a; if (he > 0.0) hullEnd = min(hullEnd, he*1.002 + 0.05); }
-  vec2 hTop = uMeshOn == 1 && (uHullOn == 0 || (hullT > 1e29 && uHullNear <= 0.0)) ? vec2(-1.0) : tracePlaneHull(ro, rd, hullEnd, hullT);
+  // nothing of the airframe to march: no moving hull on this ray, or its hull begins behind the surface already drawn
+  bool noAf = uMeshOn == 1 && (uHullOn == 0 || (hullT > 1e29 && uHullNear <= 0.0) || (hullT > 0.0 && hullT < 1e29 && hullT > hullEnd));
+  vec2 hTop = noAf ? vec2(-1.0) : tracePlaneHull(ro, rd, hullEnd, hullT);
   int hTopPiece = gPI;   // (traffic tracing moves the piece transform; restored before shading)
   if (cockpitView && hTop.x > 0.0) {
     int id0 = int(hTop.y + 0.5);
@@ -56,6 +64,9 @@ void main(){
   // the raster passes' logarithmic depth of the view depth along the camera's axis (a panorama: the distance itself)
   float w = uPano.x > 0.0 ? t : -t*dot(rd, uCamRot[2]);
   gl_FragDepth = (log2(max(1e-6, 1.0 + w))*uLogC - 1.0)*0.5 + 0.5;
+  // at or behind the surface already drawn (the march that ran into the mesh's own panel): the depth test would drop it
+  // after the shading below; dropped here, unshaded
+  if (uSceneZOn == 1 && gl_FragDepth >= texelFetch(uSceneZ, ivec2(gl_FragCoord.xy), 0).r - 2e-7) discard;
   float sunVis = smoothstep(-0.05, 0.05, uSunDir.y);
   if (hit == 8) {   // the UFO
     Mat m; vec3 n; bool cabin; float ao;

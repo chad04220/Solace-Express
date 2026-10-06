@@ -58,7 +58,8 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   // (with the mesh the hull is the moving parts' only: no near segment even with the eye inside it - a ray starting inside
   // reads 0 and marches from the eye - and the march ends where the ray leaves the moving volume: the cabin's
   // panel, roof and seats are the mesh's, and the yoke's pixels alone march, as deep as the yoke's hull)
-  if (meshOn) drawHull(fp, slot, pm->second.movKey, 0.f, true);
+  static const bool oldNear = getenv("OLDNEAR") != nullptr;   // (debug A/B: the 1.2 m near march with the eye inside the moving hull, no exit)
+  if (meshOn) { if (oldNear) drawHull(fp, slot, pm->second.movKey, pm->second.eyeInMov ? -1.f : 0.f); else drawHull(fp, slot, pm->second.movKey, 0.f, true); }
   else if (hullUse && hulls.count(hullK)) drawHull(fp, slot, hullK);
   // the traffic: the same light aircraft, each with its model's mesh when one is baked (then its hull is the moving
   // parts' too), else its full hull
@@ -79,12 +80,38 @@ void Renderer::rasterObjects(const FrameParams& fp) {
     float rot[9] = {t[25 * 4], t[25 * 4 + 1], t[25 * 4 + 2], t[26 * 4], t[26 * 4 + 1], t[26 * 4 + 2], t[27 * 4], t[27 * 4 + 1], t[27 * 4 + 2]};
     drawPlaneMesh(fp, *trafMesh[k], rot, vec3(t[24 * 4], t[24 * 4 + 1], t[24 * 4 + 2]), k);
   }
+  // the depth so far (the terrain, the scenery, the meshes) copied out: the march goes no further than it on any ray,
+  // and a pixel whose moving hull begins behind it marches nothing (the cabin's panel and roof come from the mesh: only
+  // the yoke's pixels, in front of it, march - and the traffic's and the debris' traces stop at the nearest surface too)
+  bool sceneZ = false;
+  if (glBlitFramebuffer) {
+    if (!texDepthCopy || depthCopyW < rw || depthCopyH < rh) {
+      int w = std::max(rw, depthCopyW), h = std::max(rh, depthCopyH);
+      if (texDepthCopy) glDeleteTextures(1, &texDepthCopy);
+      glGenTextures(1, &texDepthCopy); glBindTexture(GL_TEXTURE_2D, texDepthCopy);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      if (!fboDepthCopy) glGenFramebuffers(1, &fboDepthCopy);
+      glBindFramebuffer(GL_FRAMEBUFFER, fboDepthCopy);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texDepthCopy, 0);
+      { GLenum none = GL_NONE; glDrawBuffers(1, &none); } glReadBuffer(GL_NONE);
+      depthCopyW = w; depthCopyH = h;
+    }
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, fboGB); glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fboDepthCopy);
+    glBlitFramebuffer(0, 0, rw, rh, 0, 0, rw, rh, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboGB);
+    glDrawBuffers(4, gb);
+    sceneZ = true;
+  }
   setRT(progObjects, fp);
   for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, 0); }   // (the G-buffer is the target here, never read)
   glUniform1f(U(progObjects, "uLogC"), 2.f / log2f(40000.f + 1.f));
   glUniform1i(U(progObjects, "uMeshOn"), meshOn ? 1 : 0);
+  glActiveTexture(GL_TEXTURE0 + 28); glBindTexture(GL_TEXTURE_2D, sceneZ ? texDepthCopy : 0); glUniform1i(U(progObjects, "uSceneZ"), 28); glUniform1i(U(progObjects, "uSceneZOn"), sceneZ ? 1 : 0);
   glBindVertexArray(vaoEmpty);
-  glDrawArrays(GL_TRIANGLES, 0, 3);
+  static const bool noMarch = getenv("NOMARCH") != nullptr;   // (debug: the objects pass without its full-screen march, to time the mesh draws alone)
+  if (!noMarch) glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);
   glDisable(GL_DEPTH_TEST);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);

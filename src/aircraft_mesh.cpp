@@ -20,7 +20,7 @@
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 4;   // (bump with the format)
+const uint32_t kMeshMagic = 0x4d455348u + 5;   // (bump with the format)
 }
 
 bool Renderer::compilePlaneMesh() {
@@ -195,26 +195,29 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       if (cval(cx, cy + 1, cz, vy) && (v0 < 0.f) != (vy < 0.f) && cube(cx, cy, cz - 1, b) && cube(cx - 1, cy, cz - 1, c) && cube(cx - 1, cy, cz, dq)) quad(a, b, c, dq);
       if (cval(cx, cy, cz + 1, vz) && (v0 < 0.f) != (vz < 0.f) && cube(cx - 1, cy, cz, b) && cube(cx - 1, cy - 1, cz, c) && cube(cx, cy - 1, cz, dq)) quad(a, b, c, dq);
     }
-    // ---- the hull of what moves: the 0.25 m voxels holding a moving cell, and their neighbours
-    std::vector<uint8_t> mv((size_t)n1 * n1 * n1, 0);
+    // ---- the hull of what moves: the moving 6.25 cm cells, each grown by one cell, as faces on the fine lattice (a
+    // 0.25 m margin round the yoke's sweep reached the pilot's eye and every cockpit ray started inside the hull: all
+    // of them marched; on the fine lattice the hull is the yoke's, the levers' and the pedals' own)
+    std::vector<uint8_t> mv((size_t)n1 * n1 * n1, 0); std::unordered_map<int, uint64_t> mvMask;
+    auto setFine = [&](int i2, int j2, int k2) {
+      if (i2 < 0 || j2 < 0 || k2 < 0 || i2 >= n2 || j2 >= n2 || k2 >= n2) return;
+      mvMask[((k2 / 4) * n1 + j2 / 4) * n1 + i2 / 4] |= 1ull << ((i2 & 3) + 4 * (j2 & 3) + 16 * (k2 & 3));
+    };
     for (size_t q = 0; q < cand.size(); q++) {
       if (!moving[q]) continue;
       int id = cand[q], i2 = id % n2, j2 = (id / n2) % n2, k2 = id / (n2 * n2);
-      for (int dz = -1; dz <= 1; dz++) for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
-        int i1 = i2 / 4 + dx, j1 = j2 / 4 + dy, k1 = k2 / 4 + dz;
-        if (i1 < 0 || j1 < 0 || k1 < 0 || i1 >= n1 || j1 >= n1 || k1 >= n1) continue;
-        mv[((size_t)k1 * n1 + j1) * n1 + i1] = 1;
-      }
+      for (int dz = -1; dz <= 1; dz++) for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) setFine(i2 + dx, j2 + dy, k2 + dz);
     }
-    std::unordered_map<int, uint64_t> noMask;
-    hullFaces(n1, org, kS1, false, mv, noMask, hullTri);
-    {   // the eye against the moving hull: outside it, the cockpit's hull pass keeps its near faces and no pixel marches the first metre
-      int ei = (int)floorf((M[22 * 4] - org) / kS1), ej = (int)floorf((M[22 * 4 + 1] - org) / kS1), ek = (int)floorf((M[22 * 4 + 2] - org) / kS1);
+    for (auto& kv : mvMask) mv[kv.first] = kv.second == ~0ull ? 1 : 2;
+    hullFaces(n1, org, kS2, true, mv, mvMask, hullTri);
+    {   // the eye against the moving hull (its cell and the neighbours), for the record
+      int ei = (int)floorf((M[22 * 4] - org) / kS2), ej = (int)floorf((M[22 * 4 + 1] - org) / kS2), ek = (int)floorf((M[22 * 4 + 2] - org) / kS2);
       bool in = false;
       for (int dz = -1; dz <= 1 && !in; dz++) for (int dy = -1; dy <= 1 && !in; dy++) for (int dx = -1; dx <= 1 && !in; dx++) {
-        int i1 = ei + dx, j1 = ej + dy, k1 = ek + dz;
-        if (i1 < 0 || j1 < 0 || k1 < 0 || i1 >= n1 || j1 >= n1 || k1 >= n1) continue;
-        in = mv[((size_t)k1 * n1 + j1) * n1 + i1] != 0;
+        int i2 = ei + dx, j2 = ej + dy, k2 = ek + dz;
+        if (i2 < 0 || j2 < 0 || k2 < 0 || i2 >= n2 || j2 >= n2 || k2 >= n2) continue;
+        auto it = mvMask.find(((k2 / 4) * n1 + j2 / 4) * n1 + i2 / 4);
+        in = it != mvMask.end() && ((it->second >> ((i2 & 3) + 4 * (j2 & 3) + 16 * (k2 & 3))) & 1);
       }
       hullTri.push_back(in ? 1.f : 0.f);   // (carried at the end of the hull's floats: the cache keeps it)
     }
