@@ -805,8 +805,8 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   // rows drops unavailable aircraft, never one the job can be flown in (the review of v3.24.0: an owned Starling, the
   // seventh row, went unseen and unselectable on a long briefing)
   int firstOk = -1;
-  Career::Source srcs[kNumAircraft]; std::string whys[kNumAircraft];
-  int order[kNumAircraft], nOrder = 0;
+  std::vector<Career::Source> srcs(kNumAircraft); std::vector<std::string> whys(kNumAircraft);
+  std::vector<int> order(kNumAircraft); int nOrder = 0;
   for (int i = 0; i < kNumAircraft; i++) {
     srcs[i] = career.canFly(c, i, &whys[i]);
     if ((c.type == CT_FERRY || c.type == CT_TRIAL) && srcs[i] == Career::SRC_NONE && career.license == LIC_STUDENT && i == 0) srcs[i] = Career::SRC_LESSON;
