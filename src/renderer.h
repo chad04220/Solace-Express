@@ -100,6 +100,7 @@ public:
   int quality = 1;           // 0 low, 1 medium, 2 high
   int dbgOff = 0;            // profiling: ray tracer features switched off (uDbg bits)
   int mode = 0;              // 0 the ray tracer, 1 the raster renderer (docs/RENDERER_REBUILD.md; needs rasterOk)
+  std::function<void()> bakeYield;   // called between the bake's evaluation batches (the benchmark answers the window's messages during a long bake)
   int modeForce = -1;        // the tools' --raster / the harness' RASTER: overrides the setting whenever the game applies it
   bool rasterOk = false;     // the raster renderer's programs built
   bool ok = false;
@@ -254,7 +255,6 @@ private:
   bool hullWanted(const FrameParams& fp) const;
   float hullNear(const FrameParams& fp) const;
   void drawHull(const FrameParams& fp, int slot, uint64_t key, float nearOverride = -1.f);
-  std::function<void()> bakeYield;   // called between the bake's evaluation batches (the benchmark answers the window's messages during a long bake)
   float hullNearNow = 0.f;   // the hull pass's near distance this frame (uHullNear): hullNear(fp), or a mesh's moving hull's own
   void drawTrafficHulls(const FrameParams& fp, const PlaneMesh* const* meshes = nullptr);   // meshes[k]: that traffic's mesh (its moving hull is drawn instead)
   void ensureHullTarget();
