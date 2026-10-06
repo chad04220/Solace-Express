@@ -27,8 +27,12 @@ bool Renderer::compilePlaneMesh() {
   std::string e;
   progPlaneMesh = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(""), e);
   if (!progPlaneMesh) { error = "Aircraft mesh shader: " + e; return false; }
-  progPlaneMeshDepth = linkProgramCached(planeMeshVSAssembly(""), "#version 330 core\nflat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; uniform int uScrSkip;\nvoid main(){ int mid = int(vId + 0.5); if (uScrSkip == 1 && ((mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63))) discard; }\n", e);
+  // the depth pre-pass; with uScrSkip the fragments at or behind a screen (texScrDepth) are dropped: the screens are holes
+  progPlaneMeshDepth = linkProgramCached(planeMeshVSAssembly(""), "#version 330 core\nflat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; uniform int uScrSkip; uniform sampler2D uScrDepth;\nvoid main(){ if (uScrSkip == 1 && gl_FragCoord.z >= texelFetch(uScrDepth, ivec2(gl_FragCoord.xy), 0).r - 2e-7) discard; }\n", e);
   if (!progPlaneMeshDepth) { error = "Aircraft mesh depth shader: " + e; return false; }
+  // the screens alone, depth only (the bomb camera's pane excepted while it shows a picture)
+  progPlaneMeshScr = linkProgramCached(planeMeshVSAssembly(""), "#version 330 core\nflat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; uniform int uBombPane;\nvoid main(){ int mid = int(vId + 0.5); bool scr = (mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63); if (!scr || (uBombPane == 1 && mid == 61)) discard; }\n", e);
+  if (!progPlaneMeshScr) { error = "Aircraft mesh screen shader: " + e; return false; }
   return true;
 }
 
@@ -275,6 +279,42 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   // depth first, with nothing shaded: the skin's far side, the far wing and the cabin's hidden surfaces never run the
   // material shader
   static const bool noPre = getenv("MESHNOPRE") != nullptr;   // (debug: no depth pre-pass)
+  // the research craft's displays as windows: the cabin is sealed, so a screen must be a hole through the whole
+  // airframe, not a missing pane with the pod's structure behind it. The screens' depth goes into texScrDepth first;
+  // the pre-pass and the material pass then drop every fragment at or behind a screen, and the world drawn before
+  // the airframe stays (the bomb camera's pane keeps its picture while it has one)
+  const bool scrSkip = screenWindows && trafK < 0 && fp.plane.PS[3] > 0.5f && (int)(fp.plane.M[2] + 0.5f) >= 5 && progPlaneMeshScr;
+  if (scrSkip) {
+    if (!texScrDepth || scrDepthW < rw || scrDepthH < rh) {
+      int w = std::max(rw, scrDepthW), h = std::max(rh, scrDepthH);
+      if (texScrDepth) glDeleteTextures(1, &texScrDepth);
+      glGenTextures(1, &texScrDepth); glBindTexture(GL_TEXTURE_2D, texScrDepth);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      if (!fboScrDepth) glGenFramebuffers(1, &fboScrDepth);
+      glBindFramebuffer(GL_FRAMEBUFFER, fboScrDepth);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texScrDepth, 0);
+      { GLenum none = GL_NONE; glDrawBuffers(1, &none); } glReadBuffer(GL_NONE);
+      scrDepthW = w; scrDepthH = h;
+    }
+    GLint prevFbo = 0; glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboScrDepth);
+    glViewport(0, 0, rw, rh);
+    glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);
+    glUseProgram(progPlaneMeshScr);
+    glUniformMatrix4fv(U(progPlaneMeshScr, "uVP"), 1, GL_FALSE, vp.m);
+    glUniform2f(U(progPlaneMeshScr, "uJit"), jitX, jitY);
+    glUniform1f(U(progPlaneMeshScr, "uLogC"), logC);
+    glUniformMatrix3fv(U(progPlaneMeshScr, "uRot"), 1, GL_FALSE, rot);
+    glUniform3f(U(progPlaneMeshScr, "uPos"), pos.x, pos.y, pos.z);
+    glUniform1i(U(progPlaneMeshScr, "uBombPane"), fp.fx.feed[3] > 0.5f ? 1 : 0);
+    glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
+    glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
+    GLenum gb[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+    glDrawBuffers(4, gb);
+    glViewport(0, 0, rw, rh);
+  }
   if (!noPre) {
     glUseProgram(progPlaneMeshDepth);
     glUniformMatrix4fv(U(progPlaneMeshDepth, "uVP"), 1, GL_FALSE, vp.m);
@@ -282,9 +322,8 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
     glUniform1f(U(progPlaneMeshDepth, "uLogC"), logC);
     glUniformMatrix3fv(U(progPlaneMeshDepth, "uRot"), 1, GL_FALSE, rot);
     glUniform3f(U(progPlaneMeshDepth, "uPos"), pos.x, pos.y, pos.z);
-    // the research craft's displays as windows: no depth for them either (the bomb camera's pane excepted while it shows)
-    bool scrSkip = screenWindows && trafK < 0 && fp.plane.PS[3] > 0.5f && (int)(fp.plane.M[2] + 0.5f) >= 5 && !(fp.fx.feed[3] > 0.5f);
     glUniform1i(U(progPlaneMeshDepth, "uScrSkip"), scrSkip ? 1 : 0);
+    glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, scrSkip ? texScrDepth : 0); glUniform1i(U(progPlaneMeshDepth, "uScrDepth"), 29);
     glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
     glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -298,6 +337,8 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   glUniformMatrix3fv(U(progPlaneMesh, "uRot"), 1, GL_FALSE, rot);
   glUniform3f(U(progPlaneMesh, "uPos"), pos.x, pos.y, pos.z);
   glUniform1i(U(progPlaneMesh, "uMeshTraffic"), trafK);
+  glUniform1i(U(progPlaneMesh, "uScrSkip"), scrSkip ? 1 : 0);
+  glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, scrSkip ? texScrDepth : 0); glUniform1i(U(progPlaneMesh, "uScrDepth"), 29);
   if (!noPre) { glDepthFunc(GL_LEQUAL); glDepthMask(GL_FALSE); }
   glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
   glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);

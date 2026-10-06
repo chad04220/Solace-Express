@@ -21,8 +21,11 @@ vec3 planeLight(vec3 p, vec3 rd, float t, int mid, Mat m, vec3 n, vec3 lp, vec3 
       // from takes nothing from it in any case)
       float ndl = dot(n, uSunDir);
       float ms = (uAfShOn & 1) != 0 && uWreck == 0 ? (ndl < (interior ? 0.3 : 0.08) ? 0.0 : shMapLookupB(0, p, n, 1.0 + 2.0*(1.0 - ndl))) : -1.0;   // (inside, a surface the sun barely faces is lit by the fixtures and the ambient alone: its thin frames alias in the map)
+      // (inside, an occluder within ~0.3 m of the receiver is a thin frame or the receiver's own far side: the map's
+      // texels alias along it, so the march decides there - a small share of the cabin's pixels)
+      bool thin = interior && ms >= 0.0 && ms < 0.995 && gShMapOcc*2.0*planeBound() < 0.3;
       if (ms >= 0.995) {}
-      else if (ms >= 0.0 && ms <= 0.005) tsh = 0.0;
+      else if (ms >= 0.0 && ms <= 0.005 && !thin) tsh = 0.0;
       else { gShMax = interior ? 3.5 : 1e9; tsh *= planeShadow(p + n*0.02, uSunDir); gShMax = 1e9; }
     }
     // (and the scenery's: an airframe parked by a hangar or under trees sits in the same shadow as the ground

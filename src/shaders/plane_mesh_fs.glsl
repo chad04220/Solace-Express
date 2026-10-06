@@ -4,7 +4,9 @@
 //! triangles that straddle two materials.
 in vec3 vW; in vec3 vN; flat in float vId; in float vIdS; in float vAo;
 uniform int uMeshTraffic;   // -1 the player's aircraft, else the traffic aircraft whose airframe this is
+uniform sampler2D uScrDepth; uniform int uScrSkip;   // the research craft's screens' depth: a fragment at or behind a screen is dropped (the screens are holes to the world)
 void main(){
+  if (uScrSkip == 1 && gl_FragCoord.z >= texelFetch(uScrDepth, ivec2(gl_FragCoord.xy), 0).r - 2e-7) discard;
   gZero = min(uQuality, 0);
   bool traf = uMeshTraffic >= 0;
   if (traf) { loadTraffic(uMeshTraffic); trafficXf(uMeshTraffic); } else { loadMain(); pieceXf(-1); }
