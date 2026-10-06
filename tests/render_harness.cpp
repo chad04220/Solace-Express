@@ -221,8 +221,16 @@ void main(){
     for (float& m : g_ren.passMs) m = 0.f;   // (the smoothed pass times start clean: the warm-up frames' bakes stay out of them)
     auto t0 = std::chrono::steady_clock::now();
     int frames = atoi(getenv("BENCH"));
-    for (int i = 0; i < frames; i++) game.render();
+    const bool wall = getenv("BENCHWALL") != nullptr;   // (each pass waited for and timed on the wall clock: exact on any driver)
+    double wsum[Renderer::kPasses] = {};
+    for (int i = 0; i < frames; i++) {
+      g_ren.syncTiming = wall;
+      game.render();
+      if (wall) { glFinish(); for (int p = 0; p < Renderer::kPasses; p++) wsum[p] += g_ren.passWall[p]; }
+    }
+    g_ren.syncTiming = false;
     glFinish();
+    if (wall) { printf("passes (wall ms):"); const char* nm[] = {"world", "displays", "feeds", "objects", "proxy", "lighting", "taa", "sprites", "bloom", "shafts", "composite"}; for (int p = 0; p < Renderer::kPasses; p++) printf(" %s %.0f", nm[p], wsum[p] / frames); printf("\n"); }
     printf("bench: %.1f ms/frame  (scenery: %d instances, %d chunks, %.2f ms CPU)\n", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / frames, g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs);
     { const float* pm = g_ren.passMs; printf("passes (GPU ms, smoothed): world %.1f  displays %.1f  feeds %.1f  objects %.1f  shadow proxy %.1f  lighting %.1f  taa %.1f  sprites %.1f  bloom %.1f  shafts %.1f  composite %.1f\n", pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9], pm[10]); }
   }

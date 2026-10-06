@@ -240,6 +240,9 @@ void Renderer::drawTrafficHulls(const FrameParams& fp, const PlaneMesh* const* m
   for (int k = 0; k < n; k++) {
     uint64_t h = meshes && meshes[k] ? meshes[k]->movKey : trafficModelKey(fp.traffic[k].t);   // its moving hull, or its full one
     auto it = hulls.find(h);
+    // a meshed aircraft whose moving hull is empty (every moving piece a rigid part) has nothing to march: no hull of
+    // its own, and its pixels read "no traffic on this ray" (aborting here left every aircraft marched in full)
+    if (meshes && meshes[k] && it != hulls.end() && it->second.ok && !it->second.verts) { hm[k] = nullptr; continue; }
     if (it == hulls.end() || !it->second.ok || !it->second.verts) {
       static int warned = 0;
       if (getenv("HULLDBG") && warned++ < 3) printf("traffic hulls: aircraft %d of %d has none (type %.0f)\n", k, n, fp.traffic[k].t[2]);
@@ -272,6 +275,7 @@ void Renderer::drawTrafficHulls(const FrameParams& fp, const PlaneMesh* const* m
     glUniform1i(lp, pass);
     if (pass) { glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(1.f, 4.f); }
     for (int k = 0; k < n; k++) {
+      if (!hm[k]) continue;
       const float* t = fp.traffic[k].t;
       float rot[9] = {t[25 * 4], t[25 * 4 + 1], t[25 * 4 + 2], t[26 * 4], t[26 * 4 + 1], t[26 * 4 + 2], t[27 * 4], t[27 * 4 + 1], t[27 * 4 + 2]};
       glUniformMatrix3fv(glGetUniformLocation(progHull, "uRot"), 1, GL_FALSE, rot);

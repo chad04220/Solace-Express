@@ -78,6 +78,7 @@ void trafficXf(int k){
   gPR = mat3(texelFetch(uTraffic, ivec2(25, k), 0).xyz, texelFetch(uTraffic, ivec2(26, k), 0).xyz, texelFetch(uTraffic, ivec2(27, k), 0).xyz);
 }
 uniform int uTrafHullOn;   // the traffic's hulls (third channel of uEnv): where any traffic aircraft can begin on this ray
+uniform int uTrafMarch;   // bit k: traffic aircraft k has anything to march (a mesh with an empty moving hull has not)
 bool gTrafCamRay = false;   // the ray being traced is this pixel's camera ray
 vec2 traceTraffic(vec3 ro, vec3 rd, float tmax, out int idx){
   vec2 best = vec2(-1.0); idx = -1;
@@ -88,6 +89,7 @@ vec2 traceTraffic(vec3 ro, vec3 rd, float tmax, out int idx){
   }
   for (int k = 0; k < 12; k++) {
     if (k >= uTrafficN) break;
+    if ((uTrafMarch & (1 << k)) == 0) continue;
     vec4 P = texelFetch(uTraffic, ivec2(24, k), 0);
     // the hull pass projects to 2 km (aircraft_hull.cpp): it speaks only for aircraft wholly inside that range
     bool hulled = hs >= 0.0 && length(P.xyz - ro) + P.w < 1900.0;

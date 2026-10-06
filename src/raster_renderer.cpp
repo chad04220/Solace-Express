@@ -128,14 +128,26 @@ void Renderer::rasterObjects(const FrameParams& fp) {
     glDrawBuffers(4, gb);
     sceneZ = true;
   }
+  // what the march has to do this frame: a traffic aircraft drawn as a mesh whose moving hull is empty (every moving
+  // piece a rigid part) never needs it; the player's aircraft only without its mesh, with its moving hull drawn, or
+  // broken up; and with nothing at all (the usual flight in a light aircraft) the full-screen pass is skipped
+  int trafMarch = 0;
+  for (int k = 0; k < trafN; k++) {
+    if (trafMesh[k]) { auto it = hulls.find(trafMesh[k]->movKey); if (it != hulls.end() && it->second.ok && !it->second.verts) continue; }
+    trafMarch |= 1 << k;
+  }
+  const bool marchAny = (fp.plane.on && (!meshOn || hullOn || fp.wreck.pieces > 0)) || trafMarch != 0 || fp.ufoOn || fp.wreck.debris > 0;
+  static const bool objDbg = getenv("OBJDBG") != nullptr;   // (debug: why the march runs)
+  if (objDbg) { int nm = 0; for (int k = 0; k < trafN; k++) nm += (trafMarch >> k) & 1; printf("objects: march %d (plane on %d mesh %d hull %d wreck %d; traffic %d of %d; ufo %d debris %d)\n", (int)marchAny, (int)fp.plane.on, (int)meshOn, (int)hullOn, fp.wreck.pieces, nm, trafN, (int)fp.ufoOn, fp.wreck.debris); }
   setRT(progObjects, fp);
+  glUniform1i(U(progObjects, "uTrafMarch"), trafMarch);
   for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, 0); }   // (the G-buffer is the target here, never read)
   glUniform1f(U(progObjects, "uLogC"), 2.f / log2f(40000.f + 1.f));
   glUniform1i(U(progObjects, "uMeshOn"), meshOn ? 1 : 0);
   glActiveTexture(GL_TEXTURE0 + 28); glBindTexture(GL_TEXTURE_2D, sceneZ ? texDepthCopy : 0); glUniform1i(U(progObjects, "uSceneZ"), 28); glUniform1i(U(progObjects, "uSceneZOn"), sceneZ ? 1 : 0);
   glBindVertexArray(vaoEmpty);
   static const bool noMarch = getenv("NOMARCH") != nullptr;   // (debug: the objects pass without its full-screen march, to time the mesh draws alone)
-  if (!noMarch) glDrawArrays(GL_TRIANGLES, 0, 3);
+  if (!noMarch && marchAny) glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);
   glDisable(GL_DEPTH_TEST);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
