@@ -29,6 +29,19 @@ void Renderer::initTerrainMesh() {
   glGenBuffers(1, &vboTerrainInst); glBindBuffer(GL_ARRAY_BUFFER, vboTerrainInst);
   glBufferData(GL_ARRAY_BUFFER, 4096 * sizeof(float) * 4, nullptr, GL_STREAM_DRAW);
   glEnableVertexAttribArray(0); glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 16, (void*)0); glVertexAttribDivisor(0, 1);
+  // the chunk's grid as indexed triangles: 33 x 33 vertices shared by the 2048 triangles (the same six corners per
+  // cell, in the same order and winding, as the plain vertex list had), so the vertex shader's height and normal
+  // samples run once per grid point instead of once per triangle corner (5.6x fewer: Codex's performance review)
+  {
+    std::vector<uint16_t> idx; idx.reserve(kChunkVerts);
+    for (int cell = 0; cell < TP_CHUNK * TP_CHUNK; cell++) for (int k = 0; k < 6; k++) {
+      int ox = (k == 2 || k == 3 || k == 5) ? 1 : 0, oy = (k == 1 || k == 4 || k == 5) ? 1 : 0;
+      int gx = cell % TP_CHUNK + ox, gy = cell / TP_CHUNK + oy;
+      idx.push_back((uint16_t)(gy * (TP_CHUNK + 1) + gx));
+    }
+    glGenBuffers(1, &iboTerrain); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboTerrain);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx.size() * sizeof(uint16_t), idx.data(), GL_STATIC_DRAW);
+  }
   glBindVertexArray(0);
   // the sea grid: rings from 2 m to 300 km, 96 segments; the first ring closes on a centre vertex
   const int R = 84, SEG = 96;
@@ -118,7 +131,7 @@ void Renderer::drawTerrainMesh(const FrameParams& fp) {
   glUniform1f(U(p, "uSplit"), kSplit);
   glBindVertexArray(vaoTerrain); glBindBuffer(GL_ARRAY_BUFFER, vboTerrainInst);
   glBufferData(GL_ARRAY_BUFFER, terrInst.size() * sizeof(float), terrInst.data(), GL_STREAM_DRAW);
-  glDrawArraysInstanced(GL_TRIANGLES, 0, kChunkVerts, terrChunks);
+  glDrawElementsInstanced(GL_TRIANGLES, kChunkVerts, GL_UNSIGNED_SHORT, nullptr, terrChunks);
   // the sea
   if (progWater && vaoWater && fp.camPos.y > -0.5f) {
     p = progWater;

@@ -29,10 +29,18 @@ void main(){
     if (i >= uPLN) break;
     int slot = gbShadowSlot(i);
     if (slot < 0) continue;
-    vec3 L = uPLP[i].xyz - p; float d = length(L);
-    if (d < uPLP[i].w*40.0 + 400.0) {   // (beyond the beam's reach nothing is lit to shadow)
+    vec3 L = uPLP[i].xyz - p; float d2 = dot(L, L), d = sqrt(d2); vec3 l = L/max(d, 1e-4);
+    // only where the lighting pass reads the shadow (shadeSurface: the same terms and the same thresholds): the
+    // surface facing the light, inside a spotlight's cone, and lit above its minimum - the rest of the pixels in the
+    // beam's reach were marched or looked up for nothing
+    float ndl = dot(n, l);
+    if (ndl <= 0.0) continue;
+    vec3 E = uPLC[i].rgb/(d2 + uPLP[i].w*uPLP[i].w);
+    if (uPLC[i].w > -1.5) E *= smoothstep(uPLC[i].w, mix(uPLC[i].w, 1.0, 0.3), dot(-l, uPLD[i].xyz));
+    if (max(E.r, max(E.g, E.b))*ndl <= 0.004) continue;
+    {
       float m = (uAfShOn & (2 << slot)) != 0 ? shMapLookup(1 + slot, p, n) : -1.0;
-      ls[slot] = m >= 0.0 ? m : lightShadow(i, p, n, L/d, d);
+      ls[slot] = m >= 0.0 ? m : lightShadow(i, p, n, l, d);
     }
   }
   oColor = vec4(sunS, ls);

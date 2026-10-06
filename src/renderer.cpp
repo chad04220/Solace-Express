@@ -496,7 +496,7 @@ bool Renderer::readCostMap(std::vector<float>& out, int& w, int& h) {
 }
 
 // Exact pass timing for the analysis tool: wait for the GPU at every pass boundary
-static_assert(Renderer::kPasses == 10, "passWall holds kPasses entries");
+static_assert(Renderer::kPasses == 11, "passWall holds kPasses entries");
 void Renderer::syncStamp(int i) {
   glFinish();
   auto now = std::chrono::steady_clock::now();
@@ -1246,17 +1246,18 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     stamp(1);
     if ((fp.dispMode & 1) && (!texPages || (frameNo & 1) == 0)) renderDisplays(fp, false);   // the cockpit display atlases, before the objects pass samples them (the research jets' pages at 30 Hz: 9 Mpx and their mips a frame)
     if (fp.dispMode & 2) renderDisplays(fp, true);
+    stamp(2);
     // the research jets' cockpit cameras: the same passes on their own targets, before the objects pass draws the screens
     renderFeeds(fp, [this](GLuint p, const FrameParams& f) { setRT(p, f); }, [this](const FrameParams& f, GLuint) { rasterShadowProxy(f); rasterLight(f); cloudPass(f); rasterEffects(f); }, [this](const FrameParams& f) { feedEffects(f); });
-    stamp(2);
-    rasterObjects(fp);
     stamp(3);
-    rasterShadowProxy(fp);
+    rasterObjects(fp);
     stamp(4);
+    rasterShadowProxy(fp);
+    stamp(5);
     rasterLight(fp);
     cloudPass(fp);
     rasterEffects(fp);
-    stamp(5);
+    stamp(6);
   } else {
     shOn = 0;   // (no airframe shadow maps on the ray tracer: the airframe lighting marches as before)
     drawEnvelope(fp);
@@ -1271,7 +1272,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glDrawBuffers(3, bufs);
     glViewport(0, 0, rw, rh);
     glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
-    stamp(3); stamp(4);   // (the raster path's objects and shadow proxy passes: nothing here)
+    stamp(3); stamp(4); stamp(5);   // (the raster path's feeds, objects and shadow proxy passes: nothing here)
     // the research jets' cockpit cameras first: the displays show this frame's pictures
     renderFeeds(fp, [this](GLuint p, const FrameParams& f) { setRT(p, f); }, [this](const FrameParams& f, GLuint pr) { traceRT(f, pr); cloudPass(f); }, [this](const FrameParams& f) { feedEffects(f); });
     // aircraft hull (rasterized; baked at the end of the frame that first needs it - see below)
@@ -1286,7 +1287,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
 
     // a new airframe or view: bake its hull with the ray tracer's own shape code (used from the next frame on)
     if (hullUse && !hulls.count(hullK)) { setRT(progHullBake, fp); bakeHull(fp, hullSlot, hullK); }
-    stamp(5);
+    stamp(6);
   }
   // ------------------------------------------------ temporal AA resolve (before the sprites: particles never smear)
   {
@@ -1323,14 +1324,14 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     if (pv2.on) { prevPlanePos = pv2.pos; memcpy(prevPlaneRot, pv2.rot, sizeof prevPlaneRot); }
   }
 
-  stamp(6);
+  stamp(7);
   // ------------------------------------------------ sprites
   glBindFramebuffer(GL_FRAMEBUFFER, fboSprite);
   GLenum one = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &one);
   glViewport(0, 0, W, H);
   drawSprites(fp, (float)W, (float)H, (float)rw / allocW, (float)rh / allocH);   // (the depth is in the ray tracer's corner)
 
-  stamp(7);
+  stamp(8);
   // ------------------------------------------------ bloom
   glBindVertexArray(vaoEmpty);
   glActiveTexture(GL_TEXTURE0);
@@ -1353,7 +1354,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glDrawArrays(GL_TRIANGLES, 0, 3);
   }
   glDisable(GL_BLEND);
-  stamp(8);
+  stamp(9);
   // ------------------------------------------------ light shafts
   float rsx = 0, rsy = 0; vec3 rsp = fp.camPos + fp.sunDir * 10000.f;
   bool sunFront = dot(fp.sunDir, -fp.camBack) > 0.f && project(fp, rsp, rsx, rsy);
@@ -1377,7 +1378,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glDrawArrays(GL_TRIANGLES, 0, 3);
   }
 
-  stamp(9);
+  stamp(10);
   // ------------------------------------------------ composite to backbuffer
   glBindFramebuffer(GL_FRAMEBUFFER, screenFbo);
   glViewport(0, 0, W, H);

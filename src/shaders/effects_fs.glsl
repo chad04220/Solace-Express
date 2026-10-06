@@ -53,7 +53,7 @@ void main(){
       if (r > pr.w) continue;
       float blades = uPr.z; float blur = uPr.y;
       float ang = atan(hp.y, hp.x) - uPr.x;
-      float bl = smoothstep(0.86, 0.95, cos(blades*ang*0.5*2.0))*smoothstep(pr.w, pr.w*0.9, r);
+      float bl = smoothstep(0.86, 0.95, cos(blades*ang*0.5*2.0))*(1.0 - smoothstep(pr.w*0.9, pr.w, r));
       float a = mix(bl, 0.10 + 0.08*smoothstep(0.6, 1.0, cos(blades*ang)) + 0.25*smoothstep(pr.w*0.95, pr.w, r), blur);
       vec3 pc = vec3(0.04)*(uSunCol*max(uSunDir.y, 0.0) + 0.2) + vec3(0.6, 0.6, 0.1)*smoothstep(pr.w*0.9, pr.w, r)*0.3;
       col = mix(col, pc, clamp(a, 0.0, 1.0)*0.85);

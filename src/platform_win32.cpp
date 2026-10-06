@@ -711,8 +711,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
                   "takes ~2.2x as long at 100%% as at 67%% (2.2x the pixels), the per-pixel ray tracing is the bottleneck.\n");
       auto qpcMs = [&](LARGE_INTEGER a, LARGE_INTEGER b) { return (double)(b.QuadPart - a.QuadPart) / freq.QuadPart * 1000.0; };
       auto pump = [&] { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } };
-      static const char* kPassNameRT[Renderer::kPasses] = {"scenery+shadows", "displays", "-", "-", "ray trace+clouds", "TAA", "sprites", "bloom", "light shafts", "composite"};
-      static const char* kPassNameRaster[Renderer::kPasses] = {"world+terrain shadow", "displays+feeds", "objects (airframes)", "airframe shadow proxy", "lighting+clouds+effects", "TAA", "sprites", "bloom", "light shafts", "composite"};
+      static const char* kPassNameRT[Renderer::kPasses] = {"scenery+shadows", "displays", "-", "-", "-", "ray trace+clouds", "TAA", "sprites", "bloom", "light shafts", "composite"};
+      static const char* kPassNameRaster[Renderer::kPasses] = {"world+terrain shadow", "displays", "camera feeds", "objects (airframes)", "airframe shadow proxy", "lighting+clouds+effects", "TAA", "sprites", "bloom", "light shafts", "composite"};
       const char* const* kPassName = g_ren.mode == 1 ? kPassNameRaster : kPassNameRT;
       static const struct { int bit; const char* name; } kFeat[] = {
         {1, "volumetric clouds"}, {2, "terrain shadows"}, {4, "scenery shadow maps"}, {8, "aircraft shadow"}, {16, "point lights"},
@@ -798,7 +798,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           }
         }
         // 5. per-pixel work of the ray tracer
-        if (haveCost) {
+        if (haveCost && g_ren.mode != 1) {   // (the counting program is the ray tracer's: on the rasterizer there is nothing to count this way)
           g_ren.costMap = true; frames(2); glFinish();
           std::vector<float> cm; int w = 0, h = 0;
           g_ren.readCostMap(cm, w, h);
@@ -964,9 +964,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         double ms = (double)(f1.QuadPart - f0.QuadPart) / freq.QuadPart * 1000.0 / N;
         if (bf) {
           const float* pm = g_ren.passMs;
-          fprintf(bf, g_ren.mode == 1 ? "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: world %.2f  displays %.2f  objects %.2f  shadow proxy %.2f  lighting %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n"
-                              : "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: scenery+shadows %.2f  displays %.2f  (%.2f %.2f)  raytrace %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n",
-                  sc.c_str(), ms, 1000.0 / ms, g_ren.gpuMs, pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9]);
+          fprintf(bf, g_ren.mode == 1 ? "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: world %.2f  displays %.2f  feeds %.2f  objects %.2f  shadow proxy %.2f  lighting %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n"
+                              : "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: scenery+shadows %.2f  displays %.2f  (%.2f %.2f %.2f)  raytrace %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n",
+                  sc.c_str(), ms, 1000.0 / ms, g_ren.gpuMs, pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9], pm[10]);
           fflush(bf);
         }
         g_ren.entSync = true;

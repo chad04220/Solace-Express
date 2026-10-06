@@ -23,6 +23,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_TRIANGLES 0x0004
 #define GL_UNSIGNED_BYTE 0x1401
 #define GL_UNSIGNED_INT 0x1405
+#define GL_UNSIGNED_SHORT 0x1403
 #define GL_FLOAT 0x1406
 #define GL_HALF_FLOAT 0x140B
 #define GL_DEPTH_TEST 0x0B71
@@ -181,6 +182,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
   X(void, glGetQueryObjectui64v, (GLuint, GLenum, GLuint64*)) \
   X(void, glQueryCounter, (GLuint, GLenum)) \
   X(void, glDrawArraysInstanced, (GLenum, GLint, GLsizei, GLsizei)) \
+  X(void, glDrawElementsInstanced, (GLenum, GLsizei, GLenum, const void*, GLsizei)) \
   X(void, glVertexAttribDivisor, (GLuint, GLuint)) \
   X(void, glDepthFunc, (GLenum)) \
   X(void, glDepthMask, (GLboolean)) \

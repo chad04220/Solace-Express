@@ -13,9 +13,7 @@ const int C = 32;
 int octAt(float d){ return d < 600.0 ? 11 : (d < 3000.0 ? 9 : (d < 12000.0 ? 7 : 5)); }   // (terrainNormal's thresholds)
 float hAt(vec2 xz, float d){ return terrainH(xz, octAt(d)); }
 void main(){
-  int id = gl_VertexID, cell = id/6, k = id - cell*6;
-  ivec2 o = k == 0 ? ivec2(0, 0) : (k == 1 || k == 4) ? ivec2(0, 1) : (k == 2 || k == 3) ? ivec2(1, 0) : ivec2(1, 1);
-  ivec2 g = ivec2(cell % C, cell / C) + o;   // grid vertex 0..32 (two triangles per cell, wound counter-clockwise seen from above)
+  ivec2 g = ivec2(gl_VertexID % (C + 1), gl_VertexID / (C + 1));   // grid vertex 0..32 (indexed: terrain_mesh.cpp lays the two triangles per cell, counter-clockwise seen from above)
   float cs = aInst.z, S = cs*float(C);
   vec2 xz = aInst.xy + vec2(g)*cs;
   float dh = length(xz - uCamPos.xz);
