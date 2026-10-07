@@ -3663,8 +3663,8 @@ void Game::debugScene(const std::string& name) {
   // loading-screen pictures (--loadshots): loadshot_<CODE> an airport from an elevated three-quarter view with the aircraft
   // on its runway; loadshot_air_<n> aircraft n in flight, filmed from alongside. Afternoon light, a little cloud.
   if (name.compare(0, 13, "loadshot_air_") == 0) {
-    static const char* kSpot[9] = {"MDB", "PMB", "ORC", "KLO", "FJH", "CAP", "PVI", "VCF", "LHK"};   // a different place each
-    int n = std::clamp(atoi(name.c_str() + 13), 0, 8);
+    static const char* kSpot[kWraith + 1] = {"MDB", "PMB", "ORC", "KLO", "FJH", "CAP", "PVI", "VCF", "LHK", "SMP", "GLS", "NPT", "HFS"};   // a different place each
+    int n = std::clamp(atoi(name.c_str() + 13), 0, kWraith);
     resCraft = n; resAirborne = true; resTime = 16.3f; resWx = 0; resAirport = std::max(0, g_world.findAirport(kSpot[n]));
     launchResearch();
     {   // at its own cruise speed, holding height (the research launch's 200 m/s tears a light aircraft apart)
