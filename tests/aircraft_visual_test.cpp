@@ -199,6 +199,7 @@ int main(int argc,char**argv) {
         if(std::string(view)=="aft") direction=vec3(.1f,-.25f,1);
         if(std::string(view)=="overhead") direction=vec3(-m.eye.x,.35f,-.05f);
         if(std::string(view)=="pedals") { eye=vec3(0.f,m.eye.y-.55f,m.eye.z+.05f); direction=vec3(m.eye.x*1.4f,-.55f,-.75f); }
+        if(std::string(view)=="cockpit"&&getenv("AVT_DIR")) sscanf(getenv("AVT_DIR"),"%f,%f,%f",&direction.x,&direction.y,&direction.z);   // (aim the cockpit view: AVT_DIR=x,y,z in body space)
         target=eye+direction; glUniform1f(loc("vScale"),.68f); glUniform1i(loc("vPerspective"),1);
       } else {
         float size=std::max(s.fusLen,s.span);

@@ -375,6 +375,16 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     }
     else if (mid == 68) { tx = triSample(lp, ln, M_PLASTIC, 0.2, nT); m.alb = tx.rgb*vec3(0.55, 0.05, 0.04); m.rough = 0.35; m.nrm = nT; }
     else if (mid == 69) { tx = triSample(lp, ln, M_FABRIC, 0.08, nT); m.alb = tx.rgb*vec3(0.2, 0.21, 0.24); m.rough = 0.9; m.nrm = nT; }
+    else if (mid == 78) {   // the compass card behind its window: cream, a tick every 5 degrees (a long one and its numerals
+                            // every 30), the red lubber line, lit from inside at night
+      float cx = lp.x, cy = lp.y - (E.y - 0.048);
+      float u = cx/0.0045, tick = abs(fract(u) - 0.5)*0.0045, longT = abs(fract(u/6.0) - 0.5)*0.027;
+      m.alb = vec3(0.78, 0.74, 0.62); m.rough = 0.15;
+      if ((tick < 0.0005 && cy > 0.004) || (longT < 0.0007 && cy > -0.002)) m.alb = vec3(0.05);
+      if (longT < 0.004 && cy < -0.003 && cy > -0.011 && fract(cx/0.0016) < 0.45) m.alb = vec3(0.06);   // the numerals under them
+      if (abs(cx) < 0.0008) m.alb = vec3(0.75, 0.05, 0.03);   // lubber line
+      m.emit = m.alb*vec3(1.0, 0.8, 0.55)*(0.05 + 0.9*uNight);
+    }
   }
   else {
     vec3 nT; vec4 tx;

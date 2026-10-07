@@ -431,6 +431,9 @@ vec2 partFieldCockpit(int k, vec3 l){
     float fus0 = flapRoot(), flapEnd = span*W2.w, ailEnd = span*0.94;
     res = vec2(k == PT_FLAP ? sdSurface(sv, c, t, span, W0.y, W0.z, W0.w, W1.w, 0.74, fus0, flapEnd, 0.0, 0.0)
                             : sdSurface(sv, c, t, span, W0.y, W0.z, W0.w, W1.w, 0.74, flapEnd + 0.03, ailEnd, 0.0, 0.0), 2.0);
+    // from the cockpit, outside the fuselage only, as the wing is (mapPlane): a high wing's flap starts over the cabin
+    // roof, and its inboard end hung through it as a black plate at the top of the windscreen
+    if (gPS.w > 0.5) { vec3 sec = fusSection(l.z); res.x = max(res.x, -(length(vec2(l.x/sec.x, (l.y - sec.z)/sec.y)) - 1.0)*min(sec.x, sec.y)); }
   } else if (k == PT_ELEVATOR) {
     vec4 H0 = gM[12], H1 = gM[13];
     float hs = l.x, ht = l.y - (H1.x + hs*H1.z), hc = l.z - H1.y;

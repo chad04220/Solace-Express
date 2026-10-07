@@ -3539,14 +3539,15 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < 5; i++) updateCamera(1 / 60.f);
     toasts.clear(); return;
   }
-  if (name.compare(0, 3, "ckv") == 0) {   // cockpit view of aircraft N: ckv<N>_<look yaw deg>_<look pitch deg>_<hour>[_<roll input -1..1>]
-    int idx = 0; float ly = 0, lpch = -8, hour = 11, roll = 0; sscanf(name.c_str() + 3, "%d_%f_%f_%f_%f", &idx, &ly, &lpch, &hour, &roll);
+  if (name.compare(0, 3, "ckv") == 0) {   // cockpit view of aircraft N: ckv<N>_<look yaw deg>_<look pitch deg>_<hour>[_<roll input -1..1>[_<flaps 0..1>]]
+    int idx = 0; float ly = 0, lpch = -8, hour = 11, roll = 0, fl = 0; sscanf(name.c_str() + 3, "%d_%f_%f_%f_%f_%f", &idx, &ly, &lpch, &hour, &roll, &fl);
     if (idx == kResearchJet) { resAirborne = true; resTime = hour; launchResearch(); }
     else { timeOfDay = hour; plane.reset(&kAircraft[idx], vec3(-4000, 600, 9000), 40, kAircraft[idx].maxFuel, 100, true, kAircraft[idx].cruise); camQ = plane.q; takeoffAnnounced = true; }
     camMode = 1; hint.clear(); toasts.clear();
     for (int i = 0; i < 4; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     lookYaw = ly * DEG; lookPitch = lpch * DEG; camYaw = lookYaw; camPitch = lookPitch + 0.12f;
-    plane.ctl.roll = roll; botControl = roll != 0.f;   // (a held roll input: the yokes turn)
+    plane.ctl.roll = roll; botControl = roll != 0.f || fl != 0.f;   // (a held roll input: the yokes turn)
+    if (fl != 0.f) { plane.ctl.flaps = fl; plane.flaps = fl; }
     toasts.clear(); hint.clear(); return;
   }
   if (name.compare(0, 3, "trf") == 0) {   // AI traffic: trf<seconds>_<view> at Solace Capital; view 0 = airport overview, k = chase craft k-1

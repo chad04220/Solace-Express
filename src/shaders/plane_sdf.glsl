@@ -505,6 +505,7 @@ vec2 mapPlaneBody(vec3 p){
   // ---------------- fuselage (hollow with window openings in cockpit view)
   float f = sdFuselage(p);
   vec2 res = vec2(f, 1.0);
+  float winHole = 1e9;   // (from the cockpit: the distance to the window openings, negative in them - the visors keep to the roof)
   if (inside > 0.5) {
     // hollow cabin with real window openings
     vec4 E = gM[22]; vec4 WS = gM[23]; vec3 sec = fusSection(p.z);
@@ -521,7 +522,8 @@ vec2 mapPlaneBody(vec3 p){
     // (and rounded, a 3 cm lip: a hard cut meeting the curved roof at a shallow angle left a knife edge far thinner than
     // the mesh's lattice, which came off it serrated against the sky)
     float shell0 = shell;
-    shell = -smin(-shell, min(holeWs, holeSide), 0.03);
+    winHole = min(holeWs, holeSide);
+    shell = -smin(-shell, winHole, 0.03);
     res = vec2(shell, shell > shell0 + 1e-4 ? 63.0 : 11.0);
     // rear bulkhead: a trimmed baggage wall closes the cabin behind the last seats / windows (instead of looking
     // straight down the hollow tail cone)
@@ -937,12 +939,14 @@ vec2 mapPlaneBody(vec3 p){
       res = opU(res, vec2(sdCapsule(vec3(abs(p.x) - wx + 0.012, p.y - (E.y - 0.42), p.z - (E.z - 0.42)), vec3(0.0), vec3(0.0, 0.0, 0.11), 0.009), 60.0));
       }
     }
-    // sun visors folded against the cabin roof
-    vec3 vp = vec3(p.x - sign(p.x)*abs(E.x), p.y - gCab1.x, p.z - (E.z - 0.30));
-    if (sdBox(vp, vec3(0.16, 0.16, 0.16)) < res.x) {
-      vp.xy = rot2(vp.xy, sign(p.x)*gCab1.y);  // fold against the curved roof, rather than through it
-      vp.yz = rot2(vp.yz, 0.25);
-      res = opU(res, vec2(max(sdRoundBox(vp, vec3(0.13, 0.011, 0.05), 0.006), f + 0.055), 14.0));   // (22 mm: thinner, the bake's lattice left it ragged)
+    // sun visors folded up against the headliner: a pad 2 cm thick that follows the roof's own curve (an even layer
+    // under it), 26 cm across ahead of each seat. (A flat plate turned to the roof's slope met the curved roof only along
+    // a line: the copilot's came apart where the cabin trimmed it and hung a loose black fragment at the windscreen top)
+    vec3 vp = vec3(abs(p.x) - abs(E.x), p.y, p.z - (E.z - 0.30));
+    if (abs(vp.x) < 0.16 && abs(vp.z) < 0.08 && p.y > E.y + 0.04) {
+      float pad = max(abs(f + 0.075) - 0.012, 0.02 - winHole);                  // 2.4 cm, 3 mm under the headliner, 2 cm clear of the windows
+      float outline = sdRoundBox(vec3(vp.x, 0.0, vp.z), vec3(0.13, 1.0, 0.05), 0.03);
+      res = opU(res, vec2(-smin(-pad, -outline, 0.012), 63.0));   // (rounded where the outline meets the pad: a clean edge off the lattice; in the cabin's trim)
     }
     // overhead console: dome light and two map lights (modelled lenses - the cabin's night lighting)
     {
@@ -953,8 +957,11 @@ vec2 mapPlaneBody(vec3 p){
       res = opU(res, vec2(sdRoundCylX((vec3(abs(oc.x) - 0.06, oc.y + 0.024, oc.z - 0.12)).yxz, 0.013, 0.004, 0.002), 64.0));
       }
     }
-    float compass = sdRoundBox(p - vec3(0.0, E.y - 0.05, pz - 0.05), vec3(0.04, 0.03, 0.03), 0.01);
-    res = opU(res, vec2(compass, 66.0));
+    // the magnetic compass on the glareshield: a rounded black housing, its card behind a window on the face towards the
+    // pilot (78: the card, plane_material.glsl). It was a plain black box
+    vec3 cq = p - vec3(0.0, E.y - 0.05, pz - 0.05);
+    float compass = sdRoundBox(cq, vec3(0.045, 0.034, 0.03), 0.012);   // (the half sizes include the rounding: its face is flat 33 x 22 mm either side)
+    res = opU(res, vec2(compass, cq.z > 0.024 && abs(cq.x) < 0.03 && abs(cq.y - 0.002) < 0.017 ? 78.0 : 66.0));
   }
   if (inside > 0.5 && gModelId == kOspreyModel) res = opU(res, mapOspreyCabinTrim(p));   // the Osprey's cabin trim
   return res;

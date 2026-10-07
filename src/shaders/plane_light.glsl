@@ -37,6 +37,12 @@ vec3 planeLight(vec3 p, vec3 rd, float t, int mid, Mat m, vec3 n, vec3 lp, vec3 
         + (m.alb*(1.0 - m.metal)*(ambientLight(n)*0.4 + ambientLight(vec3(0.0, 1.0, 0.0))*0.2)
            + skyColor(normalize(reflect(rd, n) + vec3(0.0, 0.3, 0.0)))*F*(1.0 - m.rough)*(1.0 - m.rough)*0.35)*ao
         + cabinLight(lp, inv*n, inv*v, m, E.xyz, gM[21].w, E.w)*ao + m.emit;
+    // the sun's bounce: what comes through the windows lights the floor, the seats and the panel, and that lights the
+    // rest - the headliner and the posts most (they face the lit floor). Without it the cabin's upper half sat black
+    // in full sun
+    float bounceSun = smoothstep(-0.05, 0.1, uSunDir.y)*cloudShadow(p);
+    vec3 nB = inv*n;   // (body space: the cabin's floor is below whatever the attitude)
+    col += m.alb*(1.0 - m.metal)*uSunCol*(bounceSun*0.07*(0.55 - 0.45*nB.y))*ao;
   } else {
     col = shadeSurface(p, n, rd, m, sh);
     vec3 h = normalize(-rd + uSunDir);
