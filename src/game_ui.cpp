@@ -62,7 +62,10 @@ static vec3 mixc(vec3 a, vec3 b, float t) { return a + (b - a) * t; }
 void Game::applyUiPalette() { applyPalette(set.cbHud); }
 float Game::S() const { return std::max(0.6f, g_ren.H / 720.f) * set.uiScale; }
 
-bool Game::hovered(float x, float y, float w, float h) const { return in.mx >= x && in.mx < x + w && in.my >= y && in.my < y + h; }
+bool Game::hovered(float x, float y, float w, float h) const {
+  if (hitClipOn && (in.mx < hitClip[0] || in.mx >= hitClip[2] || in.my < hitClip[1] || in.my >= hitClip[3])) return false;
+  return in.mx >= x && in.mx < x + w && in.my >= y && in.my < y + h;
+}
 
 // Eases a per-widget value toward target (hover glows, sliding indicators)
 float Game::anim(uint32_t id, float target, float rate) {
@@ -544,16 +547,27 @@ void Game::drawHub() {
   const int nTabs = 5;
   float tx = 24 * s, ty = 80 * s, tabW[5], tabX[5];
   g_ren.rectGrad(0, 73 * s, W, 44 * s, vec3(0.008f, 0.028f, 0.05f), vec3(0.0f, 0.01f, 0.02f), 0.55f);   // glass band behind the tabs
+  // the tabs fit the room left of the Radio and Main Menu buttons: smaller type, then without their numbers, when the
+  // window is narrow for the UI scale (the review of v3.31.0, U4: Radio covered SETTINGS at 720p and 140%)
+  float tfs = 15 * s; bool numbered = true;
+  {
+    const float room = W - 280 * s - 16 * s - tx;
+    auto total = [&](float fsz, bool num) { float t = 0; for (int i = 0; i < nTabs; i++) t += g_ren.textWidth(num ? fmt("%02d  %s", i + 1, tabs[i]) : std::string(tabs[i]), fsz) + 28 * s + 6 * s; return t; };
+    float t = total(tfs, true);
+    if (t > room) tfs = std::max(11 * s, tfs * room / t);
+    if (total(tfs, true) > room) { numbered = false; tfs = 15 * s; t = total(tfs, false); if (t > room) tfs = std::max(10 * s, tfs * room / t); }
+  }
   for (int i = 0; i < nTabs; i++) {
-    std::string lab = fmt("%02d  %s", i + 1, tabs[i]);
-    float w = g_ren.textWidth(lab, 15 * s) + 28 * s;
+    std::string lab = numbered ? fmt("%02d  %s", i + 1, tabs[i]) : std::string(tabs[i]);
+    float w = g_ren.textWidth(lab, tfs) + 28 * s;
     tabX[i] = tx; tabW[i] = w;
     bool hov = hovered(tx, ty, w, 34 * s);
     float h = anim(uid(tx, ty, "tab"), hov ? 1.f : 0.f, 14);
     if (h > 0.01f) g_ren.rectGrad(tx, ty, w, 34 * s, vec3(0.03f, 0.1f, 0.15f), vec3(0.01f, 0.04f, 0.07f), 0.5f * h, 2 * s);
     vec3 tc = hubTab == i ? C_TEXT : mixc(C_DIM, C_TEXT, h);
-    g_ren.text(tx + 14 * s, ty + 9 * s, 15 * s, fmt("%02d", i + 1), hubTab == i ? C_ACCENT : C_ACCENT * 0.55f, 1, 0, false);
-    g_ren.text(tx + 14 * s + g_ren.textWidth("00  ", 15 * s), ty + 9 * s, 15 * s, tabs[i], tc, 1, 0, false);
+    const float tyt = ty + 17 * s - tfs * 0.53f;
+    if (numbered) g_ren.text(tx + 14 * s, tyt, tfs, fmt("%02d", i + 1), hubTab == i ? C_ACCENT : C_ACCENT * 0.55f, 1, 0, false);
+    g_ren.text(tx + 14 * s + (numbered ? g_ren.textWidth("00  ", tfs) : 0.f), tyt, tfs, tabs[i], tc, 1, 0, false);
     if (hov && in.mPressed[0] && hubTab != i) { hubTab = i; g_audio.trigger(SFX_CLICK); }
     tx += w + 6 * s;
   }
@@ -628,9 +642,22 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   }
   if (hubList == 0) { header(x + 16 * s, cy, lw - 32 * s, ellipsize(career.finished ? "CAMPAIGN COMPLETE - FREELANCE JOBS CONTINUE" : "AVAILABLE WORK", lw - 60 * s, 13 * s)); cy += 28 * s; }
   else { header(x + 16 * s, cy, lw - 32 * s, "TRIALS  -  OFF THE BOOKS, LOCAL BEST TIMES"); cy += 28 * s; }
-  for (int i = 0; i < (int)cards.size(); i++) {
-    float chh = 66 * s;
-    if (cy + chh > y + h - 8 * s) break;
+  // the cards scroll (mouse wheel, or the right stick) when the list is longer than the panel: every job stays
+  // reachable (the review of v3.31.0, U2: the last two freelance jobs had no way in), the selected card kept in view
+  const float chh = 66 * s, step = chh + 8 * s, listTop = cy, listBot = y + h - 8 * s;
+  const int visCards = std::max(1, (int)floorf((listBot - listTop + 8 * s) / step)), nCards = (int)cards.size();
+  static int listScroll = 0; static int listFor = -1, selSeen = -1;
+  if (listFor != hubList) { listFor = hubList; listScroll = 0; }
+  if (hovered(x, listTop, lw, listBot - listTop) && in.wheel != 0) { listScroll -= (int)in.wheel; in.wheel = 0; }
+  if (selSeen != selContract) {   // a new selection (keys, a stick) scrolls itself into view
+    selSeen = selContract;
+    if (selContract < listScroll) listScroll = selContract;
+    if (selContract >= listScroll + visCards) listScroll = selContract - visCards + 1;
+  }
+  listScroll = std::clamp(listScroll, 0, std::max(0, nCards - visCards));
+  if (listScroll > 0) g_ren.text(x + lw - 18 * s, listTop - 24 * s, 12 * s, fmt("^ %d more", listScroll), C_DIM, 1, 2);
+  if (listScroll + visCards < nCards) g_ren.text(x + lw - 18 * s, listBot - 6 * s, 12 * s, fmt("%d more v", nCards - listScroll - visCards), C_DIM, 1, 2);
+  for (int i = listScroll; i < nCards && i < listScroll + visCards; i++) {
     bool sel = i == selContract;
     bool hov = hovered(x + 10 * s, cy, lw - 20 * s, chh);
     card(x + 10 * s, cy, lw - 20 * s, chh, sel, hov, cards[i].job ? C_GOOD : cards[i].story ? C_WARN : C_ACCENT);
@@ -652,7 +679,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
       float payW = g_ren.text(x + lw - 24 * s, cy + 37 * s, 16 * s, fmtMoney(c.payout), C_GOOD, 1, 2);
       g_ren.text(x + 24 * s, cy + 37 * s, 14 * s, ellipsize(sub, cardW - payW - 12 * s, 14 * s), C_DIM, 1);
     }
-    cy += chh + 8 * s;
+    cy += step;
   }
   // details
   float dx = x + lw + 16 * s, dw = w - lw - 16 * s;
@@ -683,6 +710,8 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   // keep their place at the panel's foot: a long briefing never pushes the chooser off the panel or runs under it
   const float chooserH = 26 * s + ((kNumAircraft + 1) / 2) * (30 * s + 6 * s);
   const float chooserTop = std::min(std::max(y + h - 70 * s - chooserH, y + 70 * s + mapW + 8 * s), y + h - 70 * s - 26 * s - 2 * (30 * s + 6 * s));
+  // (the route map ends above the chooser: on a short panel - a large UI scale - it is drawn smaller rather than over it)
+  mapW = std::max(60 * s, std::min(mapW, chooserTop - (y + 60 * s) - 16 * s));
   const float detTop = py, detBot = chooserTop - 10 * s;
   static float detScroll = 0.f, detMax = 0.f; static int detFor = -1;
   if (detFor != hubList * 1000 + selContract) { detFor = hubList * 1000 + selContract; detScroll = 0.f; detMax = 0.f; }
@@ -810,38 +839,56 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   for (int i = 0; i < kNumAircraft; i++) {
     srcs[i] = career.canFly(c, i, &whys[i]);
     if ((c.type == CT_FERRY || c.type == CT_TRIAL) && srcs[i] == Career::SRC_NONE && career.license == LIC_STUDENT && i == 0) srcs[i] = Career::SRC_LESSON;
-    if (srcs[i] != Career::SRC_NONE) { order[nOrder++] = i; if (firstOk < 0) firstOk = i; }
   }
-  for (int i = 0; i < kNumAircraft; i++) if (srcs[i] == Career::SRC_NONE) order[nOrder++] = i;
-  float rowH = 30 * s;
+  // the player's own aircraft first, then the other flyable ones, then the rest
+  for (int pass = 0; pass < 3; pass++)
+    for (int i = 0; i < kNumAircraft; i++) {
+      const bool own = srcs[i] == Career::SRC_OWNED, ok = srcs[i] != Career::SRC_NONE;
+      if ((pass == 0 && own) || (pass == 1 && ok && !own) || (pass == 2 && !ok)) { order[nOrder++] = i; if (ok && firstOk < 0) firstOk = i; }
+    }
+  float rowH = 30 * s, rowStep = rowH + 6 * s;
   float colW = (iw - 10 * s) * 0.5f;
-  int hidden = 0;
+  // the rows scroll (mouse wheel, or the right stick) when the panel can't show them all: every aircraft stays
+  // reachable (the review of v3.31.0, U1: an owned Osprey sat below six rentals, out of reach)
+  const float chooserBot = y + h - 70 * s;
+  const int totalRows = (kNumAircraft + 1) / 2, visRows = std::max(1, (int)floorf((chooserBot - py + 6 * s) / rowStep));
+  static int chooserScroll = 0; static int chooserFor = -1;
+  if (chooserFor != hubList * 1000 + selContract) { chooserFor = hubList * 1000 + selContract; chooserScroll = 0; }
+  if (hovered(px, py, iw, visRows * rowStep) && in.wheel != 0) { chooserScroll -= (int)in.wheel; in.wheel = 0; }
+  chooserScroll = std::clamp(chooserScroll, 0, std::max(0, totalRows - visRows));
+  int hidden = 0, below = 0, above = chooserScroll * 2;
   for (int j = 0; j < kNumAircraft; j++) {
     const int i = order[j];
     const std::string& why = whys[i];
     const auto src = srcs[i];
-    float rx = px + (j % 2) * (colW + 10 * s), ry = py + (j / 2) * (rowH + 6 * s);
-    if (ry + rowH > y + h - 70 * s) { hidden = kNumAircraft - j; break; }
+    const int row = j / 2 - chooserScroll;
+    if (row < 0) continue;
+    float rx = px + (j % 2) * (colW + 10 * s), ry = py + row * rowStep;
+    if (row >= visRows) { below = kNumAircraft - j; for (int k = j; k < kNumAircraft; k++) hidden += srcs[order[k]] == Career::SRC_NONE; break; }
     bool sel = selAircraft == i;
     bool hov = hovered(rx, ry, colW, rowH) && src != Career::SRC_NONE;
     card(rx, ry, colW, rowH, sel, hov, src == Career::SRC_NONE ? C_DIM * 0.4f : src == Career::SRC_OWNED ? C_GOOD : C_ACCENT);
     if (hov && in.mPressed[0]) { selAircraft = i; launchFuelKg = -1; g_audio.trigger(SFX_CLICK); }
-    g_ren.text(rx + 10 * s, ry + 7 * s, 15 * s, kAircraft[i].name, src == Career::SRC_NONE ? C_DIM * 0.6f : C_TEXT, 1);
+    // (the name and the status share the row: each kept to its side, shortened when the row is narrow)
+    const float nameW = g_ren.textWidth(kAircraft[i].name, 15 * s), nameMax = colW * 0.48f;
+    g_ren.text(rx + 10 * s, ry + 7 * s, 15 * s, nameW > nameMax ? ellipsize(kAircraft[i].name, nameMax, 15 * s) : std::string(kAircraft[i].name), src == Career::SRC_NONE ? C_DIM * 0.6f : C_TEXT, 1);
     std::string st;
     if (src == Career::SRC_LESSON) st = "School aircraft";
     else if (src == Career::SRC_OWNED) { int fc = career.ferryCost(c, i); st = fc ? fmt("Owned (ferry %s)", fmtMoney(fc).c_str()) : "Owned"; }
     else if (src == Career::SRC_RENT) st = fmt("Rent %s", fmtMoney(kAircraft[i].rentFee).c_str());
     else st = why;
     float sts = 12.5f * s;
-    while (g_ren.textWidth(st, sts) > colW * 0.55f && st.size() > 4) st = st.substr(0, st.size() - 4) + "...";
+    const float stMax = colW - std::min(nameW, nameMax) - (sel ? 46 : 34) * s;
+    while (g_ren.textWidth(st, sts) > std::min(colW * 0.55f, stMax) && st.size() > 4) st = st.substr(0, st.size() - 4) + "...";
     g_ren.text(rx + colW - (sel ? 22 : 10) * s, ry + 9 * s, sts, st, src == Career::SRC_NONE ? C_BAD * 0.8f : src == Career::SRC_OWNED ? C_GOOD : C_WARN, 1, 2);
   }
   if (selAircraft >= 0 && (selAircraft >= kNumAircraft || srcs[selAircraft] == Career::SRC_NONE)) selAircraft = -1;
   if (selAircraft < 0) selAircraft = firstOk;
-  {   // what didn't fit, on the header's line; the chosen aircraft named there whenever its own row is among it
+  {   // what is scrolled out of view, on the header's line; the chosen aircraft named there whenever its row is out of view
     bool selShown = false;
-    for (int j = 0; j < kNumAircraft - hidden; j++) selShown |= order[j] == selAircraft;
-    std::string note = hidden > 0 ? fmt("+%d not available here", hidden) : std::string();
+    for (int j = above; j < kNumAircraft - below; j++) selShown |= order[j] == selAircraft;
+    std::string note;
+    if (above + below > 0) note = fmt("%s%d more%s - scroll", above > 0 ? "^ " : "", above + below, below > 0 ? " v" : "") + (hidden > 0 ? fmt(" (%d not available here)", hidden) : std::string());
     if (selAircraft >= 0 && !selShown) note = std::string("flying the ") + kAircraft[selAircraft].name + (note.empty() ? "" : "   " + note);
     if (!note.empty()) g_ren.text(px + iw, chooserY + 2 * s, 12 * s, note, selAircraft >= 0 && !selShown ? C_GOOD : C_DIM, 1, 2);
   }
@@ -1151,8 +1198,17 @@ void Game::drawSettings(float x, float y, float w, float h) {
   py += 44 * s;
   if (settingsPage == 1) { drawControls(x, py, w, y + h - py); return; }
   header(x, py, std::min(w, 620 * S()), "DISPLAY / AUDIO / CONTROLS"); py += 28 * s;
-  // twelve rows of controls: closer together when the panel is short (720p), so the last one stays inside it
-  const float rs = clampf((y + h - py - 60 * s - 26 * s) / 12.f, 34 * s, 42 * s);
+  // the controls scroll in a clipped region of their own (mouse wheel, the right stick; keyboard or D-pad focus scrolls
+  // its control into view): every one stays reachable at any resolution and UI scale (the review of v3.31.0, U3: five
+  // rows sat below a 1080p screen). A control outside the region takes no clicks.
+  const float rs = 42 * s, regTop = py, regBot = y + h - 24 * s;
+  static float genScroll = 0.f, genMax = 0.f;
+  if (hovered(x - 8 * s, regTop, w + 16 * s, regBot - regTop) && in.wheel != 0) { genScroll -= in.wheel * 48.f * s; in.wheel = 0; }
+  genScroll = std::clamp(genScroll, 0.f, genMax);
+  const size_t focus0 = focusList.size();
+  g_ren.uiClip(x - 8 * s, regTop, x + w + 8 * s, regBot);
+  hitClipOn = true; hitClip[0] = x - 8 * s; hitClip[1] = regTop; hitClip[2] = x + w + 8 * s; hitClip[3] = regBot;
+  py -= genScroll;
   auto slider = [&](const std::string& label, float& v, float lo, float hi, float step, const std::string& disp) {
     g_ren.text(x, py + 6 * s, 16 * s, label, C_DIM, 1);
     if (button(x + 250 * s, py, 36 * s, 32 * s, "-")) v = clampf(v - step, lo, hi);
@@ -1221,6 +1277,23 @@ void Game::drawSettings(float x, float y, float w, float h) {
   if (fs != set.fullscreen) wantFullscreenToggle = true;
   py += 6 * s;
   g_ren.text(x, py, 14 * s, ellipsize("Settings are saved automatically. To add radio stations, edit " + (saveDir.empty() ? std::string("radio_stations.txt in the game folder") : saveDir + "/radio_stations.txt"), w, 14 * s), C_DIM, 0.8f);
+  py += 22 * s;
+  genMax = std::max(0.f, py + genScroll - regBot);
+  hitClipOn = false;
+  g_ren.uiClipOff();
+  if (genMax > 0.f) {   // where the list stands: a thin track at the right edge
+    const float th = regBot - regTop, bh = std::max(24 * s, th * th / (th + genMax)), by = regTop + (th - bh) * (genScroll / genMax);
+    g_ren.rect(x + w + 2 * s, regTop, 3 * s, th, C_ACCENT, 0.12f, 1.5f * s);
+    g_ren.rect(x + w + 2 * s, by, 3 * s, bh, C_ACCENT, 0.7f, 1.5f * s);
+  }
+  // the control with keyboard / D-pad focus scrolled into view (next frame draws it there)
+  if (focusNav)
+    for (size_t k = focus0; k < focusList.size(); k++)
+      if (focusList[k].id == focusId) {
+        const float fy = focusList[k].y, fh = focusList[k].h;
+        if (fy < regTop) genScroll -= regTop - fy + 8 * s;
+        else if (fy + fh > regBot) genScroll += fy + fh - regBot + 8 * s;
+      }
   saveSettings();
   (void)w;
 }
@@ -1759,7 +1832,8 @@ void Game::drawHud(const FrameParams& fp) {
   if (!cockpit) {
     float sy = H - stripH;
     hudStrip(0, sy, W, stripH, 1.f);
-    // left: the wind dial and its numbers
+    // left: the wind dial and its numbers (windEnd: where they end, for the instructor beside them)
+    float windEnd = 300 * s;
     {
       vec3 wv = plane.windVel; float ws = length(vec3(wv.x, 0, wv.z)); float from = wrapDeg360(atan2f(-wv.x, wv.z) / DEG);
       float cxw = 30 * s, cyw = sy + stripH * 0.5f, R = 17 * s;
@@ -1773,9 +1847,14 @@ void Game::drawHud(const FrameParams& fp) {
         hudArrow(cxw + src.x * R * 0.72f, cyw + src.y * R * 0.72f, cxw + dv.x * R * 0.8f, cyw + dv.y * R * 0.8f, (1.4f + 1.4f * wscale) * s, 8 * s, (3.5f + 2.f * wscale) * s, wc, 1.f);
         float hw = ws * cosf(rel), xw = ws * sinf(rel);
         std::string g = wx.gust > 0.5f ? fmt(" G%.0f", (wx.windSpeed + wx.gust) * (set.metric ? 3.6f : MS_TO_KT)) : "";
-        g_ren.text(58 * s, sy + 16 * s, 14 * s, fmt("%03.0f / %s", from, fmtSpeed(ws).c_str()) + g, C_TEXT, 1, 0, false);
-        g_ren.text(58 * s + 118 * s, sy + 6 * s, 9 * s, "COMPONENTS", C_DIM, 1, 0, false);
-        g_ren.text(58 * s + 118 * s, sy + 17 * s, 12 * s, fmt("%s %s   X %s %s", hw >= 0 ? "HEAD" : "TAIL", fmtSpeed(fabsf(hw)).c_str(), fmtSpeed(fabsf(xw)).c_str(), xw >= 0 ? "R" : "L"), fabsf(xw) > 7.f ? C_WARN : C_DIM, 1, 0, false);
+        const std::string wtxt = fmt("%03.0f / %s", from, fmtSpeed(ws).c_str()) + g;
+        g_ren.text(58 * s, sy + 16 * s, 14 * s, wtxt, C_TEXT, 1, 0, false);
+        // (the components start after the wind's own figures: a gust and km/h ran them into a fixed column)
+        const float cxc = 58 * s + std::max(118 * s, g_ren.textWidth(wtxt, 14 * s) + 18 * s);
+        g_ren.text(cxc, sy + 6 * s, 9 * s, "COMPONENTS", C_DIM, 1, 0, false);
+        const std::string comp = fmt("%s %s   X %s %s", hw >= 0 ? "HEAD" : "TAIL", fmtSpeed(fabsf(hw)).c_str(), fmtSpeed(fabsf(xw)).c_str(), xw >= 0 ? "R" : "L");
+        g_ren.text(cxc, sy + 17 * s, 12 * s, comp, fabsf(xw) > 7.f ? C_WARN : C_DIM, 1, 0, false);
+        windEnd = std::max(windEnd, cxc + g_ren.textWidth(comp, 12 * s));
       } else g_ren.text(58 * s, sy + 16 * s, 14 * s, "CALM", C_TEXT, 1, 0, false);
     }
     // right: g against the structure, then the mode chips and the autopilot's words
@@ -1807,7 +1886,7 @@ void Game::drawHud(const FrameParams& fp) {
     }
     // centre: the instructor
     if (set.showHints && !hint.empty() && !crashed) {
-      float hx0 = 330 * s, hx1 = rx - 24 * s, hw = hx1 - hx0;
+      float hx0 = std::max(330 * s, windEnd + 24 * s), hx1 = rx - 24 * s, hw = hx1 - hx0;
       if (hw > 200 * s) {
         auto lines = wrap(hint, hw - 70 * s, 12.5f * s);
         if (lines.size() > 2) { lines.resize(2); lines[1] = ellipsize(lines[1] + " ...", hw - 70 * s, 12.5f * s); }
@@ -2233,6 +2312,26 @@ void Game::drawDebrief() {
     }
     py += 48 * s;
   }
+  // The foot of the panel, from the buttons up, stays put: the unsaved notice, the campaign's end, a new licence and
+  // the total. What is above it - the flight data, the coaching and the settlement's lines - scrolls (mouse wheel, the
+  // right stick) in the room that is left, as one body: at a large UI scale on a small screen that room may hold only
+  // a few lines (the review of v3.24.0, R9, and of v3.31.0, U4: the total's divider ran through the first fee)
+  const bool campaignEnd = career.finished && lastSuccess && contract.story && contract.id == g_story.back().id;
+  const auto campaignLines = campaignEnd ? wrap("You've completed the Solace Express campaign. Congratulations, Captain!", pw - 60 * s, 18 * s) : std::vector<std::string>();
+  const bool newLic = career.license > licenseBefore;
+  const float campY = (commitBlocked() ? y + ph - 108 * s : y + ph - 76 * s) - campaignLines.size() * 24 * s;
+  const float licY = campY - (newLic ? 34 * s : 0.f), totalY = licY - 34 * s;
+  int total = 0;
+  for (auto& l : payout) total += l.amount;
+  const float bodyTop = py, bodyBot = std::max(bodyTop + 24 * s, totalY - 12 * s);
+  static float payScroll = 0.f, bodyH = 0.f; static std::string payFor;
+  const std::string payKey = debriefTitle + "|" + contract.id + "|" + std::to_string(payout.size()) + "|" + std::to_string(total);
+  if (payKey != payFor) { payFor = payKey; payScroll = 0.f; }
+  const float payMax = std::max(0.f, bodyH - (bodyBot - bodyTop));
+  if (hovered(x, bodyTop, pw, bodyBot - bodyTop) && in.wheel != 0) { payScroll -= in.wheel * 48.f * s; in.wheel = 0; }
+  payScroll = std::clamp(payScroll, 0.f, payMax);
+  g_ren.uiClip(x, bodyTop - 2 * s, x + pw, bodyBot);
+  py = bodyTop - payScroll;
   auto row = [&](const std::string& k, const std::string& v) { g_ren.text(px, py, 16 * s, k, C_DIM, 1); g_ren.text(px + 230 * s, py, 16 * s, ellipsize(v, pw - 290 * s, 16 * s), C_TEXT, 1); py += 24 * s; };
   header(px, py, pw - 60 * s, "FLIGHT DATA"); py += 24 * s;
   if (result.landed) row("Touchdown", fmt("%.0f fpm", touchdownFpm));
@@ -2249,35 +2348,17 @@ void Game::drawDebrief() {
   }
   py += 10 * s;
   header(px, py, pw - 60 * s, "SETTLEMENT"); py += 24 * s;
-  // the foot of the panel, from the buttons up: the unsaved notice, the campaign's end, a new licence and the total stay
-  // put; the settlement's lines scroll (mouse wheel) in what is left above them (the review of v3.24.0, R9: eleven
-  // lines ran into the buttons)
-  const bool campaignEnd = career.finished && lastSuccess && contract.story && contract.id == g_story.back().id;
-  const auto campaignLines = campaignEnd ? wrap("You've completed the Solace Express campaign. Congratulations, Captain!", pw - 60 * s, 18 * s) : std::vector<std::string>();
-  const bool newLic = career.license > licenseBefore;
-  const float campY = (commitBlocked() ? y + ph - 108 * s : y + ph - 76 * s) - campaignLines.size() * 24 * s;
-  const float licY = campY - (newLic ? 34 * s : 0.f), totalY = licY - 34 * s;
-  const float rowsTop = py, rowsBot = rowsTop + std::max(1.f, floorf((totalY - 12 * s - rowsTop) / (24 * s))) * 24 * s;   // (whole lines: the wheel moves two)
-  int total = 0;
-  for (auto& l : payout) total += l.amount;
-  static float payScroll = 0.f; static std::string payFor;
-  const std::string payKey = debriefTitle + "|" + contract.id + "|" + std::to_string(payout.size()) + "|" + std::to_string(total);
-  if (payKey != payFor) { payFor = payKey; payScroll = 0.f; }
-  const float payMax = std::max(0.f, payout.size() * 24 * s - (rowsBot - rowsTop));
-  if (hovered(x, rowsTop, pw, rowsBot - rowsTop) && in.wheel != 0) { payScroll -= in.wheel * 48.f * s; in.wheel = 0; }
-  payScroll = std::clamp(payScroll, 0.f, payMax);
-  g_ren.uiClip(x, rowsTop - 2 * s, x + pw, rowsBot);
-  py = rowsTop - payScroll;
   for (auto& l : payout) {
     float vw = g_ren.text(x + pw - 30 * s, py, 16 * s, fmtMoney(l.amount), l.amount >= 0 ? C_GOOD : C_BAD, 1, 2);
     g_ren.text(px, py, 16 * s, ellipsize(l.label, pw - 80 * s - vw, 16 * s), C_TEXT, 1);
     py += 24 * s;
   }
+  bodyH = py + payScroll - bodyTop;
   g_ren.uiClipOff();
-  if (payMax > 0.f) {   // a thin bar at the panel's edge: where the view is in the lines
-    const float trackH = rowsBot - rowsTop, barH = std::max(20 * s, trackH * trackH / (trackH + payMax));
-    g_ren.rect(x + pw - 18 * s, rowsTop, 3 * s, trackH, C_ACCENT, 0.12f);
-    g_ren.rect(x + pw - 18 * s, rowsTop + (trackH - barH) * payScroll / payMax, 3 * s, barH, C_ACCENT, 0.7f);
+  if (payMax > 0.f) {   // a thin bar at the panel's edge: where the view is in the body
+    const float trackH = bodyBot - bodyTop, barH = std::max(20 * s, trackH * trackH / (trackH + payMax));
+    g_ren.rect(x + pw - 18 * s, bodyTop, 3 * s, trackH, C_ACCENT, 0.12f);
+    g_ren.rect(x + pw - 18 * s, bodyTop + (trackH - barH) * payScroll / payMax, 3 * s, barH, C_ACCENT, 0.7f);
   }
   g_ren.rect(px, totalY - 8 * s, pw - 60 * s, 1 * s, C_ACCENT, 0.5f);
   g_ren.text(px, totalY, 18 * s, "Total", C_TEXT, 1);

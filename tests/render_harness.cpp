@@ -22,6 +22,7 @@ static void* getProc(const char* n) { void* p = s_getProc((const unsigned char*)
 struct GameTest {
   static void drawUI(Game& g, const std::string& what) {
     g.realTime = 5; g.uiDt = 1.f;
+    if (getenv("UISCALE")) g.set.uiScale = (float)atof(getenv("UISCALE"));   // (the review's 140% checks)
     if (what == "controls") { g.hubTab = TAB_SETTINGS; g.settingsPage = 1; if (getenv("CAPTURE")) { g.bindCapture = ACT_GEAR; g.bindCaptureDev = 0; g.bindCaptureT = 3; } g.drawHub(); }
     else if (what == "settings") { g.hubTab = TAB_SETTINGS; g.settingsPage = 0; g.drawHub(); }
     else if (what == "pause") { g.drawPause(); }
@@ -34,13 +35,25 @@ struct GameTest {
       for (int i = 0; i < 11; i++) g.payout.push_back({lines[i], amt[i]});
       g.screen = SCR_DEBRIEF; g.drawDebrief();
     }
+    else if (what == "osprey_free") {   // the review of v3.31.0, U1: a CPL pilot owning only the Osprey, Free Flight MDB -> HFS
+      g.career.license = LIC_CPL; g.career.money = 50000; g.career.storyIndex = (int)g_story.size();
+      g.career.location = g_world.findAirport("MDB"); g.career.fleet.clear(); g.career.fleet.push_back({8, g.career.location, 1000, 1});
+      g.freeDest = g_world.findAirport("HFS");
+      g.hubTab = TAB_CONTRACTS; g.selContract = 0; g.selAircraft = -1;
+      for (int f = 0; f < 3; f++) {
+        if (f) { g_ren.uiEnd(); glClear(GL_COLOR_BUFFER_BIT); g_ren.uiBegin(); }
+        g.drawHub();
+      }
+      printf("osprey_free: selected aircraft %d (%s)\n", g.selAircraft, g.selAircraft >= 0 ? kAircraft[g.selAircraft].name : "-");
+    }
     else if (what.rfind("contracts_", 0) == 0) {   // a story job's briefing at ATP with one owned Starling at its airport (the review of v3.24.0, R1)
       const std::string id = what.substr(10);
       for (int i = 0; i < (int)g_story.size(); i++) if (g_story[i].id == id) g.career.storyIndex = i;
       const Contract* st = g.career.nextStory();
       g.career.license = LIC_ATP; g.career.money = 1000000; g.career.location = st ? st->from : 0;
       g.career.fleet.push_back({6, g.career.location, 1000, 1});
-      g.hubTab = TAB_CONTRACTS; g.selContract = 0; g.selAircraft = -1;
+      if (getenv("PVI")) { g.career.location = g_world.findAirport("PVI"); g.career.refreshBoard(); printf("board %zu jobs\n", g.career.board.size()); if (getenv("SELLAST")) g.selContract = 99; }
+      g.hubTab = TAB_CONTRACTS; if (!getenv("SELLAST")) g.selContract = 0; g.selAircraft = -1;
       for (int f = 0; f < 3; f++) {   // (the frame after the automatic choice adds its cost and fuel rows)
         if (f) { g_ren.uiEnd(); glClear(GL_COLOR_BUFFER_BIT); g_ren.uiBegin(); }
         g.drawHub();

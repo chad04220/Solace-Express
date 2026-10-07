@@ -387,6 +387,8 @@ private:
   float S() const;  // UI scale
   bool button(float x, float y, float w, float h, const std::string& label, bool enabled = true, bool highlight = false);
   bool hovered(float x, float y, float w, float h) const;
+  // a scrolling region being drawn: the pointer outside it hovers nothing there (a control scrolled out of view takes no clicks)
+  bool hitClipOn = false; float hitClip[4] = {0, 0, 0, 0};
   // E5.4: keyboard / D-pad focus through the menus. Every enabled button registers itself for the frame; the arrow
   // keys (outside flight) and the D-pad move the focus to the nearest button in that direction, Enter / Space / A
   // press it. Moving the mouse hands control back to the cursor.
