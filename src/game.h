@@ -83,9 +83,7 @@ public:
   std::function<void()> platformPresent;   // swaps the window's buffers and answers its messages (platform_win32 sets it): a frame shown from inside a long bake
   int monitorHz = 60;            // the display's refresh rate (the platform layer sets it)
   bool wantPacing = false;       // the frame-rate target changed: the platform layer re-applies its pacing
-  // the pre-rendered menu montage (Windows: menu_video_win.cpp): returns the texture to show at this time, or 0 to
-  // render the montage live; and sceneOnly, set while recording it (the scene without the menu on top)
-  std::function<unsigned(float)> menuVideo;
+  // sceneOnly: the scene without the menu on top (captures of the menu's scenery)
   bool sceneOnly = false;
   void focusLost() { if (screen == SCR_FLIGHT && !crashed) paused = true; }   // the window lost focus: a flight pauses
   Settings set;
@@ -206,6 +204,7 @@ private:
   float approachMinAgl = 1e9f;
   float thrPrevAlong = -1e9f; bool appLow = false, appHigh = false;   // arrival recording (updateFlight): threshold crossing, go-arounds
   bool parkingBrake = true;
+  void settleAirborneStart();   // a start in the air: gear stowed (where it retracts), every brake released
   std::string coaching;   // the debrief's one coaching point (endFlight)
 
   // effects

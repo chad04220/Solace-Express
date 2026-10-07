@@ -17,7 +17,6 @@
 #include <mutex>
 #include "game.h"
 #include "load_pacer.h"
-#include "menu_video_win.h"
 
 // Ask hybrid-graphics laptops for the dedicated GPU: the integrated one may reject or take minutes over the big scene shaders
 extern "C" {
@@ -536,7 +535,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   // side, the career and the aircraft performance, the renderer's textures, the menu, then every aircraft's meshes
   const std::string cmdLine = GetCommandLineA();
   // (--raster, from older scripts, is accepted and ignored: there is one renderer)
-  const bool tool = cmdLine.find("--bench ") != std::string::npos || cmdLine.find("--shots ") != std::string::npos || cmdLine.find("--profile ") != std::string::npos || cmdLine.find("--analyze") != std::string::npos || cmdLine.find("--loadshots") != std::string::npos || cmdLine.find("--menuvideo") != std::string::npos;
+  const bool tool = cmdLine.find("--bench ") != std::string::npos || cmdLine.find("--shots ") != std::string::npos || cmdLine.find("--profile ") != std::string::npos || cmdLine.find("--analyze") != std::string::npos || cmdLine.find("--loadshots") != std::string::npos;
   auto exists = [](const std::string& p) { return !p.empty() && GetFileAttributesA(p.c_str()) != INVALID_FILE_ATTRIBUTES; };
   g_ren.checkMeshCache();
   const bool worldFresh = !exists(worldCache), perfFresh = game.cacheDir.empty() || !exists(game.cacheDir + "\\perf.bin");
@@ -1075,57 +1074,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       return 0;
     }
   }
-  // The menu montage as a video: SolaceExpress.exe --menuvideo [--kbps N] renders the whole montage loop (8 shots,
-  // 128 s) offline at 1920x1080 and 30 fps, every frame with its scenery complete, and encodes it to menu.mp4 next to
-  // the exe (H.264, 5 Mbps by default: about 80 MB). The main menu then plays that instead of rendering the montage live.
-  {
-    std::string cl = GetCommandLineA();
-    if (cl.find("--menuvideo") != std::string::npos) {
-      int kbps = 5000; size_t kb = cl.find("--kbps "); if (kb != std::string::npos) kbps = std::clamp(atoi(cl.c_str() + kb + 7), 500, 40000);
-      if (g_fullscreen) toggleFullscreen();
-      RECT wr = {0, 0, 1920, 1080}; AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
-      SetWindowPos(g_hwnd, nullptr, 0, 0, wr.right - wr.left, wr.bottom - wr.top, SWP_NOMOVE | SWP_NOZORDER);
-      MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
-      RECT rc; GetClientRect(g_hwnd, &rc);
-      if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
-      const int fps = 30, frames = 128 * fps;   // the montage's loop: 8 shots of 16 s, each fading through black
-      std::string path = game.assetDir + "\\menu.mp4", tmp = game.assetDir + "\\menu_rendering.mp4";
-      DeleteFileA(tmp.c_str());
-      MenuVideoWriter vw;
-      int w = g_ren.W & ~1, h = g_ren.H & ~1;
-      if (!vw.open(tmp, w, h, fps, kbps)) { MessageBoxA(g_hwnd, ("Could not record the menu video: " + vw.error).c_str(), "Solace Express", MB_OK); return 1; }
-      g_ren.entSync = true;   // every frame with its scenery complete
-      Game* g = new Game();
-      g->saveDir = game.saveDir; g->assetDir = game.assetDir;
-      g->initHeadless(); g->iconTex = iconTex; g->debugScene("menuT0"); g->sceneOnly = true;
-      std::vector<uint8_t> px((size_t)g_ren.W * g_ren.H * 3), fr((size_t)w * h * 3);
-      LARGE_INTEGER f0, f1, fq; QueryPerformanceFrequency(&fq); QueryPerformanceCounter(&f0);
-      bool ok = true;
-      for (int i = 0; i < frames && ok; i++) {
-        while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { if (m.message == WM_QUIT) game.quit = true; TranslateMessage(&m); DispatchMessageW(&m); }
-        if (game.quit) { ok = false; break; }
-        g->update(1.f / fps); g->render();
-        glFinish();
-        glPixelStorei(GL_PACK_ALIGNMENT, 1);
-        glReadPixels(0, 0, g_ren.W, g_ren.H, GL_RGB, GL_UNSIGNED_BYTE, px.data());
-        for (int y = 0; y < h; y++) memcpy(&fr[(size_t)y * w * 3], &px[(size_t)y * g_ren.W * 3], (size_t)w * 3);
-        ok = vw.write(fr.data());
-        SwapBuffers(g_hdc);
-        if (i % 15 == 0) {
-          QueryPerformanceCounter(&f1);
-          double el = (double)(f1.QuadPart - f0.QuadPart) / fq.QuadPart, left = el / (i + 1) * (frames - i - 1);
-          SetWindowTextA(g_hwnd, ("Solace Express - rendering the menu video: frame " + std::to_string(i + 1) + " / " + std::to_string(frames) +
-                                  "  (about " + std::to_string((int)(left / 60.0 + 0.5)) + " min left)").c_str());
-        }
-      }
-      delete g;
-      ok = vw.finish() && ok;
-      if (ok) { DeleteFileA(path.c_str()); ok = MoveFileA(tmp.c_str(), path.c_str()) != 0; }
-      else DeleteFileA(tmp.c_str());
-      if (!ok && !game.quit) MessageBoxA(g_hwnd, "Recording the menu video failed.", "Solace Express", MB_OK);
-      return ok ? 0 : 1;
-    }
-  }
   // Development captures: SolaceExpress.exe --shots scene1,scene2,... [--size 1920x1080] renders each debug scene
   // (see Game::debugScene) with all scenery generated up front and saves shots\<scene>.png next to the exe.
   {
@@ -1165,9 +1113,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       return 0;
     }
   }
-  // the pre-rendered menu montage, when render_menu.bat has made one (or it shipped with the game)
-  MenuVideoPlayer menuVideo;
-  if (menuVideo.open(game.assetDir + "\\menu.mp4")) game.menuVideo = [&menuVideo](float t) { return menuVideo.frame(t); };
+  // (the menus render their scenes live: a menu.mp4 left from an older version is not played)
   startAudio();
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) { fprintf(f, "Audio: %s\n", audioBackendName()); fclose(f); }
 

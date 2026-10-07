@@ -7,7 +7,6 @@ rem
 rem   diagnostics.bat           the full run (below)
 rem   diagnostics.bat quick     the benchmarks and the system report only (about 3 minutes)
 rem   diagnostics.bat shots     the screenshots only
-rem   diagnostics.bat menu      renders the main-menu video (menu.mp4) on your GPU; add a bit rate in kbit/s (default 5000)
 rem   diagnostics.bat loading   renders the loading-screen pictures (the "loading" folder) on your GPU
 rem
 rem The full run:
@@ -35,7 +34,6 @@ if exist VERSION.txt set /p VER=<VERSION.txt
 set SCENES=menu,air,storm,night,cockpit,hud,hub1
 set RSCENES=research10,research20,research40,rjet,wr_8_0_0_0_1,rjetc,ckv11_0_-10_12,ufo13_0
 set MODE=%~1
-if /i "%MODE%"=="menu" goto menu
 if /i "%MODE%"=="loading" goto loading
 set OUT=diagnostics
 if exist "%OUT%" rmdir /s /q "%OUT%"
@@ -121,14 +119,6 @@ echo.
 echo Done. Send over:  %~dp0diagnostics_%VER%.zip
 echo (the "diagnostics" folder next to the exe holds the same files, unzipped)
 start "" "%~dp0%OUT%"
-pause
-exit /b 0
-
-:menu
-rem the main-menu montage (8 shots, a 128 second loop) rendered at 1920x1080 and 30 fps with its scenery complete, saved
-rem as menu.mp4 next to the exe; the menu then plays the video instead of rendering the montage live
-if "%~2"=="" (start "" /wait SolaceExpress.exe --menuvideo) else (start "" /wait SolaceExpress.exe --menuvideo --kbps %~2)
-if exist menu.mp4 (echo Done: menu.mp4 is next to SolaceExpress.exe.) else (echo The menu video was not made.)
 pause
 exit /b 0
 

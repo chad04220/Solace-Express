@@ -758,6 +758,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   takeoffAnnounced = c.startAirborne; touchedDown = false; touchdownFpm = 0; stillTimer = 0; tdRunway = -2;   // (an airborne start has no takeoff to announce)
   engineAutoStarted = false; startDelay = 1.2f;
   parkingBrake = !c.startAirborne;   // a start on the ground is parked: the brake is released to roll
+  if (!plane.onGround) settleAirborneStart();
   particles.clear(); bursts.clear(); pops.clear(); boomT = -1; for (auto& tt : pieceTrail) tt.clear(); trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0;
   lightning = 0; nextLightning = 6; thunderDelay = -1;
   landingLight = true;
@@ -1588,6 +1589,7 @@ void Game::launchResearch() {
     vec3 p = plane.pos + a.dir() * 1500.f; p.y = std::max(a.elev, g_world.height(p.x, p.z)) + 900.f;
     plane.reset(&kAircraft[resCraft], p, plane.heading(), kAircraft[resCraft].maxFuel, 85, true, 200.f);
     plane.ctl.throttle = 0.7f; takeoffAnnounced = true;
+    settleAirborneStart();   // (startFlight parked it for a start on the ground)
     camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 4, 26));
   } else if (wr) toast("F/V tilts the four thruster pods: full down for vertical takeoff", vec3(0.7f, 0.9f, 1));
   prevMach = 0;
@@ -2332,6 +2334,14 @@ std::vector<std::pair<int, bool>> Game::prewarmItems(bool allCraft) {
 std::string Game::prewarmLabel(int craft, bool inside, bool fresh) {
   return std::string(fresh ? "Building the " : "Loading the ") + kAircraft[craft].name + (inside ? " cockpit's mesh" : "'s mesh") + (fresh ? "  (once: kept for the next launch)" : "  from the cache");
 }
+// A start in the air (a career leg that opens airborne, an airborne research sortie): the gear up where it retracts, the
+// parking brake and the wheel brakes off, so nothing holds the aircraft back or hangs out in the wind from the first frame
+void Game::settleAirborneStart() {
+  parkingBrake = false;
+  plane.ctl.brake = 0.f; plane.brakeHold = 0;
+  if (plane.spec && plane.spec->retract) { plane.ctl.gearDown = false; plane.gear = 0.f; }
+}
+
 void Game::prewarm(const std::function<void(float, const std::string&)>& progress, bool allCraft, LoadPacer* pace, int menuStep, const std::vector<int>* itemSteps) {
   if (screen != SCR_MENU) return;
   bool sync = g_ren.entSync;
@@ -3098,10 +3108,10 @@ void Game::update(float dt) {
 }
 
 void Game::render() {
-  // the main menu's and the career hub's montage from the pre-rendered video when there is one (those screens then
-  // cost next to nothing). The research menu stays live: its preview is the sortie's own airport, so the scenery the
-  // flight opens with streams in while the player chooses
-  unsigned vid = (screen == SCR_MENU || screen == SCR_HUB) && menuVideo && !sceneOnly ? menuVideo(realTime) : 0;
+  // every menu draws its scene live (the main menu's tour, the hub's airport, the research terminal's preview): the
+  // scenery a flight opens with streams in while the player chooses. vid: a full-screen picture instead of the scene
+  // (the research terminal's boot screen)
+  unsigned vid = 0;
   FrameParams fp;
   // the research terminal warming up: its first frame is the boot screen alone (nothing of the scene, so it is on the
   // screen the instant the combo is held); the frames after it draw the preview, which streams the airport and bakes

@@ -297,6 +297,19 @@ struct GameTest {
       pad(0, 0); g.in.pad = false; g.update(dt); g.paused = false;
       g.botControl = true;
     }
+    // ---- a start in the air: gear stowed and every brake off, a research sortie's too (startFlight parks it first)
+    {
+      Game r; r.initHeadless(); r.botControl = true;
+      bool ok = true;
+      for (int craft : {kResearchJet, kWraith}) {
+        r.resCraft = craft; r.resAirborne = true; r.launchResearch();
+        r.update(1.f / 60.f);
+        bool good = !r.parkingBrake && r.plane.ctl.brake == 0.f && !r.plane.onGround && (!r.plane.spec->retract || (!r.plane.ctl.gearDown && r.plane.gear < 0.01f));
+        printf("Airborne research start (%s): parking brake %d, brake %.1f, gear %.2f lever %s: %s\n", r.plane.spec->name, r.parkingBrake, r.plane.ctl.brake, r.plane.gear, r.plane.ctl.gearDown ? "down" : "up", good ? "ok" : "FAIL");
+        ok = ok && good;
+      }
+      fails += !ok;
+    }
     // ---- low frame rates keep simulated time: 5 s of 5 fps frames is 5 s of flight
     {
       g.startFlight(g_story[0], 0, Career::SRC_LESSON);

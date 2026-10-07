@@ -188,6 +188,7 @@ void main(){
   // ---- a render server: everything loaded once (the context, the shaders, the islands, the textures, the aircraft
   // meshes, and the scenery as it is generated), then one shot per request. Requests are lines on a named pipe
   // (SERVE_REQ, default /tmp/claude-0/sp/rs.req): "<scene> [frames=N] [taam=N] [bench=N] [dbgoff=N] [out=path]";
+  // (settle=N: N frames a 240th of a second apart, the anti-aliasing settling as for the loading pictures)
   // each reply ("ok <path> <seconds>") goes to SERVE_REP (/tmp/claude-0/sp/rs.rep). tools/render_client.sh sends one.
   if (scene == "serve") {
     if (!perfCached && !cacheDir.empty()) { for (int i = 0; i < kNumAircraft; i++) Plane::perf(&kAircraft[i]); Plane::perfSave(cacheDir + "/perf.bin", cacheStamp); }
@@ -209,12 +210,12 @@ void main(){
         auto t0 = std::chrono::steady_clock::now();
         std::vector<std::string> tok; for (size_t a = 0, b2; a < r.size(); a = b2 + 1) { b2 = r.find(' ', a); if (b2 == std::string::npos) b2 = r.size(); if (b2 > a) tok.push_back(r.substr(a, b2 - a)); }
         std::string sc = tok[0], out = "/tmp/claude-0/sp/shot_" + sc + ".ppm";
-        int frames = 0, taam = 0, bench = 0;
+        int frames = 0, taam = 0, bench = 0, settle = 0;
         g_ren.dbgOff = 0;
         for (size_t k = 1; k < tok.size(); k++) {
           size_t e = tok[k].find('='); if (e == std::string::npos) continue;
           std::string key = tok[k].substr(0, e), v = tok[k].substr(e + 1);
-          if (key == "frames") frames = atoi(v.c_str()); else if (key == "taam") taam = atoi(v.c_str()); else if (key == "bench") bench = atoi(v.c_str());
+          if (key == "frames") frames = atoi(v.c_str()); else if (key == "taam") taam = atoi(v.c_str()); else if (key == "bench") bench = atoi(v.c_str()); else if (key == "settle") settle = atoi(v.c_str());
           else if (key == "dbgoff") g_ren.dbgOff = atoi(v.c_str()); else if (key == "out") out = v;
         }
         g_ren.resetTemporal();
@@ -223,6 +224,7 @@ void main(){
         for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
         for (int i = 0; i < taam; i++) { g->update(1.f / 60.f); g->render(); }
         for (int i = 0; i < frames; i++) g->render();
+        for (int i = 0; i < settle; i++) { g->update(1.f / 240.f); g->render(); }   // (the loading pictures: the TAA settles, barely moving)
         glFinish();
         std::string extra;
         if (bench > 0) {
