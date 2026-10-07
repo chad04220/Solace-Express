@@ -141,7 +141,10 @@ public:
   // aerobatic figures the autopilot flies (aircraft_stunt.cpp), each sized to this airframe's envelope
   enum Stunt { STUNT_LOOP = 0, STUNT_ROLL, STUNT_BARREL, STUNT_IMMELMANN, STUNT_SPLIT_S, STUNT_CUBAN, STUNT_WINGOVER, STUNT_COUNT };
   static const char* stuntName(int figure);
-  enum ApStage { APS_NAV = 0, APS_FINAL, APS_FLARE, APS_ROLLOUT, APS_GOAROUND, APS_HOVER };
+  enum ApStage { APS_NAV = 0, APS_FINAL, APS_FLARE, APS_ROLLOUT, APS_GOAROUND, APS_HOVER, APS_BLEED };
+  // (APS_BLEED: the research craft come down the final fast and, a few km out, rear up belly-first into the airflow -
+  // throttle closed, nose 70 deg up - to shed the speed, then drop the nose back onto the glidepath)
+  int apBleedPhase = 0; bool apBled = false; float apBleedT = 1e9f;   // (pitching up / nose back down; done this approach; s since)
   bool apOn = false; int apMode = AP_OFF;
   float apHeading = 0, apAlt = 0, apSpeed = 0, apVS = 0; bool apUseVS = false;
   float apPitchI = 0, apRollI = 0, apThrI = 0.5f, apXI = 0, apGamI = 0, apTrimEst = 0, apFlareTau = 0, apFlareVs = 0, apGustAdd = 0;
@@ -213,6 +216,7 @@ private:
   float apPitchLag() const;  // how long this airframe's pitch takes to answer at this speed (s)
   float apPlan(int airport, bool rev, const Weather& wx, bool commit);
   void apHover(float dt);
+  void apBellyUp(float dt);   // the research craft's speed-shedding pitch-up on the final (APS_BLEED)
   void wraithThrust(vec3& F, vec3& T, float podThrust, vec3 wd, vec3 Taero, vec3 surfMax, float dt);
   vec3 gust;
   float cd0 = 0.03f;

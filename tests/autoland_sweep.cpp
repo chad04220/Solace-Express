@@ -69,6 +69,7 @@ int main(int argc, char** argv) {
             }
             if (p.apStage == Plane::APS_GOAROUND && last != Plane::APS_GOAROUND) goArounds++;
             if (getenv("APDBG") && !td && p.apStage == Plane::APS_FINAL && p.pos.y - p.gearHeight() - A.elev < 45.f && (k % 15) == 0) printf("    final: %.1f m up, vs %.2f (asked %.2f), ias %.1f, pitch %.1f, throttle %.2f\n", p.pos.y - p.gearHeight() - A.elev, p.vel.y, p.apVS, p.ias, p.pitchDeg(), p.ctl.throttle);
+            if (getenv("APDBG") && p.apStage == Plane::APS_BLEED && (k % 15) == 0) printf("    belly-up: %.1f m up, pitch %.0f, ias %.1f, vs %.1f, g %.1f\n", p.pos.y - p.gearHeight() - A.elev, p.pitchDeg(), p.ias, p.vel.y, p.gLoad);
             if (getenv("APDBG") && !td && p.apStage == Plane::APS_FLARE && (k % 15) == 0) printf("    flare: %.1f m up, vs %.2f, ias %.1f, pitch %.1f\n", p.pos.y - p.gearHeight() - A.elev, p.vel.y, p.ias, p.pitchDeg());
             if (getenv("APDBG") && td && (k % 60) == 0 && length(vec3(p.vel.x, 0, p.vel.z)) > 3.f) printf("    rollout: %.1f m/s, brake %.2f, on ground %d, throttle %.2f\n", length(vec3(p.vel.x, 0, p.vel.z)), p.ctl.brake, (int)p.onGround, p.ctl.throttle);
             if (getenv("APTRACE") && (p.apStage != last || (k % 600) == 0)) { vec3 r = p.pos - p.apTd; printf("    t %4.0f stage %d leg %d along %6.0f cross %6.0f agl %5.0f above field %5.0f  %s\n", k / 60.f, p.apStage, p.apLeg, dot(r, p.apLd), dot(r, vec3(-p.apLd.z, 0, p.apLd.x)), p.pos.y - g_world.height(p.pos.x, p.pos.z), p.pos.y - A.elev, p.apStatus.c_str()); }

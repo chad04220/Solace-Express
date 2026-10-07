@@ -704,7 +704,7 @@ void Plane::apEngage(int mode, int airport, const Weather& wx) {
   float spd0 = ias > 1.f ? ias : length(vel);
   apHeading = heading(); apAlt = pos.y; apSpeed = std::max(spd0, spec->vref * 1.3f);
   apPitchI = 0; apRollI = 0; apThrI = ctl.throttle; apXI = 0; apGamI = 0; apTrimEst = ctl.pitch; apUseVS = false;
-  apAirport = airport; apStage = APS_NAV; apStageT = 0; apLeg = 0; apTurnDir = 0; apClimbDir = 0;
+  apAirport = airport; apStage = APS_NAV; apStageT = 0; apLeg = 0; apTurnDir = 0; apClimbDir = 0; apBled = false; apBleedT = 1e9f;
   apDecline.clear();
   if (mode >= AP_NAV && airport >= 0) {
     // runway end: the better of the two plans (terrain on the approach, headwind, how far away it is, and whether the
@@ -1024,7 +1024,19 @@ void Plane::apGuidance(float dt) {
       }
       if (dist < F + 1500.f || high) ctl.gearDown = true;
       apSpeed = (dist > F ? vref * 1.3f : dist > F * 0.5f ? vref * 1.18f : vref * 1.06f) + apGustAdd;
-      if (dist < 2000.f && dist > 250.f && (fabsf(cross) > std::min(80.f, std::max(a.width * 0.5f, 12.f) + dist * 0.03f) || err > 40.f || err < -80.f)) {
+      // the research craft: down the final fast, then the belly-up to shed it (below); a second approach after a go-around
+      // too. (A go-around's climb resets it: apBled is cleared there)
+      const bool research = (int)(spec - kAircraft) >= kNumAircraft;
+      apBleedT += dt;
+      if (research && !apBled) {
+        apSpeed = std::max(apSpeed, vref * 1.7f);
+        if (dist < 4000.f && dist > 1800.f && hab > 80.f && fabsf(cross) < 60.f && ias > vref * 1.35f) {
+          apStage = APS_BLEED; apStageT = 0; apBleedPhase = 0; apBled = true;
+          if (getenv("APDBG")) printf("  belly-up at %.0f m: %.0f m up, ias %.1f (vref %.1f)\n", dist, hab, ias, vref);
+          break;
+        }
+      }
+      if (dist < 2000.f && dist > 250.f && (fabsf(cross) > std::min(80.f, std::max(a.width * 0.5f, 12.f) + dist * 0.03f) || err > 40.f || (err < -80.f && apBleedT > 12.f))) {   // (high just after the belly-up: it comes down steeply)
         if (getenv("APDBG")) printf("  go-around at %.0f m: cross %.0f, %.0f m %s the glidepath\n", dist, cross, fabsf(err), err > 0.f ? "below" : "above");
         apStage = APS_GOAROUND; apStageT = 0;
       }
@@ -1038,7 +1050,7 @@ void Plane::apGuidance(float dt) {
       // the XR-40 comes to a hover over the touchdown point instead of a fast landing roll (starting to slow where it
       // can stop at a gentle 2 m/s^2 - the hover allows twice that - from the ground speed it has, tailwind included)
       float gsAl = std::max(vel.x * ld.x + vel.z * ld.z, 0.f);
-      if (s.special == 2 && dist < clampf(gsAl * gsAl / 4.f + 200.f, 1700.f, 6000.f) && dist > 0.f && fabsf(cross) < 60.f) { apStage = APS_HOVER; apStageT = 0; apThrI = ctl.throttle; }
+      if (s.special == 2 && (apBled || (int)(spec - kAircraft) < kNumAircraft) && apStage == APS_FINAL && dist < clampf(gsAl * gsAl / 4.f + 200.f, 1700.f, 6000.f) && dist > 0.f && fabsf(cross) < 60.f) { apStage = APS_HOVER; apStageT = 0; apThrI = ctl.throttle; }
       // flare height: enough for this airframe to rotate in time (a heavy one answers the elevator slowly)
       float lag = apPitchLag();
       float flareH = clampf(std::max(ias * 0.13f, -vel.y * (1.6f + 1.8f * lag)), 4.f, 30.f);
@@ -1089,6 +1101,18 @@ void Plane::apGuidance(float dt) {
         apDisengage(); apDone = true; apOverrun = !onRwy; ctl.brake = 1; apStatus = onRwy ? "AUTOLAND COMPLETE" : "AUTOLAND  STOPPED PAST THE RUNWAY";
       }
       break;
+    case APS_BLEED: {   // the belly-up (flown in apControl): rear up, then nose back down onto the glidepath
+      apHeading = rwyHdg - apDrift; apSpeed = 0;
+      ctl.gearDown = true;
+      // (over at 68 deg, or slow enough - or climbing hard: a conventional airframe, its pull held to the g limit, turns
+      // the speed into height instead of drag - the XR-10 zoomed 200 m and had to go round; the fly-by-wire jets snap up
+      // fast enough to stall the wing and go flat against the air)
+      if (apBleedPhase == 0 && (pitchDeg() > 68.f || ias < vref * 1.1f || vel.y > 18.f || apStageT > 4.f)) apBleedPhase = 1;
+      // (back to the final once the nose is down at the glidepath's attitude; too low for any of it, at once)
+      if ((apBleedPhase == 1 && pitchDeg() < 4.f) || hab < 35.f || apStageT > 12.f) { apStage = APS_FINAL; apStageT = 0; apBleedT = 0; apXI = 0; apGamI = 0; }
+      apStatus = fmt("APPR  %s  RWY %02d  BELLY UP  %.0f kt", a.code, rwyN, ias * MS_TO_KT);
+      break;
+    }
     case APS_HOVER: {
       float vAl = vel.x * ld.x + vel.z * ld.z;
       apStatus = fmt("VTOL  %s  RWY %02d  %.0f m  %.0f kt", a.code, rwyN, std::max(dist, 0.f), fabsf(vAl) * MS_TO_KT);
@@ -1096,6 +1120,7 @@ void Plane::apGuidance(float dt) {
       break;
     }
     case APS_GOAROUND:
+      apBled = false;   // (the next approach comes down fast and sheds it again)
       apHeading = rwyHdg; apUseVS = true; apVS = jet ? 9.f : 4.f; apSpeed = vref * 1.35f;
       ctl.flaps = 0.34f;
       if (apStageT > 8.f && s.retract) ctl.gearDown = false;
@@ -1167,6 +1192,24 @@ void Plane::apRates(float qT, float pT, float rollCap, float nzMin, float nzMax,
   ctl.yaw = fbw ? clampf(G0 * tilt / spd / 1.4f, -1.f, 1.f) : clampf(beta * 2.f + rErr * 1.5f * qn, -0.6f, 0.6f);
 }
 
+// The belly-up: throttle closed, wings level, the nose pulled up as hard as the structure takes to ~70 deg - the whole
+// underside square to the airflow, a barn door of drag - and then pushed back down, unloaded, to the glidepath's
+// attitude. A research craft's way to shed 70 knots in a few seconds (the career types slow down on the throttle).
+void Plane::apBellyUp(float dt) {
+  const PerfModel& P = perf(spec);
+  const float spd = std::max(length(vel), 1.f), V = std::max(ias, 15.f);
+  const float nzMax = std::max(P.gLimit * 0.85f, 1.5f), nzMin = std::max(P.gNeg * 0.8f, -1.5f);
+  const float pitch = pitchDeg(), bank = bankDeg();
+  float rollCap = (spec->special ? fbwRollMax(0.f) : P.rollRate * clampf(V / spec->cruise, 0.25f, 2.f)) * 0.95f;
+  const float pT = clampf(-bank * DEG * 3.f, -rollCap, rollCap);
+  float qT;
+  if (apBleedPhase == 0) qT = std::min(G0 * nzMax / spd, 1.6f);            // rear up: all the pitch rate the g allows
+  else qT = clampf((2.f - pitch) * DEG * 1.2f, -1.4f, 0.2f);               // nose back down to the horizon, unloaded
+  apRates(qT, pT, rollCap, nzMin, nzMax, dt);
+  ctl.throttle = 0.f; apThrI = 0.f;
+  if (spec->special == 0) ctl.flaps = 0.f;
+}
+
 void Plane::apControl(float dt) {
   const AircraftSpec& s = *spec;
   bool fbw = s.special != 0;
@@ -1191,6 +1234,7 @@ void Plane::apControl(float dt) {
   if (apMode == AP_APPR && apStage == APS_HOVER) { apHover(dt); return; }
   if (onGround) return;
   if (apMode == AP_STUNT && apStuntFly(dt)) return;
+  if (apMode == AP_APPR && apStage == APS_BLEED) { apBellyUp(dt); return; }
   // The pilot flies to the edge of what this aircraft can do (its learned envelope, Plane::perf): the load factor it
   // commands is bounded only by the structure (less what the gusts can add) and by the stall at this speed, the
   // bank by that load factor, the roll rate by the airframe's own. Close to the ground on an approach it stays sane:
