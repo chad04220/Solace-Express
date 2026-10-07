@@ -515,30 +515,40 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
   auto step = [&]() { if (done) done->fetch_add(1); };
   std::string vsFS = kFullscreenVS;
   std::string hdr = "#version 330 core\n";
+  setCompileStage("scenery objects");
   progEnt = program(hdr + kEntVS, hdr + kEntFS1 + kEntFS2, error); step();
   progEntSh = program(hdr + kEntVS, hdr + kEntFS1 + kEntShadowFS, error); step();
   if (!progEnt || !progEntSh) { error = "Entity shader: " + error; return false; }
+  setCompileStage("particles and sprites");
   progSprite = program(kSpriteVS, kSpriteFS, error); step();
+  setCompileStage("bloom and light shafts");
   progDown = program(vsFS, kDownFS, error); step();
   progUp = program(vsFS, kUpFS, error); step();
   progRayMask = program(vsFS, kRayMaskFS, error); step();
   progRay = program(vsFS, kRayFS, error); step();
   progFeedRays = program(vsFS, kFeedRaysFS, error); step();
+  setCompileStage("post-processing and anti-aliasing");
   progPost = program(vsFS, kPostFS, error); step();
   progTAA = program(vsFS, kTaaFS, error); step();
   if (!progSprite || !progDown || !progUp || !progRayMask || !progRay || !progPost || !progTAA) { error = "Shader: " + error; return false; }
   {   // the programs built on the shared scene library (shaders.h worldLibAssembly), each with its own main: the GPS
     // aerial imagery, the terrain-shadow bake, the clouds, the hull and mesh bakes, the cockpit display atlases
     std::string ms = worldLibAssembly(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "");
+    setCompileStage("the GPS map");
     progMap = program(vsFS, ms + kMapMain, error); step();
+    setCompileStage("terrain shadows");
     { std::string e; progTShBake = program(vsFS, ms + kTShBakeMain, e); step(); }   // optional: without it the terrain casts no sun shadow
+    setCompileStage("clouds");
     { std::string e; progClouds = program(vsFS, ms + kCloudMain, e); step(); }       // optional: without them no clouds
     { std::string e; progCloudComp = program(vsFS, kCloudCompFS, e); step(); }
     if (!progMap) { error = "Map shader: " + error; return false; }
+    setCompileStage("the aircraft mesh builder");
     compileHull(vsFS, worldLibAssembly(std::string(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + "#define PART_BAKE\n") + kHullBakeMain); step();   // (the bake alone evaluates a part by its id: PART_BAKE)
+    setCompileStage("cockpit displays");
     progDisp = program(vsFS, ms + kDispMain, error); step();
     // not fatal: without it the cockpit screens stay dark, but the game still runs (the error goes to startup.log)
     if (!progDisp) { dispError = error; error.clear(); }
+    setCompileStage("the renderer: aircraft, terrain, water and lighting");
     if (!compileRaster()) return false;   // (the renderer itself: its error names the program)
     step(); step(); step();
   }

@@ -16,6 +16,7 @@
 #include <memory>
 #include <mutex>
 #include "game.h"
+#include "load_pacer.h"
 #include "menu_video_win.h"
 
 // Ask hybrid-graphics laptops for the dedicated GPU: the integrated one may reject or take minutes over the big scene shaders
@@ -466,6 +467,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     };
     if (!writable(dir)) { dir = game.saveDir + "\\shadercache"; if (!writable(dir)) dir.clear(); }
     g_shaderCacheDir = dir;
+    game.cacheDir = dir;
+    // this build's stamp (the exe's size and time): what the launch caches beside the shaders (the islands, the aircraft
+    // performance) is kept for this build only, and any other build makes it again
+    WIN32_FILE_ATTRIBUTE_DATA fa;
+    if (n && GetFileAttributesExA(exe, GetFileExInfoStandard, &fa)) {
+      char b[64]; snprintf(b, sizeof b, "%08lx%08lx-%08lx%08lx", fa.nFileSizeHigh, fa.nFileSizeLow, fa.ftLastWriteTime.dwHighDateTime, fa.ftLastWriteTime.dwLowDateTime);
+      game.buildStamp = b;
+    }
     WIN32_FIND_DATAA fd; HANDLE h = dir.empty() ? INVALID_HANDLE_VALUE : FindFirstFileA((dir + "\\*.bin").c_str(), &fd);
     cached = h != INVALID_HANDLE_VALUE; if (cached) FindClose(h);
   }
@@ -514,7 +523,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   }
   std::atomic<int> progDone{0}, compileState{0};   // state: 0 running, 1 ok, 2 failed
   std::atomic<bool> worldDone{false};
-  std::thread worldThread([&] { g_world.build(); worldDone = true; });
+  const std::string worldCache = game.cacheDir.empty() || game.buildStamp.empty() ? std::string() : game.cacheDir + "\\world.bin";
+  std::thread worldThread([&] { g_world.build(worldCache, game.buildStamp); worldDone = true; });
   // the first-time compile runs in a child process (see buildShaderCacheChild); this process then loads the results
   PROCESS_INFORMATION child = {};
   std::atomic<int> childDone{-1}, childMisses{0};
@@ -522,6 +532,25 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   const std::string stampPath = g_shaderCacheDir.empty() ? std::string() : g_shaderCacheDir + "\\stamp.txt", stamp = shaderCacheStamp();
   bool cacheCurrent = false;
   if (!stampPath.empty()) if (FILE* f = fopen(stampPath.c_str(), "r")) { char b[32] = {}; cacheCurrent = fscanf(f, "%31s", b) == 1 && stamp == b; fclose(f); }
+  // ---- the launch's steps, paced by what each took last time (load_pacer.h): the shaders and the islands side by
+  // side, the career and the aircraft performance, the renderer's textures, the menu, then every aircraft's meshes
+  const std::string cmdLine = GetCommandLineA();
+  // (--raster, from older scripts, is accepted and ignored: there is one renderer)
+  const bool tool = cmdLine.find("--bench ") != std::string::npos || cmdLine.find("--shots ") != std::string::npos || cmdLine.find("--profile ") != std::string::npos || cmdLine.find("--analyze") != std::string::npos || cmdLine.find("--loadshots") != std::string::npos || cmdLine.find("--menuvideo") != std::string::npos;
+  auto exists = [](const std::string& p) { return !p.empty() && GetFileAttributesA(p.c_str()) != INVALID_FILE_ATTRIBUTES; };
+  g_ren.checkMeshCache();
+  const bool worldFresh = !exists(worldCache), perfFresh = game.cacheDir.empty() || !exists(game.cacheDir + "\\perf.bin");
+  LoadPacer pace;
+  pace.load(g_shaderCacheDir.empty() ? std::string() : g_shaderCacheDir + "\\load_times.txt");
+  const int stStart = pace.add("start", "start", !cacheCurrent || worldFresh, cacheCurrent ? 3.f : 60.f);
+  const int stInit = pace.add("career", "career", perfFresh, perfFresh ? 2.f : 0.3f);
+  const int stTex = pace.add("renderer", "renderer", false, 1.5f);
+  const int stMenu = pace.add("menu", "menu", false, 2.f);
+  std::vector<int> meshSteps;
+  if (!tool)
+    for (const auto& it : Game::prewarmItems(true))
+      meshSteps.push_back(pace.add("mesh" + std::to_string(it.first) + (it.second ? "c" : "o"), "mesh", !g_ren.meshCached, g_ren.meshCached ? 0.3f : 12.f));
+  pace.begin(stStart);
   if (ctx2 && !g_shaderCacheDir.empty() && !cacheCurrent) {
     SECURITY_ATTRIBUTES sa = {sizeof(sa), nullptr, TRUE};
     HANDLE rd = nullptr, wr = nullptr;
@@ -560,10 +589,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     wglMakeCurrent(nullptr, nullptr);
     compileState = ok ? 1 : 2;
   });
-  // the first, biggest programs are most of the work: their progress is estimated from the last measured compile time
-  float estRT = cached ? 1.5f : 40.f;
-  if (!cached && !g_shaderCacheDir.empty())
-    if (FILE* f = fopen((g_shaderCacheDir + "\\compile_time.txt").c_str(), "r")) { float v; if (fscanf(f, "%f", &v) == 1 && v > 1 && v < 3600) estRT = v; fclose(f); }
   LARGE_INTEGER freq, prev, now;
   QueryPerformanceFrequency(&freq); QueryPerformanceCounter(&prev);
   LARGE_INTEGER t0 = prev; float compileSecs = 0;
@@ -573,6 +598,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   struct Intro {
     std::mutex m; std::string stage;
     std::atomic<float> target{0.f};
+    std::atomic<LoadPacer*> pacer{nullptr};   // (set: the bar follows the pacer every frame, not only when the main thread posts)
     std::atomic<int> state{0};          // 0 starting, 1 running, 2 fade out and stop, 3 stop now, 4 finished, -1 unavailable
     std::thread th;
   } intro;
@@ -594,7 +620,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       if (st == 2) { fade -= 1.f / 20.f; if (fade <= 0.f) break; }
       LARGE_INTEGER n; QueryPerformanceCounter(&n);
       float t = (float)(n.QuadPart - t0.QuadPart) / freq.QuadPart;
-      float target = intro.target;
+      LoadPacer* lp = intro.pacer;
+      float target = lp ? lp->fraction() : (float)intro.target;
       shown = std::max(shown, shown + (target - shown) * 0.12f);
       std::string stage; { std::lock_guard<std::mutex> lk(intro.m); stage = intro.stage; }
       GetClientRect(g_hwnd, &rc);
@@ -612,6 +639,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     ReleaseDC(g_hwnd, dcI);
     intro.state = 4;
   });
+  intro.pacer = &pace;
   while (intro.state == 0) Sleep(1);
   const bool introThreaded = intro.state == 1;
   if (!introThreaded) intro.th.join();
@@ -641,7 +669,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   auto stopIntro = [&](bool fade) {
     if (!introThreaded) { if (fade) for (int i = 0; i < 20; i++) introFrame(1.f, "READY", 1.f - i / 20.f); return; }
     if (intro.state != 1) return;
-    if (fade) { intro.target = 1.f; { std::lock_guard<std::mutex> lk(intro.m); intro.stage = "READY"; } }
+    if (fade) { intro.pacer = nullptr; intro.target = 1.f; { std::lock_guard<std::mutex> lk(intro.m); intro.stage = "Ready"; } }
     intro.state = fade ? 2 : 3;
     while (intro.state != 4) {   // keep the window responsive while it finishes
       MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { if (m.message == WM_QUIT) game.quit = true; TranslateMessage(&m); DispatchMessageW(&m); }
@@ -655,13 +683,17 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     int d = childDone >= 0 && compileState == 0 ? std::max((int)childDone, (int)progDone) : (int)progDone;
     bool compiled = !ctx2 || compileState != 0, built = worldDone;
     if (d == 0 && compileState == 0) compileSecs = t;
-    float sp = !ctx2 ? 0.f : compileState == 1 ? 1.f : d == 0 ? 0.8f * std::min(0.97f, 1.f - expf(-t / (estRT * 0.6f))) : 0.8f + 0.2f * (d - 1) / (Renderer::kProgramCount - 1);
-    float wp = built ? 1.f : std::min(0.95f, t / 4.f);
-    float target = 0.1f * wp + 0.7f * sp;   // (the rest: textures, then the menu and the aircraft shells - see below)
-    std::string stage = !ctx2 ? "PREPARING" : d == 0 ? (cached ? "LOADING SHADERS FROM CACHE" : "COMPILING SHADERS")
-                      : compileState == 0 ? "COMPILING SHADERS  " + std::to_string(d) + " / " + std::to_string(Renderer::kProgramCount) : "SHADERS READY";
-    if (!built) stage += "   //   GENERATING THE SOLACE ISLANDS";
-    introFrame(target, stage, 1.f);
+    // what is being done, by name: the shader program (the child process compiling on a first launch reports a count only)
+    std::string stage;
+    if (!ctx2) stage = "Preparing";
+    else if (compileState == 0) {
+      const std::string sh = g_ren.compileStage();
+      stage = cacheCurrent ? "Loading the shaders from the cache" : "Compiling the shaders (the first launch of this version only)";
+      if (!sh.empty()) stage += ": " + sh;
+      stage += "   " + std::to_string(std::min(d + 1, Renderer::kProgramCount)) + " of " + std::to_string(Renderer::kProgramCount);
+    } else stage = "Shaders ready";
+    if (!built) stage += worldFresh ? "   |   Generating the islands (once)" : "   |   Loading the islands";
+    introFrame(pace.fraction(), stage, 1.f);
     if (game.quit) break;
     if (compiled && built && t > 3.2f) break;   // the logo stays up long enough to be seen
   }
@@ -674,29 +706,33 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (hw2) DestroyWindow(hw2);
   if (game.quit) { stopIntro(false); return 0; }
   if (ctx2 && compileState != 1) { stopIntro(false); fatal(g_ren.error); return 1; }
-  if (!ctx2) introFrame(0.12f, cached ? "LOADING SHADERS FROM CACHE" : "COMPILING SHADERS (this can take a minute)", 1.f);
+  if (!ctx2) introFrame(pace.fraction(), cached ? "Loading the shaders from the cache" : "Compiling the shaders (this can take a minute)", 1.f);
   if (ctx2 && compileState == 1 && !stampPath.empty() && !cacheCurrent && g_ren.dispError.empty())   // the cache now holds this build
     if (FILE* f = fopen(stampPath.c_str(), "w")) { fprintf(f, "%s\n", stamp.c_str()); fclose(f); }
   if ((g_shaderCacheMisses > 0 || childMisses > 0) && ctx2 && !g_shaderCacheDir.empty())
     if (FILE* f = fopen((g_shaderCacheDir + "\\compile_time.txt").c_str(), "w")) { fprintf(f, "%.1f\n", compileSecs); fclose(f); }
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  pace.begin(stInit);
+  introFrame(pace.fraction(), perfFresh ? "Loading your career  |  learning how each aircraft flies (once)" : "Loading your career and the aircraft performance", 1.f);
   game.init(false);
-  introFrame(0.82f, "PREPARING TEXTURES", 1.f);
+  pace.begin(stTex);
+  introFrame(pace.fraction(), "Preparing the renderer: textures, materials and the GPS map", 1.f);
   g_ren.renderScale = 1.0f; g_ren.quality = game.set.quality;
   GetClientRect(g_hwnd, &cr);
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) { stopIntro(false); fatal(g_ren.error); return 1; }
   {
-    std::string cl = GetCommandLineA();
-    // (--raster, from older scripts, is accepted and ignored: there is one renderer)
-    bool tool = cl.find("--bench ") != std::string::npos || cl.find("--shots ") != std::string::npos || cl.find("--profile ") != std::string::npos || cl.find("--analyze") != std::string::npos || cl.find("--loadshots") != std::string::npos || cl.find("--menuvideo") != std::string::npos;
-    // a normal start loads the menu's first place and builds every aircraft's hull under the intro (rendered
-    // offscreen: the intro keeps the window), so the menu opens complete and no flight waits for a hull
-    if (!tool) game.prewarm([&](float f, const std::string& what) { introFrame(0.84f + 0.15f * f, what, 1.f); });
+    // a normal start loads the menu's first place and builds (or reads) every aircraft's meshes, the research jets'
+    // too, under the intro (rendered offscreen: the intro keeps the window), so nothing past the menu waits for one
+    if (!tool) game.prewarm([&](float f, const std::string& what) { introFrame(f, what, 1.f); }, true, &pace, stMenu, &meshSteps);
+    pace.end();
     if (game.quit) { stopIntro(false); return 0; }
+    if (!tool) pace.save();
     stopIntro(!tool);   // the bench and shot tools draw straight away; a normal start fades the intro out
   }
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
     fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits.load(), g_shaderCacheMisses.load());
+    fprintf(f, "Launch: shaders and islands %.1f s (islands %s), career %.1f s, renderer %.1f s, menu %.1f s, aircraft meshes %.1f s (%d built)\n",
+            pace.tookOf("start"), worldFresh ? "generated" : "from the cache", pace.tookOf("career"), pace.tookOf("renderer"), pace.tookOf("menu"), pace.tookOf("mesh"), g_ren.bakeBuilt);
     if (!g_ren.dispError.empty()) fprintf(f, "Display shader failed (cockpit screens disabled):\n%s\n", g_ren.dispError.c_str());
     fclose(f);
   }

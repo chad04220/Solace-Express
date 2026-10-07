@@ -1,5 +1,6 @@
 // Solace Express - game flow, flight session, cameras, particles, lights, audio feed
 #include "game.h"
+#include "load_pacer.h"
 #include <chrono>
 #include <ctime>
 #include <thread>
@@ -403,10 +404,15 @@ void Game::init(bool buildWorld) {
   applyUiPalette();
   wantPacing = true;   // (the frame-rate target from the settings)
   loadStations();
-  {   // every type's performance, learned by flying it, on threads side by side (the job board needs the career ones now)
-    std::vector<std::thread> th;
-    for (int i = 0; i < kNumAircraft; i++) th.emplace_back([i] { Plane::perf(&kAircraft[i]); });
-    for (auto& t : th) t.join();
+  {   // every type's performance, learned by flying it, on threads side by side (the job board needs the career ones now);
+    // kept with the cache, so a launch after the first reads them
+    const std::string pf = cacheDir.empty() ? std::string() : joinPath(cacheDir, "perf.bin");
+    if (pf.empty() || !Plane::perfLoad(pf, buildStamp)) {
+      std::vector<std::thread> th;
+      for (int i = 0; i < kNumAircraft; i++) th.emplace_back([i] { Plane::perf(&kAircraft[i]); });
+      for (auto& t : th) t.join();
+      if (!pf.empty()) Plane::perfSave(pf, buildStamp);
+    }
   }
   career.newGame();
   std::string sav = joinPath(saveDir, "career.sav");
@@ -2318,7 +2324,15 @@ void Game::menuTour(FrameParams& fp) {
   fp.fade = smoothstepf(0.f, 0.9f, u) * smoothstepf(kMenuShotLen, kMenuShotLen - 0.9f, u);   // cut through black
 }
 
-void Game::prewarm(const std::function<void(float, const std::string&)>& progress, bool allCraft) {
+std::vector<std::pair<int, bool>> Game::prewarmItems(bool allCraft) {
+  std::vector<std::pair<int, bool>> todo;
+  for (int i = 0; i <= kWraith; i++) if (allCraft || !kAircraft[i].special) { todo.push_back({i, false}); todo.push_back({i, true}); }
+  return todo;
+}
+std::string Game::prewarmLabel(int craft, bool inside, bool fresh) {
+  return std::string(fresh ? "Building the " : "Loading the ") + kAircraft[craft].name + (inside ? " cockpit's mesh" : "'s mesh") + (fresh ? "  (once: kept for the next launch)" : "  from the cache");
+}
+void Game::prewarm(const std::function<void(float, const std::string&)>& progress, bool allCraft, LoadPacer* pace, int menuStep, const std::vector<int>* itemSteps) {
   if (screen != SCR_MENU) return;
   bool sync = g_ren.entSync;
   // (offscreen only for these frames: the intro may draw through the same UI path in between)
@@ -2326,24 +2340,28 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   // the tour's first place: every scenery chunk in range, the shadow maps and the terrain shadow
   g_ren.entSync = true;
   realTime = 3.f;
-  progress(0.f, "LOADING THE MENU");
+  if (pace && menuStep >= 0) pace->begin(menuStep);
+  progress(pace ? pace->fraction() : 0.f, "Loading the menu's scenery and its terrain shadow");
   for (int i = 0; i < 12 && !quit; i++) {
     realTime = 3.f; frame();
+    if (pace) { pace->setSub((i + 1) / 12.f); progress(pace->fraction(), fmt("Loading the menu's scenery and its terrain shadow  (%d chunks to go)", g_ren.entPending)); }
     if (i >= 2 && g_ren.entPending == 0 && !g_ren.tshPending()) break;
   }
   g_ren.entSync = sync;
   // every light aircraft's body (outside, and the cockpit's when that is in use; with allCraft the research jets' too):
   // a frame that wants one bakes it, or loads it from the cache
-  std::vector<std::pair<int, bool>> todo;
-  for (int i = 0; i <= kWraith; i++) if (allCraft || !kAircraft[i].special) { todo.push_back({i, false}); todo.push_back({i, true}); }
+  const std::vector<std::pair<int, bool>> todo = prewarmItems(allCraft);
   for (size_t k = 0; k < todo.size() && !quit; k++) {
     prewarmCraft = todo[k].first; prewarmInside = todo[k].second;
-    progress(0.35f + 0.65f * k / todo.size(), std::string(todo[k].second ? "BUILDING AIRCRAFT BODIES  COCKPIT  " : "BUILDING AIRCRAFT BODIES  ") + kAircraft[prewarmCraft].name);
+    if (pace && itemSteps && k < itemSteps->size()) pace->begin((*itemSteps)[k]);
+    const bool fresh = !g_ren.meshCached;   // (the cache this build's bake writes: empty, every mesh is built)
+    progress(pace ? pace->fraction() : 0.35f + 0.65f * k / todo.size(), prewarmLabel(prewarmCraft, prewarmInside, fresh) + fmt("   %d of %d", (int)k + 1, (int)todo.size()));
     realTime = 3.f; frame();   // bakes it at the end of the frame, if this view uses one
   }
   prewarmCraft = -1; prewarmInside = false;
   realTime = 0.f;
-  progress(1.f, "READY");
+  if (pace) pace->end();
+  progress(pace ? pace->fraction() : 1.f, "Ready");
 }
 
 void Game::menuBackgroundCamera(FrameParams& fp) {

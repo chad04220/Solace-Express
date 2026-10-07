@@ -1,6 +1,7 @@
 // Solace Express - world: hand-designed archipelago, terrain, airports, weather
 #pragma once
 #include "common.h"
+#include <string>
 
 static const float WORLD_HALF = 40000.0f;  // map spans [-40km, 40km] on x and z
 static const int HM_N = 2048;              // base heightmap resolution (39 m texels; smoothed, see World::build)
@@ -55,7 +56,11 @@ public:
   std::vector<uint8_t> roadId; // RG8 per mask texel: nearest road segment + 1 (shader computes exact road edges), baked forest noise
   std::vector<uint8_t> mask; // RGBA8: road distance, building density, urbanness, farmland / sea-stack flag
   std::vector<float> hmax[HMAX_LEVELS];   // upper bound of the terrain per cell, level L has HMAX_N>>L cells per side
-  void build();
+  // cachePath: the generated arrays are read from there when its stamp matches (a launch after the first skips the
+  // generation), else generated and written there
+  void build(const std::string& cachePath = std::string(), const std::string& stamp = std::string());
+  bool loadCache(const std::string& path, const std::string& stamp);
+  void saveCache(const std::string& path, const std::string& stamp) const;
   // Terrain envelope (the terrain mesh culls its chunks with it, terrain_mesh.cpp): an upper bound of the rendered
   // terrain at every vertex of the HM_N grid through the texel centres (tpV0, (HM_N+1)^2), and per cell (tpM[L])
   std::vector<float> tpV0, tpM[TP_LEVELS];

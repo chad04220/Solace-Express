@@ -1,5 +1,7 @@
 // Solace Express - hand-designed archipelago "The Solace Islands"
 #include "world.h"
+#include <cstdio>
+#include <cstring>
 #include "scenery.h"
 
 World g_world;
@@ -198,9 +200,10 @@ float airportInfluence(float x, float z) {
   return best;
 }
 
-void World::build() {
+void World::build(const std::string& cachePath, const std::string& stamp) {
   airports.assign(std::begin(kAirports), std::end(kAirports));
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
+  if (!cachePath.empty() && loadCache(cachePath, stamp)) { sceneryInit(); boxes.clear(); return; }
   hm.resize((size_t)HM_N * HM_N * 4);
   sceneryInit();
   parallelFor(HM_N, [&](int j) {   // rows are independent; spread over every core
@@ -234,6 +237,43 @@ void World::build() {
   buildEnvelope();
   // Airport buildings are raster scenery entities now (airport_scenery.cpp); the old analytic box list stays empty
   boxes.clear();
+  if (!cachePath.empty()) saveCache(cachePath, stamp);
+}
+
+// The generated world on disk: its height and mask textures, height bounds and terrain envelope, stamped with the
+// build that made them (any other build generates again)
+namespace {
+const uint32_t kWorldMagic = 0x574c4431u;   // "WLD1"
+template <class T> void putVec(FILE* f, const std::vector<T>& v) { uint64_t n = v.size(); fwrite(&n, 8, 1, f); if (n) fwrite(v.data(), sizeof(T), n, f); }
+template <class T> bool getVec(FILE* f, std::vector<T>& v, uint64_t expect) {
+  uint64_t n = 0; if (fread(&n, 8, 1, f) != 1 || (expect && n != expect) || n > (1ull << 30)) return false;
+  v.resize(n); return !n || fread(v.data(), sizeof(T), n, f) == n;
+}
+}
+bool World::loadCache(const std::string& path, const std::string& stamp) {
+  FILE* f = fopen(path.c_str(), "rb"); if (!f) return false;
+  uint32_t magic = 0; char st[64] = {};
+  bool ok = fread(&magic, 4, 1, f) == 1 && magic == kWorldMagic && fread(st, 1, 64, f) == 64 && stamp == std::string(st, strnlen(st, 64));
+  ok = ok && getVec(f, hm, (uint64_t)HM_N * HM_N * 4) && getVec(f, roadId, (uint64_t)MASK_N * MASK_N * 2) && getVec(f, mask, (uint64_t)MASK_N * MASK_N * 4);
+  for (int L = 0; ok && L < HMAX_LEVELS; L++) ok = getVec(f, hmax[L], 0);
+  ok = ok && getVec(f, tpV0, 0);
+  for (int L = 0; ok && L < TP_LEVELS; L++) ok = getVec(f, tpM[L], 0);
+  fclose(f);
+  if (!ok) { hm.clear(); roadId.clear(); mask.clear(); }
+  return ok;
+}
+void World::saveCache(const std::string& path, const std::string& stamp) const {
+  std::string tmp = path + ".tmp";
+  FILE* f = fopen(tmp.c_str(), "wb"); if (!f) return;
+  char st[64] = {}; strncpy(st, stamp.c_str(), 63);
+  fwrite(&kWorldMagic, 4, 1, f); fwrite(st, 1, 64, f);
+  putVec(f, hm); putVec(f, roadId); putVec(f, mask);
+  for (int L = 0; L < HMAX_LEVELS; L++) putVec(f, hmax[L]);
+  putVec(f, tpV0);
+  for (int L = 0; L < TP_LEVELS; L++) putVec(f, tpM[L]);
+  bool ok = !ferror(f); fclose(f);
+  remove(path.c_str());
+  if (!ok || rename(tmp.c_str(), path.c_str()) != 0) remove(tmp.c_str());
 }
 
 int World::findAirport(const char* code) const {

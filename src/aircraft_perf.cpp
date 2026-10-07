@@ -1,6 +1,9 @@
 // Solace Express - learning each aircraft's envelope by flying it (see PerfModel in aircraft.h)
 #include "aircraft.h"
 #include <mutex>
+#include <cstdio>
+#include <cstring>
+#include <string>
 
 namespace {
 // a patch of open sea away from the islands for the test sorties (flat, no terrain to hit)
@@ -21,9 +24,29 @@ vec3 seaPoint() {
 }
 }
 
+static PerfModel s_perf[16]; static int s_perfState[16] = {};   // 0 not learned, 1 learning (provisional numbers), 2 learned
+static std::recursive_mutex s_perfM[16];   // (one per type: different types can be learned on different threads at once)
+// The learned models on disk, stamped with the build that learned them (another build learns them again)
+bool Plane::perfLoad(const std::string& path, const std::string& stamp) {
+  FILE* f = fopen(path.c_str(), "rb"); if (!f) return false;
+  char st[64] = {}; uint32_t n = 0, sz = 0; PerfModel tmp[16];
+  bool ok = fread(st, 1, 64, f) == 64 && stamp == std::string(st, strnlen(st, 64)) && fread(&n, 4, 1, f) == 1 && fread(&sz, 4, 1, f) == 1
+            && n == (uint32_t)kNumAircraft && n <= 16 && sz == sizeof(PerfModel) && fread(tmp, sizeof(PerfModel), n, f) == n;
+  fclose(f);
+  if (!ok) return false;
+  for (uint32_t i = 0; i < n; i++) { std::lock_guard<std::recursive_mutex> lk(s_perfM[i]); if (!s_perfState[i]) { s_perf[i] = tmp[i]; s_perfState[i] = 2; } }
+  return true;
+}
+void Plane::perfSave(const std::string& path, const std::string& stamp) {
+  FILE* f = fopen(path.c_str(), "wb"); if (!f) return;
+  char st[64] = {}; strncpy(st, stamp.c_str(), 63);
+  uint32_t n = (uint32_t)kNumAircraft, sz = sizeof(PerfModel);
+  fwrite(st, 1, 64, f); fwrite(&n, 4, 1, f); fwrite(&sz, 4, 1, f);
+  for (uint32_t i = 0; i < n; i++) fwrite(&perf(&kAircraft[i]), sizeof(PerfModel), 1, f);
+  fclose(f);
+}
 const PerfModel& Plane::perf(const AircraftSpec* sp) {
-  static PerfModel cache[16]; static int state[16] = {};   // 0 not learned, 1 learning (provisional numbers), 2 learned
-  static std::recursive_mutex m[16];   // (one per type: different types can be learned on different threads at once)
+  PerfModel* cache = s_perf; int* state = s_perfState; std::recursive_mutex* m = s_perfM;
   int idx = (int)(sp - kAircraft);
   if (idx < 0 || idx >= 16) { static PerfModel none; return none; }
   std::lock_guard<std::recursive_mutex> lk(m[idx]);

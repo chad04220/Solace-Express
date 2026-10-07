@@ -14,6 +14,7 @@
 #include "shaders.h"
 #include "hull_mesh.h"
 #include "mesh_simplify.h"
+#include <filesystem>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -863,6 +864,19 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
   glBindVertexArray(0);
   glActiveTexture(GL_TEXTURE0);
+}
+
+// Whether this build's aircraft meshes are in the cache: any file of its stamp (a launch after the first reads them all;
+// an update that changes the aircraft builds them all again) - for the loading bar's pacing and wording
+void Renderer::checkMeshCache() {
+  meshCached = false;
+  if (g_shaderCacheDir.empty()) return;
+  const std::string tail = "_" + meshCacheStamp() + ".bin";
+  std::error_code ec;
+  for (const auto& e : std::filesystem::directory_iterator(g_shaderCacheDir, ec)) {
+    const std::string n = e.path().filename().string();
+    if (n.size() > tail.size() && n.compare(0, 5, "mesh_") == 0 && n.compare(n.size() - tail.size(), tail.size(), tail) == 0) { meshCached = true; return; }
+  }
 }
 
 uint64_t Renderer::trafficModelKey(const float* t) const {

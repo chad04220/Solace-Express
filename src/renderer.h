@@ -3,6 +3,7 @@
 #include <chrono>
 #include <functional>
 #include <atomic>
+#include <mutex>
 #include <unordered_map>
 #include "common.h"
 #include "gl.h"
@@ -149,6 +150,12 @@ public:
   void uiClipOff() { flushUI(); uiClipOn = false; }
   bool screenshot(const char* path);
   bool screenshotPNG(const char* path);
+  // the program being compiled or loaded now (compilePrograms, on its worker thread), for the loading screen
+  std::string compileStage() { std::lock_guard<std::mutex> lk(stageMu); return stageName; }
+  void setCompileStage(const char* s) { std::lock_guard<std::mutex> lk(stageMu); stageName = s; }
+  std::mutex stageMu; std::string stageName;
+  bool meshCached = false;   // this build's aircraft meshes are in the cache already (checkMeshCache: a launch reads them, it builds none)
+  void checkMeshCache();
   // environment entities: entSync generates every chunk in range before drawing (headless captures)
   bool entSync = false;
   int entDrawn = 0, entChunks = 0;

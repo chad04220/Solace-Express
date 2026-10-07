@@ -7,14 +7,18 @@
 
 bool Renderer::compileRaster() {
   std::string e;
+  setCompileStage("lighting");
   progLight = linkProgramCached(kFullscreenVS, lightFSAssembly(""), e);
   if (!progLight) { error = "Lighting shader: " + e; return false; }
   for (int v = 0; v < 2; v++) {   // (every aircraft, then the light aircraft alone: pickAfPrograms)
     const std::string d = v ? "#define AF_LIGHT\n" : "";
+    setCompileStage(v ? "aircraft (light aircraft build)" : "aircraft (every aircraft)");
     progObjectsV[v] = linkProgramCached(kFullscreenVS, objectsFSAssembly(d), e);
     if (!progObjectsV[v]) { error = "Objects shader: " + e; return false; }
+    setCompileStage(v ? "aircraft shadows (light aircraft build)" : "aircraft shadows (every aircraft)");
     progShProxyV[v] = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly(d), e);
     if (!progShProxyV[v]) { error = "Shadow proxy shader: " + e; return false; }
+    setCompileStage(v ? "effects (light aircraft build)" : "effects (every aircraft)");
     progEffectsV[v] = linkProgramCached(kFullscreenVS, effectsFSAssembly(d), e);
     if (!progEffectsV[v]) { error = "Effects shader: " + e; return false; }
   }
@@ -32,7 +36,9 @@ bool Renderer::compileRaster() {
   if (!progShMap) { error = "Shadow map shader: " + e; return false; }
   progShMov = linkProgramCached(kShMapVS, "#version 330 core\nout float oM; void main(){ oM = 1.0; }\n", e);
   if (!progShMov) { error = "Shadow map (moving hull) shader: " + e; return false; }
+  setCompileStage("aircraft meshes");
   if (!compilePlaneMesh()) return false;
+  setCompileStage("terrain and water");
   return compileTerrainMesh();
 }
 

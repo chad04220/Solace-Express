@@ -72,7 +72,12 @@ public:
   bool quit = false;
   // launch: while the intro still shows, render the menu tour's first place offscreen until its scenery and shadows
   // are in, and every light aircraft's hull is built (progress: fraction 0..1, what is being done)
-  void prewarm(const std::function<void(float, const std::string&)>& progress, bool allCraft = false);   // (allCraft: the research craft too - the diagnostics)
+  // the launch's last steps: the menu's first place, then every aircraft's meshes (outside and cockpit; allCraft: the
+  // research jets' too). With a pacer, each is a step of its own (menuStep, then itemSteps in prewarmItems' order)
+  // and `progress` gets the pacer's fraction
+  void prewarm(const std::function<void(float, const std::string&)>& progress, bool allCraft = false, class LoadPacer* pace = nullptr, int menuStep = -1, const std::vector<int>* itemSteps = nullptr);
+  static std::vector<std::pair<int, bool>> prewarmItems(bool allCraft);   // (aircraft, cockpit) in the order prewarm builds them
+  static std::string prewarmLabel(int craft, bool inside, bool fresh);
   int prewarmCraft = -1; bool prewarmInside = false;   // the menu tour shows this aircraft instead (prewarm only)
   bool wantFullscreenToggle = false;
   std::function<void()> platformPresent;   // swaps the window's buffers and answers its messages (platform_win32 sets it): a frame shown from inside a long bake
@@ -92,6 +97,7 @@ public:
   // startup screen, drawn with the given renderer (the intro thread has its own, in its own GL context)
   void drawIntro(float progress, const std::string& stage, float t, unsigned icon, float fade, Renderer& R = g_ren);
   bool shaderFirstRun = false;
+  std::string cacheDir, buildStamp;   // where the launch keeps what it built (the platform layer: the shader cache's folder) and this build's stamp
   unsigned iconTex = 0;   // the application icon (intro screen, main menu)
   void init(bool buildWorld = true);   // buildWorld false: g_world.build() already ran (on the intro's worker thread)
   void initHeadless();

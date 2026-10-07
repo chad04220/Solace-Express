@@ -197,6 +197,8 @@ public:
   // fly-by-wire rate command of the research craft: full-stick pitch and roll rates (rad/s)
   float fbwPitchMax(float V) const { V = std::max(V, 1.f); return spec->special == 2 ? clampf(80.f * G0 / V, 2.0f, 6.0f) : clampf(66.f * G0 / V, 1.8f, 5.2f); }
   static const PerfModel& perf(const AircraftSpec* s);   // learned once per type (aircraft_perf.cpp)
+  static bool perfLoad(const std::string& path, const std::string& stamp);   // every type's, from a cache of this build's
+  static void perfSave(const std::string& path, const std::string& stamp);
   float fbwRollMax(float hover) const { return (spec->special == 2 ? 7.0f : 5.5f) * (1.f - 0.6f * hover); }
 private:
   void substep(float dt, const Weather& wx, float time);
