@@ -43,6 +43,14 @@ if(WIN32)
   endif()
 endif()
 
+# Development render harness on Linux (Xvfb + Mesa): test frames, and a render server (render_harness serve) that keeps
+# everything loaded between shots. Not built by default: cmake --build build --target render_harness
+if(UNIX AND NOT APPLE)
+  add_executable(render_harness EXCLUDE_FROM_ALL tests/render_harness.cpp ${GAME_SOURCES} src/radio_stub.cpp)
+  add_dependencies(render_harness shaders_gen)
+  target_link_libraries(render_harness PRIVATE ${CMAKE_DL_LIBS} X11 pthread)
+endif()
+
 # Headless tests (flight model + campaign progression validation)
 add_executable(flight_test tests/flight_test.cpp ${CORE_SOURCES})
 add_executable(progression_test tests/progression_test.cpp ${CORE_SOURCES})

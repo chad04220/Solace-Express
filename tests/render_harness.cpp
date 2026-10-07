@@ -1,4 +1,6 @@
 #include <chrono>
+#include <sys/stat.h>
+#include <unistd.h>
 // Development harness: renders test frames on Linux (Xvfb + Mesa) to validate shaders and visuals.
 #include <X11/Xlib.h>
 #include <dlfcn.h>
@@ -71,7 +73,14 @@ int main(int argc, char** argv) {
   const char* missing = nullptr;
   if (!glLoad(getProc, &missing)) { printf("missing %s\n", missing); return 1; }
   printf("GL: %s\n", glGetString(GL_RENDERER));
-  g_world.build();
+  // the islands and the aircraft performance from the cache beside the shaders (SHADERCACHE), stamped with this binary
+  // (any rebuild makes them again): a render needn't generate the world each time
+  std::string cacheStamp;
+  { struct stat st; char exe[1024] = {}; ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
+    if (n > 0 && stat(exe, &st) == 0) cacheStamp = std::to_string((long long)st.st_size) + "-" + std::to_string((long long)st.st_mtime); }
+  const std::string cacheDir = getenv("SHADERCACHE") ? getenv("SHADERCACHE") : "";
+  g_world.build(cacheDir.empty() ? std::string() : cacheDir + "/world.bin", cacheStamp);
+  const bool perfCached = !cacheDir.empty() && Plane::perfLoad(cacheDir + "/perf.bin", cacheStamp);
   buildStory();
   if (argc > 1 && std::string(argv[1]) == "gauges") {   // display atlas: every gauge and MFD page, without the scene
     std::string fs = worldLibAssembly("") + R"(
@@ -176,6 +185,64 @@ void main(){
   printf("renderer ok (shader cache: %d loaded, %d compiled, %.0f s)\n", g_shaderCacheHits.load(), g_shaderCacheMisses.load(),
          std::chrono::duration<double>(std::chrono::steady_clock::now() - tInit).count());
   std::string scene = argc > 1 ? argv[1] : "default";
+  // ---- a render server: everything loaded once (the context, the shaders, the islands, the textures, the aircraft
+  // meshes, and the scenery as it is generated), then one shot per request. Requests are lines on a named pipe
+  // (SERVE_REQ, default /tmp/claude-0/sp/rs.req): "<scene> [frames=N] [taam=N] [bench=N] [dbgoff=N] [out=path]";
+  // each reply ("ok <path> <seconds>") goes to SERVE_REP (/tmp/claude-0/sp/rs.rep). tools/render_client.sh sends one.
+  if (scene == "serve") {
+    if (!perfCached && !cacheDir.empty()) { for (int i = 0; i < kNumAircraft; i++) Plane::perf(&kAircraft[i]); Plane::perfSave(cacheDir + "/perf.bin", cacheStamp); }
+    const std::string req = getenv("SERVE_REQ") ? getenv("SERVE_REQ") : "/tmp/claude-0/sp/rs.req";
+    const std::string rep = getenv("SERVE_REP") ? getenv("SERVE_REP") : "/tmp/claude-0/sp/rs.rep";
+    mkfifo(req.c_str(), 0600); mkfifo(rep.c_str(), 0600);
+    if (getenv("PREWARM")) { Game* pw = new Game(); pw->initHeadless(); pw->debugScene("menu"); pw->prewarm([](float, const std::string&) {}, true); delete pw; }
+    printf("serving %dx%d: requests on %s\n", W, H, req.c_str()); fflush(stdout);
+    for (;;) {
+      FILE* in = fopen(req.c_str(), "r"); if (!in) return 1;
+      char line[2048];
+      std::vector<std::string> reqs;
+      while (fgets(line, sizeof line, in)) reqs.push_back(line);
+      fclose(in);
+      for (std::string r : reqs) {
+        while (!r.empty() && (r.back() == '\n' || r.back() == '\r' || r.back() == ' ')) r.pop_back();
+        if (r.empty()) continue;
+        if (r == "quit") { FILE* o = fopen(rep.c_str(), "w"); if (o) { fprintf(o, "bye\n"); fclose(o); } return 0; }
+        auto t0 = std::chrono::steady_clock::now();
+        std::vector<std::string> tok; for (size_t a = 0, b2; a < r.size(); a = b2 + 1) { b2 = r.find(' ', a); if (b2 == std::string::npos) b2 = r.size(); if (b2 > a) tok.push_back(r.substr(a, b2 - a)); }
+        std::string sc = tok[0], out = "/tmp/claude-0/sp/shot_" + sc + ".ppm";
+        int frames = 0, taam = 0, bench = 0;
+        g_ren.dbgOff = 0;
+        for (size_t k = 1; k < tok.size(); k++) {
+          size_t e = tok[k].find('='); if (e == std::string::npos) continue;
+          std::string key = tok[k].substr(0, e), v = tok[k].substr(e + 1);
+          if (key == "frames") frames = atoi(v.c_str()); else if (key == "taam") taam = atoi(v.c_str()); else if (key == "bench") bench = atoi(v.c_str());
+          else if (key == "dbgoff") g_ren.dbgOff = atoi(v.c_str()); else if (key == "out") out = v;
+        }
+        g_ren.resetTemporal();
+        Game* g = new Game();
+        g->initHeadless(); g->debugScene(sc);
+        for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
+        for (int i = 0; i < taam; i++) { g->update(1.f / 60.f); g->render(); }
+        for (int i = 0; i < frames; i++) g->render();
+        glFinish();
+        std::string extra;
+        if (bench > 0) {
+          double wsum[Renderer::kPasses] = {};
+          auto b0 = std::chrono::steady_clock::now();
+          for (int i = 0; i < bench; i++) { g_ren.syncTiming = true; g->render(); glFinish(); for (int p = 0; p < Renderer::kPasses; p++) wsum[p] += g_ren.passWall[p]; }
+          g_ren.syncTiming = false;
+          char b[512]; const char* nm[] = {"world", "displays", "feeds", "objects", "proxy", "lighting", "taa", "sprites", "bloom", "shafts", "composite"};
+          int n = snprintf(b, sizeof b, " frame %.0f ms:", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - b0).count() / bench);
+          for (int p = 0; p < Renderer::kPasses && n < (int)sizeof b - 32; p++) n += snprintf(b + n, sizeof b - n, " %s %.0f", nm[p], wsum[p] / bench);
+          extra = b;
+        }
+        g_ren.screenshot(out.c_str());
+        delete g;
+        double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        printf("%s -> %s (%.1f s)%s\n", r.c_str(), out.c_str(), secs, extra.c_str()); fflush(stdout);
+        FILE* o = fopen(rep.c_str(), "w"); if (o) { fprintf(o, "ok %s %.1f%s\n", out.c_str(), secs, extra.c_str()); fclose(o); }
+      }
+    }
+  }
   if (scene.rfind("multi:", 0) == 0) {   // several scenes from one shader compile: multi:a,b,c
     if (getenv("PREWARM")) { Game* pw = new Game(); pw->initHeadless(); pw->debugScene("menu"); pw->prewarm([](float, const std::string&) {}); delete pw; }   // (every body built once, for all the shots)
     std::string list = scene.substr(6) + ",";
