@@ -35,7 +35,12 @@ void main(){
   if (uMeshOn == 1 && uHullOn == 1 && uHullExitOn == 1 && uWreck == 0) { float he = texelFetch(uEnv, ivec2(gl_FragCoord.xy), 0).a; if (he > 0.0) hullEnd = min(hullEnd, he*1.002 + 0.05); }
   // nothing of the airframe to march: no moving hull on this ray, or its hull begins behind the surface already drawn
   bool noAf = uMeshOn == 1 && (uHullOn == 0 || (hullT > 1e29 && uHullNear <= 0.0) || (hullT > 0.0 && hullT < 1e29 && hullT > hullEnd));
+#ifdef OBJ_NO_AF
+  noAf = true;   // (the build for a frame with only the UFO or the debris to march: Renderer::rasterObjects)
+  vec2 hTop = vec2(-1.0);
+#else
   vec2 hTop = noAf ? vec2(-1.0) : tracePlaneHull(ro, rd, hullEnd, hullT);
+#endif
   int hTopPiece = gPI;   // (traffic tracing moves the piece transform; restored before shading)
   if (cockpitView && hTop.x > 0.0) {
     int id0 = int(hTop.y + 0.5);
@@ -51,7 +56,9 @@ void main(){
   float t = 1e9; int hit = 0;
   if (ph.x > 0.0) { t = ph.x; hit = 4; }
   int trafK = -1; vec2 trafH = vec2(-1.0);
+#ifndef OBJ_NO_AF
   if (!pod && uTrafficN > 0) { gTrafCamRay = true; trafH = traceTraffic(ro, rd, t < 1e8 ? t : tmax, trafK); gTrafCamRay = false; loadMain(); pieceXf(hTopPiece); }
+#endif
   float tU = (uUfoOn == 1 && !pod) ? traceUfo(ro, rd, t < 1e8 ? t : tmax) : -1.0;
   if (tU > 0.0 && tU < t) { t = tU; hit = 8; }
   bool trafHit = false;
@@ -89,6 +96,10 @@ void main(){
   }
   // the aircraft, a traffic aircraft or a wreck piece (gP* hold the transform of the piece that was hit); a display
   // in a research jet's cockpit shows its camera's picture (plane_gb.glsl)
+#ifdef OBJ_NO_AF
+  discard;
+#else
   vec3 lp0 = gPC + transpose(gPR)*(p - gPP);
   planeToGB(p, rd, t, int(ph.y + 0.5), planeNormal(lp0), pod || onScr, trafHit, -1.0);
+#endif
 }

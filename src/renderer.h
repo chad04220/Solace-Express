@@ -336,7 +336,7 @@ private:
   // mesh (trafShOn bit k), so the proxy marches only the traffic that still has moving parts
   GLuint progShMap = 0, progShMov = 0, texShMap = 0, texShMov = 0, fboShMap = 0; int shOn = 0; mat4 shMapVP[4];
   bool shMovOn = false;   // the player's maps carry a moving-hull mask this frame (the proxy marches the field there)
-  GLuint progShProxyMaps = 0;   // the shadow proxy without any field: every shadow this frame from a map (proxyNeedsMarch)
+  GLuint progShProxyMaps = 0, progObjectsNoAf = 0;   // (progObjectsNoAf: the objects pass with only the UFO and the debris to march)
   bool proxyNeedsMarch(const FrameParams& fp) const;
   int trafShOn = 0; mat4 trafShVP[kMaxTrafficDrawn];
   static constexpr int kShMapRes = 1024, kShLayers = 4 + kMaxTrafficDrawn;

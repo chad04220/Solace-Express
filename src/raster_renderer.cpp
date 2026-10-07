@@ -19,6 +19,8 @@ bool Renderer::compileRaster() {
     if (!progEffectsV[v]) { error = "Effects shader: " + e; return false; }
   }
   progObjects = progObjectsV[0]; progShProxy = progShProxyV[0]; progEffects = progEffectsV[0];
+  progObjectsNoAf = linkProgramCached(kFullscreenVS, objectsFSAssembly("#define AF_LIGHT\n#define OBJ_NO_AF\n"), e);
+  if (!progObjectsNoAf) { error = "Objects (UFO, debris) shader: " + e; return false; }
   progShProxyMaps = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly("#define AF_LIGHT\n#define PROXY_MAPS_ONLY\n"), e);
   if (!progShProxyMaps) { error = "Shadow proxy (maps) shader: " + e; return false; }
   // the airframe shadow maps: the baked mesh (and the moving hull) from a light, plain depth
@@ -153,15 +155,20 @@ void Renderer::rasterObjects(const FrameParams& fp) {
     if (trafMesh[k]) { auto it = hulls.find(trafMesh[k]->movKey); if (it != hulls.end() && it->second.ok && !it->second.verts) continue; }
     trafMarch |= 1 << k;
   }
-  const bool marchAny = (fp.plane.on && (!meshOn || hullOn || fp.wreck.pieces > 0)) || trafMarch != 0 || fp.ufoOn || fp.wreck.debris > 0;
+  const bool afMarch = (fp.plane.on && (!meshOn || hullOn || fp.wreck.pieces > 0)) || trafMarch != 0;
+  const bool marchAny = afMarch || fp.ufoOn || fp.wreck.debris > 0;
+  // (only the UFO or the debris to march: the build without any airframe in it - on the owner's GPU the airframes'
+  // code alone made the UFO's march more than twice as slow)
+  static const bool objFull = getenv("OBJFULL") != nullptr;   // (debug: always the full build)
+  const GLuint prog = !afMarch && !objFull && progObjectsNoAf ? progObjectsNoAf : progObjects;
   static const bool objDbg = getenv("OBJDBG") != nullptr;   // (debug: why the march runs)
   if (objDbg) { int nm = 0; for (int k = 0; k < trafN; k++) nm += (trafMarch >> k) & 1; printf("objects: march %d (plane on %d mesh %d hull %d wreck %d; traffic %d of %d; ufo %d debris %d)\n", (int)marchAny, (int)fp.plane.on, (int)meshOn, (int)hullOn, fp.wreck.pieces, nm, trafN, (int)fp.ufoOn, fp.wreck.debris); }
-  setRT(progObjects, fp);
-  glUniform1i(U(progObjects, "uTrafMarch"), trafMarch);
+  setRT(prog, fp);
+  glUniform1i(U(prog, "uTrafMarch"), trafMarch);
   for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, 0); }   // (the G-buffer is the target here, never read)
-  glUniform1f(U(progObjects, "uLogC"), 2.f / log2f(40000.f + 1.f));
-  glUniform1i(U(progObjects, "uMeshOn"), meshOn ? 1 : 0);
-  glActiveTexture(GL_TEXTURE0 + 28); glBindTexture(GL_TEXTURE_2D, sceneZ ? texDepthCopy : 0); glUniform1i(U(progObjects, "uSceneZ"), 28); glUniform1i(U(progObjects, "uSceneZOn"), sceneZ ? 1 : 0);
+  glUniform1f(U(prog, "uLogC"), 2.f / log2f(40000.f + 1.f));
+  glUniform1i(U(prog, "uMeshOn"), meshOn ? 1 : 0);
+  glActiveTexture(GL_TEXTURE0 + 28); glBindTexture(GL_TEXTURE_2D, sceneZ ? texDepthCopy : 0); glUniform1i(U(prog, "uSceneZ"), 28); glUniform1i(U(prog, "uSceneZOn"), sceneZ ? 1 : 0);
   glBindVertexArray(vaoEmpty);
   static const bool noMarch = getenv("NOMARCH") != nullptr;   // (debug: the objects pass without its full-screen march, to time the mesh draws alone)
   if (!noMarch && marchAny) glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -264,7 +271,9 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
   for (int i = 0; i < fp.plN; i++) {
     const FrameParams::PointLight& L = fp.pl[i];
     if (L.shadow <= 0.f) continue;
-    if (L.cosCut <= 0.05f && length(L.pos - c) < R * 1.1f) continue;   // (an omnidirectional lamp on the airframe itself: no view to map, it keeps the march)
+    // (an omnidirectional lamp on the airframe itself - a beacon, a nav light: by day its light is lost under the sun's
+    // and it needs no shadow (proxyNeedsMarch); at night it is mapped looking down, over the ground it lights)
+    if (L.cosCut <= 0.05f && length(L.pos - c) < R * 1.1f && fp.sunDir.y > 0.08f) continue;
     float li = std::max(L.col.x, std::max(L.col.y, L.col.z)); int slot = 0;
     for (int k = 0; k < fp.plN; k++) {
       if (k == i || fp.pl[k].shadow <= 0.f) continue;
@@ -289,15 +298,17 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
     } else {
       const FrameParams::PointLight& L = fp.pl[lightOf[layer]];
       float dc = length(L.pos - c);
-      vec3 d, up; float fov;
-      if (L.cosCut > 0.05f && dc < R * 1.1f) {   // a lamp on the airframe: perspective along its beam, out to its reach
+      vec3 d, up; float fov, zn = 0.2f;
+      if (L.cosCut <= 0.05f && dc < R * 1.1f) {   // an omnidirectional lamp on the airframe: straight down, nearly a hemisphere
+        d = vec3(0, -1, 0); up = vec3(0, 0, 1); fov = 165.f * DEG; zn = 0.05f;
+      } else if (L.cosCut > 0.05f && dc < R * 1.1f) {   // a lamp on the airframe: perspective along its beam, out to its reach
         d = normalize(L.dir); up = fabsf(d.y) < 0.99f ? vec3(0, 1, 0) : vec3(0, 0, 1);
         fov = std::min(2.f * (acosf(clampf(L.cosCut, -1.f, 1.f)) + 0.12f), 165.f * DEG);
       } else {   // a light on the ground (the apron's, the runway's): looking at the airframe, wide enough for its bound
         d = normalize(c - L.pos); up = fabsf(d.y) < 0.99f ? vec3(0, 1, 0) : vec3(0, 0, 1);
         fov = std::min(2.f * asinf(clampf(R / std::max(dc, R * 1.001f), 0.f, 1.f)) + 0.1f, 165.f * DEG);
       }
-      vp = perspective(fov, 1.f, 0.2f, L.radius * 40.f + 400.f) * lookAt(L.pos, L.pos + d, up);
+      vp = perspective(fov, 1.f, zn, L.radius * 40.f + 400.f) * lookAt(L.pos, L.pos + d, up);
     }
     shMapVP[layer] = vp;
     glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texShMap, 0, layer);
@@ -345,6 +356,7 @@ bool Renderer::proxyNeedsMarch(const FrameParams& fp) const {
   if (all || !progShProxyMaps) return true;
   const bool sun = fp.sunDir.y > -0.05f;
   if (fp.plane.on) {
+    const float R = std::max(fp.plane.M[0], fp.plane.M[9 * 4] * 2.f) * 0.55f + 1.5f;   // (planeBound, as rasterShadowMaps)
     if (shMovOn || (sun && !(shOn & 1))) return true;
     for (int i = 0; i < fp.plN; i++) {
       if (fp.pl[i].shadow <= 0.f) continue;
@@ -354,9 +366,9 @@ bool Renderer::proxyNeedsMarch(const FrameParams& fp) const {
         const float lk = std::max(fp.pl[k].col.x, std::max(fp.pl[k].col.y, fp.pl[k].col.z));
         if (lk > li || (lk == li && k < i)) slot++;
       }
-      // (an airframe's own omni lamp - its nav lights - has no map; by day its light on the ground is lost under the
+      // (an airframe's own omni lamp - its nav lights - has no map by day: its light on the ground is lost under the
       // sun's, so its shadow there is too)
-      const bool navByDay = fp.pl[i].cosCut <= 0.05f && length(fp.pl[i].pos - fp.plane.pos) < 40.f && fp.sunDir.y > 0.08f;
+      const bool navByDay = fp.pl[i].cosCut <= 0.05f && length(fp.pl[i].pos - fp.plane.pos) < R * 1.1f && fp.sunDir.y > 0.08f;
       if (slot < 3 && !(shOn & (2 << slot)) && !navByDay) return true;
     }
   }

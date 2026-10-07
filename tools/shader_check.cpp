@@ -34,6 +34,7 @@ int main(int argc, char** argv) {
     put(dir, "shadow_proxy_light.frag", shadowProxyFSAssembly("#define AF_LIGHT\n"));
     put(dir, "effects_light.frag", effectsFSAssembly("#define AF_LIGHT\n"));
     put(dir, "plane_mesh_light.frag", planeMeshFSAssembly("#define AF_LIGHT\n"));
+    put(dir, "objects_noaf.frag", objectsFSAssembly("#define AF_LIGHT\n#define OBJ_NO_AF\n"));
     put(dir, "shadow_proxy_maps.frag", shadowProxyFSAssembly("#define AF_LIGHT\n#define PROXY_MAPS_ONLY\n"));
   }
   return 0;
