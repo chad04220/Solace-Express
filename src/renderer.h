@@ -236,7 +236,7 @@ private:
   // the aircraft mesh (aircraft_mesh.cpp): the static part of the airframe baked from its field, and the hull of the
   // part that moves (the march's start on the raster path, where the mesh leaves off)
   struct PartMesh { int type = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; };   // a cockpit's rigid moving part, in its own frame (plane_parts.glsl)
-  struct PlaneMesh { std::vector<PartMesh> parts; uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; };
+  struct PlaneMesh { std::vector<PartMesh> parts; uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0, fineIdx = 0; bool ok = false; uint64_t movKey = 0;   /* fineIdx: where the cockpit's thin patch begins */ bool eyeInMov = false; };
   std::unordered_map<uint64_t, PlaneMesh> planeMeshes;
   GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0, progPlaneMeshScr = 0, texScrDepth = 0, fboScrDepth = 0; int scrDepthW = 0, scrDepthH = 0;   // (progPlaneMeshScr / texScrDepth: the research craft's screens' depth, the cabin mesh clipped at and behind them: the screens are holes to the world)   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
   bool compilePlaneMesh();
@@ -335,6 +335,10 @@ private:
   // XR-40's). uShOn: bit 0 the sun, bits 1-3 the light slots. Layers 4 + k: traffic aircraft k's sun shadow from its
   // mesh (trafShOn bit k), so the proxy marches only the traffic that still has moving parts
   GLuint progShMap = 0, progShMov = 0, texShMap = 0, texShMov = 0, fboShMap = 0; int shOn = 0; mat4 shMapVP[4];
+  // the cabin's own sun map in the cockpit view: 5 m about the eye at 2048 texels (2.4 mm), for the cabin's light and
+  // shade - the whole airframe's map (layer 0, ~1.4 cm a texel) speckled the posts and frames a hand's width away
+  GLuint texShCab = 0, fboShCab = 0; bool shCabOn = false; mat4 shCabVP; float shCabBias = 0.f;
+  static constexpr int kShCabRes = 2048;
   bool shMovOn = false;   // the player's maps carry a moving-hull mask this frame (the proxy marches the field there)
   GLuint progShProxyMaps = 0, progObjectsNoAf = 0;   // (progObjectsNoAf: the objects pass with only the UFO and the debris to march)
   bool proxyNeedsMarch(const FrameParams& fp) const;

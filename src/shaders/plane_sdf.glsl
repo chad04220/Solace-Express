@@ -810,7 +810,8 @@ vec2 mapPlaneBody(vec3 p){
     float glare = sdRoundBox(p - vec3(0.0, E.y - 0.1, 0.5*(gz0 + pz + 0.06)), vec3(phw*0.97, 0.022, 0.5*(pz + 0.06 - gz0)), 0.018);
     glare = max(glare, f + 0.055);
     res = opU(res, vec2(glare, 14.0));
-    res = opU(res, vec2(sdCapsule(p, vec3(-phw*0.88, E.y - 0.124, pz + 0.07), vec3(phw*0.88, E.y - 0.124, pz + 0.07), 0.0035), 64.0));
+    // (the strip under the lip, trimmed to the cabin wall as the glareshield is and ending short of its ends)
+    res = opU(res, vec2(max(sdCapsule(p, vec3(-phw*0.85, E.y - 0.124, pz + 0.07), vec3(phw*0.85, E.y - 0.124, pz + 0.07), 0.0035), f + 0.075), 64.0));
     // centre: radio / transponder stack below the clusters; glass cockpits add an engine display between the PFDs
     res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.505, pf + 0.012), vec3(0.115, 0.06, 0.016), 0.004), 65.0));
     if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.31, pf + 0.008), vec3(0.085, 0.085, 0.01), 0.004), 67.0));

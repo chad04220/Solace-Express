@@ -26,7 +26,7 @@
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 14;   // (bump with the format, or with what the bake makes of the field: the cockpit's sharp edges, +14)
+const uint32_t kMeshMagic = 0x4d455348u + 15;   // (bump with the format, or with what the bake makes of the field: the cockpit's sharp edges, +14; its thin patch laid out fat, +15)
 // the rigid parts a cockpit has (plane_parts.glsl PT_*) and each one's instances: x which seat or side, y which pedal
 struct PartInst { int type; float sx, sy; };
 const int kMaxPartInst = 128;
@@ -323,7 +323,8 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     // surface crosses, at the mean of its edge crossings, pulled onto the surface; a quad round every lattice edge the
     // surface crosses, between the four cubes that share it, wound with the field's normal
     size_t nLattice = 0;
-    auto nets = [&](const std::vector<std::pair<int, uint8_t>>& cells, int sub, float sink, float inflate) {
+    // iso: the level meshed (a positive one lays the surface that far out: the cockpit's thin patch, trimmed per pixel)
+    auto nets = [&](const std::vector<std::pair<int, uint8_t>>& cells, int sub, float sink, float inflate, float iso = 0.f) {
       const float h = kS2 / sub;
       std::unordered_map<int64_t, int> corner;   // lattice coords -> sample index
       std::vector<vec3> cpts;
@@ -340,6 +341,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       }
       nLattice += cpts.size();
       std::vector<float> cv; mode(1, 0); hullEval(cpts, cv);
+      if (iso != 0.f) for (float& x : cv) x -= iso;
       auto cval = [&](int lx, int ly, int lz, float& v) { auto it = corner.find(key3(lx, ly, lz)); if (it == corner.end()) return false; v = cv[it->second]; return true; };
       std::unordered_map<int64_t, int> cubeV;   // cube coords -> vertex (local)
       std::vector<vec3> vpos; std::vector<int> vcube; std::vector<uint8_t> vsink;   // (each vertex's cube, and whether its cell sinks)
@@ -407,7 +409,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         mode(3, 0); hullEval4(vpos, vn);
         mode(2, 0); hullEval4(vpos, d4);
         for (size_t q = 0; q < vpos.size(); q++) {
-          vec3 p = vpos[q] - vec3(vn[q * 4], vn[q * 4 + 1], vn[q * 4 + 2]) * std::max(-h, std::min(h, d4[q * 4]));
+          vec3 p = vpos[q] - vec3(vn[q * 4], vn[q * 4 + 1], vn[q * 4 + 2]) * std::max(-h, std::min(h, d4[q * 4] - iso));
           const float m = 0.25f * h;
           float lo[3] = {org + vcube[q * 3] * h - m, org + vcube[q * 3 + 1] * h - m, org + vcube[q * 3 + 2] * h - m};
           p.x = std::max(lo[0], std::min(lo[0] + h + 2.f * m, p.x)); p.y = std::max(lo[1], std::min(lo[1] + h + 2.f * m, p.y)); p.z = std::max(lo[2], std::min(lo[2] + h + 2.f * m, p.z));
@@ -418,7 +420,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       mode(2, 0); hullEval4(vpos, d4);
       if (getenv("HULLDBG")) {   // how far off the surface the vertices still sit
         int n2mm = 0, n5mm = 0; float mx = 0.f;
-        for (size_t q = 0; q < vpos.size(); q++) { float a = fabsf(d4[q * 4]); mx = std::max(mx, a); if (a > 0.002f) n2mm++; if (a > 0.005f) n5mm++; }
+        for (size_t q = 0; q < vpos.size(); q++) { float a = fabsf(d4[q * 4] - iso); mx = std::max(mx, a); if (a > 0.002f) n2mm++; if (a > 0.005f) n5mm++; }
         printf("mesh %s (lattice %.2f cm): %zu vertices off the surface: %d > 2 mm, %d > 5 mm, max %.1f mm\n", inside ? "cockpit" : "outside", h * 100.f, vpos.size(), n2mm, n5mm, mx * 1000.f);
       }
       // the ring round the fine patch sinks into the wall (along the normal, away from the cabin), so the patch is in
@@ -457,7 +459,10 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     nets(coarseCells, 4, 0.003f, 0.f);
     fineStart = (uint32_t)ib.size();
     const size_t fineV = vb.size() / 8;   // (the fine patch's vertices are its own, after the coarse mesh's)
-    if (!fineCells.empty()) nets(fineCells, 8, 0.f, 0.f);
+    // (the thin patch laid out 4.7 mm fat: a plate thinner than its lattice - a trailing edge running out to nothing, a
+    // visor's rim - has no corner inside it and would end in a ragged line where it gets that thin; laid out fat it
+    // is all there, and the mesh pass traces every pixel of it back onto the true shape, dropping the halo)
+    if (!fineCells.empty()) nets(fineCells, 8, 0.f, 0.f, inside ? 0.6f * kS2 / 8.f : 0.f);
     // simplified (mesh_simplify.h): flat panels to a few triangles, curves to within 1 mm (the cabin's 0.4 mm: seen
     // from half a metre); the fine patch apart, to the same 0.4 mm. On worker threads, while the GPU goes on with the hull and the parts (vb, ib and fineStart are not
     // touched again until they are joined, below)
@@ -653,7 +658,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, ib.size() * sizeof(uint32_t), ib.data(), GL_STATIC_DRAW);
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-  PM.idx = (int)ib.size();
+  PM.idx = (int)ib.size(); PM.fineIdx = std::min((int)fineStart, PM.idx);
   // the rigid parts, each a mesh of its own (validated: a damaged cache drops the parts, never reads past its end)
   for (auto& P : PM.parts) { if (P.vao) glDeleteVertexArrays(1, &P.vao); if (P.vbo) glDeleteBuffers(1, &P.vbo); if (P.ibo) glDeleteBuffers(1, &P.ibo); }
   PM.parts.clear();
@@ -821,7 +826,7 @@ void Renderer::drawPlaneMeshDepth(const FrameParams& fp, const PlaneMesh& pm, co
     glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, scrSkip ? texScrDepth : 0); glUniform1i(U(progPlaneMeshDepth, "uScrDepth"), 29);
     glUniform1i(U(progPlaneMeshDepth, "uPartInst"), -1);
     glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-    glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
+    glDrawElements(GL_TRIANGLES, pm.fineIdx, GL_UNSIGNED_INT, nullptr);   // (not the cockpit's thin patch: laid out fat, its halo would hide the cabin behind it)
     drawPlaneParts(pm, progPlaneMeshDepth, trafK);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
   }
@@ -855,9 +860,16 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   glUniform1i(U(prog, "uScrSkip"), scrSkip ? 1 : 0);
   glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, scrSkip ? texScrDepth : 0); glUniform1i(U(prog, "uScrDepth"), 29);
   glUniform1i(U(prog, "uPartInst"), -1);
+  glUniform1i(U(prog, "uMeshThin"), 0);
   if (!noPre) { glDepthFunc(GL_LEQUAL); glDepthMask(GL_FALSE); }
-  glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);   // (the airframe and the cabin's fine patch, which lies on the surface: one draw)
+  glDrawElements(GL_TRIANGLES, pm.fineIdx, GL_UNSIGNED_INT, nullptr);
   drawPlaneParts(pm, prog, trafK);   // (its moving parts, each at its pose)
+  if (pm.idx > pm.fineIdx) {   // the cockpit's thin patch, last: every pixel traced back onto the true shape, the halo dropped, depth written where it lands
+    glUniform1i(U(prog, "uPartInst"), -1);
+    glUniform1i(U(prog, "uMeshThin"), 1);
+    glDepthMask(GL_TRUE);
+    glDrawElements(GL_TRIANGLES, pm.idx - pm.fineIdx, GL_UNSIGNED_INT, (void*)(sizeof(uint32_t) * (size_t)pm.fineIdx));
+  }
   glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
   glBindVertexArray(0);
   glActiveTexture(GL_TEXTURE0);

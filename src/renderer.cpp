@@ -599,6 +599,11 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel) {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    // (seen from the seat the panel is a few hundred pixels tall and at an angle: anisotropic filtering, and a little
+    // sharper than the mip chain alone, so the readouts and dial markings stay crisp - the TAA settles the rest)
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, -0.5f);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, 8.0f);
+    glGetError();  // anisotropy may be unsupported
     glGenerateMipmap(GL_TEXTURE_2D);
   }
   if (!fboDisp) glGenFramebuffers(1, &fboDisp);
@@ -935,6 +940,9 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   if (trafShOn) glUniformMatrix4fv(U(p, "uTrafShVP"), kMaxTrafficDrawn, GL_FALSE, trafShVP[0].m);
   glActiveTexture(GL_TEXTURE0 + 26); glBindTexture(GL_TEXTURE_2D_ARRAY, shOn || trafShOn ? texShMap : 0); glUniform1i(U(p, "uAfShMap"), 26);
   glActiveTexture(GL_TEXTURE0 + 27); glBindTexture(GL_TEXTURE_2D_ARRAY, shOn ? texShMov : 0); glUniform1i(U(p, "uAfShMov"), 27);
+  glActiveTexture(GL_TEXTURE0 + 12); glBindTexture(GL_TEXTURE_2D, shCabOn ? texShCab : 0); glUniform1i(U(p, "uCabShMap"), 12);   // the cabin's sun map (cockpit view)
+  glUniform1i(U(p, "uCabShOn"), shCabOn ? 1 : 0);
+  if (shCabOn) { glUniformMatrix4fv(U(p, "uCabShVP"), 1, GL_FALSE, shCabVP.m); glUniform1f(U(p, "uCabShBias"), shCabBias); }
   glUniform1i(U(p, "uHullOn"), hullOn ? 1 : 0); glUniform1f(U(p, "uHullNear"), hullOn ? hullNearNow : hullNear(fp)); glUniform1i(U(p, "uHullExitOn"), hullOn && hullExitOn ? 1 : 0);
   glUniform1i(U(p, "uTrafHullOn"), trafHullOn ? 1 : 0);
   {   // AI traffic: one row of 32 texels per aircraft

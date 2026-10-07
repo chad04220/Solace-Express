@@ -7,8 +7,19 @@
 uniform sampler2DArray uAfShMap;   // depth from the light
 uniform sampler2DArray uAfShMov;   // the moving parts' hull from the light (1: march the field here)
 uniform mat4 uAfShVP[4]; uniform int uAfShOn;
+// the cockpit view's cabin sun map (Renderer::rasterShadowMaps): 5 m about the eye, 2.4 mm a texel; -1 outside it
+uniform sampler2D uCabShMap; uniform mat4 uCabShVP; uniform int uCabShOn; uniform float uCabShBias;
+float cabShLookup(vec3 p, vec3 n, float biasK){
+  vec3 u = (uCabShVP*vec4(p + n*0.008, 1.0)).xyz*0.5 + 0.5;
+  if (u.x < 0.002 || u.x > 0.998 || u.y < 0.002 || u.y > 0.998 || u.z >= 1.0) return -1.0;
+  vec2 ts = 1.0/vec2(textureSize(uCabShMap, 0));
+  float s = 0.0, bias = uCabShBias*biasK;
+  for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) s += texture(uCabShMap, u.xy + vec2(float(dx), float(dy))*ts).r >= u.z - bias ? 1.0 : 0.0;
+  return s/9.0;
+}
 // 1 lit, 0 shadowed (soft between), or -1: the field decides (a moving part may be here)
 float shMapLookupB(int layer, vec3 p, vec3 n, float biasK){
+  if (layer == 0 && uCabShOn == 1) { float c = cabShLookup(p, n, biasK); if (c >= 0.0) return c; }
   vec4 q = uAfShVP[layer]*vec4(p + n*0.06, 1.0);
   if (q.w <= 0.0) return 1.0;
   vec3 u = q.xyz/q.w*0.5 + 0.5;

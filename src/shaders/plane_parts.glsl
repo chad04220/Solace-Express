@@ -277,7 +277,7 @@ Pose partPoseCockpit(int k, vec2 sd){
   vec3 O = vec3(sd.x*abs(E.x), E.y - 0.43, pz);
   float pull = cPitch*0.075;
   if (k == PT_YOKE_SHAFT) { X.R = D; X.T = O + vec3(0.0, 0.0, pull); }
-  else if (k == PT_YOKE_WHEEL) { X.R = D*transpose(partRxy(cRoll*0.75)); X.T = O + vec3(0.0, 0.0, 0.22 + pull); }
+  else if (k == PT_YOKE_WHEEL) { X.R = D*transpose(partRxy(-cRoll*0.75)); X.T = O + vec3(0.0, 0.0, 0.22 + pull); }   // (roll right, cRoll > 0: clockwise as the pilot sees it - D's mirror turns the angle round)
   else if (k == PT_PEDAL) {   // right rudder (yaw > 0) pushes the right pedal forward (-z), left rudder the left
     float q = sd.y;
     X.R = mat3(q, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);

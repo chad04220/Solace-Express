@@ -254,7 +254,7 @@ void Renderer::rasterTrafficShadowMaps(const FrameParams& fp) {
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 void Renderer::rasterShadowMaps(const FrameParams& fp) {
-  shOn = 0; shMovOn = false;
+  shOn = 0; shMovOn = false; shCabOn = false;
   static const bool off = getenv("SHMAPOFF") != nullptr;   // (debug / the analysis: the per-pixel march as before)
   if (off || !progShMap || !planeMeshWanted(fp)) return;
   // (in the cockpit the cabin mesh first: its controls, seats and panel shade the cabin, and its windows let the sun in)
@@ -341,6 +341,37 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
     }
     shOn |= 1 << layer;
     if (mov) shMovOn = true;
+  }
+  // the cockpit view: the cabin's own sun map, about the eye (the depth from the sun's side of the whole airframe on)
+  if (slot == 1 && (want & 1)) {
+    if (!texShCab) {
+      glGenTextures(1, &texShCab); glBindTexture(GL_TEXTURE_2D, texShCab);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, kShCabRes, kShCabRes, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glGenFramebuffers(1, &fboShCab); glBindFramebuffer(GL_FRAMEBUFFER, fboShCab);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texShCab, 0);
+      glReadBuffer(GL_NONE);   // (depth alone: complete only without a read buffer under GL 3.3)
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, fboShCab);
+    { GLenum none = GL_NONE; glDrawBuffers(1, &none); }
+    glViewport(0, 0, kShCabRes, kShCabRes);
+    glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE); glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+    glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);
+    const vec3 d = normalize(fp.sunDir), up = fabsf(d.y) < 0.99f ? vec3(0, 1, 0) : vec3(0, 0, 1), eye = fp.camPos;
+    const float h = 2.5f, zf = 2.f * R + 3.f;
+    shCabVP = orthoMat(-h, h, -h, h, 0.1f, zf) * lookAt(eye + d * (2.f * R), eye, up);
+    shCabBias = 0.004f / (zf - 0.1f);   // (4 mm, in the map's depth)
+    glUseProgram(progShMap);
+    glUniformMatrix4fv(U(progShMap, "uVP"), 1, GL_FALSE, shCabVP.m);
+    glUniformMatrix3fv(U(progShMap, "uRot"), 1, GL_FALSE, pv.rot);
+    glUniform3f(U(progShMap, "uPos"), c.x, c.y, c.z);
+    glUniform1i(U(progShMap, "uPartInst"), -1);
+    glBindVertexArray(pm->second.vao);
+    glDrawElements(GL_TRIANGLES, pm->second.idx, GL_UNSIGNED_INT, nullptr);
+    drawPlaneParts(pm->second, progShMap, -1);
+    shCabOn = true;
   }
   glBindVertexArray(0);
   glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); glDepthMask(GL_TRUE); glDisable(GL_DEPTH_TEST);

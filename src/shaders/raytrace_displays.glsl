@@ -460,24 +460,25 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
     }
     return c;
   }
-  // ---- radio stack: three LCD rows (COM, NAV, transponder) with standby frequencies (pilot's side only)
+  // ---- radio stack: three LCD rows (COM, NAV, transponder), the pilot's side of a single (a twin's second engine
+  // dial stands there: its radios are the centre stack's). The digits large enough to read from the seat (8 mm)
   vec2 rs = q - vec2(0.33, 0.0);
-  if (pilotSide && abs(rs.x) < 0.07 && abs(rs.y) < 0.09) {
+  if (pilotSide && ck != 1 && abs(rs.x) < 0.07 && abs(rs.y) < 0.09) {
     float row = floor((rs.y + 0.09)/0.06);
     vec2 cell = vec2(rs.x, mod(rs.y + 0.09, 0.06) - 0.03);
     vec3 col = vec3(0.035, 0.036, 0.04);
-    float lcd = sdRBox(cell - vec2(-0.006, 0.0), vec2(0.056, 0.012), 0.0015);
+    float lcd = sdRBox(cell - vec2(-0.006, 0.0), vec2(0.056, 0.0165), 0.0015);
     vec3 G2 = vec3(0.15, 1.0, 0.45);
     if (lcd < 0.0) {
       col = vec3(0.004, 0.02, 0.01);
       vec2 lq = cell - vec2(-0.058, 0.0);
-      float h = 0.0055;
-      if (row == 2.0) { col = mix(col, G2*0.6, txt4(lq - vec2(0.002, 0.0055), h*0.45, ivec4(67, 79, 77, 49), 0));
-        col = mix(col, G2, numC(lq - vec2(0.05, -0.002), 118.3, h, 2, 2)); col = mix(col, G2*0.5, numC(lq - vec2(0.104, -0.002), 121.5, h*0.8, 2, 2)); }
-      else if (row == 1.0) { col = mix(col, G2*0.6, txt4(lq - vec2(0.002, 0.0055), h*0.45, ivec4(78, 65, 86, 49), 0));
-        col = mix(col, G2, numC(lq - vec2(0.05, -0.002), 110.9, h, 2, 2)); col = mix(col, G2*0.5, numC(lq - vec2(0.104, -0.002), 113.2, h*0.8, 2, 2)); }
-      else { col = mix(col, G2*0.6, txt4(lq - vec2(0.002, 0.0055), h*0.45, ivec4(88, 80, 68, 82), 0));
-        col = mix(col, G2, numC(lq - vec2(0.05, -0.002), 1200.0, h, 2, 0)); col = mix(col, G2*0.6, txt4(lq - vec2(0.06, -0.002), h*0.6, ivec4(65, 76, 84, 0), 0)); }
+      float h = 0.0085;
+      if (row == 2.0) { col = mix(col, G2*0.6, txt4(lq - vec2(0.002, 0.0105), h*0.4, ivec4(67, 79, 77, 49), 0));
+        col = mix(col, G2, numC(lq - vec2(0.075, -0.003), 118.3, h, 2, 2)); }
+      else if (row == 1.0) { col = mix(col, G2*0.6, txt4(lq - vec2(0.002, 0.0105), h*0.4, ivec4(78, 65, 86, 49), 0));
+        col = mix(col, G2, numC(lq - vec2(0.075, -0.003), 110.9, h, 2, 2)); }
+      else { col = mix(col, G2*0.6, txt4(lq - vec2(0.002, 0.0105), h*0.4, ivec4(88, 80, 68, 82), 0));
+        col = mix(col, G2, numC(lq - vec2(0.065, -0.003), 1200.0, h, 2, 0)); col = mix(col, G2*0.6, txt4(lq - vec2(0.088, -0.003), h*0.5, ivec4(65, 76, 84, 0), 0)); }
     }
     col = mix(col, vec3(0.2), aLine(lcd, lw));
     col = mix(col, vec3(0.25), aFill(length(cell - vec2(0.06, 0.0)) - 0.005));

@@ -49,6 +49,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_REPEAT 0x2901
 #define GL_CLAMP_TO_EDGE 0x812F
 #define GL_TEXTURE_MAX_ANISOTROPY 0x84FE
+#define GL_TEXTURE_LOD_BIAS 0x8501
 #define GL_RED 0x1903
 #define GL_RGB 0x1907
 #define GL_RGBA 0x1908
