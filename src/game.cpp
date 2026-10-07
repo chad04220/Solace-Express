@@ -590,7 +590,11 @@ void Game::updateWeather(float dt) {
       bool was = plane.apRev;
       plane.apEngage(plane.apMode, plane.apAirport, wx);
       apRepickT = plane.apRev != was ? 90.f : 8.f;
-      if (plane.apRev != was) toast(fmt("Autopilot: the wind has shifted - now runway %02d at %s", A.rwyNumber(plane.apRev), A.code), vec3(0.6f, 1, 0.6f));
+      if (!plane.apDecline.empty()) {   // (neither end is safe in the new wind: the hold it falls back to is said, and why)
+        g_audio.trigger(SFX_AP_DISC);
+        toast("Autopilot: the wind has shifted - unable to autoland at " + plane.apDecline + " - holding heading and height", vec3(1, 0.75f, 0.35f));
+        toast("Any stick input hands control back", vec3(0.8f, 0.8f, 0.8f));
+      } else if (plane.apRev != was) toast(fmt("Autopilot: the wind has shifted - now runway %02d at %s", A.rwyNumber(plane.apRev), A.code), vec3(0.6f, 1, 0.6f));
     }
   }
 }
@@ -771,7 +775,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   float fuel = chosenFuel(c, spec, src, launchPlan);
   launchFuelKg = -1;
   plane.reset(&s, start, hdg, fuel, payloadKg, c.startAirborne, s.cruise);
-  plane.apComfort = true;   // a career flight: the autopilot flies for the passengers and the load (the stick is never limited)
+  plane.apComfort = c.gentle();   // gentle for passengers or a fragile load, else the airframe's whole envelope (the stick is never limited)
   fuelStart = plane.fuel;
   rollFailures(c, spec, src);
   isolatedFlight = false; jobLeg = false; jobClockBase = 0; attemptFrom = c.from;
@@ -965,7 +969,9 @@ void Game::flightControls(float dt) {
     padP = padP * fabsf(padP) * 0.4f + padP * 0.6f; padR = padR * fabsf(padR) * 0.4f + padR * 0.6f;
   }
   bool manual = fabsf(pitchIn) + fabsf(rollIn) > 0 || fabsf(padP) + fabsf(padR) > 0.3f;
-  bool apNav = plane.apOn && (plane.apMode == Plane::AP_APPR || plane.apMode == Plane::AP_STUNT);
+  // (a refused autoland's hold too: the pilot asked for a landing, not a hold, and was told the stick takes over - the
+  // review of v3.31.0, F3)
+  bool apNav = plane.apOn && (plane.apMode == Plane::AP_APPR || plane.apMode == Plane::AP_STUNT || (plane.apMode == Plane::AP_HOLD && !plane.apDecline.empty()));
   if (plane.apOn) {
     if (apNav) {   // flying a GPS route / autoland: any real stick input hands control back
       if (fabsf(pitchIn + padP) > 0.5f || fabsf(rollIn + padR) > 0.5f) {
@@ -1028,7 +1034,12 @@ void Game::flightControls(float dt) {
   }
   // brakes: B / D-pad left = parking brake toggle, Space = wheel brakes
   bool& parking = parkingBrake;   // (set by startFlight for a start on the ground)
-  if (plane.apDone) { plane.apDone = false; parking = true; toast("Autoland complete - parking brake set", vec3(0.5f, 1, 0.6f)); g_audio.trigger(SFX_AP_DISC, 0.7f); }
+  if (plane.apDone) {
+    plane.apDone = false; parking = true;
+    if (plane.apOverrun) toast("Autoland: stopped past the end of the runway - parking brake set", vec3(1, 0.45f, 0.35f));
+    else toast("Autoland complete - parking brake set", vec3(0.5f, 1, 0.6f));
+    plane.apOverrun = false; g_audio.trigger(SFX_AP_DISC, 0.7f);
+  }
   if (plane.spec->special == 2) wraithControls(dt);
   if (actKeyP(ACT_PARK) || (!showMap && actPadP(ACT_PARK))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
   float wb = actDown(ACT_BRAKE) ? 1.f : 0.f;
@@ -2442,6 +2453,10 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
   fp.camBack = -fwd; fp.camRight = normalize(cross(fwd, vec3(0, 1, 0))); fp.camUp = cross(fp.camRight, fwd);
   fp.fovY = 50.f * DEG;
   fp.vignette = 0.9f;
+  if (screen == SCR_HUB) {   // the hub's flights start at either end of this runway: their scenery streams in while the player chooses, so the loading screen has nothing left to build
+    const Airport& A = g_world.airports[ap];
+    fp.prefetchOn = true; fp.prefetchPos = A.threshold(((int)(realTime * 2.f)) & 1);
+  }
 }
 
 // The preview: the selected craft hangs in the air over the chosen launch site, at the sortie's time of day, and the

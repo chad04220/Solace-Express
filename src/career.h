@@ -22,6 +22,9 @@ struct Contract {
   float timeLimitMin = 0;
   int minLicense = LIC_STUDENT;
   bool ownedOnly = false, fragile = false;
+  // the autopilot flies gently (apComfort: 1.25 g, 25 deg of bank, soft climbs and descents) only for passengers or a
+  // fragile load; otherwise it uses the airframe's whole envelope - hard turns, high g
+  bool gentle() const { return pax > 0 || fragile; }
   int grantLicense = -1;
   int forceAircraft = -1;      // lessons use a specific aircraft (free)
   Weather wx;

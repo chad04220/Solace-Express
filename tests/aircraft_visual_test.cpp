@@ -160,8 +160,8 @@ int main(int argc,char**argv) {
   setvbuf(stdout,nullptr,_IONBF,0);
   if(argc<2) { puts("Usage: aircraft_visual_test OUTPUT_DIR [WIDTH HEIGHT] [first-aircraft last-aircraft]"); return 2; }
   int W=argc>2?atoi(argv[2]):480,H=argc>3?atoi(argv[3]):300;
-  int first=argc>4?atoi(argv[4]):0,last=argc>5?atoi(argv[5]):8;
-  if(W<16||H<16||first<0||last>8||first>last) return 2;
+  int first=argc>4?atoi(argv[4]):0,last=argc>5?atoi(argv[5]):kWraith;   // (the whole roster: the career types, then the research craft)
+  if(W<16||H<16||first<0||last>kWraith||first>last) return 2;
   std::filesystem::path out(argv[1]); std::filesystem::create_directories(out);
   if(!initGL(W,H)) { puts("EGL failed"); return 2; }
   printf("Renderer: %s\n",glGetString(GL_RENDERER));
@@ -234,7 +234,8 @@ int main(int argc,char**argv) {
   if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)return 2;
   glViewport(0,0,64,16);std::vector<float> px(64*16*4);int failures=0;
   auto readProbe=[&](int mode){glUniform1i(loc("vMode"),mode);glDrawArrays(GL_TRIANGLES,0,3);glFinish();glReadPixels(0,0,64,16,GL_RGBA,GL_FLOAT,px.data());};
-  for(int a=first;a<=std::min(last,6);a++){
+  for(int a=first;a<=last;a++){
+    if(a==kWraith)continue;   // (its cockpit is its own field: the touchpad probe below)
     Plane p;p.spec=&kAircraft[a];float M[96];packModel(kAircraft[a],a,p.gearHeight(),M);glUniform4fv(loc("uM"),24,M);glUniform4f(loc("uPS"),1,0,0,1);
     readProbe(1);int buried=0;float worst=-1e5;
     for(size_t i=0;i<px.size();i+=4)if(px[i+3]>.5f){worst=std::max(worst,px[i]);if(!std::isfinite(px[i])||px[i]>0.001f)buried++;}
@@ -242,16 +243,16 @@ int main(int argc,char**argv) {
     readProbe(3);float jump=0;for(size_t i=0;i<px.size();i+=4){if(!std::isfinite(px[i]))failures++;else jump=std::max(jump,px[i]);}
     printf("ENDCAP %s: maximum seam jump %.6f m\n",kAircraft[a].id,jump);if(jump>.001f)failures++;
   }
-  if(first<=8&&last>=8){
-    Plane p;p.spec=&kAircraft[8];float M[96];packModel(kAircraft[8],8,p.gearHeight(),M);glUniform4fv(loc("uM"),24,M);glUniform4f(loc("uPS"),1,0,0,1);
+  if(first<=kWraith&&last>=kWraith){
+    Plane p;p.spec=&kAircraft[kWraith];float M[96];packModel(kAircraft[kWraith],kWraith,p.gearHeight(),M);glUniform4fv(loc("uM"),24,M);glUniform4f(loc("uPS"),1,0,0,1);
     int buried=0;float worst=1e5;int states=0;
     for(float pitch:{-1.f,0.f,1.f})for(float roll:{-1.f,0.f,1.f})for(float throttle:{0.f,.5f,1.f}){
       glUniform4f(loc("uCtl"),pitch,roll,0,throttle);readProbe(2);states++;
       for(size_t i=0;i<px.size();i+=4){worst=std::min(worst,px[i]);if(!std::isfinite(px[i])||px[i]<-.0001f)buried++;}
     }
-    printf("WRAITH TOUCHPADS: %d buried samples in %d stick/throttle states; minimum clearance %.4f m\n",buried,states,worst);if(buried)failures++;
+    printf("WRAITH TOUCHPADS (%s): %d buried samples in %d stick/throttle states; minimum clearance %.4f m\n",kAircraft[kWraith].id,buried,states,worst);if(buried)failures++;
   }
-  if(getenv("AVT_PROBE")) for(int a=5;a<=8;a++){
+  if(getenv("AVT_PROBE")) for(int a=5;a<=kOsprey;a++){
     Plane p;p.spec=&kAircraft[a];float M[96];packModel(kAircraft[a],a,p.gearHeight(),M);glUniform4fv(loc("uM"),24,M);glUniform4f(loc("uPS"),0,0,0,0);
     readProbe(4); printf("SKIN %s: main hinge in %.3f out %.3f (aft %.3f %.3f) | nose hinge %.3f centre %.3f (aft %.3f %.3f)\n",kAircraft[a].id,px[0],px[4],px[64*4],px[64*4+4],px[8],px[12],px[64*4+8],px[64*4+12]);
   }

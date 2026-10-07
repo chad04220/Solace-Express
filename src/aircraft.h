@@ -145,10 +145,12 @@ public:
   bool apOn = false; int apMode = AP_OFF;
   float apHeading = 0, apAlt = 0, apSpeed = 0, apVS = 0; bool apUseVS = false;
   float apPitchI = 0, apRollI = 0, apThrI = 0.5f, apXI = 0, apGamI = 0, apTrimEst = 0, apFlareTau = 0, apFlareVs = 0, apGustAdd = 0;
-  int apAirport = -1, apStage = 0, apLeg = 0; bool apRev = false; float apStageT = 0, apCruiseAlt = 0, apFinalLen = 8000;
+  int apAirport = -1, apStage = 0, apLeg = 0; float apOutSide = 0;   // (apOutSide: the side of the centreline the outbound leg keeps to, +-1; 0 off that leg)
+  bool apRev = false; float apStageT = 0, apCruiseAlt = 0, apFinalLen = 8000;
   vec3 apLd, apTd;            // landing direction and touchdown point of the chosen runway end
   vec3 apHoldC; float apHoldR = 1500, apHoldAlt = 0, apIntAlt = 0; int apHoldDir = 1, apTurnDir = 0, apClimbDir = 0; float apGs = 0.0524f, apDrift = 0;   // descent orbit and intercept altitude
   bool apDone = false;        // an autoland just finished (the game sets the parking brake)
+  bool apOverrun = false;     // ...and it stopped past the runway's end: over, not a success
   std::string apStatus;       // one-line status for the HUD
   std::string apPlanWhy;   // after apPlan: why that runway end is unsafe ("" safe): too short for the wind, too high to descend onto
   std::string apDecline;   // set by apEngage when neither end is safe: the autoland is declined (the autopilot holds instead), and why
@@ -207,6 +209,7 @@ private:
   bool apStuntFly(float dt);   // true when it flew the controls itself this step (false: setting up, normal loops)
   void apRates(float qT, float pT, float rollCap, float nzMin, float nzMax, float dt);   // the shared inner loops
   float apAltGain() const;   // altitude error -> climb rate (1/s), as fast as this airframe's pitch answers at this speed
+  float terrainAround() const;   // the highest ground to keep clear of: under it, ahead along its track, and all round
   float apPitchLag() const;  // how long this airframe's pitch takes to answer at this speed (s)
   float apPlan(int airport, bool rev, const Weather& wx, bool commit);
   void apHover(float dt);

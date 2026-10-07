@@ -20,6 +20,20 @@ static PFNGETPROC s_getProc;
 static void* getProc(const char* n) { void* p = s_getProc((const unsigned char*)n); if (!p) p = dlsym(s_lib, n); return p; }
 
 struct GameTest {
+  static int hubFly(Game& game) {   // the hub at the player's airport for HUBFRAMES frames, then a job from there: what the loading screen still has to do
+    g_ren.entSync = false;
+    game.headless = false; game.screen = SCR_HUB;
+    const int hf = getenv("HUBFRAMES") ? atoi(getenv("HUBFRAMES")) : 120;
+    for (int i = 0; i < hf; i++) { game.update(1.f / 30.f); game.render(); }
+    printf("hub at %s: %d frames, scenery pending %d, chunks %d\n", g_world.airports[game.career.location].code, hf, g_ren.entPending, (int)g_ren.entChunks);
+    Contract c = game.career.board.empty() ? Contract() : game.career.board[0];
+    if (game.career.board.empty()) { c.from = game.career.location; c.to = (c.from + 1) % (int)g_world.airports.size(); c.title = "Test"; }
+    game.startFlight(c, 1, Career::SRC_RENT);
+    int frames = 0, pend0 = -1; const int b0 = g_ren.bakeBuilt;
+    while (game.screen == SCR_LOADING && game.loadReadyT < 0 && frames < 2000) { game.update(1.f / 30.f); game.render(); if (pend0 < 0) pend0 = g_ren.entPending; frames++; }
+    printf("loading from %s: first frame pending %d, ready after %d frames (%.1f s of game time), meshes built %d\n", g_world.airports[c.from].code, pend0, frames, game.loadT, g_ren.bakeBuilt - b0);
+    return 0;
+  }
   static void drawUI(Game& g, const std::string& what) {
     g.realTime = 5; g.uiDt = 1.f;
     if (getenv("UISCALE")) g.set.uiScale = (float)atof(getenv("UISCALE"));   // (the review's 140% checks)
@@ -304,6 +318,7 @@ void main(){
   }
   Game game;
   game.initHeadless();
+  if (scene == "hubfly") return GameTest::hubFly(game);
   if (scene == "prewarm") {   // the launch prewarm, then the menu's first frames as a player would see them open
     game.debugScene("menu");
     auto t0 = std::chrono::steady_clock::now();

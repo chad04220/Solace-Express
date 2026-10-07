@@ -913,6 +913,24 @@ struct GameTest {
              beside, besideTd, apron, onRwy, ok ? "ok" : "FAIL");
       fails += !ok;
     }
+    {   // a refused autoland (the review of v3.31.0, F3): the Starling asked to land at Gull Rock's 480 m is told it can't
+        // and holds heading and height - and, as the toast says, the stick takes the aircraft back
+      Game q; q.initHeadless(); q.career.license = LIC_ATP; q.botControl = false; q.set.traffic = false;
+      Contract c = g_story[4]; c.wx = Weather(); c.wx.windSpeed = 0; c.wx.gust = 0; c.wx.turbulence = 0; c.wps.clear(); c.startAirborne = true;
+      q.beginCareerFlight(c, 6, Career::SRC_RENT);
+      q.plane.pos.y += 900.f; q.plane.onGround = false; q.takeoffAnnounced = true; q.engineAutoStarted = true;
+      q.update(1.f / 60.f);   // (into the flight's input context: keys already held when it changes are set aside)
+      q.apDest = g_world.findAirport("GLR");
+      q.engageAutopilot();
+      const bool held = q.plane.apOn && q.plane.apMode == Plane::AP_HOLD && !q.plane.apDecline.empty();
+      bool told = false; for (auto& t : q.toasts) told |= t.text.find("hands control back") != std::string::npos;
+      q.in.down[K_DOWN] = true;
+      for (int i = 0; i < 5 && q.plane.apOn; i++) q.update(1.f / 60.f);
+      q.in.down[K_DOWN] = false;
+      const bool ok = q.screen == SCR_FLIGHT && held && told && !q.plane.apOn;
+      printf("Refused autoland: holds %d (%s), says the stick takes over %d, stick takes over %d: %s\n", held, q.plane.apDecline.c_str(), told, !q.plane.apOn, ok ? "ok" : "FAIL");
+      fails += !ok;
+    }
     {   // a checkride's standard gates its licence (the review of v3.24.0, R8): 600 fpm passes, just over fails, as do a
         // take-off against a hold and a landing against a go-around; a failed one leaves the licence and the story as they were
       int ride = -1; for (int i = 0; i < (int)g_story.size() && ride < 0; i++) if (g_story[i].grantLicense == LIC_PPL) ride = i;

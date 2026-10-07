@@ -153,7 +153,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
     // the next place the camera will cut to (the menu tour): its near chunks go to the worker threads now, and are kept
     if (fp.prefetchOn && g_scenery.workers() > 0) {
       vec3 pc = fp.prefetchPos;
-      const int pcx = Scenery::chunkOf(pc.x), pcz = Scenery::chunkOf(pc.z), prad = (int)ceilf(farDetail / Scenery::CH) + 1;
+      const int pcx = Scenery::chunkOf(pc.x), pcz = Scenery::chunkOf(pc.z), prad = rad;   // (all of it, as the view there will want it: the flight's loading screen waits for every chunk)
       for (int dz = -prad; dz <= prad; dz++)
         for (int dx = -prad; dx <= prad; dx++) {
           int cx = pcx + dx, cz = pcz + dz;
@@ -161,7 +161,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
           float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
           float ex = std::max(std::max(x0 - pc.x, pc.x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - pc.z, pc.z - z0 - Scenery::CH), 0.f);
           float d = sqrtf(ex * ex + ez * ez);
-          int want = d < farDetail ? 2 : 0;
+          int want = d < farDetail ? 2 : d < farAll ? 1 : 0;
           if (!want) continue;
           Scenery::Chunk* c = g_scenery.get(cx, cz);
           if (c) { c->lastUse = entFrame; if (c->level >= want) continue; }

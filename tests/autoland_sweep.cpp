@@ -1,8 +1,11 @@
 // Autoland sweep: every aircraft at every airport it can use, in calm, crosswind and gusty weather, from several
 // directions and heights. A run succeeds when the autopilot lands on the runway (touchdown under 3 m/s, stopped on the
 // runway) without crashing, within 30 simulated minutes.
-//   autoland_sweep [slice count] [--csv file] [--craft i] [--airport CODE] [--wind w]
+//   autoland_sweep [slice count] [--csv file] [--craft i] [--airport CODE] [--wind w] [--comfort] [--all]
+//   (--comfort: the career's passenger-comfort guidance, apComfort; --all: every field, as the GPS offers them, not only
+//   those the career would send the type to - a short one must be refused, never overrun)
 //   (slice/count: run every count-th case starting at slice, for parallel runs; the others narrow the cases)
+//   (env APDBG: the plans, go-arounds and the last metres; APTRACE: the guidance stage and leg every 10 s)
 #include "../src/aircraft.h"
 #include "../src/career.h"
 #include <cstdio>
@@ -12,12 +15,14 @@
 #include <cmath>
 
 int main(int argc, char** argv) {
-  int slice = 0, count = 1, onlyCraft = -1, onlyWind = -1; const char* csv = nullptr; const char* onlyAp = nullptr;
+  int slice = 0, count = 1, onlyCraft = -1, onlyWind = -1; bool comfort = false, all = false; const char* csv = nullptr; const char* onlyAp = nullptr;
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--csv") && i + 1 < argc) csv = argv[++i];
     else if (!strcmp(argv[i], "--craft") && i + 1 < argc) onlyCraft = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--wind") && i + 1 < argc) onlyWind = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--airport") && i + 1 < argc) onlyAp = argv[++i];
+    else if (!strcmp(argv[i], "--comfort")) comfort = true;
+    else if (!strcmp(argv[i], "--all")) all = true;
     else if (i + 1 < argc && argv[i][0] != '-') { slice = atoi(argv[i]); count = std::max(1, atoi(argv[++i])); }
   }
   g_world.build(); buildStory();
@@ -29,8 +34,8 @@ int main(int argc, char** argv) {
     const AircraftSpec& s = kAircraft[si];
     for (int ai = 0; ai < nAp; ai++) {
       const Airport& A = g_world.airports[ai];
-      if (!s.special && !runwayOK(s, A)) continue;   // the career never sends it there
-      if (s.special && (A.length < 1400.f || A.surface != SURF_ASPHALT) && si == kResearchJet) continue;   // (the XR-30 needs a long hard runway)
+      if (!all && !s.special && !runwayOK(s, A)) continue;   // the career never sends it there
+      if (!all && s.special && (A.length < 1400.f || A.surface != SURF_ASPHALT) && si == kResearchJet) continue;   // (the XR-30 needs a long hard runway)
       for (int wi = 0; wi < 3; wi++)
         for (int st = 0; st < 2; st++, idx++) {
           if (idx % count != slice) continue;
@@ -46,6 +51,7 @@ int main(int argc, char** argv) {
           start.y = std::max(A.elev + (st ? 600.f : 1500.f), g_world.height(start.x, start.z) + 450.f);
           Plane p; p.reset(&s, start, wrapDeg360(brg + 90.f), s.maxFuel * 0.7f, 150, true, s.cruise * 0.8f);
           p.ctl.gearDown = !s.retract; p.gear = p.ctl.gearDown ? 1.f : 0.f; p.ctl.throttle = 0.7f;
+          p.apComfort = comfort;
           p.apEngage(Plane::AP_NAV, ai, wx);
           if (!p.apDecline.empty()) {   // declined before committing to an approach: an explicit refusal, not a landing
             printf("%-16s %s wind%d start%d  DECLINED  %s\n", s.name, A.code, wi, st, p.apDecline.c_str());
@@ -64,12 +70,13 @@ int main(int argc, char** argv) {
             if (getenv("APDBG") && !td && p.apStage == Plane::APS_FINAL && p.pos.y - p.gearHeight() - A.elev < 45.f && (k % 15) == 0) printf("    final: %.1f m up, vs %.2f (asked %.2f), ias %.1f, pitch %.1f, throttle %.2f\n", p.pos.y - p.gearHeight() - A.elev, p.vel.y, p.apVS, p.ias, p.pitchDeg(), p.ctl.throttle);
             if (getenv("APDBG") && !td && p.apStage == Plane::APS_FLARE && (k % 15) == 0) printf("    flare: %.1f m up, vs %.2f, ias %.1f, pitch %.1f\n", p.pos.y - p.gearHeight() - A.elev, p.vel.y, p.ias, p.pitchDeg());
             if (getenv("APDBG") && td && (k % 60) == 0 && length(vec3(p.vel.x, 0, p.vel.z)) > 3.f) printf("    rollout: %.1f m/s, brake %.2f, on ground %d, throttle %.2f\n", length(vec3(p.vel.x, 0, p.vel.z)), p.ctl.brake, (int)p.onGround, p.ctl.throttle);
+            if (getenv("APTRACE") && (p.apStage != last || (k % 600) == 0)) { vec3 r = p.pos - p.apTd; printf("    t %4.0f stage %d leg %d along %6.0f cross %6.0f agl %5.0f above field %5.0f  %s\n", k / 60.f, p.apStage, p.apLeg, dot(r, p.apLd), dot(r, vec3(-p.apLd.z, 0, p.apLd.x)), p.pos.y - g_world.height(p.pos.x, p.pos.z), p.pos.y - A.elev, p.apStatus.c_str()); }
             last = p.apStage;
           }
           vec3 rel = p.pos - A.pos();
           float along = fabsf(dot(rel, A.dir())), cross = fabsf(dot(rel, vec3(-A.dir().z, 0, A.dir().x)));
           bool good = !p.ev.crashed && p.apDone && td && tdVs < 3.f && along < A.length * 0.5f && cross < A.width * 0.5f;
-          const char* why = p.ev.crashed ? p.ev.crashReason.c_str() : !p.apDone ? "timeout" : !td ? "no touchdown" : tdVs >= 3.f ? "hard" : "off runway";
+          const char* why = p.ev.crashed ? p.ev.crashReason.c_str() : !p.apDone ? "timeout" : !td ? "no touchdown" : tdVs >= 3.f ? "hard" : p.apOverrun ? "overran" : "off runway";
           printf("%-16s %s wind%d start%d  %s  %5.0f s  td %.1f  along %5.0f  cross %4.1f  GA %d  maxG %.1f  %s\n", s.name, A.code, wi, st,
                  good ? "ok  " : "FAIL", k / 60.f, tdVs, along, cross, goArounds, maxG, good ? "" : why);
           fflush(stdout);

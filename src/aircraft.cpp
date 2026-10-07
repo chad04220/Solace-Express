@@ -119,7 +119,7 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   w = vec3(); ctl = Controls(); ev = FlightEvents(); apComfort = false; sceneryHits = true; brakeHold = 0;
   flaps = 0; gear = 1; rpm = 0; n1 = 0; engineSpool = 0; maxG = minG = 1; flightTime = 0;
   fail = Failures(); iceFeed = 0; overG = 0;
-  apDisengage(); apDone = false; apPitchI = 0; gust = vec3(); rng = Rng(77);
+  apDisengage(); apDone = false; apOverrun = false; apPitchI = 0; gust = vec3(); rng = Rng(77);
   // drag comes from the airframe's shape (aero.cpp), evaluated every step at the speed and air density of the moment
   cd0 = aeroCD0(aeroModel(*s), *s, std::max(speed, 30.f), 1.225f, speed / 340.f);
   nozzle = 0; mach = 0;
@@ -732,6 +732,8 @@ void Plane::apEngage(int mode, int airport, const Weather& wx) {
 
 // plan an approach to one runway end: the final approach length that clears the terrain, a descent orbit over the
 // lowest ground near the approach, and the altitude to intercept the final from. Returns a score (higher is better).
+static const float kIntRegion = 6000.f;   // how far beyond the gate the approach's intercept region reaches (m)
+
 float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   const AircraftSpec& s = *spec;
   const Airport& a = g_world.airports[airport];
@@ -756,10 +758,13 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   float iafAlt = a.elev + gh + F * gs + 20.f;
   // orbit radius: a comfortable turn at holding speed
   float vh = std::max(s.vref * 1.45f, std::min(s.cruise * 0.6f, s.vref * 1.8f));
-  float R = clampf(vh * vh / (G0 * tanf((s.special ? 40.f : 24.f) * DEG)) * 1.15f, 900.f, 3500.f);
-  // intercept region: the extended centreline from the gate out to 4 km beyond it
+  // (gentle - passengers, a fragile load - a 24 deg bank; otherwise the turns are flown hard: 45 deg, 55 for the research jets)
+  float R = apComfort ? clampf(vh * vh / (G0 * tanf((s.special ? 40.f : 24.f) * DEG)) * 1.15f, 900.f, 3500.f)
+                      : clampf(vh * vh / (G0 * tanf((s.special ? 55.f : 45.f) * DEG)) * 1.15f, 400.f, 3500.f);
+  // intercept region: the extended centreline from the gate out to 6 km beyond it (the guidance captures the final and
+  // turns back from its outbound leg inside it)
   float intMsa = 0;
-  for (float d = F; d <= F + 6000.f; d += 250.f) for (int k = -2; k <= 2; k++) intMsa = std::max(intMsa, H(td - ld * d + rr * (k * 500.f)));
+  for (float d = F; d <= F + kIntRegion; d += 250.f) for (int k = -2; k <= 2; k++) intMsa = std::max(intMsa, H(td - ld * d + rr * (k * 500.f)));
   float intAlt = std::max(iafAlt, intMsa + 250.f);
   vec3 bestC = td - ld * (F + R + 2000.f); float bestCost = 1e9f, bestAlt = intAlt;
   for (float al = -3000.f; al <= F + R + vh * 15.f + 9000.f; al += 750.f)
@@ -797,7 +802,11 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   // (jets only: the propeller types touch down slower and float little - the sweep's gusty tailwind landings stopped
   // by mid-runway, at Orchard Valley's 800 m too - where the jets ran off the end)
   const float ldgNeed = s.engineType == ENG_JET && tw > 0.f && stillAir > 0.f ? stillAir * (vg / vap) * (vg / vap) : 0.f;
-  const float stopShort = ldgNeed > 0.f ? ldgNeed - a.length * 0.95f : 0.f;
+  // every field, whatever got it chosen (the GPS offers them all): the runway the type needs at all - the career's own
+  // dispatch rule (AircraftSpec::runwayNeeded) - comes first; then the tailwind's addition (the review of v3.31.0, F2: the
+  // Starling took Gull Rock's 480 m and overran it)
+  const float rwyNeed = s.runwayNeeded(a.elev), fieldShort = s.special == 2 ? 0.f : rwyNeed - a.length;   // (the XR-40 comes down vertically)
+  const float stopShort = fieldShort > 0.f ? 1000.f + fieldShort : ldgNeed > 0.f ? ldgNeed - a.length * 0.95f : 0.f;
   // ...and whether it can get down to the glidepath from the hold: it leaves the orbit at its height and descends from
   // there, may not go below the intercept altitude until the gate, and goes around if still 80 m high 2 km out.
   // What it can lose on the way: nine tenths of its steepest final descent (the guidance's limit) at the approach
@@ -807,11 +816,24 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   const float gp2k = a.elev + gh + 2000.f * gs, gpF = a.elev + gh + F * gs;
   const float legOut = len2(bestC - (td - ld * (F + 1500.f))) + 1500.f;   // (from leaving the orbit to the gate: the guidance descends all the way)
   const float hAtGate = std::max(bestAlt - lose(legOut), std::max(intAlt, gpF));
+  // ...and from the turn-in: the outbound leg and the turn back (the guidance's own geometry: out past the gate by its
+  // minimum and a turn's width, a turn and a half across - gentle turns are wide) at the ground's height there plus the
+  // en-route margin, then down the final (QA F1: a passenger Starling at Kettle Lake turning in wide over the ridge
+  // beyond runway 20 was lifted too high to land, round and round, until it met the ridge)
+  const float Rin = apComfort ? std::max(vh / (3.f * DEG), vh * vh / (G0 * tanf((s.special ? 45.f : 26.f) * DEG))) : vh * vh / (G0 * tanf((s.special ? 55.f : 45.f) * DEG));
+  const float outReach = F + 1300.f + vh * 15.f + 2.f * Rin, crossReach = 3.4f * Rin;
+  float turnMsa = a.elev;
+  for (float d = F; d <= outReach; d += 400.f) for (float c = -crossReach; c <= crossReach; c += 500.f) turnMsa = std::max(turnMsa, H(td - ld * d + rr * c));
   const float highAt2k = hAtGate - lose(F - 2000.f) - (gp2k + 75.f);
-  apPlanWhy = stopShort > 0.f ? fmt("runway too short with this wind (%.0f of %.0f m)", ldgNeed, a.length)
-            : highAt2k > 0.f ? "terrain keeps the approach too high to descend onto" : "";
+  // (where the turn-in's ground would lift it well above the intercept altitude, this end is no good for turns this wide:
+  // the en-route terrain floor takes it up and the final is never met from there)
+  const float turnHigh = turnMsa + 250.f - (intAlt + 150.f);
+  apPlanWhy = fieldShort > 0.f ? fmt("runway too short for the %s (%.0f m, it needs %.0f m)", s.name, a.length, rwyNeed)
+            : stopShort > 0.f ? fmt("runway too short with this wind (%.0f of %.0f m)", ldgNeed, a.length)
+            : highAt2k > 0.f ? "terrain keeps the approach too high to descend onto"
+            : turnHigh > 0.f ? (apComfort ? "high ground where it would turn in (gently, for the passengers or the load)" : "high ground where it would turn in") : "";
   float score = hw * 40.f - bestCost - (F0 - F) * 0.3f - length(bestC - pos) * 0.02f - blocked
-              - (atanf(gs) / DEG - 3.f) * 150.f - (stopShort > 0.f ? 20000.f + stopShort * 20.f : 0.f) - (highAt2k > 0.f ? 20000.f + highAt2k * 20.f : 0.f);
+              - (atanf(gs) / DEG - 3.f) * 150.f - (stopShort > 0.f ? 20000.f + stopShort * 20.f : 0.f) - (highAt2k > 0.f ? 20000.f + highAt2k * 20.f : 0.f) - (turnHigh > 0.f ? 20000.f + turnHigh * 20.f : 0.f);
   if (getenv("APDBG")) printf("apPlan %s rev %d: F %.0f gs %.2f deg blocked %.0f wind %+.1f cost %.0f landing %.0f of %.0f m, %.0f m high at 2 km, score %.0f %s (hold %.0f m above the field, leg %.0f m)\n", a.code, (int)rev, F, atanf(gs) / DEG, blocked, hw, bestCost, ldgNeed, a.length, highAt2k, score, apPlanWhy.c_str(), bestAlt - a.elev, legOut);
   if (commit) {
     apRev = rev; apFinalLen = F; apGs = gs; apHoldC = bestC; apHoldC.y = 0; apHoldR = R; apHoldAlt = bestAlt; apIntAlt = intAlt;
@@ -920,9 +942,14 @@ void Plane::apGuidance(float dt) {
         // out to settle before the gate. Too close in (or on the wrong side), first fly outbound, diverging a little.
         float outMin = F + 500.f + vnow * 15.f;
         float Rt = vnow * vnow / (G0 * tanf((s.special ? 30.f : 20.f) * DEG));
-        float Rturn = std::max(vnow / (3.f * DEG), vnow * vnow / (G0 * tanf((s.special ? 45.f : 26.f) * DEG)));   // NAV turns
+        float Rturn = apComfort ? std::max(vnow / (3.f * DEG), vnow * vnow / (G0 * tanf((s.special ? 45.f : 26.f) * DEG)))   // NAV turns: a gentle rate,
+                                : vnow * vnow / (G0 * tanf((s.special ? 55.f : 45.f) * DEG));                                // or flown hard
         float L1 = vnow * 14.f;
-        float side = cross >= 0 ? 1.f : -1.f, D = side * 2.4f * Rturn;
+        // (the side is kept from the outbound leg's start: still turning from the hold it can cross the centreline, and a
+        // side taken afresh then flipped the line to the far side, which it chased out past 20 km - QA F1, Kettle Lake)
+        if (apLeg != 3) apOutSide = 0.f;
+        else if (apOutSide == 0.f) apOutSide = cross >= 0 ? 1.f : -1.f;
+        float side = apLeg == 3 ? apOutSide : cross >= 0 ? 1.f : -1.f, D = side * 2.4f * Rturn;
         // outbound: follow a line parallel to the centreline, a turn's width off it, so the turn back rolls out on it
         auto intercept = [&](int leg) {
           return (leg == 3 ? rwyHdg + 180.f + clampf(atanf((cross - D) / L1) / DEG * 1.2f, -45.f, 45.f)
@@ -940,14 +967,16 @@ void Plane::apGuidance(float dt) {
           apStatus = fmt("HOLD  %s  %s %.0f ft", a.code, pos.y > apHoldAlt + 50.f ? "descending to" : "leaving at", apHoldAlt * M_TO_FT);
         } else {
           if (apLeg == 2 && along > -(outMin - 400.f) && fabsf(cross) > 300.f) apLeg = 3;
-          if (apLeg == 3 && along < -(outMin + 800.f) && fabsf(cross - D) < 400.f) apLeg = 2;
+          // (or sooner, wherever it is across, once the ground ahead would lift it above the intercept altitude: the plan
+          // keeps away from ends with high ground where it turns in, this is the guard - QA F1, Kettle Lake)
+          if (apLeg == 3 && along < -(outMin + 800.f) && (fabsf(cross - D) < 400.f || terrainAround() + 250.f > apIntAlt + 100.f)) apLeg = 2;
           apHeading = intercept(apLeg);
           apAlt = std::max(apIntAlt, std::min(apHoldAlt, pos.y));
           apSpeed = vh;
           float hd = hdgErrDeg(heading(), rwyHdg), th = fabsf(hd);
           float lead = Rt * (1.f - cosf(std::min(th, 90.f) * DEG)) + 150.f;
           bool closing = cross * hd < 0.f || fabsf(cross) < 150.f;
-          if (apLeg == 2 && along < -1500.f && fabsf(cross) < lead && closing && th < 70.f) { apStage = APS_FINAL; apStageT = 0; apXI = 0; }
+          if (apLeg == 2 && along < -1500.f && along > -(F + kIntRegion) && fabsf(cross) < lead && closing && th < 70.f) { apStage = APS_FINAL; apStageT = 0; apXI = 0; }
           apStatus = fmt("NAV  %s  RWY %02d  %s  %.1f km", a.code, rwyN, apLeg == 3 ? "outbound" : "intercept", dist / 1000.f);
         }
       }
@@ -975,6 +1004,11 @@ void Plane::apGuidance(float dt) {
       if (hab < 60.f) apVS = std::max(apVS, -(vg * gs + clampf((hab - 15.f) / 45.f, 0.f, 1.f)));
       // outside the gate the glideslope can run below the safe intercept altitude: hold that until the gate
       if (dist > F && pos.y < apIntAlt + 30.f) apVS = std::max(apVS, clampf((apIntAlt - pos.y) * 0.1f, -1.f, 3.f));
+      // and above the ground ahead: the planned corridor ends at the gate, and beyond it the extended glidepath can run
+      // into high ground (QA F1: a Starling captured 19 km out at Kettle Lake descended into the ridge on its path)
+      float hiAhead = -1e9f;
+      for (int i = 1; i <= 8; i++) { vec3 q = pos + vec3(ld.x, 0, ld.z) * (i * 250.f); if (dist - i * 250.f > 400.f) hiAhead = std::max(hiAhead, g_world.height(q.x, q.z)); }
+      if (dist > F) apVS = std::max(apVS, clampf((hiAhead + 150.f - pos.y) * 0.1f, -1.f, jet ? 9.f : 4.f));
       bool high = err < -40.f && dist < F + 1000.f;   // above the glideslope: configure early for the drag
       if (high) ctl.flaps = 1.f;
       else if (dist > F * 0.55f) ctl.flaps = dist > F ? 0.34f : 0.67f;
@@ -989,9 +1023,13 @@ void Plane::apGuidance(float dt) {
         if (getenv("APDBG")) printf("  go-around at %.0f m: cross %.0f, %.0f m %s the glidepath\n", dist, cross, fabsf(err), err > 0.f ? "below" : "above");
         apStage = APS_GOAROUND; apStageT = 0;
       }
-      { vec3 ahead = pos + vec3(ld.x, 0, ld.z) * 800.f; if (dist > 1200.f && pos.y < g_world.height(ahead.x, ahead.z) + 40.f) {
-        if (getenv("APDBG")) printf("  go-around at %.0f m: ground ahead (%.0f m below, %.0f m above the field)\n", dist, pos.y - g_world.height(ahead.x, ahead.z), pos.y - a.elev);
-        apStage = APS_GOAROUND; apStageT = 0; } }
+      {   // (inside the gate the planned corridor is clear, and the glidepath may pass a slope near the field closely: one
+          // look 800 m ahead; outside it, the 2 km ahead)
+        vec3 ahead = pos + vec3(ld.x, 0, ld.z) * 800.f;
+        float g = dist > F ? hiAhead : g_world.height(ahead.x, ahead.z);
+        if (dist > 1200.f && pos.y < g + 40.f) {
+          if (getenv("APDBG")) printf("  go-around at %.0f m: ground ahead (%.0f m below, %.0f m above the field)\n", dist, pos.y - g, pos.y - a.elev);
+          apStage = APS_GOAROUND; apStageT = 0; } }
       // the XR-40 comes to a hover over the touchdown point instead of a fast landing roll (starting to slow where it
       // can stop at a gentle 2 m/s^2 - the hover allows twice that - from the ground speed it has, tailwind included)
       float gsAl = std::max(vel.x * ld.x + vel.z * ld.z, 0.f);
@@ -1043,7 +1081,7 @@ void Plane::apGuidance(float dt) {
       if (length(vel) < 2.5f) {   // stopped: complete only on the runway; past its end the autoland is over but not a success
         float fromThr = along + clampf(a.length * 0.12f, 80.f, 300.f);   // (td sits past the threshold)
         bool onRwy = fromThr >= -5.f && fromThr <= a.length + 5.f && fabsf(cross) <= std::max(a.width * 0.5f, 12.f) + 8.f;
-        apDisengage(); apDone = true; ctl.brake = 1; apStatus = onRwy ? "AUTOLAND COMPLETE" : "AUTOLAND  STOPPED PAST THE RUNWAY";
+        apDisengage(); apDone = true; apOverrun = !onRwy; ctl.brake = 1; apStatus = onRwy ? "AUTOLAND COMPLETE" : "AUTOLAND  STOPPED PAST THE RUNWAY";
       }
       break;
     case APS_HOVER: {
@@ -1056,20 +1094,27 @@ void Plane::apGuidance(float dt) {
       apHeading = rwyHdg; apUseVS = true; apVS = jet ? 9.f : 4.f; apSpeed = vref * 1.35f;
       ctl.flaps = 0.34f;
       if (apStageT > 8.f && s.retract) ctl.gearDown = false;
-      if (pos.y > std::max(a.elev + 450.f, apHoldAlt - 30.f)) { apStage = APS_NAV; apLeg = 0; apStageT = 0; apTurnDir = 0; }
+      // (back to NAV only clear of the ground all round: its turns would otherwise put it into the slope it climbed from)
+      if (pos.y > std::max(a.elev + 450.f, apHoldAlt - 30.f) && pos.y > terrainAround() + 200.f) { apStage = APS_NAV; apLeg = 0; apStageT = 0; apTurnDir = 0; }
       apStatus = fmt("GO AROUND  %s", a.code);
       break;
   }
   // terrain safety while en route and in the go-around: never let the target sit below the ground ahead
   if (apStage == APS_NAV || apStage == APS_GOAROUND) {
-    vec3 f = len2(vel) > 5.f ? vel * (1.f / len2(vel)) : forward();
-    float hi = g_world.height(pos.x, pos.z);
-    for (int i = 1; i <= 6; i++) { vec3 p = pos + vec3(f.x, 0, f.z) * (i * 600.f); hi = std::max(hi, g_world.height(p.x, p.z)); }
-    // (and all round: in a steep orbit the velocity points off the circle, the ground that matters is what it turns over)
-    for (int i = 0; i < 8; i++) { float a = i * PI / 4; for (float r : {700.f, 1500.f}) hi = std::max(hi, g_world.height(pos.x + cosf(a) * r, pos.z + sinf(a) * r)); }
+    const float hi = terrainAround();
     if (!apUseVS) apAlt = std::max(apAlt, hi + 250.f);
     else if (pos.y < hi + 200.f) apVS = std::max(apVS, 5.f);
   }
+}
+
+// the highest ground the autopilot must keep clear of: under it, along its track for 3.6 km, and all round (in a steep
+// orbit the velocity points off the circle, the ground that matters is what it turns over)
+float Plane::terrainAround() const {
+  vec3 f = len2(vel) > 5.f ? vel * (1.f / len2(vel)) : forward();
+  float hi = g_world.height(pos.x, pos.z);
+  for (int i = 1; i <= 6; i++) { vec3 p = pos + vec3(f.x, 0, f.z) * (i * 600.f); hi = std::max(hi, g_world.height(p.x, p.z)); }
+  for (int i = 0; i < 8; i++) { float a = i * PI / 4; for (float r : {700.f, 1500.f}) hi = std::max(hi, g_world.height(pos.x + cosf(a) * r, pos.z + sinf(a) * r)); }
+  return hi;
 }
 
 // how quickly this airframe's pitch answers at this speed (s): the learned time to the pitch-rate peak at cruise, slower

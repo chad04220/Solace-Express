@@ -529,7 +529,7 @@ void Scenery::trim(vec3 cam, float keepDetail, float keepAll, int frame) {
       float x = chunkX0(cx) + CH * 0.5f, z = chunkX0(cz) + CH * 0.5f;
       float d = sqrtf((x - cam.x) * (x - cam.x) + (z - cam.z) * (z - cam.z));
       if (d > keepAll && frame - p->lastUse > 120) { p.reset(); continue; }
-      if (d > keepDetail && p->level >= 2) {
+      if (d > keepDetail && p->level >= 2 && frame - p->lastUse > 120) {   // (not a chunk prefetched for where the camera goes next)
         // drop the level-2 kinds (trees, bushes, boulders)
         std::vector<Ent> keep; uint32_t off[EK_COUNT + 1];
         for (int k = 0; k < EK_COUNT; k++) {

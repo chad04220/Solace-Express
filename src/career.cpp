@@ -304,7 +304,7 @@ Career::LaunchPlan Career::plan(const Contract& c, int si, Source src) const {
   st.y = std::max(g_world.height(st.x, st.z), A.elev) + 150.f;
   vec3 dir = B.pos() - st; dir.y = 0;
   pl.reset(&s, st, atan2f(dir.x, -dir.z) / DEG, s.maxFuel * 0.7f, 100, true, s.cruise * 0.8f);
-  pl.apComfort = true;
+  pl.apComfort = c.gentle();
   pl.apEngage(Plane::AP_NAV, c.to, c.wx);
   const PerfModel& P = Plane::perf(&s);
   vec3 C = pl.apHoldC; C.y = 0;
@@ -395,7 +395,7 @@ float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut) {
   }
   vec3 start = a.threshold(reverse) + (reverse ? -a.dir() : a.dir()) * 30.f;
   Plane p; p.reset(&s, start, reverse ? h0 + 180.f : h0, s.maxFuel, (float)c.cargoKg + c.pax * 85.f + 85.f, c.startAirborne, s.cruise);
-  p.apComfort = true; p.sceneryHits = false;
+  p.apComfort = c.gentle(); p.sceneryHits = false;
   if (!c.startAirborne) { p.engineRunning = true; p.engineSpool = 0.f; }
   const float dt = 1 / 30.f;
   float t = c.startAirborne ? 0.f : 4.f;   // (the engine start and the brake release before the roll)
@@ -409,10 +409,10 @@ float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut) {
     if (phase == 1) {
       if (wp < c.wps.size()) {   // the checkpoints in turn, on the hold modes at each one's height
         vec3 d(c.wps[wp].x - p.pos.x, 0, c.wps[wp].z - p.pos.z);
-        if (p.apMode != Plane::AP_HOLD || !p.apOn) { p.apEngage(Plane::AP_HOLD, -1, wx); p.apComfort = true; p.apSpeed = s.cruise * 0.85f; }
+        if (p.apMode != Plane::AP_HOLD || !p.apOn) { p.apEngage(Plane::AP_HOLD, -1, wx); p.apComfort = c.gentle(); p.apSpeed = s.cruise * 0.85f; }
         p.apHeading = wrapDeg360(atan2f(d.x, -d.z) / DEG); p.apAlt = c.wps[wp].alt; p.apUseVS = false;
         if (length(d) < 300.f) wp++;
-      } else { p.apEngage(Plane::AP_NAV, c.to, wx); p.apComfort = true; phase = 2; }
+      } else { p.apEngage(Plane::AP_NAV, c.to, wx); p.apComfort = c.gentle(); phase = 2; }
     }
     p.step(dt, wx, t);
     t += dt;

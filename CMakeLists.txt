@@ -49,6 +49,11 @@ if(UNIX AND NOT APPLE)
   add_executable(render_harness EXCLUDE_FROM_ALL tests/render_harness.cpp ${GAME_SOURCES} src/radio_stub.cpp)
   add_dependencies(render_harness shaders_gen)
   target_link_libraries(render_harness PRIVATE ${CMAKE_DL_LIBS} X11 pthread)
+  # the aircraft fields' geometry probes (headrest clearance, end-cap seams, the XR-40's touchpads) on Mesa/EGL, across
+  # the whole roster: aircraft_visual_test OUTPUT_DIR [W H] [first last]
+  add_executable(aircraft_visual_test EXCLUDE_FROM_ALL tests/aircraft_visual_test.cpp ${CORE_SOURCES} src/models.cpp src/gl.cpp)
+  add_dependencies(aircraft_visual_test shaders_gen)
+  target_link_libraries(aircraft_visual_test PRIVATE ${CMAKE_DL_LIBS} pthread)
 endif()
 
 # Headless tests (flight model + campaign progression validation)

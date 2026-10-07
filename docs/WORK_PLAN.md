@@ -1,8 +1,8 @@
 # Solace Express — Work Plan
 
-The owner's work plan from v3.9.4 (`f8b8537`), cut down to what is still open (2026-10-06, v3.27.1). Every finished
-item, with its spec, is in this file's history (`git log -p docs/WORK_PLAN.md`). The renderer rebuild is
-docs/RENDERER_REBUILD.md; the owner-side tool is the one `diagnostics.bat` in the release zip (docs/COLLABORATION.md).
+The owner's work plan from v3.9.4 (`f8b8537`), cut down to what is still open (2026-10-07, v3.32.0, with Codex's
+review of v3.31.0 folded in). Every finished item, with its spec, is in this file's history (`git log -p
+docs/WORK_PLAN.md`). The renderer rebuild is docs/RENDERER_REBUILD.md; the owner-side tool is the one `diagnostics.bat` in the release zip (docs/COLLABORATION.md).
 
 ## Open items
 
@@ -12,14 +12,18 @@ docs/RENDERER_REBUILD.md; the owner-side tool is the one `diagnostics.bat` in th
 | A6 UBO for scene parameters | deferred: every scene is GPU-bound on the owner's machine (CPU submit 7-8 ms under a longer GPU frame) |
 | Per-family aircraft shaders | done (v3.29.0-v3.29.2): light-aircraft builds (AF_LIGHT), a maps-only shadow proxy (PROXY_MAPS_ONLY; at night the airframe's beacon mapped looking down) and a UFO/debris-only objects build (OBJ_NO_AF). Owner's diagnostic v3.29.2 vs v3.28.0: every scene faster - cockpit 14.4 -> 7.4 ms, Mantis cockpit 18.5 -> 10.1, night 10.1 -> 7.7, UFO 6.9 -> 5.3 (objects 4.6 -> 0.9), proxy 0.1-0.2 ms everywhere. A research-only build is the remaining step if the jet cockpits need it |
 | Launch front-loading (v3.31.0) | done: every aircraft's meshes (research jets too) at launch; the islands and the aircraft performance cached per build; the loading bar paced by measured step times (load_pacer.h, shadercache/load_times.txt) with each step named. Still streamed: the scenery round a flight's start (the world is 313 x 313 chunks) |
-| Tiled light culling | deferred: low value now that every benchmark scene runs at 60 fps or better |
+| Tiled light culling | deferred: low value at the owner's v3.29.2 diagnostics (every benchmark scene at 60 fps or better then). Not current evidence: recheck against the current release's diagnostics after the v3.30.1 hotfix |
 | A10 / A11 water sky probe, cloud reprojection | deferred: the lighting and cloud passes are 1-3 ms; worth it only if the owner's diagnostics show them growing |
 | Review visuals (cockpit framing, materials, vegetation, coast) | open, cheap changes only (the owner prefers performance and gameplay); the XR-20's cockpit framing is done |
-| Cockpit edges (jagged perimeters, the wing roots' pale wedges) | open: v3.30.0 traced them per pixel and cost 95 ms in the cockpit on the owner's GPU (v3.30.1 took it out). Next: in the bake - a finer lattice for the thin patch and the window rims, no cost in flight |
+| Cockpit edges (jagged perimeters, the wing roots' pale wedges) | open: v3.30.0 traced them per pixel and cost 95 ms in the cockpit on the owner's GPU (v3.30.1 took it out). Next: in the bake - a finer lattice for the thin patch and the window rims. Measure what it costs: bake time, cache size, triangles drawn and VRAM, not only the flight frame |
+| R1 aircraft reachability (reopened by the review of v3.31.0) | v3.32.0: the aircraft chooser lists owned aircraft first and scrolls (wheel, right stick), so rentals can't push one out of reach; a retry or restart needs an aircraft the job can use. Accept: the owner checks every career aircraft at 720p / 1080p and 80 / 100 / 140% |
+| R7 autoland in the real career and from the GPS (reopened) | v3.32.0: the gentle (passenger) law and the full envelope both swept (`autoland_sweep --comfort`, `--all` for every field the GPS offers); runway length, the turn-in's ground and the glidepath checked before committing, with the reason said when refused; the stick takes over a refused autoland's hold; a stop past the runway's end is reported as an overrun. Accept: both sweeps land or refuse every case |
+| R9 layouts at every supported scale (reopened) | v3.32.0: Work list, Settings and the debrief scroll; tabs fit or number themselves; the wind readout keeps clear of its components. Accept: the owner's screenshots at 140% |
+| W1 audio follows a default output device change | implemented; validation on real devices (headset plugged and unplugged) pending |
 
 Done since v3.24.0 and kept out of this list: R3's moving parts (every aircraft, the research jets' nozzles, gear and
-actuators included: no moving hull is left), the cloaked XR-40 on its mesh, F1's gusty autoland (the sweep lands or
-declines every case), W1's audio device change, the review's career findings (R1-R6, R8-R10).
+actuators included: no moving hull is left), the cloaked XR-40 on its mesh, the review's career findings (R2-R6, R8,
+R10).
 
 Decided, not planned: D1 (the FlightSession / CrashFx / Comms extraction from `Game`: a pure refactor with regression
 risk and no player-visible gain) and B3 (the first-run compile stays on the helper process).
