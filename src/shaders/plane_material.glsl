@@ -383,7 +383,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
       if ((tick < 0.0005 && cy > 0.004) || (longT < 0.0007 && cy > -0.002)) m.alb = vec3(0.05);
       if (longT < 0.004 && cy < -0.003 && cy > -0.011 && fract(cx/0.0016) < 0.45) m.alb = vec3(0.06);   // the numerals under them
       if (abs(cx) < 0.0008) m.alb = vec3(0.75, 0.05, 0.03);   // lubber line
-      m.emit = m.alb*vec3(1.0, 0.8, 0.55)*(0.05 + 0.9*uNight);
+      m.emit = m.alb*vec3(1.0, 0.8, 0.55)*(0.05 + 0.3*uNight);   // (a dim lamp: at 0.9 it was the brightest thing in the cabin at night)
     }
   }
   else {
