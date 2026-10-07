@@ -10,7 +10,7 @@ docs/RENDERER_REBUILD.md; the owner-side tool is the one `diagnostics.bat` in th
 |---|---|
 | A3 instrument atlas static/dynamic split | deferred: the display pass is 0.2-0.8 ms on the owner's GPU (v3.27.1); worth it only if it grows |
 | A6 UBO for scene parameters | deferred: every scene is GPU-bound on the owner's machine (CPU submit 7-8 ms under a longer GPU frame) |
-| Per-family aircraft shaders | partly done (v3.29.0): a light-aircraft build (AF_LIGHT) of the objects, shadow proxy, effects and mesh programs without the research jets' code, used whenever none is in the frame (the mesh per aircraft). A research-only build is the remaining step if the jet cockpits need it |
+| Per-family aircraft shaders | done (v3.29.0-v3.29.2): light-aircraft builds (AF_LIGHT), a maps-only shadow proxy (PROXY_MAPS_ONLY; at night the airframe's beacon mapped looking down) and a UFO/debris-only objects build (OBJ_NO_AF). Owner's diagnostic v3.29.2 vs v3.28.0: every scene faster - cockpit 14.4 -> 7.4 ms, Mantis cockpit 18.5 -> 10.1, night 10.1 -> 7.7, UFO 6.9 -> 5.3 (objects 4.6 -> 0.9), proxy 0.1-0.2 ms everywhere. A research-only build is the remaining step if the jet cockpits need it |
 | Tiled light culling | deferred: low value now that every benchmark scene runs at 60 fps or better |
 | A10 / A11 water sky probe, cloud reprojection | deferred: the lighting and cloud passes are 1-3 ms; worth it only if the owner's diagnostics show them growing |
 | Review visuals (cockpit framing, materials, vegetation, coast) | open, cheap changes only (the owner prefers performance and gameplay); the XR-20's cockpit framing is done |
