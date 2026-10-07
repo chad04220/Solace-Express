@@ -231,6 +231,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   }
   if (ib.empty()) {
     bakeBuilt++;
+    if (onBakeStart) onBakeStart();   // (not in the cache, or unreadable: the launch's loading screen says it is building)
     // ---- the field's states, on the bake program (bound by the caller)
     std::vector<HullState> st = hullStateList(M, inside, true);   // (the sweeps that move only rigid parts dropped)
     const int ns = (int)st.size();
@@ -777,6 +778,9 @@ void Renderer::drawPlaneMeshDepth(const FrameParams& fp, const PlaneMesh& pm, co
   // the airframe stays (the bomb camera's pane keeps its picture while it has one)
   const bool scrSkip = screenWindows && trafK < 0 && fp.plane.PS[3] > 0.5f && (int)(fp.plane.M[2] + 0.5f) >= 5 && progPlaneMeshScr;
   if (scrSkip) {
+    // (the incoming framebuffer, the G-buffer, saved before anything is bound: allocating the target binds its own,
+    // and restoring that one left the scenery drawn after this into the screens' depth target)
+    GLint prevFbo = 0; glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
     if (!texScrDepth || scrDepthW < rw || scrDepthH < rh) {
       int w = std::max(rw, scrDepthW), h = std::max(rh, scrDepthH);
       if (texScrDepth) glDeleteTextures(1, &texScrDepth);
@@ -790,7 +794,6 @@ void Renderer::drawPlaneMeshDepth(const FrameParams& fp, const PlaneMesh& pm, co
       { GLenum none = GL_NONE; glDrawBuffers(1, &none); } glReadBuffer(GL_NONE);
       scrDepthW = w; scrDepthH = h;
     }
-    GLint prevFbo = 0; glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fboScrDepth);
     glViewport(0, 0, rw, rh);
     glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);

@@ -46,6 +46,18 @@ public:
     cur = i; steps[i].t0 = now; sub = -1.f;
   }
   void end() { std::lock_guard<std::mutex> lk(m); if (cur >= 0) finish(cur, clock()); cur = -1; }
+  // the running step turned out to do the other kind of work (it found its cache missing or unreadable): its time is
+  // remembered under that kind, and its expectation follows it
+  void markFresh(int i, bool fresh) {
+    std::lock_guard<std::mutex> lk(m);
+    Step& s = steps[i];
+    const std::string want = fresh ? ":b" : ":c";
+    if (s.key.size() < 2 || s.key.compare(s.key.size() - 2, 2, want) == 0) return;
+    s.key.replace(s.key.size() - 2, 2, want); s.group.replace(s.group.size() - 2, 2, want);
+    auto it = prev.find(s.key);
+    s.known = it != prev.end();
+    s.expect = s.known ? std::max(it->second, 0.02f) : (fresh ? std::max(s.def, 10.f) : s.def);
+  }
   // the running step's own measure of how far it is (0..1), if it has one
   void setSub(float f) { std::lock_guard<std::mutex> lk(m); sub = f; }
   // 0..1 of the whole launch

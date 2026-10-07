@@ -2354,9 +2354,19 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   for (size_t k = 0; k < todo.size() && !quit; k++) {
     prewarmCraft = todo[k].first; prewarmInside = todo[k].second;
     if (pace && itemSteps && k < itemSteps->size()) pace->begin((*itemSteps)[k]);
-    const bool fresh = !g_ren.meshCached;   // (the cache this build's bake writes: empty, every mesh is built)
-    progress(pace ? pace->fraction() : 0.35f + 0.65f * k / todo.size(), prewarmLabel(prewarmCraft, prewarmInside, fresh) + fmt("   %d of %d", (int)k + 1, (int)todo.size()));
+    // worded as a cache read; a bake that begins (its cache missing or unreadable) says so, and is timed as a build
+    const int step = pace && itemSteps && k < itemSteps->size() ? (*itemSteps)[k] : -1;
+    const std::string count = fmt("   %d of %d", (int)k + 1, (int)todo.size());
+    progress(pace ? pace->fraction() : 0.35f + 0.65f * k / todo.size(), prewarmLabel(prewarmCraft, prewarmInside, false) + count);
+    bool built = false;
+    g_ren.onBakeStart = [&] {
+      built = true;
+      if (pace && step >= 0) pace->markFresh(step, true);
+      progress(pace ? pace->fraction() : 0.35f + 0.65f * k / todo.size(), prewarmLabel(prewarmCraft, prewarmInside, true) + count);
+    };
     realTime = 3.f; frame();   // bakes it at the end of the frame, if this view uses one
+    g_ren.onBakeStart = nullptr;
+    if (pace && step >= 0 && !built) pace->markFresh(step, false);
   }
   prewarmCraft = -1; prewarmInside = false;
   realTime = 0.f;

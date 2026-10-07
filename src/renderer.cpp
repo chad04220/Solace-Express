@@ -950,7 +950,10 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   if (trafShOn) glUniformMatrix4fv(U(p, "uTrafShVP"), kMaxTrafficDrawn, GL_FALSE, trafShVP[0].m);
   glActiveTexture(GL_TEXTURE0 + 26); glBindTexture(GL_TEXTURE_2D_ARRAY, shOn || trafShOn ? texShMap : 0); glUniform1i(U(p, "uAfShMap"), 26);
   glActiveTexture(GL_TEXTURE0 + 27); glBindTexture(GL_TEXTURE_2D_ARRAY, shOn ? texShMov : 0); glUniform1i(U(p, "uAfShMov"), 27);
-  glActiveTexture(GL_TEXTURE0 + 12); glBindTexture(GL_TEXTURE_2D, shCabOn ? texShCab : 0); glUniform1i(U(p, "uCabShMap"), 12);   // the cabin's sun map (cockpit view)
+  // the cabin's sun map (cockpit view) on unit 22: 12 is the far scenery cascade's (bound below, it took this one's place);
+  // 22 is otherwise only the lighting pass's (its G-buffer extras), which reads no cabin map, and this binds it again
+  // before every pass that does
+  glActiveTexture(GL_TEXTURE0 + 22); glBindTexture(GL_TEXTURE_2D, shCabOn ? texShCab : 0); glUniform1i(U(p, "uCabShMap"), 22);
   glUniform1i(U(p, "uCabShOn"), shCabOn ? 1 : 0);
   if (shCabOn) { glUniformMatrix4fv(U(p, "uCabShVP"), 1, GL_FALSE, shCabVP.m); glUniform1f(U(p, "uCabShBias"), shCabBias); }
   glUniform1i(U(p, "uHullOn"), hullOn ? 1 : 0); glUniform1f(U(p, "uHullNear"), hullOn ? hullNearNow : hullNear(fp)); glUniform1i(U(p, "uHullExitOn"), hullOn && hullExitOn ? 1 : 0);

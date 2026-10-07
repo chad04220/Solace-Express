@@ -692,7 +692,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       if (!sh.empty()) stage += ": " + sh;
       stage += "   " + std::to_string(std::min(d + 1, Renderer::kProgramCount)) + " of " + std::to_string(Renderer::kProgramCount);
     } else stage = "Shaders ready";
-    if (!built) stage += worldFresh ? "   |   Generating the islands (once)" : "   |   Loading the islands";
+    if (!built) stage += g_worldStage == 1 ? "   |   Loading the islands from the cache" : "   |   Generating the islands (once: kept for the next launch)";
     introFrame(pace.fraction(), stage, 1.f);
     if (game.quit) break;
     if (compiled && built && t > 3.2f) break;   // the logo stays up long enough to be seen
@@ -712,6 +712,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if ((g_shaderCacheMisses > 0 || childMisses > 0) && ctx2 && !g_shaderCacheDir.empty())
     if (FILE* f = fopen((g_shaderCacheDir + "\\compile_time.txt").c_str(), "w")) { fprintf(f, "%.1f\n", compileSecs); fclose(f); }
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  pace.markFresh(stStart, !cacheCurrent || !g_world.fromCache);   // (timed as what it did: the islands read, or generated)
   pace.begin(stInit);
   introFrame(pace.fraction(), perfFresh ? "Loading your career  |  learning how each aircraft flies (once)" : "Loading your career and the aircraft performance", 1.f);
   game.init(false);
@@ -732,7 +733,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
     fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits.load(), g_shaderCacheMisses.load());
     fprintf(f, "Launch: shaders and islands %.1f s (islands %s), career %.1f s, renderer %.1f s, menu %.1f s, aircraft meshes %.1f s (%d built)\n",
-            pace.tookOf("start"), worldFresh ? "generated" : "from the cache", pace.tookOf("career"), pace.tookOf("renderer"), pace.tookOf("menu"), pace.tookOf("mesh"), g_ren.bakeBuilt);
+            pace.tookOf("start"), g_world.fromCache ? "from the cache" : "generated", pace.tookOf("career"), pace.tookOf("renderer"), pace.tookOf("menu"), pace.tookOf("mesh"), g_ren.bakeBuilt);
     if (!g_ren.dispError.empty()) fprintf(f, "Display shader failed (cockpit screens disabled):\n%s\n", g_ren.dispError.c_str());
     fclose(f);
   }

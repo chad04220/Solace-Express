@@ -360,23 +360,37 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texShCab, 0);
       glReadBuffer(GL_NONE);   // (depth alone: complete only without a read buffer under GL 3.3)
     }
-    glBindFramebuffer(GL_FRAMEBUFFER, fboShCab);
-    { GLenum none = GL_NONE; glDrawBuffers(1, &none); }
-    glViewport(0, 0, kShCabRes, kShCabRes);
-    glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE); glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-    glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);
-    const vec3 d = normalize(fp.sunDir), up = fabsf(d.y) < 0.99f ? vec3(0, 1, 0) : vec3(0, 0, 1), eye = fp.camPos;
+    // the sun and the eye in the aircraft's own frame (pv.rot: body to world, column-major)
+    const float* r = pv.rot;
+    auto toBody = [&](vec3 v) { return vec3(r[0] * v.x + r[1] * v.y + r[2] * v.z, r[3] * v.x + r[4] * v.y + r[5] * v.z, r[6] * v.x + r[7] * v.y + r[8] * v.z); };
+    const vec3 dB = normalize(toBody(normalize(fp.sunDir))), eB = toBody(fp.camPos - c);
     const float h = 2.5f, zf = 2.f * R + 3.f;
-    shCabVP = orthoMat(-h, h, -h, h, 0.1f, zf) * lookAt(eye + d * (2.f * R), eye, up);
+    const bool redraw = pm->second.key != shCabKey || ++shCabAge >= 8 || dot(dB, shCabDir) < cosf(0.25f * DEG) || length(eB - shCabEye) > 0.02f;
+    if (redraw) {
+      shCabKey = pm->second.key; shCabAge = 0; shCabDir = dB; shCabEye = eB;
+      const vec3 up = fabsf(dB.y) < 0.99f ? vec3(0, 1, 0) : vec3(0, 0, 1);
+      shCabBodyVP = orthoMat(-h, h, -h, h, 0.1f, zf) * lookAt(eB + dB * (2.f * R), eB, up);
+      glBindFramebuffer(GL_FRAMEBUFFER, fboShCab);
+      { GLenum none = GL_NONE; glDrawBuffers(1, &none); }
+      glViewport(0, 0, kShCabRes, kShCabRes);
+      glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE); glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+      glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);
+      const float ident[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+      glUseProgram(progShMap);
+      glUniformMatrix4fv(U(progShMap, "uVP"), 1, GL_FALSE, shCabBodyVP.m);
+      glUniformMatrix3fv(U(progShMap, "uRot"), 1, GL_FALSE, ident);   // (drawn in the aircraft's frame)
+      glUniform3f(U(progShMap, "uPos"), 0.f, 0.f, 0.f);
+      glUniform1i(U(progShMap, "uPartInst"), -1);
+      glBindVertexArray(pm->second.vao);
+      glDrawElements(GL_TRIANGLES, pm->second.idx, GL_UNSIGNED_INT, nullptr);
+      drawPlaneParts(pm->second, progShMap, -1);
+    }
+    // this frame's world-space lookup: world to body (the transpose of the rotation, about the aircraft), then the map
+    mat4 w2b;
+    for (int a = 0; a < 3; a++) for (int b = 0; b < 3; b++) w2b(a, b) = r[a * 3 + b];
+    for (int a = 0; a < 3; a++) w2b(a, 3) = -(r[a * 3] * c.x + r[a * 3 + 1] * c.y + r[a * 3 + 2] * c.z);
+    shCabVP = shCabBodyVP * w2b;
     shCabBias = 0.004f / (zf - 0.1f);   // (4 mm, in the map's depth)
-    glUseProgram(progShMap);
-    glUniformMatrix4fv(U(progShMap, "uVP"), 1, GL_FALSE, shCabVP.m);
-    glUniformMatrix3fv(U(progShMap, "uRot"), 1, GL_FALSE, pv.rot);
-    glUniform3f(U(progShMap, "uPos"), c.x, c.y, c.z);
-    glUniform1i(U(progShMap, "uPartInst"), -1);
-    glBindVertexArray(pm->second.vao);
-    glDrawElements(GL_TRIANGLES, pm->second.idx, GL_UNSIGNED_INT, nullptr);
-    drawPlaneParts(pm->second, progShMap, -1);
     shCabOn = true;
   }
   glBindVertexArray(0);

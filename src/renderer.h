@@ -154,7 +154,8 @@ public:
   std::string compileStage() { std::lock_guard<std::mutex> lk(stageMu); return stageName; }
   void setCompileStage(const char* s) { std::lock_guard<std::mutex> lk(stageMu); stageName = s; }
   std::mutex stageMu; std::string stageName;
-  bool meshCached = false;   // this build's aircraft meshes are in the cache already (checkMeshCache: a launch reads them, it builds none)
+  bool meshCached = false;
+  std::function<void()> onBakeStart;   // called as an aircraft mesh begins to build (not read from the cache): the loading screen's wording   // this build's aircraft meshes are in the cache already (checkMeshCache: a launch reads them, it builds none)
   void checkMeshCache();
   // environment entities: entSync generates every chunk in range before drawing (headless captures)
   bool entSync = false;
@@ -345,6 +346,9 @@ private:
   // the cabin's own sun map in the cockpit view: 5 m about the eye at 2048 texels (2.4 mm), for the cabin's light and
   // shade - the whole airframe's map (layer 0, ~1.4 cm a texel) speckled the posts and frames a hand's width away
   GLuint texShCab = 0, fboShCab = 0; bool shCabOn = false; mat4 shCabVP; float shCabBias = 0.f;
+  // (kept in the aircraft's own frame and drawn again only when the sun has turned against it, the eye has moved, a
+  // different cockpit is in use, or every 8th frame for the moving controls: shCabVP is this frame's world-space form)
+  mat4 shCabBodyVP; vec3 shCabDir, shCabEye; uint64_t shCabKey = 0; int shCabAge = 1 << 20;
   static constexpr int kShCabRes = 2048;
   bool shMovOn = false;   // the player's maps carry a moving-hull mask this frame (the proxy marches the field there)
   GLuint progShProxyMaps = 0, progObjectsNoAf = 0;   // (progObjectsNoAf: the objects pass with only the UFO and the debris to march)

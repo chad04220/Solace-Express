@@ -5,6 +5,7 @@
 #include "scenery.h"
 
 World g_world;
+std::atomic<int> g_worldStage{0};
 
 // ---------------------------------------------------------------- noise
 float hash2i(int x, int y) {
@@ -203,7 +204,10 @@ float airportInfluence(float x, float z) {
 void World::build(const std::string& cachePath, const std::string& stamp) {
   airports.assign(std::begin(kAirports), std::end(kAirports));
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
-  if (!cachePath.empty() && loadCache(cachePath, stamp)) { sceneryInit(); boxes.clear(); return; }
+  g_worldStage = cachePath.empty() ? 2 : 1;
+  fromCache = !cachePath.empty() && loadCache(cachePath, stamp);
+  if (fromCache) { sceneryInit(); boxes.clear(); g_worldStage = 3; return; }
+  g_worldStage = 2;
   hm.resize((size_t)HM_N * HM_N * 4);
   sceneryInit();
   parallelFor(HM_N, [&](int j) {   // rows are independent; spread over every core
@@ -238,6 +242,7 @@ void World::build(const std::string& cachePath, const std::string& stamp) {
   // Airport buildings are raster scenery entities now (airport_scenery.cpp); the old analytic box list stays empty
   boxes.clear();
   if (!cachePath.empty()) saveCache(cachePath, stamp);
+  g_worldStage = 3;
 }
 
 // The generated world on disk: its height and mask textures, height bounds and terrain envelope, stamped with the
@@ -246,21 +251,28 @@ namespace {
 const uint32_t kWorldMagic = 0x574c4431u;   // "WLD1"
 template <class T> void putVec(FILE* f, const std::vector<T>& v) { uint64_t n = v.size(); fwrite(&n, 8, 1, f); if (n) fwrite(v.data(), sizeof(T), n, f); }
 template <class T> bool getVec(FILE* f, std::vector<T>& v, uint64_t expect) {
-  uint64_t n = 0; if (fread(&n, 8, 1, f) != 1 || (expect && n != expect) || n > (1ull << 30)) return false;
+  uint64_t n = 0; if (fread(&n, 8, 1, f) != 1 || n != expect) return false;
   v.resize(n); return !n || fread(v.data(), sizeof(T), n, f) == n;
 }
 }
 bool World::loadCache(const std::string& path, const std::string& stamp) {
   FILE* f = fopen(path.c_str(), "rb"); if (!f) return false;
+  // into temporaries, every array at its exact size (the terrain code indexes them on that assumption), published only
+  // when the whole file checks out: a short, malformed or other build's cache is rejected and the world generated
+  World w;
   uint32_t magic = 0; char st[64] = {};
   bool ok = fread(&magic, 4, 1, f) == 1 && magic == kWorldMagic && fread(st, 1, 64, f) == 64 && stamp == std::string(st, strnlen(st, 64));
-  ok = ok && getVec(f, hm, (uint64_t)HM_N * HM_N * 4) && getVec(f, roadId, (uint64_t)MASK_N * MASK_N * 2) && getVec(f, mask, (uint64_t)MASK_N * MASK_N * 4);
-  for (int L = 0; ok && L < HMAX_LEVELS; L++) ok = getVec(f, hmax[L], 0);
-  ok = ok && getVec(f, tpV0, 0);
-  for (int L = 0; ok && L < TP_LEVELS; L++) ok = getVec(f, tpM[L], 0);
+  ok = ok && getVec(f, w.hm, (uint64_t)HM_N * HM_N * 4) && getVec(f, w.roadId, (uint64_t)MASK_N * MASK_N * 2) && getVec(f, w.mask, (uint64_t)MASK_N * MASK_N * 4);
+  for (int L = 0; ok && L < HMAX_LEVELS; L++) { const uint64_t n = (uint64_t)(HMAX_N >> L); ok = getVec(f, w.hmax[L], n * n); }
+  ok = ok && getVec(f, w.tpV0, (uint64_t)(HM_N + 1) * (HM_N + 1));
+  for (int L = 0; ok && L < TP_LEVELS; L++) { const uint64_t n = (uint64_t)(HM_N >> L); ok = getVec(f, w.tpM[L], n * n); }
+  ok = ok && fgetc(f) == EOF;   // (nothing after the last array: not some other format's file)
   fclose(f);
-  if (!ok) { hm.clear(); roadId.clear(); mask.clear(); }
-  return ok;
+  if (!ok) return false;
+  hm.swap(w.hm); roadId.swap(w.roadId); mask.swap(w.mask); tpV0.swap(w.tpV0);
+  for (int L = 0; L < HMAX_LEVELS; L++) hmax[L].swap(w.hmax[L]);
+  for (int L = 0; L < TP_LEVELS; L++) tpM[L].swap(w.tpM[L]);
+  return true;
 }
 void World::saveCache(const std::string& path, const std::string& stamp) const {
   std::string tmp = path + ".tmp";

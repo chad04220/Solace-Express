@@ -60,6 +60,7 @@ public:
   // generation), else generated and written there
   void build(const std::string& cachePath = std::string(), const std::string& stamp = std::string());
   bool loadCache(const std::string& path, const std::string& stamp);
+  bool fromCache = false;   // the last build() read its cache (else it generated, and saved, the world)
   void saveCache(const std::string& path, const std::string& stamp) const;
   // Terrain envelope (the terrain mesh culls its chunks with it, terrain_mesh.cpp): an upper bound of the rendered
   // terrain at every vertex of the HM_N grid through the texel centres (tpV0, (HM_N+1)^2), and per cell (tpM[L])
@@ -90,3 +91,5 @@ void noised(float px, float pz, float& v, float& dx, float& dz);
 float terrainFbm(float px, float pz, int octaves);
 
 extern World g_world;
+#include <atomic>
+extern std::atomic<int> g_worldStage;   // World::build: 0 not begun, 1 reading the cache, 2 generating, 3 done (the loading screen's wording)
