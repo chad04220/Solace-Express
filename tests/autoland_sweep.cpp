@@ -2,7 +2,7 @@
 // directions and heights. A run succeeds when the autopilot lands on the runway (touchdown under 3 m/s, stopped on the
 // runway) without crashing, within 30 simulated minutes.
 //   autoland_sweep [slice count] [--csv file] [--craft i] [--airport CODE] [--wind w] [--comfort] [--all]
-//   (--comfort: the career's passenger-comfort guidance, apComfort; --all: every field, as the GPS offers them, not only
+//   (--comfort: the gentle guidance for passengers and fragile loads, apComfort, on the career types; --all: every field, as the GPS offers them, not only
 //   those the career would send the type to - a short one must be refused, never overrun)
 //   (slice/count: run every count-th case starting at slice, for parallel runs; the others narrow the cases)
 //   (env APDBG: the plans, go-arounds and the last metres; APTRACE: the guidance stage and leg every 10 s)
@@ -32,6 +32,7 @@ int main(int argc, char** argv) {
   const int nAp = (int)g_world.airports.size();
   for (int si = 0; si <= kWraith; si++) {
     const AircraftSpec& s = kAircraft[si];
+    if (comfort && si >= kNumAircraft) continue;   // (the gentle law flies passengers and fragile loads: career types only)
     for (int ai = 0; ai < nAp; ai++) {
       const Airport& A = g_world.airports[ai];
       if (!all && !s.special && !runwayOK(s, A)) continue;   // the career never sends it there

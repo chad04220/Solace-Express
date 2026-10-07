@@ -758,9 +758,11 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   float iafAlt = a.elev + gh + F * gs + 20.f;
   // orbit radius: a comfortable turn at holding speed
   float vh = std::max(s.vref * 1.45f, std::min(s.cruise * 0.6f, s.vref * 1.8f));
-  // (gentle - passengers, a fragile load - a 24 deg bank; otherwise the turns are flown hard: 45 deg, 55 for the research jets)
-  float R = apComfort ? clampf(vh * vh / (G0 * tanf((s.special ? 40.f : 24.f) * DEG)) * 1.15f, 900.f, 3500.f)
-                      : clampf(vh * vh / (G0 * tanf((s.special ? 55.f : 45.f) * DEG)) * 1.15f, 400.f, 3500.f);
+  // (gentle - passengers, a fragile load - a 24 deg bank; otherwise flown hard, 45 deg. The research jets keep their 40
+  // deg orbit, wide enough at their speed to slow down in before the final: a tighter one brought the XR-30 to Northpoint
+  // at 108 kt and it ran off the end)
+  float R = apComfort || s.special ? clampf(vh * vh / (G0 * tanf((s.special ? 40.f : 24.f) * DEG)) * 1.15f, 900.f, 3500.f)
+                                   : clampf(vh * vh / (G0 * tanf(45.f * DEG)) * 1.15f, 400.f, 3500.f);
   // intercept region: the extended centreline from the gate out to 6 km beyond it (the guidance captures the final and
   // turns back from its outbound leg inside it)
   float intMsa = 0;
@@ -820,7 +822,7 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   // minimum and a turn's width, a turn and a half across - gentle turns are wide) at the ground's height there plus the
   // en-route margin, then down the final (QA F1: a passenger Starling at Kettle Lake turning in wide over the ridge
   // beyond runway 20 was lifted too high to land, round and round, until it met the ridge)
-  const float Rin = apComfort ? std::max(vh / (3.f * DEG), vh * vh / (G0 * tanf((s.special ? 45.f : 26.f) * DEG))) : vh * vh / (G0 * tanf((s.special ? 55.f : 45.f) * DEG));
+  const float Rin = apComfort || s.special ? std::max(vh / (3.f * DEG), vh * vh / (G0 * tanf((s.special ? 45.f : 26.f) * DEG))) : vh * vh / (G0 * tanf(45.f * DEG));   // (as the guidance's Rturn)
   const float outReach = F + 1300.f + vh * 15.f + 2.f * Rin, crossReach = 3.4f * Rin;
   float turnMsa = a.elev;
   for (float d = F; d <= outReach; d += 400.f) for (float c = -crossReach; c <= crossReach; c += 500.f) turnMsa = std::max(turnMsa, H(td - ld * d + rr * c));
@@ -942,8 +944,11 @@ void Plane::apGuidance(float dt) {
         // out to settle before the gate. Too close in (or on the wrong side), first fly outbound, diverging a little.
         float outMin = F + 500.f + vnow * 15.f;
         float Rt = vnow * vnow / (G0 * tanf((s.special ? 30.f : 20.f) * DEG));
-        float Rturn = apComfort ? std::max(vnow / (3.f * DEG), vnow * vnow / (G0 * tanf((s.special ? 45.f : 26.f) * DEG)))   // NAV turns: a gentle rate,
-                                : vnow * vnow / (G0 * tanf((s.special ? 55.f : 45.f) * DEG));                                // or flown hard
+        // NAV turns: a gentle rate, or flown hard - but the research jets keep the wide outbound offset: at their speed
+        // it takes the localizer's look-ahead (14 s of flight) to settle on the centreline, not the turn, and a tighter
+        // offset swapped outbound and intercept legs without end (the bank they fly is not limited by it)
+        float Rturn = apComfort || s.special ? std::max(vnow / (3.f * DEG), vnow * vnow / (G0 * tanf((s.special ? 45.f : 26.f) * DEG)))
+                                             : vnow * vnow / (G0 * tanf(45.f * DEG));
         float L1 = vnow * 14.f;
         // (the side is kept from the outbound leg's start: still turning from the hold it can cross the centreline, and a
         // side taken afresh then flipped the line to the far side, which it chased out past 20 km - QA F1, Kettle Lake)
