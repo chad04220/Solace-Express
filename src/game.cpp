@@ -360,27 +360,58 @@ void Game::continueJob(int spec, Career::Source src) {
   Contract c = career.job->continuation();
   bool took = commitLaunch([&](Career& k) {
     Career::JobState& J = *k.job;
-    if (spec != J.spec || src != J.src) J.hirePaid = false;   // a different aircraft: a new hire
+    if (spec != J.spec || src != J.src) { J.hirePaid = false; J.ferryPaid = false; }   // a different aircraft: a new hire, its own ferry (C3)
     J.spec = spec; J.src = src; J.state = Career::JobState::ACTIVE; k.attempt++; k.attemptOpen = true;
   });
   if (!took || !career.job || career.job->state != Career::JobState::ACTIVE) return;   // the save did not take: the job stays as it was, nothing flies on a stale career
   startFlight(c, spec, src);
-  {   // the committed job: the leg carries on from its checkpoints, its clock and the ride so far
-    wpIndex = std::min(career.job->wpDone, (int)c.wps.size()); result.wpDone = wpIndex; jobClockBase = career.job->jobClockMin * 60.f;
-    result.patient = career.job->patient; result.comfort = career.job->comfort;
-    if (career.job->hirePaid) launchPlan.hire = 0;
-    if (career.job->ferryPaid) launchPlan.ferry = 0;
-  }
+  applyJobLeg();
+}
+// the committed job's leg carries on from its checkpoints, its clock and the ride so far, its paid fees waived
+void Game::applyJobLeg() {
+  if (!career.job || career.job->state != Career::JobState::ACTIVE) return;
+  const Career::JobState& J = *career.job;
+  wpIndex = std::min(J.wpDone, (int)contract.wps.size()); result.wpDone = wpIndex; jobClockBase = J.jobClockMin * 60.f;
+  result.patient = J.patient; result.comfort = J.comfort;
+  if (J.hirePaid) launchPlan.hire = 0;
+  if (J.ferryPaid) launchPlan.ferry = 0;
+  jobLeg = true;
+}
+void Game::continuationWaivers(Career::LaunchPlan& p, const Contract& c, int spec, Career::Source src) const {
+  if (!career.job) return;
+  const Career::JobState& J = *career.job;
+  if (spec != J.spec || src != J.src) return;   // another aircraft: its hire and its ferry are new
+  if (J.hirePaid) p.hire = 0;
+  if (J.ferryPaid) p.ferry = 0;
+  p.net = c.payout - p.fees() - p.fuelCostEst;
+}
+// The pause menu's Restart: the same flight from the start, in the mode it was flown in. A practice approach or a
+// trial stays off the books, a job's leg carries on from where the job waited (its checkpoints, clock and ride, its
+// paid fees), a research sortie relaunches (the review of v3.31.0, C1: Restart made practice and trials career
+// flights, and reset a job leg's clock and comfort)
+void Game::restartFlight() {
+  if (researchFlight) { launchResearch(); return; }
+  const bool iso = isolatedFlight, leg = jobLeg;
+  Contract c = contract;
+  startFlight(c, specIdx, source);
+  if (iso) isolatedFlight = true;
+  if (leg) applyJobLeg();
 }
 // The debrief's second button: a job waiting at its stop flies on from there with its clock, ride and paid fees (as
 // the hub's Continue does); anything else (a lesson, a checkride, a job that ended) is flown again from the start
 void Game::retryFromDebrief() {
+  // the aircraft must still be one the job can be flown in: if it is gone (repossessed, sold) or no longer suits, the
+  // hub's chooser offers the ones that can, with the reason (the review of v3.31.0, C2: a repossessed aircraft flew)
+  std::string why;
   if (career.job && career.job->state == Career::JobState::RECOVERY) {
-    const auto sc = career.canFly(career.job->continuation(), specIdx);
-    continueJob(specIdx, sc != Career::SRC_NONE ? sc : career.job->src);
+    const auto sc = career.canFly(career.job->continuation(), specIdx, &why);
+    if (sc == Career::SRC_NONE) { screen = SCR_HUB; hubTab = TAB_CONTRACTS; selContract = 0; selAircraft = -1; hubMsg = std::string("Choose another aircraft: ") + kAircraft[specIdx].name + " - " + why; hubMsgTime = 6; return; }
+    continueJob(specIdx, sc);
   } else {
-    Contract c = contract; const auto sc = career.canFly(c, specIdx);
-    beginCareerFlight(c, specIdx, sc != Career::SRC_NONE ? sc : source);
+    Contract c = contract; auto sc = career.canFly(c, specIdx, &why);
+    if (sc == Career::SRC_NONE && source == Career::SRC_LESSON) sc = Career::SRC_LESSON;   // (the school's aircraft, as the hub gives it)
+    if (sc == Career::SRC_NONE) { screen = SCR_HUB; hubTab = TAB_CONTRACTS; selContract = 0; selAircraft = -1; hubMsg = std::string("Choose another aircraft: ") + kAircraft[specIdx].name + " - " + why; hubMsgTime = 6; return; }
+    beginCareerFlight(c, specIdx, sc);
   }
   if (screen == SCR_DEBRIEF) { screen = SCR_HUB; hubTab = TAB_CONTRACTS; }   // (the launch didn't take: its message is on the hub)
 }
@@ -743,7 +774,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   plane.apComfort = true;   // a career flight: the autopilot flies for the passengers and the load (the stick is never limited)
   fuelStart = plane.fuel;
   rollFailures(c, spec, src);
-  isolatedFlight = false; jobClockBase = 0; attemptFrom = c.from;
+  isolatedFlight = false; jobLeg = false; jobClockBase = 0; attemptFrom = c.from;
   wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0;
   surveyT = surveyInT = 0; minimumsChecked = false; minimumsGoArounds = 0; trialT0 = trialT1 = -1; formT = formLost = 0; formDone = false;
   hudPrevIas = 0; hudTrend = 0;

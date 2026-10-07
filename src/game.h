@@ -123,6 +123,11 @@ private:
   void releaseJob();                                 // the open job cancelled: the load stays where it is, nothing charged
   void practiseApproach(int spec, Career::Source src);   // a flight to the job's destination that touches nothing in the career
   bool isolatedFlight = false;   // a practice flight: endFlight returns to the hub without any settlement
+  bool jobLeg = false;           // this flight is an accepted job's leg flown on from where it waited (continueJob)
+  void applyJobLeg();            // that leg's checkpoints, clock, ride so far and paid fees onto the flight just started
+  void restartFlight();          // the pause menu's Restart: the same flight again, in the same mode (practice, trial, job leg)
+  // a job leg's fees as they will be charged: the hire and ferry already paid are waived for the same aircraft only
+  void continuationWaivers(Career::LaunchPlan& p, const Contract& c, int spec, Career::Source src) const;
   float launchFuelKg = -1;       // the fuel chosen on the job card for the next flight (-1: the plan's default)
   float chosenFuel(const Contract& c, int spec, Career::Source src, const Career::LaunchPlan& p) const;   // what the tanks hold at take-off
   float jobClockBase = 0;        // seconds already on the job's clock from earlier legs (deadlines count from it)

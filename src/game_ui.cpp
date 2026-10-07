@@ -763,7 +763,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
       // (the plan runs the autopilot's approach planner: cached for this job, aircraft and career state)
       static std::string planKey; static Career::LaunchPlan e;
       std::string key = fmt("%s|%d|%d|%d|%d|%u", c.id.c_str(), selAircraft, (int)esrc, career.location, career.money < 1500, career.boardSeed);
-      if (key != planKey) { e = career.plan(c, selAircraft, esrc); planKey = key; }
+      if (key != planKey) { e = career.plan(c, selAircraft, esrc); if (cd.job) continuationWaivers(e, c, selAircraft, esrc); planKey = key; }   // (a job leg: quoted as it will be charged - C3)
       if (!e.flown) applyQuote(c, e, true);   // (the flown time replaces the quick estimate when it's in)
       int ops = e.fees() + e.fuelCostEst;
       if (c.payout > 0 || ops > 0) {
@@ -2281,7 +2281,7 @@ void Game::drawPause() {
   float by = y + 80 * s, bw = 240 * s, bh = 46 * s;
   if (button(x + 30 * s, by, bw, bh, "Resume", true, true)) paused = false;
   by += bh + 12 * s;
-  if (button(x + 30 * s, by, bw, bh, "Restart flight")) { if (researchFlight) launchResearch(); else { Contract c = contract; startFlight(c, specIdx, source); } }
+  if (button(x + 30 * s, by, bw, bh, "Restart flight")) restartFlight();
   by += bh + 12 * s;
   if (button(x + 30 * s, by, bw * 0.48f, bh, "Settings")) { settingsFromPause = true; settingsPage = 0; }
   if (button(x + 30 * s + bw * 0.52f, by, bw * 0.48f, bh, "Controls")) { settingsFromPause = true; settingsPage = 1; }

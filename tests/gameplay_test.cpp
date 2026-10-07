@@ -297,6 +297,23 @@ struct GameTest {
       pad(0, 0); g.in.pad = false; g.update(dt); g.paused = false;
       g.botControl = true;
     }
+    // ---- the pause menu's Restart keeps the flight's mode: a trial stays off the books (the review of v3.31.0, C1);
+    // the debrief's retry never launches an aircraft the job can't be flown in (C2)
+    {
+      Game r; r.initHeadless(); r.botControl = true;
+      Contract c = g_story[0]; c.id = "TRIALTEST";
+      r.startFlight(c, 0, Career::SRC_LESSON); r.isolatedFlight = true;
+      r.update(1.f / 60.f);
+      r.restartFlight();
+      bool ok1 = r.isolatedFlight;
+      printf("Restart of a trial: still off the books %d: %s\n", r.isolatedFlight, ok1 ? "ok" : "FAIL"); fails += !ok1;
+      Game q; q.initHeadless(); q.botControl = true;
+      q.contract = g_story[1]; q.specIdx = 5; q.source = Career::SRC_RENT;   // a Meridian on a student's lesson: not allowed
+      q.screen = SCR_DEBRIEF; const int att = q.career.attempt;
+      q.retryFromDebrief();
+      bool ok2 = q.screen == SCR_HUB && q.career.attempt == att && !q.career.attemptOpen;
+      printf("Debrief retry in an aircraft the job can't use: screen %d, attempt %d -> %d (%s): %s\n", q.screen, att, q.career.attempt, q.hubMsg.c_str(), ok2 ? "ok" : "FAIL"); fails += !ok2;
+    }
     // ---- a start in the air: gear stowed and every brake off, a research sortie's too (startFlight parks it first)
     {
       Game r; r.initHeadless(); r.botControl = true;
