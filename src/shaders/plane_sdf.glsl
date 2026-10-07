@@ -164,12 +164,14 @@ vec2 mapJetCockpit(vec3 p){
   vec2 res = vec2(-sdEllipsoid(q - vec3(0.0, -0.05, 0.25), vec3(0.8, 0.72, 1.45)), 40.0);
   float r = length(q.xz), ang = atan(q.x, -q.z);
   // panoramic front display in a chamfered bezel, annunciator strip above it
-  float scr = max(max(abs(r - 0.64) - 0.006, abs(ang) - 1.25), abs(q.y - 0.02) - 0.30);
+  // (the displays deep behind their glass, out to the bezel: as thin slabs - 12 mm, 10 mm, 8 mm - the bake's lattice
+  // missed them in long strips along their curve, and the pod's shell showed through as shards across the view)
+  float scr = max(max(abs(r - 0.667) - 0.033, abs(ang) - 1.25), abs(q.y - 0.02) - 0.30);
   res = opU(res, vec2(scr, 41.0));
   float bez = max(max(abs(r - 0.675) - 0.02, abs(ang) - 1.3), abs(q.y - 0.02) - 0.345);
   bez = max(bez, -max(max(r - 0.66, abs(ang) - 1.25), abs(q.y - 0.02) - 0.30));   // window cut-out
   res = opU(res, vec2(bez, 44.0));
-  res = opU(res, vec2(max(max(abs(r - 0.648) - 0.004, abs(ang) - 0.62), abs(q.y - 0.348) - 0.016), 49.0));
+  res = opU(res, vec2(max(max(abs(r - 0.664) - 0.02, abs(ang) - 0.62), abs(q.y - 0.348) - 0.016), 49.0));
   // curved instrument console under the display: sloped top with five recessed multi-function displays
   {
     float topY = -0.30 - (0.66 - r)*0.35;
@@ -180,7 +182,9 @@ vec2 mapJetCockpit(vec3 p){
     float rec = sdBox(rq, vec3(0.072, 0.012, 0.052));
     con = max(con, -rec);
     res = opU(res, vec2(con, 44.0));
-    res = opU(res, vec2(sdBox(rq + vec3(0.0, 0.006, 0.0), vec3(0.07, 0.002, 0.05)), 45.0));
+    // (each display a solid block filling its recess up to the glass, 4 mm below the console top: a 4 mm slab floating
+    // over the recess floor, a 2 mm slit from its walls, was finer than the bake's lattice and came out in fragments)
+    res = opU(res, vec2(sdBox(rq + vec3(0.0, 0.017, 0.0), vec3(0.073, 0.013, 0.053)), 45.0));
     // rotary knobs between the displays
     float kk = clamp(floor(ang/0.42), -3.0, 2.0) + 0.5;
     vec3 kq = vec3((ang - kk*0.42)*r, q.y - topY, r - 0.505);
@@ -188,7 +192,7 @@ vec2 mapJetCockpit(vec3 p){
   }
   // side display bays beside the pilot (camera feeds) with framed bezels and vents
   vec3 sq = vec3(abs(q.x) - 0.635, q.y - 0.04, q.z - 0.24);  // bring the bezel corners inside the curved pod
-  res = opU(res, vec2(sdBox(sq, vec3(0.005, 0.2, 0.3)), q.x < 0.0 ? 42.0 : 43.0));
+  res = opU(res, vec2(sdBox(sq - vec3(0.02, 0.0, 0.0), vec3(0.025, 0.2, 0.3)), q.x < 0.0 ? 42.0 : 43.0));
   float sbz = sdRoundBox(sq - vec3(0.02, 0.0, 0.0), vec3(0.014, 0.23, 0.33), 0.012);
   sbz = max(sbz, -sdBox(sq - vec3(-0.01, 0.0, 0.0), vec3(0.02, 0.2, 0.3)));
   res = opU(res, vec2(sbz, 44.0));
@@ -512,8 +516,11 @@ vec2 mapPlaneBody(vec3 p){
     float holeSide = sdBox(p - vec3(0.0, 0.5*(WS.z - 0.12 + sideTop), 0.5*(WS.y + WS.w)), vec3(5.0, 0.5*(sideTop - WS.z + 0.12), 0.5*(WS.w - WS.y)));
     holeSide = max(holeSide, 0.3 - abs(p.x));
     holeSide = max(holeSide, -(abs(p.z - WS.y - 0.04) - 0.025));
+    // the window openings' cut faces in the frames' trim, not the shell's paint: where the flat cut meets the curved
+    // roof at a shallow angle the face is a long wedge, and in the light shell colour it read as a hole to the sky
+    float shell0 = shell;
     shell = max(shell, -min(holeWs, holeSide));
-    res = vec2(shell, 11.0);
+    res = vec2(shell, shell > shell0 + 1e-4 ? 63.0 : 11.0);
     // rear bulkhead: a trimmed baggage wall closes the cabin behind the last seats / windows (instead of looking
     // straight down the hollow tail cone)
     float zB = gM[20].x > 0.5 ? gM[20].z + 0.15 : WS.w + (gM[21].z > 0.5 ? 0.9 : 0.75);
@@ -587,8 +594,10 @@ vec2 mapPlaneBody(vec3 p){
     float elev = gPartMode == -2 ? 1e9 : sdSurface(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98, -cPitch*0.4, 0.0);
     tail = min(tail, min(stab, elev));
     if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + H0.y*0.45), vec3(0.18, 0.2, H0.y*0.55)), 0.08);
-    float d = smin(res.x, tail, 0.12*R);
-    res = vec2(d, tail < res.x ? 3.0 : res.y);
+    // inside, the tail surfaces stop at the cabin wall as the wing does (a canard - the Mantis's horizontal tail sits
+    // ahead of the pilot - otherwise crossed both footwells)
+    if (inside > 0.5) { tail = max(tail, -f); res = vec2(min(res.x, tail), tail < res.x ? 3.0 : res.y); }
+    else { float d = smin(res.x, tail, 0.12*R); res = vec2(d, tail < res.x ? 3.0 : res.y); }
   }
   // ---------------- engines
   {
@@ -931,7 +940,7 @@ vec2 mapPlaneBody(vec3 p){
     if (sdBox(vp, vec3(0.16, 0.16, 0.16)) < res.x) {
       vp.xy = rot2(vp.xy, sign(p.x)*gCab1.y);  // fold against the curved roof, rather than through it
       vp.yz = rot2(vp.yz, 0.25);
-      res = opU(res, vec2(max(sdRoundBox(vp, vec3(0.13, 0.006, 0.05), 0.004), f + 0.055), 14.0));
+      res = opU(res, vec2(max(sdRoundBox(vp, vec3(0.13, 0.011, 0.05), 0.006), f + 0.055), 14.0));   // (22 mm: thinner, the bake's lattice left it ragged)
     }
     // overhead console: dome light and two map lights (modelled lenses - the cabin's night lighting)
     {
