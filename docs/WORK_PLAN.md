@@ -14,7 +14,8 @@ docs/RENDERER_REBUILD.md; the owner-side tool is the one `diagnostics.bat` in th
 | Tiled light culling | deferred: low value now that every benchmark scene runs at 60 fps or better |
 | A10 / A11 water sky probe, cloud reprojection | deferred: the lighting and cloud passes are 1-3 ms; worth it only if the owner's diagnostics show them growing |
 | Review visuals (cockpit framing, materials, vegetation, coast) | open, cheap changes only (the owner prefers performance and gameplay); the XR-20's cockpit framing is done |
-| Cockpit mesh: pale wedges under the wing roots | open: seen from some cockpits (the Osprey's) where big simplified triangles span a crease; predates the dual-contouring bake |
+| Cockpit mesh: pale wedges under the wing roots | done (v3.30.0): they were the wing's trailing edge thinner than the lattice - the cockpit's thin patch is now meshed 4.7 mm fat and traced back per pixel |
+| Cockpit edges per pixel (v3.30.0) | done: details, material edges, edge-on outlines and the thin patch traced onto the true shape in the mesh pass; cabin sun map; yokes' direction; twin panel overlap; readouts. Cost on the test renderer ~1.3-2x the cockpit's objects pass: check the owner's next diagnostic |
 
 Done since v3.24.0 and kept out of this list: R3's moving parts (every aircraft, the research jets' nozzles, gear and
 actuators included: no moving hull is left), the cloaked XR-40 on its mesh, F1's gusty autoland (the sweep lands or

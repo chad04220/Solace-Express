@@ -26,7 +26,7 @@
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 15;   // (bump with the format, or with what the bake makes of the field: the cockpit's sharp edges, +14; its thin patch laid out fat, +15)
+const uint32_t kMeshMagic = 0x4d455348u + 16;   // (bump with the format, or with what the bake makes of the field: the cockpit's sharp edges, +14; its thin patch laid out fat and drawn last, +16)
 // the rigid parts a cockpit has (plane_parts.glsl PT_*) and each one's instances: x which seat or side, y which pedal
 struct PartInst { int type; float sx, sy; };
 const int kMaxPartInst = 128;
@@ -181,7 +181,7 @@ bool Renderer::compilePlaneMesh() {
   progPlaneMesh = progPlaneMeshV[0];
   // the depth pre-pass; with uScrSkip the fragments at or behind a screen (texScrDepth) are dropped: the screens are holes
   // (uCloakZ: a cloaked XR-40's sweeping front, body z - what lies ahead of it is see-through and writes no depth; -1e9 none)
-  progPlaneMeshDepth = linkProgramCached(planeMeshVSAssembly(""), "#version 330 core\nflat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; uniform int uScrSkip; uniform sampler2D uScrDepth; uniform float uCloakZ; uniform mat3 uRot; uniform vec3 uPos;\nvoid main(){ if (uScrSkip == 1 && gl_FragCoord.z >= texelFetch(uScrDepth, ivec2(gl_FragCoord.xy), 0).r - 2e-7) discard; if (uCloakZ > -1e8 && (transpose(uRot)*(vW - uPos)).z < uCloakZ) discard; }\n", e);
+  progPlaneMeshDepth = linkProgramCached(planeMeshVSAssembly(""), "#version 330 core\nflat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; uniform int uScrSkip; uniform sampler2D uScrDepth; uniform float uCloakZ; uniform mat3 uRot; uniform vec3 uPos; uniform float uLogC;\nvoid main(){ if (uScrSkip == 1) { float zs = texelFetch(uScrDepth, ivec2(gl_FragCoord.xy), 0).r; if (gl_FragCoord.z >= zs - 2e-7) discard; } if (uCloakZ > -1e8 && (transpose(uRot)*(vW - uPos)).z < uCloakZ) discard; }\n", e);
   if (!progPlaneMeshDepth) { error = "Aircraft mesh depth shader: " + e; return false; }
   progPartPose = linkProgramCached(kFullscreenVS, partPoseFSAssembly(), e);
   if (!progPartPose) { error = "Cockpit part pose shader: " + e; return false; }
@@ -460,9 +460,12 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     fineStart = (uint32_t)ib.size();
     const size_t fineV = vb.size() / 8;   // (the fine patch's vertices are its own, after the coarse mesh's)
     // (the thin patch laid out 4.7 mm fat: a plate thinner than its lattice - a trailing edge running out to nothing, a
-    // visor's rim - has no corner inside it and would end in a ragged line where it gets that thin; laid out fat it
-    // is all there, and the mesh pass traces every pixel of it back onto the true shape, dropping the halo)
-    if (!fineCells.empty()) nets(fineCells, 8, 0.f, 0.f, inside ? 0.6f * kS2 / 8.f : 0.f);
+    // window's rim, a visor - has no corner inside it and ends in a ragged line where it gets that thin; laid out fat
+    // it is all there, and the mesh pass traces every pixel of it back onto the true shape, dropping the halo. Drawn
+    // last, from fineStart)
+    // (not the research jets' sealed cockpits: their panes are a few mm thick, and their frames came out clean without it)
+    const bool fatThin = inside && M[2] < 4.5f;
+    if (!fineCells.empty()) nets(fineCells, 8, 0.f, 0.f, fatThin ? 0.6f * kS2 / 8.f : 0.f);
     // simplified (mesh_simplify.h): flat panels to a few triangles, curves to within 1 mm (the cabin's 0.4 mm: seen
     // from half a metre); the fine patch apart, to the same 0.4 mm. On worker threads, while the GPU goes on with the hull and the parts (vb, ib and fineStart are not
     // touched again until they are joined, below)
@@ -658,7 +661,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, ib.size() * sizeof(uint32_t), ib.data(), GL_STATIC_DRAW);
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-  PM.idx = (int)ib.size(); PM.fineIdx = std::min((int)fineStart, PM.idx);
+  PM.idx = (int)ib.size(); PM.fineIdx = M[2] < 4.5f ? std::min((int)fineStart, PM.idx) : PM.idx;   // (the research jets' thin patch is on the surface: drawn with the rest)
   // the rigid parts, each a mesh of its own (validated: a damaged cache drops the parts, never reads past its end)
   for (auto& P : PM.parts) { if (P.vao) glDeleteVertexArrays(1, &P.vao); if (P.vbo) glDeleteBuffers(1, &P.vbo); if (P.ibo) glDeleteBuffers(1, &P.ibo); }
   PM.parts.clear();
@@ -858,6 +861,7 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   glUniform3f(U(prog, "uPos"), pos.x, pos.y, pos.z);
   glUniform1i(U(prog, "uMeshTraffic"), trafK);
   glUniform1i(U(prog, "uScrSkip"), scrSkip ? 1 : 0);
+  glUniform1f(U(prog, "uScrNear"), (int)(fp.plane.M[2] + 0.5f) == 6 ? 0.03f : 0.f);
   glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, scrSkip ? texScrDepth : 0); glUniform1i(U(prog, "uScrDepth"), 29);
   glUniform1i(U(prog, "uPartInst"), -1);
   glUniform1i(U(prog, "uMeshThin"), 0);
