@@ -236,7 +236,7 @@ private:
   // the aircraft mesh (aircraft_mesh.cpp): the static part of the airframe baked from its field, and the hull of the
   // part that moves (the march's start on the raster path, where the mesh leaves off)
   struct PartMesh { int type = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; };   // a cockpit's rigid moving part, in its own frame (plane_parts.glsl)
-  struct PlaneMesh { std::vector<PartMesh> parts; uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0, fineIdx = 0; bool ok = false; uint64_t movKey = 0;   /* fineIdx: where the cockpit's thin patch begins */ bool eyeInMov = false; };
+  struct PlaneMesh { std::vector<PartMesh> parts; uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; };
   std::unordered_map<uint64_t, PlaneMesh> planeMeshes;
   GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0, progPlaneMeshScr = 0, texScrDepth = 0, fboScrDepth = 0; int scrDepthW = 0, scrDepthH = 0;   // (progPlaneMeshScr / texScrDepth: the research craft's screens' depth, the cabin mesh clipped at and behind them: the screens are holes to the world)   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
   bool compilePlaneMesh();
