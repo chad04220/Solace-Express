@@ -518,8 +518,10 @@ vec2 mapPlaneBody(vec3 p){
     holeSide = max(holeSide, -(abs(p.z - WS.y - 0.04) - 0.025));
     // the window openings' cut faces in the frames' trim, not the shell's paint: where the flat cut meets the curved
     // roof at a shallow angle the face is a long wedge, and in the light shell colour it read as a hole to the sky
+    // (and rounded, a 3 cm lip: a hard cut meeting the curved roof at a shallow angle left a knife edge far thinner than
+    // the mesh's lattice, which came off it serrated against the sky)
     float shell0 = shell;
-    shell = max(shell, -min(holeWs, holeSide));
+    shell = -smin(-shell, min(holeWs, holeSide), 0.03);
     res = vec2(shell, shell > shell0 + 1e-4 ? 63.0 : 11.0);
     // rear bulkhead: a trimmed baggage wall closes the cabin behind the last seats / windows (instead of looking
     // straight down the hollow tail cone)
