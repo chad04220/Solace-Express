@@ -164,6 +164,7 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   flaps = 0; gear = 1; rpm = 0; n1 = 0; engineSpool = 0; maxG = minG = 1; flightTime = 0;
   fail = Failures(); iceFeed = 0; overG = 0;
   apDisengage(); apDone = false; apOverrun = false; apPitchI = 0; gust = vec3(); rng = Rng(77);
+  wxl = wxfield::Local(); wxAir = vec3(); windVel = windAvg = gustRot = vec3(); gustBurst = 0;
   // drag comes from the airframe's shape (aero.cpp), evaluated every step at the speed and air density of the moment
   cd0 = aeroCD0(aeroModel(*s), *s, std::max(speed, 30.f), 1.225f, speed / 340.f);
   nozzle = 0; mach = 0;
@@ -214,6 +215,7 @@ void Plane::step(float dt, const Weather& wx, float time) {
   // only lengthens the landing: QA F1's overruns touched down at 77 m/s ground speed on a 62 m/s reference)
   apGustAdd = 0.5f * wx.gust + 2.f * wx.turbulence;
   if (apMode == AP_APPR) apGustAdd *= clampf(1.f + dot(apLd, vec3(sinf(wx.windFrom * DEG), 0, -cosf(wx.windFrom * DEG))) * wx.windSpeed / 4.f, 0.f, 1.f);
+  wxl = wxfield::local(wx, pos, agl());   // (the wind's slow parts here: they change over hundreds of metres)
   if (apOn) { apSense(); apGuidance(dt); }   // (what it can do now, then what to do about it)
   // a wind that has turned behind it since the approach was planned: down the final, while there is room to climb
   // away, the stop is checked again by the plan's own rule. Too long now, it goes around, and clear of the ground the
@@ -241,6 +243,7 @@ void Plane::step(float dt, const Weather& wx, float time) {
     if (okR || okF) { apEngage(AP_APPR, apHoldFor, wx); if (apDecline.empty()) apWindEvent = 2; }
   }
   for (int i = 0; i < N && !ev.crashed; i++) substep(h, wx, time + h * i);
+  windAvg = flightTime <= 0.f ? windVel : lerp(windAvg, windVel, 1.f - expf(-dt / 1.5f));
   flightTime += dt;
 }
 
@@ -253,22 +256,18 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   density = 1.225f * expf(-pos.y / 8500.f);
   float sigmaRho = density / 1.225f;
 
-  // ---------------- wind and turbulence
-  float prof = clampf(powf(std::max(altAgl, 1.f) / 10.f, 0.14f), 0.35f, 1.6f);
-  float wf = wx.windFrom * DEG;
-  vec3 baseWind = vec3(-sinf(wf), 0, cosf(wf)) * (wx.windSpeed * prof);
-  float gv, d1, d2, gv2, gv3;
-  noised(time * 0.35f, 1.7f, gv, d1, d2);
-  noised(time * 0.27f, 9.1f, gv2, d1, d2);
-  noised(time * 1.9f, 4.4f, gv3, d1, d2);
-  float turb = wx.turbulence * (1.f + 1.5f * smoothstepf(300.f, 0.f, altAgl) * (altAgl > 3 ? 1.f : 0.f));
-  if (wx.storm) turb += 0.6f;
-  // (the vertical part fades in the last wingspan above the ground: the air can't flow through the surface, and the
-  // eddies there are about as big as the height - MIL-F-8785C's low-altitude scale L_w = h - so a wing averages out
-  // more of them the lower and wider it is)
-  float turbV = turb * clampf(altAgl / std::max(s.span, 8.f), 0.3f, 1.f);
-  gust = vec3(gv * wx.gust * 0.7f, gv3 * turbV * 2.2f, gv2 * wx.gust * 0.7f) + normalize(baseWind) * (std::max(0.f, gv) * wx.gust * 0.5f);
-  windVel = baseWind + gust;
+  // ---------------- wind and turbulence (weather.cpp): the mean wind's profile and veer, the gust bursts, the eddies
+  // the air carries (the vertical ones fading in the last wingspan above the ground), the terrain's lift and sink,
+  // thermals and storm drafts; and the eddies' gradient across the airframe, which the damping terms below see as
+  // a roll, pitch or yaw (a gust under the right wing is the air the right wing meets when it rolls down)
+  wxAir += wxfield::driftWind(wx) * dt;
+  const wxfield::Sample ws = wxfield::wind(wx, wxl, pos, altAgl, time, wxAir, s.span);
+  windVel = ws.v; gust = ws.v - wxfield::meanWind(wx, altAgl); gustBurst = ws.burst;
+  {
+    const vec3 R = right(), Fw = forward(), Up = up();
+    const vec3 dR(dot(ws.gx, R), dot(ws.gy, R), dot(ws.gz, R)), dF(dot(ws.gx, Fw), dot(ws.gy, Fw), dot(ws.gz, Fw));   // the air's change across the span and along the fuselage
+    gustRot = vec3(dot(dR, Up), -dot(dF, Up), -dot(dF, R));
+  }
 
   // ---------------- engine
   bool hasFuel = fuel > 0;
@@ -362,7 +361,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
 
     float Vh = std::max(V, 12.f);
     float p = -w.z, qq = w.x, r = -w.y;
-    float ph = p * s.span / (2 * Vh), qh = qq * s.chord / (2 * Vh), rh = r * s.span / (2 * Vh);
+    float ph = (p - gustRot.x) * s.span / (2 * Vh), qh = (qq - gustRot.y) * s.chord / (2 * Vh), rh = (r - gustRot.z) * s.span / (2 * Vh);   // (relative to the air's own rotation)
     // trim reference so the aircraft flies hands-off near cruise
     float clCruise = (s.emptyMass + s.maxFuel * 0.6f + s.cargoKg * 0.5f) * G0 / (0.5f * 1.225f * s.cruise * s.cruise * s.wingArea);
     float aCruise = (clCruise - s.CL0) / aeroCLa(aero, s.cruise / 340.f);

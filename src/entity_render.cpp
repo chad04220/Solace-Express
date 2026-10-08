@@ -386,7 +386,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
     glUniformMatrix4fv(glGetUniformLocation(progEntSh, "uVP"), 1, GL_FALSE, shVP[c].m);
     glUniform1i(glGetUniformLocation(progEntSh, "uShadowPass"), 1);
     glUniform1f(glGetUniformLocation(progEntSh, "uTime"), fp.time);
-    glUniform3f(glGetUniformLocation(progEntSh, "uWind"), fp.wind.x, fp.wind.y, fp.wind.z);
+    glUniform3f(glGetUniformLocation(progEntSh, "uWind"), fp.windSock.x, fp.windSock.y, fp.windSock.z);
     glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(1.5f, 2.f);
     issue(progEntSh, draws[1 + c]);
     groundShadowKey[c]=nextGroundKey[c];
@@ -424,7 +424,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
     glUniform2f(glGetUniformLocation(progEnt, "uJit"), jitX, jitY);
     glUniform1f(glGetUniformLocation(progEnt, "uLogC"), 2.f / log2f(40000.f + 1.f));
     glUniform1f(glGetUniformLocation(progEnt, "uTime"), fp.time);
-    glUniform3f(glGetUniformLocation(progEnt, "uWind"), fp.wind.x, fp.wind.y, fp.wind.z);
+    glUniform3f(glGetUniformLocation(progEnt, "uWind"), fp.windSock.x, fp.windSock.y, fp.windSock.z);
     glUniform1i(glGetUniformLocation(progEnt, "uShadowPass"), 0);
     glUniform3f(glGetUniformLocation(progEnt, "uCam"), cam.x, cam.y, cam.z);
     glUniform3f(glGetUniformLocation(progEnt, "uCamV"), cam.x, cam.y, cam.z);

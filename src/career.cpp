@@ -397,6 +397,9 @@ float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut) {
     if (phase == 0) {
       p.ctl.brake = 0; p.ctl.throttle = 1; p.ctl.gearDown = true; p.ctl.flaps = s.retract ? 0.15f : 0.1f;
       p.ctl.pitch = p.ias > s.vref * 0.95f ? clampf(0.08f * (10.f - p.pitchDeg()), -1, 1) : 0.f;
+      // (and the runway's heading with the wings kept near level: a gust under one wing rolls it, and hands off the
+      // climb-out wandered into the hills)
+      if (!p.onGround) { float he = wrapAngle(((reverse ? h0 + 180.f : h0) - p.heading()) * DEG) / DEG; p.ctl.roll = clampf(0.05f * (clampf(he * 0.8f, -10.f, 10.f) - p.bankDeg()), -1, 1); }
       if (p.agl() > 120.f) { p.ctl.flaps = 0; if (s.retract) p.ctl.gearDown = false; phase = 1; }
     }
     if (phase == 1) {

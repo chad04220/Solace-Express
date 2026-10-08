@@ -3,6 +3,7 @@
 #include "common.h"
 #include "world.h"
 #include "wheel_motion.h"
+#include "weather.h"
 
 enum EngineType { ENG_PISTON = 0, ENG_TURBOPROP, ENG_JET };
 enum License { LIC_STUDENT = 0, LIC_PPL, LIC_CPL, LIC_ATP };
@@ -171,6 +172,11 @@ public:
   float groundRough = 0;      // 0 asphalt .. 1 rough (for audio/vibration)
   float alpha = 0, beta = 0, airspeed = 0, ias = 0, gLoad = 1, stallWarn = 0;
   vec3 windVel;               // current wind incl. gusts
+  vec3 windAvg;               // the wind smoothed over a couple of seconds (the HUD's readout: the eddies don't flicker it)
+  wxfield::Local wxl;         // the slow parts of the wind here (weather.h: the terrain's lift and sink, thermals, the cloud, the rain), every step
+  vec3 wxAir;                 // the air mass's drift since the flight began: the eddies and gusts ride it
+  vec3 gustRot;               // the eddies' rotation across the airframe, as body rates (rad/s): x roll right, y pitch up, z yaw right
+  float gustBurst = 0;        // the gust burst under way, 0..1 (1: the reported peak)
   float density = 1.225f;
   // ---- autopilot: HOLD (heading / altitude / speed), NAV (to a chosen airport), APPR (approach, flare, rollout)
   enum ApMode { AP_OFF = 0, AP_HOLD, AP_NAV, AP_APPR, AP_STUNT };

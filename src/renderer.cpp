@@ -2,6 +2,7 @@
 #include "renderer.h"
 #include "materials.h"
 #include "shaders.h"
+#include "weather.h"
 #if defined(_MSC_VER)
 #pragma warning(push, 0)
 #endif
@@ -157,52 +158,19 @@ std::string meshCacheStamp() {
 
 // Cloud noise baked once into tileable textures, so the cloud march samples them with the GPU's texture filtering
 // instead of evaluating hashed value noise per sample: a 1024^2 coverage map (4 octaves, period 16 coverage units =
-// 83 km) and a 128^3 smooth value-noise volume (period 32 lattice cells) used at every billow and detail scale.
+// 83 km) and a 128^3 smooth value-noise volume (period 32 lattice cells) used at every billow and detail scale. The
+// arrays are weather.cpp's, which the flight model and the game read the same clouds from.
 void Renderer::genCloudNoise() {
-  auto hp = [](int x, int y, int z, int P) {
-    x = ((x % P) + P) % P; y = ((y % P) + P) % P; z = ((z % P) + P) % P;
-    // Hash mixing deliberately wraps at 32 bits; signed products would be undefined at these cell sizes.
-    uint32_t hx = uint32_t(x)*73856093u ^ (uint32_t(z)*19349663u) ^ (uint32_t(P)*7919u);
-    uint32_t hy = uint32_t(y)*83492791u + uint32_t(z)*2971u;
-    return hash2i(static_cast<int32_t>(hx), static_cast<int32_t>(hy));
-  };
-  auto s3 = [](float t) { return t * t * (3.f - 2.f * t); };
-  auto vn2 = [&](float x, float y, int P) {
-    int ix = (int)floorf(x), iy = (int)floorf(y); float fx = s3(x - ix), fy = s3(y - iy);
-    return lerpf(lerpf(hp(ix, iy, 0, P), hp(ix + 1, iy, 0, P), fx), lerpf(hp(ix, iy + 1, 0, P), hp(ix + 1, iy + 1, 0, P), fx), fy);
-  };
-  const int CN = 1024;
-  std::vector<uint8_t> cov((size_t)CN * CN);
-  parallelFor(CN, [&](int y) {
-    for (int x = 0; x < CN; x++) {
-      float qx = (x + 0.5f) / CN * 16.f, qy = (y + 0.5f) / CN * 16.f, s = 0, a = 0.5f; int P = 16;
-      for (int o = 0; o < 4; o++) { s += a * vn2(qx, qy, P); qx *= 2; qy *= 2; P *= 2; a *= 0.5f; }
-      cov[(size_t)y * CN + x] = (uint8_t)std::min(255.f, s / 0.9375f * 255.f + 0.5f);
-    }
-  });
+  const int CN = wxfield::kCovN, VN = wxfield::kVolN;
   if (!texCloudCov) glGenTextures(1, &texCloudCov);
   glBindTexture(GL_TEXTURE_2D, texCloudCov);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, CN, CN, 0, GL_RED, GL_UNSIGNED_BYTE, cov.data());
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, CN, CN, 0, GL_RED, GL_UNSIGNED_BYTE, wxfield::coverageMap());
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-  const int VN = 128, VP = 32;   // 4 texels per lattice cell
-  std::vector<uint8_t> vol((size_t)VN * VN * VN);
-  parallelFor(VN, [&](int z) {
-    for (int y = 0; y < VN; y++)
-      for (int x = 0; x < VN; x++) {
-        float px = (x + 0.5f) / VN * VP, py = (y + 0.5f) / VN * VP, pz = (z + 0.5f) / VN * VP;
-        int ix = (int)floorf(px), iy = (int)floorf(py), iz = (int)floorf(pz);
-        float fx = s3(px - ix), fy = s3(py - iy), fz = s3(pz - iz);
-        auto h = [&](int a, int b, int c) { return hp(ix + a, iy + b, iz + c, VP); };
-        float v = lerpf(lerpf(lerpf(h(0, 0, 0), h(1, 0, 0), fx), lerpf(h(0, 1, 0), h(1, 1, 0), fx), fy),
-                        lerpf(lerpf(h(0, 0, 1), h(1, 0, 1), fx), lerpf(h(0, 1, 1), h(1, 1, 1), fx), fy), fz);
-        vol[((size_t)z * VN + y) * VN + x] = (uint8_t)(v * 255.f + 0.5f);
-      }
-  });
   if (!texNoise3) glGenTextures(1, &texNoise3);
   glBindTexture(GL_TEXTURE_3D, texNoise3);
-  glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, VN, VN, VN, 0, GL_RED, GL_UNSIGNED_BYTE, vol.data());
+  glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, VN, VN, VN, 0, GL_RED, GL_UNSIGNED_BYTE, wxfield::noiseVolume());
   glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT); glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
   glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
@@ -907,6 +875,13 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUniform1f(U(p, "uStorm"), fp.storm);
   glUniform2f(U(p, "uWindOff"), fp.windOff.x, fp.windOff.y);
   glUniform3f(U(p, "uWindV"), fp.wind.x, fp.wind.y, fp.wind.z);
+  glUniform3f(U(p, "uCloudDet"), fp.cloudDet.x, fp.cloudDet.y, fp.cloudDet.z);
+  glUniform1f(U(p, "uCloudBoil"), fp.cloudBoil);
+  glUniform1i(U(p, "uWakeN"), fp.wakeN);
+  if (fp.wakeN > 1) {
+    glUniform4fv(U(p, "uWake"), fp.wakeN, &fp.wake[0][0]); glUniform1fv(U(p, "uWakeK"), fp.wakeN, fp.wakeK);
+    glUniform4fv(U(p, "uWakeB"), 1, fp.wakeB);
+  }
   // airports + buildings
   {
     int n = std::min(16, (int)g_world.airports.size());
@@ -1291,6 +1266,8 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform1f(U(progPost, "uTime"), fp.time);
   glUniform2f(U(progPost, "uRes"), (float)W, (float)H);
   glUniform1f(U(progPost, "uRainLens"), fp.rainLens);
+  glUniform4fv(U(progPost, "uRainFlow"), 1, fp.rainFlow);
+  glUniform1f(U(progPost, "uGlassMist"), fp.glassMist);
   glUniform1f(U(progPost, "uFade"), fp.fade);
   glUniform1f(U(progPost, "uVignette"), fp.vignette);
   glUniform1f(U(progPost, "uGLoad"), fp.gLoad);

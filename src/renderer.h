@@ -75,7 +75,17 @@ struct FrameParams {
   bool prefetchOn = false; vec3 prefetchPos;   // scenery to have the worker threads build ahead (the menu tour's next place)
   float cloudCover = 0.3f, cloudBase = 1500, fogB = 0.0001f, wet = 0, snow = 0, lightning = 0, storm = 0;
   vec2 windOff;
-  vec3 wind;   // surface wind velocity (m/s, the way the air moves): windsocks
+  vec3 wind;   // surface wind velocity (m/s, the way the air moves): the sea's waves, the clouds' lean
+  vec3 windSock;   // the surface wind with its gusts where the camera is (the windsocks swing with them)
+  vec3 cloudDet; float cloudBoil = 0;   // the cloud detail's drift through the cloud bodies and the billows' rise (m: Weather::cloudDetail, cloudBoil)
+  // the aircraft's wake through the cloud (clouds.glsl wakeCarve): a path of points (xyz, the tunnel's radius there),
+  // each segment's strength (0 where the path left the cloud layer) and the bounding sphere of it all
+  static constexpr int kWakeMax = 20;
+  float wake[kWakeMax][4] = {}, wakeK[kWakeMax] = {}, wakeB[4] = {0, 0, 0, 0}; int wakeN = 0;
+  // the windscreen's rain and cloud (post_fs.glsl, the cockpit view): where on screen the airflow over the glass
+  // streams from (uv, may lie far off screen; z +1 away from it, -1 towards it), how fast (w: 0 still .. 1 fast),
+  // and the cloud's fine mist on the glass
+  float rainFlow[4] = {0.5f, -1.f, 1.f, 0.f}; float glassMist = 0;
   PlaneVisual plane;
   WreckVisual wreck;
   FxVisual fx;
