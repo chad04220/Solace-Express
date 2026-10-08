@@ -1917,7 +1917,9 @@ void Game::breakUp(vec3 impactVel, bool water, bool air) {
   float y0 = -(plane.gearHeight() + 0.7f), y1 = std::max(m.vt[4] + m.vt[0], m.ht[4]) + 0.6f;
   float z0 = std::min(m.st[0][0], m.engine >= 2 && m.engine <= 3 ? m.nacZ0 : 0.f) - 0.9f;
   float z1 = std::max(std::max(m.st[7][0], m.vt[5] + m.vt[1]), m.ht[5] + m.ht[1]) + 0.6f;
-  float zA = m.wing[5] - 0.25f, zB = m.wing[5] + std::max(m.wing[1], m.wing[3] + m.wing[2]) + 0.35f;
+  // (the wing's pieces start at its most forward point: a forward-swept wing's tips reach well ahead of its root - the
+  // XR-20's by 2.5 m - and they stayed on the nose piece when it broke up)
+  float zA = m.wing[5] + std::min(0.f, m.wing[3]) - 0.25f, zB = m.wing[5] + std::max(m.wing[1], m.wing[3] + m.wing[2]) + 0.35f;
   float xr = modelHalfWidth(m, m.wing[5] + m.wing[1] * 0.5f) * 1.08f + 0.05f;
   float wy0 = m.wing[4] - 0.45f, wy1 = m.wing[4] + 0.5f + m.winglet * 1.2f;
   if (m.engine == 2 || m.engine == 3) { wy0 = std::min(wy0, m.nacY - m.nacR - 0.3f); wy1 = std::max(wy1, m.nacY + m.nacR + 0.2f); }
@@ -3570,6 +3572,19 @@ void Game::debugScene(const std::string& name) {
     plane.ctl.roll = roll; botControl = roll != 0.f || fl != 0.f;   // (a held roll input: the yokes turn)
     if (fl != 0.f) { plane.ctl.flaps = fl; plane.flaps = fl; }
     toasts.clear(); hint.clear(); return;
+  }
+  if (name.compare(0, 3, "brk") == 0) {   // an in-flight break-up: brk<aircraft>_<seconds after>_<view yaw deg>: the pieces, seen from 30 m
+    int idx = 0; float secs = 0.4f, vy = 90.f; sscanf(name.c_str() + 3, "%d_%f_%f", &idx, &secs, &vy);
+    Contract c; c.from = 0; c.to = 1; c.title = "Break-up"; c.wx = Weather(); c.wx.timeOfDay = 13.f; c.wx.cloudCover = 0.1f;
+    realTime = 20; startFlight(c, idx, Career::SRC_OWNED);
+    plane.reset(&kAircraft[idx], vec3(-4000, 900, 9000), 40, kAircraft[idx].maxFuel * 0.5f, 100, true, kAircraft[idx].cruise * 0.7f);
+    takeoffAnnounced = true; camQ = plane.q;
+    plane.ev.crashed = true; plane.ev.crashReason = "Structural failure";
+    for (float tt = 0; tt < secs + 1 / 30.f; tt += 1 / 30.f) { realTime += 1 / 30.f; update(1 / 30.f); }
+    vec3 cen; for (auto& w : wreck) cen = cen + w.c; if (!wreck.empty()) cen = cen * (1.f / wreck.size());
+    vec3 off(sinf(vy * DEG) * 30.f, 12.f, -cosf(vy * DEG) * 30.f);
+    dbgCam = true; dbgFollow = false; dbgCamPos = cen + off; dbgCamLook = cen;
+    toasts.clear(); hint.clear(); uiHidden = true; hudOn = false; return;
   }
   if (name.compare(0, 3, "trf") == 0) {   // AI traffic: trf<seconds>_<view> at Solace Capital; view 0 = airport overview, k = chase craft k-1
     float secs = 60; int view = 0; sscanf(name.c_str() + 3, "%f_%d", &secs, &view);
