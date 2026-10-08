@@ -345,7 +345,10 @@ private:
   bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI
   // bound action state: keyboard key or gamepad button
-  std::string expandHint(const std::string& raw) const;   // {actionId} tokens -> the bound keys
+  std::string expandHint(const std::string& raw, bool pad = false) const;   // {actionId} tokens -> the bound keys (pad: buttons)
+  std::string actLabel(int a, bool pad) const;   // an action's key, or its gamepad button / stick / trigger
+  bool padActive = false;   // the gamepad was used last (a key press hands back to the keyboard): what prompts name
+  bool padPrompts() const { return in.pad && padActive; }
   // input contexts: who gets the input this frame, in priority order (a key-binding capture, a dialog, the pause
   // menu, a menu screen, a flight overlay - GPS or radio - then the flight). An action works only in the contexts in
   // kActionCtx; on a change of context every held key and button is ignored until it's released (no A held through

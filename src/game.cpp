@@ -106,18 +106,36 @@ void Game::armInputs() {
   for (int k = 0; k < 256; k++) { if (!in.down[k]) keyUnarmed[k] = false; if (keyUnarmed[k]) in.down[k] = in.pressed[k] = false; }
   padUnarmed &= in.buttons;
   in.buttons &= ~padUnarmed; in.buttonsPressed &= ~padUnarmed;
+  // the device the prompts name: the gamepad from when it connects or is used, the keyboard from a key press
+  if (in.pad && (!padWas || in.buttonsPressed || fabsf(in.lx) + fabsf(in.ly) + fabsf(in.rx) + fabsf(in.ry) > 0.6f || in.lt + in.rt > 0.3f)) padActive = true;
+  for (int k = 1; k < 256 && padActive; k++) if (in.pressed[k]) padActive = false;
   if (padWas && !in.pad && screen == SCR_FLIGHT && !paused) { paused = true; settingsFromPause = false; toast("Controller disconnected - paused. Reconnect it, or carry on with the keyboard", vec3(1, 0.85f, 0.5f)); }
   padWas = in.pad;
 }
 
-std::string Game::expandHint(const std::string& raw) const {
+// The pad's names follow its bindings; the stick and trigger actions a pad drives without a button binding are named
+// by the stick or trigger; an action the pad has no control for keeps its key (the keyboard still works with a pad).
+std::string Game::actLabel(int a, bool pad) const {
+  if (pad) {
+    if (set.padBind[a]) return padName(set.padBind[a]);
+    switch (a) {
+      case ACT_THR_UP: return "RT"; case ACT_THR_DN: return "LT";
+      case ACT_PITCH_UP: case ACT_PITCH_DN: case ACT_ROLL_L: case ACT_ROLL_R: return "LEFT STICK";
+    }
+  }
+  return keyName(set.keyBind[a]);
+}
+// (pad: the hint as shown with a gamepad - its buttons, and no "(or gamepad ...)" aside. Voice lines are always
+// matched on the keyboard text: AtcVoice swaps in the controller recording itself.)
+std::string Game::expandHint(const std::string& raw, bool pad) const {
   std::string out;
   for (size_t i = 0; i < raw.size(); i++) {
     size_t e = raw[i] == '{' ? raw.find('}', i) : std::string::npos;
     int a = -1;
     if (e != std::string::npos) { std::string id = raw.substr(i + 1, e - i - 1); for (int k = 0; k < ACT_COUNT; k++) if (id == kActions[k].id) a = k; }
+    if (pad && raw.compare(i, 13, " (or gamepad ") == 0 && raw.find(')', i) != std::string::npos) { i = raw.find(')', i); continue; }
     if (a < 0) { out += raw[i]; continue; }
-    out += keyName(set.keyBind[a]); i = e;
+    out += actLabel(a, pad); i = e;
   }
   return out;
 }
@@ -1123,7 +1141,7 @@ void Game::updateFlight(float dt) {
     // starter catches: puff of smoke from the exhausts
     vec3 ex = plane.pos + plane.q.rotate(vec3(0.4f, -plane.spec->fusRad * 0.6f, -plane.spec->fusLen * 0.35f));
     for (int i = 0; i < 14; i++) spawn(ex, plane.q.rotate(vec3(0.8f + i * 0.05f, -0.5f, 2.f)) + vec3(0, 0.6f, 0), 2.5f, 0.6f, 1.6f, vec3(0.55f, 0.58f, 0.62f), 0.55f, SPR_SMOKE, 1.5f, 0.3f);
-    if (!takeoffAnnounced && contract.type == CT_LESSON) toast("Engine running. Release the parking brake with " + keyName(set.keyBind[ACT_PARK]) + ".", vec3(0.7f, 1, 0.7f));   // ("B" by default)
+    if (!takeoffAnnounced && contract.type == CT_LESSON) toast("Engine running. Release the parking brake with " + actLabel(ACT_PARK, padPrompts()) + ".", vec3(0.7f, 1, 0.7f));   // ("B" by default)
     else if (!takeoffAnnounced) toast("Engine running.", vec3(0.7f, 1, 0.7f));   // (the takeoff clearance is the tower's: updateAtc)
   }
   // gear / flap motor cues
@@ -1393,9 +1411,12 @@ void Game::updateFlight(float dt) {
   if (contract.hints.size() > (size_t)phase && phase != lastHintPhase) {
     lastHintPhase = phase;
     if (!contract.hints[phase].empty()) {
-      hint = expandHint(contract.hints[phase]);
-      if (set.showHints && std::find(hintsVoiced.begin(), hintsVoiced.end(), hint) == hintsVoiced.end()) { hintsVoiced.push_back(hint); commsPending.push_back({hint, contract.id}); }   // each said once
+      hint = expandHint(contract.hints[phase], padPrompts());
+      std::string said = expandHint(contract.hints[phase]);
+      if (set.showHints && std::find(hintsVoiced.begin(), hintsVoiced.end(), said) == hintsVoiced.end()) { hintsVoiced.push_back(said); commsPending.push_back({said, contract.id}); }   // each said once
     }
+  } else if (contract.hints.size() > (size_t)phase && !contract.hints[phase].empty() && hint == expandHint(contract.hints[phase], !padPrompts())) {
+    hint = expandHint(contract.hints[phase], padPrompts());   // (the player picked up the other device: the hint names its controls now)
   }
 }
 
@@ -2980,9 +3001,9 @@ void Game::updateComms(float dt) {
     const char* say[4] = {"STALL", "PULL UP", "GEAR!", nullptr};
     for (int i = 0; i < 4; i++) {
       if (w[i] && (!warnWas[i] || realTime - warnLastT[i] > 8.f)) {
-        std::string m = say[i] ? say[i] : "ENGINE OFF - press " + keyName(set.keyBind[ACT_ENGINE]) + " to restart";
+        std::string m = say[i] ? say[i] : "ENGINE OFF - press " + actLabel(ACT_ENGINE, padPrompts()) + " to restart";
         AtcVoice::Tx tx;
-        if (atc.resolve(m, contract.id, in.pad, tx)) { tx.prio = std::max(tx.prio, 95); atc.say(tx); }
+        if (atc.resolve(m, contract.id, padPrompts(), tx)) { tx.prio = std::max(tx.prio, 95); atc.say(tx); }
         warnLastT[i] = realTime;
       }
       warnWas[i] = w[i];
@@ -2993,10 +3014,10 @@ void Game::updateComms(float dt) {
       if (it != failVoiced.end() && it->second == a.key) continue;
       failVoiced[a.slot] = a.key;
       AtcVoice::Tx tx;
-      if (atc.resolve(a.text, contract.id, in.pad, tx)) atc.say(tx);
+      if (atc.resolve(a.text, contract.id, padPrompts(), tx)) atc.say(tx);
     }
   }
-  for (auto& m : commsPending) { AtcVoice::Tx tx; if (atc.resolve(m.text, m.mission, in.pad, tx)) atc.say(tx); }
+  for (auto& m : commsPending) { AtcVoice::Tx tx; if (atc.resolve(m.text, m.mission, padPrompts(), tx)) atc.say(tx); }
   commsPending.clear();
   if (screen == SCR_FLIGHT && !crashed && !researchFlight) updateAtc(dt);
   // while someone is talking the music and the engine sit lower (a headset's comms priority): quick down, slow up
@@ -3805,7 +3826,7 @@ void Game::debugScene(const std::string& name) {
   if (name == "top") { camMode = 2; camYaw = 0.3f; camPitch = 1.35f; camZoom = 4.f; }
   if (name == "orbit") { camMode = 2; camYaw = 2.3f; camPitch = 0.25f; camZoom = 0.6f; timeOfDay = 9.0f; }
   for (int i = 0; i < 30; i++) updateCamera(0.1f);
-  if (name == "hud") hint = contract.hints.size() ? expandHint(contract.hints[2]) : "";
+  if (name == "hud") hint = contract.hints.size() ? expandHint(contract.hints[2], padPrompts()) : "";
   if (name == "gps" || name == "pause" || name == "minimap") {
     plane.reset(&kAircraft[1], vec3(-4000, 600, 9000), 40, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
     takeoffAnnounced = true; camQ = plane.q; hint.clear(); toasts.clear();

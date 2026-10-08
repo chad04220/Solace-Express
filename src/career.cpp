@@ -55,7 +55,7 @@ void buildStory() {
             "Release the brakes, apply full power, rotate gently at 50 knots and climb straight ahead through the rings.")
      .wp(wpRel("MDB", 2.2f, 0, 150)).wp(wpRel("MDB", 4.0f, 0, 300)).wp(wpRel("MDB", 5.5f, -0.6f, 380))
      .hints({"Press {parkingBrake} to release the parking brake, then hold {throttleUp} (or gamepad RT) to add full throttle.",
-             "Keep the nose on the centreline with Q/E rudder. At 50 kt gently pull back (S) to lift off.",
+             "Keep the nose on the centreline with {yawLeft}/{yawRight} rudder. At 50 kt gently pull back ({pitchUp}) to lift off.",
              "Nice! Hold a gentle climb about 7 degrees nose-up. Fly through the green rings.",
              "Reduce power slightly ({throttleDown}) once level and trim with {trimDown} and {trimUp}. Rings show the path.",
              "", "", ""});
@@ -66,13 +66,13 @@ void buildStory() {
             "Aim for a gentle touchdown below 300 feet per minute.")
      .wp(wpRel("MDB", 2.4f, 0, 200)).wp(wpRel("MDB", 2.8f, 1.4f, 420)).wp(wpRel("MDB", 0.0f, 1.8f, 420))
      .wp(wpRel("MDB", -2.4f, 1.8f, 400)).wp(wpRel("MDB", -3.0f, 0.8f, 260)).wp(wpRel("MDB", -2.4f, 0, 165))
-     .hints({"Release brakes (B), full power, and take off as in Lesson 1.",
+     .hints({"Release brakes ({parkingBrake}), full power, and take off as in Lesson 1.",
              "Rudder to stay straight. Rotate at 50 kt.",
              "Climb through the rings. The pattern turns LEFT. Use gentle 20 degree banks.",
              "On downwind reduce power to about 60% and set one notch of flaps ({flapsDown}).",
              "Turn final, add full flaps ({flapsDown}), and follow the PAPI lights: two white, two red is on glidepath.",
              "Reduce power to idle over the threshold, then gently raise the nose to flare just above the runway.",
-             "Brake (B) to a full stop to complete the lesson."});
+             "Brake ({parkingBrake}) to a full stop to complete the lesson."});
     add(s); }
   { S s("L3", 0, CT_LESSON, "MDB", "HFS", "Lesson 3: Cross-Country to Harlan Farm");
     s.lesson().pay(300).wx(W(200, 7, 3, 0.15f, 0.35f, 3500, 30, 0, false, 13.0f))
@@ -84,7 +84,7 @@ void buildStory() {
              "Watch your fuel gauge and the distance readout. Press {gpsMap} to view the map.",
              "Harlan Farm runway 17 is short: slow to 60 kt, full flaps, aim for the very start of the strip.",
              "Flare gently and get the wheels down early.",
-             "Full stop with brakes (B) to finish."});
+             "Full stop with brakes ({parkingBrake}) to finish."});
     add(s); }
   { S s("L4", 0, CT_LESSON, "HFS", "ORC", "Checkride: Private Pilot License");
     s.lesson().pay(400).grant(LIC_PPL).wx(W(330, 11, 5, 0.25f, 0.5f, 3000, 25, 0, false, 15.5f))

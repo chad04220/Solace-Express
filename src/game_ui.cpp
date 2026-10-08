@@ -857,6 +857,10 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   if (hovered(px, py, iw, visRows * rowStep) && in.wheel != 0) { chooserScroll -= (int)in.wheel; in.wheel = 0; }
   chooserScroll = std::clamp(chooserScroll, 0, std::max(0, totalRows - visRows));
   int hidden = 0, below = 0, above = chooserScroll * 2;
+  // a row whose name or status had to be shortened shows them in full under it while it's pointed at, or while it's
+  // the chosen one and nothing else is (the review of v3.33.0, U2: at 140% the names and the reasons an aircraft
+  // can't take a job were cut to a few letters)
+  int tipJ = -1; bool tipHov = false; float tipX = 0, tipY = 0; std::string tipName, tipSt;
   for (int j = 0; j < kNumAircraft; j++) {
     const int i = order[j];
     const std::string& why = whys[i];
@@ -879,8 +883,20 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     else st = why;
     float sts = 12.5f * s;
     const float stMax = colW - std::min(nameW, nameMax) - (sel ? 46 : 34) * s;
+    const std::string stFull = st;
     while (g_ren.textWidth(st, sts) > std::min(colW * 0.55f, stMax) && st.size() > 4) st = st.substr(0, st.size() - 4) + "...";
     g_ren.text(rx + colW - (sel ? 22 : 10) * s, ry + 9 * s, sts, st, src == Career::SRC_NONE ? C_BAD * 0.8f : src == Career::SRC_OWNED ? C_GOOD : C_WARN, 1, 2);
+    const bool pointed = hovered(rx, ry, colW, rowH);
+    if ((nameW > nameMax || st != stFull) && (pointed || (sel && !tipHov))) { tipJ = j; tipHov = pointed; tipX = rx; tipY = ry + rowH; tipName = kAircraft[i].name; tipSt = stFull; }
+  }
+  if (tipJ >= 0) {
+    const float tw = std::min(iw, std::max(colW, g_ren.textWidth(tipName, 14 * s) + 24 * s)), tx = std::min(tipX, px + iw - tw);
+    auto lines = wrap(tipSt, tw - 20 * s, 12.5f * s);
+    const float th = 28 * s + 17 * s * lines.size(), ty = tipY + th + 4 * s > y + h ? tipY - rowH - th - 2 * s : tipY + 2 * s;
+    g_ren.rect(tx, ty, tw, th, vec3(0.02f, 0.03f, 0.05f), 0.96f, 6 * s);
+    g_ren.rectOutline(tx, ty, tw, th, C_ACCENT, 0.6f, 6 * s, 1 * s);
+    g_ren.text(tx + 10 * s, ty + 6 * s, 14 * s, tipName, C_TEXT, 1);
+    for (size_t k = 0; k < lines.size(); k++) g_ren.text(tx + 10 * s, ty + 26 * s + 17 * s * k, 12.5f * s, lines[k], srcs[order[tipJ]] == Career::SRC_NONE ? C_BAD : C_DIM, 1);
   }
   if (selAircraft >= 0 && (selAircraft >= kNumAircraft || srcs[selAircraft] == Career::SRC_NONE)) selAircraft = -1;
   if (selAircraft < 0) selAircraft = firstOk;
@@ -1230,14 +1246,19 @@ void Game::drawSettings(float x, float y, float w, float h) {
     if (button(x + 250 * s, py, 200 * s, 32 * s, v ? on : off, true, v)) v = !v;
     py += rs;
   };
+  // a setting's explanation under its buttons, wrapped to the width beside the labels (at 140% UI scale on a 720p
+  // screen one line ran off the panel: the review of v3.33.0, U2)
+  auto note = [&](const std::string& t) {
+    for (auto& l : wrap(t, std::max(w - 250 * s, 120 * s), 12.5f * s)) { g_ren.text(x + 250 * s, py, 12.5f * s, l, C_DIM, 0.85f, 0, false); py += 17 * s; }
+    py += 7 * s;
+  };
   g_ren.text(x, py + 6 * s, 16 * s, "Render resolution", C_DIM, 1);
   {
     const char* rm[] = {"Native", "Auto", "85%", "75%", "67%"};
     for (int i = 0; i < 5; i++) if (button(x + 250 * s + i * 78 * s, py, 72 * s, 32 * s, rm[i], true, set.resMode == i)) set.resMode = i;
     py += 36 * s;
-    g_ren.text(x + 250 * s, py, 12.5f * s, fmt("rendered at %dx%d (%.0f%%), upscaled to %dx%d by the temporal AA", (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale),
-               g_ren.renderScale * 100.f, g_ren.W, g_ren.H), C_DIM, 0.85f, 0, false);
-    py += 24 * s;
+    note(fmt("rendered at %dx%d (%.0f%%), upscaled to %dx%d by the temporal AA", (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale),
+             g_ren.renderScale * 100.f, g_ren.W, g_ren.H));
   }
   g_ren.text(x, py + 6 * s, 16 * s, "Frame rate", C_DIM, 1);
   {
@@ -1247,9 +1268,8 @@ void Game::drawSettings(float x, float y, float w, float h) {
       if (button(x + 250 * s + i * 62 * s, py, 58 * s, 32 * s, l, true, set.fpsTarget == fr[i])) { set.fpsTarget = fr[i]; wantPacing = true; }
     }
     py += 36 * s;
-    g_ren.text(x + 250 * s, py, 12.5f * s, fmt("%s: %.0f fps now, GPU %s%s", set.fpsTarget ? fmt("capped at %d", set.fpsTarget).c_str() : fmt("the display's %d Hz, on vsync", monitorHz).c_str(),
-               1.f / std::max(fpsAvg, 1e-4f), g_ren.gpuMs > 0 ? fmt("%.1f ms", g_ren.gpuMs).c_str() : "n/a", set.resMode == 1 ? " (Auto resolution holds this rate)" : ""), C_DIM, 0.85f, 0, false);
-    py += 24 * s;
+    note(fmt("%s: %.0f fps now, GPU %s%s", set.fpsTarget ? fmt("capped at %d", set.fpsTarget).c_str() : fmt("the display's %d Hz, on vsync", monitorHz).c_str(),
+             1.f / std::max(fpsAvg, 1e-4f), g_ren.gpuMs > 0 ? fmt("%.1f ms", g_ren.gpuMs).c_str() : "n/a", set.resMode == 1 ? " (Auto resolution holds this rate)" : ""));
   }
   g_ren.text(x, py + 6 * s, 16 * s, "Render quality", C_DIM, 1);
   const char* q[] = {"Low", "Medium", "High"};
@@ -1679,7 +1699,7 @@ void Game::drawHud(const FrameParams& fp) {
       g_ren.text(x0 + isz * 0.5f, iy + isz - 1 * s, 10.5f * s, w.label, w.col, a, 1, false);
       x0 += isz + gap;
     }
-    if (engOff && n) g_ren.text(W * 0.5f, iy + isz + 22 * s, 11 * s, "press " + keyName(set.keyBind[ACT_ENGINE]) + " to restart", C_DIM, 0.9f, 1, false);
+    if (engOff && n) g_ren.text(W * 0.5f, iy + isz + 22 * s, 11 * s, "press " + actLabel(ACT_ENGINE, padPrompts()) + " to restart", C_DIM, 0.9f, 1, false);
   }
   // ================================================================ the rails
   const float stripH = cockpit ? 0.f : 46 * s, pfd = 148 * s;
@@ -2234,7 +2254,7 @@ void Game::drawGps() {
   g_ren.text(px, py, 13 * s, ellipsize(fmt("ELEV %s   WIND %03.0f/%.0fkt", fmtAlt(D.elev).c_str(), wx.windFrom, wx.windSpeed * MS_TO_KT), vw, 13 * s), C_DIM, e); py += 24 * s;
   // autopilot / autoland
   header(px, py, vw, "AUTOPILOT"); py += 24 * s;
-  g_ren.text(px, py, 13 * s, ellipsize(plane.apOn ? plane.apStatus : std::string("OFF  -  Z engages"), vw, 13 * s), plane.apOn ? C_GOOD : C_DIM, e); py += 20 * s;
+  g_ren.text(px, py, 13 * s, ellipsize(plane.apOn ? plane.apStatus : "OFF  -  " + actLabel(ACT_AP, padPrompts()) + " engages", vw, 13 * s), plane.apOn ? C_GOOD : C_DIM, e); py += 20 * s;
   {
     float bw = 30 * s, bh = 26 * s;
     if (button(px, py, bw, bh, "<")) cycleApDest(-1);

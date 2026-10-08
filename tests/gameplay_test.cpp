@@ -260,6 +260,17 @@ struct GameTest {
       bool ok = def.find("Press B ") != std::string::npos && reb.find("Press P ") != std::string::npos && reb.find("Press B ") == std::string::npos && !rebVoiced && defVoiced;
       printf("Hint after rebinding the parking brake: \"%s\" voiced %d (default voiced %d): %s\n", reb.c_str(), rebVoiced, defVoiced, ok ? "ok" : "FAIL");
       fails += !ok;
+      // with a gamepad the hint names its buttons as bound (D-pad Left parks, B is the flaps) and RT for the throttle,
+      // the GPS names the autopilot's binding, and the spoken line is still the controller recording
+      std::string padT = g.expandHint(raw, true);
+      bool padVoiced = !voices || g.atc.resolve(def, "L1", true, tx);
+      int keepAp = g.set.keyBind[ACT_AP]; g.set.keyBind[ACT_AP] = 'P';
+      std::string apKey = g.actLabel(ACT_AP, false), apPad = g.actLabel(ACT_AP, true);
+      g.set.keyBind[ACT_AP] = keepAp;
+      ok = padT.find("D-PAD LEFT") != std::string::npos && padT.find("hold RT") != std::string::npos && padT.find("Press B ") == std::string::npos &&
+           padT.find("SHIFT") == std::string::npos && padT.find("(or gamepad") == std::string::npos && padVoiced && apKey == "P" && apPad == "RS CLICK";
+      printf("Hint with a gamepad: \"%s\" voiced %d; autopilot named %s / %s: %s\n", padT.c_str(), padVoiced, apKey.c_str(), apPad.c_str(), ok ? "ok" : "FAIL");
+      fails += !ok;
       printf("ATC history after the flights so far: %zu lines (limit %zu): %s\n", g.atc.history.size(), g.atc.historyLimit, g.atc.history.size() <= 64 ? "ok" : "FAIL");
       fails += g.atc.history.size() > 64;
     }
