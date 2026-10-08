@@ -47,10 +47,11 @@ static int scan(const char* name, const std::string& src) {
   return bad;
 }
 
-// NVIDIA's compiler failed on two forms that every other driver takes (v3.35.0 would not start: "fatal error C9999:
-// Unhandled expr op assign/(182) in CreateDag" in the shadow proxy): struct variables declared together with
-// initializers ("Pose M = f(), N = g();") and arrays declared in a list after other names ("float a = 1.0, b[3];").
-// One struct to a declaration, local arrays on their own. Returns the number of such declarations.
+// Two forms suspected when NVIDIA's compiler failed on v3.35.0's shadow proxy ("fatal error C9999: Unhandled expr op
+// assign/(182) in CreateDag"): struct variables declared together with initializers ("Pose M = f(), N = g();") and
+// arrays declared in a list after other names ("float a = 1.0, b[3];"). v3.36.0 had neither and still failed there, so
+// they were not the cause (renderer.cpp linkProgramCached retries such a failure with the compiler's own options); the
+// shaders keep to one struct to a declaration and local arrays on their own. Returns the number of such declarations.
 static int scanDecl(const char* name, const std::string& src) {
   std::string s; s.reserve(src.size());   // the source without comments (newlines kept for the line numbers)
   for (size_t i = 0; i < src.size();) {
@@ -86,7 +87,7 @@ static int scanDecl(const char* name, const std::string& src) {
             else if (d == 0 && e == ',') { decl++; seenEq = false; }
             else if (d == 0 && e == '=' && q + 1 < t.size() && t[q + 1] != '=' && t[q - 1] != '=' && t[q - 1] != '<' && t[q - 1] != '>' && t[q - 1] != '!') { seenEq = true; inits++; }
           }
-          if ((isStruct && decl > 0 && inits > 0) || arrLater) { printf("%s:%d: '%s' declared %s (one to a declaration: NVIDIA)\n", name, ln, ty.c_str(), arrLater ? "as an array in a list" : "with others and initialized"); bad++; }
+          if ((isStruct && decl > 0 && inits > 0) || arrLater) { printf("%s:%d: '%s' declared %s (one to a declaration)\n", name, ln, ty.c_str(), arrLater ? "as an array in a list" : "with others and initialized"); bad++; }
         }
       }
     }
@@ -109,7 +110,7 @@ int main() {
   if (bad) { printf("FAIL: %d reserved word(s) used as identifiers\n", bad); return 1; }
   int forms = scanDecl("objects.frag", objectsFSAssembly("")) + scanDecl("shadow_proxy.frag", shadowProxyFSAssembly("")) + scanDecl("effects.frag", effectsFSAssembly(""))
             + scanDecl("plane_mesh.frag", planeMeshFSAssembly("")) + scanDecl("scene_lib.frag", lib) + scanDecl("light.frag", lightFSAssembly(""));
-  if (forms) { printf("FAIL: %d declaration(s) NVIDIA's compiler refuses\n", forms); return 1; }
+  if (forms) { printf("FAIL: %d declaration(s) of a form the shaders avoid\n", forms); return 1; }
   printf("PASS: no reserved GLSL words in the shaders\n");
   return 0;
 }

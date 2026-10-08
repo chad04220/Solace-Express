@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <complex>
 #include <cstring>
+#include <mutex>
 
 Renderer g_ren;
 
@@ -38,6 +39,12 @@ GLint U(GLuint prog, const char* name) {
 }
 
 static GLuint compile(GLenum type, const std::string& src, std::string& err) {
+  // (debug: NVFAIL - a fragment shader containing that text fails as NVIDIA's compiler does, unless it also contains
+  // NVFAIL_OK's; to rehearse linkProgramCached's retries and the reduced builds on any driver)
+  static const char* nvFail = getenv("NVFAIL"); static const char* nvOk = getenv("NVFAIL_OK");
+  if (nvFail && type == GL_FRAGMENT_SHADER && src.find(nvFail) != std::string::npos && !(nvOk && src.find(nvOk) != std::string::npos)) {
+    err += "Fragment info\n-------------\n(0) : fatal error C9999: simulated (NVFAIL)\n"; return 0;
+  }
   GLuint s = glCreateShader(type);
   const char* c = src.c_str();
   glShaderSource(s, 1, &c, nullptr);
@@ -69,7 +76,7 @@ static std::string cachePath(const std::string& vs, const std::string& fs) {
   char name[40]; snprintf(name, sizeof name, "%016llx.bin", (unsigned long long)h);
   return g_shaderCacheDir + "/" + name;
 }
-GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err) {
+static GLuint linkOnce(const std::string& vs, const std::string& fs, std::string& err, bool& rejectedBefore) {
   bool cache = binaryCacheUsable();
   std::string path = cache ? cachePath(vs, fs) : std::string();
   if (cache) {
@@ -88,6 +95,13 @@ GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::stri
       }
     }
   }
+  // (a source this driver's compiler rejected before: its failure is not compiled again - see linkProgramCached)
+  if (cache) {
+    if (FILE* f = fopen((path + ".rej").c_str(), "rb")) {
+      char log[8192]; size_t n = fread(log, 1, sizeof(log) - 1, f); log[n] = 0; fclose(f);
+      rejectedBefore = true; err += log; return 0;
+    }
+  }
   static const bool timed = getenv("SHADERTIME") != nullptr;   // (debug: each program's compile and link time, and the start of its entry point)
   if (const char* dd = getenv("SHADERDUMP")) {   // (debug: each program's sources, numbered, to time and cut down outside the game)
     static int dumped = 0; char nm[512];
@@ -98,8 +112,13 @@ GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::stri
     dumped++;
   }
   auto t0 = std::chrono::steady_clock::now();
+  const size_t err0 = err.size();
   GLuint v = compile(GL_VERTEX_SHADER, vs, err), f = compile(GL_FRAGMENT_SHADER, fs, err);
-  if (!v || !f) return 0;
+  auto reject = [&]() {   // (an internal error of the driver's compiler: remembered, see linkProgramCached)
+    if (!cache || err.find("C9999", err0) == std::string::npos) return;
+    if (FILE* fo = fopen((path + ".rej").c_str(), "wb")) { fwrite(err.data() + err0, 1, err.size() - err0, fo); fclose(fo); }
+  };
+  if (!v || !f) { if (v) glDeleteShader(v); if (f) glDeleteShader(f); reject(); return 0; }
   GLuint p = glCreateProgram(); glAttachShader(p, v); glAttachShader(p, f);
   if (cache) glProgramParameteri(p, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, 1);
   glLinkProgram(p);
@@ -109,7 +128,7 @@ GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::stri
     for (char& c : tag) if (c == '\n') c = ' ';
     fprintf(stderr, "shader %6.1f s  fs %7zu bytes  %s\n", std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), fs.size(), tag.c_str());
   }
-  if (!ok) { char log[8192]; glGetProgramInfoLog(p, sizeof(log), nullptr, log); err += log; return 0; }
+  if (!ok) { char log[8192]; glGetProgramInfoLog(p, sizeof(log), nullptr, log); err += log; glDeleteProgram(p); glDeleteShader(v); glDeleteShader(f); reject(); return 0; }
   glDeleteShader(v); glDeleteShader(f);
   g_shaderCacheMisses++;
   if (cache) {
@@ -130,6 +149,57 @@ GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::stri
     }
   }
   return p;
+}
+// A program the driver's compiler fails on with an internal error is built again with that compiler's own options, one
+// set after another, until one builds. NVIDIA's has failed so ("fatal error C9999: Unhandled expr op assign/(182) in
+// CreateDag", v3.35.0 and v3.36.0) on programs every other driver builds; #pragma optionNV is its own (the options of
+// its offline compiler, cgc) and other drivers ignore it. The cache keeps the set that built under its own source, and
+// remembers the rejection (<hash>.rej, the driver's log), so a later launch loads that build without compiling the
+// failure again. g_shaderNotes says what was rejected and what built instead (startup.log).
+std::string g_shaderNotes;
+static std::mutex s_notesMu;
+static const char* const kNvOptionSets[] = {
+  "#pragma optionNV(inline all)\n",
+  "#pragma optionNV(ifcvt none)\n",
+  "#pragma optionNV(unroll none)\n",
+  "#pragma optionNV(inline all)\n#pragma optionNV(ifcvt none)\n",
+  "#pragma optionNV(ifcvt none)\n#pragma optionNV(unroll none)\n",
+  "#pragma optionNV(inline all)\n#pragma optionNV(ifcvt none)\n#pragma optionNV(unroll none)\n",
+};
+static std::atomic<int> s_nvFirstSet{0};      // the set that last built: tried first for the next rejected program
+static std::atomic<bool> s_nvUseless{false};  // every set failed on a program: the rest go without the retries
+void shaderNote(const std::string& s) { std::lock_guard<std::mutex> lk(s_notesMu); g_shaderNotes += s; if (s.empty() || s.back() != '\n') g_shaderNotes += "\n"; }
+static std::string firstLine(const std::string& s) { size_t n = s.find('\n'); return n == std::string::npos ? s : s.substr(0, n); }
+static std::string programName(const std::string& fs) {   // (the build stage and the start of the entry point, to name it in the notes)
+  size_t m = fs.rfind("void main()"); std::string t = m == std::string::npos ? fs.substr(0, 60) : fs.substr(m, 70);
+  for (char& c : t) if (c == '\n') c = ' ';
+  for (size_t k; (k = t.find("  ")) != std::string::npos;) t.erase(k, 1);
+  const std::string stage = g_ren.compileStage();
+  return stage.empty() ? t : stage + ": " + t;
+}
+GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err) {
+  bool before = false;
+  const size_t err0 = err.size();
+  GLuint p = linkOnce(vs, fs, err, before);
+  if (p || err.find("C9999", err0) == std::string::npos || s_nvUseless) return p;
+  const std::string log = err.substr(err0);
+  const size_t at = fs.find('\n') + 1;   // (after the #version line)
+  const int n = (int)(sizeof(kNvOptionSets) / sizeof(kNvOptionSets[0])), first = s_nvFirstSet;
+  for (int k = 0; k < n; k++) {
+    const int set = (first + k) % n;
+    std::string e2; bool b2 = false;
+    p = linkOnce(vs, fs.substr(0, at) + kNvOptionSets[set] + fs.substr(at), e2, b2);
+    if (!p) continue;
+    s_nvFirstSet = set;
+    std::string opts = kNvOptionSets[set]; for (char& c : opts) if (c == '\n') c = ' ';
+    shaderNote("Shader [" + programName(fs) + "]: the driver's compiler failed" + (before ? " (an earlier launch)" : "") + " - built with " + opts +
+               "\n  " + firstLine(log.substr(log.find("C9999") == std::string::npos ? 0 : log.rfind('\n', log.find("C9999")) + 1)));
+    err.resize(err0);
+    return p;
+  }
+  s_nvUseless = true;
+  shaderNote("Shader [" + programName(fs) + "]: the driver's compiler failed, and with each of its option sets:\n" + log);
+  return 0;
 }
 static GLuint program(const std::string& vs, const std::string& fs, std::string& err) { return linkProgramCached(vs, fs, err); }
 // Fingerprint of every shader source and of the driver (needs a current context): the platform layer stamps the

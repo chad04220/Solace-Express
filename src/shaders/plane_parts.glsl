@@ -159,7 +159,7 @@ float gearNoseShow(){
   return inCabin ? 1.0 - smoothstep(0.3, 0.8, gearUp()) : 1.0;
 }
 // a rotation by a about the unit axis k
-mat3 rotAxis(vec3 k, float a){ float c = cos(a), s = sin(a); return c*mat3(1.0) + s*mat3(0.0, k.z, -k.y,  -k.z, 0.0, k.x,  k.y, -k.x, 0.0) + (1.0 - c)*outerProduct(k, k); }
+mat3 rotAxis(vec3 k, float a){ float c = cos(a), s = sin(a); return c*mat3(1.0) + s*mat3(0.0, k.z, -k.y,  -k.z, 0.0, k.x,  k.y, -k.x, 0.0) + (1.0 - c)*mat3(k*k.x, k*k.y, k*k.z); }   // (k k^T written out)
 // A leg swinging fore or aft (dir -1 forward, +1 aft) about a crosswise pivot at its top, through straight down, until
 // it lies along the chord, while its wheel turns a quarter about the leg to lie flat (a wing is thinner than the
 // wheel is tall): the turn at retraction u, from the leg's rest direction v (the pivot to the wheel's centre). The
@@ -344,7 +344,7 @@ Pose gearPartPose(int k, vec2 sd){
     else { vec3 H = gearHinge(); mat3 Rf = partRxy(gearFoldAngle()); X.R = S*Rf; X.T = S*(H - Rf*H); }
   } else if (k == PT_GEAR_NOSE) {   // (about its pivot, from the shape's rest frame at the station)
     X.R = partRxz(gPS.z)*max(gearNoseShow(), 1e-3); X.T = vec3(0.0, 0.0, nz);
-    if (gtype >= 3) { vec3 pl = vec3(0.0, gearNoseFold().x, 0.0); X.R = partRyz(-1.5707963*up)*X.R; X.T += pl - X.R*pl; }
+    if (gtype >= 3) { vec3 pl = vec3(0.0, gearNoseFold().x, 0.0); X.R = partRyz(-1.5707963*up)*X.R; X.T = X.T + (pl - X.R*pl); }
   }
   else if (k == PT_GEAR_TAIL) { X.R = partRxz(gPS.z); X.T = vec3(0.0, 0.0, G1.y); }
   else if (k == PT_GEAR_MDOOR && gtype == 4 && !gearSwingMain()) {   // the fold well's doors, hinged along its long edges fore and aft

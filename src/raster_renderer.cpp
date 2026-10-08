@@ -10,23 +10,42 @@ bool Renderer::compileRaster() {
   setCompileStage("lighting");
   e.clear(); progLight = linkProgramCached(kFullscreenVS, lightFSAssembly(""), e);
   if (!progLight) { error = "Lighting shader: " + e; return false; }
+  // The shadow proxy and the effects pass each have builds with less in them, for a driver whose compiler fails on the
+  // whole even with its own options (linkProgramCached): NVIDIA's did on v3.35.0's and v3.36.0's. The first that builds
+  // is used and startup.log says which; the proxy's last resort is the maps-only build below. What each leaves out:
+  // the traffic's sun shadows marched (those without a map), the airframe's in the landing lights; the XR-40 cloak's
+  // view through its cloaked part, the research jets' exhaust flames.
+  static const char* const kProxyLess[] = {"", "#define PROXY_NO_TRAFFIC\n", "#define PROXY_NO_LIGHTS\n", "#define PROXY_NO_TRAFFIC\n#define PROXY_NO_LIGHTS\n"};
+  static const char* const kProxyLessName[] = {"", "the traffic's marched shadows", "the airframe's shadows in the lights", "the traffic's marched shadows and the airframe's in the lights"};
+  static const char* const kFxLess[] = {"", "#define FX_NO_CLOAK\n", "#define FX_NO_PLUMES\n", "#define FX_NO_CLOAK\n#define FX_NO_PLUMES\n"};
+  static const char* const kFxLessName[] = {"", "the cloak's view", "the jets' flames", "the cloak's view and the jets' flames"};
   for (int v = 0; v < 2; v++) {   // (every aircraft, then the light aircraft alone: pickAfPrograms)
     const std::string d = v ? "#define AF_LIGHT\n" : "";
+    const char* build = v ? "light aircraft build" : "every aircraft";
     setCompileStage(v ? "aircraft (light aircraft build)" : "aircraft (every aircraft)");
     e.clear(); progObjectsV[v] = linkProgramCached(kFullscreenVS, objectsFSAssembly(d), e);
     if (!progObjectsV[v]) { error = "Objects shader: " + e; return false; }
     setCompileStage(v ? "aircraft shadows (light aircraft build)" : "aircraft shadows (every aircraft)");
-    e.clear(); progShProxyV[v] = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly(d), e);
-    // (a driver whose compiler fails on it - NVIDIA's once did, on v3.35.0's gear fields - starts on the maps-only build
-    // below, its failure in startup.log: the shadows a march adds, the traffic's and the moving parts', are lost, not the game)
-    if (!progShProxyV[v] && proxyError.empty()) proxyError = "Shadow proxy shader: " + e;
+    std::string first;
+    for (int k = 0; k < 4 && !progShProxyV[v]; k++) {
+      e.clear(); progShProxyV[v] = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly(d + kProxyLess[k]), e);
+      if (k == 0) first = e;
+      if (progShProxyV[v] && k > 0) shaderNote(std::string("Shadow proxy (") + build + "): built without " + kProxyLessName[k]);
+    }
+    if (!progShProxyV[v] && proxyError.empty()) proxyError = "Shadow proxy shader: " + first;
     setCompileStage(v ? "effects (light aircraft build)" : "effects (every aircraft)");
-    e.clear(); progEffectsV[v] = linkProgramCached(kFullscreenVS, effectsFSAssembly(d), e);
-    if (!progEffectsV[v]) { error = "Effects shader: " + e; return false; }
+    for (int k = 0; k < 4 && !progEffectsV[v]; k++) {
+      e.clear(); progEffectsV[v] = linkProgramCached(kFullscreenVS, effectsFSAssembly(d + kFxLess[k]), e);
+      if (k == 0) first = e;
+      if (progEffectsV[v] && k > 0) shaderNote(std::string("Effects (") + build + "): built without " + kFxLessName[k]);
+    }
+    if (!progEffectsV[v]) { error = "Effects shader: " + first; return false; }
   }
   progObjects = progObjectsV[0]; progShProxy = progShProxyV[0]; progEffects = progEffectsV[0];
+  setCompileStage("UFO and debris");
   e.clear(); progObjectsNoAf = linkProgramCached(kFullscreenVS, objectsFSAssembly("#define AF_LIGHT\n#define OBJ_NO_AF\n"), e);
   if (!progObjectsNoAf) { error = "Objects (UFO, debris) shader: " + e; return false; }
+  setCompileStage("aircraft shadows (maps only)");
   e.clear(); progShProxyMaps = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly("#define AF_LIGHT\n#define PROXY_MAPS_ONLY\n"), e);
   if (!progShProxyMaps) { error = "Shadow proxy (maps) shader: " + (proxyError.empty() ? e : proxyError + "\n" + e); return false; }
   for (int v = 0; v < 2; v++) if (!progShProxyV[v]) progShProxyV[v] = progShProxyMaps;
@@ -36,6 +55,7 @@ bool Renderer::compileRaster() {
     "uniform sampler2D uPartPose; uniform int uPartInst;\n"   // (a cockpit's rigid part at its pose: plane_mesh_vs.glsl)
     "void main(){ vec3 p = aPos; if (uPartInst >= 0) { int b = uPartInst*4; p = mat3(texelFetch(uPartPose, ivec2(b, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 1, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 2, 0), 0).xyz)*aPos + texelFetch(uPartPose, ivec2(b + 3, 0), 0).xyz; }\n"
     "  gl_Position = uVP*vec4(uRot*p + uPos, 1.0); }\n";
+  setCompileStage("aircraft shadow maps");
   e.clear(); progShMap = linkProgramCached(kShMapVS, "#version 330 core\nvoid main(){}\n", e);
   if (!progShMap) { error = "Shadow map shader: " + e; return false; }
   e.clear(); progShMov = linkProgramCached(kShMapVS, "#version 330 core\nout float oM; void main(){ oM = 1.0; }\n", e);

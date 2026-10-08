@@ -208,7 +208,8 @@ void main(){
   if (getenv("DBGOFF")) g_ren.dbgOff = atoi(getenv("DBGOFF"));   // switch renderer features off (Renderer::dbgOff bits)
   auto tInit = std::chrono::steady_clock::now();
   g_ren.matDir = getenv("MATDIR") ? getenv("MATDIR") : "assets/materials";   // (MATDIR="": the procedural layers)
-  if (!g_ren.init(W, H)) { printf("init failed: %s\n", g_ren.error.c_str()); return 1; }
+  if (!g_ren.init(W, H)) { printf("init failed: %s\n%s", g_ren.error.c_str(), g_shaderNotes.c_str()); return 1; }
+  if (!g_shaderNotes.empty()) printf("shader notes:\n%s", g_shaderNotes.c_str());   // (programs rejected and what built instead: NVFAIL)
   g_ren.entSync = !getenv("ENTSTREAM");   // captures generate every scenery chunk in range up front
   printf("renderer ok (shader cache: %d loaded, %d compiled, %.0f s)\n", g_shaderCacheHits.load(), g_shaderCacheMisses.load(),
          std::chrono::duration<double>(std::chrono::steady_clock::now() - tInit).count());

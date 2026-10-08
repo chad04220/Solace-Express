@@ -62,6 +62,8 @@ std::string shaderCacheStamp();   // fingerprint of all shader sources + the dri
 bool writePNG(const char* path, int w, int h, const std::vector<uint8_t>& rgbBottomUp);
 bool readImage(const char* path, int& w, int& h, std::vector<uint8_t>& rgbaTopDown);   // PNG or JPEG
 GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err);
+extern std::string g_shaderNotes;          // programs the driver's compiler rejected and what built instead (startup.log)
+void shaderNote(const std::string& s);      // (adds a line to it; safe from the compile threads)
 GLint U(GLuint prog, const char* name);   // a uniform's location (cached per program; name must be a string literal)
 
 struct FrameParams {

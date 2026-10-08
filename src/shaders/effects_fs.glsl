@@ -20,6 +20,8 @@ void main(){
   bool cockpitView = uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0;
   int type = RESEARCH_ON ? int(gM[0].z + 0.5) : 0;
   // XR-40 cloak: a pixel on the cloaked craft (left out of the G-buffer) sees the frame behind it along a bent ray
+  // (FX_NO_CLOAK, FX_NO_PLUMES: the builds without them, for a driver whose compiler fails on the whole - raster_renderer.cpp)
+#ifndef FX_NO_CLOAK
   if (uWr[4].w > 0.001 && uPlaneOn == 1 && uWreck == 0 && !cockpitView && type == 6 && uPano.x <= 0.0) {
     float hullT = 0.0;
     if (uHullOn == 1) { float hv = texelFetch(uEnv, px, 0).g; hullT = hv > 1e29 ? hv : (hv > 0.0 ? max(uHullNear, hv*0.999 - 0.1) : 0.0); }
@@ -38,6 +40,7 @@ void main(){
       }
     }
   }
+#endif
   // propeller discs (motion-blurred), composited over the scene
   if (uPlaneOn == 1 && uWreck == 0) {
     mat3 inv = transpose(uPlaneRot);
@@ -61,9 +64,11 @@ void main(){
   }
   if (uPlaneOn == 1 && uWreck == 0 && uVapor.x > 0.01) { vec3 c0 = col; col = vaporCone(col, ro, rd, t, jitter); if (dot(abs(col - c0), vec3(1.0)) > 0.02) taaFlag = min(taaFlag, 0.2); }
   vec3 plE = vec3(0.0); float plT = 1.0;
+#ifndef FX_NO_PLUMES
   if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && isMantis()) { plE = mantisPlume(ro, rd, t, jitter); plT = gPlumeT; }
   if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && type == 5) { plE = jetPlumes(ro, rd, t, jitter); plT = gPlumeT; }
   if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && type == 6) { plE = wraithPlumes(ro, rd, t, jitter); plT = gPlumeT; }
+#endif
   if (plE.r + plE.g + plE.b > 0.03) taaFlag = min(taaFlag, 0.2);
   if (!pod && uFxBeams + uFxBombs + uFxBlasts > 0) col = weaponsFx(col, ro, rd, t);
   col = col*plT + plE;   // (the flames over the clouds, which the cloud pass has already laid under them)

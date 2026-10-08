@@ -480,7 +480,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   game.shaderFirstRun = !cached;
   auto fatal = [&](const std::string& what) {
     FILE* f = fopen((game.saveDir + "\\error.log").c_str(), "w");
-    if (f) { fprintf(f, "%s\nRenderer: %s\n", what.c_str(), (const char*)glGetString(GL_RENDERER)); fclose(f); }
+    if (f) { fprintf(f, "%s\nRenderer: %s / %s\n%s", what.c_str(), (const char*)glGetString(GL_RENDERER), (const char*)glGetString(GL_VERSION), g_shaderNotes.c_str()); fclose(f); }
+    if (!g_shaderNotes.empty()) if (FILE* fl = fopen((game.saveDir + "\\startup.log").c_str(), "a")) { fprintf(fl, "%s", g_shaderNotes.c_str()); fclose(fl); }
     MessageBoxA(g_hwnd, ("Graphics initialisation failed:\n" + what.substr(0, 1500)).c_str(), "Solace Express", MB_ICONERROR);
   };
   RECT cr; GetClientRect(g_hwnd, &cr);
@@ -736,6 +737,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
             pace.tookOf("start"), g_world.fromCache ? "from the cache" : "generated", pace.tookOf("career"), pace.tookOf("renderer"), pace.tookOf("menu"), pace.tookOf("mesh"), g_ren.bakeBuilt);
     if (!g_ren.dispError.empty()) fprintf(f, "Display shader failed (cockpit screens disabled):\n%s\n", g_ren.dispError.c_str());
     if (!g_ren.proxyError.empty()) fprintf(f, "Shadow proxy shader failed (aircraft shadows from the shadow maps only):\n%s\n", g_ren.proxyError.c_str());
+    if (!g_shaderNotes.empty()) fprintf(f, "%s", g_shaderNotes.c_str());   // (programs the driver's compiler rejected, and what built instead)
     fclose(f);
   }
   // Every aircraft body (outside and cockpit, the research craft's too) built or loaded before the tools draw a scene:
