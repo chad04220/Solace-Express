@@ -7,27 +7,31 @@
 vec4 gearWheelFrame(vec3 p, out float halfWidth, out bool braked){
   vec4 G0 = gM[18], G1 = gM[19];
   int kind = int(gM[0].y + 0.5), engine = int(gM[0].z + 0.5);
-  bool research = RESEARCH_ON && engine >= 5, retract = kind >= 3;
-  float up = retract ? 1.0 - gPS.x : 0.0, gh = G1.x, R = gM[0].w;
+  bool research = RESEARCH_ON && engine >= 5;
+  float gh = G1.x;
   float wr = research ? 0.38 : G0.y;
-  float upY = -R*0.6;
-  if (kind == 3 && !research) { vec2 nsec = nacSection(G0.z); upY = nsec.x - nsec.y + 0.03; }
-  float researchLift = engine == 6 ? gh - 0.19 : gh - 0.5;
-  float lift = up*(research ? researchLift : upY + gh);
-  vec3 mq = vec3(abs(p.x) - G0.x, p.y + gh - wr - lift, p.z - G0.z);
-  if (kind == 3 && !research) mq.x = abs(mq.x) - 0.22;
-  float mh = research ? 0.13 : kind == 3 ? 0.11 : kind == 0 ? 0.065 : kind == 1 ? 0.09 : kind == 2 ? 0.14 : 0.10;
+  float mh = research ? JT_TYRE_H : kind == 3 ? 0.11 : kind == 0 ? 0.065 : kind == 1 ? 0.09 : kind == 2 ? 0.14 : 0.10;
   float nwr = research ? 0.33 : kind == 3 ? wr*0.75 : wr*0.85;
   float nh = research || kind == 3 ? 0.07 : 0.055;
-  vec3 nq = p - vec3(0.0, 0.0, G1.z < 0.5 ? G0.w : G1.y);
-  if (!research) nq.xz = rot2(nq.xz, -gPS.z);
-  if (G1.z > 0.5 && !research) {
-    nwr = 0.10; nh = 0.035;
-    nq.y += gh - 0.11*gM[0].x - nwr;
-  } else {
-    float liftN = up*(research ? researchLift : gh - R*0.6);
-    nq.y += gh - nwr - liftN;
-    if (research || kind == 3) nq.x = abs(nq.x) - (research ? 0.10 : 0.15);
+  vec3 mq, nq;
+  if (research) {   // (the research jets' wheels from their parts' poses: plane_parts.glsl jtMainPose, jtNosePose)
+    Pose M = jtMainPose(partMirror(p.x < 0.0 ? -1.0 : 1.0)), N = jtNosePose();
+    mq = transpose(M.R)*(p - M.T) - vec3(G0.x, wr - gh, G0.z);
+    nq = transpose(N.R)*(p - N.T) - vec3(0.0, nwr - gh, G0.w); nq.x = abs(nq.x) - 0.10;
+  } else {   // (the wheels' rest frames from their parts' poses, as they fold: plane_parts.glsl gearPartPose)
+    Pose X = gearPartPose(PT_GEAR_MAIN, vec2(p.x < 0.0 ? -1.0 : 1.0, 0.0));
+    mq = transpose(X.R)*(p - X.T) - vec3(G0.x, wr - gh, G0.z);
+    if (kind == 3) mq.x = abs(mq.x) - 0.22;
+    if (G1.z > 0.5) {
+      nwr = 0.10; nh = 0.035;
+      nq = p - vec3(0.0, 0.0, G1.y); nq.xz = rot2(nq.xz, -gPS.z);
+      nq.y += gh - 0.11*gM[0].x - nwr;
+    } else {
+      Pose N = gearPartPose(PT_GEAR_NOSE, vec2(0.0));
+      float ns = max(length(N.R[0]), 1e-3);
+      nq = transpose(N.R/ns)*(p - N.T)/ns - vec3(0.0, nwr - gh, 0.0);
+      if (kind == 3) nq.x = abs(nq.x) - 0.15;
+    }
   }
   braked = dot(mq, mq) < dot(nq, nq);
   halfWidth = braked ? mh : nh;

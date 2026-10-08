@@ -171,6 +171,7 @@ private:
   Weather wx;
   Weather wxStart;   // C8: the flight's weather drifts from the contract's wx to its wxEnd (updateWeather)
   float apRepickT = 0;
+  int apWindSaid = 0;   // the autopilot's wind go-around the HUD has told of (plane.apWindEvent)
   void updateWeather(float dt);
   float timeOfDay = 12;
   int wpIndex = 0;
@@ -317,7 +318,7 @@ private:
   int atcKey() const { return atcF.phase * 4 + (atcF.depRev ? 1 : 0) + (atcF.arrRev ? 2 : 0); }   // E6: a tower call is valid while this is what it was made for
   void updateAtc(float dt);
   // every in-flight message the voices may say: the toasts, the lesson hints (with the lesson's id), the warnings
-  struct CommsMsg { std::string text, mission; };
+  struct CommsMsg { std::string text, mission; bool padOk = true; };   // (padOk: a recording naming the gamepad's buttons names the player's)
   std::vector<CommsMsg> commsPending;
   bool commsCrashSeen = false;
   std::vector<std::string> hintsVoiced;   // the lesson hints said this flight
@@ -345,7 +346,8 @@ private:
   bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI
   // bound action state: keyboard key or gamepad button
-  std::string expandHint(const std::string& raw, bool pad = false) const;   // {actionId} tokens -> the bound keys (pad: buttons)
+  std::string expandHint(const std::string& raw, bool pad = false) const;
+  bool hintPadDefault(const std::string& raw) const;   // every control the hint names on its default gamepad button   // {actionId} tokens -> the bound keys (pad: buttons)
   std::string actLabel(int a, bool pad) const;   // an action's key, or its gamepad button / stick / trigger
   bool padActive = false;   // the gamepad was used last (a key press hands back to the keyboard): what prompts name
   bool padPrompts() const { return in.pad && padActive; }

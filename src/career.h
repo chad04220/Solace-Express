@@ -77,6 +77,7 @@ struct FlightResult {
   bool landingLightOn = true;
   bool belowMinimumsUnaligned = false;
   float surveyInBand = 1.f;
+  float surveySec = 0, surveyInSec = 0;   // the survey pattern's seconds flown and those inside the band, the job's whole so far (a continued leg carries them on)
 };
 
 struct PayoutLine { std::string label; int amount; };
@@ -186,6 +187,7 @@ public:
     float fuelBilledKg = 0;
     bool hirePaid = false, positioningPaid = false, ferryPaid = false;
     float patient = 1.f, comfort = 1.f;   // the ride so far (medevac, VIP): the next leg carries on from it
+    float surveySec = 0, surveyInSec = 0; // the survey pattern so far: seconds flown, and inside the altitude band (review S2: a diversion reset them)
     uint32_t id = 0;
     Contract continuation() const { Contract k = c; k.from = at; k.startAirborne = false; return k; }   // the next leg's contract
   };

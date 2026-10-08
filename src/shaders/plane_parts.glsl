@@ -152,22 +152,52 @@ Pose poseMul(Pose a, Pose b){ Pose X; X.R = a.R*b.R; X.T = a.R*b.T + a.T; return
 // wheel station, taildragger). The legs travel until gear 0.2, then the doors close over them.
 float gearUp(){ return clamp((1.0 - gPS.x)*1.25, 0.0, 1.0); }
 float gearDoorAngle(){ return smoothstep(0.0, 0.2, gPS.x)*1.45; }
-// In the cockpit view a nose wheel that rises into the cabin (its station behind the instrument panel: the XR-20's,
-// whose cockpit sits right over its nose gear) would stand stowed in front of the pilot: it shrinks away as it rises
+// In the cockpit view a retracting nose wheel shrinks away as it folds: stowed along the belly it would lie in the
+// footwell of a cabin drawn hollow
 float gearNoseShow(){
-  bool inCabin = gPS.w > 0.5 && int(gM[0].y + 0.5) >= 3 && gM[18].w > gM[21].w - 0.2;
+  bool inCabin = gPS.w > 0.5 && int(gM[0].y + 0.5) >= 3;
   return inCabin ? 1.0 - smoothstep(0.3, 0.8, gearUp()) : 1.0;
+}
+// a rotation by a about the unit axis k
+mat3 rotAxis(vec3 k, float a){ float c = cos(a), s = sin(a); return c*mat3(1.0) + s*mat3(0.0, k.z, -k.y,  -k.z, 0.0, k.x,  k.y, -k.x, 0.0) + (1.0 - c)*outerProduct(k, k); }
+// A leg swinging fore or aft (dir -1 forward, +1 aft) about a crosswise pivot at its top, through straight down, until
+// it lies along the chord, while its wheel turns a quarter about the leg to lie flat (a wing is thinner than the
+// wheel is tall): the turn at retraction u, from the leg's rest direction v (the pivot to the wheel's centre). The
+// wheel's outboard face (and what the leg carries on that side) ends underneath. The turn is done in the first 60% of
+// the swing, while the wheel still hangs below the wing (turning as it went in, the last of it lifted the rim through
+// the upper skin)
+mat3 gearSwingR(vec3 v, float dir, float u){
+  float chi = mod(dir*1.5707963 - atan(v.z, v.y) + 3.14159265, 6.2831853) - 3.14159265;
+  vec3 k = normalize(v);
+  float tw = (partRyz(chi)*rotAxis(k, 1.5707963)*vec3(1.0, 0.0, 0.0)).y < 0.0 ? 1.5707963 : -1.5707963;
+  return partRyz(chi*u)*rotAxis(k, tw*smoothstep(0.0, 0.6, u));
 }
 // A wing-retracting main (type 4) folds inboard about a fore-and-aft hinge, until the leg lies along the wing (its
 // dihedral) and the wheel lies flat under the wing root, in a streamlined fairing: raised straight up it came through
 // the top of a wing a third as thick as the wheel is tall, and even flat the wheel (20 cm across its tyre) is thicker
-// than these wings where the gear stands (7 to 15 cm). The hinge is placed so the folded wheel's top stays 2 cm under
-// the upper skin; the fairing's floor (its doors) runs 4 cm under the wheel, parallel to the wing.
+// than these wings where the gear stands (7 to 15 cm). The hinge is placed so all of the folded wheel, its hub caps too,
+// stays under the upper skin (gearStowGap); the fairing's floor (its doors) runs 4 cm under its lower caps, parallel to
+// the wing.
 float wingHalf(float s, float z){   // the wing's half thickness at span s and body z (sdPanel: an uneven capsule from the LE radius to the TE radius)
   vec4 W0 = gM[9], W1 = gM[10];
   float kk = clamp(s/W0.x, 0.0, 1.0), ch = mix(W0.y, W0.z, kk), le = W1.y + W0.w*kk;
   float r1 = W1.w*ch*0.5, r2 = max(0.004*ch, 0.005);
   return mix(r1, r2, clamp((z - le - r1)/max(ch - r1 - r2, 0.01), 0.0, 1.0));
+}
+// How high a stowed main wheel's centre may lie under the wing's upper skin, laid flat with its centre at span s, body
+// z (r: its radius; slope: how much the chord plane rises outboard, relative to the wheel - the dihedral's for a wheel
+// lying flat in the body's frame, 0 for one lying in the wing's): the most of each part's height under the skin
+// across the wheel - its hub caps and brake disc (4.4 cm proud of the tyre: plane_sdf.glsl gearWheelDetails), its rims,
+// its tyre (10 cm half width) - each 1.6 cm under it, where the wing thins aft and the dihedral lowers it inboard.
+// (Measured at the wheel's centre only, for the tyre alone, the caps came through the top of the wing, stowed.)
+float gearStowGap(float s, float z, float r, float slope){
+  float y = wingHalf(s, z) - 0.16;
+  for (int i = 0; i < 4; i++) {
+    vec2 d = i == 0 ? vec2(1.0, 0.0) : i == 1 ? vec2(-1.0, 0.0) : i == 2 ? vec2(0.0, 1.0) : vec2(0.0, -1.0);
+    y = min(y, wingHalf(s + d.x*0.55*r, z + d.y*0.55*r) + d.x*0.55*r*slope - 0.145);
+    y = min(y, wingHalf(s + d.x*0.9*r, z + d.y*0.9*r) + d.x*0.9*r*slope - 0.116);
+  }
+  return y;
 }
 struct GearFold { vec3 H; float legLen, dl, xf, floor0; };   // (floor0: the fairing floor's height at x 0, rising with the dihedral)
 GearFold gearFold(){
@@ -176,10 +206,10 @@ GearFold gearFold(){
   float yh = W1.x + track*W1.z, legLen = 0.0, xf = track;
   for (int i = 0; i < 4; i++) {   // (the hinge's height sets the leg's length, which sets where the wheel folds to)
     legLen = yh - wy; xf = track - legLen*cos(dl);
-    yh = W1.x + xf*W1.z + wingHalf(xf, mz) - 0.12 + legLen*sin(dl);
+    yh = W1.x + xf*W1.z + gearStowGap(xf, mz, wr, 0.0) + legLen*sin(dl);
   }
   GearFold f; f.legLen = yh - wy; f.dl = dl; f.xf = track - f.legLen*cos(dl); f.H = vec3(track, yh, mz);
-  f.floor0 = (yh - f.legLen*sin(dl) - 0.14) - f.xf*W1.z;
+  f.floor0 = (yh - f.legLen*sin(dl) - 0.185) - f.xf*W1.z;
   return f;
 }
 vec3 gearHinge(){ return gearFold().H; }
@@ -191,10 +221,10 @@ GearWell gearFoldWellOf(GearFold f){
   vec4 G0 = gM[18], W1 = gM[10];
   float track = G0.x, wr = G0.y, mz = G0.z;
   GearWell g;
-  g.x1 = track + 0.12; g.x0 = max(f.xf - wr - 0.05, 0.05); g.hz = wr + 0.07;
+  g.x1 = track + 0.12; g.x0 = max(f.xf - wr - 0.05, 0.05); g.hz = wr + 0.03;
   g.F.R = mat3(1.0, W1.z, 0.0,  0.0, 1.0, 0.0,  0.0, 0.0, 1.0);
   g.F.T = vec3(0.0, f.floor0, mz);
-  g.depth = 0.14 + 0.1;   // (the floor to the folded wheel's top: 2 cm under the upper skin)
+  g.depth = 0.185 + 0.14;   // (the floor to the folded wheel's hub caps: under the upper skin, gearStowGap)
   return g;
 }
 GearWell gearFoldWell(){ return gearFoldWellOf(gearFold()); }
@@ -203,26 +233,99 @@ float wingHingeZ(float s){ vec4 W0 = gM[9], W1 = gM[10]; float k = clamp(s/W0.x,
 // how far back a folding main's fairing may reach, over its span (from the root to its outboard end; the hinge line is
 // straight in the span, so its ends bound it), clear of the flap's hinge line
 float gearFairAft(){ return min(wingHingeZ(0.0), wingHingeZ(gM[18].x + 0.12)) - 0.03; }
-// These mains stand about where the flaps hinge (and the fold keeps the wheel's station): where the fairing's
-// trailing end (gearFoldWellOf's hz and its rounding) would reach under the flap, the flap starts just outboard of
-// the fairing instead and the wing root over it stays fixed, so a lowered flap never cuts through the folded gear
-bool gearFlapOutboard(){ return int(gM[0].y + 0.5) == 4 && gM[18].z + gM[18].y + 0.1 > gearFairAft(); }
-float flapRoot(){ float fr = 0.55*gM[0].w; return gearFlapOutboard() ? max(fr, gM[18].x + 0.16) : fr; }
-// a bay the wheel rises straight into (the nose wheel's; type 3's mains', in the nacelle): the opening's centre at the
-// skin height of its hinges, its half width and length, its depth above that, and how far the cut reaches below it to
-// open a curved belly between the hinges
-struct VBay { vec3 c; vec2 h; float depth, below; };
+float flapRoot(){ return 0.55*gM[0].w; }
+// The inward fold keeps the wheel's station, and on some of these wings the mains stand near the flaps' hinge line (at
+// their physics' station, 4% of the length aft of the datum): the well came across it, a bay in the flaps (it once
+// moved the flaps outboard of it). Those swing forward into the wing instead, the wheel turned flat ahead of the
+// hinge line (the Swift's, the XR-10's): the hinge H at the leg's top, as far aft as leaves the well 10 cm clear of
+// the hinge line (the leg raked aft at rest), and at the height that keeps all of the flat wheel under the upper skin
+// there (gearStowGap); T the stowed wheel's centre; the well from z0 to z1 along a shallow fairing whose floor - fy, 4
+// cm under the wheel's lower caps - carries the doors, hw its half width
+bool gearSwingMain(){ return int(gM[0].y + 0.5) == 4 && gM[18].z + gM[18].y + 0.03 > gearFairAft() + 0.005; }
+struct GearSwing { vec3 H, T; float z0, z1, fy, hw; };
+GearSwing gearSwingOf(){
+  vec4 G0 = gM[18], W1 = gM[10];
+  float track = G0.x, wr = G0.y, mz = G0.z;
+  vec3 W = vec3(track, wr - gM[19].x, mz);
+  float zh = min(mz, min(wingHingeZ(track - wr), wingHingeZ(track + wr)) - 0.13);
+  GearSwing g; g.H = vec3(track, W1.x + track*W1.z, zh);
+  for (int i = 0; i < 2; i++) { float tz = zh - length(W - g.H); g.H.y = W1.x + track*W1.z + gearStowGap(track, tz, wr, W1.z); }
+  g.T = g.H - vec3(0.0, 0.0, length(W - g.H));
+  g.z0 = g.T.z - wr - 0.06; g.z1 = zh + 0.1; g.hw = wr + 0.05; g.fy = g.H.y - 0.185;
+  return g;
+}
+// The retracting nose leg folds aft, a quarter turn about a crosswise pivot at its top, into a bay along the belly.
+// (It rose straight up as far as the gear is tall: through the cabin floor, and in the shorter noses up to the
+// windscreen.) The pivot stands the nose wheel's radius and 7 cm over the belly - the higher of the belly where the
+// leg stands and where the wheel comes to rest - so the stowed wheel lies inside the fuselage. x: the pivot's height,
+// y: the leg's length (the pivot to the wheel's centre)
+float gearNoseR(){ return int(gM[0].y + 0.5) == 3 ? gM[18].y*0.75 : gM[18].y*0.85; }
+vec2 gearNoseFold(){
+  float nz = gM[18].w, nwr = gearNoseR(), wy = nwr - gM[19].x;
+  vec3 s0 = fusSection(nz);
+  float py = s0.z - s0.y + nwr + 0.07;
+  for (int i = 0; i < 2; i++) { vec3 s1 = fusSection(nz + py - wy); py = max(s0.z - s0.y, s1.z - s1.y) + nwr + 0.07; }
+  return vec2(py, py - wy);
+}
+// A leg folding about a crosswise pivot (body x) at height py, from its wheel's centre at rest W to its stowed place T
+// (both (y, z)): the pivot as far from both - on their bisector - so one turn takes the wheel from one to the other.
+// x: the pivot's z, y: the turn (about +x, as partRyz)
+vec2 gearSwing(vec2 W, vec2 T, float py){
+  vec2 m = 0.5*(W + T), d = T - W;
+  float pz = m.y - d.x*(py - m.x)/(abs(d.y) > 1e-4 ? d.y : 1e-4);
+  vec2 a = W - vec2(py, pz), b = T - vec2(py, pz);
+  return vec2(pz, atan(a.x*b.y - a.y*b.x, dot(a, b)));
+}
+// A nacelle main (type 3, the right side's) folds forward into its nacelle: its wheels from their rest to the
+// nacelle's fullest section, about a pivot 22 cm over the nacelle's floor - on the bisector, so the leg stands raked a
+// little forward. (It rose straight up as far as the gear is tall, and the leg's top came out through the top of the
+// wing.) P: the pivot, ang: the full turn, T: the wheels' stowed centre (y, z); z0..z1: the wheel bay along the
+// nacelle's floor, z1..zs: the slot the leg swings through, closed by a door on the leg
+struct NacFold { vec3 P; float ang; vec2 T; float z0, z1, zs; };
+NacFold gearNacFold(){
+  vec4 G0 = gM[18]; float wr = G0.y;
+  float tz = gM[16].w + gM[17].x*0.3 - 0.2;
+  vec2 W = vec2(wr - gM[19].x, G0.z), T = vec2(nacSection(tz).x, tz), sw = vec2(G0.z, 0.0);
+  float py = 0.0;
+  for (int i = 0; i < 3; i++) { vec2 ns = nacSection(sw.x); py = ns.x - ns.y + 0.22; sw = gearSwing(W, T, py); }
+  NacFold f; f.P = vec3(G0.x, py, sw.x); f.ang = sw.y; f.T = T;
+  f.z0 = tz - wr - 0.1; f.z1 = tz + wr + 0.12; f.zs = sw.x + 0.2;
+  return f;
+}
+// the nacelle's skin under a main (x from its centre line, body y, z): the distance to its round section, below the axis
+float gearNacSkin(float x, float y, float z){ vec2 ns = nacSection(z); return max(length(vec2(x, y - ns.x)) - ns.y, y - ns.x); }
+// a bay the gear swings into (the nose wheel's, along the belly; type 3's mains', in the nacelle's floor): the opening's
+// centre at the skin height of its hinges, its half width and length, its depth above that, how far the cut reaches
+// below it to open a curved belly between the hinges, and its pitch (about +x: the nacelle's floor slopes)
+struct VBay { vec3 c; vec2 h; float depth, below, pitch; };
 VBay gearVBay(bool nose){
   vec4 G0 = gM[18]; int gtype = int(gM[0].y + 0.5);
   float track = G0.x, wr = G0.y, mz = G0.z, nz = G0.w;
   VBay b;
-  if (nose) {
-    vec3 sN = fusSection(nz); float nw = gtype == 3 ? wr*0.75 : wr*0.85, nx = gtype == 3 ? 0.3 : 0.14;
-    float ey = sN.y*sqrt(max(1.0 - nx*nx/(sN.x*sN.x), 0.0));   // (the belly's height at the hinges: an elliptic section)
-    b.c = vec3(0.0, sN.z - ey, nz); b.h = vec2(nx, nw + 0.08); b.depth = 2.0*nw + 0.15 + sN.y - ey; b.below = sN.y - ey + 0.03;
-  } else {
-    vec2 ns = nacSection(mz); float rr = ns.y, hx = min(0.38, rr*0.7), hy = sqrt(max(rr*rr - hx*hx, 0.0)), sk = ns.x - hy;
-    b.c = vec3(track, sk, mz); b.h = vec2(hx, wr + 0.08); b.depth = (ns.x - ns.y + 0.03) + 2.0*wr - sk + 0.1; b.below = rr - hy + 0.03;
+  if (!nose && gtype == 4) {   // a main swung into the wing: along its fairing's floor
+    GearSwing g = gearSwingOf();
+    b.c = vec3(track, g.fy, 0.5*(g.z0 + g.z1)); b.h = vec2(g.hw, 0.5*(g.z1 - g.z0)); b.depth = g.H.y + 0.13 - g.fy; b.below = 0.03; b.pitch = 0.0;
+  } else if (nose) {   // from just ahead of the pivot to behind the stowed wheel; its hinges at the highest skin along it
+    float nw = gearNoseR(), nx = gtype == 3 ? 0.3 : 0.14;
+    vec2 nf = gearNoseFold();
+    // (its hinges along the chord of the belly's line from end to end: at the station it narrows towards the nose)
+    float z0 = nz - 0.14, z1 = nz + nf.y + nw + 0.1, hk[3], lo[3];
+    for (int i = 0; i < 3; i++) {
+      vec3 sN = fusSection(mix(z0, z1, 0.5*float(i)));
+      hk[i] = sN.z - sN.y*sqrt(max(1.0 - nx*nx/(sN.x*sN.x), 0.0));   // (the belly's height at the hinges: an elliptic section)
+      lo[i] = sN.z - sN.y;
+    }
+    float cy = 0.5*(hk[0] + hk[2]), sag = max(hk[1] - cy, 0.0);   // (a belly that rises above the chord at its middle: the doors sit that much higher, never out of the skin)
+    b.c = vec3(0.0, cy + sag, 0.5*(z0 + z1)); b.h = vec2(nx, 0.5*length(vec2(z1 - z0, hk[2] - hk[0]))); b.pitch = -atan(hk[2] - hk[0], z1 - z0);
+    b.depth = nf.x + nw + 0.06 - b.c.y; b.below = b.c.y - min(min(lo[0], lo[1]), lo[2]) + 0.03;
+  } else {   // the wheel bay: its hinges along the chord of the nacelle's floor, either end
+    NacFold f = gearNacFold();
+    vec2 n0 = nacSection(f.z0), n1 = nacSection(f.z1);
+    float hx = min(0.42, min(n0.y, n1.y)*0.7);
+    float y0 = n0.x - sqrt(max(n0.y*n0.y - hx*hx, 0.0)), y1 = n1.x - sqrt(max(n1.y*n1.y - hx*hx, 0.0));
+    float len = length(vec2(f.z1 - f.z0, y1 - y0));
+    b.c = vec3(track, 0.5*(y0 + y1), 0.5*(f.z0 + f.z1)); b.h = vec2(hx, 0.5*len); b.pitch = -atan(y1 - y0, f.z1 - f.z0);
+    b.depth = f.T.x + wr + 0.06 - b.c.y; b.below = max(n0.y, n1.y) - sqrt(max(max(n0.y, n1.y)*max(n0.y, n1.y) - hx*hx, 0.0)) + 0.08;
   }
   return b;
 }
@@ -235,11 +338,15 @@ Pose gearPartPose(int k, vec2 sd){
   mat3 S = partMirror(sd.x);
   Pose X; X.R = mat3(1.0); X.T = vec3(0.0);
   if (k == PT_GEAR_MAIN) {
-    if (gtype == 3) { vec2 ns = nacSection(mz); X.R = S; X.T = S*vec3(0.0, up*(ns.x - ns.y + 0.03 + gh), 0.0); }
+    if (gtype == 3) { NacFold f = gearNacFold(); mat3 Rf = partRyz(up*f.ang); X.R = S*Rf; X.T = S*(f.P - Rf*f.P); }
+    else if (gearSwingMain()) { GearSwing g = gearSwingOf(); mat3 Rf = gearSwingR(vec3(G0.x, G0.y - gh, mz) - g.H, -1.0, up); X.R = S*Rf; X.T = S*(g.H - Rf*g.H); }
     else { vec3 H = gearHinge(); mat3 Rf = partRxy(gearFoldAngle()); X.R = S*Rf; X.T = S*(H - Rf*H); }
-  } else if (k == PT_GEAR_NOSE) { X.R = partRxz(gPS.z)*max(gearNoseShow(), 1e-3); X.T = vec3(0.0, up*(gh - gM[0].w*0.6), nz); }
+  } else if (k == PT_GEAR_NOSE) {   // (about its pivot, from the shape's rest frame at the station)
+    X.R = partRxz(gPS.z)*max(gearNoseShow(), 1e-3); X.T = vec3(0.0, 0.0, nz);
+    if (gtype >= 3) { vec3 pl = vec3(0.0, gearNoseFold().x, 0.0); X.R = partRyz(-1.5707963*up)*X.R; X.T += pl - X.R*pl; }
+  }
   else if (k == PT_GEAR_TAIL) { X.R = partRxz(gPS.z); X.T = vec3(0.0, 0.0, G1.y); }
-  else if (k == PT_GEAR_MDOOR && gtype == 4) {   // the fold well's doors, hinged along its long edges fore and aft
+  else if (k == PT_GEAR_MDOOR && gtype == 4 && !gearSwingMain()) {   // the fold well's doors, hinged along its long edges fore and aft
     GearWell g = gearFoldWell();
     float s = sd.y, ca = cos(a), sa = sin(a);
     Pose D; D.R = mat3(1.0, 0.0, 0.0,  0.0, ca, -s*sa,  0.0, -sa, -s*ca); D.T = vec3(0.5*(g.x0 + g.x1), 0.0, s*g.hz);
@@ -247,7 +354,8 @@ Pose gearPartPose(int k, vec2 sd){
   } else {   // a vertical bay's doors, hinged along its sides
     VBay b = gearVBay(k == PT_GEAR_NDOOR);
     float s = sd.y;
-    X.R = partMirror(-s)*partRxy(-a); X.T = b.c + vec3(s*b.h.x, 0.0, 0.0);
+    mat3 Rp = partRyz(b.pitch);
+    X.R = Rp*partMirror(-s)*partRxy(-a); X.T = b.c + Rp*vec3(s*b.h.x, 0.0, 0.0);
     if (k == PT_GEAR_MDOOR) { X.R = S*X.R; X.T = S*X.T; }
   }
   return X;
@@ -319,30 +427,79 @@ Pose partPoseCockpit(int k, vec2 sd){
   }
   return X;
 }
-// the research jets' gear bays (the XR-30's and the XR-40's: the same gear, in bays at their own skin heights): a bay's
-// centre at the skin (the right main's), its half width and half length
-vec3 jtBayC(bool nose){
+// The research jets' retracting tricycle gear (the XR-30's and the XR-40's, under their own airframes). The mains swing
+// into the wing with the wheel turned flat (gearSwingR): the XR-30's aft (its main stands just behind the swept
+// leading edge), the XR-40's forward, its leg raked aft at rest so the wheel comes to lie where the wing is thicker.
+// The nose leg folds aft along the belly. (They rose straight up, the struts shortening, through wings a third as thick
+// as the wheel is tall: the wheel showed through the top of the wing until it was drawn as nothing below 6%.)
+// JtGear: the main's hinge H (the right side's), its swing dir (-1 forward) and the stowed wheel's centre T; its well
+// along a shallow fairing's floor (centre mc, half size mh, depth md); the nose's pivot P and its well along the belly
+// (centre nc, half size nh, pitch np, depth nd, how far the cut reaches below the hinges nb)
+const float JT_TYRE_H = 0.10;   // (the main tyres' half width: slim enough to lie flat in the wing)
+struct JtGear { vec3 H, T, mc, P, nc; vec2 mh, nh; float dir, md, np, nd, nb; };
+// the belly's height at body z, x across (the XR-40's faceted section: wraith_sdf.glsl wrSection; the XR-30's round)
+float jtBelly(float z, float x){
+  if (int(gM[0].z + 0.5) == 6) {
+    float zc = clamp(z, -8.3, 7.8), yc = -0.1 - 0.12*smoothstep(-5.0, -8.4, zc);
+    float W = zc < -4.4 ? (zc + 8.4)*0.30 : (zc < 4.5 ? 1.2 + (zc + 4.4)*0.012 : 1.31 - (zc - 4.5)*0.13);
+    float bot = yc - min((zc + 8.4)*0.12, 0.48) + max(zc - 5.0, 0.0)*0.06;
+    return bot + max(abs(x) - W*0.42, 0.0)*(yc - bot)/max(W*0.58, 1e-3);
+  }
+  vec3 s = fusSection(z); return s.z - s.y*sqrt(max(1.0 - x*x/(s.x*s.x), 0.0));
+}
+// the jet's wing's upper skin at span x, body z (sdPanel's frame and sizes: plane_sdf.glsl mapJet, wraith_sdf.glsl
+// mapWraith with wrSection's centre line)
+float jtWingTop(float x, float z){
   bool wr = int(gM[0].z + 0.5) == 6;
-  return nose ? vec3(0.0, wr ? -0.43 : -0.39, gM[18].w) : vec3(gM[18].x, wr ? -0.21 : -0.355, gM[18].z);
+  float s = wr ? x - 1.0 : x, c = wr ? z + 3.0 : z + 1.6;
+  float span = wr ? 5.2 : 5.6, rc = wr ? 8.2 : 7.2, tc = wr ? 1.35 : 1.2, sweep = wr ? 4.7 : 5.6, th = wr ? 0.035 : 0.04;
+  float k = clamp(s/span, 0.0, 1.0), ch = mix(rc, tc, k), le = sweep*k, r1 = th*ch*0.5, r2 = max(0.004*ch, 0.005);
+  float hw = mix(r1, r2, clamp((c - le - r1)/max(ch - r1 - r2, 0.01), 0.0, 1.0));
+  return (wr ? -0.12 - 0.12*smoothstep(-5.0, -8.4, z) - s*0.012 : -0.18 - s*0.035) + hw;
 }
-const vec2 JT_MAIN_BAY_H = vec2(0.2, 0.46), JT_NOSE_BAY_H = vec2(0.24, 0.42);
-// how far the gear has risen: it rises straight up, the struts shortening and the wheels sliding (the XR-40's folds
-// flush with its belly)
-float jtGearLift(){ return (1.0 - gPS.x)*(gM[19].x - (int(gM[0].z + 0.5) == 6 ? 0.19 : 0.5)); }
-// a strut from its fixed mount A to its foot B (rest), shortened along y by the lift; below 6% extension the gear is
-// stowed and drawn as nothing (as the field draws it): the pose collapses to the mount
-Pose jtStrutPose(vec3 A, vec3 B, mat3 S){
-  float show = gPS.x > 0.06 ? 1.0 : 1e-3, k = (B.y + jtGearLift() - A.y)/min(B.y - A.y, -1e-3);
-  mat3 D = show*mat3(1.0, 0.0, 0.0,  0.0, k, 0.0,  0.0, 0.0, 1.0);
-  Pose X; X.R = S*D; X.T = S*(A - D*A); return X;
+// the stowed main wheel's centre height, lying flat with its centre at (x, z): as gearStowGap, all of it under the skin
+float jtStowY(float x, float z){
+  float y = jtWingTop(x, z) - 0.16;
+  for (int i = 0; i < 4; i++) {
+    vec2 d = i == 0 ? vec2(1.0, 0.0) : i == 1 ? vec2(-1.0, 0.0) : i == 2 ? vec2(0.0, 1.0) : vec2(0.0, -1.0);
+    y = min(y, jtWingTop(x + d.x*0.21, z + d.y*0.21) - 0.145);
+    y = min(y, jtWingTop(x + d.x*0.34, z + d.y*0.34) - 0.116);
+  }
+  return y;
 }
-Pose jtWheelPose(vec3 C, mat3 S){
-  float show = gPS.x > 0.06 ? 1.0 : 1e-3;
-  Pose X; X.R = S*mat3(show); X.T = S*(C + vec3(0.0, jtGearLift(), 0.0) - show*C); return X;
+JtGear jtGearOf(){
+  bool wr = int(gM[0].z + 0.5) == 6;
+  vec4 G0 = gM[18]; float gh = gM[19].x, track = G0.x, mz = G0.z, nz = G0.w;
+  JtGear g;
+  vec3 W = vec3(track, 0.38 - gh, mz);
+  g.dir = wr ? -1.0 : 1.0;
+  g.H = vec3(track, -0.2, wr ? mz - 0.5 : mz);   // (its height: where the flat wheel lies under the wing's upper skin, hub caps and all)
+  for (int i = 0; i < 2; i++) g.H.y = jtStowY(track, g.H.z + g.dir*length(W - g.H));
+  g.T = g.H + vec3(0.0, 0.0, g.dir*length(W - g.H));
+  float z0 = g.dir < 0.0 ? g.T.z - 0.44 : g.H.z - 0.12, z1 = g.dir < 0.0 ? g.H.z + 0.12 : g.T.z + 0.44;
+  float fy = g.H.y - JT_TYRE_H - 0.085;
+  g.mc = vec3(track, fy, 0.5*(z0 + z1)); g.mh = vec2(0.41, 0.5*(z1 - z0)); g.md = g.H.y + JT_TYRE_H + 0.03 - fy;
+  float nwy = 0.33 - gh, py = jtBelly(nz, 0.0) + 0.40;
+  for (int i = 0; i < 2; i++) py = max(jtBelly(nz, 0.0), jtBelly(nz + py - nwy, 0.0)) + 0.40;
+  g.P = vec3(0.0, py, nz);
+  float n0 = nz - 0.16, n1 = nz + py - nwy + 0.43;
+  float b0 = jtBelly(n0, 0.24), b1 = jtBelly(n1, 0.24), cy = 0.5*(b0 + b1), sag = max(jtBelly(0.5*(n0 + n1), 0.24) - cy, 0.0);
+  g.nc = vec3(0.0, cy + sag, 0.5*(n0 + n1)); g.nh = vec2(0.24, 0.5*length(vec2(n1 - n0, b1 - b0))); g.np = -atan(b1 - b0, n1 - n0);
+  g.nd = py + 0.38 - g.nc.y;
+  g.nb = g.nc.y - min(min(jtBelly(n0, 0.0), jtBelly(n1, 0.0)), jtBelly(0.5*(n0 + n1), 0.0)) + 0.03;
+  return g;
 }
-// a bay's door (hinged as the light aircraft's vertical bays' are: gearPartPose)
-Pose jtDoorPose(vec3 c, vec2 h, float s, mat3 S){
-  Pose X; X.R = S*partMirror(-s)*partRxy(-gearDoorAngle()); X.T = S*(c + vec3(s*h.x, 0.0, 0.0)); return X;
+// the main's leg and wheel, swung as one (S: the side); the nose's, folded about its pivot
+Pose jtMainPose(mat3 S){
+  JtGear g = jtGearOf();
+  mat3 R = gearSwingR(vec3(gM[18].x, 0.38 - gM[19].x, gM[18].z) - g.H, g.dir, gearUp());
+  Pose X; X.R = S*R; X.T = S*(g.H - R*g.H); return X;
+}
+Pose jtNosePose(){ JtGear g = jtGearOf(); mat3 R = partRyz(-1.5707963*gearUp()); Pose X; X.R = R; X.T = g.P - R*g.P; return X; }
+// a bay's door (hinged along its side as the light aircraft's are: gearPartPose), pitched with the bay
+Pose jtDoorPose(vec3 c, vec2 h, float s, mat3 S, float pitch){
+  mat3 Rp = partRyz(pitch);
+  Pose X; X.R = S*Rp*partMirror(-s)*partRxy(-gearDoorAngle()); X.T = S*(c + Rp*vec3(s*h.x, 0.0, 0.0)); return X;
 }
 // the XR-30's surfaces, nozzles and gear
 Pose jtPartPose(int k, vec2 sd){
@@ -352,12 +509,10 @@ Pose jtPartPose(int k, vec2 sd){
     vec4 G0 = gM[18]; float gh = gM[19].x;
     mat3 S = partMirror(sd.x);
     if (k == PT_JT_NOZZLE) { X.R = S*partRyz(gFlame.z); X.T = S*vec3(0.82, -0.12, 7.75); }   // (about its front edge, by the vectoring angle)
-    else if (k == PT_JT_LEGM) X = jtStrutPose(vec3(G0.x*0.8, -0.3, G0.z), vec3(G0.x - 0.1, -gh + 0.43, G0.z), S);
-    else if (k == PT_JT_WHEELM) X = jtWheelPose(vec3(G0.x, -gh + 0.38, G0.z), S);
-    else if (k == PT_JT_LEGN) X = jtStrutPose(vec3(0.0, -0.35, G0.w), vec3(0.0, -gh + 0.43, G0.w), mat3(1.0));
-    else if (k == PT_JT_WHEELN) X = jtWheelPose(vec3(0.0, -gh + 0.33, G0.w), mat3(1.0));
-    else if (k == PT_JT_DOORM) X = jtDoorPose(jtBayC(false), JT_MAIN_BAY_H, sd.y, S);
-    else X = jtDoorPose(jtBayC(true), JT_NOSE_BAY_H, sd.y, mat3(1.0));
+    else if (k == PT_JT_LEGM || k == PT_JT_WHEELM) X = jtMainPose(S);
+    else if (k == PT_JT_LEGN || k == PT_JT_WHEELN) X = jtNosePose();
+    else if (k == PT_JT_DOORM) { JtGear g = jtGearOf(); X = jtDoorPose(g.mc, g.mh, sd.y, S, 0.0); }
+    else { JtGear g = jtGearOf(); X = jtDoorPose(g.nc, g.nh, sd.y, mat3(1.0), g.np); }
     return X;
   }
   if (k == PT_JT_ELEVON) {   // the wing's frame (s, c, t) = (|x|, z + 1.6, y + 0.18 + 0.035 s)

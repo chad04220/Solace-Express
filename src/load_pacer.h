@@ -3,9 +3,8 @@
 // The launch is a list of steps (the shaders and the islands, the renderer, the menu, each aircraft's mesh), each with
 // the seconds it is expected to take: what it took on the last launch that did the same kind of work (built from
 // scratch or read from a cache: the two are remembered apart), else the average of the steps of its group that have
-// run this time, else a default. The bar shows the expected seconds done over the expected total, so it moves at an
-// even pace instead of sitting on the step that does most of the work; a step with its own count of items (the
-// shaders) moves by that within its share, else by the time it has run against what it was expected to take.
+// run this time, else a default. The bar moves by the seconds still expected (fraction), so it runs at an even pace
+// from start to finish instead of sitting on the step that does most of the work.
 #pragma once
 #include <chrono>
 #include <cstdio>
@@ -60,22 +59,29 @@ public:
   }
   // the running step's own measure of how far it is (0..1), if it has one
   void setSub(float f) { std::lock_guard<std::mutex> lk(m); sub = f; }
-  // 0..1 of the whole launch
+  // 0..1 of the whole launch: the share done moves at the pace the time still expected allows - (1 - done) over the
+  // seconds left - so it runs on evenly through every step, a little faster when a step ends early and slower, never
+  // still, when one overruns. (Each step's own share, held at 97% while it overran, left the bar standing at one
+  // number through the longest steps.) It never steps back
   // (the intro's own thread asks every frame: the bar moves on while a step holds the main thread)
   float fraction() const {
     std::lock_guard<std::mutex> lk(m);
-    double total = 0, done = 0;
+    const double now = clock();
+    double left = 0; bool open = false;
     for (size_t i = 0; i < steps.size(); i++) {
-      double e = expectOf((int)i);
-      total += e;
-      if (steps[i].took >= 0) done += e;
-      else if ((int)i == cur) {
-        double run = clock() - steps[i].t0;
-        double f = sub >= 0.f ? sub : std::min(0.97, run / std::max(e, 1e-3));
-        done += e * std::min(1.0, std::max(0.0, f));
-      }
+      if (steps[i].took >= 0) continue;
+      open = true;
+      const double e = expectOf((int)i);
+      if ((int)i != cur) { left += e; continue; }
+      const double run = now - steps[i].t0;
+      // (the running step: what its own count says is left, else its expected time less what it has run; an overrun
+      // still expects a tenth of its time and a third as long again as it has overrun so far)
+      left += std::max(sub >= 0.f ? e * (1.0 - std::min(1.0, (double)sub)) : e - run, e * 0.1 + std::max(run - e, 0.0) * 0.3);
     }
-    return total > 0 ? (float)std::min(1.0, done / total) : 0.f;
+    if (!open) { shown = 1.0; return 1.f; }
+    if (tLast >= 0 && left > 1e-3) shown += (1.0 - shown) * std::min(1.0, (now - tLast) / left);
+    tLast = now;
+    return (float)std::min(shown, 1.0);
   }
   // what each step took, for the next launch (and a summary for the startup log)
   void save() const {
@@ -97,6 +103,7 @@ private:
   std::map<std::string, float> prev;
   std::string path;
   int cur = -1; float sub = -1.f;
+  mutable double shown = 0, tLast = -1;   // (fraction's: the share shown, and when it was last asked)
   mutable std::mutex m;
   static double clock() { return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
   void finish(int i, double now) { steps[i].took = now - steps[i].t0; }

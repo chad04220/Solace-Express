@@ -69,6 +69,12 @@ static const vec3 kWraithPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.
 // What an aircraft can do, learned by flying it: Plane::perf() flies a few short test sorties through the flight model
 // (once per type, cached) and measures its envelope. The autopilot flies to these numbers, so it pushes every type to
 // its own limits and re-learns them by itself if the flight model changes.
+// Where the wheels touch, in the body frame: one set of numbers for the physics' ground contacts (Plane::step) and the
+// drawn model (models.cpp packModel), so an aircraft always stands on the wheels it shows - the mains' half track and
+// station, the nose wheel's station, a taildragger's tail wheel (station, height above the mains' contact)
+struct GearStations { float track, mainZ, noseZ, tailZ, tailY; };
+GearStations gearStations(const AircraftSpec& s);
+
 struct PerfModel {
   float vs1 = 0, vs0 = 0;          // stall speed clean / full flap (m/s), from the wing's CLmax at the test weight
   float vy = 0, roc = 0;           // best-climb speed and the climb rate there at full power (m/s)
@@ -160,6 +166,7 @@ public:
   bool onGround = false, wasOnGround = false;
   bool sceneryHits = true;   // collide with trees and buildings (off for the quote's background flight: the scenery isn't thread-safe)
   bool apComfort = false;   // the autopilot flies for passengers (career flights): gentle bank, g, roll and climb; the stick is never limited
+  bool apUpset = false;     // slow or steep enough that recovering comes before comfort (apControl)
   float brakeHold = 0;   // the steady push the parked brakes are holding (N along the nose), learned while held
   float groundRough = 0;      // 0 asphalt .. 1 rough (for audio/vibration)
   float alpha = 0, beta = 0, airspeed = 0, ias = 0, gLoad = 1, stallWarn = 0;
@@ -185,6 +192,8 @@ public:
   bool apOverrun = false;     // ...and it stopped past the runway's end: over, not a success
   std::string apStatus;       // one-line status for the HUD
   std::string apPlanWhy;   // after apPlan: why that runway end is unsafe ("" safe): too short for the wind, too high to descend onto
+  int apHoldFor = -1; float apRetryT = 0;   // a declined autoland's field: circling clear of the ground, tried again every 20 s
+  int apWindEvent = 0;      // the wind turned behind it on the final: 1 going around, 2 then planned afresh (the game says so and clears it)
   std::string apDecline;   // set by apEngage when neither end is safe: the autoland is declined (the autopilot holds instead), and why
   void apEngage(int mode, int airport, const Weather& wx);
   // start a figure: the autopilot first gets the speed and height it needs (diving or climbing), then flies it and
@@ -250,6 +259,7 @@ private:
   float apPitchLag() const;  // how long this airframe's pitch takes to answer at this speed (s)
   float apPathLag() const;   // and its flight path: the pitch's lag, or the wing's in building the lift, the slower (s)
   float apPlan(int airport, bool rev, const Weather& wx, bool commit);
+  float apStopNeed(const Airport& a, bool rev, const Weather& wx, float* tw) const;
   void apHover(float dt);
   void apBellyUp(float dt);   // the research craft's speed-shedding pitch-up on the final (APS_BLEED)
   void wraithThrust(vec3& F, vec3& T, float podThrust, vec3 wd, vec3 Taero, vec3 surfMax, float dt);

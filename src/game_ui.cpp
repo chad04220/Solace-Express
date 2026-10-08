@@ -353,7 +353,19 @@ void Game::drawIntro(float progress, const std::string& stage, float t, unsigned
   // progress bar: segmented track, glowing fill head, percentage and the current stage
   float bw = std::min(680 * s, W - 80 * s), bh = 10 * s, bx = cx - bw * 0.5f, by = H - 104 * s;
   float p = clampf(progress, 0, 1);
-  R.text(bx, by - 30 * s, 14 * s, stage, C_TEXT, 0.9f * e, 0, false);
+  {   // the stage left of the percentage, never into it: a smaller size (to 80%), then without its notes in brackets,
+      // then cut short
+    const float pw = R.textWidth("100%", 14 * s) + 18 * s, room = bw - pw;
+    std::string st = stage; float ss = 14 * s;
+    while (R.textWidth(st, ss) > room && ss > 11.3f * s) ss -= 0.35f * s;
+    for (size_t a; R.textWidth(st, ss) > room && (a = st.find(" (")) != std::string::npos;) {
+      const size_t b = st.find(')', a);
+      if (b == std::string::npos) break;
+      st.erase(a, b + 1 - a);
+    }
+    if (R.textWidth(st, ss) > room) { while (st.size() > 1 && R.textWidth(st + "...", ss) > room) st.pop_back(); st += "..."; }
+    R.text(bx, by - 30 * s + (14 * s - ss) * 0.5f, ss, st, C_TEXT, 0.9f * e, 0, false);
+  }
   R.text(bx + bw, by - 30 * s, 14 * s, fmt("%3.0f%%", p * 100), C_ACCENT, e, 2, false);
   R.rect(bx - 3 * s, by - 3 * s, bw + 6 * s, bh + 6 * s, C_ACCENT, 0.08f * e, 3 * s);
   R.rectOutline(bx - 3 * s, by - 3 * s, bw + 6 * s, bh + 6 * s, C_ACCENT, 0.35f * e, 3 * s, 1 * s);

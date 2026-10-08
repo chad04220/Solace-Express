@@ -7,8 +7,32 @@ uniform int uMeshTraffic;   // -1 the player's aircraft, else the traffic aircra
 // the research craft's screens are holes to the world (cabin_windows.glsl): uScrSkip, with the eye (body frame), the
 // model, whether the XR-40's floor shows the bomb camera, and the part being drawn (-1 the static cabin)
 uniform int uScrSkip; uniform vec3 uScrEye; uniform int uScrModel; uniform int uBombPane; uniform int uPartInst;
+uniform mat3 uRot; uniform vec3 uPos;   // (plane_mesh_vs.glsl: the eye in the body frame is -uRot^T uPos, exact)
+// The raised frame round each pilot's instrument cluster (plane_sdf.glsl: 14 mm wide, 12 mm proud of the panel) is
+// finer than the bake's lattice, whose triangles there mix the frame and the panel: a strip of panel tilted like the
+// frame's wall, a frame edge in steps. Along the eye's sight line instead: the frame's top, one of its walls, or the
+// panel face round it. clusterFr: the frame's centre line's distance (x) and its gradient (yz) at a panel point
+vec3 clusterFr(vec2 xy, vec4 E, int ck){
+  bool co = xy.x*E.x < 0.0;
+  float cx = ck == 2 ? 0.02 : (ck == 1 ? 0.09 : 0.05), hx = co ? coCluster(ck).y : (ck == 2 ? 0.2 : (ck == 1 ? 0.255 : 0.215)), hy = ck == 2 ? 0.098 : 0.112;
+  vec2 fq = vec2(xy.x - (!co ? E.x + cx : -E.x + coCluster(ck).x + coShift(E, ck)), xy.y - (E.y - 0.32));
+  vec2 dq = abs(fq) - vec2(hx, hy) + 0.02;
+  return vec3(length(max(dq, 0.0)) + min(max(dq.x, dq.y), 0.0) - 0.02, normalize(max(dq, 1e-6))*sign(fq));
+}
+bool clusterFrame(vec3 q, vec3 e, inout int mid, out vec3 nB){
+  nB = vec3(0.0, 0.0, 1.0);
+  vec4 E = gM[22]; float pf = gM[21].w + 0.045; int ck = int(gM[21].z + 0.5);
+  if ((mid != 10 && mid != 66) || abs(q.z - pf - 0.006) > 0.02 || abs(q.y - (E.y - 0.32)) > 0.16) return false;
+  vec3 v = q - e;
+  if (v.z > -1e-4 || abs(clusterFr(q.xy, E, ck).x) > 0.03) return false;
+  vec3 ft = clusterFr(e.xy + v.xy*((pf + 0.012 - e.z)/v.z), E, ck);   // where the line crosses the frame's top
+  if (abs(ft.x) <= 0.007) { mid = 66; return true; }
+  vec3 fb = clusterFr(e.xy + v.xy*((pf - e.z)/v.z), E, ck);           // and the panel face
+  if (abs(fb.x) <= 0.007 || (ft.x > 0.0) != (fb.x > 0.0)) { mid = 66; nB = vec3(ft.x > 0.0 ? fb.yz : -fb.yz, 0.0); return true; }
+  mid = 10; return true;
+}
 void main(){
-  if (uScrSkip == 1 && cabinWindowCut(vB - uScrEye, uScrModel, uBombPane == 1, uPartInst >= 0)) discard;
+  if (RESEARCH_ON && uScrSkip == 1 && cabinWindowCut(vB - uScrEye, uScrModel, uBombPane == 1, uPartInst >= 0)) discard;
   gZero = min(uQuality, 0);
   bool traf = uMeshTraffic >= 0;
   if (traf) { loadTraffic(uMeshTraffic); trafficXf(uMeshTraffic); } else { loadMain(); pieceXf(-1); }
@@ -27,12 +51,14 @@ void main(){
   if (abs(vIdS - vId) > 1e-3) { vec3 lp = gPC + transpose(gPR)*(d + (uCamPos - gPP)); mid = int(mapPiece(lp).y + 0.5); }
   // (a screen's id outside every outline - the bake's triangles overrunning the glass - is the frame round it; the
   // research cockpits' own display panels against their frames and mounts from their shapes: cabin_windows.glsl)
-  if (uScrSkip == 1 && cabinScreenId(mid) && !(uBombPane == 1 && mid == 61)) mid = uScrModel == 6 ? 65 : 44;
+  if (RESEARCH_ON && uScrSkip == 1 && cabinScreenId(mid) && !(uBombPane == 1 && mid == 61)) mid = uScrModel == 6 ? 65 : 44;
   if (RESEARCH_ON && !traf && gPS.w > 0.5 && int(gM[0].z + 0.5) >= 5) mid = cabinPanelId(vB - gM[22].xyz, int(gM[0].z + 0.5), mid);
   vec3 conN;   // (the XR-40's consoles and display mounts: their own field's normal, cabin_windows.glsl)
   if (RESEARCH_ON && !traf && gPS.w > 0.5 && uPartInst < 0 && cabinConsoleNormal(vB - gM[22].xyz, int(gM[0].z + 0.5), mid, conN)) ln = conN;
   vec3 wallN;   // (a window's frame: the surface the eye truly sees there, not the mesh's zigzag one)
-  if (uScrSkip == 1 && uPartInst < 0 && cabinWallNormal(vB - uScrEye, uScrModel, mid, wallN)) ln = wallN;
+  if (RESEARCH_ON && uScrSkip == 1 && uPartInst < 0 && cabinWallNormal(vB - uScrEye, uScrModel, mid, wallN)) ln = wallN;
+  vec3 frN;   // (a light aircraft's cluster frames)
+  if (!traf && gPS.w > 0.5 && uPartInst < 0 && int(gM[0].z + 0.5) < 5 && clusterFrame(vB, -transpose(uRot)*uPos, mid, frN)) ln = frN;
   bool pod = !traf && uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0;
   planeToGB(p, rd, t, mid, ln, pod, traf, !traf && gPS.w > 0.5 ? vAo : -1.0);
 }

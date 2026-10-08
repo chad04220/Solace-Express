@@ -140,6 +140,17 @@ std::string Game::expandHint(const std::string& raw, bool pad) const {
   return out;
 }
 
+// whether every control a hint names is still on its default gamepad button: a recorded lesson line names those (review
+// S3: rebound, the instructor said "D-pad Left" while the hint showed the player's own button)
+bool Game::hintPadDefault(const std::string& raw) const {
+  for (size_t i = raw.find('{'); i != std::string::npos; i = raw.find('{', i + 1)) {
+    size_t e = raw.find('}', i);
+    if (e == std::string::npos) break;
+    std::string id = raw.substr(i + 1, e - i - 1);
+    for (int k = 0; k < ACT_COUNT; k++) if (id == kActions[k].id && set.padBind[k] != kActions[k].pad) return false;
+  }
+  return true;
+}
 // The flown time for a job's plan when it's in; else (start) a background flight is begun for it if none is running
 void Game::applyQuote(const Contract& c, Career::LaunchPlan& e, bool start) {
   if (quoteJob.valid() && quoteJob.wait_for(std::chrono::seconds(0)) == std::future_status::ready) quoteFlown[quoteJobKey] = quoteJob.get();
@@ -363,7 +374,11 @@ bool Game::commitLaunch(const std::function<void(Career&)>& change) {
   return false;
 }
 void Game::beginCareerFlight(const Contract& c, int spec, Career::Source src) {
+  // the plan the job is saved with: the same one startFlight flies and settles against (the flown route's quote first,
+  // then the fuel the player chose: the other way round, the quote put back its own uplift and the bill was for that,
+  // not for what went into the tanks - review S1)
   Career::LaunchPlan p = career.plan(c, spec, src);
+  applyQuote(c, p, false);
   career.planFuel(p, c, chosenFuel(c, spec, src, p));
   if (!commitLaunch([&](Career& k) {
     k.attempt++; k.attemptOpen = true;
@@ -391,6 +406,8 @@ void Game::applyJobLeg() {
   const Career::JobState& J = *career.job;
   wpIndex = std::min(J.wpDone, (int)contract.wps.size()); result.wpDone = wpIndex; jobClockBase = J.jobClockMin * 60.f;
   result.patient = J.patient; result.comfort = J.comfort;
+  surveyT = J.surveySec; surveyInT = J.surveyInSec; result.surveySec = surveyT; result.surveyInSec = surveyInT;
+  result.surveyInBand = surveyT > 1.f ? surveyInT / surveyT : 1.f;
   if (J.hirePaid) launchPlan.hire = 0;
   if (J.ferryPaid) launchPlan.ferry = 0;
   jobLeg = true;
@@ -529,6 +546,7 @@ void Game::updateJobMeters(float dt, float gs) {
   if (c.type == CT_SURVEY && !c.wps.empty() && air && wpIndex > 0 && wpIndex < (int)c.wps.size()) {
     surveyT += dt; if (fabsf(plane.pos.y - c.wps[0].alt) <= 46.f) surveyInT += dt;
     result.surveyInBand = surveyT > 1.f ? surveyInT / surveyT : 1.f;
+    result.surveySec = surveyT; result.surveyInSec = surveyInT;   // (the job's whole: a continued leg starts from its earlier legs' - applyJobLeg)
   }
   if (c.type == CT_IFR && air) {
     const Airport& A = g_world.airports[c.to];
@@ -610,7 +628,7 @@ void Game::updateWeather(float dt) {
       apRepickT = plane.apRev != was ? 90.f : 8.f;
       if (!plane.apDecline.empty()) {   // (neither end is safe in the new wind: the hold it falls back to is said, and why)
         g_audio.trigger(SFX_AP_DISC);
-        toast("Autopilot: the wind has shifted - unable to autoland at " + plane.apDecline + " - holding heading and height", vec3(1, 0.75f, 0.35f));
+        toast("Autopilot: the wind has shifted - unable to autoland at " + plane.apDecline + " - circling clear of the ground (it tries again as the wind changes)", vec3(1, 0.75f, 0.35f));
         toast("Any stick input hands control back", vec3(0.8f, 0.8f, 0.8f));
       } else if (plane.apRev != was) toast(fmt("Autopilot: the wind has shifted - now runway %02d at %s", A.rwyNumber(plane.apRev), A.code), vec3(0.6f, 1, 0.6f));
     }
@@ -773,8 +791,8 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   if (!g_ren.dispError.empty() && !dispWarned && !headless) { dispWarned = true; toast("Cockpit display shader failed on this GPU (details in startup.log)", vec3(1.f, 0.45f, 0.35f)); }
   contract = c; specIdx = spec; source = src;
   launchPlan = career.plan(c, spec, src);   // the quote this flight is settled against (fees exactly as shown)
+  applyQuote(c, launchPlan, false);          // (the flown route's estimate, then the fuel chosen: beginCareerFlight's order)
   career.planFuel(launchPlan, c, chosenFuel(c, spec, src, launchPlan));
-  applyQuote(c, launchPlan, false);
   researchFlight = false;   // a career flight; launchResearch sets it again for its own
   wx = c.wx; wxStart = c.wx; timeOfDay = wx.timeOfDay; apRepickT = 0;
   const AircraftSpec& s = kAircraft[spec];
@@ -959,7 +977,7 @@ void Game::engageAutopilot() {
   if (apDest >= 0) {
     plane.apEngage(Plane::AP_NAV, apDest, wx);
     const Airport& a = g_world.airports[apDest];
-    if (!plane.apDecline.empty()) toast("Autopilot: unable to autoland at " + plane.apDecline + " - holding heading and height", vec3(1, 0.75f, 0.35f));
+    if (!plane.apDecline.empty()) toast("Autopilot: unable to autoland at " + plane.apDecline + " - circling clear of the ground (it tries again as the wind changes)", vec3(1, 0.75f, 0.35f));
     else toast(fmt("Autopilot: AUTOLAND %s runway %02d", a.code, a.rwyNumber(plane.apRev)), vec3(0.6f, 1, 0.6f));
     toast("Any stick input hands control back", vec3(0.8f, 0.8f, 0.8f));
   } else {
@@ -1132,6 +1150,18 @@ void Game::updateFlight(float dt) {
     updateFailures(simDt);
     updateResearchCard(simDt);
     plane.step(simDt, wx, gameTime);
+    if (plane.apWindEvent != apWindSaid) {   // (the autopilot went around for a wind that turned behind it on the final: Plane::step)
+      if (plane.apWindEvent == 1) toast("Autopilot: too much tailwind to stop on this runway - going around", vec3(1, 0.75f, 0.35f));
+      else if (plane.apWindEvent == 2) {
+        if (!plane.apDecline.empty()) {
+          g_audio.trigger(SFX_AP_DISC);
+          toast("Autopilot: the wind has shifted - unable to autoland at " + plane.apDecline + " - circling clear of the ground (it tries again as the wind changes)", vec3(1, 0.75f, 0.35f));
+          toast("Any stick input hands control back", vec3(0.8f, 0.8f, 0.8f));
+        } else if (plane.apAirport >= 0) toast(fmt("Autopilot: the wind has shifted - now runway %02d at %s", g_world.airports[plane.apAirport].rwyNumber(plane.apRev), g_world.airports[plane.apAirport].code), vec3(0.6f, 1, 0.6f));
+        plane.apWindEvent = 0;
+      }
+      apWindSaid = plane.apWindEvent;
+    }
     flightClock += simDt;
     timeOfDay += simDt / 3600.f;
     if (plane.ev.bellyLanding && !result.bellyLanding) { result.bellyLanding = true; toast("Belly landing - hold it straight", vec3(1, 0.6f, 0.3f)); g_audio.trigger(SFX_CRASH, 0.4f); }
@@ -1273,7 +1303,8 @@ void Game::updateFlight(float dt) {
     toast(fmt("%s  %.0f fpm", r.c_str(), fpm), fpm < 450 ? vec3(0.6f, 1, 0.6f) : vec3(1, 0.6f, 0.3f));
     float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
     for (int side = -1; side <= 1; side += 2) {
-      vec3 wp = plane.pos + plane.q.rotate(vec3(side * std::max(1.2f, plane.spec->span * 0.13f), -plane.gearHeight(), 0));
+      const GearStations gst = gearStations(*plane.spec);   // (at the main wheels)
+      vec3 wp = plane.pos + plane.q.rotate(vec3(side * gst.track, -plane.gearHeight(), gst.mainZ));
       int n = (int)clampf(gs * 0.3f, 4, 18);
       for (int i = 0; i < n; i++) spawn(wp, plane.vel * 0.3f + vec3((rand() % 100 - 50) * 0.02f, 0.5f, (rand() % 100 - 50) * 0.02f), 2.5f + (rand() % 100) * 0.01f, 0.6f, 1.8f, vec3(0.75f, 0.75f, 0.76f), 0.45f, SPR_SMOKE, 2.f, 0.2f);
     }
@@ -1290,7 +1321,8 @@ void Game::updateFlight(float dt) {
     while (dustAccum > 1) {
       dustAccum -= 1;
       int side = rand() & 1 ? 1 : -1;
-      vec3 wp = plane.pos + plane.q.rotate(vec3(side * std::max(1.2f, plane.spec->span * 0.13f), -plane.gearHeight(), 0.5f));
+      const GearStations gst = gearStations(*plane.spec);   // (behind the main wheels)
+      vec3 wp = plane.pos + plane.q.rotate(vec3(side * gst.track, -plane.gearHeight(), gst.mainZ + 0.5f));
       spawn(wp, plane.vel * 0.15f + vec3(0, 0.8f, 0), 2.5f, 0.8f, 2.2f, col, surf == SURF_GRASS ? 0.15f : 0.35f, SPR_SMOKE, 1.5f, 0.1f);
     }
   }
@@ -1413,7 +1445,7 @@ void Game::updateFlight(float dt) {
     if (!contract.hints[phase].empty()) {
       hint = expandHint(contract.hints[phase], padPrompts());
       std::string said = expandHint(contract.hints[phase]);
-      if (set.showHints && std::find(hintsVoiced.begin(), hintsVoiced.end(), said) == hintsVoiced.end()) { hintsVoiced.push_back(said); commsPending.push_back({said, contract.id}); }   // each said once
+      if (set.showHints && std::find(hintsVoiced.begin(), hintsVoiced.end(), said) == hintsVoiced.end()) { hintsVoiced.push_back(said); commsPending.push_back({said, contract.id, hintPadDefault(contract.hints[phase])}); }   // each said once
     }
   } else if (contract.hints.size() > (size_t)phase && !contract.hints[phase].empty() && hint == expandHint(contract.hints[phase], !padPrompts())) {
     hint = expandHint(contract.hints[phase], padPrompts());   // (the player picked up the other device: the hint names its controls now)
@@ -3019,7 +3051,7 @@ void Game::updateComms(float dt) {
       if (atc.resolve(a.text, contract.id, padPrompts(), tx)) atc.say(tx);
     }
   }
-  for (auto& m : commsPending) { AtcVoice::Tx tx; if (atc.resolve(m.text, m.mission, padPrompts(), tx)) atc.say(tx); }
+  for (auto& m : commsPending) { AtcVoice::Tx tx; if (atc.resolve(m.text, m.mission, padPrompts() && m.padOk, tx)) atc.say(tx); }   // (rebound: the hint is shown, not said)
   commsPending.clear();
   if (screen == SCR_FLIGHT && !crashed && !researchFlight) updateAtc(dt);
   // while someone is talking the music and the engine sit lower (a headset's comms priority): quick down, slow up
@@ -3720,9 +3752,9 @@ void Game::debugScene(const std::string& name) {
     dbgFollowOff = plane.right() * (R * 0.85f) + plane.forward() * (R * 0.55f) + vec3(0, R * 0.16f, 0);
     toasts.clear(); hint.clear(); uiHidden = true; return;
   }
-  if (name.compare(0, 4, "gav_") == 0) {   // an aircraft parked on the runway, orbit view: gav_<spec>_<yaw>_<pitch>_<dist>[_<gear>]
-    int sp = 0; float yawD = 120, pitD = 10, dist = 0, gearAt = -1;
-    sscanf(name.c_str() + 4, "%d_%f_%f_%f_%f", &sp, &yawD, &pitD, &dist, &gearAt);
+  if (name.compare(0, 4, "gav_") == 0) {   // an aircraft parked on the runway, orbit view: gav_<spec>_<yaw>_<pitch>_<dist>[_<gear>[_<lift m>]]
+    int sp = 0; float yawD = 120, pitD = 10, dist = 0, gearAt = -1, lift = 0;
+    sscanf(name.c_str() + 4, "%d_%f_%f_%f_%f_%f", &sp, &yawD, &pitD, &dist, &gearAt, &lift);
     sp = std::clamp(sp, 0, kWraith);
     Contract c; c.from = g_world.findAirport("CAP"); c.to = g_world.findAirport("MDB"); c.title = "Aircraft check";
     c.wx = Weather(); c.wx.timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 14.5f; c.wx.cloudCover = 0.2f; c.wx.visibility = 60000;
@@ -3743,7 +3775,8 @@ void Game::debugScene(const std::string& name) {
       for (int i = 0; i < n; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     }
     if (gearAt >= 0) {   // (the gear held part way: lifted clear of the runway for the few frames that follow)
-      plane.gear = std::min(gearAt, 1.f); plane.ctl.gearDown = gearAt >= 0.5f; plane.pos.y += 2.f; plane.vel = vec3();
+      plane.gear = std::min(gearAt, 1.f); plane.ctl.gearDown = gearAt >= 0.5f; plane.pos.y += 2.f + lift; plane.vel = vec3();   // (lift: high enough to look up at its underside)
+      dbgCamPos = plane.pos + off;
     }
     return;
   }

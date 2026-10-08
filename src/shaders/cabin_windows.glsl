@@ -16,8 +16,8 @@ const float kWinGlass = 0.004, kWinFrameTop = 0.019, kWinBand = 0.023;
 // eye at the origin; inFront: whether the band in front of the glass is cut too (the static cabin; a moving part,
 // a pedal or the stick, is solid down to the glass)
 bool winPaneCut(vec3 q, vec3 c, vec3 n, vec3 up, vec2 hs, float ch, bool inFront){
-  vec3 l = wrFrame(q, c, n, up);
-  if (l.z > kWinBand || (l.z > kWinGlass && !inFront)) return false;
+  float lz = dot(q - c, n);   // (its height over the glass first: most of the cabin is far from any one pane)
+  if (lz > kWinBand || (lz > kWinGlass && !inFront)) return false;
   float qn = dot(q, n), cn = dot(c, n);
   if (qn > -1e-5) return false;
   if (wrShape(wrFrame(q*min((kWinFrameTop + cn)/qn, 1.0), c, n, up).xy, hs, ch) >= 0.0) return false;   // down over the frame
@@ -33,8 +33,8 @@ vec3 winCylAt(vec3 q, float rr, bool clampQ){   // where the line of sight to q 
   return q*(clampQ ? min(t, 1.0) : t);
 }
 bool winFrontCut(vec3 q, bool inFront){
-  vec3 l = wrFront(q);
-  if (l.z > kWinBand || (l.z > kWinGlass && !inFront)) return false;
+  float lz = WF_R - length(q.xz - WF_C.xz);   // (wrFront's depth)
+  if (lz > kWinBand || (lz > kWinGlass && !inFront)) return false;
   vec3 pt = winCylAt(q, WF_R - kWinFrameTop, true);
   if (wrFrontShape(pt, wrFront(pt).xy) >= 0.0) return false;   // down over the frame
   vec3 p = winCylAt(q, WF_R - kWinGlass, false);
@@ -52,6 +52,7 @@ bool cabinWindowCut(vec3 q, int model, bool bomb, bool part){
     if (bomb) return false;
     if (winPaneCut(aq, WB_C, WB_N, F, WB_S, 0.07, inFront)) return true;
     // the footwell floor, under its grid of titanium ribs (wraith_cockpit_sdf.glsl): the ribs stand on the glass
+    if (dot(q - WL_C, WL_N) > kWinBand) return false;
     vec3 l = wrFrame(q, WL_C, WL_N, F);
     vec2 gr = abs(fract(l.xy/vec2(0.2, 0.17) + 0.5) - 0.5)*vec2(0.2, 0.17);
     bool rib = min(gr.x, gr.y) < 0.01 && l.z > -0.002 && l.z < 0.024;
@@ -119,8 +120,10 @@ vec3 winWallN2(vec2 l, vec2 hs, float ch, vec3 t, vec3 b){
 // side displays': past the top's outer edge a line of sight meets the ring's outer wall or, beyond, the shell's hex
 // panels; id: what it meets there, 65 the frame or 64 the shell)
 bool winPaneWall(vec3 q, vec3 c, vec3 n, vec3 up, vec2 hs, float ch, bool outer, out vec3 wn, out int id){
-  vec3 l = wrFrame(q, c, n, up);
   id = 65;
+  float lz = dot(q - c, n);   // (its height over the glass first)
+  if (lz > kWinFrameTop + 0.003 || lz < -0.03) return false;
+  vec3 l = wrFrame(q, c, n, up);
   float s = wrShape(l.xy, hs, ch);
   if (l.z > kWinFrameTop + 0.003 || s < -0.012 || s > (outer ? 0.05 : 0.02) || l.z < (s > 0.02 ? -0.03 : kWinGlass - 0.002)) return false;
   float qn = dot(q, n), cn = dot(c, n);
@@ -151,8 +154,9 @@ bool cabinWallNormal(vec3 q, int model, inout int mid, out vec3 wn){
     ok = min(gr.x, gr.y) >= 0.01 && winPaneWall(q, WL_C, WL_N, F, WL_S, 0.1, false, wn, id);
   }
   if (ok) { mid = id; return true; }
-  vec3 l = wrFront(q);   // the front display's frame on its cylinder: the same along the line of sight
-  if (l.z < kWinGlass - 0.002 || l.z > kWinFrameTop + 0.003) return false;
+  float lz = WF_R - length(q.xz - WF_C.xz);   // the front display's frame on its cylinder: the same along the line of sight
+  if (lz < kWinGlass - 0.002 || lz > kWinFrameTop + 0.003) return false;
+  vec3 l = wrFront(q);
   float s = wrFrontShape(q, l.xy);
   if (s < -0.012 || s > 0.02) return false;
   vec3 pt = winCylAt(q, WF_R - kWinFrameTop, false);

@@ -27,7 +27,7 @@
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 18;   // (bump with the format, or with what the bake makes of the field: the cockpit's sharp edges, +14; its thin patch laid out fat and drawn last, +16; back on the surface, +17; its flat faces flat-shaded, +18)
+const uint32_t kMeshMagic = 0x4d455348u + 19;   // (bump with the format, or with what the bake makes of the field: the cockpit's sharp edges, +14; its thin patch laid out fat and drawn last, +16; back on the surface, +17; its flat faces flat-shaded, +18; the parts' creases, +19)
 // the rigid parts a cockpit has (plane_parts.glsl PT_*) and each one's instances: x which seat or side, y which pedal
 struct PartInst { int type; float sx, sy; };
 const int kMaxPartInst = 128;
@@ -108,20 +108,20 @@ bool gearPartBox(int type, const float* M, vec3& lo, vec3& hi, float& h) {
   const float track = m(18, 0), wr = m(18, 1), mz = m(18, 2), gh = m(19, 0);
   const int gtype = (int)(m(0, 1) + 0.5f);
   switch (type) {
-    case 33: lo = vec3(track - 0.5f, -gh - 0.1f, mz - wr - 0.6f); hi = vec3(track + 0.5f, 1.5f, mz + wr + 0.6f); h = 0.005f; return true;
+    case 33: lo = vec3(track - 0.5f, -gh - 0.1f, mz - wr - (gtype == 3 ? 1.5f : 0.6f)); hi = vec3(track + 0.5f, gtype == 3 ? 2.2f : 1.5f, mz + wr + (gtype == 3 ? 2.0f : 0.6f)); h = 0.005f; return true;   // (a nacelle main's raked leg and its door)
     case 34: lo = vec3(-0.45f, -gh - 0.1f, -1.0f); hi = vec3(0.45f, 1.5f, 1.0f); h = 0.005f; return true;
     case 35: lo = vec3(-0.3f, -gh - 0.1f, -0.8f); hi = vec3(0.3f, 1.2f, 0.6f); h = 0.004f; return true;
-    case 36: if (gtype == 4) { lo = vec3(-2.5f, -0.06f, -0.06f); hi = vec3(2.5f, 0.03f, wr + 0.2f); }
-             else { lo = vec3(-0.06f, -0.06f, -wr - 0.2f); hi = vec3(0.5f, 0.03f, wr + 0.2f); }
+    case 36: if (gtype == 4) { lo = vec3(-2.5f, -0.06f, -1.3f); hi = vec3(2.5f, 0.03f, 1.3f); }   // (a fold well's door from its fore-and-aft hinge, or a swing well's from its side)
+             else { lo = vec3(-0.06f, -0.06f, -wr - 0.4f); hi = vec3(0.5f, 0.03f, wr + 0.4f); }
              h = 0.004f; return true;
-    case 37: lo = vec3(-0.06f, -0.06f, -wr - 0.2f); hi = vec3(0.4f, 0.03f, wr + 0.2f); h = 0.004f; return true;
+    case 37: lo = vec3(-0.06f, -0.06f, -1.7f); hi = vec3(0.4f, 0.03f, 1.7f); h = 0.004f; return true;   // (the nose bay's doors run the folded leg's length)
     // the XR-30's (plane_sdf.glsl jtPartField): a nozzle in its own frame, the gear extended (body space), a door
     case 38: lo = vec3(-0.56f, -0.44f, -0.12f); hi = vec3(0.56f, 0.44f, 1.2f); h = 0.005f; return true;
-    case 39: lo = vec3(track * 0.8f - 0.3f, -gh - 0.1f, mz - 0.45f); hi = vec3(track + 0.25f, 0.f, mz + 0.45f); h = 0.005f; return true;
+    case 39: lo = vec3(track - 0.4f, -gh - 0.15f, mz - 0.8f); hi = vec3(track + 0.4f, 0.2f, mz + 0.6f); h = 0.005f; return true;   // (a main leg from its hinge, raked or not)
     case 40: lo = vec3(track - 0.35f, -gh - 0.15f, mz - 0.55f); hi = vec3(track + 0.35f, -gh + 0.95f, mz + 0.55f); h = 0.005f; return true;
-    case 41: lo = vec3(-0.3f, -gh - 0.1f, m(18, 3) - 0.45f); hi = vec3(0.3f, 0.f, m(18, 3) + 0.45f); h = 0.005f; return true;
+    case 41: lo = vec3(-0.35f, -gh - 0.1f, m(18, 3) - 0.45f); hi = vec3(0.35f, 0.6f, m(18, 3) + 0.45f); h = 0.005f; return true;   // (the nose leg from its pivot, up in the fuselage)
     case 42: lo = vec3(-0.35f, -gh - 0.15f, m(18, 3) - 0.5f); hi = vec3(0.35f, -gh + 0.85f, m(18, 3) + 0.5f); h = 0.004f; return true;
-    case 43: case 44: lo = vec3(-0.06f, -0.06f, -0.5f); hi = vec3(0.32f, 0.03f, 0.5f); h = 0.004f; return true;
+    case 43: case 44: lo = vec3(-0.06f, -0.06f, -1.5f); hi = vec3(0.5f, 0.03f, 1.5f); h = 0.004f; return true;   // (the swing and fold wells' long doors)
   }
   return false;
 }
@@ -497,7 +497,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     // ---- the rigid parts (plane_parts.glsl), each alone in its own frame at rest: a 1 cm survey finds its box, then
     // surface nets on a 2 mm lattice over it, every vertex pulled onto the surface as above
     // (each part meshed here is simplified on a thread of its own and added to the blob once all are done, in order)
-    struct PartOut { int type; std::vector<float> vb; std::vector<uint32_t> ib; size_t raw; };
+    struct PartOut { int type; std::vector<float> vb; std::vector<uint32_t> ib; size_t raw; float sx, sy; };
     std::vector<std::unique_ptr<PartOut>> partOut; std::vector<std::thread> partSimp;
     {
       PartInst pl[kMaxPartInst]; const int np = partList(M, inside, pl);
@@ -604,7 +604,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         if (pib.empty()) continue;
         if (getenv("HULLDBG")) printf("mesh part %d: %d x %d x %d lattice, %zu vertices, %zu triangles\n", type, nx, ny, nz, vp.size(), pib.size() / 3);
         // simplified as the airframe is (the cockpit's controls to 0.3 mm, the exterior's parts to 0.8 mm)
-        partOut.push_back(std::make_unique<PartOut>(PartOut{type, std::move(pvb), std::move(pib), 0}));
+        partOut.push_back(std::make_unique<PartOut>(PartOut{type, std::move(pvb), std::move(pib), 0, pl[pi].sx, pl[pi].sy}));
         PartOut* po = partOut.back().get(); po->raw = po->ib.size() / 3;
         partSimp.emplace_back([po, inside] { size_t pe = po->ib.size(); simplifyMesh(po->vb, po->ib, pe, inside ? 0.0003f : 0.0008f); });
       }
@@ -660,6 +660,40 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       if (getenv("HULLDBG")) printf("mesh cockpit: %d of %zu triangles flat-shaded\n", nFlat, nt);
     }
     for (auto& th : partSimp) th.join();
+    // ---- a part's sharp edges, sharp: a vertex on a crease (the XR-40's octagonal pod shells, 45 degrees between
+    // facets) carries the field's normal there - one facet's, the other's or between - and across the simplified
+    // mesh's long triangles it smeared over the facets beside it: lit by the sky, the pods' tops came out crumpled. Each
+    // triangle corner whose own surface - the field's normal a fifth of the way in towards the triangle's centre -
+    // turns more than 12 degrees from its vertex's takes that normal instead, on a copy of the vertex; a smooth curve's
+    // corners stay shared
+    for (auto& po : partOut) {
+      const size_t nt = po->ib.size() / 3;
+      if (!nt) continue;
+      std::vector<vec3> smp(nt * 3);
+      for (size_t t = 0; t < nt; t++) {
+        vec3 P[3];
+        for (int k = 0; k < 3; k++) { const float* v = &po->vb[(size_t)po->ib[t * 3 + k] * 8]; P[k] = vec3(v[0], v[1], v[2]); }
+        const vec3 m = (P[0] + P[1] + P[2]) * (1.f / 3.f);
+        for (int k = 0; k < 3; k++) smp[t * 3 + k] = P[k] + (m - P[k]) * 0.2f;
+      }
+      glUniform1i(U(progHullBake, "uHPart"), po->type); glUniform2f(U(progHullBake, "uHPartSide"), po->sx, po->sy);
+      std::vector<float> cn; mode(3, 0); hullEval4(smp, cn);
+      const float creaseCos = cosf(12.f * DEG);
+      int nCr = 0;
+      for (size_t c = 0; c < nt * 3; c++) {
+        const float* g = &cn[c * 4];
+        const float gl = sqrtf(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
+        if (gl < 1e-6f) continue;
+        float v[8]; memcpy(v, &po->vb[(size_t)po->ib[c] * 8], sizeof v);
+        if (v[3] * g[0] + v[4] * g[1] + v[5] * g[2] >= creaseCos * gl) continue;
+        v[3] = g[0] / gl; v[4] = g[1] / gl; v[5] = g[2] / gl;
+        po->ib[c] = (uint32_t)(po->vb.size() / 8);
+        po->vb.insert(po->vb.end(), v, v + 8);
+        nCr++;
+      }
+      if (getenv("HULLDBG")) printf("mesh part %d: %d corners on creases\n", po->type, nCr);
+    }
+    glUniform1i(U(progHullBake, "uHPart"), -1);
     for (auto& po : partOut) {
       partBlob.push_back((uint32_t)po->type); partBlob.push_back((uint32_t)po->vb.size()); partBlob.push_back((uint32_t)po->ib.size());
       size_t at = partBlob.size(); partBlob.resize(at + po->vb.size());

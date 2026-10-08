@@ -6,8 +6,10 @@
 in vec2 vUV; layout(location=0) out vec4 oHist; layout(location=1) out vec4 oColor;
 uniform sampler2D uRaw; uniform sampler2D uDepth; uniform sampler2D uHist; uniform vec2 uRes; uniform float uHistValid;
 uniform vec2 uRawRes; uniform vec2 uRawUVS; uniform vec2 uJit; uniform float uDt;   // (this frame's time step: the blend is per 1/60 s)   // render resolution (<= uRes: temporal upscaling) and this frame's jitter
-uniform vec3 uCamPos; uniform mat3 uCamRot; uniform vec3 uPrevCamPos; uniform mat3 uPrevCamRot; uniform float uTanHalf; uniform float uAspect;
-uniform vec3 uPlanePos; uniform mat3 uPlaneRot; uniform vec3 uPrevPlanePos; uniform mat3 uPrevPlaneRot;
+// (positions relative to the cameras, subtracted on the CPU: uCamDelta the camera's move since the last frame, uPlaneRel
+// and uPrevPlaneRel the aircraft from this frame's and the last frame's camera)
+uniform mat3 uCamRot; uniform vec3 uCamDelta; uniform mat3 uPrevCamRot; uniform float uTanHalf; uniform float uAspect;
+uniform vec3 uPlaneRel; uniform mat3 uPlaneRot; uniform vec3 uPrevPlaneRel; uniform mat3 uPrevPlaneRot;
 vec3 toY(vec3 c){ c = c/(1.0 + max(c.r, max(c.g, c.b))); return vec3(0.25*c.r + 0.5*c.g + 0.25*c.b, 0.5*c.r - 0.5*c.b, -0.25*c.r + 0.5*c.g - 0.25*c.b); }
 vec3 fromY(vec3 y){ vec3 c = vec3(y.x + y.y - y.z, y.x + y.z, y.x - y.y - y.z); return c/max(1.0 - max(c.r, max(c.g, c.b)), 1e-3); }
 // 5-tap Catmull-Rom history fetch: keeps the accumulated image sharp
@@ -53,9 +55,12 @@ void main(){
   vec3 d;
   if (t > 9e5) d = transpose(uPrevCamRot)*rd;          // sky: a direction, only camera rotation matters
   else {
-    vec3 P = uCamPos + rd*t;
-    if (flag > 0.4 && flag < 0.6) P = uPrevPlaneRot*(transpose(uPlaneRot)*(P - uPlanePos)) + uPrevPlanePos;
-    d = transpose(uPrevCamRot)*(P - uPrevCamPos);
+    // (from the camera throughout: rebuilt in world metres - uCamPos + rd*t - a cockpit point 50 cm away lost its
+    // detail to the floats' 4 mm step out at 38 km, and the history shredded the instruments there: review G1)
+    vec3 R = rd*t;
+    if (flag > 0.4 && flag < 0.6) R = uPrevPlaneRot*(transpose(uPlaneRot)*(R - uPlaneRel)) + uPrevPlaneRel;
+    else R += uCamDelta;
+    d = transpose(uPrevCamRot)*R;
   }
   vec2 puv = d.z < -1e-4 ? vec2(d.x/(-d.z)/(uTanHalf*uAspect), d.y/(-d.z)/uTanHalf)*0.5 + 0.5 : vec2(-1.0);
   bool valid = uHistValid > 0.5 && flag > 0.1 && all(greaterThan(puv, vec2(0.0))) && all(lessThan(puv, vec2(1.0)));

@@ -925,7 +925,7 @@ struct GameTest {
       fails += !ok;
     }
     {   // a refused autoland (the review of v3.31.0, F3): the Starling asked to land at Gull Rock's 480 m is told it can't
-        // and holds heading and height - and, as the toast says, the stick takes the aircraft back
+        // and circles clear of the ground - and, as the toast says, the stick takes the aircraft back
       Game q; q.initHeadless(); q.career.license = LIC_ATP; q.botControl = false; q.set.traffic = false;
       Contract c = g_story[4]; c.wx = Weather(); c.wx.windSpeed = 0; c.wx.gust = 0; c.wx.turbulence = 0; c.wps.clear(); c.startAirborne = true;
       q.beginCareerFlight(c, 6, Career::SRC_RENT);
@@ -940,6 +940,43 @@ struct GameTest {
       q.in.down[K_DOWN] = false;
       const bool ok = q.screen == SCR_FLIGHT && held && told && !q.plane.apOn;
       printf("Refused autoland: holds %d (%s), says the stick takes over %d, stick takes over %d: %s\n", held, q.plane.apDecline.c_str(), told, !q.plane.apOn, ok ? "ok" : "FAIL");
+      fails += !ok;
+    }
+    {   // the fuel chosen is the fuel billed (the review of v3.34.0, S1): an owned Wren with its flown quote in, launched
+        // with full tanks rather than the quote's uplift - the tanks, the plan's uplift and charge and the job's saved plan agree
+      Game q; q.initHeadless(); q.career.license = LIC_CPL; q.career.money = 50000; q.career.location = g_world.findAirport("ORC");
+      Contract c = g_story[4]; const int si = 1; q.career.fleet.push_back({si, c.from, 0.f, 1.f});
+      float kg = -1; float minutes = simulateFlightMinutes(c, si, &kg);
+      q.quoteFlown[fmt("%s|%d|%d|%d", c.id.c_str(), si, c.from, c.to)] = {minutes, kg};
+      q.launchFuelKg = kAircraft[si].maxFuel;
+      const int expect = (int)(kAircraft[si].maxFuel * q.career.fuelPrice(c.from, si));
+      q.beginCareerFlight(c, si, Career::SRC_OWNED);
+      const bool tank = fabsf(q.plane.fuel - kAircraft[si].maxFuel) < 0.5f, uplift = fabsf(q.launchPlan.fuelUpliftKg - kAircraft[si].maxFuel) < 0.5f;
+      const bool charge = abs(q.launchPlan.fuelCostEst - expect) <= 1, saved = q.career.job && q.career.job->plan.fuelCostEst == q.launchPlan.fuelCostEst;
+      const bool ok = kg > 0.f && kg < kAircraft[si].maxFuel * 0.9f && tank && uplift && charge && saved;
+      printf("Chosen fuel billed: quote %.0f kg, tanks %.0f kg, uplift %.0f kg, charge $%d of $%d, job's plan agrees %d: %s\n", kg, q.plane.fuel, q.launchPlan.fuelUpliftKg,
+             q.launchPlan.fuelCostEst, expect, saved, ok ? "ok" : "FAIL");
+      fails += !ok;
+    }
+    {   // a survey's altitude record survives a diversion (the review of v3.34.0, S2): 300 s outside the band, the
+        // checkpoints done, diverted, the job continued and finished - the time out of the band still counts
+      Game q; q.initHeadless(); q.career.license = LIC_PPL; q.career.money = 50000;
+      Contract c; c.id = "SURVEY_TEST"; c.title = "Survey test"; c.type = CT_SURVEY; c.from = g_world.findAirport("MDB"); c.to = g_world.findAirport("ORC");
+      c.pax = 1; c.cargoKg = 40; c.payout = 10000; c.minLicense = LIC_PPL;
+      for (int i = 0; i < 6; i++) c.wps.push_back({1000.f * i, 0.f, 500.f});
+      q.beginCareerFlight(c, 1, Career::SRC_RENT); q.plane.onGround = false; q.takeoffAnnounced = true; q.wpIndex = 1; q.plane.pos.y = 650.f;
+      q.updateJobMeters(300.f, 50.f);
+      const float before = q.surveyT;
+      q.wpIndex = 6; q.result.wpDone = 6; q.flightClock = 300.f; q.plane.onGround = true; q.touchedDown = true; q.result.divertedTo = c.from;
+      q.endFlight(false, "Diverted", OUT_DIVERTED);
+      q.continueJob(1, Career::SRC_RENT);
+      const float carried = q.surveyT, carriedIn = q.surveyInT;
+      q.flightClock = 120.f; q.plane.onGround = true; q.touchedDown = true; q.touchdownFpm = 200.f;
+      q.endFlight(true, "", OUT_SUCCESS);
+      bool bonus = false, docked = false;
+      for (auto& l : q.payout) { bonus |= l.label == "Survey altitude held"; docked |= l.label.find("Survey altitude held ") == 0 && l.amount < 0; }
+      const bool ok = before >= 299.f && carried >= 299.f && carriedIn < 1.f && !bonus && docked;
+      printf("Survey record across a diversion: %.0f s out of band before, %.0f s (%.0f in band) carried on, bonus %d, docked %d: %s\n", before, carried, carriedIn, bonus, docked, ok ? "ok" : "FAIL");
       fails += !ok;
     }
     {   // a checkride's standard gates its licence (the review of v3.24.0, R8): 600 fpm passes, just over fails, as do a

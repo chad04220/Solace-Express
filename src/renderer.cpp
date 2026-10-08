@@ -1201,17 +1201,18 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glUniform2f(U(progTAA, "uJit"), jitX, jitY);
     glUniform1f(U(progTAA, "uHistValid"), histValid ? 1.f : 0.f);
     glUniform1f(U(progTAA, "uDt"), fp.dt);
-    glUniform3f(U(progTAA, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
+    const vec3 camD = fp.camPos - prevCamPos;   // (relative: taa_fs.glsl)
+    glUniform3f(U(progTAA, "uCamDelta"), camD.x, camD.y, camD.z);
     glUniformMatrix3fv(U(progTAA, "uCamRot"), 1, GL_FALSE, cr);
-    glUniform3f(U(progTAA, "uPrevCamPos"), prevCamPos.x, prevCamPos.y, prevCamPos.z);
     glUniformMatrix3fv(U(progTAA, "uPrevCamRot"), 1, GL_FALSE, prevCamRot);
     glUniform1f(U(progTAA, "uTanHalf"), tanf(fp.fovY * 0.5f));
     glUniform1f(U(progTAA, "uAspect"), (float)W / H);
     const PlaneVisual& pv2 = fp.plane;
     vec3 pp = pv2.on ? pv2.pos : prevPlanePos;
-    glUniform3f(U(progTAA, "uPlanePos"), pp.x, pp.y, pp.z);
+    const vec3 pRel = pp - fp.camPos, ppRel = prevPlanePos - prevCamPos;
+    glUniform3f(U(progTAA, "uPlaneRel"), pRel.x, pRel.y, pRel.z);
     glUniformMatrix3fv(U(progTAA, "uPlaneRot"), 1, GL_FALSE, pv2.on ? pv2.rot : prevPlaneRot);
-    glUniform3f(U(progTAA, "uPrevPlanePos"), prevPlanePos.x, prevPlanePos.y, prevPlanePos.z);
+    glUniform3f(U(progTAA, "uPrevPlaneRel"), ppRel.x, ppRel.y, ppRel.z);
     glUniformMatrix3fv(U(progTAA, "uPrevPlaneRot"), 1, GL_FALSE, prevPlaneRot);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     histIdx = cur; histValid = true;

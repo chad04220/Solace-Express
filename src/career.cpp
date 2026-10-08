@@ -601,6 +601,7 @@ std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan
   J.jobClockMin += r.flightMin; J.legs++;
   J.maxG = std::max(J.maxG, r.maxG); J.minG = std::min(J.minG, r.minG); J.maxBank = std::max(J.maxBank, r.maxBank);
   J.patient = std::min(J.patient, r.patient); J.comfort = std::min(J.comfort, r.comfort);   // (the ride so far: the next leg starts from it)
+  J.surveySec = std::max(J.surveySec, r.surveySec); J.surveyInSec = std::max(J.surveyInSec, r.surveyInSec);   // (the leg's are the job's whole so far)
   J.wpDone = std::max(J.wpDone, r.wpDone);
   if (J.c.fragile && (r.maxG > 2.0f || r.minG < 0.0f || (r.landed && fabsf(r.touchdownFpm) > 400))) J.fragileHit = true;
   J.at = at; J.state = JobState::RECOVERY;
@@ -622,6 +623,10 @@ std::vector<PayoutLine> Career::settleJob(const FlightResult& r, const LaunchPla
   w.maxG = std::max(J.maxG, r.maxG); w.minG = std::min(J.minG, r.minG); w.maxBank = std::max(J.maxBank, r.maxBank);
   w.late = J.c.timeLimitMin > 0 && J.jobClockMin + r.flightMin > J.c.timeLimitMin;
   w.patient = std::min(J.patient, r.patient); w.comfort = std::min(J.comfort, r.comfort);
+  {   // the survey band over every leg (the last leg's counters carry the earlier legs': the larger is the job's whole)
+    float st = std::max(J.surveySec, r.surveySec), si = std::max(J.surveyInSec, r.surveyInSec);
+    if (st > 1.f) w.surveyInBand = si / st;
+  }
   if (J.fragileHit && J.c.fragile) w.maxG = std::max(w.maxG, 2.01f);   // (a leg already damaged it)
   LaunchPlan q = p;
   if (J.positioningPaid) q.positioning = 0;
@@ -1049,6 +1054,7 @@ bool Career::save(const std::string& path) const {
     ok = ok && fprintf(f, "job %d %s %d %d %d %d %f %f %f %f %d %f %d %d %u\n", (int)J.state, kAircraft[J.spec].id, (int)J.src, J.at, J.legs, J.wpDone, J.jobClockMin,
                        J.maxG, J.minG, J.maxBank, J.fragileHit ? 1 : 0, J.fuelBilledKg, J.hirePaid ? 1 : 0, J.positioningPaid ? 1 : 0, J.id) > 0;
     ok = ok && fprintf(f, "job2 %f %f %d\n", J.patient, J.comfort, J.ferryPaid ? 1 : 0) > 0;
+    ok = ok && fprintf(f, "job3 %f %f\n", J.surveySec, J.surveyInSec) > 0;
     ok = ok && fprintf(f, "plan %d %d %d %d %f %f %f %f %d\n", J.plan.positioning, J.plan.ferry, J.plan.hire, (int)J.plan.fuel, J.plan.fuelKgEst, J.plan.minutesEst, J.plan.minutesSigma, J.plan.fuelUpliftKg, J.plan.fuelCostEst) > 0;
     const Contract& c = J.c;
     bool story = false; for (auto& s : g_story) if (s.id == c.id) story = true;
@@ -1140,6 +1146,11 @@ bool Career::load(const std::string& path) {
       float pa = 1, co = 1; int fp = 0;
       ok = fscanf(f, "%f %f %d", &pa, &co, &fp) == 3 && std::isfinite(pa) && std::isfinite(co);
       if (ok && c.job) { c.job->patient = clampf(pa, 0.f, 1.f); c.job->comfort = clampf(co, 0.f, 1.f); c.job->ferryPaid = fp != 0; }
+    }
+    else if (!strcmp(key, "job3")) {   // the survey pattern so far (saves before this line had none: the defaults stand)
+      float st = 0, si = 0;
+      ok = fscanf(f, "%f %f", &st, &si) == 2 && std::isfinite(st) && std::isfinite(si);
+      if (ok && c.job) { c.job->surveySec = std::max(st, 0.f); c.job->surveyInSec = clampf(si, 0.f, std::max(st, 0.f)); }
     }
     else if (!strcmp(key, "plan")) {
       int fuel = 0; LaunchPlan p;

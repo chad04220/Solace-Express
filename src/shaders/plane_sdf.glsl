@@ -18,6 +18,11 @@ vec2 gearWell(vec3 q, vec2 res, vec3 c, vec2 h, float depth, float below){
   vec3 r = q - c;
   return wellCut(res, sdBox(r - vec3(0.0, 0.5*(depth - below), 0.0), vec3(h.x, 0.5*(depth + below), h.y)), r.y);
 }
+// (a well pitched about +x, as partRyz: along a sloping floor)
+vec2 gearWellP(vec3 q, vec2 res, vec3 c, vec2 h, float depth, float below, float pitch){
+  vec3 r = transpose(partRyz(pitch))*(q - c);
+  return wellCut(res, sdBox(r - vec3(0.0, 0.5*(depth - below), 0.0), vec3(h.x, 0.5*(depth + below), h.y)), r.y);
+}
 vec2 gearBay(vec3 q, vec2 res, vec3 c, vec2 h, float depth, float below, float open){
   if (open <= 0.001) return res;
   vec3 r = q - c;
@@ -75,7 +80,7 @@ vec2 gearWheelDetails(vec3 q, vec2 res, float r, float h, bool braked){
   if (braked) metal = min(metal, sdRoundCylX(q + vec3(h + 0.022, 0.0, 0.0), r*0.65, 0.012, 0.005));
   return opU(res, vec2(metal, 8.0));
 }
-vec2 gearLegDetails(vec3 p, vec2 res, vec3 upper, vec3 lower, float shaft, bool oleo){
+vec2 gearLegDetails(vec3 p, vec2 res, vec3 upper, vec3 lower, float shaft, bool oleo, bool brace){
   vec3 centre = (upper + lower)*0.5;
   if (sdBox(p - centre, abs(upper - lower)*0.5 + vec3(0.32, 0.15, 0.32)) >= res.x) return res;
   float metal = sdCapsule(p, mix(upper, lower, 0.86), mix(upper, lower, 0.97), shaft*1.45);
@@ -85,7 +90,7 @@ vec2 gearLegDetails(vec3 p, vec2 res, vec3 upper, vec3 lower, float shaft, bool 
     vec3 elbow = mix(upper, lower, 0.72) + vec3(0.0, 0.0, 0.12*scale);
     metal = min(metal, sdCapsule(p, mix(upper, lower, 0.56), elbow, 0.013*scale));
     metal = min(metal, sdCapsule(p, elbow, mix(upper, lower, 0.87), 0.013*scale));
-    metal = min(metal, sdCapsule(p, upper + vec3(-0.18*scale, 0.0, -0.18*scale), mix(upper, lower, 0.37), 0.020*scale));
+    if (brace) metal = min(metal, sdCapsule(p, upper + vec3(-0.18*scale, 0.0, -0.18*scale), mix(upper, lower, 0.37), 0.020*scale));
   }
   return opU(res, vec2(metal, 8.0));
 }
@@ -98,21 +103,27 @@ vec2 gearMainShape(vec3 l, vec3 mount){
   int gtype = int(gM[0].y + 0.5);
   float track = G0.x, wr = G0.y, mz = G0.z;
   vec3 wc = vec3(track, wr - G1.x, mz); float legs, tyres, shaft, halfWidth;
-  if (gtype == 3) {   // up into the nacelle: a twin-wheel bogie on a heavy leg
+  float door = 1e9;
+  if (gtype == 3) {   // a twin-wheel bogie on a heavy leg, raked from its pivot (gearNacFold), and a door on the leg: the
+                      // nacelle's skin over the slot the leg swings through, where it lies stowed
     legs = sdCapsule(l, mount, vec3(track, wc.y + 0.05, mz), 0.09);
     legs = min(legs, sdCapsule(l, vec3(track - 0.25, wc.y, mz), vec3(track + 0.25, wc.y, mz), 0.05));
     tyres = min(sdRoundCylX(l - wc - vec3(0.22, 0.0, 0.0), wr, 0.11, 0.06), sdRoundCylX(l - wc + vec3(0.22, 0.0, 0.0), wr, 0.11, 0.06));
-    shaft = 0.09; halfWidth = 0.11;
+    shaft = 0.06; halfWidth = 0.11;   // (its links and brace at the light legs' size: they stay inside the nacelle's tapering tail)
+    NacFold f = gearNacFold();
+    vec3 b = f.P + partRyz(f.ang)*(l - f.P);
+    door = max(abs(gearNacSkin(b.x - track, b.y, b.z) + 0.012) - 0.012, max(abs(b.x - track) - 0.125, max(f.z1 - b.z, b.z - f.zs)));
   } else {            // from its hinge
     legs = sdCapsule(l, mount, wc + vec3(0.0, 0.05, 0.0), 0.06);
     tyres = sdRoundCylX(l - wc, wr, 0.1, 0.05);
     shaft = 0.06; halfWidth = 0.1;
   }
-  vec2 res = opU(vec2(legs, 8.0), vec2(tyres, 6.0));
+  vec2 res = opU(opU(vec2(legs, 8.0), vec2(tyres, 6.0)), vec2(door, 5.0));
   vec3 wq = l - wc; if (gtype == 3) wq.x = abs(wq.x) - 0.22;
   res = gearWheelDetails(wq, res, wr, halfWidth, true);
-  // (a folding leg's side brace on its outboard side: inboard, the fold swung it up through the top of the wing)
-  return gearLegDetails(gtype == 4 ? vec3(2.0*track - l.x, l.yz) : l, res, mount, wc + vec3(0.0, 0.05, 0.0), shaft, true);
+  // (a folding leg's side brace on its outboard side: inboard, the fold swung it up through the top of the wing; a leg
+  // swung forward has none - the wheel's turn would carry it out through the fairing's floor)
+  return gearLegDetails(gtype == 4 ? vec3(2.0*track - l.x, l.yz) : l, res, mount, wc + vec3(0.0, 0.05, 0.0), shaft, true, !(gtype == 4 && gearSwingMain()));
 }
 vec2 gearNoseShape(vec3 l){
   vec4 G0 = gM[18], G1 = gM[19];
@@ -120,7 +131,7 @@ vec2 gearNoseShape(vec3 l){
   float wr = G0.y, gh = G1.x;
   vec3 secN = fusSection(G0.w);
   float nwr = gtype == 3 ? wr*0.75 : wr*0.85, rLeg = gtype >= 3 ? 0.07 : 0.035, fx = 0.06 + (gtype == 3 ? 0.15 : 0.0);
-  vec3 nc = vec3(0.0, nwr - gh, 0.0), top = vec3(0.0, secN.z - secN.y*0.7, -0.05);
+  vec3 nc = vec3(0.0, nwr - gh, 0.0), top = gtype >= 3 ? vec3(0.0, gearNoseFold().x, 0.0) : vec3(0.0, secN.z - secN.y*0.7, -0.05);   // (a retracting leg from its pivot)
   float nl = sdCapsule(l, top, nc + vec3(0.0, nwr*0.9, 0.0), rLeg);
   nl = min(nl, sdCapsule(vec3(abs(l.x), l.yz), vec3(fx, nc.y + nwr*0.9, 0.0), vec3(fx, nc.y, 0.0), 0.02));
   float nt = gtype == 3 ? min(sdRoundCylX(l - nc - vec3(0.15, 0.0, 0.0), nwr, 0.07, 0.04), sdRoundCylX(l - nc + vec3(0.15, 0.0, 0.0), nwr, 0.07, 0.04))
@@ -132,14 +143,14 @@ vec2 gearNoseShape(vec3 l){
     res = opU(res, vec2(sp, 1.0));
   }
   res = gearWheelDetails(gtype == 3 ? vec3(abs(l.x) - 0.15, l.yz) - nc : l - nc, res, nwr, gtype == 3 ? 0.07 : 0.055, false);
-  return gearLegDetails(l, res, top, nc + vec3(0.0, nwr*0.9, 0.0), rLeg, true);
+  return gearLegDetails(l, res, top, nc + vec3(0.0, nwr*0.9, 0.0), rLeg, true, true);
 }
 vec2 gearTailShape(vec3 l){
   vec4 G1 = gM[19];
   vec3 tsec = fusSection(G1.y - 0.3), tc = vec3(0.0, -G1.x + 0.11*gM[0].x + 0.1, 0.0), top = vec3(0.0, tsec.z - tsec.y*0.6, -0.3);
   vec2 res = opU(vec2(sdCapsule(l, top, tc + vec3(0.0, 0.03, -0.05), 0.02), 8.0), vec2(sdRoundCylX(l - tc, 0.1, 0.035, 0.02), 6.0));
   res = gearWheelDetails(l - tc, res, 0.1, 0.035, false);
-  return gearLegDetails(l, res, top, tc + vec3(0.0, 0.03, -0.05), 0.02, false);
+  return gearLegDetails(l, res, top, tc + vec3(0.0, 0.03, -0.05), 0.02, false, false);
 }
 // a vertical bay's door from its hinge (x 0) to the bay's centre line; a fold well's from its hinge (z 0), spanwise about x 0
 float gearDoorV(vec3 l, vec2 h){ return sdBox(vec3(l.x - h.x*0.5, l.y + 0.012, l.z), vec3(h.x*0.5, 0.012, h.y - 0.01)); }
@@ -147,10 +158,10 @@ float gearDoorF(vec3 l, GearWell g){ float hzD = g.hz - 0.01; return sdBox(vec3(
 #ifdef PART_BAKE
 vec2 gearPartField(int k, vec3 l){
   int gtype = int(gM[0].y + 0.5);
-  if (k == PT_GEAR_MAIN) return gearMainShape(l, gtype == 3 ? vec3(gM[18].x, nacSection(gM[18].z).x, gM[18].z) : gearHinge());
+  if (k == PT_GEAR_MAIN) return gearMainShape(l, gtype == 3 ? gearNacFold().P : gearSwingMain() ? gearSwingOf().H : gearHinge());
   if (k == PT_GEAR_NOSE) return gearNoseShape(l);
   if (k == PT_GEAR_TAIL) return gearTailShape(l);
-  if (k == PT_GEAR_MDOOR && gtype == 4) return vec2(gearDoorF(l, gearFoldWell()), 5.0);
+  if (k == PT_GEAR_MDOOR && gtype == 4 && !gearSwingMain()) return vec2(gearDoorF(l, gearFoldWell()), 5.0);
   return vec2(gearDoorV(l, gearVBay(k == PT_GEAR_NDOOR).h), 5.0);
 }
 #endif
@@ -293,31 +304,50 @@ vec2 jtTurbine(vec2 res, vec3 l){
 // its gear (body space, right side): a strut from its mount A to its foot B, a main wheel (wq: from its centre), the
 // nose's twin wheels (nq: from their axle's centre)
 vec2 jtStrut(vec3 l, vec3 A, vec3 B, float r){
-  return gearLegDetails(l, vec2(sdCapsule(l, A, B, r), 8.0), A, B, r, true);
+  return gearLegDetails(l, vec2(sdCapsule(l, A, B, r), 8.0), A, B, r, true, true);
 }
-vec2 jtMainWheel(vec3 wq){ return gearWheelDetails(wq, vec2(sdRoundCylX(wq, 0.38, 0.13, 0.06), 6.0), 0.38, 0.13, true); }
+vec2 jtMainWheel(vec3 wq){ return gearWheelDetails(wq, vec2(sdRoundCylX(wq, 0.38, JT_TYRE_H, 0.05), 6.0), 0.38, JT_TYRE_H, true); }
 vec2 jtNoseWheels(vec3 nq){ vec3 q = vec3(abs(nq.x) - 0.1, nq.yz); return gearWheelDetails(q, vec2(sdRoundCylX(q, 0.33, 0.07, 0.04), 6.0), 0.33, 0.07, false); }
-// the research jets' retractable tricycle gear (the XR-30's and the XR-40's): the bays' wells cut into the airframe;
-// the doors over them, the struts and the wheels rigid parts (plane_parts.glsl jtPartPose: the gear rises straight
-// up, its struts shortening, and is stowed below 6% extension). mainDepth, mainBelow: the main wells' depth and how
-// far their cut reaches below the skin
+// the main's leg at rest (right side, body space): its strut from the hinge H down the line to the wheel's centre wc,
+// a fork either side of the tyre and the axle through it (the wheel turns about that line as it swings: gearSwingR).
+// No side brace: the turn would carry it out of the wing
+vec2 jtMainLeg(vec3 l, vec3 H, vec3 wc){
+  vec3 u = normalize(H - wc), f = wc + u*0.44, sd = vec3(JT_TYRE_H + 0.035, 0.0, 0.0);
+  vec2 res = gearLegDetails(l, vec2(sdCapsule(l, H, f, 0.07), 8.0), H, f, 0.07, true, false);
+  vec3 lq = vec3(wc.x + abs(l.x - wc.x), l.yz);
+  res = opU(res, vec2(min(sdCapsule(lq, f + sd, wc + sd, 0.025), sdCapsule(l, wc - sd, wc + sd, 0.035)), 8.0));
+  return opU(res, vec2(sdCapsule(l, f - sd, f + sd, 0.03), 8.0));
+}
+// The research jets' retractable tricycle gear (the XR-30's and the XR-40's; plane_parts.glsl jtGearOf): the main's
+// fairing under the wing (blended in: flush where the wing is thick enough) and its well, the nose's well along the
+// belly; the doors over them, the legs and the wheels rigid parts (plane_parts.glsl jtPartPose). (mainDepth, mainBelow:
+// the old bays' depths, unused)
 vec2 jtGear(vec3 p, vec3 ap, vec2 res, float mainDepth, float mainBelow){
-  vec4 G0 = gM[18];
-  vec3 cm = jtBayC(false), cn = jtBayC(true);
-  res = gearWell(ap, res, cm, JT_MAIN_BAY_H, mainDepth, mainBelow);
-  res = gearWell(p, res, cn, JT_NOSE_BAY_H, 0.7, 0.05);
+  JtGear g = jtGearOf();
+  bool wr = int(gM[0].z + 0.5) == 6;
+  float fl = g.mh.y + 0.03, top = g.H.y + 0.06;
+  vec3 fe = ap - vec3(g.mc.x, 0.5*(g.mc.y + top), g.mc.z);
+  float fr = min(0.08, 0.5*(top - g.mc.y));   // (rounded along its sides, its floor flat under the doors)
+  float fair = sdRoundBox(fe, vec3(g.mh.x + 0.01 + fr, 0.5*(top - g.mc.y), fl + 0.4), fr);
+  fair = max(fair, (abs(fe.z) - fl - 2.0*(ap.y - g.mc.y))*0.4472);   // (its ends taper up into the wing)
+  float fd = res.x;
+  res.x = smin(res.x, fair, 0.1);
+  if (fair < fd) res.y = wr ? 80.0 : 31.0;
+  res = gearWell(ap, res, g.mc, g.mh, g.md, 0.03);
+  res = gearWellP(p, res, g.nc, g.nh, g.nd, g.nb, g.np);
   if (gPartMode != -1) return res;
-  float a = gearDoorAngle(), sm = ap.x > cm.x ? 1.0 : -1.0, sn = p.x > 0.0 ? 1.0 : -1.0;   // (the near door of each bay, by the side of its centre line)
-  res = opU(res, vec2(gearDoorV(transpose(partMirror(-sm)*partRxy(-a))*(ap - cm - vec3(sm*JT_MAIN_BAY_H.x, 0.0, 0.0)), JT_MAIN_BAY_H), 5.0));
-  res = opU(res, vec2(gearDoorV(transpose(partMirror(-sn)*partRxy(-a))*(p - cn - vec3(sn*JT_NOSE_BAY_H.x, 0.0, 0.0)), JT_NOSE_BAY_H), 5.0));
-  if (gPS.x > 0.06) {
-    float gh = gM[19].x, lift = jtGearLift();
-    vec3 wc = vec3(G0.x, -gh + 0.38 + lift, G0.z), nc = vec3(0.0, -gh + 0.33 + lift, G0.w);
-    res = opU(res, jtStrut(ap, vec3(G0.x*0.8, -0.3, G0.z), wc + vec3(-0.1, 0.05, 0.0), 0.07));
-    res = opU(res, jtMainWheel(ap - wc));
-    res = opU(res, jtStrut(p, vec3(0.0, -0.35, G0.w), nc + vec3(0.0, 0.1, 0.0), 0.06));
-    res = opU(res, jtNoseWheels(p - nc));
-  }
+  float a = gearDoorAngle(), sm = ap.x > g.mc.x ? 1.0 : -1.0, sn = p.x > 0.0 ? 1.0 : -1.0;   // (the near door of each bay, by the side of its centre line)
+  res = opU(res, vec2(gearDoorV(transpose(partMirror(-sm)*partRxy(-a))*(ap - g.mc - vec3(sm*g.mh.x, 0.0, 0.0)), g.mh), 5.0));
+  mat3 Rp = partRyz(g.np);
+  res = opU(res, vec2(gearDoorV(transpose(Rp*partMirror(-sn)*partRxy(-a))*(p - g.nc - Rp*vec3(sn*g.nh.x, 0.0, 0.0)), g.nh), 5.0));
+  vec4 G0 = gM[18]; float gh = gM[19].x;
+  vec3 wc = vec3(G0.x, 0.38 - gh, G0.z), nc = vec3(0.0, 0.33 - gh, G0.w);
+  Pose M = jtMainPose(mat3(1.0)), N = jtNosePose();
+  vec3 lm = transpose(M.R)*(ap - M.T), ln = transpose(N.R)*(p - N.T);
+  res = opU(res, jtMainLeg(lm, g.H, wc));
+  res = opU(res, jtMainWheel(lm - wc));
+  res = opU(res, jtStrut(ln, g.P, nc + vec3(0.0, 0.1, 0.0), 0.06));
+  res = opU(res, jtNoseWheels(ln - nc));
   return res;
 }
 // the XR-30's rigid parts at rest (plane_parts.glsl places them): the right elevon and rudder (body space), the right
@@ -325,12 +355,12 @@ vec2 jtGear(vec3 p, vec3 ap, vec2 res, float mainDepth, float mainBelow){
 vec2 jtPartField(int k, vec3 l){
   vec4 G0 = gM[18]; float gh = gM[19].x;
   if (k == PT_JT_NOZZLE) return jtNozzleShape(l);
-  if (k == PT_JT_LEGM) return jtStrut(l, vec3(G0.x*0.8, -0.3, G0.z), vec3(G0.x - 0.1, -gh + 0.43, G0.z), 0.07);
-  if (k == PT_JT_WHEELM) return jtMainWheel(l - vec3(G0.x, -gh + 0.38, G0.z));
-  if (k == PT_JT_LEGN) return jtStrut(l, vec3(0.0, -0.35, G0.w), vec3(0.0, -gh + 0.43, G0.w), 0.06);
-  if (k == PT_JT_WHEELN) return jtNoseWheels(l - vec3(0.0, -gh + 0.33, G0.w));
-  if (k == PT_JT_DOORM) return vec2(gearDoorV(l, JT_MAIN_BAY_H), 5.0);
-  if (k == PT_JT_DOORN) return vec2(gearDoorV(l, JT_NOSE_BAY_H), 5.0);
+  if (k == PT_JT_LEGM) return jtMainLeg(l, jtGearOf().H, vec3(G0.x, 0.38 - gh, G0.z));
+  if (k == PT_JT_WHEELM) return jtMainWheel(l - vec3(G0.x, 0.38 - gh, G0.z));
+  if (k == PT_JT_LEGN) return jtStrut(l, jtGearOf().P, vec3(0.0, 0.43 - gh, G0.w), 0.06);
+  if (k == PT_JT_WHEELN) return jtNoseWheels(l - vec3(0.0, 0.33 - gh, G0.w));
+  if (k == PT_JT_DOORM) return vec2(gearDoorV(l, jtGearOf().mh), 5.0);
+  if (k == PT_JT_DOORN) return vec2(gearDoorV(l, jtGearOf().nh), 5.0);
   if (k == PT_JT_ELEVON) return vec2(sdSurface(l.x, l.z + 1.6, l.y - (-0.18 - l.x*0.035), 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3, 0.0, 0.0), 31.0);
   if (k == PT_JT_CANARD) return vec2(sdPanel(l.x, l.z + 0.6, l.y, 1.5, 1.5, 0.45, 1.0, 0.05, 1.0, 0.0, 0.0), 31.0);
   if (k == PT_JT_RUDDER) {
@@ -517,10 +547,13 @@ vec2 mapPlaneBody(vec3 p){
     // roof at a shallow angle the face is a long wedge, and in the light shell colour it read as a hole to the sky
     // (and rounded, a 3 cm lip: a hard cut meeting the curved roof at a shallow angle left a knife edge far thinner than
     // the mesh's lattice, which came off it serrated against the sky)
+    // (inside, the trim runs 4 cm from every opening, and over the whole pillar between the windscreen and a side
+    // window - within 10 cm of both: by where the rounding reached alone - 2.6 cm - a 5 cm post between two openings
+    // was trim only just, and where the pillar widened into the roof the headliner showed through it in long slivers)
     float shell0 = shell;
     winHole = min(holeWs, holeSide);
     shell = -smin(-shell, winHole, 0.03);
-    res = vec2(shell, shell > shell0 + 1e-4 ? 63.0 : 11.0);
+    res = vec2(shell, shell > shell0 + 1e-4 || (f < -0.03 && (winHole < 0.04 || max(holeWs, holeSide) < 0.1)) ? 63.0 : 11.0);
     // rear bulkhead: a trimmed baggage wall closes the cabin behind the last seats / windows (instead of looking
     // straight down the hollow tail cone)
     float zB = gM[20].x > 0.5 ? gM[20].z + 0.15 : WS.w + (gM[21].z > 0.5 ? 0.9 : 0.75);
@@ -683,14 +716,38 @@ vec2 mapPlaneBody(vec3 p){
     float side = p.x < 0.0 ? -1.0 : 1.0;
     if (retract) {
       float a = gearDoorAngle(), up = gearUp();
-      if (gtype == 3) {   // the nacelle's well; the near door (by the side of the bay's centre line); the leg, raised
-        VBay b = gearVBay(false);
+      if (gtype == 3) {   // the nacelle's wheel bay and the slot the leg swings through; the near door (by the side of the
+                          // bay's centre line); the leg, folded
+        VBay b = gearVBay(false); NacFold f = gearNacFold();
+        res = gearWellP(ap, res, b.c, b.h, b.depth, b.below, b.pitch);
+        vec2 ns = nacSection(ap.z);
+        float sf = ns.x - sqrt(max(ns.y*ns.y - 0.0169, 0.0));   // (the floor's height at the slot's edges)
+        res = wellCut(res, sdBox(ap - vec3(track, 0.5*(sf + f.P.y + 0.05), 0.5*(f.z1 - 0.05 + f.zs)), vec3(0.13, 0.5*(f.P.y + 0.35 - sf), 0.5*(f.zs - f.z1 + 0.05))), ap.y - sf);
+        if (gPartMode == -1) {
+          float s = ap.x > b.c.x ? 1.0 : -1.0;
+          mat3 Rp = partRyz(b.pitch);
+          res = opU(res, vec2(gearDoorV(transpose(Rp*partMirror(-s)*partRxy(-a))*(ap - b.c - Rp*vec3(s*b.h.x, 0.0, 0.0)), b.h), 5.0));
+          mat3 Rf = partRyz(up*f.ang);
+          res = opU(res, gearMainShape(transpose(Rf)*(ap - f.P) + f.P, f.P));
+        }
+      } else if (gearSwingMain()) {   // swung forward into the wing: its fairing (blended in; inside a wing thick enough
+                                      // it never shows), its well, the near door, the leg swung
+        GearSwing g = gearSwingOf(); VBay b = gearVBay(false);
+        float zc = 0.5*(g.z0 + g.z1), fl = 0.5*(g.z1 - g.z0) + 0.03, top = g.H.y + 0.06;
+        vec3 fe = ap - vec3(track, 0.5*(g.fy + top), zc);
+        float fr = min(0.08, 0.5*(top - g.fy));   // (rounded along its sides, its floor flat under the doors)
+        float fair = sdRoundBox(fe, vec3(g.hw + 0.01 + fr, 0.5*(top - g.fy), fl + 0.4), fr);
+        fair = max(fair, (abs(fe.z) - fl - 2.0*(ap.y - g.fy))*0.4472);   // (its ends taper up into the wing)
+        fair = max(fair, ap.z - gearFairAft());                           // (and stop short of the flaps' hinge line)
+        float fd = res.x;
+        res.x = smin(res.x, fair, 0.1);
+        if (fair < fd) res.y = 2.0;   // (the wing's paint)
         res = gearWell(ap, res, b.c, b.h, b.depth, b.below);
         if (gPartMode == -1) {
           float s = ap.x > b.c.x ? 1.0 : -1.0;
           res = opU(res, vec2(gearDoorV(transpose(partMirror(-s)*partRxy(-a))*(ap - b.c - vec3(s*b.h.x, 0.0, 0.0)), b.h), 5.0));
-          vec2 ns = nacSection(mz);
-          res = opU(res, gearMainShape(ap - vec3(0.0, up*(ns.x - ns.y + 0.03 + gh), 0.0), vec3(track, ns.x, mz)));
+          mat3 Rf = gearSwingR(vec3(track, wr - gh, mz) - g.H, -1.0, up);
+          res = opU(res, gearMainShape(transpose(Rf)*(ap - g.H) + g.H, g.H));
         }
       } else {   // the fold's fairing under the wing root (blended in; inside a wing thick enough it never shows), its well, the near door, the leg folded
         GearFold f = gearFold(); GearWell g = gearFoldWellOf(f);
@@ -699,7 +756,7 @@ vec2 mapPlaneBody(vec3 p){
         vec3 fe = bq - bc; float fh = 0.5*(g.x1 - g.x0) + 0.03, fl = g.hz + 0.03, ext = 1.5*ft;
         float fair = sdRoundBox(fe - vec3(0.0, ft*0.5, 0.0), vec3(fh, ft*0.5, fl + ext), fr);
         fair = max(fair, (abs(fe.z) - fl - 1.5*bq.y)*0.5547);   // (its ends taper up into the wing; its outboard side stays clear of the flap's root)
-        if (!gearFlapOutboard()) fair = max(fair, fe.z - (gearFairAft() - mz));   // (a flap at the root: the taper stops short of its hinge line, out of its slot)
+        fair = max(fair, fe.z - (gearFairAft() - mz));   // (the taper stops short of the flaps' hinge line)
         float fd = res.x;
         res.x = smin(res.x, fair, 0.08);
         if (fair < fd) res.y = 2.0;   // (the wing's paint)
@@ -712,11 +769,12 @@ vec2 mapPlaneBody(vec3 p){
           res = opU(res, gearMainShape(transpose(Rf)*(ap - f.H) + f.H, f.H));
         }
       }
-      if (G1.z < 0.5) {   // the nose wheel's well and its near door
+      if (G1.z < 0.5) {   // the nose wheel's well along the belly and its near door
         VBay b = gearVBay(true);
-        res = gearWell(p, res, b.c, b.h, b.depth, b.below);
+        res = gearWellP(p, res, b.c, b.h, b.depth, b.below, b.pitch);
         float s = p.x > 0.0 ? 1.0 : -1.0;
-        if (gPartMode == -1) res = opU(res, vec2(gearDoorV(transpose(partMirror(-s)*partRxy(-a))*(p - b.c - vec3(s*b.h.x, 0.0, 0.0)), b.h), 5.0));
+        mat3 Rp = partRyz(b.pitch);
+        if (gPartMode == -1) res = opU(res, vec2(gearDoorV(transpose(Rp*partMirror(-s)*partRxy(-a))*(p - b.c - Rp*vec3(s*b.h.x, 0.0, 0.0)), b.h), 5.0));
       }
     } else {   // fixed mains: in place
       vec3 wc = vec3(track, wr - gh, mz);
@@ -740,14 +798,14 @@ vec2 mapPlaneBody(vec3 p){
       res = gearWheelDetails(ap - wc, res, wr, gtype == 0 ? 0.065 : gtype == 1 ? 0.09 : 0.14, true);
       vec3 mount = vec3(secM.x*(gtype == 2 ? 0.8 : gtype == 0 ? 0.75 : 0.7), secM.z - secM.y*(gtype == 1 ? 0.85 : 0.8), mz);
       vec3 ankle = gtype == 2 ? wc : wc + vec3(gtype == 0 ? -0.06 : -0.08, gtype == 1 ? 0.06 : 0.04, 0.0);
-      res = gearLegDetails(ap, res, mount, ankle, gtype == 1 ? 0.045 : 0.03, false);
+      res = gearLegDetails(ap, res, mount, ankle, gtype == 1 ? 0.045 : 0.03, false, false);
       res = opU(res, vec2(spats, 1.0));
     }
     // the nose wheel (steered by the pedals, raised with the gear) or the tail wheel
     if (gPartMode == -1) {
       mat3 Rs = partRxz(steer);
       float ns = gearNoseShow();
-      if (G1.z < 0.5 && ns > 0.01) res = opU(res, gearNoseShape(transpose(Rs)*(p - vec3(0.0, retract ? gearUp()*(gh - R*0.6) : 0.0, gM[18].w))/ns)*vec2(ns, 1.0));
+      if (G1.z < 0.5 && ns > 0.01) { Pose X = gearPartPose(PT_GEAR_NOSE, vec2(0.0)); res = opU(res, gearNoseShape(transpose(X.R/ns)*(p - X.T)/ns)*vec2(ns, 1.0)); }
       else res = opU(res, gearTailShape(transpose(Rs)*(p - vec3(0.0, 0.0, G1.y))));
     }
   }
@@ -949,10 +1007,11 @@ vec2 mapPlaneBody(vec3 p){
     }
     // sun visors folded up against the headliner: a pad 2 cm thick that follows the roof's own curve (an even layer
     // under it), 26 cm across ahead of each seat. (A flat plate turned to the roof's slope met the curved roof only along
-    // a line: the copilot's came apart where the cabin trimmed it and hung a loose black fragment at the windscreen top)
+    // a line: the copilot's came apart where the cabin trimmed it and hung a loose black fragment at the windscreen top.
+    // Hung 3 mm under the headliner, the gap - finer than the bake's lattice - came off its near edge in jags and specks)
     vec3 vp = vec3(abs(p.x) - abs(E.x), p.y, p.z - (E.z - 0.30));
     if (abs(vp.x) < 0.16 && abs(vp.z) < 0.08 && p.y > E.y + 0.04) {
-      float pad = max(abs(f + 0.075) - 0.012, 0.02 - winHole);                  // 2.4 cm, 3 mm under the headliner, 2 cm clear of the windows
+      float pad = max(abs(f + 0.071) - 0.012, 0.02 - winHole);                  // 2.4 cm, flush with the headliner (1 mm into it), 2 cm clear of the windows
       float outline = sdRoundBox(vec3(vp.x, 0.0, vp.z), vec3(0.13, 1.0, 0.05), 0.03);
       res = opU(res, vec2(-smin(-pad, -outline, 0.012), 63.0));   // (rounded where the outline meets the pad: a clean edge off the lattice; in the cabin's trim)
     }

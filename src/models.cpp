@@ -197,13 +197,12 @@ void packModel(const AircraftSpec& s, int idx, float gh, float o[24 * 4]) {
   put(15, m.vt[4], m.vt[5], m.roundness, (float)m.slats);
   put(16, m.nacX, m.nacY, m.nacR, m.nacZ0);
   put(17, m.nacLen, m.spinnerR, m.propR, (float)m.cargoPod);
-  float track = std::max(1.2f, s.span * 0.13f);
-  // main wheels: nacelle-retracting gear sits under the rear of the engine nacelle (it folds up into it)
-  float mz = m.gear == 3 ? m.nacZ0 + m.nacLen * 0.6f : s.taildragger ? -0.10f * L : 0.04f * L;
-  // retracting nose gear: behind the nose taper, where the full section begins, so its bay lies flush on the belly
-  float nz = m.gear >= 3 ? std::max(-0.36f * L, m.st[3][0] + 0.35f) : -0.36f * L;
-  put(18, track, m.wheelR, mz, nz);
-  put(19, gh, 0.45f * L, s.taildragger ? 1.f : 0.f, (float)m.deice);
+  // the wheels exactly where the physics' ground contacts are (aircraft.cpp gearStations): drawn anywhere else, the
+  // aircraft stood on wheels it doesn't have (a nacelle main sits in its nacelle's tail and folds forward into it; a
+  // retracting nose wheel folds aft along the belly)
+  const GearStations gst = gearStations(s);
+  put(18, gst.track, m.wheelR, gst.mainZ, gst.noseZ);
+  put(19, gh, gst.tailZ, s.taildragger ? 1.f : 0.f, (float)m.deice);
   put(20, (float)m.winCount, m.winZ0, m.winZ1, m.winY);
   float panelZ = m.eye.z - (m.cockpit == 2 ? 0.85f : 0.68f);
   put(21, m.winW, m.winH, (float)m.cockpit, panelZ);
