@@ -16,15 +16,14 @@ permissions:
   contents: write
 
 jobs:
-  linux-sanitizers:   # every headless test under AddressSanitizer + UBSan (the shader checks need a validator: skipped)
+  linux-sanitizers:   # every headless test under AddressSanitizer + UBSan (the shader checks need a validator: skipped); a release waits for it
     runs-on: ubuntu-latest
-    if: inputs.release_tag == ''
     steps:
       - uses: actions/checkout@v4
       - name: Configure (GCC, ASan + UBSan)
         run: cmake -S . -B build -DSANITIZE=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
       - name: Build
-        run: cmake --build build --parallel 4 --target flight_test progression_test save_test airport_layout_test envelope_test hull_test mesh_simplify_test entity_raycast_test gameplay_test encounter_timing_test shader_keyword_test
+        run: cmake --build build --parallel 4 --target flight_test progression_test save_test airport_layout_test envelope_test hull_test mesh_simplify_test entity_raycast_test gameplay_test encounter_timing_test shader_keyword_test world_cache_test
       - name: Test
         env:
           ASAN_OPTIONS: detect_leaks=0
@@ -65,8 +64,24 @@ jobs:
           name: SolaceExpress-windows-x64
           path: dist/SolaceExpress/
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SolaceExpress-windows-x64-zip
+          path: dist/SolaceExpress-windows-x64.zip
+
+  release:   # only once the same source has passed on Windows and under the Linux sanitizers
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+    needs: [linux-sanitizers, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: SolaceExpress-windows-x64-zip
+          path: dist
+
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.release_tag || github.ref_name }}
