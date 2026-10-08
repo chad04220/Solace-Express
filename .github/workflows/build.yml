@@ -54,6 +54,8 @@ jobs:
           Set-Content -Path dist/SolaceExpress/VERSION.txt -Value "${{ inputs.release_tag || github.ref_name }}"
           New-Item -ItemType Directory -Force -Path dist/SolaceExpress/loading | Out-Null
           Copy-Item assets/loading/*.jpg dist/SolaceExpress/loading/
+          New-Item -ItemType Directory -Force -Path dist/SolaceExpress/materials | Out-Null
+          Copy-Item assets/materials/*.jpg dist/SolaceExpress/materials/
           Copy-Item -Recurse assets/voice dist/SolaceExpress/voice
           if (Test-Path assets/menu.mp4) { Copy-Item assets/menu.mp4 dist/SolaceExpress/ }   # the pre-rendered menu montage (diagnostics.bat menu)
           Compress-Archive -Path dist/SolaceExpress/* -DestinationPath dist/SolaceExpress-windows-x64.zip -Force

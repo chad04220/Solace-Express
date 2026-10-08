@@ -207,6 +207,7 @@ void main(){
   g_ren.renderScale = getenv("RSCALE") ? (float)atof(getenv("RSCALE")) : 1.0f; g_ren.quality = 1;
   if (getenv("DBGOFF")) g_ren.dbgOff = atoi(getenv("DBGOFF"));   // switch renderer features off (Renderer::dbgOff bits)
   auto tInit = std::chrono::steady_clock::now();
+  g_ren.matDir = getenv("MATDIR") ? getenv("MATDIR") : "assets/materials";   // (MATDIR="": the procedural layers)
   if (!g_ren.init(W, H)) { printf("init failed: %s\n", g_ren.error.c_str()); return 1; }
   g_ren.entSync = !getenv("ENTSTREAM");   // captures generate every scenery chunk in range up front
   printf("renderer ok (shader cache: %d loaded, %d compiled, %.0f s)\n", g_shaderCacheHits.load(), g_shaderCacheMisses.load(),

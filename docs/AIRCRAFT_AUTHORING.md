@@ -18,7 +18,7 @@ An aircraft is **data first**. Nothing is modelled in a 3D package and nothing i
 | Physics, career and livery | one row in `kAircraft[]`, `src/aircraft.cpp` (`AircraftSpec`, `src/aircraft.h`) |
 | 3D shape | one row in `kModels[]`, `src/models.cpp` (`ModelDef`, `src/models.h`): a parametric shape the GLSL distance field builds (`src/shaders/plane_sdf.glsl`) |
 | Triangle meshes | baked from that distance field at launch, then cached on disk (`src/aircraft_mesh.cpp`) |
-| Materials and textures | procedural: GLSL material code per material id (`src/shaders/plane_material.glsl`) on texture sets generated at launch (`src/renderer.cpp`) |
+| Materials and textures | GLSL material code per material id (`src/shaders/plane_material.glsl`) on a 30-layer texture array: CC0 photo scans in `assets/materials` (`tools/pack_materials.py`), procedural where a layer has none (`src/materials.cpp`) |
 | Moving parts | rigid parts, posed every frame from the controls (`src/shaders/plane_parts.glsl`) |
 | Cockpit | generated from the model row: seats, panel, yokes, pedals, visors, compass, windows (one of three layouts) |
 | Engine sound | synthesized from the engine type, cylinder count and blade count (`src/audio.cpp`) |
@@ -309,9 +309,12 @@ code sits behind `RESEARCH_ON`, which the `AF_LIGHT` builds compile out, so the 
 
 ## 7. Materials and textures
 
-There are **no image textures for aircraft.** At launch `renderer.cpp` generates a 512² array of procedural PBR texture
-sets. Each set has albedo, roughness and a normal; the aircraft use `M_PAINT`, `M_METAL`, `M_RUBBER`, `M_PLASTIC`,
-`M_FABRIC`, `M_CARPET` and `M_LEATHER`; the rest are terrain and buildings. A material is GLSL that fills a `Mat`
+There are **no per-aircraft image textures.** Every surface samples one 512² array of 30 PBR texture sets (albedo,
+roughness, a normal, height and AO), loaded at launch by `Renderer::genMaterials`: a layer comes from the CC0 scans in
+`assets/materials` (Poly Haven and ambientCG, packed by `tools/pack_materials.py`) when it has one, and from the
+procedural generator in `src/materials.cpp` when it doesn't (the foliage, needles, aircraft paint, tyre rubber, crops
+and forest canopy). The aircraft use `M_PAINT`, `M_METAL`, `M_RUBBER`, `M_PLASTIC`, `M_FABRIC`, `M_CARPET` and
+`M_LEATHER`; the rest are terrain and buildings. A material is GLSL that fills a `Mat`
 (`alb`, `rough`, `metal`, `nrm`, `emit`) for a material id, usually from a triplanar sample:
 
 ```glsl
@@ -349,9 +352,12 @@ Rules learned the hard way:
   automatic for Tier A.
 - **Night:** scale lamp emission by `uNight`. Keep cockpit glows dim: a lit compass at full strength was the brightest
   thing in the cabin.
-- **A new texture set** is a new `case` in the generator (`renderer.cpp`, the procedural PBR block), a new `M_*`
-  constant in `scene_uniforms.glsl`, and one more layer of memory for every GPU. Prefer reusing a set with a new
-  tint, scale or pattern.
+- **A new texture set** is a new layer: a `case` in the generator (`materials.cpp`, its fallback and the reference the
+  packer matches to), its name in `materials.cpp`'s table, a new `M_*` constant in `scene_uniforms.glsl`, and one more
+  layer of memory for every GPU. To give it a scan, add it to `pack_materials.py`'s manifest (source, real size, the
+  tile the shaders use) and run the packer: it fits the scan to the tile seamlessly and matches its mean colour,
+  roughness and relief to the generator's, so a scan never changes a material's palette. Prefer reusing a set with a
+  new tint, scale or pattern.
 
 ---
 

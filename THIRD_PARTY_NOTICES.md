@@ -22,9 +22,17 @@ Stations listed in `radio_stations.txt` are third-party services streamed live a
 
 All voices were synthesised for this project with stock synthetic speakers, then headset- or radio-filtered; no real person's voice was used. The instructor, the checkride examiner and the display pilot use Qwen3-TTS-12Hz-1.7B-CustomVoice (stock speakers Ryan, Sohee and Aiden), licensed under the Apache License 2.0. The airport information, cockpit assistant and research computer voices, and the North, Coast and Valley Tower controllers, use the Kokoro-82M v1.0 model (stock voices bf_emma, af_bella, am_fenrir, am_michael, af_sarah and bm_daniel) through kokoro-onnx; Kokoro-82M is licensed under the Apache License 2.0 and kokoro-onnx under the MIT License. The licence texts are in `voice/licenses/`. The recordings themselves are part of this project.
 
+## Material textures (`materials/`)
+
+The photo-scanned surface textures in `materials/` (grass, rock, sand, snow, asphalt, gravel, soil, concrete, roof
+tiles, slate, plaster, brick, brushed metal, plastic, fabric, carpet, leather, corrugated iron, bark, planks, forest
+floor, shingles and siding) are derived from CC0 (public domain) assets from Poly Haven (polyhaven.com) and ambientCG
+(ambientcg.com), resampled and recoloured for this project by `tools/pack_materials.py`, which lists every source.
+CC0 needs no attribution; it is given with thanks.
+
 ## Everything else
 
-All other code, shaders, textures (procedurally generated at startup), audio (synthesised in real time, apart from the tower voices above), aircraft, map and campaign content are original to this project.
+All other code, shaders, textures (the rest procedurally generated at startup), audio (synthesised in real time, apart from the tower voices above), aircraft, map and campaign content are original to this project.
 
 ## stb_image
 

@@ -141,6 +141,9 @@ void Renderer::drawTerrainMesh(const FrameParams& fp) {
     glUniform2f(U(p, "uPano"), fp.pano, fp.panoTanY);
     glUniform2f(U(p, "uJit"), jitX, jitY);
     glUniform1f(U(p, "uLogC"), 2.f / log2f(40000.f + 1.f));
+    glActiveTexture(GL_TEXTURE0 + 9); glBindTexture(GL_TEXTURE_2D_ARRAY, texWaves); glUniform1i(U(p, "uWaves"), 9);
+    glUniform3f(U(p, "uWaveRms"), waveRms[0], waveRms[1], waveRms[2]);
+    glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(vaoWater);
     glDrawElements(GL_TRIANGLES, waterIdx, GL_UNSIGNED_INT, nullptr);
   }

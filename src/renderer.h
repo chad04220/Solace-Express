@@ -100,6 +100,8 @@ public:
   int W = 0, H = 0;          // window size
   float renderScale = 1.0f;
   int quality = 1;           // 0 low, 1 medium, 2 high
+  std::string matDir;          // the scanned material layers (assets/materials; empty or missing: procedural ones)
+  int matScanned = 0;          // how many of the layers came from it
   int dbgOff = 0;            // profiling: renderer features switched off (uDbg bits)
   bool screenWindows = getenv("SCREENFEEDS") == nullptr;   // the research craft's displays are windows (no camera feeds but the bomb camera's; SCREENFEEDS=1 brings the cameras back)
   int bakeCount = 0;   // airframe meshes and hulls baked or loaded so far (the research terminal's warm-up waits for a frame that bakes nothing)
@@ -217,6 +219,8 @@ private:
   void genMaterials();
   void genCloudNoise();   // tileable cloud coverage (2D) and billow / detail noise (3D) textures
   GLuint texCloudCov = 0, texNoise3 = 0;
+  void genWaves();        // the sea's wave bands (water.glsl): three tileable slope / height maps of a wind-driven sea
+  GLuint texWaves = 0; float waveRms[3] = {1, 1, 1};   // (each band's slope rms, the shader's decode scale)
   void genMinimap();
   // ---- environment entities: instanced meshes -> G-buffer (lit by the lighting pass) + sun shadow cascades
   GLuint progEnt = 0, progEntSh = 0, vaoEnt = 0, vboEntMesh = 0, vboEntInst = 0;

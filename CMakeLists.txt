@@ -25,7 +25,7 @@ include_directories(${CMAKE_BINARY_DIR}/gen)
 set(CORE_SOURCES
   src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/career.cpp)
 set(GAME_SOURCES
-  ${CORE_SOURCES} src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_wraith.cpp src/renderer.cpp src/raster_renderer.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/entity_mesh.cpp src/gl.cpp src/audio.cpp src/models.cpp)
+  ${CORE_SOURCES} src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_wraith.cpp src/renderer.cpp src/materials.cpp src/raster_renderer.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/entity_mesh.cpp src/gl.cpp src/audio.cpp src/models.cpp)
 
 if(WIN32)
   if(MINGW)
@@ -55,6 +55,9 @@ if(UNIX AND NOT APPLE)
   add_dependencies(aircraft_visual_test shaders_gen)
   target_link_libraries(aircraft_visual_test PRIVATE ${CMAKE_DL_LIBS} pthread)
 endif()
+# the procedural material layers as images, for tools/pack_materials.py: material_dump OUTPUT_DIR
+add_executable(material_dump EXCLUDE_FROM_ALL tools/material_dump.cpp src/materials.cpp src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
+target_include_directories(material_dump PRIVATE src)
 
 # Headless tests (flight model + campaign progression validation)
 add_executable(flight_test tests/flight_test.cpp ${CORE_SOURCES})

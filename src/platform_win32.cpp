@@ -719,6 +719,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   introFrame(pace.fraction(), "Preparing the renderer: textures, materials and the GPS map", 1.f);
   g_ren.renderScale = 1.0f; g_ren.quality = game.set.quality;
   GetClientRect(g_hwnd, &cr);
+  g_ren.matDir = game.assetDir + "\\materials";   // (the scanned material layers shipped beside the exe)
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) { stopIntro(false); fatal(g_ren.error); return 1; }
   {
     // a normal start loads the menu's first place and builds (or reads) every aircraft's meshes, the research jets'

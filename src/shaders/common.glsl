@@ -84,6 +84,7 @@ float terrainH(vec2 p, int oct){
 uniform vec3 uSunDir; uniform vec3 uSunCol; uniform float uNight; uniform float uTime;
 uniform float uCloudCover; uniform float uCloudBase; uniform float uFogB; uniform float uWet; uniform float uSnow;
 uniform vec2 uWindOff; uniform float uLightning; uniform float uStorm;
+uniform vec3 uWindV;   // surface wind velocity (m/s, the way the air moves)
 
 vec3 skyColor(vec3 rd){
   vec3 sd = uSunDir;

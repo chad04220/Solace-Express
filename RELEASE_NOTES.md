@@ -10,3 +10,8 @@
 - On the ground at speed, the autopilot steers back to the centreline over a few seconds of roll instead of a fixed amount per metre. A research jet at 65 m/s no longer swings across the runway and off its edge.
 - Every case in the autoland sweep lands or is refused: 870 in the normal law (864 landed, 6 refused) and 648 in the gentle law (644 landed, 4 refused). The extra refusal is a heavy Starling with a gusting tailwind at Meadowbrook: it needs 1,141 m of the 1,100 m runway.
 - New flight tests fly autolands with an engine out (Islander, Q400, Starling), fully loaded (Caravan, Q400) and iced (Kestrel, Q400).
+
+### Real textures and a wind-driven sea
+- 23 of the 30 surface textures are now photo scans (CC0, from Poly Haven and ambientCG) instead of generated noise: grass, rock, sand, snow, asphalt, gravel, soil, concrete, roof tiles, slate, plaster, brick, brushed metal, cockpit plastic, seat fabric, carpet, leather, corrugated iron, bark, planks, forest floor, shingles and siding. Each keeps its old average colour, so the world's palette is unchanged; the detail is real. The cockpit headliner and panels lose the grainy speckle they had in sunlight (the Osprey's window arches).
+- The rest stay generated: the foliage, needles, aircraft paint, tyre treads, crops and forest canopy.
+- The sea is built from a real wave spectrum: swell, wind waves and ripples, each moving at its own speed down the actual wind. A calm day is glassy with a sharp sun glint; a windy one is choppy, with whitecaps on the crests (about 1% of the sea at 20 kt, 10% at 40 kt) and light glowing through the wave tops when you look toward the sun. Before, the waves were the same in every wind and ran in no particular direction.
