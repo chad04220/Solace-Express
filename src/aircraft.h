@@ -42,6 +42,11 @@ struct AircraftSpec {
   float fuelPriceBase() const { return engineType == ENG_PISTON ? 2.2f : 1.4f; }   // $ per kg at a hub
 };
 
+// whether a type may use a field: its surface (grass and sand only for the short-field types, gravel and snow for the
+// rough-field ones) and its length (runwayNeeded). The career dispatches by it and the autoland lands by it.
+bool surfaceOK(const AircraftSpec& s, int surface);
+bool runwayOK(const AircraftSpec& s, const Airport& a);
+
 extern const AircraftSpec kAircraft[];
 // the aircraft's registration: "SX-" and three letters, painted on the rear fuselage (shaders.h, uReg) and the
 // call sign the towers use for it (Game::updateAtc)

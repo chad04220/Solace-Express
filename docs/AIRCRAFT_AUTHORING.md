@@ -258,8 +258,12 @@ width, headrest, dome light, armrests, visor height and slope, overhead, vents).
 - **The autopilot's two laws.** It flies to the airframe's limits (hard turns, high g) unless the job carries
   passengers or a fragile load (`Contract::gentle()` sets `Plane::apComfort`: 25° of bank, 1.25 g, soft climbs and
   descents, a stabilized approach no more than ~500 fpm beyond the glidepath's own descent, and no belly-up).
-- **Autoland** plans each runway end (`apPlan`). It refuses a runway shorter than `runwayNeeded`, a tailwind landing it
-  can't stop from, terrain that keeps it too high, or high ground where it would turn in. An airframe built for it
+- **Autoland** plans each runway end (`apPlan`). It refuses a field the career wouldn't send the type to (the same
+  `surfaceOK` and `runwayNeeded` rule as dispatch: grass and sand only with `runwayM` under 900, gravel and snow only
+  with `roughOK`), a runway it can't stop on (the aim point plus 0.20 × the touchdown ground speed squared, 0.27 for a
+  taildragger, more on a rough surface: the approach speed at the weight it has now, in the field's air, plus any
+  tailwind), terrain that keeps it too high, high ground where it would turn in, or a turn-in that would leave the
+  chart. So `runwayM` and `roughOK` must be honest for a type whose distances aren't learned (`special`). An airframe built for it
   (`apEnv.highAlpha`) flies the final fast and does the belly-up (`APS_BLEED`, `apBellyUp`) before landing; one that
   can hold itself up on its thrust (`apEnv.hover`) then hovers.
 - **The test:** `autoland_sweep --craft <i>` (every airport, three winds, two starts), then `--comfort` for a career

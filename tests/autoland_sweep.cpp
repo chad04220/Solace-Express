@@ -35,8 +35,7 @@ int main(int argc, char** argv) {
     if (comfort && si >= kNumAircraft) continue;   // (the gentle law flies passengers and fragile loads: career types only)
     for (int ai = 0; ai < nAp; ai++) {
       const Airport& A = g_world.airports[ai];
-      if (!all && !s.special && !runwayOK(s, A)) continue;   // the career never sends it there
-      if (!all && s.special && (A.length < 1400.f || A.surface != SURF_ASPHALT) && si == kResearchJet) continue;   // (the XR-30 needs a long hard runway)
+      if (!all && !runwayOK(s, A)) continue;   // the career never sends it there (and the autoland refuses it)
       for (int wi = 0; wi < 3; wi++)
         for (int st = 0; st < 2; st++, idx++) {
           if (idx % count != slice) continue;
@@ -75,6 +74,7 @@ int main(int argc, char** argv) {
             if (getenv("APTRACE") && (p.apStage != last || (k % 600) == 0)) { vec3 r = p.pos - p.apTd; printf("    t %4.0f stage %d leg %d along %6.0f cross %6.0f agl %5.0f above field %5.0f  %s\n", k / 60.f, p.apStage, p.apLeg, dot(r, p.apLd), dot(r, vec3(-p.apLd.z, 0, p.apLd.x)), p.pos.y - g_world.height(p.pos.x, p.pos.z), p.pos.y - A.elev, p.apStatus.c_str()); }
             last = p.apStage;
           }
+          if (getenv("APDBG") && td) { const float tdOff = clampf(A.length * 0.12f, 80.f, 300.f); printf("  stopped %.0f m past the threshold (%.0f m runway)\n", dot(p.pos - p.apTd, p.apLd) + tdOff, A.length); }
           vec3 rel = p.pos - A.pos();
           float along = fabsf(dot(rel, A.dir())), cross = fabsf(dot(rel, vec3(-A.dir().z, 0, A.dir().x)));
           bool good = !p.ev.crashed && p.apDone && td && tdVs < 3.f && along < A.length * 0.5f && cross < A.width * 0.5f;

@@ -62,9 +62,11 @@ const AircraftSpec kAircraft[] = {
   52000.0f, 80000.0f, 130000.0f, 0.33f, 0.085f, 0.065f, LIC_ATP, 340000, 0,
   16.30f, 0.80f, -0.9375f, -1.145f, 2, 0,
   vec3(0.14f, 0.18f, 0.20f), vec3(0.20f, 0.78f, 0.70f), 0, 0.96f, 9.f, -4.f},
-  // hidden research model: thrust-to-weight ~2.2, supersonic, pitch thrust vectoring (see Plane::substep special path)
+  // hidden research model: thrust-to-weight ~2.2, supersonic, pitch thrust vectoring (see Plane::substep special path).
+  // It lands fast and long on its small unflapped wing: 1,400 m of hard runway (250 m and rough fields once said here,
+  // and the autoland took it to fields it overran or broke its gear on - the review of v3.33.0, A1)
   {"xr30_specter", "XR-30 Specter", "Confidential research model", ENG_JET, 2, 0, 0, 0, 0, 9000, 3000, 0, 0, 46.0f, 11.2f, 4.6f,
-   0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 132000, 0, 60, 70, 420, 4000, 250, true, false, true,
+   0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 132000, 0, 60, 70, 420, 4000, 1400, false, false, true,
    25000, 90000, 110000, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 0, 0,
    17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1, 2.7f, 40.f, -20.f},
   // XR-20 Mantis: forward-swept twin-jet systems demonstrator (Codex's proposal; special 0: the generic flight model and
@@ -788,7 +790,7 @@ void Plane::apSense() {
   E.glideMax = clampf(std::min(0.6f * glide, E.spool >= 2.f ? 3.5f : 6.5f), 3.f, 6.5f);
   if (P.ldgRoll > 0.f && P.ldgRoll < 260.f) E.glideMax = 6.5f;
   E.gUse = P.gUse;
-  E.ldgDist = P.ldgRoll * E.wRatio;
+  E.ldgDist = P.ldgRoll * E.mass / (s.emptyMass + s.maxFuel + s.cargoKg);   // (the learned distance is at full weight)
   E.hover = liftThrustMax() > 1.1f * E.mass * G0;
   E.agile = P.gUse >= 30.f;
   E.rateCmd = s.special != 0;
@@ -870,26 +872,26 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   vec3 from(sinf(wx.windFrom * DEG), 0, -cosf(wx.windFrom * DEG));
   // (the wind weighs 40 per m/s of headwind, the distance to the entry 0.02 per metre: a 10 kt wind is worth about
   //  10 km of flying round to the other end, a light one isn't)
-  // the landing distance this end needs with the wind behind: a field the type is sent to fits its still-air landing
-  // (that much is the career's choice: runwayOK); what a tailwind adds is the touchdown ground speed squared - the
-  // tailwind and half its gusts on the autopilot's approach speed. The still-air distance is the learned one (from 15 m,
-  // aircraft_perf.cpp) x1.6 - the autopilot crosses the fence above 1.3 Vs0 and floats a little; measured on the
-  // Starling at Cedar Ridge - in the field's thinner air, and never taken as more than 90% of the runway. With the wind
-  // ahead or across, nothing is added (QA F1: the Starling overran Cedar Ridge's 1,000 m with a 4-7 m/s tailwind)
+  // the landing distance this end needs, from the threshold to a stop: the aim point (td above), then the float and
+  // the roll. Flown by the autopilot - every type it lands, 290 calm landings at every field - the float and the roll
+  // together came to 0.20 of the touchdown ground speed squared (s^2/m: about 2.5 m/s^2 of deceleration from the aim
+  // point, whatever the type; a taildragger, held tail-up while it's fast, 0.27). The touchdown speed: the approach
+  // speed at the weight and ice it has now, in the field's thinner air, with the tailwind and half its gusts on top; a
+  // rough surface brakes worse. All of it against the whole runway (the review of v3.33.0, A1: the learned still-air
+  // distance x1.6, cut to 90% of the runway, was over twice the props' roll and short of the jets', and only the jets'
+  // tailwind was added). QA F1: the Starling overran Cedar Ridge's 1,000 m with a 4-7 m/s tailwind.
   const float hw = dot(ld, from) * wx.windSpeed;
   const float tw = hw < 0.f ? -hw + 0.5f * wx.gust : 0.f;
-  const float vap = std::max(E.vApp * 1.06f, 10.f), vg = vap + tw;
   const float sigma = expf(-a.elev / 8500.f);
-  const float stillAir = std::min(1.6f * E.ldgDist / sigma, a.length * 0.9f);   // (at the weight it has now)
-  // (for engines slow to spool - the jets: they come in under power and float, where the propeller types touch down
-  // slower and stop short - the sweep's gusty tailwind landings stopped by mid-runway, at Orchard Valley's 800 m too,
-  // where the jets ran off the end)
-  const float ldgNeed = E.spool >= 2.f && tw > 0.f && stillAir > 0.f ? stillAir * (vg / vap) * (vg / vap) : 0.f;
-  // every field, whatever got it chosen (the GPS offers them all): the runway the type needs at all - the career's own
-  // dispatch rule (AircraftSpec::runwayNeeded) - comes first; then the tailwind's addition (the review of v3.31.0, F2: the
-  // Starling took Gull Rock's 480 m and overran it)
-  const float rwyNeed = s.runwayNeeded(a.elev), fieldShort = E.hover ? 0.f : rwyNeed - a.length;   // (what holds itself up on its thrust comes down vertically)
-  const float stopShort = fieldShort > 0.f ? 1000.f + fieldShort : ldgNeed > 0.f ? ldgNeed - a.length * 0.95f : 0.f;
+  const float vtd = E.vApp / sqrtf(sigma) + tw;
+  const float ldgNeed = E.hover ? 0.f : len2(td - a.threshold(rev)) + (s.taildragger ? 0.27f : 0.2f) * vtd * vtd * (surfaceRough(a.surface) ? 1.1f : 1.f);   // (what holds itself up on its thrust comes down vertically)
+  // every field, whatever got it chosen (the GPS offers them all): the runway the type may use at all - the career's own
+  // dispatch rule, its surface (surfaceOK) and length (AircraftSpec::runwayNeeded) - comes first, then the landing
+  // distance (the review of v3.31.0, F2: the Starling took Gull Rock's 480 m and overran it; of v3.33.0, A1: Harlan
+  // Farm's grass and Palm Bay's sand, which the career never sends it to, and it overran them)
+  const bool surfBad = !E.hover && !surfaceOK(s, a.surface);
+  const float rwyNeed = s.runwayNeeded(a.elev), fieldShort = E.hover ? 0.f : rwyNeed - a.length;
+  const float stopShort = fieldShort > 0.f ? 1000.f + fieldShort : ldgNeed - a.length;
   // ...and whether it can get down to the glidepath from the hold: it leaves the orbit at its height and descends from
   // there, may not go below the intercept altitude until the gate, and goes around if still 80 m high 2 km out.
   // What it can lose on the way: nine tenths of its steepest final descent (the guidance's limit) at the approach
@@ -911,12 +913,25 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   // (where the turn-in's ground would lift it well above the intercept altitude, this end is no good for turns this wide:
   // the en-route terrain floor takes it up and the final is never met from there)
   const float turnHigh = turnMsa + 250.f - (intAlt + 150.f);
-  apPlanWhy = fieldShort > 0.f ? fmt("runway too short for the %s (%.0f m, it needs %.0f m)", s.name, a.length, rwyNeed)
-            : stopShort > 0.f ? fmt("runway too short with this wind (%.0f of %.0f m)", ldgNeed, a.length)
+  // ...and whether it stays on the chart: the orbit was chosen inside it, but the outbound leg and the turn back onto
+  // the final reach out beyond the gate - from the gate to the turn back, two turns' width either side (the review of
+  // v3.33.0, A1: the passenger Starling flew off the chart's edge from Palm Bay and was lost. Far Isle, in the chart's
+  // corner, still fits from the north-west)
+  float offChart = 0.f;
+  for (int k = 0; k < 4; k++) {
+    vec3 q = td - ld * (k & 1 ? outReach : F) + rr * (k & 2 ? 2.f * Rin : -2.f * Rin);
+    offChart = std::max(offChart, std::max(fabsf(q.x), fabsf(q.z)) - WORLD_HALF * 1.1f);   // (the flight is lost at 1.2)
+  }
+  std::string surf = surfaceName(a.surface); for (auto& ch : surf) ch = (char)tolower(ch);
+  apPlanWhy = surfBad ? fmt("the %s can't use a %s runway", s.name, surf.c_str())
+            : fieldShort > 0.f ? fmt("runway too short for the %s (%.0f m, it needs %.0f m)", s.name, a.length, rwyNeed)
+            : stopShort > 0.f ? fmt("runway too short to stop on%s (%.0f of %.0f m)", tw > 0.f ? " with this tailwind" : "", ldgNeed, a.length)
             : highAt2k > 0.f ? "terrain keeps the approach too high to descend onto"
-            : turnHigh > 0.f ? (apComfort ? "high ground where it would turn in (gently, for the passengers or the load)" : "high ground where it would turn in") : "";
+            : turnHigh > 0.f ? (apComfort ? "high ground where it would turn in (gently, for the passengers or the load)" : "high ground where it would turn in")
+            : offChart > 0.f ? "the approach would leave the chart" : "";
   float score = hw * 40.f - bestCost - (F0 - F) * 0.3f - length(bestC - pos) * 0.02f - blocked
-              - (atanf(gs) / DEG - 3.f) * 150.f - (stopShort > 0.f ? 20000.f + stopShort * 20.f : 0.f) - (highAt2k > 0.f ? 20000.f + highAt2k * 20.f : 0.f) - (turnHigh > 0.f ? 20000.f + turnHigh * 20.f : 0.f);
+              - (atanf(gs) / DEG - 3.f) * 150.f - (stopShort > 0.f ? 20000.f + stopShort * 20.f : 0.f) - (highAt2k > 0.f ? 20000.f + highAt2k * 20.f : 0.f) - (turnHigh > 0.f ? 20000.f + turnHigh * 20.f : 0.f)
+              - (surfBad ? 40000.f : 0.f) - (offChart > 0.f ? 20000.f + offChart * 20.f : 0.f);
   if (getenv("APDBG")) printf("apPlan %s rev %d: F %.0f gs %.2f deg blocked %.0f wind %+.1f cost %.0f landing %.0f of %.0f m, %.0f m high at 2 km, score %.0f %s (hold %.0f m above the field, leg %.0f m)\n", a.code, (int)rev, F, atanf(gs) / DEG, blocked, hw, bestCost, ldgNeed, a.length, highAt2k, score, apPlanWhy.c_str(), bestAlt - a.elev, legOut);
   if (commit) {
     apRev = rev; apFinalLen = F; apGs = gs; apHoldC = bestC; apHoldC.y = 0; apHoldR = R; apHoldAlt = bestAlt; apIntAlt = intAlt;
@@ -1213,6 +1228,11 @@ void Plane::apGuidance(float dt) {
       apStatus = fmt("GO AROUND  %s", a.code);
       break;
   }
+  // the chart's edge: en route or going around (a slow climb straight out past the runway runs a long way), beyond where
+  // any plan reaches it turns back for the field (the review of v3.33.0, A1: a passenger Starling flew off the chart
+  // from Palm Bay and was lost)
+  if ((apStage == APS_NAV || apStage == APS_GOAROUND) && std::max(fabsf(pos.x), fabsf(pos.z)) > WORLD_HALF * 1.12f)
+    apHeading = atan2f(apTd.x - pos.x, -(apTd.z - pos.z)) / DEG;
   // terrain safety while en route and in the go-around: never let the target sit below the ground ahead
   if (apStage == APS_NAV || apStage == APS_GOAROUND) {
     const float hi = terrainAround();

@@ -232,6 +232,4 @@ extern std::vector<Contract> g_story;
 float simulateFlightMinutes(const Contract& c, int specIdx, float* fuelKgOut = nullptr);
 extern float kEstK[5];   // the flight-time estimate's fitted weights (Career::plan)
 void buildStory();
-bool surfaceOK(const AircraftSpec& s, int surface);
-bool runwayOK(const AircraftSpec& s, const Airport& a);
 bool replaceFile(const std::string& from, const std::string& to);   // moves `from` over `to` in one step (career saves, the settings file)

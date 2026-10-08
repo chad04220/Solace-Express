@@ -377,7 +377,7 @@ int main(int argc, char** argv) {
       p.apSense();
       const ApEnvelope& E = p.apEnv; const ApEnvelope& R = ref.apEnv;
       bool read = eng ? E.thrustFrac < 0.65f * R.thrustFrac && E.climb < R.climb * 0.6f && E.canGoAround
-                : heavy ? E.vApp > s.vref * 1.2f && E.vs1 > Plane::perf(&s).vs1 * 1.2f && E.ldgDist > Plane::perf(&s).ldgRoll * 1.4f   // (over the learned, test-weight figures)
+                : heavy ? E.vApp > s.vref * 1.2f && E.vs1 > Plane::perf(&s).vs1 * 1.2f && E.ldgDist > Plane::perf(&s).ldgRoll * 1.05f   // (over the learned figures: the stall at the test weight, the landing at full weight - every seat taken is more)
                 : E.vs1 > R.vs1 * 1.08f && E.climb < R.climb;
       p.apEngage(Plane::AP_NAV, ai, wx);
       float tdVs = 0; bool td = false; int k = 0, goArounds = 0, lastStage = 0;

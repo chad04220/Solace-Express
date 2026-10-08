@@ -197,13 +197,6 @@ void buildStory() {
      .brief("The last flight of the night, through a storm, to Far Isle. Bring them home, Captain."); add(s); }
 }
 
-bool surfaceOK(const AircraftSpec& s, int surface) {
-  if (surface == SURF_ASPHALT) return true;
-  if (surface == SURF_GRASS || surface == SURF_SAND) return s.runwayM < 900;
-  return s.roughOK;
-}
-bool runwayOK(const AircraftSpec& s, const Airport& a) { return surfaceOK(s, a.surface) && a.length >= s.runwayNeeded(a.elev); }
-
 // the flight-time estimate's weights: a constant (taxi, takeoff, landing roll) and the en-route, climb, orbit and
 // approach parts (Career::plan)
 // (fitted to 53 autopilot flights of the story and freelance jobs: on 35 other freelance flights the median error is

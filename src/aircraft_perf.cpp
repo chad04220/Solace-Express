@@ -183,6 +183,13 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
   return P;
 }
 
+bool surfaceOK(const AircraftSpec& s, int surface) {
+  if (surface == SURF_ASPHALT) return true;
+  if (surface == SURF_GRASS || surface == SURF_SAND) return s.runwayM < 900;
+  return s.roughOK;
+}
+bool runwayOK(const AircraftSpec& s, const Airport& a) { return surfaceOK(s, a.surface) && a.length >= s.runwayNeeded(a.elev); }
+
 float AircraftSpec::runwayNeeded(float elev) const {
   const PerfModel& P = Plane::perf(this);
   float base = special || P.toRoll <= 0 || P.ldgRoll <= 0 ? runwayM : std::max(P.toRoll, P.ldgRoll) * 1.15f;
