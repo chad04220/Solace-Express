@@ -2,7 +2,7 @@
 
 How to add an aircraft to Solace Express, from its numbers to its shape, materials, moving parts, cockpit, weapons,
 sound, career role and tests. It is written for whoever adds the next type, a person or an AI assistant, and reflects
-the code at v3.32.0. Where the code and this guide disagree, the code wins: fix the guide in the same change.
+the code at v3.33.0. Where the code and this guide disagree, the code wins: fix the guide in the same change.
 
 Older material, kept for its history: `docs/design/additional-aircraft/` (Codex's proposals for the Swift S6, the
 Osprey C6 and the XR-10 / XR-20).
@@ -11,7 +11,8 @@ Osprey C6 and the XR-10 / XR-20).
 
 ## 0. In one page
 
-An aircraft is **data first**. Nothing is modelled in a 3D package and nothing is loaded from files:
+An aircraft is **data first**. Nothing is modelled in a 3D package, and the only image files are the shared surface
+textures (§7.2), never one made for an aircraft:
 
 | Part of the aircraft | Where it comes from |
 |---|---|
@@ -309,20 +310,20 @@ code sits behind `RESEARCH_ON`, which the `AF_LIGHT` builds compile out, so the 
 
 ## 7. Materials and textures
 
-There are **no per-aircraft image textures.** Every surface samples one 512² array of 30 PBR texture sets (albedo,
-roughness, a normal, height and AO), loaded at launch by `Renderer::genMaterials`: a layer comes from the CC0 scans in
-`assets/materials` (Poly Haven and ambientCG, packed by `tools/pack_materials.py`) when it has one, and from the
-procedural generator in `src/materials.cpp` when it doesn't (the foliage, needles, aircraft paint, tyre rubber, crops
-and forest canopy). The aircraft use `M_PAINT`, `M_METAL`, `M_RUBBER`, `M_PLASTIC`, `M_FABRIC`, `M_CARPET` and
-`M_LEATHER`; the rest are terrain and buildings. A material is GLSL that fills a `Mat`
-(`alb`, `rough`, `metal`, `nrm`, `emit`) for a material id, usually from a triplanar sample:
+An aircraft has **no textures of its own and no UV mapping.** Its look is GLSL: a material function per material id
+(§7.1) that paints the livery, seams, rivets and placards procedurally and takes its surface detail from one shared
+array of 30 texture sets (§7.2), sampled triplanar in body space (§7.3). Adding an aircraft never adds an image file.
+
+A material fills a `Mat` (`alb`, `rough`, `metal`, `nrm`, `emit`) for a material id, usually from a triplanar sample:
 
 ```glsl
 tx = triSample(lp, ln, M_METAL, 0.25, nT);   // body-space position and normal, set, scale (m), out: tangent-space normal
 m.alb = tx.rgb*vec3(0.62, 0.63, 0.65); m.metal = 0.9; m.rough = clamp(tx.a*0.6, 0.15, 0.5); m.nrm = nT;
 ```
 
-**Material ids** (`plane_material.glsl`, `planeMaterialN`), as the field returns them in `.y`:
+### 7.1 Material ids
+
+Material ids (`plane_material.glsl`, `planeMaterialN`), as the field returns them in `.y`:
 
 | Ids | What | Handled where |
 |---|---|---|
@@ -352,12 +353,123 @@ Rules learned the hard way:
   automatic for Tier A.
 - **Night:** scale lamp emission by `uNight`. Keep cockpit glows dim: a lit compass at full strength was the brightest
   thing in the cabin.
-- **A new texture set** is a new layer: a `case` in the generator (`materials.cpp`, its fallback and the reference the
-  packer matches to), its name in `materials.cpp`'s table, a new `M_*` constant in `scene_uniforms.glsl`, and one more
-  layer of memory for every GPU. To give it a scan, add it to `pack_materials.py`'s manifest (source, real size, the
-  tile the shaders use) and run the packer: it fits the scan to the tile seamlessly and matches its mean colour,
-  roughness and relief to the generator's, so a scan never changes a material's palette. Prefer reusing a set with a
-  new tint, scale or pattern.
+
+### 7.2 The texture array
+
+`Renderer::genMaterials` (`renderer.cpp`) builds two `GL_TEXTURE_2D_ARRAY`s of 30 layers, 512² each, mipmapped, 8×
+anisotropic, repeating: **`uAlb`** (rgb the albedo stored as the square root of linear - the shaders square it - and
+alpha the roughness) and **`uNrm`** (rg the tangent-space normal's x and y, DirectX's convention: green is a slope
+*down* the image; b the height; a the ambient occlusion). About 84 MB with the mips, loaded once at launch.
+
+Each layer comes from **`assets/materials`** (shipped beside the exe as `materials/`) when its three files are there:
+`NN_name_c.jpg` (albedo), `NN_name_n.jpg` (normal x, y and height), `NN_name_m.jpg` (roughness in red, AO in green),
+all exactly 512². Otherwise - a file missing, unreadable or the wrong size - the layer is made by the **procedural
+generator**, `materialProcLayer` in `src/materials.cpp`, silently. So a game without the folder still runs, and
+the render harness can show the old look with `MATDIR=""`.
+
+| # | `M_` | Source | Shader tile (m) | Used by |
+|---|---|---|---|---|
+| 0 | `M_GRASS` | ambientCG Grass004 | 4-6 | terrain, airfield grass |
+| 1 | `M_FOREST` | procedural (crowns from above) | 26 | terrain forest |
+| 2 | `M_ROCK` | Poly Haven rock_face_03, stretched | 18 | terrain cliffs, rocks |
+| 3 | `M_SAND` | Poly Haven aerial_beach_01 | 6 | beaches |
+| 4 | `M_SNOW` | ambientCG Snow006 | 8 | snow |
+| 5 | `M_ASPHALT` | Poly Haven asphalt_04 | 6-7 | runways, taxiways, roads |
+| 6 | `M_GRAVEL` | ambientCG Gravel022 | 2-6 | gravel strips, aprons |
+| 7 | `M_DIRT` | Poly Haven dry_ground_rocks | 4-7 | soil, tracks |
+| 8 | `M_CONCRETE` | Poly Haven concrete_floor_worn_001 | 1.6-5 | aprons, walls, towers |
+| 9 | `M_TILES` | Poly Haven clay_roof_tiles_02 | 3 | roofs |
+| 10 | `M_SLATE` | Poly Haven roof_slates_03 | 3 | roofs, the church |
+| 11 | `M_PLASTER` | ambientCG PaintedPlaster017 | 2.5 | walls |
+| 12 | `M_BRICK` | Poly Haven red_brick | 1.4 | walls |
+| 13 | `M_LEAVES` | procedural | 0.75-3 | broadleaf trees |
+| 14 | `M_NEEDLES` | procedural | 0.9 | conifers |
+| 15 | `M_PAINT` | procedural (white, orange peel) | 0.6-0.9 | aircraft paint |
+| 16 | `M_METAL` | ambientCG Metal009 (brushed) | 0.25-2 | aircraft, hangars, fixtures |
+| 17 | `M_RUBBER` | procedural (tyre tread grooves) | 0.08-0.35 | tyres, seals |
+| 18 | `M_PLASTIC` | ambientCG Plastic012A | 0.2-0.4 | cockpit panels, trim |
+| 19 | `M_FABRIC` | ambientCG Fabric030 | 0.08-0.3 (4 once) | seats, headliner |
+| 20 | `M_CARPET` | ambientCG Carpet012 | 0.15 | cabin floors |
+| 21 | `M_LEATHER` | ambientCG Leather030 | 0.25-0.3 | seats, yoke grips |
+| 22 | `M_CORRUGATED` | Poly Haven corrugated_iron | 1-4 | hangars, warehouses |
+| 23 | `M_CROP` | procedural (rows) | 4 | fields |
+| 24 | `M_WHEAT` | procedural | 4 | fields |
+| 25 | `M_BARK` | Poly Haven bark_brown_02 | 0.8-1 | tree trunks |
+| 26 | `M_PLANKS` | Poly Haven weathered_brown_planks | 2 | docks, sheds |
+| 27 | `M_LITTER` | Poly Haven forest_floor | 4 | forest floor |
+| 28 | `M_SHINGLES` | Poly Haven grey_roof_tiles_02 | 3 | roofs |
+| 29 | `M_SIDING` | ambientCG WoodSiding008, flipped | 3 | house walls |
+
+The constants live in `scene_uniforms.glsl` (and `ent_fs1.glsl` for the scenery). Every scan is CC0, credited in
+`THIRD_PARTY_NOTICES.md`; `tools/pack_materials.py`'s manifest is the record of what each layer was made from.
+
+### 7.3 Using a layer in a material
+
+- **Samplers.** `triSample(p, n, layer, scale, out nTS)` (`material_common.glsl`) blends three planar projections by
+  the normal and, in each, the tile at `scale` metres with a second at 4.7× mixed 35% (it breaks the repeat). Terrain
+  uses `groundSample` (two rotated lookups blended by noise and height, a macro layer, the AO); the scenery its own
+  `triS` (`ent_fs2.glsl`). The sample's albedo comes back linear.
+- **`scale` is the tile size in metres** and should match the "shader tile" column: the scans were fitted to it.
+  Twice the scale is twice-size planks.
+- **Colour is a tint.** Each scanned layer keeps the average colour of the procedural layer it replaced (§7.4), so a
+  material's `tx.rgb * tint` gives the colour it always had. Pick the tint for the colour you want; don't fight the
+  layer's mean.
+- **Relief:** `m.nrm = nT` at full strength, or scaled (`nT*0.7`) for a softer surface. Under a low sun, strong relief
+  on fine detail reads as grain (§7.4, "speckle").
+- **Roughness** comes in `tx.a`; most materials clamp or scale it to their own range.
+- **Metal** is the material's call (`m.metal`), not the layer's.
+
+### 7.4 Replacing a layer with a scan
+
+1. **Choose the scan.** CC0 only (Poly Haven, ambientCG). It needs a colour map and a DirectX normal map; roughness,
+   AO and displacement are used when there. Prefer even, unremarkable surfaces: one striking feature (a long crack, a
+   stain) repeats visibly every tile. Note its real width (Poly Haven lists it; ambientCG doesn't, so judge it from a
+   feature of known size).
+2. **Dump the procedural layers:** `cmake --build build --target material_dump && build/material_dump /tmp/old`. The
+   packer matches each scan to these.
+3. **Add a manifest row** in `tools/pack_materials.py`: `layer: ("ph:id" or "acg:Id", real width m, shader tile m,
+   options)`. The packer repeats the scan a whole number of times to fill the tile (or, with `stretch`, fits it
+   whole: a 2.6 m rock face read as an 18 m cliff), box-filters it to 512² (seamless), and then matches the procedural
+   layer: the per-channel mean colour, the mean roughness, and the mean slope (held to 0.5-2× the scan's own).
+   Options: `colour` (how much of the scan's own colour variation to keep), `contrast` (scale its variation about
+   the mean), `bump` (relief against the procedural layer's), `flip` (upside down, for a wall layer with an up).
+4. **Pack:** `tools/pack_materials.py --old /tmp/old --only N` (downloads are cached in `~/.cache/solace-materials`).
+   It prints the repeat, the content's scale against its real size, the colours matched and the relief gain.
+5. **Look at it** next to the old layer (the `_c.jpg` against the dump's `_alb.ppm`), then in the game: the render
+   harness reads `assets/materials` (`MATDIR=""` for the procedural look), so render the same scenes both ways -
+   an `apv_` airport view, `ckv` cockpits, `mountain`, `loadshot_` - and compare.
+6. **Commit the three JPEGs** with the manifest change. Nothing else ships or needs rebuilding: no cache keys on the
+   textures.
+
+Learned the hard way:
+
+- **Speckle is usually relief, not shadows.** The generated fabric and plastic had strong, coarse bumps; under a
+  grazing sun the Osprey's window arches looked like shadow acne. The scans and a soft `nT` fixed it.
+- **A flat scan raised to the generator's relief amplifies its grain** (asphalt by 8×, concrete by 23× before the 2×
+  clamp): its noise becomes speckle. The clamp is there for that.
+- **A dark scan matched to a light layer keeps its contrast**: white siding from dark boards came out striped black
+  and white. Use `contrast` 0.5-0.7.
+- **Scale and repeat show on runways and roofs first.** A prominent crack every 3 m down a runway, roof tiles the
+  size of paving slabs: check the content scale the packer prints and the shader's real tile.
+- **Walls run v up the wall**, so the image's top is at the bottom of the wall: `flip` a layer whose look has an up.
+- **The normal map must be DirectX's** (green down). A GL map lights every bump from the wrong side.
+- **JPEGs are 4:4:4** (`subsampling=0`); chroma subsampling smears the normal map's x and y.
+
+### 7.5 Adding a layer
+
+A new set is a new layer for every GPU (about 2.8 MB with mips), so first try an existing one with a new tint, scale
+or pattern. If it must be new: bump `kMatLayers` (`materials.h`), add its name to `materials.cpp`'s table and a
+`case` to the generator (the fallback, and the reference a scan is matched to), add an `M_*` constant in
+`scene_uniforms.glsl` (and `ent_fs1.glsl` if the scenery uses it) and its name to `NAMES` in the packer, then give it
+a scan (§7.4) if one fits.
+
+### 7.6 Other generated textures
+
+Built at launch in `renderer.cpp`, none tied to an aircraft: the cloud coverage map and 3D noise (`genCloudNoise`), the
+minimap (`genMinimap`), and the sea's wave bands (`genWaves`): three tileable maps of slope and height, 256², from a
+Phillips spectrum by inverse FFT (wavelengths 16-128 m, 2-16 m and 0.25-2 m). `water.glsl` scrolls each at its waves'
+phase speed down the actual wind (`uWindV`), twice at crossing angles, scales the slope to the wind (Cox and Munk) and
+puts whitecaps on the crests as the wind rises. A seaplane or a ditching reads the sea from there.
 
 ---
 
@@ -531,6 +643,8 @@ cockpit muffling inside. A new type gets its sound from `engineType`, `engines`,
    - `ckv<i>_<yaw>_<pitch>_<hour>[_<roll>[_<flaps>]]`: the cockpit (`settle=30` lets the anti-aliasing settle);
    - `loadshot_<CODE>`, `loadshot_air_<i>`: the loading pictures (`settle=40`, 1920×1080);
    - `research` (the XR-30 selected), `research10`, `research20`, `research40`: the research terminal.
+   - `apv_<CODE>_<view>_<hour>`, `mountain`, `sunset`, `storm`: the world, for textures and the sea. The harness loads
+     the scanned textures from `assets/materials` (`MATDIR=""` for the procedural ones, §7.4).
 6. **On the owner's GPU:** `SolaceExpress.exe --shots gav_<i>_120_10_0,ckv<i>_0_-8_11 --size 1920x1080`, then
    `diagnostics.bat` for the frame-time gate (§8). `SolaceExpress.exe --loadshots` re-renders every loading picture.
 
@@ -555,7 +669,7 @@ cockpit muffling inside. A new type gets its sound from `engineType`, `engines`,
 loops (§2) to it, and add its terminal entry, test cards and scenery spot (§15).
 
 **Tier B:** all of the above, plus a new engine code and its dispatch (§6), its field behind `RESEARCH_ON`, its parts
-and their `partList` branch and bake boxes (§9), its material range (§7), its cockpit (generic, or sealed with
+and their `partList` branch and bake boxes (§9), its material range (§7.1), its cockpit (generic, or sealed with
 camera feeds), its physics path if it needs a new `special` (§5), its effects (§12), and a measured frame time on the
 owner's GPU (§8).
 

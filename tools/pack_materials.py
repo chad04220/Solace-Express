@@ -30,7 +30,9 @@ NAMES = ["grass", "forest", "rock", "sand", "snow", "asphalt", "gravel", "dirt",
 #                  colour - keep this much of the scan's own colour variation about the matched mean (0..1, default 1);
 #                  contrast - scale its variation about the mean (default 1: a dark scan brought up to a light layer's
 #                             mean keeps a dark scan's contrast, which on white siding is too much);
-#                  bump - relief relative to the procedural layer's (default 1))
+#                  bump - relief relative to the procedural layer's (default 1);
+#                  flip - upside down: the walls' triplanar sample runs v up the wall, so a wall layer whose look
+#                         has an up (lap siding: each board's shadow line under the one above) is stored flipped)
 MANIFEST = {
     0:  ("acg:Grass004", 2.0, 5.0, {}),
     2:  ("ph:rock_face_03", 2.6, 18.0, {"stretch": True, "bump": 1.0}),
@@ -40,7 +42,7 @@ MANIFEST = {
     6:  ("acg:Gravel022", 1.0, 2.0, {}),
     7:  ("ph:dry_ground_rocks", 4.0, 5.0, {}),
     8:  ("ph:concrete_floor_worn_001", 3.0, 3.5, {}),
-    9:  ("ph:clay_roof_tiles_02", 2.5, 2.0, {"contrast": 0.5}),
+    9:  ("ph:clay_roof_tiles_02", 2.5, 3.0, {"contrast": 0.5}),
     10: ("ph:roof_slates_03", 3.0, 3.0, {}),
     11: ("acg:PaintedPlaster017", 2.0, 2.5, {}),
     12: ("ph:red_brick", 1.3, 1.4, {}),
@@ -53,8 +55,8 @@ MANIFEST = {
     25: ("ph:bark_brown_02", 0.9, 0.9, {}),
     26: ("ph:weathered_brown_planks", 1.7, 2.0, {"contrast": 0.7}),
     27: ("ph:forest_floor", 2.1, 4.0, {}),
-    28: ("ph:grey_roof_tiles_02", 1.5, 2.0, {"contrast": 0.7}),
-    29: ("acg:WoodSiding008", 2.0, 1.5, {"contrast": 0.6}),
+    28: ("ph:grey_roof_tiles_02", 1.5, 3.0, {"contrast": 0.7}),
+    29: ("acg:WoodSiding008", 2.0, 3.0, {"contrast": 0.6, "flip": True}),
 }
 
 
@@ -141,6 +143,9 @@ def read_old(old_dir, l):
 
 def pack(l, src, size, tile, opt, old_dir, cache, out):
     m = fetch(src, cache)
+    if opt.get("flip"):   # (rows reversed: the normal's green, a slope down the image, turns over with them)
+        m = {k: v[::-1].copy() for k, v in m.items()}
+        m["nrm"][..., 1] = 1.0 - m["nrm"][..., 1]
     reps = 1 if opt.get("stretch") else max(1, int(round(tile / size)))
     content = tile / (reps * size)
     col = fit(srgb_to_lin(m["col"]), reps)
