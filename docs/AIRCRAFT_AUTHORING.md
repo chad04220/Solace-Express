@@ -1,248 +1,629 @@
-# Solace Express — Aircraft Authoring Brief (for an AI assistant)
+# Solace Express — Aircraft Authoring Guide
 
-You are an aircraft designer for **Solace Express**, a C++17 / OpenGL 3.3 flight simulator with a procedural world. Your job is to produce new aircraft types that drop into the game **as data**, with no renderer or engine work. This document is the complete contract. Follow it exactly; the integrator (another AI, Claude, working in the repository) will paste your output into the source, build it and run the test suite. Anything outside this contract will be sent back.
+How to add an aircraft to Solace Express, from its numbers to its shape, materials, moving parts, cockpit, weapons,
+sound, career role and tests. It is written for whoever adds the next type, a person or an AI assistant, and reflects
+the code at v3.32.0. Where the code and this guide disagree, the code wins: fix the guide in the same change.
 
----
-
-## 0. TL;DR for the model
-
-- Every aircraft is **two C++ table rows**: an `AircraftSpec` (flight model, career data, livery) and a `ModelDef` (3D shape parameters). There are no mesh files, no textures, no external assets. Geometry is a parametric signed-distance model evaluated by the renderer; shading is procedural.
-- The renderer is a rasterizer that **bakes triangle meshes from the parametric model at load time**, so a correctly written table row works with zero renderer changes. That is what "easily implemented" means here: stay inside the parametric model (Tier A below).
-- Hand-written distance-field airframes (Tier B, how the two research jets are built) are only for shapes the parametric model cannot express. They are accepted only if they follow the part/rig rules in §6, because the mesh bake needs them.
-- Output format is fixed (§7). Always include the self-check table (§5). Never invent fields, never reorder fields, never change existing rows.
+Older material, kept for its history: `docs/design/additional-aircraft/` (Codex's proposals for the Swift S6, the
+Osprey C6 and the XR-10 / XR-20).
 
 ---
 
-## 1. Coordinate system, units, conventions
+## 0. In one page
 
-- Body coordinates: **+x right, +y up, +z aft** (towards the tail). Origin at the aircraft's centre of gravity. The nose is at negative z.
-- Units: metres, kilograms, seconds, radians inside the renderer; **degrees where the field says deg**; speeds in **m/s** in `AircraftSpec` (the UI converts to knots); power in **watts per engine** for props, **newtons of thrust per engine** for jets; prices in game currency.
-- The world is a 80 km × 80 km archipelago, so "range" is **game-scale** (45–300 km), not real-world.
-- The table rows are C++ aggregate initialisers. Field order is law. Floats carry an `f` suffix (`0.62f`), ints are plain, booleans are `true`/`false`, enums by name, colours as `vec3(r, g, b)` in linear 0–1.
+An aircraft is **data first**. Nothing is modelled in a 3D package and nothing is loaded from files:
+
+| Part of the aircraft | Where it comes from |
+|---|---|
+| Physics, career and livery | one row in `kAircraft[]`, `src/aircraft.cpp` (`AircraftSpec`, `src/aircraft.h`) |
+| 3D shape | one row in `kModels[]`, `src/models.cpp` (`ModelDef`, `src/models.h`): a parametric shape the GLSL distance field builds (`src/shaders/plane_sdf.glsl`) |
+| Triangle meshes | baked from that distance field at launch, then cached on disk (`src/aircraft_mesh.cpp`) |
+| Materials and textures | procedural: GLSL material code per material id (`src/shaders/plane_material.glsl`) on texture sets generated at launch (`src/renderer.cpp`) |
+| Moving parts | rigid parts, posed every frame from the controls (`src/shaders/plane_parts.glsl`) |
+| Cockpit | generated from the model row: seats, panel, yokes, pedals, visors, compass, windows (one of three layouts) |
+| Engine sound | synthesized from the engine type, cylinder count and blade count (`src/audio.cpp`) |
+| Flight performance the autopilot flies to | learned at launch by flying the type (`src/aircraft_perf.cpp`), cached |
+
+Two tiers:
+
+- **Tier A, the normal way.** One `AircraftSpec` row and one `ModelDef` row. No renderer code. Every career aircraft and
+  two of the four research craft (the XR-10 Nightjar and the XR-20 Mantis) are Tier A.
+- **Tier B, only when the shape can't be described by a model row.** A hand-written GLSL distance field with its own
+  moving parts, like the XR-30 Specter (`mapJet`, `plane_sdf.glsl`) and the XR-40 Wraith (`wraith_sdf.glsl`,
+  `wraith_cockpit_sdf.glsl`). Weeks of work, a heavier shader for every aircraft pixel, and many places to wire up
+  (§6, §17). A hand-built XR-20 once cost four times the frame in the research terminal and was put back to Tier A.
+
+The checklist for a new type is §17. The fill-in template is §18.
 
 ---
 
-## 2. Where aircraft live in the code
+## 1. Conventions
 
-| What | File | Notes |
-|---|---|---|
-| Flight model + career + livery table | `src/aircraft.cpp` → `const AircraftSpec kAircraft[]` | Struct in `src/aircraft.h` |
-| 3D model table | `src/models.cpp` → `const ModelDef kModels[]` | Struct in `src/models.h` |
-| Row count rule | `kNumAircraft = sizeof(kAircraft)/sizeof(kAircraft[0]) - 4` | The **last four rows are the hidden research craft** (`xr10_nightjar`, `xr30_specter`, `xr20_mantis`, `xr40_wraith`; `kNightjar`, `kResearchJet`, `kMantis`, `kWraith` in aircraft.h). New career aircraft must be inserted **before** the `xr10_nightjar` row in **both** tables, in the **same position**, because the tables are index-aligned (`kModels[spec - kAircraft]`). |
-| Research craft indices | `src/aircraft.h` → `kResearchJet = 7`, `kWraith = 8` | Inserting N career rows before them means these two constants must be increased by N. Say so explicitly in your output. |
-| Save files | by `id` string | `id` must be unique, lowercase ASCII, stable forever. |
-
-Everything else is derived automatically from the two rows: engine sound (type, cylinders, blades), drag build-up (`aero.cpp` from fuselage/wing/tail geometry), autopilot performance learning (`Plane::perf` flies each type at start-up), AI traffic (new types appear as traffic), ATC call signs (registration from the `id` hash), hangar/market UI, README performance table (`flight_test --table`), hull and mesh baking.
+- **Body axes:** +x right, +y up, **+z aft** (towards the tail). The origin is the centre of gravity. The nose is at
+  negative z.
+- **Units:** metres, kilograms, seconds. Speeds in `AircraftSpec` are **m/s** (the UI shows knots). Prop power is
+  **watts per engine**; jet thrust is **newtons per engine**. Angles in the model rows are **degrees** where the
+  field says so; the shaders work in radians.
+- **The world** is an 80 × 80 km archipelago, so ranges are game scale (45–300 km for career types). Airports run
+  from 480 m strips (Gull Rock) to 2.8 km runways; one gravel strip is at 1650 m elevation.
+- **C++ rows** are aggregate initialisers: field order is law. Floats carry `f`, colours are `vec3(r, g, b)` in
+  linear 0–1. Avoid pure white and pure black in liveries: the sun blows them out or crushes them.
 
 ---
 
-## 3. `AircraftSpec` — field by field
+## 2. The roster: indices, limits and what keys on them
 
-Struct (from `src/aircraft.h`), in order:
+`kAircraft[]` and `kModels[]` are **index-aligned**: row *i* of one is row *i* of the other (`kModels[spec - kAircraft]`).
+Today:
+
+| Index | id | Name | Notes |
+|---|---|---|---|
+| 0 | `kestrel` | Kestrel T2 | the lessons' aircraft (`Contract::forceAircraft = 0`) |
+| 1 | `wren` | Wren 180 | |
+| 2 | `bush` | Bushmaster STOL | taildragger |
+| 3 | `islander` | Islander Twin | |
+| 4 | `pelican` | Pelican Caravan | |
+| 5 | `meridian` | Meridian Q400 | |
+| 6 | `starling` | Starling 500 Jet | |
+| 7 | `swift_s6` | Swift S6 | |
+| 8 | `osprey_c6` | Osprey C6 | `kOsprey`; its own cabin trim, keyed by index in GLSL (`kOspreyModel = 8`) |
+| 9 | `xr10_nightjar` | XR-10 Nightjar | `kNightjar`; research, Tier A |
+| 10 | `xr30_specter` | XR-30 Specter | `kResearchJet`; research, Tier B (`special = 1`, engine code 5) |
+| 11 | `xr20_mantis` | XR-20 Mantis | `kMantis`; research, Tier A |
+| 12 | `xr40_wraith` | XR-40 Wraith | `kWraith`; research, Tier B (`special = 2`, engine code 6), the only armed type |
+
+Rules and limits:
+
+1. **Career types come first, the research craft last.** `kNumAircraft = rows - 4`: the last four rows are the
+   research craft, hidden from the career. A new **career** type goes **before** `xr10_nightjar`, at the same index in
+   both tables. Then every research constant shifts up by one: `kNightjar`, `kResearchJet`, `kMantis`, `kWraith` in
+   `aircraft.h`. `flight_test` checks those constants against the ids and fails if one is wrong. A new **research**
+   type goes at the end, and `kNumAircraft`'s `- 4` becomes `- 5`.
+2. **Sixteen types at most.** The learned-performance tables are fixed arrays of 16, indexed by row
+   (`aircraft_perf.cpp: s_perf[16]`; the `perf.bin` cache also rejects more). A type past 16 gets an empty
+   performance model and its autopilot fails silently. There are 13 today. Grow the arrays before adding a 17th.
+3. **Saves are keyed by `id`, not index.** The fleet, a loan and open jobs are written as `id` strings
+   (`career.cpp`), so inserting rows doesn't break players' saves. An `id` is permanent: lowercase ASCII, unique, never
+   renamed. It also seeds the registration ("SX-" plus three letters, `registrationOf`), which is painted on the
+   fuselage and used as the call sign.
+4. **Things keyed by index**, to check whenever the roster changes:
+   - `kOspreyModel = 8` in `plane_sdf.glsl` and `gModelId == 8` in `plane_material.glsl` (the Osprey's cabin trim);
+   - AI traffic picks types by hard-coded index (`traffic.cpp`: 0–4 at small fields, 5–6 at big ones, 0–6 for
+     cruisers). **New types don't appear as traffic until you add them there**;
+   - the main menu's tour (`kMenuShots`, `game.cpp`) names craft by index;
+   - the loading pictures are named by index (`assets/loading/air_<index>.jpg`), and `loadshot_air_<n>` picks the
+     scenery spot from `kSpot[kWraith + 1]` (`game.cpp`). Inserting a career type renames every later picture:
+     re-render them (§16);
+   - loops that run "to the last type" use `kWraith`: the launch prewarm (`game.cpp`, every type's meshes),
+     `--loadshots` (`platform_win32.cpp`), `aircraft_visual_test` and `autoland_sweep`. A new last row needs those
+     moved to it. A `kNumTypes` constant would be cleaner; add one if you touch them all.
+
+---
+
+## 3. `AircraftSpec`: physics, career and livery
 
 ```cpp
 struct AircraftSpec {
   const char* id; const char* name; const char* role;
-  int engineType, engines, cylinders, blades;   // ENG_PISTON / ENG_TURBOPROP / ENG_JET; engines 1..4; cylinders (piston only, else 0); prop blades (0 for jets)
+  int engineType, engines, cylinders, blades;  // ENG_PISTON / ENG_TURBOPROP / ENG_JET; 1..4; cylinders (piston, else 0); prop blades (0 for jets)
   float idleRpm, maxRpm;       // piston: prop rpm; turboprop: N1 % scale (e.g. 1100, 1900); jet: 0, 0
-  float emptyMass, maxFuel, cargoKg; int pax;   // kg, kg, kg, seats (excluding the pilot)
-  float wingArea, span, chord; // m^2, m, m (mean chord)
-  float CL0, CLa, CLmax, flapCL, CD0, gearCD, flapCD, oswald;   // CLa, CD0, gearCD and oswald are REFERENCE values only: aero.cpp derives its own from the geometry. CL0, CLmax, flapCL, flapCD are used.
-  float power;                 // W per engine (prop) or N thrust per engine (jet)
-  float v0;                    // static-thrust knee speed for props (m/s); 0 for jets
-  float vr, vref, cruise;      // rotate, approach reference, cruise speeds (m/s)
-  float rangeKm, runwayM;      // game-scale design range; runway needed at sea level (m) — used until the type's learned take-off/landing distances replace it
+  float emptyMass, maxFuel, cargoKg; int pax;   // kg, kg, kg, seats besides the pilot
+  float wingArea, span, chord; // m^2, m, mean chord m
+  float CL0, CLa, CLmax, flapCL, CD0, gearCD, flapCD, oswald;   // CLa, CD0, gearCD, oswald: reference only (aero.cpp derives its own from the shape)
+  float power;                 // W per engine (prop) or N per engine (jet)
+  float v0;                    // props: static-thrust knee speed (m/s); jets 0
+  float vr, vref, cruise;      // rotate, approach reference, cruise (m/s)
+  float rangeKm, runwayM;      // game-scale range (sets the fuel flow); runway at sea level until the learned distances replace it
   bool roughOK, taildragger, retract;
   float Ixx, Iyy, Izz;         // roll, pitch, yaw inertia (kg m^2)
-  float elevPow, ailPow, rudPow;   // control power scalars; stay within 0.38–0.45 / 0.045–0.07 / 0.05–0.07 for conventional aircraft
-  int license; int price; int rentFee;   // LIC_STUDENT / LIC_PPL / LIC_CPL / LIC_ATP; rentFee 0 = not rentable
-  // visual / aero geometry
-  float fusLen, fusRad, wingY, wingZ; int engLayout, tail;   // fuselage length and max half-height (m); wing root height above CG and root LE z (m); engLayout 0 nose, 1 wing nacelles, 2 aft fuselage; tail 0 conventional, 1 T-tail
-  vec3 colBase, colStripe;     // livery: base paint and accent (cheat line, wingtips, fin flash)
-  int special = 0;             // 0 for every career aircraft (and the XR-10). 1 and 2 are the research jets. Never use.
+  float elevPow, ailPow, rudPow;   // control power: ~0.38–0.45 / 0.045–0.07 / 0.05–0.07 for conventional types
+  int license; int price; int rentFee;   // LIC_STUDENT..LIC_ATP; rentFee 0 = not rentable
+  float fusLen, fusRad, wingY, wingZ; int engLayout, tail;   // fuselage length, max half height; wing root height and LE z; 0 nose / 1 wing nacelles / 2 aft; 0 conventional / 1 T-tail
+  vec3 colBase, colStripe;     // livery: base paint; cheat line, wingtips, fin flash
+  int special = 0;             // 0 for every type but the XR-30 (1) and XR-40 (2): they switch on whole code paths (§5)
+  float designMach = 0, gPos = 0, gNeg = 0;   // research tiers: < 1 held under the barrier by its drag rise, > 1 reheat
+                                              // and the research drag rise; structural limits (0: 5.8 / -3 g)
 };
 ```
 
-Column header used in the table (keep it as a comment above your row):
+What the game derives from these by itself: the drag build-up, lift slope and span efficiency (`aero.cpp`, from the
+geometry), the fuel flow (from `rangeKm` and `cruise`), the maximum take-off mass (`maxMass()`), the runway it needs
+(`runwayNeeded`, from the learned take-off and landing at full weight, +15%, longer at altitude), the engine sound, the
+registration and call sign, the hangar and market cards, and the README's performance table (`flight_test --table`).
+
+The column header to keep above a row:
 
 ```
 // id, name, role, eng, n, cyl, blades, idle, max, empty, fuel, cargo, pax, S, b, c, CL0, CLa, CLmax, flapCL, CD0, gearCD, flapCD, e,
 // power, v0, vr, vref, cruise, range, runway, rough, tail, retract, Ixx, Iyy, Izz, elev, ail, rud, lic, price, rent,
-// fusLen, fusRad, wingY, wingZ, engLayout, tail, colBase, colStripe
-// (optional trailing fields after `special`: designMach - 0 conventional, below 1 held just under the barrier, above 1 reheat
-//  and the research drag rise; gPos / gNeg - structural limits, 0 for the type's defaults)
+// fusLen, fusRad, wingY, wingZ, engLayout, tail, colBase, colStripe[, special, designMach, gPos, gNeg]
 ```
 
-Reference rows (exact, from the game):
-
-```cpp
-{"kestrel", "Kestrel T2", "Two-seat trainer", ENG_PISTON, 1, 4, 2, 750, 2600, 530, 70, 120, 1, 14.9f, 10.1f, 1.5f,
- 0.30f, 4.8f, 1.45f, 0.55f, 0.030f, 0.004f, 0.045f, 0.75f, 110000, 22, 25, 30, 50, 45, 400, false, false, false,
- 900, 1300, 1900, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 18000, 120,
- 7.3f, 0.62f, 1.19f, -0.92f, 0, 0, vec3(0.92f, 0.92f, 0.95f), vec3(0.85f, 0.12f, 0.10f)},
-{"pelican", "Pelican Caravan", "Single turboprop hauler", ENG_TURBOPROP, 1, 0, 3, 1100, 1900, 2150, 420, 1400, 12, 25.9f, 15.9f, 1.95f,
- 0.32f, 5.0f, 1.60f, 0.90f, 0.030f, 0.005f, 0.060f, 0.78f, 540000, 30, 31, 38, 85, 130, 550, true, false, false,
- 12000, 14000, 24000, 0.40f, 0.052f, 0.060f, LIC_CPL, 120000, 1600,
- 11.5f, 0.92f, 1.09f, -1.83f, 0, 0, vec3(0.95f, 0.95f, 0.95f), vec3(0.85f, 0.45f, 0.05f)},
-{"starling", "Starling 500 Jet", "Light business jet", ENG_JET, 2, 0, 0, 0, 0, 4600, 1100, 700, 7, 30.0f, 15.9f, 2.0f,
- 0.25f, 5.0f, 1.40f, 0.75f, 0.022f, 0.012f, 0.070f, 0.80f, 15000, 0, 55, 62, 200, 260, 1250, false, false, true,
- 30000, 60000, 85000, 0.42f, 0.050f, 0.055f, LIC_ATP, 260000, 0,
- 14.0f, 0.95f, -0.58f, 1.0f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f)},
-```
-
-Physical consistency the tests enforce (see §5): the aircraft must take off within `0.9 × runwayM`, climb, hold altitude and heading on autopilot within its g limits, respond in the correct sense to each control, and complete a comfortable autopilot route to a landing. Unflyable numbers fail CI.
+The physics must close: `flight_test` flies every career type off the Capital's runway and fails it if it doesn't lift
+off within **0.9 × `runwayM`**, climb, hold altitude on the autopilot, and respond the right way to each control. Use
+the self-check table (§19) before building.
 
 ---
 
-## 4. `ModelDef` — the 3D shape
-
-Struct (from `src/models.h`), in order:
+## 4. `ModelDef`: the shape (Tier A)
 
 ```cpp
 struct ModelDef {
-  float st[8][4];        // fuselage stations nose -> tail: {z, half width, half height, centre y}; z strictly increasing; st[0] is the nose tip, st[7] the tail tip (both small radii)
-  float roundness;       // cross-section: 1 = ellipse, 0 = rounded box (0.3–0.65 reads as a cabin with flat sides)
+  float st[8][4];        // fuselage stations nose -> tail: {z, half width, half height, centre y}; z strictly increasing; tiny at both ends
+  float roundness;       // section: 1 ellipse, 0 rounded box (0.3–0.65 reads as a cabin with flat sides)
   float wing[8];         // half span, root chord, tip chord, LE sweep at the tip (m aft), root y, root LE z, dihedral (deg), thickness ratio
-  int strut; float strutX, winglet, flapFrac; int slats, deice;   // lift struts (0/1) and their spanwise attach x; winglet height (0 none); flaps end at this fraction of the half span (ailerons run from there to 0.94); leading-edge slats (0/1); dark de-ice boots on the leading edges (0/1)
-  float ht[7]; int ttail; // horizontal tail: half span, root chord, tip chord, LE sweep, y, LE z, dihedral (deg); ttail 1 mounts it on the fin top (y/z then ignored)
+  int strut; float strutX, winglet, flapFrac; int slats, deice;   // lift struts and their x; winglet height; flaps end at this fraction of the half span (ailerons from there to 0.94); slats; de-ice boots
+  float ht[7]; int ttail; // tailplane: half span, root chord, tip chord, LE sweep, y, LE z, dihedral (deg); T-tail flag (y and z then come from the fin)
   float vt[6];           // fin: height, root chord, tip chord, LE sweep, base y, root LE z
-  int engine; float nacX, nacY, nacR, nacZ0, nacLen, spinnerR, propR;   // engine 0 nose piston, 1 nose turboprop, 2 wing piston nacelles, 3 wing turboprop nacelles, 4 aft fuselage jets (5 and 6 are reserved for the research craft). nacX/nacY: nacelle axis (mirrored), nacR radius, nacZ0 front z, nacLen length; spinnerR, propR for props (0 for jets)
-  int gear; float wheelR; // gear 0 fixed tricycle with spats, 1 fixed tricycle, 2 taildragger with tundra tyres, 3 retracts into the nacelles (needs engine 3), 4 retracts into wing/body; main wheel radius (m)
-  int cargoPod;          // belly cargo pod (0/1)
-  int winCount; float winZ0, winZ1, winY, winW, winH;   // passenger windows: count, first/last z, height above the section centre line, half width, half height (all 0 for none)
-  vec3 eye; int cockpit; // pilot eye position (body coords); cockpit 0 analog single cluster, 1 analog twin (pilot + copilot clusters), 2 glass (PFDs, centre display, leather)
-  float wsZ0, wsZ1, wsY, sideZ1;   // windshield from z0 to z1 above height wsY; side windows run from wsZ1 aft to sideZ1
+  int engine; float nacX, nacY, nacR, nacZ0, nacLen, spinnerR, propR;   // 0 nose piston, 1 nose turboprop, 2 wing piston nacelles, 3 wing turboprop nacelles, 4 aft jets; 5, 6 the XR-30 / XR-40 fields (reserved)
+  int gear; float wheelR; // 0 fixed tricycle with spats, 1 fixed tricycle, 2 taildragger tundra, 3 retracts into the nacelles (needs engine 3), 4 retracts into wing/body
+  int cargoPod;
+  int winCount; float winZ0, winZ1, winY, winW, winH;   // passenger windows: count per side, first/last z, height above the section centre, half width, half height
+  vec3 eye; int cockpit; // pilot's eye (left seat); 0 analog single cluster, 1 analog twin, 2 glass (PFDs, centre display, leather)
+  float wsZ0, wsZ1, wsY, sideZ1;   // windscreen from z0 to z1 above height wsY; side windows from wsZ1 aft to sideZ1
 };
 ```
 
-Reference row (the Wren 180, annotated):
+An annotated row (the Wren 180):
 
 ```cpp
-{ // stations: z, halfW, halfH, centreY — a 4-seat tourer, 8.3 m long
-  {{-4.15f,0.100f,0.090f,-0.020f},{-3.92f,0.380f,0.350f,-0.050f},{-2.80f,0.520f,0.445f,-0.035f},{-1.80f,0.600f,0.645f,0.095f},
+{ {{-4.15f,0.100f,0.090f,-0.020f},{-3.92f,0.380f,0.350f,-0.050f},{-2.80f,0.520f,0.445f,-0.035f},{-1.80f,0.600f,0.645f,0.095f},
    {-0.20f,0.620f,0.645f,0.115f},{1.60f,0.450f,0.420f,0.160f},{3.40f,0.150f,0.190f,0.290f},{4.15f,0.060f,0.090f,0.350f}}, 0.86f,
-  {5.50f,1.62f,1.00f,.55f,.80f,-1.85f,1.7f,.13f},   // wing: 11 m span, 1.62/1.00 m chords, 0.55 m tip sweep, root at y .80 z -1.85, 1.7 deg dihedral, 13% thick
-  0,0,0,.55f, 0,0,                                   // no struts, no winglets, flaps to 55% span, no slats, no de-ice
-  {1.75f,1.05f,.72f,.18f,.32f,3.00f,0}, 0,           // horizontal tail; conventional
+  {5.50f,1.62f,1.00f,.55f,.80f,-1.85f,1.7f,.13f},   // wing: 11 m span, chords 1.62 / 1.00, tip sweep 0.55, root y .80 z -1.85, 1.7 deg dihedral, 13% thick
+  0,0,0,.55f, 0,0,                                   // no struts or winglets, flaps to 55% span, no slats or de-ice
+  {1.75f,1.05f,.72f,.18f,.32f,3.00f,0}, 0,           // tailplane; conventional
   {1.62f,1.45f,.50f,1.02f,.27f,2.60f},               // fin
-  0, 0,0,0,0,0, .14f,.95f,                           // nose piston engine, spinner r .14, prop r .95
-  1, .26f, 0,                                        // fixed tricycle gear, wheel r .26, no cargo pod
-  1, .50f,1.72f,.22f,.27f,.20f,                      // one cabin window per side between z .50 and 1.72
-  vec3(-.30f,.54f,-1.30f), 0, -2.60f,-1.75f,.36f,0.45f },   // eye (left seat), analog single cockpit, windshield z -2.60..-1.75 above y .36, side windows to z 0.45
+  0, 0,0,0,0,0, .14f,.95f,                           // nose piston, spinner r .14, prop r .95
+  1, .26f, 0,                                        // fixed tricycle, wheel r .26, no pod
+  1, .50f,1.72f,.22f,.27f,.20f,                      // one cabin window a side
+  vec3(-.30f,.54f,-1.30f), 0, -2.60f,-1.75f,.36f,0.45f },   // eye, analog single cockpit, windscreen, side windows
 ```
 
-### 4.1 Geometry rules the shape generator relies on
+### 4.1 Rules the shape generator relies on
 
-1. **Stations.** Exactly 8. `z` strictly increasing. The spline through them is monotone-cubic, so a bulge between two stations needs a station there. Keep `half height` ≥ `half width × 0.5` in the cabin, and make `st[0]`/`st[7]` tiny (≤ 0.1 m) so the nose and tail close. `fusLen` in the spec ≈ `st[7].z − st[0].z`; `fusRad` in the spec ≈ the largest half height.
-2. **Wing.** Thickness ratio 0.10–0.16. The fuselage/wing fillet is automatic. `wing[4]` (root y) sets high/low wing: above the cabin centre line for a high wing (≈ `centreY + halfH`), below it for a low wing (≈ `centreY − halfH × 0.7`). For a low wing the spar passes under the cabin floor; keep `eye.y − 1.08` (the floor) above the wing's upper surface at the root.
-3. **Tail.** T-tail: set `ttail = 1`, `ht[4..5]` are recomputed. Conventional: place `ht` at `vt` base height or slightly above, LE z near the fin root LE.
-4. **Engines.** Nose engines take the spinner from `st[0]`; set `spinnerR` ≈ `st[1].halfW × 0.35` and `propR` so the disc clears the ground by ≥ 0.25 m at the computed gear height (`gearHeight = fusRad×1.3 + 0.55` for singles, `+0.75` for twins/jets, `fusRad + 0.45` for taildraggers). Wing nacelles: `nacY` slightly below the wing surface at `nacX`, `nacZ0` ahead of the wing LE by ~0.8 × `nacR` so the spinner sits in front. Aft jets (`engine 4`): nacelles alongside the rear fuselage with pylons generated automatically; set `nacX ≈ st[5].halfW + nacR + 0.4`.
-5. **Gear.** You only choose the kind and `wheelR`. Track, wheel stations and the retraction wells are derived (`track = max(1.2, 0.13 × span)`; mains at `0.04 L` behind the CG, nose at `−0.36 L`, or `−0.10 L` for a taildragger's mains). `gear 3` requires `engine 3`; `gear 4` mains fold sideways, inboard about a fore-and-aft hinge, until the leg lies along the wing and the wheel lies flat under the wing root in a streamlined fairing (a wheel raised straight up would come through the top of a thin wing). The hinge is placed so the folded wheel stays 2 cm under the upper skin, so the wing must be there at the track (low wing, or a wing root wide enough).
-6. **Cabin.** The pilot's eye must be inside the fuselage with ≥ 8 cm clearance to the roof (`cabinRoof` at the eye z) and the instrument panel is placed automatically at `eye.z − 0.68` (`− 0.85` for glass cockpits) with half width `0.93 × halfWidth(panelZ)`. The windshield (`wsZ0..wsZ1`, base `wsY`) must sit ahead of the panel and below the roof; side windows `wsZ1..sideZ1`. Seats, yoke, pedals, pedestal, overhead console, visors and trim are generated from these numbers; they are fitted to the section automatically.
-7. **Windows.** `winY` is relative to the section centre line at that z; `winW`/`winH` are half sizes; keep them inside `halfH × 0.8`.
-8. **Livery.** `colBase` paints fuselage, wings, tail; `colStripe` paints the cheat line, wingtips and fin flash. Registration letters, panel seams, rivets, door outlines, fuel caps, antennas, pitot and static wicks are added automatically. Avoid pure white (`vec3(1)`) and pure black; the sun will blow them out.
+1. **Stations.** Exactly 8, z strictly increasing; a monotone cubic runs through them, so a bulge needs a station.
+   Keep the half height at least half the half width in the cabin; make `st[0]` and `st[7]` tiny (≤ 0.1 m).
+   `fusLen ≈ st[7].z − st[0].z`, `fusRad ≈` the largest half height.
+2. **Wing.** Thickness 0.10–0.16. The fillet is automatic. Root height sets high or low wing. For a low wing keep the
+   cabin floor (`eye.y − 1.08`) above the wing's upper surface at the root. A high wing's flaps start over the roof:
+   from the cockpit they are clipped to the outside of the fuselage, as the wing is.
+3. **Tail.** T-tail: `ttail = 1`. Conventional: the tailplane at or a little above the fin base, its LE near the fin's.
+4. **Engines and props.** `spinnerR ≈ st[1] half width × 0.35`; `propR` so the disc clears the ground by 0.25 m at the
+   gear height (`fusRad × 1.3 + 0.55` singles, `+ 0.75` twins and jets, `fusRad + 0.45` taildraggers). Wing nacelles
+   slightly below the wing at `nacX`, starting about `0.8 × nacR` ahead of the LE. Aft jets: `nacX ≈ st[5] half width +
+   nacR + 0.4`; the pylons are generated.
+5. **Gear.** You choose the kind and the wheel radius; the track (`max(1.2, 0.13 × span)`), the wheel stations and the
+   wells are derived. `gear 3` needs `engine 3`. `gear 4` mains fold sideways into a fairing under the wing root, so the
+   wing must be there at the track.
+6. **Cabin.** The eye at least 8 cm under the roof. The panel goes at `eye.z − 0.68` (`− 0.85` glass), its half width
+   `0.93 ×` the section's. The windscreen must sit ahead of the panel and under the roof. Seats, yokes, pedals,
+   pedestal, overhead console, visors, compass, trim and the window openings' rounded lips are all fitted from these.
+7. **Windows.** `winY` is relative to the section's centre line; keep `winW`/`winH` inside `0.8 ×` the half height.
 
-### 4.2 What the new renderer does with this
+### 4.2 The packed model (what the shaders see)
 
-At load the renderer evaluates the parametric distance field of each type and extracts triangle meshes: the static airframe as one mesh, and each rigid moving part as its own (flaps, ailerons, elevators and rudder; the main legs, the nose or tail wheel and the bays' doors; in the cockpit the yokes, pedals, throttle and flap levers), posed every frame from the controls. Normals, material ids and the cabin's ambient occlusion are baked per vertex from the same field, and every mesh is simplified to within 1 mm of the field outside (0.4 mm in the cockpit) without moving a material boundary. Materials stay procedural. The propellers are drawn as blurred discs by the effects pass. The only geometry still marched is what moves without being a part: the XR-30's vectoring nozzles, under a small hull. Nothing in this section asks you for mesh data and nothing you write is view-dependent; keep it that way.
+`packModel` (`models.cpp`) packs the two rows into 24 `vec4`, `uM[]` / `gM[]` in GLSL. Shader code reads these slots:
+
+| Slot | x | y | z | w |
+|---|---|---|---|---|
+| 0 | fusLen | gear kind | engine code | fusRad |
+| 1–8 | station z | half width | half height | centre y |
+| 9 | wing half span | root chord | tip chord | tip sweep |
+| 10 | wing root y | root LE z | tan(dihedral) | thickness |
+| 11 | strut | strutX | winglet | flapFrac |
+| 12 | tail half span | root chord | tip chord | sweep |
+| 13 | tail y | tail LE z | tan(dihedral) | T-tail |
+| 14 | fin height | root chord | tip chord | sweep |
+| 15 | fin base y | fin LE z | roundness | slats |
+| 16 | nacX | nacY | nacR | nacZ0 |
+| 17 | nacLen | spinnerR | propR | cargoPod |
+| 18 | gear track | wheel radius | mains z | nose z |
+| 19 | gear height | 0.45 L | taildragger | de-ice |
+| 20 | window count | winZ0 | winZ1 | winY |
+| 21 | winW | winH | cockpit layout | panel z |
+| 22 | eye x | eye y | eye z | panel half width |
+| 23 | wsZ0 | wsZ1 | wsY | sideZ1 |
+
+The cockpit view also derives the cabin fit from these (`loadCabinFit`, `plane_common.glsl`: `gCab0`, `gCab1` for seat
+width, headrest, dome light, armrests, visor height and slope, overhead, vents).
 
 ---
 
-## 5. Self-check table (mandatory in every output)
+## 5. Flight model and autopilot
 
-Compute and print these before the rows. Use `g = 9.81`, `ρ = 1.225`, mass at **max weight** `m = emptyMass + maxFuel + cargoKg + 90·pax + 90`.
+- **Aerodynamics** come from the shape (`aero.cpp`): part-by-part drag from wetted areas and form factors, Reynolds-
+  dependent skin friction, the lift slope and span efficiency from the aspect ratio, the wave drag from the section's
+  critical Mach. Cruise speed and climb come out of it; nothing is tuned. A wrong number shows up as a wrong cruise in
+  `flight_test`, so fix the shape or the power, not the drag.
+- **`special`** switches whole paths in `Plane::substep` (`aircraft.cpp`): 1, the XR-30 (fly-by-wire, pitch thrust
+  vectoring, no fuel burn, the research drag rise, a 50 g structure); 2, the XR-40 (four tilting thruster pods,
+  vertical flight, a 90 g structure). A new Tier B type with new physics needs a new value and a new path. A
+  conventional research type uses `special = 0` with `designMach`, `gPos`, `gNeg` (the XR-10 and XR-20).
+- **Learned performance.** At launch, `Plane::perf` flies short test sorties per type (stall speeds, best climb, roll
+  rate, pitch response, g per stick, take-off and landing distances) and caches them in `shadercache/perf.bin`, stamped
+  with the build. The autopilot flies to these numbers, so a new type needs no autopilot tuning.
+- **The autopilot's two laws.** It flies to the airframe's limits (hard turns, high g) unless the job carries
+  passengers or a fragile load (`Contract::gentle()` sets `Plane::apComfort`: 25° of bank, 1.25 g, soft climbs and
+  descents).
+- **Autoland** plans each runway end (`apPlan`). It refuses a runway shorter than `runwayNeeded`, a tailwind landing it
+  can't stop from, terrain that keeps it too high, or high ground where it would turn in. The research craft (index
+  `≥ kNumAircraft`) fly the final fast and do the belly-up (`APS_BLEED`, `apBellyUp`) before landing; `special == 2`
+  then hovers.
+- **The test:** `autoland_sweep --craft <i>` (every airport, three winds, two starts), then `--comfort` for a career
+  type, and `--all` to check it refuses fields it can't use. Every case must land or be refused with a reason.
+
+---
+
+## 6. Hand-built shapes (Tier B)
+
+Read §7–§10 first: a Tier B shape must obey the material, part and bake rules as well.
+
+**Dispatch.** `mapPlaneBody` (`plane_sdf.glsl`) routes on the engine code in `gM[0].z`: 5 → `mapJet`, 6 →
+`mapWraith`, everything else → the packed model. A new Tier B type takes the next code (7) and a new branch. Research
+code sits behind `RESEARCH_ON`, which the `AF_LIGHT` builds compile out, so the light aircraft don't pay for it (§8).
+
+**Field rules.** These are what the mesh bake needs; break them and it makes holes, slivers or ragged edges:
+
+1. **A lower bound of the true distance everywhere** (Lipschitz ≤ 1). Compose with `min`, `max`, negation, `opU`,
+   `smin` (blend ≤ 0.35 m) and the primitives in `plane_common.glsl` (`sdBox`, `sdRoundBox`, `sdCapsule`,
+   `sdEllipsoid`, `sdTorus`, `sdRoundCone`, `sdCylX`, `sdRoundCylX`, `sdPanel`, `sdSurface`). Never scale a distance up;
+   never return something that isn't a distance.
+2. **`sdRoundBox(p, b, r)`'s half sizes `b` include the rounding.** Its flat face is at `b`, not `b + r`. (A compass
+   card tested at `b + r` never matched in v3.32.0.)
+3. **No knife edges and no plates thinner than ~2.5 lattice cells.** The cockpit lattice is 1.56 cm (§10). Where a
+   flat cut meets a curved surface at a shallow angle it leaves a wedge thinner than that, and the bake serrates it.
+   Round every cut with a smooth boolean (`-smin(-a, b, k)`): v3.32.0's window openings got a 3 cm lip
+   (`shell = -smin(-shell, winHole, 0.03)`) and their jagged frames were gone. Minimum feature thickness is 8 mm
+   (4 mm radius for antennas and wicks).
+4. **A part that should hug a curved surface must follow it.** Don't rotate a flat plate to the average slope. Build it
+   as an even layer of the surface's own field, bounded in the other two axes. The v3.32.0 sun visors are
+   `abs(f + 0.075) - 0.012` under the headliner: the old tilted plates came apart where the cabin trimmed them, and one
+   hung a loose black plate at the windscreen.
+5. **Everything inside the bounding radius** `max(fusLen, span) × 0.55 + 1.5` m, in every state.
+6. **Geometry depends on state, never on time.** State is `gPS` (gear, flaps, steer, inside the cockpit), `gCtl`
+   (pitch, roll, yaw, throttle), `gFlame` (spool, reheat, nozzle, Mach), the prop angle and the type's own channels
+   (`gWr[7]` for the XR-40). `uTime` is for shading only.
+7. **Everything that moves is a rigid part** (§9). Wells and cavities that open are cut in the static body; their doors
+   are parts that close flush.
+8. **Bound expensive sub-fields** by box: `if (sdBox(q, halfSize) < res.x) { ... }`. Every pixel of the objects pass
+   and every bake sample evaluates the whole field.
+9. **Cockpit-only shapes** check `gPS.w > 0.5` (the cockpit view). `mapPlaneBody` keeps the window openings' distance
+   in `winHole` for cabin fittings to stay clear of the glass.
+10. **A sealed cockpit** (no canopy) shows the outside on display panes fed by cameras on the airframe
+    (`feed_cameras.h`: up to 13 feeds; the pane geometry must match the shader's `feedScreen`). A cockpit with glass
+    uses real window openings cut in the shell.
+
+---
+
+## 7. Materials and textures
+
+There are **no image textures for aircraft.** At launch `renderer.cpp` generates a 512² array of procedural PBR texture
+sets. Each set has albedo, roughness and a normal; the aircraft use `M_PAINT`, `M_METAL`, `M_RUBBER`, `M_PLASTIC`,
+`M_FABRIC`, `M_CARPET` and `M_LEATHER`; the rest are terrain and buildings. A material is GLSL that fills a `Mat`
+(`alb`, `rough`, `metal`, `nrm`, `emit`) for a material id, usually from a triplanar sample:
+
+```glsl
+tx = triSample(lp, ln, M_METAL, 0.25, nT);   // body-space position and normal, set, scale (m), out: tangent-space normal
+m.alb = tx.rgb*vec3(0.62, 0.63, 0.65); m.metal = 0.9; m.rough = clamp(tx.a*0.6, 0.15, 0.5); m.nrm = nT;
+```
+
+**Material ids** (`plane_material.glsl`, `planeMaterialN`), as the field returns them in `.y`:
+
+| Ids | What | Handled where |
+|---|---|---|
+| 1, 2, 3 | fuselage, wing, tail paint: livery, cheat line, registration, seams, rivets, de-ice | the first chain |
+| 5, 6, 8 | nacelle, rubber, bare metal | the first chain |
+| 10–14 | cockpit: panel (instruments drawn on it), shell and floor, seats, controls, glareshield | the first chain (10–14 are lit as interior) |
+| 16, 17, 18, 19, 21 | spinner, exhaust, nav lights, beacon, fan face | the first chain |
+| 30–59 | the XR-30's airframe and the research cockpits | `RESEARCH_ON && mid >= 30 && mid < 60` |
+| 60–69, 78 | light-aircraft cockpit: brushed metal, rubber, trim, lenses, radio stack, satin black, centre display, red knobs, harness; the compass card | `mid >= 60` |
+| 61–79 on the XR-40 | its cockpit | `shadeWraithCockpit`, when engine code is 6 |
+| 80–93 | the XR-40's airframe | `shadeWraith` |
+| 94, 95–100, 101–104 | light fixture housings, own lenses, traffic lenses | the second chain |
+| 120–124 | the Osprey's cabin trim (`gModelId == 8`) | its own block |
+
+Rules learned the hard way:
+
+- **An id lands in exactly one branch.** If you add id 59 under `mid >= 60`, it never runs (v3.32.0's compass card did
+  exactly this). Check the ranges above before choosing.
+- **Interior or exterior is decided by id:** `interior = (10..14) || (40..93)`. Interior pixels get the cabin's own
+  lighting (sun through the windows, its bounce, the fixtures); exterior pixels get the sky and the airframe's sun
+  shadow. A cockpit material outside those ranges is lit as if it were outside.
+- **Free ids today:** for a light-aircraft cockpit, 70–77 and 79 (those are the XR-40's only when the engine code is 6);
+  for the exterior, 4, 7, 9, 15, 20 and 22–29, each needing a new branch in the first chain. For a new Tier B type,
+  claim a range and gate it with `RESEARCH_ON` if it is research-only.
+- **Livery:** `gColBase` and `gColStripe` come from `colBase`/`colStripe`. Paint, the cheat line, wingtips and fin
+  flash, panel seams, rivets, door outlines, fuel caps, antennas, the pitot, static wicks and the registration are
+  automatic for Tier A.
+- **Night:** scale lamp emission by `uNight`. Keep cockpit glows dim: a lit compass at full strength was the brightest
+  thing in the cabin.
+- **A new texture set** is a new `case` in the generator (`renderer.cpp`, the procedural PBR block), a new `M_*`
+  constant in `scene_uniforms.glsl`, and one more layer of memory for every GPU. Prefer reusing a set with a new
+  tint, scale or pattern.
+
+---
+
+## 8. Shaders: how they're built and what they cost
+
+- **Embedding.** Every `src/shaders/*.glsl` starts with `//! kName` and a description. `tools/embed_shaders.cmake` turns
+  each into a C++ string constant in `build/gen/shaders_gen.h`, and `shaders.h` assembles programs from them
+  (`objectsFSAssembly`, `planeMeshFSAssembly`, `effectsFSAssembly`, …). A new file is picked up by the glob; add it
+  to the assemblies that need it.
+- **Program families.** The big airframe programs are built twice: every aircraft, and `AF_LIGHT` (no research code:
+  `RESEARCH_ON` is false and the compiler drops it). `OBJ_NO_AF` is the objects pass with no airframe at all (UFO and
+  debris), and `PROXY_MAPS_ONLY` is the shadow proxy that only reads shadow maps. The mesh bake's program adds
+  `PART_BAKE`. Put research-only code behind `RESEARCH_ON` so the light aircraft don't pay for it.
+- **Caches.** Compiled programs are cached by source in `shadercache/`; the first launch of a new build compiles them.
+  Meshes are cached by a stamp of the **geometry** sources only (`meshCacheStamp`: common, view and scene uniforms,
+  plane common, parts, SDF, the research fields and the bake program, plus the GPU driver). So material and lighting
+  edits rebake nothing, while a shape edit rebakes every aircraft once. Bump `kMeshMagic` (`aircraft_mesh.cpp`) when you
+  change what the bake makes of the field, not just the field.
+- **Portability.** OpenGL 3.3 core, and it must compile on NVIDIA, AMD, Intel and Mesa:
+  - no GLSL keywords as identifiers (`flat`, `sample`, `patch`, `input`, `output`, …; `shader_keyword_test` checks);
+  - nothing that inlines a huge loop body many times (some NVIDIA drivers refuse oversized shaders: the display atlas
+    evaluates each page once for that reason);
+  - `shader_check` validates every assembled program.
+- **Cost.** The owner plays at 60 fps on a mid-range GPU and prefers performance to fancy graphics. Baseline from the
+  owner's v3.29.2 diagnostic: cockpit 7.4 ms, Mantis cockpit 10.1 ms, night 7.7 ms. Every line in the field or the
+  material code runs for every aircraft pixel of several passes, so bound sub-fields, keep loops short, and never trace
+  the field per pixel in the mesh pass (v3.30.0 did, and the cockpit went from 7.4 to 98.9 ms). The gate
+  (`docs/WORK_PLAN.md`): the owner's `diagnostics.bat` before and after; the targeted pass improves and nothing else
+  regresses by more than 0.2 ms.
+
+---
+
+## 9. Moving parts
+
+Everything that moves is a **rigid part** (`plane_parts.glsl`): a solid with its own shape in its own frame
+(`partField(k, l)`) and a pose from the state (`partPose`: `body = R·local + T`, where `R` is a rotation, a mirror for
+the other side, a hinged surface's deflection about its swept and tapered hinge, or a stretch along an axis).
+
+- **Ids 0–45 are taken**: the cockpit controls 0–10, the light aircraft's surfaces 11–14, the XR-40's 15–29 and 45,
+  the XR-30's 30–32 and 38–44, the packed model's gear 33–37. A new part takes 46 or above.
+- **`partList`** (`aircraft_mesh.cpp`) lists each type's instances (type, side, which one) for the outside and the
+  cockpit. Tier A types get the flaps, ailerons, elevators, rudder, gear and doors outside, and the yokes, pedals and
+  throttle (knob or levers) and flap lever inside, automatically. A new engine code needs its own branch. Limits: 128
+  part instances per mesh (`kMaxPartInst`), 512 posed instances per frame (`kMaxPoseInst`).
+- **A bake box per part.** Surfaces use `surfaceBox`, the gear `gearPartBox`, the XR-40 `wraithPartBox` (box plus lattice
+  step, 3–8 mm). Other parts are found by a 1 cm survey of their field.
+- **In the airframe's field**, place each part through its pose (`partAt(res, PT_X, vec2(side, which), p)`) and leave it out when
+  `gPartMode == -2` (the static mesh's bake). The part's own bake calls `partField` directly. Motion written as
+  hand-made math in the airframe field is baked frozen.
+- **Control directions are tested.** Roll +1 raises the right aileron and rolls right; pitch +1 raises the elevator's
+  trailing edge and pitches up; yaw +1 swings the rudder's trailing edge right. Yokes turn the way the stick goes
+  (`flight_test`'s control-direction check, and the owner looks).
+
+---
+
+## 10. Baking
+
+At launch every aircraft's meshes are built or read from the cache, outside and cockpit, research craft included.
+That's the "Building the <name> cockpit's mesh" step, paced by `load_pacer.h`. In `bakePlaneMesh`:
+
+1. **States.** The field is sampled on the GPU in every gear, flap, steering and control state the hull sweep lists
+   (`hullStateList`).
+2. **Moving cells.** A 6.25 cm cell whose distance changes by more than 8 mm between states is "moving"; the rest of
+   the surface band is static.
+3. **Thin cells** (cockpit only). A plate or rod under about 2.5 cells through is re-meshed on a lattice twice as fine
+   (0.78 cm), as a patch over the first mesh; the first mesh sinks its ring 3 mm under it.
+4. **Surface nets** on the 1.56 cm lattice: one vertex per lattice cube the surface crosses. Inside, sharp edges use
+   dual contouring (the vertex where the face planes meet). Each vertex is pulled onto the surface, and normals,
+   material ids and the cabin's ambient occlusion are baked per vertex.
+5. **Simplified** to within 1 mm outside and 0.4 mm in the cockpit, without moving a material boundary.
+6. **Parts** are baked each alone in its own frame (§9). The **moving cells**, grown by one 0.25 m voxel, make a hull
+   that the objects pass marches inside; anything not a part is marched there every frame, so keep it rare.
+7. **Cached** as `shadercache/mesh_<key>_<stamp>.bin`, validated on read (counts must add up to the file).
+
+`HULLDBG=1` prints each bake: states, how far vertices sit off the surface, and every part's lattice, vertex and
+triangle counts. A slow or huge bake usually means a thin feature, a knife edge or a part box far bigger than its part.
+
+---
+
+## 11. Cockpits
+
+- **Three generic layouts** (`ModelDef.cockpit`): 0 analog single cluster, 1 analog twin (pilot and copilot clusters),
+  2 glass (PFDs, a centre engine display, leather, an overhead plate). The instruments are drawn once a frame into a
+  display atlas (`disp_main.glsl`, `drawInstruments(q, layout)`) and sampled by the panel material (id 10). A new
+  layout is a new case there and in the panel's material.
+- **Generated fittings:** seats with headrests (dropped where the roof is too low), the yokes and pedals (parts), the
+  pedestal with its throttle, fuel selector and trim wheel, the switch row, the radio stack, side trim with armrests,
+  the overhead console with dome and map lights, the visors, the compass and the glareshield light strip.
+- **One type's own fittings** go in the field gated by `gModelId` (the Osprey's `mapOspreyCabinTrim`) with their own
+  material ids. Remember to move the index constant if rows shift (§2).
+- **Lighting** inside: the sun through the windows with the cabin's own sun map (`texShCab`, 2048², hardware-filtered),
+  the sun's bounce off the cabin, the sky through the windows, the fixtures at night, and baked ambient occlusion.
+- **Check views** with the harness (§16): `ckv<i>_<yaw>_<pitch>_<hour>[_<roll>[_<flaps>]]`, at 9:00 for long shadows,
+  15:00, 19:30 and 22:00, looking forward, left and right, and up at the roof and visors.
+
+---
+
+## 12. Effects and lights
+
+- **Propellers** are not geometry: the effects pass draws each prop as a motion-blurred disc (`effects_fs.glsl`) at
+  the hubs `modelProps` derives from the model row, with the spec's blade count. The blades show solid below 250 rpm (an engine stopped or
+  starting) and blur fully by 700 rpm.
+- **Jet plumes** exist for the research codes 5 and 6 (`jetPlumes`, `wraithPlumes`). The transonic vapour cone shows
+  on any type between Mach 0.9 and 1.07 in humid low air, sized by its span. A new plume shape is effects-pass code behind `RESEARCH_ON`.
+- **Lights:** the nav lights, strobes and beacon are placed from the model (`modelWingTip`, `modelFinTop`,
+  `modelTailTip`) for Tier A. The player's own lamps are up to six lenses (`uLensP/D`). Their light on the ground and
+  airframe comes from the light list in `FrameParams`.
+
+---
+
+## 13. Weapons
+
+Only the XR-40 is armed, and its systems are written for it (`game_wraith.cpp`, gated by `special == 2`). The XR-15's
+belly Gatling was tried and reverted. To arm another type, generalise rather than copy: a per-type weapon table, with
+`WraithState`'s parts split into a weapons state. Every piece a weapon touches:
+
+| Piece | Where | Notes |
+|---|---|---|
+| Controls | `ACT_WEAPONS`, `ACT_FIRE`, `ACT_BOMB`, `ACT_CLOAK` (`game.h`); `wraithControls` | rebindable; voices never name a rebound control |
+| State | `WraithState` (`game.h`): armed, turrets and bay travel, bolts, bombs, blasts, craters, scorch marks, counters | |
+| Firing | `fireLaser`: muzzle points in body space (`kLaserLens`), convergence 650 m ahead, 2000 m/s plus the craft's own velocity, a 0.12 s cooldown | the bolt leaves after the physics step, from where the turret is now |
+| Hits | `updateBolts`: each segment swept against the ground and sea (`groundHit`), traffic (`traffic.rayHit`), scenery (`g_scenery.raycast`) and the UFO | `laserImpact` downs aircraft, damages or destroys scenery (`g_scenery.damage`) and scorches the ground |
+| Bombs | `updateWraith`: the bay opens, the bomb drops from the cradle (`kBayBomb`), falls with gravity and a little drag, and goes off on contact or near an aircraft | `detonate`: a blast, a crater, everything within 230 m, a shock on the player |
+| Visuals | `wraithVisual` fills `FrameParams::fx`: up to 16 beams, 8 bombs, 6 blasts, the impact pip; `effects_fs.glsl` `weaponsFx` draws them | the craters and scorch marks join the wreck's crater list (24 at most) |
+| Moving hardware | the turrets, hatches, arms and bay doors are rigid parts posed from `pv.wr[]` | their travel is state, never time |
+| Cockpit | the bomb-impact pip on the floor displays; the bomb camera on feed slot 12 | |
+| Sound | `SFX_LASER`, `SFX_PLASMA`, `SFX_BOOM`, `SFX_CLOAK`, `SFX_GEAR_CLUNK` | |
+| Rules | weapons are research-only, never in the career | `traffic.destroyNear` and `traffic.rayHit` serve any weapon |
+
+---
+
+## 14. Sound
+
+Engine sound is synthesized per engine (`audio.cpp`): a piston's firing pulses from its cylinder count and rpm, the
+prop's blade-pass tone from its blades, a turboprop's or jet's N1 whine and roar, a sick engine skipping firings, and
+cockpit muffling inside. A new type gets its sound from `engineType`, `engines`, `cylinders`, `blades`, `idleRpm` and
+`maxRpm`. A special engine (the XR-40's pods) is its own code path.
+
+---
+
+## 15. Career and world
+
+- **Market and hangar:** every type below `kNumAircraft` appears, by `license`, `price` and `rentFee` (0: buy only).
+  `canFly`/`runwayOK` keep the career from sending it where `runwayNeeded` is longer than the runway, or to a rough
+  field without `roughOK`.
+- **Contracts** offer cargo up to `cargoKg` and seats up to `pax`; passengers or a fragile load make the autopilot
+  fly gently. Lessons force type 0.
+- **Traffic, menu tour, loading pictures:** by index, by hand (§2).
+- **README:** the aircraft table comes from `flight_test --table` (the learned performance); paste it in.
+- **A research type** also needs its terminal entry (`kResCraft[]`, `game_research_ui.cpp`: designation, accent colour,
+  velocity / agility / signature bars, the spec rows, the envelope chart, handling notes), its preview call-outs, its
+  test cards (`kResCards`), and a scenery spot in `kSpot` for its loading picture.
+
+---
+
+## 16. Testing and looking at it
+
+1. **Build and test:** `cmake --build build && ctest --test-dir build`. For any C++ change, also check it compiles on
+   MSVC: `x86_64-w64-mingw32-g++ -std=c++17 -fsyntax-only -Ibuild/gen -Isrc <file>` (no variable-length arrays, no GCC
+   builtins).
+2. **`flight_test`:** every career type takes off within 0.9 × `runwayM`, climbs, holds altitude, flies its controls
+   the right way; the index constants match the ids. `flight_test --table` prints the README's table.
+3. **`aircraft_visual_test OUT [W H] [first last]`** (Linux, Mesa/EGL): the production field from fixed views, plus
+   numeric probes for headrest clearance, seam jumps and the XR-40's touchpads. Use `AVT_VIEWS=cockpit,front` to pick
+   views, `AVT_DIR=x,y,z` to aim the cockpit camera, and `AVT_IDS=1` to write material ids instead of colours (find what a
+   stray shape is).
+4. **`autoland_sweep`**, both laws (§5).
+5. **The render server** (`tests/render_harness.cpp serve W H`, client `tools/render_client.sh`) keeps everything
+   loaded between shots. Start it without `PREWARM` so it bakes only the aircraft a shot needs. Useful scenes:
+   - `gav_<i>_<yaw>_<pitch>_<dist>[_<gear>]`: parked on the runway, orbit view;
+   - `ckv<i>_<yaw>_<pitch>_<hour>[_<roll>[_<flaps>]]`: the cockpit (`settle=30` lets the anti-aliasing settle);
+   - `loadshot_<CODE>`, `loadshot_air_<i>`: the loading pictures (`settle=40`, 1920×1080);
+   - `research` (the XR-30 selected), `research10`, `research20`, `research40`: the research terminal.
+6. **On the owner's GPU:** `SolaceExpress.exe --shots gav_<i>_120_10_0,ckv<i>_0_-8_11 --size 1920x1080`, then
+   `diagnostics.bat` for the frame-time gate (§8). `SolaceExpress.exe --loadshots` re-renders every loading picture.
+
+---
+
+## 17. Checklist: adding a type
+
+**Tier A, career:**
+
+1. Design it against the fleet (§20) and fill in the self-check (§19).
+2. Add the `AircraftSpec` row and the `ModelDef` row at the same index, before `xr10_nightjar`.
+3. Bump `kNightjar`, `kResearchJet`, `kMantis`, `kWraith` in `aircraft.h` (and `kOsprey`/`kOspreyModel`/`gModelId == 8`
+   if inserting before the Osprey).
+4. Check the roster stays at 16 types or fewer (§2).
+5. Build, run `ctest`, `flight_test --table`, `aircraft_visual_test`, `autoland_sweep --craft <i>` and `--comfort`.
+6. Look at it: `gav_` from four sides with the gear down and up, `ckv_` forward, left, right and up, morning and night.
+7. Add it to traffic (`traffic.cpp`) if it should fly about, and to the menu tour if wanted.
+8. Re-render the loading pictures (every `air_<n>` from the new index on has moved) and add its own.
+9. Update the README's aircraft table and features, `RELEASE_NOTES.md`, and this guide's roster (§2, §20).
+
+**Tier A, research:** the same, appended at the end with `kNumAircraft`'s `- 4` made `- 5`. Move the "to the last type"
+loops (§2) to it, and add its terminal entry, test cards and scenery spot (§15).
+
+**Tier B:** all of the above, plus a new engine code and its dispatch (§6), its field behind `RESEARCH_ON`, its parts
+and their `partList` branch and bake boxes (§9), its material range (§7), its cockpit (generic, or sealed with
+camera feeds), its physics path if it needs a new `special` (§5), its effects (§12), and a measured frame time on the
+owner's GPU (§8).
+
+---
+
+## 18. Template
+
+```cpp
+// aircraft.cpp, kAircraft[]: before the xr10_nightjar row
+// id, name, role, eng, n, cyl, blades, idle, max, empty, fuel, cargo, pax, S, b, c, CL0, CLa, CLmax, flapCL, CD0, gearCD, flapCD, e,
+// power, v0, vr, vref, cruise, range, runway, rough, tail, retract, Ixx, Iyy, Izz, elev, ail, rud, lic, price, rent,
+// fusLen, fusRad, wingY, wingZ, engLayout, tail, colBase, colStripe
+{"<id>", "<Name>", "<Role in a few words>", ENG_<PISTON|TURBOPROP|JET>, <engines>, <cyl>, <blades>, <idle>f, <max>f,
+ <empty>f, <fuel>f, <cargo>f, <pax>, <S>f, <b>f, <c>f,
+ <CL0>f, <CLa>f, <CLmax>f, <flapCL>f, <CD0>f, <gearCD>f, <flapCD>f, <e>f,
+ <power>f, <v0>f, <vr>f, <vref>f, <cruise>f, <rangeKm>f, <runwayM>f, <roughOK>, <taildragger>, <retract>,
+ <Ixx>f, <Iyy>f, <Izz>f, <elevPow>f, <ailPow>f, <rudPow>f, LIC_<STUDENT|PPL|CPL|ATP>, <price>, <rentFee>,
+ <fusLen>f, <fusRad>f, <wingY>f, <wingZ>f, <engLayout>, <tail>, vec3(<base r, g, b>), vec3(<stripe r, g, b>)},
+```
+
+```cpp
+// models.cpp, kModels[]: at the same index
+{ // stations: z, half width, half height, centre y (nose to tail; tiny at both ends)
+  {{<z0>f,<w>f,<h>f,<y>f},{...},{...},{...},{...},{...},{...},{<z7>f,<w>f,<h>f,<y>f}}, <roundness>f,
+  {<halfSpan>f,<rootChord>f,<tipChord>f,<tipSweep>f,<rootY>f,<rootLEz>f,<dihedralDeg>f,<thickness>f},   // wing
+  <strut>,<strutX>f,<winglet>f,<flapFrac>f, <slats>,<deice>,
+  {<htHalfSpan>f,<htRoot>f,<htTip>f,<htSweep>f,<htY>f,<htLEz>f,<htDihedralDeg>f}, <ttail>,       // tailplane
+  {<finHeight>f,<finRoot>f,<finTip>f,<finSweep>f,<finBaseY>f,<finLEz>f},                           // fin
+  <engine>, <nacX>f,<nacY>f,<nacR>f,<nacZ0>f,<nacLen>f, <spinnerR>f,<propR>f,                       // engines and props
+  <gear>, <wheelR>f, <cargoPod>,                                                                     // gear
+  <winCount>, <winZ0>f,<winZ1>f,<winY>f,<winW>f,<winH>f,                                             // cabin windows
+  vec3(<eyeX>f,<eyeY>f,<eyeZ>f), <cockpit>, <wsZ0>f,<wsZ1>f,<wsY>f,<sideZ1>f },                     // eye, layout, windscreen, side windows
+```
+
+Start from the nearest existing type (a row of the same size and engine layout) and change it a step at a time,
+rendering as you go: it is much faster than starting from zero.
+
+---
+
+## 19. Self-check (before the first build)
+
+With `g = 9.81`, `ρ = 1.225` and the mass at maximum `m = emptyMass + maxFuel + cargoKg + 85·pax + 85`:
 
 | Check | Formula | Required |
 |---|---|---|
-| Wing loading | `m·g / wingArea` (N/m²) | 400–1200 trainers/tourers, up to 4000 airliners/jets |
-| Stall speed, clean | `vs1 = sqrt(2·m·g / (ρ·S·CLmax))` | report |
-| Stall speed, full flap | `vs0 = sqrt(2·m·g / (ρ·S·(CLmax+flapCL)))` | report |
+| Wing loading | `m·g / S` (N/m²) | 400–1200 trainers and tourers, up to 4000 airliners and jets |
+| Stall, clean | `vs1 = sqrt(2·m·g / (ρ·S·CLmax))` | report |
+| Stall, full flap | `vs0 = sqrt(2·m·g / (ρ·S·(CLmax + flapCL)))` | report |
 | Rotate | `vr ≈ 1.10–1.15 × vs0` | `vr > vs0` |
 | Approach | `vref ≈ 1.3 × vs0` | `vref > vr` |
-| Cruise | realistic for the power; `cruise ≥ 1.6 × vref` | `cruise > vref` |
+| Cruise | consistent with the power; `cruise ≥ 1.6 × vref` | `cruise > vref` |
 | Power loading (props) | `m / (power/1000 · engines)` kg/kW | 5–9 light aircraft, 4–6 turboprops |
 | Thrust/weight (jets) | `power·engines / (m·g)` | 0.25–0.40 civil |
-| Runway | `runwayM` consistent with wing loading and power (trainer ≈ 400, bush ≈ 220, twin ≈ 450, turboprop ≈ 550, regional ≈ 1100, bizjet ≈ 1250) | report |
-| Inertia | `Ixx ≈ 0.12·m·(span/2)²`, `Iyy ≈ 0.18·m·(fusLen/2)²`, `Izz ≈ Ixx + Iyy` (± 40 %) | within range |
-| Geometry | `fusLen ≈ st[7].z − st[0].z`, `fusRad ≈ max halfH`, `span ≈ 2·wing[0]`, `wingArea ≈ 2·wing[0]·(wing[1]+wing[2])/2 + fuselage carry-through` | within 10 % |
-| Prop clearance | nose prop: `gearHeight + st[0].centreY − propR`; nacelle props: `gearHeight + nacY − propR` (the CG sits `gearHeight` above the ground, §4.1 item 4) | ≥ 0.25 m |
-| Career fit | `license`/`price`/`rentFee` between neighbours of similar size; `rangeKm` 40–300 | sensible |
-
-The integrator runs: `cmake --build build && ctest --test-dir build` (flight model, progression, saves, gameplay loop, airport layouts, envelope, hull), then renders the type with the harness scenes `gav_<index>_<yaw>_<pitch>_<dist>` (parked on the runway, orbit view: e.g. `gav_3_120_10_0`, `gav_3_210_5_0`, `gav_3_60_35_0`, with `GAVOUT=1` for the outside model) and `ckv<index>_<yaw>_<pitch>_<hour>` (cockpit view: `ckv3_0_-8_11`, `ckv3_-60_-20_11`, `ckv3_0_-45_11`), and on the owner's GPU `SolaceExpress.exe --shots gav_3_120_10_0,ckv3_0_-8_11 --size 1920x1080`. Design for those views.
+| Runway | `runwayM` consistent with the wing loading and power | trainer ≈ 400, bush ≈ 220, twin ≈ 450, turboprop ≈ 550, regional ≈ 1100, bizjet ≈ 1250 |
+| Inertia | `Ixx ≈ 0.12·m·(b/2)²`, `Iyy ≈ 0.18·m·(L/2)²`, `Izz ≈ Ixx + Iyy` | within ±40 % |
+| Geometry | `fusLen ≈ st[7].z − st[0].z`, `fusRad ≈ max half height`, `b ≈ 2·wing[0]`, `S ≈ 2·wing[0]·(root + tip)/2` plus carry-through | within 10 % |
+| Prop clearance | nose: `gearHeight + st[0].y − propR`; nacelles: `gearHeight + nacY − propR` | ≥ 0.25 m |
+| Career fit | licence, price and rent between neighbours of similar size; `rangeKm` 40–300 | sensible |
 
 ---
 
-## 6. Tier B — hand-built airframes (only when Tier A cannot express the shape)
+## 20. The fleet today
 
-The XR-30 and XR-40 (`mapJet` in `src/shaders/plane_sdf.glsl`, `mapWraith` in `wraith_sdf.glsl`) are hand-written GLSL signed-distance functions (the XR-10 and XR-20 use the generic field: a hand-built one for the XR-20 was tried and cost 4x the frame in the terminal preview, so it went back to Tier A). A Tier B aircraft is a new such function. It costs integration work (dispatch, material ids, part table), so propose it only with a reason. The rules below exist because the rebuilt renderer **bakes meshes from the function at load**; break them and the bake produces holes, slivers or frozen animation.
+Spec values (the learned numbers are in the README's table):
 
-Rule 5's contract is implemented in `src/shaders/plane_parts.glsl`: a part is a `PT_*` id with a rest shape (`partField(k, l)`, in the part's own frame) and a pose (`partPose(k, side)`: `body = R·local + T`, where `R` may be a rotation, a mirror for the other side, a hinged surface's deflection about its swept and tapered hinge, or a scale along an axis). In the airframe function, `partOn(id)` is `gPartMode != -2` (the static mesh's bake leaves the part out) and the part's own bake calls `partField` directly. The XR-30's elevons, canards and rudders, the XR-40's pods, fans, vanes, iris petals, bay doors, bomb, turrets, elevons and ruddervators, and the packed model's landing gear (`gearPartField`, `gearPartPose`: the folding main leg, the steered nose and tail wheels, the doors over always-open wells) are worked examples (`jtPartField`, `wrPartField`, `wrPartPose`). `partField` exists only in the mesh bake's program (`PART_BAKE`): the airframe field places each part inline, so the shaders that march it inline each shape once. Everything else in this section (primitives, globals, material ids) exists today.
-
-1. **Signature.** `vec2 mapCustom_<Name>(vec3 p)` returning `(signed distance, material id)`. Negative inside. The function must be a **lower bound of the true distance** everywhere (Lipschitz constant ≤ 1): compose only with `min`, `smin` (blend radius ≤ 0.35 m), `max` with a negated primitive (subtraction), `opU`, and the primitive library (`sdBox`, `sdRoundBox`, `sdCapsule`, `sdEllipsoid`, `sdTorus`, `sdRoundCone`, `sdCylX`, `sdRoundCylX`, `sdPanel`, `sdSurface`). Never scale a distance by a factor > 1, never return a non-distance (a plane equation, a product, a texture lookup).
-2. **Bounding sphere.** Everything must lie within radius `planeBound() = max(fusLen, span)·0.55 + 1.5` of the origin, in every state.
-3. **Closed solids.** Every part is a watertight solid with a minimum feature thickness of **8 mm** (antennas, wicks, LED strips: radius ≥ 4 mm). No infinitely thin sheets, no zero-thickness `max(abs(d) − 0, …)` shells: use `abs(d + t) − t`.
-4. **State, not time.** Geometry may depend only on the state vector: `gPS = (gear 0..1, flaps 0..1, steer rad, insideCockpit 0/1)`, `gCtl = (pitch, roll, yaw −1..1, throttle 0..1)`, `gFlame = (spool, reheat, nozzle angle, mach)`, prop angle `uPr.x`, and up to 8 type-specific channels you declare (`uCustom[8]`). **`uTime` may be used in shading only, never in geometry.**
-5. **Parts and rigs.** Every piece that moves is one **part**, declared in a table you supply:
-   `PART(id, "name", kind, params)` with `kind` ∈ { `STATIC`, `HINGE(pivot, axis, angle = k·state + c)`, `SLIDE(dir, dist = k·state + c)`, `SURFACE(span, rootChord, tipChord, sweep, hingeFrac, s0, s1, deflection = k·state, slide = k·state)` (exactly the `sdSurface` parameters), `SPIN(pivot, axis, angle = state)`, `STRETCH(origin, axis, length = k·state + c)` }.
-   Inside the function, wrap each part's primitives in `if (partOn(id)) { ... }` and express its motion **only** through the matching helper (`rigHinge(p, id)`, `rigSlide(p, id)`, …) that transforms `p` into the part's rest frame. The bake evaluates each part alone in its rest pose and animates it with the same table; anything moved by hand-written math is baked frozen.
-   Cut-outs that open with a part (gear wells, bay cavities, hatches) belong to the **static body** and are always cut; their doors are parts that close flush at rest. The body must look right with every door closed and every well cut.
-6. **Material ids.** Use the shared table: 1 fuselage paint, 2 wing paint, 3 tail paint, 5 nacelle, 6 rubber/tyre, 8 bare metal (legs, antennas), 16 spinner, 17 exhaust, 18 nav lights (red x<0 / green x>0), 19 beacon, 21 fan face, 94 light-fixture housing, 95–100 lenses. Cockpit: 10 panel (instruments are drawn on it), 11 shell/floor, 12 seats, 13 controls, 14 glareshield, 60 brushed metal, 61 rubber, 63 trim, 64 lenses, 65 radio stack, 66 satin black, 67 centre display, 68 red knobs, 69 harness. New looks need a new id in 110–127 **with a one-line material description** (albedo, roughness, metalness, emission, pattern); the integrator writes the shading.
-7. **Cockpit.** A sealed cockpit (no transparent canopy) shows the outside on display panes fed by cameras you place (`feed_cameras.h` rig: pane centre, normal, half size); an open cockpit uses real window openings cut in the shell. Say which. The eye position comes from `ModelDef.eye`.
-8. **Deliver with it.** The Tier A `AircraftSpec` row (it still drives physics), a `ModelDef` row with `engine` set to the next free code (7+) and stations that approximate the hull (the hull mesh and the camera feeds use them), the part table, the material notes, and a list of harness views that exercise every part at both ends of its travel.
-
----
-
-## 7. Output format (exactly this, per aircraft)
-
-```
-### <Name> — <role in five words>
-Design brief: 3–6 sentences. Real-world analogue(s), dimensions, why it fits the fleet (gap it fills in licence / price / runway / range).
-
-Self-check: the table from §5 with your numbers.
-
-Integration notes: index to insert at (before `xr30_specter`), new values of kResearchJet/kWraith, anything the integrator must know.
-
-```cpp
-// aircraft.cpp — insert before the xr30_specter row
-{ ...AircraftSpec row... },
-```
-
-```cpp
-// models.cpp — insert at the same index
-{ ...ModelDef row with inline comments per group... },
-```
-
-Harness views to look at: gav_<i>_120_10_0, gav_<i>_210_5_0, gav_<i>_60_35_0, ckv<i>_0_-8_11, ckv<i>_-60_-20_11
-Optional: a README table row placeholder (the integrator regenerates the table from the learned performance).
-```
-
-Use `<i>` for the new row's index. Produce one aircraft per message unless asked for a set; for a set, keep the fleet coherent (no two aircraft in the same licence/price/runway slot).
-
----
-
-## 8. Do not
-
-- Do not modify existing rows, enums, structs, shaders or tests.
-- Do not add fields, assets, textures, meshes, or references to external files.
-- Do not use `special` ≠ 0, `engine` 5/6, or any value outside the documented ranges.
-- Do not propose physics that the §5 checks cannot justify.
-- Do not place the eye, panel or windshield where §4.1 rules would be violated; the cabin generator cannot recover from that.
-- Do not write Tier B code unless a Tier A shape is genuinely impossible, and then follow §6 to the letter.
-
----
-
-## 9. Fleet today (for gap analysis)
-
-| Aircraft | Type | Seats / Cargo | Range | Cruise | Runway | Licence | Price / Rent |
+| Aircraft | Type | Seats / cargo | Range | Cruise | Runway | Licence | Price / rent |
 |---|---|---|---|---|---|---|---|
-| Kestrel T2 | Two-seat trainer | 1 / 120 kg | 45 km | 116 kt | 401 m paved | Student | 18 000 / 120 |
-| Wren 180 | Four-seat tourer | 3 / 320 kg | 70 km | 128 kt | 437 m paved | PPL | 30 000 / 250 |
-| Bushmaster STOL | Backcountry taildragger | 4 / 480 kg | 72 km | 131 kt | 257 m, gravel/snow | CPL | 40 000 / 450 |
-| Islander Twin | Nine-seat utility twin | 9 / 900 kg | 90 km | 129 kt | 458 m, gravel/snow | CPL | 85 000 / 900 |
-| Pelican Caravan | Single turboprop hauler | 12 / 1400 kg | 130 km | 149 kt | 553 m, gravel/snow | CPL | 120 000 / 1600 |
-| Meridian Q400 | Regional turboprop airliner | 40 / 4500 kg | 170 km | 266 kt | 1129 m paved | ATP | 600 000 / 8000 |
-| Starling 500 | Light business jet | 7 / 700 kg | 260 km | ~390 kt | 1250 m paved | ATP | 260 000 / — |
+| Kestrel T2 | Two-seat trainer | 1 / 120 kg | 45 km | 97 kt | 400 m | Student | 18 000 / 120 |
+| Wren 180 | Four-seat tourer | 3 / 320 kg | 70 km | 117 kt | 450 m | PPL | 30 000 / 250 |
+| Bushmaster STOL | Backcountry taildragger | 4 / 480 kg | 72 km | 107 kt | 220 m, rough | CPL | 40 000 / 450 |
+| Islander Twin | Nine-seat utility twin | 9 / 900 kg | 90 km | 126 kt | 420 m, rough | CPL | 85 000 / 900 |
+| Pelican Caravan | Single turboprop hauler | 12 / 1400 kg | 130 km | 165 kt | 550 m, rough | CPL | 120 000 / 1600 |
+| Meridian Q400 | Regional turboprop airliner | 40 / 4500 kg | 170 km | 272 kt | 1100 m | ATP | 600 000 / 8000 |
+| Starling 500 Jet | Light business jet | 7 / 700 kg | 260 km | 389 kt | 1250 m | ATP | 260 000 / — |
+| Swift S6 | Retractable low-wing tourer | 3 / 420 kg | 140 km | 148 kt | 600 m | PPL | 68 000 / 600 |
+| Osprey C6 | Six-seat coastal charter twin | 5 / 270 kg | 110 km | 144 kt | 550 m | CPL | 68 000 / 650 |
 
-Obvious gaps: a PPL-level four-seat retractable (fast tourer), a six-seat piston twin, a float/amphibian is **not** possible (no water physics), a light sport two-seater below the Kestrel, a 19-seat turboprop commuter, a medium bizjet or small regional jet, a vintage biplane is **not** possible (single wing only), an agricultural/utility taildragger, a glider is **not** possible (engine required).
+Research craft (the research terminal only):
 
-Airports range from 600 m grass/gravel strips to 2800 m international runways; the world has one 1650 m-elevation gravel strip (thin air). Design runway needs accordingly.
+| Craft | Tier | What it is | Top Mach | Structure |
+|---|---|---|---|---|
+| XR-10 Nightjar | A | conventional twin-jet demonstrator | 0.96 | +9 / −4 g |
+| XR-20 Mantis | A | forward-swept systems demonstrator, canards | 1.9 | +14 / −6 g |
+| XR-30 Specter | B | fly-by-wire, pitch thrust vectoring, sealed cockpit | 2.7 | +40 / −20 g |
+| XR-40 Wraith | B | four tilting thruster pods, vertical flight, cloak, lasers, plasma bombs | 4.3 | +90 / −45 g |
+
+Gaps worth filling: a light-sport two-seater below the Kestrel, a 19-seat turboprop commuter, a medium business jet or
+small regional jet, an agricultural or utility taildragger. Not possible without new physics: floats and amphibians
+(no water handling), biplanes (one wing only), gliders (an engine is assumed).
