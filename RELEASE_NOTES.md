@@ -2,6 +2,7 @@
 ### The coast
 - No more sea water in the middle of the land. The terrain's detail had dug 14 hollows below sea level well inland, up to 30 m deep and 1.4 km across (near Summit Pass, Kettle Lake, Northpoint and the volcano). The flat sea filled them, so pools of sea water sat in fields and forests, and an aircraft landing there "ditched in the sea". Each hollow is now lifted, with a smooth rise round it, into an ordinary valley floor with grass, fields and forest. Runway grounds and approach paths are never raised.
 - Low beaches, spits and islands no longer sink under the sea in the distance and rise out of it as you come closer.
+- Shallow banks just under the sea no longer break through it a few kilometres off as a lattice of pale sandy dashes.
 - Beaches are textured sand at a natural brightness, darker and glossier where the waves run up. Before, they blew out to a flat white in the sun. Palm Bay's sandy grounds are a smooth sand-and-grass mix instead of a repeating pattern of dots.
 
 ### Forests
@@ -15,14 +16,16 @@
 ### The cockpit
 - More of the world ahead. The glareshield over the panel was a deep slab whose far edge sat only 2-4 degrees below the horizon. It is now a thin hood that slopes down to the windscreen, giving 4-6 degrees more view over the nose in every cockpit. The compass and the panel light strip sit on the new hood.
 - Cockpits no longer waver or turn jagged far from the middle of the map. Every cockpit was placed and shaded from positions in world metres, which near the map's edges hold only to about 4 mm. At arm's length that is several pixels, so straight edges rippled as you flew, and markings, gauge rims, bezels and the cabin's sun shadows came out stair-stepped. Cockpits are now worked out from the camera and are equally sharp anywhere on the map. This applies to every aircraft.
+- Looking up past the side windows of the light aircraft and the XR-10, the roof no longer shows pale, jagged shards along the window tops. They were the fuselage's outer skin, seen through gaps in the window opening's edge and lit by the sun outside.
+- The sun's edge across the airliners' and jets' window frames is a smooth shade, not a spread of dark blotches.
 - Flat panels beside a rounded edge are lit evenly in every cockpit. The edge's curve used to smear across the panel, so on shiny surfaces the lights' highlights broke into a sawtooth along the edge.
 
 ### XR-40 and XR-30 cockpits
 - The displays that work as windows have straight, clean edges from every angle. Before, each frame's edge was a row of saw teeth, and at some angles the cabin's hex wall showed through as black marks and stray panels, worst on the XR-40's overhead and side displays.
-- The window frames' inner walls are lit evenly instead of glinting in lumps.
+- The XR-40's window frames are lit as their true shape, with no sawtooth along their inner and outer edges (worst on the overhead display, looking up). Their inner walls are lit evenly instead of glinting in lumps.
 - The XR-40's floor grid is whole. Ribs no longer go missing in sections.
 - Both XR-40 armrest displays show their full page. Only the lower half was showing.
-- The XR-40's dash displays and annunciators are sharp-edged, with no dark spikes round them, and the hologram emitter between them is smooth instead of ringed by shards. The armrest displays' mounts are clean-edged too.
+- The XR-40's dash displays and annunciators are sharp-edged, with no dark spikes round them, and the hologram emitter between them is smooth instead of ringed by shards. The armrest displays' mounts have smooth, evenly lit sides; a sawtooth of highlights ran along their edges. A glowing hex tile in the cabin wall no longer comes out speckled.
 - The buttons beside the XR-30's seat are crisp backlit keys. They came out as a heap of melted blocks.
 - No more dotted streaks across the XR-30's panoramic view.
 - The fine detail on the bezels, frames and carbon panels (flutes, seams, grooves, the weave) no longer shimmers into waves as you look round. Display text is crisper.

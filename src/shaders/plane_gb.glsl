@@ -30,7 +30,7 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
   float tsh = 1.0, self = 1.0;
   if (sunVis > 0.0 && !podMat) {
     tsh = (trafHit || uWreck > 0) ? terrainShadow(p, uSunDir, t) : uPlaneTSh;
-    if (tsh > 0.0 && !trafHit) self = afSunSelf(p, n, interior);
+    if (tsh > 0.0 && !trafHit) self = afSunSelf(p, gPR*lnOut, interior);
   }
   if (pod || interior || podMat) {   // the cockpit: lit by its own fixtures and the sun through the windows (plane_light.glsl)
     gInteriorAO = aoIn;

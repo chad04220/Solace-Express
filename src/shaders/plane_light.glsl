@@ -7,9 +7,14 @@
 // surface the sun grazes or faces away from takes nothing from it in any case). Inside, the map's soft value is used
 // as it is, frames and edges too: marching there cost the cockpit view ~19 ms on an RTX 3070 Laptop (v3.25.0). One
 // call for the exterior and the cabin alike: each march written out is another copy of the airframe's distance
+// n: the surface's own normal, not the material's bumped one - against a cut-off the bumps dithered the sun's edge
+// into blotches the shape of the leather's dimples (the airliners' window frames)
 float afSunSelf(vec3 p, vec3 n, bool interior){
   float ndl = dot(n, uSunDir);
-  float ms = (uAfShOn & 1) != 0 && uWreck == 0 ? (ndl < (interior ? 0.3 : 0.05) ? 0.0 : shMapLookupB(0, p, n, 1.0 + 2.0*(1.0 - ndl))) : -1.0;   // (inside, a surface the sun barely faces is lit by the fixtures and the ambient alone: its thin frames alias in the map)
+  // (inside, a surface the sun barely faces is lit by the fixtures and the ambient alone - its thin frames alias in the
+  // map - faded in over a band rather than cut off)
+  float lo = interior ? 0.15 : 0.03, hi = interior ? 0.35 : 0.07;
+  float ms = (uAfShOn & 1) != 0 && uWreck == 0 ? (ndl < lo ? 0.0 : shMapLookupB(0, p, n, 1.0 + 2.0*(1.0 - ndl))*smoothstep(lo, hi, ndl)) : -1.0;
   if (ms >= 0.0) return ms;
   gShMax = interior ? 3.5 : 1e9;   // (inside, the ray only needs to get out through the cabin and the wing above it)
   float s = planeShadow(p + n*0.02, uSunDir);

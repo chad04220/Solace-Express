@@ -19,6 +19,10 @@ void main(){
   if (RESEARCH_ON && !traf && uWr[4].w > 0.001 && int(gM[0].z + 0.5) == 6 && gPS.w < 0.5 && uWreck == 0 && vB.z < uWr[6].y) discard;
   float t = length(d); vec3 rd = d/max(t, 1e-6);
   vec3 ln = normalize(vN);
+  // a face turned from the eye in the cabin - the shell's outer skin seen through a gap in a window opening's lip,
+  // where the lip runs thinner than the lattice along the roof - is lit as the cabin side it stands for: lit as the
+  // skin outside, facing the sun, it showed as pale shards along the side windows' tops (the light aircraft, looking up)
+  if (!traf && gPS.w > 0.5 && uPartInst < 0 && !gl_FrontFacing) ln = -ln;   // (the bake winds each triangle to its outward normal; a part's pose may mirror it)
   int mid = int(vId + 0.5);
   if (abs(vIdS - vId) > 1e-3) { vec3 lp = gPC + transpose(gPR)*(d + (uCamPos - gPP)); mid = int(mapPiece(lp).y + 0.5); }
   // (a screen's id outside every outline - the bake's triangles overrunning the glass - is the frame round it; the
