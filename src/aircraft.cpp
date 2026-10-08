@@ -58,10 +58,10 @@ const AircraftSpec kAircraft[] = {
   {"xr10_nightjar", "XR-10 Nightjar", "Tapered-wing research demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
   5700.0f, 1300.0f, 100.0f, 0, 38.18f, 16.60f, 2.508f,
   0.15f, 4.6f, 1.55f, 0.55f, 0.020f, 0.010f, 0.045f, 0.80f,
-  26000.0f, 0.0f, 43.0f, 50.0f, 240.0f, 240.0f, 1250.0f, false, false, true,
+  30000.0f, 0.0f, 43.0f, 50.0f, 260.0f, 240.0f, 1250.0f, false, false, true,
   52000.0f, 80000.0f, 130000.0f, 0.33f, 0.085f, 0.065f, LIC_ATP, 340000, 0,
   16.30f, 0.80f, -0.9375f, -1.145f, 2, 0,
-  vec3(0.14f, 0.18f, 0.20f), vec3(0.20f, 0.78f, 0.70f), 0, 0.96f, 9.f, -4.f},
+  vec3(0.14f, 0.18f, 0.20f), vec3(0.20f, 0.78f, 0.70f), 0, 1.30f, 9.f, -4.f},
   // hidden research model: thrust-to-weight ~2.2, supersonic, pitch thrust vectoring (see Plane::substep special path).
   // It lands fast and long on its small unflapped wing: 1,400 m of hard runway (250 m and rough fields once said here,
   // and the autoland took it to fields it overran or broke its gear on - the review of v3.33.0, A1)
@@ -69,14 +69,15 @@ const AircraftSpec kAircraft[] = {
    0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 132000, 0, 60, 70, 420, 4000, 1400, false, false, true,
    25000, 90000, 110000, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 0, 0,
    17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1, 2.7f, 40.f, -20.f},
-  // XR-20 Mantis: forward-swept twin-jet systems demonstrator (Codex's proposal; special 0: the generic flight model and
-  // the generic field, like the XR-10). Its foreplanes are the model's horizontal tail placed forward.
-  {"xr20_mantis", "XR-20 Mantis", "Forward-swept systems demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
+  // XR-20 Mantis: forward-swept single-jet systems demonstrator (special 0: conventional flight model and controls).
+  // One centerline 88 kN-rated engine preserves the prior pair's combined thrust (176 kN static at full reheat).
+  // Its foreplanes are the model's horizontal tail placed forward; the two fins remain independently ruddered.
+  {"xr20_mantis", "XR-20 Mantis", "Forward-swept systems demonstrator", ENG_JET, 1, 0, 0, 0.0f, 0.0f,
    6100.0f, 1800.0f, 0.0f, 0, 30.0f, 13.2f, 2.27f,
    0.25f, 5.0f, 1.55f, 0.60f, 0.026f, 0.012f, 0.070f, 0.78f,
-   30000.0f, 0.0f, 55.0f, 62.0f, 300.0f, 900.0f, 1350.0f, false, false, true,
+   88000.0f, 0.0f, 55.0f, 62.0f, 330.0f, 750.0f, 1350.0f, false, false, true,
    30000.0f, 70000.0f, 100000.0f, 0.45f, 0.070f, 0.070f, LIC_ATP, 480000, 0,
-   16.0f, 1.05f, -0.62f, 0.65f, 2, 0, vec3(0.065f, 0.085f, 0.105f), vec3(0.95f, 0.43f, 0.055f), 0, 1.9f, 14.f, -6.f},
+   16.0f, 1.05f, -0.62f, 0.65f, 2, 0, vec3(0.105f, 0.125f, 0.15f), vec3(0.92f, 0.43f, 0.08f), 0, 1.9f, 14.f, -6.f},
   // hidden stealth aerobatic research model: four tilting thruster pods (power = one pod's dry thrust), T/W ~2.2 dry
   // and ~4.6 boosted, structure good for +90 / -45 g (see Plane::wraithThrust)
   {"xr40_wraith", "XR-40 Wraith", "Stealth aerobatic research model", ENG_JET, 4, 0, 0, 0, 0, 10500, 3000, 0, 0, 52.0f, 12.4f, 5.2f,
@@ -182,7 +183,9 @@ GearStations gearStations(const AircraftSpec& s) {
   const float L = s.fusLen;
   GearStations g;
   g.track = std::max(1.2f, s.span * 0.13f);
-  g.mainZ = s.taildragger ? -0.10f * L : 0.04f * L;
+  // (the XR-30's and XR-40's mains under the middle of their delta wings, a tenth of the length behind the centre of
+  // gravity: at 4% they stood near the wings' leading edges)
+  g.mainZ = s.taildragger ? -0.10f * L : s.special ? 0.10f * L : 0.04f * L;
   g.noseZ = -0.36f * L;
   g.tailZ = 0.45f * L; g.tailY = 0.11f * L;   // (the tail wheel: 11.3 deg ground attitude)
   return g;

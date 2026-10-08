@@ -122,6 +122,7 @@ public:
   // analysis tool (--analyze, the harness's BENCHWALL): exact per-pass times (the GPU is waited on at every pass boundary)
   bool syncTiming = false; double passWall[11] = {};   // (kPasses)
   std::string dispError;   // set when the cockpit display shader failed to build (the screens stay dark)
+  std::string proxyError;  // set when the marched shadow proxy failed to build (the airframes' shadows come from their maps alone)
   bool compilePrograms(std::atomic<int>* done);  // scene programs; safe on a worker thread with a shared context
   bool init(int w, int h);                       // everything else (runs compilePrograms itself if not done yet)
   GLuint makeTexture(const uint8_t* rgba, int w, int h);

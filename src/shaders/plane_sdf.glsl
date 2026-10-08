@@ -111,8 +111,18 @@ vec2 gearMainShape(vec3 l, vec3 mount){
     tyres = min(sdRoundCylX(l - wc - vec3(0.22, 0.0, 0.0), wr, 0.11, 0.06), sdRoundCylX(l - wc + vec3(0.22, 0.0, 0.0), wr, 0.11, 0.06));
     shaft = 0.06; halfWidth = 0.11;   // (its links and brace at the light legs' size: they stay inside the nacelle's tapering tail)
     NacFold f = gearNacFold();
-    vec3 b = f.P + partRyz(f.ang)*(l - f.P);
+    mat3 Rs = partRyz(f.ang);
+    vec3 b = f.P + Rs*(l - f.P);
     door = max(abs(gearNacSkin(b.x - track, b.y, b.z) + 0.012) - 0.012, max(abs(b.x - track) - 0.125, max(f.z1 - b.z, b.z - f.zs)));
+    // and its two brackets from the leg (in the stowed frame: from the leg's line down to the door in the nacelle's
+    // floor - the door rides 20 cm off the leg, and on nothing it hung beside it like a loose rod)
+    vec3 ft = f.P + Rs*(vec3(track, wc.y + 0.05, mz) - f.P), ab = ft - f.P;
+    float za = mix(f.z1, f.zs, 0.25), zb = mix(f.z1, f.zs, 0.75);
+    vec2 na = nacSection(za), nb = nacSection(zb);
+    vec3 sa = vec3(track, na.x - na.y + 0.012, za), sb = vec3(track, nb.x - nb.y + 0.012, zb);
+    vec3 la = f.P + ab*clamp(dot(sa - f.P, ab)/dot(ab, ab), 0.0, 1.0);
+    vec3 lb = f.P + ab*clamp(dot(sb - f.P, ab)/dot(ab, ab), 0.0, 1.0);
+    legs = min(legs, min(sdCapsule(b, la, sa, 0.025), sdCapsule(b, lb, sb, 0.025)));
   } else {            // from its hinge
     legs = sdCapsule(l, mount, wc + vec3(0.0, 0.05, 0.0), 0.06);
     tyres = sdRoundCylX(l - wc, wr, 0.1, 0.05);
@@ -161,8 +171,9 @@ vec2 gearPartField(int k, vec3 l){
   if (k == PT_GEAR_MAIN) return gearMainShape(l, gtype == 3 ? gearNacFold().P : gearSwingMain() ? gearSwingOf().H : gearHinge());
   if (k == PT_GEAR_NOSE) return gearNoseShape(l);
   if (k == PT_GEAR_TAIL) return gearTailShape(l);
-  if (k == PT_GEAR_MDOOR && gtype == 4 && !gearSwingMain()) return vec2(gearDoorF(l, gearFoldWell()), 5.0);
-  return vec2(gearDoorV(l, gearVBay(k == PT_GEAR_NDOOR).h), 5.0);
+  // (each door in the paint of the skin it closes into: the fuselage's livery, the wing's under a main's fairing, a nacelle's)
+  if (k == PT_GEAR_MDOOR && gtype == 4 && !gearSwingMain()) return vec2(gearDoorF(l, gearFoldWell()), 2.0);
+  return vec2(gearDoorV(l, gearVBay(k == PT_GEAR_NDOOR).h), k == PT_GEAR_NDOOR ? 1.0 : gtype == 3 ? 5.0 : 2.0);
 }
 #endif
 
@@ -337,12 +348,13 @@ vec2 jtGear(vec3 p, vec3 ap, vec2 res, float mainDepth, float mainBelow){
   res = gearWellP(p, res, g.nc, g.nh, g.nd, g.nb, g.np);
   if (gPartMode != -1) return res;
   float a = gearDoorAngle(), sm = ap.x > g.mc.x ? 1.0 : -1.0, sn = p.x > 0.0 ? 1.0 : -1.0;   // (the near door of each bay, by the side of its centre line)
-  res = opU(res, vec2(gearDoorV(transpose(partMirror(-sm)*partRxy(-a))*(ap - g.mc - vec3(sm*g.mh.x, 0.0, 0.0)), g.mh), 5.0));
+  res = opU(res, vec2(gearDoorV(transpose(partMirror(-sm)*partRxy(-a))*(ap - g.mc - vec3(sm*g.mh.x, 0.0, 0.0)), g.mh), wr ? 80.0 : 31.0));   // (in the skin's own paint)
   mat3 Rp = partRyz(g.np);
-  res = opU(res, vec2(gearDoorV(transpose(Rp*partMirror(-sn)*partRxy(-a))*(p - g.nc - Rp*vec3(sn*g.nh.x, 0.0, 0.0)), g.nh), 5.0));
+  res = opU(res, vec2(gearDoorV(transpose(Rp*partMirror(-sn)*partRxy(-a))*(p - g.nc - Rp*vec3(sn*g.nh.x, 0.0, 0.0)), g.nh), wr ? 80.0 : 30.0));
   vec4 G0 = gM[18]; float gh = gM[19].x;
   vec3 wc = vec3(G0.x, 0.38 - gh, G0.z), nc = vec3(0.0, 0.33 - gh, G0.w);
-  Pose M = jtMainPose(mat3(1.0)), N = jtNosePose();
+  Pose M = jtMainPose(mat3(1.0));   // (one struct to a declaration, no local arrays, no struct members written in a loop: NVIDIA's
+  Pose N = jtNosePose();            // compiler failed on those - C9999 "Unhandled expr op assign" - and the game would not start)
   vec3 lm = transpose(M.R)*(ap - M.T), ln = transpose(N.R)*(p - N.T);
   res = opU(res, jtMainLeg(lm, g.H, wc));
   res = opU(res, jtMainWheel(lm - wc));
@@ -359,8 +371,9 @@ vec2 jtPartField(int k, vec3 l){
   if (k == PT_JT_WHEELM) return jtMainWheel(l - vec3(G0.x, 0.38 - gh, G0.z));
   if (k == PT_JT_LEGN) return jtStrut(l, jtGearOf().P, vec3(0.0, 0.43 - gh, G0.w), 0.06);
   if (k == PT_JT_WHEELN) return jtNoseWheels(l - vec3(0.0, 0.33 - gh, G0.w));
-  if (k == PT_JT_DOORM) return vec2(gearDoorV(l, jtGearOf().mh), 5.0);
-  if (k == PT_JT_DOORN) return vec2(gearDoorV(l, jtGearOf().nh), 5.0);
+  bool wrd = int(gM[0].z + 0.5) == 6;   // (the doors in the skin's paint: the XR-40's, the XR-30's wing and body)
+  if (k == PT_JT_DOORM) return vec2(gearDoorV(l, jtGearOf().mh), wrd ? 80.0 : 31.0);
+  if (k == PT_JT_DOORN) return vec2(gearDoorV(l, jtGearOf().nh), wrd ? 80.0 : 30.0);
   if (k == PT_JT_ELEVON) return vec2(sdSurface(l.x, l.z + 1.6, l.y - (-0.18 - l.x*0.035), 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3, 0.0, 0.0), 31.0);
   if (k == PT_JT_CANARD) return vec2(sdPanel(l.x, l.z + 0.6, l.y, 1.5, 1.5, 0.45, 1.0, 0.05, 1.0, 0.0, 0.0), 31.0);
   if (k == PT_JT_RUDDER) {
@@ -432,8 +445,8 @@ vec2 mapPlane(vec3 p){
   if (!gOwn) {   // traffic: the same fixtures, placed from the packed model (wingtips, fin top, tail cone)
     bool jet = RESEARCH_ON && int(gM[0].z + 0.5) == 5;
     vec3 tip = jet ? vec3(5.67, -0.38, 4.4) : vec3(gM[9].x + 0.07, gM[10].x + gM[9].x*gM[10].z, gM[10].y + gM[9].w + gM[9].z*0.25);
-    vec3 fin = jet ? vec3(0.0, 0.67, 1.6) : vec3(0.0, gM[15].x + gM[14].x + 0.04, gM[15].y + gM[14].w + gM[14].z*0.4);
-    vec3 tl = jet ? vec3(0.0, 0.45, 7.6) : vec3(0.0, gM[8].w, gM[8].x + 0.03);
+    vec3 fin = jet ? vec3(0.0, 0.67, 1.6) : isMantis() ? mantisFinTop() : vec3(0.0, gM[15].x + gM[14].x + 0.04, gM[15].y + gM[14].w + gM[14].z*0.4);
+    vec3 tl = jet ? vec3(0.0, 0.45, 7.6) : isMantis() ? mantisTailLight() : vec3(0.0, gM[8].w, gM[8].x + 0.03);
     vec3 ap = vec3(abs(p.x), p.y, p.z);
     for (int i = 0; i < 3; i++) {
       vec3 c = i == 0 ? tip : (i == 1 ? fin : tl);
@@ -512,6 +525,43 @@ vec3 ospreyCabinAlbedo(int id) {
   if(id==123)return vec3(.062,.040,.028);
   return vec3(.95,.82,.58);
 }
+// XR-20: a compact centerline research workstation. Instrument glass has its own live material mapping;
+// the side-stick, throttle and pedals use the exact rigid-part interfaces used by the production mesh renderer.
+vec2 mapMantisCockpit(vec3 p, float f){
+  vec3 E=gM[22].xyz; float z=gM[21].w; vec3 q=p-E;
+  vec2 r=vec2(1e5,11.0);
+  // Faceted instrument bridge: flight strip above, engine and navigation displays below.
+  r=opU(r,vec2(sdRoundBox(p-vec3(0,E.y-.355,z),vec3(.46,.23,.055),.025),14.0));
+  r=opU(r,vec2(sdRoundBox(p-vec3(0,E.y-.325,z+.059),vec3(.395,.19,.009),.012),130.0));
+  vec3 d=vec3(abs(p.x)-.235,p.y-(E.y-.695),p.z-z-.16);
+  r=opU(r,vec2(sdRoundBox(d,vec3(.22,.145,.055),.025),14.0));
+  r=opU(r,vec2(sdRoundBox(d-vec3(0,0,.058),vec3(.185,.117,.01),.01),p.x<0.0?131.0:132.0));
+  // Short hood never blocks the forward pane, warm datum trim and under-panel illumination.
+  r=opU(r,vec2(sdRoundBox(p-vec3(0,E.y-.15,z-.02),vec3(.47,.018,.13),.012),14.0));
+  r=opU(r,vec2(sdRoundBox(p-vec3(0,E.y-.168,z+.103),vec3(.415,.006,.008),.004),133.0));
+  // Floor/firewall and two connected side consoles. They end below the canopy rail.
+  r=opU(r,vec2(max(sdRoundBox(q-vec3(0,-1.055,-.15),vec3(.58,.025,1.02),.012),f+.055),11.0));
+  r=opU(r,vec2(max(sdBox(p-vec3(0,E.y-.81,z-.04),vec3(.55,.24,.045)),f+.055),63.0));
+  vec3 c=vec3(abs(q.x)-.43,q.y+.75,q.z+.03);
+  r=opU(r,vec2(sdRoundBox(c,vec3(.115,.21,.48),.04),63.0));
+  r=opU(r,vec2(sdRoundBox(c-vec3(0,.21,0),vec3(.10,.012,.43),.01),66.0));
+  r=opU(r,vec2(sdRoundBox(c-vec3(-.104,.10,0),vec3(.008,.008,.37),.004),133.0));
+  r=partAt(r,PT_JET_STICK,vec2(0),p); r=partAt(r,PT_JET_THR,vec2(0),p);
+  r=partAt(r,PT_PEDAL,vec2(0,-1),p); r=partAt(r,PT_PEDAL,vec2(0,1),p);
+  // Single bolstered seat, harness and headrest: a clear central footwell, with no duplicate copilot parts.
+  r=opU(r,vec2(sdRoundBox(q-vec3(0,-.78,.12),vec3(.235,.065,.28),.045),12.0));
+  vec3 b=q-vec3(0,-.37,.40); b.yz=rot2(b.yz,-.16);
+  r=opU(r,vec2(sdRoundBox(b,vec3(.22,.35,.065),.04),12.0));
+  r=opU(r,vec2(sdRoundBox(vec3(abs(b.x)-.20,b.y,b.z+.045),vec3(.035,.27,.055),.025),12.0));
+  r=opU(r,vec2(sdRoundBox(q-vec3(0,.025,.47),vec3(.115,.075,.06),.03),12.0));
+  r=opU(r,vec2(sdRoundBox(vec3(abs(b.x)-.095,b.y,b.z+.068),vec3(.024,.30,.007),.004),69.0));
+  r=opU(r,vec2(sdRoundBox(q-vec3(0,-.70,.02),vec3(.21,.018,.022),.009),69.0));
+  r=opU(r,vec2(sdRoundBox(q-vec3(0,-.694,.00),vec3(.035,.022,.015),.006),60.0));
+  // Aft equipment wall seals the occupied volume before the wing/engine structure begins.
+  r=opU(r,vec2(max(abs(p.z-(E.z+.80))-.035,f+.05),63.0));
+  // All fittings are physically contained in the skin, leaving at least 5 cm of the shell.
+  r.x=max(r.x,f+.05); return r;
+}
 const int kOspreyModel = 8;   // (aircraft.h kOsprey)
 vec2 mapPlaneBody(vec3 p){
 #ifdef PART_BAKE
@@ -551,7 +601,7 @@ vec2 mapPlaneBody(vec3 p){
     // window - within 10 cm of both: by where the rounding reached alone - 2.6 cm - a 5 cm post between two openings
     // was trim only just, and where the pillar widened into the roof the headliner showed through it in long slivers)
     float shell0 = shell;
-    winHole = min(holeWs, holeSide);
+    winHole = isMantis() ? mantisWindow(p) : min(holeWs, holeSide);
     shell = -smin(-shell, winHole, 0.03);
     res = vec2(shell, shell > shell0 + 1e-4 || (f < -0.03 && (winHole < 0.04 || max(holeWs, holeSide) < 0.1)) ? 63.0 : 11.0);
     // rear bulkhead: a trimmed baggage wall closes the cabin behind the last seats / windows (instead of looking
@@ -566,7 +616,7 @@ vec2 mapPlaneBody(vec3 p){
   vec4 W0b = gM[9], W1b = gM[10], W2b = gM[11];
   float wy0 = min(W1b.x, W1b.x + W0b.x*W1b.z), wy1 = max(W1b.x, W1b.x + W0b.x*W1b.z);
   float wyLo = (W2b.x > 0.5 ? min(wy0, -0.35*R) : wy0) - 0.45 - W2b.z, wyHi = wy1 + 0.45 + W2b.z;
-  float wz0 = W1b.y - 0.45, wz1 = W1b.y + max(W0b.y, W0b.w + W0b.z) + 0.45;
+  float wz0 = W1b.y + min(0.0, W0b.w) - 0.45, wz1 = W1b.y + max(W0b.y, W0b.w + W0b.z) + 0.45;
   if (sdBox(p - vec3(0.0, 0.5*(wyLo + wyHi), 0.5*(wz0 + wz1)), vec3(W0b.x + 0.35, 0.5*(wyHi - wyLo), 0.5*(wz1 - wz0))) < res.x + 0.06*R + 0.1) {
     vec4 W0 = gM[9], W1 = gM[10], W2 = gM[11];
     float span = W0.x, rc = W0.y, tc = W0.z, sw = W0.w, th = W1.w;
@@ -610,21 +660,24 @@ vec2 mapPlaneBody(vec3 p){
   vec4 V0b = gM[14], V1b = gM[15], H0b = gM[12], H1b = gM[13];
   float tz0 = min(V1b.y, H1b.y) - 0.35, tz1 = max(V1b.y + max(V0b.y, V0b.w + V0b.z), H1b.y + max(H0b.y, H0b.w + H0b.z)) + 0.35;
   float ty0 = min(V1b.x, H1b.x - H0b.x*abs(H1b.z)) - 0.45, ty1 = max(V1b.x + V0b.x, H1b.x + H0b.x*abs(H1b.z)) + 0.45;
-  if (sdBox(p - vec3(0.0, 0.5*(ty0 + ty1), 0.5*(tz0 + tz1)), vec3(max(H0b.x, 0.3) + 0.35, 0.5*(ty1 - ty0), 0.5*(tz1 - tz0))) < res.x + 0.12*R) {
+  if (sdBox(p - vec3(0.0, 0.5*(ty0 + ty1), 0.5*(tz0 + tz1)), vec3(max(H0b.x, isMantis() ? MT_FIN_X + sin(MT_CANT)*V0b.x : 0.3) + 0.35, 0.5*(ty1 - ty0), 0.5*(tz1 - tz0))) < res.x + 0.12*R) {
     vec4 V0 = gM[14], V1 = gM[15];
-    float s = p.y - V1.x, c = p.z - V1.y, t = p.x;
+    vec3 vq=vec3(p.x,p.y-V1.x,p.z-V1.y);
+    if(isMantis()) vq.xy=rot2(vec2(abs(p.x)-MT_FIN_X,p.y-V1.x),MT_CANT);
+    float s = vq.y, c = vq.z, t = vq.x;
     float h = V0.x;
     float hasT = gM[13].w;
     float rud0 = hasT > 0.5 ? 0.05 : 0.08*h;
     float fin = sdPanel(s, c, t, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97);
     // right rudder (yaw +) swings the trailing edge to the right (+x)
     float rud = gPartMode == -2 ? 1e9 : sdSurface(s, c, t, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97, -cYaw*0.42, 0.0);   // (rudder and elevators: rigid parts too)
+    if(isMantis()) { rud=1e9; if(gPartMode==-1) { vec2 pr=partAt(vec2(1e9,3),PT_RUDDER,vec2(p.x<0.0?-1.0:1.0,0),p); rud=pr.x; } }
     float tail = min(fin, rud);
     vec4 H0 = gM[12], H1 = gM[13];
     float hs = abs(p.x), ht = p.y - (H1.x + hs*H1.z), hc = p.z - H1.y;
     float stab = sdPanel(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98);
-    // pulling back (pitch +) raises the elevator trailing edge
-    float elev = gPartMode == -2 ? 1e9 : sdSurface(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98, -cPitch*0.4, 0.0);
+    // Pull raises an aft elevator; the Mantis canard lowers its trailing edge to lift the nose.
+    float elev = gPartMode == -2 ? 1e9 : sdSurface(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98, (isMantis() ? cPitch : -cPitch)*0.4, 0.0);
     tail = min(tail, min(stab, elev));
     if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + H0.y*0.45), vec3(0.18, 0.2, H0.y*0.55)), 0.08);
     // inside, the tail surfaces stop at the cabin wall as the wing does (a canard - the Mantis's horizontal tail sits
@@ -640,6 +693,7 @@ vec2 mapPlaneBody(vec3 p){
     if (eng <= 1) { float sr0 = max(N1.y, 0.1); eb = sdBox(p - vec3(0.0, S0.w, S0.x + 0.5*(1.75 - sr0*2.3)), vec3(0.95, 1.1, 0.5*(1.75 + sr0*2.3) + 0.25)); }
     else if (eng <= 3) { vec3 nq = vec3(abs(p.x) - N0.x, p.y - N0.y, p.z); float yr = abs(gM[10].x + N0.x*gM[10].z - N0.y);
                          eb = sdBox(nq - vec3(0.0, 0.0, N0.w + 0.5*(N1.x - N1.y*2.3)), vec3(N0.z + 0.6, N0.z + yr + 0.6, 0.5*(N1.x + N1.y*2.3) + 0.4)); }
+    else if (isMantis()) eb = sdBox(p-vec3(0.0,0.15,3.20),vec3(1.30,1.40,5.10));
     else { vec3 nq = vec3(abs(p.x), p.y - N0.y, p.z - N0.w); eb = sdBox(nq - vec3(0.5*(N0.x + N0.z), 0.0, 0.5*N1.x), vec3(0.5*(N0.x + N0.z) + 0.3, N0.z + 0.4, 0.5*N1.x + 0.75)); }
     if (eb > res.x + 0.12) {}
     else if (eng <= 1) {
@@ -675,6 +729,35 @@ vec2 mapPlaneBody(vec3 p){
       res = vec2(nacJoin, nac < res.x ? 5.0 : res.y);
       float sr = N1.y;
       res = opU(res, vec2(sdRoundCone(np, vec3(0.0, 0.0, z0 - sr*2.3), vec3(0.0, 0.0, z0 + 0.05), 0.015, sr), 16.0));
+    } else if (isMantis()) {
+      // One centerline powerplant: a raised dorsal mouth aft of the sealed cockpit routes into one core.
+      // Cutting the same inlet/nozzle voids through the skin prevents hidden fuselage caps in either opening.
+      float nr=N0.z, len=N1.x; vec3 core=vec3(0.0,N0.y,N0.w), end=mantisNozzle();
+      vec3 elbow=vec3(0.0,.32,1.38);
+      vec3 ductP=p*vec3(1,1.6,1), ductM=MT_INLET*vec3(1,1.6,1), ductE=elbow*vec3(1,1.6,1);
+      float shell=sdRoundCone(ductP,ductM,ductE,nr*.91,nr)/1.6;
+      shell=smin(shell,sdRoundCone(p,elbow,core+vec3(0,0,1.00),nr,nr),.10);
+      shell=min(shell,sdRoundCone(p,core,end,nr,nr*.88));
+      shell=max(shell,MT_INLET.z-p.z); shell=max(shell,p.z-end.z);
+      float inlet=sdCapsule(ductP,ductM-vec3(0,0,.30),ductE,nr*.77)/1.6;
+      float exitBore=sdCapsule(p,end-vec3(0,0,.78),end+vec3(0,0,1.1),nr*.72);
+      float openings=min(inlet,exitBore);
+      shell=max(shell,-openings); res.x=max(res.x,-openings);
+      res=opU(res,vec2(shell,5.0));
+      // Thin structural tail shelves retain the existing canted-fin roots without recreating side nacelles.
+      vec3 shelf=vec3(abs(p.x)-.86,p.y-.16,p.z-5.30);
+      res=opU(res,vec2(sdRoundBox(shelf,vec3(.29,.09,1.12),.07),5.0));
+      // One intake fan, recessed along the descending duct; one aft turbine behind an unobstructed exhaust lip.
+      vec3 fanP=mix(ductM,ductE,.68);
+      vec3 ductAxis=normalize(ductE-ductM);
+      float fan=max(length((ductP-fanP)-ductAxis*dot(ductP-fanP,ductAxis))-nr*.76,abs(dot(ductP-fanP,ductAxis))-.035)/1.6;
+      res=opU(res,vec2(fan,21.0));
+      vec3 tq=p-(end-vec3(0,0,.64));
+      float turbine=max(length(tq.xy)-nr*.70,abs(tq.z)-.035);
+      res=opU(res,vec2(turbine,134.0));
+      // The metal nozzle is one circular annulus, with no center spike or mirrored overlapping engine instance.
+      float lip=max(abs(length((p-end).xy)-nr*.79)-nr*.065,abs(p.z-end.z+.055)-.055);
+      res=opU(res,vec2(lip,17.0));
     } else {
       vec3 np = vec3(abs(p.x) - N0.x, p.y - N0.y, p.z - N0.w);
       float nr = N0.z, len = N1.x;
@@ -689,7 +772,7 @@ vec2 mapPlaneBody(vec3 p){
       float cone = sdRoundCone(np, vec3(0.0, 0.0, len - 0.25), vec3(0.0, 0.0, len + 0.3), nr*0.5, 0.04);
       res = opU(res, vec2(cone, 17.0));
       vec3 sec = fusSection(N0.w + len*0.5);
-      float px0 = sec.x*0.7, px1 = N0.x - nr*0.8;
+      float px0 = sec.x*0.7, px1 = max(px0 + 0.05, N0.x - nr*0.8);
       float pylon = sdRoundBox(vec3(abs(p.x) - 0.5*(px0 + px1), p.y - N0.y, p.z - N0.w - len*0.5), vec3(0.5*(px1 - px0) + 0.05, 0.06, len*0.28), 0.04);
       res.x = smin(res.x, pylon, 0.1);
     }
@@ -745,7 +828,7 @@ vec2 mapPlaneBody(vec3 p){
         res = gearWell(ap, res, b.c, b.h, b.depth, b.below);
         if (gPartMode == -1) {
           float s = ap.x > b.c.x ? 1.0 : -1.0;
-          res = opU(res, vec2(gearDoorV(transpose(partMirror(-s)*partRxy(-a))*(ap - b.c - vec3(s*b.h.x, 0.0, 0.0)), b.h), 5.0));
+          res = opU(res, vec2(gearDoorV(transpose(partMirror(-s)*partRxy(-a))*(ap - b.c - vec3(s*b.h.x, 0.0, 0.0)), b.h), 2.0));
           mat3 Rf = gearSwingR(vec3(track, wr - gh, mz) - g.H, -1.0, up);
           res = opU(res, gearMainShape(transpose(Rf)*(ap - g.H) + g.H, g.H));
         }
@@ -764,7 +847,7 @@ vec2 mapPlaneBody(vec3 p){
         if (gPartMode == -1) {
           float s = bq.z > 0.0 ? 1.0 : -1.0, ca = cos(a), sa = sin(a);
           mat3 DR = mat3(1.0, 0.0, 0.0,  0.0, ca, -s*sa,  0.0, -sa, -s*ca);
-          res = opU(res, vec2(gearDoorF(transpose(DR)*(bq - bc - vec3(0.0, 0.0, s*g.hz)), g), 5.0));
+          res = opU(res, vec2(gearDoorF(transpose(DR)*(bq - bc - vec3(0.0, 0.0, s*g.hz)), g), 2.0));
           mat3 Rf = partRxy(up*(f.dl - 1.5707963));
           res = opU(res, gearMainShape(transpose(Rf)*(ap - f.H) + f.H, f.H));
         }
@@ -774,7 +857,7 @@ vec2 mapPlaneBody(vec3 p){
         res = gearWellP(p, res, b.c, b.h, b.depth, b.below, b.pitch);
         float s = p.x > 0.0 ? 1.0 : -1.0;
         mat3 Rp = partRyz(b.pitch);
-        if (gPartMode == -1) res = opU(res, vec2(gearDoorV(transpose(Rp*partMirror(-s)*partRxy(-a))*(p - b.c - Rp*vec3(s*b.h.x, 0.0, 0.0)), b.h), 5.0));
+        if (gPartMode == -1) res = opU(res, vec2(gearDoorV(transpose(Rp*partMirror(-s)*partRxy(-a))*(p - b.c - Rp*vec3(s*b.h.x, 0.0, 0.0)), b.h), 1.0));
       }
     } else {   // fixed mains: in place
       vec3 wc = vec3(track, wr - gh, mz);
@@ -815,7 +898,7 @@ vec2 mapPlaneBody(vec3 p){
     vec3 tip = vec3(W0.x + 0.02, W1.x + W0.x*W1.z, W1.y + W0.w + W0.z*0.25);
     res = opU(res, vec2(length(vec3(abs(p.x), p.y, p.z) - tip) - 0.045, 18.0));
     vec4 V0 = gM[14], V1 = gM[15];
-    res = opU(res, vec2(length(p - vec3(0.0, V1.x + V0.x + 0.04, V1.y + V0.w + V0.z*0.4)) - 0.05, 19.0));
+    res = opU(res, vec2(length(p - (isMantis() ? mantisFinTop() : vec3(0.0, V1.x + V0.x + 0.04, V1.y + V0.w + V0.z*0.4))) - 0.05, 19.0));
     vec3 sec = fusSection(0.2);
     float ant = sdRoundBox(p - vec3(0.0, sec.z + sec.y + 0.11, 0.2), vec3(0.006, 0.12, 0.05), 0.004);
     res = opU(res, vec2(ant, 8.0));   // (8: exterior metal - 13 is a cockpit material, lit as if inside the cabin)
@@ -854,6 +937,7 @@ vec2 mapPlaneBody(vec3 p){
   // Ids: 10 panel (instruments drawn on it), 11 shell/floor, 12 seats, 13 controls, 14 glareshield & overhead,
   // 60 brushed metal, 61 rubber, 63 trim panels, 64 light lenses, 65 radio stack, 66 satin black (bezels, knobs),
   // 67 centre engine display (glass cockpits), 68 red knobs / buttons, 69 harness webbing
+  if (inside > 0.5 && isMantis()) return opU(res,mapMantisCockpit(p,f));
   if (inside > 0.5) {
     vec4 E = gM[22]; float pz = gM[21].w, phw = E.w; int ck = int(gM[21].z + 0.5);
     float pf = pz + 0.045;                                             // panel face (towards the pilot)

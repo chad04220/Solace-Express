@@ -65,6 +65,23 @@ vec3 fusSection(float z){
   float t2 = t*t, t3 = t2*t;
   return a.yzw*(2.0*t3 - 3.0*t2 + 1.0) + ma*h*(t3 - 2.0*t2 + t) + b.yzw*(-2.0*t3 + 3.0*t2) + mb*h*(t3 - t2);
 }
+// The Mantis remains in the shared engine-4 path. Its centerline glass cockpit is a stable packed-model
+// discriminator, including traffic/bake passes that do not carry uModelId. No roster index or uniform layout changes.
+bool isMantis(){ return int(gM[0].z + 0.5) == 4 && abs(gM[22].x) < 0.001 && gM[13].y < -3.0; }
+const float MT_CANT = 0.48;
+const float MT_FIN_X = 1.05;   // fin roots stay on the shoulders when the engine moves to the centerline
+const vec3 MT_INLET = vec3(0.0, 1.05, -0.65);
+vec3 mantisNozzle(){ return vec3(0.0,gM[16].y,gM[16].w+gM[17].x); }
+// The aft navigation lamp sits on the upper nozzle rim, clear of the open exhaust.
+vec3 mantisTailLight(){ return mantisNozzle()+vec3(0,gM[16].z*.88+.02,-.04); }
+vec3 mantisFinTop(){ return vec3(MT_FIN_X + sin(MT_CANT)*gM[14].x, gM[15].x + cos(MT_CANT)*gM[14].x + 0.04, gM[15].y + gM[14].w + gM[14].z*0.4); }
+// One uninterrupted front pane and two side panes. The canopy rail is below the pilot's sightline.
+float mantisWindow(vec3 p){
+  vec4 W=gM[23];
+  float front=max(max(W.x-p.z,p.z-W.y),W.z-p.y);
+  float side=max(max(W.y+0.045-p.z,p.z-W.w),W.z-0.08-p.y);
+  return min(front,side);
+}
 // Fuselage livery: a cheat line of constant width that follows the fuselage centreline (so it sweeps up with the
 // tail cone), fading in on the cowling and tapering only where the tail cone gets too slim to carry it, with a
 // pinstripe above it and a grey belly. Returns the paint colour; shared by the renderer and the geometry previewer.
@@ -82,6 +99,15 @@ vec3 fuselagePaint(vec3 lp, vec3 sec){
   float fade = smoothstep(gM[2].x - 0.1, gM[3].x, lp.z);                  // grows in over the cowling
   float d = abs(lp.y - c);
   vec3 col = gColBase;
+  if (isMantis()) {
+    // Graphite body, angular amber shoulder stripe and anti-glare nose. The form, rather than a recolor, leads.
+    col=vec3(.105,.125,.15);
+    if(lp.y < sec.z-.45*sec.y) col=vec3(.055,.065,.082);
+    float stripe=lp.y-sec.z-(.07+.035*clamp(lp.z+4.0,0.0,8.0));
+    if(abs(stripe)<.045 && lp.z>-6.2 && lp.z<5.7) col=vec3(.92,.43,.08);
+    if(lp.z<-6.6 || (lp.y>sec.z+.50*sec.y && lp.z<-4.8)) col=vec3(.038,.046,.057);
+    return col;
+  }
   if (lp.y - sec.z < -0.72*sec.y) col = mix(gColBase, vec3(0.62, 0.64, 0.66), 0.5);   // belly
   if (d < w*fade) col = gColStripe;
   float pc = c + w + hc*0.035, pw = hc*0.012;                             // pinstripe

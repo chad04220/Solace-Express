@@ -17,7 +17,9 @@ bool Renderer::compileRaster() {
     if (!progObjectsV[v]) { error = "Objects shader: " + e; return false; }
     setCompileStage(v ? "aircraft shadows (light aircraft build)" : "aircraft shadows (every aircraft)");
     progShProxyV[v] = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly(d), e);
-    if (!progShProxyV[v]) { error = "Shadow proxy shader: " + e; return false; }
+    // (a driver whose compiler fails on it - NVIDIA's once did, on v3.35.0's gear fields - starts on the maps-only build
+    // below, its failure in startup.log: the shadows a march adds, the traffic's and the moving parts', are lost, not the game)
+    if (!progShProxyV[v] && proxyError.empty()) proxyError = "Shadow proxy shader: " + e;
     setCompileStage(v ? "effects (light aircraft build)" : "effects (every aircraft)");
     progEffectsV[v] = linkProgramCached(kFullscreenVS, effectsFSAssembly(d), e);
     if (!progEffectsV[v]) { error = "Effects shader: " + e; return false; }
@@ -26,7 +28,9 @@ bool Renderer::compileRaster() {
   progObjectsNoAf = linkProgramCached(kFullscreenVS, objectsFSAssembly("#define AF_LIGHT\n#define OBJ_NO_AF\n"), e);
   if (!progObjectsNoAf) { error = "Objects (UFO, debris) shader: " + e; return false; }
   progShProxyMaps = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly("#define AF_LIGHT\n#define PROXY_MAPS_ONLY\n"), e);
-  if (!progShProxyMaps) { error = "Shadow proxy (maps) shader: " + e; return false; }
+  if (!progShProxyMaps) { error = "Shadow proxy (maps) shader: " + (proxyError.empty() ? e : proxyError + "\n" + e); return false; }
+  for (int v = 0; v < 2; v++) if (!progShProxyV[v]) progShProxyV[v] = progShProxyMaps;
+  progShProxy = progShProxyV[0];
   // the airframe shadow maps: the baked mesh (and the moving hull) from a light, plain depth
   static const char* kShMapVS = "#version 330 core\nlayout(location = 0) in vec3 aPos; uniform mat4 uVP; uniform mat3 uRot; uniform vec3 uPos;\n"
     "uniform sampler2D uPartPose; uniform int uPartInst;\n"   // (a cockpit's rigid part at its pose: plane_mesh_vs.glsl)

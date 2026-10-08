@@ -118,20 +118,19 @@ const ModelDef kModels[] = {
     4, .38f, 0,
     0, 0,0,0,0,0,
     vec3(0,.62f,-4.70f), 3, -6.0f,-4.9f,.5f,-4.0f },
-  // ---------------------------------------------------------------- XR-20 Mantis (forward-swept demonstrator; generic field like the XR-10)
-  { // eight stations, nose to tail: a slim round body with the cockpit well forward
-    {{-8.0f,.07f,.07f,.05f},{-6.3f,.44f,.44f,.05f},{-4.8f,.79f,.79f,.05f},{-3.9f,.98f,.98f,.05f},
-     {-.3f,1.02f,1.02f,.04f},{2.65f,1.05f,1.05f,.04f},{6.1f,.40f,.40f,.20f},{8.0f,.07f,.07f,.28f}}, 1.0f,
-    {6.6f,3.15f,1.35f,-2.48f,-.62f,.65f,0.0f,.10f},   // forward-swept wing (negative LE sweep at the tip)
+  // ---------------------------------------------------------------- XR-20 Mantis (single-seat forward-swept systems demonstrator)
+  { // a low shoulder / chine body, a raised single-seat canopy and a tapered instrument nose
+    {{-8.0f,.035f,.035f,-.04f},{-6.25f,.30f,.22f,-.03f},{-4.95f,.64f,.57f,.10f},{-3.65f,.78f,.85f,.10f},
+     {-.3f,1.05f,.61f,-.02f},{2.65f,1.10f,.53f,-.03f},{6.1f,.48f,.30f,.03f},{8.0f,.06f,.07f,.10f}}, .28f,
+    {6.6f,3.15f,1.35f,-3.15f,-.62f,.65f,1.0f,.075f},   // strong forward sweep (span, area and roots as the physics has them)
     0,0.0f,0.0f,.52f,0,0,
-    {2.75f,1.18f,1.18f,0.0f,-.15f,-4.19f,0.0f},0,      // the canards: the horizontal tail placed forward
-    {2.3f,1.84f,1.10f,.80f,.20f,4.30f},
-    4,1.55f,.05f,.48f,1.73f,3.07f,0.0f,0.0f,          // aft twin jets
+    {2.40f,1.35f,.48f,.90f,-.18f,-4.90f,3.0f},0,       // tapered canards, clear of the cockpit sill
+    {1.65f,2.10f,.60f,1.20f,.22f,4.30f},               // twin canted fins, their roots on the shoulders at +-1.05 m
+    4,0.0f,-.08f,.68f,1.32f,6.20f,0.0f,0.0f,          // one large centreline core: a dorsal inlet, a round nozzle aft
     4,.26f,0,
     0,0.0f,0.0f,0.0f,0.0f,0.0f,
-    vec3(-.42f,.65f,-3.35f),2,                         // glass cockpit, the left seat (the generic cabin is a two-seat one: on its
-                                                        // centre line the pilot sat between the seats, behind the centre display)
-    -4.95f,-4.45f,.45f,-2.7f },
+    vec3(0.0f,.67f,-3.75f),2,                         // a centreline eye; the live glass instruments
+    -5.45f,-4.48f,.28f,-2.70f },
   // ---------------------------------------------------------------- XR-40 Wraith (stealth research craft; faceted SDF in the shader, engine code 6)
   { {{-8.40f,.04f,.03f,-.05f},{-7.00f,.45f,.24f,-.02f},{-5.20f,.85f,.48f,.05f},{-3.20f,1.10f,.58f,.06f},{0.0f,1.25f,.58f,.04f},{3.20f,1.30f,.52f,0},{6.00f,1.05f,.42f,-.02f},{7.80f,.80f,.32f,-.02f}}, .25f,
     {6.20f,7.60f,1.40f,5.40f,-.15f,-2.30f,0.0f,.04f}, 0,0,0,.82f, 0,0,
@@ -211,5 +210,11 @@ void packModel(const AircraftSpec& s, int idx, float gh, float o[24 * 4]) {
 }
 
 vec3 modelWingTip(const ModelDef& m) { return vec3(m.wing[0] + 0.02f, m.wing[4] + m.wing[0] * tanf(m.wing[6] * DEG), m.wing[5] + m.wing[3] + m.wing[2] * 0.25f); }
-vec3 modelFinTop(const ModelDef& m) { return vec3(0, m.vt[4] + m.vt[0] + 0.04f, m.vt[5] + m.vt[3] + m.vt[2] * 0.4f); }
-vec3 modelTailTip(const ModelDef& m) { return vec3(0, m.st[7][3], m.st[7][0] + 0.03f); }
+vec3 modelFinTop(const ModelDef& m) {   // (the XR-20's right fin, canted 0.48 rad from its shoulder root: plane_common.glsl mantisFinTop)
+  if (&m == &kModels[kMantis]) return vec3(1.05f + sinf(0.48f) * m.vt[0], m.vt[4] + cosf(0.48f) * m.vt[0] + 0.04f, m.vt[5] + m.vt[3] + m.vt[2] * 0.4f);
+  return vec3(0, m.vt[4] + m.vt[0] + 0.04f, m.vt[5] + m.vt[3] + m.vt[2] * 0.4f);
+}
+vec3 modelTailTip(const ModelDef& m) {   // (the XR-20's: on its nozzle's upper rim)
+  if (&m == &kModels[kMantis]) return vec3(0, m.nacY + m.nacR * 0.88f + 0.02f, m.nacZ0 + m.nacLen - 0.04f);
+  return vec3(0, m.st[7][3], m.st[7][0] + 0.03f);
+}

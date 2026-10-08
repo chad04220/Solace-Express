@@ -15,7 +15,8 @@ vec4 gearWheelFrame(vec3 p, out float halfWidth, out bool braked){
   float nh = research || kind == 3 ? 0.07 : 0.055;
   vec3 mq, nq;
   if (research) {   // (the research jets' wheels from their parts' poses: plane_parts.glsl jtMainPose, jtNosePose)
-    Pose M = jtMainPose(partMirror(p.x < 0.0 ? -1.0 : 1.0)), N = jtNosePose();
+    Pose M = jtMainPose(partMirror(p.x < 0.0 ? -1.0 : 1.0));
+    Pose N = jtNosePose();
     mq = transpose(M.R)*(p - M.T) - vec3(G0.x, wr - gh, G0.z);
     nq = transpose(N.R)*(p - N.T) - vec3(0.0, nwr - gh, G0.w); nq.x = abs(nq.x) - 0.10;
   } else {   // (the wheels' rest frames from their parts' poses, as they fold: plane_parts.glsl gearPartPose)
@@ -440,6 +441,53 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     }
     else if (mid == 11) m.alb = vec3(0.58, 0.54, 0.44); else if (mid == 12) m.alb = vec3(0.30, 0.115, 0.052);
     else if (mid == 63) m.alb = vec3(0.72, 0.66, 0.53); else if (mid == 69) m.alb = vec3(0.062, 0.040, 0.028);
+  }
+  if (isMantis()) {
+    if(mid==1 && mantisWindow(lp)<0.0) { m.alb=vec3(.018,.035,.045); m.rough=.055; m.metal=.30; }
+    if(mid==2 || mid==3 || mid==5) {
+      m.alb=vec3(.115,.14,.17); m.rough=.42; m.metal=.16;
+      if(mid==2) {
+        float k=clamp(abs(lp.x)/gM[9].x,0.0,1.0), ch=mix(gM[9].y,gM[9].z,k);
+        float cc=(lp.z-gM[10].y-gM[9].w*k)/ch;
+        if(k>.88 || (cc>.14 && cc<.18 && k>.27)) m.alb=vec3(.92,.43,.08);
+        if(cc>.75) m.alb=vec3(.065,.079,.10);
+      }
+      if(mid==3 && lp.z>3.5 && lp.y>1.05) m.alb=vec3(.92,.43,.08);
+      if(mid==5 && lp.z<MT_INLET.z+.12) { m.alb=vec3(.34,.38,.42); m.metal=.85; m.rough=.25; }
+      if(mid==5 && lp.z>gM[16].w+gM[17].x-.28) { m.alb=vec3(.18,.15,.12); m.metal=.8; }
+    }
+    if(mid==21) {
+      vec3 fc=mix(MT_INLET,vec3(0,.32,1.38),.68); vec2 fq=lp.xy-fc.xy;
+      float blades=.5+.5*cos(atan(fq.y,fq.x)*22.0-uTime*75.0*gFlame.x);
+      m.alb=mix(vec3(.035,.045,.052),vec3(.20,.23,.25),blades); m.metal=.9; m.rough=.35;
+    }
+    if(mid==134) {
+      vec2 tq=lp.xy-vec2(0,gM[16].y); float radial=length(tq);
+      float ring=exp(-pow((radial-gM[16].z*.49)/.035,2.0));
+      m.alb=vec3(.075,.06,.045); m.metal=.85; m.rough=.45;
+      m.emit=vec3(1.0,.29,.045)*ring*(.3*gFlame.x+2.2*gFlame.y);
+    }
+    if(mid==11 || mid==63) { m.alb=vec3(.075,.09,.11); m.rough=.68; }
+    if(mid==12) { m.alb=vec3(.08,.095,.11); m.rough=.8; }
+    if(mid==69) { m.alb=vec3(.43,.25,.075); m.rough=.9; }
+    if(mid>=130 && mid<=133) {
+      interior=true; m.nrm=vec3(0,0,1); m.metal=0.0;
+      if(mid==133) { m.alb=vec3(.80,.36,.06); m.rough=.34; m.emit=vec3(.8,.30,.04)*(.18+.45*uNight); }
+      else {
+        float px=t*2.0*uTanHalf/uRes.y; vec3 sc=vec3(.006,.012,.018);
+        if(ln.z>.5) {
+          if(mid==130) {
+            vec2 q=vec2(lp.x/1.85+.02,(lp.y-E.y+.325)/1.85);
+            vec4 pt=panelTex(q,px/1.85); if(pt.a>.001) sc=pt.rgb/pt.a;
+          } else {
+            vec2 uv=vec2((lp.x-(mid==131?-.235:.235))/.185,(lp.y-E.y+.695)/.117);
+            sc=pageTex(mid==131?0:2,uv,px/.117)*smoothstep(1.0,.95,max(abs(uv.x),abs(uv.y)));
+          }
+          gDispPx=true;
+        }
+        m.alb=vec3(.006); m.rough=.075; m.emit=sc*(.82+.45*uNight);
+      }
+    }
   }
   n = applyTS(n, m.nrm, interior ? 0.35 : 0.12);
   int engM = int(gM[0].z + 0.5);

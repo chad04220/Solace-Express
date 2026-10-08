@@ -149,20 +149,99 @@ int main(int argc, char** argv) {
     ok = p.fail.avionicsDark() && p.flightTime >= 0.f && !p.ev.crashed;
     printf("Alternator failure: battery flat after %.0f s %s\n", p.fail.battery <= 0.f ? 420.f : -1.f, ok ? "ok" : "FAIL"); fails += !ok;
   }
-  // ---------------- the research register's performance tiers: the XR-10 just subsonic, the XR-20 supersonic, the XR-30
-  // and the XR-40 above them in that order; and the structure takes a short overstress but not a sustained one
+  // ---------------- XR-20's centerline engine: the former pair's real combined thrust, with one failure channel.
+  {
+    const AircraftSpec& single = kAircraft[kMantis];
+    AircraftSpec twin = single; twin.engines = 2; twin.power = 44000.f;   // delivered two-engine proposal
+    Plane p, old;
+    p.spec = &single; old.spec = &twin;
+    bool ok = single.engines == 1 && single.power == 88000.f && single.special == 0;
+    float maxThrustDelta = 0.f; int samples = 0;
+    for (float alt : {0.f, 1500.f, 3000.f, 8000.f, 12000.f, 18000.f})
+      for (float spool : {0.f, 0.2f, 0.5f, 0.75f, 0.85f, 0.9f, 0.95f, 1.f})
+        for (float speed : {0.f, 60.f, 200.f, 340.f, 600.f, 850.f, 1000.f}) {
+          float rho = 1.225f * expf(-alt / 8500.f);
+          maxThrustDelta = std::max(maxThrustDelta, fabsf(p.thrustAt(spool, speed, speed, rho) - old.thrustAt(spool, speed, speed, rho)));
+          samples++;
+        }
+    ok = ok && maxThrustDelta == 0.f && fabsf(p.thrustAt(1.f, 0.f, 0.f, 1.225f) - 176000.f) < 0.1f
+            && p.fuelFlowMax() == old.fuelFlowMax() && fabsf(p.fuelFlowMax() - 0.990f) < 0.00001f
+            && p.spoolRate() == old.spoolRate() && p.spoolRate() == 0.45f;
+    printf("XR-20 single core: %d thrust samples, maximum pair delta %.3f N, static reheat %.0f N, fuel %.3f kg/s %s\n",
+           samples, maxThrustDelta, p.thrustAt(1.f, 0.f, 0.f, 1.225f), p.fuelFlowMax(), ok ? "ok" : "FAIL"); fails += !ok;
+    auto reset = [&](Plane& v, const AircraftSpec* s) {
+      v.reset(s, vec3(-39000, 8000, 35000), 0, single.maxFuel * 0.7f, 85, true, 200);
+      v.sceneryHits = false; v.gear = 0; v.ctl.gearDown = false; v.ctl.throttle = 1;
+    };
+    reset(p, &single); reset(old, &twin);
+    p.fail.engineHealth[1] = p.fail.engineHealth[2] = p.fail.engineHealth[3] = 0.f;   // nonexistent engines cannot dilute its power
+    for (int i = 0; i < 120; i++) { p.step(1 / 60.f, wx, i / 60.f); old.step(1 / 60.f, wx, i / 60.f); }
+    p.apSense();
+    ok = p.engineRunning && !p.glideOnly() && p.engineSpool == old.engineSpool && p.fuel == old.fuel
+         && fabsf(p.apEnv.spool - 1.f / 0.45f) < 0.00001f;
+    printf("XR-20 one-channel health: unused slots ignored, spool %.6f, equal fuel burn, AP response %.3f s %s\n",
+           p.engineSpool, p.apEnv.spool, ok ? "ok" : "FAIL"); fails += !ok;
+    reset(p, &single);
+    ok = p.failNow(FAIL_ENGINE_PARTIAL, 0) && p.fail.engineHealth[0] == 0.45f && p.engineRunning;
+    for (int i = 0; i < 15 * 60; i++) p.step(1 / 60.f, wx, i / 60.f);
+    p.apSense();
+    ok = ok && !p.ev.crashed && !p.glideOnly() && p.engineSpool > 0.449f && p.engineSpool < 0.451f
+         && p.apEnv.thrustFrac > 0.f && p.apEnv.thrustFrac < 0.25f;
+    printf("XR-20 partial core loss: health %.2f, spool %.5f, AP thrust fraction %.3f %s\n",
+           p.fail.engineHealth[0], p.engineSpool, p.apEnv.thrustFrac, ok ? "ok" : "FAIL"); fails += !ok;
+    reset(p, &single); reset(old, &twin); Plane stopped = p;
+    stopped.engineRunning = false; stopped.starterTime = 0;
+    float fuelBefore = p.fuel;
+    ok = p.failNow(FAIL_ENGINE_TOTAL, 1) && p.glideOnly() && !p.engineRunning && p.fail.engineHealth[0] == 0.f;
+    ok = old.failNow(FAIL_ENGINE_TOTAL, 1) && old.engineRunning && !old.glideOnly() && ok;
+    for (int i = 0; i < 120; i++) { p.step(1 / 60.f, wx, i / 60.f); stopped.step(1 / 60.f, wx, i / 60.f); old.step(1 / 60.f, wx, i / 60.f); }
+    float singleYaw = wrapAngle(p.heading() * DEG) / DEG, twinYaw = wrapAngle(old.heading() * DEG) / DEG;
+    p.apSense();
+    ok = ok && !p.ev.crashed && !p.engineRunning && p.fuel == fuelBefore && p.apEnv.thrustFrac == 0.f && !p.apEnv.canGoAround
+         && length(p.vel - stopped.vel) == 0.f && length(p.w - stopped.w) == 0.f
+         && fabsf(singleYaw) < 0.01f && fabsf(twinYaw) > 0.1f;
+    p.starterTime = 0.01f; p.step(1 / 60.f, wx, 3.f);
+    ok = ok && !p.engineRunning && p.starterTime == 0.f;   // cranking cannot revive a failed core
+    printf("XR-20 total core loss: zero powered force/fuel, AP glide only, yaw %+.3f deg (prior twin %+.3f), restart inhibited %s\n",
+           singleYaw, twinYaw, ok ? "ok" : "FAIL"); fails += !ok;
+  }
+  // ---------------- research tiers: actual sustained level flight, not designMach labels or a diving peak.
+  // designMach is the onset of extra drag, not a hard speed cap. Keep the XR-30 / XR-40 physics unchanged.
   {
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
-    auto topMach = [&](int idx, float alt) {
+    struct LevelResult { float mach = 0, minAlt = 1e9f, maxAlt = -1e9f, vs = 0, accel = 0; bool intact = true; };
+    auto levelMach = [&](int idx, float alt) {
       const AircraftSpec& s = kAircraft[idx];
-      Plane p; p.reset(&s, vec3(-40000, alt, 0), 90, s.maxFuel * 0.7f, 85, true, 200); p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0;
-      float m = 0;
-      for (int i = 0; i < 100 * 240 && !p.ev.crashed; i++) { p.ctl.pitch = clampf((alt - p.pos.y) * 0.002f - p.vel.y * 0.01f - p.w.x * 0.3f, -1, 1); p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1, 1); p.step(1 / 240.f, calm, i / 240.f); m = std::max(m, p.mach); }
-      return m;
+      Plane p; p.reset(&s, vec3(-39000, alt, 35000), 90, s.maxFuel * 0.7f, 0, true, 200);
+      p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0; p.sceneryHits = false;
+      LevelResult r; float integral = 0, vFrom = 0; int n = 0;
+      for (int i = 0; i < 240 * 60 && !p.ev.crashed; i++) {
+        float error = alt - p.pos.y;
+        integral = clampf(integral + error / 60.f, -200.f, 200.f);
+        p.ctl.pitch = clampf(error * 0.002f - p.vel.y * 0.01f - p.w.x * 0.3f + integral * 0.00004f, -1.f, 1.f);
+        p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1.f, 1.f);
+        p.step(1 / 60.f, calm, i / 60.f);
+        // Recycle horizontal position over the same open sea so chart bounds do not truncate a sustained test.
+        // All flight state (altitude, attitude, velocity, fuel, mass, controls and forces) continues normally.
+        p.pos.x = -39000; p.pos.z = 35000;
+        if (i == 210 * 60) vFrom = p.airspeed;
+        if (i >= 210 * 60) { r.mach += p.mach; r.vs += p.vel.y; r.minAlt = std::min(r.minAlt, p.pos.y); r.maxAlt = std::max(r.maxAlt, p.pos.y); n++; }
+      }
+      r.intact = !p.ev.crashed && p.fuel > 0 && n == 30 * 60;
+      if (n) { r.mach /= n; r.vs /= n; } r.accel = (p.airspeed - vFrom) / 30.f;
+      return r;
     };
-    float m8 = topMach(kNightjar, 8000.f), m10 = topMach(kMantis, 8000.f), m9 = topMach(kResearchJet, 8000.f), m11 = topMach(kWraith, 8000.f);
-    bool ok = m8 > 0.93f && m8 < 1.0f && m10 > 1.7f && m10 < 2.2f && m9 > 2.5f && m9 > m10 + 0.4f && m11 > 4.0f && m11 > m9 + 0.8f;
-    printf("Research tiers at 8 km: XR-10 Mach %.2f  XR-20 Mach %.2f  XR-30 Mach %.2f  XR-40 Mach %.2f %s\n", m8, m10, m9, m11, ok ? "ok" : "FAIL"); fails += !ok;
+    bool ok = true;
+    for (float alt : {1500.f, 3000.f, 8000.f, 12000.f}) {
+      LevelResult n = levelMach(kNightjar, alt), m = levelMach(kMantis, alt), s = levelMach(kResearchJet, alt), w = levelMach(kWraith, alt);
+      bool stable = true;
+      for (const auto& r : {n, m, s, w}) stable = stable && r.intact && fabsf(r.vs) < 0.3f && fabsf(r.accel) < 0.15f && r.minAlt > alt - 40.f && r.maxAlt < alt + 40.f;
+      bool tier = stable && n.mach > 1.15f && n.mach < 1.65f && m.mach > 1.75f && m.mach < 2.25f && m.mach > n.mach + 0.35f
+                && s.mach > 2.65f && s.mach < 3.1f && s.mach > m.mach + 0.55f && w.mach > 4.f && w.mach > s.mach + 0.8f;
+      printf("Sustained research tiers at %.1f km: XR-10 M%.3f XR-20 M%.3f XR-30 M%.3f XR-40 M%.3f; level/settled %s %s\n", alt / 1000.f, n.mach, m.mach, s.mach, w.mach, stable ? "yes" : "NO", tier ? "ok" : "FAIL");
+      ok = ok && tier;
+    }
+    fails += !ok;
     // the overstress: the XR-30 (limited to 40 g) rides 15% over for four seconds while the stress builds (it bleeds
     // its speed before the airframe gives), and a full pull at Mach 3 takes it past twice the limit: that snaps it
     const AircraftSpec& s9 = kAircraft[kResearchJet];

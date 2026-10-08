@@ -533,6 +533,8 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel) {
   glUniform4fv(U(p, "uI0"), 1, pv.I0); glUniform4fv(U(p, "uI1"), 1, pv.I1); glUniform4fv(U(p, "uI2"), 1, pv.I2);
   glUniform1f(U(p, "uTime"), fp.time); glUniform1i(U(p, "uCraterN"), 0);
   glUniform4f(U(p, "uDispMode"), panel ? 1.f : 0.f, (float)fp.dispCk, 0, 0);
+  glUniform1i(U(p, "uDisplayEngines"), pv.model == kMantis ? 1 : 2);
+  glUniform4fv(U(p, "uFlame"), 1, pv.flame);
   glUniform2f(U(p, "uDispRes"), (float)w, (float)h);
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);

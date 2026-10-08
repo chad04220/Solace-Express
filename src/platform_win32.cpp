@@ -735,6 +735,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     fprintf(f, "Launch: shaders and islands %.1f s (islands %s), career %.1f s, renderer %.1f s, menu %.1f s, aircraft meshes %.1f s (%d built)\n",
             pace.tookOf("start"), g_world.fromCache ? "from the cache" : "generated", pace.tookOf("career"), pace.tookOf("renderer"), pace.tookOf("menu"), pace.tookOf("mesh"), g_ren.bakeBuilt);
     if (!g_ren.dispError.empty()) fprintf(f, "Display shader failed (cockpit screens disabled):\n%s\n", g_ren.dispError.c_str());
+    if (!g_ren.proxyError.empty()) fprintf(f, "Shadow proxy shader failed (aircraft shadows from the shadow maps only):\n%s\n", g_ren.proxyError.c_str());
     fclose(f);
   }
   // Every aircraft body (outside and cockpit, the research craft's too) built or loaded before the tools draw a scene:

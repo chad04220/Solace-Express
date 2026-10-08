@@ -127,6 +127,7 @@ bool gearPartBox(int type, const float* M, vec3& lo, vec3& hi, float& h) {
 }
 int partList(const float* M, bool inside, PartInst* out) {
   const int eng = (int)(M[2] + 0.5f);
+  const bool mantis = eng == 4 && fabsf(M[22 * 4]) < 0.001f && M[13 * 4 + 1] < -3.f;   // (the XR-20: a centreline eye, its canards ahead: plane_common.glsl isMantis)
   int n = 0;
   if (eng == 6 && !inside) {   // the XR-40: per pod its nacelle, fan, vanes, ten iris petals and tilt actuator; the bay doors, the bomb, the turrets, the elevons and ruddervators, the gear
     for (int i = 0; i < 4; i++) {
@@ -146,7 +147,7 @@ int partList(const float* M, bool inside, PartInst* out) {
   }
   if (eng < 5) {   // the light aircraft's (and the XR-10's and XR-20's) control surfaces, outside and from the cockpit
     for (int s = -1; s <= 1; s += 2) { out[n++] = {11, (float)s, 0}; out[n++] = {12, (float)s, 0}; out[n++] = {13, (float)s, 0}; }   // flap, aileron, elevator
-    out[n++] = {14, 0, 0};   // rudder
+    if (mantis) { out[n++] = {14, -1, 0}; out[n++] = {14, 1, 0}; } else out[n++] = {14, 0, 0};   // the rudder (the XR-20's canted pair)
     // and their gear: a retracting main leg a side and its bay's two doors; the nose wheel (and its doors) or the tail wheel
     const int gtype = (int)(M[1] + 0.5f); const bool tail = M[19 * 4 + 2] > 0.5f;
     if (gtype >= 3) for (int s = -1; s <= 1; s += 2) { out[n++] = {33, (float)s, 0}; out[n++] = {36, (float)s, -1}; out[n++] = {36, (float)s, 1}; }
@@ -165,6 +166,7 @@ int partList(const float* M, bool inside, PartInst* out) {
   if (eng == 5) { out[n++] = {6, 0, 0}; out[n++] = {7, 0, 0}; return n; }                      // the XR-30: stick, throttle
   if (eng == 6) { out[n++] = {8, 0, 0}; out[n++] = {9, 0, 0}; out[n++] = {10, -1, 0}; out[n++] = {10, 1, 0}; return n; }   // the XR-40: and its pedals
   if (eng > 6) return 0;
+  if (mantis) { out[n++] = {6, 0, 0}; out[n++] = {7, 0, 0}; out[n++] = {2, 0, -1}; out[n++] = {2, 0, 1}; return n; }   // the XR-20: side stick, throttle, one pair of pedals
   for (int s = -1; s <= 1; s += 2) { out[n++] = {0, (float)s, 0}; out[n++] = {1, (float)s, 0}; }   // the yokes: shaft, wheel
   for (int s = -1; s <= 1; s += 2) for (int q = -1; q <= 1; q += 2) out[n++] = {2, (float)s, (float)q};   // the pedals
   if ((int)(M[21 * 4 + 2] + 0.5f) == 0) out[n++] = {3, 0, 0};   // a push-pull throttle

@@ -33,6 +33,7 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float jit){
     // 2D nozzle: a flat jet that rounds out and spreads downstream, pinched at every shock cell in reheat
     float pinch = 1.0 - 0.14*ab*(0.5 + 0.5*cos(cell*6.2832))*(1.0 - u);
     float wx = mix(0.37, 0.55, u)*(1.0 + 0.5*ab*u)*pinch, wy = mix(0.25, 0.55, u)*(1.0 + 0.5*ab*u)*pinch;
+    if(isMantis()) { wx=mix(gM[16].z*.70,.72,u)*(1.0+.5*ab*u)*pinch; wy=wx; }
     float e2 = (nx*nx)/(wx*wx) + (ny*ny)/(wy*wy);
     if (e2 > 4.0) continue;
     float r = sqrt(e2);
@@ -74,6 +75,11 @@ vec3 feedScreen(int id, vec3 sl, out vec3 rdc, out bool bomb);
 vec3 wrFeedOverlay(vec3 col, vec3 sl);
 float wrClip(vec3 lp, int mid);
 vec3 wrClipAtlas(vec2 uv);
+vec3 mantisPlume(vec3 ro, vec3 rd, float tmax, float jit){
+  if(gFlame.x<.02) return vec3(0);
+  mat3 inv=transpose(uPlaneRot);
+  return plumeOne(inv*(ro-uPlanePos),inv*rd,tmax,mantisNozzle()+vec3(0,0,.02),vec3(0,0,1),jit);
+}
 vec3 jetPlumes(vec3 ro, vec3 rd, float tmax, float jit){
   if (gFlame.x < 0.02) return vec3(0.0);
   mat3 inv = transpose(uPlaneRot);

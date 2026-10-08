@@ -1790,6 +1790,13 @@ void Game::buildLights(FrameParams& fp) {
              * (((s.special == 2 ? 6.f * sp * sp : 14.f * sp) + 45.f * ab) * flick / (float)nEx) * dark;
     for (int k = 0; k < nEx; k++) light(W(exP[k] + exD[k] * (0.15f + 0.15f * ab)), 0.08f, c * (s.special == 2 ? exS[k] : 1.f), -2.f, vec3(0, 1, 0), 0.05f);
   }
+  // the XR-20: one exhaust light, behind its one round nozzle
+  if (&s == &kAircraft[kMantis] && plane.engineRunning && !(camMode == 1 && fp.sealedCockpit)) {
+    float sp = fp.plane.flame[0], ab = fp.plane.flame[1];
+    float flick = 0.85f + 0.15f * sinf(t * 57.f) * sinf(t * 23.f + 1.f);
+    vec3 c = lerp(vec3(0.3f, 0.55f, 1.f), vec3(1.f, 0.62f, 0.3f), ab) * ((14.f * sp + 45.f * ab) * flick);
+    light(W(vec3(0, md.nacY, md.nacZ0 + md.nacLen + 0.18f)), 0.10f, c, -2.f, vec3(0, 1, 0), 0.05f);
+  }
   // fixture positions (body space)
   vec3 tip = s.special == 2 ? kWraithWingTip : s.special ? kJetWingTip : modelWingTip(md);
   vec3 tail = s.special == 2 ? vec3(0, -0.1f, 7.86f) : s.special ? vec3(0, 0.45f, 7.6f) : modelTailTip(md);
@@ -2244,7 +2251,12 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   vec3 vb = length(p.vel) > 2.f ? p.q.conj().rotate(normalize(p.vel)) : vec3(0, 0, -1);
   pv.hudV[0] = vb.x; pv.hudV[1] = vb.y; pv.hudV[2] = vb.z;
   pv.hud3[0] = p.engineSpool; pv.hud3[1] = p.alpha / DEG; pv.hud3[2] = p.vel.y; pv.hud3[3] = p.agl();
-  if (s.special) {
+  if (&s == &kAircraft[kMantis]) {   // (its one engine: out with the fuel or a failure, whatever the spool still reads as it winds down)
+    bool live = p.engineRunning && p.fuel > 0.f && p.fail.engineHealth[0] > 0.f;
+    pv.flame[0] = live ? p.engineSpool : 0.f;
+    pv.flame[1] = live ? smoothstepf(0.85f, 1.f, p.engineSpool) : 0.f;
+    pv.flame[2] = 0.f; pv.flame[3] = p.mach;
+  } else if (s.special) {
     pv.flame[0] = p.engineRunning ? p.engineSpool : 0.f; pv.flame[1] = p.engineRunning ? smoothstepf(0.7f, 1.f, p.engineSpool) : 0.f;
     pv.flame[2] = jetNozzleAngle(p); pv.flame[3] = p.mach;
   }

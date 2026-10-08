@@ -27,22 +27,25 @@ struct ResCraftInfo {
   const char* notes[5];    // handling directives
   const char* contractId;
 };
+// (the conventional pair's figures as the flight model flies them: top speed sustained level at 8 km with 70% fuel,
+// T/W static in full reheat at sea level with 70% fuel and the pilot, roll rate at full aileron at 200 m/s - it grows
+// with speed on conventional controls - and the time a full cell lasts in full reheat)
 const ResCraftInfo kResCraft[] = {
-  {kNightjar, "NG-XR10-N  //  BLK 0", "XR-10", "NIGHTJAR", R_TEAL, {0.3f, 0.35f, 0.92f}, "CONVENTIONAL TWIN-JET DEMONSTRATOR",
-   {{"CONFIGURATION", "Tapered low wing, conventional tail", -1}, {"PROPULSION", "2 x turbofan, 25 kN total", 0.08f},
-    {"THRUST / WEIGHT", "0.9 : 1", 0.2f}, {"TOP SPEED", "Mach 0.98 - just subsonic", 0.25f},
-    {"VECTORING", "None - conventional controls", 0.f}, {"ROLL RATE", "200 deg/s", 0.5f},
-    {"AIRFRAME", "+9 / -4 g", 0.1f}, {"ENDURANCE", "1,300 kg fuel, 240 km at speed", 0.3f}},
-   12.f, -6.f, 6.f, 9.f, -4.f, 0.98f, 0.25f,
-   {"Conventional controls: no FBW, no vectoring", "Flaps and gear as any jet: ~150 kt over the fence", "Fuel burns: a 1,300 kg cell, plan the sortie",
-    "Long hard runways only", "The programme's flying testbed for sensors and skins"}, "XR10"},
-  {kMantis, "NG-XR20-M  //  BLK 2", "XR-20", "MANTIS", R_EMBER, {0.35f, 0.55f, 0.7f}, "FORWARD-SWEPT SYSTEMS DEMONSTRATOR",
-   {{"CONFIGURATION", "Forward sweep, all-moving canards", -1}, {"PROPULSION", "2 x turbofan, 30 kN total", 0.1f},
-    {"THRUST / WEIGHT", "1.9 : 1 with reheat", 0.4f}, {"TOP SPEED", "Mach 2.0", 0.5f},
-    {"SYSTEMS", "Reheat, canards, forward sweep", 0.5f}, {"ROLL RATE", "280 deg/s", 0.7f},
-    {"AIRFRAME", "+14 / -6 g", 0.16f}, {"ENDURANCE", "1,800 kg fuel, 900 km", 0.3f}},
-   16.f, -8.f, 8.f, 14.f, -6.f, 2.0f, 0.3f,
-   {"Canards ahead of a forward-swept wing: brisk in pitch", "Reheat above 85% throttle: supersonic with height", "Conventional controls, flaps and retractable gear",
+  {kNightjar, "NG-XR10-N  //  BLK 0", "XR-10", "NIGHTJAR", R_TEAL, {0.36f, 0.35f, 0.92f}, "SUPERSONIC TWIN-JET DEMONSTRATOR",
+   {{"CONFIGURATION", "Tapered low wing, conventional tail", -1}, {"PROPULSION", "2 x 30 kN rated, reheat", 0.15f},
+    {"THRUST / WEIGHT", "1.8 : 1 static reheat", 0.30f}, {"TOP SPEED", "Mach 1.44 at 8 km", 0.36f},
+    {"VECTORING", "None - conventional controls", 0.f}, {"ROLL RATE", "190 deg/s at 200 m/s", 0.48f},
+    {"AIRFRAME", "+9 / -4 g", 0.1f}, {"ENDURANCE", "1,300 kg, 12 min in full reheat", 0.12f}},
+   12.f, -6.f, 6.f, 9.f, -4.f, 1.44f, 0.25f,
+   {"Conventional controls: no FBW, no vectoring", "Flaps and gear as any jet; approach speed follows weight", "Fuel burns: a 1,300 kg cell, plan the sortie",
+    "Long hard runways only", "T/W reference: sea level, 70% fuel + pilot"}, "XR10"},
+  {kMantis, "NG-XR20-M  //  BLK 2", "XR-20", "MANTIS", R_EMBER, {0.52f, 0.55f, 0.7f}, "FORWARD-SWEPT SYSTEMS DEMONSTRATOR",
+   {{"CONFIGURATION", "Forward sweep, canards, twin fins", -1}, {"PROPULSION", "1 x 88 kN rated, reheat", 0.30f},
+    {"THRUST / WEIGHT", "2.4 : 1 static reheat", 0.42f}, {"TOP SPEED", "Mach 2.06 at 8 km", 0.52f},
+    {"SYSTEMS", "Single-seat live research cockpit", 0.5f}, {"ROLL RATE", "215 deg/s at 200 m/s", 0.54f},
+    {"AIRFRAME", "+14 / -6 g", 0.16f}, {"ENDURANCE", "1,800 kg, 30 min in full reheat", 0.3f}},
+   16.f, -8.f, 8.f, 14.f, -6.f, 2.06f, 0.3f,
+   {"Canards ahead of a forward-swept wing: brisk in pitch", "Reheat above 85% throttle; T/W at 70% fuel + pilot", "Conventional controls, flaps and retractable gear",
     "Good for +14 / -6 g; a short overstress is survivable", "Land at ~120 kt with full flap"}, "XR20"},
   {kResearchJet, "NG-XR30-S  //  BLK 3", "XR-30", "SPECTER", R_ICE, {0.7f, 0.72f, 0.45f}, "HYPERSONIC-CAPABLE RESEARCH MODEL",
    {{"CONFIGURATION", "Lifting body, cranked delta, canards", -1}, {"PROPULSION", "2 x turbofan, 472 kN full reheat", 0.72f},
@@ -129,12 +132,12 @@ void silhouette(int craft, float cx, float cy, float sc, vec3 c, float a, float 
       float px = kWraithPods[i].x / 6.4f, py = kWraithPods[i].z / 8.2f;
       g_ren.rectOutline(cx + px * sc - 0.07f * sc, cy + py * sc - 0.14f * sc, 0.14f * sc, 0.28f * sc, c, a, 0.06f * sc, th);
     }
-  } else if (craft == kMantis) {   // forward-swept wing, canards, single fin, two aft engines
+  } else if (craft == kMantis) {   // forward-swept wing, canards, twin canted fins, one centerline engine
     static const float body[] = {0.f, -1.f, 0.1f, -0.75f, 0.12f, -0.45f, 0.36f, -0.5f, 0.38f, -0.42f, 0.14f, -0.3f, 0.14f, 0.02f, 0.95f, -0.2f, 0.98f, -0.08f, 0.26f, 0.42f, 0.15f, 0.7f, 0.12f, 0.94f, 0.f, 0.96f};
     mirror(body, 13);
+    g_ren.rectOutline(cx - 0.08f * sc, cy + 0.34f * sc, 0.16f * sc, 0.42f * sc, c, a, 0.05f * sc, th);
     for (int side = -1; side <= 1; side += 2)
-      g_ren.rectOutline(cx + side * 0.2f * sc - 0.05f * sc, cy + 0.42f * sc, 0.1f * sc, 0.3f * sc, c, a, 0.04f * sc, th);
-    g_ren.line(cx, cy + 0.55f * sc, cx, cy + 0.98f * sc, th, c, a);
+      g_ren.line(cx + side * 0.20f * sc, cy + 0.55f * sc, cx + side * 0.34f * sc, cy + 0.94f * sc, th, c, a);
   } else if (craft == kResearchJet) {
     static const float body[] = {0.f, -1.f, 0.1f, -0.7f, 0.16f, -0.35f, 0.42f, -0.42f, 0.2f, -0.18f, 0.5f, 0.28f, 0.98f, 0.52f, 0.92f, 0.66f, 0.3f, 0.7f, 0.2f, 0.92f, 0.f, 0.92f};
     mirror(body, 11);
@@ -166,7 +169,7 @@ std::vector<std::string> wrap(const std::string& s, float width, float size);   
 
 // The test cards. Each step: what is measured, the value, how long it must be held (0: once is enough), its label.
 const Game::ResCard Game::kResCards[] = {
-  {kNightjar, "XR10-1", "TRANSONIC DASH", "Take the Nightjar to the edge of its envelope: hold Mach 0.95 for 15 s, climb through 11,000 m, then bring it home.",
+  {kNightjar, "XR10-1", "TRANSONIC DASH", "Check the transonic transition: hold Mach 0.95 for 15 s, climb through 11,000 m, then bring the Nightjar home. Reheat can now carry it beyond Mach 1.",
    {{RS_MACH, 0.95f, 15.f, "Hold Mach 0.95"}, {RS_ALT, 11000.f, 0.f, "Climb through 11,000 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
   {kNightjar, "XR10-2", "AGILITY", "Conventional controls at their limit: a 170 deg/s roll, 8 g, then -3 g. The airframe is good for +9 / -4 and will take a short overstress.",
    {{RS_ROLL, 170.f, 0.f, "Roll at 170 deg/s"}, {RS_G, 8.f, 0.f, "Pull 8 g"}, {RS_NEGG, -3.f, 0.f, "Push to -3 g"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
@@ -512,8 +515,8 @@ void Game::drawResearch(const FrameParams& fp) {
     else {   // a conventional airframe: its parts from the parametric model
       const ModelDef& md = kModels[resCraft];
       vec3 tip = modelWingTip(md), fin = modelFinTop(md);
-      calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  TEST RADAR", -1}, {tip, "TAPERED WING  //  SLOTTED FLAPS", 1},
-               {vec3(-md.nacX, md.nacY, md.nacZ0 + md.nacLen * 0.5f), "TURBOFAN  //  12.5 kN", -1}, {fin, "CONVENTIONAL TAIL", 1}};
+      calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  TEST RADAR", -1}, {tip, resCraft == kMantis ? "FORWARD SWEEP  //  SLOTTED FLAPS" : "TAPERED WING  //  SLOTTED FLAPS", 1},
+               {vec3(-md.nacX, md.nacY, md.nacZ0 + md.nacLen * 0.5f), resCraft == kMantis ? "CENTERLINE CORE  //  88 kN RATED" : "TURBOFAN  //  30 kN RATED", -1}, {fin, resCraft == kMantis ? "TWIN CANTED FINS" : "CONVENTIONAL TAIL", 1}};
     }
     float ca = e * smoothstepf(0.6f, 1.3f, selT);
     int ci = 0;
@@ -557,10 +560,10 @@ void Game::drawResearch(const FrameParams& fp) {
     float ch = std::min(120 * s, L.bot - py - 120 * s);
     if (ch > 50 * s) {
       float gx0 = px + 26 * s, gw = iw - 30 * s, gy0 = py, gh = ch;
-      float mMax = RC.vMax > 1.5f ? 4.f : 1.f, nTop = RC.nTop, nBot = RC.nBot, nStep = RC.nStep;   // each craft on its own scale
+      float mMax = RC.idx == kNightjar ? 1.6f : (RC.vMax > 1.5f ? 4.f : 1.f), nTop = RC.nTop, nBot = RC.nBot, nStep = RC.nStep;   // each craft on its own scale
       auto X = [&](float m) { return gx0 + m / mMax * gw; };
       auto Y = [&](float n) { return gy0 + (nTop - n) / (nTop - nBot) * gh; };
-      for (int m = 0; m <= 4; m++) { float mm = m * mMax / 4.f; g_ren.rect(X(mm), gy0, 1, gh, R_DIM, 0.18f * e); g_ren.text(X(mm), gy0 + gh + 3 * s, 9 * s, mMax > 1.5f ? fmt("M%d", m) : fmt("M%.2f", mm), R_DIM, e, 1, false); }
+      for (int m = 0; m <= 4; m++) { float mm = m * mMax / 4.f; g_ren.rect(X(mm), gy0, 1, gh, R_DIM, 0.18f * e); g_ren.text(X(mm), gy0 + gh + 3 * s, 9 * s, RC.idx != kNightjar && mMax > 1.5f ? fmt("M%d", m) : fmt("M%.2f", mm), R_DIM, e, 1, false); }
       for (float n = nBot; n <= nTop + 0.1f; n += nStep) { g_ren.rect(gx0, Y(n), gw, 1, R_DIM, n == 0 ? 0.4f : 0.18f * e); g_ren.text(gx0 - 4 * s, Y(n) - 5 * s, 9 * s, fmt("%+.0f", n), R_DIM, e, 2, false); }
       float nMax = RC.nMax, nMin = RC.nMin, vMax = RC.vMax, ms = RC.ms;
       std::vector<std::pair<float, float>> env;

@@ -511,14 +511,17 @@ vec3 mfdTitle(vec3 c, vec2 uv, ivec4 a, ivec4 b){
   c = mix(c, C*0.8, aFill(sdBox(uv - vec2(0.8, 0.86), vec2(0.06, 0.02))));
   return c;
 }
+uniform int uDisplayEngines;   // one on the Mantis; existing twin-engine research pages otherwise
 vec3 mfdPage(int page, vec2 uv){
   const vec3 G = vec3(0.25, 1.0, 0.7), A = vec3(1.0, 0.62, 0.15), W = vec3(0.9, 0.95, 1.0), R = vec3(1.0, 0.25, 0.2), C = vec3(0.3, 0.8, 1.0);
   float lw = 0.012; vec3 c = vec3(0.0);
-  float spool = uHud3.x, thr = uHud2.y, ab = smoothstep(0.85, 1.0, spool);
+  float spool = uHud3.x, thr = uHud2.y, ab = uDisplayEngines==1?uFlame.y:smoothstep(0.85, 1.0, spool);
   if (page == 0) {          // ENGINES: twin N1 dials (270 deg), needles, digital readouts, reheat banner
-    c = mfdTitle(c, uv, ivec4(69, 78, 71, 73), ivec4(78, 69, 83, 0));
+    bool single=uDisplayEngines==1;
+    c = mfdTitle(c, uv, ivec4(69, 78, 71, 73), single?ivec4(78,69,0,0):ivec4(78,69,83,0));
     for (int e = 0; e < 2; e++) {
-      vec2 o = uv - vec2(e == 0 ? -0.46 : 0.46, 0.05);
+      if(single && e>0) break;
+      vec2 o = uv - vec2(single?0.0:(e == 0 ? -0.46 : 0.46), 0.05);
       float rr = 0.36, A0 = -2.356, AS = 4.712;
       c = mix(c, G*0.25, dArc(o, rr, A0, A0 + AS, lw*0.8));
       c = mix(c, spool > 0.85 ? A : G, dArc(o, rr, A0, A0 + AS*clamp(spool, 0.0, 1.0), lw*3.0));
@@ -533,7 +536,7 @@ vec3 mfdPage(int page, vec2 uv){
       if (wb < 0.0) c = vec3(0.0);
       c = mix(c, G*0.7, aLine(wb, lw*0.6));
       c = mix(c, G, numC(bq - vec2(0.13, 0.0), spool*100.0, 0.085, 2, 1));
-      c = mix(c, W*0.7, txt4(o - vec2(0.0, 0.09), 0.05, e == 0 ? ivec4(78, 49, 32, 76) : ivec4(78, 49, 32, 82), 1));
+      c = mix(c, W*0.7, txt4(o - vec2(0.0, 0.09), 0.05, single?ivec4(78,49,0,0):(e == 0 ? ivec4(78,49,32,76):ivec4(78,49,32,82)), 1));
     }
     float bn = sdRBox(uv - vec2(0.0, -0.78), vec2(0.36, 0.09), 0.03);
     if (ab > 0.01) {

@@ -817,6 +817,24 @@ struct GameTest {
       bool alias = g.atc.resolve("BATTERY FLAT  no autopilot, no GPS", "", false, tx) && tx.ids.size() == 1 && g.atc.text(tx.ids[0]) == "BATTERY FLAT - no autopilot, no GPS";
       printf("Pod setting grouped %d, HUD alias spoken in full %d: %s\n", pods, alias, pods && alias ? "ok" : "FAIL"); fails += !(pods && alias);
     }
+    {   // XR-20 has one real engine: its live HUD and spoken warning must not retain a second-engine channel.
+      Plane saved = g.plane;
+      const AircraftSpec& s = kAircraft[kMantis];
+      g.plane.reset(&s, vec3(-39000, 8000, 35000), 0, s.maxFuel * 0.7f, 85, true, 200);
+      g.plane.failNow(FAIL_ENGINE_PARTIAL, 0);
+      auto partial = g.hudAnnunciators();
+      bool ok = s.engines == 1 && partial.size() == 1 && partial[0].text == "ENGINE POWER LOSS";
+      g.plane.failNow(FAIL_ENGINE_TOTAL, 0);
+      auto total = g.hudAnnunciators();
+      ok = ok && total.size() == 1 && total[0].text.rfind("ENGINE FAILURE  glide ", 0) == 0 && g.plane.glideOnly() && !g.plane.engineRunning;
+      if (voices) {
+        AtcVoice::Tx tx;
+        for (const auto& ann : partial) ok = g.atc.resolve(ann.text, "", false, tx) && ok;
+        for (const auto& ann : total) ok = g.atc.resolve(ann.text, "", false, tx) && ok;
+      }
+      printf("XR-20 single-engine HUD: partial %zu / total %zu warning, live glide guidance and voice %s\n", partial.size(), total.size(), ok ? "ok" : "FAIL"); fails += !ok;
+      g.plane = saved;
+    }
     if (voices) {   // the startup announcements survive startFlight's comms reset; a mechanical engine failure gives glide guidance, not restart advice
       Contract c = g_story[4]; c.wx = Weather();
       g.startFlight(c, 1, Career::SRC_OWNED);
