@@ -372,7 +372,7 @@ the render harness can show the old look with `MATDIR=""`.
 | 0 | `M_GRASS` | ambientCG Grass004 | 4-6 | terrain, airfield grass |
 | 1 | `M_FOREST` | procedural (crowns from above) | 26 | terrain forest |
 | 2 | `M_ROCK` | Poly Haven rock_face_03, stretched | 18 | terrain cliffs, rocks |
-| 3 | `M_SAND` | Poly Haven aerial_beach_01 | 6 | beaches |
+| 3 | `M_SAND` | Poly Haven coast_sand_01, at 0.58× the generator's brightness | 6 | beaches |
 | 4 | `M_SNOW` | ambientCG Snow006 | 8 | snow |
 | 5 | `M_ASPHALT` | Poly Haven asphalt_04 | 6-7 | runways, taxiways, roads |
 | 6 | `M_GRAVEL` | ambientCG Gravel022 | 2-6 | gravel strips, aprons |
@@ -432,7 +432,9 @@ The constants live in `scene_uniforms.glsl` (and `ent_fs1.glsl` for the scenery)
    whole: a 2.6 m rock face read as an 18 m cliff), box-filters it to 512² (seamless), and then matches the procedural
    layer: the per-channel mean colour, the mean roughness, and the mean slope (held to 0.5-2× the scan's own).
    Options: `colour` (how much of the scan's own colour variation to keep), `contrast` (scale its variation about
-   the mean), `bump` (relief against the procedural layer's), `flip` (upside down, for a wall layer with an up).
+   the mean), `bump` (relief against the procedural layer's), `brightness` (scale the matched mean: the generator's
+   sand was twice a real beach's and blew out to a textureless white), `flip` (upside down, for a wall layer with an
+   up).
 4. **Pack:** `tools/pack_materials.py --old /tmp/old --only N` (downloads are cached in `~/.cache/solace-materials`).
    It prints the repeat, the content's scale against its real size, the colours matched and the relief gain.
 5. **Look at it** next to the old layer (the `_c.jpg` against the dump's `_alb.ppm`), then in the game: the render
@@ -643,7 +645,8 @@ cockpit muffling inside. A new type gets its sound from `engineType`, `engines`,
    - `ckv<i>_<yaw>_<pitch>_<hour>[_<roll>[_<flaps>]]`: the cockpit (`settle=30` lets the anti-aliasing settle);
    - `loadshot_<CODE>`, `loadshot_air_<i>`: the loading pictures (`settle=40`, 1920×1080);
    - `research` (the XR-30 selected), `research10`, `research20`, `research40`: the research terminal.
-   - `apv_<CODE>_<view>_<hour>`, `mountain`, `sunset`, `storm`: the world, for textures and the sea. The harness loads
+   - `apv_<CODE>_<view>_<hour>`, `mountain`, `sunset`, `storm`: the world, for textures and the sea;
+   - `wcam_<x>_<z>_<height>_<yaw>_<pitch>[_<hour>]`: a free camera anywhere (metres above the ground, yaw 0 north). The harness loads
      the scanned textures from `assets/materials` (`MATDIR=""` for the procedural ones, §7.4).
 6. **On the owner's GPU:** `SolaceExpress.exe --shots gav_<i>_120_10_0,ckv<i>_0_-8_11 --size 1920x1080`, then
    `diagnostics.bat` for the frame-time gate (§8). `SolaceExpress.exe --loadshots` re-renders every loading picture.

@@ -362,7 +362,13 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
   }
   if (msk.w > 0.05 && p.y > 0.5) fieldMaterial(p.xz, msk.w*(1.0 - wRock), m);
   if (wSand > 0.01) { vec4 s = groundSample(p.xz, M_SAND, 6.0, nTS, hL); float w = hblend(wSand, hC, 1.0 - hL);
-    m.alb = mix(m.alb, s.rgb*mix(vec3(1.0), vec3(1.08,1.04,0.95), lush), w); m.rough = mix(m.rough, s.a, w); m.nrm = mix(m.nrm, nTS, w); hC = mix(hC, hL, w); }
+    // (on an airfield's flattened grounds - a beach strip's - all of it is the transition, and the height blend dotted
+    // it with the sand tile's bumps every 6 m: there the weight alone, a smooth mix)
+    w = mix(wSand, w, smoothstep(1.0, 4.0, base.y));
+    // dry sand in drifts and patches; wet at the waterline, a little above it where the waves run up: darker, glossier
+    float wetS = smoothstep(1.1 + 0.5*hNoise, 0.2, p.y);
+    vec3 sc = s.rgb*mix(vec3(1.0), vec3(1.08,1.04,0.95), lush)*(0.85 + 0.3*vnoise(p.xz/70.0))*mix(1.0, 0.55, wetS);
+    m.alb = mix(m.alb, sc, w); m.rough = mix(m.rough, mix(s.a, s.a*0.45, wetS), w); m.nrm = mix(m.nrm, nTS, w); hC = mix(hC, hL, w); }
   if (wRock > 0.01) {
     vec3 nr; vec4 r = triSample(p, n, M_ROCK, 18.0, nr);
     float w = hblend(wRock, hC, dot(r.rgb, vec3(0.6))*1.6);

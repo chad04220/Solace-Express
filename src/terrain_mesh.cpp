@@ -43,12 +43,15 @@ void Renderer::initTerrainMesh() {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx.size() * sizeof(uint16_t), idx.data(), GL_STATIC_DRAW);
   }
   glBindVertexArray(0);
-  // the sea grid: rings from 2 m to 300 km, 96 segments; the first ring closes on a centre vertex
-  const int R = 84, SEG = 96;
+  // the sea grid: rings from 2 m to 300 km, each 6% wider, 192 segments; the first ring closes on a centre vertex.
+  // (Fine because depth is logarithmic per vertex and only interpolated between: across a triangle 15% deep it was off
+  // by 0.3% of the distance, a metre at 300 m - enough for the sea floor, held just under the sea (terrain_vs), to show
+  // through it in ovals. At 6% it's 0.05%)
+  const int R = 205, SEG = 192;
   std::vector<float> v; std::vector<unsigned> idx;
   v.push_back(0); v.push_back(0);
   for (int r = 0; r < R; r++) {
-    float rad = 2.f * powf(1.155f, (float)r);
+    float rad = 2.f * powf(1.06f, (float)r);
     for (int s = 0; s < SEG; s++) { float a = 2.f * PI * s / SEG; v.push_back(rad * cosf(a)); v.push_back(rad * sinf(a)); }
   }
   auto at = [&](int r, int s) { return 1u + (unsigned)r * SEG + (unsigned)((s + SEG) % SEG); };

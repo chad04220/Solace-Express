@@ -31,12 +31,14 @@ NAMES = ["grass", "forest", "rock", "sand", "snow", "asphalt", "gravel", "dirt",
 #                  contrast - scale its variation about the mean (default 1: a dark scan brought up to a light layer's
 #                             mean keeps a dark scan's contrast, which on white siding is too much);
 #                  bump - relief relative to the procedural layer's (default 1);
+#                  brightness - scale the matched mean (the generator's sand was 0.77, twice a real beach's: it
+#                         blew out to a white without texture in the sun);
 #                  flip - upside down: the walls' triplanar sample runs v up the wall, so a wall layer whose look
 #                         has an up (lap siding: each board's shadow line under the one above) is stored flipped)
 MANIFEST = {
     0:  ("acg:Grass004", 2.0, 5.0, {}),
     2:  ("ph:rock_face_03", 2.6, 18.0, {"stretch": True, "bump": 1.0}),
-    3:  ("ph:aerial_beach_01", 30.0, 6.0, {}),
+    3:  ("ph:coast_sand_01", 15.0, 6.0, {"brightness": 0.58}),
     4:  ("acg:Snow006", 2.0, 8.0, {}),
     5:  ("ph:asphalt_04", 4.0, 6.5, {}),
     6:  ("acg:Gravel022", 1.0, 2.0, {}),
@@ -156,7 +158,7 @@ def pack(l, src, size, tile, opt, old_dir, cache, out):
     ao = fit(m["ao"][..., 0:1], reps)[..., 0] if "ao" in m else None
     oalb, onrm, ora = read_old(old_dir, l)
     # colour: the procedural layer's mean, per channel, with the scan's variation about it
-    mean_new = col.reshape(-1, 3).mean(0); mean_old = oalb.reshape(-1, 3).mean(0)
+    mean_new = col.reshape(-1, 3).mean(0); mean_old = oalb.reshape(-1, 3).mean(0) * opt.get("brightness", 1.0)
     lum = col @ np.array([0.2126, 0.7152, 0.0722]); lum_mean = lum.mean()
     k = opt.get("colour", 1.0)
     rel = col / np.maximum(mean_new, 1e-4)                       # (the scan's own variation, per channel)

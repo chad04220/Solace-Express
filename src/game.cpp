@@ -3708,6 +3708,18 @@ void Game::debugScene(const std::string& name) {
     }
     return;
   }
+  if (name.compare(0, 5, "wcam_") == 0) {   // a free camera over the world: wcam_<x>_<z>_<height above ground>_<yaw>_<pitch>[_<hour>] (m, deg; yaw 0 north)
+    float x = 0, z = 0, hgt = 300, yaw = 0, pitch = -30, tod = 11;
+    sscanf(name.c_str() + 5, "%f_%f_%f_%f_%f_%f", &x, &z, &hgt, &yaw, &pitch, &tod);
+    Contract c; c.from = 0; c.to = 1; c.title = "World";
+    c.wx = Weather(); c.wx.timeOfDay = tod; c.wx.cloudCover = 0.15f; c.wx.visibility = 60000; c.wx.windSpeed = 4; c.wx.windFrom = 200;
+    realTime = 20; startFlight(c, 0, Career::SRC_OWNED);
+    for (int i = 0; i < 10; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    vec3 cam(x, std::max(g_world.height(x, z), 0.f) + hgt, z);
+    vec3 dir(sinf(yaw * DEG) * cosf(pitch * DEG), sinf(pitch * DEG), -cosf(yaw * DEG) * cosf(pitch * DEG));
+    dbgCam = true; dbgFollow = false; dbgCamPos = cam; dbgCamLook = cam + dir * 100.f;
+    toasts.clear(); hint.clear(); uiHidden = true; return;
+  }
   if (name.compare(0, 4, "apv_") == 0 && name.size() >= 9) {   // airport detail views: apv_<CODE>_<view>_<hour>
     int ai = std::max(0, g_world.findAirport(name.substr(4, 3).c_str()));
     int view = atoi(name.c_str() + 8);

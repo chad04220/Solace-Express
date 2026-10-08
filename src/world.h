@@ -68,6 +68,7 @@ public:
   void buildHMax();
   void buildEnvelope();
   void bakeMask();
+  int fillInlandPits();   // lift ground below the sea that the sea can't reach above it (World::build); returns the pits it found
   void sampleMask(float x, float z, float out[4]) const;   // manual bilinear (matches shader)
   void maskTexel(float x, float z, float out[4]) const;    // nearest texel (matches shader texelFetch)
   float forestAt(float x, float z) const;                  // baked forest-patch noise, manual bilinear (matches shader)

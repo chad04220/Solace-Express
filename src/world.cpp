@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 #include "scenery.h"
+#include <deque>
 
 World g_world;
 std::atomic<int> g_worldStage{0};
@@ -183,6 +184,26 @@ static void computeTexel(float x, float z, float out[4]) {
   out[0] = h; out[1] = amp; out[2] = lush; out[3] = cold;
 }
 
+// What an airport allows the ground at a point to be: grounds 0..1, how much it lies on a field's flattened grounds
+// (left alone), and cap, the height its approach funnels hold the terrain under (+inf outside them) - computeTexel's
+// own rules, for anything that reshapes the ground afterwards
+static void airportLimits(float x, float z, float& grounds, float& cap) {
+  grounds = 0.f; cap = 1e9f;
+  for (const Airport& a : kAirports) {
+    float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
+    float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
+    float d = u - a.length * 0.5f;
+    if (d > 0 && d < 7000) {
+      float halfw = 250.f + 0.18f * d;
+      float wc = (1.f - smoothstepf(halfw, halfw + 900.f, v)) * (1.f - smoothstepf(5000.f, 7000.f, d));
+      if (wc > 0.001f) cap = std::min(cap, a.elev + 10.f + (a.elev > 600 ? 0.045f : 0.032f) * d);
+    }
+    float hu = a.length * 0.5f + 260.f, hv = a.size == 2 ? 420.f : 240.f;
+    float du = std::max(0.f, u - hu), dv = std::max(0.f, v - hv);
+    grounds = std::max(grounds, 1.f - smoothstepf(0.f, 550.f, sqrtf(du * du + dv * dv)));
+  }
+}
+
 // 0..1: how strongly a point belongs to an airport's flattened grounds or approach funnel
 float airportInfluence(float x, float z) {
   float best = 0;
@@ -236,6 +257,7 @@ void World::build(const std::string& cachePath, const std::string& stamp) {
       });
     }
   }
+  for (int pass = 0; pass < 4 && fillInlandPits() > 0; pass++) {}   // (until none is left: see fillInlandPits)
   bakeMask();
   buildHMax();
   buildEnvelope();
@@ -394,6 +416,115 @@ void World::buildEnvelope() {
         tpM[L][(size_t)j * n + i] = std::max(std::max(P[(size_t)(2 * j) * pn + 2 * i], P[(size_t)(2 * j) * pn + 2 * i + 1]),
                                              std::max(P[(size_t)(2 * j + 1) * pn + 2 * i], P[(size_t)(2 * j + 1) * pn + 2 * i + 1]));
   }
+}
+
+// Ground below the sea that the open sea can't reach - a hollow the detail layer digs into low land, 14 of them in the
+// islands as generated, the deepest 30 m, the largest 1.4 km^2 - would be flooded by the flat sea: a pool of sea water
+// in a field (which the physics ditched in) that came and went with the terrain's detail. Each is lifted, with the
+// ground round it, until its floor is a valley floor 8 m up: the base heightmap is raised by a smooth bump (wide
+// enough that the hollow's rim rises with it, so no moat and no step) and every texel of detail is kept. 8 m clears
+// the band the terrain shader paints as beach, so the floor grows grass and forest like the land round it. Airport
+// grounds and approach funnels are never lifted. Raising ground can cut a sea inlet off into a new hollow, so build()
+// runs this until it finds none. Once per build: the world is cached.
+int World::fillInlandPits() {
+  const int F = 4, N = HM_N * F;                 // fine cells of about 10 m (N a multiple of 64: a row is whole words)
+  const float S = HM_TEXEL / F;
+  const size_t NN = (size_t)N * N, W = (size_t)N / 64;
+  std::vector<uint64_t> below(NN / 64, 0), sea(NN / 64, 0);
+  auto get = [](const std::vector<uint64_t>& v, size_t k) { return (v[k >> 6] >> (k & 63)) & 1u; };
+  auto put = [](std::vector<uint64_t>& v, size_t k) { v[k >> 6] |= 1ull << (k & 63); };
+  // below the sea: the detail layer's bound (|fbm| < 2) decides most cells without evaluating it
+  parallelFor(N, [&](int j) {
+    for (int i = 0; i < N; i++) {
+      const float x = -WORLD_HALF + (i + 0.5f) * S, z = -WORLD_HALF + (j + 0.5f) * S;
+      float b[4]; sampleBase(x, z, b);
+      const bool lo = b[0] + 2.f * b[1] < 0.f || (b[0] - 2.f * b[1] < 0.f && height(x, z, 11) < 0.f);
+      if (lo) below[(size_t)j * W + (i >> 6)] |= 1ull << (i & 63);
+    }
+  });
+  // the open sea: everything below it that the map's edge reaches
+  std::deque<uint32_t> q;
+  for (int i = 0; i < N; i++)
+    for (size_t k : {(size_t)i, (size_t)(N - 1) * N + i, (size_t)i * N, (size_t)i * N + N - 1})
+      if (get(below, k) && !get(sea, k)) { put(sea, k); q.push_back((uint32_t)k); }
+  while (!q.empty()) {
+    const uint32_t k = q.front(); q.pop_front();
+    const int x = (int)(k % N), y = (int)(k / N);
+    const int nx[4] = {x + 1, x - 1, x, x}, ny[4] = {y, y, y + 1, y - 1};
+    for (int d = 0; d < 4; d++) {
+      if (nx[d] < 0 || ny[d] < 0 || nx[d] >= N || ny[d] >= N) continue;
+      const size_t kk = (size_t)ny[d] * N + nx[d];
+      if (get(below, kk) && !get(sea, kk)) { put(sea, kk); q.push_back((uint32_t)kk); }
+    }
+  }
+  // the lift each texel needs: the deepest any pit cell in its reach (the bilinear cells round it) lies below the floor
+  const float target = 8.f;
+  std::vector<float> req((size_t)HM_N * HM_N, 0.f);
+  int pits = 0;
+  for (size_t w = 0; w < NN / 64; w++) {
+    const uint64_t m = below[w] & ~sea[w];
+    if (!m) continue;
+    for (int b = 0; b < 64; b++) {
+      if (!((m >> b) & 1u)) continue;
+      const size_t k = w * 64 + (size_t)b;
+      const float x = -WORLD_HALF + ((k % N) + 0.5f) * S, z = -WORLD_HALF + ((k / N) + 0.5f) * S;
+      const float need = target + 0.3f - height(x, z, 11);   // (0.3: what the coarser detail far off can take away)
+      const float fx = (x + WORLD_HALF) / HM_TEXEL - 0.5f, fz = (z + WORLD_HALF) / HM_TEXEL - 0.5f;
+      const int i0 = (int)floorf(fx), j0 = (int)floorf(fz);
+      for (int dj = 0; dj <= 1; dj++) for (int di = 0; di <= 1; di++) {
+        const size_t t = (size_t)std::clamp(j0 + dj, 0, HM_N - 1) * HM_N + std::clamp(i0 + di, 0, HM_N - 1);
+        req[t] = std::max(req[t], need);
+      }
+      pits++;
+    }
+  }
+  if (!pits) return 0;
+  const std::vector<float> need0 = req;   // (before it's spread: the texels that shape a pit themselves)
+  // the bump: the requirement spread by a running maximum, then smoothed by a box of the same radius - every texel
+  // then gets at least what it needs (each one in its box is at least its own need) and the ground rises gently,
+  // ~0.6 km across
+  const int R = 8;
+  auto pass = [&](std::vector<float>& v, bool maxf, bool rows) {
+    std::vector<float> o(v.size());
+    parallelFor(HM_N, [&](int a) {
+      for (int c = 0; c < HM_N; c++) {
+        float acc = 0.f;
+        for (int d = -R; d <= R; d++) {
+          const int cc = std::clamp(c + d, 0, HM_N - 1);
+          const float x = rows ? v[(size_t)a * HM_N + cc] : v[(size_t)cc * HM_N + a];
+          acc = maxf ? std::max(acc, x) : acc + x;
+        }
+        (rows ? o[(size_t)a * HM_N + c] : o[(size_t)c * HM_N + a]) = maxf ? acc : acc / (2 * R + 1);
+      }
+    });
+    v.swap(o);
+  };
+  pass(req, true, true); pass(req, true, false); pass(req, false, true); pass(req, false, false);
+  // raised - but never on an airport's flattened grounds, and in its approach funnels no higher than they hold the
+  // terrain (its detail included, as computeTexel keeps it). A hollow the lift can't fill there has its detail
+  // flattened instead, just above the sea
+  parallelFor(HM_N, [&](int tj) {
+    for (int ti = 0; ti < HM_N; ti++) {
+      const size_t k = (size_t)tj * HM_N + ti;
+      const float lift = req[k];
+      if (lift <= 0.f) continue;
+      const float cx = -WORLD_HALF + (ti + 0.5f) * HM_TEXEL, cz = -WORLD_HALF + (tj + 0.5f) * HM_TEXEL;
+      float grounds, cap; airportLimits(cx, cz, grounds, cap);
+      float* t = &hm[k * 4];
+      const float L = std::min(lift * (1.f - smoothstepf(0.f, 0.05f, grounds)), std::max(0.f, cap - t[0] - 1.5f * t[1]));
+      t[0] += L;
+      if (L >= lift - 0.01f || need0[k] <= 0.f) continue;
+      float fmin = 1e9f;   // (the detail's lowest over the texel's reach, an eighth of a texel apart, less a margin)
+      for (int sj = -8; sj <= 8; sj++) for (int si = -8; si <= 8; si++)
+        fmin = std::min(fmin, terrainFbm((cx + si * HM_TEXEL / 8.f) / DETAIL_SCALE, (cz + sj * HM_TEXEL / 8.f) / DETAIL_SCALE, 11));
+      fmin -= 0.05f;
+      const float floor1 = 1.f;
+      if (t[0] + t[1] * fmin >= floor1) continue;
+      if (t[0] > floor1 && fmin < 0.f) t[1] = std::min(t[1], (t[0] - floor1) / -fmin);
+      else { t[0] = std::max(t[0], floor1); t[1] = 0.f; }
+    }
+  });
+  return pits;
 }
 
 void World::sampleBase(float x, float z, float out[4]) const {

@@ -32,6 +32,11 @@ void main(){
     float ha = hAt(pa, length(vec3(pa.x, h, pa.y) - uCamPos)), hb = hAt(pb, length(vec3(pb.x, h, pb.y) - uCamPos));
     h = mix(h, 0.5*(ha + hb), m);
   }
+  // the sea floor no deeper than just under the sea, seen from above it: the sea is opaque and its colour reads the
+  // depth from the heightfield, not the mesh, but a coarse chunk's triangle from a 30 m deep vertex to a beach's 2 m
+  // one crossed the sea hundreds of metres inland - beaches, spits and low islands sank under the water far off and
+  // rose out of it as they came near
+  if (uCamPos.y > 0.5) h = max(h, -0.5);
   // the normal at the mesh's own resolution (widening with the morph)
   float e = cs*(1.0 + m);
   vec3 n = normalize(vec3(hAt(xz - vec2(e, 0.0), d) - hAt(xz + vec2(e, 0.0), d), 2.0*e, hAt(xz - vec2(0.0, e), d) - hAt(xz + vec2(0.0, e), d)));
