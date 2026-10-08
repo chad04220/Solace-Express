@@ -438,7 +438,7 @@ vec2 mapPlane(vec3 p){
 vec2 mapOspreyCabinTrim(vec3 p) {
   vec2 r=vec2(1e5,120.0);
   // Copper brow sits below the existing glareshield and above all gauge faces.
-  r=opU(r,vec2(sdRoundBox(p-vec3(0,.590,-2.516),vec3(.48,.009,.008),.004),121.0));
+  r=opU(r,vec2(sdRoundBox(p-vec3(0,.553,-2.516),vec3(.48,.009,.008),.004),121.0));   // (under the glareshield's lowered lip)
   // Sculpted ivory sill and copper inset: well below the side-window opening.
   vec3 q=vec3(abs(p.x),p.y,p.z);
   r=opU(r,vec2(sdRoundBox(q-vec3(.598,.125,-1.93),vec3(.023,.080,.47),.016),120.0));
@@ -803,7 +803,7 @@ vec2 mapPlaneBody(vec3 p){
   if (inside > 0.5) {
     vec4 E = gM[22]; float pz = gM[21].w, phw = E.w; int ck = int(gM[21].z + 0.5);
     float pf = pz + 0.045;                                             // panel face (towards the pilot)
-    float panel = sdRoundBox(p - vec3(0.0, E.y - 0.36, pz), vec3(phw, 0.24, 0.045), 0.015);
+    float panel = sdRoundBox(p - vec3(0.0, E.y - 0.38, pz), vec3(phw, 0.22, 0.045), 0.015);   // (its top under the glareshield's hood)
     panel = max(panel, f + 0.06);  // contour the panel corners to the inside of the cowling
     res = opU(res, vec2(panel, 10.0));
     // raised bezels framing each pilot's instrument cluster
@@ -817,14 +817,26 @@ vec2 mapPlaneBody(vec3 p){
       float frame = max(abs(fr) - 0.007, abs(p.z - pf - 0.006) - 0.006);
       res = opU(res, vec2(frame, 66.0));
     }
-    // glareshield with a warm LED strip under its lip that floods the panel
+    // glareshield with a warm LED strip under its lip that floods the panel: a short hood over the instruments, then
+    // the dash top sloping down to the windscreen's base. (It ran level all the way to the windscreen 8 cm under the
+    // eye, and its far edge cut the view 3-4 deg below the horizon - the windscreen itself reaches 7-16 deg - so the
+    // world showed only in a strip above it. Now 8-10 deg over the nose, or the windscreen's own edge)
     vec4 WSg = gM[23];
     float gz0 = min(WSg.x - 0.05, pz - 0.2);
-    float glare = sdRoundBox(p - vec3(0.0, E.y - 0.1, 0.5*(gz0 + pz + 0.06)), vec3(phw*0.97, 0.022, 0.5*(pz + 0.06 - gz0)), 0.018);
+    const float gy = 0.157;                                   // the hood's centre under the eye (top 13.5 cm, bottom 17.9 cm)
+    float zr = pz + 0.06, zh = pz - 0.08;                     // the hood's lip over the panel and its front
+    float glare = sdRoundBox(p - vec3(0.0, E.y - gy, 0.5*(zh + zr)), vec3(phw*0.97, 0.022, 0.5*(zr - zh)), 0.018);
+    {
+      float yf = min(E.y - gy, WSg.z + 0.01 - 0.022);         // (the slope's centre line ends just under the windscreen's base)
+      vec2 ax = vec2((E.y - gy) - yf, zh - gz0);              // (y, z) from its front end to its back
+      vec3 gq = p - vec3(0.0, 0.5*(E.y - gy + yf), 0.5*(zh + gz0));
+      gq.yz = rot2(gq.yz, atan(ax.x, ax.y));
+      glare = smin(glare, sdRoundBox(gq, vec3(phw*0.97, 0.022, 0.5*length(ax) + 0.01), 0.018), 0.02);
+    }
     glare = max(glare, f + 0.055);
     res = opU(res, vec2(glare, 14.0));
     // (the strip under the lip, trimmed to the cabin wall as the glareshield is and ending short of its ends)
-    res = opU(res, vec2(max(sdCapsule(p, vec3(-phw*0.85, E.y - 0.124, pz + 0.07), vec3(phw*0.85, E.y - 0.124, pz + 0.07), 0.0035), f + 0.075), 64.0));
+    res = opU(res, vec2(max(sdCapsule(p, vec3(-phw*0.85, E.y - gy - 0.024, pz + 0.07), vec3(phw*0.85, E.y - gy - 0.024, pz + 0.07), 0.0035), f + 0.075), 64.0));
     // centre: radio / transponder stack below the clusters; glass cockpits add an engine display between the PFDs
     res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.505, pf + 0.012), vec3(0.115, 0.06, 0.016), 0.004), 65.0));
     if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, E.y - 0.31, pf + 0.008), vec3(0.085, 0.085, 0.01), 0.004), 67.0));
@@ -959,7 +971,7 @@ vec2 mapPlaneBody(vec3 p){
     }
     // the magnetic compass on the glareshield: a rounded black housing, its card behind a window on the face towards the
     // pilot (78: the card, plane_material.glsl). It was a plain black box
-    vec3 cq = p - vec3(0.0, E.y - 0.05, pz - 0.05);
+    vec3 cq = p - vec3(0.0, E.y - 0.101, pz - 0.05);   // (on the hood: its top 13.5 cm under the eye)
     float compass = sdRoundBox(cq, vec3(0.045, 0.034, 0.03), 0.012);   // (the half sizes include the rounding: its face is flat 33 x 22 mm either side)
     res = opU(res, vec2(compass, cq.z > 0.024 && abs(cq.x) < 0.03 && abs(cq.y - 0.002) < 0.017 ? 78.0 : 66.0));
   }
