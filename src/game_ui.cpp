@@ -458,8 +458,8 @@ void Game::drawLoading() {
     float bx = cx, bwid = 380 * s;
     g_ren.glow(bx, by - 12 * s, bwid, 40 * s, C_ACCENT, 0.25f * pulse, 4 * s, 16 * s);
     g_ren.rectGrad(bx, by - 12 * s, bwid, 40 * s, C_ACCENT * 1.05f, C_ACCENT * 0.6f, 0.95f, 4 * s);
-    g_ren.text(bx + bwid * 0.5f, by - 1 * s, 17 * s, in.pad ? "PRESS  A  TO FLY" : "CLICK OR PRESS ENTER TO FLY", C_INK, 1, 1, false);
-    g_ren.text(bx + bwid + 20 * s, by + 1 * s, 13 * s, in.pad ? "B  BACK" : "ESC  BACK", C_DIM, 0.9f, 0, false);
+    g_ren.text(bx + bwid * 0.5f, by - 1 * s, 17 * s, padPrompts() ? "PRESS  A  TO FLY" : "CLICK OR PRESS ENTER TO FLY", C_INK, 1, 1, false);
+    g_ren.text(bx + bwid + 20 * s, by + 1 * s, 13 * s, padPrompts() ? "B  BACK" : "ESC  BACK", C_DIM, 0.9f, 0, false);
   }
 }
 
@@ -1590,7 +1590,7 @@ void Game::drawHud(const FrameParams& fp) {
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   if (crashed && crashTimer > 0.8f && crashTimer < crashEndT - 1.f) {   // the crash sequence can be skipped
     float a = 0.55f + 0.35f * sinf(realTime * 3.f);
-    g_ren.text(W * 0.5f, H - 46 * s, 17 * s, in.pad ? "PRESS  A  TO SKIP" : "PRESS  ENTER  TO SKIP", C_TEXT, a, 1);
+    g_ren.text(W * 0.5f, H - 46 * s, 17 * s, padPrompts() ? "PRESS  A  TO SKIP" : "PRESS  ENTER  TO SKIP", C_TEXT, a, 1);
   }
   if (!hudOn) return;
   { auto it = uiAnim.find(0x6e61u); if (showMap && it != uiAnim.end() && it->second > 0.6f) return; }  // GPS map covers the HUD

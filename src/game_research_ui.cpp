@@ -632,7 +632,7 @@ void Game::drawResearch(const FrameParams& fp) {
     g_ren.text(bx + bw * 0.5f, by + 29 * s, 9 * hs, resCard >= 0 ? std::string("TEST CARD  ") + kResCards[resCard].id + "  " + kResCards[resCard].title : "FREE ROAM  //  NOT RECORDED IN LOGBOOK", resCard >= 0 ? ACC : R_DIM, e, 1, false);
     if (click(bx, by, bw, bh) || in.pressed[K_ENTER]) { launchResearch(); return; }
   }
-  g_ren.text(W * 0.5f, H - 22 * s, 10.5f * s, in.pad ? "L-STICK CURSOR   A SELECT   X SWITCH AIRFRAME   R-STICK ROTATE   LB / RB SITE   START INITIATE   B ABORT"
+  g_ren.text(W * 0.5f, H - 22 * s, 10.5f * s, padPrompts() ? "L-STICK CURSOR   A SELECT   X SWITCH AIRFRAME   R-STICK ROTATE   LB / RB SITE   START INITIATE   B ABORT"
                                                      : "TAB SWITCH AIRFRAME   <- / -> SITE   DRAG ROTATE   WHEEL ZOOM   ENTER INITIATE   ESC ABORT",
              R_DIM, 0.75f * e, 1, false);
   if (fmodf(realTime, 1.4f) < 1.0f) g_ren.text(W - 24 * s, H - 22 * s, 10.5f * s, "CLASSIFIED", R_RED, 0.85f * e, 2, false);
