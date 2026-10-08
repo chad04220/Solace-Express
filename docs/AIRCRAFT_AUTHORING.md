@@ -239,16 +239,28 @@ width, headrest, dome light, armrests, visor height and slope, overhead, vents).
   vectoring, no fuel burn, the research drag rise, a 50 g structure); 2, the XR-40 (four tilting thruster pods,
   vertical flight, a 90 g structure). A new Tier B type with new physics needs a new value and a new path. A
   conventional research type uses `special = 0` with `designMach`, `gPos`, `gNeg` (the XR-10 and XR-20).
-- **Learned performance.** At launch, `Plane::perf` flies short test sorties per type (stall speeds, best climb, roll
-  rate, pitch response, g per stick, take-off and landing distances) and caches them in `shadercache/perf.bin`, stamped
-  with the build. The autopilot flies to these numbers, so a new type needs no autopilot tuning.
+- **Learned performance.** At launch, `Plane::perf` flies short test sorties per type (stall speeds, best climb, idle
+  sink, roll rate, pitch response, g per stick, take-off and landing distances) at the test weight (60% fuel, 150 kg
+  aboard, 1200 m) and caches them in `shadercache/perf.bin`, stamped with the build.
+- **One autopilot, no per-type code.** Every step it is on, `Plane::apSense()` reads what the aircraft can do *now* into
+  `Plane::apEnv` (`ApEnvelope`, `aircraft.h`): the learned envelope corrected for the weight (stall and approach speeds
+  with √weight, landing distance with weight, a heavier airframe pulling fewer g per stick), the air (density), ice (up
+  to 30% of the lift), engine health (thrust from `thrustAt`, so an engine out halves a twin's and cuts its climb by
+  more), and what it is built with (flaps, rate-command controls, thrust it can turn downward). Every decision reads
+  that and nothing else: the speeds it flies, how hard it turns and climbs, the steepest descent (its idle sink in
+  landing trim) and glidepath (its idle glide; shallow for engines slow to spool), whether it can go around at all (an
+  aircraft that can't climb lands from what it has), when it flares (the slower of the pitch's lag and the wing's in
+  building lift, `apPathLag`), whether it sheds speed with the belly-up (an airframe that takes 8 g or more) and
+  whether it comes down vertically (thrust it can direct downward above its weight). **A new type therefore needs no
+  autopilot code or tuning**: give it honest physics and it is flown to them. Don't branch on an index, `special` or
+  the engine type in the autopilot; add a reading to `ApEnvelope` instead.
 - **The autopilot's two laws.** It flies to the airframe's limits (hard turns, high g) unless the job carries
   passengers or a fragile load (`Contract::gentle()` sets `Plane::apComfort`: 25° of bank, 1.25 g, soft climbs and
-  descents).
+  descents, a stabilized approach no more than ~500 fpm beyond the glidepath's own descent, and no belly-up).
 - **Autoland** plans each runway end (`apPlan`). It refuses a runway shorter than `runwayNeeded`, a tailwind landing it
-  can't stop from, terrain that keeps it too high, or high ground where it would turn in. The research craft (index
-  `≥ kNumAircraft`) fly the final fast and do the belly-up (`APS_BLEED`, `apBellyUp`) before landing; `special == 2`
-  then hovers.
+  can't stop from, terrain that keeps it too high, or high ground where it would turn in. An airframe built for it
+  (`apEnv.highAlpha`) flies the final fast and does the belly-up (`APS_BLEED`, `apBellyUp`) before landing; one that
+  can hold itself up on its thrust (`apEnv.hover`) then hovers.
 - **The test:** `autoland_sweep --craft <i>` (every airport, three winds, two starts), then `--comfort` for a career
   type, and `--all` to check it refuses fields it can't use. Every case must land or be refused with a reason.
 

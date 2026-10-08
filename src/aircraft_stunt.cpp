@@ -39,6 +39,7 @@ void Plane::apStuntBegin(int figure, const Weather& wx) {
   apStuntDir = (apStunt + (int)(pos.x * 0.01f)) % 2 ? -1 : 1;   // rolls and wingovers go either way
   apStuntSpeedAfter = keepSpeed; apStuntAbort.clear();
   const PerfModel& P = perf(spec);
+  apSense();
   // the figure's load factor: what the structure takes less what a gust could add; its entry speed: enough that the
   // wing can still pull a useful load over the top
   float gust = std::max(0.6f, P.gLimit * 0.05f);
@@ -46,8 +47,10 @@ void Plane::apStuntBegin(int figure, const Weather& wx) {
   // (enough speed that after climbing the figure's height it still flies over the top: 2.8 Vs for a loop; a split-S
   // starts slow because it builds its speed on the way down, a wingover needs only a little over the stall)
   bool down = apStunt == STUNT_SPLIT_S, gentle = apStunt == STUNT_WINGOVER || apStunt == STUNT_ROLL;
-  apStuntV = P.vs1 * (down ? 1.8f : gentle ? 2.2f : 2.8f);
-  if (spec->special) apStuntV = std::max(apStuntV, down ? 110.f : 160.f);
+  // (from the stall as it is now: heavier or iced, it needs more; a wing that flies at high alpha stalls far below the
+  // speed it flies cleanly at, so it gets a proper entry speed)
+  apStuntV = apEnv.vs1 * (down ? 1.8f : gentle ? 2.2f : 2.8f);
+  if (apEnv.highAlpha) apStuntV = std::max(apStuntV, down ? 110.f : 160.f);
   apStuntHdg = heading();
 }
 
@@ -67,18 +70,19 @@ bool Plane::apStuntFly(float dt) {
   float spd = std::max(length(vel), 1.f), V = std::max(ias, 15.f);
   vec3 upB = q.rotate(vec3(0, 1, 0)), rightB = q.rotate(vec3(1, 0, 0));
   float upY = upB.y;                                         // 1 upright and level, -1 inverted
-  float stallG = (V / P.vs1) * (V / P.vs1) * 0.9f;
+  const ApEnvelope& E = apEnv;
+  float stallG = (V / E.vs1) * (V / E.vs1) * 0.9f;
   float nPull = std::min(apStuntN, std::max(stallG * 0.8f, 0.5f));   // over the top: float over, don't stall it
-  float rollCap = (s.special ? fbwRollMax(0.f) : P.rollRate * clampf(V / s.cruise, 0.25f, 2.f)) * 0.95f;
+  float rollCap = (E.rateCmd ? fbwRollMax(0.f) : P.rollRate * clampf(V / s.cruise, 0.25f, 2.f)) * 0.95f;
   float gust = std::max(0.6f, P.gLimit * 0.05f);
   float nzMax = std::min(P.gLimit - gust - P.gLimit * 0.03f, std::max(stallG, 1.05f)), nzMin = std::max(P.gNeg + gust + 0.3f, -std::max(stallG, 0.5f) * 0.5f);
   float R = apStuntV * apStuntV / (G0 * std::max(apStuntN - 1.f, 1.f));   // the figure's loop radius
   float ground = std::max(g_world.height(pos.x, pos.z), g_world.height(pos.x + vel.x * 4.f, pos.z + vel.z * 4.f));
   float agl = pos.y - std::max(ground, 0.f);
-  float margin = s.special ? 120.f : s.engineType == ENG_JET ? 200.f : 120.f;
+  float margin = E.spool >= 2.f ? 200.f : 120.f;   // (engines slow to spool: more room to recover in)
   const Step* fig = kFig[apStunt];
   if (s.retract) ctl.gearDown = false;
-  if (!s.special) ctl.flaps = 0;
+  if (!E.rateCmd) ctl.flaps = 0;   // (a fly-by-wire craft schedules its own)
   auto finish = [&](const char* why) {
     if (why) apStuntAbort = why;
     apMode = AP_HOLD; apUseVS = false; apAlt = std::max(pos.y, ground + 150.f); apHeading = heading(); apSpeed = apStuntSpeedAfter;

@@ -377,6 +377,9 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
       glViewport(0, 0, kShCabRes, kShCabRes);
       glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE); glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
       glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);
+      // (the depth pushed back by its slope across a texel, by the hardware: a fixed bias is too little where the sun
+      // grazes a curve - the windows' rounded lips came out blotched with their own shadow on the owner's GPU)
+      glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(1.5f, 4.f);
       const float ident[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
       glUseProgram(progShMap);
       glUniformMatrix4fv(U(progShMap, "uVP"), 1, GL_FALSE, shCabBodyVP.m);
@@ -386,6 +389,7 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
       glBindVertexArray(pm->second.vao);
       glDrawElements(GL_TRIANGLES, pm->second.idx, GL_UNSIGNED_INT, nullptr);
       drawPlaneParts(pm->second, progShMap, -1);
+      glDisable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(0.f, 0.f);
     }
     // this frame's world-space lookup: world to body (the transpose of the rotation, about the aircraft), then the map
     mat4 w2b;

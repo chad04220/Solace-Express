@@ -81,6 +81,30 @@ struct PerfModel {
   float toRoll = 0, ldgRoll = 0;   // at full weight, sea level, no wind: ground roll to lift-off, and landing distance from 15 m (3 deg path at 1.3 Vs0) to a stop on the brakes (m)
 };
 
+// The autopilot's live reading of what this aircraft can do now (Plane::apSense, every step it flies): the learned
+// envelope (PerfModel: measured once per type, at a test weight in still air at 1200 m) corrected for the weight it
+// carries, the air it is in, its configuration and its condition - engines failed or running rough, ice on the wings.
+// Every decision the autopilot makes reads these; none asks which aircraft it is.
+struct ApEnvelope {
+  float mass = 0, wRatio = 1, sigma = 1;  // kg; weight over the test weight; air density over sea level's
+  float vs0 = 0, vs1 = 0;                  // stall IAS now, full flap and clean (weight, ice)
+  float vApp = 0;                          // the approach reference speed now (IAS): the type's, for this weight and ice
+  float thrustFrac = 1;                    // full thrust now over the tests': engine health, the air
+  float climb = 0;                         // best steady climb rate now at full power (m/s; negative: it can't hold height)
+  float climbPlan = 0;                     // a climb it holds for minutes at working speeds (planning, the go-around)
+  float descentMax = 0;                    // steepest descent on the approach without gaining speed (m/s)
+  float glideMax = 0;                      // steepest glidepath it flies (deg): its idle glide, and its engines' response
+  float spool = 0;                         // how long its engines take to answer the throttle (s)
+  float gUse = 0;                          // the load factor it may pull (the structure, its pull authority)
+  float ldgDist = 0;                       // landing distance from 15 m in still air at this weight, sea level (m)
+  bool hover = false;                      // it can hold its weight on its thrust alone
+  bool highAlpha = false;                  // strong and agile enough to rear up and shed speed on the final (the belly-up)
+  bool agile = false;                      // built for extreme manoeuvres (steeper intercepts)
+  bool rateCmd = false;                    // its flight controls take rate commands (fly-by-wire), not surface deflections
+  bool flaps = true;                       // it has flaps to fly the approach with
+  bool canGoAround = true;                 // it can climb away from a missed approach
+};
+
 struct Controls {
   float pitch = 0, roll = 0, yaw = 0;  // -1..1 (pitch +1 = nose up, roll +1 = right, yaw +1 = right)
   float throttle = 0;                  // 0..1
@@ -197,6 +221,9 @@ public:
   float gearHeight() const;
   float mass() const { return spec->emptyMass + fuel + payload; }
   float fuelFlowMax() const;   // kg/s at full throttle
+  float spoolRate() const;     // how fast the engines follow the throttle (spool fraction per second)
+  float thrustAt(float spool, float V, float vf, float rho = -1.f) const;   // all engines' thrust (N) at this spool, airspeed and forward airspeed, in the air it is in (or rho's)
+  float liftThrustMax() const; // the thrust it can direct straight down (N): vectored lift
   float rangeLeftKm() const;
   float cd0Value() const { return cd0; }
   // fly-by-wire rate command of the research craft: full-stick pitch and roll rates (rad/s)
@@ -205,6 +232,8 @@ public:
   static bool perfLoad(const std::string& path, const std::string& stamp);   // every type's, from a cache of this build's
   static void perfSave(const std::string& path, const std::string& stamp);
   float fbwRollMax(float hover) const { return (spec->special == 2 ? 7.0f : 5.5f) * (1.f - 0.6f * hover); }
+  ApEnvelope apEnv;            // what it can do now (apSense)
+  void apSense();              // read it: the learned envelope, corrected for weight, air, configuration and condition
 private:
   void substep(float dt, const Weather& wx, float time);
   void apGuidance(float dt);
@@ -214,6 +243,7 @@ private:
   float apAltGain() const;   // altitude error -> climb rate (1/s), as fast as this airframe's pitch answers at this speed
   float terrainAround() const;   // the highest ground to keep clear of: under it, ahead along its track, and all round
   float apPitchLag() const;  // how long this airframe's pitch takes to answer at this speed (s)
+  float apPathLag() const;   // and its flight path: the pitch's lag, or the wing's in building the lift, the slower (s)
   float apPlan(int airport, bool rev, const Weather& wx, bool commit);
   void apHover(float dt);
   void apBellyUp(float dt);   // the research craft's speed-shedding pitch-up on the final (APS_BLEED)

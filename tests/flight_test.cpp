@@ -357,6 +357,51 @@ int main(int argc, char** argv) {
       fails += !ok;
     }
   }
+  // ---------------- the autopilot flies the aircraft as it is now (ApEnvelope): what it reads for an engine out, a full
+  // load, ice and no engines at all, and an autoland at Solace Capital in each of those conditions (one go-around at most)
+  {
+    int ai = g_world.findAirport("CAP"); const Airport& A = g_world.airports[ai];
+    struct Case { int craft; const char* cond; };
+    const Case cases[] = {{3, "engine out"}, {5, "engine out"}, {6, "engine out"}, {4, "full load"}, {5, "full load"}, {0, "iced"}, {5, "iced"}};
+    for (const Case& c : cases) {
+      const AircraftSpec& s = kAircraft[c.craft];
+      Weather wx; wx.windSpeed = 5; wx.windFrom = wrapDeg360(A.heading + 20.f); wx.turbulence = 0.1f;
+      vec3 side(-A.dir().z, 0, A.dir().x);
+      vec3 start = A.pos() + side * 14000.f + A.dir() * 3000.f; start.y = std::max(A.elev + 1200.f, g_world.height(start.x, start.z) + 500.f);
+      const bool eng = c.cond[0] == 'e', heavy = c.cond[0] == 'f', iced = c.cond[0] == 'i';
+      Plane p; p.reset(&s, start, wrapDeg360(A.heading + 120.f), s.maxFuel * (heavy ? 0.75f : 0.6f), heavy ? s.cargoKg + s.pax * 85.f : 150.f, true, s.cruise * 0.85f);
+      p.ctl.gearDown = !s.retract; p.gear = p.ctl.gearDown ? 1.f : 0.f; p.ctl.throttle = 0.7f;
+      Plane ref = p; ref.apSense();   // (the same aircraft without the failure)
+      if (eng) p.failNow(FAIL_ENGINE_TOTAL, 0);
+      if (iced) { p.failNow(FAIL_ICING, 0); p.fail.ice = 0.7f; }
+      p.apSense();
+      const ApEnvelope& E = p.apEnv; const ApEnvelope& R = ref.apEnv;
+      bool read = eng ? E.thrustFrac < 0.65f * R.thrustFrac && E.climb < R.climb * 0.6f && E.canGoAround
+                : heavy ? E.vApp > s.vref * 1.2f && E.vs1 > Plane::perf(&s).vs1 * 1.2f && E.ldgDist > Plane::perf(&s).ldgRoll * 1.4f   // (over the learned, test-weight figures)
+                : E.vs1 > R.vs1 * 1.08f && E.climb < R.climb;
+      p.apEngage(Plane::AP_NAV, ai, wx);
+      float tdVs = 0; bool td = false; int k = 0, goArounds = 0, lastStage = 0;
+      for (; k < 1800 * 60 && !p.ev.crashed && !p.apDone; k++) {
+        if (iced) p.fail.ice = std::max(p.fail.ice, 0.7f);   // (holding the ice: no warm air melts it on the way down)
+        p.step(1 / 60.f, wx, k / 60.f);
+        if (p.ev.touchdown && !td) { td = true; tdVs = -p.ev.touchdownVs; }
+        if (p.apStage == Plane::APS_GOAROUND && lastStage != Plane::APS_GOAROUND) goArounds++;
+        lastStage = p.apStage;
+      }
+      vec3 rel = p.pos - A.pos(); float along = fabsf(dot(rel, A.dir())), cross = fabsf(dot(rel, side));
+      bool ok = read && !p.ev.crashed && p.apDone && td && tdVs < 3.0f && along < A.length * 0.5f && cross < A.width * 0.5f && goArounds <= 1;
+      printf("AP live %-16s %-10s reads vApp %4.1f vs1 %4.1f thrust %.2f climb %5.1f%s | %s after %4.0f s  touchdown %.1f m/s  go-arounds %d %s%s\n", s.name, c.cond,
+             E.vApp, E.vs1, E.thrustFrac, E.climb, read ? "" : " (wrong)", p.apDone ? "landed" : "NOT DONE", k / 60.f, tdVs, goArounds,
+             p.ev.crashed ? p.ev.crashReason.c_str() : "", ok ? " ok" : " FAIL");
+      fails += !ok;
+    }
+    // no engines at all: no climb, so no go-around to fly
+    Plane p; p.reset(&kAircraft[3], vec3(0, 1500, 0), 0, kAircraft[3].maxFuel * 0.6f, 150, true, kAircraft[3].cruise * 0.8f);
+    p.failNow(FAIL_ENGINE_TOTAL, 0); p.failNow(FAIL_ENGINE_TOTAL, 1); p.apSense();
+    bool ok = p.apEnv.climb < 0.f && !p.apEnv.canGoAround;
+    printf("AP live %-16s both out   reads climb %.1f, go-around %s  %s\n", kAircraft[3].name, p.apEnv.climb, p.apEnv.canGoAround ? "yes" : "no", ok ? "ok" : "FAIL");
+    fails += !ok;
+  }
   // ---------------- aerobatics: every figure on a light single, the airliner and the Wraith. It must set itself up,
   // fly the figure inside the airframe's limits and level off into a hold on the heading the figure ends on.
   for (int si : {0, 5, (int)kWraith}) {
