@@ -187,37 +187,61 @@ void leafCards(MB& mb, vec3 c, float r, float squash, int n, vec3 crownC, float 
 
 void trunk(MB& mb, vec3 a, vec3 b, float r0, float r1, int segs, float ao0 = 0.7f, float ao1 = 0.9f) { mb.cyl(a, b, r0, r1, segs, P_BARK, false, false, ao0, ao1); }
 
-// conifer: stacked jagged cones
+// conifer: tiers of drooping branches round a straight stem. Each tier is a star - branch tips out and down, notches
+// between them drawn in towards the stem - rather than a smooth cone (stacked paper cones, the review of v3.33.0's
+// visuals), and up close every branch carries a flat spray of needles along it (leaf cards, cut in the shader).
 void conifer(MB& mb, int lod, float H, float R, float yBase, int tiers, float taper, float seed) {
   if (lod >= 2) {   // one cone
     mb.cyl(vec3(0, yBase * 0.6f, 0), vec3(0, H, 0), R * 0.95f, 0.f, 6, P_NEEDLE, false, true, 0.8f, 0.95f);
     return;
   }
   trunk(mb, vec3(0, -1.f, 0), vec3(0, H * 0.75f, 0), R * 0.1f + 0.08f, 0.05f, lod == 0 ? 6 : 4);
-  int segs = lod == 0 ? 9 : 6;
+  const int segs = lod == 0 ? 8 : 6;   // branches per tier
   int n = lod == 0 ? tiers : std::max(3, tiers / 2);
+  int card = 0;
   for (int i = 0; i < n; i++) {
     float t = (float)i / (n - 1);
     float th = (H - yBase) / n * (lod == 0 ? 1.9f : 2.3f);
     float y0 = yBase + (H - yBase - th * 0.9f) * powf(t, 0.92f);
     float r = R * (1.f - t * taper) * (0.92f + 0.12f * hash2i(i * 7 + (int)(seed * 100), 3));
     vec3 apex(0.f, std::min(y0 + th, H), 0.f);
-    std::vector<vec3> rim(segs);
-    std::vector<float> rr(segs);
-    for (int s = 0; s < segs; s++) {
-      float a = (s + 0.5f * (i & 1)) * 2 * PI / segs + seed;
+    // the rim: a branch tip, then a notch half-way to the next
+    std::vector<vec3> rim(segs * 2);
+    std::vector<float> rr(segs * 2);
+    for (int s = 0; s < segs * 2; s++) {
+      float a = (s * 0.5f + 0.5f * (i & 1) + 0.35f * (hash2i(i * 13 + s, (int)(seed * 331)) - 0.5f) * (s & 1 ? 0.f : 1.f)) * 2 * PI / segs + seed;
       float hr = hash2i(i * 31 + s, (int)(seed * 977) + 5);
-      rr[s] = r * (0.78f + 0.36f * hr);
-      rim[s] = vec3(cosf(a) * rr[s], y0 - rr[s] * (0.18f + 0.22f * hr), sinf(a) * rr[s]);
+      bool tip = !(s & 1);
+      rr[s] = tip ? r * (0.8f + 0.38f * hr) : r * (0.5f + 0.12f * hr);
+      float droop = tip ? rr[s] * (0.32f + 0.22f * hr) : rr[s] * 0.12f;
+      rim[s] = vec3(cosf(a) * rr[s], y0 - droop, sinf(a) * rr[s]);
     }
     float aoT = lerpf(0.62f, 1.f, t);
-    for (int s = 0; s < segs; s++) {
-      vec3 a = rim[s], b = rim[(s + 1) % segs];
-      float slopeA = rr[s] / std::max(apex.y - a.y, 0.3f), slopeB = rr[(s + 1) % segs] / std::max(apex.y - b.y, 0.3f);
-      vec3 na = normalize(vec3(a.x, rr[s] * slopeA * 0.9f, a.z)), nb = normalize(vec3(b.x, rr[(s + 1) % segs] * slopeB * 0.9f, b.z));
-      mb.vert(a, na, P_NEEDLE, aoT); mb.vert(b, nb, P_NEEDLE, aoT); mb.vert(apex, normalize(na + nb + vec3(0, 1.5f, 0)), P_NEEDLE, aoT * 0.75f);
+    for (int s = 0; s < segs * 2; s++) {
+      int s1 = (s + 1) % (segs * 2);
+      vec3 a = rim[s], b = rim[s1];
+      float slopeA = rr[s] / std::max(apex.y - a.y, 0.3f), slopeB = rr[s1] / std::max(apex.y - b.y, 0.3f);
+      vec3 na = normalize(vec3(a.x, rr[s] * slopeA * 0.9f, a.z)), nb = normalize(vec3(b.x, rr[s1] * slopeB * 0.9f, b.z));
+      float aoA = aoT * (s & 1 ? 0.7f : 1.f), aoB = aoT * (s1 & 1 ? 0.7f : 1.f);   // (the notches in shadow)
+      mb.vert(a, na, P_NEEDLE, aoA); mb.vert(b, nb, P_NEEDLE, aoB); mb.vert(apex, normalize(na + nb + vec3(0, 1.5f, 0)), P_NEEDLE, aoT * 0.75f);
       // underside: a shallow inverted cone back to the trunk keeps the tier solid from below
-      if (lod == 0) { vec3 in(0.f, y0 + th * 0.25f, 0.f); mb.vert(a, vec3(na.x, -0.6f, na.z), P_NEEDLE, aoT * 0.55f); mb.vert(in, vec3(0, -1, 0), P_NEEDLE, 0.35f); mb.vert(b, vec3(nb.x, -0.6f, nb.z), P_NEEDLE, aoT * 0.55f); }
+      if (lod == 0) { vec3 in(0.f, y0 + th * 0.25f, 0.f); mb.vert(a, vec3(na.x, -0.6f, na.z), P_NEEDLE, aoA * 0.55f); mb.vert(in, vec3(0, -1, 0), P_NEEDLE, 0.35f); mb.vert(b, vec3(nb.x, -0.6f, nb.z), P_NEEDLE, aoB * 0.55f); }
+    }
+    if (lod != 0) continue;
+    // the needle sprays: one along each branch, from part-way out to past its tip, sagging with it
+    for (int s = 0; s < segs * 2; s += 2) {
+      vec3 tipP = rim[s], dir = normalize(vec3(tipP.x, 0, tipP.z)), side(-dir.z, 0, dir.x);
+      vec3 root = vec3(0, y0 + th * 0.3f, 0) + dir * (rr[s] * 0.3f);
+      vec3 end = tipP + dir * (rr[s] * 0.12f) + vec3(0, -rr[s] * 0.05f, 0);
+      vec3 along = end - root;
+      float w = std::max(rr[s] * 0.42f, 0.35f);
+      vec3 up = normalize(cross(side, along)); if (up.y < 0) up = -up;
+      vec3 ln = normalize(up * 0.7f + dir * 0.5f);   // lit like part of the tier
+      vec3 q[4] = {root - side * (w * 0.5f), root + side * (w * 0.5f), end + side * (w * 0.5f), end - side * (w * 0.5f)};
+      float uv[4][2] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+      int id[6] = {0, 1, 2, 0, 2, 3};
+      for (int k : id) mb.vert(q[k], ln, P_LEAFCARD, aoT * (0.75f + 0.25f * uv[k][1]), uv[k][0] + (float)(card % 8), uv[k][1]);
+      card++;
     }
   }
 }
@@ -256,7 +280,7 @@ void buildTree(MB& mb, int kind, int lod) {
           clump(mb, tip, tr * (lod == 0 ? 1.f : 1.35f), 0.6f, 0, P_NEEDLE, cc, cc.y - 3.f, I.h, 0.07f * id, 0.38f);
           if (lod == 0) {
             clump(mb, b0 + dir * (L * 0.55f) + vec3(0, 0.15f, 0), tr * 0.75f, 0.6f, 0, P_NEEDLE, cc, cc.y - 3.f, I.h, 0.07f * id + 0.3f, 0.38f);
-            leafCards(mb, tip, tr * 1.25f, 0.65f, 5, cc, cc.y - 3.f, I.h, 0.07f * id + 0.5f, 0.75f);
+            leafCards(mb, tip, tr * 1.25f, 0.65f, 6, cc, cc.y - 3.f, I.h, 0.07f * id + 0.5f, 0.55f);
           }
         }
       }

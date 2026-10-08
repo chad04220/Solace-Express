@@ -41,9 +41,10 @@ void main(){
   if (part == P_LEAFCARD) {
     cls = 1.0;
     float h = hsh(floor(vec2(fract(vAux.z), vAux.w)*5.0) + floor(vAux.z)*7.0 + vInst.x*13.0);
-    vec3 tint = uKind == K_OAK ? vec3(0.07, 0.12, 0.035) : uKind == K_BIRCH ? vec3(0.11, 0.17, 0.045) : uKind == K_PINE ? vec3(0.045, 0.085, 0.06) : vec3(0.075, 0.12, 0.04);
+    vec3 tint = uKind == K_OAK ? vec3(0.07, 0.12, 0.035) : uKind == K_BIRCH ? vec3(0.11, 0.17, 0.045) : uKind == K_PINE ? vec3(0.045, 0.085, 0.06)
+              : uKind == K_SPRUCE ? vec3(0.038, 0.072, 0.066) : uKind == K_FIR ? vec3(0.042, 0.08, 0.058) : vec3(0.075, 0.12, 0.04);
     alb = tint*mix(0.75, 1.3, h)*mix(0.82, 1.12, fract(seed*5.3));
-    alb = mix(alb, alb*vec3(1.6, 1.05, 0.55), smoothstep(0.8, 1.0, fract(seed*13.7))*0.8);   // trees turning
+    if (uKind >= K_OAK) alb = mix(alb, alb*vec3(1.6, 1.05, 0.55), smoothstep(0.8, 1.0, fract(seed*13.7))*0.8);   // broadleaf trees turning (never the conifers)
     alb *= mix(0.6, 1.0, ao);
     rough = 0.6;
     nb = n0;
@@ -51,6 +52,16 @@ void main(){
     cls = 1.0;
     if (part == P_NEEDLE) {
       alb = triS(lp, n0, M_NEEDLES, 0.9, 1.4, nb, rough);
+      // a lumpy noise normal and shade, finer than the leaves': a needle mass reads as many small tufts and shoots,
+      // not one smooth cushion
+      // (within a few hundred metres: further off it is finer than a pixel, and the forest's far pixels are many)
+      float tuft = 1.0 - smoothstep(250.0, 400.0, dist);
+      if (tuft > 0.0) {
+        vec3 q = lp*4.6 + vInst.x*11.0;
+        vec3 g = vec3(vn3(q + vec3(0.6, 0.0, 0.0)) - vn3(q - vec3(0.6, 0.0, 0.0)), vn3(q + vec3(0.0, 0.6, 0.0)) - vn3(q - vec3(0.0, 0.6, 0.0)), vn3(q + vec3(0.0, 0.0, 0.6)) - vn3(q - vec3(0.0, 0.0, 0.6)));
+        nb = normalize(nb + g*1.2*tuft);
+        alb *= mix(1.0, mix(0.68, 1.12, vn3(lp*6.1 - vInst.x*3.0)), tuft);
+      }
       vec3 tint = (uKind == K_SPRUCE ? vec3(0.5, 0.7, 0.68) : uKind == K_PINE ? vec3(0.5, 0.68, 0.56) : vec3(0.55, 0.76, 0.62))*mix(0.85, 1.1, vAux.z);
       alb *= tint*mix(0.85, 1.15, fract(seed*7.31));
       if (uSnow > 0.05 || wy > 1500.0) alb = mix(alb, vec3(0.85, 0.88, 0.92), smoothstep(0.35, 0.8, n0.y)*max(uSnow, smoothstep(1500.0, 1900.0, wy))*0.85);

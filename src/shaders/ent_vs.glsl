@@ -23,6 +23,18 @@ void main(){
     posed.yz=aAux.zw+vec2(c*q.x-s*q.y,s*q.x+c*q.y);
     posedN.yz=vec2(c*aNrm.y-s*aNrm.z,s*aNrm.y+c*aNrm.z);
   }
+  // trees and bushes: no two alike. Each instance turns its crown round the trunk by its own amount, more towards the
+  // top (the whorls, tiers and clumps come round at other bearings), pushes it out of round its own way and leans a
+  // little - one mesh per species read as one tree copied across the hills (both passes: the shadow is the same tree)
+  if (uKind <= 6) {
+    float sd = iB.w, t = clamp(posed.y/(uKind == 6 ? 1.8 : uKind == 5 ? 10.0 : 12.0), 0.0, 1.6);
+    float tw = (fract(sd*3.71) - 0.5)*2.4*t, ct = cos(tw), st = sin(tw);
+    mat2 R = mat2(ct, st, -st, ct);
+    posed.xz = R*posed.xz; posedN.xz = R*posedN.xz;
+    float ph = atan(posed.z, posed.x);
+    posed.xz *= 1.0 + min(t, 1.0)*(0.14*sin(2.0*ph + sd*41.0) + 0.07*sin(3.0*ph + sd*23.0));
+    if (uKind != 6) posed.xz += vec2(cos(sd*57.0), sin(sd*57.0))*0.45*fract(sd*8.3)*t*t;   // (up to ~0.5 m at 12 m)
+  }
   vec3 lp = posed*iB.xyz;
   // foliage sways a little in the wind, more towards the top and the frond tips
   if (uKind <= 6 && (aAux.x < 3.5 || aAux.x > 17.5) && uShadowPass == 0) {

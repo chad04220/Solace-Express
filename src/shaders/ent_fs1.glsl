@@ -27,11 +27,23 @@ bool leafCut(float viewEdge){
     float n = vn3(vL*2.3 + vInst.x*17.0)*0.55 + vn3(vL*7.3 - vInst.x*9.0)*0.45;
     return n < 0.24 + 0.4*viewEdge;
   }
+  if (part == P_NEEDLE) {   // needle masses: ragged towards their silhouettes - tufts and branch ends, not pillows or paper cones
+    if (viewEdge <= 0.1) return false;   // (no cut can fall below it: the noise isn't paid for)
+    float n = vn3(vL*3.1 + vInst.x*13.0)*0.6 + vn3(vL*9.0 - vInst.x*7.0)*0.4;
+    return n < 0.6*viewEdge - 0.06;
+  }
   if (part == P_LEAFCARD && uKind == K_PINE) {   // a tuft of needles radiating from the shoot
     vec2 q = vec2(fract(vAux.z), vAux.w)*2.0 - 1.0; float r = length(q);
     float a = atan(q.y, q.x)/6.2832 + 0.5;
     float k = fract(a*46.0 + r*0.6 + hsh(vec2(floor(vAux.z), vInst.x))*7.0);
-    return r > 0.95 - 0.25*hsh(vec2(floor(a*46.0), floor(vAux.z))) || r < 0.06 || k > 0.32;
+    return r > 0.95 - 0.35*hsh(vec2(floor(a*46.0), floor(vAux.z))) || r < 0.06 || k > 0.5;
+  }
+  if (part == P_LEAFCARD && uKind <= K_SPRUCE) {   // a fir's flat spray: needles either side of the shoot, slanting forward, to a point at its tip
+    float u = abs(fract(vAux.z)*2.0 - 1.0), v = vAux.w;
+    if (u > 0.95*(1.0 - 0.8*v*v)*smoothstep(0.0, 0.1, v)) return true;
+    if (u < 0.06) return false;   // the shoot
+    float far = smoothstep(25.0, 110.0, length(uCam - vW));   // (needles finer than a pixel: a denser spray instead of shimmer)
+    return fract((v + u*0.4)*24.0 + hsh(vec2(floor(vAux.z), vInst.x))*3.0) > mix(0.45, 0.8, far);
   }
   if (part == P_LEAFCARD) {   // a spray of leaves: jittered ellipses on a 3x3 grid, each at its own angle
     vec2 uv0 = vec2(fract(vAux.z), vAux.w);
