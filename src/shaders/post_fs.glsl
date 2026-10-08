@@ -40,7 +40,7 @@ void main(){
   vec3 mn = min(tM, min(min(tN, tS), min(tE, tW))), mx = max(tM, max(max(tN, tS), max(tE, tW)));
   vec3 amp = sqrt(clamp(min(mn, 1.0 - mx)/max(mx, 1e-4), 0.0, 1.0));
   vec3 wgt = -amp/6.5;   // CAS sharpness ~0.5
-  if (abs(texture(uScene, uv).a - 0.55) < 0.02) wgt = vec3(0.0);   // cockpit displays: already anti-aliased, sharpening only makes them crunchy
+  if (abs(texture(uScene, uv).a - 0.55) < 0.02) wgt *= 0.5;   // cockpit displays: already anti-aliased - a lighter touch (none at all left them soft after the TAA)
   vec3 sh = clamp((tM + (tN + tS + tE + tW)*wgt)/(1.0 + 4.0*wgt), 0.0, 0.99995);
   vec3 scene = sh/(1.0 - sh);
   vec3 c = mix(scene, texture(uBloom, uv).rgb/6.0, uBloomK) + texture(uRays, uv).rgb*uRayK;   // 6 bloom levels summed

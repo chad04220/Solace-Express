@@ -136,7 +136,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kWraithCockpitSDF, kWraithCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
+  for (const char* src : {kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -789,6 +789,14 @@ void Renderer::setOffscreen(bool on) {
 mat4 Renderer::viewProj(const FrameParams& fp, float zNear, float zFar) const {
   return perspective(fp.fovY, (float)W / H, zNear, zFar) * viewMat(fp);
 }
+// the same with the camera at the origin, for positions given relative to it: in world metres (floats) a position is
+// held only to their spacing there - 4 mm at the map's edges - and so was everything the world matrix placed: the
+// cockpits' vertices, an arm's length away, swam by several pixels as the aircraft flew
+mat4 Renderer::viewProjRel(const FrameParams& fp, float zNear, float zFar) const {
+  mat4 view = viewMat(fp);
+  view(0, 3) = 0.f; view(1, 3) = 0.f; view(2, 3) = 0.f;
+  return perspective(fp.fovY, (float)W / H, zNear, zFar) * view;
+}
 mat4 Renderer::viewMat(const FrameParams& fp) const {
   mat4 view;
   view(0, 0) = fp.camRight.x; view(0, 1) = fp.camRight.y; view(0, 2) = fp.camRight.z;
@@ -853,7 +861,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   // before every pass that does
   glActiveTexture(GL_TEXTURE0 + 22); glBindTexture(GL_TEXTURE_2D, shCabOn ? texShCab : 0); glUniform1i(U(p, "uCabShMap"), 22);
   glUniform1i(U(p, "uCabShOn"), shCabOn ? 1 : 0);
-  if (shCabOn) { glUniformMatrix4fv(U(p, "uCabShVP"), 1, GL_FALSE, shCabVP.m); glUniform1f(U(p, "uCabShBias"), shCabBias); }
+  if (shCabOn) { glUniformMatrix4fv(U(p, "uCabShVP"), 1, GL_FALSE, shCabVP.m); glUniformMatrix4fv(U(p, "uCabShVPc"), 1, GL_FALSE, shCabVPc.m); glUniform1f(U(p, "uCabShBias"), shCabBias); }
   glUniform1i(U(p, "uHullOn"), hullOn ? 1 : 0); glUniform1f(U(p, "uHullNear"), hullOn ? hullNearNow : hullNear(fp)); glUniform1i(U(p, "uHullExitOn"), hullOn && hullExitOn ? 1 : 0);
   glUniform1i(U(p, "uTrafHullOn"), trafHullOn ? 1 : 0);
   {   // AI traffic: one row of 32 texels per aircraft

@@ -8,6 +8,11 @@
 #else
 #define RESEARCH_ON true
 #endif
+// The hit relative to the camera, exactly (gRelSet): the mesh pass's from its body-space vertex position, the march's
+// from its ray. The world point holds it only to the float spacing of world metres - 4 mm at the map's edges, a third
+// of a degree at arm's length - and what was taken from it (a cockpit's markings, gauge and bezel edges, panel
+// outlines, the cabin sun map's texels) came out stair-stepped there, the steps crawling as the aircraft moved.
+bool gRelSet = false; vec3 gRel = vec3(0.0);
 float sdBox(vec3 p, vec3 b){ vec3 q = abs(p)-b; return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0); }
 float sdRoundBox(vec3 p, vec3 b, float r){ vec3 q = abs(p)-b+r; return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r; }
 float sdCapsule(vec3 p, vec3 a, vec3 b, float r){ vec3 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0); return length(pa-ba*h)-r; }

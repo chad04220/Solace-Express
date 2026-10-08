@@ -9,7 +9,7 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
   bool wr = RESEARCH_ON && eng == 6;
   // a research jet's display from the pilot's seat: its camera's picture, with the display's own look and symbology
   if (RESEARCH_ON && pod && eng >= 5 && ((mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63))) {
-    vec3 scrL = transpose(uPlaneRot)*(p - uPlanePos);
+    vec3 scrL = transpose(uPlaneRot)*(gRelSet ? gRel + (uCamPos - uPlanePos) : p - uPlanePos);
     bool bomb; vec3 rdc;
     vec3 col = feedScreen(mid, scrL, rdc, bomb);
     if (uScrWin == 1 && !bomb) discard;   // a window: the world drawn before the airframe stays

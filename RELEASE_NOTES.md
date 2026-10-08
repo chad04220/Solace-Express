@@ -14,6 +14,21 @@
 
 ### The cockpit
 - More of the world ahead. The glareshield over the panel was a deep slab whose far edge sat only 2-4 degrees below the horizon. It is now a thin hood that slopes down to the windscreen, giving 4-6 degrees more view over the nose in every cockpit. The compass and the panel light strip sit on the new hood.
+- Cockpits no longer waver or turn jagged far from the middle of the map. Every cockpit was placed and shaded from positions in world metres, which near the map's edges hold only to about 4 mm. At arm's length that is several pixels, so straight edges rippled as you flew, and markings, gauge rims, bezels and the cabin's sun shadows came out stair-stepped. Cockpits are now worked out from the camera and are equally sharp anywhere on the map. This applies to every aircraft.
+- Flat panels beside a rounded edge are lit evenly in every cockpit. The edge's curve used to smear across the panel, so on shiny surfaces the lights' highlights broke into a sawtooth along the edge.
+
+### XR-40 and XR-30 cockpits
+- The displays that work as windows have straight, clean edges from every angle. Before, each frame's edge was a row of saw teeth, and at some angles the cabin's hex wall showed through as black marks and stray panels, worst on the XR-40's overhead and side displays.
+- The window frames' inner walls are lit evenly instead of glinting in lumps.
+- The XR-40's floor grid is whole. Ribs no longer go missing in sections.
+- Both XR-40 armrest displays show their full page. Only the lower half was showing.
+- The XR-40's dash displays and annunciators are sharp-edged, with no dark spikes round them, and the hologram emitter between them is smooth instead of ringed by shards. The armrest displays' mounts are clean-edged too.
+- The buttons beside the XR-30's seat are crisp backlit keys. They came out as a heap of melted blocks.
+- No more dotted streaks across the XR-30's panoramic view.
+- The fine detail on the bezels, frames and carbon panels (flutes, seams, grooves, the weave) no longer shimmers into waves as you look round. Display text is crisper.
+
+### Break-ups
+- When the XR-20 breaks up, each forward-swept wing now comes off whole. The tips used to stay on the nose section.
 
 ### Autoland
 - The GPS autoland now uses the same rule the career dispatches by. It no longer takes the Starling or the Mantis onto Harlan Farm's grass or Palm Bay's sand, where they overran.

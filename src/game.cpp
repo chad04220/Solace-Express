@@ -3562,10 +3562,13 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < 5; i++) updateCamera(1 / 60.f);
     toasts.clear(); return;
   }
-  if (name.compare(0, 3, "ckv") == 0) {   // cockpit view of aircraft N: ckv<N>_<look yaw deg>_<look pitch deg>_<hour>[_<roll input -1..1>[_<flaps 0..1>]]
+  if (name.compare(0, 3, "ckv") == 0) {   // cockpit view of aircraft N: ckv<N>_<look yaw deg>_<look pitch deg>_<hour>[_<roll input -1..1>[_<flaps 0..1>]][@<x>,<z>]
     int idx = 0; float ly = 0, lpch = -8, hour = 11, roll = 0, fl = 0; sscanf(name.c_str() + 3, "%d_%f_%f_%f_%f_%f", &idx, &ly, &lpch, &hour, &roll, &fl);
     if (idx == kResearchJet) { resAirborne = true; resTime = hour; launchResearch(); }
     else { timeOfDay = hour; plane.reset(&kAircraft[idx], vec3(-4000, 600, 9000), 40, kAircraft[idx].maxFuel, 100, true, kAircraft[idx].cruise); camQ = plane.q; takeoffAnnounced = true; }
+    size_t at = name.find('@');   // (ckv...@x,z: out at x, z - by the map's edge, where world-space floats are coarsest)
+    float ax = 0, az = 0;
+    if (at != std::string::npos && sscanf(name.c_str() + at + 1, "%f,%f", &ax, &az) == 2) { plane.pos = vec3(ax, std::max(g_world.height(ax, az), 0.f) + 600.f, az); camQ = plane.q; }
     camMode = 1; hint.clear(); toasts.clear();
     for (int i = 0; i < 4; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     lookYaw = ly * DEG; lookPitch = lpch * DEG; camYaw = lookYaw; camPitch = lookPitch + 0.12f;

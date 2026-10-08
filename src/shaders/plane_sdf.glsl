@@ -179,12 +179,9 @@ vec2 mapJetCockpit(vec3 p){
     float k = clamp(floor(ang/0.42 + 0.5), -2.0, 2.0);
     float ar = (ang - k*0.42)*r;
     vec3 rq = vec3(ar, q.y - topY, r - 0.575);
-    float rec = sdBox(rq, vec3(0.072, 0.012, 0.052));
-    con = max(con, -rec);
-    res = opU(res, vec2(con, 44.0));
-    // (each display a solid block filling its recess up to the glass, 4 mm below the console top: a 4 mm slab floating
-    // over the recess floor, a 2 mm slit from its walls, was finer than the bake's lattice and came out in fragments)
-    res = opU(res, vec2(sdBox(rq + vec3(0.0, 0.017, 0.0), vec3(0.073, 0.013, 0.053)), 45.0));
+    // (each display flush in the console's top: a slab floating in a recess came out in fragments, and a block filling
+    // it to 4 mm below the top left the recess's edges wavy - steps finer than the bake's lattice)
+    res = opU(res, vec2(con, rq.y > -0.01 && abs(rq.x) < 0.072 && abs(rq.z) < 0.052 ? 45.0 : 44.0));
     // rotary knobs between the displays
     float kk = clamp(floor(ang/0.42), -3.0, 2.0) + 0.5;
     vec3 kq = vec3((ang - kk*0.42)*r, q.y - topY, r - 0.505);
@@ -200,12 +197,11 @@ vec2 mapJetCockpit(vec3 p){
   {
     vec3 cq = vec3(abs(q.x) - 0.52, q.y + 0.44, q.z - 0.08);
     float shelf = sdRoundBox(cq, vec3(0.13, 0.05, 0.36), 0.015);
-    res = opU(res, vec2(shelf, 44.0));
-    res = opU(res, vec2(sdBox(cq - vec3(0.02, 0.051, -0.2), vec3(0.075, 0.002, 0.06)), q.x < 0.0 ? 52.0 : 53.0));
-    vec3 bq = cq - vec3(0.0, 0.055, 0.12);
-    vec2 cell = clamp(floor(bq.xz/0.032 + 0.5), vec2(-3.0, -2.0), vec2(3.0, 3.0));
-    bq.xz -= cell*0.032;
-    res = opU(res, vec2(sdRoundBox(bq, vec3(0.012, 0.006, 0.012), 0.003), 54.0));
+    // (its display and its keys flush in its top: the keys - 24 mm caps, 8 mm apart, 11 mm proud - were steps far
+    // finer than the bake's lattice, and came out a heap of melted blocks; plane_material.glsl draws them)
+    float sid = cq.y > 0.04 && abs(cq.x - 0.02) < 0.075 && abs(cq.z + 0.2) < 0.06 ? (q.x < 0.0 ? 52.0 : 53.0) :
+                cq.y > 0.04 && abs(cq.x) < 0.112 && abs(cq.z - 0.136) < 0.096 ? 54.0 : 44.0;
+    res = opU(res, vec2(shelf, sid));
   }
   // overhead switch panel angled towards the pilot
   {

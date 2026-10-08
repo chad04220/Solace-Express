@@ -36,11 +36,12 @@ vec2 mapWraithCockpit(vec3 p){
   res = opU(res, vec2(sL.x, 61.0));
   res = opU(res, vec2(min(min(min(sF.y, sS.y), sO.y), min(sC.y, sL.y)), 65.0));
   }
-  // glass floor: a grid of thin titanium ribs over the pane
+  // glass floor: a grid of titanium ribs over the pane (16 mm wide, standing 18 mm proud of the glass: at 12 by 8 mm
+  // they slipped between the bake's lattice points in places, and the grid came out with sections missing)
   {
     vec3 l = wrFrame(q, WL_C, WL_N, vec3(0,0,-1));
     vec2 g = abs(fract(l.xy/vec2(0.2, 0.17) + 0.5) - 0.5)*vec2(0.2, 0.17);
-    float grid = max(max(min(g.x, g.y) - 0.006, l.z - 0.012), max(wrShape(l.xy, WL_S, 0.1), -l.z));
+    float grid = max(max(min(g.x, g.y) - 0.008, l.z - 0.022), max(wrShape(l.xy, WL_S, 0.1), -l.z));
     if (gCkSkip != 1) res = opU(res, vec2(grid, 72.0));
   }
   // dash: an angular carbon blade under the front wrap with two displays and the hologram emitter between them
@@ -48,18 +49,23 @@ vec2 mapWraithCockpit(vec3 p){
     vec3 l = wrFrame(q, WD_C, WD_N, vec3(0,1,0));
     float blade = max(max(abs(l.x) - 0.66, abs(l.y) - 0.1), abs(l.z + 0.02) - 0.022);
     blade = max(blade, (abs(l.x)*0.6 + abs(l.y) - 0.48));                                // swept ends
-    res = opU(res, vec2(blade, 65.0));
+    // its two displays and the annunciator tiles along its upper edge (ARM, LASER, BAY, BOMB, CLOAK, PODS, G, ALT) are
+    // flush in its face: as slabs a few millimetres proud of it, finer than the bake's lattice, their edges came out as
+    // dark spiky facets (the owner's report)
     vec3 m = vec3(abs(l.x) - 0.33, l.y + 0.005, l.z - 0.003);
-    if (gCkSkip != 2) res = opU(res, vec2(max(wrShape(m.xy, vec2(0.15, 0.07), 0.035), abs(m.z) - 0.0015), 69.0));
-    vec3 h = vec3(l.x, l.y + 0.01, l.z);
-    float pod = max(length(h.xy) - 0.055, abs(h.z - 0.012) - 0.012);
-    res = opU(res, vec2(pod, 74.0));
-    res = opU(res, vec2(max(abs(length(h.xy) - 0.035) - 0.004, abs(h.z - 0.026) - 0.003), 67.0));
-    // annunciator tiles along the blade's upper edge: ARM, LASER, BAY, BOMB, CLOAK, PODS, G, ALT
     vec3 a = vec3(l.x, l.y - 0.083, l.z - 0.001);
-    float cell = clamp(floor(a.x/0.07 + 0.5), -3.5, 3.5);
     a.x -= (floor(a.x/0.07) + 0.5)*0.07;
-    if (gCkSkip != 2) res = opU(res, vec2(max(max(abs(a.x) - 0.028, abs(a.y) - 0.009), max(abs(l.x) - 0.28, abs(a.z) - 0.0015)), 76.0));
+    bool face = gCkSkip != 2 && l.z > -0.01;
+    float bid = face && wrShape(m.xy, vec2(0.15, 0.07), 0.035) < 0.0 ? 69.0 : face && max(max(abs(a.x) - 0.028, abs(a.y) - 0.009), abs(l.x) - 0.28) < 0.0 ? 76.0 : 65.0;
+    vec3 h = vec3(l.x, l.y + 0.01, l.z);
+    // (the hologram emitter: a rounded disc filleted into the blade, its glowing ring a round tube filleted into the
+    // disc - a sharp-edged disc on a blade tilted to the lattice, and then the crease under a rounded rim, came out as
+    // dark shards round it: the owner's report)
+    vec2 pd = vec2(length(h.xy) - 0.046, abs(h.z - 0.012) - 0.003);
+    float pod = min(max(pd.x, pd.y), 0.0) + length(max(pd, 0.0)) - 0.009;
+    float ring = length(vec2(length(h.xy) - 0.035, h.z - 0.024)) - 0.006;
+    float podR = smin(pod, ring, 0.006);
+    res = opU(res, vec2(smin(blade, podR, 0.014), blade < podR ? bid : ring < pod ? 67.0 : 74.0));
   }
   // side consoles: angular slabs below the side displays with touch glass, a display and the controls
   {
@@ -67,12 +73,16 @@ vec2 mapWraithCockpit(vec3 p){
     float slab = max(max(abs(cq.x) - 0.13, abs(cq.y) - 0.04), abs(cq.z) - 0.36);
     slab = max(slab, (-cq.x*0.7 + cq.y) - 0.035);                      // chamfered inner edge
     slab = max(slab, (abs(cq.z) + abs(cq.x)*0.5) - 0.4);
-    res = opU(res, vec2(slab, 65.0));
-    // Aft touch area leaves the stick base and the throttle's full travel on solid console material.
-    if (gCkSkip != 2) res = opU(res, vec2(max(max(abs(cq.x - 0.015) - 0.1, abs(cq.y - 0.041) - 0.0015), abs(cq.z - 0.265) - 0.09), 68.0));
+    // (its touch glass and the display on its tilted mount flush in their tops, as the dash's are. The aft touch area
+    // leaves the stick base and the throttle's full travel on solid console material)
+    bool touch = gCkSkip != 2 && cq.y > 0.03 && abs(cq.x - 0.015) < 0.1 && abs(cq.z - 0.265) < 0.09;
+    res = opU(res, vec2(slab, touch ? 68.0 : 65.0));
     vec3 mq = cq - vec3(0.015, 0.075, -0.24); mq.yz = rot2(mq.yz, -0.55);
-    if (gCkSkip != 2) res = opU(res, vec2(max(wrShape(mq.xz, vec2(0.09, 0.055), 0.02), abs(mq.y) - 0.0015), 69.0));
-    res = opU(res, vec2(sdBox(mq + vec3(0.0, 0.012, 0.0), vec3(0.105, 0.012, 0.07)), 65.0));
+    bool mfd = gCkSkip != 2 && mq.y > -0.006 && wrShape(mq.xz, vec2(0.09, 0.055), 0.02) < 0.0;
+    // (a rounded block down into the console: a thin sharp slab meeting it at a slant zigzagged. Its edges round at
+    // 14 mm, the display just inside the flat of its top: at 8 mm the bend was finer than the cabin's fine lattice,
+    // and its titanium's highlights ran along it as a sawtooth - the owner's report)
+    res = opU(res, vec2(sdRoundBox(mq + vec3(0.0, 0.03, 0.0), vec3(0.105, 0.03, 0.07), 0.014), mfd ? 69.0 : 65.0));
   }
   // side stick (right) follows pitch and roll; throttle (left) slides with the throttle
   {

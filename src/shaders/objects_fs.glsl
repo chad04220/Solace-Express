@@ -99,7 +99,8 @@ void main(){
 #ifdef OBJ_NO_AF
   discard;
 #else
-  vec3 lp0 = gPC + transpose(gPR)*(p - gPP);
+  gRelSet = true; gRel = rd*t;   // (exact: plane_common.glsl)
+  vec3 lp0 = gPC + transpose(gPR)*(gRel + (ro - gPP));
   planeToGB(p, rd, t, int(ph.y + 0.5), planeNormal(lp0), pod || onScr, trafHit, -1.0);
 #endif
 }

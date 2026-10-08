@@ -75,7 +75,7 @@ void planeMaterial(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, out Ma
 // (the same with the body-space normal given: the mesh pass carries it per vertex, the march computes it from the field)
 void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 lnIn, out Mat m, out vec3 n, out vec3 lp, out vec3 ln, out bool interior, out bool podMat){
   mat3 inv = transpose(gPR);
-  lp = gPC + inv*(p - gPP);
+  lp = gPC + inv*(gRelSet ? gRel + (uCamPos - gPP) : p - gPP);   // (plane_common.glsl gRelSet)
   ln = lnIn;
   n = gPR*ln;
   if (mid == 11) { vec3 sc = fusSection(lp.z); vec3 rad = vec3(lp.x, lp.y - sc.z, 0.0); if (dot(ln, rad) > 0.55*length(rad) && lp.y > gM[22].y - 0.9) mid = 1; }
@@ -233,8 +233,12 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     else { m.alb = vec3(0.25, 0.02, 0.02); m.emit = bcn ? vec3(30.0, 1.5, 0.6) : vec3(0.0); }
   }
   else if (RESEARCH_ON && mid >= 80 && mid < 94) shadeWraith(m, mid, lp, ln, t);
-  else if (RESEARCH_ON && mid >= 61 && mid < 80 && int(gM[0].z + 0.5) == 6) { gPixM = t*uTanHalf*2.0/uRes.y; shadeWraithCockpit(m, mid, lp, ln, E.xyz); }   // XR-40 cockpit
+  else if (RESEARCH_ON && mid >= 61 && mid < 80 && int(gM[0].z + 0.5) == 6) {   // XR-40 cockpit
+    gPixM = t*uTanHalf*2.0/uRes.y; gPixG = gPixM/max(abs(dot(ln, transpose(uPlaneRot)*rd)), 0.2);
+    shadeWraithCockpit(m, mid, lp, ln, E.xyz);
+  }
   else if (RESEARCH_ON && mid >= 30 && mid < 60) {  // XR-30 research jet surfaces
+    gPixM = t*uTanHalf*2.0/uRes.y; gPixG = gPixM/max(abs(dot(ln, transpose(uPlaneRot)*rd)), 0.2);
     vec3 nT; vec4 tx;
     float pulse = 0.75 + 0.25*sin(uTime*2.5);
     if (mid == 30 || mid == 31) {
@@ -261,21 +265,24 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
       m.emit = vec3(1.0, 0.3, 0.07)*(0.05*sp*sp + 1.4*ab)*deep;
     }
     else if (mid == 40) {  // sealed pod: carbon weave between structural ribs
-      vec2 wv = floor(vec2(lp.x + lp.z, lp.y - lp.z)*55.0);
+      vec2 wv = vec2(lp.x + lp.z, lp.y - lp.z)*27.5;   // (a checker of 1.8 cm squares: two square waves, crossed)
+      float wa = aaSquare(wv.x, gPixG*39.0), wb = aaSquare(wv.y, gPixG*39.0);
       tx = triSample(lp, ln, M_FABRIC, 4.0, nT); m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.3);
-      m.alb = vec3(0.03, 0.032, 0.036)*(0.8 + 0.4*mod(wv.x + wv.y, 2.0)); m.rough = 0.3; m.metal = 0.2;
-      float rib = abs(fract((lp.z - E.z)*4.0) - 0.5);
-      if (rib > 0.46) { m.alb = vec3(0.07, 0.075, 0.08); m.metal = 0.7; m.rough = 0.3; }
+      m.alb = vec3(0.03, 0.032, 0.036)*(0.8 + 0.4*(wa + wb - 2.0*wa*wb)); m.rough = 0.3; m.metal = 0.2;
+      float rib = aaLines((lp.z - E.z)*4.0 + 0.5, 0.04, gPixG*4.0);
+      m.alb = mix(m.alb, vec3(0.07, 0.075, 0.08), rib); m.metal = mix(m.metal, 0.7, rib);
       if (abs(lp.y - (E.y - 0.18)) < 0.004) m.emit = gColStripe*1.4*pulse;
     }
     else if (mid >= 41 && mid <= 43) { m.alb = vec3(0.0); m.rough = 0.05; }
     else if (mid == 44) {  // bezels and consoles: satin composite with machined edges and fasteners
       vec2 hx = lp.xz*45.0 + vec2(lp.y*30.0);
       tx = triSample(lp, ln, M_PLASTIC, 0.4, nT); m.nrm = nT;
-      m.alb = vec3(0.028, 0.03, 0.034)*(0.9 + 0.2*step(0.5, fract(hx.x + floor(hx.y)*0.5)))*(0.7 + 0.6*tx.r); m.rough = mix(0.42, tx.a, 0.4); m.metal = 0.35;
+      float tile = aaSquare(hx.x + floor(hx.y)*0.5, gPixG*60.0);
+      m.alb = vec3(0.028, 0.03, 0.034)*(0.9 + 0.2*mix(tile, 0.5, smoothstep(0.3, 0.8, gPixG*60.0)))*(0.7 + 0.6*tx.r); m.rough = mix(0.42, tx.a, 0.4); m.metal = 0.35;
       vec3 qd = lp - E.xyz; float rr = length(qd.xz), an = atan(qd.x, -qd.z);
-      if (abs(fract(an*9.0) - 0.5) < 0.025 && rr < 0.7) m.alb *= 2.2;                 // panel seams
-      if (length(vec2(fract(an*18.0) - 0.5, (qd.y - 0.36)*90.0)) < 0.12) { m.alb = vec3(0.35); m.metal = 1.0; m.rough = 0.25; }  // screws
+      if (rr < 0.7) m.alb *= 1.0 + 1.2*aaLines(an*9.0, 0.025, gPixG*9.0/max(rr, 0.1));   // panel seams
+      float sc = aaDisc(length(vec2(fract(an*18.0) - 0.5, (qd.y - 0.36)*90.0)), 0.12, gPixG*max(18.0/max(rr, 0.1), 90.0), 0.0);   // screws
+      m.alb = mix(m.alb, vec3(0.35), sc); m.metal = mix(m.metal, 1.0, sc); m.rough = mix(m.rough, 0.25, sc);
     }
     else if (mid == 45 || mid == 52 || mid == 53) {  // multi-function displays
       vec3 qd = lp - E.xyz; int page; vec2 uv;
@@ -317,11 +324,19 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
       m.alb = vec3(0.02); m.rough = 0.1;
       m.emit = inCell ? on*2.0 + vec3(0.025, 0.03, 0.035) : vec3(0.0);
     }
-    else if (mid == 54) {  // backlit keys
+    else if (mid == 54) {  // backlit keys, flush in the shelf's top: 24 mm caps with a lit legend, light leaking round them
       vec3 qd = lp - E.xyz; vec3 cq = vec3(abs(qd.x) - 0.52, qd.y + 0.44, qd.z - 0.08) - vec3(0.0, 0.055, 0.12);
-      vec2 cell = floor(cq.xz/0.032 + 0.5); float hk = hash2i(ivec2(cell) + ivec2(qd.x < 0.0 ? 11 : 37, 5));
+      vec2 cell = clamp(floor(cq.xz/0.032 + 0.5), vec2(-3.0, -2.0), vec2(3.0, 3.0)); float hk = hash2i(ivec2(cell) + ivec2(qd.x < 0.0 ? 11 : 37, 5));
+      vec2 f = cq.xz - cell*0.032;
       vec3 kc = hk < 0.15 ? vec3(1.0, 0.55, 0.15) : hk < 0.25 ? vec3(0.3, 1.0, 0.5) : gColStripe*0.6;
-      m.alb = vec3(0.04); m.rough = 0.4; m.emit = ln.y > 0.6 ? kc*(0.12 + 0.5*step(0.85, hk)*step(0.5, fract(uTime*0.7 + hk*3.0))) : vec3(0.0);
+      float fw = gPixG, big = smoothstep(0.3, 0.8, fw/0.032);   // (a pixel spanning most of a key: its average)
+      float dk = length(max(abs(f) - 0.009, 0.0)) - 0.003;
+      float key = mix(clamp(0.5 - dk/fw, 0.0, 1.0), 0.56, big);
+      float rim = mix(clamp(1.0 - abs(dk + 0.0012)/max(fw, 0.0012), 0.0, 1.0), 0.0, big);   // the cap's bevelled edge catching the light
+      float leg = mix(clamp(0.5 - (max(abs(f.x) - 0.006, abs(f.y + 0.003) - 0.0014))/fw, 0.0, 1.0), 0.03, big);
+      float on = 0.12 + 0.5*step(0.85, hk)*step(0.5, fract(uTime*0.7 + hk*3.0));
+      m.alb = mix(vec3(0.008), vec3(0.045, 0.047, 0.05) + 0.06*rim, key); m.rough = mix(0.7, 0.35, key); m.metal = 0.0;
+      m.emit = kc*(on*(0.35*key + 2.2*leg) + 0.05*(1.0 - key));
     }
     else if (mid == 55) {  // overhead panel face: status LEDs beside each switch
       vec3 qd = lp - E.xyz - vec3(0.0, 0.5, -0.32); qd.yz = rot2(qd.yz, 0.55);

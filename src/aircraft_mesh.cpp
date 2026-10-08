@@ -27,7 +27,7 @@
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 17;   // (bump with the format, or with what the bake makes of the field: the cockpit's sharp edges, +14; its thin patch laid out fat and drawn last, +16; back on the surface, +17)
+const uint32_t kMeshMagic = 0x4d455348u + 18;   // (bump with the format, or with what the bake makes of the field: the cockpit's sharp edges, +14; its thin patch laid out fat and drawn last, +16; back on the surface, +17; its flat faces flat-shaded, +18)
 // the rigid parts a cockpit has (plane_parts.glsl PT_*) and each one's instances: x which seat or side, y which pedal
 struct PartInst { int type; float sx, sy; };
 const int kMaxPartInst = 128;
@@ -180,15 +180,12 @@ bool Renderer::compilePlaneMesh() {
     if (!progPlaneMeshV[v]) { error = "Aircraft mesh shader: " + e; return false; }
   }
   progPlaneMesh = progPlaneMeshV[0];
-  // the depth pre-pass; with uScrSkip the fragments at or behind a screen (texScrDepth) are dropped: the screens are holes
+  // the depth pre-pass; with uScrSkip the research cockpit's windows are cut (cabin_windows.glsl: the screens are holes)
   // (uCloakZ: a cloaked XR-40's sweeping front, body z - what lies ahead of it is see-through and writes no depth; -1e9 none)
-  progPlaneMeshDepth = linkProgramCached(planeMeshVSAssembly(""), "#version 330 core\nflat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; uniform int uScrSkip; uniform sampler2D uScrDepth; uniform float uCloakZ; uniform mat3 uRot; uniform vec3 uPos; uniform float uLogC;\nvoid main(){ if (uScrSkip == 1) { float zs = texelFetch(uScrDepth, ivec2(gl_FragCoord.xy), 0).r; if (gl_FragCoord.z >= zs - 2e-7) discard; } if (uCloakZ > -1e8 && (transpose(uRot)*(vW - uPos)).z < uCloakZ) discard; }\n", e);
+  progPlaneMeshDepth = linkProgramCached(planeMeshVSAssembly(""), planeMeshDepthFSAssembly(), e);
   if (!progPlaneMeshDepth) { error = "Aircraft mesh depth shader: " + e; return false; }
   progPartPose = linkProgramCached(kFullscreenVS, partPoseFSAssembly(), e);
   if (!progPartPose) { error = "Cockpit part pose shader: " + e; return false; }
-  // the screens alone, depth only (the bomb camera's pane excepted while it shows a picture)
-  progPlaneMeshScr = linkProgramCached(planeMeshVSAssembly(""), "#version 330 core\nflat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; uniform int uBombPane;\nvoid main(){ int mid = int(vId + 0.5); bool scr = (mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63); if (!scr || (uBombPane == 1 && mid == 61)) discard; }\n", e);
-  if (!progPlaneMeshScr) { error = "Aircraft mesh screen shader: " + e; return false; }
   return true;
 }
 
@@ -616,6 +613,52 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     simpStatic.join(); simpFine.join();
     fineStart = (uint32_t)ib.size();
     { const uint32_t off = (uint32_t)(vb.size() / 8); vb.insert(vb.end(), vbF.begin(), vbF.end()); for (uint32_t i : ibF) ib.push_back(i + off); }
+    // ---- the cabin's flat faces, flat: a vertex at the foot of a rounded edge carries the bend's turned normal, and
+    // across the simplified mesh's large flat triangles it smeared a band of the bend over the face - on the XR-40's
+    // polished titanium the fixtures' highlights broke into a sawtooth along the edges (an armrest display's mount,
+    // the owner's report). A triangle lying in a flat stretch of the field's surface - the field's normal at its
+    // centre and half way to each corner within 2 degrees of its plane's (a curve's chord fails it, and stays smooth)
+    // - takes its plane's normal at its corners, on copies of them; one across a bend keeps its corners'
+    if (inside && !ib.empty()) {
+      const size_t nt = ib.size() / 3;
+      std::vector<vec3> smp(nt * 4), fnv(nt);
+      for (size_t t = 0; t < nt; t++) {
+        const float *a = &vb[(size_t)ib[t * 3] * 8], *b = &vb[(size_t)ib[t * 3 + 1] * 8], *c = &vb[(size_t)ib[t * 3 + 2] * 8];
+        const vec3 A(a[0], a[1], a[2]), B(b[0], b[1], b[2]), Cc(c[0], c[1], c[2]);
+        const vec3 fn = cross(B - A, Cc - A); const float l = length(fn);
+        fnv[t] = l > 1e-12f ? fn * (1.f / l) : vec3(0, 0, 0);
+        const vec3 m = (A + B + Cc) * (1.f / 3.f);
+        smp[t * 4] = m; smp[t * 4 + 1] = (m + A) * 0.5f; smp[t * 4 + 2] = (m + B) * 0.5f; smp[t * 4 + 3] = (m + Cc) * 0.5f;
+      }
+      glUniform1i(U(progHullBake, "uHPart"), -2);   // (the field the airframe's mesh was laid from)
+      std::vector<float> cn; mode(3, 0); hullEval4(smp, cn);
+      glUniform1i(U(progHullBake, "uHPart"), -1);
+      const float flatCos = cosf(2.f * DEG), keepCos = cosf(1.5f * DEG);
+      int nFlat = 0;
+      for (size_t t = 0; t < nt; t++) {
+        if (dot(fnv[t], fnv[t]) < 0.5f) continue;
+        vec3 f = fnv[t];
+        if (cn[t * 16] * f.x + cn[t * 16 + 1] * f.y + cn[t * 16 + 2] * f.z < 0.f) f = f * -1.f;
+        bool flat = true;
+        for (int k = 0; k < 4 && flat; k++) {
+          const float* g = &cn[(t * 4 + k) * 4];
+          const float gl = sqrtf(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
+          flat = g[0] * f.x + g[1] * f.y + g[2] * f.z >= flatCos * gl;
+        }
+        if (!flat) continue;
+        bool off = false;
+        for (int k = 0; k < 3; k++) { const float* v = &vb[(size_t)ib[t * 3 + k] * 8]; if (v[3] * f.x + v[4] * f.y + v[5] * f.z < keepCos) off = true; }
+        if (!off) continue;
+        for (int k = 0; k < 3; k++) {
+          float v[8]; memcpy(v, &vb[(size_t)ib[t * 3 + k] * 8], sizeof v);
+          v[3] = f.x; v[4] = f.y; v[5] = f.z;
+          ib[t * 3 + k] = (uint32_t)(vb.size() / 8);
+          vb.insert(vb.end(), v, v + 8);
+        }
+        nFlat++;
+      }
+      if (getenv("HULLDBG")) printf("mesh cockpit: %d of %zu triangles flat-shaded\n", nFlat, nt);
+    }
     for (auto& th : partSimp) th.join();
     for (auto& po : partOut) {
       partBlob.push_back((uint32_t)po->type); partBlob.push_back((uint32_t)po->vb.size()); partBlob.push_back((uint32_t)po->ib.size());
@@ -767,64 +810,41 @@ void Renderer::drawPlaneParts(const PlaneMesh& pm, GLuint prog, int trafK) {
 // The mesh's depth alone (and, for a research craft's sealed cockpit, its screens' depth first): run at the start of
 // the frame for the player's aircraft (rasterWorld), so the scenery, the terrain and the sea behind the cabin walls or
 // the airframe fail the depth test before they are shaded, and again by drawPlaneMesh for a mesh that was not
+// the window cut's uniforms (cabin_windows.glsl): on, the eye in the body frame, the model, the bomb camera's pane
+void Renderer::setScreenCut(GLuint p, const FrameParams& fp, bool on) {
+  glUniform1i(U(p, "uScrSkip"), on ? 1 : 0);
+  if (!on) return;
+  glUniform3f(U(p, "uScrEye"), fp.plane.M[22 * 4], fp.plane.M[22 * 4 + 1], fp.plane.M[22 * 4 + 2]);
+  glUniform1i(U(p, "uScrModel"), (int)(fp.plane.M[2] + 0.5f));
+  glUniform1i(U(p, "uBombPane"), fp.fx.feed[3] > 0.5f ? 1 : 0);
+}
+
 void Renderer::drawPlaneMeshDepth(const FrameParams& fp, const PlaneMesh& pm, const float* rot, const vec3& pos, int trafK) {
   if (!pm.ok || !pm.idx) return;
-  mat4 vp = viewProj(fp, 0.01f, 2000.f);   // (a near plane at 1 cm: in the cockpit the panel is closer than 0.5 m)
+  // (a near plane at 1 cm: in the cockpit the panel is closer than 0.5 m. From the camera, the aircraft placed relative
+  // to it: plane_mesh_vs.glsl)
+  mat4 vp = viewProjRel(fp, 0.01f, 2000.f);
+  const vec3 rp = pos - fp.camPos;
   const float logC = 2.f / log2f(40000.f + 1.f);
   glBindVertexArray(pm.vao);
   // the research craft's displays as windows: the cabin is sealed, so a screen must be a hole through the whole
-  // airframe, not a missing pane with the pod's structure behind it. The screens' depth goes into texScrDepth first;
-  // the pre-pass and the material pass then drop every fragment at or behind a screen, and the world drawn before
-  // the airframe stays (the bomb camera's pane keeps its picture while it has one)
-  const bool scrSkip = screenWindows && trafK < 0 && fp.plane.PS[3] > 0.5f && (int)(fp.plane.M[2] + 0.5f) >= 5 && progPlaneMeshScr;
-  if (scrSkip) {
-    // (the incoming framebuffer, the G-buffer, saved before anything is bound: allocating the target binds its own,
-    // and restoring that one left the scenery drawn after this into the screens' depth target)
-    GLint prevFbo = 0; glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
-    if (!texScrDepth || scrDepthW < rw || scrDepthH < rh) {
-      int w = std::max(rw, scrDepthW), h = std::max(rh, scrDepthH);
-      if (texScrDepth) glDeleteTextures(1, &texScrDepth);
-      glGenTextures(1, &texScrDepth); glBindTexture(GL_TEXTURE_2D, texScrDepth);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      glBindTexture(GL_TEXTURE_2D, 0);
-      if (!fboScrDepth) glGenFramebuffers(1, &fboScrDepth);
-      glBindFramebuffer(GL_FRAMEBUFFER, fboScrDepth);
-      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texScrDepth, 0);
-      { GLenum none = GL_NONE; glDrawBuffers(1, &none); } glReadBuffer(GL_NONE);
-      scrDepthW = w; scrDepthH = h;
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, fboScrDepth);
-    glViewport(0, 0, rw, rh);
-    glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);
-    glUseProgram(progPlaneMeshScr);
-    glUniformMatrix4fv(U(progPlaneMeshScr, "uVP"), 1, GL_FALSE, vp.m);
-    glUniform2f(U(progPlaneMeshScr, "uJit"), jitX, jitY);
-    glUniform1f(U(progPlaneMeshScr, "uLogC"), logC);
-    glUniformMatrix3fv(U(progPlaneMeshScr, "uRot"), 1, GL_FALSE, rot);
-    glUniform3f(U(progPlaneMeshScr, "uPos"), pos.x, pos.y, pos.z);
-    glUniform1i(U(progPlaneMeshScr, "uBombPane"), fp.fx.feed[3] > 0.5f ? 1 : 0);
-    glUniform1i(U(progPlaneMeshScr, "uPartInst"), -1);
-    glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
-    glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
-    GLenum gb[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
-    glDrawBuffers(4, gb);
-    glViewport(0, 0, rw, rh);
-  }
+  // airframe, not a missing pane with the pod's structure behind it. The pre-pass and the material pass cut every
+  // fragment the eye sees through a pane (cabin_windows.glsl), and the world drawn before the airframe stays (the
+  // bomb camera's pane keeps its picture while it has one)
+  const bool scrSkip = screenWindows && trafK < 0 && fp.plane.PS[3] > 0.5f && (int)(fp.plane.M[2] + 0.5f) >= 5;
   {
     glUseProgram(progPlaneMeshDepth);
     glUniformMatrix4fv(U(progPlaneMeshDepth, "uVP"), 1, GL_FALSE, vp.m);
     glUniform2f(U(progPlaneMeshDepth, "uJit"), jitX, jitY);
     glUniform1f(U(progPlaneMeshDepth, "uLogC"), logC);
     glUniformMatrix3fv(U(progPlaneMeshDepth, "uRot"), 1, GL_FALSE, rot);
-    glUniform3f(U(progPlaneMeshDepth, "uPos"), pos.x, pos.y, pos.z);
-    glUniform1i(U(progPlaneMeshDepth, "uScrSkip"), scrSkip ? 1 : 0);
+    glUniform3f(U(progPlaneMeshDepth, "uPos"), rp.x, rp.y, rp.z);
+    setScreenCut(progPlaneMeshDepth, fp, scrSkip);
     {   // a cloaked XR-40 (the player's, outside): its front's body z, as the mesh pass's own test
       const PlaneVisual& pv = fp.plane;
       const bool ck = trafK < 0 && (int)(pv.M[2] + 0.5f) == 6 && pv.wr[4][3] > 0.001f && pv.PS[3] < 0.5f;
       glUniform1f(U(progPlaneMeshDepth, "uCloakZ"), ck ? pv.wr[6][1] : -1e9f);
     }
-    glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, scrSkip ? texScrDepth : 0); glUniform1i(U(progPlaneMeshDepth, "uScrDepth"), 29);
     glUniform1i(U(progPlaneMeshDepth, "uPartInst"), -1);
     glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
     glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
@@ -841,9 +861,10 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   // material shader (already done when the frame began with it)
   static const bool noPre = getenv("MESHNOPRE") != nullptr;   // (debug: no depth pre-pass)
   if (!noPre && !depthDone) drawPlaneMeshDepth(fp, pm, rot, pos, trafK);
-  mat4 vp = viewProj(fp, 0.01f, 2000.f);
+  mat4 vp = viewProjRel(fp, 0.01f, 2000.f);
+  const vec3 rp = pos - fp.camPos;
   const float logC = 2.f / log2f(40000.f + 1.f);
-  const bool scrSkip = screenWindows && trafK < 0 && fp.plane.PS[3] > 0.5f && (int)(fp.plane.M[2] + 0.5f) >= 5 && progPlaneMeshScr;
+  const bool scrSkip = screenWindows && trafK < 0 && fp.plane.PS[3] > 0.5f && (int)(fp.plane.M[2] + 0.5f) >= 5;
   // (this aircraft's own build of the program: the light aircraft's leaves the research jets out - pickAfPrograms)
   const float eng = trafK >= 0 ? fp.traffic[trafK].t[2] : fp.plane.M[2];
   static const bool all = getenv("AF_ALL") != nullptr;
@@ -856,10 +877,9 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   glUniform2f(U(prog, "uJit"), jitX, jitY);
   glUniform1f(U(prog, "uLogC"), logC);
   glUniformMatrix3fv(U(prog, "uRot"), 1, GL_FALSE, rot);
-  glUniform3f(U(prog, "uPos"), pos.x, pos.y, pos.z);
+  glUniform3f(U(prog, "uPos"), rp.x, rp.y, rp.z);
   glUniform1i(U(prog, "uMeshTraffic"), trafK);
-  glUniform1i(U(prog, "uScrSkip"), scrSkip ? 1 : 0);
-  glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, scrSkip ? texScrDepth : 0); glUniform1i(U(prog, "uScrDepth"), 29);
+  setScreenCut(prog, fp, scrSkip);
   glUniform1i(U(prog, "uPartInst"), -1);
   if (!noPre) { glDepthFunc(GL_LEQUAL); glDepthMask(GL_FALSE); }
   glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);   // (the airframe and the cabin's fine patch, which lies on the surface: one draw)

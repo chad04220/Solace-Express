@@ -52,10 +52,21 @@ inline std::string partPoseFSAssembly() {
 }
 // the aircraft mesh pass: the objects pass's materials and lighting classes on the baked static airframe
 inline std::string planeMeshVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kPlaneMeshVS; }
+// the aircraft mesh's depth pre-pass: the cut of the research cockpits' windows (cabin_windows.glsl) and the cloak's front
+inline std::string planeMeshDepthFSAssembly() {
+  return std::string("#version 330 core\n") + kWraithCockpitCommon + kCabinWindows +
+         "flat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; in vec3 vB;\n"
+         "uniform int uScrSkip; uniform vec3 uScrEye; uniform int uScrModel; uniform int uBombPane; uniform int uPartInst;\n"
+         "uniform float uCloakZ;\n"
+         "void main(){\n"
+         "  if (uScrSkip == 1 && cabinWindowCut(vB - uScrEye, uScrModel, uBombPane == 1, uPartInst >= 0)) discard;\n"
+         "  if (uCloakZ > -1e8 && vB.z < uCloakZ) discard;\n"
+         "}\n";
+}
 inline std::string planeMeshFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + "#define AF_MESH\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kPlaneCommon + kPlaneParts + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
-         kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
+         kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kCabinWindows + kWraithCockpitSDF + kWraithCockpitMaterial +
          kPlaneMaterial + kAfShMap + kPlaneLight + kGBuffer + kGBWrite + kPlaneGB + kPlaneMeshFS;
 }
 // the shadow proxy: the airframe fields' shadows on what is in the G-buffer, for the lighting pass

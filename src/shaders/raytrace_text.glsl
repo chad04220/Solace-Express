@@ -37,7 +37,7 @@ vec3 pageTex(int page, vec2 uv, float fp){   // fp: page uv units per screen pix
   vec2 cell = vec2(float(page - (page/4)*4), float(page/4));
   vec2 a = (cell + clamp(uv*0.5 + 0.5, 0.003, 0.997))/vec2(4.0, 2.0);
   float lod = log2(max(fp*float(textureSize(uDispTex, 0).y)*0.25, 1e-4));
-  return textureLod(uDispTex, a, max(lod, 0.0)).rgb;
+  return textureLod(uDispTex, a, max(lod - 0.75, 0.0)).rgb;   // (sharper than the footprint: the TAA settles it; at the footprint's own level they read soft)
 }
 vec4 panelTex(vec2 q, float px){   // q: panel metres; px: metres per screen pixel; rgb premultiplied by coverage (a)
   vec2 a = vec2((q.x + 0.16)/0.58, (q.y + 0.11)/0.22);

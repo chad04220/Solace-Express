@@ -396,6 +396,11 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
     for (int a = 0; a < 3; a++) for (int b = 0; b < 3; b++) w2b(a, b) = r[a * 3 + b];
     for (int a = 0; a < 3; a++) w2b(a, 3) = -(r[a * 3] * c.x + r[a * 3 + 1] * c.y + r[a * 3 + 2] * c.z);
     shCabVP = shCabBodyVP * w2b;
+    // and from the camera, for a hit the shader has exactly relative to it (af_shmap.glsl): the same rotation, and the
+    // camera's offset from the aircraft - small, so held to a hair where the world-space translation is not
+    mat4 c2b = w2b; const vec3 cc = fp.camPos - c;
+    for (int a = 0; a < 3; a++) c2b(a, 3) = r[a * 3] * cc.x + r[a * 3 + 1] * cc.y + r[a * 3 + 2] * cc.z;
+    shCabVPc = shCabBodyVP * c2b;
     shCabBias = 0.004f / (zf - 0.1f);   // (4 mm, in the map's depth)
     shCabOn = true;
   }

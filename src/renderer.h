@@ -131,6 +131,7 @@ public:
   void setRenderScale(float s);   // the render resolution only: the TAA history stays at display resolution, no pop
   void renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites);
   mat4 viewProj(const FrameParams& fp, float zNear = 0.5f, float zFar = 90000.f) const;
+  mat4 viewProjRel(const FrameParams& fp, float zNear, float zFar) const;   // the same from the camera at the origin
   mat4 viewMat(const FrameParams& fp) const;   // world -> camera (x right, y up, z back)
   bool project(const FrameParams& fp, vec3 p, float& sx, float& sy) const;  // to window pixels
 
@@ -250,7 +251,8 @@ private:
   struct PartMesh { int type = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; };   // a cockpit's rigid moving part, in its own frame (plane_parts.glsl)
   struct PlaneMesh { std::vector<PartMesh> parts; uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; };
   std::unordered_map<uint64_t, PlaneMesh> planeMeshes;
-  GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0, progPlaneMeshScr = 0, texScrDepth = 0, fboScrDepth = 0; int scrDepthW = 0, scrDepthH = 0;   // (progPlaneMeshScr / texScrDepth: the research craft's screens' depth, the cabin mesh clipped at and behind them: the screens are holes to the world)   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
+  GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0;   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
+  void setScreenCut(GLuint p, const FrameParams& fp, bool on);   // the research cockpits' windows cut (cabin_windows.glsl)
   bool compilePlaneMesh();
   bool planeMeshWanted(const FrameParams& fp) const;
   void bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key);
@@ -349,7 +351,7 @@ private:
   GLuint progShMap = 0, progShMov = 0, texShMap = 0, texShMov = 0, fboShMap = 0; int shOn = 0; mat4 shMapVP[4];
   // the cabin's own sun map in the cockpit view: 5 m about the eye at 2048 texels (2.4 mm), for the cabin's light and
   // shade - the whole airframe's map (layer 0, ~1.4 cm a texel) speckled the posts and frames a hand's width away
-  GLuint texShCab = 0, fboShCab = 0; bool shCabOn = false; mat4 shCabVP; float shCabBias = 0.f;
+  GLuint texShCab = 0, fboShCab = 0; bool shCabOn = false; mat4 shCabVP, shCabVPc; float shCabBias = 0.f;
   // (kept in the aircraft's own frame and drawn again only when the sun has turned against it, the eye has moved, a
   // different cockpit is in use, or every 8th frame for the moving controls: shCabVP is this frame's world-space form)
   mat4 shCabBodyVP; vec3 shCabDir, shCabEye; uint64_t shCabKey = 0; int shCabAge = 1 << 20;

@@ -5,6 +5,21 @@
 // and numerals come from the SDF font atlas.
 float gAA = 0.002;
 float gPixM = 0.001;
+float gPixG = 0.001;   // the same along the surface: stretched where the surface is seen edge-on (procedural detail's footprint)
+// periodic surface detail (flutes, seams, grooves, a weave) anti-aliased over the pixel's footprint fw, in periods,
+// and settling to its average where a pixel spans most of a period: drawn hard-edged a pixel or two wide, it shimmered
+// into moire waves across the research cockpits' frames and bezels
+float aaLines(float u, float w, float fw){   // lines of half width w (periods) on the half-integers: their coverage
+  float c = clamp((w - abs(fract(u) - 0.5))/max(fw, 1e-4) + 0.5, 0.0, 1.0);
+  return mix(c, 2.0*w, smoothstep(0.3, 0.8, fw));
+}
+float aaSquare(float u, float fw){   // step(0.5, fract(u)), box-filtered over fw
+  fw = max(fw, 1e-4); float a = u - 0.5*fw, b = u + 0.5*fw;
+  return (floor(b)*0.5 + max(fract(b) - 0.5, 0.0) - floor(a)*0.5 - max(fract(a) - 0.5, 0.0))/fw;
+}
+float aaDisc(float d, float r, float fw, float area){   // inside a dot of radius r (d: the distance to its centre), area its share
+  return mix(clamp((r - d)/max(fw, 1e-4) + 0.5, 0.0, 1.0), area, smoothstep(0.3, 0.8, fw));
+}
 bool gDispPx = false;   // this pixel shows a display or gauge face: the post pass doesn't sharpen it   // metres of surface per pixel at the current hit (set before shading cockpit displays)
 float aFill(float d){ return clamp(0.5 - d/gAA, 0.0, 1.0); }
 float aLine(float d, float w){   // a stroke never thinner than 1.5 px: thin lines stay continuous, dimmed to keep their weight

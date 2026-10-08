@@ -28,6 +28,7 @@ int main(int argc, char** argv) {
     put(dir, "effects.frag", effectsFSAssembly(""));
     put(dir, "plane_mesh.vert", planeMeshVSAssembly(""));
     put(dir, "plane_mesh.frag", planeMeshFSAssembly(""));
+    put(dir, "plane_mesh_depth.frag", planeMeshDepthFSAssembly());
     put(dir, "part_pose.frag", partPoseFSAssembly());
     // the light-aircraft builds (AF_LIGHT: Renderer::pickAfPrograms)
     put(dir, "objects_light.frag", objectsFSAssembly("#define AF_LIGHT\n"));

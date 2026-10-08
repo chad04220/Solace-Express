@@ -8,9 +8,11 @@ uniform sampler2DArray uAfShMap;   // depth from the light
 uniform sampler2DArray uAfShMov;   // the moving parts' hull from the light (1: march the field here)
 uniform mat4 uAfShVP[4]; uniform int uAfShOn;
 // the cockpit view's cabin sun map (Renderer::rasterShadowMaps): 5 m about the eye, 2.4 mm a texel; -1 outside it
-uniform sampler2DShadow uCabShMap; uniform mat4 uCabShVP; uniform int uCabShOn; uniform float uCabShBias;   // (compared and filtered by the hardware: each tap a bilinear blend of four texels' tests, so a shadow's edge is a gradient, not 2.4 mm steps)
+uniform sampler2DShadow uCabShMap; uniform mat4 uCabShVP, uCabShVPc; uniform int uCabShOn; uniform float uCabShBias;   // (compared and filtered by the hardware: each tap a bilinear blend of four texels' tests, so a shadow's edge is a gradient, not 2.4 mm steps)
 float cabShLookup(vec3 p, vec3 n, float biasK){
-  vec3 u = (uCabShVP*vec4(p + n*0.008, 1.0)).xyz*0.5 + 0.5;
+  // (from the hit relative to the camera when the pass has it exactly - uCabShVPc: from there - for at the map's edges the
+  // world point's float spacing alone is 1.6 of the map's texels: plane_common.glsl gRelSet)
+  vec3 u = (gRelSet ? uCabShVPc*vec4(gRel + n*0.008, 1.0) : uCabShVP*vec4(p + n*0.008, 1.0)).xyz*0.5 + 0.5;
   if (u.x < 0.002 || u.x > 0.998 || u.y < 0.002 || u.y > 0.998 || u.z >= 1.0) return -1.0;
   vec2 ts = 1.0/vec2(textureSize(uCabShMap, 0));
   float s = 0.0, bias = uCabShBias*biasK;
