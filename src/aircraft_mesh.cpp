@@ -27,7 +27,7 @@
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 19;   // (bump with the format, or with what the bake makes of the field: the cockpit's sharp edges, +14; its thin patch laid out fat and drawn last, +16; back on the surface, +17; its flat faces flat-shaded, +18; the parts' creases, +19)
+const uint32_t kMeshMagic = 0x4d455348u + 20;   // (bump with the format, or with what the bake makes of the field: the cockpit's sharp edges, +14; its thin patch laid out fat and drawn last, +16; back on the surface, +17; its flat faces flat-shaded, +18; the parts' creases, +19; the outside's edges held to half a metre, +20)
 // the rigid parts a cockpit has (plane_parts.glsl PT_*) and each one's instances: x which seat or side, y which pedal
 struct PartInst { int type; float sx, sy; };
 const int kMaxPartInst = 128;
@@ -468,7 +468,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     std::vector<float> vbF(vb.begin() + fineV * 8, vb.end()); vb.resize(fineV * 8);
     std::vector<uint32_t> ibF(ib.begin() + fineStart, ib.end()); ib.resize(fineStart);
     for (uint32_t& i : ibF) i -= (uint32_t)fineV;
-    std::thread simpStatic([&vb, &ib, inside] { size_t e = ib.size(); simplifyMesh(vb, ib, e, inside ? 0.0004f : 0.001f); });
+    std::thread simpStatic([&vb, &ib, inside] { size_t e = ib.size(); simplifyMesh(vb, ib, e, inside ? 0.0004f : 0.001f, 0.04f, inside ? 0.f : 0.5f); });   // (outside, no edge over half a metre: mesh_simplify.h)
     std::thread simpFine([&vbF, &ibF] { size_t e = ibF.size(); simplifyMesh(vbF, ibF, e, 0.0004f); });
     // ---- the hull of what moves: the moving 6.25 cm cells, each grown by one cell, as faces on the fine lattice (a
     // 0.25 m margin round the yoke's sweep reached the pilot's eye and every cockpit ray started inside the hull: all

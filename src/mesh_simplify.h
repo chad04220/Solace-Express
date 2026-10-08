@@ -8,7 +8,10 @@
 //     moving hull's cut stay exactly where the bake put them),
 //   - join vertices whose normals differ by more than ~25 degrees (a crease) or whose occlusion differs by more than
 //     maxAoStep (the cabin's baked shading),
-//   - turn any triangle by more than ~45 degrees or to nothing, or break the surface's manifold (the link condition).
+//   - turn any triangle by more than ~45 degrees or to nothing, or break the surface's manifold (the link condition),
+//   - leave an edge longer than maxEdge (0: no limit). The raster passes' logarithmic depth is set per vertex and
+//     interpolated across the triangle, which on a long one close to the camera runs metres off: the far side of the
+//     Q400's fuselage came through its belly in long patches from a few metres below.
 // Only the triangles before triEnd take part; the rest (the cabin's fine patch) are kept as they are.
 #pragma once
 #include "common.h"
@@ -37,7 +40,7 @@ struct Quadric {
 
 // vb: 8 floats a vertex (position, normal, material id, occlusion); ib: triangles; triEnd: the index count of the part
 // that is simplified (updated). Returns the triangle count removed.
-inline size_t simplifyMesh(std::vector<float>& vb, std::vector<uint32_t>& ib, size_t& triEnd, float maxErr, float maxAoStep = 0.04f) {
+inline size_t simplifyMesh(std::vector<float>& vb, std::vector<uint32_t>& ib, size_t& triEnd, float maxErr, float maxAoStep = 0.04f, float maxEdge = 0.f) {
   using namespace meshsimp;
   const size_t nv = vb.size() / 8, nt = ib.size() / 3, ntA = std::min(triEnd, ib.size()) / 3;
   if (nv < 4 || ntA < 4) return 0;
@@ -116,6 +119,7 @@ inline size_t simplifyMesh(std::vector<float>& vb, std::vector<uint32_t>& ib, si
     for (uint32_t x : ringV) if (mark2[x] == gen2) common++;
     if (common != 2) return false;
     if (nB + ringV.size() - (size_t)common - 2 > kMaxValence) return false;
+    if (maxEdge > 0.f) for (uint32_t x : ringV) if (x != v && length(P(x) - pv) > maxEdge) return false;   // (u's neighbours, joined to v)
     // no triangle of u's that stays turns over, or folds by more than ~45 degrees, or collapses
     for (uint32_t t : vt[u]) {
       if (tDead[t]) continue;

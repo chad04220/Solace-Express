@@ -22,7 +22,8 @@ float cabShLookup(vec3 p, vec3 n, float biasK){
 // 1 lit, 0 shadowed (soft between), or -1: the field decides (a moving part may be here)
 float shMapLookupB(int layer, vec3 p, vec3 n, float biasK){
   if (layer == 0 && uCabShOn == 1) { float c = cabShLookup(p, n, biasK); if (c >= 0.0) return c; }
-  vec4 q = uAfShVP[layer]*vec4(p + n*0.06, 1.0);
+  float off = layer == 0 ? 0.06 + 0.12*(1.0 - abs(dot(n, uSunDir))) : 0.06;   // (the sun's offset grows as it grazes the surface)
+  vec4 q = uAfShVP[layer]*vec4(p + n*off, 1.0);
   if (q.w <= 0.0) return 1.0;
   vec3 u = q.xyz/q.w*0.5 + 0.5;
   if (u.x < 0.0 || u.x > 1.0 || u.y < 0.0 || u.y > 1.0) return 1.0;   // outside the map: nothing of the airframe between

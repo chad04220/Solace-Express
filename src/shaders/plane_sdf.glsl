@@ -9,6 +9,9 @@
 // the opening itself, its lowest 4 cm. (Clamped everywhere, as it was, the opening kept its skin too: the wells were
 // sealed voids behind open doors.)
 vec2 wellCut(vec2 res, float box, float w){
+  // (none from the cockpit: there the fuselage is a 6 cm shell, the opening's band went through it and the nose well
+  // was a hole in the cabin floor beside the rudder pedals, the ground below showing through it)
+  if (gPS.w > 0.5) return res;
   float well = max(box, min(res.x + 0.03, w - 0.04));
   if (-well > res.x) return vec2(-well, 6.0);
   res.x = max(res.x, -well); return res;

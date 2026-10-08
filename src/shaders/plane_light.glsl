@@ -12,8 +12,9 @@
 float afSunSelf(vec3 p, vec3 n, bool interior){
   float ndl = dot(n, uSunDir);
   // (inside, a surface the sun barely faces is lit by the fixtures and the ambient alone - its thin frames alias in the
-  // map - faded in over a band rather than cut off)
-  float lo = interior ? 0.15 : 0.03, hi = interior ? 0.35 : 0.07;
+  // map - faded in over a band rather than cut off; outside, over a band too: the sun skimming a fuselage's round belly
+  // drew the map's texels across it as a stair-stepped edge between glare and shadow, the Q400's from close underneath)
+  float lo = interior ? 0.15 : 0.05, hi = interior ? 0.35 : 0.22;
   float ms = (uAfShOn & 1) != 0 && uWreck == 0 ? (ndl < lo ? 0.0 : shMapLookupB(0, p, n, 1.0 + 2.0*(1.0 - ndl))*smoothstep(lo, hi, ndl)) : -1.0;
   if (ms >= 0.0) return ms;
   gShMax = interior ? 3.5 : 1e9;   // (inside, the ray only needs to get out through the cabin and the wing above it)
