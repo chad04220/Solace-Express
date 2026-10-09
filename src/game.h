@@ -246,6 +246,7 @@ private:
   float gTunnel = 0;
   Traffic traffic;
   bool dbgCam = false, dbgFollow = false; vec3 dbgCamPos, dbgCamLook, dbgFollowOff;
+  bool benchPin = false; vec3 benchPinPos; quat benchPinQ;   // (a debug scene's aircraft held in place each step: Game::update)
   std::unordered_map<std::string, unsigned> loadImg;   // loading pictures by name (0: none on disk)
   // UFO encounter: pulls up alongside, opens its hatch on two dancing aliens, laughs, waves and zooms off
   struct Ufo { bool on = false; float t = 0, next = 0, side = 1, hatch = 0, laugh = 0, wave = 0; vec3 pos, fwd, right, up; bool sfxLaugh = false, sfxZoom = false; };
