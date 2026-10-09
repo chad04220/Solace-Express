@@ -506,6 +506,60 @@ int main(int argc, char** argv) {
       fails += !ok;
     }
   }
+  // ---------------- the weather's fields (weather.cpp): still air is still; the gust bursts reach about the reported
+  // gust and no further; the eddies are as strong as the weather asks; the wind climbing a ridge lifts and pours
+  // down its lee; it rains only under the clouds; and a replay is exact
+  {
+    const int ap = g_world.findAirport("MDB");
+    const Airport& A = g_world.airports[ap];
+    Weather still; still.windSpeed = 0; still.gust = 0; still.turbulence = 0; still.cloudCover = 0;
+    vec3 pa(A.x, A.elev + 300.f, A.z);
+    wxfield::Local L0 = wxfield::local(still, pa, 300.f);
+    wxfield::Sample s0 = wxfield::wind(still, L0, pa, 300.f, 37.f, vec3(), 11.f);
+    bool calmOk = length(s0.v) < 1e-4f && L0.sigma < 1e-4f && length(L0.draft) < 1e-4f;
+    Weather gw; gw.windSpeed = 8; gw.windFrom = 270; gw.gust = 4; gw.turbulence = 0.45f; gw.cloudCover = 0;
+    vec3 air, pg(A.x, A.elev + 10.f, A.z);
+    float peak = 0, sw2 = 0; int n = 0;
+    for (int i = 0; i < 240 * 300; i++) {   // five minutes parked: the gusts along the wind
+      float t = i / 240.f; air += wxfield::driftWind(gw) * (1 / 240.f);
+      wxfield::Local L = wxfield::local(gw, pg, 10.f);
+      wxfield::Local Lq = L; Lq.sigma = 0;   // (the bursts alone)
+      vec3 v = wxfield::wind(gw, Lq, pg, 10.f, t, air, 11.f).v;
+      peak = std::max(peak, v.x);   // (from 270: along +x)
+      wxfield::Local Lh = wxfield::local(gw, pg + vec3(0, 290.f, 0), 300.f);
+      vec3 ve = wxfield::wind(gw, Lh, pg + vec3(0, 290.f, 0), 300.f, t, air, 11.f).v - Lh.draft;
+      sw2 += ve.y * ve.y; n++;
+    }
+    const float base = length(wxfield::meanWind(gw, 10.f)), sigW = wxfield::local(gw, pg + vec3(0, 290.f, 0), 300.f).sigma, rmsW = sqrtf(sw2 / n);
+    bool gustOk = peak > base + 0.6f * gw.gust && peak < base + 1.4f * gw.gust;
+    bool turbOk = rmsW > sigW * 0.6f && rmsW < sigW * 1.6f;
+    // the strongest lift and sink over the islands in a 12 m/s westerly, 100 m above the ground
+    Weather rw; rw.windSpeed = 12; rw.windFrom = 270; rw.turbulence = 0; rw.gust = 0; rw.cloudCover = 0;
+    float lift = 0, sink = 0;
+    for (float x = -36000; x <= 36000; x += 1500)
+      for (float z = -36000; z <= 36000; z += 1500) {
+        float g = g_world.height(x, z); if (g < 50.f) continue;
+        wxfield::Local L = wxfield::local(rw, vec3(x, g + 100.f, z), 100.f);
+        lift = std::max(lift, L.lift); sink = std::min(sink, L.lift);
+      }
+    bool ridgeOk = lift > 1.5f && sink < -1.f;
+    // rain: none where the field has no cloud overhead, some where it has
+    Weather sh = gw; sh.cloudCover = 0.4f; sh.precip = 1; sh.windSpeed = 0;
+    int wrong = 0, wet = 0;
+    for (float x = -36000; x <= 36000; x += 900)
+      for (float z = -36000; z <= 36000; z += 900) {
+        float r = wxfield::rainAt(sh, vec3(x, 200.f, z)), c = wxfield::cloudColumn(sh, x, z);
+        if (r > 0.f && c < -0.25f) wrong++;
+        if (r > 0.3f) wet++;
+      }
+    bool rainOk = wrong == 0 && wet > 0 && wxfield::rainAt(sh, vec3(0, sh.cloudBase + wxfield::cloudThickness(sh) + 10.f, 0)) == 0.f;
+    wxfield::Sample a1 = wxfield::wind(gw, wxfield::local(gw, pg, 10.f), pg, 10.f, 12.3f, vec3(40, 0, 0), 11.f), a2 = wxfield::wind(gw, wxfield::local(gw, pg, 10.f), pg, 10.f, 12.3f, vec3(40, 0, 0), 11.f);
+    bool replayOk = a1.v.x == a2.v.x && a1.v.y == a2.v.y && a1.v.z == a2.v.z && a1.gy.x == a2.gy.x;
+    bool ok = calmOk && gustOk && turbOk && ridgeOk && rainOk && replayOk;
+    printf("Weather: still air %s; gusts peak %.1f m/s on %.1f (reported %.0f); eddies %.2f m/s rms for %.2f; ridge lift %+.1f, lee sink %+.1f m/s; rain only under cloud %s (%d wet points); replay %s  %s\n",
+           calmOk ? "still" : "MOVING", peak, base, gw.gust, rmsW, sigW, lift, sink, wrong == 0 ? "yes" : "NO", wet, replayOk ? "exact" : "DIFFERS", ok ? "ok" : "FAIL");
+    fails += !ok;
+  }
   printf("%d failures\n", fails);
   return fails ? 1 : 0;
 }

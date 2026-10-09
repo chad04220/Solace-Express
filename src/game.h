@@ -199,7 +199,17 @@ private:
   float stillTimer = 0;
   bool engineAutoStarted = false;
   float startDelay = 0;
-  vec2 cloudOff;
+  vec2 cloudOff;                 // the cloud field's drift with the wind (Weather::cloudDrift), its detail's drift and the billows' rise
+  vec3 cloudDet; float cloudBoil = 0;
+  void moveClouds(float dt);     // moves them on with the wind and hands them to wx (the flight model and the renderer read the same clouds)
+  // the aircraft's wake through the cloud (clouds.glsl wakeCarve): points along its path in the cloud layer, in the
+  // cloud field's frame (they drift with it), each tunnel widening and filling in as it ages; brk: no tunnel from
+  // the point before (the path left the layer between them)
+  struct WakePt { vec3 c; float age; bool brk; };
+  std::vector<WakePt> cloudWake; bool wakeGap = true;
+  void updateCloudWake(float dt);
+  float wispAccum = 0;           // cloud wisps streaming past in and near cloud (spawned per metre flown)
+  float rainNow = 0, mistNow = 0;   // the rain at the aircraft (0..1) and the cloud on its glass, smoothed
   int diversion = -1;
   bool apWasOn = false;
   int stuntNext = 0;            // the next aerobatic figure the aerobatics key flies (Plane::Stunt)

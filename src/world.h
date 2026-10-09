@@ -45,6 +45,10 @@ struct Weather {
   int precip = 0;   // 0 none, 1 rain, 2 snow
   bool storm = false;
   float timeOfDay = 11.0f;  // hours
+  // the cloud field's live state, moved on by the game every frame and never saved (weather.h, clouds.glsl): its drift
+  // with the wind (m: the cloud pass's uWindOff), its fine detail's drift through the cloud bodies (m: the wisps
+  // stream downwind off their edges) and the billows' rise (m: the cumulus boil)
+  vec2 cloudDrift; vec3 cloudDetail; float cloudBoil = 0;
   std::string describe() const;
 };
 

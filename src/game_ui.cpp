@@ -1867,7 +1867,7 @@ void Game::drawHud(const FrameParams& fp) {
     // left: the wind dial and its numbers (windEnd: where they end, for the instructor beside them)
     float windEnd = 300 * s;
     {
-      vec3 wv = plane.windVel; float ws = length(vec3(wv.x, 0, wv.z)); float from = wrapDeg360(atan2f(-wv.x, wv.z) / DEG);
+      vec3 wv = plane.windAvg; float ws = length(vec3(wv.x, 0, wv.z)); float from = wrapDeg360(atan2f(-wv.x, wv.z) / DEG);
       float cxw = 30 * s, cyw = sy + stripH * 0.5f, R = 17 * s;
       hudRing(cxw, cyw, R, 1.2f * s, C_ACCENT, 0.5f, 32);
       for (int k = 0; k < 8; k++) { float a = k * PI / 4; g_ren.line(cxw + sinf(a) * R * 0.78f, cyw - cosf(a) * R * 0.78f, cxw + sinf(a) * R, cyw - cosf(a) * R, (k % 2 ? 1.f : 1.6f) * s, C_TEXT, 0.5f); }

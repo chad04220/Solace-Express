@@ -53,15 +53,16 @@ void main(){
     vec3 n = normalize(vec3(0.0, c.y, sqrt(max(1.0 - c.y*c.y, 0.0))));
     float l = 0.6 + 0.4*max(dot(n, normalize(uSunDir + vec3(0,0.3,0))), 0.0);
     o = vec4(vCol.rgb*(uSunCol*l*1.2*max(uSunDir.y+0.1,0.0) + uAmb), vCol.a*a*wisp);
-  } else if (kind == 3) { // rain streak
+  } else if (kind == 3) { // rain streak (a colour past 1 is light on it: a landing light's beam, lightning)
     float a = smoothstep(1.0, 0.0, abs(c.x)) * smoothstep(1.0, 0.6, abs(c.y));
-    o = vec4(vCol.rgb*(uAmb*2.0 + 0.1), vCol.a*a);
+    // (by daylight; at night hardly seen but where a light catches them)
+    o = vec4(min(vCol.rgb, vec3(1.0))*(uAmb*2.0 + 0.1)*smoothstep(0.06, 0.2, uAmb.y) + max(vCol.rgb - vec3(1.0), vec3(0.0)), vCol.a*a);
   } else if (kind == 4) { // fire (additive)
     float a = smoothstep(1.0, 0.0, r2);
     o = vec4(vCol.rgb*a*a*vCol.a*3.0, 0.0);
-  } else {                // snow flake
+  } else {                // snow flake (lit as the rain)
     float a = smoothstep(1.0, 0.2, r2);
-    o = vec4(vCol.rgb*(uAmb*2.5 + uSunCol*0.3), vCol.a*a);
+    o = vec4(min(vCol.rgb, vec3(1.0))*(uAmb*2.5 + uSunCol*0.3)*mix(0.15, 1.0, smoothstep(0.06, 0.2, uAmb.y)) + max(vCol.rgb - vec3(1.0), vec3(0.0)), vCol.a*a);
   }
   float fog = exp(-vDist*uFogB*0.5);
   o.rgb *= fog; o.a *= mix(1.0, fog, 0.5);
