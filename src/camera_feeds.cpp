@@ -40,10 +40,8 @@ void Renderer::measureFeedMounts(const FrameParams& fp) {
   const size_t n0 = pts.size();
   for (int j = 0; j < NY; j++) for (int s = 0; s < NZ; s++) pts.push_back(E + vec3(0.f, -1.2f + j * 0.1f, -s * nstep));
   float ps[4] = {fp.plane.PS[0], fp.plane.PS[1], fp.plane.PS[2], 0.f}, ctl[4] = {0, 0, 0, 0};   // the outside shape, controls centred
-  glUniform1i(glGetUniformLocation(progHullBake, "uHPart"), -1);
-  glUniform1i(glGetUniformLocation(progHullBake, "uHStN"), 1);
-  glUniform4fv(glGetUniformLocation(progHullBake, "uHStPS"), 1, ps);
-  glUniform4fv(glGetUniformLocation(progHullBake, "uHStCtl"), 1, ctl);
+  // A fresh distance query, independent of the last mesh's normal/AO mode or XR state arrays.
+  beginHullBake(fp, 1, ps, ctl);
   std::vector<float> d;
   hullEval(pts, d);
   FeedMounts& fm = g_feedMounts[rig];
@@ -69,30 +67,15 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     if (feedRigNow) { for (bool& v : feedValid) v = false; feedRigNow = 0; }
     return;
   }
+  // Direct-window Specter never needs an offscreen camera. Wraith retains a prewarmed
+  // bomb target even before release, so activating it does not allocate at the input edge.
+  if (screenWindows && fp.feedRig != 2) return;
   if (!g_feedMounts[fp.feedRig].ok) {   // first sight of this craft: find the mounts (its cameras go up next frame)
     if (progHullBake) { setRT(progHullBake, fp); measureFeedMounts(fp); }
     else g_feedMounts[fp.feedRig].ok = true;
     return;
   }
   if (fp.feedRig != feedRigNow) { for (bool& v : feedValid) v = false; feedRigNow = fp.feedRig; }
-  if (!texFeed) {
-    glGenTextures(1, &texFeed); glBindTexture(GL_TEXTURE_2D, texFeed);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, kFeedAtlasW, kFeedAtlasH, 0, GL_RGBA, GL_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glGenFramebuffers(1, &fboFeed); glBindFramebuffer(GL_FRAMEBUFFER, fboFeed);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texFeed, 0);
-    GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
-    glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
-  }
-  if (!feedView.fboScene) {   // the feeds' own render targets, made by the same code as the main view's
-    swapView(feedView);
-    W = kFeedMaxW; H = kFeedMaxH;
-    float rs = renderScale; renderScale = 1.f;
-    createRenderTargets();
-    renderScale = rs;
-    swapView(feedView);
-  }
   // The pictures' resolution: the game sizes each camera at the main view's pixel density (feed_cameras.h); the
   // feeds draw at a fraction of it - the front display (the window the pilot flies by) and the bomb camera at 0.6,
   // the side, aft, overhead and floor panels at 0.45 (three quarters of that on the lowest quality). The displays
@@ -101,6 +84,36 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
   static const float kFront = getenv("FEEDK0") ? (float)atof(getenv("FEEDK0")) : 0.6f, kSide = getenv("FEEDK") ? (float)atof(getenv("FEEDK")) : 0.45f;
   const float qk = quality <= 0 ? 0.75f : 1.f;
   auto scaleOf = [&](int k) { return (k == 0 || k == kFeedBombSlot ? kFront : kSide) * qk; };
+  int targetW = kFeedMaxW, targetH = kFeedMaxH;
+  if (screenWindows) {
+    const FeedCamera& bomb = fp.feeds[kFeedBombSlot].on ? fp.feeds[kFeedBombSlot] : fp.feeds[9];
+    const float sk = scaleOf(kFeedBombSlot);
+    targetW = std::clamp((int)(bomb.w*sk + 0.5f), 64, kFeedMaxW);
+    targetH = std::clamp((int)(bomb.h*sk + 0.5f), 64, kFeedMaxH);
+  }
+  const int atlasW = screenWindows ? targetW : kFeedAtlasW, atlasH = screenWindows ? targetH : kFeedAtlasH;
+  if (!texFeed || feedAtlasW < atlasW || feedAtlasH < atlasH) {
+    if (texFeed) glDeleteTextures(1, &texFeed);
+    feedAtlasW = std::max(feedAtlasW, atlasW); feedAtlasH = std::max(feedAtlasH, atlasH);
+    for (bool& v : feedValid) v = false;
+    glGenTextures(1, &texFeed); glBindTexture(GL_TEXTURE_2D, texFeed);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, feedAtlasW, feedAtlasH, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    if (!fboFeed) glGenFramebuffers(1, &fboFeed); glBindFramebuffer(GL_FRAMEBUFFER, fboFeed);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texFeed, 0);
+    GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
+    glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
+  }
+  if (!feedView.fboScene || feedView.allocW < targetW || feedView.allocH < targetH) {   // the feeds' own render targets, made by the same code as the main view's
+    swapView(feedView);
+    W = std::max(targetW, allocW); H = std::max(targetH, allocH);
+    float rs = renderScale; renderScale = 1.f;
+    createRenderTargets();
+    renderScale = rs;
+    swapView(feedView);
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
   // atlas layout: the slots in order, packed in rows (a tile changes size: its picture is redrawn)
   {
     int x = 0, y = 0, rowH = 0;
@@ -108,13 +121,13 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
       const FeedCamera& c = fp.feeds[k];
       const float sk = scaleOf(k);
       int w = c.on ? std::min((int)(c.w * sk + 0.5f), (int)kFeedMaxW) : 0, h = c.on ? std::min((int)(c.h * sk + 0.5f), (int)kFeedMaxH) : 0;
-      if (!c.on || w < 8 || h < 8) { feedValid[k] = false; feedTileWH[k][0] = feedTileWH[k][1] = 0; continue; }
-      if (x + w + 2 > kFeedAtlasW) { x = 0; y += rowH + 2; rowH = 0; }
-      if (y + h > kFeedAtlasH) { feedValid[k] = false; continue; }
+      if ((screenWindows && k != kFeedBombSlot) || !c.on || w < 8 || h < 8) { feedValid[k] = false; feedTileWH[k][0] = feedTileWH[k][1] = 0; continue; }
+      if (x > 0 && x + w + 2 > feedAtlasW) { x = 0; y += rowH + 2; rowH = 0; }
+      if (y + h > feedAtlasH) { feedValid[k] = false; continue; }
       if (feedTileWH[k][0] != w || feedTileWH[k][1] != h) feedValid[k] = false;
       feedTileWH[k][0] = w; feedTileWH[k][1] = h;
-      feedTile[k][0] = (float)x / kFeedAtlasW; feedTile[k][1] = (float)y / kFeedAtlasH;
-      feedTile[k][2] = (float)w / kFeedAtlasW; feedTile[k][3] = (float)h / kFeedAtlasH;
+      feedTile[k][0] = (float)x / feedAtlasW; feedTile[k][1] = (float)y / feedAtlasH;
+      feedTile[k][2] = (float)w / feedAtlasW; feedTile[k][3] = (float)h / feedAtlasH;
       x += w + 2; rowH = std::max(rowH, h);
     }
   }
@@ -170,7 +183,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     // into its tile
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fboScene); glReadBuffer(GL_COLOR_ATTACHMENT0);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fboFeed);
-    int x0 = (int)(feedTile[k][0] * kFeedAtlasW + 0.5f), y0 = (int)(feedTile[k][1] * kFeedAtlasH + 0.5f);
+    int x0 = (int)(feedTile[k][0] * feedAtlasW + 0.5f), y0 = (int)(feedTile[k][1] * feedAtlasH + 0.5f);
     glBlitFramebuffer(0, 0, rw, rh, x0, y0, x0 + rw, y0 + rh, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     feedValid[k] = true; feedAge[k] = 0;
@@ -179,13 +192,13 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
   swapView(feedView);
   static const char* dump = getenv("FEEDDUMP");   // (debug: write the atlas as it stands after this frame's feeds)
   if (dump) {
-    std::vector<float> px((size_t)kFeedAtlasW * kFeedAtlasH * 4);
+    std::vector<float> px((size_t)feedAtlasW * feedAtlasH * 4);
     glBindFramebuffer(GL_FRAMEBUFFER, fboFeed); glReadBuffer(GL_COLOR_ATTACHMENT0);
-    glReadPixels(0, 0, kFeedAtlasW, kFeedAtlasH, GL_RGBA, GL_FLOAT, px.data());
+    glReadPixels(0, 0, feedAtlasW, feedAtlasH, GL_RGBA, GL_FLOAT, px.data());
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    std::vector<uint8_t> rgb((size_t)kFeedAtlasW * kFeedAtlasH * 3);
-    for (size_t i = 0; i < (size_t)kFeedAtlasW * kFeedAtlasH; i++)
+    std::vector<uint8_t> rgb((size_t)feedAtlasW * feedAtlasH * 3);
+    for (size_t i = 0; i < (size_t)feedAtlasW * feedAtlasH; i++)
       for (int c = 0; c < 3; c++) { float v = px[i * 4 + c]; v = v / (1.f + v); rgb[i * 3 + c] = (uint8_t)(255.f * powf(std::max(v, 0.f), 1.f / 2.2f)); }
-    writePNG(dump, kFeedAtlasW, kFeedAtlasH, rgb);
+    writePNG(dump, feedAtlasW, feedAtlasH, rgb);
   }
 }

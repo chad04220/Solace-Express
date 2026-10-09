@@ -54,6 +54,9 @@ vec3 gWheel;           // the wheels' roll of the aircraft loaded (the player's,
 vec4 gM[24]; vec4 gPS; vec4 gCtl; vec3 gColBase; vec3 gColStripe; vec4 gFlame;
 vec4 gWr[7];   // the XR-40's animation state the field reads (uWr, or a bake's state)
 // Fitted cabin mounts, cached when the model is loaded rather than at every ray-march sample.
+uniform vec4 uCabinFootFit; uniform vec2 uCabinSeatFit; // six bounded CPU-authored fit values, no packed-model slots reused
+vec2 gCabSeat; // physical seat-rail floor and seat-pan drop below eye
+vec4 gCab2; // pedal contact y, forward foot station, pair centre magnitude, foot spacing
 vec4 gCab0, gCab1;  // seat half width, headrest y, dome-light y, armrest x | visor y / slope, overhead y, vent x
 void loadCabinFit();
 uniform sampler2D uTraffic; uniform int uTrafficN;

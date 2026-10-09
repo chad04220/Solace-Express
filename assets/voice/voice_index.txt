@@ -590,31 +590,31 @@ radio_digit.tower_valley.9	tower_valley/radio_digit.tower_valley.9.wav	niner.
 @tower_valley.alpha.X	phonetic.tower_valley.X
 @tower_valley.alpha.Y	phonetic.tower_valley.Y
 @tower_valley.alpha.Z	phonetic.tower_valley.Z
-lesson.L1.phase0	instructor/lesson.L1.phase0.wav	Tap D-pad Left to release the parking brake, then hold RT to add full throttle.	instructor	65	line	Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.	L1
-lesson.L1.phase1	instructor/lesson.L1.phase1.wav	Keep the nose on the centreline with LB/RB rudder. At 50 kt gently pull the left stick back to lift off.	instructor	65	line	Keep the nose on the centreline with Q/E rudder. At 50 kt gently pull back (S) to lift off.	L1
-lesson.L1.phase2	instructor/lesson.L1.phase2.wav	Nice! Hold a gentle climb about 7 degrees nose-up. Fly through the green rings.	instructor	65	line		L1
-lesson.L1.phase3	instructor/lesson.L1.phase3.wav	Reduce power slightly with LT once level and trim with D-pad Down/Up. Rings show the path.	instructor	65	line	Reduce power slightly (CTRL) once level and trim with [ and ]. Rings show the path.	L1
-lesson.L2.phase0	instructor/lesson.L2.phase0.wav	Release the parking brake with D-pad Left, hold RT for full power, and take off as in Lesson 1.	instructor	65	line	Release brakes (B), full power, and take off as in Lesson 1.	L2
-lesson.L2.phase1	instructor/lesson.L2.phase1.wav	Rudder to stay straight. Rotate at 50 kt.	instructor	65	line		L2
-lesson.L2.phase2	instructor/lesson.L2.phase2.wav	Climb through the rings. The pattern turns LEFT. Use gentle 20 degree banks.	instructor	65	line		L2
-lesson.L2.phase3	instructor/lesson.L2.phase3.wav	On downwind use LT to reduce power to about 60%, then press B for one notch of flaps.	instructor	65	line	On downwind reduce power to about 60% and set one notch of flaps (F).	L2
-lesson.L2.phase4	instructor/lesson.L2.phase4.wav	Turn final, press B until full flaps, and follow the PAPI lights: two white, two red is on glidepath.	instructor	65	line	Turn final, add full flaps (F), and follow the PAPI lights: two white, two red is on glidepath.	L2
-lesson.L2.phase5	instructor/lesson.L2.phase5.wav	Reduce power to idle over the threshold, then gently raise the nose to flare just above the runway.	instructor	65	line		L2
-lesson.L2.phase6	instructor/lesson.L2.phase6.wav	Hold A to brake to a full stop and complete the lesson.	instructor	65	line	Brake (B) to a full stop to complete the lesson.	L2
-lesson.L3.phase0	instructor/lesson.L3.phase0.wav	Release brakes and take off. The magenta arrow on the HUD points to your destination.	instructor	65	line		L3
-lesson.L3.phase1	instructor/lesson.L3.phase1.wav	Stay on the centreline.	instructor	65	line		L3
-lesson.L3.phase2	instructor/lesson.L3.phase2.wav	Climb to about 1,500 feet and head toward the arrow. Click the right stick for autopilot heading/altitude hold.	instructor	65	line	Climb to about 1,500 feet and head toward the arrow. Press Z for autopilot heading/altitude hold.	L3
-lesson.L3.phase3	instructor/lesson.L3.phase3.wav	Watch your fuel gauge and the distance readout. Press N to view the map.	instructor	65	line		L3
-lesson.L3.phase4	instructor/lesson.L3.phase4.wav	Harlan Farm runway 17 is short: slow to 60 kt, full flaps, aim for the very start of the strip.	instructor	65	line		L3
-lesson.L3.phase5	instructor/lesson.L3.phase5.wav	Flare gently and get the wheels down early.	instructor	65	line		L3
-lesson.L3.phase6	instructor/lesson.L3.phase6.wav	Hold A to brake to a full stop and finish.	instructor	65	line	Full stop with brakes (B) to finish.	L3
-lesson.L4.phase0	rosa/lesson.L4.phase0.wav	Final exam: take off when ready.	rosa	65	line		L4
-lesson.L4.phase1	rosa/lesson.L4.phase1.wav	Crosswind! Use rudder to stay on the centreline.	rosa	65	line		L4
-lesson.L4.phase2	rosa/lesson.L4.phase2.wav	Climb out and navigate to Orchard Valley.	rosa	65	line		L4
-lesson.L4.phase3	rosa/lesson.L4.phase3.wav	Plan your descent early - Orchard Valley sits at 690 ft.	rosa	65	line		L4
-lesson.L4.phase4	rosa/lesson.L4.phase4.wav	Crab into the wind on final. Just before touchdown, use rudder to align with the runway.	rosa	65	line		L4
-lesson.L4.phase5	rosa/lesson.L4.phase5.wav	Keep the upwind wing slightly low as you flare.	rosa	65	line		L4
-lesson.L4.phase6	rosa/lesson.L4.phase6.wav	Stop on the runway to complete the checkride.	rosa	65	line		L4
+lesson.L1.phase0	instructor/lesson.L1.phase0.controls-neutral.wav	Release the parking brake, then apply full throttle.	instructor	65	lesson		L1
+lesson.L1.phase1	instructor/lesson.L1.phase1.controls-neutral.wav	Keep the nose on the centreline with rudder. At fifty knots, gently raise the nose to lift off.	instructor	65	lesson		L1
+lesson.L1.phase2	instructor/lesson.L1.phase2.wav	Nice! Hold a gentle climb about 7 degrees nose-up. Fly through the green rings.	instructor	65	lesson		L1
+lesson.L1.phase3	instructor/lesson.L1.phase3.controls-neutral.wav	Reduce power slightly once level, then trim the aircraft. Rings show the path.	instructor	65	lesson		L1
+lesson.L2.phase0	instructor/lesson.L2.phase0.controls-neutral.wav	Release the parking brake, apply full power, and take off as in Lesson one.	instructor	65	lesson		L2
+lesson.L2.phase1	instructor/lesson.L2.phase1.wav	Rudder to stay straight. Rotate at 50 kt.	instructor	65	lesson		L2
+lesson.L2.phase2	instructor/lesson.L2.phase2.wav	Climb through the rings. The pattern turns LEFT. Use gentle 20 degree banks.	instructor	65	lesson		L2
+lesson.L2.phase3	instructor/lesson.L2.phase3.controls-neutral.wav	On downwind reduce power to about sixty percent and set one notch of flaps.	instructor	65	lesson		L2
+lesson.L2.phase4	instructor/lesson.L2.phase4.controls-neutral.wav	Turn final, add full flaps, and follow the precision approach path indicator lights. Two white lights and two red lights mean you are on the glide path.	instructor	65	lesson		L2
+lesson.L2.phase5	instructor/lesson.L2.phase5.wav	Reduce power to idle over the threshold, then gently raise the nose to flare just above the runway.	instructor	65	lesson		L2
+lesson.L2.phase6	instructor/lesson.L2.phase6.controls-neutral.wav	Apply the wheel brakes to come to a full stop and complete the lesson.	instructor	65	lesson		L2
+lesson.L3.phase0	instructor/lesson.L3.phase0.wav	Release brakes and take off. The magenta arrow on the HUD points to your destination.	instructor	65	lesson		L3
+lesson.L3.phase1	instructor/lesson.L3.phase1.wav	Stay on the centreline.	instructor	65	lesson		L3
+lesson.L3.phase2	instructor/lesson.L3.phase2.controls-neutral.wav	Climb to about fifteen hundred feet and head toward the arrow. Engage the autopilot for heading and altitude hold.	instructor	65	lesson		L3
+lesson.L3.phase3	instructor/lesson.L3.phase3.controls-neutral.wav	Watch your fuel gauge and the distance readout. Open the map when needed.	instructor	65	lesson		L3
+lesson.L3.phase4	instructor/lesson.L3.phase4.wav	Harlan Farm runway 17 is short: slow to 60 kt, full flaps, aim for the very start of the strip.	instructor	65	lesson		L3
+lesson.L3.phase5	instructor/lesson.L3.phase5.wav	Flare gently and get the wheels down early.	instructor	65	lesson		L3
+lesson.L3.phase6	instructor/lesson.L3.phase6.controls-neutral.wav	Apply the wheel brakes to come to a full stop and finish.	instructor	65	lesson		L3
+lesson.L4.phase0	rosa/lesson.L4.phase0.wav	Final exam: take off when ready.	rosa	65	lesson		L4
+lesson.L4.phase1	rosa/lesson.L4.phase1.wav	Crosswind! Use rudder to stay on the centreline.	rosa	65	lesson		L4
+lesson.L4.phase2	rosa/lesson.L4.phase2.wav	Climb out and navigate to Orchard Valley.	rosa	65	lesson		L4
+lesson.L4.phase3	rosa/lesson.L4.phase3.wav	Plan your descent early - Orchard Valley sits at 690 ft.	rosa	65	lesson		L4
+lesson.L4.phase4	rosa/lesson.L4.phase4.wav	Crab into the wind on final. Just before touchdown, use rudder to align with the runway.	rosa	65	lesson		L4
+lesson.L4.phase5	rosa/lesson.L4.phase5.wav	Keep the upwind wing slightly low as you flare.	rosa	65	lesson		L4
+lesson.L4.phase6	rosa/lesson.L4.phase6.wav	Stop on the runway to complete the checkride.	rosa	65	lesson		L4
 radio.spectre.50e58a57b125	spectre/radio.spectre.50e58a57b125.wav	SPECTRE DISPLAY PAIR: Two Specters joining on your wing - enjoy the show!	spectre	45	line		
 radio.spectre.5f513f152f0d	spectre/radio.spectre.5f513f152f0d.wav	SPECTRE: That's the show - Specters breaking off. Fly safe!	spectre	45	line		
 radio.spectre.f055fe79a458	spectre/radio.spectre.f055fe79a458.wav	SPECTRE: You're on approach - we'll leave you to it. Specters out!	spectre	45	line		

@@ -1,53 +1,5 @@
 //! kWraithFx
-//! The XR-40's plasma plumes, the transonic vapour cone, the cloak skin and the weapons effects.
-// four round plasma jets, one per pod (thrust fractions in uWr[2]): a white-cyan core in a violet sheath that
-// swirls slowly, with bright standing shock rings; longer, hotter and tighter-ringed in boost
-vec3 plumeRound(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, float sp, float ab, float jit){
-  float L = mix(3.0, 6.0, sp) + 8.0*ab;
-  vec3 c = o + ax*(L*0.5); float br = L*0.5 + 0.7;
-  vec3 oc = lo - c; float b = dot(oc, ld), h = b*b - dot(oc, oc) + br*br;
-  if (h <= 0.0) return vec3(0.0);
-  h = sqrt(h); float t0 = max(-b - h, 0.0), t1 = min(-b + h, tmax);
-  if (t1 <= t0) return vec3(0.0);
-  vec3 bx = normalize(cross(ax, abs(ax.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), by = cross(ax, bx);
-  float spacing = 0.75 - 0.2*ab;
-  float dt = (t1 - t0)/28.0; vec3 acc = vec3(0.0);
-  for (int i = 0; i < 28; i++) {
-    COST(3);
-    vec3 q = lo + ld*(t0 + (float(i) + jit)*dt) - o;
-    float x = dot(q, ax); if (x < -0.05 || x > L) continue;
-    float u = max(x, 0.0)/L;
-    vec3 rq = q - ax*x; float rr = length(rq);
-    float w = mix(0.33, 0.2, u)*(1.0 + 0.9*ab*u);
-    float r = rr/w; if (r > 2.2) continue;
-    float ang = atan(dot(rq, by), dot(rq, bx));
-    float helix = 0.5 + 0.5*sin(ang*3.0 - x*5.0 + uTime*24.0);
-    float flick = vnoise(vec2(x*3.0 - uTime*60.0, ang*2.0 + rr*6.0));
-    float cell = fract(x/spacing);
-    float ring = exp(-pow((cell - 0.5)/0.06, 2.0))*exp(-pow((r - 0.5)/0.2, 2.0))*exp(-x/spacing*0.35)*step(0.4, x/spacing);
-    float core = exp(-r*r*7.0)*pow(1.0 - u, 0.6);
-    float sheath = exp(-pow((r - 0.7)/0.3, 2.0))*(0.55 + 0.45*helix)*(0.6 + 0.4*flick);
-    vec3 shCol = mix(vec3(0.42, 0.22, 1.0), vec3(0.95, 0.3, 0.85), smoothstep(0.3, 1.0, u));
-    vec3 e = vec3(0.75, 0.92, 1.0)*core*(7.0 + 5.0*ab) + shCol*sheath*(2.6 + 1.6*ab) + vec3(0.8, 0.9, 1.0)*ring*(4.0 + 6.0*ab);
-    acc += e*smoothstep(-0.05, 0.08, x)*pow(1.0 - u, 1.2)*smoothstep(1.0, 4.0, t0 + (float(i) + jit)*dt)*dt;
-    gPlumeT *= exp(-(sheath*0.35 + core*0.5)*sp*dt);
-  }
-  return acc*(0.5 + 0.7*sp);
-}
-vec3 wraithPlumes(vec3 ro, vec3 rd, float tmax, float jit){
-  if (gFlame.x < 0.02) return vec3(0.0);
-  mat3 inv = transpose(uPlaneRot);
-  vec3 lo = inv*(ro - uPlanePos), ld = inv*rd;
-  vec3 col = vec3(0.0);
-  for (int i = 0; i < 4; i++) {
-    float a = uWr[0][i] + uWr[3][i], y = uWr[1][i], a0 = uWr[0][i];
-    vec3 ax = normalize(vec3(-sin(y), -sin(a)*cos(y), cos(a)*cos(y)));
-    vec3 o = WR_POD[i] + vec3(0.0, -sin(a0), cos(a0))*1.5;
-    float th = clamp(uWr[2][i], 0.0, 1.6);
-    col += plumeRound(lo, ld, tmax, o, ax, clamp(th*1.3, 0.0, 1.0), gFlame.y, jit);
-  }
-  return col/(1.0 + max(col.r, max(col.g, col.b))*0.15);
-}
+//! Transonic vapour cone, cloak and weapons. All reheat nozzles use plane_fx.glsl researchPlumes.
 // Transonic vapour cone (Prandtl-Glauert condensation): near Mach 1 in humid air the pressure drop behind the shock
 // condenses a shell of fog around the airframe. A sharp leading edge at the shock, a bell that flares and thins aft,
 // streaky and flickering, lit by the sun and the sky.

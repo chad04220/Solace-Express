@@ -377,40 +377,91 @@ void partPedestal(out vec3 pc, out float pw, out float ph, out float pd){
   vec4 E = gM[22]; float pz = gM[21].w; int ck = int(gM[21].z + 0.5);
   pw = ck == 0 ? 0.075 : 0.11; ph = 0.22; pd = ck == 0 ? 0.24 : 0.32;
   pc = vec3(0.0, E.y - 0.84 + (0.22 - ph), pz + 0.06 + pd);
+  if(fleetCabin()){ CockpitLayout L=cockpitLayout(); pw=L.pedestal.x;ph=L.pedestal.y;pd=L.pedestal.z;pc=vec3(0,(gModelId==2?.560:swiftPreservedFurnitureY())-1.06+ph,pz+.06+pd+L.pedestal.w); }
 }
 // the pedals' height: clear of the floor where the belly curves up towards the firewall
-float partPedalY(){
-  vec4 E = gM[22]; float pz = gM[21].w;
-  vec3 sP = fusSection(pz + 0.2);
-  float kx = clamp((abs(E.x) + 0.1)/max(sP.x - 0.035, 0.01), 0.0, 0.98);
-  float floorY = max(E.y - 1.06, sP.z - (sP.y - 0.035)*sqrt(1.0 - kx*kx) + 0.03);
-  return max(E.y - 0.98, floorY + 0.09);
+float partPedalY(){ return gCab2.x; }
+// Kestrel/Wren retain the two linked control instances, now compact center sticks.
+// Reusing shaft/grip part IDs preserves extraction, animation and all flight input bindings.
+// Shared floor-column family; utility twins reuse the reviewed utility dimensions.
+bool compactTwinPowerBank(){ return gModelId==3 || gModelId==8; }
+bool utilityFloorYoke(){ return compactTwinPowerBank() || gModelId==4; }
+bool floorSupportedYoke(){ return utilityFloorYoke() || gModelId==5 || gModelId==6 || gModelId==9; }
+bool compactTrainerStick(){ return gModelId==0 || gModelId==1; }
+vec3 trainerStickPivot(float side){ return cockpitYokeMount(side); }
+vec3 trainerPowerGrip(float side,float throttle){ CockpitLayout L=cockpitLayout();return vec3(side*abs(L.controls.z),gM[22].y-L.controls.w,gM[22].z-.170+.100*(1.0-throttle)); }
+vec3 trainerMixtureGrip(float side){ return vec3(side*.350,gM[22].y-.190,gM[22].z-.140); }
+// Bushmaster local prototype: explicitly gated floor sticks and journaled power lever.
+bool bushmasterPowerLever(){ return gModelId==2; }
+vec3 bushmasterPowerPivot(float side){ return vec3(side*.022,.020,-1.400); }
+float bushmasterPowerAngle(float throttle){ return -.400+.800*clamp(throttle,0.0,1.0); }
+float bushmasterPowerLeverLocal(vec3 q,float side,float gripRadius){
+  vec3 elbow=vec3(side*.023,.070,0),grip=vec3(side*.023,.230,0);
+  float stem=min(sdCapsule(q,vec3(0),elbow,.007),sdCapsule(q,elbow,grip,.007));
+  float journal=sdCylX(q,.022,.006);
+  float bored=max(min(stem,journal),-(length(q.yz)-.014));
+  return min(bored,length(q-grip)-gripRadius);
 }
+
+bool bushmasterFloorStick(){ return gModelId==2; }
+vec3 bushmasterStickPivot(float side){ return vec3(side*.250,.220,-1.500); }
+float bushmasterStickShaft(vec3 q){
+  return min(length(q)-.016,sdCapsule(q,vec3(0),vec3(0,.090,0),.012));
+}
+vec2 bushmasterStickGrip(vec3 q){
+  vec2 res=vec2(sdCapsule(q,vec3(0,.090,0),vec3(0,.150,0),.018),61.0);
+  return opU(res,vec2(length(q-vec3(0,.156,-.006))-.009,68.0));
+}
+
 // sd: the instance (x: which seat or which side, -1 or 1; y: the left or right pedal of the pair). The cockpit's
 // controls and the light aircraft's surfaces (the airframe field places the cockpit's in place: partAt below)
+// Swift compact supported yoke: full flight input through geared physical travel.
+bool swiftCompactYoke(){return gModelId==7;}
+float swiftYokeWheel(vec3 q){
+ float d=sdRoundBox(q,vec3(.045,.025,.020),.010);
+ vec3 b=vec3(abs(q.x),q.y,q.z);
+ d=min(d,sdCapsule(b,vec3(.035,0,0),vec3(.092,.008,0),.014));
+ return min(d,sdCapsule(b,vec3(.096,.004,0),vec3(.100,.094,0),.018));
+}
 Pose partPoseCockpit(int k, vec2 sd){
   vec4 E = gM[22]; float pz = gM[21].w;
   float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z, cThr = gCtl.w;
   Pose X; X.R = mat3(1.0); X.T = vec3(0.0);
   mat3 D = mat3(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);   // the yokes' frame: x mirrored, each in its pilot's own frame
-  vec3 O = vec3(sd.x*abs(E.x), E.y - 0.43, pz);
-  float pull = cPitch*0.075;
-  if (k == PT_YOKE_SHAFT) { X.R = D; X.T = O + vec3(0.0, 0.0, pull); }
+  vec3 O = fleetCabin()?cockpitYokeMount(sd.x):vec3(sd.x*abs(E.x), E.y - 0.43, pz);
+  float pull = cPitch*(utilityFloorYoke()?.045:(floorSupportedYoke()?.050:.075));
+  if(swiftCompactYoke() && (k==PT_YOKE_SHAFT || k==PT_YOKE_WHEEL)) {
+    X.T=vec3(sd.x*.250,.270,-1.500+cPitch*.025);
+    X.R=k==PT_YOKE_WHEEL?D*transpose(partRxy(-cRoll*.400)):D;
+  }
+  else if(bushmasterFloorStick() && (k==PT_YOKE_SHAFT || k==PT_YOKE_WHEEL)) {
+    X.R=transpose(partRxy(cRoll*.180)*partRyz(-cPitch*.180));
+    X.T=bushmasterStickPivot(sd.x);
+  }
+  else if(compactTrainerStick() && (k==PT_YOKE_SHAFT || k==PT_YOKE_WHEEL)) {
+    X.R=transpose(partRxy(cRoll*.18)*partRyz(-cPitch*.18));
+    X.T=trainerStickPivot(sd.x);
+  }
+  else if (k == PT_YOKE_SHAFT) { X.R = D; X.T = O + vec3(0.0, 0.0, pull); }
   else if (k == PT_YOKE_WHEEL) { X.R = D*transpose(partRxy(-cRoll*0.75)); X.T = O + vec3(0.0, 0.0, 0.22 + pull); }   // (roll right, cRoll > 0: clockwise as the pilot sees it - D's mirror turns the angle round)
   else if (k == PT_PEDAL) {   // right rudder (yaw > 0) pushes the right pedal forward (-z), left rudder the left
     float q = sd.y;
     X.R = mat3(q, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
-    X.T = vec3(sd.x*abs(E.x) + q*0.1, partPedalY(), pz + 0.2 - q*cYaw*0.06);
-  } else if (k == PT_THR_KNOB) X.T = vec3(0.0, E.y - 0.5, pz + 0.05 + 0.1*(1.0 - cThr));
+    X.T = vec3(sd.x*gCab2.z + q*gCab2.w, partPedalY(), gCab2.y - q*cYaw*0.055);
+  } else if (k == PT_THR_KNOB) {
+    if(swiftCompactYoke()){X.T=vec3(-.040,.070,-1.660-.100*cThr);}
+    else if(bushmasterPowerLever()){X.T=bushmasterPowerPivot(-1.0);X.R=partRyz(-bushmasterPowerAngle(cThr));}
+    else {CockpitLayout L=cockpitLayout();X.T=compactTrainerStick()?trainerPowerGrip(sd.x,cThr):vec3(fleetCabin()?L.controls.z:0.0,E.y-(fleetCabin()?L.controls.w:.5),pz+.05+.1*(1.0-cThr));}
+  }
   else if (k == PT_THR_LEVER || k == PT_FLAP_LEVER) {
     vec3 pc; float pw, ph, pd; partPedestal(pc, pw, ph, pd);
     if (k == PT_THR_LEVER) {
       mat3 Dq = mat3(sd.x, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
       X.R = Dq*partLever(mix(-0.55, 0.6, cThr));
-      X.T = Dq*vec3(0.035, pc.y + ph - 0.02, pc.z - pd*0.35);
+      X.T = Dq*vec3(gModelId==4?0.0:0.035, pc.y + ph - 0.02, pc.z - pd*0.35);
     } else {
       X.R = partLever(mix(0.3, -0.5, gPS.y));
-      X.T = vec3(pw*0.6, pc.y + ph - 0.02, pc.z + pd*0.1);
+      X.T = vec3(pw*0.6, pc.y + ph - 0.02, pc.z + pd*(compactTwinPowerBank()?.80:.10));
     }
   }
   else if (k == PT_JET_STICK) { X.R = transpose(partRxy(cRoll*0.25)*partRyz(-cPitch*0.25)); X.T = E.xyz + (isMantis()?vec3(.43,-.535,-.28):vec3(0.42, -0.375, -0.02)); }
@@ -439,7 +490,8 @@ Pose partPoseCockpit(int k, vec2 sd){
   }
   else if (k == PT_WR_PEDAL) {
     X.R = mat3(sd.x, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
-    X.T = E.xyz + vec3(sd.x*0.16, -0.63, -0.78 - sd.x*cYaw*0.04);   // (right rudder, yaw > 0, pushes the right pedal forward, -z: it pulled it back)
+    bool specter=int(gM[0].z+.5)==5;
+    X.T = E.xyz + (specter?vec3(sd.x*.145,-.820,-.73-sd.x*cYaw*.055):vec3(sd.x*.16,-.675,-.78-sd.x*cYaw*.04));   // (right rudder, yaw > 0, pushes the right pedal forward, -z: it pulled it back)
   }
   return X;
 }
@@ -561,7 +613,21 @@ vec2 jtPartField(int k, vec3 l);   // (plane_sdf.glsl)
 // each part's shape in its own frame: distance and material id (the cockpit's controls and the light aircraft's surfaces)
 vec2 partFieldCockpit(int k, vec3 l){
   vec2 res = vec2(1e9, 0.0);
-  if (k == PT_YOKE_SHAFT) res = vec2(sdCapsule(l, vec3(0.0, 0.0, -0.06), vec3(0.0, 0.0, 0.2), 0.017), 60.0);   // (it slides through the panel)
+  if(swiftCompactYoke() && k==PT_YOKE_SHAFT) {
+    res=vec2(sdCapsule(l,vec3(0,0,-.130),vec3(0,0,-.010),.012),60.0);
+  } else if(swiftCompactYoke() && k==PT_YOKE_WHEEL) {
+    res=vec2(swiftYokeWheel(l),66.0);
+  } else if(bushmasterFloorStick() && k==PT_YOKE_SHAFT) {
+    res=vec2(bushmasterStickShaft(l),60.0);
+  } else if(bushmasterFloorStick() && k==PT_YOKE_WHEEL) {
+    res=bushmasterStickGrip(l);
+  } else if(compactTrainerStick() && k==PT_YOKE_SHAFT) {
+    res=vec2(sdCapsule(l,vec3(0),vec3(0,.090,0),.012),60.0);
+  } else if(compactTrainerStick() && k==PT_YOKE_WHEEL) {
+    // 90 mm hand-sized grip, matte rubber with a retained top trim/PTT button.
+    res=vec2(sdCapsule(l,vec3(0,.090,0),vec3(0,.180,0),.018),61.0);
+    res=opU(res,vec2(length(l-vec3(0,.181,-.011))-.008,68.0));
+  } else if (k == PT_YOKE_SHAFT) res = vec2(sdCapsule(l, vec3(0.0,0.0,utilityFloorYoke()?-.020:(floorSupportedYoke()?0.0:-.060)), vec3(0.0,0.0,utilityFloorYoke()?.195:.200), .017), 60.0);   // (it slides through the panel)
   else if (k == PT_YOKE_WHEEL) {
     float hub = sdRoundBox(l, vec3(0.06, 0.03, 0.022), 0.015);
     float horns = sdCapsule(vec3(abs(l.x), l.yz), vec3(0.05, 0.0, 0.0), vec3(0.118, 0.012, 0.0), 0.016);
@@ -574,9 +640,13 @@ vec2 partFieldCockpit(int k, vec3 l){
     vec3 pr = l; pr.yz = rot2(pr.yz, 0.5);
     float psz = int(gM[21].z + 0.5) == 0 ? 0.8 : 1.0;   // smaller pedals in the cramped light-aircraft footwells
     res = vec2(sdRoundBox(pr, vec3(0.045, 0.08, 0.01)*psz, 0.008), 61.0);
-    res = opU(res, vec2(sdCapsule(l, vec3(0.0, 0.05, -0.03), vec3(0.0, 0.2, -0.21), 0.011), 60.0));   // arm up to the footwell wall
+    // Recessed dark grip on a visible satin-metal foot plate. This is the pedal face, not an upper linkage.
+    float rim=sdRoundBox(pr+vec3(0,0,.002),vec3(.050,.085,.009)*psz,.007);
+    rim=max(rim,-sdRoundBox(pr-vec3(0,0,.006),vec3(.038,.071,.018)*psz,.006));
+    res=opU(res,vec2(rim,60.0));
+    res = opU(res, vec2(sdCapsule(l, vec3(0.0, -0.025, -0.018), vec3(0.0, -0.058, -0.085), 0.011), 60.0));   // arm up to the footwell wall
   } else if (k == PT_THR_KNOB) {   // push-pull: the shaft slides through the panel
-    res = vec2(min(sdCapsule(l, vec3(0.0, 0.0, -0.16), vec3(0.0), 0.006), length(l) - 0.022), 66.0);
+    res = bushmasterPowerLever()?vec2(bushmasterPowerLeverLocal(l,-1.0,.022),66.0):vec2(min(sdCapsule(l, vec3(0.0, 0.0, (compactTrainerStick()||swiftCompactYoke())?-.180:-.160), vec3(0.0), 0.006), length(l) - 0.022), 66.0);
   } else if (k == PT_THR_LEVER) {
     res = vec2(sdCapsule(l, vec3(0.0), vec3(0.0, 0.16, 0.0), 0.008), 60.0);
     res = opU(res, vec2(sdRoundBox(l - vec3(0.0, 0.16, 0.0), vec3(0.03, 0.014, 0.02), 0.009), 66.0));
@@ -617,8 +687,12 @@ vec2 partFieldCockpit(int k, vec3 l){
     res = vec2(sdSurface(l.y - V1.x, l.z - V1.y, l.x, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97, 0.0, 0.0), 3.0);
   } else if (k == PT_WR_PEDAL) {
     float ped = max(sdBox(l, vec3(0.05, 0.075, 0.012)), (abs(l.x) + abs(l.y))*0.70711 - 0.08);
-    ped = min(ped, sdCapsule(l, vec3(0.0, -0.07, 0.02), vec3(0.0, -0.12, 0.1), 0.012));
-    res = vec2(ped, 71.0);
+    ped = min(ped, sdCapsule(l, vec3(0.0, -0.07, 0.02), vec3(0.0, -0.09, 0.1), 0.012));
+    res = vec2(ped, int(gM[0].z+.5)==5?47.0:71.0);
+  }
+  if(compactTwinPowerBank() && (k==PT_THR_LEVER || k==PT_FLAP_LEVER)){
+    res=opU(res,vec2(sdCylX(l,.016,.010),60.0));
+    res.x=max(res.x,-sdCylX(l,.008,.025)); // 1mm running clearance around fixed7mm axle
   }
   return res;
 }

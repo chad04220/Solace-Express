@@ -77,6 +77,7 @@ struct FlightResult {
   bool landingLightOn = true;
   bool belowMinimumsUnaligned = false;
   float surveyInBand = 1.f;
+  bool surveyHistoryKnown = true;
   float surveySec = 0, surveyInSec = 0;   // the survey pattern's seconds flown and those inside the band, the job's whole so far (a continued leg carries them on)
 };
 
@@ -162,6 +163,7 @@ public:
     int positioning = 0, ferry = 0, hire = 0;          // fixed, quoted exactly at acceptance
     enum FuelPolicy { FUEL_INCLUDED, FUEL_BILL_CONSUMED, FUEL_PURCHASED } fuel = FUEL_INCLUDED;
     float fuelKgEst = 0, minutesEst = 0, minutesSigma = 0;
+    float fuelLoadKg = -1;    // accepted tank load, retained on restart
     float fuelUpliftKg = 0;    // FUEL_PURCHASED: what is bought at the departure (the tanks' shortfall to the chosen fuel)
     int fuelCostEst = 0, net = 0;                      // net = payout - fixed fees - fuelCostEst
     std::string challenge;
@@ -177,7 +179,7 @@ public:
   // load reaches the destination.
   struct JobState {
     Contract c;                 // the terms, frozen at acceptance
-    LaunchPlan plan;            // the quote of the first leg
+    LaunchPlan plan;            // the accepted quote of the current leg
     int spec = 0; Source src = SRC_NONE;
     enum State { READY = 0, ACTIVE, RECOVERY, DONE, FAILED, CANCELLED } state = READY;
     int at = 0;                 // the airport the load / party is at now
@@ -187,6 +189,7 @@ public:
     float fuelBilledKg = 0;
     bool hirePaid = false, positioningPaid = false, ferryPaid = false;
     float patient = 1.f, comfort = 1.f;   // the ride so far (medevac, VIP): the next leg carries on from it
+    bool surveyHistoryKnown = true;
     float surveySec = 0, surveyInSec = 0; // the survey pattern so far: seconds flown, and inside the altitude band (review S2: a diversion reset them)
     uint32_t id = 0;
     Contract continuation() const { Contract k = c; k.from = at; k.startAirborne = false; return k; }   // the next leg's contract

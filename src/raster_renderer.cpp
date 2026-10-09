@@ -41,6 +41,9 @@ bool Renderer::compileRaster() {
     }
     if (!progEffectsV[v]) { error = "Effects shader: " + first; return false; }
   }
+  setCompileStage("traffic propellers");
+  e.clear(); progTrafficProps = linkProgramCached(kPropDiscVS, kPropDiscFS, e);
+  if (!progTrafficProps) { error = "Traffic prop shader: " + e; return false; }
   progObjects = progObjectsV[0]; progShProxy = progShProxyV[0]; progEffects = progEffectsV[0];
   setCompileStage("UFO and debris");
   e.clear(); progObjectsNoAf = linkProgramCached(kFullscreenVS, objectsFSAssembly("#define AF_LIGHT\n#define OBJ_NO_AF\n"), e);
@@ -53,7 +56,7 @@ bool Renderer::compileRaster() {
   // the airframe shadow maps: the baked mesh (and the moving hull) from a light, plain depth
   static const char* kShMapVS = "#version 330 core\nlayout(location = 0) in vec3 aPos; uniform mat4 uVP; uniform mat3 uRot; uniform vec3 uPos;\n"
     "uniform sampler2D uPartPose; uniform int uPartInst;\n"   // (a cockpit's rigid part at its pose: plane_mesh_vs.glsl)
-    "void main(){ vec3 p = aPos; if (uPartInst >= 0) { int b = uPartInst*4; p = mat3(texelFetch(uPartPose, ivec2(b, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 1, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 2, 0), 0).xyz)*aPos + texelFetch(uPartPose, ivec2(b + 3, 0), 0).xyz; }\n"
+    "void main(){ vec3 p = aPos; if (uPartInst >= 0) { int b = (uPartInst + gl_InstanceID)*4; p = mat3(texelFetch(uPartPose, ivec2(b, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 1, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 2, 0), 0).xyz)*aPos + texelFetch(uPartPose, ivec2(b + 3, 0), 0).xyz; }\n"
     "  gl_Position = uVP*vec4(uRot*p + uPos, 1.0); }\n";
   setCompileStage("aircraft shadow maps");
   e.clear(); progShMap = linkProgramCached(kShMapVS, "#version 330 core\nvoid main(){}\n", e);
@@ -153,6 +156,17 @@ void Renderer::rasterObjects(const FrameParams& fp) {
     float rot[9] = {t[25 * 4], t[25 * 4 + 1], t[25 * 4 + 2], t[26 * 4], t[26 * 4 + 1], t[26 * 4 + 2], t[27 * 4], t[27 * 4 + 1], t[27 * 4 + 2]};
     drawPlaneMesh(fp, *trafMesh[k], rot, vec3(t[24 * 4], t[24 * 4 + 1], t[24 * 4 + 2]), k);
   }
+  // what the march has to do this frame: a traffic aircraft drawn as a mesh whose moving hull is empty (every moving
+  // piece a rigid part) never needs it; the player's aircraft only without its mesh, with its moving hull drawn, or
+  // broken up; and with nothing at all (the usual flight in a light aircraft) the full-screen pass is skipped
+  int trafMarch = 0;
+  for (int k = 0; k < trafN; k++) {
+    if (trafMesh[k]) { auto it = hulls.find(trafMesh[k]->movKey); if (it != hulls.end() && it->second.ok && !it->second.verts) continue; }
+    trafMarch |= 1 << k;
+  }
+  const bool afMarch = (fp.plane.on && (!meshOn || hullOn || fp.wreck.pieces > 0)) || trafMarch != 0;
+  const bool marchAny = afMarch || fp.ufoOn || fp.wreck.debris > 0;
+  if (marchAny) {
   // the depth so far (the terrain, the scenery, the meshes) copied out: the march goes no further than it on any ray,
   // and a pixel whose moving hull begins behind it marches nothing (the cabin's panel and roof come from the mesh: only
   // the yoke's pixels, in front of it, march - and the traffic's and the debris' traces stop at the nearest surface too)
@@ -177,16 +191,6 @@ void Renderer::rasterObjects(const FrameParams& fp) {
     glDrawBuffers(4, gb);
     sceneZ = true;
   }
-  // what the march has to do this frame: a traffic aircraft drawn as a mesh whose moving hull is empty (every moving
-  // piece a rigid part) never needs it; the player's aircraft only without its mesh, with its moving hull drawn, or
-  // broken up; and with nothing at all (the usual flight in a light aircraft) the full-screen pass is skipped
-  int trafMarch = 0;
-  for (int k = 0; k < trafN; k++) {
-    if (trafMesh[k]) { auto it = hulls.find(trafMesh[k]->movKey); if (it != hulls.end() && it->second.ok && !it->second.verts) continue; }
-    trafMarch |= 1 << k;
-  }
-  const bool afMarch = (fp.plane.on && (!meshOn || hullOn || fp.wreck.pieces > 0)) || trafMarch != 0;
-  const bool marchAny = afMarch || fp.ufoOn || fp.wreck.debris > 0;
   // (only the UFO or the debris to march: the build without any airframe in it - on the owner's GPU the airframes'
   // code alone made the UFO's march more than twice as slow)
   static const bool objFull = getenv("OBJFULL") != nullptr;   // (debug: always the full build)
@@ -202,6 +206,7 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   glBindVertexArray(vaoEmpty);
   static const bool noMarch = getenv("NOMARCH") != nullptr;   // (debug: the objects pass without its full-screen march, to time the mesh draws alone)
   if (!noMarch && marchAny) glDrawArrays(GL_TRIANGLES, 0, 3);
+  }
   glActiveTexture(GL_TEXTURE0);
   glDisable(GL_DEPTH_TEST);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -493,8 +498,15 @@ void Renderer::rasterShadowProxy(const FrameParams& fp) {
 // The effects over the lit, clouded frame (kEffectsFS): written into the TAA history texture the resolve is about
 // to overwrite anyway (the frame can't be read and written at once), then copied back
 void Renderer::rasterEffects(const FrameParams& fp) {
-  if (rw > histW || rh > histH) return;   // (a camera feed larger than the main view: no scratch for it)
   static const bool off = getenv("RASTERNOFX") != nullptr; if (off) return;   // (debug)
+  const auto& p = fp.plane;
+  const bool intact = p.on && fp.wreck.pieces == 0, cockpit = p.PS[3] > 0.5f;
+  const int engine = intact ? (int)(p.M[2] + 0.5f) : 0;
+  // Conservative exact-empty gate. Exhaust/hologram/cloak families remain active regardless
+  // of engine switches; their shader alone decides intensity. Weapons survive a missing player.
+  const bool effects = fp.fx.beams + fp.fx.bombs + fp.fx.blasts > 0 ||
+    (intact && (p.propCount > 0 || p.vapor[0] > .01f || (!cockpit && p.exhaust.count > 0) || (engine == 6 && (cockpit || p.wr[4][3] > .001f))));
+  if (!effects || rw > histW || rh > histH) { rasterTrafficProps(fp); return; }
   const int cur = histIdx ^ 1;
   glBindFramebuffer(GL_FRAMEBUFFER, fboTAA[cur]);
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
@@ -510,6 +522,7 @@ void Renderer::rasterEffects(const FrameParams& fp) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fboComp);
   glBlitFramebuffer(0, 0, rw, rh, 0, 0, rw, rh, GL_COLOR_BUFFER_BIT, GL_NEAREST);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  rasterTrafficProps(fp);
 }
 
 void Renderer::rasterLight(const FrameParams& fp) {

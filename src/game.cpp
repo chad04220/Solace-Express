@@ -125,8 +125,8 @@ std::string Game::actLabel(int a, bool pad) const {
   }
   return keyName(set.keyBind[a]);
 }
-// (pad: the hint as shown with a gamepad - its buttons, and no "(or gamepad ...)" aside. Voice lines are always
-// matched on the keyboard text: AtcVoice swaps in the controller recording itself.)
+// The hint as shown on the active device: bound controls and no "(or gamepad ...)" aside on a pad.
+// Lesson speech is resolved separately by mission and phase, never by these device-specific words.
 std::string Game::expandHint(const std::string& raw, bool pad) const {
   std::string out;
   for (size_t i = 0; i < raw.size(); i++) {
@@ -140,17 +140,6 @@ std::string Game::expandHint(const std::string& raw, bool pad) const {
   return out;
 }
 
-// whether every control a hint names is still on its default gamepad button: a recorded lesson line names those (review
-// S3: rebound, the instructor said "D-pad Left" while the hint showed the player's own button)
-bool Game::hintPadDefault(const std::string& raw) const {
-  for (size_t i = raw.find('{'); i != std::string::npos; i = raw.find('{', i + 1)) {
-    size_t e = raw.find('}', i);
-    if (e == std::string::npos) break;
-    std::string id = raw.substr(i + 1, e - i - 1);
-    for (int k = 0; k < ACT_COUNT; k++) if (id == kActions[k].id && set.padBind[k] != kActions[k].pad) return false;
-  }
-  return true;
-}
 // The flown time for a job's plan when it's in; else (start) a background flight is begun for it if none is running
 void Game::applyQuote(const Contract& c, Career::LaunchPlan& e, bool start) {
   if (quoteJob.valid() && quoteJob.wait_for(std::chrono::seconds(0)) == std::future_status::ready) quoteFlown[quoteJobKey] = quoteJob.get();
@@ -230,6 +219,7 @@ void Game::loadSettings() {
     else if (s == "fpsTarget") set.fpsTarget = std::clamp((int)v, 0, 240);
     else if (s == "renderer") {}   // (the old renderer choice: there is one renderer now)
     else if (s == "fov") set.fov = clampf(v, 40.f, 80.f);
+    else if (s == "cockpitFocusZoom") set.cockpitFocusZoom = v != 0;
     else if (s == "headLook") set.headLook = v != 0;
     else if (s == "cbHud") set.cbHud = v != 0;
     else if (s == "uiScale") set.uiScale = clampf(v, 0.8f, 1.4f);
@@ -249,6 +239,7 @@ void Game::saveSettings() {
   std::string t = fmt("quality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
   t += fmt("renderRes %d\nfpsTarget %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
+  t += fmt("cockpitFocusZoom %d\n", set.cockpitFocusZoom);
   for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   for (const std::string& id : resDone) t += "rescard." + id + " 1\n";
   for (auto& tb : trialBest) for (size_t i = 0; i < tb.second.size(); i++) t += fmt("trial.%s.%d %f\n", tb.first.c_str(), (int)i, tb.second[i]);
@@ -373,31 +364,34 @@ bool Game::commitLaunch(const std::function<void(Career&)>& change) {
   hubMsg = "The career could not be saved (disk full or folder not writable): the flight was not started. Try again."; hubMsgTime = 6;
   return false;
 }
-void Game::beginCareerFlight(const Contract& c, int spec, Career::Source src) {
-  // the plan the job is saved with: the same one startFlight flies and settles against (the flown route's quote first,
-  // then the fuel the player chose: the other way round, the quote put back its own uplift and the bill was for that,
-  // not for what went into the tanks - review S1)
+Career::LaunchPlan Game::finalizeLaunchPlan(const Contract& c, int spec, Career::Source src) {
   Career::LaunchPlan p = career.plan(c, spec, src);
-  applyQuote(c, p, false);
+  applyQuote(c, p, false);   // route estimate first: it must not replace the player's selected uplift afterward
   career.planFuel(p, c, chosenFuel(c, spec, src, p));
+  return p;
+}
+void Game::beginCareerFlight(const Contract& c, int spec, Career::Source src) {
+  const Career::LaunchPlan p = finalizeLaunchPlan(c, spec, src);
   if (!commitLaunch([&](Career& k) {
     k.attempt++; k.attemptOpen = true;
     // (lessons and checkrides are flown whole: no job; a free flight leaves a job waiting at its stop as it is)
     if (Career::resumable(c)) k.accept(c, spec, src, p);
     else if (!(k.job && k.job->state == Career::JobState::RECOVERY)) k.job.reset();
   })) return;
-  startFlight(c, spec, src);
+  startFlight(c, spec, src, &p);
 }
 void Game::continueJob(int spec, Career::Source src) {
   if (!career.job || career.job->state != Career::JobState::RECOVERY) return;
   Contract c = career.job->continuation();
+  Career::LaunchPlan p = finalizeLaunchPlan(c, spec, src);
+  continuationWaivers(p, c, spec, src);
   bool took = commitLaunch([&](Career& k) {
     Career::JobState& J = *k.job;
     if (spec != J.spec || src != J.src) { J.hirePaid = false; J.ferryPaid = false; }   // a different aircraft: a new hire, its own ferry (C3)
-    J.spec = spec; J.src = src; J.state = Career::JobState::ACTIVE; k.attempt++; k.attemptOpen = true;
+    J.plan = p; J.spec = spec; J.src = src; J.state = Career::JobState::ACTIVE; k.attempt++; k.attemptOpen = true;
   });
   if (!took || !career.job || career.job->state != Career::JobState::ACTIVE) return;   // the save did not take: the job stays as it was, nothing flies on a stale career
-  startFlight(c, spec, src);
+  startFlight(c, spec, src, &p);
   applyJobLeg();
 }
 // the committed job's leg carries on from its checkpoints, its clock and the ride so far, its paid fees waived
@@ -407,6 +401,7 @@ void Game::applyJobLeg() {
   wpIndex = std::min(J.wpDone, (int)contract.wps.size()); result.wpDone = wpIndex; jobClockBase = J.jobClockMin * 60.f;
   result.patient = J.patient; result.comfort = J.comfort;
   surveyT = J.surveySec; surveyInT = J.surveyInSec; result.surveySec = surveyT; result.surveyInSec = surveyInT;
+  result.surveyHistoryKnown = J.surveyHistoryKnown;
   result.surveyInBand = surveyT > 1.f ? surveyInT / surveyT : 1.f;
   if (J.hirePaid) launchPlan.hire = 0;
   if (J.ferryPaid) launchPlan.ferry = 0;
@@ -415,7 +410,8 @@ void Game::applyJobLeg() {
 void Game::continuationWaivers(Career::LaunchPlan& p, const Contract& c, int spec, Career::Source src) const {
   if (!career.job) return;
   const Career::JobState& J = *career.job;
-  if (spec != J.spec || src != J.src) return;   // another aircraft: its hire and its ferry are new
+  if (J.positioningPaid) p.positioning = 0;
+  if (spec != J.spec || src != J.src) { p.net = c.payout - p.fees() - p.fuelCostEst; return; }   // another aircraft: its hire and its ferry are new
   if (J.hirePaid) p.hire = 0;
   if (J.ferryPaid) p.ferry = 0;
   p.net = c.payout - p.fees() - p.fuelCostEst;
@@ -428,7 +424,8 @@ void Game::restartFlight() {
   if (researchFlight) { launchResearch(); return; }
   const bool iso = isolatedFlight, leg = jobLeg;
   Contract c = contract;
-  startFlight(c, specIdx, source);
+  const Career::LaunchPlan p = launchPlan;   // retry the accepted load and price, even if a newer estimate has arrived
+  startFlight(c, specIdx, source, &p);
   if (iso) isolatedFlight = true;
   if (leg) applyJobLeg();
 }
@@ -844,13 +841,11 @@ void Game::computeSun(float tod, vec3& dir, vec3& col, float& night) const {
 }
 
 // ------------------------------------------------------------------ flight session
-void Game::startFlight(const Contract& c, int spec, Career::Source src) {
+void Game::startFlight(const Contract& c, int spec, Career::Source src, const Career::LaunchPlan* finalized) {
   static bool dispWarned = false;   // say once if the cockpit display shader could not be built on this GPU
   if (!g_ren.dispError.empty() && !dispWarned && !headless) { dispWarned = true; toast("Cockpit display shader failed on this GPU (details in startup.log)", vec3(1.f, 0.45f, 0.35f)); }
   contract = c; specIdx = spec; source = src;
-  launchPlan = career.plan(c, spec, src);   // the quote this flight is settled against (fees exactly as shown)
-  applyQuote(c, launchPlan, false);          // (the flown route's estimate, then the fuel chosen: beginCareerFlight's order)
-  career.planFuel(launchPlan, c, chosenFuel(c, spec, src, launchPlan));
+  launchPlan = finalized ? *finalized : finalizeLaunchPlan(c, spec, src);   // accepted quote, tank load and bill agree
   researchFlight = false;   // a career flight; launchResearch sets it again for its own
   wx = c.wx; wxStart = c.wx; timeOfDay = wx.timeOfDay; apRepickT = 0;
   wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet; wx.cloudBoil = cloudBoil;
@@ -868,7 +863,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   float hdg = reverse ? h0 + 180.f : h0;
   vec3 start = a.threshold(reverse) + (reverse ? -a.dir() : a.dir()) * 30.f;
   float payloadKg = (float)c.cargoKg + c.pax * 85.f + 85.f;
-  float fuel = chosenFuel(c, spec, src, launchPlan);
+  float fuel = launchPlan.fuelLoadKg;
   launchFuelKg = -1;
   plane.reset(&s, start, hdg, fuel, payloadKg, c.startAirborne, s.cruise);
   plane.apComfort = c.gentle();   // gentle for passengers or a fragile load, else the airframe's whole envelope (the stick is never limited)
@@ -884,6 +879,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   result = FlightResult();
   timeAccel = 1; camMode = camMode == 1 ? 1 : 0; camYaw = 0; camPitch = 0.12f; camZoom = 1; camArm = 0; camArmV = 0; camSpd = 0;
   lookYaw = 0; lookPitch = -0.13f;
+  cockpitFocus = CockpitFocusZoom(); ckZoom = 1.f; // a new flight never inherits a previous display lock
   camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 3, 15));
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
   takeoffAnnounced = c.startAirborne; touchedDown = false; touchdownFpm = 0; stillTimer = 0; tdRunway = -2;   // (an airborne start has no takeoff to announce)
@@ -899,7 +895,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src) {
   // the player sees a loading screen while the scenery around the start is generated (tests fly straight away)
   screen = headless ? SCR_FLIGHT : SCR_LOADING;
   loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadMap = false; dbgCam = dbgFollow = false;
-  atc.cancel(); atcF = AtcFlight(); hintsVoiced.clear(); commsPending.clear();   // (the last flight's calls go before this one's announcements)
+  atc.cancel(); atcF = AtcFlight(); hintsVoiced.clear(); commsPending.clear(); lessonVoiceWarned = false;   // (the last flight's calls go before this one's announcements)
   atc.valid = [this](const AtcVoice::Tx& t) { return t.key < 0 || t.key == atcKey(); };
   failVoiced.clear();
   toast(fmt("%s - %s", a.code, a.name), vec3(0.7f, 0.9f, 1.0f));
@@ -1501,16 +1497,19 @@ void Game::updateFlight(float dt) {
   }
   (void)prevPos;
   // tutorial hints
+  updateLessonHint();
+}
+
+void Game::updateLessonHint() {
   phase = computePhase();
-  if (contract.hints.size() > (size_t)phase && phase != lastHintPhase) {
-    lastHintPhase = phase;
-    if (!contract.hints[phase].empty()) {
-      hint = expandHint(contract.hints[phase], padPrompts());
-      std::string said = expandHint(contract.hints[phase]);
-      if (set.showHints && std::find(hintsVoiced.begin(), hintsVoiced.end(), said) == hintsVoiced.end()) { hintsVoiced.push_back(said); commsPending.push_back({said, contract.id, hintPadDefault(contract.hints[phase])}); }   // each said once
-    }
-  } else if (contract.hints.size() > (size_t)phase && !contract.hints[phase].empty() && hint == expandHint(contract.hints[phase], !padPrompts())) {
-    hint = expandHint(contract.hints[phase], padPrompts());   // (the player picked up the other device: the hint names its controls now)
+  if (contract.hints.size() <= (size_t)phase || contract.hints[phase].empty()) return;
+  hint = expandHint(contract.hints[phase], padPrompts());   // every frame: device switches and rebinding stay current
+  if (phase == lastHintPhase) return;
+  lastHintPhase = phase;
+  const std::string key = contract.id + ".phase" + std::to_string(phase);
+  if (set.showHints && std::find(hintsVoiced.begin(), hintsVoiced.end(), key) == hintsVoiced.end()) {
+    hintsVoiced.push_back(key);
+    commsPending.push_back({hint, contract.id, phase});   // exact lesson identity, never a fixed keyboard/controller alias
   }
 }
 
@@ -1580,10 +1579,6 @@ void Game::updateCamera(float dt) {
   if (in.wheel != 0 && showMap) gpsRangeTarget = clampf(gpsRangeTarget * powf(0.8f, in.wheel), 1500.f, 40000.f);
   else if (in.wheel != 0 && !showRadio && camMode == 1) ckZoomT = clampf(ckZoomT * powf(1.2f, in.wheel), 1.f, 4.f);
   else if (in.wheel != 0 && !showRadio) camZoom = clampf(camZoom * powf(0.88f, in.wheel), 0.35f, 4.f);
-  {   // cockpit zoom eases toward the wheel setting, or 2.8x while the zoom action is held
-    float tz = camMode == 1 ? (actDown(ACT_ZOOM) ? std::max(ckZoomT, 2.8f) : ckZoomT) : 1.f;
-    ckZoom += (tz - ckZoom) * (1.f - expf(-dt * 10.f));
-  }
   bool drag = in.mDown[1] || (camMode == 2 && in.mDown[0]);
   // chase and orbit cameras use reversed pitch: stick up / drag up swings the camera down so the view tilts up
   float pitchDir = (camMode == 0 || camMode == 2) ? -1.f : 1.f;
@@ -1633,6 +1628,16 @@ void Game::updateCamera(float dt) {
   }
   float gh = std::max(g_world.height(camPos.x, camPos.z, 6), 0.f) + 1.5f;
   if (camPos.y < gh) camPos.y = gh;
+  // Use the same body-space viewing ray as rendering, never a projected/zoomed screen position.
+  // Both mouse drag and controller look reach this path; no camera rotation or eye movement is added.
+  const int focusModel = int(plane.spec - kAircraft);
+  CockpitFocusTarget focusPanels[24];
+  const int focusCount = camMode == 1 ? modelCockpitFocusTargets(focusModel, focusPanels, 24) : 0;
+  const vec3 focusAim = quat::axisAngle(vec3(0, 1, 0), lookYaw).rotate(
+      quat::axisAngle(vec3(1, 0, 0), lookPitch).rotate(vec3(0, 0, -1)));
+  const float manualZoom = actDown(ACT_ZOOM) ? std::max(ckZoomT, 2.8f) : ckZoomT;
+  ckZoom = cockpitFocus.update(dt, camMode == 1, focusModel, set.cockpitFocusZoom && !dbgCam,
+      plane.q.conj().rotate(camPos - plane.pos), focusAim, focusPanels, focusCount, manualZoom);
 }
 
 // ------------------------------------------------------------------ gamepad menus
@@ -1843,21 +1848,18 @@ void Game::buildLights(FrameParams& fp) {
     P[0] = b.x; P[1] = b.y; P[2] = b.z; P[3] = 0; C[0] = emit.x; C[1] = emit.y; C[2] = emit.z; C[3] = 0;
     D[0] = axis.x; D[1] = axis.y; D[2] = axis.z; D[3] = (float)tint; fp.plane.lensN++;
   };
-  // exhaust flames
-  if (s.special && plane.engineRunning && !(camMode == 1 && fp.sealedCockpit)) {
-    float sp = plane.engineSpool, ab = fp.plane.flame[1];
-    vec3 exP[4], exD[4]; float exS[4]; int nEx = jetExhausts(plane, exP, exD, exS);
-    float flick = 0.85f + 0.15f * sinf(t * 57.f) * sinf(t * 23.f + 1.f);
-    vec3 c = lerp(s.special == 2 ? vec3(0.45f, 0.35f, 1.f) : vec3(0.3f, 0.55f, 1.f), s.special == 2 ? vec3(0.9f, 0.6f, 1.f) : vec3(1.f, 0.62f, 0.3f), ab)
-             * (((s.special == 2 ? 6.f * sp * sp : 14.f * sp) + 45.f * ab) * flick / (float)nEx) * dark;
-    for (int k = 0; k < nEx; k++) light(W(exP[k] + exD[k] * (0.15f + 0.15f * ab)), 0.08f, c * (s.special == 2 ? exS[k] : 1.f), -2.f, vec3(0, 1, 0), 0.05f);
-  }
-  // the XR-20: one exhaust light, behind its one round nozzle
-  if (&s == &kAircraft[kMantis] && plane.engineRunning && !(camMode == 1 && fp.sealedCockpit)) {
-    float sp = fp.plane.flame[0], ab = fp.plane.flame[1];
-    float flick = 0.85f + 0.15f * sinf(t * 57.f) * sinf(t * 23.f + 1.f);
-    vec3 c = lerp(vec3(0.3f, 0.55f, 1.f), vec3(1.f, 0.62f, 0.3f), ab) * ((14.f * sp + 45.f * ab) * flick);
-    light(W(vec3(0, md.nacY, md.nacZ0 + md.nacLen + 0.18f)), 0.10f, c, -2.f, vec3(0, 1, 0), 0.05f);
+  // Exactly one light per live exhaust, with the same moving anchor/radius/power as its plume.
+  // This replaces the old special-craft and separate Mantis paths; a failed or unfueled engine emits neither.
+  if (!(camMode == 1 && fp.sealedCockpit)) {
+    const ExhaustVisual& ex = fp.plane.exhaust;
+    const float flick = .85f + .15f*sinf(t*57.f)*sinf(t*23.f + 1.f);
+    for (int k = 0; k < ex.count; ++k) {
+      const float sp = ex.power[k][0], ab = ex.power[k][1], intensity = ex.power[k][2];
+      vec3 c = lerp(vec3(.3f, .55f, 1.f), vec3(1.f, .62f, .3f), ab)
+               *((14.f*sp + 45.f*ab)*intensity*flick*dark/(float)std::max(s.engines, 1));
+      light(W(exhaustPosition(ex, k) + exhaustDirection(ex, k)*(.15f + .15f*ab)),
+            std::max(.05f, ex.exit[k][3]*.2f), c, -2.f, vec3(0, 1, 0), .05f);
+    }
   }
   // fixture positions (body space)
   vec3 tip = s.special == 2 ? kWraithWingTip : s.special ? kJetWingTip : modelWingTip(md);
@@ -2304,24 +2306,24 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   pv.I0[0] = p.ias * MS_TO_KT; pv.I0[1] = p.pos.y * M_TO_FT; pv.I0[2] = p.heading(); pv.I0[3] = p.vel.y * 196.85f;
   pv.I1[0] = p.pitchDeg(); pv.I1[1] = p.bankDeg();
   pv.I1[2] = s.engineType == ENG_PISTON ? p.rpm / std::max(s.maxRpm, 1.f) : p.n1 / 100.f; pv.I1[3] = p.fuel / std::max(s.maxFuel, 1.f);
+  for (int i=0;i<4;i++) pv.engineHealth[i] = i<s.engines ? p.fail.engineHealth[i] : 0.f; // truthful per-engine cockpit failure indication
   pv.I2[0] = -p.q.rotate(p.w).y / DEG; pv.I2[1] = p.beta / DEG; pv.I2[2] = p.flaps; pv.I2[3] = p.gear;
   pv.colBase = s.colBase; pv.colStripe = s.colStripe;
   { std::string r = registrationOf(s); for (int i = 0; i < 3; i++) pv.reg[i] = (float)r[3 + i]; }
   pv.propCount = modelProps(md, pv.prop);
   pv.hud[0] = p.ias; pv.hud[1] = p.pos.y; pv.hud[2] = p.heading(); pv.hud[3] = p.mach;
-  pv.hud2[0] = p.gLoad; pv.hud2[1] = p.ctl.throttle; pv.hud2[2] = p.spec && p.spec->special == 1 ? jetNozzleAngle(p) / (0.5f * PI) : p.nozzle;   // XR-30: pitch vectoring (90 deg units) pv.hud2[3] = p.gear > 0.5f ? 1.f : 0.f;
+  pv.hud2[0] = p.gLoad; pv.hud2[1] = p.ctl.throttle; pv.hud2[2] = p.spec && p.spec->special == 1 ? jetNozzleAngle(p) / (0.5f * PI) : p.nozzle;   // XR-30: pitch vectoring (90 deg units)
+  pv.hud2[3] = p.gear > 0.5f ? 1.f : 0.f;
   vec3 vb = length(p.vel) > 2.f ? p.q.conj().rotate(normalize(p.vel)) : vec3(0, 0, -1);
   pv.hudV[0] = vb.x; pv.hudV[1] = vb.y; pv.hudV[2] = vb.z;
   pv.hud3[0] = p.engineSpool; pv.hud3[1] = p.alpha / DEG; pv.hud3[2] = p.vel.y; pv.hud3[3] = p.agl();
-  if (&s == &kAircraft[kMantis]) {   // (its one engine: out with the fuel or a failure, whatever the spool still reads as it winds down)
-    bool live = p.engineRunning && p.fuel > 0.f && p.fail.engineHealth[0] > 0.f;
-    pv.flame[0] = live ? p.engineSpool : 0.f;
-    pv.flame[1] = live ? smoothstepf(0.85f, 1.f, p.engineSpool) : 0.f;
-    pv.flame[2] = 0.f; pv.flame[3] = p.mach;
-  } else if (s.special) {
-    pv.flame[0] = p.engineRunning ? p.engineSpool : 0.f; pv.flame[1] = p.engineRunning ? smoothstepf(0.7f, 1.f, p.engineSpool) : 0.f;
-    pv.flame[2] = jetNozzleAngle(p); pv.flame[3] = p.mach;
+  pv.exhaust = buildExhaustVisual(p, md);
+  pv.flame[0] = pv.flame[1] = 0.f;
+  for (int i = 0; i < pv.exhaust.count; ++i) {
+    pv.flame[0] = std::max(pv.flame[0], pv.exhaust.power[i][0]);
+    pv.flame[1] = std::max(pv.flame[1], pv.exhaust.power[i][1]);
   }
+  pv.flame[2] = s.special == 1 ? jetNozzleAngle(p) : 0.f; pv.flame[3] = p.mach;
 }
 
 FrameParams Game::buildFrame() {
@@ -3162,7 +3164,15 @@ void Game::updateAtc(float dt) {
 void Game::updateComms(float dt) {
   bool live = (screen == SCR_FLIGHT || screen == SCR_LOADING) && !paused;
   if (!live) { atc.cancel(); commsPending.clear(); commsCrashSeen = false; return; }
-  if (!atc.ok()) { commsPending.clear(); return; }
+  auto lessonUnavailable = [&]() {
+    if (lessonVoiceWarned) return;
+    lessonVoiceWarned = true;
+    toast("Lesson recording unavailable. Use the on-screen controls; check the voice assets.", vec3(1.f, 0.8f, 0.4f), false);
+  };
+  if (!atc.ok()) {
+    for (const auto& m : commsPending) if (m.lessonPhase >= 0) { lessonUnavailable(); break; }
+    commsPending.clear(); return;
+  }
   if (crashed && !commsCrashSeen) { atc.cancel(); commsCrashSeen = true; }
   if (!crashed) commsCrashSeen = false;
   if (screen == SCR_FLIGHT && !crashed && flightClock > 2.f) {   // the HUD's warnings (game_ui.cpp), spoken as they come on
@@ -3191,7 +3201,13 @@ void Game::updateComms(float dt) {
       if (atc.resolve(a.text, contract.id, padPrompts(), tx)) atc.say(tx);
     }
   }
-  for (auto& m : commsPending) { AtcVoice::Tx tx; if (atc.resolve(m.text, m.mission, padPrompts() && m.padOk, tx)) atc.say(tx); }   // (rebound: the hint is shown, not said)
+  for (const auto& m : commsPending) {
+    AtcVoice::Tx tx;
+    bool resolved = m.lessonPhase >= 0 ? atc.resolveLesson(m.mission, m.lessonPhase, m.text, tx) : atc.resolve(m.text, m.mission, padPrompts(), tx);
+    if (m.lessonPhase >= 0 && resolved) for (const auto& id : tx.ids) resolved = atc.decodes(id) && resolved;
+    if (resolved) atc.say(tx);
+    else if (m.lessonPhase >= 0) lessonUnavailable();
+  }
   commsPending.clear();
   if (screen == SCR_FLIGHT && !crashed && !researchFlight) updateAtc(dt);
   // while someone is talking the music and the engine sit lower (a headset's comms priority): quick down, slow up

@@ -149,6 +149,7 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
   X(void, glDeleteShader, (GLuint)) \
   X(GLuint, glCreateProgram, (void)) \
   X(void, glAttachShader, (GLuint, GLuint)) \
+  X(void, glDetachShader, (GLuint, GLuint)) \
   X(void, glLinkProgram, (GLuint)) \
   X(void, glGetProgramiv, (GLuint, GLenum, GLint*)) \
   X(void, glGetProgramInfoLog, (GLuint, GLsizei, GLsizei*, GLchar*)) \

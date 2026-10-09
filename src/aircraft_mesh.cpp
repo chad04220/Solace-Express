@@ -11,9 +11,12 @@
 // for the whole airframe; everywhere else the mesh is the airframe and no pixel marches. Meshes are cached on disk by
 // model, view and shader fingerprint.
 #include "renderer.h"
+#include "models.h"
 #include "shaders.h"
 #include "hull_mesh.h"
 #include "mesh_simplify.h"
+#include "mesh_validation.h"
+#include "aircraft_mesh_overhead.h"
 #include <filesystem>
 #include <cmath>
 #include <cstdio>
@@ -27,7 +30,7 @@
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
-const uint32_t kMeshMagic = 0x4d455348u + 20;   // (bump with the format, or with what the bake makes of the field: the cockpit's sharp edges, +14; its thin patch laid out fat and drawn last, +16; back on the surface, +17; its flat faces flat-shaded, +18; the parts' creases, +19; the outside's edges held to half a metre, +20)
+const uint32_t kMeshMagic = 0x4d455348u + aircraftMesh::kAlgorithmVersion;
 // the rigid parts a cockpit has (plane_parts.glsl PT_*) and each one's instances: x which seat or side, y which pedal
 struct PartInst { int type; float sx, sy; };
 const int kMaxPartInst = 128;
@@ -125,7 +128,7 @@ bool gearPartBox(int type, const float* M, vec3& lo, vec3& hi, float& h) {
   }
   return false;
 }
-int partList(const float* M, bool inside, PartInst* out) {
+int partList(const float* M, bool inside, PartInst* out, int model = -1) {
   const int eng = (int)(M[2] + 0.5f);
   const bool mantis = eng == 4 && fabsf(M[22 * 4]) < 0.001f && M[13 * 4 + 1] < -3.f;   // (the XR-20: a centreline eye, its canards ahead: plane_common.glsl isMantis)
   int n = 0;
@@ -163,14 +166,17 @@ int partList(const float* M, bool inside, PartInst* out) {
     return n;
   }
   if (!inside) return n;
-  if (eng == 5) { out[n++] = {6, 0, 0}; out[n++] = {7, 0, 0}; return n; }                      // the XR-30: stick, throttle
+  if (eng == 5) { out[n++] = {6, 0, 0}; out[n++] = {7, 0, 0}; out[n++] = {10, -1, 0}; out[n++] = {10, 1, 0}; return n; }                      // the XR-30: stick, throttle
   if (eng == 6) { out[n++] = {8, 0, 0}; out[n++] = {9, 0, 0}; out[n++] = {10, -1, 0}; out[n++] = {10, 1, 0}; return n; }   // the XR-40: and its pedals
   if (eng > 6) return 0;
   if (mantis) { out[n++] = {6, 0, 0}; out[n++] = {7, 0, 0}; out[n++] = {2, 0, -1}; out[n++] = {2, 0, 1}; return n; }   // the XR-20: side stick, throttle, one pair of pedals
   for (int s = -1; s <= 1; s += 2) { out[n++] = {0, (float)s, 0}; out[n++] = {1, (float)s, 0}; }   // the yokes: shaft, wheel
   for (int s = -1; s <= 1; s += 2) for (int q = -1; q <= 1; q += 2) out[n++] = {2, (float)s, (float)q};   // the pedals
-  if ((int)(M[21 * 4 + 2] + 0.5f) == 0) out[n++] = {3, 0, 0};   // a push-pull throttle
-  else { out[n++] = {4, -1, 0}; out[n++] = {4, 1, 0}; out[n++] = {5, 0, 0}; }   // throttle levers, flap lever
+  if ((int)(M[21 * 4 + 2] + 0.5f) == 0) {
+    if(model==0 || model==1) { out[n++]={3,-1,0};out[n++]={3,1,0}; } // linked trainer side throttles
+    else out[n++] = {3, 0, 0};
+  }
+  else { if (eng != 1) out[n++] = {4, -1, 0}; out[n++] = {4, 1, 0}; out[n++] = {5, 0, 0}; }   // one power lever for the single turboprop, otherwise linked pair
   return n;
 }
 }
@@ -188,6 +194,7 @@ bool Renderer::compilePlaneMesh() {
   if (!progPlaneMeshDepth) { error = "Aircraft mesh depth shader: " + e; return false; }
   progPartPose = linkProgramCached(kFullscreenVS, partPoseFSAssembly(), e);
   if (!progPartPose) { error = "Cockpit part pose shader: " + e; return false; }
+  poseRevision.clear(); poseMeshes = {};   // a newly linked pose program must populate the texture again
   return true;
 }
 
@@ -224,7 +231,9 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
            && (hullTri.empty() || fread(hullTri.data(), sizeof(float), hullTri.size(), f) == hullTri.size())
            && (partBlob.empty() || fread(partBlob.data(), sizeof(uint32_t), partBlob.size(), f) == partBlob.size());
       fclose(f);
-      if (!ok) { vb.clear(); ib.clear(); hullTri.clear(); partBlob.clear(); }
+      ok = ok && aircraftMesh::valid(vb, ib) && aircraftMesh::validBlob(partBlob);
+      for (float x : hullTri) ok = ok && aircraftMesh::finite(x);
+      if (!ok) { vb.clear(); ib.clear(); hullTri.clear(); partBlob.clear(); std::error_code ec; std::filesystem::remove(path, ec); }
       else if (getenv("HULLDBG")) printf("mesh %s: from the cache (%zu vertices)\n", inside ? "cockpit" : "outside", vb.size() / 8);
     }
   }
@@ -236,13 +245,9 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     const int ns = (int)st.size();
     std::vector<float> sps(128 * 4, 0.f), sct(128 * 4, 0.f), swr(128 * 4, 0.f), swr2(128 * 4, 0.f);
     for (int i = 0; i < ns; i++) for (int c = 0; c < 4; c++) { sps[i * 4 + c] = st[i].ps[c]; sct[i * 4 + c] = st[i].ctl[c]; swr[i * 4 + c] = st[i].wr[c]; swr2[i * 4 + c] = st[i].wr2[c]; }
-    glUniform1i(U(progHullBake, "uHStN"), ns);
-    glUniform4fv(U(progHullBake, "uHStPS"), 128, sps.data());
-    glUniform4fv(U(progHullBake, "uHStCtl"), 128, sct.data());
-    glUniform4fv(U(progHullBake, "uHStWr"), 128, swr.data());
-    glUniform4fv(U(progHullBake, "uHStWr2"), 128, swr2.data());
-    auto mode = [&](int m, int s) { glUniform1i(U(progHullBake, "uHMode"), m); glUniform1i(U(progHullBake, "uHState"), s); };
-    glUniform1i(U(progHullBake, "uHPart"), -2);   // the airframe without its rigid parts: they are meshes of their own (below)
+    beginHullBake(fp, ns, sps.data(), sct.data(), swr.data(), swr2.data());
+    auto mode = [&](int m, int s) { hullBakeMode = m; hullBakeState = s; };
+    hullBakePart = -2;   // airframe without rigid parts: those are separate meshes below
     const float slack = 1.3f;   // the field may overstate distances by up to ~25%
     float L = M[0], span = M[9 * 4];
     float br = std::max(L, span * 2.f) * 0.55f + 1.5f;
@@ -381,6 +386,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         std::vector<float> xn; mode(3, 0); hullEval4(xpt, xn);
         std::vector<double> A(vpos.size() * 6, 0.0), B(vpos.size() * 3, 0.0);
         for (size_t i = 0; i < xpt.size(); i++) {
+          if (!aircraftMesh::normalValid(&xn[i * 4])) continue;
           const int q = xv[i]; const vec3 c = vpos[q], pp = xpt[i] - c;
           const double nx = xn[i * 4], ny = xn[i * 4 + 1], nz = xn[i * 4 + 2], nd = nx * pp.x + ny * pp.y + nz * pp.z;
           double* a = &A[q * 6]; a[0] += nx * nx; a[1] += nx * ny; a[2] += nx * nz; a[3] += ny * ny; a[4] += ny * nz; a[5] += nz * nz;
@@ -408,8 +414,9 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       std::vector<float> vn, d4;
       for (int it = 0; it < 3; it++) {
         mode(3, 0); hullEval4(vpos, vn);
-        mode(2, 0); hullEval4(vpos, d4);
+        mode(1, 0); hullEval4(vpos, d4);
         for (size_t q = 0; q < vpos.size(); q++) {
+          if (!aircraftMesh::normalValid(&vn[q * 4]) || !aircraftMesh::finite(d4[q * 4])) continue;
           vec3 p = vpos[q] - vec3(vn[q * 4], vn[q * 4 + 1], vn[q * 4 + 2]) * std::max(-h, std::min(h, d4[q * 4] - iso));
           const float m = 0.25f * h;
           float lo[3] = {org + vcube[q * 3] * h - m, org + vcube[q * 3 + 1] * h - m, org + vcube[q * 3 + 2] * h - m};
@@ -418,7 +425,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         }
       }
       mode(3, 0); hullEval4(vpos, vn);
-      mode(2, 0); hullEval4(vpos, d4);
+      mode(2, 0); hullEval4(vpos, d4, &vn);
       if (getenv("HULLDBG")) {   // how far off the surface the vertices still sit
         int n2mm = 0, n5mm = 0; float mx = 0.f;
         for (size_t q = 0; q < vpos.size(); q++) { float a = fabsf(d4[q * 4] - iso); mx = std::max(mx, a); if (a > 0.002f) n2mm++; if (a > 0.005f) n5mm++; }
@@ -468,6 +475,12 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     std::vector<float> vbF(vb.begin() + fineV * 8, vb.end()); vb.resize(fineV * 8);
     std::vector<uint32_t> ibF(ib.begin() + fineStart, ib.end()); ib.resize(fineStart);
     for (uint32_t& i : ibF) i -= (uint32_t)fineV;
+    if (!aircraftMesh::pruneDegenerate(vb, ib) || !aircraftMesh::pruneDegenerate(vbF, ibF)
+        || !aircraftMesh::compact(vb, ib) || !aircraftMesh::compact(vbF, ibF)
+        || !aircraftMesh::repairNormals(vb, ib) || !aircraftMesh::repairNormals(vbF, ibF)
+        || !aircraftMesh::valid(vb, ib) || !aircraftMesh::valid(vbF, ibF)) {
+      fprintf(stderr, "Rejected invalid aircraft surface before simplification; using SDF fallback\n"); return;
+    }
     std::thread simpStatic([&vb, &ib, inside] { size_t e = ib.size(); simplifyMesh(vb, ib, e, inside ? 0.0004f : 0.001f, 0.04f, inside ? 0.f : 0.5f); });   // (outside, no edge over half a metre: mesh_simplify.h)
     std::thread simpFine([&vbF, &ibF] { size_t e = ibF.size(); simplifyMesh(vbF, ibF, e, 0.0004f); });
     // ---- the hull of what moves: the moving 6.25 cm cells, each grown by one cell, as faces on the fine lattice (a
@@ -501,15 +514,16 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     // (each part meshed here is simplified on a thread of its own and added to the blob once all are done, in order)
     struct PartOut { int type; std::vector<float> vb; std::vector<uint32_t> ib; size_t raw; float sx, sy; };
     std::vector<std::unique_ptr<PartOut>> partOut; std::vector<std::thread> partSimp;
+    bool partsValid = true;
     {
-      PartInst pl[kMaxPartInst]; const int np = partList(M, inside, pl);
+      PartInst pl[kMaxPartInst]; const int np = partList(M, inside, pl, fp.plane.model);
       std::vector<int> done;
       for (int pi = 0; pi < np; pi++) {
         const int type = pl[pi].type;
         if (std::find(done.begin(), done.end(), type) != done.end()) continue;
         done.push_back(type);
-        glUniform1i(U(progHullBake, "uHPart"), type);
-        glUniform2f(U(progHullBake, "uHPartSide"), pl[pi].sx, pl[pi].sy);
+        hullBakePart = type;
+        hullBakeSideX = pl[pi].sx; hullBakeSideY = pl[pi].sy;
         // its box: a control surface's from the model's numbers (6 mm lattice: seen from metres away); a cockpit
         // part's from a 1 cm survey of +-0.35 m about its own origin (2 mm lattice: seen from arm's length)
         vec3 lo(1e9f, 1e9f, 1e9f), hi(-1e9f, -1e9f, -1e9f);
@@ -571,8 +585,9 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         std::vector<float> pn, p4;
         for (int it = 0; it < 3; it++) {
           mode(3, 0); hullEval4(vp, pn);
-          mode(2, 0); hullEval4(vp, p4);
+          mode(1, 0); hullEval4(vp, p4);
           for (size_t q = 0; q < vp.size(); q++) {
+            if (!aircraftMesh::normalValid(&pn[q * 4]) || !aircraftMesh::finite(p4[q * 4])) continue;
             vec3 x = vp[q] - vec3(pn[q * 4], pn[q * 4 + 1], pn[q * 4 + 2]) * std::max(-h, std::min(h, p4[q * 4]));
             const float m = 0.25f * h;
             float l0 = lo.x + vc[q * 3] * h - m, l1 = lo.y + vc[q * 3 + 1] * h - m, l2 = lo.z + vc[q * 3 + 2] * h - m;
@@ -581,7 +596,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
           }
         }
         mode(3, 0); hullEval4(vp, pn);
-        mode(2, 0); hullEval4(vp, p4);
+        mode(2, 0); hullEval4(vp, p4, &pn);
         std::vector<float> pvb(vp.size() * 8); std::vector<uint32_t> pib;
         for (size_t q = 0; q < vp.size(); q++) {
           float* o = &pvb[q * 8];
@@ -604,17 +619,33 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
           if ((v0 < 0.f) != (C(i, j, k + 1) < 0.f) && cubeAt(i - 1, j, k, b) && cubeAt(i - 1, j - 1, k, c) && cubeAt(i, j - 1, k, dq)) quad(a, b, c, dq);
         }
         if (pib.empty()) continue;
+        if (!aircraftMesh::pruneDegenerate(pvb, pib) || !aircraftMesh::compact(pvb, pib)
+            || !aircraftMesh::repairNormals(pvb, pib) || !aircraftMesh::valid(pvb, pib)) {
+          partsValid = false; break;   // join the outstanding workers before rejecting this bake
+        }
         if (getenv("HULLDBG")) printf("mesh part %d: %d x %d x %d lattice, %zu vertices, %zu triangles\n", type, nx, ny, nz, vp.size(), pib.size() / 3);
         // simplified as the airframe is (the cockpit's controls to 0.3 mm, the exterior's parts to 0.8 mm)
         partOut.push_back(std::make_unique<PartOut>(PartOut{type, std::move(pvb), std::move(pib), 0, pl[pi].sx, pl[pi].sy}));
         PartOut* po = partOut.back().get(); po->raw = po->ib.size() / 3;
+        // Bound concurrent simplifiers (static/fine plus at most two part workers).
+        if (partSimp.size() >= 2) { partSimp.front().join(); partSimp.erase(partSimp.begin()); }
         partSimp.emplace_back([po, inside] { size_t pe = po->ib.size(); simplifyMesh(po->vb, po->ib, pe, inside ? 0.0003f : 0.0008f); });
       }
-      glUniform1i(U(progHullBake, "uHPart"), -1);
+      hullBakePart = -1;
     }
     simpStatic.join(); simpFine.join();
+    if (!partsValid || !aircraftMesh::valid(vb, ib) || !aircraftMesh::valid(vbF, ibF)) {
+      for (auto& th : partSimp) th.join();
+      fprintf(stderr, "Rejected invalid aircraft surface or part; using SDF fallback\n"); return;
+    }
     fineStart = (uint32_t)ib.size();
     { const uint32_t off = (uint32_t)(vb.size() / 8); vb.insert(vb.end(), vbF.begin(), vbF.end()); for (uint32_t i : ibF) ib.push_back(i + off); }
+    // Nightjar's near-eye overhead plate: keep the simplified triangles local so the
+    // existing vertex-log depth cannot place the roof beyond it in front. No shader/depth change.
+    if (inside && pv.model == kNightjar && int(M[21*4+2] + .5f) == 2) {
+      const size_t added = aircraftMesh::boundOverheadEdges(vb, ib, fineStart, M + 22*4);
+      if (getenv("HULLDBG")) printf("mesh Nightjar overhead: added %zu local triangles\n", added);
+    }
     // ---- the cabin's flat faces, flat: a vertex at the foot of a rounded edge carries the bend's turned normal, and
     // across the simplified mesh's large flat triangles it smeared a band of the bend over the face - on the XR-40's
     // polished titanium the fixtures' highlights broke into a sawtooth along the edges (an armrest display's mount,
@@ -632,9 +663,9 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         const vec3 m = (A + B + Cc) * (1.f / 3.f);
         smp[t * 4] = m; smp[t * 4 + 1] = (m + A) * 0.5f; smp[t * 4 + 2] = (m + B) * 0.5f; smp[t * 4 + 3] = (m + Cc) * 0.5f;
       }
-      glUniform1i(U(progHullBake, "uHPart"), -2);   // (the field the airframe's mesh was laid from)
+      hullBakePart = -2;   // (the field the airframe's mesh was laid from)
       std::vector<float> cn; mode(3, 0); hullEval4(smp, cn);
-      glUniform1i(U(progHullBake, "uHPart"), -1);
+      hullBakePart = -1;
       const float flatCos = cosf(2.f * DEG), keepCos = cosf(1.5f * DEG);
       int nFlat = 0;
       for (size_t t = 0; t < nt; t++) {
@@ -645,7 +676,10 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         for (int k = 0; k < 4 && flat; k++) {
           const float* g = &cn[(t * 4 + k) * 4];
           const float gl = sqrtf(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
-          flat = g[0] * f.x + g[1] * f.y + g[2] * f.z >= flatCos * gl;
+          const float* center = &cn[t * 16];
+          const float centerL = sqrtf(center[0]*center[0]+center[1]*center[1]+center[2]*center[2]);
+          flat = gl > 0.5f && centerL > 0.5f && g[0] * f.x + g[1] * f.y + g[2] * f.z >= flatCos * gl
+                 && g[0]*center[0]+g[1]*center[1]+g[2]*center[2] >= cosf(0.25f*DEG)*gl*centerL;
         }
         if (!flat) continue;
         bool off = false;
@@ -661,7 +695,11 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       }
       if (getenv("HULLDBG")) printf("mesh cockpit: %d of %zu triangles flat-shaded\n", nFlat, nt);
     }
+    aircraftMesh::compact(vb, ib);
     for (auto& th : partSimp) th.join();
+    for (const auto& po : partOut) if (!aircraftMesh::valid(po->vb, po->ib)) {
+      fprintf(stderr, "Rejected invalid simplified aircraft part; using SDF fallback\n"); return;
+    }
     // ---- a part's sharp edges, sharp: a vertex on a crease (the XR-40's octagonal pod shells, 45 degrees between
     // facets) carries the field's normal there - one facet's, the other's or between - and across the simplified
     // mesh's long triangles it smeared over the facets beside it: lit by the sky, the pods' tops came out crumpled. Each
@@ -678,14 +716,14 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         const vec3 m = (P[0] + P[1] + P[2]) * (1.f / 3.f);
         for (int k = 0; k < 3; k++) smp[t * 3 + k] = P[k] + (m - P[k]) * 0.2f;
       }
-      glUniform1i(U(progHullBake, "uHPart"), po->type); glUniform2f(U(progHullBake, "uHPartSide"), po->sx, po->sy);
+      hullBakePart = po->type; hullBakeSideX = po->sx; hullBakeSideY = po->sy;
       std::vector<float> cn; mode(3, 0); hullEval4(smp, cn);
       const float creaseCos = cosf(12.f * DEG);
       int nCr = 0;
       for (size_t c = 0; c < nt * 3; c++) {
         const float* g = &cn[c * 4];
         const float gl = sqrtf(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
-        if (gl < 1e-6f) continue;
+        if (!aircraftMesh::normalValid(g) || gl < 1e-6f) continue;
         float v[8]; memcpy(v, &po->vb[(size_t)po->ib[c] * 8], sizeof v);
         if (v[3] * g[0] + v[4] * g[1] + v[5] * g[2] >= creaseCos * gl) continue;
         v[3] = g[0] / gl; v[4] = g[1] / gl; v[5] = g[2] / gl;
@@ -695,7 +733,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       }
       if (getenv("HULLDBG")) printf("mesh part %d: %d corners on creases\n", po->type, nCr);
     }
-    glUniform1i(U(progHullBake, "uHPart"), -1);
+    hullBakePart = -1;
     for (auto& po : partOut) {
       partBlob.push_back((uint32_t)po->type); partBlob.push_back((uint32_t)po->vb.size()); partBlob.push_back((uint32_t)po->ib.size());
       size_t at = partBlob.size(); partBlob.resize(at + po->vb.size());
@@ -709,18 +747,30 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       printf("mesh %s: %d states, %zu band cells (%d moving, %d thin), %zu lattice samples, %zu vertices, %zu triangles, moving hull %zu triangles\n",
              inside ? "cockpit" : "outside", ns, cand.size(), nmov, nThin, nLattice, vb.size() / 8, ib.size() / 3, hullTri.size() / 9);
     }
-    if (!path.empty()) {   // (the eye flag rides at the end of the hull's floats)
-      if (FILE* f = fopen(path.c_str(), "wb")) {
+    bool valid = aircraftMesh::valid(vb, ib) && aircraftMesh::validBlob(partBlob);
+    for (float x : hullTri) valid = valid && aircraftMesh::finite(x);
+    if (!valid) {
+      // The map entry remains a failed bake, so this session uses the SDF fallback rather
+      // than uploading invalid data or entering a rebuild loop every frame.
+      fprintf(stderr, "Rejected invalid aircraft mesh %016llx; using SDF fallback\n", (unsigned long long)key);
+      PM.ok = false; return;
+    }
+    if (!path.empty()) {   // atomic publication: never replace a valid cache with a partial file
+      const std::string tmp = path + ".tmp." + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+      if (FILE* f = fopen(tmp.c_str(), "wb")) {
         uint32_t hdr[6] = {kMeshMagic, (uint32_t)vb.size(), (uint32_t)ib.size(), (uint32_t)hullTri.size(), fineStart, (uint32_t)partBlob.size()};
-        fwrite(hdr, sizeof hdr, 1, f);
-        if (!vb.empty()) fwrite(vb.data(), sizeof(float), vb.size(), f);
-        if (!ib.empty()) fwrite(ib.data(), sizeof(uint32_t), ib.size(), f);
-        if (!hullTri.empty()) fwrite(hullTri.data(), sizeof(float), hullTri.size(), f);
-        if (!partBlob.empty()) fwrite(partBlob.data(), sizeof(uint32_t), partBlob.size(), f);
-        fclose(f);
+        bool ok = fwrite(hdr, sizeof hdr, 1, f) == 1;
+        if (!vb.empty()) ok = ok && fwrite(vb.data(), sizeof(float), vb.size(), f) == vb.size();
+        if (!ib.empty()) ok = ok && fwrite(ib.data(), sizeof(uint32_t), ib.size(), f) == ib.size();
+        if (!hullTri.empty()) ok = ok && fwrite(hullTri.data(), sizeof(float), hullTri.size(), f) == hullTri.size();
+        if (!partBlob.empty()) ok = ok && fwrite(partBlob.data(), sizeof(uint32_t), partBlob.size(), f) == partBlob.size();
+        ok = fclose(f) == 0 && ok;
+        if (ok) { std::error_code ec; std::filesystem::rename(tmp, path, ec); if (ec) std::filesystem::remove(tmp, ec); }
+        else { std::error_code ec; std::filesystem::remove(tmp, ec); }
       }
     }
   }
+
   // ---- to the GPU: the mesh, and the moving hull under its own key in the hull table
   if (!PM.vao) glGenVertexArrays(1, &PM.vao);
   if (!PM.vbo) glGenBuffers(1, &PM.vbo);
@@ -777,15 +827,36 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
 // traffic aircraft's (by its own controls), four texels an instance (R's columns, T), drawn by kPartPoseFS from the
 // aircraft's uniforms or its traffic row
 void Renderer::computePartPoses(const FrameParams& fp, const PlaneMesh* player, const PlaneMesh* const* traffic) {
+  if (!progPartPose) {
+    for (auto& o : poseOwner) o = PoseOwner();
+    poseType.clear(); poseRevision.clear(); poseMeshes = {};
+    return;
+  }
+  std::vector<float> revision;
+  auto addRevision = [&](const float* p, size_t n) { revision.insert(revision.end(), p, p + n); };
+  if (player) {
+    addRevision(fp.plane.M, 96); addRevision(fp.plane.PS, 4); addRevision(fp.plane.Ctl, 4);
+    addRevision(fp.plane.wheel, 3); addRevision(fp.plane.flame, 4); addRevision(&fp.plane.wr[0][0], 28);
+    revision.push_back((float)fp.plane.model);
+    float foot[4],seat[2];modelCabinFit(fp.plane.model,fp.plane.M[21*4+3],foot,seat);addRevision(foot,4);addRevision(seat,2);
+    float cockpit[36];packCockpitLayout(fp.plane.model,cockpit);addRevision(cockpit,36);
+  }
+  const int tn = std::clamp(fp.trafficN, 0, kMaxTrafficDrawn);
+  for (int k = 0; k < tn; k++) addRevision(fp.traffic[k].t, 128);
+  std::array<const PlaneMesh*, 1 + kMaxTrafficDrawn> meshes = {}; meshes[0] = player;
+  for (int k = 0; k < tn; k++) meshes[k + 1] = traffic ? traffic[k] : nullptr;
+  if (revision == poseRevision && meshes == poseMeshes) return;
+  poseRevision.swap(revision); poseMeshes = meshes;
   for (auto& o : poseOwner) o = PoseOwner();
   poseType.clear();
-  if (!progPartPose) return;
   std::vector<float> info;
   auto add = [&](int owner, const PlaneMesh* pm, const float* M, bool inside) {
     if (!pm || pm->parts.empty()) return;
-    PartInst pl[kMaxPartInst]; const int np = partList(M, inside, pl);
+    PartInst pl[kMaxPartInst]; const int np = partList(M, inside, pl, owner==0?fp.plane.model:-1);
+    std::stable_sort(pl, pl + np, [](const PartInst& a, const PartInst& b) { return a.type < b.type; });
     PoseOwner& O = poseOwner[owner]; O.pm = pm; O.base = (int)poseType.size(); O.n = 0;
     for (int i = 0; i < np && (int)poseType.size() < kMaxPoseInst; i++) {
+      if (owner == 0 && pl[i].type == 23 && fp.plane.wr[6][0] <= 0.f) continue;
       bool have = false; for (auto& P : pm->parts) have = have || P.type == pl[i].type;
       if (!have) continue;
       poseType.push_back(pl[i].type); O.n++;
@@ -793,7 +864,7 @@ void Renderer::computePartPoses(const FrameParams& fp, const PlaneMesh* player, 
     }
   };
   add(0, player, fp.plane.M, fp.plane.PS[3] > 0.5f);
-  for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); k++) if (traffic && traffic[k]) add(k + 1, traffic[k], fp.traffic[k].t, false);
+  for (int k = 0; k < tn; k++) if (traffic && traffic[k]) add(k + 1, traffic[k], fp.traffic[k].t, false);
   const int n = (int)poseType.size();
   if (!n) { for (auto& o : poseOwner) o = PoseOwner(); return; }
   if (!texPartPose) {
@@ -829,12 +900,18 @@ void Renderer::drawPlaneParts(const PlaneMesh& pm, GLuint prog, int trafK) {
   const PoseOwner& O = poseOwner[trafK + 1];
   if (O.pm != &pm || !O.n) return;
   glActiveTexture(GL_TEXTURE0 + 30); glBindTexture(GL_TEXTURE_2D, texPartPose); glUniform1i(U(prog, "uPartPose"), 30);
-  for (int i = O.base; i < O.base + O.n; i++) {
-    const PartMesh* P = nullptr; for (auto& q : pm.parts) if (q.type == poseType[i]) P = &q;
-    if (!P || !P->idx) continue;
-    glUniform1i(U(prog, "uPartInst"), i);
-    glBindVertexArray(P->vao);
-    glDrawElements(GL_TRIANGLES, P->idx, GL_UNSIGNED_INT, nullptr);
+  for (int i = O.base; i < O.base + O.n;) {
+    const int type = poseType[i]; int end = i + 1;
+    while (end < O.base + O.n && poseType[end] == type) end++;
+    const PartMesh* P = nullptr; for (auto& q : pm.parts) if (q.type == type) P = &q;
+    if (P && P->idx) {
+      glUniform1i(U(prog, "uPartInst"), i);
+      glBindVertexArray(P->vao);
+      static const bool single = getenv("PARTNOINST") != nullptr;   // deterministic A/B of identical poses and order
+      if (single) for (int k = i; k < end; k++) { glUniform1i(U(prog, "uPartInst"), k); glDrawElements(GL_TRIANGLES, P->idx, GL_UNSIGNED_INT, nullptr); }
+      else glDrawElementsInstanced(GL_TRIANGLES, P->idx, GL_UNSIGNED_INT, nullptr, end - i);
+    }
+    i = end;
   }
   glUniform1i(U(prog, "uPartInst"), -1);
   glBindVertexArray(pm.vao);

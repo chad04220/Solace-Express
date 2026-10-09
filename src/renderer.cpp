@@ -1,5 +1,7 @@
 // Solace Express - OpenGL renderer: deferred rasterizer + sprites + post + UI
 #include "renderer.h"
+#include "models.h"
+#include "mesh_validation.h"
 #include "materials.h"
 #include "shaders.h"
 #include "weather.h"
@@ -51,7 +53,7 @@ static GLuint compile(GLenum type, const std::string& src, std::string& err) {
   glShaderSource(s, 1, &c, nullptr);
   glCompileShader(s);
   GLint ok = 0; glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
-  if (!ok) { char log[8192]; glGetShaderInfoLog(s, sizeof(log), nullptr, log); err += log; return 0; }
+  if (!ok) { char log[8192]; glGetShaderInfoLog(s, sizeof(log), nullptr, log); err += log; glDeleteShader(s); return 0; }
   return s;
 }
 // ------------------------------------------------------------------ shader program cache
@@ -172,6 +174,8 @@ static GLuint linkOnce(const std::string& vs, const std::string& fs, std::string
     fprintf(stderr, "shader %6.1f s  fs %7zu bytes  %s\n", std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), fs.size(), tag.c_str());
   }
   if (!ok) { char log[8192]; glGetProgramInfoLog(p, sizeof(log), nullptr, log); err += log; glDeleteProgram(p); glDeleteShader(v); glDeleteShader(f); reject(); return 0; }
+  // The linked executable survives detachment; release shader compiler objects before the next program.
+  glDetachShader(p, v); glDetachShader(p, f);
   glDeleteShader(v); glDeleteShader(f);
   g_shaderCacheMisses++;
   compileLog("built " + what + " in " + secs());
@@ -215,7 +219,8 @@ static std::string programName(const std::string& fs) {   // (the build stage, o
   for (size_t k; (k = t.find("  ")) != std::string::npos;) t.erase(k, 1);
   return t;
 }
-GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err) {
+GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err, bool* usedSafeGear) {
+  if (usedSafeGear) *usedSafeGear = false;
   bool before = false;
   const size_t err0 = err.size();
   const std::string name = programName(fs);
@@ -233,6 +238,7 @@ GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::stri
   if (p) {
     shaderNote("Shader [" + name + "]: the driver's compiler failed" + when + " - built without the retractable gear in the airframe's field\n  " + why);
     err.resize(err0);
+    if (usedSafeGear) *usedSafeGear = true;
     return p;
   }
   s_safeUseless = true;
@@ -244,7 +250,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
+  for (const char* src : {kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -255,8 +261,8 @@ std::string shaderCacheStamp() {
 // normals and cabin occlusion, the bake's own main) and the driver, so an update that changes the terrain, the
 // lighting or the UI keeps every built body (each costs seconds on the GPU; a launch builds about twenty)
 std::string meshCacheStamp() {
-  uint64_t h = 1469598103934665603ull;
-  for (const char* src : {kCommonGLSL, kRtIO, kViewUniforms, kSceneUniforms, kPlaneCommon, kPlaneParts, kPlaneSDF, kPlaneTrace, kWraithSDF, kWraithCockpitCommon, kWraithCockpitSDF, kHullBakeMain}) h = fnv1a(src, h);
+  uint64_t h = fnv1a(aircraftMesh::kAlgorithmManifest, 1469598103934665603ull);
+  for (const char* src : {kCommonGLSL, kRtIO, kViewUniforms, kSceneUniforms, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kWraithSDF, kWraithCockpitCommon, kWraithCockpitSDF, kHullBakeMain}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -608,7 +614,10 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel) {
   glUniform4fv(U(p, "uI0"), 1, pv.I0); glUniform4fv(U(p, "uI1"), 1, pv.I1); glUniform4fv(U(p, "uI2"), 1, pv.I2);
   glUniform1f(U(p, "uTime"), fp.time); glUniform1i(U(p, "uCraterN"), 0);
   glUniform4f(U(p, "uDispMode"), panel ? 1.f : 0.f, (float)fp.dispCk, 0, 0);
-  glUniform1i(U(p, "uDisplayEngines"), pv.model == kMantis ? 1 : 2);
+  glUniform1i(U(p, "uDisplayEngines"), pv.model>=0 && pv.model<=kWraith?kAircraft[pv.model].engines:2);
+  glUniform1i(U(p, "uDisplayRetract"), pv.model>=0 && pv.model<=kWraith ? (kAircraft[pv.model].retract?1:0) : (pv.M[1]>=3.f?1:0));
+  glUniform1i(U(p, "uDisplayPiston"), pv.model>=0 && pv.model<=kWraith && kAircraft[pv.model].engineType==ENG_PISTON?1:0);
+  glUniform4fv(U(p, "uEngineHealth"), 1, pv.engineHealth);
   glUniform4fv(U(p, "uFlame"), 1, pv.flame);
   glUniform2f(U(p, "uDispRes"), (float)w, (float)h);
   glBindVertexArray(vaoEmpty);
@@ -948,8 +957,13 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
     glActiveTexture(GL_TEXTURE0 + 7); glBindTexture(GL_TEXTURE_2D, texTraffic);
-    int n = std::min(fp.trafficN, kMaxTrafficDrawn);
-    if (n > 0) glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 32, n, GL_RGBA, GL_FLOAT, fp.traffic[0].t);
+    int n = std::clamp(fp.trafficN, 0, kMaxTrafficDrawn);
+    const size_t bytes = (size_t)n * sizeof(TrafficVisual);
+    if (n > 0 && (trafficUploadN != n || memcmp(trafficUpload.data(), fp.traffic, bytes) != 0)) {
+      glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 32, n, GL_RGBA, GL_FLOAT, fp.traffic[0].t);
+      memcpy(trafficUpload.data(), fp.traffic, bytes);
+    }
+    trafficUploadN = n;
     glUniform1i(U(p, "uTraffic"), 7); glUniform1i(U(p, "uTrafficN"), n);
   }
   glUniform1i(U(p, "uUfoOn"), fp.ufoOn ? 1 : 0);
@@ -1009,6 +1023,9 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
     glUniform3f(U(p, "uPlanePos"), pv.pos.x, pv.pos.y, pv.pos.z);
     glUniformMatrix3fv(U(p, "uPlaneRot"), 1, GL_FALSE, pv.rot);
     glUniform4fv(U(p, "uM"), 24, pv.M);
+    float footFit[4],seatFit[2];modelCabinFit(pv.model,pv.M[21*4+3],footFit,seatFit);
+    glUniform4fv(U(p,"uCabinFootFit"),1,footFit);glUniform2f(U(p,"uCabinSeatFit"),seatFit[0],seatFit[1]);
+    float cockpit[36];packCockpitLayout(pv.model,cockpit);glUniform4fv(U(p,"uCockpitLayout"),9,cockpit);
     glUniform4fv(U(p, "uPS"), 1, pv.PS); glUniform4fv(U(p, "uCtl"), 1, pv.Ctl); glUniform4fv(U(p, "uPr"), 1, pv.Pr); glUniform3f(U(p, "uWheel"), pv.wheel[0], pv.wheel[1], pv.wheel[2]); glUniform1i(U(p, "uModelId"), pv.model);
     glUniform4fv(U(p, "uI0"), 1, pv.I0); glUniform4fv(U(p, "uI1"), 1, pv.I1); glUniform4fv(U(p, "uI2"), 1, pv.I2);
     glUniform3f(U(p, "uColBase"), pv.colBase.x, pv.colBase.y, pv.colBase.z);
@@ -1045,6 +1062,13 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUniform1f(U(p, "uLandLight"), fp.landLight);
   glUniform4fv(U(p, "uFlame"), 1, pv.flame);
   glUniform4fv(U(p, "uVapor"), 1, pv.vapor);
+  glUniform1i(U(p, "uExhaustCount"), pv.exhaust.count);
+  if (pv.exhaust.count > 0) {
+    glUniform4fv(U(p, "uExhaustExit"), pv.exhaust.count, pv.exhaust.exit[0]);
+    glUniform4fv(U(p, "uExhaustAxis"), pv.exhaust.count, pv.exhaust.axis[0]);
+    glUniform4fv(U(p, "uExhaustPower"), pv.exhaust.count, pv.exhaust.power[0]);
+    glUniform1iv(U(p, "uExhaustEngine"), pv.exhaust.count, pv.exhaust.engine);
+  }
   glUniform1i(U(p, "uLensN"), pv.lensN);
   if (pv.lensN) { glUniform4fv(U(p, "uLensP"), pv.lensN, &pv.lensP[0][0]); glUniform4fv(U(p, "uLensC"), pv.lensN, &pv.lensC[0][0]); glUniform4fv(U(p, "uLensD"), pv.lensN, &pv.lensD[0][0]); }
   glUniform4fv(U(p, "uWr"), 7, &pv.wr[0][0]);
@@ -1173,7 +1197,7 @@ void Renderer::feedEffects(const FrameParams& f) {
   glBindFramebuffer(GL_FRAMEBUFFER, fboComp);   // (writes the lit colour)
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
   glViewport(0, 0, rw, rh);
-  drawSprites(f, (float)kFeedMaxW, (float)kFeedMaxH, 1.f, 1.f);
+  drawSprites(f, (float)allocW, (float)allocH, 1.f, 1.f);
   if (f.pano > 0.f) return;   // (the light shafts work in a flat picture)
   float rsx = 0, rsy = 0; vec3 rsp = f.camPos + f.sunDir * 10000.f;
   bool sunFront = dot(f.sunDir, -f.camBack) > 0.f && project(f, rsp, rsx, rsy);
@@ -1189,7 +1213,7 @@ void Renderer::feedEffects(const FrameParams& f) {
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texRaw); glUniform1i(U(progRayMask, "uScene"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progRayMask, "uDepthTex"), 1);
   glUniform2f(U(progRayMask, "uSun"), sunUV.x, sunUV.y); glUniform1f(U(progRayMask, "uAsp"), (float)W / H);
-  glUniform2f(U(progRayMask, "uUVS"), (float)rw / kFeedMaxW, (float)rh / kFeedMaxH);
+  glUniform2f(U(progRayMask, "uUVS"), (float)rw / allocW, (float)rh / allocH);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glBindFramebuffer(GL_FRAMEBUFFER, fboRay[1]);
   glUseProgram(progRay);
@@ -1271,7 +1295,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   // ------------------------------------------------ temporal AA resolve (before the sprites: particles never smear)
   {
     int cur = histIdx ^ 1;
-    if (length(fp.camPos - prevCamPos) > 400.f) histValid = false;   // camera cut
+    if (length(fp.camPos - prevCamPos) > 400.f || fabsf(fp.fovY - prevFovY) > 1e-5f) histValid = false;   // camera cut
     glBindFramebuffer(GL_FRAMEBUFFER, fboTAA[cur]);
     glDrawBuffers(2, bufs);
     glViewport(0, 0, W, H);
@@ -1300,7 +1324,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     glUniformMatrix3fv(U(progTAA, "uPrevPlaneRot"), 1, GL_FALSE, prevPlaneRot);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     histIdx = cur; histValid = true;
-    prevCamPos = fp.camPos; memcpy(prevCamRot, cr, sizeof cr);
+    prevFovY = fp.fovY; prevCamPos = fp.camPos; memcpy(prevCamRot, cr, sizeof cr);
     if (pv2.on) { prevPlanePos = pv2.pos; memcpy(prevPlaneRot, pv2.rot, sizeof prevPlaneRot); }
   }
 

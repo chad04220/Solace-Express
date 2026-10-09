@@ -766,3 +766,7 @@ Research craft (the research terminal only):
 Gaps worth filling: a light-sport two-seater below the Kestrel, a 19-seat turboprop commuter, a medium business jet or
 small regional jet, an agricultural or utility taildragger. Not possible without new physics: floats and amphibians
 (no water handling), biplanes (one wing only), gliders (an engine is assumed).
+
+## Authored cockpit interiors
+
+See [Cockpit interiors](COCKPIT_INTERIORS.md) for the bounded layout records, CPU/shader fit contract, rigid-control families, live display mapping and representative-crew verification. Preserve the latest exterior and gear definitions when changing cabin data.

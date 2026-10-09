@@ -72,7 +72,7 @@ void buildStory() {
              "On downwind reduce power to about 60% and set one notch of flaps ({flapsDown}).",
              "Turn final, add full flaps ({flapsDown}), and follow the PAPI lights: two white, two red is on glidepath.",
              "Reduce power to idle over the threshold, then gently raise the nose to flare just above the runway.",
-             "Brake ({parkingBrake}) to a full stop to complete the lesson."});
+             "Hold {brake} to brake to a full stop and complete the lesson."});
     add(s); }
   { S s("L3", 0, CT_LESSON, "MDB", "HFS", "Lesson 3: Cross-Country to Harlan Farm");
     s.lesson().pay(300).wx(W(200, 7, 3, 0.15f, 0.35f, 3500, 30, 0, false, 13.0f))
@@ -84,7 +84,7 @@ void buildStory() {
              "Watch your fuel gauge and the distance readout. Press {gpsMap} to view the map.",
              "Harlan Farm runway 17 is short: slow to 60 kt, full flaps, aim for the very start of the strip.",
              "Flare gently and get the wheels down early.",
-             "Full stop with brakes ({parkingBrake}) to finish."});
+             "Hold {brake} to brake to a full stop and finish."});
     add(s); }
   { S s("L4", 0, CT_LESSON, "HFS", "ORC", "Checkride: Private Pilot License");
     s.lesson().pay(400).grant(LIC_PPL).wx(W(330, 11, 5, 0.25f, 0.5f, 3000, 25, 0, false, 15.5f))
@@ -591,7 +591,7 @@ std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan
   if (J.src == SRC_OWNED) {
     int oi = ownedIndexFor(J.spec);
     if (p.fuel == LaunchPlan::FUEL_PURCHASED) {
-      if (p.fuelCostEst) { L.push_back({fmt("Fuel uplift at %s (%.0f kg)", g_world.airports[J.c.from].code, p.fuelUpliftKg), -p.fuelCostEst}); J.fuelBilledKg += p.fuelUpliftKg; }
+      if (p.fuelCostEst) { L.push_back({fmt("Fuel uplift at %s (%.0f kg)", g_world.airports[p.startAirport].code, p.fuelUpliftKg), -p.fuelCostEst}); J.fuelBilledKg += p.fuelUpliftKg; }
       if (oi >= 0 && r.fuelLeftKg >= 0) fleet[oi].fuel = std::clamp(r.fuelLeftKg, 0.f, s.maxFuel);
     } else {
       int fuelCost = (int)(r.fuelUsedKg * s.fuelPriceBase());
@@ -604,6 +604,7 @@ std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan
   J.jobClockMin += r.flightMin; J.legs++;
   J.maxG = std::max(J.maxG, r.maxG); J.minG = std::min(J.minG, r.minG); J.maxBank = std::max(J.maxBank, r.maxBank);
   J.patient = std::min(J.patient, r.patient); J.comfort = std::min(J.comfort, r.comfort);   // (the ride so far: the next leg starts from it)
+  J.surveyHistoryKnown = J.surveyHistoryKnown && r.surveyHistoryKnown;
   J.surveySec = std::max(J.surveySec, r.surveySec); J.surveyInSec = std::max(J.surveyInSec, r.surveyInSec);   // (the leg's are the job's whole so far)
   J.wpDone = std::max(J.wpDone, r.wpDone);
   if (J.c.fragile && (r.maxG > 2.0f || r.minG < 0.0f || (r.landed && fabsf(r.touchdownFpm) > 400))) J.fragileHit = true;
@@ -626,6 +627,7 @@ std::vector<PayoutLine> Career::settleJob(const FlightResult& r, const LaunchPla
   w.maxG = std::max(J.maxG, r.maxG); w.minG = std::min(J.minG, r.minG); w.maxBank = std::max(J.maxBank, r.maxBank);
   w.late = J.c.timeLimitMin > 0 && J.jobClockMin + r.flightMin > J.c.timeLimitMin;
   w.patient = std::min(J.patient, r.patient); w.comfort = std::min(J.comfort, r.comfort);
+  w.surveyHistoryKnown = J.surveyHistoryKnown && r.surveyHistoryKnown;
   {   // the survey band over every leg (the last leg's counters carry the earlier legs': the larger is the job's whole)
     float st = std::max(J.surveySec, r.surveySec), si = std::max(J.surveyInSec, r.surveyInSec);
     if (st > 1.f) w.surveyInBand = si / st;
@@ -642,8 +644,9 @@ std::vector<PayoutLine> Career::settleJob(const FlightResult& r, const LaunchPla
 }
 void Career::releaseJob() { job.reset(); refreshBoard(); }
 void Career::planFuel(LaunchPlan& e, const Contract& c, float fuelKg) const {
-  if (e.fuel != LaunchPlan::FUEL_PURCHASED) return;
   const AircraftSpec& s = kAircraft[e.spec];
+  e.fuelLoadKg = clampf(fuelKg, 0.f, s.maxFuel);
+  if (e.fuel != LaunchPlan::FUEL_PURCHASED) return;
   int oi = ownedIndexFor(e.spec);
   float have = oi >= 0 ? fleet[oi].fuel : 0.f;
   e.fuelUpliftKg = std::max(0.f, std::min(fuelKg, s.maxFuel) - have);
@@ -675,7 +678,7 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
   if (src == SRC_OWNED) {
     int oi = ownedIndexFor(si);
     if (plan && plan->fuel == LaunchPlan::FUEL_PURCHASED) {   // bought at the departure, as quoted; the tanks keep what is left
-      if (plan->fuelCostEst) L.push_back({fmt("Fuel uplift at %s (%.0f kg)", g_world.airports[c.from].code, plan->fuelUpliftKg), -plan->fuelCostEst});
+      if (plan->fuelCostEst) L.push_back({fmt("Fuel uplift at %s (%.0f kg)", g_world.airports[plan->startAirport].code, plan->fuelUpliftKg), -plan->fuelCostEst});
       if (oi >= 0 && r.fuelLeftKg >= 0) fleet[oi].fuel = std::clamp(r.fuelLeftKg, 0.f, s.maxFuel);
     } else {
       int fuelCost = (int)(r.fuelUsedKg * s.fuelPriceBase());
@@ -749,7 +752,9 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
         if (r.belowMinimumsUnaligned) { L.push_back({"Continued below minimums without the runway lined up", -c.payout * 25 / 100}); st--; reputation = std::max(0, reputation - 1); }
         else if (r.landed) L.push_back({"Approach flown to minimums", c.payout * 5 / 100});
       }
-      if (c.type == CT_SURVEY) {
+      if (c.type == CT_SURVEY && !r.surveyHistoryKnown)
+        L.push_back({"Survey altitude adjustment waived: older save has no altitude history", 0});
+      if (c.type == CT_SURVEY && r.surveyHistoryKnown) {
         int pct = (int)(clampf(r.surveyInBand, 0.f, 1.f) * 100.f + 0.5f);
         if (pct < 95) { L.push_back({fmt("Survey altitude held %d%% of the pattern", pct), -c.payout * (100 - pct) * 6 / 1000}); if (pct < 60) st--; }
         else L.push_back({"Survey altitude held", c.payout * 5 / 100});
@@ -1043,7 +1048,7 @@ bool Career::save(const std::string& path) const {
   std::string tmp = path + ".tmp";
   FILE* f = fopen(tmp.c_str(), "w");
   if (!f) return false;
-  bool ok = fprintf(f, "solace_save 3\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\nattempt %u\nattempt_open %d\n",
+  bool ok = fprintf(f, "solace_save 4\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\nattempt %u\nattempt_open %d\n",
                     money, license, reputation, location, storyIndex, flights, landings, crashes, hours, bestLandingFpm, boardSeed, finished ? 1 : 0, attempt, attemptOpen ? 1 : 0) > 0;
   ok = ok && fprintf(f, "fleet %d\n", (int)fleet.size()) > 0;
   for (auto& p : fleet) ok = ok && fprintf(f, "plane %s %d %f %f\n", kAircraft[p.spec].id, p.location, p.fuel, p.condition) > 0;
@@ -1058,7 +1063,9 @@ bool Career::save(const std::string& path) const {
                        J.maxG, J.minG, J.maxBank, J.fragileHit ? 1 : 0, J.fuelBilledKg, J.hirePaid ? 1 : 0, J.positioningPaid ? 1 : 0, J.id) > 0;
     ok = ok && fprintf(f, "job2 %f %f %d\n", J.patient, J.comfort, J.ferryPaid ? 1 : 0) > 0;
     ok = ok && fprintf(f, "job3 %f %f\n", J.surveySec, J.surveyInSec) > 0;
+    ok = ok && fprintf(f, "survey_known %d\n", J.surveyHistoryKnown ? 1 : 0) > 0;
     ok = ok && fprintf(f, "plan %d %d %d %d %f %f %f %f %d\n", J.plan.positioning, J.plan.ferry, J.plan.hire, (int)J.plan.fuel, J.plan.fuelKgEst, J.plan.minutesEst, J.plan.minutesSigma, J.plan.fuelUpliftKg, J.plan.fuelCostEst) > 0;
+    ok = ok && fprintf(f, "plan2 %d %f %d\n", J.plan.startAirport, J.plan.fuelLoadKg, J.plan.flown ? 1 : 0) > 0;
     const Contract& c = J.c;
     bool story = false; for (auto& s : g_story) if (s.id == c.id) story = true;
     if (story) ok = ok && fprintf(f, "story_contract %s\n", c.id.c_str()) > 0;
@@ -1092,11 +1099,11 @@ bool Career::load(const std::string& path) {
   FILE* f = fopen(path.c_str(), "r");
   if (!f) return false;
   Career c; char key[64]; int ver = 0;
-  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 3) { fclose(f); return false; }
+  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 4) { fclose(f); return false; }
   const int nApt = (int)g_world.airports.size();
   bool ok = true;
   unsigned have = 0;   // mandatory fields seen (version 2: every field, the fleet count and the end marker)
-  int fleetN = -1; bool ended = false;
+  int fleetN = -1; bool ended = false, surveyRead = false, surveyKnownRead = false, plan2Read = false;
   auto rdI = [&](int& v, unsigned bit) { ok = ok && fscanf(f, "%d", &v) == 1; have |= bit; };
   auto rdF = [&](float& v) { ok = ok && fscanf(f, "%f", &v) == 1 && std::isfinite(v); };
   while (ok && fscanf(f, "%63s", key) == 1) {
@@ -1153,7 +1160,18 @@ bool Career::load(const std::string& path) {
     else if (!strcmp(key, "job3")) {   // the survey pattern so far (saves before this line had none: the defaults stand)
       float st = 0, si = 0;
       ok = fscanf(f, "%f %f", &st, &si) == 2 && std::isfinite(st) && std::isfinite(si);
-      if (ok && c.job) { c.job->surveySec = std::max(st, 0.f); c.job->surveyInSec = clampf(si, 0.f, std::max(st, 0.f)); }
+      if (ok && c.job) { c.job->surveySec = std::max(st, 0.f); c.job->surveyInSec = clampf(si, 0.f, std::max(st, 0.f)); surveyRead = true; }
+    }
+    else if (!strcmp(key, "survey_known")) {
+      int known = 0;
+      ok = c.job && fscanf(f, "%d", &known) == 1 && (known == 0 || known == 1);
+      if (ok) { c.job->surveyHistoryKnown = known != 0; surveyKnownRead = true; }
+    }
+    else if (!strcmp(key, "plan2")) {
+      int airport = 0, flown = 0; float load = -1;
+      ok = c.job && fscanf(f, "%d %f %d", &airport, &load, &flown) == 3 && airport >= 0 && airport < nApt
+           && std::isfinite(load) && load >= -1.f && load <= kAircraft[c.job->spec].maxFuel && (flown == 0 || flown == 1);
+      if (ok) { c.job->plan.startAirport = airport; c.job->plan.fuelLoadKg = load; c.job->plan.flown = flown != 0; plan2Read = true; }
     }
     else if (!strcmp(key, "plan")) {
       int fuel = 0; LaunchPlan p;
@@ -1203,6 +1221,13 @@ bool Career::load(const std::string& path) {
        && c.storyIndex >= 0 && c.storyIndex <= (int)g_story.size()
        && c.flights >= 0 && c.landings >= 0 && c.crashes >= 0 && c.hours >= 0;
   if (!ok) return false;
+  if (c.job) {
+    if (ver >= 4 && (!surveyRead || !surveyKnownRead || !plan2Read)) return false;
+    // v3 added job3 without changing the format number. Presence, not version, determines known history.
+    if (!surveyRead && c.job->c.type == CT_SURVEY && c.job->wpDone > 0) c.job->surveyHistoryKnown = false;
+    if (!plan2Read) c.job->plan.startAirport = c.job->at;
+    c.job->plan.net = c.job->c.payout - c.job->plan.fees() - c.job->plan.fuelCostEst;
+  }
   *this = c;
   refreshBoard();
   return true;

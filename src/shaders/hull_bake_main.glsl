@@ -6,7 +6,13 @@
 //! uHPart picks what is evaluated (plane_parts.glsl gPartMode).
 
 uniform sampler2D uHPts; uniform int uHStN; uniform vec4 uHStPS[128]; uniform vec4 uHStCtl[128]; uniform vec4 uHStWr[128]; uniform vec4 uHStWr2[128];
-uniform int uHMode; uniform int uHState;
+#ifdef HULL_BAKE_NORMALS
+const int uHMode = 3;
+#else
+uniform int uHMode;
+uniform sampler2D uHNormals;   // exact mode-3 output at these same points/state, reused for cabin AO
+#endif
+uniform int uHState;
 uniform int uHPart; uniform vec2 uHPartSide;   // -1 the whole aircraft, -2 without its rigid parts, >= 0 that part alone in its own frame (plane_parts.glsl); the side: its rest instance, for the ambient occlusion
 // one of the listed states: the gear / flaps / steering / cabin, the controls, and the XR-40's pods, vanes, fan, bay,
 // turrets and bomb (its surfaces follow the controls)
@@ -40,7 +46,11 @@ void main(){
   }
   vec4 o = vec4(d, 0.0, 0.0, 0.0);
   if (uHMode == 2 || uHMode == 3) {
+#ifdef HULL_BAKE_NORMALS
     vec3 n = planeNormal(p);
+#else
+    vec3 n = texelFetch(uHNormals, ivec2(gl_FragCoord.xy), 0).xyz;
+#endif
     if (uHMode == 3) o = vec4(n, 0.0);
     else {
       float ao = 1.0;

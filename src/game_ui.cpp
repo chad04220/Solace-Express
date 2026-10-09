@@ -778,6 +778,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
       std::string key = fmt("%s|%d|%d|%d|%d|%u", c.id.c_str(), selAircraft, (int)esrc, career.location, career.money < 1500, career.boardSeed);
       if (key != planKey) { e = career.plan(c, selAircraft, esrc); if (cd.job) continuationWaivers(e, c, selAircraft, esrc); planKey = key; }   // (a job leg: quoted as it will be charged - C3)
       if (!e.flown) applyQuote(c, e, true);   // (the flown time replaces the quick estimate when it's in)
+      career.planFuel(e, c, chosenFuel(c, selAircraft, esrc, e));   // selected uplift also drives costs and net
       int ops = e.fees() + e.fuelCostEst;
       if (c.payout > 0 || ops > 0) {
         std::string parts;
@@ -1305,6 +1306,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
   slider("Field of view", set.fov, 45.f, 75.f, 1.f, fmt("%.0f deg outside, %.0f in the cockpit", set.fov, set.fov + 19.f));
   slider("UI scale", set.uiScale, 0.8f, 1.4f, 0.05f, fmt("%.0f%%", set.uiScale * 100));
   toggle("Head-look", set.headLook, "Leans into turns", "Fixed ahead");
+  toggle("Display focus zoom", set.cockpitFocusZoom, "Smooth automatic zoom", "Manual zoom only");
   { bool cb = set.cbHud; toggle("HUD palette", set.cbHud, "Blue / orange (colour-blind)", "Green / red"); if (cb != set.cbHud) applyPalette(set.cbHud); }
   g_ren.text(x + 250 * s, py - 2 * s, 12.5f * s, "The HUD key remembers on / off for each camera view.", C_DIM, 0.85f, 0, false); py += 20 * s;
   toggle("Pitch control", set.invertPitch, "Inverted", "Normal (S = nose up)");
