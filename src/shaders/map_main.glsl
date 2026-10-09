@@ -31,7 +31,7 @@ void main(){
       col = mix(col, vec3(0.85, 0.9, 0.9), smoothstep(1.2, 0.0, dpt)*0.6);
     } else {
       vec3 n = terrainNormal(wp, tq);
-      Mat m = terrainMaterial(vec3(mw.x, h, mw.y), n, tq, baseAt(mw));
+      Mat m = terrainMaterial(vec3(mw.x, h, mw.y), n, tq, baseAt(mw), vec2(foot, 0.0), vec2(0.0, foot));
       float sun = max(dot(n, L), 0.0);
       col = m.alb*(0.42 + 0.9*sun) + m.emit*0.0;
     }

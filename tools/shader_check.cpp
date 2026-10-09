@@ -13,6 +13,10 @@ static void put(const std::string& dir, const char* name, const std::string& src
 
 int main(int argc, char** argv) {
   std::string dir = argc > 1 ? argv[1] : ".";
+  // Environment coverage includes the alpha-cutout path shared by colour and shadow draws.
+  put(dir, "entities.vert", std::string("#version 330 core\n") + kEntVS);
+  put(dir, "entities.frag", std::string("#version 330 core\n") + kEntFS1 + kEntFS2);
+  put(dir, "entities_shadow.frag", std::string("#version 330 core\n") + kEntFS1 + kEntShadowFS);
   {
     std::string ms = worldLibAssembly("");
     put(dir, "map.frag", ms + kMapMain);

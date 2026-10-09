@@ -31,7 +31,10 @@ void main(){
   // two-sided: shade the side facing the camera (leaf cards keep their crown-wide normal so the crown stays round)
   if (dot(wn0, V) < 0.0 && int(vAux.x + 0.5) != P_LEAFCARD) { n0 = -n0; wn0 = -wn0; }
   float dist = length(uCam - vW);
-  if (leafCut(dist < 700.0 ? pow(1.0 - abs(dot(wn0, V)), 1.5) : 0.0)) discard;
+  // Retain the near silhouette, then smoothly retire subpixel edge perforation instead of
+  // switching every crown in the 700 m band on one frame.
+  float edgeDetail = 1.0 - smoothstep(500.0, 700.0, dist);
+  if (leafCut(edgeDetail > 0.0 ? pow(1.0 - abs(dot(wn0, V)), 1.5)*edgeDetail : 0.0)) discard;
   int part = int(vAux.x + 0.5);
   float seed = vInst.x, ao = vAux.y;
   vec3 alb = vec3(0.5); float rough = 0.8, metal = 0.0, cls = 2.0; vec3 emit = vec3(0.0);
@@ -71,15 +74,21 @@ void main(){
     } else {
       // leaf masses: fine leaf texture, plus a lumpy noise normal so a clump reads as many small sprays
       alb = triS(lp, n0, M_LEAVES, 0.75, 1.6, nb, rough);
-      vec3 q = lp*3.1 + vInst.x*11.0;
-      vec3 g = vec3(vn3(q + vec3(0.7, 0.0, 0.0)) - vn3(q - vec3(0.7, 0.0, 0.0)), vn3(q + vec3(0.0, 0.7, 0.0)) - vn3(q - vec3(0.0, 0.7, 0.0)), vn3(q + vec3(0.0, 0.0, 0.7)) - vn3(q - vec3(0.0, 0.0, 0.7)));
-      nb = normalize(nb + g*1.4);
+      // Match the needles' detail budget: unchanged at <=250 m, smoothly absent beyond 400 m.
+      // These seven noise evaluations were previously paid by every distant broadleaf fragment.
+      float leafDetail = 1.0 - smoothstep(250.0, 400.0, dist);
+      float sprayShade = 0.925;   // mean of the existing [0.7, 1.15] modulation
+      if (leafDetail > 0.0) {
+        vec3 q = lp*3.1 + vInst.x*11.0;
+        vec3 g = vec3(vn3(q + vec3(0.7, 0.0, 0.0)) - vn3(q - vec3(0.7, 0.0, 0.0)), vn3(q + vec3(0.0, 0.7, 0.0)) - vn3(q - vec3(0.0, 0.7, 0.0)), vn3(q + vec3(0.0, 0.0, 0.7)) - vn3(q - vec3(0.0, 0.0, 0.7)));
+        nb = normalize(nb + g*(1.4*leafDetail));
+        sprayShade = mix(sprayShade, mix(0.7, 1.15, vn3(lp*5.3 - vInst.x*3.0)), leafDetail);
+      }
       vec3 tint = uKind == K_OAK ? vec3(0.5, 0.68, 0.34) : uKind == K_BIRCH ? vec3(0.7, 0.86, 0.38) : vec3(0.48, 0.62, 0.32);
       float hue = fract(seed*13.7);
       tint = mix(tint, tint*vec3(1.2, 0.92, 0.6), smoothstep(0.8, 1.0, hue));   // a few trees turning
       tint *= mix(0.78, 1.12, fract(seed*5.3))*mix(0.85, 1.12, vAux.z);       // tree and clump variation
-      float spray = vn3(lp*5.3 - vInst.x*3.0);
-      alb *= tint*mix(0.7, 1.15, spray);
+      alb *= tint*sprayShade;
       if (uSnow > 0.05) alb = mix(alb, vec3(0.8), smoothstep(0.5, 0.9, n0.y)*uSnow*0.6);
     }
     alb *= ao;
@@ -266,10 +275,12 @@ void main(){
       else if (s3 < 0.4) { layer = M_TILES; tint = mix(vec3(1.0, 0.8, 0.7), vec3(0.75, 0.5, 0.42), s2); }
       else if (s3 < 0.65) { layer = M_SLATE; tint = vec3(0.75, 0.77, 0.84); }
       else { layer = M_SHINGLES; tint = pal(s2, vec3(0.45, 0.45, 0.48), vec3(0.5, 0.36, 0.3), vec3(0.32, 0.38, 0.32), vec3(0.6, 0.58, 0.55)); }
-      // roof texture runs down the slope: project along the roof's own axes
-      vec3 rp = abs(n0.x) > abs(n0.z) ? vec3(lp.z, lp.y, lp.x) : lp;
-      alb = triS(rp, abs(n0.x) > abs(n0.z) ? vec3(n0.z, n0.y, n0.x) : n0, layer, tsc, 1.0, nb, rough)*tint;
-      if (abs(n0.x) > abs(n0.z)) nb = vec3(nb.z, nb.y, nb.x);
+      // Texture position, projection weights and the normal accumulator use the same roof frame.
+      bool swapRoof = abs(n0.x) > abs(n0.z);
+      vec3 rp = swapRoof ? vec3(lp.z, lp.y, lp.x) : lp;
+      if (swapRoof) nb = vec3(nb.z, nb.y, nb.x);
+      alb = triS(rp, swapRoof ? vec3(n0.z, n0.y, n0.x) : n0, layer, tsc, 1.0, nb, rough)*tint;
+      if (swapRoof) nb = vec3(nb.z, nb.y, nb.x);
       alb *= 1.0 - 0.25*uWet;
       if (uSnow > 0.05) alb = mix(alb, vec3(0.9, 0.92, 0.95), smoothstep(0.3, 0.6, n0.y)*uSnow);
     } else if (part == P_GLASS) {
@@ -303,7 +314,17 @@ void main(){
       if (uKind == K_BARN && abs(u) > (sideX ? 9.0*vScale.z : 6.0*vScale.x) - 0.35) alb = vec3(0.9);   // white corner boards
     }
     else if (part == P_AWNING) { alb = mix(pal(s2, vec3(0.7, 0.1, 0.1), vec3(0.1, 0.35, 0.2), vec3(0.15, 0.25, 0.55), vec3(0.8, 0.55, 0.1)), vec3(0.92), step(0.5, fract(lp.x/0.9))); rough = 0.85; }
-    else if (part == P_DARK) { alb = triS(lp, n0, M_GRAVEL, 2.0, 0.5, nb, rough)*0.45; }
+    else if (part == P_DARK) {
+      alb = triS(lp, n0, M_GRAVEL, 2.0, 0.5, nb, rough)*0.45;
+      if (n0.y > 0.75 && (uKind == K_SHOP || uKind == K_APART || uKind == K_OFFICE || uKind == K_TOWNHOUSE)) {
+        // Seeded flat-roof finishes: weathered bitumen or warm reflective membrane. Keep the existing grain and
+        // normal sample; no new texture, pass, instance or sub-pixel pattern is needed to break up the roof field.
+        vec3 finish = mix(vec3(0.055, 0.066, 0.078), vec3(0.27, 0.25, 0.21), step(0.58, s2));
+        float grain = 0.82 + 0.35*clamp(dot(alb, vec3(0.2126, 0.7152, 0.0722))*5.0, 0.0, 1.0);
+        alb = finish*grain*(1.0 - 0.22*uWet);
+        rough = mix(0.9, 0.48, uWet);
+      }
+    }
     else if (part == P_LAMP) { alb = vec3(0.1); rough = 0.05; cls = 3.0; emit = vec3(1.0, 0.9, 0.6)*(0.4 + 9.0*uNight)*(0.6 + 0.4*step(0.0, sin(atan(lp.z, lp.x) - uTime*1.2))); }
     else if (part == P_RLAMP) {   // runway light globe: tinted glass, the lamp glowing through it when the lights are on
       int ci = int(seed);

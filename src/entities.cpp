@@ -500,6 +500,11 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
     }
   }
   ch.ents.clear();
+  // The per-kind lists already know the final size. Reserve once before concatenation so streaming a dense
+  // chunk does not repeatedly copy its instances or retain a doubled growth allocation.
+  size_t entityCount = 0;
+  for (const auto& list : lists) entityCount += list.size();
+  ch.ents.reserve(entityCount);
   ch.ymin = 1e9f; ch.ymax = -1e9f; ch.reach = 0; ch.hmax = 0;
   const float x0 = chunkX0(cx), z0 = chunkX0(cz);
   for (int k = 0; k < EK_COUNT; k++) {

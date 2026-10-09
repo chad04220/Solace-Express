@@ -102,6 +102,9 @@ public:
   void init(bool buildWorld = true);   // buildWorld false: g_world.build() already ran (on the intro's worker thread)
   void initHeadless();
   void debugScene(const std::string& name);
+  const Weather& benchmarkWeather() const { return wx; }   // final preset state, read-only diagnostics
+  float benchmarkTimeOfDay() const { return timeOfDay; }
+  int benchmarkSceneStatus() const { return crashed ? -1 : (int)screen; }
   void update(float dt);
   void render();
   void shutdown();

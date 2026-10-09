@@ -1250,7 +1250,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
     int rq = (gpuQi + 1) % 4;   // issued three frames ago
     if (gpuQUsed[rq]) {
       GLint avail = 0; glGetQueryObjectiv(gpuQ[rq], GL_QUERY_RESULT_AVAILABLE, &avail);
-      if (avail) { GLuint64 ns = 0; glGetQueryObjectui64v(gpuQ[rq], GL_QUERY_RESULT, &ns); gpuMs = (float)(ns * 1e-6); gpuQUsed[rq] = false; }
+      if (avail) { GLuint64 ns = 0; glGetQueryObjectui64v(gpuQ[rq], GL_QUERY_RESULT, &ns); gpuMs = (float)(ns * 1e-6); gpuSample.publish(true, ns, gpuQFrame[rq]); gpuQUsed[rq] = false; }
     }
   }
   if (!stampQ[0][0] && glQueryCounter) for (int f = 0; f < 4; f++) glGenQueries(kPasses + 1, stampQ[f]);
@@ -1266,6 +1266,8 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
       }
     }
   }
+  if (gpuQUsed[gpuQi]) ++gpuSamplesOverwritten;   // existing ring reused a query before it could be read
+  gpuQFrame[gpuQi] = ++gpuFrameSerial;
   glBeginQuery(GL_TIME_ELAPSED, gpuQ[gpuQi]);
   stamp(0);
   // TAA: Halton(2,3) sub-pixel jitter and a golden-ratio noise seed, both changing every frame
@@ -1423,7 +1425,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glActiveTexture(GL_TEXTURE0);
   stamp(kPasses);
   glEndQuery(GL_TIME_ELAPSED);
-  stampUsed[gpuQi] = stampQ[gpuQi][0] != 0;
+  stampUsed[gpuQi] = !syncTiming && stampQ[gpuQi][0] != 0;   // syncStamp issues no GPU timestamps
   gpuQUsed[gpuQi] = true; gpuQi = (gpuQi + 1) % 4;
 }
 

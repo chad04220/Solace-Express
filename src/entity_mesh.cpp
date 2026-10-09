@@ -134,7 +134,7 @@ const IcoMesh& icosphere(int sub) {
 // Displaced sphere. pos(dir) gives the surface point for a unit direction; normals are smooth (averaged), or
 // bent towards `bendC` (foliage: a canopy-wide normal reads as one soft crown instead of many lumps).
 template <class F, class A>
-void blob(MB& mb, int sub, F pos, A aoFn, int part, bool flat = false, const vec3* bendC = nullptr, float bend = 0, float tag = 0) {
+void blob(MB& mb, int sub, F pos, A aoFn, int part, bool flat = false, const vec3* bendC = nullptr, float bend = 0, float tag = 0, float facet = 0) {
   const IcoMesh& ico = icosphere(sub);
   std::vector<vec3> P(ico.v.size()), N(ico.v.size(), vec3(0, 0, 0));
   for (size_t i = 0; i < ico.v.size(); i++) P[i] = pos(ico.v[i]);
@@ -148,6 +148,7 @@ void blob(MB& mb, int sub, F pos, A aoFn, int part, bool flat = false, const vec
     vec3 fn = normalize(cross(P[id[1]] - P[id[0]], P[id[2]] - P[id[0]]));
     for (int k = 0; k < 3; k++) {
       vec3 n = flat ? fn : normalize(N[id[k]]);
+      if (facet > 0.f) n = normalize(n * (1.f - facet) + fn * facet);
       if (bendC) n = normalize(n * (1.f - bend) + normalize(P[id[k]] - *bendC) * bend);
       mb.vert(P[id[k]], n, part, aoFn(P[id[k]], ico.v[id[k]]), tag);
     }
@@ -344,7 +345,9 @@ void buildTree(MB& mb, int kind, int lod) {
         auto F = [&](float s) { return crown + dir * (len * s) + vec3(0, lift * s - 3.2f * s * s, 0); };
         for (int k = 0; k < ns; k++) {
           float s0 = (float)k / ns, s1 = (float)(k + 1) / ns;
-          float w0 = 0.12f + 0.75f * powf(sinf(PI * std::min(s0 * 1.1f, 1.f)), 0.7f), w1 = 0.12f + 0.75f * powf(sinf(PI * std::min(s1 * 1.1f, 1.f)), 0.7f);
+          // sinf(PI) can be slightly negative: a fractional power otherwise makes the frond tip NaN.
+          float w0 = 0.12f + 0.75f * powf(std::max(0.f, sinf(PI * std::min(s0 * 1.1f, 1.f))), 0.7f),
+                w1 = 0.12f + 0.75f * powf(std::max(0.f, sinf(PI * std::min(s1 * 1.1f, 1.f))), 0.7f);
           vec3 c0 = F(s0), c1 = F(s1);
           vec3 tg = normalize(c1 - c0);
           // V-shaped cross-section: the leaflets droop to both sides of the midrib
@@ -381,7 +384,7 @@ void rockBlob(MB& mb, int sub, vec3 c, vec3 s, float yaw, float tilt, float seed
          if (p.y > topCut) p.y = topCut + (p.y - topCut) * 0.08f;
          return p;
        },
-       [&](vec3 p, vec3 d) { return clampf(0.62f + 0.38f * (d.y * 0.5f + 0.5f), 0.4f, 1.f); }, P_ROCK);
+       [&](vec3 p, vec3 d) { return clampf(0.62f + 0.38f * (d.y * 0.5f + 0.5f), 0.4f, 1.f); }, P_ROCK, false, nullptr, 0.f, 0.f, cube * 0.4f);   // retain broad fracture planes without adding triangles
 }
 
 // cliff column: rings of noisy radius with stratified ledges, steep sides and a rough flat top
@@ -427,20 +430,26 @@ void buildRock(MB& mb, int kind, int lod) {
         {{-1.6f, 4.9f, 1.3f}, {2.1f, 2.0f, 1.8f}, 0.7f, -0.2f}, {{4.6f, 0.7f, -2.8f}, {1.7f, 1.2f, 1.5f}, 2.2f, 0.3f},
         {{-5.6f, 0.5f, 2.4f}, {1.4f, 1.0f, 1.3f}, 0.1f, 0.25f}};
       int n = lod == 0 ? 7 : lod == 1 ? 5 : 3;
+      // The far model must keep the high central silhouette: simply dropping the upper two boulders
+      // shortened this formation by a third. Fold their volume into the retained central body.
+      if (lod == 2) { bl[0].c.y = 3.7f; bl[0].s.y = 4.45f; }
       for (int i = 0; i < n; i++) rockBlob(mb, lod == 0 ? 1 : 0, bl[i].c, bl[i].s, bl[i].yaw, bl[i].tilt, 0.13f * i + 0.2f, 0.2f, 0.7f, i < 3 ? 2.2f : 0.f);
       break;
     }
     case EK_SPIRE: {
       int segs = lod == 0 ? 14 : lod == 1 ? 9 : 6, rings = lod == 0 ? 14 : lod == 1 ? 7 : 3;
-      rockColumn(mb, vec3(0, -1.f, 0), segs, rings, 22.5f, 4.2f, 1.9f, 0.37f, 0.16f, 0.f, 0.4f);
+      // At the far LOD the top ring stands in for the cap stone as well as the column.
+      rockColumn(mb, vec3(0, -1.f, 0), segs, rings, lod == 2 ? 24.2f : 22.5f, 4.2f, lod == 2 ? 2.5f : 1.9f, 0.37f, 0.16f, 0.f, 0.4f);
       if (lod <= 1) rockBlob(mb, lod == 0 ? 1 : 0, vec3(0.5f, 22.4f, 0.1f), vec3(3.1f, 1.3f, 2.6f), 0.4f, 0.08f, 0.61f, 0.18f, 0.75f);   // cap stone
       if (lod == 0) for (int i = 0; i < 3; i++) rockBlob(mb, 0, vec3(cosf(i * 2.2f) * 4.2f, 0.4f, sinf(i * 2.2f) * 3.8f), vec3(1.4f, 1.0f, 1.2f), i * 1.1f, 0.2f, 0.4f + i * 0.2f, 0.2f, 0.6f);
       break;
     }
     case EK_SEASTACK: {
-      int segs = lod == 0 ? 18 : lod == 1 ? 11 : 7, rings = lod == 0 ? 11 : lod == 1 ? 6 : 3;
+      // Keep both columns in the far silhouette. Fewer radial/vertical divisions pay for the satellite:
+      // 135 vertices total instead of the old 147-vertex single column.
+      int segs = lod == 0 ? 18 : lod == 1 ? 11 : 6, rings = lod == 0 ? 11 : lod == 1 ? 6 : 2;
       rockColumn(mb, vec3(0, -1.f, 0), segs, rings, 31.f, 9.6f, 7.2f, 0.71f, 0.045f, 0.18f, -0.3f);
-      if (lod <= 1) rockColumn(mb, vec3(11.f, -1.f, 4.f), lod == 0 ? 10 : 7, lod == 0 ? 8 : 4, 16.f, 3.6f, 2.6f, 0.23f, 0.08f, 0.2f, 0.5f);
+      rockColumn(mb, vec3(11.f, -1.f, 4.f), lod == 0 ? 10 : lod == 1 ? 7 : 3, lod == 0 ? 8 : lod == 1 ? 4 : 2, 16.f, 3.6f, 2.6f, 0.23f, 0.08f, 0.2f, 0.5f);
       if (lod == 0) for (int i = 0; i < 5; i++) rockBlob(mb, 0, vec3(cosf(i * 1.7f) * 10.5f, 0.3f, sinf(i * 1.7f) * 9.5f), vec3(2.3f, 1.5f, 2.f), i * 1.3f, 0.2f, 0.9f + i * 0.1f, 0.22f, 0.7f);
       break;
     }
@@ -515,9 +524,9 @@ void buildBuilding(MB& mb, int kind, int lod) {
     }
     case EK_SHOP: {
       plinth(mb, 7.f, 7.f, 0.3f);
-      mb.box(vec3(-7.f, 0.3f, -7.f), vec3(7.f, 4.6f, 7.f), P_WALL, 0x3B);
+      mb.box(vec3(-7.f, 0.3f, -7.f), vec3(7.f, 4.6f, 7.f), P_WALL, 0x3B & ~8);
       mb.box(vec3(-7.f, 4.6f, -7.f), vec3(7.f, 5.5f, 7.f), P_TRIM, 0x3B & ~8);   // parapet band
-      mb.box(vec3(-6.4f, 4.4f, -6.4f), vec3(6.4f, 4.6f, 6.4f), P_DARK, 8);        // roof deck
+      mb.box(vec3(-7.f, 4.4f, -7.f), vec3(7.f, 4.6f, 7.f), P_DARK, 8);             // one roof plane, no coplanar wall cap
       mb.box(vec3(-6.4f, 0.4f, 7.f), vec3(6.4f, 3.1f, 7.08f), P_GLASS, 32);       // storefront
       if (d1) mb.box(vec3(-6.6f, 3.6f, 7.f), vec3(6.6f, 4.45f, 7.12f), P_SIGN, 32);
       if (d0) {
@@ -529,20 +538,25 @@ void buildBuilding(MB& mb, int kind, int lod) {
     }
     case EK_APARTMENT: {
       plinth(mb, 9.f, 7.f, 0.5f);
-      mb.box(vec3(-9.f, 0.5f, -7.f), vec3(9.f, 20.8f, 7.f), P_WALL, 0x3B);
+      mb.box(vec3(-9.f, 0.5f, -7.f), vec3(9.f, 20.8f, 7.f), P_WALL, 0x3B & ~8);
       mb.box(vec3(-9.f, 20.8f, -7.f), vec3(9.f, 21.6f, 7.f), P_TRIM, 0x3B & ~8);
-      mb.box(vec3(-8.6f, 20.6f, -6.6f), vec3(8.6f, 20.8f, 6.6f), P_DARK, 8);
+      mb.box(vec3(-9.f, 20.6f, -7.f), vec3(9.f, 20.8f, 7.f), P_DARK, 8);             // one roof plane, no coplanar wall cap
       if (d1) mb.box(vec3(-2.5f, 20.8f, -2.f), vec3(2.5f, 23.2f, 2.f), P_TRIM, 0x3B | 8);
       if (d0) {
         for (int f = 1; f < 6; f++) {
           float y = 0.5f + f * 3.4f;
           for (int b = 0; b < 3; b++) {
             float x0 = -7.6f + b * 5.6f;
-            mb.box(vec3(x0, y - 0.2f, 7.f), vec3(x0 + 3.6f, y, 8.3f), P_TRIM, 0x3F);
-            mb.box(vec3(x0, y, 8.2f), vec3(x0 + 3.6f, y + 1.0f, 8.3f), P_GLASS, 0x3F);
+            mb.box(vec3(x0, y - 0.2f, 7.f), vec3(x0 + 3.6f, y, 8.3f), P_TRIM, 0x3F & ~16); // omit the wall-contact face
+            mb.box(vec3(x0, y, 8.2f), vec3(x0 + 3.6f, y + 1.0f, 8.3f), P_GLASS, 0x3F & ~4); // underside rests on the slab
           }
         }
         door(mb, 0.f, 7.f, 2.2f, 2.6f, 0.5f);
+        // Roof service units and an entrance canopy, funded by the hidden balcony faces above.
+        // All remain inside the original apartment bounds and disappear with the other LOD0 details.
+        mb.box(vec3(-7.f, 20.8f, -4.f), vec3(-4.8f, 21.6f, -2.5f), P_METAL, 0x3B);
+        mb.box(vec3(4.8f, 20.8f, -4.f), vec3(7.f, 21.6f, -2.5f), P_METAL, 0x3B);
+        mb.box(vec3(-2.f, 3.1f, 7.f), vec3(2.f, 3.32f, 8.15f), P_TRIM, 0x3F & ~16);
       }
       break;
     }

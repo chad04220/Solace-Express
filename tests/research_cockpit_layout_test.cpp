@@ -63,11 +63,15 @@ static bool wraithChinCut(vec3 q){
   for(float h:{.019f,.004f}){vec3 p=q*(h==.019f?min((h+cn)/qn,1.f):(h+cn)/qn);vec3 a=researchPanelFrame(p,pane);if(researchPanelShape(vec2(a.x,a.y),pane)>=0.f)return false;}
   return true;
 }
+static float wraithBridge(vec3 q){
+  vec3 l=researchPanelFrame(q,wraithPanel(1));
+  return box(l-WR_BRIDGE_C,WR_BRIDGE_HALF-vec3(WR_BRIDGE_ROUND))-WR_BRIDGE_ROUND;
+}
 static float structure(vec3 q,bool wr){
   float d=1e6f;for(int i=0;i<(wr?3:5);++i)d=min(d,panelBody(q,wr?wraithPanel(i):specterPanel(i),wr));
   if(!wr){float r=std::hypot(q.x,q.z),a=atan(q.x,-q.z);float saddle=max(max(r-.71f,.47f-r),max(std::abs(a)-1.18f,max(q.y+.505f,-.56f-q.y)));saddle=max(saddle,.47f+std::clamp(-.54f-q.y,0.f,.02f)-r);return min(d,min(saddle,footwellLight(q)));}
   ResearchPanel p=wraithPanel(1);vec3 l=researchPanelFrame(q,p);
-  float bridge=box(l-vec3(0,-.09f,-.048f),vec3(.665f,.016f,.020f))-.015f;
+  float bridge=wraithBridge(q);
   float rail=box(l-vec3(0,-.155f,-.019f),vec3(.282f,.009f,.019f))-.008f;
   return min(d,min(bridge,rail));
 }
@@ -129,6 +133,29 @@ int main(){
       float d=structure(q,wr);minControlGap=min(minControlGap,d);check(d>.025f,"pedal travel clears new primary bridge");
     }
   }
+  // The old 12-step sightline test skipped the first ~77 mm in front of each display. The bridge
+  // actually penetrated the side glass by 13.7 mm there. Sample the face and the first 4% of every
+  // ray densely (about 1 mm steps), requiring at least 15 mm of analytic clearance.
+  float minBridgeGap=1e6f;
+  for(int i:{0,2}){
+    ResearchPanel p=wraithPanel(i);
+    for(int x=-60;x<=60;++x)for(int y=-36;y<=36;++y){
+      vec3 local(p.h.x*x/60.f,p.h.y*y/36.f,0);
+      if(researchPanelShape(vec2(local.x,local.y),p)>-.0001f)continue;
+      vec3 q=point(p,local);
+      for(int ray=0;ray<=40;++ray){
+        float gap=wraithBridge(q*(1.f-ray*.001f));minBridgeGap=min(minBridgeGap,gap);
+        check(gap>.015f,"recessed Wraith bridge clears adjacent glass and near-face pilot rays");
+      }
+    }
+    // The recessed bridge still meets the solid rear of both side modules, rather than leaving
+    // their brackets floating. This point is 52 mm behind and 60 mm below each glass centre.
+    vec3 joint=point(p,vec3(0,-.060f,-.052f));
+    check(wraithBridge(joint)<-.003f&&panelBody(joint,p,true)<-.003f,"Wraith side-module rear remains joined to bridge");
+  }
+  check(wraithBridge(point(wraithPanel(1),vec3(0,-.090f,-.053f)))<-.003f,
+        "Wraith centre-module rear remains joined to bridge");
+  std::printf("Wraith adjacent-screen near-face bridge clearance: %.1f mm\n",minBridgeGap*1000);
   check(wraithPanel(1).h.x*wraithPanel(1).h.y>2*wraithPanel(0).h.x*wraithPanel(0).h.y,"Wraith primary area hierarchy");
   check(specterPanel(2).h.x*specterPanel(2).h.y>1.8f*specterPanel(1).h.x*specterPanel(1).h.y,"Specter primary area hierarchy");
   check(std::abs(WR_HOLO_CENTRE.x)-WR_HOLO_RADIUS>.6f,"hologram outside central flight scan");

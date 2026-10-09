@@ -48,7 +48,7 @@ vec2 mapWraithCockpit(vec3 p){
   // with glass assigned flush to the front face, so extraction cannot create sub-lattice floating screen edges.
   {
     vec3 l = wrFrame(q, WD_C, WD_N, vec3(0,1,0));
-    float bridge = sdRoundBox(l - vec3(0.0, -0.09, -0.048), vec3(0.68, 0.031, 0.035), 0.015);
+    float bridge = sdRoundBox(l - WR_BRIDGE_C, WR_BRIDGE_HALF, WR_BRIDGE_ROUND);
     res = opU(res, vec2(bridge, 65.0));
     for (int i = 0; i < 3; i++) {
       ResearchPanel panel = wraithPanel(i);

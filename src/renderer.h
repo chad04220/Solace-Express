@@ -1,5 +1,6 @@
 // Solace Express - renderer interface
 #pragma once
+#include "benchmark_metrics.h"
 #include <array>
 #include <chrono>
 #include <functional>
@@ -213,7 +214,10 @@ private:
   int histIdx = 0, frameNo = 0, histW = 0, histH = 0; bool histValid = false;   // (histW/H: the history textures' size)
   // GPU frame time from a ring of timer queries (read a few frames late so the CPU never waits on them)
   GLuint gpuQ[4] = {0, 0, 0, 0}; bool gpuQUsed[4] = {false, false, false, false}; int gpuQi = 0;
+  uint64_t gpuQFrame[4] = {};
 public:
+  benchmark::GpuSample gpuSample;   // raw completed query, with freshness and originating renderScene serial
+  uint64_t gpuFrameSerial = 0, gpuSamplesOverwritten = 0;
   float gpuMs = -1.f;   // last measured GPU time of renderScene, ms (-1 = not known yet)
   static constexpr int kPasses = 11;   // world | displays | feeds | objects | airframe shadow proxy | lighting+clouds+effects, then TAA, sprites, bloom, light shafts, composite
   float passMs[kPasses] = {};         // GPU time of each pass (timestamp queries, a few frames late)

@@ -1,0 +1,142 @@
+Validation for environment review on 6f0eb23 / v3.39.0, 2026-10-09
+CPU/software-GL only; native RTX3070 performance remains unmeasured.
+
+Test project /workspace/scratch/87b29863f015/solace-environment-publish/build
+      Start 16: shader_glsl
+      Start  3: flight_model
+      Start  5: campaign_progression
+ 1/33 Test #16: shader_glsl ......................   Passed    8.88 sec
+      Start 19: gameplay_loop
+ 2/33 Test #19: gameplay_loop ....................   Passed   36.23 sec
+      Start  7: career_saves
+ 3/33 Test  #5: campaign_progression .............   Passed   48.67 sec
+      Start 15: ufo_encounter
+ 4/33 Test  #7: career_saves .....................   Passed   14.96 sec
+      Start 17: entity_raycast
+ 5/33 Test #15: ufo_encounter ....................   Passed   13.18 sec
+      Start  9: terrain_envelope
+ 6/33 Test  #9: terrain_envelope .................   Passed    7.41 sec
+      Start  2: cockpit_camera
+ 7/33 Test #17: entity_raycast ...................   Passed   13.78 sec
+      Start 20: terrain_shadow_bake
+ 8/33 Test  #2: cockpit_camera ...................   Passed    6.35 sec
+      Start 18: world_cache
+ 9/33 Test #20: terrain_shadow_bake ..............   Passed    9.97 sec
+      Start  8: airport_layouts
+10/33 Test #18: world_cache ......................   Passed    8.60 sec
+      Start 10: hull_mesh
+11/33 Test  #3: flight_model .....................   Passed   88.09 sec
+      Start 33: shader_glsl_specialization
+12/33 Test  #8: airport_layouts ..................   Passed    5.66 sec
+      Start 14: mesh_simplify
+13/33 Test #10: hull_mesh ........................   Passed    5.90 sec
+      Start  4: aero_model
+14/33 Test  #4: aero_model .......................   Passed    0.30 sec
+      Start 24: cockpit_layout_geometry
+15/33 Test #14: mesh_simplify ....................   Passed    0.94 sec
+      Start  6: shader_keywords
+16/33 Test  #6: shader_keywords ..................   Passed    0.28 sec
+      Start 25: environment_foliage
+17/33 Test #24: cockpit_layout_geometry ..........   Passed    0.64 sec
+      Start 11: traffic_prop_discs
+18/33 Test #11: traffic_prop_discs ...............   Passed    0.25 sec
+      Start 31: environment_benchmark_runner
+19/33 Test #33: shader_glsl_specialization .......   Passed    3.33 sec
+      Start 21: research_cockpit_layout
+20/33 Test #31: environment_benchmark_runner .....   Passed    0.17 sec
+      Start 30: environment_frame_statistics
+21/33 Test #21: research_cockpit_layout ..........   Passed    0.07 sec
+      Start 29: terrain_material_source
+22/33 Test #25: environment_foliage ..............   Passed    0.83 sec
+      Start 32: aircraft_specialization
+23/33 Test #29: terrain_material_source ..........   Passed    0.04 sec
+      Start 23: cockpit_layout_generated
+24/33 Test #30: environment_frame_statistics .....   Passed    0.07 sec
+      Start 26: environment_buildings
+25/33 Test #32: aircraft_specialization ..........   Passed    0.03 sec
+      Start 12: reheat_exhaust
+26/33 Test #23: cockpit_layout_generated .........   Passed    0.03 sec
+      Start 22: cockpit_layout
+27/33 Test #26: environment_buildings ............   Passed    0.01 sec
+      Start 28: terrain_material_math
+28/33 Test #12: reheat_exhaust ...................   Passed    0.01 sec
+29/33 Test #22: cockpit_layout ...................   Passed    0.00 sec
+      Start 13: mesh_validation
+      Start 27: benchmark_metrics
+30/33 Test #28: terrain_material_math ............   Passed    0.01 sec
+      Start  1: cockpit_focus_zoom
+31/33 Test #13: mesh_validation ..................   Passed    0.00 sec
+32/33 Test #27: benchmark_metrics ................   Passed    0.00 sec
+33/33 Test  #1: cockpit_focus_zoom ...............   Passed    0.00 sec
+
+100% tests passed out of 33
+
+Total Test time (real) =  91.57 sec
+
+Final Windows application cross-build:
+[ 40%] Building CXX object CMakeFiles/SolaceExpress.dir/src/aircraft_mesh.cpp.obj
+[ 40%] Building CXX object CMakeFiles/SolaceExpress.dir/src/entity_render.cpp.obj
+[ 50%] Building CXX object CMakeFiles/SolaceExpress.dir/src/aircraft_hull.cpp.obj
+[ 50%] Building CXX object CMakeFiles/SolaceExpress.dir/src/camera_feeds.cpp.obj
+[ 60%] Building CXX object CMakeFiles/SolaceExpress.dir/src/entity_mesh.cpp.obj
+[ 60%] Building CXX object CMakeFiles/SolaceExpress.dir/src/platform_win32.cpp.obj
+[ 60%] Linking CXX executable SolaceExpress.exe
+[100%] Built target SolaceExpress
+
+Fresh-process CPU fixture lifecycle:
+MATCH capital_day wcam_-3581.853_-654.658_247.793_35.000_-18.000_12.000 camera=-3581.853,350.633,-654.658 look=-3200.000,134.321,-1200.000
+START capital_day scene=2 craft=1 pos=800.0,911.6,-1200.0 vel=60.00,0.00,-0.00 agl=900.0 AP=0 parked=1 ground=0
+RESULT capital_day SURVIVED seconds=140.000 end_scene=2 crashed=0 reason= minAGL=595.85 endPos=2518.9,689.2,-2286.8 speed=74.18
+SUMMARY 0 invalid fixtures; CPU-only lifecycle probe, no rendering or FPS evidence
+
+MATCH port_verde_day wcam_-30009.785_11009.786_239.199_45.000_-16.000_12.000 camera=-30009.785,305.172,11009.786 look=-29500.000,98.444,10500.000
+START port_verde_day scene=2 craft=1 pos=-25500.0,990.4,10500.0 vel=60.00,0.00,-0.00 agl=900.1 AP=0 parked=1 ground=0
+RESULT port_verde_day SURVIVED seconds=140.000 end_scene=2 crashed=0 reason= minAGL=667.83 endPos=-23693.4,710.6,9348.2 speed=75.01
+SUMMARY 0 invalid fixtures; CPU-only lifecycle probe, no rendering or FPS evidence
+
+MATCH forest_low_view wcam_-24000.000_-5000.000_80.000_35.000_-7.000_12.000 camera=-24000.000,235.061,-5000.000 look=-23943.070,222.875,-5081.305
+START forest_low_view scene=2 craft=0 pos=-7601.7,46.3,13665.8 vel=0.00,0.02,-0.00 agl=1.3 AP=0 parked=1 ground=1
+RESULT forest_low_view SURVIVED seconds=140.000 end_scene=2 crashed=0 reason= minAGL=1.32 endPos=-7601.7,46.3,13665.7 speed=0.00
+SUMMARY 0 invalid fixtures; CPU-only lifecycle probe, no rendering or FPS evidence
+
+MATCH kaleo_rocks wcam_22816.602_10218.565_102.218_40.000_-18.000_12.000 camera=22816.602,347.717,10218.565 look=23000.000,255.011,10000.000
+START kaleo_rocks scene=2 craft=1 pos=27000.0,900.0,10000.0 vel=60.00,0.00,-0.00 agl=900.0 AP=0 parked=1 ground=0
+RESULT kaleo_rocks SURVIVED seconds=140.000 end_scene=2 crashed=0 reason= minAGL=656.04 endPos=28884.5,656.0,8874.6 speed=74.49
+SUMMARY 0 invalid fixtures; CPU-only lifecycle probe, no rendering or FPS evidence
+
+MATCH fjord_rocks wcam_17886.990_-27578.244_293.345_15.000_-14.000_12.000 camera=17886.990,368.527,-27578.244 look=17912.104,344.335,-27671.967
+START fjord_rocks scene=2 craft=0 pos=-7601.7,46.3,13665.8 vel=0.00,0.02,-0.00 agl=1.3 AP=0 parked=1 ground=1
+RESULT fjord_rocks SURVIVED seconds=140.000 end_scene=2 crashed=0 reason= minAGL=1.32 endPos=-7601.7,46.3,13665.7 speed=0.00
+SUMMARY 0 invalid fixtures; CPU-only lifecycle probe, no rendering or FPS evidence
+
+MATCH gull_rock_coast wcam_2719.338_31334.480_113.500_40.000_-14.000_12.000 camera=2719.338,119.865,31334.480 look=3000.000,11.000,31000.000
+START gull_rock_coast scene=2 craft=1 pos=7000.0,900.0,31000.0 vel=60.00,0.00,-0.00 agl=900.0 AP=0 parked=1 ground=0
+RESULT gull_rock_coast SURVIVED seconds=140.000 end_scene=2 crashed=0 reason= minAGL=654.07 endPos=8810.7,654.1,29845.4 speed=75.09
+SUMMARY 0 invalid fixtures; CPU-only lifecycle probe, no rendering or FPS evidence
+
+MATCH airport_day wcam_-271.638_-4103.590_4.000_171.891_0.541_12.000 camera=-271.638,24.000,-4103.590 look=-241.733,26.000,-3893.710
+START airport_day scene=2 craft=0 pos=-880.6,21.3,-5049.5 vel=-0.00,0.02,-0.00 agl=1.3 AP=0 parked=1 ground=1
+RESULT airport_day SURVIVED seconds=140.000 end_scene=2 crashed=0 reason= minAGL=1.32 endPos=-880.6,21.3,-5049.5 speed=0.00
+SUMMARY 0 invalid fixtures; CPU-only lifecycle probe, no rendering or FPS evidence
+
+MATCH airport_night wcam_-271.638_-4103.590_4.000_171.891_0.541_22.000 camera=-271.638,24.000,-4103.590 look=-241.733,26.000,-3893.710
+START airport_night scene=2 craft=0 pos=-880.6,21.3,-5049.5 vel=-0.00,0.02,-0.00 agl=1.3 AP=0 parked=1 ground=1
+RESULT airport_night SURVIVED seconds=140.000 end_scene=2 crashed=0 reason= minAGL=1.32 endPos=-880.6,21.3,-5049.5 speed=0.00
+SUMMARY 0 invalid fixtures; CPU-only lifecycle probe, no rendering or FPS evidence
+
+MATCH airport_wet wcam_-198.220_-3455.396_150.085_20.000_-15.000_16.000 camera=-198.220,180.291,-3455.396 look=0.000,25.000,-4000.000
+START airport_wet scene=2 craft=1 pos=4000.0,900.0,-4000.0 vel=60.00,0.00,-0.00 agl=900.0 AP=0 parked=1 ground=0
+RESULT airport_wet SURVIVED seconds=140.000 end_scene=2 crashed=0 reason= minAGL=661.67 endPos=5793.6,661.7,-5444.0 speed=75.37
+SUMMARY 0 invalid fixtures; CPU-only lifecycle probe, no rendering or FPS evidence
+
+MATCH airport_storm wcam_-198.220_-3455.396_150.085_20.000_-15.000_16.000 camera=-198.220,180.291,-3455.396 look=0.000,25.000,-4000.000
+START airport_storm scene=2 craft=1 pos=4000.0,900.0,-4000.0 vel=60.00,0.00,-0.00 agl=900.0 AP=0 parked=1 ground=0
+RESULT airport_storm SURVIVED seconds=140.000 end_scene=2 crashed=0 reason= minAGL=734.14 endPos=7444.4,848.1,-6650.5 speed=86.89
+SUMMARY 0 invalid fixtures; CPU-only lifecycle probe, no rendering or FPS evidence
+
+MATCH airport_wet_night wcam_-198.220_-3455.396_150.085_20.000_-15.000_22.000 camera=-198.220,180.291,-3455.396 look=0.000,25.000,-4000.000
+START airport_wet_night scene=2 craft=1 pos=4000.0,900.0,-4000.0 vel=60.00,0.00,-0.00 agl=900.0 AP=0 parked=1 ground=0
+RESULT airport_wet_night SURVIVED seconds=140.000 end_scene=2 crashed=0 reason= minAGL=734.14 endPos=7444.4,848.1,-6650.5 speed=86.89
+SUMMARY 0 invalid fixtures; CPU-only lifecycle probe, no rendering or FPS evidence
+
+FINAL: failures= 0

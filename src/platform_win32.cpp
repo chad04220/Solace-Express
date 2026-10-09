@@ -793,7 +793,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       fprintf(af, "Solace Express performance analysis\nGPU: %s\nCPU threads: %u   Quality: %d   Window: %dx%d\n",
               gpu.c_str(), std::thread::hardware_concurrency(), g_ren.quality, g_ren.W, g_ren.H);
       fprintf(af, "\nHow to read this: 'ms' is wall-clock time per frame with the GPU finished (vsync off). Per-pass times are\n"
-                  "exact (the GPU is waited on between passes, which adds a little overhead). Resolution scaling: if a frame\n"
+                  "serialized CPU wall times including submit + GPU waits (not isolated GPU durations). Resolution scaling: if a frame\n"
                   "takes ~2.2x as long at 100%% as at 67%% (2.2x the pixels), the per-pixel work is the bottleneck.\n");
       auto qpcMs = [&](LARGE_INTEGER a, LARGE_INTEGER b) { return (double)(b.QuadPart - a.QuadPart) / freq.QuadPart * 1000.0; };
       auto pump = [&] { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } };
@@ -848,7 +848,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           for (int i = 0; i < N; i++) { frames(1); for (int p = 0; p < Renderer::kPasses; p++) passSum[p] += g_ren.passWall[p] / N; }
           g_ren.syncTiming = false;
           double tot = 0; for (double v : passSum) tot += v;
-          fprintf(af, "GPU passes (exact, %.2f ms total):\n", tot);
+          fprintf(af, "Serialized pass wall times (CPU submit + GPU wait, %.2f ms total):\n", tot);
           for (int p = 0; p < Renderer::kPasses; p++) fprintf(af, "  %-26s %7.2f ms  %5.1f%%\n", kPassName[p], passSum[p], tot > 0 ? passSum[p] / tot * 100.0 : 0.0);
         }
         // 3. resolution scaling
@@ -954,12 +954,27 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     }
   }
   // Benchmark: SolaceExpress.exe --bench scene1,scene2,... [--size WxH] times each scene (wall clock with the GPU flushed,
-  // plus the GPU time of every pass) and writes bench.txt next to the exe
+  // plus the GPU time of every pass) and writes bench.txt next to the exe. Optional --bench-frames N
+  // and --bench-csv add long runs and raw CPU/app-present/fresh delayed GPU samples; no per-frame waits.
   {
     std::string cl = GetCommandLineA();
     size_t k = cl.find("--bench ");
     if (k != std::string::npos) {
-      std::string list = cl.substr(k + 8); list = list.substr(0, list.find(' ')) + ",";
+      std::string list = cl.substr(k + 8);
+      if (!list.empty() && list[0] == '"') { list = list.substr(1); list = list.substr(0, list.find('"')); }
+      else list = list.substr(0, list.find(' '));
+      std::vector<std::string> scenes; std::string sceneError;
+      if (!benchmark::scenes(list, scenes, sceneError)) { MessageBoxA(g_hwnd, sceneError.c_str(), "Invalid benchmark scenes", MB_ICONERROR); return 2; }
+      int sampleFrames = 120; size_t kf = cl.find("--bench-frames ");
+      if (kf != std::string::npos) {
+        char* end = nullptr; const char* first = cl.c_str() + kf + 15;
+        long nFrames = strtol(first, &end, 10);
+        if (end == first || (*end && *end != ' ') || nFrames < 2 || nFrames > 1000000) {
+          MessageBoxA(g_hwnd, "--bench-frames must be an integer from 2 to 1000000.", "Invalid benchmark length", MB_ICONERROR); return 2;
+        }
+        sampleFrames = (int)nFrames;
+      }
+      const bool writeCsv = cl.find("--bench-csv") != std::string::npos;
       int sw2 = 0, sh2 = 0; size_t kz = cl.find("--size ");
       if (kz != std::string::npos) sscanf(cl.c_str() + kz + 7, "%dx%d", &sw2, &sh2);
       if (kz != std::string::npos && cl.compare(kz + 7, 6, "native") == 0) { if (!g_fullscreen) toggleFullscreen(); }   // the whole desktop
@@ -975,7 +990,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       }
       { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } }
       { RECT rc; GetClientRect(g_hwnd, &rc); if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom); }
-      if (s_swapInterval) s_swapInterval(0);   // unlocked: measure what the GPU can do
+      const bool swapOffAccepted = s_swapInterval && s_swapInterval(0);   // request unlocked; driver/compositor may still pace
       char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
       std::string dir(exe, n); dir = dir.substr(0, dir.find_last_of("\\/"));
       std::string outName = "bench.txt"; size_t ko = cl.find("--out ");
@@ -984,17 +999,42 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         if (!outName.empty() && outName[0] == '"') { outName = outName.substr(1); outName = outName.substr(0, outName.find('"')); }   // (a quoted path)
         else outName = outName.substr(0, outName.find(' '));
       }
-      FILE* bf = fopen((dir + "\\" + outName).c_str(), "w");
+      const bool absoluteOut = (outName.size() > 1 && outName[1] == ':') || outName.rfind("\\\\", 0) == 0;
+      const std::string outputPath = absoluteOut ? outName : dir + "\\" + outName;
+      FILE* bf = fopen(outputPath.c_str(), "w");
+      if (!bf) { MessageBoxA(g_hwnd, "Cannot open benchmark output file.", "Benchmark output", MB_ICONERROR); return 2; }
+      FILE* csv = writeCsv ? fopen((outputPath + ".frames.csv").c_str(), "w") : nullptr;
+      if (writeCsv && !csv) { fclose(bf); MessageBoxA(g_hwnd, "Cannot open benchmark CSV output file.", "Benchmark output", MB_ICONERROR); return 2; }
+      if (csv) fprintf(csv, "scene,frame_index,render_frame_serial,frame_wall_ms,present_interval_ms,update_ms,render_submit_ms,swapbuffers_ms,pump_ms,gpu_sample_id,gpu_sample_origin_frame,gpu_render_scene_ms,display_width,display_height,render_width,render_height,render_scale,quality,scenery_pending,terrain_shadow_pending,bake_count,native_1080p_valid,scene_status,frame_start_qpc,present_start_qpc\n");
       if (bf) fprintf(bf, "GPU: %s\nDesktop %dx%d, render %dx%d, quality %d\n\n", gpu.c_str(), GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), g_ren.W, g_ren.H, g_ren.quality);
+      fprintf(bf, "Benchmark samples: %d; fixed simulation dt 1/60 s; QPC frequency %lld Hz\n", sampleFrames, (long long)freq.QuadPart);
+      fprintf(bf, "Pacing: WGL swap interval 0 requested (%s); software limiter NOT used. Driver/compositor overrides remain possible.\n", swapOffAccepted ? "accepted" : "unconfirmed");
+      fprintf(bf, "Frame wall includes CPU work, driver blocking, SwapBuffers and message pump. App present intervals are NOT display intervals.\n"
+                  "Batch average includes one final GPU drain; per-frame samples do not force GPU completion.\n"
+                  "GPU samples are raw delayed renderScene queries, excluding later UI/presentation; per-pass snapshots remain EMA diagnostics.\n"
+                  "Percentiles use nearest rank; 1%% low = reciprocal mean of the slowest ceil(1%% * sample count) intervals.\n");
+      auto qpcMs = [&](LARGE_INTEGER x, LARGE_INTEGER y) { return (double)(y.QuadPart - x.QuadPart) * 1000.0 / freq.QuadPart; };
+      auto printSummary = [&](const char* label, const std::vector<double>& values, bool frameRate) {
+        const auto m = benchmark::summarize(values);
+        if (!m.count) { fprintf(bf, "  %s: n=0 unavailable\n", label); return; }
+        fprintf(bf, "  %s: n=%zu min=%.3f median=%.3f p95=%.3f p99=%.3f max=%.3f mean=%.3f ms", label, m.count, m.min, m.median, m.p95, m.p99, m.max, m.mean);
+        if (frameRate && m.count) fprintf(bf, " 1%%low=%.2f fps >16.667ms=%zu/%zu", m.low1, m.overBudget, m.count);
+        fprintf(bf, "\n");
+      };
+      auto printWeather = [&](Game* g, const char* phase) {
+        const Weather& w = g->benchmarkWeather();
+        fprintf(bf, "  weather %s: cover=%.4f base=%.2f precip=%d storm=%d wind_kt=%.3f from=%.3f gust_kt=%.3f turbulence=%.4f hour=%.4f visibility=%.1f\n",
+                phase, w.cloudCover, w.cloudBase, w.precip, w.storm ? 1 : 0, w.windSpeed * MS_TO_KT, w.windFrom, w.gust * MS_TO_KT, w.turbulence, g->benchmarkTimeOfDay(), w.visibility);
+      };
       if (cl.find("--nobodies") == std::string::npos) {   // (--nobodies: the shader compile timing alone)
         int built = 0; double secs = 0;
         buildBodies(built, secs);
         if (bf) { fprintf(bf, "aircraft bodies: %d built from scratch in %.1f s (the rest loaded from the cache)\n\n", built, secs); fflush(bf); }
       }
       g_ren.entSync = true;
-      for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
-        std::string sc = list.substr(a, b - a);
-        if (sc.empty()) continue;
+      g_ren.syncTiming = false;   // normal async GPU queries; never serialized per-pass debug timing
+      bool allValid = true;
+      for (const std::string& sc : scenes) {
         MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
         RECT rc; GetClientRect(g_hwnd, &rc);
         if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
@@ -1006,11 +1046,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         Game* g = new Game();
         g->saveDir = game.saveDir;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
+        g_ren.setRenderScale(1.f);   // explicit benchmark invariant; does not change saved settings
+        fprintf(bf, "\nScene %s; requested WX=%s\n", sc.c_str(), getenv("WX") ? getenv("WX") : "(scene/default)");
+        printWeather(g, "preset");
         g_ren.entSync = false;
         // warm until the scene is built: at least 40 frames, then until 20 frames in a row bake nothing and stream
         // nothing (a body, the scenery, the terrain shadow), at most 1200
         int warm = 0, quiet = 0; const int bakes0 = g_ren.bakeCount;
-        for (; warm < 1200 && quiet < 20; warm++) {
+        for (; warm < 1200 && quiet < 20 && !game.quit; warm++) {
           const int bc = g_ren.bakeCount;
           g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); pumpB();
           const bool busy = g_ren.bakeCount != bc || g_ren.entPending > 0 || g_ren.tshPending();
@@ -1019,24 +1062,89 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         const int warmBakes = g_ren.bakeCount - bakes0;
         g_ren.bakeYield = nullptr;
         SetWindowTextA(g_hwnd, ("Solace Express - benchmarking " + sc).c_str());
+        struct Sample {
+          LARGE_INTEGER begin{}, updateEnd{}, presentBegin{}, presentEnd{}, end{};
+          uint64_t renderFrame = 0, gpuId = 0, gpuOrigin = 0;
+          double gpu = 0; float scale = 1;
+          int width = 0, height = 0, pending = 0, terrainPending = 0, bakes = 0, quality = 0;
+          bool native1080 = false; int sceneStatus = 0;
+        };
+        std::vector<Sample> samples; samples.reserve(sampleFrames);
+        const uint64_t firstGpuFrame = g_ren.gpuFrameSerial + 1;
+        const uint64_t overwritten0 = g_ren.gpuSamplesOverwritten;
+        uint64_t seenGpu = g_ren.gpuSample.id;
+        const int measuredBakes0 = g_ren.bakeCount;
+        const int measuredSceneStatus = g->benchmarkSceneStatus();
         glFinish();
         LARGE_INTEGER f0, f1; QueryPerformanceCounter(&f0);
-        const int N = 120;
-        for (int i = 0; i < N; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); pumpB(); }
+        for (int i = 0; i < sampleFrames && !game.quit; i++) {
+          Sample s; QueryPerformanceCounter(&s.begin);
+          g->update(1.f / 60.f); QueryPerformanceCounter(&s.updateEnd);
+          s.width = g_ren.W; s.height = g_ren.H; s.scale = g_ren.renderScale; s.quality = g_ren.quality;
+          g->render(); QueryPerformanceCounter(&s.presentBegin);
+          SwapBuffers(g_hdc); QueryPerformanceCounter(&s.presentEnd);
+          pumpB();
+          RECT client; GetClientRect(g_hwnd, &client);
+          s.native1080 = client.right == 1920 && client.bottom == 1080 && g_ren.W == s.width && g_ren.H == s.height && s.width == 1920 && s.height == 1080 && fabsf(s.scale - 1.f) < 1e-6f;
+          s.pending = g_ren.entPending; s.terrainPending = g_ren.tshPending() ? 1 : 0; s.bakes = g_ren.bakeCount;
+          s.renderFrame = g_ren.gpuFrameSerial; s.sceneStatus = g->benchmarkSceneStatus();
+          const auto& gpuSample = g_ren.gpuSample;
+          if (gpuSample.id != seenGpu) {
+            seenGpu = gpuSample.id;
+            if (gpuSample.frame >= firstGpuFrame && gpuSample.frame <= s.renderFrame) {
+              s.gpuId = gpuSample.id; s.gpuOrigin = gpuSample.frame; s.gpu = gpuSample.ms;
+            }
+          }
+          QueryPerformanceCounter(&s.end);
+          samples.push_back(s);
+        }
         glFinish(); QueryPerformanceCounter(&f1);
-        double ms = (double)(f1.QuadPart - f0.QuadPart) / freq.QuadPart * 1000.0 / N;
+        const int N = (int)samples.size();
+        double ms = N ? qpcMs(f0, f1) / N : 0;
+        std::vector<double> wall, present, update, submit, swap, gpuRaw;
+        int nativeFrames = 0, streamFrames = 0, stableSceneFrames = 0;
+        for (size_t i = 0; i < samples.size(); i++) {
+          const Sample& s = samples[i];
+          const double fw = qpcMs(s.begin, s.end), u = qpcMs(s.begin, s.updateEnd), r = qpcMs(s.updateEnd, s.presentBegin);
+          const double sw = qpcMs(s.presentBegin, s.presentEnd), pump = qpcMs(s.presentEnd, s.end);
+          const double pi = i ? qpcMs(samples[i - 1].presentBegin, s.presentBegin) : 0;
+          wall.push_back(fw); update.push_back(u); submit.push_back(r); swap.push_back(sw);
+          if (i) present.push_back(pi); if (s.gpuId) gpuRaw.push_back(s.gpu);
+          stableSceneFrames += s.sceneStatus >= 0 && s.sceneStatus == measuredSceneStatus;
+          nativeFrames += s.native1080; streamFrames += s.pending > 0 || s.terrainPending;
+          if (csv) {
+            fprintf(csv, "%s,%zu,%llu,%.6f,", benchmark::csvField(sc).c_str(), i, (unsigned long long)s.renderFrame, fw);
+            if (i) fprintf(csv, "%.6f", pi); else fprintf(csv, "NA");
+            fprintf(csv, ",%.6f,%.6f,%.6f,%.6f,", u, r, sw, pump);
+            if (s.gpuId) fprintf(csv, "%llu,%llu,%.6f", (unsigned long long)s.gpuId, (unsigned long long)s.gpuOrigin, s.gpu);
+            else fprintf(csv, "NA,NA,NA");
+            fprintf(csv, ",%d,%d,%d,%d,%.6f,%d,%d,%d,%d,%d,%d,%lld,%lld\n", s.width, s.height, (int)(s.width * s.scale), (int)(s.height * s.scale), s.scale, s.quality, s.pending, s.terrainPending, s.bakes, s.native1080 ? 1 : 0, s.sceneStatus, (long long)s.begin.QuadPart, (long long)s.presentBegin.QuadPart);
+          }
+        }
+        const bool complete = N == sampleFrames && quiet >= 20 && stableSceneFrames == N && !game.quit;
+        allValid = allValid && complete;
+        fprintf(bf, "  capture complete=%s quiet_warmup=%s native1080_frames=%d/%d pending_stream_frames=%d measured_body_bakes=%d stable_scene_frames=%d/%d\n",
+                complete ? "yes" : "no", quiet >= 20 ? "yes" : "no", nativeFrames, N, streamFrames, g_ren.bakeCount - measuredBakes0, stableSceneFrames, N);
+        fprintf(bf, "  fresh_gpu_samples=%zu/%d query_overwrites=%llu; trailing pending GPU samples not force-read\n", gpuRaw.size(), N, (unsigned long long)(g_ren.gpuSamplesOverwritten - overwritten0));
+        printSummary("frame work wall", wall, false); printSummary("app present interval", present, true);
+        printSummary("CPU update wall", update, false); printSummary("CPU render/submit wall", submit, false);
+        printSummary("SwapBuffers wall", swap, false); printSummary("GPU renderScene raw delayed", gpuRaw, false);
+        printWeather(g, "measured-end");
         if (bf) {
           const float* pm = g_ren.passMs;
           fprintf(bf, "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: world %.2f  displays %.2f  feeds %.2f  objects %.2f  shadow proxy %.2f  lighting %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n",
-                  sc.c_str(), ms, 1000.0 / ms, g_ren.gpuMs, pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9], pm[10]);
+                  sc.c_str(), ms, ms > 0 ? 1000.0 / ms : 0, g_ren.gpuMs, pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9], pm[10]);
           fprintf(bf, "%-22s (warmed %d frames until built; %d bodies built during it)\n", "", warm, warmBakes);
           fflush(bf);
         }
         g_ren.entSync = true;
         delete g;
+        if (game.quit) break;
       }
-      if (bf) fclose(bf);
-      return 0;
+      const bool ioFailed = ferror(bf) || (csv && ferror(csv));
+      bool closeFailed = fclose(bf) != 0;
+      if (csv) closeFailed = fclose(csv) != 0 || closeFailed;
+      return allValid && !ioFailed && !closeFailed ? 0 : 2;
     }
   }
   // Loading-screen pictures: SolaceExpress.exe --loadshots renders every airport (and every aircraft in flight) at

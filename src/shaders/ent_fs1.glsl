@@ -45,20 +45,23 @@ bool leafCut(float viewEdge){
     float far = smoothstep(25.0, 110.0, length(uCam - vW));   // (needles finer than a pixel: a denser spray instead of shimmer)
     return fract((v + u*0.4)*24.0 + hsh(vec2(floor(vAux.z), vInst.x))*3.0) > mix(0.45, 0.8, far);
   }
-  if (part == P_LEAFCARD) {   // a spray of leaves: jittered ellipses on a 3x3 grid, each at its own angle
+  if (part == P_LEAFCARD) {   // the same jittered leaf ellipses, with only the four possible covering cells
     vec2 uv0 = vec2(fract(vAux.z), vAux.w);
-    if (length(uv0 - 0.5) > 0.47 - 0.12*vn3(vec3(uv0*5.0, floor(vAux.z) + vInst.x*7.0))) return true;   // ragged round spray
-    vec2 uv = uv0*5.0, c0 = floor(uv);
-    float best = 9.0;
-    for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+    if (length(uv0 - 0.5) > 0.47 - 0.12*vn3(vec3(uv0*5.0, floor(vAux.z) + vInst.x*7.0))) return true;
+    vec2 uv = uv0*5.0, c0 = floor(uv - 0.5);
+    // Centres are cell + [0.2, 0.8], and each rotated ellipse fits a radius-0.5 circle. A cell
+    // outside this 2x2 neighborhood is at least 0.7 away on one axis, so it cannot cover uv.
+    for (int j = 0; j < 2; j++) for (int i = 0; i < 2; i++) {
       vec2 c = c0 + vec2(i, j);
       float h = hsh(c + floor(vAux.z)*7.0 + vInst.x*13.0);
       vec2 ctr = c + 0.5 + (vec2(h, fract(h*17.3)) - 0.5)*0.6;
+      vec2 d = uv - ctr;
+      if (dot(d, d) > 0.250001) continue;   // conservative circle bound before the trigonometry
       float a = h*6.2832, ca = cos(a), sa = sin(a);
-      vec2 d = uv - ctr; d = vec2(ca*d.x + sa*d.y, -sa*d.x + ca*d.y);
-      best = min(best, length(d/vec2(0.5, 0.23)) + 0.15*step(abs(d.y), 0.02));
+      d = vec2(ca*d.x + sa*d.y, -sa*d.x + ca*d.y);
+      if (length(d/vec2(0.5, 0.23)) + 0.15*step(abs(d.y), 0.02) <= 1.0) return false;
     }
-    return best > 1.0;
+    return true;
   }
   if (part == P_FENCE) {   // chain link: real diamonds up close, a dithered see-through panel further away
     // (in the sun's shadow maps a fixed pattern on the panel itself, about as dense as the mesh: the view-dependent

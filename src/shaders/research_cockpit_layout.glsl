@@ -41,6 +41,11 @@ ResearchPanel wraithPanel(int i){
   p.page = i == 0 ? 0 : i == 1 ? 3 : 2;
   return p;
 }
+// Recess the cross-dash support 35 mm behind its former position: the side modules cant toward the eye,
+// so a bridge flush with the centre module crosses their inner lower glass. Keep its width and load path.
+const vec3 WR_BRIDGE_C = vec3(0.0, -0.09, -0.083);
+const vec3 WR_BRIDGE_HALF = vec3(0.68, 0.031, 0.035);
+const float WR_BRIDGE_ROUND = 0.015;
 int wraithPanelIndex(vec3 q){ return q.x < -0.28 ? 0 : q.x > 0.28 ? 2 : 1; }
 // Kept off the central flight scan and deliberately smaller than the main page.
 const vec3 WR_HOLO_EMITTER = vec3(-0.675, -0.409, -0.932);

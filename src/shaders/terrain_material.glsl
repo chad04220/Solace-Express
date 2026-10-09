@@ -1,5 +1,31 @@
 //! kTerrainMaterial
 //! The ground material: natural layers, forests, farmland, towns, roads, airport surfaces and markings, craters.
+// Analytic pixel coverage. Footprints are supplied by the caller before any material/sea branch, never derived
+// from fract/mod or inside divergent control flow. Narrow paint loses contrast with area instead of shimmering.
+float terrainLineCoverage(float position, float halfWidth, float footprint){
+  float width = max(footprint, 1e-5);
+  return clamp((min(position + width*0.5, halfWidth) - max(position - width*0.5, -halfWidth))/width, 0.0, 1.0);
+}
+float terrainStripeIntegral(float x, float duty){
+  return floor(x)*duty + min(fract(x), duty);
+}
+float terrainStripeCoverage(float cycles, float duty, float footprint){
+  // Centre locally to keep subtraction accurate even at large world coordinates.
+  float centre = fract(cycles), width = max(footprint, 1e-5);
+  return clamp((terrainStripeIntegral(centre + width*0.5, duty) - terrainStripeIntegral(centre - width*0.5, duty))/width, 0.0, 1.0);
+}
+float terrainDetailWeight(float cyclesPerPixel){
+  return 1.0 - smoothstep(0.25, 1.0, cyclesPerPixel);
+}
+
+// Follow the actual street axis, not the transverse lot midpoint; leave junctions unpainted.
+float terrainTownPaint(vec2 p, float sx, float sz, vec2 footprint){
+  float paint = 0.0;
+  if (sx > 10.5 && sz <= 10.5) paint = terrainLineCoverage(14.0 - sx, 0.15, footprint.x)*terrainStripeCoverage(p.y/12.0, 0.5, footprint.y/12.0);
+  if (sz > 10.5 && sx <= 10.5) paint = terrainLineCoverage(14.0 - sz, 0.15, footprint.y)*terrainStripeCoverage(p.x/12.0, 0.5, footprint.x/12.0);
+  return paint;
+}
+
 uniform float uTreeFar;   // beyond this the forest is the ground texture alone (entity_render.cpp)
 vec3 terrainNormal(vec2 p, float t){
   float e = max(0.25, t*0.0012);
@@ -9,15 +35,15 @@ vec3 terrainNormal(vec2 p, float t){
 }
 
 // Runway / airport surfaces in runway-local coords (u along, v across)
-int airportAt(vec2 p, out vec2 uv){
+int airportAt(vec2 p, out vec2 uv, out vec2 along){
   for (int i=0;i<16;i++){
     if (i >= uApCount) break;
     vec4 a = uAp[i]; vec4 d = uApDim[i];
     vec2 dp = p - a.xy; float s = sin(a.w), c = cos(a.w);
     float u = dp.x*s - dp.y*c, v = dp.x*c + dp.y*s;
-    if (abs(u) < d.x*0.5 + 600.0 && abs(v) < 600.0) { uv = vec2(u, v); return i; }
+    if (abs(u) < d.x*0.5 + 600.0 && abs(v) < 600.0) { uv = vec2(u, v); along = vec2(s, -c); return i; }
   }
-  return -1;
+  along = vec2(1.0, 0.0); return -1;
 }
 // seven-segment runway designator digit; q in [0,1]^2 (x across, y = reading direction)
 float seg7(vec2 q, int d){
@@ -175,7 +201,7 @@ bool aptGround(int ai, vec2 uv, vec3 pw, int surf, int size, float len, float wi
   return true;
 }
 
-void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bool paved){
+void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, vec2 footprint, out bool onRw, out bool paved){
   vec4 d = uApDim[ai]; float len = d.x, wid = d.y; int surf = int(d.z); int size = int(d.w);
   onRw = false; paved = false;
   float u = uv.x, v = uv.y;
@@ -190,12 +216,12 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bo
       vec4 t = matSample(pw.xz, M_ASPHALT, 7.0, nTS);
       m.alb = t.rgb*0.9; m.rough = t.a; m.nrm = nTS; paved = true;
       float bu = abs(u) - len*0.5;
-      if (bu > 6.0 && fract((bu + abs(v)*1.2)/14.0) < 0.12 && abs(v) < wid*0.5) m.alb = vec3(0.6,0.48,0.05);
+      if (bu > 6.0 && abs(v) < wid*0.5) m.alb = mix(m.alb, vec3(0.6,0.48,0.05), terrainStripeCoverage((bu + abs(v)*1.2)/14.0, 0.12, (footprint.x + footprint.y*1.2)/14.0));
       return;
     }
     if (abs(u) < len*0.5 + 120.0 && abs(v) < wid*0.5 + 60.0 && (surf == 0 || surf == 1)) {
       vec4 t = matSample(pw.xz, M_GRASS, 5.0, nTS);
-      float stripe = step(0.5, fract(u/18.0));
+      float stripe = 1.0 - terrainStripeCoverage(u/18.0, 0.5, footprint.x/18.0);
       m.alb = t.rgb*(0.85 + 0.15*stripe)*vec3(0.95,1.05,0.9); m.rough = 0.9; m.nrm = nTS;
       if (surf != 0) m.alb *= vec3(0.78, 0.82, 0.7);   // longer, darker rough beside an unpaved strip: the strip stands out
     }
@@ -206,7 +232,7 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bo
   vec4 t = matSample(pw.xz, layer, surf == 0 ? 7.0 : 5.0, nTS);
   m.alb = t.rgb; m.rough = t.a; m.nrm = nTS; m.metal = 0.0;
   if (surf == 1) {   // mown strip: short, lighter, yellower grass in lengthwise mowing bands, worn wheel tracks
-    m.alb *= vec3(1.12, 1.18, 0.82) * (0.84 + 0.16*step(0.5, fract((v + wid*0.5)/4.5)));
+    m.alb *= vec3(1.12, 1.18, 0.82) * (0.84 + 0.16*(1.0 - terrainStripeCoverage((v + wid*0.5)/4.5, 0.5, footprint.y/4.5)));
     float track = smoothstep(1.4, 0.4, abs(abs(v) - 1.3))*(0.7 + 0.3*vnoise(vec2(u*0.08, v)));
     m.alb = mix(m.alb, vec3(0.32, 0.27, 0.17), track*0.55);
     float worn = smoothstep(len*0.5 - 40.0, len*0.5 - 160.0, abs(u))*smoothstep(len*0.5 - 260.0, len*0.5 - 120.0, abs(u));
@@ -221,19 +247,24 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bo
     if (board) { m.alb = vec3(0.85); m.rough = 0.6; m.nrm = vec3(0,0,1); }
   }
   if (surf == 0) {
-    if (size == 2) { vec2 sj = vec2(abs(fract(u/7.5) - 0.5), abs(fract(v/7.5) - 0.5)); if (max(sj.x, sj.y) > 0.49) m.alb *= 0.78; }
-    else { float gr = smoothstep(0.42, 0.5, abs(fract(u/0.04) - 0.5)); m.nrm.y += gr*0.2; }
+    if (size == 2) {
+      float joint = max(terrainStripeCoverage(u/7.5 + 0.01, 0.02, footprint.x/7.5), terrainStripeCoverage(v/7.5 + 0.01, 0.02, footprint.y/7.5));
+      m.alb *= 1.0 - 0.22*joint;
+    } else {
+      float gr = smoothstep(0.42, 0.5, abs(fract(u/0.04) - 0.5));
+      m.nrm.y += gr*0.2*terrainDetailWeight(footprint.x/0.04);   // 4 cm grooves only while resolved
+    }
     float tz = smoothstep(len*0.5 - 80.0, len*0.5 - 200.0, abs(u)) * smoothstep(len*0.5 - 650.0, len*0.5 - 300.0, abs(u));
     float tyre = tz * smoothstep(wid*0.3, 0.0, abs(abs(v) - 3.5)) * (0.5 + 0.5*vnoise(vec2(u*0.05, v*2.0)));
     m.alb *= 1.0 - 0.55*tyre;
     m.rough = mix(m.rough, 0.45, tyre);
     float paint = 0.0;
     float au = abs(u), hl = len*0.5;
-    if (abs(v) < 0.45 && fract(u/50.0) < 0.6 && au < hl - 70.0) paint = 1.0;
-    if (abs(abs(v) - (wid*0.5 - 1.0)) < 0.45) paint = 1.0;
-    if (au > hl - 50.0 && au < hl - 12.0 && abs(v) < wid*0.5 - 3.0 && fract((v + wid*0.5)/3.6) < 0.5) paint = 1.0;
-    if (au > hl - 380.0 && au < hl - 320.0 && abs(abs(v) - wid*0.25) < 2.5) paint = 1.0;
-    if (au > hl - 300.0 && au < hl - 150.0 && fract(au/75.0) < 0.3 && abs(abs(v) - wid*0.22) < 2.5 && wid > 25.0) paint = 1.0;
+    if (au < hl - 70.0) paint = terrainLineCoverage(v, 0.45, footprint.y)*terrainStripeCoverage(u/50.0, 0.6, footprint.x/50.0);
+    paint = max(paint, terrainLineCoverage(abs(v) - (wid*0.5 - 1.0), 0.45, footprint.y));
+    if (au > hl - 50.0 && au < hl - 12.0 && abs(v) < wid*0.5 - 3.0) paint = max(paint, terrainStripeCoverage((v + wid*0.5)/3.6, 0.5, footprint.y/3.6));
+    if (au > hl - 380.0 && au < hl - 320.0) paint = max(paint, terrainLineCoverage(abs(v) - wid*0.25, 2.5, footprint.y));
+    if (au > hl - 300.0 && au < hl - 150.0 && wid > 25.0) paint = max(paint, terrainLineCoverage(abs(v) - wid*0.22, 2.5, footprint.y)*terrainStripeCoverage(au/75.0, 0.3, footprint.x/75.0));
     // runway designators, readable from the approach end
     float hdg = uAp[ai].w*57.29578;
     int n0 = int(floor(mod(hdg, 360.0)/10.0 + 0.5)); if (n0 == 0) n0 = 36;
@@ -259,9 +290,9 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, out bool onRw, out bo
 }
 
 // exact road distance using the baked nearest-segment ids
-float roadDist(vec2 p, out float along){
+float roadDist(vec2 p, out float along, out vec2 direction){
   vec2 f = (p + WH)/MTEX - 0.5; ivec2 i = ivec2(floor(f));
-  float best = 1e9; along = 0.0;
+  float best = 1e9; along = 0.0; direction = vec2(1.0, 0.0);
   for (int k = 0; k < 4; k++) {
     ivec2 o = ivec2(k & 1, k >> 1);
     int id = int(texelFetch(uRoadId, clamp(i + o, ivec2(0), ivec2(MASKN-1)), 0).r*255.0 + 0.5) - 1;
@@ -270,7 +301,7 @@ float roadDist(vec2 p, out float along){
     vec2 ab = s.zw - s.xy; float L2 = dot(ab, ab);
     float tt = clamp(dot(p - s.xy, ab)/max(L2, 1e-3), 0.0, 1.0);
     float dd = length(s.xy + ab*tt - p);
-    if (dd < best) { best = dd; along = tt*sqrt(L2); }
+    if (dd < best) { float roadLength = sqrt(L2); best = dd; along = tt*roadLength; direction = ab/max(roadLength, 1e-3); }
   }
   return best;
 }
@@ -305,7 +336,8 @@ void fieldMaterial(vec2 p, float farm, inout Mat m){
   m.nrm = mix(m.nrm, nTS, farm*0.6);
 }
 
-Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
+Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixelDy){
+  vec2 groundFoot = abs(pixelDx) + abs(pixelDy);
   Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
   if ((uDbg & 128) != 0) { m.alb = vec3(0.2, 0.3, 0.12); m.rough = 0.9; return m; }
   float lush = base.z, cold = base.w;
@@ -370,7 +402,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
     vec3 sc = s.rgb*mix(vec3(1.0), vec3(1.08,1.04,0.95), lush)*(0.85 + 0.3*vnoise(p.xz/70.0))*mix(1.0, 0.55, wetS);
     m.alb = mix(m.alb, sc, w); m.rough = mix(m.rough, mix(s.a, s.a*0.45, wetS), w); m.nrm = mix(m.nrm, nTS, w); hC = mix(hC, hL, w); }
   if (wRock > 0.01) {
-    vec3 nr; vec4 r = triSample(p, n, M_ROCK, 18.0, nr);
+    vec3 nr; vec4 r = terrainTriSample(p, n, M_ROCK, 18.0, nr);
     float w = hblend(wRock, hC, dot(r.rgb, vec3(0.6))*1.6);
     vec3 rockTint = mix(vec3(1.0,0.95,0.88), vec3(0.75,0.72,0.72), cold);
     if (base.y > 300.0 && lush > 0.9) rockTint = vec3(0.55,0.5,0.5);
@@ -388,7 +420,10 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
     if (max(e.x, e.y) > 13.6 && edge < 10.5) { m.alb = mix(m.alb, vec3(0.08, 0.16, 0.06), smoothstep(0.04, 0.15, msk.y)); }
     float townW = smoothstep(0.04, 0.15, msk.y);
     vec4 tx; vec3 c;
-    if (edge > 10.5) { tx = matSample(p.xz, M_ASPHALT, 6.0, nTS); c = tx.rgb*0.9; if (abs(min(e.x, e.y) - 0.0) < 0.15 && edge > 12.0) c = vec3(0.7); }
+    if (edge > 10.5) {
+      tx = matSample(p.xz, M_ASPHALT, 6.0, nTS); c = tx.rgb*0.9;
+      c = mix(c, vec3(0.7), terrainTownPaint(p.xz, sx, sz, groundFoot));
+    }
     else if (edge > 9.0) { tx = matSample(p.xz, M_CONCRETE, 3.0, nTS); c = tx.rgb; }
     else if (msk.z > 0.45) { tx = matSample(p.xz, M_CONCRETE, 4.0, nTS); c = tx.rgb*0.95; }
     else { tx = matSample(p.xz, M_GRASS, 4.0, nTS); c = tx.rgb*vec3(0.8, 1.0, 0.65); }
@@ -399,19 +434,26 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base){
   }
   // ---- roads (exact geometry from the baked segment ids)
   if (msk.x < 0.25) {
-    float along; float rd = roadDist(p.xz, along);
+    float along; vec2 direction; float rd = roadDist(p.xz, along, direction);
     if (rd < 6.0) {
       vec4 tx = matSample(p.xz, rd < 4.0 ? M_ASPHALT : M_GRAVEL, 6.0, nTS);
       float a = smoothstep(6.0, 4.6, rd);
       vec3 c = tx.rgb*(rd < 4.0 ? 0.85 : 1.0);
-      if (abs(rd - 3.55) < 0.12) c = vec3(0.75);
-      if (rd < 0.11 && fract(along/12.0) < 0.5) c = vec3(0.85, 0.75, 0.3);
+      vec2 across = vec2(-direction.y, direction.x);
+      float roadFoot = abs(dot(pixelDx, across)) + abs(dot(pixelDy, across));
+      float alongFoot = abs(dot(pixelDx, direction)) + abs(dot(pixelDy, direction));
+      c = mix(c, vec3(0.75), terrainLineCoverage(rd - 3.55, 0.12, roadFoot));
+      c = mix(c, vec3(0.85, 0.75, 0.3), terrainLineCoverage(rd, 0.11, roadFoot)*terrainStripeCoverage(along/12.0, 0.5, alongFoot/12.0));
       m.alb = mix(m.alb, c, a); m.rough = mix(m.rough, tx.a, a); m.nrm = mix(m.nrm, nTS, a);
     }
   }
   // ---- airport surfaces
-  vec2 auv; int ai = airportAt(p.xz, auv);
-  if (ai >= 0) { bool onRw, paved; runwayMaterial(ai, auv, m, p, onRw, paved); }
+  vec2 auv, along; int ai = airportAt(p.xz, auv, along);
+  if (ai >= 0) {
+    vec2 across = vec2(-along.y, along.x);
+    vec2 footprint = vec2(abs(dot(pixelDx, along)) + abs(dot(pixelDy, along)), abs(dot(pixelDx, across)) + abs(dot(pixelDy, across)));
+    bool onRw, paved; runwayMaterial(ai, auv, m, p, footprint, onRw, paved);
+  }
   // ---- impact crater: churned earth, scorched blast ring, smouldering embers in the pit
   int ci = uCraterN > 0 ? craterAt(p.xz, 2.6) : -1;
   if (ci >= 0) {
