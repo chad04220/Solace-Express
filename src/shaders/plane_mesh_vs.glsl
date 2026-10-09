@@ -14,7 +14,7 @@ out vec3 vB;   // body space: what the cabin's cut-outs and panels are decided f
 void main(){
   vec3 pos = aPos, nrm = aNrm;
   if (uPartInst >= 0) {
-    int b = uPartInst*4;
+    int b = (uPartInst + gl_InstanceID)*4;
     mat3 R = mat3(texelFetch(uPartPose, ivec2(b, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 1, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 2, 0), 0).xyz);
     pos = R*aPos + texelFetch(uPartPose, ivec2(b + 3, 0), 0).xyz; nrm = transpose(inverse(R))*aNrm;   // (a control surface's pose is affine, not a rotation)
   }

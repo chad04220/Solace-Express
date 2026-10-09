@@ -5,12 +5,25 @@ vec2 mapPiece(vec3 p){ vec2 d = mapPlane(p); if (gPI >= 0) d.x = max(d.x, sdBox(
 // (The airframe's distance is a very large function: every call written out is another inlined copy in the shader.
 // Its multi-tap users loop with a bound the compiler can't see through (gZero, 0 at run time), so they keep one copy.)
 int gZero = 0;
-vec3 planeNormal(vec3 p){ float e = 0.0025; vec3 n = vec3(0.0);
-  for (int i = gZero; i < 4; i++) {   // tetrahedron taps (1,-1,-1) (-1,-1,1) (-1,1,-1) (1,1,1), in that order
-    vec3 k = 2.0*vec3(float(((i + 3) >> 1) & 1), float((i >> 1) & 1), float(i & 1)) - 1.0;
-    n += k*mapPiece(p + k*e).x;
+vec3 planeNormal(vec3 p){
+  // Keep one field call site: large SDF functions must not be duplicated by fallbacks.
+  for (int attempt = gZero; attempt < 3; attempt++) {
+    float e = attempt == 0 ? 0.0025 : attempt == 1 ? 0.00125 : 0.005;
+    vec3 n = vec3(0.0);
+    for (int i = gZero; i < 6; i++) {
+      if (attempt == 0 && i >= 4) break;
+      vec3 k;
+      if (attempt == 0) k = 2.0*vec3(float(((i + 3) >> 1) & 1), float((i >> 1) & 1), float(i & 1)) - 1.0;
+      else { k = i/2 == 0 ? vec3(1,0,0) : i/2 == 1 ? vec3(0,1,0) : vec3(0,0,1); if ((i & 1) != 0) k = -k; }
+      n += k*mapPiece(p + k*e).x;
+    }
+    float n2 = dot(n,n);
+    if (n2 > 1e-20 && n2 < 1e30) return n*inversesqrt(n2);
   }
-  return normalize(n); }
+  // Unresolved gradients do not move a crossing/QEF vertex. The bake reconstructs
+  // its normal from oriented adjacent faces before simplification, with a finite gate.
+  return vec3(0.0);
+}
 
 float planeBound(){ return max(gM[0].x, gM[9].x*2.0)*0.55 + 1.5; }
 void pieceXf(int i){ gPI = i; if (i < 0) { gPP = uPlanePos; gPR = uPlaneRot; gPC = vec3(0.0); } else { gPP = uPcPos[i]; gPR = uPcRot[i]; gPC = uPcC[i]; } }

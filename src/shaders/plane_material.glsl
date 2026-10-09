@@ -221,20 +221,19 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     if (length(fq) < gM[16].z*0.25) m.alb = vec3(0.05);
   }
   if (mid == 94) { m.alb = vec3(0.07, 0.07, 0.075); m.metal = 0.7; m.rough = 0.3; m.emit = vec3(0.0); }   // fixture housing
-  else if (mid >= 95 && mid <= 100) {   // lens: clear glossy dome over the lamp, tinted glass, glowing when lit
-    int li = mid - 95; float tint = uLensD[li].w;
-    m.alb = tint < 0.5 ? vec3(0.25, 0.02, 0.02) : tint < 1.5 ? vec3(0.02, 0.22, 0.06) : vec3(0.3);
+  else if (mid >= 95 && mid <= 100) {   // canonical semantic fixture, emission belongs to the current aircraft
+    int li = mid - 95;
+    m.alb = li == 0 || li == 3 ? vec3(0.25, 0.02, 0.02) : li == 1 ? vec3(0.02, 0.22, 0.06) : vec3(0.3);
     m.metal = 0.0; m.rough = 0.04; m.nrm = vec3(0.0, 0.0, 1.0);
-    m.emit = uLensC[li].rgb;
-  }
-  else if (mid >= 101 && mid <= 104) {   // traffic fixtures: nav lights steady, strobes and beacon flashing
-    float k = float(gTrafK), lk = 3.0 + 40.0*uNight;
-    bool strobe = fract((uTime*0.77 + k*0.13)/1.3) < 0.05/1.3, bcn = fract(uTime + k*0.37) < 0.1;
-    m.metal = 0.0; m.rough = 0.04; m.nrm = vec3(0.0, 0.0, 1.0);
-    if (mid == 101) { m.alb = vec3(0.25, 0.02, 0.02); m.emit = vec3(1.0, 0.08, 0.04)*lk + (strobe ? vec3(20.0) : vec3(0.0)); }
-    else if (mid == 102) { m.alb = vec3(0.02, 0.22, 0.06); m.emit = vec3(0.1, 1.0, 0.25)*lk + (strobe ? vec3(20.0) : vec3(0.0)); }
-    else if (mid == 103) { m.alb = vec3(0.3); m.emit = vec3(1.0, 0.97, 0.9)*lk; }
-    else { m.alb = vec3(0.25, 0.02, 0.02); m.emit = bcn ? vec3(30.0, 1.5, 0.6) : vec3(0.0); }
+    if (gOwn) m.emit = li < uLensN ? uLensC[li].rgb : vec3(0.0);
+    else {
+      float k = float(gTrafK), lk = 3.0 + 40.0*uNight;
+      bool strobe = fract((uTime*0.77 + k*0.13)/1.3) < 0.05/1.3, bcn = fract(uTime + k*0.37) < 0.1;
+      if (li < 2) m.emit = (li == 0 ? vec3(1.0, 0.08, 0.04) : vec3(0.1, 1.0, 0.25))*lk + (strobe ? vec3(20.0) : vec3(0.0));
+      else if (li == 2) m.emit = vec3(1.0, 0.97, 0.9)*lk;
+      else if (li == 3) m.emit = bcn ? vec3(30.0, 1.5, 0.6) : vec3(0.0);
+      else m.emit = vec3(0.0);   // traffic has no landing-light command in its packed state
+    }
   }
   else if (RESEARCH_ON && mid >= 80 && mid < 94) shadeWraith(m, mid, lp, ln, t);
   else if (RESEARCH_ON && mid >= 61 && mid < 80 && int(gM[0].z + 0.5) == 6) {   // XR-40 cockpit
@@ -259,58 +258,60 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
       m.alb = mix(m.alb, vec3(0.16, 0.11, 0.17), 0.4*heat);   // heat-tinted titanium
     } else if (mid == 34) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = gColStripe*(1.2 + 2.0*uNight)*pulse; }
     else if (mid == 36) {   // turbine stage and tail cone: dark heat-blued metal glowing with the exhaust heat
-      float ab = gFlame.y, sp = gFlame.x;
+      vec4 ep = exhaustEnginePower(lp.x < 0.0 ? 0 : 1);
+      float ab = ep.y, sp = ep.x;
       m.alb = vec3(0.012, 0.011, 0.012); m.metal = 0.3; m.rough = 0.75;
-      m.emit = vec3(1.0, 0.32, 0.08)*(0.15*sp*sp) + mix(vec3(1.0, 0.45, 0.12), vec3(1.0, 0.8, 0.55), ab)*ab*3.5;
+      m.emit = (vec3(1.0, 0.32, 0.08)*(0.15*sp*sp) + mix(vec3(1.0, 0.45, 0.12), vec3(1.0, 0.8, 0.55), ab)*ab*3.5)*ep.z;
     }
     else if (mid == 37) {   // afterburner internals and liner: scorched metal, red-hot in reheat towards the turbine
-      float ab = gFlame.y, sp = gFlame.x, deep = smoothstep(0.6, -0.35, dot(lp - vec3(sign(lp.x)*0.82, -0.12, 7.75), vec3(0.0, -sin(gFlame.z), cos(gFlame.z))) - 0.5);
+      vec4 ep = exhaustEnginePower(lp.x < 0.0 ? 0 : 1);
+      float ab = ep.y, sp = ep.x, deep = smoothstep(0.6, -0.35, dot(lp - vec3(sign(lp.x)*0.82, -0.12, 7.75), vec3(0.0, -sin(gFlame.z), cos(gFlame.z))) - 0.5);
       m.alb = vec3(0.014, 0.013, 0.012); m.metal = 0.2; m.rough = 0.85;   // soot-black
-      m.emit = vec3(1.0, 0.3, 0.07)*(0.05*sp*sp + 1.4*ab)*deep;
+      m.emit = vec3(1.0, 0.3, 0.07)*(0.05*sp*sp + 1.4*ab)*deep*ep.z;
     }
     else if (mid == 40) {  // sealed pod: carbon weave between structural ribs
       vec2 wv = vec2(lp.x + lp.z, lp.y - lp.z)*27.5;   // (a checker of 1.8 cm squares: two square waves, crossed)
       float wa = aaSquare(wv.x, gPixG*39.0), wb = aaSquare(wv.y, gPixG*39.0);
       tx = triSample(lp, ln, M_FABRIC, 4.0, nT); m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.3);
-      m.alb = vec3(0.03, 0.032, 0.036)*(0.8 + 0.4*(wa + wb - 2.0*wa*wb)); m.rough = 0.3; m.metal = 0.2;
+      m.alb = vec3(0.03, 0.032, 0.036)*(0.8 + 0.4*(wa + wb - 2.0*wa*wb)); m.rough = 0.64; m.metal = 0.10;
       float rib = aaLines((lp.z - E.z)*4.0 + 0.5, 0.04, gPixG*4.0);
       m.alb = mix(m.alb, vec3(0.07, 0.075, 0.08), rib); m.metal = mix(m.metal, 0.7, rib);
-      if (abs(lp.y - (E.y - 0.18)) < 0.004) m.emit = gColStripe*1.4*pulse;
+      if (abs(lp.y - (E.y - 0.18)) < 0.004) m.emit = gColStripe*0.14*pulse;
     }
     else if (mid >= 41 && mid <= 43) { m.alb = vec3(0.0); m.rough = 0.05; }
     else if (mid == 44) {  // bezels and consoles: satin composite with machined edges and fasteners
       vec2 hx = lp.xz*45.0 + vec2(lp.y*30.0);
       tx = triSample(lp, ln, M_PLASTIC, 0.4, nT); m.nrm = nT;
       float tile = aaSquare(hx.x + floor(hx.y)*0.5, gPixG*60.0);
-      m.alb = vec3(0.028, 0.03, 0.034)*(0.9 + 0.2*mix(tile, 0.5, smoothstep(0.3, 0.8, gPixG*60.0)))*(0.7 + 0.6*tx.r); m.rough = mix(0.42, tx.a, 0.4); m.metal = 0.35;
+      m.alb = vec3(0.042, 0.048, 0.056)*(0.9 + 0.2*mix(tile, 0.5, smoothstep(0.3, 0.8, gPixG*60.0)))*(0.7 + 0.6*tx.r); m.rough = mix(0.65, tx.a, 0.25); m.metal = 0.16;
       vec3 qd = lp - E.xyz; float rr = length(qd.xz), an = atan(qd.x, -qd.z);
       if (rr < 0.7) m.alb *= 1.0 + 1.2*aaLines(an*9.0, 0.025, gPixG*9.0/max(rr, 0.1));   // panel seams
       float sc = aaDisc(length(vec2(fract(an*18.0) - 0.5, (qd.y - 0.36)*90.0)), 0.12, gPixG*max(18.0/max(rr, 0.1), 90.0), 0.0);   // screws
       m.alb = mix(m.alb, vec3(0.35), sc); m.metal = mix(m.metal, 1.0, sc); m.rough = mix(m.rough, 0.25, sc);
     }
     else if (mid == 45 || mid == 52 || mid == 53) {  // multi-function displays
-      vec3 qd = lp - E.xyz; int page; vec2 uv;
+      vec3 qd = lp - E.xyz; int page; vec2 uv; float panelScale;
       if (mid == 45) {
-        float rr = length(qd.xz), an = atan(qd.x, -qd.z);
-        float k = clamp(floor(an/0.42 + 0.5), -2.0, 2.0);
-        page = int(k) + 2; uv = vec2((an - k*0.42)*rr/0.07, (rr - 0.575)/0.05);
+        ResearchPanel panel = specterPanel(specterPanelIndex(qd));
+        vec3 l = researchPanelFrame(qd, panel);
+        page = panel.page; uv = l.xy/panel.h; panelScale = min(panel.h.x, panel.h.y);
       } else {
         vec3 cq = vec3(abs(qd.x) - 0.52, qd.y + 0.44, qd.z - 0.08);
-        page = mid == 52 ? 5 : 6; uv = vec2((cq.x - 0.02)/0.075*sign(qd.x), -(cq.z + 0.2)/0.06);
+        page = mid == 52 ? 5 : 6; uv = vec2((cq.x - 0.02)/0.075*sign(qd.x), -(cq.z + 0.2)/0.06); panelScale = 0.06;
       }
       // 4x supersampled over this pixel's footprint on the panel: crisp at any display resolution
-      float fp = t*uTanHalf*2.0/uRes.y/(mid == 45 ? 0.07 : 0.06);   // the true pixel size: TAA smooths the foreshortened axis
+      float fp = t*uTanHalf*2.0/uRes.y/panelScale;   // the true pixel size: TAA smooths the foreshortened axis
       gAA = fp*0.55;
       vec3 sc = pageTex(page, uv, fp);
       float edge = smoothstep(1.0, 0.92, max(abs(uv.x), abs(uv.y)));
       sc = sc*edge + vec3(0.01, 0.03, 0.04)*edge;                                         // dark-blue backlight
-      m.alb = vec3(0.01); m.rough = 0.06; m.metal = 0.0; m.emit = sc*1.5; gDispPx = true;
+      m.alb = vec3(0.01); m.rough = 0.06; m.metal = 0.0; m.emit = sc*(page == 3 ? 1.35 : 1.10); gDispPx = true;
     }
     else if (mid == 46) { tx = triSample(lp, ln, M_LEATHER, 0.3, nT); m.alb = vec3(dot(tx.rgb, vec3(0.33)))*vec3(0.3, 0.32, 0.36); m.rough = tx.a; m.nrm = nT;
-      if (abs(abs(lp.x - E.x) - 0.16) < 0.005) m.emit = gColStripe*0.9*pulse;
-      if (lp.y > E.y + 0.12 && abs(lp.x - E.x) < 0.1 && ln.z > 0.5) m.emit = gColStripe*1.2; }
+      if (abs(abs(lp.x - E.x) - 0.16) < 0.005) m.emit = gColStripe*0.09*pulse;
+      if (lp.y > E.y + 0.12 && abs(lp.x - E.x) < 0.1 && ln.z > 0.5) m.emit = gColStripe*0.12; }
     else if (mid == 47) { tx = triSample(lp, ln, M_RUBBER, 0.1, nT); m.alb = tx.rgb*0.3; m.rough = tx.a; m.metal = 0.1; m.nrm = nT; if (lp.y > E.y - 0.24 && ln.y > 0.3) m.emit = vec3(1.0, 0.45, 0.1)*0.8; }
-    else if (mid == 48) { m.alb = vec3(0.1); m.emit = gColStripe*1.1*pulse; }
+    else if (mid == 48) { m.alb = vec3(0.1); m.emit = gColStripe*0.16*pulse; }
     else if (mid == 49) {  // annunciator strip: GEAR, BRK, AB, TVC, MACH, G, LOW ALT, SYS
       vec3 qd = lp - E.xyz; float an = atan(qd.x, -qd.z);
       int cell = int(clamp(floor((an + 0.62)/0.155), 0.0, 7.0));
@@ -352,7 +353,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
       if (abs(f2.y + 0.03) < 0.0015 && abs(f2.x) < 0.02) m.emit = vec3(0.4, 0.5, 0.55)*0.6;   // engraved labels
     }
     else if (mid == 56) { tx = triSample(lp, ln, M_FABRIC, 0.08, nT); m.alb = tx.rgb*vec3(0.18, 0.19, 0.21); m.rough = 0.9; m.nrm = nT; if (abs(fract(lp.y*40.0) - 0.5) < 0.04) m.emit = vec3(1.0, 0.45, 0.1)*0.25; }
-    else if (mid == 57) { m.alb = vec3(0.1); m.emit = vec3(1.0, 0.5, 0.15)*1.8; }
+    else if (mid == 57) { m.alb = vec3(0.1); m.emit = vec3(1.0, 0.5, 0.15)*(.065+.055*uNight); } // footwell datum stays below live flight information
     else if (mid == 58) { m.alb = vec3(0.7, 0.66, 0.6); m.rough = 0.3; m.emit = vec3(1.0, 0.8, 0.58)*0.55; }   // ceiling light diffusers
   }
   else if (mid >= 60) {  // light-aircraft / airliner cockpit parts (PBR texture sets)
@@ -457,14 +458,16 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     }
     if(mid==21) {
       vec3 fc=mix(MT_INLET,vec3(0,.32,1.38),.68); vec2 fq=lp.xy-fc.xy;
-      float blades=.5+.5*cos(atan(fq.y,fq.x)*22.0-uTime*75.0*gFlame.x);
+      vec4 ep=exhaustEnginePower(0);
+      float blades=.5+.5*cos(atan(fq.y,fq.x)*22.0-uTime*75.0*ep.x*ep.z);
       m.alb=mix(vec3(.035,.045,.052),vec3(.20,.23,.25),blades); m.metal=.9; m.rough=.35;
     }
     if(mid==134) {
       vec2 tq=lp.xy-vec2(0,gM[16].y); float radial=length(tq);
       float ring=exp(-pow((radial-gM[16].z*.49)/.035,2.0));
       m.alb=vec3(.075,.06,.045); m.metal=.85; m.rough=.45;
-      m.emit=vec3(1.0,.29,.045)*ring*(.3*gFlame.x+2.2*gFlame.y);
+      vec4 ep=exhaustEnginePower(0);
+      m.emit=vec3(1.0,.29,.045)*ring*(.3*ep.x+2.2*ep.y)*ep.z;
     }
     if(mid==11 || mid==63) { m.alb=vec3(.075,.09,.11); m.rough=.68; }
     if(mid==12) { m.alb=vec3(.08,.095,.11); m.rough=.8; }
@@ -487,6 +490,10 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
         m.alb=vec3(.006); m.rough=.075; m.emit=sc*(.82+.45*uNight);
       }
     }
+  }
+  if (fleetCabin()) {
+    if (mid>=140 && mid<=146) interior=true;
+    shadeFleetCabin(m,mid,lp,ln,t*2.0*uTanHalf/uRes.y);
   }
   n = applyTS(n, m.nrm, interior ? 0.35 : 0.12);
   int engM = int(gM[0].z + 0.5);

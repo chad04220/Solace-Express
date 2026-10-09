@@ -134,12 +134,28 @@ vec3 glassGlare(vec3 c, vec2 d, float r){   // faint reflection across the cover
   float g = smoothstep(0.2, 1.0, dot(normalize(d + vec2(1e-5)), normalize(vec2(-0.6, 0.8))))*smoothstep(1.0, 0.55, length(d)/r);
   return c + vec3(0.025, 0.03, 0.035)*g;
 }
+uniform int uDisplayEngines, uDisplayRetract, uDisplayPiston;
+uniform vec4 uEngineHealth; // exact health from Plane::fail, zero means stopped
 const vec3 IW = vec3(0.93, 0.94, 0.9), IG = vec3(0.12, 0.78, 0.3), IY = vec3(0.95, 0.78, 0.12), IR = vec3(0.95, 0.15, 0.1), IO = vec3(1.0, 0.55, 0.05);
 // Instrument colour (emissive) for a point q on the panel (metres, relative to the pilot's panel centre)
 vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
   float ias = uI0.x, alt = uI0.y, hdg = uI0.z, vs = uI0.w;
   float pitch = uI1.x, bank = uI1.y, engF = uI1.z, fuel = uI1.w;
   float lw = 0.00045;   // standard line width
+  // Spare rightmost atlas strip: actual heading, flaps and gear/fuel status. No simulated radio frequencies.
+  if (q.x > .336 && q.x < .416 && abs(q.y)<.105) {
+    vec2 uq=q-vec2(.376,0); float row=floor((uq.y+.105)/.0525);
+    vec2 cell=vec2(uq.x,uq.y+.105-row*.0525-.02625);
+    vec3 col=vec3(.008,.017,.021), ink=vec3(.44,.91,.82);
+    ivec4 label=row>2.5?ivec4(72,68,71,0):row>1.5?ivec4(70,76,65,80):row>.5?ivec4(71,69,65,82):ivec4(70,85,69,76);
+    float value=row>2.5?mod(hdg,360.0):row>1.5?uI2.z*100.0:row>.5?uI2.w*100.0:fuel*100.0;
+    col=mix(col,ink*.70,txt4((cell-vec2(-.032,0))*vec2(3.7594,1),.0170,label,0));
+    if(row>.5 && row<1.5 && uDisplayRetract==0) col=mix(col,IW,txt4((cell-vec2(.032,0))*vec2(3.7594,1),.0220,ivec4(70,73,88,0),2));
+    else col=mix(col,IW,numC((cell-vec2(.032,0))*vec2(3.7594,1),value,.0240,2,0));
+    if(row>.5 && row<1.5 && uDisplayRetract==1) col=mix(col,uI2.w>.99?IG:uI2.w<.01?ink:IY,aFill(sdBox(cell,vec2(.0025,.005))));
+    if(row<.5 && fuel<.15) col=mix(col,IR,aLine(abs(cell.y+.020),.001));
+    return col;
+  }
   if (ck == 2) {
     // ---- glass cockpit: primary flight display
     vec2 pd = q - vec2(-0.07, 0.0);
@@ -160,7 +176,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
           col = mix(col, IW, aStroke(sdSeg(vec2(o.x, ly), vec2(-hl, 0.0), vec2(hl, 0.0)), 2.0*(lw*0.5)));
           if (abs(i) % 2 == 0) {
             float v = abs(float(i))*5.0;
-            col = mix(col, IW, numC(vec2(o.x - sign(o.x)*(hl + 0.0055), ly), v, 0.0028, 1, 0));
+            col = mix(col, IW, numC(vec2(o.x - sign(o.x)*(hl + 0.008), ly), v, 0.0062, 1, 0));
           }
         }
         // bank scale and pointer
@@ -187,37 +203,43 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
         col = mix(col, vec3(0.0), aFill(sym - 0.0006));
         col = mix(col, IY, aFill(sym));
       }
-      // speed tape (left) and altitude tape (right) with readout windows
+      // Native-seat type sizes. The outer panel bounds stay unchanged; the wider altitude
+      // window extends inward over the horizon so five feet digits never hit the panel edge.
       for (int side = 0; side < 2; side++) {
-        float cx = side == 0 ? -0.07 : 0.07;
+        float cx = side == 0 ? -0.067 : 0.0615;
+        float halfWidth = side == 0 ? 0.017 : 0.0225;
         vec2 t = pd - vec2(cx, 0.006);
-        if (abs(t.x) < 0.0135 && abs(t.y) < 0.058) {
+        float val = side == 0 ? ias : alt;
+        if (abs(t.x) < halfWidth && abs(t.y) < 0.058) {
           col = vec3(0.07, 0.075, 0.09);
-          float val = side == 0 ? ias : alt, stp = side == 0 ? 10.0 : 100.0, ppu = side == 0 ? 0.0011 : 0.00011;
+          float stp = side == 0 ? 10.0 : 100.0, ppu = side == 0 ? 0.0011 : 0.00011;
           float vy = val + t.y/ppu;
           float k = floor(vy/stp + 0.5), dy = (vy - k*stp)*ppu;
-          float tx = side == 0 ? 0.0135 : -0.0135, dir = side == 0 ? -1.0 : 1.0;
+          float tx = side == 0 ? halfWidth : -halfWidth, dir = side == 0 ? -1.0 : 1.0;
           col = mix(col, IW, aStroke(sdSeg(vec2(t.x, dy), vec2(tx, 0.0), vec2(tx + dir*(mod(k, 2.0) == 0.0 ? 0.004 : 0.0022), 0.0)), 2.0*(lw*0.5)));
-          if (mod(k, 2.0) == 0.0 && k*stp >= 0.0) col = mix(col, IW, numC(vec2(t.x - (side == 0 ? 0.0075 : -0.0075), dy), k*stp, 0.0026, side == 0 ? 2 : 0, 0));
-          // readout window
-          float wb = sdRBox(t, vec2(0.0135, 0.0042), 0.0008);
-          if (wb < 0.0) {
-            col = vec3(0.0);
-            col = mix(col, IW, numC(t - vec2(side == 0 ? 0.0115 : -0.0115, 0.0), val, 0.0042, side == 0 ? 2 : 0, 0));
-          }
-          col = mix(col, IW, aLine(wb, lw));
+          if (mod(k, 2.0) == 0.0 && k*stp >= 0.0) col = mix(col, IW, numC(vec2(t.x - (side == 0 ? 0.0105 : -0.016), dy), k*stp, 0.0058, side == 0 ? 2 : 0, 0));
         }
+        vec2 read = t - vec2(side == 0 ? 0.0025 : -0.003, 0.0);
+        float wb = sdRBox(read, vec2(side == 0 ? 0.0195 : 0.0255, 0.0068), 0.0008);
+        if (wb < 0.0) {
+          col = vec3(0.0);
+          col = mix(col, IW, numC(read - vec2(side == 0 ? 0.0165 : -0.0215, 0.0), val, 0.0086, side == 0 ? 2 : 0, 0));
+        }
+        col = mix(col, IW, aLine(wb, lw));
+        col = mix(col, IW, txt4(pd - vec2(cx, 0.0695), 0.0062, side == 0 ? ivec4(75, 84, 83, 0) : ivec4(70, 84, 0, 0), 1));
       }
-      // heading tape
+      // Heading scale remains in tens of degrees; the larger boxed live value is degrees.
       vec2 hd = pd - vec2(0.0, -0.064);
-      if (abs(hd.x) < 0.052 && abs(hd.y) < 0.0095) {
+      if (abs(hd.x) < 0.052 && abs(hd.y) < 0.0105) {
         col = vec3(0.07, 0.075, 0.09);
         float ppd2 = 0.0011, hv = hdg + hd.x/ppd2;
         float k = floor(hv/5.0 + 0.5), dx = (hv - k*5.0)*ppd2;
-        col = mix(col, IW, aStroke(sdSeg(vec2(dx, hd.y), vec2(0.0, 0.0095), vec2(0.0, mod(k, 2.0) == 0.0 ? 0.0055 : 0.0075)), 2.0*(lw*0.5)));
-        if (mod(k, 6.0) == 0.0) col = mix(col, IW, numC(vec2(dx, hd.y + 0.0005), mod(k*5.0/10.0, 36.0), 0.0032, 1, 0));
-        float wb = sdRBox(hd - vec2(0.0, -0.0045), vec2(0.0065, 0.0042), 0.0008);
-        if (wb < 0.0) { col = vec3(0.0); col = mix(col, IW, numC(hd - vec2(0.0, -0.0045), mod(hdg, 360.0), 0.0036, 1, 0)); }
+        col = mix(col, IW, aStroke(sdSeg(vec2(dx, hd.y), vec2(0.0, 0.0105), vec2(0.0, mod(k, 2.0) == 0.0 ? 0.0065 : 0.0085)), 2.0*(lw*0.5)));
+        // Select labels on their own 30-degree grid, not the narrow 5-degree tick cell.
+        float labelK = floor(hv/30.0 + 0.5), labelX = (hv - labelK*30.0)*ppd2;
+        col = mix(col, IW, numC(vec2(labelX, hd.y + 0.0005), mod(labelK*3.0, 36.0), 0.0062, 1, 0));
+        float wb = sdRBox(hd, vec2(0.017, 0.0065), 0.0008);
+        if (wb < 0.0) { col = vec3(0.0); col = mix(col, IW, numC(hd, mod(hdg, 360.0), 0.0084, 1, 0)); }
         col = mix(col, IW, aLine(wb, lw));
       }
       return col*1.35;
@@ -235,24 +257,25 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
         float k = floor(ah/5.0 + 0.5), at = radians(k*5.0 - hdg);
         vec2 u = dirA(at);
         col = mix(col, IW, aStroke(sdSeg(c, u*0.075, u*(0.075 - (mod(k, 2.0) == 0.0 ? 0.0045 : 0.0025))), 2.0*(lw*0.5)));
-        if (mod(k, 6.0) == 0.0) col = mix(col, IW, numC(rot2(c - u*0.0655, at), mod(k*0.5, 36.0), 0.0032, 1, 0));
+        float labelK = floor(ah/30.0 + 0.5), labelA = radians(labelK*30.0 - hdg);
+        col = mix(col, IW, numC(rot2(c - dirA(labelA)*0.0655, labelA), mod(labelK*3.0, 36.0), 0.0068, 1, 0));
       }
       col = mix(col, vec3(1.0, 0.35, 1.0), aStroke(sdSeg(c, vec2(0.0, 0.004), vec2(0.0, 0.074)), 2.0*(lw*0.5)));
       col = mix(col, IY, aFill(sdTri(c, vec2(0.0, 0.006), vec2(-0.0045, -0.005), vec2(0.0045, -0.005))));
-      float wb = sdRBox(nd - vec2(0.0, 0.066), vec2(0.008, 0.0045), 0.0008);
-      if (wb < 0.0) { col = vec3(0.0); col = mix(col, IW, numC(nd - vec2(0.0, 0.066), mod(hdg, 360.0), 0.0038, 1, 0)); }
+      float wb = sdRBox(nd - vec2(0.0, 0.066), vec2(0.017, 0.0065), 0.0008);
+      if (wb < 0.0) { col = vec3(0.0); col = mix(col, IW, numC(nd - vec2(0.0, 0.066), mod(hdg, 360.0), 0.0084, 1, 0)); }
       col = mix(col, IW, aLine(wb, lw));
       // engine strip: N1 bar, value and label
       vec2 e = nd - vec2(0.0, -0.064);
       if (abs(e.y) < 0.009) {
         col = vec3(0.02, 0.025, 0.03);
-        col = mix(col, IW*0.7, txt4(e - vec2(-0.072, 0.0), 0.003, ivec4(78, 49, 0, 0), 0));
+        col = mix(col, IW*0.85, txt4(e - vec2(-0.070, 0.0), 0.0062, ivec4(78, 49, 0, 0), 0));
         float bx = clamp(engF, 0.0, 1.1)/1.1;
-        float bar = sdBox(e - vec2(-0.012, 0.0), vec2(0.045, 0.003));
+        float bar = sdBox(e - vec2(-0.008, 0.0), vec2(0.039, 0.0038));
         col = mix(col, vec3(0.1), aFill(bar));
-        col = mix(col, engF > 1.0 ? IR : IG, aFill(max(bar, e.x + 0.057 - bx*0.09)));
+        col = mix(col, engF > 1.0 ? IR : IG, aFill(max(bar, e.x + 0.047 - bx*0.078)));
         col = mix(col, IW, aLine(bar, lw));
-        col = mix(col, IW, numC(e - vec2(0.072, 0.0), engF*100.0, 0.0034, 2, 0));
+        col = mix(col, IW, numC(e - vec2(0.071, 0.0), engF*100.0, 0.0078, 2, 0));
       }
       return col*1.35;
     }
@@ -261,7 +284,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
   float r = 0.038;
   bool inD;
   vec2 d; vec3 c;
-  float nh = 0.0042;   // numeral height on the dials
+  float nh = 0.0072, uh = 0.0062;   // native-seat numeral and unit cap heights
   // ---- airspeed (kt): white flap arc, green normal, yellow caution, red never-exceed
   d = q - vec2(-0.095, 0.045);
   c = dialFace(d, r, inD);
@@ -276,7 +299,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
       c = mix(c, IW, dTicks(d, r, A0, A1, 40.0, 0.88, 0.96, lw*0.7));
       c = mix(c, IW, dTicks(d, r, A0, A1, 10.0, 0.8, 0.96, lw*1.2));
       c = mix(c, IW, dNums(d, r, A0 + 5.2*0.2, A1, 4.0, 40.0, 40.0, 1e5, 0.62, nh));
-      c = mix(c, IW*0.8, txt4(d - vec2(0.0, -r*0.4), nh*0.55, ivec4(75, 78, 79, 84), 1));
+      c = mix(c, IW*0.8, txt4(d - vec2(0.0, -r*0.30), uh, ivec4(75, 78, 79, 84), 1));
       c = mix(c, vec3(0.0), dNeedle(d - vec2(0.0006, -0.0006), A0 + clamp(ias, 0.0, vmax)/vmax*5.2, r*0.86, r*0.045, r*0.18)*0.6);
       c = mix(c, IW, dNeedle(d, A0 + clamp(ias, 0.0, vmax)/vmax*5.2, r*0.86, r*0.045, r*0.18));
       c = mix(c, vec3(0.08), aFill(length(d) - r*0.07));
@@ -298,7 +321,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
         if (i == 0) continue;
         float ly = hz - float(i)*5.0*ppd, hl = abs(i) % 2 == 0 ? r*0.26 : r*0.12;
         c = mix(c, IW, aStroke(sdSeg(vec2(o.x, ly), vec2(-hl, 0.0), vec2(hl, 0.0)), 2.0*(lw*0.45)));
-        if (abs(i) % 2 == 0) c = mix(c, IW, numC(vec2(o.x - sign(o.x)*(hl + r*0.12), ly), abs(float(i))*5.0, nh*0.6, 1, 0));
+        if (abs(i) % 2 == 0) c = mix(c, IW, numC(vec2(o.x - sign(o.x)*(hl + r*0.19), ly), abs(float(i))*5.0, uh, 1, 0));
       }
       // rotating bank ring with ticks, fixed pointer
       float rr = length(d);
@@ -332,13 +355,13 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
     if (inD) {
       float P = 3.14159265;
       c = mix(c, IW, dTicks(d, r, -P, P, 50.0, 0.88, 0.96, lw*0.6));
-      c = mix(c, IW, dTicks(d, r, -P, P, 10.0, 0.78, 0.96, lw*1.2));
-      c = mix(c, IW, dNums(d, r, 0.0, 2.0*P, 10.0, 0.0, 1.0, 10.0, 0.62, nh*1.05));
+      c = mix(c, IW, dTicks(d, r, -P, P, 10.0, 0.84, 0.96, lw*1.2));
+      c = mix(c, IW, dNums(d, r, 0.0, 2.0*P, 10.0, 0.0, 1.0, 10.0, 0.72, nh*1.05));
       vec2 wd = d - vec2(0.0, -r*0.27);
-      float wb = sdRBox(wd, vec2(r*0.3, r*0.11), r*0.02);
-      if (wb < 0.0) { c = vec3(0.0); c = mix(c, IW, numC(wd - vec2(r*0.27, 0.0), alt, nh*0.62, 2, 0)); }
+      float wb = sdRBox(wd, vec2(0.0215, 0.0062), r*0.02);
+      if (wb < 0.0) { c = vec3(0.0); c = mix(c, IW, numC(wd - vec2(0.0195, 0.0), alt, 0.0080, 2, 0)); }
       c = mix(c, vec3(0.35), aLine(wb, lw));
-      c = mix(c, IW*0.8, txt4(d - vec2(0.0, r*0.33), nh*0.5, ivec4(70, 69, 69, 84), 1));
+      c = mix(c, IW*0.8, txt4(d - vec2(0.0, r*0.33), uh, ivec4(70, 69, 69, 84), 1));
       float a10k = alt/100000.0*2.0*P, a1k = alt/10000.0*2.0*P, a100 = alt/1000.0*2.0*P;
       vec2 u = dirA(a10k);
       c = mix(c, IW, aFill(sdTri(d, u*r*0.98, u*r*0.86 + vec2(u.y, -u.x)*r*0.05, u*r*0.86 - vec2(u.y, -u.x)*r*0.05)));
@@ -362,9 +385,9 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
         c = mix(c, IW, aStroke(sdSeg(d, u0*r*0.72, u0*r*0.9), 2.0*(lw*0.9)));
         c = mix(c, IW, aStroke(sdSeg(d, u1*r*0.72, u1*r*0.9), 2.0*(lw*0.9)));
       }
-      c = mix(c, IW, txt4(d - vec2(-r*0.66, -r*0.3), nh*0.6, ivec4(76, 0, 0, 0), 1));
-      c = mix(c, IW, txt4(d - vec2(r*0.66, -r*0.3), nh*0.6, ivec4(82, 0, 0, 0), 1));
-      c = mix(c, IW*0.7, txt(d - vec2(0.0, r*0.5), nh*0.45, ivec4(50, 32, 77, 73), ivec4(78, 0, 0, 0), 1));
+      c = mix(c, IW, txt4(d - vec2(-r*0.66, -r*0.3), uh, ivec4(76, 0, 0, 0), 1));
+      c = mix(c, IW, txt4(d - vec2(r*0.66, -r*0.3), uh, ivec4(82, 0, 0, 0), 1));
+      c = mix(c, IW*0.7, txt(d - vec2(0.0, r*0.5), uh, ivec4(50, 32, 77, 73), ivec4(78, 0, 0, 0), 1));
       vec2 dd = rot2(d, rt);
       float plane = min(sdBox(dd, vec2(r*0.66, r*0.035)), length(dd) - r*0.09);
       plane = min(plane, sdBox(dd - vec2(0.0, r*0.12), vec2(r*0.025, r*0.08)));
@@ -389,13 +412,13 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
       float P = 3.14159265, ch = radians(hdg);
       vec2 cd = rot2(d, -ch);   // card frame
       c = mix(c, IW, dTicks(cd, r, -P, P, 72.0, 0.88, 0.96, lw*0.6));
-      c = mix(c, IW, dTicks(cd, r, -P, P, 36.0, 0.82, 0.96, lw*0.9));
+      c = mix(c, IW, dTicks(cd, r, -P, P, 36.0, 0.85, 0.96, lw*0.9));
       // labels every 30 degrees, upright along the card
       float a = atan(cd.x, cd.y), k = floor(a/(P/6.0) + 0.5), la = k*P/6.0;
-      vec2 lc = rot2(cd - dirA(la)*r*0.66, la);
+      vec2 lc = rot2(cd - dirA(la)*r*0.75, la);
       int ki = int(mod(k + 12.0, 12.0));
       float lab = ki == 0 ? txt4(lc, nh, ivec4(78, 0, 0, 0), 1) : ki == 3 ? txt4(lc, nh, ivec4(69, 0, 0, 0), 1) : ki == 6 ? txt4(lc, nh, ivec4(83, 0, 0, 0), 1) : ki == 9 ? txt4(lc, nh, ivec4(87, 0, 0, 0), 1)
-                : numC(lc, float(ki*3), nh*0.85, 1, 0);
+                : numC(lc, float(ki*3), nh*0.95, 1, 0);
       c = mix(c, ki % 3 == 0 ? IO : IW, lab);
       for (int k2 = 0; k2 < 8; k2++) { vec2 u = dirA(float(k2)*P/4.0); c = mix(c, IO, aStroke(sdSeg(d, u*r*0.97, u*r*1.0), 2.0*(lw))); }
       c = mix(c, IO, aFill(sdTri(d, vec2(0.0, r*0.8), vec2(-r*0.05, r*0.93), vec2(r*0.05, r*0.93))));
@@ -413,14 +436,17 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
     if (inD) {
       float A = 2.97, z = -1.5708;
       c = mix(c, IW, dTicks(d, r, z - A, z + A, 40.0, 0.88, 0.96, lw*0.6));
-      c = mix(c, IW, dTicks(d, r, z - A, z + A, 8.0, 0.8, 0.96, lw*1.2));
+      c = mix(c, IW, dTicks(d, r, z - A, z + A, 8.0, 0.84, 0.96, lw*1.2));
       float a = wrapA(atan(d.x, d.y), z - A, z + A);
-      float k = clamp(floor((a - (z - A))/(2.0*A)*8.0 + 0.5), 0.0, 8.0);
-      vec2 lc = dirA(z - A + 2.0*A*k/8.0)*r*0.62;
-      c = mix(c, IW, numC(d - lc, abs(k - 4.0)*5.0, nh*0.95, 1, 0));
-      c = mix(c, IW*0.8, txt4(d - vec2(r*0.36, r*0.2), nh*0.5, ivec4(85, 80, 0, 0), 1));
-      c = mix(c, IW*0.8, txt4(d - vec2(r*0.36, -r*0.2), nh*0.5, ivec4(68, 78, 0, 0), 1));
-      c = mix(c, IW*0.6, txt4(d - vec2(-r*0.3, -r*0.28), nh*0.42, ivec4(70, 80, 77, 0), 1));
+      // Keep every 100/500 ft/min tick, but print only 0/10/20 on the x100 scale.
+      // Independent label sectors and inward 20s leave a clear single-line unit band.
+      float k = clamp(floor((a - (z - A))/(2.0*A)*4.0 + 0.5), 0.0, 4.0);
+      vec2 lc = dirA(z - A + 2.0*A*k/4.0)*r*0.66;
+      if (k < 0.5 || k > 3.5) lc = vec2(r*0.56, sign(k - 2.0)*r*0.19);
+      c = mix(c, IW, numC(d - lc, abs(k - 2.0)*10.0, nh*0.95, 1, 0));
+      c = mix(c, IW*0.8, txt4(d - vec2(0.004, 0.0075), uh, ivec4(85, 80, 0, 0), 1));
+      c = mix(c, IW*0.8, txt4(d - vec2(0.004, -0.0075), uh, ivec4(68, 78, 0, 0), 1));
+      c = mix(c, IW*0.85, txt(d - vec2(0.0, -0.016), uh, ivec4(88, 49, 48, 48), ivec4(32, 70, 80, 77), 1));
       float na = z + clamp(vs/2000.0, -1.0, 1.0)*A;
       c = mix(c, vec3(0.0), dNeedle(d - vec2(0.0006, -0.0006), na, r*0.86, r*0.045, r*0.18)*0.6);
       c = mix(c, IW, dNeedle(d, na, r*0.86, r*0.045, r*0.18));
@@ -431,7 +457,7 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
   }
   // ---- engine RPM / N1 and fuel (pilot's side)
   if (!pilotSide) return vec3(-1.0);
-  int engines = ck == 1 ? 2 : 1;
+  int engines = clamp(uDisplayEngines,1,2);
   for (int e = 0; e < 2; e++) {
     if (e >= engines) break;
     float re = r*0.85;
@@ -444,11 +470,14 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
         vec2 ur = dirA(A0 + 4.2); c = mix(c, IR, aStroke(sdSeg(d, ur*re*0.78, ur*re*0.96), 2.0*(re*0.03)));
         c = mix(c, IW, dTicks(d, re, A0, A0 + 4.2*1.1, 22.0, 0.88, 0.96, lw*0.6));
         c = mix(c, IW, dTicks(d, re, A0, A0 + 4.2*1.1, 11.0, 0.8, 0.96, lw*1.1));
-        float a = wrapA(atan(d.x, d.y), A0, A0 + 4.62);
-        float k = clamp(floor((a - A0)/(4.2*1.1)*5.5 + 0.5), 0.0, 5.0);
-        c = mix(c, IW, numC(d - dirA(A0 + 4.2*1.1*k/5.5)*re*0.6, k*(ck == 1 ? 20.0 : 6.0), nh*0.9, 1, 0));
-        c = mix(c, IW*0.8, txt4(d - vec2(0.0, -re*0.42), nh*0.5, ck == 1 ? ivec4(78, 49, 32, 37) : ivec4(82, 80, 77, 0), 1));
-        float na = A0 + clamp(engF, 0.0, 1.1)*4.2;
+        for (int label = 0; label < 4; label++) {
+          float k = label == 3 ? 5.0 : float(label)*2.0;
+          c = mix(c, IW, numC(d - dirA(A0 + 4.2*1.1*k/5.5)*re*0.64, k*(uDisplayPiston==0 ? 20.0 : 6.0), nh, 1, 0));
+        }
+        c = mix(c, IW*0.85, txt4(d - vec2(0.003, -re*0.5), uh, uDisplayPiston==0 ? ivec4(78, 49, 32, 37) : ivec4(82, 80, 77, 0), 1));
+        float shown = uEngineHealth[e] <= 0.0 ? 0.0 : engF;
+        float na = A0 + clamp(shown, 0.0, 1.1)*4.2;
+        if(uEngineHealth[e]<.999)c=mix(c,uEngineHealth[e]<=0.0?IR:IY,aLine(length(d)-re*.96,re*.035));
         c = mix(c, vec3(0.0), dNeedle(d - vec2(0.0006, -0.0006), na, re*0.86, re*0.05, re*0.18)*0.6);
         c = mix(c, IW, dNeedle(d, na, re*0.86, re*0.05, re*0.18));
         c = mix(c, vec3(0.08), aFill(length(d) - re*0.08));
@@ -465,9 +494,9 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
       float A0 = -1.2, A1 = 1.2;
       c = mix(c, IR, dArc(d, rf*0.86, A0, A0 + 0.42, rf*0.08));
       c = mix(c, IW, dTicks(d, rf, A0, A1, 8.0, 0.82, 0.96, lw*0.8));
-      c = mix(c, IW, txt4(d - dirA(A0)*rf*0.6, nh*0.75, ivec4(69, 0, 0, 0), 1));
-      c = mix(c, IW, txt4(d - dirA(A1)*rf*0.6, nh*0.75, ivec4(70, 0, 0, 0), 1));
-      c = mix(c, IW*0.8, txt4(d - vec2(0.0, -rf*0.42), nh*0.5, ivec4(70, 85, 69, 76), 1));
+      c = mix(c, IW, txt4(d - dirA(A0)*rf*0.6, nh*0.97, ivec4(69, 0, 0, 0), 1));
+      c = mix(c, IW, txt4(d - dirA(A1)*rf*0.6, nh*0.97, ivec4(70, 0, 0, 0), 1));
+      c = mix(c, IW*0.8, txt4(d - vec2(0.0, -rf*0.42), uh, ivec4(70, 85, 69, 76), 1));
       float na = A0 + fuel*(A1 - A0);
       c = mix(c, IW, dNeedle(d, na, rf*0.86, rf*0.06, rf*0.15));
       c = mix(c, vec3(0.08), aFill(length(d) - rf*0.1));
@@ -475,81 +504,60 @@ vec3 drawInstruments(vec2 q, int ck, bool pilotSide){
     }
     return c;
   }
-  // ---- radio stack: three LCD rows (COM, NAV, transponder), the pilot's side of a single (a twin's second engine
-  // dial stands there: its radios are the centre stack's). The digits large enough to read from the seat (8 mm)
-  vec2 rs = q - vec2(0.33, 0.0);
-  if (pilotSide && ck != 1 && abs(rs.x) < 0.07 && abs(rs.y) < 0.09) {
-    float row = floor((rs.y + 0.09)/0.06);
-    vec2 cell = vec2(rs.x, mod(rs.y + 0.09, 0.06) - 0.03);
-    vec3 col = vec3(0.035, 0.036, 0.04);
-    float lcd = sdRBox(cell - vec2(-0.006, 0.0), vec2(0.056, 0.0165), 0.0015);
-    vec3 G2 = vec3(0.15, 1.0, 0.45);
-    if (lcd < 0.0) {
-      col = vec3(0.004, 0.02, 0.01);
-      vec2 lq = cell - vec2(-0.058, 0.0);
-      float h = 0.0085;
-      if (row == 2.0) { col = mix(col, G2*0.6, txt4(lq - vec2(0.002, 0.0105), h*0.4, ivec4(67, 79, 77, 49), 0));
-        col = mix(col, G2, numC(lq - vec2(0.075, -0.003), 118.3, h, 2, 2)); }
-      else if (row == 1.0) { col = mix(col, G2*0.6, txt4(lq - vec2(0.002, 0.0105), h*0.4, ivec4(78, 65, 86, 49), 0));
-        col = mix(col, G2, numC(lq - vec2(0.075, -0.003), 110.9, h, 2, 2)); }
-      else { col = mix(col, G2*0.6, txt4(lq - vec2(0.002, 0.0105), h*0.4, ivec4(88, 80, 68, 82), 0));
-        col = mix(col, G2, numC(lq - vec2(0.065, -0.003), 1200.0, h, 2, 0)); col = mix(col, G2*0.6, txt4(lq - vec2(0.088, -0.003), h*0.5, ivec4(65, 76, 84, 0), 0)); }
-    }
-    col = mix(col, vec3(0.2), aLine(lcd, lw));
-    col = mix(col, vec3(0.25), aFill(length(cell - vec2(0.06, 0.0)) - 0.005));
-    col = mix(col, vec3(0.08), aFill(length(cell - vec2(0.06, 0.0)) - 0.0035));
-    return col;
-  }
   return vec3(-1.0);
 }
 // ---------------------------------------------------------------- XR-30 / XR-40 multi-function display pages
 // uv spans [-1, 1] across the glass; gAA is set by the caller to this pixel's footprint in uv units
 vec3 mfdTitle(vec3 c, vec2 uv, ivec4 a, ivec4 b){
   const vec3 C = vec3(0.3, 0.8, 1.0);
-  c = mix(c, C*0.9, txt(uv - vec2(-0.86, 0.86), 0.085, a, b, 0));
+  c = mix(c, C*0.9, txt(uv - vec2(-0.86, 0.86), 0.10, a, b, 0));
   c = mix(c, C*0.45, aFill(sdBox(uv - vec2(0.0, 0.76), vec2(0.88, 0.004))));
   c = mix(c, C*0.8, aFill(sdBox(uv - vec2(0.8, 0.86), vec2(0.06, 0.02))));
   return c;
 }
-uniform int uDisplayEngines;   // one on the Mantis; existing twin-engine research pages otherwise
 vec3 mfdPage(int page, vec2 uv){
   const vec3 G = vec3(0.25, 1.0, 0.7), A = vec3(1.0, 0.62, 0.15), W = vec3(0.9, 0.95, 1.0), R = vec3(1.0, 0.25, 0.2), C = vec3(0.3, 0.8, 1.0);
   float lw = 0.012; vec3 c = vec3(0.0);
-  float spool = uHud3.x, thr = uHud2.y, ab = uDisplayEngines==1?uFlame.y:smoothstep(0.85, 1.0, spool);
+  float spool = uHud3.x, thr = uHud2.y, ab = uFlame.y;
   if (page == 0) {          // ENGINES: twin N1 dials (270 deg), needles, digital readouts, reheat banner
-    bool single=uDisplayEngines==1;
+    bool single=uDisplayEngines==1, four=uDisplayEngines==4;
     c = mfdTitle(c, uv, ivec4(69, 78, 71, 73), single?ivec4(78,69,0,0):ivec4(78,69,83,0));
-    for (int e = 0; e < 2; e++) {
-      if(single && e>0) break;
-      vec2 o = uv - vec2(single?0.0:(e == 0 ? -0.46 : 0.46), 0.05);
+    for (int e = 0; e < 4; e++) {
+      if(e>=uDisplayEngines) break;
+      vec2 centre=four?vec2((e%2)==0?-.46:.46,e<2?.30:-.33):vec2(single?0.0:(e==0?-.46:.46),.05);
+      float displayScale = four ? 0.62 : 1.0;
+      vec2 o=(uv-centre)/displayScale;
+      float engSpool = uEngineHealth[e]<=0.0 ? 0.0 : uI1.z;
       float rr = 0.36, A0 = -2.356, AS = 4.712;
       c = mix(c, G*0.25, dArc(o, rr, A0, A0 + AS, lw*0.8));
-      c = mix(c, spool > 0.85 ? A : G, dArc(o, rr, A0, A0 + AS*clamp(spool, 0.0, 1.0), lw*3.0));
+      c = mix(c, uEngineHealth[e]<.999 ? R : G, dArc(o, rr, A0, A0 + AS*clamp(engSpool, 0.0, 1.0), lw*3.0));
       c = mix(c, R, dArc(o, rr, A0 + AS*0.97, A0 + AS, lw*3.0));
       c = mix(c, W*0.8, dTicks(o, rr, A0, A0 + AS, 10.0, 0.82, 0.92, lw*0.7));
       c = mix(c, W*0.6, dTicks(o, rr, A0, A0 + AS, 20.0, 0.86, 0.92, lw*0.5));
-      c = mix(c, W*0.8, dNums(o, rr, A0, A0 + AS, 5.0, 0.0, 2.0, 100.0, 0.66, 0.065));
-      c = mix(c, W, dNeedle(o, A0 + AS*clamp(spool, 0.0, 1.05), rr*0.95, 0.022, 0.05));
+      c = mix(c, W*0.8, dNums(o, rr, A0, A0 + AS, 5.0, 0.0, 2.0, 100.0, 0.66, 0.08/displayScale));
+      c = mix(c, W, dNeedle(o, A0 + AS*clamp(engSpool, 0.0, 1.05), rr*0.95, 0.022, 0.05));
       c = mix(c, W*0.3, aFill(length(o) - 0.035));
-      vec2 bq = o - vec2(0.0, -0.36);
-      float wb = sdRBox(bq, vec2(0.2, 0.075), 0.02);
+      vec2 bq = o - vec2(0.0, -0.39);
+      float wb = sdRBox(bq, vec2(0.245, 0.072)/displayScale, 0.02);
       if (wb < 0.0) c = vec3(0.0);
       c = mix(c, G*0.7, aLine(wb, lw*0.6));
-      c = mix(c, G, numC(bq - vec2(0.13, 0.0), spool*100.0, 0.085, 2, 1));
-      c = mix(c, W*0.7, txt4(o - vec2(0.0, 0.09), 0.05, single?ivec4(78,49,0,0):(e == 0 ? ivec4(78,49,32,76):ivec4(78,49,32,82)), 1));
+      c = mix(c, G, numC(bq - vec2(0.21/displayScale, 0.0), engSpool*100.0, 0.10/displayScale, 2, 1));
+      c = mix(c, W*0.7, txt4(o - vec2(0.0, -0.011/displayScale), 0.065/displayScale, single?ivec4(78,49,0,0):four?ivec4(78,49,32,49+e):(e == 0 ? ivec4(78,49,32,76):ivec4(78,49,32,82)), 1));
     }
     float bn = sdRBox(uv - vec2(0.0, -0.78), vec2(0.36, 0.09), 0.03);
     if (ab > 0.01) {
       float fl = 0.6 + 0.4*sin(uTime*20.0);
       c = mix(c, A*0.25*ab, aFill(bn));
       c = mix(c, A*fl, aLine(bn, lw*0.8)*ab);
-      c = mix(c, A*fl, txt(uv - vec2(0.0, -0.78), 0.08, ivec4(82, 69, 72, 69), ivec4(65, 84, 0, 0), 1)*ab);
-    } else c = mix(c, G*0.4, txt(uv - vec2(0.0, -0.78), 0.06, ivec4(68, 82, 89, 0), ivec4(0), 1));
-  } else if (page == 1) {   // POWER: thrust, energy cell, core temperature, nozzle bars with scales + Mach
+      c = mix(c, A*fl, txt(uv - vec2(0.0, -0.78), 0.09, ivec4(82, 69, 72, 69), ivec4(65, 84, 0, 0), 1)*ab);
+    } else c = mix(c, G*0.8, txt(uv - vec2(0.0, -0.78), 0.075, ivec4(68, 82, 89, 0), ivec4(0), 1));
+  } else if (page == 1) {   // POWER: actual throttle, fuel fraction, N1 and nozzle bars with scales + Mach
     c = mfdTitle(c, uv, ivec4(80, 79, 87, 69), ivec4(82, 0, 0, 0));
+    // Reserve the enlarged Mach field: erase the title's decorative dash beneath its digits.
+    c = mix(c, vec3(0.0), aFill(sdBox(uv - vec2(0.8, 0.86), vec2(0.065, 0.03))));
     for (int b = 0; b < 4; b++) {
       float x0 = -0.66 + float(b)*0.44;
-      float lv = b == 0 ? thr : b == 1 ? 1.0 : b == 2 ? 0.35 + 0.6*spool : abs(uHud2.z);
+      float lv = b == 0 ? thr : b == 1 ? uI1.w : b == 2 ? uI1.z : abs(uHud2.z);
       vec2 o = uv - vec2(x0, -0.12);
       float frame = sdRBox(o, vec2(0.1, 0.5), 0.02);
       vec3 bc = b == 2 && lv > 0.85 ? A : (b == 1 ? C : G);
@@ -558,12 +566,12 @@ vec3 mfdPage(int page, vec2 uv){
       c = mix(c, bc*0.6, aLine(frame, lw*0.6));
       float tk = fract((o.y + 0.475)/0.095 + 0.5) - 0.5;
       c = mix(c, W*0.5, aStroke(sdSeg(vec2(o.x, tk*0.095), vec2(0.11, 0.0), vec2(0.15, 0.0)), 2.0*(lw*0.3))*step(abs(o.y), 0.48));
-      c = mix(c, W*0.85, numC(o - vec2(0.0, 0.58), lv*100.0, 0.06, 1, 0));
-      ivec4 lb = b == 0 ? ivec4(84, 72, 82, 0) : b == 1 ? ivec4(67, 69, 76, 76) : b == 2 ? ivec4(67, 79, 82, 69) : ivec4(78, 79, 90, 0);
-      c = mix(c, W*0.6, txt4(o - vec2(0.0, -0.6), 0.05, lb, 1));
+      c = mix(c, W*0.85, numC(o - vec2(0.0, 0.58), lv*100.0, 0.10, 1, 0));
+      ivec4 lb = b == 0 ? ivec4(84, 72, 82, 0) : b == 1 ? ivec4(70, 85, 69, 76) : b == 2 ? ivec4(78, 49, 0, 0) : ivec4(78, 79, 90, 0);
+      c = mix(c, W*0.85, txt4(o - vec2(0.0, -0.6), 0.075, lb, 1));
     }
-    c = mix(c, W*0.6, txt4(uv - vec2(0.42, 0.86), 0.06, ivec4(77, 65, 67, 72), 2));
-    c = mix(c, W, numC(uv - vec2(0.72, 0.86), uHud.w, 0.075, 2, 2));
+    c = mix(c, W*0.6, txt4(uv - vec2(0.39, 0.86), 0.075, ivec4(77, 65, 67, 72), 2));
+    c = mix(c, W, numC(uv - vec2(0.88, 0.86), uHud.w, 0.10, 2, 2));
   } else if (page == 2) {   // MAP: heading-up moving terrain map, 6 km range
     float h = radians(uHud.z); vec2 f = vec2(sin(h), -cos(h)), rt = vec2(cos(h), sin(h));
     vec2 wp = uPlanePos.xz + (rt*uv.x + f*uv.y)*6000.0;
@@ -573,8 +581,8 @@ vec3 mfdPage(int page, vec2 uv){
     c = hh < 0.0 ? vec3(0.02, 0.1, 0.26)*(1.0 + hh/600.0) : land*0.75;
     c = mix(c, G*0.7, aLine(length(uv) - 0.5, lw*0.6)*step(0.5, fract(atan(uv.y, uv.x)*12.0)));
     c = mix(c, G*0.7, aLine(length(uv) - 0.95, lw*0.6));
-    c = mix(c, G*0.8, numC(uv - vec2(0.36, 0.38), 3.0, 0.05, 1, 0));
-    c = mix(c, G*0.8, txt4(uv - vec2(0.43, 0.38), 0.04, ivec4(75, 77, 0, 0), 0));
+    c = mix(c, G*0.8, numC(uv - vec2(0.34, 0.38), 3.0, 0.085, 1, 0));
+    c = mix(c, G*0.8, txt4(uv - vec2(0.405, 0.38), 0.075, ivec4(75, 77, 0, 0), 0));
     float tri = sdTri(uv, vec2(0.0, 0.1), vec2(-0.065, -0.07), vec2(0.065, -0.07));
     c = mix(c, vec3(0.0), aFill(tri - 0.015));
     c = mix(c, W, aFill(tri));
@@ -582,11 +590,11 @@ vec3 mfdPage(int page, vec2 uv){
     vec2 nn = -vec2(dot(vec2(0.0, -1.0), rt), dot(vec2(0.0, -1.0), f))*0.8;   // north marker
     float nc = length(uv - nn) - 0.075;
     c = mix(c, R*0.3, aFill(nc)); c = mix(c, R, aLine(nc, lw*0.6));
-    c = mix(c, W, txt4(uv - nn, 0.07, ivec4(78, 0, 0, 0), 1));
-    float wb = sdRBox(uv - vec2(0.0, 0.86), vec2(0.15, 0.08), 0.02);
+    c = mix(c, W, txt4(uv - nn, 0.09, ivec4(78, 0, 0, 0), 1));
+    float wb = sdRBox(uv - vec2(0.0, 0.86), vec2(0.18, 0.08), 0.02);
     if (wb < 0.0) c = vec3(0.0);
     c = mix(c, W*0.7, aLine(wb, lw*0.6));
-    c = mix(c, W, numC(uv - vec2(0.0, 0.86), mod(uHud.z, 360.0), 0.08, 1, 0));
+    c = mix(c, W, numC(uv - vec2(0.0, 0.86), mod(uHud.z, 360.0), 0.10, 1, 0));
   } else if (page == 3) {   // ADI: attitude with a numbered pitch ladder, bank scale and slip-free aircraft symbol
     vec3 fw = uPlaneRot*vec3(0.0, 0.0, -1.0), rw = uPlaneRot*vec3(1.0, 0.0, 0.0), uw = uPlaneRot*vec3(0.0, 1.0, 0.0);
     float pitch = asin(clamp(fw.y, -1.0, 1.0)), bank = atan(-rw.y, uw.y);
@@ -598,7 +606,7 @@ vec3 mfdPage(int page, vec2 uv){
       if (k == 0) continue;
       float y = hz - float(k)*0.0873*ppr, hl = abs(k) % 2 == 0 ? 0.24 : 0.12;
       c = mix(c, W*0.9, aStroke(sdSeg(vec2(o.x, y), vec2(-hl, 0.0), vec2(hl, 0.0)), 2.0*(lw*0.45)));
-      if (abs(k) % 2 == 0) c = mix(c, W*0.9, numC(vec2(o.x - sign(o.x)*(hl + 0.1), y), abs(float(k))*5.0, 0.06, 1, 0));
+      if (abs(k) % 2 == 0) c = mix(c, W*0.9, numC(vec2(o.x - sign(o.x)*(hl + 0.1), y), abs(float(k))*5.0, 0.085, 1, 0));
     }
     float rr = length(uv);
     for (int k = 0; k < 6; k++) {
@@ -615,11 +623,24 @@ vec3 mfdPage(int page, vec2 uv){
     sym = min(sym, sdBox(uv, vec2(0.03)));
     c = mix(c, vec3(0.0), aFill(sym - 0.015));
     c = mix(c, A, aFill(sym));
-    c = mix(c, vec3(0.0, 0.01, 0.02), 0.94*aFill(sdBox(uv - vec2(0.0, -0.9), vec2(1.0, 0.1))));
-    c = mix(c, W*0.8, txt4(uv - vec2(-0.88, -0.86), 0.05, ivec4(66, 78, 75, 0), 0));
-    c = mix(c, W, numC(uv - vec2(-0.6, -0.86), abs(degrees(bank)), 0.06, 0, 0));
-    c = mix(c, W*0.8, txt4(uv - vec2(0.45, -0.86), 0.05, ivec4(80, 67, 72, 0), 0));
-    c = mix(c, W, numC(uv - vec2(0.9, -0.86), degrees(pitch), 0.06, 2, 0));
+    // Dedicated data band, drawn LAST and fully opaque: moving pitch marks never mix with data.
+    // I0.x is indicated knots and I0.y is feet. The upper attitude/roll view keeps its own region.
+    if (uv.y < -0.50) {
+      c = vec3(0.006, 0.012, 0.017);
+      c = mix(c, W*0.35, aLine(uv.y + 0.50, lw*0.65));
+      // First row: the measured SDF ink extents fit five IAS digits and signed five-digit altitude.
+      c = mix(c, W*0.85, txt4(uv - vec2(-0.965, -0.66), 0.070, ivec4(73, 65, 83, 0), 0));
+      c = mix(c, W, numC(uv - vec2(-0.270, -0.66), uI0.x, 0.10, 2, 0));
+      c = mix(c, W*0.85, txt4(uv - vec2(-0.030, -0.66), 0.070, ivec4(75, 84, 83, 0), 2));
+      c = mix(c, W*0.85, txt4(uv - vec2(0.015, -0.66), 0.070, ivec4(65, 76, 84, 0), 0));
+      c = mix(c, W, numC(uv - vec2(0.810, -0.66), uI0.y, 0.10, 2, 0));
+      c = mix(c, W*0.85, txt4(uv - vec2(0.965, -0.66), 0.070, ivec4(70, 84, 0, 0), 2));
+      // Second row is separated by .22 UV from IAS/ALT, with no shared outlines or moving scale.
+      c = mix(c, W*0.8, txt4(uv - vec2(-0.88, -0.88), 0.075, ivec4(66, 78, 75, 0), 0));
+      c = mix(c, W, numC(uv - vec2(-0.52, -0.88), abs(degrees(bank)), 0.10, 0, 0));
+      c = mix(c, W*0.8, txt4(uv - vec2(0.28, -0.88), 0.075, ivec4(80, 67, 72, 0), 0));
+      c = mix(c, W, numC(uv - vec2(0.9, -0.88), degrees(pitch), 0.10, 2, 0));
+    }
   } else if (page == 4) {   // TVC: side view of the jet, the nozzles' pitch-vector angle on a +-30 deg scale, gear, reheat
     c = mfdTitle(c, uv, ivec4(84, 86, 67, 0), ivec4(0));
     vec2 o = uv - vec2(-0.2, 0.25);
@@ -644,24 +665,24 @@ vec3 mfdPage(int page, vec2 uv){
       float ta = 1.5708 + float(k)*0.5236;
       vec2 u = dirA(ta);
       c = mix(c, W*0.7, aStroke(sdSeg(sq, u*0.62, u*0.68), 2.0*(lw*0.4)));
-      c = mix(c, W*0.7, numC(sq - u*0.75, abs(float(k))*30.0, 0.05, 1, 0));
+      c = mix(c, W*0.7, numC(sq - u*0.75, abs(float(k))*30.0, 0.08, 1, 0));
     }
     vec2 u = dirA(1.5708 + clamp(a, -0.5236, 0.5236));
     c = mix(c, A, aFill(sdTri(sq, u*0.6, u*0.52 + vec2(u.y, -u.x)*0.035, u*0.52 - vec2(u.y, -u.x)*0.035)));
-    c = mix(c, W*0.7, txt4(uv - vec2(-0.86, -0.42), 0.055, ivec4(78, 79, 90, 0), 0));
-    c = mix(c, W, numC(uv - vec2(-0.28, -0.42), degrees(a), 0.07, 2, 0));
+    c = mix(c, W*0.7, txt4(uv - vec2(-0.86, -0.42), 0.075, ivec4(78, 79, 90, 0), 0));
+    c = mix(c, W, numC(uv - vec2(-0.28, -0.42), degrees(a), 0.10, 2, 0));
     for (int g = 0; g < 3; g++) {
-      vec2 gq = uv - vec2(-0.72 + float(g)*0.3, -0.7);
-      float gb = sdRBox(gq, vec2(0.13, 0.07), 0.02);
+      vec2 gq = uv - vec2(-0.70 + float(g)*0.32, -0.7);
+      float gb = sdRBox(gq, vec2(0.15, 0.07), 0.02);
       vec3 gc = uHud2.w > 0.5 ? G : R*0.7;
       c = mix(c, gc*0.25, aFill(gb)); c = mix(c, gc, aLine(gb, lw*0.6));
-      c = mix(c, gc, txt(gq, 0.04, g == 0 ? ivec4(78, 79, 83, 69) : g == 1 ? ivec4(76, 69, 70, 84) : ivec4(82, 73, 71, 72), g == 2 ? ivec4(84, 0, 0, 0) : ivec4(0), 1));
+      c = mix(c, gc, txt(gq, 0.062, g == 0 ? ivec4(78, 79, 83, 69) : g == 1 ? ivec4(76, 69, 70, 84) : ivec4(82, 73, 71, 72), g == 2 ? ivec4(84, 0, 0, 0) : ivec4(0), 1));
     }
     float hb = sdRBox(uv - vec2(0.58, -0.7), vec2(0.28, 0.08), 0.03);
     bool rh = ab > 0.5;
     float pl = rh ? 0.8 + 0.2*sin(uTime*6.0) : 1.0;
     c = mix(c, (rh ? A : G*0.3)*0.2, aFill(hb)); c = mix(c, (rh ? A : G*0.4)*pl, aLine(hb, lw*0.7));
-    c = mix(c, (rh ? A : G*0.4)*pl, txt(uv - vec2(0.58, -0.7), 0.055, ivec4(82, 69, 72, 69), ivec4(65, 84, 0, 0), 1));
+    c = mix(c, (rh ? A : G*0.4)*pl, txt(uv - vec2(0.58, -0.7), 0.08, ivec4(82, 69, 72, 69), ivec4(65, 84, 0, 0), 1));
   } else if (page == 5) {   // G-METER and angle of attack
     c = mfdTitle(c, uv, ivec4(71, 32, 47, 32), ivec4(65, 79, 65, 0));
     float gv = uHud2.x;
@@ -673,13 +694,13 @@ vec3 mfdPage(int page, vec2 uv){
     c = mix(c, W*0.8, dTicks(o, 0.62, A0, A0 + AS, 5.0, 0.84, 0.94, lw*0.7));
     c = mix(c, W*0.5, dTicks(o, 0.62, A0, A0 + AS, 15.0, 0.88, 0.94, lw*0.5));
     { float a2 = wrapA(atan(o.x, o.y), A0, A0 + AS); float k = clamp(floor((a2 - A0)/AS*5.0 + 0.5), 0.0, 5.0);
-      c = mix(c, W*0.8, numC(o - dirA(A0 + AS*k/5.0)*0.43, k*3.0 - 3.0, 0.06, 1, 0)); }
+      c = mix(c, W*0.8, numC(o - dirA(A0 + AS*k/5.0)*0.43, k*3.0 - 3.0, 0.085, 1, 0)); }
     c = mix(c, W, dNeedle(o, A0 + AS*gf, 0.6, 0.03, 0.08));
     c = mix(c, W*0.3, aFill(length(o) - 0.05));
-    float wb = sdRBox(o - vec2(0.0, -0.45), vec2(0.2, 0.08), 0.02);
+    float wb = sdRBox(o - vec2(0.0, -0.45), vec2(0.235, 0.08), 0.02);
     if (wb < 0.0) c = vec3(0.0);
     c = mix(c, W*0.7, aLine(wb, lw*0.6));
-    c = mix(c, W, numC(o - vec2(0.15, -0.45), gv, 0.08, 2, 1));
+    c = mix(c, W, numC(o - vec2(0.205, -0.45), gv, 0.11, 2, 1));
     vec2 aq = uv - vec2(-0.82, -0.1);
     float tape = sdRBox(aq, vec2(0.06, 0.58), 0.02);
     c = mix(c, C*0.08, aFill(tape)); c = mix(c, C*0.6, aLine(tape, lw*0.6));
@@ -687,7 +708,7 @@ vec3 mfdPage(int page, vec2 uv){
     c = mix(c, W*0.5, aStroke(sdSeg(vec2(aq.x, tk*0.0967), vec2(-0.06, 0.0), vec2(-0.02, 0.0)), 2.0*(lw*0.3))*step(abs(aq.y), 0.56));
     float ay = clamp(uHud3.y/30.0, -1.0, 1.0)*0.56;
     c = mix(c, A, aFill(sdTri(aq - vec2(0.0, ay), vec2(-0.05, 0.0), vec2(0.06, 0.04), vec2(0.06, -0.04))));
-    c = mix(c, W*0.6, txt4(aq - vec2(0.0, -0.68), 0.045, ivec4(65, 79, 65, 0), 1));
+    c = mix(c, W*0.6, txt4(aq - vec2(0.0, -0.68), 0.075, ivec4(65, 79, 65, 0), 1));
   } else {                  // COMPASS rose with heading and altitude readouts
     c = mfdTitle(c, uv, ivec4(78, 65, 86, 0), ivec4(0));
     float h = radians(uHud.z), P = 3.14159265;
@@ -699,21 +720,22 @@ vec3 mfdPage(int page, vec2 uv){
     float a = atan(o.x, o.y), k = floor(a/(P/6.0) + 0.5), la = k*P/6.0;
     vec2 lc = rot2(o - dirA(la)*0.45, la);
     int ki = int(mod(k + 12.0, 12.0));
-    float lab = ki == 0 ? txt4(lc, 0.075, ivec4(78, 0, 0, 0), 1) : ki == 3 ? txt4(lc, 0.075, ivec4(69, 0, 0, 0), 1) : ki == 6 ? txt4(lc, 0.075, ivec4(83, 0, 0, 0), 1) : ki == 9 ? txt4(lc, 0.075, ivec4(87, 0, 0, 0), 1) : numC(lc, float(ki*3), 0.065, 1, 0);
+    float lab = ki == 0 ? txt4(lc, 0.10, ivec4(78, 0, 0, 0), 1) : ki == 3 ? txt4(lc, 0.10, ivec4(69, 0, 0, 0), 1) : ki == 6 ? txt4(lc, 0.10, ivec4(83, 0, 0, 0), 1) : ki == 9 ? txt4(lc, 0.10, ivec4(87, 0, 0, 0), 1) : numC(lc, float(ki*3), 0.09, 1, 0);
     c = mix(c, ki == 0 ? R : W, lab);
     c = mix(c, A, aFill(sdTri(cc, vec2(0.0, 0.6), vec2(-0.045, 0.7), vec2(0.045, 0.7))));
     float tri = sdTri(cc, vec2(0.0, 0.09), vec2(-0.055, -0.06), vec2(0.055, -0.06));
     c = mix(c, A, aFill(tri));
-    float wb = sdRBox(uv - vec2(-0.6, 0.62), vec2(0.27, 0.085), 0.02);
+    // Two-line header windows retain clearance above the compass and fit five feet digits.
+    float wb = sdRBox(uv - vec2(-0.49, 0.64), vec2(0.38, 0.11), 0.02);
     if (wb < 0.0) c = vec3(0.0);
     c = mix(c, W*0.7, aLine(wb, lw*0.6));
-    c = mix(c, W*0.6, txt4(uv - vec2(-0.84, 0.62), 0.045, ivec4(72, 68, 71, 0), 0));
-    c = mix(c, W, numC(uv - vec2(-0.36, 0.62), mod(uHud.z, 360.0), 0.08, 2, 0));
-    float ab2 = sdRBox(uv - vec2(0.58, 0.62), vec2(0.3, 0.085), 0.02);
+    c = mix(c, W*0.85, txt4(uv - vec2(-0.49, 0.692), 0.075, ivec4(72, 68, 71, 0), 1));
+    c = mix(c, W, numC(uv - vec2(-0.49, 0.59), mod(uHud.z, 360.0), 0.10, 1, 0));
+    float ab2 = sdRBox(uv - vec2(0.49, 0.64), vec2(0.38, 0.11), 0.02);
     if (ab2 < 0.0) c = vec3(0.0);
     c = mix(c, G*0.7, aLine(ab2, lw*0.6));
-    c = mix(c, G*0.6, txt4(uv - vec2(0.31, 0.62), 0.045, ivec4(65, 76, 84, 0), 0));
-    c = mix(c, G, numC(uv - vec2(0.85, 0.62), uHud.y*3.28084, 0.075, 2, 0));
+    c = mix(c, G*0.85, txt4(uv - vec2(0.49, 0.692), 0.075, ivec4(65, 76, 84, 0), 1));
+    c = mix(c, G, numC(uv - vec2(0.49, 0.59), uHud.y*3.28084, 0.10, 1, 0));
   }
   return c;
 }

@@ -53,12 +53,13 @@ void main(){
   // research cockpits' own display panels against their frames and mounts from their shapes: cabin_windows.glsl)
   if (RESEARCH_ON && uScrSkip == 1 && cabinScreenId(mid) && !(uBombPane == 1 && mid == 61)) mid = uScrModel == 6 ? 65 : 44;
   if (RESEARCH_ON && !traf && gPS.w > 0.5 && int(gM[0].z + 0.5) >= 5) mid = cabinPanelId(vB - gM[22].xyz, int(gM[0].z + 0.5), mid);
+  if (!traf && gPS.w > .5 && uPartInst < 0) mid = fleetPanelId(vB, mid);
   vec3 conN;   // (the XR-40's consoles and display mounts: their own field's normal, cabin_windows.glsl)
   if (RESEARCH_ON && !traf && gPS.w > 0.5 && uPartInst < 0 && cabinConsoleNormal(vB - gM[22].xyz, int(gM[0].z + 0.5), mid, conN)) ln = conN;
   vec3 wallN;   // (a window's frame: the surface the eye truly sees there, not the mesh's zigzag one)
   if (RESEARCH_ON && uScrSkip == 1 && uPartInst < 0 && cabinWallNormal(vB - uScrEye, uScrModel, mid, wallN)) ln = wallN;
   vec3 frN;   // (a light aircraft's cluster frames)
-  if (!traf && gPS.w > 0.5 && uPartInst < 0 && int(gM[0].z + 0.5) < 5 && clusterFrame(vB, -transpose(uRot)*uPos, mid, frN)) ln = frN;
+  if (!traf && gPS.w > 0.5 && uPartInst < 0 && int(gM[0].z + 0.5) < 5 && !fleetCabin() && !isMantis() && clusterFrame(vB, -transpose(uRot)*uPos, mid, frN)) ln = frN;
   bool pod = !traf && uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0;
   planeToGB(p, rd, t, mid, ln, pod, traf, !traf && gPS.w > 0.5 ? vAo : -1.0);
 }

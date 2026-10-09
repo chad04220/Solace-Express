@@ -65,9 +65,9 @@ void main(){
   if (uPlaneOn == 1 && uWreck == 0 && uVapor.x > 0.01) { vec3 c0 = col; col = vaporCone(col, ro, rd, t, jitter); if (dot(abs(col - c0), vec3(1.0)) > 0.02) taaFlag = min(taaFlag, 0.2); }
   vec3 plE = vec3(0.0); float plT = 1.0;
 #ifndef FX_NO_PLUMES
-  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && isMantis()) { plE = mantisPlume(ro, rd, t, jitter); plT = gPlumeT; }
-  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && type == 5) { plE = jetPlumes(ro, rd, t, jitter); plT = gPlumeT; }
-  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && type == 6) { plE = wraithPlumes(ro, rd, t, jitter); plT = gPlumeT; }
+  if (uPlaneOn == 1 && uWreck == 0 && gPS.w < 0.5 && uExhaustCount > 0) {
+    plE = researchPlumes(ro, rd, t, jitter); plT = gPlumeT;
+  }
 #endif
   if (plE.r + plE.g + plE.b > 0.03) taaFlag = min(taaFlag, 0.2);
   if (!pod && uFxBeams + uFxBombs + uFxBlasts > 0) col = weaponsFx(col, ro, rd, t);

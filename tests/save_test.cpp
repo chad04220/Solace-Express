@@ -104,7 +104,7 @@ int main() {
   const char* bad[] = {
     "solace_save 1\nlicense 1\nplane kestrel 999 70\n",                                   // fleet airport out of range
     "solace_save 1\n",                                                                    // header only
-    "solace_save 4\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // unknown version
+    "solace_save 5\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // unknown version
     "solace_save 1\nmoney 5\nlicense 9\nlocation 0\nstory 0\n",                           // bad license
     "solace_save 1\nmoney 5\nlicense 0\nlocation -3\nstory 0\n",                          // bad location
     "solace_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 999\n",                         // story past the end

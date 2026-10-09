@@ -31,51 +31,52 @@ void shadeWraithCockpit(inout Mat m, int mid, vec3 lp, vec3 ln, vec3 E){
     float hk = hash2i(ivec2(floor(id*3.0 + 0.5)) + ivec2(5, 9));   // (rounded: half the cells' centres are whole numbers, and cut down to an
                                                                     // integer they flipped between two cells pixel by pixel - a glowing cell came out speckled)
     m.alb = vec3(0.022, 0.024, 0.03)*(0.85 + 0.3*hk)*(0.8 + 0.4*tx.r);
-    m.rough = 0.38 + 0.2*hk; m.metal = 0.3; m.nrm = nT*0.6;
+    m.rough = 0.62 + 0.16*hk; m.metal = 0.10; m.nrm = nT*0.6;
     float gv = mix(clamp((0.06 - e)/max(gPixG*13.0, 1e-4) + 0.5, 0.0, 1.0), 0.23, smoothstep(0.3, 0.8, gPixG*13.0));   // the grooves
     m.alb *= mix(1.0, 0.35, gv); m.rough = mix(m.rough, 0.7, gv);
-    if (e > 0.06 && hk > 0.965) m.emit = mix(cyan, vio, step(0.985, hk))*0.25*(0.6 + 0.4*sin(uTime*1.3 + hk*20.0));
+    if (e > 0.06 && hk > 0.965) m.emit = mix(cyan, vio, step(0.985, hk))*0.025*(0.6 + 0.4*sin(uTime*1.3 + hk*20.0));
   } else if (mid == 65 || mid == 72) {   // anodised titanium frames: machined flutes, fasteners, an emitter line
     tx = triSample(lp*2.0, ln, M_METAL, 0.5, nT);
-    m.alb = vec3(0.075, 0.078, 0.088)*(0.8 + 0.4*tx.r); m.metal = 0.85; m.rough = 0.3 + 0.15*tx.a; m.nrm = nT*0.5;
+    m.alb = vec3(0.075, 0.078, 0.088)*(0.8 + 0.4*tx.r); m.metal = 0.65; m.rough = 0.48 + 0.12*tx.a; m.nrm = nT*0.5;
     m.alb *= 1.0 - 0.3*aaLines((q.x + q.y*0.7 + q.z*0.4)*60.0, 0.05, gPixG*77.0);   // (machined flutes)
-    if (mid == 72) { m.alb *= 0.8; m.emit = vio*0.35*pulse*aaLines((q.x + q.z)*25.0 + 0.5, 0.0055, gPixG*35.0); }
+    if (mid == 72) { m.alb *= 0.8; m.emit = vio*0.04*pulse*aaLines((q.x + q.z)*25.0 + 0.5, 0.0055, gPixG*35.0); }
   } else if (mid == 66) {   // seat: dark perforated hide in hexagonal quilting, glowing seams
     tx = triSample(lp, ln, M_LEATHER, 0.25, nT);
     vec2 id; float e = wrHex((abs(ln.x) > 0.6 ? q.zy : abs(ln.y) > 0.6 ? q.xz : q.xy)*22.0, id);
     m.alb = vec3(dot(tx.rgb, vec3(0.33)))*vec3(0.17, 0.17, 0.2); m.rough = 0.62; m.nrm = nT;
     float sv = mix(clamp((0.035 - e)/max(gPixG*22.0, 1e-4) + 0.5, 0.0, 1.0), 0.14, smoothstep(0.3, 0.8, gPixG*22.0));   // the seams
-    m.alb *= mix(1.0, 0.5, sv); if (q.y > -0.55 && q.y < 0.1) m.emit = cyan*0.08*pulse*sv;
+    m.alb *= mix(1.0, 0.5, sv); if (q.y > -0.55 && q.y < 0.1) m.emit = cyan*0.012*pulse*sv;
     vec2 pf = (abs(ln.x) > 0.6 ? q.zy : abs(ln.y) > 0.6 ? q.xz : q.xy)*90.0;
     m.alb *= 1.0 - 0.55*aaDisc(length(fract(pf) - 0.5), 0.18, gPixG*90.0, 0.1);   // perforations
-  } else if (mid == 67) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = mix(cyan, vio, 0.5 + 0.5*sin(q.z*6.0 - uTime*1.5))*1.6*pulse; }
+  } else if (mid == 67) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = mix(cyan, vio, 0.5 + 0.5*sin(q.z*6.0 - uTime*1.5))*0.22*pulse; }
   else if (mid == 68) {   // touch glass on the consoles
     vec3 cq = vec3(abs(q.x) - 0.56, q.y + 0.47, q.z + 0.12);
     vec2 uv = vec2((cq.x - 0.015)/0.1, (cq.z - 0.265)/0.09)*0.5 + 0.5;
     m.alb = vec3(0.01); m.rough = 0.04; m.emit = wrUiPanel(uv, q.x > 0.0 ? 0.3 : 0.7)*1.5; gDispPx = true;
   } else if (mid == 69) {   // multi-function displays (dash and consoles)
-    int page; vec2 uv;
-    if (q.z < -0.7) {   // dash pair (by depth: the consoles' displays tilt up towards the pilot, and by height their forward half was taken for the dash's - off its page, black: half of each was cut off)
-      vec3 l = wrFrame(q, WD_C, WD_N, vec3(0,1,0));
-      page = l.x < 0.0 ? 0 : 2; uv = vec2((abs(l.x) - 0.33)/0.15*sign(l.x), (l.y + 0.005)/0.07);
+    int page; vec2 uv; float panelScale;
+    if (q.z < -0.7) {
+      ResearchPanel panel = wraithPanel(wraithPanelIndex(q));
+      vec3 l = researchPanelFrame(q, panel);
+      page = panel.page; uv = l.xy/panel.h; panelScale = min(panel.h.x, panel.h.y);
     } else {
       vec3 cq = vec3(abs(q.x) - 0.56, q.y + 0.47, q.z + 0.12);
       vec3 mq = cq - vec3(0.015, 0.075, -0.24); mq.yz = rot2(mq.yz, -0.55);
-      page = q.x < 0.0 ? 1 : 3; uv = vec2(mq.x/0.09*sign(q.x), -mq.z/0.055);
+      page = q.x < 0.0 ? 1 : 6; uv = vec2(mq.x/0.09*sign(q.x), -mq.z/0.055); panelScale = 0.055;
     }
     // 4x supersampled over the pixel's footprint on the glass, every element anti-aliased: crisp at any resolution
-    float fp = gPixM/(q.z < -0.7 ? 0.07 : 0.055);
+    float fp = gPixM/panelScale;
     gAA = fp*0.55;
     vec3 sc = pageTex(page, uv, fp)*vec3(0.85, 1.0, 1.15);
     float edge = smoothstep(1.0, 0.93, max(abs(uv.x), abs(uv.y)));
     sc = sc*edge + vec3(0.008, 0.02, 0.035)*edge;
-    m.alb = vec3(0.01); m.rough = 0.05; m.emit = sc*1.5; gDispPx = true;
+    m.alb = vec3(0.01); m.rough = 0.05; m.emit = sc*(page == 3 ? 1.35 : 1.10); gDispPx = true;
   } else if (mid == 70) {   // grips, knobs and toggles: rubberised with machined caps
     tx = triSample(lp, ln, M_RUBBER, 0.08, nT); m.alb = tx.rgb*0.25; m.rough = tx.a; m.nrm = nT; m.metal = 0.1;
     if (ln.y > 0.7) { m.alb = vec3(0.3); m.metal = 0.9; m.rough = 0.25; }
   } else if (mid == 71) { tx = triSample(lp*3.0, ln, M_METAL, 0.3, nT); m.alb = tx.rgb*0.35; m.metal = 0.9; m.rough = 0.3; m.nrm = nT;
     m.alb *= 1.0 - 0.5*aaLines(q.y*40.0, 0.12, gPixG*40.0); }
-  else if (mid == 73) { m.alb = vec3(0.05); m.emit = vio*2.2*pulse; }
+  else if (mid == 73) { m.alb = vec3(0.05); m.emit = vio*0.12*pulse; }
   else if (mid == 74) { m.alb = vec3(0.04); m.metal = 0.9; m.rough = 0.2; }
   else if (mid == 76) {   // annunciators: lit by the craft's state
     vec3 l = wrFrame(q, WD_C, WD_N, vec3(0,1,0));
@@ -86,17 +87,17 @@ void shadeWraithCockpit(inout Mat m, int mid, vec3 lp, vec3 ln, vec3 E){
     vec3 tc = c <= 3 ? vec3(1.0, 0.3, 0.35) : c == 4 ? vio : c == 5 ? cyan : vec3(1.0, 0.6, 0.15);
     m.alb = vec3(0.015); m.rough = 0.1; m.emit = tc*(0.04 + 2.2*on);
   }
-  else { m.alb = vec3(0.02); m.rough = 0.6; m.emit = cyan*0.35*pulse*step(0.5, fract(q.y*14.0 + 0.25)); }   // vents
+  else { m.alb = vec3(0.02); m.rough = 0.6; m.emit = cyan*0.05*pulse*step(0.5, fract(q.y*14.0 + 0.25)); }   // vents
 }
 
 // ---------------------------------------------------------------- hologram: a rotating wireframe globe over the dash
 vec3 wrHolo(vec3 ro, vec3 rd, float tmax){
-  vec3 c = uPlanePos + uPlaneRot*(gM[22].xyz + vec3(0.0, -0.21, -0.93));
-  float R = 0.07;
+  vec3 c = uPlanePos + uPlaneRot*(gM[22].xyz + WR_HOLO_CENTRE);
+  float R = WR_HOLO_RADIUS;
   vec3 oc = ro - c; float b = dot(oc, rd), h = b*b - dot(oc, oc) + R*R;
   vec3 col = vec3(0.0);
   // projection cone from the emitter
-  vec3 e = uPlanePos + uPlaneRot*(gM[22].xyz + vec3(0.0, -0.335, -0.975));
+  vec3 e = uPlanePos + uPlaneRot*(gM[22].xyz + WR_HOLO_EMITTER);
   vec3 ax = normalize(c - e); vec3 w = ro - e; float bb = dot(rd, ax), dd = dot(rd, w), ee = dot(ax, w), den = 1.0 - bb*bb;
   float sA = den > 1e-5 ? (ee - bb*dd)/den : 0.0, sR = max(dot(e + ax*sA - ro, rd), 0.0);
   float L = length(c - e);
@@ -114,7 +115,7 @@ vec3 wrHolo(vec3 ro, vec3 rd, float tmax){
     float coast = land*(1.0 - step(0.66, vnoise(vec2(a*2.5, lat*4.0) + 3.0)));
     col += mix(vec3(0.2, 0.8, 1.0), vec3(0.75, 0.45, 1.0), land)*(0.32*lines + 0.03*land + 0.4*coast)*(k == 0 ? 1.0 : 0.35);
   }
-  return col*(0.85 + 0.15*sin(uTime*30.0));
+  return col*0.55*(0.85 + 0.15*sin(uTime*30.0));
 }
 
 // ---------------------------------------------------------------- belly camera on the front floor pane

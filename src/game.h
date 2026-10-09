@@ -4,6 +4,7 @@
 #include <optional>
 #include <set>
 #include "common.h"
+#include "cockpit_focus_zoom.h"
 #include <unordered_map>
 #include <future>
 #include <map>
@@ -49,6 +50,7 @@ struct Settings {
   int resMode = 1;   // 0 native, 1 auto (holds the frame-rate target, the default), 2 85%, 3 75%, 4 67% (TAA upscales to the display)
   int fpsTarget = 60;   // the frame-rate cap (30 / 60 / 90 / 120 / 144 / 240); 0: the monitor's refresh rate (vsync). 60 by default: a 240 Hz screen would otherwise ask for 240 fps
   float fov = 55;      // the outside views' vertical field of view (degrees); the cockpit's is 19 wider
+  bool cockpitFocusZoom = true; // smoothly magnify a display as the view approaches its centre
   bool headLook = true;   // the cockpit view leans into turns when nothing else moves it
   bool cbHud = false;     // colour-blind palette: good / bad as blue / orange instead of green / red
   float uiScale = 1.f;    // on top of the window-height scale
@@ -129,6 +131,7 @@ private:
   // a job leg's fees as they will be charged: the hire and ferry already paid are waived for the same aircraft only
   void continuationWaivers(Career::LaunchPlan& p, const Contract& c, int spec, Career::Source src) const;
   float launchFuelKg = -1;       // the fuel chosen on the job card for the next flight (-1: the plan's default)
+  Career::LaunchPlan finalizeLaunchPlan(const Contract& c, int spec, Career::Source src);
   float chosenFuel(const Contract& c, int spec, Career::Source src, const Career::LaunchPlan& p) const;   // what the tanks hold at take-off
   float jobClockBase = 0;        // seconds already on the job's clock from earlier legs (deadlines count from it)
   // C7: one failure may be rolled for the flight (from the aircraft's condition), scheduled at a clock time; the gear
@@ -328,9 +331,9 @@ private:
   int atcKey() const { return atcF.phase * 4 + (atcF.depRev ? 1 : 0) + (atcF.arrRev ? 2 : 0); }   // E6: a tower call is valid while this is what it was made for
   void updateAtc(float dt);
   // every in-flight message the voices may say: the toasts, the lesson hints (with the lesson's id), the warnings
-  struct CommsMsg { std::string text, mission; bool padOk = true; };   // (padOk: a recording naming the gamepad's buttons names the player's)
+  struct CommsMsg { std::string text, mission; int lessonPhase = -1; };   // lesson identity is independent of displayed controls
   std::vector<CommsMsg> commsPending;
-  bool commsCrashSeen = false;
+  bool commsCrashSeen = false, lessonVoiceWarned = false;
   std::vector<std::string> hintsVoiced;   // the lesson hints said this flight
   bool warnWas[4] = {}; float warnLastT[4] = {-99, -99, -99, -99};   // stall, pull up, gear, engine off: rising edges
   // a failure annunciator (C7): the HUD draws text, comms speak it when its state (slot -> key) comes on or changes
@@ -351,13 +354,13 @@ private:
   std::vector<TipPt> tipTrail[2]; int tipSeg = 0; bool tipOn = false;
   int ctlScroll = 0; float ctlScrollAcc = 0;
   float ckZoom = 1.f, ckZoomT = 1.f;
+  CockpitFocusZoom cockpitFocus;
   float autoScale = 0.75f, autoScaleT = 0;   // (starts at three quarters: the upscaler makes it hard to tell, and the first frames are the slow ones)   // dynamic resolution state   // cockpit view zoom (current, target)
   float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0; bool loadMap = false;   // pre-flight loading screen
   bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI
   // bound action state: keyboard key or gamepad button
-  std::string expandHint(const std::string& raw, bool pad = false) const;
-  bool hintPadDefault(const std::string& raw) const;   // every control the hint names on its default gamepad button   // {actionId} tokens -> the bound keys (pad: buttons)
+  std::string expandHint(const std::string& raw, bool pad = false) const;   // {actionId} tokens -> the bound keys (pad: buttons)
   std::string actLabel(int a, bool pad) const;   // an action's key, or its gamepad button / stick / trigger
   bool padActive = false;   // the gamepad was used last (a key press hands back to the keyboard): what prompts name
   bool padPrompts() const { return in.pad && padActive; }
@@ -386,9 +389,10 @@ private:
   int radioScroll = 0;
   void saveGame();
   void toast(const std::string& s, vec3 col = vec3(1, 1, 1), bool voiced = true);   // voiced: a voice line says it, if the packs have one
-  void startFlight(const Contract& c, int spec, Career::Source src);
+  void startFlight(const Contract& c, int spec, Career::Source src, const Career::LaunchPlan* finalized = nullptr);
   void endFlight(bool success, const std::string& reason, FlightOutcome outcome = OUT_CRASHED);
   void updateFlight(float dt);
+  void updateLessonHint();
   void flightControls(float dt);
   void updateCamera(float dt);
   void updateParticles(float dt);

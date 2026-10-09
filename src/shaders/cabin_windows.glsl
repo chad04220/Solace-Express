@@ -81,10 +81,11 @@ int cabinPanelId(vec3 q, int model, int mid){
   if (model == 6) {
     if (mid != 65 && mid != 68 && mid != 69 && mid != 76) return mid;
     vec3 aq = vec3(abs(q.x), q.y, q.z);
-    vec3 l = wrFrame(q, WD_C, WD_N, vec3(0.0, 1.0, 0.0));   // the dash pair
-    vec3 m = vec3(abs(l.x) - 0.33, l.y + 0.005, l.z - 0.003);
-    if (abs(m.z) < 0.004 && wrShape(m.xy, vec2(0.15, 0.07), 0.035) < 0.0) return 69;
-    vec3 a = vec3(l.x, l.y - 0.083, l.z - 0.001); a.x -= (floor(a.x/0.07) + 0.5)*0.07;   // its annunciator tiles
+    ResearchPanel panel = wraithPanel(wraithPanelIndex(q));
+    vec3 m = researchPanelFrame(q, panel);
+    if (abs(m.z) < 0.004 && researchPanelShape(m.xy, panel) < 0.0) return 69;
+    vec3 l = wrFrame(q, WD_C, WD_N, vec3(0.0, 1.0, 0.0));
+    vec3 a = l - vec3(0.0, -0.155, 0.008); a.x -= (floor(a.x/0.07) + 0.5)*0.07;
     if (abs(a.z) < 0.004 && max(max(abs(a.x) - 0.028, abs(a.y) - 0.009), abs(l.x) - 0.28) < 0.0) return 76;
     vec3 cq = vec3(aq.x - 0.56, q.y + 0.47, q.z + 0.12);    // the console's display on its tilted mount, and its touch glass
     vec3 mq = cq - vec3(0.015, 0.075, -0.24); mq.yz = mat2(cos(0.55), -sin(0.55), sin(0.55), cos(0.55))*mq.yz;   // (rot2(mq.yz, -0.55))
@@ -93,11 +94,9 @@ int cabinPanelId(vec3 q, int model, int mid){
     return 65;
   }
   if (mid != 44 && mid != 45 && mid != 52 && mid != 53 && mid != 54) return mid;
-  float r = length(q.xz), ang = atan(q.x, -q.z);
-  float topY = -0.30 - (0.66 - r)*0.35;                     // the five displays in the console's sloped top
-  float k = clamp(floor(ang/0.42 + 0.5), -2.0, 2.0);
-  vec3 rq = vec3((ang - k*0.42)*r, q.y - topY, r - 0.575);
-  if (abs(rq.x) < 0.072 && abs(rq.z) < 0.052 && abs(rq.y) < 0.004 && abs(ang) < 1.18) return 45;
+  ResearchPanel panel = specterPanel(specterPanelIndex(q));
+  vec3 m = researchPanelFrame(q, panel);
+  if (abs(m.z) < 0.004 && researchPanelShape(m.xy, panel) < 0.0) return 45;
   vec3 cq = vec3(abs(q.x) - 0.52, q.y + 0.44, q.z - 0.08);   // the side shelves' small displays
   if (abs(cq.x - 0.02) < 0.075 && abs(cq.z + 0.2) < 0.06 && abs(cq.y - 0.05) < 0.004) return q.x < 0.0 ? 52 : 53;
   if (abs(cq.x) < 0.112 && abs(cq.z - 0.136) < 0.096 && abs(cq.y - 0.05) < 0.004) return 54;   // and their keys

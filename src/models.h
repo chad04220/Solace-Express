@@ -38,3 +38,14 @@ int modelProps(const ModelDef& m, float out[2][4]);
 vec3 modelWingTip(const ModelDef& m);
 vec3 modelFinTop(const ModelDef& m);
 vec3 modelTailTip(const ModelDef& m);
+
+// Fitted cockpit foot/seat mounts, computed on the CPU once per uniform upload rather than per fragment.
+// foot: pedal y, station z, pair-centre magnitude, foot spacing; seat: rail-floor y, pan drop below eye.
+void modelCabinFit(int model, float panelZ, float foot[4], float seat[2]);
+
+// Nine vec4 of authored cockpit layout, separate from the full 24-vec4 packed aircraft model.
+void packCockpitLayout(int model, float values[36]);
+
+struct CockpitFocusTarget;
+// Visible live instruments only; camera-window glass and decorative touch surfaces are excluded.
+int modelCockpitFocusTargets(int model,CockpitFocusTarget* out,int capacity);

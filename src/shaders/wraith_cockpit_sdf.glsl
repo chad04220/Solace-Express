@@ -44,28 +44,33 @@ vec2 mapWraithCockpit(vec3 p){
     float grid = max(max(min(g.x, g.y) - 0.008, l.z - 0.022), max(wrShape(l.xy, WL_S, 0.1), -l.z));
     if (gCkSkip != 1) res = opU(res, vec2(grid, 72.0));
   }
-  // dash: an angular carbon blade under the front wrap with two displays and the hologram emitter between them
+  // A shallow hex-framed bridge: large centre ADI, engine left and map right. The modules are thick solids,
+  // with glass assigned flush to the front face, so extraction cannot create sub-lattice floating screen edges.
   {
     vec3 l = wrFrame(q, WD_C, WD_N, vec3(0,1,0));
-    float blade = max(max(abs(l.x) - 0.66, abs(l.y) - 0.1), abs(l.z + 0.02) - 0.022);
-    blade = max(blade, (abs(l.x)*0.6 + abs(l.y) - 0.48));                                // swept ends
-    // its two displays and the annunciator tiles along its upper edge (ARM, LASER, BAY, BOMB, CLOAK, PODS, G, ALT) are
-    // flush in its face: as slabs a few millimetres proud of it, finer than the bake's lattice, their edges came out as
-    // dark spiky facets (the owner's report)
-    vec3 m = vec3(abs(l.x) - 0.33, l.y + 0.005, l.z - 0.003);
-    vec3 a = vec3(l.x, l.y - 0.083, l.z - 0.001);
-    a.x -= (floor(a.x/0.07) + 0.5)*0.07;
-    bool face = gCkSkip != 2 && l.z > -0.01;
-    float bid = face && wrShape(m.xy, vec2(0.15, 0.07), 0.035) < 0.0 ? 69.0 : face && max(max(abs(a.x) - 0.028, abs(a.y) - 0.009), abs(l.x) - 0.28) < 0.0 ? 76.0 : 65.0;
-    vec3 h = vec3(l.x, l.y + 0.01, l.z);
-    // (the hologram emitter: a rounded disc filleted into the blade, its glowing ring a round tube filleted into the
-    // disc - a sharp-edged disc on a blade tilted to the lattice, and then the crease under a rounded rim, came out as
-    // dark shards round it: the owner's report)
-    vec2 pd = vec2(length(h.xy) - 0.046, abs(h.z - 0.012) - 0.003);
-    float pod = min(max(pd.x, pd.y), 0.0) + length(max(pd, 0.0)) - 0.009;
-    float ring = length(vec2(length(h.xy) - 0.035, h.z - 0.024)) - 0.006;
-    float podR = smin(pod, ring, 0.006);
-    res = opU(res, vec2(smin(blade, podR, 0.014), blade < podR ? bid : ring < pod ? 67.0 : 74.0));
+    float bridge = sdRoundBox(l - vec3(0.0, -0.09, -0.048), vec3(0.68, 0.031, 0.035), 0.015);
+    res = opU(res, vec2(bridge, 65.0));
+    for (int i = 0; i < 3; i++) {
+      ResearchPanel panel = wraithPanel(i);
+      vec3 m = researchPanelFrame(q, panel);
+      float body = sdRoundBox(m + vec3(0.0, 0.0, 0.028), vec3(panel.h + vec2(0.020), 0.028), 0.012);
+      body = max(body, (abs(m.x) + abs(m.y) - panel.h.x - panel.h.y - 0.040 + panel.corner)*0.70710678);
+      bool glass = gCkSkip != 2 && m.z > -0.010 && researchPanelShape(m.xy, panel) < 0.0;
+      res = opU(res, vec2(body, glass ? 69.0 : 65.0));
+    }
+    // State-driven ARM/LASER/BAY/BOMB/CLOAK/PODS/G/ALT tiles sit on a quiet strip below the primary display.
+    vec3 a = l - vec3(0.0, -0.155, 0.008);
+    float rail = sdRoundBox(a + vec3(0.0, 0.0, 0.027), vec3(0.29, 0.017, 0.027), 0.008);
+    vec3 cell = a; cell.x -= (floor(cell.x/0.07) + 0.5)*0.07;
+    bool status = gCkSkip != 2 && a.z > -0.006 && abs(cell.x) < 0.028 && abs(a.y) < 0.009 && abs(l.x) < 0.28;
+    res = opU(res, vec2(rail, status ? 76.0 : 65.0));
+    // The retained hologram is a small left-edge aid, clear of both the flight page and its flight scan.
+    vec3 h = wrFrame(q, WR_HOLO_EMITTER, WD_N, vec3(0,1,0));
+    vec2 pd = vec2(length(h.xy) - 0.026, abs(h.z + 0.008) - 0.012);
+    float pod = min(max(pd.x, pd.y), 0.0) + length(max(pd, 0.0)) - 0.006;
+    float ring = length(vec2(length(h.xy) - 0.023, h.z - 0.009)) - 0.004;
+    res = opU(res, vec2(smin(pod, ring, 0.006), ring < pod ? 67.0 : 74.0));
+    res = opU(res, vec2(sdCapsule(q, vec3(-0.628, -0.427, -0.954), WR_HOLO_EMITTER, 0.020), 65.0));
   }
   // side consoles: angular slabs below the side displays with touch glass, a display and the controls
   {
@@ -159,14 +164,17 @@ vec3 wrClipAtlas(vec2 uv){
   else if (tile == 6) { q = wrPanePoint(WC_C, WC_N, vec3(0,1,0), vec3(f*WC_S, 0.0)); inside = wrShape(f*WC_S, WC_S, 0.07); }
   else if (tile == 7) { q = wrPanePoint(WL_C, WL_N, vec3(0,0,-1), vec3(f*WL_S, 0.0)); inside = wrShape(f*WL_S, WL_S, 0.1); }
   else if (tile <= 9) { q = wrPanePoint(WB_C, WB_N, vec3(0,0,-1), vec3(f*WB_S, 0.0)); inside = wrShape(f*WB_S, WB_S, 0.07); }
-  else if (tile <= 11) { skip = 2; vec2 m = f*vec2(0.15, 0.07); q = wrPanePoint(WD_C, WD_N, vec3(0,1,0), vec3(0.33 + m.x, m.y - 0.005, 0.003)); inside = wrShape(m, vec2(0.15, 0.07), 0.035); }
+  else if (tile <= 11) { skip = 2; ResearchPanel panel = wraithPanel(tile == 10 ? 0 : 2);
+    q = wrPanePoint(panel.c, panel.n, vec3(0,1,0), vec3(f*panel.h, 0.0)); inside = researchPanelShape(f*panel.h, panel); }
   else if (tile <= 13) { skip = 2; vec2 m = f*vec2(0.1, 0.09); q = vec3(0.56 + 0.015 + m.x, 0.041 - 0.47, 0.265 + m.y - 0.12); inside = max(abs(m.x) - 0.1, abs(m.y) - 0.09); }
   else if (tile <= 15) { skip = 2; vec2 m = f*vec2(0.09, 0.055); vec3 mq = vec3(m.x, 0.0, m.y); mq.yz = rot2(mq.yz, 0.55);
     vec3 cq = mq + vec3(0.015, 0.075, -0.24); q = vec3(0.56 + cq.x, cq.y - 0.47, cq.z - 0.12); inside = wrShape(m, vec2(0.09, 0.055), 0.02); }
-  else if (tile == 16) { skip = 2; vec2 m = f*vec2(0.28, 0.009); q = wrPanePoint(WD_C, WD_N, vec3(0,1,0), vec3(m.x, 0.083 + m.y, 0.001)); inside = max(abs(m.x) - 0.28, abs(m.y) - 0.009); }
+  else if (tile == 16) { skip = 2; vec2 m = f*vec2(0.28, 0.009); q = wrPanePoint(WD_C, WD_N, vec3(0,1,0), vec3(m.x, -0.155 + m.y, 0.008)); inside = max(abs(m.x) - 0.28, abs(m.y) - 0.009); }
   else if (tile <= 18) { q = wrPanePoint(WA_C, WS_N, vec3(0,1,0), vec3(f*WA_S, 0.0)); inside = wrShape(f*WA_S, WA_S, 0.11); }
+  else if (tile == 19) { skip = 2; ResearchPanel panel = wraithPanel(1);
+    q = wrPanePoint(panel.c, panel.n, vec3(0,1,0), vec3(f*panel.h, 0.0)); inside = researchPanelShape(f*panel.h, panel); }
   else return vec3(0.02);
-  q.x *= sgn;
+  if (tile != 10 && tile != 11) q.x *= sgn;
   if (inside > 0.0) return vec3(0.0);
   int keep = gCkSkip; gCkSkip = skip;
   vec2 dm = mapWraithCockpit(q + gM[22].xyz); float d = dm.x;

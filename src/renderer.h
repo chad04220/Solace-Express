@@ -1,5 +1,6 @@
 // Solace Express - renderer interface
 #pragma once
+#include <array>
 #include <chrono>
 #include <functional>
 #include <atomic>
@@ -11,6 +12,7 @@
 #include "entity_mesh.h"
 #include "ground_vehicle.h"
 #include "feed_cameras.h"
+#include "exhaust.h"
 
 struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft, bill = 0; };   // bill > 0: x,y,z is the centre of a camera-facing square of that half size
 enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7, SPR_RIBBON = 8, SPR_FLAME = 9 };
@@ -26,6 +28,8 @@ struct PlaneVisual {
   float reg[3] = {65, 65, 65};   // registration letters (character codes)
   float prop[2][4]; int propCount = 0;
   float hud[4] = {0, 0, 0, 0}, hud2[4] = {1, 0, 0, 0}, hudV[3] = {0, 0, -1}, hud3[4] = {0, 0, 0, 1000};  // research jet HUD data
+  float engineHealth[4] = {1,1,1,1}; // actual per-engine failure health, for live cockpit indication
+  ExhaustVisual exhaust;
   float flame[4] = {0, 0, 0, 0};  // research jet exhaust: spool, reheat, nozzle vector angle (rad), mach
   float vapor[4] = {0, 0, 0, 0};  // transonic vapour cone: density, start z, start radius, length (body space)
   int lensN = 0; float lensP[6][4] = {}, lensC[6][4] = {}, lensD[6][4] = {};   // light fixtures (body space): lens centre | emission | axis + tint
@@ -61,7 +65,7 @@ std::string meshCacheStamp();     // fingerprint of the sources the aircraft mes
 std::string shaderCacheStamp();   // fingerprint of all shader sources + the driver (current context needed)
 bool writePNG(const char* path, int w, int h, const std::vector<uint8_t>& rgbBottomUp);
 bool readImage(const char* path, int& w, int& h, std::vector<uint8_t>& rgbaTopDown);   // PNG or JPEG
-GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err);
+GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err, bool* usedSafeGear = nullptr);
 extern std::string g_shaderNotes;          // programs the driver's compiler rejected and what built instead (startup.log)
 void shaderNote(const std::string& s);      // (adds a line to it; safe from the compile threads)
 GLint U(GLuint prog, const char* name);   // a uniform's location (cached per program; name must be a string literal)
@@ -123,7 +127,7 @@ public:
   // loops, so a screen drawn from the callback (the research terminal's boot sequence) never freezes
   std::chrono::steady_clock::time_point bakeYieldAt{};
   bool bakeDue() { auto now = std::chrono::steady_clock::now(); if (now - bakeYieldAt < std::chrono::milliseconds(30)) return false; bakeYieldAt = now; return true; }
-  void bakeTick() { if (bakeYield && bakeDue()) bakeYield(); }
+  void bakeTick() { if (bakeYield && bakeDue()) { bakeYield(); hullBakeUploaded[0] = hullBakeUploaded[1] = false; } }
   bool ok = false;
   std::string error;
   GLuint minimapTex = 0;
@@ -205,6 +209,7 @@ private:
   // temporal AA: the lighting pass writes texRaw; the resolve blends it with the reprojected history into texHist[cur] + texColor
   GLuint texRaw = 0, texHist[2] = {0, 0}, fboTAA[2] = {0, 0};
   GLuint texTraffic = 0;
+  std::array<TrafficVisual, kMaxTrafficDrawn> trafficUpload = {}; int trafficUploadN = -1;
   int histIdx = 0, frameNo = 0, histW = 0, histH = 0; bool histValid = false;   // (histW/H: the history textures' size)
   // GPU frame time from a ring of timer queries (read a few frames late so the CPU never waits on them)
   GLuint gpuQ[4] = {0, 0, 0, 0}; bool gpuQUsed[4] = {false, false, false, false}; int gpuQi = 0;
@@ -218,6 +223,7 @@ public:
   void reportGLError(int stampIdx);
   void syncStamp(int i);
 private:
+  float prevFovY = 0.f;
   vec3 prevCamPos, prevPlanePos; float prevCamRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1}, prevPlaneRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
   int rw = 0, rh = 0, bw = 0, bh = 0;
   float maxH = 2500;
@@ -264,6 +270,8 @@ private:
   struct PartMesh { int type = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; };   // a cockpit's rigid moving part, in its own frame (plane_parts.glsl)
   struct PlaneMesh { std::vector<PartMesh> parts; uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; };
   std::unordered_map<uint64_t, PlaneMesh> planeMeshes;
+  GLuint progTrafficProps = 0;
+  void rasterTrafficProps(const FrameParams& fp);
   GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0;   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
   void setScreenCut(GLuint p, const FrameParams& fp, bool on);   // the research cockpits' windows cut (cabin_windows.glsl)
   bool compilePlaneMesh();
@@ -277,6 +285,8 @@ private:
   static constexpr int kMaxPoseInst = 512;
   struct PoseOwner { const PlaneMesh* pm = nullptr; int base = 0, n = 0; };
   PoseOwner poseOwner[1 + kMaxTrafficDrawn];
+  std::vector<float> poseRevision;
+  std::array<const PlaneMesh*, 1 + kMaxTrafficDrawn> poseMeshes = {};
   std::vector<int> poseType;   // each instance's part type
   GLuint progPartPose = 0, texPartPose = 0, texPartInfo = 0, fboPartPose = 0;
   void computePartPoses(const FrameParams& fp, const PlaneMesh* player, const PlaneMesh* const* traffic);
@@ -285,12 +295,23 @@ private:
   const PlaneMesh* earlyMesh = nullptr;   // the player's mesh whose depth opens this frame's G-buffer (rasterWorld; drawEntities draws it)
   uint64_t trafficModelKey(const float* t) const;   // hullKey(slot 0) of a traffic aircraft's model
   std::unordered_map<uint64_t, HullMesh> hulls;   // every airframe baked so far, outside and cockpit (keyed by hullKey)
-  GLuint progHull = 0, progHullBake = 0, vaoHull = 0, texHPts = 0, texHOut = 0, fboHOut = 0, fboHull = 0, texHullDepth = 0;
+  GLuint progHull = 0, progHullBake = 0, progHullBakeNormal = 0, vaoHull = 0, texHPts = 0, texHNormals = 0, texHOut = 0, fboHOut = 0, fboHull = 0, texHullDepth = 0;
   int hullDepthW = 0, hullDepthH = 0;
   bool hullOn = false;
   bool compileHull(const std::string& bakeVS, const std::string& bakeFS);
   void hullEval(const std::vector<vec3>& pts, std::vector<float>& out);
-  void hullEval4(const std::vector<vec3>& pts, std::vector<float>& out);
+  // Bake inputs live on the CPU: both programs receive the same model, states and part selectors.
+  // No selector is recovered from GL (the normal program can optimize some uniforms away).
+  FrameParams hullBakeFrame;
+  std::array<float, 512> hullBakePS{}, hullBakeCtl{}, hullBakeWr{}, hullBakeWr2{};
+  int hullBakeStates = 0, hullBakeMode = 0, hullBakeState = 0, hullBakePart = -1;
+  float hullBakeSideX = 1.f, hullBakeSideY = 1.f;
+  bool hullBakeUploaded[2] = {false, false};
+  void beginHullBake(const FrameParams& fp, int states, const float* ps, const float* ctl,
+                     const float* wr = nullptr, const float* wr2 = nullptr);
+  GLuint bindHullBake(bool restore = false);
+  void hullEval4(const std::vector<vec3>& pts, std::vector<float>& out, const std::vector<float>* normals = nullptr);
+  void hullEvalBatch(const vec3* pts, size_t n, float* out, const float* normals);
   void bakeHull(const FrameParams& fp, int slot, uint64_t key);
   uint64_t hullKey(const FrameParams& fp, int slot) const;
   bool hullWanted(const FrameParams& fp) const;
@@ -315,6 +336,7 @@ private:
   ViewTargets feedView;                // (allocated at the largest picture; each camera uses its corner of it)
   static constexpr int kFeedMaxW = 2048, kFeedMaxH = 1024, kFeedAtlasW = 4096, kFeedAtlasH = 3072;
   GLuint texFeed = 0, fboFeed = 0;
+  int feedAtlasW = 0, feedAtlasH = 0;
   float feedTile[kMaxFeeds][4] = {};   // atlas rectangle of each slot (uv: x0, y0, w, h)
   int feedTileWH[kMaxFeeds][2] = {};
   bool feedValid[kMaxFeeds] = {};      // its tile holds a picture

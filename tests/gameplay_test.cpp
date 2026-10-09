@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 // attitude-based vertical-speed controller (same structure as the in-game autopilot)
 // the pilot steers by the track over the ground (a heading held against a sideslip or a crosswind drifts off the line)
 static float trackDeg(const Plane& p) { return wrapDeg360(atan2f(p.vel.x, -p.vel.z) / DEG); }
@@ -16,17 +17,22 @@ static void pitchFor(Plane& p, float vsT, float dt, float maxPitch = 14.f) {
   p.ctl.pitch = clampf(0.07f * (pitchT - p.pitchDeg()) - 1.2f * p.w.x + s_eI, -1, 1);
 }
 struct GameTest {
+#include "state_regression.inc"
+#include "lesson_voice_regression.inc"
   static int run() {
     g_world.build(); buildStory();
     g_audio.init(48000);
     Game g; g.initHeadless(); g.botControl = true;
-    int fails = 0;
+    int fails = getenv("SOLACE_VOICE_ONLY") ? 0 : stateRegressions();
+    if (getenv("SOLACE_STATE_ONLY")) { printf("%d state failures\n", fails); return fails; }
 #ifdef SOLACE_ASSETS
     bool voices = g.atc.load(std::string(SOLACE_ASSETS) + "/voice");   // the tower voices (the audio is rendered below, as the audio thread would)
     if (!voices) { printf("Voice index: FAIL (assets/voice/voice_index.txt did not load; the voice checks below need it)\n"); fails++; }
 #else
     bool voices = false;
 #endif
+    fails += controlVoiceRegressions();
+    if (getenv("SOLACE_VOICE_ONLY")) { printf("%d voice failures\n", fails); return fails; }
     static float abuf[2 * 4096];
     if (voices) {   // the voice lines resolve for the game's messages, fixed and assembled from fragments
       struct Case { const char* msg; const char* mission; bool pad, want; } cases[] = {
@@ -36,7 +42,7 @@ struct GameTest {
         {"3 aircraft caught in the blast", "", false, true}, {"ENGINE OFF - press I to restart", "", false, true}, {"STALL", "", false, true},
         {"SPECTRE: That's the show - Specters breaking off. Fly safe!", "", false, true}, {"Pods 60 deg", "", false, true},
         {"Nice! Hold a gentle climb about 7 degrees nose-up. Fly through the green rings.", "L1", false, true},
-        {"Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.", "L1", true, true},    // gamepad wording
+        {"Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.", "L1", true, false},   // lesson speech uses semantic phase identity
         {"Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.", "L1", false, false},  // not for keyboard
         {"Engine running. Cleared for takeoff runway 05.", "", false, false},   // the towers clear takeoff
         {"Something the packs never recorded", "", false, false}};
@@ -263,15 +269,15 @@ struct GameTest {
       std::string reb = g.expandHint(raw);
       g.set.keyBind[ACT_PARK] = keep;
       AtcVoice::Tx tx;
-      bool defVoiced = !voices || g.atc.resolve(def, "L1", false, tx) || g.atc.resolve(def, "L1", true, tx);
-      bool rebVoiced = voices && (g.atc.resolve(reb, "L1", false, tx) || g.atc.resolve(reb, "L1", true, tx));
-      bool ok = def.find("Press B ") != std::string::npos && reb.find("Press P ") != std::string::npos && reb.find("Press B ") == std::string::npos && !rebVoiced && defVoiced;
+      bool defVoiced = !voices || g.atc.resolveLesson("L1", 0, def, tx);
+      bool rebVoiced = !voices || g.atc.resolveLesson("L1", 0, reb, tx);
+      bool ok = def.find("Press B ") != std::string::npos && reb.find("Press P ") != std::string::npos && reb.find("Press B ") == std::string::npos && rebVoiced && defVoiced;
       printf("Hint after rebinding the parking brake: \"%s\" voiced %d (default voiced %d): %s\n", reb.c_str(), rebVoiced, defVoiced, ok ? "ok" : "FAIL");
       fails += !ok;
       // with a gamepad the hint names its buttons as bound (D-pad Left parks, B is the flaps) and RT for the throttle,
-      // the GPS names the autopilot's binding, and the spoken line is still the controller recording
+      // the GPS names the autopilot's binding, and the spoken line is control-independent
       std::string padT = g.expandHint(raw, true);
-      bool padVoiced = !voices || g.atc.resolve(def, "L1", true, tx);
+      bool padVoiced = !voices || g.atc.resolveLesson("L1", 0, padT, tx);
       int keepAp = g.set.keyBind[ACT_AP]; g.set.keyBind[ACT_AP] = 'P';
       std::string apKey = g.actLabel(ACT_AP, false), apPad = g.actLabel(ACT_AP, true);
       g.set.keyBind[ACT_AP] = keepAp;

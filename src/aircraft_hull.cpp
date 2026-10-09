@@ -10,6 +10,7 @@
 // airframe, in any of the sampled states, may reach into it: its centre distance is under its half diagonal (with
 // room for the distance field's slack) plus the furthest a part moves between two sampled states.
 #include "renderer.h"
+#include "models.h"
 #include "hull_mesh.h"
 #include <unordered_map>
 
@@ -46,84 +47,139 @@ void main(){
 bool Renderer::compileHull(const std::string& bakeVS, const std::string& bakeFS) {
   std::string hdr = "#version 330 core\n", e;
   progHull = linkProgramCached(hdr + kHullVS, hdr + kHullFS, e);
-  progHullBake = linkProgramCached(bakeVS, bakeFS, e);
-  return progHull && progHullBake;
+  auto define = [](const std::string& s, const char* d) { const size_t at = s.find('\n') + 1; return s.substr(0, at) + d + s.substr(at); };
+  const std::string normalFS = define(bakeFS, "#define HULL_BAKE_NORMALS\n");
+  bool safeField = false, safeNormal = false;
+  progHullBake = linkProgramCached(bakeVS, bakeFS, e, &safeField);
+  if (progHullBake) {
+    progHullBakeNormal = linkProgramCached(bakeVS, safeField ? define(normalFS, "#define NV_SAFE_GEAR\n") : normalFS, e, &safeNormal);
+    // A driver fallback must use the same field for distance and normal. Keep the upstream retry/cache/timebox
+    // machinery for each program, but never mix a full-gear distance with a reduced-gear normal (or vice versa).
+    if (progHullBakeNormal && safeNormal && !safeField) {
+      glDeleteProgram(progHullBake);
+      progHullBake = linkProgramCached(bakeVS, define(bakeFS, "#define NV_SAFE_GEAR\n"), e);
+    }
+  }
+  if (!progHullBake || !progHullBakeNormal) {
+    if (progHullBake) glDeleteProgram(progHullBake);
+    if (progHullBakeNormal) glDeleteProgram(progHullBakeNormal);
+    progHullBake = progHullBakeNormal = 0;
+    shaderNote("Aircraft bake unavailable; using the distance-field renderer.\n" + e);
+  }
+  return progHull && progHullBake && progHullBakeNormal;
 }
 
-// distances of a list of aircraft-space points (the bake program and its uniforms are already bound)
+void Renderer::beginHullBake(const FrameParams& fp, int states, const float* ps, const float* ctl,
+                             const float* wr, const float* wr2) {
+  hullBakeFrame = fp;
+  hullBakeStates = std::clamp(states, 0, 128);
+  auto copy = [&](std::array<float, 512>& dst, const float* src) {
+    dst.fill(0.f);
+    if (src) std::copy(src, src + hullBakeStates * 4, dst.begin());
+  };
+  copy(hullBakePS, ps); copy(hullBakeCtl, ctl); copy(hullBakeWr, wr); copy(hullBakeWr2, wr2);
+  hullBakeMode = hullBakeState = 0; hullBakePart = -1;
+  hullBakeSideX = hullBakeSideY = 1.f;
+  hullBakeUploaded[0] = hullBakeUploaded[1] = false;
+}
+
+GLuint Renderer::bindHullBake(bool restore) {
+  const int which = hullBakeMode == 3 ? 1 : 0;
+  const GLuint p = which ? progHullBakeNormal : progHullBake;
+  if (!p) return 0;
+  if (restore || !hullBakeUploaded[which]) {
+    setRT(p, hullBakeFrame);
+    glUniform1i(U(p, "uHStN"), hullBakeStates);
+    glUniform4fv(U(p, "uHStPS"), 128, hullBakePS.data());
+    glUniform4fv(U(p, "uHStCtl"), 128, hullBakeCtl.data());
+    glUniform4fv(U(p, "uHStWr"), 128, hullBakeWr.data());
+    glUniform4fv(U(p, "uHStWr2"), 128, hullBakeWr2.data());
+    hullBakeUploaded[which] = true;
+  } else glUseProgram(p);
+  glUniform1i(U(p, "uHMode"), hullBakeMode);
+  glUniform1i(U(p, "uHState"), hullBakeState);
+  glUniform1i(U(p, "uHPart"), hullBakePart);
+  glUniform2f(U(p, "uHPartSide"), hullBakeSideX, hullBakeSideY);
+  glUniform1i(U(p, "uHPts"), 19);
+  glUniform1i(U(p, "uHNormals"), 18);
+  return p;
+}
+
 void Renderer::hullEval(const std::vector<vec3>& pts, std::vector<float>& out) {
   std::vector<float> o4;
   hullEval4(pts, o4);
   out.resize(pts.size());
   for (size_t i = 0; i < pts.size(); i++) out[i] = o4[i * 4];
 }
-// the bake program's four outputs per point (kHullBakeMain: by uHMode the distance | distance, material id, cabin AO
-// | the normal)
-void Renderer::hullEval4(const std::vector<vec3>& pts, std::vector<float>& out) {
-  const int TW = 512;
-  int n = (int)pts.size(), rows = (n + TW - 1) / TW;
-  out.assign((size_t)n * 4, 1e9f);
-  if (!n) return;
-  // the point list as a 512-wide texture: no taller than the device allows (the Q400's lattice is 22 million points,
-  // 43 thousand rows; a texture past GL_MAX_TEXTURE_SIZE is refused and the bake read back stale data: Codex's
-  // fleet review), and no taller than 8192 rows in any case, in batches evaluated one after the other
-  static GLint maxTex = 0;
-  if (!maxTex) { glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTex); if (maxTex < 1024) maxTex = 1024; }
-  const int maxRows = std::min(maxTex, 8192);
-  if (rows > maxRows) {
-    std::vector<vec3> part; std::vector<float> po;
-    for (int at = 0; at < n; at += TW * maxRows) {
-      int cnt = std::min(n - at, TW * maxRows);
-      part.assign(pts.begin() + at, pts.begin() + at + cnt);
-      hullEval4(part, po);
-      std::copy(po.begin(), po.begin() + (size_t)cnt * 4, out.begin() + (size_t)at * 4);
-    }
+
+// Modes 0/1/4 evaluate distance, 3 evaluates the original normal, 2 reuses that exact normal for material/AO.
+void Renderer::hullEval4(const std::vector<vec3>& pts, std::vector<float>& out, const std::vector<float>* normals) {
+  out.assign(pts.size() * 4, 1e9f);
+  if (pts.empty()) return;
+  if (hullBakeMode == 2 && (!normals || normals->size() != pts.size() * 4)) {
+    shaderNote("Aircraft bake: mode 2 requires matching mode-3 normals.");
     return;
   }
-  std::vector<float> buf((size_t)TW * rows * 4, 1e4f);
-  for (int i = 0; i < n; i++) { buf[(size_t)i * 4] = pts[i].x; buf[(size_t)i * 4 + 1] = pts[i].y; buf[(size_t)i * 4 + 2] = pts[i].z; }
+  static GLint maxTex = 0;
+  if (!maxTex) { glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTex); if (maxTex < 1024) maxTex = 1024; }
+  const size_t maxPoints = size_t(512) * std::min(maxTex, 8192);
+  for (size_t at = 0; at < pts.size(); at += maxPoints) {
+    const size_t count = std::min(pts.size() - at, maxPoints);
+    hullEvalBatch(pts.data() + at, count, out.data() + at * 4, normals ? normals->data() + at * 4 : nullptr);
+  }
+}
+
+void Renderer::hullEvalBatch(const vec3* pts, size_t n, float* out, const float* normals) {
+  const int TW = 512, rows = int((n + TW - 1) / TW);
+  if (!bindHullBake()) return;
+  std::vector<float> buf(size_t(TW) * rows * 4, 1e4f);
+  for (size_t i = 0; i < n; i++) { buf[i * 4] = pts[i].x; buf[i * 4 + 1] = pts[i].y; buf[i * 4 + 2] = pts[i].z; }
   if (!texHPts) {
     glGenTextures(1, &texHPts); glGenTextures(1, &texHOut); glGenFramebuffers(1, &fboHOut);
   }
-  glActiveTexture(GL_TEXTURE0 + 19); glBindTexture(GL_TEXTURE_2D, texHPts);   // (19: a unit the bake doesn't otherwise use)
+  glActiveTexture(GL_TEXTURE0 + 19); glBindTexture(GL_TEXTURE_2D, texHPts);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, TW, rows, 0, GL_RGBA, GL_FLOAT, buf.data());
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glUniform1i(glGetUniformLocation(progHullBake, "uHPts"), 19);
-  glActiveTexture(GL_TEXTURE0 + 18);   // (the result texture is only created here; it is not sampled)
-  glBindTexture(GL_TEXTURE_2D, texHOut);
+  glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, texHOut);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, TW, rows, 0, GL_RGBA, GL_FLOAT, nullptr);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glBindFramebuffer(GL_FRAMEBUFFER, fboHOut);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texHOut, 0);
+  if (hullBakeMode == 2) {
+    if (!texHNormals) glGenTextures(1, &texHNormals);
+    glBindTexture(GL_TEXTURE_2D, texHNormals);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, TW, rows, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    // At most 64 MiB on the GPU. Reuse the existing CPU normal array; only pad the final row (8 KiB).
+    const int wholeRows = int(n / TW), tail = int(n % TW);
+    if (wholeRows) glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, TW, wholeRows, GL_RGBA, GL_FLOAT, normals);
+    if (tail) {
+      std::array<float, TW * 4> row{};
+      std::copy(normals + size_t(wholeRows) * TW * 4, normals + n * 4, row.begin());
+      glTexSubImage2D(GL_TEXTURE_2D, 0, 0, wholeRows, TW, 1, GL_RGBA, GL_FLOAT, row.data());
+    }
+  } else glBindTexture(GL_TEXTURE_2D, 0);   // never sample the attached output texture
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
-  glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST);
-  glBindVertexArray(vaoEmpty);
-  // in bands of rows, each finished before the next: one long draw could trip the driver's watchdog
+  glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glBindVertexArray(vaoEmpty);
   for (int r0 = 0; r0 < rows; r0 += 32) {
-    int r1 = std::min(rows, r0 + 32);
-    glEnable(GL_SCISSOR_TEST); glScissor(0, r0, TW, r1 - r0);
-    glViewport(0, 0, TW, rows);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    glDisable(GL_SCISSOR_TEST);
-    glFinish();
-    if (bakeYield && bakeDue()) {   // a frame from inside the bake, then this pass's state back
-      bakeYield();
+    const int r1 = std::min(rows, r0 + 32);
+    glEnable(GL_SCISSOR_TEST); glScissor(0, r0, TW, r1 - r0); glViewport(0, 0, TW, rows);
+    glDrawArrays(GL_TRIANGLES, 0, 3); glDisable(GL_SCISSOR_TEST); glFinish();
+    if (bakeYield && bakeDue()) {
+      bakeYield(); hullBakeUploaded[0] = hullBakeUploaded[1] = false; bindHullBake(true);
       glBindFramebuffer(GL_FRAMEBUFFER, fboHOut); glDrawBuffers(1, &c0);
-      glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST);
-      glBindVertexArray(vaoEmpty);
+      glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glBindVertexArray(vaoEmpty);
       glActiveTexture(GL_TEXTURE0 + 19); glBindTexture(GL_TEXTURE_2D, texHPts);
+      glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, hullBakeMode == 2 ? texHNormals : 0);
     }
   }
-  std::vector<float> res((size_t)TW * rows * 4);
-  glReadBuffer(GL_COLOR_ATTACHMENT0);
-  glReadPixels(0, 0, TW, rows, GL_RGBA, GL_FLOAT, res.data());
+  // Reuse the point staging buffer for readback; no additional full-size CPU normal/result allocation.
+  glReadBuffer(GL_COLOR_ATTACHMENT0); glReadPixels(0, 0, TW, rows, GL_RGBA, GL_FLOAT, buf.data());
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  // leave units 18 and 19 as the other passes expect them (18: the baked terrain shadow, read without rebinding by
-  // the passes that run before the objects pass sets its textures)
   glActiveTexture(GL_TEXTURE0 + 19); glBindTexture(GL_TEXTURE_2D, 0);
   glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, tshFront >= 0 ? texTSh[tshFront] : 0);
   glActiveTexture(GL_TEXTURE0);
-  std::copy(res.begin(), res.begin() + (size_t)n * 4, out.begin());
+  std::copy(buf.begin(), buf.begin() + n * 4, out);
   bakeTick();
 }
 
@@ -140,13 +196,7 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
   int ns = (int)st.size();
   std::vector<float> sps(128 * 4, 0.f), sct(128 * 4, 0.f), swr(128 * 4, 0.f), swr2(128 * 4, 0.f);
   for (int i = 0; i < ns; i++) for (int c = 0; c < 4; c++) { sps[i * 4 + c] = st[i].ps[c]; sct[i * 4 + c] = st[i].ctl[c]; swr[i * 4 + c] = st[i].wr[c]; swr2[i * 4 + c] = st[i].wr2[c]; }
-  glUniform1i(glGetUniformLocation(progHullBake, "uHPart"), -1);   // (the whole aircraft, its rigid parts posed in each state)
-  glUniform1i(glGetUniformLocation(progHullBake, "uHStN"), ns);
-  glUniform4fv(glGetUniformLocation(progHullBake, "uHStPS"), 128, sps.data());
-  glUniform4fv(glGetUniformLocation(progHullBake, "uHStCtl"), 128, sct.data());
-  glUniform4fv(glGetUniformLocation(progHullBake, "uHStWr"), 128, swr.data());
-  glUniform4fv(glGetUniformLocation(progHullBake, "uHStWr2"), 128, swr2.data());
-  glUniform1i(glGetUniformLocation(progHullBake, "uHMode"), 0);
+  beginHullBake(fp, ns, sps.data(), sct.data(), swr.data(), swr2.data());
 
   const float slack = 1.3f;   // the distance field may overstate distances by up to ~25%
   const float d1 = slack * halfDiag(kS1) + 0.05f + 0.02f;   // 0.25 m voxels: + half the largest step between states
@@ -299,8 +349,12 @@ uint64_t Renderer::hullKey(const FrameParams& fp, int slot) const {
   uint64_t h = 1469598103934665603ull ^ (uint64_t)slot;
   auto mix = [&](const void* p, size_t n) { const uint8_t* b = (const uint8_t*)p; for (size_t i = 0; i < n; i++) { h ^= b[i]; h *= 1099511628211ull; } };
   mix(pv.M, sizeof(float) * 96);
-  // (not the light fixtures: their housings stand at most ~0.2 m proud of the airframe, inside the 0.25 m voxels'
-  // margin, so one hull serves the menu's airframe without them and the flight's with them)
+  if (slot == 1) {
+    mix(&pv.model,sizeof pv.model); // explicit per-craft layout and actual fit inputs, independent of lights/state
+    float foot[4],seat[2];modelCabinFit(pv.model,pv.M[21*4+3],foot,seat);mix(foot,sizeof foot);mix(seat,sizeof seat);
+    float cockpit[36];packCockpitLayout(pv.model,cockpit);mix(cockpit,sizeof cockpit);
+  }
+  // Fixtures are canonical model-derived geometry (plane_sdf.glsl); lamp state and owner only affect emission.
   return h;
 }
 

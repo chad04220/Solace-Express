@@ -358,7 +358,7 @@ void Game::wraithVisual(FrameParams& fp) {
   const WraithState& W = wraith;
   PlaneVisual& pv = fp.plane;
   if (plane.spec && plane.spec->special == 2 && pv.on) {
-    for (int i = 0; i < 4; i++) { pv.wr[0][i] = plane.podTilt[i]; pv.wr[1][i] = plane.podYaw[i]; pv.wr[2][i] = plane.engineRunning ? plane.podThr[i] : 0.f; pv.wr[3][i] = plane.podVane[i]; }
+    for (int i = 0; i < 4; i++) { pv.wr[0][i] = plane.podTilt[i]; pv.wr[1][i] = plane.podYaw[i]; pv.wr[2][i] = exhaustPodThrust(plane, i); pv.wr[3][i] = plane.podVane[i]; }
     if (plane.onGround && !plane.engineRunning) for (int i = 0; i < 4; i++) pv.wr[0][i] = plane.nozzle * 0.5f * PI;
     pv.wr[4][0] = fmodf(plane.fanAngle, 6.2832f * 8.f); pv.wr[4][1] = W.bay; pv.wr[4][2] = W.lasers; pv.wr[4][3] = W.stealth;
     pv.wr[5][0] = plane.surf.x; pv.wr[5][1] = plane.surf.y; pv.wr[5][2] = plane.surf.z; pv.wr[5][3] = W.laserGlow;

@@ -40,7 +40,7 @@ float sdUnevenCapsule2(vec2 p, float r1, float r2, float h){
   if (k > a*h) return length(p - vec2(0.0, h)) - r2;
   return dot(p, vec2(a, b)) - r1;
 }
-float sdEllipsoid(vec3 p, vec3 r){ float k0 = length(p/r); float k1 = length(p/(r*r)); return k0*(k0 - 1.0)/max(k1, 1e-5); }
+float sdEllipsoid(vec3 p, vec3 r){ float k0 = length(p/r); float k1 = length(p/(r*r)); return k1 > 1e-5 ? k0*(k0 - 1.0)/k1 : -min(r.x, min(r.y, r.z)); }
 float sdRoundCylX(vec3 p, float r, float h, float rr){ vec2 d = vec2(length(p.yz) - r + rr, abs(p.x) - h + rr); return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - rr; }
 
 // fuselage cross-section (half width, half height, centre y) at body z: a monotone cubic through the stations
@@ -119,23 +119,32 @@ float cabinRoof(vec3 sec, float x){ float k = abs(x)/max(sec.x - 0.035, 0.01); r
 float cabinWidth(vec3 sec, float y){ float k = (y - sec.z)/max(sec.y - 0.035, 0.01); return (sec.x - 0.035)*sqrt(max(1.0 - k*k, 0.0)); }
 
 
+// Swift eye/body moves independently of retained world cabin furniture.
+float swiftPreservedFurnitureY(){ return gModelId==7?.520:gM[22].y; }
+
 void loadCabinFit(){
   vec3 E = gM[22].xyz;
-  float sw = clamp(cabinWidth(fusSection(E.z + 0.05), E.y - 0.8) - abs(E.x) - 0.015, 0.145, 0.21);
+  float seatDrop=uCabinSeatFit.y;
+  float sw = clamp(cabinWidth(fusSection(E.z + 0.05), E.y - seatDrop) - abs(E.x) - 0.015, 0.145, 0.21);
+  if(gModelId==0 || gModelId==1)sw=min(sw,.165); // same cap as CPU rail fitting
+  if(gModelId==2)sw=min(sw,.180); // matched Bushmaster pan/rail fit
+  if(gModelId==7)sw=min(sw,.180); // matched supported Swift pan/rail fit
   // headrest: mounted on top of the reclined seat back (centre ~4 cm above eye level, 45 cm aft); dropped altogether
   // (-100) where the cabin roof wouldn't clear it by 8 cm
   float hy = E.y + 0.057;   // along the reclined back's axis, just above its top (top at E.y - 0.046, E.z + 0.434)
   if (cabinRoof(fusSection(E.z + 0.455), abs(E.x) + 0.11) < hy + 0.075 + 0.08) hy = -100.0;
   float ly = cabinRoof(fusSection(E.z - 0.05), 0.09) - 0.035;
-  float wx = max(cabinWidth(fusSection(E.z - 0.15), E.y - 0.5) - 0.05, 0.2);
+  float wx = max(cabinWidth(fusSection(E.z - 0.15), swiftPreservedFurnitureY() - 0.5) - 0.05, 0.2);
   gCab0 = vec4(sw, hy, ly, wx);
   vec3 vs = fusSection(E.z - 0.30); float hw = max(vs.x - 0.035, 0.01), hh = max(vs.y - 0.035, 0.01);   // visors: at the windshield top, ahead of the eye
   float k = clamp(abs(E.x)/hw, 0.0, 0.95);
   float slope = atan(hh*k/(hw*sqrt(max(1.0 - k*k, 0.01))));
   float vy = cabinRoof(vs, abs(E.x)) - 0.05;
   float oy = cabinRoof(fusSection(E.z - 0.2), 0.22) - 0.03;
-  float vx = min(gM[22].w - 0.07, cabinWidth(fusSection(gM[21].w), E.y - 0.19) - 0.04);
+  float vx = min(gM[22].w - 0.07, cabinWidth(fusSection(gM[21].w), swiftPreservedFurnitureY() - 0.19) - 0.04);
   gCab1 = vec4(vy, slope, oy, max(vx, 0.1));
+  gCab2=uCabinFootFit;gCabSeat=uCabinSeatFit;
+
 }
 void loadMain(){ gOwn = true; gModelId = uModelId; gWheel = uWheel; for (int i = 0; i < 24; i++) gM[i] = uM[i]; for (int i = 0; i < 7; i++) gWr[i] = uWr[i]; gPS = uPS; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; if (gPS.w > 0.5 && gM[0].z < 4.5) loadCabinFit(); }
 int gTrafK = 0;

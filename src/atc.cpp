@@ -12,7 +12,7 @@
 static const char* kVoiceName[AtcVoice::kVoices] = {"tower_north", "tower_coast", "tower_valley"};
 
 bool AtcVoice::load(const std::string& d) {
-  dir = d; clips.clear(); lookup.clear(); exact.clear(); padAlias.clear();   // (a reload with removed ids leaves no stale references)
+  dir = d; clips.clear(); lookup.clear(); exact.clear();   // (a reload with removed ids leaves no stale references)
   std::ifstream f(dir + "/voice_index.txt");
   if (!f) return false;
   std::string ln;
@@ -28,13 +28,26 @@ bool AtcVoice::load(const std::string& d) {
     if (f.size() >= 6) { c.speaker = f[3]; c.prio = atoi(f[4].c_str()); c.kind = f[5]; }
     else c.kind = f[0].compare(0, 6, "tower.") == 0 ? "line" : "fragment";   // (tower pack: full calls are tower.*)
     if (f.size() > 7) c.mission = f[7];
-    if (c.kind == "line" && !c.speaker.empty()) {
+    // Legacy lesson lines name fixed keys/buttons. Never put them in the general resolver: only the explicitly
+    // binding-independent lesson rows may be spoken, including when an older asset directory is loaded.
+    bool legacyLesson = f[0].compare(0, 7, "lesson.") == 0 && c.kind != "lesson";
+    if ((c.kind == "line" || c.kind == "lesson") && !c.speaker.empty() && !legacyLesson) {
       exact[c.words].push_back(f[0]);
-      if (f.size() > 6 && !f[6].empty()) padAlias[f[6]] = f[0];   // the line names gamepad buttons
     }
     clips[f[0]] = c;
   }
   return !clips.empty();
+}
+
+bool AtcVoice::resolveLesson(const std::string& mission, int phase, const std::string& displayedHint, Tx& out) const {
+  out = Tx(); out.text = displayedHint;
+  if (phase < 0 || mission.empty()) return false;
+  const std::string id = "lesson." + mission + ".phase" + std::to_string(phase);
+  auto it = clips.find(id);
+  if (it == clips.end() || it->second.kind != "lesson" || it->second.mission != mission) return false;
+  const Clip& c = it->second;
+  out.ids = {id}; out.prio = c.prio; out.radio = false; out.group = "lesson";
+  return true;
 }
 
 std::string AtcVoice::line(int v, const char* key) const { return std::string("tower.") + kVoiceName[v] + "." + key; }
@@ -62,7 +75,7 @@ void AtcVoice::cardinal(const std::string& sp, long n, std::vector<std::string>&
 
 // A port of the voice pack's reference resolver (resolve_message.py): the line recorded for a message the game shows,
 // or the message assembled from fragments (weather, flap / pod settings, checkpoints, landing ratings, warnings ...).
-bool AtcVoice::resolve(const std::string& msg, const std::string& mission, bool pad, Tx& out) const {
+bool AtcVoice::resolve(const std::string& msg, const std::string& mission, bool /*pad*/, Tx& out) const {
   out = Tx(); out.text = msg;
   auto finish = [&](const std::string& sp, int prio) {
     for (auto& id : out.ids) if (id.empty() || !clips.count(id)) { out.ids.clear(); return false; }   // (a fragment the pack lacks)
@@ -91,8 +104,6 @@ bool AtcVoice::resolve(const std::string& msg, const std::string& mission, bool 
     if (id.compare(0, 10, "clearance.") == 0) return false;   // the takeoff clearance comes from the tower controllers
     return line(id);
   }
-  auto pa = padAlias.find(msg);   // a lesson hint whose recording names the gamepad's buttons: only with a gamepad
-  if (pa != padAlias.end()) return pad && line(pa->second);
   std::smatch m;
   auto digits = [&](const std::string& sp, const std::string& t) { for (char c : t) out.ids.push_back(atomO(sp, std::string("n") + c)); };
   static const std::regex wxRe(R"(Runway (\d{2}), Wind (\d{3})@(\d+)kt(?: G(\d+))?, (clear|scattered|broken|overcast)(?: (\d+)ft)?, vis (10\+|\d+(?:\.\d+)?)km(?:, (rain|thunderstorms|snow))?, (\d{2}):(\d{2}))");

@@ -19,6 +19,7 @@ int main(int argc, char** argv) {
     put(dir, "tshbake.frag", ms + kTShBakeMain);
     put(dir, "clouds.frag", ms + kCloudMain);
     put(dir, "hullbake.frag", worldLibAssembly("#define PART_BAKE\n") + kHullBakeMain);
+    put(dir, "hullbake_normals.frag", worldLibAssembly("#define PART_BAKE\n#define HULL_BAKE_NORMALS\n") + kHullBakeMain);
     put(dir, "displays.frag", ms + kDispMain);
     put(dir, "terrain.vert", terrainVSAssembly("")); put(dir, "terrain.frag", terrainFSAssembly(""));
     put(dir, "water.vert", waterVSAssembly("")); put(dir, "water.frag", waterFSAssembly(""));
@@ -26,6 +27,7 @@ int main(int argc, char** argv) {
     put(dir, "objects.frag", objectsFSAssembly(""));
     put(dir, "shadow_proxy.frag", shadowProxyFSAssembly(""));
     put(dir, "effects.frag", effectsFSAssembly(""));
+    put(dir, "prop_disc.vert", kPropDiscVS); put(dir, "prop_disc.frag", kPropDiscFS);
     put(dir, "plane_mesh.vert", planeMeshVSAssembly(""));
     put(dir, "plane_mesh.frag", planeMeshFSAssembly(""));
     put(dir, "plane_mesh_depth.frag", planeMeshDepthFSAssembly());
@@ -45,6 +47,7 @@ int main(int argc, char** argv) {
     put(dir, "effects_safegear.frag", effectsFSAssembly("#define NV_SAFE_GEAR\n"));
     put(dir, "plane_mesh_safegear.frag", planeMeshFSAssembly("#define NV_SAFE_GEAR\n"));
     put(dir, "hullbake_safegear.frag", worldLibAssembly("#define NV_SAFE_GEAR\n#define PART_BAKE\n") + kHullBakeMain);
+    put(dir, "hullbake_normals_safegear.frag", worldLibAssembly("#define NV_SAFE_GEAR\n#define PART_BAKE\n#define HULL_BAKE_NORMALS\n") + kHullBakeMain);
   }
   return 0;
 }

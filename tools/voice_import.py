@@ -11,6 +11,9 @@ mono WAV (the radio-filtered speech has no content above ~6 kHz, so this keeps t
 assets/voice/voice_index.txt lists one clip per line:
     id <tab> file <tab> subtitle [<tab> speaker <tab> priority <tab> kind <tab> source subtitle <tab> mission]
 plus the runtime lookup tables as  @key <tab> value  (template fragments, radio digits, number words, key names).
+The checked-in lesson_controls.json overrides the ten legacy control-naming
+recordings, and explicitly marks the other reviewed, control-independent lessons.
+Every override's audio hash is verified before the index is written.
 """
 import hashlib, json, os, sys, wave
 import numpy as np
@@ -51,6 +54,40 @@ def convert(pack, line, out):
     write_mulaw_wav(os.path.join(out, rel), mulaw(np.round(y)), 16000)
     return rel
 
+def apply_lesson_overrides(rows, out):
+    """Keep the truthful neutral lesson takes when importing the original packs.
+
+    New audio has distinct filenames, so convert() cannot overwrite it with the
+    older fixed-button recordings. A missing or edited take fails the import.
+    """
+    from pathlib import Path
+    root = Path(out).resolve()
+    manifest = json.loads((root / "lesson_controls.json").read_text())
+    lessons = {r["id"]: r for r in manifest["lines"]}
+    if len(lessons) != len(manifest["lines"]):
+        raise ValueError("Duplicate lesson recording IDs")
+    seen, result = set(), []
+    for line in rows:
+        fields = line.split("\t")
+        if not fields[0].startswith("lesson."):
+            result.append(line)
+            continue
+        cid = fields[0]
+        if cid not in lessons:
+            raise ValueError("Unreviewed lesson recording: " + cid)
+        row = lessons[cid]
+        path = (root / row["file"]).resolve()
+        if not path.is_relative_to(root):
+            raise ValueError("Invalid lesson recording path: " + cid)
+        if hashlib.sha256(path.read_bytes()).hexdigest() != row["runtime_sha256"]:
+            raise ValueError("Lesson audio hash mismatch: " + cid)
+        result.append("\t".join([cid, row["file"], row["spoken_text"], row["speaker_id"],
+                                  str(row["priority"]), "lesson", "", row["mission"]]))
+        seen.add(cid)
+    if seen != set(lessons):
+        raise ValueError("Missing imported lesson IDs: " + ", ".join(sorted(set(lessons) - seen)))
+    return result
+
 def main(tower_pack, orig_pack=None):
     out = os.path.join(os.path.dirname(__file__), "..", "assets", "voice")
     os.makedirs(out, exist_ok=True)
@@ -78,6 +115,7 @@ def main(tower_pack, orig_pack=None):
             for k, cid in atoms.items(): rows.append("@atom.%s.%s\t%s" % (sp, k, cid))
         for k, cid in o["key_assets"].items(): rows.append("@key.%s\t%s" % (k, cid))
         for c in o["aircraft_names"]: rows.append("@craft.%s\t%s" % (c["name"], c["id"]))
+        rows = apply_lesson_overrides(rows, out)
     with open(os.path.join(out, "voice_index.txt"), "w") as f:
         f.write("# Solace Express voices (tools/voice_import.py): id <tab> file <tab> subtitle [<tab> speaker <tab> priority <tab> kind <tab> alias <tab> mission], or @lookup <tab> value\n")
         f.write("\n".join(rows) + "\n")

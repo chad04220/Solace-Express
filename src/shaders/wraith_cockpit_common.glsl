@@ -23,7 +23,8 @@ const vec3 WA_C = vec3(0.8, -0.075, 0.34);  const vec2 WA_S = vec2(0.25, 0.345);
 const vec3 WO_C = vec3(0.0, 0.403, -0.55);  const vec3 WO_N = vec3(0.0, -1.0, 0.0);       const vec2 WO_S = vec2(0.42, 0.36);
 const vec3 WC_C = vec3(0.0, -0.5, -1.0);    const vec3 WC_N = vec3(0.0, 0.7509, 0.6604);  const vec2 WC_S = vec2(0.38, 0.2);
 const vec3 WL_C = vec3(0.0, -0.775, -0.66); const vec3 WL_N = vec3(0.0, 1.0, 0.0);       const vec2 WL_S = vec2(0.4, 0.34);
-const vec3 WD_C = vec3(0.0, -0.34, -0.99);  const vec3 WD_N = vec3(0.0, 0.6, 0.8);
+// Instrument bridge only. None of the direct-window/feed panes above moves with this layout.
+const vec3 WD_C = vec3(0.0, -0.389, -0.96); const vec3 WD_N = vec3(0.0, 0.6, 0.8);
 const vec3 WB_C = vec3(0.47, -0.705, 0.4);   const vec3 WB_N = vec3(-0.3714, 0.9285, 0.0); const vec2 WB_S = vec2(0.14, 0.2);
 // distance (negative inside) to the edge of the display a point lies on, for the HUD frame and vignette
 float wrScreenEdge(vec3 q, int id){
