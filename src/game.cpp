@@ -2463,7 +2463,10 @@ FrameParams Game::buildFrame() {
     // the windscreen (cockpit view): the rain here and the cloud's mist on it, streaming away on screen from where
     // the air meets the glass - a little below where the nose points, so over the roof; out of a side window, aft
     fp.rainLens = 0; fp.glassMist = 0;
-    if (camMode == 1 && !crashed) {
+    // (not in the research jets' sealed pods: their windows are displays, and with no glass to bead on, the drops
+    // streamed over the cabin's own frames and panels - more than 1.3 m from the eye, the depth the post pass takes
+    // for "seen through the glass" - in the XR-40 at night in a storm)
+    if (camMode == 1 && !crashed && !plane.spec->special) {
       fp.rainLens = wx.precip == 1 ? rainNow : 0.f;
       fp.glassMist = mistNow;
       vec3 f = normalize(plane.forward() - plane.up() * 0.45f);
