@@ -82,18 +82,23 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, vec2 radius, vec4 p
     float shell = exp(-pow((r - 0.8)/0.22, 2.0))*(1.0 - smoothstep(0.0, 0.3, u));
     float flame = exp(-e2*1.3)*smoothstep(0.2, 0.75, turb + 0.45*(1.0 - u))*smoothstep(0.02, 0.18, u);
     vec3 fCol = mix(vec3(1.0, 0.5, 0.14), vec3(0.85, 0.16, 0.04), smoothstep(0.4, 1.0, u));
-    vec3 e = ab*(vec3(0.75, 0.38, 0.95)*shell*0.9 + vec3(1.0, 0.8, 0.45)*diam*7.0 + fCol*flame*(4.0 - 2.4*u)
-                 + vec3(1.0, 0.62, 0.3)*exp(-e2*5.0)*(1.0 - smoothstep(0.0, 0.5, u))*1.2);
+    // (the reheat flame as bright as sunlit concrete and saturated enough for the tone curve to leave it orange: at a
+    // third of that, in the dry flame's paler colour, the XR-10's full reheat was a beige smear on a daylit runway)
+    vec3 rCol = mix(vec3(1.0, 0.45, 0.11), vec3(1.0, 0.18, 0.03), smoothstep(0.3, 0.95, u));
+    vec3 e = ab*4.0*(vec3(0.75, 0.38, 0.95)*shell*0.9 + vec3(1.0, 0.85, 0.6)*diam*9.0 + rCol*flame*(4.0 - 2.4*u)
+                     + vec3(1.0, 0.72, 0.42)*exp(-e2*5.0)*(1.0 - smoothstep(0.0, 0.5, u))*1.2);
     // dry: a blue core that grows with the throttle, an orange-tipped flame from mid power, pale shock cells near full
     e += (1.0 - ab)*(vec3(0.3, 0.5, 1.0)*exp(-e2*2.5)*(1.0 - u)*3.2*sp
                      + mix(vec3(1.0, 0.55, 0.25), fCol, u)*flame*(1.8 - 0.8*u)*smoothstep(0.3, 0.85, sp)
                      + vec3(0.65, 0.78, 1.0)*diam*3.5*smoothstep(0.5, 0.95, sp));
     float tcam = t0 + (float(i) + jit)*dt;
     acc += e*lip*pow(1.0 - u, 0.8)*mix(1.0, smoothstep(3.0*scale, 14.0*scale, tcam), camIn)*dt;
-    gPlumeT *= exp(-ab*intensity*(flame*0.9 + shell*0.3)*lip*dt/scale);
+    // (the hot flame by the nozzle hides a little of what is behind it; the cooling tail, which hardly glows, doesn't -
+    // dimming the background there drew a trail of smoke)
+    gPlumeT *= exp(-ab*intensity*(flame*2.5*pow(1.0 - u, 1.5) + shell*0.3)*lip*dt/scale);
   }
   acc *= (0.9 + 0.1*sin(uTime*63.0))*0.35*intensity/scale;
-  return acc/(1.0 + max(acc.r, max(acc.g, acc.b))*0.45);   // gentle hue-preserving roll-off keeps the orange orange
+  return acc/(1.0 + max(acc.r, max(acc.g, acc.b))*mix(0.45, 0.12, ab));   // gentle hue-preserving roll-off keeps the orange orange
 }
 void shadeWraith(inout Mat m, int mid, vec3 lp, vec3 ln, float t);
 vec3 vaporCone(vec3 col, vec3 ro, vec3 rd, float tmax, float jit);
