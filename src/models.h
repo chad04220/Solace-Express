@@ -30,6 +30,8 @@ struct AircraftSpec;
 void packModel(const AircraftSpec& s, int idx, float gearHeight, float out[24 * 4]);
 // Fuselage half width at a body z (for panel sizing)
 float modelHalfWidth(const ModelDef& m, float z);
+// the fuselage's section at a body z: half width, half height, centre height (the stations' monotone cubic)
+void modelSection(const ModelDef& m, float z, float& hw, float& hh, float& cy);
 // Propeller hubs (body coords) and radius; returns count
 int modelProps(const ModelDef& m, float out[2][4]);
 // Positions of light fixtures (right wingtip, top of fin, tail cone) in body coords

@@ -3,6 +3,7 @@
 // Conceptual Approach" ch. 12 (DATCOM lift slope, Torenbeek fuselage wetted area, Korn critical Mach).
 #include "aero.h"
 #include "aircraft.h"
+#include "models.h"
 #include <mutex>
 
 namespace {
@@ -30,8 +31,16 @@ AeroModel build(const AircraftSpec& s) {
   a.exposed = sExp / S;
   float wingQ = s.wingY > 0.5f ? 1.f : 1.05f;   // high wing clean, low wing filleted
   add("wing", sExp * (1.977f + 0.52f * a.tc), c, formFactorWing(a.tc, 0.2f) / 1.f * wingQ, lam);
-  // tails: typical volume-coefficient sizes (the research craft's blended fins are small)
+  // tails: as they are drawn (models.cpp; the XR-20's canards and twin fins), else typical volume-coefficient sizes
   float sh = research ? 0.08f * S : 0.22f * S, sv = research ? 0.10f * S : 0.14f * S;
+  {
+    const int idx = (int)(&s - kAircraft);
+    if (idx >= 0 && idx < kNumAircraft + 4 && s.special == 0) {
+      const ModelDef& m = kModels[idx];
+      if (m.ht[0] > 0.f) sh = m.ht[0] * (m.ht[1] + m.ht[2]);
+      if (m.vt[0] > 0.f) sv = m.vt[0] * 0.5f * (m.vt[1] + m.vt[2]) * (idx == kMantis ? 2.f : 1.f);
+    }
+  }
   float tailQ = s.tail == 1 ? 1.08f : 1.04f;
   add("horizontal tail", sh * 2.05f, c * 0.7f, formFactorWing(0.10f, 0.2f) * tailQ, lam);
   add("vertical tail", sv * 2.05f, c * 0.9f, formFactorWing(0.10f, 0.2f) * tailQ, lam);
@@ -123,6 +132,26 @@ float aeroCD0(const AeroModel& a, const AircraftSpec& s, float V, float rho, flo
     fric += cf * ffq * p.swet;
   }
   return (fric * (1.f + a.misc) + a.extraDq) / s.wingArea;
+}
+
+void aeroDragAreas(const AeroModel& a, const AircraftSpec& s, float V, float rho, float mu, float mach, float out[4]) {
+  V = std::max(V, 5.f);
+  out[0] = out[1] = out[2] = out[3] = 0.f;
+  for (int i = 0; i < a.nParts; i++) {
+    const AeroModel::Part& p = a.parts[i];
+    float Re = rho * V * p.len / mu, ReCut = 38.21f * powf(p.len / a.roughness, 1.053f);
+    float Ret = std::min(Re, ReCut), lg = log10f(std::max(Ret, 1e4f));
+    float cfTurb = 0.455f / (powf(lg, 2.58f) * powf(1.f + 0.144f * mach * mach, 0.65f));
+    float cfLam = 1.328f / sqrtf(std::max(Re, 1e4f));
+    float cf = p.laminar * cfLam + (1.f - p.laminar) * cfTurb;
+    float ffq = p.ffq;
+    const bool surface = p.name[0] == 'w' || p.name[0] == 'h' || p.name[0] == 'v';
+    if (surface) ffq *= powf(std::max(mach, 0.05f) / 0.2f, 0.18f);
+    float dq = cf * ffq * p.swet * (1.f + a.misc);
+    out[p.name[0] == 'w' ? 0 : p.name[0] == 'h' ? 1 : p.name[0] == 'v' ? 2 : 3] += dq;
+  }
+  out[3] += a.extraDq;
+  (void)s;
 }
 
 float aeroCLa(const AeroModel& a, float mach) {

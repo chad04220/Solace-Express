@@ -5,11 +5,15 @@
 #include <cmath>
 #include <filesystem>
 // attitude-based vertical-speed controller (same structure as the in-game autopilot)
-static float s_pI = 0;
+// the pilot steers by the track over the ground (a heading held against a sideslip or a crosswind drifts off the line)
+static float trackDeg(const Plane& p) { return wrapDeg360(atan2f(p.vel.x, -p.vel.z) / DEG); }
+static float s_pI = 0, s_eI = 0;
 static void pitchFor(Plane& p, float vsT, float dt, float maxPitch = 14.f) {
   s_pI = clampf(s_pI + (vsT - p.vel.y) * 0.15f * dt, -8.f, 12.f);
   float pitchT = clampf(s_pI + 0.8f * (vsT - p.vel.y), -10.f, maxPitch);
-  p.ctl.pitch = clampf(0.07f * (pitchT - p.pitchDeg()) - 1.2f * p.w.x, -1, 1);
+  // (and trims as it goes: holding an attitude with the flaps out, or slow, takes a steady push or pull)
+  s_eI = clampf(s_eI + 0.03f * (pitchT - p.pitchDeg()) * dt, -0.7f, 0.7f);
+  p.ctl.pitch = clampf(0.07f * (pitchT - p.pitchDeg()) - 1.2f * p.w.x + s_eI, -1, 1);
 }
 struct GameTest {
   static int run() {
@@ -70,7 +74,7 @@ struct GameTest {
       vec3 tgt = g.wpIndex < (int)g.contract.wps.size() ? vec3(g.contract.wps[g.wpIndex].x, g.contract.wps[g.wpIndex].alt, g.contract.wps[g.wpIndex].z) : p.pos + p.forward() * 100.f;
       vec3 to = tgt - p.pos;
       float brg = atan2f(to.x, -to.z) / DEG;
-      float herr = wrapAngle((brg - p.heading()) * DEG) / DEG;
+      float herr = wrapAngle((brg - trackDeg(p)) * DEG) / DEG;
       if (p.onGround) { p.ctl.yaw = clampf(herr * 0.1f, -1, 1); p.ctl.roll = 0; p.ctl.pitch = p.ias > p.spec->vr ? 0.6f : 0.f; }
       else {
         float bankT = clampf(herr * 1.5f, -25, 25);
@@ -109,7 +113,7 @@ struct GameTest {
     g.plane.reset(&kAircraft[1], start, a.heading, 60, 150, true, kAircraft[1].vref + 6);
     g.takeoffAnnounced = true; g.engineAutoStarted = true;
     g.atcF.phase = 3; g.atc.history.clear();   // (placed on final: an inbound start, as the game's airborne starts are)
-    g.plane.ctl.flaps = 1.f; g.flapNotch = 1.f; s_pI = -2.f;
+    g.plane.ctl.flaps = 1.f; g.flapNotch = 1.f; s_pI = -2.f; s_eI = 0.f;
     float tdFpm = 0;
     for (t = 0; t < 300 && g.screen == SCR_FLIGHT; t += dt) {
       Plane& p = g.plane;
@@ -120,15 +124,17 @@ struct GameTest {
       if (!p.onGround && !g.touchedDown) {
         float ideal = a.elev + std::max(0.f, (-along + 250.f)) * tanf(3.f * DEG);
         float hdgT = a.heading - clampf(lat * 0.08f, -20, 20);
-        float herr = wrapAngle((hdgT - p.heading()) * DEG) / DEG;
+        float herr = wrapAngle((hdgT - trackDeg(p)) * DEG) / DEG;
         p.ctl.roll = clampf((clampf(herr * 2.f, -15, 15) - p.bankDeg()) * 0.05f + p.w.z * 0.3f, -1, 1);
         float vsT = agl < 7.f ? -0.7f : clampf(-p.ias * tanf(3.f * DEG) + (ideal - p.pos.y) * 0.15f, -6, 1);
         pitchFor(p, vsT, dt);
         p.ctl.throttle = agl < 6.f ? 0.f : clampf(0.35f + (p.spec->vref - p.ias) * 0.05f, 0, 1);
         p.ctl.yaw = clampf(p.beta * 3.f, -1, 1);
-      } else { p.ctl.throttle = 0; p.ctl.brake = 1; p.ctl.pitch = 0; p.ctl.roll = 0; p.ctl.yaw = 0; }
+      } else {   // (down: flaps up, the forward pressure eased off - let go at once it ballooned back into the air)
+        p.ctl.throttle = 0; p.ctl.brake = 1; p.ctl.pitch = std::min(0.f, p.ctl.pitch + 0.4f * dt); p.ctl.roll = 0; p.ctl.yaw = 0; p.ctl.flaps = 0; g.flapNotch = 0;
+      }
       g.update(dt); audio(dt);
-      if (getenv("TRACE") && fmodf(t, 0.5f) < dt && t < 14) printf("  t%4.1f gnd %d ias %5.1f agl %6.1f along %6.0f lat %5.1f pitch %5.1f vs %5.1f thr %.2f bank %5.1f ctlP %5.2f ctlR %5.2f flap %.2f alpha %5.1f\n", t, p.onGround, p.ias, agl, along, lat, p.pitchDeg(), p.vel.y, p.ctl.throttle, p.bankDeg(), p.ctl.pitch, p.ctl.roll, p.flaps, p.alpha/DEG);
+      if (getenv("TRACE") && fmodf(t, 1.0f) < dt && t < 140) printf("  t%4.1f gnd %d ias %5.1f agl %6.1f along %6.0f lat %5.1f pitch %5.1f vs %5.1f thr %.2f bank %5.1f ctlP %5.2f ctlR %5.2f flap %.2f alpha %5.1f\n", t, p.onGround, p.ias, agl, along, lat, p.pitchDeg(), p.vel.y, p.ctl.throttle, p.bankDeg(), p.ctl.pitch, p.ctl.roll, p.flaps, p.alpha/DEG);
       if (g.touchedDown && tdFpm == 0) tdFpm = g.touchdownFpm;
     }
     int total = g.career.money - money0;
@@ -181,14 +187,14 @@ struct GameTest {
       g.startFlight(c, 1, Career::SRC_RENT);
       g.plane.reset(&kAircraft[1], start, a.heading, 60, 150, true, kAircraft[1].vref + 6);
       g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 3; g.atcF.airborne = true; g.atc.history.clear();
-      g.plane.ctl.flaps = 1.f; g.flapNotch = 1.f; s_pI = -2.f;
+      g.plane.ctl.flaps = 1.f; g.flapNotch = 1.f; s_pI = -2.f; s_eI = 0.f;
       g.traffic.craft.clear(); g.set.traffic = true;
       for (t = 0; t < 150 && g.screen == SCR_FLIGHT && !g.plane.onGround; t += dt) {
         rollout(c.to, 300.f);
         Plane& p = g.plane;
         vec3 rel = p.pos - thr; float along = dot(vec3(rel.x, 0, rel.z), dir), lat = dot(vec3(rel.x, 0, rel.z), vec3(-dir.z, 0, dir.x));
         float ideal = a.elev + std::max(0.f, (-along + 250.f)) * tanf(3.f * DEG);
-        float herr = wrapAngle((a.heading - clampf(lat * 0.08f, -20, 20) - p.heading()) * DEG) / DEG;
+        float herr = wrapAngle((a.heading - clampf(lat * 0.08f, -20, 20) - trackDeg(p)) * DEG) / DEG;
         p.ctl.roll = clampf((clampf(herr * 2.f, -15, 15) - p.bankDeg()) * 0.05f + p.w.z * 0.3f, -1, 1);
         pitchFor(p, clampf(-p.ias * tanf(3.f * DEG) + (ideal - p.pos.y) * 0.15f, -6, 1), dt);
         p.ctl.throttle = clampf(0.35f + (p.spec->vref - p.ias) * 0.05f, 0, 1);
@@ -206,11 +212,13 @@ struct GameTest {
       for (int sp = 0; sp < kNumAircraft; sp++) {   // every career aircraft, from a free flight at Solace Capital
         Contract fc = g_story[0]; fc.forceAircraft = -1; fc.type = CT_FERRY; fc.from = fc.to = g_world.findAirport("CAP"); fc.wps.clear(); fc.hints.clear();
         g.startFlight(sp == 0 ? g_story[0] : fc, sp, sp == 0 ? Career::SRC_LESSON : Career::SRC_RENT);
-        for (int i = 0; i < 60 * 8; i++) { g.plane.ctl.throttle = 1.f; g.update(dt); }
+        for (int i = 0; i < 60 * 8; i++) { g.plane.ctl.throttle = 0.4f; g.update(dt); }
         float held = length(vec3(g.plane.vel.x, 0.f, g.plane.vel.z));
-        printf("Parking brake at the start (%s): running=%d brake=%.1f speed after 8 s at full power %.2f m/s\n", kAircraft[sp].name, g.plane.engineRunning, g.plane.ctl.brake, held);
-        // set on every aircraft, and it holds full power on all of them (a propeller's static thrust is limited by its
-        // disk, Plane::substep, so even the STOL types don't drag their brakes)
+        printf("Parking brake at the start (%s): running=%d brake=%.1f speed after 8 s at run-up power %.2f m/s\n", kAircraft[sp].name, g.plane.engineRunning, g.plane.ctl.brake, held);
+        // set on every aircraft, and it holds run-up power on all of them (a fixed-pitch propeller at a run-up's 1700 rpm
+        // takes about a third of its power). Full power it needn't: only the mains are braked, and the thrust line, a
+        // metre and more over the wheels, and a high wing's slipstream take weight off them - a light type with power to
+        // spare slides on its locked tyres, as a real one would
         if (!(g.plane.engineRunning && g.plane.ctl.brake > 0.99f && held < 0.02f)) fails++;   // (static friction: no creep)
       }
       g.botControl = true;
@@ -521,14 +529,14 @@ struct GameTest {
       g.plane.ctl.throttle = 0.5f; g.update(dt);
       g.fireFailure(FAIL_ENGINE_TOTAL, 0);
       bool glide = g.plane.glideOnly() && !g.plane.engineRunning && (g.result.failureKinds & (1 << FAIL_ENGINE_TOTAL));
-      s_pI = -2.f; float tdFpm = 0;
+      s_pI = -2.f; s_eI = 0.f; float tdFpm = 0;
       for (t = 0; t < 240 && g.screen == SCR_FLIGHT; t += dt) {
         Plane& p = g.plane;
         vec3 rel = p.pos - thr;
         float along = dot(vec3(rel.x, 0, rel.z), dir), lat = dot(vec3(rel.x, 0, rel.z), vec3(-dir.z, 0, dir.x));
         float agl = p.pos.y - a.elev;
         if (!p.onGround && !g.touchedDown) {
-          float hdgT = a.heading - clampf(lat * 0.08f, -20, 20), herr = wrapAngle((hdgT - p.heading()) * DEG) / DEG;
+          float hdgT = a.heading - clampf(lat * 0.08f, -20, 20), herr = wrapAngle((hdgT - trackDeg(p)) * DEG) / DEG;
           p.ctl.roll = clampf((clampf(herr * 2.f, -15, 15) - p.bankDeg()) * 0.05f + p.w.z * 0.3f, -1, 1);
           // the glide: the speed decides the pitch (best glide, then Vref over the fence), flaps only when the field is made
           float vT = -along > 900.f ? p.spec->vref * 1.15f : p.spec->vref * 1.05f;
@@ -537,7 +545,9 @@ struct GameTest {
           pitchFor(p, vsT, dt);
           p.ctl.throttle = 1.f;   // (nothing answers)
           p.ctl.yaw = clampf(p.beta * 3.f, -1, 1);
-        } else { p.ctl.throttle = 0; p.ctl.brake = 1; p.ctl.pitch = 0; p.ctl.roll = 0; p.ctl.yaw = 0; }
+        } else {   // (down: flaps up, the forward pressure eased off - let go at once it ballooned back into the air)
+          p.ctl.throttle = 0; p.ctl.brake = 1; p.ctl.pitch = std::min(0.f, p.ctl.pitch + 0.4f * dt); p.ctl.roll = 0; p.ctl.yaw = 0; p.ctl.flaps = 0; g.flapNotch = 0;
+        }
         g.update(dt);
         if (g.touchedDown && tdFpm == 0) tdFpm = g.touchdownFpm;
       }
@@ -613,7 +623,7 @@ struct GameTest {
         vec3 start = thr - dir * 3500.f; start.y = a.elev + 3500.f * tanf(3.f * DEG) + 15.f;
         g.plane.reset(&kAircraft[1], start, a.heading, 60, 150, true, kAircraft[1].vref + 6);
         g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 3;
-        g.plane.ctl.flaps = 1.f; g.flapNotch = 1.f; s_pI = -2.f;
+        g.plane.ctl.flaps = 1.f; g.flapNotch = 1.f; s_pI = -2.f; s_eI = 0.f;
         for (t = 0; t < 300 && g.screen == SCR_FLIGHT; t += dt) {
           Plane& p = g.plane;
           vec3 rel = p.pos - thr;
@@ -621,14 +631,16 @@ struct GameTest {
           float agl = p.pos.y - a.elev;
           if (!p.onGround && !g.touchedDown) {
             float ideal = a.elev + std::max(0.f, (-along + 250.f)) * tanf(3.f * DEG);
-            float hdgT = a.heading - clampf(lat * 0.08f, -20, 20), herr = wrapAngle((hdgT - p.heading()) * DEG) / DEG;
+            float hdgT = a.heading - clampf(lat * 0.08f, -20, 20), herr = wrapAngle((hdgT - trackDeg(p)) * DEG) / DEG;
             p.ctl.roll = clampf((clampf(herr * 2.f, -15, 15) - p.bankDeg()) * 0.05f + p.w.z * 0.3f, -1, 1);
             float vsT = agl < 7.f ? -0.7f : clampf(-p.ias * tanf(3.f * DEG) + (ideal - p.pos.y) * 0.15f, -6, 1);
             if (rough && t > 2.f && t < 6.5f) p.ctl.roll = clampf((48.f - p.bankDeg()) * 0.05f + p.w.z * 0.3f, -1, 1);   // (a steep bank the patient feels)
             pitchFor(p, vsT, dt);
             p.ctl.throttle = agl < 6.f ? 0.f : clampf(0.35f + (p.spec->vref - p.ias) * 0.05f, 0, 1);
             p.ctl.yaw = clampf(p.beta * 3.f, -1, 1);
-          } else { p.ctl.throttle = 0; p.ctl.brake = 1; p.ctl.pitch = 0; p.ctl.roll = 0; p.ctl.yaw = 0; }
+          } else {   // (down: flaps up, the forward pressure eased off - let go at once it ballooned back into the air)
+            p.ctl.throttle = 0; p.ctl.brake = 1; p.ctl.pitch = std::min(0.f, p.ctl.pitch + 0.4f * dt); p.ctl.roll = 0; p.ctl.yaw = 0; p.ctl.flaps = 0; g.flapNotch = 0;
+          }
           g.update(dt);
         }
         bool bonus = false, hit = false;

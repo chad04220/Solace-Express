@@ -136,6 +136,11 @@ float Plane::fuelFlowMax() const {
 float Plane::rangeLeftKm() const { return fuel / (fuelFlowMax() * 0.8f) * spec->cruise / 1000.f; }
 float Plane::glideRatio() const {   // clean best L/D from the aircraft's own drag build-up (gear as it is)
   if (!spec) return 8.f;
+  if (spec->special == 0) {   // (the strip model's, engines stopped: aero_strips.cpp; ice adds its drag at the best glide's lift)
+    const AeroGeom& g = aeroGeom(*spec);
+    const float ld = g.glideLD[0] + (g.glideLD[1] - g.glideLD[0]) * gear;
+    return clampf(1.f / (1.f / ld + 0.035f * fail.ice), 3.f, 30.f);
+  }
   const AeroModel& a = aeroModel(*spec);
   float cd0g = cd0 + a.gearDq / spec->wingArea * gear + 0.025f * fail.ice;
   return clampf(0.5f * sqrtf(PI * a.e * a.AR / std::max(cd0g, 0.01f)), 4.f, 25.f);
@@ -164,7 +169,7 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   flaps = 0; gear = 1; rpm = 0; n1 = 0; engineSpool = 0; maxG = minG = 1; flightTime = 0;
   fail = Failures(); iceFeed = 0; overG = 0;
   apDisengage(); apDone = false; apOverrun = false; apPitchI = 0; gust = vec3(); rng = Rng(77);
-  wxl = wxfield::Local(); wxAir = vec3(); windVel = windAvg = gustRot = vec3(); gustBurst = 0;
+  wxl = wxfield::Local(); wxAir = vec3(); windVel = windAvg = gustRot = vec3(); gustBurst = 0; aeroMem = AeroMem(); ctlSurf = vec3();
   // drag comes from the airframe's shape (aero.cpp), evaluated every step at the speed and air density of the moment
   cd0 = aeroCD0(aeroModel(*s), *s, std::max(speed, 30.f), 1.225f, speed / 340.f);
   nozzle = 0; mach = 0;
@@ -180,23 +185,39 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   }
 }
 
+// how far the wheels hang below the model's origin (m)
+static float gearHeightOf(const AircraftSpec& s) {
+  if (s.taildragger) return s.fusRad * 1.0f + 0.45f;
+  return s.fusRad * 1.3f + (s.engineType == ENG_JET || s.engines == 2 ? 0.75f : 0.55f);
+}
+
 GearStations gearStations(const AircraftSpec& s) {
   const float L = s.fusLen;
   GearStations g;
   g.track = std::max(1.2f, s.span * 0.13f);
-  // (the XR-30's and XR-40's mains under the middle of their delta wings, a tenth of the length behind the centre of
-  // gravity: at 4% they stood near the wings' leading edges)
-  g.mainZ = s.taildragger ? -0.10f * L : s.special ? 0.10f * L : 0.04f * L;
   g.noseZ = -0.36f * L;
   g.tailZ = 0.45f * L; g.tailY = 0.11f * L;   // (the tail wheel: 11.3 deg ground attitude)
+  if (s.special == 0) {
+    // the mains where a designer puts them for the centre of gravity (aero_strips.cpp sets it a static margin ahead of
+    // the neutral point): a tricycle's behind it by a tip-back angle of 15 degrees, and far enough that the nose wheel
+    // carries no more than a tenth of the wheelbase's share; a taildragger's ahead of it by 12 degrees standing level
+    // (23 in its three-point attitude: braking hard on the mains doesn't stand it on its nose), its tail wheel set for
+    // the same 11.3 degree ground attitude
+    const vec3 cg = aeroGeom(s).cg;
+    const float h = gearHeightOf(s) + cg.y;
+    if (s.taildragger) {
+      g.mainZ = cg.z - h * tanf(12.f * DEG);
+      g.tailY = (g.tailZ - g.mainZ) * tanf(11.3f * DEG);
+    } else g.mainZ = cg.z + std::max(h * tanf(15.f * DEG), 0.1f * (cg.z - g.noseZ));
+  } else {
+    // (the XR-30's and XR-40's mains under the middle of their delta wings, a tenth of the length behind the centre of
+    // gravity: at 4% they stood near the wings' leading edges)
+    g.mainZ = 0.10f * L;
+  }
   return g;
 }
 
-float Plane::gearHeight() const {
-  const AircraftSpec& s = *spec;
-  if (s.taildragger) return s.fusRad * 1.0f + 0.45f;
-  return s.fusRad * 1.3f + (s.engineType == ENG_JET || s.engines == 2 ? 0.75f : 0.55f);
-}
+float Plane::gearHeight() const { return gearHeightOf(*spec); }
 
 float Plane::heading() const { vec3 f = forward(); return wrapDeg360(atan2f(f.x, -f.z) / DEG); }
 float Plane::pitchDeg() const { return asinf(clampf(forward().y, -1, 1)) / DEG; }
@@ -313,22 +334,61 @@ void Plane::substep(float dt, const Weather& wx, float time) {
 
   // ---------------- configuration
   if (fail.flapAsym) flaps = fail.flapAt;   // the stopped flap holds the pair where they were
-  else flaps = approach(flaps, ctl.flaps, s.special ? 0.5f : 0.6f, dt);
+  else flaps = approach(flaps, ctl.flaps * (s.special ? 1.f : aeroGeom(s).flapMax), s.special ? 0.5f : 0.6f, dt);   // (as far as they trim: aero_strips.cpp)
   nozzle = s.special == 2 ? flaps : 0.f;   // the XR-40's F/V keys tilt its thruster pods instead of flaps
   if (s.retract && fail.gearStuck == 0) gear = clampf(gear + (ctl.gearDown ? 1.f : -1.f) * dt / 5.f, 0, 1);
   else if (!s.retract) gear = 1;
 
   // ---------------- aerodynamics
-  vec3 F(0, 0, 0), T(0, 0, 0);  // body-frame force and torque
+  vec3 F(0, 0, 0), T(0, 0, 0);  // body-frame force, and torque about the centre of gravity
   vec3 Taero(0, 0, 0), surfMax(0, 0, 0);   // XR-40: passive aerodynamic torque and full-deflection surface authority
   const AeroModel& aero = aeroModel(s);
   const float AR = aero.AR;
+  const vec3 cg = s.special == 0 ? aeroGeom(s).cg : vec3();   // (body, from the model's origin)
   stallWarn = 0;
   if (V > 0.5f) {
     alpha = atan2f(-va.y, -va.z);
     beta = asinf(clampf(va.x / V, -1, 1));
-    float qbar = 0.5f * density * V * V;
     mach = V / atmo.a;
+  } else { alpha = 0; beta = 0; }
+  if (s.special == 0) {
+    // the strip model (aero_strips.cpp): the drawn airframe's surfaces strip by strip, each in its own air - the
+    // aircraft's motion and rotation, the gusts across it, the slipstreams - with the fuselage, the engines' thrust
+    // along their lines and the propellers' torque, P-factor and gyroscopic moments; summed about the centre of gravity
+    const AeroGeom& ag = aeroGeom(s);
+    AeroIn in;
+    in.va = va; in.w = w;
+    {   // the eddies' gradient across the airframe, in the body's axes (the air's velocity change per metre)
+      const vec3 B[3] = {right(), up(), forward() * -1.f};
+      vec3 col[3];
+      for (int j = 0; j < 3; j++) {
+        vec3 jw(dot(ws.gx, B[j]), dot(ws.gy, B[j]), dot(ws.gz, B[j]));
+        col[j] = vec3(dot(jw, B[0]), dot(jw, B[1]), dot(jw, B[2]));
+      }
+      in.gx = vec3(col[0].x, col[1].x, col[2].x); in.gy = vec3(col[0].y, col[1].y, col[2].y); in.gz = vec3(col[0].z, col[1].z, col[2].z);
+    }
+    in.rho = density; in.a = atmo.a; in.mu = atmo.mu; in.agl = altAgl;
+    // (a sideslip-to-aileron interconnect where the wing needs one: aero_strips.cpp)
+    const float sas = clampf(-ag.betaToAil * beta, -0.3f, 0.3f);
+    in.pitch = ctl.pitch; in.roll = ctl.roll + sas; in.yaw = ctl.yaw; in.trim = ctl.trim;
+    ctlSurf = vec3(clampf(ctl.pitch + ctl.trim * 0.3f, -1.f, 1.f), clampf(in.roll + ag.ailRig, -1.f, 1.f), clampf(ctl.yaw + ag.rudRig, -1.f, 1.f));
+    in.gear = gear; in.ice = fail.ice; in.flapL = in.flapR = flaps;
+    // each engine's share of the thrust and of the shaft power by its health (a dead one makes none, and windmills)
+    float hs = 0; for (int e = 0; e < ag.nEng; e++) hs += fail.engineHealth[std::min(e, 3)];
+    const float shaft = engineRunning && s.engineType != ENG_JET ? s.engines * s.power * engineSpool * (s.engineType == ENG_PISTON ? sigmaRho : powf(sigmaRho, 0.75f)) : 0.f;
+    for (int e = 0; e < ag.nEng; e++) {
+      const float h = fail.engineHealth[std::min(e, 3)], share = hs > 1e-3f ? h / hs : 0.f;
+      in.thrust[e] = thrust * share; in.power[e] = shaft * share;
+      in.dead[e] = !engineRunning || h < 0.05f;
+      in.omega[e] = in.dead[e] ? 0.f : rpm * (2.f * PI / 60.f);
+    }
+    AeroOut ao;
+    aeroForces(ag, s, in, aeroMem, dt, ao);
+    F += ao.F; T += ao.M;
+    stallWarn = ao.stall;
+  } else if (V > 0.5f) {
+    // the research craft on fly-by-wire (the XR-30, XR-40): their coefficients, and the flight control system below
+    float qbar = 0.5f * density * V * V;
     // lift: the wing's slope from its aspect ratio and the fuselage, steepening with Mach (Prandtl-Glauert)
     float CLa = aeroCLa(aero, std::min(mach, 0.9f));
     float cl0 = s.CL0 + s.flapCL * flaps;
@@ -368,26 +428,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     float aCruise = (clCruise - s.CL0) / aeroCLa(aero, s.cruise / 340.f);
     float Cma = -1.1f, Cmq = -16.f;
     float ctlEff = 1.f - 0.4f * sig;
-    float Cm = Cma * (alpha - aCruise) + Cmq * qh + s.elevPow * (ctl.pitch + ctl.trim * 0.4f) * ctlEff - 0.06f * flaps;
-    // prop-wash over the tail keeps the elevator alive at low speed
-    float wash = s.engineType != ENG_JET ? clampf(thrust / (m * G0) * 2.f, 0, 1) * smoothstepf(30.f, 5.f, V) : 0.f;
-    Cm += s.elevPow * ctl.pitch * wash * 1.5f;
-    if (onGround) Cm += s.elevPow * ctl.pitch * 1.2f;  // main-gear pivot geometry helps rotation
-    float Cl = -0.10f * beta - 0.55f * ph + 0.08f * rh + s.ailPow * ctl.roll * ctlEff;
-    float Cn = 0.09f * beta - 0.16f * rh + s.rudPow * ctl.yaw * (1.f + wash) - 0.012f * ctl.roll;
-    if (s.engines == 1 && s.engineType != ENG_JET) Cn -= 0.008f * engineSpool * smoothstepf(45.f, 10.f, V);
-    if (fail.flapAsym) Cl += 0.035f * flaps;   // the flap still out on the left lifts that wing: it rolls right, held with aileron
-    if (s.engines == 2 && !s.special) {   // a twin with an engine out: the live engine's thrust yaws it towards the dead one (and rolls it a little)
-      float asym = (fail.engineHealth[0] - fail.engineHealth[1]) * 0.5f;   // +: the right engine is the weak one
-      float arm = s.span * 0.2f, Fe = thrust * (s.engines > 0 ? 1.f : 0.f);
-      Cn += asym * Fe * arm / std::max(qbar * s.wingArea * s.span, 1.f) * 0.9f;   // (positive Cn: nose right)
-      Cl -= asym * 0.015f * engineSpool;
-    }
-    // stall wing-drop
-    if (sig > 0.3f) { float dv, a, b; noised(time * 0.8f, 2.2f, dv, a, b); Cl += sig * 0.04f * dv; }
-    float L = Cl * qbar * s.wingArea * s.span, M = Cm * qbar * s.wingArea * s.chord, Nn = Cn * qbar * s.wingArea * s.span;
-    if (!s.special) T += vec3(M, -Nn, -L);
-    else if (s.special == 2) {
+    if (s.special == 2) {
       // XR-40: the airframe's own stability and damping act on it; the fly-by-wire decides the surface deflections
       float Cm0 = Cma * (alpha - aCruise) * 0.4f + Cmq * 0.35f * qh, Cl0 = -0.10f * beta - 0.55f * ph + 0.08f * rh, Cn0 = 0.09f * beta - 0.16f * rh;
       Taero = vec3(Cm0 * qbar * s.wingArea * s.chord, -Cn0 * qbar * s.wingArea * s.span, -Cl0 * qbar * s.wingArea * s.span);
@@ -395,7 +436,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
       T += Taero;
     }
     stallWarn = smoothstepf(aStall - 5 * DEG, aStall - 1.5f * DEG, alpha);
-  } else { alpha = 0; beta = 0; }
+  }
   if (s.special) {
     if (s.special == 1) F += vec3(0, 0, -thrust);   // XR-30: the nozzles vector in pitch only (no vertical flight)
     // fly-by-wire rate command through vectored thrust and reaction jets: authority independent of airspeed
@@ -420,7 +461,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     vec3 Ii(s.Iyy * ms0, s.Izz * ms0, s.Ixx * ms0);
     if (wr) wraithThrust(F, T, thrust * 0.25f, wd, Taero, surfMax, dt);
     else T += vec3(Ii.x * kp * (wd.x - w.x), Ii.y * k * (wd.y - w.y), Ii.z * k * (wd.z - w.z));
-  } else F += vec3(0, 0, -thrust);
+  }
 
   // ---------------- ground contacts
   float L = s.fusLen, R = s.fusRad;
@@ -513,7 +554,9 @@ void Plane::substep(float dt, const Weather& wx, float time) {
       float mu = rw >= 0 && !surfaceRough(g_world.airports[rw].surface) ? 0.8f : 0.55f;
       float rollRes = 0.015f + 0.06f * rough;
       float brakeF = (c.kind <= 1 ? ctl.brake * 0.7f : 0.f);   // (enough for the main wheels to hold full power when parked)
-      f += wr * (-nF * mu * clampf(vlat / 0.4f, -1, 1));
+      // (sideways the tyre grips as well: its full friction within a few cm/s of slip - looser, a steady side force, the
+      // fin in the slipstream's swirl at full power, crept the aircraft sideways on its brakes)
+      f += wr * (-nF * mu * clampf(vlat / 0.05f, -1, 1));
       if (brakeF > 0.35f && fabsf(vlong) < 0.3f) {
         // parked / held on the brakes: static friction - the wheel holds against whatever pushes it (power, slope)
         // up to the tyre's grip, and slips only past it (a linear ramp to zero at rest let full power creep)
@@ -528,7 +571,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
       if (length(vh) > 0.01f) f += normalize(vh) * (-nF * 0.6f);
     }
     Fw += f;
-    Tw += cross(c.p, q.conj().rotate(f));
+    Tw += cross(c.p - cg, q.conj().rotate(f));
   }
   // (what was left of the creep is pushed back next step too: the held force converges on the steady push, so the
   // wheels stop dead instead of creeping a step's acceleration)
@@ -579,8 +622,12 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     bool snap = gLoad > gp * 2.f || gLoad < gn * 2.f;
     if (!anyWheel && (overG >= 1.f || snap)) { ev.crashed = true; ev.crashReason = "Structural failure - overstressed airframe"; return; }
   }
-  vel += acc * dt;
-  pos += vel * dt;
+  // the centre of gravity moves under the forces and the airframe turns about it; the model's origin (pos, vel) rides
+  // along
+  const vec3 cgW = q.rotate(cg);
+  vec3 vcg = vel + cross(q.rotate(w), cgW), pcg = pos + cgW;
+  vcg += acc * dt;
+  pcg += vcg * dt;
   // inertia scales with loading
   float ms = m / s.emptyMass;
   vec3 I(s.Iyy * ms, s.Izz * ms, s.Ixx * ms);
@@ -591,6 +638,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   if (onGround) w *= expf(-2.0f * dt);  // gear/strut damping
   float wl = length(w);
   if (wl > 1e-6f) { q = q * quat::axisAngle(w / wl, wl * dt); q.normalize(); }
+  { const vec3 cgW1 = q.rotate(cg); pos = pcg - cgW1; vel = vcg - cross(q.rotate(w), cgW1); }
   if (pos.x < -WORLD_HALF * 1.2f || pos.x > WORLD_HALF * 1.2f || pos.z < -WORLD_HALF * 1.2f || pos.z > WORLD_HALF * 1.2f) {
     ev.crashed = true; ev.crashReason = "Flew beyond the charted area and ran out of options";
   }
@@ -754,7 +802,7 @@ void Plane::apEngage(int mode, int airport, const Weather& wx) {
   apOn = mode != AP_OFF; apMode = mode; apDone = false; apWindEvent = 0;
   float spd0 = ias > 1.f ? ias : length(vel);
   apHeading = heading(); apAlt = pos.y; apSpeed = std::max(spd0, spec->vref * 1.3f);
-  apPitchI = 0; apRollI = 0; apThrI = ctl.throttle; apXI = 0; apGamI = 0; apTrimEst = ctl.pitch; apUseVS = false; apUpset = false;
+  apPitchI = 0; apRollI = 0; apYawI = 0; apVmcCap = 1; apThrI = ctl.throttle; apXI = 0; apGamI = 0; apTrimEst = ctl.pitch; apUseVS = false; apUpset = false;
   apAirport = airport; apStage = APS_NAV; apStageT = 0; apLeg = 0; apTurnDir = 0; apClimbDir = 0; apBled = false; apBleedT = 1e9f;
   apDecline.clear(); apHoldFor = -1;
   if (mode >= AP_NAV && airport >= 0) {
@@ -1367,7 +1415,10 @@ void Plane::apRates(float qT, float pT, float rollCap, float nzMin, float nzMax,
   float tilt = -q.rotate(vec3(1, 0, 0)).y;                                      // sin(bank) cos(pitch), any attitude
   float qn = clampf((s.cruise * s.cruise) / (V * V), 0.3f, 3.f);
   float rErr = w.y + G0 * tilt / spd;
-  ctl.yaw = fbw ? clampf(G0 * tilt / spd / 1.4f, -1.f, 1.f) : clampf(beta * 2.f + rErr * 1.5f * qn, -0.6f, 0.6f);
+  // (and held in: what a steady yaw needs - a dead engine's thrust, the slipstream's swirl at climb power - builds up
+  // as rudder trim, so the sideslip is flown out instead of standing at what the sideslip term alone would answer)
+  if (!fbw) apYawI = clampf(apYawI + beta * qn * dt * 1.5f, -0.8f, 0.8f);
+  ctl.yaw = fbw ? clampf(G0 * tilt / spd / 1.4f, -1.f, 1.f) : clampf(beta * 2.f + rErr * 1.5f * qn + apYawI, -1.f, 1.f);
 }
 
 // The belly-up: throttle closed, wings level, the nose pulled up as hard as the structure takes to ~70 deg - the whole
@@ -1399,8 +1450,8 @@ void Plane::apControl(float dt) {
     vec3 rr(-apLd.z, 0, apLd.x), rel = pos - apTd;
     float cross = rel.x * rr.x + rel.z * rr.z, he = hdgErrDeg(atan2f(apLd.x, -apLd.z) / DEG, heading());
     ctl.throttle = 0;
-    // (a taildragger holds its tail down only once it's too slow to fly again; before that the stick stays neutral)
-    ctl.pitch = s.taildragger ? (ias > E.vApp * 0.8f ? 0.f : 0.35f) : (apStageT > 1.2f ? -0.1f : 0.f);
+    // (a taildragger: the stick a little back while it could still fly, then all the way back to hold the tail down)
+    ctl.pitch = s.taildragger ? (ias > E.vApp * 0.8f ? 0.15f : 1.f) : (apStageT > 1.2f ? -0.1f : 0.f);
     // wings level with everything the ailerons have (a gust under the upwind wing at 60 kt still lifts it), damped
     ctl.roll = clampf(-bankDeg() * 0.18f + w.z * 0.6f, -1.f, 1.f);
     // (back to the centreline no quicker than over 3 s of the roll: at a research jet's 65 m/s a fixed 0.6 deg a metre
@@ -1409,6 +1460,9 @@ void Plane::apControl(float dt) {
     he = hdgErrDeg(atan2f(apLd.x, -apLd.z) / DEG - copysignf(std::min(off, 10.f), cross), heading());
     ctl.yaw = clampf(he * 0.08f + w.y / DEG * 0.12f, -1.f, 1.f);   // steer for the centreline, damp the yaw rate
     ctl.brake = clampf((apStageT - 0.6f) * 1.2f, 0.f, s.taildragger ? 0.55f : 1.f);
+    // a taildragger's mains stand only a little ahead of its centre of gravity: braked hard with the tail up it goes
+    // over onto its propeller. The brakes come in as the tail comes down, and let go the moment the nose starts down
+    if (s.taildragger) ctl.brake *= smoothstepf(4.f, 9.f, pitchDeg()) * (w.x < -0.02f ? 0.f : 1.f);
     // flaps up once it is down to stay: the wing stops carrying the weight and the brakes get their grip (at 64 m/s the
     // Starling's full flaps held it to 1.5 m/s^2 of braking for its first ten seconds, and it ran off Meadowbrook's end)
     if (apStageT > 1.f) ctl.flaps = 0.f;
@@ -1510,4 +1564,11 @@ void Plane::apControl(float dt) {
     ctl.throttle = clampf(apThrI + e * 0.12f + (vsT - vel.y) * 0.02f, 0.f, 1.f);
   } else if (apMode == AP_APPR) ctl.throttle = std::max(0.f, ctl.throttle - dt * 0.6f);   // flare: idle
   // (apSpeed 0 outside an approach: the pilot keeps the throttle)
+  // a twin with an engine out: full rudder holds the live engine's thrust only down to the minimum control speed.
+  // Below it - the rudder at its stop and the sideslip still growing - power comes off the live engine until the
+  // rudder holds again (the standard recovery), and goes back on as it does
+  const bool asym = s.engines >= 2 && fabsf(fail.engineHealth[0] - fail.engineHealth[1]) > 0.3f;
+  if (asym && fabsf(ctl.yaw) > 0.95f && fabsf(beta) > 5.f * DEG) apVmcCap = std::max(0.15f, apVmcCap - dt * 0.5f);
+  else apVmcCap = std::min(1.f, apVmcCap + dt * 0.15f);
+  if (asym) ctl.throttle = std::min(ctl.throttle, apVmcCap);
 }

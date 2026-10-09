@@ -4,6 +4,7 @@
 #include "world.h"
 #include "wheel_motion.h"
 #include "weather.h"
+#include "aero.h"
 
 enum EngineType { ENG_PISTON = 0, ENG_TURBOPROP, ENG_JET };
 enum License { LIC_STUDENT = 0, LIC_PPL, LIC_CPL, LIC_ATP };
@@ -175,8 +176,11 @@ public:
   vec3 windAvg;               // the wind smoothed over a couple of seconds (the HUD's readout: the eddies don't flicker it)
   wxfield::Local wxl;         // the slow parts of the wind here (weather.h: the terrain's lift and sink, thermals, the cloud, the rain), every step
   vec3 wxAir;                 // the air mass's drift since the flight began: the eddies and gusts ride it
+  vec3 ctlSurf;               // the control surfaces as the physics deflects them (-1..1: x elevator, y ailerons, z rudder): the
+                              // stick and trim, the factory rigging and any augmenter - what the renderer draws
   vec3 gustRot;               // the eddies' rotation across the airframe, as body rates (rad/s): x roll right, y pitch up, z yaw right
   float gustBurst = 0;        // the gust burst under way, 0..1 (1: the reported peak)
+  AeroMem aeroMem;             // the strip model's memory: each strip's separation, the downwash on its way to the tail (aero.h)
   float density = 1.225f, soundSpeed = 340.3f;   // the air the aircraft is in (the standard atmosphere at its height)
   // ---- autopilot: HOLD (heading / altitude / speed), NAV (to a chosen airport), APPR (approach, flare, rollout)
   enum ApMode { AP_OFF = 0, AP_HOLD, AP_NAV, AP_APPR, AP_STUNT };
@@ -189,7 +193,7 @@ public:
   int apBleedPhase = 0; bool apBled = false; float apBleedT = 1e9f;   // (pitching up / nose back down; done this approach; s since)
   bool apOn = false; int apMode = AP_OFF;
   float apHeading = 0, apAlt = 0, apSpeed = 0, apVS = 0; bool apUseVS = false;
-  float apPitchI = 0, apRollI = 0, apThrI = 0.5f, apXI = 0, apGamI = 0, apTrimEst = 0, apFlareTau = 0, apFlareVs = 0, apGustAdd = 0;
+  float apPitchI = 0, apRollI = 0, apYawI = 0, apVmcCap = 1, apThrI = 0.5f, apXI = 0, apGamI = 0, apTrimEst = 0, apFlareTau = 0, apFlareVs = 0, apGustAdd = 0;
   int apAirport = -1, apStage = 0, apLeg = 0; float apOutSide = 0;   // (apOutSide: the side of the centreline the outbound leg keeps to, +-1; 0 off that leg)
   bool apRev = false; float apStageT = 0, apCruiseAlt = 0, apFinalLen = 8000;
   vec3 apLd, apTd;            // landing direction and touchdown point of the chosen runway end

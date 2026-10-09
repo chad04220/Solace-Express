@@ -23,9 +23,9 @@ add_custom_target(shaders_gen DEPENDS ${SHADER_GEN})
 include_directories(${CMAKE_BINARY_DIR}/gen)
 
 set(CORE_SOURCES
-  src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/career.cpp src/weather.cpp)
+  src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/models.cpp src/career.cpp src/weather.cpp)
 set(GAME_SOURCES
-  ${CORE_SOURCES} src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_wraith.cpp src/renderer.cpp src/materials.cpp src/raster_renderer.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/entity_mesh.cpp src/gl.cpp src/audio.cpp src/models.cpp)
+  ${CORE_SOURCES} src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_wraith.cpp src/renderer.cpp src/materials.cpp src/raster_renderer.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/entity_mesh.cpp src/gl.cpp src/audio.cpp)
 
 if(WIN32)
   if(MINGW)
@@ -51,7 +51,7 @@ if(UNIX AND NOT APPLE)
   target_link_libraries(render_harness PRIVATE ${CMAKE_DL_LIBS} X11 pthread)
   # the aircraft fields' geometry probes (headrest clearance, end-cap seams, the XR-40's touchpads) on Mesa/EGL, across
   # the whole roster: aircraft_visual_test OUTPUT_DIR [W H] [first last]
-  add_executable(aircraft_visual_test EXCLUDE_FROM_ALL tests/aircraft_visual_test.cpp ${CORE_SOURCES} src/models.cpp src/gl.cpp)
+  add_executable(aircraft_visual_test EXCLUDE_FROM_ALL tests/aircraft_visual_test.cpp ${CORE_SOURCES} src/gl.cpp)
   add_dependencies(aircraft_visual_test shaders_gen)
   target_link_libraries(aircraft_visual_test PRIVATE ${CMAKE_DL_LIBS} pthread)
 endif()
@@ -61,6 +61,7 @@ target_include_directories(material_dump PRIVATE src)
 
 # Headless tests (flight model + campaign progression validation)
 add_executable(flight_test tests/flight_test.cpp ${CORE_SOURCES})
+add_executable(aero_test tests/aero_test.cpp ${CORE_SOURCES})
 add_executable(progression_test tests/progression_test.cpp ${CORE_SOURCES})
 add_executable(shader_keyword_test tests/shader_keyword_test.cpp)
 add_executable(save_test tests/save_test.cpp ${CORE_SOURCES})
@@ -101,6 +102,7 @@ if(MSVC)
 endif()
 enable_testing()
 add_test(NAME flight_model COMMAND flight_test)
+add_test(NAME aero_model COMMAND aero_test)
 add_test(NAME campaign_progression COMMAND progression_test)
 add_test(NAME shader_keywords COMMAND shader_keyword_test)
 add_test(NAME career_saves COMMAND save_test)

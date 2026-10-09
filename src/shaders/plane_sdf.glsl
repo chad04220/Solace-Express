@@ -680,14 +680,14 @@ vec2 mapPlaneBody(vec3 p){
     float rud0 = hasT > 0.5 ? 0.05 : 0.08*h;
     float fin = sdPanel(s, c, t, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97);
     // right rudder (yaw +) swings the trailing edge to the right (+x)
-    float rud = gPartMode == -2 ? 1e9 : sdSurface(s, c, t, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97, -cYaw*0.42, 0.0);   // (rudder and elevators: rigid parts too)
+    float rud = gPartMode == -2 ? 1e9 : sdSurface(s, c, t, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97, -cYaw*0.5, 0.0);   // (rudder and elevators: rigid parts too)
     if(isMantis()) { rud=1e9; if(gPartMode==-1) { vec2 pr=partAt(vec2(1e9,3),PT_RUDDER,vec2(p.x<0.0?-1.0:1.0,0),p); rud=pr.x; } }
     float tail = min(fin, rud);
     vec4 H0 = gM[12], H1 = gM[13];
     float hs = abs(p.x), ht = p.y - (H1.x + hs*H1.z), hc = p.z - H1.y;
     float stab = sdPanel(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98);
     // Pull raises an aft elevator; the Mantis canard lowers its trailing edge to lift the nose.
-    float elev = gPartMode == -2 ? 1e9 : sdSurface(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98, (isMantis() ? cPitch : -cPitch)*0.4, 0.0);
+    float elev = gPartMode == -2 ? 1e9 : sdSurface(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98, isMantis() ? elevDefl(cPitch) : -elevDefl(cPitch), 0.0);
     tail = min(tail, min(stab, elev));
     if (hasT > 0.5) tail = smin(tail, sdEllipsoid(p - vec3(0.0, H1.x, H1.y + H0.y*0.45), vec3(0.18, 0.2, H0.y*0.55)), 0.08);
     // inside, the tail surfaces stop at the cabin wall as the wing does (a canard - the Mantis's horizontal tail sits

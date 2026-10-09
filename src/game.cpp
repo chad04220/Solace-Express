@@ -2294,7 +2294,10 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   float steer = p.ctl.yaw * 0.45f * smoothstepf(30.f, 4.f, spd);
   if (s.taildragger) steer = -steer;
   pv.PS[0] = p.gear; pv.PS[1] = p.flaps; pv.PS[2] = steer; pv.PS[3] = inside ? 1.f : 0.f;
-  pv.Ctl[0] = clampf(p.ctl.pitch + p.ctl.trim * 0.3f, -1, 1); pv.Ctl[1] = clampf(p.ctl.roll, -1, 1); pv.Ctl[2] = clampf(p.ctl.yaw, -1, 1); pv.Ctl[3] = p.ctl.throttle;
+  // (the surfaces as the physics deflects them: the stick, the trim, the factory's rigging and any augmenter)
+  if (s.special == 0 && p.flightTime > 0.f) { pv.Ctl[0] = p.ctlSurf.x; pv.Ctl[1] = p.ctlSurf.y; pv.Ctl[2] = p.ctlSurf.z; }   // (a display aircraft that never flew: its stick)
+  else { pv.Ctl[0] = clampf(p.ctl.pitch + p.ctl.trim * 0.3f, -1, 1); pv.Ctl[1] = clampf(p.ctl.roll, -1, 1); pv.Ctl[2] = clampf(p.ctl.yaw, -1, 1); }
+  pv.Ctl[3] = p.ctl.throttle;
   float blur = s.engineType == ENG_JET ? 1.f : smoothstepf(250.f, 700.f, p.rpm);
   float wr = s.special ? .38f : md.wheelR;
   float nr = s.special ? .33f : s.taildragger ? .10f : md.gear == 3 ? wr*.75f : wr*.85f;

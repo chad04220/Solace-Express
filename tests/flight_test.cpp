@@ -94,9 +94,16 @@ int main(int argc, char** argv) {
     p.reset(&sw, st, a.heading, sw.maxFuel * 0.3f, 85, true, sw.vref);
     p.ctl.gearDown = false; p.gear = 0; ok = p.failNow(FAIL_GEAR_STUCK, 0) && p.fail.gearStuck == 1;
     p.ctl.gearDown = true; p.ctl.flaps = 1; p.flaps = 1; p.ctl.throttle = 0;
-    float tstop = -1;
+    float tstop = -1, pitchI = 0;
     for (int i = 0; i < 90 * 240 && !p.ev.crashed; i++) {
-      p.ctl.pitch = p.ev.bellyLanding ? 0.f : clampf((std::max(-0.8f, -p.agl() * 0.3f) - p.vel.y) * 0.25f - p.w.x * 0.8f + 0.08f, -1, 1);
+      // (the pilot glides in at Vref holding an attitude - nose up when fast, down when slow - trimming as it goes,
+      // and flares from 4 m, easing the sink to a touch)
+      if (p.ev.bellyLanding) p.ctl.pitch = 0.f;
+      else {
+        float err = p.agl() > 4.f ? clampf(-3.f + (p.ias - sw.vref) * 0.5f, -8.f, 8.f) - p.pitchDeg() : (std::max(-0.8f, -p.agl() * 0.3f) - p.vel.y) * 3.f;
+        pitchI = clampf(pitchI + err * 0.02f / 240.f, -0.6f, 0.6f);
+        p.ctl.pitch = clampf(err * 0.08f - p.w.x * 0.8f + pitchI, -1, 1);
+      }
       p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1, 1);
       p.ctl.yaw = clampf(wrapAngle((a.heading - p.heading()) * DEG) * 2.f, -1, 1);
       p.step(1 / 240.f, calm, i / 240.f);
@@ -145,7 +152,7 @@ int main(int argc, char** argv) {
     ok = vsIced > vsClean * 1.04f && vsIced < stallClean * 1.6f;
     printf("Icing: stall warning at %.0f kt clean, %.0f kt iced %s\n", vsClean * MS_TO_KT, vsIced * MS_TO_KT, ok ? "ok" : "FAIL"); fails += !ok;
     p.reset(&s, vec3(-6000, 1200, 16000), 0, s.maxFuel * 0.5f, 85, true, s.cruise); p.failNow(FAIL_ALTERNATOR, 0);
-    for (int i = 0; i < 600 * 60 && !p.fail.avionicsDark(); i++) { p.ctl.pitch = clampf((0.f - p.vel.y) * 0.1f - p.w.x * 0.8f, -1, 1); p.ctl.throttle = 0.7f; p.step(1 / 60.f, calm, i / 60.f); }
+    for (int i = 0; i < 600 * 60 && !p.fail.avionicsDark(); i++) { p.ctl.pitch = clampf((0.f - p.vel.y) * 0.1f - p.w.x * 0.8f, -1, 1); p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1, 1); p.ctl.throttle = 0.7f; p.step(1 / 60.f, calm, i / 60.f); }
     ok = p.fail.avionicsDark() && p.flightTime >= 0.f && !p.ev.crashed;
     printf("Alternator failure: battery flat after %.0f s %s\n", p.fail.battery <= 0.f ? 420.f : -1.f, ok ? "ok" : "FAIL"); fails += !ok;
   }
@@ -217,7 +224,7 @@ int main(int argc, char** argv) {
       LevelResult r; float integral = 0, vFrom = 0; int n = 0;
       for (int i = 0; i < 240 * 60 && !p.ev.crashed; i++) {
         float error = alt - p.pos.y;
-        integral = clampf(integral + error / 60.f, -200.f, 200.f);
+        integral = clampf(integral + error / 60.f, -7500.f, 7500.f);   // (enough to hold the supersonic trim change: the lift's centre moves aft)
         p.ctl.pitch = clampf(error * 0.002f - p.vel.y * 0.01f - p.w.x * 0.3f + integral * 0.00004f, -1.f, 1.f);
         p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1.f, 1.f);
         p.step(1 / 60.f, calm, i / 60.f);

@@ -158,6 +158,9 @@ float gearNoseShow(){
   bool inCabin = gPS.w > 0.5 && int(gM[0].y + 0.5) >= 3;
   return inCabin ? 1.0 - smoothstep(0.3, 0.8, gearUp()) : 1.0;
 }
+// the elevator's deflection (rad) for the stick and trim c: 28 deg up for a pull, 20 down for a push (aero_strips.cpp
+// elevTravel: the physics deflects it the same)
+float elevDefl(float c){ return c*(c > 0.0 ? 0.49 : 0.35); }
 // a rotation by a about the unit axis k
 mat3 rotAxis(vec3 k, float a){ float c = cos(a), s = sin(a); return c*mat3(1.0) + s*mat3(0.0, k.z, -k.y,  -k.z, 0.0, k.x,  k.y, -k.x, 0.0) + (1.0 - c)*mat3(k*k.x, k*k.y, k*k.z); }   // (k k^T written out)
 // A leg swinging fore or aft (dir -1 forward, +1 aft) about a crosswise pivot at its top, through straight down, until
@@ -424,12 +427,12 @@ Pose partPoseCockpit(int k, vec2 sd){
                      : surfPose(sd.x, W1.x, W1.y, W1.z, W0.x, W0.y, W0.z, W0.w, 0.74, -cRoll*sd.x*0.33, 0.0);
   } else if (k == PT_ELEVATOR) {
     vec4 H0 = gM[12], H1 = gM[13];
-    X = surfPose(sd.x, H1.x, H1.y, H1.z, H0.x, H0.y, H0.z, H0.w, 0.68, (isMantis() ? cPitch : -cPitch)*0.4, 0.0);
+    X = surfPose(sd.x, H1.x, H1.y, H1.z, H0.x, H0.y, H0.z, H0.w, 0.68, isMantis() ? elevDefl(cPitch) : -elevDefl(cPitch), 0.0);
   } else if (k == PT_RUDDER) {   // the fin's frame: span up (y), chord aft (z), thickness across (x)
     vec4 V0 = gM[14], V1 = gM[15];
     mat3 A = mat3(0.0, 0.0, 1.0,   1.0, 0.0, 0.0,   0.0, 1.0, 0.0); vec3 a = vec3(-V1.x, -V1.y, 0.0);
     mat3 B = mat3(0.0, 1.0, 0.0,   0.0, 0.0, 1.0,   1.0, 0.0, 0.0); vec3 b = vec3(0.0, V1.x, V1.y);
-    mat3 D; vec3 d; surfDefl(V0.x, V0.y, V0.z, V0.w, 0.66, -cYaw*0.42*(isMantis()?sd.x:1.0), 0.0, D, d);
+    mat3 D; vec3 d; surfDefl(V0.x, V0.y, V0.z, V0.w, 0.66, -cYaw*0.5*(isMantis()?sd.x:1.0), 0.0, D, d);   // (29 deg each way: aero_strips.cpp)
     X.R = B*D*A; X.T = B*(D*a + d) + b;
     if(isMantis()) {
       // Rest mesh stays in the generic fin frame. Two instances cant/translate it onto the fixed airframe shoulders.

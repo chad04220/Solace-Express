@@ -36,7 +36,7 @@ const ModelDef kModels[] = {
   { {{-5.48f,.03f,.03f,-.07f},{-5.20f,.40f,.40f,-.08f},{-4.40f,.60f,.60f,-.02f},{-3.50f,.72f,.82f,.04f},{-0.50f,.72f,.82f,.04f},{1.80f,.50f,.62f,.12f},{4.60f,.15f,.30f,.40f},{5.45f,.06f,.14f,.45f}}, .35f,
     {7.45f,2.05f,2.05f,0,.95f,-2.40f,1.0f,.14f}, 0,0,0,.60f, 0,0,
     {2.30f,1.30f,1.05f,.10f,.45f,3.90f,0}, 0,
-    {1.90f,1.70f,1.00f,1.00f,.35f,3.50f},
+    {2.15f,1.95f,1.20f,1.00f,.35f,3.50f},   // (a twin's fin: big enough for full rudder to hold one engine's thrust)
     2, 2.38f,.78f,.38f,-3.35f,2.85f, .14f,1.00f,
     1, .32f, 0,
     4, -2.4f,1.2f,.22f,.20f,.17f,
@@ -89,7 +89,7 @@ const ModelDef kModels[] = {
   {6.20f,2.25f,1.35f,0.55f,-0.68f,-0.80f,4.0f,0.13f},
   0,0.0f,0.0f,0.59f,0,1, // no struts/winglets/slats; flaps to 59%; de-ice boots
   {2.15f,1.35f,0.85f,0.28f,0.34f,3.15f,0.0f},0, // conventional horizontal tail
-  {1.85f,1.65f,0.65f,0.85f,0.32f,2.80f}, // tapered swept fin
+  {2.05f,1.95f,0.85f,0.85f,0.32f,2.80f}, // tapered swept fin (a twin's: big enough for full rudder to hold one engine's thrust)
   2,2.30f,-0.54f,0.40f,-1.50f,2.60f,0.16f,1.05f, // twin three-blade piston nacelles
   4,0.29f,0, // retract into low wing/body; no cargo pod
   2,-0.55f,1.45f,0.25f,0.27f,0.22f, // two large cabin windows per side
@@ -164,6 +164,7 @@ static void stationAt(const ModelDef& m, float z, float& hw, float& hh, float& c
 }
 
 float modelHalfWidth(const ModelDef& m, float z) { float hw, hh, cy; stationAt(m, z, hw, hh, cy); return hw; }
+void modelSection(const ModelDef& m, float z, float& hw, float& hh, float& cy) { stationAt(m, z, hw, hh, cy); }
 
 int modelProps(const ModelDef& m, float out[2][4]) {
   if (m.engine <= 1) {
