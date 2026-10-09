@@ -44,9 +44,12 @@ echo [1/6] System report ...
 set INFO=%OUT%\system.txt
 echo Solace Express %VER%  (diagnostics v2) > "%INFO%"
 echo date %DATE% %TIME% >> "%INFO%"
+rem (the GPU's memory from its driver's registry entry: Win32_VideoController.AdapterRAM is 32 bits and reads 4095 MB
+rem for any card with 4 GB or more)
 powershell -NoProfile -Command ^
   "$o = @();" ^
-  "$o += '--- GPU'; Get-CimInstance Win32_VideoController | ForEach-Object { $o += ('  {0}  driver {1}  ({2} MB)' -f $_.Name, $_.DriverVersion, [int]($_.AdapterRAM / 1MB)) };" ^
+  "$vram = @{}; Get-ItemProperty 'HKLM:\SYSTEM\ControlSet001\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0*' -ErrorAction SilentlyContinue | ForEach-Object { $q = $_.'HardwareInformation.qwMemorySize'; if ($q -is [byte[]]) { $q = [BitConverter]::ToInt64($q, 0) }; if ($q -and $_.DriverDesc) { $vram[$_.DriverDesc] = [int64]$q } };" ^
+  "$o += '--- GPU'; Get-CimInstance Win32_VideoController | ForEach-Object { $mb = if ($vram[$_.Name]) { [int64]($vram[$_.Name] / 1MB) } else { [int64]($_.AdapterRAM / 1MB) }; $o += ('  {0}  driver {1}  ({2} MB)' -f $_.Name, $_.DriverVersion, $mb) };" ^
   "$o += '--- CPU'; Get-CimInstance Win32_Processor | ForEach-Object { $o += ('  {0}  {1} cores / {2} threads  {3} MHz' -f $_.Name, $_.NumberOfCores, $_.NumberOfLogicalProcessors, $_.MaxClockSpeed) };" ^
   "$cs = Get-CimInstance Win32_ComputerSystem; $o += ('--- Memory  {0:N1} GB' -f ($cs.TotalPhysicalMemory / 1GB));" ^
   "$os = Get-CimInstance Win32_OperatingSystem; $o += ('--- Windows  {0}  build {1}' -f $os.Caption, $os.BuildNumber);" ^
@@ -118,7 +121,9 @@ echo ---------------------------------------------------------------
 echo.
 echo Done. Send over:  %~dp0diagnostics_%VER%.zip
 echo (the "diagnostics" folder next to the exe holds the same files, unzipped)
-start "" "%~dp0%OUT%"
+rem (the folder is opened with Explorer by name: "start" on "...\diagnostics" tries the program extensions first, found
+rem diagnostics.bat itself and ran the whole thing again, deleting this run's folder as it started)
+explorer.exe "%~dp0%OUT%"
 pause
 exit /b 0
 
