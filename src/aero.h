@@ -11,6 +11,16 @@
 
 struct AircraftSpec;
 
+// The International Standard Atmosphere (ISO 2533): the troposphere's lapse of 6.5 K per km to 11 km, isothermal to
+// 20 km, then 1 K per km. Temperature (K), pressure (Pa), density (kg/m^3), speed of sound (m/s) and dynamic
+// viscosity (Pa s, Sutherland) at a geometric height (m; below sea level it extrapolates)
+struct Atmosphere { float T, p, rho, a, mu; };
+Atmosphere isa(float h);
+inline float isaDensity(float h) { return isa(h).rho; }
+// the airspeed an airspeed indicator shows (calibrated: the pitot's impact pressure as at sea level, subsonic and,
+// past Mach 1, behind the probe's shock), from the true airspeed (m/s) in that air
+float calibratedAirspeed(float tas, const Atmosphere& at);
+
 struct AeroModel {
   struct Part { const char* name; float swet, len, ffq, laminar; };   // wetted area, reference length, form factor x interference
   Part parts[8]; int nParts = 0;

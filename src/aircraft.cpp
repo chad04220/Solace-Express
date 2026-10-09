@@ -112,9 +112,9 @@ float Plane::thrustAt(float spool, float V, float vf, float rho) const {
     // a supersonic research type on conventional controls: dry up to 85% throttle, reheat above, and ram
     // compression keeps the thrust up with Mach
     float ab = smoothstepf(0.85f, 1.0f, spool);
-    return s.engines * s.power * powf(sigmaRho, 0.6f) * (0.82f * spool + 1.18f * ab) * (1.f + 0.15f * std::min(V / 340.f, 2.5f));
+    return s.engines * s.power * powf(sigmaRho, 0.6f) * (0.82f * spool + 1.18f * ab) * (1.f + 0.15f * std::min(V / soundSpeed, 2.5f));
   } else if (s.engineType == ENG_JET) {
-    float mach = V / 340.f;
+    float mach = V / soundSpeed;
     return s.engines * s.power * spool * powf(sigmaRho, 0.75f) * (1.f - 0.3f * mach);
   }
   float P = s.engines * s.power * spool * (s.engineType == ENG_PISTON ? sigmaRho : powf(sigmaRho, 0.75f));
@@ -253,7 +253,8 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   const AircraftSpec& s = *spec;
   float m = mass();
   float altAgl = agl();
-  density = 1.225f * expf(-pos.y / 8500.f);
+  const Atmosphere atmo = isa(pos.y);   // (the standard atmosphere: aero.cpp)
+  density = atmo.rho; soundSpeed = atmo.a;
   float sigmaRho = density / 1.225f;
 
   // ---------------- wind and turbulence (weather.cpp): the mean wind's profile and veer, the gust bursts, the eddies
@@ -289,7 +290,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   vec3 vaW = vel - windVel;
   vec3 va = q.conj().rotate(vaW);
   float V = length(va);
-  airspeed = V; ias = V * sqrtf(sigmaRho);
+  airspeed = V; ias = calibratedAirspeed(V, atmo);   // (what the airspeed indicator reads: the pitot's impact pressure)
   if (fail.pitot) ias = fail.pitotIas * sqrtf(fail.pitotRho / std::max(density, 0.1f));   // a blocked pitot: the reading climbs with altitude and falls with descent, never with speed
   if (s.engineType == ENG_PISTON) {
     float tr = engineRunning ? s.idleRpm + (s.maxRpm * 0.86f - s.idleRpm) * powf(engineSpool, 0.7f) + s.maxRpm * 0.12f * clampf(-va.z / s.cruise, 0, 1.3f) * sqrtf(engineSpool)
@@ -327,7 +328,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     alpha = atan2f(-va.y, -va.z);
     beta = asinf(clampf(va.x / V, -1, 1));
     float qbar = 0.5f * density * V * V;
-    mach = V / (340.f * sqrtf(std::max(1.f - pos.y / 44000.f, 0.6f)));
+    mach = V / atmo.a;
     // lift: the wing's slope from its aspect ratio and the fuselage, steepening with Mach (Prandtl-Glauert)
     float CLa = aeroCLa(aero, std::min(mach, 0.9f));
     float cl0 = s.CL0 + s.flapCL * flaps;
@@ -791,7 +792,7 @@ void Plane::apSense() {
   const AircraftSpec& s = *spec;
   const PerfModel& P = perf(spec);
   ApEnvelope& E = apEnv;
-  const float mTest = s.emptyMass + s.maxFuel * 0.6f + 150.f, rhoTest = 1.225f * expf(-1200.f / 8500.f);
+  const float mTest = s.emptyMass + s.maxFuel * 0.6f + 150.f, rhoTest = isaDensity(1200.f);
   E.mass = mass(); E.wRatio = E.mass / mTest;
   E.sigma = density / 1.225f;
   // the stall: with the square root of the weight; ice takes up to 30% of the wing's lift
@@ -862,7 +863,7 @@ float Plane::apStopNeed(const Airport& a, bool rev, const Weather& wx, float* tw
   const float hw = dot(ld, from) * wx.windSpeed;
   const float t = hw < 0.f ? -hw + 0.5f * wx.gust : 0.f;
   if (tw) *tw = t;
-  const float sigma = expf(-a.elev / 8500.f);
+  const float sigma = isaDensity(a.elev) / 1.225f;
   const float vtd = E.vApp / sqrtf(sigma) + t;
   return E.hover ? 0.f : len2(td - a.threshold(rev)) + (spec->taildragger ? 0.27f : 0.2f) * vtd * vtd * (surfaceRough(a.surface) ? 1.1f : 1.f);   // (what holds itself up on its thrust comes down vertically)
 }

@@ -63,6 +63,38 @@ AeroModel build(const AircraftSpec& s) {
 }
 }
 
+Atmosphere isa(float h) {
+  const float g = 9.80665f, R = 287.053f, T0 = 288.15f, p0 = 101325.f;
+  float T, p;
+  if (h < 11000.f) { T = T0 - 0.0065f * h; p = p0 * powf(T / T0, g / (R * 0.0065f)); }
+  else {
+    const float T11 = 216.65f, p11 = p0 * powf(T11 / T0, g / (R * 0.0065f));
+    if (h < 20000.f) { T = T11; p = p11 * expf(-g * (h - 11000.f) / (R * T11)); }
+    else { const float p20 = p11 * expf(-g * 9000.f / (R * T11)); T = T11 + 0.001f * (h - 20000.f); p = p20 * powf(T / T11, -g / (R * 0.001f)); }
+  }
+  Atmosphere at;
+  at.T = T; at.p = p; at.rho = p / (R * T); at.a = sqrtf(1.4f * R * T);
+  at.mu = 1.458e-6f * T * sqrtf(T) / (T + 110.4f);
+  return at;
+}
+
+float calibratedAirspeed(float tas, const Atmosphere& at) {
+  const float a0 = 340.294f, p0 = 101325.f;
+  const float M = tas / at.a;
+  float qc;   // the impact pressure the pitot feels
+  if (M < 1.f) qc = at.p * (powf(1.f + 0.2f * M * M, 3.5f) - 1.f);
+  else qc = at.p * (166.92158f * powf(M, 7.f) / powf(7.f * M * M - 1.f, 2.5f) - 1.f);   // (Rayleigh: behind the normal shock)
+  // the speed at sea level that gives that impact pressure (subsonic; past it, the supersonic formula solved by a few steps)
+  float cas = a0 * sqrtf(std::max(5.f * (powf(qc / p0 + 1.f, 2.f / 7.f) - 1.f), 0.f));
+  if (cas > a0) {
+    float m = cas / a0;
+    for (int i = 0; i < 6; i++) { float f = 166.92158f * powf(m, 7.f) / powf(7.f * m * m - 1.f, 2.5f) - 1.f - qc / p0;
+                                  float d = (166.92158f * powf(m, 7.f) / powf(7.f * m * m - 1.f, 2.5f)) * (7.f / m - 35.f * m / (7.f * m * m - 1.f)); m -= f / d; }
+    cas = m * a0;
+  }
+  return std::copysign(cas, tas);
+}
+
 const AeroModel& aeroModel(const AircraftSpec& s) {
   static AeroModel cache[16]; static bool built[16] = {};
   static std::mutex m;

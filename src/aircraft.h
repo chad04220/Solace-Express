@@ -177,7 +177,7 @@ public:
   vec3 wxAir;                 // the air mass's drift since the flight began: the eddies and gusts ride it
   vec3 gustRot;               // the eddies' rotation across the airframe, as body rates (rad/s): x roll right, y pitch up, z yaw right
   float gustBurst = 0;        // the gust burst under way, 0..1 (1: the reported peak)
-  float density = 1.225f;
+  float density = 1.225f, soundSpeed = 340.3f;   // the air the aircraft is in (the standard atmosphere at its height)
   // ---- autopilot: HOLD (heading / altitude / speed), NAV (to a chosen airport), APPR (approach, flare, rollout)
   enum ApMode { AP_OFF = 0, AP_HOLD, AP_NAV, AP_APPR, AP_STUNT };
   // aerobatic figures the autopilot flies (aircraft_stunt.cpp), each sized to this airframe's envelope

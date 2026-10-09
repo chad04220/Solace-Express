@@ -1,4 +1,5 @@
 // Solace Express - menus, hub screens and flight HUD
+#include "aero.h"
 #include "game.h"
 
 // High-tech glass UI: deep navy panels, cyan accents, amber for warnings
@@ -794,7 +795,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
           float payload = (float)c.cargoKg + c.pax * 85.f + 85.f, mass = sp.emptyMass + fuel + payload;
           bool heavy = mass > sp.maxMass() + 0.5f;
           const PerfModel& P = Plane::perf(&sp);
-          float sigma = expf(-g_world.airports[c.from].elev / 8500.f);
+          float sigma = isaDensity(g_world.airports[c.from].elev) / 1.225f;
           float roll = P.toRoll > 0 ? P.toRoll * (mass / sp.maxMass()) * (mass / sp.maxMass()) / sigma : 0.f;
           Career::LaunchPlan ef = e; career.planFuel(ef, c, fuel);
           std::string v = fmt("%.0f kg (%.0f%%)  -  take-off %.0f of %.0f kg%s", fuel, 100.f * fuel / sp.maxFuel, mass, sp.maxMass(), heavy ? "  OVERWEIGHT" : "");

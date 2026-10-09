@@ -1,5 +1,6 @@
 // Solace Express - learning each aircraft's envelope by flying it (see PerfModel in aircraft.h)
 #include "aircraft.h"
+#include "aero.h"
 #include <mutex>
 #include <cstdio>
 #include <cstring>
@@ -57,7 +58,7 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
   Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
   const float fuel = s.maxFuel * 0.6f, payload = 150.f;
   const vec3 sea = seaPoint() + vec3(0, 1200.f, 0);
-  const float W = (s.emptyMass + fuel + payload) * G0, rho = 1.225f * expf(-1200.f / 8500.f);
+  const float W = (s.emptyMass + fuel + payload) * G0, rho = isaDensity(1200.f);
   P.vs1 = sqrtf(2.f * W / (rho * s.wingArea * s.CLmax));
   P.vs0 = sqrtf(2.f * W / (rho * s.wingArea * (s.CLmax + s.flapCL)));
   P.gLimit = s.gLimitPos(); P.gNeg = s.gLimitNeg();
@@ -158,7 +159,7 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
     {
       // full flap, idle, then the brakes as hard as the type takes (a taildragger brakes gently, as the autopilot's
       // rollout does); Vs0 at this weight and the field's air
-      float W = (s.emptyMass + s.maxFuel + mtowLoad) * G0, rho = 1.225f * expf(-a.elev / 8500.f);
+      float W = (s.emptyMass + s.maxFuel + mtowLoad) * G0, rho = isaDensity(a.elev);
       float vs0 = sqrtf(2.f * W / (rho * s.wingArea * (s.CLmax + s.flapCL)));
       Plane p; vec3 st = a.threshold(false) + a.dir() * 200.f; st.y = a.elev;
       p.reset(&s, st, a.heading, s.maxFuel, mtowLoad, false);
