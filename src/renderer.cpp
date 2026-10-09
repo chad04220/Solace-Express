@@ -76,7 +76,33 @@ static std::string cachePath(const std::string& vs, const std::string& fs) {
   char name[40]; snprintf(name, sizeof name, "%016llx.bin", (unsigned long long)h);
   return g_shaderCacheDir + "/" + name;
 }
-static GLuint linkOnce(const std::string& vs, const std::string& fs, std::string& err, bool& rejectedBefore) {
+// <cache>/compile.log: a line as each program's build starts and ends, written as it happens (the start-up child
+// process and the game append to the same file). On a driver whose compiler fails or never finishes, its last lines
+// say on what, and how long each took.
+static std::mutex s_logMu;
+static void compileLog(const std::string& line) {
+  if (g_shaderCacheDir.empty()) return;
+  static const auto t0 = std::chrono::steady_clock::now();
+  std::lock_guard<std::mutex> lk(s_logMu);
+  const std::string path = g_shaderCacheDir + "/compile.log";
+  static bool first = true;
+  if (first) {   // (one launch's worth at a time: the file starts again when it has grown past 256 KB)
+    first = false;
+    if (FILE* f = fopen(path.c_str(), "rb")) { fseek(f, 0, SEEK_END); long n = ftell(f); fclose(f); if (n > 256 * 1024) remove(path.c_str()); }
+  }
+  static bool head = true;
+  if (FILE* f = fopen(path.c_str(), "a")) {
+    if (head) {   // (each process's lines start with the driver they ran on)
+      head = false;
+      const GLubyte* r = glGetString(GL_RENDERER); const GLubyte* v = glGetString(GL_VERSION);
+      fprintf(f, "---- %s / %s\n", r ? (const char*)r : "?", v ? (const char*)v : "?");
+    }
+    fprintf(f, "%7.1f s  %s\n", std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), line.c_str());
+    fclose(f);
+  }
+}
+static thread_local std::string g_compileWhat;   // what linkProgramCached is building (for compile.log)
+static GLuint linkOnce(const std::string& vs, const std::string& fs, std::string& err, bool& rejectedBefore, const char* variant) {
   bool cache = binaryCacheUsable();
   std::string path = cache ? cachePath(vs, fs) : std::string();
   if (cache) {
@@ -101,6 +127,15 @@ static GLuint linkOnce(const std::string& vs, const std::string& fs, std::string
       char log[8192]; size_t n = fread(log, 1, sizeof(log) - 1, f); log[n] = 0; fclose(f);
       rejectedBefore = true; err += log; return 0;
     }
+    // (a retry an earlier attempt started and never finished - the driver hung on it, or the process was stopped: not again)
+    if (variant) {
+      if (FILE* f = fopen((path + ".try").c_str(), "rb")) {
+        fclose(f); rejectedBefore = true; err += "(0) : fatal error C9999: an earlier attempt at this build did not finish\n";
+        compileLog("skipped " + g_compileWhat + " with " + variant + ": an earlier attempt did not finish");
+        return 0;
+      }
+      if (FILE* f = fopen((path + ".try").c_str(), "wb")) fclose(f);
+    }
   }
   static const bool timed = getenv("SHADERTIME") != nullptr;   // (debug: each program's compile and link time, and the start of its entry point)
   if (const char* dd = getenv("SHADERDUMP")) {   // (debug: each program's sources, numbered, to time and cut down outside the game)
@@ -113,8 +148,15 @@ static GLuint linkOnce(const std::string& vs, const std::string& fs, std::string
   }
   auto t0 = std::chrono::steady_clock::now();
   const size_t err0 = err.size();
+  const std::string what = g_compileWhat + (variant ? std::string(" with ") + variant : std::string());
+  compileLog("building " + what);
   GLuint v = compile(GL_VERTEX_SHADER, vs, err), f = compile(GL_FRAGMENT_SHADER, fs, err);
+  auto secs = [&]() { char b[32]; snprintf(b, sizeof b, "%.1f s", std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count()); return std::string(b); };
   auto reject = [&]() {   // (an internal error of the driver's compiler: remembered, see linkProgramCached)
+    std::string l = err.substr(err0); size_t c = l.find("error"); l = c == std::string::npos ? l.substr(0, 160) : l.substr(c, 160);
+    for (char& ch : l) if (ch == '\n' || ch == '\r') ch = ' ';
+    compileLog("FAILED " + what + " after " + secs() + ": " + l);
+    if (cache && variant) remove((path + ".try").c_str());
     if (!cache || err.find("C9999", err0) == std::string::npos) return;
     if (FILE* fo = fopen((path + ".rej").c_str(), "wb")) { fwrite(err.data() + err0, 1, err.size() - err0, fo); fclose(fo); }
   };
@@ -131,6 +173,8 @@ static GLuint linkOnce(const std::string& vs, const std::string& fs, std::string
   if (!ok) { char log[8192]; glGetProgramInfoLog(p, sizeof(log), nullptr, log); err += log; glDeleteProgram(p); glDeleteShader(v); glDeleteShader(f); reject(); return 0; }
   glDeleteShader(v); glDeleteShader(f);
   g_shaderCacheMisses++;
+  compileLog("built " + what + " in " + secs());
+  if (cache && variant) remove((path + ".try").c_str());
   if (cache) {
     GLint len = 0; glGetProgramiv(p, GL_PROGRAM_BINARY_LENGTH, &len);
     if (len > 0) {
@@ -159,46 +203,61 @@ static GLuint linkOnce(const std::string& vs, const std::string& fs, std::string
 std::string g_shaderNotes;
 static std::mutex s_notesMu;
 static const char* const kNvOptionSets[] = {
-  "#pragma optionNV(inline all)\n",
   "#pragma optionNV(ifcvt none)\n",
   "#pragma optionNV(unroll none)\n",
-  "#pragma optionNV(inline all)\n#pragma optionNV(ifcvt none)\n",
-  "#pragma optionNV(ifcvt none)\n#pragma optionNV(unroll none)\n",
+  "#pragma optionNV(inline all)\n",
   "#pragma optionNV(inline all)\n#pragma optionNV(ifcvt none)\n#pragma optionNV(unroll none)\n",
 };
 static std::atomic<int> s_nvFirstSet{0};      // the set that last built: tried first for the next rejected program
-static std::atomic<bool> s_nvUseless{false};  // every set failed on a program: the rest go without the retries
+static std::atomic<bool> s_nvUseless{false};  // every set failed on a program, or the retries ran out of time: no more
+static std::atomic<int> s_nvSpentMs{0};       // the time this process has spent on retries (at most kNvBudgetMs)
+static const int kNvBudgetMs = 150000, kNvSlowMs = 60000;   // (a retry slower than kNvSlowMs ends them too)
 void shaderNote(const std::string& s) { std::lock_guard<std::mutex> lk(s_notesMu); g_shaderNotes += s; if (s.empty() || s.back() != '\n') g_shaderNotes += "\n"; }
 static std::string firstLine(const std::string& s) { size_t n = s.find('\n'); return n == std::string::npos ? s : s.substr(0, n); }
-static std::string programName(const std::string& fs) {   // (the build stage and the start of the entry point, to name it in the notes)
+static std::string oneLine(std::string s) { for (char& c : s) if (c == '\n') c = ' '; while (!s.empty() && s.back() == ' ') s.pop_back(); return s; }
+static std::string programName(const std::string& fs) {   // (the build stage, or the start of the entry point, to name it)
+  const std::string stage = g_ren.compileStage();
+  if (!stage.empty()) return stage;
   size_t m = fs.rfind("void main()"); std::string t = m == std::string::npos ? fs.substr(0, 60) : fs.substr(m, 70);
   for (char& c : t) if (c == '\n') c = ' ';
   for (size_t k; (k = t.find("  ")) != std::string::npos;) t.erase(k, 1);
-  const std::string stage = g_ren.compileStage();
-  return stage.empty() ? t : stage + ": " + t;
+  return t;
 }
 GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err) {
   bool before = false;
   const size_t err0 = err.size();
-  GLuint p = linkOnce(vs, fs, err, before);
-  if (p || err.find("C9999", err0) == std::string::npos || s_nvUseless) return p;
+  const std::string name = programName(fs);
+  g_compileWhat = name;
+  GLuint p = linkOnce(vs, fs, err, before, nullptr);
+  if (p || err.find("C9999", err0) == std::string::npos) return p;
   const std::string log = err.substr(err0);
+  const size_t c = log.find("C9999"), ls = c == std::string::npos ? std::string::npos : log.rfind('\n', c);
+  const std::string why = firstLine(c == std::string::npos ? log : log.substr(ls == std::string::npos ? 0 : ls + 1));   // (the driver's error line)
+  if (s_nvUseless) { shaderNote("Shader [" + name + "]: the driver's compiler failed" + (before ? " (an earlier launch)" : "") + ": " + why); return 0; }
   const size_t at = fs.find('\n') + 1;   // (after the #version line)
   const int n = (int)(sizeof(kNvOptionSets) / sizeof(kNvOptionSets[0])), first = s_nvFirstSet;
-  for (int k = 0; k < n; k++) {
+  const std::string stage = g_ren.compileStage();
+  for (int k = 0; k < n && !s_nvUseless; k++) {
     const int set = (first + k) % n;
+    const std::string opts = oneLine(kNvOptionSets[set]);
+    g_ren.setCompileStage((stage + " - the driver's compiler failed, retrying with its options (" + std::to_string(k + 1) + " of " + std::to_string(n) + ")").c_str());
     std::string e2; bool b2 = false;
-    p = linkOnce(vs, fs.substr(0, at) + kNvOptionSets[set] + fs.substr(at), e2, b2);
-    if (!p) continue;
-    s_nvFirstSet = set;
-    std::string opts = kNvOptionSets[set]; for (char& c : opts) if (c == '\n') c = ' ';
-    shaderNote("Shader [" + programName(fs) + "]: the driver's compiler failed" + (before ? " (an earlier launch)" : "") + " - built with " + opts +
-               "\n  " + firstLine(log.substr(log.find("C9999") == std::string::npos ? 0 : log.rfind('\n', log.find("C9999")) + 1)));
-    err.resize(err0);
-    return p;
+    const auto t0 = std::chrono::steady_clock::now();
+    p = linkOnce(vs, fs.substr(0, at) + kNvOptionSets[set] + fs.substr(at), e2, b2, opts.c_str());
+    const int ms = (int)(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() * 1000.0);
+    s_nvSpentMs += ms;
+    if (p) {
+      s_nvFirstSet = set;
+      g_ren.setCompileStage(stage.c_str());
+      shaderNote("Shader [" + name + "]: the driver's compiler failed" + (before ? " (an earlier launch)" : "") + " - built with " + opts + "\n  " + why);
+      err.resize(err0);
+      return p;
+    }
+    if (ms > kNvSlowMs || s_nvSpentMs > kNvBudgetMs) { s_nvUseless = true; compileLog("retries stopped: too slow"); }
   }
+  g_ren.setCompileStage(stage.c_str());
   s_nvUseless = true;
-  shaderNote("Shader [" + programName(fs) + "]: the driver's compiler failed, and with each of its option sets:\n" + log);
+  shaderNote("Shader [" + name + "]: the driver's compiler failed" + (before ? " (an earlier launch)" : "") + ", also with its options: " + why);
   return 0;
 }
 static GLuint program(const std::string& vs, const std::string& fs, std::string& err) { return linkProgramCached(vs, fs, err); }

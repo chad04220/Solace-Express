@@ -369,8 +369,16 @@ static int buildShaderCacheChild(HINSTANCE hInst, const std::string& dir) {
   g_shaderCacheDir = dir;
   HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
   auto say = [&](const char* fmt2, int v) { char b[32]; int n = snprintf(b, sizeof b, fmt2, v); DWORD w; if (out && out != INVALID_HANDLE_VALUE) WriteFile(out, b, n, &w, nullptr); };
+  auto sayStage = [&](const std::string& st) { std::string l = "s " + st + "\n"; DWORD w; if (out && out != INVALID_HANDLE_VALUE) WriteFile(out, l.data(), (DWORD)l.size(), &w, nullptr); };
   std::atomic<int> done{0}; std::atomic<bool> fin{false};
-  std::thread rep([&] { int last = -1; while (!fin) { int d = done; if (d != last) { last = d; say("%d\n", d); } Sleep(15); } });
+  std::thread rep([&] {   // (the count of programs built, and what is being built: the game's loading screen shows both)
+    int last = -1; std::string lastStage;
+    while (!fin) {
+      int d = done; if (d != last) { last = d; say("%d\n", d); }
+      std::string st = g_ren.compileStage(); if (st != lastStage) { lastStage = st; sayStage(st); }
+      Sleep(15);
+    }
+  });
   bool ok = g_ren.compilePrograms(&done);
   fin = true; rep.join();
   say("%d\n", (int)done);
@@ -528,6 +536,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   // the first-time compile runs in a child process (see buildShaderCacheChild); this process then loads the results
   PROCESS_INFORMATION child = {};
   std::atomic<int> childDone{-1}, childMisses{0};
+  std::mutex childStageMu; std::string childStage;   // (what the child is building, as it reports it)
   std::thread childReader;
   const std::string stampPath = g_shaderCacheDir.empty() ? std::string() : g_shaderCacheDir + "\\stamp.txt", stamp = shaderCacheStamp();
   bool cacheCurrent = false;
@@ -562,12 +571,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       std::vector<char> cmdBuf(cmd.begin(), cmd.end()); cmdBuf.push_back(0);
       if (CreateProcessA(nullptr, cmdBuf.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS, nullptr, nullptr, &si, &child)) {
         childDone = 0;
-        childReader = std::thread([rd, &childDone, &childMisses] {
+        childReader = std::thread([rd, &childDone, &childMisses, &childStageMu, &childStage] {
           std::string line; char buf[256]; DWORD n = 0;
           while (ReadFile(rd, buf, sizeof buf, &n, nullptr) && n > 0)
             for (DWORD i = 0; i < n; i++) {
               if (buf[i] != '\n') { line += buf[i]; continue; }
-              if (line.size() > 2 && line[0] == 'm') childMisses = atoi(line.c_str() + 2);
+              if (line.size() >= 2 && line[0] == 's' && line[1] == ' ') { std::lock_guard<std::mutex> lk(childStageMu); childStage = line.substr(2); }
+              else if (line.size() > 2 && line[0] == 'm') childMisses = atoi(line.c_str() + 2);
               else if (!line.empty()) childDone = atoi(line.c_str());
               line.clear();
             }
@@ -687,7 +697,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     std::string stage;
     if (!ctx2) stage = "Preparing";
     else if (compileState == 0) {
-      const std::string sh = g_ren.compileStage();
+      std::string sh = g_ren.compileStage();
+      if (childDone >= 0 && child.hProcess && WaitForSingleObject(child.hProcess, 0) == WAIT_TIMEOUT) { std::lock_guard<std::mutex> lk(childStageMu); sh = childStage; }   // (the child compiling: what it reports)
       stage = cacheCurrent ? "Loading the shaders from the cache" : "Compiling the shaders (the first launch of this version only)";
       if (!sh.empty()) stage += ": " + sh;
       stage += "   " + std::to_string(std::min(d + 1, Renderer::kProgramCount)) + " of " + std::to_string(Renderer::kProgramCount);
