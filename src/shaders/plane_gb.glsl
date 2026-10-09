@@ -6,7 +6,7 @@
 void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHit, float aoIn){
   float sunVis = smoothstep(-0.05, 0.05, uSunDir.y);
   int eng = int(gM[0].z + 0.5);
-  bool wr = RESEARCH_ON && eng == 6;
+  bool wr = WRAITH_ON && (!JET_ON || eng == 6);
   // a research jet's display from the pilot's seat: its camera's picture, with the display's own look and symbology
   if (RESEARCH_ON && pod && eng >= 5 && ((mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63))) {
     vec3 scrL = transpose(uPlaneRot)*(gRelSet ? gRel + (uCamPos - uPlanePos) : p - uPlanePos);

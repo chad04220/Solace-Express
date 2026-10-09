@@ -35,7 +35,7 @@ vec3 planeLight(vec3 p, vec3 rd, float t, int mid, Mat m, vec3 n, vec3 lp, vec3 
   if (RESEARCH_ON && podMat) {  // sealed research cockpit: lit only by its modelled fixtures, low and moody
     mat3 inv = transpose(gPR);
     int engP = int(gM[0].z + 0.5);
-    col = (engP == 6 ? wraithPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : podLight(lp, inv*n, inv*(-rd), m, E.xyz))*ao + m.emit;
+    col = (WRAITH_ON && (!JET_ON || engP == 6) ? wraithPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : podLight(lp, inv*n, inv*(-rd), m, E.xyz))*ao + m.emit;
   } else if (interior) {
     vec3 v = -rd; mat3 inv = transpose(gPR);
     vec3 F = fresnelSchlick(max(dot(n, v), 0.0), mix(vec3(0.04), m.alb, m.metal));

@@ -39,9 +39,14 @@ float hblend(float w, float hBase, float hLayer){
 // triplanar PBR sample (world or local coordinates)
 vec4 triSample(vec3 p, vec3 n, int layer, float scale, out vec3 nTS){
   vec3 bw = pow(abs(n), vec3(4.0)); bw /= dot(bw, vec3(1.0));
-  vec3 n1, n2, n3;
-  vec4 r = matSample(p.zy, layer, scale, n1)*bw.x + matSample(p.xz, layer, scale, n2)*bw.y + matSample(p.xy, layer, scale, n3)*bw.z;
-  nTS = n1*bw.x + n2*bw.y + n3*bw.z;
+  // (a projection that adds under 2% is left out and the rest share its weight: on a flat face - most of a cockpit, most
+  // of a fuselage's flanks - one projection of the three is read, 4 texture reads instead of 12. The weight fades to
+  // nothing at the cut, so where a 2x2 pixel quad splits across it the skipped read's level of detail doesn't matter)
+  bw = max(bw - 0.02, 0.0); bw /= dot(bw, vec3(1.0));
+  vec4 r = vec4(0.0); vec3 nn; nTS = vec3(0.0);
+  if (bw.x > 0.0) { r += matSample(p.zy, layer, scale, nn)*bw.x; nTS += nn*bw.x; }
+  if (bw.y > 0.0) { r += matSample(p.xz, layer, scale, nn)*bw.y; nTS += nn*bw.y; }
+  if (bw.z > 0.0) { r += matSample(p.xy, layer, scale, nn)*bw.z; nTS += nn*bw.z; }
   return r;
 }
 

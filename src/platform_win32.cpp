@@ -776,7 +776,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     std::string cl = GetCommandLineA();
     size_t k = cl.find("--analyze");
     if (k != std::string::npos) {
-      std::string list = "menu,air,storm,night,cockpit,rjet,rjetc,wr_8_0_0_0_1";
+      std::string list = "menu,air,storm,night,cockpit,rjet,rjetc,wr_8_0_0_0_1,wr_8_0_-8_0_1_3_2_22.5_1";   // (the last: the XR-40 at night in a storm over Solace Capital)
       if (cl.size() > k + 10 && cl[k + 9] == ' ' && cl[k + 10] != '-') { list = cl.substr(k + 10); list = list.substr(0, list.find(' ')); }
       list += ",";
       if (g_fullscreen) toggleFullscreen();

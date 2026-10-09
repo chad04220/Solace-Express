@@ -183,9 +183,13 @@ int partList(const float* M, bool inside, PartInst* out, int model = -1) {
 
 bool Renderer::compilePlaneMesh() {
   std::string e;
-  for (int v = 0; v < 2; v++) {   // (every aircraft, then the light aircraft alone: pickAfPrograms)
-    progPlaneMeshV[v] = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(v ? "#define AF_LIGHT\n" : ""), e);
-    if (!progPlaneMeshV[v]) { error = "Aircraft mesh shader: " + e; return false; }
+  // (every aircraft, the light aircraft alone - pickAfPrograms - then each research jet alone: drawPlaneMesh; without
+  // a jet's own build its aircraft is drawn with every aircraft's)
+  static const char* const kBuild[4] = {"", "#define AF_LIGHT\n", "#define AF_JET\n", "#define AF_WRAITH\n"};
+  for (int v = 0; v < 4; v++) {
+    e.clear(); progPlaneMeshV[v] = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(kBuild[v]), e);
+    if (!progPlaneMeshV[v] && v < 2) { error = "Aircraft mesh shader: " + e; return false; }
+    if (!progPlaneMeshV[v]) shaderNote(std::string("Aircraft mesh shader (") + (v == 2 ? "the XR-30's" : "the XR-40's") + " own build) failed: drawn with every aircraft's");
   }
   progPlaneMesh = progPlaneMeshV[0];
   // the depth pre-pass; with uScrSkip the research cockpit's windows are cut (cabin_windows.glsl: the screens are holes)
@@ -978,10 +982,12 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   const vec3 rp = pos - fp.camPos;
   const float logC = 2.f / log2f(40000.f + 1.f);
   const bool scrSkip = screenWindows && trafK < 0 && fp.plane.PS[3] > 0.5f && (int)(fp.plane.M[2] + 0.5f) >= 5;
-  // (this aircraft's own build of the program: the light aircraft's leaves the research jets out - pickAfPrograms)
+  // (this aircraft's own build of the program: the light aircraft's leaves the research jets out, each research jet's
+  // everything but itself - compilePlaneMesh)
   const float eng = trafK >= 0 ? fp.traffic[trafK].t[2] : fp.plane.M[2];
   static const bool all = getenv("AF_ALL") != nullptr;
-  const GLuint prog = progPlaneMeshV[eng > 4.5f || all || !progPlaneMeshV[1] ? 0 : 1];
+  const int e = (int)(eng + 0.5f), build = all ? 0 : e == 6 ? 3 : e == 5 ? 2 : e < 5 ? 1 : 0;
+  const GLuint prog = progPlaneMeshV[build] ? progPlaneMeshV[build] : progPlaneMeshV[0];
   glBindVertexArray(pm.vao);
   // then the materials on exactly the nearest surface
   setRT(prog, fp);

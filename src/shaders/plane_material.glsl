@@ -89,7 +89,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
   vec3 sec = fusSection(lp.z);
   vec4 WS = gM[23]; vec4 E = gM[22];
   int ck = int(gM[21].z + 0.5);
-  if (mid == 1) {
+  if (FLEET_ON && mid == 1) {
     float yr = (lp.y - sec.z)/sec.y;
     bool body = lp.z > gM[1].x + 0.05 && lp.z < gM[8].x - 0.05 && abs(lp.x) < sec.x + 0.05 && abs(yr) < 1.05;
     if (body) {
@@ -163,7 +163,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
       if (int(gM[0].z + 0.5) == 0 && lp.z < gM[1].x + 0.3 && ln.z < -0.4 && abs(lp.x) > 0.11 && abs(lp.x) < sec.x*0.8 && abs(yr + 0.15) < 0.35) m.alb = vec3(0.02);
       if (int(gM[0].z + 0.5) == 1 && lp.z < gM[1].x + 0.7 && lp.y < sec.z - sec.y*0.45 && ln.z < -0.3) m.alb = vec3(0.02);
     }
-  } else if (mid == 2) {
+  } else if (FLEET_ON && mid == 2) {
     float s = abs(lp.x); float k = clamp(s/gM[9].x, 0.0, 1.0);
     float ch = mix(gM[9].y, gM[9].z, k); float le = gM[9].w*k;
     float cc = (lp.z - gM[10].y - le)/ch;
@@ -195,7 +195,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     if (int(gM[0].z + 0.5) == 4 && lp.z < gM[16].w + 0.3) { m.alb = vec3(0.85); m.metal = 1.0; m.rough = 0.18; }
   } else if (mid == 6) { m.alb = vec3(0.025); m.rough = 0.85; }
   else if (mid == 8) { m.alb = gM[11].x > 0.5 && length(lp.xz) > 1.2 && lp.y > -0.3 ? gColBase*0.95 : vec3(0.6, 0.61, 0.63); m.metal = 0.5; m.rough = 0.35; }
-  else if (mid == 10) {
+  else if (FLEET_ON && mid == 10) {
     m.alb = vec3(0.075); m.rough = 0.6;
     if (ln.z > 0.6) {
       bool pilot = lp.x*E.x >= 0.0;
@@ -214,7 +214,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
   else if (mid == 17) { m.alb = vec3(0.09, 0.075, 0.06); m.metal = 0.7; m.rough = 0.55; }
   else if (mid == 18) { m.alb = vec3(0.1); m.emit = (lp.x < 0.0 ? vec3(1.0, 0.05, 0.02) : vec3(0.05, 1.0, 0.15))*(0.5 + 2.0*uNight); m.rough = 0.1; }
   else if (mid == 19) { m.alb = vec3(0.3, 0.02, 0.02); m.emit = vec3(1.0, 0.05, 0.02)*step(0.88, fract(uTime))*3.0; m.rough = 0.1; }
-  else if (mid == 21) {
+  else if (FLEET_ON && mid == 21) {
     vec2 fq = vec2(abs(lp.x) - gM[16].x, lp.y - gM[16].y);
     float bl = step(0.5, fract(atan(fq.y, fq.x)*22.0/6.2832 + length(fq)*2.0));
     m.alb = mix(vec3(0.04), vec3(0.22), bl); m.metal = 0.9; m.rough = 0.3;
@@ -235,12 +235,12 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
       else m.emit = vec3(0.0);   // traffic has no landing-light command in its packed state
     }
   }
-  else if (RESEARCH_ON && mid >= 80 && mid < 94) shadeWraith(m, mid, lp, ln, t);
-  else if (RESEARCH_ON && mid >= 61 && mid < 80 && int(gM[0].z + 0.5) == 6) {   // XR-40 cockpit
+  else if (WRAITH_ON && mid >= 80 && mid < 94) shadeWraith(m, mid, lp, ln, t);
+  else if (WRAITH_ON && mid >= 61 && mid < 80 && (!JET_ON || int(gM[0].z + 0.5) == 6)) {   // XR-40 cockpit
     gPixM = t*uTanHalf*2.0/uRes.y; gPixG = gPixM/max(abs(dot(ln, transpose(uPlaneRot)*rd)), 0.2);
     shadeWraithCockpit(m, mid, lp, ln, E.xyz);
   }
-  else if (RESEARCH_ON && mid >= 30 && mid < 60) {  // XR-30 research jet surfaces
+  else if (JET_ON && mid >= 30 && mid < 60) {  // XR-30 research jet surfaces
     gPixM = t*uTanHalf*2.0/uRes.y; gPixG = gPixM/max(abs(dot(ln, transpose(uPlaneRot)*rd)), 0.2);
     vec3 nT; vec4 tx;
     float pulse = 0.75 + 0.25*sin(uTime*2.5);
@@ -356,7 +356,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     else if (mid == 57) { m.alb = vec3(0.1); m.emit = vec3(1.0, 0.5, 0.15)*(.065+.055*uNight); } // footwell datum stays below live flight information
     else if (mid == 58) { m.alb = vec3(0.7, 0.66, 0.6); m.rough = 0.3; m.emit = vec3(1.0, 0.8, 0.58)*0.55; }   // ceiling light diffusers
   }
-  else if (mid >= 60) {  // light-aircraft / airliner cockpit parts (PBR texture sets)
+  else if (FLEET_ON && mid >= 60) {  // light-aircraft / airliner cockpit parts (PBR texture sets)
     vec3 nT; vec4 tx;
     if (mid == 60) { tx = triSample(lp, ln, M_METAL, 0.25, nT); m.alb = tx.rgb*vec3(0.62, 0.63, 0.65); m.metal = 0.9; m.rough = clamp(tx.a*0.6, 0.15, 0.5); m.nrm = nT; }
     else if (mid == 61) { tx = triSample(lp, ln, M_RUBBER, 0.12, nT); m.alb = tx.rgb*0.6; m.rough = tx.a; m.nrm = nT; }
@@ -434,7 +434,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     m.emit += vec3(1.0, 0.32, 0.06)*pow(clamp(burn*cut*0.9, 0.0, 1.0), 5.0)*(1.5 + sin(uTime*7.0 + lp.x*9.0))*3.0;
   }
   if (mid == 6 || mid == 8) m = gearFinish(lp, mid, m, t*2.0*uTanHalf/uRes.y);
-  if (gModelId == 8) {   // the Osprey C6's cabin: ivory composite, copper trim, tobacco leather, cocoa textile (its own fittings and the shared ones)
+  if (FLEET_ON && gModelId == 8) {   // the Osprey C6's cabin: ivory composite, copper trim, tobacco leather, cocoa textile (its own fittings and the shared ones)
     if (mid >= 120 && mid <= 124) {
       m.alb = ospreyCabinAlbedo(mid); m.metal = mid == 121 ? 0.85 : 0.0; m.rough = mid == 121 ? 0.3 : mid == 122 ? 0.5 : mid == 124 ? 0.2 : 0.75; m.nrm = vec3(0.0, 0.0, 1.0);
       if (mid == 124) m.emit = vec3(1.0, 0.9, 0.7)*0.4; interior = true;
@@ -442,7 +442,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     else if (mid == 11) m.alb = vec3(0.58, 0.54, 0.44); else if (mid == 12) m.alb = vec3(0.30, 0.115, 0.052);
     else if (mid == 63) m.alb = vec3(0.72, 0.66, 0.53); else if (mid == 69) m.alb = vec3(0.062, 0.040, 0.028);
   }
-  if (isMantis()) {
+  if (FLEET_ON && isMantis()) {
     if(mid==1 && mantisWindow(lp)<0.0) { m.alb=vec3(.018,.035,.045); m.rough=.055; m.metal=.30; }
     if(mid==2 || mid==3 || mid==5) {
       m.alb=vec3(.115,.14,.17); m.rough=.42; m.metal=.16;
@@ -491,7 +491,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
       }
     }
   }
-  if (fleetCabin()) {
+  if (FLEET_ON && fleetCabin()) {
     if (mid>=140 && mid<=146) interior=true;
     shadeFleetCabin(m,mid,lp,ln,t*2.0*uTanHalf/uRes.y);
   }

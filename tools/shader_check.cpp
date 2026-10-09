@@ -37,6 +37,9 @@ int main(int argc, char** argv) {
     put(dir, "shadow_proxy_light.frag", shadowProxyFSAssembly("#define AF_LIGHT\n"));
     put(dir, "effects_light.frag", effectsFSAssembly("#define AF_LIGHT\n"));
     put(dir, "plane_mesh_light.frag", planeMeshFSAssembly("#define AF_LIGHT\n"));
+    // each research jet's own mesh build (Renderer::compilePlaneMesh)
+    put(dir, "plane_mesh_jet.frag", planeMeshFSAssembly("#define AF_JET\n"));
+    put(dir, "plane_mesh_wraith.frag", planeMeshFSAssembly("#define AF_WRAITH\n"));
     put(dir, "objects_noaf.frag", objectsFSAssembly("#define AF_LIGHT\n#define OBJ_NO_AF\n"));
     put(dir, "shadow_proxy_maps.frag", shadowProxyFSAssembly("#define AF_LIGHT\n#define PROXY_MAPS_ONLY\n"));
     // the reduced builds for a driver whose compiler fails on the whole (raster_renderer.cpp compileRaster)

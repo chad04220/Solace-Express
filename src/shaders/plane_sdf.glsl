@@ -758,8 +758,8 @@ vec2 mapPlaneBody(vec3 p){
   {   // the research jets: their own airframes, then their gear - the same for both, called once here so the program
       // carries one copy of it (written into each airframe it was two, and the march's every pixel paid for the size)
     int engJ = int(gM[0].z + 0.5);
-    if (RESEARCH_ON && (engJ == 5 || engJ == 6)) {
-      vec2 r = engJ == 5 ? mapJet(p) : mapWraith(p);
+    if (RESEARCH_ON && (!FLEET_ON || engJ == 5 || engJ == 6)) {   // (a research jet's own build: nothing else follows)
+      vec2 r = JET_ON && (!WRAITH_ON || engJ == 5) ? mapJet(p) : mapWraith(p);
       return gPS.w > 0.5 || !GEAR_FIELD ? r : jtGear(p, vec3(abs(p.x), p.y, p.z), r, engJ == 6 ? 0.7 : 0.8, engJ == 6 ? 0.03 : 0.06);
     }
   }

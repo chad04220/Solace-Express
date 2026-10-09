@@ -7,6 +7,10 @@
 //! XR-30 pod). The cut-out was a pass of the triangles the bake labelled as screens: its edge came out a row of
 //! triangle teeth, and the depth it was compared with - interpolated in log space across the large flat triangles of
 //! the walls behind - let whole wall panels through at some angles (the owner's report on the XR-40).
+#ifndef WRAITH_ON   // (the build's aircraft: plane_common.glsl; the depth pre-pass, without it, keeps both jets)
+#define WRAITH_ON true
+#define JET_ON true
+#endif
 const float kWinGlass = 0.004, kWinFrameTop = 0.019, kWinBand = 0.023;
 // A line of sight is cut only where it comes down into the opening inside the outline at the frame's top and is still
 // inside it at the glass: one that comes down over the frame meets the frame's top or its inner wall first (those are
@@ -43,7 +47,7 @@ bool winFrontCut(vec3 q, bool inFront){
 // model: 5 the XR-30, 6 the XR-40; bomb: the XR-40's floor panes show the bomb camera (kept); part: a moving part
 bool cabinWindowCut(vec3 q, int model, bool bomb, bool part){
   bool inFront = !part;
-  if (model == 6) {
+  if (WRAITH_ON && (!JET_ON || model == 6)) {
     vec3 aq = vec3(abs(q.x), q.y, q.z);
     const vec3 Y = vec3(0.0, 1.0, 0.0), F = vec3(0.0, 0.0, -1.0);
     if (winFrontCut(q, inFront)) return true;
@@ -58,6 +62,7 @@ bool cabinWindowCut(vec3 q, int model, bool bomb, bool part){
     bool rib = min(gr.x, gr.y) < 0.01 && l.z > -0.002 && l.z < 0.024;
     return winPaneCut(q, WL_C, WL_N, F, WL_S, 0.1, inFront && !rib);
   }
+  if (!JET_ON) return false;
   // the XR-30's pod: the panoramic display, a cylinder about the eye (glass at r 0.634, standing proud of its frame),
   // and the side bays (glass at |x| 0.63, flush with theirs). Within 8 mm in front of the glass is the glass too: the
   // mesh lies a millimetre or two either side of it, and the near side was left as dotted lines across the view
@@ -78,7 +83,7 @@ bool cabinScreenId(int mid){ return (mid >= 41 && mid <= 43) || (mid >= 61 && mi
 // a panel's edge (a step far finer than its lattice) the label zigzagged, so a display came out with a ragged border
 // or half of it the mount's (the XR-40's console displays, the owner's report). q: the point, eye at the origin.
 int cabinPanelId(vec3 q, int model, int mid){
-  if (model == 6) {
+  if (WRAITH_ON && (!JET_ON || model == 6)) {
     if (mid != 65 && mid != 68 && mid != 69 && mid != 76) return mid;
     vec3 aq = vec3(abs(q.x), q.y, q.z);
     ResearchPanel panel = wraithPanel(wraithPanelIndex(q));
@@ -93,7 +98,7 @@ int cabinPanelId(vec3 q, int model, int mid){
     if (abs(cq.y - 0.04) < 0.004 && abs(cq.x - 0.015) < 0.1 && abs(cq.z - 0.265) < 0.09) return 68;
     return 65;
   }
-  if (mid != 44 && mid != 45 && mid != 52 && mid != 53 && mid != 54) return mid;
+  if (!JET_ON || (mid != 44 && mid != 45 && mid != 52 && mid != 53 && mid != 54)) return mid;
   ResearchPanel panel = specterPanel(specterPanelIndex(q));
   vec3 m = researchPanelFrame(q, panel);
   if (abs(m.z) < 0.004 && researchPanelShape(m.xy, panel) < 0.0) return 45;
@@ -140,7 +145,7 @@ bool winPaneWall(vec3 q, vec3 c, vec3 n, vec3 up, vec2 hs, float ch, bool outer,
 // mid: the pixel's material - only a frame's or the shell's is decided here (in, the same or the shell's); out: ok
 bool cabinWallNormal(vec3 q, int model, inout int mid, out vec3 wn){
   wn = vec3(0.0);
-  if (model != 6 || (mid != 64 && mid != 65)) return false;
+  if (!WRAITH_ON || (JET_ON && model != 6) || (mid != 64 && mid != 65)) return false;
   vec3 aq = vec3(abs(q.x), q.y, q.z);
   const vec3 Y = vec3(0.0, 1.0, 0.0), F = vec3(0.0, 0.0, -1.0);
   bool ok = false; int id = 65;
@@ -185,7 +190,7 @@ float wrConsoleField(vec3 q){
 }
 bool cabinConsoleNormal(vec3 q, int model, int mid, out vec3 cn){
   cn = vec3(0.0);
-  if (model != 6 || (mid != 65 && mid != 68 && mid != 69)) return false;
+  if (!WRAITH_ON || (JET_ON && model != 6) || (mid != 65 && mid != 68 && mid != 69)) return false;
   if (abs(abs(q.x) - 0.56) > 0.16 || abs(q.y + 0.415) > 0.12 || abs(q.z + 0.12) > 0.4) return false;
   if (abs(wrConsoleField(q)) > 0.006) return false;   // (on them, not on what stands near: the stick's base, a frame)
   const float e = 0.001; vec3 g = vec3(0.0);

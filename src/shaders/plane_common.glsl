@@ -3,10 +3,31 @@
 //! livery paint, skin seams and rivets, the cabin fit.
 // AF_LIGHT: a program for the light aircraft and airliners alone. The research jets' fields, materials, displays
 // and lights become dead code the compiler drops, so every pixel of the big shared passes pays for less code.
-#ifdef AF_LIGHT
+// AF_JET / AF_WRAITH: the XR-30's or the XR-40's own, for the aircraft mesh pass (each aircraft is a draw of its own,
+// with its own build): the light aircraft's fields, cabins and liveries and the other research jet's are dropped too. A
+// GPU reserves registers for the worst path in a program whether a pixel takes it or not: the XR-40's cockpit, drawn
+// with every aircraft's code, slowed by 3 ms as the light aircraft's cockpits grew (v3.34 to v3.38, RTX 3070 Laptop).
+// FLEET_ON: the light aircraft and airliners; JET_ON, WRAITH_ON: the XR-30, the XR-40; RESEARCH_ON: either of them.
+#if defined(AF_WRAITH)
+#define RESEARCH_ON true
+#define FLEET_ON false
+#define JET_ON false
+#define WRAITH_ON true
+#elif defined(AF_JET)
+#define RESEARCH_ON true
+#define FLEET_ON false
+#define JET_ON true
+#define WRAITH_ON false
+#elif defined(AF_LIGHT)
 #define RESEARCH_ON false
+#define FLEET_ON true
+#define JET_ON false
+#define WRAITH_ON false
 #else
 #define RESEARCH_ON true
+#define FLEET_ON true
+#define JET_ON true
+#define WRAITH_ON true
 #endif
 // The hit relative to the camera, exactly (gRelSet): the mesh pass's from its body-space vertex position, the march's
 // from its ray. The world point holds it only to the float spacing of world metres - 4 mm at the map's edges, a third

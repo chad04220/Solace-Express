@@ -376,7 +376,9 @@ private:
   // The big airframe programs in two builds: [0] every aircraft, [1] AF_LIGHT - without the research jets' code
   // (plane_common.glsl RESEARCH_ON), so each pixel pays for less. pickAfPrograms points progObjects, progShProxy,
   // progEffects and progPlaneMesh at the light build whenever no research jet is in the frame.
-  GLuint progObjectsV[2] = {}, progShProxyV[2] = {}, progEffectsV[2] = {}, progPlaneMeshV[2] = {};
+  // The aircraft mesh pass draws each aircraft on its own, so it has two more builds: [2] AF_JET, the XR-30's alone,
+  // and [3] AF_WRAITH, the XR-40's alone (drawPlaneMesh picks by the aircraft drawn)
+  GLuint progObjectsV[2] = {}, progShProxyV[2] = {}, progEffectsV[2] = {}, progPlaneMeshV[4] = {};
   void pickAfPrograms(const FrameParams& fp);
   // the airframe shadow maps (raster_renderer.cpp): the player's baked static mesh rendered from the sun (layer 0,
   // orthographic) and from the three brightest shadow-casting lights (layers 1-3, perspective along each beam); a

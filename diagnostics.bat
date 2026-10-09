@@ -32,7 +32,7 @@ if not exist SolaceExpress.exe (
 set VER=unknown
 if exist VERSION.txt set /p VER=<VERSION.txt
 set SCENES=menu,air,storm,night,cockpit,hud,hub1
-set RSCENES=research10,research20,research40,rjet,wr_8_0_0_0_1,rjetc,ckv11_0_-10_12,ufo13_0
+set RSCENES=research10,research20,research40,rjet,wr_8_0_0_0_1,wr_8_0_-8_0_1_3_2_22.5_1,rjetc,ckv11_0_-10_12,ufo13_0
 set MODE=%~1
 if /i "%MODE%"=="loading" goto loading
 set OUT=diagnostics
@@ -95,7 +95,7 @@ echo [5/6] Screenshots ...
 set HUDDEMO=1
 set GAVOUT=1
 set MTBAY=1
-start "" /wait SolaceExpress.exe --shots hud,research10,research20,research40,gav_11_120_10_0,gav_11_210_5_0,ckv11_0_-10_12,ckv11_-60_-20_12,ckv8_0_-10_12,gav_9_120_10_0,ufo13_0,ufo17_2,cockpit,rjetc,wr_8_0_0_0_1,hub1,hub2,menu --size 1920x1080
+start "" /wait SolaceExpress.exe --shots hud,research10,research20,research40,gav_11_120_10_0,gav_11_210_5_0,ckv11_0_-10_12,ckv11_-60_-20_12,ckv8_0_-10_12,gav_9_120_10_0,ufo13_0,ufo17_2,cockpit,rjetc,wr_8_0_0_0_1,wr_8_0_-8_0_1_3_2_22.5_1,hub1,hub2,menu --size 1920x1080
 set HUDDEMO=
 set GAVOUT=
 set MTBAY=
