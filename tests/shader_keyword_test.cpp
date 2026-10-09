@@ -1,7 +1,9 @@
 // Guards the GLSL sources against identifiers that later GLSL versions (or the reserved-word list) claim.
 // The shaders are #version 330, where e.g. "patch" and "sample" are still legal names, but some Windows drivers
 // apply the newer keyword list regardless and refuse to compile them.
+#include <algorithm>
 #include <cctype>
+#include <regex>
 #include <cstdio>
 #include <set>
 #include <string>
@@ -96,6 +98,44 @@ static int scanDecl(const char* name, const std::string& src) {
   return bad;
 }
 
+// A matrix divided by a scalar ("transpose(X.R/ns)"): NVIDIA's compiler failed on it with "fatal error C9999: Unhandled
+// expr op assign/(182) in CreateDag" and the game would not start (v3.35.0 - v3.36.2; every other driver took it).
+// Divide the vector instead (transpose(R)*(p - T)/s). Counts each function's matrices (its mat2/3/4 locals and
+// parameters, its Poses' .R) followed by a division.
+static int scanMatDiv(const char* name, const std::string& src) {
+  std::string s; s.reserve(src.size());   // (the source without comments; newlines kept for the line numbers)
+  for (size_t i = 0; i < src.size();) {
+    if (src.compare(i, 2, "//") == 0) { while (i < src.size() && src[i] != '\n') i++; continue; }
+    if (src.compare(i, 2, "/*") == 0) { size_t e = src.find("*/", i + 2); for (size_t k = i; k < std::min(e, src.size()); k++) if (src[k] == '\n') s += '\n'; i = e == std::string::npos ? src.size() : e + 2; continue; }
+    s += src[i++];
+  }
+  static const std::regex decl(R"(\b(mat[234]|Pose)\s+(\w+))");
+  int bad = 0;
+  size_t start = 0;   // (each top-level block: a function from the end of what came before it to its closing brace)
+  for (size_t i = 0; i < s.size(); i++) {
+    if (s[i] == ';' ) { start = i + 1; continue; }
+    if (s[i] != '{') continue;
+    size_t close = i + 1;
+    for (int depth = 1; close < s.size() && depth; close++) depth += s[close] == '{' ? 1 : s[close] == '}' ? -1 : 0;
+    const std::string fn = s.substr(start, close - start);
+    std::set<std::string> mats;
+    for (std::sregex_iterator d(fn.begin(), fn.end(), decl), e; d != e; ++d) mats.insert((*d)[1] == "Pose" ? (*d)[2].str() + ".R" : (*d)[2].str());
+    for (const std::string& m : mats) {
+      std::string pat = "(^|[^\\w.])";
+      for (char c : m) pat += c == '.' ? std::string("\\.") : std::string(1, c);
+      pat += "\\s*/[^/=]";
+      std::smatch sm;
+      if (std::regex_search(fn, sm, std::regex(pat))) {
+        const size_t at = start + sm.position();
+        printf("%s:%d: the matrix '%s' divided by a scalar (divide the vector instead)\n", name, (int)std::count(s.begin(), s.begin() + at, '\n') + 1, m.c_str());
+        bad++;
+      }
+    }
+    i = close - 1; start = close;
+  }
+  return bad;
+}
+
 int main() {
   // the same assemblies as Renderer::compilePrograms and the raster passes: line numbers match the driver's error log
   std::string lib = worldLibAssembly("");
@@ -111,6 +151,9 @@ int main() {
   int forms = scanDecl("objects.frag", objectsFSAssembly("")) + scanDecl("shadow_proxy.frag", shadowProxyFSAssembly("")) + scanDecl("effects.frag", effectsFSAssembly(""))
             + scanDecl("plane_mesh.frag", planeMeshFSAssembly("")) + scanDecl("scene_lib.frag", lib) + scanDecl("light.frag", lightFSAssembly(""));
   if (forms) { printf("FAIL: %d declaration(s) of a form the shaders avoid\n", forms); return 1; }
+  int divs = scanMatDiv("objects.frag", objectsFSAssembly("")) + scanMatDiv("shadow_proxy.frag", shadowProxyFSAssembly("")) + scanMatDiv("effects.frag", effectsFSAssembly(""))
+           + scanMatDiv("plane_mesh.frag", planeMeshFSAssembly("")) + scanMatDiv("scene_lib.frag", lib) + scanMatDiv("part_pose.frag", partPoseFSAssembly());
+  if (divs) { printf("FAIL: %d matrix division(s): NVIDIA's compiler refuses them\n", divs); return 1; }
   printf("PASS: no reserved GLSL words in the shaders\n");
   return 0;
 }

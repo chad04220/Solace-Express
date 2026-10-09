@@ -28,9 +28,8 @@ vec4 gearWheelFrame(vec3 p, out float halfWidth, out bool braked){
       nq = p - vec3(0.0, 0.0, G1.y); nq.xz = rot2(nq.xz, -gPS.z);
       nq.y += gh - 0.11*gM[0].x - nwr;
     } else {
-      Pose N = gearPartPose(PT_GEAR_NOSE, vec2(0.0));
-      float ns = max(length(N.R[0]), 1e-3);
-      nq = transpose(N.R/ns)*(p - N.T)/ns - vec3(0.0, nwr - gh, 0.0);
+      float ns = max(gearNoseShow(), 1e-3); Pose N = gearNosePose(ns);
+      nq = transpose(N.R)*(p - N.T)/ns - vec3(0.0, nwr - gh, 0.0);
       if (kind == 3) nq.x = abs(nq.x) - 0.15;
     }
   }

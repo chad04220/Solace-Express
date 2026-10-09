@@ -1,6 +1,13 @@
 //! kPlaneSDF
 //! The aircraft distance fields: light aircraft and airliners from the packed model (mapPlaneBody), the XR-30 (mapJet) and
 //! its sealed cockpit (mapJetCockpit), and the light fixtures (mapPlane).
+// NV_SAFE_GEAR: the airframe's field without the retractable gear (its bays, fairings, doors and legs, the jets' too),
+// built only for a driver whose compiler fails on the whole (renderer.cpp linkProgramCached)
+#ifdef NV_SAFE_GEAR
+const bool GEAR_FIELD = false;
+#else
+const bool GEAR_FIELD = true;
+#endif
 // Landing-gear bay: with the gear out (open > 0) a dark well is cut into the skin above the opening (c: centre of the
 // opening, h: half width / half length, depth upwards) and two doors, hinged along the bay's long edges, swing down.
 // Closed, the skin is untouched.
@@ -575,7 +582,7 @@ vec2 mapPlaneBody(vec3 p){
     int engJ = int(gM[0].z + 0.5);
     if (RESEARCH_ON && (engJ == 5 || engJ == 6)) {
       vec2 r = engJ == 5 ? mapJet(p) : mapWraith(p);
-      return gPS.w > 0.5 ? r : jtGear(p, vec3(abs(p.x), p.y, p.z), r, engJ == 6 ? 0.7 : 0.8, engJ == 6 ? 0.03 : 0.06);
+      return gPS.w > 0.5 || !GEAR_FIELD ? r : jtGear(p, vec3(abs(p.x), p.y, p.z), r, engJ == 6 ? 0.7 : 0.8, engJ == 6 ? 0.03 : 0.06);
     }
   }
   float L = gM[0].x; int gtype = int(gM[0].y + 0.5); int eng = int(gM[0].z + 0.5); float R = gM[0].w;
@@ -795,7 +802,7 @@ vec2 mapPlaneBody(vec3 p){
   if (gtype <= 2) { vec3 sg0 = fusSection(gM[18].z), sg1 = fusSection(gM[19].z < 0.5 ? gM[18].w : gM[19].y);
                     gearTop = max(sg0.z - sg0.y*0.5, sg1.z - sg1.y*0.5) + 0.12; }
   bool retract = gtype >= 3;
-  if ((retract || gear > 0.02) && p.y - gearTop < res.x) {
+  if ((retract ? GEAR_FIELD : gear > 0.02) && p.y - gearTop < res.x) {
     vec4 G0 = gM[18], G1 = gM[19];
     float track = G0.x, wr = G0.y, mz = G0.z, gh = G1.x;
     vec3 ap = vec3(abs(p.x), p.y, p.z);
@@ -891,7 +898,7 @@ vec2 mapPlaneBody(vec3 p){
     if (gPartMode == -1) {
       mat3 Rs = partRxz(steer);
       float ns = gearNoseShow();
-      if (G1.z < 0.5 && ns > 0.01) { Pose X = gearPartPose(PT_GEAR_NOSE, vec2(0.0)); res = opU(res, gearNoseShape(transpose(X.R/ns)*(p - X.T)/ns)*vec2(ns, 1.0)); }
+      if (G1.z < 0.5 && ns > 0.01) { Pose X = gearNosePose(ns); res = opU(res, gearNoseShape(transpose(X.R)*(p - X.T)/ns)*vec2(ns, 1.0)); }
       else res = opU(res, gearTailShape(transpose(Rs)*(p - vec3(0.0, 0.0, G1.y))));
     }
   }

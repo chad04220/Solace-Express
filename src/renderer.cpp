@@ -194,27 +194,18 @@ static GLuint linkOnce(const std::string& vs, const std::string& fs, std::string
   }
   return p;
 }
-// A program the driver's compiler fails on with an internal error is built again with that compiler's own options, one
-// set after another, until one builds. NVIDIA's has failed so ("fatal error C9999: Unhandled expr op assign/(182) in
-// CreateDag", v3.35.0 and v3.36.0) on programs every other driver builds; #pragma optionNV is its own (the options of
-// its offline compiler, cgc) and other drivers ignore it. The cache keeps the set that built under its own source, and
-// remembers the rejection (<hash>.rej, the driver's log), so a later launch loads that build without compiling the
-// failure again. g_shaderNotes says what was rejected and what built instead (startup.log).
+// A program the driver's compiler fails on with an internal error, and that holds the airframe's field, is built once
+// more without the retractable gear in that field (NV_SAFE_GEAR, plane_sdf.glsl): the game starts, without the gear's
+// bays, fairings and doors in what that program draws, and startup.log says so. NVIDIA's compiler failed so ("C9999:
+// Unhandled expr op assign/(182) in CreateDag", v3.35.0 - v3.36.2) on the gear code's nose pose. (v3.36.1 retried with
+// the compiler's own #pragma optionNV sets instead: on the largest program those builds took minutes or never ended.)
+// The cache remembers a rejection (<hash>.rej, the driver's log), so a later launch skips the failed build and loads
+// the one that built. g_shaderNotes says what was rejected and what built instead (startup.log).
 std::string g_shaderNotes;
 static std::mutex s_notesMu;
-static const char* const kNvOptionSets[] = {
-  "#pragma optionNV(ifcvt none)\n",
-  "#pragma optionNV(unroll none)\n",
-  "#pragma optionNV(inline all)\n",
-  "#pragma optionNV(inline all)\n#pragma optionNV(ifcvt none)\n#pragma optionNV(unroll none)\n",
-};
-static std::atomic<int> s_nvFirstSet{0};      // the set that last built: tried first for the next rejected program
-static std::atomic<bool> s_nvUseless{false};  // every set failed on a program, or the retries ran out of time: no more
-static std::atomic<int> s_nvSpentMs{0};       // the time this process has spent on retries (at most kNvBudgetMs)
-static const int kNvBudgetMs = 150000, kNvSlowMs = 60000;   // (a retry slower than kNvSlowMs ends them too)
+static std::atomic<bool> s_safeUseless{false};   // the gear-less build failed too: not tried for the rest
 void shaderNote(const std::string& s) { std::lock_guard<std::mutex> lk(s_notesMu); g_shaderNotes += s; if (s.empty() || s.back() != '\n') g_shaderNotes += "\n"; }
 static std::string firstLine(const std::string& s) { size_t n = s.find('\n'); return n == std::string::npos ? s : s.substr(0, n); }
-static std::string oneLine(std::string s) { for (char& c : s) if (c == '\n') c = ' '; while (!s.empty() && s.back() == ' ') s.pop_back(); return s; }
 static std::string programName(const std::string& fs) {   // (the build stage, or the start of the entry point, to name it)
   const std::string stage = g_ren.compileStage();
   if (!stage.empty()) return stage;
@@ -233,31 +224,18 @@ GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::stri
   const std::string log = err.substr(err0);
   const size_t c = log.find("C9999"), ls = c == std::string::npos ? std::string::npos : log.rfind('\n', c);
   const std::string why = firstLine(c == std::string::npos ? log : log.substr(ls == std::string::npos ? 0 : ls + 1));   // (the driver's error line)
-  if (s_nvUseless) { shaderNote("Shader [" + name + "]: the driver's compiler failed" + (before ? " (an earlier launch)" : "") + ": " + why); return 0; }
+  const std::string when = before ? " (an earlier launch)" : "";
+  if (fs.find("mapPlaneBody(") == std::string::npos || s_safeUseless) { shaderNote("Shader [" + name + "]: the driver's compiler failed" + when + ": " + why); return 0; }
   const size_t at = fs.find('\n') + 1;   // (after the #version line)
-  const int n = (int)(sizeof(kNvOptionSets) / sizeof(kNvOptionSets[0])), first = s_nvFirstSet;
-  const std::string stage = g_ren.compileStage();
-  for (int k = 0; k < n && !s_nvUseless; k++) {
-    const int set = (first + k) % n;
-    const std::string opts = oneLine(kNvOptionSets[set]);
-    g_ren.setCompileStage((stage + " - the driver's compiler failed, retrying with its options (" + std::to_string(k + 1) + " of " + std::to_string(n) + ")").c_str());
-    std::string e2; bool b2 = false;
-    const auto t0 = std::chrono::steady_clock::now();
-    p = linkOnce(vs, fs.substr(0, at) + kNvOptionSets[set] + fs.substr(at), e2, b2, opts.c_str());
-    const int ms = (int)(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() * 1000.0);
-    s_nvSpentMs += ms;
-    if (p) {
-      s_nvFirstSet = set;
-      g_ren.setCompileStage(stage.c_str());
-      shaderNote("Shader [" + name + "]: the driver's compiler failed" + (before ? " (an earlier launch)" : "") + " - built with " + opts + "\n  " + why);
-      err.resize(err0);
-      return p;
-    }
-    if (ms > kNvSlowMs || s_nvSpentMs > kNvBudgetMs) { s_nvUseless = true; compileLog("retries stopped: too slow"); }
+  std::string e2; bool b2 = false;
+  p = linkOnce(vs, fs.substr(0, at) + "#define NV_SAFE_GEAR\n" + fs.substr(at), e2, b2, "the gear left out of the field");
+  if (p) {
+    shaderNote("Shader [" + name + "]: the driver's compiler failed" + when + " - built without the retractable gear in the airframe's field\n  " + why);
+    err.resize(err0);
+    return p;
   }
-  g_ren.setCompileStage(stage.c_str());
-  s_nvUseless = true;
-  shaderNote("Shader [" + name + "]: the driver's compiler failed" + (before ? " (an earlier launch)" : "") + ", also with its options: " + why);
+  s_safeUseless = true;
+  shaderNote("Shader [" + name + "]: the driver's compiler failed" + when + ", also without the gear: " + why + "\n  without the gear: " + firstLine(e2.substr(e2.find("C9999") == std::string::npos ? 0 : e2.rfind('\n', e2.find("C9999")) + 1)));
   return 0;
 }
 static GLuint program(const std::string& vs, const std::string& fs, std::string& err) { return linkProgramCached(vs, fs, err); }

@@ -534,7 +534,7 @@ the other side, a hinged surface's deflection about its swept and tapered hinge,
 ## 10. Baking
 
 At launch every aircraft's meshes are built or read from the cache, outside and cockpit, research craft included.
-That's the "Building the <name> cockpit's mesh" step, paced by `load_pacer.h`. In `bakePlaneMesh`:
+That's the "Building the <name> cockpit's mesh" step, one of the loading bar's counted steps (`load_pacer.h`). In `bakePlaneMesh`:
 
 1. **States.** The field is sampled on the GPU in every gear, flap, steering and control state the hull sweep lists
    (`hullStateList`).

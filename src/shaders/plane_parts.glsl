@@ -330,6 +330,17 @@ VBay gearVBay(bool nose){
   }
   return b;
 }
+// The nose leg's pose about its pivot, from the shape's rest frame at the station: the rotation unscaled, the
+// translation for the leg shrunk by s (gearNoseShow: in the cockpit it shrinks away as it retracts). The part's pose
+// is (R*s, T), and a point's rest frame transpose(R)*(p - T)/s. (No matrix is divided: NVIDIA's compiler failed on
+// "transpose(X.R/ns)" with "C9999: Unhandled expr op assign/ in CreateDag", and the game would not start, v3.35-36.)
+Pose gearNosePose(float s){
+  int gtype = int(gM[0].y + 0.5);
+  float up = gtype >= 3 ? gearUp() : 0.0;
+  Pose X; X.R = partRxz(gPS.z); X.T = vec3(0.0, 0.0, gM[18].w);
+  if (gtype >= 3) { vec3 pl = vec3(0.0, gearNoseFold().x, 0.0); X.R = partRyz(-1.5707963*up)*X.R; X.T = X.T + (pl - s*(X.R*pl)); }
+  return X;
+}
 // the gear's parts' poses (sd.x: the side, sd.y: which door)
 Pose gearPartPose(int k, vec2 sd){
   vec4 G0 = gM[18], G1 = gM[19];
@@ -342,9 +353,8 @@ Pose gearPartPose(int k, vec2 sd){
     if (gtype == 3) { NacFold f = gearNacFold(); mat3 Rf = partRyz(up*f.ang); X.R = S*Rf; X.T = S*(f.P - Rf*f.P); }
     else if (gearSwingMain()) { GearSwing g = gearSwingOf(); mat3 Rf = gearSwingR(vec3(G0.x, G0.y - gh, mz) - g.H, -1.0, up); X.R = S*Rf; X.T = S*(g.H - Rf*g.H); }
     else { vec3 H = gearHinge(); mat3 Rf = partRxy(gearFoldAngle()); X.R = S*Rf; X.T = S*(H - Rf*H); }
-  } else if (k == PT_GEAR_NOSE) {   // (about its pivot, from the shape's rest frame at the station)
-    X.R = partRxz(gPS.z)*max(gearNoseShow(), 1e-3); X.T = vec3(0.0, 0.0, nz);
-    if (gtype >= 3) { vec3 pl = vec3(0.0, gearNoseFold().x, 0.0); X.R = partRyz(-1.5707963*up)*X.R; X.T = X.T + (pl - X.R*pl); }
+  } else if (k == PT_GEAR_NOSE) {
+    float s = max(gearNoseShow(), 1e-3); Pose N = gearNosePose(s); X.R = N.R*s; X.T = N.T;
   }
   else if (k == PT_GEAR_TAIL) { X.R = partRxz(gPS.z); X.T = vec3(0.0, 0.0, G1.y); }
   else if (k == PT_GEAR_MDOOR && gtype == 4 && !gearSwingMain()) {   // the fold well's doors, hinged along its long edges fore and aft

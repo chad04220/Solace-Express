@@ -1,96 +1,49 @@
-// Solace Express - the launch's loading bar, paced by how long each step took last time.
+// Solace Express - the launch's loading bar: the share of the launch's steps that is done.
 //
-// The launch is a list of steps (the shaders and the islands, the renderer, the menu, each aircraft's mesh), each with
-// the seconds it is expected to take: what it took on the last launch that did the same kind of work (built from
-// scratch or read from a cache: the two are remembered apart), else the average of the steps of its group that have
-// run this time, else a default. The bar moves by the seconds still expected (fraction), so it runs at an even pace
-// from start to finish instead of sitting on the step that does most of the work.
+// The launch is a list of steps, each a count of things to do: the shader programs (one each, built or loaded from the
+// cache) with the islands beside them, the career, the renderer, the menu, and each aircraft's mesh. The bar shows
+// how many of those are done out of all of them, not a guess from how long they took last time: it stands still while
+// one long thing is being done (a large shader program, the first build of a mesh), and it reaches 100% only when
+// everything has. Each step's time is still measured, for the summary in startup.log.
 #pragma once
+#include <algorithm>
 #include <chrono>
-#include <cstdio>
-#include <map>
 #include <mutex>
 #include <string>
 #include <vector>
 
 class LoadPacer {
 public:
-  // `file`: where the measured times live (empty: defaults only, nothing saved)
-  void load(const std::string& file) {
+  // a step of `units` things (`key` names it for tookOf)
+  int add(const std::string& key, int units = 1) {
     std::lock_guard<std::mutex> lk(m);
-    path = file; prev.clear();
-    if (path.empty()) return;
-    if (FILE* f = fopen(path.c_str(), "r")) {
-      char key[160]; float s;
-      while (fscanf(f, "%159s %f", key, &s) == 2) if (s >= 0.f && s < 3600.f) prev[key] = s;
-      fclose(f);
-    }
-  }
-  // a step: `key` names it in the times file, `group` shares an average between steps of the same kind (the aircraft
-  // meshes), `fresh` whether it will build from scratch this time (its time is remembered apart from a cache read's)
-  int add(const std::string& key, const std::string& group, bool fresh, float defaultSec) {
-    std::lock_guard<std::mutex> lk(m);
-    Step s; s.key = key + (fresh ? ":b" : ":c"); s.group = group + (fresh ? ":b" : ":c"); s.def = defaultSec;
-    auto it = prev.find(s.key);
-    s.known = it != prev.end();
-    s.expect = s.known ? std::max(it->second, 0.02f) : defaultSec;
+    Step s; s.key = key; s.units = std::max(units, 1);
     steps.push_back(s);
     return (int)steps.size() - 1;
   }
-  // a step begins (ends the one running, if any)
+  // step i begins: every step before it is done
   void begin(int i) {
     std::lock_guard<std::mutex> lk(m);
-    double now = clock();
-    if (cur >= 0 && cur != i) finish(cur, now);
-    cur = i; steps[i].t0 = now; sub = -1.f;
+    const double now = clock();
+    for (int k = 0; k < i && k < (int)steps.size(); k++) close(k, now);
+    cur = i; if (steps[i].t0 < 0) steps[i].t0 = now;
   }
-  void end() { std::lock_guard<std::mutex> lk(m); if (cur >= 0) finish(cur, clock()); cur = -1; }
-  // the running step turned out to do the other kind of work (it found its cache missing or unreadable): its time is
-  // remembered under that kind, and its expectation follows it
-  void markFresh(int i, bool fresh) {
-    std::lock_guard<std::mutex> lk(m);
-    Step& s = steps[i];
-    const std::string want = fresh ? ":b" : ":c";
-    if (s.key.size() < 2 || s.key.compare(s.key.size() - 2, 2, want) == 0) return;
-    s.key.replace(s.key.size() - 2, 2, want); s.group.replace(s.group.size() - 2, 2, want);
-    auto it = prev.find(s.key);
-    s.known = it != prev.end();
-    s.expect = s.known ? std::max(it->second, 0.02f) : (fresh ? std::max(s.def, 10.f) : s.def);
-  }
-  // the running step's own measure of how far it is (0..1), if it has one
-  void setSub(float f) { std::lock_guard<std::mutex> lk(m); sub = f; }
-  // 0..1 of the whole launch: the share done moves at the pace the time still expected allows - (1 - done) over the
-  // seconds left - so it runs on evenly through every step, a little faster when a step ends early and slower, never
-  // still, when one overruns. (Each step's own share, held at 97% while it overran, left the bar standing at one
-  // number through the longest steps.) It never steps back
-  // (the intro's own thread asks every frame: the bar moves on while a step holds the main thread)
+  // everything is done
+  void end() { std::lock_guard<std::mutex> lk(m); const double now = clock(); for (int k = 0; k < (int)steps.size(); k++) close(k, now); cur = -1; }
+  // how many of step i's things are done so far (the shader programs built, the islands)
+  void setDone(int i, float units) { std::lock_guard<std::mutex> lk(m); steps[i].done = std::max(steps[i].done, std::min(units, (float)steps[i].units)); }
+  // the running step's share done (0..1), where it is one thing that knows how far it is (the menu's scenery frames)
+  void setSub(float f) { std::lock_guard<std::mutex> lk(m); if (cur >= 0) steps[cur].done = std::max(steps[cur].done, std::min(std::max(f, 0.f), 1.f) * steps[cur].units); }
+  // 0..1: the things done out of all the launch's things; it never steps back
+  // (the intro's own thread asks every frame)
   float fraction() const {
     std::lock_guard<std::mutex> lk(m);
-    const double now = clock();
-    double left = 0; bool open = false;
-    for (size_t i = 0; i < steps.size(); i++) {
-      if (steps[i].took >= 0) continue;
-      open = true;
-      const double e = expectOf((int)i);
-      if ((int)i != cur) { left += e; continue; }
-      const double run = now - steps[i].t0;
-      // (the running step: what its own count says is left, else its expected time less what it has run; an overrun
-      // still expects a tenth of its time and a third as long again as it has overrun so far)
-      left += std::max(sub >= 0.f ? e * (1.0 - std::min(1.0, (double)sub)) : e - run, e * 0.1 + std::max(run - e, 0.0) * 0.3);
-    }
-    if (!open) { shown = 1.0; return 1.f; }
-    if (tLast >= 0 && left > 1e-3) shown += (1.0 - shown) * std::min(1.0, (now - tLast) / left);
-    tLast = now;
+    double all = 0, done = 0;
+    for (const Step& s : steps) { all += s.units; done += s.done; }
+    if (all > 0) shown = std::max(shown, done / all);
     return (float)std::min(shown, 1.0);
   }
-  // what each step took, for the next launch (and a summary for the startup log)
-  void save() const {
-    std::lock_guard<std::mutex> lk(m);
-    if (path.empty()) return;
-    std::map<std::string, float> out = prev;
-    for (const Step& s : steps) if (s.took >= 0) out[s.key] = (float)s.took;
-    if (FILE* f = fopen(path.c_str(), "w")) { for (auto& kv : out) fprintf(f, "%s %.3f\n", kv.first.c_str(), kv.second); fclose(f); }
-  }
+  // the seconds the steps whose key starts so took (the startup.log summary)
   double tookOf(const std::string& prefix) const {
     std::lock_guard<std::mutex> lk(m);
     double t = 0;
@@ -98,23 +51,15 @@ public:
     return t;
   }
 private:
-  struct Step { std::string key, group; float def = 1.f, expect = 1.f; bool known = false; double t0 = 0, took = -1; };
+  struct Step { std::string key; int units = 1; float done = 0.f; double t0 = -1, took = -1; };
   std::vector<Step> steps;
-  std::map<std::string, float> prev;
-  std::string path;
-  int cur = -1; float sub = -1.f;
-  mutable double shown = 0, tLast = -1;   // (fraction's: the share shown, and when it was last asked)
+  int cur = -1;
+  mutable double shown = 0;
   mutable std::mutex m;
   static double clock() { return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
-  void finish(int i, double now) { steps[i].took = now - steps[i].t0; }
-  // a step's expected seconds: its own from the last launch; else what the finished steps of its group took on
-  // average this time (the first aircraft built tells how long the rest will take); else its default
-  double expectOf(int i) const {
-    const Step& s = steps[i];
-    if (s.took >= 0) return s.known ? s.expect : s.took;   // (a step done keeps the share it was given, so the bar never steps back)
-    if (s.known) return s.expect;
-    double sum = 0; int n = 0;
-    for (const Step& o : steps) if (o.took >= 0 && o.group == s.group) { sum += o.took; n++; }
-    return n ? sum / n : s.def;
+  void close(int k, double now) {
+    Step& s = steps[k];
+    s.done = (float)s.units;
+    if (s.took < 0) s.took = s.t0 >= 0 ? now - s.t0 : 0.0;
   }
 };

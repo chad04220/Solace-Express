@@ -541,24 +541,23 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   const std::string stampPath = g_shaderCacheDir.empty() ? std::string() : g_shaderCacheDir + "\\stamp.txt", stamp = shaderCacheStamp();
   bool cacheCurrent = false;
   if (!stampPath.empty()) if (FILE* f = fopen(stampPath.c_str(), "r")) { char b[32] = {}; cacheCurrent = fscanf(f, "%31s", b) == 1 && stamp == b; fclose(f); }
-  // ---- the launch's steps, paced by what each took last time (load_pacer.h): the shaders and the islands side by
-  // side, the career and the aircraft performance, the renderer's textures, the menu, then every aircraft's meshes
+  // ---- the launch's steps (load_pacer.h), the bar showing how many of their things are done: the shader programs and
+  // the islands side by side, the career and the aircraft performance, the renderer's textures, the menu, then every
+  // aircraft's meshes
   const std::string cmdLine = GetCommandLineA();
   // (--raster, from older scripts, is accepted and ignored: there is one renderer)
   const bool tool = cmdLine.find("--bench ") != std::string::npos || cmdLine.find("--shots ") != std::string::npos || cmdLine.find("--profile ") != std::string::npos || cmdLine.find("--analyze") != std::string::npos || cmdLine.find("--loadshots") != std::string::npos;
   auto exists = [](const std::string& p) { return !p.empty() && GetFileAttributesA(p.c_str()) != INVALID_FILE_ATTRIBUTES; };
   g_ren.checkMeshCache();
-  const bool worldFresh = !exists(worldCache), perfFresh = game.cacheDir.empty() || !exists(game.cacheDir + "\\perf.bin");
+  const bool perfFresh = game.cacheDir.empty() || !exists(game.cacheDir + "\\perf.bin");
   LoadPacer pace;
-  pace.load(g_shaderCacheDir.empty() ? std::string() : g_shaderCacheDir + "\\load_times.txt");
-  const int stStart = pace.add("start", "start", !cacheCurrent || worldFresh, cacheCurrent ? 3.f : 60.f);
-  const int stInit = pace.add("career", "career", perfFresh, perfFresh ? 2.f : 0.3f);
-  const int stTex = pace.add("renderer", "renderer", false, 1.5f);
-  const int stMenu = pace.add("menu", "menu", false, 2.f);
+  const int stStart = pace.add("start", Renderer::kProgramCount + 1);   // (each shader program built or loaded, and the islands)
+  const int stInit = pace.add("career");
+  const int stTex = pace.add("renderer");
+  const int stMenu = pace.add("menu");
   std::vector<int> meshSteps;
   if (!tool)
-    for (const auto& it : Game::prewarmItems(true))
-      meshSteps.push_back(pace.add("mesh" + std::to_string(it.first) + (it.second ? "c" : "o"), "mesh", !g_ren.meshCached, g_ren.meshCached ? 0.3f : 12.f));
+    for (const auto& it : Game::prewarmItems(true)) meshSteps.push_back(pace.add("mesh" + std::to_string(it.first) + (it.second ? "c" : "o")));
   pace.begin(stStart);
   if (ctx2 && !g_shaderCacheDir.empty() && !cacheCurrent) {
     SECURITY_ATTRIBUTES sa = {sizeof(sa), nullptr, TRUE};
@@ -704,6 +703,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       stage += "   " + std::to_string(std::min(d + 1, Renderer::kProgramCount)) + " of " + std::to_string(Renderer::kProgramCount);
     } else stage = "Shaders ready";
     if (!built) stage += g_worldStage == 1 ? "   |   Loading the islands from the cache" : "   |   Generating the islands (once: kept for the next launch)";
+    pace.setDone(stStart, (float)std::min(d, Renderer::kProgramCount) + (built ? 1.f : 0.f));   // (the programs done, and the islands)
     introFrame(pace.fraction(), stage, 1.f);
     if (game.quit) break;
     if (compiled && built && t > 3.2f) break;   // the logo stays up long enough to be seen
@@ -723,7 +723,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if ((g_shaderCacheMisses > 0 || childMisses > 0) && ctx2 && !g_shaderCacheDir.empty())
     if (FILE* f = fopen((g_shaderCacheDir + "\\compile_time.txt").c_str(), "w")) { fprintf(f, "%.1f\n", compileSecs); fclose(f); }
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-  pace.markFresh(stStart, !cacheCurrent || !g_world.fromCache);   // (timed as what it did: the islands read, or generated)
   pace.begin(stInit);
   introFrame(pace.fraction(), perfFresh ? "Loading your career  |  learning how each aircraft flies (once)" : "Loading your career and the aircraft performance", 1.f);
   game.init(false);
@@ -739,7 +738,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     if (!tool) game.prewarm([&](float f, const std::string& what) { introFrame(f, what, 1.f); }, true, &pace, stMenu, &meshSteps);
     pace.end();
     if (game.quit) { stopIntro(false); return 0; }
-    if (!tool) pace.save();
     stopIntro(!tool);   // the bench and shot tools draw straight away; a normal start fades the intro out
   }
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {

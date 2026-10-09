@@ -40,9 +40,11 @@ int main(int argc, char** argv) {
     // the reduced builds for a driver whose compiler fails on the whole (raster_renderer.cpp compileRaster)
     put(dir, "shadow_proxy_less.frag", shadowProxyFSAssembly("#define PROXY_NO_TRAFFIC\n#define PROXY_NO_LIGHTS\n"));
     put(dir, "effects_less.frag", effectsFSAssembly("#define FX_NO_CLOAK\n#define FX_NO_PLUMES\n"));
-    // and a build with NVIDIA's compiler options (renderer.cpp linkProgramCached), which other compilers must ignore
-    { std::string fs = effectsFSAssembly(""); size_t at = fs.find('\n') + 1;
-      put(dir, "effects_nvopt.frag", fs.substr(0, at) + "#pragma optionNV(inline all)\n#pragma optionNV(ifcvt none)\n#pragma optionNV(unroll none)\n" + fs.substr(at)); }
+    // and the builds without the retractable gear in the airframe's field (renderer.cpp linkProgramCached: NV_SAFE_GEAR)
+    put(dir, "shadow_proxy_safegear.frag", shadowProxyFSAssembly("#define NV_SAFE_GEAR\n"));
+    put(dir, "effects_safegear.frag", effectsFSAssembly("#define NV_SAFE_GEAR\n"));
+    put(dir, "plane_mesh_safegear.frag", planeMeshFSAssembly("#define NV_SAFE_GEAR\n"));
+    put(dir, "hullbake_safegear.frag", worldLibAssembly("#define NV_SAFE_GEAR\n#define PART_BAKE\n") + kHullBakeMain);
   }
   return 0;
 }
