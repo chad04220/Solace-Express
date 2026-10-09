@@ -1,5 +1,6 @@
 // Solace Express - OpenGL renderer: deferred rasterizer + sprites + post + UI
 #include "renderer.h"
+#include "shader_prune.h"
 #include "models.h"
 #include "mesh_validation.h"
 #include "materials.h"
@@ -105,7 +106,9 @@ static void compileLog(const std::string& line) {
   }
 }
 static thread_local std::string g_compileWhat;   // what linkProgramCached is building (for compile.log)
-static GLuint linkOnce(const std::string& vs, const std::string& fs, std::string& err, bool& rejectedBefore, const char* variant) {
+static GLuint linkOnce(const std::string& vsIn, const std::string& fsIn, std::string& err, bool& rejectedBefore, const char* variant) {
+  // (each stage cut to what it runs, before the cache's key and the compiler see it: shader_prune.h)
+  const std::string vs = shaderPrune::prune(vsIn), fs = shaderPrune::prune(fsIn);
   bool cache = binaryCacheUsable();
   std::string path = cache ? cachePath(vs, fs) : std::string();
   if (cache) {
@@ -262,7 +265,12 @@ std::string shaderCacheStamp() {
 // lighting or the UI keeps every built body (each costs seconds on the GPU; a launch builds about twenty)
 std::string meshCacheStamp() {
   uint64_t h = fnv1a(aircraftMesh::kAlgorithmManifest, 1469598103934665603ull);
-  for (const char* src : {kCommonGLSL, kRtIO, kViewUniforms, kSceneUniforms, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kWraithSDF, kWraithCockpitCommon, kWraithCockpitSDF, kHullBakeMain}) h = fnv1a(src, h);
+  // (the bake programs as the driver gets them, cut to what they run: an edit to a material, a light or a comment
+  // leaves every aircraft body as it was; one to a shape the bake evaluates builds them again)
+  const std::string bake = worldLibAssembly("#define PART_BAKE\n") + kHullBakeMain;
+  const size_t at = bake.find('\n') + 1;
+  h = fnv1a(shaderPrune::prune(bake), h);
+  h = fnv1a(shaderPrune::prune(bake.substr(0, at) + "#define HULL_BAKE_NORMALS\n" + bake.substr(at)), h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);

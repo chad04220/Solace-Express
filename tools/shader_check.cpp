@@ -3,16 +3,20 @@
 // ./shader_check outdir && glslangValidator outdir/*.frag
 #include <cstdio>
 #include <string>
+#include <filesystem>
 #include "../src/shaders.h"
 #include "../src/shaders_wraith_cockpit.h"
+#include "../src/shader_prune.h"
 
+// each program as assembled, and in <dir>/pruned as the renderer hands it to the driver (shader_prune.h)
 static void put(const std::string& dir, const char* name, const std::string& src) {
-  FILE* f = fopen((dir + "/" + name).c_str(), "w"); if (!f) return;
-  fputs(src.c_str(), f); fclose(f);
+  if (FILE* f = fopen((dir + "/" + name).c_str(), "w")) { fputs(src.c_str(), f); fclose(f); }
+  if (FILE* f = fopen((dir + "/pruned/" + name).c_str(), "w")) { fputs(shaderPrune::prune(src).c_str(), f); fclose(f); }
 }
 
 int main(int argc, char** argv) {
   std::string dir = argc > 1 ? argv[1] : ".";
+  { std::error_code ec; std::filesystem::create_directories(dir + "/pruned", ec); }
   // Environment coverage includes the alpha-cutout path shared by colour and shadow draws.
   put(dir, "entities.vert", std::string("#version 330 core\n") + kEntVS);
   put(dir, "entities.frag", std::string("#version 330 core\n") + kEntFS1 + kEntFS2);
@@ -56,5 +60,13 @@ int main(int argc, char** argv) {
     put(dir, "hullbake_safegear.frag", worldLibAssembly("#define NV_SAFE_GEAR\n#define PART_BAKE\n") + kHullBakeMain);
     put(dir, "hullbake_normals_safegear.frag", worldLibAssembly("#define NV_SAFE_GEAR\n#define PART_BAKE\n#define HULL_BAKE_NORMALS\n") + kHullBakeMain);
   }
+  // the small programs (Renderer::compilePrograms), as assembled and as pruned
+  put(dir, "fullscreen.vert", kFullscreenVS);
+  put(dir, "ui.vert", kUIVS); put(dir, "ui.frag", kUIFS);
+  put(dir, "sprite.vert", kSpriteVS); put(dir, "sprite.frag", kSpriteFS);
+  put(dir, "bloom_down.frag", kDownFS); put(dir, "bloom_up.frag", kUpFS);
+  put(dir, "ray_mask.frag", kRayMaskFS); put(dir, "rays.frag", kRayFS); put(dir, "feed_rays.frag", kFeedRaysFS);
+  put(dir, "post.frag", kPostFS); put(dir, "taa.frag", kTaaFS);
+  put(dir, "cloud_comp.frag", kCloudCompFS); put(dir, "cloud_acc.frag", kCloudAccFS);
   return 0;
 }

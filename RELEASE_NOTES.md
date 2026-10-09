@@ -15,6 +15,11 @@
 - Scenery is drawn nearest first in every direction, so buildings hidden behind nearer ones are no longer shaded. Before, flying on some headings drew a city back to front.
 - The cockpit displays draw only the pages the cockpit actually shows: 5 of 8 in the XR-40 and 2 of 8 in the glass cockpits, instead of all 8. Every screen looks and updates the same as before.
 
+### Faster updates
+- Each shader is now cut down to the code it actually runs before it is compiled and cached. A future update only recompiles the shaders whose code really changed, instead of nearly all of them, and the smaller shaders also compile faster.
+- Aircraft bodies are now rebuilt only when a change touches their shapes. Changes to materials, lighting or comments no longer trigger the several-minute rebuild of every aircraft.
+- This version still compiles everything once on its first launch.
+
 ### Diagnostics
 - The XR-40 storm scene over the city now flies over the city centre and stays there, so every measurement in the analysis sees the same view. Before, it hovered and climbed away during the run.
 - The analysis now gives each pass's GPU time from the GPU's own timers, alongside the older numbers that include CPU waits.
