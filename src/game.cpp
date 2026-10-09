@@ -6,6 +6,7 @@
 #include <thread>
 #include "airport_layout.h"
 #include "entities.h"
+#include "scenery.h"
 #include "models.h"
 
 // XR-30 wingtip (body frame) matching mapJet's cranked delta in shaders.h
@@ -3532,12 +3533,28 @@ void Game::debugScene(const std::string& name) {
     screen = SCR_RESEARCH; realTime = 30; resAuthed = false; resOpened = realTime - atoi(name.c_str() + 12) / 10.f;
     return;
   }
-  if (name.compare(0, 3, "wr_") == 0) {   // XR-40: wr_<mode>_<cam yaw>_<cam pitch>_<cam dist>_<seconds>
+  if (name.compare(0, 3, "wr_") == 0) {   // XR-40: wr_<mode>_<cam yaw>_<cam pitch>_<cam dist>_<seconds>[_<airport>_<weather>_<hour>_<over town>]
     // modes: 0 cruise, 1 hover, 2 parked, 3 cloak spreading, 4 cloaked, 5 turrets out + bay open, 6 lasers firing,
-    // 7 plasma bomb (camera on the impact), 8 cockpit
-    int mode = 0; float yawD = 210, pitD = 12, dist = 30, secs = 1.5f;
-    sscanf(name.c_str() + 3, "%d_%f_%f_%f_%f", &mode, &yawD, &pitD, &dist, &secs);
-    resCraft = kWraith; realTime = 20; resAirborne = mode != 2; resTime = getenv("TOD") ? (float)atof(getenv("TOD")) : 12.f; launchResearch();
+    // 7 plasma bomb (camera on the impact), 8 cockpit. The optional tail: the research flight's airport, weather (0 clear,
+    // 1 cloud, 2 storm) and hour, and 1 to fly it in low over the town nearest that airport (wr_8_0_-8_0_1_3_2_22.5_1:
+    // the cockpit at night in a storm, coming in over Solace Capital)
+    int mode = 0, site = -1, wxSel = -1, overTown = 0; float yawD = 210, pitD = 12, dist = 30, secs = 1.5f, hour = -1.f;
+    sscanf(name.c_str() + 3, "%d_%f_%f_%f_%f_%d_%d_%f_%d", &mode, &yawD, &pitD, &dist, &secs, &site, &wxSel, &hour, &overTown);
+    const int siteWas = resAirport, wxWas = resWx;
+    if (site >= 0) resAirport = std::min(site, (int)g_world.airports.size() - 1);
+    if (wxSel >= 0) resWx = std::min(wxSel, 2);
+    resCraft = kWraith; realTime = 20; resAirborne = mode != 2; resTime = getenv("TOD") ? (float)atof(getenv("TOD")) : hour >= 0.f ? hour : 12.f; launchResearch();
+    resAirport = siteWas; resWx = wxWas;   // (the research menu's own choices: this scene's are for this flight only)
+    if (overTown && resAirborne) {   // 3 km short of the town's centre, 450 m over it, heading across it
+      const Airport& a = g_world.airports[std::clamp(site, 0, (int)g_world.airports.size() - 1)];
+      const Town* T = &kTowns[0]; float best = 1e18f;
+      for (int i = 0; i < kNumTowns; i++) { const float d = (kTowns[i].x - a.x) * (kTowns[i].x - a.x) + (kTowns[i].z - a.z) * (kTowns[i].z - a.z); if (d < best) { best = d; T = &kTowns[i]; } }
+      const vec3 c(T->x, 0.f, T->z), from = c + normalize(vec3(a.x - T->x, 0.f, a.z - T->z)) * 3000.f;
+      const float hdg = atan2f(c.x - from.x, -(c.z - from.z)) / DEG;
+      plane.reset(&kAircraft[resCraft], vec3(from.x, std::max(g_world.height(from.x, from.z), 0.f) + 450.f, from.z), hdg, kAircraft[resCraft].maxFuel, 85, true, 200.f);
+      plane.ctl.throttle = 0.7f; settleAirborneStart();
+      camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 4, 26));
+    }
     botControl = true;
     if (mode == 1) { plane.ctl.flaps = 1; flapNotch = 1; plane.flaps = plane.nozzle = 1; plane.vel = vec3(); plane.ctl.throttle = 0.66f; plane.engineRunning = true; plane.engineSpool = 0.66f; }
     else if (mode != 2) { plane.apEngage(Plane::AP_HOLD, -1, wx); }
