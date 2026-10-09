@@ -3548,19 +3548,24 @@ void Game::debugScene(const std::string& name) {
     if (wxSel >= 0) resWx = std::min(wxSel, 2);
     resCraft = kWraith; realTime = 20; resAirborne = mode != 2; resTime = getenv("TOD") ? (float)atof(getenv("TOD")) : hour >= 0.f ? hour : 12.f; launchResearch();
     resAirport = siteWas; resWx = wxWas;   // (the research menu's own choices: this scene's are for this flight only)
-    if (overTown && resAirborne) {   // 3 km short of the town's centre, 450 m over it, heading across it
+    // (over town 1: 3 km short of the town's centre, 450 m over it, heading across it at 200 m/s. 2: hovering on the
+    // pods 300 m over its centre, looking the same way - a scene that holds still, for timing the worst of it: in the
+    // analysis the flypast was over the city for some measurements and short of it for others)
+    const bool hoverTown = overTown == 2 && resAirborne;
+    if (overTown && resAirborne) {
       const Airport& a = g_world.airports[std::clamp(site, 0, (int)g_world.airports.size() - 1)];
       const Town* T = &kTowns[0]; float best = 1e18f;
       for (int i = 0; i < kNumTowns; i++) { const float d = (kTowns[i].x - a.x) * (kTowns[i].x - a.x) + (kTowns[i].z - a.z) * (kTowns[i].z - a.z); if (d < best) { best = d; T = &kTowns[i]; } }
       const vec3 c(T->x, 0.f, T->z), from = c + normalize(vec3(a.x - T->x, 0.f, a.z - T->z)) * 3000.f;
       const float hdg = atan2f(c.x - from.x, -(c.z - from.z)) / DEG;
-      plane.reset(&kAircraft[resCraft], vec3(from.x, std::max(g_world.height(from.x, from.z), 0.f) + 450.f, from.z), hdg, kAircraft[resCraft].maxFuel, 85, true, 200.f);
+      const vec3 at = hoverTown ? c : from;
+      plane.reset(&kAircraft[resCraft], vec3(at.x, std::max(g_world.height(at.x, at.z), 0.f) + (hoverTown ? 300.f : 450.f), at.z), hdg, kAircraft[resCraft].maxFuel, 85, true, hoverTown ? 0.f : 200.f);
       plane.ctl.throttle = 0.7f; settleAirborneStart();
       camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 4, 26));
     }
     botControl = true;
-    if (mode == 1) { plane.ctl.flaps = 1; flapNotch = 1; plane.flaps = plane.nozzle = 1; plane.vel = vec3(); plane.ctl.throttle = 0.66f; plane.engineRunning = true; plane.engineSpool = 0.66f; }
-    else if (mode != 2) { plane.apEngage(Plane::AP_HOLD, -1, wx); }
+    if (mode == 1 || hoverTown) { plane.ctl.flaps = 1; flapNotch = 1; plane.flaps = plane.nozzle = 1; plane.vel = vec3(); plane.ctl.throttle = 0.66f; plane.engineRunning = true; plane.engineSpool = 0.66f; }
+    else if (mode != 2 && !hoverTown) { plane.apEngage(Plane::AP_HOLD, -1, wx); }
     if (mode == 3 || mode == 4) wraith.cloakOn = true;
     if (getenv("WRCLOUD")) { wx.cloudCover = (float)atof(getenv("WRCLOUD")); wx.cloudBase = plane.pos.y - 60.f; }   // craft inside the cloud deck
     if (mode == 5 || mode == 6) { wraith.armed = true; }
