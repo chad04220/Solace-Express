@@ -65,7 +65,8 @@ if exist shadercache set CACHE=shadercache
 if not defined CACHE if exist "%APPDATA%\SolaceExpress\shadercache" set CACHE=%APPDATA%\SolaceExpress\shadercache
 if defined CACHE (
   if exist "%CACHE%.aside" rmdir /s /q "%CACHE%.aside"
-  move /y "%CACHE%" "%CACHE%.aside" >nul
+  move /y "%CACHE%" "%CACHE%.aside" >nul 2>"%OUT%\cache_aside.txt"
+  if exist "%CACHE%" echo The shader cache %CACHE% could not be set aside, so the first run below is not a cold compile.>>"%OUT%\cache_aside.txt"
 )
 if exist "%APPDATA%\SolaceExpress\startup.log" del /q "%APPDATA%\SolaceExpress\startup.log"
 powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--bench menu --nobodies --size 1920x1080 --out %OUT%\compile_run.txt' -Wait }; $line = ('first run with an empty shader cache: {0:N1} s (compiles the shaders, then times the menu scene once; no aircraft bodies built)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::WriteAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
