@@ -197,7 +197,7 @@ private:
   static constexpr int kTShN = 2048, kTShRows = 64;   // texels per side, rows baked per frame
   void bakeTerrainShadow(const FrameParams& fp);            // the terrain sun-shadow bake, a band of rows a frame
   bool depthValid = false;   // the depth target holds a frame
-  void renderDisplays(const FrameParams& fp, bool panel);
+  void renderDisplays(const FrameParams& fp, bool panel, int half = -1);   // half: the research pages' bottom (0) or top (1) row alone
   GLuint progSprite = 0, progDown = 0, progUp = 0, progRayMask = 0, progRay = 0, progPost = 0, progUI = 0, progTAA = 0, progFeedRays = 0;
   static constexpr int kBloomMips = 6;
   GLuint fboMip[kBloomMips] = {}, texMip[kBloomMips] = {}; int mipW[kBloomMips] = {}, mipH[kBloomMips] = {};

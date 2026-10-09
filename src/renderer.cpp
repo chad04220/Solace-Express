@@ -576,7 +576,7 @@ void Renderer::bakeTerrainShadow(const FrameParams& fp) {
 }
 
 // Cockpit display atlas for this frame: the research jets' display pages, or the light aircraft's instrument panel
-void Renderer::renderDisplays(const FrameParams& fp, bool panel) {
+void Renderer::renderDisplays(const FrameParams& fp, bool panel, int half) {
   GLuint& tex = panel ? texPanel : texPages;
   if (!progDisp && tex) return;   // no display shader: the screens stay as cleared below (dark)
   // 1080 lines on every display: each research-jet page is a 1080 x 1080 cell of the 4 x 2 atlas, and the light
@@ -584,7 +584,9 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel) {
   int w = panel ? 2848 : 4320, h = panel ? 1080 : 2160;
   if (!tex) {
     glGenTextures(1, &tex); glBindTexture(GL_TEXTURE_2D, tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
+    // (the pages are read for their colour alone: packed floats, half the bytes to draw and to mipmap; the panel's
+    // alpha is its gauges' coverage)
+    glTexImage2D(GL_TEXTURE_2D, 0, panel ? GL_RGBA16F : GL_R11F_G11F_B10F, w, h, 0, panel ? GL_RGBA : GL_RGB, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     // (seen from the seat the panel is a few hundred pixels tall and at an angle: anisotropic filtering, and a little
@@ -625,7 +627,9 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel) {
   glUniform4fv(U(p, "uFlame"), 1, pv.flame);
   glUniform2f(U(p, "uDispRes"), (float)w, (float)h);
   glBindVertexArray(vaoEmpty);
+  if (!panel && half >= 0) { glEnable(GL_SCISSOR_TEST); glScissor(0, half * (h / 2), w, h / 2); }   // (one row of pages)
   glDrawArrays(GL_TRIANGLES, 0, 3);
+  glDisable(GL_SCISSOR_TEST);
   glActiveTexture(GL_TEXTURE0);   // (not unit 15, which holds the font)
   glBindTexture(GL_TEXTURE_2D, tex); glGenerateMipmap(GL_TEXTURE_2D);
 }
@@ -1282,7 +1286,10 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   rasterShadowMaps(fp);   // (the airframe's shadow maps: the feeds' and the main view's proxy both read them)
   rasterTrafficShadowMaps(fp);
   stamp(1);
-  if ((fp.dispMode & 1) && (!texPages || (frameNo & 1) == 0)) renderDisplays(fp, false);   // the cockpit display atlases, before the objects pass samples them (the research jets' pages at 30 Hz: 9 Mpx and their mips a frame)
+  // the cockpit display atlases, before the objects pass samples them. The research jets' pages: a row of four a frame,
+  // so each page at 30 Hz with the same cost every frame (the whole 9 Mpx atlas every other frame put ~3 ms on alternate
+  // frames on an RTX 3070 Laptop: a stutter at 60 fps)
+  if (fp.dispMode & 1) renderDisplays(fp, false, texPages ? (int)(frameNo & 1) : -1);
   if (fp.dispMode & 2) renderDisplays(fp, true);
   stamp(2);
   // the research jets' cockpit cameras: the same passes on their own targets, before the objects pass draws the screens
