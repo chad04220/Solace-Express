@@ -52,6 +52,7 @@ int gModelId = -1;
 uniform vec3 uWheel;   // the player's wheels' roll (main left, main right, nose / tail), from the simulation
 vec3 gWheel;           // the wheels' roll of the aircraft loaded (the player's, or a traffic aircraft's from its rotation columns' .w)
 vec4 gM[24]; vec4 gPS; vec4 gCtl; vec3 gColBase; vec3 gColStripe; vec4 gFlame;
+float gFlapDL = 0.0;   // the left flap less the right (gPS.y): the player's split flap (uPr.w), none on traffic or in the bakes
 vec4 gWr[7];   // the XR-40's animation state the field reads (uWr, or a bake's state)
 // Fitted cabin mounts, cached when the model is loaded rather than at every ray-march sample.
 uniform vec4 uCabinFootFit; uniform vec2 uCabinSeatFit; // six bounded CPU-authored fit values, no packed-model slots reused

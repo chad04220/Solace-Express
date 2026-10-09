@@ -155,6 +155,26 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 600 * 60 && !p.fail.avionicsDark(); i++) { p.ctl.pitch = clampf((0.f - p.vel.y) * 0.1f - p.w.x * 0.8f, -1, 1); p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1, 1); p.ctl.throttle = 0.7f; p.step(1 / 60.f, calm, i / 60.f); }
     ok = p.fail.avionicsDark() && p.flightTime >= 0.f && !p.ev.crashed;
     printf("Alternator failure: battery flat after %.0f s %s\n", p.fail.battery <= 0.f ? 420.f : -1.f, ok ? "ok" : "FAIL"); fails += !ok;
+    // a split flap: the left one stops up and the right goes down with the lever. The aircraft rolls left (the right
+    // wing lifts more), the aileron holds it level, and the autopilot puts the lever back so the right one matches
+    p.reset(&s, vec3(-6000, 1200, 16000), 0, s.maxFuel * 0.5f, 85, true, s.vref * 1.3f); p.ctl.throttle = 0.5f;
+    float rollI = 0;   // (with an integral: the split's rolling moment wants a standing aileron)
+    auto level = [&](bool ail) { p.ctl.pitch = clampf((0.f - p.vel.y) * 0.1f - p.w.x * 0.8f, -1, 1); rollI = ail ? clampf(rollI - p.bankDeg() * 0.05f / 240.f, -1, 1) : 0.f; p.ctl.roll = ail ? clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f + rollI, -1, 1) : 0.f; };
+    for (int i = 0; i < 240; i++) { level(true); p.step(1 / 240.f, calm, i / 240.f); }
+    ok = p.failNow(FAIL_FLAP_ASYM, 0) && p.flapLeft() == 0.f;
+    p.ctl.flaps = 1.f; const float bk0 = p.bankDeg();
+    for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) { level(false); p.step(1 / 240.f, calm, i / 240.f); }
+    const float rollFree = p.bankDeg() - bk0, split = p.flaps - p.flapLeft();
+    float ailHold = 0; int nAil = 0;
+    for (int i = 0; i < 15 * 240 && !p.ev.crashed; i++) { level(true); p.step(1 / 240.f, calm, i / 240.f); if (i > 10 * 240) { ailHold += p.ctl.roll; nAil++; } }
+    ailHold /= std::max(nAil, 1);
+    const float bankHeld = p.bankDeg();
+    p.apEngage(Plane::AP_HOLD, -1, calm);
+    for (int i = 0; i < 20 * 240 && !p.ev.crashed; i++) p.step(1 / 240.f, calm, i / 240.f);
+    ok = ok && !p.ev.crashed && rollFree < -3.f && split > 0.5f && fabsf(bankHeld) < 3.f && ailHold > 0.05f && ailHold < 0.9f &&
+         fabsf(p.flaps - p.flapLeft()) < 0.02f && fabsf(p.bankDeg()) < 3.f;
+    printf("Split flap (left stuck up, split %.2f, held at %+.1f deg): rolls %+.1f deg in 3 s, held with %.0f%% aileron; the autopilot matches the lever (%.2f / %.2f), bank %+.1f %s\n",
+           split, bankHeld, rollFree, ailHold * 100.f, p.flapLeft(), p.flaps, p.bankDeg(), ok ? "ok" : "FAIL"); fails += !ok;
   }
   // ---------------- XR-20's centerline engine: the former pair's real combined thrust, with one failure channel.
   {

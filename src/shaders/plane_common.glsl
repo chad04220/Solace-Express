@@ -146,13 +146,13 @@ void loadCabinFit(){
   gCab2=uCabinFootFit;gCabSeat=uCabinSeatFit;
 
 }
-void loadMain(){ gOwn = true; gModelId = uModelId; gWheel = uWheel; for (int i = 0; i < 24; i++) gM[i] = uM[i]; for (int i = 0; i < 7; i++) gWr[i] = uWr[i]; gPS = uPS; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; if (gPS.w > 0.5 && gM[0].z < 4.5) loadCabinFit(); }
+void loadMain(){ gOwn = true; gModelId = uModelId; gWheel = uWheel; for (int i = 0; i < 24; i++) gM[i] = uM[i]; for (int i = 0; i < 7; i++) gWr[i] = uWr[i]; gPS = uPS; gFlapDL = uPr.w; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; if (gPS.w > 0.5 && gM[0].z < 4.5) loadCabinFit(); }
 int gTrafK = 0;
 void loadTraffic(int k){
   gOwn = false; gTrafK = k; gModelId = -1;
   gWheel = vec3(texelFetch(uTraffic, ivec2(25, k), 0).w, texelFetch(uTraffic, ivec2(26, k), 0).w, texelFetch(uTraffic, ivec2(27, k), 0).w);
   for (int i = 0; i < 24; i++) gM[i] = texelFetch(uTraffic, ivec2(i, k), 0);
-  gPS = texelFetch(uTraffic, ivec2(28, k), 0); gCtl = texelFetch(uTraffic, ivec2(29, k), 0);
+  gPS = texelFetch(uTraffic, ivec2(28, k), 0); gFlapDL = 0.0; gCtl = texelFetch(uTraffic, ivec2(29, k), 0);
   for (int i = 0; i < 7; i++) gWr[i] = uWr[i];
   vec4 c0 = texelFetch(uTraffic, ivec2(30, k), 0), c1 = texelFetch(uTraffic, ivec2(31, k), 0);
   gColBase = c0.rgb; gColStripe = c1.rgb;

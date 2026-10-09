@@ -146,7 +146,7 @@ struct Failures {
   float battery = 1;                     // 1 full .. 0 flat (avionics dark: no autopilot, no GPS)
   bool pitot = false; float pitotIas = 0, pitotRho = 1.225f;   // blocked: the airspeed indication is frozen at what it read (it then reads like an altimeter)
   int gearStuck = 0;                     // 0 no, 1 stuck up (won't extend), 2 stuck down (won't retract)
-  bool flapAsym = false; float flapAt = 0;   // one flap stopped where it was: a rolling moment with the deflection
+  bool flapAsym = false; float flapAt = 0;   // the left flap stopped where it was; the right one still follows the lever (a split: a rolling moment)
   float ice = 0;                         // 0..1 airframe ice: lift lost, drag added (grows in cloud below freezing, melts in warm air)
   bool any() const { for (float h : engineHealth) if (h < 1) return true; return alternator || pitot || gearStuck || flapAsym || ice > 0.05f; }
   bool avionicsDark() const { return alternator && battery <= 0.f; }
@@ -161,7 +161,8 @@ public:
   vec3 w;                 // angular velocity (body): x pitch-up, y yaw-left, z roll-left
   Controls ctl;
   float fuel = 0, payload = 0;
-  float flaps = 0, gear = 1;  // actual positions
+  float flaps = 0, gear = 1;  // actual positions (flaps: the right one's, and the left's unless it stopped: flapLeft)
+  float flapLeft() const { return fail.flapAsym ? fail.flapAt : flaps; }
   float rpm = 0, n1 = 0;      // engine state (spooled)
   float engineSpool = 0;      // 0..1 actual power fraction
   bool engineRunning = false; float starterTime = 0;

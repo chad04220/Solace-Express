@@ -473,7 +473,7 @@ Pose partPoseCockpit(int k, vec2 sd){
   else if (k == PT_WR_THR) X.T = E.xyz + vec3(-0.5, -0.38, -0.08 + 0.13*(0.5 - cThr));
   else if (k == PT_FLAP || k == PT_AILERON) {   // the wing's (plane_sdf.glsl mapPlane)
     vec4 W0 = gM[9], W1 = gM[10], W2 = gM[11];
-    float flaps = gPS.y;
+    float flaps = gPS.y + (sd.x < 0.0 ? gFlapDL : 0.0);   // (the left one's own, if it stopped)
     X = k == PT_FLAP ? surfPose(sd.x, W1.x, W1.y, W1.z, W0.x, W0.y, W0.z, W0.w, 0.74, flaps*0.62, flaps*0.1)
                      : surfPose(sd.x, W1.x, W1.y, W1.z, W0.x, W0.y, W0.z, W0.w, 0.74, -cRoll*sd.x*0.33, 0.0);
   } else if (k == PT_ELEVATOR) {

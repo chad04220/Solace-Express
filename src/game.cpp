@@ -818,7 +818,7 @@ std::vector<Game::Annunciator> Game::hudAnnunciators() const {
   if (F.alternator) ann.push_back({F.avionicsDark() ? std::string("BATTERY FLAT  no autopilot, no GPS") : fmt("ALTERNATOR  battery %.0f%%", F.battery * 100.f), "alternator", F.avionicsDark() ? "flat" : "battery", F.avionicsDark()});
   if (F.pitot) ann.push_back({"PITOT BLOCKED  airspeed unreliable", "pitot", "blocked", false});
   if (F.gearStuck) ann.push_back({F.gearStuck == 1 ? "GEAR STUCK UP  belly landing: paved, level, slow" : "GEAR STUCK DOWN  slower, more fuel", "gear", F.gearStuck == 1 ? "up" : "down", F.gearStuck == 1});
-  if (F.flapAsym) ann.push_back({"FLAP ASYMMETRY  hold the wing up", "flaps", "asym", false});
+  if (F.flapAsym) ann.push_back({fmt("FLAP ASYMMETRY  left stuck at %.0f%%: keep the lever there", F.flapAt / std::max(aeroGeom(spc).flapMax, 0.05f) * 100.f), "flaps", "asym", false});
   if (F.ice > 0.05f) ann.push_back({fmt("ICING %.0f%%  leave the cloud, keep speed", F.ice * 100.f), "ice", F.ice > 0.5f ? "severe" : "icing", F.ice > 0.5f});
   return ann;
 }
@@ -2305,7 +2305,7 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   float nr = s.special ? .33f : s.taildragger ? .10f : md.gear == 3 ? wr*.75f : wr*.85f;
   pv.model = (int)(p.spec - kAircraft);
   pv.wheel[0] = p.wheelMotion[0].angle(wr); pv.wheel[1] = p.wheelMotion[1].angle(wr); pv.wheel[2] = p.wheelMotion[2].angle(nr);
-  pv.Pr[0] = propAngle; pv.Pr[1] = blur; pv.Pr[2] = (float)std::max(s.blades, 2); pv.Pr[3] = 0;
+  pv.Pr[0] = propAngle; pv.Pr[1] = blur; pv.Pr[2] = (float)std::max(s.blades, 2); pv.Pr[3] = p.flapLeft() - p.flaps;   // (a split flap: the left one's own)
   pv.I0[0] = p.ias * MS_TO_KT; pv.I0[1] = p.pos.y * M_TO_FT; pv.I0[2] = p.heading(); pv.I0[3] = p.vel.y * 196.85f;
   pv.I1[0] = p.pitchDeg(); pv.I1[1] = p.bankDeg();
   pv.I1[2] = s.engineType == ENG_PISTON ? p.rpm / std::max(s.maxRpm, 1.f) : p.n1 / 100.f; pv.I1[3] = p.fuel / std::max(s.maxFuel, 1.f);
@@ -3604,7 +3604,8 @@ void Game::debugScene(const std::string& name) {
   int spec = 0;
   if (name.size() == 3 && name[0] == 'm') {
     // model inspection: m<aircraft><view>  views: e = exterior 3/4 front, r = controls deflected from behind,
-    // c = cockpit, g = on the ground, s = side, d = cockpit with controls deflected
+    // c = cockpit, g = on the ground, s = side, d = cockpit with controls deflected, f = a split flap (the left one
+    // stuck up, the right one down) from behind
     spec = name[1] - '0'; char v = name[2];
     c.wx = Weather(); c.wx.cloudCover = 0.25f; c.wx.timeOfDay = 10.5f; c.wx.windSpeed = 0; c.wx.turbulence = 0;
     startFlight(c, spec, Career::SRC_OWNED);
@@ -3618,6 +3619,7 @@ void Game::debugScene(const std::string& name) {
     camYaw = 3.14159f - 0.75f; camPitch = 0.18f;
     if (v == 'r' || v == 'd' || v == 'b') { botControl = true; plane.ctl.roll = 1; plane.ctl.pitch = 1; plane.ctl.yaw = 1; plane.ctl.flaps = v == 'b' ? 0.f : 1.f; plane.flaps = plane.ctl.flaps; camYaw = v == 'b' ? 0.f : -0.55f; camPitch = v == 'b' ? 0.22f : 0.35f; if (v == 'b') camZoom = 0.3f; }
     if (v == 's') { camYaw = 1.5708f; camPitch = 0.05f; }
+    if (v == 'f') { plane.failNow(FAIL_FLAP_ASYM, 0); botControl = true; plane.ctl.flaps = 1.f; plane.flaps = aeroGeom(s).flapMax; camYaw = 0.f; camPitch = 0.3f; camZoom = 0.3f; }
     if (v == 'c' || v == 'd') { camMode = 1; lookYaw = 0; lookPitch = v == 'd' ? -0.45f : -0.13f; }
     if (v == 'y' || v == 'p' || v == 'a') {
       botControl = true; plane.ctl = Controls(); plane.ctl.throttle = 0.6f;

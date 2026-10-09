@@ -155,7 +155,7 @@ bool Plane::failNow(int kind, int engine) {
     case FAIL_ALTERNATOR: fail.alternator = true; return true;
     case FAIL_PITOT: fail.pitot = true; fail.pitotIas = ias; fail.pitotRho = density; return true;
     case FAIL_GEAR_STUCK: if (!s.retract) return false; fail.gearStuck = gear < 0.5f ? 1 : 2; gear = gear < 0.5f ? 0.f : 1.f; return true;
-    case FAIL_FLAP_ASYM: fail.flapAsym = true; fail.flapAt = flaps; return true;
+    case FAIL_FLAP_ASYM: if (s.special || s.flapCL <= 0.01f) return false; fail.flapAsym = true; fail.flapAt = flaps; return true;
     case FAIL_ICING: fail.ice = std::max(fail.ice, 0.3f); return true;
     default: return false;
   }
@@ -333,8 +333,8 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   }
 
   // ---------------- configuration
-  if (fail.flapAsym) flaps = fail.flapAt;   // the stopped flap holds the pair where they were
-  else flaps = approach(flaps, ctl.flaps * (s.special ? 1.f : aeroGeom(s).flapMax), s.special ? 0.5f : 0.6f, dt);   // (as far as they trim: aero_strips.cpp)
+  // (a stopped left flap stays where it was, and the right one keeps following the lever: flapLeft)
+  flaps = approach(flaps, ctl.flaps * (s.special ? 1.f : aeroGeom(s).flapMax), s.special ? 0.5f : 0.6f, dt);   // (as far as they trim: aero_strips.cpp)
   nozzle = s.special == 2 ? flaps : 0.f;   // the XR-40's F/V keys tilt its thruster pods instead of flaps
   if (s.retract && fail.gearStuck == 0) gear = clampf(gear + (ctl.gearDown ? 1.f : -1.f) * dt / 5.f, 0, 1);
   else if (!s.retract) gear = 1;
@@ -372,7 +372,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     const float sas = clampf(-ag.betaToAil * beta, -0.3f, 0.3f);
     in.pitch = ctl.pitch; in.roll = ctl.roll + sas; in.yaw = ctl.yaw; in.trim = ctl.trim;
     ctlSurf = vec3(clampf(ctl.pitch + ctl.trim * 0.3f, -1.f, 1.f), clampf(in.roll + ag.ailRig, -1.f, 1.f), clampf(ctl.yaw + ag.rudRig, -1.f, 1.f));
-    in.gear = gear; in.ice = fail.ice; in.flapL = in.flapR = flaps;
+    in.gear = gear; in.ice = fail.ice; in.flapL = flapLeft(); in.flapR = flaps;
     // each engine's share of the thrust and of the shaft power by its health (a dead one makes none, and windmills)
     float hs = 0; for (int e = 0; e < ag.nEng; e++) hs += fail.engineHealth[std::min(e, 3)];
     const float shaft = engineRunning && s.engineType != ENG_JET ? s.engines * s.power * engineSpool * (s.engineType == ENG_PISTON ? sigmaRho : powf(sigmaRho, 0.75f)) : 0.f;
@@ -861,6 +861,13 @@ void Plane::apSense() {
   // the approach reference: the type's, but never under 1.23 times the stall it has (FAR 25's VREF; the revised XR-20's
   // canard holds its trimmed lift to 1.27, and its book speed was only 5% above that)
   E.vs0 = P.vs0 * wk; E.vs1 = P.vs1 * wk; E.vApp = std::max(s.vref, 1.23f * P.vs0) * wk;
+  // a flap that stopped (the other matched to it: apControl): the approach at that setting's own reference speed, and
+  // the landing roll longer by its square
+  const float vAppFull = E.vApp;
+  if (fail.flapAsym) {
+    const float vsAt = E.vs1 + (E.vs0 - E.vs1) * clampf(fail.flapAt / std::max(aeroGeom(s).flapMax, 0.05f), 0.f, 1.f);
+    E.vApp = std::max(E.vApp, 1.23f * vsAt);
+  }
   // the engines: full thrust now (their health, running or not, this air) over the tests'
   float healthSum = 0; for (int i = 0; i < s.engines && i < 4; i++) healthSum += fail.engineHealth[i];
   const float health = engineRunning || starterTime > 0.f ? (s.engines > 0 ? healthSum / s.engines : 1.f) : 0.f;
@@ -889,7 +896,7 @@ void Plane::apSense() {
   E.glideMax = clampf(std::min(0.6f * glide, E.spool >= 2.f ? 3.5f : 6.5f), 3.f, 6.5f);
   if (P.ldgRoll > 0.f && P.ldgRoll < 260.f) E.glideMax = 6.5f;
   E.gUse = P.gUse;
-  E.ldgDist = P.ldgRoll * E.mass / (s.emptyMass + s.maxFuel + s.cargoKg);   // (the learned distance is at full weight)
+  E.ldgDist = P.ldgRoll * E.mass / (s.emptyMass + s.maxFuel + s.cargoKg) * (E.vApp / vAppFull) * (E.vApp / vAppFull);   // (the learned distance is at full weight and flap)
   E.hover = liftThrustMax() > 1.1f * E.mass * G0;
   E.agile = P.gUse >= 30.f;
   E.rateCmd = s.special != 0;
@@ -1239,7 +1246,7 @@ void Plane::apGuidance(float dt) {
       // with it (the speed its learned landing distance was flown at). Full flap at the book speed instead flew the
       // Starling onto Meadowbrook nose first, 3 deg down: at 1.6 times that stall the wing lifts with the nose low
       const float kGs = clampf((vel.x * ld.x + vel.z * ld.z) / std::max(ias, 10.f), 0.5f, 2.f);
-      const bool shortField = clampf(a.length * 0.12f, 80.f, 300.f) + 0.2f * (kGs * vref) * (kGs * vref) * (s.taildragger ? 1.35f : 1.f) * (surfaceRough(a.surface) ? 1.1f : 1.f) > 0.6f * a.length;
+      const bool shortField = !fail.flapAsym && clampf(a.length * 0.12f, 80.f, 300.f) + 0.2f * (kGs * vref) * (kGs * vref) * (s.taildragger ? 1.35f : 1.f) * (surfaceRough(a.surface) ? 1.1f : 1.f) > 0.6f * a.length;
       const float vBase = shortField ? std::min(vref, 1.3f * E.vs0) : vref;
       bool high = err < -40.f && dist < F + 1000.f;   // above the glideslope: configure early for the drag
       if (high) ctl.flaps = 1.f;
@@ -1536,7 +1543,7 @@ void Plane::apControl(float dt) {
   bool appr = apMode == AP_APPR && apStage >= APS_FINAL && apStage != APS_GOAROUND;
   bool flare = apMode == AP_APPR && apStage == APS_FLARE;
   float gustG = std::max(0.6f, P.gLimit * 0.05f);   // what a gust can add on top of a commanded pull
-  float vsFl = E.vs1 + (E.vs0 - E.vs1) * clampf(flaps, 0.f, 1.f);   // stall speed now at this flap setting (weight, ice)
+  float vsFl = E.vs1 + (E.vs0 - E.vs1) * clampf(std::min(flaps, flapLeft()), 0.f, 1.f);   // stall speed now at this flap setting (weight, ice; the lesser of a split pair)
   float stallG = (V / vsFl) * (V / vsFl) * 0.9f;
   float nzMax = std::min(P.gLimit - gustG - P.gLimit * 0.03f, stallG), nzMin = std::max(P.gNeg + gustG + 0.3f, -stallG * 0.5f);
   nzMax = std::max(nzMax, 1.05f);
@@ -1581,6 +1588,8 @@ void Plane::apControl(float dt) {
   float kBank = std::min(appr ? 1.5f : 3.f, 0.7f / P.tRoll);           // bank loop no faster than the roll mode
   float pT = clampf((bankT - bank) * DEG * kBank, -rollCap, rollCap);
   if (!E.flaps) ctl.flaps = 0;   // no flaps to fly with (the XR-40's lever tilts its pods): keep it up
+  // a flap that stopped: the lever back to where it is, so the other one matches it and the wings stay level
+  else if (fail.flapAsym) ctl.flaps = clampf(fail.flapAt / std::max(aeroGeom(s).flapMax, 0.05f), 0.f, 1.f);
   // vertical: altitude -> climb rate -> flight path -> load factor -> elevator
   // (the climb it can make now: heavy, high, iced or an engine out, less - and with none to spare it holds what it can)
   float vsUp = std::max(E.climb * 1.1f, 1.f), vsDn = std::max(spd * 0.42f, vsUp);   // dives up to ~25 deg

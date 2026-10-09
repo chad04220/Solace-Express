@@ -815,7 +815,8 @@ vec2 mapPlaneBody(vec3 p){
     float fus0 = 0.55*R, flap0 = flapRoot(), flapEnd = span*W2.w, ailEnd = span*0.94;
     float wing = sdPanel(s, c, t, span, rc, tc, sw, th, 0.74, flap0, ailEnd);
     // (the flaps and ailerons are rigid parts with meshes of their own: the airframe bake leaves them out, plane_parts.glsl)
-    float flap = gPartMode == -2 ? 1e9 : sdSurface(s, c, t, span, rc, tc, sw, th, 0.74, flap0, flapEnd, flaps*0.62, flaps*0.1);
+    float flp = flaps + (sgn < 0.0 ? gFlapDL : 0.0);   // (the left one's own, if it stopped)
+    float flap = gPartMode == -2 ? 1e9 : sdSurface(s, c, t, span, rc, tc, sw, th, 0.74, flap0, flapEnd, flp*0.62, flp*0.1);
     // right aileron TE goes UP for right roll; left goes down
     float ail = gPartMode == -2 ? 1e9 : sdSurface(s, c, t, span, rc, tc, sw, th, 0.74, flapEnd + 0.03, ailEnd, -cRoll*sgn*0.33, 0.0);
     float wd = min(wing, min(flap, ail));
