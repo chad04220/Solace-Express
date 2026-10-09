@@ -336,7 +336,11 @@ void main(){
   if (getenv("PREWARM")) game.prewarm([](float, const std::string&) {});   // (every aircraft's body built first, as the game's launch does: the traffic drawn from meshes)
   game.debugScene(scene);
   for (int i = 0; i < 3; i++) { game.update(1.f / 30.f); game.render(); }
-  if (getenv("TAAM")) for (int i = 0, n = atoi(getenv("TAAM")); i < n; i++) { game.update(1.f / 60.f); game.render(); }   // moving frames
+  if (getenv("TAAM")) for (int i = 0, n = atoi(getenv("TAAM")); i < n; i++) {   // moving frames
+    game.update(1.f / 60.f); game.render();
+    const int seq = getenv("SEQ") ? atoi(getenv("SEQ")) : 0;   // (the last SEQ of them saved too: frame-to-frame flicker)
+    if (seq > 0 && i >= n - seq) { char b[256]; snprintf(b, sizeof b, "/tmp/claude-0/sp/seq_%s_%d.ppm", scene.c_str(), i - (n - seq)); glFinish(); g_ren.screenshot(b); }
+  }
   if (getenv("TAAF")) for (int i = 0, n = atoi(getenv("TAAF")); i < n; i++) game.render();   // extra static frames: let TAA converge
   glFinish();
   if (getenv("BENCH")) {

@@ -250,7 +250,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
+  for (const char* src : {kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -518,7 +518,7 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     { std::string e; progTShBake = program(vsFS, ms + kTShBakeMain, e); step(); }   // optional: without it the terrain casts no sun shadow
     setCompileStage("clouds");
     { std::string e; progClouds = program(vsFS, ms + kCloudMain, e); step(); }       // optional: without them no clouds
-    { std::string e; progCloudComp = program(vsFS, kCloudCompFS, e); step(); }
+    { std::string e; progCloudComp = program(vsFS, kCloudCompFS, e); progCloudAcc = program(vsFS, kCloudAccFS, e); step(); }   // (no accumulation: the march's own frame, as before)
     if (!progMap) { error = "Map shader: " + error; return false; }
     setCompileStage("the aircraft mesh builder");
     compileHull(vsFS, worldLibAssembly(std::string(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + "#define PART_BAKE\n") + kHullBakeMain); step();   // (the bake alone evaluates a part by its id: PART_BAKE)
@@ -837,6 +837,21 @@ void Renderer::createRenderTargets() {
 // Display-resolution targets: TAA history + the upscaled scene that sprites, bloom and the composite work on
 void Renderer::createTargets() {
   createRenderTargets();
+  {   // the clouds' accumulation, the main view's alone (the camera feeds make their render targets with the code above)
+    const int qw = (W + 1) / 2, qh = (H + 1) / 2;
+    makeTex(texCloudT, qw, qh, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboCloud);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, texCloudT, 0);
+    for (int i = 0; i < 2; i++) {
+      makeTex(texCloudAcc[i], qw, qh, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
+      makeTex(texCloudAccD[i], qw, qh, GL_RG32F, GL_RG, GL_FLOAT, GL_LINEAR);
+      if (!fboCloudAcc[i]) glGenFramebuffers(1, &fboCloudAcc[i]);
+      glBindFramebuffer(GL_FRAMEBUFFER, fboCloudAcc[i]);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texCloudAcc[i], 0);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texCloudAccD[i], 0);
+    }
+    cloudAccValid = false;
+  }
   makeTex(texColor, W, H, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR);
   for (int i = 0; i < 2; i++) {
     makeTex(texHist[i], W, H, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR); histW = W; histH = H;
@@ -1158,20 +1173,56 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
 void Renderer::cloudPass(const FrameParams& fp) {
   if (!cloudSplit) return;
   // clouds at a quarter of the pixels, along the rays of the depths just traced
+  // (the main view also writes each texel's cloud distance, for its accumulation below; a camera feed has none)
+  static const bool accOff = getenv("CLOUDACCOFF") != nullptr;   // (debug A/B: the march's own frame, as before)
+  const bool acc = !feedPass && progCloudAcc && texCloudT && !accOff;
   glBindFramebuffer(GL_FRAMEBUFFER, fboCloud);
-  GLenum cb[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-  glDrawBuffers(2, cb);
+  GLenum cb[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
+  glDrawBuffers(acc ? 3 : 2, cb);
   glViewport(0, 0, cw, ch);
   setRT(progClouds, fp);
   glActiveTexture(GL_TEXTURE0 + 19); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progClouds, "uSceneDepth"), 19);
   glUniform1i(U(progClouds, "uFrame"), (int)(frameNo & 3));
   glDrawArrays(GL_TRIANGLES, 0, 3);
+  // the clouds' own accumulation (kCloudAccFS): the march's frame steadied by the last ones, reprojected from where
+  // each texel's cloud was. A camera cut, another render scale or a frame without clouds starts it afresh
+  GLuint cloudTex = texCloud;
+  if (acc) {
+    const int cur = cloudAccIdx ^ 1;
+    const bool fresh = !cloudAccValid || cloudAccRw != rw || cloudAccRh != rh || cloudAccFrame + 1 != frameNo
+                    || length(fp.camPos - prevCamPos) > 400.f || fabsf(fp.fovY - prevFovY) > 1e-5f;
+    glBindFramebuffer(GL_FRAMEBUFFER, fboCloudAcc[cur]);
+    glDrawBuffers(2, cb);
+    glViewport(0, 0, cw, ch);
+    GLuint p = progCloudAcc;
+    glUseProgram(p);
+    const GLuint tex[5] = {texCloud, texCloudT, texCloudD, texCloudAcc[cloudAccIdx], texCloudAccD[cloudAccIdx]};
+    const char* nm[5] = {"uCur", "uCurT", "uCurD", "uHist", "uHistD"};
+    for (int i = 0; i < 5; i++) { glActiveTexture(GL_TEXTURE0 + i); glBindTexture(GL_TEXTURE_2D, tex[i]); glUniform1i(U(p, nm[i]), i); }
+    const float qw = (float)((allocW + 1) / 2), qh = (float)((allocH + 1) / 2);
+    glUniform2f(U(p, "uCloudHi"), (float)(cw - 1), (float)(ch - 1));
+    glUniform2f(U(p, "uHistUVS"), rw * 0.5f / qw, rh * 0.5f / qh);
+    glUniform2f(U(p, "uView"), (float)rw, (float)rh);
+    float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};
+    glUniformMatrix3fv(U(p, "uCamRot"), 1, GL_FALSE, cr);
+    glUniformMatrix3fv(U(p, "uPrevCamRot"), 1, GL_FALSE, prevCamRot);
+    const vec3 camD = fp.camPos - prevCamPos;
+    glUniform3f(U(p, "uCamDelta"), camD.x, camD.y, camD.z);
+    glUniform1f(U(p, "uTanHalf"), tanf(fp.fovY * 0.5f));
+    glUniform1f(U(p, "uAspect"), (float)rw / rh);
+    glUniform1f(U(p, "uHistValid"), fresh ? 0.f : 1.f);
+    glUniform1f(U(p, "uDt"), fp.dt);
+    glBindVertexArray(vaoEmpty);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    cloudAccIdx = cur; cloudAccValid = true; cloudAccRw = rw; cloudAccRh = rh; cloudAccFrame = frameNo;
+    cloudTex = texCloudAcc[cur];
+  }
   // composite over the lit colour: colour x transmittance + in-scatter (its alpha, the TAA class, is kept)
   glBindFramebuffer(GL_FRAMEBUFFER, fboComp);
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
   glViewport(0, 0, rw, rh);
   glUseProgram(progCloudComp);
-  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texCloud); glUniform1i(U(progCloudComp, "uCloud"), 0);
+  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, cloudTex); glUniform1i(U(progCloudComp, "uCloud"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, texCloudD); glUniform1i(U(progCloudComp, "uCloudD"), 1);
   glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progCloudComp, "uDepthTex"), 2);
   glActiveTexture(GL_TEXTURE0 + 3); glBindTexture(GL_TEXTURE_2D, texCloudMask); glUniform1i(U(progCloudComp, "uMaskTex"), 3);

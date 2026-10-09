@@ -195,6 +195,10 @@ private:
   std::chrono::steady_clock::time_point syncT;
   // quarter-resolution clouds: the cloud march, its full-resolution composite, their targets
   GLuint progClouds = 0, progCloudComp = 0, texCloud = 0, texCloudD = 0, fboCloud = 0, texCloudMask = 0, fboComp = 0;
+  // the clouds' own accumulation (kCloudAccFS, the main view's alone): this frame's cloud distance (the march's third
+  // target) and two histories, (in-scatter, transmittance) and (cloud distance, scene depth)
+  GLuint progCloudAcc = 0, texCloudT = 0, texCloudAcc[2] = {0, 0}, texCloudAccD[2] = {0, 0}, fboCloudAcc[2] = {0, 0};
+  int cloudAccIdx = 0, cloudAccRw = 0, cloudAccRh = 0, cloudAccFrame = -10; bool cloudAccValid = false;
   int cw = 0, ch = 0;
   // baked terrain sun shadow (world space): front = the one the shaders read, back = the one being baked
   GLuint progTShBake = 0, texTSh[2] = {0, 0}, fboTSh = 0;
@@ -364,7 +368,7 @@ public:
   bool meshOff = getenv("MESHOFF") != nullptr;           // debug: no aircraft meshes on the raster path (the whole airframe marches)
   bool tshPending() const { return tshBaking || tshFront < 0; }
   void resetTemporal() {   // forget every frame-to-frame accumulation (TAA history, jitter/seed sequence, terrain-shadow bake):
-    frameNo = 0; histIdx = 0; histValid = false;   // the next frame renders as if it were the first (exact test comparisons)
+    frameNo = 0; histIdx = 0; histValid = false; cloudAccValid = false;   // the next frame renders as if it were the first (exact test comparisons)
     tshFront = -1; tshBack = 0; tshRow = 0; tshBaking = false;
     for (bool& v : shValid) v = false;   // shadow cascades re-render
   }

@@ -5,6 +5,9 @@
 - Distant rock outcrops, spires and sea stacks now match their close-up shapes.
 - Broadleaf trees' leaf cut-outs are cheaper to draw with the same coverage.
 
+### Clouds
+- Clouds no longer shimmer or crawl while you move, which was worst with the sun behind them. Their brightness is now built up over several frames, following each cloud as the view moves, instead of being redrawn from scratch every frame. Lightning, cloud edges and aircraft passing in front still update immediately.
+
 ### XR-40
 - The bridge behind the centre display no longer cuts across the two side screens: it is recessed 35 mm, with the screens where they were.
 

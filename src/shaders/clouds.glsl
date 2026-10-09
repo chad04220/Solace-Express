@@ -62,6 +62,9 @@ float rainColumn(vec3 p){
 }
 float hgPhase(float c, float g){ float g2 = g*g; return (1.0 - g2)/(12.566*pow(max(1.0 + g2 - 2.0*g*c, 1e-4), 1.5)); }
 int gCloudLite = 0;   // reflections: half the steps, no rain shafts, no wake
+// how far the light seen along this ray was scattered, weighted by how much each step gave (kCloudMain: the clouds'
+// own accumulation reprojects each texel's last value from where its cloud was, not from the sky or the ground behind)
+float gCloudW = 0.0, gCloudWT = 0.0;
 vec4 cloudLayer(vec3 ro, vec3 rd, float tmax, float jitter){
   float thick = 900.0 + 900.0*uCloudCover;
   float yb = uCloudBase, yt = uCloudBase + thick;
@@ -109,6 +112,7 @@ vec4 cloudLayer(vec3 ro, vec3 rd, float tmax, float jitter){
       float a = 1.0 - exp(-d*dts*0.016);
       float fogT = exp(-uFogB*t*0.6);
       L += T*a*mix(skyH, c, fogT);
+      gCloudW += T*a; gCloudWT += T*a*t;
       T *= 1.0 - a;
       if (T < 0.02) break;
     }
@@ -136,6 +140,7 @@ vec4 rainShafts(vec3 ro, vec3 rd, float tmax, float jitter){
     float r = rainColumn(p)*smoothstep(yb, yb - 150.0, p.y);
     float a = 1.0 - exp(-k*smoothstep(0.35, 0.95, r)*(tb - ta));
     L += T*a*mix(skyH, col, exp(-uFogB*t*0.6));
+    gCloudW += T*a; gCloudWT += T*a*t;
     T *= 1.0 - a;
   }
   return vec4(L, T);
