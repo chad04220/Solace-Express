@@ -15,22 +15,47 @@ on:
 permissions:
   contents: write
 
+# A newer push to the same branch cancels the run still going for the last one; a manual run (a release) is in a group
+# of its own and is never cancelled
+concurrency:
+  group: ci-${{ github.event_name == 'workflow_dispatch' && format('dispatch-{0}', github.run_id) || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   linux-sanitizers:   # every headless test under AddressSanitizer + UBSan (the shader checks need a validator: skipped); a release waits for it
+    # (a pull request from a branch of this repository: its push already runs the same commit)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 1500M
     steps:
       - uses: actions/checkout@v4
+      - name: Compiler cache
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ccache
+      - uses: actions/cache@v4   # the last run's compiled files: a push recompiles only what it changed
+        with:
+          path: .ccache
+          key: ccache-sanitize-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            ccache-sanitize-${{ github.ref_name }}-
+            ccache-sanitize-
       - name: Configure (GCC, ASan + UBSan)
-        run: cmake -S . -B build -DSANITIZE=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        run: cmake -S . -B build -DSANITIZE=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
       - name: Build
-        run: cmake --build build --parallel 4 --target flight_test progression_test save_test airport_layout_test envelope_test hull_test mesh_simplify_test entity_raycast_test gameplay_test encounter_timing_test shader_keyword_test world_cache_test aero_test
-      - name: Test
+        run: |
+          ccache -z
+          cmake --build build --parallel 4 --target flight_test progression_test save_test airport_layout_test envelope_test hull_test mesh_simplify_test entity_raycast_test gameplay_test encounter_timing_test shader_keyword_test world_cache_test aero_test
+          ccache -s
+      - name: Test   # four at a time: the runner's four cores (the flight model, the longest, sets the time)
         env:
           ASAN_OPTIONS: detect_leaks=0
           UBSAN_OPTIONS: print_stacktrace=1
-        run: ctest --test-dir build --output-on-failure -E "shader_glsl|terrain_shadow_bake"
+        run: ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake"
 
   windows:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +67,7 @@ jobs:
         run: cmake --build build --config Release --parallel
 
       - name: Test (flight model + campaign progression)
-        run: ctest --test-dir build -C Release --output-on-failure
+        run: ctest --test-dir build -C Release --output-on-failure -j4
 
       - name: Package
         shell: pwsh
