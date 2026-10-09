@@ -47,13 +47,15 @@ A pilot-career flight game for Windows with a detailed real-time 3D world drawn 
 
 | Aircraft | Type | Seats / Cargo | Range | Cruise | Take-off roll | Landing distance | Runway | Licence |
 |---|---|---|---|---|---|---|---|---|
-| Kestrel T2 | Two-seat trainer | 1 / 120 kg | 45 km | 116 kt | 98 m | 349 m | 401 m paved | Student |
-| Wren 180 | Four-seat tourer | 3 / 320 kg | 70 km | 128 kt | 176 m | 380 m | 437 m paved | PPL |
-| Bushmaster STOL | Backcountry taildragger | 4 / 480 kg | 72 km | 131 kt | 103 m | 224 m | 257 m, gravel/snow | CPL |
-| Islander Twin | Nine-seat utility twin | 9 / 900 kg | 90 km | 129 kt | 251 m | 398 m | 458 m, gravel/snow | CPL |
-| Pelican Caravan | Single turboprop hauler | 12 / 1400 kg | 130 km | 149 kt | 481 m | 451 m | 553 m, gravel/snow | CPL |
-| Meridian Q400 | Regional turboprop airliner | 40 / 4500 kg | 170 km | 266 kt | 981 m | 646 m | 1129 m paved | ATP |
-| Starling 500 Jet | Light business jet | 7 / 700 kg | 260 km | 469 kt | 427 m | 540 m | 621 m paved | ATP |
+| Kestrel T2 | Two-seat trainer | 1 / 120 kg | 45 km | 118 kt | 99 m | 357 m | 410 m paved | Student |
+| Wren 180 | Four-seat tourer | 3 / 320 kg | 70 km | 130 kt | 144 m | 384 m | 442 m paved | PPL |
+| Bushmaster STOL | Backcountry taildragger | 4 / 480 kg | 72 km | 133 kt | 98 m | 218 m | 251 m, gravel/snow | CPL |
+| Islander Twin | Nine-seat utility twin | 9 / 900 kg | 90 km | 130 kt | 225 m | 408 m | 469 m, gravel/snow | CPL |
+| Pelican Caravan | Single turboprop hauler | 12 / 1400 kg | 130 km | 150 kt | 379 m | 457 m | 525 m, gravel/snow | CPL |
+| Meridian Q400 | Regional turboprop airliner | 40 / 4500 kg | 170 km | 265 kt | 678 m | 623 m | 780 m paved | ATP |
+| Starling 500 Jet | Light business jet | 7 / 700 kg | 260 km | 466 kt | 462 m | 527 m | 607 m paved | ATP |
+| Swift S6 | Retractable low-wing tourer | 3 / 420 kg | 140 km | 173 kt | 165 m | 392 m | 451 m paved | PPL |
+| Osprey C6 | Six-seat coastal charter twin | 5 / 270 kg | 110 km | 160 kt | 149 m | 389 m | 447 m paved | CPL |
 
 Cruise, take-off roll and landing distance are what each aircraft actually does in the flight model (learned by flying it: `flight_test --table`); the runway it needs is the longer of the two at full weight, 15% to spare, longer at high fields.
 
