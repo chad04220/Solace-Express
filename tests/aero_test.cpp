@@ -71,7 +71,8 @@ int main() {
     // full flap (the trim wheel adds up to 0.3 either way)
     {
       const float W = (s.emptyMass + s.maxFuel * 0.6f + s.cargoKg * 0.5f) * G0, rho = 1.225f;
-      const float vs1 = sqrtf(2 * W / (rho * s.wingArea * s.CLmax)), vs0 = sqrtf(2 * W / (rho * s.wingArea * (s.CLmax + s.flapCL * g.flapMax)));
+      const float vs1 = sqrtf(2 * W / (rho * s.wingArea * aeroCLmaxFlown(s, 0))), vs0 = sqrtf(2 * W / (rho * s.wingArea * aeroCLmaxFlown(s, 1)));
+      printf("    flown CLmax %.2f clean, %.2f flaps (wing %.2f, %.2f)\n", aeroCLmaxFlown(s, 0), aeroCLmaxFlown(s, 1), s.CLmax, s.CLmax + s.flapCL * g.flapMax);
       struct Case { const char* name; float V, flaps; } cases[] = {{"cruise", s.cruise, 0.f}, {"1.3 Vs1", 1.3f * vs1, 0.f}, {"Vref flap", 1.3f * vs0, g.flapMax}, {"1.1 Vs0", 1.1f * vs0, g.flapMax}};
       printf("    elevator to trim:");
       for (const Case& c : cases) {
@@ -85,6 +86,12 @@ int main() {
           if (fabsf(det) < 1e-6f) break;
           alpha += clampf(((W - L0) * a22 + M0 * a12) / det, -0.05f, 0.05f);
           el += clampf((-M0 * a11 - (W - L0) * a21) / det, -0.2f, 0.2f);
+        }
+        {   // (a balance or nothing: an elevator that can't trim it doesn't converge)
+          AeroIn in; in.steady = true; in.va = vec3(0, -c.V * sinf(alpha), -c.V * cosf(alpha)); in.rho = rho; in.flapL = in.flapR = c.flaps; in.pitch = el;
+          aeroForces(g, s, in, mem, 0.f, o);
+          float L = o.F.y * cosf(alpha) - o.F.z * sinf(alpha);
+          if (fabsf(L - W) > 0.02f * W || fabsf(o.M.x) > 0.01f * W * g.MAC) el = 9.f;
         }
         printf("  %s %.0f m/s a %.1f: %+.2f", c.name, c.V, alpha / DEG, el);
         check(fabsf(el) < (c.flaps > 0.f ? (c.V < 1.2f * vs0 ? 0.95f : 0.65f) : 0.75f), c.name, s.name);   // (the calibration's own aims: aero_strips.cpp)

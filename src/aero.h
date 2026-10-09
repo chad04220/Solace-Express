@@ -97,6 +97,8 @@ struct AeroGeom {
                                     // feathered): gear up, gear down
   float betaToAil = 0;    // aileron per radian of sideslip (a stability augmenter's): where the wing's own dihedral effect is
                           // too weak or turned round (forward sweep), it rolls away from the sideslip as a dihedral wing would
+  float clMaxTrim[2] = {9.f, 9.f};   // the highest lift coefficient it can be trimmed to, clean and with its flaps (a
+                                     // canard's stall can come first; 9: the wing's own stall)
   float flapMax = 1;      // the most flap the elevator trims on the approach: the flaps stop there (a canard's, mostly)
   float flapA = 0;        // the flaps' change of the zero-lift angle on their strips at full deflection (rad)
   float tailArm = 1, kEps = 1, etaTail = 0.92f;   // wing to tail (m), the downwash's share there, the tail's dynamic pressure ratio
@@ -106,6 +108,9 @@ struct AeroGeom {
 };
 // built once per type from its model (special 0 types; the XR-30 and XR-40 fly their own fly-by-wire model)
 const AeroGeom& aeroGeom(const AircraftSpec& s);
+// the highest lift coefficient it flies steady at, clean (flaps 0) or with its flaps out as far as they go (1): the
+// wing's maximum and the flaps', unless the controls run out first (a canard's stall)
+float aeroCLmaxFlown(const AircraftSpec& s, int flaps);
 // what the aerodynamics remember between steps: the strips' separation, the downwash on its way to the tail
 struct AeroMem { float f[AeroGeom::kMaxStrips]; float eps = 0, clw = 0; bool init = false; };
 struct AeroIn {

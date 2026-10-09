@@ -132,7 +132,9 @@ AeroGeom build(const AircraftSpec& s, int idx) {
       int first = g.nSt;
       addPanel(g, kind, (float)side, vec3(0, hy, hz), sp, n, m.ht[0], m.ht[1], m.ht[2], m.ht[3], 0.f, (int)NT);
       addControl(g, first, g.nSt, vec3(0, hy, hz), sp, m.ht[0], (int)NT, 0.12f, m.ht[0] * 0.98f, AC_ELEV, 0.32f);
-      for (int i = first; i < g.nSt; i++) g.st[i].clMax = 1.2f;   // (a symmetric section)
+      // (a tail's section is symmetric; a canard's is cambered for lift - it carries part of the weight, and has to
+      // keep lifting to the wing's stall)
+      for (int i = first; i < g.nSt; i++) { g.st[i].clMax = kind == AS_CANARD ? 1.6f : 1.2f; g.st[i].cm0 = kind == AS_CANARD ? -0.06f : 0.f; }
     }
     AeroSurface& t = g.surf[kind];
     t.first = first0; t.count = g.nSt - first0; t.b = 2.f * m.ht[0] * cosf(hd); t.S = m.ht[0] * (m.ht[1] + m.ht[2]);
@@ -265,7 +267,9 @@ void calibrate(AeroGeom& g, const AircraftSpec& s, int idx) {
   const float W = (s.emptyMass + s.maxFuel * 0.6f + s.cargoKg * 0.5f) * G0;
   float thr[4] = {};
   auto placeCG = [&](float sm) {
-    const float V = s.cruise, rho = a15.rho;
+    // (subsonic, at most Mach 0.6: a supersonic type trims its cruise with the elevator - set for Mach 1, the XR-20's
+    // canard sat so steep that any up elevator stalled it when slow)
+    const float V = std::min(s.cruise, 0.6f * a15.a), rho = a15.rho;
     float alpha = 2.f * DEG;
     for (int pass = 0; pass < 2; pass++) {   // (the neutral point moves a little with the tail's load: twice round)
       g.xNP = neutralPoint();
@@ -317,8 +321,8 @@ void calibrate(AeroGeom& g, const AircraftSpec& s, int idx) {
   // Where the drawn tail can't, the masses go further aft - down to a 6% margin - as a designer would ballast it
   {
     const float rho = 1.225f;
-    auto trimElevator = [&](float k) {   // (at k x Vs0)
-      const float fl = s.flapCL > 0.01f ? g.flapMax : 0.f, V = k * sqrtf(2.f * W / (rho * s.wingArea * (s.CLmax + s.flapCL * fl)));
+    auto trimElevator = [&](float k, float fl) {   // (at k x the stall speed with these flaps)
+      const float V = k * sqrtf(2.f * W / (rho * s.wingArea * (s.CLmax + s.flapCL * fl)));
       float alpha = 4.f * DEG, el = 0.f;
       for (int it = 0; it < 25; it++) {
         auto f = [&](float a, float e) {
@@ -332,13 +336,54 @@ void calibrate(AeroGeom& g, const AircraftSpec& s, int idx) {
         alpha += clampf(((W - r0.x) * a22 + r0.y * a12) / det, -0.05f, 0.05f);
         el = clampf(el + clampf((-r0.y * a11 - (W - r0.x) * a21) / det, -0.2f, 0.2f), -1.5f, 1.5f);
       }
+      // (only a balance counts: lift within 2% of the weight, the moment within a hundredth of the weight's over the
+      // mean chord - an elevator that can't trim it doesn't converge to anything)
+      AeroIn in = steadyIn(V, rho, alpha); in.flapL = in.flapR = fl; in.pitch = el;
+      mem.init = false; aeroForces(g, s, in, mem, 0.f, o);
+      if (fabsf(liftOf(o) - W) > 0.02f * W || fabsf(o.M.x) > 0.01f * W * g.MAC) return 9.f;
       return el;
     };
+    const float flaps = s.flapCL > 0.01f ? 1.f : 0.f;
     // (and slowed to 1.1 Vs0 - the flare, the approach to the stall - with a little still to spare)
-    auto trims = [&]() { return trimElevator(1.3f) < 0.6f && trimElevator(1.1f) < 0.92f; };
+    auto trims = [&]() { return trimElevator(1.3f, flaps * g.flapMax) < 0.6f && trimElevator(1.1f, flaps * g.flapMax) < 0.92f; };
     for (float sm = smNominal; !trims() && sm > 0.065f; ) { sm = std::max(sm - 0.01f, 0.06f); placeCG(sm); }
-    // and where even that won't do (a canard ahead of a flapped wing), the flaps go only as far as it trims
-    while (s.flapCL > 0.01f && g.flapMax > 0.15f && !trims()) g.flapMax -= 0.1f;
+    // and where even that won't do (a canard ahead of a flapped wing), the flaps go only as far as the approach trims
+    if (flaps > 0.f) {
+      while (g.flapMax > 0.05f && trimElevator(1.3f, g.flapMax) >= 0.6f) g.flapMax = std::max(g.flapMax - 0.1f, 0.f);
+      if (g.flapMax < 0.05f) g.flapMax = 0.f;
+    }
+    // the most lift it flies at, trimmed: at each angle of attack the elevator that balances it (bisected; an angle
+    // it can't balance it can't fly at), the best lift of those. The published stall speeds are trimmed ones, so the
+    // wing's sections are set to give the type's CLmax so (the tail's download costs a few percent) - but by no more
+    // than 15%: a canard that stalls before the wing (it is meant to: the nose drops first) sets a lower limit of
+    // its own, and the autopilot's stall speeds come from it (aircraft_perf.cpp)
+    auto trimmedCLmax = [&](float fl) {
+      const float V = 40.f, qS = 0.5f * rho * V * V * s.wingArea;
+      float best = 0.f;
+      for (float a = 0.f; a < 26.f * DEG; a += 0.5f * DEG) {
+        auto m = [&](float e) { AeroIn in = steadyIn(V, rho, a); in.flapL = in.flapR = fl; in.pitch = e; mem.init = false; aeroForces(g, s, in, mem, 0.f, o); return o.M.x; };
+        float lo = -1.f, hi = 1.f, mlo = m(lo), mhi = m(hi);
+        if ((mlo > 0.f) == (mhi > 0.f)) continue;
+        for (int i = 0; i < 12; i++) { float mid = 0.5f * (lo + hi), mm = m(mid); if ((mm > 0.f) == (mlo > 0.f)) { lo = mid; mlo = mm; } else hi = mid; }
+        m(0.5f * (lo + hi));
+        best = std::max(best, liftOf(o) / qS);
+      }
+      return best;
+    };
+    {
+      float total = 1.f;
+      for (int it = 0; it < 3; it++) {
+        const float cl = trimmedCLmax(0.f);
+        if (cl < 0.05f) break;
+        const float k = clampf(s.CLmax / cl, 1.f / total * 0.95f, 1.15f / total);
+        total *= k;
+        for (int w = g.surf[AS_WING].first; w < g.surf[AS_WING].first + g.surf[AS_WING].count; w++) g.st[w].clMax *= k;
+      }
+    }
+    g.clMaxTrim[0] = trimmedCLmax(0.f) * 1.005f;   // (a hair over: the wing's own CLmax is the limit where it's met)
+    g.clMaxTrim[1] = trimmedCLmax(flaps * g.flapMax) * 1.005f;
+    // (flaps that leave it less lift it can trim to than it has clean only cost it: they stay up)
+    if (g.flapMax > 0.f && g.clMaxTrim[1] < g.clMaxTrim[0]) { g.flapMax = 0.f; g.clMaxTrim[1] = g.clMaxTrim[0]; }
   }
   // the dihedral effect at 1.3 Vs1 clean: a wing whose own is weaker than a light aircraft's (Cl_beta -0.05 per
   // radian) gets a sideslip-to-aileron interconnect that makes up the difference
@@ -407,6 +452,11 @@ const AeroGeom& aeroGeom(const AircraftSpec& s) {
     cache[idx].gearAt = vec3(0, -s.fusRad - 0.35f, 0.7f * gst.mainZ + 0.3f * (s.taildragger ? gst.tailZ : gst.noseZ));
   }
   return cache[idx];
+}
+
+float aeroCLmaxFlown(const AircraftSpec& s, int flaps) {
+  const float fl = flaps ? (s.special ? 1.f : aeroGeom(s).flapMax) : 0.f, wing = s.CLmax + s.flapCL * fl;
+  return s.special ? wing : std::min(wing, aeroGeom(s).clMaxTrim[flaps ? 1 : 0]);
 }
 
 void aeroForces(const AeroGeom& g, const AircraftSpec& s, const AeroIn& in, AeroMem& mem, float dt, AeroOut& out) {
@@ -512,7 +562,9 @@ void aeroForces(const AeroGeom& g, const AircraftSpec& s, const AeroIn& in, Aero
       // lift per streamwise angle - is the section's there times the sweep's cosine)
       float aEff = aGeo + inc / st.cosSw + dctl + g.flapA * flap;
       float a = slope[st.surf] * st.load / st.cosSw;
-      float clMax = st.clMax * (1.f - 0.3f * in.ice) + 0.9f * a * g.flapA * flap;
+      // (a deflected surface raises the section's maximum lift too, on the side it deflects towards: a plain flap's
+      // about 60% of the lift it adds - the canard pulled to full lift stalled sooner instead of lifting more)
+      float clMax = st.clMax * (1.f - 0.3f * in.ice) + 0.9f * a * g.flapA * flap + 0.6f * a * std::max(dctl * (aGeo + inc >= 0.f ? 1.f : -1.f), 0.f);
       float x = a * aEff / std::max(clMax, 0.1f);
       // separation: its static share at this angle, reached with a lag (fast to separate, slow to reattach)
       float f0 = 1.f - smoothstepf(1.25f, 1.25f + 5.f * DEG * a / std::max(clMax, 0.1f), fabsf(x));

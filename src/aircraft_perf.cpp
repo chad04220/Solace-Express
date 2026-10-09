@@ -59,8 +59,8 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
   const float fuel = s.maxFuel * 0.6f, payload = 150.f;
   const vec3 sea = seaPoint() + vec3(0, 1200.f, 0);
   const float W = (s.emptyMass + fuel + payload) * G0, rho = isaDensity(1200.f);
-  P.vs1 = sqrtf(2.f * W / (rho * s.wingArea * s.CLmax));
-  P.vs0 = sqrtf(2.f * W / (rho * s.wingArea * (s.CLmax + s.flapCL * (s.special ? 1.f : aeroGeom(s).flapMax))));   // (the flaps as far as they go)
+  P.vs1 = sqrtf(2.f * W / (rho * s.wingArea * aeroCLmaxFlown(s, 0)));   // (the wing's, unless its controls run out first)
+  P.vs0 = sqrtf(2.f * W / (rho * s.wingArea * aeroCLmaxFlown(s, 1)));   // (the flaps as far as they go)
   P.gLimit = s.gLimitPos(); P.gNeg = s.gLimitNeg();
   // provisional numbers, used by the inner loops while the test sorties below fly
   P.vy = s.vref * 1.4f; P.roc = s.special ? 30.f : s.engineType == ENG_JET ? 12.f : 4.f; P.sinkIdle = 4.f;
@@ -160,7 +160,7 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
       // full flap, idle, then the brakes as hard as the type takes (a taildragger brakes gently, as the autopilot's
       // rollout does); Vs0 at this weight and the field's air
       float W = (s.emptyMass + s.maxFuel + mtowLoad) * G0, rho = isaDensity(a.elev);
-      float vs0 = sqrtf(2.f * W / (rho * s.wingArea * (s.CLmax + s.flapCL * (s.special ? 1.f : aeroGeom(s).flapMax))));
+      float vs0 = sqrtf(2.f * W / (rho * s.wingArea * aeroCLmaxFlown(s, 1)));
       Plane p; vec3 st = a.threshold(false) + a.dir() * 200.f; st.y = a.elev;
       p.reset(&s, st, a.heading, s.maxFuel, mtowLoad, false);
       p.sceneryHits = false;
