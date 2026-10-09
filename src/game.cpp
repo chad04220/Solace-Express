@@ -3810,14 +3810,21 @@ void Game::debugScene(const std::string& name) {
     if (at != std::string::npos && sscanf(name.c_str() + at + 1, "%f,%f", &ax, &az) == 2) { plane.pos = vec3(ax, std::max(g_world.height(ax, az), 0.f) + 600.f, az); camQ = plane.q; }
     camMode = 1; hint.clear(); toasts.clear();
     for (int i = 0; i < 4; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
-    lookYaw = ly * DEG; lookPitch = lpch * DEG; camYaw = lookYaw; camPitch = lookPitch + 0.12f;
-    plane.ctl.roll = roll; botControl = roll != 0.f || fl != 0.f;   // (a held roll input: the yokes turn)
-    if (fl != 0.f) { plane.ctl.flaps = fl; plane.flaps = fl; }
-    if (const char* cs = getenv("CKCTL")) {   // (debug: the controls held at pitch,roll,yaw,throttle - yokes, pedals and levers at their stops)
+    if (const char* cs = getenv("CKCTL")) {   // (debug: the controls held at pitch,roll,yaw,throttle - yokes, pedals and levers at their stops,
+      // the aircraft held where it was while they get there: flown, full aft stick at cruise breaks a jet up)
       float cp = 0, cr = 0, cy = 0, ct = 0.7f; sscanf(cs, "%f,%f,%f,%f", &cp, &cr, &cy, &ct);
-      botControl = true; plane.ctl.pitch = cp; plane.ctl.roll = cr; plane.ctl.yaw = cy; plane.ctl.throttle = ct; plane.engineSpool = ct;
-      for (int i = 0; i < 20; i++) { realTime += 1 / 30.f; update(1 / 30.f); plane.ctl.pitch = cp; plane.ctl.roll = cr; plane.ctl.yaw = cy; plane.ctl.throttle = ct; }
+      botControl = true;
+      const vec3 p0 = plane.pos, v0 = plane.vel; const quat q0 = plane.q;
+      for (int i = 0; i < 20; i++) {
+        plane.ctl.pitch = cp; plane.ctl.roll = cr; plane.ctl.yaw = cy; plane.ctl.throttle = ct; plane.engineSpool = ct;
+        realTime += 1 / 30.f; update(1 / 30.f);
+        plane.pos = p0; plane.vel = v0; plane.q = q0; plane.w = vec3(); plane.gLoad = 1.f;
+      }
+      gTunnel = 0;
     }
+    lookYaw = ly * DEG; lookPitch = lpch * DEG; camYaw = lookYaw; camPitch = lookPitch + 0.12f;
+    if (!getenv("CKCTL")) { plane.ctl.roll = roll; botControl = roll != 0.f || fl != 0.f; }   // (a held roll input: the yokes turn)
+    if (fl != 0.f) { plane.ctl.flaps = fl; plane.flaps = fl; }
     toasts.clear(); hint.clear(); return;
   }
   if (name.compare(0, 3, "brk") == 0) {   // an in-flight break-up: brk<aircraft>_<seconds after>_<view yaw deg>: the pieces, seen from 30 m
