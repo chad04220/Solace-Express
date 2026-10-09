@@ -148,6 +148,7 @@ add_test(NAME ufo_encounter COMMAND encounter_timing_test)
 add_executable(shader_prune_test tests/shader_prune_test.cpp)
 target_include_directories(shader_prune_test PRIVATE src)
 add_test(NAME shader_prune COMMAND shader_prune_test)
+add_dependencies(shader_keyword_test shader_prune_test)   # (built with a target the CI sanitizer job names)
 # GLSL check of the ray tracer and the programs built from it, as assembled and as pruned (only where glslangValidator
 # is installed)
 add_executable(shader_check tools/shader_check.cpp)
