@@ -1,5 +1,10 @@
 ## What's new
 
+Dynamic weather (below), and a fix to the Airline tab.
+
+### Fixes
+- The Airline tab's text stays inside its panels. At 1920x1080 the "No routes yet" line ran across into the right-hand panel through the Pilots heading, and the right-hand panel's lines ran off its edge. Long lines now wrap, and the pilots' names stop short of their Hire and Let go buttons.
+
 ### Wind and gusts
 - Gusts come in bursts. A gust builds over a second or two, peaks at about the reported gust, swings the wind a little and dies away, with a lull before the next. Parked, you meet one every ten or twenty seconds. Flying, you meet them quicker and sharper. The gusts are strongest near the ground and fade with height. Before, the wind wobbled smoothly all the time at the same rate.
 - Turbulence is carried by the air. The faster you fly, the quicker the bumps come. Near the ground the eddies are small and choppy, and aloft they are long and smooth. A gust under one wing now rolls the aircraft, and one along the fuselage pitches or yaws it.
