@@ -101,6 +101,8 @@ struct AeroGeom {
                                      // canard's stall can come first; 9: the wing's own stall)
   float flapMax = 1;      // the most flap the elevator trims on the approach: the flaps stop there (a canard's, mostly)
   float flapA = 0;        // the flaps' change of the zero-lift angle on their strips at full deflection (rad)
+  float flapCdK = 0.4f;   // the flapped strips' drag per (flapA x deflection)^2: the type's full-flap drag (its profile drag
+                          // and the induced drag of the lift crowded inboard)
   float tailArm = 1, kEps = 1, etaTail = 0.92f;   // wing to tail (m), the downwash's share there, the tail's dynamic pressure ratio
   float MAC = 1, xNP = 0, staticMargin = 0;       // mean aerodynamic chord (m), the neutral point (body z) and the margin at the CG
   float wingArea = 0;     // the drawn wing's area (m^2)

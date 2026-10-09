@@ -82,6 +82,7 @@ int main(int argc, char** argv) {
               wx.windFrom = wrapDeg360(wx0.windFrom + 120.f * f); wx.windSpeed = wx0.windSpeed + (8.f - wx0.windSpeed) * f;
             }
             p.step(1 / 60.f, wx, k / 60.f);
+            if (getenv("APDBG") && p.gLoad > maxG && p.gLoad > 4.f) printf("    max g %.1f at t %.1f stage %d on ground %d agl %.1f ias %.1f pitch %.1f vs %.2f q %.1f\n", p.gLoad, k / 60.f, p.apStage, (int)p.onGround, p.agl(), p.ias, p.pitchDeg(), p.vel.y, p.w.x / DEG);
             maxG = std::max(maxG, p.gLoad);
             if (!p.onGround && k > 60) { minG = std::min(minG, p.gLoad); maxBank = std::max(maxBank, fabsf(p.bankDeg())); }   // (airborne, past the spawn's first second)
             if (p.ev.touchdown && !td) {
@@ -89,7 +90,7 @@ int main(int argc, char** argv) {
               if (getenv("APDBG")) { vec3 r = p.pos - p.apTd; printf("  touchdown %.0f m past the aim point (%.0f m runway), ground speed %.1f m/s (vref %.1f), vs %.1f\n", dot(r, p.apLd), A.length, length(vec3(p.vel.x, 0, p.vel.z)), s.vref, tdVs); }
             }
             if (p.apStage == Plane::APS_GOAROUND && last != Plane::APS_GOAROUND) goArounds++;
-            if (getenv("APDBG") && !td && p.apStage == Plane::APS_FINAL && p.pos.y - p.gearHeight() - A.elev < 45.f && (k % 15) == 0) printf("    final: %.1f m up, vs %.2f (asked %.2f), ias %.1f, pitch %.1f, throttle %.2f, stick %.2f, g %.2f, aoa %.1f\n", p.pos.y - p.gearHeight() - A.elev, p.vel.y, p.apVS, p.ias, p.pitchDeg(), p.ctl.throttle, p.ctl.pitch, p.gLoad, p.alpha / DEG);
+            if (getenv("APDBG") && !td && p.apStage == Plane::APS_FINAL && p.pos.y - p.gearHeight() - A.elev < 45.f && (k % 15) == 0) printf("    final: %.1f m up, vs %.2f (asked %.2f), ias %.1f (asked %.1f), pitch %.1f, throttle %.2f, stick %.2f, flaps %.2f, g %.2f, aoa %.1f\n", p.pos.y - p.gearHeight() - A.elev, p.vel.y, p.apVS, p.ias, p.apSpeed, p.pitchDeg(), p.ctl.throttle, p.ctl.pitch, p.flaps, p.gLoad, p.alpha / DEG);
             if (getenv("APDBG") && p.apStage == Plane::APS_BLEED && (k % 15) == 0) printf("    belly-up: %.1f m up, pitch %.0f, ias %.1f, vs %.1f, g %.1f\n", p.pos.y - p.gearHeight() - A.elev, p.pitchDeg(), p.ias, p.vel.y, p.gLoad);
             if (getenv("APDBG") && !td && p.apStage == Plane::APS_FLARE && (k % 15) == 0) printf("    flare: %.1f m up, vs %.2f (asked %.2f), ias %.1f, pitch %.1f, stick %.2f, g %.2f, aoa %.1f, cross %.1f, heading off the runway %.1f\n", p.pos.y - p.gearHeight() - A.elev, p.vel.y, p.apVS, p.ias, p.pitchDeg(), p.ctl.pitch, p.gLoad, p.alpha / DEG, dot(p.pos - p.apTd, vec3(-p.apLd.z, 0, p.apLd.x)), wrapAngle(p.heading() * DEG - atan2f(p.apLd.x, -p.apLd.z)) / DEG);
             if (getenv("APDBG") && td && (k % 60) == 0 && length(vec3(p.vel.x, 0, p.vel.z)) > 3.f) printf("    rollout: %.1f m/s, brake %.2f, on ground %d, throttle %.2f, cross %.1f, heading off the runway %.1f\n", length(vec3(p.vel.x, 0, p.vel.z)), p.ctl.brake, (int)p.onGround, p.ctl.throttle, dot(p.pos - p.apTd, vec3(-p.apLd.z, 0, p.apLd.x)), wrapAngle(p.heading() * DEG - atan2f(p.apLd.x, -p.apLd.z)) / DEG);

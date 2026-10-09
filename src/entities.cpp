@@ -560,6 +560,26 @@ static float entityPad() {
   });
   return pad;
 }
+// what an approach has to clear besides the ground: the tops of the trees and buildings near a point on its path
+float Scenery::obstacleTop(float x, float z, float r) {
+  float top = -1e9f;
+  const float pad = entityPad();
+  for (int cz = chunkOf(z - r - pad); cz <= chunkOf(z + r + pad); cz++)
+    for (int cx = chunkOf(x - r - pad); cx <= chunkOf(x + r + pad); cx++) {
+      Chunk* ch = ensure(cx, cz, 2);
+      if (!ch || ch->ents.empty() || ch->ymax <= top) continue;
+      for (int k = 0; k < EK_COUNT; k++) {
+        if (k == EK_RWYLIGHT || k == EK_PAPI) continue;   // (frangible airport fixtures)
+        const EntKindInfo& I = kEntInfo[k];
+        for (uint32_t i = ch->off[k]; i < ch->off[k + 1]; i++) {
+          const Ent& e = ch->ents[i];
+          const float R = hypotf(I.hx * e.sx, I.hz * e.sz) + r, dx = x - e.x, dz = z - e.z;
+          if (dx * dx + dz * dz < R * R && !destroyed(e)) top = std::max(top, e.y + I.h * e.sy);
+        }
+      }
+    }
+  return top;
+}
 int Scenery::collide(vec3 p, float r, Ent* entOut) {
   float pad = entityPad();
   int c0x = chunkOf(p.x - r - pad), c1x = chunkOf(p.x + r + pad), c0z = chunkOf(p.z - r - pad), c1z = chunkOf(p.z + r + pad);

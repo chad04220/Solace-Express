@@ -96,6 +96,21 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
   P.gPull = std::min(P.gLimit, 1.f + P.gPerStick);
   P.gUse = std::max(1.6f, std::min(P.gLimit, P.gPull));
   P.bankMax = clampf(acosf(1.f / P.gUse) / DEG, 35.f, 85.f);
+  // the rear-up: a full pull at idle from level flight at the fast final's speed, until the belly-up would stop (68 deg,
+  // or zooming); how far the nose gets is whether the belly-up sheds the speed at all - a canard that stalls first, or
+  // a tail that runs out of authority, holds the angle of attack down and turns the speed into height instead (the
+  // revised XR-20 reached 23 deg, zoomed 50 m and arrived on the final 15 m/s fast)
+  P.rearPitch = 90.f;
+  if (!s.special) {
+    Plane p; fresh(p, s.vref * 1.7f, false);
+    p.ctl.throttle = 0; p.engineSpool = 0;
+    P.rearPitch = 0;
+    for (int k = 0; k < 4 * 60 && !p.ev.crashed && p.vel.y < 18.f; k++) {
+      p.ctl.pitch = 1.f; p.ctl.throttle = 0; p.step(1 / 60.f, calm, k / 60.f);
+      P.rearPitch = std::max(P.rearPitch, p.pitchDeg());
+      if (P.rearPitch > 68.f) break;
+    }
+  }
   // speed held with the elevator on the autopilot's inner loops, throttle as given; returns the specific excess power
   // (energy height rate, m/s: what it would climb at if it held the speed exactly)
   auto excessPower = [&](float v, bool dirty, float thr, float secs) {
@@ -165,12 +180,15 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
       p.reset(&s, st, a.heading, s.maxFuel, mtowLoad, false);
       p.sceneryHits = false;
       for (int i = 0; i < 60; i++) p.step(1 / 60.f, calm, 0.f);   // (settled on its wheels)
-      // (the roll starts at touchdown, 1.1 Vs0: the approach at 1.3 Vs0 is the air segment below)
-      p.vel = p.forward() * (vs0 * 1.1f); p.ctl.flaps = 1; p.flaps = 1; p.ctl.throttle = 0; p.engineRunning = true;
+      // (the roll starts at touchdown, 1.1 Vs0 - a taildragger's three-point at the stall: at 1.1 Vs0 in that attitude the
+      // Bushmaster's full-flap wing flew again - and the approach at 1.3 Vs0 is the air segment below)
+      p.vel = p.forward() * (vs0 * (s.taildragger ? 1.f : 1.1f)); p.ctl.flaps = 1; p.flaps = 1; p.ctl.throttle = 0; p.engineRunning = true;
       vec3 p0 = p.pos; P.ldgRoll = -1;
       for (float t = 0; t < 120.f && !p.ev.crashed; t += 1 / 60.f) {
-        // (a taildragger is held tail-up while fast - in its three-point attitude it would fly again - then stick back)
-        p.ctl.throttle = 0; p.ctl.brake = s.taildragger ? 0.55f : 1.f; p.ctl.pitch = s.taildragger ? (p.ias > s.vref * 0.8f ? -0.35f : 0.4f) : 0.f;
+        // (a taildragger as the autopilot's rollout flies it: the stick back, the brakes in as the tail is down and off the
+        // moment the nose starts down - held tail-up with the stick forward, it nosed over onto its propeller)
+        p.ctl.throttle = 0; p.ctl.pitch = s.taildragger ? (p.ias > s.vref * 0.8f ? 0.15f : 1.f) : 0.f;
+        p.ctl.brake = s.taildragger ? 0.55f * smoothstepf(4.f, 9.f, p.pitchDeg()) * (p.w.x < -0.02f ? 0.f : 1.f) : 1.f;
         p.ctl.yaw = clampf(wrapAngle((a.heading - p.heading()) * DEG) * 3.f, -1, 1);
         p.step(1 / 60.f, calm, t);
         // (the landing distance: the approach path from 15 m over the threshold - 3 deg, or the 6.5 deg the autopilot

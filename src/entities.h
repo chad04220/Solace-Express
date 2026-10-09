@@ -65,6 +65,7 @@ public:
   static float chunkX0(int c) { return c * CH - WORLD_HALF; }
   // Collision: returns the kind + 1 of an entity the sphere (p, r) touches, 0 if none (entOut: a copy of it).
   int collide(vec3 p, float r, Ent* entOut = nullptr);
+  float obstacleTop(float x, float z, float r);      // the highest treetop or roof within r of (x, z) (m; -1e9: none)
   // First entity a segment (a, unit d, length L) passes through: distance along it, or -1 (kindOut = kind + 1)
   float raycast(vec3 a, vec3 d, float L, int* kindOut = nullptr, Ent* entOut = nullptr);
   // Craters destroy what stands in them (x, z, radius)

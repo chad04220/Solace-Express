@@ -250,6 +250,13 @@ void calibrate(AeroGeom& g, const AircraftSpec& s, int idx) {
     if (dcl > 1e-3f) g.flapA *= clampf(s.flapCL * scale / dcl, 0.3f, 3.f);
   }
   if (s.flapCL <= 0.01f) g.flapA = 0.f;
+  // (and their drag: the type's at full flap, on its wing - the deflected flap's own profile drag, about sin^2 of its
+  // angle, and the induced drag of the lift crowded inboard - square in the deflection. A generic 0.4 left the
+  // full-flap drag a third to a fifth of it: the Bushmaster dived its final at idle, nose 13 deg down, gathering speed)
+  {
+    float fa = 0; for (int i = 0; i < g.nSt; i++) if (g.st[i].ctl == AC_FLAP) fa += g.st[i].area * g.st[i].cover * 1.1f;
+    if (fa > 0.f && g.flapA > 1e-3f && s.flapCD > 0.f) g.flapCdK = s.flapCD * s.wingArea / (fa * g.flapA * g.flapA);
+  }
   // the neutral point (with the centre of gravity at the origin for now): where the lift's change acts
   g.cg = vec3();
   // (subsonic, at most Mach 0.5: past Mach 1 the lift's centre moves aft and the margin only grows - where it is
@@ -604,7 +611,7 @@ void aeroForces(const AeroGeom& g, const AircraftSpec& s, const AeroIn& in, Aero
     // the deflected surface's drag
     vec3 nPerp = st.n - L.uh * dot(st.n, L.uh); float nl = length(nPerp); nPerp = nl > 1e-4f ? nPerp * (1.f / nl) : st.n;
     float ai = CLs[st.surf] / (PI * std::max(g.surf[st.surf].AR, 0.5f) * g.surf[st.surf].e) * ge[st.surf];
-    float cdAtt = cdp[st.surf] + 0.006f * L.cl * L.cl + L.cl * ai + 0.3f * L.dctl * L.dctl + 0.4f * (g.flapA * L.cover) * (g.flapA * L.cover);
+    float cdAtt = cdp[st.surf] + 0.006f * L.cl * L.cl + L.cl * ai + 0.3f * L.dctl * L.dctl + g.flapCdK * (g.flapA * L.cover) * (g.flapA * L.cover);
     // separated: the flat plate's normal force, and its friction (L.cl already carries the attached share)
     float ap = L.aPlate, CN = 1.6f * sinf(ap) + 0.45f * sinf(2.f * ap);
     vec3 Fsep = st.n * (CN * qS) + L.uh * (cdp[st.surf] * qS);

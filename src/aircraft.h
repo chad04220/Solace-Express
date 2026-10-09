@@ -89,6 +89,7 @@ struct PerfModel {
   float gPull = 0;                 // load factor a full aft stick reaches at cruise (before any limiter)
   float gLimit = 0, gNeg = 0;      // structural limits (positive, negative)
   float gUse = 0;                  // what the pilot may pull: within the structure, the stall and its pull authority
+  float rearPitch = 0;             // the nose-up attitude a full pull at idle reaches from level flight at 1.7 Vref (deg)
   float bankMax = 0;               // steepest bank it may hold in a level turn (deg)
   float cruiseV = 0;               // level true airspeed at 75% power, 1500 m, mid weight (m/s)
   float toRoll = 0, ldgRoll = 0;   // at full weight, sea level, no wind: ground roll to lift-off, and landing distance from 15 m (3 deg path at 1.3 Vs0) to a stop on the brakes (m)
@@ -191,6 +192,8 @@ public:
   // (APS_BLEED: the research craft come down the final fast and, a few km out, rear up belly-first into the airflow -
   // throttle closed, nose 70 deg up - to shed the speed, then drop the nose back onto the glidepath)
   int apBleedPhase = 0; bool apBled = false; float apBleedT = 1e9f;   // (pitching up / nose back down; done this approach; s since)
+  float apFlareMin = 0;   // the lowest the flare has been (m above the runway): a balloon is measured from it
+  float apGroundT = 0;   // s the rollout has had its wheels down without a skip (the nose waits for it)
   bool apOn = false; int apMode = AP_OFF;
   float apHeading = 0, apAlt = 0, apSpeed = 0, apVS = 0; bool apUseVS = false;
   float apPitchI = 0, apRollI = 0, apYawI = 0, apVmcCap = 1, apThrI = 0.5f, apXI = 0, apGamI = 0, apTrimEst = 0, apFlareTau = 0, apFlareVs = 0, apGustAdd = 0;

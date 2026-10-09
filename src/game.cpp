@@ -3813,6 +3813,11 @@ void Game::debugScene(const std::string& name) {
     lookYaw = ly * DEG; lookPitch = lpch * DEG; camYaw = lookYaw; camPitch = lookPitch + 0.12f;
     plane.ctl.roll = roll; botControl = roll != 0.f || fl != 0.f;   // (a held roll input: the yokes turn)
     if (fl != 0.f) { plane.ctl.flaps = fl; plane.flaps = fl; }
+    if (const char* cs = getenv("CKCTL")) {   // (debug: the controls held at pitch,roll,yaw,throttle - yokes, pedals and levers at their stops)
+      float cp = 0, cr = 0, cy = 0, ct = 0.7f; sscanf(cs, "%f,%f,%f,%f", &cp, &cr, &cy, &ct);
+      botControl = true; plane.ctl.pitch = cp; plane.ctl.roll = cr; plane.ctl.yaw = cy; plane.ctl.throttle = ct; plane.engineSpool = ct;
+      for (int i = 0; i < 20; i++) { realTime += 1 / 30.f; update(1 / 30.f); plane.ctl.pitch = cp; plane.ctl.roll = cr; plane.ctl.yaw = cy; plane.ctl.throttle = ct; }
+    }
     toasts.clear(); hint.clear(); return;
   }
   if (name.compare(0, 3, "brk") == 0) {   // an in-flight break-up: brk<aircraft>_<seconds after>_<view yaw deg>: the pieces, seen from 30 m
@@ -3980,6 +3985,11 @@ void Game::debugScene(const std::string& name) {
       botControl = true; plane.ctl.pitch = cp; plane.ctl.roll = cr; plane.ctl.yaw = cy; plane.ctl.flaps = cf; plane.flaps = cf;
       const int n = getenv("GAVCTLN") ? atoi(getenv("GAVCTLN")) : 60;   // (the settle time: the controls' smoothing)
       for (int i = 0; i < n; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    }
+    if (const char* th = getenv("GAVTHR")) {   // (debug: the engines running at this throttle - reheat from 0.85 on the jets that have it)
+      const float t = clampf((float)atof(th), 0.f, 1.f);
+      botControl = true; plane.engineRunning = true; plane.ctl.throttle = t; plane.engineSpool = t; plane.ctl.brake = 1;
+      plane.rpm = plane.spec->engineType == ENG_JET ? 24.f + 76.f * t : plane.spec->maxRpm * 0.9f; plane.n1 = 24.f + 76.f * t;
     }
     if (gearAt >= 0) {   // (the gear held part way: lifted clear of the runway for the few frames that follow)
       plane.gear = std::min(gearAt, 1.f); plane.ctl.gearDown = gearAt >= 0.5f; plane.pos.y += 2.f + lift; plane.vel = vec3();   // (lift: high enough to look up at its underside)
