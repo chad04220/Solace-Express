@@ -617,6 +617,10 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel) {
   glUniform1i(U(p, "uDisplayEngines"), pv.model>=0 && pv.model<=kWraith?kAircraft[pv.model].engines:2);
   glUniform1i(U(p, "uDisplayRetract"), pv.model>=0 && pv.model<=kWraith ? (kAircraft[pv.model].retract?1:0) : (pv.M[1]>=3.f?1:0));
   glUniform1i(U(p, "uDisplayPiston"), pv.model>=0 && pv.model<=kWraith && kAircraft[pv.model].engineType==ENG_PISTON?1:0);
+  {   // (the jets with an afterburner: the research craft and the supersonic types - exhaust.h hasReheat)
+    const AircraftSpec* rs = pv.model>=0 && pv.model<=kWraith ? &kAircraft[pv.model] : nullptr;
+    glUniform1i(U(p, "uDisplayReheat"), rs ? (rs->engineType==ENG_JET && (rs->special!=0 || rs->designMach>1.f) ? 1 : 0) : 1);
+  }
   glUniform4fv(U(p, "uEngineHealth"), 1, pv.engineHealth);
   glUniform4fv(U(p, "uFlame"), 1, pv.flame);
   glUniform2f(U(p, "uDispRes"), (float)w, (float)h);

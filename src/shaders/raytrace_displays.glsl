@@ -134,7 +134,7 @@ vec3 glassGlare(vec3 c, vec2 d, float r){   // faint reflection across the cover
   float g = smoothstep(0.2, 1.0, dot(normalize(d + vec2(1e-5)), normalize(vec2(-0.6, 0.8))))*smoothstep(1.0, 0.55, length(d)/r);
   return c + vec3(0.025, 0.03, 0.035)*g;
 }
-uniform int uDisplayEngines, uDisplayRetract, uDisplayPiston;
+uniform int uDisplayEngines, uDisplayRetract, uDisplayPiston, uDisplayReheat;
 uniform vec4 uEngineHealth; // exact health from Plane::fail, zero means stopped
 const vec3 IW = vec3(0.93, 0.94, 0.9), IG = vec3(0.12, 0.78, 0.3), IY = vec3(0.95, 0.78, 0.12), IR = vec3(0.95, 0.15, 0.1), IO = vec3(1.0, 0.55, 0.05);
 // Instrument colour (emissive) for a point q on the panel (metres, relative to the pilot's panel centre)
@@ -545,12 +545,14 @@ vec3 mfdPage(int page, vec2 uv){
       c = mix(c, W*0.7, txt4(o - vec2(0.0, -0.011/displayScale), 0.065/displayScale, single?ivec4(78,49,0,0):four?ivec4(78,49,32,49+e):(e == 0 ? ivec4(78,49,32,76):ivec4(78,49,32,82)), 1));
     }
     float bn = sdRBox(uv - vec2(0.0, -0.78), vec2(0.36, 0.09), 0.03);
-    if (ab > 0.01) {
-      float fl = 0.6 + 0.4*sin(uTime*20.0);
-      c = mix(c, A*0.25*ab, aFill(bn));
-      c = mix(c, A*fl, aLine(bn, lw*0.8)*ab);
-      c = mix(c, A*fl, txt(uv - vec2(0.0, -0.78), 0.09, ivec4(82, 69, 72, 69), ivec4(65, 84, 0, 0), 1)*ab);
-    } else c = mix(c, G*0.8, txt(uv - vec2(0.0, -0.78), 0.075, ivec4(68, 82, 89, 0), ivec4(0), 1));
+    if (uDisplayReheat != 0) {   // (only a jet with reheat reports it: a turboprop's or a bizjet's page has no DRY banner)
+      if (ab > 0.01) {
+        float fl = 0.6 + 0.4*sin(uTime*20.0);
+        c = mix(c, A*0.25*ab, aFill(bn));
+        c = mix(c, A*fl, aLine(bn, lw*0.8)*ab);
+        c = mix(c, A*fl, txt(uv - vec2(0.0, -0.78), 0.09, ivec4(82, 69, 72, 69), ivec4(65, 84, 0, 0), 1)*ab);
+      } else c = mix(c, G*0.8, txt(uv - vec2(0.0, -0.78), 0.075, ivec4(68, 82, 89, 0), ivec4(0), 1));
+    }
   } else if (page == 1) {   // POWER: actual throttle, fuel fraction, N1 and nozzle bars with scales + Mach
     c = mfdTitle(c, uv, ivec4(80, 79, 87, 69), ivec4(82, 0, 0, 0));
     // Reserve the enlarged Mach field: erase the title's decorative dash beneath its digits.
