@@ -61,5 +61,6 @@ void main(){
   vec3 frN;   // (a light aircraft's cluster frames)
   if (FLEET_ON && !traf && gPS.w > 0.5 && uPartInst < 0 && int(gM[0].z + 0.5) < 5 && !fleetCabin() && !isMantis() && clusterFrame(vB, -transpose(uRot)*uPos, mid, frN)) ln = frN;
   bool pod = !traf && uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0;
+  if ((uDbg & 32768) != 0 && !traf) { gbWritePrelit(t, ln, GB_POD, vec3(0.05)); oG3 = vec4(1.0, 1.0, 1.0, float(GBF_RIGID)/255.0); return; }   // (Renderer::kProbeMeshShade)
   planeToGB(p, rd, t, mid, ln, pod, traf, !traf && gPS.w > 0.5 ? vAo : -1.0);
 }

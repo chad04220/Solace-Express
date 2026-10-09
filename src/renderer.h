@@ -120,6 +120,10 @@ public:
   std::string matDir;          // the scanned material layers (assets/materials; empty or missing: procedural ones)
   int matScanned = 0;          // how many of the layers came from it
   int dbgOff = 0;            // profiling: renderer features switched off (uDbg bits)
+  // the analysis's cost probes, above the features' bits: one piece of the frame's work left out to time it (the picture
+  // is wrong while one is on): the scenery's G-buffer draws, the terrain's, the objects pass's march, the player's
+  // airframe mesh shaded flat (plane_mesh_fs.glsl)
+  static constexpr int kProbeScenery = 1 << 12, kProbeTerrain = 1 << 13, kProbeMarch = 1 << 14, kProbeMeshShade = 1 << 15;
   bool screenWindows = getenv("SCREENFEEDS") == nullptr;   // the research craft's displays are windows (no camera feeds but the bomb camera's; SCREENFEEDS=1 brings the cameras back)
   int bakeCount = 0;   // airframe meshes and hulls baked or loaded so far (the research terminal's warm-up waits for a frame that bakes nothing)
   int bakeBuilt = 0;   // of them, built from scratch (not loaded from the mesh cache): the diagnostics report it
@@ -198,7 +202,7 @@ private:
   static constexpr int kTShN = 2048, kTShRows = 64;   // texels per side, rows baked per frame
   void bakeTerrainShadow(const FrameParams& fp);            // the terrain sun-shadow bake, a band of rows a frame
   bool depthValid = false;   // the depth target holds a frame
-  void renderDisplays(const FrameParams& fp, bool panel, int half = -1);   // half: the research pages' bottom (0) or top (1) row alone
+  void renderDisplays(const FrameParams& fp, bool panel, int half = -1);   // half: the pages' even (0) or odd (1) half alone, -1 all
   GLuint progSprite = 0, progDown = 0, progUp = 0, progRayMask = 0, progRay = 0, progPost = 0, progUI = 0, progTAA = 0, progFeedRays = 0;
   static constexpr int kBloomMips = 6;
   GLuint fboMip[kBloomMips] = {}, texMip[kBloomMips] = {}; int mipW[kBloomMips] = {}, mipH[kBloomMips] = {};

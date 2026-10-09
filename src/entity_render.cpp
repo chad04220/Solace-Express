@@ -242,8 +242,19 @@ void Renderer::drawEntities(const FrameParams& fp) {
   static std::vector<Ent> bucket[3][EK_COUNT][ENT_LODS];   // pass 0 view, 1/2 shadow cascades
   for (auto& a : bucket) for (auto& b : a) for (auto& v : b) v.clear();
   bool anyCrater = g_scenery.anyGone();
-  for (int dz = -rad; dz <= rad; dz++)
-    for (int dx = -rad; dx <= rad; dx++) {
+  // the chunks nearest first, so each bucket's instances go out front to back and the depth test rejects what nearer
+  // buildings hide before it is shaded (row by row, a heading towards -z drew the city back to front). The offsets
+  // sorted once for the widest reach; a narrower one (a camera feed's) skips the rest
+  static std::vector<std::pair<short, short>> ring; static int ringRad = -1;
+  if (rad > ringRad) {
+    ring.clear();
+    for (int dz = -rad; dz <= rad; dz++) for (int dx = -rad; dx <= rad; dx++) ring.push_back({(short)dx, (short)dz});
+    std::stable_sort(ring.begin(), ring.end(), [](const std::pair<short, short>& a, const std::pair<short, short>& b) { return a.first * a.first + a.second * a.second < b.first * b.first + b.second * b.second; });
+    ringRad = rad;
+  }
+  for (const auto& off : ring) {
+      const int dx = off.first, dz = off.second;
+      if (dx < -rad || dx > rad || dz < -rad || dz > rad) continue;
       Scenery::Chunk* ch = g_scenery.get(ccx + dx, ccz + dz);
       if (!ch || ch->ents.empty()) continue;
       float x0 = Scenery::chunkX0(ccx + dx), z0 = Scenery::chunkX0(ccz + dz), x1 = x0 + Scenery::CH, z1 = z0 + Scenery::CH;
@@ -432,7 +443,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
     glUniform1f(glGetUniformLocation(progEnt, "uRwyLights"), fp.rwyLights);
     glUniform1f(glGetUniformLocation(progEnt, "uWet"), fp.wet);
     glUniform1f(glGetUniformLocation(progEnt, "uSnow"), fp.snow);
-    issue(progEnt, draws[0]);
+    if (!(dbgOff & kProbeScenery)) issue(progEnt, draws[0]);
   }
   glDisable(GL_DEPTH_TEST);
   glBindVertexArray(0);

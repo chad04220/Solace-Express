@@ -850,6 +850,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           double tot = 0; for (double v : passSum) tot += v;
           fprintf(af, "Serialized pass wall times (CPU submit + GPU wait, %.2f ms total):\n", tot);
           for (int p = 0; p < Renderer::kPasses; p++) fprintf(af, "  %-26s %7.2f ms  %5.1f%%\n", kPassName[p], passSum[p], tot > 0 ? passSum[p] / tot * 100.0 : 0.0);
+          // the same passes from the GPU's own timestamps, the frames running as in play (nothing waited for)
+          for (float& m : g_ren.passMs) m = 0.f;
+          frames(60);
+          double gtot = 0; for (float v : g_ren.passMs) gtot += v;
+          fprintf(af, "GPU pass times (timestamp queries, frames not waited for: %.2f ms total):\n", gtot);
+          for (int p = 0; p < Renderer::kPasses; p++) fprintf(af, "  %-26s %7.2f ms  %5.1f%%\n", kPassName[p], g_ren.passMs[p], gtot > 0 ? g_ren.passMs[p] / gtot * 100.0 : 0.0);
         }
         // 3. resolution scaling
         double ms100 = 0, ms67 = 0;
@@ -879,6 +885,19 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
             g_ren.dbgOff = 0;
             fprintf(af, "  %-26s %7.2f ms   saves %6.2f ms (%4.1f%%)\n", F.name, ms, base - ms, (base - ms) / base * 100.0);
             if (base - ms > topSave) { topSave = base - ms; top = F.name; }
+          }
+          // 5. where the frame goes: one piece of the work left out at a time (Renderer::kProbe*: the picture is wrong
+          // while one is, and these are not settings)
+          static const struct { int bit; const char* name; } kProbe[] = {
+            {Renderer::kProbeScenery, "scenery (buildings, trees)"}, {Renderer::kProbeTerrain, "terrain"},
+            {Renderer::kProbeMarch, "airframe march"}, {Renderer::kProbeMeshShade, "own airframe's shading"},
+          };
+          fprintf(af, "Work (frame time with it left out; base %.2f ms):\n", base);
+          for (const auto& P : kProbe) {
+            g_ren.dbgOff = P.bit;
+            double ms = timed(30);
+            g_ren.dbgOff = 0;
+            fprintf(af, "  %-26s %7.2f ms   costs %6.2f ms (%4.1f%%)\n", P.name, ms, base - ms, (base - ms) / base * 100.0);
           }
         }
         // a picture of the scene for reference

@@ -205,7 +205,7 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   glActiveTexture(GL_TEXTURE0 + 28); glBindTexture(GL_TEXTURE_2D, sceneZ ? texDepthCopy : 0); glUniform1i(U(prog, "uSceneZ"), 28); glUniform1i(U(prog, "uSceneZOn"), sceneZ ? 1 : 0);
   glBindVertexArray(vaoEmpty);
   static const bool noMarch = getenv("NOMARCH") != nullptr;   // (debug: the objects pass without its full-screen march, to time the mesh draws alone)
-  if (!noMarch && marchAny) glDrawArrays(GL_TRIANGLES, 0, 3);
+  if (!noMarch && marchAny && !(dbgOff & kProbeMarch)) glDrawArrays(GL_TRIANGLES, 0, 3);
   }
   glActiveTexture(GL_TEXTURE0);
   glDisable(GL_DEPTH_TEST);

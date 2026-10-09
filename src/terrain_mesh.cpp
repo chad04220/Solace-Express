@@ -134,7 +134,7 @@ void Renderer::drawTerrainMesh(const FrameParams& fp) {
   glUniform1f(U(p, "uSplit"), kSplit);
   glBindVertexArray(vaoTerrain); glBindBuffer(GL_ARRAY_BUFFER, vboTerrainInst);
   glBufferData(GL_ARRAY_BUFFER, terrInst.size() * sizeof(float), terrInst.data(), GL_STREAM_DRAW);
-  glDrawElementsInstanced(GL_TRIANGLES, kChunkVerts, GL_UNSIGNED_SHORT, nullptr, terrChunks);
+  if (!(dbgOff & kProbeTerrain)) glDrawElementsInstanced(GL_TRIANGLES, kChunkVerts, GL_UNSIGNED_SHORT, nullptr, terrChunks);
   // the sea
   if (progWater && vaoWater && fp.camPos.y > -0.5f) {
     p = progWater;

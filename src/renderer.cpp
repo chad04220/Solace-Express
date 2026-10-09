@@ -582,6 +582,7 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel, int half) {
   // 1080 lines on every display: each research-jet page is a 1080 x 1080 cell of the 4 x 2 atlas, and the light
   // aircraft's instrument panel is 1080 texels tall (0.58 x 0.22 m)
   int w = panel ? 2848 : 4320, h = panel ? 1080 : 2160;
+  const bool fresh = !tex;
   if (!tex) {
     glGenTextures(1, &tex); glBindTexture(GL_TEXTURE_2D, tex);
     // (the pages are read for their colour alone: packed floats, half the bytes to draw and to mipmap; the panel's
@@ -600,6 +601,7 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel, int half) {
   glBindFramebuffer(GL_FRAMEBUFFER, fboDisp);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
   glViewport(0, 0, w, h); glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
+  if (fresh && progDisp) { glClearColor(0, 0, 0, 0); glClear(GL_COLOR_BUFFER_BIT); half = -1; }   // (a page no cockpit draws stays black, never undefined)
   if (!progDisp) {
     glClearColor(0, 0, 0, 0); glClear(GL_COLOR_BUFFER_BIT);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, tex); glGenerateMipmap(GL_TEXTURE_2D);
@@ -627,9 +629,23 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel, int half) {
   glUniform4fv(U(p, "uFlame"), 1, pv.flame);
   glUniform2f(U(p, "uDispRes"), (float)w, (float)h);
   glBindVertexArray(vaoEmpty);
-  if (!panel && half >= 0) { glEnable(GL_SCISSOR_TEST); glScissor(0, half * (h / 2), w, h / 2); }   // (one row of pages)
-  glDrawArrays(GL_TRIANGLES, 0, 3);
-  glDisable(GL_SCISSOR_TEST);
+  if (panel) glDrawArrays(GL_TRIANGLES, 0, 3);
+  else {
+    // only the pages this cockpit shows (the rest of the atlas is never read): the XR-40's dash and consoles 0-3 and 6
+    // (wraith_cockpit_material.glsl), the XR-30's 0-6 (plane_material.glsl), a glass cockpit's 0 and 2
+    // (cockpit_material.glsl, plane_material.glsl) - the XR-40's 8 pages cost 5. Half of them a frame (half: which),
+    // alternately, so each page still changes at 30 Hz and every frame costs the same
+    const int sp = pv.model >= 0 && pv.model <= kWraith ? kAircraft[pv.model].special : 0;
+    const unsigned used = sp == 2 ? 0x4Fu : sp == 1 ? 0x7Fu : 0x05u;
+    glEnable(GL_SCISSOR_TEST);
+    for (int pg = 0, k = 0; pg < 8; pg++) {
+      if (!((used >> pg) & 1u)) continue;
+      const bool now = half < 0 || (k & 1) == half;
+      k++;
+      if (now) { glScissor((pg & 3) * (w / 4), (pg >> 2) * (h / 2), w / 4, h / 2); glDrawArrays(GL_TRIANGLES, 0, 3); }
+    }
+    glDisable(GL_SCISSOR_TEST);
+  }
   glActiveTexture(GL_TEXTURE0);   // (not unit 15, which holds the font)
   glBindTexture(GL_TEXTURE_2D, tex); glGenerateMipmap(GL_TEXTURE_2D);
 }
@@ -1288,9 +1304,9 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   rasterShadowMaps(fp);   // (the airframe's shadow maps: the feeds' and the main view's proxy both read them)
   rasterTrafficShadowMaps(fp);
   stamp(1);
-  // the cockpit display atlases, before the objects pass samples them. The research jets' pages: a row of four a frame,
-  // so each page at 30 Hz with the same cost every frame (the whole 9 Mpx atlas every other frame put ~3 ms on alternate
-  // frames on an RTX 3070 Laptop: a stutter at 60 fps)
+  // the cockpit display atlases, before the objects pass samples them. The pages: half of those the cockpit shows each
+  // frame, so each page at 30 Hz with the same cost every frame (the whole 9 Mpx atlas every other frame put ~3 ms on
+  // alternate frames on an RTX 3070 Laptop: a stutter at 60 fps)
   if (fp.dispMode & 1) renderDisplays(fp, false, texPages ? (int)(frameNo & 1) : -1);
   if (fp.dispMode & 2) renderDisplays(fp, true);
   stamp(2);
