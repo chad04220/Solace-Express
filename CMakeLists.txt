@@ -264,3 +264,6 @@ if(UNIX AND NOT APPLE AND Python3_Interpreter_FOUND)
   target_compile_definitions(ui_review_hangar_harness PRIVATE UI_REVIEW_FLEET_ONLY=1)
   target_link_libraries(ui_review_hangar_harness PRIVATE ${CMAKE_DL_LIBS} pthread)
 endif()
+
+# CI's explicit hull_test build must also produce the registered UI CPU tests.
+add_dependencies(hull_test load_pacer_test hangar_geometry_test hangar_catalog_test)
