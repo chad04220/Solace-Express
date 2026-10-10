@@ -18,8 +18,9 @@ int main(int argc, char** argv) {
   int fails = 0;
   // FLIGHT_QUICK (the sanitizer job, where every step runs several times slower): the checks made type by type run on
   // the types that between them fly every kind of airframe and engine - a piston single, the twin, the turboprop
-  // airliner, the business jet and the research jets - instead of all of them, and each failure case once. Every
-  // section still runs; the full set is the Windows job's and every local run's.
+  // airliner, the business jet and the research jets - instead of all of them; the research tiers at their lowest and
+  // highest altitude, the comfort routes in a single and the jet, the autoland's failures as an engine out and ice.
+  // Every section still runs; the full set is the Windows job's and every local run's.
   const bool quick = getenv("FLIGHT_QUICK") != nullptr;
   auto skip = [&](int i) { return quick && i != 0 && i != 3 && i != 5 && i != 6 && i != kResearchJet && i != kWraith; };
   if (strcmp(kAircraft[kOsprey].id, "osprey_c6") != 0 || strcmp(kAircraft[kNightjar].id, "xr10_nightjar") != 0 || strcmp(kAircraft[kResearchJet].id, "xr30_specter") != 0 || strcmp(kAircraft[kMantis].id, "xr20_mantis") != 0 || strcmp(kAircraft[kWraith].id, "xr40_wraith") != 0) { printf("aircraft indices (kOsprey / kNightjar / kResearchJet / kMantis / kWraith) don't match the table\n"); return 1; }
@@ -268,6 +269,7 @@ int main(int argc, char** argv) {
     };
     bool ok = true;
     for (float alt : {1500.f, 3000.f, 8000.f, 12000.f}) {
+      if (quick && (alt == 3000.f || alt == 8000.f)) continue;   // (quick: the lowest and the highest)
       LevelResult n = levelMach(kNightjar, alt), m = levelMach(kMantis, alt), s = levelMach(kResearchJet, alt), w = levelMach(kWraith, alt);
       bool stable = true;
       for (const auto& r : {n, m, s, w}) stable = stable && r.intact && fabsf(r.vs) < 0.3f && fabsf(r.accel) < 0.15f && r.minAlt > alt - 40.f && r.maxAlt < alt + 40.f;
@@ -432,7 +434,9 @@ int main(int argc, char** argv) {
     float he = fabsf(wrapAngle((p.apHeading - p.heading()) * DEG) / DEG);
     bool ok = !p.ev.crashed && he < 3.f && maxBank <= 26.f && maxG <= 1.3f && minG >= 0.8f;
     printf("AP comfort hold %-16s hdg err %4.1f  max bank %4.1f  g %.2f..%.2f  %s\n", s.name, he, maxBank, minG, maxG, ok ? "ok" : "FAIL"); fails += !ok;
-    // route to Solace Capital and land: comfortable all the way to the final approach
+    // route to Solace Capital and land: comfortable all the way to the final approach (quick: a single and the jet - the
+    // law is the same for every type)
+    if (quick && i != 0 && i != 6) continue;
     int ai = g_world.findAirport("CAP"); const Airport& A = g_world.airports[ai];
     vec3 side(-A.dir().z, 0, A.dir().x);
     vec3 start = A.pos() + side * 14000.f + A.dir() * 3000.f; start.y = std::max(A.elev + 1200.f, g_world.height(start.x, start.z) + 500.f);
@@ -482,7 +486,7 @@ int main(int argc, char** argv) {
     const Case cases[] = {{3, "engine out"}, {5, "engine out"}, {6, "engine out"}, {4, "full load"}, {5, "full load"}, {0, "iced"}, {5, "iced"}};
     std::string seen;   // (quick: each condition once)
     for (const Case& c : cases) {
-      if (quick && seen.find(c.cond[0]) != std::string::npos) continue;
+      if (quick && (seen.find(c.cond[0]) != std::string::npos || c.cond[0] == 'f')) continue;   // (quick: an engine out and ice)
       seen += c.cond[0];
       const AircraftSpec& s = kAircraft[c.craft];
       Weather wx; wx.windSpeed = 5; wx.windFrom = wrapDeg360(A.heading + 20.f); wx.turbulence = 0.1f;
