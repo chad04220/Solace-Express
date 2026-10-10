@@ -34,7 +34,7 @@ bool clusterFrame(vec3 q, vec3 e, inout int mid, out vec3 nB){
 void main(){
   if (RESEARCH_ON && uScrSkip == 1 && cabinWindowCut(vB - uScrEye, uScrModel, uBombPane == 1, uPartInst >= 0)) discard;
   gZero = min(uQuality, 0);
-  bool traf = uMeshTraffic >= 0;
+  bool traf = FLEET_ON && uMeshTraffic >= 0;   // (the research jets' own builds never draw traffic: no traffic data path in them)
   if (traf) { loadTraffic(uMeshTraffic); trafficXf(uMeshTraffic); } else { loadMain(); pieceXf(-1); }
   vec3 d = vW, p = uCamPos + d;   // (from the camera: plane_mesh_vs.glsl; p, in world metres, only for the world's lookups)
   gRelSet = true; gRel = d;
@@ -61,6 +61,8 @@ void main(){
   vec3 frN;   // (a light aircraft's cluster frames)
   if (FLEET_ON && !traf && gPS.w > 0.5 && uPartInst < 0 && int(gM[0].z + 0.5) < 5 && !fleetCabin() && !isMantis() && clusterFrame(vB, -transpose(uRot)*uPos, mid, frN)) ln = frN;
   bool pod = !traf && uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0;
-  if ((uDbg & 32768) != 0 && !traf) { gbWritePrelit(t, ln, GB_POD, vec3(0.05)); oG3 = vec4(1.0, 1.0, 1.0, float(GBF_RIGID)/255.0); return; }   // (Renderer::kProbeMeshShade)
+#ifdef PROBE_MESH_SHADE
+  if (!traf) { gbWritePrelit(t, ln, GB_POD, vec3(0.05)); oG3 = vec4(1.0, 1.0, 1.0, float(GBF_RIGID)/255.0); return; }   // (the analysis's probe build: Renderer::kProbeMeshShade)
+#endif
   planeToGB(p, rd, t, mid, ln, pod, traf, !traf && gPS.w > 0.5 ? vAo : -1.0);
 }

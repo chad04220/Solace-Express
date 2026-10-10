@@ -334,6 +334,7 @@ void main(){
     return 0;
   }
   if (getenv("PREWARM")) game.prewarm([](float, const std::string&) {});   // (every aircraft's body built first, as the game's launch does: the traffic drawn from meshes)
+  if (getenv("NOTRAFFIC")) game.set.traffic = false;   // (A/B timings of the player's aircraft alone)
   game.debugScene(scene);
   for (int i = 0; i < 3; i++) { game.update(1.f / 30.f); game.render(); }
   if (getenv("TAAM")) for (int i = 0, n = atoi(getenv("TAAM")); i < n; i++) {   // moving frames

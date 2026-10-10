@@ -77,12 +77,20 @@ vec3 fbSlope3(vec4 a, vec4 b, vec4 c){
 }
 vec3 fusSection(float z){
   z = clamp(z, gM[1].x, gM[8].x);
-  int i = 1;
-  for (int k = 1; k < 8; k++) { i = k; if (z <= gM[k+1].x) break; }
-  vec4 a = gM[i], b = gM[i+1];
+  // the segment [gM[i], gM[i+1]] that holds z (the first whose end is at or past it) and the stations either side of
+  // it, picked with constant indices: an array indexed by a variable lives in the GPU's per-thread memory, and gM is
+  // copied on every pixel of every airframe pass - a loop index here put half a kilobyte a pixel through memory
+  int i = 7; bool f = false;
+  vec4 am = gM[6], a = gM[7], b = gM[8], bp = gM[8];
+  if (!f && z <= gM[2].x) { f = true; i = 1; am = gM[1]; a = gM[1]; b = gM[2]; bp = gM[3]; }
+  if (!f && z <= gM[3].x) { f = true; i = 2; am = gM[1]; a = gM[2]; b = gM[3]; bp = gM[4]; }
+  if (!f && z <= gM[4].x) { f = true; i = 3; am = gM[2]; a = gM[3]; b = gM[4]; bp = gM[5]; }
+  if (!f && z <= gM[5].x) { f = true; i = 4; am = gM[3]; a = gM[4]; b = gM[5]; bp = gM[6]; }
+  if (!f && z <= gM[6].x) { f = true; i = 5; am = gM[4]; a = gM[5]; b = gM[6]; bp = gM[7]; }
+  if (!f && z <= gM[7].x) { f = true; i = 6; am = gM[5]; a = gM[6]; b = gM[7]; bp = gM[8]; }
   float h = max(b.x - a.x, 1e-3), t = clamp((z - a.x)/h, 0.0, 1.0);
   vec3 dd = (b.yzw - a.yzw)/h;
-  vec3 ma = i > 1 ? fbSlope3(gM[i-1], a, b) : dd*0.5, mb = i < 7 ? fbSlope3(a, b, gM[i+2]) : dd*0.5;
+  vec3 ma = i > 1 ? fbSlope3(am, a, b) : dd*0.5, mb = i < 7 ? fbSlope3(a, b, bp) : dd*0.5;
   float t2 = t*t, t3 = t2*t;
   return a.yzw*(2.0*t3 - 3.0*t2 + 1.0) + ma*h*(t3 - 2.0*t2 + t) + b.yzw*(-2.0*t3 + 3.0*t2) + mb*h*(t3 - t2);
 }
@@ -114,7 +122,7 @@ float rivetRow(float x, float y, float sp, float o, float ds, float px){
   return (1.0 - smoothstep(0.0028, 0.0028 + px, length(vec2(dx, dy))))*smoothstep(0.008, 0.002, px);
 }
 vec3 fuselagePaint(vec3 lp, vec3 sec){
-  float hc = 0.0; for (int i = 2; i <= 7; i++) hc = max(hc, gM[i].z);   // cabin half height
+  float hc = max(max(max(gM[2].z, gM[3].z), max(gM[4].z, gM[5].z)), max(max(gM[6].z, gM[7].z), 0.0));   // cabin half height (the tallest station; constant indices, as in fusSection)
   float w = min(hc*0.07, sec.y*0.32);                                     // half width of the cheat line
   float c = sec.z - min(hc*0.12, sec.y*0.4);                              // its centre
   float fade = smoothstep(gM[2].x - 0.1, gM[3].x, lp.z);                  // grows in over the cowling
@@ -167,14 +175,19 @@ void loadCabinFit(){
   gCab2=uCabinFootFit;gCabSeat=uCabinSeatFit;
 
 }
-void loadMain(){ gOwn = true; gModelId = uModelId; gWheel = uWheel; for (int i = 0; i < 24; i++) gM[i] = uM[i]; for (int i = 0; i < 7; i++) gWr[i] = uWr[i]; gPS = uPS; gFlapDL = uPr.w; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; if (gPS.w > 0.5 && gM[0].z < 4.5) loadCabinFit(); }
+// (the copies written out, element by element, for the same reason as fusSection's: no index the compiler has to
+// work out at run time, so the arrays stay in registers or are read straight from the uniforms)
+void loadMain(){ gOwn = true; gModelId = uModelId; gWheel = uWheel;
+  gM[0] = uM[0]; gM[1] = uM[1]; gM[2] = uM[2]; gM[3] = uM[3]; gM[4] = uM[4]; gM[5] = uM[5]; gM[6] = uM[6]; gM[7] = uM[7]; gM[8] = uM[8]; gM[9] = uM[9]; gM[10] = uM[10]; gM[11] = uM[11]; gM[12] = uM[12]; gM[13] = uM[13]; gM[14] = uM[14]; gM[15] = uM[15]; gM[16] = uM[16]; gM[17] = uM[17]; gM[18] = uM[18]; gM[19] = uM[19]; gM[20] = uM[20]; gM[21] = uM[21]; gM[22] = uM[22]; gM[23] = uM[23];
+  gWr[0] = uWr[0]; gWr[1] = uWr[1]; gWr[2] = uWr[2]; gWr[3] = uWr[3]; gWr[4] = uWr[4]; gWr[5] = uWr[5]; gWr[6] = uWr[6];
+  gPS = uPS; gFlapDL = uPr.w; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; if (gPS.w > 0.5 && gM[0].z < 4.5) loadCabinFit(); }
 int gTrafK = 0;
 void loadTraffic(int k){
   gOwn = false; gTrafK = k; gModelId = -1;
   gWheel = vec3(texelFetch(uTraffic, ivec2(25, k), 0).w, texelFetch(uTraffic, ivec2(26, k), 0).w, texelFetch(uTraffic, ivec2(27, k), 0).w);
-  for (int i = 0; i < 24; i++) gM[i] = texelFetch(uTraffic, ivec2(i, k), 0);
+  gM[0] = texelFetch(uTraffic, ivec2(0, k), 0); gM[1] = texelFetch(uTraffic, ivec2(1, k), 0); gM[2] = texelFetch(uTraffic, ivec2(2, k), 0); gM[3] = texelFetch(uTraffic, ivec2(3, k), 0); gM[4] = texelFetch(uTraffic, ivec2(4, k), 0); gM[5] = texelFetch(uTraffic, ivec2(5, k), 0); gM[6] = texelFetch(uTraffic, ivec2(6, k), 0); gM[7] = texelFetch(uTraffic, ivec2(7, k), 0); gM[8] = texelFetch(uTraffic, ivec2(8, k), 0); gM[9] = texelFetch(uTraffic, ivec2(9, k), 0); gM[10] = texelFetch(uTraffic, ivec2(10, k), 0); gM[11] = texelFetch(uTraffic, ivec2(11, k), 0); gM[12] = texelFetch(uTraffic, ivec2(12, k), 0); gM[13] = texelFetch(uTraffic, ivec2(13, k), 0); gM[14] = texelFetch(uTraffic, ivec2(14, k), 0); gM[15] = texelFetch(uTraffic, ivec2(15, k), 0); gM[16] = texelFetch(uTraffic, ivec2(16, k), 0); gM[17] = texelFetch(uTraffic, ivec2(17, k), 0); gM[18] = texelFetch(uTraffic, ivec2(18, k), 0); gM[19] = texelFetch(uTraffic, ivec2(19, k), 0); gM[20] = texelFetch(uTraffic, ivec2(20, k), 0); gM[21] = texelFetch(uTraffic, ivec2(21, k), 0); gM[22] = texelFetch(uTraffic, ivec2(22, k), 0); gM[23] = texelFetch(uTraffic, ivec2(23, k), 0);
   gPS = texelFetch(uTraffic, ivec2(28, k), 0); gFlapDL = 0.0; gCtl = texelFetch(uTraffic, ivec2(29, k), 0);
-  for (int i = 0; i < 7; i++) gWr[i] = uWr[i];
+  gWr[0] = uWr[0]; gWr[1] = uWr[1]; gWr[2] = uWr[2]; gWr[3] = uWr[3]; gWr[4] = uWr[4]; gWr[5] = uWr[5]; gWr[6] = uWr[6];
   vec4 c0 = texelFetch(uTraffic, ivec2(30, k), 0), c1 = texelFetch(uTraffic, ivec2(31, k), 0);
   gColBase = c0.rgb; gColStripe = c1.rgb;
   gFlame = vec4(gCtl.w, c1.w, gPS.y*1.5708 - gCtl.x*0.5, 0.0);

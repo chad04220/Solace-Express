@@ -181,11 +181,12 @@ int partList(const float* M, bool inside, PartInst* out, int model = -1) {
 }
 }
 
+// (every aircraft, the light aircraft alone - pickAfPrograms - then each research jet alone: drawPlaneMesh; without
+// a jet's own build its aircraft is drawn with every aircraft's)
+static const char* const kMeshBuild[4] = {"", "#define AF_LIGHT\n", "#define AF_JET\n", "#define AF_WRAITH\n"};
 bool Renderer::compilePlaneMesh() {
   std::string e;
-  // (every aircraft, the light aircraft alone - pickAfPrograms - then each research jet alone: drawPlaneMesh; without
-  // a jet's own build its aircraft is drawn with every aircraft's)
-  static const char* const kBuild[4] = {"", "#define AF_LIGHT\n", "#define AF_JET\n", "#define AF_WRAITH\n"};
+  const char* const* kBuild = kMeshBuild;
   for (int v = 0; v < 4; v++) {
     e.clear(); progPlaneMeshV[v] = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(kBuild[v]), e);
     if (!progPlaneMeshV[v] && v < 2) { error = "Aircraft mesh shader: " + e; return false; }
@@ -987,7 +988,13 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   const float eng = trafK >= 0 ? fp.traffic[trafK].t[2] : fp.plane.M[2];
   static const bool all = getenv("AF_ALL") != nullptr;
   const int e = (int)(eng + 0.5f), build = all ? 0 : e == 6 ? 3 : e == 5 ? 2 : e < 5 ? 1 : 0;
-  const GLuint prog = progPlaneMeshV[build] ? progPlaneMeshV[build] : progPlaneMeshV[0];
+  GLuint prog = progPlaneMeshV[build] ? progPlaneMeshV[build] : progPlaneMeshV[0];
+  // the analysis's probe of the player's airframe shading (kProbeMeshShade): a build of its own, made the first time
+  // it is asked for, so the game's programs carry no trace of it
+  if ((dbgOff & kProbeMeshShade) && trafK < 0) {
+    if (!progPlaneMeshProbe[build]) { std::string pe; progPlaneMeshProbe[build] = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(std::string(kMeshBuild[build]) + "#define PROBE_MESH_SHADE\n"), pe); }
+    if (progPlaneMeshProbe[build]) prog = progPlaneMeshProbe[build];
+  }
   glBindVertexArray(pm.vao);
   // then the materials on exactly the nearest surface
   setRT(prog, fp);
