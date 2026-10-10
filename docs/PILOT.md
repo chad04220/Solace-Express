@@ -144,15 +144,18 @@ The present autopilot still flies exactly as it did: all 294 calm checkride flig
 
 | | present | the pilot |
 |---|---|---|
-| Landed and stopped | 284 | 281 (3 XR-40s off the chart) |
-| Stabilised | 190 | 243 |
+| Landed and stopped | 284 | 284 |
+| Stabilised | 190 | 244 |
 | g rms, median | 0.32 | 0.08 |
 | Bank, median / worst tenth | 71 / 85 deg | 30 / 60 deg |
 | g, worst tenth | 16.5 | 2.5 |
-| Lowest g, worst tenth | -3.1 | 0.7 |
-| Time, median | 367 s | 463 s |
+| Lowest g, worst tenth | -3.1 | 0.6 |
+| Time, median | 367 s | 464 s |
 | Fuel, median | 21.8 kg | 23.0 kg |
 
+- **The height before the turn:** up to half a g kept back from the bank when below the height it wants or sinking.
+- **The chart's edge:** a turn as tight as the room left needs (up to 80 deg), when even its sharpest is too wide.
+- **The sea's surface**, not its bed, is the ground the look-ahead keeps clear of.
 - **Open:** the airliners and the XR-10 take 50-90% longer (a longer final from a higher gate, wider patterns); the
-  XR-40 leaves the chart in 3 of 32 and is never stabilised (its hover approach); the XR-30 still reaches 5 g. Then the
-  other weathers.
+  XR-40 is never stabilised (its hover approach), and started near the chart's edge at 375 m/s needs up to 9.6 g to
+  stay on it (the plan should turn it away and slow it first). Then the other weathers.

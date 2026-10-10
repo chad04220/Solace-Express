@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
             }
             p.step(dt, wx, k * dt);
             if (getenv("EXAMT") && k % 30 == 0 && k * dt < atof(getenv("EXAMT")))   // (a trace, every half second, up to EXAMT s)
-              printf("      t %6.1f  st %d leg %d  ias %5.1f/%5.1f  bank %5.0f  g %5.2f  edge %d esc %d up %d  agl %5.0f  vs %6.1f  hdg %4.0f  x %6.0f z %6.0f\n", k * dt, p.apStage, p.apLeg, p.ias, p.apSpeed, p.bankDeg(), p.gLoad, (int)p.apEdge, (int)p.apEscape, (int)p.apUpset, p.agl(), p.vel.y, p.heading(), p.pos.x, p.pos.z);
+              printf("      t %6.1f  st %d leg %d  ias %5.1f/%5.1f  bank %5.0f  g %5.2f  edge %d esc %d up %d  agl %5.0f  alt %5.0f/%5.0f  vs %6.1f  hdg %4.0f  x %6.0f z %6.0f\n", k * dt, p.apStage, p.apLeg, p.ias, p.apSpeed, p.bankDeg(), p.gLoad, (int)p.apEdge, (int)p.apEscape, (int)p.apUpset, p.agl(), p.pos.y, p.apAlt, p.vel.y, p.heading(), p.pos.x, p.pos.z);
             const float terrain = g_world.height(p.pos.x, p.pos.z);
             if (!p.onGround && k > 60) {
               nAir++;

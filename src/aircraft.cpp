@@ -1632,7 +1632,15 @@ void Plane::apControl(float dt) {
     edge = std::max(fabsf(ahead.x), fabsf(ahead.z)) > WORLD_HALF * 1.05f && std::max(fabsf(ahead.x), fabsf(ahead.z)) > std::max(fabsf(pos.x), fabsf(pos.z));
   }
   apEdge = edge;
-  const float proK = edge ? 1.f : apProScale(), proG = 1.3f + 1.2f * proK, proBank = 30.f + 30.f * proK;   // (apProG / apProBank, or at the chart's edge their sharpest)
+  const float proK = edge ? 1.f : apProScale();
+  float proG = 1.3f + 1.2f * proK, proBank = 30.f + 30.f * proK;   // (apProG / apProBank, or at the chart's edge their sharpest)
+  if (edge) {
+    // (and if even that turn is wider than the room left before the chart is lost - an XR-40 at 375 m/s turns 8 km wide
+    // at 2.5 g, and from the chart's eastern edge was off it in 45 s - as tight as the room needs, up to 80 deg)
+    const float room = WORLD_HALF * 1.15f - std::max(fabsf(pos.x), fabsf(pos.z)), rTurn = std::max(room * 0.7f, 500.f);
+    const float tb = spd * spd / (rTurn * G0), nzEdge = std::min(sqrtf(1.f + tb * tb), nzMax);
+    if (nzEdge > proG) { proG = nzEdge; proBank = std::min(acosf(1.f / nzEdge) / DEG, 80.f); }
+  }
   if (!apPro) {
     if (!flare && (ias < vsFl * 1.08f || fabsf(pd) > 25.f || bd > 45.f)) apUpset = true;
     else if (apUpset && (flare || (ias > vsFl * 1.3f && fabsf(pd) < 12.f && bd < 25.f))) apUpset = false;
@@ -1680,7 +1688,7 @@ void Plane::apControl(float dt) {
           vy = std::min(vy + aUp * 0.5f, std::max(vyCap, vel.y)); y += vy * 0.5f;
           if (i % 5) continue;
           const vec3 q = along(t, roll ? tRoll : 1e9f);
-          const float hq = g_world.height(q.x, q.z);
+          const float hq = std::max(g_world.height(q.x, q.z), 0.f);   // (the sea's surface, not its bed)
           if (y < hq + margin) ok = false;
           if (need) *need = std::max(*need, (hq + margin + 40.f - pos.y) / t);
           else if (!ok) return false;
@@ -1727,7 +1735,12 @@ void Plane::apControl(float dt) {
   // more when well below the altitude it wants)
   float reserve = !apUseVS && apAlt - pos.y > 80.f ? 1.5f : 1.25f;
   if (apComfort) reserve = std::min(reserve, 1.12f);   // (a 25 deg bank needs 1.1 g: the comfort ceiling leaves little to climb with)
-  float bankMax = acosf(std::min(0.99f, (pro ? 1.05f : reserve) / std::max(nzMax, 1.01f))) / DEG;   // (a professional's: 0.05 g to spare)
+  // (a professional's: 0.05 g to spare - and more, up to half a g, as it falls below the height it wants or sinks when it
+  // shouldn't: the height comes before the turn. At 60 deg and 2.5 g the XR-40 turned on down from 955 m to 113 m with
+  // its target at 800)
+  const float lowBy = apUseVS ? 0.f : (apAlt - pos.y) + std::max(0.f, -vel.y) * 5.f;
+  const float proReserve = 1.05f + 0.45f * smoothstepf(20.f, 150.f, lowBy);
+  float bankMax = acosf(std::min(0.99f, (proAny ? proReserve : reserve) / std::max(nzMax, 1.01f))) / DEG;
   if (appr) bankMax = std::min(bankMax, agl() < 150.f ? (pro ? 15.f : 20.f) : (pro ? std::min(apProBank(), 30.f) : 35.f));
   bankMax = clampf(bankMax, 10.f, 85.f);
   if (proAny && !appr) bankMax = std::min(bankMax, apComfort ? 25.f : apEscape ? 10.f : proBank);   // (the ground ahead: wings level, and pull)
