@@ -1,0 +1,23 @@
+{
+  "audit_started_utc": "2026-10-10T16:06:09Z",
+  "release": "v3.43.0",
+  "commit": "91212bf4a131c02d2da41efbdb09248a09bc3599",
+  "release_url": "https://github.com/chad04220/Solace-Express/releases/tag/v3.43.0",
+  "release_published_utc": "2026-10-10T12:34:53Z",
+  "zip_sha256": "19205ebcad8c3a201386e39edfde970060054634aaf479e6583bb44574b6a728",
+  "zip_bytes": 41583832,
+  "unreleased_head_observed": "84b8d1a6f1a9dfbabf457873b4bd4728163ad523",
+  "scope": "Read-only audit of the published release; newer development changes are separately identified, not substituted.",
+  "native_windows_playtest": false,
+  "target_gpu_measured": false,
+  "target": "1920x1080, RTX 3070, 60+ FPS",
+  "latest_release_during_review": {
+    "release": "v3.44.0",
+    "commit": "b22c2fca66fff88b62801a79f9f0c6edf06dcb9e",
+    "published_utc": "2026-10-10T16:29:06Z",
+    "url": "https://github.com/chad04220/Solace-Express/releases/tag/v3.44.0",
+    "zip_bytes": 107043513,
+    "zip_sha256": "a6a559a817bc95b60617fb9bfbeca2ef79f41e8bf296e772a262033691c0643d",
+    "method": "Separate source-delta review, latest build/tests and targeted gameplay/world replays; original evidence retains its exact version."
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "original_release": {
+    "tag": "v3.43.0",
+    "commit": "91212bf4a131c02d2da41efbdb09248a09bc3599",
+    "local_release_ctest": {
+      "passed": 41,
+      "failed": 0,
+      "seconds": 205.91,
+      "FLIGHT_QUICK": "unset"
+    },
+    "local_sanitizer_ctest": {
+      "passed": 41,
+      "failed": 0,
+      "seconds": 813.88,
+      "FLIGHT_QUICK": "unset",
+      "ASAN_OPTIONS": "detect_leaks=0:halt_on_error=1",
+      "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1",
+      "leak_sanitizer_tested": false
+    },
+    "windows_crossbuild": "passed",
+    "indexed_voice_decodes": {
+      "passed": 1068,
+      "failed": 0
+    }
+  },
+  "latest_release": {
+    "tag": "v3.44.0",
+    "commit": "b22c2fca66fff88b62801a79f9f0c6edf06dcb9e",
+    "local_release_ctest": {
+      "passed": 54,
+      "failed": 0,
+      "FLIGHT_QUICK": "unset",
+      "seconds": 125.72
+    },
+    "github_ci": {
+      "run_id": 38066530909,
+      "url": "https://github.com/chad04220/Solace-Express/actions/runs/38066530909",
+      "windows": {
+        "passed": 49,
+        "failed": 0
+      },
+      "linux_sanitizers": {
+        "passed": 50,
+        "failed": 0,
+        "FLIGHT_QUICK": "1"
+      },
+      "native_gpu_playtest": false
+    },
+    "flight_replays": {
+      "modes": 5,
+      "fixtures": 9,
+      "comparison": "all five latest logs byte-identical to original version; see latest flight report"
+    },
+    "world_ownership": {
+      "chunks": 2205,
+      "entities": 1214634,
+      "mismatches": 13,
+      "prior_mismatches": 130
+    },
+    "terminal_culling_repros": {
+      "fixed": 4
+    },
+    "runways": {
+      "count": 16,
+      "maximum_height_error_m": 0
+    },
+    "package_assets_verified": 1224,
+    "renderer_asset_checks": 495,
+    "extracted_material_math_checks": 745961,
+    "aircraft_body_cache_keys_unnecessarily_changed": 26,
+    "builder_programs_compared": 52
+  },
+  "custom_original_coverage": {
+    "flight_scenarios": 134,
+    "career_extra_assertions": 80,
+    "continuation_state_combinations": 8192,
+    "ui_resolution_scale_configurations": 5,
+    "ui_previews": 73,
+    "traffic_simulations": 5,
+    "traffic_seconds_each": 900,
+    "surface_net_sanitizer_fixtures": 48,
+    "cloak_ab_views": 4,
+    "native_1080_capture": true
+  },
+  "known_failures_outside_stock_suites": [
+    "Player-input, flight/ATC, career/diversion and world defects detailed in reports",
+    "Malformed WAV fixtures trigger sanitizer failures; shipped indexed bank decodes cleanly",
+    "Bundled renderer CPU regression runner fails source-contract extraction"
+  ],
+  "limits": [
+    "No native Windows/GPU gameplay session",
+    "No physical-controller or native audio-device/radio-stream test",
+    "No RTX3070 FPS or VRAM measurement",
+    "Original rendered images retain v3.43 label; latest environmental shader review is separately identified",
+    "No finite suite covers all gameplay/world/driver states"
+  ],
+  "production_source_modified": false,
+  "production_fixes_or_pushes": false
+}
