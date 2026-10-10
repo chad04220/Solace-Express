@@ -10,7 +10,8 @@ void main(){
   if (vW.y < 0.0 && uCamPos.y > 0.0) discard;
   vec3 p = vW; vec3 rd = p - uCamPos; float t = length(rd);
   vec3 n = normalize(vN);
-  vec3 pl = vec3(wrapW(p.xz), p.y);   // (the ground's own place: across the map's seam, the islands on the far side)
+  vec2 pw = wrapW(p.xz);
+  vec3 pl = vec3(pw.x, p.y, pw.y);   // (the ground's own place: across the map's seam, the islands on the far side; y the height)
   Mat m = terrainMaterial(pl, n, t, baseAt(pl.xz), pixelDx, pixelDy);
   vec3 ns = applyTS(n, m.nrm, terrainBumpStrength(t));
   gbWrite(t, ns, GB_TERRAIN, m, 1.0);

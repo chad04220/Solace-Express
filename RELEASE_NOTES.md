@@ -1,4 +1,14 @@
-## What's new
+## What's new in v3.45.1
+
+### Fixed: the ground lost its textures
+- In v3.45.0 the ground lost its textures: hillsides and fields came out snow-white, and runways, fields, towns and roads were missing. A grey stripe could also run straight across beaches and shallows.
+- The cause was the change that made the map wrap. It swapped the ground's height with its north–south position in the terrain shader, so the shader thought every patch of ground was thousands of metres up. It also looked for the runways and roads in the wrong place.
+- The fix puts the height back. A test now checks that the shader keeps the height in place.
+
+### Correction to the v3.45.0 notes
+- The roads cross water and deep valleys on bridge spans, but the bridges themselves aren't modelled yet. For now, a road stops at the water's edge and carries on from the far side. The bridge decks are next on the list.
+
+## What's new in v3.45.0
 
 ### Fly one way forever
 - **The islands now sit in 10 km of open sea, and the map wraps at its edges.** Fly east past the sea and you come in from the west, over the far side's islands. The same holds north and south and on the diagonals. There's no edge of the chart any more: no warnings to turn back, and no flight is lost out there.
@@ -9,7 +19,7 @@
 
 ### Roads
 - A real road network now runs across the islands: 104 km of highway and 256 km of roads. It joins all 26 settlements and every airfield on an island that has one.
-- The roads are built into the ground, with cuts, embankments and bridges over water and deep valleys. Each class has its own markings: dual carriageways with a central reserve, two-lane roads with centre and edge lines, lanes, and gravel tracks.
+- The roads are built into the ground, with cuts and embankments. Each class has its own markings: dual carriageways with a central reserve, two-lane roads with centre and edge lines, lanes, and gravel tracks.
 - Kaleo's empty eastern plain now has a port city (Kailani), a market town (Canefield) and three villages. Palm Bay's island, Far Isle and Nordholm's coast have a village each.
 
 ### Fixes from the v3.44.0 review

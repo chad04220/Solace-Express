@@ -37,6 +37,14 @@ RELEASE_HASHES = {
 }
 for name,digest in RELEASE_HASHES.items():
     assert hashlib.sha256(function(mat,name).encode()).hexdigest()==digest, 'Aircraft shared helper changed: '+name
+# the place the ground's material is worked out at keeps the height in y: v3.45.0 built it as vec3(wrapW(p.xz), p.y) -
+# x, z, y - and every hillside came out snow, the runways, fields and towns gone
+arg=re.search(r'terrainMaterial\((\w+)\s*,',fs).group(1)
+if arg not in ('p','vW'):
+    built=re.search(r'vec3\s+'+arg+r'\s*=\s*vec3\(([^;]*)\)\s*;',fs)
+    assert built, 'terrain FS: the material position must be built as vec3(x, height, z)'
+    parts=[x.strip() for x in built.group(1).split(',')]
+    assert len(parts)==3 and re.fullmatch(r'(p|vW)\.y',parts[1]), 'terrain FS: the material position must keep the height in y, got '+built.group(1)
 assert fs.index('dFdx(vW.xz)') < fs.index('discard;')
 assert fs.index('dFdy(vW.xz)') < fs.index('discard;')
 assert 'dFdx(' not in terrain and 'dFdy(' not in terrain and 'fwidth(' not in terrain

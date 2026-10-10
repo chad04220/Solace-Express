@@ -4250,7 +4250,7 @@ void Game::debugScene(const std::string& name) {
       return;
     }
   }
-  if (name == "air" || name == "sunset" || name == "mountain" || name == "cockpit" || name == "jet" || name == "storm" || name == "snow" || name == "hud" || name == "forest" || name == "seam" || name == "seamgps") {
+  if (name == "air" || name == "sunset" || name == "mountain" || name == "cockpit" || name == "jet" || name == "storm" || name == "snow" || name == "hud" || name == "forest" || name == "seam" || name == "seamgps" || name == "at") {
     vec3 p(-4000, 600, 9000); float hdg = 40;
     if (name == "forest") { p = vec3(-960, 270, 23500); hdg = 0; }   // (low, north up the island's longest forest: 9 km of it ahead, 130-250 m below - what the trees cost, their fades and detail cross-fades)
     if (name == "sunset") { timeOfDay = 18.2f; p = vec3(-26000, 300, 14000); hdg = 270; }
@@ -4258,6 +4258,10 @@ void Game::debugScene(const std::string& name) {
     if (name == "jet") { p = vec3(8000, 900, 6000); hdg = 80; }
     if (name == "storm") { p = vec3(10000, 700, 10000); hdg = 120; }
     if (name == "snow") { p = vec3(20000, 600, -24000); hdg = 80; }
+    if (name == "at") {   // AT="x,z,height above the ground,heading": anywhere (CAMPITCH tilts the chase camera down, degrees)
+      float x = 0, z = 0, agl = 300, h = 0; if (getenv("AT")) sscanf(getenv("AT"), "%f,%f,%f,%f", &x, &z, &agl, &h);
+      p = vec3(x, std::max(g_world.height(x, z), 0.f) + agl, z); hdg = h;
+    }
     if (name == "seam" || name == "seamgps") { p = vec3(WRAP_HALF - 1500.f, 1500.f, 4000.f); hdg = getenv("SEAMHDG") ? (float)atof(getenv("SEAMHDG")) : 90.f; }   // (over the map's seam, east of the islands: their far side's copy ahead)
     plane.reset(&kAircraft[spec], p, hdg, kAircraft[spec].maxFuel, 100, true, kAircraft[spec].cruise);
     takeoffAnnounced = true;
@@ -4649,6 +4653,7 @@ void Game::debugScene(const std::string& name) {
     if (name == "minimap") showMinimap = true;
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
   }
+  if (name == "at" && getenv("CAMPITCH")) { camPitch = (float)atof(getenv("CAMPITCH")) * DEG; camZoom = 2.5f; for (int i = 0; i < 30; i++) updateCamera(0.1f); }
   if (name == "seamgps") { showMap = true; uiAnim[0x6e61u] = 1.f; gpsRangeTarget = gpsRange = 25000.f; }
   if (name == "gpsap" || name == "apfinal" || name == "apvtol") {   // autopilot: GPS autoland pick, then the approach
     int sp = name == "apvtol" ? 8 : 4;   // (the XR-40: the research jet that lands vertically)
