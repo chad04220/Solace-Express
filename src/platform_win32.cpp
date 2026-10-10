@@ -814,6 +814,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   g_ren.matDir = game.assetDir + "\\materials";   // (the scanned material layers shipped beside the exe)
   if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom), [&](float f, const std::string& what) { pace.setSub(f); introFrame(pace.fraction(), what, 1.f); })) { stopIntro(false); fatal(g_ren.error); return 1; }
   if (game.quit) { stopIntro(false); return 0; }
+  // the graphics started: an error.log left by an earlier launch that failed is that launch's, not this one's (the
+  // diagnostics collect it, and v3.42.0's still showed v3.36.0's NVIDIA compiler failure, fixed since)
+  if (!tool) DeleteFileA((game.saveDir + "\\error.log").c_str());
   {
     // a normal start loads the menu's first place and builds (or reads) every aircraft's meshes, the research jets'
     // too, under the intro (rendered offscreen: the intro keeps the window), so nothing past the menu waits for one

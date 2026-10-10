@@ -44,6 +44,8 @@ if /i "%MODE%"=="loading" goto loading
 set OUT=diagnostics
 if exist "%OUT%" rmdir /s /q "%OUT%"
 mkdir "%OUT%"
+rem (an error.log already there is an earlier launch's: kept apart, so the one collected at the end is these runs')
+if exist "%APPDATA%\SolaceExpress\error.log" move /y "%APPDATA%\SolaceExpress\error.log" "%OUT%\error_before.log" >nul
 if /i "%MODE%"=="shots" goto shots
 
 echo [1/6] System report ...
