@@ -184,9 +184,27 @@ int main() {
       "\n    void   main ( ) {o=vec4( K( 1.0 )   -   -SUM+f(2.0)) ;}\n";
     const std::string oa = shaderPrune::prune(a), ob = shaderPrune::prune(b);
     check(oa == ob, "only the layout differs: the same program", oa + "----\n" + ob);
-    check(oa.compare(0, 18, "#version 330 core\n") == 0 && has(oa, "#define K(x) (x*2.0)") && has(oa, "#define SUM 1.0 + \\\n2.0"), "preprocessor lines keep their spaces", oa);
+    check(oa.compare(0, 18, "#version 330 core\n") == 0 && has(oa, "#define K(x) (x*2.0)") && has(oa, "#define SUM 1.0 + \\\n 2.0"), "preprocessor lines keep their spaces", oa);
     check(has(oa, "x*.5+1.+x.x- -x") && has(oa, "float f(float x)") && !has(oa, "\n\n"), "the spaces two tokens need, and only those", oa);
     check(shaderPrune::prune(oa) == oa, "canonical: pruned twice, the same", oa);
+  }
+  {   // a line a '\' continues keeps the space its leading blanks made, and an empty one is kept: each splices as before
+    const std::string src =
+      "#version 330 core\n"
+      "#define Y a\\\n"
+      "    b\n"
+      "#define F\\\n"
+      "  (x)\n"
+      "#define X 1 \\\n"
+      "   \n"
+      "float y;\n"
+      "out vec4 o;\n"
+      "void main(){ o = vec4(y); }\n";
+    const std::string o = shaderPrune::prune(src);
+    check(has(o, "#define Y a\\\n b\n"), "a continued line's first token stays apart from the last before", o);
+    check(has(o, "#define F\\\n (x)\n"), "an object-like macro whose body opens with '(' stays object-like", o);
+    check(has(o, "#define X 1 \\\n\nfloat y;"), "an empty continued line still ends the directive", o);
+    check(shaderPrune::prune(o) == o, "canonical with continuations: pruned twice, the same", o);
   }
   {   // a name that is also a variable elsewhere is kept (conservative)
     const std::string src =

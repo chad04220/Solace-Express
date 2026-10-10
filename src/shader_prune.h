@@ -254,7 +254,9 @@ struct Decl { size_t b, e; std::string name; };
 // that keep two tokens apart (between two names or numbers, between two operator characters that would join, by a
 // '.' next to a name or a number) - each one space - so an edit that only re-indents, re-aligns or re-spaces code
 // changes no program. (A preprocessor line keeps a space for every run of blanks: "#define F (x)" is not "F(x)". The
-// line breaks stay, so the driver's messages still point at a line of the program.)
+// line breaks stay, so the driver's messages still point at a line of the program. A line a '\' continues is the
+// directive's still: it keeps a space for its leading blanks - they part its first token from the last one before -
+// and kept even when empty, as it ends the directive.)
 inline bool keepSpace(char a, char b, bool numberBefore) {
   static const char* ops = "+-*/%<>=!&|^";
   if (idChar(a) && idChar(b)) return true;
@@ -266,9 +268,10 @@ inline std::string normalizeSpace(const std::string& s) {
   for (size_t at = 0; at < s.size();) {
     size_t e = s.find('\n', at); if (e == std::string::npos) e = s.size();
     size_t k = at; while (k < e && (s[k] == ' ' || s[k] == '\t' || s[k] == '\r')) k++;
-    const bool pp = k < e && s[k] == '#';
+    const bool cont = o.size() >= 2 && o[o.size() - 2] == '\\';   // (the line before ends in a '\': this one goes on with it)
+    const bool pp = cont || (k < e && s[k] == '#');
     std::string line; line.reserve(e - k);
-    bool blank = false; size_t tok = 0;   // (tok: where the name or number ending the line so far begins)
+    bool blank = cont && k > at; size_t tok = 0;   // (tok: where the name or number ending the line so far begins)
     for (; k < e; k++) {
       const char c = s[k];
       if (c == ' ' || c == '\t' || c == '\r') { blank = true; continue; }
@@ -279,7 +282,7 @@ inline std::string normalizeSpace(const std::string& s) {
       line += c;
     }
     if (blank && !line.empty() && line.back() == '\\') line += ' ';
-    if (!line.empty()) { o += line; o += '\n'; }
+    if (!line.empty() || cont) { o += line; o += '\n'; }
     at = e + 1;
   }
   return o;

@@ -224,6 +224,13 @@ int Renderer::afModelOf(const float* M, int model) {
   for (int m = 0; m < kAfModels; m++) if (afKeys[m] == k) return model < 0 || model == m ? m : -1;
   return -1;
 }
+// the mesh pass's program for an aircraft: its type's own build, else every aircraft's (each made the first time it is
+// asked for). 0 when neither builds: then that aircraft is marched, and every other type keeps its mesh
+GLuint Renderer::meshProgramFor(const float* M, int model) {
+  const int own = afModelOf(M, model);
+  const GLuint p = own >= 0 ? afMeshProgram(own) : 0;
+  return p ? p : sharedMeshProgram();
+}
 GLuint Renderer::afMeshProgram(int model) {
   AfOwn& a = afOwn[model];
   if (!a.meshTried) {
@@ -269,10 +276,10 @@ std::string Renderer::meshStamp(int model, int slot) {
   return a.stamp[slot];
 }
 
-// every aircraft but a wreck
-bool Renderer::planeMeshWanted(const FrameParams& fp) const {
+// every aircraft but a wreck, and one whose mesh pass has no program (meshProgramFor: it alone is marched)
+bool Renderer::planeMeshWanted(const FrameParams& fp) {
   const PlaneVisual& pv = fp.plane;
-  return !meshOff && !meshFail && !bakeOff && pv.on && fp.wreck.pieces == 0;   // (a cloaked XR-40 too: the mesh passes leave its cloaked part out)
+  return !meshOff && pv.on && fp.wreck.pieces == 0 && meshProgramFor(pv.M, pv.model);   // (a cloaked XR-40 too: the mesh passes leave its cloaked part out)
 }
 
 void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
@@ -1054,7 +1061,7 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   const int own = afModelOf(trafK >= 0 ? fp.traffic[trafK].t : fp.plane.M, trafK >= 0 ? -1 : fp.plane.model);
   GLuint prog = own >= 0 ? afMeshProgram(own) : 0;
   if (!prog) prog = sharedMeshProgram();
-  if (!prog) { meshFail = true; return; }   // (no program: the march draws the airframes from the next frame)
+  if (!prog) return;   // (never: an aircraft is drawn as a mesh only when it has a program - meshProgramFor)
   // the analysis's probe of the player's airframe shading (kProbeMeshShade): a build of its own, made the first time
   // it is asked for, so the game's programs carry no trace of it
   if ((dbgOff & kProbeMeshShade) && trafK < 0) {

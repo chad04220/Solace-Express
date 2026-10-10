@@ -301,11 +301,11 @@ private:
   GLuint progTrafficProps = 0;
   void rasterTrafficProps(const FrameParams& fp);
   GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0;   // (progPlaneMesh: the shared build, every aircraft's code - made only if an aircraft's own fails: sharedMeshProgram)
-  bool sharedMeshTried = false, meshFail = false;   // (meshFail: no mesh program at all - the march draws the airframes)
+  bool sharedMeshTried = false;
   GLuint sharedMeshProgram();   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
   void setScreenCut(GLuint p, const FrameParams& fp, bool on);   // the research cockpits' windows cut (cabin_windows.glsl)
   bool compilePlaneMesh(const std::function<void()>& step = {});
-  bool planeMeshWanted(const FrameParams& fp) const;
+  bool planeMeshWanted(const FrameParams& fp);
   void bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key);
   void drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const float* rot, const vec3& pos, int trafK, bool depthDone = false);
   void drawPlaneMeshDepth(const FrameParams& fp, const PlaneMesh& pm, const float* rot, const vec3& pos, int trafK);
@@ -335,8 +335,9 @@ private:
   bool hullOn = false;
   bool compileHull(const std::function<void()>& step = {});
   // the bodies' builder (the bake): each aircraft's own pair (afBakePrograms); the shared pair, every aircraft's code,
-  // is made only if an aircraft's own fails (sharedBakePrograms); with neither, bakeOff and the march draws the airframes
-  bool sharedBakeTried = false, bakeOff = false;
+  // is made only if an aircraft's own fails (sharedBakePrograms); with neither, that aircraft's bodies are not built and
+  // the march draws its airframe
+  bool sharedBakeTried = false;
   bool sharedBakePrograms(GLuint out[2]);
   void hullEval(const std::vector<vec3>& pts, std::vector<float>& out);
   // Bake inputs live on the CPU: both programs receive the same model, states and part selectors.
@@ -437,6 +438,7 @@ private:
   uint64_t afKeys[kAfModels] = {}; bool afKeysSet = false;   // (each type's packed model's key: trafficModelKey)
   int afModelOf(const float* M, int model);   // the type whose packed model M is (model: the type it claims, -1 any), or -1: the shared builds
   GLuint afMeshProgram(int model);
+  GLuint meshProgramFor(const float* M, int model);   // its type's own mesh-pass build, else the shared one; 0 with neither
   bool afBakePrograms(int model, int slot, GLuint out[2]);   // slot: 0 the outside body, 1 the cockpit's
   std::string meshStamp(int model, int slot);   // a body's cache stamp: its type's own builder for the slot (-1: the shared)
   // the airframe shadow maps (raster_renderer.cpp): the player's baked static mesh rendered from the sun (layer 0,

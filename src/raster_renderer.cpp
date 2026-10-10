@@ -106,8 +106,8 @@ void Renderer::updatePartPoses(const FrameParams& fp) {
     auto pm = planeMeshes.find(hullKey(fp, fp.plane.PS[3] > 0.5f ? 1 : 0));
     if (pm != planeMeshes.end() && pm->second.ok) player = &pm->second;
   }
-  if (!meshOff && !meshFail && fp.pano <= 0.f)
-    for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); k++) { auto it = planeMeshes.find(trafficModelKey(fp.traffic[k].t)); if (it != planeMeshes.end() && it->second.ok) traf[k] = &it->second; }
+  if (!meshOff && fp.pano <= 0.f)
+    for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); k++) { auto it = planeMeshes.find(trafficModelKey(fp.traffic[k].t)); if (it != planeMeshes.end() && it->second.ok && meshProgramFor(fp.traffic[k].t, -1)) traf[k] = &it->second; }
   computePartPoses(fp, player, traf);
 }
 
@@ -158,7 +158,7 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   // parts' too), else its full hull
   const PlaneMesh* trafMesh[kMaxTrafficDrawn] = {};
   const int trafN = std::min(fp.trafficN, kMaxTrafficDrawn);
-  if (!meshOff && !meshFail) for (int k = 0; k < trafN; k++) { auto it = planeMeshes.find(trafficModelKey(fp.traffic[k].t)); if (it != planeMeshes.end() && it->second.ok) trafMesh[k] = &it->second; }
+  if (!meshOff) for (int k = 0; k < trafN; k++) { auto it = planeMeshes.find(trafficModelKey(fp.traffic[k].t)); if (it != planeMeshes.end() && it->second.ok && meshProgramFor(fp.traffic[k].t, -1)) trafMesh[k] = &it->second; }
   if (fp.pano <= 0.f) drawTrafficHulls(fp, trafMesh); else trafHullOn = false;
   glBindFramebuffer(GL_FRAMEBUFFER, fboGB);
   GLenum gb[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
@@ -539,10 +539,11 @@ void Renderer::rasterEffects(const FrameParams& fp) {
   const bool effects = fp.fx.beams + fp.fx.bombs + fp.fx.blasts > 0 ||
     (intact && (p.propCount > 0 || p.vapor[0] > .01f || (!cockpit && p.exhaust.count > 0) || (engine == 6 && (cockpit || p.wr[4][3] > .001f))));
   if (!effects || rw > histW || rh > histH) { rasterTrafficProps(fp); return; }
-  // (the player's aircraft's: the XR-40's own - its cloak, its weapons, its hologram - else the light aircraft's build,
-  // which has no airframe in it: the propellers, the vapour and the flames; with no aircraft, every aircraft's)
-  const bool wraith = intact && engine == 6;
-  const GLuint progEffects = afPassProgram(kAfEffects, wraith ? afModelOf(p.M, p.model) : -1, wraith || !p.on);
+  // (the player's aircraft's: the XR-40's own - its cloak, its weapons, its hologram; wrecked too, its bombs still falling
+  // and its blasts burning - else the light aircraft's build, which has no airframe in it: the propellers, the vapour and
+  // the flames; with no aircraft, or weapons in the air with no XR-40 flying, every aircraft's)
+  const bool wraith = p.on && (int)(p.M[2] + 0.5f) == 6, weapons = fp.fx.beams + fp.fx.bombs + fp.fx.blasts > 0;
+  const GLuint progEffects = afPassProgram(kAfEffects, wraith ? afModelOf(p.M, p.model) : -1, wraith || weapons || !p.on);
   if (!progEffects) { rasterTrafficProps(fp); return; }
   const int cur = histIdx ^ 1;
   glBindFramebuffer(GL_FRAMEBUFFER, fboTAA[cur]);

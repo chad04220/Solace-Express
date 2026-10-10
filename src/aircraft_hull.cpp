@@ -108,9 +108,10 @@ void Renderer::beginHullBake(const FrameParams& fp, int states, const float* ps,
   hullBakeSideX = hullBakeSideY = 1.f;
   hullBakeUploaded[0] = hullBakeUploaded[1] = false;
   // the aircraft's own pair (its code alone: a smaller program, and its edits rebuild its bodies alone), or the shared
-  // one; with neither, nothing can be built (the callers leave the airframe to the march: bakeOff)
+  // one; with neither, nothing can be built: each caller marks what it was building as not built, and that aircraft's
+  // airframe is left to the march (every other type keeps its builder and its bodies)
   const int own = afModelOf(fp.plane.M, fp.plane.model), slot = ps && ps[3] > 0.5f ? 1 : 0;   // (the body: the states' inside flag)
-  if ((own < 0 || !afBakePrograms(own, slot, hullBakeProg)) && !sharedBakePrograms(hullBakeProg)) { hullBakeProg[0] = hullBakeProg[1] = 0; bakeOff = true; }
+  if ((own < 0 || !afBakePrograms(own, slot, hullBakeProg)) && !sharedBakePrograms(hullBakeProg)) hullBakeProg[0] = hullBakeProg[1] = 0;
 }
 
 GLuint Renderer::bindHullBake(bool restore) {
@@ -396,7 +397,7 @@ uint64_t Renderer::hullKey(const FrameParams& fp, int slot) const {
 bool Renderer::hullWanted(const FrameParams& fp) const {
   const PlaneVisual& pv = fp.plane;
   if (pv.PS[3] > 0.5f) return false;   // (the cockpit is drawn from its mesh)
-  return !hullOff && progHull && !bakeOff && pv.on && fp.wreck.pieces == 0 && pv.M[2] < 4.5f;
+  return !hullOff && progHull && pv.on && fp.wreck.pieces == 0 && pv.M[2] < 4.5f;
 }
 
 void Renderer::ensureHullTarget() {
