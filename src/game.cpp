@@ -688,10 +688,6 @@ void Game::moveClouds(float dt) {
   cloudBoil += (0.3f + 1.4f * cu + (wx.storm ? 2.f : 0.f)) * dt;
   wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet; wx.cloudBoil = cloudBoil;
 }
-// The aircraft through the cloud: its path in the cloud layer is kept (a point every 150 m, or sooner in a turn) in
-// the cloud field's frame, and the cloud pass carves a tunnel along it that opens a moment behind the aircraft,
-// widens and fills in again over the next minute (FrameParams::wake). Flying in or near cloud, wisps of it stream
-// past (their parallax is the speed you feel in cloud), and the wingtips' vortices draw ribbons through it.
 Game::WakePt Game::wakeHere(vec3 c, bool brk, float odo) const {
   // the pair the airframe's surfaces are rolling up (aero_wake.h), which sinks at w0 = G / (2 pi b0) under its own
   // downwash and slows as it decays over a few times b0 / w0. Without one (too slow to fly), a lifting line's: the
@@ -710,6 +706,10 @@ Game::WakePt Game::wakeHere(vec3 c, bool brk, float odo) const {
   const vec3 bx = plane.q.rotate(vec3(1, 0, 0));
   return {c, 0.f, brk, w0, clampf(4.f * b0 / std::max(fabsf(w0), 0.05f), 20.f, 120.f), odo, gam, b0, atan2f(dot(bx, upv), dot(bx, sd)), py};
 }
+// The aircraft through the cloud: its path in the cloud layer is kept (a point every 150 m, or sooner in a turn) in
+// the cloud field's frame, with the vortex pair as it was there, and the cloud pass stirs and clears a channel along
+// it that opens a moment behind the aircraft, widens and fills in again over the next minute (FrameParams::wake). Flying in or near cloud, wisps of it stream
+// past (their parallax is the speed you feel in cloud), and the wingtips' vortices draw ribbons through it.
 void Game::updateCloudWake(float dt) {
   // (the rain and the cloud at the aircraft, smoothed: the windscreen, the rain round the camera, the visibility, the drumming on the airframe)
   rainNow = flightClock < 0.1f ? plane.wxl.rain : approach(rainNow, plane.wxl.rain, 1.2f, dt);   // (raining already as the flight opens)
@@ -2513,9 +2513,10 @@ FrameParams Game::buildFrame() {
     fp.windSock.y = 0;
   }
   // the aircraft's wake through the cloud: its points where the cloud field has carried them, the channel's radius
-  // (the pair's oval, about its spacing either side, spreading with the turbulence as it ages), how far the vortex pair has sunk, the distance along the path in Crow
-  // wavelengths (about 8.6 core spacings), the age, and each segment's strength (opening in a moment, filling in over
-  // a minute, faded at the oldest end; none across a gap)
+  // (the pair's oval, about its spacing either side, spreading with the turbulence as it ages), how far the vortex
+  // pair has sunk, the distance along the path in Crow wavelengths (about 8.6 core spacings), the age, the pair as it
+  // was there, and each segment's strength (opening in a moment, filling in over a minute, faded at the oldest end;
+  // none across a gap)
   fp.wakeN = 0;
   static const bool wakeOff = getenv("WAKEOFF") != nullptr;   // (debug A/B: no wake through the cloud)
   if (flying && !wakeOff && !cloudWake.empty() && wx.cloudCover >= 0.02f) {
