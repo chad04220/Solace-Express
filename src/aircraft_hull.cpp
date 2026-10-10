@@ -163,6 +163,7 @@ void Renderer::hullEval4(const std::vector<vec3>& pts, std::vector<float>& out, 
 void Renderer::hullEvalBatch(const vec3* pts, size_t n, float* out, const float* normals) {
   const int TW = 512, rows = int((n + TW - 1) / TW);
   if (!bindHullBake()) return;
+  const auto tEval = std::chrono::steady_clock::now(); const double yield0 = bakeYieldS;
   std::vector<float> buf(size_t(TW) * rows * 4, 1e4f);
   for (size_t i = 0; i < n; i++) { buf[i * 4] = pts[i].x; buf[i * 4 + 1] = pts[i].y; buf[i * 4 + 2] = pts[i].z; }
   if (!texHPts) {
@@ -197,7 +198,7 @@ void Renderer::hullEvalBatch(const vec3* pts, size_t n, float* out, const float*
     glEnable(GL_SCISSOR_TEST); glScissor(0, r0, TW, r1 - r0); glViewport(0, 0, TW, rows);
     glDrawArrays(GL_TRIANGLES, 0, 3); glDisable(GL_SCISSOR_TEST); glFinish();
     if (bakeYield && bakeDue()) {
-      bakeYield(); hullBakeUploaded[0] = hullBakeUploaded[1] = false; bindHullBake(true);
+      yieldTimed(); hullBakeUploaded[0] = hullBakeUploaded[1] = false; bindHullBake(true);
       glBindFramebuffer(GL_FRAMEBUFFER, fboHOut); glDrawBuffers(1, &c0);
       glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glBindVertexArray(vaoEmpty);
       glActiveTexture(GL_TEXTURE0 + 19); glBindTexture(GL_TEXTURE_2D, texHPts);
@@ -211,6 +212,7 @@ void Renderer::hullEvalBatch(const vec3* pts, size_t n, float* out, const float*
   glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, tshFront >= 0 ? texTSh[tshFront] : 0);
   glActiveTexture(GL_TEXTURE0);
   std::copy(buf.begin(), buf.begin() + n * 4, out);
+  bakeEvalS += std::chrono::duration<double>(std::chrono::steady_clock::now() - tEval).count() - (bakeYieldS - yield0); bakeEvalPts += n;
   bakeTick();
 }
 

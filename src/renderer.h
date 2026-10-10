@@ -146,7 +146,11 @@ public:
   // loops, so a screen drawn from the callback (the research terminal's boot sequence) never freezes
   std::chrono::steady_clock::time_point bakeYieldAt{};
   bool bakeDue() { auto now = std::chrono::steady_clock::now(); if (now - bakeYieldAt < std::chrono::milliseconds(30)) return false; bakeYieldAt = now; return true; }
-  void bakeTick() { if (bakeYield && bakeDue()) { bakeYield(); hullBakeUploaded[0] = hullBakeUploaded[1] = false; } }
+  void bakeTick() { if (bakeYield && bakeDue()) { yieldTimed(); hullBakeUploaded[0] = hullBakeUploaded[1] = false; } }
+  // where a body's bake spends its time (compile.log: bakePlaneMesh): the field's evaluation on the GPU, the frames shown
+  // while it runs, and the rest (the meshing and the simplification, on the CPU)
+  double bakeEvalS = 0, bakeYieldS = 0; size_t bakeEvalPts = 0;
+  void yieldTimed() { const auto t = std::chrono::steady_clock::now(); bakeYield(); bakeYieldS += std::chrono::duration<double>(std::chrono::steady_clock::now() - t).count(); }
   bool ok = false;
   std::string error;
   GLuint minimapTex = 0;
@@ -316,6 +320,7 @@ private:
   bool sharedMeshTried = false;
   GLuint sharedMeshProgram();   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
   void setScreenCut(GLuint p, const FrameParams& fp, bool on);   // the research cockpits' windows cut (cabin_windows.glsl)
+  static void bakeLog(const std::string& line);   // a line in compile.log
   // A broken-up aircraft (fp.wreck.pieces): each piece drawn from the airframe's outside mesh, placed on its own and
   // cut to its share (wreck_clip.glsl). The mesh's triangles are sorted by piece once (splitWreck), so a piece draws only
   // its own and those across its edges.

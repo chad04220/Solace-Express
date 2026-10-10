@@ -29,6 +29,31 @@
 
 namespace {
 inline int64_t key3(int x, int y, int z) { return ((int64_t)(x + 4096) << 42) | ((int64_t)(y + 4096) << 21) | (int64_t)(z + 4096); }
+// a cell or a lattice corner -> index: open addressing over flat arrays (the surface nets' look-ups; std::unordered_map
+// spent seconds of a bake allocating and chasing its nodes)
+struct LatticeMap {
+  std::vector<int64_t> keys; std::vector<int> vals; size_t mask = 0, n = 0;
+  static constexpr int64_t kEmpty = INT64_MIN;
+  explicit LatticeMap(size_t expect = 1024) { size_t cap = 1024; while (cap < expect * 2) cap <<= 1; keys.assign(cap, kEmpty); vals.assign(cap, -1); mask = cap - 1; }
+  static size_t hash(int64_t k) { uint64_t x = (uint64_t)k * 0x9E3779B97F4A7C15ull; return (size_t)(x ^ (x >> 29)); }
+  void grow() {
+    std::vector<int64_t> ok; std::vector<int> ov; ok.swap(keys); ov.swap(vals);
+    keys.assign(ok.size() * 2, kEmpty); vals.assign(ok.size() * 2, -1); mask = keys.size() - 1;
+    for (size_t i = 0; i < ok.size(); i++) if (ok[i] != kEmpty) { size_t h = hash(ok[i]) & mask; while (keys[h] != kEmpty) h = (h + 1) & mask; keys[h] = ok[i]; vals[h] = ov[i]; }
+  }
+  // the index of k, inserting v if it isn't there yet (inserted: whether it was)
+  int insert(int64_t k, int v, bool& inserted) {
+    if ((n + 1) * 2 > keys.size()) grow();
+    size_t h = hash(k) & mask;
+    while (keys[h] != kEmpty) { if (keys[h] == k) { inserted = false; return vals[h]; } h = (h + 1) & mask; }
+    keys[h] = k; vals[h] = v; n++; inserted = true; return v;
+  }
+  bool find(int64_t k, int& v) const {
+    size_t h = hash(k) & mask;
+    while (keys[h] != kEmpty) { if (keys[h] == k) { v = vals[h]; return true; } h = (h + 1) & mask; }
+    return false;
+  }
+};
 const float kH = kS2 / 4.f;   // the lattice: 1.5625 cm
 const uint32_t kMeshMagic = 0x4d455348u + aircraftMesh::kAlgorithmVersion;
 // the rigid parts a cockpit has (plane_parts.glsl PT_*) and each one's instances: x which seat or side, y which pedal
@@ -315,6 +340,8 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       else if (getenv("HULLDBG")) printf("mesh %s: from the cache (%zu vertices)\n", inside ? "cockpit" : "outside", vb.size() / 8);
     }
   }
+  const auto tBake = std::chrono::steady_clock::now();
+  bakeEvalS = bakeYieldS = 0; bakeEvalPts = 0;
   if (ib.empty()) {
     bakeBuilt++;
     if (onBakeStart) onBakeStart();   // (not in the cache, or unreadable: the launch's loading screen says it is building)
@@ -326,6 +353,13 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     beginHullBake(fp, ns, sps.data(), sct.data(), swr.data(), swr2.data());
     if (!hullBakeProg[0]) { PM.ok = false; return; }   // (no builder: a failed bake, as below - this session marches it)
     auto mode = [&](int m, int s) { hullBakeMode = m; hullBakeState = s; };
+    // (where the bake goes, phase by phase - wall time, and of it the field's evaluation and the frames shown: HULLDBG)
+    std::string phaseLog; auto tPh = std::chrono::steady_clock::now(); double gPh = bakeEvalS + bakeYieldS;
+    auto phase = [&](const char* name) {
+      const auto now = std::chrono::steady_clock::now(); const double g = bakeEvalS + bakeYieldS;
+      char b[96]; snprintf(b, sizeof b, " %s %.1f (gpu %.1f)", name, std::chrono::duration<double>(now - tPh).count(), g - gPh);
+      phaseLog += b; tPh = now; gPh = g;
+    };
     hullBakePart = -2;   // airframe without rigid parts: those are separate meshes below
     const float slack = 1.3f;   // the field may overstate distances by up to ~25%
     float L = M[0], span = M[9 * 4];
@@ -333,24 +367,30 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     int n0 = 2 * (int)ceilf(br / kS0); float org = -n0 * 0.5f * kS0;
     int n1 = n0 * 4, n2 = n1 * 4;
     auto centre = [&](float s, int i, int j, int k) { return vec3(org + (i + 0.5f) * s, org + (j + 0.5f) * s, org + (k + 0.5f) * s); };
-    std::vector<vec3> pts; std::vector<float> d, d4;
-    // ---- level 0 and 1: where the airframe is at all, in any state (the least distance over the states)
-    mode(0, 0);
+    std::vector<vec3> pts; std::vector<float> d, d4, dX;
+    // ---- level 0 and 1: where the surface can be at all, in any state: not far outside in every state (the least
+    // distance over the states), nor deep inside in every one (the greatest: a cabin's field is solid all round it, and
+    // the XR-40's sent some 90 million points through the level below to find a few thousand cells)
     for (int k = 0; k < n0; k++) for (int j = 0; j < n0; j++) for (int i = 0; i < n0; i++) pts.push_back(centre(kS0, i, j, k));
-    hullEval(pts, d);
+    mode(0, 0); hullEval(pts, d);
+    mode(4, 0); hullEval(pts, dX);
+    mode(0, 0);
     float keep0 = slack * (halfDiag(kS0) + halfDiag(kS1) + halfDiag(kS2)) + 0.1f;
     std::vector<int> c1; pts.clear();
     for (int k = 0; k < n0; k++) for (int j = 0; j < n0; j++) for (int i = 0; i < n0; i++) {
-      if (d[((size_t)k * n0 + j) * n0 + i] >= keep0) continue;
+      const size_t q0 = ((size_t)k * n0 + j) * n0 + i;
+      if (d[q0] >= keep0 || dX[q0] <= -keep0) continue;
       for (int c = 0; c < 64; c++) { int ii = i * 4 + (c & 3), jj = j * 4 + ((c >> 2) & 3), kk = k * 4 + (c >> 4); c1.push_back((kk * n1 + jj) * n1 + ii); pts.push_back(centre(kS1, ii, jj, kk)); }
     }
     hullEval(pts, d);
+    mode(4, 0); hullEval(pts, dX);
+    mode(0, 0);
     float keep1 = slack * (halfDiag(kS1) + halfDiag(kS2)) + 0.1f;
     // ---- level 2: the 6.25 cm cells the surface can pass through in some state (least distance under the band,
     // greatest above it: not deep inside in every state)
     std::vector<int> c2; pts.clear();
     for (size_t q = 0; q < c1.size(); q++) {
-      if (d[q] >= keep1) continue;
+      if (d[q] >= keep1 || dX[q] <= -keep1) continue;
       int id = c1[q], ii = id % n1, jj = (id / n1) % n1, kk = id / (n1 * n1);
       for (int c = 0; c < 64; c++) { int i2 = ii * 4 + (c & 3), j2 = jj * 4 + ((c >> 2) & 3), k2 = kk * 4 + (c >> 4); c2.push_back((k2 * n2 + j2) * n2 + i2); pts.push_back(centre(kS2, i2, j2, k2)); }
     }
@@ -360,6 +400,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     mode(4, 0); hullEval(pts, dMax);
     std::vector<int> cand; std::vector<vec3> candP;
     for (size_t q = 0; q < c2.size(); q++) if (dMin[q] < band && dMax[q] > -band) { cand.push_back(c2[q]); candP.push_back(pts[q]); }
+    phase("cells");
     // ---- which of them move: the distance in some state differs from the rest state's
     std::vector<float> dRest; mode(1, 0); hullEval(candP, dRest);
     std::vector<uint8_t> moving(cand.size(), 0);
@@ -383,6 +424,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     }
     std::unordered_map<int, uint8_t> cellMov;   // level-2 index -> moving
     for (size_t q = 0; q < cand.size(); q++) cellMov[cand[q]] = moving[q];
+    phase("moving+thin");
     // ---- the static band cells: the coarse mesh's (all but the thin ones; 2: in the ring round a thin cell), and the
     // fine patch's (the thin ones and their ring)
     std::unordered_set<int> thinSet;
@@ -411,34 +453,68 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     // iso: the level meshed (a positive one lays the surface that far out: the cockpit's thin patch, trimmed per pixel)
     auto nets = [&](const std::vector<std::pair<int, uint8_t>>& cells, int sub, float sink, float inflate, float iso = 0.f) {
       const float h = kS2 / sub;
-      std::unordered_map<int64_t, int> corner;   // lattice coords -> sample index
-      std::vector<vec3> cpts;
-      for (auto& ce : cells) {
-        if ((&ce - &cells[0]) % 1024 == 0) bakeTick();
-        int id = ce.first, i2 = id % n2, j2 = (id / n2) % n2, k2 = id / (n2 * n2);
+      // Each cell owns the lattice corners and cubes 0..sub-1 along every axis from its low corner, in its slot's own
+      // block of the arrays (a hash map of every corner and cube was most of the meshing: 80 million look-ups a body,
+      // most of them cache misses); a corner at sub along an axis is the neighbour's there, or where that neighbour
+      // isn't in the set, one of the few kept apart in `rim`
+      const int s1 = sub + 1, nOwn = sub * sub * sub, nAll = s1 * s1 * s1;
+      LatticeMap slotOf(cells.size());   // cell -> slot
+      for (size_t q = 0; q < cells.size(); q++) { bool fresh; slotOf.insert(cells[q].first, (int)q, fresh); }
+      auto slotAt = [&](int i2, int j2, int k2) {
+        int q;
+        if (i2 < 0 || j2 < 0 || k2 < 0 || i2 >= n2 || j2 >= n2 || k2 >= n2 || !slotOf.find((k2 * n2 + j2) * n2 + i2, q)) return -1;
+        return q;
+      };
+      std::vector<vec3> cpts(cells.size() * nOwn);
+      for (size_t q = 0; q < cells.size(); q++) {
+        const int id = cells[q].first, i2 = id % n2, j2 = (id / n2) % n2, k2 = id / (n2 * n2);
+        vec3* o = &cpts[q * nOwn];
+        for (int z = 0; z < sub; z++) for (int y = 0; y < sub; y++) for (int x = 0; x < sub; x++)
+          *o++ = vec3(org + (i2 * sub + x) * h, org + (j2 * sub + y) * h, org + (k2 * sub + z) * h);
+      }
+      LatticeMap rim(cells.size() * (size_t)sub);   // lattice coords -> sample index (the corners no cell owns)
+      // a cell's (sub+1)^3 corners' sample indices (add: the rim's corners put in the set; else -1 where one isn't)
+      auto cellCorners = [&](size_t q, int* out, bool add) {
+        const int id = cells[q].first, i2 = id % n2, j2 = (id / n2) % n2, k2 = id / (n2 * n2);
+        int nb[8]; nb[0] = (int)q;
+        for (int c = 1; c < 8; c++) nb[c] = slotAt(i2 + (c & 1), j2 + ((c >> 1) & 1), k2 + (c >> 2));
         for (int z = 0; z <= sub; z++) for (int y = 0; y <= sub; y++) for (int x = 0; x <= sub; x++) {
-          int lx = i2 * sub + x, ly = j2 * sub + y, lz = k2 * sub + z;
-          int64_t kk = key3(lx, ly, lz);
-          if (corner.count(kk)) continue;
-          corner[kk] = (int)cpts.size();
-          cpts.push_back(vec3(org + lx * h, org + ly * h, org + lz * h));
+          const int c = (x == sub) | ((y == sub) << 1) | ((z == sub) << 2);
+          int& r = out[(z * s1 + y) * s1 + x];
+          if (nb[c] >= 0) { r = nb[c] * nOwn + ((z % sub) * sub + y % sub) * sub + x % sub; continue; }
+          const int lx = i2 * sub + x, ly = j2 * sub + y, lz = k2 * sub + z;
+          if (!add) { if (!rim.find(key3(lx, ly, lz), r)) r = -1; continue; }
+          bool fresh; r = rim.insert(key3(lx, ly, lz), (int)cpts.size(), fresh);
+          if (fresh) cpts.push_back(vec3(org + lx * h, org + ly * h, org + lz * h));
         }
+      };
+      std::vector<int> cc(nAll);
+      for (size_t q = 0; q < cells.size(); q++) {
+        if (q % 1024 == 0) bakeTick();
+        cellCorners(q, cc.data(), true);
       }
       nLattice += cpts.size();
+      phase("  corners");
       std::vector<float> cv; mode(1, 0); hullEval(cpts, cv);
+      phase("  eval");
       if (iso != 0.f) for (float& x : cv) x -= iso;
-      auto cval = [&](int lx, int ly, int lz, float& v) { auto it = corner.find(key3(lx, ly, lz)); if (it == corner.end()) return false; v = cv[it->second]; return true; };
-      std::unordered_map<int64_t, int> cubeV;   // cube coords -> vertex (local)
+      std::vector<int> cubeV(cells.size() * nOwn, -1);   // each slot's cubes -> vertex (local)
       std::vector<vec3> vpos; std::vector<int> vcube; std::vector<uint8_t> vsink;   // (each vertex's cube, and whether its cell sinks)
+      std::vector<int> vslot; std::vector<uint8_t> vcross;   // (and its cell's slot, and which of its low corner's three edges the surface crosses)
       std::vector<vec3> xpt; std::vector<int> xv;   // (in the cockpit: every edge crossing and its vertex, for the sharp edges below)
       const int ce[12][2] = {{0, 1}, {1, 3}, {2, 3}, {0, 2}, {4, 5}, {5, 7}, {6, 7}, {4, 6}, {0, 4}, {1, 5}, {3, 7}, {2, 6}};   // corner bit x + 2y + 4z
-      for (auto& cl : cells) {
-        if ((&cl - &cells[0]) % 1024 == 0) bakeTick();
+      for (size_t qc = 0; qc < cells.size(); qc++) {
+        if (qc % 1024 == 0) bakeTick();
+        const auto& cl = cells[qc];
         int id = cl.first, i2 = id % n2, j2 = (id / n2) % n2, k2 = id / (n2 * n2);
+        cellCorners(qc, cc.data(), false);
         for (int z = 0; z < sub; z++) for (int y = 0; y < sub; y++) for (int x = 0; x < sub; x++) {
           int cx = i2 * sub + x, cy = j2 * sub + y, cz = k2 * sub + z;
           float v[8]; bool ok = true;
-          for (int c = 0; c < 8 && ok; c++) ok = cval(cx + (c & 1), cy + ((c >> 1) & 1), cz + (c >> 2), v[c]);
+          for (int c = 0; c < 8 && ok; c++) {
+            const int r = cc[((z + (c >> 2)) * s1 + y + ((c >> 1) & 1)) * s1 + x + (c & 1)];
+            ok = r >= 0; if (ok) v[c] = cv[r];
+          }
           if (!ok) continue;
           int neg = 0; for (int c = 0; c < 8; c++) if (v[c] < 0.f) neg++;
           if (neg == 0 || neg == 8) continue;
@@ -452,10 +528,12 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
             sum = sum + pa + (pb - pa) * t; cnt++;
             if (inside) { xpt.push_back(pa + (pb - pa) * t); xv.push_back((int)vpos.size()); }
           }
-          cubeV[key3(cx, cy, cz)] = (int)vpos.size();
+          cubeV[qc * nOwn + (z * sub + y) * sub + x] = (int)vpos.size();
           vpos.push_back(sum * (1.f / cnt)); vcube.push_back(cx); vcube.push_back(cy); vcube.push_back(cz); vsink.push_back(cl.second == 2);
+          vslot.push_back((int)qc); vcross.push_back((uint8_t)(((v[0] < 0.f) != (v[1] < 0.f)) | (((v[0] < 0.f) != (v[2] < 0.f)) << 1) | (((v[0] < 0.f) != (v[4] < 0.f)) << 2)));
         }
       }
+      phase("  cubes");
       // In the cockpit, seen from a metre: each vertex where the planes through its edge crossings meet, along the
       // field's normals there (dual contouring), instead of at the crossings' mean - on a sharp edge (a window frame's
       // lip, a strut's rim, a bezel) the mean sits off the edge and the edge zigzags with the lattice; where two faces
@@ -505,6 +583,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       }
       mode(3, 0); hullEval4(vpos, vn);
       mode(2, 0); hullEval4(vpos, d4, &vn);
+      phase("  pull");
       if (getenv("HULLDBG")) {   // how far off the surface the vertices still sit
         int n2mm = 0, n5mm = 0; float mx = 0.f;
         for (size_t q = 0; q < vpos.size(); q++) { float a = fabsf(d4[q * 4] - iso); mx = std::max(mx, a); if (a > 0.002f) n2mm++; if (a > 0.005f) n5mm++; }
@@ -523,30 +602,44 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         o[0] = vpos[q].x; o[1] = vpos[q].y; o[2] = vpos[q].z; o[3] = vn[q * 4]; o[4] = vn[q * 4 + 1]; o[5] = vn[q * 4 + 2];
         o[6] = floorf(d4[q * 4 + 1] + 0.5f); o[7] = inside ? d4[q * 4 + 2] : 1.f;
       }
-      auto cube = [&](int x, int y, int z, int& out) { auto it = cubeV.find(key3(x, y, z)); if (it == cubeV.end()) return false; out = it->second; return true; };
+      // a cube's vertex from the current vertex's cell (q, at i2 j2 k2) or one of the seven below it (nb)
+      int nb[8], cq = -1, ci2 = 0, cj2 = 0, ck2 = 0;
+      auto cube = [&](int x, int y, int z, int& out) {
+        int lx = x - ci2 * sub, ly = y - cj2 * sub, lz = z - ck2 * sub;
+        const int c = (lx < 0) | ((ly < 0) << 1) | ((lz < 0) << 2);
+        if (nb[c] < 0) return false;
+        lx += lx < 0 ? sub : 0; ly += ly < 0 ? sub : 0; lz += lz < 0 ? sub : 0;
+        out = cubeV[(size_t)nb[c] * nOwn + (lz * sub + ly) * sub + lx];
+        return out >= 0;
+      };
       auto quad = [&](int a, int b, int c, int dq) {
         vec3 nAvg(vn[a * 4] + vn[b * 4] + vn[c * 4] + vn[dq * 4], vn[a * 4 + 1] + vn[b * 4 + 1] + vn[c * 4 + 1] + vn[dq * 4 + 1], vn[a * 4 + 2] + vn[b * 4 + 2] + vn[c * 4 + 2] + vn[dq * 4 + 2]);
         vec3 fn = cross(vpos[b] - vpos[a], vpos[c] - vpos[a]) + cross(vpos[c] - vpos[a], vpos[dq] - vpos[a]);
         if (dot(fn, nAvg) < 0.f) std::swap(b, dq);
         ib.push_back(base + a); ib.push_back(base + b); ib.push_back(base + c); ib.push_back(base + a); ib.push_back(base + c); ib.push_back(base + dq);
       };
-      size_t qn = 0;
-      for (auto& kv : cubeV) {
-        if ((qn++ & 16383) == 0) bakeTick();
-        int64_t k = kv.first;
-        int cx = (int)((k >> 42) & 0x1fffff) - 4096, cy = (int)((k >> 21) & 0x1fffff) - 4096, cz = (int)(k & 0x1fffff) - 4096;
-        float v0, vx, vy, vz;
-        if (!cval(cx, cy, cz, v0)) continue;
-        int a = kv.second, b, c, dq;
-        if (cval(cx + 1, cy, cz, vx) && (v0 < 0.f) != (vx < 0.f) && cube(cx, cy - 1, cz, b) && cube(cx, cy - 1, cz - 1, c) && cube(cx, cy, cz - 1, dq)) quad(a, b, c, dq);
-        if (cval(cx, cy + 1, cz, vy) && (v0 < 0.f) != (vy < 0.f) && cube(cx, cy, cz - 1, b) && cube(cx - 1, cy, cz - 1, c) && cube(cx - 1, cy, cz, dq)) quad(a, b, c, dq);
-        if (cval(cx, cy, cz + 1, vz) && (v0 < 0.f) != (vz < 0.f) && cube(cx - 1, cy, cz, b) && cube(cx - 1, cy - 1, cz, c) && cube(cx, cy - 1, cz, dq)) quad(a, b, c, dq);
+      // (the quads in the vertices' order: the same mesh on every platform - a hash map's own order differs)
+      for (size_t a0 = 0; a0 < vpos.size(); a0++) {
+        if ((a0 & 16383) == 0) bakeTick();
+        if (vslot[a0] != cq) {
+          cq = vslot[a0]; const int id = cells[cq].first; ci2 = id % n2; cj2 = (id / n2) % n2; ck2 = id / (n2 * n2);
+          nb[0] = cq;
+          for (int c = 1; c < 8; c++) nb[c] = slotAt(ci2 - (c & 1), cj2 - ((c >> 1) & 1), ck2 - (c >> 2));
+        }
+        const int cx = vcube[a0 * 3], cy = vcube[a0 * 3 + 1], cz = vcube[a0 * 3 + 2], xs = vcross[a0];
+        int a = (int)a0, b, c, dq;
+        if ((xs & 1) && cube(cx, cy - 1, cz, b) && cube(cx, cy - 1, cz - 1, c) && cube(cx, cy, cz - 1, dq)) quad(a, b, c, dq);
+        if ((xs & 2) && cube(cx, cy, cz - 1, b) && cube(cx - 1, cy, cz - 1, c) && cube(cx - 1, cy, cz, dq)) quad(a, b, c, dq);
+        if ((xs & 4) && cube(cx - 1, cy, cz, b) && cube(cx - 1, cy - 1, cz, c) && cube(cx, cy - 1, cz, dq)) quad(a, b, c, dq);
       }
+      phase("  quads");
     };
     nets(coarseCells, 4, 0.003f, 0.f);
+    phase("nets");
     fineStart = (uint32_t)ib.size();
     const size_t fineV = vb.size() / 8;   // (the fine patch's vertices are its own, after the coarse mesh's)
     if (!fineCells.empty()) nets(fineCells, 8, 0.f, 0.f);
+    phase("fine nets");
     // simplified (mesh_simplify.h): flat panels to a few triangles, curves to within 1 mm (the cabin's 0.4 mm: seen
     // from half a metre); the fine patch apart, to the same 0.4 mm. On worker threads, while the GPU goes on with the hull and the parts (vb, ib and fineStart are not
     // touched again until they are joined, below)
@@ -588,11 +681,12 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       }
       hullTri.push_back(in ? 1.f : 0.f);   // (carried at the end of the hull's floats: the cache keeps it)
     }
+    phase("prep+moving hull");
     // ---- the rigid parts (plane_parts.glsl), each alone in its own frame at rest: a 1 cm survey finds its box, then
     // surface nets on a 2 mm lattice over it, every vertex pulled onto the surface as above
     // (each part meshed here is simplified on a thread of its own and added to the blob once all are done, in order)
     struct PartOut { int type; std::vector<float> vb; std::vector<uint32_t> ib; size_t raw; float sx, sy; };
-    std::vector<std::unique_ptr<PartOut>> partOut; std::vector<std::thread> partSimp;
+    std::vector<std::unique_ptr<PartOut>> partOut; std::vector<std::thread> partSimp; double partJoinS = 0;
     bool partsValid = true;
     {
       PartInst pl[kMaxPartInst]; const int np = partList(M, inside, pl, fp.plane.model);
@@ -636,30 +730,91 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
           lo = lo - vec3(mg, mg, mg); hi = hi + vec3(mg, mg, mg);
         }
         const int nx = (int)ceilf((hi.x - lo.x) / h) + 1, ny = (int)ceilf((hi.y - lo.y) / h) + 1, nz = (int)ceilf((hi.z - lo.z) / h) + 1;
-        std::vector<vec3> cp((size_t)nx * ny * nz); std::vector<float> cv;
-        for (int k = 0; k < nz; k++) for (int j = 0; j < ny; j++) for (int i = 0; i < nx; i++) cp[((size_t)k * ny + j) * nx + i] = vec3(lo.x + i * h, lo.y + j * h, lo.z + k * h);
-        mode(1, 0); hullEval(cp, cv);
-        auto C = [&](int i, int j, int k) { return cv[((size_t)k * ny + j) * nx + i]; };
         const int mx = nx - 1, my = ny - 1, mz = nz - 1;
+        // the lattice sampled only where the surface can be: blocks of 4 x 4 x 4 cubes whose centre lies within the
+        // band (the field may overstate a distance, as above), every corner of those, and the blocks the surface runs
+        // on into (below); the rest is never looked at (a part's box is mostly empty: the XR-40's parts held 85 million
+        // lattice corners, of which these are 19)
+        const int B = 4, bx = (mx + B - 1) / B, by = (my + B - 1) / B, bz = (mz + B - 1) / B;
+        std::vector<vec3> bp; bp.reserve((size_t)bx * by * bz);
+        for (int k = 0; k < bz; k++) for (int j = 0; j < by; j++) for (int i = 0; i < bx; i++) bp.push_back(vec3(lo.x + (i + 0.5f) * B * h, lo.y + (j + 0.5f) * B * h, lo.z + (k + 0.5f) * B * h));
+        std::vector<float> bd; mode(1, 0); hullEval(bp, bd);
+        const float bandB = slack * 0.5f * sqrtf(3.f) * B * h + 2.f * h;
+        std::vector<uint8_t> keepB(bd.size());
+        for (size_t q = 0; q < bd.size(); q++) keepB[q] = fabsf(bd[q]) < bandB;
+        // (each lattice cube's block along each axis, and whether a row of blocks holds any kept)
+        std::vector<int> bI(mx), bJ(my), bK(mz); std::vector<uint8_t> rowB((size_t)by * bz, 0);
+        for (int i = 0; i < mx; i++) bI[i] = i / B;
+        for (int j = 0; j < my; j++) bJ[j] = j / B;
+        for (int k = 0; k < mz; k++) bK[k] = k / B;
+        std::vector<float> cv((size_t)nx * ny * nz, 0.f); std::vector<uint8_t> have(cv.size(), 0);
+        {
+          // and every block the surface passes into from a kept one, across their shared face, round by round until it
+          // stays within the kept blocks (the field overstates distances most in places - a fan's blades, repeated
+          // round its hub - so a block whose centre seemed out of reach can still hold surface)
+          std::vector<size_t> todo;
+          for (size_t q = 0; q < keepB.size(); q++) if (keepB[q]) todo.push_back(q);
+          while (!todo.empty()) {
+            std::vector<vec3> sp; std::vector<size_t> si;
+            for (size_t b : todo) {
+              const int ib = (int)(b % bx), jb = (int)(b / bx % by), kb = (int)(b / ((size_t)bx * by));
+              for (int k = kb * B; k <= std::min((kb + 1) * B, nz - 1); k++) for (int j = jb * B; j <= std::min((jb + 1) * B, ny - 1); j++) for (int i = ib * B; i <= std::min((ib + 1) * B, nx - 1); i++) {
+                const size_t q = ((size_t)k * ny + j) * nx + i;
+                if (have[q]) continue;
+                have[q] = 1; si.push_back(q); sp.push_back(vec3(lo.x + i * h, lo.y + j * h, lo.z + k * h));
+              }
+            }
+            std::vector<float> sd; mode(1, 0); hullEval(sp, sd);
+            for (size_t q = 0; q < si.size(); q++) cv[si[q]] = sd[q];
+            std::vector<size_t> grow;
+            for (size_t b : todo) {
+              const int bc[3] = {(int)(b % bx), (int)(b / bx % by), (int)(b / ((size_t)bx * by))}, nb3[3] = {bx, by, bz}, n3[3] = {nx, ny, nz};
+              for (int f = 0; f < 6; f++) {
+                const int ax = f >> 1, side = f & 1;
+                int o[3] = {bc[0], bc[1], bc[2]}; o[ax] += side ? 1 : -1;
+                if (o[ax] < 0 || o[ax] >= nb3[ax]) continue;
+                const size_t nq = ((size_t)o[2] * by + o[1]) * bx + o[0];
+                if (keepB[nq]) continue;
+                int r0[3], r1[3];
+                for (int a = 0; a < 3; a++) { r0[a] = bc[a] * B; r1[a] = std::min((bc[a] + 1) * B, n3[a] - 1); }
+                if (side) r0[ax] = r1[ax]; else r1[ax] = r0[ax];
+                bool neg = false, pos = false;
+                for (int k = r0[2]; k <= r1[2] && !(neg && pos); k++) for (int j = r0[1]; j <= r1[1]; j++) for (int i = r0[0]; i <= r1[0]; i++) {
+                  if (cv[((size_t)k * ny + j) * nx + i] < 0.f) neg = true; else pos = true;
+                }
+                if (neg && pos) { keepB[nq] = 1; grow.push_back(nq); }
+              }
+            }
+            todo.swap(grow);
+          }
+        }   // (the rest of the lattice is never read: every cube looked at below lies in a kept block, its corners sampled)
+        for (size_t q = 0; q < keepB.size(); q++) if (keepB[q]) rowB[q / bx] = 1;
+        auto C = [&](int i, int j, int k) { return cv[((size_t)k * ny + j) * nx + i]; };
         std::vector<int> cubeV((size_t)mx * my * mz, -1);
         std::vector<vec3> vp; std::vector<int> vc;
         const int ce[12][2] = {{0, 1}, {1, 3}, {2, 3}, {0, 2}, {4, 5}, {5, 7}, {6, 7}, {4, 6}, {0, 4}, {1, 5}, {3, 7}, {2, 6}};
-        for (int k = 0; k < mz; k++) for (int j = 0; j < my; j++) for (int i = 0; i < mx; i++) {
-          if (i == 0 && j == 0) bakeTick();
-          float v[8]; int neg = 0;
-          for (int c = 0; c < 8; c++) { v[c] = C(i + (c & 1), j + ((c >> 1) & 1), k + (c >> 2)); if (v[c] < 0.f) neg++; }
-          if (neg == 0 || neg == 8) continue;
-          vec3 sum; int cnt = 0;
-          for (int e = 0; e < 12; e++) {
-            int a = ce[e][0], b = ce[e][1];
-            if ((v[a] < 0.f) == (v[b] < 0.f)) continue;
-            float t = v[a] / (v[a] - v[b]);
-            vec3 pa(lo.x + (i + (a & 1)) * h, lo.y + (j + ((a >> 1) & 1)) * h, lo.z + (k + (a >> 2)) * h);
-            vec3 pb(lo.x + (i + (b & 1)) * h, lo.y + (j + ((b >> 1) & 1)) * h, lo.z + (k + (b >> 2)) * h);
-            sum = sum + pa + (pb - pa) * t; cnt++;
+        for (int k = 0; k < mz; k++) for (int j = 0; j < my; j++) {
+          if (j == 0) bakeTick();
+          const size_t row = (size_t)bK[k] * by + bJ[j];
+          if (!rowB[row]) continue;
+          const uint8_t* keepRow = &keepB[row * bx];
+          for (int i = 0; i < mx; i++) {
+            if (!keepRow[bI[i]]) { i = std::min(mx, (bI[i] + 1) * B) - 1; continue; }   // (no surface in this block)
+            float v[8]; int neg = 0;
+            for (int c = 0; c < 8; c++) { v[c] = C(i + (c & 1), j + ((c >> 1) & 1), k + (c >> 2)); if (v[c] < 0.f) neg++; }
+            if (neg == 0 || neg == 8) continue;
+            vec3 sum; int cnt = 0;
+            for (int e = 0; e < 12; e++) {
+              int a = ce[e][0], b = ce[e][1];
+              if ((v[a] < 0.f) == (v[b] < 0.f)) continue;
+              float t = v[a] / (v[a] - v[b]);
+              vec3 pa(lo.x + (i + (a & 1)) * h, lo.y + (j + ((a >> 1) & 1)) * h, lo.z + (k + (a >> 2)) * h);
+              vec3 pb(lo.x + (i + (b & 1)) * h, lo.y + (j + ((b >> 1) & 1)) * h, lo.z + (k + (b >> 2)) * h);
+              sum = sum + pa + (pb - pa) * t; cnt++;
+            }
+            cubeV[((size_t)k * my + j) * mx + i] = (int)vp.size();
+            vp.push_back(sum * (1.f / cnt)); vc.push_back(i); vc.push_back(j); vc.push_back(k);
           }
-          cubeV[((size_t)k * my + j) * mx + i] = (int)vp.size();
-          vp.push_back(sum * (1.f / cnt)); vc.push_back(i); vc.push_back(j); vc.push_back(k);
         }
         std::vector<float> pn, p4;
         for (int it = 0; it < 3; it++) {
@@ -689,13 +844,19 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
           if (dot(fn, nA) < 0.f) std::swap(b, dq);
           pib.push_back(a); pib.push_back(b); pib.push_back(c); pib.push_back(a); pib.push_back(c); pib.push_back(dq);
         };
-        for (int k = 0; k < mz; k++) for (int j = 0; j < my; j++) for (int i = 0; i < mx; i++) {
-          int a = cubeV[((size_t)k * my + j) * mx + i], b, c, dq;
-          if (a < 0) continue;
-          float v0 = C(i, j, k);
-          if ((v0 < 0.f) != (C(i + 1, j, k) < 0.f) && cubeAt(i, j - 1, k, b) && cubeAt(i, j - 1, k - 1, c) && cubeAt(i, j, k - 1, dq)) quad(a, b, c, dq);
-          if ((v0 < 0.f) != (C(i, j + 1, k) < 0.f) && cubeAt(i, j, k - 1, b) && cubeAt(i - 1, j, k - 1, c) && cubeAt(i - 1, j, k, dq)) quad(a, b, c, dq);
-          if ((v0 < 0.f) != (C(i, j, k + 1) < 0.f) && cubeAt(i - 1, j, k, b) && cubeAt(i - 1, j - 1, k, c) && cubeAt(i, j - 1, k, dq)) quad(a, b, c, dq);
+        for (int k = 0; k < mz; k++) for (int j = 0; j < my; j++) {
+          const size_t row = (size_t)bK[k] * by + bJ[j];
+          if (!rowB[row]) continue;
+          const uint8_t* keepRow = &keepB[row * bx];
+          for (int i = 0; i < mx; i++) {
+            if (!keepRow[bI[i]]) { i = std::min(mx, (bI[i] + 1) * B) - 1; continue; }
+            int a = cubeV[((size_t)k * my + j) * mx + i], b, c, dq;
+            if (a < 0) continue;
+            float v0 = C(i, j, k);
+            if ((v0 < 0.f) != (C(i + 1, j, k) < 0.f) && cubeAt(i, j - 1, k, b) && cubeAt(i, j - 1, k - 1, c) && cubeAt(i, j, k - 1, dq)) quad(a, b, c, dq);
+            if ((v0 < 0.f) != (C(i, j + 1, k) < 0.f) && cubeAt(i, j, k - 1, b) && cubeAt(i - 1, j, k - 1, c) && cubeAt(i - 1, j, k, dq)) quad(a, b, c, dq);
+            if ((v0 < 0.f) != (C(i, j, k + 1) < 0.f) && cubeAt(i - 1, j, k, b) && cubeAt(i - 1, j - 1, k, c) && cubeAt(i, j - 1, k, dq)) quad(a, b, c, dq);
+          }
         }
         if (pib.empty()) continue;
         if (!aircraftMesh::pruneDegenerate(pvb, pib) || !aircraftMesh::compact(pvb, pib)
@@ -707,12 +868,15 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         partOut.push_back(std::make_unique<PartOut>(PartOut{type, std::move(pvb), std::move(pib), 0, pl[pi].sx, pl[pi].sy}));
         PartOut* po = partOut.back().get(); po->raw = po->ib.size() / 3;
         // Bound concurrent simplifiers (static/fine plus at most two part workers).
-        if (partSimp.size() >= 2) { partSimp.front().join(); partSimp.erase(partSimp.begin()); }
+        if (partSimp.size() >= 2) { const auto tj = std::chrono::steady_clock::now(); partSimp.front().join(); partSimp.erase(partSimp.begin()); partJoinS += std::chrono::duration<double>(std::chrono::steady_clock::now() - tj).count(); }
         partSimp.emplace_back([po, inside] { size_t pe = po->ib.size(); simplifyMesh(po->vb, po->ib, pe, inside ? 0.0003f : 0.0008f); });
       }
       hullBakePart = -1;
     }
+    phase("parts");
+    { char jb[64]; snprintf(jb, sizeof jb, " (of it waiting on simplifiers %.1f)", partJoinS); phaseLog += jb; }
     simpStatic.join(); simpFine.join();
+    phase("simplify wait");
     if (!partsValid || !aircraftMesh::valid(vb, ib) || !aircraftMesh::valid(vbF, ibF)) {
       for (auto& th : partSimp) th.join();
       fprintf(stderr, "Rejected invalid aircraft surface or part; using SDF fallback\n"); return;
@@ -833,6 +997,16 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       // than uploading invalid data or entering a rebuild loop every frame.
       fprintf(stderr, "Rejected invalid aircraft mesh %016llx; using SDF fallback\n", (unsigned long long)key);
       PM.ok = false; return;
+    }
+    phase("finish");
+    if (getenv("HULLDBG")) printf("phases:%s\n", phaseLog.c_str());
+    {   // (where it went: compile.log)
+      const double all = std::chrono::duration<double>(std::chrono::steady_clock::now() - tBake).count();
+      const int own = afModelOf(M, pv.model);
+      char line[256]; snprintf(line, sizeof line, "baked %s's %s body in %.1f s: the field %.1f s (%.1f M points), the frames shown %.1f s, the meshing %.1f s",
+                               own >= 0 ? kAircraft[own].name : "an aircraft", inside ? "cockpit" : "outside", all, bakeEvalS, bakeEvalPts * 1e-6, bakeYieldS, all - bakeEvalS - bakeYieldS);
+      bakeLog(line);
+      if (getenv("HULLDBG")) printf("%s\n", line);
     }
     if (!path.empty()) {   // atomic publication: never replace a valid cache with a partial file
       const std::string tmp = path + ".tmp." + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());

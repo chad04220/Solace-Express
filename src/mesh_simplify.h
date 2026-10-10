@@ -19,6 +19,8 @@
 #include <cstdint>
 #include <cmath>
 #include <algorithm>
+#include <functional>
+#include <thread>
 
 namespace meshsimp {
 struct Quadric {
@@ -66,36 +68,41 @@ inline size_t simplifyMesh(std::vector<float>& vb, std::vector<uint32_t>& ib, si
     double nx = n.x / l, ny = n.y / l, nz = n.z / l, d = -(nx * pa.x + ny * pa.y + nz * pa.z);
     for (uint32_t v : {a, b, c}) Q[v].addPlane(nx, ny, nz, d, 1.0);
   }
-  // the ring of a vertex: its neighbours, each with the number of live triangles it shares with it (deduplicated by a
-  // per-vertex stamp: a ring is linear in its size)
-  std::vector<uint32_t> ringV, ringC, mark(nv, 0), slot(nv, 0), mark2(nv, 0);
-  uint32_t gen = 0, gen2 = 0;
-  auto ring = [&](uint32_t v) {
-    ringV.clear(); ringC.clear(); gen++;
+  // the ring of a vertex: its neighbours in the order met, each with the number of live triangles it shares with it
+  // (deduplicated by a per-vertex stamp: a ring is linear in its size). Each scoring thread below has its own, in R.
+  // compact: drop the dead triangles from the vertex's list as well - never while other threads read the lists
+  struct Ring { std::vector<uint32_t> v, c, mark; uint32_t gen = 0; };
+  auto ring = [&](uint32_t v, Ring& R, bool compact) {
+    R.v.clear(); R.c.clear();
+    if (R.mark.empty()) R.mark.assign(nv, 0);
+    const uint32_t g = ++R.gen;
     auto& L = vt[v];
     size_t w = 0;
     for (size_t i = 0; i < L.size(); i++) {
       uint32_t t = L[i];
       if (tDead[t]) continue;
-      L[w++] = t;
+      if (compact) L[w++] = t;
       for (int k = 0; k < 3; k++) {
         uint32_t x = ib[t * 3 + k];
         if (x == v) continue;
-        if (mark[x] != gen) { mark[x] = gen; slot[x] = (uint32_t)ringV.size(); ringV.push_back(x); ringC.push_back(1); }
-        else ringC[slot[x]]++;
+        if (R.mark[x] != g) { R.mark[x] = g; R.v.push_back(x); R.c.push_back(1); continue; }
+        size_t j = 0;
+        while (R.v[j] != x) j++;
+        R.c[j]++;
       }
     }
-    L.resize(w);
+    if (compact) L.resize(w);
   };
+  Ring R0;
   // lock the open edges' and the material boundaries' vertices (and any non-manifold edge's)
   for (uint32_t v = 0; v < nv; v++) {
     if (lock[v]) continue;
-    ring(v);
-    if (ringV.empty()) { lock[v] = 1; continue; }
-    for (size_t j = 0; j < ringV.size(); j++) if (ringC[j] != 2 || ID(ringV[j]) != ID(v)) { lock[v] = 1; break; }
+    ring(v, R0, true);
+    if (R0.v.empty()) { lock[v] = 1; continue; }
+    for (size_t j = 0; j < R0.v.size(); j++) if (R0.c[j] != 2 || ID(R0.v[j]) != ID(v)) { lock[v] = 1; break; }
   }
   const double maxE = 0.5 * (double)maxErr * maxErr;   // (the mean over the planes: held to ~0.7 maxErr, the removed vertex itself to maxErr, so the drift of earlier removals stays inside the bound)
-  // is u -> v allowed, and its cost (needs ring(u) computed: ringV)
+  // is u -> v allowed, and its cost (needs ring(u) computed in R)
   const size_t kMaxValence = 20;   // (no fans: a hub vertex makes slivers, and every collapse beside it slower)
   // the cheap part: same material and occlusion, no crease between, and the mean squared distance from v to every
   // plane u and v carry (their own and those of the vertices merged into them) within maxErr
@@ -105,21 +112,21 @@ inline size_t simplifyMesh(std::vector<float>& vb, std::vector<uint32_t>& ib, si
     cost = std::max(0.0, Q[u].eval(pv.x, pv.y, pv.z) + Q[v].eval(pv.x, pv.y, pv.z)) / std::max(Q[u].n + Q[v].n, 1.0);
     return cost <= maxE;
   };
-  auto tryCollapse = [&](uint32_t u, uint32_t v, double& cost) {
+  auto tryCollapse = [&](uint32_t u, uint32_t v, double& cost, Ring& R) {
     if (!cheapCost(u, v, cost)) return false;
     vec3 pv = P(v), pu = P(u);
     // the link condition: u and v share exactly the vertices opposite their edge (two, the edge being interior); and
     // v's ring afterwards (both rings less u and v) no larger than kMaxValence
-    gen2++; size_t nB = 0;
+    const uint32_t g = ++R.gen; size_t nB = 0;
     for (uint32_t t : vt[v]) {
       if (tDead[t]) continue;
-      for (int k = 0; k < 3; k++) { uint32_t x = ib[t * 3 + k]; if (x != v && mark2[x] != gen2) { mark2[x] = gen2; nB++; } }
+      for (int k = 0; k < 3; k++) { uint32_t x = ib[t * 3 + k]; if (x != v && R.mark[x] != g) { R.mark[x] = g; nB++; } }
     }
     int common = 0;
-    for (uint32_t x : ringV) if (mark2[x] == gen2) common++;
+    for (uint32_t x : R.v) if (R.mark[x] == g) common++;
     if (common != 2) return false;
-    if (nB + ringV.size() - (size_t)common - 2 > kMaxValence) return false;
-    if (maxEdge > 0.f) for (uint32_t x : ringV) if (x != v && length(P(x) - pv) > maxEdge) return false;   // (u's neighbours, joined to v)
+    if (nB + R.v.size() - (size_t)common - 2 > kMaxValence) return false;
+    if (maxEdge > 0.f) for (uint32_t x : R.v) if (x != v && length(P(x) - pv) > maxEdge) return false;   // (u's neighbours, joined to v)
     // no triangle of u's that stays turns over, or folds by more than ~45 degrees, or collapses
     for (uint32_t t : vt[u]) {
       if (tDead[t]) continue;
@@ -145,36 +152,60 @@ inline size_t simplifyMesh(std::vector<float>& vb, std::vector<uint32_t>& ib, si
   std::vector<Pick> picks;
   std::vector<uint32_t> touchedAt(nv, 0);   // (the round that last changed the vertex's ring)
   std::vector<uint8_t> stale(nv, 1);         // (scored again only when its ring or its target's changed: else its answer stands)
+  // The scoring reads the mesh and writes only its own vertices' stale flags and picks, so a large mesh is scored on
+  // several threads, each a run of vertices, their picks joined in vertex order: the same picks, in the same order, as
+  // on one (the XR-40's airframe spent three quarters of its four seconds here)
+  auto score = [&](uint32_t u0, uint32_t u1, std::vector<Pick>& out, Ring& R) {
+    for (uint32_t u = u0; u < u1; u++) {
+      if (lock[u] || vDead[u] || !stale[u]) continue;
+      stale[u] = 0;
+      ring(u, R, false);
+      double bc = 1e300; uint32_t bv = UINT32_MAX;
+      for (uint32_t v : R.v) { double c; if (cheapCost(u, v, c) && c < bc) { bc = c; bv = v; } }
+      if (bv == UINT32_MAX) continue;
+      double c;
+      if (tryCollapse(u, bv, c, R)) out.push_back({(float)c, u, bv});
+    }
+  };
+  const unsigned nThreads = nv >= 32768 ? std::max(1u, std::min(8u, std::thread::hardware_concurrency())) : 1u;
+  std::vector<std::vector<Pick>> partPicks(nThreads); std::vector<Ring> partRing(nThreads);
   size_t removed = 0;
   for (uint32_t round = 1; round < 64; round++) {
     picks.clear();
-    for (uint32_t u = 0; u < nv; u++) {
-      if (lock[u] || vDead[u] || !stale[u]) continue;
-      stale[u] = 0;
-      ring(u);
-      double bc = 1e300; uint32_t bv = UINT32_MAX;
-      for (uint32_t v : ringV) { double c; if (cheapCost(u, v, c) && c < bc) { bc = c; bv = v; } }
-      if (bv == UINT32_MAX) continue;
-      double c;
-      if (tryCollapse(u, bv, c)) picks.push_back({(float)c, u, bv});
+    if (nThreads == 1) score(0, (uint32_t)nv, picks, R0);
+    else {
+      std::vector<std::thread> th;
+      for (unsigned i = 0; i < nThreads; i++) {
+        partPicks[i].clear();
+        th.emplace_back(score, (uint32_t)(nv * i / nThreads), (uint32_t)(nv * (i + 1) / nThreads), std::ref(partPicks[i]), std::ref(partRing[i]));
+      }
+      for (auto& t : th) t.join();
+      for (auto& pp : partPicks) picks.insert(picks.end(), pp.begin(), pp.end());
     }
     if (picks.empty()) break;
     std::sort(picks.begin(), picks.end());
     size_t done = 0;
     for (const Pick& k : picks) {
       if (vDead[k.u] || vDead[k.v] || touchedAt[k.u] == round || touchedAt[k.v] == round) { stale[k.u] = 1; continue; }
-      ring(k.u);
+      ring(k.u, R0, true);
       // u onto v: its triangles with v go, the rest take v; u's ring (v among it) is changed for this round
-      for (uint32_t x : ringV) { touchedAt[x] = round; stale[x] = 1; }
+      for (uint32_t x : R0.v) { touchedAt[x] = round; stale[x] = 1; }
       touchedAt[k.u] = round;
+      uint32_t gone[8]; int nGone = 0;   // (the other vertices of the triangles that go)
       for (uint32_t t : vt[k.u]) {
         if (tDead[t]) continue;
         uint32_t* tri = &ib[t * 3];
-        if (tri[0] == k.v || tri[1] == k.v || tri[2] == k.v) { tDead[t] = 1; removed++; continue; }
+        if (tri[0] == k.v || tri[1] == k.v || tri[2] == k.v) {
+          tDead[t] = 1; removed++;
+          for (int q = 0; q < 3; q++) if (tri[q] != k.u && nGone < 8) gone[nGone++] = tri[q];
+          continue;
+        }
         for (int q = 0; q < 3; q++) if (tri[q] == k.u) tri[q] = k.v;
         vt[k.v].push_back(t);
       }
       vt[k.u].clear();
+      // (and those triangles out of their other vertices' lists now: the scoring threads read the lists as they are)
+      for (int g = 0; g < nGone; g++) { auto& L = vt[gone[g]]; L.erase(std::remove_if(L.begin(), L.end(), [&](uint32_t t) { return tDead[t] != 0; }), L.end()); }
       Q[k.v].add(Q[k.u]);
       vDead[k.u] = 1;
       done++;
