@@ -45,10 +45,10 @@ inline float entKeep(int k, float d) { float r = entThinRef(k); return d <= r ? 
 // that much further out - flying at a forest, the trees came on one by one from a kilometre out, the bushes from 150 m
 constexpr float kEntFadeBand = 0.10f;
 inline float entKeepDrawn(int k, float d) { return entKeep(k, d / (1.f + kEntFadeBand)); }
-inline float entFade(float key, float ref, float d, float far) {   // 0 gone .. 1 whole (the vertex shader's, for the tests)
+inline float entFade(float key, float ref, float d, float limit) {   // 0 gone .. 1 whole (the vertex shader's, for the tests; limit: the draw distance)
   auto ss = [](float a, float b, float x) { float t = std::min(std::max((x - a) / (b - a), 0.f), 1.f); return t * t * (3.f - 2.f * t); };
   const float dK = ref / sqrtf(std::max(key, 1e-6f));
-  return (1.f - ss(dK * (1.f - kEntFadeBand), dK * (1.f + kEntFadeBand), d)) * (1.f - ss(far * 0.9f, far, d));
+  return (1.f - ss(dK * (1.f - kEntFadeBand), dK * (1.f + kEntFadeBand), d)) * (1.f - ss(limit * 0.9f, limit, d));
 }
 
 // One item of an airport's furniture (airport_scenery.cpp): kind + the placed instance
