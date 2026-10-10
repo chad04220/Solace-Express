@@ -852,6 +852,36 @@ struct GameTest {
       bool ok = dmg[0] > 0.01f && fabsf(dmg[1] / std::max(dmg[0], 1e-6f) - 1.f) < 0.25f;
       printf("Job meters at 1x / 4x: comfort lost %.3f / %.3f over a simulated minute: %s\n", dmg[0], dmg[1], ok ? "ok" : "FAIL"); fails += !ok;
     }
+    // ---- UI-1 (the v3.44.0 review): the radio panel owns the pointer over it. A click on a station reached the hub
+    // beneath it first - one at 1080p over the Hangar bought a Wren ($30,000, saved) - and in an XR-40 flight armed the
+    // weapons and fired. Clicks over the whole panel, on every tab: nothing beneath it moves
+    {
+      const int W0 = g_ren.W, H0 = g_ren.H; g_ren.W = 1920; g_ren.H = 1080;
+      const std::string sd = g.saveDir; g.saveDir = ".";
+      const auto st0 = g.stations; g.stations.clear();
+      for (int i = 0; i < 16; i++) g.stations.push_back({fmt("Test FM %d", i), "test://"});
+      g.career.newGame(); g.career.money = 1000000; g.screen = SCR_HUB; g.showRadio = true; g.focusNav = false;
+      int moved = 0, clicks = 0;
+      for (int tab = TAB_CONTRACTS; tab <= TAB_SETTINGS; tab++) {
+        g.hubTab = tab; g.in.mx = g.in.my = -1; g_ren.uiBegin(); g.drawHub();   // (the panel's place, from its first frame)
+        for (int j = 0; j < 12; j++) for (int i = 0; i < 10; i++) {
+          const int money = g.career.money; const size_t fleet = g.career.fleet.size(); const bool loan = g.career.loan.open();
+          g.in.mx = g.radioRect[0] + (i + 0.5f) * g.radioRect[2] / 10.f; g.in.my = g.radioRect[1] + (j + 0.5f) * g.radioRect[3] / 12.f;
+          g.in.mPressed[0] = true; g_ren.uiBegin(); g.drawHub(); g.in.mPressed[0] = false; clicks++;
+          if (g.career.money != money || g.career.fleet.size() != fleet || g.career.loan.open() != loan || g.hubTab != tab || g.screen != SCR_HUB) {
+            moved++; g.career.newGame(); g.career.money = 1000000; g.screen = SCR_HUB; g.hubTab = tab;
+          }
+        }
+      }
+      // the XR-40, weapons safe, the radio open: holding the mouse button over it neither arms nor fires
+      g.wraith = Game::WraithState(); g.showRadio = true; g.in.mDown[0] = true; g.in.mPressed[0] = true;
+      g.wraithControls(dt);
+      const bool safe = !g.wraith.armed && !g.wraith.wantFire;
+      g.in.mDown[0] = g.in.mPressed[0] = false; g.showRadio = false; g.wraith = Game::WraithState();
+      remove("./settings.cfg"); g.saveDir = sd; g.settingsWritten.clear(); g.stations = st0; g_ren.W = W0; g_ren.H = H0; g_ren.uiBegin();
+      bool ok = moved == 0 && clicks == 600 && safe;
+      printf("Radio panel owns its clicks: %d of %d clicks over it moved the hub beneath, XR-40 weapons stay safe %d: %s\n", moved, clicks, safe, ok ? "ok" : "FAIL"); fails += !ok;
+    }
     // ---- CAR-1 (the v3.44.0 review): rough air costs the patient only what the aircraft is put through - five minutes
     // straight and level on the autopilot in P4's turbulence (0.55) left the patient at 10%, "in distress" whatever the
     // pilot did

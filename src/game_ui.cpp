@@ -65,7 +65,13 @@ static vec3 mixc(vec3 a, vec3 b, float t) { return a + (b - a) * t; }
 void Game::applyUiPalette() { applyPalette(set.cbHud); }
 float Game::S() const { return std::max(0.6f, g_ren.H / 720.f) * set.uiScale; }
 
+bool Game::pointerOverOverlay() const {
+  return showRadio && !radioDrawing && radioRect[2] > 0.f &&
+         in.mx >= radioRect[0] && in.mx < radioRect[0] + radioRect[2] && in.my >= radioRect[1] && in.my < radioRect[1] + radioRect[3];
+}
+
 bool Game::hovered(float x, float y, float w, float h) const {
+  if (pointerOverOverlay()) return false;   // (beneath the radio panel: it owns the pointer there)
   if (hitClipOn && (in.mx < hitClip[0] || in.mx >= hitClip[2] || in.my < hitClip[1] || in.my >= hitClip[3])) return false;
   return in.mx >= x && in.mx < x + w && in.my >= y && in.my < y + h;
 }
@@ -1542,6 +1548,9 @@ void Game::drawRadioPanel(float x, float y) {
   const int rows = std::min((int)stations.size(), std::max(4, (int)((g_ren.H - y - 140 * s) / (34 * s))));
   const int visible = std::min(rows, 12);
   float w = 440 * s, h = (118 + 34 * visible) * s;
+  radioRect[0] = x; radioRect[1] = y; radioRect[2] = w; radioRect[3] = h;   // (next frame's widgets beneath it keep off)
+  radioDrawing = true;
+  struct Done { bool& f; ~Done() { f = false; } } done{radioDrawing};
   panel(x, y, w, h, 0.92f);
   g_ren.text(x + 18 * s, y + 14 * s, 20 * s, "Internet Radio", C_TEXT, 1);
   if (radio.state() == Radio::PLAYING)  // live equaliser bars
@@ -2277,7 +2286,7 @@ void Game::drawGps() {
       if (inside(p, 30 * s)) g_ren.text(p.x + 8 * s, p.y - 16 * s, 11 * s, "AUTOLAND", AP_CYAN, e, 0, true);
     }
     // click an airport to pick it for the autopilot
-    if (in.mPressed[0] && inside(p, 0) && fabsf(in.mx - p.x) < 16 * s && fabsf(in.my - p.y) < 16 * s && apDest != i) { apDest = i; g_audio.trigger(SFX_CLICK); }
+    if (in.mPressed[0] && !pointerOverOverlay() && inside(p, 0) && fabsf(in.mx - p.x) < 16 * s && fabsf(in.my - p.y) < 16 * s && apDest != i) { apDest = i; g_audio.trigger(SFX_CLICK); }
   }
   // the autopilot's approach plan: descent orbit, intercept and final approach course
   if (plane.apOn && plane.apMode == Plane::AP_APPR) {

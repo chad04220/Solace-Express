@@ -59,12 +59,15 @@ void Game::wraithControls(float dt) {
   }
   // fire: left mouse or Enter held, or the right bumper while weapons are hot
   bool padHot = air && in.pad && W.armed;
-  bool fire = (in.mDown[0] && !showMap) || (actKey(ACT_FIRE) && !showMap) || (padHot && actPad(ACT_FIRE));
+  // (an open map or radio takes the mouse and the keyboard: a click on a station armed the weapons and fired - review
+  // UI-1; the pad's bumpers aren't the radio's)
+  const bool overlay = showMap || showRadio;
+  bool fire = (in.mDown[0] && !overlay) || (actKey(ACT_FIRE) && !overlay) || (padHot && actPad(ACT_FIRE));
   if (W.fireLatch) { if (!in.mDown[0] && !actKey(ACT_FIRE)) W.fireLatch = false; fire = false; }
   if (fire && !W.armed) { W.armed = true; g_audio.trigger(SFX_GEAR_CLUNK, 0.6f); }
   W.wantFire = fire;   // the bolt leaves the lens after this frame's physics step (updateWraith)
   // bombs: Backspace, middle mouse, or the left bumper while weapons are hot - each press queues a drop
-  if (actKeyP(ACT_BOMB) || in.mPressed[2] || (padHot && actPadP(ACT_BOMB))) {
+  if ((!overlay && (actKeyP(ACT_BOMB) || in.mPressed[2])) || (padHot && actPadP(ACT_BOMB))) {
     if (W.bombQueue < 3) W.bombQueue++;
   }
 }

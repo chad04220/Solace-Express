@@ -521,6 +521,10 @@ private:
   void drawMinimap(float x, float y, float size, float rangeM);
   void drawMapOverlay();
   void drawRadioPanel(float x, float y);
+  // The radio panel where it was last drawn: over it the panel owns the pointer (review UI-1). Widgets drawn before it in
+  // a frame - beneath it - see neither hover nor click there; a click on a station bought the hangar's aircraft beneath.
+  float radioRect[4] = {0, 0, 0, 0}; bool radioDrawing = false;
+  bool pointerOverOverlay() const;
   void drawPause();
   void drawDebrief();
   void drawToasts();

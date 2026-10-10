@@ -1779,6 +1779,7 @@ void Renderer::image(GLuint tex, float x, float y, float w, float h, float u0, f
 
 void Renderer::flushUI() {
   if (ui.empty()) return;
+  if (!progUI) { ui.clear(); return; }   // (no renderer: a headless test drawing the hub - nothing to draw it with)
   glBindFramebuffer(GL_FRAMEBUFFER, screenFbo);
   glViewport(0, 0, W, H);
   glEnable(GL_BLEND); glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
