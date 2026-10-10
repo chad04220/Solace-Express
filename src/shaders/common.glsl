@@ -35,12 +35,20 @@ float craterH(vec2 p){ float h = 0.0;
 float hash2i(ivec2 p){ uint h = uint(p.x)*0x8da6b343u + uint(p.y)*0xd8163841u; h ^= h>>13; h *= 0x5bd1e995u; h ^= h>>15; return float(h & 0xFFFFFFu)/16777216.0; }
 float hash1(float n){ return fract(sin(n)*43758.5453); }
 float hash3(vec3 p){ p = fract(p*0.3183099+0.1); p*=17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+// The islands span [-WH, WH], in 10 km of open sea all round, and there the map wraps: what is anywhere is what is at
+// its place in [-50, 50) km (world.h wrapCoord, exactly)
+vec2 wrapW(vec2 p){ return p - 100000.0*floor((p + 50000.0)/100000.0); }
 vec4 baseAt(vec2 p){
+  p = wrapW(p);
   vec2 f = (p + WH)/TEXEL - 0.5; vec2 fl = floor(f); ivec2 i = ivec2(fl); vec2 t = f - fl;
   ivec2 mx = ivec2(HMN-1);
   vec4 a = texelFetch(uHM, clamp(i, ivec2(0), mx), 0), b = texelFetch(uHM, clamp(i+ivec2(1,0), ivec2(0), mx), 0);
   vec4 c = texelFetch(uHM, clamp(i+ivec2(0,1), ivec2(0), mx), 0), d = texelFetch(uHM, clamp(i+ivec2(1,1), ivec2(0), mx), 0);
-  return (a*(1.0-t.x)+b*t.x)*(1.0-t.y) + (c*(1.0-t.x)+d*t.x)*t.y;
+  vec4 r = (a*(1.0-t.x)+b*t.x)*(1.0-t.y) + (c*(1.0-t.x)+d*t.x)*t.y;
+  // past the islands' square: the open sea, settling to 80 m within 3 km (World::sampleBase, the same)
+  float o = max(abs(p.x), abs(p.y)) - WH;
+  if (o > 0.0) { float k = smoothstep(0.0, 3000.0, o); r.x = mix(r.x, -80.0, k); r.y *= 1.0 - k; }
+  return r;
 }
 vec3 noised(vec2 x){
   vec2 f0 = floor(x); ivec2 i = ivec2(f0); vec2 f = x - f0;
@@ -67,18 +75,20 @@ float fbm2(vec2 p, int oct){ float s=0.0, a=0.5; for(int i=0;i<8;i++){ if(i>=oct
 uniform sampler2D uMask; uniform sampler2D uRoadId;
 const int MASKN = 2048; const float MTEX = 39.0625;
 vec4 maskAt(vec2 p){
+  p = wrapW(p);
   vec2 f = (p + WH)/MTEX - 0.5; vec2 fl = floor(f); ivec2 i = ivec2(fl); vec2 t = f - fl; ivec2 mx = ivec2(MASKN-1);
   vec4 a = texelFetch(uMask, clamp(i, ivec2(0), mx), 0), b = texelFetch(uMask, clamp(i+ivec2(1,0), ivec2(0), mx), 0);
   vec4 c = texelFetch(uMask, clamp(i+ivec2(0,1), ivec2(0), mx), 0), d = texelFetch(uMask, clamp(i+ivec2(1,1), ivec2(0), mx), 0);
   return (a*(1.0-t.x)+b*t.x)*(1.0-t.y) + (c*(1.0-t.x)+d*t.x)*t.y;
 }
-vec4 maskTexel(vec2 p){ return texelFetch(uMask, clamp(ivec2(floor((p + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0); }
+vec4 maskTexel(vec2 p){ return texelFetch(uMask, clamp(ivec2(floor((wrapW(p) + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0); }
 float roadGrade(vec2 p, float g);   // the ground with the roads built into it (roads.glsl)
-float groundH(vec2 p, int oct){ vec4 b = baseAt(p); return roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct)); }
+float groundH(vec2 p, int oct){ p = wrapW(p); vec4 b = baseAt(p); return roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct)); }
 // Terrain height: the bare heightfield (trees, rocks and buildings are separate entities) with the roads built into it,
 // plus impact craters
 float terrainH(vec2 p, int oct){
   COST(0);
+  p = wrapW(p);
   vec4 b = baseAt(p);
   float g = roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct));
   if (uCraterN > 0 && g > 0.3) g += craterH(p);

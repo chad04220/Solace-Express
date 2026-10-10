@@ -5,12 +5,28 @@ uniform vec3 uWaveRms;           // each band's share of the sea's slope (rms, s
 
 // one wave band at xz: its waves run down the wind d at phase speed c (m/s); returns the slope in world xz in units of
 // the band's rms, h its height (in rms). L the band's tile (m), off a fixed offset (the crossing sample's)
+// (the direction is turned a fraction of a degree, so a whole number of the band's tiles fits in the map's 100 km each
+// way: the sea joins itself seamlessly at the map's wrap, world.h WRAP_HALF)
 vec2 waveBand(vec2 xz, int b, float L, vec2 d, float c, vec2 off, out float h){
+  d = round(d*(100000.0/L))*(L/100000.0);
   vec2 u = vec2(dot(xz, d) - c*uTime, dot(xz, vec2(-d.y, d.x)))/L + off;
   vec4 w = texture(uWaves, vec3(u, float(b)));
   vec2 s = (w.rg*2.0 - 1.0)*4.0;
   h = (w.b*2.0 - 1.0)*4.0;
   return d*s.x + vec2(-d.y, d.x)*s.y;
+}
+
+// value noise that repeats every n lattice cells (the sea's patches and swell: a whole number of cells in the map's
+// 100 km, so they join at its wrap)
+float hashP(ivec2 i, int n){ return hash2i(ivec2(((i.x % n) + n) % n, ((i.y % n) + n) % n)); }
+float vnoiseP(vec2 x, int n){ vec2 i = floor(x), f = fract(x); f = f*f*(3.0 - 2.0*f); ivec2 k = ivec2(i);
+  return mix(mix(hashP(k, n), hashP(k + ivec2(1, 0), n), f.x), mix(hashP(k + ivec2(0, 1), n), hashP(k + ivec2(1, 1), n), f.x), f.y); }
+vec3 noisedP(vec2 x, int n){
+  vec2 f0 = floor(x); ivec2 i = ivec2(f0); vec2 f = x - f0;
+  vec2 u = f*f*f*(f*(f*6.0-15.0)+10.0); vec2 du = 30.0*f*f*(f*(f-2.0)+1.0);
+  float a = hashP(i, n), b = hashP(i+ivec2(1,0), n), c = hashP(i+ivec2(0,1), n), d = hashP(i+ivec2(1,1), n);
+  float k1 = b-a, k2 = c-a, k4 = a-b-c+d;
+  return vec3(-1.0+2.0*(a+k1*u.x+k2*u.y+k4*u.x*u.y), 2.0*du*vec2(k1+k4*u.y, k2+k4*u.x));
 }
 
 // Beer–Lambert transmission: absorption grows with the refracted optical path, not a
@@ -70,17 +86,18 @@ vec3 waterShade(vec3 p, vec3 rd, float t, vec2 pixelDx, vec2 pixelDy){
   // twice read as one pattern stamped across the sea from the air: the review of v3.33.0), and the wind waves and
   // ripples come and go in patches a kilometre or so across, as gusts roughen the sea in some places and not others
   float h0, h0b, h1, h1b, h2, h2b;
-  vec2 s0 = waveBand(p.xz, 0, 256.0, d, 7.9, vec2(0.0), h0)*0.8 + waveBand(p.xz, 0, 202.0, d2, 6.0, vec2(0.37, 0.61), h0b)*0.6;
-  vec2 s1 = waveBand(p.xz, 1, 32.0, d, 3.1, vec2(0.0), h1)*0.8 + waveBand(p.xz, 1, 25.3, d3, 2.3, vec2(0.71, 0.13), h1b)*0.6;
-  vec2 s2 = waveBand(p.xz, 2, 4.0, d, 1.1, vec2(0.0), h2)*0.8 + waveBand(p.xz, 2, 3.16, d2, 0.85, vec2(0.29, 0.83), h2b)*0.6;
-  float gust = vnoise(p.xz/1100.0 + d*uTime*0.004)*0.65 + vnoise(p.xz/370.0 - d*uTime*0.009)*0.35;
+  vec2 pw = wrapW(p.xz);   // (every pattern here repeats with the map: its own place keeps the precision)
+  vec2 s0 = waveBand(pw, 0, 256.0, d, 7.9, vec2(0.0), h0)*0.8 + waveBand(pw, 0, 202.0, d2, 6.0, vec2(0.37, 0.61), h0b)*0.6;
+  vec2 s1 = waveBand(pw, 1, 32.0, d, 3.1, vec2(0.0), h1)*0.8 + waveBand(pw, 1, 25.3, d3, 2.3, vec2(0.71, 0.13), h1b)*0.6;
+  vec2 s2 = waveBand(pw, 2, 4.0, d, 1.1, vec2(0.0), h2)*0.8 + waveBand(pw, 2, 3.16, d2, 0.85, vec2(0.29, 0.83), h2b)*0.6;
+  float gust = vnoiseP(pw/(100000.0/91.0) + d*uTime*0.004, 91)*0.65 + vnoiseP(pw/(100000.0/270.0) - d*uTime*0.009, 270)*0.35;
   float patchK = mix(0.6, 1.3, smoothstep(0.2, 0.8, gust));
   s1 *= patchK; s2 *= patchK*patchK; h1 *= patchK; h2 *= patchK;   // (whitecaps gather where it gusts)
   // what the pixel can't resolve of each band (its waves under ~3 pixels) leaves the surface as roughness instead
   float foot = max(length(pixelDx), length(pixelDy));                         // metres per pixel at this distance
   float a0 = 1.0 - smoothstep(16.0/3.0, 64.0/3.0, foot), a1 = 1.0 - smoothstep(2.0/3.0, 8.0/3.0, foot), a2 = 1.0 - smoothstep(0.25/3.0, 1.0/3.0, foot);
   vec2 sl = (s0*uWaveRms.x*a0 + s1*uWaveRms.y*a1 + s2*uWaveRms.z*a2)*sigma;
-  vec3 n0 = noised(p.xz*0.004 + uTime*vec2(0.02, 0.013));      // long swell from afar, never aliases
+  vec3 n0 = noisedP(pw*0.004 + uTime*vec2(0.02, 0.013), 400);   // long swell from afar, never aliases
   sl += n0.yz*0.02;
   vec3 n = normalize(vec3(-sl.x, 1.0, -sl.y));
   float lost = sigma*sigma*(uWaveRms.x*uWaveRms.x*(1.0 - a0*a0) + uWaveRms.y*uWaveRms.y*patchK*patchK*(1.0 - a1*a1) + uWaveRms.z*uWaveRms.z*patchK*patchK*patchK*patchK*(1.0 - a2*a2)) + 0.0004;
@@ -110,6 +127,7 @@ vec3 waterShade(vec3 p, vec3 rd, float t, vec2 pixelDx, vec2 pixelDy){
     bottom = p.xz + refracted.xz*path;
     // Continental shelves are sand with subdued rocky pockets; the world heightfield
     // determines depth and visibility while the existing terrain scans supply detail.
+    bottom = wrapW(bottom);   // (the sea floor's own place: across the seam, the far side's shallows)
     float rock = smoothstep(0.56, 0.76, vnoise(bottom/42.0))*(0.25 + 0.55*smoothstep(3.0, 14.0, depth));
     vec3 bed = waterBottomColor(bottom, pixelDx, pixelDy, rock);
     vec3 toBed = waterTransmission(depth/max(uSunDir.y, 0.25), extinction);

@@ -72,7 +72,7 @@ static vec3 windDir(const Weather& wx) { float wf = wx.windFrom * DEG; return ve
 float cloudThickness(const Weather& wx) { return 900.f + 900.f * wx.cloudCover; }
 
 float cloudColumn(const Weather& wx, float x, float z) {
-  float cov = covTex((x + wx.cloudDrift.x) / (5200.f * 16.f), (z + wx.cloudDrift.y) / (5200.f * 16.f)) * 0.9375f;
+  float cov = covTex((x + wx.cloudDrift.x) / (100000.f), (z + wx.cloudDrift.y) / (100000.f)) * 0.9375f;
   return cov - (1.05f - wx.cloudCover * 0.75f);
 }
 
@@ -83,16 +83,16 @@ float cloudDensity(const Weather& wx, vec3 p, bool detail) {
   // the tops lean downwind (the wind is stronger aloft): the cloud at height hf is the column from upwind of it
   vec3 d = windDir(wx);
   float lean = hf * std::min(wx.windSpeed * 30.f, 450.f), lx = d.x * lean, lz = d.z * lean;
-  float cov = covTex((p.x - lx + wx.cloudDrift.x) / (5200.f * 16.f), (p.z - lz + wx.cloudDrift.y) / (5200.f * 16.f)) * 0.9375f;
+  float cov = covTex((p.x - lx + wx.cloudDrift.x) / (100000.f), (p.z - lz + wx.cloudDrift.y) / (100000.f)) * 0.9375f;
   float shape = smoothstepf(0.f, 0.07f, hf) * smoothstepf(1.f, 0.4f - 0.22f * wx.cloudCover, hf);
   float den = cov - (1.05f - wx.cloudCover * 0.75f) + shape * 0.45f - 0.45f;
   if (den < -0.2f) return 0.f;
   vec3 w = p + vec3(wx.cloudDrift.x - lx, 0, wx.cloudDrift.y - lz);
-  float bill = cn3(w / 760.f) * 0.6f + cn3((w - vec3(0, wx.cloudBoil, 0)) / 270.f + vec3(11.3f, 4.1f, 7.7f)) * 0.4f;
+  float bill = cn3(w / 781.25f) * 0.6f + cn3((w - vec3(0, wx.cloudBoil, 0)) / 260.41667f + vec3(11.3f, 4.1f, 7.7f)) * 0.4f;
   den += (bill - 0.55f) * 0.42f * (0.55f + hf);
   if (detail) {
     vec3 wv = w + wx.cloudDetail;
-    float e = (cn3(wv / 95.f + vec3(3.7f, 0, 1.9f)) - 0.5f) * 0.17f + (cn3(wv / 36.f + vec3(17.1f, 9.3f, 5.5f)) - 0.5f) * 0.06f;
+    float e = (cn3(wv / 94.69697f + vec3(3.7f, 0, 1.9f)) - 0.5f) * 0.17f + (cn3(wv / 35.91954f + vec3(17.1f, 9.3f, 5.5f)) - 0.5f) * 0.06f;
     den += e * (1.f - smoothstepf(0.f, 0.3f, den));
   }
   return clampf(den * 4.5f, 0.f, 1.f);
@@ -108,7 +108,7 @@ float rainAt(const Weather& wx, vec3 p) {
   const vec3 d = windDir(wx);
   // (under a cloud at all, and then the heavier the denser the field above: an overcast rains everywhere, lightly
   // between its heavy cells; scattered showers only under their clouds)
-  float cov = covTex((p.x - d.x * drift + wx.cloudDrift.x) / (5200.f * 16.f), (p.z - d.z * drift + wx.cloudDrift.y) / (5200.f * 16.f)) * 0.9375f;
+  float cov = covTex((p.x - d.x * drift + wx.cloudDrift.x) / (100000.f), (p.z - d.z * drift + wx.cloudDrift.y) / (100000.f)) * 0.9375f;
   float c = cov - (1.05f - wx.cloudCover * 0.75f);
   return smoothstepf(-0.25f, 0.15f, c) * (0.35f + 0.65f * smoothstepf(0.42f, 0.62f, cov)) * (wx.storm ? 1.f : 0.85f) * smoothstepf(top, top - 300.f, p.y);
 }

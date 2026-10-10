@@ -562,7 +562,8 @@ void Game::drawMapView(float x, float y, float w, float h, int from, int to, con
   float s = S();
   float sz = std::min(w, h);
   float ox = x + (w - sz) * 0.5f, oy = y + (h - sz) * 0.5f;
-  g_ren.image(g_ren.minimapTex, ox, oy, sz, sz);
+  const float iu = (WRAP_HALF - WORLD_HALF) / WRAP_SPAN;   // (the islands' square of the map's period)
+  g_ren.image(g_ren.minimapTex, ox, oy, sz, sz, iu, iu, 1.f - iu, 1.f - iu);
   g_ren.flushUIPublic();
   auto toS = [&](float wx_, float wz) { return vec2(ox + (wx_ + WORLD_HALF) / (2 * WORLD_HALF) * sz, oy + (wz + WORLD_HALF) / (2 * WORLD_HALF) * sz); };
   if (from >= 0 && to >= 0) {
@@ -1689,12 +1690,13 @@ void Game::drawPFD(float x, float y, float sz) {
 void Game::drawMinimap(float x, float y, float sz, float range) {
   float s = S();
   g_ren.rect(x - 4 * s, y - 4 * s, sz + 8 * s, sz + 8 * s, vec3(0, 0, 0), 0.6f, 8 * s);
-  float u0 = (plane.pos.x - range + WORLD_HALF) / (2 * WORLD_HALF), v0 = (plane.pos.z - range + WORLD_HALF) / (2 * WORLD_HALF);
-  float u1 = (plane.pos.x + range + WORLD_HALF) / (2 * WORLD_HALF), v1 = (plane.pos.z + range + WORLD_HALF) / (2 * WORLD_HALF);
+  // (the image repeats with the map: across its seam, the far side's islands)
+  float u0 = (plane.pos.x - range + WRAP_HALF) / WRAP_SPAN, v0 = (plane.pos.z - range + WRAP_HALF) / WRAP_SPAN;
+  float u1 = (plane.pos.x + range + WRAP_HALF) / WRAP_SPAN, v1 = (plane.pos.z + range + WRAP_HALF) / WRAP_SPAN;
   g_ren.image(g_ren.minimapTex, x, y, sz, sz, u0, v0, u1, v1, 0.95f);
   g_ren.flushUIPublic();
-  auto toS = [&](float wx_, float wz, bool& inside) {
-    float px = x + (wx_ - plane.pos.x + range) / (2 * range) * sz, py = y + (wz - plane.pos.z + range) / (2 * range) * sz;
+  auto toS = [&](float wx_, float wz, bool& inside) {   // (at the copy nearest the aircraft: across the map's seam, the far side's)
+    float px = x + (wrapCoord(wx_ - plane.pos.x) + range) / (2 * range) * sz, py = y + (wrapCoord(wz - plane.pos.z) + range) / (2 * range) * sz;
     inside = px > x && px < x + sz && py > y && py < y + sz;
     return vec2(clampf(px, x, x + sz), clampf(py, y, y + sz));
   };
@@ -1787,6 +1789,7 @@ void Game::drawHud(const FrameParams& fp) {
   const Airport& d = dest();
   bool toWp = wpIndex < (int)contract.wps.size();
   vec3 target = toWp ? vec3(contract.wps[wpIndex].x, contract.wps[wpIndex].alt, contract.wps[wpIndex].z) : d.pos();
+  target.x = nearCopy(target.x, plane.pos.x); target.z = nearCopy(target.z, plane.pos.z);   // (the short way round the map)
   vec3 to = target - plane.pos;
   float dist = length(vec3(to.x, 0, to.z));
   float brg = wrapDeg360(atan2f(to.x, -to.z) / DEG);
@@ -2243,7 +2246,10 @@ void Game::drawGps() {
   gpsRange = gpsRange + (gpsRangeTarget - gpsRange) * (1.f - expf(-10.f * uiDt));
   float range = gpsRange, k = msz / (2 * range);
   vec2 C(mcx, mcy);
-  auto toS = [&](float wx_, float wz) { return vec2(mcx + (wx_ - plane.pos.x) * k, mcy + (wz - plane.pos.z) * k); };
+  // (a place on the map at its copy nearest the aircraft - across the map's seam, the far side's; toR: a point given
+  // relative to the aircraft as it is, the grid and the track ahead)
+  auto toS = [&](float wx_, float wz) { return vec2(mcx + wrapCoord(wx_ - plane.pos.x) * k, mcy + wrapCoord(wz - plane.pos.z) * k); };
+  auto toR = [&](float wx_, float wz) { return vec2(mcx + (wx_ - plane.pos.x) * k, mcy + (wz - plane.pos.z) * k); };
   auto inside = [&](vec2 p, float m) { return p.x > mx + m && p.x < x1 - m && p.y > my + m && p.y < y1 - m; };
   auto seg = [&](vec2 a, vec2 b, float th, vec3 c, float al) { if (clipSeg(a, b, mx, my, x1, y1)) g_ren.line(a.x, a.y, b.x, b.y, th, c, al * e); };
   auto dashed = [&](vec2 a, vec2 b, float th, vec3 c, float al, float dash, float phase) {
@@ -2276,8 +2282,8 @@ void Game::drawGps() {
   g_ren.rect(mx, my, msz, msz, vec3(0.0f, 0.05f, 0.1f), 0.1f * e);   // a touch of display tint over the imagery
   // grid every 5 / 10 km
   float gstep = range > 15000 ? 10000.f : range > 6000 ? 5000.f : 2000.f;
-  for (float gx = floorf((plane.pos.x - range) / gstep) * gstep; gx <= plane.pos.x + range; gx += gstep) { vec2 a = toS(gx, plane.pos.z - range), b = toS(gx, plane.pos.z + range); seg(a, b, 1 * s, C_ACCENT, 0.12f); }
-  for (float gz = floorf((plane.pos.z - range) / gstep) * gstep; gz <= plane.pos.z + range; gz += gstep) { vec2 a = toS(plane.pos.x - range, gz), b = toS(plane.pos.x + range, gz); seg(a, b, 1 * s, C_ACCENT, 0.12f); }
+  for (float gx = floorf((plane.pos.x - range) / gstep) * gstep; gx <= plane.pos.x + range; gx += gstep) { vec2 a = toR(gx, plane.pos.z - range), b = toR(gx, plane.pos.z + range); seg(a, b, 1 * s, C_ACCENT, 0.12f); }
+  for (float gz = floorf((plane.pos.z - range) / gstep) * gstep; gz <= plane.pos.z + range; gz += gstep) { vec2 a = toR(plane.pos.x - range, gz), b = toR(plane.pos.x + range, gz); seg(a, b, 1 * s, C_ACCENT, 0.12f); }
   // range rings with labels
   for (int ri = 1; ri <= 2; ri++) {
     float rr = range * 0.5f * ri, rp = rr * k;
@@ -2304,9 +2310,9 @@ void Game::drawGps() {
   pts.push_back(vec2(dest().x, dest().z));
   int activeLeg = std::min(wpIndex, (int)pts.size() - 2);
   for (int i = 0; i + 1 < (int)pts.size(); i++) {
-    vec2 a = toS(pts[i].x, pts[i].y), b = toS(pts[i + 1].x, pts[i + 1].y);
+    vec2 a = toS(pts[i].x, pts[i].y), b(a.x + wrapCoord(pts[i + 1].x - pts[i].x) * k, a.y + wrapCoord(pts[i + 1].y - pts[i].y) * k);   // (each leg the short way)
     bool act = i == activeLeg, done = i < activeLeg;
-    if (act) { vec2 p = toS(plane.pos.x, plane.pos.z); a = p; seg(a, b, 6 * s, MAG, 0.18f); dashed(a, b, 3 * s, MAG, 1.f, 10 * s, -T * 40 * s); }
+    if (act) { a = C; b = toS(pts[i + 1].x, pts[i + 1].y); seg(a, b, 6 * s, MAG, 0.18f); dashed(a, b, 3 * s, MAG, 1.f, 10 * s, -T * 40 * s); }
     else dashed(a, b, 2 * s, done ? C_DIM : MAG, done ? 0.35f : 0.6f, 6 * s, 0);
   }
   for (int i = 0; i < (int)contract.wps.size(); i++) {
@@ -2354,7 +2360,7 @@ void Game::drawGps() {
   // predicted track: markers at 1, 2 and 5 minutes along the ground velocity
   vec2 gv(plane.vel.x, plane.vel.z);
   for (int m : {1, 2, 5}) {
-    vec2 p = toS(plane.pos.x + gv.x * 60 * m, plane.pos.z + gv.y * 60 * m);
+    vec2 p = toR(plane.pos.x + gv.x * 60 * m, plane.pos.z + gv.y * 60 * m);
     seg(C, p, 1.5f * s, vec3(1, 1, 0.3f), 0.5f);
     if (inside(p, 4 * s)) { g_ren.rect(p.x - 3 * s, p.y - 3 * s, 6 * s, 6 * s, vec3(1, 1, 0.3f), e, 1 * s); g_ren.text(p.x + 6 * s, p.y - 6 * s, 10 * s, fmt("%dm", m), vec3(1, 1, 0.3f), 0.8f * e, 0, false); }
   }
@@ -2396,14 +2402,15 @@ void Game::drawGps() {
   panel(sx, sy, sw, sh, 0.95f * e);
   float px = sx + 18 * s, py = sy + 16 * s, vw = sw - 36 * s;
   vec3 target = wpIndex < (int)contract.wps.size() ? vec3(contract.wps[wpIndex].x, contract.wps[wpIndex].alt, contract.wps[wpIndex].z) : dest().pos();
-  vec3 to = target - plane.pos; float dist = length(vec3(to.x, 0, to.z));
+  vec3 to = target - plane.pos; to.x = wrapCoord(to.x); to.z = wrapCoord(to.z);   // (the short way round the map)
+  float dist = length(vec3(to.x, 0, to.z));
   float brg = wrapDeg360(atan2f(to.x, -to.z) / DEG);
   float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
   float trk = gs > 2 ? wrapDeg360(atan2f(plane.vel.x, -plane.vel.z) / DEG) : plane.heading();
   // remaining route distance
   float remain = dist;
-  { vec2 prev(target.x, target.z); for (int i = wpIndex + 1; i < (int)contract.wps.size(); i++) { vec2 p(contract.wps[i].x, contract.wps[i].z); remain += length(vec3(p.x - prev.x, 0, p.y - prev.y)); prev = p; }
-    if (wpIndex < (int)contract.wps.size()) remain += length(vec3(dest().x - prev.x, 0, dest().z - prev.y)); }
+  { vec2 prev(target.x, target.z); for (int i = wpIndex + 1; i < (int)contract.wps.size(); i++) { vec2 p(contract.wps[i].x, contract.wps[i].z); remain += length(vec3(wrapCoord(p.x - prev.x), 0, wrapCoord(p.y - prev.y))); prev = p; }
+    if (wpIndex < (int)contract.wps.size()) remain += length(vec3(wrapCoord(dest().x - prev.x), 0, wrapCoord(dest().z - prev.y))); }
   auto kv = [&](const char* kname, const std::string& v, vec3 c = C_TEXT, float vs = 16.f) {
     g_ren.text(px, py + 2 * s, 12 * s, kname, C_DIM, e, 0, false);
     g_ren.text(px + vw, py, vs * s, ellipsize(v, vw - 70 * s, vs * s), c, e, 2);

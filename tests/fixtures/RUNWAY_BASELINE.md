@@ -126,3 +126,28 @@ fixture is unchanged, and the test reports the number of exempt samples separate
 The bit-identical whole-array result above describes the redesigned communities
 before adding that explicit crater, not an assertion that the crater changes no
 terrain. Future audits must compare height channels outside this bounded disk.
+
+### Explicit road-grading exception
+
+The owner's brief (`docs/LIVING_ISLANDS_PLAN.md`, Phase A item 4) builds the road
+network into the ground: each road's platform is levelled across its width, with
+cut-and-fill banks blending back to the natural ground. A frozen full-world location
+may differ from baseline only where all of these hold:
+
+- it lies within a road's reach (`ROAD_BANK_MAX` of a road's edge, plus 1 m);
+- it is not on any airfield's grounds;
+- under an approach funnel, it is no higher than the funnel's cap.
+
+Bridges and the stretches beside an airfield leave the ground alone. The test
+counts these samples separately and fails if they exceed a twentieth of the
+frozen locations; v3.45 grades 47 of 17,523. Runway samples, runway fixtures and
+airport grounds have no road exception. The immutable fixture is unchanged.
+
+### The open sea beyond the archipelago (map wrap)
+
+From v3.45 the 80 km square sits in 10 km of open sea, and the map wraps every
+100 km (`src/world.h`, `WRAP_HALF`). Every frozen location lies inside the square,
+where the wrap changes nothing: a lookup is wrapped into [-50, 50) km, which leaves
+coordinates inside the square exactly as they were. The sea fades to 80 m deep only
+outside the square. `world_cache_test` checks that heights repeat exactly every
+100 km, and that the band is open sea with no cliff at the square's edge.

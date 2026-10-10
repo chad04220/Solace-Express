@@ -2,6 +2,8 @@
 // file, a derived array of the wrong size or trailing bytes are all rejected (the world is then generated again).
 #include <limits>
 #include "../src/world.h"
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -53,6 +55,27 @@ int main() {
     t.insert(t.end(), good.begin() + off + 8 + n0 * 4, good.end());
     writeAll(bad, t);
     World d; CHECK(!d.loadCache(bad, "stampA") && d.hm.empty(), "an empty height-bound array is rejected, nothing published");
+  }
+  {   // the map wraps (world.h WRAP_HALF): the islands in 10 km of open sea all round, the whole repeating every 100 km
+      // both ways - the same ground a period on in any direction, the sea settled to its depth 3 km out, and no step
+      // where the islands' square ends
+    bool periodic = true, sea = true; float step = 0.f;
+    for (int i = 0; i < 2000; i++) {
+      const float x = -50000.f + (float)((i * 7919) % 1000) * 100.f, z = -50000.f + (float)((i * 104729) % 1000) * 100.f;   // (whole metres: a period on is exact)
+      const float h = a.height(x, z);
+      periodic = periodic && h == a.height(x + WRAP_SPAN, z) && h == a.height(x, z - WRAP_SPAN) && h == a.height(x - 2.f * WRAP_SPAN, z + WRAP_SPAN);
+      if (std::max(fabsf(x), fabsf(z)) >= WORLD_HALF + 3000.f) sea = sea && h == -SEA_DEPTH;
+    }
+    for (float t = -WORLD_HALF; t <= WORLD_HALF; t += 500.f)
+      for (int side = 0; side < 4; side++) {
+        const float e = side & 1 ? WORLD_HALF : -WORLD_HALF;
+        auto at = [&](float off) { return side < 2 ? a.height(e + (side & 1 ? off : -off), t) : a.height(t, e + (side & 1 ? off : -off)); };
+        for (float o = -400.f; o < 3400.f; o += 50.f) step = std::max(step, fabsf(at(o + 50.f) - at(o)));
+      }
+    CHECK(periodic, "the map repeats every 100 km both ways");
+    CHECK(sea, "past the islands' square, the open sea at its depth");
+    printf("  (steepest 50 m step from the islands' edge out to the open sea: %.1f m)\n", step);
+    CHECK(step < 15.f, "no cliff where the islands' square ends");
   }
   remove(path.c_str()); remove(bad.c_str());
   printf(fails ? "%d FAILED\n" : "all passed\n", fails);

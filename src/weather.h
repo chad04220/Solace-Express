@@ -13,7 +13,7 @@
 namespace wxfield {
 
 // the baked cloud noise (renderer.cpp uploads these same arrays as uCloudCov and uNoise3, noise_tex.glsl): a tileable
-// 1024^2 coverage map (4 octaves of value noise, period 16 coverage units = 83 km) and a 128^3 value-noise volume
+// 1024^2 coverage map (4 octaves of value noise, period 16 coverage units = 100 km: the map wraps there, world.h WRAP_HALF) and a 128^3 value-noise volume
 // (period 32 lattice cells). Generated once, on first use, on every core.
 static const int kCovN = 1024, kVolN = 128;
 const uint8_t* coverageMap();

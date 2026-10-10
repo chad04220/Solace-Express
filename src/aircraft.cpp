@@ -169,7 +169,7 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   flaps = 0; gear = 1; rpm = 0; n1 = 0; engineSpool = 0; maxG = minG = 1; flightTime = 0;
   fail = Failures(); iceFeed = 0; overG = 0;
   apDisengage(); apDone = false; apOverrun = false; apPitchI = 0; gust = vec3(); rng = Rng(77);
-  wxl = wxfield::Local(); wxAir = vec3(); windVel = windAvg = gustRot = vec3(); gustBurst = 0; aeroMem = AeroMem(); ctlSurf = vec3();
+  wxl = wxfield::Local(); wxAir = seamShift = vec3(); windVel = windAvg = gustRot = vec3(); gustBurst = 0; aeroMem = AeroMem(); ctlSurf = vec3();
   // drag comes from the airframe's shape (aero.cpp), evaluated every step at the speed and air density of the moment
   cd0 = aeroCD0(aeroModel(*s), *s, std::max(speed, 30.f), 1.225f, speed / 340.f);
   nozzle = 0; mach = 0;
@@ -266,6 +266,10 @@ void Plane::step(float dt, const Weather& wx, float time) {
   for (int i = 0; i < N && !ev.crashed; i++) substep(h, wx, time + h * i);
   windAvg = flightTime <= 0.f ? windVel : lerp(windAvg, windVel, 1.f - expf(-dt / 1.5f));
   flightTime += dt;
+  // the map wraps (world.h): over its seam it comes back in from the other side, and the air it flies in with it (the
+  // eddies and gusts go on as they were); the autopilot's plan stays where the field is
+  const vec3 seam(wrapCoord(pos.x) - pos.x, 0.f, wrapCoord(pos.z) - pos.z);
+  if (seam.x != 0.f || seam.z != 0.f) { pos += seam; wxAir += seam; seamShift += seam; }
 }
 
 struct Contact { vec3 p; int kind; };  // kind 0 main L, 1 main R, 2 nose/tail wheel, 3+ structure
@@ -657,9 +661,6 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   float wl = length(w);
   if (wl > 1e-6f) { q = q * quat::axisAngle(w / wl, wl * dt); q.normalize(); }
   { const vec3 cgW1 = q.rotate(cg); pos = pcg - cgW1; vel = vcg - cross(q.rotate(w), cgW1); }
-  if (pos.x < -WORLD_HALF * 1.2f || pos.x > WORLD_HALF * 1.2f || pos.z < -WORLD_HALF * 1.2f || pos.z > WORLD_HALF * 1.2f) {
-    ev.crashed = true; ev.crashReason = "Flew beyond the charted area and ran out of options";
-  }
 
   // ---------------- autopilot inner loops
   if (apOn) apControl(dt);
@@ -844,6 +845,7 @@ void Plane::apEngage(int mode, int airport, const Weather& wx) {
         const Airport& a = g_world.airports[ai];
         const vec3 ld = rv ? -a.dir() : a.dir(), thr = a.threshold(rv);
         vec3 rel = pos - thr; rel.y = 0;
+        rel.x = wrapCoord(rel.x); rel.z = wrapCoord(rel.z);   // (the short way round the map)
         const float along = rel.x * ld.x + rel.z * ld.z, cross = fabsf(rel.x * ld.z - rel.z * ld.x);
         vec3 v = vel; v.y = 0; const float vl = length(v);
         const float align = vl > 1.f ? (v.x * ld.x + v.z * ld.z) / vl : 0.f;
@@ -1004,6 +1006,7 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   const ApEnvelope& E = apEnv;
   const Airport& a = g_world.airports[airport];
   auto H = [](vec3 q) { return g_world.height(q.x, q.z); };
+  const vec3 P(nearCopy(pos.x, a.x), pos.y, nearCopy(pos.z, a.z));   // (where the aircraft is, the short way round the map from the field)
   vec3 ld = rev ? a.dir() * -1.f : a.dir(), rr(-ld.z, 0, ld.x);
   vec3 td = a.threshold(rev) + ld * clampf(a.length * 0.12f, 80.f, 300.f); td.y = a.elev;
   // glidepath: 3 degrees, steepened (up to what the type can fly) to clear the ground and trees under the final
@@ -1056,7 +1059,7 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
       float hAlt = std::max(intAlt, m + 280.f);
       // ...and how far out of the way it is from where the aircraft is now (every km flown is fuel)
       float cost = (hAlt - iafAlt) * 3.f + std::max(0.f, hAlt - iafAlt - 150.f) * 10.f + len2(c - qi) * 0.15f + near
-                 + std::max(0.f, len2(c - pos) + len2(c - qi) - len2(qi - pos)) * 0.12f;
+                 + std::max(0.f, len2(c - P) + len2(c - qi) - len2(qi - P)) * 0.12f;
       if (cost < bestCost) { bestCost = cost; bestC = c; bestAlt = hAlt; }
     }
   vec3 from(sinf(wx.windFrom * DEG), 0, -cosf(wx.windFrom * DEG));
@@ -1125,7 +1128,7 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   // drop the Kestrel flew 15 km to Meadowbrook's far end)
   const float spareDrop = (gateH - apStabHeight(E.vApp)) * std::max(0.f, 5.1f / std::max(E.vApp, 10.f) / std::max(gs, 0.02f) - 1.f);
   const float dive = apPro ? std::max(0.f, intAlt - iafAlt - spareDrop) : 0.f;
-  float score = hw * 40.f - bestCost - (F0 - F) * 0.3f - length(bestC - pos) * 0.02f - blocked - dive * 15.f
+  float score = hw * 40.f - bestCost - (F0 - F) * 0.3f - length(bestC - P) * 0.02f - blocked - dive * 15.f
               - (atanf(gs) / DEG - 3.f) * 150.f - (stopShort > 0.f ? 20000.f + stopShort * 20.f : 0.f) - (highAt2k > 0.f ? 20000.f + highAt2k * 20.f : 0.f) - (turnHigh > 0.f ? 20000.f + turnHigh * 20.f : 0.f)
               - (surfBad ? 40000.f : 0.f) - (offChart > 0.f ? 20000.f + offChart * 20.f : 0.f);
   if (getenv("APDBG")) printf("apPlan %s rev %d: intercept alt %.0f m above the field, glidepath at the gate %.0f m; ", a.code, (int)rev, intAlt - a.elev, iafAlt - a.elev);
@@ -1169,6 +1172,7 @@ void Plane::apGuidance(float dt) {
   switch (apStage) {
     case APS_NAV: {
       vec3 C = apHoldC; C.y = pos.y;
+      C.x = nearCopy(C.x, pos.x); C.z = nearCopy(C.z, pos.z);   // (the short way there, across the map's seam if that is shorter)
       float dc = len2(C - pos);
       const float vh = apHoldSpeed(vref, s.cruise, apPro);
       apUseVS = false;
@@ -1497,9 +1501,9 @@ void Plane::apGuidance(float dt) {
   }
   // the chart's edge: en route or going around (a slow climb straight out past the runway runs a long way), beyond where
   // any plan reaches it turns back for the field (the review of v3.33.0, A1: a passenger Starling flew off the chart
-  // from Palm Bay and was lost)
+  // from Palm Bay and was lost. The map wraps now, but the plan's patterns stay on this side of its seam)
   if ((apStage == APS_NAV || apStage == APS_GOAROUND) && std::max(fabsf(pos.x), fabsf(pos.z)) > WORLD_HALF * 1.12f)
-    apHeading = atan2f(apTd.x - pos.x, -(apTd.z - pos.z)) / DEG;
+    apHeading = atan2f(nearCopy(apTd.x, pos.x) - pos.x, -(nearCopy(apTd.z, pos.z) - pos.z)) / DEG;
   // terrain safety while en route and in the go-around: never let the target sit below the ground ahead
   if (apStage == APS_NAV || apStage == APS_GOAROUND) {
     const float hi = terrainAround();

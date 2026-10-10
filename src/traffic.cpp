@@ -694,6 +694,19 @@ void Traffic::updateEscorts(float dt, vec3 player, vec3 playerVel) {
 }
 
 // ------------------------------------------------------------------ update
+// The player came back in over the map's seam, moved by d (Plane::step): the craft about it - cruisers, the formation
+// passes, the escorts - come along; a field's own traffic and an airline's flight between its fields belong where
+// they are and stay (out of range now, they go)
+void Traffic::followSeam(vec3 d) {
+  for (auto& c : craft) {
+    if (!c.alive || c.role == TrafficCraft::AIRPORT || c.role == TrafficCraft::STUNT || c.routeTag >= 0) continue;
+    c.pos += d;
+    for (auto& p : c.path) p += d;
+  }
+  for (auto& p : puffs) p.p += d;
+  for (auto& b : booms) b.first += d;
+}
+
 bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround, float playerSpan) {
   puffs.clear(); booms.clear(); flybys.clear(); radio.clear();
   if (!enabled) {   // traffic off in the settings: only a summoned display pair flies

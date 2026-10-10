@@ -8,13 +8,19 @@ and vehicle meshes, photographic materials, shallow water and volcano crater sta
 Each phase ships as a version, measured on the owner's RTX 3070 laptop through `diagnostics.bat` (native 1080p,
 60 fps or better everywhere) before the next starts.
 
-## Where it stands (v3.44 candidate)
+## Where it stands (v3.45)
 
-- 18 settlements: 2 cities, 3 towns, 13 villages. Lots on a 28 m grid round each centre, aligned with the road in.
-- Roads: 45 straight segments painted on the ground, 8 m wide. They join some towns and airports; one crosses the south
-  bay over open water, and much of each island has none. No highways, no bridges, no grading.
-- Buildings: 10,003 in the world, 36% fewer than before the merge - the farms, barns, silos and country shops mostly
-  went into denser towns and cities. Trees, bushes and rocks: unchanged (15.9 million and 360,000).
+- 26 settlements, 14,098 street-front buildings. Since v3.44, Kaleo's east has a port city (Kailani), a market town
+  (Canefield) and three villages, and Palm Bay's island, Far Isle and Nordholm's coast have a village each.
+- **Phase A, items 1-4 shipped.** The road network is generated and cached with the world: 43 paths, 104 km of
+  highway and 256 km of roads joining all 26 settlements and every airfield on an island that has one. Routes are
+  found by A* over the terrain. The roads are graded into the ground (on the CPU and in every shader's `terrainH`)
+  and painted by class. Runways, airfield grounds and approach funnels are untouched
+  (`tests/fixtures/RUNWAY_BASELINE.md`, road-grading exception).
+- **Still to come in Phase A:**
+  - Item 5: bridges are spans the ground is left alone under, not yet meshes.
+  - Item 6: road furniture.
+- The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network
 

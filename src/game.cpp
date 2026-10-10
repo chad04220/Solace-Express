@@ -717,6 +717,29 @@ Game::WakePt Game::wakeHere(vec3 c, bool brk, float odo) const {
   const vec3 bx = plane.q.rotate(vec3(1, 0, 0));
   return {c, 0.f, brk, w0, clampf(4.f * b0 / std::max(fabsf(w0), 0.05f), 20.f, 120.f), odo, gam, b0, atan2f(dot(bx, upv), dot(bx, sd)), py};
 }
+// The aircraft came back in over the map's seam (Plane::step, world.h WRAP_HALF): what the flight has put in the world
+// round it comes with it - the camera, the smoke and the sparks, the wreckage, the wingtip ribbons, its path through the
+// cloud, the traffic flying with it, the renderer's last frame - so nothing jumps. What belongs to a place (the
+// craters, the fields' own traffic, the route) stays: across the seam the map is the same.
+void Game::followSeam(vec3 d) {
+  camPos += d; dbgCamPos += d; dbgCamLook += d;
+  for (auto& p : particles) p.p += d;
+  for (auto& w : wreck) w.c += d;
+  for (auto& b : debris) b.p += d;
+  for (auto& p : pops) p.p += d;
+  for (auto& tr : pieceTrail) for (auto& t : tr) { t.p += d; t.sw.c += d; }
+  for (auto& tr : tipTrail) for (auto& t : tr) { t.p += d; t.sw.c += d; }
+  boomP += d;
+  for (auto& w : cloudWake) w.c += d;
+  ufo.pos += d;
+  for (auto& b : wraith.bolts) b.h += d;
+  for (auto& b : wraith.bombs) b.p += d;
+  for (auto& b : wraith.blasts) b.p += d;
+  wraith.cam.pos += d; wraith.cam.look += d; wraith.cam.blastP += d;
+  traffic.followSeam(d);
+  g_ren.followSeam(d);
+}
+
 // The aircraft through the cloud: its path in the cloud layer is kept (a point every 150 m, or sooner in a turn) in
 // the cloud field's frame, with the vortex pair as it was there, and the cloud pass stirs and clears a channel along
 // it that opens a moment behind the aircraft, widens and fills in again over the next minute (FrameParams::wake). Flying in or near cloud, wisps of it stream
@@ -1136,7 +1159,7 @@ void Game::cycleApDest(int dir) {
   int n = (int)g_world.airports.size();
   std::vector<int> order(n);
   for (int i = 0; i < n; i++) order[i] = i;
-  auto d2 = [&](int i) { float dx = g_world.airports[i].x - plane.pos.x, dz = g_world.airports[i].z - plane.pos.z; return dx * dx + dz * dz; };
+  auto d2 = [&](int i) { float dx = wrapCoord(g_world.airports[i].x - plane.pos.x), dz = wrapCoord(g_world.airports[i].z - plane.pos.z); return dx * dx + dz * dz; };   // (the short way round the map)
   std::sort(order.begin(), order.end(), [&](int a, int b) { return d2(a) < d2(b); });
   if (apDest < 0) apDest = (int)(&dest() - &g_world.airports[0]);   // first pick: the contract's destination
   else {
@@ -1314,7 +1337,7 @@ void Game::flightControls(float dt) {
   if (actPressed(ACT_ENGINE) && !plane.engineRunning && plane.fuel > 0) { plane.starterTime = 0.01f; toast("Engine start"); }
   // time acceleration
   if (actPressed(ACT_TIME)) {
-    float dd = length(vec3(plane.pos.x - dest().x, 0, plane.pos.z - dest().z));
+    float dd = length(vec3(wrapCoord(plane.pos.x - dest().x), 0, wrapCoord(plane.pos.z - dest().z)));
     if (!apCruising() && (plane.onGround || plane.agl() < 250.f || dd < 3500.f)) { timeAccel = 1; toast("Time acceleration only available in cruise", vec3(1, 0.7f, 0.4f)); }
     else { timeAccel = timeAccel >= 4 ? 1 : timeAccel * 2; toast(fmt("Time x%.0f", timeAccel)); }
   }
@@ -1348,7 +1371,7 @@ void Game::updateFlight(float dt) {
   // (time acceleration is switched off before this frame's step, not after it: a 4x frame on the approach was one
   // too many)
   if (timeAccel > 1) {
-    float dd = length(vec3(plane.pos.x - dest().x, 0, plane.pos.z - dest().z));
+    float dd = length(vec3(wrapCoord(plane.pos.x - dest().x), 0, wrapCoord(plane.pos.z - dest().z)));
     bool approach = plane.apOn && plane.apMode == Plane::AP_APPR && plane.apStage != Plane::APS_NAV;
     if ((!apCruising() && (plane.agl() < 250.f || dd < 3500.f)) || approach || plane.onGround || crashed) { timeAccel = 1; toast("Time acceleration off"); }
   }
@@ -1361,6 +1384,7 @@ void Game::updateFlight(float dt) {
     updateFailures(simDt);
     updateResearchCard(simDt);
     plane.step(simDt, wx, gameTime);
+    if (plane.seamShift.x != 0.f || plane.seamShift.z != 0.f) { prevPos += plane.seamShift; followSeam(plane.seamShift); plane.seamShift = vec3(); }
     if (benchPin) { plane.pos = benchPinPos; plane.q = benchPinQ; plane.w = vec3(); }   // (a timing scene held in place: flying, going nowhere)
     if (plane.apWindEvent != apWindSaid) {   // (the autopilot went around for a wind that turned behind it on the final: Plane::step)
       if (plane.apWindEvent == 1) toast("Autopilot: too much tailwind to stop on this runway - going around", vec3(1, 0.75f, 0.35f));
@@ -1570,15 +1594,6 @@ void Game::updateFlight(float dt) {
     tipOn = vapK > 0.f;
   }
   if (plane.spec->special) jetEffects(simDt);
-  // the edge of the chart: warned well before it (past 1.2x the half-width the flight is lost)
-  {
-    float edge = std::max(fabsf(plane.pos.x), fabsf(plane.pos.z)) / WORLD_HALF;
-    edgeWarnT -= dt;
-    if (edge > 1.04f && edgeWarnT <= 0) {
-      edgeWarnT = 8.f; g_audio.trigger(SFX_BEEP);
-      toast(edge > 1.12f ? "LEAVING THE CHART - TURN BACK NOW" : "Approaching the edge of the chart - turn back", vec3(1, 0.5f, 0.2f));
-    }
-  }
   // GPS breadcrumb trail
   trailT += dt;
   if (trailT > 2.f && !plane.onGround) { trailT = 0; trail.push_back(vec2(plane.pos.x, plane.pos.z)); if (trail.size() > 500) trail.erase(trail.begin()); }
@@ -4235,7 +4250,7 @@ void Game::debugScene(const std::string& name) {
       return;
     }
   }
-  if (name == "air" || name == "sunset" || name == "mountain" || name == "cockpit" || name == "jet" || name == "storm" || name == "snow" || name == "hud" || name == "forest") {
+  if (name == "air" || name == "sunset" || name == "mountain" || name == "cockpit" || name == "jet" || name == "storm" || name == "snow" || name == "hud" || name == "forest" || name == "seam" || name == "seamgps") {
     vec3 p(-4000, 600, 9000); float hdg = 40;
     if (name == "forest") { p = vec3(-960, 270, 23500); hdg = 0; }   // (low, north up the island's longest forest: 9 km of it ahead, 130-250 m below - what the trees cost, their fades and detail cross-fades)
     if (name == "sunset") { timeOfDay = 18.2f; p = vec3(-26000, 300, 14000); hdg = 270; }
@@ -4243,6 +4258,7 @@ void Game::debugScene(const std::string& name) {
     if (name == "jet") { p = vec3(8000, 900, 6000); hdg = 80; }
     if (name == "storm") { p = vec3(10000, 700, 10000); hdg = 120; }
     if (name == "snow") { p = vec3(20000, 600, -24000); hdg = 80; }
+    if (name == "seam" || name == "seamgps") { p = vec3(WRAP_HALF - 1500.f, 1500.f, 4000.f); hdg = getenv("SEAMHDG") ? (float)atof(getenv("SEAMHDG")) : 90.f; }   // (over the map's seam, east of the islands: their far side's copy ahead)
     plane.reset(&kAircraft[spec], p, hdg, kAircraft[spec].maxFuel, 100, true, kAircraft[spec].cruise);
     takeoffAnnounced = true;
     camQ = plane.q;
@@ -4633,6 +4649,7 @@ void Game::debugScene(const std::string& name) {
     if (name == "minimap") showMinimap = true;
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
   }
+  if (name == "seamgps") { showMap = true; uiAnim[0x6e61u] = 1.f; gpsRangeTarget = gpsRange = 25000.f; }
   if (name == "gpsap" || name == "apfinal" || name == "apvtol") {   // autopilot: GPS autoland pick, then the approach
     int sp = name == "apvtol" ? 8 : 4;   // (the XR-40: the research jet that lands vertically)
     plane.reset(&kAircraft[sp], vec3(-4000, 900, 9000), 40, kAircraft[sp].maxFuel, 100, true, kAircraft[sp].cruise * 0.8f);

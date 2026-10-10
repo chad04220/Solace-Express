@@ -14,17 +14,17 @@ float cloudDensity(vec3 p, int detail){
   if (hf < 0.0 || hf > 1.0) return 0.0;
   float U = length(uWindV.xz);
   vec2 lean = (U > 0.1 ? uWindV.xz/U : vec2(0.0))*(hf*min(U*30.0, 450.0));
-  vec2 q = (p.xz - lean + uWindOff) / 5200.0;
+  vec2 q = (p.xz - lean + uWindOff) / 6250.0;
   float cov = textureLod(uCloudCov, q*(1.0/16.0), 0.0).r*0.9375;
   float shape = smoothstep(0.0, 0.07, hf) * smoothstep(1.0, 0.4 - 0.22*uCloudCover, hf);
   float d = cov - (1.05 - uCloudCover*0.75) + shape*0.45 - 0.45;
   if (d < -0.2) return 0.0;
   vec3 w = p + vec3(uWindOff.x - lean.x, 0.0, uWindOff.y - lean.y);
-  float bill = cn3(w/760.0)*0.6 + cn3((w - vec3(0.0, uCloudBoil, 0.0))/270.0 + vec3(11.3, 4.1, 7.7))*0.4;
+  float bill = cn3(w/781.25)*0.6 + cn3((w - vec3(0.0, uCloudBoil, 0.0))/260.41667 + vec3(11.3, 4.1, 7.7))*0.4;
   d += (bill - 0.55)*0.42*(0.55 + hf);                                       // billows, deeper towards the tops
   if (detail > 0) {
     vec3 wv = w + uCloudDet;
-    float e = (cn3(wv/95.0 + vec3(3.7, 0.0, 1.9)) - 0.5)*0.17 + (cn3(wv/36.0 + vec3(17.1, 9.3, 5.5)) - 0.5)*0.06;
+    float e = (cn3(wv/94.69697 + vec3(3.7, 0.0, 1.9)) - 0.5)*0.17 + (cn3(wv/35.91954 + vec3(17.1, 9.3, 5.5)) - 0.5)*0.06;
     d += e*(1.0 - smoothstep(0.0, 0.3, d));                                   // wispy edges, solid cores
   }
   return clamp(d*4.5, 0.0, 1.0);
@@ -146,7 +146,7 @@ float rainColumn(vec3 p){
   float U = length(uWindV.xz);
   vec2 wd = U > 0.1 ? uWindV.xz/U : vec2(0.0);
   float drift = min(max(uCloudBase - p.y, 0.0)*U/(uSnow > 0.0 ? 1.5 : 9.0), 3000.0);
-  float cov = textureLod(uCloudCov, (p.xz - wd*drift + uWindOff)/(5200.0*16.0), 0.0).r*0.9375;
+  float cov = textureLod(uCloudCov, (p.xz - wd*drift + uWindOff)/(100000.0), 0.0).r*0.9375;
   float c = cov - (1.05 - uCloudCover*0.75);
   return smoothstep(-0.25, 0.15, c)*(0.35 + 0.65*smoothstep(0.42, 0.62, cov))*(uStorm > 0.5 ? 1.0 : 0.85);
 }

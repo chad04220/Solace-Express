@@ -4,7 +4,17 @@
 #include "road_network.h"
 #include <string>
 
-static const float WORLD_HALF = 40000.0f;  // map spans [-40km, 40km] on x and z
+static const float WORLD_HALF = 40000.0f;  // the islands span [-40km, 40km] on x and z
+// ...in 10 km of open sea all round, and there the map wraps: [-50 km, 50 km) repeats every 100 km on both axes, so
+// flying on in one direction comes round to where it began. What the world holds is looked up at the wrapped place
+// (wrapCoord); the aircraft is brought back inside when it crosses the seam (Game::wrapAcrossSeam)
+static const float WRAP_HALF = 50000.0f;
+static const float WRAP_SPAN = 2.0f * WRAP_HALF;
+static const float SEA_DEPTH = 80.0f;      // the open sea's depth round the islands' square (the band fades to it)
+inline float wrapCoord(float v) { return v - WRAP_SPAN * floorf((v + WRAP_HALF) / WRAP_SPAN); }   // into [-50, 50) km
+// the copy of coordinate v nearest ref: the short way round, across the seam where that is shorter (v itself, exactly,
+// where it is not; within one period of ref)
+inline float nearCopy(float v, float ref) { const float d = v - ref; return d >= WRAP_HALF ? v - WRAP_SPAN : d < -WRAP_HALF ? v + WRAP_SPAN : v; }
 static const int HM_N = 2048;              // base heightmap resolution (39 m texels; smoothed, see World::build)
 static const float HM_TEXEL = 2.0f * WORLD_HALF / HM_N;
 static const float DETAIL_SCALE = 2200.0f; // wavelength of the procedural detail layer

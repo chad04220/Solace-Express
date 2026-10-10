@@ -5,7 +5,7 @@ uniform sampler2D uTSh; uniform int uTShOn;   // baked terrain sun shadow (see k
 float terrainShadow(vec3 ro, vec3 rd, float camT){
   if ((uDbg & 2) != 0) return 1.0;
   if (uTShOn == 1) {   // one lookup instead of a march: the height a point here needs to see the sun, and how far away
-    vec2 hd = texture(uTSh, ro.xz/(2.0*WH) + 0.5).xy;   // the terrain that blocks it is (that sets the penumbra)
+    vec2 hd = texture(uTSh, wrapW(ro.xz)/(2.0*WH) + 0.5).xy;   // the terrain that blocks it is (that sets the penumbra)
     return clamp(12.0*length(rd.xz)*(ro.y - hd.x)/max(hd.y, 1.0), 0.0, 1.0);
   }
   float res = 1.0, t = 2.0;

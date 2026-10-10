@@ -187,6 +187,8 @@ public:
   vec3 windAvg;               // the wind smoothed over a couple of seconds (the HUD's readout: the eddies don't flicker it)
   wxfield::Local wxl;         // the slow parts of the wind here (weather.h: the terrain's lift and sink, thermals, the cloud, the rain), every step
   vec3 wxAir;                 // the air mass's drift since the flight began: the eddies and gusts ride it
+  vec3 seamShift;             // where the map's seam brought it back in (world.h WRAP_HALF): what step() moved it by, summed
+                              // until the game takes it (Game::followSeam: what it places in the world comes with it)
   vec3 ctlSurf;               // the control surfaces as the physics deflects them (-1..1: x elevator, y ailerons, z rudder): the
                               // stick and trim, the factory rigging and any augmenter - what the renderer draws
   vec3 gustRot;               // the eddies' rotation across the airframe, as body rates (rad/s): x roll right, y pitch up, z yaw right

@@ -617,7 +617,8 @@ void Scenery::trim(vec3 cam, float keepDetail, float keepAll, int frame) {
       auto& p = chunks[(size_t)cz * NC + cx];
       if (!p) continue;
       float x = chunkX0(cx) + CH * 0.5f, z = chunkX0(cz) + CH * 0.5f;
-      float d = sqrtf((x - cam.x) * (x - cam.x) + (z - cam.z) * (z - cam.z));
+      const float ddx = wrapCoord(x - cam.x), ddz = wrapCoord(z - cam.z);   // (the short way: a chunk the far side of the map's seam is drawn there too)
+      float d = sqrtf(ddx * ddx + ddz * ddz);
       if (d > keepAll && frame - p->lastUse > 120) { p.reset(); continue; }
       if (d > keepDetail && p->level >= 2 && frame - p->lastUse > 120) {   // (not a chunk prefetched for where the camera goes next)
         // drop the level-2 kinds (trees, bushes, boulders)

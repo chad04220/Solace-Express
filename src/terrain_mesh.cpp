@@ -12,6 +12,7 @@
 namespace {
 const float kSplit = 2.6f;          // split while the camera is nearer than this many chunk sizes
 const int kMinLevel = -7;           // finest chunk: 0.305 m cells, 9.8 m across
+const float kTerrainFar = 90000.f;  // the projection's far plane (Renderer::viewProj): a copy of the islands beyond it is not visited
 const int kChunkVerts = TP_CHUNK * TP_CHUNK * 6;
 }
 
@@ -99,11 +100,12 @@ void Renderer::selectTerrainChunks(const FrameParams& fp) {
     return true;
   };
   terrInst.clear();
+  float copyX = 0.f, copyZ = 0.f;   // the copy of the islands being visited (its offset: the map repeats, world.h WRAP_HALF)
   // L: the chunk's level (cells of T * 2^L); x0, z0: its origin (m)
   std::function<void(int, float, float)> visit = [&](int L, float x0, float z0) {
     float cs = T * ldexpf(1.f, L), S = cs * TP_CHUNK;
     // height bound: the envelope's cell maximum at the chunk's size (L >= 0), or of the texel it lies in (L < 0)
-    int ox = (int)floorf((x0 + WORLD_HALF) / T + 0.01f), oz = (int)floorf((z0 + WORLD_HALF) / T + 0.01f);
+    int ox = (int)floorf((x0 - copyX + WORLD_HALF) / T + 0.01f), oz = (int)floorf((z0 - copyZ + WORLD_HALF) / T + 0.01f);
     int Lm = std::max(L, 0) + 5; float top;
     if (Lm >= TP_LEVELS) top = rootTop;
     else { int n = N >> Lm; int i = std::clamp(ox >> Lm, 0, n - 1), j = std::clamp(oz >> Lm, 0, n - 1); top = g_world.tpM[Lm][(size_t)j * n + i]; }
@@ -116,7 +118,14 @@ void Renderer::selectTerrainChunks(const FrameParams& fp) {
       for (int k = 0; k < 4; k++) visit(L - 1, x0 + (k & 1) * h, z0 + (k >> 1) * h);
     } else terrInst.insert(terrInst.end(), {x0, z0, cs, 0.f});
   };
-  visit(TP_LEVELS - 1, -WORLD_HALF, -WORLD_HALF);
+  // the islands, and their copies across the map's seam as far as the view reaches (the far side's islands on the
+  // horizon: the vertex shader's heights wrap, so a copy's chunks are the islands' own ground)
+  for (int kz = -1; kz <= 1; kz++) for (int kx = -1; kx <= 1; kx++) {
+    copyX = kx * WRAP_SPAN; copyZ = kz * WRAP_SPAN;
+    const float ex = std::max(std::max(-WORLD_HALF + copyX - cam.x, cam.x - (WORLD_HALF + copyX)), 0.f), ez = std::max(std::max(-WORLD_HALF + copyZ - cam.z, cam.z - (WORLD_HALF + copyZ)), 0.f);
+    if ((kx != 0 || kz != 0) && ex * ex + ez * ez > kTerrainFar * kTerrainFar) continue;
+    visit(TP_LEVELS - 1, -WORLD_HALF + copyX, -WORLD_HALF + copyZ);
+  }
   terrChunks = (int)terrInst.size() / 4;
 }
 

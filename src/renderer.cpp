@@ -502,11 +502,12 @@ void Renderer::bindEnvironmentMaterials(GLuint p, int baseColourUnit, int baseNo
 }
 
 
+// (the whole of the map's period, the open sea round the islands with it: it repeats as the map does, world.h WRAP_HALF)
 void Renderer::genMinimap() {
-  const int N = 1024;
+  const int N = 1280;
   std::vector<uint8_t> img((size_t)N * N * 4);
   parallelFor(N, [&](int j) { for (int i = 0; i < N; i++) {
-    float x = -WORLD_HALF + (i + 0.5f) * 2 * WORLD_HALF / N, z = -WORLD_HALF + (j + 0.5f) * 2 * WORLD_HALF / N;
+    float x = -WRAP_HALF + (i + 0.5f) * WRAP_SPAN / N, z = -WRAP_HALF + (j + 0.5f) * WRAP_SPAN / N;
     float h = g_world.groundHeight(x, z, 5);
     float hx = g_world.groundHeight(x + 80, z, 5) - h;
     float b[4]; g_world.sampleBase(x, z, b);
@@ -533,8 +534,8 @@ void Renderer::genMinimap() {
   glGenerateMipmap(GL_TEXTURE_2D);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 }
 
 // The UI program, its vertex array and the font: enough to draw the intro screen while everything else is built

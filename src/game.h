@@ -236,6 +236,7 @@ private:
   std::vector<WakePt> cloudWake; bool wakeGap = true; float wakeOdo = 0;
   WakePt wakeHere(vec3 c, bool brk, float odo) const;   // a point of the wake at c with the pair as it is now
   void updateCloudWake(float dt);
+  void followSeam(vec3 d);   // the aircraft came back in over the map's seam, moved by d: what is placed round it comes too
   float wispAccum = 0;           // cloud wisps streaming past in and near cloud (spawned per metre flown)
   float rainNow = 0, mistNow = 0;   // the rain at the aircraft (0..1) and the cloud on its glass, smoothed
   int diversion = -1;
@@ -382,7 +383,6 @@ private:
   std::vector<Annunciator> hudAnnunciators() const;
   std::map<std::string, std::string> failVoiced;   // slot -> the state key last spoken this flight
   void updateComms(float dt);
-  float edgeWarnT = 0;   // chart-edge warning repeat
   float voiceDuck = 0;   // 0..1: music and engine lowered while someone is talking
   std::string settingsWritten;   // the settings file's last written contents (written again only when changed)
   int atcStation(int airport) const { return (airport * 7 + 2) % AtcVoice::kVoices; }   // each airport keeps one voice

@@ -651,6 +651,7 @@ int World::fillInlandPits() {
 }
 
 void World::sampleBase(float x, float z, float out[4]) const {
+  x = wrapCoord(x); z = wrapCoord(z);
   float fx = (x + WORLD_HALF) / HM_TEXEL - 0.5f, fz = (z + WORLD_HALF) / HM_TEXEL - 0.5f;
   float flx = floorf(fx), flz = floorf(fz);
   int i0 = (int)flx, j0 = (int)flz;
@@ -660,15 +661,20 @@ void World::sampleBase(float x, float z, float out[4]) const {
     float a = at(i0, j0, c), b = at(i0 + 1, j0, c), cc = at(i0, j0 + 1, c), d = at(i0 + 1, j0 + 1, c);
     out[c] = (a * (1 - tx) + b * tx) * (1 - tz) + (cc * (1 - tx) + d * tx) * tz;
   }
+  // past the islands' square: the open sea, settling to one depth within 3 km (common.glsl baseAt, the same)
+  const float o = std::max(fabsf(x), fabsf(z)) - WORLD_HALF;
+  if (o > 0.f) { const float k = smoothstepf(0.f, 3000.f, o); out[0] += (-SEA_DEPTH - out[0]) * k; out[1] *= 1.f - k; }
 }
 
 float World::naturalHeight(float x, float z, int octaves) const {
+  x = wrapCoord(x); z = wrapCoord(z);
   float b[4]; sampleBase(x, z, b);
   return b[1] < 0.01f ? b[0] : b[0] + b[1] * terrainFbm(x / DETAIL_SCALE, z / DETAIL_SCALE, octaves);
 }
 
 float World::height(float x, float z, int octaves) const {
   // bare ground: trees, rocks and buildings are separate entities (entities.h); the roads are built into it
+  x = wrapCoord(x); z = wrapCoord(z);
   return roadGrade(roadGrid, x, z, naturalHeight(x, z, octaves));
 }
 

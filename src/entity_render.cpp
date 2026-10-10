@@ -70,8 +70,16 @@ void Renderer::drawEntities(const FrameParams& fp) {
   const EntRanges shadowRanges = entBaseRangesFor(quality);
   const float farAll = std::max(R.big, R.build) + 300.f, farDetail = std::max(std::max(R.tree, R.rock), R.bush) + 300.f;
   vec3 cam = fp.camPos;
-  const int ccx = Scenery::chunkOf(cam.x), ccz = Scenery::chunkOf(cam.z);
   const int rad = (int)ceilf(farAll / Scenery::CH) + 1;
+  // the islands and, near the map's seam, their copies across it (the map repeats: world.h WRAP_HALF): each one's
+  // chunks are the islands' own, looked up from where the camera is relative to that copy and drawn moved by its offset
+  struct Copy { float ox, oz; };
+  std::vector<Copy> copies;
+  for (int kz = -1; kz <= 1; kz++) for (int kx = -1; kx <= 1; kx++) {
+    const float ox = kx * WRAP_SPAN, oz = kz * WRAP_SPAN;
+    const float ex = std::max(std::max(-WORLD_HALF + ox - cam.x, cam.x - (WORLD_HALF + ox)), 0.f), ez = std::max(std::max(-WORLD_HALF + oz - cam.z, cam.z - (WORLD_HALF + oz)), 0.f);
+    if (ex * ex + ez * ez < farAll * farAll) copies.push_back({ox, oz});
+  }
   // how far beyond a shadow cascade a chunk's casters can still throw shadow into it: its tallest caster times the
   // shadow length per metre of height at this sun, plus how far footprints spill past the chunk. (A fixed pad
   // dropped tall buildings whose chunk began just outside it before the per-caster test could accept them.)
@@ -82,19 +90,23 @@ void Renderer::drawEntities(const FrameParams& fp) {
   struct Need { float d; int cx, cz, level; };
   if (!feedPass) {
     std::vector<Need> need;
-    for (int dz = -rad; dz <= rad; dz++)
-      for (int dx = -rad; dx <= rad; dx++) {
-        int cx = ccx + dx, cz = ccz + dz;
-        if (cx < 0 || cz < 0 || cx >= Scenery::NC || cz >= Scenery::NC) continue;
-        float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
-        float ex = std::max(std::max(x0 - cam.x, cam.x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - cam.z, cam.z - z0 - Scenery::CH), 0.f);
-        float d = sqrtf(ex * ex + ez * ez);
-        int want = d < farDetail ? 2 : d < farAll ? 1 : 0;
-        if (!want) continue;
-        Scenery::Chunk* c = g_scenery.get(cx, cz);
-        if (c) c->lastUse = entFrame;
-        if (!c || c->level < want) need.push_back({d, cx, cz, want});
-      }
+    for (const Copy& cp : copies) {
+      const vec3 camL = cam - vec3(cp.ox, 0.f, cp.oz);   // (the camera as that copy of the islands sees it)
+      const int lcx = Scenery::chunkOf(camL.x), lcz = Scenery::chunkOf(camL.z);
+      for (int dz = -rad; dz <= rad; dz++)
+        for (int dx = -rad; dx <= rad; dx++) {
+          int cx = lcx + dx, cz = lcz + dz;
+          if (cx < 0 || cz < 0 || cx >= Scenery::NC || cz >= Scenery::NC) continue;
+          float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
+          float ex = std::max(std::max(x0 - camL.x, camL.x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - camL.z, camL.z - z0 - Scenery::CH), 0.f);
+          float d = sqrtf(ex * ex + ez * ez);
+          int want = d < farDetail ? 2 : d < farAll ? 1 : 0;
+          if (!want) continue;
+          Scenery::Chunk* c = g_scenery.get(cx, cz);
+          if (c) c->lastUse = entFrame;
+          if (!c || c->level < want) need.push_back({d, cx, cz, want});
+        }
+    }
     // a new chunk inside a shadow cascade's area makes that cascade re-render
     auto added = [&](int cx, int cz) {
       entGenCount++;
@@ -103,9 +115,11 @@ void Renderer::drawEntities(const FrameParams& fp) {
         // tall casters just outside. (A wider test re-rendered the far 4096^2 map nearly every frame in flight, since
         // tree chunks keep streaming in a few km ahead.)
         float r = (c == 0 ? R.sh0 : R.sh1) * kShFade1 + std::max(300.f, chunkShPad(g_scenery.get(cx, cz)));
-        float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
-        float ex = std::max(std::max(x0 - shCenter[c].x, shCenter[c].x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - shCenter[c].z, shCenter[c].z - z0 - Scenery::CH), 0.f);
-        if (ex < r && ez < r) shGen[c] = -1;
+        for (const Copy& cp : copies) {
+          float x0 = Scenery::chunkX0(cx) + cp.ox, z0 = Scenery::chunkX0(cz) + cp.oz;
+          float ex = std::max(std::max(x0 - shCenter[c].x, shCenter[c].x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - shCenter[c].z, shCenter[c].z - z0 - Scenery::CH), 0.f);
+          if (ex < r && ez < r) shGen[c] = -1;
+        }
       }
     };
     // chunks the worker threads finished since last frame
@@ -237,33 +251,39 @@ void Renderer::drawEntities(const FrameParams& fp) {
     std::stable_sort(ring.begin(), ring.end(), [](const std::pair<short, short>& a, const std::pair<short, short>& b) { return a.first * a.first + a.second * a.second < b.first * b.first + b.second * b.second; });
     ringRad = rad;
   }
+  for (const Copy& cp : copies) {
+    const float ox = cp.ox, oz = cp.oz;
+    const vec3 camL = cam - vec3(ox, 0.f, oz);   // (the camera as this copy of the islands sees it: what is drawn moves by the offset)
+    const int lcx = Scenery::chunkOf(camL.x), lcz = Scenery::chunkOf(camL.z);
+    const vec3 shC[2] = {newCenter[0] - vec3(ox, 0.f, oz), newCenter[1] - vec3(ox, 0.f, oz)};
+    auto moved = [&](const Ent& e) { Ent w = e; w.x += ox; w.z += oz; return w; };
   for (const auto& off : ring) {
       const int dx = off.first, dz = off.second;
       if (dx < -rad || dx > rad || dz < -rad || dz > rad) continue;
-      Scenery::Chunk* ch = g_scenery.get(ccx + dx, ccz + dz);
+      Scenery::Chunk* ch = g_scenery.get(lcx + dx, lcz + dz);
       if (!ch || ch->ents.empty()) continue;
-      float x0 = Scenery::chunkX0(ccx + dx), z0 = Scenery::chunkX0(ccz + dz), x1 = x0 + Scenery::CH, z1 = z0 + Scenery::CH;
-      float ex = std::max(std::max(x0 - cam.x, cam.x - x1), 0.f), ez = std::max(std::max(z0 - cam.z, cam.z - z1), 0.f);
-      float ey = std::max(std::max(ch->ymin - cam.y, cam.y - ch->ymax), 0.f);
+      float x0 = Scenery::chunkX0(lcx + dx), z0 = Scenery::chunkX0(lcz + dz), x1 = x0 + Scenery::CH, z1 = z0 + Scenery::CH;
+      float ex = std::max(std::max(x0 - camL.x, camL.x - x1), 0.f), ez = std::max(std::max(z0 - camL.z, camL.z - z1), 0.f);
+      float ey = std::max(std::max(ch->ymin - camL.y, camL.y - ch->ymax), 0.f);
       float dmin = sqrtf(ex * ex + ez * ez + ey * ey);
-      float fx = std::max(fabsf(x0 - cam.x), fabsf(x1 - cam.x)), fz = std::max(fabsf(z0 - cam.z), fabsf(z1 - cam.z));
-      float fy = std::max(fabsf(ch->ymin - cam.y), fabsf(ch->ymax - cam.y));
+      float fx = std::max(fabsf(x0 - camL.x), fabsf(x1 - camL.x)), fz = std::max(fabsf(z0 - camL.z), fabsf(z1 - camL.z));
+      float fy = std::max(fabsf(ch->ymin - camL.y), fabsf(ch->ymax - camL.y));
       float dmax = sqrtf(fx * fx + fz * fz + fy * fy);
-      bool affected = anyCrater && g_scenery.chunkAffected(ccx + dx, ccz + dz);
+      bool affected = anyCrater && g_scenery.chunkAffected(lcx + dx, lcz + dz);
       // A nominal 12 m chunk pad can discard a wide terminal, an animated
       // crown, or buried foundations before their correct instance bounds run.
       // Rebuild this authored all-LOD union only when chunk content changes.
-      auto& chunkBounds=entityChunkBounds[size_t(ccz+dz)*Scenery::NC+ccx+dx];
+      auto& chunkBounds=entityChunkBounds[size_t(lcz+dz)*Scenery::NC+lcx+dx];
       const auto& actual=chunkBounds.get(*ch,allEntityBounds);
       bool inView=dmin<farAll && (fp.pano>0.f || (chunkBounds.valid &&
-        boxVisible(actual.lo.x,actual.lo.y,actual.lo.z,actual.hi.x,actual.hi.y,actual.hi.z)));
+        boxVisible(actual.lo.x+ox,actual.lo.y,actual.lo.z+oz,actual.hi.x+ox,actual.hi.y,actual.hi.z+oz)));
       bool inSh[2] = {false, false};
       for (int c = 0; c < 2; c++)
         if (shDirty[c]) {
           // the cascade box, grown by how far this chunk's tallest casters reach (tall things outside it still cast
           // into it; the per-caster test below then keeps only those that do)
           float r = cR[c] + std::max(210.f, chunkShPad(ch));
-          float hx = std::max(std::max(x0 - newCenter[c].x, newCenter[c].x - x1), 0.f), hz = std::max(std::max(z0 - newCenter[c].z, newCenter[c].z - z1), 0.f);
+          float hx = std::max(std::max(x0 - shC[c].x, shC[c].x - x1), 0.f), hz = std::max(std::max(z0 - shC[c].z, shC[c].z - z1), 0.f);
           inSh[c] = hx < r && hz < r;
         }
       if (!inView && !inSh[0] && !inSh[1]) continue;
@@ -290,12 +310,14 @@ void Renderer::drawEntities(const FrameParams& fp) {
             float kp = entKeepDrawn(k, std::max(dmin, 1.f));
             eb = (uint32_t)(std::lower_bound(ch->ents.begin() + b, ch->ents.begin() + e, kp, [](const Ent& x, float v) { return entThinKey(x) < v; }) - ch->ents.begin());
           }
-          auto& bk = bucket[0][k][lodN]; bk.insert(bk.end(), ch->ents.begin() + b, ch->ents.begin() + eb);
+          auto& bk = bucket[0][k][lodN]; const size_t n0 = bk.size(); bk.insert(bk.end(), ch->ents.begin() + b, ch->ents.begin() + eb);
+          if (ox != 0.f || oz != 0.f) for (size_t j = n0; j < bk.size(); j++) { bk[j].x += ox; bk[j].z += oz; }
         }
         if (bulk && !inSh[0] && !inSh[1]) continue;
         for (uint32_t i = b; i < e; i++) {
-          const Ent& en = ch->ents[i];
-          if (affected && g_scenery.destroyed(en)) continue;
+          const Ent& e0 = ch->ents[i];
+          if (affected && g_scenery.destroyed(e0)) continue;
+          const Ent en = moved(e0);   // (where it is drawn)
           float ddx = en.x - cam.x, ddy = en.y - cam.y, ddz = en.z - cam.z;
           float d = sqrtf(ddx * ddx + ddy * ddy + ddz * ddz);
           int lod = entDetailAt(d, close, l0, l1);
@@ -317,7 +339,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
           bool shKeep = !thin || entThinKey(en) < entKeep(k, d);   // shadows only from what is drawn (from halfway through its fade)
           for (int c = 0; c < 2; c++)
             if (inSh[c] && shKeep && k != EK_RWYLIGHT && k != EK_PAPI) {
-              float sx = en.x - newCenter[c].x, sz = en.z - newCenter[c].z;
+              float sx = e0.x - shC[c].x, sz = e0.z - shC[c].z;
               float h = kEntInfo[k].h * en.sy, er = std::max(kEntInfo[k].hx * en.sx, kEntInfo[k].hz * en.sz) + h * shReach;
               float cr = cR[c] * kShFade1 + er; if (sx * sx + sz * sz > cr * cr) continue;
               // Keep shadow detail at its original threshold when extending the view LODs.
@@ -328,6 +350,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
         }
       }
     }
+  }
 
   double tGather = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count();
   // ------------------------------------------------ upload all buckets at once
