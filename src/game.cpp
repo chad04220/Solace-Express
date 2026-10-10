@@ -240,8 +240,9 @@ void Game::loadSettings() {
 
 // Written only when something changed (the settings page calls this every frame), through a temp file so an
 // interrupted write never leaves a half-written settings file.
-void Game::saveSettings() {
-  if (diskless) return;   // (a tool session: the player's settings stay as they were)
+// (false: the settings file couldn't be written)
+bool Game::saveSettings() {
+  if (diskless) return true;   // (a tool session: the player's settings stay as they were)
   std::string t = fmt("quality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
   t += fmt("renderRes %d\nfpsTarget %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
@@ -249,15 +250,16 @@ void Game::saveSettings() {
   for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   for (const std::string& id : resDone) t += "rescard." + id + " 1\n";
   for (auto& tb : trialBest) for (size_t i = 0; i < tb.second.size(); i++) t += fmt("trial.%s.%d %f\n", tb.first.c_str(), (int)i, tb.second[i]);
-  if (t == settingsWritten) return;
+  if (t == settingsWritten) return true;
   std::string path = joinPath(saveDir, "settings.cfg"), tmp = path + ".tmp";
   FILE* f = fopen(tmp.c_str(), "w");
-  if (!f) return;
+  if (!f) return false;
   bool ok = fwrite(t.data(), 1, t.size(), f) == t.size();
   ok = fclose(f) == 0 && ok;
   if (ok) ok = replaceFile(tmp, path);   // (in one step: a crash between a remove and a rename left no settings at all)
   if (!ok) remove(tmp.c_str());
   if (ok) settingsWritten = t;
+  return ok;
 }
 
 // Built-in presets. Bump kStationsVersion when adding presets: older station files get the new ones appended.
@@ -574,7 +576,7 @@ void Game::init(bool buildWorld, const std::function<void(float, const std::stri
   }
   report(2 + kNumAircraft, "Career and recovery checks complete");
   radio.init();
-  radio.setVolume(set.radioVol);
+  radio.setVolume(radioLevel()); radioSentVol = radioLevel();
   report(3 + kNumAircraft, "Radio initialized");
   atc.load(assetDir + "/voice");   // tower voices (absent: the towers stay silent)
   camQ = quat();
@@ -676,8 +678,11 @@ void Game::updateResearchCard(float dt) {
   if (!inst || resHold < st.hold) return;
   resStep++; resHold = 0;
   if (resStep >= C.n) {
-    resCardDone = true; resDone.insert(C.id); saveSettings();
-    toast(fmt("TEST CARD %s COMPLETE - %s SIGNED OFF", C.id, C.title), vec3(0.5f, 1.f, 0.6f)); g_audio.trigger(SFX_SUCCESS);
+    resCardDone = true; resDone.insert(C.id);
+    // (signed off only when it is on record: a settings file that can't be written says so - the review of v3.44.0, CAR-10)
+    if (saveSettings()) toast(fmt("TEST CARD %s COMPLETE - %s SIGNED OFF", C.id, C.title), vec3(0.5f, 1.f, 0.6f));
+    else toast(fmt("TEST CARD %s COMPLETE - SIGNED OFF THIS SESSION ONLY: THE RECORD COULD NOT BE SAVED", C.id), vec3(1.f, 0.6f, 0.4f));
+    g_audio.trigger(SFX_SUCCESS);
   } else { toast(fmt("STEP %d of %d: %s", resStep + 1, C.n, C.steps[resStep].label), vec3(0.9f, 0.9f, 0.6f)); g_audio.trigger(SFX_CHIME, 0.8f); }
 }
 // The clouds move with the wind (weather.h): the field drifts at twice the surface wind, its fine detail a little
@@ -1005,7 +1010,9 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   screen = headless ? SCR_FLIGHT : SCR_LOADING;
   loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadStableFrames = 0; loadBakeSeen = g_ren.bakeCount; loadObservedFrame = -1; loadMap = false; dbgCam = dbgFollow = false; benchPin = false;
   atc.cancel(); atcF = AtcFlight(); hintsVoiced.clear(); commsPending.clear(); lessonVoiceWarned = false;   // (the last flight's calls go before this one's announcements)
-  atc.valid = [this](const AtcVoice::Tx& t) { return t.key < 0 || t.key == atcKey(); };
+  // (a hazard call is said only while the hazard holds: a "PULL UP" queued behind the tower played at 1,958 m, climbing -
+  // the review of v3.44.0, AUD-3)
+  atc.valid = [this](const AtcVoice::Tx& t) { return t.key < 0 || (t.key >= kWarnKey ? t.key - kWarnKey < 4 && warnWas[t.key - kWarnKey] : t.key == atcKey()); };
   failVoiced.clear();
   toast(fmt("%s - %s", a.code, a.name), vec3(0.7f, 0.9f, 1.0f));
   toast(fmt("Runway %02d, %s", a.rwyNumber(reverse), wx.describe().c_str()), vec3(0.8f, 0.8f, 0.8f));
@@ -1347,6 +1354,7 @@ void Game::updateFlight(float dt) {
   }
   float simDt = dt * timeAccel;
   vec3 prevPos = plane.pos;
+  refreshGroundPits();   // (what the wheels, the weapons and the wreckage meet this frame)
   moveClouds(simDt);
   if (!crashed) {
     updateWeather(simDt);
@@ -1919,7 +1927,11 @@ void Game::launchResearch() {
   if (resWx == 0) { c.wx.cloudCover = 0.15f; c.wx.visibility = 60000; }
   else if (resWx == 1) { c.wx.cloudCover = 0.6f; c.wx.cloudBase = 1300; }
   else { c.wx.cloudCover = 0.95f; c.wx.cloudBase = 800; c.wx.precip = 1; c.wx.storm = true; c.wx.windSpeed = 9; c.wx.gust = 5; c.wx.turbulence = 0.5f; c.wx.visibility = 9000; }
+  // (its own fuel, never the job card's choice: that stays for the career's next flight - the review of v3.44.0, CAR-7)
+  const float careerFuelChoice = launchFuelKg;
+  launchFuelKg = -1;
   startFlight(c, resCraft, Career::SRC_OWNED);
+  launchFuelKg = careerFuelChoice;
   researchFlight = true;
   toasts.clear();
   { std::string nm = rs.name; for (char& ch : nm) ch = (char)toupper((unsigned char)ch); toast(nm + (resCard >= 0 ? std::string(" // TEST CARD ") + kResCards[resCard].title : std::string(" // RESEARCH FLIGHT")), wr ? vec3(0.75f, 0.45f, 1.f) : rs.special ? vec3(0.4f, 0.9f, 1) : vec3(0.35f, 0.95f, 0.8f)); }
@@ -2134,24 +2146,23 @@ void Game::updateUfo(float dt) {
 }
 
 // ------------------------------------------------------------------ crash wreckage
-// a crater's floor and rim at x, z (common.glsl craterH, exactly): a bowl with a raised lip, its edge ragged in a few
-// lobes that differ from crater to crater
-static bool craterShape(float x, float z, float cx, float cz, float R, float D, float& h) {
-  const float dx = x - cx, dz = z - cz, r = sqrtf(dx * dx + dz * dz);
-  if (r > 1.9f * R) return false;
-  const float a = atan2f(dz, dx), s = (cx * 0.0137f + cz * 0.0191f - floorf(cx * 0.0137f + cz * 0.0191f)) * 6.2832f;
-  const float d = r / (R * (1.f + 0.09f * sinf(3.f * a + s) + 0.05f * sinf(5.f * a + 2.3f * s)));
-  if (d > 1.8f) return false;
-  h += -D * std::max(1.f - d * d, 0.f) + 0.22f * D * expf(-(d - 1.f) * (d - 1.f) * 14.f);
-  return true;
-}
-float Game::wreckGround(float x, float z) const {
-  float g = g_world.height(x, z, 6);
-  if (g <= 0.3f || (craterR <= 0 && pits.empty())) return g;
-  float h = 0; bool in = false;
-  if (craterR > 0) in = craterShape(x, z, craterX, craterZ, craterR, craterD, h) || in;
-  for (const Pit& p : pits) in = craterShape(x, z, p.x, p.z, p.R, p.D, h) || in;
-  return in ? g_world.groundHeight(x, z, 6) + h : g;
+// the ground under the wreckage: the pits dug this flight in it (g_groundPits)
+float Game::wreckGround(float x, float z) const { return pitGround(x, z, g_world.height(x, z, 6)); }
+// this flight's pits, in the order the renderer draws them (frame(): the first 24): the crash crater, the pieces' pits,
+// the plasma craters and the laser scorches, newest first
+void Game::refreshGroundPits() {
+  g_groundPits.clear(); g_scenery.craters.clear();
+  if (screen != SCR_FLIGHT && screen != SCR_DEBRIEF) return;
+  // craters flatten the scenery that stood in them (a plasma blast clears a far wider circle than its pit; laser scorch
+  // pits don't: what a bolt destroys is tracked one object at a time)
+  if (craterR > 0) g_scenery.craters.push_back(vec3(craterX, craterZ, craterR * 1.5f));
+  for (const Pit& p : pits) if (p.R > 1.2f) g_scenery.craters.push_back(vec3(p.x, p.z, p.R * 1.3f));
+  for (const vec3& f : wraith.flattened) g_scenery.craters.push_back(f);
+  if (craterR > 0) g_groundPits.push_back({craterX, craterZ, craterR, craterD});
+  for (const Pit& p : pits) g_groundPits.push_back({p.x, p.z, p.R, p.D});
+  for (const auto& c : wraith.craters) g_groundPits.push_back({c.x, c.z, c.R, c.D});
+  for (int i = (int)wraith.scorch.size() - 1; i >= 0; i--) g_groundPits.push_back({wraith.scorch[i].x, wraith.scorch[i].z, wraith.scorch[i].R, wraith.scorch[i].D});
+  if (g_groundPits.size() > 24) g_groundPits.resize(24);   // (the renderer's 24)
 }
 
 // Splits the airframe into nose, centre section, both wings and tail (each the aircraft's field clipped to a
@@ -2708,9 +2719,9 @@ FrameParams Game::buildFrame() {
       fp.wreck.deb[i][0] = d.p.x; fp.wreck.deb[i][1] = d.p.y; fp.wreck.deb[i][2] = d.p.z; fp.wreck.deb[i][3] = d.charred ? -d.size : d.size;
       fp.wreck.debQ[i][0] = d.q.w; fp.wreck.debQ[i][1] = d.q.x; fp.wreck.debQ[i][2] = d.q.y; fp.wreck.debQ[i][3] = d.q.z;
     }
+    refreshGroundPits();   // (the pits drawn are the pits the aircraft, the weapons and the wreckage meet)
     fp.wreck.craterN = 0;
-    if (craterR > 0) { float* c = fp.wreck.crater[fp.wreck.craterN++]; c[0] = craterX; c[1] = craterZ; c[2] = craterR; c[3] = craterD; }
-    for (const Pit& p : pits) { if (fp.wreck.craterN >= 24) break; float* c = fp.wreck.crater[fp.wreck.craterN++]; c[0] = p.x; c[1] = p.z; c[2] = p.R; c[3] = p.D; }
+    for (const GroundPit& p : g_groundPits) { float* c = fp.wreck.crater[fp.wreck.craterN++]; c[0] = p.x; c[1] = p.z; c[2] = p.R; c[3] = p.D; }
     vec3 fwd = camMode == 1 ? plane.q.rotate(quat::axisAngle(vec3(0, 1, 0), lookYaw).rotate(quat::axisAngle(vec3(1, 0, 0), lookPitch).rotate(vec3(0, 0, -1))))
                             : normalize(plane.pos + vec3(0, plane.spec->fusRad * 0.3f, 0) - camPos);
     vec3 upRef = camMode == 1 ? plane.up() : vec3(0, 1, 0);
@@ -2739,12 +2750,7 @@ FrameParams Game::buildFrame() {
       float li = clampf(fp.night + lowVis * 0.6f + 0.12f, 0, 1);
       fp.rwyLights = li > 0.15f ? li : 0.f;
     }
-    // craters flatten the scenery that stood in them (a plasma blast clears a far wider circle than its pit)
-    // (laser scorch pits don't: what a bolt destroys is tracked one object at a time)
-    g_scenery.craters.clear();
-    if (craterR > 0) g_scenery.craters.push_back(vec3(craterX, craterZ, craterR * 1.5f));
-    for (const Pit& p : pits) if (p.R > 1.2f) g_scenery.craters.push_back(vec3(p.x, p.z, p.R * 1.3f));
-    for (const auto& c : wraith.craters) g_scenery.craters.push_back(vec3(c.x, c.z, c.R * 4.f));
+    // (the scenery the craters flattened: refreshGroundPits)
     // the windscreen (cockpit view): the rain here and the cloud's mist on it, streaming away on screen from where
     // the air meets the glass - a little below where the nose points, so over the roof; out of a side window, aft
     fp.rainLens = 0; fp.glassMist = 0;
@@ -3057,6 +3063,24 @@ void Game::researchPreviewCamera(FrameParams& fp) {
   fp.vignette = 0.75f;
 }
 
+// The blended sprites far to near, all of them together: the volcano's plume came after the sorted smoke and a distant
+// plume drew over nearer smoke and trails (the review of v3.44.0, RND-5). Each quad is six vertices, placed by its middle
+void sortAlphaQuads(std::vector<SpriteVert>& v, vec3 cam) {
+  const size_t n = v.size() / 6;
+  if (n < 2) return;
+  std::vector<std::pair<float, uint32_t>> order(n);
+  for (size_t i = 0; i < n; i++) {
+    const SpriteVert* q = &v[i * 6];
+    const vec3 c((q[0].x + q[1].x + q[2].x + q[5].x) * 0.25f, (q[0].y + q[1].y + q[2].y + q[5].y) * 0.25f, (q[0].z + q[1].z + q[2].z + q[5].z) * 0.25f);
+    order[i] = {-length(c - cam), (uint32_t)i};
+  }
+  std::stable_sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+  std::vector<SpriteVert> out; out.reserve(v.size());
+  for (auto& o : order) out.insert(out.end(), v.begin() + o.second * 6, v.begin() + o.second * 6 + 6);
+  out.insert(out.end(), v.begin() + n * 6, v.end());   // (a tail that isn't a whole quad, as it was)
+  v.swap(out);
+}
+
 void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, std::vector<SpriteVert>& add) {
   vec3 cr = fp.camRight;
   // billboards are turned to face whichever camera draws them (the main view or a cockpit camera) in the vertex shader
@@ -3349,7 +3373,10 @@ void Game::updateAtc(float dt) {
   const float kt = MS_TO_KT;
   float agl = plane.agl(), gs = length(vec3(plane.vel.x, 0, plane.vel.z));
   if (!plane.onGround && agl > 15.f) F.airborne = true;
-  if (F.holding && F.phase == 1 && (length(plane.pos - F.holdPos) > 40.f || F.airborne)) { result.holdViolated = true; F.holding = false; }   // (moved off the hold, or took off)
+  // (the hold counts from where the aircraft is once the call has been heard - the channel free again - not from where
+  // it was when the call was queued: it tripped while still being spoken - the review of v3.44.0, FLT-6)
+  if (F.holding && !F.holdHeard && !atc.busy()) { F.holdHeard = true; F.holdPos = plane.pos; }
+  if (F.holding && F.holdHeard && F.phase == 1 && (length(plane.pos - F.holdPos) > 40.f || F.airborne)) { result.holdViolated = true; F.holding = false; }   // (moved off the hold, or took off)
   const std::string reg = registrationOf(*plane.spec);   // "SX-ABC"
   auto callsign = [&](int v, bool arrival, std::vector<std::string>& ids, std::string& txt) {
     int k = arrival && F.dep != F.arr;
@@ -3390,6 +3417,13 @@ void Game::updateAtc(float dt) {
     ids.push_back(atc.atom(v, "knots")); txt += " knots. ";
     ids.push_back("");
   };
+  // the arrival tower is the operational destination's: the field the autopilot is landing at when that isn't the
+  // contract's (a GPS alternate, a glide to the nearest field) - a fresh inbound call to it; the contract's own
+  // destination is untouched (the review of v3.44.0, FLT-5)
+  if (plane.apOn && (plane.apMode == Plane::AP_NAV || plane.apMode == Plane::AP_APPR) && plane.apAirport >= 0 && plane.apAirport != F.arr && F.airborne && !plane.onGround) {
+    F.arr = plane.apAirport;
+    if (F.phase >= 4 && F.phase <= 5) { F.phase = 3; F.waitT = 0; F.trafficSaid = false; F.goAround = F.goAroundUnable = false; }
+  }
   const Airport& D = g_world.airports[F.dep];
   const Airport& A = g_world.airports[F.arr];
   int vd = atcStation(F.dep), va = atcStation(F.arr);
@@ -3409,9 +3443,11 @@ void Game::updateAtc(float dt) {
       break;
     case 1:   // lined up on the runway: cleared for takeoff (straight away if the aircraft is already rolling)
       if ((F.spoken >= 1 && F.waitT > 4.f && !atc.busy()) || gs > 4.f) {   // (after the greeting has been heard)
-        // traffic landing or departing first: hold (the clearance comes once it's clear, or after 90 s regardless)
+        // traffic landing or departing first: hold (the clearance comes once it's clear; after 90 s the tower clears the
+        // traffic out of the way first - never the player onto it: the review of v3.44.0, FLT-4)
+        if (F.trafficT >= 90.f) { traffic.clearRunway(F.dep); F.trafficT = 0; }
         RwyTraffic rt = rwyTraffic(F.dep);
-        if (gs <= 4.f && (rt.onRunway || (rt.fin && rt.finD < 4500.f)) && F.trafficT < 90.f) {
+        if (gs <= 4.f && (rt.onRunway || (rt.fin && rt.finD < 4500.f))) {
           F.trafficT += dt;
           if (!F.trafficSaid) {
             AtcVoice::Tx tx; tx.prio = 85; tx.subtitle = true; tx.group = "tower";
@@ -3419,7 +3455,7 @@ void Game::updateAtc(float dt) {
             tx.ids.push_back(atc.line(vd, rt.departing ? "hold_departure" : rt.onRunway ? "hold_position" : "hold_arrival"));
             tx.text += atc.text(tx.ids.back());
             tx.apt = F.dep; tx.key = atcKey(); atc.say(tx); F.trafficSaid = true; F.waitT = 0;
-            F.holding = true; F.holdPos = plane.pos;
+            F.holding = true; F.holdHeard = false; F.holdPos = plane.pos;
           }
           break;
         }
@@ -3518,6 +3554,9 @@ void Game::updateAtc(float dt) {
       break;
     }
     case 5:   // cleared: the landing roll, or a go-around (climbing away again: a fresh approach call)
+      // (until the wheels are on, the runway is watched: traffic on it takes the clearance back - continue, or go
+      // around on short final, as before it was given: the review of v3.44.0, FLT-4)
+      if (!F.goAround && F.airborne && !plane.onGround && !touchedDown && rwyTraffic(F.arr).onRunway) { F.phase = 4; F.trafficSaid = false; break; }
       if (plane.onGround && length(plane.pos - A.pos()) < 3000.f) {
         if (gs < 18.f) {
           AtcVoice::Tx tx; tx.prio = 55; tx.subtitle = true; tx.group = "tower"; tx.ids.push_back(atc.line(va, "exit_when_able")); tx.text = atc.text(tx.ids[0]);
@@ -3536,7 +3575,9 @@ void Game::updateAtc(float dt) {
 // crashes (then only the crash itself is announced).
 void Game::updateComms(float dt) {
   bool live = (screen == SCR_FLIGHT || screen == SCR_LOADING) && !paused;
-  if (!live) { atc.cancel(); commsPending.clear(); commsCrashSeen = false; return; }
+  // (paused, or in the menus, nobody is talking: the music comes back up - it stayed at the duck when a pause cut a
+  // call short: the review of v3.44.0, AUD-2)
+  if (!live) { atc.cancel(); commsPending.clear(); commsCrashSeen = false; voiceDuck = approach(voiceDuck, 0.f, 1.5f, dt); return; }
   auto lessonUnavailable = [&]() {
     if (lessonVoiceWarned) return;
     lessonVoiceWarned = true;
@@ -3544,7 +3585,7 @@ void Game::updateComms(float dt) {
   };
   if (!atc.ok()) {
     for (const auto& m : commsPending) if (m.lessonPhase >= 0) { lessonUnavailable(); break; }
-    commsPending.clear(); return;
+    commsPending.clear(); voiceDuck = 0.f; return;
   }
   if (crashed && !commsCrashSeen) { atc.cancel(); commsCrashSeen = true; }
   if (!crashed) commsCrashSeen = false;
@@ -3560,7 +3601,7 @@ void Game::updateComms(float dt) {
       if (w[i] && (!warnWas[i] || realTime - warnLastT[i] > 8.f)) {
         std::string m = say[i] ? say[i] : "ENGINE OFF - press " + actLabel(ACT_ENGINE, padPrompts()) + " to restart";
         AtcVoice::Tx tx;
-        if (atc.resolve(m, contract.id, padPrompts(), tx)) { tx.prio = std::max(tx.prio, 95); atc.say(tx); }
+        if (atc.resolve(m, contract.id, padPrompts(), tx)) { tx.prio = std::max(tx.prio, 95); tx.key = kWarnKey + i; atc.say(tx); }   // (said only while it still holds)
         warnLastT[i] = realTime;
       }
       warnWas[i] = w[i];
@@ -3596,10 +3637,9 @@ void Game::updateComms(float dt) {
 void Game::feedAudio() {
   AudioParams ap;
   ap.master = set.master; ap.engineVol = set.engineVol * (1.f - 0.35f * voiceDuck); ap.sfxVol = set.sfxVol; ap.voiceVol = set.atcVol;
-  {   // the radio music, lowered under speech
-    static float sentVol = -1.f;
-    float rv = set.radioVol * (1.f - 0.65f * voiceDuck);
-    if (fabsf(rv - sentVol) > 0.01f || (rv != sentVol && (rv == set.radioVol || voiceDuck >= 1.f))) { radio.setVolume(rv); sentVol = rv; }
+  {   // the radio music, at the master volume (the review of v3.44.0, AUD-1), lowered under speech
+    const float rv = radioLevel();
+    if (fabsf(rv - radioSentVol) > 0.01f || (rv != radioSentVol && (voiceDuck <= 0.f || voiceDuck >= 1.f))) { radio.setVolume(rv); radioSentVol = rv; }
   }
   static bool muffled = false;
   if (actKeyP(ACT_ANR) || (screen == SCR_FLIGHT && !paused && actPadP(ACT_ANR))) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
@@ -3784,7 +3824,11 @@ void Game::render() {
   if (!vid) {
     fp = buildFrame();
     std::vector<SpriteVert> a, b;
-    if (!fp.hangarPreview) { buildSprites(fp, a, b); volcano::append(fp, g_ren.quality, a, b); }
+    if (!fp.hangarPreview) {
+      buildSprites(fp, a, b);
+      const size_t own = a.size(); volcano::append(fp, g_ren.quality, a, b);
+      if (a.size() != own) sortAlphaQuads(a, fp.camPos);   // (only with the plume in view: the rest comes sorted)
+    }
     g_ren.renderScene(fp, a, b);
     if (screen == SCR_LOADING && loadReadyT < 0) ++loadFrames;
   } else g_ren.clearScreen();

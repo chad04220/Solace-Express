@@ -41,7 +41,8 @@ checks = {
     'mesh callers have no stale direct baker uniform uploads': 'U(progHullBake,' not in mesh,
     'feed starts its own canonical distance query': 'beginHullBake(fp, 1, ps, ctl);' in function(feeds, 'void Renderer::measureFeedMounts('),
     'shader identity includes shared bake main': 'kHullBakeMain' in function(renderer, 'std::string shaderCacheStamp('),
-    'mesh identity includes shared bake main': 'kHullBakeMain' in function(renderer, 'std::string meshCacheStamp('),
+    # (the mesh cache hashes the bake programs as assembled and pruned - kHullBakeMain among them: shaders.h)
+    'mesh identity includes shared bake main': 'shaderPrune::prune(hullBakeFSAssembly(' in function(renderer, 'std::string meshCacheStamp(') and 'kHullBakeMain' in function((SRC / 'src/shaders.h').read_text(), 'inline std::string hullBakeFSAssembly('),
     'point batches obey device limit and 8192-row cap': 'size_t(512) * std::min(maxTex, 8192)' in function(hull, 'void Renderer::hullEval4('),
 }
 paths = ['src/renderer.cpp', 'src/renderer.h', 'src/aircraft_hull.cpp', 'src/aircraft_mesh.cpp', 'src/camera_feeds.cpp', 'src/shaders/hull_bake_main.glsl', 'src/shaders/plane_trace.glsl']
@@ -53,4 +54,5 @@ assert all(checks.values())
 # Current compiler/cache/lifetime code, without the full renderer dependencies.
 start=renderer.index("static GLuint compile(GLenum")
 end=renderer.index("static GLuint program(",start)
-(HERE / "actual_shader_functions.inc").write_text(renderer[start:end])
+# (the bake log's one Renderer method there is the renderer's own business: the harness has no Renderer)
+(HERE / "actual_shader_functions.inc").write_text('\n'.join(l for l in renderer[start:end].split('\n') if not l.startswith('void Renderer::')))

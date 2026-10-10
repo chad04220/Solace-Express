@@ -85,5 +85,9 @@ private:
   vec3 escF = vec3(0, 0, -1); float escV = 60.f, escLift = 0; int escNext = 0, escLeft = 0;
   void groundTaxi(TrafficCraft& c, float dt, float maxSpeed, vec3 playerPos, bool playerOnGround);
   void attitudeToQuat(TrafficCraft& c) const;
-  bool runwayBusy(int ai, int self, vec3 playerPos, bool playerOnGround) const;
+  bool runwayBusy(int ai, int self, vec3 playerPos, bool playerOnGround, bool lineup = false) const;
+public:
+  // the tower's word after a long hold (the review of v3.44.0, FLT-4): what is on the runway at this field is cleared
+  // off it, and what is on final or turning onto it goes around - the player's departure is never cleared onto it
+  void clearRunway(int ai);
 };

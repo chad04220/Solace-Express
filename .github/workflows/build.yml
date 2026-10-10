@@ -75,7 +75,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist/SolaceExpress | Out-Null
           Copy-Item build/Release/SolaceExpress.exe dist/SolaceExpress/
-          Copy-Item README.md, radio_stations.txt, THIRD_PARTY_NOTICES.md, diagnostics.bat dist/SolaceExpress/
+          Copy-Item README.md, LICENSE, radio_stations.txt, THIRD_PARTY_NOTICES.md, diagnostics.bat dist/SolaceExpress/
           Set-Content -Path dist/SolaceExpress/VERSION.txt -Value "${{ inputs.release_tag || github.ref_name }}"
           New-Item -ItemType Directory -Force -Path dist/SolaceExpress/loading | Out-Null
           Copy-Item assets/loading/*.jpg dist/SolaceExpress/loading/

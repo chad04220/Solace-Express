@@ -27,6 +27,7 @@ struct Contract {
   bool gentle() const { return pax > 0 || fragile; }
   int grantLicense = -1;
   int forceAircraft = -1;      // lessons use a specific aircraft (free)
+  int requireSpec = -1;        // the client's aircraft type (story: A4's jet), -1 any that fits (the review of v3.44.0, CAR-8)
   Weather wx;
   // C8: where the weather is going. With wxShift the conditions drift from wx to wxEnd over the flight's estimated
   // time (wind direction and strength, cloud, visibility, precipitation); the brief shows the forecast

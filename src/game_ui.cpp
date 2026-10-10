@@ -63,7 +63,12 @@ static uint32_t uid(float x, float y, const std::string& s) {
 static vec3 mixc(vec3 a, vec3 b, float t) { return a + (b - a) * t; }
 
 void Game::applyUiPalette() { applyPalette(set.cbHud); }
-float Game::S() const { return std::max(0.6f, g_ren.H / 720.f) * set.uiScale; }
+// (by the height, and no wider than the layouts' 1280 px at 140% allow: an 800 x 600 window at 140% clipped the
+// settings off the right - the review of v3.44.0, UI-4)
+float Game::S() const {
+  const float byH = std::max(0.6f, g_ren.H / 720.f) * set.uiScale;
+  return g_ren.W > 0 ? std::min(byH, g_ren.W / (1280.f / 1.4f)) : byH;   // (no window, headless: by the height alone)
+}
 
 bool Game::pointerOverOverlay() const {
   return showRadio && !radioDrawing && radioRect[2] > 0.f &&
@@ -128,9 +133,13 @@ void Game::card(float x, float y, float w, float h, bool sel, bool hov, vec3 acc
 static std::string ellipsize(const std::string& str, float width, float size);
 // Scrollable workspaces hash buttons in content coordinates; focus survives viewport movement.
 static float buttonContentOffsetY = 0.f;
-bool Game::button(float x, float y, float w, float h, const std::string& label, bool enabled, bool highlight) {
+// (a label "shown##key" shows "shown" and takes its identity from the key: a toggle whose label flips between ON and
+// OFF keeps its keyboard / D-pad focus - the review of v3.44.0, UI-3)
+bool Game::button(float x, float y, float w, float h, const std::string& labelId, bool enabled, bool highlight) {
   float s = S(), r = 4 * s;
-  uint32_t id = uid(x, std::round(y + buttonContentOffsetY), label);
+  const size_t cut = labelId.find("##");
+  const std::string label = cut == std::string::npos ? labelId : labelId.substr(0, cut);
+  uint32_t id = uid(x, std::round(y + buttonContentOffsetY), cut == std::string::npos ? labelId : labelId.substr(cut));
   bool focused = focusNav && focusId == id && enabled;
   if (enabled) focusList.push_back({id, x, y, w, h});
   bool hov = enabled && (hovered(x, y, w, h) || focused);
@@ -754,7 +763,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
       if (!cd.free) row("Challenge", e.challenge, C_WARN);
     }
   }
-  if (c.ownedOnly) row("Requirement", "Your own aircraft", C_ACCENT);
+  if (c.ownedOnly || c.requireSpec >= 0) row("Requirement", c.requireSpec < 0 ? std::string("Your own aircraft") : fmt("%s%s", c.ownedOnly ? "Your own " : "The ", kAircraft[c.requireSpec].name), C_ACCENT);
   if (c.grantLicense > career.license) row("Reward", std::string("Earns ") + licenseName(c.grantLicense), C_ACCENT);
   if (c.from != career.location && c.type != CT_LESSON) { int pc = career.positioningCost(c); row("Positioning", pc ? fmt("Airline ticket to %s: %s", A.code, fmtMoney(pc).c_str()) : "Free courtesy ride", C_DIM); }
   g_ren.uiClipOff();
@@ -1376,7 +1385,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
   };
   auto toggle = [&](const std::string& label, bool& v, const char* on, const char* off) {
     g_ren.text(x, py + 6 * s, 16 * s, label, C_DIM, 1);
-    if (button(x + 250 * s, py, 200 * s, 32 * s, v ? on : off, true, v)) v = !v;
+    if (button(x + 250 * s, py, 200 * s, 32 * s, std::string(v ? on : off) + "##" + label, true, v)) v = !v;
     py += rs;
   };
   // a setting's explanation under its buttons, wrapped to the width beside the labels (at 140% UI scale on a 720p
@@ -1413,10 +1422,11 @@ void Game::drawSettings(float x, float y, float w, float h) {
   slider("Effects volume", set.sfxVol, 0, 1.5f, 0.05f, fmt("%.0f%%", set.sfxVol * 100));
   float rv = set.radioVol;
   slider("Radio volume", set.radioVol, 0, 1, 0.05f, fmt("%.0f%%", set.radioVol * 100));
-  if (rv != set.radioVol) radio.setVolume(set.radioVol);
+  if (rv != set.radioVol) radio.setVolume(radioLevel());
   slider("Voice volume", set.atcVol, 0, 1, 0.05f, fmt("%.0f%%", set.atcVol * 100));
   slider("Mouse sensitivity", set.mouseSens, 0.2f, 3.f, 0.1f, fmt("%.1f", set.mouseSens));
-  slider("Field of view", set.fov, 45.f, 75.f, 1.f, fmt("%.0f deg outside, %.0f in the cockpit", set.fov, set.fov + 19.f));
+  slider("Field of view", set.fov, 45.f, 75.f, 1.f, fmt("%.0f / %.0f deg", set.fov, set.fov + 19.f));   // (the long form clipped even at 1080p: the review of v3.44.0, UI-6)
+  py -= 6 * s; note("outside / in the cockpit");
   slider("UI scale", set.uiScale, 0.8f, 1.4f, 0.05f, fmt("%.0f%%", set.uiScale * 100));
   toggle("Head-look", set.headLook, "Leans into turns", "Fixed ahead");
   toggle("Display focus zoom", set.cockpitFocusZoom, "Smooth automatic zoom", "Manual zoom only");
@@ -1570,7 +1580,7 @@ void Game::drawRadioPanel(float x, float y) {
     if (i >= (int)stations.size()) break;
     bool cur = i == set.radioStation && radio.state() != Radio::IDLE;
     if (button(x + 14 * s, py, bw, 30 * s, ellipsize(stations[i].first, bw - 20 * s, std::min(30 * s * 0.46f, 18 * s)), true, cur)) {
-      set.radioStation = i; radio.setVolume(set.radioVol); radio.play(stations[i].second); saveSettings();
+      set.radioStation = i; radio.setVolume(radioLevel()); radio.play(stations[i].second); saveSettings();
     }
     py += 34 * s;
   }
@@ -1583,9 +1593,9 @@ void Game::drawRadioPanel(float x, float y) {
     g_ren.rect(sx + 5 * s, ty + (th - kh) * radioScroll / maxScroll, 8 * s, kh, C_ACCENT, 0.8f, 4 * s);
   }
   if (button(x + 14 * s, py + 4 * s, 120 * s, 30 * s, "Stop")) radio.stop();
-  if (button(x + 150 * s, py + 4 * s, 40 * s, 30 * s, "-")) { set.radioVol = clampf(set.radioVol - 0.1f, 0, 1); radio.setVolume(set.radioVol); }
+  if (button(x + 150 * s, py + 4 * s, 40 * s, 30 * s, "-")) { set.radioVol = clampf(set.radioVol - 0.1f, 0, 1); radio.setVolume(radioLevel()); }
   g_ren.text(x + 200 * s, py + 10 * s, 15 * s, fmt("Vol %.0f%%", set.radioVol * 100), C_TEXT, 1);
-  if (button(x + 290 * s, py + 4 * s, 40 * s, 30 * s, "+")) { set.radioVol = clampf(set.radioVol + 0.1f, 0, 1); radio.setVolume(set.radioVol); }
+  if (button(x + 290 * s, py + 4 * s, 40 * s, 30 * s, "+")) { set.radioVol = clampf(set.radioVol + 0.1f, 0, 1); radio.setVolume(radioLevel()); }
   g_ren.text(x + w - 14 * s, py + 12 * s, 11 * s, fmt("%d STATIONS", (int)stations.size()), C_DIM, 0.8f, 2, false);
 }
 

@@ -190,6 +190,27 @@ struct GameTest {
       for (auto& x : g.atc.history) printf("   voice: %s\n", x.c_str());
       printf("Departure hold for traffic: %s\n", held && cleared ? "ok" : "FAIL"); fails += !(held && cleared);
     }
+    if (voices) {   // FLT-6 (the v3.44.0 review): the hold counts from where the aircraft is once the call has been heard - creeping
+                    // while it is still being said is no violation; moving 50 m after it is
+      g.startFlight(g_story[0], 0, Career::SRC_LESSON);
+      g.traffic.craft.clear(); g.commsPending.clear(); g.atc.history.clear(); g.set.traffic = true;
+      const vec3 dirR = g_world.airports[g.contract.from].dir();
+      bool spoken = false, early = false, heard = false;
+      for (float tt = 0; tt < 40 && !heard; tt += dt) {
+        rollout(g.contract.from, 600.f);
+        g.plane.ctl.brake = 1; g.plane.ctl.throttle = 0;
+        if (g.atcF.holding && !g.atcF.holdHeard) { spoken = true; g.plane.pos += dirR * 0.3f; }   // (rolling on through the call)
+        g.update(dt); audio(dt);
+        if (g.result.holdViolated) early = true;
+        heard = g.atcF.holding && g.atcF.holdHeard;
+      }
+      bool late = false;
+      if (heard) { for (int i = 0; i < 30 && !g.result.holdViolated; i++) { rollout(g.contract.from, 600.f); g.plane.pos += dirR * 2.f; g.update(dt); audio(dt); } late = g.result.holdViolated; }
+      g.traffic.craft.clear(); g.set.traffic = false;
+      const bool ok = spoken && heard && !early && late;
+      printf("Hold from where it was heard: creeping through the call %d fined %d, moving once heard fined %d: %s\n", spoken, early, late, ok ? "ok" : "FAIL"); fails += !ok;
+      g.endFlight(false, "test", OUT_ABANDONED); g.screen = SCR_HUB;
+    }
     if (voices) {   // arrival: the runway is occupied on final (continue), and still occupied on short final (go around)
       g.career.location = g_world.findAirport("ORC");
       g.startFlight(c, 1, Career::SRC_RENT);
@@ -212,6 +233,119 @@ struct GameTest {
       bool ok = towerSaid("runway is occupied") && towerSaid("Go around") && !towerSaid("cleared to land");
       ok = ok && g.atcF.lastCall.find("Go around") != std::string::npos && g.atcF.lastValid && g.atcF.lastApt == c.to;   // the HUD recall line
       printf("Arrival with the runway occupied: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
+    }
+    if (voices) {   // FLT-4 (the v3.44.0 review): traffic onto the runway after the landing clearance takes it back - a go-around
+                    // on short final; and a departure held past 90 s is cleared only once the tower has the runway cleared
+      g.career.location = g_world.findAirport("ORC");
+      g.startFlight(c, 1, Career::SRC_RENT);
+      g.plane.reset(&kAircraft[1], start, a.heading, 60, 150, true, kAircraft[1].vref + 6);
+      g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 3; g.atcF.airborne = true; g.atc.history.clear();
+      g.plane.ctl.flaps = 1.f; g.flapNotch = 1.f; s_pI = -2.f; s_eI = 0.f;
+      g.traffic.craft.clear(); g.set.traffic = true;
+      bool clearedFirst = false, incursion = false;
+      for (t = 0; t < 150 && g.screen == SCR_FLIGHT && !g.plane.onGround; t += dt) {
+        Plane& p = g.plane;
+        vec3 rel = p.pos - thr; float along = dot(vec3(rel.x, 0, rel.z), dir), lat = dot(vec3(rel.x, 0, rel.z), vec3(-dir.z, 0, dir.x));
+        if (!incursion && towerSaid("cleared to land")) clearedFirst = true;
+        if (clearedFirst && along > -600.f) incursion = true;   // (an aircraft rolls onto the runway on short final)
+        if (incursion) rollout(c.to, 300.f);
+        float ideal = a.elev + std::max(0.f, (-along + 250.f)) * tanf(3.f * DEG);
+        float herr = wrapAngle((a.heading - clampf(lat * 0.08f, -20, 20) - trackDeg(p)) * DEG) / DEG;
+        p.ctl.roll = clampf((clampf(herr * 2.f, -15, 15) - p.bankDeg()) * 0.05f + p.w.z * 0.3f, -1, 1);
+        pitchFor(p, clampf(-p.ias * tanf(3.f * DEG) + (ideal - p.pos.y) * 0.15f, -6, 1), dt);
+        p.ctl.throttle = clampf(0.35f + (p.spec->vref - p.ias) * 0.05f, 0, 1);
+        g.update(dt); audio(dt);
+        if (incursion && g.atcF.goAround) break;
+      }
+      const bool late = clearedFirst && incursion && towerSaid("Go around") && g.atcF.goAround;
+      // the departure: lined up, an aircraft stuck on the runway for good - held past 90 s, the tower clears it off
+      g.startFlight(g_story[0], 0, Career::SRC_LESSON);
+      g.traffic.craft.clear(); g.commsPending.clear(); g.atc.history.clear();
+      rollout(g.contract.from, 600.f);
+      bool clearedOntoIt = false, gone = false;
+      for (float tt = 0; tt < 130 && !towerSaid("cleared for takeoff"); tt += dt) {
+        bool on = false; for (auto& o : g.traffic.craft) if (o.id == 9999 && o.alive) on = true;
+        if (on) rollout(g.contract.from, 600.f); else gone = true;   // (stuck there while it lasts)
+        g.plane.ctl.brake = 1; g.plane.ctl.throttle = 0; g.update(dt); audio(dt);
+        bool still = false; for (auto& o : g.traffic.craft) if (o.id == 9999 && o.alive) still = true;
+        if (!still) gone = true;
+        if (still && towerSaid("cleared for takeoff")) clearedOntoIt = true;
+      }
+      const bool longHold = gone && towerSaid("cleared for takeoff") && !clearedOntoIt;
+      if (!longHold) { printf("  long hold: gone %d, cleared %d, onto it %d, phase %d, trafficT %.0f\n", gone, towerSaid("cleared for takeoff"), clearedOntoIt, g.atcF.phase, g.atcF.trafficT); for (auto& x : g.atc.history) printf("   voice: %s\n", x.c_str()); }
+      g.set.traffic = false; g.traffic.craft.clear();
+      printf("Runway occupancy after clearance: late incursion takes the landing clearance back %d, a stuck runway is cleared before the departure %d: %s\n",
+             late, longHold, late && longHold ? "ok" : "FAIL"); fails += !(late && longHold);
+      g.endFlight(false, "test", OUT_ABANDONED); g.screen = SCR_HUB;
+    }
+    {   // FLT-5 (the v3.44.0 review): an autoland to a GPS alternate talks to the alternate's tower; the contract keeps its own
+      g.career.location = g_world.findAirport("ORC");
+      g.startFlight(c, 1, Career::SRC_RENT);
+      const int alt = g_world.findAirport("CAP");
+      const Airport& B = g_world.airports[alt];
+      vec3 p0 = B.threshold(false) - B.dir() * 6000.f; p0.y = B.elev + 400.f;
+      g.plane.reset(&kAircraft[1], p0, B.heading, 60, 150, true, kAircraft[1].cruise * 0.8f);
+      g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 4; g.atcF.airborne = true; g.atc.history.clear();
+      g.traffic.craft.clear(); g.set.traffic = false;
+      g.update(dt);
+      g.apDest = alt; g.engageAutopilot();
+      for (int i = 0; i < 10; i++) g.update(dt);
+      const bool ok = c.to != alt && g.plane.apOn && g.atcF.arr == alt && g.atcF.phase >= 3 && g.contract.to == c.to;
+      printf("Tower for a GPS alternate: arrival tower %s (contract %s), phase %d: %s\n", g_world.airports[g.atcF.arr].code, g_world.airports[g.contract.to].code, g.atcF.phase, ok ? "ok" : "FAIL"); fails += !ok;
+      g.endFlight(false, "test", OUT_ABANDONED); g.screen = SCR_HUB;
+    }
+    {   // AUD-1..4 (the v3.44.0 review): the radio follows the master volume; a pause mid-call brings the music back up; a
+        // hazard call is dropped once the hazard has passed; a cut-off or empty voice clip is refused, not overread
+      Game q; q.initHeadless(); q.startFlight(g_story[0], 0, Career::SRC_LESSON);
+      q.set.master = 0.5f; q.set.radioVol = 0.8f; q.voiceDuck = 0.f; q.feedAudio();
+      const bool master = fabsf(q.radio.volume() - 0.4f) < 0.01f;
+      q.voiceDuck = 1.f; q.paused = true;
+      for (int i = 0; i < 240; i++) { q.updateComms(1.f / 60.f); q.feedAudio(); }
+      const bool unducked = q.voiceDuck < 0.01f && fabsf(q.radio.volume() - 0.4f) < 0.01f;
+      q.paused = false;
+      AtcVoice::Tx w; w.key = Game::kWarnKey + 1;
+      q.warnWas[1] = true; const bool holds = q.atc.valid(w);
+      q.warnWas[1] = false; const bool passed = !q.atc.valid(w);
+      namespace fs = std::filesystem;
+      const fs::path vd = fs::temp_directory_path() / "solace_bad_voice"; fs::create_directories(vd);
+      { std::ofstream ix(vd / "voice_index.txt"); ix << "bad.trunc\ttrunc.wav\tTruncated.\nbad.empty\tempty.wav\tEmpty.\n"; }
+      { std::ofstream f(vd / "trunc.wav", std::ios::binary); f.write("RIFF\x24\0\0\0WAVEfmt \x10\0\0\0\x01\0", 22); }   // (the fmt chunk cut off)
+      { std::ofstream f(vd / "empty.wav", std::ios::binary); const char h[] = "RIFF\x24\0\0\0WAVEfmt \x10\0\0\0\x01\0\x01\0\x40\x1f\0\0\x80\x3e\0\0\x02\0\x10\0data\0\0\0\0"; f.write(h, sizeof h - 1); }
+      AtcVoice v; const bool refused = v.load(vd.string()) && !v.decodes("bad.trunc") && !v.decodes("bad.empty");
+      std::error_code ec; fs::remove_all(vd, ec);
+      const bool ok = master && unducked && holds && passed && refused;
+      printf("Audio: radio at master x radio %d, unducked after a pause %d, hazard call kept while it holds %d and dropped once passed %d, bad clips refused %d: %s\n",
+             master, unducked, holds, passed, refused, ok ? "ok" : "FAIL"); fails += !ok;
+    }
+    {   // WLD-1..3 (the v3.44.0 review): a plasma crater is dug into the ground the aircraft and the wreckage meet; what eight
+        // bombs flattened stays flattened; a wreck on a chunk seam is the business of the chunks either side of it
+      Game q; q.initHeadless(); q.botControl = true; q.set.traffic = false;
+      q.resCraft = kWraith; q.resAirborne = false; q.launchResearch();
+      const Airport& a = g_world.airports[q.contract.from];
+      vec3 p0 = a.pos() + vec3(-a.dir().z, 0, a.dir().x) * 600.f; p0.y = g_world.height(p0.x, p0.z);
+      const float g0 = p0.y;
+      q.detonate(p0, false); q.refreshGroundPits();
+      const bool dug = q.wreckGround(p0.x, p0.z) < g0 - 7.f;
+      // the aircraft set down at the crater's floor rests there (on the old ground it was 8 m under it, and thrown up)
+      Plane& pl = q.plane;
+      pl.reset(pl.spec, vec3(p0.x, 0.f, p0.z), a.heading, pl.spec->maxFuel, 85.f, false, 0.f);
+      pl.pos.y = q.wreckGround(p0.x, p0.z) + pl.gearHeight() + 0.05f;   // (reset stands it on the islands as built)
+      pl.ctl.brake = 1; float rise = 0;
+      for (int i = 0; i < 120; i++) { pl.step(1.f / 60.f, q.wx, 0.f); rise = std::max(rise, pl.pos.y - (q.wreckGround(p0.x, p0.z) + pl.gearHeight())); }
+      const bool rests = rise < 1.f && !pl.ev.crashed;
+      // eight bombs: the first one's flattened circle is still there
+      for (int k = 1; k < 8; k++) { vec3 pk = p0 + vec3(300.f * k, 0, 0); pk.y = g_world.height(pk.x, pk.z); q.detonate(pk, false); }
+      q.refreshGroundPits();
+      bool kept = false; for (const vec3& c : g_scenery.craters) if (fabsf(c.x - p0.x) < 1.f && fabsf(c.y - p0.z) < 1.f) kept = true;
+      // a tree a few centimetres inside a chunk's west edge, destroyed: both chunks either side of the seam know
+      const int cx = 150, cz = 150;
+      Ent e{Scenery::chunkX0(cx) + 0.05f, 0.f, Scenery::chunkX0(cz) + 100.f, 0.f, 1.f, 1.f, 1.f, 0.37f};
+      const bool gone = g_scenery.damage(e, 0, 100) && g_scenery.destroyed(e);
+      const bool seam = gone && g_scenery.chunkAffected(cx, cz) && g_scenery.chunkAffected(cx - 1, cz);
+      g_scenery.resetDamage(); q.wraith = Game::WraithState(); q.refreshGroundPits();
+      const bool ok = dug && rests && kept && seam;
+      printf("Craters and wrecks: crater dug into the ground %d, aircraft rests on its floor %d (rose %.1f m), the first bomb's damage kept after eight %d, a seam wreck in both chunks %d: %s\n",
+             dug, rests, rise, kept, seam, ok ? "ok" : "FAIL"); fails += !ok;
     }
     if (voices) {   // FLT-3 (the v3.44.0 review): the same, on the autopilot's autoland - the tower's go-around is flown (it
                     // landed anyway, and the player was fined $500 for it); and an aircraft that can't climb away lands unfined
@@ -435,6 +569,21 @@ struct GameTest {
         r.update(1.f / 60.f);
         bool good = !r.parkingBrake && r.plane.ctl.brake == 0.f && !r.plane.onGround && (!r.plane.spec->retract || (!r.plane.ctl.gearDown && r.plane.gear < 0.01f));
         printf("Airborne research start (%s): parking brake %d, brake %.1f, gear %.2f lever %s: %s\n", r.plane.spec->name, r.parkingBrake, r.plane.ctl.brake, r.plane.gear, r.plane.ctl.gearDown ? "down" : "up", good ? "ok" : "FAIL");
+        ok = ok && good;
+      }
+      fails += !ok;
+    }
+    // ---- a research runway start takes its own fuel, not the job card's choice, which stays for the career (the
+    //      review of v3.44.0, CAR-7: a 7 kg Kestrel selection launched the XR-10 and XR-20 with 7 kg)
+    {
+      Game r; r.initHeadless(); r.botControl = true; r.set.traffic = false;
+      bool ok = true;
+      for (int craft : {kNightjar, kMantis}) {
+        r.resCraft = craft; r.resAirborne = false; r.launchFuelKg = -1; r.launchResearch();
+        const float own = r.plane.fuel;
+        r.launchFuelKg = 7.f; r.launchResearch();
+        const bool good = own > 50.f && fabsf(r.plane.fuel - own) < 0.5f && r.launchFuelKg == 7.f;
+        printf("Research runway start (%s): %.0f kg, %.0f kg with a 7 kg career choice, choice kept %d: %s\n", r.plane.spec->name, own, r.plane.fuel, r.launchFuelKg == 7.f, good ? "ok" : "FAIL");
         ok = ok && good;
       }
       fails += !ok;
@@ -939,6 +1088,19 @@ struct GameTest {
       bool ok = moved == 0 && clicks == 600 && safe;
       printf("Radio panel owns its clicks: %d of %d clicks over it moved the hub beneath, XR-40 weapons stay safe %d: %s\n", moved, clicks, safe, ok ? "ok" : "FAIL"); fails += !ok;
     }
+    // ---- UI-4 (the v3.44.0 review): an 800 x 600 window at 140%: every settings control on both pages lies inside it
+    {
+      const int W0 = g_ren.W, H0 = g_ren.H; const float ui0 = g.set.uiScale, page0 = (float)g.settingsPage;
+      g_ren.W = 800; g_ren.H = 600; g.set.uiScale = 1.4f; g.screen = SCR_HUB; g.hubTab = TAB_SETTINGS; g.showRadio = false; g.focusNav = false;
+      int outside = 0, seen = 0;
+      for (int page = 0; page < 2; page++) {
+        g.settingsPage = page; g.focusList.clear(); g.in.mx = g.in.my = -1; g_ren.uiBegin(); g.drawHub();
+        for (auto& f : g.focusList) { seen++; if (f.x < 0.f || f.x + f.w > (float)g_ren.W + 0.5f) outside++; }
+      }
+      g.settingsPage = (int)page0; g.set.uiScale = ui0; g_ren.W = W0; g_ren.H = H0; g_ren.uiBegin(); g.focusList.clear();
+      const bool ok = seen > 20 && outside == 0;
+      printf("Settings at 800x600, 140%%: %d of %d controls outside the window: %s\n", outside, seen, ok ? "ok" : "FAIL"); fails += !ok;
+    }
     // ---- CAR-1 (the v3.44.0 review): rough air costs the patient only what the aircraft is put through - five minutes
     // straight and level on the autopilot in P4's turbulence (0.55) left the patient at 10%, "in distress" whatever the
     // pilot did
@@ -1076,6 +1238,13 @@ struct GameTest {
       bool mouse = !g.focusNav;
       bool ok = first && down && right && mouse;
       printf("Menu focus navigation: first %d, down %d, right %d, mouse releases %d: %s\n", first, down, right, mouse, ok ? "ok" : "FAIL"); fails += !ok;
+    }
+    {   // UI-3 (the v3.44.0 review): a settings toggle keeps its focus when its label flips (its identity is its setting)
+      Game q; q.initHeadless(); q.screen = SCR_MENU;
+      auto idOf = [&](const char* l) { q.focusList.clear(); q.button(100, 100, 200, 32, l); return q.focusList.empty() ? 0u : q.focusList.back().id; };
+      const uint32_t on = idOf("On##Air traffic"), off = idOf("Off##Air traffic"), other = idOf("Off##Units"), plain = idOf("Off");
+      const bool ok = on && on == off && off != other && plain != off;
+      printf("Toggle focus across its label: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
     }
     {   // the career's launches and their saves (the review of v3.24.0, R4-R6): a launch whose save fails flies nothing and
         // leaves nothing pending; a cancelled loading screen leaves the job waiting at its stop; a free flight beside a

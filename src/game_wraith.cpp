@@ -18,7 +18,7 @@ static void bombLaunch(const Plane& plane, vec3& p, vec3& v) {
   p = plane.pos + plane.q.rotate(kBayBomb - vec3(0, 0.25f, 0));
   v = plane.vel - plane.up() * kBombEject;
 }
-float groundAt(vec3 p) { return std::max(g_world.height(p.x, p.z), 0.f); }
+float groundAt(vec3 p) { return std::max(pitGround(p.x, p.z, g_world.height(p.x, p.z)), 0.f); }   // (into the craters: WLD-1)
 // first point where a segment from a (direction d, length L) meets the ground or the sea; t < 0 when clear
 float groundHit(vec3 a, vec3 d, float L) {
   float t = 0, prev = 0;
@@ -259,6 +259,9 @@ void Game::detonate(vec3 p, bool water) {
   if (!water) {
     W.craters.push_back({p.x, p.z, 24.f, -8.f});
     if (W.craters.size() > 7) W.craters.erase(W.craters.begin());
+    // (what it flattened stays flattened when its crater is no longer drawn: the eighth bomb brought back the first's
+    // buildings, and their collision - the review of v3.44.0, WLD-2)
+    W.flattened.push_back(vec3(p.x, p.z, 24.f * 4.f));
   }
   float dCam = length(p - camPos);
   g_audio.trigger(SFX_PLASMA, clampf(1.3f - dCam / 6000.f, 0.25f, 1.f));
@@ -416,16 +419,7 @@ void Game::wraithVisual(FrameParams& fp) {
   if (plane.spec && plane.spec->special == 2 && camMode == 1 && !crashed && W.cam.on) {
     fx.feed[0] = W.cam.look.x; fx.feed[1] = W.cam.look.y; fx.feed[2] = W.cam.look.z; fx.feed[3] = 1.f;
   }
-  // glassed craters join the crash crater (if any)
-  for (size_t i = 0; i < W.craters.size() && fp.wreck.craterN < 24; i++) {
-    float* c = fp.wreck.crater[fp.wreck.craterN++];
-    c[0] = W.craters[i].x; c[1] = W.craters[i].z; c[2] = W.craters[i].R; c[3] = W.craters[i].D;
-  }
-  // laser scorch pits (newest first, in case the list is full)
-  for (int i = (int)W.scorch.size() - 1; i >= 0 && fp.wreck.craterN < 24; i--) {
-    float* c = fp.wreck.crater[fp.wreck.craterN++];
-    c[0] = W.scorch[i].x; c[1] = W.scorch[i].z; c[2] = W.scorch[i].R; c[3] = W.scorch[i].D;
-  }
+  // (the glassed craters and the laser scorch pits are drawn with the crash crater's: Game::refreshGroundPits)
   // a young detonation lights up its surroundings (borrowing the exhaust light)
   for (const auto& b : W.blasts)
     if (b.age < 0.4f) {

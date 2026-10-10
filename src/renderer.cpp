@@ -426,11 +426,12 @@ void Renderer::genMaterials(const std::function<void(float, const std::string&)>
     if (*tex) glDeleteTextures(1, tex);
     *tex = 0;
   }
-  GLint maxSize = 0, maxUnits = 0, maxLayers = 0;
+  GLint maxSize = 0, maxUnits = 0, fragUnits = 0, maxLayers = 0;
   glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);
   glGetIntegerv(0x8B4D, &maxUnits);   // GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS
+  glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &fragUnits);   // (the fragment stage's own: these samplers sit on units 29 and 30 - the review of v3.44.0, RND-6)
   glGetIntegerv(0x88FF, &maxLayers);  // GL_MAX_ARRAY_TEXTURE_LAYERS
-  envMaterialUnits = maxUnits >= 32;
+  envMaterialUnits = maxUnits >= 32 && fragUnits >= 32;
   if (matDir.empty() || !envMaterialUnits || maxLayers < kEnvMatLayers) return;
   GLint maxAnisotropy = 1;
   for (int i = 0; i < 16 && glGetError() != 0; i++) {}
@@ -1772,6 +1773,9 @@ float Renderer::text(float x, float y, float size, const std::string& s, vec3 c,
 }
 
 void Renderer::image(GLuint tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1, float a) {
+  // (no texture yet - an aerial map not rendered, a picture not loaded: a dark panel, not whatever texture is bound,
+  // which drew the font atlas as the route map: the review of v3.44.0, UI-7)
+  if (!tex) { rect(x, y, w, h, vec3(0.03f, 0.05f, 0.07f), 0.85f * a); return; }
   if (curImg && curImg != tex) flushUI();
   curImg = tex;
   quad(ui, x, y, x + w, y + h, u0, v0, u1, v1, vec3(1, 1, 1), a, 3);

@@ -43,7 +43,9 @@ void main(){
         ivec2 bp = clamp(ivec2(uv*uRes), ivec2(0), ivec2(uRes) - 1);
         col = cloakSkin(texelFetch(uRawTex, bp, 0).rgb, ckN, rd, ckLp, ckLp.z - uWr[6].y + 0.8);
         col = applyFog(col, ro, rd, hc.x);
-        taaFlag = 0.5;
+        // (a moving effect's history, not the airframe's: what it shows is the world behind, and the depth here is the
+        // world's - reprojected with the aircraft's motion it landed up to 112 px off: the review of v3.44.0, RND-2)
+        taaFlag = 0.2;
       }
     }
   }

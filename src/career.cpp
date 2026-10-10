@@ -35,6 +35,7 @@ struct S {  // compact story entry builder
   S& pay(int p) { c.payout = p; return *this; }
   S& lic(int l) { c.minLicense = l; return *this; }
   S& owned() { c.ownedOnly = true; return *this; }
+  S& type(const char* spec) { for (int i = 0; i < kNumAircraft; i++) if (!strcmp(kAircraft[i].id, spec)) c.requireSpec = i; return *this; }
   S& fragile() { c.fragile = true; return *this; }
   S& limit(float m) { c.timeLimitMin = m; return *this; }
   S& grant(int l) { c.grantLicense = l; return *this; }
@@ -134,8 +135,8 @@ void buildStory() {
      .brief("Mountain rescue needs equipment at Summit Pass: a 600 m gravel shelf at 5,400 ft. Only a STOL aircraft can do this. "
             "Rent the Bushmaster - a taildragger, so keep the tail down with back pressure and use rudder constantly."); add(s); }
   { S s("P4", 2, CT_MEDEVAC, "SMP", "CAP", "Medevac: Injured Climber");
-    s.load(80, 1).pay(5600).lic(LIC_CPL).limit(14).wx(W(260, 16, 9, 0.55f, 0.5f, 6000, 30, 0, false, 10.3f))
-     .brief("An injured climber needs a hospital. Get her to Solace Capital within 14 minutes - and gently."); add(s); }
+    s.load(80, 1).pay(5600).lic(LIC_CPL).limit(20).wx(W(260, 16, 9, 0.55f, 0.5f, 6000, 30, 0, false, 10.3f))
+     .brief("An injured climber needs a hospital. Get her to Solace Capital within 20 minutes - and gently."); add(s); }
   { S s("P5", 2, CT_PAX, "CAP", "KLO", "Island Hopper");
     s.load(100, 8).pay(6200).lic(LIC_CPL).wx(W(70, 12, 4, 0.2f, 0.4f, 3500, 35, 0, false, 12.0f))
      .brief("Eight tourists to tropical Kaleo. Rent an Islander Twin for the crossing."); add(s); }
@@ -182,7 +183,7 @@ void buildStory() {
     s.load(600, 40).pay(65000).lic(LIC_ATP).wx(W(250, 12, 6, 0.3f, 0.6f, 3000, 20, 1, false, 18.8f))
      .brief("A full cabin to Port Verde across the Spine. Sunset over the sea."); add(s); }
   { S s("A4", 4, CT_VIP, "PVI", "FAR", "The Minister's Jet");
-    s.load(150, 5).pay(110000).lic(LIC_ATP).owned().limit(12).wx(W(130, 8, 0, 0.1f, 0.2f, 6000, 50, 0, false, 11.5f))
+    s.load(150, 5).pay(110000).lic(LIC_ATP).owned().type("starling").limit(12).wx(W(130, 8, 0, 0.1f, 0.2f, 6000, 50, 0, false, 11.5f))
      .brief("The Minister needs to reach Far Isle in 12 minutes, in comfort. Only a jet will do: the Starling 500. The autopilot's full arrival takes too long: fly the approach straight in."); add(s); }
   { S s("A5", 4, CT_PAX, "FAR", "NPT", "Storm Run");
     s.load(500, 30).pay(85000).lic(LIC_ATP).wx(W(200, 20, 12, 0.6f, 0.95f, 1800, 6, 1, true, 16.0f))
@@ -227,6 +228,7 @@ Career::Source Career::canFly(const Contract& c, int si, std::string* why) const
   const AircraftSpec& s = kAircraft[si];
   auto no = [&](const std::string& w) { if (why) *why = w; return SRC_NONE; };
   if (c.forceAircraft >= 0) return si == c.forceAircraft ? SRC_LESSON : no("Lesson aircraft only");
+  if (c.requireSpec >= 0 && si != c.requireSpec) return no(fmt("Client requires the %s", kAircraft[c.requireSpec].name));
   if (license < s.license) return no(std::string("Requires ") + licenseName(s.license));
   if (license < c.minLicense) return no(std::string("Contract requires ") + licenseName(c.minLicense));
   if (s.cargoKg < c.cargoKg) return no(fmt("Max cargo %.0f kg", s.cargoKg));
@@ -550,7 +552,12 @@ void Career::refreshBoard() {
     if (canFly(c, si) == SRC_NONE) continue;
     float km = contractKm(c);
     c.payout = (int)((250 + km * (30 + c.cargoKg * 0.13f + c.pax * 16)) * r.range(0.9f, 1.15f)) / 10 * 10;
-    if (c.type == CT_MEDEVAC) { c.payout = c.payout * 2; c.timeLimitMin = ceilf(km * 1000.f / Plane::perf(&s).cruiseV / 60.f * 1.5f + 4); }
+    // a deadline is the planned flight in the type the job was drawn for, a quarter on top: the autopilot's whole
+    // arrival can make it (it was the straight line at cruise x 1.5-1.6 + 3-4 min, and the arrival adds 5-8 min: the
+    // review of v3.44.0, CAR-8 - 7 sampled timed jobs in 40 were late in every type)
+    // (set below, once the weather the plan flies in is drawn)
+    bool timed = c.type == CT_MEDEVAC;
+    if (c.type == CT_MEDEVAC) c.payout = c.payout * 2;
     else if (c.type == CT_VIP) c.payout = c.payout * 17 / 10;
     else if (c.type == CT_NIGHT) c.payout = c.payout * 13 / 10;
     else if (c.type == CT_IFR) c.payout = c.payout * 15 / 10;
@@ -560,13 +567,16 @@ void Career::refreshBoard() {
     c.payout = c.payout * (100 + c.repBonusPct) / 100 / 10 * 10;
     bool plain = c.type == CT_CARGO || c.type == CT_PAX;
     c.fragile = c.type == CT_CARGO && r.uni() < 0.15f;
-    if (plain && r.uni() < 0.15f) { c.timeLimitMin = ceilf(km * 1000.f / Plane::perf(&s).cruiseV / 60.f * 1.6f + 3); c.payout = c.payout * 13 / 10; }
+    if (plain && r.uni() < 0.15f) { timed = true; c.payout = c.payout * 13 / 10; }
     const char* vipNames[] = {"A minister", "A film star", "The island's governor", "A racing driver", "An opera singer", "A football squad's captain"};
     const char* medNames[] = {"Burns patient", "Diver with the bends", "Heart attack", "Road accident casualty", "Premature baby and nurse", "Stroke patient"};
     const char* surveyNames[] = {"Forestry survey", "Coastline mapping", "Power-line inspection", "Flood survey", "Pipeline patrol", "Wildlife count"};
     switch (c.type) {
       case CT_MEDEVAC: c.title = fmt("Medevac: %s to %s", medNames[r.next() % 6], B.name); c.brief = fmt("A patient at %s needs the hospital at %s within %.0f minutes. Keep it under 1.5 g and 30 degrees of bank, and the touchdown soft: the patient's condition is on the HUD.", A.name, B.name, c.timeLimitMin); break;
-      case CT_VIP: c.title = fmt("VIP: %s to %s", vipNames[r.next() % 6], B.name); c.brief = fmt("%s and party, %d aboard, expect a limousine ride to %s. The comfort meter on the HUD drops with every steep bank, bump and firm touchdown; a delighted client pays extra.", vipNames[(r.next() % 6)], c.pax, B.name); break;
+      case CT_VIP: {   // (one VIP for the title and the brief - they named two in 83% of jobs: the review of v3.44.0, CAR-9; the second draw kept, so the rest of the board stays as it was)
+        const char* who = vipNames[r.next() % 6]; (void)r.next();
+        c.title = fmt("VIP: %s to %s", who, B.name); c.brief = fmt("%s and party, %d aboard, expect a limousine ride to %s. The comfort meter on the HUD drops with every steep bank, bump and firm touchdown; a delighted client pays extra.", who, c.pax, B.name); break;
+      }
       case CT_NIGHT: c.title = fmt("Night freight to %s", B.name); c.brief = fmt("%s for the morning at %s, flown overnight between two lit fields. Have the landing light on for the touchdown.", cargoNames[r.next() % 10], B.name); break;
       case CT_IFR: c.title = fmt("Low-vis run to %s", B.name); c.brief = fmt("%s to %s under a low overcast in poor visibility. Fly the approach on the instruments: if you are not lined up with the runway when you break out, go around.", cargoNames[r.next() % 10], B.name); break;
       case CT_SURVEY: c.title = fmt("%s near %s", surveyNames[r.next() % 6], B.name); c.brief = fmt("Fly the six survey checkpoints in order, holding %.0f ft within 150 ft, then land at %s. Pay follows the share of the pattern flown in the band.", c.wps[0].alt * M_TO_FT, B.name); break;
@@ -588,6 +598,7 @@ void Career::refreshBoard() {
     if (c.type == CT_IFR) { c.wx.cloudCover = 0.95f; c.wx.cloudBase = r.range(300.f, 600.f) / M_TO_FT + B.elev; c.wx.visibility = r.range(1500.f, 3000.f); c.wx.precip = r.uni() < 0.5f ? 1 : 0; c.wx.windSpeed = std::min(c.wx.windSpeed, 6.f / MS_TO_KT); }
     if (c.type == CT_SURVEY) { c.wx.cloudCover = std::min(c.wx.cloudCover, 0.4f); c.wx.cloudBase = std::max(c.wx.cloudBase, c.wps[0].alt + 300.f); c.wx.gust = 0; c.wx.turbulence = std::min(c.wx.turbulence, 0.12f); }
     if (c.type == CT_MEDEVAC || c.type == CT_VIP) { c.wx.gust = std::min(c.wx.gust, 4.f / MS_TO_KT); c.wx.storm = false; }
+    if (timed) c.timeLimitMin = ceilf(plan(c, si, SRC_RENT).minutesEst * 1.25f);
     bool dup = false;
     for (auto& b : board) if (b.to == c.to && b.type == c.type) dup = true;
     if (!dup) board.push_back(c);

@@ -88,6 +88,30 @@ int main() {
     }
     printf("Background quote take-offs: %d flown\n", flown);
   }
+  // deadlines the autopilot can make (the review of v3.44.0, CAR-8): every timed job on the boards has a type that can
+  // fly it whose planned time, a quarter on top, is inside the limit; and a client's aircraft type is enforced (A4)
+  {
+    int timed = 0, tight = 0;
+    for (unsigned seed = 1; seed <= 4; seed++)
+      for (int ap = 0; ap < (int)g_world.airports.size(); ap++) {
+        Career t; t.newGame(); t.license = LIC_ATP; t.location = ap; t.boardSeed = seed; t.storyIndex = (int)g_story.size(); t.money = 1000000; t.refreshBoard();
+        for (auto& k : t.board) {
+          if (k.timeLimitMin <= 0) continue;
+          timed++; bool ok = false;
+          for (int si = 0; si < kNumAircraft && !ok; si++) if (!kAircraft[si].special && t.canFly(k, si) != Career::SRC_NONE) ok = t.plan(k, si, Career::SRC_RENT).minutesEst * 1.2f <= k.timeLimitMin;
+          if (!ok) { tight++; printf("  !! %s (%s to %s): %.0f min, no type plans it with a fifth to spare\n", k.id.c_str(), g_world.airports[k.from].code, g_world.airports[k.to].code, k.timeLimitMin); }
+        }
+      }
+    int a4 = -1; for (int i = 0; i < (int)g_story.size(); i++) if (g_story[i].id == "A4") a4 = i;
+    bool typed = a4 >= 0 && g_story[a4].requireSpec >= 0;
+    if (typed) {
+      Career t; t.newGame(); t.license = LIC_ATP; t.location = g_story[a4].from;
+      for (int si = 0; si < kNumAircraft; si++) if (!kAircraft[si].special) t.fleet.push_back({si, g_story[a4].from, kAircraft[si].maxFuel, 1.f});
+      for (int si = 0; si < kNumAircraft; si++) if (!kAircraft[si].special && (t.canFly(g_story[a4], si) != Career::SRC_NONE) != (si == g_story[a4].requireSpec)) typed = false;
+    }
+    printf("Deadlines: %d timed jobs, %d without a type that plans them in time; A4 only in its jet %d\n", timed, tight, typed);
+    problems += tight + !typed;
+  }
   // every story contract has a continuation policy: lessons and checkrides are retaken whole, timed jobs and the
   // VIP charter resume against their clock, the medevac resumes with its destination, the rest resume
   for (auto& k : g_story) {

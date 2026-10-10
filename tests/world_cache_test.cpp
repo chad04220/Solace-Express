@@ -1,5 +1,6 @@
 // The islands' cache (World::saveCache / loadCache): a valid file reads back identical, and a wrong stamp, a truncated
 // file, a derived array of the wrong size or trailing bytes are all rejected (the world is then generated again).
+#include <limits>
 #include "../src/world.h"
 #include <cstdio>
 #include <cstring>
@@ -33,6 +34,10 @@ int main() {
   const std::string bad = "world_cache_bad.bin";
   { std::vector<char> t(good.begin(), good.begin() + good.size() / 2); writeAll(bad, t); World d; CHECK(!d.loadCache(bad, "stampA"), "a truncated file is rejected"); }
   { std::vector<char> t = good; t.push_back(0); writeAll(bad, t); World d; CHECK(!d.loadCache(bad, "stampA"), "trailing bytes are rejected"); }
+  {   // a NaN height in an otherwise well-formed file (the review of v3.44.0, WLD-4): the first height, after the header and hm's count
+    std::vector<char> t = good; const float nan = std::numeric_limits<float>::quiet_NaN(); memcpy(&t[4 + 64 + 8], &nan, 4);
+    writeAll(bad, t); World d; CHECK(!d.loadCache(bad, "stampA") && d.hm.empty(), "a NaN height is rejected, nothing published");
+  }
   {   // the height bounds' first level written as empty: its size field zero, its data gone
     const size_t head = 4 + 64;
     size_t off = head;

@@ -494,6 +494,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   for (const Contact& c : cs) {
     vec3 pw = pos + q.rotate(c.p);
     float gy = g_world.height(pw.x, pw.z, 7);
+    if (sceneryHits) gy = pitGround(pw.x, pw.z, gy);   // (down into what the game has dug: the player's aircraft, not the background quote's)
     bool water = gy < 0.3f && g_world.onRunway(pw.x, pw.z, 30) < 0;
     float surf = std::max(gy, 0.f);
     float pen = surf - pw.y;
@@ -1397,7 +1398,7 @@ void Plane::apGuidance(float dt) {
       apStatus = fmt("APPR  %s  RWY %02d  %.1f km  GS %+.0f m", a.code, rwyN, dist / 1000.f, -err);
       break;
     }
-    case APS_FLARE:
+    case APS_FLARE: {
       // steer the ground track onto the centreline (not the heading: a slow aircraft can float for seconds in the flare
       // and a gusting crosswind would carry it off the side faster than a smoothed crab estimate follows), and take
       // most of the crab out only in the last metre
@@ -1409,6 +1410,8 @@ void Plane::apGuidance(float dt) {
       // the sink rate comes off exponentially as the height does, at a pace set when the flare starts: the height then
       // over the sink then (so it never asks for more sink than it has), no quicker than this airframe can follow
       if (apStageT <= dt * 1.5f) apFlareTau = std::max(clampf(2.2f * apPathLag(), 2.5f, 8.f), hab / std::max(-vel.y, 0.5f));
+      // (how far past the aim point it floats: the runway is running out - from 60 m on, a fast jet's ordinary float)
+      const float late = clampf((along - 60.f) / 250.f, 0.f, 1.f);
       // (settling, not skimming: a firmer end to the flare for a fast aircraft, whose every second of float is a long
       // way down the runway, and firmer still the longer it floats)
       {
@@ -1430,12 +1433,14 @@ void Plane::apGuidance(float dt) {
         // holding off and letting the speed bleed - with its flaps out at the book speed the Q400 flew onto Far Isle a
         // degree nose down, and its nosewheel met the runway with its mains at 8.8 g
         // (less sink, never a climb: asked to climb a metre up, the Wren skipped off Fjordhaven's runway and flew on)
-        if (!s.taildragger && hab < 4.f) apVS = std::min(apVS + clampf((2.5f - pitchDeg()) * 0.3f, 0.f, 1.5f) * clampf((4.f - hab) / 2.f, 0.f, 1.f), std::max(apVS, -0.3f));
+        // (...until it is past the aim point: there the runway is running out and it settles on - held off at 0.3 m/s
+        // with the power on for the passengers, the loaded Q400 skimmed 850 m in ground effect and ran off Meadowbrook)
+        if (!s.taildragger && hab < 4.f) apVS = std::min(apVS + clampf((2.5f - pitchDeg()) * 0.3f, 0.f, 1.5f) * clampf((4.f - hab) / 2.f, 0.f, 1.f) * (1.f - late), std::max(apVS, -0.3f - 1.2f * late));
       }
       // (idle from the start of the flare, unless the passengers or a fragile load are aboard: then the speed is held on
       // the power until the wheels are nearly on - a heavy aircraft floating at idle lost 6 m/s below vref, then its lift, and sank
       // back in at 2.4 m/s from a flare that had brought it to 1.3: review F2, F3)
-      apSpeed = apComfort && hab > 0.8f ? vref * 0.97f : 0.f;
+      apSpeed = apComfort && hab > 0.8f && late < 1.f ? vref * (0.97f - 0.12f * late) : 0.f;   // (and less of it past the aim point)
       // (and a balloon - a gust under it 1.5 m above the lowest it had come - gets the power back on to hold the
       // reference speed while it settles: at idle the XR-10 ballooned to 6 m at Fjordhaven, slowed to 1.14 Vs and fell
       // back in at 3.5 m/s with nothing left to flare with)
@@ -1443,11 +1448,12 @@ void Plane::apGuidance(float dt) {
       // the power on the Wren flew the length of Fjordhaven a metre up in a gusting tailwind)
       if (apFlareMin >= 0.f) {
         apFlareMin = std::min(apFlareMin, hab);
-        if (hab > apFlareMin + 1.5f && hab > 1.f) apSpeed = std::max(apSpeed, vref);
+        if (hab > apFlareMin + 1.5f && hab > 1.f && late < 1.f) apSpeed = std::max(apSpeed, vref * (1.f - 0.12f * late));   // (not once it is well past the aim point)
       }
       if (onGround) { apStage = APS_ROLLOUT; apStageT = 0; }
       apStatus = fmt("FLARE  %s  RWY %02d", a.code, rwyN);
       break;
+    }
     case APS_ROLLOUT:
       apSpeed = 0;
       // bounced back into the air: fly it down again (a rollout's controls would leave it to the gusts)
@@ -1481,7 +1487,7 @@ void Plane::apGuidance(float dt) {
       apBled = false;   // (the next approach comes down fast and sheds it again)
       apHeading = rwyHdg; apUseVS = true; apVS = std::max(E.climbPlan, 1.f); apSpeed = vref * 1.35f;   // (the climb it can hold now)
       ctl.flaps = 0.34f;
-      if (apStageT > 8.f && s.retract) ctl.gearDown = false;
+      if (apStageT > 8.f && s.retract && hab > 30.f && vel.y > 0.5f) ctl.gearDown = false;   // (climbing away clear of the ground: from a balked flare a heavy one sinks back first, and met the runway on its belly)
       // (back to NAV only clear of the ground all round: its turns would otherwise put it into the slope it climbed from)
       if (pos.y > std::max(a.elev + 450.f, apHoldAlt - 30.f) && pos.y > terrainAround() + 200.f) { apStage = APS_NAV; apLeg = 0; apStageT = 0; apTurnDir = 0; }
       apStatus = fmt("GO AROUND  %s", a.code);
@@ -1901,7 +1907,7 @@ void Plane::apControl(float dt) {
   // elevator: the pitch rate that bends the flight path as asked at the commanded load factor (in a turn, the part of
   // the turn rate that lies in the pitch axis), tracked with stick scaled by this airframe's learned pitch power
   float qT = G0 * (nzT - cosf(g) * cb) / spd;
-  static float dbgT = 0; dbgT += dt;
+  static thread_local float dbgT = 0; dbgT += dt;   // (per thread: the background quote flies the same autopilot - the review of v3.44.0, RND-8)
   if (getenv("APDBG2") && apMode == AP_APPR && apStage == APS_FINAL && dbgT > 0.5f) { dbgT = 0;
     printf("    fin vsT %5.1f vs %5.1f  gT %5.2f g %5.2f eD %+.3f gI %+.3f  nzT %.2f nz %.2f  pitch %5.1f  ias %5.1f/%5.1f est %5.1f  thr %.2f thrI %.2f flaps %.2f\n",
            vsT, vel.y, gT / DEG, g / DEG, eD, apGamI, nzT, gLoad, pitchDeg(), ias, apSpeed, apSpdEst, ctl.throttle, apThrI, flaps); }

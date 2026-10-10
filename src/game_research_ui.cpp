@@ -488,7 +488,7 @@ void Game::drawResearch(const FrameParams& fp) {
           g_ren.rect(bx + q * bw / 20.f, by + 2 * s, bw / 20.f - 2 * s, 8 * f * s, b == 2 ? R_AMBER : c, (on ? 0.85f : 0.12f) * e);
         }
       }
-      if (click(x, y, w, h)) resCraft = craft;
+      if (y + h <= L.bot && click(x, y, w, h)) resCraft = craft;
       y += h + 12 * s;
     }
     if (in.pressed[K_TAB] || (in.buttonsPressed & PAD_X)) resCraft = kResCraft[(resCraftSlot(resCraft) + 1) % kNumResCraft].idx;
@@ -498,6 +498,9 @@ void Game::drawResearch(const FrameParams& fp) {
     tag(x, y + 4 * s, s, fmt("TEST CARDS  //  %d OF %d SIGNED OFF", nDone, nCards), ACC, e); y += 26 * s;
     float rh = clampf((L.bot - y - 40 * s) / (nCards + 1), 12 * s, 20 * s), fs = std::min(10.5f * s, rh * 0.62f);
     auto cardRow = [&](int idx, const char* num, const char* title, bool done) {
+      // (a row that doesn't fit above the sortie bar is neither drawn nor clickable: hidden under the bar at 1280x720
+      // and 140%, it took the ABORT click meant for the bar - the review of v3.44.0, UI-2)
+      if (y + rh > L.bot) { y += rh; return; }
       bool sel = resCard == idx, hov = hovered(x, y, w, rh);
       if (sel || hov) g_ren.rect(x, y, w, rh, ACC, (sel ? 0.18f : 0.08f) * e);
       if (sel) g_ren.rect(x, y, 2 * s, rh, ACC, e);

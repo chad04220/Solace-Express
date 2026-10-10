@@ -101,5 +101,13 @@ void noised(float px, float pz, float& v, float& dx, float& dz);
 float terrainFbm(float px, float pz, int octaves);
 
 extern World g_world;
+// The ground the game has dug this flight - the crash crater, the pieces' pits, plasma craters, laser scorches: what the
+// renderer draws (common.glsl craterH) - x, z, radius, depth (its sign the shader's flag). The main thread's: what touches
+// the ground in play (the aircraft, its weapons, the wreckage) comes down into them; the background quote flights, on
+// the islands as built, never read it (the review of v3.44.0, WLD-1: an 8 m plasma crater was drawn over the old floor)
+struct GroundPit { float x, z, R, D; };
+extern std::vector<GroundPit> g_groundPits;
+bool craterShape(float x, float z, float cx, float cz, float R, float D, float& h);   // a pit's floor and rim at x, z (adds to h)
+float pitGround(float x, float z, float g);   // g, the ground's height at x, z, with the pits dug into it
 #include <atomic>
 extern std::atomic<int> g_worldStage;   // World::build: 0 not begun, 1 reading the cache, 2 generating, 3 done (the loading screen's wording)

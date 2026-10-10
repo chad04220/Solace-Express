@@ -55,7 +55,7 @@ void subImage(GLenum, GLint, GLint x, GLint y, GLsizei w, GLsizei h, GLenum, GLe
 void draw(GLenum, GLint, GLsizei) {
   Renderer& r = *renderer;
   const int m = r.hullBakeMode;
-  const GLuint expected = m == 3 ? r.progHullBakeNormal : r.progHullBake;
+  const GLuint expected = r.hullBakeProg[m == 3 ? 1 : 0];   // (the pair beginHullBake chose: the aircraft's own, or the shared one)
   check(current == expected, "correct program selected for mode " + std::to_string(m));
   check(fbo == r.fboHOut && vao == r.vaoEmpty && !blend && !depth && scissor, "draw restores FBO, VAO, blend/depth and scissor state");
   check(m == 3 || scalar(current, "uHMode") == m, "uniform mode follows CPU selector");
@@ -67,7 +67,8 @@ void draw(GLenum, GLint, GLsizei) {
   check(scalar(current,"uCloudBoil")==r.hullBakeFrame.cloudBoil,"cloud boil copied/restored");
   if(r.hullBakeFrame.wakeN>1){
     check(uniforms[current]["uWake"]==std::vector<float>(&r.hullBakeFrame.wake[0][0],&r.hullBakeFrame.wake[0][0]+r.hullBakeFrame.wakeN*4),"all wake points copied/restored");
-    check(uniforms[current]["uWakeK"]==std::vector<float>(r.hullBakeFrame.wakeK,r.hullBakeFrame.wakeK+r.hullBakeFrame.wakeN),"wake strengths copied/restored");
+    check(uniforms[current]["uWakeP"]==std::vector<float>(&r.hullBakeFrame.wakeP[0][0],&r.hullBakeFrame.wakeP[0][0]+r.hullBakeFrame.wakeN*4),"wake path copied/restored");
+    check(uniforms[current]["uWakeG"]==std::vector<float>(&r.hullBakeFrame.wakeG[0][0],&r.hullBakeFrame.wakeG[0][0]+r.hullBakeFrame.wakeN*4),"wake geometry copied/restored");
     check(uniforms[current]["uWakeB"]==std::vector<float>(r.hullBakeFrame.wakeB,r.hullBakeFrame.wakeB+4),"wake bounds copied/restored");
   }
   check(uniforms[current]["uHStPS"] == std::vector<float>(r.hullBakePS.begin(), r.hullBakePS.end()), "PS state array restored");
@@ -154,13 +155,20 @@ static GLuint linkOnce(const std::string&, const std::string& fs, std::string& e
 }
 #include "actual_link_cache.inc"
 #include "actual_dispatch.inc"
+// (what the extracted methods call and these checks don't exercise: the environment materials and the wreck boxes of the
+// shared uniforms, and the per-aircraft builders - the mock aircraft has none of its own, so the shared pair is used)
+void Renderer::bindEnvironmentMaterials(GLuint, int, int) {}
+void Renderer::setWreckBoxes(GLuint, const WreckVisual&) {}
+int Renderer::afModelOf(const float*, int) { return -1; }
+bool Renderer::afBakePrograms(int, int, GLuint*) { return false; }
+bool Renderer::sharedBakePrograms(GLuint out[2]) { if (!progHullBake) return false; out[0] = progHullBake; out[1] = progHullBakeNormal; return true; }
 
 using namespace audit;
 void setup(Renderer& r, FrameParams& fp) {
   renderer=&r;r.progHullBake=101;r.progHullBakeNormal=102;r.vaoEmpty=99;r.texTraffic=901;r.W=r.rw=800;r.H=r.rh=600;r.texTSh[0]=777;r.tshFront=0;
   fp.plane.on=true;fp.plane.model=7;fp.feedRig=2;
   fp.cloudDet=vec3(.25f,.5f,.75f);fp.cloudBoil=2.f;fp.wakeN=FrameParams::kWakeMax;
-  for(int i=0;i<fp.wakeN;i++){for(int j=0;j<4;j++)fp.wake[i][j]=float(i*4+j);fp.wakeK[i]=float(i)*.03125f;}
+  for(int i=0;i<fp.wakeN;i++)for(int j=0;j<4;j++){fp.wake[i][j]=float(i*4+j);fp.wakeP[i][j]=float(i*4+j)*.03125f;fp.wakeG[i][j]=float(i*4+j)*.0625f;}
   for(int i=0;i<4;i++)fp.wakeB[i]=float(i+1);
   for(int i=0;i<96;i++)fp.plane.M[i]=float(i)*.03125f;
   for(int i=0;i<28;i++)(&fp.plane.wr[0][0])[i]=float(i)*.0625f;
@@ -177,16 +185,20 @@ void assertNormalTransport(Renderer& r, size_t n) {
 }
 void resetLinkTest() {links.clear();failField=failNormal=failSafeField=failSafeNormal=nonVendorFailure=historicalReject=false;s_safeUseless=false;g_shaderNotes.clear();}
 void cleanup(Renderer& r) {for(GLuint p:{r.progHull,r.progHullBake,r.progHullBakeNormal})if(p)glDeleteProgram(p);}
+// the field / normal pair as a builder links it (Renderer::linkBakePair: each aircraft's own, or the shared one)
+static bool linkPair(Renderer& r, const std::string& vs, const std::string& fs) {
+  GLuint o[2] = {0, 0}; std::string e; const bool ok = r.linkBakePair(vs, fs, o, e); r.progHullBake = o[0]; r.progHullBakeNormal = o[1]; return ok;
+}
 void fallbacks() {
   const std::string vs="#version 330 core\nvoid main(){}",fs="#version 330 core\nvec2 mapPlaneBody(vec3 p); void main(){}";
-  {resetLinkTest();Renderer r;check(r.compileHull(vs,fs),"pair succeeds normally");check(links.size()==2&&!links[0].safe&&!links[1].safe,"both normal builds retain full field");cleanup(r);}
-  {resetLinkTest();failField=true;Renderer r;check(r.compileHull(vs,fs),"field fallback succeeds");check(links.size()==3&&!links[0].normal&&links[1].safe&&links[1].retry&&links[2].normal&&links[2].safe,"field fallback forces same safe normal field");cleanup(r);}
-  {resetLinkTest();failNormal=true;Renderer r;check(r.compileHull(vs,fs),"normal fallback succeeds");check(links.size()==4&&links[1].normal&&!links[1].safe&&links[2].normal&&links[2].safe&&links[2].retry&&!links[3].normal&&links[3].safe,"normal fallback rebuilds field with same safe geometry");check(livePrograms.size()==3,"replaced field program deleted");cleanup(r);}
-  {resetLinkTest();failNormal=historicalReject=true;Renderer r;check(r.compileHull(vs,fs),"historical rejection follows matched fallback");check(g_shaderNotes.find("an earlier launch")!=std::string::npos,"historical fallback note retained");cleanup(r);}
-  {resetLinkTest();failField=failSafeField=true;Renderer r;check(!r.compileHull(vs,fs),"field terminal fallback failure propagated");check(!r.progHullBake&&!r.progHullBakeNormal&&s_safeUseless,"failed pair disabled with upstream useless guard");cleanup(r);}
-  {resetLinkTest();failNormal=failSafeNormal=true;Renderer r;check(!r.compileHull(vs,fs),"normal terminal fallback failure propagated");check(!r.progHullBake&&!r.progHullBakeNormal,"successful sibling deleted after normal failure");cleanup(r);}
-  {resetLinkTest();failNormal=failSafeField=true;Renderer r;check(!r.compileHull(vs,fs),"field rebuild failure after successful normal fallback propagated");check(!r.progHullBake&&!r.progHullBakeNormal,"all surviving programs deleted on pair rebuild failure");cleanup(r);}
-  {resetLinkTest();failNormal=nonVendorFailure=true;Renderer r;check(!r.compileHull(vs,fs),"ordinary failure propagated");check(links.size()==2,"ordinary error gets no NVIDIA retry");cleanup(r);}
+  {resetLinkTest();Renderer r;check(linkPair(r,vs,fs),"pair succeeds normally");check(links.size()==2&&!links[0].safe&&!links[1].safe,"both normal builds retain full field");cleanup(r);}
+  {resetLinkTest();failField=true;Renderer r;check(linkPair(r,vs,fs),"field fallback succeeds");check(links.size()==3&&!links[0].normal&&links[1].safe&&links[1].retry&&links[2].normal&&links[2].safe,"field fallback forces same safe normal field");cleanup(r);}
+  {resetLinkTest();failNormal=true;Renderer r;check(linkPair(r,vs,fs),"normal fallback succeeds");check(links.size()==4&&links[1].normal&&!links[1].safe&&links[2].normal&&links[2].safe&&links[2].retry&&!links[3].normal&&links[3].safe,"normal fallback rebuilds field with same safe geometry");check(livePrograms.size()==2,"replaced field program deleted (the pair alone: no hull program in a builder)");cleanup(r);}
+  {resetLinkTest();failNormal=historicalReject=true;Renderer r;check(linkPair(r,vs,fs),"historical rejection follows matched fallback");check(g_shaderNotes.find("an earlier launch")!=std::string::npos,"historical fallback note retained");cleanup(r);}
+  {resetLinkTest();failField=failSafeField=true;Renderer r;check(!linkPair(r,vs,fs),"field terminal fallback failure propagated");check(!r.progHullBake&&!r.progHullBakeNormal&&s_safeUseless,"failed pair disabled with upstream useless guard");cleanup(r);}
+  {resetLinkTest();failNormal=failSafeNormal=true;Renderer r;check(!linkPair(r,vs,fs),"normal terminal fallback failure propagated");check(!r.progHullBake&&!r.progHullBakeNormal,"successful sibling deleted after normal failure");cleanup(r);}
+  {resetLinkTest();failNormal=failSafeField=true;Renderer r;check(!linkPair(r,vs,fs),"field rebuild failure after successful normal fallback propagated");check(!r.progHullBake&&!r.progHullBakeNormal,"all surviving programs deleted on pair rebuild failure");cleanup(r);}
+  {resetLinkTest();failNormal=nonVendorFailure=true;Renderer r;check(!linkPair(r,vs,fs),"ordinary failure propagated");check(links.size()==2,"ordinary error gets no NVIDIA retry");cleanup(r);}
   {resetLinkTest();bool safe=true;std::string err;GLuint p=linkProgramCached(vs,fs,err,&safe);check(p&&!safe,"optional safe output reset on first-link success");glDeleteProgram(p);}
   check(livePrograms.empty(),"all fallback test programs released");
   std::set<std::string> distinct;for(const auto& x:variantSources)distinct.insert(x.second);
@@ -211,7 +223,7 @@ int main() {
   r.hullBakeMode=3;r.hullBakeState=19;r.hullBakePart=21;r.hullBakeWr.fill(99);r.hullBakeWr2.fill(99);r.measureFeedMounts(fp);
   check(r.hullBakeMode==0&&r.hullBakeState==0&&r.hullBakePart==-1&&r.hullBakeStates==1,"feed measurement resets stale normal/state/part mode");
   check(r.hullBakePS[3]==0&&r.hullBakeWr==std::array<float,512>{}&&r.hullBakeWr2==std::array<float,512>{},"feed measurement clears cockpit and prior XR state arrays");check(g_feedMounts[2].ok,"feed result marked available");
-  r.progHullBakeNormal=0;r.hullBakeMode=3;oldDraws=draws;r.hullEval4(p,out);check(draws==oldDraws&&out[0]==1e9f,"missing selected program fails closed");
+  r.hullBakeProg[1]=0;r.hullBakeMode=3;oldDraws=draws;r.hullEval4(p,out);check(draws==oldDraws&&out[0]==1e9f,"missing selected program fails closed");
   fallbacks();
   std::cout<<"PASS: "<<checks<<" assertions; "<<draws<<" mock draws; "<<yields<<" adversarial yields. Selector/common state, point-normal alignment, tail padding, bounded batching, feed reset, fail-closed inputs, paired NVIDIA fallback and cleanup.\n";
 }

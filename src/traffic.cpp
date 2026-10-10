@@ -230,7 +230,7 @@ void Traffic::groundTaxi(TrafficCraft& c, float dt, float maxSpeed, vec3 playerP
   attitudeToQuat(c);
 }
 
-bool Traffic::runwayBusy(int ai, int self, vec3 playerPos, bool playerOnGround) const {
+bool Traffic::runwayBusy(int ai, int self, vec3 playerPos, bool playerOnGround, bool lineup) const {
   const Airport& a = g_world.airports[ai];
   for (auto& o : craft) {
     if (!o.alive || o.id == self || o.role != TrafficCraft::AIRPORT || o.airport != ai) continue;
@@ -239,8 +239,18 @@ bool Traffic::runwayBusy(int ai, int self, vec3 playerPos, bool playerOnGround) 
   }
   vec2 pl = apLocal(a, playerPos);
   if (fabsf(pl.x) < a.length * 0.5f + 150.f && fabsf(pl.y) < a.width * 0.5f + 25.f && playerPos.y - a.elev < 120.f) return true;
+  // (and nothing lines up in front of a player on final for either end, cleared to land: the review of v3.44.0, FLT-4)
+  if (lineup && fabsf(pl.y) < 400.f && fabsf(pl.x) > a.length * 0.5f && fabsf(pl.x) < a.length * 0.5f + 5000.f && playerPos.y - a.elev < 500.f) return true;
   (void)playerOnGround;
   return false;
+}
+void Traffic::clearRunway(int ai) {
+  for (auto& o : craft) {
+    if (!o.alive || o.role != TrafficCraft::AIRPORT || o.airport != ai) continue;
+    if (o.state == TrafficCraft::LINEUP || o.state == TrafficCraft::ROLLOUT || o.state == TrafficCraft::TAKEOFF) o.alive = false;   // (held there by the player in its way)
+    else if (o.state == TrafficCraft::FINAL) { o.state = TrafficCraft::CLIMB; o.gear = 1; }
+    else if (o.state == TrafficCraft::CIRCUIT && o.wp >= 3) o.wp = 1;   // (extends its downwind)
+  }
 }
 
 void Traffic::updateAirport(TrafficCraft& c, float dt, vec3 playerPos, bool playerOnGround) {
@@ -269,7 +279,7 @@ void Traffic::updateAirport(TrafficCraft& c, float dt, vec3 playerPos, bool play
       break;
     case TrafficCraft::HOLD:
       c.speed = approach(c.speed, 0, 3.f, dt);
-      if (c.timer <= 0 && !runwayBusy(c.airport, c.id, playerPos, playerOnGround)) {
+      if (c.timer <= 0 && !runwayBusy(c.airport, c.id, playerPos, playerOnGround, true)) {
         c.state = TrafficCraft::LINEUP; c.path = {apWorld(a, uC + 25.f, 0, 0), apWorld(a, uC + 90.f, 0, 0)}; c.wp = 0;
       }
       break;

@@ -9,6 +9,7 @@ public:
   void play(const std::string& url);
   void stop();
   void setVolume(float v);  // 0..1
+  float volume() const { return vol; }   // (as last set)
   void poll();
   State state() const { return st; }
   const std::string& status() const { return msg; }

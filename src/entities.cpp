@@ -170,7 +170,17 @@ bool Scenery::damage(const Ent& e, int kind, int amount) {
   h += amount;
   if (h < hitPoints(e, kind)) return false;
   hits.erase(k);
-  wrecked[chunkOf(e.z) * NC + chunkOf(e.x)].push_back(k);
+  // filed under the chunk its position falls in (destroyed() looks there) and, on a chunk seam, the neighbour too: the
+  // chunk that placed it may be either side of the rounding, and only a chunk with something wrecked is drawn without
+  // its wrecks (the review of v3.44.0, WLD-3: 13 in 1.21 M stayed drawn, and cast shadows, with no collision)
+  const int cx = chunkOf(e.x), cz = chunkOf(e.z);
+  const float fx = e.x - chunkX0(cx), fz = e.z - chunkX0(cz), seam = 0.5f;
+  const int ox = fx < seam ? -1 : fx > CH - seam ? 1 : 0, oz = fz < seam ? -1 : fz > CH - seam ? 1 : 0;
+  for (int dz = 0; dz <= (oz ? 1 : 0); dz++)
+    for (int dx = 0; dx <= (ox ? 1 : 0); dx++) {
+      const int nx = cx + dx * ox, nz = cz + dz * oz;
+      if (nx >= 0 && nx < NC && nz >= 0 && nz < NC) wrecked[nz * NC + nx].push_back(k);
+    }
   wreckRev++;
   return true;
 }

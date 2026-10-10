@@ -214,7 +214,7 @@ static bool readWav(const std::string& path, std::vector<float>& out, int outRat
   int fmt = 0, ch = 1, rate = 0, bits = 0; size_t data = 0, len = 0;
   for (size_t o = 12; o + 8 <= b.size();) {
     size_t n = u32(o + 4);
-    if (!b.compare(o, 4, "fmt ")) { fmt = (int)u16(o + 8); ch = (int)u16(o + 10); rate = (int)u32(o + 12); bits = (int)u16(o + 22); }
+    if (!b.compare(o, 4, "fmt ")) { if (n < 16 || o + 24 > b.size()) return false; fmt = (int)u16(o + 8); ch = (int)u16(o + 10); rate = (int)u32(o + 12); bits = (int)u16(o + 22); }   // (a truncated header: no clip - the review of v3.44.0, AUD-4)
     else if (!b.compare(o, 4, "data")) { data = o + 8; len = std::min(n, b.size() - data); }
     o += 8 + n + (n & 1);
   }
@@ -229,6 +229,7 @@ static bool readWav(const std::string& path, std::vector<float>& out, int outRat
       in[i] = (sign ? -v : v) / 32768.f;
     }
   }
+  if (in.empty()) return false;   // (no samples: an empty or cut-off data chunk)
   // to the output rate (linear: the radio speech has nothing above ~6 kHz)
   double step = (double)rate / outRate;
   size_t n = (size_t)((in.size() - 1) / step) + 1;

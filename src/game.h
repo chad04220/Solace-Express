@@ -292,6 +292,7 @@ private:
     struct Blast { vec3 p; float R, age, dur; bool water; };
     struct Crater { float x, z, R, D; };
     std::vector<Bolt> bolts; std::vector<Bomb> bombs; std::vector<Blast> blasts; std::vector<Crater> craters;
+    std::vector<vec3> flattened;   // every plasma blast on land this flight (x, z, the radius it flattens): its damage outlasts the 7 craters drawn
     struct BombCam { bool on = false; int phase = 0; vec3 pos, look, blastP; float t = 0, orbit = 0, tanHalf = 0.3f; } cam;   // spawned bomb camera (floor screen)
     std::vector<Crater> scorch;   // small laser craters (most recent 16)
     int wrecked = 0;              // trees, rocks and buildings destroyed
@@ -321,6 +322,7 @@ private:
   float crashEndT = 7.5f;         // crashTimer at which the results screen comes up
   void updateWreck(float dt);
   float wreckGround(float x, float z) const;
+  void refreshGroundPits();   // g_groundPits from this flight's pits (each frame, before the physics and the drawing)
   struct RingBurst { vec3 c, ax, ay, col; float t; };
   std::vector<RingBurst> bursts;   // checkpoint shockwaves
   float sparkAccum = 0;
@@ -358,7 +360,7 @@ private:
     // still stands (a go-around voids a landing clearance; it is never replayed or re-issued from here)
     std::string lastCall; int lastApt = -1; float lastT = 0; bool lastValid = true;
     // the instructions compliance is scored on: a hold (where the aircraft was told to wait) and a go-around
-    bool holding = false; vec3 holdPos; bool goAround = false;
+    bool holding = false, holdHeard = false; vec3 holdPos; bool goAround = false;   // (holdHeard: the hold call said - the hold counts from there)
     bool goAroundUnable = false;   // the go-around came while the autopilot flew the approach and it couldn't climb away
                                    // (an engine out, overloaded): it lands from what it has, and that isn't the player's
     bool lastBeforePause = false;   // the recall line was said before a pause: labelled so
@@ -371,6 +373,9 @@ private:
   bool commsCrashSeen = false, lessonVoiceWarned = false;
   std::vector<std::string> hintsVoiced;   // the lesson hints said this flight
   bool warnWas[4] = {}; float warnLastT[4] = {-99, -99, -99, -99};   // stall, pull up, gear, engine off: rising edges
+  static const int kWarnKey = 1000;   // (a hazard call's Tx key: kWarnKey + its index, valid while warnWas holds)
+  float radioSentVol = -1.f;          // the radio's volume as last set (feedAudio)
+  float radioLevel() const { return set.master * set.radioVol * (1.f - 0.65f * voiceDuck); }   // the music: master x radio, ducked under speech
   // a failure annunciator (C7): the HUD draws text, comms speak it when its state (slot -> key) comes on or changes
   // severity, never for the numbers alone (battery and ice percentages move every frame)
   struct Annunciator { std::string text, slot, key; bool bad; };
@@ -419,7 +424,7 @@ private:
   bool confirmNew = false;
 
   // ---------------------------------------------------------------- helpers
-  void saveSettings();
+  bool saveSettings();
   void loadStations();
   int radioScroll = 0;
   void saveGame();

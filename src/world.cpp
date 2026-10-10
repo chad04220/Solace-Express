@@ -6,6 +6,25 @@
 #include <deque>
 
 World g_world;
+std::vector<GroundPit> g_groundPits;
+// a pit's floor and rim (common.glsl craterH, exactly): a bowl with a raised lip, its edge ragged in a few lobes that
+// differ from pit to pit
+bool craterShape(float x, float z, float cx, float cz, float R, float D, float& h) {
+  const float dx = x - cx, dz = z - cz, r = sqrtf(dx * dx + dz * dz);
+  if (r > 1.9f * R) return false;
+  const float a = atan2f(dz, dx), s = (cx * 0.0137f + cz * 0.0191f - floorf(cx * 0.0137f + cz * 0.0191f)) * 6.2832f;
+  const float d = r / (R * (1.f + 0.09f * sinf(3.f * a + s) + 0.05f * sinf(5.f * a + 2.3f * s)));
+  if (d > 1.8f) return false;
+  D = fabsf(D);
+  h += -D * std::max(1.f - d * d, 0.f) + 0.22f * D * expf(-(d - 1.f) * (d - 1.f) * 14.f);
+  return true;
+}
+float pitGround(float x, float z, float g) {
+  if (g_groundPits.empty() || g <= 0.3f) return g;   // (not in the sea: the shader digs only land)
+  float h = 0; bool in = false;
+  for (const GroundPit& p : g_groundPits) in = craterShape(x, z, p.x, p.z, p.R, p.D, h) || in;
+  return in ? g + h : g;
+}
 std::atomic<int> g_worldStage{0};
 
 // ---------------------------------------------------------------- noise
@@ -364,6 +383,13 @@ bool World::loadCache(const std::string& path, const std::string& stamp) {
   for (int L = 0; ok && L < TP_LEVELS; L++) { const uint64_t n = (uint64_t)(HM_N >> L); ok = getVec(f, w.tpM[L], n * n); }
   ok = ok && fgetc(f) == EOF;   // (nothing after the last array: not some other format's file)
   fclose(f);
+  // (and every number in it a number: a NaN height in a well-formed file loaded, and the terrain and the flight model
+  // ran on it - the review of v3.44.0, WLD-4)
+  auto finite = [](const std::vector<float>& v) { for (float x : v) if (!std::isfinite(x)) return false; return true; };
+  ok = ok && finite(w.hm) && finite(w.tpV0);
+  for (int L = 0; ok && L < HMAX_LEVELS; L++) ok = finite(w.hmax[L]);
+  for (int L = 0; ok && L < TP_LEVELS; L++) ok = finite(w.tpM[L]);
+  for (size_t i = 0; ok && i < w.roadGrid.segs.size(); i++) { const RoadSegment& r = w.roadGrid.segs[i]; ok = std::isfinite(r.ax + r.az + r.bx + r.bz + r.ah + r.bh + r.along); }
   if (!ok) return false;
   hm.swap(w.hm); mask.swap(w.mask); tpV0.swap(w.tpV0);
   std::swap(roads, w.roads); std::swap(roadGrid, w.roadGrid);

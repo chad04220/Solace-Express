@@ -96,6 +96,11 @@ static LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_CLOSE: if (g_game) g_game->quit = true; return 0;
     case WM_DISPLAYCHANGE: case WM_EXITSIZEMOVE: setupPacing(h); break;   // refresh rate / monitor may have changed
     case WM_SIZE: if (g_ren.ok) g_ren.resize(LOWORD(lp), HIWORD(lp)); return 0;
+    case WM_GETMINMAXINFO: {   // (a window no smaller than 800 x 600 inside: the menus and settings are laid out for it - the review of v3.44.0, UI-4)
+      RECT r = {0, 0, 800, 600}; AdjustWindowRect(&r, (DWORD)GetWindowLongPtr(h, GWL_STYLE), FALSE);
+      MINMAXINFO* mm = (MINMAXINFO*)lp; mm->ptMinTrackSize.x = r.right - r.left; mm->ptMinTrackSize.y = r.bottom - r.top;
+      return 0;
+    }
     case WM_KEYDOWN: case WM_SYSKEYDOWN:
       if (msg == WM_SYSKEYDOWN && wp == VK_RETURN) {   // Alt+Enter: fullscreen only (the Enter never reaches the game)
         if (!(lp & (1 << 30))) { toggleFullscreen(); setupPacing(h); if (g_game) g_game->set.fullscreen = g_fullscreen; }

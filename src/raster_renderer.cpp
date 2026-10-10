@@ -648,20 +648,31 @@ bool Renderer::rasterCloak(const FrameParams& fp) {
       "}\n", e);
     if (!progCloak) shaderNote("Cloak surface shader failed (the cloak is marched instead):\n" + e);
   }
-  if (!progCloak) return false;
-  if (!texCloak || cloakW != rw || cloakH != rh) {
+  if (!progCloak || cloakFailed) return false;
+  // allocated once at the full window size like every other target (the render resolution is its lower-left part, read
+  // with texelFetch), half floats (the distance to a surface a few hundred metres off, and a normal), and checked: an
+  // incomplete one falls back to the march (the review of v3.44.0, RND-1: Auto 60's every 5% step reallocated 40 MiB)
+  if (!texCloak || cloakW != allocW || cloakH != allocH) {
     if (!texCloak) { glGenTextures(1, &texCloak); glGenTextures(1, &texCloakZ); glGenFramebuffers(1, &fboCloak); }
+    while (glGetError() != GL_NO_ERROR) {}   // (only this allocation's errors below)
     glBindTexture(GL_TEXTURE_2D, texCloak);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, rw, rh, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, allocW, allocH, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, texCloakZ);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, rw, rh, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, allocW, allocH, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, fboCloak);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texCloak, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texCloakZ, 0);
-    cloakW = rw; cloakH = rh;
+    cloakW = allocW; cloakH = allocH;
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE || glGetError() == GL_OUT_OF_MEMORY) {
+      shaderNote("Cloak target incomplete or out of memory: the cloak is marched instead");
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glDeleteFramebuffers(1, &fboCloak); glDeleteTextures(1, &texCloak); glDeleteTextures(1, &texCloakZ);
+      fboCloak = texCloak = texCloakZ = 0; cloakFailed = true;
+      return false;
+    }
   }
   glBindFramebuffer(GL_FRAMEBUFFER, fboCloak);
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);

@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 #include "gl.h"
+#include "shader_prune.h"   // (linkProgramCached prunes each stage before the cache and the compiler see it)
 struct AuditRenderer { std::string compileStage(){return "CPU shader lifetime test";} } g_ren;
 GLuint linkProgramCached(const std::string&, const std::string&, std::string&, bool* = nullptr);
 #include "actual_shader_functions.inc"

@@ -28,6 +28,8 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_FRAMEBUFFER_BINDING 0x8CA6
 #define GL_FLOAT 0x1406
 #define GL_HALF_FLOAT 0x140B
+#define GL_NO_ERROR 0
+#define GL_OUT_OF_MEMORY 0x0505
 #define GL_DEPTH_TEST 0x0B71
 #define GL_BLEND 0x0BE2
 #define GL_CULL_FACE 0x0B44
