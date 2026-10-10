@@ -9,6 +9,10 @@
 - The loading bar now counts all 41 shader programs and the rest of the start-up work, so it moves with what is actually done.
 - A smoother logo and icon, and anti-aliased lines in the interface.
 
+### Research terminal
+- The terminal's boot screen has a loading bar like the launch screen's. It shows how much of the terminal's set-up is done: each research aircraft and its cockpit, the site's scenery and its terrain lighting. It says what is being loaded and how much is left, and reaches 100% only when everything is ready.
+- The fingerprint, retina and neural scans now move with the loading, up to twice their old speed. A quick load gets you through in about three seconds. During a long step the scans wait, while their sweeps and traces keep moving. ACCESS GRANTED appears the moment everything is ready, where it used to hold on that page until the loading caught up.
+
 ### Scenery
 - Trees and bushes keep each detail level about 10–12% farther away: trees reach 2.9 / 5 / 7.8 km on Low / Medium / High. Camera feeds and scenery shadows keep their previous budgets, and placement density and the tree models are unchanged.
 

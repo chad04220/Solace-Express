@@ -177,6 +177,9 @@ private:
   bool hasSave = false;
   bool confirmRes = false;   // the main menu asked whether to enter the research terminal before the campaign is done
   bool resWarm = false; int resWarmFrames = 0, resBakeSeen = 0; int resWarmCraft = -1; bool resWarmCk = false;   // (resWarmCraft / resWarmCk: the craft and view the warm-up frame shows, -1 the selected one)   // the research terminal warming up behind its boot screen (the craft's shells, the airport's scenery)
+  float resWork = 0.f; int resPend0 = 0;   // the warm-up's share done (0..1: the craft views drawn, the site's scenery chunks made, its terrain lighting) and the most chunks it has waited on
+  static constexpr float kResScan0 = 0.35f, kResScan1 = 3.75f;   // the stretch of the boot sequence the scans fill: the warm-up's work runs across it, ACCESS GRANTED at its end
+  float resSeq = 0.f, resSeqAt = 0.f, resSeqOpened = -1.f;   // the boot sequence's own clock (the scans move as far as the warm-up has come), the realTime it last moved at, and the opening it belongs to
   bool headless = false;
 
   // flight session

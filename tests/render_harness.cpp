@@ -20,6 +20,26 @@ static PFNGETPROC s_getProc;
 static void* getProc(const char* n) { void* p = s_getProc((const unsigned char*)n); if (!p) p = dlsym(s_lib, n); return p; }
 
 struct GameTest {
+  static int researchWarm(Game& game) {   // the research terminal opened from the menu after the launch's prewarm: its warm-up, its bar and the boot sequence, frame by frame on the real clock
+    game.debugScene("menu");
+    if (getenv("PREWARM")) game.prewarm([](float, const std::string&) {}, true);   // (as the launch does; without it the warm-up bakes the research craft itself)
+    g_ren.entSync = false;   // (the scenery streams over frames, as in the game)
+    for (int i = 0; i < 3; i++) { game.update(1.f / 30.f); game.render(); }
+    game.in.down['U'] = game.in.down['I'] = true; game.in.pressed['U'] = true;
+    const float shots[] = {1.0f, 2.2f, 3.3f, 3.85f};
+    int shot = 0;
+    auto t0 = std::chrono::steady_clock::now(), last = t0;
+    for (int f = 0; f < 6000 && (game.resWarm || game.resSeq < 5.5f); f++) {
+      auto now = std::chrono::steady_clock::now();
+      const float dt = std::min(0.25f, std::max(1.f / 240.f, std::chrono::duration<float>(now - last).count())); last = now;
+      game.update(dt); game.render(); game.in.endFrame(); game.in.down['U'] = game.in.down['I'] = false;
+      const float bar = std::min(1.f, std::max(0.f, (game.resSeq - Game::kResScan0) / (Game::kResScan1 - Game::kResScan0)));
+      printf("frame %4d  %6.2f s  views %2d  pending %4d of %4d  work %5.1f%%  seq %5.2f  bar %5.1f%%%s\n", f, std::chrono::duration<float>(now - t0).count(), game.resWarmFrames,
+             g_ren.entPending, game.resPend0, game.resWork * 100.f, game.resSeq, bar * 100.f, game.resWarm ? "" : "  (ready)");
+      if (shot < 4 && game.resSeq >= shots[shot]) { char b[128]; snprintf(b, sizeof b, "/tmp/claude-0/sp/reswarm_%d.ppm", shot++); glFinish(); g_ren.screenshot(b); }
+    }
+    return 0;
+  }
   static int hubFly(Game& game) {   // the hub at the player's airport for HUBFRAMES frames, then a job from there: what the loading screen still has to do
     g_ren.entSync = false;
     game.headless = false; game.screen = SCR_HUB;
@@ -333,6 +353,7 @@ void main(){
     g_ren.screenshot("/tmp/claude-0/sp/shot_prewarm.ppm"); printf("wrote shot_prewarm\n");
     return 0;
   }
+  if (scene == "researchwarm") return GameTest::researchWarm(game);
   if (getenv("PREWARM")) game.prewarm([](float, const std::string&) {});   // (every aircraft's body built first, as the game's launch does: the traffic drawn from meshes)
   if (getenv("NOTRAFFIC")) game.set.traffic = false;   // (A/B timings of the player's aircraft alone)
   game.debugScene(scene);

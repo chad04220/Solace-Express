@@ -2,6 +2,7 @@
 // airframe selection with a live 3D preview of the chosen craft, its decrypted specification and
 // manoeuvre envelope, and the sortie parameters.
 #include "game.h"
+#include "load_pacer.h"
 #include "models.h"
 
 namespace {
@@ -221,10 +222,23 @@ std::string Game::resStepText(const ResStep& st) const {
 void Game::drawResearch(const FrameParams& fp) {
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   const float kIntro = 4.9f;
-  if (resAuthed && realTime - resOpened < kIntro - 0.6f) resOpened = realTime - (kIntro - 0.6f);   // returning: just the resume flash
-  const float kGranted = 4.3f;   // the ACCESS GRANTED page, complete, before the shutters open
-  if (resWarm && realTime - resOpened > kGranted) resOpened = realTime - kGranted;   // (warming up: the sequence plays to the granted page and holds there until every craft and the site are ready)
-  float T = realTime - resOpened;
+  // the sequence's own clock, T: the boot lines on the real clock; the scans (kResScan0..kResScan1) only as far as the
+  // warm-up has come - they follow its share done, eased like the launch's bar and at most twice their own pace, so
+  // they run with the loading and stand still while one long thing is done; ACCESS GRANTED once everything is ready,
+  // then the shutters on the real clock. aT, the real time since it opened, moves the decoration (blinks, sweeps,
+  // traces), which never stops.
+  if (resSeqOpened != resOpened) { resSeqOpened = resOpened; resSeq = 0.f; resSeqAt = realTime; }
+  if (resAuthed) resSeq = std::max(resSeq, kIntro - 0.6f);   // returning: just the resume flash
+  {
+    const float dt = clampf(realTime - resSeqAt, 0.f, 0.1f), span = kResScan1 - kResScan0;
+    resSeqAt = realTime;
+    if (resSeq < kResScan0) resSeq = std::min(resSeq + dt, kResScan0);
+    else if (resSeq < kResScan1) {
+      const float f = (resSeq - kResScan0) / span, work = resWarm ? std::min(resWork, 0.99f) : 1.f;   // (100% only when it is all done)
+      resSeq = kResScan0 + span * std::max(f, std::min(easeLoadProgress(f, work, dt), f + 2.f * dt / span));
+    } else resSeq += dt;
+  }
+  const float T = resSeq, aT = realTime - resOpened;
   bool wr = resCraft == kWraith;
   const ResCraftInfo& RC = kResCraft[resCraftSlot(resCraft)];
   vec3 ACC = RC.colour;
@@ -242,7 +256,7 @@ void Game::drawResearch(const FrameParams& fp) {
     float A = 1.f - fadeOut;
     // scanlines and a faint grid
     for (float y = 0; y < H; y += 3 * s) g_ren.rect(0, y, W, 1, R_ICE, 0.025f * A);
-    for (float x = fmodf(T * 20.f * s, 48 * s); x < W; x += 48 * s) g_ren.rect(x, 0, 1, H, R_ICE, 0.03f * A);
+    for (float x = fmodf(aT * 20.f * s, 48 * s); x < W; x += 48 * s) g_ren.rect(x, 0, 1, H, R_ICE, 0.03f * A);
     // header terminal
     const char* boot[] = {"NIGHTGLASS SECURE TERMINAL  v9.4.1  //  QUANTUM LINK ESTABLISHED", "SUBJECT PRESENT  //  BEGIN MULTI-FACTOR BIOMETRIC VERIFICATION"};
     for (int i = 0; i < 2; i++) {
@@ -251,11 +265,7 @@ void Game::drawResearch(const FrameParams& fp) {
       g_ren.text(40 * s, (30 + i * 20) * s, 13 * s, l, i ? R_DIM : R_ICE, A, 0, false);
     }
     g_ren.text(W - 40 * s, 30 * s, 13 * s, "SESSION " + hexWord(hsh((uint32_t)resOpened * 7 + 3), 8), R_DIM, A, 2, false);
-    g_ren.text(W - 40 * s, 50 * s, 13 * s, "CLEARANCE REQUIRED: OMEGA-BLACK", R_RED, A * (fmodf(T, 0.8f) < 0.55f ? 1.f : 0.4f), 2, false);
-    if (resWarm) {   // what the terminal is doing behind the sequence
-      const char* what = g_ren.entPending > 0 ? "STREAMING THE SITE" : "COMPILING AIRFRAME SHELLS";
-      g_ren.text(W * 0.5f, H - 46 * s, 12 * s, fmt("INITIALIZING  //  %s  //  %s %s", what, kAircraft[resWarmCraft >= 0 ? resWarmCraft : resCraft].name, fmodf(T, 0.6f) < 0.4f ? "..." : "   "), R_ICE, A * 0.8f, 1, false);
-    }
+    g_ren.text(W - 40 * s, 50 * s, 13 * s, "CLEARANCE REQUIRED: OMEGA-BLACK", R_RED, A * (fmodf(aT, 0.8f) < 0.55f ? 1.f : 0.4f), 2, false);
     float pw = std::min(360 * s, (W - 120 * s) / 3.f), ph = std::min(400 * s, H - 230 * s), py0 = 100 * s;
     float gap = (W - 3 * pw) / 4.f;
     // ---- 1: fingerprint
@@ -264,7 +274,7 @@ void Game::drawResearch(const FrameParams& fp) {
       float ap = A * smoothstepf(t0 - 0.2f, t0, T);
       slab(x, py0, pw, ph, s, ok ? R_GREEN : R_ICE, ap);
       tag(x + 14 * s, py0 + 12 * s, s, title, ok ? R_GREEN : R_ICE, ap);
-      g_ren.text(x + pw - 14 * s, py0 + 12 * s, 11.5f * s, ok ? "VERIFIED" : T >= t0 ? "SCANNING" : "STANDBY", ok ? R_GREEN : T >= t0 ? R_AMBER : R_DIM, ap * (ok || fmodf(T, 0.5f) < 0.33f ? 1.f : 0.3f), 2, false);
+      g_ren.text(x + pw - 14 * s, py0 + 12 * s, 11.5f * s, ok ? "VERIFIED" : T >= t0 ? "SCANNING" : "STANDBY", ok ? R_GREEN : T >= t0 ? R_AMBER : R_DIM, ap * (ok || fmodf(aT, 0.5f) < 0.33f ? 1.f : 0.3f), 2, false);
       float prog = clampf((T - t0) / (t1 - t0), 0, 1);
       g_ren.rect(x + 14 * s, py0 + ph - 18 * s, pw - 28 * s, 3 * s, R_ICE, 0.12f * ap);
       g_ren.rect(x + 14 * s, py0 + ph - 18 * s, (pw - 28 * s) * prog, 3 * s, ok ? R_GREEN : R_ICE, 0.9f * ap);
@@ -303,7 +313,7 @@ void Game::drawResearch(const FrameParams& fp) {
       float tyy = py0 + ph * 0.8f;
       int mcount = std::min(23, (int)((T - t0) / (t1 - t0) * 23.f));
       g_ren.text(x + 16 * s, tyy, 12 * s, fmt("MINUTIAE      %02d / 23", std::max(0, mcount)), R_DIM, ap, 0, false);
-      g_ren.text(x + 16 * s, tyy + 18 * s, 12 * s, ok ? "RIDGE MATCH   99.981 %" : fmt("RIDGE MATCH   %06.3f %%", 40.f + 59.f * clampf((T - t0) / (t1 - t0), 0, 1) + rnd01((uint32_t)(T * 30)) * 0.9f), ok ? R_GREEN : R_ICE, ap, 0, false);
+      g_ren.text(x + 16 * s, tyy + 18 * s, 12 * s, ok ? "RIDGE MATCH   99.981 %" : fmt("RIDGE MATCH   %06.3f %%", 40.f + 59.f * clampf((T - t0) / (t1 - t0), 0, 1) + rnd01((uint32_t)(aT * 30)) * 0.9f), ok ? R_GREEN : R_ICE, ap, 0, false);
     }
     // ---- 2: retina
     {
@@ -335,14 +345,14 @@ void Game::drawResearch(const FrameParams& fp) {
       }
       g_ren.rect(cx - pr, cy - pr, 2 * pr, 2 * pr, R_INK, ap, pr);   // the pupil over the vessels
       ring(cx, cy, pr, 1.5f * s, ic, ap);
-      dashRing(cx, cy, R * 1.22f, 2 * s, ic, 0.7f * ap, 24, 0.55f, T * 0.9f);
-      dashRing(cx, cy, R * 1.36f, 1.2f * s, ic, 0.4f * ap, 60, 0.3f, -T * 0.5f);
-      float sw = T * 4.f;   // radar sweep
+      dashRing(cx, cy, R * 1.22f, 2 * s, ic, 0.7f * ap, 24, 0.55f, aT * 0.9f);
+      dashRing(cx, cy, R * 1.36f, 1.2f * s, ic, 0.4f * ap, 60, 0.3f, -aT * 0.5f);
+      float sw = aT * 4.f;   // radar sweep
       if (!ok) for (int k = 0; k < 10; k++) g_ren.line(cx, cy, cx + cosf(sw - k * 0.05f) * R * 1.3f, cy + sinf(sw - k * 0.05f) * R * 1.3f, 2 * s, R_ICE, ap * (0.6f - k * 0.06f));
       g_ren.line(cx - R * 1.5f, cy, cx - R * 1.15f, cy, 1 * s, ic, ap); g_ren.line(cx + R * 1.15f, cy, cx + R * 1.5f, cy, 1 * s, ic, ap);
       g_ren.line(cx, cy - R * 1.5f, cx, cy - R * 1.15f, 1 * s, ic, ap); g_ren.line(cx, cy + R * 1.15f, cx, cy + R * 1.5f, 1 * s, ic, ap);
       float tyy = py0 + ph * 0.8f;
-      std::string hsx; for (int i = 0; i < 3; i++) hsx += hexWord(hsh(i * 91 + (ok ? 7 : (int)(T * 20))), 4) + " ";
+      std::string hsx; for (int i = 0; i < 3; i++) hsx += hexWord(hsh(i * 91 + (ok ? 7 : (int)(aT * 20))), 4) + " ";
       g_ren.text(x + 16 * s, tyy, 12 * s, "IRIS CODE     " + hsx, ok ? R_GREEN : R_DIM, ap, 0, false);
       g_ren.text(x + 16 * s, tyy + 18 * s, 12 * s, ok ? "HAMMING DIST  0.0031   MATCH" : fmt("HAMMING DIST  %.4f", 0.5f - 0.49f * p), ok ? R_GREEN : R_ICE, ap, 0, false);
     }
@@ -357,7 +367,7 @@ void Game::drawResearch(const FrameParams& fp) {
         g_ren.rect(gx, by, gw, 1, R_DIM, 0.25f * ap);
         float lxp = gx, lyp = by;
         for (int i = 1; i <= 90; i++) {
-          float u = i / 90.f, ph2 = u * 18.f + T * (3.f + tr), noise = (rnd01(i * 7 + tr * 1000 + (int)(T * 12)) - 0.5f) * (1.f - p);
+          float u = i / 90.f, ph2 = u * 18.f + aT * (3.f + tr), noise = (rnd01(i * 7 + tr * 1000 + (int)(aT * 12)) - 0.5f) * (1.f - p);
           float y = by + (sinf(ph2 * (1 + tr * 0.4f)) * 0.5f + sinf(ph2 * 2.7f + tr) * 0.3f + noise * 1.2f) * 12 * s;
           float xx = gx + u * gw;
           g_ren.line(lxp, lyp, xx, y, 1.3f * s, ok ? R_GREEN : (tr == 3 ? R_AMBER : R_ICE), ap * 0.85f);
@@ -366,8 +376,41 @@ void Game::drawResearch(const FrameParams& fp) {
         g_ren.text(gx, by - 30 * s, 10 * s, fmt("CH-%d  %s", tr + 1, tr == 3 ? "THETA" : tr == 2 ? "ALPHA" : tr == 1 ? "BETA" : "GAMMA"), R_DIM, ap, 0, false);
       }
       float tyy = py0 + ph * 0.8f;
-      g_ren.text(x + 16 * s, tyy, 12 * s, fmt("HEART RATE    %d BPM", 64 + (int)(6 * sinf(T * 2.f))), R_DIM, ap, 0, false);
+      g_ren.text(x + 16 * s, tyy, 12 * s, fmt("HEART RATE    %d BPM", 64 + (int)(6 * sinf(aT * 2.f))), R_DIM, ap, 0, false);
       g_ren.text(x + 16 * s, tyy + 18 * s, 12 * s, ok ? "NEURAL MATCH  CONFIRMED" : fmt("COHERENCE     %.2f", 0.2f + 0.79f * p), ok ? R_GREEN : R_ICE, ap, 0, false);
+    }
+    // ---- the warm-up's bar, where the grant's banner comes: the scans' share done (the warm-up's, eased), what it is
+    // on and how much of that is left; the ticks are where the fingerprint and the retina scans complete
+    {
+      const float span = kResScan1 - kResScan0, p = clampf((T - kResScan0) / span, 0.f, 1.f);
+      const float ab = A * smoothstepf(0.f, 0.25f, T) * (1.f - smoothstepf(kResScan1, kResScan1 + 0.1f, T));
+      const float bw = std::min(720 * s, W - 2 * gap), bx = (W - bw) * 0.5f, by = py0 + ph + 26 * s;
+      auto upper = [](std::string t) { for (char& c : t) c = (char)toupper((unsigned char)c); return t; };
+      auto fit = [&](std::string t, float room, float size) {
+        if (g_ren.textWidth(t, size) <= room) return t;
+        while (!t.empty() && g_ren.textWidth(t + "...", size) > room) t.pop_back();
+        return t + "...";
+      };
+      const int nViews = 2 * kNumResCraft, item = std::max(0, resWarmFrames - 2);
+      std::string what, detail;
+      if (!resWarm) { what = p >= 1.f ? "ALL SYSTEMS READY" : "SYSTEMS CHECK"; detail = "AIRFRAMES, COCKPITS AND THE SITE LOADED"; }
+      else if (item < nViews) {
+        const AircraftSpec& c = kAircraft[resWarmCraft >= 0 ? resWarmCraft : kResCraft[item / 2].idx];
+        what = "AIRFRAME SHELLS"; detail = fmt("%s  //  %s  //  %d OF %d", upper(c.name).c_str(), resWarmCk ? "COCKPIT" : "EXTERIOR", item + 1, nViews);
+      } else if (g_ren.entPending > 0) {
+        const Airport& ap = g_world.airports[resAirport];
+        what = "STREAMING THE SITE"; detail = fmt("%s %s  //  %d SCENERY CHUNKS REMAINING", ap.code, upper(ap.name).c_str(), g_ren.entPending);
+      } else if (loadingShadowPending()) { what = "TERRAIN LIGHTING"; detail = "BAKING THE SITE'S TERRAIN SHADOW"; }
+      else { what = "SYSTEMS CHECK"; detail = "VERIFYING THE SITE BEFORE ACCESS"; }
+      const bool ready = !resWarm && p >= 1.f;
+      const vec3 c = ready ? R_GREEN : R_ICE;
+      const int percent = ready ? 100 : std::min(99, (int)(p * 100.f));   // (floored: 100% only when it is all done)
+      g_ren.text(bx, by, 13 * s, fit("INITIALIZING  //  " + what + (ready || fmodf(aT, 0.6f) < 0.4f ? "" : " _"), bw - 80 * s, 13 * s), c, ab, 0, false);
+      g_ren.text(bx + bw, by - 6 * s, 20 * s, fmt("%d%%", percent), c, ab, 2, false);
+      g_ren.rect(bx, by + 24 * s, bw, 4 * s, R_ICE, 0.12f * ab, 2 * s);
+      if (p > 0.f) g_ren.rectGrad(bx, by + 24 * s, bw * p, 4 * s, ready ? R_GREEN : R_DIM, c, ab, 2 * s);
+      for (float tk : {1.75f, 2.9f}) g_ren.rect(bx + bw * (tk - kResScan0) / span, by + 31 * s, 1 * s, 4 * s, p * span + kResScan0 >= tk ? c : R_DIM, 0.6f * ab);
+      g_ren.text(bx, by + 38 * s, 11.5f * s, fit(detail, bw, 11.5f * s), R_DIM, ab, 0, false);
     }
     // ---- grant
     if (T > 3.75f) {

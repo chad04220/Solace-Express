@@ -3501,11 +3501,21 @@ void Game::update(float dt) {
   if (screen == SCR_MENU && ((in.down['U'] && in.down['I'] && (in.pressed['U'] || in.pressed['I'])) || padCombo)) {
     screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP);
     resWarm = true; resWarmFrames = 0; resBakeSeen = g_ren.bakeCount;   // the terminal's boot screen shows at once; the craft and its airport warm behind it
+    resWork = 0.f; resPend0 = 0;
   }
   if (screen == SCR_RESEARCH && resWarm) {   // warming: the scenery streams flat out, the previewed craft's shells bake; done when a frame bakes nothing and nothing is pending
     g_ren.entBudgetMs = 14.f;
     bool baked = g_ren.bakeCount != resBakeSeen; resBakeSeen = g_ren.bakeCount;
-    if (resWarmFrames > 2 * resCraftCount() + 3 && !baked && g_ren.entPending == 0 && !loadingShadowPending()) { resWarm = false; resWarmCraft = -1; resWarmCk = false; g_ren.entBudgetMs = 2.5f; }
+    // how much of it is done, for the boot screen's bar and its scans: the craft views drawn (render() has drawn
+    // resWarmFrames frames, the first the boot screen alone, then one view each and the selected craft until the check
+    // below), the scenery chunks made out of the most the site has waited on (counted from the first frame of the
+    // site), and its terrain lighting
+    const int nViews = 2 * resCraftCount() + 3, f = resWarmFrames;
+    const bool site = f >= 2, lit = site && !loadingShadowPending();
+    if (site) resPend0 = std::max(resPend0, g_ren.entPending);
+    const float views = clampf((f - 1.f) / nViews, 0.f, 1.f), chunks = !site ? 0.f : resPend0 > 0 ? 1.f - (float)g_ren.entPending / resPend0 : 1.f;
+    resWork = std::max(resWork, 0.25f * views + 0.65f * chunks + 0.10f * (lit ? 1.f : 0.f));
+    if (resWarmFrames > 2 * resCraftCount() + 3 && !baked && g_ren.entPending == 0 && !loadingShadowPending()) { resWarm = false; resWarmCraft = -1; resWarmCk = false; g_ren.entBudgetMs = 2.5f; resWork = 1.f; }
   }
   if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
   radio.poll();
@@ -3715,8 +3725,10 @@ void Game::debugScene(const std::string& name) {
     resCraft = name == "research40" ? kWraith : name == "research10" ? kNightjar : name == "research20" ? kMantis : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
     return;
   }
-  if (name.rfind("researchscan", 0) == 0) {   // the biometric sequence at a moment: researchscan<tenths of a second>
+  if (name.rfind("researchscan", 0) == 0) {   // the biometric sequence at a moment: researchscan<tenths of a second into the sequence>, the warm-up as far on as the scans show
     screen = SCR_RESEARCH; realTime = 30; resAuthed = false; resOpened = realTime - atoi(name.c_str() + 12) / 10.f;
+    resSeq = realTime - resOpened; resSeqAt = realTime; resSeqOpened = resOpened;
+    resWarm = resSeq < kResScan1; resWork = clampf((resSeq - kResScan0) / (kResScan1 - kResScan0), 0.f, 1.f); resWarmFrames = 1 + (int)(resWork * 4.f * (2 * resCraftCount() + 3)); resWarmCraft = -1;
     return;
   }
   if (name.compare(0, 3, "wr_") == 0) {   // XR-40: wr_<mode>_<cam yaw>_<cam pitch>_<cam dist>_<seconds>[_<airport>_<weather>_<hour>_<over town>]
