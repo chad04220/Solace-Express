@@ -16,6 +16,14 @@ void main(){
   } else if (vMode < 3.5) { oColor = texture(uImg, vUV)*vCol; }
   else if (vMode < 5.0) { float d = sdRR(vUV, vHalf, (vMode - 4.0)*1000.0); oColor = vec4(vCol.rgb, vCol.a*clamp(0.5 - d, 0.0, 1.0)); }
   else if (vMode < 6.0) { float d = sdRR(vUV, vHalf, (vMode - 5.0)*1000.0); oColor = vec4(vCol.rgb, vCol.a*clamp(0.5*vP + 0.5 - abs(d + 0.5*vP), 0.0, 1.0)); }
-  else { float d = sdRR(vUV, vHalf, (vMode - 6.0)*1000.0); float k = clamp(1.0 - max(d, 0.0)/max(vP, 1.0), 0.0, 1.0);
+  else if (vMode < 7.5) { float d = sdRR(vUV, vHalf, (vMode - 6.0)*1000.0); float k = clamp(1.0 - max(d, 0.0)/max(vP, 1.0), 0.0, 1.0);
     oColor = vec4(vCol.rgb, vCol.a*k*k*step(0.0, d)); }
+  else {
+    // AA capsule: half.x is segment half-length, half.y is stroke radius.
+    // The CPU pads the quad so coverage reaches zero before its raster edge.
+    vec2 q = vec2(max(abs(vUV.x) - vHalf.x, 0.0), vUV.y);
+    float d = length(q) - vHalf.y;
+    float aa = max(fwidth(d), 1.0);
+    oColor = vec4(vCol.rgb, vCol.a*clamp(0.5 - d/aa, 0.0, 1.0));
+  }
 }

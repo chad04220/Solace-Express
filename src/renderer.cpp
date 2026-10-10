@@ -18,6 +18,7 @@
 #endif
 #include "shaders_wraith_cockpit.h"
 #include "entity_shaders.h"
+#include "hangar_preview.h"
 #include "font_data.h"
 #include "scenery.h"
 #include <unordered_map>
@@ -253,7 +254,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
+  for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -498,46 +499,56 @@ void Renderer::syncStamp(int i) {
 // objects, which are shared between contexts, so the platform layer can run it on a worker thread with its own
 // context while the intro screen animates. `done` counts finished programs (kProgramCount in all).
 bool Renderer::compilePrograms(std::atomic<int>* done) {
-  auto step = [&]() { if (done) done->fetch_add(1); };
+  int completed = 0;
+  auto step = [&]() { ++completed; if (done) done->fetch_add(1); };
   std::string vsFS = kFullscreenVS;
   std::string hdr = "#version 330 core\n";
   setCompileStage("scenery objects");
-  progEnt = program(hdr + kEntVS, hdr + kEntFS1 + kEntFS2, error); step();
-  progEntSh = program(hdr + kEntVS, hdr + kEntFS1 + kEntShadowFS, error); step();
+  progEnt = program(hdr + kEntVS, hdr + kEntFS1 + kEntFS2, error); if (progEnt) step();
+  progEntSh = program(hdr + kEntVS, hdr + kEntFS1 + kEntShadowFS, error); if (progEntSh) step();
   if (!progEnt || !progEntSh) { error = "Entity shader: " + error; return false; }
   setCompileStage("particles and sprites");
-  progSprite = program(kSpriteVS, kSpriteFS, error); step();
+  progSprite = program(kSpriteVS, kSpriteFS, error); if (progSprite) step();
   setCompileStage("bloom and light shafts");
-  progDown = program(vsFS, kDownFS, error); step();
-  progUp = program(vsFS, kUpFS, error); step();
-  progRayMask = program(vsFS, kRayMaskFS, error); step();
-  progRay = program(vsFS, kRayFS, error); step();
+  progDown = program(vsFS, kDownFS, error); if (progDown) step();
+  progUp = program(vsFS, kUpFS, error); if (progUp) step();
+  progRayMask = program(vsFS, kRayMaskFS, error); if (progRayMask) step();
+  progRay = program(vsFS, kRayFS, error); if (progRay) step();
   progFeedRays = program(vsFS, kFeedRaysFS, error); step();
   setCompileStage("post-processing and anti-aliasing");
-  progPost = program(vsFS, kPostFS, error); step();
-  progTAA = program(vsFS, kTaaFS, error); step();
+  progPost = program(vsFS, kPostFS, error); if (progPost) step();
+  progTAA = program(vsFS, kTaaFS, error); if (progTAA) step();
   if (!progSprite || !progDown || !progUp || !progRayMask || !progRay || !progPost || !progTAA) { error = "Shader: " + error; return false; }
   {   // the programs built on the shared scene library (shaders.h worldLibAssembly), each with its own main: the GPS
     // aerial imagery, the terrain-shadow bake, the clouds, the hull and mesh bakes, the cockpit display atlases
     std::string ms = worldLibAssembly(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "");
     setCompileStage("the GPS map");
-    progMap = program(vsFS, ms + kMapMain, error); step();
+    progMap = program(vsFS, ms + kMapMain, error); if (progMap) step();
     setCompileStage("terrain shadows");
     { std::string e; progTShBake = program(vsFS, ms + kTShBakeMain, e); step(); }   // optional: without it the terrain casts no sun shadow
     setCompileStage("clouds");
     { std::string e; progClouds = program(vsFS, ms + kCloudMain, e); step(); }       // optional: without them no clouds
-    { std::string e; progCloudComp = program(vsFS, kCloudCompFS, e); progCloudAcc = program(vsFS, kCloudAccFS, e); step(); }   // (no accumulation: the march's own frame, as before)
+    { std::string e; progCloudComp = program(vsFS, kCloudCompFS, e); step(); }
+    setCompileStage("cloud accumulation");
+    { std::string e; progCloudAcc = program(vsFS, kCloudAccFS, e); step(); }   // optional: without it the march's own frame is used
     if (!progMap) { error = "Map shader: " + error; return false; }
     setCompileStage("the aircraft mesh builder");
-    compileHull(vsFS, worldLibAssembly(std::string(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + "#define PART_BAKE\n") + kHullBakeMain); step();   // (the bake alone evaluates a part by its id: PART_BAKE)
+    compileHull(vsFS, worldLibAssembly(std::string(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + "#define PART_BAKE\n") + kHullBakeMain, step);   // (the bake alone evaluates a part by its id: PART_BAKE)
     setCompileStage("cockpit displays");
     progDisp = program(vsFS, ms + kDispMain, error); step();
     // not fatal: without it the cockpit screens stay dark, but the game still runs (the error goes to startup.log)
     if (!progDisp) { dispError = error; error.clear(); }
     setCompileStage("the renderer: aircraft, terrain, water and lighting");
-    if (!compileRaster()) return false;   // (the renderer itself: its error names the program)
-    step(); step(); step();
+    if (!compileRaster(step)) return false;   // (the renderer itself: its error names the program)
   }
+  setCompileStage("hangar showroom");
+  progHangar = program(hangarPreview::kVS, hangarPreview::kFS, error); if (progHangar) step();
+  if (!progHangar) { error = "Hangar shader: " + error; return false; }
+  setCompileStage("classified hangar silhouette");
+  progClassifiedHangar = program(kFullscreenVS, hangarPreview::kClassifiedFS, error);
+  if (!progClassifiedHangar) { error = "Classified hangar shader: " + error; return false; }
+  step();
+  if (completed != kProgramCount) { error = "Internal shader progress count mismatch"; return false; }
   glFinish();   // everything complete before another context uses the programs
   return true;
 }
@@ -708,9 +719,12 @@ void Renderer::renderMap(float cx, float cz, float half, int N) {
   glBindFramebuffer(GL_FRAMEBUFFER, 0); glViewport(0, 0, W, H);
 }
 
-bool Renderer::init(int w, int h) {
+bool Renderer::init(int w, int h, const std::function<void(float, const std::string&)>& progress) {
+  int completed = 0;
+  auto ready = [&](const char* next) { if (progress) progress(++completed / 11.f, next); };
   if (!initUI(w, h)) return false;
   if (!progTAA && !compilePrograms(nullptr)) return false;
+  ready("Allocating geometry buffers");
 
   glGenVertexArrays(1, &vaoEmpty);
   glGenVertexArrays(1, &vaoSprite); glGenBuffers(1, &vboSprite);
@@ -722,6 +736,7 @@ bool Renderer::init(int w, int h) {
   glEnableVertexAttribArray(4); glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(SpriteVert), (void*)44);
   glBindVertexArray(0);
 
+  ready("Uploading terrain textures");
   // heightmap
   glGenTextures(1, &texHM); glBindTexture(GL_TEXTURE_2D, texHM);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, HM_N, HM_N, 0, GL_RGBA, GL_FLOAT, g_world.hm.data());
@@ -745,6 +760,7 @@ bool Renderer::init(int w, int h) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glBindTexture(GL_TEXTURE_2D, texHM);
+  ready("Uploading world data");
   {
     std::vector<V4> d(384, V4{0, 0, 0, 0});
     for (int i = 0; i < (int)g_roads.size() && i < 64; i++) d[i] = {g_roads[i].ax, g_roads[i].az, g_roads[i].bx, g_roads[i].bz};
@@ -786,14 +802,16 @@ bool Renderer::init(int w, int h) {
   maxH = 0;
   for (size_t i = 0; i < g_world.hm.size(); i += 4) maxH = std::max(maxH, g_world.hm[i] + g_world.hm[i + 1] * 1.5f);
   maxH += 20;
-  genMaterials();
-  genCloudNoise();
-  genWaves();
-  genMinimap();
+  ready("Preparing surface materials");
+  genMaterials(); ready("Preparing cloud textures");
+  genCloudNoise(); ready("Preparing ocean spectrum");
+  genWaves(); ready("Preparing navigation map");
+  genMinimap(); ready("Preparing scenery meshes");
   if (!initEntities()) return false;
-  initTerrainMesh();
+  ready("Preparing terrain geometry");
+  initTerrainMesh(); ready("Allocating render targets");
   W = w; H = h;
-  createTargets();
+  createTargets(); ready("Renderer ready");
   ok = true;
   return true;
 }
@@ -1029,7 +1047,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUniform1f(U(p, "uAspect"), (float)W / H);
   glUniform2f(U(p, "uPano"), fp.pano, fp.panoTanY);
   glUniform1f(U(p, "uMaxH"), maxH);
-  glUniform1i(U(p, "uQuality"), quality); glUniform1i(U(p, "uDbg"), dbgOff);
+  glUniform1i(U(p, "uQuality"), quality); glUniform1i(U(p, "uDbg"), dbgOff | (fp.hangarPreview ? (2 | 256) : 0));
   glUniform1f(U(p, "uTime"), fp.time);
   glUniform3f(U(p, "uSunDir"), fp.sunDir.x, fp.sunDir.y, fp.sunDir.z); glUniform1f(U(p, "uPlaneTSh"), fp.planeTerrSh);
   glUniform3f(U(p, "uSunCol"), fp.sunCol.x, fp.sunCol.y, fp.sunCol.z);
@@ -1131,7 +1149,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   {   // entity G-buffer and the sun shadow cascades
     for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, texGB[i]); }
     glUniform1i(U(p, "uGB0"), 8); glUniform1i(U(p, "uGB1"), 9); glUniform1i(U(p, "uGB2"), 10);
-    bool sh = fp.sunDir.y > 0.03f && shValid[0];
+    bool sh = !fp.hangarPreview && fp.sunDir.y > 0.03f && shValid[0];
     glUniform1i(U(p, "uShOn"), sh ? (shValid[1] ? 2 : 1) : 0);
     for (int c = 0; c < 2; c++) { glActiveTexture(GL_TEXTURE0 + 11 + c); glBindTexture(GL_TEXTURE_2D, texSh[c]); }
     glUniform1i(U(p, "uShMap0"), 11); glUniform1i(U(p, "uShMap1"), 12);
@@ -1317,7 +1335,65 @@ void Renderer::feedEffects(const FrameParams& f) {
   glActiveTexture(GL_TEXTURE0);
 }
 
+// A compact cached triangle room, sharing depth, lighting, aircraft shadows and TAA.
+// No terrain draws, streamed scenery, outdoor cascades or volumetric clouds in a preview.
+void Renderer::rasterHangar(const FrameParams& fp) {
+  earlyMesh = nullptr;
+  updatePartPoses(fp);  // parked gear/surface poses must also be current for the shadow pass
+  const float size = std::max(12.f, fp.hangarSize);
+  if (!vaoHangar) {
+    glGenVertexArrays(1, &vaoHangar); glGenBuffers(1, &vboHangar);
+    glBindVertexArray(vaoHangar); glBindBuffer(GL_ARRAY_BUFFER, vboHangar);
+    for (int i = 0; i < 4; ++i) {
+      glEnableVertexAttribArray(i);
+      glVertexAttribPointer(i, i == 3 ? 1 : 3, GL_FLOAT, GL_FALSE, sizeof(hangarPreview::Vertex), (void*)(size_t)(i * sizeof(vec3)));
+    }
+  }
+  if (hangarGeometrySize != size) {
+    const auto vertices = hangarPreview::geometry(size);
+    glBindBuffer(GL_ARRAY_BUFFER, vboHangar);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(hangarPreview::Vertex), vertices.data(), GL_STATIC_DRAW);
+    hangarVertexCount = (int)vertices.size(); hangarGeometrySize = size;
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, fboGB);
+  GLenum gb[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+  glDrawBuffers(4, gb); glViewport(0, 0, rw, rh);
+  glDisable(GL_BLEND); glDisable(GL_CULL_FACE); glDisable(GL_SCISSOR_TEST);
+  glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
+  glClearColor(0, 0, 0, 0); glClearDepth(1.0); glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glUseProgram(progHangar);
+  const mat4 vp = viewProjRel(fp, .1f, 40000.f);
+  glUniformMatrix4fv(U(progHangar, "uVP"), 1, GL_FALSE, vp.m);
+  glUniform3f(U(progHangar, "uOrigin"), fp.hangarOrigin.x, fp.hangarOrigin.y, fp.hangarOrigin.z);
+  glUniform3f(U(progHangar, "uEye"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
+  glUniform3f(U(progHangar, "uBack"), fp.camBack.x, fp.camBack.y, fp.camBack.z);
+  glUniform2f(U(progHangar, "uJit"), jitX, jitY); glUniform1f(U(progHangar, "uSize"), size);
+  glBindVertexArray(vaoHangar); glDrawArrays(GL_TRIANGLES, 0, hangarVertexCount);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Renderer::lightClassifiedHangar(const FrameParams& fp) {
+  glBindFramebuffer(GL_FRAMEBUFFER, fboScene);
+  GLenum b[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
+  glDrawBuffers(3,b); glViewport(0,0,rw,rh);
+  glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
+  glUseProgram(progClassifiedHangar);
+  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,texGB[0]);
+  glUniform1i(U(progClassifiedHangar,"uGeometry"),0);
+  glUniform3f(U(progClassifiedHangar,"uRight"),fp.camRight.x,fp.camRight.y,fp.camRight.z);
+  glUniform3f(U(progClassifiedHangar,"uUp"),fp.camUp.x,fp.camUp.y,fp.camUp.z);
+  glUniform3f(U(progClassifiedHangar,"uBack"),fp.camBack.x,fp.camBack.y,fp.camBack.z);
+  glUniform2f(U(progClassifiedHangar,"uJit"),jitX,jitY);
+  glUniform1f(U(progClassifiedHangar,"uTanHalf"),tanf(fp.fovY*.5f));
+  glUniform1f(U(progClassifiedHangar,"uAspect"),(float)W/H);
+  glBindVertexArray(vaoEmpty);glDrawArrays(GL_TRIANGLES,0,3);depthValid=true;
+}
+
 void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites) {
+  const bool classified = fp.hangarPreview && fp.hangarClassified;
+  if (classified != previousClassifiedHangar || fp.hangarPreview != previousHangar || (fp.hangarPreview && fp.plane.model != previousPreviewModel)) histValid = false;
+  previousClassifiedHangar = classified;
+  previousHangar = fp.hangarPreview; previousPreviewModel = fp.plane.model;
   curAlpha = &alphaSprites; curAdd = &addSprites;
   pickAfPrograms(fp);
   if (!gpuQ[0]) glGenQueries(4, gpuQ);
@@ -1354,14 +1430,15 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   }
   // ------------------------------------------------ environment entities: shadow cascades + G-buffer
   static const bool cloudSplitOff = getenv("CLOUDSPLITOFF") != nullptr;   // (debug: no clouds)
-  cloudSplit = !cloudSplitOff && progClouds && progCloudComp && fp.cloudCover >= 0.02f;
+  cloudSplit = !fp.hangarPreview && !cloudSplitOff && progClouds && progCloudComp && fp.cloudCover >= 0.02f;
   GLenum bufs[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
   float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};   // (this frame's camera, for the TAA)
   // ------------------------------------------------ the raster renderer: scenery, terrain and sea into the G-buffer, then one lighting pass
-  rasterWorld(fp);
-  bakeTerrainShadow(fp);
-  rasterShadowMaps(fp);   // (the airframe's shadow maps: the feeds' and the main view's proxy both read them)
-  rasterTrafficShadowMaps(fp);
+  if (fp.hangarPreview) rasterHangar(fp);
+  else { rasterWorld(fp); bakeTerrainShadow(fp); }
+  if (classified) { shOn = 0; shMovOn = false; shCabOn = false; }
+  if (!classified) rasterShadowMaps(fp);   // (the airframe's shadow maps: the feeds' and the main view's proxy both read them)
+  if (!classified) rasterTrafficShadowMaps(fp);
   stamp(1);
   // the cockpit display atlases, before the objects pass samples them. The pages: half of those the cockpit shows each
   // frame, so each page at 30 Hz with the same cost every frame (the whole 9 Mpx atlas every other frame put ~3 ms on
@@ -1374,11 +1451,10 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   stamp(3);
   rasterObjects(fp);
   stamp(4);
-  rasterShadowProxy(fp);
+  if (!classified) rasterShadowProxy(fp);
   stamp(5);
-  rasterLight(fp);
-  cloudPass(fp);
-  rasterEffects(fp);
+  if (classified) lightClassifiedHangar(fp);
+  else { rasterLight(fp); cloudPass(fp); rasterEffects(fp); }
   stamp(6);
   // ------------------------------------------------ temporal AA resolve (before the sprites: particles never smear)
   {
@@ -1421,7 +1497,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glBindFramebuffer(GL_FRAMEBUFFER, fboSprite);
   GLenum one = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &one);
   glViewport(0, 0, W, H);
-  drawSprites(fp, (float)W, (float)H, (float)rw / allocW, (float)rh / allocH);   // (the depth is in the render resolution's corner)
+  if (!classified) drawSprites(fp, (float)W, (float)H, (float)rw / allocW, (float)rh / allocH);   // (the depth is in the render resolution's corner)
 
   stamp(8);
   // ------------------------------------------------ bloom
@@ -1451,7 +1527,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   float rsx = 0, rsy = 0; vec3 rsp = fp.camPos + fp.sunDir * 10000.f;
   bool sunFront = dot(fp.sunDir, -fp.camBack) > 0.f && project(fp, rsp, rsx, rsy);
   vec2 sunUV(rsx / W, 1.f - rsy / H);
-  float rayK = sunFront && !fp.sealedCockpit ? smoothstepf(-0.03f, 0.06f, fp.sunDir.y) * (1.f - 0.7f * smoothstepf(0.85f, 1.f, fp.cloudCover))
+  float rayK = !classified && sunFront && !fp.sealedCockpit ? smoothstepf(-0.03f, 0.06f, fp.sunDir.y) * (1.f - 0.7f * smoothstepf(0.85f, 1.f, fp.cloudCover))
              * (1.f - smoothstepf(0.6f, 1.6f, std::max(fabsf(sunUV.x - 0.5f), fabsf(sunUV.y - 0.5f)))) : 0.f;
   if (rayK > 0.001f) {
     glViewport(0, 0, bw, bh);
@@ -1495,7 +1571,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   glUniform2f(U(progPost, "uSunScreen"), sx / W, 1.f - sy / H);
   glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progPost, "uDepthTex"), 2);
   glUniform2f(U(progPost, "uDepthUVS"), (float)rw / allocW, (float)rh / allocH);
-  glUniform1f(U(progPost, "uSunVisible"), vis && !fp.sealedCockpit ? (1.f - smoothstepf(0.5f, 0.9f, fp.cloudCover)) * smoothstepf(-0.02f, 0.1f, fp.sunDir.y) : 0.f);
+  glUniform1f(U(progPost, "uSunVisible"), vis && !classified && !fp.sealedCockpit ? (1.f - smoothstepf(0.5f, 0.9f, fp.cloudCover)) * smoothstepf(-0.02f, 0.1f, fp.sunDir.y) : 0.f);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);
   stamp(kPasses);
@@ -1539,11 +1615,19 @@ void Renderer::glow(float x, float y, float w, float h, vec3 c, float a, float r
 }
 
 void Renderer::line(float x0, float y0, float x1, float y1, float th, vec3 c, float a) {
-  float dx = x1 - x0, dy = y1 - y0, l = sqrtf(dx * dx + dy * dy);
-  if (l < 1e-3f) return;
-  float nx = -dy / l * th * 0.5f, ny = dx / l * th * 0.5f;
-  UIVert q[4] = {{x0 + nx, y0 + ny, 0, 0, c.x, c.y, c.z, a, 0, 0, 0, 0}, {x1 + nx, y1 + ny, 0, 0, c.x, c.y, c.z, a, 0, 0, 0, 0},
-                 {x1 - nx, y1 - ny, 0, 0, c.x, c.y, c.z, a, 0, 0, 0, 0}, {x0 - nx, y0 - ny, 0, 0, c.x, c.y, c.z, a, 0, 0, 0, 0}};
+  const float dx = x1 - x0, dy = y1 - y0, l = sqrtf(dx * dx + dy * dy);
+  if (l < 1e-3f || th <= 0.f || a <= 0.f) return;
+  // One padded quad, just like the old solid strip. UVs are local screen pixels;
+  // mode 8 evaluates an AA capsule, including round caps, without extra draws.
+  const float tx = dx/l, ty = dy/l, nx = -ty, ny = tx;
+  const float half = l*.5f, radius = th*.5f, ex = half + radius + 1.f, ey = radius + 1.f;
+  const float cx = (x0+x1)*.5f, cy = (y0+y1)*.5f;
+  UIVert q[4];
+  const float uv[4][2] = {{-ex,ey},{ex,ey},{ex,-ey},{-ex,-ey}};
+  for (int i=0;i<4;++i) {
+    const float u=uv[i][0], v=uv[i][1];
+    q[i] = {cx+tx*u+nx*v, cy+ty*u+ny*v, u, v, c.x,c.y,c.z,a, 8.f,half,radius,0.f};
+  }
   ui.push_back(q[0]); ui.push_back(q[1]); ui.push_back(q[2]); ui.push_back(q[0]); ui.push_back(q[2]); ui.push_back(q[3]);
 }
 

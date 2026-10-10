@@ -7,6 +7,7 @@
 #include "../src/shaders.h"
 #include "../src/shaders_wraith_cockpit.h"
 #include "../src/shader_prune.h"
+#include "../src/hangar_preview.h"
 
 // each program as assembled, and in <dir>/pruned as the renderer hands it to the driver (shader_prune.h)
 static void put(const std::string& dir, const char* name, const std::string& src) {
@@ -17,6 +18,9 @@ static void put(const std::string& dir, const char* name, const std::string& src
 int main(int argc, char** argv) {
   std::string dir = argc > 1 ? argv[1] : ".";
   { std::error_code ec; std::filesystem::create_directories(dir + "/pruned", ec); }
+  put(dir, "hangar.vert", hangarPreview::kVS);
+  put(dir, "hangar.frag", hangarPreview::kFS);
+  put(dir, "hangar_classified.frag", hangarPreview::kClassifiedFS);
   // Environment coverage includes the alpha-cutout path shared by colour and shadow draws.
   put(dir, "entities.vert", std::string("#version 330 core\n") + kEntVS);
   put(dir, "entities.frag", std::string("#version 330 core\n") + kEntFS1 + kEntFS2);
@@ -35,7 +39,7 @@ int main(int argc, char** argv) {
     put(dir, "objects.frag", objectsFSAssembly(""));
     put(dir, "shadow_proxy.frag", shadowProxyFSAssembly(""));
     put(dir, "effects.frag", effectsFSAssembly(""));
-    put(dir, "prop_disc.vert", kPropDiscVS); put(dir, "prop_disc.frag", kPropDiscFS);
+    put(dir, "prop_disc.vert", kPropDiscVS); put(dir, "prop_disc.frag", propDiscFSAssembly());
     put(dir, "plane_mesh.vert", planeMeshVSAssembly(""));
     put(dir, "plane_mesh.frag", planeMeshFSAssembly(""));
     put(dir, "plane_mesh_depth.frag", planeMeshDepthFSAssembly());

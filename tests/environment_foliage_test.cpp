@@ -1,5 +1,6 @@
 // CPU-only contracts for the environmental model/foliage prototype. No GL context or world build is needed.
 #include "entity_mesh.h"
+#include "entity_lod.h"
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
@@ -35,6 +36,84 @@ bool covered(float u,float v,float card,float seed,bool bounded) {
   }
   return false;
 }
+
+void sameRanges(const EntRanges& a,const EntRanges& b) {
+  for(int k=0;k<EK_COUNT;++k) {
+    float a0,a1,b0,b1;entLodLimits(a,k,a0,a1);entLodLimits(b,k,b0,b1);
+    assert(entRangeOf(a,k)==entRangeOf(b,k) && a0==b0 && a1==b1);
+  }
+  assert(a.sh0==b.sh0 && a.sh1==b.sh1 && a.shRes==b.shRes);
+}
+
+// Integral of the unchanged keep fraction over a flat full-circle population of unit density.
+// This estimates surviving instances/vertices, not frustum-visible objects, GPU work or FPS.
+double keptArea(int k,double distance) {
+  double ref=entThinRef(k),d=std::min(distance,ref);
+  return double(PI)*d*d+(distance>ref?2.0*double(PI)*ref*ref*log(distance/ref):0.0);
+}
+double modelVertices(const EntRanges& ranges,int k,const EntMeshRange& mesh) {
+  float l0,l1;entLodLimits(ranges,k,l0,l1);
+  double a0=keptArea(k,l0),a1=keptArea(k,l1),far=keptArea(k,entRangeOf(ranges,k));
+  return a0*mesh.count[0]+(a1-a0)*mesh.count[1]+(far-a1)*mesh.count[2];
+}
+
+void foliageRanges(const EntMeshRange* meshes) {
+  // Frozen pre-extension policy: feeds, shadow LODs, all non-foliage ranges must retain it.
+  const EntRanges baseline[] = {
+    {2600,800,1700,9000,9000,190,900,280,1100,550,2800,300,1600,2048},
+    {4500,1300,2800,13000,13000,260,1300,380,1600,850,4000,420,2600,2048},
+    {7000,1800,3800,18000,18000,360,1800,480,2000,1300,5500,520,3600,4096}
+  };
+  const float expected[3][4]={{210,1000,2900,900},{290,1450,5000,1450},{400,2000,7800,2000}};
+  for(int q=-2;q<=4;++q) {
+    int preset=std::clamp(q,0,2);
+    sameRanges(entBaseRangesFor(q),baseline[preset]);
+    sameRanges(entRangesFor(q,true),baseline[0]); // feeds remain original Low even on High
+    sameRanges(entRangesFor(q),entRangesFor(preset));
+  }
+  for(int q=0;q<3;++q) {
+    const auto before=baseline[q],after=entRangesFor(q);
+    assert(after.t0==expected[q][0] && after.t1==expected[q][1]);
+    assert(after.tree==expected[q][2] && after.bush==expected[q][3]);
+    assert(after.sh0==before.sh0 && after.sh1==before.sh1 && after.shRes==before.shRes);
+    // Detailed chunk generation grows with foliage; the wider scenery scan is unchanged.
+    assert(after.tree>std::max(after.rock,after.bush) && after.tree+300.f<after.build);
+    double streamRatio=pow((after.tree+300.0)/(before.tree+300.0),2);
+    assert(streamRatio>1.0 && streamRatio<1.25);
+    double minInstances=1e9,maxInstances=0,minVertices=1e9,maxVertices=0;
+    for(int k=0;k<EK_COUNT;++k) {
+      float old0,old1,l0,l1;entLodLimits(before,k,old0,old1);entLodLimits(after,k,l0,l1);
+      float oldFar=entRangeOf(before,k),far=entRangeOf(after,k);
+      if(entClass(k)!=EC_TREE) {
+        assert(l0==old0 && l1==old1 && far==oldFar);
+        continue;
+      }
+      assert(l0>old0 && l1>old1 && far>oldFar);
+      assert(l0/old0<=1.12501f && l1/old1<=1.12501f && far/oldFar<=1.12501f);
+      assert(l0>0 && l0<l1 && l1<far);
+      if(k==EK_BUSH) assert(l0==after.t0*.6f && l1==after.t1*.5f);
+      // Existing switch points now keep the previous higher-detail model. Test both sides
+      // of each new switch, using the same selection helper as bulk and per-instance draws.
+      assert(entLodAt(old0,l0,l1)==0 && entLodAt(old1,l0,l1)==1);
+      assert(entLodAt(std::nextafter(l0,0.f),l0,l1)==0 && entLodAt(l0,l0,l1)==1);
+      assert(entLodAt(std::nextafter(l0,far),l0,l1)==1);
+      assert(entLodAt(std::nextafter(l1,0.f),l0,l1)==1 && entLodAt(l1,l0,l1)==2);
+      assert(entLodAt(std::nextafter(l1,far),l0,l1)==2);
+      assert(entLodAt(oldFar,l0,l1)==2 && entLodAt(std::nextafter(far,0.f),l0,l1)==2);
+      if(q>0) {
+        float prev0,prev1;auto prev=entRangesFor(q-1);entLodLimits(prev,k,prev0,prev1);
+        assert(l0>prev0 && l1>prev1 && far>entRangeOf(prev,k));
+      }
+      double instances=keptArea(k,far)/keptArea(k,oldFar);
+      double vertices=modelVertices(after,k,meshes[k])/modelVertices(before,k,meshes[k]);
+      assert(instances>1.0 && instances<1.13 && vertices>1.0 && vertices<1.26);
+      minInstances=std::min(minInstances,instances);maxInstances=std::max(maxInstances,instances);
+      minVertices=std::min(minVertices,vertices);maxVertices=std::max(maxVertices,vertices);
+    }
+    printf("foliage ranges q%d: flat-circle model, surviving instances +%.2f..%.2f%%, vertices +%.2f..%.2f%%; detail-stream area +%.2f%% (not measured frame cost)\n",
+      q,100*(minInstances-1),100*(maxInstances-1),100*(minVertices-1),100*(maxVertices-1),100*(streamRatio-1));
+  }
+}
 }
 
 int main() {
@@ -42,6 +121,7 @@ int main() {
   static_assert(sizeof(Ent)==32,"instance ABI changed");
   std::vector<EVert> v,again;EntMeshRange r[EK_COUNT],r2[EK_COUNT];
   buildEntityMeshes(v,r);buildEntityMeshes(again,r2);
+  foliageRanges(r);
   assert(v.size()==again.size() && !memcmp(v.data(),again.data(),v.size()*sizeof(EVert)));
   assert(!memcmp(r,r2,sizeof r));
   // Per-kind/LOD limits pinned to a7f8d30. Improvements must not hide a blanket geometry budget increase.

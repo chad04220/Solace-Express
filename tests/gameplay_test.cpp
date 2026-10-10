@@ -18,12 +18,14 @@ static void pitchFor(Plane& p, float vsT, float dt, float maxPitch = 14.f) {
 }
 struct GameTest {
 #include "state_regression.inc"
+#include "free_flight_regression.inc"
 #include "lesson_voice_regression.inc"
   static int run() {
     g_world.build(); buildStory();
     g_audio.init(48000);
     Game g; g.initHeadless(); g.botControl = true;
-    int fails = getenv("SOLACE_VOICE_ONLY") ? 0 : stateRegressions();
+    if (getenv("SOLACE_FREE_FLIGHT_ONLY")) return freeFlightRegressions();
+    int fails = getenv("SOLACE_VOICE_ONLY") ? 0 : stateRegressions() + freeFlightRegressions();
     if (getenv("SOLACE_STATE_ONLY")) { printf("%d state failures\n", fails); return fails; }
 #ifdef SOLACE_ASSETS
     bool voices = g.atc.load(std::string(SOLACE_ASSETS) + "/voice");   // the tower voices (the audio is rendered below, as the audio thread would)

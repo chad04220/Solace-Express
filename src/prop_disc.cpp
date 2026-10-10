@@ -54,6 +54,7 @@ void Renderer::rasterTrafficProps(const FrameParams& fp) {
       glUniform3f(uniform("uDiscRight"), d.right.x, d.right.y, d.right.z);
       glUniform3f(uniform("uDiscUp"), d.up.x, d.up.y, d.up.z);
       glUniform4f(uniform("uDisc"), d.radius, d.angle, d.blur, (float)d.blades);
+      glUniform1f(uniform("uPropHub"), d.hubRadius/d.radius);
       glDrawArrays(GL_TRIANGLES, 0, 6);
     }
   }

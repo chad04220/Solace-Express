@@ -1,0 +1,16 @@
+GL: llvmpipe (LLVM 19.1.7, 256 bits); 1920x1080; UI scale 1.00; LAYOUT PREVIEW: production UI, 3D backdrop omitted
+PASS original research XR-30 default, repeated keyboard/mouse selections, incompatible test reset, site wrapping, start position, weather, escape
+PASS tab 1 offscreen action focus identity and reachability
+PASS tab 2 offscreen action focus identity and reachability
+PASS loading requires distinct completed frames; absent optional shadow shader cannot deadlock
+PASS all 13 catalog aircraft dimension endpoints fit hangar preview; tyres grounded within0.1mm and props stationary
+PASS13catalog keyboard/Enter and D-pad/A traversal, all4classified mouse targets, no classified economic controls
+PASS free-flight9aircraft + 16 airport keyboard selection, runway/airborne and Escape, career unchanged
+GL: llvmpipe (LLVM 19.1.7, 256 bits); 1280x720; UI scale 1.40; LAYOUT PREVIEW: production UI, 3D backdrop omitted
+PASS original research XR-30 default, repeated keyboard/mouse selections, incompatible test reset, site wrapping, start position, weather, escape
+PASS tab 1 offscreen action focus identity and reachability
+PASS tab 2 offscreen action focus identity and reachability
+PASS loading requires distinct completed frames; absent optional shadow shader cannot deadlock
+PASS all 13 catalog aircraft dimension endpoints fit hangar preview; tyres grounded within0.1mm and props stationary
+PASS13catalog keyboard/Enter and D-pad/A traversal, all4classified mouse targets, no classified economic controls
+PASS free-flight9aircraft + 16 airport keyboard selection, runway/airborne and Escape, career unchanged

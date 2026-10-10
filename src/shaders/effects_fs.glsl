@@ -41,8 +41,8 @@ void main(){
     }
   }
 #endif
-  // propeller discs (motion-blurred), composited over the scene
-  if (uPlaneOn == 1 && uWreck == 0) {
+  // Model-sized tapered blades, continuously integrated into their motion-blurred discs.
+  if (FLEET_ON && uPlaneOn == 1 && uWreck == 0) {
     mat3 inv = transpose(uPlaneRot);
     vec3 lo = inv*(ro - uPlanePos), ld = inv*rd;
     for (int i = 0; i < 2; i++) {
@@ -50,16 +50,13 @@ void main(){
       vec4 pr = uProp[i];
       if (abs(ld.z) < 1e-4) continue;
       float tp = (pr.z - lo.z)/ld.z;
-      if (tp < 0.0 || tp > t) continue;
       vec3 hp = lo + ld*tp - pr.xyz;
-      float r = length(hp.xy);
-      if (r > pr.w) continue;
-      float blades = uPr.z; float blur = uPr.y;
-      float ang = atan(hp.y, hp.x) - uPr.x;
-      float bl = smoothstep(0.86, 0.95, cos(blades*ang*0.5*2.0))*(1.0 - smoothstep(pr.w*0.9, pr.w, r));
-      float a = mix(bl, 0.10 + 0.08*smoothstep(0.6, 1.0, cos(blades*ang)) + 0.25*smoothstep(pr.w*0.95, pr.w, r), blur);
-      vec3 pc = vec3(0.04)*(uSunCol*max(uSunDir.y, 0.0) + 0.2) + vec3(0.6, 0.6, 0.1)*smoothstep(pr.w*0.9, pr.w, r)*0.3;
-      col = mix(col, pc, clamp(a, 0.0, 1.0)*0.85);
+      vec2 q = hp.xy/pr.w, dx = dFdx(q), dy = dFdy(q);
+      if (tp < 0.0 || tp > t || dot(q, q) > 1.03) continue;
+      vec4 blade = propellerVisual(q, dx, dy, uPr.x, uPr.y, uPr.z, gM[17].y/pr.w,
+                                  uSunCol*max(uSunDir.y, 0.0) + vec3(0.2));
+      col = mix(col, blade.rgb, blade.a);
+      if (blade.a > 0.003 && uPr.y > 0.001) taaFlag = min(taaFlag, 0.2);
     }
   }
   if (uPlaneOn == 1 && uWreck == 0 && uVapor.x > 0.01) { vec3 c0 = col; col = vaporCone(col, ro, rd, t, jitter); if (dot(abs(col - c0), vec3(1.0)) > 0.02) taaFlag = min(taaFlag, 0.2); }

@@ -2,6 +2,7 @@
 // sun shadow-cascade passes. The lighting pass lights the G-buffer.
 #include "renderer.h"
 #include "entity_shaders.h"
+#include "entity_lod.h"
 #include <chrono>
 
 
@@ -48,31 +49,6 @@ void Renderer::createGBuffer() {
 }
 
 namespace {
-struct EntRanges { float tree, bush, rock, big, build, t0, t1, r0, r1, b0, b1, sh0, sh1; int shRes; };
-EntRanges rangesFor(int q) {
-  if (q <= 0) return {2600, 800, 1700, 9000, 9000, 190, 900, 280, 1100, 550, 2800, 300, 1600, 2048};
-  if (q == 1) return {4500, 1300, 2800, 13000, 13000, 260, 1300, 380, 1600, 850, 4000, 420, 2600, 2048};
-  return {7000, 1800, 3800, 18000, 18000, 360, 1800, 480, 2000, 1300, 5500, 520, 3600, 4096};
-}
-float rangeOf(const EntRanges& R, int k) {
-  if (k == EK_RWYLIGHT) return 1800.f;   // beyond this a glint sprite stands in
-  if (k == EK_PAPI) return 3500.f;
-  if (k == EK_CAR || k == EK_FUEL_PUMP) return std::min(R.build, 1600.f);
-  if (k == EK_FENCE) return std::min(R.build, 1100.f);
-  if (k == EK_WINDSOCK || k == EK_TRUCK || k == EK_LOCALIZER) return std::min(R.build, 2500.f);
-  if (k == EK_GA_PLANE || k == EK_JETBRIDGE || k == EK_MAST || k == EK_FLOODMAST || k == EK_BEACON) return std::min(R.build, 4500.f);
-  if (k == EK_BUSH) return R.bush;
-  if (entClass(k) == EC_TREE) return R.tree;
-  if (k <= EK_SLAB) return R.rock;
-  if (entClass(k) == EC_ROCK) return R.big;
-  return R.build;
-}
-void lodLimits(const EntRanges& R, int k, float& l0, float& l1) {
-  int c = entClass(k);
-  if (c == EC_TREE) { l0 = R.t0; l1 = R.t1; if (k == EK_BUSH) { l0 *= 0.6f; l1 *= 0.5f; } }
-  else if (c == EC_ROCK) { l0 = R.r0 * (k >= EK_OUTCROP ? 2.5f : 1.f); l1 = R.r1 * (k >= EK_OUTCROP ? 3.f : 1.f); }
-  else { l0 = R.b0; l1 = R.b1; }
-}
 struct Draw { int kind, lod; size_t first; int count; int vehicle = -1; };
 }  // namespace
 
@@ -82,7 +58,8 @@ void Renderer::drawEntities(const FrameParams& fp) {
   // a camera feed (camera_feeds.cpp): only its G-buffer, at the shortest draw distances; streaming, the shadow
   // cascades and the statistics stay the main view's
   if (!feedPass) entFrame++;
-  const EntRanges R = rangesFor(feedPass ? 0 : quality);
+  const EntRanges R = entRangesFor(quality, feedPass);
+  const EntRanges shadowRanges = entBaseRangesFor(quality);
   const float farAll = std::max(R.big, R.build) + 300.f, farDetail = std::max(std::max(R.tree, R.rock), R.bush) + 300.f;
   vec3 cam = fp.camPos;
   const int ccx = Scenery::chunkOf(cam.x), ccz = Scenery::chunkOf(cam.z);
@@ -279,14 +256,16 @@ void Renderer::drawEntities(const FrameParams& fp) {
       for (int k = 0; k < EK_COUNT; k++) {
         uint32_t b = ch->off[k], e = ch->off[k + 1];
         if (b == e) continue;
-        float far = rangeOf(R, k), l0, l1;
-        lodLimits(R, k, l0, l1);
+        float far = entRangeOf(R, k), l0, l1;
+        entLodLimits(R, k, l0, l1);
+        float shadowL0, shadowL1;
+        entLodLimits(shadowRanges, k, shadowL0, shadowL1);
         bool thin = entThins(k);
         bool viewK = inView && dmin < far;
         if (!viewK && !inSh[0] && !inSh[1]) continue;
         // the whole chunk in one LOD band and inside the draw distance: hand its instances over in one block (the
         // vertex shader does the distance thinning per instance, exactly as below)
-        int lodN = dmin < l0 ? 0 : dmin < l1 ? 1 : 2, lodF = dmax < l0 ? 0 : dmax < l1 ? 1 : 2;
+        int lodN = entLodAt(dmin, l0, l1), lodF = entLodAt(dmax, l0, l1);
         bool bulk = viewK && !affected && dmax < far && lodN == lodF;
         if (bulk) {
           // thinned kinds: only the prefix that can survive anywhere in the chunk (keys ascending, nearest point's
@@ -304,7 +283,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
           if (affected && g_scenery.destroyed(en)) continue;
           float ddx = en.x - cam.x, ddy = en.y - cam.y, ddz = en.z - cam.z;
           float d = sqrtf(ddx * ddx + ddy * ddy + ddz * ddz);
-          int lod = d < l0 ? 0 : d < l1 ? 1 : 2;
+          int lod = entLodAt(d, l0, l1);
           bool keep = !thin || entThinKey(en) < entKeep(k, d);   // (the ground texture takes over distant forest)
           if (viewK && d < far && !bulk && keep) bucket[0][k][lod].push_back(en);
           // shadows: only what can cast into the faded circle the shader uses (radius kShFade1 x R around the
@@ -315,7 +294,8 @@ void Renderer::drawEntities(const FrameParams& fp) {
               float sx = en.x - newCenter[c].x, sz = en.z - newCenter[c].z;
               float h = kEntInfo[k].h * en.sy, er = std::max(kEntInfo[k].hx * en.sx, kEntInfo[k].hz * en.sz) + h * shReach;
               float cr = cR[c] * kShFade1 + er; if (sx * sx + sz * sz > cr * cr) continue;
-              int sl = c == 0 ? std::min(lod, 1) : (entClass(k) == EC_BUILDING ? 1 : 2);
+              // Keep shadow detail at its original threshold when extending the view LODs.
+              int sl = c == 0 ? std::min(entLodAt(d, shadowL0, shadowL1), 1) : (entClass(k) == EC_BUILDING ? 1 : 2);
               if (c == 1 && thin && kEntInfo[k].h * en.sy < 3.f) continue;   // boulders and bushes don't reach the far cascade
               bucket[1 + c][k][sl].push_back(en);
             }
@@ -338,10 +318,10 @@ void Renderer::drawEntities(const FrameParams& fp) {
   // Dynamic vehicles use the same meshes/Ent instance layout, with a separate pose per small draw.
   for(int vi=0;vi<(int)fp.groundVehicles.size();++vi) {
     const auto& v=fp.groundVehicles[vi];if(!validGroundVehicle(v)) continue;
-    const Ent& e=v.entity;int k=v.kind;float d=length(vec3(e.x,e.y,e.z)-cam),l0,l1;lodLimits(R,k,l0,l1);
-    int lod=d<l0?0:d<l1?1:2;
+    const Ent& e=v.entity;int k=v.kind;float d=length(vec3(e.x,e.y,e.z)-cam),l0,l1;entLodLimits(R,k,l0,l1);
+    int lod=entLodAt(d,l0,l1);
     size_t first=entStage.size();entStage.push_back(e);
-    if(d<rangeOf(R,k) && entRange[k].count[lod]>0) draws[0].push_back({k,lod,first,1,vi});
+    if(d<entRangeOf(R,k) && entRange[k].count[lod]>0) draws[0].push_back({k,lod,first,1,vi});
     for(int c=0;c<2 && sunUp && !feedPass;++c) {
       const auto& info=kEntInfo[k];float pad=std::max(info.hx*e.sx,info.hz*e.sz)+info.h*e.sy*shReach+60.f;
       if(shDirty[c] && std::fabs(e.x-newCenter[c].x)<cR[c]+pad && std::fabs(e.z-newCenter[c].z)<cR[c]+pad)
@@ -358,7 +338,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
     for (const Draw& d : list) {
       if(d.vehicle>=0) { const float* a=fp.groundVehicles[d.vehicle].angle;glUniform4fv(uw0,1,a);glUniform2f(uw1,a[4],a[5]); }
       else { glUniform4f(uw0,0,0,0,0);glUniform2f(uw1,0,0); }
-      glUniform1f(uf, rangeOf(R, d.kind)); glUniform1f(ut, entThins(d.kind) ? 1.f : 0.f); glUniform1f(ur, entThinRef(d.kind));
+      glUniform1f(uf, entRangeOf(R, d.kind)); glUniform1f(ut, entThins(d.kind) ? 1.f : 0.f); glUniform1f(ur, entThinRef(d.kind));
       glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent)));
       glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent) + 16));
       glUniform1i(uk, d.kind);

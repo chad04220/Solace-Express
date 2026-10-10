@@ -1,5 +1,8 @@
 ## What's new
 
+### Foliage detail (review branch)
+- Trees and bushes keep each detail level roughly 10–12% farther away. Trees now reach 2.9 / 5 / 7.8 km on Low / Medium / High; camera feeds and scenery shadow detail retain their previous budgets. Placement density and the model meshes are unchanged. Native-1080p RTX 3070 performance still needs hardware validation; see `docs/FOLIAGE_DRAW_RANGES.md`.
+
 ### Environment (Codex's review branch, merged)
 - Ground and scenery look better without drawing more: pitched roofs lit the right way round, hidden shop and apartment faces removed, roof equipment and canopies on near apartments, flat roofs varied, road and runway markings filtered so they no longer shimmer, terrain normals corrected, and the 2 km bump step smoothed away.
 - Distant rock outcrops, spires and sea stacks now match their close-up shapes.

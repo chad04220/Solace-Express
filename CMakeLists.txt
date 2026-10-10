@@ -43,6 +43,13 @@ if(WIN32)
   endif()
 endif()
 
+# Surfaceless EGL production UI review (no X server or EGL headers required).
+if(UNIX AND NOT APPLE)
+  add_executable(ui_review_harness EXCLUDE_FROM_ALL tests/ui_review_harness.cpp ${GAME_SOURCES} src/radio_stub.cpp)
+  add_dependencies(ui_review_harness shaders_gen)
+  target_link_libraries(ui_review_harness PRIVATE ${CMAKE_DL_LIBS} pthread)
+endif()
+
 # Development render harness on Linux (Xvfb + Mesa): test frames, and a render server (render_harness serve) that keeps
 # everything loaded between shots. Not built by default: cmake --build build --target render_harness
 if(UNIX AND NOT APPLE)
@@ -140,6 +147,14 @@ if(MSVC)   # the game itself is built with /fp:fast: the envelope must bound the
 endif()
 add_test(NAME hull_mesh COMMAND hull_test)
 add_test(NAME traffic_prop_discs COMMAND prop_disc_test)
+if(UNIX AND NOT APPLE)
+  add_executable(propeller_visual_test tests/propeller_visual_test.cpp src/gl.cpp)
+  add_dependencies(propeller_visual_test shaders_gen)
+  target_link_libraries(propeller_visual_test PRIVATE ${CMAKE_DL_LIBS})
+  add_dependencies(prop_disc_test propeller_visual_test)
+  add_test(NAME propeller_visuals COMMAND propeller_visual_test)
+  set_tests_properties(propeller_visuals PROPERTIES SKIP_RETURN_CODE 77)
+endif()
 add_test(NAME reheat_exhaust COMMAND exhaust_test)
 add_test(NAME mesh_validation COMMAND mesh_validation_test)
 add_test(NAME mesh_simplify COMMAND mesh_simplify_test)
@@ -212,4 +227,40 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME shader_glsl_specialization COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/aircraft_specialization_test.py --shader-dir ${CMAKE_BINARY_DIR}/glsl --validator ${GLSLANG_VALIDATOR})
     set_tests_properties(shader_glsl_specialization PROPERTIES DEPENDS shader_glsl)
   endif()
+endif()
+
+# Task-weighted loading must never invent completed work.
+add_executable(load_pacer_test tests/load_pacer_test.cpp)
+target_include_directories(load_pacer_test PRIVATE src)
+if(NOT WIN32)
+  target_link_libraries(load_pacer_test PRIVATE pthread)
+endif()
+add_test(NAME loading_progress COMMAND load_pacer_test)
+add_executable(hangar_geometry_test tests/hangar_geometry_test.cpp)
+add_test(NAME hangar_geometry COMMAND hangar_geometry_test)
+add_executable(hangar_catalog_test tests/hangar_catalog_test.cpp ${CORE_SOURCES})
+target_include_directories(hangar_catalog_test PRIVATE src)
+add_test(NAME hangar_catalog COMMAND hangar_catalog_test)
+if(Python3_Interpreter_FOUND AND NOT WIN32)
+  add_test(NAME shader_loading_contract COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_SOURCE_DIR}/tools/validation/shader_progress_contract.py
+    --generated ${CMAKE_BINARY_DIR}/gen --cxx ${CMAKE_CXX_COMPILER})
+endif()
+
+# Explicit report-only fallback for software drivers unable to compile unused
+# all-aircraft variants. Exact standard AF_LIGHT scene programs; fleet hangar only.
+if(UNIX AND NOT APPLE AND Python3_Interpreter_FOUND)
+  set(UI_FLEET_ADAPTER_DIR ${CMAKE_BINARY_DIR}/ui-fleet-adapter)
+  set(UI_FLEET_ADAPTERS ${UI_FLEET_ADAPTER_DIR}/renderer.cpp ${UI_FLEET_ADAPTER_DIR}/raster_renderer.cpp ${UI_FLEET_ADAPTER_DIR}/aircraft_mesh.cpp)
+  add_custom_command(OUTPUT ${UI_FLEET_ADAPTERS}
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/prepare_ui_hangar_adapter.py ${CMAKE_SOURCE_DIR}/src ${UI_FLEET_ADAPTER_DIR}
+    DEPENDS tools/prepare_ui_hangar_adapter.py src/renderer.cpp src/raster_renderer.cpp src/aircraft_mesh.cpp
+    COMMENT "Generating test-only standard-fleet startup adapters")
+  set(UI_FLEET_SOURCES ${GAME_SOURCES})
+  list(REMOVE_ITEM UI_FLEET_SOURCES src/renderer.cpp src/raster_renderer.cpp src/aircraft_mesh.cpp)
+  add_executable(ui_review_hangar_harness EXCLUDE_FROM_ALL tests/ui_review_harness.cpp ${UI_FLEET_SOURCES} ${UI_FLEET_ADAPTERS} src/radio_stub.cpp)
+  add_dependencies(ui_review_hangar_harness shaders_gen)
+  target_include_directories(ui_review_hangar_harness PRIVATE src)
+  target_compile_definitions(ui_review_hangar_harness PRIVATE UI_REVIEW_FLEET_ONLY=1)
+  target_link_libraries(ui_review_hangar_harness PRIVATE ${CMAKE_DL_LIBS} pthread)
 endif()

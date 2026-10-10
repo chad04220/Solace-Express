@@ -1,0 +1,39 @@
+Free Flight: all 288 aircraft/airport/start combinations launch and return: ok
+Free Flight: runway parking, terrain-safe cruise starts, full tanks and zero fees: ok
+Free Flight: new-player career and career UI selections unchanged: ok
+Free Flight: setup/back never creates a career save: ok
+Free Flight: all research aircraft and invalid selections rejected without side effects: ok
+Free Flight: stale setup choices are clamped to available ordinary aircraft/airports: ok
+Free Flight: active job: baseline save created: ok
+Free Flight: active job: baseline is a valid reloadable career save: ok
+Free Flight: active job: launch and live update ignore job/ownership/licence/money: ok
+Free Flight: active job: restart/refill retains free mode and charges nothing: ok
+Free Flight: active job: pause return has no settlement or save: ok
+Free Flight: active job: first-frame wheel contact 0, stopped timer 0.000, career unchanged 1
+Free Flight: active job: real stopped-on-runway completion preserves career: ok
+Free Flight: active job: outcome 0 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: outcome 2 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: outcome 3 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: outcome 4 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: outcome 5 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: crash timer returns to free hangar without penalties: ok
+Free Flight: active job: loading cancellation does not close or save existing career attempt: ok
+Free Flight: active job: back to main menu preserves career save byte-for-byte: ok
+Free Flight: active job: unsaved career transaction neither blocks nor leaks into Free Flight: ok
+Free Flight: recovery job: baseline save created: ok
+Free Flight: recovery job: baseline is a valid reloadable career save: ok
+Free Flight: recovery job: launch and live update ignore job/ownership/licence/money: ok
+Free Flight: recovery job: restart/refill retains free mode and charges nothing: ok
+Free Flight: recovery job: pause return has no settlement or save: ok
+Free Flight: recovery job: first-frame wheel contact 0, stopped timer 0.000, career unchanged 1
+Free Flight: recovery job: real stopped-on-runway completion preserves career: ok
+Free Flight: recovery job: outcome 0 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: outcome 2 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: outcome 3 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: outcome 4 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: outcome 5 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: crash timer returns to free hangar without penalties: ok
+Free Flight: recovery job: loading cancellation does not close or save existing career attempt: ok
+Free Flight: recovery job: back to main menu preserves career save byte-for-byte: ok
+Free Flight: recovery job: unsaved career transaction neither blocks nor leaks into Free Flight: ok
+0 Free Flight failures

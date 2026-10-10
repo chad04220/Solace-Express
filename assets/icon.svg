@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <title>Solace Express application icon</title>
+  <defs>
+    <linearGradient id="sunset" x1="0" y1="150" x2="0" y2="242" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff9723"/><stop offset="1" stop-color="#cc6041"/>
+    </linearGradient>
+    <clipPath id="badge"><rect x="14" y="14" width="228" height="228" rx="43"/></clipPath>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="49" fill="#ffb838"/>
+  <rect x="14" y="14" width="228" height="228" rx="43" fill="#0e1c30"/>
+  <path d="M14 150H242V242H14Z" fill="url(#sunset)" clip-path="url(#badge)"/>
+  <polygon points="128,30 140,64 140,110 230,140 230,156 140,140 136,200 166,218 166,230 128,222 90,230 90,218 120,200 116,140 26,156 26,140 116,110 116,64" fill="#f5f5fa"/>
+</svg>
