@@ -341,7 +341,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     }
   }
   const auto tBake = std::chrono::steady_clock::now();
-  bakeEvalS = bakeYieldS = 0; bakeEvalPts = 0;
+  bakeEvalS = bakeYieldS = 0; bakeEvalPts = 0; double progS = 0;
   if (ib.empty()) {
     bakeBuilt++;
     if (onBakeStart) onBakeStart();   // (not in the cache, or unreadable: the launch's loading screen says it is building)
@@ -350,7 +350,9 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     const int ns = (int)st.size();
     std::vector<float> sps(128 * 4, 0.f), sct(128 * 4, 0.f), swr(128 * 4, 0.f), swr2(128 * 4, 0.f);
     for (int i = 0; i < ns; i++) for (int c = 0; c < 4; c++) { sps[i * 4 + c] = st[i].ps[c]; sct[i * 4 + c] = st[i].ctl[c]; swr[i * 4 + c] = st[i].wr[c]; swr2[i * 4 + c] = st[i].wr2[c]; }
-    beginHullBake(fp, ns, sps.data(), sct.data(), swr.data(), swr2.data());
+    const auto tProg = std::chrono::steady_clock::now();
+    beginHullBake(fp, ns, sps.data(), sct.data(), swr.data(), swr2.data());   // (its programs built, if the cache hasn't them)
+    progS = std::chrono::duration<double>(std::chrono::steady_clock::now() - tProg).count() - bakeEvalS - bakeYieldS;
     if (!hullBakeProg[0]) { PM.ok = false; return; }   // (no builder: a failed bake, as below - this session marches it)
     auto mode = [&](int m, int s) { hullBakeMode = m; hullBakeState = s; };
     // (where the bake goes, phase by phase - wall time, and of it the field's evaluation and the frames shown: HULLDBG)
@@ -1003,8 +1005,8 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     {   // (where it went: compile.log)
       const double all = std::chrono::duration<double>(std::chrono::steady_clock::now() - tBake).count();
       const int own = afModelOf(M, pv.model);
-      char line[256]; snprintf(line, sizeof line, "baked %s's %s body in %.1f s: the field %.1f s (%.1f M points), the frames shown %.1f s, the meshing %.1f s",
-                               own >= 0 ? kAircraft[own].name : "an aircraft", inside ? "cockpit" : "outside", all, bakeEvalS, bakeEvalPts * 1e-6, bakeYieldS, all - bakeEvalS - bakeYieldS);
+      char line[320]; snprintf(line, sizeof line, "baked %s's %s body in %.1f s: its builder's programs %.1f s, the field %.1f s (%.1f M points), the frames shown %.1f s, the meshing %.1f s",
+                               own >= 0 ? kAircraft[own].name : "an aircraft", inside ? "cockpit" : "outside", all, progS, bakeEvalS, bakeEvalPts * 1e-6, bakeYieldS, all - progS - bakeEvalS - bakeYieldS);
       bakeLog(line);
       if (getenv("HULLDBG")) printf("%s\n", line);
     }

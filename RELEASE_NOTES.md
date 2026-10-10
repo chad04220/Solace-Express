@@ -10,7 +10,7 @@
   - The moving parts (control surfaces, fans, gear, pods) are sampled only where their surface is, following it from block to block, instead of over their whole box. That is 19 million points instead of 85 million on the XR-40.
   - The simplifier that trims each body to its final triangles weighs its candidates on several processor cores at once.
 - Bodies already built are kept: this update builds nothing again.
-- `compile.log` now has a line for each body built, giving its time and how it splits between the GPU, the frames shown while it ran, and the processor. The next diagnostics will show where the time goes on your machine.
+- `compile.log` now has a line for each body built, giving its time and how it splits between building its builder's shader programs, the GPU, the frames shown while it ran, and the processor. The next diagnostics will show where the time goes on your machine.
 
 ### Fixes
 - An error log left by a launch that failed is cleared once the game starts normally again, and `diagnostics.bat` keeps any it finds apart (`error_before.log`), so the error log it collects is from its own runs. The v3.42.0 diagnostics still showed the NVIDIA shader compiler failure fixed in v3.36.x, from a log the game had never cleared.
