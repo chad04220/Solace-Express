@@ -242,7 +242,7 @@ width, headrest, dome light, armrests, visor height and slope, overhead, vents).
   conventional research type uses `special = 0` with `designMach`, `gPos`, `gNeg` (the XR-10 and XR-20).
 - **Learned performance.** At launch, `Plane::perf` flies short test sorties per type (stall speeds, best climb, idle
   sink, roll rate, pitch response, g per stick, take-off and landing distances) at the test weight (60% fuel, 150 kg
-  aboard, 1200 m) and caches them in `shadercache/perf.bin`, stamped with the build.
+  aboard, 1200 m) and caches them in `perf.bin` in the cache folder (`%LOCALAPPDATA%\SolaceExpress`), stamped with the build.
 - **One autopilot, no per-type code.** Every step it is on, `Plane::apSense()` reads what the aircraft can do *now* into
   `Plane::apEnv` (`ApEnvelope`, `aircraft.h`): the learned envelope corrected for the weight (stall and approach speeds
   with √weight, landing distance with weight, a heavier airframe pulling fewer g per stick), the air (density), ice (up
@@ -489,7 +489,7 @@ puts whitecaps on the crests as the wind rises. A seaplane or a ditching reads t
   `RESEARCH_ON` is false and the compiler drops it). `OBJ_NO_AF` is the objects pass with no airframe at all (UFO and
   debris), and `PROXY_MAPS_ONLY` is the shadow proxy that only reads shadow maps. The mesh bake's program adds
   `PART_BAKE`. Put research-only code behind `RESEARCH_ON` so the light aircraft don't pay for it.
-- **Caches.** Compiled programs are cached by source in `shadercache/`; the first launch of a new build compiles them.
+- **Caches.** Compiled programs are cached by source in the cache folder (`%LOCALAPPDATA%\SolaceExpress`); the first launch of a new build compiles them.
   Meshes are cached by a stamp of the **geometry** sources only (`meshCacheStamp`: common, view and scene uniforms,
   plane common, parts, SDF, the research fields and the bake program, plus the GPU driver). So material and lighting
   edits rebake nothing, while a shape edit rebakes every aircraft once. Bump `kMeshMagic` (`aircraft_mesh.cpp`) when you
@@ -548,7 +548,7 @@ That's the "Building the <name> cockpit's mesh" step, one of the loading bar's c
 5. **Simplified** to within 1 mm outside and 0.4 mm in the cockpit, without moving a material boundary.
 6. **Parts** are baked each alone in its own frame (§9). The **moving cells**, grown by one 0.25 m voxel, make a hull
    that the objects pass marches inside; anything not a part is marched there every frame, so keep it rare.
-7. **Cached** as `shadercache/mesh_<key>_<stamp>.bin`, validated on read (counts must add up to the file).
+7. **Cached** as `mesh_<key>_<stamp>.bin` in the cache folder, validated on read (counts must add up to the file).
 
 `HULLDBG=1` prints each bake: states, how far vertices sit off the surface, and every part's lattice, vertex and
 triangle counts. A slow or huge bake usually means a thin feature, a knife edge or a part box far bigger than its part.

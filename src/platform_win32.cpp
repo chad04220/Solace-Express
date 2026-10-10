@@ -387,6 +387,44 @@ static int buildShaderCacheChild(HINSTANCE hInst, const std::string& dir) {
   return ok ? 0 : 1;
 }
 
+// Where the launch keeps what it builds: %LOCALAPPDATA%\SolaceExpress. Local, not Roaming: none of it is the player's
+// (it is all rebuilt at will), the shader binaries are this GPU's and driver's alone, and a roaming profile would carry
+// hundreds of MB between machines at every sign-in. Where Local can't be written, next to the game, then with the save
+// data, as before. A cache in either of those old places (a shadercache folder) is moved over once - a rename on the
+// same drive; from another drive it is cleared instead, as most of it is the last build's and would be rebuilt anyway.
+static std::string cacheDirFor(const std::string& exeDir, const std::string& saveDir) {
+  auto writable = [](const std::string& d) {
+    CreateDirectoryA(d.c_str(), nullptr);
+    std::string probe = d + "\\.probe";
+    FILE* f = fopen(probe.c_str(), "wb"); if (!f) return false;
+    fclose(f); remove(probe.c_str()); return true;
+  };
+  auto clearOld = [](const std::string& d) {   // (only what the cache itself writes there, then the folder if that empties it)
+    for (const char* pat : {"\\*.bin", "\\*.try", "\\*.txt", "\\*.log"}) {
+      WIN32_FIND_DATAA fd; HANDLE h = FindFirstFileA((d + pat).c_str(), &fd);
+      if (h == INVALID_HANDLE_VALUE) continue;
+      do { DeleteFileA((d + "\\" + fd.cFileName).c_str()); } while (FindNextFileA(h, &fd));
+      FindClose(h);
+    }
+    RemoveDirectoryA(d.c_str());
+  };
+  const std::string olds[] = {exeDir + "\\shadercache", saveDir + "\\shadercache"};
+  char local[MAX_PATH] = {};
+  const DWORD n = GetEnvironmentVariableA("LOCALAPPDATA", local, MAX_PATH);
+  if (n && n < MAX_PATH) {
+    const std::string dir = std::string(local) + "\\SolaceExpress";
+    if (GetFileAttributesA(dir.c_str()) == INVALID_FILE_ATTRIBUTES)
+      for (const std::string& old : olds)
+        if (GetFileAttributesA(old.c_str()) != INVALID_FILE_ATTRIBUTES && MoveFileExA(old.c_str(), dir.c_str(), 0)) break;
+    if (writable(dir)) {
+      for (const std::string& old : olds) if (GetFileAttributesA(old.c_str()) != INVALID_FILE_ATTRIBUTES) clearOld(old);
+      return dir;
+    }
+  }
+  for (const std::string& old : olds) if (writable(old)) return old;
+  return std::string();
+}
+
 // the benchmark loops: the window answers its messages between frames (no "Not Responding" on a slow scene)
 static void pumpB() { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } }
 
@@ -461,18 +499,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     return 1;
   }
   bool cached = false;
-  {   // compiled shader programs are cached next to the game (or with the save data if that folder is read-only)
+  {   // what the launch builds - the shader programs as the driver compiled them, the islands, each type's learned
+      // performance, the aircraft bodies - is kept in %LOCALAPPDATA%\SolaceExpress (cacheDirFor, above)
     char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
-    std::string dir = std::string(exe, n);
-    size_t sl = dir.find_last_of("\\/");
-    dir = (sl == std::string::npos ? std::string(".") : dir.substr(0, sl)) + "\\shadercache";
-    auto writable = [](const std::string& d) {
-      CreateDirectoryA(d.c_str(), nullptr);
-      std::string probe = d + "\\.probe";
-      FILE* f = fopen(probe.c_str(), "wb"); if (!f) return false;
-      fclose(f); remove(probe.c_str()); return true;
-    };
-    if (!writable(dir)) { dir = game.saveDir + "\\shadercache"; if (!writable(dir)) dir.clear(); }
+    std::string exeDir = std::string(exe, n);
+    size_t sl = exeDir.find_last_of("\\/");
+    exeDir = sl == std::string::npos ? std::string(".") : exeDir.substr(0, sl);
+    const std::string dir = cacheDirFor(exeDir, game.saveDir);
     g_shaderCacheDir = dir;
     game.cacheDir = dir;
     // this build's stamp (the exe's size and time): what the launch caches beside the shaders (the islands, the aircraft

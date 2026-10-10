@@ -12,3 +12,11 @@
 - Trees, bushes and boulders no longer pop into view as you fly towards them. Out in the distance only a share of them is drawn, thinning out further away, and each used to switch on all at once when its turn came: trees one by one from about a kilometre out, bushes and boulders from as close as 150 m. Now each one fades in over a stretch of the distance instead, and the far edge of the forest fades out the same way, about 8 km out on High. The forest is just as dense as before.
 - Checked in fast flight too: even at 600 m/s, every patch of trees is loaded at the far edge of the view, never closer.
 - Trees and bushes no longer visibly switch to a simpler model as they get further away. Where they change detail (about 400 m and 2 km out for a tree on High, 240 m and 1 km for a bush), the nearer model now dissolves into the simpler one over the last stretch before the switch.
+
+### Where the game keeps its cache
+- What the game builds for your machine (the compiled shaders, the islands, each aircraft's learned performance and its body meshes) now lives in its own folder, `%LOCALAPPDATA%\SolaceExpress`, instead of a `shadercache` folder next to the game. It's in Local rather than Roaming because it belongs to this machine: the shaders are compiled for your GPU and driver, and a roaming profile would copy hundreds of MB between computers at every sign-in. Saves and settings stay in `%APPDATA%\SolaceExpress`.
+- The first launch moves an existing cache over (instantly, on the same drive), so nothing is rebuilt that didn't have to be. If the game is on another drive, the old cache is cleared instead. Only if Local can't be written does the game fall back to the old places.
+- Deleting the folder is safe: the next launch builds it again.
+
+### Diagnostics v3
+- `diagnostics.bat` finds the cache in its new place. It also collects the shader compile log (how long each program took, first launch and later), and the error log if the game left one. It reports the cache's size and its largest files, and times a new scene: a low flight over the island's longest forest, which measures what the trees cost, their fade-ins and detail cross-fades included.

@@ -3999,8 +3999,9 @@ void Game::debugScene(const std::string& name) {
       return;
     }
   }
-  if (name == "air" || name == "sunset" || name == "mountain" || name == "cockpit" || name == "jet" || name == "storm" || name == "snow" || name == "hud") {
+  if (name == "air" || name == "sunset" || name == "mountain" || name == "cockpit" || name == "jet" || name == "storm" || name == "snow" || name == "hud" || name == "forest") {
     vec3 p(-4000, 600, 9000); float hdg = 40;
+    if (name == "forest") { p = vec3(-960, 270, 23500); hdg = 0; }   // (low, north up the island's longest forest: 9 km of it ahead, 130-250 m below - what the trees cost, their fades and detail cross-fades)
     if (name == "sunset") { timeOfDay = 18.2f; p = vec3(-26000, 300, 14000); hdg = 270; }
     if (name == "mountain") { p = vec3(-20000, 1900, -9000); hdg = 60; }
     if (name == "jet") { p = vec3(8000, 900, 6000); hdg = 80; }

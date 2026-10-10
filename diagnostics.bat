@@ -11,18 +11,22 @@ rem   diagnostics.bat loading   renders the loading-screen pictures (the "loadin
 rem
 rem The full run:
 rem   1. system report: GPU and driver, CPU, memory, Windows, monitors with their refresh rates
-rem   2. first-run shader compile time (the shader cache is set aside), then the time to build every
-rem      aircraft body from scratch with the shaders cached
+rem   2. first-run shader compile time (the cache - %LOCALAPPDATA%\SolaceExpress - is set aside), then the time to build
+rem      every aircraft body from scratch with the shaders cached; the shader compile log of both
 rem   Diagnostics v2: every benchmark and screenshot run first builds (or loads) every aircraft body, outside and
 rem   cockpit, the research craft's too, and each scene warms until nothing is being built or streamed before it is
 rem   timed: no number includes a body being built or a traffic aircraft drawn the slow way for want of its body.
+rem   Diagnostics v3: the cache is found where the game now keeps it (Local, not Roaming: it is this machine's), the
+rem   shader compile log and any error log are collected, the cache's size is reported, and a low flight over forest
+rem   is timed (the trees' fades and detail cross-fades).
 rem   3. benchmark, full screen at 1920x1080: frame time and
-rem      the GPU time of every pass for each scene (the HUD, the cockpit, night); then the research craft and their
+rem      the GPU time of every pass for each scene (the HUD, the cockpit, night, a forest); then the research craft and their
 rem      cockpits in their own file (the heaviest scenes: if one stalls the GPU, the rest of the numbers are already written)
 rem   4. the pass-by-pass analysis (CPU vs GPU, resolution scaling, what each feature costs)
 rem   5. screenshots: the HUD with every warning lit, the research terminal and craft, the cockpits,
 rem      the hangar, the menu
-rem   6. startup.log (GPU, texture units, shader programs compiled, audio backend) and the settings file
+rem   6. startup.log (GPU, texture units, shader programs compiled, audio backend), error.log if the game left one, the
+rem      settings file, the shader compile log and the cache's size
 cd /d "%~dp0"
 if not exist SolaceExpress.exe (
   echo SolaceExpress.exe is not in this folder. Put diagnostics.bat next to it and run it again.
@@ -31,7 +35,7 @@ if not exist SolaceExpress.exe (
 )
 set VER=unknown
 if exist VERSION.txt set /p VER=<VERSION.txt
-set SCENES=menu,air,storm,night,cockpit,hud,hub1
+set SCENES=menu,air,forest,storm,night,cockpit,hud,hub1
 set RSCENES=research10,research20,research40,rjet,wr_8_0_0_0_1,wr_8_0_-8_0_1_3_2_22.5_1,wr_8_0_-8_0_1_3_2_22.5_2,rjetc,ckv11_0_-10_12,ufo13_0
 set MODE=%~1
 if /i "%MODE%"=="loading" goto loading
@@ -42,7 +46,7 @@ if /i "%MODE%"=="shots" goto shots
 
 echo [1/6] System report ...
 set INFO=%OUT%\system.txt
-echo Solace Express %VER%  (diagnostics v2) > "%INFO%"
+echo Solace Express %VER%  (diagnostics v3) > "%INFO%"
 echo date %DATE% %TIME% >> "%INFO%"
 rem (the GPU's memory from its driver's registry entry: Win32_VideoController.AdapterRAM is 32 bits and reads 4095 MB
 rem for any card with 4 GB or more)
@@ -60,9 +64,8 @@ powershell -NoProfile -Command ^
 type "%INFO%"
 
 echo [2/6] First-run shader compile time, then every aircraft body built from scratch (the cache is set aside) ...
-set CACHE=
-if exist shadercache set CACHE=shadercache
-if not defined CACHE if exist "%APPDATA%\SolaceExpress\shadercache" set CACHE=%APPDATA%\SolaceExpress\shadercache
+call :findcache
+set OLDCACHE=%CACHE%
 if defined CACHE (
   if exist "%CACHE%.aside" rmdir /s /q "%CACHE%.aside"
   move /y "%CACHE%" "%CACHE%.aside" >nul 2>"%OUT%\cache_aside.txt"
@@ -71,11 +74,14 @@ if defined CACHE (
 if exist "%APPDATA%\SolaceExpress\startup.log" del /q "%APPDATA%\SolaceExpress\startup.log"
 powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--bench menu --nobodies --size 1920x1080 --out %OUT%\compile_run.txt' -Wait }; $line = ('first run with an empty shader cache: {0:N1} s (compiles the shaders, then times the menu scene once; no aircraft bodies built)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::WriteAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
 if exist "%APPDATA%\SolaceExpress\startup.log" copy /y "%APPDATA%\SolaceExpress\startup.log" "%OUT%\startup_firstrun.log" >nul
+call :findcache
+if defined CACHE if exist "%CACHE%\compile.log" copy /y "%CACHE%\compile.log" "%OUT%\compile_firstrun.log" >nul
 powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--bench menu --size 1920x1080 --out %OUT%\compile_run2.txt' -Wait }; $line = ('second run, shaders cached, every aircraft body built from scratch: {0:N1} s (the body build alone is in compile_run2.txt)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::AppendAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
-if defined CACHE if exist "%CACHE%.aside" (
+call :findcache
+if defined OLDCACHE if exist "%OLDCACHE%.aside" (
   rem the two runs built a fresh cache with this version's shaders and every aircraft body: it stays, the old one goes
-  rem (it is put back only if the runs left no cache)
-  if exist "%CACHE%" (rmdir /s /q "%CACHE%.aside") else (move /y "%CACHE%.aside" "%CACHE%" >nul)
+  rem (it is put back only if the runs left no cache anywhere)
+  if defined CACHE (rmdir /s /q "%OLDCACHE%.aside") else (move /y "%OLDCACHE%.aside" "%OLDCACHE%" >nul)
 )
 
 echo [3/6] Benchmark, full screen 1920x1080 ...
@@ -110,6 +116,13 @@ if /i "%MODE%"=="shots" goto finish
 echo [6/6] Logs and settings ...
 if exist "%APPDATA%\SolaceExpress\startup.log" copy /y "%APPDATA%\SolaceExpress\startup.log" "%OUT%\startup.log" >nul
 if exist "%APPDATA%\SolaceExpress\settings.cfg" copy /y "%APPDATA%\SolaceExpress\settings.cfg" "%OUT%\settings.cfg" >nul
+if exist "%APPDATA%\SolaceExpress\error.log" copy /y "%APPDATA%\SolaceExpress\error.log" "%OUT%\error.log" >nul
+call :findcache
+if defined CACHE (
+  if exist "%CACHE%\compile.log" copy /y "%CACHE%\compile.log" "%OUT%\compile.log" >nul
+  rem the cache's size and its largest files: the shader programs, the islands, the aircraft bodies
+  powershell -NoProfile -Command "$d = '%CACHE%'; $f = @(Get-ChildItem -LiteralPath $d -File); $s = ($f | Measure-Object Length -Sum).Sum; $o = @(('cache {0}: {1} files, {2:N0} MB' -f $d, $f.Count, ($s / 1MB))); $f | Sort-Object Length -Descending | Select-Object -First 40 | ForEach-Object { $o += ('  {0,10:N0} KB  {1}' -f ($_.Length / 1KB), $_.Name) }; $o | Out-File -Encoding utf8 '%OUT%\cache.txt'"
+) else (echo no cache found: the game could write none of its cache folders> "%OUT%\cache.txt")
 
 :finish
 if exist "diagnostics_%VER%.zip" del /q "diagnostics_%VER%.zip"
@@ -127,6 +140,15 @@ rem diagnostics.bat itself and ran the whole thing again, deleting this run's fo
 explorer.exe "%~dp0%OUT%"
 pause
 exit /b 0
+
+:findcache
+rem where the game keeps its cache (platform_win32.cpp cacheDirFor): %LOCALAPPDATA%\SolaceExpress; next to the game, or
+rem with the save data, only where Local can't be written (or by a version before v3.42)
+set CACHE=
+if defined LOCALAPPDATA if exist "%LOCALAPPDATA%\SolaceExpress" set CACHE=%LOCALAPPDATA%\SolaceExpress
+if not defined CACHE if exist shadercache set CACHE=%CD%\shadercache
+if not defined CACHE if exist "%APPDATA%\SolaceExpress\shadercache" set CACHE=%APPDATA%\SolaceExpress\shadercache
+goto :eof
 
 :loading
 rem every airport and every aircraft in flight, saved in the "loading" folder; the pre-flight loading screen shows them
