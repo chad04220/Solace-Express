@@ -238,29 +238,35 @@ GLuint Renderer::afMeshProgram(int model) {
   }
   return a.mesh;
 }
-bool Renderer::afBakePrograms(int model, GLuint out[2]) {
+// an aircraft's own builder for one of its bodies: the outside's has no cabin code (AF_OUTSIDE)
+static std::string bakeDefines(int model, int slot) {
+  float M[96]; packModelOf(model, M);
+  return aircraftDefines(model, M) + (slot == 0 ? "#define AF_OUTSIDE\n" : "") + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "");
+}
+bool Renderer::afBakePrograms(int model, int slot, GLuint out[2]) {
   AfOwn& a = afOwn[model];
-  if (!a.bakeTried) {
-    a.bakeTried = true;
-    float M[96]; packModelOf(model, M);
-    const std::string stage = std::string("aircraft bake (the ") + kAircraft[model].name + "'s own)";
+  if (!a.bakeTried[slot]) {
+    a.bakeTried[slot] = true;
+    const std::string who = std::string("the ") + kAircraft[model].name + (slot ? "'s cockpit" : "'s outside");
+    const std::string stage = "aircraft bake (" + who + ")";
     setCompileStage(stage.c_str());
     std::string e;
-    if (!linkBakePair(kFullscreenVS, hullBakeFSAssembly(aircraftDefines(model, M) + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "")), a.bake, e))
-      shaderNote(std::string("Aircraft bake (the ") + kAircraft[model].name + "'s own build) failed: built with every aircraft's\n" + e);
+    if (!linkBakePair(kFullscreenVS, hullBakeFSAssembly(bakeDefines(model, slot)), a.bake[slot], e))
+      shaderNote("Aircraft bake (" + who + ", its own build) failed: built with every aircraft's\n" + e);
     setCompileStage("");
   }
-  if (!a.bake[0]) return false;
-  out[0] = a.bake[0]; out[1] = a.bake[1];
+  if (!a.bake[slot][0]) return false;
+  out[0] = a.bake[slot][0]; out[1] = a.bake[slot][1];
   return true;
 }
-// the bodies' cache stamp for a type: its own bake programs as the driver gets them, so an edit to one aircraft's shape
-// (or to the code its build has) rebuilds that aircraft's bodies and no other's
-std::string Renderer::meshStamp(int model) {
+// a body's cache stamp: its builder's programs as the driver gets them - the aircraft's own, for the outside or the
+// cockpit - so an edit to one aircraft's shape rebuilds that aircraft's bodies and no other's, and an edit to its cabin
+// its cockpit's body alone
+std::string Renderer::meshStamp(int model, int slot) {
   if (model < 0) { static const std::string shared = meshCacheStamp(); return shared; }
   AfOwn& a = afOwn[model];
-  if (a.stamp.empty()) { float M[96]; packModelOf(model, M); a.stamp = meshCacheStamp(aircraftDefines(model, M)); }
-  return a.stamp;
+  if (a.stamp[slot].empty()) a.stamp[slot] = meshCacheStamp(bakeDefines(model, slot));
+  return a.stamp[slot];
 }
 
 // every aircraft but a wreck
@@ -281,7 +287,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   // the cache
   std::string path;
   if (!g_shaderCacheDir.empty()) {
-    const std::string stamp = meshStamp(afModelOf(M, pv.model));   // (the type's own: built with its own bake programs)
+    const std::string stamp = meshStamp(afModelOf(M, pv.model), inside ? 1 : 0);   // (the type's own: built with its own builder for this body)
     char name[64]; snprintf(name, sizeof name, "/mesh_%016llx_%s.bin", (unsigned long long)key, stamp.c_str());
     path = g_shaderCacheDir + name;
     if (FILE* f = fopen(path.c_str(), "rb")) {
@@ -1085,7 +1091,7 @@ void Renderer::checkMeshCache() {
   meshCached = false;
   if (g_shaderCacheDir.empty()) return;
   std::vector<std::string> tails;
-  for (int m = -1; m < kAfModels; m++) tails.push_back("_" + meshStamp(m) + ".bin");
+  for (int m = -1; m < kAfModels; m++) for (int slot = 0; slot < 2; slot++) tails.push_back("_" + meshStamp(m, slot) + ".bin");
   std::error_code ec;
   for (const auto& e : std::filesystem::directory_iterator(g_shaderCacheDir, ec)) {
     const std::string n = e.path().filename().string();

@@ -430,6 +430,7 @@ Pose partPoseCockpit(int k, vec2 sd){
   vec4 E = gM[22]; float pz = gM[21].w;
   float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z, cThr = gCtl.w;
   Pose X; X.R = mat3(1.0); X.T = vec3(0.0);
+#if HAS_CABIN   // (the cockpit's controls: never in an outside body's builder)
   mat3 D = mat3(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);   // the yokes' frame: x mirrored, each in its pilot's own frame
   vec3 O = fleetCabin()?cockpitYokeMount(sd.x):vec3(sd.x*abs(E.x), E.y - 0.43, pz);
   float pull = cPitch*(utilityFloorYoke()?.045:(floorSupportedYoke()?.050:.075));
@@ -486,7 +487,9 @@ Pose partPoseCockpit(int k, vec2 sd){
   else if (k == PT_JET_THR) X.T = E.xyz + (isMantis()?vec3(-.43,-.505,-.28+0.12*(0.5-cThr)):vec3(-0.42, -0.34, -0.02 + 0.12*(0.5 - cThr)));
   else if (k == PT_WR_STICK) { X.R = transpose(partRxy(cRoll*0.25)*partRyz(-cPitch*0.25)); X.T = E.xyz + vec3(0.5, -0.41, -0.06); }
   else if (k == PT_WR_THR) X.T = E.xyz + vec3(-0.5, -0.38, -0.08 + 0.13*(0.5 - cThr));
-  else if (k == PT_FLAP || k == PT_AILERON) {   // the wing's (plane_sdf.glsl mapPlane)
+  else
+#endif
+  if (k == PT_FLAP || k == PT_AILERON) {   // the wing's (plane_sdf.glsl mapPlane)
     vec4 W0 = gM[9], W1 = gM[10], W2 = gM[11];
     float flaps = gPS.y + (sd.x < 0.0 ? gFlapDL : 0.0);   // (the left one's own, if it stopped)
     X = k == PT_FLAP ? surfPose(sd.x, W1.x, W1.y, W1.z, W0.x, W0.y, W0.z, W0.w, 0.74, flaps*0.62, flaps*0.1)
@@ -506,11 +509,13 @@ Pose partPoseCockpit(int k, vec2 sd){
       X.T=C*(X.T-P)+vec3(sd.x*MT_FIN_X,V1.x,V1.y); X.R=C*X.R;
     }
   }
+#if HAS_CABIN
   else if (k == PT_WR_PEDAL) {
     X.R = mat3(sd.x, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
     bool specter=int(gM[0].z+.5)==5;
     X.T = E.xyz + (specter?vec3(sd.x*.145,-.820,-.73-sd.x*cYaw*.055):vec3(sd.x*.16,-.675,-.78-sd.x*cYaw*.04));   // (right rudder, yaw > 0, pushes the right pedal forward, -z: it pulled it back)
   }
+#endif
   return X;
 }
 // The research jets' retracting tricycle gear (the XR-30's and the XR-40's, under their own airframes). The mains swing
@@ -638,6 +643,7 @@ vec2 jtPartField(int k, vec3 l);   // (plane_sdf.glsl)
 // each part's shape in its own frame: distance and material id (the cockpit's controls and the light aircraft's surfaces)
 vec2 partFieldCockpit(int k, vec3 l){
   vec2 res = vec2(1e9, 0.0);
+#if HAS_CABIN   // (the cockpit's controls: never in an outside body's builder)
 #if HAS_SWIFT
   if(swiftCompactYoke() && k==PT_YOKE_SHAFT) {
     res=vec2(sdCapsule(l,vec3(0,0,-.130),vec3(0,0,-.010),.012),60.0);
@@ -700,7 +706,9 @@ vec2 partFieldCockpit(int k, vec3 l){
   } else if (k == PT_WR_THR) {
     res = vec2(max(sdBox(l, vec3(0.032, 0.045, 0.06)), (abs(l.y) + abs(l.z))*0.70711 - 0.07), 70.0);
     res = opU(res, vec2(sdBox(l - vec3(0.0, 0.046, -0.02), vec3(0.02, 0.002, 0.03)), 67.0));
-  } else if (k == PT_FLAP || k == PT_AILERON) {   // at rest, the right wing's (body space)
+  } else
+#endif
+  if (k == PT_FLAP || k == PT_AILERON) {   // at rest, the right wing's (body space)
     vec4 W0 = gM[9], W1 = gM[10], W2 = gM[11];
     float span = W0.x, sv = l.x, t = l.y - (W1.x + sv*W1.z), c = l.z - W1.y;
     float fus0 = flapRoot(), flapEnd = span*W2.w, ailEnd = span*0.94;
@@ -720,7 +728,9 @@ vec2 partFieldCockpit(int k, vec3 l){
     vec4 V0 = gM[14], V1 = gM[15];
     float h = V0.x, rud0 = gM[13].w > 0.5 ? 0.05 : 0.08*h;
     res = vec2(sdSurface(l.y - V1.x, l.z - V1.y, l.x, h, V0.y, V0.z, V0.w, 0.11, 0.66, rud0, h*0.97, 0.0, 0.0), 3.0);
-  } else if (k == PT_WR_PEDAL) {
+  }
+#if HAS_CABIN
+  else if (k == PT_WR_PEDAL) {
     float ped = max(sdBox(l, vec3(0.05, 0.075, 0.012)), (abs(l.x) + abs(l.y))*0.70711 - 0.08);
     ped = min(ped, sdCapsule(l, vec3(0.0, -0.07, 0.02), vec3(0.0, -0.09, 0.1), 0.012));
     res = vec2(ped, int(gM[0].z+.5)==5?47.0:71.0);
@@ -729,6 +739,7 @@ vec2 partFieldCockpit(int k, vec3 l){
     res=opU(res,vec2(sdCylX(l,.016,.010),60.0));
     res.x=max(res.x,-sdCylX(l,.008,.025)); // 1mm running clearance around fixed7mm axle
   }
+#endif
   return res;
 }
 #ifdef PART_BAKE

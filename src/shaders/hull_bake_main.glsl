@@ -24,7 +24,9 @@ void hullState(int s){
   // the XR-30's 2D nozzles read gFlame.z (the vectoring angle: the hover setting less half the stick): swept here, so the
   // bake sees them move (they were classed static, baked at the first frame's angle)
   if (int(gM[0].z + 0.5) == 5) gFlame.z = w.x - gCtl.x*0.5;
+#if HAS_CABIN
   if (gPS.w > 0.5) loadCabinFit();
+#endif
 }
 void main(){
   vec3 p = texelFetch(uHPts, ivec2(gl_FragCoord.xy), 0).xyz;
@@ -54,6 +56,7 @@ void main(){
     if (uHMode == 3) o = vec4(n, 0.0);
     else {
       float ao = 1.0;
+#if HAS_CABIN
       if (gPS.w > 0.5) {
         vec3 ap = p, an = n;
         if (uHPart >= 0) {   // a part's occlusion in the cabin about it, at its rest pose
@@ -62,6 +65,7 @@ void main(){
         }
         ao = interiorAO(ap, an);
       }
+#endif
       o = vec4(r.x, r.y, ao, 0.0);
     }
   }

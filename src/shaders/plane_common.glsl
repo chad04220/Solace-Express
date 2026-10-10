@@ -47,6 +47,13 @@
 #define HAS_WRAITH 1
 #endif
 #define HAS_RESEARCH (HAS_JET || HAS_WRAITH)
+// AF_OUTSIDE: a build that never sees the aircraft from inside - the outside bodies' builder - has no cabin code: an
+// edit to a cockpit changes no outside body's builder, so no outside body is built again for it (HAS_CABIN)
+#ifdef AF_OUTSIDE
+#define HAS_CABIN 0
+#else
+#define HAS_CABIN 1
+#endif
 // HAS_<type> for the preprocessor (HAS_SWIFT, HAS_MANTIS...): the build carries that type's own code - every build
 // of its family but another aircraft's own. HAS_FLEET_CABIN: the career types' and the XR-10's authored cabins
 // (cockpit_layout.glsl fleetCabin). MODEL_IS(n) in code: the player's aircraft is type n (gModelId; traffic is
@@ -233,7 +240,11 @@ void loadMain(){ gOwn = true; gModelId = uModelId; gWheel = uWheel;
   gM[0] = uM[0]; gM[1] = uM[1]; gM[2] = uM[2]; gM[3] = uM[3]; gM[4] = uM[4]; gM[5] = uM[5]; gM[6] = uM[6]; gM[7] = uM[7]; gM[8] = uM[8]; gM[9] = uM[9]; gM[10] = uM[10]; gM[11] = uM[11]; gM[12] = uM[12]; gM[13] = uM[13]; gM[14] = uM[14]; gM[15] = uM[15]; gM[16] = uM[16]; gM[17] = uM[17]; gM[18] = uM[18]; gM[19] = uM[19]; gM[20] = uM[20]; gM[21] = uM[21]; gM[22] = uM[22]; gM[23] = uM[23];
 #endif
   gWr[0] = uWr[0]; gWr[1] = uWr[1]; gWr[2] = uWr[2]; gWr[3] = uWr[3]; gWr[4] = uWr[4]; gWr[5] = uWr[5]; gWr[6] = uWr[6];
-  gPS = uPS; gFlapDL = uPr.w; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; if (gPS.w > 0.5 && gM[0].z < 4.5) loadCabinFit(); }
+  gPS = uPS; gFlapDL = uPr.w; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame;
+#if HAS_CABIN
+  if (gPS.w > 0.5 && gM[0].z < 4.5) loadCabinFit();
+#endif
+}
 int gTrafK = 0;
 void loadTraffic(int k){
   gOwn = false; gTrafK = k; gModelId = -1;

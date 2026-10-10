@@ -541,7 +541,9 @@ vec2 jtPartField(int k, vec3 l){
 }
 vec2 mapJet(vec3 p){
   float gear = gPS.x, inside = gPS.w;
+#if HAS_CABIN
   if (inside > 0.5) return mapJetCockpit(p);
+#endif
   float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z;
   vec3 ap = vec3(abs(p.x), p.y, p.z);
   float sgn = p.x > 0.0 ? 1.0 : -1.0;
@@ -786,6 +788,7 @@ vec2 mapPlaneBody(vec3 p){
   float f = sdFuselage(p);
   vec2 res = vec2(f, 1.0);
   float winHole = 1e9;   // (from the cockpit: the distance to the window openings, negative in them - the visors keep to the roof)
+#if HAS_CABIN
   if (inside > 0.5) {
     // hollow cabin with real window openings
     vec4 E = gM[22]; vec4 WS = gM[23]; vec3 sec = fusSection(p.z);
@@ -813,6 +816,7 @@ vec2 mapPlaneBody(vec3 p){
     float zB = gM[20].x > 0.5 ? gM[20].z + 0.15 : WS.w + (gM[21].z > 0.5 ? 0.9 : 0.75);
     res = opU(res, vec2(max(f + 0.03, abs(p.z - zB) - 0.02), 63.0));
   }
+#endif
   // Each part below is skipped when its bounding box is farther than the nearest surface found so far (plus its blend
   // radius): its own distance can only be larger, so the result is unchanged - but a sample in the cabin no longer
   // evaluates the wingtips, the tail and the wheels (the cockpit view takes ~30 such samples per pixel).
@@ -1142,6 +1146,7 @@ vec2 mapPlaneBody(vec3 p){
   // Ids: 10 panel (instruments drawn on it), 11 shell/floor, 12 seats, 13 controls, 14 glareshield & overhead,
   // 60 brushed metal, 61 rubber, 63 trim panels, 64 light lenses, 65 radio stack, 66 satin black (bezels, knobs),
   // 67 centre engine display (glass cockpits), 68 red knobs / buttons, 69 harness webbing
+#if HAS_CABIN   // (the cockpit view's alone: not in the outside bodies' builder, AF_OUTSIDE)
 #if HAS_MANTIS
   if (inside > 0.5 && isMantis()) return opU(res,mapMantisCockpit(p,f));
 #endif
@@ -1479,6 +1484,7 @@ vec2 mapPlaneBody(vec3 p){
   }
 #if HAS_OSPREY
   if (inside > 0.5 && MODEL_IS(kOspreyModel)) res = opU(res, mapOspreyCabinTrim(p));   // the Osprey's cabin trim
+#endif
 #endif
   return res;
 #endif

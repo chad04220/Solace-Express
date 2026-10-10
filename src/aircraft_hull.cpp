@@ -109,8 +109,8 @@ void Renderer::beginHullBake(const FrameParams& fp, int states, const float* ps,
   hullBakeUploaded[0] = hullBakeUploaded[1] = false;
   // the aircraft's own pair (its code alone: a smaller program, and its edits rebuild its bodies alone), or the shared
   // one; with neither, nothing can be built (the callers leave the airframe to the march: bakeOff)
-  const int own = afModelOf(fp.plane.M, fp.plane.model);
-  if ((own < 0 || !afBakePrograms(own, hullBakeProg)) && !sharedBakePrograms(hullBakeProg)) { hullBakeProg[0] = hullBakeProg[1] = 0; bakeOff = true; }
+  const int own = afModelOf(fp.plane.M, fp.plane.model), slot = ps && ps[3] > 0.5f ? 1 : 0;   // (the body: the states' inside flag)
+  if ((own < 0 || !afBakePrograms(own, slot, hullBakeProg)) && !sharedBakePrograms(hullBakeProg)) { hullBakeProg[0] = hullBakeProg[1] = 0; bakeOff = true; }
 }
 
 GLuint Renderer::bindHullBake(bool restore) {

@@ -42,8 +42,9 @@ mesh = read('src/aircraft_mesh.cpp')
 hull = read('src/aircraft_hull.cpp')
 assert 'afModelOf(trafK >= 0 ? fp.traffic[trafK].t : fp.plane.M, trafK >= 0 ? -1 : fp.plane.model)' in mesh, 'Lost per-aircraft mesh dispatch'
 assert 'afMeshProgram(own)' in mesh and 'planeMeshFSAssembly(aircraftDefines(model, M))' in mesh, 'Lost the aircraft\'s own mesh build'
-assert 'afBakePrograms(own, hullBakeProg)' in hull and 'hullBakeFSAssembly(aircraftDefines(model, M)' in mesh, 'Lost the aircraft\'s own bake'
-assert 'meshStamp(afModelOf(M, pv.model))' in mesh, 'The bodies\' cache must be stamped per aircraft'
+assert 'afBakePrograms(own, slot, hullBakeProg)' in hull and 'hullBakeFSAssembly(bakeDefines(model, slot))' in mesh, 'Lost the aircraft\'s own bake'
+assert '"#define AF_OUTSIDE\\n"' in mesh, 'The outside body\'s builder must leave the cabin out'
+assert 'meshStamp(afModelOf(M, pv.model), inside ? 1 : 0)' in mesh, 'The bodies\' cache must be stamped per aircraft and body'
 assembly = read('src/shaders.h')
 assert 'defines + "#define AF_MESH\\n"' in assembly
 assert '"#define AF_MODEL "' in assembly and '"#define AF_PACKED_MODEL vec4[24]("' in assembly
@@ -85,14 +86,24 @@ if a.shader_dir:
         'mapWraith': (12,), 'mapWraithCockpit': (12,), 'wraithScreen': (12,), 'shadeWraithCockpit': (12,),
     }
     shading = ('shadeFleetCabin', 'fuselagePaint', 'ospreyCabinAlbedo', 'jetScreen', 'wraithScreen', 'shadeWraithCockpit')
+    cabin = ('mapFleetPanel', 'swiftSeatPadded', 'swiftPowerFurniture', 'swiftYokeWheel', 'swiftDisplayRearSupports', 'bushSeatPadded',
+             'bushmasterPowerFurniture', 'bushmasterStickGrip', 'bushRaisedPrimaryRisers', 'mapOspreyCabinTrim', 'twinPowerBankField',
+             'mapMantisCockpit', 'mapJetCockpit', 'mapWraithCockpit')
     for m in range(13):
-        for prog in (f'plane_mesh_af{m}.frag', f'hullbake_af{m}.frag', f'objects_af{m}.frag', f'shadow_proxy_af{m}.frag'):
+        for prog in (f'plane_mesh_af{m}.frag', f'hullbake_af{m}.frag', f'hullbake_out_af{m}.frag', f'objects_af{m}.frag', f'shadow_proxy_af{m}.frag'):
             src = (a.shader_dir / 'pruned' / prog).read_text()
             for fn, owners in own_code.items():
                 defined = bool(re.search(r'^\w+\s+' + fn + r'\s*\(', src, re.M))
                 want = m in owners and not (prog.startswith(('hullbake', 'shadow_proxy')) and fn in shading)   # (the march shades what it finds, as the mesh pass does)
+                want = want and not (prog.startswith('hullbake_out') and fn in cabin)   # (the outside body's builder: no cabin)
                 assert defined == want, (prog, fn, 'defined' if defined else 'missing')
-    print('PASS: each aircraft\'s own mesh, bake, march and shadow programs hold its own code and no other aircraft\'s')
+    for m in range(13):   # (and the outside body's builder has no cabin at all, while the cockpit's has it)
+        out = (a.shader_dir / 'pruned' / f'hullbake_out_af{m}.frag').read_text()
+        ck = (a.shader_dir / 'pruned' / f'hullbake_af{m}.frag').read_text()
+        for fn in ('loadCabinFit', 'interiorAO'):
+            assert not re.search(r'^\w+\s+' + fn + r'\s*\(', out, re.M), (m, fn, 'in the outside builder')
+            assert re.search(r'^\w+\s+' + fn + r'\s*\(', ck, re.M), (m, fn, 'missing from the cockpit builder')
+    print('PASS: each aircraft\'s own mesh, bake (outside and cockpit), march and shadow programs hold its own code and no other aircraft\'s')
     # the programs the launch builds hold no airframe at all, so no edit to an aircraft compiles anything at launch
     # (each aircraft's are made as it is drawn); and each scenery class's holds only its class's surfaces
     for prog in ('objects_noaf.frag', 'shadow_proxy_maps.frag', 'effects_light.frag', 'part_pose.frag'):

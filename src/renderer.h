@@ -430,13 +430,15 @@ private:
   // after the first launch), each falling back to the shared build (sharedMeshProgram, sharedBakePrograms) if it fails.
   // AF_ALL (debug) draws and bakes everything with the shared builds.
   static constexpr int kAfModels = 13;   // (the whole roster, kAircraft: the career types and the research craft)
-  struct AfOwn { GLuint mesh = 0, probe = 0, bake[2] = {}, pass[3] = {}; bool meshTried = false, bakeTried = false, passTried[3] = {}; std::string stamp; };
+  // (the bake: a builder pair for each of its bodies - [0] the outside's, without the cabin's code (AF_OUTSIDE), [1] the
+  // cockpit's - each with its own stamp, so a cockpit's edit builds that cockpit's body alone)
+  struct AfOwn { GLuint mesh = 0, probe = 0, bake[2][2] = {}, pass[3] = {}; bool meshTried = false, bakeTried[2] = {}, passTried[3] = {}; std::string stamp[2]; };
   AfOwn afOwn[kAfModels];
   uint64_t afKeys[kAfModels] = {}; bool afKeysSet = false;   // (each type's packed model's key: trafficModelKey)
   int afModelOf(const float* M, int model);   // the type whose packed model M is (model: the type it claims, -1 any), or -1: the shared builds
   GLuint afMeshProgram(int model);
-  bool afBakePrograms(int model, GLuint out[2]);
-  std::string meshStamp(int model);   // the bodies' cache stamp: the type's own bake programs (-1: the shared ones)
+  bool afBakePrograms(int model, int slot, GLuint out[2]);   // slot: 0 the outside body, 1 the cockpit's
+  std::string meshStamp(int model, int slot);   // a body's cache stamp: its type's own builder for the slot (-1: the shared)
   // the airframe shadow maps (raster_renderer.cpp): the player's baked static mesh rendered from the sun (layer 0,
   // orthographic) and from the three brightest shadow-casting lights (layers 1-3, perspective along each beam); a
   // second array marks where the moving hull is, so the proxy still marches the field there (the XR-30's nozzles, the

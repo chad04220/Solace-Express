@@ -516,9 +516,11 @@ puts whitecaps on the crests as the wind rises. A seaplane or a ditching reads t
   own pair of programs (`ENT_CLASS`, `ent_common.glsl`: `ENT_TREES`, `ENT_ROCKS`, `ENT_BUILDINGS`); each draw takes its
   kind's class's (`entities.h entClass`).
 - **Caches.** Compiled programs are cached by source in `shadercache/`; the first launch of a new build compiles them.
-  Meshes are cached by a stamp of each aircraft's own bake programs as the driver gets them (`Renderer::meshStamp`:
-  the type's pruned bake pair, plus the GPU driver). So material and lighting edits rebake nothing, and a shape edit
-  rebakes only the aircraft whose programs it changes (an edit to shared shape code, every aircraft once). Bump `kMeshMagic` (`aircraft_mesh.cpp`) when you
+  Meshes are cached by a stamp of the builder that made them, as the driver gets it (`Renderer::meshStamp`: the type's
+  own pruned bake pair for that body, plus the GPU driver). Each aircraft has two builders: the outside body's has no
+  cabin code (`AF_OUTSIDE`, `HAS_CABIN` 0 - keep cockpit-only code behind `#if HAS_CABIN`), the cockpit's has it. So
+  material and lighting edits rebake nothing, a cockpit edit rebakes that aircraft's cockpit body alone, and a shape
+  edit only the aircraft whose builders it changes (an edit to shared shape code, every aircraft once). Bump `kMeshMagic` (`aircraft_mesh.cpp`) when you
   change what the bake makes of the field, not just the field.
 - **Portability.** OpenGL 3.3 core, and it must compile on NVIDIA, AMD, Intel and Mesa:
   - no GLSL keywords as identifiers (`flat`, `sample`, `patch`, `input`, `output`, …; `shader_keyword_test` checks);

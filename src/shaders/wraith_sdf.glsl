@@ -139,7 +139,9 @@ vec2 wrPod(vec3 p, int i, float lim){
 }
 vec2 mapWraith(vec3 p){
   float gear = gPS.x, inside = gPS.w;
+#if HAS_CABIN
   if (inside > 0.5) return mapWraithCockpit(p);
+#endif
   vec3 ap = vec3(abs(p.x), p.y, p.z);
   float sgn = p.x > 0.0 ? 1.0 : -1.0;
   float body = wrBody(p);

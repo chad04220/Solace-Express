@@ -72,8 +72,10 @@ int main(int argc, char** argv) {
       float M[96]; packModelOf(m, M);
       const std::string d = aircraftDefines(m, M), n = std::to_string(m);
       put(dir, ("plane_mesh_af" + n + ".frag").c_str(), planeMeshFSAssembly(d));
-      put(dir, ("hullbake_af" + n + ".frag").c_str(), hullBakeFSAssembly(d));
+      put(dir, ("hullbake_af" + n + ".frag").c_str(), hullBakeFSAssembly(d));   // (the cockpit body's builder)
       put(dir, ("hullbake_normals_af" + n + ".frag").c_str(), hullBakeFSAssembly(d + "#define HULL_BAKE_NORMALS\n"));
+      put(dir, ("hullbake_out_af" + n + ".frag").c_str(), hullBakeFSAssembly(d + "#define AF_OUTSIDE\n"));   // (the outside body's: no cabin)
+      put(dir, ("hullbake_normals_out_af" + n + ".frag").c_str(), hullBakeFSAssembly(d + "#define AF_OUTSIDE\n#define HULL_BAKE_NORMALS\n"));
       if (m == kWraith) put(dir, "plane_mesh_af12_probe.frag", planeMeshFSAssembly(d + "#define PROBE_MESH_SHADE\n"));   // (the analysis's probe build)
       // and its own full-screen passes (raster_renderer.cpp afPassProgram): the march, its shadows; the XR-40's effects
       put(dir, ("objects_af" + n + ".frag").c_str(), objectsFSAssembly(d));
