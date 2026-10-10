@@ -16,8 +16,15 @@ int main(int argc, char** argv) {
   }
   Weather wx; wx.windSpeed = 0; wx.gust = 0; wx.turbulence = 0;
   int fails = 0;
+  // FLIGHT_QUICK (the sanitizer job, where every step runs several times slower): the checks made type by type run on
+  // the types that between them fly every kind of airframe and engine - a piston single, the twin, the turboprop
+  // airliner, the business jet and the research jets - instead of all of them, and each failure case once. Every
+  // section still runs; the full set is the Windows job's and every local run's.
+  const bool quick = getenv("FLIGHT_QUICK") != nullptr;
+  auto skip = [&](int i) { return quick && i != 0 && i != 3 && i != 5 && i != 6 && i != kResearchJet && i != kWraith; };
   if (strcmp(kAircraft[kOsprey].id, "osprey_c6") != 0 || strcmp(kAircraft[kNightjar].id, "xr10_nightjar") != 0 || strcmp(kAircraft[kResearchJet].id, "xr30_specter") != 0 || strcmp(kAircraft[kMantis].id, "xr20_mantis") != 0 || strcmp(kAircraft[kWraith].id, "xr40_wraith") != 0) { printf("aircraft indices (kOsprey / kNightjar / kResearchJet / kMantis / kWraith) don't match the table\n"); return 1; }
   for (int ai = 0; ai < kNumAircraft; ai++) {
+    if (skip(ai)) continue;
     const AircraftSpec& s = kAircraft[ai];
     int apIdx = g_world.findAirport("CAP");
     const Airport& a = g_world.airports[apIdx];
@@ -54,6 +61,7 @@ int main(int argc, char** argv) {
   // Control-direction check: each input must move the aircraft the way its control surface animates
   // (roll +1 = right aileron up -> right bank, pitch +1 = elevator TE up -> nose up, yaw +1 = rudder TE right -> nose right)
   for (int ai = 0; ai < kNumAircraft; ai++) {
+    if (skip(ai)) continue;
     const AircraftSpec& s = kAircraft[ai];
     for (int axis = 0; axis < 3; axis++) {
       Plane p; p.reset(&s, vec3(0, 1500, 0), 90, s.maxFuel * 0.5f, 0, true, s.cruise * 0.9f);
@@ -386,6 +394,7 @@ int main(int argc, char** argv) {
   // autopilot flies each type to its own envelope (steep banks, hard pulls): what's checked is that it gets there, settles,
   // and never goes past the airframe's limits.
   for (int i = 0; i < 9; i++) {
+    if (skip(i)) continue;
     const AircraftSpec& s = kAircraft[i];
     Weather wx; wx.windSpeed = 7; wx.windFrom = 200; wx.turbulence = 0.25f; wx.gust = 2;
     Plane p; p.reset(&s, vec3(0, 1800, 2000), 30, s.maxFuel * 0.6f, 100, true, s.cruise * 0.85f);
@@ -408,6 +417,7 @@ int main(int argc, char** argv) {
   // ---------------- comfort law (career flights): the autopilot keeps passengers comfortable - bank <= 25 deg,
   // 0.8..1.3 g - in a 150 deg turn on HOLD and on a NAV route to a landing (the final approach keeps its own limits)
   for (int i = 0; i < kNumAircraft; i++) {
+    if (skip(i)) continue;
     const AircraftSpec& s = kAircraft[i];
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
     Plane p; p.reset(&s, vec3(0, 1800, 2000), 30, s.maxFuel * 0.6f, 100, true, s.cruise * 0.85f);
@@ -442,6 +452,7 @@ int main(int argc, char** argv) {
   {
     int ai = g_world.findAirport("CAP"); const Airport& A = g_world.airports[ai];
     for (int i = 0; i < 9; i++) {
+      if (skip(i)) continue;
       const AircraftSpec& s = kAircraft[i];
       Weather wx; wx.windSpeed = 6; wx.windFrom = wrapDeg360(A.heading + 25.f); wx.turbulence = 0.15f;
       vec3 side(-A.dir().z, 0, A.dir().x);
@@ -469,7 +480,10 @@ int main(int argc, char** argv) {
     int ai = g_world.findAirport("CAP"); const Airport& A = g_world.airports[ai];
     struct Case { int craft; const char* cond; };
     const Case cases[] = {{3, "engine out"}, {5, "engine out"}, {6, "engine out"}, {4, "full load"}, {5, "full load"}, {0, "iced"}, {5, "iced"}};
+    std::string seen;   // (quick: each condition once)
     for (const Case& c : cases) {
+      if (quick && seen.find(c.cond[0]) != std::string::npos) continue;
+      seen += c.cond[0];
       const AircraftSpec& s = kAircraft[c.craft];
       Weather wx; wx.windSpeed = 5; wx.windFrom = wrapDeg360(A.heading + 20.f); wx.turbulence = 0.1f;
       vec3 side(-A.dir().z, 0, A.dir().x);

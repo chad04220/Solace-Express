@@ -46,12 +46,13 @@ jobs:
       - name: Build
         run: |
           ccache -z
-          cmake --build build --parallel 4 --target flight_test progression_test save_test airport_layout_test envelope_test hull_test mesh_simplify_test entity_raycast_test gameplay_test encounter_timing_test shader_keyword_test world_cache_test aero_test aero_wake_test
+          cmake --build build --parallel 4 --target flight_test progression_test save_test airport_layout_test envelope_test hull_test mesh_simplify_test entity_raycast_test gameplay_test encounter_timing_test shader_keyword_test world_cache_test aero_test aero_wake_test breakup_test
           ccache -s
       - name: Test   # four at a time: the runner's four cores (the flight model, the longest, sets the time)
         env:
           ASAN_OPTIONS: detect_leaks=0
           UBSAN_OPTIONS: print_stacktrace=1
+          FLIGHT_QUICK: 1   # (the flight model's type-by-type checks on one of each kind of aircraft: the Windows job flies them all)
         run: ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake"
 
   windows:
