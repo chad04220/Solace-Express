@@ -427,15 +427,9 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   grassTint = mix(grassTint, vec3(0.75,0.8,0.65), cold*0.6);
   grassTint *= 0.84 + 0.22*vnoise(p.xz/90.0) + 0.1*vnoise(p.xz/23.0);   // patchy brightness breaks up repetition
   grassTint *= 1.0 - 0.18*smoothstep(0.08, 0.3, slope);                   // steeper ground: coarser, shadowed tufts
+  // (the photographic 2K grass is packed to this layer's mean colour - tools/pack_environment_scans.py, PALETTE_MATCH -
+  // so it takes the same tint and saturation: the islands' green, the scan's blades up close)
   float grassSaturation = 0.68;
-#ifdef ENV_MATERIALS
-  if (uEnvMaterials != 0) {
-    // Calibrated photographic grass already carries natural soil, dry blades and leaves.
-    // Retain its color rather than forcing it back toward the old procedural green.
-    grassSaturation = 0.94;
-    grassTint = mix(vec3(1.0), grassTint, 0.35);
-  }
-#endif
   vec3 grB = mix(vec3(dot(gr.rgb, vec3(0.2126, 0.7152, 0.0722))), gr.rgb, grassSaturation);
   m.alb = grB*grassTint*1.05; m.rough = gr.a; m.nrm = nG;
   // wildflower and dry patches

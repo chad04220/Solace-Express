@@ -32,7 +32,7 @@ CC0 needs no attribution; it is given with thanks.
 
 The independent photographed environment set in `materials/environment/` (512 px fallback) and
 `materials/high/` (2048 px) is packed by `tools/pack_environment_scans.py` without procedural-palette matching:
-- Grass: **Leafy Grass**, Charlotte Baglioni, https://polyhaven.com/a/leafy_grass
+- Grass: **Grass004**, ambientCG, https://ambientcg.com/view?id=Grass004 (its colour and roughness matched to the islands' grass layer)
 - Asphalt: **Asphalt 04**, Sergej Majboroda (photography), Jenelle van Heerden (processing), https://polyhaven.com/a/asphalt_04
 - Concrete: **Concrete Floor Worn 001**, Dimitrios Savva (photography), Rico Cilliers (processing), https://polyhaven.com/a/concrete_floor_worn_001
 
@@ -41,7 +41,7 @@ The independent photographed environment set in `materials/environment/` (512 px
 - Roof tile: **Clay Roof Tiles 02**, Amal Kumar, https://polyhaven.com/a/clay_roof_tiles_02
 - Bark: **Bark Brown 02**, Rob Tuytel, https://polyhaven.com/a/bark_brown_02
 
-All seven are CC0 1.0: https://polyhaven.com/license and https://creativecommons.org/publicdomain/zero/1.0/legalcode.
+All seven are CC0 1.0: https://polyhaven.com/license, https://ambientcg.com/license and https://creativecommons.org/publicdomain/zero/1.0/legalcode.
 `assets/materials/environment/manifest.json` records exact official source URLs, source SHA-256 hashes, packed-file
 hashes, dimensions and transformations. Source photographs/PNG downloads are not bundled; only the compact runtime
 maps are redistributed. The existing aircraft/cockpit-compatible material files remain unchanged.

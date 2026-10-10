@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "provider": "Poly Haven",
+  "provider": "Poly Haven, ambientCG",
   "license": "CC0-1.0",
   "license_url": "https://polyhaven.com/license",
   "license_text_url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
@@ -10,33 +10,32 @@
     "normal": "DirectX tangent X,Y in R,G; displacement in B",
     "material": "source roughness in R; source ambient occlusion in G",
     "filter": "linear-light box filter; filtered normal vectors renormalized",
-    "palette_matching": false,
+    "palette_matching": {
+      "layers": [
+        0
+      ],
+      "to": "the legacy layer's mean linear albedo (assets/materials), the scan's variation kept"
+    },
     "normal_gain": 1.0
   },
   "assets": [
     {
       "layer": 0,
       "name": "grass",
-      "asset": "leafy_grass",
-      "page": "https://polyhaven.com/a/leafy_grass",
+      "asset": "Grass004",
+      "provider": "ambientCG",
+      "page": "https://ambientcg.com/view?id=Grass004",
       "authors": {
-        "Charlotte Baglioni": "All"
+        "ambientCG (Lennart Demes)": "All"
       },
       "tile_metres": 2.0,
       "source_metadata": [
         {
-          "kind": "files",
-          "url": "https://api.polyhaven.com/files/leafy_grass",
-          "cache_file": "leafy_grass_files.json",
-          "bytes": 29115,
-          "sha256": "705daf71157e399391d094d14cd9e932d5c337bb2c3044bb91823145162afc83"
-        },
-        {
-          "kind": "info",
-          "url": "https://api.polyhaven.com/info/leafy_grass",
-          "cache_file": "leafy_grass_info.json",
-          "bytes": 910,
-          "sha256": "513914aaef6fd3c12ade425faf8660fd9e18584952c2160ee13ebf6e5bc42112"
+          "kind": "zip",
+          "url": "https://ambientcg.com/get?file=Grass004_2K-JPG.zip",
+          "cache_file": "Grass004_2K-JPG.zip",
+          "bytes": 39900302,
+          "sha256": "d7d3f08e8bb1e59aed0c3dbb85ea0b46d5308481f89b6a3fd62c0ec9e862245b"
         }
       ],
       "source_dimensions_mm": [
@@ -45,80 +44,91 @@
       ],
       "source_files": [
         {
-          "map": "Diffuse",
-          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/leafy_grass/leafy_grass_diff_2k.png",
-          "cache_file": "leafy_grass_Diffuse.png",
-          "sha256": "9ae7994a36a7aedf5fe65dac49d5e096e9a8ff1d8a8e8ccb28df0c9c3a7a2d34",
-          "provider_md5": "91c82271318a5bbe69182404c6dff730",
-          "bytes": 23606854
+          "map": "Color",
+          "url": "https://ambientcg.com/get?file=Grass004_2K-JPG.zip#Grass004_2K-JPG_Color.jpg",
+          "sha256": "735b141c8f1972e70a45879424f1238fea9f887324173097785f4ac36e67e9a3",
+          "bytes": 7644307
         },
         {
-          "map": "nor_dx",
-          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/leafy_grass/leafy_grass_nor_dx_2k.png",
-          "cache_file": "leafy_grass_nor_dx.png",
-          "sha256": "dec96db6a12360e6bd87c69524a236bbc7bf3fe6950886b4bf2d49f362832468",
-          "provider_md5": "47eec13603149d9cbbe7aeaf824a117c",
-          "bytes": 24429834
+          "map": "NormalDX",
+          "url": "https://ambientcg.com/get?file=Grass004_2K-JPG.zip#Grass004_2K-JPG_NormalDX.jpg",
+          "sha256": "8681bb16df1050d50053b38a5a24aa1d235ce35e1888fcbff8a97a1dd11bf034",
+          "bytes": 10011482
         },
         {
-          "map": "arm",
-          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/leafy_grass/leafy_grass_arm_2k.png",
-          "cache_file": "leafy_grass_arm.png",
-          "sha256": "ae94a44475b5793ca72cc8f9ad26f0ccd03bc5f72b0992e5070a38f923ea0bf9",
-          "provider_md5": "1ea54cc3044070188a5b524cec83dac2",
-          "bytes": 18216000
+          "map": "Roughness",
+          "url": "https://ambientcg.com/get?file=Grass004_2K-JPG.zip#Grass004_2K-JPG_Roughness.jpg",
+          "sha256": "c449fdf1e779eb7be5a19c1d58ee28cc155ed0523a141b151f3cbc843c4ae2e3",
+          "bytes": 3413801
+        },
+        {
+          "map": "AmbientOcclusion",
+          "url": "https://ambientcg.com/get?file=Grass004_2K-JPG.zip#Grass004_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "0f9180993db4c7b9479ad2a4b65763d90e8668fb7e800baff68cac1883a9dff5",
+          "bytes": 3659925
         },
         {
           "map": "Displacement",
-          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/leafy_grass/leafy_grass_disp_2k.png",
-          "cache_file": "leafy_grass_Displacement.png",
-          "sha256": "506ed7d425d9a73f6881e17f03e2a0d2fa57893bb0555a4b86ad905d2cabe510",
-          "provider_md5": "540555d31b8bf2d674b818a7e2e61125",
-          "bytes": 7311977
+          "url": "https://ambientcg.com/get?file=Grass004_2K-JPG.zip#Grass004_2K-JPG_Displacement.jpg",
+          "sha256": "7b3f8f545fad85bd980330dc29bb59fc5c76ea3099fb1ef2a29fb1d916f602c9",
+          "bytes": 3491166
         }
       ],
       "mean_linear_albedo": [
-        0.3259201277057575,
-        0.23911385194544188,
-        0.10823637002007214
+        0.12941097102178017,
+        0.16354447692013716,
+        0.035324404435467305
       ],
-      "mean_roughness": 0.685738847801872,
+      "mean_roughness": 0.26306825663488775,
+      "palette_match": {
+        "reference": [
+          "00_grass_c.jpg",
+          "00_grass_m.jpg"
+        ],
+        "packed_mean_linear_albedo": [
+          0.24598072420154266,
+          0.35726843411896275,
+          0.10838477768648298
+        ],
+        "packed_mean_roughness": 0.9157450906575519,
+        "clipped_fraction": 0.0
+      },
       "outputs": [
         {
           "path": "environment/00_grass_c.jpg",
           "size": 512,
-          "bytes": 198806,
-          "sha256": "dedabccb5fbf5688b5fbb8c5e93fab50f1b8d9adf414e421a53a8e83699f8806"
+          "bytes": 252900,
+          "sha256": "eb7c1124ebad0e76361bc05d8a9201f57151b86b90dcc2e71b2c2af563454f74"
         },
         {
           "path": "environment/00_grass_n.jpg",
           "size": 512,
-          "bytes": 426225,
-          "sha256": "6d9d2b7b6ab50415bf3538f8b0b1698934d4c11833f145807c51f525275d0108"
+          "bytes": 431102,
+          "sha256": "0636b2e2ae81f01f6621305e5cfecb017a6838a71a6bb855c3ae4c6b283f017b"
         },
         {
           "path": "environment/00_grass_m.jpg",
           "size": 512,
-          "bytes": 226952,
-          "sha256": "9d21344b61e99dec23c561380802004e4e0b8ae369a68afcd33236b15fcadad3"
+          "bytes": 283061,
+          "sha256": "8aac059347c112667414463c70c047d6a3e5dce6496746b69fded6910c0b8fec"
         },
         {
           "path": "high/00_grass_c.jpg",
           "size": 2048,
-          "bytes": 3052029,
-          "sha256": "ddb46dd614c07e6a5d07714d6bc162f8d7e00d20c65e7b81cb780f4aa7164c96"
+          "bytes": 3276958,
+          "sha256": "d3045f147a1a1843b889b14a5dac533fe2aaa4d243ec10a6d128b2988041cd02"
         },
         {
           "path": "high/00_grass_n.jpg",
           "size": 2048,
-          "bytes": 7300534,
-          "sha256": "79f3bb5ec27d58daff5f563ee2fc53b6a9dff4aa9137582caccb1b05df320643"
+          "bytes": 7576870,
+          "sha256": "3d00ee13bebf771bdab89ec91fb02b23aa00ff37d9e24c1733be6d81a1f3d7c1"
         },
         {
           "path": "high/00_grass_m.jpg",
           "size": 2048,
-          "bytes": 3895992,
-          "sha256": "09301f748b7455c24d3578dbe328fe640b1d71186192c3c4cb277d5f2bd0b269"
+          "bytes": 5218178,
+          "sha256": "e591131d416b0bdbb74880070435ae60bf2b6a79968dd49ba047d5023650488a"
         }
       ]
     },
@@ -229,7 +239,8 @@
           "bytes": 1009484,
           "sha256": "8faccf73096690f52d09cc20c5dd2fb47169939797f0121beee813767d0511bc"
         }
-      ]
+      ],
+      "provider": "Poly Haven"
     },
     {
       "layer": 8,
@@ -338,7 +349,8 @@
           "bytes": 1459494,
           "sha256": "a2d3ebef6bf1923769a1d477b15f908184251826a9407beb0c7d8df92612b36a"
         }
-      ]
+      ],
+      "provider": "Poly Haven"
     },
     {
       "layer": 12,
@@ -446,7 +458,8 @@
           "bytes": 1983291,
           "sha256": "3eb3a0e9f69784344c588f54f8ba64cf15ff22b80d5721cbe8e77406445f8af7"
         }
-      ]
+      ],
+      "provider": "Poly Haven"
     },
     {
       "layer": 11,
@@ -554,7 +567,8 @@
           "bytes": 1083774,
           "sha256": "694b88f92c44a466b4472e290b3184b7de3892e37a84d01e4c07b6142447f025"
         }
-      ]
+      ],
+      "provider": "Poly Haven"
     },
     {
       "layer": 9,
@@ -662,7 +676,8 @@
           "bytes": 1188310,
           "sha256": "a485a0e1d030ae99779781bbe9cbed6465b4b1fa3eb9a5cd94ea0852f6036a87"
         }
-      ]
+      ],
+      "provider": "Poly Haven"
     },
     {
       "layer": 25,
@@ -770,7 +785,8 @@
           "bytes": 2316619,
           "sha256": "472144df7e356cc0100aa0d643facaba14a62ae57e47ee06beb04412c1f72b65"
         }
-      ]
+      ],
+      "provider": "Poly Haven"
     }
   ]
 }

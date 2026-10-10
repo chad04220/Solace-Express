@@ -74,7 +74,8 @@ def jpeg_shape(data):
 workflow = (ROOT / '.github/workflows/build.yml').read_text()
 check('Copy-Item -Recurse assets/materials/*' in workflow, 'Windows package includes high/environment subdirectories')
 check(manifest['license'] == 'CC0-1.0', 'CC0 provenance')
-check(manifest['packing']['palette_matching'] is False, 'never recolour photographs to the procedural palette')
+check(manifest['packing']['palette_matching']['layers'] == [0],
+      "only the grass is brought to the islands' green (the owner's choice); every other scan keeps its own colour")
 layers = [0, 5, 8, 12, 11, 9, 25]
 check([a['layer'] for a in manifest['assets']] == layers, 'seven selected environment layers in shader order')
 check(manifest['schema'] == 2, 'metadata-backed provenance schema')
@@ -86,17 +87,32 @@ check(match is not None and [int(v.strip()) for v in match[1].split(',')] == lay
       'CPU array upload order agrees with the asset manifest')
 check(re.search(r'kEnvMatLayers\s*=\s*7\b', header) is not None, 'bounded seven-layer GPU array')
 for asset in manifest['assets']:
-    check(asset['page'].startswith('https://polyhaven.com/a/'), 'official asset source')
+    provider = asset.get('provider', 'Poly Haven')
+    acg = provider == 'ambientCG'
+    check(provider in ('Poly Haven', 'ambientCG'), 'a CC0 photographic provider')
+    check(asset['page'].startswith('https://ambientcg.com/view?id=' if acg else 'https://polyhaven.com/a/'), 'official asset source')
+    check(('palette_match' in asset) == (asset['layer'] == 0), 'the grass alone is colour-matched')
     check(bool(asset['authors']), 'source artists recorded')
-    check(len(asset['source_files']) == 4, 'diffuse, DX normal, ARM and displacement source hashes')
+    check(len(asset['source_files']) == (5 if acg else 4),
+          'colour, DX normal, roughness/occlusion (ARM) and displacement source hashes')
     check(len(asset['outputs']) == 6, '512 fallback and actual 2K each have c/n/m maps')
     check(math.isfinite(asset['tile_metres']) and asset['tile_metres'] > 0, 'documented finite physical tile scale')
     check(all(math.isfinite(v) and 0 <= v <= 1 for v in asset['mean_linear_albedo']), 'finite source linear albedo')
     check(len(asset['source_dimensions_mm']) == 2 and
           all(abs(d / 1000 - asset['tile_metres']) < .005 for d in asset['source_dimensions_mm']),
           'sampling scale matches measured source dimensions, without physical stretching')
-    check([m['kind'] for m in asset['source_metadata']] == ['files', 'info'], 'original API records identified')
-    for metadata in asset['source_metadata']:
+    check([m['kind'] for m in asset['source_metadata']] == (['zip'] if acg else ['files', 'info']), 'original API records identified')
+    for metadata in asset['source_metadata'] if acg else []:
+        check(metadata['url'] == 'https://ambientcg.com/get?file=%s_2K-JPG.zip' % asset['asset'], 'official 2K download')
+        check(len(metadata['sha256']) == 64 and metadata['bytes'] > 0, 'downloaded zip hash recorded')
+        if args.source_cache:
+            raw = (args.source_cache / metadata['cache_file']).read_bytes()
+            check(len(raw) == metadata['bytes'] and hashlib.sha256(raw).hexdigest() == metadata['sha256'],
+                  'cached original zip agrees with manifest')
+    for source in asset['source_files'] if acg else []:
+        check(source['url'].startswith('https://ambientcg.com/get?file=%s_2K-JPG.zip#' % asset['asset']), 'map from the official zip')
+        check(len(source['sha256']) == 64 and source['bytes'] > 0, 'source map checksum recorded')
+    for metadata in [] if acg else asset['source_metadata']:
         check(metadata['url'] == 'https://api.polyhaven.com/' + metadata['kind'] + '/' + asset['asset'],
               'official per-asset API metadata URL')
         check(len(metadata['sha256']) == 64 and metadata['bytes'] > 0, 'original API metadata hash recorded')
@@ -110,7 +126,7 @@ for asset in manifest['assets']:
             else:
                 check(record['authors'] == asset['authors'] and record['dimensions'] == asset['source_dimensions_mm'],
                       'credits and dimensions agree with the original API metadata')
-    for source in asset['source_files']:
+    for source in [] if acg else asset['source_files']:
         check(source['url'].startswith('https://dl.polyhaven.org/file/ph-assets/'), 'official download source')
         check(len(source['provider_md5']) == 32, 'provider checksum verified during packing')
         check(len(source['sha256']) == 64 and all(c in '0123456789abcdef' for c in source['sha256']), 'source checksum recorded')
@@ -150,10 +166,12 @@ for asset in manifest['assets']:
         check(np.isfinite(pixels).all(), 'finite packed texels')
         if path.stem.endswith('_c'):
             mean = (pixels ** 2).mean(axis=(0, 1))
-            check(np.max(np.abs(mean - np.array(asset['mean_linear_albedo']))) < .005,
-                  'mean source linear albedo preserved through encoding/filtering')
+            want = asset['palette_match']['packed_mean_linear_albedo'] if 'palette_match' in asset else asset['mean_linear_albedo']
+            check(np.max(np.abs(mean - np.array(want))) < .005,
+                  'mean linear albedo (the source or the matched palette) preserved through encoding/filtering')
         if path.stem.endswith('_m'):
-            check(abs(float(pixels[..., 0].mean()) - asset['mean_roughness']) < .006, 'source roughness retained')
+            want = asset['palette_match']['packed_mean_roughness'] if 'palette_match' in asset else asset['mean_roughness']
+            check(abs(float(pixels[..., 0].mean()) - want) < .006, 'roughness (the source or the matched palette) retained')
             check(float(pixels[..., 2].mean()) <= .012, 'unused blue channel stays near zero after JPEG')
         if path.stem.endswith('_n'):
             slope2 = np.sum((pixels[..., :2] * 2 - 1) ** 2, axis=-1)

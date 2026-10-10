@@ -5,14 +5,17 @@
 Seven environment-only surface sets now use natural photographic colour,
 roughness and tangent-space normal detail. The original 30-layer material array
 and every existing material JPEG are unchanged, including the concrete used by
-parked-aircraft trim. The former grass material came from ambientCG Grass004,
-whose official page identifies it as procedural. The replacement is Poly Haven's
-Leafy Grass, which includes actual green ground cover, exposed soil and leaf litter
-rather than a uniformly saturated lawn.
+parked-aircraft trim. The grass first used Poly Haven's Leafy Grass, which is mostly
+fallen leaves over soil: it turned every meadow on the islands khaki. By the owner's
+choice the grass is ambientCG Grass004 at 2K instead (the legacy layer's source, which
+ambientCG's page identifies as procedural rather than photographed), its mean colour and
+roughness matched to the legacy layer the islands were tuned with
+(`tools/pack_environment_scans.py`, `PALETTE_MATCH`): the islands' green, with real
+blade detail up close. It is the one layer whose colour is matched.
 
 | Environment layer | Original material ID | CC0 source | Physical source tile |
 |---|---:|---|---:|
-| Grass | 0 | [Leafy Grass](https://polyhaven.com/a/leafy_grass), Charlotte Baglioni | 2 m |
+| Grass | 0 | [Grass004](https://ambientcg.com/view?id=Grass004), ambientCG (colour and roughness matched) | 2 m |
 | Asphalt | 5 | [Asphalt 04](https://polyhaven.com/a/asphalt_04), Sergej Majboroda / Jenelle van Heerden | 4.04 m |
 | Concrete | 8 | [Concrete Floor Worn 001](https://polyhaven.com/a/concrete_floor_worn_001), Dimitrios Savva / Rico Cilliers | 3 m |
 | Brick | 12 | [Red Brick](https://polyhaven.com/a/red_brick), Rob Tuytel | 1.4 m |
@@ -20,7 +23,7 @@ rather than a uniformly saturated lawn.
 | Roof tile | 9 | [Clay Roof Tiles 02](https://polyhaven.com/a/clay_roof_tiles_02), Amal Kumar | 2.5 m |
 | Bark | 25 | [Bark Brown 02](https://polyhaven.com/a/bark_brown_02), Rob Tuytel | 1 m |
 
-All assets are [CC0 1.0](https://polyhaven.com/license). Official asset pages and
+All assets are CC0 1.0 ([Poly Haven](https://polyhaven.com/license), [ambientCG](https://ambientcg.com/license)). Official asset pages and
 API metadata were checked on 2026-10-10. The provider's
 [texture requirements](https://docs.polyhaven.com/en/technical-standards/textures)
 specify photo-based sources, photogrammetry or photometric stereo, with calibrated
