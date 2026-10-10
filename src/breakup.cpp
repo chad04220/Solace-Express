@@ -152,6 +152,85 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
   return n;
 }
 
+// ---------------------------------------------------------------- where they tore
+namespace {
+float& at(vec3& v, int i) { return (&v.x)[i]; }
+// points over the airframe's surfaces: each strip's leading edge, mid chord and trailing edge at its span's ends and
+// middle, a ring round each fuselage slice at its ends and middle, and each engine
+void airframePoints(const AircraftSpec& s, std::vector<vec3>& pts) {
+  const AeroGeom& g = aeroGeom(s);
+  for (int i = 0; i < g.nSt; i++) {
+    const AeroStrip& st = g.st[i];
+    const float half = 0.5f * st.area / std::max(st.chord, 0.05f);
+    for (int a = 0; a < 3; a++) for (int b = 0; b < 3; b++) pts.push_back(st.r + st.c * (st.chord * (-0.25f + 0.5f * a)) + st.sp * (half * (b - 1)));
+  }
+  for (int k = 0; k < g.nSeg; k++) {
+    const AeroSegment& sg = g.seg[k];
+    for (int e = -1; e <= 1; e++) for (int a = 0; a < 16; a++) {
+      const float t = a * (2.f * PI / 16.f);
+      pts.push_back(vec3(0.5f * sg.w * cosf(t), sg.y + 0.5f * sg.h * sinf(t), sg.z + e * 0.5f * sg.len));
+    }
+  }
+  for (int k = 0; k < g.nEng; k++) pts.push_back(g.eng[k].pos);
+}
+BreakCut facePatch(const BreakPiece& p, int f) {   // the whole of a box's face f (-x, +x, -y, +y, -z, +z)
+  const int ax = f >> 1; BreakCut c{p.C, p.H};
+  at(c.C, ax) += (f & 1 ? 1.f : -1.f) * p.H[ax]; at(c.H, ax) = 0.01f;
+  return c;
+}
+}
+
+int breakCuts(const AircraftSpec& s, const BreakPiece* p, int n, int k, BreakCut out[kMaxBreakCuts]) {
+  int m = 0;
+  auto add = [&](const BreakCut& c) { if (m < kMaxBreakCuts) out[m++] = c; };
+  if (s.special) {   // (the research jets' boxes only touch: where two meet face to face)
+    for (int j = 0; j < n; j++) {
+      if (j == k) continue;
+      for (int f = 0; f < 6; f++) {
+        const int ax = f >> 1, a1 = (ax + 1) % 3, a2 = (ax + 2) % 3;
+        const float face = p[k].C[ax] + (f & 1 ? 1.f : -1.f) * p[k].H[ax], other = p[j].C[ax] - (f & 1 ? 1.f : -1.f) * p[j].H[ax];
+        if (fabsf(face - other) > 0.05f) continue;
+        const float lo1 = std::max(p[k].C[a1] - p[k].H[a1], p[j].C[a1] - p[j].H[a1]), hi1 = std::min(p[k].C[a1] + p[k].H[a1], p[j].C[a1] + p[j].H[a1]);
+        const float lo2 = std::max(p[k].C[a2] - p[k].H[a2], p[j].C[a2] - p[j].H[a2]), hi2 = std::min(p[k].C[a2] + p[k].H[a2], p[j].C[a2] + p[j].H[a2]);
+        if (hi1 <= lo1 || hi2 <= lo2) continue;
+        BreakCut c; at(c.C, ax) = face; at(c.H, ax) = 0.01f;
+        at(c.C, a1) = 0.5f * (lo1 + hi1); at(c.H, a1) = 0.5f * (hi1 - lo1); at(c.C, a2) = 0.5f * (lo2 + hi2); at(c.H, a2) = 0.5f * (hi2 - lo2);
+        add(c);
+      }
+    }
+    return m;
+  }
+  std::vector<vec3> pts; airframePoints(s, pts);
+  std::vector<int> own(pts.size());
+  for (size_t i = 0; i < pts.size(); i++) own[i] = breakOwner(p, n, pts[i]);
+  // a face of piece j's box across which the airframe goes on into a later piece: the two were joined there, over the
+  // stretch of the face those points cross (an earlier piece's points beyond it are its own box's business)
+  for (int j = 0; j < n - 1; j++) {
+    for (int f = 0; f < 6; f++) {
+      const int ax = f >> 1, a1 = (ax + 1) % 3, a2 = (ax + 2) % 3;
+      const float sg = f & 1 ? 1.f : -1.f, face = p[j].C[ax] + sg * p[j].H[ax];
+      Bounds b; bool withK = false;
+      for (size_t i = 0; i < pts.size(); i++) {
+        if (own[i] <= j) continue;
+        const vec3 q = pts[i]; const float d = (q[ax] - face) * sg;
+        if (d <= 0.f || d > 0.6f || fabsf(q[a1] - p[j].C[a1]) > p[j].H[a1] || fabsf(q[a2] - p[j].C[a2]) > p[j].H[a2]) continue;
+        b.add(q); withK = withK || own[i] == k;
+      }
+      if (!b.any() || (j != k && !withK)) continue;
+      b.pad(vec3(0.15f));
+      at(b.lo, ax) = face - 0.01f; at(b.hi, ax) = face + 0.01f;
+      add({(b.lo + b.hi) * 0.5f, (b.hi - b.lo) * 0.5f});
+    }
+  }
+  if (m == 0 && k < n - 1) {   // (no surface of the strip model reaches it: a gear leg tore off at its top, a strut at both ends, a propeller at its hub)
+    const BreakPiece& q = p[k];
+    if (q.kind == BK_GEAR) add(facePatch(q, 3));
+    else if (q.kind == BK_STRUT) { add(facePatch(q, 0)); add(facePatch(q, 1)); }
+    else if (q.kind == BK_PROP) add(facePatch(q, p[n - 1].C.z > q.C.z ? 5 : 4));
+  }
+  return m;
+}
+
 // ---------------------------------------------------------------- the pieces' bodies
 namespace {
 struct Elem { int kind; vec3 r; float mass; DebrisPlate pl; DebrisRod rod; float self; };   // kind 0 point, 1 plate, 2 rod
@@ -171,13 +250,22 @@ float spinGripOf(const DebrisBody& b) {
   return k / std::max(std::min(b.I.x, std::min(b.I.y, b.I.z)), 1e-4f);
 }
 }
+static vec3 vmin(vec3 a, vec3 b) { return vec3(std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z)); }
+static vec3 vmax(vec3 a, vec3 b) { return vec3(std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z)); }
 static void finish(DebrisBody& b, const std::vector<Elem>& els) {
   float M = 0; vec3 c(0);
   for (const Elem& e : els) { M += e.mass; c += e.r * e.mass; }
   if (M <= 0.f) return;
   c = c / M; b.cg = c; b.mass = M;
-  vec3 I(0);
+  vec3 I(0), lo(1e9f), hi(-1e9f);
+  auto grow = [&](vec3 a, vec3 h) { lo = vmin(lo, a - h); hi = vmax(hi, a + h); };
   for (const Elem& e : els) {
+    if (e.kind == 0) grow(e.r, vec3(0.1f));
+    if (e.kind == 1) {   // (the plate from its leading edge to its trailing edge, across its span)
+      const DebrisPlate& p = e.pl;
+      for (int k = 0; k < 4; k++) grow(p.r + p.c * ((k & 1) ? 0.75f * p.chord : -0.25f * p.chord) + p.s * ((k & 2) ? 0.5f * p.span : -0.5f * p.span), vec3(0.02f));
+    }
+    if (e.kind == 2) grow(e.rod.r, vec3(0.5f * e.rod.w, 0.5f * e.rod.h, 0.5f * e.rod.len));
     const vec3 d = e.r - c;
     I += vec3(d.y * d.y + d.z * d.z, d.x * d.x + d.z * d.z, d.x * d.x + d.y * d.y) * e.mass + vec3(e.self * e.mass);
     if (e.kind == 1) { DebrisPlate p = e.pl; p.r = p.r - c; b.plates.push_back(p); }
@@ -185,6 +273,7 @@ static void finish(DebrisBody& b, const std::vector<Elem>& els) {
   }
   const float floorI = M * 0.02f;
   b.I = vec3(std::max(I.x, floorI), std::max(I.y, floorI), std::max(I.z, floorI));
+  b.lo = lo; b.hi = hi;
   float ext = 0.3f;
   for (const auto& p : b.plates) ext = std::max(ext, length(p.r) + 0.5f * std::max(p.chord, p.span));
   for (const auto& r : b.rods) ext = std::max(ext, length(r.r) + 0.5f * std::max(r.len, std::max(r.w, r.h)));
@@ -263,7 +352,10 @@ void breakBodies(const AircraftSpec& s, const BreakPiece* p, int n, float mass, 
     if (els[i].empty() || b.mass <= 0.f) {   // nothing of its own (a fairing, a pod): a little of the structure as a box
       b.mass = std::max(0.004f * empty, 1.f); b.cg = p[i].C;
       b.I = vec3(b.mass * 0.1f); b.box = p[i].H; b.size = 2.f * length(p[i].H);
+      b.lo = p[i].C - p[i].H; b.hi = p[i].C + p[i].H;
     }
+    // (a propeller, a gear leg, a strut or a pod is the whole of its box)
+    if (p[i].kind == BK_PROP || p[i].kind == BK_GEAR || p[i].kind == BK_STRUT || p[i].kind == BK_NACELLE) { b.lo = vmin(b.lo, p[i].C - p[i].H); b.hi = vmax(b.hi, p[i].C + p[i].H); }
     // a fuselage piece's torn ends meet the air broadside along its axis
     auto section = [&](float z) { float hw, hh, cy; modelSection(m, z, hw, hh, cy); return PI * hw * hh; };
     const float zA = p[n - 1].C.z - p[n - 1].H.z, zB = p[n - 1].C.z + p[n - 1].H.z;
@@ -274,13 +366,15 @@ void breakBodies(const AircraftSpec& s, const BreakPiece* p, int n, float mass, 
   }
 }
 
-DebrisBody debrisPanel(float size, float sigma) {
+DebrisBody debrisPanel(float size, float sigma) { return debrisPanel(size, 0.8f * size, sigma); }
+DebrisBody debrisPanel(float chord, float span, float sigma) {
   DebrisBody b;
-  const float c = std::max(size, 0.05f), sp = 0.8f * c, A = c * sp;
+  const float c = std::max(chord, 0.05f), sp = std::max(span, 0.05f), A = c * sp;
   b.mass = std::max(sigma * A, 0.01f);
   b.plates.push_back({vec3(0, 0, -0.25f * c), vec3(0, 0, 1), vec3(0, 1, 0), vec3(1, 0, 0), c, sp});   // (its quarter chord: a quarter ahead of the middle, where the mass is)
   b.I = vec3(b.mass * c * c / 12.f, b.mass * (c * c + sp * sp) / 12.f, b.mass * sp * sp / 12.f);
-  b.size = c;
+  b.size = std::max(c, sp);
+  b.lo = vec3(-0.5f * sp, -0.05f * c, -0.5f * c); b.hi = -b.lo;
   return b;
 }
 

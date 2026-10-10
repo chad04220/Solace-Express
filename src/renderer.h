@@ -50,10 +50,15 @@ struct FxVisual {
 struct TrafficVisual { float t[32 * 4]; };
 static const int kMaxTrafficDrawn = 12;
 
+// (as breakup.h: kMaxBreakPieces, kMaxBreakCuts)
+static const int kWreckPieces = 16, kWreckCuts = 12;
 struct WreckVisual {
-  int pieces = 0;               // > 0: draw these clipped pieces instead of the intact aircraft
-  vec3 pos[5]; float rot[5][9]; // piece centre (world) and body->world rotation
-  vec3 C[5], H[5];              // clip box (body coords) of each piece
+  int pieces = 0;               // > 0: the aircraft broken up - these pieces of it drawn from its mesh (drawWreck)
+  vec3 pos[kWreckPieces]; float rot[kWreckPieces][9];   // each piece's placing: the airframe's origin as it carries it (world), body->world rotation
+  vec3 C[kWreckPieces], H[kWreckPieces];                // its box (body coords): the first box holding a point owns it, the last piece the rest
+  vec3 mid[kWreckPieces]; float rad[kWreckPieces];      // its bound (world)
+  float burn[kWreckPieces] = {};                        // how far its fire has blackened it, 0..1
+  int cutN[kWreckPieces] = {}; float cut[kWreckPieces][kWreckCuts][6];   // where it tore: thin boxes (body coords: centre, half extents)
   int debris = 0;
   float deb[16][4], debQ[16][4];  // chunk centre + size (negative = charred), orientation quaternion (w,x,y,z)
   int craterN = 0; float crater[24][4] = {};  // x, z, radius, depth (negative depth: dark-energy crater)
@@ -147,13 +152,13 @@ public:
   GLuint minimapTex = 0;
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
-  // Logical linked programs: top-level 22 (the scenery's 6: a pair for each class), hull 1, raster 6, aircraft mesh 2,
+  // Logical linked programs: top-level 22 (the scenery's 6: a pair for each class), hull 1, raster 7, aircraft mesh 2,
   // terrain/water 2. None has an aircraft's code but the parts' poses (plane_parts.glsl).
   // Retries do not add units; finalized optional fallbacks/unavailable features do. (Each aircraft's own builds are
   // made when it is first drawn or baked - the launch's prewarm draws every one: afMeshProgram, afBakePrograms; the
   // bodies' builder has no shared build at launch at all: sharedBakePrograms.)
-  static constexpr int kProgramCount = 22 + 1 + 6 + 2 + 2;
-  static_assert(kProgramCount == 33, "Update the logical shader progress contract when adding a program");
+  static constexpr int kProgramCount = 22 + 1 + 7 + 2 + 2;
+  static_assert(kProgramCount == 34, "Update the logical shader progress contract when adding a program");
   float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
   // analysis tool (--analyze, the harness's BENCHWALL): exact per-pass times (the GPU is waited on at every pass boundary)
   bool syncTiming = false; double passWall[11] = {};   // (kPasses)
@@ -302,7 +307,7 @@ private:
   struct HullMesh { uint64_t key = 0; GLuint vbo = 0; int verts = 0; bool ok = false; };
   // the aircraft mesh (aircraft_mesh.cpp): the static part of the airframe baked from its field, and the hull of the
   // part that moves (the march's start on the raster path, where the mesh leaves off)
-  struct PartMesh { int type = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; };   // a cockpit's rigid moving part, in its own frame (plane_parts.glsl)
+  struct PartMesh { int type = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; vec3 c; };   // (c: its middle, in its own frame)   // a cockpit's rigid moving part, in its own frame (plane_parts.glsl)
   struct PlaneMesh { std::vector<PartMesh> parts; uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; };
   std::unordered_map<uint64_t, PlaneMesh> planeMeshes;
   GLuint progTrafficProps = 0;
@@ -311,6 +316,20 @@ private:
   bool sharedMeshTried = false;
   GLuint sharedMeshProgram();   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
   void setScreenCut(GLuint p, const FrameParams& fp, bool on);   // the research cockpits' windows cut (cabin_windows.glsl)
+  // A broken-up aircraft (fp.wreck.pieces): each piece drawn from the airframe's outside mesh, placed on its own and
+  // cut to its share (wreck_clip.glsl). The mesh's triangles are sorted by piece once (splitWreck), so a piece draws only
+  // its own and those across its edges.
+  struct WreckSplit { uint64_t key = 0, layout = 0; GLuint vao = 0, ibo = 0; int first[kWreckPieces] = {}, count[kWreckPieces] = {}; };
+  WreckSplit wreckSplit;
+  int meshPiece = -1;   // the wreck piece whose own triangles the mesh draws are drawing (wreckDraw 1)
+  int wreckDraw = 0;    // 0: a whole aircraft; 1: a wreck piece's own triangles (no parts); 2: the wreck's rigid parts, every piece's at once
+  const PlaneMesh* wreckMesh(const FrameParams& fp);
+  void splitWreck(const FrameParams& fp, const PlaneMesh& pm);
+  void setWreckBoxes(GLuint p, const WreckVisual& wv);
+  void setWreckPiece(GLuint p, const FrameParams& fp, bool depthProg, vec3 rel);   // the wreck draw's own uniforms (positions from rel)
+  void drawMeshBody(const PlaneMesh& pm);   // the airframe's triangles (meshPiece's alone, for a wreck piece)
+  bool wreckVisible(const FrameParams& fp, int i) const;
+  void drawWreck(const FrameParams& fp, const PlaneMesh& pm);
   bool compilePlaneMesh(const std::function<void()>& step = {});
   bool planeMeshWanted(const FrameParams& fp);
   void bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key);
@@ -453,7 +472,7 @@ private:
   // second array marks where the moving hull is, so the proxy still marches the field there (the XR-30's nozzles, the
   // XR-40's). uShOn: bit 0 the sun, bits 1-3 the light slots. Layers 4 + k: traffic aircraft k's sun shadow from its
   // mesh (trafShOn bit k), so the proxy marches only the traffic that still has moving parts
-  GLuint progShMap = 0, progShMov = 0, texShMap = 0, texShMov = 0, fboShMap = 0; int shOn = 0; mat4 shMapVP[4];
+  GLuint progShMap = 0, progShMapWreck = 0, progShMov = 0, texShMap = 0, texShMov = 0, fboShMap = 0; int shOn = 0; mat4 shMapVP[4];
   // the cabin's own sun map in the cockpit view: 5 m about the eye at 2048 texels (2.4 mm), for the cabin's light and
   // shade - the whole airframe's map (layer 0, ~1.4 cm a texel) speckled the posts and frames a hand's width away
   GLuint texShCab = 0, fboShCab = 0; bool shCabOn = false; mat4 shCabVP, shCabVPc; float shCabBias = 0.f;

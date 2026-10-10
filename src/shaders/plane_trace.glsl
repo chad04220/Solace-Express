@@ -1,7 +1,7 @@
 //! kPlaneTrace
-//! Marching the aircraft distance fields: the player (with the hull start), wreck pieces, traffic; their normals, shadows
-//! and the cabin ambient occlusion.
-vec2 mapPiece(vec3 p){ vec2 d = mapPlane(p); if (gPI >= 0) d.x = max(d.x, sdBox(p - uPcC[gPI], uPcH[gPI])); return d; }
+//! Marching the aircraft distance fields: the player (with the hull start) and the traffic; their normals, shadows and
+//! the cabin ambient occlusion. (A broken-up aircraft's pieces are drawn from its mesh: wreck_clip.glsl.)
+vec2 mapPiece(vec3 p){ return mapPlane(p); }
 // (The airframe's distance is a very large function: every call written out is another inlined copy in the shader.
 // Its multi-tap users loop with a bound the compiler can't see through (gZero, 0 at run time), so they keep one copy.)
 int gZero = 0;
@@ -26,7 +26,7 @@ vec3 planeNormal(vec3 p){
 }
 
 float planeBound(){ return max(gM[0].x, gM[9].x*2.0)*0.55 + 1.5; }
-void pieceXf(int i){ gPI = i; if (i < 0) { gPP = uPlanePos; gPR = uPlaneRot; gPC = vec3(0.0); } else { gPP = uPcPos[i]; gPR = uPcRot[i]; gPC = uPcC[i]; } }
+void pieceXf(int i){ gPI = i; gPP = uPlanePos; gPR = uPlaneRot; gPC = vec3(0.0); }
 // gPlStart: where the march along this ray may begin (the aircraft hull mesh - see aircraft_hull.cpp); 1e30: the ray
 // misses the hull, so the airframe too
 // gPlNear: marched as usual up to there first (the hull's faces nearer than that were ignored), then the jump.
@@ -60,19 +60,11 @@ vec2 tracePieceOnce(vec3 ro, vec3 rd, float tmax, float br){
   if (settle >= 0) return vec2(t, hitId);
   return vec2(-1.0);
 }
-// Leaves gPI/gPP/gPR/gPC set to the piece that was hit (for shading)
+// Leaves gPI/gPP/gPR/gPC set to the airframe's (for shading)
 vec2 tracePlane(vec3 ro, vec3 rd, float tmax){
-  if (uPlaneOn == 0) return vec2(-1.0);
-  vec2 best = vec2(-1.0); int bi = uWreck == 0 ? -1 : 0;
-  for (int i = gZero; i < 5; i++) {   // the intact airframe, or each wreck piece (one call of the march for both)
-    if (i >= max(uWreck, 1)) break;
-    int k = uWreck == 0 ? -1 : i;
-    pieceXf(k);
-    vec2 h = tracePieceOnce(ro, rd, best.x > 0.0 ? best.x : tmax, k < 0 ? planeBound() : length(uPcH[i]) + 0.3);
-    if (h.x > 0.0 && (best.x < 0.0 || h.x < best.x)) { best = h; bi = k; }
-  }
-  pieceXf(bi);
-  return best;
+  if (uPlaneOn == 0 || uWreck > 0) return vec2(-1.0);
+  pieceXf(-1);
+  return tracePieceOnce(ro, rd, tmax, planeBound());
 }
 // The airframe along a camera ray, using the hull's start (hullT: 0 none, 1e30 no airframe on this ray): the first
 // uHullNear metres are marched as usual, then the march resumes where the hull says the airframe can begin.
@@ -158,14 +150,9 @@ float trafficShadow(vec3 p){
   return s;
 }
 float planeShadow(vec3 ro, vec3 rd){
-  if (uPlaneOn == 0 || (uDbg & 8) != 0) return 1.0;
+  if (uPlaneOn == 0 || uWreck > 0 || (uDbg & 8) != 0) return 1.0;   // (a wreck's pieces shadow from the shadow maps alone)
   int keep = gPI; vec3 kP = gPP; mat3 kR = gPR; vec3 kC = gPC;
-  float res = 1.0;
-  for (int i = gZero; i < 5; i++) {   // the intact airframe, or each wreck piece (one call of the march for both)
-    if (i >= max(uWreck, 1) || res < 0.02) break;
-    int k = uWreck == 0 ? -1 : i;
-    pieceXf(k); res = min(res, pieceShadow(ro, rd, k < 0 ? planeBound() : length(uPcH[i]) + 0.3, 40));
-  }
+  pieceXf(-1); float res = pieceShadow(ro, rd, planeBound(), 40);
   gPI = keep; gPP = kP; gPR = kR; gPC = kC;
   return mix(res, 1.0, uWr[4].w*0.88);   // a cloaked XR-40 barely darkens the ground
 }

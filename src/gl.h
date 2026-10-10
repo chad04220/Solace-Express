@@ -72,6 +72,8 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_TEXTURE0 0x84C0
 #define GL_ARRAY_BUFFER 0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
+#define GL_COPY_READ_BUFFER 0x8F36
+#define GL_BUFFER_SIZE 0x8764
 #define GL_STREAM_DRAW 0x88E0
 #define GL_STATIC_DRAW 0x88E4
 #define GL_DYNAMIC_DRAW 0x88E8
@@ -200,6 +202,8 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
   X(void, glPolygonOffset, (GLfloat, GLfloat)) \
   X(void, glClearBufferfv, (GLenum, GLint, const GLfloat*)) \
   X(void, glBufferSubData, (GLenum, GLintptr, GLsizeiptr, const void*)) \
+  X(void, glGetBufferSubData, (GLenum, GLintptr, GLsizeiptr, void*)) \
+  X(void, glGetBufferParameteriv, (GLenum, GLenum, GLint*)) \
   X(void, glDeleteProgram, (GLuint))
 
 // Optional entry points (ARB_get_program_binary, core in 4.1): null when the driver lacks them

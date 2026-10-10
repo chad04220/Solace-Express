@@ -32,9 +32,9 @@ static void finish(){} static void del(GLuint){}
 main='''int main(){glFinish=finish;glDeleteProgram=del;
 struct Case {const char* name;std::set<int> fail;int retry;bool ok;int completed;int calls;};
 for(const auto& c:std::vector<Case>{
-  {"success",{},0,true,33,33},
-  {"optional cloud accumulation unavailable",{19},0,true,33,33},
-  {"optional hull unavailable",{20},0,true,33,33},
+  {"success",{},0,true,34,34},
+  {"optional cloud accumulation unavailable",{19},0,true,34,34},
+  {"optional hull unavailable",{20},0,true,34,34},
   {"fatal scenery class",{3},0,false,3,4},
   {"fatal light",{22},0,false,21,22},
   {"fatal UFO and debris",{24},0,false,23,24},

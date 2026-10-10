@@ -471,6 +471,12 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       float scorch = smoothstep(2.6, 1.1, cd*(0.8 + 0.35*nz));
       vec3 dirt = mix(vec3(0.16, 0.12, 0.09), vec3(0.08, 0.065, 0.05), nz*0.7);
       m.alb = mix(m.alb, dirt, smoothstep(1.25, 0.9, cd));
+      // the ejecta: rays of thrown earth fanning out over the ground beyond the rim, ragged and petering out
+      vec2 ud = cq/max(length(cq), 1e-4);
+      float ray = pow(clamp(0.5 + 0.5*sin(atan(ud.y, ud.x)*9.0 + 5.0*vnoise(ud*2.2 + cr.xy*0.05)), 0.0, 1.0), 3.0);
+      float blanket = smoothstep(0.85, 1.05, cd)*smoothstep(2.5, 1.2, cd*(0.85 + 0.3*nz));
+      m.alb = mix(m.alb, vec3(0.2, 0.155, 0.11)*(0.8 + 0.4*nz), blanket*(0.35 + 0.55*ray));
+      m.rough = mix(m.rough, 0.95, blanket*ray);
       m.alb = mix(m.alb, vec3(0.02, 0.018, 0.016), scorch*0.85);
       m.rough = mix(m.rough, 0.97, scorch); m.nrm = mix(m.nrm, vec3(0,0,1), scorch*0.5);
       m.emit += vec3(1.0, 0.3, 0.05)*pow(clamp(vnoise(p.xz*2.5 + uTime*0.15)*smoothstep(0.55, 0.1, cd), 0.0, 1.0), 8.0)*2.0;

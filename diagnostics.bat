@@ -18,7 +18,9 @@ rem   cockpit, the research craft's too, and each scene warms until nothing is b
 rem   timed: no number includes a body being built or a traffic aircraft drawn the slow way for want of its body.
 rem   Diagnostics v3: the cache is found where the game now keeps it (Local, not Roaming: it is this machine's), the
 rem   shader compile log and any error log are collected, the cache's size is reported, and a low flight over forest
-rem   is timed (the trees' fades and detail cross-fades).
+rem   is timed (the trees' fades and detail cross-fades). Then break-ups: a light aircraft coming apart in the air
+rem   and one flown into the ground (each piece drawn from the aircraft's mesh, each impact's crater and dust), and the
+rem   XR-30 coming apart with the research craft.
 rem   3. benchmark, full screen at 1920x1080: frame time and
 rem      the GPU time of every pass for each scene (the HUD, the cockpit, night, a forest); then the research craft and their
 rem      cockpits in their own file (the heaviest scenes: if one stalls the GPU, the rest of the numbers are already written)
@@ -35,8 +37,8 @@ if not exist SolaceExpress.exe (
 )
 set VER=unknown
 if exist VERSION.txt set /p VER=<VERSION.txt
-set SCENES=menu,air,forest,storm,night,cockpit,hud,hub1
-set RSCENES=research10,research20,research40,rjet,wr_8_0_0_0_1,wr_8_0_-8_0_1_3_2_22.5_1,wr_8_0_-8_0_1_3_2_22.5_2,rjetc,ckv11_0_-10_12,ufo13_0
+set SCENES=menu,air,forest,storm,night,cockpit,hud,hub1,airbreakc3,crash1_4
+set RSCENES=research10,research20,research40,rjet,airbreak2,wr_8_0_0_0_1,wr_8_0_-8_0_1_3_2_22.5_1,wr_8_0_-8_0_1_3_2_22.5_2,rjetc,ckv11_0_-10_12,ufo13_0
 set MODE=%~1
 if /i "%MODE%"=="loading" goto loading
 set OUT=diagnostics

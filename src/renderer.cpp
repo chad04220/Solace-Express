@@ -1109,14 +1109,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   {
     const WreckVisual& wv = fp.wreck;
     glUniform1i(U(p, "uWreck"), pv.on ? wv.pieces : 0);
-    if (pv.on && wv.pieces > 0) {
-      float P[15], C[15], Hh[15];
-      for (int i = 0; i < wv.pieces; i++) { P[i*3] = wv.pos[i].x; P[i*3+1] = wv.pos[i].y; P[i*3+2] = wv.pos[i].z; C[i*3] = wv.C[i].x; C[i*3+1] = wv.C[i].y; C[i*3+2] = wv.C[i].z; Hh[i*3] = wv.H[i].x; Hh[i*3+1] = wv.H[i].y; Hh[i*3+2] = wv.H[i].z; }
-      glUniform3fv(U(p, "uPcPos"), wv.pieces, P);
-      glUniform3fv(U(p, "uPcC"), wv.pieces, C);
-      glUniform3fv(U(p, "uPcH"), wv.pieces, Hh);
-      glUniformMatrix3fv(U(p, "uPcRot"), wv.pieces, GL_FALSE, &wv.rot[0][0]);
-    }
+    if (pv.on && wv.pieces > 0) setWreckBoxes(p, wv);   // (the mesh pass's: wreck_clip.glsl)
     glUniform1i(U(p, "uDebN"), wv.debris);
     if (wv.debris > 0) { glUniform4fv(U(p, "uDeb"), wv.debris, &wv.deb[0][0]); glUniform4fv(U(p, "uDebQ"), wv.debris, &wv.debQ[0][0]); }
     glUniform1i(U(p, "uCraterN"), wv.craterN);

@@ -15,7 +15,7 @@ vec4 dataAt(int i){ return texelFetch(uData, ivec2(i, 0), 0); }
 uniform int uPlaneOn; uniform vec3 uPlanePos; uniform mat3 uPlaneRot;
 uniform vec4 uHud; uniform vec4 uHud2; uniform vec3 uHudV; uniform vec4 uHud3;  // research jet HUD: ias m/s, alt m, hdg, mach | g, throttle, nozzle, gear | velocity dir (body)
 // wreckage: pieces of the airframe, each the aircraft SDF clipped to a body-space box with its own transform
-uniform int uWreck; uniform vec3 uPcPos[5]; uniform mat3 uPcRot[5]; uniform vec3 uPcC[5]; uniform vec3 uPcH[5];
+uniform int uWreck;   // the aircraft broken up into this many pieces, drawn from its mesh (wreck_clip.glsl)
 uniform int uDebN; uniform vec4 uDeb[16]; uniform vec4 uDebQ[16];
 int gPI = -1; vec3 gPP; mat3 gPR; vec3 gPC;   // transform of the piece being traced / shaded
 uniform vec4 uM[24]; uniform vec4 uPS; uniform vec4 uCtl; uniform vec4 uPr; uniform vec4 uI0; uniform vec4 uI1; uniform vec4 uI2;

@@ -876,6 +876,14 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     for (uint32_t q = 0; q < ni && idxOk; q++) idxOk = partBlob[at + 3 + nf + q] < nf / 8;
     if (!idxOk) break;
     PartMesh P; P.type = (int)type; P.idx = (int)ni;
+    {   // (its middle: which wreck piece it goes with - wreck_clip.glsl)
+      vec3 lo(1e9f), hi(-1e9f);
+      for (uint32_t v = 0; v < nf / 8; v++) {
+        float q[3]; memcpy(q, &partBlob[at + 3 + v * 8], sizeof q);
+        lo = vec3(std::min(lo.x, q[0]), std::min(lo.y, q[1]), std::min(lo.z, q[2])); hi = vec3(std::max(hi.x, q[0]), std::max(hi.y, q[1]), std::max(hi.z, q[2]));
+      }
+      if (nf >= 8) P.c = (lo + hi) * 0.5f;
+    }
     glGenVertexArrays(1, &P.vao); glGenBuffers(1, &P.vbo); glGenBuffers(1, &P.ibo);
     glBindVertexArray(P.vao);
     glBindBuffer(GL_ARRAY_BUFFER, P.vbo);
@@ -976,6 +984,7 @@ void Renderer::computePartPoses(const FrameParams& fp, const PlaneMesh* player, 
 // the bound program (its other uniforms and the depth state the caller's); nothing when the poses are not this mesh's
 void Renderer::drawPlaneParts(const PlaneMesh& pm, GLuint prog, int trafK) {
   if (trafK < -1 || trafK >= kMaxTrafficDrawn) return;
+  static const bool noParts = getenv("WRECKNOPARTS") != nullptr; if (noParts && meshPiece >= 0) return;   // (debug)
   const PoseOwner& O = poseOwner[trafK + 1];
   if (O.pm != &pm || !O.n) return;
   glActiveTexture(GL_TEXTURE0 + 30); glBindTexture(GL_TEXTURE_2D, texPartPose); glUniform1i(U(prog, "uPartPose"), 30);
@@ -985,6 +994,7 @@ void Renderer::drawPlaneParts(const PlaneMesh& pm, GLuint prog, int trafK) {
     const PartMesh* P = nullptr; for (auto& q : pm.parts) if (q.type == type) P = &q;
     if (P && P->idx) {
       glUniform1i(U(prog, "uPartInst"), i);
+      if (wreckDraw == 2) glUniform3f(U(prog, "uPartC"), P->c.x, P->c.y, P->c.z);
       glBindVertexArray(P->vao);
       static const bool single = getenv("PARTNOINST") != nullptr;   // deterministic A/B of identical poses and order
       if (single) for (int k = i; k < end; k++) { glUniform1i(U(prog, "uPartInst"), k); glDrawElements(GL_TRIANGLES, P->idx, GL_UNSIGNED_INT, nullptr); }
@@ -1038,9 +1048,10 @@ void Renderer::drawPlaneMeshDepth(const FrameParams& fp, const PlaneMesh& pm, co
       glUniform1f(U(progPlaneMeshDepth, "uCloakZ"), ck ? pv.wr[6][1] : -1e9f);
     }
     glUniform1i(U(progPlaneMeshDepth, "uPartInst"), -1);
+    setWreckPiece(progPlaneMeshDepth, fp, true, fp.camPos);   // (a wreck piece's share: wreck_clip.glsl)
     glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-    glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
-    drawPlaneParts(pm, progPlaneMeshDepth, trafK);
+    if (wreckDraw != 2) drawMeshBody(pm);
+    if (wreckDraw != 1) drawPlaneParts(pm, progPlaneMeshDepth, trafK);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
   }
   glBindVertexArray(0);
@@ -1084,9 +1095,10 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   glUniform1i(U(prog, "uMeshTraffic"), trafK);
   setScreenCut(prog, fp, scrSkip);
   glUniform1i(U(prog, "uPartInst"), -1);
+  setWreckPiece(prog, fp, false, fp.camPos);
   if (!noPre) { glDepthFunc(GL_LEQUAL); glDepthMask(GL_FALSE); }
-  glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);   // (the airframe and the cabin's fine patch, which lies on the surface: one draw)
-  drawPlaneParts(pm, prog, trafK);   // (its moving parts, each at its pose)
+  if (wreckDraw != 2) drawMeshBody(pm);   // (the airframe and the cabin's fine patch, which lies on the surface: one draw; a wreck piece's own triangles)
+  if (wreckDraw != 1) drawPlaneParts(pm, prog, trafK);   // (its moving parts, each at its pose)
   glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
   glBindVertexArray(0);
   glActiveTexture(GL_TEXTURE0);
@@ -1112,4 +1124,147 @@ uint64_t Renderer::trafficModelKey(const float* t) const {
   const uint8_t* b = (const uint8_t*)t;
   for (size_t i = 0; i < sizeof(float) * 96; i++) { h ^= b[i]; h *= 1099511628211ull; }
   return h;
+}
+
+// ---------------------------------------------------------------- a broken-up aircraft
+// The outside mesh of the aircraft that broke up (the one it flew with outside, or baked now if the view never needed
+// it: rasterObjects)
+const Renderer::PlaneMesh* Renderer::wreckMesh(const FrameParams& fp) {
+  if (!fp.plane.on || fp.wreck.pieces <= 0 || fp.pano > 0.f) return nullptr;
+  auto it = planeMeshes.find(hullKey(fp, 0));
+  return it != planeMeshes.end() && it->second.ok && it->second.idx ? &it->second : nullptr;
+}
+
+// Each piece's triangles: those with a corner in its share of the airframe, or reaching into its box (the clip in the
+// fragment shader makes the edge exact) - read back from the mesh once, when the aircraft breaks up
+void Renderer::splitWreck(const FrameParams& fp, const PlaneMesh& pm) {
+  const WreckVisual& wv = fp.wreck;
+  uint64_t layout = 1469598103934665603ull;
+  auto mix = [&](const void* p, size_t n) { const uint8_t* b = (const uint8_t*)p; for (size_t i = 0; i < n; i++) { layout ^= b[i]; layout *= 1099511628211ull; } };
+  mix(&wv.pieces, sizeof wv.pieces); mix(wv.C, sizeof(vec3) * wv.pieces); mix(wv.H, sizeof(vec3) * wv.pieces);
+  if (wreckSplit.vao && wreckSplit.key == pm.key && wreckSplit.layout == layout) return;
+  const int n = wv.pieces;
+  auto owner = [&](vec3 b) {
+    for (int i = 0; i < n - 1; i++) { vec3 d = b - wv.C[i]; if (fabsf(d.x) <= wv.H[i].x && fabsf(d.y) <= wv.H[i].y && fabsf(d.z) <= wv.H[i].z) return i; }
+    return n - 1;
+  };
+  GLint vbBytes = 0;
+  glBindBuffer(GL_COPY_READ_BUFFER, pm.vbo); glGetBufferParameteriv(GL_COPY_READ_BUFFER, GL_BUFFER_SIZE, &vbBytes);
+  std::vector<float> vb((size_t)std::max(vbBytes, 0) / sizeof(float));
+  if (!vb.empty()) glGetBufferSubData(GL_COPY_READ_BUFFER, 0, (GLsizeiptr)(vb.size() * sizeof(float)), vb.data());
+  std::vector<uint32_t> ib((size_t)pm.idx);
+  glBindBuffer(GL_COPY_READ_BUFFER, pm.ibo); glGetBufferSubData(GL_COPY_READ_BUFFER, 0, (GLsizeiptr)(ib.size() * sizeof(uint32_t)), ib.data());
+  glBindBuffer(GL_COPY_READ_BUFFER, 0);
+  const size_t nv = vb.size() / 8;
+  std::vector<uint8_t> own(nv);
+  for (size_t v = 0; v < nv; v++) own[v] = (uint8_t)owner(vec3(vb[v * 8], vb[v * 8 + 1], vb[v * 8 + 2]));
+  std::vector<uint32_t> lists[kWreckPieces];
+  for (size_t t = 0; t + 2 < ib.size(); t += 3) {
+    uint32_t a = ib[t], b = ib[t + 1], c = ib[t + 2];
+    if (a >= nv || b >= nv || c >= nv) continue;
+    vec3 pa(vb[a * 8], vb[a * 8 + 1], vb[a * 8 + 2]), pb(vb[b * 8], vb[b * 8 + 1], vb[b * 8 + 2]), pc(vb[c * 8], vb[c * 8 + 1], vb[c * 8 + 2]);
+    vec3 lo(std::min(pa.x, std::min(pb.x, pc.x)), std::min(pa.y, std::min(pb.y, pc.y)), std::min(pa.z, std::min(pb.z, pc.z)));
+    vec3 hi(std::max(pa.x, std::max(pb.x, pc.x)), std::max(pa.y, std::max(pb.y, pc.y)), std::max(pa.z, std::max(pb.z, pc.z)));
+    uint32_t mask = (1u << own[a]) | (1u << own[b]) | (1u << own[c]);
+    bool inOne = false;   // (wholly inside one box: none of the pieces after it can have any of it)
+    for (int i = 0; i < n - 1; i++) {
+      vec3 bl = wv.C[i] - wv.H[i], bh = wv.C[i] + wv.H[i];
+      if (hi.x < bl.x || lo.x > bh.x || hi.y < bl.y || lo.y > bh.y || hi.z < bl.z || lo.z > bh.z) continue;
+      mask |= 1u << i;
+      if (lo.x >= bl.x && hi.x <= bh.x && lo.y >= bl.y && hi.y <= bh.y && lo.z >= bl.z && hi.z <= bh.z) { inOne = true; break; }
+    }
+    if (!inOne) mask |= 1u << (n - 1);
+    for (int i = 0; i < n; i++) if (mask & (1u << i)) { lists[i].push_back(a); lists[i].push_back(b); lists[i].push_back(c); }
+  }
+  std::vector<uint32_t> all;
+  for (int i = 0; i < n; i++) { wreckSplit.first[i] = (int)all.size(); wreckSplit.count[i] = (int)lists[i].size(); all.insert(all.end(), lists[i].begin(), lists[i].end()); }
+  if (!wreckSplit.vao) glGenVertexArrays(1, &wreckSplit.vao);
+  if (!wreckSplit.ibo) glGenBuffers(1, &wreckSplit.ibo);
+  glBindVertexArray(wreckSplit.vao);
+  glBindBuffer(GL_ARRAY_BUFFER, pm.vbo);
+  glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 32, (void*)0);
+  glEnableVertexAttribArray(1); glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 32, (void*)12);
+  glEnableVertexAttribArray(2); glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 32, (void*)24);
+  glEnableVertexAttribArray(3); glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 32, (void*)28);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, wreckSplit.ibo);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, std::max<size_t>(all.size(), 1) * sizeof(uint32_t), all.empty() ? nullptr : all.data(), GL_STATIC_DRAW);
+  glBindVertexArray(0);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  wreckSplit.key = pm.key; wreckSplit.layout = layout;
+  if (getenv("WRECKDBG")) { printf("wreck: %zu triangles over %d pieces:", ib.size() / 3, n); for (int i = 0; i < n; i++) printf(" %d", wreckSplit.count[i] / 3); printf("\n"); }
+}
+
+void Renderer::setWreckBoxes(GLuint p, const WreckVisual& wv) {
+  float C[kWreckPieces * 3], H[kWreckPieces * 3];
+  for (int i = 0; i < wv.pieces; i++) { C[i * 3] = wv.C[i].x; C[i * 3 + 1] = wv.C[i].y; C[i * 3 + 2] = wv.C[i].z; H[i * 3] = wv.H[i].x; H[i * 3 + 1] = wv.H[i].y; H[i * 3 + 2] = wv.H[i].z; }
+  glUniform3fv(U(p, "uPcC"), wv.pieces, C);
+  glUniform3fv(U(p, "uPcH"), wv.pieces, H);
+}
+
+// the piece the mesh draws are drawing (meshPiece): its index and its tears; the depth pre-pass (its own small program)
+// also the pieces' boxes
+void Renderer::setWreckPiece(GLuint p, const FrameParams& fp, bool depthProg, vec3 rel) {
+  const WreckVisual& wv = fp.wreck;
+  const bool on = wreckDraw != 0 && wv.pieces > 0;
+  if (depthProg) { glUniform1i(U(p, "uWreck"), on ? wv.pieces : 0); if (on) setWreckBoxes(p, wv); }
+  glUniform1i(U(p, "uWreckParts"), on && wreckDraw == 2 ? 1 : 0);
+  if (!on) return;
+  {   // every piece's placing and burn (the parts' draw places each part with its piece)
+    float P[kWreckPieces * 3];
+    for (int i = 0; i < wv.pieces; i++) { const vec3 q = wv.pos[i] - rel; P[i * 3] = q.x; P[i * 3 + 1] = q.y; P[i * 3 + 2] = q.z; }
+    glUniform3fv(U(p, "uPcPos"), wv.pieces, P);
+    glUniformMatrix3fv(U(p, "uPcRot"), wv.pieces, GL_FALSE, &wv.rot[0][0]);
+    glUniform1fv(U(p, "uPcBurn"), wv.pieces, wv.burn);
+  }
+  const int k = meshPiece;
+  if (k < 0) { glUniform1i(U(p, "uCutN"), 0); return; }
+  glUniform1i(U(p, "uPcK"), k);
+  const int nc = std::min(wv.cutN[k], kWreckCuts);
+  glUniform1i(U(p, "uCutN"), nc);
+  if (nc > 0) {
+    float C[kWreckCuts * 3], H[kWreckCuts * 3];
+    for (int i = 0; i < nc; i++) for (int a = 0; a < 3; a++) { C[i * 3 + a] = wv.cut[k][i][a]; H[i * 3 + a] = wv.cut[k][i][3 + a]; }
+    glUniform3fv(U(p, "uCutC"), nc, C); glUniform3fv(U(p, "uCutH"), nc, H);
+  }
+}
+
+void Renderer::drawMeshBody(const PlaneMesh& pm) {
+  if (wreckDraw == 1 && meshPiece >= 0 && wreckSplit.vao && wreckSplit.key == pm.key) {
+    if (wreckSplit.count[meshPiece] > 0) {
+      glBindVertexArray(wreckSplit.vao);
+      glDrawElements(GL_TRIANGLES, wreckSplit.count[meshPiece], GL_UNSIGNED_INT, (void*)(sizeof(uint32_t) * (size_t)wreckSplit.first[meshPiece]));
+    }
+    glBindVertexArray(pm.vao);
+  } else glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
+}
+
+// a piece in view: its bound inside the camera's frustum (the pieces of an in-flight break-up end up far apart)
+bool Renderer::wreckVisible(const FrameParams& fp, int i) const {
+  const WreckVisual& wv = fp.wreck;
+  const vec3 d = wv.mid[i] - fp.camPos;
+  const float r = wv.rad[i] + 1.f, z = -dot(d, fp.camBack);
+  if (z < -r) return false;
+  const float ty = tanf(0.5f * fp.fovY), tx = ty * (float)rw / (float)std::max(rh, 1);
+  const float x = dot(d, fp.camRight), y = dot(d, fp.camUp);
+  return fabsf(x) <= z * tx + r * sqrtf(1.f + tx * tx) && fabsf(y) <= z * ty + r * sqrtf(1.f + ty * ty);
+}
+
+// every piece in view, each with its depth first and then its materials (drawPlaneMesh), its rigid parts with it
+void Renderer::drawWreck(const FrameParams& fp, const PlaneMesh& pm) {
+  splitWreck(fp, pm);
+  int drawn = 0;
+  static const int maxDraw = getenv("WRECKMAX") ? atoi(getenv("WRECKMAX")) : 99;   // (debug: the cost of each piece's draws)
+  wreckDraw = 1;   // (each piece's own triangles)
+  for (int i = 0; i < fp.wreck.pieces; i++) {
+    if (!wreckVisible(fp, i) || drawn >= maxDraw) continue;
+    meshPiece = i;
+    drawPlaneMesh(fp, pm, fp.wreck.rot[i], fp.wreck.pos[i], -1);
+    drawn++;
+  }
+  meshPiece = -1;
+  wreckDraw = 2;   // (then the rigid parts, every piece's in one draw for each kind of part)
+  drawPlaneMesh(fp, pm, fp.plane.rot, fp.plane.pos, -1);
+  wreckDraw = 0;
+  static const bool dbg = getenv("WRECKDBG") != nullptr;
+  if (dbg) { static int frame = 0; if (frame++ % 30 == 0) printf("wreck: %d of %d pieces drawn\n", drawn, fp.wreck.pieces); }
 }

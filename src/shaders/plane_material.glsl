@@ -442,13 +442,16 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     else if (mid == 13) { tx = triSample(lp, ln, M_PLASTIC, 0.2, nT); m.alb = tx.rgb*0.6; m.rough = tx.a; m.nrm = nT; }
     else if (mid == 14) { tx = triSample(lp, ln, M_CARPET, 0.15, nT); m.alb = tx.rgb*0.22; m.rough = 0.95; m.nrm = nT; }   // anti-glare flocking
   }
-  if (uWreck > 0 && !trafHit) {  // fire-blackened, buckled skin with a few glowing embers near the breaks
+#ifdef AF_MESH
+  if (uWreck > 0 && !trafHit) {  // fire-blackened, buckled skin, black inside, with embers glowing along where it tore
     float burn = vnoise(lp.xz*2.3 + lp.y*1.7) + 0.5*vnoise(lp.yz*5.1);
-    float cut = 1.0 - smoothstep(0.0, 0.6, -sdBox(lp - uPcC[gPI], uPcH[gPI]));
-    float k = clamp(0.25 + 0.55*burn + 0.5*cut, 0.0, 1.0);
+    float dc = brkCut(lp), cut = 1.0 - smoothstep(0.0, 0.6, dc), edge = 1.0 - smoothstep(0.0, 0.2, dc);
+    float pb = uPcBurn[clamp(gPI, 0, 15)];
+    float k = gWreckIn ? 1.0 : clamp(0.6*cut + pb*(0.3 + 0.6*burn), 0.0, 1.0);   // (scorched along the tears at once; all over as it burns)
     m.alb = mix(m.alb, vec3(0.025, 0.022, 0.02), k); m.rough = mix(m.rough, 0.95, k); m.metal *= 1.0 - k;
-    m.emit += vec3(1.0, 0.32, 0.06)*pow(clamp(burn*cut*0.9, 0.0, 1.0), 5.0)*(1.5 + sin(uTime*7.0 + lp.x*9.0))*3.0;
+    m.emit += vec3(1.0, 0.32, 0.06)*edge*pow(clamp(burn*0.8, 0.0, 1.0), 6.0)*(1.2 + 0.8*sin(uTime*7.0 + lp.x*9.0))*2.5*(0.3 + 0.7*pb);   // (embers in a narrow band along the tear)
   }
+#endif
   if (mid == 6 || mid == 8) m = gearFinish(lp, mid, m, t*2.0*uTanHalf/uRes.y);
 #if HAS_OSPREY
   if (FLEET_ON && MODEL_IS(8)) {   // the Osprey C6's cabin: ivory composite, copper trim, tobacco leather, cocoa textile (its own fittings and the shared ones)

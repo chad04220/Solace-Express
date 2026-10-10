@@ -58,12 +58,32 @@ int main() {
       const int ft = breakOwner(P, n, modelFinTop(m)); assert(P[ft].kind == BK_FIN || P[ft].kind == BK_TAIL);
       const int tc = breakOwner(P, n, modelTailTip(m)); assert(P[tc].kind == BK_AFT || P[tc].kind == BK_FIN);
     }
+    // every piece tore from something: a wing at its root, the nose and the tail cone round the fuselage, the centre
+    // section wherever the others left it
+    printf("  tears:");
+    for (int i = 0; i < n; i++) {
+      BreakCut c[kMaxBreakCuts]; const int nc = breakCuts(s, P, n, i, c);
+      printf(" %d", nc);
+      for (int k = 0; k < nc; k++) assert(c[k].H.x > 0.f && c[k].H.y > 0.f && c[k].H.z > 0.f && finite3(c[k].C));
+      const int kd = P[i].kind;
+      const bool must = kd == BK_WING || kd == BK_NOSE || kd == BK_AFT || kd == BK_CENTRE || kd == BK_FIN || kd == BK_TAIL || kd == BK_GEAR || kd == BK_PROP;
+      if (must && nc == 0) { printf("\n  the %s%s tore from nothing\n", P[i].side < 0 ? "left " : P[i].side > 0 ? "right " : "", breakKindName(kd)); failures++; }
+      if (kd == BK_CENTRE && nc < 2) { printf("\n  the centre section tore in only %d place\n", nc); failures++; }
+    }
+    printf("\n");
     // the bodies weigh what the airframe did
     const float mass = s.emptyMass + s.cargoKg * 0.5f, payload = s.cargoKg * 0.5f;
     DebrisBody B[kMaxBreakPieces];
     breakBodies(s, P, n, mass, payload, B);
     float sum = 0;
-    for (int i = 0; i < n; i++) { assert(B[i].mass > 0 && B[i].I.x > 0 && B[i].I.y > 0 && B[i].I.z > 0 && finite3(B[i].cg)); sum += B[i].mass; }
+    for (int i = 0; i < n; i++) {
+      assert(B[i].mass > 0 && B[i].I.x > 0 && B[i].I.y > 0 && B[i].I.z > 0 && finite3(B[i].cg)); sum += B[i].mass;
+      // its contact box holds its centre of mass and is no bigger than the airframe
+      const vec3 lo = B[i].lo, hi = B[i].hi;
+      assert(hi.x > lo.x && hi.y > lo.y && hi.z > lo.z);
+      if (!(B[i].cg.x >= lo.x - 0.01f && B[i].cg.x <= hi.x + 0.01f && B[i].cg.y >= lo.y - 0.01f && B[i].cg.y <= hi.y + 0.01f && B[i].cg.z >= lo.z - 0.01f && B[i].cg.z <= hi.z + 0.01f)) { printf("  the %s's centre of mass is outside its box\n", breakKindName(P[i].kind)); failures++; }
+      if (hi.x - lo.x > s.span + 2.f || hi.z - lo.z > s.fusLen + 4.f) { printf("  the %s's box (%.1f x %.1f x %.1f) is bigger than the airframe\n", breakKindName(P[i].kind), hi.x - lo.x, hi.y - lo.y, hi.z - lo.z); failures++; }
+    }
     assert(fabsf(sum - mass) < 0.05f * mass + 3.f * n);
     // and they fly down: from 2,500 m at the type's speed (the research jets' 300 m/s), flung apart a little and spinning,
     // in still air - where no piece may ever gain energy (the air only takes it) - and every one comes down

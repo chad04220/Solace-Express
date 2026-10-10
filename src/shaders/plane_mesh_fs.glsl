@@ -2,7 +2,7 @@
 //! The aircraft mesh pass: the baked static airframe into the G-buffer with the same materials and lighting classes as
 //! the march (plane_gb.glsl), from the mesh's position, normal and material id; the field is asked only on the few
 //! triangles that straddle two materials.
-in vec3 vW; in vec3 vN; flat in float vId; in float vIdS; in float vAo; in vec3 vB;
+in vec3 vW; in vec3 vN; flat in float vId; in float vIdS; in float vAo; in vec3 vB; flat in int vPc;
 uniform int uMeshTraffic;   // -1 the player's aircraft, else the traffic aircraft whose airframe this is
 // the research craft's screens are holes to the world (cabin_windows.glsl): uScrSkip, with the eye (body frame), the
 // model, whether the XR-40's floor shows the bomb camera, and the part being drawn (-1 the static cabin)
@@ -32,6 +32,13 @@ bool clusterFrame(vec3 q, vec3 e, inout int mid, out vec3 nB){
   mid = 10; return true;
 }
 void main(){
+  // a piece of the broken-up aircraft (drawWreck): its own share of the airframe; through where it tore, the inside of
+  // its skin, charred
+  if (uWreck > 0 && uMeshTraffic < 0) {
+    gWreckPart = vPc >= 0;
+    if (!gWreckPart && brkOwner(vB) != uPcK) discard;
+    gWreckIn = !gl_FrontFacing && !gWreckPart;   // (a part's pose may mirror its winding)
+  }
 #if HAS_RESEARCH
   if (RESEARCH_ON && uScrSkip == 1 && cabinWindowCut(vB - uScrEye, uScrModel, uBombPane == 1, uPartInst >= 0)) discard;
 #endif
@@ -40,6 +47,7 @@ void main(){
   // build's gM is its type's constants, the ones afModelOf matched the traffic aircraft's by; loadTraffic reads the rest)
   bool traf = uMeshTraffic >= 0;
   if (traf) { loadTraffic(uMeshTraffic); trafficXf(uMeshTraffic); } else { loadMain(); pieceXf(-1); }
+  if (uWreck > 0 && !traf) { gPI = gWreckPart ? vPc : uPcK; gPR = gWreckPart ? uPcRot[vPc] : uRot; gPP = uCamPos + (gWreckPart ? uPcPos[vPc] : uPos); }   // (a wreck piece, placed on its own)
   vec3 d = vW, p = uCamPos + d;   // (from the camera: plane_mesh_vs.glsl; p, in world metres, only for the world's lookups)
   gRelSet = true; gRel = d;
   // the cloaked part of the XR-40 (behind the cloak's sweeping front) is see-through: the effects pass draws it over the
@@ -52,7 +60,7 @@ void main(){
   // a face turned from the eye in the cabin - the shell's outer skin seen through a gap in a window opening's lip,
   // where the lip runs thinner than the lattice along the roof - is lit as the cabin side it stands for: lit as the
   // skin outside, facing the sun, it showed as pale shards along the side windows' tops (the light aircraft, looking up)
-  if (!traf && gPS.w > 0.5 && uPartInst < 0 && !gl_FrontFacing) ln = -ln;   // (the bake winds each triangle to its outward normal; a part's pose may mirror it)
+  if ((!traf && gPS.w > 0.5 && uPartInst < 0 && !gl_FrontFacing) || gWreckIn) ln = -ln;   // (the bake winds each triangle to its outward normal; a part's pose may mirror it)
   int mid = int(vId + 0.5);
   if (abs(vIdS - vId) > 1e-3) { vec3 lp = gPC + transpose(gPR)*(d + (uCamPos - gPP)); mid = int(mapPiece(lp).y + 0.5); }
   // (a screen's id outside every outline - the bake's triangles overrunning the glass - is the frame round it; the

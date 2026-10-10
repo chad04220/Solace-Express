@@ -35,6 +35,17 @@ bool Renderer::compileRaster(const std::function<void()>& step) {
   e.clear(); progShMap = linkProgramCached(kShMapVS, "#version 330 core\nvoid main(){}\n", e);
   if (!progShMap) { error = "Shadow map shader: " + e; return false; }
   if (step) step();
+  // (a wreck piece: cut to its share of the airframe, wreck_clip.glsl)
+  static const char* kShMapWreckVS = "layout(location = 0) in vec3 aPos; uniform mat4 uVP; uniform mat3 uRot; uniform vec3 uPos;\n"
+    "uniform sampler2D uPartPose; uniform int uPartInst; out vec3 vB; flat out int vPc;\n"
+    "void main(){ vec3 p = aPos; mat3 rot = uRot; vec3 at = uPos; vPc = -1;\n"
+    "  if (uPartInst >= 0) { int b = (uPartInst + gl_InstanceID)*4; mat3 R = mat3(texelFetch(uPartPose, ivec2(b, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 1, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 2, 0), 0).xyz);\n"
+    "    vec3 T = texelFetch(uPartPose, ivec2(b + 3, 0), 0).xyz; p = R*aPos + T; if (uWreckParts == 1) { vPc = brkOwner(R*uPartC + T); rot = uPcRot[vPc]; at = uPcPos[vPc]; } }\n"
+    "  vB = p; gl_Position = uVP*vec4(rot*p + at, 1.0); }\n";
+  e.clear(); progShMapWreck = linkProgramCached(std::string("#version 330 core\nuniform int uWreck;\n") + kWreckClip + kShMapWreckVS,
+                                                std::string("#version 330 core\nin vec3 vB; flat in int vPc; uniform int uWreck;\n") + kWreckClip + "void main(){ if (vPc < 0 && brkOwner(vB) != uPcK) discard; }\n", e);
+  if (!progShMapWreck) { fprintf(stderr, "Shadow map (wreck) shader: %s\n", e.c_str()); }   // (not needed to fly: a wreck then casts no shadow)
+  if (step) step();
   e.clear(); progShMov = linkProgramCached(kShMapVS, "#version 330 core\nout float oM; void main(){ oM = 1.0; }\n", e);
   if (!progShMov) { error = "Shadow map (moving hull) shader: " + e; return false; }
   if (step) step();
@@ -105,7 +116,7 @@ void Renderer::updatePartPoses(const FrameParams& fp) {
   if (planeMeshWanted(fp) && fp.pano <= 0.f) {
     auto pm = planeMeshes.find(hullKey(fp, fp.plane.PS[3] > 0.5f ? 1 : 0));
     if (pm != planeMeshes.end() && pm->second.ok) player = &pm->second;
-  }
+  } else if (const PlaneMesh* wm = wreckMesh(fp)) player = wm;   // (a broken-up aircraft: its pieces' parts)
   if (!meshOff && fp.pano <= 0.f)
     for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); k++) { auto it = planeMeshes.find(trafficModelKey(fp.traffic[k].t)); if (it != planeMeshes.end() && it->second.ok && meshProgramFor(fp.traffic[k].t, -1)) traf[k] = &it->second; }
   computePartPoses(fp, player, traf);
@@ -168,6 +179,9 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
   if (meshOn) drawPlaneMesh(fp, pm->second, fp.plane.rot, fp.plane.pos, -1, earlyMesh == &pm->second);   // (its depth is in since the frame began)
   earlyMesh = nullptr;
+  // a broken-up aircraft: its pieces from its outside mesh (baked below if it has none yet)
+  const PlaneMesh* wm = wreckMesh(fp);
+  if (wm) drawWreck(fp, *wm);
   for (int k = 0; k < trafN; k++) {
     if (!trafMesh[k]) continue;
     const float* t = fp.traffic[k].t;
@@ -182,7 +196,7 @@ void Renderer::rasterObjects(const FrameParams& fp) {
     if (trafMesh[k]) { auto it = hulls.find(trafMesh[k]->movKey); if (it != hulls.end() && it->second.ok && !it->second.verts) continue; }
     trafMarch |= 1 << k;
   }
-  const bool afMarch = (fp.plane.on && (!meshOn || hullOn || fp.wreck.pieces > 0)) || trafMarch != 0;
+  const bool afMarch = (fp.plane.on && fp.wreck.pieces == 0 && (!meshOn || hullOn)) || trafMarch != 0;
   const bool marchAny = afMarch || fp.ufoOn || fp.wreck.debris > 0;
   if (marchAny) {
   // the depth so far (the terrain, the scenery, the meshes) copied out: the march goes no further than it on any ray,
@@ -215,7 +229,7 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   GLuint prog = progObjectsNoAf;
   if (afMarch || objFull) {   // (the aircraft it marches: the player's, and the traffic with something to march)
     int model = -2; bool research = false;
-    if (fp.plane.on) afCover(model, research, fp.plane.M, fp.plane.model);
+    if (fp.plane.on && fp.wreck.pieces == 0) afCover(model, research, fp.plane.M, fp.plane.model);
     for (int k = 0; k < trafN; k++) if (trafMarch & (1 << k)) afCover(model, research, fp.traffic[k].t, -1);
     prog = afPassProgram(kAfObjects, model, research);
   }
@@ -239,6 +253,11 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   if (!feedPass) {
     if (meshUse && pm == planeMeshes.end()) bakePlaneMesh(fp, slot, meshK);   // (on the aircraft's own builder: beginHullBake)
     else if (hullUse && !hulls.count(hullK)) bakeHull(fp, slot, hullK);
+    else if (!wm && fp.plane.on && fp.wreck.pieces > 0 && fp.pano <= 0.f && meshProgramFor(fp.plane.M, fp.plane.model)) {
+      const uint64_t k0 = hullKey(fp, 0);
+      if (!planeMeshes.count(k0)) bakePlaneMesh(fp, 0, k0);
+      if (getenv("WRECKDBG")) { auto it = planeMeshes.find(k0); printf("wreck: baked its mesh (%s, %d indices)\n", it != planeMeshes.end() && it->second.ok ? "ok" : "failed", it != planeMeshes.end() ? it->second.idx : -1); }
+    }
   }
 }
 
@@ -316,15 +335,30 @@ void Renderer::rasterTrafficShadowMaps(const FrameParams& fp) {
 void Renderer::rasterShadowMaps(const FrameParams& fp) {
   shOn = 0; shMovOn = false; shCabOn = false;
   static const bool off = getenv("SHMAPOFF") != nullptr;   // (debug / the analysis: the per-pixel march as before)
-  if (off || !progShMap || !planeMeshWanted(fp)) return;
+  // (a broken-up aircraft: its pieces near the one the camera follows, each from the airframe's mesh - wreck_clip.glsl)
+  const PlaneMesh* wm = off || !progShMapWreck ? nullptr : wreckMesh(fp);
+  if (off || !progShMap || (!planeMeshWanted(fp) && !wm)) return;
   // (in the cockpit the cabin mesh first: its controls, seats and panel shade the cabin, and its windows let the sun in)
-  const int slot = fp.plane.PS[3] > 0.5f ? 1 : 0;
+  const int slot = fp.plane.PS[3] > 0.5f && !wm ? 1 : 0;
   auto pm = planeMeshes.find(hullKey(fp, slot));
   if (pm == planeMeshes.end() || !pm->second.ok || !pm->second.idx) pm = planeMeshes.find(hullKey(fp, 0));
   if (pm == planeMeshes.end() || !pm->second.ok || !pm->second.idx) return;
   const PlaneVisual& pv = fp.plane;
-  const float R = std::max(pv.M[0], pv.M[9 * 4] * 2.f) * 0.55f + 1.5f;   // (planeBound in the shaders)
-  const vec3 c = pv.pos;
+  float R = std::max(pv.M[0], pv.M[9 * 4] * 2.f) * 0.55f + 1.5f;   // (planeBound in the shaders)
+  vec3 c = pv.pos;
+  uint32_t wreckIn = 0;   // (the pieces in the maps: within 80 m of the followed one, which is all a map that size can hold sharply)
+  if (wm) {
+    splitWreck(fp, *wm);
+    vec3 lo(1e9f), hi(-1e9f);
+    for (int i = 0; i < fp.wreck.pieces; i++) {
+      const vec3 m = fp.wreck.mid[i]; const float r = fp.wreck.rad[i] + 0.5f;
+      if (length(m - pv.pos) > 80.f) continue;
+      wreckIn |= 1u << i;
+      lo = vec3(std::min(lo.x, m.x - r), std::min(lo.y, m.y - r), std::min(lo.z, m.z - r)); hi = vec3(std::max(hi.x, m.x + r), std::max(hi.y, m.y + r), std::max(hi.z, m.z + r));
+    }
+    if (!wreckIn) return;
+    c = (lo + hi) * 0.5f; R = 0.5f * length(hi - lo);
+  }
   // which maps: the sun when up; the lights in the proxy's slots (gbShadowSlot: the brightest shadow-casting first)
   int want = 0; int lightOf[4] = {-1, -1, -1, -1};
   if (fp.sunDir.y > -0.05f) want |= 1;
@@ -378,6 +412,28 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
     glClearDepth(1.0); float zero[4] = {0, 0, 0, 0}; glClearBufferfv(GL_COLOR, 0, zero); glClear(GL_DEPTH_BUFFER_BIT);
     // the static airframe: depth only
     glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE); glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+    if (wm) {   // (or the wreck's pieces, each placed and cut to its share)
+      glUseProgram(progShMapWreck);
+      glUniformMatrix4fv(U(progShMapWreck, "uVP"), 1, GL_FALSE, vp.m);
+      glUniform1i(U(progShMapWreck, "uPartInst"), -1);
+      wreckDraw = 1;   // (each piece's own triangles, then the rigid parts of them all at once)
+      for (int i = 0; i < fp.wreck.pieces; i++) {
+        if (!(wreckIn & (1u << i))) continue;
+        meshPiece = i;
+        glUniformMatrix3fv(U(progShMapWreck, "uRot"), 1, GL_FALSE, fp.wreck.rot[i]);
+        glUniform3f(U(progShMapWreck, "uPos"), fp.wreck.pos[i].x, fp.wreck.pos[i].y, fp.wreck.pos[i].z);
+        setWreckPiece(progShMapWreck, fp, true, vec3());
+        glBindVertexArray(wm->vao);
+        drawMeshBody(*wm);
+      }
+      meshPiece = -1; wreckDraw = 2;
+      setWreckPiece(progShMapWreck, fp, true, vec3());
+      glBindVertexArray(wm->vao);
+      drawPlaneParts(*wm, progShMapWreck, -1);
+      wreckDraw = 0;
+      shOn |= 1 << layer;
+      continue;
+    }
     glUseProgram(progShMap);
     glUniformMatrix4fv(U(progShMap, "uVP"), 1, GL_FALSE, vp.m);
     glUniformMatrix3fv(U(progShMap, "uRot"), 1, GL_FALSE, pv.rot);
@@ -403,7 +459,7 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
     if (mov) shMovOn = true;
   }
   // the cockpit view: the cabin's own sun map, about the eye (the depth from the sun's side of the whole airframe on)
-  if (slot == 1 && (want & 1)) {
+  if (slot == 1 && (want & 1) && !wm) {
     if (!texShCab) {
       glGenTextures(1, &texShCab); glBindTexture(GL_TEXTURE_2D, texShCab);
       glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, kShCabRes, kShCabRes, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
@@ -471,7 +527,7 @@ bool Renderer::proxyNeedsMarch(const FrameParams& fp) const {
   static const bool all = getenv("PROXYMARCH") != nullptr;   // (debug: always the full proxy)
   if (all || !progShProxyMaps) return true;
   const bool sun = fp.sunDir.y > -0.05f;
-  if (fp.plane.on) {
+  if (fp.plane.on && fp.wreck.pieces == 0) {   // (a wreck's pieces shadow from the maps alone: rasterShadowMaps)
     const float R = std::max(fp.plane.M[0], fp.plane.M[9 * 4] * 2.f) * 0.55f + 1.5f;   // (planeBound, as rasterShadowMaps)
     if (shMovOn || (sun && !(shOn & 1))) return true;
     for (int i = 0; i < fp.plN; i++) {
@@ -506,7 +562,7 @@ void Renderer::rasterShadowProxy(const FrameParams& fp) {
   GLuint prog = 0;
   if (proxyNeedsMarch(fp)) {   // (the aircraft it may march: the player's, and every traffic aircraft without a map)
     int model = -2; bool research = false;
-    if (fp.plane.on) afCover(model, research, fp.plane.M, fp.plane.model);
+    if (fp.plane.on && fp.wreck.pieces == 0) afCover(model, research, fp.plane.M, fp.plane.model);
     for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); k++) if (!(trafShOn & (1 << k))) afCover(model, research, fp.traffic[k].t, -1);
     prog = afPassProgram(kAfProxy, model, research);
   }

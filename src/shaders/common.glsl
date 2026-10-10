@@ -22,7 +22,14 @@ int craterAt(vec2 p, float k){ if (length(p - uCraterB.xy) > uCraterB.z) return 
   for (int i = 0; i < 24; i++) { if (i >= uCraterN) break; if (length(p - uCrater[i].xy) < uCrater[i].z*k) return i; } return -1; }
 float craterH(vec2 p){ float h = 0.0;
   if (length(p - uCraterB.xy) > uCraterB.z) return 0.0;
-  for (int i = 0; i < 24; i++) { if (i >= uCraterN) break; vec4 c = uCrater[i]; float d = length(p - c.xy)/c.z; if (d > 1.8) continue; float D = abs(c.w);
+  for (int i = 0; i < 24; i++) {   // (a bowl with a raised lip, its edge ragged in a few lobes: Game::wreckGround's craterShape, exactly)
+    if (i >= uCraterN) break;
+    vec4 c = uCrater[i]; vec2 q = p - c.xy; float r = length(q);
+    if (r > 1.9*c.z) continue;
+    float a = atan(q.y, q.x), s = fract(c.x*0.0137 + c.y*0.0191)*6.2832;
+    float d = r/(c.z*(1.0 + 0.09*sin(3.0*a + s) + 0.05*sin(5.0*a + 2.3*s)));
+    if (d > 1.8) continue;
+    float D = abs(c.w);
     h += -D*max(1.0 - d*d, 0.0) + 0.22*D*exp(-(d - 1.0)*(d - 1.0)*14.0); }
   return h; }
 float hash2i(ivec2 p){ uint h = uint(p.x)*0x8da6b343u + uint(p.y)*0xd8163841u; h ^= h>>13; h *= 0x5bd1e995u; h ^= h>>15; return float(h & 0xFFFFFFu)/16777216.0; }

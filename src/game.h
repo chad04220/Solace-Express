@@ -10,6 +10,7 @@
 #include <map>
 #include "world.h"
 #include "aircraft.h"
+#include "breakup.h"
 #include "traffic.h"
 #include "career.h"
 #include "renderer.h"
@@ -249,15 +250,21 @@ private:
   // effects
   std::vector<Particle> particles;
   // crash wreckage: rigid pieces of the airframe, small debris chunks and the impact crater
-  struct WreckPiece { vec3 c, v, w; quat q; vec3 C, H; bool rest; float fire; bool landed = false; };
-  struct Debris { vec3 p, v, w; quat q; float size; bool charred, rest; float burn = 0; };   // burn: seconds it trails fire
+  // (a piece: its centre of mass c, moving at v and turning at w, at orientation q from the airframe's frame; its box
+  // C, H and tears in the airframe's frame - breakup.h - and the body it flies on)
+  struct WreckPiece { vec3 c, v, w; quat q; vec3 C, H; bool rest; float fire; bool landed = false; int kind = BK_CENTRE; DebrisBody body; int cutN = 0; BreakCut cut[kMaxBreakCuts]; };
+  struct Debris { vec3 p, v, w; quat q; float size; bool charred, rest; float burn = 0; DebrisBody body; };   // burn: seconds it trails fire
   struct Pop { vec3 p, v; float t, R; int piece; };   // a delayed secondary explosion (on a wreck piece when piece >= 0)
   std::vector<Pop> pops;
-  std::vector<TipPt> pieceTrail[5];   // smoke trail of each falling break-up piece
+  std::vector<TipPt> pieceTrail[kMaxBreakPieces];   // smoke trail of each falling break-up piece
   float boomT = -1, boomI = 0; vec3 boomP;           // the flash of the latest explosion lights the scene
   std::vector<WreckPiece> wreck;
   std::vector<Debris> debris;
   float craterX = 0, craterZ = 0, craterR = 0, craterD = 0;
+  struct Pit { float x, z, R, D; };
+  std::vector<Pit> pits;   // the pieces' own craters where they came down (partImpact)
+  static constexpr int kMaxPits = 20;
+  void partImpact(vec3 p, vec3 v, float E, float fire, bool water);
   void breakUp(vec3 impactVel, bool water, bool air = false);
   bool airBreak = false;
   float gTunnel = 0, gTunnelPin = -1;   // the g-force lens 0..1 (post_fs.glsl, g_lens.glsl); a debug scene's held strength (-1: none)

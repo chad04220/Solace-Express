@@ -29,6 +29,12 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
 // the piece a body point belongs to
 int breakOwner(const BreakPiece* p, int n, vec3 b);
 const char* breakKindName(int kind);
+// where piece k tore away from the rest: thin boxes (body coords) on the faces of the pieces' boxes, over the stretch
+// the airframe crossed each - a wing's root on the fuselage's side, the ring round the fuselage where the nose came
+// off. The charred, glowing edges are drawn there (plane_material.glsl)
+struct BreakCut { vec3 C, H; };
+static const int kMaxBreakCuts = 12;
+int breakCuts(const AircraftSpec& s, const BreakPiece* p, int n, int k, BreakCut out[kMaxBreakCuts]);
 
 // ---------------------------------------------------------------- the pieces in the air
 struct DebrisPlate { vec3 r, c, n, s; float chord, span; };   // (piece frame, from its centre of mass) quarter-chord point; chordwise, normal, spanwise units
@@ -40,12 +46,14 @@ struct DebrisBody {
   float blunt = 0;        // the torn ends' area facing along the body axis (m^2)
   vec3 box = vec3(0);     // a piece with no surfaces of its own (a gear leg, a pod): its half extents, flown as a bluff box
   float size = 1;         // its largest extent (m): how fast it can tumble
+  vec3 lo = vec3(0), hi = vec3(0);   // what it is made of spans this box (aircraft body coords): where it meets the ground
   std::vector<DebrisPlate> plates; std::vector<DebrisRod> rods;
 };
 // the bodies of the pieces of type s (mass: what the airframe weighs as it breaks, kg; payload: of it, the load aboard)
 void breakBodies(const AircraftSpec& s, const BreakPiece* p, int n, float mass, float payload, DebrisBody out[kMaxBreakPieces]);
 // a torn skin panel or a burning fragment: one plate of side `size` m and areal density sigma kg/m^2
 DebrisBody debrisPanel(float size, float sigma);
+DebrisBody debrisPanel(float chord, float span, float sigma);   // (chord along z, span along x, normal y)
 // the air's force (N, world) and moment (N m, world, about the centre of mass) on a body at orientation q moving at v
 // with rotation w (rad/s, world) through air of density rho moving at wind
 void debrisAir(const DebrisBody& b, const quat& q, vec3 v, vec3 w, vec3 wind, float rho, vec3& F, vec3& M);

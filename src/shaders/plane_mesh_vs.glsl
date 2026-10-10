@@ -11,14 +11,19 @@ uniform sampler2D uPartPose; uniform int uPartInst;   // a rigid part's instance
 out vec3 vW;   // relative to the camera
 out vec3 vN; flat out float vId; out float vIdS; out float vAo;
 out vec3 vB;   // body space: what the cabin's cut-outs and panels are decided from
+flat out int vPc;   // a broken-up aircraft's rigid part: the piece it went with (wreck_clip.glsl; -1 otherwise)
 void main(){
   vec3 pos = aPos, nrm = aNrm;
+  mat3 rot = uRot; vec3 at = uPos;
+  vPc = -1;
   if (uPartInst >= 0) {
     int b = (uPartInst + gl_InstanceID)*4;
     mat3 R = mat3(texelFetch(uPartPose, ivec2(b, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 1, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 2, 0), 0).xyz);
-    pos = R*aPos + texelFetch(uPartPose, ivec2(b + 3, 0), 0).xyz; nrm = transpose(inverse(R))*aNrm;   // (a control surface's pose is affine, not a rotation)
+    vec3 T = texelFetch(uPartPose, ivec2(b + 3, 0), 0).xyz;
+    pos = R*aPos + T; nrm = transpose(inverse(R))*aNrm;   // (a control surface's pose is affine, not a rotation)
+    if (uWreckParts == 1) { vPc = brkOwner(R*uPartC + T); rot = uPcRot[vPc]; at = uPcPos[vPc]; }   // (the whole part goes with one piece)
   }
-  vW = uRot*pos + uPos; vB = pos;
+  vW = rot*pos + at; vB = pos;
   vN = nrm; vId = aId; vIdS = aId; vAo = aAo;
   gl_Position = uVP*vec4(vW, 1.0);
   gl_Position.xy -= 2.0*uJit*gl_Position.w;   // the TAA's sub-pixel jitter
