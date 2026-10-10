@@ -62,7 +62,7 @@ struct WreckVisual {
 // Shader programs, compiled once and then loaded from the driver-binary cache in g_shaderCacheDir (empty: no cache)
 extern std::string g_shaderCacheDir;
 extern std::atomic<int> g_shaderCacheHits, g_shaderCacheMisses;   // bumped from several GL threads at startup
-std::string meshCacheStamp();     // fingerprint of the sources the aircraft mesh bake depends on + the driver
+std::string meshCacheStamp(const std::string& defines = "");     // fingerprint of the sources the aircraft mesh bake depends on + the driver
 std::string shaderCacheStamp();   // fingerprint of all shader sources + the driver (current context needed)
 bool writePNG(const char* path, int w, int h, const std::vector<uint8_t>& rgbBottomUp);
 bool readImage(const char* path, int& w, int& h, std::vector<uint8_t>& rgbaTopDown);   // PNG or JPEG
@@ -88,10 +88,16 @@ struct FrameParams {
   vec3 wind;   // surface wind velocity (m/s, the way the air moves): the sea's waves, the clouds' lean
   vec3 windSock;   // the surface wind with its gusts where the camera is (the windsocks swing with them)
   vec3 cloudDet; float cloudBoil = 0;   // the cloud detail's drift through the cloud bodies and the billows' rise (m: Weather::cloudDetail, cloudBoil)
-  // the aircraft's wake through the cloud (clouds.glsl wakeCarve): a path of points (xyz, the tunnel's radius there),
-  // each segment's strength (0 where the path left the cloud layer) and the bounding sphere of it all
+  // the aircraft's wake through the cloud (clouds.glsl wakeCarve): a path of points (xyz, the channel's radius there)
+  // and with each the strength of the segment it starts (0 where the path left the cloud layer), how far its vortex
+  // pair has sunk below it (m), the distance along the path in Crow wavelengths and its age (s); the bounding sphere
+  // with each too the pair as it was there (circulation, spacing, the airframe's bank, the pair's height on it); and the
+  // airframe's vortices now (from the pair's centre: across, up, circulation, 1 where it winds into its tip's), its
+  // engines' wash (across, up, radius - negative for a jet's hot exhaust - and a propeller's swirl, m/s) and its pair
+  // now (circulation, spacing, the seconds a flap's vortex takes to wind into its tip's)
   static constexpr int kWakeMax = 20;
-  float wake[kWakeMax][4] = {}, wakeK[kWakeMax] = {}, wakeB[4] = {0, 0, 0, 0}; int wakeN = 0;
+  float wake[kWakeMax][4] = {}, wakeP[kWakeMax][4] = {}, wakeG[kWakeMax][4] = {}, wakeB[4] = {0, 0, 0, 0}; int wakeN = 0;
+  float wakeV[10][4] = {}, wakeE[4][4] = {}, wakeA[4] = {}; int wakeVN = 0, wakeEN = 0;
   // the windscreen's rain and cloud (post_fs.glsl, the cockpit view): where on screen the airflow over the glass
   // streams from (uv, may lie far off screen; z +1 away from it, -1 towards it), how fast (w: 0 still .. 1 fast),
   // and the cloud's fine mist on the glass
@@ -141,16 +147,25 @@ public:
   GLuint minimapTex = 0;
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
-  // Logical linked programs: top-level 18, hull 3, raster 12, aircraft mesh 6, terrain/water 2.
-  // Retries do not add units; finalized optional fallbacks/unavailable features do.
-  static constexpr int kProgramCount = 18 + 3 + 12 + 6 + 2;
-  static_assert(kProgramCount == 41, "Update the logical shader progress contract when adding a program");
+  // Logical linked programs: top-level 22 (the scenery's 6: a pair for each class), hull 1, raster 6, aircraft mesh 2,
+  // terrain/water 2. None has an aircraft's code but the parts' poses (plane_parts.glsl).
+  // Retries do not add units; finalized optional fallbacks/unavailable features do. (Each aircraft's own builds are
+  // made when it is first drawn or baked - the launch's prewarm draws every one: afMeshProgram, afBakePrograms; the
+  // bodies' builder has no shared build at launch at all: sharedBakePrograms.)
+  static constexpr int kProgramCount = 22 + 1 + 6 + 2 + 2;
+  static_assert(kProgramCount == 33, "Update the logical shader progress contract when adding a program");
   float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
   // analysis tool (--analyze, the harness's BENCHWALL): exact per-pass times (the GPU is waited on at every pass boundary)
   bool syncTiming = false; double passWall[11] = {};   // (kPasses)
   std::string dispError;   // set when the cockpit display shader failed to build (the screens stay dark)
   std::string proxyError;  // set when the marched shadow proxy failed to build (the airframes' shadows come from their maps alone)
   bool compilePrograms(std::atomic<int>* done);  // scene programs; safe on a worker thread with a shared context
+  // the bodies' builder as a pair - the field's distance, and its normals and cabin occlusion - settled together on a
+  // driver's fallback (aircraft_hull.cpp)
+  bool linkBakePair(const std::string& bakeVS, const std::string& bakeFS, GLuint out[2], std::string& e, const char* normalStage = nullptr);
+  // a full-screen airframe pass's build (raster_renderer.cpp), with the reduced builds tried in turn
+  enum { kAfObjects = 0, kAfProxy = 1, kAfEffects = 2 };
+  GLuint linkAfPass(int pass, const std::string& defines, const std::string& who);
   bool init(int w, int h, const std::function<void(float, const std::string&)>& progress = {});                       // everything else (runs compilePrograms itself if not done yet)
   GLuint makeTexture(const uint8_t* rgba, int w, int h);
   void renderMap(float cx, float cz, float half, int N);   // GPS aerial image into mapTex()
@@ -176,6 +191,7 @@ public:
   void image(GLuint tex, float x, float y, float w, float h, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1, float a = 1.0f);
   void uiEnd();
   void flushUIPublic() { flushUI(); }
+  float uiGLoad = 0, uiTime = 0;   // the g-force lens over what the UI draws next (g_lens.glsl; 0: none) and its heartbeat's clock (FrameParams::time)
   // UI clipping (screen pixels, y down): what is drawn until uiClipOff() shows only inside the box
   void uiClip(float x0, float y0, float x1, float y1) { flushUI(); uiClipOn = true; uiClipBox[0] = x0; uiClipBox[1] = y0; uiClipBox[2] = x1; uiClipBox[3] = y1; }
   void uiClipOff() { flushUI(); uiClipOn = false; }
@@ -261,7 +277,8 @@ private:
   GLuint texWaves = 0; float waveRms[3] = {1, 1, 1};   // (each band's slope rms, the shader's decode scale)
   void genMinimap();
   // ---- environment entities: instanced meshes -> G-buffer (lit by the lighting pass) + sun shadow cascades
-  GLuint progEnt = 0, progEntSh = 0, vaoEnt = 0, vboEntMesh = 0, vboEntInst = 0;
+  GLuint progEnt[3] = {}, progEntSh[3] = {};   // the scenery's programs, a build for each class (entities.h entClass: shaders.h entFSAssembly)
+  GLuint vaoEnt = 0, vboEntMesh = 0, vboEntInst = 0;
   GLuint fboGB = 0, texGB[5] = {0, 0, 0, 0, 0}, texGBDepth = 0, fboShProxy = 0;   // (texGB[4]: the raster renderer's shadow proxy)
   GLuint fboSh[2] = {0, 0}, texSh[2] = {0, 0}; int shRes = 0;
   // shadows fade between kShFade0 and kShFade1 x the cascade radius around shIdeal (camera-anchored, so a cached
@@ -290,10 +307,12 @@ private:
   std::unordered_map<uint64_t, PlaneMesh> planeMeshes;
   GLuint progTrafficProps = 0;
   void rasterTrafficProps(const FrameParams& fp);
-  GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0;   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
+  GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0;   // (progPlaneMesh: the shared build, every aircraft's code - made only if an aircraft's own fails: sharedMeshProgram)
+  bool sharedMeshTried = false;
+  GLuint sharedMeshProgram();   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
   void setScreenCut(GLuint p, const FrameParams& fp, bool on);   // the research cockpits' windows cut (cabin_windows.glsl)
   bool compilePlaneMesh(const std::function<void()>& step = {});
-  bool planeMeshWanted(const FrameParams& fp) const;
+  bool planeMeshWanted(const FrameParams& fp);
   void bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key);
   void drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const float* rot, const vec3& pos, int trafK, bool depthDone = false);
   void drawPlaneMeshDepth(const FrameParams& fp, const PlaneMesh& pm, const float* rot, const vec3& pos, int trafK);
@@ -321,7 +340,12 @@ private:
   GLuint progHull = 0, progHullBake = 0, progHullBakeNormal = 0, vaoHull = 0, texHPts = 0, texHNormals = 0, texHOut = 0, fboHOut = 0, fboHull = 0, texHullDepth = 0;
   int hullDepthW = 0, hullDepthH = 0;
   bool hullOn = false;
-  bool compileHull(const std::string& bakeVS, const std::string& bakeFS, const std::function<void()>& step = {});
+  bool compileHull(const std::function<void()>& step = {});
+  // the bodies' builder (the bake): each aircraft's own pair (afBakePrograms); the shared pair, every aircraft's code,
+  // is made only if an aircraft's own fails (sharedBakePrograms); with neither, that aircraft's bodies are not built and
+  // the march draws its airframe
+  bool sharedBakeTried = false;
+  bool sharedBakePrograms(GLuint out[2]);
   void hullEval(const std::vector<vec3>& pts, std::vector<float>& out);
   // Bake inputs live on the CPU: both programs receive the same model, states and part selectors.
   // No selector is recovered from GL (the normal program can optimize some uniforms away).
@@ -330,6 +354,7 @@ private:
   int hullBakeStates = 0, hullBakeMode = 0, hullBakeState = 0, hullBakePart = -1;
   float hullBakeSideX = 1.f, hullBakeSideY = 1.f;
   bool hullBakeUploaded[2] = {false, false};
+  GLuint hullBakeProg[2] = {};   // the bake's distance and normal programs: the aircraft's own pair, or the shared one (beginHullBake)
   void beginHullBake(const FrameParams& fp, int states, const float* ps, const float* ctl,
                      const float* wr = nullptr, const float* wr2 = nullptr);
   GLuint bindHullBake(bool restore = false);
@@ -397,17 +422,32 @@ private:
   void drawSprites(const FrameParams& fp, float texW, float texH, float uvsX, float uvsY);
   void feedEffects(const FrameParams& f);
   // ---- the raster renderer (raster_renderer.cpp, terrain_mesh.cpp)
-  GLuint progLight = 0, progObjects = 0, progShProxy = 0, progEffects = 0, progTerrain = 0, progWater = 0;
-  // The big airframe programs in two builds: [0] every aircraft, [1] AF_LIGHT - without the research jets' code
-  // (plane_common.glsl RESEARCH_ON), so each pixel pays for less. pickAfPrograms points progObjects, progShProxy,
-  // progEffects and progPlaneMesh at the light build whenever no research jet is in the frame.
-  // The aircraft mesh pass draws each aircraft on its own, so it has two more builds: [2] AF_JET, the XR-30's alone,
-  // and [3] AF_WRAITH, the XR-40's alone (drawPlaneMesh picks by the aircraft drawn)
-  GLuint progObjectsV[2] = {}, progShProxyV[2] = {}, progEffectsV[2] = {}, progPlaneMeshV[4] = {}, progPlaneMeshProbe[4] = {};
-  // the aircraft mesh program's builds: every aircraft, the light aircraft alone (pickAfPrograms), then each research
-  // jet alone (drawPlaneMesh; without a jet's own build its aircraft is drawn with every aircraft's)
-  static constexpr const char* kMeshBuild[4] = {"", "#define AF_LIGHT\n", "#define AF_JET\n", "#define AF_WRAITH\n"};
-  void pickAfPrograms(const FrameParams& fp);
+  GLuint progLight = 0, progTerrain = 0, progWater = 0;
+  // The full-screen airframe passes - the objects pass's march, the shadow proxy's, the effects - take the program for
+  // the aircraft they cover this frame: their type's own build when they are all one type, else a shared build, [0]
+  // every aircraft's or [1] AF_LIGHT, without the research jets' code (plane_common.glsl RESEARCH_ON), so each pixel
+  // pays for less (raster_renderer.cpp afPassProgram). Each is made the first time a frame needs it; the launch builds
+  // only the two with no airframe at all (progObjectsNoAf, progShProxyMaps).
+  GLuint afShared[3][2] = {}; bool afSharedTried[3][2] = {};
+  GLuint afPassProgram(int pass, int model, bool research);   // model: the one type covered (its own build), or -1
+  void afCover(int& model, bool& research, const float* M, int claimed);
+  GLuint progPlaneMeshProbe = 0;
+  // ---- each aircraft's own builds (shaders.h aircraftDefines: its code and its packed model, nothing of any other
+  // aircraft's): the mesh pass draws every aircraft, the player's and each traffic aircraft, with its type's own, and
+  // the bakes build each body with its own pair. Made the first time the type is drawn or baked (from the binary cache
+  // after the first launch), each falling back to the shared build (sharedMeshProgram, sharedBakePrograms) if it fails.
+  // AF_ALL (debug) draws and bakes everything with the shared builds.
+  static constexpr int kAfModels = 13;   // (the whole roster, kAircraft: the career types and the research craft)
+  // (the bake: a builder pair for each of its bodies - [0] the outside's, without the cabin's code (AF_OUTSIDE), [1] the
+  // cockpit's - each with its own stamp, so a cockpit's edit builds that cockpit's body alone)
+  struct AfOwn { GLuint mesh = 0, probe = 0, bake[2][2] = {}, pass[3] = {}; bool meshTried = false, bakeTried[2] = {}, passTried[3] = {}; std::string stamp[2]; };
+  AfOwn afOwn[kAfModels];
+  uint64_t afKeys[kAfModels] = {}; bool afKeysSet = false;   // (each type's packed model's key: trafficModelKey)
+  int afModelOf(const float* M, int model);   // the type whose packed model M is (model: the type it claims, -1 any), or -1: the shared builds
+  GLuint afMeshProgram(int model);
+  GLuint meshProgramFor(const float* M, int model);   // its type's own mesh-pass build, else the shared one; 0 with neither
+  bool afBakePrograms(int model, int slot, GLuint out[2]);   // slot: 0 the outside body, 1 the cockpit's
+  std::string meshStamp(int model, int slot);   // a body's cache stamp: its type's own builder for the slot (-1: the shared)
   // the airframe shadow maps (raster_renderer.cpp): the player's baked static mesh rendered from the sun (layer 0,
   // orthographic) and from the three brightest shadow-casting lights (layers 1-3, perspective along each beam); a
   // second array marks where the moving hull is, so the proxy still marches the field there (the XR-30's nozzles, the

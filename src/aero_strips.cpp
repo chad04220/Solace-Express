@@ -503,7 +503,7 @@ void aeroForces(const AeroGeom& g, const AircraftSpec& s, const AeroIn& in, Aero
     wash[nw++] = {en.pos, en.fwd * -1.f, en.fwd, en.R, dv, std::min(vth, 0.5f * dv + 2.f), en.rot};
   }
   // ---------------- pass 1: each strip's flow and lift coefficient
-  struct Local { vec3 up, uh; float q, cl, x, f, aPlate, dctl, cover; } loc[AeroGeom::kMaxStrips];
+  struct Local { vec3 up, uh; float q, cl, x, f, aPlate, dctl, cover, vs; } loc[AeroGeom::kMaxStrips];
   float CLs[AS_COUNT] = {}, maxX = 0;
   const float wingCLlag = mem.clw;   // (the downwash at the tail is the wing's lift of a moment ago: it takes tail arm / V to get there)
   const float eps = g.kEps * 2.f * wingCLlag / (PI * std::max(g.surf[AS_WING].AR, 1.f)) * ge[AS_WING];
@@ -585,7 +585,7 @@ void aeroForces(const AeroGeom& g, const AircraftSpec& s, const AeroIn& in, Aero
       float cl = clAtt * f;
       Local& L = loc[i];
       L.up = up; L.uh = uh; L.q = 0.5f * rho * vs2 * (st.surf == AS_TAIL ? g.etaTail : 1.f);
-      L.cl = cl; L.x = x; L.f = f; L.aPlate = aGeo + inc / st.cosSw + 0.4f * dctl + 0.6f * g.flapA * flap; L.dctl = dctl; L.cover = flap;
+      L.cl = cl; L.x = x; L.f = f; L.aPlate = aGeo + inc / st.cosSw + 0.4f * dctl + 0.6f * g.flapA * flap; L.dctl = dctl; L.cover = flap; L.vs = vs;
       // the surface's lift coefficient (the strips' lift over its area, on the flight's dynamic pressure: a strip in a
       // slipstream carries more)
       const float qr = std::min(L.q / std::max(out.qbar, 0.5f * rho * 25.f), 4.f);
@@ -624,6 +624,7 @@ void aeroForces(const AeroGeom& g, const AircraftSpec& s, const AeroIn& in, Aero
              - 0.2f * CN * (1.f - f) - 0.25f * L.cl * sup;
     vec3 Msec = cross(st.n, st.c) * (cm * qS * st.chord);
     F += Fs; Mo += cross(st.r - g.cg, Fs) + Msec;
+    out.gam[i] = L.cl * st.bodyF * L.q * st.chord / (rho * std::max(L.vs, 1.f));
   }
   // ---------------- the fuselage: its slender-body (Munk) forces and its crossflow drag, slice by slice
   for (int k = 0; k < g.nSeg; k++) {

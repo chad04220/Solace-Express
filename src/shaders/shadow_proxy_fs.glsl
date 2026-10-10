@@ -7,23 +7,20 @@
 //! only where the moving parts' hull lies in the map, and for the traffic.
 in vec2 vUV; out vec4 oColor;
 // PROXY_MAPS_ONLY: the build for a frame whose every shadow comes from a map (Renderer::proxyNeedsMarch) - no march,
-// so none of the airframes' fields is in the program
+// so none of the airframes' fields is in the program: not even in its source (the conditionals below, which the pruner
+// settles - a macro that drops its argument left the whole field in the source, and every edit to an aircraft compiled
+// this program again)
 // (PROXY_NO_TRAFFIC, PROXY_NO_LIGHTS: the builds without the traffic's march or the lights', for a driver whose compiler
 // fails on the whole - raster_renderer.cpp)
-#ifdef PROXY_MAPS_ONLY
-#define PROXY_MARCH(x) 1.0
-#else
-#define PROXY_MARCH(x) (x)
-#endif
 #if defined(PROXY_MAPS_ONLY) || defined(PROXY_NO_TRAFFIC)
-#define PROXY_MARCH_TRAFFIC(x) 1.0
+#define PROXY_TRAFFIC_MARCH 0
 #else
-#define PROXY_MARCH_TRAFFIC(x) (x)
+#define PROXY_TRAFFIC_MARCH 1
 #endif
 #if defined(PROXY_MAPS_ONLY) || defined(PROXY_NO_LIGHTS)
-#define PROXY_MARCH_LIGHT(x) 1.0
+#define PROXY_LIGHT_MARCH 0
 #else
-#define PROXY_MARCH_LIGHT(x) (x)
+#define PROXY_LIGHT_MARCH 1
 #endif
 // the traffic's sun shadows from their maps (uAfShMap layers 4 + k, where uTrafShOn has bit k): one projection and four
 // taps per aircraft, instead of a march through its field
@@ -47,7 +44,9 @@ float trafficShadowMaps(vec3 p, vec3 n){
 }
 void main(){
   gZero = min(uQuality, 0);
+#ifndef PROXY_MAPS_ONLY
   loadMain();
+#endif
   ivec2 px = ivec2(gl_FragCoord.xy);
   vec4 g0 = texelFetch(uGB0, px, 0);
   int cls = int(g0.w + 0.5);
@@ -60,8 +59,16 @@ void main(){
   bool ground = cls == GB_TERRAIN || cls == GB_ENTITY || cls == GB_FOLIAGE;
   if (ground && uSunDir.y > -0.05 && t < 3000.0) {
     float m = (uAfShOn & 1) != 0 ? shMapLookup(0, p, n) : -1.0;
-    sunS = m >= 0.0 ? mix(m, 1.0, uWr[4].w*0.88) : PROXY_MARCH(planeShadow(p + n*0.2, uSunDir));   // (a cloaked XR-40 barely darkens the ground: planeShadow's own fade)
-    if (uTrafficN > 0) sunS *= PROXY_MARCH_TRAFFIC(trafficShadow(p))*trafficShadowMaps(p, n);
+#ifdef PROXY_MAPS_ONLY
+    sunS = m >= 0.0 ? mix(m, 1.0, uWr[4].w*0.88) : 1.0;
+#else
+    sunS = m >= 0.0 ? mix(m, 1.0, uWr[4].w*0.88) : planeShadow(p + n*0.2, uSunDir);   // (a cloaked XR-40 barely darkens the ground: planeShadow's own fade)
+#endif
+#if PROXY_TRAFFIC_MARCH
+    if (uTrafficN > 0) sunS *= trafficShadow(p)*trafficShadowMaps(p, n);
+#else
+    if (uTrafficN > 0) sunS *= trafficShadowMaps(p, n);
+#endif
   }
   vec3 ls = vec3(1.0);
   for (int i = 0; i < 12; i++) {
@@ -79,7 +86,11 @@ void main(){
     if (max(E.r, max(E.g, E.b))*ndl <= 0.004) continue;
     {
       float m = (uAfShOn & (2 << slot)) != 0 ? shMapLookup(1 + slot, p, n) : -1.0;
-      ls[slot] = m >= 0.0 ? m : PROXY_MARCH_LIGHT(planeLightShadow(i, p, n, l, d));
+#if PROXY_LIGHT_MARCH
+      ls[slot] = m >= 0.0 ? m : planeLightShadow(i, p, n, l, d);
+#else
+      ls[slot] = m >= 0.0 ? m : 1.0;
+#endif
     }
   }
   oColor = vec4(sunS, ls);

@@ -32,15 +32,21 @@ bool clusterFrame(vec3 q, vec3 e, inout int mid, out vec3 nB){
   mid = 10; return true;
 }
 void main(){
+#if HAS_RESEARCH
   if (RESEARCH_ON && uScrSkip == 1 && cabinWindowCut(vB - uScrEye, uScrModel, uBombPane == 1, uPartInst >= 0)) discard;
+#endif
   gZero = min(uQuality, 0);
-  bool traf = FLEET_ON && uMeshTraffic >= 0;   // (the research jets' own builds never draw traffic: no traffic data path in them)
+  // (a traffic aircraft is drawn with its type's own build too - the XR-30s of the formations and the escort pair: an own
+  // build's gM is its type's constants, the ones afModelOf matched the traffic aircraft's by; loadTraffic reads the rest)
+  bool traf = uMeshTraffic >= 0;
   if (traf) { loadTraffic(uMeshTraffic); trafficXf(uMeshTraffic); } else { loadMain(); pieceXf(-1); }
   vec3 d = vW, p = uCamPos + d;   // (from the camera: plane_mesh_vs.glsl; p, in world metres, only for the world's lookups)
   gRelSet = true; gRel = d;
   // the cloaked part of the XR-40 (behind the cloak's sweeping front) is see-through: the effects pass draws it over the
   // lit frame, so the G-buffer keeps what lies behind it
+#if HAS_RESEARCH
   if (RESEARCH_ON && !traf && uWr[4].w > 0.001 && int(gM[0].z + 0.5) == 6 && gPS.w < 0.5 && uWreck == 0 && vB.z < uWr[6].y) discard;
+#endif
   float t = length(d); vec3 rd = d/max(t, 1e-6);
   vec3 ln = normalize(vN);
   // a face turned from the eye in the cabin - the shell's outer skin seen through a gap in a window opening's lip,
@@ -51,15 +57,27 @@ void main(){
   if (abs(vIdS - vId) > 1e-3) { vec3 lp = gPC + transpose(gPR)*(d + (uCamPos - gPP)); mid = int(mapPiece(lp).y + 0.5); }
   // (a screen's id outside every outline - the bake's triangles overrunning the glass - is the frame round it; the
   // research cockpits' own display panels against their frames and mounts from their shapes: cabin_windows.glsl)
+#if HAS_RESEARCH
   if (RESEARCH_ON && uScrSkip == 1 && cabinScreenId(mid) && !(uBombPane == 1 && mid == 61)) mid = uScrModel == 6 ? 65 : 44;
+#endif
+#if HAS_RESEARCH
   if (RESEARCH_ON && !traf && gPS.w > 0.5 && int(gM[0].z + 0.5) >= 5) mid = cabinPanelId(vB - gM[22].xyz, int(gM[0].z + 0.5), mid);
+#endif
+#if HAS_FLEET_CABIN
   if (FLEET_ON && !traf && gPS.w > .5 && uPartInst < 0) mid = fleetPanelId(vB, mid);
+#endif
   vec3 conN;   // (the XR-40's consoles and display mounts: their own field's normal, cabin_windows.glsl)
+#if HAS_WRAITH   // (the XR-40's alone: cabin_windows.glsl)
   if (RESEARCH_ON && !traf && gPS.w > 0.5 && uPartInst < 0 && cabinConsoleNormal(vB - gM[22].xyz, int(gM[0].z + 0.5), mid, conN)) ln = conN;
+#endif
   vec3 wallN;   // (a window's frame: the surface the eye truly sees there, not the mesh's zigzag one)
+#if HAS_WRAITH   // (the XR-40's alone: cabin_windows.glsl)
   if (RESEARCH_ON && uScrSkip == 1 && uPartInst < 0 && cabinWallNormal(vB - uScrEye, uScrModel, mid, wallN)) ln = wallN;
+#endif
   vec3 frN;   // (a light aircraft's cluster frames)
+#if HAS_FLEET
   if (FLEET_ON && !traf && gPS.w > 0.5 && uPartInst < 0 && int(gM[0].z + 0.5) < 5 && !fleetCabin() && !isMantis() && clusterFrame(vB, -transpose(uRot)*uPos, mid, frN)) ln = frN;
+#endif
   bool pod = !traf && uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0;
 #ifdef PROBE_MESH_SHADE
   if (!traf) { gbWritePrelit(t, ln, GB_POD, vec3(0.05)); oG3 = vec4(1.0, 1.0, 1.0, float(GBF_RIGID)/255.0); return; }   // (the analysis's probe build: Renderer::kProbeMeshShade)

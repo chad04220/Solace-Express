@@ -15,12 +15,15 @@ flat out vec4 vInst;   // seed, yaw, scale y, instance height
 flat out vec3 vScale;
 void main(){
   vFade = 1.0; vLodK = vec2(0.0, 1.0);
+#if ENT_TREES
   if (uShadowPass == 0 && uLod >= 0) {   // a tree's detail levels cross-fade over the last 15% before each switch
     float d = length(iA.xyz - uCamV);
     float t0 = smoothstep(uLodL.x*0.85, uLodL.x, d), t1 = smoothstep(uLodL.y*0.85, uLodL.y, d);
     vLodK = uLod == 0 ? vec2(t0, 1.0) : uLod == 1 ? vec2(t1, t0) : vec2(0.0, t1);
     if (vLodK.y <= vLodK.x) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   }
+#endif
+#if ENT_TREES || ENT_ROCKS
   if (uShadowPass == 0 && uThin > 0.5) {   // thin out towards the far limit (the ground texture takes over distant forest)
     // each instance's turn comes where its keep fraction (ref/d)^2 falls to its key; it dissolves over 10% of that
     // distance either side of it, and the draw limit over its last tenth - never on or off at once (entFade)
@@ -28,17 +31,21 @@ void main(){
     vFade = (1.0 - smoothstep(dK*0.9, dK*1.1, d))*(1.0 - smoothstep(uFar*0.9, uFar, d));
     if (vFade <= 0.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   }
+#endif
   vec3 posed=aPos, posedN=aNrm;
   int wheel=int(aAux.x+.5)-27;
+#if ENT_BUILDINGS
   if(wheel>=0 && wheel<6) {
     float a=wheel<4?uWheel0[wheel]:uWheel1[wheel-4], c=cos(a),s=sin(a);
     vec2 q=aPos.yz-aAux.zw;
     posed.yz=aAux.zw+vec2(c*q.x-s*q.y,s*q.x+c*q.y);
     posedN.yz=vec2(c*aNrm.y-s*aNrm.z,s*aNrm.y+c*aNrm.z);
   }
+#endif
   // trees and bushes: no two alike. Each instance turns its crown round the trunk by its own amount, more towards the
   // top (the whorls, tiers and clumps come round at other bearings), pushes it out of round its own way and leans a
   // little - one mesh per species read as one tree copied across the hills (both passes: the shadow is the same tree)
+#if ENT_TREES
   if (uKind <= 6) {
     float sd = iB.w, t = clamp(posed.y/(uKind == 6 ? 1.8 : uKind == 5 ? 10.0 : 12.0), 0.0, 1.6);
     float tw = (fract(sd*3.71) - 0.5)*2.4*t, ct = cos(tw), st = sin(tw);
@@ -48,16 +55,20 @@ void main(){
     posed.xz *= 1.0 + min(t, 1.0)*(0.14*sin(2.0*ph + sd*41.0) + 0.07*sin(3.0*ph + sd*23.0));
     if (uKind != 6) posed.xz += vec2(cos(sd*57.0), sin(sd*57.0))*0.45*fract(sd*8.3)*t*t;   // (up to ~0.5 m at 12 m)
   }
+#endif
   vec3 lp = posed*iB.xyz;
   // foliage sways a little in the wind, more towards the top and the frond tips
+#if ENT_TREES
   if (uKind <= 6 && (aAux.x < 3.5 || aAux.x > 17.5) && uShadowPass == 0) {
     float h = max(aPos.y, 0.0)/14.0;
     float ph = uTime*(1.1 + 0.4*fract(iB.w*7.0)) + iA.x*0.05 + iA.z*0.04;
     lp.xz += vec2(sin(ph), cos(ph*0.83))*0.06*h*h*iB.y + (aAux.x > 1.5 && aAux.x < 2.5 ? vec2(0.0, sin(ph*2.3 + aPos.x))*0.08*aAux.w : vec2(0.0));
   }
+#endif
   float c = cos(iA.w), s = sin(iA.w);
   vec3 wp = vec3(c*lp.x + s*lp.z, lp.y, -s*lp.x + c*lp.z) + iA.xyz;
   vec3 ln = normalize(posedN/iB.xyz);
+#if ENT_BUILDINGS
   if (uKind == 40 && abs(aAux.x - 23.0) < 0.5) {
     // windsock: the sock (modelled along +x from the pole top) streams downwind, filling out by ~15 kt and drooping
     // when calm, with a little flutter. Built straight in world space, then expressed back in the instance frame.
@@ -73,6 +84,7 @@ void main(){
     ln = vec3(c*wn.x - s*wn.z, wn.y, s*wn.x + c*wn.z);
     lp = aPos;
   }
+#endif
   vW = wp; vL = wheel>=0 && wheel<6 ? aPos*iB.xyz : lp; vLN = ln; vAux = aAux;
   vInst = vec4(iB.w, iA.w, iB.y, iA.y); vScale = iB.xyz;
   gl_Position = uVP*vec4(wp, 1.0);

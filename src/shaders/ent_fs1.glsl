@@ -23,6 +23,7 @@ float vn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f*f*(3.0 - 2.0*f);
 // foliage cut-outs: holes through the clumps towards their silhouettes (leafy edges, dappled shadows)
 bool leafCut(float viewEdge){
   int part = int(vAux.x + 0.5);
+#if ENT_TREES
   if (part == P_LEAF) {
     float n = vn3(vL*2.3 + vInst.x*17.0)*0.55 + vn3(vL*7.3 - vInst.x*9.0)*0.45;
     return n < 0.24 + 0.4*viewEdge;
@@ -63,6 +64,8 @@ bool leafCut(float viewEdge){
     }
     return true;
   }
+#endif
+#if ENT_BUILDINGS
   if (part == P_FENCE) {   // chain link: real diamonds up close, a dithered see-through panel further away
     // (in the sun's shadow maps a fixed pattern on the panel itself, about as dense as the mesh: the view-dependent
     // cut-outs below would follow the camera and the frame-to-frame dither would make the shadow crawl)
@@ -71,11 +74,14 @@ bool leafCut(float viewEdge){
     if (d < 35.0) { vec2 q = vec2(vL.x + vL.y, vL.x - vL.y)/0.17; vec2 f = abs(fract(q) - 0.5); return min(f.x, f.y) > 0.07*(1.0 + d/35.0); }
     return hsh(gl_FragCoord.xy + fract(uTime*7.31)*vec2(17.0, 41.0)) > 0.06 + 0.2*smoothstep(500.0, 40.0, d);
   }
+#endif
+#if ENT_TREES
   if (part == P_FROND) {   // leaflets either side of the midrib
     float a = abs(vAux.z);
     if (a < 0.07) return false;
     float l = fract(vAux.w*34.0 + a*2.2);
     return l > 0.58 || a > 0.97 - 0.25*vAux.w*vAux.w;
   }
+#endif
   return false;
 }

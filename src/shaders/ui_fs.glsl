@@ -1,9 +1,10 @@
 //! kUIFS
-#version 330 core
+//! The interface: flat and gradient rectangles, outlines, glows, text and its shadow, images and anti-aliased lines; the flight HUD under the g-force lens (assembled after g_lens.glsl: shaders.h uiFSAssembly).
 in vec2 vUV; in vec4 vCol; in float vMode; in vec2 vHalf; in float vP; out vec4 oColor;
 uniform sampler2D uFont; uniform sampler2D uImg;
+uniform float uGLoad; uniform float uTime; uniform vec2 uScreen;   // the g-force lens over the HUD (0: none) and its heartbeat's clock
 float sdRR(vec2 p, vec2 h, float r){ vec2 q = abs(p) - h + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
-void main(){
+void uiColour(){
   if (vMode < 0.5) { oColor = vCol; }
   else if (vMode < 1.5) {
     float d = texture(uFont, vUV).r;
@@ -25,5 +26,13 @@ void main(){
     float d = length(q) - vHalf.y;
     float aa = max(fwidth(d), 1.0);
     oColor = vec4(vCol.rgb, vCol.a*clamp(0.5 - d/aa, 0.0, 1.0));
+  }
+}
+void main(){
+  uiColour();
+  if (uGLoad > 0.002) {   // (blended over the scene the post pass already put the lens over: the same colour as if under it)
+    float rr, th, beat, px;
+    float gX = gLensShape(gl_FragCoord.xy/uScreen, uScreen, uGLoad, uTime, rr, th, beat, px);
+    oColor.rgb = gLensColour(oColor.rgb, uGLoad, gX, rr, th, beat, px);
   }
 }

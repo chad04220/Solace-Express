@@ -36,7 +36,8 @@ def point(E,m,tile,p):
 # Bushmaster's raised primary panel intentionally fails the generic eye-drop
 # proxy. Test the actual forward path instead, without relaxing face/skin fit.
 # Source-shape assertions fail closed when these mirrored GLSL fields change.
-def compact(s): return re.sub(r'\s+', '', re.sub(r'//[^\n]*', '', s))
+# (MODEL_IS(n), plane_common.glsl, is gModelId==n in every build that carries the code: the contracts read it so)
+def compact(s): return re.sub(r'MODEL_IS\((\d+)\)', r'gModelId==\1', re.sub(r'\s+', '', re.sub(r'//[^\n]*', '', s)))
 def rb(p,h,r=0):
     q=[abs(p[k])-h[k]+r for k in range(3)]
     return math.sqrt(sum(max(v,0)**2 for v in q))+min(max(q),0)-r

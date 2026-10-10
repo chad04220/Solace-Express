@@ -17,7 +17,7 @@ const bool GEAR_FIELD = true;
 // sealed voids behind open doors.)
 // Swift matched initial supported body; metres, unchanged exterior.
 // Requires existing sdRoundBox,sdBox,sdCapsule,smin,rot2 helpers.
-// Explicit call gate gModelId==7. f is the unchanged world fuselage SDF.
+// Explicit call gate MODEL_IS(7). f is the unchanged world fuselage SDF.
 // rd-box halfsize INCLUDES round radius. Headrest/posts remain disabled.
 vec3 swiftSeatPanCenter(float side){return vec3(side*.250,-.170,-1.350);}
 vec3 swiftSeatBackCenter(float side){return vec3(side*.250,.08866339043319735,-1.147791994999997);}
@@ -519,7 +519,9 @@ vec2 jtGear(vec3 p, vec3 ap, vec2 res, float mainDepth, float mainBelow){
 // canard in its pivot's frame, the nozzle in its own frame, the gear extended (body space), a door in its hinge's frame
 vec2 jtPartField(int k, vec3 l){
   vec4 G0 = gM[18]; float gh = gM[19].x;
+#if HAS_JET
   if (k == PT_JT_NOZZLE) return jtNozzleShape(l);
+#endif
   if (k == PT_JT_LEGM) return jtMainLeg(l, jtGearOf().H, vec3(G0.x, 0.38 - gh, G0.z));
   if (k == PT_JT_WHEELM) return jtMainWheel(l - vec3(G0.x, 0.38 - gh, G0.z));
   if (k == PT_JT_LEGN) return jtStrut(l, jtGearOf().P, vec3(0.0, 0.43 - gh, G0.w), 0.06);
@@ -527,17 +529,21 @@ vec2 jtPartField(int k, vec3 l){
   bool wrd = int(gM[0].z + 0.5) == 6;   // (the doors in the skin's paint: the XR-40's, the XR-30's wing and body)
   if (k == PT_JT_DOORM) return vec2(gearDoorV(l, jtGearOf().mh), wrd ? 80.0 : 31.0);
   if (k == PT_JT_DOORN) return vec2(gearDoorV(l, jtGearOf().nh), wrd ? 80.0 : 30.0);
+#if HAS_JET   // (the XR-30's own surfaces; the gear above is the XR-40's too)
   if (k == PT_JT_ELEVON) return vec2(sdSurface(l.x, l.z + 1.6, l.y - (-0.18 - l.x*0.035), 5.6, 7.2, 1.2, 5.6, 0.04, 0.84, 1.2, 5.3, 0.0, 0.0), 31.0);
   if (k == PT_JT_CANARD) return vec2(sdPanel(l.x, l.z + 0.6, l.y, 1.5, 1.5, 0.45, 1.0, 0.05, 1.0, 0.0, 0.0), 31.0);
   if (k == PT_JT_RUDDER) {
     vec3 q = l - vec3(1.0, 0.3, 4.6); q.xy = rot2(q.xy, 0.42);
     return vec2(sdSurface(q.y, q.z, q.x, 2.3, 2.6, 1.0, 1.9, 0.05, 0.7, 0.15, 2.2, 0.0, 0.0), 31.0);
   }
+#endif
   return vec2(1e9, 0.0);
 }
 vec2 mapJet(vec3 p){
   float gear = gPS.x, inside = gPS.w;
+#if HAS_CABIN
   if (inside > 0.5) return mapJetCockpit(p);
+#endif
   float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z;
   vec3 ap = vec3(abs(p.x), p.y, p.z);
   float sgn = p.x > 0.0 ? 1.0 : -1.0;
@@ -755,14 +761,26 @@ vec2 mapPlaneBody(vec3 p){
 #ifdef PART_BAKE
   if (gPartMode >= 0) return partField(gPartMode, p);   // (the mesh bake: one rigid part alone, in its own frame)
 #endif
+#if HAS_RESEARCH
   {   // the research jets: their own airframes, then their gear - the same for both, called once here so the program
       // carries one copy of it (written into each airframe it was two, and the march's every pixel paid for the size)
     int engJ = int(gM[0].z + 0.5);
-    if (RESEARCH_ON && (!FLEET_ON || engJ == 5 || engJ == 6)) {   // (a research jet's own build: nothing else follows)
-      vec2 r = JET_ON && (!WRAITH_ON || engJ == 5) ? mapJet(p) : mapWraith(p);
+#if HAS_FLEET
+    if (engJ == 5 || engJ == 6)
+#endif
+    {   // (a research jet's own build: nothing else follows - the light aircraft's body below is not in it)
+#if HAS_JET && HAS_WRAITH
+      vec2 r = engJ == 5 ? mapJet(p) : mapWraith(p);
+#elif HAS_JET
+      vec2 r = mapJet(p);
+#else
+      vec2 r = mapWraith(p);
+#endif
       return gPS.w > 0.5 || !GEAR_FIELD ? r : jtGear(p, vec3(abs(p.x), p.y, p.z), r, engJ == 6 ? 0.7 : 0.8, engJ == 6 ? 0.03 : 0.06);
     }
   }
+#endif
+#if HAS_FLEET
   float L = gM[0].x; int gtype = int(gM[0].y + 0.5); int eng = int(gM[0].z + 0.5); float R = gM[0].w;
   float gear = gPS.x, flaps = gPS.y, steer = gPS.z, inside = gPS.w;
   float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z, cThr = gCtl.w;
@@ -770,6 +788,7 @@ vec2 mapPlaneBody(vec3 p){
   float f = sdFuselage(p);
   vec2 res = vec2(f, 1.0);
   float winHole = 1e9;   // (from the cockpit: the distance to the window openings, negative in them - the visors keep to the roof)
+#if HAS_CABIN
   if (inside > 0.5) {
     // hollow cabin with real window openings
     vec4 E = gM[22]; vec4 WS = gM[23]; vec3 sec = fusSection(p.z);
@@ -797,6 +816,7 @@ vec2 mapPlaneBody(vec3 p){
     float zB = gM[20].x > 0.5 ? gM[20].z + 0.15 : WS.w + (gM[21].z > 0.5 ? 0.9 : 0.75);
     res = opU(res, vec2(max(f + 0.03, abs(p.z - zB) - 0.02), 63.0));
   }
+#endif
   // Each part below is skipped when its bounding box is farther than the nearest surface found so far (plus its blend
   // radius): its own distance can only be larger, so the result is unchanged - but a sample in the cabin no longer
   // evaluates the wingtips, the tail and the wheels (the cockpit view takes ~30 such samples per pixel).
@@ -1126,12 +1146,18 @@ vec2 mapPlaneBody(vec3 p){
   // Ids: 10 panel (instruments drawn on it), 11 shell/floor, 12 seats, 13 controls, 14 glareshield & overhead,
   // 60 brushed metal, 61 rubber, 63 trim panels, 64 light lenses, 65 radio stack, 66 satin black (bezels, knobs),
   // 67 centre engine display (glass cockpits), 68 red knobs / buttons, 69 harness webbing
+#if HAS_CABIN   // (the cockpit view's alone: not in the outside bodies' builder, AF_OUTSIDE)
+#if HAS_MANTIS
   if (inside > 0.5 && isMantis()) return opU(res,mapMantisCockpit(p,f));
+#endif
   if (inside > 0.5) {
     vec4 E = gM[22]; float pz = gM[21].w, phw = E.w; int ck = int(gM[21].z + 0.5);
     float pf = pz + 0.045;
+#if HAS_FLEET_CABIN
     if (fleetCabin()) res = opU(res,mapFleetPanel(p,f));
-    else {
+    else
+#endif
+    {
     float panel = sdRoundBox(p - vec3(0.0, E.y - 0.38, pz), vec3(phw, 0.22, 0.045), 0.015);   // (its top under the glareshield's hood)
     panel = max(panel, f + 0.06);  // contour the panel corners to the inside of the cowling
     res = opU(res, vec2(panel, 10.0));
@@ -1176,26 +1202,32 @@ vec2 mapPlaneBody(vec3 p){
       res = opU(res, vec2(length(vq - vec3(0.0, 0.0, 0.004)) - 0.019, 66.0));
     }
     }
-    float floor_ = sdBox(p - vec3(0.0, (gModelId==2?.560:(gModelId==7?.520:E.y)) - 1.08, E.z), vec3(phw, 0.02, 1.6));
+    float floor_ = sdBox(p - vec3(0.0, (MODEL_IS(2)?.560:(MODEL_IS(7)?.520:E.y)) - 1.08, E.z), vec3(phw, 0.02, 1.6));
     floor_ = max(floor_, f + 0.04);
     res = opU(res, vec2(floor_, 11.0));
     // seats: pan with a front roll, bolstered back, headrest, rails, lap belt and shoulder harness
     // (each group below is skipped when its bounding box is farther than the nearest surface so far, as outside)
     vec3 sp = vec3(abs(p.x) - abs(E.x), p.y, p.z);
     float sbTop = max(gCab0.y + 0.16, E.y + 0.06);
-    if(gModelId==2){
+#if HAS_BUSHMASTER
+    if(MODEL_IS(2)){
       float side=p.x<0.0?-1.0:1.0;
       res=opU(res,vec2(bushSeatPadded(p,side),12.0));
       res=opU(res,vec2(bushSeatRailSupports(p,side,f),60.0));
       res=opU(res,vec2(min(bushDrapedShoulderWeb(p,side),bushDrapedLapWeb(p,side)),69.0));
       res=opU(res,vec2(bushDrapedBuckle(p,side),60.0));
-    } else if(gModelId==7){
+    } else
+#endif
+#if HAS_SWIFT
+    if(MODEL_IS(7)){
       float side=p.x<0.0?-1.0:1.0;
       res=opU(res,vec2(swiftSeatPadded(p,side),12.0));
       res=opU(res,vec2(swiftSeatRailSupports(p,side,f),60.0));
       res=opU(res,vec2(min(swiftDrapedShoulderWeb(p,side),swiftDrapedLapWeb(p,side)),69.0));
       res=opU(res,vec2(swiftDrapedBuckle(p,side),60.0));
-    } else if (sdBox(sp - vec3(0.0, 0.5*(E.y - 1.08 + sbTop), E.z + 0.13), vec3(max(gCab0.x, 0.2) + 0.08, 0.5*(sbTop - E.y + 1.08), 0.49)) < res.x) {
+    } else
+#endif
+    if (sdBox(sp - vec3(0.0, 0.5*(E.y - 1.08 + sbTop), E.z + 0.13), vec3(max(gCab0.x, 0.2) + 0.08, 0.5*(sbTop - E.y + 1.08), 0.49)) < res.x) {
       float sw = gCab0.x;
       float seatDrop=gCabSeat.y;
       float seat = sdRoundBox(sp - vec3(0.0, E.y - seatDrop, E.z + 0.05), vec3(sw, 0.055, 0.24), 0.05);
@@ -1224,22 +1256,28 @@ vec2 mapPlaneBody(vec3 p){
       res = opU(res, vec2(sdRoundBox(vec3(sp.x, sp.y - (E.y-seatDrop+.07), sp.z - (E.z - 0.055)), vec3(0.03, 0.02, 0.006), 0.004), 60.0));   // buckle
     }
     // Two compact linked center sticks in the trainers; other models retain their yokes.
+#if HAS_SWIFT
     if(swiftCompactYoke()) {
       float side=p.x<0.0?-1.0:1.0;
       res=opU(res,vec2(swiftYokeSupport(p,side,f),60.0));
       res=partAt(res,PT_YOKE_SHAFT,vec2(side,0),p);
       res=partAt(res,PT_YOKE_WHEEL,vec2(side,0),p);
-    } else if(bushmasterFloorStick()) {
+    } else
+#endif
+#if HAS_BUSHMASTER
+    if(bushmasterFloorStick()) {
       // No legacy yoke near-field bound: the entire floor blade must survive static bake.
       float side=p.x<0.0?-1.0:1.0;
       res=opU(res,vec2(bushmasterStickSupport(p,side,f),60.0));
       res=partAt(res,PT_YOKE_SHAFT,vec2(side,0),p);
       res=partAt(res,PT_YOKE_WHEEL,vec2(side,0),p);
-    } else if(compactTrainerStick()) {
+    } else
+#endif
+    if(compactTrainerStick()) {
       float side=p.x<0.0?-1.0:1.0;vec3 pivot=trainerStickPivot(side);
       if(sdBox(p-pivot-vec3(0,-.15,0),vec3(.12,.50,.18))<res.x) {
         // Raked narrow support terminates in the unchanged inner floor; never outside skin.
-        float floorY=gModelId==0?-.4018632253:-.4447097837;
+        float floorY=MODEL_IS(0)?-.4018632253:-.4447097837;
         vec3 foot=vec3(pivot.x,floorY-.010,E.z-.300);
         vec3 elbow=vec3(pivot.x,pivot.y,E.z-.300);
         float column=min(sdCapsule(p,foot,elbow,.018),sdCapsule(p,elbow,pivot,.018));
@@ -1254,7 +1292,7 @@ vec2 mapPlaneBody(vec3 p){
     if(floorSupportedYoke()) {
       bool utility=utilityFloorYoke();float ys=p.x<0.0?-1.0:1.0;
       vec3 top=cockpitYokeMount(ys)+vec3(0,0,utility?.100:.050);
-      vec3 foot=utility?vec3(top.x,E.y-1.070,E.z-.260):vec3(top.x,gModelId==6?-.645622863:(gModelId==9?E.y-1.070:-.170000024),top.z);
+      vec3 foot=utility?vec3(top.x,E.y-1.070,E.z-.260):vec3(top.x,MODEL_IS(6)?-.645622863:(MODEL_IS(9)?E.y-1.070:-.170000024),top.z);
       if(utility || sdBox(p-(foot+top)*.5,vec3(.040,(top.y-foot.y)*.5+.040,.040))<res.x) {
         float post=sdCapsule(p,foot,top-vec3(0,utility?.046:.048,0),utility?.022:.018);
         post=max(post,f+.025);
@@ -1286,10 +1324,10 @@ vec2 mapPlaneBody(vec3 p){
       }
     }
     // Closed floor-backed heel rests support the 32-degree shoe contact paths in the glass twins.
-    if(gModelId==6 || gModelId==9) {
+    if(MODEL_IS(6) || MODEL_IS(9)) {
       float heelTop=gCab2.x-.10618064348,heelZ=gCab2.y+.21857179004;
-      float innerHalf=gModelId==6?.08155441626:.04153902776;
-      float outerHalf=gModelId==6?.05978298455:.03892687641;
+      float innerHalf=MODEL_IS(6)?.08155441626:.04153902776;
+      float outerHalf=MODEL_IS(6)?.05978298455:.03892687641;
       vec3 hq=vec3(abs(p.x),p.y,p.z);
       float heel=sdRoundBox(hq-vec3(gCab2.z-gCab2.w,heelTop-innerHalf,heelZ),vec3(.061,innerHalf,.083),.006);
       heel=min(heel,sdRoundBox(hq-vec3(gCab2.z+gCab2.w,heelTop-outerHalf,heelZ),vec3(.061,outerHalf,.083),.006));
@@ -1297,15 +1335,21 @@ vec2 mapPlaneBody(vec3 p){
       res=opU(res,vec2(heel,60.0));
     }
     // Closed, floor-supported heel pads under the trainers' sliding rudder contact paths.
-    if(gModelId==2){
+#if HAS_BUSHMASTER
+    if(MODEL_IS(2)){
       float side=p.x<0.0?-1.0:1.0;float pair=p.x-side*gCab2.z<0.0?-1.0:1.0;
       float x=side*gCab2.z+pair*gCab2.w;
       res=opU(res,vec2(bushHeelPlate(p,x),61.0));res=opU(res,vec2(bushHeelPost(p,x,f),60.0));
-    } else if(gModelId==7){
+    } else
+#endif
+#if HAS_SWIFT
+    if(MODEL_IS(7)){
       float side=p.x<0.0?-1.0:1.0;float pair=p.x-side*gCab2.z<0.0?-1.0:1.0;
       float x=side*gCab2.z+pair*gCab2.w;
       res=opU(res,vec2(swiftHeelPlate(p,x),61.0));res=opU(res,vec2(swiftHeelPost(p,x,f),60.0));
-    } else if(compactTrainerStick()) {
+    } else
+#endif
+    if(compactTrainerStick()) {
       { // nearest mirrored heel pad; four disconnected copies, no duplicated field evaluations
         float ss=p.x<0.0?-1.0:1.0;float qq=p.x-ss*gCab2.z<0.0?-1.0:1.0;
         vec3 heel=vec3(ss*gCab2.z+qq*gCab2.w,gCab2.x-.00794630,gCab2.y+.25374173);
@@ -1317,27 +1361,35 @@ vec2 mapPlaneBody(vec3 p){
     }
     // footwell wall: closes the space between the floor and the panel's lower edge; the pedals hang from it
     {
-      float fy0 = (gModelId==2?.560:(gModelId==7?.520:E.y)) - 1.08, fy1 = (gModelId==2?.560:(gModelId==7?.520:E.y)) - 0.58;
+      float fy0 = (MODEL_IS(2)?.560:(MODEL_IS(7)?.520:E.y)) - 1.08, fy1 = (MODEL_IS(2)?.560:(MODEL_IS(7)?.520:E.y)) - 0.58;
       float fw = sdBox(p - vec3(0.0, 0.5*(fy0 + fy1), pz - 0.18), vec3(phw, 0.5*(fy1 - fy0), 0.04));
       res = opU(res, vec2(max(fw, f + 0.04), 11.0));
     }
     // Model2 power quadrant is outside the old pedestal's proximity/bake guard.
+#if HAS_SWIFT
     if(swiftCompactYoke()){
       res=opU(res,vec2(swiftPowerFurniture(p),145.0));
       res=partAt(res,PT_THR_KNOB,vec2(0),p);
       float mix_=min(sdCapsule(p,vec3(.040,.070,-1.890),vec3(.040,.070,-1.715),.005),length(p-vec3(.040,.070,-1.710))-.018);
       res=opU(res,vec2(mix_,68.0));
     }
+#endif
+#if HAS_BUSHMASTER
     if(bushmasterPowerLever()){
       res=opU(res,vec2(bushmasterPowerFurniture(p),145.0));
       res=partAt(res,PT_THR_KNOB,vec2(0),p);
       res=opU(res,vec2(bushmasterPowerLeverLocal(p-bushmasterPowerPivot(1.0),1.0,.018),68.0));
     }
+#endif
     // centre pedestal: trim wheel, fuel selector; throttle (push-pull knobs or levers), mixture, flap lever
     {
       float pw,ph,pd; vec3 pc; partPedestal(pc,pw,ph,pd);
       if (sdBox(p-pc, vec3(pw+.12,ph+.24,pd+.12)) < res.x) {
+#if HAS_ISLANDER || HAS_OSPREY
       res = opU(res, compactTwinPowerBank()?twinPowerBankField(p,pc,pw,ph,pd):vec2(sdRoundBox(p-pc,vec3(pw,ph,pd),.03),63.0));
+#else
+      res = opU(res, vec2(sdRoundBox(p-pc,vec3(pw,ph,pd),.03),63.0));
+#endif
       vec3 tw = p - vec3(pw + 0.004, pc.y + ph*0.2, pc.z + pd*0.35);
       res = opU(res, vec2(sdCylX(tw, 0.075, 0.012), 66.0));
       res = opU(res, vec2(sdRoundCylX((p - vec3(0.0, pc.y + ph + 0.012, pc.z + pd*0.4)).yxz, 0.035, 0.012, 0.004), 66.0));   // fuel selector
@@ -1345,14 +1397,14 @@ vec2 mapPlaneBody(vec3 p){
         if(!compactTrainerStick() && !bushmasterPowerLever() && !swiftCompactYoke()) {
         res = partAt(res, PT_THR_KNOB, vec2(0.0), p);   // (a rigid part: plane_parts.glsl)
         CockpitLayout ML=cockpitLayout();bool authoredRow=fleetCabin();
-        float mixX=authoredRow?ML.controls.z+((gModelId==0||gModelId==1)?.065:.075):.06;
+        float mixX=authoredRow?ML.controls.z+((MODEL_IS(0)||MODEL_IS(1))?.065:.075):.06;
         float mixY=E.y-(authoredRow?ML.controls.w:.55);
         float mixZ0=pz+(authoredRow?-.012:.04);
         float mix_=min(sdCapsule(p,vec3(mixX,mixY,mixZ0),vec3(mixX,mixY,pz+.08),.005),length(p-vec3(mixX,mixY,pz+.085))-.018);
         res = opU(res, vec2(mix_, 68.0));
         }
       } else {
-        res = partAt(res, PT_THR_LEVER, vec2(gModelId==4?1.0:(p.x < 0.0 ? -1.0 : 1.0), 0.0), p);   // the throttle levers and the flap lever: rigid parts (plane_parts.glsl)
+        res = partAt(res, PT_THR_LEVER, vec2(MODEL_IS(4)?1.0:(p.x < 0.0 ? -1.0 : 1.0), 0.0), p);   // the throttle levers and the flap lever: rigid parts (plane_parts.glsl)
         res = partAt(res, PT_FLAP_LEVER, vec2(0.0), p);
       }
       }
@@ -1430,6 +1482,10 @@ vec2 mapPlaneBody(vec3 p){
     res = opU(res, vec2(compass, cq.z > 0.024 && abs(cq.x) < 0.03 && abs(cq.y - 0.002) < 0.017 ? 78.0 : 66.0));
     }
   }
-  if (inside > 0.5 && gModelId == kOspreyModel) res = opU(res, mapOspreyCabinTrim(p));   // the Osprey's cabin trim
+#if HAS_OSPREY
+  if (inside > 0.5 && MODEL_IS(kOspreyModel)) res = opU(res, mapOspreyCabinTrim(p));   // the Osprey's cabin trim
+#endif
+#endif
   return res;
+#endif
 }

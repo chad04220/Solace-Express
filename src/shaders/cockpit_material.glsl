@@ -37,8 +37,8 @@ void shadeFleetCabin(inout Mat m,int mid,vec3 lp,vec3 ln,float px){
     vec3 nT;vec4 tx=triSample(lp,ln,M_PLASTIC,.30,nT);
     m.alb=vec3(.055,.060,.067)*(.74+.35*tx.r);m.rough=.72;m.metal=.04;m.nrm=nT*.35;
   }else if(mid==146){
-    m.alb=gModelId==8?vec3(.54,.235,.095):mix(L.trim.rgb,gColStripe,.40);
-    m.rough=.48;m.metal=gModelId==8?.50:.10;m.emit=vec3(0.0);m.nrm=vec3(0,0,1);
+    m.alb=MODEL_IS(8)?vec3(.54,.235,.095):mix(L.trim.rgb,gColStripe,.40);
+    m.rough=.48;m.metal=MODEL_IS(8)?.50:.10;m.emit=vec3(0.0);m.nrm=vec3(0,0,1);
   }else if(mid==11 || mid==63){
     bool floorPart=lp.y<gM[22].y-1.0,roofPart=lp.y>gM[22].y+.10;
     vec3 nT;vec4 tx=triSample(lp,ln,floorPart?M_CARPET:roofPart?M_FABRIC:M_PLASTIC,floorPart?.4:.35,nT);

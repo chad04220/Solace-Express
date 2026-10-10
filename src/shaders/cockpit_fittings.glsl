@@ -57,15 +57,16 @@ float swiftDisplayRearSupports(vec3 p,float fuselage){
 }
 
 bool fleetIndividualBrow(int tile){
-  if(gModelId==1 || gModelId==3 || gModelId==8)return false; // one connected crew brow
-  if(gModelId==2 || gModelId==4 || gModelId==7)return tile==0;
+  if(MODEL_IS(1) || MODEL_IS(3) || MODEL_IS(8))return false; // one connected crew brow
+  if(MODEL_IS(2) || MODEL_IS(4) || MODEL_IS(7))return tile==0;
   return true;
 }
 vec2 fleetRoleStructure(vec3 p,float fuselage){
   vec4 E=gM[22];float pz=gM[21].w;vec2 r=vec2(1e5,145.0);
-  if(gModelId==0 || gModelId==1){
+#if HAS_KESTREL || HAS_WREN
+  if(MODEL_IS(0) || MODEL_IS(1)){
   // Trainer power controls now have fitted side-console caps; no obsolete footwell apron.
-  if(gModelId==1){
+  if(MODEL_IS(1)){
     // The Wren's continuous, softly rounded touring fascia and broad common brow.
     float back=sdRoundBox(p-vec3(-.016,E.y-.369,pz-.060),vec3(.536,.171,.028),.025);
     float stem=sdRoundBox(p-vec3(.015,E.y-.493,pz-.036),vec3(.139,.165,.025),.018);
@@ -73,41 +74,62 @@ vec2 fleetRoleStructure(vec3 p,float fuselage){
     float brow=sdRoundBox(p-vec3(-.016,E.y-.187,pz-.021),vec3(.524,.014,.065),.014);
     r=opU(r,vec2(brow,14.0));
   }
-}else if(gModelId==2){
+}
+#endif
+#if HAS_BUSHMASTER
+  if(MODEL_IS(2)){
     // Sparse exposed utility rail, leaving two open low leg wells.
     float rail=sdRoundBox(p-vec3(-.055,.072,pz-.068),vec3(.426,.012,.027),.006);
     r=opU(r,vec2(rail,63.0));
     // Preserve the status support in world space; obsolete low power apron is removed.
     float statusMount=sdCapsule(p,vec3(0,.030,pz+.010),vec3(0,.010,pz+.080),.013);
     r=opU(r,vec2(min(statusMount,bushRaisedPrimaryRisers(p,fuselage)),145.0));
-  }else if(gModelId==3){
+  }
+#endif
+#if HAS_ISLANDER
+  if(MODEL_IS(3)){
     // One squared instrument workbench, instead of three unrelated freestanding pods.
     float back=sdRoundBox(p-vec3(0,E.y-.348,pz-.091),vec3(.564,.176,.038),.008);
     r=opU(r,vec2(back,145.0));
     float brow=sdRoundBox(p-vec3(0,E.y-.170,pz-.020),vec3(.559,.014,.076),.008);
     r=opU(r,vec2(brow,14.0));
-  }else if(gModelId==4){
+  }
+#endif
+#if HAS_PELICAN
+  if(MODEL_IS(4)){
     // Deep pilot/power workbench with a centered connected low utility shelf backing.
     float left=sdRoundBox(p-vec3(-.245,E.y-.400,pz-.086),vec3(.360,.170,.030),.012);
     float utility=sdRoundBox(p-vec3(0,E.y-.638,pz+.012),vec3(.120,.095,.040),.012);
     r=opU(r,vec2(min(left,utility),63.0));
-  }else if(gModelId==6){
+  }
+#endif
+#if HAS_STARLING
+  if(MODEL_IS(6)){
     // Executive center stack joins both shared displays without entering the copilot leg well.
     float stack=sdRoundBox(p-vec3(0,E.y-.5675,pz-.025),vec3(.055,.4475,.095),.012);
     stack=min(stack,sdRoundBox(p-vec3(0,E.y-.120,pz+.085),vec3(.075,.032,.025),.008));
     r=opU(r,vec2(stack,145.0));
-  }else if(gModelId==9){
+  }
+#endif
+#if HAS_NIGHTJAR
+  if(MODEL_IS(9)){
     // Shared forward stack: connected to the bridge and footwell wall, leaving both crew leg wells open.
     float stack=sdRoundBox(p-vec3(0,E.y-.750,pz-.025),vec3(.110,.265,.135),.012);
     r=opU(r,vec2(stack,145.0));
-  }else if(gModelId==7){
+  }
+#endif
+#if HAS_SWIFT
+  if(MODEL_IS(7)){
     // A slim, sloping central island connects raised gear/flap status to low right power/fuel.
     CockpitLayout L=cockpitLayout();vec3 a=cockpitMount(L.status),b=cockpitMount(L.systems);
     vec3 q=p-vec3((a.xy+b.xy)*.5,pz-.107);vec2 d=a.xy-b.xy;
     q.xy=rot2(q.xy,atan(d.x,d.y));
     float spine=sdRoundBox(q,vec3(.085,.5*length(d)+.065,.024),.020);
     r=opU(r,vec2(min(spine,swiftDisplayRearSupports(p,fuselage)),145.0));
-  }else if(gModelId==8){
+  }
+#endif
+#if HAS_OSPREY
+  if(MODEL_IS(8)){
     // Ivory connected shell with dark one-piece coaming; original copper cabin trim stays present.
     float ivory=sdRoundBox(p-vec3(0,E.y-.388,pz-.068),vec3(.557,.190,.028),.025);
     float stem=sdRoundBox(p-vec3(.016,E.y-.554,pz-.032),vec3(.130,.087,.029),.025);
@@ -115,6 +137,7 @@ vec2 fleetRoleStructure(vec3 p,float fuselage){
     float brow=sdRoundBox(p-vec3(0,E.y-.184,pz-.024),vec3(.548,.012,.064),.012);
     r=opU(r,vec2(brow,14.0));
   }
+#endif
   r.x=max(fleetKeepFacesClear(p,r.x),fuselage+.065); // fit supports without covering live faces
   return r;
 }
@@ -130,14 +153,22 @@ vec2 mapFleetPanel(vec3 p,float fuselage){
     outv=opU(outv,vec2(body,face?140.0+float(i):145.0));
     if(i<2){
       vec3 lip=q-vec3(0,h.y+.027,.008);
-      if(fleetIndividualBrow(i)) outv=opU(outv,vec2(gModelId==2?bushShellFittedPilotBrow(p,fuselage):gModelId==7?swiftShellFittedPilotBrow(p,fuselage):sdRoundBox(lip,vec3(h.x+.027,.014,.083),.012),14.0));
+#if HAS_BUSHMASTER && HAS_SWIFT
+      if(fleetIndividualBrow(i)) outv=opU(outv,vec2(MODEL_IS(2)?bushShellFittedPilotBrow(p,fuselage):MODEL_IS(7)?swiftShellFittedPilotBrow(p,fuselage):sdRoundBox(lip,vec3(h.x+.027,.014,.083),.012),14.0));
+#elif HAS_BUSHMASTER
+      if(fleetIndividualBrow(i)) outv=opU(outv,vec2(MODEL_IS(2)?bushShellFittedPilotBrow(p,fuselage):sdRoundBox(lip,vec3(h.x+.027,.014,.083),.012),14.0));
+#elif HAS_SWIFT
+      if(fleetIndividualBrow(i)) outv=opU(outv,vec2(MODEL_IS(7)?swiftShellFittedPilotBrow(p,fuselage):sdRoundBox(lip,vec3(h.x+.027,.014,.083),.012),14.0));
+#else
+      if(fleetIndividualBrow(i)) outv=opU(outv,vec2(sdRoundBox(lip,vec3(h.x+.027,.014,.083),.012),14.0));
+#endif
       // Subdued satin edge in the aircraft's identity color, deliberately unlit.
       outv=opU(outv,vec2(sdRoundBox(q-vec3(0,h.y+.012,.060),vec3(h.x*.92,.005,.008),.004),146.0));
     }
   }
   outv=opU(outv,fleetRoleStructure(p,fuselage));
   // Low structural bridge, leaving leg wells open rather than filling the view with one large blank slab.
-  float by=gModelId==2?.030:swiftPreservedFurnitureY()-.53;
+  float by=MODEL_IS(2)?.030:swiftPreservedFurnitureY()-.53;
   float bridge=sdRoundBox(p-vec3(0,by,pz-.025),vec3(E.w*.90,L.structure.w,.045),min(.018,L.structure.y));
   outv=opU(outv,vec2(max(fleetKeepFacesClear(p,bridge),fuselage+.06),63.0));
   // Short anti-glare deck: its leading edge descends to the windshield sill and remains beneath the useful view.
@@ -148,13 +179,13 @@ vec2 mapFleetPanel(vec3 p,float fuselage){
   float deck=sdRoundBox(hood,vec3(E.w*.95,.015,.5*length(axis)),.013);
   outv=opU(outv,vec2(max(deck,fuselage+.065),14.0));
   // A low firewall closes the hollow nose below the windshield, without a long horizontal glare shelf.
-  float fyTop=min(swiftPreservedFurnitureY()-L.structure.x,gM[23].z-.012),fyBottom=(gModelId==2?.560:swiftPreservedFurnitureY())-1.07;
+  float fyTop=min(swiftPreservedFurnitureY()-L.structure.x,gM[23].z-.012),fyBottom=(MODEL_IS(2)?.560:swiftPreservedFurnitureY())-1.07;
   float firewall=sdBox(p-vec3(0,(fyTop+fyBottom)*.5,gM[23].x+.035),vec3(E.w*.95,(fyTop-fyBottom)*.5,.022));
   outv=opU(outv,vec2(max(firewall,fuselage+.065),145.0));
 
   // Small robust matte vents, integrated into the outer ends rather than chrome rings dominating the scan.
   for(int side=-1;side<=1;side+=2){
-    vec3 q=p-vec3(float(side)*min(E.w-.045,gCab1.w),(gModelId==2?.560:swiftPreservedFurnitureY())-.205,pz+.007);
+    vec3 q=p-vec3(float(side)*min(E.w-.045,gCab1.w),(MODEL_IS(2)?.560:swiftPreservedFurnitureY())-.205,pz+.007);
     outv=opU(outv,vec2(sdRoundBox(q,vec3(.023,.019,.028),.014),66.0));
   }
   return outv;

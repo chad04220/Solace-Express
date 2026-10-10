@@ -12,6 +12,7 @@
 #include "renderer.h"
 #include "models.h"
 #include "hull_mesh.h"
+#include "shaders.h"
 #include <unordered_map>
 
 namespace {
@@ -44,36 +45,54 @@ void main(){
 )";
 }
 
-bool Renderer::compileHull(const std::string& bakeVS, const std::string& bakeFS, const std::function<void()>& step) {
+// The bake's two programs - the field's distance, and its normals and cabin occlusion (HULL_BAKE_NORMALS) - built as
+// a pair: the shared one, and each aircraft's own (afBakePrograms)
+bool Renderer::linkBakePair(const std::string& bakeVS, const std::string& bakeFS, GLuint out[2], std::string& e, const char* normalStage) {
+  auto define = [](const std::string& s, const char* d) { const size_t at = s.find('\n') + 1; return s.substr(0, at) + d + s.substr(at); };
+  const std::string normalFS = define(bakeFS, "#define HULL_BAKE_NORMALS\n");
+  bool safeField = false, safeNormal = false;
+  out[0] = linkProgramCached(bakeVS, bakeFS, e, &safeField); out[1] = 0;
+  if (out[0]) {
+    if (normalStage) setCompileStage(normalStage);
+    out[1] = linkProgramCached(bakeVS, safeField ? define(normalFS, "#define NV_SAFE_GEAR\n") : normalFS, e, &safeNormal);
+    // A driver fallback must use the same field for distance and normal. Keep the upstream retry/cache/timebox
+    // machinery for each program, but never mix a full-gear distance with a reduced-gear normal (or vice versa).
+    if (out[1] && safeNormal && !safeField) {
+      glDeleteProgram(out[0]);
+      out[0] = linkProgramCached(bakeVS, define(bakeFS, "#define NV_SAFE_GEAR\n"), e);
+    }
+  }
+  if (!out[0] || !out[1]) {
+    if (out[0]) glDeleteProgram(out[0]);
+    if (out[1]) glDeleteProgram(out[1]);
+    out[0] = out[1] = 0;
+    return false;
+  }
+  return true;
+}
+
+bool Renderer::compileHull(const std::function<void()>& step) {
   std::string hdr = "#version 330 core\n", e;
   progHull = linkProgramCached(hdr + kHullVS, hdr + kHullFS, e);
   if (!progHull) shaderNote("Aircraft hull unavailable; using the unbounded distance-field renderer.\n" + e);
   if (step) step();
-  setCompileStage("aircraft distance-field bake");
-  auto define = [](const std::string& s, const char* d) { const size_t at = s.find('\n') + 1; return s.substr(0, at) + d + s.substr(at); };
-  const std::string normalFS = define(bakeFS, "#define HULL_BAKE_NORMALS\n");
-  bool safeField = false, safeNormal = false;
-  progHullBake = linkProgramCached(bakeVS, bakeFS, e, &safeField);
-  if (progHullBake) {
-    setCompileStage("aircraft surface-normal bake");
-    progHullBakeNormal = linkProgramCached(bakeVS, safeField ? define(normalFS, "#define NV_SAFE_GEAR\n") : normalFS, e, &safeNormal);
-    // A driver fallback must use the same field for distance and normal. Keep the upstream retry/cache/timebox
-    // machinery for each program, but never mix a full-gear distance with a reduced-gear normal (or vice versa).
-    if (progHullBakeNormal && safeNormal && !safeField) {
-      glDeleteProgram(progHullBake);
-      progHullBake = linkProgramCached(bakeVS, define(bakeFS, "#define NV_SAFE_GEAR\n"), e);
-    }
+  return progHull != 0;
+}
+
+// The shared builder (every aircraft's code), for an aircraft whose own failed: made the first time one does
+bool Renderer::sharedBakePrograms(GLuint out[2]) {
+  if (!sharedBakeTried) {
+    sharedBakeTried = true;
+    setCompileStage("aircraft bake (every aircraft)");
+    GLuint pair[2]; std::string e;
+    if (!linkBakePair(kFullscreenVS, hullBakeFSAssembly(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : ""), pair, e))
+      shaderNote("Aircraft bake unavailable; using the distance-field renderer.\n" + e);
+    progHullBake = pair[0]; progHullBakeNormal = pair[1];
+    setCompileStage("");
   }
-  if (!progHullBake || !progHullBakeNormal) {
-    if (progHullBake) glDeleteProgram(progHullBake);
-    if (progHullBakeNormal) glDeleteProgram(progHullBakeNormal);
-    progHullBake = progHullBakeNormal = 0;
-    shaderNote("Aircraft bake unavailable; using the distance-field renderer.\n" + e);
-  }
-  // Distance and normal are a coupled field: settle their shared fallback before
-  // counting either. A reduced-field retry remains the same logical program.
-  if (step) { step(); step(); }
-  return progHull && progHullBake && progHullBakeNormal;
+  if (!progHullBake) return false;
+  out[0] = progHullBake; out[1] = progHullBakeNormal;
+  return true;
 }
 
 void Renderer::beginHullBake(const FrameParams& fp, int states, const float* ps, const float* ctl,
@@ -88,11 +107,16 @@ void Renderer::beginHullBake(const FrameParams& fp, int states, const float* ps,
   hullBakeMode = hullBakeState = 0; hullBakePart = -1;
   hullBakeSideX = hullBakeSideY = 1.f;
   hullBakeUploaded[0] = hullBakeUploaded[1] = false;
+  // the aircraft's own pair (its code alone: a smaller program, and its edits rebuild its bodies alone), or the shared
+  // one; with neither, nothing can be built: each caller marks what it was building as not built, and that aircraft's
+  // airframe is left to the march (every other type keeps its builder and its bodies)
+  const int own = afModelOf(fp.plane.M, fp.plane.model), slot = ps && ps[3] > 0.5f ? 1 : 0;   // (the body: the states' inside flag)
+  if ((own < 0 || !afBakePrograms(own, slot, hullBakeProg)) && !sharedBakePrograms(hullBakeProg)) hullBakeProg[0] = hullBakeProg[1] = 0;
 }
 
 GLuint Renderer::bindHullBake(bool restore) {
   const int which = hullBakeMode == 3 ? 1 : 0;
-  const GLuint p = which ? progHullBakeNormal : progHullBake;
+  const GLuint p = hullBakeProg[which];
   if (!p) return 0;
   if (restore || !hullBakeUploaded[which]) {
     setRT(p, hullBakeFrame);
@@ -204,6 +228,7 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
   std::vector<float> sps(128 * 4, 0.f), sct(128 * 4, 0.f), swr(128 * 4, 0.f), swr2(128 * 4, 0.f);
   for (int i = 0; i < ns; i++) for (int c = 0; c < 4; c++) { sps[i * 4 + c] = st[i].ps[c]; sct[i * 4 + c] = st[i].ctl[c]; swr[i * 4 + c] = st[i].wr[c]; swr2[i * 4 + c] = st[i].wr2[c]; }
   beginHullBake(fp, ns, sps.data(), sct.data(), swr.data(), swr2.data());
+  if (!hullBakeProg[0]) { hulls[key].ok = false; return; }   // (no builder: this session marches it)
 
   const float slack = 1.3f;   // the distance field may overstate distances by up to ~25%
   const float d1 = slack * halfDiag(kS1) + 0.05f + 0.02f;   // 0.25 m voxels: + half the largest step between states
@@ -372,7 +397,7 @@ uint64_t Renderer::hullKey(const FrameParams& fp, int slot) const {
 bool Renderer::hullWanted(const FrameParams& fp) const {
   const PlaneVisual& pv = fp.plane;
   if (pv.PS[3] > 0.5f) return false;   // (the cockpit is drawn from its mesh)
-  return !hullOff && progHull && progHullBake && pv.on && fp.wreck.pieces == 0 && pv.M[2] < 4.5f;
+  return !hullOff && progHull && pv.on && fp.wreck.pieces == 0 && pv.M[2] < 4.5f;
 }
 
 void Renderer::ensureHullTarget() {

@@ -23,7 +23,7 @@ add_custom_target(shaders_gen DEPENDS ${SHADER_GEN})
 include_directories(${CMAKE_BINARY_DIR}/gen)
 
 set(CORE_SOURCES
-  src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/breakup.cpp src/models.cpp src/career.cpp src/weather.cpp)
+  src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/weather.cpp)
 set(GAME_SOURCES
   ${CORE_SOURCES} src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_wraith.cpp src/renderer.cpp src/materials.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/entity_mesh.cpp src/gl.cpp src/audio.cpp)
 # The game's sources compiled once for the programs that link the whole game besides the game itself (the game-loop
@@ -78,6 +78,7 @@ target_include_directories(material_dump PRIVATE src)
 add_executable(flight_test tests/flight_test.cpp ${CORE_SOURCES})
 add_executable(aero_test tests/aero_test.cpp ${CORE_SOURCES})
 add_executable(breakup_test tests/breakup_test.cpp ${CORE_SOURCES})
+add_executable(aero_wake_test tests/aero_wake_test.cpp ${CORE_SOURCES})
 add_executable(progression_test tests/progression_test.cpp ${CORE_SOURCES})
 add_executable(shader_keyword_test tests/shader_keyword_test.cpp)
 add_executable(research_cockpit_layout_test tests/research_cockpit_layout_test.cpp)
@@ -146,6 +147,7 @@ add_test(NAME cockpit_camera COMMAND cockpit_camera_test)
 add_test(NAME flight_model COMMAND flight_test)
 add_test(NAME aero_model COMMAND aero_test)
 add_test(NAME breakup COMMAND breakup_test)
+add_test(NAME aero_wake COMMAND aero_wake_test)
 add_test(NAME campaign_progression COMMAND progression_test)
 add_test(NAME shader_keywords COMMAND shader_keyword_test)
 add_test(NAME career_saves COMMAND save_test)
@@ -177,7 +179,7 @@ add_test(NAME shader_prune COMMAND shader_prune_test)
 add_dependencies(shader_keyword_test shader_prune_test)   # (built with a target the CI sanitizer job names)
 # GLSL check of the ray tracer and the programs built from it, as assembled and as pruned (only where glslangValidator
 # is installed)
-add_executable(shader_check tools/shader_check.cpp)
+add_executable(shader_check tools/shader_check.cpp ${CORE_SOURCES})   # (the aircraft's packed models: their own builds)
 target_include_directories(shader_check PRIVATE src)
 find_program(GLSLANG_VALIDATOR glslangValidator)
 if(GLSLANG_VALIDATOR)
@@ -259,8 +261,8 @@ if(Python3_Interpreter_FOUND AND NOT WIN32)
     --generated ${CMAKE_BINARY_DIR}/gen --cxx ${CMAKE_CXX_COMPILER})
 endif()
 
-# Explicit report-only fallback for software drivers unable to compile unused
-# all-aircraft variants. Exact standard AF_LIGHT scene programs; fleet hangar only.
+# The UI review on a software driver: the game's own programs (the launch builds none with an aircraft's code), with
+# the review's diagnostic checks; fleet hangar only.
 if(UNIX AND NOT APPLE AND Python3_Interpreter_FOUND)
   set(UI_FLEET_ADAPTER_DIR ${CMAKE_BINARY_DIR}/ui-fleet-adapter)
   set(UI_FLEET_ADAPTERS ${UI_FLEET_ADAPTER_DIR}/renderer.cpp ${UI_FLEET_ADAPTER_DIR}/raster_renderer.cpp ${UI_FLEET_ADAPTER_DIR}/aircraft_mesh.cpp)
