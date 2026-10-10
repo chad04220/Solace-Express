@@ -14,6 +14,12 @@ int main(int argc, char** argv) {
     }
     return 0;
   }
+  // --part 1..3: the checks in three pieces CI's sanitizer runners take side by side (0, the default: all of it)
+  //   1 the take-offs, the controls, the failures, the research jets   2 the map's seam, the autopilot's holds and its
+  //   comfort law   3 the autolands, the aerobatics, the review's flights, the weather
+  int part = 0;
+  for (int i = 1; i + 1 < argc; i++) if (!strcmp(argv[i], "--part")) part = atoi(argv[i + 1]);
+  auto in = [&](int k) { return part == 0 || part == k; };
   Weather wx; wx.windSpeed = 0; wx.gust = 0; wx.turbulence = 0;
   int fails = 0;
   // FLIGHT_QUICK (the sanitizer job, where every step runs several times slower): the checks made type by type run on
@@ -24,7 +30,7 @@ int main(int argc, char** argv) {
   const bool quick = getenv("FLIGHT_QUICK") != nullptr;
   auto skip = [&](int i) { return quick && i != 0 && i != 3 && i != 5 && i != 6 && i != kResearchJet && i != kWraith; };
   if (strcmp(kAircraft[kOsprey].id, "osprey_c6") != 0 || strcmp(kAircraft[kNightjar].id, "xr10_nightjar") != 0 || strcmp(kAircraft[kResearchJet].id, "xr30_specter") != 0 || strcmp(kAircraft[kMantis].id, "xr20_mantis") != 0 || strcmp(kAircraft[kWraith].id, "xr40_wraith") != 0) { printf("aircraft indices (kOsprey / kNightjar / kResearchJet / kMantis / kWraith) don't match the table\n"); return 1; }
-  for (int ai = 0; ai < kNumAircraft; ai++) {
+  for (int ai = 0; ai < kNumAircraft && in(1); ai++) {
     if (skip(ai)) continue;
     const AircraftSpec& s = kAircraft[ai];
     int apIdx = g_world.findAirport("CAP");
@@ -61,7 +67,7 @@ int main(int argc, char** argv) {
   }
   // Control-direction check: each input must move the aircraft the way its control surface animates
   // (roll +1 = right aileron up -> right bank, pitch +1 = elevator TE up -> nose up, yaw +1 = rudder TE right -> nose right)
-  for (int ai = 0; ai < kNumAircraft; ai++) {
+  for (int ai = 0; ai < kNumAircraft && in(1); ai++) {
     if (skip(ai)) continue;
     const AircraftSpec& s = kAircraft[ai];
     for (int axis = 0; axis < 3; axis++) {
@@ -76,10 +82,10 @@ int main(int argc, char** argv) {
       if (!ok) { printf("CONTROL DIRECTION FAIL %s axis %d delta %.2f\n", s.name, axis, d); fails++; }
     }
   }
-  printf("control directions checked\n");
+  if (in(1)) printf("control directions checked\n");
   // ---------------- failures (C7): an engine-out glide reaches a field, a stuck gear belly landing at Vref is survivable,
   // a twin flies on one engine, a blocked pitot freezes the airspeed, ice costs lift
-  {
+  if (in(1)) {
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
     // Kestrel, engine stopped at 1200 m over flat ground: glide at the best-glide speed and measure the ratio
     const AircraftSpec& s = kAircraft[0];
@@ -195,7 +201,7 @@ int main(int argc, char** argv) {
            split, bankHeld, rollFree, ailHold * 100.f, p.flapLeft(), p.flaps, p.bankDeg(), ok ? "ok" : "FAIL"); fails += !ok;
   }
   // ---------------- XR-20's centerline engine: the former pair's real combined thrust, with one failure channel.
-  {
+  if (in(1)) {
     const AircraftSpec& single = kAircraft[kMantis];
     AircraftSpec twin = single; twin.engines = 2; twin.power = 44000.f;   // delivered two-engine proposal
     Plane p, old;
@@ -252,7 +258,7 @@ int main(int argc, char** argv) {
   }
   // ---------------- research tiers: actual sustained level flight, not designMach labels or a diving peak.
   // designMach is the onset of extra drag, not a hard speed cap. Keep the XR-30 / XR-40 physics unchanged.
-  {
+  if (in(1)) {
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
     struct LevelResult { float mach = 0, minAlt = 1e9f, maxAlt = -1e9f, vs = 0, accel = 0; bool intact = true; };
     auto levelMach = [&](int idx, float alt) {
@@ -301,7 +307,7 @@ int main(int argc, char** argv) {
     printf("Sustained overstress (XR-30): %.1f g held, stress %.2f of the way to failure, intact; full pull at Mach 3 peaks %.0f g and %s %s\n", gmax, ogMax, g2, p.ev.crashed ? "snaps" : "holds", ok ? "ok" : "FAIL"); fails += !ok;
   }
   // XR-30 research jet: supersonic in level flight, no vertical flight, slow flight on approach, pull limits, roll authority
-  {
+  if (in(1)) {
     const AircraftSpec& s = kAircraft[kResearchJet];
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
     Plane p;
@@ -381,7 +387,7 @@ int main(int argc, char** argv) {
     printf("XR-30 roll rate %.0f deg/s %s\n", -p.w.z / DEG, ok ? "ok" : "FAIL"); fails += !ok;
   }
   // ---------------- XR-40 Wraith: four-pod VTOL hover, top speed, roll rate and the structural g it can pull
-  {
+  if (in(1)) {
     const AircraftSpec& s = kAircraft[kWraith];
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
     Plane p; p.reset(&s, vec3(0, 800, 0), 0, s.maxFuel, 85, true, 0.1f); p.vel = vec3(); p.ctl.flaps = 1; p.flaps = p.nozzle = 1;
@@ -405,7 +411,7 @@ int main(int argc, char** argv) {
   // seam an aircraft comes back in from the other side and flies on as it was - the same flight whichever copy of the
   // map it is reckoned in (its air comes with it: the eddies and gusts go on as they were) - and the autopilot takes the
   // short way across it
-  {
+  if (in(2)) {
     const AircraftSpec& s = kAircraft[1];
     Weather wx; wx.windSpeed = 7; wx.windFrom = 250; wx.turbulence = 0.3f; wx.gust = 3;
     Plane a; a.reset(&s, vec3(WRAP_HALF - 400.f, 700.f, 3000.f), 90, s.maxFuel * 0.5f, 85, true, s.cruise * 0.9f);
@@ -436,7 +442,7 @@ int main(int argc, char** argv) {
   // ---------------- autopilot: stable holds in turbulence, and autoland at Solace Capital for every aircraft. The
   // autopilot flies each type to its own envelope (steep banks, hard pulls): what's checked is that it gets there, settles,
   // and never goes past the airframe's limits.
-  for (int i = 0; i < 9; i++) {
+  for (int i = 0; i < 9 && in(2); i++) {
     if (skip(i)) continue;
     const AircraftSpec& s = kAircraft[i];
     Weather wx; wx.windSpeed = 7; wx.windFrom = 200; wx.turbulence = 0.25f; wx.gust = 2;
@@ -459,7 +465,7 @@ int main(int argc, char** argv) {
   }
   // ---------------- comfort law (career flights): the autopilot keeps passengers comfortable - bank <= 25 deg,
   // 0.8..1.3 g - in a 150 deg turn on HOLD and on a NAV route to a landing (the final approach keeps its own limits)
-  for (int i = 0; i < kNumAircraft; i++) {
+  for (int i = 0; i < kNumAircraft && in(2); i++) {
     if (skip(i)) continue;
     const AircraftSpec& s = kAircraft[i];
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
@@ -494,7 +500,7 @@ int main(int argc, char** argv) {
     printf("AP comfort route %-16s %s after %4.0f s  en-route max bank %4.1f  g %.2f..%.2f  %s\n", s.name, q.apDone ? "landed" : "NOT DONE", k / 60.f, maxBank, minG, maxG, ok ? "ok" : "FAIL");
     fails += !ok;
   }
-  {
+  if (in(3)) {
     int ai = g_world.findAirport("CAP"); const Airport& A = g_world.airports[ai];
     for (int i = 0; i < 9; i++) {
       if (skip(i)) continue;
@@ -521,7 +527,7 @@ int main(int argc, char** argv) {
   }
   // ---------------- the autopilot flies the aircraft as it is now (ApEnvelope): what it reads for an engine out, a full
   // load, ice and no engines at all, and an autoland at Solace Capital in each of those conditions (one go-around at most)
-  {
+  if (in(3)) {
     int ai = g_world.findAirport("CAP"); const Airport& A = g_world.airports[ai];
     struct Case { int craft; const char* cond; };
     const Case cases[] = {{3, "engine out"}, {5, "engine out"}, {6, "engine out"}, {4, "full load"}, {5, "full load"}, {0, "iced"}, {5, "iced"}};
@@ -569,7 +575,7 @@ int main(int argc, char** argv) {
   }
   // ---------------- aerobatics: every figure on a light single, the airliner and the Wraith. It must set itself up,
   // fly the figure inside the airframe's limits and level off into a hold on the heading the figure ends on.
-  for (int si : {0, 5, (int)kWraith}) {
+  if (in(3)) for (int si : {0, 5, (int)kWraith}) {
     const AircraftSpec& s = kAircraft[si];
     const PerfModel& P = Plane::perf(&s);
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0;
@@ -595,7 +601,7 @@ int main(int argc, char** argv) {
   // ---------------- FLT-2 (the review of v3.44.0): the engine stops 2.5 km out on final, 350 m up, and the autoland is
   // engaged again - it flew its usual plan (a climb to a cruise, a descent orbit) without the power for either and
   // ditched. Now it glides the final it is on to the runway; from 20 km out, with nothing in reach, it says so
-  for (int far = 0; far < 2; far++) {
+  for (int far = 0; far < 2 && in(3); far++) {
     const int ai = g_world.findAirport("MDB"); const Airport& A = g_world.airports[ai];
     const AircraftSpec& s = kAircraft[0];
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0;
@@ -621,7 +627,7 @@ int main(int argc, char** argv) {
   // ---------------- FLT-1 (the review of v3.44.0): a split-S asked for low down. Admitted from 700 m on the structure's
   // load - a pull the research jets' wings can't hold at the figure's entry speed - the XR-20, XR-30 and XR-40 flew into
   // the sea. Asked for at 700 m over the sea now, each climbs first (or gives it up) and none touches the water
-  for (int si : {kMantis, kResearchJet, kWraith}) {
+  if (in(3)) for (int si : {kMantis, kResearchJet, kWraith}) {
     if (quick && si != kWraith) continue;   // (the sanitizer job: the XR-40, the one Codex flew in the game)
     const AircraftSpec& s = kAircraft[si];
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0;
@@ -643,7 +649,7 @@ int main(int argc, char** argv) {
   // ---------------- the weather's fields (weather.cpp): still air is still; the gust bursts reach about the reported
   // gust and no further; the eddies are as strong as the weather asks; the wind climbing a ridge lifts and pours
   // down its lee; it rains only under the clouds; and a replay is exact
-  {
+  if (in(3)) {
     const int ap = g_world.findAirport("MDB");
     const Airport& A = g_world.airports[ap];
     Weather still; still.windSpeed = 0; still.gust = 0; still.turbulence = 0; still.cloudCover = 0;

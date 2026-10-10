@@ -190,7 +190,7 @@ cmake -S . -B build-win -DCMAKE_TOOLCHAIN_FILE=cmake-mingw.cmake   # omit the to
 cmake --build build-win -j
 ```
 
-The GitHub Actions workflow (`.github/workflows/build.yml`) builds with MSVC, runs the tests, and uploads `SolaceExpress-windows-x64` as an artifact on every push. A second job runs the headless tests under AddressSanitizer and UBSan.
+The GitHub Actions workflow (`.github/workflows/build.yml`) builds with MSVC, runs the tests, and uploads `SolaceExpress-windows-x64` as an artifact on every push. A second job runs the headless tests under AddressSanitizer and UBSan. The sanitizers slow the tests down about tenfold, so this job is split across three runners. The selector deals the tests out by their measured cost (their ctest `COST`). The longest tests, the flight model, the campaign and the game loop, are registered in parts (`--part N`), so no runner waits on a single long test.
 
 A push to a branch builds and runs only the tests that the change can affect. It compares against the last commit that passed CI on that branch. `tools/ci/select_tests.py` works the selection out from CMake's description of the build: each test's sources, the libraries it links, their `#include`s, the files they read by name, and the shaders. The job summary says which tests ran and why. Several cases run everything:
 - a change to the build itself (`CMakeLists.txt`, the workflow, the selector);

@@ -2,13 +2,22 @@
 // player can rent or afford, waypoints must clear terrain, and money pacing must not require a long grind.
 #include "../src/career.h"
 #include <cstdlib>
-int main() {
+int main(int argc, char** argv) {
+  // --part 1..3: the checks in three pieces CI's sanitizer runners take side by side (0, the default: all of it)
+  //   1, 2 the story played through, each flying the fuel-estimate flights for its share of the jobs (2: then the
+  //        background quotes' take-offs)   3 the deadlines, the continuation policies, the boards, the ways to earn
+  int part = 0;
+  for (int i = 1; i + 1 < argc; i++) if (!strcmp(argv[i], "--part")) part = atoi(argv[i + 1]);
+  auto in = [&](int k) { return part == 0 || part == k; };
   g_world.build(); buildStory();
   Career c; c.newGame();
   int problems = 0; long grind = 0; int loans = 0;
   std::vector<int> flownIn(g_story.size(), -1);   // (the type each story job is flown in below)
-  for (size_t i = 0; i < g_story.size(); i++) {
+  for (size_t i = 0; i < g_story.size() && (in(1) || in(2)); i++) {
     const Contract& k = g_story[i];
+    // (the part that flies the job's fuel-estimate flight, where it has one: the first third of the story holds as much
+    // of that flying as the rest)
+    const bool flies = in(i < g_story.size() / 3 ? 1 : 2);
     // terrain clearance along route legs
     std::vector<vec3> pts; pts.push_back(g_world.airports[k.from].pos());
     for (auto& w : k.wps) pts.push_back(vec3(w.x, w.alt, w.z));
@@ -54,10 +63,11 @@ int main() {
       // is pessimistic; where it says the tanks are too small, the quote the card really shows (the job flown on the
       // autopilot) decides. A story contract must leave at least 5% of reserve over that with full tanks.
       float est = pl.fuelKgEst;
-      if (k.forceAircraft < 0 && est * 1.25f > s.maxFuel) { float flown = -1; float mins = simulateFlightMinutes(k, best, &flown); if (mins > 0 && flown > 0) est = flown; }
+      const bool quoted = k.forceAircraft < 0 && est * 1.25f > s.maxFuel;   // (the flown quote decides: the other part's, if not this one's)
+      if (quoted && flies) { float flown = -1; float mins = simulateFlightMinutes(k, best, &flown); if (mins > 0 && flown > 0) est = flown; }
       float need = std::min(est * 1.25f, s.maxFuel), payload = (float)k.cargoKg + k.pax * 85.f + 85.f;
-      if (k.forceAircraft < 0 && est * 1.05f > s.maxFuel) { printf("  !! %s: %s needs %.0f kg of fuel, tanks hold %.0f: no reserve\n", k.id.c_str(), s.name, est, s.maxFuel); problems++; }
-      if (s.emptyMass + std::min(need, s.maxFuel) + payload > s.maxMass() + 0.5f) { printf("  !! %s: %s over the take-off weight at minimum fuel (%.0f > %.0f kg)\n", k.id.c_str(), s.name, s.emptyMass + need + payload, s.maxMass()); problems++; }
+      if ((!quoted || flies) && k.forceAircraft < 0 && est * 1.05f > s.maxFuel) { printf("  !! %s: %s needs %.0f kg of fuel, tanks hold %.0f: no reserve\n", k.id.c_str(), s.name, est, s.maxFuel); problems++; }
+      if ((!quoted || flies) && s.emptyMass + std::min(need, s.maxFuel) + payload > s.maxMass() + 0.5f) { printf("  !! %s: %s over the take-off weight at minimum fuel (%.0f > %.0f kg)\n", k.id.c_str(), s.name, s.emptyMass + need + payload, s.maxMass()); problems++; }
       if (src0 == Career::SRC_OWNED) c.money -= pl.fuelCostEst;   // (the money model includes the fuel bought)
     }
     FlightResult r; r.success = true; r.landed = k.id != "L1"; r.touchdownFpm = 250; r.flightMin = 8;
@@ -70,7 +80,7 @@ int main() {
   // quotes, in every type the player could pick for it when it's next, climbs out from its runway. Unsteered, one roll
   // in five ran off the side and the card never got its flown time. (FLIGHT_QUICK, the sanitizer job: in the type the
   // campaign above flies it in)
-  {
+  if (in(2)) {
     const bool quick = getenv("FLIGHT_QUICK") != nullptr;
     int flown = 0;
     for (size_t i = 0; i < g_story.size(); i++) {
@@ -90,7 +100,7 @@ int main() {
   }
   // deadlines the autopilot can make (the review of v3.44.0, CAR-8): every timed job on the boards has a type that can
   // fly it whose planned time, a quarter on top, is inside the limit; and a client's aircraft type is enforced (A4)
-  {
+  if (in(3)) {
     int timed = 0, tight = 0;
     for (unsigned seed = 1; seed <= 4; seed++)
       for (int ap = 0; ap < (int)g_world.airports.size(); ap++) {
@@ -115,6 +125,7 @@ int main() {
   // every story contract has a continuation policy: lessons and checkrides are retaken whole, timed jobs and the
   // VIP charter resume against their clock, the medevac resumes with its destination, the rest resume
   for (auto& k : g_story) {
+    if (!in(3)) break;
     Career::JobPolicy p = Career::policyOf(k);
     bool want = p != Career::POL_UNSET
       && ((k.forceAircraft >= 0 || k.grantLicense >= 0) ? p == Career::POL_RETAKE : true)
@@ -122,14 +133,16 @@ int main() {
       && ((k.type == CT_VIP || (k.timeLimitMin > 0 && k.forceAircraft < 0 && k.grantLicense < 0 && k.type != CT_MEDEVAC)) ? p == Career::POL_RESUME_CLOCK : true);
     if (!want) { printf("  !! %s: continuation policy %d doesn't fit the contract\n", k.id.c_str(), (int)p); problems++; }
   }
-  if (Career::policyOf(g_story[0]) != Career::POL_RETAKE || Career::policyOf(g_story[3]) != Career::POL_RETAKE) { printf("  !! L1 / L4 must be retaken whole\n"); problems++; }
+  if (in(3) && (Career::policyOf(g_story[0]) != Career::POL_RETAKE || Career::policyOf(g_story[3]) != Career::POL_RETAKE)) { printf("  !! L1 / L4 must be retaken whole\n"); problems++; }
   // financing pacing: with the loan the whole story needs at most a few freelance jobs of grind in total (a good
   // freelance job nets about $1500 early on), and no loan may still be open with payments missed at the end
-  if (grind > 5 * 1500) { printf("  !! the story needs $%ld of freelance grind even with financing (> 5 jobs)\n", grind); problems++; }
-  if (c.loan.open() && c.loan.missed > 0) { printf("  !! the story ends with %d loan payments missed\n", c.loan.missed); problems++; }
-  printf("Total extra freelance money needed: $%ld (%d loans taken), problems: %d, finished=%d\n", grind, loans, problems, c.finished);
+  if (in(1)) {
+    if (grind > 5 * 1500) { printf("  !! the story needs $%ld of freelance grind even with financing (> 5 jobs)\n", grind); problems++; }
+    if (c.loan.open() && c.loan.missed > 0) { printf("  !! the story ends with %d loan payments missed\n", c.loan.missed); problems++; }
+    printf("Total extra freelance money needed: $%ld (%d loans taken), problems: %d, finished=%d\n", grind, loans, problems, c.finished);
+  }
   // Freelance board must never be empty once licensed
-  for (int ap = 0; ap < (int)g_world.airports.size(); ap++) {
+  for (int ap = 0; ap < (int)g_world.airports.size() && in(3); ap++) {
     Career t; t.newGame(); t.license = surfaceRough(g_world.airports[ap].surface) && g_world.airports[ap].surface != SURF_GRASS && g_world.airports[ap].surface != SURF_SAND ? LIC_CPL : LIC_PPL; t.location = ap; t.refreshBoard();
     long sum = 0; for (auto& b : t.board) sum += b.payout;
     printf("  board %s lic%d: %zu jobs avg $%ld\n", g_world.airports[ap].code, t.license, t.board.size(), t.board.empty() ? 0 : sum / (long)t.board.size());
@@ -137,7 +150,7 @@ int main() {
   }
   // there is always a way to earn: every airport x licence x balance x fleet state has a job the player can fly for
   // a positive net (or a free lesson next); the board is never empty
-  {
+  if (in(3)) {
     int bad = 0, checked = 0;
     const int moneys[] = {-8000, -1500, 0, 500, 3000};
     for (int ap = 0; ap < (int)g_world.airports.size(); ap++)

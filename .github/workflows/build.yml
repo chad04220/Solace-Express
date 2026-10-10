@@ -28,6 +28,13 @@ jobs:
   linux-sanitizers:   # every headless test under AddressSanitizer + UBSan (the shader checks need a validator: skipped); a release waits for it
     # (a pull request from a branch of this repository: its push already runs the same commit)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    # The tests are dealt out to three runners by what they cost under the sanitizers (their ctest COST, the seconds
+    # each took here), each building only the programs its own share needs
+    name: linux-sanitizers (${{ matrix.shard }} of 3)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     runs-on: ubuntu-latest
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -40,9 +47,10 @@ jobs:
       - uses: actions/cache@v4   # the last run's compiled files: a push recompiles only what it changed
         with:
           path: .ccache
-          key: ccache-sanitize-${{ github.ref_name }}-${{ github.sha }}
+          key: ccache-sanitize-${{ matrix.shard }}-${{ github.ref_name }}-${{ github.sha }}
           restore-keys: |
-            ccache-sanitize-${{ github.ref_name }}-
+            ccache-sanitize-${{ matrix.shard }}-${{ github.ref_name }}-
+            ccache-sanitize-${{ matrix.shard }}-
             ccache-sanitize-
       - name: Configure (GCC, ASan + UBSan)
         run: |
@@ -62,30 +70,28 @@ jobs:
                    --jq '[.[] | select(.event == "push" or .event == "workflow_dispatch" or .event == "schedule")][0].headSha // ""' || true)
             if [ -n "$base" ] && ! git fetch -q --no-tags --depth=1 origin "$base"; then base=""; fi
           fi
-          python3 tools/ci/select_tests.py --build-dir build --exclude "shader_glsl|terrain_shadow_bake" ${base:+--base "$base"}
+          python3 tools/ci/select_tests.py --build-dir build --exclude "shader_glsl|terrain_shadow_bake" --shards 3 --shard ${{ matrix.shard }} ${base:+--base "$base"}
       - name: Build
         if: steps.pick.outputs.mode != 'none'
         run: |
           ccache -z
           cmake --build build --parallel 4 --target ${{ steps.pick.outputs.targets }}
           ccache -s
-      - name: Test   # four at a time: the runner's four cores (the flight model, the longest, sets the time)
+      - name: Test   # four at a time: the runner's four cores
         if: github.event_name != 'schedule' && steps.pick.outputs.mode != 'none'
         env:
           ASAN_OPTIONS: detect_leaks=0
           UBSAN_OPTIONS: print_stacktrace=1
           FLIGHT_QUICK: 1   # (the flight model's type-by-type checks on one of each kind of aircraft: the Windows job flies them all)
-          MODE: ${{ steps.pick.outputs.mode }}
           PICKED: ${{ steps.pick.outputs.regex }}
-        run: |
-          if [ "$MODE" = some ]; then pick=(-R "$PICKED"); else pick=(); fi
-          ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake" "${pick[@]}"
+        run: ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake" -R "$PICKED"
       - name: Test, every type (nightly)   # (FLIGHT_QUICK unset - set at all, even empty, it counts)
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule' && steps.pick.outputs.mode != 'none'
         env:
           ASAN_OPTIONS: detect_leaks=0
           UBSAN_OPTIONS: print_stacktrace=1
-        run: ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake"
+          PICKED: ${{ steps.pick.outputs.regex }}
+        run: ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake" -R "$PICKED"
 
   windows:
     if: github.event_name != 'schedule' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)

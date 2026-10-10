@@ -15,7 +15,7 @@ the answer can't be sure, everything runs:
 Documentation never selects anything. The nightly run and every release run everything regardless (build.yml).
 
 Usage:
-  select_tests.py --build-dir build [--config Release] [--exclude REGEX] (--base SHA | --changed FILE...)
+  select_tests.py --build-dir build [--config Release] [--exclude REGEX] [--shards N --shard K] (--base SHA | --changed FILE...)
 Prints the decision; with GITHUB_OUTPUT set, writes mode=all|some|none, regex= (a ctest -R pattern) and targets= (the
 build targets those tests need) there, and a summary to GITHUB_STEP_SUMMARY.
 """
@@ -52,7 +52,7 @@ def read_ctest_file(build, config):
     Studio) has a block per configuration: the one for `config`."""
     path = os.path.join(build, "CTestTestfile.cmake")
     text = open(path, encoding="utf-8", errors="replace").read()
-    tests, order, cond = {}, [], None
+    tests, order, cond, costs = {}, [], None, {}
     for line in text.splitlines():
         s = line.strip()
         m = re.match(r'(?:else)?if\s*\(\s*"?(?:\$\{)?CTEST_CONFIGURATION_TYPE\}?"?\s+MATCHES\s+"(.*)"\s*\)', s)
@@ -62,6 +62,9 @@ def read_ctest_file(build, config):
             cond = "<else>"; continue
         if s.startswith("endif"):
             cond = None; continue
+        m = re.match(r'set_tests_properties\(\s*(\S+)\s+PROPERTIES\b.*?\bCOST\s+"?([0-9.]+)', s)
+        if m:   # (the test's measured seconds: how the shards are dealt, below)
+            costs[m.group(1).strip('"[]=')] = float(m.group(2)); continue
         if not s.startswith("add_test("):
             continue
         args = []
@@ -75,6 +78,7 @@ def read_ctest_file(build, config):
         if name not in tests:
             order.append(name)
         tests[name] = {"name": name, "command": args[1:]}
+    for n in order: tests[n]["cost"] = costs.get(n, 1.0)
     return [tests[n] for n in order]
 
 
@@ -242,6 +246,15 @@ def decide(model, changed, exclude=None):
     return ("some" if picked else "none"), picked, targets, notes
 
 
+def deal(tests, n):
+    """The tests in n shards of about equal cost (their COST, the seconds they take under the sanitizers): the costliest
+    first, each to the shard with the least so far"""
+    shards = [[] for _ in range(n)]; load = [0.0] * n
+    for t in sorted(tests, key=lambda t: (-t["cost"], t["name"])):
+        k = load.index(min(load)); shards[k].append(t); load[k] += t["cost"]
+    return shards, load
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--build-dir", required=True)
@@ -250,6 +263,8 @@ def main():
     ap.add_argument("--exclude", default="", help="tests this job never runs (a ctest -E pattern)")
     ap.add_argument("--base", default="", help="the last commit that passed: compared with HEAD")
     ap.add_argument("--changed", nargs="*", help="the changed files themselves (instead of --base)")
+    ap.add_argument("--shards", type=int, default=1, help="the picked tests dealt out to this many jobs by their cost")
+    ap.add_argument("--shard", type=int, default=1, help="this job's shard, 1..--shards")
     a = ap.parse_args()
     model = Model(a.source_dir, a.build_dir, a.config)
     changed = None
@@ -259,12 +274,24 @@ def main():
         r = git(model.src, "diff", "--name-only", a.base, "HEAD")
         changed = [l for l in r.stdout.splitlines() if l] if r.returncode == 0 else None
     mode, picked, targets, notes = decide(model, changed, a.exclude or None)
+    total = len(picked)
+    shardNote = ""
+    if a.shards > 1 and picked:   # (this job's share of them: the tests and the programs they need)
+        byName = {t["name"]: t for t in model.tests}
+        shards, load = deal([byName[n] for n in picked], a.shards)
+        mine = shards[a.shard - 1]
+        picked = [t["name"] for t in mine]
+        targets = set()
+        for t in mine: targets |= model.test_deps(t)[1]
+        shardNote = f"Shard {a.shard} of {a.shards}: {len(picked)} tests, {load[a.shard - 1]:.0f} s of their measured cost (the shards: {', '.join('%.0f' % l for l in load)} s)"
+        if not picked: mode = "none"
     regex = "^(" + "|".join(re.escape(n) for n in picked) + ")$" if picked else ""
-    lines = [f"Tests: {mode} - {len(picked)} of {len([t for t in model.tests if not (a.exclude and re.search(a.exclude, t['name']))])}"]
+    lines = [f"Tests: {mode} - {total} of {len([t for t in model.tests if not (a.exclude and re.search(a.exclude, t['name']))])}"]
+    if shardNote: lines.append(shardNote)
     if changed is not None:
         lines.append(f"Changed since {a.base[:12] or 'the given list'}: {len(changed)} files")
     lines += ["  " + n for n in notes[:12]]
-    if mode == "some":
+    if mode == "some" or shardNote:
         lines.append("Picked: " + ", ".join(picked))
     print("\n".join(lines))
     if os.environ.get("GITHUB_OUTPUT"):

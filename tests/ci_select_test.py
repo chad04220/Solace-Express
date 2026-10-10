@@ -38,13 +38,13 @@ check(["README.md", "docs/LIVING_ISLANDS_PLAN.md", "RELEASE_NOTES.md"], mode="no
 check(["CMakeLists.txt"], mode="all")
 check([".github/workflows/build.yml"], mode="all")
 check(["tools/ci/select_tests.py"], mode="all")
-check(["tests/flight_test.cpp"], mode="some", picks=["flight_model"], skips=["gameplay_loop_2", "world_cache", "campaign_progression"])
-check(["src/game_ui.cpp"], mode="some", picks=["gameplay_loop_2"], skips=["flight_model", "terrain_envelope", "campaign_progression"])
-check(["src/aircraft.cpp"], picks=["flight_model", "campaign_progression", "gameplay_loop_2"], skips=["mesh_simplify", "community_layout"])
-check(["src/world.h"], picks=["world_cache", "flight_model", "community_layout", "runway_preservation"])
-check(["src/shaders/water.glsl"], picks=["shader_prune", "gameplay_loop_2"], skips=["flight_model", "career_saves"])
-check(["src/entity_mesh.cpp"], picks=["environment_buildings"], skips=["flight_model", "career_saves"])
-check(["tests/fixtures/runways_52317bb.golden"], picks=["runway_preservation"], skips=["flight_model"])
+check(["tests/flight_test.cpp"], mode="some", picks=["flight_model_1"], skips=["gameplay_loop_2", "world_cache", "campaign_progression_1"])
+check(["src/game_ui.cpp"], mode="some", picks=["gameplay_loop_2"], skips=["flight_model_1", "terrain_envelope", "campaign_progression_1"])
+check(["src/aircraft.cpp"], picks=["flight_model_1", "campaign_progression_1", "gameplay_loop_2"], skips=["mesh_simplify", "community_layout"])
+check(["src/world.h"], picks=["world_cache", "flight_model_1", "community_layout", "runway_preservation"])
+check(["src/shaders/water.glsl"], picks=["shader_prune", "gameplay_loop_2"], skips=["flight_model_1", "career_saves"])
+check(["src/entity_mesh.cpp"], picks=["environment_buildings"], skips=["flight_model_1", "career_saves"])
+check(["tests/fixtures/runways_52317bb.golden"], picks=["runway_preservation"], skips=["flight_model_1"])
 # every compiled test is picked by a change to its own main source
 for t in model.tests:
     cmd = t.get("command") or []
@@ -55,5 +55,12 @@ for t in model.tests:
         m, picked, _, _ = st.decide(model, own[:1])
         if t["name"] not in picked:
             print(f"FAIL {own[0]} does not pick {t['name']}"); fails += 1
+# CI's sanitizer shards: every test dealt to exactly one, and no shard more than the costliest test over another
+for n in (2, 3):
+    shards, load = st.deal(model.tests, n)
+    dealt = sorted(t["name"] for s in shards for t in s)
+    ok = dealt == sorted(names) and max(load) - min(load) <= max(t["cost"] for t in model.tests)
+    print(f"{'ok  ' if ok else 'FAIL'} {n} shards: {', '.join('%.0f s' % l for l in load)}")
+    fails += not ok
 print(f"{len(model.tests)} tests; {'all passed' if not fails else str(fails) + ' FAILED'}")
 sys.exit(1 if fails else 0)
