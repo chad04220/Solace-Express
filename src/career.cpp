@@ -224,8 +224,9 @@ int Career::ownedIndexFor(int specIdx) const {
 
 static float routeTopOf(const Contract& c);
 Career::Source Career::canFly(const Contract& c, int si, std::string* why) const {
-  const AircraftSpec& s = kAircraft[si];
   auto no = [&](const std::string& w) { if (why) *why = w; return SRC_NONE; };
+  if (!isCareerAircraft(si)) return no("Not available in the career fleet");
+  const AircraftSpec& s = kAircraft[si];
   if (c.forceAircraft >= 0) return si == c.forceAircraft ? SRC_LESSON : no("Lesson aircraft only");
   if (license < s.license) return no(std::string("Requires ") + licenseName(s.license));
   if (license < c.minLicense) return no(std::string("Contract requires ") + licenseName(c.minLicense));
@@ -414,7 +415,7 @@ float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut) {
   size_t wp = 0; int phase = c.startAirborne ? 1 : 0;   // 0 takeoff roll and initial climb, 1 the checkpoints, 2 the approach
   for (int k = 0; k < 60 * 60 * 30; k++) {
     if (phase == 0) {
-      p.ctl.brake = 0; p.ctl.throttle = 1; p.ctl.gearDown = true; p.ctl.flaps = s.retract ? 0.15f : 0.1f;
+      p.ctl.brake = 0; p.ctl.throttle = 1; p.ctl.gearDown = true; p.ctl.flaps = s.fullCabinEnvelope ? s.takeoffFlap : s.retract ? 0.15f : 0.1f;
       p.ctl.pitch = p.ias > s.vref * 0.95f ? clampf(0.08f * (10.f - p.pitchDeg()), -1, 1) : 0.f;
       // (and the runway's heading with the wings kept near level: a gust under one wing rolls it, and hands off the
       // climb-out wandered into the hills)
@@ -457,7 +458,7 @@ bool Career::earningPath() const {
   const Contract* st = nextStory();
   if (st && st->forceAircraft >= 0) return true;   // a free lesson
   for (auto& c : board)
-    for (int i = 0; i < kNumAircraft; i++) { Source src = canFly(c, i); if (src != SRC_NONE && netQuick(c, i, src) > 0) return true; }
+    for (int i : kCareerAircraft) { Source src = canFly(c, i); if (src != SRC_NONE && netQuick(c, i, src) > 0) return true; }
   return false;
 }
 Contract Career::recoveryContract() const {
@@ -465,7 +466,7 @@ Contract Career::recoveryContract() const {
   c.wx = W(220, 4, 0, 0.05f, 0.2f, 4500, 40, 0, false, 10.5f);
   // the licensed aircraft the player can rent (or owns), cheapest hire first
   std::vector<int> types;
-  for (int i = 0; i < kNumAircraft; i++) if (license >= kAircraft[i].license && license >= LIC_PPL && (kAircraft[i].rentFee > 0 || ownedIndexFor(i) >= 0)) types.push_back(i);
+  for (int i : kCareerAircraft) if (license >= kAircraft[i].license && license >= LIC_PPL && (kAircraft[i].rentFee > 0 || ownedIndexFor(i) >= 0)) types.push_back(i);
   std::sort(types.begin(), types.end(), [](int a, int b) { return kAircraft[a].rentFee < kAircraft[b].rentFee; });
   if (types.empty()) return c;
   // from the nearest field one of them can use, to the nearest other field it can use
@@ -501,7 +502,7 @@ void Career::refreshBoard() {
   Rng r(boardSeed * 2654435761u + location * 97 + 13);
   // aircraft the player can access now
   std::vector<int> access;
-  for (int i = 0; i < kNumAircraft; i++)
+  for (int i : kCareerAircraft)
     if (license >= kAircraft[i].license && license >= LIC_PPL && (kAircraft[i].rentFee > 0 || ownedIndexFor(i) >= 0)) access.push_back(i);
   if (access.empty()) { if (!earningPath()) { Contract rc = recoveryContract(); if (rc.payout > 0) board.push_back(rc); } return; }
   const char* cargoNames[] = {"Medical supplies", "Mail sacks", "Fresh produce", "Machine parts", "Fishing gear", "Coffee beans", "Newspapers", "Spare tyres", "Wine crates", "Lab samples"};
@@ -801,6 +802,7 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
 }
 
 bool Career::buy(int si, std::string* msg) {
+  if (!isCareerAircraft(si)) { if (msg) *msg = "Not available in the career fleet"; return false; }
   const AircraftSpec& s = kAircraft[si];
   if (ownedIndexFor(si) >= 0) { *msg = "You already own one."; return false; }
   if (license < s.license) { *msg = std::string("Requires ") + licenseName(s.license); return false; }
@@ -813,6 +815,7 @@ bool Career::buy(int si, std::string* msg) {
 }
 
 bool Career::finance(int si, std::string* msg) {
+  if (!isCareerAircraft(si)) { if (msg) *msg = "Not available in the career fleet"; return false; }
   const AircraftSpec& s = kAircraft[si];
   if (ownedIndexFor(si) >= 0) { *msg = "You already own one."; return false; }
   if (license < s.license) { *msg = std::string("Requires ") + licenseName(s.license); return false; }
@@ -827,6 +830,7 @@ bool Career::finance(int si, std::string* msg) {
   return true;
 }
 bool Career::buyUsed(int si, std::string* msg) {
+  if (!isCareerAircraft(si)) { if (msg) *msg = "Not available in the career fleet"; return false; }
   const AircraftSpec& s = kAircraft[si];
   if (ownedIndexFor(si) >= 0) { *msg = "You already own one."; return false; }
   if (license < s.license) { *msg = std::string("Requires ") + licenseName(s.license); return false; }
@@ -1145,7 +1149,7 @@ bool Career::load(const std::string& path) {
       char id[64]; int loc = -1; float fuel = 0, cond = 1.f; int spec = -1;
       ok = fscanf(f, "%63s %d %f", id, &loc, &fuel) == 3;
       { long pos = ftell(f); float cv = 0; if (fscanf(f, "%f", &cv) == 1 && std::isfinite(cv)) cond = cv; else fseek(f, pos, SEEK_SET); }   // (version 3 adds the condition)
-      for (int i = 0; ok && i < kNumAircraft; i++) if (!strcmp(kAircraft[i].id, id)) spec = i;
+      for (int i : kCareerAircraft) if (ok && !strcmp(kAircraft[i].id, id)) spec = i;
       ok = ok && spec >= 0 && loc >= 0 && loc < nApt && std::isfinite(fuel);
       if (ok) c.fleet.push_back({spec, loc, std::clamp(fuel, 0.f, kAircraft[spec].maxFuel), std::clamp(cond, 0.f, 1.f)});
     }
@@ -1156,14 +1160,14 @@ bool Career::load(const std::string& path) {
     else if (!strcmp(key, "loan")) {
       char id[64]; Loan l;
       ok = fscanf(f, "%63s %d %d %d %f", id, &l.balance, &l.payment, &l.missed, &l.rate) == 5 && l.balance >= 0 && l.payment >= 0 && l.missed >= 0 && l.missed < 3 && std::isfinite(l.rate);
-      l.spec = -1; for (int i = 0; ok && i < kNumAircraft; i++) if (!strcmp(kAircraft[i].id, id)) l.spec = i;
+      l.spec = -1; for (int i : kCareerAircraft) if (ok && !strcmp(kAircraft[i].id, id)) l.spec = i;
       ok = ok && l.spec >= 0;
       if (ok) c.loan = l;
     }
     else if (!strcmp(key, "job")) {   // (version 3) the open job, followed by its plan and contract lines
       JobState J; char id[64]; int st = 0, src = 0, fh = 0, hp = 0, pp = 0;
       ok = fscanf(f, "%d %63s %d %d %d %d %f %f %f %f %d %f %d %d %u", &st, id, &src, &J.at, &J.legs, &J.wpDone, &J.jobClockMin, &J.maxG, &J.minG, &J.maxBank, &fh, &J.fuelBilledKg, &hp, &pp, &J.id) == 15;
-      J.spec = -1; for (int i = 0; ok && i < kNumAircraft; i++) if (!strcmp(kAircraft[i].id, id)) J.spec = i;
+      J.spec = -1; for (int i : kCareerAircraft) if (ok && !strcmp(kAircraft[i].id, id)) J.spec = i;
       ok = ok && J.spec >= 0 && st >= 0 && st <= 5 && src >= 0 && src <= 3 && J.at >= 0 && J.at < nApt && J.legs >= 0 && J.wpDone >= 0
            && std::isfinite(J.jobClockMin) && std::isfinite(J.maxG) && std::isfinite(J.minG) && std::isfinite(J.maxBank) && std::isfinite(J.fuelBilledKg);
       J.state = (JobState::State)st; J.src = (Source)src; J.fragileHit = fh != 0; J.hirePaid = hp != 0; J.positioningPaid = pp != 0;

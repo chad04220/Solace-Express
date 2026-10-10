@@ -14,7 +14,7 @@ static void check(bool ok, const char* what, const char* name) {
 int main() {
   printf("%-16s %6s %6s %5s %5s %6s %6s %6s %6s %6s %6s %5s %6s %6s %6s\n", "type", "Smod", "Sspec", "AR", "MAC", "wInc", "flapA", "tInc",
          "xNP", "cgZ", "cgY", "SM", "aTrim", "mainZ", "noseZ");
-  for (int i = 0; i < kNumAircraft + 4; i++) {
+  for (int i = 0; i < kAircraftCount; i++) {
     const AircraftSpec& s = kAircraft[i];
     if (s.special != 0) continue;
     const AeroGeom& g = aeroGeom(s);

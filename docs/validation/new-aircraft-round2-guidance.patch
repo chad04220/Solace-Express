@@ -1,0 +1,177 @@
+--- a/src/aircraft.cpp
++++ b/src/aircraft.cpp
+@@ -849,7 +849,7 @@
+ 
+ 
+ void Plane::apEngage(int mode, int airport, const Weather& wx) {
+-  apOn = mode != AP_OFF; apMode = mode; apDone = false; apWindEvent = 0;
++  apOn = mode != AP_OFF; apMode = mode; apDone = false; apWindEvent = 0; apTerminalRejoin = false;
+   float spd0 = ias > 1.f ? ias : length(vel);
+   apHeading = heading(); apAlt = pos.y; apSpeed = std::max(spd0, spec->vref * 1.3f);
+   apPitchI = 0; apRollI = 0; apYawI = 0; apVmcCap = 1; apThrI = ctl.throttle; apXI = 0; apGamI = 0; apTrimEst = ctl.pitch; apUseVS = false; apUpset = false;
+@@ -965,6 +965,15 @@
+ // Conventional transport-category jets need lag-aware guidance even outside professional mode.
+ // Use capabilities rather than a roster index; the established fleet keeps its existing law.
+ static bool transportPathControl(const AircraftSpec& s) { return s.engineType == ENG_JET && s.gLimitPos() <= 2.5f; }
++// The additional lateral rejection/cleanup policy has only a full-power missed-
++// approach envelope. Degraded engines and matched flap jams retain the established
++// procedure: clean best-climb power alone does not prove configured climb margin,
++// and a jammed flap cannot reach the new cleanup transition's clean position.
++static bool transportGoAroundControl(const Plane& p) {
++  if (!transportPathControl(*p.spec) || !p.engineRunning || p.fail.flapAsym) return false;
++  for (int i = 0; i < p.spec->engines && i < 4; ++i) if (p.fail.engineHealth[i] < 1.f) return false;
++  return true;
++}
+ // the hold and intercept speed: well above the approach speed, below cruise
+ // (a professional's: 1.4 to 1.5 times it, an airliner's manoeuvring speed in the pattern - at 1.8 the Starling's 25 deg
+ // orbit took three minutes a lap and its pattern ran 12 km out)
+@@ -1129,6 +1138,7 @@
+ 
+ void Plane::apGuidance(float dt) {
+   const AircraftSpec& s = *spec;
++  if (apTerminalRejoin && !transportGoAroundControl(*this)) apTerminalRejoin = false;
+   apStageT += dt;
+   const ApEnvelope& E = apEnv;
+   if (apMode != AP_APPR || apAirport < 0) {   // (hold: altitude unless a vertical speed was asked for, apUseVS)
+@@ -1196,7 +1206,10 @@
+         // (once slowed, it stays slow unless it is taken well away again: the slowing distance shrinks as the speed comes
+         // off, and the Meridian, turning round onto the hold, sped up to cruise and slowed again twice over)
+         const bool slowed = apPro && apSpeed > 0.f && apSpeed <= vh + 0.5f;
+-        apSpeed = dc < slowDist + (slowed ? 3000.f : 0.f) ? vh : s.cruise * 0.85f;
++        // A missed approach is still a terminal maneuver. Do not accelerate a
++        // transport back to cruise simply because its return to the descent hold
++        // is long; that expands the turn beyond the planned corridor and chart.
++        apSpeed = apTerminalRejoin || dc < slowDist + (slowed ? 3000.f : 0.f) ? vh : s.cruise * 0.85f;
+         // climb planning: can this aircraft out-climb the ground ahead on the way? Compare the height needed over
+         // the next 12 km of track with what it can reach at a conservative climb gradient. If it can't, climb in a
+         // circle (turning towards the lower side) until it can, then carry on.
+@@ -1364,6 +1377,23 @@
+           break;
+         }
+       }
++      // A heavy transport cannot remove a large sideways velocity once its wheels touch.
++      // Check the same three-second capture horizon used by rollout steering while
++      // there is still height to climb away, against this runway's actual pavement.
++      // A forced landing retains the existing no-go-around decision when climb is unavailable.
++      if (transportGoAroundControl(*this) && E.canGoAround && !onGround && hab < 100.f && dist < 2000.f && dist > 250.f) {
++        const float predictedCross = cross + dot(vel, rr) * 3.f;
++        const GearStations g = gearStations(s);
++        float contactCross = 0.f;
++        for (vec3 c : {vec3(-g.track, -gh, g.mainZ), vec3(g.track, -gh, g.mainZ), vec3(0, -gh, g.noseZ)})
++          contactCross = std::max(contactCross, fabsf(predictedCross + dot(q.rotate(c), rr)));
++        if (contactCross > a.width * 0.5f) {
++          if (getenv("APDBG")) printf("  go-around at %.0f m: lateral capture cross %.1f, drift %.1f m/s, predicted contact %.1f, runway %.0f m\n", dist, cross, dot(vel, rr), contactCross, a.width);
++          apStage = APS_GOAROUND; apStageT = 0;
++          apStatus = fmt("GO AROUND  %s  LATERAL CAPTURE", a.code);
++          break;
++        }
++      }
+       // (no go-around when it can't climb away - an engine out, overloaded, iced: it lands from what it has)
+       if (E.canGoAround && dist < 2000.f && dist > 250.f && (fabsf(cross) > std::min(80.f, std::max(a.width * 0.5f, 12.f) + dist * 0.03f) || err > 40.f || (err < -80.f && apBleedT > 12.f))) {   // (high just after the belly-up: it comes down steeply)
+         if (getenv("APDBG")) printf("  go-around at %.0f m: cross %.0f, %.0f m %s the glidepath\n", dist, cross, fabsf(err), err > 0.f ? "below" : "above");
+@@ -1471,15 +1501,27 @@
+       if (onGround) { apStage = APS_ROLLOUT; apStageT = 0; }
+       break;
+     }
+-    case APS_GOAROUND:
++    case APS_GOAROUND: {
+       apBled = false;   // (the next approach comes down fast and sheds it again)
+       apHeading = rwyHdg; apUseVS = true; apVS = std::max(E.climbPlan, 1.f); apSpeed = vref * 1.35f;   // (the climb it can hold now)
+       ctl.flaps = 0.34f;
+       if (apStageT > 8.f && s.retract) ctl.gearDown = false;
+       // (back to NAV only clear of the ground all round: its turns would otherwise put it into the slope it climbed from)
+-      if (pos.y > std::max(a.elev + 450.f, apHoldAlt - 30.f) && pos.y > terrainAround() + 200.f) { apStage = APS_NAV; apLeg = 0; apStageT = 0; apTurnDir = 0; }
++      const bool clear = pos.y > std::max(a.elev + 450.f, apHoldAlt - 30.f) && pos.y > terrainAround() + 200.f;
++      const bool transport = transportGoAroundControl(*this);
++      // Shed the remaining flap lift progressively before starting the turn,
++      // using the same command rate as the passenger approach configuration.
++      if (transport && clear) ctl.flaps = std::max(0.f, flapBefore - 0.05f * dt);
++      if (clear && (!transport || flaps < 0.01f)) {
++        // The missed approach rejoins the planned descent hold, not the original
++        // en-route cruise altitude. Keep NAV's terrain floor, without a needless
++        // zoom climb immediately as a transport starts its passenger turn.
++        if (transportGoAroundControl(*this)) { apCruiseAlt = pos.y; apTerminalRejoin = true; }
++        apStage = APS_NAV; apLeg = 0; apStageT = 0; apTurnDir = 0;
++      }
+       apStatus = fmt("GO AROUND  %s", a.code);
+       break;
++    }
+   }
+   // A transport's large flap lift increment must be introduced progressively inside the
+   // passenger g envelope. A step from approach to landing flap otherwise balloons the
+@@ -1584,7 +1626,16 @@
+   float rErr = w.y + G0 * tilt / spd;
+   // (and held in: what a steady yaw needs - a dead engine's thrust, the slipstream's swirl at climb power - builds up
+   // as rudder trim, so the sideslip is flown out instead of standing at what the sideslip term alone would answer)
+-  if (!fbw) apYawI = clampf(apYawI + beta * qn * dt * 1.5f, -0.8f, 0.8f);
++  if (!fbw) {
++    // With symmetric engines in a transport missed approach and its low-speed
++    // terminal return, the coordinated-rate and sideslip damper supplies the yaw
++    // correction. Let accumulated trim decay rather than winding the integral
++    // through the low-speed Dutch-roll cycle.
++    if (transportGoAroundControl(*this) && apMode == AP_APPR &&
++        (apStage == APS_GOAROUND || apTerminalRejoin))
++      apYawI = approach(apYawI, 0.f, 1.f / std::max(apPathLag(), 0.1f), dt);
++    else apYawI = clampf(apYawI + beta * qn * dt * 1.5f, -0.8f, 0.8f);
++  }
+   ctl.yaw = fbw ? clampf(G0 * tilt / spd / 1.4f, -1.f, 1.f) : clampf(beta * 2.f + rErr * 1.5f * qn + apYawI, -1.f, 1.f);
+ }
+ 
+@@ -1627,14 +1678,25 @@
+     ctl.roll = clampf(-bankDeg() * 0.18f + w.z * 0.6f, -1.f, 1.f);
+     // (back to the centreline no quicker than over 3 s of the roll: at a research jet's 65 m/s a fixed 0.6 deg a metre
+     // swung it from 10 m one side to 22 m the other and off the edge at Far Isle)
+-    float off = std::min(0.6f * fabsf(cross), atanf(fabsf(cross) / (std::max(length(vel), 8.f) * 3.f)) / DEG * 1.2f);
+-    he = hdgErrDeg(atan2f(apLd.x, -apLd.z) / DEG - copysignf(std::min(off, 10.f), cross), heading());
++    // A transport's yaw inertia carries lateral motion past the centreline. Steer
++    // the cross-track position predicted over the same three-second capture horizon,
++    // so the rudder unwinds before that motion reverses the position error.
++    const float steerCross = transportPathControl(s) ? cross + dot(vel, rr) * 3.f : cross;
++    float off = std::min(0.6f * fabsf(steerCross), atanf(fabsf(steerCross) / (std::max(length(vel), 8.f) * 3.f)) / DEG * 1.2f);
++    he = hdgErrDeg(atan2f(apLd.x, -apLd.z) / DEG - copysignf(std::min(off, 10.f), steerCross), heading());
+     // (and held in: a crosswind weathervanes it into the wind with a moment that grows as fast as the rudder's does,
+     // so the rudder that holds the runway heading builds up as an integral - proportional alone stood 3.5 deg off
+     // the runway at 60 m/s and the Starling slid 20 m sideways before the nosewheel could steer)
+     if (apStageT <= dt * 1.5f) apYawI = 0;
+-    apYawI = clampf(apYawI + he * 0.04f * dt, -0.8f, 0.8f);
+-    ctl.yaw = clampf(he * 0.08f + w.y / DEG * 0.12f + apYawI, -1.f, 1.f);   // steer for the centreline, damp the yaw rate
++    // The same horizon anticipates yaw still in progress, before rudder authority
++    // falls away as the transport slows. Otherwise its heading crosses the target
++    // with a large yaw rate and the steering integral reverses too late.
++    const float yawD = 0.12f + (transportPathControl(s) ? 3.f * 0.08f : 0.f);
++    const float yawP = he * 0.08f + w.y / DEG * yawD;
++    const float yawDemand = yawP + apYawI;
++    if (!transportPathControl(s) || ((yawDemand <= 1.f || he <= 0.f) && (yawDemand >= -1.f || he >= 0.f)))
++      apYawI = clampf(apYawI + he * 0.04f * dt, -0.8f, 0.8f);
++    ctl.yaw = clampf(yawP + apYawI, -1.f, 1.f);   // steer for the centreline, damp the yaw rate
+     ctl.brake = clampf((apStageT - 0.6f) * 1.2f, 0.f, s.taildragger ? 0.55f : 1.f);
+     // a taildragger's mains stand only a little ahead of its centre of gravity: braked hard with the tail up it goes
+     // over onto its propeller. The brakes come in as the tail comes down, and let go the moment the nose starts down
+@@ -1805,7 +1867,7 @@
+   float maxTurn = G0 * tanf(bankMax * DEG) / spd;                       // rad/s
+   // The learned roll lag is a cruise measurement. A transport approaching at a third
+   // of cruise speed responds more slowly, just as the pitch loop's lag already does.
+-  const float tRoll = P.tRoll * (transportPathControl(s) && appr ? clampf(s.cruise / V, 0.6f, 2.5f) : 1.f);
++  const float tRoll = P.tRoll * (transportPathControl(s) && (appr || (apMode == AP_APPR && apStage == APS_GOAROUND && transportGoAroundControl(*this))) ? clampf(s.cruise / V, 0.6f, 2.5f) : 1.f);
+   float turnT = clampf(herr * DEG * std::min(appr ? 0.25f : 0.6f, 0.25f / P.tRoll), -maxTurn, maxTurn);
+   float bankT = clampf(atanf(turnT * spd / G0) / DEG, -bankMax, bankMax);
+   if (flare) bankT = clampf(bankT, -4.f, 4.f);
+--- a/src/aircraft.h
++++ b/src/aircraft.h
+@@ -236,6 +236,7 @@
+   float apHeading = 0, apAlt = 0, apSpeed = 0, apVS = 0; bool apUseVS = false;
+   float apPitchI = 0, apRollI = 0, apYawI = 0, apVmcCap = 1, apThrI = 0.5f, apXI = 0, apGamI = 0, apTrimEst = 0, apFlareTau = 0, apFlareVs = 0, apGustAdd = 0;
+   int apAirport = -1, apStage = 0, apLeg = 0; float apOutSide = 0;   // (apOutSide: the side of the centreline the outbound leg keeps to, +-1; 0 off that leg)
++  bool apTerminalRejoin = false; // keep the missed-approach return at the planned terminal speed
+   bool apRev = false; float apStageT = 0, apCruiseAlt = 0, apFinalLen = 8000;
+   vec3 apLd, apTd;            // landing direction and touchdown point of the chosen runway end
+   vec3 apHoldC; float apHoldR = 1500, apHoldAlt = 0, apIntAlt = 0; int apHoldDir = 1, apTurnDir = 0, apClimbDir = 0; float apGs = 0.0524f, apDrift = 0;   // descent orbit and intercept altitude
+@@ -258,7 +259,7 @@
+   // one figure at a time: what was flying before it (the autopilot on or off, its mode and field), restored once the
+   // figure has recovered to level flight (apStuntEnded, which the game answers)
+   bool apStuntWasOn = false, apStuntEnded = false; int apStuntWasMode = 0, apStuntWasAirport = -1;
+-  void apDisengage() { apOn = false; apMode = AP_OFF; apUseVS = false; }
++  void apDisengage() { apOn = false; apMode = AP_OFF; apUseVS = false; apTerminalRejoin = false; }
+   float maxG = 1, minG = 1;
+   float overG = 0;   // sustained overstress (grows past the structural limit, decays within it; the airframe fails at 1)
+   float flightTime = 0;

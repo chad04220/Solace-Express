@@ -1,0 +1,234 @@
+{
+  "01_windshield_joins": {
+    "file": "01_windshield_joins.png",
+    "title": "Clean windshield joins",
+    "caption": "Upper-glazing wing-root fragments removed; the window shapes remain intact.",
+    "rows": [
+      {
+        "label": "Kestrel T2",
+        "crop_native_xyxy": [
+          680,
+          35,
+          1180,
+          235
+        ],
+        "before": "fleet-initial/00_kestrel/kestrel_cockpit.png",
+        "after": "fleet-final/00_kestrel/kestrel_cockpit.png",
+        "before_sha256": "587b08e24ed0737d72996b26b5acf5f0d5104fd8276d233cb762b733004842c8",
+        "after_sha256": "3651ff2481aa823441131f422f45e502ce50b60009c3e1151aef0dad5d12d4e0"
+      },
+      {
+        "label": "Bushmaster STOL",
+        "crop_native_xyxy": [
+          1170,
+          95,
+          1670,
+          295
+        ],
+        "before": "fleet-initial/02_bush/bush_cockpit.png",
+        "after": "fleet-final/02_bush/bush_cockpit.png",
+        "before_sha256": "ccd7193bdcf894eb345186cdead8de8757a5aae8f83092a0d934531128b9a303",
+        "after_sha256": "5a626fae70bd4ea992c3c4ec1481ac3e05742b5702ad701a8c731922740c80d0"
+      }
+    ],
+    "bytes": 390412,
+    "sheet_sha256": "a91f75a7d374b2f006ff23603bdd99d466ae293641acc0fa516765d8378d5150"
+  },
+  "02_cockpit_contacts": {
+    "file": "02_cockpit_contacts.png",
+    "title": "Closed cockpit contacts",
+    "caption": "Deck, brow and firewall pinholes closed without moving the instrument faces.",
+    "rows": [
+      {
+        "label": "Kestrel \u00b7 deck, pilot brow and firewall",
+        "crop_native_xyxy": [
+          500,
+          490,
+          1000,
+          675
+        ],
+        "before": "fleet-initial/00_kestrel/kestrel_cockpit.png",
+        "after": "fleet-final/00_kestrel/kestrel_cockpit.png",
+        "before_sha256": "587b08e24ed0737d72996b26b5acf5f0d5104fd8276d233cb762b733004842c8",
+        "after_sha256": "3651ff2481aa823441131f422f45e502ce50b60009c3e1151aef0dad5d12d4e0"
+      },
+      {
+        "label": "Swift S6 \u00b7 firewall fleck",
+        "crop_native_xyxy": [
+          750,
+          490,
+          1250,
+          690
+        ],
+        "before": "fleet-initial/07_swift_s6/swift_s6_cockpit.png",
+        "after": "round2-independent/07_swift_s6/swift_s6_cockpit.png",
+        "before_sha256": "69972d8e87e34c01a31dfc96b264c67527f9506c165dd78b92638cb0c69f271f",
+        "after_sha256": "ec498dfb02b7403ca16e08812a7d209050bfe7d3b31b339c80e5ab6240aad402"
+      },
+      {
+        "label": "Bushmaster \u00b7 firewall contact",
+        "crop_native_xyxy": [
+          1020,
+          465,
+          1520,
+          665
+        ],
+        "before": "fleet-initial/02_bush/bush_cockpit.png",
+        "after": "fleet-final/02_bush/bush_cockpit.png",
+        "before_sha256": "ccd7193bdcf894eb345186cdead8de8757a5aae8f83092a0d934531128b9a303",
+        "after_sha256": "5a626fae70bd4ea992c3c4ec1481ac3e05742b5702ad701a8c731922740c80d0"
+      }
+    ],
+    "bytes": 552490,
+    "sheet_sha256": "cb3c38134626f264416abc4f8ba506879580b46d459cdfc48348afcbdd218250"
+  },
+  "03_seat_webbing": {
+    "file": "03_seat_webbing.png",
+    "title": "Continuous shoulder webbing",
+    "caption": "Representative utility and jet seats: the bands now follow the padded backs.",
+    "rows": [
+      {
+        "label": "Bushmaster STOL",
+        "crop_native_xyxy": [
+          1350,
+          575,
+          1850,
+          855
+        ],
+        "before": "fleet-initial/02_bush/bush_cockpit_right.png",
+        "after": "fleet-final/02_bush/bush_cockpit_right.png",
+        "before_sha256": "791dfdb3d9d48ec9e1122f8220b77d504299b1471b57e7c5717c1a3720c7fd6f",
+        "after_sha256": "2f19fa3150dbf69264425ced927fa2cafc6ea55a98b4f74a958f6ed8fa212d01"
+      },
+      {
+        "label": "Starling 500 Jet",
+        "crop_native_xyxy": [
+          1220,
+          475,
+          1720,
+          795
+        ],
+        "before": "fleet-initial/06_starling/starling_cockpit_right.png",
+        "after": "fleet-final/06_starling/starling_cockpit_right.png",
+        "before_sha256": "174aa7aadd3f7d927d980a9175766904c8f1d5c65169284ed78fa5e17bb6ac92",
+        "after_sha256": "d4f4257e1206ef9af17b372aff3fed4d5151dfd8b51d32dc17ce5d00beacf28c"
+      }
+    ],
+    "bytes": 699909,
+    "sheet_sha256": "4f352aca448a7391117aead175b30778e473384667ccac66b5ac4da69f3e866f"
+  },
+  "04_atlas_controls": {
+    "file": "04_atlas_controls.png",
+    "title": "Atlas thrust levers and navigation tablet",
+    "caption": "Full-throttle shafts clear the tablet; the tablet-side shading is smooth.",
+    "rows": [
+      {
+        "label": "Same full-throttle camera \u00b7 unchanged tablet geometry",
+        "crop_native_xyxy": [
+          1190,
+          375,
+          1890,
+          1000
+        ],
+        "before": "fleet-initial/14_atlas_a180/atlas_a180_cockpit_down_throttle_full.png",
+        "after": "fleet-final/14_atlas_a180/atlas_a180_cockpit_down_throttle_full.png",
+        "before_sha256": "d474ffaa516e55ce54879207ce3c3e9d76eadc804a04943c502e602ad3087ecf",
+        "after_sha256": "0eeaaa9bd0eb1a588e8b91fb926c8ed3e5e61df4c3dc60bfeb21b247a1256ce9"
+      }
+    ],
+    "bytes": 722206,
+    "sheet_sha256": "480e0819759251033862098fe988543d9b8edfe44d051e8ec721869115645579"
+  },
+  "06_larkspur_window": {
+    "file": "06_larkspur_window.png",
+    "title": "Larkspur rear glazing",
+    "caption": "The authored aft oval now opens through the cabin wall with rounded trim.",
+    "rows": [
+      {
+        "label": "Rear-cabin aperture \u00b7 original seats and main-window pillar retained",
+        "crop_native_xyxy": [
+          650,
+          270,
+          1200,
+          670
+        ],
+        "before": "fleet-initial/13_larkspur_l4/larkspur_l4_cockpit_aft.png",
+        "after": "fleet-final/13_larkspur_l4/larkspur_l4_cockpit_aft.png",
+        "before_sha256": "c34a56339a10ebf4e23977ade45a6a4a8809c9b3650b88f14c85e5081dac685d",
+        "after_sha256": "b401af5cf87b4d5db00388fb39077a0f25f8ea9ce0dca8c50a16ffbf8f56104b"
+      }
+    ],
+    "bytes": 494352,
+    "sheet_sha256": "678267f5e000eb41040578dba6f4b00a5f4c75358179321ed5ed240912f8169d"
+  },
+  "07_specter_details": {
+    "file": "07_specter_details.png",
+    "title": "Specter cockpit detail",
+    "caption": "Smooth support shading and continuous stems on all 27 overhead toggles.",
+    "rows": [
+      {
+        "label": "Instrument-support inner rim",
+        "crop_native_xyxy": [
+          660,
+          480,
+          1360,
+          660
+        ],
+        "before": "fleet-initial/10_xr30_specter/xr30_specter_cockpit_down.png",
+        "after": "postrepair-gates/10_xr30_specter/xr30_specter_cockpit_down.png",
+        "before_sha256": "bfdd741c5ccae88c172567275d773e4b3056d6e113c0c1644015d4854ecd4f3b",
+        "after_sha256": "cd4eb6144ac557e85049e20ff9773256f84dc1553e854272cdb0a0a9917f09bd"
+      },
+      {
+        "label": "Overhead switch bank \u00b7 unchanged 9 mm capsules",
+        "crop_native_xyxy": [
+          600,
+          620,
+          1300,
+          920
+        ],
+        "before": "fleet-initial/10_xr30_specter/xr30_specter_cockpit_overhead.png",
+        "after": "round2-independent/10_xr30_specter/xr30_specter_cockpit_overhead.png",
+        "before_sha256": "939e3017f947c631eac5b2a3254e15c5b43589e1b9729a5dee989fc458d44dcc",
+        "after_sha256": "fc5c382c09e60e12d326f76f2f842c0d83af09ded6c16523f24b18c74d23e4c1"
+      }
+    ],
+    "bytes": 515018,
+    "sheet_sha256": "c954d95cd7590b717b8010d3ee9c83e8a2e49aa7096b7e28d679073c83cadc7c"
+  },
+  "05_atlas_vents_bezel": {
+    "file": "05_atlas_vents_bezel.png",
+    "title": "Atlas vents and instrument bezel",
+    "caption": "The vent is seated on the side console; the display bevel shades smoothly.",
+    "rows": [
+      {
+        "label": "Same pilot view \u00b7 floating vent moved onto the console",
+        "crop_native_xyxy": [
+          240,
+          540,
+          740,
+          1080
+        ],
+        "before": "fleet-initial/14_atlas_a180/atlas_a180_cockpit.png",
+        "after": "fleet-final/14_atlas_a180/atlas_a180_cockpit.png",
+        "before_sha256": "df01ddfc19089ff940c94da92874e1860b62b09f9bd3f2b916bccd7789eb8093",
+        "after_sha256": "6bc81dd460a9b3bde9bb6faf8d91685c12171ef06f4e8cdf59cb27f2b9001249"
+      },
+      {
+        "label": "Primary display \u00b7 diagonal bevel facets removed",
+        "crop_native_xyxy": [
+          700,
+          865,
+          1200,
+          1015
+        ],
+        "before": "fleet-initial/14_atlas_a180/atlas_a180_cockpit.png",
+        "after": "fleet-final/14_atlas_a180/atlas_a180_cockpit.png",
+        "before_sha256": "df01ddfc19089ff940c94da92874e1860b62b09f9bd3f2b916bccd7789eb8093",
+        "after_sha256": "6bc81dd460a9b3bde9bb6faf8d91685c12171ef06f4e8cdf59cb27f2b9001249"
+      }
+    ],
+    "bytes": 635860,
+    "sheet_sha256": "ab425f30f580c6376351b874ec62da4d4e33af90e76d362a8b9998e1a5606bde"
+  }
+}

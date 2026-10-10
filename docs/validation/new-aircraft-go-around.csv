@@ -1,0 +1,9 @@
+aircraft,airport,load,engines_out,induced_go_around,initial_mass_kg,wind_mps,mode,seconds,touchdown_sink_mps,stop_from_centre_m,cross_track_m,go_arounds,nav_max_bank_deg,nav_min_g,nav_max_g,max_rollout_cross_m,max_contact_cross_m,result,reason
+atlas_a180,CAP,mid,0,1,59942,0.0,comfort,896.7,1.23,278.9,0.03,1,25.94,0.854,1.243,0.05,3.50,PASS,
+atlas_a180,CAP,mid,0,1,59942,6.0,comfort,1408.4,0.75,212.1,6.26,1,25.69,0.844,1.274,7.41,10.88,PASS,
+atlas_a180,CAP,maximum,0,1,74385,0.0,comfort,1477.4,1.30,115.4,0.01,1,27.12,0.833,1.246,0.03,3.48,PASS,
+atlas_a180,CAP,maximum,0,1,74385,6.0,comfort,1468.1,1.77,37.6,5.24,1,26.93,0.832,1.269,7.37,10.83,PASS,
+atlas_a180,PVI,mid,0,1,59942,0.0,comfort,1098.4,1.21,6.5,0.05,1,25.26,0.837,1.243,0.05,3.50,PASS,
+atlas_a180,PVI,mid,0,1,59942,6.0,comfort,1042.6,1.03,113.2,1.75,1,25.40,0.816,1.288,2.34,5.80,PASS,
+atlas_a180,PVI,maximum,0,1,74385,0.0,comfort,1016.7,0.51,192.8,0.06,1,25.45,0.835,1.244,0.35,3.80,PASS,
+atlas_a180,PVI,maximum,0,1,74385,6.0,comfort,1068.4,1.19,4.8,3.88,1,25.51,0.823,1.277,5.68,9.15,PASS,

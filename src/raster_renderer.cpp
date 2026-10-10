@@ -40,7 +40,7 @@ bool Renderer::compileRaster(const std::function<void()>& step) {
     "uniform sampler2D uPartPose; uniform int uPartInst; out vec3 vB; flat out int vPc;\n"
     "void main(){ vec3 p = aPos; mat3 rot = uRot; vec3 at = uPos; vPc = -1;\n"
     "  if (uPartInst >= 0) { int b = (uPartInst + gl_InstanceID)*4; mat3 R = mat3(texelFetch(uPartPose, ivec2(b, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 1, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 2, 0), 0).xyz);\n"
-    "    vec3 T = texelFetch(uPartPose, ivec2(b + 3, 0), 0).xyz; p = R*aPos + T; if (uWreckParts == 1) { vPc = brkOwner(R*uPartC + T); rot = uPcRot[vPc]; at = uPcPos[vPc]; } }\n"
+    "    vec3 T = texelFetch(uPartPose, ivec2(b + 3, 0), 0).xyz; p = R*aPos + T; if (uWreckParts == 1) { vPc = brkRigidOwner(R*uPartC + T); rot = uPcRot[vPc]; at = uPcPos[vPc]; } }\n"
     "  vB = p; gl_Position = uVP*vec4(rot*p + at, 1.0); }\n";
   e.clear(); progShMapWreck = linkProgramCached(std::string("#version 330 core\nuniform int uWreck;\n") + kWreckClip + kShMapWreckVS,
                                                 std::string("#version 330 core\nin vec3 vB; flat in int vPc; uniform int uWreck;\n") + kWreckClip + "void main(){ if (vPc < 0 && brkOwner(vB) != uPcK) discard; }\n", e);

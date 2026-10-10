@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "iteration": "fleet-interiors-v8-crew-fit",
-  "coordinate_note": "Pilot, copilot and system records are [body x, metres below pilot eye, metres aft of packed panel station, scale]. Exterior model identity and roster remain unchanged. XR20 accepted cockpit and the XR30/40 research modules retain separate role-specific physical geometry.",
+  "iteration": "fleet-interiors-v9-larkspur-atlas",
+  "coordinate_note": "Pilot, copilot and system records are [body x, metres below pilot eye, metres aft of packed panel station, scale]. Model IDs are stable; dedicated research interiors 10\u201312 do not consume fleet records.",
   "aircraft": [
     {
       "model": 0,
@@ -591,6 +591,124 @@
         0.2,
         0.23,
         0.6
+      ]
+    },
+    {
+      "model": 13,
+      "name": "Larkspur L4",
+      "design": "Four-seat olive and ivory utility tourer: raised captain six-pack, recessed right companion scan, offset power/status tower, low compact linked sticks and narrow push-pull console",
+      "pilot": [
+        -0.3,
+        0.325,
+        0.012,
+        1.25
+      ],
+      "copilot": [
+        0.365,
+        0.365,
+        -0.05,
+        0.99
+      ],
+      "systems": [
+        0.037,
+        0.345,
+        0.055,
+        1.09
+      ],
+      "status": [
+        0.05,
+        0.56,
+        0.105,
+        0.105
+      ],
+      "structure": [
+        0.171,
+        0.02,
+        0.014,
+        0.03
+      ],
+      "controls": [
+        0.66,
+        0.32,
+        -0.028,
+        0.69
+      ],
+      "pedestal": [
+        0.075,
+        0.14,
+        0.245,
+        0.105
+      ],
+      "trim": [
+        0.62,
+        0.59,
+        0.46,
+        0.31
+      ],
+      "cloth": [
+        0.19,
+        0.24,
+        0.15,
+        0.15
+      ]
+    },
+    {
+      "model": 14,
+      "name": "Atlas A180",
+      "design": "Two-crew wraparound blueglass flightdeck: inward-canted equal flight/navigation bridges, shared engine display, low utility and navigation deck, floor yokes, paired thrust pedestal and reachable overhead systems",
+      "pilot": [
+        -0.72,
+        0.39,
+        0.04,
+        1.7
+      ],
+      "copilot": [
+        0.72,
+        0.39,
+        0.04,
+        1.7
+      ],
+      "systems": [
+        0,
+        0.365,
+        0.065,
+        1.63
+      ],
+      "status": [
+        -0.287,
+        0.36,
+        0.1,
+        0.068
+      ],
+      "structure": [
+        0.162,
+        0.014,
+        0.025,
+        0.045
+      ],
+      "controls": [
+        0.64,
+        0.08,
+        0,
+        0.67
+      ],
+      "pedestal": [
+        0.19,
+        0.185,
+        0.41,
+        0.18
+      ],
+      "trim": [
+        0.22,
+        0.28,
+        0.34,
+        0.2
+      ],
+      "cloth": [
+        0.085,
+        0.12,
+        0.17,
+        0.55
       ]
     }
   ]

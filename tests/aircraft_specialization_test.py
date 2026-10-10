@@ -63,8 +63,9 @@ for axis in 'xyz':
     assert f'if (bw.{axis} > 0.0)' in mesh_mat
 print('PASS: v3.39 family guards, per-aircraft dispatch, terrain-helper exclusion, projection skip')
 
+aircraft_count = int(re.search(r'kAircraftCount = (\d+)', read('src/aircraft.h')).group(1))
 if a.shader_dir:
-    own = [f'plane_mesh_af{m}.frag' for m in range(13)]
+    own = [f'plane_mesh_af{m}.frag' for m in range(aircraft_count)]
     mesh_names = ('plane_mesh.frag', 'plane_mesh_safegear.frag') + tuple(own)
     for name in mesh_names + ('terrain.frag', 'map.frag'):
         path = a.shader_dir / name
@@ -74,23 +75,29 @@ if a.shader_dir:
             present = bool(re.search(r'\b' + helper + r'\s*\(', source))
             assert present == (name not in mesh_names), (name, helper, present)
         subprocess.run([a.validator, '-l', str(path)], check=True, stdout=subprocess.PIPE)
-    print('PASS: the shared and all thirteen own aircraft mesh builds exclude terrain helpers; terrain/map retain them; all link')
+    print('PASS: the shared and all own aircraft mesh builds exclude terrain helpers; terrain/map retain them; all link')
     # each aircraft's own code (a function only it runs) in its own programs, and in no other aircraft's: the mesh
     # pass's and the bake's, as the driver gets them
     own_code = {
-        'mapFleetPanel': range(10), 'shadeFleetCabin': range(10), 'fuselagePaint': (*range(10), 11),
+        'mapFleetPanel': (*range(10), 13, 14), 'shadeFleetCabin': (*range(10), 13, 14), 'fuselagePaint': (*range(10), 11, 13, 14),
         'swiftSeatPadded': (7,), 'swiftPowerFurniture': (7,), 'swiftYokeWheel': (7,), 'swiftDisplayRearSupports': (7,),
         'bushSeatPadded': (2,), 'bushmasterPowerFurniture': (2,), 'bushmasterStickGrip': (2,), 'bushRaisedPrimaryRisers': (2,),
         'mapOspreyCabinTrim': (8,), 'ospreyCabinAlbedo': (8,), 'twinPowerBankField': (3, 8),
         'mapMantisCockpit': (11,),
+        'atlasFanPose': (14,), 'atlasFanField': (14,),
+        'atlasMainKnee': (14,), 'atlasGearFoldR': (14,), 'atlasMainDoorWidth': (14,), 'atlasMainDoorAngle': (14,),
+        'atlasFixedWingFootprint': (14,), 'atlasRootFairing': (14,), 'atlasFairingOwns': (14,),
+        'larkspurStickShaft': (13,), 'larkspurStickGrip': (13,), 'larkspurStickPivot': (13,),
+        'atlasNavFrame': (14,), 'atlasOverheadFrame': (14,), 'mapNewFleetFurnishings': (13, 14),
         'mapJet': (10,), 'mapJetCockpit': (10,), 'jetScreen': (10,), 'jtNozzleShape': (10,),
         'mapWraith': (12,), 'mapWraithCockpit': (12,), 'wraithScreen': (12,), 'shadeWraithCockpit': (12,),
     }
     shading = ('shadeFleetCabin', 'fuselagePaint', 'ospreyCabinAlbedo', 'jetScreen', 'wraithScreen', 'shadeWraithCockpit')
     cabin = ('mapFleetPanel', 'swiftSeatPadded', 'swiftPowerFurniture', 'swiftYokeWheel', 'swiftDisplayRearSupports', 'bushSeatPadded',
              'bushmasterPowerFurniture', 'bushmasterStickGrip', 'bushRaisedPrimaryRisers', 'mapOspreyCabinTrim', 'twinPowerBankField',
-             'mapMantisCockpit', 'mapJetCockpit', 'mapWraithCockpit')
-    for m in range(13):
+             'mapMantisCockpit', 'mapJetCockpit', 'mapWraithCockpit', 'larkspurStickShaft', 'larkspurStickGrip',
+             'larkspurStickPivot', 'atlasNavFrame', 'atlasOverheadFrame', 'mapNewFleetFurnishings')
+    for m in range(aircraft_count):
         for prog in (f'plane_mesh_af{m}.frag', f'hullbake_af{m}.frag', f'hullbake_out_af{m}.frag', f'objects_af{m}.frag', f'shadow_proxy_af{m}.frag'):
             src = (a.shader_dir / 'pruned' / prog).read_text()
             for fn, owners in own_code.items():
@@ -98,13 +105,13 @@ if a.shader_dir:
                 want = m in owners and not (prog.startswith(('hullbake', 'shadow_proxy')) and fn in shading)   # (the march shades what it finds, as the mesh pass does)
                 want = want and not (prog.startswith('hullbake_out') and fn in cabin)   # (the outside body's builder: no cabin)
                 assert defined == want, (prog, fn, 'defined' if defined else 'missing')
-    for m in range(13):   # (and the outside body's builder has no cabin at all, while the cockpit's has it)
+    for m in range(aircraft_count):   # (and the outside body's builder has no cabin at all, while the cockpit's has it)
         out = (a.shader_dir / 'pruned' / f'hullbake_out_af{m}.frag').read_text()
         ck = (a.shader_dir / 'pruned' / f'hullbake_af{m}.frag').read_text()
         for fn in ('loadCabinFit', 'interiorAO'):
             assert not re.search(r'^\w+\s+' + fn + r'\s*\(', out, re.M), (m, fn, 'in the outside builder')
             assert re.search(r'^\w+\s+' + fn + r'\s*\(', ck, re.M), (m, fn, 'missing from the cockpit builder')
-    for m in range(13):   # (each own mesh build draws a traffic aircraft of its type as that aircraft: its data, not the player's)
+    for m in range(aircraft_count):   # (each own mesh build draws a traffic aircraft of its type as that aircraft: its data, not the player's)
         src = (a.shader_dir / 'pruned' / f'plane_mesh_af{m}.frag').read_text()
         assert 'bool traf=uMeshTraffic>=0;' in src and 'if(traf){loadTraffic(uMeshTraffic);trafficXf(uMeshTraffic);}' in src, (m, 'traffic drawn with the player\'s data')
     print('PASS: each aircraft\'s own mesh, bake (outside and cockpit), march and shadow programs hold its own code and no other aircraft\'s')

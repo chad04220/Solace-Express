@@ -1,0 +1,17 @@
+[
+  {
+    "final": "../new-aircraft-review/fleet-final/14_atlas_a180/atlas_a180_bay_gear_up_belly.png",
+    "baseline": "../new-aircraft-review/atlas-ramp-final/14_atlas_a180/atlas_a180_bay_gear_pct000_belly.png",
+    "pixel_exact": true
+  },
+  {
+    "final": "../new-aircraft-review/fleet-final/14_atlas_a180/atlas_a180_bay_gear_half_belly.png",
+    "baseline": "../new-aircraft-review/atlas-ramp-final/14_atlas_a180/atlas_a180_bay_gear_pct050_belly.png",
+    "pixel_exact": true
+  },
+  {
+    "final": "../new-aircraft-review/fleet-final/14_atlas_a180/atlas_a180_bay_gear_down_belly.png",
+    "baseline": "../new-aircraft-review/atlas-ramp-final/14_atlas_a180/atlas_a180_bay_gear_pct100_belly.png",
+    "pixel_exact": true
+  }
+]

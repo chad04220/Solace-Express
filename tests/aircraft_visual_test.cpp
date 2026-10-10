@@ -160,8 +160,8 @@ int main(int argc,char**argv) {
   setvbuf(stdout,nullptr,_IONBF,0);
   if(argc<2) { puts("Usage: aircraft_visual_test OUTPUT_DIR [WIDTH HEIGHT] [first-aircraft last-aircraft]"); return 2; }
   int W=argc>2?atoi(argv[2]):480,H=argc>3?atoi(argv[3]):300;
-  int first=argc>4?atoi(argv[4]):0,last=argc>5?atoi(argv[5]):kWraith;   // (the whole roster: the career types, then the research craft)
-  if(W<16||H<16||first<0||last>kWraith||first>last) return 2;
+  int first=argc>4?atoi(argv[4]):0,last=argc>5?atoi(argv[5]):kAircraftCount-1;   // (all stable roster identities, including appended conventional aircraft)
+  if(W<16||H<16||first<0||last>=kAircraftCount||first>last) return 2;
   std::filesystem::path out(argv[1]); std::filesystem::create_directories(out);
   if(!initGL(W,H)) { puts("EGL failed"); return 2; }
   printf("Renderer: %s\n",glGetString(GL_RENDERER));

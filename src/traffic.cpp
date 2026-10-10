@@ -11,7 +11,7 @@
 
 static const float G = 9.81f;
 static float wrapPi(float a) { while (a > PI) a -= 2 * PI; while (a < -PI) a += 2 * PI; return a; }
-static float gearH(const AircraftSpec& s) { return s.taildragger ? s.fusRad + 0.45f : s.fusRad * 1.3f + (s.engineType == ENG_JET || s.engines == 2 ? 0.75f : 0.55f); }
+static float gearH(const AircraftSpec& s) { if (s.gearHeightM > 0.f) return s.gearHeightM; return s.taildragger ? s.fusRad + 0.45f : s.fusRad * 1.3f + (s.engineType == ENG_JET || s.engines == 2 ? 0.75f : 0.55f); }
 static bool bigAircraft(int spec) { return spec == 5 || spec == 6; }
 static bool jetLike(int spec) { return kAircraft[spec].engineType == ENG_JET; }
 
@@ -791,6 +791,13 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
     vec3 cp[3] = {vec3(-track,-gh,s.taildragger?-.10f*len:.04f*len),
                   vec3(track,-gh,s.taildragger?-.10f*len:.04f*len),
                   s.taildragger?vec3(0,-gh+.11f*len,.45f*len):vec3(0,-gh,-.36f*len)};
+    // Authored gear must sample travel at its real contact stations. Keep the
+    // historic sampler exact for aircraft without authored gear overrides.
+    if (s.gearHeightM > 0.f || s.gearTrackM > 0.f) {
+      const GearStations gs = gearStations(s);
+      cp[0] = vec3(-gs.track,-gh,gs.mainZ); cp[1] = vec3(gs.track,-gh,gs.mainZ);
+      cp[2] = s.taildragger ? vec3(0,-gh+gs.tailY,gs.tailZ) : vec3(0,-gh,gs.noseZ);
+    }
     float steer = s.special ? 0.f : c.ctlYaw*.45f*smoothstepf(30.f,4.f,c.speed)*(s.taildragger?-1.f:1.f);
     vec3 fw = q0.rotate(vec3(0,0,-1)) + c.q.rotate(vec3(0,0,-1)); fw.y = 0;
     fw = length(fw)>1e-5f ? normalize(fw) : c.q.rotate(vec3(0,0,-1));
@@ -855,9 +862,7 @@ int Traffic::fillVisuals(vec3 camPos, TrafficVisual* out, int maxN, int* order) 
     packModel(s, c.spec, gearH(s), t);
     float bound = std::max(t[0], t[36] * 2.f) * 0.55f + 1.5f;
     vec3 r = c.q.rotate(vec3(1, 0, 0)), u = c.q.rotate(vec3(0, 1, 0)), b = c.q.rotate(vec3(0, 0, 1));
-    const ModelDef& m=kModels[c.spec];
-    float wr=s.special?.38f:m.wheelR;
-    float nr=s.special?.33f:s.taildragger?.10f:m.gear==3?wr*.75f:wr*.85f;
+    float wr,nr; modelWheelRadii(c.spec,wr,nr);
     float steer=s.special?0.f:c.ctlYaw*.45f*smoothstepf(30.f,4.f,c.speed)*(s.taildragger?-1.f:1.f);
     // The rotation-column .w components were unused; the existing 32-texel traffic stride stays unchanged.
     float v[32] = {c.pos.x, c.pos.y, c.pos.z, bound,

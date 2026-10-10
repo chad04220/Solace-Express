@@ -6,7 +6,7 @@ import json, math, re, sys, os, hashlib
 from pathlib import Path
 root=Path(os.environ.get('COCKPIT_CONTRACT_ROOT',Path(__file__).resolve().parents[1]))
 layout=json.loads((root/'assets/cockpits/layouts.json').read_text())['aircraft']
-source=(root/'src/models.cpp').read_text(); blocks=source.split('// ----------------------------------------------------------------')[1:11]
+source=(root/'src/models.cpp').read_text(); blocks=source.split('// ----------------------------------------------------------------')[1:16]
 number=r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?'
 models=[]
 for i,block in enumerate(blocks):
@@ -25,13 +25,16 @@ def section(m,z):
 def fuselage(m,p):
     hw,hh,cy=section(m,p[2]);x,y=p[0],p[1]-cy;mn=min(hw,hh);rnd=m['roundness'];ell=(math.hypot(x/hw,y/hh)-1)*mn;r=mn*(.3+.7*rnd);dx,dy=abs(x)-hw+r,abs(y)-hh+r;rr=math.hypot(max(dx,0),max(dy,0))+min(max(dx,dy),0)-r;return rr*(1-rnd)+ell*rnd
 def module(model,L,tile):
-    m=L[['pilot','copilot','systems','status'][tile]];glass=model in (5,6,9);twin=model in (3,8) or glass
+    m=L[['pilot','copilot','systems','status'][tile]];glass=model in (5,6,9,14);twin=model in (3,8) or glass
     h=([.184,.092] if glass else [.147,.099]) if tile<2 else ([.105,.094] if glass else [.087 if twin else .052,.096]) if tile==2 else [1,.70]
     return m,[x*m[3] for x in h]
 def point(E,m,tile,p):
     y,z=p[1],p[2]
     if tile==3: y,z=math.cos(.35)*y+math.sin(.35)*z,-math.sin(.35)*y+math.cos(.35)*z
-    return [m[0]+p[0],E[1]-m[1]+y,E[2]-(.85 if E[3] else .68)+m[2]+z]
+    x=p[0]
+    if len(E)>4 and E[4]==14 and tile<2:
+        a=-.16 if tile==0 else .16;x,z=math.cos(a)*x-math.sin(a)*z,math.sin(a)*x+math.cos(a)*z
+    return [m[0]+x,E[1]-m[1]+y,E[2]-(.85 if E[3] else .68)+m[2]+z]
 
 # Bushmaster's raised primary panel intentionally fails the generic eye-drop
 # proxy. Test the actual forward path instead, without relaxing face/skin fit.
@@ -48,7 +51,7 @@ def bushmaster_forward_contract(md,L):
     housing='floatfleetHousing(vec3q,vec2h,floatradius,floatchamfer){floatbody=sdRoundBox(q,vec3(h+vec2(.022),.050),radius);floatcorner=(abs(q.x)+abs(q.y)-(h.x+h.y+.044-chamfer))*.70710678;returnmax(body,corner);}'
     assert housing in fittings, 'fleetHousing changed: update CPU mirror before accepting model2'
     assert 'floatbody=fleetHousing(q,h,min(L.structure.y,.025),L.structure.z);' in fittings
-    assert 'vec3fleetModuleFrame(vec3p,inti,vec4mount){vec3q=p-cockpitMount(mount);if(i==3)q.yz=rot2(q.yz,.35);returnq;}' in fittings
+    assert 'vec3fleetModuleFrame(vec3p,inti,vec4mount){vec3q=p-cockpitMount(mount);if(i==3)q.yz=rot2(q.yz,.35);if(gModelId==14&&i<2)q.xz=rot2(q.xz,i==0?.16:-.16);returnq;}' in fittings
     layout_shader=shader_text[root/'src/shaders/cockpit_layout.glsl']
     assert 'vec2(.147,.099)' in layout_shader and 'vec3(m.x,gM[22].y-m.y,gM[21].w+m.z)' in layout_shader
     # Parse dimensions from the actual helper, not the historical result JSON.
@@ -65,12 +68,16 @@ def bushmaster_forward_contract(md,L):
     assert match, 'unsupported low-brow formula: reconcile CPU mirror'
     by,bz,bx,hy,hz,br,inset=map(float,match.groups())
     assert inset>=.066, 'pilot brow must retain its 6 mm inner-shell separation'
+    # Generic brows are now named before dispatch so the Kestrel-only return
+    # can be expressed once. Both Bushmaster compilation branches must still
+    # select its own parsed low-brow helper, never that generic fallback.
+    assert 'floatbrow=sdRoundBox(lip,vec3(h.x+.027,.014,.083),.012);' in fittings
+    assert 'if(gModelId==0&&i==0)brow=max(sdRoundBox(lip+vec3(.025,0,0),vec3(h.x+.052,.014,.083),.012),fuselage+.040);' in fittings
     dispatches=[
-        'if(fleetIndividualBrow(i))outv=opU(outv,vec2(gModelId==2?bushShellFittedPilotBrow(p,fuselage):sdRoundBox(lip,vec3(h.x+.027,.014,.083),.012),14.0));',
-        'if(fleetIndividualBrow(i))outv=opU(outv,vec2(gModelId==2?bushShellFittedPilotBrow(p,fuselage):gModelId==7?swiftShellFittedPilotBrow(p,fuselage):sdRoundBox(lip,vec3(h.x+.027,.014,.083),.012),14.0));',
-        'if(gModelId==2&&i==0)outv=opU(outv,vec2(bushShellFittedPilotBrow(p,fuselage),14.0));else'
+        'if(fleetIndividualBrow(i))outv=opU(outv,vec2(gModelId==2?bushShellFittedPilotBrow(p,fuselage):brow,14.0));',
+        'if(fleetIndividualBrow(i))outv=opU(outv,vec2(gModelId==2?bushShellFittedPilotBrow(p,fuselage):gModelId==7?swiftShellFittedPilotBrow(p,fuselage):brow,14.0));'
     ]
-    assert any(v in fittings for v in dispatches), 'model2 low brow not dispatched by panel renderer'
+    assert all(v in fittings for v in dispatches), 'model2 low brow not dispatched in both panel-renderer compilation branches'
     assert 'if(gModelId==2||gModelId==4||gModelId==7)returntile==0;' in fittings, 'individual brow selection changed'
     assert 'sdRoundBox(q-vec3(0,h.y+.012,.060),vec3(h.x*.92,.005,.008),.004)' in fittings, 'satin rim changed'
     primitives=shader_text[root/'src/shaders/plane_common.glsl']
@@ -123,8 +130,8 @@ def bushmaster_forward_contract(md,L):
     return rows, brow_path
 
 rows=[];fail=[];checks=0
-for i,L in enumerate(layout):
-    md=models[i];E=md['eye']+[i in (5,6,9)];worst=(-1e9,None)
+for L in layout:
+    i=L['model'];md=models[i];E=md['eye']+[i in (5,6,9,14),i];worst=(-1e9,None)
     for tile in range(4):
         m,h=module(i,L,tile)
         # The original visible face / outer-skin requirement remains 45 mm for EVERY model.

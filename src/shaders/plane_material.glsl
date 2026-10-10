@@ -10,9 +10,9 @@ vec4 gearWheelFrame(vec3 p, out float halfWidth, out bool braked){
   bool research = RESEARCH_ON && engine >= 5;
   float gh = G1.x;
   float wr = research ? 0.38 : G0.y;
-  float mh = research ? JT_TYRE_H : kind == 3 ? 0.11 : kind == 0 ? 0.065 : kind == 1 ? 0.09 : kind == 2 ? 0.14 : 0.10;
-  float nwr = research ? 0.33 : kind == 3 ? wr*0.75 : wr*0.85;
-  float nh = research || kind == 3 ? 0.07 : 0.055;
+  float mh = isAtlas() ? .145 : research ? JT_TYRE_H : kind == 3 ? 0.11 : kind == 0 ? 0.065 : kind == 1 ? 0.09 : kind == 2 ? 0.14 : 0.10;
+  float nwr = research ? .33 : gearNoseR();
+  float nh = isAtlas()?.115:research || kind == 3 ? .07 : .055;
   vec3 mq, nq;
 #if HAS_RESEARCH
   if (research) {   // (the research jets' wheels from their parts' poses: plane_parts.glsl jtMainPose, jtNosePose)
@@ -26,6 +26,7 @@ vec4 gearWheelFrame(vec3 p, out float halfWidth, out bool braked){
     Pose X = gearPartPose(PT_GEAR_MAIN, vec2(p.x < 0.0 ? -1.0 : 1.0, 0.0));
     mq = transpose(X.R)*(p - X.T) - vec3(G0.x, wr - gh, G0.z);
     if (kind == 3) mq.x = abs(mq.x) - 0.22;
+    if (isAtlas()) {mq.x=abs(mq.x)-.34;mq.z=abs(mq.z)-.62;}
     if (G1.z > 0.5) {
       nwr = 0.10; nh = 0.035;
       nq = p - vec3(0.0, 0.0, G1.y); nq.xz = rot2(nq.xz, -gPS.z);
@@ -34,6 +35,7 @@ vec4 gearWheelFrame(vec3 p, out float halfWidth, out bool braked){
       float ns = max(gearNoseShow(), 1e-3); Pose N = gearNosePose(ns);
       nq = transpose(N.R)*(p - N.T)/ns - vec3(0.0, nwr - gh, 0.0);
       if (kind == 3) nq.x = abs(nq.x) - 0.15;
+      if (isAtlas()) nq.x=abs(nq.x)-.25;
     }
   }
   braked = dot(mq, mq) < dot(nq, nq);
@@ -124,6 +126,10 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
           float fd = length(vec2(arc - 0.09*floor(arc/0.09 + 0.5), lp.z - zs + 0.02));
           rv = max(rv, (1.0 - smoothstep(0.005, 0.005 + px, fd))*smoothstep(0.012, 0.003, px)*step(-0.2, yr));
         }
+        if(isAtlas() && lp.z < -19.60) {
+          // A smooth composite radome has one service joint, no metal skin stringer grid.
+          sm=1.0-smoothstep(.004,.004+px,abs(lp.z+19.76));rv=0.0;
+        }
         m.alb *= 1.0 - 0.32*sm; m.alb *= 1.0 + 0.12*rv; m.rough = mix(m.rough, 0.18, rv);
         // registration on the rear fuselage sides, "SX-" and three letters (the player's from uReg, the one
         // the towers call; each traffic aircraft its own), reading front to back from either side
@@ -148,22 +154,36 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
         }
       }
       float post = ck == 2 ? min(abs(lp.x) - 0.03, abs(abs(lp.x) - abs(E.x) - 0.42) - 0.035) : abs(lp.x) - 0.025;
-      bool ws = lp.z > WS.x && lp.z < WS.y && lp.y > WS.z;
-      float sideTop = sec.z + sec.y*0.78;
-      bool sideW = lp.z > WS.y && lp.z < WS.w && lp.y > WS.z - 0.12 && lp.y < sideTop && abs(lp.x) > 0.3 && abs(lp.z - WS.y - 0.04) > 0.025;
+      bool ws = lp.z > WS.x && lp.z < WS.y && lp.y > WS.z && (!isAtlas() || lp.y<1.20);
+      float sideTop = isAtlas()?min(sec.z+sec.y*.78,1.22):sec.z+sec.y*.78;
+      bool sideW = lp.z > WS.y && lp.z < WS.w && lp.y > (isAtlas()?WS.z:WS.z-.12) && lp.y < sideTop && abs(lp.x) > 0.3 && abs(lp.z - WS.y - 0.04) > 0.025;
       bool frame = (ws && post <= 0.0) || (lp.z > WS.x - 0.03 && lp.z < WS.w + 0.03 && lp.y > WS.z - 0.15 && lp.y < sideTop + 0.03 && abs(lp.x) > 0.3 && !sideW && lp.z > WS.y);
+#if HAS_ATLAS
+      if(isAtlas()) {
+        float pane=atlasWindow(lp);ws=pane<0.0;sideW=false;post=1.0;
+        frame=pane>=0.0&&pane<.040;
+      }
+#endif
       if ((ws && post > 0.0) || sideW) { m.alb = vec3(0.012, 0.016, 0.02); m.rough = 0.03; m.metal = 0.2; }
       else if (frame) m.alb *= 0.55;
       int nw = int(gM[20].x + 0.5);
       if (nw > 0 && abs(lp.x) > sec.x*0.4 && lp.z > gM[20].y && lp.z < gM[20].z) {
-        float pw = (gM[20].z - gM[20].y)/float(nw);
-        vec2 wq = vec2(mod(lp.z - gM[20].y, pw) - pw*0.5, lp.y - (sec.z + gM[20].w));
-        vec2 hs = gM[21].xy; float rr = min(hs.x, hs.y)*0.7;
-        vec2 dq = abs(wq) - hs + rr; float wd = length(max(dq, 0.0)) + min(max(dq.x, dq.y), 0.0) - rr;
+        float wd=fleetPassengerPane(lp,sec);
         if (wd < 0.0) { m.alb = vec3(0.02, 0.025, 0.03); m.rough = 0.05; m.emit = vec3(1.0, 0.85, 0.6)*uNight*0.5; }
         else if (wd < 0.022) m.alb *= 0.7;
       }
-      if (ck == 2 && lp.z < WS.x && lp.z > WS.x - 2.0 && yr > 0.2) { m.alb = vec3(0.02); m.rough = 0.85; }
+      if(isAtlas() && abs(lp.x)>sec.x*.70) {
+        // Real-size forward/aft entry doors and two overwing emergency exits.
+        float dz=min(abs(lp.z+14.55),abs(lp.z-12.90));
+        vec2 dq=abs(vec2(dz,lp.y-.08))-vec2(.47,.98)+.11;
+        float dd=length(max(dq,0.0))+min(max(dq.x,dq.y),0.0)-.11;
+        float px=max(.002,t*2.0*uTanHalf/uRes.y);
+        float outline=1.0-smoothstep(.012,.012+px,abs(dd));
+        m.alb=mix(m.alb,vec3(.18,.22,.24),outline*.82);
+        if(dz<.08 && abs(lp.y+.11)<.026) {m.alb=vec3(.57,.60,.62);m.metal=.8;}
+        if(dz<.12 && abs(lp.y-.60)<.15) {m.alb=vec3(.03,.065,.075);m.rough=.08;}
+      }
+      if (ck == 2 && !isAtlas() && lp.z < WS.x && lp.z > WS.x - 2.0 && yr > 0.2) { m.alb = vec3(0.02); m.rough = 0.85; }
       if (int(gM[0].z + 0.5) == 0 && lp.z < gM[1].x + 0.3 && ln.z < -0.4 && abs(lp.x) > 0.11 && abs(lp.x) < sec.x*0.8 && abs(yr + 0.15) < 0.35) m.alb = vec3(0.02);
       if (int(gM[0].z + 0.5) == 1 && lp.z < gM[1].x + 0.7 && lp.y < sec.z - sec.y*0.45 && ln.z < -0.3) m.alb = vec3(0.02);
     }
@@ -173,7 +193,12 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     float cc = (lp.z - gM[10].y - le)/ch;
     m.alb = gColBase*0.98;
     if (s > gM[9].x*0.9) m.alb = gColStripe;
-    if (gM[19].w > 0.5 && cc < 0.045) { m.alb = vec3(0.06); m.rough = 0.6; }
+    if(isAtlas()) {
+      m.alb=vec3(.65,.69,.72);
+      if(cc<.09){m.alb=vec3(.73,.78,.80);m.metal=.7;m.rough=.23;}
+      if(lp.y>gM[10].x+s*gM[10].z+.18 && s>gM[9].x-.20)m.alb=gColStripe;
+    }
+    if (mod(gM[19].w, 2.0) > 0.5 && cc < 0.045) { m.alb = vec3(0.06); m.rough = 0.6; }
     {   // ribs every 0.8 m, the spars' seams along the span, rivets down them; a fuel cap on top of each wing
       float px = t*2.0*uTanHalf/uRes.y;
       float sm = seamLine(s, 0.8, 0.0035, px)*step(0.05, cc);
@@ -196,8 +221,24 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     float fh = (lp.y - gM[15].x)/max(gM[14].x, 0.1), fle = gM[15].y + gM[14].w*clamp(fh, 0.0, 1.0);
     if (fh > 0.42 - 0.18*clamp((lp.z - fle)/max(gM[14].y, 0.1), 0.0, 1.0) && abs(lp.x) < 0.25) m.alb = gColStripe;
     if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
+    if(isAtlas() && lp.y>gM[15].x && abs(lp.x)<.6) {
+      m.alb=gColStripe*.85;
+      float ribbon=lp.z-fle-1.15-.42*(lp.y-gM[15].x);
+      if(abs(ribbon)<.18)m.alb=vec3(.27,.67,.72);
+      if(ribbon>.25 && ribbon<.40)m.alb=vec3(.91,.94,.93);
+    }
+    if(isLarkspur() && fh>.35 && abs(lp.x)<.20) {
+      m.alb=gColStripe;
+      if(abs(lp.z-fle-.38)<.035)m.alb=vec3(.78,.39,.16);
+    }
   } else if (mid == 5) {
     m.alb = gColBase*0.96; m.rough = 0.3;
+    if(isAtlas()) {
+      float dz=lp.z-gM[16].w;
+      if(lp.y<gM[16].y+.80)m.alb=mix(gColStripe,gColBase,.15);
+      float seam=1.0-smoothstep(.009,.022,min(abs(dz-1.8),abs(dz-3.4)));
+      m.alb*=1.0-.35*seam;
+    }
     if (int(gM[0].z + 0.5) == 4 && lp.z < gM[16].w + 0.3) { m.alb = vec3(0.85); m.metal = 1.0; m.rough = 0.18; }
   } else if (mid == 6) { m.alb = vec3(0.025); m.rough = 0.85; }
   else if (mid == 8) { m.alb = gM[11].x > 0.5 && length(lp.xz) > 1.2 && lp.y > -0.3 ? gColBase*0.95 : vec3(0.6, 0.61, 0.63); m.metal = 0.5; m.rough = 0.35; }
@@ -516,7 +557,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
 #endif
 #if HAS_FLEET_CABIN
   if (FLEET_ON && fleetCabin()) {
-    if (mid>=140 && mid<=146) interior=true;
+    if (mid>=140 && mid<=148) interior=true;
     shadeFleetCabin(m,mid,lp,ln,t*2.0*uTanHalf/uRes.y);
   }
 #endif

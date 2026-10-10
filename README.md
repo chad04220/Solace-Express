@@ -63,6 +63,8 @@ Cruise, take-off roll and landing distance are what each aircraft actually does 
 
 The game shows no key prompts during flight. Open **Controls** from the main menu, the pause menu or the Settings tab to see every binding. To remap one, click its keyboard or controller cell and press the new key or button (Esc / Menu cancels, right-click clears the binding). A key that's already used in the same group swaps over, and **Reset to defaults** restores the table below. Bindings are saved in `settings.cfg`. The arrow keys, PgUp / PgDn, the number keys, the sticks and the triggers are fixed.
 
+**XR-40 manual VTOL (90-degree pod notch):** hold throttle-up (default **Shift**, **PgUp** or **+**) for full power, or hold **1–9** for a partial-power target. **RT** commands power proportionally; **LT** reduces it, and throttle-down or **0** commands idle. Releasing the power control commands idle and the engines wind down at their normal spool rate. Held controls must be released after pausing or changing input context before they can apply power again. Forward flight, the intermediate pod notches, and engaged autopilot retain their existing throttle controls.
+
 | Key (default) | Action | Gamepad (default) |
 |---|---|---|
 | W / S or ↑ / ↓ | Pitch down / up | Left stick |

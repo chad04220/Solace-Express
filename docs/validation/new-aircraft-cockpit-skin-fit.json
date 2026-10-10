@@ -1,0 +1,286 @@
+{
+  "source_hashes": {
+    "src/models.cpp": "d87dc5a55c0260e64a7699173eb6c4d99f71930fbfa9af72ce19996c3017c168",
+    "assets/cockpits/layouts.json": "ce05d010c54b2853ed104aabbce8fa9e182f2f44f8ca019a33f53775ba8de2cb",
+    "src/shaders/cockpit_layout.glsl": "63e1bda17892a3068199f98833bcce91f8d1d756395810368bd375485fb2c103",
+    "src/shaders/cockpit_fittings.glsl": "347cd84ba6fa01a8c53817ce0d39e6a9dfa005c64cbde53625c9b5dee66d8e4c",
+    "src/shaders/plane_sdf.glsl": "da584ce6a46eb8389ec5d9cc5c1e8bf929e8ea3b19e44ef3c7567004b5ad10c3",
+    "src/shaders/plane_common.glsl": "c8c514c7590910dec2f9f74764d11ab1a2c0b7979fd40201abd9c6769b2fd076"
+  },
+  "model2_forward_rays": [
+    {
+      "seat": -1,
+      "down_degrees": 0,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.06174229853322706,
+        "housing_0": 0.05216000000000007,
+        "satin_rim_0": 0.05716000000000006,
+        "pilot_brow": 0.046160000000000055,
+        "housing_1": 0.3631297616737305,
+        "satin_rim_1": 0.3948756731815065,
+        "housing_2": 0.29913445221120005,
+        "housing_3": 0.46828309490701975
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": -1,
+      "down_degrees": 1,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.04283971290298366,
+        "housing_0": 0.039871634290534835,
+        "satin_rim_0": 0.04658223065350016,
+        "pilot_brow": 0.033395586294711,
+        "housing_1": 0.35949545839606445,
+        "satin_rim_1": 0.3918694677260945,
+        "housing_2": 0.2891369504587729,
+        "housing_3": 0.45911781891001396
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": -1,
+      "down_degrees": 2,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.02317552718054632,
+        "housing_0": 0.02756222073635902,
+        "satin_rim_0": 0.035978230715747905,
+        "pilot_brow": 0.020616788501952102,
+        "housing_1": 0.35632150821406255,
+        "satin_rim_1": 0.3891892163753024,
+        "housing_2": 0.279182740211891,
+        "housing_3": 0.4498540148746198
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": -1,
+      "down_degrees": 3,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.0026713679721103614,
+        "housing_0": 0.015246302813995125,
+        "satin_rim_0": 0.025364259379792743,
+        "pilot_brow": 0.00783369653458796,
+        "housing_1": 0.3536254737546806,
+        "satin_rim_1": 0.3868472419053506,
+        "housing_2": 0.2692657879902397,
+        "housing_3": 0.44049939957485895
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": -1,
+      "down_degrees": 4,
+      "required": false,
+      "clear": false,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": -0.018760300944973184,
+        "housing_0": 0.0029315243917687195,
+        "satin_rim_0": 0.014751461764048571,
+        "pilot_brow": -0.004886572718762559,
+        "housing_1": 0.35142095773769294,
+        "satin_rim_1": 0.3848508796467205,
+        "housing_2": 0.25947898250230894,
+        "housing_3": 0.4310564271551267
+      },
+      "first_hits": {
+        "pilot_brow": {
+          "point": [
+            -0.25,
+            0.4837084504933961,
+            -1.912
+          ],
+          "sdf_m": -0.00013154950660385425
+        },
+        "windowed_shell": {
+          "point": [
+            -0.25,
+            0.4284662690580229,
+            -2.702
+          ],
+          "sdf_m": -0.001465811799162719
+        }
+      }
+    },
+    {
+      "seat": 1,
+      "down_degrees": 0,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.06174229853322706,
+        "housing_0": 0.31021844069758125,
+        "satin_rim_0": 0.34551426463959956,
+        "pilot_brow": 0.3039011068066715,
+        "housing_1": 0.09789999999999996,
+        "satin_rim_1": 0.10289999999999995,
+        "housing_2": 0.2821638894912,
+        "housing_3": 0.46828309490701975
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": 1,
+      "down_degrees": 1,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.04283971290298366,
+        "housing_0": 0.3081256771754657,
+        "satin_rim_0": 0.34381926002515145,
+        "pilot_brow": 0.30200980929104193,
+        "housing_1": 0.08436028335671955,
+        "satin_rim_1": 0.09107072536665199,
+        "housing_2": 0.27221575811779725,
+        "housing_3": 0.45911781891001396
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": 1,
+      "down_degrees": 2,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.02317552718054632,
+        "housing_0": 0.3064970936967487,
+        "satin_rim_0": 0.3424360467932308,
+        "pilot_brow": 0.30063738165813647,
+        "housing_1": 0.0707887767855882,
+        "satin_rim_1": 0.0792079756863749,
+        "housing_2": 0.26226156291763186,
+        "housing_3": 0.4498540148746198
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": 1,
+      "down_degrees": 3,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.0026713679721103614,
+        "housing_0": 0.3053434872380787,
+        "satin_rim_0": 0.34137216928334535,
+        "pilot_brow": 0.2997930698361411,
+        "housing_1": 0.05719580713740088,
+        "satin_rim_1": 0.06732582876503874,
+        "housing_2": 0.25236934106235126,
+        "housing_3": 0.44049939957485895
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": 1,
+      "down_degrees": 4,
+      "required": false,
+      "clear": false,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": -0.018760300944973184,
+        "housing_0": 0.30467115093261776,
+        "satin_rim_0": 0.34063211241097163,
+        "pilot_brow": 0.2994820291282461,
+        "housing_1": 0.043584250126181404,
+        "satin_rim_1": 0.055420652521057864,
+        "housing_2": 0.24250841978230894,
+        "housing_3": 0.4310564271551267
+      },
+      "first_hits": {
+        "windowed_shell": {
+          "point": [
+            0.25,
+            0.4284662690580229,
+            -2.702
+          ],
+          "sdf_m": -0.001465811799162719
+        }
+      }
+    }
+  ],
+  "checks": 3080,
+  "failures": 0,
+  "fit": [
+    {
+      "model": 0,
+      "name": "Kestrel T2",
+      "minimum_glass_to_skin_m": 0.10619274266837406,
+      "worst_tile": 0
+    },
+    {
+      "model": 1,
+      "name": "Wren 180",
+      "minimum_glass_to_skin_m": 0.11202298271200842,
+      "worst_tile": 0
+    },
+    {
+      "model": 2,
+      "name": "Bushmaster STOL",
+      "minimum_glass_to_skin_m": 0.09290226537046693,
+      "worst_tile": 0
+    },
+    {
+      "model": 3,
+      "name": "Islander Twin",
+      "minimum_glass_to_skin_m": 0.1460162092962358,
+      "worst_tile": 0
+    },
+    {
+      "model": 4,
+      "name": "Pelican Caravan",
+      "minimum_glass_to_skin_m": 0.16770262068128958,
+      "worst_tile": 0
+    },
+    {
+      "model": 5,
+      "name": "Meridian Q400",
+      "minimum_glass_to_skin_m": 0.13420008122378008,
+      "worst_tile": 0
+    },
+    {
+      "model": 6,
+      "name": "Starling 500",
+      "minimum_glass_to_skin_m": 0.1414414066941563,
+      "worst_tile": 0
+    },
+    {
+      "model": 7,
+      "name": "Swift S6",
+      "minimum_glass_to_skin_m": 0.10606672611616455,
+      "worst_tile": 0
+    },
+    {
+      "model": 8,
+      "name": "Osprey C6",
+      "minimum_glass_to_skin_m": 0.131260360572632,
+      "worst_tile": 0
+    },
+    {
+      "model": 9,
+      "name": "XR-10 Nightjar",
+      "minimum_glass_to_skin_m": 0.1428756068693761,
+      "worst_tile": 1
+    },
+    {
+      "model": 13,
+      "name": "Larkspur L4",
+      "minimum_glass_to_skin_m": 0.07846444145069384,
+      "worst_tile": 1
+    },
+    {
+      "model": 14,
+      "name": "Atlas A180",
+      "minimum_glass_to_skin_m": 0.47892316908017113,
+      "worst_tile": 0
+    }
+  ],
+  "violations": [],
+  "limits": "Conservative skin and source-data contract only. Production raster, moving control envelopes and GPU performance remain separate gates."
+}

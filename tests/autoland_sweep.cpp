@@ -44,9 +44,9 @@ int main(int argc, char** argv) {
   if (out) fprintf(out, "aircraft,airport,wind,start,result,seconds,touchdown_mps,along_m,cross_m,go_arounds,max_g,reason\n");
   int n = 0, ok = 0, declined = 0, idx = 0;
   const int nAp = (int)g_world.airports.size();
-  for (int si = 0; si <= kWraith; si++) {
+  for (int si = 0; si < kAircraftCount; si++) {
     const AircraftSpec& s = kAircraft[si];
-    if (comfort && si >= kNumAircraft) continue;   // (the gentle law flies passengers and fragile loads: career types only)
+    if (comfort && !isCareerAircraft(si)) continue;   // (the gentle law flies passengers and fragile loads: career types only)
     for (int ai = 0; ai < nAp; ai++) {
       const Airport& A = g_world.airports[ai];
       if (!all && !runwayOK(s, A)) continue;   // the career never sends it there (and the autoland refuses it)

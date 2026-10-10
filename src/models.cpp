@@ -3,6 +3,8 @@
 #include "cockpit_layout_data.h"
 #include "cockpit_focus_zoom.h"
 #include "aircraft.h"
+static_assert(sizeof(kCockpitLayouts)/sizeof(kCockpitLayouts[0])==kAircraftCount,
+              "cockpit layout table must cover every stable aircraft index");
 
 // clang-format off
 const ModelDef kModels[] = {
@@ -142,8 +144,31 @@ const ModelDef kModels[] = {
     4, .40f, 0,
     0, 0,0,0,0,0,
     vec3(0,.58f,-4.30f), 3, -5.6f,-4.5f,.5f,-3.6f },
+  // ---------------------------------------------------------------- Larkspur L4 (cantilever shoulder-wing grand tourer)
+  // A low cowling, panoramic four-seat cabin, swept dorsal fin and slim tapering panels; authored at full scale.
+  { {{-4.40f,.085f,.080f,-.060f},{-4.04f,.37f,.33f,-.055f},{-2.82f,.54f,.46f,-.030f},{-1.80f,.68f,.79f,.080f},
+     {.40f,.70f,.78f,.100f},{1.85f,.46f,.47f,.180f},{3.68f,.15f,.20f,.310f},{4.40f,.055f,.080f,.360f}}, .90f,
+    {5.80f,2.13f,1.04f,.58f,.94f,-1.90f,3.0f,.135f}, 0,0,.12f,.58f,0,0,
+    {1.95f,1.15f,.65f,.35f,.36f,3.00f,2.0f},0,
+    {1.75f,1.72f,.50f,1.07f,.30f,2.53f},
+    0,0,0,0,0,0,.16f,1.03f,
+    0,.285f,0,
+    1,.65f,1.70f,.28f,.32f,.235f,
+    vec3(-.29f,.60f,-1.48f),0,-2.72f,-1.96f,.38f,.40f },
+  // ---------------------------------------------------------------- Atlas A180 (180-seat twin-underwing transport)
+  // The largest fleet aircraft: broad pressurised barrel, sculpted flight deck, swept low wing, tall swept tail.
+  { {{-21.30f,.045f,.040f,-.30f},{-20.95f,.50f,.40f,-.33f},{-19.20f,1.32f,.92f,-.24f},{-15.00f,2.05f,2.10f,0},
+     {12.0f,2.05f,2.10f,0},{16.8f,1.45f,1.58f,.30f},{20.15f,.47f,.64f,.83f},{21.30f,.13f,.22f,1.05f}},1.0f,
+    {19.90f,5.70f,1.235f,9.25f,-1.00f,-3.55f,5.0f,.135f},0,0,1.80f,.57f,0,1,
+    {7.30f,4.70f,1.85f,4.00f,.55f,14.50f,5.0f},0,
+    {6.20f,7.00f,2.60f,4.40f,1.15f,12.70f},
+    4,6.30f,-1.85f,1.28f,-3.80f,4.60f,0,0,
+    4,.57f,0,
+    32,-13.6f,12.0f,.46f,.155f,.215f,
+    vec3(-.72f,.92f,-16.30f),2,-20.00f,-17.52f,.42f,-15.80f },
 };
 // clang-format on
+static_assert(sizeof(kModels)/sizeof(kModels[0]) == kAircraftCount, "one authored model per aircraft roster entry");
 
 // monotone cubic through the stations (mirrors fusSection in shaders.h)
 static float fbSlope(float d0, float d1, float h0, float h1) {
@@ -182,6 +207,14 @@ int modelProps(const ModelDef& m, float out[2][4]) {
   return 0;
 }
 
+void modelWheelRadii(int idx, float& mainRadius, float& noseRadius) {
+  const AircraftSpec& s = kAircraft[idx];
+  const ModelDef& m = kModels[idx];
+  mainRadius = s.special ? .38f : m.wheelR;
+  noseRadius = s.special ? .33f : s.taildragger ? .10f :
+               idx == kAtlas ? mainRadius*.74f : m.gear == 3 ? mainRadius*.75f : mainRadius*.85f;
+}
+
 void packModel(const AircraftSpec& s, int idx, float gh, float o[24 * 4]) {
   const ModelDef& m = kModels[idx];
   auto put = [&](int i, float a, float b, float c, float d) { o[i * 4] = a; o[i * 4 + 1] = b; o[i * 4 + 2] = c; o[i * 4 + 3] = d; };
@@ -204,7 +237,9 @@ void packModel(const AircraftSpec& s, int idx, float gh, float o[24 * 4]) {
   // retracting nose wheel folds aft along the belly)
   const GearStations gst = gearStations(s);
   put(18, gst.track, m.wheelR, gst.mainZ, gst.noseZ);
-  put(19, gh, gst.tailZ, s.taildragger ? 1.f : 0.f, (float)m.deice);
+  // Low bit: de-ice; new authored variants carry their explicit roster ID above it.
+  // Legacy packed data remains byte-identical. Traffic has no separate model uniform.
+  put(19, gh, gst.tailZ, s.taildragger ? 1.f : 0.f, (float)(m.deice + (idx >= kLarkspur ? 2 * idx : 0)));
   put(20, (float)m.winCount, m.winZ0, m.winZ1, m.winY);
   float panelZ = m.eye.z - (m.cockpit == 2 ? 0.85f : 0.68f);
   put(21, m.winW, m.winH, (float)m.cockpit, panelZ);
@@ -226,9 +261,10 @@ vec3 modelTailTip(const ModelDef& m) {   // (the XR-20's: on its nozzle's upper 
 
 
 void modelCabinFit(int model, float panelZ, float foot[4], float seat[2]) {
-  model=std::clamp(model,0,kWraith); const ModelDef& m=kModels[model]; const vec3 E=m.eye;
-  const bool compact=model==0||model==1||model==2||model==6||model==7||model==9;
-  const float drop=model<10?(compact?.64f:.73f):.80f;
+  model=std::clamp(model,0,kAircraftCount-1); const ModelDef& m=kModels[model]; const vec3 E=m.eye;
+  const bool compact=model==0||model==1||model==2||model==6||model==7||model==9||model==kLarkspur;
+  const bool fleet=model<10||model==kLarkspur||model==kAtlas;
+  const float drop=fleet?(compact?.64f:.73f):.80f;
   auto floorAt=[&](float x,float z) {
     float hw,hh,cy;stationAt(m,z,hw,hh,cy);float lo=cy-hh,hi=cy,mn=std::min(hw,hh),rr=mn*(.3f+.7f*m.roundness);
     for(int i=0;i<12;i++) {
@@ -244,7 +280,7 @@ void modelCabinFit(int model, float panelZ, float foot[4], float seat[2]) {
   float width=m.cockpit==0?.036f:.045f;
   // A rotated full-size metal rim extends 77.365 mm below its pivot. Keep 5.6 mm above
   // the flat floor; curved-floor fitting is unchanged on the compact aircraft.
-  foot[0]=std::max(E.y-1.06f+(model<10?.083f:.072f),floorAt(centre+spacing+width,footZ-.055f)+.072f);
+  foot[0]=std::max(E.y-1.06f+(fleet?.083f:.072f),floorAt(centre+spacing+width,footZ-.055f)+.072f);
   if(model==9)foot[0]+=.004f; // 4 mm inner-shell margin for the moving pedal extraction.
   foot[1]=footZ;foot[2]=centre;foot[3]=spacing;
   // Swift: retain verified world pedal mounts when the supported seats move inboard/down.
@@ -260,7 +296,7 @@ void modelCabinFit(int model, float panelZ, float foot[4], float seat[2]) {
 }
 
 void packCockpitLayout(int model,float values[36]) {
-  const int index=std::clamp(model,0,9);
+  const int index=std::clamp(model,0,kAircraftCount-1);
   for(int i=0;i<9;i++)for(int j=0;j<4;j++)values[i*4+j]=kCockpitLayouts[index].value[i][j];
 }
 
@@ -275,17 +311,20 @@ inline float atan(float a,float b){ return atan2f(a,b); }
 #include "shaders/research_cockpit_layout.glsl"
 }
 int modelCockpitFocusTargets(int model,CockpitFocusTarget* out,int capacity){
-  if(!out || capacity<=0 || model<0 || model>kWraith)return 0;
+  if(!out || capacity<=0 || model<0 || model>=kAircraftCount)return 0;
   const ModelDef& m=kModels[model];const vec3 E=m.eye;const float panelZ=E.z-(m.cockpit==2?.85f:.68f);int count=0;
   auto add=[&](vec3 c,vec3 n,vec2 h){ if(count<capacity)out[count++]={c,normalize(n),h}; };
-  if(model<10){
+  if(model<10||model==kLarkspur||model==kAtlas){
     const auto& L=kCockpitLayouts[model].value;const bool glass=m.cockpit==2,twin=model==3||model==8;
     auto mount=[&](int i){return vec3(L[i][0],E.y-L[i][1],panelZ+L[i][2]+.050f);};
     for(int tile=0;tile<2;tile++){
       const float scale=L[tile][3];vec3 c=mount(tile);
       if(glass){
-        add(c+vec3(-.09f*scale,0,0),vec3(0,0,1),vec2(.085f*scale,.075f*scale));
-        add(c+vec3(.10f*scale,0,0),vec3(0,0,1),vec2(.075f*scale,.075f*scale));
+        const float yaw=model==kAtlas?(tile==0?-.16f:.16f):0.f;
+        const vec3 n(-sinf(yaw),0,cosf(yaw)),right(cosf(yaw),0,sinf(yaw));
+        c=vec3(L[tile][0],E.y-L[tile][1],panelZ+L[tile][2])+n*.050f;
+        add(c+right*(-.09f*scale),n,vec2(.085f*scale,.075f*scale));
+        add(c+right*(.10f*scale),n,vec2(.075f*scale,.075f*scale));
       }else for(int row=0;row<2;row++)for(int col=0;col<3;col++)
         add(c+vec3((col-1)*.095f*scale,(row==0?.045f:-.05f)*scale,0),vec3(0,0,1),vec2(.038f*scale,.038f*scale));
     }
@@ -298,6 +337,11 @@ int modelCockpitFocusTargets(int model,CockpitFocusTarget* out,int capacity){
     }
     const vec3 n(0,sinf(.35f),cosf(.35f));
     add(vec3(L[3][0],E.y-L[3][1],panelZ+L[3][2])+n*.05f,n,vec2(L[3][3],L[3][3]*.70f));
+    if(model==kAtlas){
+      const vec3 navN(0,sinf(1.15f),cosf(1.15f));
+      add(vec3(0,E.y-.590f,panelZ+.335f)+navN*.022f,navN,vec2(.165f,.115f));
+      add(vec3(0,E.y+.458f,E.z-.260f),vec3(0,-1,0),vec2(.150f,.108f));
+    }
   }else if(model==kMantis){
     add(vec3(0,E.y-.325f,panelZ+.068f),vec3(0,0,1),vec2(.395f,.19f));
     for(int side:{-1,1})add(vec3(side*.235f,E.y-.695f,panelZ+.228f),vec3(0,0,1),vec2(.185f,.117f));

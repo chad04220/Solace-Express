@@ -181,8 +181,12 @@ bool AtcVoice::resolve(const std::string& msg, const std::string& mission, bool 
   static const std::regex splashRe(R"(SPLASH (\d+) - (.+) down)");
   if (std::regex_match(msg, m, splashRe)) {
     auto c = lookup.find("craft." + m[2].str());
-    if (c == lookup.end()) return false;
-    out.ids.push_back(atomO("nyx", "splash")); cardinal("nyx", std::stol(m[1]), out.ids); out.ids.push_back(atomO("nyx", "craft_" + c->second)); out.ids.push_back(atomO("nyx", "down"));
+    out.ids.push_back(atomO("nyx", "splash")); cardinal("nyx", std::stol(m[1]), out.ids);
+    // Aircraft added after a voice pack may have no recorded name. Keep the complete name on screen,
+    // but speak the accurate existing "Splash <count> down" fragments rather than mute the event or
+    // substitute another aircraft's recording. Indexed names still require their actual clip in finish().
+    if (c != lookup.end()) out.ids.push_back(atomO("nyx", "craft_" + c->second));
+    out.ids.push_back(atomO("nyx", "down"));
     return finish("nyx", 45);
   }
   static const std::regex blastRe(R"((\d+) aircraft caught in the blast)");

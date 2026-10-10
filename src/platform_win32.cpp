@@ -1265,7 +1265,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       CreateDirectoryA(dir.c_str(), nullptr);
       std::vector<std::pair<std::string, std::string>> jobs;   // scene, file
       for (const Airport& a : g_world.airports) jobs.push_back({std::string("loadshot_") + a.code, a.code});
-      for (int i = 0; i <= kWraith; i++) jobs.push_back({"loadshot_air_" + std::to_string(i), "air_" + std::to_string(i)});
+      for (int i = 0; i < kAircraftCount; i++) jobs.push_back({"loadshot_air_" + std::to_string(i), "air_" + std::to_string(i)});
       int done = 0;
       for (auto& J : jobs) {
         MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }

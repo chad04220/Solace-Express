@@ -1,0 +1,412 @@
+{
+  "scope": "Native same-camera focused validation after the source correction batch; unresolved pixels remain explicit.",
+  "phase": "postrepair-gates",
+  "reviewed": [
+    {
+      "model": 7,
+      "name": "Swift S6",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/07_swift_s6/swift_s6_cockpit.png",
+          "sha256": "59bbd05060319ce2d1308ccabaab09025d6276a73e52b6294deed07d93a3ead5"
+        },
+        {
+          "path": "postrepair-gates/07_swift_s6/swift_s6_cockpit_left.png",
+          "sha256": "7cb29262f5f111db22e4ebb6d9d297a90b373183f0ef9685aa61fcf4c63cf369"
+        },
+        {
+          "path": "postrepair-gates/07_swift_s6/swift_s6_cockpit_right.png",
+          "sha256": "247ca658977e94fd8a1fb9282719120ccd5bbb5717b302955c92a9c75f399cee"
+        }
+      ],
+      "results": {
+        "07-C02": "pass: shoulder webbing is now continuous and follows the back/bolster; lap/seat/control layout retained",
+        "07-C04": "unresolved: agreeing-normal reversed fine triangles are corrected, but the visible blue pixel remains on adjacent ambiguous coarse material11/145 firewall/shell triangle25256"
+      },
+      "winding": {
+        "rebuilt_flipped": 156,
+        "opposite_pairs_preserved": 0,
+        "native_backface_check": "normal/left/right retain continuous inner shell/window trim; no missing intentional face found"
+      },
+      "comparison": "cockpit-review-small/07_swift_native_labeled_comparison.png"
+    },
+    {
+      "model": 14,
+      "name": "Atlas A180",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/14_atlas_a180/atlas_a180_cockpit.png",
+          "sha256": "d9ad06641a68f4fa7e4ee584f837501a2ee911cd9de3dc575fe522c72ec3e856"
+        },
+        {
+          "path": "postrepair-gates/14_atlas_a180/atlas_a180_cockpit_down_throttle_full.png",
+          "sha256": "64bc4fc5d798ac156c279f666af5bb7b022036aa00ed34e7c41e9a979734c505"
+        },
+        {
+          "path": "postrepair-gates/14_atlas_a180/atlas_a180_cockpit_down_throttle_off.png",
+          "sha256": "3a141df74bd0d8ae93e6878ec20f6ce7c573ab017a9328bbc69ca45a71a84481"
+        },
+        {
+          "path": "postrepair-gates/14_atlas_a180/atlas_a180_cockpit_left.png",
+          "sha256": "4b5a5db6fae1785faa0e2918443f9999698642ea2a73d64a0be931f69e448beb"
+        },
+        {
+          "path": "postrepair-gates/14_atlas_a180/atlas_a180_cockpit_right.png",
+          "sha256": "536596ef616276b5e78ee7bceba9c974626aa24d46146a78aaef42e3d40f114c"
+        }
+      ],
+      "results": {
+        "AT-C01": "pass: full/off throttle views show thrust shafts/handles clear of the navigation housing; source-bound full-sweep contract also passes",
+        "AT-C02": "pass: previously repeated fine-grid glare-deck teeth are gone; the rounded inward edge is continuous",
+        "AT-C03": "pass: primary lower-bezel diagonal facets are removed without changing the panel geometry or display content",
+        "AT-C04": "pass: both vents are on the existing side-console tops",
+        "AT-C05": "new verified pre-existing tablet-side normal ripple; round2 analytic normal is staged only"
+      },
+      "winding": {
+        "rebuilt_flipped": 414,
+        "opposite_pairs_preserved": 0
+      },
+      "comparison": "cockpit-review-small/14_atlas_post_details.jpg"
+    },
+    {
+      "model": 13,
+      "name": "Larkspur L4",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/13_larkspur_l4/larkspur_l4_cockpit_aft.png",
+          "sha256": "b401af5cf87b4d5db00388fb39077a0f25f8ea9ce0dca8c50a16ffbf8f56104b"
+        },
+        {
+          "path": "postrepair-gates/13_larkspur_l4/larkspur_l4_cockpit_right.png",
+          "sha256": "598488a43b6d797aedd60382f22179b0ff44799ad3c857405e291fc69fb681b9"
+        }
+      ],
+      "results": {
+        "L4-C01": "pass: front shoulder bands are continuous on the back/bolsters",
+        "L4-C02": "pass: aft oval opens through the cabin wall with trim; existing main-window pillar and four-seat layout retained"
+      },
+      "winding": {
+        "rebuilt_flipped": 245,
+        "opposite_pairs_preserved": 0
+      },
+      "comparison": "cockpit-review-small/13_larkspur_post_comparison.jpg"
+    },
+    {
+      "model": 3,
+      "name": "Islander Twin",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/03_islander/islander_cockpit_right.png",
+          "sha256": "88e212d370ea07746a5795d6c4b33abfbc8addb6344a276c063f896e8aff02aa"
+        }
+      ],
+      "results": {
+        "03-C02": "pass: the previously disconnected shoulder patches are a continuous, cushion-following band; control and glazing layout retained"
+      },
+      "winding": {
+        "rebuilt_flipped": 73,
+        "opposite_pairs_preserved": 0
+      },
+      "comparison": "cockpit-review-small/03_islander_post_comparison.jpg"
+    },
+    {
+      "model": 9,
+      "name": "XR-10 Nightjar",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/09_xr10_nightjar/xr10_nightjar_cockpit.png",
+          "sha256": "0e0a2e88258ac197aaa851a34a3ae906c7628e1f2929b4e4dde0851f23b7efe1"
+        },
+        {
+          "path": "postrepair-gates/09_xr10_nightjar/xr10_nightjar_cockpit_overhead.png",
+          "sha256": "50d4be7a357671e8e33e963007979acafa550a38bbff056da473b42523d1ed25"
+        },
+        {
+          "path": "postrepair-gates/09_xr10_nightjar/xr10_nightjar_cockpit_right.png",
+          "sha256": "0d1909e6c6513d36d5e8f27f1356bc5be2b00fe4fec4fa7dacca06a97a47eb9b"
+        }
+      ],
+      "results": {
+        "09-C02": "pass: shoulder strips are continuous on the unchanged padded seat",
+        "09-C03": "unresolved: inward rounding moved the narrow firewall/shell boundary but left mixed-material blue flecks. Stage a hidden structural overlap to eliminate the5mm gap; source remains frozen during current captures."
+      },
+      "winding": {
+        "rebuilt_flipped": 141,
+        "opposite_pairs_preserved": 0
+      },
+      "comparison": "cockpit-review-small/09_nightjar_post_comparison.jpg"
+    },
+    {
+      "model": 10,
+      "name": "XR-30 Specter",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/10_xr30_specter/xr30_specter_cockpit_down.png",
+          "sha256": "cd4eb6144ac557e85049e20ff9773256f84dc1553e854272cdb0a0a9917f09bd"
+        },
+        {
+          "path": "postrepair-gates/10_xr30_specter/xr30_specter_cockpit_overhead.png",
+          "sha256": "b861dd94055121a316528dcb510d215d0ea25ebf57f43e2d22c948d09a8f5cab"
+        },
+        {
+          "path": "postrepair-gates/10_xr30_specter/xr30_specter_cockpit_refactor_specter_vector.png",
+          "sha256": "60227b053792305ddb8a81368297ca55bbdbc84da2aa432db69546767e6fa248"
+        }
+      ],
+      "results": {
+        "10-C01": "pass: the repeated triangular highlights on the inner saddle support are gone; unchanged curved geometry is smooth. Down and deflected-control views retain clear displays and controls.",
+        "10-C02": "unresolved: exact normals do not recover the malformed 9 mm capsule silhouettes. A localized overhead-only 3.90625 mm extraction region is being staged and bounded; the rest of the cabin remains at its existing resolution."
+      },
+      "winding": {
+        "applied": false,
+        "reason": "dedicated research cabin excluded"
+      },
+      "comparison": "cockpit-review-small/10_specter_post_comparison.jpg"
+    },
+    {
+      "model": 0,
+      "name": "Kestrel T2",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/00_kestrel/kestrel_cockpit.png",
+          "sha256": "efbd8218f22c3bde585e314acd9989256cd044e3541da734dc3cb49234c6aff2"
+        },
+        {
+          "path": "postrepair-gates/00_kestrel/kestrel_cockpit_right.png",
+          "sha256": "f9ac9a69a960101329948808fead0599bcb6dfa0c7b4f8cf33c29ca096a7c3c0"
+        }
+      ],
+      "results": {
+        "00-C01": "unresolved: inward rounding leaves blue mixed shell/deck flecks. Cached rays confirm the separate 5 mm contact gap remains; a hidden structural overlap is staged.",
+        "00-C02": "pass: shoulder webbing is continuous on the unchanged padded seat.",
+        "00-E01": "pass: the upper-windshield wing-root shards are gone; the local interior boundary is smooth and continuous."
+      },
+      "winding": {
+        "rebuilt_flipped": 110,
+        "opposite_pairs_preserved": 0
+      },
+      "comparison": "cockpit-review-small/00_kestrel_post_native_details.jpg"
+    },
+    {
+      "model": 2,
+      "name": "Bushmaster STOL",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/02_bush/bush_cockpit.png",
+          "sha256": "eb6f8668c004b5fecad5239290bbe2a6de1b46c406c512144f2bbfca3c490132"
+        },
+        {
+          "path": "postrepair-gates/02_bush/bush_cockpit_right.png",
+          "sha256": "30e5028bcf805146bde8fe51bcdd7c05d1b511a928e8a8b5553d7243defea428"
+        }
+      ],
+      "results": {
+        "02-C01": "unresolved: the fine jagged deck-to-skin contact line remains after inward rounding; a hidden structural overlap is staged.",
+        "02-C02": "pass: specialized-seat shoulder webbing follows the bolster and no longer breaks into patches.",
+        "02-E01": "pass: the upper-windshield wing-root fragments are gone without changing the exterior wing profile."
+      },
+      "winding": {
+        "rebuilt_flipped": 75,
+        "opposite_pairs_preserved": 0
+      },
+      "comparison": "cockpit-review-small/02_bush_post_native_details.jpg"
+    },
+    {
+      "model": 6,
+      "name": "Starling 500 Jet",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/06_starling/starling_cockpit_left.png",
+          "sha256": "ca6a90c44f66e649210bae0f9910f730cd0cdd843c588f19438bf6e0445cbc3f"
+        },
+        {
+          "path": "postrepair-gates/06_starling/starling_cockpit_right.png",
+          "sha256": "d4f4257e1206ef9af17b372aff3fed4d5151dfd8b51d32dc17ce5d00beacf28c"
+        }
+      ],
+      "results": {
+        "06-C02": "pass: shoulder webbing is continuous. Left/right native views retain intentional inner shell/window trim faces. The rebuilt helper also explicitly preserves two exact opposite-face pairs."
+      },
+      "winding": {
+        "rebuilt_flipped": 266,
+        "opposite_pairs_preserved": 2,
+        "real_mesh_pair_check": {
+          "evidence": "diagnostics/starling-protected-pairs-postrepair.json",
+          "paired_triangles": [
+            [
+              391295,
+              391296
+            ],
+            [
+              400597,
+              400598
+            ]
+          ],
+          "same_positions_materials": true,
+          "opposing_normal_dot": [
+            -1.0,
+            -1.0
+          ]
+        }
+      },
+      "comparison": "cockpit-review-small/06_starling_post_native.jpg"
+    },
+    {
+      "model": 1,
+      "name": "Wren 180",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/01_wren/wren_cockpit.png",
+          "sha256": "1a3d9936f14a2ee1ac4ecc5dea780bb029a9b427f3b20f83a244e53653d41493"
+        },
+        {
+          "path": "postrepair-gates/01_wren/wren_cockpit_right.png",
+          "sha256": "53c2c346720630f827ddb13afdc1d4a9234777ac86b6e67ca645995fb1e65068"
+        }
+      ],
+      "results": {
+        "01-C01": "unresolved: rounding reduces the torn deck contact but leaves a small bright fragment. Stage a hidden 20 mm deck/shell overlap shared with verified Kestrel/Bush contact cases.",
+        "01-C02": "pass: shoulder bands are continuous and follow the existing bolster."
+      },
+      "winding": {
+        "rebuilt_flipped": 167,
+        "opposite_pairs_preserved": 0
+      },
+      "comparison": "cockpit-review-small/01_wren_post_deck.jpg"
+    },
+    {
+      "model": 4,
+      "name": "Pelican Caravan",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/04_pelican/pelican_cockpit.png",
+          "sha256": "c5eaf4e0f4ede05f31eef20d253f7aafc77f1ef5067a5b5897fdb84ebfaa96c4"
+        },
+        {
+          "path": "postrepair-gates/04_pelican/pelican_cockpit_right.png",
+          "sha256": "871a027848eb15bb63cdec07d825d4d0d6518d7bb00010064ade44f4bab028e0"
+        }
+      ],
+      "results": {
+        "04-C02": "pass: shoulder bands are continuous on the unchanged padded seat.",
+        "04-C03": "pass: the previously stepped firewall top now has a continuous rounded edge with no repeated facets; envelope and instruments retained."
+      },
+      "winding": {
+        "rebuilt_flipped": 156,
+        "opposite_pairs_preserved": 0
+      },
+      "comparison": "cockpit-review-small/04_pelican_post_firewall.jpg"
+    },
+    {
+      "model": 5,
+      "name": "Meridian Q400",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/05_meridian/meridian_cockpit.png",
+          "sha256": "ae6690c50ac7a65a4f6071c01b4da8e5cd1ddb11df7b7f692b97a69ab3c04fea"
+        },
+        {
+          "path": "postrepair-gates/05_meridian/meridian_cockpit_right.png",
+          "sha256": "a36add9b7f9ce07a2869fbb2332165ae44049921e0817699f92c673f5fec2327"
+        }
+      ],
+      "results": {
+        "05-C02": "pass: shoulder bands are continuous on the unchanged padded seat.",
+        "05-C03": "pass: repeated primary lower-bezel diagonal facets are gone; unchanged housing contour and display content remain clear."
+      },
+      "winding": {
+        "rebuilt_flipped": 167,
+        "opposite_pairs_preserved": 0
+      },
+      "comparison": "cockpit-review-small/05_meridian_post_bezel.jpg"
+    },
+    {
+      "model": 8,
+      "name": "Osprey C6",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/08_osprey_c6/osprey_c6_cockpit_right.png",
+          "sha256": "f7ea36d4ace48d99cf96ec4d17219384ee18ccc5b8c915da140fa0c38a3f0137"
+        }
+      ],
+      "results": {
+        "08-C02": "pass: shoulder webbing now follows the padded back and no longer breaks into buried fragments."
+      },
+      "winding": {
+        "rebuilt_flipped": 124,
+        "opposite_pairs_preserved": 0
+      },
+      "comparison": "cockpit-review-small/08_osprey_c6_post_shoulder.jpg"
+    },
+    {
+      "model": 11,
+      "name": "XR-20 Mantis",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/11_xr20_mantis/xr20_mantis_cockpit.png",
+          "sha256": "b4542dfd64d7a401a976f1625fd8f82279ac2ebd1179351749bb6f35ce79ef7d"
+        },
+        {
+          "path": "postrepair-gates/11_xr20_mantis/xr20_mantis_cockpit_down.png",
+          "sha256": "5745f7d99c4ff4eaf69719ab7ba4c5c10f453856dc782f2fb8390bb17a72176f"
+        },
+        {
+          "path": "postrepair-gates/11_xr20_mantis/xr20_mantis_cockpit_right.png",
+          "sha256": "729392a5db540426f59f51227c097728101b885b0e08cb2f228cab3b6e112ae5"
+        }
+      ],
+      "results": {
+        "11-GATE": "pass: normal/down/right retain continuous display housings, cockpit walls and controls; the small continuous glass corner raster steps match the separately reviewed initial minor bevel detail."
+      },
+      "winding": {
+        "rebuilt_flipped": 148,
+        "opposite_pairs_preserved": 0
+      },
+      "comparison": "cockpit-review-small/11_xr20_mantis_post_native.jpg"
+    },
+    {
+      "model": 12,
+      "name": "XR-40 Wraith",
+      "binary_sha256": "eb9d0701cfaae44813b493ba93579b62b648d6643fefe235112016f22af419e6",
+      "frames": [
+        {
+          "path": "postrepair-gates/12_xr40_wraith/xr40_wraith_cockpit_refactor_wraith_hover.png",
+          "sha256": "e79269dbde6b9c83ed26bb73295678938a045806c88713dc189cbd32df6e589e"
+        }
+      ],
+      "results": {
+        "12-GATE": "pass: hover-control cockpit preserves the clear instrument cluster, pedal geometry, side consoles and canopy supports; no new gap or clipping."
+      },
+      "winding": {
+        "applied": false,
+        "reason": "dedicated research cabin excluded"
+      },
+      "comparison": "cockpit-review-small/12_xr40_wraith_post_native.jpg"
+    }
+  ],
+  "summary": {
+    "aircraft_reviewed": 15,
+    "native_acceptance": "21 of 28 findings pass first-postrepair A/B; seven verified residuals are in the second correction batch.",
+    "winding_flipped": 2242,
+    "opposite_face_pairs_preserved": 2,
+    "research_models_excluded": [
+      10,
+      12
+    ]
+  },
+  "historical_phase_note": "This report preserves its capture phase and observations. Current final status, source hashes and guidance bridge are recorded in fleet-cockpit-integrated-review.json."
+}

@@ -34,6 +34,12 @@ struct AircraftSpec {
   // barrier by its drag rise; above 1 the engines have reheat and the drag rise is the research jets'. gPos / gNeg are
   // the structural limits (0: the type's defaults); the airframe takes a sustained overstress before it lets go
   float designMach = 0, gPos = 0, gNeg = 0;
+  // Learn the full passenger/cargo envelope and retain the published runway minimum.
+  // Existing types keep their calibrated reference loading until separately revalidated.
+  bool fullCabinEnvelope = false;
+  float gearHeightM = 0;       // positive: authored wheel contact height; 0: derive from legacy geometry
+  float takeoffFlap = 0.2f;    // recommended take-off setting; taildraggers retain their 0.3 default
+  float gearTrackM = 0;       // positive: main-wheel half-track; 0: derive from legacy geometry
   float gLimitPos() const { return gPos > 0 ? gPos : special == 2 ? 90.f : special ? 50.f : 5.8f; }
   float gLimitNeg() const { return gNeg < 0 ? gNeg : special == 2 ? -45.f : special ? -25.f : -3.f; }
   // the runway it needs: the longer of its learned take-off and landing distances at full weight (Plane::perf), 15% to
@@ -59,13 +65,34 @@ inline std::string registrationOf(const AircraftSpec& s) {
   for (int i = 0; i < 3; i++) { h = h * 1664525u + 1013904223u; r += (char)('A' + (h >> 8) % 26); }
   return r;
 }
-extern const int kNumAircraft;   // career aircraft (market, rentals, contracts)
 static const int kOsprey = 8;       // the Osprey C6: the only type with its own cabin trim in the field (plane_sdf.glsl)
-// the research craft (hidden from the career, only reachable from the research terminal), after the career types
+// Stable aircraft identities: append new types; never renumber existing saves, diagnostics or shader models.
+// Research craft are reachable only from the research terminal, independent of their flight-model special flag.
 static const int kNightjar = 9;     // XR-10 Nightjar: a conventional twin jet (special 0, the generic field and flight model)
 static const int kResearchJet = 10; // XR-30 Specter
 static const int kMantis = 11;      // XR-20 Mantis: forward-swept systems demonstrator (special 0; the generic field)
 static const int kWraith = 12;      // XR-40 Wraith stealth aerobatic research craft
+static constexpr int kLarkspur = 13; // Larkspur L4: four-seat piston tourer
+static constexpr int kAtlas = 14;    // Atlas A180: twin-underwing transport
+static constexpr int kAircraftCount = 15; // all aircraft, including research
+static constexpr int kResearchAircraft[] = {kNightjar, kMantis, kResearchJet, kWraith};
+static constexpr int kCareerAircraft[] = {0, 1, 2, 3, 4, 5, 6, 7, kOsprey, kLarkspur, kAtlas};
+static constexpr int kNumAircraft = sizeof(kCareerAircraft) / sizeof(kCareerAircraft[0]); // career roster count, never an index bound
+inline constexpr bool validAircraft(int spec) { return spec >= 0 && spec < kAircraftCount; }
+inline constexpr int careerRowFor(int spec) {
+  for (int row = 0; row < kNumAircraft; ++row) if (kCareerAircraft[row] == spec) return row;
+  return -1;
+}
+inline constexpr bool isCareerAircraft(int spec) { return careerRowFor(spec) >= 0; }
+inline constexpr bool isResearchAircraft(int spec) {
+  for (int research : kResearchAircraft) if (research == spec) return true;
+  return false;
+}
+inline constexpr int careerSpecAt(int row) { return row >= 0 && row < kNumAircraft ? kCareerAircraft[row] : kCareerAircraft[0]; }
+inline constexpr int validCareerSelection(int spec) { return isCareerAircraft(spec) ? spec : kCareerAircraft[0]; }
+inline float performanceReferencePayload(const AircraftSpec& s) {
+  return s.fullCabinEnvelope ? 0.5f * (s.cargoKg + s.pax * 85.f + 85.f) : 150.f;
+}
 // XR-40 thruster pods (body coords, +z aft): front left, front right, rear left, rear right pivot points
 static const vec3 kWraithPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.08f, -3.3f), vec3(-2.75f, 0.05f, 3.45f), vec3(2.75f, 0.05f, 3.45f)};
 
@@ -209,6 +236,7 @@ public:
   float apHeading = 0, apAlt = 0, apSpeed = 0, apVS = 0; bool apUseVS = false;
   float apPitchI = 0, apRollI = 0, apYawI = 0, apVmcCap = 1, apThrI = 0.5f, apXI = 0, apGamI = 0, apTrimEst = 0, apFlareTau = 0, apFlareVs = 0, apGustAdd = 0;
   int apAirport = -1, apStage = 0, apLeg = 0; float apOutSide = 0;   // (apOutSide: the side of the centreline the outbound leg keeps to, +-1; 0 off that leg)
+  bool apTerminalRejoin = false; // keep the missed-approach return at the planned terminal speed
   bool apRev = false; float apStageT = 0, apCruiseAlt = 0, apFinalLen = 8000;
   vec3 apLd, apTd;            // landing direction and touchdown point of the chosen runway end
   vec3 apHoldC; float apHoldR = 1500, apHoldAlt = 0, apIntAlt = 0; int apHoldDir = 1, apTurnDir = 0, apClimbDir = 0; float apGs = 0.0524f, apDrift = 0;   // descent orbit and intercept altitude
@@ -231,7 +259,7 @@ public:
   // one figure at a time: what was flying before it (the autopilot on or off, its mode and field), restored once the
   // figure has recovered to level flight (apStuntEnded, which the game answers)
   bool apStuntWasOn = false, apStuntEnded = false; int apStuntWasMode = 0, apStuntWasAirport = -1;
-  void apDisengage() { apOn = false; apMode = AP_OFF; apUseVS = false; }
+  void apDisengage() { apOn = false; apMode = AP_OFF; apUseVS = false; apTerminalRejoin = false; }
   float maxG = 1, minG = 1;
   float overG = 0;   // sustained overstress (grows past the structural limit, decays within it; the airframe fails at 1)
   float flightTime = 0;

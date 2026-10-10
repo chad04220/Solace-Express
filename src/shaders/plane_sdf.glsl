@@ -15,6 +15,19 @@ const bool GEAR_FIELD = true;
 // skin is left wherever it would come closer than that to another surface (the far side of a thin wing) - except across
 // the opening itself, its lowest 4 cm. (Clamped everywhere, as it was, the opening kept its skin too: the wells were
 // sealed voids behind open doors.)
+// Seat-draped shoulder webbing follows the sculpted back, including its bolsters.
+// The former flat strips ran through the cushions, leaving disconnected dark patches.
+float fleetSeatBackPad(vec3 b,float sw){
+  float bw=mix(min(sw,.2),min(sw,.145),smoothstep(-.14,.28,b.y));
+  float back=sdRoundBox(b,vec3(bw,.360,.050),.045);
+  return smin(back,sdRoundBox(vec3(abs(b.x)-bw+.025,b.y+.050,b.z+.030),vec3(.030,.260,.070),.030),.025);
+}
+float fleetShoulderWeb(vec3 b,float back){
+  vec2 offset=rot2(vec2(-.030,-.060),-.180);
+  float bands=max(abs(abs(b.x)-.110)-.022,abs(b.y-offset.x)-.330);
+  // Seven millimetres of proud fabric, rounded into the existing 44 mm bands, attached to the cushion.
+  return max(-smin(-(back-.007),-bands,.010),b.z+.002);
+}
 // Swift matched initial supported body; metres, unchanged exterior.
 // Requires existing sdRoundBox,sdBox,sdCapsule,smin,rot2 helpers.
 // Explicit call gate MODEL_IS(7). f is the unchanged world fuselage SDF.
@@ -27,11 +40,8 @@ float swiftSeatPadded(vec3 p,float side){
   d=smin(d,sdCapsule(q,vec3(-.125,.030,-.220),vec3(.125,.030,-.220),.045),.012);
   // Complete pan; no notch. Control clearance belongs to combined study.
   vec3 b=p-swiftSeatBackCenter(side);b.yz=rot2(b.yz,-.180);
-  float bw=mix(.180,.145,smoothstep(-.140,.280,b.y));
-  float back=sdRoundBox(b,vec3(bw,.360,.050),.045);
-  // Original padded bolster retained;3.27mm torso contact is explicit soft contact.
-  float bolster=sdRoundBox(vec3(abs(b.x)-bw+.025,b.y+.050,b.z+.030),vec3(.030,.260,.070),.030);
-  back=smin(back,bolster,.025);
+  // Original padded bolster and verified torso contact are unchanged.
+  float back=fleetSeatBackPad(b,.180);
   return min(d,back);
 }
 float swiftSeatRailSupports(vec3 p,float side,float f){
@@ -54,9 +64,8 @@ float swiftHeelPost(vec3 p,float x,float f){
   return max(d,f+.060); // Raw lower caps fail14.47mm; this conforming cut is mandatory.
 }
 float swiftDrapedShoulderWeb(vec3 p,float side){
-  vec3 q=p-vec3(side*.250,.05866339043319735,-1.2077919949999971);
-  q.x=abs(q.x)-.110;q.yz=rot2(q.yz,-.180);
-  return sdBox(q,vec3(.022,.330,.004));
+  vec3 b=p-swiftSeatBackCenter(side);b.yz=rot2(b.yz,-.180);
+  return fleetShoulderWeb(b,fleetSeatBackPad(b,.180));
 }
 // Optional conservative forward seat-draped lap belt/buckle resolution.
 // Do NOT retain original rigid buckle relative Z-.055: it intersects pelvis.
@@ -87,10 +96,7 @@ float bushSeatPadded(vec3 p,float side){
   float d=sdRoundBox(q,vec3(.180,.055,.240),.050);
   d=smin(d,sdCapsule(q,vec3(-.125,.030,-.220),vec3(.125,.030,-.220),.045),.012);
   vec3 b=p-bushSeatBackCenter(side);b.yz=rot2(b.yz,-.180);
-  float bw=mix(.180,.145,smoothstep(-.140,.280,b.y));
-  float back=sdRoundBox(b,vec3(bw,.360,.050),.045);
-  float bolster=sdRoundBox(vec3(abs(b.x)-bw+.025,b.y+.050,b.z+.030),vec3(.030,.260,.070),.030);
-  back=smin(back,bolster,.025);
+  float back=fleetSeatBackPad(b,.180);
   return min(d,back);
 }
 float bushSeatRailSupports(vec3 p,float side,float f){
@@ -117,9 +123,8 @@ float bushFinalBlade(vec3 p,float side,float f){
   return max(sdRoundBox(p-center,vec3(.005,.5*(top-bottom),.020),.002),f+.060);
 }
 float bushDrapedShoulderWeb(vec3 p,float side){
-  vec3 q=p-vec3(side*.250,.11866339043319743,-1.057791994999997);
-  q.x=abs(q.x)-.110;q.yz=rot2(q.yz,-.180);
-  return sdBox(q,vec3(.022,.330,.004));
+  vec3 b=p-bushSeatBackCenter(side);b.yz=rot2(b.yz,-.180);
+  return fleetShoulderWeb(b,fleetSeatBackPad(b,.180));
 }
 float bushDrapedLapWeb(vec3 p,float side){return sdBox(p-vec3(side*.250,-.040,-1.361),vec3(.170,.022,.004));}
 float bushDrapedBuckle(vec3 p,float side){return sdRoundBox(p-vec3(side*.250,-.040,-1.366),vec3(.030,.020,.006),.004);}
@@ -143,6 +148,21 @@ float bushmasterPowerFurniture(vec3 p){
   return min(min(saddle,support),min(base,spindle));
 }
 
+#if HAS_ATLAS
+// The doorseat and aft lip are unchanged. A 1.75 m parabolic leading ramp
+// rises smoothly from the closed floor into the wing instead of a tall wall.
+float atlasRootFairing(vec3 q,float halfZ){
+  float ft=1.45,reach=1.75,aft=.24;
+  float fair=sdRoundBox(q-vec3(0,ft*.5,.5*(aft-reach)),vec3(1.94,ft*.5,halfZ+.5*(aft+reach)),.22);
+  float ahead=max(-q.z-halfZ-.04,0.0),curve=ft/(reach*reach);
+  float ramp=(curve*ahead*ahead-q.y)/sqrt(1.0+4.0*curve*curve*ahead*ahead);
+  fair=max(fair,ramp);
+  return max(fair,(q.z-halfZ-.04-1.5*q.y)*.5547);
+}
+// Classify the contributing primitive, not a roundoff-sized change after mix.
+// The latter spuriously repainted distant nacelle/exhaust vertices as wing skin.
+bool atlasFairingOwns(float fair,float footprint,float base){return max(fair,footprint)<base;}
+#endif
 vec2 wellCut(vec2 res, float box, float w){
   // (none from the cockpit: there the fuselage is a 6 cm shell, the opening's band went through it and the nose well
   // was a hole in the cabin floor beside the rudder pedals, the ground below showing through it)
@@ -188,7 +208,16 @@ float sdFuselage(vec3 p){
   // Signed caps keep the nose/tail shell closed and make the cap rim a small rolled edge.
   float roll = min(m*0.2, 0.025);
   vec2 cap = vec2(d2, dz) + roll;
-  return min(max(cap.x, cap.y), 0.0) + length(max(cap, 0.0)) - roll;
+  float fus=min(max(cap.x, cap.y), 0.0) + length(max(cap, 0.0)) - roll;
+#if HAS_ATLAS
+  if(isAtlas()) {
+    // A true ellipsoidal transport radome gives a rounded forward normal, without the
+    // station spline's finite-slope needle tip. Its shoulder overlaps the authored loft.
+    float dome=sdEllipsoid(p-vec3(0,-.33,-20.65),vec3(.61,.51,.65));
+    fus=smin(max(fus,-20.95-p.z),dome,.06);
+  }
+#endif
+  return fus;
 }
 
 // Tapered airfoil panel. s = spanwise (>= 0 from root), c = chordwise from root LE (aft +), t = thickness axis.
@@ -236,12 +265,64 @@ vec2 gearLegDetails(vec3 p, vec2 res, vec3 upper, vec3 lower, float shaft, bool 
 // space, its leg from mount); the nose and tail wheels extended and straight, about their steering pivots; a door
 // closed, in its hinge's frame. The airframe field places them itself (each piece once, the near door only), so a
 // shader that inlines the field carries each shape once.
+// Fixed mains use the same rigid-part path as retracting legs so an entire
+// wheel, pant and strut can detach without taking a rectangular piece of fuselage.
+vec2 gearFixedMainShape(vec3 ap){
+  vec4 G0=gM[18],G1=gM[19];
+  int gtype=int(gM[0].y+0.5);
+  float track=G0.x,wr=G0.y,mz=G0.z,gh=G1.x;
+  vec2 res=vec2(1e5,0.0);
+  vec3 wc = vec3(track, wr - gh, mz);
+  vec3 secM = fusSection(mz);
+  float legs, tyres, spats = 1e5;
+  if (gtype == 0) {
+    legs = sdCapsule(ap, vec3(secM.x*0.75, secM.z - secM.y*0.8, mz), wc + vec3(-0.06, 0.04, 0.0), 0.03);
+    tyres = sdRoundCylX(ap - wc, wr, 0.065, 0.04);
+    float sp = sdEllipsoid(ap - wc - vec3(0.0, 0.04, 0.06), vec3(0.14, wr*1.05, wr*1.9));
+    spats = max(sp, -(ap.y - (wc.y - wr*0.5)));
+  } else if (gtype == 1) {
+    legs = sdCapsule(ap, vec3(secM.x*0.7, secM.z - secM.y*0.85, mz), wc + vec3(-0.08, 0.06, 0.0), 0.045);
+    tyres = sdRoundCylX(ap - wc, wr, 0.09, 0.05);
+    tyres = min(tyres, sdRoundCylX(ap - wc - vec3(0.06, 0.0, 0.0), wr*0.45, 0.04, 0.02));
+  } else {
+    legs = min(sdCapsule(ap, vec3(secM.x*0.8, secM.z - secM.y*0.8, mz - 0.35), wc, 0.03), sdCapsule(ap, vec3(secM.x*0.8, secM.z - secM.y*0.8, mz + 0.3), wc, 0.03));
+    tyres = sdRoundCylX(ap - wc, wr, 0.14, 0.09);
+  }
+  res = opU(res, vec2(legs, 8.0));
+  res = opU(res, vec2(tyres, 6.0));
+  // Covered wheels have no exposed rim/hub solid. Prevent the metal lip from piercing the closed pants.
+  if(gtype!=0) res = gearWheelDetails(ap - wc, res, wr, gtype == 1 ? 0.09 : 0.14, true);
+  vec3 mount = vec3(secM.x*(gtype == 2 ? 0.8 : gtype == 0 ? 0.75 : 0.7), secM.z - secM.y*(gtype == 1 ? 0.85 : 0.8), mz);
+  vec3 ankle = gtype == 2 ? wc : wc + vec3(gtype == 0 ? -0.06 : -0.08, gtype == 1 ? 0.06 : 0.04, 0.0);
+  res = gearLegDetails(ap, res, mount, ankle, gtype == 1 ? 0.045 : 0.03, false, false);
+  res = opU(res, vec2(spats, 1.0));
+  return res;
+}
 vec2 gearMainShape(vec3 l, vec3 mount){
   vec4 G0 = gM[18], G1 = gM[19];
   int gtype = int(gM[0].y + 0.5);
   float track = G0.x, wr = G0.y, mz = G0.z;
   vec3 wc = vec3(track, wr - G1.x, mz); float legs, tyres, shaft, halfWidth;
   float door = 1e9;
+#if HAS_ATLAS
+  if (isAtlas()) {
+    // The vertical oleo exits through the bay floor; the trailing link meets the
+    // four-wheel truck behind it. The complete connected assembly folds about H.
+    vec3 knee=atlasMainKnee();
+    // Two axles and four braked tyres per main leg. The shared contact station is the truck centre.
+    vec3 q=l-wc, wq=vec3(abs(q.x)-.34,q.y,abs(q.z)-.62);
+    tyres=sdRoundCylX(wq,wr,.145,.075);
+    legs=sdCapsule(l,mount,knee,.125);
+    legs=min(legs,sdCapsule(l,knee,wc+vec3(0,.10,0),.115));
+    legs=min(legs,sdRoundCylX(l-knee,.16,.16,.025));
+    legs=min(legs,sdCapsule(q,vec3(0,0,-.62),vec3(0,0,.62),.095));
+    legs=min(legs,sdCapsule(vec3(q.x,q.y,abs(q.z)),vec3(-.39,0,.62),vec3(.39,0,.62),.085));
+    vec2 res=opU(vec2(legs,8),vec2(tyres,6));
+    res=gearWheelDetails(wq,res,wr,.145,true);
+    // The scissor faces forward into the well rather than crossing its aft lip.
+    return gearLegDetails(vec3(l.xy,2.0*mount.z-l.z),res,mount,knee,.095,true,false);
+  }
+#endif
   if (gtype == 3) {   // a twin-wheel bogie on a heavy leg, raked from its pivot (gearNacFold), and a door on the leg: the
                       // nacelle's skin over the slot the leg swings through, where it lies stowed
     legs = sdCapsule(l, mount, vec3(track, wc.y + 0.05, mz), 0.09);
@@ -278,19 +359,25 @@ vec2 gearNoseShape(vec3 l){
   int gtype = int(gM[0].y + 0.5);
   float wr = G0.y, gh = G1.x;
   vec3 secN = fusSection(G0.w);
-  float nwr = gtype == 3 ? wr*0.75 : wr*0.85, rLeg = gtype >= 3 ? 0.07 : 0.035, fx = 0.06 + (gtype == 3 ? 0.15 : 0.0);
+  float nwr = gearNoseR(), rLeg = isAtlas()?.095:gtype >= 3 ? 0.07 : 0.035, fx = isAtlas()?.36:0.06 + (gtype == 3 ? 0.15 : 0.0);
   vec3 nc = vec3(0.0, nwr - gh, 0.0), top = gtype >= 3 ? vec3(0.0, gearNoseFold().x, 0.0) : vec3(0.0, secN.z - secN.y*0.7, -0.05);   // (a retracting leg from its pivot)
   float nl = sdCapsule(l, top, nc + vec3(0.0, nwr*0.9, 0.0), rLeg);
   nl = min(nl, sdCapsule(vec3(abs(l.x), l.yz), vec3(fx, nc.y + nwr*0.9, 0.0), vec3(fx, nc.y, 0.0), 0.02));
   float nt = gtype == 3 ? min(sdRoundCylX(l - nc - vec3(0.15, 0.0, 0.0), nwr, 0.07, 0.04), sdRoundCylX(l - nc + vec3(0.15, 0.0, 0.0), nwr, 0.07, 0.04))
                         : sdRoundCylX(l - nc, nwr, 0.055, 0.035);
+  if(isAtlas()) {
+    vec3 nq=l-nc;nq.x=abs(nq.x)-.25;
+    nt=sdRoundCylX(nq,nwr,.115,.055);
+    nl=min(nl,sdCapsule(l,nc+vec3(-.34,0,0),nc+vec3(.34,0,0),.065));
+  }
   vec2 res = opU(vec2(nl, 8.0), vec2(nt, 6.0));
   if (gtype == 0) {   // the spat
-    float sp = sdEllipsoid(l - nc - vec3(0.0, 0.05, 0.06), vec3(0.1, nwr*1.12, nwr*2.2));
-    sp = max(max(sp, -(l.y - (nc.y - nwr*0.5))), -sdCylX(l - nc, nwr*0.54, 0.12));
+    float sp = sdEllipsoid(l - nc - vec3(0.0, 0.05, 0.06), vec3(0.13, nwr*1.12, nwr*2.2));
+    // Wheel pants are a closed aerodynamic side cover. Only the contact tread remains exposed below.
+    sp = max(sp, -(l.y - (nc.y - nwr*0.5)));
     res = opU(res, vec2(sp, 1.0));
   }
-  res = gearWheelDetails(gtype == 3 ? vec3(abs(l.x) - 0.15, l.yz) - nc : l - nc, res, nwr, gtype == 3 ? 0.07 : 0.055, false);
+  if(gtype!=0) res = gearWheelDetails(isAtlas()?vec3(abs(l.x)-.25,l.yz)-nc:gtype == 3 ? vec3(abs(l.x) - 0.15, l.yz) - nc : l - nc, res, nwr, isAtlas()?.115:gtype == 3 ? 0.07 : 0.055, false);
   return gearLegDetails(l, res, top, nc + vec3(0.0, nwr*0.9, 0.0), rLeg, true, true);
 }
 vec2 gearTailShape(vec3 l){
@@ -306,10 +393,14 @@ float gearDoorF(vec3 l, GearWell g){ float hzD = g.hz - 0.01; return sdBox(vec3(
 #ifdef PART_BAKE
 vec2 gearPartField(int k, vec3 l){
   int gtype = int(gM[0].y + 0.5);
+  if (k == PT_GEAR_MAIN && gtype <= 2) return gearFixedMainShape(l);
   if (k == PT_GEAR_MAIN) return gearMainShape(l, gtype == 3 ? gearNacFold().P : gearSwingMain() ? gearSwingOf().H : gearHinge());
   if (k == PT_GEAR_NOSE) return gearNoseShape(l);
   if (k == PT_GEAR_TAIL) return gearTailShape(l);
   // (each door in the paint of the skin it closes into: the fuselage's livery, the wing's under a main's fairing, a nacelle's)
+#if HAS_ATLAS
+  if (k == PT_GEAR_MDOOR && isAtlas()) return vec2(gearDoorV(l,vec2(2.09,gearFoldWell().hz)),2.0);
+#endif
   if (k == PT_GEAR_MDOOR && gtype == 4 && !gearSwingMain()) return vec2(gearDoorF(l, gearFoldWell()), 2.0);
   return vec2(gearDoorV(l, gearVBay(k == PT_GEAR_NDOOR).h), k == PT_GEAR_NDOOR ? 1.0 : gtype == 3 ? 5.0 : 2.0);
 }
@@ -800,6 +891,17 @@ vec2 mapPlaneBody(vec3 p){
     float holeSide = sdBox(p - vec3(0.0, 0.5*(WS.z - 0.12 + sideTop), 0.5*(WS.y + WS.w)), vec3(5.0, 0.5*(sideTop - WS.z + 0.12), 0.5*(WS.w - WS.y)));
     holeSide = max(holeSide, 0.3 - abs(p.x));
     holeSide = max(holeSide, -(abs(p.z - WS.y - 0.04) - 0.025));
+#if HAS_LARKSPUR
+    // Genuine aft glazing matches the existing external oval, with the same rounded inner trim lip.
+    if(MODEL_IS(13)) {
+      float rearPane=max(fleetPassengerPane(p,sec),max(max(gM[20].y-p.z,p.z-gM[20].z),sec.x*.4-abs(p.x)));
+      holeSide=min(holeSide,rearPane);
+    }
+#endif
+#if HAS_ATLAS
+    // One authored pane mask owns exterior glass, physical holes and the inner trim.
+    if(MODEL_IS(14)){holeWs=atlasWindow(p);holeSide=holeWs;}
+#endif
     // the window openings' cut faces in the frames' trim, not the shell's paint: where the flat cut meets the curved
     // roof at a shallow angle the face is a long wedge, and in the light shell colour it read as a hole to the sky
     // (and rounded, a 3 cm lip: a hard cut meeting the curved roof at a shallow angle left a knife edge far thinner than
@@ -849,7 +951,17 @@ vec2 mapPlaneBody(vec3 p){
       wd = min(wd, max(sl, fus0 + 0.4 - s));
     }
     float fd = res.x;
-    if (inside > 0.5) { wd = max(wd, -f); res.x = min(res.x, wd); }
+    if (inside > 0.5) {
+      // A hard subtraction left a razor-thin wing-root wedge at these two
+      // upper window openings. Round only the cabin-side junction by 30 mm;
+      // their outside wing and fuselage fields remain exactly unchanged.
+#if HAS_KESTREL || HAS_BUSHMASTER
+      if (MODEL_IS(0) || MODEL_IS(2)) wd = -smin(-wd, f, 0.03);
+      else
+#endif
+        wd = max(wd, -f);
+      res.x = min(res.x, wd);
+    }
     else res.x = smin(res.x, wd, 0.08*R);
     if (wd < fd) res.y = 2.0;
     // lift struts
@@ -903,7 +1015,7 @@ vec2 mapPlaneBody(vec3 p){
     else if (eng <= 3) { vec3 nq = vec3(abs(p.x) - N0.x, p.y - N0.y, p.z); float yr = abs(gM[10].x + N0.x*gM[10].z - N0.y);
                          eb = sdBox(nq - vec3(0.0, 0.0, N0.w + 0.5*(N1.x - N1.y*2.3)), vec3(N0.z + 0.6, N0.z + yr + 0.6, 0.5*(N1.x + N1.y*2.3) + 0.4)); }
     else if (isMantis()) eb = sdBox(p-vec3(0.0,0.15,3.20),vec3(1.30,1.40,5.10));
-    else { vec3 nq = vec3(abs(p.x), p.y - N0.y, p.z - N0.w); eb = sdBox(nq - vec3(0.5*(N0.x + N0.z), 0.0, 0.5*N1.x), vec3(0.5*(N0.x + N0.z) + 0.3, N0.z + 0.4, 0.5*N1.x + 0.75)); }
+    else { vec3 nq = vec3(abs(p.x), p.y - N0.y, p.z - N0.w); eb = sdBox(nq - vec3(0.5*(N0.x + N0.z), 0.0, 0.5*N1.x), vec3(0.5*(N0.x + N0.z) + 0.3, N0.z + (isAtlas()?1.2:0.4), 0.5*N1.x + 0.75)); }
     if (eb > res.x + 0.12) {}
     else if (eng <= 1) {
       float sr = N1.y;
@@ -938,7 +1050,36 @@ vec2 mapPlaneBody(vec3 p){
       res = vec2(nacJoin, nac < res.x ? 5.0 : res.y);
       float sr = N1.y;
       res = opU(res, vec2(sdRoundCone(np, vec3(0.0, 0.0, z0 - sr*2.3), vec3(0.0, 0.0, z0 + 0.05), 0.015, sr), 16.0));
-    } else if (isMantis()) {
+    }
+#if HAS_ATLAS
+    else if (isAtlas()) {
+      vec3 ap=vec3(abs(p.x),p.y,p.z), np=ap-vec3(N0.x,N0.y,N0.w);
+      float nr=N0.z,len=N1.x;
+      // Rounded intake lip joins a broad bypass barrel and a tapering aft cowl.
+      float u=clamp(np.z/len,0.0,1.0);
+      float radius=nr*(1.0-.24*smoothstep(.40,1.0,u));
+      float shell=max(length(np.xy)-radius,max(-np.z,np.z-len));
+      float bore=nr*(.855-.29*smoothstep(.45,1.0,u));
+      shell=max(shell,bore-length(np.xy));
+      float lip=length(vec2(length(np.xy)-nr*.93,np.z-.09))-nr*.072;
+      res=opU(res,vec2(min(shell,lip),5));
+      // A streamlined vertical pylon intersects the pod roof and the wing spar, never the inlet.
+      float wingY=gM[10].x+N0.x*gM[10].z;
+      vec3 pq=ap-vec3(N0.x,0,N0.w);
+      float py=.5*(N0.y+nr*.72+wingY), ph=.5*(wingY-(N0.y+nr*.72))+.15;
+      float pylon=sdRoundBox(pq-vec3(0,py,len*.65),vec3(.16,max(ph,.12),len*.36),.11);
+      res=opU(res,vec2(pylon,5));
+      // Core turbine and tail cone sit behind the open bypass annulus.
+      float core=sdRoundCone(np,vec3(0,0,len*.43),vec3(0,0,len+.42),nr*.43,.08);
+      res=opU(res,vec2(core,17));
+      float backing=max(length(np.xy)-nr*.85,abs(np.z-1.02)-.022);
+      res=opU(res,vec2(backing,17));
+      float nozzle=max(abs(length(np.xy)-nr*.59)-.032,abs(np.z-len+.075)-.075);
+      res=opU(res,vec2(nozzle,8));
+      if(gPartMode==-1){Pose F=atlasFanPose(p.x<0.0?-1.0:1.0);res=opU(res,atlasFanField(transpose(F.R)*(p-F.T)));}
+    }
+#endif
+    else if (isMantis()) {
       // One centerline powerplant: a raised dorsal mouth aft of the sealed cockpit routes into one core.
       // Cutting the same inlet/nozzle voids through the skin prevents hidden fuselage caps in either opening.
       float nr=N0.z, len=N1.x; vec3 core=vec3(0.0,N0.y,N0.w), end=mantisNozzle();
@@ -994,7 +1135,7 @@ vec2 mapPlaneBody(vec3 p){
     res.x = smin(res.x, pod, 0.12);
   }
   // ---------------- landing gear (fixed types hang below the lower fuselage: a plane bounds them)
-  // The retracting legs, the nose and tail wheels and the bays' doors are rigid parts (plane_parts.glsl
+  // All main legs, the nose and tail wheels and the bays' doors are rigid parts (plane_parts.glsl
   // gearPartPose, gearPartField above): placed here by their poses, left out of the airframe's mesh bake. The wells are
   // the airframe's, always open: the doors close over them.
   float gearTop = 1e5;
@@ -1044,21 +1185,51 @@ vec2 mapPlaneBody(vec3 p){
       } else {   // the fold's fairing under the wing root (blended in; inside a wing thick enough it never shows), its well, the near door, the leg folded
         GearFold f = gearFold(); GearWell g = gearFoldWellOf(f);
         vec3 bq = inverse(g.F.R)*(ap - g.F.T), bc = vec3(0.5*(g.x0 + g.x1), 0.0, 0.0);
-        float ft = max(gM[10].x - g.F.T.y, 0.02), fr = min(0.07, 0.5*ft);   // (up to the wing's mid-plane: it only ever bulges below)
-        vec3 fe = bq - bc; float fh = 0.5*(g.x1 - g.x0) + 0.03, fl = g.hz + 0.03, ext = 1.5*ft;
-        float fair = sdRoundBox(fe - vec3(0.0, ft*0.5, 0.0), vec3(fh, ft*0.5, fl + ext), fr);
-        fair = max(fair, (abs(fe.z) - fl - 1.5*bq.y)*0.5547);   // (its ends taper up into the wing; its outboard side stays clear of the flap's root)
-        fair = max(fair, fe.z - (gearFairAft() - mz));   // (the taper stops short of the flaps' hinge line)
-        float fd = res.x;
-        res.x = smin(res.x, fair, 0.08);
-        if (fair < fd) res.y = 2.0;   // (the wing's paint)
-        res = wellCut(res, sdBox(bq - bc - vec3(0.0, 0.5*(g.depth - 0.04) - 0.02, 0.0), vec3(0.5*(g.x1 - g.x0), 0.5*(g.depth + 0.04), g.hz)), bq.y);
+#if HAS_ATLAS
+        if(isAtlas()) {
+          // A rounded root blend meets the belly and wing, without any fairing
+          // extending behind the wing. Keep enough lower lip for the closed doors.
+          float fair=atlasRootFairing(bq-bc,g.hz),footprint=atlasFixedWingFootprint(ap);
+          float fd=res.x,joined=smin(fd,fair,.08);
+          res.x=min(fd,max(joined,footprint));
+          if(atlasFairingOwns(fair,footprint,fd))res.y=2.0;
+        } else
+#endif
+        {
+          float ft=max(gM[10].x-g.F.T.y,.02),fr=min(.07,.5*ft);
+          vec3 fe=bq-bc;float fh=.5*(g.x1-g.x0)+.03,fl=g.hz+.03,ext=1.5*ft;
+          float fair=sdRoundBox(fe-vec3(0,ft*.5,0),vec3(fh,ft*.5,fl+ext),fr);
+          fair=max(fair,(abs(fe.z)-fl-1.5*bq.y)*.5547);
+          fair=max(fair,ap.z-gearFairAft());
+          float fd=res.x;res.x=smin(res.x,fair,.08);if(fair<fd)res.y=2.0;
+        }
+        float cutCenter=isAtlas()?.5*(g.depth-.30):.5*(g.depth-.04)-.02;
+        float cutHalf=isAtlas()?.5*(g.depth+.30):.5*(g.depth+.04);
+        res = wellCut(res, sdBox(bq - bc - vec3(0,cutCenter,0),vec3(.5*(g.x1-g.x0),cutHalf,g.hz)),bq.y);
+#if HAS_ATLAS
+        if(isAtlas()) {
+          vec3 mount=vec3(track,gM[10].x+track*gM[10].z-.03,f.H.z);
+          res=opU(res,vec2(sdCapsule(ap,mount,f.H,.15),8.0));
+        }
+#endif
         if (gPartMode == -1) {
-          float s = bq.z > 0.0 ? 1.0 : -1.0, ca = cos(a), sa = sin(a);
-          mat3 DR = mat3(1.0, 0.0, 0.0,  0.0, ca, -s*sa,  0.0, -sa, -s*ca);
-          res = opU(res, vec2(gearDoorF(transpose(DR)*(bq - bc - vec3(0.0, 0.0, s*g.hz)), g), 2.0));
-          mat3 Rf = partRxy(up*(f.dl - 1.5707963));
-          res = opU(res, gearMainShape(transpose(Rf)*(ap - f.H) + f.H, f.H));
+#if HAS_ATLAS
+          if(isAtlas()) {
+            for(int di=0;di<2;di++) {
+              float ds=di==0?-1.0:1.0;
+              mat3 DR=partMirror(-ds)*partRxy(-atlasMainDoorAngle(ds));
+              vec3 q=transpose(DR)*(bq-vec3(ds*1.70,0,0));
+              res=opU(res,vec2(gearDoorV(q,vec2(2.09*atlasMainDoorWidth(ds)/2.10,g.hz)),2.0));
+            }
+          } else
+#endif
+          {
+            float s=bq.z>0.0?1.0:-1.0,ca=cos(a),sa=sin(a);
+            mat3 DR=mat3(1,0,0, 0,ca,-s*sa, 0,-sa,-s*ca);
+            res=opU(res,vec2(gearDoorF(transpose(DR)*(bq-bc-vec3(0,0,s*g.hz)),g),2.0));
+          }
+          mat3 Rf=gearFoldR(up);
+          res=opU(res,gearMainShape(transpose(Rf)*(ap-f.H)+f.H,f.H));
         }
       }
       if (G1.z < 0.5) {   // the nose wheel's well along the belly and its near door
@@ -1068,30 +1239,8 @@ vec2 mapPlaneBody(vec3 p){
         mat3 Rp = partRyz(b.pitch);
         if (gPartMode == -1) res = opU(res, vec2(gearDoorV(transpose(Rp*partMirror(-s)*partRxy(-a))*(p - b.c - Rp*vec3(s*b.h.x, 0.0, 0.0)), b.h), 1.0));
       }
-    } else {   // fixed mains: in place
-      vec3 wc = vec3(track, wr - gh, mz);
-      vec3 secM = fusSection(mz);
-      float legs, tyres, spats = 1e5;
-      if (gtype == 0) {
-        legs = sdCapsule(ap, vec3(secM.x*0.75, secM.z - secM.y*0.8, mz), wc + vec3(-0.06, 0.04, 0.0), 0.03);
-        tyres = sdRoundCylX(ap - wc, wr, 0.065, 0.04);
-        float sp = sdEllipsoid(ap - wc - vec3(0.0, 0.04, 0.06), vec3(0.1, wr*1.05, wr*1.9));
-        spats = max(max(sp, -(ap.y - (wc.y - wr*0.5))), -sdCylX(ap - wc, wr*0.54, 0.12));
-      } else if (gtype == 1) {
-        legs = sdCapsule(ap, vec3(secM.x*0.7, secM.z - secM.y*0.85, mz), wc + vec3(-0.08, 0.06, 0.0), 0.045);
-        tyres = sdRoundCylX(ap - wc, wr, 0.09, 0.05);
-        tyres = min(tyres, sdRoundCylX(ap - wc - vec3(0.06, 0.0, 0.0), wr*0.45, 0.04, 0.02));
-      } else {
-        legs = min(sdCapsule(ap, vec3(secM.x*0.8, secM.z - secM.y*0.8, mz - 0.35), wc, 0.03), sdCapsule(ap, vec3(secM.x*0.8, secM.z - secM.y*0.8, mz + 0.3), wc, 0.03));
-        tyres = sdRoundCylX(ap - wc, wr, 0.14, 0.09);
-      }
-      res = opU(res, vec2(legs, 8.0));
-      res = opU(res, vec2(tyres, 6.0));
-      res = gearWheelDetails(ap - wc, res, wr, gtype == 0 ? 0.065 : gtype == 1 ? 0.09 : 0.14, true);
-      vec3 mount = vec3(secM.x*(gtype == 2 ? 0.8 : gtype == 0 ? 0.75 : 0.7), secM.z - secM.y*(gtype == 1 ? 0.85 : 0.8), mz);
-      vec3 ankle = gtype == 2 ? wc : wc + vec3(gtype == 0 ? -0.06 : -0.08, gtype == 1 ? 0.06 : 0.04, 0.0);
-      res = gearLegDetails(ap, res, mount, ankle, gtype == 1 ? 0.045 : 0.03, false, false);
-      res = opU(res, vec2(spats, 1.0));
+    } else if (gPartMode == -1) {   // fixed mains: same shape, owned by PT_GEAR_MAIN in the mesh bake
+      res = opU(res, gearFixedMainShape(ap));
     }
     // the nose wheel (steered by the pedals, raised with the gear) or the tail wheel
     if (gPartMode == -1) {
@@ -1154,7 +1303,12 @@ vec2 mapPlaneBody(vec3 p){
     vec4 E = gM[22]; float pz = gM[21].w, phw = E.w; int ck = int(gM[21].z + 0.5);
     float pf = pz + 0.045;
 #if HAS_FLEET_CABIN
-    if (fleetCabin()) res = opU(res,mapFleetPanel(p,f));
+    if (fleetCabin()) {
+      res = opU(res,mapFleetPanel(p,f));
+#if HAS_LARKSPUR || HAS_ATLAS
+      res=opU(res,mapNewFleetFurnishings(p,f));
+#endif
+    }
     else
 #endif
     {
@@ -1202,7 +1356,7 @@ vec2 mapPlaneBody(vec3 p){
       res = opU(res, vec2(length(vq - vec3(0.0, 0.0, 0.004)) - 0.019, 66.0));
     }
     }
-    float floor_ = sdBox(p - vec3(0.0, (MODEL_IS(2)?.560:(MODEL_IS(7)?.520:E.y)) - 1.08, E.z), vec3(phw, 0.02, 1.6));
+    float floor_ = sdBox(p - vec3(0.0, (MODEL_IS(2)?.560:(MODEL_IS(7)?.520:E.y)) - 1.08, E.z), vec3(MODEL_IS(14)?fusSection(E.z+1.0).x:phw, 0.02, 1.6));
     floor_ = max(floor_, f + 0.04);
     res = opU(res, vec2(floor_, 11.0));
     // seats: pan with a front roll, bolstered back, headrest, rails, lap belt and shoulder harness
@@ -1233,9 +1387,7 @@ vec2 mapPlaneBody(vec3 p){
       float seat = sdRoundBox(sp - vec3(0.0, E.y - seatDrop, E.z + 0.05), vec3(sw, 0.055, 0.24), 0.05);
       seat = smin(seat, sdCapsule(sp, vec3(-sw + 0.055, E.y-seatDrop+.03, E.z-.17), vec3(sw-.055,E.y-seatDrop+.03,E.z-.17), 0.045), 0.012);
       vec3 bp = sp - vec3(0.0, E.y - 0.4, E.z + 0.37); bp.yz = rot2(bp.yz, -0.18);   // reclined 10 deg: the top leans aft (+z)
-      float bw = mix(min(sw, 0.2), min(sw, 0.145), smoothstep(-0.14, 0.28, bp.y));
-      float back = sdRoundBox(bp, vec3(bw, 0.36, 0.05), 0.045);
-      back = smin(back, sdRoundBox(vec3(abs(bp.x) - bw + 0.025, bp.y + 0.05, bp.z + 0.03), vec3(0.03, 0.26, 0.07), 0.03), 0.025);   // tapered upper bolsters clear the curved roof
+      float back=fleetSeatBackPad(bp,sw);   // identical tapered upper bolsters clear the curved roof
       seat = min(seat, back);
       if (gCab0.y > -50.0) {   // headrest on two posts above the seat back
         vec3 hr = sp - vec3(0.0, gCab0.y, E.z + 0.455); hr.yz = rot2(hr.yz, -0.18);   // tilted with the back
@@ -1249,13 +1401,20 @@ vec2 mapPlaneBody(vec3 p){
       float postHalf=max((panBase-postBase)*.5,.015);
       rails=min(rails,sdRoundBox(vec3(abs(sp.x)-railX,sp.y-(postBase+postHalf),sp.z-E.z-.05),vec3(.013,postHalf,.016),.003));
       res = opU(res, vec2(rails, 60.0));
-      vec3 hq = vec3(abs(sp.x) - 0.11, sp.y - (E.y - 0.43), sp.z - (E.z + 0.31)); hq.yz = rot2(hq.yz, -0.18);
-      float belt = sdBox(hq, vec3(0.022, 0.33, 0.004));
+      float belt=fleetShoulderWeb(bp,back);
       belt = min(belt, sdBox(vec3(sp.x, sp.y - (E.y-seatDrop+.07), sp.z - (E.z - 0.05)), vec3(sw - 0.01, 0.022, 0.004)));
       res = opU(res, vec2(belt, 69.0));
       res = opU(res, vec2(sdRoundBox(vec3(sp.x, sp.y - (E.y-seatDrop+.07), sp.z - (E.z - 0.055)), vec3(0.03, 0.02, 0.006), 0.004), 60.0));   // buckle
     }
     // Two compact linked center sticks in the trainers; other models retain their yokes.
+#if HAS_LARKSPUR
+    if(larkspurCenterStick()) {
+      float side=p.x<0.0?-1.0:1.0;
+      res=partAt(res,PT_YOKE_SHAFT,vec2(side,0),p);
+      res=partAt(res,PT_YOKE_WHEEL,vec2(side,0),p);
+      res=partAt(res,PT_THR_KNOB,vec2(0),p);
+    } else
+#endif
 #if HAS_SWIFT
     if(swiftCompactYoke()) {
       float side=p.x<0.0?-1.0:1.0;
@@ -1292,7 +1451,7 @@ vec2 mapPlaneBody(vec3 p){
     if(floorSupportedYoke()) {
       bool utility=utilityFloorYoke();float ys=p.x<0.0?-1.0:1.0;
       vec3 top=cockpitYokeMount(ys)+vec3(0,0,utility?.100:.050);
-      vec3 foot=utility?vec3(top.x,E.y-1.070,E.z-.260):vec3(top.x,MODEL_IS(6)?-.645622863:(MODEL_IS(9)?E.y-1.070:-.170000024),top.z);
+      vec3 foot=utility?vec3(top.x,E.y-1.070,E.z-.260):vec3(top.x,MODEL_IS(6)?-.645622863:((MODEL_IS(9)||MODEL_IS(14))?E.y-1.070:-.170000024),top.z);
       if(utility || sdBox(p-(foot+top)*.5,vec3(.040,(top.y-foot.y)*.5+.040,.040))<res.x) {
         float post=sdCapsule(p,foot,top-vec3(0,utility?.046:.048,0),utility?.022:.018);
         post=max(post,f+.025);
@@ -1394,7 +1553,7 @@ vec2 mapPlaneBody(vec3 p){
       res = opU(res, vec2(sdCylX(tw, 0.075, 0.012), 66.0));
       res = opU(res, vec2(sdRoundCylX((p - vec3(0.0, pc.y + ph + 0.012, pc.z + pd*0.4)).yxz, 0.035, 0.012, 0.004), 66.0));   // fuel selector
       if (ck == 0) {
-        if(!compactTrainerStick() && !bushmasterPowerLever() && !swiftCompactYoke()) {
+        if(!compactTrainerStick() && !bushmasterPowerLever() && !swiftCompactYoke() && !larkspurCenterStick()) {
         res = partAt(res, PT_THR_KNOB, vec2(0.0), p);   // (a rigid part: plane_parts.glsl)
         CockpitLayout ML=cockpitLayout();bool authoredRow=fleetCabin();
         float mixX=authoredRow?ML.controls.z+((MODEL_IS(0)||MODEL_IS(1))?.065:.075):.06;
@@ -1409,7 +1568,7 @@ vec2 mapPlaneBody(vec3 p){
       }
       }
     }
-    if (ck == 2) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, gCab1.z, E.z - 0.2), vec3(0.22, 0.03, 0.3), 0.02), 14.0));
+    if (ck == 2 && !MODEL_IS(14)) res = opU(res, vec2(sdRoundBox(p - vec3(0.0, gCab1.z, E.z - 0.2), vec3(0.22, 0.03, 0.3), 0.02), 14.0));
     // Legacy decorative switch row belongs to the old slab; authored decks supply their own controls.
     if(!fleetCabin()) {
       vec3 swp = p - vec3(0.0, E.y - 0.565, pz + 0.05);

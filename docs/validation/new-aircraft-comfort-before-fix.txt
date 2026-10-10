@@ -1,0 +1,2 @@
+aircraft,airport,load,initial_mass_kg,wind_mps,mode,seconds,touchdown_sink_mps,stop_from_centre_m,cross_track_m,go_arounds,nav_max_bank_deg,nav_min_g,nav_max_g,result,reason
+atlas_a180,CAP,legacy-fixture,56100,0.0,comfort,662.4,0.99,354.3,3.28,0,27.14,0.863,1.242,FAIL,en-route comfort envelope

@@ -1,0 +1,39 @@
+Static trim solves physical force and moment balance; TAS m/s, mass kg. Runway integrates 6-DOF.
+type,mass,vs_clean_SL,vs_flap_SL,vref_1.3vs,cruise75_1500m,cruise75_10000m,climb_excess_1500m
+kestrel,710,22.94,19.53,25.39,59.87,0.00,6.62
+wren,1205,28.18,23.54,30.60,65.42,0.00,5.78
+bush,1272,24.25,19.55,25.42,67.33,0.00,7.91
+islander,2755,30.70,25.50,33.14,65.04,0.00,4.87
+pelican,3612,37.37,29.89,38.86,75.24,0.00,5.42
+meridian,16742,58.96,46.85,60.91,134.49,0.00,9.69
+starling,5840,47.19,38.08,49.51,240.46,234.66,43.46
+swift_s6,1450,28.69,23.64,30.73,88.09,0.00,8.29
+osprey_c6,1920,28.78,24.28,31.56,81.35,0.00,8.28
+larkspur_l4,1232,26.55,21.53,27.99,68.50,0.00,6.41
+LEVEL larkspur_l4 altitude1500 target68.50 actual68.51 meanVS+0.002 altitudeError-0.1 maxBank0.05 crashed0
+RUNWAY larkspur_l4 light mass1056 groundroll110.0m lift29.6m/s t6.2s landroll69.7m landing15m355.9m approach25.9m/s
+TAKEOFF_15M larkspur_l4 light distance280.0 climb5.01
+RUNWAY larkspur_l4 design-max mass1501 groundroll259.7m lift35.3m/s t13.1s landroll99.6m landing15m385.9m approach30.9m/s
+TAKEOFF_15M larkspur_l4 design-max distance506.5 climb3.66
+FINAL larkspur_l4 CAP mass1501 touchdown333.2 sink1.72 stop455.2 cross1.43 stopped1 crashed0 
+LEARNED larkspur_l4 cruise68.5 climb7.05 vy42.8 takeoff220.1 landing15m383.5 requiredSL600.0 CAP1 PVI1 KLO1 FAR1
+atlas_a180,59942,67.00,51.73,67.25,263.85,241.62,34.28
+LEVEL atlas_a180 altitude1500 target263.85 actual263.85 meanVS+0.001 altitudeError-0.0 maxBank0.00 crashed0
+LEVEL atlas_a180 altitude10000 target241.62 actual241.61 meanVS-0.001 altitudeError-0.0 maxBank0.00 crashed0
+RUNWAY atlas_a180 light mass46285 groundroll523.4m lift64.1m/s t16.0s landroll304.3m landing15m590.5m approach59.1m/s
+TAKEOFF_15M atlas_a180 light distance683.5 climb12.83
+RUNWAY atlas_a180 design-max mass74385 groundroll1307.6m lift77.7m/s t32.4s landroll494.9m landing15m781.1m approach74.9m/s
+TAKEOFF_15M atlas_a180 design-max distance1525.9 climb10.64
+SETTLED atlas_a180 mass74385 originAGL3.6196 pitch0.0861 bank-0.0000 gh3.650 track3.450 mainZ4.1733 nacelleClearance0.4929 q[0.0002569,-0.9396924,0.0007058,0.3420202]
+NACELLE_CONTACT bank5deg crashed1 reason=Engine nacelle struck the ground
+FINAL atlas_a180 PVI mass59942 touchdown352.3 sink1.07 stop1027.1 cross0.00 stopped1 crashed0 
+FINAL atlas_a180 CAP mass59942 touchdown354.2 sink1.06 stop1042.8 cross0.00 stopped1 crashed0 
+PVI mid-load mass59942 takeoff15m1044.0 landing15m682.8 length2200
+FINAL atlas_a180 PVI mass74385 touchdown341.8 sink1.56 stop1234.5 cross0.00 stopped1 crashed0 
+FINAL atlas_a180 CAP mass74385 touchdown341.4 sink1.57 stop1216.1 cross0.02 stopped1 crashed0 
+PVI design-max mass74385 takeoff15m1523.7 landing15m780.9 length2200
+ENGINE_OUT_FLIGHT atlas_a180 mass74385 90s altitude+627.8 meanVS+7.44 meanIAS106.4 rudder+0.399 bank-0.03 maxHeadingError8.9 crashed0
+ENGINE_OUT atlas loaded specific-excess9.09m/s uncorrected-yaw-moment539515Nm
+WAKE atlas circulation426.0 sink3.34 larkspur55.8 sink1.29
+LEARNED atlas_a180 cruise263.8 climb32.35 vy159.8 takeoff1280.5 landing15m778.8 requiredSL1900.0 CAP1 PVI1 KLO0 FAR0
+PASS (0 failures)

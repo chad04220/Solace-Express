@@ -12,6 +12,8 @@
 #include "menu_layout.h"
 #include "hangar_catalog.h"
 
+static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bool inside);
+
 // XR-30 wingtip (body frame) matching mapJet's cranked delta in shaders.h
 static const vec3 kJetWingTip(5.62f, -0.38f, 4.4f);
 // XR-30 nozzle swivel (0 aft .. 90 deg down) plus pitch vectoring; mirrored by mapJet and the exhaust plumes
@@ -40,7 +42,7 @@ const ActionInfo kActions[ACT_COUNT] = {
   {"pitchDown", "Pitch down (nose down)", 0, 'W', 0},          {"pitchUp", "Pitch up (nose up)", 0, 'S', 0},
   {"rollLeft", "Roll left", 0, 'A', 0},                         {"rollRight", "Roll right", 0, 'D', 0},
   {"yawLeft", "Rudder left", 0, 'Q', PAD_LB},                   {"yawRight", "Rudder right", 0, 'E', PAD_RB},
-  {"throttleUp", "Throttle up", 0, K_SHIFT, 0},                 {"throttleDown", "Throttle down", 0, K_CTRL, 0},
+  {"throttleUp", "Throttle up (VTOL: hold)", 0, K_SHIFT, 0},    {"throttleDown", "Throttle down", 0, K_CTRL, 0},
   {"trimUp", "Trim nose up", 0, K_RBRACKET, PAD_UP},            {"trimDown", "Trim nose down", 0, K_LBRACKET, PAD_DOWN},
   {"flapsDown", "Flaps down / pods to VTOL", 1, 'F', PAD_B},    {"flapsUp", "Flaps up / pods forward", 1, 'V', PAD_X},
   {"gear", "Landing gear", 1, 'G', PAD_Y},                      {"brake", "Wheel brakes", 1, K_SPACE, PAD_A},
@@ -105,8 +107,16 @@ void Game::armInputs() {
   if (ctx != lastCtx) {
     for (int k = 0; k < 256; k++) if (in.down[k]) keyUnarmed[k] = true;
     padUnarmed |= in.buttons;
+    // Hover power is momentary, so triggers held across a pause / overlay must be released before powering up
+    // again, just like a held key or button. Keep this separate from the conventional throttle's input path.
+    if (plane.spec && plane.spec->special == 2 && plane.ctl.flaps > 0.99f) {
+      vtolLtUnarmed |= in.pad && in.lt > 0.05f;
+      vtolRtUnarmed |= in.pad && in.rt > 0.05f;
+    }
     lastCtx = ctx;
   }
+  if (!in.pad || in.lt <= 0.05f) vtolLtUnarmed = false;
+  if (!in.pad || in.rt <= 0.05f) vtolRtUnarmed = false;
   for (int k = 0; k < 256; k++) { if (!in.down[k]) keyUnarmed[k] = false; if (keyUnarmed[k]) in.down[k] = in.pressed[k] = false; }
   padUnarmed &= in.buttons;
   in.buttons &= ~padUnarmed; in.buttonsPressed &= ~padUnarmed;
@@ -468,7 +478,7 @@ void Game::practiseApproach(int spec, Career::Source src) {
 // Main-menu Free Flight never quotes, accepts, saves or settles a career job. A fresh
 // zero-fee plan supplies full tanks even without a licence, money or an owned aircraft.
 void Game::beginFreeFlightSetup() {
-  freeCraft = std::clamp(freeCraft, 0, kNumAircraft - 1);
+  freeCraft = validCareerSelection(freeCraft);
   freeAirport = g_world.airports.empty() ? 0 : std::clamp(freeAirport, 0, (int)g_world.airports.size() - 1);
   freeFlight = isolatedFlight = researchFlight = false;
   paused = showMap = showRadio = settingsFromPause = false;
@@ -486,7 +496,7 @@ void Game::cancelFreeFlightSetup() {
 void Game::launchFreeFlight() {
   if (screen != SCR_FREE_FLIGHT && !freeFlight) return;
   // Validate at the boundary too: a stale selection or direct call must never unlock research.
-  if (freeCraft < 0 || freeCraft >= kNumAircraft || kAircraft[freeCraft].special ||
+  if (!isCareerAircraft(freeCraft) ||
       freeAirport < 0 || freeAirport >= (int)g_world.airports.size()) return;
   const AircraftSpec& s = kAircraft[freeCraft];
   Contract c;
@@ -541,7 +551,7 @@ void Game::init(bool buildWorld, const std::function<void(float, const std::stri
     if (pf.empty() || !Plane::perfLoad(pf, buildStamp)) {
       std::vector<std::thread> th;
       std::atomic<int> completed{0};
-      for (int i = 0; i < kNumAircraft; i++) th.emplace_back([i, &completed] { Plane::perf(&kAircraft[i]); completed.fetch_add(1); });
+      for (int i : kCareerAircraft) th.emplace_back([i, &completed] { Plane::perf(&kAircraft[i]); completed.fetch_add(1); });
       if (progress) {
         while (completed.load() < kNumAircraft) {
           const int n = completed.load();
@@ -1236,6 +1246,8 @@ void Game::flightControls(float dt) {
   auto flapToast = [&]() {
     if (plane.spec->special == 2) toast(flapNotch > 0.99f ? "Pods 90 deg - VTOL hover" : fmt("Pods %d deg", (int)lroundf(flapNotch * 90)), vec3(0.8f, 0.55f, 1));
     else toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1));
+    if (plane.spec->special == 2 && flapNotch > 0.99f && !plane.apOn)
+      toast("VTOL: hold " + actLabel(ACT_THR_UP, padActive) + "; release to idle", vec3(0.8f, 0.55f, 1));
   };
   if (apNav) flapNotch = c.flaps;   // the autopilot runs the flaps on the approach
   else if (plane.spec->special == 1) flapNotch = 0;   // the XR-30 has no flaps: a delta wing and canards
@@ -1303,6 +1315,21 @@ void Game::flightControls(float dt) {
     float dd = length(vec3(plane.pos.x - dest().x, 0, plane.pos.z - dest().z));
     if (!apCruising() && (plane.onGround || plane.agl() < 250.f || dd < 3500.f)) { timeAccel = 1; toast("Time acceleration only available in cruise", vec3(1, 0.7f, 0.4f)); }
     else { timeAccel = timeAccel >= 4 ? 1 : timeAccel * 2; toast(fmt("Time x%.0f", timeAccel)); }
+  }
+  // Only the explicitly selected 90-degree hover notch uses momentary manual power. Resolve it after the pod
+  // and autopilot switches so entry, stick takeover and AP disengagement cannot carry a stale throttle command
+  // for one physics step. Intermediate / forward notches and every engaged autopilot retain their normal law.
+  if (!plane.apOn && plane.spec->special == 2 && c.flaps > 0.99f) {
+    float power = 0.f;
+    if (actOk(ACT_THR_UP)) {
+      if (actDown(ACT_THR_UP) || key(K_PGUP) || key(K_PLUS)) power = 1.f;
+      for (int k = 1; k <= 9; k++) if (key('0' + k)) power = std::max(power, k / 9.f);
+      const float rt = in.pad && !vtolRtUnarmed && in.rt > 0.05f ? in.rt : 0.f;
+      const float lt = in.pad && !vtolLtUnarmed && in.lt > 0.05f ? in.lt : 0.f;
+      power = clampf(std::max(power, rt) - lt, 0.f, 1.f);
+      if (actDown(ACT_THR_DN) || key(K_PGDN) || key(K_MINUS) || key('0')) power = 0.f;
+    }
+    c.throttle = power;   // engineSpool still follows this target at the aircraft's existing spool rate
   }
 }
 
@@ -2249,6 +2276,12 @@ void Game::partImpact(vec3 p, vec3 v, float E, float fire, bool water) {
 }
 
 void Game::breakUp(vec3 impactVel, bool water, bool air) {
+  // Capture the ordinary production pose before the caller clears velocity.
+  // In particular, speed-dependent nose steering must not snap to its taxi angle.
+  FrameParams captured{};
+  fillPlaneVisual(captured.plane, plane, propAngle, false);
+  wraithVisual(captured);
+  wreckPlanePose = captured.plane;
   const AircraftSpec& s = *plane.spec;
   Rng r(1234 + (uint32_t)(flightClock * 100));
   float speed = length(impactVel);
@@ -2265,7 +2298,7 @@ void Game::breakUp(vec3 impactVel, bool water, bool air) {
   vec3 vRot = plane.q.rotate(plane.w);
   for (int i = 0; i < n; i++) {
     WreckPiece w;
-    w.C = P[i].C; w.H = P[i].H; w.kind = P[i].kind; w.body = B[i];
+    w.C = P[i].C; w.H = P[i].H; w.kind = P[i].kind; w.side = P[i].side; w.rigidOnly = P[i].rigidOnly; w.body = B[i];
     w.cutN = breakCuts(s, P, n, i, w.cut);
     w.q = plane.q;
     w.c = plane.pos + plane.q.rotate(B[i].cg);
@@ -2548,8 +2581,7 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   else { pv.Ctl[0] = clampf(p.ctl.pitch + p.ctl.trim * 0.3f, -1, 1); pv.Ctl[1] = clampf(p.ctl.roll, -1, 1); pv.Ctl[2] = clampf(p.ctl.yaw, -1, 1); }
   pv.Ctl[3] = p.ctl.throttle;
   float blur = s.engineType == ENG_JET ? 1.f : smoothstepf(45.f, 650.f, p.rpm);
-  float wr = s.special ? .38f : md.wheelR;
-  float nr = s.special ? .33f : s.taildragger ? .10f : md.gear == 3 ? wr*.75f : wr*.85f;
+  float wr, nr; modelWheelRadii(idx, wr, nr);
   pv.model = (int)(p.spec - kAircraft);
   pv.wheel[0] = p.wheelMotion[0].angle(wr); pv.wheel[1] = p.wheelMotion[1].angle(wr); pv.wheel[2] = p.wheelMotion[2].angle(nr);
   pv.Pr[0] = propAngle; pv.Pr[1] = blur; pv.Pr[2] = (float)std::max(s.blades, 2); pv.Pr[3] = p.flapLeft() - p.flaps;   // (a split flap: the left one's own)
@@ -2676,9 +2708,11 @@ FrameParams Game::buildFrame() {
       WreckVisual& wv = fp.wreck;
       static_assert(kWreckPieces == kMaxBreakPieces && kWreckCuts == kMaxBreakCuts, "the renderer's wreck limits are the breakup's");
       wv.pieces = std::min((int)wreck.size(), kWreckPieces);
+      std::fill(std::begin(wv.gearOwner), std::end(wv.gearOwner), -1);
       for (int i = 0; i < wv.pieces; i++) {
         const WreckPiece& w = wreck[i];
-        wv.pos[i] = w.c - w.q.rotate(w.body.cg); wv.C[i] = w.C; wv.H[i] = w.H;
+        wv.pos[i] = w.c - w.q.rotate(w.body.cg); wv.C[i] = w.C; wv.H[i] = w.rigidOnly ? vec3(-1.f) : w.H;
+        if (w.kind == BK_GEAR) wv.gearOwner[w.side < 0 ? 0 : w.side > 0 ? 1 : 2] = i;
         wv.mid[i] = wv.pos[i] + w.q.rotate((w.body.lo + w.body.hi) * 0.5f); wv.rad[i] = 0.5f * length(w.body.hi - w.body.lo) + 0.5f;
         wv.cutN[i] = w.cutN;
         wv.burn[i] = clampf(w.fire * (0.15f + crashTimer / (airBreak ? 8.f : 2.f)), 0.f, 1.f);   // (an impact's fireball chars at once; a failure in the air as the pieces burn)
@@ -2714,6 +2748,14 @@ FrameParams Game::buildFrame() {
     fp.landLightPos = plane.pos + plane.forward() * (plane.spec->fusLen * 0.4f);
     fp.landLightDir = normalize(plane.forward() - plane.up() * 0.1f);
     wraithVisual(fp);
+    if (!wreck.empty()) {
+      // Freeze articulation while preserving the moving world frame:
+      // nearby-wreck shadow selection still needs its current position.
+      const vec3 worldPos = fp.plane.pos;
+      float worldRot[9]; memcpy(worldRot, fp.plane.rot, sizeof worldRot);
+      fp.plane = wreckPlanePose; fp.plane.pos = worldPos;
+      memcpy(fp.plane.rot, worldRot, sizeof worldRot);
+    }
     buildFeedCameras(fp);
     if (boomT >= 0 && boomT < 1.6f && !(length(fp.flameLight) > 0.f)) {   // an explosion's flash lights the scene, fading as the fireball cools
       float k = boomT < 0.08f ? boomT / 0.08f : expf(-(boomT - 0.08f) * 2.6f);
@@ -2798,7 +2840,7 @@ void Game::menuTour(FrameParams& fp) {
   // the aircraft passes over the airfield at mid-shot, on a heading turned from the runway's
   float hd = a.heading + S.turn;
   vec3 dir(sinf(hd * DEG), 0, -cosf(hd * DEG)), right = normalize(cross(dir, vec3(0, 1, 0)));
-  float v = std::min(kAircraft[S.craft].cruise, S.craft >= kResearchJet ? 140.f : 75.f);
+  float v = std::min(kAircraft[S.craft].cruise, kAircraft[S.craft].engineType == ENG_JET ? 140.f : 75.f);
   vec3 C = a.pos();
   vec3 p = C + dir * ((u - kMenuShotLen * 0.5f) * v);
   float g = std::max({g_world.height(p.x, p.z), g_world.height(p.x + dir.x * 400.f, p.z + dir.z * 400.f), g_world.height(p.x - dir.x * 400.f, p.z - dir.z * 400.f), 0.f});
@@ -2834,7 +2876,7 @@ void Game::menuTour(FrameParams& fp) {
 
 std::vector<std::pair<int, bool>> Game::prewarmItems(bool allCraft) {
   std::vector<std::pair<int, bool>> todo;
-  for (int i = 0; i <= kWraith; i++) if (allCraft || !kAircraft[i].special) { todo.push_back({i, false}); todo.push_back({i, true}); }
+  for (int i = 0; i < kAircraftCount; i++) if (allCraft || !kAircraft[i].special) { todo.push_back({i, false}); todo.push_back({i, true}); }
   return todo;
 }
 std::string Game::prewarmLabel(int craft, bool inside, bool fresh) {
@@ -2931,7 +2973,7 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
 // A dedicated showroom is isolated from the flight simulation. Selection changes only the
 // displayed airframe; purchasing, fuel, wear and the active flight remain untouched.
 void Game::hangarPreviewCamera(FrameParams& fp) {
-  const int craft = screen == SCR_FREE_FLIGHT ? std::clamp(freeCraft, 0, kNumAircraft - 1) : std::clamp(selHangar, 0, kWraith);
+  const int craft = screen == SCR_FREE_FLIGHT ? validCareerSelection(freeCraft) : std::clamp(selHangar, 0, kAircraftCount - 1);
   const AircraftSpec& sp = kAircraft[craft];
   static Plane demo;
   if (demo.spec != &sp) demo.reset(&sp, vec3(0), 0, sp.maxFuel, 85, false, 0);
@@ -3712,7 +3754,7 @@ void Game::update(float dt) {
       }
       if (saved) in = frameIn;
       if (screen == SCR_FLIGHT) updateCamera(dt);
-      if (plane.spec) {
+      if (plane.spec && wreck.empty()) {
         float rps = plane.spec->engineType == ENG_TURBOPROP ? plane.rpm / 60.f : plane.rpm / 60.f;
         propAngle = fmodf(propAngle + rps * 2 * PI * dt * (plane.rpm < 400 ? 1.f : 0.0f) + (plane.rpm >= 400 ? dt * 3.f : 0.f), 2 * PI * 100);
       }
@@ -4109,7 +4151,7 @@ void Game::debugScene(const std::string& name) {
     // o off to the side of the hole it came out of the cloud by): wxfly_<x>_<z>_<alt m>_<hdg>_<seconds>_<cam>_<aircraft>
     float fsecs = 0; int fspec = 1;
     if (sscanf(name.c_str(), "wxfly_%f_%f_%f_%f_%f_%c_%d", &px, &pz, &agl, &hdg, &fsecs, &cm, &fspec) >= 5) {
-      fspec = std::clamp(fspec, 0, kNumAircraft - 1);
+      fspec = validCareerSelection(fspec);
       plane.reset(&kAircraft[fspec], vec3(px, agl, pz), hdg, kAircraft[fspec].maxFuel, 100, true, kAircraft[fspec].cruise);
       takeoffAnnounced = true; camQ = plane.q; hudOn = false; hint.clear(); botControl = true;
       plane.apEngage(Plane::AP_HOLD, -1, wx); plane.apAlt = agl; plane.apHeading = hdg;
@@ -4237,8 +4279,8 @@ void Game::debugScene(const std::string& name) {
   }
   if (name.compare(0, 5, "crash") == 0) {   // crash<type>_<seconds after>: type flown into the ground in a steep dive at cruise speed
     int idx = 1; float after = 1.f; sscanf(name.c_str() + 5, "%d_%f", &idx, &after);
-    idx = std::clamp(idx, 0, kWraith);
-    if (idx >= kResearchJet) { resAirborne = true; realTime = 20; launchResearch(); hudOn = false; }
+    idx = std::clamp(idx, 0, kAircraftCount - 1);
+    if (isResearchAircraft(idx)) { resCraft = idx; resAirborne = true; realTime = 20; launchResearch(); hudOn = false; }
     else plane.reset(&kAircraft[idx], vec3(-960, 0, 23500), 0, kAircraft[idx].maxFuel, 100, true, kAircraft[idx].cruise);
     {   // (over land, and land where it comes down: some 150 m on)
       const vec3 f = normalize(vec3(plane.forward().x, 0, plane.forward().z));
@@ -4250,7 +4292,7 @@ void Game::debugScene(const std::string& name) {
     }
     plane.pos.y = std::max(g_world.height(plane.pos.x, plane.pos.z), 0.f) + 180.f;
     plane.q = quat::axisAngle(plane.right(), -50.f * DEG) * plane.q;
-    plane.vel = plane.forward() * (idx >= kResearchJet ? 250.f : kAircraft[idx].cruise); plane.ctl.throttle = 1; botControl = true; plane.ctl.pitch = 0.f;
+    plane.vel = plane.forward() * (isResearchAircraft(idx) ? 250.f : kAircraft[idx].cruise); plane.ctl.throttle = 1; botControl = true; plane.ctl.pitch = 0.f;
     camMode = 2; camYaw = 0.9f; camPitch = 0.3f; camZoom = getenv("BRKZOOM") ? (float)atof(getenv("BRKZOOM")) : 1.8f;
     float tb = -1, vHit = 0;
     for (int i = 0; i < 60 * 60; i++) {
@@ -4416,8 +4458,8 @@ void Game::debugScene(const std::string& name) {
   // loading-screen pictures (--loadshots): loadshot_<CODE> an airport from an elevated three-quarter view with the aircraft
   // on its runway; loadshot_air_<n> aircraft n in flight, filmed from alongside. Afternoon light, a little cloud.
   if (name.compare(0, 13, "loadshot_air_") == 0) {
-    static const char* kSpot[kWraith + 1] = {"MDB", "PMB", "ORC", "KLO", "FJH", "CAP", "PVI", "VCF", "LHK", "SMP", "GLS", "NPT", "HFS"};   // a different place each
-    int n = std::clamp(atoi(name.c_str() + 13), 0, kWraith);
+    static const char* kSpot[kAircraftCount] = {"MDB", "PMB", "ORC", "KLO", "FJH", "CAP", "PVI", "VCF", "LHK", "SMP", "GLS", "NPT", "HFS", "ORC", "CAP"};   // a different place each
+    int n = std::clamp(atoi(name.c_str() + 13), 0, kAircraftCount - 1);
     resCraft = n; resAirborne = true; resTime = 16.3f; resWx = 0; resAirport = std::max(0, g_world.findAirport(kSpot[n]));
     launchResearch();
     {   // at its own cruise speed, holding height (the research launch's 200 m/s tears a light aircraft apart)
@@ -4436,7 +4478,7 @@ void Game::debugScene(const std::string& name) {
   if (name.compare(0, 4, "gav_") == 0) {   // an aircraft parked on the runway, orbit view: gav_<spec>_<yaw>_<pitch>_<dist>[_<gear>[_<lift m>]]
     int sp = 0; float yawD = 120, pitD = 10, dist = 0, gearAt = -1, lift = 0;
     sscanf(name.c_str() + 4, "%d_%f_%f_%f_%f_%f", &sp, &yawD, &pitD, &dist, &gearAt, &lift);
-    sp = std::clamp(sp, 0, kWraith);
+    sp = std::clamp(sp, 0, kAircraftCount - 1);
     Contract c; c.from = g_world.findAirport("CAP"); c.to = g_world.findAirport("MDB"); c.title = "Aircraft check";
     c.wx = Weather(); c.wx.timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 14.5f; c.wx.cloudCover = 0.2f; c.wx.visibility = 60000;
     realTime = 20;

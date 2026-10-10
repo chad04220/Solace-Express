@@ -14,7 +14,7 @@ int main() {
     for (auto& w : k.wps) { float h = g_world.height(w.x, w.z); if (w.alt < h + 60) { printf("  !! %s waypoint below terrain (%.0f vs %.0f)\n", k.id.c_str(), w.alt, h); problems++; } }
     // choose cheapest option
     int best = -1; long long bestCost = 1LL << 40; bool needBuy = false;
-    for (int s = 0; s < kNumAircraft; s++) {
+    for (int s : kCareerAircraft) {
       Career tmp = c; std::string why;
       auto src = tmp.canFly(k, s, &why);
       long long cost;

@@ -7,7 +7,7 @@ int main(int argc, char** argv) {
   if (argc > 1 && std::string(argv[1]) == "--table") {   // the README's aircraft table, from the learned performance
     printf("| Aircraft | Type | Seats / Cargo | Range | Cruise | Take-off roll | Landing distance | Runway | Licence |\n|---|---|---|---|---|---|---|---|---|\n");
     static const char* lic[] = {"Student", "PPL", "CPL", "ATP"};
-    for (int i = 0; i < kNumAircraft; i++) {
+    for (int i : kCareerAircraft) {
       const AircraftSpec& s = kAircraft[i]; const PerfModel& P = Plane::perf(&s);
       printf("| %s | %s | %d / %.0f kg | %.0f km | %.0f kt | %.0f m | %.0f m | %.0f m%s | %s |\n", s.name, s.role, s.pax, s.cargoKg, s.rangeKm, P.cruiseV * MS_TO_KT,
              P.toRoll, P.ldgRoll, s.runwayNeeded(0), s.roughOK ? ", gravel/snow" : " paved", lic[s.license]);
@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
   const bool quick = getenv("FLIGHT_QUICK") != nullptr;
   auto skip = [&](int i) { return quick && i != 0 && i != 3 && i != 5 && i != 6 && i != kResearchJet && i != kWraith; };
   if (strcmp(kAircraft[kOsprey].id, "osprey_c6") != 0 || strcmp(kAircraft[kNightjar].id, "xr10_nightjar") != 0 || strcmp(kAircraft[kResearchJet].id, "xr30_specter") != 0 || strcmp(kAircraft[kMantis].id, "xr20_mantis") != 0 || strcmp(kAircraft[kWraith].id, "xr40_wraith") != 0) { printf("aircraft indices (kOsprey / kNightjar / kResearchJet / kMantis / kWraith) don't match the table\n"); return 1; }
-  for (int ai = 0; ai < kNumAircraft; ai++) {
+  for (int ai : kCareerAircraft) {
     if (skip(ai)) continue;
     const AircraftSpec& s = kAircraft[ai];
     int apIdx = g_world.findAirport("CAP");
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
     float t = 0, dt = 1.f / 60.f; float liftoffDist = -1, vLift = 0;
     // settle + start engine
     for (; t < 4; t += dt) p.step(dt, wx, t);
-    p.ctl.brake = 0; p.ctl.throttle = 1; p.ctl.flaps = s.taildragger ? 0.3f : 0.2f;
+    p.ctl.brake = 0; p.ctl.throttle = 1; p.ctl.flaps = s.taildragger ? 0.3f : s.takeoffFlap;
     vec3 p0 = p.pos;
     for (; t < 90; t += dt) {
       if (p.ias > s.vr) p.ctl.pitch = clampf((10.f - p.pitchDeg()) * 0.08f - p.w.x * 0.5f, -1, 1);
@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
   }
   // Control-direction check: each input must move the aircraft the way its control surface animates
   // (roll +1 = right aileron up -> right bank, pitch +1 = elevator TE up -> nose up, yaw +1 = rudder TE right -> nose right)
-  for (int ai = 0; ai < kNumAircraft; ai++) {
+  for (int ai : kCareerAircraft) {
     if (skip(ai)) continue;
     const AircraftSpec& s = kAircraft[ai];
     for (int axis = 0; axis < 3; axis++) {
@@ -395,7 +395,7 @@ int main(int argc, char** argv) {
   // ---------------- autopilot: stable holds in turbulence, and autoland at Solace Capital for every aircraft. The
   // autopilot flies each type to its own envelope (steep banks, hard pulls): what's checked is that it gets there, settles,
   // and never goes past the airframe's limits.
-  for (int i = 0; i < 9; i++) {
+  for (int i : kCareerAircraft) {
     if (skip(i)) continue;
     const AircraftSpec& s = kAircraft[i];
     Weather wx; wx.windSpeed = 7; wx.windFrom = 200; wx.turbulence = 0.25f; wx.gust = 2;
@@ -418,7 +418,7 @@ int main(int argc, char** argv) {
   }
   // ---------------- comfort law (career flights): the autopilot keeps passengers comfortable - bank <= 25 deg,
   // 0.8..1.3 g - in a 150 deg turn on HOLD and on a NAV route to a landing (the final approach keeps its own limits)
-  for (int i = 0; i < kNumAircraft; i++) {
+  for (int i : kCareerAircraft) {
     if (skip(i)) continue;
     const AircraftSpec& s = kAircraft[i];
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
@@ -455,7 +455,7 @@ int main(int argc, char** argv) {
   }
   {
     int ai = g_world.findAirport("CAP"); const Airport& A = g_world.airports[ai];
-    for (int i = 0; i < 9; i++) {
+    for (int i : kCareerAircraft) {
       if (skip(i)) continue;
       const AircraftSpec& s = kAircraft[i];
       Weather wx; wx.windSpeed = 6; wx.windFrom = wrapDeg360(A.heading + 25.f); wx.turbulence = 0.15f;

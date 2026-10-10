@@ -694,7 +694,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     row("Counts for", "nothing: no pay, no fees, no logbook entry", C_DIM);
   }
   if (c.payout) row("Payment", c.repBonusPct > 0 ? fmt("%s (incl. +%d%% reputation bonus)", fmtMoney(c.payout).c_str(), c.repBonusPct) : fmtMoney(c.payout), C_GOOD);
-  if (selAircraft >= 0 && selAircraft < kNumAircraft) {   // for the aircraft picked below (last frame's choice)
+  if (isCareerAircraft(selAircraft)) {   // for the aircraft picked below (last frame's choice)
     auto esrc = career.canFly(c, selAircraft);
     if (esrc != Career::SRC_NONE) {
       // (the plan runs the autopilot's approach planner: cached for this job, aircraft and career state)
@@ -772,15 +772,15 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   // rows drops unavailable aircraft, never one the job can be flown in (the review of v3.24.0: an owned Starling, the
   // seventh row, went unseen and unselectable on a long briefing)
   int firstOk = -1;
-  std::vector<Career::Source> srcs(kNumAircraft); std::vector<std::string> whys(kNumAircraft);
+  std::vector<Career::Source> srcs(kAircraftCount); std::vector<std::string> whys(kAircraftCount);
   std::vector<int> order(kNumAircraft); int nOrder = 0;
-  for (int i = 0; i < kNumAircraft; i++) {
+  for (int i : kCareerAircraft) {
     srcs[i] = career.canFly(c, i, &whys[i]);
     if ((c.type == CT_FERRY || c.type == CT_TRIAL) && srcs[i] == Career::SRC_NONE && career.license == LIC_STUDENT && i == 0) srcs[i] = Career::SRC_LESSON;
   }
   // the player's own aircraft first, then the other flyable ones, then the rest
   for (int pass = 0; pass < 3; pass++)
-    for (int i = 0; i < kNumAircraft; i++) {
+    for (int i : kCareerAircraft) {
       const bool own = srcs[i] == Career::SRC_OWNED, ok = srcs[i] != Career::SRC_NONE;
       if ((pass == 0 && own) || (pass == 1 && ok && !own) || (pass == 2 && !ok)) { order[nOrder++] = i; if (ok && firstOk < 0) firstOk = i; }
     }
@@ -836,7 +836,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     g_ren.text(tx + 10 * s, ty + 6 * s, 14 * s, tipName, C_TEXT, 1);
     for (size_t k = 0; k < lines.size(); k++) g_ren.text(tx + 10 * s, ty + 26 * s + 17 * s * k, 12.5f * s, lines[k], srcs[order[tipJ]] == Career::SRC_NONE ? C_BAD : C_DIM, 1);
   }
-  if (selAircraft >= 0 && (selAircraft >= kNumAircraft || srcs[selAircraft] == Career::SRC_NONE)) selAircraft = -1;
+  if (selAircraft >= 0 && (!isCareerAircraft(selAircraft) || srcs[selAircraft] == Career::SRC_NONE)) selAircraft = -1;
   if (selAircraft < 0) selAircraft = firstOk;
   {   // what is scrolled out of view, on the header's line; the chosen aircraft named there whenever its row is out of view
     bool selShown = false;
@@ -1050,7 +1050,7 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   const float x = 24 * s, y = 126 * s, w = W - 48 * s, h = H - 146 * s;
   const HangarLayout L = hangarLayout(x, y, w, h, s);
   const float lw = L.leftWidth, rx = L.rightX, rw = L.rightWidth;
-  freeCraft = std::clamp(freeCraft, 0, kNumAircraft - 1);
+  freeCraft = validCareerSelection(freeCraft);
   const int airportCount = (int)g_world.airports.size();
   if (airportCount == 0) { if (button(x, y, 260 * s, 42 * s, "Back to main menu")) cancelFreeFlightSetup(); return; }
   freeAirport = std::clamp(freeAirport, 0, airportCount - 1);
@@ -1062,28 +1062,29 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   if (button(W - 220 * s, 25 * s, 196 * s, 38 * s, "Back to main menu")) { cancelFreeFlightSetup(); uiGlass = false; return; }
   panel(x, y, lw, h); panel(rx, y, rw, h);
   g_ren.text(x + 18 * s, y + 18 * s, 22 * s, "Aircraft", C_TEXT, 1);
-  g_ren.text(x + 18 * s, y + 49 * s, 11 * s, "ALL 9 AVAILABLE / FREE", C_ACCENT, 1, 0, false);
+  g_ren.text(x + 18 * s, y + 49 * s, 11 * s, fmt("ALL %d AVAILABLE / FREE", kNumAircraft), C_ACCENT, 1, 0, false);
   const float craftTop = y + 78 * s, craftBottom = y + h - 30 * s, craftStep = 68 * s;
   const int craftVisible = std::max(1, (int)((craftBottom - craftTop) / craftStep));
   static int craftFirst = 0, craftSeen = -1, airportFirst = 0, airportSeen = -1;
   auto craftId = [&](int i) { return uid(0, (float)i, "free-flight-airframe"); };
   if (hovered(x, craftTop, lw, craftBottom - craftTop) && in.wheel) { craftFirst -= (int)in.wheel; in.wheel = 0; }
-  if (craftSeen != freeCraft) { if (freeCraft < craftFirst) craftFirst = freeCraft; if (freeCraft >= craftFirst + craftVisible) craftFirst = freeCraft - craftVisible + 1; craftSeen = freeCraft; }
-  if (focusNav) for (int i = 0; i < kNumAircraft; ++i) if (focusId == craftId(i)) { if (i < craftFirst) craftFirst = i; if (i >= craftFirst + craftVisible) craftFirst = i - craftVisible + 1; }
+  if (craftSeen != freeCraft) { const int row = careerRowFor(freeCraft); if (row < craftFirst) craftFirst = row; if (row >= craftFirst + craftVisible) craftFirst = row - craftVisible + 1; craftSeen = freeCraft; }
+  if (focusNav) for (int i = 0; i < kNumAircraft; ++i) if (focusId == craftId(careerSpecAt(i))) { if (i < craftFirst) craftFirst = i; if (i >= craftFirst + craftVisible) craftFirst = i - craftVisible + 1; }
   craftFirst = std::clamp(craftFirst, 0, std::max(0, kNumAircraft - craftVisible));
   for (int i = 0; i < kNumAircraft; ++i) {
+    const int spec = careerSpecAt(i);
     const float cy = craftTop + (i - craftFirst) * craftStep;
-    focusList.push_back({craftId(i), x + 10 * s, cy, lw - 20 * s, craftStep - 8 * s});
+    focusList.push_back({craftId(spec), x + 10 * s, cy, lw - 20 * s, craftStep - 8 * s});
     if (i < craftFirst || i >= craftFirst + craftVisible) continue;
-    const bool focused = focusNav && focusId == craftId(i), hov = hovered(x + 10 * s, cy, lw - 20 * s, craftStep - 8 * s);
-    card(x + 10 * s, cy, lw - 20 * s, craftStep - 8 * s, freeCraft == i, hov || focused, C_ACCENT);
+    const bool focused = focusNav && focusId == craftId(spec), hov = hovered(x + 10 * s, cy, lw - 20 * s, craftStep - 8 * s);
+    card(x + 10 * s, cy, lw - 20 * s, craftStep - 8 * s, freeCraft == spec, hov || focused, C_ACCENT);
     if (focused) g_ren.rectOutline(x + 8 * s, cy - 2 * s, lw - 16 * s, craftStep - 4 * s, C_ACCENT, 0.85f, 5 * s, 1.5f * s);
     const bool activate = focused && (in.pressed[K_ENTER] || in.pressed[' ']);
-    if ((hov && in.mPressed[0]) || activate) { freeCraft = i; g_audio.trigger(SFX_CLICK); if (activate) in.pressed[K_ENTER] = in.pressed[' '] = false; }
-    g_ren.text(x + 23 * s, cy + 10 * s, 16 * s, ellipsize(kAircraft[i].name, lw - 46 * s, 16 * s), C_TEXT, 1);
-    g_ren.text(x + 23 * s, cy + 35 * s, 11 * s, ellipsize(kAircraft[i].role, lw - 46 * s, 11 * s), C_DIM, 1);
+    if ((hov && in.mPressed[0]) || activate) { freeCraft = spec; g_audio.trigger(SFX_CLICK); if (activate) in.pressed[K_ENTER] = in.pressed[' '] = false; }
+    g_ren.text(x + 23 * s, cy + 10 * s, 16 * s, ellipsize(kAircraft[spec].name, lw - 46 * s, 16 * s), C_TEXT, 1);
+    g_ren.text(x + 23 * s, cy + 35 * s, 11 * s, ellipsize(kAircraft[spec].role, lw - 46 * s, 11 * s), C_DIM, 1);
   }
-  g_ren.text(x + 18 * s, y + h - 22 * s, 11 * s, ellipsize(fmt("%02d - %02d / 09   SCROLL", craftFirst + 1, std::min(kNumAircraft, craftFirst + craftVisible)), lw - 36 * s, 11 * s), C_DIM, 0.85f, 0, false);
+  g_ren.text(x + 18 * s, y + h - 22 * s, 11 * s, ellipsize(fmt("%02d - %02d / %02d   SCROLL", craftFirst + 1, std::min(kNumAircraft, craftFirst + craftVisible), kNumAircraft), lw - 36 * s, 11 * s), C_DIM, 0.85f, 0, false);
   const AircraftSpec& spec = kAircraft[freeCraft];
   const float vx = L.previewX, vw = L.previewWidth;
   g_ren.rectGrad(vx, y, vw, 82 * s, C_PANEL, C_PANEL2, 0.86f, 4 * s);

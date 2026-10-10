@@ -243,7 +243,7 @@ void main(){
   // (settle=N: N frames a 240th of a second apart, the anti-aliasing settling as for the loading pictures)
   // each reply ("ok <path> <seconds>") goes to SERVE_REP (/tmp/claude-0/sp/rs.rep). tools/render_client.sh sends one.
   if (scene == "serve") {
-    if (!perfCached && !cacheDir.empty()) { for (int i = 0; i < kNumAircraft; i++) Plane::perf(&kAircraft[i]); Plane::perfSave(cacheDir + "/perf.bin", cacheStamp); }
+    if (!perfCached && !cacheDir.empty()) { for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]); Plane::perfSave(cacheDir + "/perf.bin", cacheStamp); }
     const std::string req = getenv("SERVE_REQ") ? getenv("SERVE_REQ") : "/tmp/claude-0/sp/rs.req";
     const std::string rep = getenv("SERVE_REP") ? getenv("SERVE_REP") : "/tmp/claude-0/sp/rs.rep";
     mkfifo(req.c_str(), 0600); mkfifo(rep.c_str(), 0600);

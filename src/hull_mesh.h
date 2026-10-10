@@ -3,6 +3,7 @@
 // With `fine`, every face is laid on the sub-voxel lattice (unit U = the sub-voxel size), else on the voxel lattice.
 #pragma once
 #include "common.h"
+#include "aircraft_mesh_build.h"
 #include <algorithm>
 #include <unordered_map>
 #include <vector>
@@ -10,7 +11,7 @@
 // The airframe's moving parts' states the hull bake and the mesh bake sweep: the gear, flaps, steering and the
 // controls (and in the cockpit the yoke and the throttle) each through their range, the others at rest. M: the
 // packed model (models.cpp packModel), inside: the cockpit field. The first state is the rest state.
-struct HullState { float ps[4], ctl[4], wr[4] = {0, 0, 0, 0}, wr2[4] = {0, 0, 0, 0}; };   // wr: pod tilt, yaw vane, thrust, pitch vane; wr2: fan angle, bay, lasers, bomb loaded (the XR-40)
+using HullState = aircraftBuild::HullState; // shared state format, separate family sweep modules
 const float kS0 = 1.f, kS1 = 0.25f, kS2 = 0.0625f;   // cell sizes of the three voxel levels
 inline float halfDiag(float s) { return s * 0.8660254f; }
 // meshBake: the list for the static mesh's bake (aircraft_mesh.cpp), whose field leaves the rigid parts out
@@ -19,7 +20,6 @@ inline float halfDiag(float s) { return s * 0.8660254f; }
 // gear. Fewer states, a proportionally shorter bake.
 inline std::vector<HullState> hullStateList(const float* M, bool inside, bool meshBake = false) {
   std::vector<HullState> st;
-  const int eng = (int)(M[2] + 0.5f);
   const bool partsOnly = meshBake;                 // (the XR-30's nozzles, which its elevator sweep vectors, are parts too)
   const bool gearParts = meshBake;                 // (the packed model's gear and nose wheel are rigid parts, and the XR-30's and XR-40's own)
   auto add = [&](float gear, float flaps, float steer, float p, float r, float y, float thr) {
@@ -44,24 +44,7 @@ inline std::vector<HullState> hullStateList(const float* M, bool inside, bool me
     for (int i = 0; i <= 4; i++) for (int k = 0; k <= 4; k++) add(1, 0, 0, i * 0.5f - 1.f, k * 0.5f - 1.f, 0, 0);   // yoke / stick
     for (int i = 0; i <= 4; i++) add(1, 0, 0, 0, 0, 0, i * 0.25f);                                                  // throttle
   }
-  if ((int)(M[2] + 0.5f) == 6 && !inside) {   // the XR-40: its pods, vanes, fan, bay, turrets and bomb
-    auto addWr = [&](float tilt, float yawv, float thr, float vane, float fan, float bay, float las, float bomb) {
-      HullState h = {{1, 0, 0, 0}, {0, 0, 0, 0}, {tilt, yawv, thr, vane}, {fan, bay, las, bomb}};
-      st.push_back(h);
-    };
-    if (!partsOnly) for (int i = 1; i <= 8; i++) addWr(i / 8.f, 0, 0, 0, 0, 0, 0, 1);   // pod tilt (the actuators: rigid parts too)
-    if (!partsOnly) for (int i = 0; i <= 4; i++) { float s = i * 0.5f - 1.f; addWr(0, s, 0, 0, 0, 0, 0, 1); addWr(0, 0, 0, s, 0, 0, 0, 1); }   // vanes
-    if (!partsOnly) {
-      for (int i = 1; i <= 4; i++) addWr(0, 0, i * 0.4f, 0, 0, 0, 0, 1);                 // thrust (the iris)
-      for (int i = 1; i <= 7; i++) addWr(0, 0, 0, 0, i * 0.7854f, 0, 0, 1);              // the fans round
-      for (int i = 1; i <= 4; i++) { addWr(0, 0, 0, 0, 0, i * 0.25f, 0, 1); addWr(0, 0, 0, 0, 0, 0, i * 0.25f, 1); }   // bay, turrets
-      addWr(0, 0, 0, 0, 0, 1, 0, 0);                                                     // bay open, bomb away
-    }
-  }
-  if ((int)(M[2] + 0.5f) == 5 && !inside && !meshBake) {   // the XR-30: its nozzles vector from level to the hover setting (wr[0] = the angle)
-    for (int i = 1; i <= 6; i++) { HullState h = {{1, 0, 0, 0}, {0, 0, 0, 0}, {1.5707963f * i / 6.f, 0, 0, 0}, {0, 0, 0, 0}}; st.push_back(h); }
-    for (int s = -1; s <= 1; s += 2) { HullState h = {{1, 0, 0, 0}, {(float)s, 0, 0, 0}, {1.5707963f, 0, 0, 0}, {0, 0, 0, 0}}; st.push_back(h); }
-  }
+  aircraftBuild::meshBuilderFor(M).appendHullStates(st, inside, meshBake);
   if (st.size() > 128) st.resize(128);
   return st;
 }
@@ -71,6 +54,9 @@ inline void cabinBox(const float* M, float* lo, float* hi) {
   float E[3] = {m(22, 0), m(22, 1), m(22, 2)}, pz = m(21, 3);
   lo[0] = -1.1f; lo[1] = E[1] - 1.25f; lo[2] = std::min(pz, E[2]) - 0.7f;
   hi[0] = 1.1f; hi[1] = E[1] + 0.5f; hi[2] = E[2] + 1.6f;
+  // Atlas alone: the real wraparound flight deck is wider/taller than the compact
+  // fleet cabin. Its stable packed model tag includes two times the model index.
+  if (int(m(19,3)+.5f)/2 == 14) { lo[0]=-1.85f;hi[0]=1.85f;hi[1]=E[1]+1.05f; }
 }
 
 inline void hullFaces(int n1, float org, float U, bool fine, const std::vector<uint8_t>& state,

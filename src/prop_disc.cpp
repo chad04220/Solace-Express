@@ -1,4 +1,4 @@
-// AI propellers over the lit frame: at most two small, depth-tested screen rectangles per traffic aircraft.
+// Traffic and detached propellers over the lit frame: at most two small, depth-tested rectangles per aircraft.
 #include "renderer.h"
 #include "prop_disc.h"
 #include "models.h"
@@ -6,26 +6,38 @@
 
 void Renderer::rasterTrafficProps(const FrameParams& fp) {
   static const bool off = getenv("TRAFFICPROPOFF") != nullptr;
-  if (off || !progTrafficProps || fp.trafficN <= 0) return;
-  struct Draw { TrafficPropDisc disc; PropDiscBounds bounds; float distance; } draws[kMaxTrafficDrawn*2];
+  // The existing wreck hull path is perspective-only (wreckMesh); do not leave
+  // floating prop discs in a panoramic feed where that hull is not drawn.
+  const bool wreckProps = fp.plane.on && fp.wreck.pieces > 0 && fp.plane.propCount > 0 && fp.pano <= 0.f;
+  if (!progTrafficProps || ((off || fp.trafficN <= 0) && !wreckProps)) return;
+  struct Draw { TrafficPropDisc disc; PropDiscBounds bounds; float distance; } draws[(kMaxTrafficDrawn + 1)*2];
   int count = 0;
   const float tanY = fp.pano > 0.f ? fp.panoTanY : tanf(fp.fovY*.5f), aspect = (float)W/H;
   const vec2 pad(2.f/rw + 2.f*fabsf(jitX), 2.f/rh + 2.f*fabsf(jitY));
   auto camera = [&](vec3 v) { return vec3(dot(v, fp.camRight), dot(v, fp.camUp), dot(v, fp.camBack)); };
-  for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); ++k) {
+  auto append = [&](const TrafficPropDisc& disc) {
+    Draw d; d.disc = disc; d.distance = dot(d.disc.centre, d.disc.centre);
+    d.disc.centre = camera(d.disc.centre); d.disc.right = camera(d.disc.right); d.disc.up = camera(d.disc.up);
+    if (propDiscBounds(d.disc.centre, d.disc.radius, tanY, aspect, fp.pano, pad, d.bounds)) draws[count++] = d;
+  };
+  for (int k = 0; !off && k < std::min(fp.trafficN, kMaxTrafficDrawn); ++k) {
     const float* t = fp.traffic[k].t;
     int blades = 2;
     // The row contains packed geometry, not a roster id. Resolve the matching spec once per craft, not per pixel.
-    for (int m = 0; m < kNumAircraft; ++m) {
+    for (int m = 0; m < kAircraftCount; ++m) {
       if (fabsf(t[0] - kAircraft[m].fusLen) < .001f && fabsf(t[2] - kModels[m].engine) < .01f &&
           fabsf(t[9*4] - kModels[m].wing[0]) < .001f) { blades = kAircraft[m].blades; break; }
     }
     TrafficPropDisc discs[2]; const int n = trafficPropGeometry(t, fp.camPos, blades, discs);
-    for (int i = 0; i < n; ++i) {
-      Draw d; d.disc = discs[i]; d.distance = dot(d.disc.centre, d.disc.centre);
-      d.disc.centre = camera(d.disc.centre); d.disc.right = camera(d.disc.right); d.disc.up = camera(d.disc.up);
-      if (propDiscBounds(d.disc.centre, d.disc.radius, tanY, aspect, fp.pano, pad, d.bounds)) draws[count++] = d;
-    }
+    for (int i = 0; i < n; ++i) append(discs[i]);
+  }
+  // The intact player prop is already drawn by effects_fs. A wreck instead uses
+  // its real spinner owner's transform, so blades neither vanish nor stay at the
+  // original fuselage. The shared breakup body supplies its tumble and drag.
+  if (wreckProps) for (int i = 0; i < std::min(fp.plane.propCount, 2); ++i) {
+    const int owner = propWreckOwner(fp.plane.prop[i], fp.wreck.pieces, fp.wreck.C, fp.wreck.H);
+    if (owner >= 0) append(wreckPropGeometry(fp.plane.prop[i], fp.wreck.rot[owner], fp.wreck.pos[owner],
+                                            fp.camPos, fp.plane.Pr[0], (int)fp.plane.Pr[2], fp.plane.M[17*4 + 1]));
   }
   if (!count) return;
   std::sort(draws, draws + count, [](const Draw& a, const Draw& b) { return a.distance > b.distance; });

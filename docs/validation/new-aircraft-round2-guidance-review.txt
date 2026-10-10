@@ -1,0 +1,39 @@
+Round-two Atlas guidance review, 2026-10-10 21:36 UTC
+
+Final applied source: aircraft.cpp db56dcabc289c318c50b495d91b072b952e0797ab30d640c89ea1cebac9911c2;
+aircraft.h 469135a8858fbc43b889beacfa8d5f6bebb14b94a16e6a01331547d0f44b1b00.
+Full source/test hashes: new-aircraft-source-sha256.txt. Guidance-only patch: new-aircraft-round2-guidance.patch.
+Independent read-only review: new-aircraft-independent-guidance-review.txt.
+All fourteen native core translation units were compiled with the same new header before the final test runs. A mixed-header link is invalid: the added bool moves apRev even if sizeof(Plane) stays unchanged.
+
+Final focused results (not a substitute for the pending aggregate/platform build):
+- 34/34 native routes plus 23 state/gate checks: new-aircraft-autoland.txt and .csv.
+- 8/8 induced lateral-instability recoveries plus state checks: new-aircraft-go-around.txt and .csv.
+- Whole-fleet flight_test: zero failures, new-aircraft-flight.txt.
+- Independent constant-mass/manual performance, aero and wake: all pass in corresponding new-aircraft-*.txt logs.
+- Engine-out native diagnostic: the same three failed cases/timestamps as baseline; five complete landings. Compare new-aircraft-engine-out-baseline.txt and new-aircraft-engine-out.txt/.csv. These failures are explicitly retained, not hidden by a passing aggregate return code.
+
+Root cause and rejected variants:
+1. At the final 4.05 m flap-root geometry, the exact calm comfort fixture touched down at 325.7 s, cross-track +12.51 m, sideways speed +6.40 m/s, speed 62.66 m/s, heading error -7.27 degrees, bank -3.83 degrees. Baseline maximum origin cross-track 28.23 m exceeded CAP's 25 m half-width.
+2. Anticipatory ground steering improved final stop to 1.91 m but still reached 28.26 m during rollout. Final-position-only success was rejected. A bounded 125-profile rudder replay from the identical touchdown found no contained result (best 28.055 m origin); this is evidence of limited capture authority, not a global optimal-control proof. See new-aircraft-touchdown-rudder-feasibility.csv.
+3. A pre-flare lateral stability gate plus unmodified missed approach landed, but exceeded the exact fixture's unchanged 26-degree/.8–1.3g comfort envelope. Broad NAV anticipation and roll-lag changes were rejected for worsening other comfort routes and introducing degraded-engine failures.
+4. Raising GOAROUND target speed, abrupt flap cleanup and a roll/beta-stability wait were rejected: some caused large vertical transients; the stability wait could fly out of the chart. The retained transition uses the ordinary safe-height/terrain floors, progressive cleanup before NAV, and the current safe altitude as the return target.
+5. A matched nonzero flap jam would never satisfy the new clean-flap exit condition; the new policy therefore excludes flapAsym. The early FINAL break also requires !onGround. Both have explicit state regressions.
+6. Healthy-only missed-approach yaw-integral washout and existing roll-lag compensation passed the ordinary matrix, but an induced maximum-load calm PVI recovery accelerated back toward cruise during NAV and left the chart. The identical commanded GOAROUND state comparison showed baseline landed 1208.1 s/contact 15.24 m versus rejected candidate chart exit 858.9 s. See new-aircraft-pvi-recovery-{baseline,rejected}.txt. The final explicit apTerminalRejoin state retains planned terminal speed without changing ordinary NAV.
+7. Ending the washout at NAV->FINAL restarted low-speed yaw oscillation. In the same commanded maximum-load windy CAP recovery, the rejected candidate touched down at bank -8.19 degrees, heading 10 degrees left of the runway; lateral speed grew toward -8.9 m/s, and a modeled gear contact reached 25.70 m. Baseline reached 14.98 m. Keeping the healthy washout consistently through the flagged return and landing reduces the final candidate to 10.91 m. All three complete trajectories are in new-aircraft-cap-recovery-{baseline,rejected,final}.txt. The baseline's overall diagnostic return includes a new gate unit it does not implement; compare its actual flight row, not that unit-failure total.
+8. Removing only the retained ground steering correction from the final transition profile makes ordinary maximum-load calm PVI fail contact containment 24.37 m on 22.5 m half-width. Retaining it passes 12.44 m. See new-aircraft-rollout-ablation.txt. Its utility is independently established rather than inferred from one final stop.
+
+Retained scope:
+- Capability-selected conventional transport jets (jet propulsion and structural positive limit<=2.5g), currently Atlas only.
+- New rejection/cleanup/terminal-return/yaw-washout policy requires running, full-health engines and functional flaps; it also respects the live canGoAround envelope. It is disabled for engine/flap degradation and does not infer configured engine-out climb from clean best-climb data.
+- Gate: projected contact footprint over the same 3 s capture horizon used by steering, within 2000–250 m along approach and below 100 m runway-relative height; actual field width, not a hardcoded airport. The distance is along approach, not altitude.
+- No legacy controller, force model, manual actuator, brake force, contact, geometry, runway or assertion change in this patch. Ground steering applies to Atlas even with a failed engine, so successful engine-out rollouts need not be byte-identical.
+- Terminal state arms only on healthy GOAROUND->NAV, clears on new engagement/disengagement/reset/completed landing or engine/flap degradation. Repair alone does not re-arm. Unit tests check these transitions and ordinary NAV cruise scheduling.
+
+Evidence boundaries:
+- Containment measures all three modeled contact CENTRES, transformed by attitude, continuously after first contact including bounce/flare frames. It does not certify every rendered tyre edge/truck corner.
+- Specified wind 6 m/s at 25 degrees off runway has about 2.54 m/s steady crosswind component, not a strong-crosswind test. Turbulence 0.15; no all-weather approval.
+- Bank/g assertion applies to the exact legacy comfort fixture, which passes 25.43 degrees/.818–1.242g. Maximum-load CAP still records 27.12 degrees calm and 26.93 windy; windy touchdown 2.25 m/s is firm. The earlier mid-load calm bank exception is resolved.
+- Native AP burns game-compressed fuel. Maximum load is initial mass. Separate physical approach tests hold maximum legal mass constant.
+- Baseline engine-out failures: CAP mid/calm terrain at494.1 s, CAP maximum/calm trees at475.4 s, PVI maximum/calm gear collapse at508.0 s. Do not claim universal engine-out autoland or missed-approach capability.
+- Existing world/chart limitations and newer upstream wrap/navigation changes remain integration overlaps for a future controller review; no generic world-boundary rewrite was included.

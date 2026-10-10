@@ -1,0 +1,19 @@
+Aircraft build-interface focused validation, 2026-10-10 UTC
+Baseline: final intentional Atlas/cockpit/Specter repairs, mesh algorithm24
+Exact parity: legacy functions against live production interface
+PASS: 7329 exact parity checks, 3594 part plans, all 15 aircraft and alternate packed models.
+Durable contract, optimized
+aircraft_build_contract: 1459 checks across 15 aircraft, PASS
+Durable contract, ASan+UBSan; ASAN_OPTIONS=detect_leaks=0 (ptrace limits LSan)
+aircraft_build_contract: 1459 checks across 15 aircraft, PASS
+PASS: CPU/GLSL part ABI, separate family builders, common bake/pose/hull dispatch
+PASS: v3.39 family guards, per-aircraft dispatch, terrain-helper exclusion, projection skip
+PASS: 29 production gear/prop debris contracts; unique owners and captured separation poses
+PASS: 37 combined render contracts, including authored tyre radii and traffic stations
+Atlas actual contacts: track 3.4500, mainZ 4.17334, gearHeight 3.6500; H=(3.450,-1.300,2.720), stowed centre=(1.850,-1.300,1.07057), yaw 1.485320
+Minimum metres: closed wheel 0.05100, swept wall 0.05201, retained upper skin 0.07689, opposite trucks 1.20077, planform 0.08485; maximum truck x 3.97900
+Fixed field minimum 0.005000 (SDF estimator, not a physical gap); trunnion separation outside joint 0.12334m; aft closure negative controls pass
+Door minima metres: truck 0.08859, shaft/oleo 0.09812, nacelle 0.19988, positive x 0.33617, deployed ground 0.19619; flap root 4.050
+PASS: 21923754 checks, 0 failures. CPU/source geometry only; cached raster and hardware validation are separate.
+C++17 syntax-only: aircraft_mesh.cpp, aircraft_hull.cpp, tools/shader_check.cpp
+PASS syntax-only

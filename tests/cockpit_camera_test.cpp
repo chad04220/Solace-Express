@@ -9,7 +9,7 @@ struct GameTest {
     auto check=[&](bool v,const char* n){++checks;if(!v){++fails;printf("FAIL: %s\n",n);}};
     g.screen=SCR_FLIGHT;g.camMode=1;g.plane.pos=vec3(0,1000,0);g.plane.q=quat();g.set.headLook=false;g.in.pad=true;g.armInputs();
     auto aimAt=[&](vec3 ray){ray=normalize(ray);g.camYaw=atan2f(-ray.x,-ray.z);g.camPitch=asinf(ray.y)+.12f;};
-    for(int model=0;model<=kWraith;++model){
+    for(int model=0;model<kAircraftCount;++model){
       g.plane.spec=&kAircraft[model];CockpitFocusTarget p[24];int n=modelCockpitFocusTargets(model,p,24);
       check(n>0 && n<=24,"each cockpit has bounded targets");
       for(int i=0;i<n;++i){

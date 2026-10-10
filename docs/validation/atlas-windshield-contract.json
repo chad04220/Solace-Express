@@ -1,0 +1,302 @@
+{
+  "checks": 144000,
+  "failures": 0,
+  "rays": [
+    {
+      "seat": -1,
+      "yaw_deg": -8,
+      "down_deg": 0,
+      "minimum_sampled_shell_sdf_m": 0.09901039854596284,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": -8,
+      "down_deg": 1,
+      "minimum_sampled_shell_sdf_m": 0.10965224422938477,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": -8,
+      "down_deg": 2,
+      "minimum_sampled_shell_sdf_m": 0.10243496301649123,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": -8,
+      "down_deg": 3,
+      "minimum_sampled_shell_sdf_m": 0.0948545113775413,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": -8,
+      "down_deg": 4,
+      "minimum_sampled_shell_sdf_m": 0.08688469621478359,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": -8,
+      "down_deg": 7.448451336700702,
+      "minimum_sampled_shell_sdf_m": 0.05607143615037788,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": 0,
+      "down_deg": 0,
+      "minimum_sampled_shell_sdf_m": 0.16253184056842057,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": 0,
+      "down_deg": 1,
+      "minimum_sampled_shell_sdf_m": 0.17783607231271742,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": 0,
+      "down_deg": 2,
+      "minimum_sampled_shell_sdf_m": 0.1934072590558535,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": 0,
+      "down_deg": 3,
+      "minimum_sampled_shell_sdf_m": 0.20924761705057318,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": 0,
+      "down_deg": 4,
+      "minimum_sampled_shell_sdf_m": 0.225374576239813,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": 0,
+      "down_deg": 7.448451336700702,
+      "minimum_sampled_shell_sdf_m": 0.08094392986717301,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": 8,
+      "down_deg": 0,
+      "minimum_sampled_shell_sdf_m": 0.2167125190806341,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": 8,
+      "down_deg": 1,
+      "minimum_sampled_shell_sdf_m": 0.23401270580228542,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": 8,
+      "down_deg": 2,
+      "minimum_sampled_shell_sdf_m": 0.24585245751697002,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": 8,
+      "down_deg": 3,
+      "minimum_sampled_shell_sdf_m": 0.22500706275661214,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": 8,
+      "down_deg": 4,
+      "minimum_sampled_shell_sdf_m": 0.1975458973547291,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": -1,
+      "yaw_deg": 8,
+      "down_deg": 7.448451336700702,
+      "minimum_sampled_shell_sdf_m": 0.01381511207397008,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": -8,
+      "down_deg": 0,
+      "minimum_sampled_shell_sdf_m": 0.2167125190806341,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": -8,
+      "down_deg": 1,
+      "minimum_sampled_shell_sdf_m": 0.23401270580228542,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": -8,
+      "down_deg": 2,
+      "minimum_sampled_shell_sdf_m": 0.24585245751697002,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": -8,
+      "down_deg": 3,
+      "minimum_sampled_shell_sdf_m": 0.22500706275661214,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": -8,
+      "down_deg": 4,
+      "minimum_sampled_shell_sdf_m": 0.1975458973547291,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": -8,
+      "down_deg": 7.448451336700702,
+      "minimum_sampled_shell_sdf_m": 0.01381511207397008,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": 0,
+      "down_deg": 0,
+      "minimum_sampled_shell_sdf_m": 0.16253184056842057,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": 0,
+      "down_deg": 1,
+      "minimum_sampled_shell_sdf_m": 0.17783607231271742,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": 0,
+      "down_deg": 2,
+      "minimum_sampled_shell_sdf_m": 0.1934072590558535,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": 0,
+      "down_deg": 3,
+      "minimum_sampled_shell_sdf_m": 0.20924761705057318,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": 0,
+      "down_deg": 4,
+      "minimum_sampled_shell_sdf_m": 0.225374576239813,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": 0,
+      "down_deg": 7.448451336700702,
+      "minimum_sampled_shell_sdf_m": 0.08094392986717301,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": 8,
+      "down_deg": 0,
+      "minimum_sampled_shell_sdf_m": 0.09901039854596284,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": 8,
+      "down_deg": 1,
+      "minimum_sampled_shell_sdf_m": 0.10965224422938477,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": 8,
+      "down_deg": 2,
+      "minimum_sampled_shell_sdf_m": 0.10243496301649123,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": 8,
+      "down_deg": 3,
+      "minimum_sampled_shell_sdf_m": 0.0948545113775413,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": 8,
+      "down_deg": 4,
+      "minimum_sampled_shell_sdf_m": 0.08688469621478359,
+      "clear": true,
+      "first_hit": null
+    },
+    {
+      "seat": 1,
+      "yaw_deg": 8,
+      "down_deg": 7.448451336700702,
+      "minimum_sampled_shell_sdf_m": 0.05607143615037788,
+      "clear": true,
+      "first_hit": null
+    }
+  ],
+  "violations": [],
+  "source_sha256": {
+    "src/models.cpp": "d87dc5a55c0260e64a7699173eb6c4d99f71930fbfa9af72ce19996c3017c168",
+    "src/shaders/plane_common.glsl": "c8c514c7590910dec2f9f74764d11ab1a2c0b7979fd40201abd9c6769b2fd076",
+    "src/shaders/plane_sdf.glsl": "da584ce6a46eb8389ec5d9cc5c1e8bf929e8ea3b19e44ef3c7567004b5ad10c3",
+    "src/shaders/plane_material.glsl": "b212dd423b2b929ac587dbe658f351998e2ac5d6d765174019277b27406831a1"
+  },
+  "limits": "Both crew seats: yaw0,+/-8 degrees; level through4degrees down plus actual -0.13rad review center;4m forward,1mm sample spacing. Verifies windowed shell only. Nose radome blend lies beyond these rays and below their sightline. Panel/control occlusion and native raster checked separately."
+}

@@ -1,0 +1,201 @@
+{
+  "purpose": "Actual log counts for source-keyed caches used by the final fleet sweep; reused caches are not new zero-repair bakes",
+  "models": [
+    {
+      "model": 0,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_70158983ff7f24ad_a4d081de3d1067fa.bin",
+      "final_phase_was_bake": false,
+      "actual_matching_cache_bake_logs": [
+        {
+          "log": "round2-final/00_kestrel/warm_cockpit.log",
+          "repaired": 35,
+          "opposite_pairs_preserved": 0,
+          "binary_sha256": "12082a6534ef6e64ac04a848cdbd9019a5d26a029a7ddf7479bda05e38dabd25"
+        }
+      ],
+      "research_excluded": false
+    },
+    {
+      "model": 1,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_d29abee52f43c7e3_a56a093c0d2d46b0.bin",
+      "final_phase_was_bake": false,
+      "actual_matching_cache_bake_logs": [
+        {
+          "log": "round2-final/01_wren/warm_cockpit.log",
+          "repaired": 64,
+          "opposite_pairs_preserved": 0,
+          "binary_sha256": "12082a6534ef6e64ac04a848cdbd9019a5d26a029a7ddf7479bda05e38dabd25"
+        }
+      ],
+      "research_excluded": false
+    },
+    {
+      "model": 2,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_54e042c2bfd3d052_cac3636c51e5324c.bin",
+      "final_phase_was_bake": false,
+      "actual_matching_cache_bake_logs": [
+        {
+          "log": "round2-final/02_bush/warm_cockpit.log",
+          "repaired": 28,
+          "opposite_pairs_preserved": 0,
+          "binary_sha256": "12082a6534ef6e64ac04a848cdbd9019a5d26a029a7ddf7479bda05e38dabd25"
+        }
+      ],
+      "research_excluded": false
+    },
+    {
+      "model": 3,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_57635454748c81c9_719d7a4e1cc73b90.bin",
+      "final_phase_was_bake": true,
+      "actual_matching_cache_bake_logs": [
+        {
+          "log": "fleet-final/03_islander/warm_cockpit.log",
+          "repaired": 73,
+          "opposite_pairs_preserved": 0,
+          "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41"
+        }
+      ],
+      "research_excluded": false
+    },
+    {
+      "model": 4,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_4101220c1c4fe8e8_faaf16040989d78e.bin",
+      "final_phase_was_bake": true,
+      "actual_matching_cache_bake_logs": [
+        {
+          "log": "fleet-final/04_pelican/warm_cockpit.log",
+          "repaired": 156,
+          "opposite_pairs_preserved": 0,
+          "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41"
+        }
+      ],
+      "research_excluded": false
+    },
+    {
+      "model": 5,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_76f1e145dc5db74c_1d5dd0ee375c1040.bin",
+      "final_phase_was_bake": true,
+      "actual_matching_cache_bake_logs": [
+        {
+          "log": "fleet-final/05_meridian/warm_cockpit.log",
+          "repaired": 167,
+          "opposite_pairs_preserved": 0,
+          "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41"
+        }
+      ],
+      "research_excluded": false
+    },
+    {
+      "model": 6,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_27b952ef5017162b_d307ec6f1db7205c.bin",
+      "final_phase_was_bake": true,
+      "actual_matching_cache_bake_logs": [
+        {
+          "log": "fleet-final/06_starling/warm_cockpit.log",
+          "repaired": 266,
+          "opposite_pairs_preserved": 2,
+          "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41"
+        }
+      ],
+      "research_excluded": false
+    },
+    {
+      "model": 7,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_3dcb6a9c1adad171_5b904e5994a584bc.bin",
+      "final_phase_was_bake": true,
+      "actual_matching_cache_bake_logs": [
+        {
+          "log": "fleet-final/07_swift_s6/warm_cockpit.log",
+          "repaired": 23,
+          "opposite_pairs_preserved": 0,
+          "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41"
+        }
+      ],
+      "research_excluded": false
+    },
+    {
+      "model": 8,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_ac6ce77e367072c6_43ab03cc6f2e4082.bin",
+      "final_phase_was_bake": true,
+      "actual_matching_cache_bake_logs": [
+        {
+          "log": "fleet-final/08_osprey_c6/warm_cockpit.log",
+          "repaired": 124,
+          "opposite_pairs_preserved": 0,
+          "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41"
+        }
+      ],
+      "research_excluded": false
+    },
+    {
+      "model": 9,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_17c50329314094ba_44c0550b939a7f0c.bin",
+      "final_phase_was_bake": true,
+      "actual_matching_cache_bake_logs": [
+        {
+          "log": "fleet-final/09_xr10_nightjar/warm_cockpit.log",
+          "repaired": 104,
+          "opposite_pairs_preserved": 0,
+          "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41"
+        }
+      ],
+      "research_excluded": false
+    },
+    {
+      "model": 10,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_4c68d07786c7a684_ee4ec66ea25bb18c.bin",
+      "final_phase_was_bake": false,
+      "actual_matching_cache_bake_logs": [],
+      "research_excluded": true
+    },
+    {
+      "model": 11,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_45ca4e1b4970671c_cd6dedede025b3de.bin",
+      "final_phase_was_bake": true,
+      "actual_matching_cache_bake_logs": [
+        {
+          "log": "fleet-final/11_xr20_mantis/warm_cockpit.log",
+          "repaired": 148,
+          "opposite_pairs_preserved": 0,
+          "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41"
+        }
+      ],
+      "research_excluded": false
+    },
+    {
+      "model": 12,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_62b501d35c0cccd7_fcff357c6b201b7c.bin",
+      "final_phase_was_bake": false,
+      "actual_matching_cache_bake_logs": [],
+      "research_excluded": true
+    },
+    {
+      "model": 13,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_3970886ae1447d26_8d791a6f8ddb86b4.bin",
+      "final_phase_was_bake": true,
+      "actual_matching_cache_bake_logs": [
+        {
+          "log": "fleet-final/13_larkspur_l4/warm_cockpit.log",
+          "repaired": 245,
+          "opposite_pairs_preserved": 0,
+          "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41"
+        }
+      ],
+      "research_excluded": false
+    },
+    {
+      "model": 14,
+      "cache": "/workspace/scratch/87b29863f015/new-aircraft-review/cache/mesh_fa174847133dad0f_43ddd9a6967537c4.bin",
+      "final_phase_was_bake": true,
+      "actual_matching_cache_bake_logs": [
+        {
+          "log": "fleet-final/14_atlas_a180/warm_cockpit.log",
+          "repaired": 416,
+          "opposite_pairs_preserved": 0,
+          "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41"
+        }
+      ],
+      "research_excluded": false
+    }
+  ]
+}

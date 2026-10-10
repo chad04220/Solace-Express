@@ -8,7 +8,7 @@
     auto bytes = [](const fs::path& path) { std::ifstream f(path, std::ios::binary); return std::string(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()); };
     auto snapshot = [&](const Career& c) { const auto path = root / "snapshot.sav"; if (!c.save(path.string())) return std::string("SAVE FAILED"); return bytes(path); };
 
-    // All airports and all nine ordinary airframes are available to a new, penniless
+    // All airports and all ordinary airframes are available to a new, penniless
     // student without a fleet. Every start is a fresh aircraft with full tanks.
     {
       Game q; q.initHeadless(); q.botControl = true; q.set.traffic = false;
@@ -18,7 +18,7 @@
       q.beginFreeFlightSetup();
       bool all = q.screen == SCR_FREE_FLIGHT, ground = true, air = true, noFees = true;
       int launches = 0;
-      for (int craft = 0; craft < kNumAircraft; ++craft) for (int airport = 0; airport < (int)g_world.airports.size(); ++airport) for (int airborne = 0; airborne < 2; ++airborne) {
+      for (int craft : kCareerAircraft) for (int airport = 0; airport < (int)g_world.airports.size(); ++airport) for (int airborne = 0; airborne < 2; ++airborne) {
         q.freeCraft = craft; q.freeAirport = airport; q.freeAirborne = airborne != 0; q.launchFreeFlight(); ++launches;
         all &= q.screen == SCR_FLIGHT && q.freeFlight && q.isolatedFlight && !q.researchFlight && q.specIdx == craft && q.plane.spec == &kAircraft[craft];
         all &= q.contract.from == airport && q.contract.to == airport && q.contract.startAirborne == (airborne != 0) && q.contract.wps.empty() && !q.contract.story;
@@ -28,14 +28,14 @@
         q.endFlight(false, "", OUT_ABANDONED);
         all &= q.screen == SCR_FREE_FLIGHT && !q.freeFlight && !q.isolatedFlight;
       }
-      check(kNumAircraft == 9 && launches == 2 * kNumAircraft * (int)g_world.airports.size() && all, fmt("all %d aircraft/airport/start combinations launch and return", launches));
+      check(kNumAircraft == 11 && launches == 2 * kNumAircraft * (int)g_world.airports.size() && all, fmt("all %d aircraft/airport/start combinations launch and return", launches));
       check(ground && air && noFees, "runway parking, terrain-safe cruise starts, full tanks and zero fees");
       check(snapshot(q.career) == before && q.selHangar == kResearchJet && q.selAircraft == 3 && near(q.launchFuelKg, 12.f), "new-player career and career UI selections unchanged");
       q.cancelFreeFlightSetup();
       check(q.screen == SCR_MENU && !q.hasSave && !fs::exists(fs::path(q.saveDir) / "career.sav"), "setup/back never creates a career save");
 
       // Research includes two craft whose special flag is zero: reject by catalog
-      // range, not merely by that flag, including out-of-range/negative indices.
+      // membership, not merely by that flag, including out-of-range/negative indices.
       q.beginFreeFlightSetup();
       bool rejected = true;
       for (int craft : {-1, kNightjar, kResearchJet, kMantis, kWraith, 1000000}) {
@@ -49,7 +49,7 @@
       }
       check(rejected && snapshot(q.career) == before, "all research aircraft and invalid selections rejected without side effects");
       q.freeCraft = kWraith; q.freeAirport = -17; q.beginFreeFlightSetup();
-      check(q.freeCraft >= 0 && q.freeCraft < kNumAircraft && q.freeAirport == 0, "stale setup choices are clamped to available ordinary aircraft/airports");
+      check(isCareerAircraft(q.freeCraft) && q.freeAirport == 0, "stale setup choices are clamped to available ordinary aircraft/airports");
     }
 
     // Preserve both an ACTIVE and a RECOVERY job, its paid fees/checkpoints, an

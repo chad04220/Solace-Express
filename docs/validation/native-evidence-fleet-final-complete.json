@@ -1,0 +1,339 @@
+{
+  "folder": "/workspace/scratch/87b29863f015/new-aircraft-review/fleet-final",
+  "aircraft": [
+    {
+      "model": 0,
+      "name": "Kestrel T2",
+      "views": 20,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 1,
+      "name": "Wren 180",
+      "views": 16,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 2,
+      "name": "Bushmaster STOL",
+      "views": 16,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 3,
+      "name": "Islander Twin",
+      "views": 16,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 4,
+      "name": "Pelican Caravan",
+      "views": 16,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 5,
+      "name": "Meridian Q400",
+      "views": 18,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 6,
+      "name": "Starling 500 Jet",
+      "views": 18,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 36,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 36,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 7,
+      "name": "Swift S6",
+      "views": 18,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 8,
+      "name": "Osprey C6",
+      "views": 18,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 9,
+      "name": "XR-10 Nightjar",
+      "views": 18,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 36,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 36,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 10,
+      "name": "XR-30 Specter",
+      "views": 18,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 36,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 36,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 11,
+      "name": "XR-20 Mantis",
+      "views": 18,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 36,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 36,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 12,
+      "name": "XR-40 Wraith",
+      "views": 18,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 36,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 39,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 13,
+      "name": "Larkspur L4",
+      "views": 25,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 14,
+      "name": "Atlas A180",
+      "views": 30,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 36,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 36,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    }
+  ],
+  "errors": [],
+  "aircraft_count": 15,
+  "view_count": 283,
+  "pass": true
+}

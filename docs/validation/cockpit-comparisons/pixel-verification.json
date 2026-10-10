@@ -1,0 +1,162 @@
+{
+  "result": "pass",
+  "crop_count": 26,
+  "checks": [
+    {
+      "sheet": "01_windshield_joins",
+      "label": "Kestrel T2",
+      "side": "before",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "01_windshield_joins",
+      "label": "Kestrel T2",
+      "side": "after",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "01_windshield_joins",
+      "label": "Bushmaster STOL",
+      "side": "before",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "01_windshield_joins",
+      "label": "Bushmaster STOL",
+      "side": "after",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "02_cockpit_contacts",
+      "label": "Kestrel \u00b7 deck, pilot brow and firewall",
+      "side": "before",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "02_cockpit_contacts",
+      "label": "Kestrel \u00b7 deck, pilot brow and firewall",
+      "side": "after",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "02_cockpit_contacts",
+      "label": "Swift S6 \u00b7 firewall fleck",
+      "side": "before",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "02_cockpit_contacts",
+      "label": "Swift S6 \u00b7 firewall fleck",
+      "side": "after",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "02_cockpit_contacts",
+      "label": "Bushmaster \u00b7 firewall contact",
+      "side": "before",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "02_cockpit_contacts",
+      "label": "Bushmaster \u00b7 firewall contact",
+      "side": "after",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "03_seat_webbing",
+      "label": "Bushmaster STOL",
+      "side": "before",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "03_seat_webbing",
+      "label": "Bushmaster STOL",
+      "side": "after",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "03_seat_webbing",
+      "label": "Starling 500 Jet",
+      "side": "before",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "03_seat_webbing",
+      "label": "Starling 500 Jet",
+      "side": "after",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "04_atlas_controls",
+      "label": "Same full-throttle camera \u00b7 unchanged tablet geometry",
+      "side": "before",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "04_atlas_controls",
+      "label": "Same full-throttle camera \u00b7 unchanged tablet geometry",
+      "side": "after",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "05_atlas_vents_bezel",
+      "label": "Same pilot view \u00b7 floating vent moved onto the console",
+      "side": "before",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "05_atlas_vents_bezel",
+      "label": "Same pilot view \u00b7 floating vent moved onto the console",
+      "side": "after",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "05_atlas_vents_bezel",
+      "label": "Primary display \u00b7 diagonal bevel facets removed",
+      "side": "before",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "05_atlas_vents_bezel",
+      "label": "Primary display \u00b7 diagonal bevel facets removed",
+      "side": "after",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "06_larkspur_window",
+      "label": "Rear-cabin aperture \u00b7 original seats and main-window pillar retained",
+      "side": "before",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "06_larkspur_window",
+      "label": "Rear-cabin aperture \u00b7 original seats and main-window pillar retained",
+      "side": "after",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "07_specter_details",
+      "label": "Instrument-support inner rim",
+      "side": "before",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "07_specter_details",
+      "label": "Instrument-support inner rim",
+      "side": "after",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "07_specter_details",
+      "label": "Overhead switch bank \u00b7 unchanged 9 mm capsules",
+      "side": "before",
+      "exact_native_pixels": true
+    },
+    {
+      "sheet": "07_specter_details",
+      "label": "Overhead switch bank \u00b7 unchanged 9 mm capsules",
+      "side": "after",
+      "exact_native_pixels": true
+    }
+  ]
+}

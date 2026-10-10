@@ -100,6 +100,51 @@ int main() {
     }
   }
 
+  {   // Stable IDs survive the non-contiguous career roster; existing saves need no migration.
+    const char* legacyIds[] = {"kestrel", "wren", "bush", "islander", "pelican", "meridian", "starling", "swift_s6", "osprey_c6"};
+    std::string legacy = "airxpress_save 1\nmoney 900\nlicense 3\nlocation 1\nstory 4\n";
+    for (const char* id : legacyIds) legacy += std::string("plane ") + id + " 1 20\n";
+    writeFile("save_test_roster.sav", legacy.c_str());
+    Career old; old.newGame(); check(old.load("save_test_roster.sav") && old.fleet.size() == 9, "legacy nine-aircraft save loads unchanged");
+    for (int i = 0; i < (int)old.fleet.size(); ++i) check(old.fleet[i].spec == i, "legacy saved aircraft keeps its original index");
+
+    Career a; a.newGame(); a.license = LIC_ATP;
+    for (int spec : kCareerAircraft) a.fleet.push_back({spec, 1, kAircraft[spec].maxFuel * .5f, .8f});
+    a.loan = {kAtlas, 10000, 500, 0, .12f};
+    Career::JobState job; job.spec = kLarkspur; job.src = Career::SRC_OWNED; job.at = 1;
+    job.c.id = "ROSTER_COMPAT"; job.c.from = 1; job.c.to = 2; job.c.forceAircraft = kLarkspur;
+    job.plan.spec = kLarkspur; job.plan.startAirport = 1; a.job = job;
+    check(a.save("save_test_roster.sav"), "all career aircraft, appended loan and appended job save");
+    Career b; b.newGame(); check(b.load("save_test_roster.sav") && b.fleet.size() == kNumAircraft, "expanded career save loads");
+    for (int row = 0; row < (int)b.fleet.size(); ++row) check(b.fleet[row].spec == careerSpecAt(row), "career fleet saved ID maps to original stable index");
+    check(b.loan.spec == kAtlas && b.job && b.job->spec == kLarkspur && b.job->c.forceAircraft == kLarkspur,
+          "new loan/job/forced aircraft identities round-trip without research substitution");
+
+    for (int spec : {kLarkspur, kAtlas}) {
+      Career market; market.newGame(); market.license = LIC_ATP; market.money = 100000000;
+      market.location = g_world.findAirport("CAP"); std::string message;
+      check(market.buy(spec, &message) && market.ownedIndexFor(spec) >= 0, "new ordinary type can be purchased in career");
+      Contract dispatch; dispatch.from = dispatch.to = market.location;
+      check(market.canFly(dispatch, spec, &message) == Career::SRC_OWNED, "new ordinary type is dispatchable at a suitable paved hub");
+      Career financed; financed.newGame(); financed.license = LIC_ATP; financed.money = 100000000;
+      check(financed.finance(spec, &message) && financed.loan.spec == spec, "new ordinary type can be financed under its own identity");
+    }
+
+    Career locked; locked.newGame(); locked.license = LIC_ATP; locked.money = 100000000;
+    Contract c; c.from = 1; c.to = 2; std::string why;
+    for (int research : kResearchAircraft) {
+      check(locked.canFly(c, research, &why) == Career::SRC_NONE, "research craft cannot be dispatched in career");
+      check(!locked.buy(research, &why) && !locked.buyUsed(research, &why) && !locked.finance(research, &why), "research craft cannot be bought or financed by direct call");
+      const std::string forbidden = std::string("airxpress_save 1\nmoney 900\nlicense 3\nlocation 1\nstory 4\nplane ") + kAircraft[research].id + " 1 20\n";
+      writeFile("save_test_roster_bad.sav", forbidden.c_str());
+      check(!locked.load("save_test_roster_bad.sav"), "research aircraft cannot enter career through a save");
+    }
+    check(locked.money == 100000000 && locked.fleet.empty() && !locked.loan.open(), "rejected research operations leave career unchanged");
+    for (int invalid : {-1, kAircraftCount, 1000000})
+      check(locked.canFly(c, invalid) == Career::SRC_NONE && !locked.buy(invalid, &why) && !locked.buyUsed(invalid, &why) && !locked.finance(invalid, &why), "invalid direct career selections fail closed");
+    remove("save_test_roster.sav"); remove("save_test_roster.sav.bak"); remove("save_test_roster_bad.sav");
+  }
+
   // each of these must be rejected and leave the career as it was
   const char* bad[] = {
     "solace_save 1\nlicense 1\nplane kestrel 999 70\n",                                   // fleet airport out of range

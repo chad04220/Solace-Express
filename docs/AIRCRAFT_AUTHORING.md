@@ -2,7 +2,7 @@
 
 How to add an aircraft to Solace Express, from its numbers to its shape, materials, moving parts, cockpit, weapons,
 sound, career role and tests. It is written for whoever adds the next type, a person or an AI assistant, and reflects
-the code at v3.33.0. Where the code and this guide disagree, the code wins: fix the guide in the same change.
+the original v3.33.0 architecture, with roster, cache and capability guidance updated for the October 2026 two-aircraft review. Where the code and this guide disagree, the code wins: fix the guide in the same change.
 
 Older material, kept for its history: `docs/design/additional-aircraft/` (Codex's proposals for the Swift S6, the
 Osprey C6 and the XR-10 / XR-20).
@@ -31,8 +31,10 @@ Two tiers:
   two of the four research craft (the XR-10 Nightjar and the XR-20 Mantis) are Tier A.
 - **Tier B, only when the shape can't be described by a model row.** A hand-written GLSL distance field with its own
   moving parts, like the XR-30 Specter (`mapJet`, `plane_sdf.glsl`) and the XR-40 Wraith (`wraith_sdf.glsl`,
-  `wraith_cockpit_sdf.glsl`). Weeks of work, a heavier shader for every aircraft pixel, and many places to wire up
-  (§6, §17). A hand-built XR-20 once cost four times the frame in the research terminal and was put back to Tier A.
+  `wraith_cockpit_sdf.glsl`). These use the same registered build interface and lazy per-aircraft bake/cache lifecycle
+  as Tier A, with separate family mesh modules and shader specializations (§6, §9). Their custom geometry still needs
+  careful ownership and performance checks. A hand-built XR-20 once cost four times the frame in the research terminal
+  and was put back to Tier A.
 
 The checklist for a new type is §17. The fill-in template is §18.
 
@@ -72,32 +74,38 @@ Today:
 | 10 | `xr30_specter` | XR-30 Specter | `kResearchJet`; research, Tier B (`special = 1`, engine code 5) |
 | 11 | `xr20_mantis` | XR-20 Mantis | `kMantis`; research, Tier A |
 | 12 | `xr40_wraith` | XR-40 Wraith | `kWraith`; research, Tier B (`special = 2`, engine code 6), the only armed type |
+| 13 | `larkspur_l4` | Larkspur L4 | `kLarkspur`; conventional career/free-flight piston tourer |
+| 14 | `atlas_a180` | Atlas A180 | `kAtlas`; conventional career/free-flight twin-underwing transport, largest fleet airframe |
 
 Rules and limits:
 
-1. **Career types come first, the research craft last.** `kNumAircraft = rows - 4`: the last four rows are the
-   research craft, hidden from the career. A new **career** type goes **before** `xr10_nightjar`, at the same index in
-   both tables. Then every research constant shifts up by one: `kNightjar`, `kResearchJet`, `kMantis`, `kWraith` in
-   `aircraft.h`. `flight_test` checks those constants against the ids and fails if one is wrong. A new **research**
-   type goes at the end, and `kNumAircraft`'s `- 4` becomes `- 5`.
-2. **Sixteen types at most.** The learned-performance tables are fixed arrays of 16, indexed by row
-   (`aircraft_perf.cpp: s_perf[16]`; the `perf.bin` cache also rejects more). A type past 16 gets an empty
-   performance model and its autopilot fails silently. There are 13 today. Grow the arrays before adding a 17th.
-3. **Saves are keyed by `id`, not index.** The fleet, a loan and open jobs are written as `id` strings
-   (`career.cpp`), so inserting rows doesn't break players' saves. An `id` is permanent: lowercase ASCII, unique, never
-   renamed. It also seeds the registration ("SX-" plus three letters, `registrationOf`), which is painted on the
-   fuselage and used as the call sign.
-4. **Things keyed by index**, to check whenever the roster changes:
-   - `kOspreyModel = 8` in `plane_sdf.glsl` and `gModelId == 8` in `plane_material.glsl` (the Osprey's cabin trim);
-   - AI traffic picks types by hard-coded index (`traffic.cpp`: 0–4 at small fields, 5–6 at big ones, 0–6 for
-     cruisers). **New types don't appear as traffic until you add them there**;
-   - the main menu's tour (`kMenuShots`, `game.cpp`) names craft by index;
-   - the loading pictures are named by index (`assets/loading/air_<index>.jpg`), and `loadshot_air_<n>` picks the
-     scenery spot from `kSpot[kWraith + 1]` (`game.cpp`). Inserting a career type renames every later picture:
-     re-render them (§16);
-   - loops that run "to the last type" use `kWraith`: the launch prewarm (`game.cpp`, every type's meshes),
-     `--loadshots` (`platform_win32.cpp`), `aircraft_visual_test` and `autoland_sweep`. A new last row needs those
-     moved to it. A `kNumTypes` constant would be cleaner; add one if you touch them all.
+1. **Aircraft identities are append-only.** Add a new row at the end of both `kAircraft[]` and `kModels[]`.
+   Never insert before an existing row or renumber the research constants. Add its constant in `aircraft.h`, raise
+   `kAircraftCount`, and append the constant to either `kCareerAircraft` or `kResearchAircraft` as appropriate.
+   Current career membership is `{0,1,2,3,4,5,6,7,8,13,14}`; research identities remain 9–12.
+2. **Counts are not index limits for subsets.** `kAircraftCount` is the extent of the complete aligned tables and
+   sizes the aero/performance caches and `Renderer::kAfModels`. `kNumAircraft` is the count of career entries (11),
+   not an upper bound on their IDs. Iterate `for (int spec : kCareerAircraft)` for career/free flight; use
+   `careerSpecAt`, `careerRowFor`, `isCareerAircraft` and `validCareerSelection` at UI/launch boundaries. Iterate
+   `0 <= spec < kAircraftCount` for complete-roster rendering, prewarming and diagnostics.
+3. **Preserve string IDs and numeric identities.** The fleet, a loan and open jobs save permanent lowercase `id`
+   strings. Forced-aircraft contract fields, shader models, settings/diagnostic selections and loading image names
+   can carry numeric identities, so string-based fleet saves are not permission to shift indices. The `id` also
+   seeds the registration ("SX-" plus three letters, `registrationOf`) and call sign.
+4. **Career access is explicit, not a physics special flag.** Both Nightjar and Mantis have `special == 0` but
+   remain research-only. The career hangar orders ordinary craft before four locked research teasers without moving
+   the underlying tables. Market, finance, dispatch, save loading and standalone Free Flight enforce membership.
+5. **Performance caches use career row order.** `perf.bin` stores one learned model per explicit career entry,
+   mapping each row back to its stable ID on load. A different roster count invalidates old caches. Update the
+   compatibility tests whenever extending the mapping; do not read a career-sized prefix of `kAircraft[]`.
+6. **Other index-keyed assets and code:**
+   - Existing GLSL `HAS_<type>`/`MODEL_IS(n)` constants stay unchanged; add guards for the new stable ID.
+   - AI traffic still has explicit choices in `traffic.cpp`; an appended type does not automatically join traffic.
+   - The main-menu tour (`kMenuShots`) remains explicitly authored.
+   - Add a scenery spot to `kSpot[kAircraftCount]` for `loadshot_air_<n>` and its own `assets/loading/air_<n>.jpg`.
+     Existing loading pictures keep their filenames.
+   - Run `hangar_catalog_test`, `save_test`, the Free Flight matrix and shader specialization tests. They verify
+     the original identities, subset ordering, research exclusions and cache mapping as well as the new rows.
 
 ---
 
@@ -122,8 +130,12 @@ struct AircraftSpec {
   float fusLen, fusRad, wingY, wingZ; int engLayout, tail;   // fuselage length, max half height; wing root height and LE z; 0 nose / 1 wing nacelles / 2 aft; 0 conventional / 1 T-tail
   vec3 colBase, colStripe;     // livery: base paint; cheat line, wingtips, fin flash
   int special = 0;             // 0 for every type but the XR-30 (1) and XR-40 (2): they switch on whole code paths (§5)
-  float designMach = 0, gPos = 0, gNeg = 0;   // research tiers: < 1 held under the barrier by its drag rise, > 1 reheat
+  float designMach = 0, gPos = 0, gNeg = 0;   // performance tiers: < 1 held under the barrier by its drag rise, > 1 reheat
                                               // and the research drag rise; structural limits (0: 5.8 / -3 g)
+  bool fullCabinEnvelope = false; // include passengers/cargo in reference and MTOW learning; preserve design runway minimum
+  float gearHeightM = 0;          // positive authored contact-height override, else derive from geometry
+  float takeoffFlap = 0.2f;        // recommended takeoff flap setting (legacy taildraggers keep 0.3)
+  float gearTrackM = 0;           // positive authored main-wheel half-track override, else derive from span
 };
 ```
 
@@ -137,7 +149,7 @@ The column header to keep above a row:
 ```
 // id, name, role, eng, n, cyl, blades, idle, max, empty, fuel, cargo, pax, S, b, c, CL0, CLa, CLmax, flapCL, CD0, gearCD, flapCD, e,
 // power, v0, vr, vref, cruise, range, runway, rough, tail, retract, Ixx, Iyy, Izz, elev, ail, rud, lic, price, rent,
-// fusLen, fusRad, wingY, wingZ, engLayout, tail, colBase, colStripe[, special, designMach, gPos, gNeg]
+// fusLen, fusRad, wingY, wingZ, engLayout, tail, colBase, colStripe[, special, designMach, gPos, gNeg, fullCabinEnvelope, gearHeightM, takeoffFlap, gearTrackM]
 ```
 
 The physics must close: `flight_test` flies every career type off the Capital's runway and fails it if it doesn't lift
@@ -194,7 +206,8 @@ An annotated row (the Wren 180):
    slightly below the wing at `nacX`, starting about `0.8 × nacR` ahead of the LE. Aft jets: `nacX ≈ st[5] half width +
    nacR + 0.4`; the pylons are generated.
 5. **Gear.** You choose the kind and the wheel radius; the track (`max(1.2, 0.13 × span)`), the wheel stations and the
-   wells are derived. `gear 3` needs `engine 3`. `gear 4` mains fold sideways into a fairing under the wing root, so the
+   wells are derived unless positive `gearTrackM`/`gearHeightM` values specify the authored contacts. Keep these
+   overrides in the spec so copied/tuning specs retain them. `gear 3` needs `engine 3`. `gear 4` mains fold sideways into a fairing under the wing root, so the
    wing must be there at the track.
 6. **Cabin.** The eye at least 8 cm under the roof. The panel goes at `eye.z − 0.68` (`− 0.85` glass), its half width
    `0.93 ×` the section's. The windscreen must sit ahead of the panel and under the roof. Seats, yokes, pedals,
@@ -219,7 +232,7 @@ An annotated row (the Wren 180):
 | 16 | nacX | nacY | nacR | nacZ0 |
 | 17 | nacLen | spinnerR | propR | cargoPod |
 | 18 | gear track | wheel radius | mains z | nose z |
-| 19 | gear height | 0.45 L | taildragger | de-ice |
+| 19 | gear height | 0.45 L | taildragger | legacy: de-ice; new variants: de-ice + 2 × stable model ID |
 | 20 | window count | winZ0 | winZ1 | winY |
 | 21 | winW | winH | cockpit layout | panel z |
 | 22 | eye x | eye y | eye z | panel half width |
@@ -542,14 +555,24 @@ Everything that moves is a **rigid part** (`plane_parts.glsl`): a solid with its
 (`partField(k, l)`) and a pose from the state (`partPose`: `body = R·local + T`, where `R` is a rotation, a mirror for
 the other side, a hinged surface's deflection about its swept and tapered hinge, or a stretch along an axis).
 
-- **Ids 0–45 are taken**: the cockpit controls 0–10, the light aircraft's surfaces 11–14, the XR-40's 15–29 and 45,
-  the XR-30's 30–32 and 38–44, the packed model's gear 33–37. A new part takes 46 or above.
-- **`partList`** (`aircraft_mesh.cpp`) lists each type's instances (type, side, which one) for the outside and the
-  cockpit. Tier A types get the flaps, ailerons, elevators, rudder, gear and doors outside, and the yokes, pedals and
-  throttle (knob or levers) and flap lever inside, automatically. A new engine code needs its own branch. Limits: 128
-  part instances per mesh (`kMaxPartInst`), 512 posed instances per frame (`kMaxPoseInst`).
-- **A bake box per part.** Surfaces use `surfaceBox`, the gear `gearPartBox`, the XR-40 `wraithPartBox` (box plus lattice
-  step, 3–8 mm). Other parts are found by a 1 cm survey of their field.
+- **Ids 0–46 are taken**: the cockpit controls 0–10, the light aircraft's surfaces 11–14, the XR-40's 15–29 and 45,
+  the XR-30's 30–32 and 38–44, the packed model's gear 33–37, and the Atlas turbofan 46. A new part takes 47 or above.
+- **One build contract, separate owners.** `aircraft_mesh_build.h` selects a `MeshBuilder` using the same packed-model
+  family as `shaders.h` (`aircraft_build_family.h`). Fleet, Specter and Wraith implement `parts`, `partPlan` and
+  `appendHullStates` in separate `aircraft_mesh_build_<family>.h` modules. The renderer owns the generic sampling,
+  simplification, caching and drawing lifecycle. No family shader or geometry is merged into another.
+- **`partList`** dispatches to that family's ordered instances (type, side, which one), used by both the bake and
+  live pose upload. Tier A types get their existing surfaces, gear and cockpit controls automatically. A new
+  custom family implements the same interface. Limits remain 128 part instances per mesh (`kMaxPartInst`) and
+  512 posed instances per frame (`kMaxPoseInst`). CPU part IDs in `aircraft_mesh_build_types.h` match the unchanged
+  GLSL IDs and serialized mesh records; `aircraft_build_interface_test.py` guards this ABI.
+- **A bake plan per part.** Each family returns fixed bounds or a surveyed box and its existing lattice spacing.
+  Fleet surfaces and gear remain fleet-owned; Specter owns its surfaces and nozzles; Wraith owns its pods, weapons,
+  actuators and surfaces. The two research craft share only their existing research-gear bounds. Cockpit controls
+  keep their centered 1 cm survey. `aircraft_build_contract_test` freezes all 15 types' ordered part instances,
+  bounds, lattice spacing and hull sweeps against the pre-refactor behavior.
+  The applied interface passed 7,329 exact CPU/assembly checks and eight pixel/state/topology-identical native
+  XR-30/XR-40 fixtures; see the [parity evidence](validation/aircraft-build-refactor/README.md).
 - **In the airframe's field**, place each part through its pose (`partAt(res, PT_X, vec2(side, which), p)`) and leave it out when
   `gPartMode == -2` (the static mesh's bake). The part's own bake calls `partField` directly. Motion written as
   hand-made math in the airframe field is baked frozen.
@@ -570,6 +593,8 @@ That's the "Building the <name> cockpit's mesh" step, one of the loading bar's c
    the surface band is static.
 3. **Thin cells** (cockpit only). A plate or rod under about 2.5 cells through is re-meshed on a lattice twice as fine
    (0.78 cm), as a patch over the first mesh; the first mesh sinks its ring 3 mm under it.
+   Specter's unchanged 9 mm overhead toggles alone use a bounded 3.90625 mm patch (`aircraft_mesh_specter_detail.h`);
+   its one-cell overlap sinks the older fine patch 1.5 mm. This does not refine the whole cabin.
 4. **Surface nets** on the 1.56 cm lattice: one vertex per lattice cube the surface crosses. Inside, sharp edges use
    dual contouring (the vertex where the face planes meet). Each vertex is pulled onto the surface, and normals,
    material ids and the cabin's ambient occlusion are baked per vertex.
@@ -593,7 +618,7 @@ triangle counts. A slow or huge bake usually means a thin feature, a knife edge 
   pedestal with its throttle, fuel selector and trim wheel, the switch row, the radio stack, side trim with armrests,
   the overhead console with dome and map lights, the visors, the compass and the glareshield light strip.
 - **One type's own fittings** go in the field gated by `gModelId` (the Osprey's `mapOspreyCabinTrim`) with their own
-  material ids. Remember to move the index constant if rows shift (§2).
+  material ids. Keep existing index constants immutable and append new identities (§2).
 - **Lighting** inside: the sun through the windows with the cabin's own sun map (`texShCab`, 2048², hardware-filtered),
   the sun's bounce off the cabin, the sky through the windows, the fixtures at night, and baked ambient occlusion.
 - **Check views** with the harness (§16): `ckv<i>_<yaw>_<pitch>_<hour>[_<roll>[_<flaps>]]`, at 9:00 for long shadows,
@@ -646,7 +671,8 @@ cockpit muffling inside. A new type gets its sound from `engineType`, `engines`,
 
 ## 15. Career and world
 
-- **Market and hangar:** every type below `kNumAircraft` appears, by `license`, `price` and `rentFee` (0: buy only).
+- **Market and Free Flight:** every member of `kCareerAircraft` appears, by `license`, `price` and `rentFee` (0: buy only in career).
+  The career hangar additionally shows locked research teasers; Free Flight excludes those research entries.
   `canFly`/`runwayOK` keep the career from sending it where `runwayNeeded` is longer than the runway, or to a rough
   field without `roughOK`.
 - **Contracts** offer cargo up to `cargoKg` and seats up to `pax`; passengers or a fragile load make the autopilot
@@ -690,22 +716,24 @@ cockpit muffling inside. A new type gets its sound from `engineType`, `engines`,
 **Tier A, career:**
 
 1. Design it against the fleet (§20) and fill in the self-check (§19).
-2. Add the `AircraftSpec` row and the `ModelDef` row at the same index, before `xr10_nightjar`.
-3. Bump `kNightjar`, `kResearchJet`, `kMantis`, `kWraith` in `aircraft.h` (and `kOsprey`/`kOspreyModel`/`MODEL_IS(8)`
-   if inserting before the Osprey), the indices in `plane_common.glsl`'s `HAS_<type>` switches and `MODEL_IS` tests,
-   and `Renderer::kAfModels` (§8).
-4. Check the roster stays at 16 types or fewer (§2).
+2. Append `AircraftSpec` and `ModelDef` rows at the same new stable index; never insert before an existing type.
+3. Add its constant, raise `kAircraftCount`, and append it to `kCareerAircraft`. Add its own GLSL `HAS_<type>` switch
+   and `MODEL_IS(newIndex)` checks without changing old IDs. Renderer and cache extents use the total count.
+4. Choose capability fields for reference loading, gear contacts and takeoff configuration; do not add physics
+   exceptions based on the aircraft's index. Keep the learner, aerodynamic calibration and autopilot reference
+   payload aligned through `performanceReferencePayload`.
 5. Build, run `ctest`, `flight_test --table`, `aircraft_visual_test`, `autoland_sweep --craft <i>` and `--comfort`.
 6. Look at it: `gav_` from four sides with the gear down and up, `ckv_` forward, left, right and up, morning and night.
 7. Add it to traffic (`traffic.cpp`) if it should fly about, and to the menu tour if wanted.
-8. Re-render the loading pictures (every `air_<n>` from the new index on has moved) and add its own.
+8. Add its `kSpot` entry and new loading picture. Existing picture filenames do not move.
 9. Update the README's aircraft table and features, `RELEASE_NOTES.md`, and this guide's roster (§2, §20).
 
-**Tier A, research:** the same, appended at the end with `kNumAircraft`'s `- 4` made `- 5`. Move the "to the last type"
-loops (§2) to it, and add its terminal entry, test cards and scenery spot (§15).
+**Tier A, research:** append in the aligned tables and `kResearchAircraft`, leaving `kCareerAircraft` unchanged.
+Raise `kAircraftCount`, add its shader guards, terminal entry, test cards and scenery spot (§15), and extend the
+research catalog/designation UI as needed. Never use `special` alone as the access-control predicate.
 
 **Tier B:** all of the above, plus a new engine code and its dispatch (§6), its field behind `RESEARCH_ON`, its parts
-and their `partList` branch and bake boxes (§9), its material range (§7.1), its cockpit (generic, or sealed with
+and their family build module, ordered instances and bake plans (§9), its material range (§7.1), its cockpit (generic, or sealed with
 camera feeds), its physics path if it needs a new `special` (§5), its effects (§12), and a measured frame time on the
 owner's GPU (§8).
 
@@ -714,7 +742,7 @@ owner's GPU (§8).
 ## 18. Template
 
 ```cpp
-// aircraft.cpp, kAircraft[]: before the xr10_nightjar row
+// aircraft.cpp, kAircraft[]: append at the next stable index; add the ID to kCareerAircraft
 // id, name, role, eng, n, cyl, blades, idle, max, empty, fuel, cargo, pax, S, b, c, CL0, CLa, CLmax, flapCL, CD0, gearCD, flapCD, e,
 // power, v0, vr, vref, cruise, range, runway, rough, tail, retract, Ixx, Iyy, Izz, elev, ail, rud, lic, price, rent,
 // fusLen, fusRad, wingY, wingZ, engLayout, tail, colBase, colStripe

@@ -1,0 +1,15 @@
+{
+  "src/aircraft_mesh_build_research_gear.h": "ed5848b30f09b651c24365ae053324662f29bf6a0374b99cb20d4e95f9406352",
+  "src/aircraft_mesh_build.h": "54f63358ab91e0e674a04f5e1f3a6b51aea4c5ab68c8102d869f42bcabb03e43",
+  "src/aircraft_mesh_build_types.h": "b7740429bdec674e2f875e64d8cb864c9b9240a0619bfaf2d3ff95333abc785a",
+  "src/aircraft_build_family.h": "7a8c5d02c233338c77141287db7ee278af0282b706783d355a58da5494a8c83f",
+  "src/aircraft_mesh_build_fleet.h": "dd0eba7fa971ae2073793e2c41978b2ced803479274493c5b71b9dd85c99f81b",
+  "src/aircraft_mesh_build_specter.h": "096bb1e7182f5508fb5c6e6b09854d5371651a5484c4b2e37194f32419767d3c",
+  "src/aircraft_mesh_build_wraith.h": "99b417b5d66b22566d843f9beb632ad0eb9be57b63c6a06eb2d129a33581f446",
+  "src/aircraft_mesh.cpp": "1130839f6192ac104e34901e70978eceb5227b70d31a6fa4cabc062e624f441f",
+  "src/hull_mesh.h": "f4017e7e623a26719d4b401e8327d8ee88b1593a27659c6d3a3130874b51fcf5",
+  "src/shaders.h": "0af529b620379dc674be0a00c0b6f1e7b38ea6a8710f65984699b4ef96c7e90c",
+  "tests/aircraft_build_contract_test.cpp": "3e50ee20df9185f2c7e69663ebe3f968c9892f03fca1b48a288e512f5fdee9d3",
+  "tests/aircraft_build_golden.inc": "2544f9cfd5194f88e0ed679cc4e0e6e87f434c805388d8c20b1a4c3a62751959",
+  "tests/aircraft_build_interface_test.py": "b2fcf3443ab6db897fdc499f5f19a306bdc479e2c263cccea85f006f273bbe31"
+}

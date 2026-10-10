@@ -3,6 +3,7 @@
 #include "aircraft.h"
 #include "models.h"
 #include "aero.h"
+#include "gear_breakup_geometry.h"
 #include <algorithm>
 #include <cmath>
 
@@ -33,7 +34,7 @@ const char* breakKindName(int kind) {
 }
 
 int breakOwner(const BreakPiece* p, int n, vec3 b) {
-  for (int i = 0; i < n - 1; i++) if (inBox(p[i], b)) return i;
+  for (int i = 0; i < n - 1; i++) if (!p[i].rigidOnly && inBox(p[i], b)) return i;
   return n - 1;   // (the centre section: its own box, and whatever no other box holds)
 }
 
@@ -48,9 +49,99 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
   float xs = std::max(m.wing[0], m.ht[0]) + 1.f, y0 = -(gearHeight + 1.f), y1 = 0.f;
   for (int i = 0; i < 8; i++) y1 = std::max(y1, m.st[i][3] + m.st[i][2]);
   y1 = std::max(y1, m.vt[4] + m.vt[0]) + 1.5f;
+  // Wheels are at the full half-track (not half of that again). All gear legs
+  // use separate rigid meshes: give them explicit debris owners once exposed,
+  // without cutting a gear-shaped box out of the surrounding fuselage/wing skin.
+  // At gear <= .2 the wheels are fully stowed while only the doors move; preserve
+  // their existing attachment to the containing airframe piece in that state.
+  auto gearPieces = [&]() {
+    const bool fixed = !s.special && m.gear <= 2;
+    if (!fixed && gearDown <= .2f) return;
+    const GearStations gs = gearStations(s);
+    const bool atlas = &s == &kAircraft[kAtlas];
+    const float wr = s.special ? .38f : m.wheelR;
+    const auto main = gearBreakup::mainPose(s,m,gs,gearHeight,gearDown);
+    const vec3 wheel(gs.track,wr-gearHeight,gs.mainZ);
+    auto place = [](vec3 p, vec3 hinge, const quat& rotation) { return hinge+rotation.rotate(p-hinge); };
+    auto grow = [](Bounds& b,vec3 p,vec3 h) { b.add(p-h);b.add(p+h); };
+    auto cylinderBounds = [&](Bounds& b,vec3 p,float radius,float half,vec3 hinge,const quat& rotation) {
+      const vec3 axis=rotation.rotate(vec3(1,0,0));
+      const vec3 h(fabsf(axis.x)*half+radius*sqrtf(std::max(0.f,1-axis.x*axis.x)),
+                   fabsf(axis.y)*half+radius*sqrtf(std::max(0.f,1-axis.y*axis.y)),
+                   fabsf(axis.z)*half+radius*sqrtf(std::max(0.f,1-axis.z*axis.z)));
+      grow(b,place(p,hinge,rotation),h+vec3(.015f));
+    };
+    Bounds mainBounds;
+    // The leg's endpoints/links and each complete wheel, transformed before making
+    // their contact AABB. Rotating a deployed AABB leaves large empty corners and
+    // makes a partly folded leg land above the ground or rotate around empty air.
+    const float shaft = fixed ? .08f : atlas ? .24f : .20f;
+    grow(mainBounds,main.hinge,vec3(shaft));
+    grow(mainBounds,place(wheel,main.hinge,main.rotation),vec3(shaft));
+    // Atlas uses a vertical oleo and a lower trailing link. The knee is not
+    // collinear with hinge/contact, so include it before forming posed bounds.
+    const vec3 mainKnee(gs.track,-2.40f,2.72f);
+    if(atlas) grow(mainBounds,place(mainKnee,main.hinge,main.rotation),vec3(shaft));
+    if(atlas) for(float x:{-.34f,.34f}) for(float z:{-.62f,.62f})
+      cylinderBounds(mainBounds,wheel+vec3(x,0,z),wr,.189f,main.hinge,main.rotation);
+    else if(m.gear==3 && !s.special) for(float x:{-.22f,.22f})
+      cylinderBounds(mainBounds,wheel+vec3(x,0,0),wr,.154f,main.hinge,main.rotation);
+    else cylinderBounds(mainBounds,wheel,wr,fixed?(m.gear==0?.065f:m.gear==1?.134f:.184f):.144f,main.hinge,main.rotation);
+    if(fixed && m.gear==0) grow(mainBounds,wheel+vec3(0,.04f,.06f),vec3(.14f,wr*1.05f,wr*1.9f));
+    if(fixed && m.gear==2) { grow(mainBounds,main.hinge+vec3(0,0,-.35f),vec3(.06f));grow(mainBounds,main.hinge+vec3(0,0,.30f),vec3(.06f)); }
+    if(m.gear==3 && !s.special) {
+      // The nacelle's narrow skin door and brackets ride on the leg. Their field
+      // is authored in the stowed frame, then inverse-posed for its rigid bake.
+      const auto nac=gearBreakup::nacFold(m,gs,gearHeight);
+      const quat stowed=quat::axisAngle(vec3(1,0,0),nac.angle);
+      for(int iz=0;iz<=12;++iz) for(float x:{-.125f,0.f,.125f}) {
+        const float z=nac.z1+(nac.zs-nac.z1)*iz/12.f;
+        const vec2 section=gearBreakup::nacSection(m,z);
+        const vec3 skin(gs.track+x,section.x-sqrtf(std::max(0.f,section.y*section.y-x*x))+.012f,z);
+        const vec3 rest=place(skin,nac.hinge,stowed.conj());
+        grow(mainBounds,place(rest,main.hinge,main.rotation),vec3(.04f));
+      }
+    }
+    const vec3 mainMass=place(lerp(main.hinge,wheel,.68f)+(atlas?(mainKnee-main.hinge)*.15f:vec3(0)),main.hinge,main.rotation);
+    for(int sd:{-1,1}) {
+      Bounds b=mainBounds;
+      if(sd<0) { b.lo.x=-mainBounds.hi.x;b.hi.x=-mainBounds.lo.x; }
+      BreakPiece p=fromBounds(b,BK_GEAR,sd);p.rigidOnly=true;p.massCenter=mainMass;p.massCenter.x*=sd;push(p);
+    }
+    const float z=s.taildragger?gs.tailZ:gs.noseZ;
+    const float nwr=s.taildragger?.10f:s.special?.33f:wr*(atlas?.74f:m.gear==3?.75f:.85f);
+    const vec3 nw(0,nwr-gearHeight+(s.taildragger?.11f*s.fusLen:0.f),z);
+    float hw,hh,cy;modelSection(m,z-(s.taildragger?.3f:0.f),hw,hh,cy);
+    vec3 pivot(0,cy-hh*(s.taildragger?.6f:.7f),z-(s.taildragger?.3f:.05f));
+    quat nr;
+    if(!fixed) {
+      float py=s.special?gearBreakup::jetBelly(m,z,0.f)+.40f:botAt(m,z)+nwr+.07f;
+      for(int i=0;i<2;++i) py=s.special?std::max(gearBreakup::jetBelly(m,z,0.f),gearBreakup::jetBelly(m,z+py-nw.y,0.f))+.40f:
+                                              std::max(botAt(m,z),botAt(m,z+py-nw.y))+nwr+.07f;
+      pivot=vec3(0,py,z);nr=quat::axisAngle(vec3(1,0,0),-.5f*PI*clampf((1-gearDown)*1.25f,0,1));
+    }
+    Bounds nose;grow(nose,pivot,vec3(.20f));grow(nose,place(nw,pivot,nr),vec3(.12f));
+    const float offset=s.special?.10f:atlas?.25f:m.gear==3?.15f:0.f;
+    const float half=s.taildragger?.079f:s.special?.114f:atlas?.159f:m.gear==3?.114f:.099f;
+    // The breakup API has no steering angle. Bound the entire permitted steering
+    // sweep, with extra travel margin, so a turned tyre/pant never lies outside it.
+    const vec3 steeringPivot=fixed?vec3(0,0,z):pivot;
+    for(float steer:{-.6f,-.45f,0.f,.45f,.6f}) {
+      const quat turn=nr*quat::axisAngle(vec3(0,1,0),steer);
+      for(float side:{-1.f,1.f}) cylinderBounds(nose,nw+vec3(side*offset,0,0),nwr,half,steeringPivot,turn);
+      if(fixed && m.gear==0) {
+        const vec3 radii(.13f,nwr*1.12f,nwr*2.2f),x=turn.rotate(vec3(radii.x,0,0)),y=turn.rotate(vec3(0,radii.y,0)),zz=turn.rotate(vec3(0,0,radii.z));
+        const vec3 h(sqrtf(x.x*x.x+y.x*y.x+zz.x*zz.x),sqrtf(x.y*x.y+y.y*y.y+zz.y*zz.y),sqrtf(x.z*x.z+y.z*y.z+zz.z*zz.z));
+        grow(nose,place(nw+vec3(0,.05f,.06f),steeringPivot,turn),h+vec3(.015f));
+      }
+    }
+    BreakPiece p=fromBounds(nose,BK_GEAR,0);p.rigidOnly=true;p.massCenter=place(lerp(pivot,nw,.68f),pivot,nr);push(p);
+
+  };
   if (s.special) {
     // the XR-30 and XR-40 draw their own airframes (mapJet, the Wraith's): their pieces fitted to those - nose, centre,
     // tail and both outer wings, no overlaps
+    gearPieces();
     const float y0j = -1.7f, y1j = 2.9f;
     out[n++] = fromLoHi(vec3(-5.9f, -1.1f, -3.f), vec3(-2.2f, 0.8f, 6.1f), BK_WING, -1);
     out[n++] = fromLoHi(vec3(2.2f, -1.1f, -3.f), vec3(5.9f, 0.8f, 6.1f), BK_WING, 1);
@@ -67,24 +158,8 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
   // engine nacelles that stand clear of the fuselage: on the wings, or podded on the tail cone
   const bool podded = m.engine >= 2 && m.nacR > 0.05f && m.nacX - m.nacR * 0.5f > hwAt(m, m.nacZ0 + 0.5f * m.nacLen);
   if (podded) for (int sd = -1; sd <= 1; sd += 2)
-    push({vec3(sd * m.nacX, m.nacY, m.nacZ0 + 0.5f * m.nacLen), vec3(m.nacR + 0.1f, m.nacR + 0.14f, 0.5f * m.nacLen + 0.12f), BK_NACELLE, sd});
-  // the landing gear: fixed, or retractable and down
-  const bool fixedGear = m.gear <= 2, gearOut = fixedGear || gearDown > 0.5f;
-  if (gearOut) {
-    const GearStations gs = gearStations(s);
-    const float yb = -gearHeight - 0.08f, wr = std::max(m.wheelR, 0.2f);
-    for (int sd = -1; sd <= 1; sd += 2) {
-      const float x = sd * (m.gear == 3 && podded ? m.nacX : 0.5f * gs.track);
-      float top = botAt(m, gs.mainZ) - 0.03f;
-      if (m.wing[4] < 0.f) top = std::min(top, m.wing[4] - 0.5f * tcw * m.wing[1] - 0.03f);   // (under a low wing: below its skin)
-      if (m.gear == 3 && podded) top = std::min(top, m.nacY - m.nacR - 0.02f);
-      if (top > yb + 0.2f) push(fromLoHi(vec3(x - wr * 0.7f - 0.3f, yb, gs.mainZ - wr - 0.45f), vec3(x + wr * 0.7f + 0.3f, top, gs.mainZ + wr + 0.45f), BK_GEAR, sd));
-    }
-    if (!s.taildragger) {
-      const float top = botAt(m, gs.noseZ) - 0.03f;
-      if (top > yb + 0.2f) push(fromLoHi(vec3(-wr * 0.5f - 0.2f, yb, gs.noseZ - wr - 0.35f), vec3(wr * 0.5f + 0.2f, top, gs.noseZ + wr + 0.35f), BK_GEAR, 0));
-    }
-  }
+    push({vec3(sd * m.nacX, m.nacY, m.nacZ0 + 0.5f * m.nacLen), vec3(m.nacR + 0.1f, m.nacR + 0.14f, 0.5f * m.nacLen + (&s == &kAircraft[kAtlas] ? .50f : .12f)), BK_NACELLE, sd});
+  gearPieces();
   // wing struts: from the lower fuselage out to the wing, below its skin
   if (m.strut) {
     const float zs = m.wing[5] + 0.3f * m.wing[1], yTop = m.wing[4] - 0.5f * tcw * m.wing[1] - 0.04f, yLow = botAt(m, zs) + 0.15f;
@@ -183,6 +258,7 @@ BreakCut facePatch(const BreakPiece& p, int f) {   // the whole of a box's face 
 int breakCuts(const AircraftSpec& s, const BreakPiece* p, int n, int k, BreakCut out[kMaxBreakCuts]) {
   int m = 0;
   auto add = [&](const BreakCut& c) { if (m < kMaxBreakCuts) out[m++] = c; };
+  if (p[k].rigidOnly) { add(facePatch(p[k], 3)); return m; }
   if (s.special) {   // (the research jets' boxes only touch: where two meet face to face)
     for (int j = 0; j < n; j++) {
       if (j == k) continue;
@@ -206,6 +282,7 @@ int breakCuts(const AircraftSpec& s, const BreakPiece* p, int n, int k, BreakCut
   // a face of piece j's box across which the airframe goes on into a later piece: the two were joined there, over the
   // stretch of the face those points cross (an earlier piece's points beyond it are its own box's business)
   for (int j = 0; j < n - 1; j++) {
+    if (p[j].rigidOnly) continue;
     for (int f = 0; f < 6; f++) {
       const int ax = f >> 1, a1 = (ax + 1) % 3, a2 = (ax + 2) % 3;
       const float sg = f & 1 ? 1.f : -1.f, face = p[j].C[ax] + sg * p[j].H[ax];
@@ -328,7 +405,7 @@ void breakBodies(const AircraftSpec& s, const BreakPiece* p, int n, float mass, 
     float pm = p[i].kind == BK_PROP ? mProp : p[i].kind == BK_GEAR ? (p[i].side ? 0.018f : 0.01f) * empty : p[i].kind == BK_STRUT ? 0.007f * empty : 0.f;
     if (pm <= 0.f) continue;
     used += pm;
-    Elem e; e.kind = 0; e.r = p[i].C; e.mass = pm; e.self = (p[i].H.x * p[i].H.x + p[i].H.y * p[i].H.y + p[i].H.z * p[i].H.z) / 3.f;
+    Elem e; e.kind = 0; e.r = p[i].rigidOnly ? p[i].massCenter : p[i].C; e.mass = pm; e.self = (p[i].H.x * p[i].H.x + p[i].H.y * p[i].H.y + p[i].H.z * p[i].H.z) / 3.f;
     els[i].push_back(e);
     if (p[i].kind == BK_PROP) {   // two blades' worth of plate in the disc
       Elem b; b.kind = 1; b.r = p[i].C; b.mass = 0.f; b.self = 0.f;
@@ -356,6 +433,16 @@ void breakBodies(const AircraftSpec& s, const BreakPiece* p, int n, float mass, 
     }
     // (a propeller, a gear leg, a strut or a pod is the whole of its box)
     if (p[i].kind == BK_PROP || p[i].kind == BK_GEAR || p[i].kind == BK_STRUT || p[i].kind == BK_NACELLE) { b.lo = vmin(b.lo, p[i].C - p[i].H); b.hi = vmax(b.hi, p[i].C + p[i].H); }
+    if (p[i].rigidOnly) {
+      // A complete gear assembly has only a point-mass element, so finish()
+      // cannot infer its extent from plates/rods. Use its posed bounds about the
+      // true mass centre rather than treating a multi-metre bogie as a .6 m chip.
+      // This feeds the existing breakup impulse scaling and rim-speed spin cap.
+      const vec3 radius(std::max(fabsf(b.lo.x-b.cg.x),fabsf(b.hi.x-b.cg.x)),
+                        std::max(fabsf(b.lo.y-b.cg.y),fabsf(b.hi.y-b.cg.y)),
+                        std::max(fabsf(b.lo.z-b.cg.z),fabsf(b.hi.z-b.cg.z)));
+      b.size = std::max(b.size, 2.f*length(radius));
+    }
     // a fuselage piece's torn ends meet the air broadside along its axis
     auto section = [&](float z) { float hw, hh, cy; modelSection(m, z, hw, hh, cy); return PI * hw * hh; };
     const float zA = p[n - 1].C.z - p[n - 1].H.z, zB = p[n - 1].C.z + p[n - 1].H.z;

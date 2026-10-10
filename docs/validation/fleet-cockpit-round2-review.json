@@ -1,0 +1,243 @@
+{
+  "scope": "Second native acceptance pass for the seven verified cockpit residual findings; immutable phase and exact frame provenance are retained.",
+  "reviewed": [
+    {
+      "model": 7,
+      "phase": "round2-independent",
+      "binary_sha256": "77d0139d065272a0e7d0cf5d0f62f06dd4a88b5d9fb10a6cfdadd420f3b46b8b",
+      "source_snapshot": "/workspace/scratch/87b29863f015/new-aircraft-review/source-snapshots/cockpit-round2",
+      "frames": [
+        {
+          "path": "round2-independent/07_swift_s6/swift_s6_cockpit.png",
+          "sha256": "ec498dfb02b7403ca16e08812a7d209050bfe7d3b31b339c80e5ab6240aad402"
+        }
+      ],
+      "results": {
+        "07-C04": "pass: the residual blue firewall/shell fleck is gone after the hidden shell overlap. Native contact and full forward views retain the surrounding instrument, sill and support contours."
+      },
+      "comparison": "cockpit-review-small/07_swift_s6_round2_native_contact.png",
+      "winding": {
+        "rebuilt_flipped": 23,
+        "opposite_pairs_preserved": 0
+      }
+    },
+    {
+      "model": 9,
+      "phase": "round2-independent",
+      "binary_sha256": "77d0139d065272a0e7d0cf5d0f62f06dd4a88b5d9fb10a6cfdadd420f3b46b8b",
+      "source_snapshot": "/workspace/scratch/87b29863f015/new-aircraft-review/source-snapshots/cockpit-round2",
+      "frames": [
+        {
+          "path": "round2-independent/09_xr10_nightjar/xr10_nightjar_cockpit.png",
+          "sha256": "d25228247310a3be1980098dbb7ab6241aa9e35d9d0a3f11f94970c259cd38c7"
+        }
+      ],
+      "results": {
+        "09-C03": "pass: the fine blue firewall/shell contact fragments are gone after the hidden overlap. The continuous firewall, coaming and window contours are retained."
+      },
+      "comparison": "cockpit-review-small/09_xr10_nightjar_round2_native_contact.png",
+      "winding": {
+        "rebuilt_flipped": 104,
+        "opposite_pairs_preserved": 0
+      }
+    },
+    {
+      "model": 0,
+      "phase": "round2-independent",
+      "binary_sha256": "77d0139d065272a0e7d0cf5d0f62f06dd4a88b5d9fb10a6cfdadd420f3b46b8b",
+      "source_snapshot": "/workspace/scratch/87b29863f015/new-aircraft-review/source-snapshots/cockpit-round2",
+      "frames": [
+        {
+          "path": "round2-independent/00_kestrel/kestrel_cockpit.png",
+          "sha256": "3538616819f7542a3984a3a6dfced84064aa50c5d47eda1866adf5fcc6776f35"
+        }
+      ],
+      "results": {
+        "00-C01": "partial: the deck mid-edge is continuous, but a separate firewall contact fleck and pilot-brow/shell slit remain. Cached rays identify both. A final narrow firewall overlap and outboard brow return are applied pending another native gate."
+      },
+      "comparison": "cockpit-review-small/00_kestrel_round2_native_contact.png",
+      "winding": {
+        "rebuilt_flipped": 97,
+        "opposite_pairs_preserved": 0
+      },
+      "independent_review": "Native residual points read as pinholes at the brow/firewall join; retain as a small confirmed correction target."
+    },
+    {
+      "model": 1,
+      "phase": "round2-independent",
+      "binary_sha256": "77d0139d065272a0e7d0cf5d0f62f06dd4a88b5d9fb10a6cfdadd420f3b46b8b",
+      "source_snapshot": "/workspace/scratch/87b29863f015/new-aircraft-review/source-snapshots/cockpit-round2",
+      "frames": [
+        {
+          "path": "round2-independent/01_wren/wren_cockpit.png",
+          "sha256": "49dd0f9a9764445c5656ae242becc0c505e94f6af65c48a81dc09adc82a96b3f"
+        }
+      ],
+      "results": {
+        "01-C01": "partial: the deck contact improves, but the adjacent old firewall/shell gap remains at pixels 899,546\u2013547. The front point at 642,651 ray-hits the existing vent66 and is excluded from the correction. A narrow firewall overlap is applied pending another native gate."
+      },
+      "comparison": "cockpit-review-small/01_wren_round2_native_contact.png",
+      "winding": {
+        "rebuilt_flipped": 161,
+        "opposite_pairs_preserved": 0
+      },
+      "independent_review": "The isolated front point is a plausible vent-edge highlight given material66; no separate missing-skin defect or source change is justified."
+    },
+    {
+      "model": 2,
+      "phase": "round2-independent",
+      "binary_sha256": "77d0139d065272a0e7d0cf5d0f62f06dd4a88b5d9fb10a6cfdadd420f3b46b8b",
+      "source_snapshot": "/workspace/scratch/87b29863f015/new-aircraft-review/source-snapshots/cockpit-round2",
+      "frames": [
+        {
+          "path": "round2-independent/02_bush/bush_cockpit.png",
+          "sha256": "532828df3d5ed6ca9ac8ec39dc5858f3a606bee40095b948c07c0008a63684ec"
+        }
+      ],
+      "results": {
+        "02-C01": "partial: the surviving jagged strip is traced to the adjacent firewall at body z\u2248\u22122.65, rather than the deck or brow. The same proven firewall overlap is applied pending another native gate."
+      },
+      "comparison": "cockpit-review-small/02_bush_round2_native_detail.png",
+      "winding": {
+        "rebuilt_flipped": 67,
+        "opposite_pairs_preserved": 0
+      }
+    },
+    {
+      "model": 10,
+      "phase": "round2-independent",
+      "binary_sha256": "77d0139d065272a0e7d0cf5d0f62f06dd4a88b5d9fb10a6cfdadd420f3b46b8b",
+      "source_snapshot": "/workspace/scratch/87b29863f015/new-aircraft-review/source-snapshots/cockpit-round2",
+      "frames": [
+        {
+          "path": "round2-independent/10_xr30_specter/xr30_specter_cockpit_overhead.png",
+          "sha256": "fc5c382c09e60e12d326f76f2f842c0d83af09ded6c16523f24b18c74d23e4c1"
+        },
+        {
+          "path": "round2-independent/10_xr30_specter/xr30_specter_cockpit_refactor_specter_vector.png",
+          "sha256": "85b9960c367bab52a5db39a84966e1fb0e45b5fe73bf5c266f3b7a11ad65be56"
+        }
+      ],
+      "results": {
+        "10-C02": "pass: all 27 authored capsule stems/crowns are continuous at native resolution; the broken amber tip patches are gone, and the full local overlap perimeter has no visible seam. No shader shape, material, control or part changed."
+      },
+      "comparison": "cockpit-review-small/10_xr30_specter_round2_native_detail.png",
+      "local_detail_measurements": {
+        "core_cells": 56,
+        "overlap_cells": 170,
+        "samples": 960081,
+        "vertices_before": 81084,
+        "vertices_after": 85106,
+        "triangles_before": 117226,
+        "triangles_after": 123678,
+        "geometry_added_bytes": 206128,
+        "peak_tracked_cpu_working_vector_bytes": 39024536,
+        "peak_excludes": "output geometry and GPU staging; this is not total process RSS",
+        "evidence": "diagnostics/specter-detail-round2/STAGING.md",
+        "perimeter_crop": "cockpit-review-small/10_specter_round2_perimeter.jpg"
+      }
+    },
+    {
+      "model": 0,
+      "phase": "round2-final",
+      "binary_sha256": "12082a6534ef6e64ac04a848cdbd9019a5d26a029a7ddf7479bda05e38dabd25",
+      "source_snapshot": "/workspace/scratch/87b29863f015/new-aircraft-review/source-snapshots/final-round2",
+      "frames": [
+        {
+          "path": "round2-final/00_kestrel/kestrel_cockpit.png",
+          "sha256": "3651ff2481aa823441131f422f45e502ce50b60009c3e1151aef0dad5d12d4e0"
+        }
+      ],
+      "results": {
+        "00-C01": "pass: the final firewall overlap and pilot-brow return remove both residual pinholes. Deck, brow and sill joins are continuous, with the instrument-facing brow edge, height, depth and surrounding window contours retained."
+      },
+      "comparison": "cockpit-review-small/00_kestrel_final_native_contact.png",
+      "winding": {
+        "rebuilt_flipped": 35,
+        "opposite_pairs_preserved": 0
+      }
+    },
+    {
+      "model": 14,
+      "phase": "round2-final",
+      "binary_sha256": "12082a6534ef6e64ac04a848cdbd9019a5d26a029a7ddf7479bda05e38dabd25",
+      "source_snapshot": "/workspace/scratch/87b29863f015/new-aircraft-review/source-snapshots/final-round2",
+      "frames": [
+        {
+          "path": "round2-final/14_atlas_a180/atlas_a180_cockpit_down_throttle_full.png",
+          "sha256": "d6bd2d9304c4603c13b957ef705ec6829e7cd4c58b0abceff124c3cc4e88fb67"
+        },
+        {
+          "path": "round2-final/14_atlas_a180/atlas_a180_cockpit_down_throttle_off.png",
+          "sha256": "d9102a53e7d57ecf2546ba69dd8011606728f16f93ddd2504869d1d1e522bf82"
+        },
+        {
+          "path": "round2-final/14_atlas_a180/atlas_a180_cockpit_right.png",
+          "sha256": "960eaf5575747ceb59079ef0d9b8c09939aa2603ac5e5e4a8b38b346b26f5eb5"
+        }
+      ],
+      "results": {
+        "AT-C05": "pass: the navigation-tablet side/back bevel no longer has repeated diagonal normal ripples. Native right/full/off views retain the authored contour, clear live display content and thrust-lever separation."
+      },
+      "comparison": "cockpit-review-small/14_atlas_a180_final_native_tablet_full.png",
+      "winding": {
+        "rebuilt_flipped": 412,
+        "opposite_pairs_preserved": 0
+      }
+    },
+    {
+      "model": 1,
+      "phase": "round2-final",
+      "binary_sha256": "12082a6534ef6e64ac04a848cdbd9019a5d26a029a7ddf7479bda05e38dabd25",
+      "source_snapshot": "/workspace/scratch/87b29863f015/new-aircraft-review/source-snapshots/final-round2",
+      "frames": [
+        {
+          "path": "round2-final/01_wren/wren_cockpit.png",
+          "sha256": "ec0e98ea4860eb185b15411f9ee02bfe6a04edc4ca32fa22b0a87e012f932958"
+        }
+      ],
+      "results": {
+        "01-C01": "pass: the final rear firewall fleck is gone; the connected deck/firewall joins retain their intended contours. The independently reviewed isolated vent highlight is unchanged."
+      },
+      "comparison": "cockpit-review-small/01_wren_final_native_contact.png",
+      "winding": {
+        "rebuilt_flipped": 64,
+        "opposite_pairs_preserved": 0
+      }
+    },
+    {
+      "model": 2,
+      "phase": "round2-final",
+      "binary_sha256": "12082a6534ef6e64ac04a848cdbd9019a5d26a029a7ddf7479bda05e38dabd25",
+      "source_snapshot": "/workspace/scratch/87b29863f015/new-aircraft-review/source-snapshots/final-round2",
+      "frames": [
+        {
+          "path": "round2-final/02_bush/bush_cockpit.png",
+          "sha256": "5a626fae70bd4ea992c3c4ec1481ac3e05742b5702ad701a8c731922740c80d0"
+        }
+      ],
+      "results": {
+        "02-C01": "pass: the former open-looking firewall fragments are closed and the junction is continuous. Cached rays show the correct flat firewall normal and valid winding. Independent native review classifies the remaining small dark stair-step as minor mesh/raster faceting, not a hole or clipping defect; no further shape change is justified."
+      },
+      "comparison": "cockpit-review-small/02_bush_final_native_contact.png",
+      "winding": {
+        "rebuilt_flipped": 28,
+        "opposite_pairs_preserved": 0
+      },
+      "independent_review": "Closed continuous junction; retain the small dark contact crease as minor mesh/raster faceting.",
+      "cpu_evidence": "diagnostics/bush-final-contact-witnesses.json"
+    }
+  ],
+  "summary": {
+    "confirmed_findings_total": 28,
+    "confirmed_findings_native_resolved": 28,
+    "remaining_confirmed_cockpit_defects": 0,
+    "scope": "Cumulative acceptance from all15 initial and first-postrepair groups plus focused second/final contact and normal gates. Final integration/refactor checks remain separate.",
+    "minor_rendering_details_retained": [
+      "Bush: small dark continuous contact crease from mesh/raster faceting.",
+      "Wren: isolated existing vent highlight, verified material66.",
+      "Mantis: 2\u20133 pixel continuous display-bevel raster/specular steps."
+    ]
+  },
+  "historical_phase_note": "This report preserves its capture phase and observations. Current final status, source hashes and guidance bridge are recorded in fleet-cockpit-integrated-review.json."
+}
