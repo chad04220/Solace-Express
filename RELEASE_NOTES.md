@@ -27,3 +27,6 @@
 - The channel's walls are ragged and churning, and they grow rougher and patchier as it widens and fills in. An older channel pinches into a chain of bulges as the vortex pair links up into rings, and the cloud pushed aside piles up slightly round a young one.
 - Cloud wisps streaming past move with the air round the aircraft. They lift ahead of the wing, swing round the nose, blow back in a slipstream, and once behind the wing the vortices catch them and turn them as they sink.
 - The wingtip vapour curls inboard and down round the vortex cores, faster the harder the wing pulls.
+
+### Fixes
+- XR-30s flying as traffic look like themselves again: the formations that fly past, and the escort pair in their red-and-gold and blue-and-white display colours. Since v3.41.0 they were drawn with your own aircraft's colours, lights and engine glow, lit as if they were turned the way your aircraft is, with their panel lines sliding over the skin as they moved. Seen from the cockpit, they were also drawn clear of the haze and the clouds.

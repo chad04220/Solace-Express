@@ -45,6 +45,7 @@ assert 'afMeshProgram(own)' in mesh and 'planeMeshFSAssembly(aircraftDefines(mod
 assert 'afBakePrograms(own, slot, hullBakeProg)' in hull and 'hullBakeFSAssembly(bakeDefines(model, slot))' in mesh, 'Lost the aircraft\'s own bake'
 assert '"#define AF_OUTSIDE\\n"' in mesh, 'The outside body\'s builder must leave the cabin out'
 assert 'meshStamp(afModelOf(M, pv.model), inside ? 1 : 0)' in mesh, 'The bodies\' cache must be stamped per aircraft and body'
+assert 'bool traf = uMeshTraffic >= 0;' in read('src/shaders/plane_mesh_fs.glsl'), 'Traffic is drawn with its type\'s own mesh build (the XR-30s of the formations and the escort pair): never gate it on a family'
 assembly = read('src/shaders.h')
 assert 'defines + "#define AF_MESH\\n"' in assembly
 assert '"#define AF_MODEL "' in assembly and '"#define AF_PACKED_MODEL vec4[24]("' in assembly
@@ -103,6 +104,9 @@ if a.shader_dir:
         for fn in ('loadCabinFit', 'interiorAO'):
             assert not re.search(r'^\w+\s+' + fn + r'\s*\(', out, re.M), (m, fn, 'in the outside builder')
             assert re.search(r'^\w+\s+' + fn + r'\s*\(', ck, re.M), (m, fn, 'missing from the cockpit builder')
+    for m in range(13):   # (each own mesh build draws a traffic aircraft of its type as that aircraft: its data, not the player's)
+        src = (a.shader_dir / 'pruned' / f'plane_mesh_af{m}.frag').read_text()
+        assert 'bool traf=uMeshTraffic>=0;' in src and 'if(traf){loadTraffic(uMeshTraffic);trafficXf(uMeshTraffic);}' in src, (m, 'traffic drawn with the player\'s data')
     print('PASS: each aircraft\'s own mesh, bake (outside and cockpit), march and shadow programs hold its own code and no other aircraft\'s')
     # the programs the launch builds hold no airframe at all, so no edit to an aircraft compiles anything at launch
     # (each aircraft's are made as it is drawn); and each scenery class's holds only its class's surfaces

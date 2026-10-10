@@ -36,7 +36,9 @@ void main(){
   if (RESEARCH_ON && uScrSkip == 1 && cabinWindowCut(vB - uScrEye, uScrModel, uBombPane == 1, uPartInst >= 0)) discard;
 #endif
   gZero = min(uQuality, 0);
-  bool traf = FLEET_ON && uMeshTraffic >= 0;   // (the research jets' own builds never draw traffic: no traffic data path in them)
+  // (a traffic aircraft is drawn with its type's own build too - the XR-30s of the formations and the escort pair: an own
+  // build's gM is its type's constants, the ones afModelOf matched the traffic aircraft's by; loadTraffic reads the rest)
+  bool traf = uMeshTraffic >= 0;
   if (traf) { loadTraffic(uMeshTraffic); trafficXf(uMeshTraffic); } else { loadMain(); pieceXf(-1); }
   vec3 d = vW, p = uCamPos + d;   // (from the camera: plane_mesh_vs.glsl; p, in world metres, only for the world's lookups)
   gRelSet = true; gRel = d;
