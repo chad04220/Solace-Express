@@ -33,7 +33,7 @@ int main(){
   check(crossings>0,"adversarial nominal reach-zero cases actually cross the edge");
   // Exercise the real generation/trim/clear/async publication paths on a safe,
   // flat all-sea field. No world cache or user-visible scenery is changed.
-  g_world.hm.assign(size_t(HM_N)*HM_N*4,0.f);g_world.mask.assign(size_t(MASK_N)*MASK_N*4,0);g_world.roadId.assign(size_t(MASK_N)*MASK_N*2,0);g_world.airports.clear();
+  g_world.hm.assign(size_t(HM_N)*HM_N*4,0.f);g_world.mask.assign(size_t(MASK_N)*MASK_N*4,0);g_world.roadGrid=RoadGrid();g_world.roadGrid.head.assign(size_t(MASK_N)*MASK_N,0);g_world.airports.clear();
   const int cx=0,cz=0;auto*c=g_scenery.ensure(cx,cz,1);uint64_t first=c->revision;check(first>0,"real generation has revision");
   auto*same=g_scenery.ensure(cx,cz,1);check(same->revision==first,"unchanged ensure keeps revision");
   c=g_scenery.ensure(cx,cz,2);uint64_t upgraded=c->revision;check(upgraded>first,"level upgrade has new revision");

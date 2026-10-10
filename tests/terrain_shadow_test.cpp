@@ -11,6 +11,7 @@
 #include <cmath>
 #include <string>
 #include <algorithm>
+#include <vector>
 
 static void* lib;
 static void* (*eglProc)(const char*);
@@ -42,8 +43,9 @@ int main() {
   setvbuf(stdout, nullptr, _IONBF, 0);
   if (!initGL()) { puts("terrain shadow bake: no EGL here, skipped"); return 0; }
   g_world.build();
-  // the bake shader with what it uses from the shared shader code: the common terrain code and the max-height mip chain
-  std::string fs = std::string("#version 330 core\n") + kCommonGLSL + "layout(location=0) out vec4 oColor; uniform float uMaxH;\n" +
+  // the bake shader with what it uses from the shared shader code: the common terrain code, the roads graded into it
+  // (with the scene uniforms they read: uData) and the max-height mip chain
+  std::string fs = std::string("#version 330 core\n") + kCommonGLSL + kSceneUniforms + kRoads + "layout(location=0) out vec4 oColor;\n" +
                    "uniform sampler2D uHMax; const int HMAXN = " + std::to_string(HMAX_N) + "; const int HMAXL = " + std::to_string(HMAX_LEVELS) + ";\n" + kTShBakeMain;
   GLuint vs = compile(GL_VERTEX_SHADER, kFullscreenVS), f = compile(GL_FRAGMENT_SHADER, fs);
   if (!vs || !f) return 1;
@@ -58,6 +60,15 @@ int main() {
   for (int L = 0; L < HMAX_LEVELS; L++) glTexImage2D(GL_TEXTURE_2D, L, GL_R32F, HMAX_N >> L, HMAX_N >> L, 0, GL_RED, GL_FLOAT, g_world.hmax[L].data());
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, HMAX_LEVELS - 1);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  // the road network, as the renderer uploads it (unit 4 the grid, unit 5 the entries)
+  GLuint grid, data;
+  glGenTextures(1, &grid); glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, grid);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, RoadGrid::N, RoadGrid::N, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, g_world.roadGrid.head.data());
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  std::vector<float> rows(ROAD_DATA_W * 4, 0.f); { const std::vector<float> e = roadEntryRows(g_world.roadGrid); rows.insert(rows.end(), e.begin(), e.end()); }
+  glGenTextures(1, &data); glActiveTexture(GL_TEXTURE0 + 5); glBindTexture(GL_TEXTURE_2D, data);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, ROAD_DATA_W, (GLsizei)(rows.size() / 4 / ROAD_DATA_W), 0, GL_RGBA, GL_FLOAT, rows.data());
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glActiveTexture(GL_TEXTURE0);
   glGenTextures(1, &target); glBindTexture(GL_TEXTURE_2D, target);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, N, N, 0, GL_RG, GL_FLOAT, nullptr);
@@ -68,6 +79,7 @@ int main() {
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, hm);   // (creating the target took unit 0)
   glGenVertexArrays(1, &vao); glBindVertexArray(vao); glUseProgram(p);
   glUniform1i(glGetUniformLocation(p, "uHM"), 0); glUniform1i(glGetUniformLocation(p, "uHMax"), 6);
+  glUniform1i(glGetUniformLocation(p, "uRoadGrid"), 4); glUniform1i(glGetUniformLocation(p, "uData"), 5);
   glUniform1i(glGetUniformLocation(p, "uCraterN"), 0); glUniform1f(glGetUniformLocation(p, "uBakeN"), (float)N);
   float maxH = 0; for (size_t i = 0; i < g_world.hm.size(); i += 4) maxH = std::max(maxH, g_world.hm[i] + g_world.hm[i + 1] * 1.5f);
   glUniform1f(glGetUniformLocation(p, "uMaxH"), maxH + 20.f);

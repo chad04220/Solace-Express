@@ -13,22 +13,48 @@ static void check(bool value, const char* message) { if (!value) { if (failures 
 int main() {
   g_world.build();
   check(g_communityPlans.size() == (size_t)kNumTowns, "every community has a shared street plan");
-  check(!g_roads.empty() && g_roads.size() <= 64, "road ids stay inside renderer's fixed 64-segment budget");
-  size_t countBefore = g_roads.size(); sceneryConnectRoads(g_world);
-  check(g_roads.size() == countBefore, "access road initialization is idempotent");
-  for (const RoadSeg& road : g_roads) {
-    check(std::isfinite(road.ax + road.az + road.bx + road.bz), "finite road endpoints");
-    check(hypotf(road.bx - road.ax, road.bz - road.az) > 1.f, "no zero-length road segments");
-    // Forty surveyed legacy trunk segments precede all new access links.
-    if (&road - g_roads.data() >= 40) for (int step = 0; step <= 200; step++) {
-      float f = step / 200.f, x = lerpf(road.ax, road.bx, f), z = lerpf(road.az, road.bz, f);
-      check(g_world.groundHeight(x, z, 7) > 1.5f, "new access links stay on dry land");
+  // The road network (road_network.h): every settlement and airfield on it, its roads on dry land or bridges, off the
+  // runways' protected rectangles, graded within their class's limit
+  const RoadNetwork& net = g_world.roads;
+  check(!net.paths.empty() && !g_world.roadGrid.segs.empty(), "the road network is built");
+  std::vector<int> joined(net.nodes.size(), 0);
+  for (const RoadPath& p : net.paths) {
+    if (p.from >= 0) joined[p.from]++;
+    if (p.to >= 0) joined[p.to]++;
+    check(p.pts.size() >= 2 && p.bridge.size() + 1 == p.pts.size(), "a path has points and a bridge flag per segment");
+    float length = 0; for (size_t k = 1; k < p.pts.size(); k++) length += hypotf(p.pts[k].x - p.pts[k - 1].x, p.pts[k].z - p.pts[k - 1].z);
+    for (size_t k = 0; k < p.pts.size(); k++) {
+      const RoadPoint& q = p.pts[k];
+      check(std::isfinite(q.x + q.z + q.h), "finite road points");
+      const bool onBridge = (k > 0 && p.bridge[k - 1]) || (k + 1 < p.pts.size() && p.bridge[k]);
+      if (!onBridge) check(g_world.naturalHeight(q.x, q.z, 6) > -1.f, "roads off bridges stay on land");
       for (const Airport& airport : g_world.airports) {
-        vec2 q = aptLocal(airport, vec3(x, 0, z));
-        check(fabsf(q.x) >= airport.length * .5f + 250.f || fabsf(q.y) >= airport.width * .5f + 75.f, "new access links avoid runway protected rectangles");
+        vec2 a = aptLocal(airport, vec3(q.x, 0, q.z));
+        const bool inside = fabsf(a.x) < airport.length * .5f + 250.f && fabsf(a.y) < airport.width * .5f + 75.f;
+        if (inside && failures < 40) std::printf("  in %s's protected rectangle: path %d->%d point %zu/%zu u %.0f v %.0f\n", airport.code, p.from, p.to, k, p.pts.size(), a.x, a.y);
+        check(!inside, "roads avoid runway protected rectangles");
+      }
+      if (k > 0) {
+        const RoadPoint& o = p.pts[k - 1];
+        const float run = hypotf(q.x - o.x, q.z - o.z);
+        check(run > 0.5f, "no zero-length road segments");
+        // (ends too far apart in height for the road's length: the shortfall spread evenly along it)
+        const float spread = fabsf(p.pts.back().h - p.pts.front().h) / std::max(length, 1.f);
+        const bool steep = fabsf(q.h - o.h) > (roadSpec(p.cls).maxGrade * 1.05f + spread) * run + 0.05f;
+        if (steep) std::printf("  steep: path %d->%d class %d at %.0f %.0f: %.1f m over %.1f m\n", p.from, p.to, (int)p.cls, q.x, q.z, q.h - o.h, run);
+        check(!steep, "roads graded within their class's limit");
       }
     }
   }
+  int alone = 0;
+  for (size_t n = 0; n < net.nodes.size(); n++) {
+    if (joined[n]) continue;
+    bool settled = false;   // (an airfield alone on its island - Gull Rock's strip - has nowhere to go)
+    for (size_t m = 0; m < net.nodes.size(); m++) settled = settled || (m != n && net.nodes[m].kind < 3 && net.nodes[m].island == net.nodes[n].island);
+    if (!settled && net.nodes[n].kind == 3) continue;
+    alone++; std::printf("  not on the network: node %zu (kind %d) at %.0f %.0f\n", n, net.nodes[n].kind, net.nodes[n].x, net.nodes[n].z);
+  }
+  check(alone == 0, "every settlement and airfield is on the road network (an airfield alone on its island aside)");
   Lot invalid;
   check(!communityLot(g_world, -1, 0, 0, invalid) && !communityLot(g_world, kNumTowns, 0, 0, invalid), "invalid public town indices are rejected");
   int total = 0, tall = 0, occupiedTowns = 0, cars = 0;
@@ -99,6 +125,6 @@ int main() {
   bool rawPresent = communityLot(g_world, 0, -5, -5, raw);
   check(cachedPresent == rawPresent && cached.cx == raw.cx && cached.cz == raw.cz && cached.yaw == raw.yaw && cached.wallH == raw.wallH, "uncached fallback preserves cached lot data");
   sceneryBakeCommunityLots(g_world);
-  std::printf("%d buildings, %d tall, %d inhabited towns, %zu roads, %d parked cars sampled; %d failures\n", total, tall, occupiedTowns, g_roads.size(), cars, failures);
+  std::printf("%d buildings, %d tall, %d inhabited towns, %zu road paths, %d parked cars sampled; %d failures\n", total, tall, occupiedTowns, g_world.roads.paths.size(), cars, failures);
   return failures ? 1 : 0;
 }

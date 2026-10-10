@@ -62,6 +62,8 @@ float vnoise3(vec3 x){ vec3 i=floor(x), f=fract(x); f=f*f*(3.0-2.0*f);
 float fbm2(vec2 p, int oct){ float s=0.0, a=0.5; for(int i=0;i<8;i++){ if(i>=oct) break; s+=a*vnoise(p); p=p*2.02+vec2(13.7,-7.1); a*=0.5; } return s; }
 
 // ---------------------------------------------------------------- scenery (mirrors scenery.cpp exactly)
+// (uRoadId: the old road-id texture's sampler, read by nothing since the road network - roads.glsl's uRoadGrid on the
+// same unit - but declared as it was: the aircraft bodies' cache key hashes this library's declarations)
 uniform sampler2D uMask; uniform sampler2D uRoadId;
 const int MASKN = 2048; const float MTEX = 39.0625;
 vec4 maskAt(vec2 p){
@@ -70,19 +72,15 @@ vec4 maskAt(vec2 p){
   vec4 c = texelFetch(uMask, clamp(i+ivec2(0,1), ivec2(0), mx), 0), d = texelFetch(uMask, clamp(i+ivec2(1,1), ivec2(0), mx), 0);
   return (a*(1.0-t.x)+b*t.x)*(1.0-t.y) + (c*(1.0-t.x)+d*t.x)*t.y;
 }
-float forestAt(vec2 p){
-  vec2 f = (p + WH)/MTEX - 0.5; vec2 fl = floor(f); ivec2 i = ivec2(fl); vec2 t = f - fl; ivec2 mx = ivec2(MASKN-1);
-  float a = texelFetch(uRoadId, clamp(i, ivec2(0), mx), 0).g, b = texelFetch(uRoadId, clamp(i+ivec2(1,0), ivec2(0), mx), 0).g;
-  float c = texelFetch(uRoadId, clamp(i+ivec2(0,1), ivec2(0), mx), 0).g, d = texelFetch(uRoadId, clamp(i+ivec2(1,1), ivec2(0), mx), 0).g;
-  return ((a*(1.0-t.x)+b*t.x)*(1.0-t.y) + (c*(1.0-t.x)+d*t.x)*t.y)*0.875;
-}
 vec4 maskTexel(vec2 p){ return texelFetch(uMask, clamp(ivec2(floor((p + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0); }
-float groundH(vec2 p, int oct){ vec4 b = baseAt(p); return b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct); }
-// Terrain height: the bare heightfield (trees, rocks and buildings are separate entities) plus impact craters
+float roadGrade(vec2 p, float g);   // the ground with the roads built into it (roads.glsl)
+float groundH(vec2 p, int oct){ vec4 b = baseAt(p); return roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct)); }
+// Terrain height: the bare heightfield (trees, rocks and buildings are separate entities) with the roads built into it,
+// plus impact craters
 float terrainH(vec2 p, int oct){
   COST(0);
   vec4 b = baseAt(p);
-  float g = b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct);
+  float g = roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct));
   if (uCraterN > 0 && g > 0.3) g += craterH(p);
   return g;
 }

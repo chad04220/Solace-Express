@@ -1,6 +1,7 @@
 // Solace Express - world: hand-designed archipelago, terrain, airports, weather
 #pragma once
 #include "common.h"
+#include "road_network.h"
 #include <string>
 
 static const float WORLD_HALF = 40000.0f;  // map spans [-40km, 40km] on x and z
@@ -57,7 +58,10 @@ public:
   std::vector<Airport> airports;
   std::vector<Box> boxes;
   std::vector<float> hm;     // RGBA per texel: base height, detail amplitude, lushness, coldness
-  std::vector<uint8_t> roadId; // RG8 per mask texel: nearest road segment + 1 (shader computes exact road edges), baked forest noise
+  // The road network (road_network.h): its paths (bridges, traffic) and the grid the terrain grades and the ground
+  // material paints from - per mask texel the road segments that reach it, and the baked forest noise
+  RoadNetwork roads;
+  RoadGrid roadGrid;
   std::vector<uint8_t> mask; // RGBA8: road distance, building density, urbanness, farmland / sea-stack flag
   std::vector<float> hmax[HMAX_LEVELS];   // upper bound of the terrain per cell, level L has HMAX_N>>L cells per side
   // cachePath: the generated arrays are read from there when its stamp matches (a launch after the first skips the
@@ -79,8 +83,9 @@ public:
   float groundHeight(float x, float z, int octaves = 8) const;          // same as height()
   bool lotAt(int i, int j, Lot& out) const;                 // a town lot with a building on it (entities.cpp picks the building)
   int findAirport(const char* code) const;
-  // Terrain height (m) at a world position (bare ground). octaves controls detail fidelity.
+  // Terrain height (m) at a world position (bare ground, the roads graded into it). octaves controls detail fidelity.
   float height(float x, float z, int octaves = 8) const;
+  float naturalHeight(float x, float z, int octaves = 8) const;   // (the same without the roads)
   vec3 normal(float x, float z) const;
   // Base layer sample (manual bilinear, matches the shader exactly)
   void sampleBase(float x, float z, float out[4]) const;

@@ -44,9 +44,11 @@ vec4 craterRockMaterial(vec3 p, vec3 n, vec2 pixelDx, vec2 pixelDy, out vec3 nor
   return rock;
 }
 
-// Static scene slots mirror Renderer::init and the CPU community layout. No new sampler.
-const int COMMUNITY_INFO = 320, COMMUNITY_PLAN = 352, COMMUNITY_META = 383;
+// Static scene slots mirror Renderer::init and the CPU community layout. No new sampler. (Its constants are the
+// function's own: a top-level declaration survives pruning into every program of the world library - the aircraft
+// bodies' bake among them, whose cache key it would change; see tests/fixtures/aircraft_bake.fnv)
 bool communityGrid(vec2 p, out vec2 q, out vec4 plan){
+  const int COMMUNITY_INFO = 320, COMMUNITY_PLAN = 352, COMMUNITY_META = 383;
   float best = 1.0; int nearest = -1;
   int count = clamp(int(dataAt(COMMUNITY_META).x + 0.5), 0, 31);
   vec2 delta = vec2(0.0);
@@ -346,21 +348,31 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, vec2 footprint, out b
   }
 }
 
-// exact road distance using the baked nearest-segment ids
-float roadDist(vec2 p, out float along, out vec2 direction){
-  vec2 f = (p + WH)/MTEX - 0.5; ivec2 i = ivec2(floor(f));
-  float best = 1e9; along = 0.0; direction = vec2(1.0, 0.0);
-  for (int k = 0; k < 4; k++) {
-    ivec2 o = ivec2(k & 1, k >> 1);
-    int id = int(texelFetch(uRoadId, clamp(i + o, ivec2(0), ivec2(MASKN-1)), 0).r*255.0 + 0.5) - 1;
-    if (id < 0) continue;
-    vec4 s = dataAt(id);
-    vec2 ab = s.zw - s.xy; float L2 = dot(ab, ab);
-    float tt = clamp(dot(p - s.xy, ab)/max(L2, 1e-3), 0.0, 1.0);
-    float dd = length(s.xy + ab*tt - p);
-    if (dd < best) { float roadLength = sqrt(L2); best = dd; along = tt*roadLength; direction = ab/max(roadLength, 1e-3); }
+// The road paved at a point (the network, road_network.h): signed distance across it from its centreline (+ right of
+// its direction), the distance along it, its direction and class; false: no road's paving or verge here. A second road's
+// paving overlapping it - a junction - stops the markings. Bridge decks are their own meshes: never painted here.
+bool roadAt(vec2 p, out float across, out float along, out vec2 dir, out int cls, out bool junction){
+  across = 1e9; along = 0.0; dir = vec2(1.0, 0.0); cls = 1; junction = false;
+  uint h = roadHead(p); int n = int((h >> 19u) & 63u);
+  if (n == 0) return false;
+  int e0 = int(h & 0x7FFFFu), path = -1;
+  float best = 1e9;
+  for (int k = 0; k < 63; k++) {
+    if (k >= n) break;
+    vec4 a = roadTexel(2*(e0 + k)), b = roadTexel(2*(e0 + k) + 1);
+    int code = int(b.w);
+    if ((code & 4) != 0) continue;
+    int c = code & 3, pid = code >> 4;
+    vec2 ab = a.zw - a.xy; float L = max(length(ab), 1e-3), t = clamp(dot(p - a.xy, ab)/(L*L), 0.0, 1.0);
+    vec2 q = p - (a.xy + ab*t);
+    float e = length(q) - roadHalfPlatform(c);   // (outside the verge: > 0)
+    if (e < 1.0 && path >= 0 && pid != path && min(e, best) < 0.0) junction = true;
+    if (e < best) {
+      best = e; path = pid; cls = c; dir = ab/L; along = b.z + t*L;
+      across = length(q)*(dir.x*q.y - dir.y*q.x < 0.0 ? -1.0 : 1.0);
+    }
   }
-  return best;
+  return best < 0.0;
 }
 
 // farmland: Voronoi field patchwork with crop rows and hedgerows
@@ -511,19 +523,48 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       m.emit += vec3(1.0, 0.75, 0.4)*smoothstep(8.0, 0.0, length(corner))*uNight*0.35*townW;
     }
   }
-  // ---- roads (exact geometry from the baked segment ids)
-  if (msk.x < 0.25) {
-    float along; vec2 direction; float rd = roadDist(p.xz, along, direction);
-    if (rd < 6.0) {
-      vec4 tx = matSample(p.xz, rd < 4.0 ? M_ASPHALT : M_GRAVEL, rd < 4.0 ? 4.0 : 6.0, nTS);
-      float a = smoothstep(6.0, 4.6, rd);
-      vec3 c = tx.rgb*(rd < 4.0 ? 0.85 : 1.0);
-      vec2 across = vec2(-direction.y, direction.x);
-      float roadFoot = abs(dot(pixelDx, across)) + abs(dot(pixelDy, across));
-      float alongFoot = abs(dot(pixelDx, direction)) + abs(dot(pixelDy, direction));
-      c = mix(c, vec3(0.75), terrainLineCoverage(rd - 3.55, 0.12, roadFoot));
-      c = mix(c, vec3(0.85, 0.75, 0.3), terrainLineCoverage(rd, 0.11, roadFoot)*terrainStripeCoverage(along/12.0, 0.5, alongFoot/12.0));
-      m.alb = mix(m.alb, c, a); m.rough = mix(m.rough, tx.a, a); m.nrm = mix(m.nrm, nTS, a);
+  // ---- roads (the network, road_network.h): each class's cross-section, its markings stopping at junctions
+  {
+    float across, along; vec2 direction; int cls; bool junction;
+    if (roadAt(p.xz, across, along, direction, cls, junction)) {
+      vec2 side = vec2(-direction.y, direction.x);
+      float roadFoot = max(abs(dot(pixelDx, side)) + abs(dot(pixelDy, side)), 1e-3);
+      float alongFoot = max(abs(dot(pixelDx, direction)) + abs(dot(pixelDy, direction)), 1e-3);
+      float x = abs(across), paved = roadHalfPaved(cls), verge = roadHalfPlatform(cls);
+      // the paving's edge over a pixel (no stair-stepping far off), then the verge: gravel by the big roads, grass
+      // by the lanes and tracks
+      float onPaving = terrainLineCoverage(x, paved, roadFoot);
+      float onVerge = 1.0 - smoothstep(verge - 1.2, verge, x);
+      vec3 nV; vec4 vg = matSample(p.xz, cls <= 1 ? M_GRAVEL : M_DIRT, 6.0, nV);
+      vec3 c = mix(m.alb, vg.rgb*(cls <= 1 ? 0.95 : 0.8), cls <= 1 ? 0.85 : 0.45);
+      float rough = mix(m.rough, vg.a, 0.8); vec3 nrm = mix(m.nrm, nV, 0.8);
+      vec4 tx; vec3 pc;
+      if (cls == 3) {   // a farm track: two wheel ruts of gravel, grass along the middle
+        tx = matSample(p.xz, M_GRAVEL, 5.0, nTS);
+        pc = mix(tx.rgb*0.9, m.alb*0.9, (1.0 - smoothstep(0.35, 0.75, x))*0.7);
+      } else {
+        tx = matSample(p.xz, M_ASPHALT, 4.0, nTS);
+        // highways newest and darkest; country lanes worn paler, patched
+        pc = tx.rgb*(cls == 0 ? 0.72 : cls == 1 ? 0.82 : 0.95);
+        if (cls == 2) pc *= 0.9 + 0.2*vnoise(p.xz/7.0);
+        float paint = 0.0, yellow = 0.0;
+        if (!junction) {
+          if (cls == 0) {   // dual carriageway: 4 m central reserve with its barrier, two 3.6 m lanes each way, hard shoulders
+            float reserve = 1.0 - terrainLineCoverage(x, 2.0, roadFoot);
+            pc = mix(pc, mix(m.alb*0.85, vec3(0.55, 0.54, 0.52), terrainLineCoverage(x, 0.35, roadFoot)), 1.0 - reserve);
+            paint = max(paint, terrainLineCoverage(x - 2.35, 0.1, roadFoot));                     // inner edge
+            paint = max(paint, terrainLineCoverage(x - 5.95, 0.08, roadFoot)*terrainStripeCoverage(along/12.0, 0.25, alongFoot/12.0));
+            paint = max(paint, terrainLineCoverage(x - 9.55, 0.1, roadFoot));                     // outer edge (the shoulder beyond)
+          } else if (cls == 1) {   // two-lane road: a dashed centre line, solid edge lines
+            yellow = terrainLineCoverage(x, 0.08, roadFoot)*terrainStripeCoverage(along/12.0, 0.5, alongFoot/12.0);
+            paint = max(paint, terrainLineCoverage(x - 3.5, 0.08, roadFoot));
+          }
+        }
+        pc = mix(pc, vec3(0.78), paint*0.9);
+        pc = mix(pc, vec3(0.82, 0.68, 0.22), yellow*0.9);
+      }
+      c = mix(c, pc, onPaving); rough = mix(rough, tx.a, onPaving); nrm = mix(nrm, nTS, onPaving);
+      m.alb = mix(m.alb, c, onVerge); m.rough = mix(m.rough, rough, onVerge); m.nrm = mix(m.nrm, nrm, onVerge);
     }
   }
   // ---- airport surfaces

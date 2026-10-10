@@ -2,7 +2,10 @@
 // can't goes; anything it can't read plainly is kept.
 #include <cstdio>
 #include <string>
+#include <cstring>
+#include <cstdint>
 #include "../src/shader_prune.h"
+#include "../src/shaders.h"
 
 static int fails = 0;
 static bool has(const std::string& s, const std::string& t) { return s.find(t) != std::string::npos; }
@@ -215,5 +218,20 @@ int main() {
     check(has(shaderPrune::prune(src), "float t()"), "shadowed name kept", shaderPrune::prune(src));
   }
   printf("%s\n", fails ? "shader_prune: FAILED" : "shader_prune: all checks passed");
+  {   // the aircraft bodies' cache key (meshCacheStamp) hashes their bake programs as pruned: those must not change
+      // unless an aircraft's shape does. A world-only edit - a top-level declaration in the shared library, the road
+      // chunk - would rebuild every player's bodies on their next launch (v3.44 did, for one unused constant). The
+      // fixture holds the hash of the shared bake's four builds; it changes on purpose only, with an aircraft edit.
+    uint64_t h = 1469598103934665603ull;
+    for (const char* d : {"", "#define AF_OUTSIDE\n"}) for (const char* n : {"", "#define HULL_BAKE_NORMALS\n"}) {
+      const std::string o = shaderPrune::prune(hullBakeFSAssembly(std::string(d) + n));
+      for (unsigned char c : o) h = (h ^ c) * 1099511628211ull;
+    }
+    char got[24]; snprintf(got, sizeof got, "%016llx", (unsigned long long)h);
+    std::string want;
+    if (FILE* f = fopen(SOLACE_SOURCE_DIR "/tests/fixtures/aircraft_bake.fnv", "r")) { char b[64] = {}; if (fscanf(f, "%63s", b) == 1) want = b; fclose(f); }
+    if (want != got) printf("aircraft bake hash %s, fixture %s\n", got, want.c_str());
+    check(want == got, "the aircraft bodies' bake is unchanged (tests/fixtures/aircraft_bake.fnv: update it only with an aircraft edit)", "");
+  }
   return fails ? 1 : 0;
 }

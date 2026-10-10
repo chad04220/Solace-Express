@@ -141,7 +141,7 @@ Local local(const Weather& wx, vec3 p, float agl) {
   // up over the ground (MIL-F-8785C: sigma_w = 0.1 x the wind at 20 ft), the rougher the ground the more - the sea
   // smooth, forest, towns and broken hills rough - whichever is the stronger
   float mask[4] = {0, 0, 0, 0}, forest = 0;
-  if (!g_world.mask.empty() && !g_world.roadId.empty()) { g_world.sampleMask(p.x, p.z, mask); forest = g_world.forestAt(p.x, p.z); }
+  if (!g_world.mask.empty() && !g_world.roadGrid.head.empty()) { g_world.sampleMask(p.x, p.z, mask); forest = g_world.forestAt(p.x, p.z); }
   float rough = g0 <= 0.5f ? 0.5f : 1.f + 0.3f * clampf(forest + mask[2], 0.f, 1.f) + 0.6f * clampf(relief / 350.f, 0.f, 1.f);
   float nearG = smoothstepf(300.f, 0.f, h) * (h > 3.f ? 1.f : 0.f);
   float base = 0.8f * wx.turbulence * (1.f + 1.5f * nearG);

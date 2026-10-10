@@ -428,7 +428,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           if (m[3] < .38f || m[1] > .025f || roadD < 55.f || roadD > 480.f || road < 0) continue;
           float g = ground(x, z);
           if (g < 4.f || fabsf(ground(x + 25, z) - ground(x - 25, z)) > 6.f || fabsf(ground(x, z + 25) - ground(x, z - 25)) > 6.f) continue;
-          const RoadSeg& route = g_roads[road];
+          const RoadSegment& route = g_world.roadGrid.segs[road];
           float dx = route.bx - route.ax, dz = route.bz - route.az;
           float along = clampf(((x - route.ax) * dx + (z - route.az) * dz) / (dx * dx + dz * dz), 0.f, 1.f);
           float yaw = atan2f(route.ax + dx * along - x, route.az + dz * along - z), c = cosf(yaw), s = sinf(yaw);

@@ -15,6 +15,9 @@
 #define SOLACE_RUNWAY_GOLDEN "tests/fixtures/runways_52317bb.golden"
 #endif
 
+void airportGroundsCap(float x, float z, float& grounds, float& cap);   // world.cpp
+float airportFunnelCeiling(float x, float z);
+
 namespace {
 int failures = 0;
 size_t sampleCount = 0, fixtureCount = 0, entityCount = 0, chunkCount = 0;
@@ -155,7 +158,7 @@ void testWorldTerrain(const char* fixturePath) {
     !strcmp(magic,"SOLACE_WORLD_HEIGHT_GOLDEN")&&version==1&&count==17523&&
     !strcmp(commit,"52317bb1f74a5ee9e66e063e2f17d5be786955a0");
   if(!valid){fclose(f);check(false,"world","invalid full-world fixture identity");return;}
-  int before=failures;float worst=0;size_t checked=0,craterSamples=0;
+  int before=failures;float worst=0;size_t checked=0,craterSamples=0,roadSamples=0;
   for(size_t i=0;i<count;++i){float x,z,expected[3];
     if(fscanf(f,"%a %a %a %a %a",&x,&z,&expected[0],&expected[1],&expected[2])!=5){check(false,"world","malformed full-world fixture");break;}
     // The explicit new volcanic crater is the only authorized physical-terrain
@@ -169,17 +172,27 @@ void testWorldTerrain(const char* fixturePath) {
       if(hypotf(du,dv)<550.f||(d>0&&d<7000.f&&v<250.f+.18f*d+900.f))crater=false;
     }
     if(crater)++craterSamples;
-    int at=0;for(int octaves:{7,8,11}){
-      float actual=g_world.height(x,z,octaves),delta=fabsf(actual-expected[at]);if(!crater)worst=std::max(worst,delta);
+    int at=0;bool graded=false;for(int octaves:{7,8,11}){
+      // The second authorized change is the road network's grading (owner's brief, docs/LIVING_ISLANDS_PLAN.md A4):
+      // a layer over the natural ground, which itself stays exactly as frozen everywhere outside the crater. Graded
+      // ground only within a road's reach, never on any airfield's grounds, and under an approach funnel no higher
+      // than the funnel holds the ground (or the ground itself, where that stands higher).
+      float natural=g_world.naturalHeight(x,z,octaves),actual=g_world.height(x,z,octaves),delta=fabsf(natural-expected[at]);if(!crater)worst=std::max(worst,delta);
       // Non-flat mountains use compiler/libm-dependent noise arithmetic. Preserve
       // centimetre-scale agreement across platforms; matched builds are bit-identical.
       float tolerance=.01f+3.e-6f*fabsf(expected[at]);
-      check(crater?std::isfinite(actual):close(actual,expected[at],tolerance),"world","terrain outside authorized crater changed");++at;
-    }++checked;
+      check(crater?std::isfinite(natural):close(natural,expected[at],tolerance),"world","terrain outside authorized crater changed");
+      if(actual!=natural){graded=true;float grounds,cap;airportGroundsCap(x,z,grounds,cap);
+        check(roadEdgeDistance(g_world.roadGrid,x,z)<=ROAD_BANK_MAX+1.f,"world","graded ground beyond any road's reach");
+        check(grounds==0.f,"world","road grading on an airfield's grounds");
+        check(actual<=std::max(natural,airportFunnelCeiling(x,z))+.01f,"world","road grading above an approach funnel's cap");}
+      ++at;
+    }++checked;roadSamples+=graded;
   }
   char trailing[2];check(fscanf(f,"%1s",trailing)==EOF,"world","unexpected trailing full-world fixture data");fclose(f);
   check(checked==17523,"world","incomplete full-world sample coverage");
-  printf("Full-world terrain: %zu frozen locations at 7/8/11 octaves (%zu within explicitly allowed 600 m summit crater), max height delta elsewhere %.9g m, %s\n",checked,craterSamples,worst,failures==before?"preserved":"FAILED");
+  check(roadSamples<checked/20,"world","road grading reaches more than a twentieth of the frozen locations");
+  printf("Full-world terrain: %zu frozen locations at 7/8/11 octaves (%zu within explicitly allowed 600 m summit crater, %zu on graded road corridors), max natural height delta elsewhere %.9g m, %s\n",checked,craterSamples,roadSamples,worst,failures==before?"preserved":"FAILED");
 }
 
 void testDescriptors(const Golden& g,const Airport& a) {

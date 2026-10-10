@@ -23,7 +23,7 @@ add_custom_target(shaders_gen DEPENDS ${SHADER_GEN})
 include_directories(${CMAKE_BINARY_DIR}/gen)
 
 set(CORE_SOURCES
-  src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/weather.cpp)
+  src/world.cpp src/road_network.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/weather.cpp)
 set(GAME_SOURCES
   ${CORE_SOURCES} src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_wraith.cpp src/renderer.cpp src/materials.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/entity_mesh.cpp src/gl.cpp src/audio.cpp)
 # The game's sources compiled once for the programs that link the whole game besides the game itself (the game-loop
@@ -71,7 +71,7 @@ if(UNIX AND NOT APPLE)
   target_link_libraries(aircraft_visual_test PRIVATE ${CMAKE_DL_LIBS} pthread)
 endif()
 # the procedural material layers as images, for tools/pack_materials.py: material_dump OUTPUT_DIR
-add_executable(material_dump EXCLUDE_FROM_ALL tools/material_dump.cpp src/materials.cpp src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
+add_executable(material_dump EXCLUDE_FROM_ALL tools/material_dump.cpp src/materials.cpp src/world.cpp src/road_network.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
 target_include_directories(material_dump PRIVATE src)
 
 # Headless tests (flight model + campaign progression validation)
@@ -175,6 +175,8 @@ add_test(NAME ufo_encounter COMMAND encounter_timing_test)
 # the shader pruner (src/shader_prune.h: each program cut to what it runs before it is cached and compiled)
 add_executable(shader_prune_test tests/shader_prune_test.cpp)
 target_include_directories(shader_prune_test PRIVATE src)
+add_dependencies(shader_prune_test shaders_gen)   # (the assembled programs: the aircraft bake's cache-stability fixture)
+target_compile_definitions(shader_prune_test PRIVATE SOLACE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 add_test(NAME shader_prune COMMAND shader_prune_test)
 add_dependencies(shader_keyword_test shader_prune_test)   # (built with a target the CI sanitizer job names)
 # GLSL check of the ray tracer and the programs built from it, as assembled and as pruned (only where glslangValidator
@@ -200,7 +202,7 @@ set_tests_properties(entity_raycast PROPERTIES COST 110)
 set_tests_properties(world_cache PROPERTIES COST 95)
 set_tests_properties(hull_mesh PROPERTIES COST 30)
 if(UNIX AND NOT APPLE)   # the terrain-shadow bake shader run on software GL through EGL (skips where there's none)
-  add_executable(terrain_shadow_test tests/terrain_shadow_test.cpp src/gl.cpp src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
+  add_executable(terrain_shadow_test tests/terrain_shadow_test.cpp src/gl.cpp src/world.cpp src/road_network.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
   target_link_libraries(terrain_shadow_test PRIVATE ${CMAKE_DL_LIBS})
   add_test(NAME terrain_shadow_bake COMMAND terrain_shadow_test)
 endif()
@@ -224,7 +226,7 @@ endif()
 # Environment-quality and honest native-resolution benchmark contracts (CPU-only).
 add_executable(environment_foliage_test tests/environment_foliage_test.cpp src/entity_mesh.cpp ${CORE_SOURCES})
 target_include_directories(environment_foliage_test PRIVATE src)
-add_executable(environment_building_test tests/environment_building_test.cpp src/entity_mesh.cpp src/entities.cpp src/scenery.cpp src/world.cpp src/airport_scenery.cpp)
+add_executable(environment_building_test tests/environment_building_test.cpp src/entity_mesh.cpp src/entities.cpp src/scenery.cpp src/world.cpp src/road_network.cpp src/airport_scenery.cpp)
 target_include_directories(environment_building_test PRIVATE src)
 add_executable(benchmark_metrics_test tools/validation/benchmark_metrics_test.cpp)
 add_dependencies(hull_test environment_foliage_test environment_building_test benchmark_metrics_test)
@@ -291,7 +293,7 @@ if(UNIX AND NOT APPLE AND Python3_Interpreter_FOUND)
 endif()
 
 # Living-islands review: immutable runway evidence and bounded environment changes.
-set(ENVIRONMENT_SOURCES src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
+set(ENVIRONMENT_SOURCES src/world.cpp src/road_network.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
 add_executable(runway_preservation_test tests/runway_preservation_test.cpp ${ENVIRONMENT_SOURCES})
 target_include_directories(runway_preservation_test PRIVATE src)
 target_compile_definitions(runway_preservation_test PRIVATE SOLACE_RUNWAY_GOLDEN="${CMAKE_SOURCE_DIR}/tests/fixtures/runways_52317bb.golden")

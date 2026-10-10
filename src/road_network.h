@@ -40,3 +40,35 @@ struct RoadNetwork {
 
 // Deterministic for a given world (its heightfield and airports); takes a few seconds.
 RoadNetwork buildRoadNetwork(const World& world);
+
+// ---- the network as the terrain, the ground material and the scenery read it: straight graded segments (each path's
+// points with the collinear ones dropped), listed under every 39 m mask texel that their platform or banks reach
+enum : uint8_t { RS_BRIDGE = 1, RS_NOGRADE = 2 };   // a bridge span (the ground below left alone, no paint); a stretch by
+                                                    // an airfield's grounds (painted on the natural ground)
+static const float ROAD_BANK_MAX = 40.f;            // the widest cut or fill bank beyond a platform's edge (m)
+struct RoadSegment { float ax, az, bx, bz, ah, bh, along; uint16_t path; uint8_t cls, flags; };
+struct RoadGrid {
+  static const int N = 2048;                        // (the mask's texels: scenery.h MASK_N)
+  std::vector<RoadSegment> segs;
+  // per texel, uploaded as it is (R32UI, common.glsl): the mask's forest noise in the top 7 bits (World::bakeMask), how
+  // many entries in the next 6, the first of them in the low 19
+  std::vector<uint32_t> head;
+  std::vector<uint32_t> list;                       // the entries: segment indices
+  // a coarser index for the nearest road further off (scenery: farmsteads up to 480 m from theirs): 500 m cells, each
+  // listing the segments within 500 m of it
+  static const int NC = 160;
+  std::vector<uint32_t> nearHead, nearList;         // (first << 8 | count; count < 256)
+  static int cell(float v);
+  static uint32_t count(uint32_t h) { return (h >> 19) & 63u; }
+  static uint32_t first(uint32_t h) { return h & 0x7FFFFu; }
+};
+void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid);
+// The ground at (x, z) with the roads built into it, from the natural ground g there: each road's platform level at its
+// graded height, its banks blending back to g. Exactly common.glsl roadGrade.
+float roadGrade(const RoadGrid& grid, float x, float z, float g);
+// The nearest road within 500 m: how far its platform's edge is (negative: on it), the segment (-1 and 1e9: none)
+float roadEdgeDistance(const RoadGrid& grid, float x, float z, int* seg = nullptr);
+// The grid's entries as the shaders read them (roads.glsl roadTexel): two RGBA32F texels each, in list order - rows 1..
+// of a 4096-wide uData (row 0 is the caller's own); the floats of those rows, padded to whole rows
+static const int ROAD_DATA_W = 4096;
+std::vector<float> roadEntryRows(const RoadGrid& grid);

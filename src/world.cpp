@@ -204,6 +204,25 @@ static void airportLimits(float x, float z, float& grounds, float& cap) {
   }
 }
 
+void airportGroundsCap(float x, float z, float& grounds, float& cap) { airportLimits(x, z, grounds, cap); }
+
+// The height a road may be built up to under an approach funnel: its cap where the funnel holds the ground down in full
+// (computeTexel's own weight 0.9 and over), unlimited elsewhere - on a funnel's fringe the ground keeps most of its own
+// height, and a road with it
+float airportFunnelCeiling(float x, float z) {
+  float ceiling = 1e9f;
+  for (const Airport& a : kAirports) {
+    float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
+    float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
+    float d = u - a.length * 0.5f;
+    if (d <= 0 || d >= 7000) continue;
+    float halfw = 250.f + 0.18f * d;
+    float wc = (1.f - smoothstepf(halfw, halfw + 900.f, v)) * (1.f - smoothstepf(5000.f, 7000.f, d));
+    if (wc >= 0.9f) ceiling = std::min(ceiling, a.elev + 10.f + (a.elev > 600 ? 0.045f : 0.032f) * d);
+  }
+  return ceiling;
+}
+
 // 0..1: how strongly a point belongs to an airport's flattened grounds or approach funnel
 float airportInfluence(float x, float z) {
   float best = 0;
@@ -224,10 +243,11 @@ float airportInfluence(float x, float z) {
 
 void World::build(const std::string& cachePath, const std::string& stamp) {
   airports.assign(std::begin(kAirports), std::end(kAirports));
+  roads = RoadNetwork(); roadGrid = RoadGrid();   // (the natural ground first: the roads are routed over it)
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
   g_worldStage = cachePath.empty() ? 2 : 1;
   fromCache = !cachePath.empty() && loadCache(cachePath, stamp);
-  if (fromCache) { sceneryInit(); sceneryConnectRoads(*this); sceneryBakeCommunityLots(*this); boxes.clear(); g_worldStage = 3; return; }
+  if (fromCache) { sceneryInit(); sceneryAlignCommunities(*this); sceneryBakeCommunityLots(*this); boxes.clear(); g_worldStage = 3; return; }
   g_worldStage = 2;
   hm.resize((size_t)HM_N * HM_N * 4);
   sceneryInit();
@@ -278,6 +298,9 @@ void World::build(const std::string& cachePath, const std::string& stamp) {
     t[0] = lerpf(t[0], 1780.f + 230.f * wall, weight);
     t[1] = lerpf(t[1], .7f + 24.f * wall, weight);
   }
+  // the roads, routed over the finished natural ground (World::height grades them in from here on)
+  roads = buildRoadNetwork(*this);
+  buildRoadGrid(roads, roadGrid);
   bakeMask();
   buildHMax();
   buildEnvelope();
@@ -290,11 +313,34 @@ void World::build(const std::string& cachePath, const std::string& stamp) {
 // The generated world on disk: its height and mask textures, height bounds and terrain envelope, stamped with the
 // build that made them (any other build generates again)
 namespace {
-const uint32_t kWorldMagic = 0x574c4433u;   // "WLD3": community masks, connected roads and bounded summit crater
+const uint32_t kWorldMagic = 0x574c4434u;   // "WLD4": the road network, its grid and the forest noise in one R32UI texel
 template <class T> void putVec(FILE* f, const std::vector<T>& v) { uint64_t n = v.size(); fwrite(&n, 8, 1, f); if (n) fwrite(v.data(), sizeof(T), n, f); }
 template <class T> bool getVec(FILE* f, std::vector<T>& v, uint64_t expect) {
   uint64_t n = 0; if (fread(&n, 8, 1, f) != 1 || n != expect) return false;
   v.resize(n); return !n || fread(v.data(), sizeof(T), n, f) == n;
+}
+template <class T> bool getVecUpTo(FILE* f, std::vector<T>& v, uint64_t most) {   // (a list whose length varies)
+  uint64_t n = 0; if (fread(&n, 8, 1, f) != 1 || n > most) return false;
+  v.resize(n); return !n || fread(v.data(), sizeof(T), n, f) == n;
+}
+void putRoads(FILE* f, const RoadNetwork& net) {
+  putVec(f, net.nodes);
+  const uint64_t n = net.paths.size(); fwrite(&n, 8, 1, f);
+  for (const RoadPath& p : net.paths) {
+    const int32_t h[3] = {(int32_t)p.cls, p.from, p.to}; fwrite(h, 4, 3, f);
+    putVec(f, p.pts); putVec(f, p.bridge);
+  }
+}
+bool getRoads(FILE* f, RoadNetwork& net) {
+  if (!getVecUpTo(f, net.nodes, 4096)) return false;
+  uint64_t n = 0; if (fread(&n, 8, 1, f) != 1 || n > 65535) return false;
+  net.paths.resize(n);
+  for (RoadPath& p : net.paths) {
+    int32_t h[3]; if (fread(h, 4, 3, f) != 3 || h[0] < 0 || h[0] >= RC_COUNT) return false;
+    p.cls = (RoadClass)h[0]; p.from = h[1]; p.to = h[2];
+    if (!getVecUpTo(f, p.pts, 1u << 20) || !getVecUpTo(f, p.bridge, 1u << 20) || p.bridge.size() + 1 != std::max<size_t>(p.pts.size(), 1)) return false;
+  }
+  return true;
 }
 }
 bool World::loadCache(const std::string& path, const std::string& stamp) {
@@ -304,14 +350,23 @@ bool World::loadCache(const std::string& path, const std::string& stamp) {
   World w;
   uint32_t magic = 0; char st[64] = {};
   bool ok = fread(&magic, 4, 1, f) == 1 && magic == kWorldMagic && fread(st, 1, 64, f) == 64 && stamp == std::string(st, strnlen(st, 64));
-  ok = ok && getVec(f, w.hm, (uint64_t)HM_N * HM_N * 4) && getVec(f, w.roadId, (uint64_t)MASK_N * MASK_N * 2) && getVec(f, w.mask, (uint64_t)MASK_N * MASK_N * 4);
+  ok = ok && getVec(f, w.hm, (uint64_t)HM_N * HM_N * 4) && getVec(f, w.mask, (uint64_t)MASK_N * MASK_N * 4);
+  ok = ok && getRoads(f, w.roads) && getVecUpTo(f, w.roadGrid.segs, 1u << 20) && getVec(f, w.roadGrid.head, (uint64_t)RoadGrid::N * RoadGrid::N) &&
+       getVecUpTo(f, w.roadGrid.list, 0x80000u) && getVec(f, w.roadGrid.nearHead, (uint64_t)RoadGrid::NC * RoadGrid::NC) && getVecUpTo(f, w.roadGrid.nearList, 1u << 24);
+  // (every entry names a segment, every texel's entries lie in the list: the terrain indexes them unchecked)
+  for (size_t i = 0; ok && i < w.roadGrid.list.size(); i++) ok = w.roadGrid.list[i] < w.roadGrid.segs.size();
+  for (size_t i = 0; ok && i < w.roadGrid.nearList.size(); i++) ok = w.roadGrid.nearList[i] < w.roadGrid.segs.size();
+  for (size_t i = 0; ok && i < w.roadGrid.head.size(); i++) ok = RoadGrid::first(w.roadGrid.head[i]) + RoadGrid::count(w.roadGrid.head[i]) <= w.roadGrid.list.size();
+  for (size_t i = 0; ok && i < w.roadGrid.nearHead.size(); i++) ok = (w.roadGrid.nearHead[i] >> 8) + (w.roadGrid.nearHead[i] & 255u) <= w.roadGrid.nearList.size();
+  for (size_t i = 0; ok && i < w.roadGrid.segs.size(); i++) ok = w.roadGrid.segs[i].cls < RC_COUNT;
   for (int L = 0; ok && L < HMAX_LEVELS; L++) { const uint64_t n = (uint64_t)(HMAX_N >> L); ok = getVec(f, w.hmax[L], n * n); }
   ok = ok && getVec(f, w.tpV0, (uint64_t)(HM_N + 1) * (HM_N + 1));
   for (int L = 0; ok && L < TP_LEVELS; L++) { const uint64_t n = (uint64_t)(HM_N >> L); ok = getVec(f, w.tpM[L], n * n); }
   ok = ok && fgetc(f) == EOF;   // (nothing after the last array: not some other format's file)
   fclose(f);
   if (!ok) return false;
-  hm.swap(w.hm); roadId.swap(w.roadId); mask.swap(w.mask); tpV0.swap(w.tpV0);
+  hm.swap(w.hm); mask.swap(w.mask); tpV0.swap(w.tpV0);
+  std::swap(roads, w.roads); std::swap(roadGrid, w.roadGrid);
   for (int L = 0; L < HMAX_LEVELS; L++) hmax[L].swap(w.hmax[L]);
   for (int L = 0; L < TP_LEVELS; L++) tpM[L].swap(w.tpM[L]);
   return true;
@@ -321,7 +376,8 @@ void World::saveCache(const std::string& path, const std::string& stamp) const {
   FILE* f = fopen(tmp.c_str(), "wb"); if (!f) return;
   char st[64] = {}; strncpy(st, stamp.c_str(), 63);
   fwrite(&kWorldMagic, 4, 1, f); fwrite(st, 1, 64, f);
-  putVec(f, hm); putVec(f, roadId); putVec(f, mask);
+  putVec(f, hm); putVec(f, mask);
+  putRoads(f, roads); putVec(f, roadGrid.segs); putVec(f, roadGrid.head); putVec(f, roadGrid.list); putVec(f, roadGrid.nearHead); putVec(f, roadGrid.nearList);
   for (int L = 0; L < HMAX_LEVELS; L++) putVec(f, hmax[L]);
   putVec(f, tpV0);
   for (int L = 0; L < TP_LEVELS; L++) putVec(f, tpM[L]);
@@ -333,6 +389,18 @@ void World::saveCache(const std::string& path, const std::string& stamp) const {
 int World::findAirport(const char* code) const {
   for (size_t i = 0; i < airports.size(); i++) if (!strcmp(airports[i].code, code)) return (int)i;
   return -1;
+}
+
+// Every cell of an n x n grid over the map (cell size cs) that a graded road segment's platform or banks reach, with the
+// segment's highest end: the bounds of the terrain lift to it
+template <class F> static void forEachRoadCell(const RoadGrid& grid, float cs, int n, float slack, F f) {
+  for (const RoadSegment& s : grid.segs) {
+    if (s.flags) continue;
+    const float R = roadSpec(s.cls).halfPlatform + ROAD_BANK_MAX + slack, top = std::max(s.ah, s.bh);
+    auto cell = [&](float v) { return std::clamp((int)floorf((v + WORLD_HALF) / cs), 0, n - 1); };
+    for (int j = cell(std::min(s.az, s.bz) - R); j <= cell(std::max(s.az, s.bz) + R); j++)
+      for (int i = cell(std::min(s.ax, s.bx) - R); i <= cell(std::max(s.ax, s.bx) + R); i++) f(i, j, top);
+  }
 }
 
 // Upper bound of the rendered terrain (ground + detail) per cell, so the ray marcher can
@@ -364,6 +432,10 @@ void World::buildHMax() {
       hmax[0][(size_t)cj * HMAX_N + ci] = std::max(top, 0.f) + 4.f;   // + crater rims
     }
   });
+  // the roads: a fill can lift the ground above anything the heightfield bounds - every cell a graded road's platform or
+  // banks reach holds at least its highest end
+  forEachRoadCell(roadGrid, 2.f * WORLD_HALF / HMAX_N, HMAX_N, 2.f * HM_TEXEL, [&](int i, int j, float top) {
+    float& m = hmax[0][(size_t)j * HMAX_N + i]; m = std::max(m, top + 4.f); });
   for (int L = 1; L < HMAX_LEVELS; L++) {
     int n = HMAX_N >> L, pn = n * 2;
     hmax[L].assign((size_t)n * n, 0.f);
@@ -421,6 +493,11 @@ void World::buildEnvelope() {
       tpV0[(size_t)j * NV + i] = H(i, j, 0) + m;
     }
   });
+  // the roads (as in buildHMax): every vertex of a cell a graded road reaches at least its highest end - so the
+  // triangles over that cell stay above the platform and its banks too
+  forEachRoadCell(roadGrid, HM_TEXEL, N, HM_TEXEL, [&](int i, int j, float top) {
+    for (int dj = 0; dj <= 1; dj++) for (int di = 0; di <= 1; di++) {
+      float& v = tpV0[(size_t)(j + dj) * NV + i + di]; v = std::max(v, top + 0.5f); } });
   tpM[0].assign((size_t)N * N, 0.f);
   parallelFor(N, [&](int j) {
     for (int i = 0; i < N; i++)
@@ -559,10 +636,14 @@ void World::sampleBase(float x, float z, float out[4]) const {
   }
 }
 
-float World::height(float x, float z, int octaves) const {
+float World::naturalHeight(float x, float z, int octaves) const {
   float b[4]; sampleBase(x, z, b);
-  float g = b[1] < 0.01f ? b[0] : b[0] + b[1] * terrainFbm(x / DETAIL_SCALE, z / DETAIL_SCALE, octaves);
-  return g;   // bare ground: trees, rocks and buildings are separate entities (entities.h)
+  return b[1] < 0.01f ? b[0] : b[0] + b[1] * terrainFbm(x / DETAIL_SCALE, z / DETAIL_SCALE, octaves);
+}
+
+float World::height(float x, float z, int octaves) const {
+  // bare ground: trees, rocks and buildings are separate entities (entities.h); the roads are built into it
+  return roadGrade(roadGrid, x, z, naturalHeight(x, z, octaves));
 }
 
 vec3 World::normal(float x, float z) const {

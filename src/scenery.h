@@ -15,7 +15,6 @@ struct Town { const char* name; float x, z, r; int kind; };  // kind 0 village, 
 extern const Town kTowns[];
 extern const int kNumTowns;
 struct RoadSeg { float ax, az, bx, bz; };
-extern std::vector<RoadSeg> g_roads;
 
 // A settlement's street axes follow its incoming road. Block dimensions are whole lots,
 // uploaded unchanged to the terrain material; these affect scenery, never ground height.
@@ -27,10 +26,12 @@ vec2 communityWorld(int town, float x, float z);
 float communityStreetDistance(int town, float x, float z, float* yaw = nullptr);
 bool communityPark(int town, float localX, float localZ);
 bool communityLot(const World& world, int town, int i, int j, struct Lot& out);
-// Called after the immutable heightfield is available, including a cache hit.
-void sceneryConnectRoads(const World& world);
+// Called once the road network is built or read from the cache: the street grids turned to the roads into them.
+void sceneryAlignCommunities(const World& world);
 void sceneryBakeCommunityLots(const World& world); // setup-only: immutable O(1) streaming lookup
 
+// From the nearest road of g_world's network within 500 m (1e9: none): its platform's edge, plus 6 m. segOut: the
+// segment (World::roadGrid.segs)
 float roadDistance(float x, float z, int* segOut = nullptr);
 float valueNoise(float x, float z);               // same as GLSL vnoise()
 float coverFbm(float x, float z, int oct);        // same as GLSL fbm2()

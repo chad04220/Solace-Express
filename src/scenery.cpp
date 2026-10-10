@@ -79,8 +79,10 @@ static const float kRoadPolys[][18] = {
   {2, 35.f, 35.f, 36.f, 34.f},
   {3, -15.3f, 3.25f, -14.f, 4.f, -18.f, 9.f},
 };
-std::vector<RoadSeg> g_roads;
 std::vector<CommunityPlan> g_communityPlans;
+static void invalidateCommunityLotCache();
+// The roads the islands were first drawn with: gone from the map (the road network replaced them, road_network.h), kept
+// only as part of the heightfield's recipe - the ground along them was smoothed, and that ground is preserved
 static std::vector<RoadSeg> legacyRoads;
 
 static void initRoads() {
@@ -88,29 +90,33 @@ static void initRoads() {
   std::call_once(once, [] {
     for (const auto& p : kRoadPolys) {
       int n = (int)p[0];
-      for (int i = 0; i + 1 < n; i++) {
-        RoadSeg r{p[1 + 2 * i] * 1000.f, p[2 + 2 * i] * 1000.f, p[3 + 2 * i] * 1000.f, p[4 + 2 * i] * 1000.f};
-        legacyRoads.push_back(r);
-        // The first old polyline declares eight points but supplies seven. Preserve its
-        // zero-filled final segment ONLY in the terrain modifier, not as a road to (0,0).
-        if (&p != &kRoadPolys[0] || i < 6) g_roads.push_back(r);
-      }
+      for (int i = 0; i + 1 < n; i++)   // (the first polyline declares eight points but supplies seven: its zero-filled
+                                        // last segment, to (0, 0), is part of the recipe too)
+        legacyRoads.push_back({p[1 + 2 * i] * 1000.f, p[2 + 2 * i] * 1000.f, p[3 + 2 * i] * 1000.f, p[4 + 2 * i] * 1000.f});
     }
-    for (const Town& t : kTowns) {
-      float best = 1e20f, c = 1.f, s = 0.f;
-      for (const RoadSeg& r : g_roads) {
-        float dx = r.bx - r.ax, dz = r.bz - r.az, length = hypotf(dx, dz);
-        float u = clampf(((t.x - r.ax) * dx + (t.z - r.az) * dz) / (length * length), 0.f, 1.f);
-        float distance = hypotf(r.ax + u * dx - t.x, r.az + u * dz - t.z);
-        if (distance < best) { best = distance; c = dx / length; s = -dz / length; }
-      }
-      if (best > 2.f * t.r) { c = 1.f; s = 0.f; }
-      g_communityPlans.push_back({c, s, t.kind == 2 ? 3 : t.kind == 1 ? 5 : 6, t.kind == 2 ? 2 : 4});
-    }
+    for (const Town& t : kTowns) g_communityPlans.push_back({1.f, 0.f, t.kind == 2 ? 3 : t.kind == 1 ? 5 : 6, t.kind == 2 ? 2 : 4});
   });
 }
 
-static void invalidateCommunityLotCache();
+// Each settlement's street grid turned to the road that runs into its centre (the network's nearest segment within twice
+// its radius; none: the grid stays square to the map)
+void sceneryAlignCommunities(const World& world) {
+  initRoads();
+  for (int i = 0; i < kNumTowns; i++) {
+    const Town& t = kTowns[i];
+    float best = 2.f * t.r, c = 1.f, s = 0.f;
+    for (const RoadSegment& r : world.roadGrid.segs) {
+      const float dx = r.bx - r.ax, dz = r.bz - r.az, length = hypotf(dx, dz);
+      if (length < 1.f) continue;
+      const float u = clampf(((t.x - r.ax) * dx + (t.z - r.az) * dz) / (length * length), 0.f, 1.f);
+      const float distance = hypotf(r.ax + u * dx - t.x, r.az + u * dz - t.z);
+      if (distance < best) { best = distance; c = dx / length; s = -dz / length; }
+    }
+    g_communityPlans[i].cosine = c; g_communityPlans[i].sine = s;
+  }
+  invalidateCommunityLotCache();
+}
+
 void sceneryInit() { initRoads(); invalidateCommunityLotCache(); }
 
 static float roadDistanceIn(const std::vector<RoadSeg>& roads, float x, float z, int* segOut = nullptr) {
@@ -127,7 +133,9 @@ static float roadDistanceIn(const std::vector<RoadSeg>& roads, float x, float z,
   return sqrtf(best);
 }
 
-float roadDistance(float x, float z, int* segOut) { return roadDistanceIn(g_roads, x, z, segOut); }
+// (measured as the old roads were: from the centreline of a country road 12 m across - so from the platform's edge, plus
+// 6 m - whatever the class; the scenery's clearances were tuned to that)
+float roadDistance(float x, float z, int* segOut) { return roadEdgeDistance(g_world.roadGrid, x, z, segOut) + 6.f; }
 
 int communityAt(float x, float z) {
   int best = -1; float distance = 1.f;
@@ -166,68 +174,6 @@ bool communityPark(int town, float localX, float localZ) {
   return floorf(localX / (p.blockX * LOT)) == 0.f && floorf(localZ / (p.blockZ * LOT)) == 0.f;
 }
 
-void sceneryConnectRoads(const World& world) {
-  initRoads();
-  static std::once_flag once;
-  std::call_once(once, [&] {
-    const size_t trunkCount = g_roads.size();
-    auto safe = [&](vec2 a, vec2 b) {
-      float length = hypotf(b.x - a.x, b.y - a.y);
-      if (length < 1.f || length > 6500.f) return false;
-      int steps = (int)ceilf(length / 35.f); float previous = world.groundHeight(a.x, a.y, 7);
-      for (int i = 0; i <= steps; i++) {
-        float f = (float)i / steps, x = lerpf(a.x, b.x, f), z = lerpf(a.y, b.y, f);
-        float h = world.groundHeight(x, z, 7);
-        if (h < 2.f || fabsf(h - previous) > 4.f + length / steps * 0.24f) return false;
-        for (const Airport& airport : world.airports) {
-          vec2 q = aptLocal(airport, vec3(x, 0, z));
-          if (fabsf(q.x) < airport.length * 0.5f + 250.f && fabsf(q.y) < airport.width * 0.5f + 75.f) return false;
-        }
-        previous = h;
-      }
-      return true;
-    };
-    for (const Town& town : kTowns) {
-      if (g_roads.size() >= 64 || roadDistance(town.x, town.z) < 12.f) continue;
-      vec2 start(town.x, town.z), destination; float best = 1e9f;
-      for (size_t k = 0; k < trunkCount; k++) {
-        const RoadSeg& r = g_roads[k]; vec2 ab(r.bx - r.ax, r.bz - r.az);
-        float f = clampf(((start.x - r.ax) * ab.x + (start.y - r.az) * ab.y) / (ab.x * ab.x + ab.y * ab.y), 0.f, 1.f);
-        vec2 p(r.ax + f * ab.x, r.az + f * ab.y); float d = length(p - start);
-        if (d < best && safe(start, p)) { best = d; destination = p; }
-      }
-      if (best < 1e9f) g_roads.push_back({start.x, start.y, destination.x, destination.y});
-    }
-    for (size_t ai = 0; ai < world.airports.size() && g_roads.size() < 64; ai++) {
-      const Airport& a = world.airports[ai]; AptLayout layout = aptLayout(a, (int)ai);
-      float u = layout.termU + (layout.paved ? 0.f : 80.f);
-      float v = layout.paved ? layout.lotV1 + 18.f : layout.bldV + 40.f;
-      vec3 gate = aptWorld(a, u, layout.side * v, 0);
-      vec2 start(gate.x, gate.z), destination; float best = 1e9f;
-      for (size_t k = 0; k < trunkCount; k++) {
-        const RoadSeg& r = g_roads[k]; vec2 ab(r.bx - r.ax, r.bz - r.az);
-        float f = clampf(((start.x - r.ax) * ab.x + (start.y - r.az) * ab.y) / (ab.x * ab.x + ab.y * ab.y), 0.f, 1.f);
-        vec2 p(r.ax + f * ab.x, r.az + f * ab.y);
-        float d = length(p - start);
-        vec2 endpoint = aptLocal(a, vec3(p.x, 0, p.y));
-        float outward = endpoint.y * layout.side - v;
-        // Leave through the landside gate, never back across hangars/apron. A shallow
-        // angle would cut the adjacent fence despite the centreline passing its opening.
-        if (outward < 30.f || outward < fabsf(endpoint.x - u) * 1.25f) continue;
-        if (d < best && d < 6500.f && safe(start, p)) { best = d; destination = p; }
-      }
-      for (const Town& town : kTowns) {
-        vec2 p(town.x, town.z); float d = length(p - start);
-        vec2 endpoint = aptLocal(a, vec3(p.x, 0, p.y));
-        float outward = endpoint.y * layout.side - v;
-        if (outward < 30.f || outward < fabsf(endpoint.x - u) * 1.25f) continue;
-        if (d < best && safe(start, p)) { best = d; destination = p; }
-      }
-      if (best < 1e9f) g_roads.push_back({start.x, start.y, destination.x, destination.y});
-    }
-  });
-}
-
 float valueNoise(float x, float z) {
   float fx = floorf(x), fz = floorf(z);
   int ix = (int)fx, iz = (int)fz;
@@ -261,18 +207,18 @@ extern float airportInfluence(float x, float z);
 
 void World::bakeMask() {
   initRoads();
-  sceneryConnectRoads(*this);
+  sceneryAlignCommunities(*this);
   mask.assign((size_t)MASK_N * MASK_N * 4, 0);
-  roadId.assign((size_t)MASK_N * MASK_N * 2, 0);
+  if (roadGrid.head.empty()) roadGrid.head.assign((size_t)MASK_N * MASK_N, 0);
   parallelFor(MASK_N, [&](int j) {
     for (int i = 0; i < MASK_N; i++) {
       float x = -WORLD_HALF + (i + 0.5f) * MASK_TEXEL, z = -WORLD_HALF + (j + 0.5f) * MASK_TEXEL;
       float b[4]; sampleBase(x, z, b);
-      int seg = -1;
-      float rd = roadDistance(x, z, &seg);
-      roadId[((size_t)j * MASK_N + i) * 2] = (uint8_t)(seg + 1);
-      // forest-patch noise baked once instead of evaluating 3 octaves of value noise at every ray-march step
-      roadId[((size_t)j * MASK_N + i) * 2 + 1] = (uint8_t)lroundf(clampf(coverFbm(x / 1400.f + 3.1f, z / 1400.f, 3) / 0.875f, 0, 1) * 255.f);
+      float rd = roadEdgeDistance(roadGrid, x, z) + 6.f;   // (as roadDistance measures it)
+      // forest-patch noise baked once instead of evaluating 3 octaves of value noise at every ray-march step: the top 7
+      // bits of the texel's road word
+      uint32_t& head = roadGrid.head[(size_t)j * MASK_N + i];
+      head = (head & 0x1FFFFFFu) | (uint32_t)lroundf(clampf(coverFbm(x / 1400.f + 3.1f, z / 1400.f, 3) / 0.875f, 0, 1) * 127.f) << 25;
       float dens = 0, urban = 0;
       for (int k = 0; k < kNumTowns; k++) {
         const Town& t = kTowns[k];
@@ -329,16 +275,12 @@ float World::forestAt(float x, float z) const {
   float flx = floorf(fx), flz = floorf(fz);
   int i0 = (int)flx, j0 = (int)flz;
   float tx = fx - flx, tz = fz - flz;
-  auto at = [&](int i, int j) { i = std::clamp(i, 0, MASK_N - 1); j = std::clamp(j, 0, MASK_N - 1); return roadId[((size_t)j * MASK_N + i) * 2 + 1] / 255.f; };
+  auto at = [&](int i, int j) { i = std::clamp(i, 0, MASK_N - 1); j = std::clamp(j, 0, MASK_N - 1); return (roadGrid.head[(size_t)j * MASK_N + i] >> 25) / 127.f; };
   float a = at(i0, j0), b = at(i0 + 1, j0), c = at(i0, j0 + 1), d = at(i0 + 1, j0 + 1);
   return ((a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz) * 0.875f;
 }
 
-float World::groundHeight(float x, float z, int octaves) const {
-  float b[4]; sampleBase(x, z, b);
-  if (b[1] < 0.01f) return b[0];
-  return b[0] + b[1] * terrainFbm(x / DETAIL_SCALE, z / DETAIL_SCALE, octaves);
-}
+float World::groundHeight(float x, float z, int octaves) const { return height(x, z, octaves); }
 
 // Lots live in the settlement's local grid, with frontage on real drawn streets.
 // The finite 28 m lattice bounds both generation cost and building density.
