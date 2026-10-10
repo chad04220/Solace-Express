@@ -220,6 +220,9 @@ public:
   int apWindEvent = 0;      // the wind turned behind it on the final: 1 going around, 2 then planned afresh (the game says so and clears it)
   std::string apDecline;   // set by apEngage when neither end is safe: the autoland is declined (the autopilot holds instead), and why
   void apEngage(int mode, int airport, const Weather& wx);
+  // The tower's go-around (the runway occupied on short final) while it flies an approach: abandoned for a climb-out and
+  // a fresh approach. False when it can't climb away (it lands from what it has) or isn't flying one (review FLT-3)
+  bool apTowerGoAround();
   // start a figure: the autopilot first gets the speed and height it needs (diving or climbing), then flies it and
   // levels off into a hold. Any ground in the way aborts it into a recovery.
   void apStuntBegin(int figure, const Weather& wx);

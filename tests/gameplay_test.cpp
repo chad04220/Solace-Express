@@ -213,6 +213,40 @@ struct GameTest {
       ok = ok && g.atcF.lastCall.find("Go around") != std::string::npos && g.atcF.lastValid && g.atcF.lastApt == c.to;   // the HUD recall line
       printf("Arrival with the runway occupied: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
     }
+    if (voices) {   // FLT-3 (the v3.44.0 review): the same, on the autopilot's autoland - the tower's go-around is flown (it
+                    // landed anyway, and the player was fined $500 for it); and an aircraft that can't climb away lands unfined
+      // (the load past which the Wren can't climb away at approach speed - the autopilot's own sense of it, apEnv)
+      float unableLoad = 150;
+      for (float kg = 150; kg <= 1500; kg += 50) {
+        Plane q; q.reset(&kAircraft[1], start, a.heading, 60, kg, true, kAircraft[1].vref + 6); q.apEngage(Plane::AP_NAV, c.to, c.wx);
+        q.step(dt, c.wx, 0.f); if (!q.apEnv.canGoAround) { unableLoad = kg; break; }
+      }
+      for (int unable = 0; unable < 2; unable++) {
+        g.career.location = g_world.findAirport("ORC");
+        Contract cw = c; cw.wx.windFrom = a.heading; cw.wx.windSpeed = 4; cw.wx.gust = 0;   // (down the runway: the tower's end and the autopilot's)
+        g.startFlight(cw, 1, Career::SRC_RENT);
+        g.plane.reset(&kAircraft[1], start, a.heading, 60, unable ? unableLoad : 150, true, kAircraft[1].vref + 6);   // (unable: loaded past climbing away)
+        g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 3; g.atcF.airborne = true; g.atc.history.clear();
+        g.traffic.craft.clear(); g.set.traffic = true;
+        g.apDest = c.to; g.engageAutopilot();
+        g.plane.apRev = false; g.plane.apStage = Plane::APS_FINAL; g.plane.apStageT = 0;   // (established on the final it was placed on)
+        bool down = false, called = false; float climbedTo = 0, tCall = -1;
+        for (t = 0; t < 120 && g.screen == SCR_FLIGHT; t += dt) {
+          rollout(c.to, 300.f);
+          g.update(dt); audio(dt);
+          if (!called && towerSaid("Go around")) { called = true; tCall = t; }
+          if (g.plane.onGround) down = true;
+          if (called) climbedTo = std::max(climbedTo, g.plane.agl());
+          if (unable ? down : climbedTo > 150.f) break;
+        }
+        const bool fined = g.result.landedAgainstGoAround;
+        g.set.traffic = false; g.traffic.craft.clear();
+        bool ok = called && !fined && (unable ? down : (!down && climbedTo > 150.f));
+        printf("Autoland, runway occupied%s: go-around called at %.0f s, %s, fined %d: %s\n", unable ? " (unable to climb away)" : "", tCall,
+               unable ? (down ? "landed" : "not down") : (down ? "landed" : fmt("climbed away to %.0f m", climbedTo).c_str()), fined, ok ? "ok" : "FAIL"); fails += !ok;
+        g.endFlight(false, "test", OUT_ABANDONED); g.screen = SCR_HUB;
+      }
+    }
     g.set.traffic = trafficSet;
     // ---- a lesson starts with the parking brake set: full throttle doesn't move the aircraft until it's released
     {

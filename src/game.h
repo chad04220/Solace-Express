@@ -359,6 +359,8 @@ private:
     std::string lastCall; int lastApt = -1; float lastT = 0; bool lastValid = true;
     // the instructions compliance is scored on: a hold (where the aircraft was told to wait) and a go-around
     bool holding = false; vec3 holdPos; bool goAround = false;
+    bool goAroundUnable = false;   // the go-around came while the autopilot flew the approach and it couldn't climb away
+                                   // (an engine out, overloaded): it lands from what it has, and that isn't the player's
     bool lastBeforePause = false;   // the recall line was said before a pause: labelled so
   } atcF;
   int atcKey() const { return atcF.phase * 4 + (atcF.depRev ? 1 : 0) + (atcF.arrRev ? 2 : 0); }   // E6: a tower call is valid while this is what it was made for

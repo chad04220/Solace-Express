@@ -1491,7 +1491,7 @@ void Game::updateFlight(float dt) {
     if (appHigh && !plane.onGround && dA < 3000.f && plane.agl() < 60.f && plane.vel.y < 0.f) appLow = true;
     if (appLow && !plane.onGround && plane.agl() > 150.f) { appLow = false; result.goArounds++; result.thrKt = -1; }
     if (plane.ev.touchdown && takeoffAnnounced && lat < A.width && along > -50.f && along < A.length) { result.tdPastThrM = std::max(0.f, along); result.rwyLenM = A.length; result.centerlineErr = lat; }
-    if (plane.ev.touchdown && takeoffAnnounced && atcF.goAround) result.landedAgainstGoAround = true;
+    if (plane.ev.touchdown && takeoffAnnounced && atcF.goAround && !atcF.goAroundUnable) result.landedAgainstGoAround = true;
     if (plane.onGround) { appLow = false; appHigh = false; if (result.tdPastThrM >= 0 && length(plane.vel) > 1.f) result.stopLeftM = A.length - along; }   // (while still rolling: its direction says which end)
   }
   // touchdown
@@ -3489,6 +3489,8 @@ void Game::updateAtc(float dt) {
             tx.prio = 99; tx.tag = callsign(va, true, tx.ids, tx.text);
             tx.ids.push_back(atc.line(va, "go_around_aircraft")); tx.text += atc.text(tx.ids.back());
             tx.apt = F.arr; F.phase = 5; tx.key = atcKey(); atc.say(tx); F.waitT = 0; F.trafficSaid = false; F.goAround = true;
+            // (on the autopilot's approach it goes around itself - or, unable to climb away, lands: not the player's doing)
+            F.goAroundUnable = plane.apOn && plane.apAirport >= 0 && !plane.apTowerGoAround();
           } else if (!F.trafficSaid) {
             tx.prio = 80; tx.tag = callsign(va, true, tx.ids, tx.text);
             tx.ids.push_back(atc.line(va, rt.onRunway ? "runway_occupied" : "clearance_follows")); tx.text += atc.text(tx.ids.back());
@@ -3511,8 +3513,8 @@ void Game::updateAtc(float dt) {
           AtcVoice::Tx tx; tx.prio = 55; tx.subtitle = true; tx.group = "tower"; tx.ids.push_back(atc.line(va, "exit_when_able")); tx.text = atc.text(tx.ids[0]);
           tx.apt = F.arr; F.phase = 6; tx.key = atcKey(); atc.say(tx);
         }
-      } else if (!plane.onGround && agl > 180.f && plane.vel.y > 2.f && F.waitT > 20.f) { F.phase = F.dep == F.arr ? 4 : 3; F.waitT = 0; F.lastValid = false; F.goAround = false; }   // (went around: the clearance no longer stands)
-      if (F.goAround && !plane.onGround && agl > 150.f && plane.vel.y > 1.f) F.goAround = false;   // (complied: climbing away)
+      } else if (!plane.onGround && agl > 180.f && plane.vel.y > 2.f && F.waitT > 20.f) { F.phase = F.dep == F.arr ? 4 : 3; F.waitT = 0; F.lastValid = false; F.goAround = F.goAroundUnable = false; }   // (went around: the clearance no longer stands)
+      if (F.goAround && !plane.onGround && agl > 150.f && plane.vel.y > 1.f) F.goAround = F.goAroundUnable = false;   // (complied: climbing away)
       break;
     default: break;
   }

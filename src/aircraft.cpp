@@ -813,6 +813,15 @@ void Plane::apHover(float dt) {
 }
 
 
+bool Plane::apTowerGoAround() {
+  if (!apOn || apAirport < 0 || onGround || apMode == AP_STUNT) return false;
+  if (apStage == APS_GOAROUND) return true;
+  if (apStage == APS_ROLLOUT || !apEnv.canGoAround) return false;
+  if (getenv("APDBG")) printf("  go-around: the tower's (runway occupied)\n");
+  apStage = APS_GOAROUND; apStageT = 0;
+  return true;
+}
+
 void Plane::apEngage(int mode, int airport, const Weather& wx) {
   apOn = mode != AP_OFF; apMode = mode; apDone = false; apWindEvent = 0;
   float spd0 = ias > 1.f ? ias : length(vel);
