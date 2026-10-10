@@ -28,6 +28,7 @@ extern const ModelDef kModels[];
 struct AircraftSpec;
 // Packs a model into the shader's uM[] uniform array (24 vec4) using the physics gear geometry
 void packModel(const AircraftSpec& s, int idx, float gearHeight, float out[24 * 4]);
+void packModelOf(int idx, float out[24 * 4]);   // type idx's as a Plane of that type packs it (the game, the traffic): shaders.h aircraftDefines
 // Fuselage half width at a body z (for panel sizing)
 float modelHalfWidth(const ModelDef& m, float z);
 // the fuselage's section at a body z: half width, half height, centre height (the stations' monotone cubic)

@@ -15,10 +15,14 @@ struct CockpitLayout {
 };
 uniform vec4 uCockpitLayout[9]; // one selected model record, uploaded for live and bake passes
 
+#if HAS_FLEET_CABIN
 bool fleetCabin(){ return gModelId >= 0 && gModelId < 10; }
+#else
+bool fleetCabin(){ return false; }
+#endif
 CockpitLayout cockpitLayout(){ return CockpitLayout(uCockpitLayout[0],uCockpitLayout[1],uCockpitLayout[2],uCockpitLayout[3],uCockpitLayout[4],uCockpitLayout[5],uCockpitLayout[6],uCockpitLayout[7],uCockpitLayout[8]); }
 bool cockpitGlass(){ return int(gM[21].z + .5) == 2; }
-bool cockpitTwin(){ return gModelId==3 || gModelId==8 || cockpitGlass(); }
+bool cockpitTwin(){ return MODEL_IS(3) || MODEL_IS(8) || cockpitGlass(); }
 vec2 cockpitFlightHalf(float scale){ return (cockpitGlass()?vec2(.184,.092):vec2(.147,.099))*scale; }
 vec2 cockpitSystemsHalf(float scale){ return (cockpitGlass()?vec2(.105,.094):vec2(cockpitTwin()?.087:.052,.096))*scale; }
 vec3 cockpitMount(vec4 m){ return vec3(m.x,gM[22].y-m.y,gM[21].w+m.z); }

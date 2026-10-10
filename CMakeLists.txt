@@ -175,7 +175,7 @@ add_test(NAME shader_prune COMMAND shader_prune_test)
 add_dependencies(shader_keyword_test shader_prune_test)   # (built with a target the CI sanitizer job names)
 # GLSL check of the ray tracer and the programs built from it, as assembled and as pruned (only where glslangValidator
 # is installed)
-add_executable(shader_check tools/shader_check.cpp)
+add_executable(shader_check tools/shader_check.cpp ${CORE_SOURCES})   # (the aircraft's packed models: their own builds)
 target_include_directories(shader_check PRIVATE src)
 find_program(GLSLANG_VALIDATOR glslangValidator)
 if(GLSLANG_VALIDATOR)

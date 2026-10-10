@@ -41,6 +41,7 @@ void main(){
   vec3 nb = n0; float r0;
   vec3 lp = vL;
   float wy = vW.y;
+#if ENT_TREES
   if (part == P_LEAFCARD) {
     cls = 1.0;
     float h = hsh(floor(vec2(fract(vAux.z), vAux.w)*5.0) + floor(vAux.z)*7.0 + vInst.x*13.0);
@@ -106,7 +107,10 @@ void main(){
       alb = triS(lp*vec3(1.0, 0.5, 1.0), n0, M_BARK, 0.8, 1.2, nb, rough)*(uKind == K_PINE ? vec3(1.05, 0.8, 0.65) : vec3(0.8, 0.75, 0.7));
     }
     alb *= ao;
-  } else if (part == P_ROCK) {
+  } else
+#endif
+#if ENT_ROCKS
+  if (part == P_ROCK) {
     float sc = uKind == K_SEASTACK || uKind == K_SPIRE ? 7.0 : uKind == K_OUTCROP ? 4.5 : 2.2;
     alb = triS(lp, n0, M_ROCK, sc, 1.3, nb, rough);
     vec3 tint = uKind == K_SPIRE ? vec3(0.98, 0.72, 0.55) : uKind == K_SEASTACK ? mix(vec3(0.72, 0.66, 0.58), vec3(0.6, 0.6, 0.62), fract(seed*3.1)) : mix(vec3(0.78, 0.76, 0.74), vec3(0.88, 0.84, 0.78), fract(seed*3.1));
@@ -117,7 +121,10 @@ void main(){
     if (uKind == K_SEASTACK) { alb = mix(alb, vec3(0.92, 0.9, 0.85), top*smoothstep(20.0, 26.0, lp.y)*0.7); alb *= mix(0.55, 1.0, smoothstep(0.0, 2.5, wy)); }   // guano, wet base
     float sn = max(uSnow, smoothstep(1400.0, 1800.0, wy));
     if (sn > 0.0) alb = mix(alb, vec3(0.9, 0.92, 0.95), smoothstep(0.45, 0.8, nb.y)*sn);
-  } else if (uKind >= K_HANGAR) {
+  } else
+#endif
+#if ENT_BUILDINGS
+  if (uKind >= K_HANGAR) {
     // ---------------------------------------------------------------- airport buildings, aircraft, vehicles, furniture
     vec3 mp = lp/vScale;   // mesh coordinates (the instance scale removed)
     bool sideX = abs(n0.x) > 0.5;
@@ -344,6 +351,9 @@ void main(){
     else if (part == P_CANOPY) { alb = vec3(0.92); if (n0.y < -0.5) emit = vec3(1.0, 0.98, 0.95)*uNight*3.0; if (abs(n0.y) < 0.5 && lp.y < 4.95) alb = pal(s1, vec3(0.8, 0.1, 0.08), vec3(0.1, 0.3, 0.7), vec3(0.95, 0.75, 0.1), vec3(0.1, 0.55, 0.3)); rough = 0.4; }
     if (uSnow > 0.05 && part != P_GLASS && part != P_ROOF) alb = mix(alb, vec3(0.9), smoothstep(0.6, 0.9, n0.y)*uSnow*0.8);
   }
+#else
+  {}
+#endif
   vec3 wn = vec3(cy*nb.x + sy*nb.z, nb.y, -sy*nb.x + cy*nb.z);
   if (dot(wn, V) < -0.2) wn = normalize(wn + V*0.5);   // bumped normals must not face away from the camera
   oG0 = vec4(dist, octEnc(normalize(wn)), cls == 1.0 ? 4.0 : 3.0);   // GB_FOLIAGE / GB_ENTITY (kGBuffer)

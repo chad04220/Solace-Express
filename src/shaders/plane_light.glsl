@@ -32,11 +32,20 @@ vec3 planeLight(vec3 p, vec3 rd, float t, int mid, Mat m, vec3 n, vec3 lp, vec3 
   // the aircraft aren't in the scenery cascades, so this never shadows the airframe itself)
   float sh = sunSh > 0.0 && !podMat ? sunSh*cloudShadow(p)*entShadow(p, n) : 0.0;
   float ao = podMat || interior ? interiorAO(lp, ln) : 1.0;   // (one call: the occlusion taps the field outside the mesh pass)
+#if HAS_RESEARCH
   if (RESEARCH_ON && podMat) {  // sealed research cockpit: lit only by its modelled fixtures, low and moody
     mat3 inv = transpose(gPR);
     int engP = int(gM[0].z + 0.5);
-    col = (WRAITH_ON && (!JET_ON || engP == 6) ? wraithPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : podLight(lp, inv*n, inv*(-rd), m, E.xyz))*ao + m.emit;
-  } else if (interior) {
+#if HAS_WRAITH && HAS_JET
+    col = (engP == 6 ? wraithPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : podLight(lp, inv*n, inv*(-rd), m, E.xyz))*ao + m.emit;
+#elif HAS_WRAITH
+    col = wraithPodLight(lp, inv*n, inv*(-rd), m, E.xyz)*ao + m.emit;
+#else
+    col = podLight(lp, inv*n, inv*(-rd), m, E.xyz)*ao + m.emit;
+#endif
+  } else
+#endif
+  if (interior) {
     vec3 v = -rd; mat3 inv = transpose(gPR);
     vec3 F = fresnelSchlick(max(dot(n, v), 0.0), mix(vec3(0.04), m.alb, m.metal));
     col = pbr(n, v, uSunDir, m.alb, m.rough, m.metal, uSunCol*sh*3.2)

@@ -85,8 +85,7 @@ void Renderer::pickAfPrograms(const FrameParams& fp) {
   for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); k++) research = research || fp.traffic[k].t[2] > 4.5f;
   static const bool all = getenv("AF_ALL") != nullptr;   // (debug: every aircraft build always)
   const int v = research || all ? 0 : 1;
-  progObjects = progObjectsV[v]; progShProxy = progShProxyV[v]; progEffects = progEffectsV[v];
-  if (progPlaneMeshV[v]) progPlaneMesh = progPlaneMeshV[v];   // (the mesh draws pick theirs per aircraft: drawPlaneMesh)
+  progObjects = progObjectsV[v]; progShProxy = progShProxyV[v]; progEffects = progEffectsV[v];   // (the mesh draws: each aircraft its type's own, drawPlaneMesh)
 }
 
 // The rigid parts' poses for this view: the player's aircraft's and the traffic's (computed again by the objects pass:

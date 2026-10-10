@@ -32,14 +32,14 @@ static void finish(){} static void del(GLuint){}
 main='''int main(){glFinish=finish;glDeleteProgram=del;
 struct Case {const char* name;std::set<int> fail;int retry;bool ok;int completed;int calls;};
 for(const auto& c:std::vector<Case>{
-  {"success",{},0,true,41,41},
-  {"proxy maps fallback",{22,23,24,25},0,true,41,44},
-  {"optional cloud accumulation unavailable",{15},0,true,41,41},
-  {"optional bake unavailable",{17},0,true,41,40},
-  {"coupled normal retry",{},18,true,41,42},
-  {"optional XR mesh unavailable",{34},0,true,41,41},
-  {"fatal light",{20},0,false,19,20},
-  {"fatal fleet mesh",{32},0,false,31,32}
+  {"success",{},0,true,42,42},
+  {"proxy maps fallback",{26,27,28,29},0,true,42,45},
+  {"optional cloud accumulation unavailable",{19},0,true,42,42},
+  {"optional bake unavailable",{21},0,true,42,41},
+  {"coupled normal retry",{},22,true,42,43},
+  {"fatal scenery class",{3},0,false,3,4},
+  {"fatal light",{24},0,false,23,24},
+  {"fatal shared mesh",{36},0,false,35,36}
 }){calls=0;fail=c.fail;normalFallbackAt=c.retry;Renderer r;std::atomic<int> done{0};bool ok=r.compilePrograms(&done);printf("%s: ok=%d completed=%d attempts=%d\\n",c.name,ok,done.load(),calls);if(ok!=c.ok||done!=c.completed||calls!=c.calls){puts(r.error.c_str());return 1;}}
 puts("Logical shader completion contract: PASS");}
 '''

@@ -212,6 +212,8 @@ void packModel(const AircraftSpec& s, int idx, float gh, float o[24 * 4]) {
   put(23, m.wsZ0, m.wsZ1, m.wsY, m.sideZ1);
 }
 
+void packModelOf(int idx, float o[24 * 4]) { Plane p; p.spec = &kAircraft[idx]; packModel(kAircraft[idx], idx, p.gearHeight(), o); }
+
 vec3 modelWingTip(const ModelDef& m) { return vec3(m.wing[0] + 0.02f, m.wing[4] + m.wing[0] * tanf(m.wing[6] * DEG), m.wing[5] + m.wing[3] + m.wing[2] * 0.25f); }
 vec3 modelFinTop(const ModelDef& m) {   // (the XR-20's right fin, canted 0.48 rad from its shoulder root: plane_common.glsl mantisFinTop)
   if (&m == &kModels[kMantis]) return vec3(1.05f + sinf(0.48f) * m.vt[0], m.vt[4] + cosf(0.48f) * m.vt[0] + 0.04f, m.vt[5] + m.vt[3] + m.vt[2] * 0.4f);

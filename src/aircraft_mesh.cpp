@@ -183,16 +183,12 @@ int partList(const float* M, bool inside, PartInst* out, int model = -1) {
 
 bool Renderer::compilePlaneMesh(const std::function<void()>& step) {
   std::string e;
-  const char* const* kBuild = kMeshBuild;
-  for (int v = 0; v < 4; v++) {
-    static const char* stages[] = {"aircraft meshes (all aircraft)", "aircraft meshes (fleet)", "aircraft meshes (XR-30)", "aircraft meshes (XR-40)"};
-    setCompileStage(stages[v]);
-    e.clear(); progPlaneMeshV[v] = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(kBuild[v]), e);
-    if (!progPlaneMeshV[v] && v < 2) { error = "Aircraft mesh shader: " + e; return false; }
-    if (!progPlaneMeshV[v]) shaderNote(std::string("Aircraft mesh shader (") + (v == 2 ? "the XR-30's" : "the XR-40's") + " own build) failed: drawn with every aircraft's");
-    if (step) step();
-  }
-  progPlaneMesh = progPlaneMeshV[0];
+  // the shared build, every aircraft's code: an aircraft is drawn with it until its own is made (afMeshProgram), or if
+  // its own fails
+  setCompileStage("aircraft meshes (all aircraft)");
+  progPlaneMesh = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(""), e);
+  if (!progPlaneMesh) { error = "Aircraft mesh shader: " + e; return false; }
+  if (step) step();
   // the depth pre-pass; with uScrSkip the research cockpit's windows are cut (cabin_windows.glsl: the screens are holes)
   // (uCloakZ: a cloaked XR-40's sweeping front, body z - what lies ahead of it is see-through and writes no depth; -1e9 none)
   setCompileStage("aircraft mesh depth");
@@ -205,6 +201,59 @@ bool Renderer::compilePlaneMesh(const std::function<void()>& step) {
   if (step) step();
   poseRevision.clear(); poseMeshes = {};   // a newly linked pose program must populate the texture again
   return true;
+}
+
+// ---- each aircraft's own builds (renderer.h AfOwn)
+int Renderer::afModelOf(const float* M, int model) {
+  static_assert(kAfModels == kWraith + 1, "one own build for each type in the roster");
+  static const bool all = getenv("AF_ALL") != nullptr;   // (debug: every aircraft drawn and baked with the shared builds)
+  if (all) return -1;
+  if (!afKeysSet) {
+    for (int m = 0; m < kAfModels; m++) { float P[96]; packModelOf(m, P); afKeys[m] = trafficModelKey(P); }
+    afKeysSet = true;
+  }
+  // (by its packed model, the constants its own build is made with; and the type it claims, if any, must be that one)
+  const uint64_t k = trafficModelKey(M);
+  for (int m = 0; m < kAfModels; m++) if (afKeys[m] == k) return model < 0 || model == m ? m : -1;
+  return -1;
+}
+GLuint Renderer::afMeshProgram(int model) {
+  AfOwn& a = afOwn[model];
+  if (!a.meshTried) {
+    a.meshTried = true;
+    float M[96]; packModelOf(model, M);
+    const std::string stage = std::string("aircraft mesh (the ") + kAircraft[model].name + "'s own)";
+    setCompileStage(stage.c_str());
+    std::string e;
+    a.mesh = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(aircraftDefines(model, M)), e);
+    setCompileStage("");
+    if (!a.mesh) shaderNote(std::string("Aircraft mesh shader (the ") + kAircraft[model].name + "'s own build) failed: drawn with every aircraft's\n" + e);
+  }
+  return a.mesh;
+}
+bool Renderer::afBakePrograms(int model, GLuint out[2]) {
+  AfOwn& a = afOwn[model];
+  if (!a.bakeTried) {
+    a.bakeTried = true;
+    float M[96]; packModelOf(model, M);
+    const std::string stage = std::string("aircraft bake (the ") + kAircraft[model].name + "'s own)";
+    setCompileStage(stage.c_str());
+    std::string e;
+    if (!linkBakePair(kFullscreenVS, hullBakeFSAssembly(aircraftDefines(model, M)), a.bake, e))
+      shaderNote(std::string("Aircraft bake (the ") + kAircraft[model].name + "'s own build) failed: built with every aircraft's\n" + e);
+    setCompileStage("");
+  }
+  if (!a.bake[0]) return false;
+  out[0] = a.bake[0]; out[1] = a.bake[1];
+  return true;
+}
+// the bodies' cache stamp for a type: its own bake programs as the driver gets them, so an edit to one aircraft's shape
+// (or to the code its build has) rebuilds that aircraft's bodies and no other's
+std::string Renderer::meshStamp(int model) {
+  if (model < 0) { static const std::string shared = meshCacheStamp(); return shared; }
+  AfOwn& a = afOwn[model];
+  if (a.stamp.empty()) { float M[96]; packModelOf(model, M); a.stamp = meshCacheStamp(aircraftDefines(model, M)); }
+  return a.stamp;
 }
 
 // every aircraft but a wreck
@@ -225,7 +274,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   // the cache
   std::string path;
   if (!g_shaderCacheDir.empty()) {
-    static const std::string stamp = meshCacheStamp();
+    const std::string stamp = meshStamp(afModelOf(M, pv.model));   // (the type's own: built with its own bake programs)
     char name[64]; snprintf(name, sizeof name, "/mesh_%016llx_%s.bin", (unsigned long long)key, stamp.c_str());
     path = g_shaderCacheDir + name;
     if (FILE* f = fopen(path.c_str(), "rb")) {
@@ -987,17 +1036,19 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   const vec3 rp = pos - fp.camPos;
   const float logC = 2.f / log2f(40000.f + 1.f);
   const bool scrSkip = screenWindows && trafK < 0 && fp.plane.PS[3] > 0.5f && (int)(fp.plane.M[2] + 0.5f) >= 5;
-  // (this aircraft's own build of the program: the light aircraft's leaves the research jets out, each research jet's
-  // everything but itself - compilePlaneMesh)
-  const float eng = trafK >= 0 ? fp.traffic[trafK].t[2] : fp.plane.M[2];
-  static const bool all = getenv("AF_ALL") != nullptr;
-  const int e = (int)(eng + 0.5f), build = all ? 0 : e == 6 ? 3 : e == 5 ? 2 : e < 5 ? 1 : 0;
-  GLuint prog = progPlaneMeshV[build] ? progPlaneMeshV[build] : progPlaneMeshV[0];
+  // (this aircraft's type's own build of the program: its code alone - afMeshProgram; else every aircraft's)
+  const int own = afModelOf(trafK >= 0 ? fp.traffic[trafK].t : fp.plane.M, trafK >= 0 ? -1 : fp.plane.model);
+  GLuint prog = own >= 0 ? afMeshProgram(own) : 0;
+  if (!prog) prog = progPlaneMesh;
   // the analysis's probe of the player's airframe shading (kProbeMeshShade): a build of its own, made the first time
   // it is asked for, so the game's programs carry no trace of it
   if ((dbgOff & kProbeMeshShade) && trafK < 0) {
-    if (!progPlaneMeshProbe[build]) { std::string pe; progPlaneMeshProbe[build] = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(std::string(kMeshBuild[build]) + "#define PROBE_MESH_SHADE\n"), pe); }
-    if (progPlaneMeshProbe[build]) prog = progPlaneMeshProbe[build];
+    GLuint& probe = own >= 0 && prog != progPlaneMesh ? afOwn[own].probe : progPlaneMeshProbe;
+    if (!probe) {
+      float M[96]; if (own >= 0 && prog != progPlaneMesh) packModelOf(own, M);
+      std::string pe; probe = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly((own >= 0 && prog != progPlaneMesh ? aircraftDefines(own, M) : std::string()) + "#define PROBE_MESH_SHADE\n"), pe);
+    }
+    if (probe) prog = probe;
   }
   glBindVertexArray(pm.vao);
   // then the materials on exactly the nearest surface
@@ -1019,16 +1070,18 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   glActiveTexture(GL_TEXTURE0);
 }
 
-// Whether this build's aircraft meshes are in the cache: any file of its stamp (a launch after the first reads them all;
-// an update that changes the aircraft builds them all again) - for the loading bar's pacing and wording
+// Whether this build's aircraft meshes are in the cache: any file of one of its stamps (a launch after the first reads
+// them all; an update that changes an aircraft builds that aircraft's again) - for the loading bar's pacing and wording
 void Renderer::checkMeshCache() {
   meshCached = false;
   if (g_shaderCacheDir.empty()) return;
-  const std::string tail = "_" + meshCacheStamp() + ".bin";
+  std::vector<std::string> tails;
+  for (int m = -1; m < kAfModels; m++) tails.push_back("_" + meshStamp(m) + ".bin");
   std::error_code ec;
   for (const auto& e : std::filesystem::directory_iterator(g_shaderCacheDir, ec)) {
     const std::string n = e.path().filename().string();
-    if (n.size() > tail.size() && n.compare(0, 5, "mesh_") == 0 && n.compare(n.size() - tail.size(), tail.size(), tail) == 0) { meshCached = true; return; }
+    for (const std::string& tail : tails)
+      if (n.size() > tail.size() && n.compare(0, 5, "mesh_") == 0 && n.compare(n.size() - tail.size(), tail.size(), tail) == 0) { meshCached = true; return; }
   }
 }
 
