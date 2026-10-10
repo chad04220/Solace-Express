@@ -140,19 +140,24 @@ The present autopilot still flies exactly as it did: all 294 calm checkride flig
 - **Time:** a pattern at 1.4-1.5 times the approach speed, out of the descent orbit as soon as it is down, no orbit when
   the rest can be lost on the way, no speeding up again once slowed for the hold.
 
-**The calm checkride now** (294 flights, against the present autopilot):
+**The checkride now**, all five weathers (1,470 flights, against the present autopilot; it still flies exactly as it did,
+all 1,470 flights matching the baseline):
 
 | | present | the pilot |
 |---|---|---|
-| Landed and stopped | 284 | 284 |
-| Stabilised | 190 | 244 |
-| g rms, median | 0.32 | 0.08 |
-| Bank, median / worst tenth | 71 / 85 deg | 30 / 60 deg |
-| g, worst tenth | 16.5 | 2.5 |
-| Lowest g, worst tenth | -3.1 | 0.6 |
-| Time, median | 367 s | 464 s |
-| Fuel, median | 21.8 kg | 23.0 kg |
+| Landed and stopped | 1,369 | 1,369 |
+| Calm / cross / gusts / shift / storm | 284 / 284 / 278 / 276 / 247 | 284 / 284 / 276 / 279 / 246 |
+| Stabilised | 719 | 1,011 |
+| g rms, median | 0.32 | 0.11 |
+| Jerk rms, median | 0.39 | 0.16 |
+| Bank, median / worst tenth | 72 / 86 deg | 30 / 60 deg |
+| g, worst tenth | 16.7 | 2.6 |
+| Lowest g, worst tenth | -3.1 | 0.2 |
+| Time, median | 368 s | 458 s |
+| Fuel, median | 23.8 kg | 24.4 kg |
 
+- **Gusts:** a gust's gain is let pass, a loss answered at once (filtered both ways, a storm's shear took 9 m/s off the
+  Islander 20 m up before the power came). Below 100 m on the final, firm hands: 0.6-1.6 g, changed quickly.
 - **The height before the turn:** up to half a g kept back from the bank when below the height it wants or sinking.
 - **The chart's edge:** a turn as tight as the room left needs (up to 80 deg), when even its sharpest is too wide.
 - **The sea's surface**, not its bed, is the ground the look-ahead keeps clear of.

@@ -1718,7 +1718,13 @@ void Plane::apControl(float dt) {
   // get more g: the ground as much as clears it, a recovery a g more - but its bank stays its own (the whole envelope's
   // 85 deg and 11 g was a turn, not a recovery)
   const bool proAny = apPro && !flare, pro = proAny && !apUpset && !apEscape;
-  if (pro) { nzMax = std::min(nzMax, apComfort ? 1.25f : proG); nzMin = std::max(nzMin, apComfort ? 0.85f : 0.75f); }
+  // (short final, below 100 m: firm hands - a downdraft there is answered with what it takes, 0.6 to 1.6 g, quickly; in
+  // the storm the gentle envelope let the sink build to 5-8 m/s into the flare)
+  const bool shortFinal = appr && agl() < 100.f;
+  if (pro) {
+    nzMax = std::min(nzMax, shortFinal ? std::max(proG, 1.6f) : apComfort ? 1.25f : proG);
+    nzMin = std::max(nzMin, shortFinal ? 0.6f : apComfort ? 0.85f : 0.75f);
+  }
   else if (proAny && apEscape) { nzMax = std::min(nzMax, std::max(escG, proG)); nzMin = std::max(nzMin, 0.25f); }
   else if (proAny) { nzMax = std::min(nzMax, proG + 1.f); nzMin = std::max(nzMin, 0.25f); }   // (recovering: unloaded, never pushed negative)
   else if (apComfort && !flare) {
@@ -1799,7 +1805,10 @@ void Plane::apControl(float dt) {
       // (back onto the speed over ~8 s, no harder than 0.06 g - or, in a jet built for it, up to 0.2 g: at 0.06 g the XR-40
       // took eight minutes and 150 km to come down from 400 m/s to its terminal speed, and flew off the chart)
       const float aLim = 0.6f + 1.4f * apProScale();
-      const float vdotT = clampf((apSpeed - apSpdEst) * 0.12f, -aLim, aLim);
+      // (a gust's gain is let pass, a loss is answered at once, as a pilot does: filtered both ways, a storm's shear took
+      // 9 m/s off the Islander 20 m up before the power came, and it flared from a 5 m/s sink)
+      const float vMeas = std::min(apSpdEst, ias);
+      const float vdotT = clampf((apSpeed - vMeas) * 0.12f, -aLim, aLim);
       eE = (gT - g) + (vdotT - vdot) / G0;
       // (the path first: the elevator weighs the speed lightly while the throttle can still answer it, fully once the
       // throttle is at a stop - unweighted, the nose chased every slowing the engines were still answering, and a calm
@@ -1837,7 +1846,7 @@ void Plane::apControl(float dt) {
   float cb = cosf(clampf(bank, -85.f, 85.f) * DEG);
   float nzT = clampf((cosf(g) + spd / G0 * gDot) / std::max(cb, 0.1f), nzMin, nzMax);
   // (a professional's g comes on and off smoothly: 0.8 g/s; a recovery, the ground ahead and the flare take it at once)
-  apNzCmd = pro ? approach(apNzCmd, nzT, 0.8f, dt) : nzT;
+  apNzCmd = pro ? approach(apNzCmd, nzT, shortFinal ? 3.f : 0.8f, dt) : nzT;
   nzT = apNzCmd;
   // a big bank change (reversing a turn) is flown unloaded: rolling hard while pulling hard couples into pitch
   float bankErr = fabsf(bankT - bank);
