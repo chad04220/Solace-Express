@@ -1,6 +1,7 @@
 // Career save robustness: damaged or incomplete saves are rejected without touching the live career, a failed write
 // reports false and leaves the previous save intact, and a good save round-trips.
 #include "../src/career.h"
+#include "test_world.h"
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -16,7 +17,7 @@ static void check(bool c, const char* what) { if (!c) { printf("  !! %s\n", what
 static void writeFile(const std::string& p, const char* text) { FILE* f = fopen(p.c_str(), "w"); fputs(text, f); fclose(f); }
 static std::string readFile(const std::string& p) { std::string s; FILE* f = fopen(p.c_str(), "r"); if (!f) return s; char b[512]; size_t n; while ((n = fread(b, 1, sizeof b, f)) > 0) s.append(b, n); fclose(f); return s; }
 int main() {
-  g_world.build(); buildStory();
+  buildTestWorld(); buildStory();
   const std::string p = "save_test_career.sav";
   Career live; live.newGame(); live.money = -1234; live.storyIndex = 5; live.license = LIC_PPL; live.fleet.push_back({1, 2, 50.f, 0.f});
   check(live.save(p), "good save writes");

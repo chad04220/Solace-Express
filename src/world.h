@@ -75,8 +75,8 @@ public:
   std::vector<uint8_t> mask; // RGBA8: road distance, building density, urbanness, farmland / sea-stack flag
   std::vector<float> hmax[HMAX_LEVELS];   // upper bound of the terrain per cell, level L has HMAX_N>>L cells per side
   // cachePath: the generated arrays are read from there when its stamp matches (a launch after the first skips the
-  // generation), else generated and written there
-  void build(const std::string& cachePath = std::string(), const std::string& stamp = std::string());
+  // generation), else generated and written there (save false: not written - the tests, reading the run's own islands)
+  void build(const std::string& cachePath = std::string(), const std::string& stamp = std::string(), bool save = true);
   bool loadCache(const std::string& path, const std::string& stamp);
   bool fromCache = false;   // the last build() read its cache (else it generated, and saved, the world)
   void saveCache(const std::string& path, const std::string& stamp) const;

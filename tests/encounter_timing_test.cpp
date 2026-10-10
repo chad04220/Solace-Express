@@ -1,10 +1,13 @@
-// Solace Express - the UFO encounter's timeline (Codex's test): hatch, laugh and wave beats, the 26.5 s end, J+K summon, departure on landing
+// Solace Express - the UFO encounter's timeline (Codex's test): hatch, laugh and wave beats, the 26.5 s end, J+K summon, departure on landing.
+// The scene starts the encounter at its beginning (ufo0): the checks set its clock themselves, so flying the game on
+// to the screenshot's 12 s first only cost time (360 frames of the whole game: under the sanitizers, half the test)
 #include "../src/game.h"
+#include "test_world.h"
 #include <cstdio>
 #include <cmath>
 struct GameTest {
  static int run(){
-  g_world.build();buildStory();g_audio.init(48000);static Game g;g.initHeadless();g.debugScene("ufo12_2");
+  buildTestWorld();buildStory();g_audio.init(48000);static Game g;g.initHeadless();g.debugScene("ufo0_2");
   int failures=0;auto check=[&](bool ok,const char* name){printf("%s: %s\n",name,ok?"PASS":"FAIL");failures+=!ok;};
   g.plane.onGround=false;g.crashed=false;g.paused=false;
   const float times[]={0,8,9,10,12,15.8f,16.3f,17,18.5f,19,20,21,22,23,26.5f,26.51f};

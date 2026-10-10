@@ -1,8 +1,9 @@
 #include "volcano_effects.h"
+#include "test_world.h"
 #include <cstdio>
 #include <cstring>
 int main(){
-  g_world.build(); int failures=0, checks=0;
+  buildTestWorld(); int failures=0, checks=0;
   auto check=[&](bool b,const char*label){++checks;if(!b){++failures;printf("FAIL %s\n",label);}};
   const vec3 base=volcano::vent(g_world);
   check(fabsf((base.y-14.f)-1780.f)<2.f,"vent anchored to excavated crater floor");

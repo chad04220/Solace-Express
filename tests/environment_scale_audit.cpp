@@ -4,6 +4,7 @@
 #include "../src/aircraft.h"
 #include "../src/scenery.h"
 #include "../src/entity_mesh.h"
+#include "test_world.h"
 #include <cstdio>
 #include <set>
 #include <fstream>
@@ -56,7 +57,7 @@ int main(int argc, char** argv) {
   std::printf("CAR,actual_mesh_width_m=%.3f,length_m=%.3f,height_m=%.3f\n",car.x.hi-car.x.lo,car.z.hi-car.z.lo,car.y.hi-car.y.lo);
   check(car.x.hi-car.x.lo>1.5f && car.x.hi-car.x.lo<2.1f,"car mesh width is ordinary passenger-car scale");
   check(car.z.hi-car.z.lo>4.f && car.z.hi-car.z.lo<5.2f,"car mesh length is ordinary passenger-car scale");
-  g_world.build();
+  buildTestWorld();
   Range width[EK_COUNT],depth[EK_COUNT],height[EK_COUNT],yscale[EK_COUNT],door[EK_COUNT]; int count[EK_COUNT]={};
   std::set<std::pair<int,int>> chunks;
   for(int t=0;t<kNumTowns;t++) {

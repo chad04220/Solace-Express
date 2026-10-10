@@ -45,6 +45,11 @@ check(["src/world.h"], picks=["world_cache", "flight_model_1", "community_layout
 check(["src/shaders/water.glsl"], picks=["shader_prune", "gameplay_loop_2"], skips=["flight_model_1", "career_saves"])
 check(["src/entity_mesh.cpp"], picks=["environment_buildings"], skips=["flight_model_1", "career_saves"])
 check(["tests/fixtures/runways_52317bb.golden"], picks=["runway_preservation"], skips=["flight_model_1"])
+# the run's islands (tests/test_world.cpp, a ctest fixture): picked with the tests that load them, and on their own
+check(["src/world.cpp"], picks=["test_world", "flight_model_1", "runway_preservation", "world_cache"])
+check(["tests/test_world.h"], mode="some", picks=["test_world", "flight_model_1", "ufo_encounter"], skips=["runway_preservation", "hull_mesh"])
+check(["tests/test_world.cpp"], mode="some", picks=["test_world"], skips=["flight_model_1"])
+check(["tests/encounter_timing_test.cpp"], mode="some", picks=["ufo_encounter", "test_world"], skips=["flight_model_1"])
 # every compiled test is picked by a change to its own main source
 for t in model.tests:
     cmd = t.get("command") or []
@@ -55,12 +60,17 @@ for t in model.tests:
         m, picked, _, _ = st.decide(model, own[:1])
         if t["name"] not in picked:
             print(f"FAIL {own[0]} does not pick {t['name']}"); fails += 1
-# CI's sanitizer shards: every test dealt to exactly one, and no shard more than the costliest test over another
+# CI's sanitizer shards: every test dealt to exactly one, the fixture setups (the run's islands) to each shard with a
+# test that needs them, and no shard more than the costliest test over another
+setups = {t["name"] for t in model.tests if t["setup"]}
+needs = {t["name"]: t["requires"] for t in model.tests}
 for n in (2, 3):
-    shards, load = st.deal(model.tests, n)
-    dealt = sorted(t["name"] for s in shards for t in s)
-    ok = dealt == sorted(names) and max(load) - min(load) <= max(t["cost"] for t in model.tests)
-    print(f"{'ok  ' if ok else 'FAIL'} {n} shards: {', '.join('%.0f s' % l for l in load)}")
+    got = [st.shard(model, sorted(names), n, k) for k in range(1, n + 1)]
+    load = got[0][2]
+    dealt = sorted(x for mine, _, _ in got for x in mine if x not in setups)
+    served = all(not any(needs[x] for x in mine) or setups & set(mine) for mine, _, _ in got)
+    ok = dealt == sorted(names - setups) and served and max(load) - min(load) <= max(t["cost"] for t in model.tests if t["name"] not in setups)
+    print(f"{'ok  ' if ok else 'FAIL'} {n} shards: {', '.join('%.0f s' % l for l in load)}, each with the islands it needs {served}")
     fails += not ok
 print(f"{len(model.tests)} tests; {'all passed' if not fails else str(fails) + ' FAILED'}")
 sys.exit(1 if fails else 0)

@@ -1,6 +1,7 @@
 // End-to-end gameplay test: a scripted pilot flies Lesson 1 and then lands at a destination,
 // exercising the real game loop (completion detection, scoring, payout, story progression).
 #include "../src/game.h"
+#include "test_world.h"
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
@@ -22,7 +23,7 @@ struct GameTest {
 #include "free_flight_regression.inc"
 #include "lesson_voice_regression.inc"
   static int run(int part = 0) {
-    g_world.build(); buildStory();
+    buildTestWorld(); buildStory();
     g_audio.init(48000);
     // part (--part 1..4): the test in four pieces CI runs side by side, each from a fresh game (0, the default: all
     // of it, one after another). 1 the state, free-flight and voice regressions; 2 Lesson 1, the landing, the towers;

@@ -215,25 +215,26 @@ foreach(part 1 2 3)
   add_test(NAME campaign_progression_${part} COMMAND progression_test --part ${part})
 endforeach()
 # the long tests first (ctest starts the costliest; a fresh CI runner has no timings of its own to go by), so a
-# parallel run isn't left waiting on one that started last: their seconds under the sanitizers (CI, v3.45.0; the rest
-# at the end of this file, after their tests)
-set_tests_properties(flight_model_1 PROPERTIES COST 285)   # (the parts: the whole's seconds shared out as the parts
-set_tests_properties(flight_model_2 PROPERTIES COST 265)   # take them in a normal build, each with its own islands)
-set_tests_properties(flight_model_3 PROPERTIES COST 305)
-set_tests_properties(campaign_progression_1 PROPERTIES COST 220)
-set_tests_properties(campaign_progression_2 PROPERTIES COST 200)
-set_tests_properties(campaign_progression_3 PROPERTIES COST 225)
-set_tests_properties(gameplay_loop_1 PROPERTIES COST 210)
-set_tests_properties(gameplay_loop_2 PROPERTIES COST 300)
-set_tests_properties(gameplay_loop_3 PROPERTIES COST 370)
-set_tests_properties(gameplay_loop_4 PROPERTIES COST 340)
-set_tests_properties(career_saves PROPERTIES COST 255)
-set_tests_properties(ufo_encounter PROPERTIES COST 250)
-set_tests_properties(cockpit_camera PROPERTIES COST 115)
-set_tests_properties(entity_raycast PROPERTIES COST 107)
-set_tests_properties(airport_layouts PROPERTIES COST 106)
-set_tests_properties(terrain_envelope PROPERTIES COST 106)
-set_tests_properties(world_cache PROPERTIES COST 98)
+# parallel run isn't left waiting on one that started last: their seconds under the sanitizers (CI, v3.45.1, less the
+# ~100 s each took to generate the islands where it now loads the run's: the test_world fixture at the end of this
+# file; the rest there too, after their tests)
+set_tests_properties(flight_model_1 PROPERTIES COST 220)
+set_tests_properties(flight_model_2 PROPERTIES COST 150)
+set_tests_properties(flight_model_3 PROPERTIES COST 335)
+set_tests_properties(campaign_progression_1 PROPERTIES COST 150)
+set_tests_properties(campaign_progression_2 PROPERTIES COST 220)
+set_tests_properties(campaign_progression_3 PROPERTIES COST 155)
+set_tests_properties(gameplay_loop_1 PROPERTIES COST 195)
+set_tests_properties(gameplay_loop_2 PROPERTIES COST 230)
+set_tests_properties(gameplay_loop_3 PROPERTIES COST 300)
+set_tests_properties(gameplay_loop_4 PROPERTIES COST 350)
+set_tests_properties(career_saves PROPERTIES COST 180)
+set_tests_properties(ufo_encounter PROPERTIES COST 20)
+set_tests_properties(cockpit_camera PROPERTIES COST 25)
+set_tests_properties(entity_raycast PROPERTIES COST 60)
+set_tests_properties(airport_layouts PROPERTIES COST 10)
+set_tests_properties(terrain_envelope PROPERTIES COST 10)
+set_tests_properties(world_cache PROPERTIES COST 100)
 set_tests_properties(hull_mesh PROPERTIES COST 29)
 set_tests_properties(breakup PROPERTIES COST 25)
 set_tests_properties(mesh_simplify PROPERTIES COST 11)
@@ -427,12 +428,12 @@ target_include_directories(environment_chunk_bounds_test PRIVATE src)
 add_test(NAME environment_chunk_bounds COMMAND environment_chunk_bounds_test)
 add_dependencies(airport_layout_test environment_chunk_bounds_test)
 
-# the rest of the long tests' seconds under the sanitizers (CI, v3.45.0), here after they are all registered
+# the rest of the long tests' seconds under the sanitizers (as above), here after they are all registered
 set_tests_properties(runway_preservation PROPERTIES COST 173)
-set_tests_properties(airport_environment PROPERTIES COST 151)
-set_tests_properties(community_layout PROPERTIES COST 150)
-set_tests_properties(volcano_effects PROPERTIES COST 99)
-set_tests_properties(environment_scale_audit PROPERTIES COST 98)
+set_tests_properties(airport_environment PROPERTIES COST 20)
+set_tests_properties(community_layout PROPERTIES COST 15)
+set_tests_properties(volcano_effects PROPERTIES COST 10)
+set_tests_properties(environment_scale_audit PROPERTIES COST 30)
 set_tests_properties(environment_close_bounds PROPERTIES COST 22)
 if(Python3_Interpreter_FOUND)
   set_tests_properties(ci_test_selection PROPERTIES COST 44)
@@ -440,3 +441,33 @@ if(Python3_Interpreter_FOUND)
     set_tests_properties(renderer_cpu_mocks PROPERTIES COST 46)
   endif()
 endif()
+
+# The islands, generated once a test run (tests/test_world.cpp, the "world" fixture: ctest runs it before any test
+# below, even when asked for just one) and loaded by the tests that fly over them (tests/test_world.h) instead of each
+# generating them again: under the sanitizers that was about 100 s a test, twenty times a run. It starts first (its
+# cost), beside the tests that don't need it. runway_preservation, world_cache and the fast-math envelope
+# still generate their own, and so does any test run outside ctest. The tests' programs depend on its program, so a
+# build of any one of them keeps the generator up to date.
+add_executable(test_world tests/test_world.cpp ${ENV_OBJS})
+target_include_directories(test_world PRIVATE src)
+if(MSVC)
+  target_compile_definitions(test_world PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+add_test(NAME test_world COMMAND test_world ${CMAKE_BINARY_DIR}/test_world.bin)
+set_tests_properties(test_world PROPERTIES FIXTURES_SETUP world COST 1000)
+foreach(t airport_environment airport_layouts cockpit_camera community_layout ufo_encounter entity_raycast terrain_envelope
+          environment_scale_audit flight_model_1 flight_model_2 flight_model_3 gameplay_loop_1 gameplay_loop_2 gameplay_loop_3
+          gameplay_loop_4 campaign_progression_1 campaign_progression_2 campaign_progression_3 career_saves terrain_shadow_bake
+          volcano_effects)
+  if(TEST ${t})
+    set_property(TEST ${t} APPEND PROPERTY FIXTURES_REQUIRED world)
+    set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT "SOLACE_TEST_WORLD=${CMAKE_BINARY_DIR}/test_world.bin")
+  endif()
+endforeach()
+foreach(t airport_environment_test airport_layout_test cockpit_camera_test community_layout_test encounter_timing_test
+          entity_raycast_test envelope_test environment_scale_audit flight_test gameplay_test progression_test save_test
+          terrain_shadow_test volcano_effects_test)
+  if(TARGET ${t})
+    add_dependencies(${t} test_world)
+  endif()
+endforeach()

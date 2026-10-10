@@ -2,6 +2,7 @@
 // This supplements airport_layout_test's runway/taxiway/AI-stand and solid-overlap checks.
 #include "../src/airport_layout.h"
 #include "../src/entities.h"
+#include "test_world.h"
 #include <cstdio>
 #include <cstring>
 
@@ -31,7 +32,7 @@ static bool addedDetail(const AptItem& it) {
          (it.kind == EK_TRUCK && fabsf(it.e.sy - .85f) < .001f);
 }
 int main() {
-  g_world.build();
+  buildTestWorld();
   int failed = 0, checks = 0, additions = 0;
   auto check = [&](bool ok, const char* code, const char* what) {
     checks++; if (!ok) { failed++; printf("FAIL: %s %s\n", code, what); }

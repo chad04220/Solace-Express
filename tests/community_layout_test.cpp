@@ -3,6 +3,7 @@
 #include "../src/scenery.h"
 #include "../src/entities.h"
 #include "../src/airport_layout.h"
+#include "test_world.h"
 #include <cstdio>
 #include <cstring>
 #include <set>
@@ -11,7 +12,7 @@
 static int failures = 0;
 static void check(bool value, const char* message) { if (!value) { if (failures < 16) std::printf("FAIL: %s\n", message); failures++; } }
 int main() {
-  g_world.build();
+  buildTestWorld();
   check(g_communityPlans.size() == (size_t)kNumTowns, "every community has a shared street plan");
   // The road network (road_network.h): every settlement and airfield on it, its roads on dry land or bridges, off the
   // runways' protected rectangles, graded within their class's limit

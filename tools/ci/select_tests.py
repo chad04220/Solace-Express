@@ -52,7 +52,7 @@ def read_ctest_file(build, config):
     Studio) has a block per configuration: the one for `config`."""
     path = os.path.join(build, "CTestTestfile.cmake")
     text = open(path, encoding="utf-8", errors="replace").read()
-    tests, order, cond, costs = {}, [], None, {}
+    tests, order, cond, props = {}, [], None, {}
     for line in text.splitlines():
         s = line.strip()
         m = re.match(r'(?:else)?if\s*\(\s*"?(?:\$\{)?CTEST_CONFIGURATION_TYPE\}?"?\s+MATCHES\s+"(.*)"\s*\)', s)
@@ -62,9 +62,15 @@ def read_ctest_file(build, config):
             cond = "<else>"; continue
         if s.startswith("endif"):
             cond = None; continue
-        m = re.match(r'set_tests_properties\(\s*(\S+)\s+PROPERTIES\b.*?\bCOST\s+"?([0-9.]+)', s)
-        if m:   # (the test's measured seconds: how the shards are dealt, below)
-            costs[m.group(1).strip('"[]=')] = float(m.group(2)); continue
+        m = re.match(r'set_tests_properties\(\s*(\S+)\s+PROPERTIES\b(.*)', s)
+        if m:   # (its measured seconds: how the shards are dealt; its fixtures: what ctest runs before it)
+            p = props.setdefault(m.group(1).strip('"[]='), {})
+            c = re.search(r'\bCOST\s+"?([0-9.]+)', m.group(2))
+            if c: p["cost"] = float(c.group(1))
+            for key in ("FIXTURES_SETUP", "FIXTURES_REQUIRED"):
+                f = re.search(r'\b' + key + r'\s+"([^"]*)"', m.group(2))
+                if f: p[key] = set(x for x in f.group(1).split(";") if x)
+            continue
         if not s.startswith("add_test("):
             continue
         args = []
@@ -78,7 +84,9 @@ def read_ctest_file(build, config):
         if name not in tests:
             order.append(name)
         tests[name] = {"name": name, "command": args[1:]}
-    for n in order: tests[n]["cost"] = costs.get(n, 1.0)
+    for n in order:
+        p = props.get(n, {})
+        tests[n].update(cost=p.get("cost", 1.0), setup=p.get("FIXTURES_SETUP", set()), requires=p.get("FIXTURES_REQUIRED", set()))
     return [tests[n] for n in order]
 
 
@@ -219,6 +227,15 @@ def affected(deps, changed):
     return any(c == d or (d.endswith("/") and c.startswith(d)) for c in changed for d in deps)
 
 
+def setups_for(model, names):
+    """The fixture setups the tests need that aren't among them: ctest runs those first whether it was asked for them or
+    not (tests/test_world.cpp's islands), so they are built, and listed, with them"""
+    need = set()
+    for t in model.tests:
+        if t["name"] in names: need |= t["requires"]
+    return [t["name"] for t in model.tests if t["setup"] & need and t["name"] not in names]
+
+
 def decide(model, changed, exclude=None):
     """('all' | 'some' | 'none', the tests picked, their targets, notes)"""
     tests = [t for t in model.tests if not (exclude and re.search(exclude, t["name"]))]
@@ -243,6 +260,8 @@ def decide(model, changed, exclude=None):
                 notes.append(t["name"] + " (" + "; ".join(sorted(set(why))[:2]) + ")")
     if len(picked) == len(every):
         return "all", every, alltargets, notes
+    for n in setups_for(model, picked):
+        picked.append(n); targets |= model.test_deps(next(t for t in model.tests if t["name"] == n))[1]
     return ("some" if picked else "none"), picked, targets, notes
 
 
@@ -253,6 +272,20 @@ def deal(tests, n):
     for t in sorted(tests, key=lambda t: (-t["cost"], t["name"])):
         k = load.index(min(load)); shards[k].append(t); load[k] += t["cost"]
     return shards, load
+
+
+def shard(model, picked, n, k):
+    """Shard k of n: the picked tests dealt out by their cost, and the fixture setups its own share needs (every shard
+    that needs one runs it, so those are left out of the dealing; one picked for itself alone is dealt like any test).
+    (its tests, the programs they need, the shards' costs)"""
+    byName = {t["name"]: t for t in model.tests}
+    shared = set(setups_for(model, [x for x in picked if not byName[x]["setup"]]))
+    shards, load = deal([byName[x] for x in picked if x not in shared], n)
+    mine = [t["name"] for t in shards[k - 1]]
+    mine += setups_for(model, mine)
+    targets = set()
+    for x in mine: targets |= model.test_deps(byName[x])[1]
+    return mine, targets, load
 
 
 def main():
@@ -277,12 +310,7 @@ def main():
     total = len(picked)
     shardNote = ""
     if a.shards > 1 and picked:   # (this job's share of them: the tests and the programs they need)
-        byName = {t["name"]: t for t in model.tests}
-        shards, load = deal([byName[n] for n in picked], a.shards)
-        mine = shards[a.shard - 1]
-        picked = [t["name"] for t in mine]
-        targets = set()
-        for t in mine: targets |= model.test_deps(t)[1]
+        picked, targets, load = shard(model, picked, a.shards, a.shard)
         shardNote = f"Shard {a.shard} of {a.shards}: {len(picked)} tests, {load[a.shard - 1]:.0f} s of their measured cost (the shards: {', '.join('%.0f' % l for l in load)} s)"
         if not picked: mode = "none"
     regex = "^(" + "|".join(re.escape(n) for n in picked) + ")$" if picked else ""

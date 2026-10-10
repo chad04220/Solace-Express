@@ -1,6 +1,7 @@
 // Validates the hand-designed campaign: every story contract must be flyable with an aircraft the
 // player can rent or afford, waypoints must clear terrain, and money pacing must not require a long grind.
 #include "../src/career.h"
+#include "test_world.h"
 #include <cstdlib>
 int main(int argc, char** argv) {
   // --part 1..3: the checks in three pieces CI's sanitizer runners take side by side (0, the default: all of it)
@@ -9,7 +10,7 @@ int main(int argc, char** argv) {
   int part = 0;
   for (int i = 1; i + 1 < argc; i++) if (!strcmp(argv[i], "--part")) part = atoi(argv[i + 1]);
   auto in = [&](int k) { return part == 0 || part == k; };
-  g_world.build(); buildStory();
+  buildTestWorld(); buildStory();
   Career c; c.newGame();
   int problems = 0; long grind = 0; int loans = 0;
   std::vector<int> flownIn(g_story.size(), -1);   // (the type each story job is flown in below)

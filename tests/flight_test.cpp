@@ -1,9 +1,10 @@
 #include <string>
 // Headless flight-model checks: take-off roll, climb, cruise, stall per aircraft.
 #include "../src/aircraft.h"
+#include "test_world.h"
 #include <cstdlib>
 int main(int argc, char** argv) {
-  g_world.build();
+  buildTestWorld();
   if (argc > 1 && std::string(argv[1]) == "--table") {   // the README's aircraft table, from the learned performance
     printf("| Aircraft | Type | Seats / Cargo | Range | Cruise | Take-off roll | Landing distance | Runway | Licence |\n|---|---|---|---|---|---|---|---|---|\n");
     static const char* lic[] = {"Student", "PPL", "CPL", "ATP"};

@@ -1,10 +1,11 @@
 // Real camera/input integration, CPU only: no render, window, or GL context.
 #include "../src/game.h"
 #include "../src/models.h"
+#include "test_world.h"
 #include <filesystem>
 struct GameTest {
   static int run() {
-    g_world.build(); // updateCamera samples the real terrain under the eye
+    buildTestWorld(); // updateCamera samples the real terrain under the eye
     Game g; g.initHeadless(); int fails=0, checks=0;
     auto check=[&](bool v,const char* n){++checks;if(!v){++fails;printf("FAIL: %s\n",n);}};
     g.screen=SCR_FLIGHT;g.camMode=1;g.plane.pos=vec3(0,1000,0);g.plane.q=quat();g.set.headLook=false;g.in.pad=true;g.armInputs();

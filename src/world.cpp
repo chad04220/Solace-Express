@@ -260,7 +260,7 @@ float airportInfluence(float x, float z) {
   return best;
 }
 
-void World::build(const std::string& cachePath, const std::string& stamp) {
+void World::build(const std::string& cachePath, const std::string& stamp, bool save) {
   airports.assign(std::begin(kAirports), std::end(kAirports));
   roads = RoadNetwork(); roadGrid = RoadGrid();   // (the natural ground first: the roads are routed over it)
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
@@ -325,7 +325,7 @@ void World::build(const std::string& cachePath, const std::string& stamp) {
   buildEnvelope();
   // Airport buildings are raster scenery entities now (airport_scenery.cpp); the old analytic box list stays empty
   boxes.clear();
-  if (!cachePath.empty()) saveCache(cachePath, stamp);
+  if (!cachePath.empty() && save) saveCache(cachePath, stamp);
   g_worldStage = 3;
 }
 

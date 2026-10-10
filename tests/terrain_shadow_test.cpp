@@ -6,6 +6,7 @@
 #include "../src/gl.h"
 #include "../src/shaders.h"
 #include "../src/world.h"
+#include "test_world.h"
 #include <dlfcn.h>
 #include <cstdio>
 #include <cmath>
@@ -42,7 +43,7 @@ static GLuint compile(GLenum type, const std::string& src) {
 int main() {
   setvbuf(stdout, nullptr, _IONBF, 0);
   if (!initGL()) { puts("terrain shadow bake: no EGL here, skipped"); return 0; }
-  g_world.build();
+  buildTestWorld();
   // the bake shader with what it uses from the shared shader code: the common terrain code, the roads graded into it
   // (with the scene uniforms they read: uData) and the max-height mip chain
   std::string fs = std::string("#version 330 core\n") + kCommonGLSL + kSceneUniforms + kRoads + "layout(location=0) out vec4 oColor;\n" +

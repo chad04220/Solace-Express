@@ -2,9 +2,10 @@
 // analytic raycast must report a hit no later than that point - in particular a grazing pass through a tree crown that
 // a coarse sampled sweep would step over.
 #include "../src/entities.h"
+#include "test_world.h"
 #include <cstdio>
 int main() {
-  g_world.build();
+  buildTestWorld();
   uint32_t rs = 12345;
   auto rnd = [&]() { rs ^= rs << 13; rs ^= rs >> 17; rs ^= rs << 5; return (rs & 0xFFFFFF) / 16777216.f; };
   int checked = 0, missed = 0, grazing = 0;

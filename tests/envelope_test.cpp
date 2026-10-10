@@ -2,6 +2,7 @@
 // steepest and most detailed cells, the envelope's triangle height at every quadtree level has to be at or above the
 // exact terrain height (8 octaves of detail, more than the renderer ever uses).
 #include "../src/world.h"
+#include "test_world.h"
 #include <cstdio>
 #include <algorithm>
 
@@ -25,7 +26,7 @@ static float envelopeAt(float x, float z, int L) {
 }
 
 int main() {
-  g_world.build();
+  buildTestWorld();
   int bad = 0, total = 0; float worst = 1e9f, meanGap = 0;
   Rng r(77);
   const float lim = WORLD_HALF - HM_TEXEL;

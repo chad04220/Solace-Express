@@ -2,6 +2,7 @@
 // buildings and parked aircraft don't overlap each other, the AI stands are clear, and every airport got furnished.
 #include "../src/airport_layout.h"
 #include "../src/entities.h"
+#include "test_world.h"
 #include <cstdio>
 
 struct OBB { float u, v, hu, hv, cu, su; };   // runway-local centre, half extents along its own axes, axis direction
@@ -30,7 +31,7 @@ static bool smallFixture(int k) { return k == EK_RWYLIGHT || k == EK_PAPI || k =
 static bool vehicle(int k) { return k == EK_CAR || k == EK_TRUCK; }
 
 int main() {
-  g_world.build();
+  buildTestWorld();
   int fails = 0, total = 0;
   for (int ai = 0; ai < (int)g_world.airports.size(); ai++) {
     const Airport& a = g_world.airports[ai];
