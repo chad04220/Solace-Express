@@ -40,6 +40,9 @@ struct GameTest {
     }
     return 0;
   }
+  static size_t particleCount(const Game& g) { return g.particles.size(); }
+  static size_t wreckCount(const Game& g) { return g.wreck.size(); }
+  static size_t debrisCount(const Game& g) { return g.debris.size(); }
   static int hubFly(Game& game) {   // the hub at the player's airport for HUBFRAMES frames, then a job from there: what the loading screen still has to do
     g_ren.entSync = false;
     game.headless = false; game.screen = SCR_HUB;
@@ -366,6 +369,7 @@ void main(){
   if (getenv("TAAF")) for (int i = 0, n = atoi(getenv("TAAF")); i < n; i++) game.render();   // extra static frames: let TAA converge
   glFinish();
   if (getenv("BENCH")) {
+    printf("bench scene: %zu particles, %zu wreck pieces, %zu fragments\n", GameTest::particleCount(game), GameTest::wreckCount(game), GameTest::debrisCount(game));
     for (float& m : g_ren.passMs) m = 0.f;   // (the smoothed pass times start clean: the warm-up frames' bakes stay out of them)
     auto t0 = std::chrono::steady_clock::now();
     int frames = atoi(getenv("BENCH"));
