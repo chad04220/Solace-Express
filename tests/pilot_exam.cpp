@@ -40,6 +40,7 @@ struct Score {
   float gMax = 1, gMin = 1, gRms = 0, jerkRms = 0, bankMax = 0, pitchMax = 0, pitchMin = 0;
   float minClear = 1e9f, minStall = 1e9f;
   int goArounds = 0;
+  float tPhase[5] = {0, 0, 0, 0, 0};   // s en route, in the descent orbit, on the intercept / outbound, on the final, flaring and rolling out
   std::string why;
 };
 
@@ -55,13 +56,13 @@ int main(int argc, char** argv) {
     else if (!strcmp(argv[i], "--airport") && i + 1 < argc) onlyAp = argv[++i];
     else if (!strcmp(argv[i], "--comfort")) comfort = true;
     else if (!strcmp(argv[i], "--quiet")) quiet = true;
-    else if (!strcmp(argv[i], "--final")) onFinal = true;   // (each flight starts established on a 9 km final, configured: the final approach alone)
+    else if (!strcmp(argv[i], "--final")) onFinal = true;   // (each flight starts established on its final just inside the gate, configured: the final approach alone)
     else if (i + 1 < argc && argv[i][0] != '-') { slice = atoi(argv[i]); count = std::max(1, atoi(argv[++i])); }
   }
   g_world.build(); buildStory();
   FILE* out = csv ? fopen(csv, "w") : nullptr;
   if (out) fprintf(out, "aircraft,airport,wind,start,result,seconds,fuel_kg,go_arounds,stabilised,stab_speed_sd,stab_max_sink,stab_path_rms,stab_bank_low,"
-                        "td_sink,td_zone,td_cross,td_crab,g_max,g_min,g_rms,jerk_rms,bank_max,pitch_max,pitch_min,min_clear,min_stall,why\n");
+                        "td_sink,td_zone,td_cross,td_crab,g_max,g_min,g_rms,jerk_rms,bank_max,pitch_max,pitch_min,min_clear,min_stall,t_enroute,t_orbit,t_intercept,t_final,t_land,why\n");
   std::vector<Score> all; std::vector<int> allCraft;
   const int nAp = (int)g_world.airports.size();
   int idx = 0;
@@ -90,8 +91,8 @@ int main(int argc, char** argv) {
           p.apEngage(Plane::AP_NAV, ai, wx);
           Score sc;
           if (!p.apDecline.empty()) { sc.declined = true; sc.why = p.apDecline; }
-          if (onFinal && !sc.declined) {   // established on the final 9 km out, on the glidepath at the approach speed, with approach flap
-            const vec3 ld = p.apLd; const float d = 9000.f;
+          if (onFinal && !sc.declined) {   // established on the final just inside its gate, on the glidepath at the approach speed, with approach flap
+            const vec3 ld = p.apLd; const float d = std::min(9000.f, p.apFinalLen - 300.f);
             vec3 q = p.apTd - ld * d; q.y = A.elev + p.gearHeight() + d * p.apGs;
             const float v = p.apEnv.vApp * 1.3f;
             p.reset(&s, q, atan2f(ld.x, -ld.z) / DEG, s.maxFuel * 0.7f, 150.f, true, v);
@@ -112,12 +113,16 @@ int main(int argc, char** argv) {
               wx.windFrom = wrapDeg360(wx0.windFrom + 120.f * f); wx.windSpeed = wx0.windSpeed + (8.f - wx0.windSpeed) * f; wx.gust = 2.f * f;
             }
             p.step(dt, wx, k * dt);
+            if (getenv("EXAMT") && k % 30 == 0 && k * dt < atof(getenv("EXAMT")))   // (a trace, every half second, up to EXAMT s)
+              printf("      t %6.1f  st %d leg %d  ias %5.1f/%5.1f  bank %5.0f  g %5.2f  edge %d esc %d up %d  agl %5.0f  vs %6.1f  hdg %4.0f  x %6.0f z %6.0f\n", k * dt, p.apStage, p.apLeg, p.ias, p.apSpeed, p.bankDeg(), p.gLoad, (int)p.apEdge, (int)p.apEscape, (int)p.apUpset, p.agl(), p.vel.y, p.heading(), p.pos.x, p.pos.z);
             const float terrain = g_world.height(p.pos.x, p.pos.z);
             if (!p.onGround && k > 60) {
               nAir++;
               gF += (p.gLoad - gF) * std::min(1.f, dt * 6.f);   // (the g a body feels: the vibration above ~1 Hz filtered off)
               const float jerk = (gF - gPrev) / dt; gPrev = gF;
               jerkSum += jerk * jerk; gSum += (gF - 1.f) * (gF - 1.f);
+              if (getenv("EXAMG") && p.gLoad > atof(getenv("EXAMG")) && sc.gMax <= atof(getenv("EXAMG")))
+                printf("      g %.1f at t %.1f: stage %d leg %d escape %d upset %d  ias %.0f  pitch %.0f  bank %.0f  agl %.0f  vs %.1f  mode %d\n", p.gLoad, k * dt, p.apStage, p.apLeg, (int)p.apEscape, (int)p.apUpset, p.ias, p.pitchDeg(), p.bankDeg(), p.agl(), p.vel.y, p.apMode);
               sc.gMax = std::max(sc.gMax, p.gLoad); sc.gMin = std::min(sc.gMin, p.gLoad);
               sc.bankMax = std::max(sc.bankMax, fabsf(p.bankDeg())); sc.pitchMax = std::max(sc.pitchMax, p.pitchDeg()); sc.pitchMin = std::min(sc.pitchMin, p.pitchDeg());
               // (the ground: away from the field's own approach and departure, 3 km round it)
@@ -127,6 +132,8 @@ int main(int argc, char** argv) {
               if (p.pos.y - std::max(terrain, A.elev) > 15.f && vs > 1.f) sc.minStall = std::min(sc.minStall, p.ias / vs);
             }
             if (p.apStage == Plane::APS_GOAROUND && lastStage != Plane::APS_GOAROUND) sc.goArounds++;
+            { const int ph = p.apStage == Plane::APS_NAV ? (p.apLeg == 0 ? 0 : p.apLeg == 1 ? 1 : 2) : p.apStage == Plane::APS_FINAL || p.apStage == Plane::APS_BLEED || p.apStage == Plane::APS_HOVER ? 3 : p.apStage == Plane::APS_GOAROUND ? 0 : 4;
+              sc.tPhase[ph] += dt; }
             lastStage = p.apStage;
             if ((k % 15) == 0 && !td) trace.push_back({k * dt, p.pos.x, p.pos.z, p.pos.y - p.gearHeight() - A.elev, p.ias, p.vel.y, p.bankDeg(), length(vec3(p.vel.x, 0, p.vel.z))});
             if (p.ev.touchdown && !td) {
@@ -149,14 +156,15 @@ int main(int argc, char** argv) {
             sc.stopped = sc.landed && p.apDone && !p.apOverrun && along < A.length * 0.5f && cross < A.width * 0.5f;
             sc.why = p.ev.crashed ? p.ev.crashReason : sc.timeout ? "timeout" : !td ? "no touchdown" : sc.tdSink >= 3.f ? "hard" : !sc.stopped ? "off the runway" : "";
           }
-          // the approach: from 300 m above the field to 30 m, inside the final's cone of the runway end it landed on
+          // the approach: from the height it should be stable by (Plane::apStabH: 300 m above the field, 150 m in a light
+          // aircraft flown visually) to 30 m, inside the final's cone of the runway end it landed on
           if (td && !trace.empty()) {
             vec3 v2(p.vel.x, 0, p.vel.z); const bool rev = dot(v2, A.dir()) < 0.f; vec3 ld = rev ? A.dir() * -1.f : A.dir(), th = A.threshold(rev);
             std::vector<Sample> win;
             for (auto& q : trace) {
               vec3 r(q.x - th.x, 0, q.z - th.z);
               const float al = -dot(r, ld), cr = fabsf(dot(r, vec3(-ld.z, 0, ld.x)));
-              if (q.h <= 300.f && q.h >= 30.f && al > 0.f && al < 9000.f && cr < 150.f + al * 0.15f) win.push_back(q);
+              if (q.h <= p.apStabH() && q.h >= 30.f && al > 0.f && al < 9000.f && cr < 150.f + al * 0.15f) win.push_back(q);
             }
             // (only the last continuous descent to the runway: a go-around's earlier attempt is not this approach)
             for (size_t i = win.size(); i-- > 1;) if (win[i].t - win[i - 1].t > 1.f) { win.erase(win.begin(), win.begin() + i); break; }
@@ -189,10 +197,10 @@ int main(int argc, char** argv) {
           fflush(stdout);
           if (out) {
             std::string why = sc.why; for (char& c : why) if (c == ',' || c == '"' || c == '\n') c = ';';
-            fprintf(out, "%s,%s,%s,%d,%s,%.1f,%.2f,%d,%d,%.3f,%.3f,%.3f,%.2f,%.3f,%.1f,%.2f,%.1f,%.3f,%.3f,%.4f,%.4f,%.1f,%.1f,%.1f,%.1f,%.3f,%s\n",
+            fprintf(out, "%s,%s,%s,%d,%s,%.1f,%.2f,%d,%d,%.3f,%.3f,%.3f,%.2f,%.3f,%.1f,%.2f,%.1f,%.3f,%.3f,%.4f,%.4f,%.1f,%.1f,%.1f,%.1f,%.3f,%.0f,%.0f,%.0f,%.0f,%.0f,%s\n",
                     s.id, A.code, kWindName[wi], st, res, sc.seconds, sc.fuelKg, sc.goArounds, sc.stabilised, sc.stabSpeedSd, sc.stabMaxSink, sc.stabPathRms, sc.stabBankLow,
                     sc.tdSink, sc.tdZone, sc.tdCross, sc.tdCrab, sc.gMax, sc.gMin, sc.gRms, sc.jerkRms, sc.bankMax, sc.pitchMax, sc.pitchMin,
-                    sc.minClear > 1e8f ? -1.f : sc.minClear, sc.minStall > 1e8f ? -1.f : sc.minStall, why.c_str());
+                    sc.minClear > 1e8f ? -1.f : sc.minClear, sc.minStall > 1e8f ? -1.f : sc.minStall, sc.tPhase[0], sc.tPhase[1], sc.tPhase[2], sc.tPhase[3], sc.tPhase[4], why.c_str());
             fflush(out);
           }
           all.push_back(sc); allCraft.push_back(si);

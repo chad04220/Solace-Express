@@ -816,7 +816,7 @@ void Plane::apEngage(int mode, int airport, const Weather& wx) {
   float spd0 = ias > 1.f ? ias : length(vel);
   apHeading = heading(); apAlt = pos.y; apSpeed = std::max(spd0, spec->vref * 1.3f);
   apPitchI = 0; apRollI = 0; apYawI = 0; apVmcCap = 1; apThrI = ctl.throttle; apXI = 0; apGamI = 0; apTrimEst = ctl.pitch; apUseVS = false; apUpset = false;
-  apSpdEst = ias; apVelPrev = vel; apNzCmd = gLoad;
+  apSpdEst = ias; apVelPrev = vel; apNzCmd = gLoad; apBankOk = 25.f;
   apAirport = airport; apStage = APS_NAV; apStageT = 0; apLeg = 0; apTurnDir = 0; apClimbDir = 0; apBled = false; apBleedT = 1e9f;
   apDecline.clear(); apHoldFor = -1;
   if (mode >= AP_NAV && airport >= 0) {
@@ -904,25 +904,33 @@ void Plane::apSense() {
   E.flaps = s.flapCL > 0.01f;
 }
 
+// (the airlines' and the flying schools' rule: stabilised by 1,000 ft, or by 500 ft flying visually - a light aircraft's
+// final is a mile or two, and its gate at 330 m held a trainer on a 6 km final for three and a half minutes)
+static float apStabHeight(float vApp) { return vApp < 45.f ? 150.f : 300.f; }
+float Plane::apStabH() const { return apStabHeight(apEnv.vApp); }
 // The turns the autopilot plans with, from the speed it flies them at. Gentle (passengers, a fragile load): a 26 deg
 // bank, never tighter than a standard-rate turn. Otherwise flown hard, 45 deg - except fast (a planned speed above
 // ~120 m/s), where the localizer's look-ahead, not the turn, sets how far out it settles on the centreline: there no
 // tighter than a standard-rate turn either (tighter, the XR-30 and XR-40 swapped outbound and intercept legs without
 // end). vPlan: the speed the plan was made for (the hold's), so the geometry doesn't flicker with the speed of the moment
 static float apFastK(float vPlan) { return smoothstepf(115.f, 125.f, vPlan); }
-static float apTurnR(float V, float vPlan, bool gentle) {
+static float apTurnR(float V, float vPlan, bool gentle, float hardBank = 45.f) {
   if (gentle) return std::max(V / (3.f * DEG), V * V / (G0 * tanf(26.f * DEG)));
-  return std::max(V * V / (G0 * tanf(45.f * DEG)), V / (3.f * DEG) * apFastK(vPlan));
+  return std::max(V * V / (G0 * tanf(hardBank * DEG)), V / (3.f * DEG) * apFastK(vPlan));
 }
 // the descent orbit's radius at the hold speed: 24 deg gentle, 45 hard, and fast never tighter than 17.6 s of flight
 // (a tighter one brought the XR-30 to Northpoint at 108 kt and it ran off the end)
-static float apHoldRadius(float vh, bool gentle) {
+static float apHoldRadius(float vh, bool gentle, float hardBank = 45.f) {
   const float k = apFastK(vh);
-  const float r = std::max(vh * vh / (G0 * tanf((gentle ? 24.f : 45.f) * DEG)) * 1.15f, vh * 17.6f * k);
+  const float r = std::max(vh * vh / (G0 * tanf((gentle ? 24.f : hardBank) * DEG)) * 1.15f, vh * 17.6f * k);
   return clampf(r, gentle || k > 0.5f ? 900.f : 400.f, 3500.f);
 }
 // the hold and intercept speed: well above the approach speed, below cruise
-static float apHoldSpeed(float vApp, float cruise) { return std::max(vApp * 1.45f, std::min(cruise * 0.6f, vApp * 1.8f)); }
+// (a professional's: 1.4 to 1.5 times it, an airliner's manoeuvring speed in the pattern - at 1.8 the Starling's 25 deg
+// orbit took three minutes a lap and its pattern ran 12 km out)
+static float apHoldSpeed(float vApp, float cruise, bool pro = false) {
+  return pro ? std::max(vApp * 1.4f, std::min(cruise * 0.6f, vApp * 1.5f)) : std::max(vApp * 1.45f, std::min(cruise * 0.6f, vApp * 1.8f));
+}
 
 static const float kIntRegion = 6000.f;   // how far beyond the gate the approach's intercept region reaches (m)
 
@@ -959,11 +967,13 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   auto clear = [&](vec3 q, float d) { return std::max(H(q) + margin(d), g_scenery.obstacleTop(q.x, q.z, 40.f) + clampf(d * 0.01f, 5.f, 20.f)); };
   for (float d = 300.f; d <= 3500.f; d += 50.f) { vec3 q = td - ld * d; need = std::max(need, (clear(q, d) - a.elev) / d); }
   float gs = std::min(need, tanf(maxAng * DEG));
-  // the gate - the final approach fix - where the glidepath is 460 m (1,500 ft) above the field, as a professional's is:
-  // on the glidepath and configured from there, the approach is stable long before 300 m (the gate at 4.5 km put a
-  // slow aircraft's glidepath capture at 257 m, inside the height it should already be stable by); never under the 4.5
-  // km it was, and the ground can still shorten it (below)
-  float F0 = apPro ? clampf(std::max(E.vApp * 100.f, 460.f / gs), 4500.f, 9500.f) : clampf(E.vApp * 100.f, 4500.f, 8000.f), F = F0;
+  // the gate - the final approach fix - where the glidepath is 230 m up for a light aircraft, 330-460 m (1,500 ft) for an
+  // airliner or a jet (8 s of its approach speed in height), as a professional's is: on the glidepath and configured
+  // from there, the approach is stable by the height it should be (apStabH: the gate at 4.5 km put a jet's glidepath
+  // capture at 257 m, inside the 300 m it should already be stable by; at 460 m a trainer's final took four and a half
+  // minutes); never under the 4.5 km it was, and the ground can still shorten it (below)
+  const float gateH = apStabHeight(E.vApp) < 200.f ? 230.f : clampf(E.vApp * 8.f, 330.f, 460.f);
+  float F0 = apPro ? clampf(std::max(E.vApp * 100.f, gateH / gs), 4500.f, 9500.f) : clampf(E.vApp * 100.f, 4500.f, 8000.f), F = F0;
   for (float d = 300.f; d <= F0; d += 100.f) {
     vec3 q = td - ld * d;
     if (a.elev + d * gs < clear(q, d)) { F = d - 600.f; break; }
@@ -973,8 +983,8 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   float gh = gearHeight();
   float iafAlt = a.elev + gh + F * gs + 20.f;
   // orbit radius: a comfortable turn at holding speed
-  const float vh = apHoldSpeed(E.vApp, s.cruise);
-  const float R = apHoldRadius(vh, apComfort);
+  const float vh = apHoldSpeed(E.vApp, s.cruise, apPro);
+  const float R = apHoldRadius(vh, apComfort, apPro ? apProBank() : 45.f);
   // intercept region: the extended centreline from the gate out to 6 km beyond it (the guidance captures the final and
   // turns back from its outbound leg inside it)
   float intMsa = 0;
@@ -1033,7 +1043,7 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   // minimum and a turn's width, a turn and a half across - gentle turns are wide) at the ground's height there plus the
   // en-route margin, then down the final (QA F1: a passenger Starling at Kettle Lake turning in wide over the ridge
   // beyond runway 20 was lifted too high to land, round and round, until it met the ridge)
-  const float Rin = apTurnR(vh, vh, apComfort);   // (as the guidance's)
+  const float Rin = apTurnR(vh, vh, apComfort, apPro ? apProBank() : 45.f);   // (as the guidance's)
   const float outReach = F + 1300.f + vh * 15.f + 2.f * Rin, crossReach = 3.4f * Rin;
   float turnMsa = a.elev;
   for (float d = F; d <= outReach; d += 400.f) for (float c = -crossReach; c <= crossReach; c += 500.f) turnMsa = std::max(turnMsa, H(td - ld * d + rr * c));
@@ -1060,8 +1070,11 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   // (and a stabilised final: the ground round the intercept holding it above the glidepath at the gate means a dive from
   // there to the glidepath - full flap, the throttle closed, through 300 m above the field at three times the sink of a
   // stabilised approach. Where the other end needs none, a professional takes it: 15 per metre to lose, about as much
-  // as a 5 kt headwind for every 15 m)
-  const float dive = apPro ? std::max(0.f, intAlt - iafAlt) : 0.f;
+  // as a 5 kt headwind for every 15 m. But only what it can't lose between the gate and the height it is to be stable
+  // by, at the 1,000 fpm a stable approach may sink at - a trainer can lose 140 m there, and to save itself a 150 m
+  // drop the Kestrel flew 15 km to Meadowbrook's far end)
+  const float spareDrop = (gateH - apStabHeight(E.vApp)) * std::max(0.f, 5.1f / std::max(E.vApp, 10.f) / std::max(gs, 0.02f) - 1.f);
+  const float dive = apPro ? std::max(0.f, intAlt - iafAlt - spareDrop) : 0.f;
   float score = hw * 40.f - bestCost - (F0 - F) * 0.3f - length(bestC - pos) * 0.02f - blocked - dive * 15.f
               - (atanf(gs) / DEG - 3.f) * 150.f - (stopShort > 0.f ? 20000.f + stopShort * 20.f : 0.f) - (highAt2k > 0.f ? 20000.f + highAt2k * 20.f : 0.f) - (turnHigh > 0.f ? 20000.f + turnHigh * 20.f : 0.f)
               - (surfBad ? 40000.f : 0.f) - (offChart > 0.f ? 20000.f + offChart * 20.f : 0.f);
@@ -1107,7 +1120,7 @@ void Plane::apGuidance(float dt) {
     case APS_NAV: {
       vec3 C = apHoldC; C.y = pos.y;
       float dc = len2(C - pos);
-      const float vh = apHoldSpeed(vref, s.cruise);
+      const float vh = apHoldSpeed(vref, s.cruise, apPro);
       apUseVS = false;
       ctl.flaps = 0.f;
       ctl.gearDown = !s.retract;
@@ -1134,7 +1147,15 @@ void Plane::apGuidance(float dt) {
         vec3 sd = dc > 1.f ? vec3(-d.z, 0, d.x) * (1.f / dc) : vec3(1, 0, 0);
         for (float i = 0; i <= n; i++) for (int k = -1; k <= 1; k++) { vec3 q = pos + d * (i / n) + sd * (k * 600.f); msa = std::max(msa, g_world.height(q.x, q.z)); }
         apAlt = std::max(clampf(apHoldAlt + (dc - apHoldR) * 0.06f, apHoldAlt, std::max(apCruiseAlt, apHoldAlt)), msa + 330.f);
-        apSpeed = dc < 2500.f + s.cruise * 20.f ? vh : s.cruise * 0.85f;   // slow down in time to turn tightly (not so early that slow, high-power flight eats the reserve)
+        // slow down in time to turn tightly (not so early that slow, high-power flight eats the reserve) - a professional
+        // starts as far out as it takes to slow from the speed it has at 2 m/s^2, so a jet at 400 m/s is down to its
+        // terminal speed before it turns (its turns at 25-60 deg at that speed are tens of km wide: the XR-40 flew off
+        // the chart)
+        const float vNow = std::max(ias, vh), slowDist = apPro ? (vNow * vNow - vh * vh) / (2.f * 2.f) + vh * 20.f + 2500.f : 2500.f + s.cruise * 20.f;
+        // (once slowed, it stays slow unless it is taken well away again: the slowing distance shrinks as the speed comes
+        // off, and the Meridian, turning round onto the hold, sped up to cruise and slowed again twice over)
+        const bool slowed = apPro && apSpeed > 0.f && apSpeed <= vh + 0.5f;
+        apSpeed = dc < slowDist + (slowed ? 3000.f : 0.f) ? vh : s.cruise * 0.85f;
         // climb planning: can this aircraft out-climb the ground ahead on the way? Compare the height needed over
         // the next 12 km of track with what it can reach at a conservative climb gradient. If it can't, climb in a
         // circle (turning towards the lower side) until it can, then carry on.
@@ -1174,7 +1195,11 @@ void Plane::apGuidance(float dt) {
           vec3 r = pos - C;   // orbit the way we are already turning
           apHoldDir = (r.x * vel.z - r.z * vel.x) > 0 ? -1 : 1;
           // already down at the orbit's height: no need to circle (a full orbit costs minutes of fuel), go for the final
-          if (pos.y < apHoldAlt + 60.f) apLeg = along > -(F + 500.f + vnow * 15.f) ? 3 : 2;
+          // (a professional: or near enough to lose the rest on the way to the gate, at a gentle 3 deg - the Meridian
+          // circled for 100 s to lose 35 m)
+          const vec3 gate = td - ld * F;
+          const float onWay = apPro ? 0.05f * len2(vec3(gate.x - pos.x, 0, gate.z - pos.z)) : 0.f;
+          if (pos.y < apHoldAlt + std::max(60.f, onWay)) apLeg = along > -(F + 500.f + vnow * 15.f) ? 3 : 2;
         }
         if (apClimbDir == 0) apStatus = fmt("NAV  %s  RWY %02d  %.1f km", a.code, rwyN, (dc + F) / 1000.f);
       } else {
@@ -1182,7 +1207,7 @@ void Plane::apGuidance(float dt) {
         // out to settle before the gate. Too close in (or on the wrong side), first fly outbound, diverging a little.
         float outMin = F + 500.f + vnow * 15.f;
         float Rt = vnow * vnow / (G0 * tanf((E.agile ? 30.f : 20.f) * DEG));
-        float Rturn = apTurnR(vnow, vh, apComfort);   // NAV turns (apTurnR: gentle, hard, or fast)
+        float Rturn = apTurnR(vnow, vh, apComfort, apPro ? apProBank() : 45.f);   // NAV turns (apTurnR: gentle, hard, or fast)
         float L1 = vnow * 14.f;
         // (the side is kept from the outbound leg's start: still turning from the hold it can cross the centreline, and a
         // side taken afresh then flipped the line to the far side, which it chased out past 20 km - QA F1, Kettle Lake)
@@ -1202,7 +1227,7 @@ void Plane::apGuidance(float dt) {
           apSpeed = vh;
           int next = along > -outMin ? 3 : 2;
           if (pos.y < apHoldAlt + 50.f && apStageT > 5.f &&
-              (fabsf(hdgErrDeg(intercept(next), heading())) < 30.f || apStageT > 2.f * PI * apHoldR / vh + 20.f)) { apLeg = next; apStageT = 0; }
+              (fabsf(hdgErrDeg(intercept(next), heading())) < (apPro ? 90.f : 30.f) || apStageT > 2.f * PI * apHoldR / vh + 20.f)) { apLeg = next; apStageT = 0; }   // (a professional: once down, it turns out for the final from anywhere it need not reverse its turn to - a lap of a 25 deg orbit is minutes)
           apStatus = fmt("HOLD  %s  %s %.0f ft", a.code, pos.y > apHoldAlt + 50.f ? "descending to" : "leaving at", apHoldAlt * M_TO_FT);
         } else {
           if (apLeg == 2 && along > -(outMin - 400.f) && fabsf(cross) > 300.f) apLeg = 3;
@@ -1261,8 +1286,9 @@ void Plane::apGuidance(float dt) {
       const float vBase = shortField ? std::min(vref, 1.3f * E.vs0) : vref;
       bool high = err < -40.f && dist < F + 1000.f;   // above the glideslope: configure early for the drag
       // (configured by height, as a professional is: approach flap outside the gate, more from it, the landing flap set
-      // by 380 m - landed stable from 300 m; by distance, a fast aircraft was still reconfiguring through 300 m)
-      const bool stabH = apPro && hab < 380.f;
+      // 80 m above the height it is to be stable by; by distance, a fast aircraft was still reconfiguring through 300 m)
+      const float hStab = apStabH();
+      const bool stabH = apPro && hab < hStab + 80.f;
       if (high) ctl.flaps = 1.f;
       else if (apPro ? !stabH : dist > F * 0.55f) ctl.flaps = dist > F ? 0.34f : 0.67f;
       else {   // landing flap: what leaves a nose-up attitude (~4.5 deg angle of attack) for a main-wheels-first touchdown
@@ -1274,14 +1300,22 @@ void Plane::apGuidance(float dt) {
         ctl.flaps = approach(ctl.flaps, fl, 0.3f, dt);
       }
       if (dist < F + 1500.f || high) ctl.gearDown = true;
-      // (and slowed by height: from the gate's 1.18 the final approach speed by 330 m, then held - a professional is at
-      // it, stable, from 300 m)
-      apSpeed = (dist > F ? vBase * 1.3f : apPro ? vBase * (1.06f + 0.12f * smoothstepf(330.f, 460.f, hab)) : dist > F * 0.5f ? vBase * 1.18f : vBase * 1.06f) + apGustAdd;
+      // (and slowed on a planned profile: at the final approach speed by the point where the glidepath is 30 m above the
+      // height it is to be stable by - a professional is at it from there - and from there back up the glidepath no faster than this airframe
+      // slows on it at idle with its drag out, half of that to spare: the speed a slick jet needs to shed takes it
+      // kilometres, a trainer's a few hundred metres; stepped by distance, the XR-10 was still slowing through 300 m)
+      float vSched = 0.f;
+      if (apPro) {
+        const float vFinal = vBase * 1.06f, d330 = std::max(hStab + 30.f - gh, 0.f) / std::max(gs, 0.02f);
+        const float aDec = clampf(0.5f * G0 * (1.f / std::max(0.6f * glideRatio(), 3.f) - gs), 0.25f, 1.f);
+        vSched = std::min(vBase * (dist > F ? 1.3f : 1.18f), sqrtf(vFinal * vFinal + 2.f * aDec * std::max(dist - d330, 0.f)));
+      }
+      apSpeed = (apPro ? vSched : dist > F ? vBase * 1.3f : dist > F * 0.5f ? vBase * 1.18f : vBase * 1.06f) + apGustAdd;
       // an airframe that can take it (8 g and more: the research craft), with no passengers or fragile load aboard: down
       // the final fast, then the belly-up to shed it (below); a second approach after a go-around too (a go-around's
       // climb resets apBled)
       apBleedT += dt;
-      if (E.highAlpha && !apComfort && !apBled) {
+      if (E.highAlpha && !apComfort && !apBled && !apPro) {   // (a professional plans the slowing instead: above)
         apSpeed = std::max(apSpeed, vref * 1.7f);
         if (dist < 4000.f && dist > 1800.f && hab > 80.f && fabsf(cross) < 60.f && ias > vref * 1.35f) {
           apStage = APS_BLEED; apStageT = 0; apBleedPhase = 0; apBled = true;
@@ -1305,7 +1339,7 @@ void Plane::apGuidance(float dt) {
       // landing roll (after its belly-up, if it does one), starting to slow where it can stop at a gentle 2 m/s^2 - the
       // hover allows twice that - from the ground speed it has, tailwind included
       float gsAl = std::max(vel.x * ld.x + vel.z * ld.z, 0.f);
-      if (E.hover && (apBled || !E.highAlpha || apComfort) && apStage == APS_FINAL && dist < clampf(gsAl * gsAl / 4.f + 200.f, 1700.f, 6000.f) && dist > 0.f && fabsf(cross) < 60.f) { apStage = APS_HOVER; apStageT = 0; apThrI = ctl.throttle; }
+      if (E.hover && (apBled || !E.highAlpha || apComfort || apPro) && apStage == APS_FINAL && dist < clampf(gsAl * gsAl / 4.f + 200.f, 1700.f, 6000.f) && dist > 0.f && fabsf(cross) < 60.f) { apStage = APS_HOVER; apStageT = 0; apThrI = ctl.throttle; }
       // flare height: enough for this airframe to round out in time (a heavy one answers the elevator slowly, a small
       // highly loaded wing builds its lift slowly)
       float lag = apPathLag();
@@ -1432,14 +1466,20 @@ float Plane::terrainAround() const {
 // how quickly this airframe's pitch answers at this speed (s): the learned time to the pitch-rate peak at cruise, slower
 // in proportion as the speed falls
 static float pitchLag(const PerfModel& P, const AircraftSpec& s, float ias) { return P.tQ * clampf(s.cruise / std::max(ias, 15.f), 0.6f, 2.5f); }
+// A professional's envelope for this airframe (docs/PILOT.md): an airliner's pilot flies 25 deg of bank and 1.3 g, a test
+// pilot in a jet built for 9 g or 40 g manoeuvres at more - smoothly still. 0 for the civil types (5.8 g usable) up to 1
+// at 40 g, on the ratio's logarithm: the XR-10 (9 g) 0.23, the XR-20 (14 g) 0.46, the XR-30 and XR-40 1
+float Plane::apProScale() const { return clampf(logf(std::max(perf(spec).gUse, 1.f) / 5.8f) / logf(40.f / 5.8f), 0.f, 1.f); }
+float Plane::apProG() const { return 1.3f + 1.2f * apProScale(); }      // normal manoeuvring's load factor: 1.3 g .. 2.5 g
+float Plane::apProBank() const { return 30.f + 30.f * apProScale(); }   // and its bank: 30 .. 60 deg (an airline's 25 to 30; at 25 an airliner's pattern ran 12 km out)
 float Plane::apAltGain() const { return apPro ? std::min(0.15f, 0.22f * apPathGain(true)) : std::min(0.15f, 0.25f / apPitchLag()); }
 // how fast the flight-path loop may close (1/s): no faster than this airframe's pitch answers, and - a professional's -
-// slow enough against the time its path takes to follow the nose that it settles without overshoot (the gain times that
-// lag at most 0.5: damped to ~0.7). A heavy airliner's path follows its nose seconds late: its loop closed as fast as a
-// trainer's, the Meridian porpoised down its final at 17 s, -12 to +5 m/s, in calm air
+// no faster than the time its path takes to follow the nose allows (the gain times that lag at most 1: apControl damps
+// what the lag would leave, with the path's own rate). A heavy airliner's path follows its nose seconds late: its loop
+// closed as fast as a trainer's, the Meridian porpoised down its final at 17 s, -12 to +5 m/s, in calm air
 float Plane::apPathGain(bool approach) const {
   const float k = std::min(approach ? 0.8f : 1.6f, 1.f / apPitchLag());
-  return apPro ? std::min(k, 0.5f / apPathLag()) : k;
+  return apPro ? std::min(k, 1.f / apPathLag()) : k;
 }
 float Plane::apPitchLag() const { return pitchLag(perf(spec), *spec, ias); }
 // The flight path follows the nose only as the wing builds the lift: in 2m / (rho V S CLa) - the heavier, the higher
@@ -1581,21 +1621,98 @@ void Plane::apControl(float dt) {
   // is flown until it is well clear again - a 0.85 g floor in a steep, slowing climb held the nose up until the
   // Bushmaster went over the top at 170 deg of bank: review F1)
   const float pd = pitchDeg(), bd = fabsf(bankDeg());
-  if (!flare && (ias < vsFl * 1.08f || fabsf(pd) > 25.f || bd > 45.f)) apUpset = true;
-  else if (apUpset && (flare || (ias > vsFl * 1.3f && fabsf(pd) < 12.f && bd < 25.f))) apUpset = false;
+  // (and the chart's edge, for a professional: a turn at its bank that would carry it past the edge - a fast jet's at its
+  // speed is kilometres wide - is flown at its sharpest, 2.5 g and 60 deg of bank, not the whole airframe (the XR-20's
+  // 14 g is for emergencies): the XR-20 started near Fjordhaven's corner of the chart and was off it in 40 s. Heading
+  // out: where it will be in 20 s past the edge, and getting further out - a corner field's own approaches run close to
+  // the edge, and flying along it or back in is no reason to turn harder)
+  bool edge = false;
+  if (apPro && !appr && !onGround) {
+    const vec3 ahead = pos + vec3(vel.x, 0, vel.z) * 20.f;
+    edge = std::max(fabsf(ahead.x), fabsf(ahead.z)) > WORLD_HALF * 1.05f && std::max(fabsf(ahead.x), fabsf(ahead.z)) > std::max(fabsf(pos.x), fabsf(pos.z));
+  }
+  apEdge = edge;
+  const float proK = edge ? 1.f : apProScale(), proG = 1.3f + 1.2f * proK, proBank = 30.f + 30.f * proK;   // (apProG / apProBank, or at the chart's edge their sharpest)
+  if (!apPro) {
+    if (!flare && (ias < vsFl * 1.08f || fabsf(pd) > 25.f || bd > 45.f)) apUpset = true;
+    else if (apUpset && (flare || (ias > vsFl * 1.3f && fabsf(pd) < 12.f && bd < 25.f))) apUpset = false;
+  } else {
+    // (a professional's upset is beyond what it flies on purpose: 15 deg past the bank it has been allowed - which comes
+    // down slowly, so rolling out of the edge's 60 deg to an XR-20's 41 is no upset - and over once it is back inside it.
+    // At 41 deg the XR-20 had come back off the edge in a 60 deg turn, been called upset, and pulled 11 g)
+    const float bankOk = std::max(apBankOk, apComfort ? 25.f : proBank);
+    if (!flare && (ias < vsFl * 1.08f || fabsf(pd) > 25.f || bd > std::max(45.f, bankOk + 15.f))) apUpset = true;
+    else if (apUpset && (flare || (ias > vsFl * 1.3f && fabsf(pd) < 12.f && bd < std::max(25.f, bankOk + 5.f)))) apUpset = false;
+  }
   // the ground ahead, as a ground-proximity warning sees it: where the path it is on now - straight on, at its climb or
   // descent - comes within 60 m of the terrain in the next 25 s (the final approach aside: there the path meets the
   // runway by design)
+  // (a professional's looks along the path it is on - the turn it is in, not a straight line: at 60 deg of bank and 370
+  // m/s the XR-40 turned into a ridge its straight line missed. It climbs over what is ahead on it as a matter of
+  // course, within its own envelope, and calls an escape only when the climb it makes at its own manoeuvring g would
+  // not clear it. Then it rolls wings level and pulls as firmly as clears it, not with the airframe's all: a fast jet's
+  // 25 s reach several km, and the whole envelope for every slope out there pulled the XR-40 to 34 g)
+  const bool wasEscape = apEscape;
   apEscape = false;
-  if (!appr && !onGround) for (int i = 1; i <= 5 && !apEscape; i++) {
-    const vec3 qa = pos + vel * (i * 5.f);
-    apEscape = qa.y < g_world.height(qa.x, qa.z) + 60.f;
+  float escG = nzMax, terrVs = -1e9f;
+  if (!appr && !onGround) {
+    if (!apPro) for (int i = 1; i <= 5 && !apEscape; i++) {
+      const vec3 qa = pos + vel * (i * 5.f);
+      apEscape = qa.y < g_world.height(qa.x, qa.z) + 60.f;
+    } else {
+      const float vh = std::max(sqrtf(vel.x * vel.x + vel.z * vel.z), 1.f), psi = atan2f(vel.x, -vel.z);
+      const float bnk = clampf(bankDeg(), -80.f, 80.f) * DEG, w = G0 * tanf(bnk) / vh;   // (the turn it is in, rad/s)
+      const float tRoll = fabsf(bnk) / ((15.f + 30.f * apProScale()) * DEG);              // (and the time to roll out of it)
+      const float climbMax = std::max(apEnv.climb * 1.5f, spd * 0.34f);                    // (a zoom: 20 deg, trading speed)
+      auto along = [&](float t, float tArc) {   // where it is in t s: turning for tArc s, then straight on
+        const float ta = std::min(t, tArc), ps = psi + w * ta;
+        vec3 q = pos;
+        if (fabsf(w) < 1e-4f) q = q + vec3(sinf(psi), 0, -cosf(psi)) * (vh * ta);
+        else q = q + vec3(cosf(psi) - cosf(ps), 0, sinf(psi) - sinf(ps)) * (vh / w);
+        return q + vec3(sinf(ps), 0, -cosf(ps)) * (vh * (t - ta));
+      };
+      // the path at a pull of nz up to a climb of vyCap - still in its turn, or rolled out first - and whether it clears
+      // the ground by the margin; and the climb rate that would put it over every point of it in time
+      auto clears = [&](float nz, bool roll, float margin, float vyCap, float* need) {
+        float y = pos.y, vy = vel.y; bool ok = true;
+        for (int i = 1; i <= 50; i++) {
+          const float t = i * 0.5f, aUp = std::max(0.f, (roll && t > tRoll ? nz : nz * cosf(bnk)) - 1.f) * G0;
+          vy = std::min(vy + aUp * 0.5f, std::max(vyCap, vel.y)); y += vy * 0.5f;
+          if (i % 5) continue;
+          const vec3 q = along(t, roll ? tRoll : 1e9f);
+          const float hq = g_world.height(q.x, q.z);
+          if (y < hq + margin) ok = false;
+          if (need) *need = std::max(*need, (hq + margin + 40.f - pos.y) / t);
+          else if (!ok) return false;
+        }
+        return ok;
+      };
+      clears(1.f, false, 250.f, vel.y, &terrVs);   // (the climb the ground ahead on its path asks for: kept 250 m and more above it, as the route is)
+      // (an escape once climbing away holds until the path rolled out at its own g clears by 120 m, and for 3 s at least:
+      // on and off each step, the pull came and went)
+      const float vyPro = std::max(vel.y, std::min(terrVs, climbMax));
+      if (wasEscape ? apEscT < 3.f || !clears(apProG(), true, 120.f, vyPro, nullptr) : !clears(apProG(), false, 60.f, vyPro, nullptr)) {
+        apEscape = true;
+        for (float m : {2.f, 3.f, 5.f, 8.f}) {
+          const float gk = 1.f + (apProG() - 1.f) * m;
+          if (gk >= nzMax) break;
+          if (clears(gk, true, 60.f, climbMax, nullptr)) { escG = gk * 1.2f; break; }   // (a fifth to spare: the pull takes a moment to come on)
+        }
+        float need = 0.f; clears(escG, true, 60.f, climbMax, &need);
+        terrVs = std::max(terrVs, need);
+      }
+      terrVs = std::min(terrVs, climbMax);
+    }
   }
+  apEscT = apEscape ? apEscT + dt : 0.f;
   // a professional's envelope (docs/PILOT.md): what the job needs, not what the airframe takes - 0.75 to 1.3 g, about
   // 25 deg of bank, rolled at 8 deg/s; gentler still with passengers or a fragile load. A recovery and the ground ahead
-  // get the whole envelope back
-  const bool pro = apPro && !flare && !apUpset && !apEscape;
-  if (pro) { nzMax = std::min(nzMax, apComfort ? 1.25f : 1.3f); nzMin = std::max(nzMin, apComfort ? 0.85f : 0.75f); }
+  // get more g: the ground as much as clears it, a recovery a g more - but its bank stays its own (the whole envelope's
+  // 85 deg and 11 g was a turn, not a recovery)
+  const bool proAny = apPro && !flare, pro = proAny && !apUpset && !apEscape;
+  if (pro) { nzMax = std::min(nzMax, apComfort ? 1.25f : proG); nzMin = std::max(nzMin, apComfort ? 0.85f : 0.75f); }
+  else if (proAny && apEscape) { nzMax = std::min(nzMax, std::max(escG, proG)); nzMin = std::max(nzMin, 0.25f); }
+  else if (proAny) { nzMax = std::min(nzMax, proG + 1.f); nzMin = std::max(nzMin, 0.25f); }   // (recovering: unloaded, never pushed negative)
   else if (apComfort && !flare) {
     if (!apUpset && !apPro) { nzMax = std::min(nzMax, 1.25f); nzMin = std::max(nzMin, 0.85f); }
     else if (apUpset) nzMin = std::max(nzMin, 0.25f);   // (recovering: unloaded, never pushed negative - a fragile load breaks below 0 g)
@@ -1611,9 +1728,11 @@ void Plane::apControl(float dt) {
   float reserve = !apUseVS && apAlt - pos.y > 80.f ? 1.5f : 1.25f;
   if (apComfort) reserve = std::min(reserve, 1.12f);   // (a 25 deg bank needs 1.1 g: the comfort ceiling leaves little to climb with)
   float bankMax = acosf(std::min(0.99f, (pro ? 1.05f : reserve) / std::max(nzMax, 1.01f))) / DEG;   // (a professional's: 0.05 g to spare)
-  if (appr) bankMax = std::min(bankMax, agl() < 150.f ? (pro ? 15.f : 20.f) : (pro ? 25.f : 35.f));
+  if (appr) bankMax = std::min(bankMax, agl() < 150.f ? (pro ? 15.f : 20.f) : (pro ? std::min(apProBank(), 30.f) : 35.f));
   bankMax = clampf(bankMax, 10.f, 85.f);
-  if ((pro || (apComfort && !apPro)) && !appr) bankMax = std::min(bankMax, 25.f);   // (the final approach keeps its own)
+  if (proAny && !appr) bankMax = std::min(bankMax, apComfort ? 25.f : apEscape ? 10.f : proBank);   // (the ground ahead: wings level, and pull)
+  else if (apComfort && !apPro && !appr) bankMax = std::min(bankMax, 25.f);   // (the final approach keeps its own)
+  if (apPro) apBankOk = std::max(bankMax, apBankOk - 5.f * dt);           // (the bank it has been allowed, coming down at 5 deg/s)
   float maxTurn = G0 * tanf(bankMax * DEG) / spd;                       // rad/s
   float turnT = clampf(herr * DEG * std::min(appr ? 0.25f : 0.6f, 0.25f / P.tRoll), -maxTurn, maxTurn);
   float bankT = clampf(atanf(turnT * spd / G0) / DEG, -bankMax, bankMax);
@@ -1622,7 +1741,8 @@ void Plane::apControl(float dt) {
   float rollCap = (fbw ? fbwRollMax(0.f) : P.rollRate * clampf(V / s.cruise, 0.25f, 2.f)) * 0.95f;
   rollCap *= clampf(2.f / std::max(gLoad, 0.5f), 0.35f, 1.f);         // unload, roll, pull: no full-rate rolls under load
   // (rolled in and out smoothly: 8 deg/s, 6 with passengers - low on the final, 15 for the gusts that roll it)
-  if (pro) rollCap = std::min(rollCap, (appr && agl() < 150.f ? 15.f : apComfort ? 6.f : 8.f) * DEG);
+  if (pro) rollCap = std::min(rollCap, (appr && agl() < 150.f ? 15.f : apComfort ? 6.f : 8.f + 22.f * proK) * DEG);
+  else if (proAny) rollCap = std::min(rollCap, (15.f + 30.f * proK) * DEG);   // (a recovery rolls briskly, still not at the stops)
   else if (apComfort && !apUpset) rollCap = std::min(rollCap, 15.f * DEG);
   float kBank = std::min(appr ? 1.5f : 3.f, 0.7f / P.tRoll);           // bank loop no faster than the roll mode
   float pT = clampf((bankT - bank) * DEG * kBank, -rollCap, rollCap);
@@ -1633,10 +1753,11 @@ void Plane::apControl(float dt) {
   // (the climb it can make now: heavy, high, iced or an engine out, less - and with none to spare it holds what it can)
   float vsUp = std::max(E.climb * 1.1f, 1.f), vsDn = std::max(spd * 0.42f, vsUp);   // dives up to ~25 deg
   if (apComfort && !apUpset) { vsUp = std::min(vsUp, std::max(0.6f * E.climb, 1.f)); vsDn = std::min(vsDn, std::max(spd * 0.1f, 4.f)); }
-  else if (pro) vsDn = std::min(vsDn, std::max(spd * 0.09f, 3.5f));   // (a professional's descent: about 5 deg, 900 fpm at a trainer's speed)
+  else if (pro) vsDn = std::min(vsDn, std::max(spd * 0.12f, 3.5f));   // (a professional's descent: up to 7 deg, 1,000 fpm at a trainer's speed, 2,400 at an airliner's)
   float tQv = pitchLag(P, s, V);                                        // (the airframe answers slower at low speed)
   float kAlt = apAltGain();                                            // outer loops slower than the g loop
   float vsT = apUseVS ? apVS : clampf((apAlt - pos.y) * kAlt, -vsDn, pro ? vsUp : vsUp * 3.f);   // (a professional climbs at the climb the aircraft holds, not a zoom)
+  if (apPro) vsT = std::max(vsT, terrVs);   // (the climb the ground ahead on its path needs)
   if (!flare) {
     // energy: climb no harder than the power holds the target speed; below 1.15 Vs put the nose down for speed
     // (and never slower than the best-climb speed Vy while climbing: below it the climb only gets worse, and with the
@@ -1652,7 +1773,7 @@ void Plane::apControl(float dt) {
   // so a speed short of the target with the throttle at its stop is made good with the nose, and a climb is flown at the
   // speed the power holds. The speed and its rate come from the inertial acceleration along the path, the airspeed only
   // correcting their slow drift: a gust moves the airspeed without the aircraft speeding up, and isn't chased
-  const bool tecs = pro && apSpeed > 0.f && apMode != AP_STUNT;
+  const bool tecs = proAny && apSpeed > 0.f && apMode != AP_STUNT;   // (a recovery included: switching laws jolted the throttle)
   float eD = gT - g, eE = 0.f;
   {
     const float kIas = sqrtf(std::max(density, 0.05f) / 1.225f);
@@ -1662,14 +1783,19 @@ void Plane::apControl(float dt) {
     apSpdEst += (aAl + (ias - apSpdEst) / tauV) * dt;
     if (tecs) {
       const float vdot = aAl + (ias - apSpdEst) / tauV;
-      const float vdotT = clampf((apSpeed - apSpdEst) * 0.12f, -0.6f, 0.6f);   // (back onto the speed over ~8 s, no harder than 0.06 g)
+      // (back onto the speed over ~8 s, no harder than 0.06 g - or, in a jet built for it, up to 0.2 g: at 0.06 g the XR-40
+      // took eight minutes and 150 km to come down from 400 m/s to its terminal speed, and flew off the chart)
+      const float aLim = 0.6f + 1.4f * apProScale();
+      const float vdotT = clampf((apSpeed - apSpdEst) * 0.12f, -aLim, aLim);
       eE = (gT - g) + (vdotT - vdot) / G0;
       // (the path first: the elevator weighs the speed lightly while the throttle can still answer it, fully once the
       // throttle is at a stop - unweighted, the nose chased every slowing the engines were still answering, and a calm
       // final porpoised at 10 s)
       // (at a stop: the throttle the energy law asks for beyond its range - asked below idle or above full, not merely
       // near them; a light aircraft descends its final a little above idle, and that is the throttle answering)
-      const float sat = std::max(smoothstepf(1.f, 1.15f, apThrDemand), smoothstepf(0.f, -0.15f, apThrDemand));
+      // (on the final the path comes first: fast with the throttle closed it stays on the glidepath and the drag comes out -
+      // never up off it to slow; short of power the nose still keeps the speed)
+      const float sat = std::max(smoothstepf(1.f, 1.15f, apThrDemand), appr ? 0.f : smoothstepf(0.f, -0.15f, apThrDemand));
       eD = (gT - g) - (0.25f + 0.75f * sat) * (vdotT - vdot) / G0;
     }
   }
@@ -1681,12 +1807,17 @@ void Plane::apControl(float dt) {
   // down chasing the glidepath through a final's porpoising, it took half the pull out of the round-out, and a loaded
   // Starling met the runway at 3.6 m/s from a flare that asked for 0.4 (review F3)
   float gDot;
-  if (!pro) {
+  if (!proAny) {
     if (!flare) apGamI = clampf(apGamI + eD * kGam * 0.35f * dt, -0.05f, 0.05f);
     else apGamI = std::max(apGamI, 0.f);
     gDot = clampf(eD * kGam + apGamI, -1.5f, 1.5f);
-  } else {   // (a professional's anti-windup: the integral grows only while the load factor it asks for is inside the limits)
-    gDot = clampf(eD * kGam + apGamI, -1.5f, 1.5f);
+  } else {
+    // (damped with the path's own rate - from the g it is pulling, so with none of the lag between the nose and the path:
+    // the loop's gain times the path's lag of it. Without it a heavy airframe's path overshot what the nose had asked
+    // for and porpoised; with it the Meridian's and the Starling's finals hold the path to a metre)
+    const float gRate = G0 * (gLoad * cosf(clampf(bankDeg(), -85.f, 85.f) * DEG) - cosf(g)) / spd;
+    gDot = clampf(eD * kGam + apGamI - apPathLag() * kGam * gRate, -1.5f, 1.5f);
+    // (a professional's anti-windup: the integral grows only while the load factor it asks for is inside the limits)
     const float nzWould = (cosf(g) + spd / G0 * gDot) / std::max(cosf(clampf(bankDeg(), -85.f, 85.f) * DEG), 0.1f);
     if ((nzWould <= nzMax || eD <= 0.f) && (nzWould >= nzMin || eD >= 0.f)) apGamI = clampf(apGamI + eD * kGam * 0.35f * dt, -0.05f, 0.05f);
   }
@@ -1708,7 +1839,11 @@ void Plane::apControl(float dt) {
   apRates(qT, pT, rollCap, nzMin, nzMax, dt);
   // autothrottle: everything the engines have (reheat included)
   if (tecs) {   // (the energy law's: the throttle that answers the energy-rate error, scaled by what a throttle's worth of thrust does to it here - less where the engines are slow to follow)
-    const float kT = std::max(thrustAt(1.f, spd, spd) / (mass() * G0), 0.03f);
+    // (a throttle's worth at the setting it is at: an afterburning type's reheat makes most of its full thrust in the last
+    // 15% of the throttle, and its whole thrust over the whole range put the XR-40's at 6 g a throttle - 2.5 times what the
+    // dry range gives - so its throttle hardly moved and it never slowed)
+    const float s0 = std::max(engineSpool - 0.1f, 0.f), s1 = std::min(engineSpool + 0.1f, 1.f);
+    const float kT = std::max((thrustAt(s1, spd, spd) - thrustAt(s0, spd, spd)) / (s1 - s0) / (mass() * G0), 0.03f);
     const float slow = std::min(1.f, 1.5f / std::max(apEnv.spool, 0.5f));
     apThrI = clampf(apThrI + eE / kT * 0.3f * slow * dt, 0.f, 1.f);
     apThrDemand = apThrI + eE / kT * 0.8f * slow;

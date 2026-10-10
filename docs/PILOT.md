@@ -121,16 +121,38 @@ Each stage is released when it passes the checkride better than what it replaces
 - The bank reached 72° at the median and 86° in the worst tenth.
 
 **Stage 1, in progress.** Behind `Plane::apPro`, off until it passes the checkride; `pilot_exam` uses it with `PILOT=new`.
-- **The professional envelope:** 0.75–1.3 g, 25° of bank rolled at 8°/s, smooth g, and a climb at the climb rate.
-  The whole envelope returns for an upset or for terrain ahead.
-- **The energy law (TECS):** the speed comes from the inertial acceleration, so gusts aren't chased.
-- **The final approach gate at 460 m.** At 4.5 km, a slow aircraft only captured the glidepath at 257 m.
-- **Configured and slowed by height**, by 300–380 m.
-- **A runway end weighed by the dive it would need from its intercept altitude.**
-- **The path loop damped to each airframe's own path lag.**
+The present autopilot still flies exactly as it did: all 294 calm checkride flights match the baseline to the second.
+- **The professional envelope, scaled to the airframe:** 1.3 g and 30 deg of bank in a civil type, up to 2.5 g and 60
+  deg in a research jet built for 40 g (on the logarithm of its usable g), rolled at 8-30 deg/s; smooth g; a climb at the
+  climb rate, descents up to 7 deg. Gentler with passengers (1.25 g, 25 deg).
+- **The energy law (TECS):** the speed comes from the inertial acceleration, so gusts aren't chased. A throttle's worth
+  of thrust is taken where the throttle is: an afterburning type's whole range overstated its dry range 2.5 times and
+  the XR-40 never slowed. A jet built for it slows at up to 0.2 g.
+- **The final:** the gate at 230 m for a light aircraft, 330-460 m for an airliner or a jet; configured and slowed by
+  height on a planned profile, stable by 150 m (500 ft, flown visually) or 300 m (1,000 ft); a runway end weighed by
+  the drop from its intercept altitude it couldn't lose before then; the path loop damped to each airframe's path lag.
+- **The ground ahead, along the turn it is in:** it climbs over what's ahead on its path 250 m clear as a matter of
+  course; only when its own manoeuvring g wouldn't clear it does it roll wings level and pull, as firmly as clears it
+  (the XR-40 went from 34 g to 4 g turning into a ridge at 370 m/s), held for 3 s and until clear by 120 m.
+- **An upset is beyond what it flies on purpose:** 15 deg past the bank it has lately been allowed. The recovery gets a
+  g more, never the airframe's all; its bank stays its own (an XR-20 coming off the chart's edge was called upset,
+  and turned at 85 deg and 11 g).
+- **Time:** a pattern at 1.4-1.5 times the approach speed, out of the descent orbit as soon as it is down, no orbit when
+  the rest can be lost on the way, no speeding up again once slowed for the hold.
 
-On calm finals already established, the light types went from 0–3 of 26 stabilised to 26 of 26.
-- **Found:** what kept every approach unstabilised was a dive designed into the planner. Terrain round the intercept
-  region held the aircraft at an intercept altitude far above the glidepath at the gate (up to 1,190 m against 257 m),
-  and it then dived from the gate.
-- **Open:** the heavy and fast types (Meridian, Starling, XR-10) still porpoise on some finals.
+**The calm checkride now** (294 flights, against the present autopilot):
+
+| | present | the pilot |
+|---|---|---|
+| Landed and stopped | 284 | 281 (3 XR-40s off the chart) |
+| Stabilised | 190 | 243 |
+| g rms, median | 0.32 | 0.08 |
+| Bank, median / worst tenth | 71 / 85 deg | 30 / 60 deg |
+| g, worst tenth | 16.5 | 2.5 |
+| Lowest g, worst tenth | -3.1 | 0.7 |
+| Time, median | 367 s | 463 s |
+| Fuel, median | 21.8 kg | 23.0 kg |
+
+- **Open:** the airliners and the XR-10 take 50-90% longer (a longer final from a higher gate, wider patterns); the
+  XR-40 leaves the chart in 3 of 32 and is never stabilised (its hover approach); the XR-30 still reaches 5 g. Then the
+  other weathers.

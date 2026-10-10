@@ -171,8 +171,12 @@ public:
   bool sceneryHits = true;   // collide with trees and buildings (off for the quote's background flight: the scenery isn't thread-safe)
   bool apComfort = false;   // the autopilot flies for passengers (career flights): gentle bank, g, roll and climb; the stick is never limited
   bool apUpset = false;     // slow or steep enough that recovering comes before comfort (apControl)
-  bool apPro = false;       // the pilot rework's first stage (docs/PILOT.md), off until it passes the checkride: a professional's envelope (~25 deg of bank, 0.75..1.3 g, smooth), the energy law, a stabilised final (the gate at 460 m, configured and slowed by height, the path loop damped to the airframe's lag); false: the autopilot as it was (pilot_exam: PILOT=new)
-  bool apEscape = false;    // the path it is on meets the ground within ~25 s: the whole envelope to climb away (a ground-proximity warning)
+  bool apPro = false;       // the pilot rework's first stage (docs/PILOT.md), off until it passes the checkride: a professional's envelope (30 deg of bank and 1.3 g in a civil type, up to 60 deg and 2.5 g in a research jet, smooth), the energy law, the ground ahead along its turn, a stabilised final (the gate at 230-460 m, configured and slowed by height, the path loop damped to the airframe's lag); false: the autopilot as it was (pilot_exam: PILOT=new)
+  float apStabH() const;   // the height a professional is stabilised on the final by: 150 m (500 ft) in a light aircraft flown by eye, 300 m (1,000 ft) in an airliner or a jet
+  bool apEscape = false;    // the path it is on meets the ground within ~25 s: the whole envelope to climb away (a ground-proximity warning; a professional's: along its turn, as firm a pull as clears it)
+  float apEscT = 0.f;       // how long it has been climbing away from the ground (the professional's escape is held 3 s at least)
+  bool apEdge = false;      // heading out past the chart's edge: a professional's sharpest turn (2.5 g, 60 deg) to come back
+  float apBankOk = 25.f;    // the bank a professional has been allowed lately (coming down slowly): beyond it by 15 deg is an upset
   float apNzCmd = 1.f;      // the load factor commanded, eased (the professional's g changes come on smoothly)
   float apSpdEst = 0.f, apThrDemand = 0.5f; vec3 apVelPrev;   // (apThrDemand: the throttle the energy law last asked for, before its stops)   // the energy law's airspeed with the gusts filtered off, and last step's velocity (its inertial acceleration)
   float brakeHold = 0;   // the steady push the parked brakes are holding (N along the nose), learned while held
@@ -277,6 +281,7 @@ private:
   void apRates(float qT, float pT, float rollCap, float nzMin, float nzMax, float dt);   // the shared inner loops
   float apAltGain() const;   // altitude error -> climb rate (1/s), as fast as this airframe's pitch answers at this speed
   float apPathGain(bool approach) const;   // flight-path error -> its rate (1/s): as fast as the pitch answers, slow enough for the path's lag to settle it
+  float apProScale() const; float apProG() const; float apProBank() const;   // a professional's envelope for this airframe: 0 civil .. 1 (40 g); its manoeuvring g and bank
   float terrainAround() const;   // the highest ground to keep clear of: under it, ahead along its track, and all round
   float apPitchLag() const;  // how long this airframe's pitch takes to answer at this speed (s)
   float apPathLag() const;   // and its flight path: the pitch's lag, or the wing's in building the lift, the slower (s)
