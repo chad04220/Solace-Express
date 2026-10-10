@@ -599,8 +599,8 @@ void Game::rollFailures(const Contract& c, int spec, Career::Source src) {
   float est = std::max(launchPlan.minutesEst * 60.f, 240.f);
   failPlan.at = 90.f + r.uni() * clampf(est * 0.6f, 60.f, 1500.f);   // somewhere in the first part of the flight, never on the take-off roll
 }
-// The job types' live records (C6): the medevac patient and the VIP's comfort drift down with g, bank, turbulence
-// bumps and a firm touchdown; the survey counts its time in the altitude band between the first and the last
+// The job types' live records (C6): the medevac patient and the VIP's comfort drift down with g (turbulence's bumps
+// among it), bank and a firm touchdown; the survey counts its time in the altitude band between the first and the last
 // checkpoint; the low-vis run checks the alignment the first time the aircraft comes below minimums near the
 // destination (a go-around afterwards clears it); night freight notes the landing light at touchdown.
 void Game::updateJobMeters(float dt, float gs) {
@@ -615,7 +615,8 @@ void Game::updateJobMeters(float dt, float gs) {
     if (air) {
       rate += std::max(0.f, plane.gLoad - gLim) * 0.08f + std::max(0.f, (c.type == CT_MEDEVAC ? 0.6f : 0.75f) - plane.gLoad) * 0.08f;
       rate += std::max(0.f, fabsf(plane.bankDeg()) - bankLim) * 0.003f;
-      rate += std::max(0.f, wx.turbulence - 0.25f) * 0.01f;
+      // (turbulence costs what its gusts put on the aircraft - the g above - and no more: a flat charge for the air
+      // itself drained the meter however gently the aircraft was flown, review CAR-1)
     }
     if (plane.ev.touchdown && fabsf(plane.ev.touchdownVs) * 196.85f > 300.f) m -= (fabsf(plane.ev.touchdownVs) * 196.85f - 300.f) / 1500.f;
     m = clampf(m - rate * dt, 0.f, 1.f);

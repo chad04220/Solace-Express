@@ -825,27 +825,52 @@ struct GameTest {
       bool ok = noLic && hired && assigned && blocked && ticked && recalled && incidents && paced;
       printf("Airline: licence gate %d, hired %d, assigned %d, aircraft locked %d, tick %d (net %d), recall %d, incidents %d over 60 days (repair charged once %d), ten 90 s circuits fly %d leg%s of %.1f min (paced by time %d): %s\n", noLic, hired, assigned, blocked, ticked, airNet, recalled, w.airline.incidents, once, circuitLegs, circuitLegs == 1 ? "" : "s", legMin, paced, ok ? "ok" : "FAIL"); fails += !ok;
     }
-    // ---- QA S7: the VIP's comfort (and the patient) ride simulated time: a minute of turbulence at 4x costs what it
-    // costs at 1x (the meters ran on real time, a quarter of the damage)
+    // ---- QA S7: the VIP's comfort (and the patient) ride simulated time: a minute of a too-steep bank (33 degrees, 3
+    // past the VIP's limit) at 4x costs what it costs at 1x (the meters ran on real time, a quarter of the damage)
     {
       float dmg[2] = {0, 0};
       for (int k = 0; k < 2; k++) {
         float accel = k == 0 ? 1.f : 4.f;
-        Contract v = g_story[4]; v.story = false; v.type = CT_VIP; v.pax = 1; v.payout = 2000; v.wx.turbulence = 0.5f; v.wx.windSpeed = 4; v.wx.gust = 0;
+        Contract v = g_story[4]; v.story = false; v.type = CT_VIP; v.pax = 1; v.payout = 2000; v.wx.turbulence = 0.05f; v.wx.windSpeed = 4; v.wx.gust = 0;
         g.career.license = LIC_CPL; g.career.location = v.from;
         g.startFlight(v, 1, Career::SRC_RENT); g.isolatedFlight = false;
         const Airport& d = g_world.airports[v.to];
         vec3 pos = d.threshold(false) - d.dir() * 30000.f; pos.y = d.elev + 1500.f;
         g.plane.reset(&kAircraft[1], pos, d.heading, 60, 150, true, kAircraft[1].vref + 15);
         g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 3; g.atcF.airborne = true;
-        g.plane.apOn = true; g.plane.apMode = Plane::AP_HOLD; g.plane.apHeading = d.heading; g.plane.apAlt = pos.y; g.plane.apSpeed = kAircraft[1].vref + 15;
-        g.timeAccel = accel;
-        for (float st = 0; st < 60.f && g.screen == SCR_FLIGHT; st += dt * accel) g.update(dt);
+        g.timeAccel = accel; s_pI = 0.f; s_eI = 0.f;
+        for (float st = 0; st < 60.f && g.screen == SCR_FLIGHT; st += dt * accel) {
+          Plane& p = g.plane;
+          p.ctl.roll = clampf((33.f - p.bankDeg()) * 0.05f + p.w.z * 0.3f, -1, 1);
+          pitchFor(p, 0.f, dt * accel);
+          p.ctl.throttle = clampf(0.6f + (kAircraft[1].vref + 15 - p.ias) * 0.05f, 0, 1); p.ctl.yaw = clampf(p.beta * 3.f, -1, 1);
+          g.update(dt);
+        }
         dmg[k] = 1.f - g.result.comfort;
         g.endFlight(false, "test", OUT_CRASHED); g.screen = SCR_HUB; g.timeAccel = 1;
       }
       bool ok = dmg[0] > 0.01f && fabsf(dmg[1] / std::max(dmg[0], 1e-6f) - 1.f) < 0.25f;
       printf("Job meters at 1x / 4x: comfort lost %.3f / %.3f over a simulated minute: %s\n", dmg[0], dmg[1], ok ? "ok" : "FAIL"); fails += !ok;
+    }
+    // ---- CAR-1 (the v3.44.0 review): rough air costs the patient only what the aircraft is put through - five minutes
+    // straight and level on the autopilot in P4's turbulence (0.55) left the patient at 10%, "in distress" whatever the
+    // pilot did
+    {
+      Contract v = g_story[4]; v.story = false; v.type = CT_MEDEVAC; v.pax = 1; v.payout = 2000; v.timeLimitMin = 0; v.wx.turbulence = 0.55f; v.wx.windSpeed = 6; v.wx.gust = 0;
+      g.career.license = LIC_CPL; g.career.location = v.from;
+      g.startFlight(v, 1, Career::SRC_RENT); g.isolatedFlight = false;
+      const Airport& d = g_world.airports[v.to];
+      vec3 pos = d.threshold(false) - d.dir() * 40000.f; pos.y = d.elev + 1500.f;
+      g.plane.reset(&kAircraft[1], pos, d.heading, 60, 150, true, kAircraft[1].vref + 15);
+      g.takeoffAnnounced = true; g.engineAutoStarted = true; g.atcF.phase = 3; g.atcF.airborne = true;
+      g.plane.apOn = true; g.plane.apMode = Plane::AP_HOLD; g.plane.apHeading = d.heading; g.plane.apAlt = pos.y; g.plane.apSpeed = kAircraft[1].vref + 15;
+      g.timeAccel = 4;
+      float minG = 9, maxG = -9;
+      for (float st = 0; st < 300.f && g.screen == SCR_FLIGHT; st += dt * 4) { g.update(dt); minG = std::min(minG, g.plane.gLoad); maxG = std::max(maxG, g.plane.gLoad); }
+      const float patient = g.result.patient;
+      g.endFlight(false, "test", OUT_CRASHED); g.screen = SCR_HUB; g.timeAccel = 1;
+      bool ok = patient > 0.85f;
+      printf("Medevac in rough air (turbulence 0.55, 5 min on the autopilot, g %.2f..%.2f): patient %.0f%%: %s\n", minG, maxG, patient * 100.f, ok ? "ok" : "FAIL"); fails += !ok;
     }
     // ---- a diversion leaves you (and your aircraft) where you landed
     {
