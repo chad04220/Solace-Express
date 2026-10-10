@@ -20,3 +20,6 @@
 
 ### Diagnostics v3
 - `diagnostics.bat` finds the cache in its new place. It also collects the shader compile log (how long each program took, first launch and later), and the error log if the game left one. It reports the cache's size and its largest files, and times a new scene: a low flight over the island's longest forest, which measures what the trees cost, their fade-ins and detail cross-fades included.
+
+### XR-40 plasma bomb
+- The bomb is now thrown from the bay straight down at 25 m/s, on top of the speed and direction the Wraith is flying, so it carries your momentum and drops clear of the aircraft at once. It used to just slip out of the bay at 3 m/s along the aircraft's belly, tilted with any bank or pitch. The cockpit's impact marker uses the same launch, so it still shows where the bomb will land.

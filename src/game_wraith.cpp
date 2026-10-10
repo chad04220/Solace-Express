@@ -11,6 +11,13 @@ const vec3 kLaserLens[2] = {vec3(-0.95f, -0.68f, -6.44f), vec3(0.95f, -0.68f, -6
 const float kBoltSpeed = 2000.f, kBoltStreak = 55.f, kBoltRange = 4500.f;   // muzzle speed (added to the craft's), streak, range
 // the bomb in its cradle (body coords)
 const vec3 kBayBomb(0.f, -0.31f, 0.1f);
+// a bomb's launch: from just below the cradle, thrown straight down - towards the ground, whatever the aircraft's
+// attitude - at kBombEject on top of the aircraft's own velocity (the release and the cockpit's impact marker alike)
+static constexpr float kBombEject = 25.f;   // m/s
+static void bombLaunch(const Plane& plane, vec3& p, vec3& v) {
+  p = plane.pos + plane.q.rotate(kBayBomb - vec3(0, 0.25f, 0));
+  v = plane.vel + vec3(0, -kBombEject, 0);
+}
 float groundAt(vec3 p) { return std::max(g_world.height(p.x, p.z), 0.f); }
 // first point where a segment from a (direction d, length L) meets the ground or the sea; t < 0 when clear
 float groundHit(vec3 a, vec3 d, float L) {
@@ -315,8 +322,8 @@ void Game::updateWraith(float dt) {
   W.bayHold = std::max(0.f, W.bayHold - dt);
   W.bombLoaded = std::min(1.f, W.bombLoaded + dt / 0.8f);
   if (W.bombQueue > 0 && W.bay > 0.95f && W.bombLoaded >= 1.f && !plane.onGround) {
-    vec3 p = plane.pos + plane.q.rotate(kBayBomb - vec3(0, 0.25f, 0));
-    W.bombs.push_back({p, plane.vel + plane.up() * -3.f, 0.f});
+    vec3 p, v; bombLaunch(plane, p, v);
+    W.bombs.push_back({p, v, 0.f});
     W.bombLoaded = 0; W.bombQueue--; W.bayHold = 0.6f; W.dropped++;
     g_audio.trigger(SFX_GEAR_CLUNK, 0.6f);
     toast("PLASMA BOMB AWAY", vec3(0.7f, 0.4f, 1.f));
@@ -390,7 +397,7 @@ void Game::wraithVisual(FrameParams& fp) {
   // physics as a real one (gravity, a little drag), until it meets the ground or the sea
   fx.pip[3] = 0.f;
   if (plane.spec && plane.spec->special == 2 && !plane.onGround && !crashed && camMode == 1) {
-    vec3 p = plane.pos + plane.q.rotate(kBayBomb - vec3(0, 0.25f, 0)), v = plane.vel + plane.up() * -3.f;
+    vec3 p, v; bombLaunch(plane, p, v);
     const float dt = 0.05f;
     for (int i = 0; i < 1200; i++) {
       v += vec3(0, -G0, 0) * dt - v * (2e-5f * length(v) * dt);
