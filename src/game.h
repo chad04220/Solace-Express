@@ -60,8 +60,9 @@ struct Settings {
   void resetBindings() { for (int i = 0; i < ACT_COUNT; i++) { keyBind[i] = kActions[i].key; padBind[i] = kActions[i].pad; } }
 };
 
-struct TipPt { vec3 p; float age, a; int seg; };   // wingtip vapour ribbon point (in the air mass)
-struct Particle { vec3 p, v; float life, maxLife, size, grow; vec3 col; float alpha; int kind; float drag, buoy; bool instant = false; bool fresh = true; };  // instant: no fade-in (trails)
+struct TipPt { vec3 p; float age, a; int seg; AirSwirl sw; bool caught = false; };   // wingtip vapour ribbon point (in the air mass; caught: turning round its tip's vortex)
+struct Particle { vec3 p, v; float life, maxLife, size, grow; vec3 col; float alpha; int kind; float drag, buoy; bool instant = false; bool fresh = true;
+                  bool air = false, passed = false, caught = false; AirSwirl sw; };  // instant: no fade-in (trails); air: a parcel of the air (a cloud wisp) the airframe's flow moves (passed: behind its wing; caught: turning round one of its vortices)
 
 enum GameScreen { SCR_MENU = 0, SCR_HUB, SCR_FLIGHT, SCR_DEBRIEF, SCR_RESEARCH, SCR_LOADING, SCR_FREE_FLIGHT };
 enum HubTab { TAB_CONTRACTS = 0, TAB_HANGAR, TAB_AIRLINE, TAB_LOGBOOK, TAB_SETTINGS };
@@ -220,11 +221,15 @@ private:
   vec2 cloudOff;                 // the cloud field's drift with the wind (Weather::cloudDrift), its detail's drift and the billows' rise
   vec3 cloudDet; float cloudBoil = 0;
   void moveClouds(float dt);     // moves them on with the wind and hands them to wx (the flight model and the renderer read the same clouds)
-  // the aircraft's wake through the cloud (clouds.glsl wakeCarve): points along its path in the cloud layer, in the
-  // cloud field's frame (they drift with it), each tunnel widening and filling in as it ages; brk: no tunnel from
-  // the point before (the path left the layer between them)
-  struct WakePt { vec3 c; float age; bool brk; };
-  std::vector<WakePt> cloudWake; bool wakeGap = true;
+  // the aircraft's wake through the cloud (clouds.glsl wakeAt): points along its path in the cloud layer, in the
+  // cloud field's frame (they drift with it), each channel widening and filling in as it ages; brk: no channel from
+  // the point before (the path left the layer between them); w0, T: its vortex pair's first sinking speed (m/s, away
+  // from the lift: + towards the airframe's -y) and how long that takes to die away (s); odo: the distance along the
+  // path flown in cloud (m: wakeOdo); the pair as it was there (aero_wake.h): its circulation (m^2/s), spacing (m),
+  // the bank the airframe had (rad: its x axis from the level, anticlockwise seen from behind) and the pair's height on it
+  struct WakePt { vec3 c; float age; bool brk; float w0, T, odo, gam, b0, tilt, py; };
+  std::vector<WakePt> cloudWake; bool wakeGap = true; float wakeOdo = 0;
+  WakePt wakeHere(vec3 c, bool brk, float odo) const;   // a point of the wake at c with the pair as it is now
   void updateCloudWake(float dt);
   float wispAccum = 0;           // cloud wisps streaming past in and near cloud (spawned per metre flown)
   float rainNow = 0, mistNow = 0;   // the rain at the aircraft (0..1) and the cloud on its glass, smoothed
@@ -255,7 +260,7 @@ private:
   float craterX = 0, craterZ = 0, craterR = 0, craterD = 0;
   void breakUp(vec3 impactVel, bool water, bool air = false);
   bool airBreak = false;
-  float gTunnel = 0;
+  float gTunnel = 0, gTunnelPin = -1;   // the g-force lens 0..1 (post_fs.glsl, g_lens.glsl); a debug scene's held strength (-1: none)
   Traffic traffic;
   bool dbgCam = false, dbgFollow = false; vec3 dbgCamPos, dbgCamLook, dbgFollowOff;
   bool benchPin = false; vec3 benchPinPos; quat benchPinQ;   // (a debug scene's aircraft held in place each step: Game::update)

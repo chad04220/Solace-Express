@@ -254,7 +254,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kUIVS, kUIFS, kEntCommon, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
+  for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kGLens, kUIVS, kUIFS, kEntCommon, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -453,7 +453,7 @@ void Renderer::genMinimap() {
 // The UI program, its vertex array and the font: enough to draw the intro screen while everything else is built
 bool Renderer::initUI(int w, int h) {
   if (progUI) return true;
-  progUI = program(kUIVS, kUIFS, error);
+  progUI = program(kUIVS, uiFSAssembly(), error);
   if (!progUI) { error = "UI shader: " + error; return false; }
   glGenVertexArrays(1, &vaoUI); glGenBuffers(1, &vboUI);
   glBindVertexArray(vaoUI); glBindBuffer(GL_ARRAY_BUFFER, vboUI);
@@ -519,7 +519,7 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
   progRay = program(vsFS, kRayFS, error); if (progRay) step();
   progFeedRays = program(vsFS, kFeedRaysFS, error); step();
   setCompileStage("post-processing and anti-aliasing");
-  progPost = program(vsFS, kPostFS, error); if (progPost) step();
+  progPost = program(vsFS, postFSAssembly(), error); if (progPost) step();
   progTAA = program(vsFS, kTaaFS, error); if (progTAA) step();
   if (!progSprite || !progDown || !progUp || !progRayMask || !progRay || !progPost || !progTAA) { error = "Shader: " + error; return false; }
   {   // the programs built on the shared scene library (shaders.h worldLibAssembly), each with its own main: the GPS
@@ -1068,8 +1068,11 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUniform1f(U(p, "uCloudBoil"), fp.cloudBoil);
   glUniform1i(U(p, "uWakeN"), fp.wakeN);
   if (fp.wakeN > 1) {
-    glUniform4fv(U(p, "uWake"), fp.wakeN, &fp.wake[0][0]); glUniform1fv(U(p, "uWakeK"), fp.wakeN, fp.wakeK);
-    glUniform4fv(U(p, "uWakeB"), 1, fp.wakeB);
+    glUniform4fv(U(p, "uWake"), fp.wakeN, &fp.wake[0][0]); glUniform4fv(U(p, "uWakeP"), fp.wakeN, &fp.wakeP[0][0]);
+    glUniform4fv(U(p, "uWakeG"), fp.wakeN, &fp.wakeG[0][0]); glUniform4fv(U(p, "uWakeB"), 1, fp.wakeB);
+    glUniform1i(U(p, "uWakeVN"), fp.wakeVN); if (fp.wakeVN > 0) glUniform4fv(U(p, "uWakeV"), fp.wakeVN, &fp.wakeV[0][0]);
+    glUniform1i(U(p, "uWakeEN"), fp.wakeEN); if (fp.wakeEN > 0) glUniform4fv(U(p, "uWakeE"), fp.wakeEN, &fp.wakeE[0][0]);
+    glUniform4fv(U(p, "uWakeA"), 1, fp.wakeA);
   }
   // airports + buildings
   {
@@ -1675,6 +1678,7 @@ void Renderer::flushUI() {
   glEnable(GL_BLEND); glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
   glUseProgram(progUI);
   glUniform2f(U(progUI, "uScreen"), (float)W, (float)H);
+  glUniform1f(U(progUI, "uGLoad"), uiGLoad); glUniform1f(U(progUI, "uTime"), uiTime);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texFont); glUniform1i(U(progUI, "uFont"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, curImg ? curImg : texFont); glUniform1i(U(progUI, "uImg"), 1);
   glBindVertexArray(vaoUI); glBindBuffer(GL_ARRAY_BUFFER, vboUI);

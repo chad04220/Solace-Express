@@ -125,7 +125,12 @@ struct AeroIn {
   bool dead[4] = {};      // an engine that isn't turning its propeller over (it windmills)
   bool steady = false;    // the separation at its static value (the calibration; no memory)
 };
-struct AeroOut { vec3 F, M; float alpha = 0, beta = 0, CLw = 0, stall = 0, qbar = 0; };   // (stall: the warner, 0..1)
+struct AeroOut {
+  vec3 F, M; float alpha = 0, beta = 0, CLw = 0, stall = 0, qbar = 0;   // (stall: the warner, 0..1)
+  // each strip's circulation (m^2/s): its attached lift per unit span over the air's density and speed there, positive
+  // with the lift along its normal (aero_wake.h turns its changes along the span into the vortices trailed behind)
+  float gam[AeroGeom::kMaxStrips] = {};
+};
 // the forces (body) and moments (about the centre of gravity, g.cg) on the airframe this step
 void aeroForces(const AeroGeom& g, const AircraftSpec& s, const AeroIn& in, AeroMem& mem, float dt, AeroOut& out);
 

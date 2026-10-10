@@ -111,6 +111,9 @@ inline std::string effectsFSAssembly(const std::string& defines) {
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kGBuffer + kPropellerGLSL + kEffectsFS;
 }
+// the composite and the interface, each after the g-force lens they draw (g_lens.glsl: over the scene and the flight HUD)
+inline std::string postFSAssembly() { return std::string("#version 330 core\n") + kGLens + kPostFS; }
+inline std::string uiFSAssembly() { return std::string("#version 330 core\n") + kGLens + kUIFS; }
 inline std::string propDiscFSAssembly() { return std::string("#version 330 core\n") + kPropellerGLSL + kPropDiscFS; }
 inline std::string lightFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kMaterialCommon + kLightCommon + kClouds + kGBuffer + kLightFS;

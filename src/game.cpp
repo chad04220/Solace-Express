@@ -688,9 +688,27 @@ void Game::moveClouds(float dt) {
   cloudBoil += (0.3f + 1.4f * cu + (wx.storm ? 2.f : 0.f)) * dt;
   wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet; wx.cloudBoil = cloudBoil;
 }
+Game::WakePt Game::wakeHere(vec3 c, bool brk, float odo) const {
+  // the pair the airframe's surfaces are rolling up (aero_wake.h), which sinks at w0 = G / (2 pi b0) under its own
+  // downwash and slows as it decays over a few times b0 / w0. Without one (too slow to fly), a lifting line's: the
+  // weight times the load shed round two cores pi/4 of the span apart
+  const AeroWake& wk = plane.wake;
+  float gam = wk.gamPair, b0 = wk.b0, py = wk.pairY;
+  if (b0 < 0.1f) {
+    b0 = 0.25f * PI * plane.spec->span;
+    const float rho = 1.225f * powf(std::max(1.f - 2.2558e-5f * plane.pos.y, 0.3f), 4.2559f);
+    gam = plane.mass() * G0 * clampf(plane.gLoad, -6.f, 12.f) / (rho * std::max(plane.airspeed, 20.f) * b0);
+    py = plane.spec->wingY;
+  }
+  const float w0 = gam / (2.f * PI * b0);
+  // the bank: the airframe's x axis against the path's level across, seen from behind
+  const vec3 f = normalize(plane.vel - plane.windVel + vec3(0, 0, 1e-4f)), sd = normalize(cross(f, vec3(0, 1, 0)) + vec3(1e-5f, 0, 0)), upv = cross(sd, f);
+  const vec3 bx = plane.q.rotate(vec3(1, 0, 0));
+  return {c, 0.f, brk, w0, clampf(4.f * b0 / std::max(fabsf(w0), 0.05f), 20.f, 120.f), odo, gam, b0, atan2f(dot(bx, upv), dot(bx, sd)), py};
+}
 // The aircraft through the cloud: its path in the cloud layer is kept (a point every 150 m, or sooner in a turn) in
-// the cloud field's frame, and the cloud pass carves a tunnel along it that opens a moment behind the aircraft,
-// widens and fills in again over the next minute (FrameParams::wake). Flying in or near cloud, wisps of it stream
+// the cloud field's frame, with the vortex pair as it was there, and the cloud pass stirs and clears a channel along
+// it that opens a moment behind the aircraft, widens and fills in again over the next minute (FrameParams::wake). Flying in or near cloud, wisps of it stream
 // past (their parallax is the speed you feel in cloud), and the wingtips' vortices draw ribbons through it.
 void Game::updateCloudWake(float dt) {
   // (the rain and the cloud at the aircraft, smoothed: the windscreen, the rain round the camera, the visibility, the drumming on the airframe)
@@ -711,7 +729,11 @@ void Game::updateCloudWake(float dt) {
       if (cloudWake.size() >= 2 && !L.brk && dd > 1.f) { const WakePt& P = cloudWake[cloudWake.size() - 2]; turned = dot(normalize(c - L.c), normalize(L.c - P.c)) < 0.995f; }
       push = dd > 150.f || (dd > 30.f && turned) || L.age > 2.5f;
     }
-    if (push) { cloudWake.push_back({c, 0.f, wakeGap}); wakeGap = false; }
+    if (push) {
+      if (!wakeGap && !cloudWake.empty()) wakeOdo += length(c - cloudWake.back().c);
+      cloudWake.push_back(wakeHere(c, wakeGap, wakeOdo));
+      wakeGap = false;
+    }
     while (cloudWake.size() > (size_t)FrameParams::kWakeMax - 1) cloudWake.erase(cloudWake.begin());
   } else wakeGap = true;
   // wisps: the cloud just ahead, as puffs that stay in the air and stream past
@@ -728,7 +750,9 @@ void Game::updateCloudWake(float dt) {
       float dens = wxfield::cloudDensity(wx, p, true);
       if (dens < 0.02f) continue;
       float g = r.range(0.86f, 0.97f);
+      const size_t n0 = particles.size();
       spawn(p, plane.windVel, r.range(1.6f, 2.6f), r.range(4.f, 9.f), r.range(1.5f, 3.f), vec3(g, g, g * 1.02f), clampf(0.04f + dens * 0.14f, 0.f, 0.16f), SPR_SMOKE, 0.f, 0.f);
+      if (particles.size() > n0) particles.back().air = true;   // (the airframe's flow carries it: updateParticles)
     }
   } else wispAccum = 0;
 }
@@ -928,7 +952,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   researchFlight = freeFlight = false;   // isolated launchers set their own mode after the shared reset
   wx = c.wx; wxStart = c.wx; timeOfDay = wx.timeOfDay; apRepickT = 0;
   wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet; wx.cloudBoil = cloudBoil;
-  cloudWake.clear(); wakeGap = true; wispAccum = 0; rainNow = mistNow = 0;
+  cloudWake.clear(); wakeGap = true; wakeOdo = 0; wispAccum = 0; rainNow = mistNow = 0;
   const AircraftSpec& s = kAircraft[spec];
   const Airport& a = g_world.airports[c.from];
   // runway into the wind (lessons with rings keep the published runway so the rings line up; the ringless ones, like
@@ -949,7 +973,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   fuelStart = plane.fuel;
   rollFailures(c, spec, src);
   isolatedFlight = false; jobLeg = false; jobClockBase = 0; attemptFrom = c.from;
-  wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0;
+  wpIndex = 0; flightClock = 0; crashTimer = 0; endTimer = 0; airBreak = false; crashEndT = 7.5f; gTunnel = 0; gTunnelPin = -1;
   surveyT = surveyInT = 0; minimumsChecked = false; minimumsGoArounds = 0; trialT0 = trialT1 = -1; formT = formLost = 0; formDone = false;
   hudPrevIas = 0; hudTrend = 0;
   traffic.reset();
@@ -1404,13 +1428,13 @@ void Game::updateFlight(float dt) {
     }
   }
   {
-    // g-force tunnel: a faint red tint from the first noticeable g that slowly closes into the full ring as the load
-    // nears the airframe's limit (regular aircraft 1.8 -> 6 g, the XR-30's damped cell 4 -> 50 g; negative g from
-    // -0.5 g). It builds over ~1 s and recovers over ~1.5 s
-    bool jet = plane.spec->special != 0;
-    float gp = smoothstepf(jet ? 4.f : 1.8f, jet ? 50.f : 6.f, plane.gLoad), gn = smoothstepf(jet ? -2.f : -0.5f, jet ? -25.f : -3.f, plane.gLoad);
-    float target = crashed ? 0.f : std::max(gp, gn);
-    gTunnel = approach(gTunnel, target, target > gTunnel ? 1.2f : 0.7f, dt);
+    // g-force lens (g_lens.glsl): a clear view up to 80% of the airframe's limit load either way; from there a red lens
+    // closes over it, most of the way by the limit itself and the rest as the airframe takes the overstress that breaks
+    // it (Plane::step: overG fails it at 1, twice the limit at once), so it is fully over the view as the airframe lets go
+    const float frac = plane.gLoad >= 0.f ? plane.gLoad / plane.spec->gLimitPos() : plane.gLoad / plane.spec->gLimitNeg();
+    const float stress = clampf(std::max(plane.overG, frac - 1.f), 0.f, 1.f);
+    const float target = crashed ? 0.f : 0.85f * clampf((frac - 0.8f) / 0.2f, 0.f, 1.f) + 0.15f * stress;
+    gTunnel = gTunnelPin >= 0.f ? gTunnelPin : approach(gTunnel, target, target > gTunnel ? 4.f : crashed ? 1.2f : 2.f, dt);
   }
   if (crashed) {
     crashTimer += dt;
@@ -1504,10 +1528,15 @@ void Game::updateFlight(float dt) {
     spawn(bp, plane.q.rotate(vec3(0, 0.3f, 8.f)), 1.5f, 0.6f, 2.f, vec3(0.6f, 0.55f, 0.45f), 0.18f, SPR_SMOKE, 2.f, 0.f);
   }
   // wingtip vapour in humid air under g: a continuous ribbon from each tip. Points are dropped at the tips and stay
-  // in the air mass (drifting with the wind); the strip between them widens and thins out as it ages.
+  // in the air mass (drifting with the wind); the strip between them widens and thins out as it ages. Each is caught
+  // by its tip's vortex as it is dropped and winds round its core as the pair sinks (aero_wake.h), so the ribbon
+  // curls inboard and down behind the wing - faster the harder the wing is pulling.
   for (int sd = 0; sd < 2; sd++) {
     auto& tt = tipTrail[sd];
-    for (auto& q : tt) { q.age += simDt; q.p += plane.windVel * simDt; }
+    for (auto& q : tt) {
+      q.age += simDt; q.p += plane.windVel * simDt;
+      if (q.caught) { q.sw.c += plane.windVel * simDt; q.p = aeroSwirlStep(q.sw, q.p, simDt); }
+    }
     while (!tt.empty() && tt.front().age > 1.8f) tt.erase(tt.begin());
   }
   float vapK = plane.onGround ? 0.f : clampf((plane.gLoad - 1.7f) / 1.5f, 0.f, 1.f) * ((wx.precip > 0 || plane.pos.y > wx.cloudBase - 300.f) ? 1.f : 0.f);
@@ -1517,7 +1546,9 @@ void Game::updateFlight(float dt) {
     vec3 tip = plane.spec->special == 2 ? kWraithWingTip : plane.spec->special ? kJetWingTip : modelWingTip(kModels[plane.spec - kAircraft]);
     for (int sd = 0; sd < 2; sd++) {
       float sx = sd ? 1.f : -1.f;
-      tipTrail[sd].push_back({plane.pos + plane.q.rotate(vec3(sx * tip.x, tip.y, tip.z + 0.3f)), 0.f, vapK, tipSeg});
+      TipPt t{plane.pos + plane.q.rotate(vec3(sx * tip.x, tip.y, tip.z + 0.3f)), 0.f, vapK, tipSeg};
+      t.caught = aeroWakeCatch(plane.wake, plane.pos, plane.q, t.p, t.sw);
+      tipTrail[sd].push_back(t);
       if (tipTrail[sd].size() > 400) tipTrail[sd].erase(tipTrail[sd].begin());
     }
     tipOn = vapK > 0.f;
@@ -2397,6 +2428,13 @@ void Game::updateWreck(float dt) {
 // ------------------------------------------------------------------ particles
 void Game::updateParticles(float dt) {
   for (size_t i = 0; i < bursts.size();) { bursts[i].t += dt; if (bursts[i].t > 0.9f) { bursts[i] = bursts.back(); bursts.pop_back(); } else i++; }
+  // the air the airframe moves (cloud wisps): near it, the flow round it - lifted ahead of the wing, pushed aside by the
+  // nose, blown back and turned by a slipstream, pushed down behind the wing and round its tips (aero_wake.h); once
+  // behind the wing, a parcel close to one of the pair's vortices is caught by it and turns round it as the pair sinks
+  const AeroWake& wk = plane.wake;
+  const bool flow = plane.spec && !plane.ev.crashed && wk.V > 3.f;
+  const AeroGeom* ag = flow && plane.spec->special == 0 ? &aeroGeom(*plane.spec) : nullptr;
+  const float reach = std::max(wk.span, 4.f);
   for (size_t i = 0; i < particles.size();) {
     Particle& p = particles[i];
     // spawned this frame: emitters already place particles along the path flown this frame, so moving them by a
@@ -2406,6 +2444,15 @@ void Game::updateParticles(float dt) {
     if (p.life <= 0) { particles[i] = particles.back(); particles.pop_back(); continue; }
     p.v = p.v * expf(-p.drag * dt);
     p.v.y += p.buoy * dt;
+    if (p.air && flow) {
+      if (p.caught) { p.sw.c += p.v * dt; p.p = aeroSwirlStep(p.sw, p.p, dt); }
+      else {
+        const vec3 rb = plane.q.conj().rotate(p.p - plane.pos);
+        if (fabsf(rb.x) < 1.5f * reach && fabsf(rb.y) < reach && rb.z > -1.5f * reach && rb.z < wk.pairZ + reach)
+          p.p += plane.q.rotate(aeroWakeInduced(wk, ag, rb)) * dt;
+        if (!p.passed && rb.z > wk.pairZ + 0.3f * reach) { p.passed = true; p.caught = aeroWakeCatch(wk, plane.pos, plane.q, p.p, p.sw); }
+      }
+    }
     p.p += p.v * dt;
     p.size += p.grow * dt;
     i++;
@@ -2494,36 +2541,54 @@ FrameParams Game::buildFrame() {
     fp.windSock = wxfield::wind(wx, calm, vec3(camPos.x, g + 8.f, camPos.z), 8.f, gameTime, plane.wxAir, 10.f).v;
     fp.windSock.y = 0;
   }
-  // the aircraft's wake through the cloud: its points where the cloud field has carried them, the tunnel's radius
-  // (from about the span, widening as it ages) and each segment's strength (opening in a moment, filling in over a
-  // minute, faded at the oldest end; none across a gap)
+  // the aircraft's wake through the cloud: its points where the cloud field has carried them, the channel's radius
+  // (the pair's oval, about its spacing either side, spreading with the turbulence as it ages), how far the vortex
+  // pair has sunk, the distance along the path in Crow wavelengths (about 8.6 core spacings), the age, the pair as it
+  // was there, and each segment's strength (opening in a moment, filling in over a minute, faded at the oldest end;
+  // none across a gap)
   fp.wakeN = 0;
   static const bool wakeOff = getenv("WAKEOFF") != nullptr;   // (debug A/B: no wake through the cloud)
   if (flying && !wakeOff && !cloudWake.empty() && wx.cloudCover >= 0.02f) {
     std::vector<WakePt> pts = cloudWake;
-    if (!wakeGap && !crashed) pts.push_back({plane.pos + vec3(cloudOff.x, 0, cloudOff.y), 0.f, false});
+    if (!wakeGap && !crashed) { const WakePt L = pts.back(); const vec3 hp = plane.pos + vec3(cloudOff.x, 0, cloudOff.y); pts.push_back(wakeHere(hp, false, L.odo + length(hp - L.c))); }
     const int n = std::min((int)pts.size(), FrameParams::kWakeMax), o = (int)pts.size() - n;
-    const float span = plane.spec->span;
-    vec3 lo(1e9f), hi(-1e9f); float rMax = 0;
+    const float span = plane.spec->span, crowL = 6.75f * span;
+    vec3 lo(1e9f), hi(-1e9f); float rMax = 0, sMax = 0;
     for (int i = 0; i < n; i++) {
       const WakePt& w = pts[o + i];
       vec3 p = w.c - vec3(cloudOff.x, 0, cloudOff.y);
-      float r = span * 0.8f + 4.f + 1.8f * std::min(w.age, 40.f);
+      float r = w.b0 * (1.05f + 0.2f * sqrtf(w.age)) + 1.f;
+      float sink = clampf(w.w0 * w.T * (1.f - expf(-w.age / w.T)), -4.f * span, 4.f * span);
       fp.wake[i][0] = p.x; fp.wake[i][1] = p.y; fp.wake[i][2] = p.z; fp.wake[i][3] = r;
-      lo = vec3(std::min(lo.x, p.x), std::min(lo.y, p.y), std::min(lo.z, p.z)); hi = vec3(std::max(hi.x, p.x), std::max(hi.y, p.y), std::max(hi.z, p.z)); rMax = std::max(rMax, r);
+      fp.wakeP[i][1] = sink; fp.wakeP[i][2] = w.odo / crowL; fp.wakeP[i][3] = w.age;
+      fp.wakeG[i][0] = w.gam; fp.wakeG[i][1] = w.b0; fp.wakeG[i][2] = w.tilt; fp.wakeG[i][3] = w.py;
+      lo = vec3(std::min(lo.x, p.x), std::min(lo.y, p.y), std::min(lo.z, p.z)); hi = vec3(std::max(hi.x, p.x), std::max(hi.y, p.y), std::max(hi.z, p.z)); rMax = std::max(rMax, r); sMax = std::max(sMax, fabsf(sink));
       if (i + 1 < n) {
         const WakePt& v = pts[o + i + 1];
         float age = 0.5f * (w.age + v.age);
-        fp.wakeK[i] = v.brk ? 0.f : smoothstepf(0.f, 0.7f, age) * std::min(1.f, 1.25f * expf(-age / 45.f)) * smoothstepf(0.f, 2.f, (float)i);
-      } else fp.wakeK[i] = 0.f;
+        fp.wakeP[i][0] = v.brk ? 0.f : smoothstepf(0.f, 0.7f, age) * std::min(1.f, 1.25f * expf(-age / 45.f)) * smoothstepf(0.f, 2.f, (float)i);
+      } else fp.wakeP[i][0] = 0.f;
     }
     vec3 cen = (lo + hi) * 0.5f;
-    fp.wakeB[0] = cen.x; fp.wakeB[1] = cen.y; fp.wakeB[2] = cen.z; fp.wakeB[3] = length(hi - lo) * 0.5f + rMax;
+    fp.wakeB[0] = cen.x; fp.wakeB[1] = cen.y; fp.wakeB[2] = cen.z; fp.wakeB[3] = length(hi - lo) * 0.5f + 2.2f * rMax + sMax;   // (clouds.glsl: a point as far as 2.2 radii out may be in the channel's turbulent wall, the pair sunk away from the path)
     fp.wakeN = n;
+    // the airframe's vortices and engines now (the young wake's: older, only the pair matters), from the pair's centre
+    const AeroWake& wk = plane.wake;
+    fp.wakeVN = fp.wakeEN = 0;
+    for (int k = 0; k < wk.nv && fp.wakeVN < 10; k++) {
+      const AeroWake::Vortex& v = wk.v[k];
+      const bool winds = v.surf == AS_WING && v.gam * v.r.x * wk.gamPair > 0.f;   // (a wing vortex turning as its side's tip's: it winds into it)
+      float* q = fp.wakeV[fp.wakeVN++]; q[0] = v.r.x; q[1] = v.r.y - wk.pairY; q[2] = v.gam; q[3] = winds ? 1.f : 0.f;
+    }
+    for (int e = 0; e < wk.nj && fp.wakeEN < 4; e++) {
+      const AeroWake::Jet& j = wk.j[e];
+      float* q = fp.wakeE[fp.wakeEN++]; q[0] = j.r.x; q[1] = j.r.y; q[2] = j.hot ? -j.R : j.R; q[3] = j.swirl;
+    }
+    fp.wakeA[0] = wk.gamPair; fp.wakeA[1] = wk.b0; fp.wakeA[2] = 7.f * std::max(wk.span, 1.f) / std::max(wk.V, 20.f); fp.wakeA[3] = 0.f;
     static const bool wakeDbg = getenv("WAKEDBG") != nullptr;   // (debug: the wake handed to the cloud pass)
     if (wakeDbg) {
       printf("wake: %d points, sphere r %.0f\n", n, fp.wakeB[3]);
-      for (int i = 0; i < n; i++) printf("  %2d: %+7.0f %+6.0f %+7.0f from the aircraft, r %4.1f, K %.2f, density %.2f\n", i, fp.wake[i][0] - plane.pos.x, fp.wake[i][1] - plane.pos.y, fp.wake[i][2] - plane.pos.z, fp.wake[i][3], fp.wakeK[i], wxfield::cloudDensity(wx, vec3(fp.wake[i][0], fp.wake[i][1], fp.wake[i][2]), true));
+      for (int i = 0; i < n; i++) printf("  %2d: %+7.0f %+6.0f %+7.0f from the aircraft, r %4.1f, K %.2f, sunk %4.1f, age %4.1f, density %.2f\n", i, fp.wake[i][0] - plane.pos.x, fp.wake[i][1] - plane.pos.y, fp.wake[i][2] - plane.pos.z, fp.wake[i][3], fp.wakeP[i][0], fp.wakeP[i][1], fp.wakeP[i][3], wxfield::cloudDensity(wx, vec3(fp.wake[i][0], fp.wake[i][1], fp.wake[i][2]), true));
     }
   }
   fp.exposure = 1.0f + fp.night * 0.8f;
@@ -3646,7 +3711,14 @@ void Game::render() {
     case SCR_MENU: drawMenu(); break;
     case SCR_FREE_FLIGHT: drawFreeFlightSetup(fp); break;
     case SCR_HUB: drawHub(); break;
-    case SCR_FLIGHT: if (!uiHidden || paused || showMap) { drawHud(fp); drawMapOverlay(); } if (paused) drawPause(); break;
+    case SCR_FLIGHT:
+      if (!uiHidden || paused || showMap) {   // (the HUD under the g-force lens, flushed on its own: the map and the pause menu stay clear of it)
+        g_ren.flushUIPublic(); g_ren.uiGLoad = fp.gLoad; g_ren.uiTime = fp.time;
+        drawHud(fp); g_ren.flushUIPublic(); g_ren.uiGLoad = 0;
+        drawMapOverlay();
+      }
+      if (paused) drawPause();
+      break;
     case SCR_DEBRIEF: drawDebrief(); break;
     case SCR_RESEARCH: drawResearch(fp); break;
     case SCR_LOADING: drawLoading(); break;
@@ -3957,7 +4029,8 @@ void Game::debugScene(const std::string& name) {
     }
     // the weather in flight: straight and level on the autopilot from (x, altitude, z) for some seconds (through the
     // cloud and rain WX sets), then the chase camera (c), the cockpit (k) or a look back along the path flown from
-    // beside the aircraft (b: its wake through the cloud): wxfly_<x>_<z>_<alt m>_<hdg>_<seconds>_<cam>_<aircraft>
+    // beside the aircraft (b: its wake through the cloud; t from above and behind; w inside the channel half a km back;
+    // o off to the side of the hole it came out of the cloud by): wxfly_<x>_<z>_<alt m>_<hdg>_<seconds>_<cam>_<aircraft>
     float fsecs = 0; int fspec = 1;
     if (sscanf(name.c_str(), "wxfly_%f_%f_%f_%f_%f_%c_%d", &px, &pz, &agl, &hdg, &fsecs, &cm, &fspec) >= 5) {
       fspec = std::clamp(fspec, 0, kNumAircraft - 1);
@@ -3976,9 +4049,36 @@ void Game::debugScene(const std::string& name) {
       printf("wxfly: at (%.0f, %.0f, %.0f) %.0f kt, cloud here %.2f, rain %.2f, eddies %.2f m/s, lift %+.1f thermal %+.1f, wake points %d\n", plane.pos.x, plane.pos.y, plane.pos.z,
              plane.airspeed * MS_TO_KT, plane.wxl.cloud, plane.wxl.rain, plane.wxl.sigma, plane.wxl.lift, plane.wxl.thermal, (int)cloudWake.size());
       toasts.clear();
-      if (cm == 't' && cloudWake.size() >= 5) {   // (from above and behind, looking down along the path: its trench through a cloud top)
+      if (cm == 't' && cloudWake.size() >= 5) {   // (from above and ahead, looking down along the path: its trench through a cloud top)
         const vec3 off(cloudOff.x, 0, cloudOff.y), A = cloudWake.back().c - off, B = cloudWake[cloudWake.size() - 5].c - off;
         dbgCam = true; dbgFollow = false; dbgCamPos = A + normalize(A - B) * 120.f + vec3(0, 140.f, 0); dbgCamLook = (A + B) * 0.5f;
+        for (float h : {140.f, 260.f, 420.f}) {   // (high enough to be out of the cloud)
+          const vec3 cp = A + normalize(A - B) * (0.85f * h) + vec3(0, h, 0);
+          if (wxfield::cloudDensity(wx, cp, true) < 0.01f && wxfield::cloudDensity(wx, (cp + dbgCamLook) * 0.5f + vec3(0, 40.f, 0), true) < 0.05f) { dbgCamPos = cp; break; }
+        }
+      }
+      if (cm == 'w' && cloudWake.size() >= 9) {   // (inside the channel half a kilometre back, looking on back along it)
+        const vec3 off(cloudOff.x, 0, cloudOff.y), A = cloudWake[cloudWake.size() - 5].c - off, B = cloudWake[cloudWake.size() - 9].c - off;
+        dbgCam = true; dbgFollow = false; dbgCamPos = A + vec3(0, 4.f, 0); dbgCamLook = B;
+      }
+      // (a camera in clear air with a clear view of a point: the first of some places round it with no cloud on the line
+      // to it, short of the last stretch)
+      auto clearView = [&](vec3 at, vec3 d, float short_) {
+        const vec3 sd = normalize(cross(d, vec3(0, 1, 0)));
+        for (float dist : {350.f, 600.f, 950.f}) for (float az : {35.f, -35.f, 65.f, -65.f, 15.f, 90.f}) for (float el : {6.f, 20.f, 40.f}) {
+          const vec3 cp = at + (d * cosf(az * DEG) + sd * sinf(az * DEG)) * (dist * cosf(el * DEG)) + vec3(0, dist * sinf(el * DEG), 0);
+          bool clear = true;
+          for (float t = 0.f; t < 1.f && clear; t += 0.02f) { const vec3 q = cp + (at - cp) * t; if (length(q - at) > short_ && wxfield::cloudDensity(wx, q, true) > 0.03f) clear = false; }
+          if (clear) return cp;
+        }
+        return at + d * 400.f + vec3(0, 60.f, 0);
+      };
+      if (cm == 'o' && cloudWake.size() >= 2) {   // (off to the side, at the hole where the path came out of the cloud)
+        const vec3 off(cloudOff.x, 0, cloudOff.y);
+        int e = (int)cloudWake.size() - 1;
+        while (e > 0 && wxfield::cloudDensity(wx, cloudWake[e].c - off, true) < 0.25f) e--;
+        const vec3 E = cloudWake[e].c - off, d = normalize(cloudWake.back().c - cloudWake[std::max(e - 1, 0)].c);
+        dbgCam = true; dbgFollow = false; dbgCamPos = clearView(E, d, 90.f); dbgCamLook = E;
       }
       if (cm == 'b') {   // (down the wake's own line: the path drifts a little off the heading)
         dbgCam = true; dbgFollow = false; vec3 f = plane.forward(); dbgCamPos = plane.pos - f * 8.f + vec3(0, 2.f, 0); dbgCamLook = plane.pos - f * 400.f;
@@ -4199,10 +4299,10 @@ void Game::debugScene(const std::string& name) {
       dbgCam = true; dbgCamPos = plane.pos + vec3(0, 3, 0); dbgCamLook = c.pos; break; }
     hudOn = false; toasts.clear(); return;
   }
-  if (name.compare(0, 4, "gtun") == 0) {   // g-force tunnel at a forced strength (percent), chase view: gtun<pct>
+  if (name.compare(0, 4, "gtun") == 0) {   // g-force lens at a forced strength (percent, held), chase view: gtun<pct>
     resAirborne = true; realTime = 20; launchResearch();
     for (int i = 0; i < 10; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
-    gTunnel = atof(name.c_str() + 4) / 100.f; toasts.clear(); return;
+    gTunnel = gTunnelPin = atof(name.c_str() + 4) / 100.f; toasts.clear(); return;
   }
   // loading-screen pictures (--loadshots): loadshot_<CODE> an airport from an elevated three-quarter view with the aircraft
   // on its runway; loadshot_air_<n> aircraft n in flight, filmed from alongside. Afternoon light, a little cloud.

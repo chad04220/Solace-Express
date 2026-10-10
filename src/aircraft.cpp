@@ -345,7 +345,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   const AeroModel& aero = aeroModel(s);
   const float AR = aero.AR;
   const vec3 cg = s.special == 0 ? aeroGeom(s).cg : vec3();   // (body, from the model's origin)
-  stallWarn = 0;
+  stallWarn = 0; wake = AeroWake();
   if (V > 0.5f) {
     alpha = atan2f(-va.y, -va.z);
     beta = asinf(clampf(va.x / V, -1, 1));
@@ -384,6 +384,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     }
     AeroOut ao;
     aeroForces(ag, s, in, aeroMem, dt, ao);
+    aeroWakeBuild(ag, in, ao, wake);
     F += ao.F; T += ao.M;
     stallWarn = ao.stall;
   } else if (V > 0.5f) {
@@ -419,6 +420,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     vec3 liftDir = normalize(cross(vec3(1, 0, 0), va));
     vec3 dragDir = va * (-1.f / V);
     F += liftDir * (CL * qbar * s.wingArea) + dragDir * (CD * qbar * s.wingArea) + vec3(CY * qbar * s.wingArea, 0, 0);
+    aeroWakeElliptic(CL * qbar * s.wingArea, density, V, s.span, s.wingY, s.wingZ, s.engines, thrust, 0.45f * s.fusLen, wake);
 
     float Vh = std::max(V, 12.f);
     float p = -w.z, qq = w.x, r = -w.y;

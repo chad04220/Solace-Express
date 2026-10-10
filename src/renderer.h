@@ -88,10 +88,16 @@ struct FrameParams {
   vec3 wind;   // surface wind velocity (m/s, the way the air moves): the sea's waves, the clouds' lean
   vec3 windSock;   // the surface wind with its gusts where the camera is (the windsocks swing with them)
   vec3 cloudDet; float cloudBoil = 0;   // the cloud detail's drift through the cloud bodies and the billows' rise (m: Weather::cloudDetail, cloudBoil)
-  // the aircraft's wake through the cloud (clouds.glsl wakeCarve): a path of points (xyz, the tunnel's radius there),
-  // each segment's strength (0 where the path left the cloud layer) and the bounding sphere of it all
+  // the aircraft's wake through the cloud (clouds.glsl wakeCarve): a path of points (xyz, the channel's radius there)
+  // and with each the strength of the segment it starts (0 where the path left the cloud layer), how far its vortex
+  // pair has sunk below it (m), the distance along the path in Crow wavelengths and its age (s); the bounding sphere
+  // with each too the pair as it was there (circulation, spacing, the airframe's bank, the pair's height on it); and the
+  // airframe's vortices now (from the pair's centre: across, up, circulation, 1 where it winds into its tip's), its
+  // engines' wash (across, up, radius - negative for a jet's hot exhaust - and a propeller's swirl, m/s) and its pair
+  // now (circulation, spacing, the seconds a flap's vortex takes to wind into its tip's)
   static constexpr int kWakeMax = 20;
-  float wake[kWakeMax][4] = {}, wakeK[kWakeMax] = {}, wakeB[4] = {0, 0, 0, 0}; int wakeN = 0;
+  float wake[kWakeMax][4] = {}, wakeP[kWakeMax][4] = {}, wakeG[kWakeMax][4] = {}, wakeB[4] = {0, 0, 0, 0}; int wakeN = 0;
+  float wakeV[10][4] = {}, wakeE[4][4] = {}, wakeA[4] = {}; int wakeVN = 0, wakeEN = 0;
   // the windscreen's rain and cloud (post_fs.glsl, the cockpit view): where on screen the airflow over the glass
   // streams from (uv, may lie far off screen; z +1 away from it, -1 towards it), how fast (w: 0 still .. 1 fast),
   // and the cloud's fine mist on the glass
@@ -185,6 +191,7 @@ public:
   void image(GLuint tex, float x, float y, float w, float h, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1, float a = 1.0f);
   void uiEnd();
   void flushUIPublic() { flushUI(); }
+  float uiGLoad = 0, uiTime = 0;   // the g-force lens over what the UI draws next (g_lens.glsl; 0: none) and its heartbeat's clock (FrameParams::time)
   // UI clipping (screen pixels, y down): what is drawn until uiClipOff() shows only inside the box
   void uiClip(float x0, float y0, float x1, float y1) { flushUI(); uiClipOn = true; uiClipBox[0] = x0; uiClipBox[1] = y0; uiClipBox[2] = x1; uiClipBox[3] = y1; }
   void uiClipOff() { flushUI(); uiClipOn = false; }
