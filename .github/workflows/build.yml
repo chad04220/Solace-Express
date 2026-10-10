@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: write
+  actions: read   # (the last run that passed: what a push is compared with, tools/ci/select_tests.py)
 
 # A newer push to the same branch cancels the run still going for the last one; a manual run (a release) is in a group
 # of its own and is never cancelled
@@ -44,19 +45,41 @@ jobs:
             ccache-sanitize-${{ github.ref_name }}-
             ccache-sanitize-
       - name: Configure (GCC, ASan + UBSan)
-        run: cmake -S . -B build -DSANITIZE=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        run: |
+          mkdir -p build/.cmake/api/v1/query && touch build/.cmake/api/v1/query/codemodel-v2   # (the build's description, for the selection)
+          cmake -S . -B build -DSANITIZE=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      # A push to a branch builds and runs only the tests what it changed can affect, since the last commit this
+      # workflow passed on the branch (tools/ci/select_tests.py says which, and why, in the job summary). A tag, a
+      # release, the nightly, a manual run or a first push runs everything.
+      - name: Pick the tests
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          base=""
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_TYPE" = branch ]; then
+            base=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow build.yml --branch "$GITHUB_REF_NAME" --status success --limit 30 --json headSha,event \
+                   --jq '[.[] | select(.event == "push" or .event == "workflow_dispatch" or .event == "schedule")][0].headSha // ""' || true)
+            if [ -n "$base" ] && ! git fetch -q --no-tags --depth=1 origin "$base"; then base=""; fi
+          fi
+          python3 tools/ci/select_tests.py --build-dir build --exclude "shader_glsl|terrain_shadow_bake" ${base:+--base "$base"}
       - name: Build
+        if: steps.pick.outputs.mode != 'none'
         run: |
           ccache -z
-          cmake --build build --parallel 4 --target flight_test progression_test save_test airport_layout_test envelope_test hull_test mesh_simplify_test entity_raycast_test gameplay_test encounter_timing_test shader_keyword_test world_cache_test aero_test aero_wake_test breakup_test
+          cmake --build build --parallel 4 --target ${{ steps.pick.outputs.targets }}
           ccache -s
       - name: Test   # four at a time: the runner's four cores (the flight model, the longest, sets the time)
-        if: github.event_name != 'schedule'
+        if: github.event_name != 'schedule' && steps.pick.outputs.mode != 'none'
         env:
           ASAN_OPTIONS: detect_leaks=0
           UBSAN_OPTIONS: print_stacktrace=1
           FLIGHT_QUICK: 1   # (the flight model's type-by-type checks on one of each kind of aircraft: the Windows job flies them all)
-        run: ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake"
+          MODE: ${{ steps.pick.outputs.mode }}
+          PICKED: ${{ steps.pick.outputs.regex }}
+        run: |
+          if [ "$MODE" = some ]; then pick=(-R "$PICKED"); else pick=(); fi
+          ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake" "${pick[@]}"
       - name: Test, every type (nightly)   # (FLIGHT_QUICK unset - set at all, even empty, it counts)
         if: github.event_name == 'schedule'
         env:
@@ -71,13 +94,43 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure (MSVC)
-        run: cmake -S . -B build -A x64
+        shell: bash
+        run: |
+          mkdir -p build/.cmake/api/v1/query && touch build/.cmake/api/v1/query/codemodel-v2   # (the build's description, for the selection)
+          cmake -S . -B build -A x64
 
-      - name: Build
-        run: cmake --build build --config Release --parallel
+      - name: Pick the tests   # (as the sanitizer job: what changed since the last commit this job passed)
+        id: pick
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          base=""
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_TYPE" = branch ]; then
+            base=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow build.yml --branch "$GITHUB_REF_NAME" --status success --limit 30 --json headSha,event \
+                   --jq '[.[] | select(.event == "push" or .event == "workflow_dispatch")][0].headSha // ""' || true)
+            if [ -n "$base" ] && ! git fetch -q --no-tags --depth=1 origin "$base"; then base=""; fi
+          fi
+          python tools/ci/select_tests.py --build-dir build --config Release ${base:+--base "$base"}
+
+      - name: Build   # (the game always: it is the artifact; everything when every test runs)
+        shell: bash
+        env:
+          MODE: ${{ steps.pick.outputs.mode }}
+          TARGETS: ${{ steps.pick.outputs.targets }}
+        run: |
+          if [ "$MODE" = all ]; then cmake --build build --config Release --parallel
+          else cmake --build build --config Release --parallel --target SolaceExpress $TARGETS; fi
 
       - name: Test (flight model + campaign progression)
-        run: ctest --test-dir build -C Release --output-on-failure -j4
+        if: steps.pick.outputs.mode != 'none'
+        shell: bash
+        env:
+          MODE: ${{ steps.pick.outputs.mode }}
+          PICKED: ${{ steps.pick.outputs.regex }}
+        run: |
+          if [ "$MODE" = some ]; then pick=(-R "$PICKED"); else pick=(); fi
+          ctest --test-dir build -C Release --output-on-failure -j4 "${pick[@]}"
 
       - name: Package
         shell: pwsh

@@ -190,7 +190,15 @@ cmake -S . -B build-win -DCMAKE_TOOLCHAIN_FILE=cmake-mingw.cmake   # omit the to
 cmake --build build-win -j
 ```
 
-The GitHub Actions workflow (`.github/workflows/build.yml`) builds with MSVC, runs the tests, and uploads `SolaceExpress-windows-x64` as an artifact on every push. Pushing a `v*` tag attaches a zip to a GitHub Release.
+The GitHub Actions workflow (`.github/workflows/build.yml`) builds with MSVC, runs the tests, and uploads `SolaceExpress-windows-x64` as an artifact on every push. A second job runs the headless tests under AddressSanitizer and UBSan.
+
+A push to a branch builds and runs only the tests that the change can affect. It compares against the last commit that passed CI on that branch. `tools/ci/select_tests.py` works the selection out from CMake's description of the build: each test's sources, the libraries it links, their `#include`s, the files they read by name, and the shaders. The job summary says which tests ran and why. Several cases run everything:
+- a change to the build itself (`CMakeLists.txt`, the workflow, the selector);
+- a first push to a branch, or a tag;
+- a manual run, which is how releases are made;
+- the nightly run.
+
+Documentation-only pushes run no tests. Pushing a `v*` tag attaches a zip to a GitHub Release.
 
 There are no third-party dependencies to install. The game only uses Win32, OpenGL, WinMM, XInput (loaded at runtime) and Media Foundation.
 
