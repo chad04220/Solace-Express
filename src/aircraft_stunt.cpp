@@ -64,6 +64,25 @@ void Plane::apStuntStop() {
   apStuntStep = i + 1; apStuntAng = 0;
 }
 
+// The height a split-S takes from inverted at speed V0 to level again: the half loop flown pulling what the wing holds
+// at each speed (the figure's own load at most), the dive building speed as it goes (no drag, the power off: the most
+// speed it could gain, so the widest the loop gets), after the half roll to inverted and a second to take up the pull
+float Plane::splitSDrop(float V0, float rollRate) const {
+  const ApEnvelope& E = apEnv;
+  const float vs = std::max(E.vs1, 10.f);
+  float V = std::max(V0, vs), phi = 0.f, drop = 0.f;
+  const float lag = PI / std::max(rollRate, 0.2f) + 1.f;   // (the roll over, then the pull coming on: falling as it goes)
+  drop += 0.5f * G0 * 0.3f * lag * lag;                      // (inverted with the nose held up, little of g's full fall)
+  for (int i = 0; i < 20000 && phi < PI; i++) {
+    const float dt = 0.02f;
+    const float stallG = (V / vs) * (V / vs) * 0.9f, n = std::min(apStuntN, std::max(stallG * 0.8f, 0.5f));
+    const float sink = V * sinf(phi) * dt;
+    phi += G0 * std::max(n + cosf(phi), 0.05f) / V * dt;
+    drop += sink; V = sqrtf(V * V + 2.f * G0 * sink);
+  }
+  return drop;
+}
+
 bool Plane::apStuntFly(float dt) {
   const AircraftSpec& s = *spec;
   const PerfModel& P = perf(spec);
@@ -94,6 +113,10 @@ bool Plane::apStuntFly(float dt) {
   // ---- setting up: the speed and height the figure needs, wings level, before it starts
   if (apStuntStep == 0) {
     float need = margin + kDown[apStunt] * R;
+    // a split-S comes down the whole of its half loop: the height that takes, from the pull the wing can hold as the dive
+    // builds speed - not the structure's limit, which a research jet's wing can't pull at the figure's entry speed (the
+    // review of v3.44.0, FLT-1: admitted from 700 m on that, the XR-20, XR-30 and XR-40 flew into the sea)
+    if (apStunt == STUNT_SPLIT_S) need = margin + splitSDrop(apStuntV, rollCap) * 1.2f;
     bool fast = ias >= apStuntV * 0.97f, high = agl >= need;
     if (apStunt == STUNT_SPLIT_S) fast = fast && ias <= apStuntV * 1.3f;   // (slow enough not to finish into the ground)
     bool level = fabsf(bankDeg()) < 10.f && fabsf(pitchDeg()) < 12.f;

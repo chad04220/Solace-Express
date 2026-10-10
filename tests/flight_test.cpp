@@ -551,6 +551,28 @@ int main(int argc, char** argv) {
       fails += !ok;
     }
   }
+  // ---------------- FLT-1 (the review of v3.44.0): a split-S asked for low down. Admitted from 700 m on the structure's
+  // load - a pull the research jets' wings can't hold at the figure's entry speed - the XR-20, XR-30 and XR-40 flew into
+  // the sea. Asked for at 700 m over the sea now, each climbs first (or gives it up) and none touches the water
+  for (int si : {kMantis, kResearchJet, kWraith}) {
+    if (quick && si != kWraith) continue;   // (the sanitizer job: the XR-40, the one Codex flew in the game)
+    const AircraftSpec& s = kAircraft[si];
+    Weather calm; calm.windSpeed = 0; calm.turbulence = 0;
+    vec3 sea(-WORLD_HALF * 0.9f, 700.f, WORLD_HALF * 0.9f);   // (open sea, far from any island)
+    Plane p; p.reset(&s, sea, 90, s.maxFuel * 0.6f, 150, true, s.cruise * 0.8f);
+    p.ctl.gearDown = false; p.gear = 0; p.ctl.throttle = 0.7f;
+    p.apStuntBegin(Plane::STUNT_SPLIT_S, calm);
+    float minAgl = 1e9f, startedAt = -1; int k = 0;
+    for (; k < 240 * 60 && !p.ev.crashed && p.apMode == Plane::AP_STUNT; k++) {
+      p.step(1 / 60.f, calm, k / 60.f);
+      minAgl = std::min(minAgl, p.pos.y - std::max(g_world.height(p.pos.x, p.pos.z), 0.f));
+      if (p.apStuntStep > 0 && startedAt < 0) startedAt = p.pos.y;
+    }
+    bool ok = !p.ev.crashed && minAgl > 60.f && p.apMode == Plane::AP_HOLD;
+    printf("Low split-S %-16s asked at 700 m: began at %.0f m, lowest %.0f m, %s%s\n", s.name, startedAt, minAgl,
+           p.ev.crashed ? p.ev.crashReason.c_str() : p.apStuntAbort.empty() ? "flown" : p.apStuntAbort.c_str(), ok ? "  ok" : "  FAIL");
+    fails += !ok;
+  }
   // ---------------- the weather's fields (weather.cpp): still air is still; the gust bursts reach about the reported
   // gust and no further; the eddies are as strong as the weather asks; the wind climbing a ridge lifts and pours
   // down its lee; it rains only under the clouds; and a replay is exact

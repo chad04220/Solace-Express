@@ -223,6 +223,7 @@ public:
   // The tower's go-around (the runway occupied on short final) while it flies an approach: abandoned for a climb-out and
   // a fresh approach. False when it can't climb away (it lands from what it has) or isn't flying one (review FLT-3)
   bool apTowerGoAround();
+  float splitSDrop(float V0, float rollRate) const;   // the height a split-S from V0 takes (aircraft_stunt.cpp)
   // start a figure: the autopilot first gets the speed and height it needs (diving or climbing), then flies it and
   // levels off into a hold. Any ground in the way aborts it into a recovery.
   void apStuntBegin(int figure, const Weather& wx);
