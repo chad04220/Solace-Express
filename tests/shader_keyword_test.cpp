@@ -147,7 +147,7 @@ int main() {
   bad += scan("prop_disc.vert", kPropDiscVS) + scan("prop_disc.frag", propDiscFSAssembly());
   bad += scan("taa.frag", kTaaFS) + scan("post.frag", postFSAssembly());
   bad += scan("ui.vert", kUIVS) + scan("ui.frag", uiFSAssembly());
-  bad += scan("entity.vert", h + kEntVS) + scan("entity.frag", h + kEntFS1 + kEntFS2) + scan("entity_shadow.frag", h + kEntFS1 + kEntShadowFS);
+  bad += scan("entity.vert", entVSAssembly("")) + scan("entity.frag", entFSAssembly("")) + scan("entity_shadow.frag", entShadowFSAssembly(""));
   if (bad) { printf("FAIL: %d reserved word(s) used as identifiers\n", bad); return 1; }
   int forms = scanDecl("objects.frag", objectsFSAssembly("")) + scanDecl("shadow_proxy.frag", shadowProxyFSAssembly("")) + scanDecl("effects.frag", effectsFSAssembly(""))
             + scanDecl("plane_mesh.frag", planeMeshFSAssembly("")) + scanDecl("scene_lib.frag", lib) + scanDecl("light.frag", lightFSAssembly(""));

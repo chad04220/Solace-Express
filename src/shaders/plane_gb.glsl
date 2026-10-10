@@ -8,18 +8,28 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
   int eng = int(gM[0].z + 0.5);
   bool wr = WRAITH_ON && (!JET_ON || eng == 6);
   // a research jet's display from the pilot's seat: its camera's picture, with the display's own look and symbology
+#if HAS_RESEARCH
   if (RESEARCH_ON && pod && eng >= 5 && ((mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63))) {
     vec3 scrL = transpose(uPlaneRot)*(gRelSet ? gRel + (uCamPos - uPlanePos) : p - uPlanePos);
     bool bomb; vec3 rdc;
     vec3 col = feedScreen(mid, scrL, rdc, bomb);
     if (uScrWin == 1 && !bomb) discard;   // a window: the world drawn before the airframe stays
+#if HAS_WRAITH && HAS_JET
     col = bomb ? wrFeedOverlay(col, scrL) : wr ? wraithScreen(col, rdc, mid, scrL) : jetScreen(col, rdc, mid, scrL);
+#elif HAS_WRAITH
+    col = bomb ? wrFeedOverlay(col, scrL) : wraithScreen(col, rdc, mid, scrL);
+#else
+    col = jetScreen(col, rdc, mid, scrL);   // (the XR-30's own: no bomb camera)
+#endif
+#if HAS_WRAITH
     if (wr) col += wrHolo(uCamPos, rd, t);   // the hologram floats inside the cabin, in front of the displays
+#endif
     if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
     gbWritePrelit(t, -rd, GB_DISPLAY, clamp(col, vec3(0.0), vec3(3e4)));
     oG3 = vec4(1.0, 1.0, 1.0, float(GBF_DISPLAY)/255.0);
     return;
   }
+#endif
   Mat m; vec3 n, lp, lnOut; bool interior, podMat;
   gDispPx = false;
   planeMaterialN(p, rd, t, mid, trafHit, ln, m, n, lp, lnOut, interior, podMat);
@@ -36,7 +46,9 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
     gInteriorAO = aoIn;
     vec3 col = planeLight(p, rd, t, mid, m, n, lp, lnOut, interior, podMat, sunVis > 0.0 ? tsh*self : 0.0);
     gInteriorAO = -1.0;
+#if HAS_WRAITH
     if (pod && wr) col += wrHolo(uCamPos, rd, t);   // the hologram floats inside the cabin, in front of everything
+#endif
     if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
     gbWritePrelit(t, n, pod ? GB_POD : GB_CABIN, clamp(col, vec3(0.0), vec3(3e4)));
     oG3 = vec4(1.0, 1.0, 1.0, float(flags + (gDispPx ? GBF_DISPLAY : 0))/255.0);

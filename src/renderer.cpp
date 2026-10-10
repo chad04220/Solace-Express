@@ -254,7 +254,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kGLens, kUIVS, kUIFS, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
+  for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kGLens, kUIVS, kUIFS, kEntCommon, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -264,14 +264,14 @@ std::string shaderCacheStamp() {
 // The aircraft bodies' cache key: only the sources the mesh bake's results come from (the aircraft fields, their
 // normals and cabin occlusion, the bake's own main) and the driver, so an update that changes the terrain, the
 // lighting or the UI keeps every built body (each costs seconds on the GPU; a launch builds about twenty)
-std::string meshCacheStamp() {
+// (an aircraft's own bake programs, with its own build's defines: an edit to one aircraft's shape rebuilds that
+// aircraft's bodies alone - Renderer::meshStamp)
+std::string meshCacheStamp(const std::string& defines) {
   uint64_t h = fnv1a(aircraftMesh::kAlgorithmManifest, 1469598103934665603ull);
   // (the bake programs as the driver gets them, cut to what they run: an edit to a material, a light or a comment
   // leaves every aircraft body as it was; one to a shape the bake evaluates builds them again)
-  const std::string bake = worldLibAssembly("#define PART_BAKE\n") + kHullBakeMain;
-  const size_t at = bake.find('\n') + 1;
-  h = fnv1a(shaderPrune::prune(bake), h);
-  h = fnv1a(shaderPrune::prune(bake.substr(0, at) + "#define HULL_BAKE_NORMALS\n" + bake.substr(at)), h);
+  h = fnv1a(shaderPrune::prune(hullBakeFSAssembly(defines)), h);
+  h = fnv1a(shaderPrune::prune(hullBakeFSAssembly(defines + "#define HULL_BAKE_NORMALS\n")), h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -504,9 +504,12 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
   std::string vsFS = kFullscreenVS;
   std::string hdr = "#version 330 core\n";
   setCompileStage("scenery objects");
-  progEnt = program(hdr + kEntVS, hdr + kEntFS1 + kEntFS2, error); if (progEnt) step();
-  progEntSh = program(hdr + kEntVS, hdr + kEntFS1 + kEntShadowFS, error); if (progEntSh) step();
-  if (!progEnt || !progEntSh) { error = "Entity shader: " + error; return false; }
+  for (int c = 0; c < 3; c++) {   // (each class its own build: the trees', the rocks', the buildings' and vehicles')
+    const std::string d = entClassDefines(c);
+    progEnt[c] = program(entVSAssembly(d), entFSAssembly(d), error); if (progEnt[c]) step();
+    progEntSh[c] = program(entVSAssembly(d), entShadowFSAssembly(d), error); if (progEntSh[c]) step();
+    if (!progEnt[c] || !progEntSh[c]) { error = "Entity shader: " + error; return false; }
+  }
   setCompileStage("particles and sprites");
   progSprite = program(kSpriteVS, kSpriteFS, error); if (progSprite) step();
   setCompileStage("bloom and light shafts");
@@ -532,8 +535,8 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     setCompileStage("cloud accumulation");
     { std::string e; progCloudAcc = program(vsFS, kCloudAccFS, e); step(); }   // optional: without it the march's own frame is used
     if (!progMap) { error = "Map shader: " + error; return false; }
-    setCompileStage("the aircraft mesh builder");
-    compileHull(vsFS, worldLibAssembly(std::string(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "") + "#define PART_BAKE\n") + kHullBakeMain, step);   // (the bake alone evaluates a part by its id: PART_BAKE)
+    setCompileStage("aircraft hulls");
+    compileHull(step);   // (the bodies' builders are each aircraft's own, made as its bodies are built: afBakePrograms)
     setCompileStage("cockpit displays");
     progDisp = program(vsFS, ms + kDispMain, error); step();
     // not fatal: without it the cockpit screens stay dark, but the game still runs (the error goes to startup.log)
@@ -1398,7 +1401,6 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   previousClassifiedHangar = classified;
   previousHangar = fp.hangarPreview; previousPreviewModel = fp.plane.model;
   curAlpha = &alphaSprites; curAdd = &addSprites;
-  pickAfPrograms(fp);
   if (!gpuQ[0]) glGenQueries(4, gpuQ);
   {
     int rq = (gpuQi + 1) % 4;   // issued three frames ago

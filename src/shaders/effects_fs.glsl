@@ -21,7 +21,7 @@ void main(){
   int type = RESEARCH_ON ? int(gM[0].z + 0.5) : 0;
   // XR-40 cloak: a pixel on the cloaked craft (left out of the G-buffer) sees the frame behind it along a bent ray
   // (FX_NO_CLOAK, FX_NO_PLUMES: the builds without them, for a driver whose compiler fails on the whole - raster_renderer.cpp)
-#ifndef FX_NO_CLOAK
+#if !defined(FX_NO_CLOAK) && HAS_WRAITH   // (the XR-40's alone: the one effect that marches an airframe)
   if (uWr[4].w > 0.001 && uPlaneOn == 1 && uWreck == 0 && !cockpitView && type == 6 && uPano.x <= 0.0) {
     float hullT = 0.0;
     if (uHullOn == 1) { float hv = texelFetch(uEnv, px, 0).g; hullT = hv > 1e29 ? hv : (hv > 0.0 ? max(uHullNear, hv*0.999 - 0.1) : 0.0); }
@@ -67,9 +67,13 @@ void main(){
   }
 #endif
   if (plE.r + plE.g + plE.b > 0.03) taaFlag = min(taaFlag, 0.2);
+#if HAS_WRAITH
   if (!pod && uFxBeams + uFxBombs + uFxBlasts > 0) col = weaponsFx(col, ro, rd, t);
+#endif
   col = col*plT + plE;   // (the flames over the clouds, which the cloud pass has already laid under them)
+#if HAS_WRAITH
   if (cockpitView && type == 6 && !pod) col += wrHolo(ro, rd, t);   // the hologram floats inside the cabin, in front of everything
+#endif
   if (any(isnan(col)) || any(isinf(col)) || !(col.r + col.g + col.b < 1e7)) col = vec3(0.0);
   oColor = vec4(clamp(col, vec3(0.0), vec3(3e4)), taaFlag);
 }

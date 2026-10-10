@@ -53,7 +53,7 @@ struct Draw { int kind, lod; size_t first; int count; int vehicle = -1; };
 }  // namespace
 
 void Renderer::drawEntities(const FrameParams& fp) {
-  if (!progEnt) return;
+  if (!progEnt[0]) return;
   auto tStart = std::chrono::steady_clock::now();
   // a camera feed (camera_feeds.cpp): only its G-buffer, at the shortest draw distances; streaming, the shadow
   // cascades and the statistics stay the main view's
@@ -332,10 +332,16 @@ void Renderer::drawEntities(const FrameParams& fp) {
   glBindVertexArray(vaoEnt);
   glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
   glBufferData(GL_ARRAY_BUFFER, std::max<size_t>(entStage.size(), 1) * sizeof(Ent), entStage.empty() ? nullptr : entStage.data(), GL_STREAM_DRAW);
-  auto issue = [&](GLuint prog, const std::vector<Draw>& list) {
-    GLint uk = glGetUniformLocation(prog, "uKind"), uf = glGetUniformLocation(prog, "uFar"), ut = glGetUniformLocation(prog, "uThin"), ur = glGetUniformLocation(prog, "uThinRef");
-    GLint uw0=glGetUniformLocation(prog,"uWheel0"),uw1=glGetUniformLocation(prog,"uWheel1");
+  // each draw with its kind's class's own build (progs: the pass's three, set up alike): the program changes only
+  // where the class does
+  auto issue = [&](const GLuint* progs, const std::vector<Draw>& list) {
+    GLuint prog = 0; GLint uk = -1, uf = -1, ut = -1, ur = -1, uw0 = -1, uw1 = -1;
     for (const Draw& d : list) {
+      if (progs[entClass(d.kind)] != prog) {
+        prog = progs[entClass(d.kind)]; glUseProgram(prog);
+        uk = glGetUniformLocation(prog, "uKind"); uf = glGetUniformLocation(prog, "uFar"); ut = glGetUniformLocation(prog, "uThin"); ur = glGetUniformLocation(prog, "uThinRef");
+        uw0 = glGetUniformLocation(prog, "uWheel0"); uw1 = glGetUniformLocation(prog, "uWheel1");
+      }
       if(d.vehicle>=0) { const float* a=fp.groundVehicles[d.vehicle].angle;glUniform4fv(uw0,1,a);glUniform2f(uw1,a[4],a[5]); }
       else { glUniform4f(uw0,0,0,0,0);glUniform2f(uw1,0,0); }
       glUniform1f(uf, entRangeOf(R, d.kind)); glUniform1f(ut, entThins(d.kind) ? 1.f : 0.f); glUniform1f(ur, entThinRef(d.kind));
@@ -372,12 +378,14 @@ void Renderer::drawEntities(const FrameParams& fp) {
     glBindFramebuffer(GL_FRAMEBUFFER, fboSh[c]);
     glViewport(0, 0, shRes, shRes);
     glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);
-    glUseProgram(progEntSh);
-    bindMats(progEntSh);
-    glUniformMatrix4fv(glGetUniformLocation(progEntSh, "uVP"), 1, GL_FALSE, shVP[c].m);
-    glUniform1i(glGetUniformLocation(progEntSh, "uShadowPass"), 1);
-    glUniform1f(glGetUniformLocation(progEntSh, "uTime"), fp.time);
-    glUniform3f(glGetUniformLocation(progEntSh, "uWind"), fp.windSock.x, fp.windSock.y, fp.windSock.z);
+    for (GLuint p : progEntSh) {
+      glUseProgram(p);
+      bindMats(p);
+      glUniformMatrix4fv(glGetUniformLocation(p, "uVP"), 1, GL_FALSE, shVP[c].m);
+      glUniform1i(glGetUniformLocation(p, "uShadowPass"), 1);
+      glUniform1f(glGetUniformLocation(p, "uTime"), fp.time);
+      glUniform3f(glGetUniformLocation(p, "uWind"), fp.windSock.x, fp.windSock.y, fp.windSock.z);
+    }
     glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(1.5f, 2.f);
     issue(progEntSh, draws[1 + c]);
     groundShadowKey[c]=nextGroundKey[c];
@@ -407,22 +415,25 @@ void Renderer::drawEntities(const FrameParams& fp) {
       if (a.lod != b.lod) return a.lod < b.lod;
       return (2 - entClass(a.kind)) < (2 - entClass(b.kind));
     });
-    glUseProgram(progEnt);
-    bindMats(progEnt);
-    glUniformMatrix4fv(glGetUniformLocation(progEnt, "uVP"), 1, GL_FALSE, vp.m);
-    { mat4 v = viewMat(fp); glUniformMatrix4fv(glGetUniformLocation(progEnt, "uPanoView"), 1, GL_FALSE, v.m); }
-    glUniform2f(glGetUniformLocation(progEnt, "uPano"), fp.pano, fp.panoTanY);
-    glUniform2f(glGetUniformLocation(progEnt, "uJit"), jitX, jitY);
-    glUniform1f(glGetUniformLocation(progEnt, "uLogC"), 2.f / log2f(40000.f + 1.f));
-    glUniform1f(glGetUniformLocation(progEnt, "uTime"), fp.time);
-    glUniform3f(glGetUniformLocation(progEnt, "uWind"), fp.windSock.x, fp.windSock.y, fp.windSock.z);
-    glUniform1i(glGetUniformLocation(progEnt, "uShadowPass"), 0);
-    glUniform3f(glGetUniformLocation(progEnt, "uCam"), cam.x, cam.y, cam.z);
-    glUniform3f(glGetUniformLocation(progEnt, "uCamV"), cam.x, cam.y, cam.z);
-    glUniform1f(glGetUniformLocation(progEnt, "uNight"), fp.night);
-    glUniform1f(glGetUniformLocation(progEnt, "uRwyLights"), fp.rwyLights);
-    glUniform1f(glGetUniformLocation(progEnt, "uWet"), fp.wet);
-    glUniform1f(glGetUniformLocation(progEnt, "uSnow"), fp.snow);
+    const mat4 pv = viewMat(fp);
+    for (GLuint p : progEnt) {
+      glUseProgram(p);
+      bindMats(p);
+      glUniformMatrix4fv(glGetUniformLocation(p, "uVP"), 1, GL_FALSE, vp.m);
+      glUniformMatrix4fv(glGetUniformLocation(p, "uPanoView"), 1, GL_FALSE, pv.m);
+      glUniform2f(glGetUniformLocation(p, "uPano"), fp.pano, fp.panoTanY);
+      glUniform2f(glGetUniformLocation(p, "uJit"), jitX, jitY);
+      glUniform1f(glGetUniformLocation(p, "uLogC"), 2.f / log2f(40000.f + 1.f));
+      glUniform1f(glGetUniformLocation(p, "uTime"), fp.time);
+      glUniform3f(glGetUniformLocation(p, "uWind"), fp.windSock.x, fp.windSock.y, fp.windSock.z);
+      glUniform1i(glGetUniformLocation(p, "uShadowPass"), 0);
+      glUniform3f(glGetUniformLocation(p, "uCam"), cam.x, cam.y, cam.z);
+      glUniform3f(glGetUniformLocation(p, "uCamV"), cam.x, cam.y, cam.z);
+      glUniform1f(glGetUniformLocation(p, "uNight"), fp.night);
+      glUniform1f(glGetUniformLocation(p, "uRwyLights"), fp.rwyLights);
+      glUniform1f(glGetUniformLocation(p, "uWet"), fp.wet);
+      glUniform1f(glGetUniformLocation(p, "uSnow"), fp.snow);
+    }
     if (!(dbgOff & kProbeScenery)) issue(progEnt, draws[0]);
   }
   glDisable(GL_DEPTH_TEST);

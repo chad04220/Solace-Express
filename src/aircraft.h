@@ -172,6 +172,10 @@ public:
   bool sceneryHits = true;   // collide with trees and buildings (off for the quote's background flight: the scenery isn't thread-safe)
   bool apComfort = false;   // the autopilot flies for passengers (career flights): gentle bank, g, roll and climb; the stick is never limited
   bool apUpset = false;     // slow or steep enough that recovering comes before comfort (apControl)
+  bool apPro = false;       // the pilot rework's first stage (docs/PILOT.md), off until it passes the checkride: a professional's envelope (~25 deg of bank, 0.75..1.3 g, smooth), the energy law, a stabilised final (the gate at 460 m, configured and slowed by height, the path loop damped to the airframe's lag); false: the autopilot as it was (pilot_exam: PILOT=new)
+  bool apEscape = false;    // the path it is on meets the ground within ~25 s: the whole envelope to climb away (a ground-proximity warning)
+  float apNzCmd = 1.f;      // the load factor commanded, eased (the professional's g changes come on smoothly)
+  float apSpdEst = 0.f, apThrDemand = 0.5f; vec3 apVelPrev;   // (apThrDemand: the throttle the energy law last asked for, before its stops)   // the energy law's airspeed with the gusts filtered off, and last step's velocity (its inertial acceleration)
   float brakeHold = 0;   // the steady push the parked brakes are holding (N along the nose), learned while held
   float groundRough = 0;      // 0 asphalt .. 1 rough (for audio/vibration)
   float alpha = 0, beta = 0, airspeed = 0, ias = 0, gLoad = 1, stallWarn = 0;
@@ -220,6 +224,9 @@ public:
   float apStuntAng = 0, apStuntT = 0, apStuntV = 0, apStuntN = 0, apStuntHdg = 0, apStuntSpeedAfter = 0, apStuntBank0 = 0;
   vec3 apStuntRight0;          // the wing axis when the pull started: a figure keeps it, whatever the attitude
   std::string apStuntAbort;   // why the last figure was cut short ("" if it wasn't)
+  // one figure at a time: what was flying before it (the autopilot on or off, its mode and field), restored once the
+  // figure has recovered to level flight (apStuntEnded, which the game answers)
+  bool apStuntWasOn = false, apStuntEnded = false; int apStuntWasMode = 0, apStuntWasAirport = -1;
   void apDisengage() { apOn = false; apMode = AP_OFF; apUseVS = false; }
   float maxG = 1, minG = 1;
   float overG = 0;   // sustained overstress (grows past the structural limit, decays within it; the airframe fails at 1)
@@ -271,6 +278,7 @@ private:
   bool apStuntFly(float dt);   // true when it flew the controls itself this step (false: setting up, normal loops)
   void apRates(float qT, float pT, float rollCap, float nzMin, float nzMax, float dt);   // the shared inner loops
   float apAltGain() const;   // altitude error -> climb rate (1/s), as fast as this airframe's pitch answers at this speed
+  float apPathGain(bool approach) const;   // flight-path error -> its rate (1/s): as fast as the pitch answers, slow enough for the path's lag to settle it
   float terrainAround() const;   // the highest ground to keep clear of: under it, ahead along its track, and all round
   float apPitchLag() const;  // how long this airframe's pitch takes to answer at this speed (s)
   float apPathLag() const;   // and its flight path: the pitch's lag, or the wing's in building the lift, the slower (s)

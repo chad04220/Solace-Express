@@ -7,27 +7,85 @@
 // with its own build): the light aircraft's fields, cabins and liveries and the other research jet's are dropped too. A
 // GPU reserves registers for the worst path in a program whether a pixel takes it or not: the XR-40's cockpit, drawn
 // with every aircraft's code, slowed by 3 ms as the light aircraft's cockpits grew (v3.34 to v3.38, RTX 3070 Laptop).
+// AF_MODEL n: one aircraft's own build (n its index in kAircraft, aircraft.h), with its family's switch above and its
+// packed model as constants (scene_uniforms.glsl gM): the aircraft mesh pass and the bakes draw each aircraft with its
+// own (shaders.h aircraftDefines), so a program holds that aircraft's code and nothing of any other's.
 // FLEET_ON: the light aircraft and airliners; JET_ON, WRAITH_ON: the XR-30, the XR-40; RESEARCH_ON: either of them.
+// The same switches for the preprocessor (0 or 1), where code the build leaves out goes from the program's source
+// itself (shader_prune.h settles the conditionals before it prunes): HAS_FLEET, HAS_JET, HAS_WRAITH, HAS_RESEARCH.
 #if defined(AF_WRAITH)
 #define RESEARCH_ON true
 #define FLEET_ON false
 #define JET_ON false
 #define WRAITH_ON true
+#define HAS_FLEET 0
+#define HAS_JET 0
+#define HAS_WRAITH 1
 #elif defined(AF_JET)
 #define RESEARCH_ON true
 #define FLEET_ON false
 #define JET_ON true
 #define WRAITH_ON false
+#define HAS_FLEET 0
+#define HAS_JET 1
+#define HAS_WRAITH 0
 #elif defined(AF_LIGHT)
 #define RESEARCH_ON false
 #define FLEET_ON true
 #define JET_ON false
 #define WRAITH_ON false
+#define HAS_FLEET 1
+#define HAS_JET 0
+#define HAS_WRAITH 0
 #else
 #define RESEARCH_ON true
 #define FLEET_ON true
 #define JET_ON true
 #define WRAITH_ON true
+#define HAS_FLEET 1
+#define HAS_JET 1
+#define HAS_WRAITH 1
+#endif
+#define HAS_RESEARCH (HAS_JET || HAS_WRAITH)
+// AF_OUTSIDE: a build that never sees the aircraft from inside - the outside bodies' builder - has no cabin code: an
+// edit to a cockpit changes no outside body's builder, so no outside body is built again for it (HAS_CABIN)
+#ifdef AF_OUTSIDE
+#define HAS_CABIN 0
+#else
+#define HAS_CABIN 1
+#endif
+// HAS_<type> for the preprocessor (HAS_SWIFT, HAS_MANTIS...): the build carries that type's own code - every build
+// of its family but another aircraft's own. HAS_FLEET_CABIN: the career types' and the XR-10's authored cabins
+// (cockpit_layout.glsl fleetCabin). MODEL_IS(n) in code: the player's aircraft is type n (gModelId; traffic is
+// -1), false as it compiles in another aircraft's own build.
+#ifdef AF_MODEL
+#define HAS_KESTREL (AF_MODEL == 0)
+#define HAS_WREN (AF_MODEL == 1)
+#define HAS_BUSHMASTER (AF_MODEL == 2)
+#define HAS_ISLANDER (AF_MODEL == 3)
+#define HAS_PELICAN (AF_MODEL == 4)
+#define HAS_MERIDIAN (AF_MODEL == 5)
+#define HAS_STARLING (AF_MODEL == 6)
+#define HAS_SWIFT (AF_MODEL == 7)
+#define HAS_OSPREY (AF_MODEL == 8)
+#define HAS_NIGHTJAR (AF_MODEL == 9)
+#define HAS_MANTIS (AF_MODEL == 11)
+#define HAS_FLEET_CABIN (AF_MODEL < 10)
+#define MODEL_IS(n) ((n) == AF_MODEL && gModelId == (n))
+#else
+#define HAS_KESTREL HAS_FLEET
+#define HAS_WREN HAS_FLEET
+#define HAS_BUSHMASTER HAS_FLEET
+#define HAS_ISLANDER HAS_FLEET
+#define HAS_PELICAN HAS_FLEET
+#define HAS_MERIDIAN HAS_FLEET
+#define HAS_STARLING HAS_FLEET
+#define HAS_SWIFT HAS_FLEET
+#define HAS_OSPREY HAS_FLEET
+#define HAS_NIGHTJAR HAS_FLEET
+#define HAS_MANTIS HAS_FLEET
+#define HAS_FLEET_CABIN HAS_FLEET
+#define MODEL_IS(n) (gModelId == (n))
 #endif
 // The hit relative to the camera, exactly (gRelSet): the mesh pass's from its body-space vertex position, the march's
 // from its ray. The world point holds it only to the float spacing of world metres - 4 mm at the map's edges, a third
@@ -149,15 +207,15 @@ float cabinWidth(vec3 sec, float y){ float k = (y - sec.z)/max(sec.y - 0.035, 0.
 
 
 // Swift eye/body moves independently of retained world cabin furniture.
-float swiftPreservedFurnitureY(){ return gModelId==7?.520:gM[22].y; }
+float swiftPreservedFurnitureY(){ return MODEL_IS(7)?.520:gM[22].y; }
 
 void loadCabinFit(){
   vec3 E = gM[22].xyz;
   float seatDrop=uCabinSeatFit.y;
   float sw = clamp(cabinWidth(fusSection(E.z + 0.05), E.y - seatDrop) - abs(E.x) - 0.015, 0.145, 0.21);
-  if(gModelId==0 || gModelId==1)sw=min(sw,.165); // same cap as CPU rail fitting
-  if(gModelId==2)sw=min(sw,.180); // matched Bushmaster pan/rail fit
-  if(gModelId==7)sw=min(sw,.180); // matched supported Swift pan/rail fit
+  if(MODEL_IS(0) || MODEL_IS(1))sw=min(sw,.165); // same cap as CPU rail fitting
+  if(MODEL_IS(2))sw=min(sw,.180); // matched Bushmaster pan/rail fit
+  if(MODEL_IS(7))sw=min(sw,.180); // matched supported Swift pan/rail fit
   // headrest: mounted on top of the reclined seat back (centre ~4 cm above eye level, 45 cm aft); dropped altogether
   // (-100) where the cabin roof wouldn't clear it by 8 cm
   float hy = E.y + 0.057;   // along the reclined back's axis, just above its top (top at E.y - 0.046, E.z + 0.434)
@@ -178,14 +236,22 @@ void loadCabinFit(){
 // (the copies written out, element by element, for the same reason as fusSection's: no index the compiler has to
 // work out at run time, so the arrays stay in registers or are read straight from the uniforms)
 void loadMain(){ gOwn = true; gModelId = uModelId; gWheel = uWheel;
+#ifndef AF_MODEL
   gM[0] = uM[0]; gM[1] = uM[1]; gM[2] = uM[2]; gM[3] = uM[3]; gM[4] = uM[4]; gM[5] = uM[5]; gM[6] = uM[6]; gM[7] = uM[7]; gM[8] = uM[8]; gM[9] = uM[9]; gM[10] = uM[10]; gM[11] = uM[11]; gM[12] = uM[12]; gM[13] = uM[13]; gM[14] = uM[14]; gM[15] = uM[15]; gM[16] = uM[16]; gM[17] = uM[17]; gM[18] = uM[18]; gM[19] = uM[19]; gM[20] = uM[20]; gM[21] = uM[21]; gM[22] = uM[22]; gM[23] = uM[23];
+#endif
   gWr[0] = uWr[0]; gWr[1] = uWr[1]; gWr[2] = uWr[2]; gWr[3] = uWr[3]; gWr[4] = uWr[4]; gWr[5] = uWr[5]; gWr[6] = uWr[6];
-  gPS = uPS; gFlapDL = uPr.w; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame; if (gPS.w > 0.5 && gM[0].z < 4.5) loadCabinFit(); }
+  gPS = uPS; gFlapDL = uPr.w; gCtl = uCtl; gColBase = uColBase; gColStripe = uColStripe; gFlame = uFlame;
+#if HAS_CABIN
+  if (gPS.w > 0.5 && gM[0].z < 4.5) loadCabinFit();
+#endif
+}
 int gTrafK = 0;
 void loadTraffic(int k){
   gOwn = false; gTrafK = k; gModelId = -1;
   gWheel = vec3(texelFetch(uTraffic, ivec2(25, k), 0).w, texelFetch(uTraffic, ivec2(26, k), 0).w, texelFetch(uTraffic, ivec2(27, k), 0).w);
+#ifndef AF_MODEL
   gM[0] = texelFetch(uTraffic, ivec2(0, k), 0); gM[1] = texelFetch(uTraffic, ivec2(1, k), 0); gM[2] = texelFetch(uTraffic, ivec2(2, k), 0); gM[3] = texelFetch(uTraffic, ivec2(3, k), 0); gM[4] = texelFetch(uTraffic, ivec2(4, k), 0); gM[5] = texelFetch(uTraffic, ivec2(5, k), 0); gM[6] = texelFetch(uTraffic, ivec2(6, k), 0); gM[7] = texelFetch(uTraffic, ivec2(7, k), 0); gM[8] = texelFetch(uTraffic, ivec2(8, k), 0); gM[9] = texelFetch(uTraffic, ivec2(9, k), 0); gM[10] = texelFetch(uTraffic, ivec2(10, k), 0); gM[11] = texelFetch(uTraffic, ivec2(11, k), 0); gM[12] = texelFetch(uTraffic, ivec2(12, k), 0); gM[13] = texelFetch(uTraffic, ivec2(13, k), 0); gM[14] = texelFetch(uTraffic, ivec2(14, k), 0); gM[15] = texelFetch(uTraffic, ivec2(15, k), 0); gM[16] = texelFetch(uTraffic, ivec2(16, k), 0); gM[17] = texelFetch(uTraffic, ivec2(17, k), 0); gM[18] = texelFetch(uTraffic, ivec2(18, k), 0); gM[19] = texelFetch(uTraffic, ivec2(19, k), 0); gM[20] = texelFetch(uTraffic, ivec2(20, k), 0); gM[21] = texelFetch(uTraffic, ivec2(21, k), 0); gM[22] = texelFetch(uTraffic, ivec2(22, k), 0); gM[23] = texelFetch(uTraffic, ivec2(23, k), 0);
+#endif
   gPS = texelFetch(uTraffic, ivec2(28, k), 0); gFlapDL = 0.0; gCtl = texelFetch(uTraffic, ivec2(29, k), 0);
   gWr[0] = uWr[0]; gWr[1] = uWr[1]; gWr[2] = uWr[2]; gWr[3] = uWr[3]; gWr[4] = uWr[4]; gWr[5] = uWr[5]; gWr[6] = uWr[6];
   vec4 c0 = texelFetch(uTraffic, ivec2(30, k), 0), c1 = texelFetch(uTraffic, ivec2(31, k), 0);

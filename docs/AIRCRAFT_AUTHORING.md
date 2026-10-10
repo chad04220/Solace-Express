@@ -277,7 +277,8 @@ Read §7–§10 first: a Tier B shape must obey the material, part and bake rule
 
 **Dispatch.** `mapPlaneBody` (`plane_sdf.glsl`) routes on the engine code in `gM[0].z`: 5 → `mapJet`, 6 →
 `mapWraith`, everything else → the packed model. A new Tier B type takes the next code (7) and a new branch. Research
-code sits behind `RESEARCH_ON`, which the `AF_LIGHT` builds compile out, so the light aircraft don't pay for it (§8).
+code sits behind `RESEARCH_ON`, which the `AF_LIGHT` builds compile out, so the light aircraft don't pay for it, and its
+call sites behind `#if HAS_JET` / `HAS_WRAITH` (a new one gets its own), so no other aircraft's program holds it (§8).
 
 **Field rules.** These are what the mesh bake needs; break them and it makes holes, slivers or ragged edges:
 
@@ -485,14 +486,41 @@ puts whitecaps on the crests as the wind rises. A seaplane or a ditching reads t
   each into a C++ string constant in `build/gen/shaders_gen.h`, and `shaders.h` assembles programs from them
   (`objectsFSAssembly`, `planeMeshFSAssembly`, `effectsFSAssembly`, …). A new file is picked up by the glob; add it
   to the assemblies that need it.
-- **Program families.** The big airframe programs are built twice: every aircraft, and `AF_LIGHT` (no research code:
-  `RESEARCH_ON` is false and the compiler drops it). `OBJ_NO_AF` is the objects pass with no airframe at all (UFO and
+- **Program families.** The full-screen airframe programs (every aircraft in the frame in one pass) are built twice:
+  every aircraft, and `AF_LIGHT` (no research code). `OBJ_NO_AF` is the objects pass with no airframe at all (UFO and
   debris), and `PROXY_MAPS_ONLY` is the shadow proxy that only reads shadow maps. The mesh bake's program adds
-  `PART_BAKE`. Put research-only code behind `RESEARCH_ON` so the light aircraft don't pay for it.
+  `PART_BAKE`.
+- **Each aircraft's own build.** The aircraft mesh pass draws every aircraft (the player's and each traffic aircraft)
+  with its type's own build, and the bake builds each body with its own pair: `aircraftDefines` (`shaders.h`) gives
+  `AF_MODEL` (the roster index), the family's switch and the packed model as the constant `gM`, so every branch on the
+  shape is settled as the program compiles. Code only some types run goes behind the preprocessor switches in
+  `plane_common.glsl` - `HAS_FLEET`, `HAS_JET`, `HAS_WRAITH`, `HAS_RESEARCH`, `HAS_FLEET_CABIN` and one per type with its
+  own code (`HAS_SWIFT`, `HAS_BUSHMASTER`, `HAS_OSPREY`, `HAS_MANTIS`...) - and a test of the player's type is
+  `MODEL_IS(n)`, never `gModelId == n`. The pruner (`shader_prune.h`) settles those conditionals before it drops what
+  nothing calls, so another type's code is not in the program at all: wrap the **call site** (an `if (...) {...} else`
+  with `#if HAS_X` ... `#endif` round it keeps the chain whole), and the functions only it calls go too.
+  The full-screen passes (the objects pass's march, the shadow proxy's, the effects) take the own build of the type
+  they cover when every aircraft they cover is that type, else a shared build. `aircraft_specialization_test.py`
+  checks each type's own programs hold its own functions and no other type's: add a new type's own functions to its
+  table. Each own build is made the first time its aircraft is drawn, baked or marched (the launch's prewarm draws
+  every one), from the binary cache after the first launch; the shared builds only if an own one fails or a pass covers
+  several types. **The launch compiles no program with an aircraft's code** (the test checks the ones it does build),
+  so an edit to one aircraft compiles that aircraft's programs alone. Keep it so: a new full-screen effect for one type
+  goes behind its `HAS_` switch, not into the light aircraft's effects build. `AF_ALL=1` draws and bakes everything
+  with the shared builds, for an A/B.
+- **What an edit compiles.** The binary cache is keyed by each program as the pruner leaves it: its comments,
+  unreached functions, settled conditionals and layout gone. So a comment, a re-indent or an edit to code a program
+  doesn't run compiles nothing; an edit to one aircraft's code compiles its own programs; an edit to code every light
+  aircraft shares compiles each light aircraft's own build (smaller, but one each).
+- **The scenery.** The trees, the rocks and the buildings (with the airport's fittings and the vehicles) each have their
+  own pair of programs (`ENT_CLASS`, `ent_common.glsl`: `ENT_TREES`, `ENT_ROCKS`, `ENT_BUILDINGS`); each draw takes its
+  kind's class's (`entities.h entClass`).
 - **Caches.** Compiled programs are cached by source in `shadercache/`; the first launch of a new build compiles them.
-  Meshes are cached by a stamp of the **geometry** sources only (`meshCacheStamp`: common, view and scene uniforms,
-  plane common, parts, SDF, the research fields and the bake program, plus the GPU driver). So material and lighting
-  edits rebake nothing, while a shape edit rebakes every aircraft once. Bump `kMeshMagic` (`aircraft_mesh.cpp`) when you
+  Meshes are cached by a stamp of the builder that made them, as the driver gets it (`Renderer::meshStamp`: the type's
+  own pruned bake pair for that body, plus the GPU driver). Each aircraft has two builders: the outside body's has no
+  cabin code (`AF_OUTSIDE`, `HAS_CABIN` 0 - keep cockpit-only code behind `#if HAS_CABIN`), the cockpit's has it. So
+  material and lighting edits rebake nothing, a cockpit edit rebakes that aircraft's cockpit body alone, and a shape
+  edit only the aircraft whose builders it changes (an edit to shared shape code, every aircraft once). Bump `kMeshMagic` (`aircraft_mesh.cpp`) when you
   change what the bake makes of the field, not just the field.
 - **Portability.** OpenGL 3.3 core, and it must compile on NVIDIA, AMD, Intel and Mesa:
   - no GLSL keywords as identifiers (`flat`, `sample`, `patch`, `input`, `output`, …; `shader_keyword_test` checks);
@@ -663,8 +691,9 @@ cockpit muffling inside. A new type gets its sound from `engineType`, `engines`,
 
 1. Design it against the fleet (§20) and fill in the self-check (§19).
 2. Add the `AircraftSpec` row and the `ModelDef` row at the same index, before `xr10_nightjar`.
-3. Bump `kNightjar`, `kResearchJet`, `kMantis`, `kWraith` in `aircraft.h` (and `kOsprey`/`kOspreyModel`/`gModelId == 8`
-   if inserting before the Osprey).
+3. Bump `kNightjar`, `kResearchJet`, `kMantis`, `kWraith` in `aircraft.h` (and `kOsprey`/`kOspreyModel`/`MODEL_IS(8)`
+   if inserting before the Osprey), the indices in `plane_common.glsl`'s `HAS_<type>` switches and `MODEL_IS` tests,
+   and `Renderer::kAfModels` (§8).
 4. Check the roster stays at 16 types or fewer (§2).
 5. Build, run `ctest`, `flight_test --table`, `aircraft_visual_test`, `autoland_sweep --craft <i>` and `--comfort`.
 6. Look at it: `gav_` from four sides with the gear down and up, `ckv_` forward, left, right and up, morning and night.

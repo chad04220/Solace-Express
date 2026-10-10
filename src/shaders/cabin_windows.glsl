@@ -10,6 +10,8 @@
 #ifndef WRAITH_ON   // (the build's aircraft: plane_common.glsl; the depth pre-pass, without it, keeps both jets)
 #define WRAITH_ON true
 #define JET_ON true
+#define HAS_WRAITH 1
+#define HAS_JET 1
 #endif
 const float kWinGlass = 0.004, kWinFrameTop = 0.019, kWinBand = 0.023;
 // A line of sight is cut only where it comes down into the opening inside the outline at the frame's top and is still
@@ -47,6 +49,7 @@ bool winFrontCut(vec3 q, bool inFront){
 // model: 5 the XR-30, 6 the XR-40; bomb: the XR-40's floor panes show the bomb camera (kept); part: a moving part
 bool cabinWindowCut(vec3 q, int model, bool bomb, bool part){
   bool inFront = !part;
+#if HAS_WRAITH
   if (WRAITH_ON && (!JET_ON || model == 6)) {
     vec3 aq = vec3(abs(q.x), q.y, q.z);
     const vec3 Y = vec3(0.0, 1.0, 0.0), F = vec3(0.0, 0.0, -1.0);
@@ -62,6 +65,8 @@ bool cabinWindowCut(vec3 q, int model, bool bomb, bool part){
     bool rib = min(gr.x, gr.y) < 0.01 && l.z > -0.002 && l.z < 0.024;
     return winPaneCut(q, WL_C, WL_N, F, WL_S, 0.1, inFront && !rib);
   }
+#endif
+#if HAS_JET
   if (!JET_ON) return false;
   // the XR-30's pod: the panoramic display, a cylinder about the eye (glass at r 0.634, standing proud of its frame),
   // and the side bays (glass at |x| 0.63, flush with theirs). Within 8 mm in front of the glass is the glass too: the
@@ -75,6 +80,7 @@ bool cabinWindowCut(vec3 q, int model, bool bomb, bool part){
     vec3 p = q*(0.63/abs(q.x));
     if (abs(p.y - 0.04) < 0.2 && abs(p.z - 0.24) < 0.3) return true;
   }
+#endif
   return false;
 }
 bool cabinScreenId(int mid){ return (mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63); }
@@ -83,6 +89,7 @@ bool cabinScreenId(int mid){ return (mid >= 41 && mid <= 43) || (mid >= 61 && mi
 // a panel's edge (a step far finer than its lattice) the label zigzagged, so a display came out with a ragged border
 // or half of it the mount's (the XR-40's console displays, the owner's report). q: the point, eye at the origin.
 int cabinPanelId(vec3 q, int model, int mid){
+#if HAS_WRAITH
   if (WRAITH_ON && (!JET_ON || model == 6)) {
     if (mid != 65 && mid != 68 && mid != 69 && mid != 76) return mid;
     vec3 aq = vec3(abs(q.x), q.y, q.z);
@@ -98,6 +105,10 @@ int cabinPanelId(vec3 q, int model, int mid){
     if (abs(cq.y - 0.04) < 0.004 && abs(cq.x - 0.015) < 0.1 && abs(cq.z - 0.265) < 0.09) return 68;
     return 65;
   }
+#endif
+#if !HAS_JET
+  return mid;
+#else
   if (!JET_ON || (mid != 44 && mid != 45 && mid != 52 && mid != 53 && mid != 54)) return mid;
   ResearchPanel panel = specterPanel(specterPanelIndex(q));
   vec3 m = researchPanelFrame(q, panel);
@@ -106,6 +117,7 @@ int cabinPanelId(vec3 q, int model, int mid){
   if (abs(cq.x - 0.02) < 0.075 && abs(cq.z + 0.2) < 0.06 && abs(cq.y - 0.05) < 0.004) return q.x < 0.0 ? 52 : 53;
   if (abs(cq.x) < 0.112 && abs(cq.z - 0.136) < 0.096 && abs(cq.y - 0.05) < 0.004) return 54;   // and their keys
   return 44;
+#endif
 }
 // The frames round the panes, from the glass up to the frame's top: the normal of the surface the eye truly sees there
 // (cabin frame). A line of sight that crosses the top's plane over the frame meets the top (the pane's normal); one

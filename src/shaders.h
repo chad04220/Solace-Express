@@ -1,11 +1,31 @@
 // Solace Express - shader sources and the programs assembled from them
 #pragma once
+#include <cstdio>
 #include <string>
 #include "shaders_gen.h"   // the sources: src/shaders/*.glsl, embedded at build time (tools/embed_shaders.cmake)
 
 // The scene programs are put together from the GLSL modules (one constant per file in src/shaders), in an order that
 // defines every function before its first use. Everything that builds them - the game, the shader checker, the
 // keyword test, the geometry previewer - takes the list from here, so they always check what the game runs.
+
+// One aircraft's own build of the airframe programs: its index in kAircraft (AF_MODEL), its family's switch (AF_LIGHT,
+// AF_JET for the XR-30, AF_WRAITH for the XR-40) and its packed model (models.cpp packModel, the same for the player's
+// aircraft and every traffic aircraft of the type) as the constant gM. Every branch on another aircraft's type or
+// shape is settled as the program compiles, and the code only another aircraft runs is cut from its source
+// (plane_common.glsl HAS_*, shader_prune.h): the program holds this aircraft and nothing else.
+inline std::string aircraftDefines(int model, const float packed[96]) {
+  const int eng = (int)(packed[2] + 0.5f);
+  std::string d = "#define AF_MODEL " + std::to_string(model) + "\n" + (eng == 6 ? "#define AF_WRAITH\n" : eng == 5 ? "#define AF_JET\n" : "#define AF_LIGHT\n");
+  d += "#define AF_PACKED_MODEL vec4[24](";
+  for (int i = 0; i < 96; i++) {
+    char b[32]; snprintf(b, sizeof b, "%.9g", packed[i]);   // (9 digits: the float itself, exactly)
+    std::string v = b;
+    if (v.find_first_of(".en") == std::string::npos) v += ".0";   // (a float literal, never an int)
+    d += (i % 4 == 0 ? (i ? "), vec4(" : "vec4(") : ", ") + v;
+  }
+  d += "))\n";
+  return d;
+}
 
 // The shared library of scene functions (terrain heights and materials, the clouds, the aircraft fields and
 // materials, the cockpit displays, the lights): no main. The GPS map, the terrain-shadow bake, the cloud pass, the
@@ -16,10 +36,20 @@ inline std::string worldLibAssembly(const std::string& defines) {
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kCockpitMaterial + kPlaneMaterial + kWater + kAfShMap + kPlaneLight;
 }
+// the aircraft bodies' bake (aircraft_mesh.cpp, aircraft_hull.cpp): the fields evaluated part by part (PART_BAKE), and
+// with HULL_BAKE_NORMALS their normals and cabin occlusion
+inline std::string hullBakeFSAssembly(const std::string& defines) { return worldLibAssembly(defines + "#define PART_BAKE\n") + kHullBakeMain; }
 // The aircraft distance fields alone (tests/aircraft_visual_test.cpp adds its own main)
 inline std::string sdfAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kRtIO + kViewUniforms + kSceneUniforms + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kWraithSDF + kWraithCockpitCommon + kWraithCockpitSDF;
 }
+
+// ---- the scenery's instanced meshes (entity_render.cpp): a build for each class (ENT_CLASS, ent_common.glsl: the trees,
+// the rocks, the buildings and vehicles), each with its class's code alone; each draw takes its kind's class's
+inline std::string entVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kEntCommon + kEntVS; }
+inline std::string entFSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kEntCommon + kEntFS1 + kEntFS2; }
+inline std::string entShadowFSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kEntCommon + kEntFS1 + kEntShadowFS; }
+inline std::string entClassDefines(int c) { return "#define ENT_CLASS " + std::to_string(c) + "\n"; }
 
 // ---- the raster renderer's programs (raster_renderer.cpp, terrain_mesh.cpp)
 inline std::string terrainVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kCommonGLSL + kTerrainVS; }

@@ -51,7 +51,15 @@ uniform int uModelId;   // the player's type (index into kAircraft; -1 unknown):
 int gModelId = -1;
 uniform vec3 uWheel;   // the player's wheels' roll (main left, main right, nose / tail), from the simulation
 vec3 gWheel;           // the wheels' roll of the aircraft loaded (the player's, or a traffic aircraft's from its rotation columns' .w)
-vec4 gM[24]; vec4 gPS; vec4 gCtl; vec3 gColBase; vec3 gColStripe; vec4 gFlame;
+// (an aircraft's own build, AF_MODEL: its packed model is a constant of the build - the same for the player's
+// aircraft and every traffic aircraft of its type - so every branch on it is settled when the program compiles:
+// shaders.h aircraftDefines)
+#ifdef AF_MODEL
+const vec4 gM[24] = AF_PACKED_MODEL;
+#else
+vec4 gM[24];
+#endif
+vec4 gPS; vec4 gCtl; vec3 gColBase; vec3 gColStripe; vec4 gFlame;
 float gFlapDL = 0.0;   // the left flap less the right (gPS.y): the player's split flap (uPr.w), none on traffic or in the bakes
 vec4 gWr[7];   // the XR-40's animation state the field reads (uWr, or a bake's state)
 // Fitted cabin mounts, cached when the model is loaded rather than at every ray-march sample.

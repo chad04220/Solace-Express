@@ -99,6 +99,7 @@ target_include_directories(mesh_simplify_test PRIVATE src)
 add_executable(entity_raycast_test tests/entity_raycast_test.cpp ${CORE_SOURCES})
 add_executable(world_cache_test tests/world_cache_test.cpp ${CORE_SOURCES})
 add_executable(autoland_sweep tests/autoland_sweep.cpp ${CORE_SOURCES})   # (not in ctest: a long benchmark, run by hand)
+add_executable(pilot_exam EXCLUDE_FROM_ALL tests/pilot_exam.cpp ${CORE_SOURCES})   # (the pilot's checkride, docs/PILOT.md: a long benchmark, run by hand)
 if(MSVC)
   target_compile_definitions(flight_test PRIVATE _CRT_SECURE_NO_WARNINGS)
   target_compile_definitions(progression_test PRIVATE _CRT_SECURE_NO_WARNINGS)
@@ -176,7 +177,7 @@ add_test(NAME shader_prune COMMAND shader_prune_test)
 add_dependencies(shader_keyword_test shader_prune_test)   # (built with a target the CI sanitizer job names)
 # GLSL check of the ray tracer and the programs built from it, as assembled and as pruned (only where glslangValidator
 # is installed)
-add_executable(shader_check tools/shader_check.cpp)
+add_executable(shader_check tools/shader_check.cpp ${CORE_SOURCES})   # (the aircraft's packed models: their own builds)
 target_include_directories(shader_check PRIVATE src)
 find_program(GLSLANG_VALIDATOR glslangValidator)
 if(GLSLANG_VALIDATOR)
@@ -258,8 +259,8 @@ if(Python3_Interpreter_FOUND AND NOT WIN32)
     --generated ${CMAKE_BINARY_DIR}/gen --cxx ${CMAKE_CXX_COMPILER})
 endif()
 
-# Explicit report-only fallback for software drivers unable to compile unused
-# all-aircraft variants. Exact standard AF_LIGHT scene programs; fleet hangar only.
+# The UI review on a software driver: the game's own programs (the launch builds none with an aircraft's code), with
+# the review's diagnostic checks; fleet hangar only.
 if(UNIX AND NOT APPLE AND Python3_Interpreter_FOUND)
   set(UI_FLEET_ADAPTER_DIR ${CMAKE_BINARY_DIR}/ui-fleet-adapter)
   set(UI_FLEET_ADAPTERS ${UI_FLEET_ADAPTER_DIR}/renderer.cpp ${UI_FLEET_ADAPTER_DIR}/raster_renderer.cpp ${UI_FLEET_ADAPTER_DIR}/aircraft_mesh.cpp)

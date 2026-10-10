@@ -33,6 +33,7 @@ const char* Plane::stuntName(int f) {
 
 void Plane::apStuntBegin(int figure, const Weather& wx) {
   float keepSpeed = apOn && apSpeed > 0 ? apSpeed : spec->cruise * 0.8f;
+  apStuntWasOn = apOn; apStuntWasMode = apMode; apStuntWasAirport = apAirport >= 0 ? apAirport : apHoldFor; apStuntEnded = false;
   apEngage(AP_HOLD, -1, wx);
   apMode = AP_STUNT;
   apStunt = ((figure % STUNT_COUNT) + STUNT_COUNT) % STUNT_COUNT; apStuntStep = 0; apStuntAng = 0; apStuntT = 0;
@@ -87,6 +88,7 @@ bool Plane::apStuntFly(float dt) {
     if (why) apStuntAbort = why;
     apMode = AP_HOLD; apUseVS = false; apAlt = std::max(pos.y, ground + 150.f); apHeading = heading(); apSpeed = apStuntSpeedAfter;
     apStatus = why ? fmt("STUNT ABORTED  %s", why) : fmt("%s COMPLETE", stuntName(apStunt));
+    apStuntEnded = true;   // (level again: the game hands the aircraft back as it was before the figure)
   };
 
   // ---- setting up: the speed and height the figure needs, wings level, before it starts
