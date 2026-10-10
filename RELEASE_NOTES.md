@@ -1,16 +1,27 @@
 ## What's new
 
-### XR-40 cloak
-- Engaging the cloak no longer drops the frame rate (on an RTX 3070 laptop it fell to 59 fps). To show the world through the cloaked part of the craft, the game traced the XR-40's whole shape for every pixel it covered; it now draws that part from the craft's own mesh, which tells it the same surface at a fraction of the cost. The cloak looks the same.
+### Living islands (the first step)
+Codex's environment work, merged in:
+- **Towns and cities.** All 18 settlements were rebuilt round streets that follow the road coming in: houses face the street, with gardens, courtyards and parked cars. The two cities have dense cores of towers and skyscrapers, and the villages are smaller and lower. At night, high-rise windows light floor by floor, in warm and cool tones, with some floors dark.
+- **Buildings, vehicles, trees and rocks** remodelled in all four levels of detail: window openings, roof detail, fitted car glazing and lamps, connected tree branches, and close-up sprays of leaves and needles.
+- **Airports** have service yards, structures, vehicles and clear gate access.
+- **Photographic materials** for asphalt, concrete, brick, plaster, roof tiles and bark: 2K scans up close, with a 512 px set on Low quality.
+- **Shallow water** shows the sand and rock beneath it, fading with depth; deep water costs less to draw.
+- **Mount Kaleo** has a real summit crater, with glowing fissures, smoke drifting with the wind, embers and a lava glow at night.
 
-### Faster aircraft builds
-- Building the aircraft (the loading screen's step after an update that changes them) takes less than half the time it did. On the test machine the XR-40's exterior went from 22 s to 9 s, its cockpit from 20 s to 3 s, and the Kestrel's cockpit from 13 s to 8 s. The bodies that come out are the same; only the work behind them changed:
-  - The first search for where a body's surface can be now also passes over the space deep inside it. The XR-40's cabin is solid all round, and that search sent 90 million points to the finer one to find a few thousand cells.
-  - The surface is found with each cell's own lookup tables instead of one large map of every point. That map was most of the time.
-  - The moving parts (control surfaces, fans, gear, pods) are sampled only where their surface is, following it from block to block, instead of over their whole box. That is 19 million points instead of 85 million on the XR-40.
-  - The simplifier that trims each body to its final triangles weighs its candidates on several processor cores at once.
-- Bodies already built are kept: this update builds nothing again.
-- `compile.log` now has a line for each body built, giving its time and how it splits between building its builder's shader programs, the GPU, the frames shown while it ran, and the processor. The next diagnostics will show where the time goes on your machine.
+### Grass
+- The grass keeps the islands' green and gains real blade detail up close: a 2K scan, matched to the colour and finish the islands were tuned with. The merged set's first grass scan was mostly fallen leaves over soil, and it turned every meadow khaki.
 
-### Fixes
-- An error log left by a launch that failed is cleared once the game starts normally again, and `diagnostics.bat` keeps any it finds apart (`error_before.log`), so the error log it collects is from its own runs. The v3.42.0 diagnostics still showed the NVIDIA shader compiler failure fixed in v3.36.x, from a log the game had never cleared.
+### Good to know
+- **The first launch after updating takes longer, once.** The islands are regenerated (the world format changed for the volcano's crater). Every aircraft body is rebuilt, which takes about two minutes on an RTX 3070 laptop. The new textures load as well.
+- **Size:** the download is about 60 MB larger, and the new textures use about 180 MB more GPU memory.
+
+### Next
+The plan for the rest of the islands is in `docs/LIVING_ISLANDS_PLAN.md`:
+- a real road network with highways, bridges and graded roads,
+- farms, villages, towns and cities that connect to it,
+- landmarks built by hand,
+- traffic and lights,
+- a pass over the whole picture.
+
+Please run `diagnostics.bat` on this version. It's the first measurement of the new environment on a real GPU.
