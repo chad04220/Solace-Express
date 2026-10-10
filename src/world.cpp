@@ -227,7 +227,7 @@ void World::build(const std::string& cachePath, const std::string& stamp) {
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
   g_worldStage = cachePath.empty() ? 2 : 1;
   fromCache = !cachePath.empty() && loadCache(cachePath, stamp);
-  if (fromCache) { sceneryInit(); boxes.clear(); g_worldStage = 3; return; }
+  if (fromCache) { sceneryInit(); sceneryConnectRoads(*this); sceneryBakeCommunityLots(*this); boxes.clear(); g_worldStage = 3; return; }
   g_worldStage = 2;
   hm.resize((size_t)HM_N * HM_N * 4);
   sceneryInit();
@@ -258,6 +258,26 @@ void World::build(const std::string& cachePath, const std::string& stamp) {
     }
   }
   for (int pass = 0; pass < 4 && fillInlandPits() > 0; pass++) {}   // (until none is left: see fillInlandPits)
+  // A real summit bowl for Mount Kaleo. The original procedural detail overwhelms
+  // its shallow analytic depression; carve only this bounded, airport-free summit.
+  // All terrain outside the 520 m texel-centre disk remains byte-identical.
+  const int vx0 = std::max(0, (int)((25000.f - 520.f + WORLD_HALF) / HM_TEXEL));
+  const int vx1 = std::min(HM_N - 1, (int)((25000.f + 520.f + WORLD_HALF) / HM_TEXEL));
+  const int vz0 = std::max(0, (int)((-9000.f - 520.f + WORLD_HALF) / HM_TEXEL));
+  const int vz1 = std::min(HM_N - 1, (int)((-9000.f + 520.f + WORLD_HALF) / HM_TEXEL));
+  for (int j = vz0; j <= vz1; ++j) for (int i = vx0; i <= vx1; ++i) {
+    const float x = -WORLD_HALF + (i + .5f) * HM_TEXEL;
+    const float z = -WORLD_HALF + (j + .5f) * HM_TEXEL;
+    const float dx = x - 25000.f, dz = z + 9000.f, r = hypotf(dx, dz);
+    if (r >= 520.f || airportInfluence(x, z) > .001f) continue;
+    const float angle = atan2f(dz, dx);
+    const float irregularR = r * (1.f + .035f * sinf(angle * 3.f) + .025f * cosf(angle * 5.f));
+    const float wall = smoothstepf(145.f, 340.f, irregularR);
+    const float weight = 1.f - smoothstepf(340.f, 520.f, r);
+    float* t = &hm[((size_t)j * HM_N + i) * 4];
+    t[0] = lerpf(t[0], 1780.f + 230.f * wall, weight);
+    t[1] = lerpf(t[1], .7f + 24.f * wall, weight);
+  }
   bakeMask();
   buildHMax();
   buildEnvelope();
@@ -270,7 +290,7 @@ void World::build(const std::string& cachePath, const std::string& stamp) {
 // The generated world on disk: its height and mask textures, height bounds and terrain envelope, stamped with the
 // build that made them (any other build generates again)
 namespace {
-const uint32_t kWorldMagic = 0x574c4431u;   // "WLD1"
+const uint32_t kWorldMagic = 0x574c4433u;   // "WLD3": community masks, connected roads and bounded summit crater
 template <class T> void putVec(FILE* f, const std::vector<T>& v) { uint64_t n = v.size(); fwrite(&n, 8, 1, f); if (n) fwrite(v.data(), sizeof(T), n, f); }
 template <class T> bool getVec(FILE* f, std::vector<T>& v, uint64_t expect) {
   uint64_t n = 0; if (fread(&n, 8, 1, f) != 1 || n != expect) return false;

@@ -1,0 +1,29 @@
+{
+  "crop_xyxy": [
+    0,
+    350,
+    1920,
+    1050
+  ],
+  "comparison": {
+    "v5": {
+      "all_rgb_above_240": 39319,
+      "max_channel": 251,
+      "mean_crop_rgb": [
+        45.42929017857143,
+        46.38320758928572,
+        50.193261160714286
+      ]
+    },
+    "v7": {
+      "all_rgb_above_240": 0,
+      "max_channel": 251,
+      "mean_crop_rgb": [
+        31.842684523809524,
+        32.818409226190475,
+        36.77593898809524
+      ]
+    }
+  },
+  "note": "Matched native city cameras. Whole-crop bright-pixel count includes unchanged non-office lights; not a material-isolated metric."
+}

@@ -3,12 +3,20 @@
 #include "renderer.h"
 #include "entity_shaders.h"
 #include "entity_lod.h"
+#include "entity_bounds.h"
 #include <chrono>
 
+namespace {
+EntLocalBounds closeEntityBounds[EK_COUNT],allEntityBounds[EK_COUNT];
+std::vector<EntChunkBoundsCache> entityChunkBounds;
+}
 
 bool Renderer::initEntities() {
   std::vector<EVert> verts;
   buildEntityMeshes(verts, entRange);
+  entBuildLocalBounds(verts,entRange,closeEntityBounds);
+  entBuildLocalBounds(verts,entRange,allEntityBounds,true);
+  entityChunkBounds.assign(size_t(Scenery::NC)*Scenery::NC,EntChunkBoundsCache{});
   glGenVertexArrays(1, &vaoEnt); glBindVertexArray(vaoEnt);
   glGenBuffers(1, &vboEntMesh); glBindBuffer(GL_ARRAY_BUFFER, vboEntMesh);
   glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(EVert), verts.data(), GL_STATIC_DRAW);
@@ -242,7 +250,13 @@ void Renderer::drawEntities(const FrameParams& fp) {
       float fy = std::max(fabsf(ch->ymin - cam.y), fabsf(ch->ymax - cam.y));
       float dmax = sqrtf(fx * fx + fz * fz + fy * fy);
       bool affected = anyCrater && g_scenery.chunkAffected(ccx + dx, ccz + dz);
-      bool inView = dmin < farAll && boxVisible(x0 - 12, ch->ymin, z0 - 12, x1 + 12, ch->ymax, z1 + 12);
+      // A nominal 12 m chunk pad can discard a wide terminal, an animated
+      // crown, or buried foundations before their correct instance bounds run.
+      // Rebuild this authored all-LOD union only when chunk content changes.
+      auto& chunkBounds=entityChunkBounds[size_t(ccz+dz)*Scenery::NC+ccx+dx];
+      const auto& actual=chunkBounds.get(*ch,allEntityBounds);
+      bool inView=dmin<farAll && (fp.pano>0.f || (chunkBounds.valid &&
+        boxVisible(actual.lo.x,actual.lo.y,actual.lo.z,actual.hi.x,actual.hi.y,actual.hi.z)));
       bool inSh[2] = {false, false};
       for (int c = 0; c < 2; c++)
         if (shDirty[c]) {
@@ -258,6 +272,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
         if (b == e) continue;
         float far = entRangeOf(R, k), l0, l1;
         entLodLimits(R, k, l0, l1);
+        const float close = feedPass ? 0.f : entCloseLimit(R,k);
         float shadowL0, shadowL1;
         entLodLimits(shadowRanges, k, shadowL0, shadowL1);
         bool thin = entThins(k);
@@ -265,8 +280,8 @@ void Renderer::drawEntities(const FrameParams& fp) {
         if (!viewK && !inSh[0] && !inSh[1]) continue;
         // the whole chunk in one LOD band and inside the draw distance: hand its instances over in one block (the
         // vertex shader does the distance thinning per instance, exactly as below)
-        int lodN = entLodAt(dmin, l0, l1), lodF = entLodAt(dmax, l0, l1);
-        bool bulk = viewK && !affected && dmax < far && lodN == lodF && !(entLodFades(k) && entLodSpanFades(dmin, dmax, l0, l1));
+        int lodN = entDetailAt(dmin, close, l0, l1), lodF = entDetailAt(dmax, close, l0, l1);
+        bool bulk = viewK && !affected && dmax < far && lodN == lodF && lodN != kEntCloseLod && !entDetailSpanFades(k,dmin,dmax,close,l0,l1);
         if (bulk) {
           // thinned kinds: only the prefix that can survive anywhere in the chunk (keys ascending, nearest point's
           // keep fraction); the vertex shader thins the rest of the way per instance
@@ -283,12 +298,18 @@ void Renderer::drawEntities(const FrameParams& fp) {
           if (affected && g_scenery.destroyed(en)) continue;
           float ddx = en.x - cam.x, ddy = en.y - cam.y, ddz = en.z - cam.z;
           float d = sqrtf(ddx * ddx + ddy * ddy + ddz * ddz);
-          int lod = entLodAt(d, l0, l1);
+          int lod = entDetailAt(d, close, l0, l1);
           bool keep = !thin || entThinKey(en) < entKeepDrawn(k, d);   // (the ground texture takes over distant forest; fading in or out, still drawn)
-          if (viewK && d < far && !bulk && keep) {
+          // Chunk culling is deliberately coarse. Close meshes can be thousands
+          // of triangles each, so reject their offscreen instances as one unit,
+          // including the near-detail half of a close cross-fade. The panorama
+          // has a cylindrical frustum; ordinary perspective planes do not apply.
+          const bool closeVisible = lod != kEntCloseLod || fp.pano > 0.f || !closeEntityBounds[k].valid ||
+            entBoundsVisible(entInstanceBounds(closeEntityBounds[k],k,en),pl);
+          if (viewK && d < far && !bulk && keep && closeVisible) {
             bucket[0][k][lod].push_back(en);
             // (and the farther detail level too where the two are cross-fading)
-            const int also = entLodFades(k) ? entLodAlso(d, l0, l1) : -1;
+            const int also = entDetailAlso(k,d,close,l0,l1);
             if (also >= 0 && entRange[k].count[also] > 0) bucket[0][k][also].push_back(en);
           }
           // shadows: only what can cast into the faded circle the shader uses (radius kShFade1 x R around the
@@ -324,9 +345,15 @@ void Renderer::drawEntities(const FrameParams& fp) {
   for(int vi=0;vi<(int)fp.groundVehicles.size();++vi) {
     const auto& v=fp.groundVehicles[vi];if(!validGroundVehicle(v)) continue;
     const Ent& e=v.entity;int k=v.kind;float d=length(vec3(e.x,e.y,e.z)-cam),l0,l1;entLodLimits(R,k,l0,l1);
-    int lod=entLodAt(d,l0,l1);
+    float close=feedPass?0.f:entCloseLimit(R,k);int lod=entDetailAt(d,close,l0,l1);
     size_t first=entStage.size();entStage.push_back(e);
-    if(d<entRangeOf(R,k) && entRange[k].count[lod]>0) draws[0].push_back({k,lod,first,1,vi});
+    const bool closeVisible = lod != kEntCloseLod || fp.pano > 0.f || !closeEntityBounds[k].valid ||
+      entBoundsVisible(entInstanceBounds(closeEntityBounds[k],k,e),pl);
+    if(d<entRangeOf(R,k) && entRange[k].count[lod]>0 && closeVisible) {
+      draws[0].push_back({k,lod,first,1,vi});
+      int also=entDetailAlso(k,d,close,l0,l1);
+      if(also>=0 && entRange[k].count[also]>0) draws[0].push_back({k,also,first,1,vi});
+    }
     for(int c=0;c<2 && sunUp && !feedPass;++c) {
       const auto& info=kEntInfo[k];float pad=std::max(info.hx*e.sx,info.hz*e.sz)+info.h*e.sy*shReach+60.f;
       if(shDirty[c] && std::fabs(e.x-newCenter[c].x)<cR[c]+pad && std::fabs(e.z-newCenter[c].z)<cR[c]+pad)
@@ -340,18 +367,18 @@ void Renderer::drawEntities(const FrameParams& fp) {
   // each draw with its kind's class's own build (progs: the pass's three, set up alike): the program changes only
   // where the class does
   auto issue = [&](const GLuint* progs, const std::vector<Draw>& list) {
-    GLuint prog = 0; GLint uk = -1, uf = -1, ut = -1, ur = -1, ul = -1, ull = -1, uw0 = -1, uw1 = -1;
+    GLuint prog = 0; GLint uk = -1, uf = -1, ut = -1, ur = -1, ul = -1, ull = -1, uclose = -1, uw0 = -1, uw1 = -1;
     for (const Draw& d : list) {
       if (progs[entClass(d.kind)] != prog) {
         prog = progs[entClass(d.kind)]; glUseProgram(prog);
         uk = glGetUniformLocation(prog, "uKind"); uf = glGetUniformLocation(prog, "uFar"); ut = glGetUniformLocation(prog, "uThin"); ur = glGetUniformLocation(prog, "uThinRef");
-        ul = glGetUniformLocation(prog, "uLod"); ull = glGetUniformLocation(prog, "uLodL");
+        ul = glGetUniformLocation(prog, "uLod"); ull = glGetUniformLocation(prog, "uLodL"); uclose = glGetUniformLocation(prog,"uCloseLod");
         uw0 = glGetUniformLocation(prog, "uWheel0"); uw1 = glGetUniformLocation(prog, "uWheel1");
       }
       if(d.vehicle>=0) { const float* a=fp.groundVehicles[d.vehicle].angle;glUniform4fv(uw0,1,a);glUniform2f(uw1,a[4],a[5]); }
       else { glUniform4f(uw0,0,0,0,0);glUniform2f(uw1,0,0); }
       glUniform1f(uf, entRangeOf(R, d.kind)); glUniform1f(ut, entThins(d.kind) ? 1.f : 0.f); glUniform1f(ur, entThinRef(d.kind));
-      { float l0, l1; entLodLimits(R, d.kind, l0, l1); glUniform1i(ul, d.vehicle < 0 && entLodFades(d.kind) ? d.lod : -1); glUniform2f(ull, l0, l1); }   // (the cross-fade between detail levels)
+      { float l0, l1; entLodLimits(R, d.kind, l0, l1); glUniform1i(ul, d.lod); glUniform2f(ull, l0, l1); glUniform1f(uclose,feedPass?0.f:entCloseLimit(R,d.kind)); }   // (the cross-fade between detail levels)
       glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent)));
       glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent) + 16));
       glUniform1i(uk, d.kind);
@@ -361,6 +388,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
   auto bindMats = [&](GLuint prog) {
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(glGetUniformLocation(prog, "uAlb"), 0);
     glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texNrm); glUniform1i(glGetUniformLocation(prog, "uNrm"), 1);
+    bindEnvironmentMaterials(prog, 0, 1);
   };
   glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
   glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
@@ -419,7 +447,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
     // near detail levels first, and buildings and rocks before trees: the big near occluders fill the depth buffer
     // early, so less of what lies behind them gets shaded
     std::stable_sort(draws[0].begin(), draws[0].end(), [](const Draw& a, const Draw& b) {
-      if (a.lod != b.lod) return a.lod < b.lod;
+      if (a.lod != b.lod) return (a.lod == kEntCloseLod ? -1 : a.lod) < (b.lod == kEntCloseLod ? -1 : b.lod);
       return (2 - entClass(a.kind)) < (2 - entClass(b.kind));
     });
     const mat4 pv = viewMat(fp);

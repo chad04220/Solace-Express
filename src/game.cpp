@@ -1,4 +1,5 @@
 // Solace Express - game flow, flight session, cameras, particles, lights, audio feed
+#include "volcano_effects.h"
 #include "game.h"
 #include "load_pacer.h"
 #include <chrono>
@@ -3767,7 +3768,7 @@ void Game::render() {
   if (!vid) {
     fp = buildFrame();
     std::vector<SpriteVert> a, b;
-    if (!fp.hangarPreview) buildSprites(fp, a, b);
+    if (!fp.hangarPreview) { buildSprites(fp, a, b); volcano::append(fp, g_ren.quality, a, b); }
     g_ren.renderScene(fp, a, b);
     if (screen == SCR_LOADING && loadReadyT < 0) ++loadFrames;
   } else g_ren.clearScreen();

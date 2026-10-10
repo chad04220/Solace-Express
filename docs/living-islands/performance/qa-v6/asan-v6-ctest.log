@@ -1,0 +1,39 @@
+Test project /workspace/scratch/87b29863f015/solace-world-community-asan-build
+      Start 10: airport_layouts
+ 1/17 Test #10: airport_layouts ..................   Passed   49.34 sec
+      Start 21: entity_raycast
+ 2/17 Test #21: entity_raycast ...................   Passed   58.53 sec
+      Start 22: world_cache
+ 3/17 Test #22: world_cache ......................   Passed   41.34 sec
+      Start 29: environment_foliage
+ 4/17 Test #29: environment_foliage ..............   Passed    1.97 sec
+      Start 30: environment_buildings
+ 5/17 Test #30: environment_buildings ............   Passed    0.41 sec
+      Start 32: terrain_material_math
+ 6/17 Test #32: terrain_material_math ............   Passed    0.09 sec
+      Start 43: runway_preservation
+ 7/17 Test #43: runway_preservation ..............   Passed   55.51 sec
+      Start 44: community_layout
+ 8/17 Test #44: community_layout .................   Passed   39.67 sec
+      Start 45: airport_environment
+ 9/17 Test #45: airport_environment ..............   Passed   31.35 sec
+      Start 46: volcano_effects
+10/17 Test #46: volcano_effects ..................   Passed   28.47 sec
+      Start 47: environment_asset_mesh
+11/17 Test #47: environment_asset_mesh ...........   Passed    0.77 sec
+      Start 49: environment_scale_audit
+12/17 Test #49: environment_scale_audit ..........   Passed   31.49 sec
+      Start 50: environment_close_detail
+13/17 Test #50: environment_close_detail .........   Passed    0.09 sec
+      Start 51: environment_nature_detail
+14/17 Test #51: environment_nature_detail ........   Passed    0.84 sec
+      Start 52: airport_construction_detail
+15/17 Test #52: airport_construction_detail ......   Passed    1.47 sec
+      Start 53: environment_close_bounds
+16/17 Test #53: environment_close_bounds .........   Passed    9.66 sec
+      Start 54: environment_chunk_bounds
+17/17 Test #54: environment_chunk_bounds .........   Passed    0.48 sec
+
+100% tests passed out of 17
+
+Total Test time (real) = 351.49 sec

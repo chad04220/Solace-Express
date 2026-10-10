@@ -1,8 +1,30 @@
 //! kMaterialCommon
 //! The material record and the texture-array sampling: planar, anti-tiled ground, triplanar; tangent-space detail normals.
 // triplanar/planar texture sampling with anti-tiling (two scales)
-vec4 texA(vec2 uv, int layer){ return texture(uAlb, vec3(uv, float(layer))); }
-vec4 texN(vec2 uv, int layer){ return texture(uNrm, vec3(uv, float(layer))); }
+#ifdef ENV_MATERIALS
+// Seven selective photographic 2k layers, using the same fetch count as the 512 fallback.
+// Only environment assemblies define this. Aircraft/cockpit/shared world-library paths
+// retain their original sampler, texture sizes, material helpers and array layer mapping.
+uniform sampler2DArray uEnvAlb; uniform sampler2DArray uEnvNrm; uniform int uEnvMaterials;
+int environmentLayer(int layer){
+  return layer == M_GRASS ? 0 : layer == M_ASPHALT ? 1 : layer == M_CONCRETE ? 2 : layer == M_BRICK ? 3
+       : layer == M_PLASTER ? 4 : layer == M_TILES ? 5 : layer == M_BARK ? 6 : -1;
+}
+#endif
+vec4 texA(vec2 uv, int layer){
+#ifdef ENV_MATERIALS
+  int env = environmentLayer(layer);
+  if (uEnvMaterials != 0 && env >= 0) return texture(uEnvAlb, vec3(uv, float(env)));
+#endif
+  return texture(uAlb, vec3(uv, float(layer)));
+}
+vec4 texN(vec2 uv, int layer){
+#ifdef ENV_MATERIALS
+  int env = environmentLayer(layer);
+  if (uEnvMaterials != 0 && env >= 0) return texture(uEnvNrm, vec3(uv, float(env)));
+#endif
+  return texture(uNrm, vec3(uv, float(layer)));
+}
 vec4 matSample(vec2 xz, int layer, float scale, out vec3 nTS){
   vec2 uv1 = xz/scale, uv2 = xz/(scale*4.7) + 0.37;
   vec4 a = mix(texA(uv1, layer), texA(uv2, layer), 0.35);

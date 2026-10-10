@@ -133,6 +133,8 @@ public:
   int quality = 1;           // 0 low, 1 medium, 2 high
   std::string matDir;          // the scanned material layers (assets/materials; empty or missing: procedural ones)
   int matScanned = 0;          // how many of the layers came from it
+  int matEnvScanned = 0;       // 0 or kEnvMatLayers optional 2K environment layers, separate from the base array
+  int matEnvFallbackScanned = 0;  // genuine-colour environment-only 512 px layers for Low/fallback
   int dbgOff = 0;            // profiling: renderer features switched off (uDbg bits)
   // the analysis's cost probes, above the features' bits: one piece of the frame's work left out to time it (the picture
   // is wrong while one is on): the scenery's G-buffer draws, the terrain's, the objects pass's march, the player's
@@ -240,6 +242,10 @@ private:
   GLuint fboRay[2] = {0, 0}, texRay[2] = {0, 0};
   GLuint vaoEmpty = 0, vaoSprite = 0, vboSprite = 0, vaoUI = 0, vboUI = 0;
   GLuint texHM = 0, texAlb = 0, texNrm = 0, texFont = 0, texMask = 0, texRoadId = 0, texData = 0, texHMax = 0;
+  GLuint texEnvAlb = 0, texEnvNrm = 0;  // seven 2K environment layers (298.7 MiB with mipmaps)
+  GLuint texEnvLowAlb = 0, texEnvLowNrm = 0;
+  bool envMaterialUnits = false;
+  void bindEnvironmentMaterials(GLuint p, int baseColourUnit = 1, int baseNormalUnit = 2);
   struct V4 { float x, y, z, w; };
   GLuint fboScene = 0, texColor = 0, texDepth = 0, fboSprite = 0;
   // temporal AA: the lighting pass writes texRaw; the resolve blends it with the reprojected history into texHist[cur] + texColor
@@ -275,7 +281,7 @@ private:
   void scaleDims();
   int allocW = 0, allocH = 0;   // the size the render resolution's targets were made at (rw x rh is its lower-left part)
   float jitX = 0, jitY = 0;
-  void genMaterials();
+  void genMaterials(const std::function<void(float, const std::string&)>& progress = {});
   void genCloudNoise();   // tileable cloud coverage (2D) and billow / detail noise (3D) textures
   GLuint texCloudCov = 0, texNoise3 = 0;
   void genWaves();        // the sea's wave bands (water.glsl): three tileable slope / height maps of a wind-driven sea

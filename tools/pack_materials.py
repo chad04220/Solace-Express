@@ -7,6 +7,8 @@ Each layer the manifest below names becomes three 512x512 JPEGs the renderer loa
   NN_name_n.jpg  normal x, y (DirectX's: green down) and height
   NN_name_m.jpg  roughness (red) and ambient occlusion (green)
 A layer the manifest leaves out stays procedural.
+The independent true-colour grass/asphalt/concrete environment sets are built by
+pack_environment_scans.py; this legacy packer deliberately retains aircraft/cockpit palette compatibility.
 
 The scan is fitted to the tile the shaders lay the layer at (repeated a whole number of times, then box-filtered, so
 it stays seamless), and its average colour, roughness and relief are matched to the procedural layer it replaces:

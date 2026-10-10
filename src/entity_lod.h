@@ -67,7 +67,38 @@ inline bool entLodSpanFades(float dmin, float dmax, float l0, float l1) {
 }
 // the share of the screen-door each level keeps at this distance: values in [lo, hi)
 inline void entLodKeep(int lod, float d, float l0, float l1, float& lo, float& hi) {
+  if (lod > 2) { lo = hi = 0.f; return; } // extra close slot is handled by entDetailKeep
   const float t0 = entLodT(d, l0), t1 = entLodT(d, l1);
   lo = lod == 0 ? t0 : lod == 1 ? t1 : 0.f;
   hi = lod == 0 ? 1.f : lod == 1 ? t0 : t1;
+}
+
+// Close inspection detail is an additional slot, not a shorter replacement for
+// the established three distance tiers. Shadows and camera feeds retain those tiers.
+constexpr int kEntCloseLod = 3;
+inline float entCloseLimit(const EntRanges& r, int k) {
+  const float q = std::clamp(r.b0 / 850.f, .7f, 1.2f);
+  const auto& i = kEntInfo[k];
+  if (entClass(k) == EC_TREE) return (k == EK_BUSH ? 38.f : 78.f)*q;
+  if (entClass(k) == EC_ROCK) return (k >= EK_OUTCROP ? 155.f : 55.f)*q;
+  if (k == EK_CAR) return 85.f*q;
+  if (k == EK_TRUCK) return 120.f*q;
+  return std::clamp(std::max(i.h, std::max(i.hx,i.hz)*2.f)*7.f, 55.f, 280.f)*q;
+}
+inline int entDetailAt(float d, float close, float l0, float l1) {
+  return close > 0.f && d < close ? kEntCloseLod : entLodAt(d,l0,l1);
+}
+inline int entDetailAlso(int kind, float d, float close, float l0, float l1) {
+  if (close > 0.f && d < close) return d >= close*(1.f-kEntLodFade) ? 0 : -1;
+  return entLodFades(kind) ? entLodAlso(d,l0,l1) : -1;
+}
+inline bool entDetailSpanFades(int kind, float a, float b, float close, float l0, float l1) {
+  return (close > 0.f && b >= close*(1.f-kEntLodFade) && a < close) ||
+    (entLodFades(kind) && entLodSpanFades(a,b,l0,l1));
+}
+inline void entDetailKeep(int kind,int lod,float d,float close,float l0,float l1,float& lo,float& hi) {
+  if (lod == kEntCloseLod) { lo = close > 0.f ? entLodT(d,close) : 1.f; hi=1.f; return; }
+  if (entLodFades(kind)) entLodKeep(lod,d,l0,l1,lo,hi);
+  else { lo=0.f; hi=lod==entLodAt(d,l0,l1)?1.f:0.f; }
+  if (lod==0 && close>0.f) hi*=entLodT(d,close);
 }

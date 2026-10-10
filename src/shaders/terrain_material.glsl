@@ -18,12 +18,59 @@ float terrainDetailWeight(float cyclesPerPixel){
   return 1.0 - smoothstep(0.25, 1.0, cyclesPerPixel);
 }
 
-// Follow the actual street axis, not the transverse lot midpoint; leave junctions unpainted.
-float terrainTownPaint(vec2 p, float sx, float sz, vec2 footprint){
-  float paint = 0.0;
-  if (sx > 10.5 && sz <= 10.5) paint = terrainLineCoverage(14.0 - sx, 0.15, footprint.x)*terrainStripeCoverage(p.y/12.0, 0.5, footprint.y/12.0);
-  if (sz > 10.5 && sx <= 10.5) paint = terrainLineCoverage(14.0 - sz, 0.15, footprint.y)*terrainStripeCoverage(p.x/12.0, 0.5, footprint.x/12.0);
-  return paint;
+// Crater-only explicit-gradient rock detail: one scan at two natural scales per surviving
+// triplanar projection (4/8/12 fetches, never outside the bounded summit material).
+vec4 craterRockPlane(vec2 p, vec2 dx, vec2 dy, out vec3 normal){
+  vec2 uv = p/10.0, gx = dx/10.0, gy = dy/10.0;
+  vec4 a = mix(textureGrad(uAlb, vec3(uv, float(M_ROCK)), gx, gy),
+               textureGrad(uAlb, vec3(uv/4.7 + 0.37, float(M_ROCK)), gx/4.7, gy/4.7), 0.35);
+  vec4 detail = mix(textureGrad(uNrm, vec3(uv, float(M_ROCK)), gx, gy),
+                    textureGrad(uNrm, vec3(uv/4.7 + 0.37, float(M_ROCK)), gx/4.7, gy/4.7), 0.35);
+  normal = vec3(detail.xy*2.0 - 1.0, 1.0);
+  return vec4(a.rgb*a.rgb*mix(0.8, 1.0, detail.w), a.a);
+}
+vec4 craterRockMaterial(vec3 p, vec3 n, vec2 pixelDx, vec2 pixelDy, out vec3 normal){
+  // The terrain is a heightfield: n supplies the local Y differential without a new
+  // height lookup, and the horizontal footprint was captured before any discard.
+  vec3 dx = vec3(pixelDx.x, -dot(n.xz, pixelDx)/max(n.y, 0.15), pixelDx.y);
+  vec3 dy = vec3(pixelDy.x, -dot(n.xz, pixelDy)/max(n.y, 0.15), pixelDy.y);
+  vec3 w = pow(abs(n), vec3(4.0)); w /= dot(w, vec3(1.0));
+  w = max(w - 0.02, 0.0); w /= dot(w, vec3(1.0));
+  vec4 rock = vec4(0.0); vec3 nx = vec3(0.0), ny = vec3(0.0), nz = vec3(0.0);
+  if (w.x > 0.0) rock += craterRockPlane(p.zy, dx.zy, dy.zy, nx)*w.x;
+  if (w.y > 0.0) rock += craterRockPlane(p.xz, dx.xz, dy.xz, ny)*w.y;
+  if (w.z > 0.0) rock += craterRockPlane(p.xy, dx.xy, dy.xy, nz)*w.z;
+  normal = terrainTriNormal(n, nx, ny, nz, w);
+  return rock;
+}
+
+// Static scene slots mirror Renderer::init and the CPU community layout. No new sampler.
+const int COMMUNITY_INFO = 320, COMMUNITY_PLAN = 352, COMMUNITY_META = 383;
+bool communityGrid(vec2 p, out vec2 q, out vec4 plan){
+  float best = 1.0; int nearest = -1;
+  int count = clamp(int(dataAt(COMMUNITY_META).x + 0.5), 0, 31);
+  vec2 delta = vec2(0.0);
+  for (int i = 0; i < 31; i++) {
+    if (i >= count) break;
+    vec4 town = dataAt(COMMUNITY_INFO + i);
+    float radius = max(town.z, 1.0), d = length(p - town.xy)/radius;
+    if (d < best) { best = d; nearest = i; delta = p - town.xy; }
+  }
+  if (nearest < 0) { q = vec2(0.0); plan = vec4(1.0, 0.0, 112.0, 84.0); return false; }
+  plan = dataAt(COMMUNITY_PLAN + nearest);
+  q = vec2(plan.x*delta.x - plan.y*delta.y, plan.y*delta.x + plan.x*delta.y);
+  return true;
+}
+float communityStreetDistance(vec2 q, vec2 block){
+  vec2 d = abs(q - floor(q/block + 0.5)*block);
+  return min(d.x, d.y);
+}
+float communityStreetPaint(vec2 q, vec2 block, vec2 footprint){
+  vec2 d = abs(q - floor(q/block + 0.5)*block);
+  float xRoad = terrainLineCoverage(d.x, 0.15, footprint.x)*terrainStripeCoverage(q.y/12.0, 0.5, footprint.y/12.0);
+  float zRoad = terrainLineCoverage(d.y, 0.15, footprint.y)*terrainStripeCoverage(q.x/12.0, 0.5, footprint.x/12.0);
+  // Stop paint before the crossing; suppress it smoothly over a pixel at distant intersections.
+  return max(xRoad*(1.0 - terrainLineCoverage(d.y, 4.5, footprint.y)), zRoad*(1.0 - terrainLineCoverage(d.x, 4.5, footprint.x)));
 }
 
 uniform float uTreeFar;   // beyond this the forest is the ground texture alone (entity_render.cpp)
@@ -74,7 +121,7 @@ float rwyDigits(vec2 q, int num){
 // Airport ground plan: mirrors aptLayout() in airport_layout.h (taxiway, exits, apron, car parks; strip parking).
 // Returns true when it painted the point. No local arrays (see seg7).
 float lineM(float d, float hw){ return step(abs(d), hw); }
-bool aptGround(int ai, vec2 uv, vec3 pw, int surf, int size, float len, float wid, inout Mat m){
+bool aptGround(int ai, vec2 uv, vec3 pw, int surf, int size, float len, float wid, vec2 footprint, inout Mat m){
   float side = (ai - (ai/2)*2) == 1 ? 1.0 : -1.0;
   float u = uv.x, vv = uv.y*side, hw = wid*0.5;
   vec3 nTS;
@@ -99,30 +146,38 @@ bool aptGround(int ai, vec2 uv, vec3 pw, int surf, int size, float len, float wi
     bool onEx = abs(ce) < twHW + 2.0 && vv > hw + 3.0 && vv < twV;
     bool onAp = vv >= apV0 && vv < apV1 + 1.0 && u > apU0 && u < apU1;
     float lu0 = termU - termHL - 24.0, lu1 = termU + termHL + 24.0;
-    bool onLot = vv > bldV + (big ? 40.0 : 28.0) && vv < lotV1 + 2.0 && u > lu0 && u < lu1;
+    bool onAccess = abs(u - termU) < 8.0 && vv > lotV0 && vv < lotV1 + 18.0;
+    bool onLot = (vv > bldV + (big ? 40.0 : 28.0) && vv < lotV1 + 2.0 && u > lu0 && u < lu1) || onAccess;
     if (!(onTw || onEx || onAp || onLot)) return false;
-    vec4 t = matSample(pw.xz, onLot ? M_ASPHALT : (onAp ? padLayer : M_ASPHALT), 8.0, nTS);
+    vec4 t = matSample(pw.xz, onLot ? M_ASPHALT : (onAp ? padLayer : M_ASPHALT), onAp && !onLot && padLayer == M_CONCRETE ? 3.0 : 4.0, nTS);
     m.alb = t.rgb*(onLot ? 0.85 : 1.02); m.rough = t.a; m.nrm = nTS; m.metal = 0.0;
     float paint = 0.0; vec3 pc = yel;
     if (onLot) {
-      if (vv > lotV0 - 0.5) {   // stalls either side of each aisle, 2.7 m wide; kerbs at the ends
-        float mm = mod(vv - lotV0, 16.0);
-        bool stall = mm < 5.5 || mm > 10.5;
-        if (stall && abs(fract((u - lu0)/2.7) - 0.5)*2.7 > 1.27) { paint = 1.0; pc = wht; }
-        if (abs(mm - 5.5) < 0.08 || abs(mm - 10.5) < 0.08) { paint = 1.0; pc = wht; }
-      } else if (abs(vv - (bldV + (big ? 44.0 : 31.0))) < 0.1 && fract(u/6.0) < 0.5) { paint = 1.0; pc = wht; }   // forecourt road
+      if (vv > lotV0 - 0.5 && vv < lotV1 && abs(u - termU) >= 8.0) {
+        // Analytic coverage retains line energy when 16 cm stall paint becomes subpixel.
+        float row = (vv - lotV0)/16.0;
+        float stall = max(terrainStripeCoverage(row, 5.5/16.0, footprint.y/16.0),
+                          terrainStripeCoverage(row - 10.5/16.0, 5.5/16.0, footprint.y/16.0));
+        float crossLine = terrainStripeCoverage((u - lu0)/2.7 + 0.08/2.7, 0.16/2.7, footprint.x/2.7);
+        float endLines = max(terrainStripeCoverage(row - 5.42/16.0, 0.16/16.0, footprint.y/16.0),
+                             terrainStripeCoverage(row - 10.42/16.0, 0.16/16.0, footprint.y/16.0));
+        paint = max(crossLine*stall, endLines); pc = wht;
+      } else if (vv < lotV0 - 0.5) {
+        paint = terrainLineCoverage(vv - (bldV + (big ? 44.0 : 31.0)), 0.1, footprint.y)*terrainStripeCoverage(u/6.0, 0.5, footprint.x/6.0); pc = wht;
+      }
+      if (onAccess) { paint = terrainLineCoverage(u - termU, 0.12, footprint.x)*terrainStripeCoverage(vv/12.0, 0.5, footprint.y/12.0); pc = wht; }
       if (abs(u - lu0) < 0.4 || abs(u - lu1) < 0.4) { m.alb = vec3(0.6, 0.6, 0.58); }
     } else if (onAp && !onTw) {
       // weathered pavement: slab joints, patched panels, rubber and fuel staining
       m.alb *= big ? 0.78 : 0.95;
       m.alb *= 0.88 + 0.2*vnoise(pw.xz/23.0) - 0.1*smoothstep(0.6, 0.9, vnoise(pw.xz/7.0 + 3.1));
-      if (big) { vec2 sj = abs(fract(pw.xz/6.0) - 0.5); if (max(sj.x, sj.y) > 0.49) m.alb *= 0.78;
+      if (big) { float joint = max(terrainStripeCoverage(u/6.0 + 0.01, 0.02, footprint.x/6.0), terrainStripeCoverage(vv/6.0 + 0.01, 0.02, footprint.y/6.0)); m.alb *= 1.0 - 0.22*joint;
         vec2 slab = floor(pw.xz/6.0); m.alb *= 0.93 + 0.12*hash2i(ivec2(slab)); }
       // AI stands: lead-in line from the taxiway, stop bar, oil stains
       if (u > standU0 && u < standU1) {
         float su = mod(u - standU0 - 22.5, 45.0) - 22.5;
-        if (abs(su) < 0.15 && vv < apV1 - 14.0) paint = 1.0;
-        if (abs(vv - (apV1 - 14.0)) < 0.15 && abs(su) < 3.0) paint = 1.0;
+        if (vv < apV1 - 14.0) paint = max(paint, terrainLineCoverage(su, 0.15, footprint.x));
+        paint = max(paint, terrainLineCoverage(vv - (apV1 - 14.0), 0.15, footprint.y)*terrainLineCoverage(su, 3.0, footprint.x));
         m.alb *= 1.0 - 0.35*smoothstep(0.55, 0.85, vnoise(pw.xz*0.4))*smoothstep(10.0, 2.0, length(vec2(su, vv - apV1 + 24.0)));
       }
       // gates in front of the terminal (international)
@@ -130,21 +185,21 @@ bool aptGround(int ai, vec2 uv, vec3 pw, int surf, int size, float len, float wi
         float n = max(2.0, floor(termHL*2.0/54.0)), span = n*54.0, gu = u - (termU - span*0.5);
         if (gu > 0.0 && gu < span) {
           float gs = mod(gu, 54.0) - 27.0;
-          if (abs(gs) < 0.15 && vv > bldV - 70.0 && vv < bldV - 7.0) paint = 1.0;
-          if (abs(vv - (bldV - 7.5)) < 0.15 && abs(gs) < 2.5) paint = 1.0;
-          if (abs(abs(gs) - 27.0) < 0.12 && vv > bldV - 60.0) { paint = 1.0; pc = vec3(0.7, 0.08, 0.06); }   // stand boundaries
+          if (vv > bldV - 70.0 && vv < bldV - 7.0) paint = max(paint, terrainLineCoverage(gs, 0.15, footprint.x));
+          paint = max(paint, terrainLineCoverage(vv - (bldV - 7.5), 0.15, footprint.y)*terrainLineCoverage(gs, 2.5, footprint.x));
+          if (abs(abs(gs) - 27.0) < 0.12 + footprint.x && vv > bldV - 60.0) { paint = max(paint, terrainLineCoverage(abs(gs) - 27.0, 0.12, footprint.x)); pc = vec3(0.7, 0.08, 0.06); }   // stand boundaries
         }
       }
       // GA tie-down rows
       if (u > tieU0 && u < tieU1) {
         float tu = mod(u - tieU0 - 7.0, 14.0) - 7.0;
         float r0 = vv - (apV0 + 24.0), r1 = vv - (apV0 + 46.0);
-        if ((abs(r0) < 0.1 || abs(r1) < 0.1) && abs(tu) < 4.5) paint = 1.0;
-        if (abs(tu) < 0.1 && (abs(r0) < 3.0 || abs(r1) < 3.0)) paint = 1.0;
+        paint = max(paint, max(terrainLineCoverage(r0, 0.1, footprint.y), terrainLineCoverage(r1, 0.1, footprint.y))*terrainLineCoverage(tu, 4.5, footprint.x));
+        paint = max(paint, terrainLineCoverage(tu, 0.1, footprint.x)*max(terrainLineCoverage(r0, 3.0, footprint.y), terrainLineCoverage(r1, 3.0, footprint.y)));
       }
       // taxilane along the apron front, red equipment line in front of the buildings
-      if (abs(vv - (apV0 + 8.0)) < 0.15) paint = 1.0;
-      if (abs(vv - (bldV - 4.0)) < 0.1) { paint = 1.0; pc = vec3(0.7, 0.08, 0.06); }
+      paint = max(paint, terrainLineCoverage(vv - (apV0 + 8.0), 0.15, footprint.y));
+      if (abs(vv - (bldV - 4.0)) < 0.1 + footprint.y) { paint = max(paint, terrainLineCoverage(vv - (bldV - 4.0), 0.1, footprint.y)); pc = vec3(0.7, 0.08, 0.06); }
       // floodlight pools from the masts along the back of the apron (airport_scenery.cpp: every 75 / 90 m, heads ~19 m up)
       if (uRwyLights > 0.01) {
         float stp = big ? 90.0 : 75.0, u0 = apU0 + 30.0, hh = big ? 23.0 : 16.5;
@@ -160,13 +215,15 @@ bool aptGround(int ai, vec2 uv, vec3 pw, int surf, int size, float len, float wi
       }
     } else {
       // parallel taxiway and exits: centreline, edge lines, holding position markings on the exits
-      if (onTw && abs(vv - twV) < 0.15) paint = 1.0;
-      if (onTw && abs(abs(vv - twV) - (twHW - 0.4)) < 0.1 && !(onEx && vv < twV) && !(onAp)) paint = 1.0;
+      if (onTw) paint = max(paint, terrainLineCoverage(vv - twV, 0.15, footprint.y));
+      if (onTw && !(onEx && vv < twV) && !onAp) paint = max(paint, terrainLineCoverage(abs(vv - twV) - (twHW - 0.4), 0.1, footprint.y));
       if (onEx) {
-        if (abs(ce) < 0.15) paint = 1.0;
-        if (abs(abs(ce) - (twHW - 0.4)) < 0.1 && vv < twV - twHW) paint = 1.0;
+        paint = max(paint, terrainLineCoverage(ce, 0.15, footprint.x));
+        if (vv < twV - twHW) paint = max(paint, terrainLineCoverage(abs(ce) - (twHW - 0.4), 0.1, footprint.x));
         float hp = vv - (hw + 26.0);
-        if (abs(ce) < twHW && ((abs(hp) < 0.15 || abs(hp - 0.45) < 0.15) || ((abs(hp - 1.05) < 0.15 || abs(hp - 1.5) < 0.15) && fract(ce/1.8) < 0.5))) paint = 1.0;
+        float solid = max(terrainLineCoverage(hp, 0.15, footprint.y), terrainLineCoverage(hp - 0.45, 0.15, footprint.y));
+        float dashed = max(terrainLineCoverage(hp - 1.05, 0.15, footprint.y), terrainLineCoverage(hp - 1.5, 0.15, footprint.y))*terrainStripeCoverage(ce/1.8, 0.5, footprint.x/1.8);
+        paint = max(paint, max(solid, dashed)*terrainLineCoverage(ce, twHW, footprint.x));
       }
       // dark shoulders
       if ((onTw && abs(vv - twV) > twHW) || (onEx && abs(ce) > twHW)) m.alb *= 0.75;
@@ -182,14 +239,14 @@ bool aptGround(int ai, vec2 uv, vec3 pw, int surf, int size, float len, float wi
   if (!(inPark || track)) return false;
   float edge = smoothstep(0.0, 4.0, min(min(vv - apV0, apV1 + 4.0 - vv), 60.0 - abs(u - pu)));
   if (surf == 0) {   // small paved field: asphalt pad with tie-down lines
-    vec4 t = matSample(pw.xz, M_ASPHALT, 7.0, nTS); m.alb = t.rgb; m.rough = t.a; m.nrm = nTS;
+    vec4 t = matSample(pw.xz, M_ASPHALT, 4.0, nTS); m.alb = t.rgb; m.rough = t.a; m.nrm = nTS;
     float tu = mod(u - pu + 60.0, 15.0) - 7.5;
-    if (inPark && ((abs(tu) < 0.1 && abs(vv - apV0 - 26.0) < 3.0) || abs(vv - apV0 - 26.0) < 0.1)) m.alb = mix(m.alb, yel, 0.9);
+    if (inPark) { float paint = max(terrainLineCoverage(tu, 0.1, footprint.x)*terrainLineCoverage(vv - apV0 - 26.0, 3.0, footprint.y), terrainLineCoverage(vv - apV0 - 26.0, 0.1, footprint.y)); m.alb = mix(m.alb, yel, 0.9*paint); }
     return true;
   }
   if (surf == 1) {   // grass: a mown parking area, bare wheel tracks
-    vec4 t = matSample(pw.xz, M_GRASS, 5.0, nTS);
-    vec3 g = t.rgb*vec3(1.08, 1.15, 0.82)*(0.88 + 0.12*step(0.5, fract((u - pu)/5.0)));
+    vec4 t = matSample(pw.xz, M_GRASS, 2.0, nTS);
+    vec3 g = t.rgb*vec3(1.08, 1.15, 0.82)*(0.88 + 0.12*(1.0 - terrainStripeCoverage((u - pu)/5.0, 0.5, footprint.x/5.0)));
     float worn = track ? smoothstep(4.0, 1.0, abs(abs(u - pu + 20.0) - 1.4))*0.7 : smoothstep(0.6, 0.85, vnoise(pw.xz*0.15))*0.35;
     m.alb = mix(m.alb, mix(g, vec3(0.33, 0.28, 0.18), worn), track ? 1.0 : edge); m.nrm = mix(m.nrm, nTS, edge);
     return true;
@@ -209,7 +266,7 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, vec2 footprint, out b
   float side = (ai - (ai/2)*2) == 1 ? 1.0 : -1.0;
   float off = wid*0.5 + (size == 2 ? 170.0 : 85.0);
   int padLayer = size == 2 ? M_CONCRETE : M_ASPHALT;
-  if (abs(v) > wid*0.5 + 3.0 && aptGround(ai, uv, pw, surf, size, len, wid, m)) { paved = surf == 0; return; }
+  if (abs(v) > wid*0.5 + 3.0 && aptGround(ai, uv, pw, surf, size, len, wid, footprint, m)) { paved = surf == 0; return; }
   if (abs(u) > len*0.5 + 6.0 || abs(v) > wid*0.5 + 3.0) {
     if (abs(u) < len*0.5 + 60.0 && abs(v) < wid*0.5 + 7.5 && surf == 0) {
       // paved blast pad / shoulders with yellow chevrons
@@ -307,7 +364,7 @@ float roadDist(vec2 p, out float along, out vec2 direction){
 }
 
 // farmland: Voronoi field patchwork with crop rows and hedgerows
-void fieldMaterial(vec2 p, float farm, inout Mat m){
+void fieldMaterial(vec2 p, float farm, vec2 pixelDx, vec2 pixelDy, inout Mat m){
   vec2 q = p/170.0 + vec2(vnoise(p/600.0), vnoise(p/600.0 + 7.3))*0.6;
   vec2 g = floor(q), f = fract(q);
   float d1 = 9.0, d2 = 9.0; vec2 id = vec2(0.0);
@@ -320,15 +377,18 @@ void fieldMaterial(vec2 p, float farm, inout Mat m){
   float border = sqrt(d2) - sqrt(d1);
   float hsh = hash2i(ivec2(id) + ivec2(13, 31));
   float ang = hash2i(ivec2(id) + ivec2(-77, 4))*3.1416;
-  float rows = sin(dot(p, vec2(cos(ang), sin(ang)))*2.0*3.1416/2.6);
+  vec2 rowDir = vec2(cos(ang), sin(ang));
+  float rowFoot = (abs(dot(pixelDx, rowDir)) + abs(dot(pixelDy, rowDir)))/2.6;
+  float rows = sin(dot(p, rowDir)*2.0*3.1416/2.6)*terrainDetailWeight(rowFoot);
   vec3 nTS; vec3 c; float rough = 0.9;
   if (hsh < 0.22) { vec4 t = matSample(p, M_CROP, 4.0, nTS); c = t.rgb*mix(0.8, 1.1, rows*0.5 + 0.5); }
   else if (hsh < 0.42) { vec4 t = matSample(p, M_WHEAT, 4.0, nTS); c = t.rgb*(0.92 + 0.08*rows); }
   else if (hsh < 0.56) { vec4 t = matSample(p, M_DIRT, 4.0, nTS); c = t.rgb*mix(0.75, 1.1, rows*0.5 + 0.5); rough = 0.97; }
   else if (hsh < 0.66) { c = mix(vec3(0.75, 0.68, 0.08), vec3(0.85, 0.78, 0.12), rows*0.5 + 0.5); nTS = vec3(0,0,1); }
-  else if (hsh < 0.76) { vec4 t = matSample(p, M_DIRT, 4.0, nTS); vec4 v2 = matSample(p, M_LEAVES, 3.0, nTS); c = mix(t.rgb*0.9, v2.rgb*vec3(0.6,0.9,0.5), smoothstep(0.2, 0.6, rows)); }
-  else { vec4 t = matSample(p, M_GRASS, 5.0, nTS); c = t.rgb*vec3(0.85, 1.0, 0.7);
-    float fl = step(0.985, hash2i(ivec2(floor(p*1.5)))); c = mix(c, hsh > 0.9 ? vec3(0.9, 0.2, 0.15) : vec3(0.95, 0.9, 0.95), fl*0.8); }
+  else if (hsh < 0.76) { vec4 t = matSample(p, M_DIRT, 4.0, nTS); vec4 v2 = matSample(p, M_LEAVES, 3.0, nTS); c = mix(t.rgb*0.9, v2.rgb*vec3(0.6,0.9,0.5), mix(0.37, smoothstep(0.2, 0.6, rows), terrainDetailWeight(rowFoot))); }
+  else { vec4 t = matSample(p, M_GRASS, 2.0, nTS); c = t.rgb*vec3(0.85, 1.0, 0.7);
+    float flowerDetail = terrainDetailWeight(max(length(pixelDx), length(pixelDy))*1.5);
+    float fl = mix(0.015, step(0.985, hash2i(ivec2(floor(p*1.5)))), flowerDetail); c = mix(c, hsh > 0.9 ? vec3(0.9, 0.2, 0.15) : vec3(0.95, 0.9, 0.95), fl*0.8); }
   float hedge = smoothstep(0.035, 0.012, border);
   c = mix(c, vec3(0.06, 0.14, 0.04), hedge);
   m.alb = mix(m.alb, c, farm);
@@ -357,7 +417,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   wForest *= smoothstep(2.0, 3.0, base.y);   // airport grounds are cleared (no trees there either: amp < 2.5)
   float wDirt = smoothstep(0.55, 0.7, n2) * (1.0 - wForest) * 0.6;
   float hC, hL;
-  vec4 gr = groundSample(p.xz, M_GRASS, 6.0, nTS, hC); vec3 nG = nTS;
+  vec4 gr = groundSample(p.xz, M_GRASS, 2.0, nTS, hC); vec3 nG = nTS;
   // grass colour at several scales: lush meadow, olive and dry grass by moisture (low noise fields, drier on slopes and
   // up high), with mown / grazed patches and streaks; keeps distant hills from reading as one flat green
   float dry = (tfbm(p.xz/2600.0 + 4.7) - 0.5)*1.6 + (vnoise(p.xz/420.0) - 0.5)*0.7 + (vnoise(p.xz/130.0) - 0.5)*0.45 + slope*1.6 - lush*0.55 + 0.42
@@ -367,7 +427,16 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   grassTint = mix(grassTint, vec3(0.75,0.8,0.65), cold*0.6);
   grassTint *= 0.84 + 0.22*vnoise(p.xz/90.0) + 0.1*vnoise(p.xz/23.0);   // patchy brightness breaks up repetition
   grassTint *= 1.0 - 0.18*smoothstep(0.08, 0.3, slope);                   // steeper ground: coarser, shadowed tufts
-  vec3 grB = mix(vec3(dot(gr.rgb, vec3(0.2126, 0.7152, 0.0722))), gr.rgb, 0.68);   // real grass is far less saturated than the raw texture
+  float grassSaturation = 0.68;
+#ifdef ENV_MATERIALS
+  if (uEnvMaterials != 0) {
+    // Calibrated photographic grass already carries natural soil, dry blades and leaves.
+    // Retain its color rather than forcing it back toward the old procedural green.
+    grassSaturation = 0.94;
+    grassTint = mix(vec3(1.0), grassTint, 0.35);
+  }
+#endif
+  vec3 grB = mix(vec3(dot(gr.rgb, vec3(0.2126, 0.7152, 0.0722))), gr.rgb, grassSaturation);
   m.alb = grB*grassTint*1.05; m.rough = gr.a; m.nrm = nG;
   // wildflower and dry patches
   // round flower heads up close; further out only the patch's tint survives (no aliasing squares)
@@ -392,7 +461,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       tint *= 0.85 + 0.3*vnoise(p.xz/160.0);   // stands of different age and species
       m.alb = mix(m.alb, cn.rgb*tint*0.8, far); m.rough = mix(m.rough, 0.9, far); m.nrm = mix(m.nrm, nTS, far); }
   }
-  if (msk.w > 0.05 && p.y > 0.5) fieldMaterial(p.xz, msk.w*(1.0 - wRock), m);
+  if (msk.w > 0.05 && p.y > 0.5) fieldMaterial(p.xz, msk.w*(1.0 - wRock), pixelDx, pixelDy, m);
   if (wSand > 0.01) { vec4 s = groundSample(p.xz, M_SAND, 6.0, nTS, hL); float w = hblend(wSand, hC, 1.0 - hL);
     // (on an airfield's flattened grounds - a beach strip's - all of it is the transition, and the height blend dotted
     // it with the sand tile's bumps every 6 m: there the weight alone, a smooth mix)
@@ -410,33 +479,49 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   }
   if (wSnow > 0.01) { vec4 s = groundSample(p.xz, M_SNOW, 8.0, nTS, hL); float w = hblend(wSnow, hC, 1.0 - hC);   // snow fills hollows first
     m.alb = mix(m.alb, s.rgb, w); m.rough = mix(m.rough, s.a, w); m.nrm = mix(m.nrm, nTS, w); }
-  // ---- towns: streets, pavements, gardens and plazas
-  if (msk.y > 0.04 && p.y > 1.0) {
-    vec2 lf = fract(p.xz/28.0); vec2 e = abs(lf - 0.5)*28.0;
-    // streets run along every 3rd lot boundary in x and every 2nd in z; other boundaries are garden hedges
-    vec2 li = floor(p.xz/28.0 + 0.5);
-    float sx = mod(li.x, 3.0) == 0.0 ? e.x : 0.0, sz = mod(li.y, 2.0) == 0.0 ? e.y : 0.0;
-    float edge = max(sx, sz);
-    if (max(e.x, e.y) > 13.6 && edge < 10.5) { m.alb = mix(m.alb, vec3(0.08, 0.16, 0.06), smoothstep(0.04, 0.15, msk.y)); }
-    float townW = smoothstep(0.04, 0.15, msk.y);
-    vec4 tx; vec3 c;
-    if (edge > 10.5) {
-      tx = matSample(p.xz, M_ASPHALT, 6.0, nTS); c = tx.rgb*0.9;
-      c = mix(c, vec3(0.7), terrainTownPaint(p.xz, sx, sz, groundFoot));
+  // ---- town-centred, road-aligned streets, sidewalks, forecourts and green block interiors.
+  // Geometry/park semantics match scenery.cpp; only materials change, never terrain height.
+  if (msk.y > 0.02 && p.y > 1.0) {
+    vec2 q; vec4 plan;
+    if (communityGrid(p.xz, q, plan)) {
+      vec2 dx = vec2(plan.x*pixelDx.x - plan.y*pixelDx.y, plan.y*pixelDx.x + plan.x*pixelDx.y);
+      vec2 dy = vec2(plan.x*pixelDy.x - plan.y*pixelDy.y, plan.y*pixelDy.x + plan.x*pixelDy.y);
+      vec2 footprint = abs(dx) + abs(dy), block = plan.zw;
+      float rd = communityStreetDistance(q, block);
+      vec2 bi = floor(q/block);
+      bool park = bi.x == 0.0 && bi.y == 0.0;
+      float townW = smoothstep(0.02, 0.15, msk.y);
+      vec4 tx; vec3 c;
+      if (rd < 3.5) {
+        tx = matSample(p.xz, M_ASPHALT, 4.0, nTS); c = tx.rgb*0.9;
+        c = mix(c, vec3(0.7), communityStreetPaint(q, block, footprint));
+      } else if (rd < 5.0 || (!park && rd < 21.0 && msk.z > 0.45)) {
+        tx = matSample(p.xz, M_CONCRETE, 3.0, nTS); c = tx.rgb*(rd < 5.0 ? 1.0 : 0.91);
+      } else {
+        tx = matSample(p.xz, M_GRASS, 2.0, nTS);
+        // Reuse the surrounding biome's moisture/slope/macro tint. Raw grass here used
+        // to overwrite that variation with identically bright lime-green town blocks.
+        vec3 lawn = mix(vec3(dot(tx.rgb, vec3(0.2126, 0.7152, 0.0722))), tx.rgb, 0.55);
+        float maintained = hash2i(ivec2(bi) + ivec2(47, 19));
+        c = lawn*grassTint*(0.86 + 0.14*maintained);
+        c *= mix(vec3(1.0), vec3(1.12, 0.96, 0.77), maintained*0.3);
+        if (park || (msk.z > 0.45 && rd > 21.0 && maintained > 0.65)) {
+          vec2 courtyard = q - (bi + 0.5)*block;
+          float walk = park ? max(terrainLineCoverage(courtyard.x, 0.8, footprint.x), terrainLineCoverage(courtyard.y, 0.8, footprint.y))
+                            : (maintained > 0.82 ? terrainLineCoverage(courtyard.x, 0.65, footprint.x) : terrainLineCoverage(courtyard.y, 0.65, footprint.y));
+          c = mix(c, vec3(0.19, 0.155, 0.105), walk*0.75);
+        }
+      }
+      m.alb = mix(m.alb, c, townW); m.rough = mix(m.rough, tx.a, townW); m.nrm = mix(m.nrm, nTS, townW);
+      vec2 corner = abs(q - floor(q/block + 0.5)*block) - 4.5;
+      m.emit += vec3(1.0, 0.75, 0.4)*smoothstep(8.0, 0.0, length(corner))*uNight*0.35*townW;
     }
-    else if (edge > 9.0) { tx = matSample(p.xz, M_CONCRETE, 3.0, nTS); c = tx.rgb; }
-    else if (msk.z > 0.45) { tx = matSample(p.xz, M_CONCRETE, 4.0, nTS); c = tx.rgb*0.95; }
-    else { tx = matSample(p.xz, M_GRASS, 4.0, nTS); c = tx.rgb*vec3(0.8, 1.0, 0.65); }
-    m.alb = mix(m.alb, c, townW); m.rough = mix(m.rough, tx.a, townW); m.nrm = mix(m.nrm, nTS, townW);
-    // street lamps pools at night
-    vec2 corner = vec2(sx, sz) - 13.0;
-    m.emit += vec3(1.0, 0.75, 0.4)*smoothstep(8.0, 0.0, length(corner))*uNight*0.35*townW;
   }
   // ---- roads (exact geometry from the baked segment ids)
   if (msk.x < 0.25) {
     float along; vec2 direction; float rd = roadDist(p.xz, along, direction);
     if (rd < 6.0) {
-      vec4 tx = matSample(p.xz, rd < 4.0 ? M_ASPHALT : M_GRAVEL, 6.0, nTS);
+      vec4 tx = matSample(p.xz, rd < 4.0 ? M_ASPHALT : M_GRAVEL, rd < 4.0 ? 4.0 : 6.0, nTS);
       float a = smoothstep(6.0, 4.6, rd);
       vec3 c = tx.rgb*(rd < 4.0 ? 0.85 : 1.0);
       vec2 across = vec2(-direction.y, direction.x);
@@ -481,6 +566,32 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       m.rough = mix(m.rough, 0.97, scorch); m.nrm = mix(m.nrm, vec3(0,0,1), scorch*0.5);
       m.emit += vec3(1.0, 0.3, 0.05)*pow(clamp(vnoise(p.xz*2.5 + uTime*0.15)*smoothstep(0.55, 0.1, cd), 0.0, 1.0), 8.0)*2.0;
     }
+  }
+  // Mount Kaleo's bounded summit bowl (world.cpp): 1780 m floor, 145 m core,
+  // irregular wall to 340 m, then blend to untouched terrain by 520 m.
+  vec2 volcanoQ = p.xz - vec2(25000.0, -9000.0);
+  float craterRadius = length(volcanoQ);
+  if (craterRadius < 550.0 && p.y > 1300.0) {
+    float crust = vnoise(volcanoQ/46.0 + vec2(7.1, 3.2));
+    float ash = 1.0 - smoothstep(300.0, 535.0, craterRadius + (crust - 0.5)*100.0);
+    float rubble = smoothstep(0.02, 0.8, ash + (crust - 0.5)*0.45);
+    if (rubble > 0.005) {
+      vec3 rockNormal; vec4 rock = craterRockMaterial(p, n, pixelDx, pixelDy, rockNormal);
+      // Let the scan carry fractures; noise isolines read as oversized drawn contours.
+      // Retain the removed mask's far-field mean so the wall's overall exposure stays stable.
+      vec3 basalt = rock.rgb*vec3(0.32, 0.285, 0.26)*(0.82 + 0.33*crust)*0.9544;
+      m.alb = mix(m.alb, basalt, rubble); m.rough = mix(m.rough, max(0.78, rock.a), rubble);
+      m.nrm = mix(m.nrm, rockNormal, rubble); m.metal = 0.0;
+    }
+    // Incandescence is confined to the almost-level hot floor, never painted up the snowy wall.
+    float floorMask = (1.0 - smoothstep(1784.0, 1795.0, p.y))*smoothstep(0.8, 0.96, n.y)
+                    *(1.0 - smoothstep(125.0, 155.0, craterRadius));
+    float detail = terrainDetailWeight(max(groundFoot.x, groundFoot.y)/15.0);
+    float fissure = mix(0.065, 1.0 - smoothstep(0.012, 0.045, abs(vnoise(volcanoQ/15.0 + 2.4) - 0.5)), detail);
+    float vent = 1.0 - smoothstep(26.0, 53.0, length(volcanoQ - vec2(12.0, -8.0)) + (crust - 0.5)*24.0);
+    float heat = floorMask*(fissure*0.55 + vent*0.45);
+    float pulse = 0.96 + 0.04*sin(uTime*0.7 + crust*6.2832);
+    m.emit += mix(vec3(3.5, 0.35, 0.008), vec3(6.0, 1.0, 0.025), vent)*heat*pulse;
   }
   // wet look in rain
   m.alb *= 1.0 - 0.35*uWet*(1.0-wSnow);

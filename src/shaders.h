@@ -54,11 +54,11 @@ inline std::string entClassDefines(int c) { return "#define ENT_CLASS " + std::t
 // ---- the raster renderer's programs (raster_renderer.cpp, terrain_mesh.cpp)
 inline std::string terrainVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kCommonGLSL + kTerrainVS; }
 inline std::string terrainFSAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kMaterialCommon + kTerrainMaterial + kGBuffer + kGBWrite + kTerrainFS;
+  return std::string("#version 330 core\n") + defines + "#define ENV_MATERIALS\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kMaterialCommon + kTerrainMaterial + kGBuffer + kGBWrite + kTerrainFS;
 }
 inline std::string waterVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kWaterVS; }
 inline std::string waterFSAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kMaterialCommon + kLightCommon + kClouds + kWater + kGBuffer + kGBWrite + kWaterFS;
+  return std::string("#version 330 core\n") + defines + "#define ENV_MATERIALS\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kMaterialCommon + kLightCommon + kClouds + kWater + kGBuffer + kGBWrite + kWaterFS;
 }
 // the objects pass: the aircraft, traffic, debris and UFO fields marched into the G-buffer (no terrain, no clouds)
 inline std::string objectsFSAssembly(const std::string& defines) {

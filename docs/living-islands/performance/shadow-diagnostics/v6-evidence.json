@@ -1,0 +1,27 @@
+{
+  "created_utc": "2026-10-10T10:38:35.490035+00:00",
+  "git_head": "6952bd74672866e53cacf13bc39063af1e7037f8",
+  "v6_production_sha256": {
+    "src/entity_mesh.cpp": "5e8a2ec96986f1f490896c16141cf09748964a37222f67b6fe1605478966a536",
+    "src/entity_mesh_buildings.inc": "6d8b6f2041c2ce38c5abdbeae9bf772f47c42f34b061ea6d7f04c0ebff61f9ef",
+    "src/entity_render.cpp": "8dda896e7bed9430c356dd5c5db9c4d0a8bb94e47e9c8cdb6a93611a5c9d4034",
+    "src/shaders/ent_vs.glsl": "f1cf262bc87ae38c9e030e6f964987f0759fbd841831bdbc266c06075c3324eb",
+    "src/shaders/ent_fs2.glsl": "2b1a38deda46ffcab3aac0049325806138578eaec8cf2b2da48b5540d83fb124",
+    "src/shaders/light_fs.glsl": "0e5e1b85730366a157cfab2cc4c1e98dcf2da43aa84b4e54e5dfb5b2c85deae2",
+    "src/shaders/light_common.glsl": "ebf4bbc32dcb016e9a0eba4a33570693ff258f7cb7f64215df70f1b2a933fb9a"
+  },
+  "capture_files": {
+    "kind_13_front_oblique.png": "b771ef1d122e8789adce24e0b181e45158d26f6657a354605bd084ff9d272f00",
+    "kind_13_front_oblique_gb0.f32": "e6343c408aa0c7a045652978fba8fb1826e2034083b41ccb720230ee02e45ed0",
+    "kind_13_front_oblique_shadow_near.f32": "81a6194c30c8960265fd69eb9c087701b92a2146fce8cd62aea235dd9163cf0a",
+    "kind_13_front_oblique_shadow_metadata.json": "0c9adc4df38d423c0000d31bb3c6a4a2a758cd8e7fa9bfa5c816f3cdbe543b17",
+    "kind_19_front_oblique.png": "7028ddeb1017034541c0b42cce4be39edfb7af03012f634de160e8256caaa904",
+    "kind_19_front_oblique_gb0.f32": "16e28681d094567a35d86b0ee00079e4d9c79e187a5d6df147143026104ce038",
+    "kind_19_front_oblique_shadow_near.f32": "b8feb68ad565b2a7eadaf187f977f5d055b2cd5e3e22b5b470c6b251aa81f228",
+    "kind_19_front_oblique_shadow_metadata.json": "ec9b45dac143860195d4b30561ff43c43c6811e26a95a226c3a59712c6f91b58",
+    "kind_45_front_oblique.png": "2c9dc29e7faa91b2c616bc5777848ede04eaa5c198ed66b271d11bacbb08c96a",
+    "kind_45_front_oblique_gb0.f32": "b19fc8b383bf2065d66e42862b46838fbb2ee5604cf6253c7f15c771ac625004",
+    "kind_45_front_oblique_shadow_near.f32": "943f0501d04d0f8e1f60961cb8e5e58c38aef1945dbb435ec1bd612d3d24f2a6",
+    "kind_45_front_oblique_shadow_metadata.json": "8f24471acd20762ae7e77721af73d2e70f7c08d49197c0084b7adbc36b923ad8"
+  }
+}

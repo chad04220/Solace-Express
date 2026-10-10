@@ -25,6 +25,7 @@
 #include <complex>
 #include <cstring>
 #include <mutex>
+#include <new>
 
 Renderer g_ren;
 
@@ -378,20 +379,20 @@ void Renderer::genWaves() {
 // A scanned layer from assets/materials (tools/pack_materials.py): NN_name_c.jpg the albedo, NN_name_n.jpg the normal
 // and height, NN_name_m.jpg the roughness (red) and ambient occlusion (green); false (the generator makes it) when
 // it has none
-static bool loadMaterialLayer(const std::string& dir, int l, uint8_t* alb, uint8_t* nrm) {
+static bool loadMaterialLayer(const std::string& dir, int l, uint8_t* alb, uint8_t* nrm, int size = kMatTS) {
   if (dir.empty()) return false;
   const std::string base = dir + "/" + (l < 10 ? "0" : "") + std::to_string(l) + "_" + materialName(l) + "_";
   std::vector<uint8_t> c, n, m;
-  auto rd = [&](const char* s, std::vector<uint8_t>& px) { int w = 0, h = 0; return readImage((base + s).c_str(), w, h, px) && w == kMatTS && h == kMatTS; };
+  auto rd = [&](const char* s, std::vector<uint8_t>& px) { int w = 0, h = 0; return readImage((base + s).c_str(), w, h, px) && w == size && h == size; };
   if (!rd("c.jpg", c) || !rd("n.jpg", n) || !rd("m.jpg", m)) return false;
-  for (size_t i = 0; i < (size_t)kMatTS * kMatTS * 4; i += 4) {
+  for (size_t i = 0; i < (size_t)size * size * 4; i += 4) {
     alb[i] = c[i]; alb[i + 1] = c[i + 1]; alb[i + 2] = c[i + 2]; alb[i + 3] = m[i];
     nrm[i] = n[i]; nrm[i + 1] = n[i + 1]; nrm[i + 2] = n[i + 2]; nrm[i + 3] = m[i + 1];
   }
   return true;
 }
 
-void Renderer::genMaterials() {
+void Renderer::genMaterials(const std::function<void(float, const std::string&)>& progress) {
   const int L = kMatLayers, TS = kMatTS;
   std::vector<uint8_t> alb((size_t)TS * TS * 4 * L), nrm((size_t)TS * TS * 4 * L);
   std::atomic<int> scanned{0};
@@ -413,7 +414,90 @@ void Renderer::genMaterials() {
     glGetError();  // anisotropy may be unsupported
   };
   up(texAlb, alb); up(texNrm, nrm);
+  std::vector<uint8_t>().swap(alb); std::vector<uint8_t>().swap(nrm); // release base-array CPU staging before 2K decode
+  if (progress) progress(.45f, "Preparing photographed environment materials");
+
+  // Separate environment scans preserve the entire aircraft/cockpit material array.
+  // Seven ground/building/bark surfaces gain 2K detail (298.7 MiB including mipmaps),
+  // with a genuine-colour 512 px set (18.7 MiB) for Low and failed/missing uploads.
+  matEnvScanned = matEnvFallbackScanned = 0;
+  for (GLuint* tex : {&texEnvAlb, &texEnvNrm, &texEnvLowAlb, &texEnvLowNrm}) {
+    if (*tex) glDeleteTextures(1, tex);
+    *tex = 0;
+  }
+  GLint maxSize = 0, maxUnits = 0, maxLayers = 0;
+  glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);
+  glGetIntegerv(0x8B4D, &maxUnits);   // GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS
+  glGetIntegerv(0x88FF, &maxLayers);  // GL_MAX_ARRAY_TEXTURE_LAYERS
+  envMaterialUnits = maxUnits >= 32;
+  if (matDir.empty() || !envMaterialUnits || maxLayers < kEnvMatLayers) return;
+  GLint maxAnisotropy = 1;
+  for (int i = 0; i < 16 && glGetError() != 0; i++) {}
+  glGetIntegerv(0x84FF, &maxAnisotropy);  // GL_MAX_TEXTURE_MAX_ANISOTROPY: capability query, may be unsupported
+  bool anisotropy = glGetError() == 0 && maxAnisotropy >= 1.f;
+  auto loadEnvironment = [&](int size, const char* folder, GLuint& colour, GLuint& normal) {
+    if (maxSize < size) return false;
+    bool ready = false;
+    try {
+      const size_t stride = (size_t)size * size * 4;
+      std::vector<uint8_t> ea(stride * kEnvMatLayers), en(stride * kEnvMatLayers);
+      for (int l = 0; l < kEnvMatLayers; l++) {
+        if (progress) progress((size == kMatTS ? .45f : .65f) + (size == kMatTS ? .17f : .26f) * l / kEnvMatLayers,
+                               std::string("Decoding ") + (size == kMatTS ? "512 px " : "2K ") + materialName(environmentMaterialSource(l)));
+        if (!loadMaterialLayer(matDir + folder, environmentMaterialSource(l), ea.data() + l * stride,
+                               en.data() + l * stride, size)) return false;
+      }
+      if (progress) progress(size == kMatTS ? .62f : .91f, "Uploading photographed environment materials");
+      auto upload = [&](GLuint& tex, const std::vector<uint8_t>& data) {
+        for (int i = 0; i < 16 && glGetError() != 0; i++) {}
+        glGenTextures(1, &tex); glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
+        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, size, size, kEnvMatLayers,
+                     0, GL_RGBA, GL_UNSIGNED_BYTE, data.data());
+        if (glGetError() != 0) return false;
+        glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        if (anisotropy) glTexParameterf(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_ANISOTROPY, (float)std::min(8, maxAnisotropy));
+        return glGetError() == 0;
+      };
+      ready = upload(colour, ea) && upload(normal, en);
+    } catch (const std::bad_alloc&) {
+      // Low-memory startup still retains the lower-resolution materials.
+    }
+    if (!ready) {
+      if (colour) glDeleteTextures(1, &colour);
+      if (normal) glDeleteTextures(1, &normal);
+      colour = normal = 0;
+    }
+    if (progress) progress(size == kMatTS ? .65f : .99f, "Photographed environment materials ready");
+    return ready;
+  };
+  if (loadEnvironment(kMatTS, "/environment", texEnvLowAlb, texEnvLowNrm)) matEnvFallbackScanned = kEnvMatLayers;
+  if (loadEnvironment(kEnvMatTS, "/high", texEnvAlb, texEnvNrm)) matEnvScanned = kEnvMatLayers;
 }
+
+void Renderer::bindEnvironmentMaterials(GLuint p, int baseColourUnit, int baseNormalUnit) {
+  GLint colour = U(p, "uEnvAlb"), normal = U(p, "uEnvNrm"), enabled = U(p, "uEnvMaterials");
+  if (colour < 0 && normal < 0 && enabled < 0) return;  // aircraft specializations have no extra samplers
+  bool high = quality > 0 && matEnvScanned == kEnvMatLayers && texEnvAlb && texEnvNrm;
+  bool low = matEnvFallbackScanned == kEnvMatLayers && texEnvLowAlb && texEnvLowNrm;
+  bool use = envMaterialUnits && (high || low);
+  glUniform1i(enabled, use ? 1 : 0);
+  if (!envMaterialUnits) {  // no out-of-range bindings even on an unsupported context
+    glUniform1i(colour, baseColourUnit); glUniform1i(normal, baseNormalUnit);
+    return;
+  }
+  // Unit29 is otherwise unused. Unit31's 2D texture is used only by the separate
+  // aircraft part-pose transform-feedback program, which has no material samplers.
+  // No uploads happen here; linked environment programs choose one complete set.
+  GLuint a = high ? texEnvAlb : low ? texEnvLowAlb : texAlb;
+  GLuint n = high ? texEnvNrm : low ? texEnvLowNrm : texNrm;
+  glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D_ARRAY, a); glUniform1i(colour, 29);
+  glActiveTexture(GL_TEXTURE0 + 31); glBindTexture(GL_TEXTURE_2D_ARRAY, n); glUniform1i(normal, 31);
+}
+
 
 void Renderer::genMinimap() {
   const int N = 1024;
@@ -694,6 +778,7 @@ void Renderer::renderMap(float cx, float cz, float half, int N) {
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(U(p, "uAlb"), 1);
   glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D_ARRAY, texNrm); glUniform1i(U(p, "uNrm"), 2);
+  bindEnvironmentMaterials(p);
   glActiveTexture(GL_TEXTURE0 + 3); glBindTexture(GL_TEXTURE_2D, texMask); glUniform1i(U(p, "uMask"), 3);
   glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadId"), 4);
   glActiveTexture(GL_TEXTURE0 + 5); glBindTexture(GL_TEXTURE_2D, texData); glUniform1i(U(p, "uData"), 5);
@@ -772,6 +857,15 @@ bool Renderer::init(int w, int h, const std::function<void(float, const std::str
       d[64 + i] = {b.c.x, b.c.y, b.c.z, (float)b.airport};
       d[192 + i] = {b.h.x, b.h.y, b.h.z, (float)b.kind};
     }
+    // Community street plans share the CPU placement frame. Slots 320..383 were unused;
+    // keep airport box dimensions through 319 and airport bounds from 384 intact.
+    const int townCount = std::min(31, std::min(kNumTowns, (int)g_communityPlans.size()));
+    for (int i = 0; i < townCount; ++i) {
+      const Town& town = kTowns[i]; const CommunityPlan& plan = g_communityPlans[i];
+      d[320 + i] = {town.x, town.z, town.r, (float)town.kind};
+      d[352 + i] = {plan.cosine, plan.sine, plan.blockX * LOT, plan.blockZ * LOT};
+    }
+    d[383] = {(float)townCount, 0, 0, 0};
     // [384,400) / [400,416): world bounds of each airport's buildings + their box range (lets the shader skip airports)
     d.resize(416, V4{0, 0, 0, 0});
     int nb = std::min(128, (int)g_world.boxes.size());
@@ -806,7 +900,10 @@ bool Renderer::init(int w, int h, const std::function<void(float, const std::str
   for (size_t i = 0; i < g_world.hm.size(); i += 4) maxH = std::max(maxH, g_world.hm[i] + g_world.hm[i + 1] * 1.5f);
   maxH += 20;
   ready("Preparing surface materials");
-  genMaterials(); ready("Preparing cloud textures");
+  genMaterials([&](float fraction, const std::string& stage) {
+    if (progress) progress((completed + clampf(fraction, 0.f, .99f)) / 11.f, stage);
+  });
+  ready("Preparing cloud textures");
   genCloudNoise(); ready("Preparing ocean spectrum");
   genWaves(); ready("Preparing navigation map");
   genMinimap(); ready("Preparing scenery meshes");
@@ -984,6 +1081,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(U(p, "uAlb"), 1);
   glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D_ARRAY, texNrm); glUniform1i(U(p, "uNrm"), 2);
+  bindEnvironmentMaterials(p);
   glActiveTexture(GL_TEXTURE0 + 3); glBindTexture(GL_TEXTURE_2D, texMask); glUniform1i(U(p, "uMask"), 3);
   glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadId"), 4);
   glActiveTexture(GL_TEXTURE0 + 6); glBindTexture(GL_TEXTURE_2D, texHMax); glUniform1i(U(p, "uHMax"), 6);
