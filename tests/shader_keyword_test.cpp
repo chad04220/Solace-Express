@@ -144,7 +144,7 @@ int main() {
   bad += scan("terrain.vert", terrainVSAssembly("")) + scan("terrain.frag", terrainFSAssembly("")) + scan("water.vert", waterVSAssembly("")) + scan("water.frag", waterFSAssembly("")) + scan("light.frag", lightFSAssembly("")) + scan("objects.frag", objectsFSAssembly("")) + scan("shadow_proxy.frag", shadowProxyFSAssembly("")) + scan("effects.frag", effectsFSAssembly("")) + scan("plane_mesh.vert", planeMeshVSAssembly("")) + scan("plane_mesh.frag", planeMeshFSAssembly("")) + scan("objects_light.frag", objectsFSAssembly("#define AF_LIGHT\n")) + scan("plane_mesh_light.frag", planeMeshFSAssembly("#define AF_LIGHT\n"));
   bad += scan("fullscreen.vert", kFullscreenVS) + scan("sprite.vert", kSpriteVS) + scan("sprite.frag", kSpriteFS);
   bad += scan("down.frag", kDownFS) + scan("up.frag", kUpFS) + scan("raymask.frag", kRayMaskFS) + scan("ray.frag", kRayFS);
-  bad += scan("prop_disc.vert", kPropDiscVS) + scan("prop_disc.frag", kPropDiscFS);
+  bad += scan("prop_disc.vert", kPropDiscVS) + scan("prop_disc.frag", propDiscFSAssembly());
   bad += scan("taa.frag", kTaaFS) + scan("post.frag", kPostFS);
   bad += scan("ui.vert", kUIVS) + scan("ui.frag", kUIFS);
   bad += scan("entity.vert", h + kEntVS) + scan("entity.frag", h + kEntFS1 + kEntFS2) + scan("entity_shadow.frag", h + kEntFS1 + kEntShadowFS);

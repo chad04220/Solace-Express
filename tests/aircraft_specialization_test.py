@@ -39,7 +39,7 @@ for gate in ('FLEET_ON && mid == 1', 'FLEET_ON && mid == 2', 'FLEET_ON && mid ==
     assert gate in material, 'Missing material family guard: ' + gate
 mesh = read('src/aircraft_mesh.cpp')
 assert 'e == 6 ? 3 : e == 5 ? 2 : e < 5 ? 1 : 0' in mesh, 'Lost per-aircraft mesh dispatch'
-assert '"#define AF_LIGHT\\n", "#define AF_JET\\n", "#define AF_WRAITH\\n"' in mesh
+assert '"#define AF_LIGHT\\n", "#define AF_JET\\n", "#define AF_WRAITH\\n"' in mesh + read('src/renderer.h'), 'Lost the mesh builds'
 assembly = read('src/shaders.h')
 assert 'defines + "#define AF_MESH\\n"' in assembly
 terrain_helpers = ('groundRotatedNormal', 'groundSample', 'hblend', 'terrainTriNormal',

@@ -4,7 +4,7 @@
 
 struct TrafficPropDisc {
   vec3 centre, right, up;  // camera-relative world coordinates (subtract the camera before rotating the hub)
-  float radius = 0, angle = 0, blur = 0;
+  float radius = 0, angle = 0, blur = 0, hubRadius = 0;
   int blades = 2;
 };
 struct PropDiscBounds { float x0 = -1, y0 = -1, x1 = 1, y1 = 1; };
@@ -24,6 +24,7 @@ inline int trafficPropGeometry(const float* t, vec3 camera, int blades, TrafficP
     const float z = count == 1 ? t[1*4] - .12f - t[17*4 + 1]*.6f : t[16*4 + 3] - t[17*4 + 1]*1.2f - .08f;
     auto& d = out[i];
     d.centre = rel + r*x + u*y + b*z; d.right = r; d.up = u; d.radius = radius;
+    d.hubRadius = t[17*4 + 1];
     d.angle = t[30*4 + 3]; d.blades = std::max(blades, 2);
     // Traffic has no RPM/engine-running field. Its parked .05 throttle is an idle, taxi .25-.3 and flight .45-1.
     // Keep stopped/idle blades distinct, then progressively expose the translucent running disc.

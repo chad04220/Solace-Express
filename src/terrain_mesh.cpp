@@ -15,12 +15,16 @@ const int kMinLevel = -7;           // finest chunk: 0.305 m cells, 9.8 m across
 const int kChunkVerts = TP_CHUNK * TP_CHUNK * 6;
 }
 
-bool Renderer::compileTerrainMesh() {
+bool Renderer::compileTerrainMesh(const std::function<void()>& step) {
   std::string e;
+  setCompileStage("terrain surface");
   progTerrain = linkProgramCached(terrainVSAssembly(""), terrainFSAssembly(""), e);
   if (!progTerrain) { error = "Terrain shader: " + e; return false; }
+  if (step) step();
+  setCompileStage("ocean surface");
   progWater = linkProgramCached(waterVSAssembly(""), waterFSAssembly(""), e);
   if (!progWater) { error = "Water shader: " + e; return false; }
+  if (step) step();
   return true;
 }
 

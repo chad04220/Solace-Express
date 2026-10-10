@@ -1,0 +1,86 @@
+[0/2] Re-checking globbed directories...
+-- GLOB mismatch!
+The following files were added:
+  +/workspace/scratch/87b29863f015/solace-ui-review/src/shaders/cloud_acc_fs.glsl
+[1/2] Re-running CMake...
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /workspace/scratch/87b29863f015/solace-ui-review-win
+[0/4] Re-checking globbed directories...
+[1/80] Embedding GLSL shaders
+[2/80] Building CXX object CMakeFiles/prop_disc_test.dir/tests/prop_disc_test.cpp.obj
+[3/80] Building CXX object CMakeFiles/environment_foliage_test.dir/tests/environment_foliage_test.cpp.obj
+[4/80] Building CXX object CMakeFiles/shader_prune_test.dir/tests/shader_prune_test.cpp.obj
+[5/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/tests/cockpit_camera_test.cpp.obj
+[6/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/traffic.cpp.obj
+[7/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/game_research_ui.cpp.obj
+[8/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/game_wraith.cpp.obj
+[9/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/game_ui.cpp.obj
+[10/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/raster_renderer.cpp.obj
+[11/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/game.cpp.obj
+[12/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/prop_disc.cpp.obj
+[13/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/terrain_mesh.cpp.obj
+[14/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/renderer.cpp.obj
+[15/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/entity_render.cpp.obj
+[16/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/aircraft_hull.cpp.obj
+[17/80] Linking CXX executable prop_disc_test.exe
+[18/80] Linking CXX executable shader_prune_test.exe
+[19/80] Linking CXX executable environment_foliage_test.exe
+[20/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/camera_feeds.cpp.obj
+[21/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/traffic.cpp.obj
+[22/80] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/aircraft_mesh.cpp.obj
+[23/80] Linking CXX executable cockpit_camera_test.exe
+[24/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_research_ui.cpp.obj
+[25/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_wraith.cpp.obj
+[26/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_ui.cpp.obj
+[27/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/raster_renderer.cpp.obj
+[28/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/prop_disc.cpp.obj
+[29/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/game.cpp.obj
+[30/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/terrain_mesh.cpp.obj
+[31/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/renderer.cpp.obj
+[32/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/entity_render.cpp.obj
+[33/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/camera_feeds.cpp.obj
+[34/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/aircraft_hull.cpp.obj
+[35/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/aircraft_mesh.cpp.obj
+[36/80] Building CXX object CMakeFiles/shader_keyword_test.dir/tests/shader_keyword_test.cpp.obj
+[37/80] Building CXX object CMakeFiles/SolaceExpress.dir/src/platform_win32.cpp.obj
+[38/80] Building CXX object CMakeFiles/gameplay_test.dir/src/traffic.cpp.obj
+[39/80] Building CXX object CMakeFiles/gameplay_test.dir/tests/gameplay_test.cpp.obj
+[40/80] Building CXX object CMakeFiles/gameplay_test.dir/src/game_research_ui.cpp.obj
+[41/80] Building CXX object CMakeFiles/gameplay_test.dir/src/game_ui.cpp.obj
+[42/80] Building CXX object CMakeFiles/gameplay_test.dir/src/game_wraith.cpp.obj
+[43/80] Building CXX object CMakeFiles/gameplay_test.dir/src/raster_renderer.cpp.obj
+[44/80] Building CXX object CMakeFiles/gameplay_test.dir/src/game.cpp.obj
+[45/80] Building CXX object CMakeFiles/gameplay_test.dir/src/prop_disc.cpp.obj
+[46/80] Building CXX object CMakeFiles/gameplay_test.dir/src/terrain_mesh.cpp.obj
+[47/80] Building CXX object CMakeFiles/gameplay_test.dir/src/entity_render.cpp.obj
+[48/80] Building CXX object CMakeFiles/gameplay_test.dir/src/renderer.cpp.obj
+[49/80] Building CXX object CMakeFiles/gameplay_test.dir/src/aircraft_hull.cpp.obj
+[50/80] Building CXX object CMakeFiles/gameplay_test.dir/src/camera_feeds.cpp.obj
+[51/80] Building CXX object CMakeFiles/gameplay_test.dir/src/aircraft_mesh.cpp.obj
+[52/80] Building CXX object CMakeFiles/encounter_timing_test.dir/tests/encounter_timing_test.cpp.obj
+[53/80] Building CXX object CMakeFiles/encounter_timing_test.dir/src/traffic.cpp.obj
+[54/80] Building CXX object CMakeFiles/encounter_timing_test.dir/src/game_research_ui.cpp.obj
+[55/80] Building CXX object CMakeFiles/encounter_timing_test.dir/src/game_wraith.cpp.obj
+[56/80] Building CXX object CMakeFiles/encounter_timing_test.dir/src/game_ui.cpp.obj
+[57/80] Building CXX object CMakeFiles/encounter_timing_test.dir/src/raster_renderer.cpp.obj
+[58/80] Building CXX object CMakeFiles/encounter_timing_test.dir/src/prop_disc.cpp.obj
+[59/80] Building CXX object CMakeFiles/encounter_timing_test.dir/src/game.cpp.obj
+[60/80] Building CXX object CMakeFiles/encounter_timing_test.dir/src/terrain_mesh.cpp.obj
+[61/80] Building CXX object CMakeFiles/encounter_timing_test.dir/src/renderer.cpp.obj
+[62/80] Building CXX object CMakeFiles/encounter_timing_test.dir/src/entity_render.cpp.obj
+[63/80] Building CXX object CMakeFiles/encounter_timing_test.dir/src/aircraft_hull.cpp.obj
+[64/80] Building CXX object CMakeFiles/encounter_timing_test.dir/src/camera_feeds.cpp.obj
+[65/80] Building CXX object CMakeFiles/encounter_timing_test.dir/src/aircraft_mesh.cpp.obj
+[66/80] Building CXX object CMakeFiles/load_pacer_test.dir/tests/load_pacer_test.cpp.obj
+[67/80] Building CXX object CMakeFiles/hangar_geometry_test.dir/tests/hangar_geometry_test.cpp.obj
+[68/80] Linking CXX executable SolaceExpress.exe
+[69/80] Linking CXX executable shader_keyword_test.exe
+[70/80] Linking CXX executable gameplay_test.exe
+[71/80] Building CXX object CMakeFiles/hangar_catalog_test.dir/tests/hangar_catalog_test.cpp.obj
+[72/80] Linking CXX executable load_pacer_test.exe
+[73/80] Linking CXX executable encounter_timing_test.exe
+[74/80] Linking CXX executable hangar_geometry_test.exe
+[75/80] Linking CXX executable hangar_catalog_test.exe
+[76/80] Building CXX object CMakeFiles/shader_check.dir/tools/shader_check.cpp.obj
+[77/80] Linking CXX executable shader_check.exe

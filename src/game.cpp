@@ -8,6 +8,8 @@
 #include "entities.h"
 #include "scenery.h"
 #include "models.h"
+#include "menu_layout.h"
+#include "hangar_catalog.h"
 
 // XR-30 wingtip (body frame) matching mapJet's cranked delta in shaders.h
 static const vec3 kJetWingTip(5.62f, -0.38f, 4.4f);
@@ -422,6 +424,7 @@ void Game::continuationWaivers(Career::LaunchPlan& p, const Contract& c, int spe
 // paid fees), a research sortie relaunches (the review of v3.31.0, C1: Restart made practice and trials career
 // flights, and reset a job leg's clock and comfort)
 void Game::restartFlight() {
+  if (freeFlight) { launchFreeFlight(); return; }
   if (researchFlight) { launchResearch(); return; }
   const bool iso = isolatedFlight, leg = jobLeg;
   Contract c = contract;
@@ -461,23 +464,95 @@ void Game::practiseApproach(int spec, Career::Source src) {
   isolatedFlight = true;
 }
 
-void Game::init(bool buildWorld) {
+// Main-menu Free Flight never quotes, accepts, saves or settles a career job. A fresh
+// zero-fee plan supplies full tanks even without a licence, money or an owned aircraft.
+void Game::beginFreeFlightSetup() {
+  freeCraft = std::clamp(freeCraft, 0, kNumAircraft - 1);
+  freeAirport = g_world.airports.empty() ? 0 : std::clamp(freeAirport, 0, (int)g_world.airports.size() - 1);
+  freeFlight = isolatedFlight = researchFlight = false;
+  paused = showMap = showRadio = settingsFromPause = false;
+  confirmNew = confirmRes = false;
+  atc.cancel(); commsPending.clear(); toasts.clear();
+  screen = SCR_FREE_FLIGHT;
+}
+
+void Game::cancelFreeFlightSetup() {
+  if (screen != SCR_FREE_FLIGHT) return;
+  screen = SCR_MENU;
+  // No hub return/save path: opening or closing this mode cannot create a career save.
+}
+
+void Game::launchFreeFlight() {
+  if (screen != SCR_FREE_FLIGHT && !freeFlight) return;
+  // Validate at the boundary too: a stale selection or direct call must never unlock research.
+  if (freeCraft < 0 || freeCraft >= kNumAircraft || kAircraft[freeCraft].special ||
+      freeAirport < 0 || freeAirport >= (int)g_world.airports.size()) return;
+  const AircraftSpec& s = kAircraft[freeCraft];
+  Contract c;
+  c.id = "FREE_FLIGHT"; c.title = "Free Flight"; c.type = CT_FERRY;
+  c.from = c.to = freeAirport; c.startAirborne = freeAirborne;
+  c.brief = "Fly anywhere. Full tanks, no fees, and no career progress or penalties.";
+  c.wx = Weather(); c.wx.timeOfDay = 12.f; c.wx.windSpeed = 3.f;
+  c.wx.gust = 0; c.wx.turbulence = 0.05f; c.wx.cloudCover = 0.15f; c.wx.visibility = 60000.f;
+  Career::LaunchPlan p;
+  p.spec = freeCraft; p.src = Career::SRC_NONE; p.startAirport = freeAirport; p.fuelLoadKg = s.maxFuel;
+  const float careerFuelChoice = launchFuelKg;
+  startFlight(c, freeCraft, Career::SRC_NONE, &p);
+  launchFuelKg = careerFuelChoice;
+  freeFlight = isolatedFlight = true;
+  failPlan = FailPlan();
+  if (freeAirborne) {
+    const Airport& a = g_world.airports[freeAirport];
+    vec3 pos = plane.pos + plane.forward() * 1500.f;
+    pos.y = std::max(a.elev, g_world.height(pos.x, pos.z)) + 900.f;
+    plane.reset(&s, pos, plane.heading(), s.maxFuel, 85.f, true, s.cruise);
+    settleAirborneStart();
+    engineAutoStarted = takeoffAnnounced = true;
+    camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 3, 15));
+  }
+  toasts.clear();
+  toast(std::string(s.name) + " / FREE FLIGHT", vec3(0.6f, 1.f, 0.8f), false);
+  toast(freeAirborne ? "Already airborne. Fly anywhere, then return from the pause menu." : "Full tanks. Release the parking brake when ready.", vec3(0.8f, 0.9f, 1.f), false);
+}
+
+void Game::returnToFreeFlight() {
+  freeFlight = isolatedFlight = researchFlight = false;
+  paused = showMap = showRadio = settingsFromPause = false;
+  dbgCam = dbgFollow = false;
+  atc.cancel(); commsPending.clear(); toasts.clear();
+  screen = SCR_FREE_FLIGHT;
+}
+
+void Game::init(bool buildWorld, const std::function<void(float, const std::string&)>& progress) {
+  const float units = float(kNumAircraft + 4);
+  auto report = [&](int done, const std::string& detail) { if (progress) progress(done / units, detail); };
+  report(0, "Preparing career systems");
   if (buildWorld) g_world.build();
   buildStory();
   loadSettings();
   applyUiPalette();
   wantPacing = true;   // (the frame-rate target from the settings)
   loadStations();
+  report(1, "Settings, story and radio stations ready");
   {   // every type's performance, learned by flying it, on threads side by side (the job board needs the career ones now);
     // kept with the cache, so a launch after the first reads them
     const std::string pf = cacheDir.empty() ? std::string() : joinPath(cacheDir, "perf.bin");
     if (pf.empty() || !Plane::perfLoad(pf, buildStamp)) {
       std::vector<std::thread> th;
-      for (int i = 0; i < kNumAircraft; i++) th.emplace_back([i] { Plane::perf(&kAircraft[i]); });
+      std::atomic<int> completed{0};
+      for (int i = 0; i < kNumAircraft; i++) th.emplace_back([i, &completed] { Plane::perf(&kAircraft[i]); completed.fetch_add(1); });
+      if (progress) {
+        while (completed.load() < kNumAircraft) {
+          const int n = completed.load();
+          report(1 + n, fmt("Flight performance: %d / %d airframes checked", n, kNumAircraft));
+          std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        }
+      }
       for (auto& t : th) t.join();
       if (!pf.empty()) Plane::perfSave(pf, buildStamp);
     }
   }
+  report(1 + kNumAircraft, "Aircraft performance data ready");
   career.newGame();
   std::string sav = joinPath(saveDir, "career.sav");
   hasSave = career.load(sav);
@@ -492,10 +567,13 @@ void Game::init(bool buildWorld) {
     // keep an unreadable save aside rather than overwriting it with a new career
     if (FILE* f = fopen(sav.c_str(), "r")) { fclose(f); remove((sav + ".damaged").c_str()); rename(sav.c_str(), (sav + ".damaged").c_str()); toast("Career save couldn't be read: kept as career.sav.damaged"); }
   }
+  report(2 + kNumAircraft, "Career and recovery checks complete");
   radio.init();
   radio.setVolume(set.radioVol);
+  report(3 + kNumAircraft, "Radio initialized");
   atc.load(assetDir + "/voice");   // tower voices (absent: the towers stay silent)
   camQ = quat();
+  report(4 + kNumAircraft, "Voice library indexed");
 }
 
 void Game::initHeadless() { headless = true; career.newGame(); set.resMode = 0; failuresArmed = false; }   // tools and tests render at the full resolution; nothing breaks unless the test breaks it
@@ -694,7 +772,7 @@ void Game::updateWeather(float dt) {
 // is in the air, one appears on the line a way off and flies on to the route's destination in the company livery
 void Game::airlineTraffic(float dt) {
   airlineTrafficT -= dt;
-  if (airlineTrafficT > 0 || researchFlight || career.airline.routes.empty() || !traffic.enabled || plane.onGround) return;
+  if (airlineTrafficT > 0 || researchFlight || freeFlight || career.airline.routes.empty() || !traffic.enabled || plane.onGround) return;
   airlineTrafficT = 20.f;
   for (size_t ri = 0; ri < career.airline.routes.size(); ri++) {
     const Career::Route& r = career.airline.routes[ri];
@@ -847,7 +925,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   if (!g_ren.dispError.empty() && !dispWarned && !headless) { dispWarned = true; toast("Cockpit display shader failed on this GPU (details in startup.log)", vec3(1.f, 0.45f, 0.35f)); }
   contract = c; specIdx = spec; source = src;
   launchPlan = finalized ? *finalized : finalizeLaunchPlan(c, spec, src);   // accepted quote, tank load and bill agree
-  researchFlight = false;   // a career flight; launchResearch sets it again for its own
+  researchFlight = freeFlight = false;   // isolated launchers set their own mode after the shared reset
   wx = c.wx; wxStart = c.wx; timeOfDay = wx.timeOfDay; apRepickT = 0;
   wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet; wx.cloudBoil = cloudBoil;
   cloudWake.clear(); wakeGap = true; wispAccum = 0; rainNow = mistNow = 0;
@@ -895,7 +973,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   licenseBefore = career.license;
   // the player sees a loading screen while the scenery around the start is generated (tests fly straight away)
   screen = headless ? SCR_FLIGHT : SCR_LOADING;
-  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadMap = false; dbgCam = dbgFollow = false; benchPin = false;
+  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadStableFrames = 0; loadBakeSeen = g_ren.bakeCount; loadObservedFrame = -1; loadMap = false; dbgCam = dbgFollow = false; benchPin = false;
   atc.cancel(); atcF = AtcFlight(); hintsVoiced.clear(); commsPending.clear(); lessonVoiceWarned = false;   // (the last flight's calls go before this one's announcements)
   atc.valid = [this](const AtcVoice::Tx& t) { return t.key < 0 || t.key == atcKey(); };
   failVoiced.clear();
@@ -906,6 +984,12 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
 }
 
 void Game::endFlight(bool success, const std::string& reason, FlightOutcome outcome) {
+  if (freeFlight) {
+    returnToFreeFlight();
+    toast(success || outcome == OUT_DIVERTED || outcome == OUT_OFF_AIRPORT ? "Free flight complete" : reason.empty() || outcome == OUT_ABANDONED ? "Back in the Free Flight hangar" : reason,
+          vec3(0.6f, 0.9f, 1.f), false);
+    return;
+  }
   if (researchFlight) {  // research flights never touch the career: back to the research menu
     researchFlight = false; paused = false; showMap = false;
     screen = SCR_RESEARCH; resOpened = realTime;
@@ -1519,17 +1603,33 @@ void Game::updateLessonHint() {
 // After a flight is chosen the world is held still while the scenery around the start position is generated (with a
 // bigger per-frame budget), behind a card showing an aerial image of the airport. Once nothing is left to stream it
 // cross-fades into a live establishing shot of the aircraft, and the player starts the flight when ready.
+bool Game::loadingShadowPending() const {
+  vec3 direction, colour; float night;
+  computeSun(timeOfDay, direction, colour, night);
+  return g_ren.tshRequiredPending(direction.y);
+}
 void Game::updateLoading(float dt) {
   loadT += dt;
   if (loadReadyT < 0) {
     dbgCam = false;
     updateCamera(dt);   // stream around the camera the flight will open with
     g_ren.entBudgetMs = 14.f;
-    int pend = g_ren.entPending;
-    if (loadT > 0.05f) loadPend0 = std::max(loadPend0, pend);
-    float prog = loadPend0 > 0 ? 1.f - (float)pend / loadPend0 : clampf(loadT / 0.8f, 0.f, 1.f);
-    loadShown = std::max(loadShown, loadShown + (prog - loadShown) * (1.f - expf(-dt * 8.f)));
-    if (pend == 0 && loadT > (researchFlight ? 0.15f : 0.8f)) { loadReadyT = loadT; loadShown = 1.f; g_ren.entBudgetMs = 2.5f; }
+    const int pend = std::max(0, g_ren.entPending);
+    loadPend0 = std::max(loadPend0, pend);
+    const bool shadowPending = loadingShadowPending();
+    const bool baked = loadBakeSeen != g_ren.bakeCount;
+    loadBakeSeen = g_ren.bakeCount;
+    // Observe completed scene frames; elapsed time alone is not evidence that any work finished.
+    if (loadFrames != loadObservedFrame) {
+      if (loadFrames >= 2 && pend == 0 && !shadowPending && !baked) ++loadStableFrames;
+      else loadStableFrames = 0;
+      loadObservedFrame = loadFrames;
+    }
+    const float scenery = loadPend0 > 0 ? 1.f - float(pend) / loadPend0 : (loadFrames >= 2 ? 1.f : 0.f);
+    const float verified = std::min(loadStableFrames / 2.f, 1.f);
+    const float completed = 0.75f * scenery + 0.15f * (loadFrames >= 2 && !shadowPending ? 1.f : 0.f) + 0.10f * verified;
+    loadShown = std::max(loadShown, easeLoadProgress(loadShown, std::min(completed, 0.99f), dt));
+    if (loadStableFrames >= 2) { loadReadyT = loadT; loadShown = 1.f; g_ren.entBudgetMs = 2.5f; }
     // a research sortie: the preview has already streamed its airport, so the flight opens at once (no establishing shot)
     if (loadReadyT >= 0 && researchFlight && !headless) {
       screen = SCR_FLIGHT; dbgCam = false;
@@ -1559,6 +1659,7 @@ void Game::updateLoading(float dt) {
   }
   if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) {   // back out to where the flight was chosen
     dbgCam = false; g_ren.entBudgetMs = 2.5f;
+    if (freeFlight) { returnToFreeFlight(); return; }
     // a career flight that never left the loading screen: its attempt closes and its job waits at its stop, as after
     // an interrupted session (nothing is charged: no leg was flown); an unsaved close shows as pending and blocks launches
     if (career.attemptOpen && !isolatedFlight && !researchFlight)
@@ -2302,7 +2403,7 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   if (s.special == 0 && p.flightTime > 0.f) { pv.Ctl[0] = p.ctlSurf.x; pv.Ctl[1] = p.ctlSurf.y; pv.Ctl[2] = p.ctlSurf.z; }   // (a display aircraft that never flew: its stick)
   else { pv.Ctl[0] = clampf(p.ctl.pitch + p.ctl.trim * 0.3f, -1, 1); pv.Ctl[1] = clampf(p.ctl.roll, -1, 1); pv.Ctl[2] = clampf(p.ctl.yaw, -1, 1); }
   pv.Ctl[3] = p.ctl.throttle;
-  float blur = s.engineType == ENG_JET ? 1.f : smoothstepf(250.f, 700.f, p.rpm);
+  float blur = s.engineType == ENG_JET ? 1.f : smoothstepf(45.f, 650.f, p.rpm);
   float wr = s.special ? .38f : md.wheelR;
   float nr = s.special ? .33f : s.taildragger ? .10f : md.gear == 3 ? wr*.75f : wr*.85f;
   pv.model = (int)(p.spec - kAircraft);
@@ -2588,10 +2689,17 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   realTime = 3.f;
   if (pace && menuStep >= 0) pace->begin(menuStep);
   progress(pace ? pace->fraction() : 0.f, "Loading the menu's scenery and its terrain shadow");
-  for (int i = 0; i < 12 && !quit; i++) {
+  int firstPending = 0;
+  for (int i = 0; !quit; i++) {
     realTime = 3.f; frame();
-    if (pace) { pace->setSub((i + 1) / 12.f); progress(pace->fraction(), fmt("Loading the menu's scenery and its terrain shadow  (%d chunks to go)", g_ren.entPending)); }
-    if (i >= 2 && g_ren.entPending == 0 && !g_ren.tshPending()) break;
+    firstPending = std::max(firstPending, g_ren.entPending);
+    const bool ready = i >= 2 && g_ren.entPending == 0 && !loadingShadowPending();
+    if (pace) {
+      const float chunks = firstPending > 0 ? 1.f - float(g_ren.entPending) / firstPending : (i >= 2 ? 1.f : 0.f);
+      pace->setSub(ready ? 1.f : std::min(0.95f, 0.8f * chunks + (loadingShadowPending() ? 0.f : 0.15f)));
+      progress(pace->fraction(), fmt("Preparing menu scenery  (%d chunks remaining)%s", g_ren.entPending, loadingShadowPending() ? " / baking terrain lighting" : ""));
+    }
+    if (ready) break;
   }
   g_ren.entSync = sync;
   // every light aircraft's body (outside, and the cockpit's when that is in use; with allCraft the research jets' too):
@@ -2611,13 +2719,16 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   }
   prewarmCraft = -1; prewarmInside = false;
   realTime = 0.f;
-  if (pace) pace->end();
-  progress(pace ? pace->fraction() : 1.f, "Ready");
+  if (!quit) {
+    if (pace) pace->end();
+    progress(pace ? pace->fraction() : 1.f, "Ready");
+  }
 }
 
 void Game::menuBackgroundCamera(FrameParams& fp) {
   if (screen == SCR_MENU && !getenv("MENUORBIT")) { menuTour(fp); return; }
   if (screen == SCR_RESEARCH) { researchPreviewCamera(fp); return; }
+  if (screen == SCR_FREE_FLIGHT || (screen == SCR_HUB && hubTab == TAB_HANGAR)) { hangarPreviewCamera(fp); return; }
   // A Wren circles over the islands while the camera chases it in a slow arc
   static Plane demo;
   static bool initd = false;
@@ -2646,6 +2757,75 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
     const Airport& A = g_world.airports[ap];
     fp.prefetchOn = true; fp.prefetchPos = A.threshold(((int)(realTime * 2.f)) & 1);
   }
+}
+
+// A dedicated showroom is isolated from the flight simulation. Selection changes only the
+// displayed airframe; purchasing, fuel, wear and the active flight remain untouched.
+void Game::hangarPreviewCamera(FrameParams& fp) {
+  const int craft = screen == SCR_FREE_FLIGHT ? std::clamp(freeCraft, 0, kNumAircraft - 1) : std::clamp(selHangar, 0, kWraith);
+  const AircraftSpec& sp = kAircraft[craft];
+  static Plane demo;
+  if (demo.spec != &sp) demo.reset(&sp, vec3(0), 0, sp.maxFuel, 85, false, 0);
+  // Spawn clearance is for physics to settle; a static showroom must sit on the
+  // rendered tyres immediately. The main-wheel centres are (wr-gh, mainZ).
+  // gearTailShape uses (-gh + .11*L + .1, tailZ), radius .1. Solve the
+  // main/tail bottom heights together; pitching about their X axles leaves each
+  // circular tyre's vertical support radius unchanged. Do not use the physics
+  // tail contact approximation here or change any aircraft geometry/flight pose.
+  const float gh = demo.gearHeight(), wr = kModels[craft].wheelR;
+  float pitch = 0.f, height = gh;
+  if (sp.taildragger) {
+    const GearStations stations = gearStations(sp);
+    const float dy = .11f*sp.fusLen + .1f - wr, dz = stations.tailZ - stations.mainZ;
+    const float r = sqrtf(dy*dy + dz*dz);
+    pitch = atan2f(dy, dz) + asinf(clampf((wr-.1f)/r, -1.f, 1.f));
+    height = wr - (wr-gh)*cosf(pitch) + stations.mainZ*sinf(pitch);
+  }
+  demo.q = quat::axisAngle(vec3(1, 0, 0), pitch);
+  demo.pos = vec3(0, height, 0);
+  demo.vel = vec3(0); demo.onGround = true; demo.engineRunning = false;
+  demo.gear = 1.f; demo.flaps = 0; demo.nozzle = 0; demo.rpm = 0; demo.engineSpool = 0; demo.n1 = 0;
+  demo.ctl = Controls(); demo.ctl.throttle = 0; demo.ctl.gearDown = true;
+  fillPlaneVisual(fp.plane, demo, 0.f, false);
+  fp.hangarPreview = true; fp.hangarClassified = hangarResearchLocked(craft); fp.hangarOrigin = vec3(0);
+  fp.hangarSize = std::max(12.f, std::max(sp.span, sp.fusLen));
+  fp.prefetchOn = false; fp.cloudCover = 0; fp.fogB = 0; fp.wet = 0; fp.snow = 0; fp.storm = 0;
+  fp.lightning = 0; fp.wind = vec3(0); fp.windSock = vec3(0); fp.planeTerrSh = 1;
+  fp.sunDir = normalize(vec3(-0.25f, 0.65f, -0.72f)); fp.sunCol = vec3(0.30f, 0.34f, 0.39f); fp.night = 0;
+  fp.trafficN = 0; fp.ufoOn = false; fp.feedRig = 0; fp.dispMode = 0; fp.landLight = 0;
+  fp.plN = 0;
+  for (int side : {-1, 1}) for (float z : {-0.35f, 0.45f}) {
+    FrameParams::PointLight& light = fp.pl[fp.plN++];
+    light.pos = vec3(side * 0.55f, 0.645f, z) * fp.hangarSize;
+    light.radius = fp.hangarSize * 0.045f;   // emitter size, not a light range
+    light.col = vec3(0.72f, 0.85f, 1.f) * (fp.hangarSize * fp.hangarSize * 0.30f);
+    light.cosCut = -2; light.dir = vec3(0, -1, 0); light.shadow = side == 1 && z < 0 ? fp.hangarSize * 1.5f : 0;
+  }
+  if (fp.hangarClassified) {
+    // The dedicated silhouette pass ignores materials/emission as well; keep the
+    // physical scene entirely shut down so no effects can reveal the airframe.
+    fp.plN = 0; fp.sunCol = vec3(0); fp.sealedCockpit = true;
+    fp.plane.lensN = 0; fp.plane.exhaust = ExhaustVisual{};
+    std::fill(&fp.plane.flame[0], &fp.plane.flame[0]+4, 0.f);
+    std::fill(&fp.plane.vapor[0], &fp.plane.vapor[0]+4, 0.f);
+    std::memset(fp.plane.wr, 0, sizeof(fp.plane.wr));
+  }
+  const float s = S(), W = float(std::max(g_ren.W, 1)), H = float(std::max(g_ren.H, 1));
+  const HangarLayout L = hangarLayout(24*s, 126*s, W-48*s, H-146*s, s);
+  const float cx = L.previewX + L.previewWidth * 0.5f, cy = L.previewY + L.previewHeight * 0.5f;
+  fp.fovY = 34.f * DEG;
+  const float th = tanf(fp.fovY * 0.5f);
+  const float radius = std::max(sp.span, sp.fusLen) * 0.59f;
+  const float pixels = std::max(1.f, std::min(L.previewWidth, L.previewHeight) * 0.56f);
+  const float distance = H * 0.5f * radius / (pixels * th);
+  const vec3 focus = demo.pos + vec3(0, sp.fusRad * 0.45f, 0);
+  const vec3 C = focus + normalize(vec3(0.40f, 0.24f, -1.f)) * distance;
+  const vec3 f0 = normalize(focus - C), r0 = normalize(cross(f0, vec3(0, 1, 0))), u0 = cross(r0, f0);
+  const float nx = (cx - W*0.5f)/(W*0.5f), ny = (H*0.5f-cy)/(H*0.5f);
+  const vec3 aim = focus - r0*(nx*distance*th*(W/H)) - u0*(ny*distance*th);
+  const vec3 fwd = normalize(aim-C);
+  fp.camPos = C; fp.camBack = -fwd; fp.camRight = normalize(cross(fwd, vec3(0,1,0))); fp.camUp = cross(fp.camRight,fwd);
+  fp.exposure = 1.f; fp.vignette = 0.32f;
 }
 
 // The preview: the selected craft hangs in the air over the chosen launch site, at the sortie's time of day, and the
@@ -3325,7 +3505,7 @@ void Game::update(float dt) {
   if (screen == SCR_RESEARCH && resWarm) {   // warming: the scenery streams flat out, the previewed craft's shells bake; done when a frame bakes nothing and nothing is pending
     g_ren.entBudgetMs = 14.f;
     bool baked = g_ren.bakeCount != resBakeSeen; resBakeSeen = g_ren.bakeCount;
-    if (resWarmFrames > 2 * resCraftCount() + 3 && !baked && g_ren.entPending == 0 && !g_ren.tshPending()) { resWarm = false; resWarmCraft = -1; resWarmCk = false; g_ren.entBudgetMs = 2.5f; }
+    if (resWarmFrames > 2 * resCraftCount() + 3 && !baked && g_ren.entPending == 0 && !loadingShadowPending()) { resWarm = false; resWarmCraft = -1; resWarmCk = false; g_ren.entBudgetMs = 2.5f; }
   }
   if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
   radio.poll();
@@ -3409,8 +3589,9 @@ void Game::render() {
   if (!vid) {
     fp = buildFrame();
     std::vector<SpriteVert> a, b;
-    buildSprites(fp, a, b);
+    if (!fp.hangarPreview) buildSprites(fp, a, b);
     g_ren.renderScene(fp, a, b);
+    if (screen == SCR_LOADING && loadReadyT < 0) ++loadFrames;
   } else g_ren.clearScreen();
   if (screen == SCR_RESEARCH && !resWarm) g_ren.bakeYield = nullptr;
   if (sceneOnly) return;
@@ -3424,6 +3605,7 @@ void Game::render() {
   uiDt = clampf(realTime - uiLastT, 0.f, 0.1f); uiLastT = realTime;
   switch (screen) {
     case SCR_MENU: drawMenu(); break;
+    case SCR_FREE_FLIGHT: drawFreeFlightSetup(fp); break;
     case SCR_HUB: drawHub(); break;
     case SCR_FLIGHT: if (!uiHidden || paused || showMap) { drawHud(fp); drawMapOverlay(); } if (paused) drawPause(); break;
     case SCR_DEBRIEF: drawDebrief(); break;

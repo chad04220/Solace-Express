@@ -181,24 +181,28 @@ int partList(const float* M, bool inside, PartInst* out, int model = -1) {
 }
 }
 
-// (every aircraft, the light aircraft alone - pickAfPrograms - then each research jet alone: drawPlaneMesh; without
-// a jet's own build its aircraft is drawn with every aircraft's)
-static const char* const kMeshBuild[4] = {"", "#define AF_LIGHT\n", "#define AF_JET\n", "#define AF_WRAITH\n"};
-bool Renderer::compilePlaneMesh() {
+bool Renderer::compilePlaneMesh(const std::function<void()>& step) {
   std::string e;
   const char* const* kBuild = kMeshBuild;
   for (int v = 0; v < 4; v++) {
+    static const char* stages[] = {"aircraft meshes (all aircraft)", "aircraft meshes (fleet)", "aircraft meshes (XR-30)", "aircraft meshes (XR-40)"};
+    setCompileStage(stages[v]);
     e.clear(); progPlaneMeshV[v] = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(kBuild[v]), e);
     if (!progPlaneMeshV[v] && v < 2) { error = "Aircraft mesh shader: " + e; return false; }
     if (!progPlaneMeshV[v]) shaderNote(std::string("Aircraft mesh shader (") + (v == 2 ? "the XR-30's" : "the XR-40's") + " own build) failed: drawn with every aircraft's");
+    if (step) step();
   }
   progPlaneMesh = progPlaneMeshV[0];
   // the depth pre-pass; with uScrSkip the research cockpit's windows are cut (cabin_windows.glsl: the screens are holes)
   // (uCloakZ: a cloaked XR-40's sweeping front, body z - what lies ahead of it is see-through and writes no depth; -1e9 none)
+  setCompileStage("aircraft mesh depth");
   progPlaneMeshDepth = linkProgramCached(planeMeshVSAssembly(""), planeMeshDepthFSAssembly(), e);
   if (!progPlaneMeshDepth) { error = "Aircraft mesh depth shader: " + e; return false; }
+  if (step) step();
+  setCompileStage("aircraft moving-part poses");
   progPartPose = linkProgramCached(kFullscreenVS, partPoseFSAssembly(), e);
   if (!progPartPose) { error = "Cockpit part pose shader: " + e; return false; }
+  if (step) step();
   poseRevision.clear(); poseMeshes = {};   // a newly linked pose program must populate the texture again
   return true;
 }

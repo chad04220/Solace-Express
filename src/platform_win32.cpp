@@ -536,6 +536,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   // the first-time compile runs in a child process (see buildShaderCacheChild); this process then loads the results
   PROCESS_INFORMATION child = {};
   std::atomic<int> childDone{-1}, childMisses{0};
+  std::atomic<bool> childReadDone{false};
   std::mutex childStageMu; std::string childStage;   // (what the child is building, as it reports it)
   std::thread childReader;
   const std::string stampPath = g_shaderCacheDir.empty() ? std::string() : g_shaderCacheDir + "\\stamp.txt", stamp = shaderCacheStamp();
@@ -551,14 +552,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   g_ren.checkMeshCache();
   const bool perfFresh = game.cacheDir.empty() || !exists(game.cacheDir + "\\perf.bin");
   LoadPacer pace;
-  const int stStart = pace.add("start", Renderer::kProgramCount + 1);   // (each shader program built or loaded, and the islands)
-  const int stInit = pace.add("career");
-  const int stTex = pace.add("renderer");
-  const int stMenu = pace.add("menu");
-  std::vector<int> meshSteps;
-  if (!tool)
-    for (const auto& it : Game::prewarmItems(true)) meshSteps.push_back(pace.add("mesh" + std::to_string(it.first) + (it.second ? "c" : "o")));
-  pace.begin(stStart);
   if (ctx2 && !g_shaderCacheDir.empty() && !cacheCurrent) {
     SECURITY_ATTRIBUTES sa = {sizeof(sa), nullptr, TRUE};
     HANDLE rd = nullptr, wr = nullptr;
@@ -570,7 +563,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       std::vector<char> cmdBuf(cmd.begin(), cmd.end()); cmdBuf.push_back(0);
       if (CreateProcessA(nullptr, cmdBuf.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS, nullptr, nullptr, &si, &child)) {
         childDone = 0;
-        childReader = std::thread([rd, &childDone, &childMisses, &childStageMu, &childStage] {
+        childReader = std::thread([rd, &childDone, &childMisses, &childStageMu, &childStage, &childReadDone] {
           std::string line; char buf[256]; DWORD n = 0;
           while (ReadFile(rd, buf, sizeof buf, &n, nullptr) && n > 0)
             for (DWORD i = 0; i < n; i++) {
@@ -581,11 +574,21 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
               line.clear();
             }
           CloseHandle(rd);
+          childReadDone = true;
         });
       } else CloseHandle(rd);
       CloseHandle(wr);   // the child holds its own copy: the reader sees the end of the pipe when the child exits
     }
   }
+  const int stStart = pace.add("start", Renderer::kProgramCount + 1);   // (each shader program built or loaded, and the islands)
+  const int stCache = child.hProcess ? pace.add("optional-cache", Renderer::kProgramCount) : -1;
+  const int stInit = pace.add("career", kNumAircraft + 4);
+  const int stTex = pace.add("renderer", 11);
+  const int stMenu = tool ? -1 : pace.add("menu", 12);
+  std::vector<int> meshSteps;
+  if (!tool)
+    for (const auto& it : Game::prewarmItems(true)) meshSteps.push_back(pace.add("mesh" + std::to_string(it.first) + (it.second ? "c" : "o")));
+  pace.begin(stStart);
   std::thread compileThread;
   if (ctx2) compileThread = std::thread([&] {
     if (child.hProcess) {   // wait for the child's compile (it may take a minute on the first run), then load its results
@@ -611,27 +614,30 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     std::atomic<int> state{0};          // 0 starting, 1 running, 2 fade out and stop, 3 stop now, 4 finished, -1 unavailable
     std::thread th;
   } intro;
+  std::atomic<bool> synchronousShaders{false};
   intro.th = std::thread([&] {
     HDC dcI = GetDC(g_hwnd);
     int attrs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB, 3, WGL_CONTEXT_MINOR_VERSION_ARB, 3, WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB, 0};
     HGLRC ctxI = createAttribs ? createAttribs(dcI, nullptr, attrs) : nullptr;
-    if (!ctxI || !wglMakeCurrent(dcI, ctxI)) { if (ctxI) wglDeleteContext(ctxI); intro.state = -1; return; }
+    if (!ctxI || !wglMakeCurrent(dcI, ctxI)) { if (ctxI) wglDeleteContext(ctxI); ReleaseDC(g_hwnd, dcI); intro.state = -1; return; }
     if (s_swapInterval) s_swapInterval(1);   // (the intro runs on vsync)
     std::unique_ptr<Renderer> R(new Renderer());
     RECT rc; GetClientRect(g_hwnd, &rc);
-    if (!R->initUI(std::max(64L, rc.right), std::max(64L, rc.bottom))) { wglMakeCurrent(nullptr, nullptr); wglDeleteContext(ctxI); intro.state = -1; return; }
+    if (!R->initUI(std::max(64L, rc.right), std::max(64L, rc.bottom))) { wglMakeCurrent(nullptr, nullptr); wglDeleteContext(ctxI); ReleaseDC(g_hwnd, dcI); intro.state = -1; return; }
     GLuint ic = iconPx.empty() ? 0 : R->makeTexture(iconPx.data(), 256, 256);
     int expected = 0; intro.state.compare_exchange_strong(expected, 1);
-    float shown = 0, fade = 1.f;
+    float shown = 0, fade = 1.f, lastTime = 0.f;
     for (;;) {
       int st = intro.state;
       if (st == 3) break;
-      if (st == 2) { fade -= 1.f / 20.f; if (fade <= 0.f) break; }
       LARGE_INTEGER n; QueryPerformanceCounter(&n);
       float t = (float)(n.QuadPart - t0.QuadPart) / freq.QuadPart;
+      float dt = std::max(0.f, t - lastTime); lastTime = t;
+      if (st == 2) { fade -= dt / 0.35f; if (fade <= 0.f) break; }
+      if (synchronousShaders) pace.setDone(stStart, (float)progDone + 1.f);
       LoadPacer* lp = intro.pacer;
       float target = lp ? lp->fraction() : (float)intro.target;
-      shown = std::max(shown, shown + (target - shown) * 0.12f);
+      shown = easeLoadProgress(shown, target, dt);
       std::string stage; { std::lock_guard<std::mutex> lk(intro.m); stage = intro.stage; }
       GetClientRect(g_hwnd, &rc);
       if (rc.right > 0 && rc.bottom > 0) { R->W = rc.right; R->H = rc.bottom; }
@@ -653,7 +659,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   const bool introThreaded = intro.state == 1;
   if (!introThreaded) intro.th.join();
   // falls back to drawing the intro on this thread if the intro context could not be made
-  float shownMain = 0;
+  float shownMain = 0, lastMainTime = 0;
   auto introFrame = [&](float target, const std::string& stage, float fade) {
     MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { if (m.message == WM_QUIT) game.quit = true; TranslateMessage(&m); DispatchMessageW(&m); }
     QueryPerformanceCounter(&now);
@@ -664,7 +670,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       Sleep(10);
       return t;
     }
-    shownMain = std::max(shownMain, shownMain + (target - shownMain) * 0.12f);
+    shownMain = easeLoadProgress(shownMain, target, t - lastMainTime);
+    lastMainTime = t;
     RECT rc; GetClientRect(g_hwnd, &rc);
     if (rc.right > 0 && rc.bottom > 0) { g_ren.W = rc.right; g_ren.H = rc.bottom; }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -676,7 +683,18 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   };
   // ends the intro: `fade` plays its fade-out first; afterwards this thread owns the window's drawing again
   auto stopIntro = [&](bool fade) {
-    if (!introThreaded) { if (fade) for (int i = 0; i < 20; i++) introFrame(1.f, "READY", 1.f - i / 20.f); return; }
+    if (!introThreaded) {
+      if (fade) {
+        LARGE_INTEGER start; QueryPerformanceCounter(&start);
+        float alpha = 1.f;
+        while (alpha > 0.f && !game.quit) {
+          introFrame(1.f, "Ready", alpha);
+          LARGE_INTEGER n; QueryPerformanceCounter(&n);
+          alpha = 1.f - (float)(n.QuadPart - start.QuadPart) / (freq.QuadPart * 0.35f);
+        }
+      }
+      return;
+    }
     if (intro.state != 1) return;
     if (fade) { intro.pacer = nullptr; intro.target = 1.f; { std::lock_guard<std::mutex> lk(intro.m); intro.stage = "Ready"; } }
     intro.state = fade ? 2 : 3;
@@ -686,10 +704,28 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     }
     intro.th.join();
   };
+  bool helperSkipped = false;
+  auto finalizeCacheHelper = [&] {
+    if (stCache < 0) return;
+    pace.setDone(stCache, (float)std::max(0, std::min((int)childDone, Renderer::kProgramCount)));
+    DWORD code = STILL_ACTIVE;
+    GetExitCodeProcess(child.hProcess, &code);
+    helperSkipped = code != 0 || childDone < Renderer::kProgramCount;
+    if (helperSkipped) pace.skipRemaining(stCache);
+  };
   for (;;) {
     QueryPerformanceCounter(&now);
     float t = (float)(now.QuadPart - t0.QuadPart) / freq.QuadPart;
-    int d = childDone >= 0 && compileState == 0 ? std::max((int)childDone, (int)progDone) : (int)progDone;
+    const bool helperRunning = child.hProcess && WaitForSingleObject(child.hProcess, 0) == WAIT_TIMEOUT;
+    int d = helperRunning ? (int)childDone : (int)progDone;
+    if (stCache >= 0) {
+      pace.setDone(stCache, (float)std::max(0, std::min((int)childDone, Renderer::kProgramCount)));
+      if (!helperRunning && childReadDone) {
+        // A failed/timed-out helper is optional. Its unfinished programs are skipped,
+        // never reported as built; the independent main-context pass still has to finish.
+        finalizeCacheHelper();
+      }
+    }
     bool compiled = !ctx2 || compileState != 0, built = worldDone;
     if (d == 0 && compileState == 0) compileSecs = t;
     // what is being done, by name: the shader program (the child process compiling on a first launch reports a count only)
@@ -698,18 +734,22 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     else if (compileState == 0) {
       std::string sh = g_ren.compileStage();
       if (childDone >= 0 && child.hProcess && WaitForSingleObject(child.hProcess, 0) == WAIT_TIMEOUT) { std::lock_guard<std::mutex> lk(childStageMu); sh = childStage; }   // (the child compiling: what it reports)
-      stage = cacheCurrent ? "Loading the shaders from the cache" : "Compiling the shaders (the first launch of this version only)";
+      stage = helperRunning ? "Preparing GPU shader cache" : helperSkipped ? "Cache preparation skipped; building graphics programs" : "Loading graphics programs";
       if (!sh.empty()) stage += ": " + sh;
       stage += "   " + std::to_string(std::min(d + 1, Renderer::kProgramCount)) + " of " + std::to_string(Renderer::kProgramCount);
     } else stage = "Shaders ready";
-    if (!built) stage += g_worldStage == 1 ? "   |   Loading the islands from the cache" : "   |   Generating the islands (once: kept for the next launch)";
-    pace.setDone(stStart, (float)std::min(d, Renderer::kProgramCount) + (built ? 1.f : 0.f));   // (the programs done, and the islands)
+    if (!built) stage += g_worldStage == 1 ? " | Reading island cache" : " | Building islands";
+    pace.setDone(stStart, (float)std::min((int)progDone, Renderer::kProgramCount) + (built ? 1.f : 0.f));   // (the programs done, and the islands)
     introFrame(pace.fraction(), stage, 1.f);
     if (game.quit) break;
-    if (compiled && built && t > 3.2f) break;   // the logo stays up long enough to be seen
+    if (compiled && built) break;   // no artificial delay after the real work finishes
   }
   if (game.quit && child.hProcess) TerminateProcess(child.hProcess, 9);   // closed during the intro: don't wait for it
   if (compileThread.joinable()) compileThread.join();
+  // Reconcile once more after joining: the helper and main compile may both finish
+  // between the loop's snapshots. The reader is now joined and its final count stable.
+  // Do this before closing the process handle or begin(career) can close optional work.
+  finalizeCacheHelper();
   if (child.hProcess) { CloseHandle(child.hProcess); CloseHandle(child.hThread); }
   worldThread.join();
   if (ctx2) wglDeleteContext(ctx2);
@@ -717,7 +757,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (hw2) DestroyWindow(hw2);
   if (game.quit) { stopIntro(false); return 0; }
   if (ctx2 && compileState != 1) { stopIntro(false); fatal(g_ren.error); return 1; }
-  if (!ctx2) introFrame(pace.fraction(), cached ? "Loading the shaders from the cache" : "Compiling the shaders (this can take a minute)", 1.f);
+  if (!ctx2) {
+    introFrame(pace.fraction(), "Preparing graphics programs", 1.f);
+    synchronousShaders = true;
+    bool shaderOk = g_ren.compilePrograms(&progDone);
+    synchronousShaders = false;
+    if (!shaderOk) { stopIntro(false); fatal(g_ren.error); return 1; }
+    pace.setDone(stStart, (float)Renderer::kProgramCount + 1.f);
+  }
   if (ctx2 && compileState == 1 && !stampPath.empty() && !cacheCurrent && g_ren.dispError.empty())   // the cache now holds this build
     if (FILE* f = fopen(stampPath.c_str(), "w")) { fprintf(f, "%s\n", stamp.c_str()); fclose(f); }
   if ((g_shaderCacheMisses > 0 || childMisses > 0) && ctx2 && !g_shaderCacheDir.empty())
@@ -725,22 +772,25 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   pace.begin(stInit);
   introFrame(pace.fraction(), perfFresh ? "Loading your career  |  learning how each aircraft flies (once)" : "Loading your career and the aircraft performance", 1.f);
-  game.init(false);
+  game.init(false, [&](float f, const std::string& what) { pace.setSub(f); introFrame(pace.fraction(), what, 1.f); });
+  if (game.quit) { stopIntro(false); return 0; }
   pace.begin(stTex);
   introFrame(pace.fraction(), "Preparing the renderer: textures, materials and the GPS map", 1.f);
   g_ren.renderScale = 1.0f; g_ren.quality = game.set.quality;
   GetClientRect(g_hwnd, &cr);
   g_ren.matDir = game.assetDir + "\\materials";   // (the scanned material layers shipped beside the exe)
-  if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom))) { stopIntro(false); fatal(g_ren.error); return 1; }
+  if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom), [&](float f, const std::string& what) { pace.setSub(f); introFrame(pace.fraction(), what, 1.f); })) { stopIntro(false); fatal(g_ren.error); return 1; }
+  if (game.quit) { stopIntro(false); return 0; }
   {
     // a normal start loads the menu's first place and builds (or reads) every aircraft's meshes, the research jets'
     // too, under the intro (rendered offscreen: the intro keeps the window), so nothing past the menu waits for one
     if (!tool) game.prewarm([&](float f, const std::string& what) { introFrame(f, what, 1.f); }, true, &pace, stMenu, &meshSteps);
-    pace.end();
+    if (!game.quit) pace.end();
     if (game.quit) { stopIntro(false); return 0; }
     stopIntro(!tool);   // the bench and shot tools draw straight away; a normal start fades the intro out
   }
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
+    if (helperSkipped) fprintf(f, "Optional shader-cache preparation skipped unfinished work; main-context program loading completed independently.\n");
     fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits.load(), g_shaderCacheMisses.load());
     fprintf(f, "Launch: shaders and islands %.1f s (islands %s), career %.1f s, renderer %.1f s, menu %.1f s, aircraft meshes %.1f s (%d built)\n",
             pace.tookOf("start"), g_world.fromCache ? "from the cache" : "generated", pace.tookOf("career"), pace.tookOf("renderer"), pace.tookOf("menu"), pace.tookOf("mesh"), g_ren.bakeBuilt);

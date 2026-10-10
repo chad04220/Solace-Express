@@ -72,6 +72,9 @@ void shaderNote(const std::string& s);      // (adds a line to it; safe from the
 GLint U(GLuint prog, const char* name);   // a uniform's location (cached per program; name must be a string literal)
 
 struct FrameParams {
+  bool hangarClassified = false; // locked showroom: geometry-only, ultra-low light
+  bool hangarPreview = false;  // isolated indoor preview; the aircraft uses its normal rendering path
+  vec3 hangarOrigin; float hangarSize = 12.f;  // floor centre and max airframe span/length, world metres
   std::vector<GroundVehicleVisual> groundVehicles;   // explicitly driven ground vehicles (none yet: the airport furniture is parked)
   vec3 camPos; vec3 camRight, camUp, camBack; float fovY = 1.0f;
   float dt = 1.f / 60.f;   // this frame's real time step (frame-rate independent blending: the TAA)
@@ -138,14 +141,17 @@ public:
   GLuint minimapTex = 0;
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
-  static constexpr int kProgramCount = 19;
+  // Logical linked programs: top-level 18, hull 3, raster 12, aircraft mesh 6, terrain/water 2.
+  // Retries do not add units; finalized optional fallbacks/unavailable features do.
+  static constexpr int kProgramCount = 18 + 3 + 12 + 6 + 2;
+  static_assert(kProgramCount == 41, "Update the logical shader progress contract when adding a program");
   float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
   // analysis tool (--analyze, the harness's BENCHWALL): exact per-pass times (the GPU is waited on at every pass boundary)
   bool syncTiming = false; double passWall[11] = {};   // (kPasses)
   std::string dispError;   // set when the cockpit display shader failed to build (the screens stay dark)
   std::string proxyError;  // set when the marched shadow proxy failed to build (the airframes' shadows come from their maps alone)
   bool compilePrograms(std::atomic<int>* done);  // scene programs; safe on a worker thread with a shared context
-  bool init(int w, int h);                       // everything else (runs compilePrograms itself if not done yet)
+  bool init(int w, int h, const std::function<void(float, const std::string&)>& progress = {});                       // everything else (runs compilePrograms itself if not done yet)
   GLuint makeTexture(const uint8_t* rgba, int w, int h);
   void renderMap(float cx, float cz, float half, int N);   // GPS aerial image into mapTex()
   GLuint mapTex() const { return texMap; }
@@ -286,7 +292,7 @@ private:
   void rasterTrafficProps(const FrameParams& fp);
   GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0;   // (the depth pre-pass: the airframe's inner and outer skins both face the camera; only the nearest is shaded)
   void setScreenCut(GLuint p, const FrameParams& fp, bool on);   // the research cockpits' windows cut (cabin_windows.glsl)
-  bool compilePlaneMesh();
+  bool compilePlaneMesh(const std::function<void()>& step = {});
   bool planeMeshWanted(const FrameParams& fp) const;
   void bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key);
   void drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const float* rot, const vec3& pos, int trafK, bool depthDone = false);
@@ -304,13 +310,18 @@ private:
   void computePartPoses(const FrameParams& fp, const PlaneMesh* player, const PlaneMesh* const* traffic);
   void updatePartPoses(const FrameParams& fp);
   void drawPlaneParts(const PlaneMesh& pm, GLuint prog, int trafK);   // (the program bound, its uniforms set: each part instance at its pose)
+  GLuint progHangar = 0, progClassifiedHangar = 0, vaoHangar = 0, vboHangar = 0;
+  int hangarVertexCount = 0, previousPreviewModel = -1; float hangarGeometrySize = 0;
+  bool previousHangar = false, previousClassifiedHangar = false;
+  void rasterHangar(const FrameParams& fp);
+  void lightClassifiedHangar(const FrameParams& fp);
   const PlaneMesh* earlyMesh = nullptr;   // the player's mesh whose depth opens this frame's G-buffer (rasterWorld; drawEntities draws it)
   uint64_t trafficModelKey(const float* t) const;   // hullKey(slot 0) of a traffic aircraft's model
   std::unordered_map<uint64_t, HullMesh> hulls;   // every airframe baked so far, outside and cockpit (keyed by hullKey)
   GLuint progHull = 0, progHullBake = 0, progHullBakeNormal = 0, vaoHull = 0, texHPts = 0, texHNormals = 0, texHOut = 0, fboHOut = 0, fboHull = 0, texHullDepth = 0;
   int hullDepthW = 0, hullDepthH = 0;
   bool hullOn = false;
-  bool compileHull(const std::string& bakeVS, const std::string& bakeFS);
+  bool compileHull(const std::string& bakeVS, const std::string& bakeFS, const std::function<void()>& step = {});
   void hullEval(const std::vector<vec3>& pts, std::vector<float>& out);
   // Bake inputs live on the CPU: both programs receive the same model, states and part selectors.
   // No selector is recovered from GL (the normal program can optimize some uniforms away).
@@ -367,6 +378,8 @@ public:
   bool hullOff = getenv("HULLOFF") != nullptr;           // debug: no hulls (every aircraft march starts from the camera)
   bool meshOff = getenv("MESHOFF") != nullptr;           // debug: no aircraft meshes on the raster path (the whole airframe marches)
   bool tshPending() const { return tshBaking || tshFront < 0; }
+  // Optional/unused sun shadows must not block a loading screen forever.
+  bool tshRequiredPending(float sunHeight) const { return progTShBake != 0 && sunHeight >= 0.02f && tshPending(); }
   void resetTemporal() {   // forget every frame-to-frame accumulation (TAA history, jitter/seed sequence, terrain-shadow bake):
     frameNo = 0; histIdx = 0; histValid = false; cloudAccValid = false;   // the next frame renders as if it were the first (exact test comparisons)
     tshFront = -1; tshBack = 0; tshRow = 0; tshBaking = false;
@@ -391,6 +404,9 @@ private:
   // The aircraft mesh pass draws each aircraft on its own, so it has two more builds: [2] AF_JET, the XR-30's alone,
   // and [3] AF_WRAITH, the XR-40's alone (drawPlaneMesh picks by the aircraft drawn)
   GLuint progObjectsV[2] = {}, progShProxyV[2] = {}, progEffectsV[2] = {}, progPlaneMeshV[4] = {}, progPlaneMeshProbe[4] = {};
+  // the aircraft mesh program's builds: every aircraft, the light aircraft alone (pickAfPrograms), then each research
+  // jet alone (drawPlaneMesh; without a jet's own build its aircraft is drawn with every aircraft's)
+  static constexpr const char* kMeshBuild[4] = {"", "#define AF_LIGHT\n", "#define AF_JET\n", "#define AF_WRAITH\n"};
   void pickAfPrograms(const FrameParams& fp);
   // the airframe shadow maps (raster_renderer.cpp): the player's baked static mesh rendered from the sun (layer 0,
   // orthographic) and from the three brightest shadow-casting lights (layers 1-3, perspective along each beam); a
@@ -415,8 +431,8 @@ private:
   void rasterTrafficShadowMaps(const FrameParams& fp);
   GLuint iboTerrain = 0, vaoTerrain = 0, vboTerrainInst = 0, vaoWater = 0, vboWater = 0, iboWater = 0; int waterIdx = 0;
   std::vector<float> terrInst; int terrChunks = 0;
-  bool compileRaster();
-  bool compileTerrainMesh();
+  bool compileRaster(const std::function<void()>& step = {});
+  bool compileTerrainMesh(const std::function<void()>& step = {});
   void initTerrainMesh();
   void selectTerrainChunks(const FrameParams& fp);
   void drawTerrainMesh(const FrameParams& fp);

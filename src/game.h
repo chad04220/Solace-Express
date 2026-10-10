@@ -63,7 +63,7 @@ struct Settings {
 struct TipPt { vec3 p; float age, a; int seg; };   // wingtip vapour ribbon point (in the air mass)
 struct Particle { vec3 p, v; float life, maxLife, size, grow; vec3 col; float alpha; int kind; float drag, buoy; bool instant = false; bool fresh = true; };  // instant: no fade-in (trails)
 
-enum GameScreen { SCR_MENU = 0, SCR_HUB, SCR_FLIGHT, SCR_DEBRIEF, SCR_RESEARCH, SCR_LOADING };
+enum GameScreen { SCR_MENU = 0, SCR_HUB, SCR_FLIGHT, SCR_DEBRIEF, SCR_RESEARCH, SCR_LOADING, SCR_FREE_FLIGHT };
 enum HubTab { TAB_CONTRACTS = 0, TAB_HANGAR, TAB_AIRLINE, TAB_LOGBOOK, TAB_SETTINGS };
 
 class Game {
@@ -99,7 +99,7 @@ public:
   bool shaderFirstRun = false;
   std::string cacheDir, buildStamp;   // where the launch keeps what it built (the platform layer: the shader cache's folder) and this build's stamp
   unsigned iconTex = 0;   // the application icon (intro screen, main menu)
-  void init(bool buildWorld = true);   // buildWorld false: g_world.build() already ran (on the intro's worker thread)
+  void init(bool buildWorld = true, const std::function<void(float, const std::string&)>& progress = {});   // buildWorld false: g_world.build() already ran (on the intro's worker thread)
   void initHeadless();
   void debugScene(const std::string& name);
   const Weather& benchmarkWeather() const { return wx; }   // final preset state, read-only diagnostics
@@ -128,6 +128,15 @@ private:
   void releaseJob();                                 // the open job cancelled: the load stays where it is, nothing charged
   void practiseApproach(int spec, Career::Source src);   // a flight to the job's destination that touches nothing in the career
   bool isolatedFlight = false;   // a practice flight: endFlight returns to the hub without any settlement
+  // Main-menu Free Flight is independent of the career, including an open or unsaved job.
+  // Its own selection and return screen keep the career's hangar and job card untouched.
+  bool freeFlight = false;
+  int freeCraft = 0, freeAirport = 0;
+  bool freeAirborne = false;
+  void beginFreeFlightSetup();
+  void cancelFreeFlightSetup();
+  void launchFreeFlight();
+  void returnToFreeFlight();
   bool jobLeg = false;           // this flight is an accepted job's leg flown on from where it waited (continueJob)
   void applyJobLeg();            // that leg's checkpoints, clock, ride so far and paid fees onto the flight just started
   void restartFlight();          // the pause menu's Restart: the same flight again, in the same mode (practice, trial, job leg)
@@ -283,6 +292,7 @@ private:
   void fireball(vec3 c, vec3 baseV, float R, bool air, bool water);
   void updateBombCam(float dt);
   void updateLoading(float dt);
+  bool loadingShadowPending() const;
   void drawLoading();
   float ufoSummon = 0;          // J + K held while flying summons the UFO after a second
   Ufo ufo;
@@ -360,7 +370,7 @@ private:
   float ckZoom = 1.f, ckZoomT = 1.f;
   CockpitFocusZoom cockpitFocus;
   float autoScale = 0.75f, autoScaleT = 0;   // (starts at three quarters: the upscaler makes it hard to tell, and the first frames are the slow ones)   // dynamic resolution state   // cockpit view zoom (current, target)
-  float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0; bool loadMap = false;   // pre-flight loading screen
+  float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0, loadFrames = 0, loadStableFrames = 0, loadBakeSeen = 0, loadObservedFrame = -1; bool loadMap = false;   // pre-flight loading screen
   bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI
   // bound action state: keyboard key or gamepad button
@@ -406,6 +416,7 @@ private:
   void buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, std::vector<SpriteVert>& add);
   void feedAudio();
   void menuBackgroundCamera(FrameParams& fp);
+  void hangarPreviewCamera(FrameParams& fp);
   void menuTour(FrameParams& fp);   // main menu: a tour of the islands
   int computePhase() const;
   std::string landingCoaching() const;
@@ -473,6 +484,7 @@ private:
   void launchResearch();
   void jetEffects(float dt);
   void drawMenu();
+  void drawFreeFlightSetup(const FrameParams& fp);
   void drawHub();
   void drawHubContracts(float x, float y, float w, float h);
   void drawHubHangar(float x, float y, float w, float h);

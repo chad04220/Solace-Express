@@ -23,6 +23,7 @@ int main() {
     for (int i = 0; i < n; ++i) {
       check(close(out[i].centre.x, expected[i][0]) && close(out[i].centre.y, expected[i][1]) && close(out[i].centre.z, expected[i][2]), "camera-relative hubs exactly match modelProps at map edge");
       check(close(out[i].radius, expected[i][3]), "prop radius comes from this model");
+      check(close(out[i].hubRadius, kModels[m].spinnerR), "blade roots fit this model's existing solid spinner");
       check(out[i].blades == kAircraft[m].blades, "correct 2/3/4-blade aircraft count");
       check(close(out[i].angle, 1.234f), "angle from traffic texel 30.w");
       check(out[i].blur == 0.f, "parked .05 throttle has distinct idle blades");

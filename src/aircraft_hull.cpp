@@ -44,14 +44,18 @@ void main(){
 )";
 }
 
-bool Renderer::compileHull(const std::string& bakeVS, const std::string& bakeFS) {
+bool Renderer::compileHull(const std::string& bakeVS, const std::string& bakeFS, const std::function<void()>& step) {
   std::string hdr = "#version 330 core\n", e;
   progHull = linkProgramCached(hdr + kHullVS, hdr + kHullFS, e);
+  if (!progHull) shaderNote("Aircraft hull unavailable; using the unbounded distance-field renderer.\n" + e);
+  if (step) step();
+  setCompileStage("aircraft distance-field bake");
   auto define = [](const std::string& s, const char* d) { const size_t at = s.find('\n') + 1; return s.substr(0, at) + d + s.substr(at); };
   const std::string normalFS = define(bakeFS, "#define HULL_BAKE_NORMALS\n");
   bool safeField = false, safeNormal = false;
   progHullBake = linkProgramCached(bakeVS, bakeFS, e, &safeField);
   if (progHullBake) {
+    setCompileStage("aircraft surface-normal bake");
     progHullBakeNormal = linkProgramCached(bakeVS, safeField ? define(normalFS, "#define NV_SAFE_GEAR\n") : normalFS, e, &safeNormal);
     // A driver fallback must use the same field for distance and normal. Keep the upstream retry/cache/timebox
     // machinery for each program, but never mix a full-gear distance with a reduced-gear normal (or vice versa).
@@ -66,6 +70,9 @@ bool Renderer::compileHull(const std::string& bakeVS, const std::string& bakeFS)
     progHullBake = progHullBakeNormal = 0;
     shaderNote("Aircraft bake unavailable; using the distance-field renderer.\n" + e);
   }
+  // Distance and normal are a coupled field: settle their shared fallback before
+  // counting either. A reduced-field retry remains the same logical program.
+  if (step) { step(); step(); }
   return progHull && progHullBake && progHullBakeNormal;
 }
 

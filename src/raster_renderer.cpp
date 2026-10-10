@@ -5,11 +5,12 @@
 #include "renderer.h"
 #include "shaders.h"
 
-bool Renderer::compileRaster() {
+bool Renderer::compileRaster(const std::function<void()>& step) {
   std::string e;   // (each program's own log: linkProgramCached appends, so it is cleared before every build)
   setCompileStage("lighting");
   e.clear(); progLight = linkProgramCached(kFullscreenVS, lightFSAssembly(""), e);
   if (!progLight) { error = "Lighting shader: " + e; return false; }
+  if (step) step();
   // The shadow proxy and the effects pass each have builds with less in them, for a driver whose compiler fails on the
   // whole even with its own options (linkProgramCached): NVIDIA's did on v3.35.0's and v3.36.0's. The first that builds
   // is used and startup.log says which; the proxy's last resort is the maps-only build below. What each leaves out:
@@ -25,6 +26,7 @@ bool Renderer::compileRaster() {
     setCompileStage(v ? "aircraft (light aircraft build)" : "aircraft (every aircraft)");
     e.clear(); progObjectsV[v] = linkProgramCached(kFullscreenVS, objectsFSAssembly(d), e);
     if (!progObjectsV[v]) { error = "Objects shader: " + e; return false; }
+    if (step) step();
     setCompileStage(v ? "aircraft shadows (light aircraft build)" : "aircraft shadows (every aircraft)");
     std::string first;
     for (int k = 0; k < 4 && !progShProxyV[v]; k++) {
@@ -33,6 +35,7 @@ bool Renderer::compileRaster() {
       if (progShProxyV[v] && k > 0) shaderNote(std::string("Shadow proxy (") + build + "): built without " + kProxyLessName[k]);
     }
     if (!progShProxyV[v] && proxyError.empty()) proxyError = "Shadow proxy shader: " + first;
+    if (progShProxyV[v] && step) step();   // unresolved variants finish when the maps fallback is available
     setCompileStage(v ? "effects (light aircraft build)" : "effects (every aircraft)");
     for (int k = 0; k < 4 && !progEffectsV[v]; k++) {
       e.clear(); progEffectsV[v] = linkProgramCached(kFullscreenVS, effectsFSAssembly(d + kFxLess[k]), e);
@@ -40,18 +43,22 @@ bool Renderer::compileRaster() {
       if (progEffectsV[v] && k > 0) shaderNote(std::string("Effects (") + build + "): built without " + kFxLessName[k]);
     }
     if (!progEffectsV[v]) { error = "Effects shader: " + first; return false; }
+    if (step) step();
   }
   setCompileStage("traffic propellers");
-  e.clear(); progTrafficProps = linkProgramCached(kPropDiscVS, kPropDiscFS, e);
+  e.clear(); progTrafficProps = linkProgramCached(kPropDiscVS, propDiscFSAssembly(), e);
   if (!progTrafficProps) { error = "Traffic prop shader: " + e; return false; }
+  if (step) step();
   progObjects = progObjectsV[0]; progShProxy = progShProxyV[0]; progEffects = progEffectsV[0];
   setCompileStage("UFO and debris");
   e.clear(); progObjectsNoAf = linkProgramCached(kFullscreenVS, objectsFSAssembly("#define AF_LIGHT\n#define OBJ_NO_AF\n"), e);
   if (!progObjectsNoAf) { error = "Objects (UFO, debris) shader: " + e; return false; }
+  if (step) step();
   setCompileStage("aircraft shadows (maps only)");
   e.clear(); progShProxyMaps = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly("#define AF_LIGHT\n#define PROXY_MAPS_ONLY\n"), e);
   if (!progShProxyMaps) { error = "Shadow proxy (maps) shader: " + (proxyError.empty() ? e : proxyError + "\n" + e); return false; }
-  for (int v = 0; v < 2; v++) if (!progShProxyV[v]) progShProxyV[v] = progShProxyMaps;
+  if (step) step();
+  for (int v = 0; v < 2; v++) if (!progShProxyV[v]) { progShProxyV[v] = progShProxyMaps; if (step) step(); }
   progShProxy = progShProxyV[0];
   // the airframe shadow maps: the baked mesh (and the moving hull) from a light, plain depth
   static const char* kShMapVS = "#version 330 core\nlayout(location = 0) in vec3 aPos; uniform mat4 uVP; uniform mat3 uRot; uniform vec3 uPos;\n"
@@ -61,12 +68,14 @@ bool Renderer::compileRaster() {
   setCompileStage("aircraft shadow maps");
   e.clear(); progShMap = linkProgramCached(kShMapVS, "#version 330 core\nvoid main(){}\n", e);
   if (!progShMap) { error = "Shadow map shader: " + e; return false; }
+  if (step) step();
   e.clear(); progShMov = linkProgramCached(kShMapVS, "#version 330 core\nout float oM; void main(){ oM = 1.0; }\n", e);
   if (!progShMov) { error = "Shadow map (moving hull) shader: " + e; return false; }
+  if (step) step();
   setCompileStage("aircraft meshes");
-  if (!compilePlaneMesh()) return false;
+  if (!compilePlaneMesh(step)) return false;
   setCompileStage("terrain and water");
-  return compileTerrainMesh();
+  return compileTerrainMesh(step);
 }
 
 // The light build of the airframe programs when nothing in the frame is a research jet (engine code 5 or 6): the

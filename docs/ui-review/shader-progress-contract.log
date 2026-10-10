@@ -1,0 +1,9 @@
+success: ok=1 completed=41 attempts=41
+proxy maps fallback: ok=1 completed=41 attempts=44
+optional cloud accumulation unavailable: ok=1 completed=41 attempts=41
+optional bake unavailable: ok=1 completed=41 attempts=40
+coupled normal retry: ok=1 completed=41 attempts=42
+optional XR mesh unavailable: ok=1 completed=41 attempts=41
+fatal light: ok=0 completed=19 attempts=20
+fatal fleet mesh: ok=0 completed=31 attempts=32
+Logical shader completion contract: PASS
