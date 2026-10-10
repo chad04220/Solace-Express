@@ -132,7 +132,8 @@ public:
   // pilot's load factor, minus fuel and the pilot's wage), the aircraft wears and swaps ends, and a weak pilot has
   // incidents (repairs, insured or not). An aircraft on a route can't be flown by you until it is recalled.
   struct Pilot { std::string name; int rating = 1; int wage = 120; };   // rating 1..3
-  struct Route { int fleetIdx = -1, from = 0, to = 0, pilot = -1, flights = 0, earned = 0; };
+  // (progressMin: the minutes its aircraft has flown towards its next leg - the airline flies while you do, CAR-2)
+  struct Route { int fleetIdx = -1, from = 0, to = 0, pilot = -1, flights = 0, earned = 0; float progressMin = 0.f; };
   struct Airline { std::vector<Pilot> pilots; std::vector<Route> routes; int earned = 0, incidents = 0; std::vector<std::string> log; } airline;
   bool airlineOpen() const { return license >= LIC_ATP; }
   int routeOf(int fleetIdx) const;                     // the route the aircraft is on (-1 none)
@@ -143,7 +144,10 @@ public:
   bool firePilot(int pi, std::string* msg);
   bool assignRoute(int fleetIdx, int to, int pilot, std::string* msg);
   bool recallRoute(int ri, std::string* msg);
-  void airlineTick(std::vector<PayoutLine>& L);        // called by settle / closeLeg
+  float routeLegMinutes(const Route& r) const;         // one leg: the flight at cruise and the turnaround on the ground
+  // the airline's aircraft fly while the player does: each route as many legs as the minutes flown hold (called by
+  // settle / closeLeg with the leg's flight time; a short hop back to the field it left is a few minutes, not a day's fares)
+  void airlineTick(std::vector<PayoutLine>& L, float minutes);
   static bool routeFlightQualifies(const FlightResult& r);
   static std::string checkrideFault(const Contract& c, const FlightResult& r);   // why a checkride is not passed ("" passed, or not a checkride)   // whether a flight of yours advances the airline's routes
   // Settle a finished flight; returns lines for the debrief

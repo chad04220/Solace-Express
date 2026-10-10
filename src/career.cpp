@@ -630,7 +630,7 @@ std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan
   location = at;
   if (J.src == SRC_OWNED) { int oi = ownedIndexFor(J.spec); if (oi >= 0) fleet[oi].location = at; }
   wear(L, J.spec, J.src, r);
-  if (routeFlightQualifies(r)) airlineTick(L);
+  if (routeFlightQualifies(r)) airlineTick(L, r.flightMin);
   payLoan(L);
   int total = 0; for (auto& l : L) total += l.amount;
   money += total;
@@ -792,7 +792,7 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
     boardSeed++;
   }
   if (r.outcome != OUT_CRASHED) wear(L, si, src, r);
-  if (routeFlightQualifies(r)) airlineTick(L);
+  if (routeFlightQualifies(r)) airlineTick(L, r.flightMin);
   payLoan(L);
   int total = 0; for (auto& l : L) total += l.amount;
   money += total;
@@ -924,12 +924,20 @@ std::string Career::checkrideFault(const Contract& c, const FlightResult& r) {
 bool Career::routeFlightQualifies(const FlightResult& r) {
   return r.landed && r.flightMin > 0.f && (r.outcome == OUT_SUCCESS || r.outcome == OUT_DIVERTED);
 }
-void Career::airlineTick(std::vector<PayoutLine>& L) {
-  if (airline.routes.empty()) return;
+float Career::routeLegMinutes(const Route& rt) const {
+  if (rt.fleetIdx < 0 || rt.fleetIdx >= (int)fleet.size()) return 1e9f;
+  const AircraftSpec& s = kAircraft[fleet[rt.fleetIdx].spec];
+  return g_world.distanceKm(rt.from, rt.to) * 1000.f / Plane::perf(&s).cruiseV / 60.f + 6.f;   // (6 min on the stand)
+}
+void Career::airlineTick(std::vector<PayoutLine>& L, float minutes) {
+  if (airline.routes.empty() || !(minutes > 0.f)) return;
   Rng r(boardSeed * 48271u + flights * 7u + 3u);
   int net = 0, flown = 0;
   for (auto& rt : airline.routes) {
     if (rt.fleetIdx < 0 || rt.fleetIdx >= (int)fleet.size() || rt.pilot < 0 || rt.pilot >= (int)airline.pilots.size()) continue;
+    rt.progressMin = std::min(rt.progressMin + minutes, 24.f * 60.f);   // (a day's flying at most banked)
+    for (float leg = routeLegMinutes(rt); rt.progressMin >= leg; leg = routeLegMinutes(rt)) {
+    rt.progressMin -= leg;
     OwnedPlane& p = fleet[rt.fleetIdx]; const AircraftSpec& s = kAircraft[p.spec]; const Pilot& pl = airline.pilots[rt.pilot];
     int gross = routeRevenue(rt), fuel = routeFuelCost(rt), wage = pl.wage;
     float km = g_world.distanceKm(rt.from, rt.to);
@@ -950,6 +958,7 @@ void Career::airlineTick(std::vector<PayoutLine>& L) {
     rt.flights++; rt.earned += flightNet;
     std::swap(rt.from, rt.to); p.location = rt.from;   // it flew the leg and waits at the other end
     p.fuel = s.maxFuel * 0.6f;
+    }
   }
   if (flown) {
     L.push_back({fmt("Airline: %d route flight%s (fares less fuel and wages)", flown, flown == 1 ? "" : "s"), net});
@@ -1073,7 +1082,7 @@ bool Career::save(const std::string& path) const {
   if (loan.open()) ok = ok && fprintf(f, "loan %s %d %d %d %f\n", kAircraft[loan.spec].id, loan.balance, loan.payment, loan.missed, loan.rate) > 0;
   ok = ok && fprintf(f, "insured %d\n", insured ? 1 : 0) > 0;
   for (auto& p : airline.pilots) { std::string n = p.name; for (char& ch : n) if (ch == ' ') ch = '_'; ok = ok && fprintf(f, "pilot %s %d %d\n", n.c_str(), p.rating, p.wage) > 0; }
-  for (auto& r : airline.routes) ok = ok && fprintf(f, "route %d %d %d %d %d %d\n", r.fleetIdx, r.from, r.to, r.pilot, r.flights, r.earned) > 0;
+  for (auto& r : airline.routes) ok = ok && fprintf(f, "route %d %d %d %d %d %d %.3f\n", r.fleetIdx, r.from, r.to, r.pilot, r.flights, r.earned, r.progressMin) > 0;
   if (!airline.routes.empty() || !airline.pilots.empty() || airline.earned) ok = ok && fprintf(f, "airline %d %d\n", airline.earned, airline.incidents) > 0;
   if (job) {   // the open job: its state, then its contract (a story contract by id, a freelance one in full)
     const JobState& J = *job;
@@ -1151,7 +1160,11 @@ bool Career::load(const std::string& path) {
     }
     else if (!strcmp(key, "insured")) { int v = 0; ok = fscanf(f, "%d", &v) == 1 && (v == 0 || v == 1); c.insured = v == 1; }
     else if (!strcmp(key, "pilot")) { char n[64]; Pilot p; ok = fscanf(f, "%63s %d %d", n, &p.rating, &p.wage) == 3 && p.rating >= 1 && p.rating <= 3 && p.wage >= 0 && c.airline.pilots.size() < 6; if (ok) { p.name = n; for (char& ch : p.name) if (ch == '_') ch = ' '; c.airline.pilots.push_back(p); } }
-    else if (!strcmp(key, "route")) { Route r; ok = fscanf(f, "%d %d %d %d %d %d", &r.fleetIdx, &r.from, &r.to, &r.pilot, &r.flights, &r.earned) == 6 && r.fleetIdx >= 0 && r.from >= 0 && r.from < nApt && r.to >= 0 && r.to < nApt && r.pilot >= 0 && r.flights >= 0; if (ok) c.airline.routes.push_back(r); }
+    else if (!strcmp(key, "route")) {
+      Route r; ok = fscanf(f, "%d %d %d %d %d %d", &r.fleetIdx, &r.from, &r.to, &r.pilot, &r.flights, &r.earned) == 6 && r.fleetIdx >= 0 && r.from >= 0 && r.from < nApt && r.to >= 0 && r.to < nApt && r.pilot >= 0 && r.flights >= 0;
+      { long pos = ftell(f); float pm = 0; if (fscanf(f, "%f", &pm) == 1 && std::isfinite(pm) && pm >= 0.f) r.progressMin = std::min(pm, 24.f * 60.f); else fseek(f, pos, SEEK_SET); }   // (v3.45 adds the leg's progress)
+      if (ok) c.airline.routes.push_back(r);
+    }
     else if (!strcmp(key, "airline")) ok = fscanf(f, "%d %d", &c.airline.earned, &c.airline.incidents) == 2;
     else if (!strcmp(key, "loan")) {
       char id[64]; Loan l;

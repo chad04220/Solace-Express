@@ -772,8 +772,8 @@ struct GameTest {
       printf("Trials: courses %d, spot scored %d, board sorted %d, STOL roll %d, gate time %d, formation %d, settings read twice %d (%s): %s\n", ok || true, scored, sorted, roll, gates, form, twice, g.hubMsg.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
       g.trialBest.clear();
     }
-    // ---- the airline (C11): with the ATP, a hired pilot flies an owned aircraft on a route; each of your settlements is a
-    // day of theirs (fares less fuel and wages, the aircraft swapping ends and wearing); the aircraft can't be flown or
+    // ---- the airline (C11): with the ATP, a hired pilot flies an owned aircraft on a route, a leg (fares less fuel and
+    // wages, the aircraft swapping ends and wearing) for each of its leg's minutes you fly; the aircraft can't be flown or
     // sold while on the route; recall frees it; a worn aircraft with a weak pilot has incidents over time
     {
       Career k; k.newGame(); k.license = LIC_ATP; k.money = 400000; k.location = g_world.findAirport("CAP");
@@ -807,12 +807,23 @@ struct GameTest {
       bool reassigned = w.assignRoute(0, w.fleet[0].location == pvi ? cap : pvi, wp, &m);
       bool once = true;   // QA S5: a repair is its own line; the route line is the fares less fuel and wages (the repair not taken twice)
       for (int i = 0; i < 60; i++) {
-        std::vector<PayoutLine> LL; int e0 = w.airline.routes[0].earned; w.flights++; w.boardSeed++; w.airlineTick(LL);
+        std::vector<PayoutLine> LL; int e0 = w.airline.routes[0].earned; w.flights++; w.boardSeed++; w.airlineTick(LL, w.routeLegMinutes(w.airline.routes[0]));
         for (auto& l : LL) if (l.label.find("route flight") != std::string::npos && l.amount != w.airline.routes[0].earned - e0) once = false;
       }
       bool incidents = reassigned && w.airline.incidents > 0 && w.airline.routes[0].flights == 60 && once;
-      bool ok = noLic && hired && assigned && blocked && ticked && recalled && incidents;
-      printf("Airline: licence gate %d, hired %d, assigned %d, aircraft locked %d, tick %d (net %d), recall %d, incidents %d over 60 days (repair charged once %d): %s\n", noLic, hired, assigned, blocked, ticked, airNet, recalled, w.airline.incidents, once, ok ? "ok" : "FAIL"); fails += !ok;
+      // CAR-2 (the v3.44.0 review): the airline flies while the player does - ten 90 s circuits back to the field they
+      // left are 15 minutes of its flying, not ten legs of every route (they paid +$12,394 a circuit)
+      Career c2 = w; c2.airline.routes[0].progressMin = 0.f; const int legs0 = c2.airline.routes[0].flights;
+      Contract back; back.from = back.to = c2.location; back.type = CT_CARGO; back.payout = 0;
+      for (int i = 0; i < 10; i++) {
+        FlightResult cr; cr.outcome = OUT_DIVERTED; cr.landed = true; cr.flightMin = 1.5f; cr.divertedTo = c2.location; int s2 = 0;
+        c2.settle(back, 1, Career::SRC_RENT, cr, &s2);
+      }
+      const float legMin = c2.routeLegMinutes(c2.airline.routes[0]);
+      const int circuitLegs = c2.airline.routes[0].flights - legs0;
+      bool paced = legMin > 5.f && circuitLegs == (int)floorf(15.f / legMin) && circuitLegs <= 2;
+      bool ok = noLic && hired && assigned && blocked && ticked && recalled && incidents && paced;
+      printf("Airline: licence gate %d, hired %d, assigned %d, aircraft locked %d, tick %d (net %d), recall %d, incidents %d over 60 days (repair charged once %d), ten 90 s circuits fly %d leg%s of %.1f min (paced by time %d): %s\n", noLic, hired, assigned, blocked, ticked, airNet, recalled, w.airline.incidents, once, circuitLegs, circuitLegs == 1 ? "" : "s", legMin, paced, ok ? "ok" : "FAIL"); fails += !ok;
     }
     // ---- QA S7: the VIP's comfort (and the patient) ride simulated time: a minute of turbulence at 4x costs what it
     // costs at 1x (the meters ran on real time, a quarter of the damage)
