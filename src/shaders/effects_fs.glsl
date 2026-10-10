@@ -5,6 +5,7 @@
 //! composed in order, with their TAA classes. Reads the frame and writes a copy of it.
 in vec2 vUV; out vec4 oColor;
 uniform sampler2D uRawTex; uniform sampler2D uSceneDepth;
+uniform sampler2D uCloakTex; uniform int uCloakTexOn;   // a cloaked XR-40's cloaked part from its mesh: distance, normal (Renderer::rasterCloak)
 void main(){
   gZero = min(uQuality, 0);
   loadMain();
@@ -23,13 +24,19 @@ void main(){
   // (FX_NO_CLOAK, FX_NO_PLUMES: the builds without them, for a driver whose compiler fails on the whole - raster_renderer.cpp)
 #if !defined(FX_NO_CLOAK) && HAS_WRAITH   // (the XR-40's alone: the one effect that marches an airframe)
   if (uWr[4].w > 0.001 && uPlaneOn == 1 && uWreck == 0 && !cockpitView && type == 6 && uPano.x <= 0.0) {
-    float hullT = 0.0;
-    if (uHullOn == 1) { float hv = texelFetch(uEnv, px, 0).g; hullT = hv > 1e29 ? hv : (hv > 0.0 ? max(uHullNear, hv*0.999 - 0.1) : 0.0); }
-    vec2 hc = tracePlaneHull(ro, rd, t, hullT);
+    vec2 hc = vec2(-1.0); vec4 ck = vec4(0.0);
+    if (uCloakTexOn == 1) {   // (its surface on this pixel, drawn from the mesh: no march)
+      ck = texelFetch(uCloakTex, px, 0);
+      if (ck.x > 0.0 && ck.x < t) hc.x = ck.x;
+    } else {
+      float hullT = 0.0;
+      if (uHullOn == 1) { float hv = texelFetch(uEnv, px, 0).g; hullT = hv > 1e29 ? hv : (hv > 0.0 ? max(uHullNear, hv*0.999 - 0.1) : 0.0); }
+      hc = tracePlaneHull(ro, rd, t, hullT);
+    }
     if (hc.x > 0.0) {
       vec3 hp = ro + rd*hc.x, ckLp = transpose(uPlaneRot)*(hp - uPlanePos);
       if (ckLp.z < uWr[6].y) {
-        vec3 ckN = uPlaneRot*planeNormal(ckLp);
+        vec3 ckN = uCloakTexOn == 1 ? ck.yzw : uPlaneRot*planeNormal(ckLp);
         vec3 rdB = normalize(rd - (ckN - rd*dot(ckN, rd))*0.035);
         vec3 q = hp + rdB*max(t - hc.x, 0.5), v = transpose(uCamRot)*(q - ro);   // (the world behind, about where this ray met it)
         vec2 uv = vec2(v.x/max(-v.z, 1e-3)/(uTanHalf*uAspect), v.y/max(-v.z, 1e-3)/uTanHalf)*0.5 + 0.5 - uJit;

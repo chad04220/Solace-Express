@@ -601,6 +601,7 @@ void Renderer::rasterEffects(const FrameParams& fp) {
   const bool wraith = p.on && (int)(p.M[2] + 0.5f) == 6, weapons = fp.fx.beams + fp.fx.bombs + fp.fx.blasts > 0;
   const GLuint progEffects = afPassProgram(kAfEffects, wraith ? afModelOf(p.M, p.model) : -1, wraith || weapons || !p.on);
   if (!progEffects) { rasterTrafficProps(fp); return; }
+  const bool cloakTex = wraith && rasterCloak(fp);   // (the cloaked part's surface from the mesh: no march in the effects)
   const int cur = histIdx ^ 1;
   glBindFramebuffer(GL_FRAMEBUFFER, fboTAA[cur]);
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
@@ -609,6 +610,8 @@ void Renderer::rasterEffects(const FrameParams& fp) {
   setRT(progEffects, fp);
   glActiveTexture(GL_TEXTURE0 + 24); glBindTexture(GL_TEXTURE_2D, texRaw); glUniform1i(U(progEffects, "uRawTex"), 24);
   glActiveTexture(GL_TEXTURE0 + 25); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progEffects, "uSceneDepth"), 25);
+  glActiveTexture(GL_TEXTURE0 + 29); glBindTexture(GL_TEXTURE_2D, cloakTex ? texCloak : 0); glUniform1i(U(progEffects, "uCloakTex"), 29);
+  glUniform1i(U(progEffects, "uCloakTexOn"), cloakTex ? 1 : 0);
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);
@@ -617,6 +620,73 @@ void Renderer::rasterEffects(const FrameParams& fp) {
   glBlitFramebuffer(0, 0, rw, rh, 0, 0, rw, rh, GL_COLOR_BUFFER_BIT, GL_NEAREST);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   rasterTrafficProps(fp);
+}
+
+// The cloaked XR-40's cloaked part (behind the cloak's sweeping front), drawn from its outside mesh into texCloak: the
+// distance to its nearest surface along each pixel's ray (0: none) and that surface's normal (world). The effects pass
+// shows the frame behind it along a ray bent by that normal; it used to march the craft's whole shape for every pixel
+// the craft covered, which on the owner's GPU took the frame from over 100 fps to 59 the moment the cloak came on.
+// False (the effects march instead) when the view isn't outside, or the mesh or the program isn't there.
+bool Renderer::rasterCloak(const FrameParams& fp) {
+  const PlaneVisual& pv = fp.plane;
+  static const bool off = getenv("CLOAKMARCH") != nullptr;   // (debug A/B: the march, as before)
+  if (off || !pv.on || fp.wreck.pieces > 0 || pv.PS[3] > 0.5f || pv.wr[4][3] <= 0.001f || fp.pano > 0.f || meshOff) return false;
+  auto it = planeMeshes.find(hullKey(fp, 0));
+  if (it == planeMeshes.end() || !it->second.ok || !it->second.idx) return false;
+  const PlaneMesh& pm = it->second;
+  if (!cloakTried) {
+    cloakTried = true;
+    std::string e;
+    progCloak = linkProgramCached(planeMeshVSAssembly(""),
+      "#version 330 core\n"
+      "in vec3 vW; in vec3 vN; flat in float vId; in float vIdS; in float vAo; in vec3 vB; flat in int vPc;\n"
+      "uniform float uCloakZ; uniform mat3 uRot;\n"
+      "out vec4 oCk;\n"
+      "void main(){\n"
+      "  if (vB.z >= uCloakZ) discard;   // (ahead of the front: the craft as it is, in the G-buffer)\n"
+      "  oCk = vec4(length(vW), normalize(uRot*vN));\n"
+      "}\n", e);
+    if (!progCloak) shaderNote("Cloak surface shader failed (the cloak is marched instead):\n" + e);
+  }
+  if (!progCloak) return false;
+  if (!texCloak || cloakW != rw || cloakH != rh) {
+    if (!texCloak) { glGenTextures(1, &texCloak); glGenTextures(1, &texCloakZ); glGenFramebuffers(1, &fboCloak); }
+    glBindTexture(GL_TEXTURE_2D, texCloak);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, rw, rh, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D, texCloakZ);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, rw, rh, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, fboCloak);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texCloak, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texCloakZ, 0);
+    cloakW = rw; cloakH = rh;
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, fboCloak);
+  GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
+  glViewport(0, 0, rw, rh);
+  glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
+  glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE); glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+  float zero[4] = {0, 0, 0, 0}; glClearBufferfv(GL_COLOR, 0, zero); glClearDepth(1.0); glClear(GL_DEPTH_BUFFER_BIT);
+  const mat4 vp = viewProjRel(fp, 0.01f, 2000.f);   // (as the mesh pass: the same jittered pixels)
+  const vec3 rp = pv.pos - fp.camPos;
+  glUseProgram(progCloak);
+  glUniformMatrix4fv(U(progCloak, "uVP"), 1, GL_FALSE, vp.m);
+  glUniform2f(U(progCloak, "uJit"), jitX, jitY);
+  glUniform1f(U(progCloak, "uLogC"), 2.f / log2f(40000.f + 1.f));
+  glUniformMatrix3fv(U(progCloak, "uRot"), 1, GL_FALSE, pv.rot);
+  glUniform3f(U(progCloak, "uPos"), rp.x, rp.y, rp.z);
+  glUniform1f(U(progCloak, "uCloakZ"), pv.wr[6][1]);
+  glUniform1i(U(progCloak, "uWreck"), 0); glUniform1i(U(progCloak, "uWreckParts"), 0);
+  glUniform1i(U(progCloak, "uPartInst"), -1);
+  glBindVertexArray(pm.vao);
+  glDrawElements(GL_TRIANGLES, pm.idx, GL_UNSIGNED_INT, nullptr);
+  drawPlaneParts(pm, progCloak, -1);   // (its moving parts at their pose: the turrets, the bay doors, the nozzles)
+  glBindVertexArray(0);
+  glDisable(GL_DEPTH_TEST);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  return true;
 }
 
 void Renderer::rasterLight(const FrameParams& fp) {

@@ -38,7 +38,7 @@ if not exist SolaceExpress.exe (
 set VER=unknown
 if exist VERSION.txt set /p VER=<VERSION.txt
 set SCENES=menu,air,forest,storm,night,cockpit,hud,hub1,airbreakc3,crash1_4
-set RSCENES=research10,research20,research40,rjet,airbreak2,wr_8_0_0_0_1,wr_8_0_-8_0_1_3_2_22.5_1,wr_8_0_-8_0_1_3_2_22.5_2,rjetc,ckv11_0_-10_12,ufo13_0
+set RSCENES=research10,research20,research40,rjet,airbreak2,wr_4_210_12_30_3,wr_8_0_0_0_1,wr_8_0_-8_0_1_3_2_22.5_1,wr_8_0_-8_0_1_3_2_22.5_2,rjetc,ckv11_0_-10_12,ufo13_0
 set MODE=%~1
 if /i "%MODE%"=="loading" goto loading
 set OUT=diagnostics

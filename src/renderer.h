@@ -499,6 +499,10 @@ private:
   void rasterObjects(const FrameParams& fp);
   void rasterShadowProxy(const FrameParams& fp);
   void rasterEffects(const FrameParams& fp);
+  // a cloaked XR-40's cloaked part from its mesh: per pixel its nearest surface's distance and normal, which the effects
+  // pass bends the frame through (instead of marching the craft's whole shape for every pixel it covers)
+  GLuint progCloak = 0, fboCloak = 0, texCloak = 0, texCloakZ = 0; int cloakW = 0, cloakH = 0; bool cloakTried = false;
+  bool rasterCloak(const FrameParams& fp);
   void rasterLight(const FrameParams& fp);
 };
 
