@@ -86,23 +86,25 @@ float wakeAt(vec3 p, out vec3 src){
   float ct = cos(tilt), st = sin(tilt), along = dot(dv, ax);
   vec2 xy = vec2(dot(dv, side), dot(dv, up));
   vec2 q = vec2(xy.x*ct + xy.y*st, xy.y*ct - xy.x*st) - vec2(0.0, py);
-  // the air wound back round the vortices, each where it has sunk to, the circulation scaled to the pair's here
+  // the air wound back round the vortices, each where it has sunk to, the circulation scaled to the pair's here. Each
+  // turns the air on its own side of the pair (between them their shared downwash is the oval's sinking, below); a
+  // wing vortex spins the cloud's droplets out of its core, clearing a thin tube along it
   float rc = sqrt(pow(max(0.05*b0, 0.3), 2.0) + 8e-4*abs(gam)*age);
   float kg = abs(uWakeA.x) > 1e-3 ? gam/uWakeA.x : 0.0, kb = b0/max(uWakeA.y, 0.5), m = smoothstep(0.0, max(uWakeA.z, 0.1), age);
-  vec2 s = q;
-  if (uWakeVN > 0) {
-    for (int k = 0; k < 10; k++) {
-      if (k >= uWakeVN) break;
-      vec4 v = uWakeV[k];
-      vec2 c = vec2(v.x*kb, v.y);
-      float g = v.z*kg;
-      if (v.w > 0.5) c = mix(c, vec2(sign(v.x)*0.5*b0, 0.0), m); else g *= exp(-age/2.5);
-      s = wakeUnwind(s, c - vec2(0.0, D), g, age, rc);
-    }
-  } else {
-    s = wakeUnwind(s, vec2(0.5*b0, -D), gam, age, rc);
-    s = wakeUnwind(s, vec2(-0.5*b0, -D), -gam, age, rc);
+  vec2 dsp = vec2(0.0); float core = 0.0;
+  for (int k = 0; k < 10; k++) {
+    if (k >= max(uWakeVN, 2)) break;
+    vec4 v = uWakeVN > 0 ? uWakeV[k] : vec4((k == 0 ? -0.5 : 0.5)*b0, 0.0, (k == 0 ? -1.0 : 1.0)*gam, 1.0);
+    float kgv = uWakeVN > 0 ? kg : 1.0, kbv = uWakeVN > 0 ? kb : 1.0;
+    vec2 c = vec2(v.x*kbv, v.y);
+    float g = v.z*kgv;
+    if (v.w > 0.5) c = mix(c, vec2(sign(v.x)*0.5*b0, 0.0), m); else g *= exp(-age/2.5);
+    c.y -= D;
+    float own = smoothstep(-0.2*b0, 0.2*b0, q.x*(v.x >= 0.0 ? 1.0 : -1.0));
+    dsp += (wakeUnwind(q, c, g, age, rc) - q)*own;
+    if (v.w > 0.5) { vec2 dc = q - c; core = max(core, exp(-dot(dc, dc)/(4.0*rc*rc))); }
   }
+  vec2 s = q + dsp;
   // the pair's oval: the air in it came down with the pair
   float ov = 1.0 - smoothstep(0.85, 1.15, length(vec2(q.x/(1.045*b0), (q.y + D)/(0.865*b0))));
   // the engines: a propeller's slipstream twisted back by its swirl (dying away in a second or two), a jet's hot exhaust
@@ -135,7 +137,7 @@ float wakeAt(vec3 p, out vec3 src){
   float n = cn3(pw/26.0)*0.65 + cn3(pw/9.0 + vec3(5.2, 1.3, 7.7))*0.35;
   float qn = qc + (n - 0.5)*(0.3 + 0.5*af);
   float c = K*(1.0 - smoothstep(mix(0.5, 0.15, af), 1.0, qn))*(1.0 - 0.4*af*(1.0 - smoothstep(0.3, 0.55, n)));
-  c = max(c, K*hot);
+  c = max(c, K*max(hot, core));
   return c - 0.3*K*(1.0 - af)*smoothstep(0.95, 1.1, qn)*(1.0 - smoothstep(1.15, 1.45, qn));
 }
 // Rain shafts: the rain under the cloud cells, from the base to the ground and carried downwind as it falls (snow
