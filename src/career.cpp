@@ -338,13 +338,32 @@ void Career::useFlownTime(LaunchPlan& e, const Contract& c, float minutes, float
   if (minutes > 0) { e.flown = true; finishPlan(e, c, minutes, fuelKg); }
 }
 
+// The fuel the quick estimate quotes. The engines burn Plane::fuelFlowMax at full power and 20% of it at idle, so a
+// flight's fuel is its minutes at each share of full power: the climb at full power, en route at the share this type's
+// cruise on the autopilot (0.85 x cruise) takes - from where that speed sits against the speed 75% power holds
+// (PerfModel::cruiseV), measured level on the autopilot for every type: 1.25 r - 0.37, within 0.02 - and the take-off and
+// the approach at the shares fitted to 355 autopilot flights of the story and freelance jobs in every ordinary type.
+// That comes to the burn within about 20% either way (the time estimate's own spread), so the quote is 15% above it:
+// nine flights in ten burn less than it says. (It was the flight's minutes at 84% of full power, which took the
+// engines to run near full power all the way: on average they run at 44-62%, and the quote was 1.4 to 2 times the burn
+// - a 16 minute checkride in a 70 kg trainer was quoted 78 kg and told to expect to run dry, and it burns 43.)
+static float cruisePowerShare(const AircraftSpec& s) {
+  const float r = 0.85f * s.cruise / std::max(Plane::perf(&s).cruiseV, 1.f);
+  return clampf(1.25f * r - 0.37f, 0.3f, 1.f);
+}
+static float fullPowerFlow(const AircraftSpec& s) { return s.maxFuel / (s.rangeKm * 1000.f / s.cruise * 0.8f); }   // kg/s (Plane::fuelFlowMax)
+static float quickFuelKg(const AircraftSpec& s, const Career::LaunchPlan& e) {
+  const float powerMinutes = 0.69f + cruisePowerShare(s) * kEstK[1] * e.tCruise + 0.24f * e.tClimb + 0.48f * e.tApproach;
+  return fullPowerFlow(s) * 60.f * powerMinutes * 1.15f;
+}
+
 void Career::finishPlan(LaunchPlan& e, const Contract& c, float minutes, float fuelKg) const {
   const AircraftSpec& s = kAircraft[e.spec];
   const Airport& B = g_world.airports[c.to];
   e.minutesEst = minutes;
   e.minutesSigma = 0.15f * e.minutesEst;
-  float flow = s.maxFuel / (s.rangeKm * 1000.f / s.cruise * 0.8f);   // as Plane::fuelFlowMax, at cruise power
-  e.fuelKgEst = s.special ? 0.f : fuelKg >= 0 ? fuelKg : flow * 0.84f * e.minutesEst * 60.f;
+  // (flown in the background: what the autopilot burned; else the quick estimate's, above)
+  e.fuelKgEst = s.special ? 0.f : fuelKg >= 0 ? fuelKg : quickFuelKg(s, e);
   if (e.fuel == LaunchPlan::FUEL_PURCHASED) {   // bought at the departure: the estimate's fuel with a quarter to spare, less what the tanks hold
     int oi = ownedIndexFor(e.spec);
     float have = oi >= 0 ? fleet[oi].fuel : 0.f;
@@ -428,10 +447,9 @@ int Career::netQuick(const Contract& c, int si, Source src) const {
   const AircraftSpec& s = kAircraft[si];
   int fees = positioningCost(c) + (src == SRC_OWNED ? ferryCost(c, si) : 0) + (src == SRC_RENT ? s.rentFee : 0);
   int fuel = 0;
-  if (src == SRC_OWNED) {   // the owned aircraft's fuel for the distance at cruise, as the plan would estimate it
-    float flow = s.maxFuel / (s.rangeKm * 1000.f / s.cruise * 0.8f);
+  if (src == SRC_OWNED) {   // the owned aircraft's fuel for the distance at its cruise power, the take-off, climb and approach on top (as the plan's quick estimate)
     float minutes = (contractKm(c) + 6.f) * 1000.f / (s.cruise * 0.85f) / 60.f;
-    fuel = (int)(flow * 0.84f * minutes * 60.f * fuelPrice(c.from, si));
+    fuel = (int)(fullPowerFlow(s) * 60.f * (2.6f + cruisePowerShare(s) * minutes) * 1.15f * fuelPrice(c.from, si));
   }
   return c.payout - fees - fuel;
 }

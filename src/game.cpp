@@ -1149,6 +1149,24 @@ void Game::flightControls(float dt) {
   // (a refused autoland's hold too: the pilot asked for a landing, not a hold, and was told the stick takes over - the
   // review of v3.31.0, F3)
   bool apNav = plane.apOn && (plane.apMode == Plane::AP_APPR || plane.apMode == Plane::AP_STUNT || (plane.apMode == Plane::AP_HOLD && !plane.apDecline.empty()));
+  // aerobatics: a figure is flown only while the pilot leaves the aircraft alone. Any flight input - a stick, a trigger,
+  // a key or button for anything the aircraft does - hands it straight back, wherever the figure has got to; the view,
+  // the HUD, the map, the radio and the pause don't (the stunt key itself: below)
+  if (plane.apOn && plane.apMode == Plane::AP_STUNT) {
+    bool touched = fabsf(pitchIn) + fabsf(rollIn) + fabsf(yawIn) + fabsf(padP) + fabsf(padR) + fabsf(padY) > 0.f || (in.pad && (in.lt > 0.1f || in.rt > 0.1f));
+    for (int a = 0; a < ACT_COUNT && !touched; a++) if (a != ACT_STUNT && a != ACT_AP && (a < ACT_CAMERA || a > ACT_ZOOM)) touched = actDown(a);   // (the autopilot key turns it all off: below)
+    for (int k : {K_PGUP, K_PGDN, K_PLUS, K_MINUS, K_HOME, K_END}) touched = touched || in.down[k];
+    for (int k = '0'; k <= '9'; k++) touched = touched || in.down[k];
+    if (in.pad && !touched) {   // (and any other button: all but the view's, the instruments' and the pause)
+      unsigned keep = PAD_START | set.padBind[ACT_STUNT] | set.padBind[ACT_AP];
+      for (int a = ACT_CAMERA; a <= ACT_ZOOM; a++) keep |= set.padBind[a];
+      touched = (in.buttonsPressed & ~keep) != 0;
+    }
+    if (touched) {
+      plane.apDisengage(); g_audio.trigger(SFX_AP_DISC); toast("Autopilot disconnected - your aircraft", vec3(1, 0.7f, 0.3f));
+      apNav = false;
+    }
+  }
   if (plane.apOn) {
     if (apNav) {   // flying a GPS route / autoland: any real stick input hands control back
       if (fabsf(pitchIn + padP) > 0.5f || fabsf(rollIn + padR) > 0.5f) {
@@ -1217,6 +1235,16 @@ void Game::flightControls(float dt) {
     else toast("Autoland complete - parking brake set", vec3(0.5f, 1, 0.6f));
     plane.apOverrun = false; g_audio.trigger(SFX_AP_DISC, 0.7f);
   }
+  // a figure flown (or given up) and level again: aerobatics ends, and the aircraft goes back to what was flying it
+  // before - the pilot (the autopilot off), the autopilot's hold, or its route to the field it was flying to (the
+  // recorded lines: what the autopilot's own disconnect and engagement say)
+  if (plane.apStuntEnded) {
+    plane.apStuntEnded = false;
+    if (!plane.apOn) {}   // (already handed back)
+    else if (!plane.apStuntWasOn) { plane.apDisengage(); g_audio.trigger(SFX_AP_DISC); toast("Autopilot disconnected - your aircraft", vec3(1, 0.7f, 0.3f)); }
+    else if (plane.apStuntWasAirport >= 0) { const int keep = apDest; apDest = plane.apStuntWasAirport; engageAutopilot(); apDest = keep; }
+    else toast("Autopilot ON: the stick trims heading and altitude, throttle sets speed", vec3(0.6f, 1, 0.6f));
+  }
   if (plane.spec->special == 2) wraithControls(dt);
   if (actKeyP(ACT_PARK) || (!showMap && actPadP(ACT_PARK))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
   float wb = actDown(ACT_BRAKE) ? 1.f : 0.f;
@@ -1230,11 +1258,12 @@ void Game::flightControls(float dt) {
     else engageAutopilot();
   }
   // aerobatics: the autopilot flies the next figure, sized to this aircraft (it climbs or dives for the height and
-  // speed first); pressed again it stops the figure and recovers to level flight
+  // speed first), once; pressed again during it, like any other input, it hands the aircraft back at once
   if (actPressed(ACT_STUNT)) {
     if (plane.onGround) toast("Aerobatics need to be airborne", vec3(1, 0.6f, 0.4f));
-    else if (plane.apOn && plane.apMode == Plane::AP_STUNT) { plane.apStuntStop(); toast("Aerobatics: recovering to level flight", vec3(1, 0.85f, 0.5f)); }
-    else {
+    else if (plane.apOn && plane.apMode == Plane::AP_STUNT) {
+      plane.apDisengage(); g_audio.trigger(SFX_AP_DISC); toast("Autopilot disconnected - your aircraft", vec3(1, 0.7f, 0.3f));
+    } else {
       plane.apStuntBegin(stuntNext, wx);
       toast(fmt("Aerobatics: %s", Plane::stuntName(plane.apStunt)), vec3(0.6f, 1, 0.6f));
       toast("Any stick input hands control back", vec3(0.8f, 0.8f, 0.8f));

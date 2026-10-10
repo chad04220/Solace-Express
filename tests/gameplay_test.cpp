@@ -262,6 +262,26 @@ struct GameTest {
       fails += !ok;
       g.career = keep;
     }
+    // ---- the quick fuel estimate covers what the flight burns without overstating it: the PPL checkride in the
+    // Kestrel (quoted 78 kg for its 70 kg tanks - "expect to run dry" - when it burns 43), and legs in a single, a
+    // turboprop and the jet, each flown on the autopilot in the background as a job quote is. (Legs the autopilot flies
+    // in about the time it planned: when it goes around or circles longer than planned - the A4 leg, 11 minutes planned
+    // and 17 flown - the burn per minute still matches, the minutes don't)
+    {
+      int ok = 0, n = 0;
+      for (auto [id, specId] : std::vector<std::pair<const char*, const char*>>{{"L4", "kestrel"}, {"C2", "wren"}, {"C7", "pelican"}, {"C2", "starling"}}) {
+        int si = -1; for (int i = 0; i < kNumAircraft; i++) if (std::string(kAircraft[i].id) == specId) si = i;
+        const Contract* c = nullptr; for (auto& k : g_story) if (k.id == id) c = &k;
+        if (si < 0 || !c) { printf("   fuel estimate: %s / %s not found\n", id, specId); n++; continue; }
+        Career::LaunchPlan pl = g.career.plan(*c, si, Career::SRC_RENT);
+        float burn = -1, m = simulateFlightMinutes(*c, si, &burn);
+        const float r = burn > 0 ? pl.fuelKgEst / burn : -1.f;
+        const bool good = m > 0 && r >= 0.95f && r <= 1.5f && pl.fuelKgEst <= kAircraft[si].maxFuel;
+        printf("   fuel estimate %s in the %s: quoted %.1f kg, burned %.1f kg on the autopilot (x%.2f), tanks %.0f kg%s\n", id, kAircraft[si].name, pl.fuelKgEst, burn, r, kAircraft[si].maxFuel, good ? "" : "  <-");
+        ok += good; n++;
+      }
+      printf("Quick fuel estimate: %d of %d legs quoted at 0.95-1.5x the burn and inside the tanks: %s\n", ok, n, ok == n ? "ok" : "FAIL"); fails += ok != n;
+    }
     // ---- E1: lesson hints name the keys bound now, and no recording names a key the player rebound; the ATC history
     // stays bounded over long sessions
     {
@@ -315,6 +335,37 @@ struct GameTest {
       bool ok3 = g.paused;
       printf("Controller lost in flight: paused %d: %s\n", g.paused, ok3 ? "ok" : "FAIL"); fails += !ok3;
       g.paused = false;
+      // aerobatics: one figure, then the aircraft is the pilot's again (the autopilot off, as it was); any flight input
+      // during a figure - a throttle key here - hands it back at once; begun from the autopilot's route, the route resumes
+      {
+        g.in = Input();
+        const int cap = g_world.findAirport("CAP");
+        auto airborne = [&] {
+          g.startFlight(fc, 1, Career::SRC_RENT); g.parkingBrake = false;
+          g.plane.reset(&kAircraft[1], g_world.airports[cap].pos() + vec3(0, 1800, 0), 90, 60, 85, true, kAircraft[1].cruise * 0.9f);
+          g.takeoffAnnounced = true; g.engineAutoStarted = true; g.plane.ctl.throttle = 0.7f;
+        };
+        auto press = [&](int act) { int k = g.set.keyBind[act]; g.in.down[k] = g.in.pressed[k] = true; g.update(dt); g.in.endFrame(); g.in.down[k] = false; };
+        auto fly = [&](float secs) {   // (and the frame after it, which hands the aircraft back)
+          for (int i = 0; i < (int)(secs / dt) && g.plane.apOn && g.plane.apMode == Plane::AP_STUNT && g.screen == SCR_FLIGHT; i++) { g.update(dt); g.in.endFrame(); }
+          g.update(dt); g.in.endFrame();
+        };
+        airborne(); press(ACT_STUNT);
+        const bool began = g.plane.apOn && g.plane.apMode == Plane::AP_STUNT;
+        fly(240.f);
+        const bool once = began && !g.plane.apOn && g.plane.apStuntAbort.empty() && g.screen == SCR_FLIGHT && !g.plane.ev.crashed;
+        airborne(); press(ACT_STUNT); for (int i = 0; i < 60; i++) { g.update(dt); g.in.endFrame(); }
+        const bool still = g.plane.apOn && g.plane.apMode == Plane::AP_STUNT;
+        press(ACT_THR_UP);
+        const bool taken = still && !g.plane.apOn;
+        airborne(); const int keepDest = g.apDest; g.apDest = g_world.findAirport("MDB"); g.engageAutopilot(); press(ACT_STUNT);
+        fly(240.f);
+        const bool resumed = g.plane.apOn && g.plane.apMode == Plane::AP_APPR && g.plane.apAirport == g.apDest;
+        g.apDest = keepDest; g.plane.apDisengage(); g.in = Input();
+        printf("Aerobatics: %s flown once, then the pilot's %d; a throttle key mid-figure hands it back %d; from the autopilot's route, the route resumes %d: %s\n",
+               Plane::stuntName(0), once, taken, resumed, once && taken && resumed ? "ok" : "FAIL");
+        fails += !(once && taken && resumed);
+      }
       // the XR-40 armed: both bumpers held 1.5 s
       g.resCraft = kWraith; g.resAirborne = true; g.launchResearch(); g.wraith.armed = true;
       bool hid0 = g.uiHidden;

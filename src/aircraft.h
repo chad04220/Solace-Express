@@ -218,6 +218,9 @@ public:
   float apStuntAng = 0, apStuntT = 0, apStuntV = 0, apStuntN = 0, apStuntHdg = 0, apStuntSpeedAfter = 0, apStuntBank0 = 0;
   vec3 apStuntRight0;          // the wing axis when the pull started: a figure keeps it, whatever the attitude
   std::string apStuntAbort;   // why the last figure was cut short ("" if it wasn't)
+  // one figure at a time: what was flying before it (the autopilot on or off, its mode and field), restored once the
+  // figure has recovered to level flight (apStuntEnded, which the game answers)
+  bool apStuntWasOn = false, apStuntEnded = false; int apStuntWasMode = 0, apStuntWasAirport = -1;
   void apDisengage() { apOn = false; apMode = AP_OFF; apUseVS = false; }
   float maxG = 1, minG = 1;
   float overG = 0;   // sustained overstress (grows past the structural limit, decays within it; the airframe fails at 1)
