@@ -112,3 +112,25 @@ Each stage is released when it passes the checkride better than what it replaces
 | 6 | Aerobatics flown as paths | `aircraft_stunt.cpp`'s steps |
 | 7 | Requests while engaged | the hold mode's stick trims |
 | 8 | The career's time and fuel estimates refitted to the new pilot | `kEstK`, the fuel shares |
+
+## Progress
+
+**Baseline: the present autopilot.** 1,470 flights.
+- 93.1% landed and stopped on the runway, 4.3% declined, 2.6% failed.
+- **1% of the approaches were stabilised.**
+- The bank reached 72° at the median and 86° in the worst tenth.
+
+**Stage 1, in progress.** Behind `Plane::apPro`, off until it passes the checkride; `pilot_exam` uses it with `PILOT=new`.
+- **The professional envelope:** 0.75–1.3 g, 25° of bank rolled at 8°/s, smooth g, and a climb at the climb rate.
+  The whole envelope returns for an upset or for terrain ahead.
+- **The energy law (TECS):** the speed comes from the inertial acceleration, so gusts aren't chased.
+- **The final approach gate at 460 m.** At 4.5 km, a slow aircraft only captured the glidepath at 257 m.
+- **Configured and slowed by height**, by 300–380 m.
+- **A runway end weighed by the dive it would need from its intercept altitude.**
+- **The path loop damped to each airframe's own path lag.**
+
+On calm finals already established, the light types went from 0–3 of 26 stabilised to 26 of 26.
+- **Found:** what kept every approach unstabilised was a dive designed into the planner. Terrain round the intercept
+  region held the aircraft at an intercept altitude far above the glidepath at the gate (up to 1,190 m against 257 m),
+  and it then dived from the gate.
+- **Open:** the heavy and fast types (Meridian, Starling, XR-10) still porpoise on some finals.

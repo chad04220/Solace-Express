@@ -3,8 +3,8 @@
 // Plane::apEngage(AP_NAV, field) and scored as an examiner would: did it land and stop on the runway, was the approach
 // stabilised, how was the touchdown, how smooth was the ride, how close did it come to the ground and the stall, how
 // many go-arounds, how long and how much fuel. The present autopilot's score is the baseline the new pilot must beat.
-//   pilot_exam [slice count] [--csv file] [--craft i] [--airport CODE] [--wind w] [--comfort] [--quiet]
-//   (wind: 0 calm, 1 crosswind, 2 gusts, 3 wind shift on the final, 4 storm)
+//   pilot_exam [slice count] [--csv file] [--craft i] [--airport CODE] [--wind w] [--comfort] [--quiet] [--final]
+//   (wind: 0 calm, 1 crosswind, 2 gusts, 3 wind shift on the final, 4 storm; env PILOT=new: the rework's pilot, else the autopilot the game flies)
 #include "../src/aircraft.h"
 #include "../src/career.h"
 #include "../src/weather.h"
@@ -47,7 +47,7 @@ float pct(std::vector<float> v, float p) { if (v.empty()) return 0.f; std::sort(
 }  // namespace
 
 int main(int argc, char** argv) {
-  int slice = 0, count = 1, onlyCraft = -1, onlyWind = -1; bool comfort = false, quiet = false; const char* csv = nullptr; const char* onlyAp = nullptr;
+  int slice = 0, count = 1, onlyCraft = -1, onlyWind = -1; bool comfort = false, quiet = false, onFinal = false; const char* csv = nullptr; const char* onlyAp = nullptr;
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--csv") && i + 1 < argc) csv = argv[++i];
     else if (!strcmp(argv[i], "--craft") && i + 1 < argc) onlyCraft = atoi(argv[++i]);
@@ -55,6 +55,7 @@ int main(int argc, char** argv) {
     else if (!strcmp(argv[i], "--airport") && i + 1 < argc) onlyAp = argv[++i];
     else if (!strcmp(argv[i], "--comfort")) comfort = true;
     else if (!strcmp(argv[i], "--quiet")) quiet = true;
+    else if (!strcmp(argv[i], "--final")) onFinal = true;   // (each flight starts established on a 9 km final, configured: the final approach alone)
     else if (i + 1 < argc && argv[i][0] != '-') { slice = atoi(argv[i]); count = std::max(1, atoi(argv[++i])); }
   }
   g_world.build(); buildStory();
@@ -84,10 +85,21 @@ int main(int argc, char** argv) {
           Plane p; p.reset(&s, start, wrapDeg360(brg + 90.f), s.maxFuel * 0.7f, 150.f, true, s.cruise * 0.8f);
           p.ctl.gearDown = !s.retract; p.gear = p.ctl.gearDown ? 1.f : 0.f; p.ctl.throttle = 0.7f;
           p.apComfort = comfort;
+          if (getenv("PILOT") && !strcmp(getenv("PILOT"), "new")) p.apPro = true;   // (the rework's pilot; else the autopilot the game flies)
           const float fuel0 = p.fuel;
           p.apEngage(Plane::AP_NAV, ai, wx);
           Score sc;
           if (!p.apDecline.empty()) { sc.declined = true; sc.why = p.apDecline; }
+          if (onFinal && !sc.declined) {   // established on the final 9 km out, on the glidepath at the approach speed, with approach flap
+            const vec3 ld = p.apLd; const float d = 9000.f;
+            vec3 q = p.apTd - ld * d; q.y = A.elev + p.gearHeight() + d * p.apGs;
+            const float v = p.apEnv.vApp * 1.3f;
+            p.reset(&s, q, atan2f(ld.x, -ld.z) / DEG, s.maxFuel * 0.7f, 150.f, true, v);
+            p.ctl.gearDown = true; p.gear = 1.f; p.ctl.flaps = 0.34f; p.flaps = 0.34f; p.ctl.throttle = 0.4f; p.apComfort = comfort;
+            if (getenv("PILOT") && !strcmp(getenv("PILOT"), "new")) p.apPro = true;
+            p.apEngage(Plane::AP_NAV, ai, wx);
+            p.apStage = Plane::APS_FINAL; p.apStageT = 0;
+          }
           std::vector<Sample> trace; trace.reserve(1800 * 4);
           float gPrev = 1.f, gF = 1.f, jerkSum = 0, gSum = 0; int nAir = 0, holdK = 0, lastStage = -1; bool td = false; int k = 0;
           float shiftT = -1.f;
@@ -148,6 +160,7 @@ int main(int argc, char** argv) {
             }
             // (only the last continuous descent to the runway: a go-around's earlier attempt is not this approach)
             for (size_t i = win.size(); i-- > 1;) if (win[i].t - win[i - 1].t > 1.f) { win.erase(win.begin(), win.begin() + i); break; }
+            if (getenv("EXAMDBG")) for (auto& q : win) { vec3 r(q.x - th.x, 0, q.z - th.z); printf("      win t %6.1f  al %6.0f  h %5.0f  ias %5.1f  vs %5.1f  bank %4.0f\n", q.t, -dot(r, ld), q.h, q.ias, q.vs, q.bank); }
             if (win.size() >= 8) {
               double m = 0; for (auto& q : win) m += q.ias; m /= win.size();
               double v = 0; for (auto& q : win) v += (q.ias - m) * (q.ias - m);
