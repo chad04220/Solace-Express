@@ -40,6 +40,16 @@ struct Ent { float x, y, z, yaw, sx, sy, sz, seed; };
 inline float entThinKey(const Ent& e) { return fmodf(e.seed * 7.13f, 1.f); }   // (the entity vertex shader uses the same)
 inline float entThinRef(int k) { return 80.f * kEntInfo[k].h; }               // full density out to here (m)
 inline float entKeep(int k, float d) { float r = entThinRef(k); return d <= r ? 1.f : r * r / (d * d); }
+// An instance's turn comes where its keep fraction falls to its key (d = ref / sqrt(key)). It is never switched on or off
+// there at once: it dissolves in over kEntFadeBand of that distance either side (ent_vs.glsl), so the drawn set reaches
+// that much further out - flying at a forest, the trees came on one by one from a kilometre out, the bushes from 150 m
+constexpr float kEntFadeBand = 0.10f;
+inline float entKeepDrawn(int k, float d) { return entKeep(k, d / (1.f + kEntFadeBand)); }
+inline float entFade(float key, float ref, float d, float far) {   // 0 gone .. 1 whole (the vertex shader's, for the tests)
+  auto ss = [](float a, float b, float x) { float t = std::min(std::max((x - a) / (b - a), 0.f), 1.f); return t * t * (3.f - 2.f * t); };
+  const float dK = ref / sqrtf(std::max(key, 1e-6f));
+  return (1.f - ss(dK * (1.f - kEntFadeBand), dK * (1.f + kEntFadeBand), d)) * (1.f - ss(far * 0.9f, far, d));
+}
 
 // One item of an airport's furniture (airport_scenery.cpp): kind + the placed instance
 struct AptItem { int kind; Ent e; };

@@ -7,3 +7,7 @@
 ### Aerobatics
 - An aerobatic figure is flown once. When it's done and the aircraft is level again, it goes back to how it was before you started: yours, if you were hand-flying, or the autopilot's route or hold if that was flying.
 - Any flight input during a figure hands the aircraft straight back to you: stick, rudder, throttle, flaps, gear, brakes, trim or any flight key or button. Pressing the aerobatics key again does too. Changing the view, the HUD, the map, the radio or pausing doesn't.
+
+### Trees and bushes
+- Trees, bushes and boulders no longer pop into view as you fly towards them. Out in the distance only a share of them is drawn, thinning out further away, and each used to switch on all at once when its turn came: trees one by one from about a kilometre out, bushes and boulders from as close as 150 m. Now each one fades in over a stretch of the distance instead, and the far edge of the forest fades out the same way, about 8 km out on High. The forest is just as dense as before.
+- Checked in fast flight too: even at 600 m/s, every patch of trees is loaded at the far edge of the view, never closer.

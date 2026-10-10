@@ -114,10 +114,45 @@ void foliageRanges(const EntMeshRange* meshes) {
       q,100*(minInstances-1),100*(maxInstances-1),100*(minVertices-1),100*(maxVertices-1),100*(streamRatio-1));
   }
 }
+
+// Thinned instances dissolve in and out (entFade, mirrored by ent_vs.glsl) rather than switching: the fade is continuous
+// in distance, whole well inside an instance's turn and gone past it, never drawn where the CPU has already dropped the
+// instance (entKeepDrawn), and on average as dense as the thinning it replaces.
+void foliageFade() {
+  for(int q=0;q<3;++q) {
+    const EntRanges R=entRangesFor(q);
+    for(int k=0;k<=EK_SLAB;++k) {
+      if(!entThins(k)) continue;
+      const float ref=entThinRef(k),far=entRangeOf(R,k);
+      double worstStep=0,worstDensity=0;
+      for(float key=0.0005f;key<1.f;key+=0.0137f) {
+        float prev=entFade(key,ref,1.f,far);
+        for(float d=1.f;d<far*1.01f;d*=1.0025f) {
+          const float f=entFade(key,ref,d,far);
+          assert(f>=0.f && f<=1.f);
+          worstStep=std::max(worstStep,double(fabsf(f-prev)));prev=f;
+          if(f>0.f) assert(key<entKeepDrawn(k,d)+1e-6f && d<far);   // drawn by the shader: handed over by the CPU
+          if(d<0.85f*ref) assert(f==1.f);                           // full density near: no thinning there at all
+        }
+      }
+      // the step per quarter percent of the distance closed: at most a few percent of a whole instance (the old switch was
+      // all of it at once)
+      assert(worstStep<0.05);
+      for(float d=ref*1.2f;d<far*0.85f;d*=1.1f) {
+        double sum=0;const int n=20000;
+        for(int i=0;i<n;++i) sum+=entFade((i+0.5f)/n,ref,d,far);
+        worstDensity=std::max(worstDensity,fabs(sum/n/entKeep(k,d)-1.0));
+      }
+      assert(worstDensity<0.02);
+      if(q==2 && (k==EK_FIR || k==EK_BUSH)) printf("foliage fade %s: worst step %.3f of an instance per 0.25%% of the distance, density within %.2f%% of the thinning\n",kEntInfo[k].name,worstStep,100*worstDensity);
+    }
+  }
+}
 }
 
 int main() {
   static_assert(sizeof(EVert)==40,"environment vertex ABI changed");
+  foliageFade();
   static_assert(sizeof(Ent)==32,"instance ABI changed");
   std::vector<EVert> v,again;EntMeshRange r[EK_COUNT],r2[EK_COUNT];
   buildEntityMeshes(v,r);buildEntityMeshes(again,r2);

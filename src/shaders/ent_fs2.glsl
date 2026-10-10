@@ -24,6 +24,11 @@ vec4 windowGrid(vec2 q, vec2 cell, vec2 pane, float y0){
   return vec4(inside, fr, id);
 }
 void main(){
+  // dissolving in or out (vFade): a screen-door the anti-aliasing resolves to a fade, its pattern turned each frame
+  if (vFade < 1.0) {
+    vec2 q = gl_FragCoord.xy + 5.588238*mod(floor(uTime*60.0), 64.0);
+    if (fract(52.9829189*fract(dot(q, vec2(0.06711056, 0.00583715)))) >= vFade) discard;
+  }
   vec3 V = normalize(uCam - vW);
   float yaw = vInst.y, cy = cos(yaw), sy = sin(yaw);
   vec3 n0 = normalize(vLN);

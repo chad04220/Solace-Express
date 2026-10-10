@@ -8,12 +8,17 @@ uniform vec3 uCamV; uniform float uFar; uniform float uThin; uniform float uThin
 uniform vec3 uWind;   // surface wind velocity (windsocks)
 uniform mat4 uPanoView; uniform vec2 uPano;   // a panoramic camera feed: projected onto its cylinder (camRay)
 out vec3 vW; out vec3 vL; out vec3 vLN; out vec4 vAux;
+flat out float vFade;   // 1 whole .. 0 gone: an instance's dissolve in or out at its thinning turn and the draw limit
 flat out vec4 vInst;   // seed, yaw, scale y, instance height
 flat out vec3 vScale;
 void main(){
+  vFade = 1.0;
   if (uShadowPass == 0 && uThin > 0.5) {   // thin out towards the far limit (the ground texture takes over distant forest)
-    float d = length(iA.xyz - uCamV);
-    if (fract(iB.w*7.13) >= min(1.0, uThinRef*uThinRef/max(d*d, 1.0)) || d >= uFar) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+    // each instance's turn comes where its keep fraction (ref/d)^2 falls to its key; it dissolves over 10% of that
+    // distance either side of it, and the draw limit over its last tenth - never on or off at once (entFade)
+    float d = length(iA.xyz - uCamV), dK = uThinRef/sqrt(max(fract(iB.w*7.13), 1e-6));
+    vFade = (1.0 - smoothstep(dK*0.9, dK*1.1, d))*(1.0 - smoothstep(uFar*0.9, uFar, d));
+    if (vFade <= 0.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   }
   vec3 posed=aPos, posedN=aNrm;
   int wheel=int(aAux.x+.5)-27;

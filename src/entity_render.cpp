@@ -272,7 +272,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
           // keep fraction); the vertex shader thins the rest of the way per instance
           uint32_t eb = e;
           if (thin) {
-            float kp = entKeep(k, std::max(dmin, 1.f));
+            float kp = entKeepDrawn(k, std::max(dmin, 1.f));
             eb = (uint32_t)(std::lower_bound(ch->ents.begin() + b, ch->ents.begin() + e, kp, [](const Ent& x, float v) { return entThinKey(x) < v; }) - ch->ents.begin());
           }
           auto& bk = bucket[0][k][lodN]; bk.insert(bk.end(), ch->ents.begin() + b, ch->ents.begin() + eb);
@@ -284,11 +284,11 @@ void Renderer::drawEntities(const FrameParams& fp) {
           float ddx = en.x - cam.x, ddy = en.y - cam.y, ddz = en.z - cam.z;
           float d = sqrtf(ddx * ddx + ddy * ddy + ddz * ddz);
           int lod = entLodAt(d, l0, l1);
-          bool keep = !thin || entThinKey(en) < entKeep(k, d);   // (the ground texture takes over distant forest)
+          bool keep = !thin || entThinKey(en) < entKeepDrawn(k, d);   // (the ground texture takes over distant forest; fading in or out, still drawn)
           if (viewK && d < far && !bulk && keep) bucket[0][k][lod].push_back(en);
           // shadows: only what can cast into the faded circle the shader uses (radius kShFade1 x R around the
           // centre; a caster's shadow reaches h / tan(sun elevation) away), thinned like the trees themselves
-          bool shKeep = keep;   // shadows only from what is drawn
+          bool shKeep = !thin || entThinKey(en) < entKeep(k, d);   // shadows only from what is drawn (from halfway through its fade)
           for (int c = 0; c < 2; c++)
             if (inSh[c] && shKeep && k != EK_RWYLIGHT && k != EK_PAPI) {
               float sx = en.x - newCenter[c].x, sz = en.z - newCenter[c].z;
