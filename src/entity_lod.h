@@ -45,3 +45,29 @@ inline void entLodLimits(const EntRanges& r, int k, float& l0, float& l1) {
 }
 
 inline int entLodAt(float distance, float l0, float l1) { return distance < l0 ? 0 : distance < l1 ? 1 : 2; }
+
+// A tree's change of detail level is cross-faded, never switched: over the last kEntLodFade of the distance to each
+// switch, the nearer model dissolves out as the farther one dissolves in - complementary halves of one screen-door
+// (ent_vs.glsl / ent_fs2.glsl), so every pixel is one or the other. Only the farther, cheaper model is drawn the extra
+// way; the nearer one still ends at the switch.
+constexpr float kEntLodFade = 0.15f;
+inline bool entLodFades(int k) { return entClass(k) == EC_TREE; }
+inline float entLodT(float d, float L) {   // 0 the nearer model .. 1 the farther one (smoothstep, as the shader's)
+  float t = std::min(std::max((d - L * (1.f - kEntLodFade)) / (L * kEntLodFade), 0.f), 1.f); return t * t * (3.f - 2.f * t);
+}
+// the farther level also drawn at this distance, fading in (-1: none)
+inline int entLodAlso(float d, float l0, float l1) {
+  if (d >= l0 * (1.f - kEntLodFade) && d < l0) return 1;
+  if (d >= l1 * (1.f - kEntLodFade) && d < l1) return 2;
+  return -1;
+}
+// whether any distance in [dmin, dmax] is inside a fade (then a chunk's instances can't go to one level in a block)
+inline bool entLodSpanFades(float dmin, float dmax, float l0, float l1) {
+  return (dmax >= l0 * (1.f - kEntLodFade) && dmin < l0) || (dmax >= l1 * (1.f - kEntLodFade) && dmin < l1);
+}
+// the share of the screen-door each level keeps at this distance: values in [lo, hi)
+inline void entLodKeep(int lod, float d, float l0, float l1, float& lo, float& hi) {
+  const float t0 = entLodT(d, l0), t1 = entLodT(d, l1);
+  lo = lod == 0 ? t0 : lod == 1 ? t1 : 0.f;
+  hi = lod == 0 ? 1.f : lod == 1 ? t0 : t1;
+}

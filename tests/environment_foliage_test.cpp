@@ -148,11 +148,50 @@ void foliageFade() {
     }
   }
 }
+
+// A tree's detail levels cross-fade (entLodKeep, mirrored by ent_vs.glsl): at every distance their shares of the
+// screen-door add up to exactly one whole tree, the levels with a share are exactly the ones the CPU hands over (the
+// one entLodAt picks and the farther one entLodAlso adds), each share changes smoothly, and the nearer model never
+// reaches past its switch.
+void detailCrossFade() {
+  for(int q=0;q<3;++q) for(int feed=0;feed<2;++feed) {
+    const EntRanges R=entRangesFor(q,feed!=0);
+    for(int k=0;k<=EK_BUSH;++k) {
+      assert(entLodFades(k));
+      float l0,l1;entLodLimits(R,k,l0,l1);
+      assert(l0<l1*(1.f-kEntLodFade));   // the two fades never overlap
+      float prev[ENT_LODS]={1.f,0.f,0.f};double worst=0;
+      for(float d=1.f;d<entRangeOf(R,k);d*=1.0025f) {
+        float sum=0;int also=entLodAlso(d,l0,l1),at=entLodAt(d,l0,l1);
+        for(int lod=0;lod<ENT_LODS;++lod) {
+          float lo,hi;entLodKeep(lod,d,l0,l1,lo,hi);
+          const float share=std::max(hi-lo,0.f);
+          sum+=share;
+          const bool handed=lod==at||lod==also;
+          if(share>0.f) assert(handed);
+          if(lod==at && also<0) assert(share==1.f);   // outside a fade: the one level, whole
+          worst=std::max(worst,double(fabsf(share-prev[lod])));prev[lod]=share;
+        }
+        assert(fabsf(sum-1.f)<1e-5f);
+        if(also>=0) assert(also==at+1);
+      }
+      assert(worst<0.06);
+      // a chunk's span clear of both fades: one level, whole, everywhere in it (the block path)
+      for(float a=1.f;a<entRangeOf(R,k);a*=1.07f) {
+        const float b=a+300.f;
+        if(entLodSpanFades(a,b,l0,l1) || entLodAt(a,l0,l1)!=entLodAt(b,l0,l1)) continue;
+        for(float d=a;d<=b;d+=7.f) { float lo,hi;entLodKeep(entLodAt(a,l0,l1),d,l0,l1,lo,hi); assert(lo==0.f && hi==1.f); }
+      }
+      if(q==2 && !feed && (k==EK_FIR || k==EK_BUSH)) printf("detail cross-fade %s: %.0f-%.0f m and %.0f-%.0f m, worst step %.3f of a tree per 0.25%% of the distance\n",kEntInfo[k].name,l0*(1.f-kEntLodFade),l0,l1*(1.f-kEntLodFade),l1,worst);
+    }
+  }
+}
 }
 
 int main() {
   static_assert(sizeof(EVert)==40,"environment vertex ABI changed");
   foliageFade();
+  detailCrossFade();
   static_assert(sizeof(Ent)==32,"instance ABI changed");
   std::vector<EVert> v,again;EntMeshRange r[EK_COUNT],r2[EK_COUNT];
   buildEntityMeshes(v,r);buildEntityMeshes(again,r2);

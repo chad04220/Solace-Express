@@ -266,7 +266,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
         // the whole chunk in one LOD band and inside the draw distance: hand its instances over in one block (the
         // vertex shader does the distance thinning per instance, exactly as below)
         int lodN = entLodAt(dmin, l0, l1), lodF = entLodAt(dmax, l0, l1);
-        bool bulk = viewK && !affected && dmax < far && lodN == lodF;
+        bool bulk = viewK && !affected && dmax < far && lodN == lodF && !(entLodFades(k) && entLodSpanFades(dmin, dmax, l0, l1));
         if (bulk) {
           // thinned kinds: only the prefix that can survive anywhere in the chunk (keys ascending, nearest point's
           // keep fraction); the vertex shader thins the rest of the way per instance
@@ -285,7 +285,12 @@ void Renderer::drawEntities(const FrameParams& fp) {
           float d = sqrtf(ddx * ddx + ddy * ddy + ddz * ddz);
           int lod = entLodAt(d, l0, l1);
           bool keep = !thin || entThinKey(en) < entKeepDrawn(k, d);   // (the ground texture takes over distant forest; fading in or out, still drawn)
-          if (viewK && d < far && !bulk && keep) bucket[0][k][lod].push_back(en);
+          if (viewK && d < far && !bulk && keep) {
+            bucket[0][k][lod].push_back(en);
+            // (and the farther detail level too where the two are cross-fading)
+            const int also = entLodFades(k) ? entLodAlso(d, l0, l1) : -1;
+            if (also >= 0 && entRange[k].count[also] > 0) bucket[0][k][also].push_back(en);
+          }
           // shadows: only what can cast into the faded circle the shader uses (radius kShFade1 x R around the
           // centre; a caster's shadow reaches h / tan(sun elevation) away), thinned like the trees themselves
           bool shKeep = !thin || entThinKey(en) < entKeep(k, d);   // shadows only from what is drawn (from halfway through its fade)
@@ -334,11 +339,13 @@ void Renderer::drawEntities(const FrameParams& fp) {
   glBufferData(GL_ARRAY_BUFFER, std::max<size_t>(entStage.size(), 1) * sizeof(Ent), entStage.empty() ? nullptr : entStage.data(), GL_STREAM_DRAW);
   auto issue = [&](GLuint prog, const std::vector<Draw>& list) {
     GLint uk = glGetUniformLocation(prog, "uKind"), uf = glGetUniformLocation(prog, "uFar"), ut = glGetUniformLocation(prog, "uThin"), ur = glGetUniformLocation(prog, "uThinRef");
+    GLint ul = glGetUniformLocation(prog, "uLod"), ull = glGetUniformLocation(prog, "uLodL");
     GLint uw0=glGetUniformLocation(prog,"uWheel0"),uw1=glGetUniformLocation(prog,"uWheel1");
     for (const Draw& d : list) {
       if(d.vehicle>=0) { const float* a=fp.groundVehicles[d.vehicle].angle;glUniform4fv(uw0,1,a);glUniform2f(uw1,a[4],a[5]); }
       else { glUniform4f(uw0,0,0,0,0);glUniform2f(uw1,0,0); }
       glUniform1f(uf, entRangeOf(R, d.kind)); glUniform1f(ut, entThins(d.kind) ? 1.f : 0.f); glUniform1f(ur, entThinRef(d.kind));
+      { float l0, l1; entLodLimits(R, d.kind, l0, l1); glUniform1i(ul, d.vehicle < 0 && entLodFades(d.kind) ? d.lod : -1); glUniform2f(ull, l0, l1); }   // (the cross-fade between detail levels)
       glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent)));
       glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.first * sizeof(Ent) + 16));
       glUniform1i(uk, d.kind);

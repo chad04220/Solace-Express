@@ -5,14 +5,22 @@ layout(location=3) in vec4 iA; layout(location=4) in vec4 iB;   // position + ya
 uniform vec4 uWheel0; uniform vec2 uWheel1; // dynamic packet; all zero for parked scenery
 uniform mat4 uVP; uniform vec2 uJit; uniform float uLogC; uniform float uTime; uniform int uKind; uniform int uShadowPass;
 uniform vec3 uCamV; uniform float uFar; uniform float uThin; uniform float uThinRef;   // view pass: per-instance distance thinning (entKeep)
+uniform int uLod; uniform vec2 uLodL;   // the detail level drawn (-1: no cross-fade) and the switch distances (entLodKeep)
 uniform vec3 uWind;   // surface wind velocity (windsocks)
 uniform mat4 uPanoView; uniform vec2 uPano;   // a panoramic camera feed: projected onto its cylinder (camRay)
 out vec3 vW; out vec3 vL; out vec3 vLN; out vec4 vAux;
 flat out float vFade;   // 1 whole .. 0 gone: an instance's dissolve in or out at its thinning turn and the draw limit
+flat out vec2 vLodK;    // the share of the screen-door this detail level keeps, [lo, hi): two levels cross-fading split it
 flat out vec4 vInst;   // seed, yaw, scale y, instance height
 flat out vec3 vScale;
 void main(){
-  vFade = 1.0;
+  vFade = 1.0; vLodK = vec2(0.0, 1.0);
+  if (uShadowPass == 0 && uLod >= 0) {   // a tree's detail levels cross-fade over the last 15% before each switch
+    float d = length(iA.xyz - uCamV);
+    float t0 = smoothstep(uLodL.x*0.85, uLodL.x, d), t1 = smoothstep(uLodL.y*0.85, uLodL.y, d);
+    vLodK = uLod == 0 ? vec2(t0, 1.0) : uLod == 1 ? vec2(t1, t0) : vec2(0.0, t1);
+    if (vLodK.y <= vLodK.x) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  }
   if (uShadowPass == 0 && uThin > 0.5) {   // thin out towards the far limit (the ground texture takes over distant forest)
     // each instance's turn comes where its keep fraction (ref/d)^2 falls to its key; it dissolves over 10% of that
     // distance either side of it, and the draw limit over its last tenth - never on or off at once (entFade)

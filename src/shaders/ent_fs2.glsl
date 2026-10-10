@@ -24,10 +24,14 @@ vec4 windowGrid(vec2 q, vec2 cell, vec2 pane, float y0){
   return vec4(inside, fr, id);
 }
 void main(){
-  // dissolving in or out (vFade): a screen-door the anti-aliasing resolves to a fade, its pattern turned each frame
-  if (vFade < 1.0) {
+  // dissolving in or out (vFade), or cross-fading between detail levels (vLodK): a screen-door the anti-aliasing resolves
+  // to a fade, its pattern turned each frame. The two levels keep complementary parts of the same pattern, so every pixel
+  // is one or the other; the thinning's dissolve uses a pattern of its own on top
+  if (vFade < 1.0 || vLodK.x > 0.0 || vLodK.y < 1.0) {
     vec2 q = gl_FragCoord.xy + 5.588238*mod(floor(uTime*60.0), 64.0);
-    if (fract(52.9829189*fract(dot(q, vec2(0.06711056, 0.00583715)))) >= vFade) discard;
+    float n = fract(52.9829189*fract(dot(q, vec2(0.06711056, 0.00583715))));
+    if (n < vLodK.x || n >= vLodK.y) discard;
+    if (vFade < 1.0 && fract(52.9829189*fract(dot(q + vec2(23.0, 41.0), vec2(0.06711056, 0.00583715)))) >= vFade) discard;
   }
   vec3 V = normalize(uCam - vW);
   float yaw = vInst.y, cy = cos(yaw), sy = sin(yaw);

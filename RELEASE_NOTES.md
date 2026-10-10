@@ -11,3 +11,4 @@
 ### Trees and bushes
 - Trees, bushes and boulders no longer pop into view as you fly towards them. Out in the distance only a share of them is drawn, thinning out further away, and each used to switch on all at once when its turn came: trees one by one from about a kilometre out, bushes and boulders from as close as 150 m. Now each one fades in over a stretch of the distance instead, and the far edge of the forest fades out the same way, about 8 km out on High. The forest is just as dense as before.
 - Checked in fast flight too: even at 600 m/s, every patch of trees is loaded at the far edge of the view, never closer.
+- Trees and bushes no longer visibly switch to a simpler model as they get further away. Where they change detail (about 400 m and 2 km out for a tree on High, 240 m and 1 km for a bush), the nearer model now dissolves into the simpler one over the last stretch before the switch.
