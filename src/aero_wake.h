@@ -17,7 +17,7 @@
 struct AeroGeom; struct AeroIn; struct AeroOut;
 
 struct AeroWake {
-  static const int kMaxVortex = 10;
+  static constexpr int kMaxVortex = 10;
   // a trailing vortex: where it leaves the trailing edge, its circulation about the aft direction (m^2/s; seen from
   // behind, + turns the air anticlockwise: the right tip's), the surface it comes from (AeroSurfaceKind) and its chain
   // (vortices of one chain are joined by the bound vortex along the surface between them)
