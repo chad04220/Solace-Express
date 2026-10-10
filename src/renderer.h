@@ -91,8 +91,13 @@ struct FrameParams {
   // the aircraft's wake through the cloud (clouds.glsl wakeCarve): a path of points (xyz, the channel's radius there)
   // and with each the strength of the segment it starts (0 where the path left the cloud layer), how far its vortex
   // pair has sunk below it (m), the distance along the path in Crow wavelengths and its age (s); the bounding sphere
+  // with each too the pair as it was there (circulation, spacing, the airframe's bank, the pair's height on it); and the
+  // airframe's vortices now (from the pair's centre: across, up, circulation, 1 where it winds into its tip's), its
+  // engines' wash (across, up, radius - negative for a jet's hot exhaust - and a propeller's swirl, m/s) and its pair
+  // now (circulation, spacing, the seconds a flap's vortex takes to wind into its tip's)
   static constexpr int kWakeMax = 20;
-  float wake[kWakeMax][4] = {}, wakeP[kWakeMax][4] = {}, wakeB[4] = {0, 0, 0, 0}; int wakeN = 0;
+  float wake[kWakeMax][4] = {}, wakeP[kWakeMax][4] = {}, wakeG[kWakeMax][4] = {}, wakeB[4] = {0, 0, 0, 0}; int wakeN = 0;
+  float wakeV[10][4] = {}, wakeE[4][4] = {}, wakeA[4] = {}; int wakeVN = 0, wakeEN = 0;
   // the windscreen's rain and cloud (post_fs.glsl, the cockpit view): where on screen the airflow over the glass
   // streams from (uv, may lie far off screen; z +1 away from it, -1 towards it), how fast (w: 0 still .. 1 fast),
   // and the cloud's fine mist on the glass

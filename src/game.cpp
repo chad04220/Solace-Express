@@ -692,6 +692,24 @@ void Game::moveClouds(float dt) {
 // the cloud field's frame, and the cloud pass carves a tunnel along it that opens a moment behind the aircraft,
 // widens and fills in again over the next minute (FrameParams::wake). Flying in or near cloud, wisps of it stream
 // past (their parallax is the speed you feel in cloud), and the wingtips' vortices draw ribbons through it.
+Game::WakePt Game::wakeHere(vec3 c, bool brk, float odo) const {
+  // the pair the airframe's surfaces are rolling up (aero_wake.h), which sinks at w0 = G / (2 pi b0) under its own
+  // downwash and slows as it decays over a few times b0 / w0. Without one (too slow to fly), a lifting line's: the
+  // weight times the load shed round two cores pi/4 of the span apart
+  const AeroWake& wk = plane.wake;
+  float gam = wk.gamPair, b0 = wk.b0, py = wk.pairY;
+  if (b0 < 0.1f) {
+    b0 = 0.25f * PI * plane.spec->span;
+    const float rho = 1.225f * powf(std::max(1.f - 2.2558e-5f * plane.pos.y, 0.3f), 4.2559f);
+    gam = plane.mass() * G0 * clampf(plane.gLoad, -6.f, 12.f) / (rho * std::max(plane.airspeed, 20.f) * b0);
+    py = plane.spec->wingY;
+  }
+  const float w0 = gam / (2.f * PI * b0);
+  // the bank: the airframe's x axis against the path's level across, seen from behind
+  const vec3 f = normalize(plane.vel - plane.windVel + vec3(0, 0, 1e-4f)), sd = normalize(cross(f, vec3(0, 1, 0)) + vec3(1e-5f, 0, 0)), upv = cross(sd, f);
+  const vec3 bx = plane.q.rotate(vec3(1, 0, 0));
+  return {c, 0.f, brk, w0, clampf(4.f * b0 / std::max(fabsf(w0), 0.05f), 20.f, 120.f), odo, gam, b0, atan2f(dot(bx, upv), dot(bx, sd)), py};
+}
 void Game::updateCloudWake(float dt) {
   // (the rain and the cloud at the aircraft, smoothed: the windscreen, the rain round the camera, the visibility, the drumming on the airframe)
   rainNow = flightClock < 0.1f ? plane.wxl.rain : approach(rainNow, plane.wxl.rain, 1.2f, dt);   // (raining already as the flight opens)
@@ -712,15 +730,8 @@ void Game::updateCloudWake(float dt) {
       push = dd > 150.f || (dd > 30.f && turned) || L.age > 2.5f;
     }
     if (push) {
-      // the wake's vortex pair (lifting line): the lift (the weight times the load) shed as a circulation
-      // G = L / (rho V b0) round two cores b0 = pi/4 of the span apart, which sink together at w0 = G / (2 pi b0)
-      // and slow as they decay over a few times b0 / w0
-      const float b0 = 0.25f * PI * plane.spec->span;
-      const float rho = 1.225f * powf(std::max(1.f - 2.2558e-5f * plane.pos.y, 0.3f), 4.2559f);
-      const float G = plane.mass() * G0 * clampf(plane.gLoad, 0.3f, 12.f) / (rho * std::max(plane.airspeed, 20.f) * b0);
-      const float w0 = G / (2.f * PI * b0);
       if (!wakeGap && !cloudWake.empty()) wakeOdo += length(c - cloudWake.back().c);
-      cloudWake.push_back({c, 0.f, wakeGap, w0, clampf(4.f * b0 / std::max(w0, 0.05f), 20.f, 120.f), wakeOdo});
+      cloudWake.push_back(wakeHere(c, wakeGap, wakeOdo));
       wakeGap = false;
     }
     while (cloudWake.size() > (size_t)FrameParams::kWakeMax - 1) cloudWake.erase(cloudWake.begin());
@@ -739,7 +750,9 @@ void Game::updateCloudWake(float dt) {
       float dens = wxfield::cloudDensity(wx, p, true);
       if (dens < 0.02f) continue;
       float g = r.range(0.86f, 0.97f);
+      const size_t n0 = particles.size();
       spawn(p, plane.windVel, r.range(1.6f, 2.6f), r.range(4.f, 9.f), r.range(1.5f, 3.f), vec3(g, g, g * 1.02f), clampf(0.04f + dens * 0.14f, 0.f, 0.16f), SPR_SMOKE, 0.f, 0.f);
+      if (particles.size() > n0) particles.back().air = true;   // (the airframe's flow carries it: updateParticles)
     }
   } else wispAccum = 0;
 }
@@ -1486,10 +1499,15 @@ void Game::updateFlight(float dt) {
     spawn(bp, plane.q.rotate(vec3(0, 0.3f, 8.f)), 1.5f, 0.6f, 2.f, vec3(0.6f, 0.55f, 0.45f), 0.18f, SPR_SMOKE, 2.f, 0.f);
   }
   // wingtip vapour in humid air under g: a continuous ribbon from each tip. Points are dropped at the tips and stay
-  // in the air mass (drifting with the wind); the strip between them widens and thins out as it ages.
+  // in the air mass (drifting with the wind); the strip between them widens and thins out as it ages. Each is caught
+  // by its tip's vortex as it is dropped and winds round its core as the pair sinks (aero_wake.h), so the ribbon
+  // curls inboard and down behind the wing - faster the harder the wing is pulling.
   for (int sd = 0; sd < 2; sd++) {
     auto& tt = tipTrail[sd];
-    for (auto& q : tt) { q.age += simDt; q.p += plane.windVel * simDt; }
+    for (auto& q : tt) {
+      q.age += simDt; q.p += plane.windVel * simDt;
+      if (q.caught) { q.sw.c += plane.windVel * simDt; q.p = aeroSwirlStep(q.sw, q.p, simDt); }
+    }
     while (!tt.empty() && tt.front().age > 1.8f) tt.erase(tt.begin());
   }
   float vapK = plane.onGround ? 0.f : clampf((plane.gLoad - 1.7f) / 1.5f, 0.f, 1.f) * ((wx.precip > 0 || plane.pos.y > wx.cloudBase - 300.f) ? 1.f : 0.f);
@@ -1499,7 +1517,9 @@ void Game::updateFlight(float dt) {
     vec3 tip = plane.spec->special == 2 ? kWraithWingTip : plane.spec->special ? kJetWingTip : modelWingTip(kModels[plane.spec - kAircraft]);
     for (int sd = 0; sd < 2; sd++) {
       float sx = sd ? 1.f : -1.f;
-      tipTrail[sd].push_back({plane.pos + plane.q.rotate(vec3(sx * tip.x, tip.y, tip.z + 0.3f)), 0.f, vapK, tipSeg});
+      TipPt t{plane.pos + plane.q.rotate(vec3(sx * tip.x, tip.y, tip.z + 0.3f)), 0.f, vapK, tipSeg};
+      t.caught = aeroWakeCatch(plane.wake, plane.pos, plane.q, t.p, t.sw);
+      tipTrail[sd].push_back(t);
       if (tipTrail[sd].size() > 400) tipTrail[sd].erase(tipTrail[sd].begin());
     }
     tipOn = vapK > 0.f;
@@ -2379,6 +2399,13 @@ void Game::updateWreck(float dt) {
 // ------------------------------------------------------------------ particles
 void Game::updateParticles(float dt) {
   for (size_t i = 0; i < bursts.size();) { bursts[i].t += dt; if (bursts[i].t > 0.9f) { bursts[i] = bursts.back(); bursts.pop_back(); } else i++; }
+  // the air the airframe moves (cloud wisps): near it, the flow round it - lifted ahead of the wing, pushed aside by the
+  // nose, blown back and turned by a slipstream, pushed down behind the wing and round its tips (aero_wake.h); once
+  // behind the wing, a parcel close to one of the pair's vortices is caught by it and turns round it as the pair sinks
+  const AeroWake& wk = plane.wake;
+  const bool flow = plane.spec && !plane.ev.crashed && wk.V > 3.f;
+  const AeroGeom* ag = flow && plane.spec->special == 0 ? &aeroGeom(*plane.spec) : nullptr;
+  const float reach = std::max(wk.span, 4.f);
   for (size_t i = 0; i < particles.size();) {
     Particle& p = particles[i];
     // spawned this frame: emitters already place particles along the path flown this frame, so moving them by a
@@ -2388,6 +2415,15 @@ void Game::updateParticles(float dt) {
     if (p.life <= 0) { particles[i] = particles.back(); particles.pop_back(); continue; }
     p.v = p.v * expf(-p.drag * dt);
     p.v.y += p.buoy * dt;
+    if (p.air && flow) {
+      if (p.caught) { p.sw.c += p.v * dt; p.p = aeroSwirlStep(p.sw, p.p, dt); }
+      else {
+        const vec3 rb = plane.q.conj().rotate(p.p - plane.pos);
+        if (fabsf(rb.x) < 1.5f * reach && fabsf(rb.y) < reach && rb.z > -1.5f * reach && rb.z < wk.pairZ + reach)
+          p.p += plane.q.rotate(aeroWakeInduced(wk, ag, rb)) * dt;
+        if (!p.passed && rb.z > wk.pairZ + 0.3f * reach) { p.passed = true; p.caught = aeroWakeCatch(wk, plane.pos, plane.q, p.p, p.sw); }
+      }
+    }
     p.p += p.v * dt;
     p.size += p.grow * dt;
     i++;
@@ -2477,25 +2513,26 @@ FrameParams Game::buildFrame() {
     fp.windSock.y = 0;
   }
   // the aircraft's wake through the cloud: its points where the cloud field has carried them, the channel's radius
-  // (from about the span, widening as it ages), how far the vortex pair has sunk, the distance along the path in Crow
+  // (the pair's oval, about its spacing either side, spreading with the turbulence as it ages), how far the vortex pair has sunk, the distance along the path in Crow
   // wavelengths (about 8.6 core spacings), the age, and each segment's strength (opening in a moment, filling in over
   // a minute, faded at the oldest end; none across a gap)
   fp.wakeN = 0;
   static const bool wakeOff = getenv("WAKEOFF") != nullptr;   // (debug A/B: no wake through the cloud)
   if (flying && !wakeOff && !cloudWake.empty() && wx.cloudCover >= 0.02f) {
     std::vector<WakePt> pts = cloudWake;
-    if (!wakeGap && !crashed) { const WakePt L = pts.back(); const vec3 hp = plane.pos + vec3(cloudOff.x, 0, cloudOff.y); pts.push_back({hp, 0.f, false, L.w0, L.T, L.odo + length(hp - L.c)}); }
+    if (!wakeGap && !crashed) { const WakePt L = pts.back(); const vec3 hp = plane.pos + vec3(cloudOff.x, 0, cloudOff.y); pts.push_back(wakeHere(hp, false, L.odo + length(hp - L.c))); }
     const int n = std::min((int)pts.size(), FrameParams::kWakeMax), o = (int)pts.size() - n;
     const float span = plane.spec->span, crowL = 6.75f * span;
-    vec3 lo(1e9f), hi(-1e9f); float rMax = 0;
+    vec3 lo(1e9f), hi(-1e9f); float rMax = 0, sMax = 0;
     for (int i = 0; i < n; i++) {
       const WakePt& w = pts[o + i];
       vec3 p = w.c - vec3(cloudOff.x, 0, cloudOff.y);
-      float r = span * 0.8f + 4.f + 1.8f * std::min(w.age, 40.f);
-      float sink = std::min(w.w0 * w.T * (1.f - expf(-w.age / w.T)), 4.f * span);
+      float r = w.b0 * (1.05f + 0.2f * sqrtf(w.age)) + 1.f;
+      float sink = clampf(w.w0 * w.T * (1.f - expf(-w.age / w.T)), -4.f * span, 4.f * span);
       fp.wake[i][0] = p.x; fp.wake[i][1] = p.y; fp.wake[i][2] = p.z; fp.wake[i][3] = r;
       fp.wakeP[i][1] = sink; fp.wakeP[i][2] = w.odo / crowL; fp.wakeP[i][3] = w.age;
-      lo = vec3(std::min(lo.x, p.x), std::min(lo.y, p.y - sink), std::min(lo.z, p.z)); hi = vec3(std::max(hi.x, p.x), std::max(hi.y, p.y), std::max(hi.z, p.z)); rMax = std::max(rMax, r);
+      fp.wakeG[i][0] = w.gam; fp.wakeG[i][1] = w.b0; fp.wakeG[i][2] = w.tilt; fp.wakeG[i][3] = w.py;
+      lo = vec3(std::min(lo.x, p.x), std::min(lo.y, p.y), std::min(lo.z, p.z)); hi = vec3(std::max(hi.x, p.x), std::max(hi.y, p.y), std::max(hi.z, p.z)); rMax = std::max(rMax, r); sMax = std::max(sMax, fabsf(sink));
       if (i + 1 < n) {
         const WakePt& v = pts[o + i + 1];
         float age = 0.5f * (w.age + v.age);
@@ -2503,8 +2540,21 @@ FrameParams Game::buildFrame() {
       } else fp.wakeP[i][0] = 0.f;
     }
     vec3 cen = (lo + hi) * 0.5f;
-    fp.wakeB[0] = cen.x; fp.wakeB[1] = cen.y; fp.wakeB[2] = cen.z; fp.wakeB[3] = length(hi - lo) * 0.5f + 2.2f * rMax;   // (clouds.glsl: a point as far as 2.2 radii out may be in the channel's turbulent wall)
+    fp.wakeB[0] = cen.x; fp.wakeB[1] = cen.y; fp.wakeB[2] = cen.z; fp.wakeB[3] = length(hi - lo) * 0.5f + 2.2f * rMax + sMax;   // (clouds.glsl: a point as far as 2.2 radii out may be in the channel's turbulent wall, the pair sunk away from the path)
     fp.wakeN = n;
+    // the airframe's vortices and engines now (the young wake's: older, only the pair matters), from the pair's centre
+    const AeroWake& wk = plane.wake;
+    fp.wakeVN = fp.wakeEN = 0;
+    for (int k = 0; k < wk.nv && fp.wakeVN < 10; k++) {
+      const AeroWake::Vortex& v = wk.v[k];
+      const bool winds = v.surf == AS_WING && v.gam * v.r.x * wk.gamPair > 0.f;   // (a wing vortex turning as its side's tip's: it winds into it)
+      float* q = fp.wakeV[fp.wakeVN++]; q[0] = v.r.x; q[1] = v.r.y - wk.pairY; q[2] = v.gam; q[3] = winds ? 1.f : 0.f;
+    }
+    for (int e = 0; e < wk.nj && fp.wakeEN < 4; e++) {
+      const AeroWake::Jet& j = wk.j[e];
+      float* q = fp.wakeE[fp.wakeEN++]; q[0] = j.r.x; q[1] = j.r.y; q[2] = j.hot ? -j.R : j.R; q[3] = j.swirl;
+    }
+    fp.wakeA[0] = wk.gamPair; fp.wakeA[1] = wk.b0; fp.wakeA[2] = 7.f * std::max(wk.span, 1.f) / std::max(wk.V, 20.f); fp.wakeA[3] = 0.f;
     static const bool wakeDbg = getenv("WAKEDBG") != nullptr;   // (debug: the wake handed to the cloud pass)
     if (wakeDbg) {
       printf("wake: %d points, sphere r %.0f\n", n, fp.wakeB[3]);

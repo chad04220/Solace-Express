@@ -29,19 +29,36 @@ float cloudDensity(vec3 p, int detail){
   }
   return clamp(d*4.5, 0.0, 1.0);
 }
-// The aircraft's wake through the cloud (game.cpp updateCloudWake): its path, kept drifting with the cloud. Behind the
-// wing its tip vortices roll the air into a pair that sinks under its own downwash, so what they clear is a slot from
-// the path down to where the pair has sunk (uWakeP.y), wider than it is tall. Turbulence widens it, roughens its walls
-// and fills it in again over the next minute; after a while the pair's Crow instability pinches it into a chain of
-// bulges as the vortices link up into rings (uWakeP.z: the distance along the path in their wavelengths). The cloud
-// pushed aside piles up a little round a young channel. How much of the cloud to take away: up to the segment's
-// strength (uWakeP.x) inside, a little below nothing at the rim; uWakeP.w is the path's age there (s).
-uniform vec4 uWake[20]; uniform vec4 uWakeP[20]; uniform int uWakeN; uniform vec4 uWakeB;
-float wakeCarve(vec3 p){
+// The aircraft's wake through the cloud (game.cpp updateCloudWake, aero_wake.h): its path, kept drifting with the
+// cloud, and what the airframe's flow has done to the air along it. Its surfaces' vortices (uWakeV: the wing's tips
+// and flap edges winding together into the pair, the tailplane's and the fin's dying away) wind the cloud round their
+// cores; the pair sinks under its own downwash carrying the air in its oval with it (uWakeP.y: how far, away from
+// the lift - towards the airframe's -y, or +y under negative g); the propellers'
+// slipstreams twist it, a jet's hot exhaust clears it (uWakeE). Each point of the path keeps the pair as it was there
+// (uWakeG: circulation, spacing, the bank the airframe had, the pair's height on it). The air that went through the
+// wake - round the path and the curtain the pair left sinking from it - is cleared, and turbulence widens that channel,
+// roughens its walls and fills it in again over the next minute; after a while the pair's Crow instability pinches it
+// into a chain of bulges (uWakeP.z: the distance along the path in their wavelengths). The cloud pushed aside piles up
+// a little round a young channel.
+// wakeAt: how much of the cloud at p to take away (up to the segment's strength uWakeP.x; a little below nothing at
+// the rim), and where the air now at p was before the aircraft went by (src: the cloud there is the cloud here).
+uniform vec4 uWake[20]; uniform vec4 uWakeP[20]; uniform vec4 uWakeG[20]; uniform int uWakeN; uniform vec4 uWakeB;
+uniform vec4 uWakeV[10]; uniform int uWakeVN; uniform vec4 uWakeE[4]; uniform int uWakeEN;
+uniform vec4 uWakeA;   // the airframe's pair now (circulation, spacing: uWakeV's scale) and how long a flap's vortex takes to wind into its tip's (s)
+// q turned back round a vortex core c (circulation gam, core radius rc) by what it has turned it in age seconds: a
+// Lamb-Oseen vortex turns the air near its core fastest (a few turns at most: the core's own spreading smears the rest)
+vec2 wakeUnwind(vec2 q, vec2 c, float gam, float age, float rc){
+  vec2 d = q - c; float r2 = dot(d, d) + 1e-4;
+  float a = clamp(gam*age/(6.2831853*r2)*(1.0 - exp(-r2/(rc*rc))), -12.0, 12.0);
+  float cs = cos(a), sn = sin(a);
+  return c + vec2(d.x*cs + d.y*sn, d.y*cs - d.x*sn);
+}
+float wakeAt(vec3 p, out vec3 src){
+  src = p;
   vec3 b = p - uWakeB.xyz;
   if (dot(b, b) > uWakeB.w*uWakeB.w) return 0.0;
-  // the segment this point is most inside (the edge's turbulence below can move it out to 1.5 radii)
-  float best = 0.0, q = 9.0, K = 0.0, age = 0.0;
+  // the segment this point is most inside (the walls' turbulence below can move it out to 1.5 radii)
+  float best = 0.0, bh = 0.0; int bi = -1;
   for (int i = 0; i < 19; i++) {
     if (i + 1 >= uWakeN) break;
     vec4 PA = uWakeP[i];
@@ -50,26 +67,75 @@ float wakeCarve(vec3 p){
     vec3 ab = B.xyz - A.xyz, ap = p - A.xyz;
     float h = clamp(dot(ap, ab)/max(dot(ab, ab), 1e-3), 0.0, 1.0);
     vec3 dv = ap - ab*h;
-    float r = mix(A.w, B.w, h), D = mix(PA.y, PB.y, h), reach = 2.2*r + D;   // (1.5 radii, swollen by a Crow bulge and moved by its meander)
+    float r = mix(A.w, B.w, h), D = abs(mix(PA.y, PB.y, h)), reach = 2.2*r + D;   // (1.5 radii, swollen by a Crow bulge and moved by its meander)
     if (dot(dv, dv) >= reach*reach) continue;
-    // across the path (level) and up from it; the slot from the path down to the pair
-    vec3 ax = ab*inversesqrt(max(dot(ab, ab), 1e-3)), side = cross(ax, vec3(0.0, 1.0, 0.0));
-    side = dot(side, side) > 1e-6 ? normalize(side) : vec3(1.0, 0.0, 0.0);
-    float ag = mix(PA.w, PB.w, h), crow = 0.35*smoothstep(15.0, 45.0, ag), ph = 6.2831853*mix(PA.z, PB.z, h);
-    float x = dot(dv, side) - 0.35*r*crow*sin(ph + 1.3), y = dot(dv, cross(side, ax));
-    y -= clamp(y, -D, 0.0);
-    float qi = length(vec2(x, y/0.72))/(r*(1.0 + crow*sin(ph)));
-    float pot = PA.x*(1.0 - smoothstep(0.3, 1.5, qi));
-    if (pot > best) { best = pot; q = qi; K = PA.x; age = ag; }
+    float y = dv.y;
+    y -= clamp(y, -D, D);   // (the pair sinks away from the lift: down, or the bank's way)
+    float pot = PA.x*(1.0 - smoothstep(0.3, 1.5, length(vec2(length(dv.xz), y))/r));
+    if (pot > best) { best = pot; bi = i; bh = h; }
   }
-  if (best <= 0.0) return 0.0;
-  // the walls: two scales of noise drifting with the cloud and churning upward move them in and out, more as the
-  // channel ages, softening its edge and leaving patches of cloud in it
+  if (bi < 0) return 0.0;
+  vec4 A = uWake[bi], B = uWake[bi + 1], PA = uWakeP[bi], PB = uWakeP[bi + 1], GA = uWakeG[bi], GB = uWakeG[bi + 1];
+  vec3 ab = B.xyz - A.xyz, c0 = A.xyz + ab*bh, dv = p - c0;
+  vec3 ax = ab*inversesqrt(max(dot(ab, ab), 1e-3)), side = cross(ax, vec3(0.0, 1.0, 0.0));
+  side = dot(side, side) > 1e-6 ? normalize(side) : vec3(1.0, 0.0, 0.0);
+  vec3 up = cross(side, ax);
+  float r = mix(A.w, B.w, bh), D = mix(PA.y, PB.y, bh), age = mix(PA.w, PB.w, bh), K = PA.x;
+  float gam = mix(GA.x, GB.x, bh), b0 = max(mix(GA.y, GB.y, bh), 0.5), tilt = mix(GA.z, GB.z, bh), py = mix(GA.w, GB.w, bh);
+  // in the airframe's axes as it passed (banked by tilt; across, up), from the pair's height
+  float ct = cos(tilt), st = sin(tilt), along = dot(dv, ax);
+  vec2 xy = vec2(dot(dv, side), dot(dv, up));
+  vec2 q = vec2(xy.x*ct + xy.y*st, xy.y*ct - xy.x*st) - vec2(0.0, py);
+  // the air wound back round the vortices, each where it has sunk to, the circulation scaled to the pair's here
+  float rc = sqrt(pow(max(0.05*b0, 0.3), 2.0) + 8e-4*abs(gam)*age);
+  float kg = abs(uWakeA.x) > 1e-3 ? gam/uWakeA.x : 0.0, kb = b0/max(uWakeA.y, 0.5), m = smoothstep(0.0, max(uWakeA.z, 0.1), age);
+  vec2 s = q;
+  if (uWakeVN > 0) {
+    for (int k = 0; k < 10; k++) {
+      if (k >= uWakeVN) break;
+      vec4 v = uWakeV[k];
+      vec2 c = vec2(v.x*kb, v.y);
+      float g = v.z*kg;
+      if (v.w > 0.5) c = mix(c, vec2(sign(v.x)*0.5*b0, 0.0), m); else g *= exp(-age/2.5);
+      s = wakeUnwind(s, c - vec2(0.0, D), g, age, rc);
+    }
+  } else {
+    s = wakeUnwind(s, vec2(0.5*b0, -D), gam, age, rc);
+    s = wakeUnwind(s, vec2(-0.5*b0, -D), -gam, age, rc);
+  }
+  // the pair's oval: the air in it came down with the pair
+  float ov = 1.0 - smoothstep(0.85, 1.15, length(vec2(q.x/(1.045*b0), (q.y + D)/(0.865*b0))));
+  // the engines: a propeller's slipstream twisted back by its swirl (dying away in a second or two), a jet's hot exhaust
+  float hot = 0.0;
+  for (int e = 0; e < 4; e++) {
+    if (e >= uWakeEN) break;
+    vec4 E = uWakeE[e];
+    vec2 c = vec2(E.x, E.y - py);
+    c.y -= D*(1.0 - smoothstep(0.85, 1.15, length(vec2(c.x/(1.045*b0), c.y/(0.865*b0)))));
+    float R = abs(E.z), d = length(s - c);
+    if (E.z < 0.0) { float Rh = R*(2.0 + 4.0*sqrt(age)); hot = max(hot, exp(-age/12.0)*exp(-d*d/(Rh*Rh))); }
+    else if (E.w != 0.0) {
+      float Rw = R*(1.0 + 0.8*sqrt(age)), a = E.w/R*1.5*(1.0 - exp(-age/1.5))*(1.0 - smoothstep(0.8*Rw, 1.2*Rw, d));
+      float cs = cos(a), sn = sin(a); vec2 dd = s - c;
+      s = c + vec2(dd.x*cs + dd.y*sn, dd.y*cs - dd.x*sn);
+    }
+  }
+  s.y += D*ov;
+  // where that air was: back in the world's axes
+  vec2 sp = s + vec2(0.0, py), sw = vec2(sp.x*ct - sp.y*st, sp.x*st + sp.y*ct);
+  src = c0 + ax*along + side*sw.x + up*sw.y;
+  // what the passing cleared: the air round the path and in the curtain the pair left sinking from it (in the
+  // airframe's axes), a wider channel as it ages (pinched and bulged by the Crow instability), its walls moved in and
+  // out by two scales of noise drifting with the cloud and churning upward - more as it ages, leaving patches of cloud
+  float crow = 0.35*smoothstep(15.0, 45.0, age), ph = 6.2831853*mix(PA.z, PB.z, bh);
+  float yc = sp.y; yc -= clamp(yc, min(-D, 0.0), max(-D, 0.0));
+  float qc = length(vec2(sp.x - 0.35*r*crow*sin(ph + 1.3), yc/0.83))/(r*(1.0 + crow*sin(ph)));   // (the oval: 0.83 as tall as wide)
   float af = smoothstep(0.0, 50.0, age);
-  vec3 pw = p + vec3(uWindOff.x, age*0.8, uWindOff.y);
+  vec3 pw = src + vec3(uWindOff.x, age*0.8, uWindOff.y);
   float n = cn3(pw/26.0)*0.65 + cn3(pw/9.0 + vec3(5.2, 1.3, 7.7))*0.35;
-  float qn = q + (n - 0.5)*(0.3 + 0.5*af);
+  float qn = qc + (n - 0.5)*(0.3 + 0.5*af);
   float c = K*(1.0 - smoothstep(mix(0.5, 0.15, af), 1.0, qn))*(1.0 - 0.4*af*(1.0 - smoothstep(0.3, 0.55, n)));
+  c = max(c, K*hot);
   return c - 0.3*K*(1.0 - af)*smoothstep(0.95, 1.1, qn)*(1.0 - smoothstep(1.15, 1.45, qn));
 }
 // Rain shafts: the rain under the cloud cells, from the base to the ground and carried downwind as it falls (snow
@@ -117,8 +183,9 @@ vec4 cloudLayer(vec3 ro, vec3 rd, float tmax, float jitter){
     COST(2);
     float dts = inside ? clamp(2.0*sqrt(max(t, 1.0)*span)/float(N), 8.0, dt*2.5) : dt;
     vec3 p = ro + rd*t;
-    float d = cloudDensity(p, 1);
-    if (uWakeN > 1 && gCloudLite == 0 && d > 0.01) d *= 1.0 - wakeCarve(p);
+    vec3 ps = p; float wk = 0.0;
+    if (uWakeN > 1 && gCloudLite == 0) wk = wakeAt(p, ps);   // (the cloud here is the cloud where the wake's flow brought this air from)
+    float d = cloudDensity(ps, 1)*(1.0 - wk);
     if (d <= 0.01) { t += dts*1.5; continue; }   // clear air between clouds: longer strides
     {
       // light march towards the sun: optical depth through the cloud above this point

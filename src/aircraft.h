@@ -5,6 +5,7 @@
 #include "wheel_motion.h"
 #include "weather.h"
 #include "aero.h"
+#include "aero_wake.h"
 
 enum EngineType { ENG_PISTON = 0, ENG_TURBOPROP, ENG_JET };
 enum License { LIC_STUDENT = 0, LIC_PPL, LIC_CPL, LIC_ATP };
@@ -183,6 +184,7 @@ public:
   vec3 gustRot;               // the eddies' rotation across the airframe, as body rates (rad/s): x roll right, y pitch up, z yaw right
   float gustBurst = 0;        // the gust burst under way, 0..1 (1: the reported peak)
   AeroMem aeroMem;             // the strip model's memory: each strip's separation, the downwash on its way to the tail (aero.h)
+  AeroWake wake;               // the vortices its surfaces trail and its engines' wash, this step (aero_wake.h)
   float density = 1.225f, soundSpeed = 340.3f;   // the air the aircraft is in (the standard atmosphere at its height)
   // ---- autopilot: HOLD (heading / altitude / speed), NAV (to a chosen airport), APPR (approach, flare, rollout)
   enum ApMode { AP_OFF = 0, AP_HOLD, AP_NAV, AP_APPR, AP_STUNT };

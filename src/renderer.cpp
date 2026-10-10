@@ -1066,7 +1066,10 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUniform1i(U(p, "uWakeN"), fp.wakeN);
   if (fp.wakeN > 1) {
     glUniform4fv(U(p, "uWake"), fp.wakeN, &fp.wake[0][0]); glUniform4fv(U(p, "uWakeP"), fp.wakeN, &fp.wakeP[0][0]);
-    glUniform4fv(U(p, "uWakeB"), 1, fp.wakeB);
+    glUniform4fv(U(p, "uWakeG"), fp.wakeN, &fp.wakeG[0][0]); glUniform4fv(U(p, "uWakeB"), 1, fp.wakeB);
+    glUniform1i(U(p, "uWakeVN"), fp.wakeVN); if (fp.wakeVN > 0) glUniform4fv(U(p, "uWakeV"), fp.wakeVN, &fp.wakeV[0][0]);
+    glUniform1i(U(p, "uWakeEN"), fp.wakeEN); if (fp.wakeEN > 0) glUniform4fv(U(p, "uWakeE"), fp.wakeEN, &fp.wakeE[0][0]);
+    glUniform4fv(U(p, "uWakeA"), 1, fp.wakeA);
   }
   // airports + buildings
   {
