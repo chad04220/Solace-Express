@@ -3898,6 +3898,7 @@ void Game::debugScene(const std::string& name) {
   if (name == "research" || name == "research40" || name == "research10" || name == "research20") {   // the terminal, settled (selection decrypted)
     screen = SCR_RESEARCH; realTime = 30; resOpened = 20; resAuthed = true;
     resCraft = name == "research40" ? kWraith : name == "research10" ? kNightjar : name == "research20" ? kMantis : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
+    resSeqOpened = resOpened; resSeq = realTime - resOpened; resSeqAt = realTime; resWarm = false; resWork = 1.f;   // (the boot sequence's own clock long past the shutters: drawResearch)
     return;
   }
   if (name.rfind("researchscan", 0) == 0) {   // the biometric sequence at a moment: researchscan<tenths of a second into the sequence>, the warm-up as far on as the scans show
