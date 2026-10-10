@@ -1,5 +1,5 @@
 //! kPostFS
-#version 330 core
+//! The composite: the windscreen's rain, sharpening, bloom and light shafts, the sun's glare, tone mapping, the vignette and the g-force lens (assembled after g_lens.glsl: shaders.h postFSAssembly).
 in vec2 vUV; out vec4 oColor;
 uniform sampler2D uScene; uniform sampler2D uBloom; uniform float uExposure; uniform float uTime; uniform vec2 uRes;
 uniform float uRainLens; uniform vec4 uRainFlow; uniform float uGlassMist; uniform vec2 uSunScreen; uniform float uSunVisible; uniform float uFade; uniform float uVignette; uniform float uGLoad;
@@ -21,6 +21,13 @@ void main(){
     sunVis *= onScreen ? open/5.0 : 1.0;
   }
   vec2 uv = vUV;
+  // the g-force lens (g_lens.glsl): where this pixel is in it; past the edge of its clear middle it bends the picture
+  // outward a touch, as the thicker part of a lens does
+  float gL = uGLoad, gX = -1.0, gRR = 0.0, gTh = 0.0, gBeat = 0.0, gPx = 0.0;
+  if (gL > 0.002) {
+    gX = gLensShape(vUV, uRes, gL, uTime, gRR, gTh, gBeat, gPx);
+    uv = 0.5 + (vUV - 0.5)*(1.0 - 0.035*gL*smoothstep(-0.05, 0.4, gX));
+  }
   // rain on the windscreen (the cockpit view): only over what is seen through the glass (the cabin's own surfaces
   // are nearer than it). Still, the drops sit beaded on it, running down now and then; in the airflow they are swept
   // back along it - streaming away on screen from where the air meets the glass (uRainFlow), quicker and longer the
@@ -83,7 +90,14 @@ void main(){
   if (abs(texture(uScene, uv).a - 0.55) < 0.02) wgt *= 0.5;   // cockpit displays: already anti-aliased - a lighter touch (none at all left them soft after the TAA)
   vec3 sh = clamp((tM + (tN + tS + tE + tW)*wgt)/(1.0 + 4.0*wgt), 0.0, 0.99995);
   vec3 scene = sh/(1.0 - sh);
-  vec3 c = mix(scene, texture(uBloom, uv).rgb/6.0, uBloomK) + texture(uRays, uv).rgb*uRayK;   // 6 bloom levels summed
+  vec3 blur = texture(uBloom, uv).rgb/6.0;   // 6 bloom levels summed: the whole picture, blurred
+  if (gX > -0.05) {   // through the g-force lens past its clear middle: colour fringes, and the picture going soft
+    float k = gL*smoothstep(-0.05, 0.35, gX);
+    vec2 ca = (uv - 0.5)*0.012*k;
+    scene = vec3(mix(scene.r, texture(uScene, uv + ca).r, k), scene.g, mix(scene.b, texture(uScene, uv - ca).b, k));
+    scene = mix(scene, blur, 0.75*k);
+  }
+  vec3 c = mix(scene, blur, uBloomK) + texture(uRays, uv).rgb*uRayK;
   // subtle sun glare / lens flare ghosts
   if (uSunVisible > 0.0) {
     vec2 sd = uv - uSunScreen; sd.x *= uRes.x/uRes.y;
@@ -96,18 +110,7 @@ void main(){
   c = aces(c);
   c = pow(c, vec3(1.0/2.2));
   vec2 vv = vUV - 0.5; c *= 1.0 - dot(vv,vv)*uVignette;
-  // g-force tunnel: a red rim that deepens to dark red and then black at the screen edge and closes in as g builds
-  if (uGLoad > 0.002) {
-    float asp = uRes.x/uRes.y;
-    float r = length(vv*vec2(asp, 1.0))/length(vec2(0.5*asp, 0.5));       // 0 centre .. 1 corner
-    float g = uGLoad*(1.0 + 0.04*sin(uTime*7.5)*uGLoad);                 // a faint heartbeat pulse at high g
-    float reach = mix(0.95, 0.12, g);
-    float k = clamp((r - reach)/max(1.05 - reach, 0.05), 0.0, 1.0);    // depth into the band
-    vec3 band = mix(vec3(0.7, 0.03, 0.02), vec3(0.22, 0.0, 0.0), smoothstep(0.0, 0.45, k));
-    band = mix(band, vec3(0.0), smoothstep(0.35, 0.85, k));
-    float a = smoothstep(0.0, 0.3, k)*clamp(0.2 + 0.9*g, 0.0, 1.0);
-    c = mix(c*mix(vec3(1.0), vec3(1.0, 0.62, 0.58), g*0.35), band, a);
-  }
+  if (gL > 0.002) c = gLensColour(c, gL, gX, gRR, gTh, gBeat, gPx);
   c += (h21(vUV*uRes + fract(uTime)*100.0) - 0.5)/255.0*2.0;
   c *= uFade;
   oColor = vec4(c, 1.0);

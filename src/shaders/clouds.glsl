@@ -29,26 +29,48 @@ float cloudDensity(vec3 p, int detail){
   }
   return clamp(d*4.5, 0.0, 1.0);
 }
-// The aircraft's wake through the cloud: its path (points with the tunnel's radius there, kept drifting with the
-// cloud) carves a tunnel that opens behind it, widens and fills in again over the next minute (game.cpp
-// updateCloudWake). 0 outside, up to the segment's strength along its axis.
-uniform vec4 uWake[20]; uniform float uWakeK[20]; uniform int uWakeN; uniform vec4 uWakeB;
+// The aircraft's wake through the cloud (game.cpp updateCloudWake): its path, kept drifting with the cloud. Behind the
+// wing its tip vortices roll the air into a pair that sinks under its own downwash, so what they clear is a slot from
+// the path down to where the pair has sunk (uWakeP.y), wider than it is tall. Turbulence widens it, roughens its walls
+// and fills it in again over the next minute; after a while the pair's Crow instability pinches it into a chain of
+// bulges as the vortices link up into rings (uWakeP.z: the distance along the path in their wavelengths). The cloud
+// pushed aside piles up a little round a young channel. How much of the cloud to take away: up to the segment's
+// strength (uWakeP.x) inside, a little below nothing at the rim; uWakeP.w is the path's age there (s).
+uniform vec4 uWake[20]; uniform vec4 uWakeP[20]; uniform int uWakeN; uniform vec4 uWakeB;
 float wakeCarve(vec3 p){
   vec3 b = p - uWakeB.xyz;
   if (dot(b, b) > uWakeB.w*uWakeB.w) return 0.0;
-  float c = 0.0;
+  // the segment this point is most inside (the edge's turbulence below can move it out to 1.5 radii)
+  float best = 0.0, q = 9.0, K = 0.0, age = 0.0;
   for (int i = 0; i < 19; i++) {
     if (i + 1 >= uWakeN) break;
-    if (uWakeK[i] <= 0.0) continue;
-    vec4 A = uWake[i], B = uWake[i + 1];
+    vec4 PA = uWakeP[i];
+    if (PA.x <= 0.0) continue;
+    vec4 A = uWake[i], B = uWake[i + 1], PB = uWakeP[i + 1];
     vec3 ab = B.xyz - A.xyz, ap = p - A.xyz;
     float h = clamp(dot(ap, ab)/max(dot(ab, ab), 1e-3), 0.0, 1.0);
     vec3 dv = ap - ab*h;
-    float r = mix(A.w, B.w, h), d2 = dot(dv, dv);
-    if (d2 >= r*r) continue;
-    c = max(c, uWakeK[i]*(1.0 - smoothstep(0.55*r, r, sqrt(d2))));
+    float r = mix(A.w, B.w, h), D = mix(PA.y, PB.y, h), reach = 2.2*r + D;   // (1.5 radii, swollen by a Crow bulge and moved by its meander)
+    if (dot(dv, dv) >= reach*reach) continue;
+    // across the path (level) and up from it; the slot from the path down to the pair
+    vec3 ax = ab*inversesqrt(max(dot(ab, ab), 1e-3)), side = cross(ax, vec3(0.0, 1.0, 0.0));
+    side = dot(side, side) > 1e-6 ? normalize(side) : vec3(1.0, 0.0, 0.0);
+    float ag = mix(PA.w, PB.w, h), crow = 0.35*smoothstep(15.0, 45.0, ag), ph = 6.2831853*mix(PA.z, PB.z, h);
+    float x = dot(dv, side) - 0.35*r*crow*sin(ph + 1.3), y = dot(dv, cross(side, ax));
+    y -= clamp(y, -D, 0.0);
+    float qi = length(vec2(x, y/0.72))/(r*(1.0 + crow*sin(ph)));
+    float pot = PA.x*(1.0 - smoothstep(0.3, 1.5, qi));
+    if (pot > best) { best = pot; q = qi; K = PA.x; age = ag; }
   }
-  return c;
+  if (best <= 0.0) return 0.0;
+  // the walls: two scales of noise drifting with the cloud and churning upward move them in and out, more as the
+  // channel ages, softening its edge and leaving patches of cloud in it
+  float af = smoothstep(0.0, 50.0, age);
+  vec3 pw = p + vec3(uWindOff.x, age*0.8, uWindOff.y);
+  float n = cn3(pw/26.0)*0.65 + cn3(pw/9.0 + vec3(5.2, 1.3, 7.7))*0.35;
+  float qn = q + (n - 0.5)*(0.3 + 0.5*af);
+  float c = K*(1.0 - smoothstep(mix(0.5, 0.15, af), 1.0, qn))*(1.0 - 0.4*af*(1.0 - smoothstep(0.3, 0.55, n)));
+  return c - 0.3*K*(1.0 - af)*smoothstep(0.95, 1.1, qn)*(1.0 - smoothstep(1.15, 1.45, qn));
 }
 // Rain shafts: the rain under the cloud cells, from the base to the ground and carried downwind as it falls (snow
 // further), grey curtains under the heavier clouds - the same field as the rain round the aircraft (weather.cpp rainAt)
