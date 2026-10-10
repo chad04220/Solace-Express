@@ -144,6 +144,15 @@ int main(int argc, char** argv) {
     float herr = wrapAngle((p.heading() - h0) * DEG) / DEG;
     ok = ok && !p.ev.crashed && yawFree > 2.f && fabsf(herr) < 8.f && p.pos.y > y0b - 150.f && p.engineSpool < 0.6f;
     printf("Twin engine-out (Islander, right): hands-off yaw %+.1f deg in 2 s, held %+.1f deg, height %+.0f m, power %.2f %s\n", yawFree, herr, p.pos.y - y0b, p.engineSpool, ok ? "ok" : "FAIL"); fails += !ok;
+    {   // ...and on one engine it burns half the fuel at the same throttle (the review of v3.44.0, FLT-7: it burned both's)
+      Plane a; a.reset(&tw, vec3(-6000, 1500, 16000), 0, tw.maxFuel * 0.5f, 300, true, tw.cruise * 0.85f);
+      Plane b = a; b.failNow(FAIL_ENGINE_TOTAL, 1);
+      const float fa = a.fuel, fb = b.fuel;
+      for (int i = 0; i < 5 * 240; i++) { a.ctl.throttle = b.ctl.throttle = 0.75f; a.step(1 / 240.f, calm, i / 240.f); b.step(1 / 240.f, calm, i / 240.f); }
+      const float r = (fb - b.fuel) / std::max(fa - a.fuel, 1e-6f);
+      ok = fabsf(r - 0.5f) < 0.05f;
+      printf("Twin engine-out fuel: one engine burns %.2f of both's %s\n", r, ok ? "ok" : "FAIL"); fails += !ok;
+    }
     // blocked pitot: the indication stays where it was as the aircraft slows, and reads higher as it climbs
     p.reset(&s, vec3(-6000, 1200, 16000), 0, s.maxFuel * 0.5f, 85, true, s.cruise); p.ctl.throttle = 0.7f;
     for (int i = 0; i < 240; i++) p.step(1 / 240.f, calm, i / 240.f);

@@ -175,6 +175,21 @@ bool Game::button(float x, float y, float w, float h, const std::string& labelId
   return false;
 }
 
+// A control drawn by hand (a hub tab, a key-binding cell) in the keyboard / D-pad walk, as a button is: true when it
+// has the focus (outlined); *activated when Enter or Space takes it this frame (the review of v3.44.0, UI-5: neither
+// the hub's tabs nor the binding cells could be reached without a mouse)
+bool Game::focusHere(uint32_t id, float x, float y, float w, float h, bool* activated) {
+  const float s = S();
+  focusList.push_back({id, x, y, w, h});
+  const bool f = focusNav && focusId == id;
+  if (f) g_ren.rectOutline(x - 3 * s, y - 3 * s, w + 6 * s, h + 6 * s, C_ACCENT, 0.7f + 0.3f * sinf(realTime * 6.f), 6 * s, 2.f * s);
+  if (activated) {
+    *activated = f && (in.pressed[K_ENTER] || in.pressed[' ']);
+    if (*activated) { in.pressed[K_ENTER] = in.pressed[' '] = false; g_audio.trigger(SFX_CLICK); }
+  }
+  return f;
+}
+
 std::vector<std::string> wrap(const std::string& s, float width, float size) {   // (shared with the research terminal)
   std::vector<std::string> lines; std::string cur, word;
   auto flush = [&]() {
@@ -512,14 +527,16 @@ void Game::drawHub() {
     std::string lab = numbered ? fmt("%02d  %s", i + 1, tabs[i]) : std::string(tabs[i]);
     float w = g_ren.textWidth(lab, tfs) + 28 * s;
     tabX[i] = tx; tabW[i] = w;
-    bool hov = hovered(tx, ty, w, 34 * s);
+    bool take = false;
+    const bool foc = focusHere(0x7AB000u + (uint32_t)i, tx, ty, w, 34 * s, &take);
+    bool hov = hovered(tx, ty, w, 34 * s) || foc;
     float h = anim(uid(tx, ty, "tab"), hov ? 1.f : 0.f, 14);
     if (h > 0.01f) g_ren.rectGrad(tx, ty, w, 34 * s, vec3(0.03f, 0.1f, 0.15f), vec3(0.01f, 0.04f, 0.07f), 0.5f * h, 2 * s);
     vec3 tc = hubTab == i ? C_TEXT : mixc(C_DIM, C_TEXT, h);
     const float tyt = ty + 17 * s - tfs * 0.53f;
     if (numbered) g_ren.text(tx + 14 * s, tyt, tfs, fmt("%02d", i + 1), hubTab == i ? C_ACCENT : C_ACCENT * 0.55f, 1, 0, false);
     g_ren.text(tx + 14 * s + (numbered ? g_ren.textWidth("00  ", tfs) : 0.f), tyt, tfs, tabs[i], tc, 1, 0, false);
-    if (hov && in.mPressed[0] && hubTab != i) { hubTab = i; g_audio.trigger(SFX_CLICK); }
+    if (((hov && in.mPressed[0]) || take) && hubTab != i) { hubTab = i; g_audio.trigger(SFX_CLICK); }
     tx += w + 6 * s;
   }
   g_ren.rect(24 * s, ty + 34 * s, tx - 30 * s, 1 * s, C_ACCENT, 0.15f);
@@ -1342,11 +1359,13 @@ void Game::drawSettings(float x, float y, float w, float h) {
     const char* pages[] = {"GENERAL", "CONTROLS"};
     float tx = x + 150 * s, tw = 140 * s;
     for (int i = 0; i < 2; i++) {
-      bool hov = hovered(tx + i * (tw + 8 * s), py - 2 * s, tw, 32 * s);
+      bool take = false;
+      const bool foc = focusHere(0x5E7700u + (uint32_t)i, tx + i * (tw + 8 * s), py - 2 * s, tw, 32 * s, &take);
+      bool hov = hovered(tx + i * (tw + 8 * s), py - 2 * s, tw, 32 * s) || foc;
       float hk = anim(uid(tx + i * tw, py, "stab"), hov ? 1.f : 0.f, 14);
       if (hk > 0.01f) g_ren.rectGrad(tx + i * (tw + 8 * s), py - 2 * s, tw, 32 * s, vec3(0.05f, 0.16f, 0.24f), vec3(0.02f, 0.06f, 0.1f), 0.8f * hk, 3 * s);
       g_ren.text(tx + i * (tw + 8 * s) + tw * 0.5f, py + 6 * s, 15 * s, pages[i], settingsPage == i ? C_TEXT : mixc(C_DIM, C_TEXT, hk), 1, 1, false);
-      if (hov && in.mPressed[0] && settingsPage != i) { settingsPage = i; bindCapture = -1; g_audio.trigger(SFX_CLICK); }
+      if (((hov && in.mPressed[0]) || take) && settingsPage != i) { settingsPage = i; bindCapture = -1; g_audio.trigger(SFX_CLICK); }
     }
     float ux = anim(0x5e77u, tx + settingsPage * (tw + 8 * s), 14);
     g_ren.glow(ux + 10 * s, py + 28 * s, tw - 20 * s, 2.5f * s, C_ACCENT, 0.5f, 1.2f * s, 7 * s);
@@ -1491,13 +1510,30 @@ void Game::drawControls(float x, float y, float w, float h) {
   if (in.pad && bindCapture < 0 && fabsf(in.ry) > 0.5f) { ctlScrollAcc += in.ry * uiDt * 12.f; }
   while (ctlScrollAcc > 1.f) { ctlScroll--; ctlScrollAcc -= 1.f; }
   while (ctlScrollAcc < -1.f) { ctlScroll++; ctlScrollAcc += 1.f; }
+  // (each cell is in the keyboard / D-pad walk, the rows scrolled out of view too: the walk moves into them and the list
+  // follows the focus)
+  auto cellId = [](int act, int dev) { return 0xB1D00000u + (uint32_t)act * 2u + (uint32_t)dev; };
+  if (focusNav && focusId >= cellId(0, 0) && focusId < cellId(ACT_COUNT, 0)) {
+    const int act = (int)((focusId - cellId(0, 0)) / 2u);
+    for (int i = 0; i < (int)rows.size(); i++) if (rows[i].act == act) { if (i < ctlScroll) ctlScroll = i; if (i >= ctlScroll + visible) ctlScroll = i - visible + 1; }
+  }
   ctlScroll = std::clamp(ctlScroll, 0, maxScroll);
   float sy = anim(0xc7151u, (float)ctlScroll, 18);
   float listTop = y;
   for (int i = 0; i < (int)rows.size(); i++) {
     float ry = listTop + (i - sy) * rowH;
-    if (ry < listTop - 0.5f * s || ry > listTop + (visible - 1) * rowH + 0.5f * s) continue;
     const Row& r = rows[i];
+    const bool shown = !(ry < listTop - 0.5f * s || ry > listTop + (visible - 1) * rowH + 0.5f * s);
+    if (!shown) {   // (registered where it would be; the list is scrolling to it - Enter takes it already)
+      if (r.act >= 0) for (int dev = 0; dev < 2; dev++) {
+        const uint32_t id = cellId(r.act, dev);
+        focusList.push_back({id, dev ? px : kx, ry + 2 * s, cellW, rowH - 8 * s});
+        if (focusNav && focusId == id && bindCapture < 0 && (in.pressed[K_ENTER] || in.pressed[' '])) {
+          in.pressed[K_ENTER] = in.pressed[' '] = false; bindCapture = r.act; bindCaptureDev = dev; bindCaptureT = 0; g_audio.trigger(SFX_CLICK);
+        }
+      }
+      continue;
+    }
     if (r.act < 0) { header(x, ry + 10 * s, w - 30 * s, kActionGroups[r.group]); continue; }
     const ActionInfo& ai = kActions[r.act];
     bool rowHov = hovered(x, ry, w - 30 * s, rowH - 4 * s);
@@ -1507,7 +1543,9 @@ void Game::drawControls(float x, float y, float w, float h) {
     for (int dev = 0; dev < 2; dev++) {
       float cx = dev ? px : kx, cy = ry + 2 * s, cw = cellW, ch = rowH - 8 * s;
       bool cap = bindCapture == r.act && bindCaptureDev == dev;
-      bool hov = hovered(cx, cy, cw, ch);
+      bool take = false;
+      const bool foc = focusHere(cellId(r.act, dev), cx, cy, cw, ch, bindCapture < 0 ? &take : nullptr);
+      bool hov = hovered(cx, cy, cw, ch) || foc;
       int k = set.keyBind[r.act]; unsigned b = set.padBind[r.act];
       bool clash = false;
       for (int o = 0; o < ACT_COUNT; o++)
@@ -1536,7 +1574,7 @@ void Game::drawControls(float x, float y, float w, float h) {
         }
         g_ren.text(cx + cw * 0.5f, cy + ch * 0.5f - 7 * s, 13 * s, lbl, none ? C_DIM * 0.6f : clash ? C_WARN : C_TEXT, 1, 1, false);
         if (!isDef) g_ren.rect(cx + cw - 7 * s, cy + 4 * s, 3.5f * s, 3.5f * s, C_ACCENT, 0.9f, 1.75f * s);   // customised marker
-        if (hov && in.mPressed[0]) { bindCapture = r.act; bindCaptureDev = dev; bindCaptureT = 0; g_audio.trigger(SFX_CLICK); }
+        if ((hov && in.mPressed[0]) || take) { bindCapture = r.act; bindCaptureDev = dev; bindCaptureT = 0; g_audio.trigger(SFX_CLICK); }
         if (hov && in.mPressed[1]) { if (dev) set.padBind[r.act] = 0; else set.keyBind[r.act] = 0; saveSettings(); g_audio.trigger(SFX_CLICK); }
       }
     }

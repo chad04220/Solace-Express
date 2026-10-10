@@ -1171,7 +1171,7 @@ bool Career::load(const std::string& path) {
     else if (!strcmp(key, "hours")) { rdF(c.hours); have |= 256; }
     else if (!strcmp(key, "best")) { rdF(c.bestLandingFpm); have |= 512; }
     else if (!strcmp(key, "seed")) { ok = fscanf(f, "%u", &c.boardSeed) == 1; have |= 1024; }
-    else if (!strcmp(key, "finished")) { rdI(fin, 2048); c.finished = fin != 0; }
+    else if (!strcmp(key, "finished")) { rdI(fin, 2048); ok = ok && (fin == 0 || fin == 1); c.finished = fin != 0; }
     else if (!strcmp(key, "attempt")) ok = fscanf(f, "%u", &c.attempt) == 1;
     else if (!strcmp(key, "attempt_open")) { int ao = 0; ok = fscanf(f, "%d", &ao) == 1 && (ao == 0 || ao == 1); c.attemptOpen = ao != 0; }
     else if (!strcmp(key, "fleet")) ok = fscanf(f, "%d", &fleetN) == 1 && fleetN >= 0;
@@ -1180,7 +1180,7 @@ bool Career::load(const std::string& path) {
       ok = fscanf(f, "%63s %d %f", id, &loc, &fuel) == 3;
       { long pos = ftell(f); float cv = 0; if (fscanf(f, "%f", &cv) == 1 && std::isfinite(cv)) cond = cv; else fseek(f, pos, SEEK_SET); }   // (version 3 adds the condition)
       for (int i = 0; ok && i < kNumAircraft; i++) if (!strcmp(kAircraft[i].id, id)) spec = i;
-      ok = ok && spec >= 0 && loc >= 0 && loc < nApt && std::isfinite(fuel);
+      ok = ok && spec >= 0 && loc >= 0 && loc < nApt && std::isfinite(fuel) && c.ownedIndexFor(spec) < 0;   // (one of each type)
       if (ok) c.fleet.push_back({spec, loc, std::clamp(fuel, 0.f, kAircraft[spec].maxFuel), std::clamp(cond, 0.f, 1.f)});
     }
     else if (!strcmp(key, "insured")) { int v = 0; ok = fscanf(f, "%d", &v) == 1 && (v == 0 || v == 1); c.insured = v == 1; }
@@ -1188,12 +1188,14 @@ bool Career::load(const std::string& path) {
     else if (!strcmp(key, "route")) {
       Route r; ok = fscanf(f, "%d %d %d %d %d %d", &r.fleetIdx, &r.from, &r.to, &r.pilot, &r.flights, &r.earned) == 6 && r.fleetIdx >= 0 && r.from >= 0 && r.from < nApt && r.to >= 0 && r.to < nApt && r.pilot >= 0 && r.flights >= 0;
       { long pos = ftell(f); float pm = 0; if (fscanf(f, "%f", &pm) == 1 && std::isfinite(pm) && pm >= 0.f) r.progressMin = std::min(pm, 24.f * 60.f); else fseek(f, pos, SEEK_SET); }   // (v3.45 adds the leg's progress)
+      for (const Route& o : c.airline.routes) ok = ok && o.fleetIdx != r.fleetIdx;   // (an aircraft flies one route)
       if (ok) c.airline.routes.push_back(r);
     }
     else if (!strcmp(key, "airline")) ok = fscanf(f, "%d %d", &c.airline.earned, &c.airline.incidents) == 2;
     else if (!strcmp(key, "loan")) {
       char id[64]; Loan l;
-      ok = fscanf(f, "%63s %d %d %d %f", id, &l.balance, &l.payment, &l.missed, &l.rate) == 5 && l.balance >= 0 && l.payment >= 0 && l.missed >= 0 && l.missed < 3 && std::isfinite(l.rate);
+      ok = fscanf(f, "%63s %d %d %d %f", id, &l.balance, &l.payment, &l.missed, &l.rate) == 5 && l.balance >= 0 && l.payment >= 0 && l.missed >= 0 && l.missed < 3 && std::isfinite(l.rate) && l.rate >= 0.f
+           && (l.balance == 0 || l.payment > 0);   // (an open loan is paid down: one with no payment never closed)
       l.spec = -1; for (int i = 0; ok && i < kNumAircraft; i++) if (!strcmp(kAircraft[i].id, id)) l.spec = i;
       ok = ok && l.spec >= 0;
       if (ok) c.loan = l;
@@ -1277,7 +1279,7 @@ bool Career::load(const std::string& path) {
   for (auto& r : c.airline.routes) if (r.fleetIdx >= (int)c.fleet.size() || r.pilot >= (int)c.airline.pilots.size()) ok = false;   // (a route needs its aircraft and pilot)
   if (c.job && (c.job->c.id.empty() || c.job->c.to < 0 || c.job->c.to >= nApt)) ok = false;   // a job needs its contract
   ok = ok && (have & 15) == 15
-       && c.license >= LIC_STUDENT && c.license <= LIC_ATP
+       && c.license >= LIC_STUDENT && c.license <= LIC_ATP && c.reputation >= 0   // (malformed states rejected too: the review of v3.44.0, CAR-11)
        && c.location >= 0 && c.location < nApt
        && c.storyIndex >= 0 && c.storyIndex <= (int)g_story.size()
        && c.flights >= 0 && c.landings >= 0 && c.crashes >= 0 && c.hours >= 0;

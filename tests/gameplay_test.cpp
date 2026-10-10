@@ -1101,6 +1101,26 @@ struct GameTest {
       const bool ok = seen > 20 && outside == 0;
       printf("Settings at 800x600, 140%%: %d of %d controls outside the window: %s\n", outside, seen, ok ? "ok" : "FAIL"); fails += !ok;
     }
+    // ---- UI-5 (the v3.44.0 review): the hub's tabs and the key-binding cells are in the keyboard / D-pad walk - Enter on
+    //      a focused tab opens it, on a focused cell (one scrolled out of view too) it starts listening for the key
+    {
+      const int W0 = g_ren.W, H0 = g_ren.H; g_ren.W = 1920; g_ren.H = 1080;
+      g.screen = SCR_HUB; g.hubTab = TAB_CONTRACTS; g.showRadio = false; g.bindCapture = -1; g.in = Input();
+      auto frame = [&] { g.focusList.clear(); g_ren.uiBegin(); g.drawHub(); };
+      g.focusNav = true; g.focusId = 0x7AB000u + 3u; frame();
+      g.in.pressed[K_ENTER] = true; frame(); g.in.pressed[K_ENTER] = false;
+      const bool tab = g.hubTab == 3;
+      g.hubTab = TAB_SETTINGS; g.settingsPage = 1; frame();
+      const int act = ACT_COUNT - 1;   // (the last row: below the list's first screen)
+      g.focusId = 0xB1D00000u + (uint32_t)act * 2u; frame();
+      bool listed = false; for (auto& f : g.focusList) listed |= f.id == g.focusId;
+      g.in.pressed[K_ENTER] = true; frame(); g.in.pressed[K_ENTER] = false;
+      const bool cell = listed && g.bindCapture == act && g.bindCaptureDev == 0;
+      g.bindCapture = -1; g.focusNav = false; g.settingsPage = 0; g.screen = SCR_MENU; g.focusList.clear();
+      g_ren.W = W0; g_ren.H = H0; g_ren.uiBegin();
+      const bool ok = tab && cell;
+      printf("Keyboard reach: Enter opens a focused hub tab %d, starts binding a focused cell scrolled out of view %d: %s\n", tab, cell, ok ? "ok" : "FAIL"); fails += !ok;
+    }
     // ---- CAR-1 (the v3.44.0 review): rough air costs the patient only what the aircraft is put through - five minutes
     // straight and level on the autopilot in P4's turbulence (0.55) left the patient at 10%, "in distress" whatever the
     // pilot did

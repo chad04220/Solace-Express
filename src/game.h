@@ -451,6 +451,7 @@ private:
   // UI (game_ui.cpp)
   float S() const;  // UI scale
   bool button(float x, float y, float w, float h, const std::string& label, bool enabled = true, bool highlight = false);
+  bool focusHere(uint32_t id, float x, float y, float w, float h, bool* activated = nullptr);   // a hand-drawn control in the keyboard / D-pad walk
   bool hovered(float x, float y, float w, float h) const;
   // a scrolling region being drawn: the pointer outside it hovers nothing there (a control scrolled out of view takes no clicks)
   bool hitClipOn = false; float hitClip[4] = {0, 0, 0, 0};

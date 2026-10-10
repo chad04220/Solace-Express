@@ -329,7 +329,9 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   float thrust = 0;
   if (engineRunning) {
     thrust = thrustAt(engineSpool, V, std::max(0.f, -va.z));
-    if (!s.special) fuel = std::max(0.f, fuel - fuelFlowMax() * (0.2f + 0.8f * ctl.throttle) * dt);
+    // (the engines still running burn it: a twin on one engine burns half - the review of v3.44.0, FLT-7)
+    const float live = s.engines > 0 ? float(s.engines - fail.enginesOut(s.engines)) / (float)s.engines : 1.f;
+    if (!s.special) fuel = std::max(0.f, fuel - fuelFlowMax() * (0.2f + 0.8f * ctl.throttle) * live * dt);
   }
 
   // ---------------- configuration

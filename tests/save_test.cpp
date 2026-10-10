@@ -113,6 +113,12 @@ int main() {
     "solace_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nplane kestrel 0\n",          // truncated line
     "solace_save 1\nmoney 5\nlicense 0\nlocation\n",                                      // truncated value
     "garbage",
+    // malformed states (the review of v3.44.0, CAR-11)
+    "solace_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nfinished 999\n",                                   // a marker past 0 / 1
+    "solace_save 1\nmoney 5\nlicense 0\nrep -4\nlocation 0\nstory 0\n",                                         // negative reputation
+    "solace_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane kestrel 0 10\nplane kestrel 0 10\n",         // two of one type
+    "solace_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane kestrel 0 10\nloan kestrel 5000 0 0 0.05\n", // an open loan with no payment
+    "solace_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane kestrel 0 10\nplane wren 0 10\npilot Ann 1 100\npilot Bo 1 100\nroute 0 0 1 0 0 0\nroute 0 1 2 1 0 0\n",   // one aircraft on two routes
   };
   int i = 0;
   for (const char* b : bad) {
