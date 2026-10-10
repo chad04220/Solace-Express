@@ -852,6 +852,29 @@ struct GameTest {
       bool ok = dmg[0] > 0.01f && fabsf(dmg[1] / std::max(dmg[0], 1e-6f) - 1.f) < 0.25f;
       printf("Job meters at 1x / 4x: comfort lost %.3f / %.3f over a simulated minute: %s\n", dmg[0], dmg[1], ok ? "ok" : "FAIL"); fails += !ok;
     }
+    // ---- diagnostics.bat and the other tools (diskless): their flights - crashes among them - never reach the player's
+    // career. A tool session started on a folder holding a save flies a fresh career in memory, and leaves the save's
+    // bytes, and the folder, as they were (the owner's v3.44 diagnostics charged their career for the crash scenes)
+    {
+      namespace fs = std::filesystem;
+      const fs::path dir = fs::path("diskless_test"); std::error_code ec; fs::remove_all(dir, ec); fs::create_directories(dir, ec);
+      Career mine; mine.newGame(); mine.money = 123456; mine.license = LIC_ATP;
+      const std::string sav = (dir / "career.sav").string();
+      const bool wrote = mine.save(sav);
+      auto bytes = [](const std::string& p) { std::ifstream f(p, std::ios::binary); return std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>()); };
+      const std::string before = bytes(sav);
+      Game d; d.headless = true; d.diskless = true; d.saveDir = dir.string(); d.init(false, nullptr);
+      const bool fresh = !d.hasSave && d.career.money != 123456;
+      Contract c = g_story[4]; c.story = false; c.payout = 1000; c.title = "Tool crash";
+      d.career.license = LIC_CPL; d.career.location = c.from;
+      d.startFlight(c, 1, Career::SRC_RENT); d.takeoffAnnounced = true;
+      d.endFlight(false, "Crashed (tool scene)", OUT_CRASHED); d.saveGame(); d.saveSettings(); d.shutdown();
+      int files = 0; for (auto& e : fs::directory_iterator(dir, ec)) { (void)e; files++; }
+      const bool untouched = wrote && bytes(sav) == before && files == 1;
+      fs::remove_all(dir, ec);
+      bool ok = fresh && untouched;
+      printf("Tools keep off the career: fresh career in memory %d, the save's bytes and folder untouched %d (%d file%s): %s\n", fresh, untouched, files, files == 1 ? "" : "s", ok ? "ok" : "FAIL"); fails += !ok;
+    }
     // ---- UI-1 (the v3.44.0 review): the radio panel owns the pointer over it. A click on a station reached the hub
     // beneath it first - one at 1080p over the Hangar bought a Wren ($30,000, saved) - and in an XR-40 flight armed the
     // weapons and fired. Clicks over the whole panel, on every tab: nothing beneath it moves

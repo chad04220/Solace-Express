@@ -805,6 +805,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   pace.begin(stInit);
   introFrame(pace.fraction(), perfFresh ? "Loading your career  |  learning how each aircraft flies (once)" : "Loading your career and the aircraft performance", 1.f);
+  game.diskless = tool;   // (diagnostics and other tools: the player's career and settings are never written)
   game.init(false, [&](float f, const std::string& what) { pace.setSub(f); introFrame(pace.fraction(), what, 1.f); });
   if (game.quit) { stopIntro(false); return 0; }
   pace.begin(stTex);

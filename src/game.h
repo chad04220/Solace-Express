@@ -92,6 +92,10 @@ public:
   void focusLost() { if (screen == SCR_FLIGHT && !crashed) paused = true; }   // the window lost focus: a flight pauses
   Settings set;
   std::string saveDir;
+  // A tool session (diagnostics.bat's --bench, --shots, --profile, --analyze, --loadshots): its flights - crashes among
+  // them - fly a fresh career kept in memory. The player's career is never read for it, and no career, settings or
+  // station file is written (the settings are read: the bench measures the player's quality)
+  bool diskless = false;
   std::string assetDir = ".";                          // folder of the exe (pre-rendered loading pictures live in assetDir\loading)
 
   void loadSettings();

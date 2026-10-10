@@ -240,6 +240,7 @@ void Game::loadSettings() {
 // Written only when something changed (the settings page calls this every frame), through a temp file so an
 // interrupted write never leaves a half-written settings file.
 void Game::saveSettings() {
+  if (diskless) return;   // (a tool session: the player's settings stay as they were)
   std::string t = fmt("quality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
   t += fmt("renderRes %d\nfpsTarget %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
@@ -319,19 +320,20 @@ void Game::loadStations() {
       for (auto& s : stations) if (s.second == d.second) have = true;
       if (!have) stations.push_back({d.first, d.second});
     }
-    if (!saveDir.empty() || userFile) writeStations(path, stations);
+    if ((!saveDir.empty() || userFile) && !diskless) writeStations(path, stations);
   }
   set.radioStation = std::clamp(set.radioStation, 0, (int)stations.size() - 1);
 }
 
 void Game::saveGame() {
+  if (diskless) return;
   if (career.save(joinPath(saveDir, "career.sav"))) hasSave = true;
   else toast("Couldn't save the career (disk full or folder not writable)", vec3(1.f, 0.4f, 0.3f));
 }
 bool Game::commit(const std::function<void(Career&)>& change) {
   Career cand = pendingCareer ? *pendingCareer : career;
   change(cand);
-  if (headless && saveDir.empty()) { career = cand; pendingCareer.reset(); return true; }   // (tests: no disk)
+  if ((headless && saveDir.empty()) || diskless) { career = cand; pendingCareer.reset(); return true; }   // (tests, tools: no disk)
   if (cand.save(joinPath(saveDir, "career.sav"))) { career = cand; pendingCareer.reset(); hasSave = true; saveWhy.clear(); return true; }
   pendingCareer = cand; retryT = 0;
   saveWhy = "Couldn't save the career (disk full or folder not writable)";
@@ -340,6 +342,7 @@ bool Game::commit(const std::function<void(Career&)>& change) {
 }
 bool Game::retryCommit() {
   if (!pendingCareer) return true;
+  if (diskless) { career = *pendingCareer; pendingCareer.reset(); return true; }
   if (!pendingCareer->save(joinPath(saveDir, "career.sav"))) return false;
   career = *pendingCareer; pendingCareer.reset(); hasSave = true; saveWhy.clear();
   toast("Career saved", vec3(0.6f, 1.f, 0.7f));
@@ -556,8 +559,8 @@ void Game::init(bool buildWorld, const std::function<void(float, const std::stri
   report(1 + kNumAircraft, "Aircraft performance data ready");
   career.newGame();
   std::string sav = joinPath(saveDir, "career.sav");
-  hasSave = career.load(sav);
-  if (!hasSave && career.load(sav + ".bak")) { hasSave = true; toast("Career save was damaged: restored the previous save"); }
+  hasSave = !diskless && career.load(sav);   // (a tool's flights never touch the player's career: a fresh one, in memory)
+  if (!hasSave && !diskless && career.load(sav + ".bak")) { hasSave = true; toast("Career save was damaged: restored the previous save"); }
   if (hasSave && career.attemptOpen) {   // the last session ended inside a flight: the career stands as it was before it
     toast(fmt("Your last flight was interrupted: you are back at %s", g_world.airports[career.location].name), vec3(1.f, 0.8f, 0.4f));
     // an accepted job whose leg never ended waits where the leg began (the hub's recovery card offers it again)
@@ -566,7 +569,7 @@ void Game::init(bool buildWorld, const std::function<void(float, const std::stri
   if (!hasSave) {
     career.newGame();
     // keep an unreadable save aside rather than overwriting it with a new career
-    if (FILE* f = fopen(sav.c_str(), "r")) { fclose(f); remove((sav + ".damaged").c_str()); rename(sav.c_str(), (sav + ".damaged").c_str()); toast("Career save couldn't be read: kept as career.sav.damaged"); }
+    if (FILE* f = diskless ? nullptr : fopen(sav.c_str(), "r")) { fclose(f); remove((sav + ".damaged").c_str()); rename(sav.c_str(), (sav + ".damaged").c_str()); toast("Career save couldn't be read: kept as career.sav.damaged"); }
   }
   report(2 + kNumAircraft, "Career and recovery checks complete");
   radio.init();
