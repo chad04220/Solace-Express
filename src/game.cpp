@@ -4019,20 +4019,36 @@ void Game::debugScene(const std::string& name) {
       printf("wxfly: at (%.0f, %.0f, %.0f) %.0f kt, cloud here %.2f, rain %.2f, eddies %.2f m/s, lift %+.1f thermal %+.1f, wake points %d\n", plane.pos.x, plane.pos.y, plane.pos.z,
              plane.airspeed * MS_TO_KT, plane.wxl.cloud, plane.wxl.rain, plane.wxl.sigma, plane.wxl.lift, plane.wxl.thermal, (int)cloudWake.size());
       toasts.clear();
-      if (cm == 't' && cloudWake.size() >= 5) {   // (from above and behind, looking down along the path: its trench through a cloud top)
+      if (cm == 't' && cloudWake.size() >= 5) {   // (from above and ahead, looking down along the path: its trench through a cloud top)
         const vec3 off(cloudOff.x, 0, cloudOff.y), A = cloudWake.back().c - off, B = cloudWake[cloudWake.size() - 5].c - off;
         dbgCam = true; dbgFollow = false; dbgCamPos = A + normalize(A - B) * 120.f + vec3(0, 140.f, 0); dbgCamLook = (A + B) * 0.5f;
+        for (float h : {140.f, 260.f, 420.f}) {   // (high enough to be out of the cloud)
+          const vec3 cp = A + normalize(A - B) * (0.85f * h) + vec3(0, h, 0);
+          if (wxfield::cloudDensity(wx, cp, true) < 0.01f && wxfield::cloudDensity(wx, (cp + dbgCamLook) * 0.5f + vec3(0, 40.f, 0), true) < 0.05f) { dbgCamPos = cp; break; }
+        }
       }
       if (cm == 'w' && cloudWake.size() >= 9) {   // (inside the channel half a kilometre back, looking on back along it)
         const vec3 off(cloudOff.x, 0, cloudOff.y), A = cloudWake[cloudWake.size() - 5].c - off, B = cloudWake[cloudWake.size() - 9].c - off;
         dbgCam = true; dbgFollow = false; dbgCamPos = A + vec3(0, 4.f, 0); dbgCamLook = B;
       }
+      // (a camera in clear air with a clear view of a point: the first of some places round it with no cloud on the line
+      // to it, short of the last stretch)
+      auto clearView = [&](vec3 at, vec3 d, float short_) {
+        const vec3 sd = normalize(cross(d, vec3(0, 1, 0)));
+        for (float dist : {350.f, 600.f, 950.f}) for (float az : {35.f, -35.f, 65.f, -65.f, 15.f, 90.f}) for (float el : {6.f, 20.f, 40.f}) {
+          const vec3 cp = at + (d * cosf(az * DEG) + sd * sinf(az * DEG)) * (dist * cosf(el * DEG)) + vec3(0, dist * sinf(el * DEG), 0);
+          bool clear = true;
+          for (float t = 0.f; t < 1.f && clear; t += 0.02f) { const vec3 q = cp + (at - cp) * t; if (length(q - at) > short_ && wxfield::cloudDensity(wx, q, true) > 0.03f) clear = false; }
+          if (clear) return cp;
+        }
+        return at + d * 400.f + vec3(0, 60.f, 0);
+      };
       if (cm == 'o' && cloudWake.size() >= 2) {   // (off to the side, at the hole where the path came out of the cloud)
         const vec3 off(cloudOff.x, 0, cloudOff.y);
         int e = (int)cloudWake.size() - 1;
         while (e > 0 && wxfield::cloudDensity(wx, cloudWake[e].c - off, true) < 0.25f) e--;
-        const vec3 E = cloudWake[e].c - off, d = normalize(cloudWake.back().c - cloudWake[std::max(e - 1, 0)].c), sd = normalize(cross(d, vec3(0, 1, 0)));
-        dbgCam = true; dbgFollow = false; dbgCamPos = E + d * 380.f + sd * 240.f + vec3(0, 30.f, 0); dbgCamLook = E;
+        const vec3 E = cloudWake[e].c - off, d = normalize(cloudWake.back().c - cloudWake[std::max(e - 1, 0)].c);
+        dbgCam = true; dbgFollow = false; dbgCamPos = clearView(E, d, 90.f); dbgCamLook = E;
       }
       if (cm == 'b') {   // (down the wake's own line: the path drifts a little off the heading)
         dbgCam = true; dbgFollow = false; vec3 f = plane.forward(); dbgCamPos = plane.pos - f * 8.f + vec3(0, 2.f, 0); dbgCamLook = plane.pos - f * 400.f;
