@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
     put(dir, "hullbake_safegear.frag", worldLibAssembly("#define NV_SAFE_GEAR\n#define PART_BAKE\n") + kHullBakeMain);
     put(dir, "hullbake_normals_safegear.frag", worldLibAssembly("#define NV_SAFE_GEAR\n#define PART_BAKE\n#define HULL_BAKE_NORMALS\n") + kHullBakeMain);
     // each aircraft's own builds (shaders.h aircraftDefines): its mesh pass and its bakes
-    for (int m = 0; m <= kWraith; m++) {
+    for (int m = 0; m < kAircraftCount; m++) {
       float M[96]; packModelOf(m, M);
       const std::string d = aircraftDefines(m, M), n = std::to_string(m);
       put(dir, ("plane_mesh_af" + n + ".frag").c_str(), planeMeshFSAssembly(d));

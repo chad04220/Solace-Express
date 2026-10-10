@@ -6,6 +6,7 @@
 #include "../src/aero.h"
 #include "../src/aero_wake.h"
 #include "../src/aircraft.h"
+#include "../src/models.h"
 #include <cstdio>
 
 static int fails = 0;
@@ -28,7 +29,7 @@ static float wingLift(const AeroGeom& g, const AeroOut& o, float rho, float V) {
 
 int main() {
   printf("%-16s %7s %7s %6s %6s %6s %5s %7s %7s %7s\n", "type", "gamPair", "KJ", "b0/b", "sink", "nv", "flapv", "tailGam", "finGam", "wash");
-  for (int i = 0; i < kNumAircraft + 4; i++) {
+  for (int i = 0; i < kAircraftCount; i++) {
     const AircraftSpec& s = kAircraft[i];
     if (s.special != 0) continue;
     const AeroGeom& g = aeroGeom(s);
@@ -42,7 +43,14 @@ int main() {
     float tailGam = 0, finGam = 0;
     for (int k = 0; k < w.nv; k++) if (w.v[k].surf == AS_TAIL && w.v[k].r.x > 0.f) tailGam += w.v[k].gam;
     check(w.gamPair > 0.f && fabsf(w.gamPair - kj) < 0.2f * kj, "pair circulation = wing lift / (rho V b0)", s.name);
-    check(w.b0 > 0.6f * w.span && w.b0 < 0.92f * w.span, "pair spacing near pi/4 of the span", s.name);
+    // Betz spacing follows the actual loading. Pi/4 is an elliptic special case, not a
+    // lower bound: the Atlas's highly tapered, washed-out wing rolls up nearer the centre.
+    float peakGamma = 0;
+    for (int k = 0; k < g.nSt; ++k) if (g.st[k].surf == AS_WING) peakGamma = std::max(peakGamma, fabsf(o.gam[k]));
+    const float loadSpan = L / (in.rho * V * std::max(peakGamma, .01f));
+    printf("  spacing %s actual%.3f expected-from-loading%.3f\n",s.name,w.b0/w.span,loadSpan/w.span);
+    check(w.b0 > 0.f && w.b0 < w.span && fabsf(w.b0-loadSpan)<.2f*loadSpan,
+          "pair spacing conserves actual spanwise lift and peak circulation", s.name);
     // between the tips the air goes down, outside them up (the vortices alone); ahead of the nose it is pushed aside
     const vec3 mid = aeroWakeInduced(w, nullptr, vec3(0.f, w.pairY, w.pairZ + 0.3f * w.span));
     const vec3 out = aeroWakeInduced(w, nullptr, vec3(0.75f * w.span, w.pairY, w.pairZ + 0.3f * w.span));
@@ -50,15 +58,25 @@ int main() {
     float zNose = 1e9f; for (int k = 0; k < g.nSeg; k++) zNose = std::min(zNose, g.seg[k].z - 0.5f * g.seg[k].len);
     const vec3 nose = aeroWakeInduced(w, &g, vec3(0.6f, g.seg[0].y, zNose + 0.3f));
     check(nose.x > 0.f, "the nose pushes the air aside", s.name);
-    // flaps: more vortices, the extra ones inboard of the tips and turning the same way
+    // flaps: correctly oriented outer-edge vortices, whether distinct or merged with the tip wake
     AeroWake wf;
+    AeroIn cleanIn; AeroOut cleanOut;
+    evalAt(g, s, V, 4.f * DEG, 0.f, 0.f, 0.f, cleanIn, cleanOut);
+    const float cleanLiftAtFlapAngle = wingLift(g, cleanOut, cleanIn.rho, V);
     evalAt(g, s, V, 4.f * DEG, 0.f, 1.f, 0.f, in, o);
     aeroWakeBuild(g, in, o, wf);
-    int inboard = 0, flapped = 0; float xTip = 0;
+    int inboard = 0, flapped = 0;
     for (int k = 0; k < g.nSt; k++) flapped += g.st[k].ctl == AC_FLAP;
-    for (int k = 0; k < wf.nv; k++) if (wf.v[k].surf == AS_WING) xTip = std::max(xTip, fabsf(wf.v[k].r.x));
-    for (int k = 0; k < wf.nv; k++) if (wf.v[k].surf == AS_WING && fabsf(wf.v[k].r.x) < xTip - 0.15f * 0.5f * wf.span && wf.v[k].gam * wf.v[k].r.x > 0.f) inboard++;
-    if (flapped && g.flapA > 0.f) check(inboard >= 2, "flap-edge vortices", s.name);
+    // Locate flap vortices against the authored flap boundary, not the outermost vortex
+    // centroid: on a strongly tapered wing the tip and outer-flap wake can merge into one.
+    const float flapEdge = kModels[i].wing[0] * kModels[i].flapFrac;
+    for (int k = 0; k < wf.nv; k++) if (wf.v[k].surf == AS_WING &&
+        fabsf(fabsf(wf.v[k].r.x)-flapEdge) < .25f * .5f * wf.span && wf.v[k].gam * wf.v[k].r.x > 0.f) inboard++;
+    if (flapped && g.flapA > 0.f) {
+      check(inboard >= 2, "flap-edge vortices", s.name);
+      check(wingLift(g, o, in.rho, V) > 1.08f * cleanLiftAtFlapAngle,
+            "flaps increase circulation/lift at the same airspeed and angle", s.name);
+    }
     // rolling right (right aileron up): the right side's vortex weakens against the left's
     AeroWake wr;
     evalAt(g, s, V, 6.f * DEG, 0.f, 0.f, 1.f, in, o);
@@ -80,6 +98,12 @@ int main() {
     for (int e = 0; e < w.nj; e++) if (!w.j[e].hot) wash = std::max(wash, dot(aeroWakeInduced(w, &g, w.j[e].r + w.aft * (2.f * w.j[e].R)), w.aft));
     if (g.nEng && g.eng[0].prop) check(wash > 1.f, "propeller slipstream", s.name);
     printf("%-16s %7.1f %7.1f %6.2f %6.2f %6d %5d %7.1f %7.1f %7.1f\n", s.name, w.gamPair, kj, w.b0 / std::max(w.span, 0.1f), aeroWakeSink(w), w.nv, inboard, tailGam, finGam, wash);
+  }
+  // The exact elliptic special case is still checked, independently of arbitrary planforms.
+  {
+    AeroWake e; aeroWakeElliptic(10000.f,1.2f,50.f,12.f,0,0,1,0,5,e);
+    check(fabsf(e.b0-PI*12.f/4.f)<.00001f && fabsf(e.gamPair*1.2f*50.f*e.b0-10000.f)<.01f,
+          "elliptic pair spacing and Kutta-Joukowski lift", "elliptic reference");
   }
   // the air a vortex catches turns round it the right way and stays at its radius
   {

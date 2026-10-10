@@ -1,0 +1,53 @@
+{
+  "folder": "/workspace/scratch/87b29863f015/new-aircraft-review/refactor-after",
+  "aircraft": [
+    {
+      "model": 10,
+      "name": "XR-30 Specter",
+      "views": 3,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 37,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 36,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "model": 12,
+      "name": "XR-40 Wraith",
+      "views": 5,
+      "native_pixels_verified": true,
+      "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "cache": {
+        "exterior": {
+          "shader_hits": 38,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        },
+        "cockpit": {
+          "shader_hits": 39,
+          "shader_misses": 0,
+          "meshes_requested": 1,
+          "meshes_built": 0
+        }
+      },
+      "errors": []
+    }
+  ],
+  "errors": [],
+  "aircraft_count": 2,
+  "view_count": 8,
+  "pass": true
+}

@@ -1,6 +1,7 @@
 // End-to-end gameplay test: a scripted pilot flies Lesson 1 and then lands at a destination,
 // exercising the real game loop (completion detection, scoring, payout, story progression).
 #include "../src/game.h"
+#include "../src/models.h"
 #include "test_world.h"
 #include <cstdlib>
 #include <cstring>
@@ -22,16 +23,20 @@ struct GameTest {
 #include "state_regression.inc"
 #include "free_flight_regression.inc"
 #include "lesson_voice_regression.inc"
+#include "aircraft_voice_regression.inc"
+#include "wreck_pose_regression.inc"
   static int run(int part = 0) {
     buildTestWorld(); buildStory();
     g_audio.init(48000);
     // part (--part 1..4): the test in four pieces CI runs side by side, each from a fresh game (0, the default: all
-    // of it, one after another). 1 the state, free-flight and voice regressions; 2 Lesson 1, the landing, the towers;
+    // of it, one after another). 1 the state, free-flight, wreck-pose, wheel and voice regressions; 2 Lesson 1, the
+    // landing, the towers;
     // 3 the parking brake, the quote and the fuel estimates; 4 the rest
     auto in = [&](int k) { return part == 0 || part == k; };
     Game g; g.initHeadless(); g.botControl = true;
+    if (getenv("SOLACE_WRECK_POSE_ONLY")) return wreckPoseRegressions() + wheelVisualRegressions();
     if (getenv("SOLACE_FREE_FLIGHT_ONLY")) return freeFlightRegressions();
-    int fails = getenv("SOLACE_VOICE_ONLY") || !in(1) ? 0 : stateRegressions() + freeFlightRegressions();
+    int fails = getenv("SOLACE_VOICE_ONLY") || !in(1) ? 0 : stateRegressions() + freeFlightRegressions() + wreckPoseRegressions() + wheelVisualRegressions();
     if (getenv("SOLACE_STATE_ONLY")) { printf("%d state failures\n", fails); return fails; }
 #ifdef SOLACE_ASSETS
     bool voices = g.atc.load(std::string(SOLACE_ASSETS) + "/voice");   // the tower voices (the audio is rendered below, as the audio thread would)
@@ -40,6 +45,9 @@ struct GameTest {
     bool voices = false;
 #endif
     if (in(1) || getenv("SOLACE_VOICE_ONLY")) fails += controlVoiceRegressions();
+#ifdef SOLACE_ASSETS
+    if (in(1) || getenv("SOLACE_VOICE_ONLY")) fails += aircraftVoiceRegressions(std::string(SOLACE_ASSETS) + "/voice");
+#endif
     if (getenv("SOLACE_VOICE_ONLY")) { printf("%d voice failures\n", fails); return fails; }
     static float abuf[2 * 4096];
     if (voices && in(1)) {   // the voice lines resolve for the game's messages, fixed and assembled from fragments
@@ -416,7 +424,7 @@ struct GameTest {
       // ---- a lesson starts with the parking brake set: full throttle doesn't move the aircraft until it's released
       {
         g.botControl = false;
-        for (int sp = 0; sp < kNumAircraft; sp++) {   // every career aircraft, from a free flight at Solace Capital
+        for (int sp : kCareerAircraft) {   // every career aircraft, from a free flight at Solace Capital
           Contract fc = g_story[0]; fc.forceAircraft = -1; fc.type = CT_FERRY; fc.from = fc.to = g_world.findAirport("CAP"); fc.wps.clear(); fc.hints.clear();
           g.startFlight(sp == 0 ? g_story[0] : fc, sp, sp == 0 ? Career::SRC_LESSON : Career::SRC_RENT);
           for (int i = 0; i < 60 * 8; i++) { g.plane.ctl.throttle = 0.4f; g.update(dt); }
@@ -439,7 +447,7 @@ struct GameTest {
         const bool trafficWas = g.set.traffic; g.set.traffic = false;
         int a4 = -1; for (size_t i = 0; i < g_story.size(); i++) if (g_story[i].id == "A4") a4 = (int)i;
         const Contract& c = g_story[a4];
-        int spec = -1; for (int i = 0; i < kNumAircraft; i++) if (std::string(kAircraft[i].id) == "starling") spec = i;
+        int spec = -1; for (int i : kCareerAircraft) if (std::string(kAircraft[i].id) == "starling") spec = i;
         g.career.license = LIC_ATP; g.career.location = c.from; g.career.money = 500000;
         g.career.fleet.clear(); g.career.fleet.push_back({spec, c.from, kAircraft[spec].maxFuel, 0.f});
         Career::LaunchPlan pl = g.career.plan(c, spec, Career::SRC_OWNED);
@@ -472,7 +480,7 @@ struct GameTest {
       {
         int ok = 0, n = 0;
         for (auto [id, specId] : std::vector<std::pair<const char*, const char*>>{{"L4", "kestrel"}, {"C2", "wren"}, {"C7", "pelican"}, {"C2", "starling"}}) {
-          int si = -1; for (int i = 0; i < kNumAircraft; i++) if (std::string(kAircraft[i].id) == specId) si = i;
+          int si = -1; for (int i : kCareerAircraft) if (std::string(kAircraft[i].id) == specId) si = i;
           const Contract* c = nullptr; for (auto& k : g_story) if (k.id == id) c = &k;
           if (si < 0 || !c) { printf("   fuel estimate: %s / %s not found\n", id, specId); n++; continue; }
           Career::LaunchPlan pl = g.career.plan(*c, si, Career::SRC_RENT);
@@ -1218,7 +1226,7 @@ struct GameTest {
                               "Rain has started", "Snow has set in", "Aerobatics: recovering to level flight", "Aerobatics need to be airborne",
                               "MACH 1 - SONIC BOOM", "CLOAK ENGAGED", "PLASMA BOMB AWAY", "Pods 90 deg - VTOL hover", "Thrust vector 90 deg - VTOL hover"}) msgs.push_back(m);
         for (int f = 0; f < Plane::STUNT_COUNT; f++) msgs.push_back(fmt("Aerobatics: %s", Plane::stuntName(f)));
-        int nAll = kNumAircraft + 4;   // (the career fleet and the four research craft)
+        int nAll = kAircraftCount;   // (the career fleet and the four research craft)
         for (int i = 0; i < nAll; i++) msgs.push_back(fmt("SPLASH %d - %s down", i + 1, kAircraft[i].name));
         bad = 0;
         for (auto& m : msgs) { AtcVoice::Tx tx; if (!g.atc.resolve(m, "", false, tx)) { printf("   no voice line for '%s'\n", m.c_str()); bad++; } }

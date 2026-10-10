@@ -8,6 +8,7 @@
 #include <mutex>
 #include <unordered_map>
 #include "common.h"
+#include "aircraft.h"
 #include "gl.h"
 #include "world.h"
 #include "entity_mesh.h"
@@ -55,7 +56,8 @@ static const int kWreckPieces = 16, kWreckCuts = 12;
 struct WreckVisual {
   int pieces = 0;               // > 0: the aircraft broken up - these pieces of it drawn from its mesh (drawWreck)
   vec3 pos[kWreckPieces]; float rot[kWreckPieces][9];   // each piece's placing: the airframe's origin as it carries it (world), body->world rotation
-  vec3 C[kWreckPieces], H[kWreckPieces];                // its box (body coords): the first box holding a point owns it, the last piece the rest
+  vec3 C[kWreckPieces], H[kWreckPieces];                // first box owns a body point; negative H: rigid-only owner, no static skin
+  int gearOwner[3] = {-1, -1, -1};                     // left main, right main, nose/tail; -1: stowed, use the containing piece
   vec3 mid[kWreckPieces]; float rad[kWreckPieces];      // its bound (world)
   float burn[kWreckPieces] = {};                        // how far its fire has blackened it, 0..1
   int cutN[kWreckPieces] = {}; float cut[kWreckPieces][kWreckCuts][6];   // where it tore: thin boxes (body coords: centre, half extents)
@@ -468,7 +470,7 @@ private:
   // the bakes build each body with its own pair. Made the first time the type is drawn or baked (from the binary cache
   // after the first launch), each falling back to the shared build (sharedMeshProgram, sharedBakePrograms) if it fails.
   // AF_ALL (debug) draws and bakes everything with the shared builds.
-  static constexpr int kAfModels = 13;   // (the whole roster, kAircraft: the career types and the research craft)
+  static constexpr int kAfModels = kAircraftCount;   // (the whole roster, kAircraft: the career types and the research craft)
   // (the bake: a builder pair for each of its bodies - [0] the outside's, without the cabin's code (AF_OUTSIDE), [1] the
   // cockpit's - each with its own stamp, so a cockpit's edit builds that cockpit's body alone)
   struct AfOwn { GLuint mesh = 0, probe = 0, bake[2][2] = {}, pass[3] = {}; bool meshTried = false, bakeTried[2] = {}, passTried[3] = {}; std::string stamp[2]; };

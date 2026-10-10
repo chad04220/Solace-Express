@@ -67,9 +67,9 @@ int main(int argc, char** argv) {
   const int nAp = (int)g_world.airports.size();
   int idx = 0;
   const float dt = 1 / 60.f;
-  for (int si = 0; si <= kWraith; si++) {
+  for (int si = 0; si < kAircraftCount; si++) {
     const AircraftSpec& s = kAircraft[si];
-    if (comfort && si >= kNumAircraft) continue;
+    if (comfort && !isCareerAircraft(si)) continue;
     for (int ai = 0; ai < nAp; ai++) {
       const Airport& A = g_world.airports[ai];
       if (!runwayOK(s, A)) continue;   // (the fields the career sends it to)

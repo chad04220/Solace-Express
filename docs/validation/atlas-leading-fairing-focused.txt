@@ -1,0 +1,42 @@
+Final Atlas leading-fairing integration, 2026-10-10 20:54 UTC.
+Actual production source, test byte-identical to reviewed candidate.
+No changes to contacts, cavity, doors, mechanism, aircraft physics or breakup transforms.
+
+=== final actual-source geometry ===
+Atlas actual contacts: track 3.4500, mainZ 4.17334, gearHeight 3.6500; H=(3.450,-1.300,2.720), stowed centre=(1.850,-1.300,1.07057), yaw 1.485320
+Minimum metres: closed wheel 0.05100, swept wall 0.05201, retained upper skin 0.07689, opposite trucks 1.20077, planform 0.08485; maximum truck x 3.97900
+Fixed field minimum 0.005000 (SDF estimator, not a physical gap); trunnion separation outside joint 0.12334m; aft closure negative controls pass
+Door minima metres: truck 0.08859, shaft/oleo 0.09812, nacelle 0.19988, positive x 0.33617, deployed ground 0.19619; flap root 4.050
+PASS: 21923754 checks, 0 failures. CPU/source geometry only; cached raster and hardware validation are separate.
+
+=== independent dense sweep ===
+poses 401 samples/pose 163200 minimum fixed-material field (0.005000000000000143, 0.0, [3.45, -2.125, 2.845], 'upper shaft') intrusions 0
+conservative added-fairing max body x 4.932766244032502 infinite nacelle cylinder separation 0.08723375596749783
+aft closure old [-0.01] new [-0.01]
+old direct shaft old [-0.0415653] new [-0.0415653]
+closed floor max field delta 2.7755575615628914e-17
+
+=== native inspection ===
+Round2-final 11-step Atlas bay sheet plus native 50% bay and half-gear full breakup inspected. Connected trailing-link knee/journal, cleared doors, unique separated gear owners, intact cut faces/nacelles. Final ramp recapture pending.
+PASS: 74537 Atlas primitive-ownership checks; old predicate misclassifies 16380 distant samples
+
+=== dated completion addendum: 2026-10-10 21:51 UTC ===
+The historical "Final ramp recapture pending" line above is superseded.
+Final-ramp native production captures were completed and accepted at 21:02 UTC:
+  new-aircraft-review/atlas-ramp-final/14_atlas_a180/
+  new-aircraft-review/validation/atlas-leading-ramp-before-after-native-crops.png
+The final post-refactor exterior sheet has also been inspected:
+  new-aircraft-review/fleet-final/14_atlas_a180/14_exterior_qa.jpg
+Its closed/half/full bay frames are pixel-exact to the accepted ramp captures,
+using the same mesh_3b9b0236c0db0047_4091cba658d7798c.bin cache.
+Recorded proof: docs/validation/atlas-final-baked-projection.json
+  - all closed-door vertices >=95.13 mm inside the wing trailing edge;
+  - CPU pose bounds match native GPU readback within 0.00051 mm;
+  - distant pod vertices wrongly tagged as wing paint: zero.
+Final cache is 18,986,904 bytes; static body 444,102 triangles. Full comparison:
+  docs/validation/atlas-underwing-cost-baselines.json
+Final design/material/footprint acceptance and the unchanged shared reflection
+limitation are documented in docs/validation/atlas-exterior-final-review.md and
+  docs/validation/atlas-compact-spot-lighting.json
+Hardware frame-time validation remains unmeasured; native llvmpipe images are
+visual/geometry evidence and are not an RTX 3070 performance claim.

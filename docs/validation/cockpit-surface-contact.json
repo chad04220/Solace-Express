@@ -1,0 +1,13 @@
+{
+  "checks": 25317,
+  "failures": 0,
+  "scope": "Shoulder contact, shared Larkspur glazing, Atlas vent/tablet normals, hidden deck/firewall shell overlap, bounded normal dispatch and Specter support gradients; native rendering remains required.",
+  "source_sha256": {
+    "plane_sdf.glsl": "da584ce6a46eb8389ec5d9cc5c1e8bf929e8ea3b19e44ef3c7567004b5ad10c3",
+    "plane_common.glsl": "c8c514c7590910dec2f9f74764d11ab1a2c0b7979fd40201abd9c6769b2fd076",
+    "plane_material.glsl": "b212dd423b2b929ac587dbe658f351998e2ac5d6d765174019277b27406831a1",
+    "cockpit_fittings.glsl": "347cd84ba6fa01a8c53817ce0d39e6a9dfa005c64cbde53625c9b5dee66d8e4c",
+    "cabin_windows.glsl": "9d88a8ea903cae5b8cdea7f59385e739969ed977ddd2e69d90927e915558ab32",
+    "plane_mesh_fs.glsl": "0235b216464d5f2dba691106bbdaa5c35f8e3ac41c5f29dac26a1bea3ec30ac5"
+  }
+}

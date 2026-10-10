@@ -1,0 +1,1430 @@
+[
+  {
+    "model": 0,
+    "folder": "00_kestrel",
+    "comparisons": [
+      {
+        "view": "kestrel_belly.png",
+        "baseline": "fleet-initial/00_kestrel/kestrel_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "kestrel_breakup_gear_down.png",
+        "baseline": "fleet-initial/00_kestrel/kestrel_breakup_gear_down.png",
+        "pixel_exact": false,
+        "changed_pixels": 11613,
+        "mean_channel_delta": 0.06036072530864198,
+        "max_channel_delta": 197,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "kestrel_front.png",
+        "baseline": "fleet-initial/00_kestrel/kestrel_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "kestrel_nose.png",
+        "baseline": "fleet-initial/00_kestrel/kestrel_nose.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "kestrel_rear.png",
+        "baseline": "fleet-initial/00_kestrel/kestrel_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "kestrel_side.png",
+        "baseline": "fleet-initial/00_kestrel/kestrel_side.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "kestrel_top.png",
+        "baseline": "fleet-initial/00_kestrel/kestrel_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "kestrel_wheel_left.png",
+        "baseline": "fleet-initial/00_kestrel/kestrel_wheel_left.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "kestrel_wheel_nose_yaw_left.png",
+        "baseline": "fleet-initial/00_kestrel/kestrel_wheel_nose_yaw_left.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "kestrel_wheel_nose_yaw_right.png",
+        "baseline": "fleet-initial/00_kestrel/kestrel_wheel_nose_yaw_right.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "kestrel_wheel_right.png",
+        "baseline": "fleet-initial/00_kestrel/kestrel_wheel_right.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 10
+  },
+  {
+    "model": 1,
+    "folder": "01_wren",
+    "comparisons": [
+      {
+        "view": "wren_belly.png",
+        "baseline": "fleet-initial/01_wren/wren_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "wren_breakup_gear_down.png",
+        "baseline": "fleet-initial/01_wren/wren_breakup_gear_down.png",
+        "pixel_exact": false,
+        "changed_pixels": 5165,
+        "mean_channel_delta": 0.0342798353909465,
+        "max_channel_delta": 182,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "wren_front.png",
+        "baseline": "fleet-initial/01_wren/wren_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "wren_nose.png",
+        "baseline": "fleet-initial/01_wren/wren_nose.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "wren_rear.png",
+        "baseline": "fleet-initial/01_wren/wren_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "wren_side.png",
+        "baseline": "fleet-initial/01_wren/wren_side.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "wren_top.png",
+        "baseline": "fleet-initial/01_wren/wren_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 6
+  },
+  {
+    "model": 2,
+    "folder": "02_bush",
+    "comparisons": [
+      {
+        "view": "bush_belly.png",
+        "baseline": "fleet-initial/02_bush/bush_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "bush_breakup_gear_down.png",
+        "baseline": "fleet-initial/02_bush/bush_breakup_gear_down.png",
+        "pixel_exact": false,
+        "changed_pixels": 10439,
+        "mean_channel_delta": 0.05353925540123457,
+        "max_channel_delta": 199,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "bush_front.png",
+        "baseline": "fleet-initial/02_bush/bush_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "bush_nose.png",
+        "baseline": "fleet-initial/02_bush/bush_nose.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "bush_rear.png",
+        "baseline": "fleet-initial/02_bush/bush_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "bush_side.png",
+        "baseline": "fleet-initial/02_bush/bush_side.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "bush_top.png",
+        "baseline": "fleet-initial/02_bush/bush_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 6
+  },
+  {
+    "model": 3,
+    "folder": "03_islander",
+    "comparisons": [
+      {
+        "view": "islander_belly.png",
+        "baseline": "postrepair-gates/03_islander/islander_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "islander_breakup_gear_down.png",
+        "baseline": "fleet-initial/03_islander/islander_breakup_gear_down.png",
+        "pixel_exact": false,
+        "changed_pixels": 10808,
+        "mean_channel_delta": 0.06327690972222222,
+        "max_channel_delta": 179,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "islander_front.png",
+        "baseline": "fleet-initial/03_islander/islander_front.png",
+        "pixel_exact": false,
+        "changed_pixels": 6233,
+        "mean_channel_delta": 0.003832786779835391,
+        "max_channel_delta": 34,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "islander_nose.png",
+        "baseline": "fleet-initial/03_islander/islander_nose.png",
+        "pixel_exact": false,
+        "changed_pixels": 4058,
+        "mean_channel_delta": 0.0030431777263374487,
+        "max_channel_delta": 37,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "islander_rear.png",
+        "baseline": "postrepair-gates/03_islander/islander_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "islander_side.png",
+        "baseline": "fleet-initial/03_islander/islander_side.png",
+        "pixel_exact": false,
+        "changed_pixels": 2107,
+        "mean_channel_delta": 0.0009780092592592592,
+        "max_channel_delta": 35,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "islander_top.png",
+        "baseline": "fleet-initial/03_islander/islander_top.png",
+        "pixel_exact": false,
+        "changed_pixels": 11859,
+        "mean_channel_delta": 0.0038758680555555556,
+        "max_channel_delta": 22,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 2
+  },
+  {
+    "model": 4,
+    "folder": "04_pelican",
+    "comparisons": [
+      {
+        "view": "pelican_belly.png",
+        "baseline": "fleet-initial/04_pelican/pelican_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "pelican_breakup_gear_down.png",
+        "baseline": "fleet-initial/04_pelican/pelican_breakup_gear_down.png",
+        "pixel_exact": false,
+        "changed_pixels": 10284,
+        "mean_channel_delta": 0.062396315586419754,
+        "max_channel_delta": 191,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "pelican_front.png",
+        "baseline": "fleet-initial/04_pelican/pelican_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "pelican_nose.png",
+        "baseline": "fleet-initial/04_pelican/pelican_nose.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "pelican_rear.png",
+        "baseline": "fleet-initial/04_pelican/pelican_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "pelican_side.png",
+        "baseline": "fleet-initial/04_pelican/pelican_side.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "pelican_top.png",
+        "baseline": "fleet-initial/04_pelican/pelican_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 6
+  },
+  {
+    "model": 5,
+    "folder": "05_meridian",
+    "comparisons": [
+      {
+        "view": "meridian_belly.png",
+        "baseline": "fleet-initial/05_meridian/meridian_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "meridian_breakup_gear_down.png",
+        "baseline": "fleet-initial/05_meridian/meridian_breakup_gear_down.png",
+        "pixel_exact": false,
+        "changed_pixels": 14176,
+        "mean_channel_delta": 0.08599665637860082,
+        "max_channel_delta": 206,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "meridian_front.png",
+        "baseline": "fleet-initial/05_meridian/meridian_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "meridian_gear_half_belly.png",
+        "baseline": "fleet-initial/05_meridian/meridian_gear_half_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "meridian_gear_up_belly.png",
+        "baseline": "fleet-initial/05_meridian/meridian_gear_up_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "meridian_nose.png",
+        "baseline": "fleet-initial/05_meridian/meridian_nose.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "meridian_rear.png",
+        "baseline": "fleet-initial/05_meridian/meridian_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "meridian_side.png",
+        "baseline": "fleet-initial/05_meridian/meridian_side.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "meridian_top.png",
+        "baseline": "fleet-initial/05_meridian/meridian_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 8
+  },
+  {
+    "model": 6,
+    "folder": "06_starling",
+    "comparisons": [
+      {
+        "view": "starling_belly.png",
+        "baseline": "postrepair-gates/06_starling/starling_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "starling_breakup_gear_down.png",
+        "baseline": "fleet-initial/06_starling/starling_breakup_gear_down.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "starling_front.png",
+        "baseline": "fleet-initial/06_starling/starling_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "starling_gear_half_belly.png",
+        "baseline": "fleet-initial/06_starling/starling_gear_half_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "starling_gear_up_belly.png",
+        "baseline": "postrepair-gates/06_starling/starling_gear_up_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "starling_nose.png",
+        "baseline": "fleet-initial/06_starling/starling_nose.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "starling_rear.png",
+        "baseline": "postrepair-gates/06_starling/starling_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "starling_side.png",
+        "baseline": "fleet-initial/06_starling/starling_side.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "starling_top.png",
+        "baseline": "fleet-initial/06_starling/starling_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 9
+  },
+  {
+    "model": 7,
+    "folder": "07_swift_s6",
+    "comparisons": [
+      {
+        "view": "swift_s6_belly.png",
+        "baseline": "fleet-initial/07_swift_s6/swift_s6_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "swift_s6_breakup_gear_down.png",
+        "baseline": "fleet-initial/07_swift_s6/swift_s6_breakup_gear_down.png",
+        "pixel_exact": false,
+        "changed_pixels": 11217,
+        "mean_channel_delta": 0.07918483153292181,
+        "max_channel_delta": 200,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "swift_s6_front.png",
+        "baseline": "fleet-initial/07_swift_s6/swift_s6_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "swift_s6_gear_half_belly.png",
+        "baseline": "fleet-initial/07_swift_s6/swift_s6_gear_half_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "swift_s6_gear_up_belly.png",
+        "baseline": "postrepair-gates/07_swift_s6/swift_s6_gear_up_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "swift_s6_nose.png",
+        "baseline": "fleet-initial/07_swift_s6/swift_s6_nose.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "swift_s6_rear.png",
+        "baseline": "fleet-initial/07_swift_s6/swift_s6_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "swift_s6_side.png",
+        "baseline": "fleet-initial/07_swift_s6/swift_s6_side.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "swift_s6_top.png",
+        "baseline": "fleet-initial/07_swift_s6/swift_s6_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 8
+  },
+  {
+    "model": 8,
+    "folder": "08_osprey_c6",
+    "comparisons": [
+      {
+        "view": "osprey_c6_belly.png",
+        "baseline": "fleet-initial/08_osprey_c6/osprey_c6_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "osprey_c6_breakup_gear_down.png",
+        "baseline": "fleet-initial/08_osprey_c6/osprey_c6_breakup_gear_down.png",
+        "pixel_exact": false,
+        "changed_pixels": 13969,
+        "mean_channel_delta": 0.09085760673868312,
+        "max_channel_delta": 192,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "osprey_c6_front.png",
+        "baseline": "fleet-initial/08_osprey_c6/osprey_c6_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "osprey_c6_gear_half_belly.png",
+        "baseline": "fleet-initial/08_osprey_c6/osprey_c6_gear_half_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "osprey_c6_gear_up_belly.png",
+        "baseline": "fleet-initial/08_osprey_c6/osprey_c6_gear_up_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "osprey_c6_nose.png",
+        "baseline": "fleet-initial/08_osprey_c6/osprey_c6_nose.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "osprey_c6_rear.png",
+        "baseline": "fleet-initial/08_osprey_c6/osprey_c6_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "osprey_c6_side.png",
+        "baseline": "fleet-initial/08_osprey_c6/osprey_c6_side.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "osprey_c6_top.png",
+        "baseline": "fleet-initial/08_osprey_c6/osprey_c6_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 8
+  },
+  {
+    "model": 9,
+    "folder": "09_xr10_nightjar",
+    "comparisons": [
+      {
+        "view": "xr10_nightjar_belly.png",
+        "baseline": "fleet-initial/09_xr10_nightjar/xr10_nightjar_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr10_nightjar_breakup_gear_down.png",
+        "baseline": "fleet-initial/09_xr10_nightjar/xr10_nightjar_breakup_gear_down.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr10_nightjar_front.png",
+        "baseline": "fleet-initial/09_xr10_nightjar/xr10_nightjar_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr10_nightjar_gear_half_belly.png",
+        "baseline": "fleet-initial/09_xr10_nightjar/xr10_nightjar_gear_half_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr10_nightjar_gear_up_belly.png",
+        "baseline": "fleet-initial/09_xr10_nightjar/xr10_nightjar_gear_up_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr10_nightjar_nose.png",
+        "baseline": "fleet-initial/09_xr10_nightjar/xr10_nightjar_nose.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr10_nightjar_rear.png",
+        "baseline": "fleet-initial/09_xr10_nightjar/xr10_nightjar_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr10_nightjar_side.png",
+        "baseline": "fleet-initial/09_xr10_nightjar/xr10_nightjar_side.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr10_nightjar_top.png",
+        "baseline": "fleet-initial/09_xr10_nightjar/xr10_nightjar_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 9
+  },
+  {
+    "model": 10,
+    "folder": "10_xr30_specter",
+    "comparisons": [
+      {
+        "view": "xr30_specter_belly.png",
+        "baseline": "fleet-initial/10_xr30_specter/xr30_specter_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr30_specter_breakup_gear_down.png",
+        "baseline": "fleet-initial/10_xr30_specter/xr30_specter_breakup_gear_down.png",
+        "pixel_exact": false,
+        "changed_pixels": 177442,
+        "mean_channel_delta": 0.04359278549382716,
+        "max_channel_delta": 132,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr30_specter_front.png",
+        "baseline": "fleet-initial/10_xr30_specter/xr30_specter_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr30_specter_gear_half_belly.png",
+        "baseline": "fleet-initial/10_xr30_specter/xr30_specter_gear_half_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr30_specter_gear_up_belly.png",
+        "baseline": "fleet-initial/10_xr30_specter/xr30_specter_gear_up_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr30_specter_nose.png",
+        "baseline": "fleet-initial/10_xr30_specter/xr30_specter_nose.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr30_specter_rear.png",
+        "baseline": "fleet-initial/10_xr30_specter/xr30_specter_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr30_specter_side.png",
+        "baseline": "fleet-initial/10_xr30_specter/xr30_specter_side.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr30_specter_top.png",
+        "baseline": "fleet-initial/10_xr30_specter/xr30_specter_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 8
+  },
+  {
+    "model": 11,
+    "folder": "11_xr20_mantis",
+    "comparisons": [
+      {
+        "view": "xr20_mantis_belly.png",
+        "baseline": "fleet-initial/11_xr20_mantis/xr20_mantis_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr20_mantis_breakup_gear_down.png",
+        "baseline": "fleet-initial/11_xr20_mantis/xr20_mantis_breakup_gear_down.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr20_mantis_front.png",
+        "baseline": "fleet-initial/11_xr20_mantis/xr20_mantis_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr20_mantis_gear_half_belly.png",
+        "baseline": "fleet-initial/11_xr20_mantis/xr20_mantis_gear_half_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr20_mantis_gear_up_belly.png",
+        "baseline": "fleet-initial/11_xr20_mantis/xr20_mantis_gear_up_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr20_mantis_nose.png",
+        "baseline": "fleet-initial/11_xr20_mantis/xr20_mantis_nose.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr20_mantis_rear.png",
+        "baseline": "fleet-initial/11_xr20_mantis/xr20_mantis_rear.png",
+        "pixel_exact": false,
+        "changed_pixels": 1,
+        "mean_channel_delta": 1.6075102880658437e-07,
+        "max_channel_delta": 1,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr20_mantis_side.png",
+        "baseline": "fleet-initial/11_xr20_mantis/xr20_mantis_side.png",
+        "pixel_exact": false,
+        "changed_pixels": 1,
+        "mean_channel_delta": 1.6075102880658437e-07,
+        "max_channel_delta": 1,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr20_mantis_top.png",
+        "baseline": "fleet-initial/11_xr20_mantis/xr20_mantis_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 7
+  },
+  {
+    "model": 12,
+    "folder": "12_xr40_wraith",
+    "comparisons": [
+      {
+        "view": "xr40_wraith_belly.png",
+        "baseline": "fleet-initial/12_xr40_wraith/xr40_wraith_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr40_wraith_breakup_gear_down.png",
+        "baseline": "fleet-initial/12_xr40_wraith/xr40_wraith_breakup_gear_down.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr40_wraith_front.png",
+        "baseline": "fleet-initial/12_xr40_wraith/xr40_wraith_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr40_wraith_gear_half_belly.png",
+        "baseline": "fleet-initial/12_xr40_wraith/xr40_wraith_gear_half_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr40_wraith_gear_up_belly.png",
+        "baseline": "fleet-initial/12_xr40_wraith/xr40_wraith_gear_up_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr40_wraith_nose.png",
+        "baseline": "fleet-initial/12_xr40_wraith/xr40_wraith_nose.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr40_wraith_rear.png",
+        "baseline": "fleet-initial/12_xr40_wraith/xr40_wraith_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr40_wraith_side.png",
+        "baseline": "fleet-initial/12_xr40_wraith/xr40_wraith_side.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "xr40_wraith_top.png",
+        "baseline": "fleet-initial/12_xr40_wraith/xr40_wraith_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 9
+  },
+  {
+    "model": 13,
+    "folder": "13_larkspur_l4",
+    "comparisons": [
+      {
+        "view": "larkspur_l4_belly.png",
+        "baseline": "fleet-initial/13_larkspur_l4/larkspur_l4_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "larkspur_l4_breakup_full_front.png",
+        "baseline": "postrepair-gates/13_larkspur_l4/larkspur_l4_breakup_full_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "larkspur_l4_breakup_full_front_running_phase1.png",
+        "baseline": "postrepair-gates/13_larkspur_l4/larkspur_l4_breakup_full_front_running_phase1.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "larkspur_l4_breakup_full_rear.png",
+        "baseline": "postrepair-gates/13_larkspur_l4/larkspur_l4_breakup_full_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "larkspur_l4_breakup_full_top.png",
+        "baseline": "postrepair-gates/13_larkspur_l4/larkspur_l4_breakup_full_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "larkspur_l4_breakup_gear_down.png",
+        "baseline": "postrepair-gates/13_larkspur_l4/larkspur_l4_breakup_gear_down.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "larkspur_l4_front.png",
+        "baseline": "postrepair-gates/13_larkspur_l4/larkspur_l4_front.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "larkspur_l4_nose.png",
+        "baseline": "fleet-initial/13_larkspur_l4/larkspur_l4_nose.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "larkspur_l4_rear.png",
+        "baseline": "fleet-initial/13_larkspur_l4/larkspur_l4_rear.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "larkspur_l4_side.png",
+        "baseline": "fleet-initial/13_larkspur_l4/larkspur_l4_side.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "larkspur_l4_top.png",
+        "baseline": "fleet-initial/13_larkspur_l4/larkspur_l4_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "larkspur_l4_wheel_left.png",
+        "baseline": "postrepair-gates/13_larkspur_l4/larkspur_l4_wheel_left.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "larkspur_l4_wheel_nose_yaw_left.png",
+        "baseline": "fleet-initial/13_larkspur_l4/larkspur_l4_wheel_nose_yaw_left.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "larkspur_l4_wheel_nose_yaw_right.png",
+        "baseline": "fleet-initial/13_larkspur_l4/larkspur_l4_wheel_nose_yaw_right.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "larkspur_l4_wheel_right.png",
+        "baseline": "fleet-initial/13_larkspur_l4/larkspur_l4_wheel_right.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      }
+    ],
+    "exact_comparisons": 15
+  },
+  {
+    "model": 14,
+    "folder": "14_atlas_a180",
+    "comparisons": [
+      {
+        "view": "atlas_a180_bay_gear_down_belly.png",
+        "baseline": "atlas-ramp-final/14_atlas_a180/atlas_a180_bay_gear_pct100_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_bay_gear_half_belly.png",
+        "baseline": "atlas-ramp-final/14_atlas_a180/atlas_a180_bay_gear_pct050_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_bay_gear_up_belly.png",
+        "baseline": "atlas-ramp-final/14_atlas_a180/atlas_a180_bay_gear_pct000_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_belly.png",
+        "baseline": "atlas-ramp-final/14_atlas_a180/atlas_a180_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_breakup_full_front.png",
+        "baseline": "postrepair-gates/14_atlas_a180/atlas_a180_breakup_full_front.png",
+        "pixel_exact": false,
+        "changed_pixels": 41797,
+        "mean_channel_delta": 0.3523972800925926,
+        "max_channel_delta": 209,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_breakup_full_front_gear_half_positive_running_phase1.png",
+        "baseline": "postrepair-gates/14_atlas_a180/atlas_a180_breakup_full_front_gear_half_positive_running_phase1.png",
+        "pixel_exact": false,
+        "changed_pixels": 2015998,
+        "mean_channel_delta": 7.8731262860082305,
+        "max_channel_delta": 224,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_breakup_full_front_gear_up.png",
+        "baseline": "postrepair-gates/14_atlas_a180/atlas_a180_breakup_full_front_gear_up.png",
+        "pixel_exact": false,
+        "changed_pixels": 47757,
+        "mean_channel_delta": 0.35898726851851853,
+        "max_channel_delta": 211,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_breakup_full_rear.png",
+        "baseline": "postrepair-gates/14_atlas_a180/atlas_a180_breakup_full_rear.png",
+        "pixel_exact": false,
+        "changed_pixels": 77066,
+        "mean_channel_delta": 0.7271494020061728,
+        "max_channel_delta": 212,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_breakup_full_top.png",
+        "baseline": "postrepair-gates/14_atlas_a180/atlas_a180_breakup_full_top.png",
+        "pixel_exact": false,
+        "changed_pixels": 59942,
+        "mean_channel_delta": 0.40953333976337447,
+        "max_channel_delta": 194,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_breakup_gear_down.png",
+        "baseline": "postrepair-gates/14_atlas_a180/atlas_a180_breakup_gear_down.png",
+        "pixel_exact": false,
+        "changed_pixels": 29319,
+        "mean_channel_delta": 0.1484985853909465,
+        "max_channel_delta": 182,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_breakup_gear_up.png",
+        "baseline": "postrepair-gates/14_atlas_a180/atlas_a180_breakup_gear_up.png",
+        "pixel_exact": false,
+        "changed_pixels": 19331,
+        "mean_channel_delta": 0.0643335262345679,
+        "max_channel_delta": 179,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_fan_left_running_failed_left_phase1.png",
+        "baseline": "fleet-initial/14_atlas_a180/atlas_a180_fan_left_running_failed_left_phase1.png",
+        "pixel_exact": false,
+        "changed_pixels": 371626,
+        "mean_channel_delta": 2.5618031442901232,
+        "max_channel_delta": 188,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "atlas_a180_fan_running_phase0.png",
+        "baseline": "fleet-initial/14_atlas_a180/atlas_a180_fan_running_phase0.png",
+        "pixel_exact": false,
+        "changed_pixels": 365203,
+        "mean_channel_delta": 2.8710392554012345,
+        "max_channel_delta": 201,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "atlas_a180_fan_running_phase1.png",
+        "baseline": "fleet-initial/14_atlas_a180/atlas_a180_fan_running_phase1.png",
+        "pixel_exact": false,
+        "changed_pixels": 364648,
+        "mean_channel_delta": 2.8704994534465023,
+        "max_channel_delta": 201,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "atlas_a180_front_loaded.png",
+        "baseline": "atlas-ramp-final/14_atlas_a180/atlas_a180_front_loaded.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_gear_half_belly.png",
+        "baseline": "fleet-initial/14_atlas_a180/atlas_a180_gear_half_belly.png",
+        "pixel_exact": false,
+        "changed_pixels": 50783,
+        "mean_channel_delta": 0.6444556970164609,
+        "max_channel_delta": 208,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "atlas_a180_gear_up_belly.png",
+        "baseline": "atlas-ramp-final/14_atlas_a180/atlas_a180_gear_up_belly.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_nose_loaded.png",
+        "baseline": "fleet-initial/14_atlas_a180/atlas_a180_nose_loaded.png",
+        "pixel_exact": false,
+        "changed_pixels": 23513,
+        "mean_channel_delta": 0.10729890046296296,
+        "max_channel_delta": 176,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "atlas_a180_rear_loaded.png",
+        "baseline": "fleet-initial/14_atlas_a180/atlas_a180_rear_loaded.png",
+        "pixel_exact": false,
+        "changed_pixels": 41879,
+        "mean_channel_delta": 0.4417451131687243,
+        "max_channel_delta": 223,
+        "scope": "Historical initial capture; may precede intentional geometry/animation repairs, not an exact refactor-parity assertion"
+      },
+      {
+        "view": "atlas_a180_side_loaded.png",
+        "baseline": "atlas-ramp-final/14_atlas_a180/atlas_a180_side_loaded.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      },
+      {
+        "view": "atlas_a180_top.png",
+        "baseline": "atlas-ramp-final/14_atlas_a180/atlas_a180_top.png",
+        "pixel_exact": true,
+        "changed_pixels": 0,
+        "mean_channel_delta": 0.0,
+        "max_channel_delta": 0,
+        "scope": "Accepted repair comparison"
+      }
+    ],
+    "exact_comparisons": 8
+  }
+]

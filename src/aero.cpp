@@ -35,7 +35,7 @@ AeroModel build(const AircraftSpec& s) {
   float sh = research ? 0.08f * S : 0.22f * S, sv = research ? 0.10f * S : 0.14f * S;
   {
     const int idx = (int)(&s - kAircraft);
-    if (idx >= 0 && idx < kNumAircraft + 4 && s.special == 0) {
+    if (idx >= 0 && idx < kAircraftCount && s.special == 0) {
       const ModelDef& m = kModels[idx];
       if (m.ht[0] > 0.f) sh = m.ht[0] * (m.ht[1] + m.ht[2]);
       if (m.vt[0] > 0.f) sv = m.vt[0] * 0.5f * (m.vt[1] + m.vt[2]) * (idx == kMantis ? 2.f : 1.f);
@@ -53,7 +53,15 @@ AeroModel build(const AircraftSpec& s) {
     add("nacelles", s.engines * 0.9f * PI * nd * nl, nl, (1.f + 0.35f / (nl / nd)) * (jet ? 1.3f : 1.2f), 0.f);
   }
   // drag areas that don't follow skin friction
-  if (!s.retract && !jet && s.wingY > 1.f) a.extraDq += 0.06f;                                       // wing struts (faired)
+  // New authored aircraft identify their struts from the actual model. A high cantilever wing
+  // must not gain phantom strut drag just because its root is raised for cockpit visibility.
+  // The established fleet retains its existing drag build-up.
+  bool hasWingStruts = s.wingY > 1.f;
+  if (s.fullCabinEnvelope) {
+    const int idx = (int)(&s - kAircraft);
+    if (idx >= 0 && idx < kAircraftCount) hasWingStruts = kModels[idx].strut != 0;
+  }
+  if (!s.retract && !jet && hasWingStruts) a.extraDq += 0.06f;                                      // wing struts (faired)
   if (s.engineType == ENG_PISTON) a.extraDq += 0.12e-6f * s.power * s.engines;                         // cooling air
   else if (s.engineType == ENG_TURBOPROP) a.extraDq += 0.03e-6f * s.power * s.engines;                 // intakes, oil cooler
   // landing gear (when down): grows with the weight it carries; fixed gear is faired, retractable gear isn't
@@ -105,10 +113,10 @@ float calibratedAirspeed(float tas, const Atmosphere& at) {
 }
 
 const AeroModel& aeroModel(const AircraftSpec& s) {
-  static AeroModel cache[16]; static bool built[16] = {};
+  static AeroModel cache[kAircraftCount]; static bool built[kAircraftCount] = {};
   static std::mutex m;
   int idx = (int)(&s - kAircraft);
-  if (idx < 0 || idx >= 16) { static thread_local AeroModel tmp; tmp = build(s); return tmp; }
+  if (idx < 0 || idx >= kAircraftCount) { static thread_local AeroModel tmp; tmp = build(s); return tmp; }
   std::lock_guard<std::mutex> lk(m);
   if (!built[idx]) { cache[idx] = build(s); built[idx] = true; }
   return cache[idx];

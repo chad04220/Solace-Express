@@ -1,0 +1,49 @@
+{
+  "checks": 8074,
+  "failures": 0,
+  "covered_wheels": [
+    {
+      "model": 0,
+      "label": "Kestrel T2 (high-wing two-seat trainer)",
+      "wheel": "main",
+      "radius_m": 0.24,
+      "cover_half_width_m": 0.14,
+      "minimum_sidewall_cover_m": 0.004799999999999999,
+      "exposed_vertical_tread_m": 0.12
+    },
+    {
+      "model": 0,
+      "label": "Kestrel T2 (high-wing two-seat trainer)",
+      "wheel": "nose",
+      "radius_m": 0.204,
+      "cover_half_width_m": 0.13,
+      "minimum_sidewall_cover_m": 0.00408,
+      "exposed_vertical_tread_m": 0.102
+    },
+    {
+      "model": 13,
+      "label": "Larkspur L4 (cantilever shoulder-wing grand tourer)",
+      "wheel": "main",
+      "radius_m": 0.285,
+      "cover_half_width_m": 0.14,
+      "minimum_sidewall_cover_m": 0.005700000000000011,
+      "exposed_vertical_tread_m": 0.1425
+    },
+    {
+      "model": 13,
+      "label": "Larkspur L4 (cantilever shoulder-wing grand tourer)",
+      "wheel": "nose",
+      "radius_m": 0.24224999999999997,
+      "cover_half_width_m": 0.13,
+      "minimum_sidewall_cover_m": 0.004845000000000002,
+      "exposed_vertical_tread_m": 0.12112499999999998
+    }
+  ],
+  "source_sha256": {
+    "src/models.cpp": "d87dc5a55c0260e64a7699173eb6c4d99f71930fbfa9af72ce19996c3017c168",
+    "src/shaders/plane_sdf.glsl": "da584ce6a46eb8389ec5d9cc5c1e8bf929e8ea3b19e44ef3c7567004b5ad10c3",
+    "src/shaders/plane_parts.glsl": "4d47156b1087bf8a0cc399a3c374d82918175f8bd66dd96b6012aa5c057ecbd0",
+    "src/aircraft_mesh_build_fleet.h": "dd0eba7fa971ae2073793e2c41978b2ced803479274493c5b71b9dd85c99f81b"
+  },
+  "limits": "CPU/source geometry and steering contract; native raster inspection remains separate."
+}

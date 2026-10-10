@@ -21,7 +21,7 @@ void main(){
     mat3 R = mat3(texelFetch(uPartPose, ivec2(b, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 1, 0), 0).xyz, texelFetch(uPartPose, ivec2(b + 2, 0), 0).xyz);
     vec3 T = texelFetch(uPartPose, ivec2(b + 3, 0), 0).xyz;
     pos = R*aPos + T; nrm = transpose(inverse(R))*aNrm;   // (a control surface's pose is affine, not a rotation)
-    if (uWreckParts == 1) { vPc = brkOwner(R*uPartC + T); rot = uPcRot[vPc]; at = uPcPos[vPc]; }   // (the whole part goes with one piece)
+    if (uWreckParts == 1) { vPc = brkRigidOwner(R*uPartC + T); rot = uPcRot[vPc]; at = uPcPos[vPc]; }   // (the whole part goes with one piece)
   }
   vW = rot*pos + at; vB = pos;
   vN = nrm; vId = aId; vIdS = aId; vAo = aAo;

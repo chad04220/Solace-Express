@@ -33,6 +33,30 @@ inline int trafficPropGeometry(const float* t, vec3 camera, int blades, TrafficP
   return count;
 }
 
+// A propeller is a disc attached to its existing breakup owner. The same first-box
+// rule used by the hull chooses the spinner's body; negative boxes own rigid gear
+// only and cannot steal a prop. Return no owner for intact flight.
+inline int propWreckOwner(const float prop[4], int pieces, const vec3* C, const vec3* H) {
+  if (pieces <= 0) return -1;
+  const vec3 hub(prop[0], prop[1], prop[2]);
+  for (int i = 0; i < pieces - 1; ++i) {
+    const vec3 q = hub - C[i];
+    if (fabsf(q.x) <= H[i].x && fabsf(q.y) <= H[i].y && fabsf(q.z) <= H[i].z) return i;
+  }
+  return pieces - 1;
+}
+
+inline TrafficPropDisc wreckPropGeometry(const float prop[4], const float rotation[9], vec3 origin,
+                                        vec3 camera, float angle, int blades, float hubRadius) {
+  const vec3 r(rotation[0], rotation[1], rotation[2]), u(rotation[3], rotation[4], rotation[5]);
+  const vec3 b(rotation[6], rotation[7], rotation[8]);
+  TrafficPropDisc d;
+  d.centre = (origin - camera) + r*prop[0] + u*prop[1] + b*prop[2];
+  d.right = r; d.up = u; d.radius = prop[3]; d.hubRadius = hubRadius;
+  d.angle = angle; d.blades = std::max(blades, 2); d.blur = 0.f;
+  return d;
+}
+
 // Conservative projection of a disc's bounding sphere. Only covered screen rectangles launch fragments; the
 // fragment shader intersects the real, oriented disc. This also avoids curved-quad errors in cylindrical feeds.
 // c is in camera space (+z behind). Extra NDC padding covers jitter and one raster pixel at the caller.

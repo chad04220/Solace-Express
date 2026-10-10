@@ -1,0 +1,49 @@
+Independent read-only review, 2026-10-10 21:11 UTC.
+Production aircraft.cpp remains bdfacd6973eaf06e19adc9d37c62334c8ea57fff6576ce013f74645cca97fa61.
+No source edits or additional builds by reviewer.
+
+Confirmed findings sent to owner and parent:
+1. New FINAL lateral-gate early break can bypass onGround->ROLLOUT. Owner added !onGround and an explicit state regression.
+2. New GOAROUND cleanup wait for actual flaps<.01 deadlocks a nonzero matched flap jam, because existing apControl resets the command to fail.flapAt every frame. Owner excluded flapAsym from the new policy and added a safe-height nonzero-jam transition test.
+3. Origin-only rollout width test was insufficient for tyre pavement containment and lost frames during bounce->FLARE. Owner added all three production gearStations contacts transformed by aircraft attitude and continuous post-touchdown tracking.
+4. Optional induced PVI maximum/calm recovery fails: candidate goes around then exits chart during NAV rejoin; baseline accepts disturbed approach then rolls outside pavement. Trace shows candidate NAV rejoin acceleration toward194 m/s before oversized outbound. No safe recovery claim supported yet.
+
+Other source observations:
+- transportPathControl selects Atlas only in current roster, through jet type and <=2.5g capability; legacy types take unchanged numeric branches.
+- New missed-approach yaw-integral washout requires running, full-health symmetric engines, preserving established asymmetric-engine trim.
+- Existing terrain gates remain: field450 m/hold-altitude threshold before GO->NAV, surrounding terrain200 m, and NAV corridor330 m/predictive climb checks. apCruiseAlt=current safe altitude does not bypass these floors.
+- Atlas rollout law also affects engine-out ground steering. Evidence supports same three pre-existing native airborne failures, not byte-identical engine-out behavior.
+- Healthy34-case matrix and full flight suite passed the earlier transition candidate. Updated footprint/state tests and final candidate rerun remain owner-controlled gates.
+
+Update21:15 UTC:
+- Reviewed candidate54c1a922 after !onGround and !flapAsym guards; both explicit unit regressions pass in autoland-reviewed-34.txt.
+- New equivalent forced-stage PVI maximum/calm comparison confirms a candidate regression, not merely a new diagnostic: baseline lands safely at1208.1 s/max contact15.24 m, candidate exits chart858.9 s.
+- Parent approved staging explicit terminal-rejoin state. Reviewed /tmp/atlas-rejoin-source/src/aircraft.cpp and aircraft.h (sourcee2a7ef6d/header469135a8): flag arms only at healthy/flap-functional GOAROUND->NAV, affects NAV return speed only, clears on engagement/disengagement/reset and engine/flap degradation. Terrain floors unchanged. Existing scope remains Atlas-only through capabilities.
+- Owner confirmed a complete isolated rebuild of every native core translation unit with the staged header. This avoids ABI mismatch even if the new bool fits padding: apRev's offset changes.
+- Final runtime results for the new explicit-state candidate are still pending; no unconditional approval yet.
+
+Final review, 2026-10-10 21:35 UTC:
+Recommendation: no blocking finding remains in the scoped staged candidate; ready for parent-controlled application and aggregate rebuild. This is an independent source/outcome review, not a claim that all aircraft envelopes are proven.
+
+Final staged source:
+  aircraft.cpp SHA256 db56dcabc289c318c50b495d91b072b952e0797ab30d640c89ea1cebac9911c2
+  aircraft.h SHA256 469135a8858fbc43b889beacfa8d5f6bebb14b94a16e6a01331547d0f44b1b00
+  /tmp/atlas-rejoin-source/final-aircraft-candidate.patch
+  /tmp/atlas-rejoin-source/final-header-candidate.patch
+Production aircraft.cpp remains bdfacd6973eaf06e19adc9d37c62334c8ea57fff6576ce013f74645cca97fa61 at review time.
+
+The explicit terminal-rejoin state and healthy-power yaw-integral washout through that return resolve the previously demonstrated NAV acceleration and late-return lateral regressions. State clears on engagement, disengagement, reset, completed landing, and engine/flap degradation; repair alone does not rearm it. New missed-approach policy excludes flap jams and degraded engines. Ground-contact FINAL enters ROLLOUT instead of the rejection branch. Terrain floors are unchanged. No aircraft spec, runway width, bank/g limit, manual control, or renderer edit is included. Current fleet capability gate selects only Atlas; existing fleet numeric paths remain unchanged. Atlas ground steering intentionally changes even for engine-out cases, so engine-out behavior is not byte-identical.
+
+Final evidence, all under /tmp/atlas-rejoin-source:
+- native-terminal-final-34.txt: 34/34 untouched healthy native routes pass; 23 gate/lifecycle checks pass.
+- forced-terminal-final-v2-8.txt: 8/8 explicitly induced missed-approach returns pass; same landing containment thresholds, longer 2400-second diagnostic budget disclosed.
+- full-flight-terminal-final.txt: 0 failures.
+- cap-common-terminal-final.txt: equivalent forced-stage CAP maximum/wind comparison passes with peak modeled contact offset 10.91 m, versus 14.98 m baseline and 25.70 m rejected candidate.
+- engine-out-terminal-final-8.txt: exactly three failures remain, matching baseline case, crash reason and time: CAP mid/calm rock at494.1 s; CAP maximum/calm trees at475.4 s; PVI maximum/calm gear collapse at508.0 s. These are retained limitations, not expected-success results.
+- performance-final.txt, aero-final.txt, wake-final.txt: owner focused runs pass.
+
+The original exact full-fuel comfort fixture now completes1196.2 s after one go-around: maximum NAV bank25.43 degrees, g0.818..1.242, peak modeled contact offset3.46 m. Tests continuously track origin plus all three actual physics contact centres after touchdown, including bounces, against each runway's unchanged half-width. They do not prove every visual bogie tyre edge stays on pavement. Wind coverage is6 m/s at25 degrees off runway (about2.54 m/s crosswind), turbulence0.15, no gust component. Broad professional/comfort envelopes were not certified; the NAV bank/g pass assertion is limited to the exact legacy comfort fixture. Other labeled comfort cases can exceed26 degrees.
+
+Owner rebuilt all14 core translation units with the staged Plane header. Parent must likewise rebuild all layout consumers after applying the new bool, then run aggregate tests against final integrated source. No production edits or heavy builds were performed by this reviewer.
+
+Live-source verification21:36 UTC: the owner applied the approved candidate during final handoff. Production src/aircraft.cpp and src/aircraft.h now exactly match the reviewed staged hashes db56dcab and469135a8; diff reports no difference. The earlier bdfacd69 statement is historical as of21:35. Parent aggregate rebuild remains the final integration gate.

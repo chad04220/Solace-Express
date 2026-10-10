@@ -9,9 +9,10 @@
 
 namespace aircraftMesh {
 // Explicit algorithm manifest: change when extraction/projection/simplification changes.
-inline constexpr uint32_t kAlgorithmVersion = 22;
-inline constexpr uint32_t kMaxPartType = 45; // update alongside the PT_* enum when adding a rigid part
-inline constexpr const char* kAlgorithmManifest = "mesh22:upstream-part-creases;exterior-edge500mm;finite-gradient-adjacency;prune-zero-area;semantic-fixtures;compact-flat;bounded-workers;nightjar-overhead-edge80mm";
+inline constexpr uint32_t kAlgorithmVersion = 24;
+inline constexpr uint32_t kMaxPartType = 46; // update alongside the PT_* enum when adding a rigid part
+inline constexpr float kAtlasDoorMaxEdge = .20f;
+inline constexpr const char* kAlgorithmManifest = "mesh24:upstream-part-creases;exterior-edge500mm;finite-gradient-adjacency;prune-zero-area;semantic-fixtures;compact-flat;bounded-workers;nightjar-overhead-edge80mm;atlas-main-door-edge200mm;islander-verified-planar;conventional-cabin-coherent-winding;atlas-swept-root-bays;specter-toggle-detail3.90625mm";
 inline bool finite(float f) { uint32_t bits; std::memcpy(&bits, &f, sizeof bits); return (bits & 0x7f800000u) != 0x7f800000u; }
 inline bool normalValid(const float* p) {
   if (!finite(p[0]) || !finite(p[1]) || !finite(p[2])) return false;

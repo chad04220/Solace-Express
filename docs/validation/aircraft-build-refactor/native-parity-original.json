@@ -1,0 +1,153 @@
+{
+  "before": "/workspace/scratch/87b29863f015/new-aircraft-review/round2-final",
+  "after": "/workspace/scratch/87b29863f015/new-aircraft-review/refactor-after",
+  "fixtures": [
+    {
+      "model_folder": "10_xr30_specter",
+      "view": "refactor_specter_neutral_rear",
+      "exact_files": {
+        "_frame_state.csv": true,
+        "_geometry.csv": true,
+        "_geometry.csv.topology.csv": true
+      },
+      "native_1080p": true,
+      "pixels_identical": true,
+      "mean_absolute_rgb_error": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "before_pixel_sha256": "b61164ec1edf5a5cf1e719002e3fd245c4d6b4948e6958e06833b17a32df3292",
+      "after_pixel_sha256": "b61164ec1edf5a5cf1e719002e3fd245c4d6b4948e6958e06833b17a32df3292"
+    },
+    {
+      "model_folder": "10_xr30_specter",
+      "view": "refactor_specter_vector_rear",
+      "exact_files": {
+        "_frame_state.csv": true,
+        "_geometry.csv": true,
+        "_geometry.csv.topology.csv": true
+      },
+      "native_1080p": true,
+      "pixels_identical": true,
+      "mean_absolute_rgb_error": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "before_pixel_sha256": "75834bceb6f5be26d1e9e818a4950ece35b6f1b5dfc60dca3193503e8b069b6a",
+      "after_pixel_sha256": "75834bceb6f5be26d1e9e818a4950ece35b6f1b5dfc60dca3193503e8b069b6a"
+    },
+    {
+      "model_folder": "10_xr30_specter",
+      "view": "cockpit_refactor_specter_vector",
+      "exact_files": {
+        "_frame_state.csv": true,
+        "_geometry.csv": true,
+        "_geometry.csv.topology.csv": true
+      },
+      "native_1080p": true,
+      "pixels_identical": true,
+      "mean_absolute_rgb_error": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "before_pixel_sha256": "7294db6e579a3cc17a3b91b72dc73ac39c0e8cb8dad4d4d1674eb01033e39ed0",
+      "after_pixel_sha256": "7294db6e579a3cc17a3b91b72dc73ac39c0e8cb8dad4d4d1674eb01033e39ed0"
+    },
+    {
+      "model_folder": "12_xr40_wraith",
+      "view": "refactor_wraith_hover_belly",
+      "exact_files": {
+        "_frame_state.csv": true,
+        "_geometry.csv": true,
+        "_geometry.csv.topology.csv": true
+      },
+      "native_1080p": true,
+      "pixels_identical": true,
+      "mean_absolute_rgb_error": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "before_pixel_sha256": "90535f6e0b24e47a3315b05f3a66a77eb6ef3fc8990efd46794dc410c315c6ef",
+      "after_pixel_sha256": "90535f6e0b24e47a3315b05f3a66a77eb6ef3fc8990efd46794dc410c315c6ef"
+    },
+    {
+      "model_folder": "12_xr40_wraith",
+      "view": "refactor_wraith_weapons_belly",
+      "exact_files": {
+        "_frame_state.csv": true,
+        "_geometry.csv": true,
+        "_geometry.csv.topology.csv": true
+      },
+      "native_1080p": true,
+      "pixels_identical": true,
+      "mean_absolute_rgb_error": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "before_pixel_sha256": "1d32426825938a81a438e7cb081ba6bc0488444f7620e61133aa3f9389395741",
+      "after_pixel_sha256": "1d32426825938a81a438e7cb081ba6bc0488444f7620e61133aa3f9389395741"
+    },
+    {
+      "model_folder": "12_xr40_wraith",
+      "view": "refactor_wraith_weapons_empty_belly",
+      "exact_files": {
+        "_frame_state.csv": true,
+        "_geometry.csv": true,
+        "_geometry.csv.topology.csv": true
+      },
+      "native_1080p": true,
+      "pixels_identical": true,
+      "mean_absolute_rgb_error": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "before_pixel_sha256": "909a3ce3ed987f735f2c3c4eee43629233aab69c693cb81341ce4cfcd9a8da90",
+      "after_pixel_sha256": "909a3ce3ed987f735f2c3c4eee43629233aab69c693cb81341ce4cfcd9a8da90"
+    },
+    {
+      "model_folder": "12_xr40_wraith",
+      "view": "refactor_wraith_cloak_front",
+      "exact_files": {
+        "_frame_state.csv": true,
+        "_geometry.csv": true,
+        "_geometry.csv.topology.csv": true
+      },
+      "native_1080p": true,
+      "pixels_identical": true,
+      "mean_absolute_rgb_error": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "before_pixel_sha256": "85b3887c2fa352263797920197a8ee4a96d1d49b16edc16a61874199e099dcac",
+      "after_pixel_sha256": "85b3887c2fa352263797920197a8ee4a96d1d49b16edc16a61874199e099dcac"
+    },
+    {
+      "model_folder": "12_xr40_wraith",
+      "view": "cockpit_refactor_wraith_hover",
+      "exact_files": {
+        "_frame_state.csv": true,
+        "_geometry.csv": true,
+        "_geometry.csv.topology.csv": true
+      },
+      "native_1080p": true,
+      "pixels_identical": true,
+      "mean_absolute_rgb_error": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "before_pixel_sha256": "2f1d889608da677b97afb679140d904514d87b8b4d6f3c3e4b9338c8626397e6",
+      "after_pixel_sha256": "2f1d889608da677b97afb679140d904514d87b8b4d6f3c3e4b9338c8626397e6"
+    }
+  ],
+  "errors": [],
+  "fixture_count": 8,
+  "pass": true
+}

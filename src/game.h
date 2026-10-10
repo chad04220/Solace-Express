@@ -257,7 +257,7 @@ private:
   // crash wreckage: rigid pieces of the airframe, small debris chunks and the impact crater
   // (a piece: its centre of mass c, moving at v and turning at w, at orientation q from the airframe's frame; its box
   // C, H and tears in the airframe's frame - breakup.h - and the body it flies on)
-  struct WreckPiece { vec3 c, v, w; quat q; vec3 C, H; bool rest; float fire; bool landed = false; int kind = BK_CENTRE; DebrisBody body; int cutN = 0; BreakCut cut[kMaxBreakCuts]; };
+  struct WreckPiece { vec3 c, v, w; quat q; vec3 C, H; bool rest; float fire; bool landed = false; int kind = BK_CENTRE, side = 0; bool rigidOnly = false; DebrisBody body; int cutN = 0; BreakCut cut[kMaxBreakCuts]; };
   struct Debris { vec3 p, v, w; quat q; float size; bool charred, rest; float burn = 0; DebrisBody body; };   // burn: seconds it trails fire
   struct Pop { vec3 p, v; float t, R; int piece; };   // a delayed secondary explosion (on a wreck piece when piece >= 0)
   std::vector<Pop> pops;
@@ -411,6 +411,7 @@ private:
   enum InputCtx { CTX_BIND, CTX_DIALOG, CTX_PAUSE, CTX_SCREEN, CTX_OVERLAY, CTX_FLIGHT };
   InputCtx ctx = CTX_SCREEN, lastCtx = CTX_SCREEN;
   bool keyUnarmed[256] = {}; unsigned padUnarmed = 0; bool padWas = false;
+  bool vtolLtUnarmed = false, vtolRtUnarmed = false;   // held hover triggers must release across input contexts
   InputCtx inputContext() const;
   static unsigned actionCtxMask(int a);
   void armInputs();
@@ -544,4 +545,5 @@ private:
   std::string fmtMoney(int m) const;
   std::string fmtSpeed(float ms) const;
   std::string fmtAlt(float m) const;
+  PlaneVisual wreckPlanePose{};   // captured at separation; detached parts cannot receive live control/steering inputs
 };

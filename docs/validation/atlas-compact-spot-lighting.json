@@ -1,0 +1,111 @@
+{
+  "sun_direction": [
+    -0.5412236494656201,
+    0.7323613257482805,
+    0.4131874269715095
+  ],
+  "samples": [
+    {
+      "label": "bright_core",
+      "pixel": [
+        1062,
+        170
+      ],
+      "normal": [
+        -0.0002937135230432555,
+        -0.9999985492056845,
+        -0.0016778912040145133
+      ],
+      "actual_reflection_direction": [
+        -0.5423191978758919,
+        -0.7337884599198639,
+        0.40919968683233826
+      ],
+      "mirrored_sky_sun_dot": 0.9999904304951598,
+      "sky_sun_disc_weight": 1.0,
+      "direct_sun_dot": -0.7328945820871182,
+      "native_rgb": [
+        228,
+        227,
+        223
+      ]
+    },
+    {
+      "label": "left_control",
+      "pixel": [
+        1030,
+        170
+      ],
+      "normal": [
+        0.0002823616978035,
+        -0.9999994231362743,
+        -0.0010363392254485574
+      ],
+      "actual_reflection_direction": [
+        -0.5271508272102795,
+        -0.7348692811616434,
+        0.4267073294150072
+      ],
+      "mirrored_sky_sun_dot": 0.9998064390356662,
+      "sky_sun_disc_weight": 0.0,
+      "direct_sun_dot": -0.7329419264421848,
+      "native_rgb": [
+        29,
+        32,
+        36
+      ]
+    },
+    {
+      "label": "right_control",
+      "pixel": [
+        1100,
+        170
+      ],
+      "normal": [
+        -0.0019336221520544654,
+        -0.9999974640258216,
+        -0.001154576675085302
+      ],
+      "actual_reflection_direction": [
+        -0.5613266837118027,
+        -0.729880926035843,
+        0.39011048173840457
+      ],
+      "mirrored_sky_sun_dot": 0.9995285851150356,
+      "sky_sun_disc_weight": 0.0,
+      "direct_sun_dot": -0.7317900030266664,
+      "native_rgb": [
+        26,
+        29,
+        34
+      ]
+    },
+    {
+      "label": "lower_control",
+      "pixel": [
+        1062,
+        195
+      ],
+      "normal": [
+        0.0012604885857796766,
+        -0.9999989214428164,
+        -0.0007538446318786827
+      ],
+      "actual_reflection_direction": [
+        -0.5491156662508314,
+        -0.723330340934662,
+        0.4186468714337313
+      ],
+      "mirrored_sky_sun_dot": 0.9999131759252612,
+      "sky_sun_disc_weight": 0.9733419469451213,
+      "direct_sun_dot": -0.7333542212109994,
+      "native_rgb": [
+        229,
+        227,
+        223
+      ]
+    }
+  ],
+  "finding": "Confirmed same shared below-horizon reflection approximation as the previous belly sliver. All samples have zero emission and near-downward normals. Bright core sun-dot .999990 gives full sun-disc weight; left/right controls fall below the disc threshold. Native material/normal/depth readback excludes an emissive marking or opposite-face patch. No lighting source change.",
+  "source": "src/shaders/light_common.glsl: shadeSurface; src/shaders/common.glsl: skyColor"
+}

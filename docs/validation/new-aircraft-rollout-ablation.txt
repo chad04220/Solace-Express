@@ -1,0 +1,42 @@
+aircraft,airport,load,engines_out,induced_go_around,initial_mass_kg,wind_mps,mode,seconds,touchdown_sink_mps,stop_from_centre_m,cross_track_m,go_arounds,nav_max_bank_deg,nav_min_g,nav_max_g,max_rollout_cross_m,max_contact_cross_m,result,reason
+LATERAL_GATE CAP engines-out 0 drift -3 predicted 6 halfwidth 25.0 climb-plan 7.7 go-around 0 PASS
+LATERAL_GATE CAP engines-out 0 drift +3 predicted 24 halfwidth 25.0 climb-plan 7.7 go-around 0 PASS
+LATERAL_GATE CAP engines-out 1 drift -3 predicted 6 halfwidth 25.0 climb-plan 5.6 go-around 0 PASS
+LATERAL_GATE CAP engines-out 1 drift +3 predicted 24 halfwidth 25.0 climb-plan 5.6 go-around 0 PASS
+LATERAL_GATE CAP engines-out 2 drift -3 predicted 6 halfwidth 25.0 climb-plan -3.4 go-around 0 PASS
+LATERAL_GATE CAP engines-out 2 drift +3 predicted 24 halfwidth 25.0 climb-plan -3.4 go-around 0 PASS
+LATERAL_GATE PVI engines-out 0 drift -3 predicted 6 halfwidth 22.5 climb-plan 7.7 go-around 0 PASS
+LATERAL_GATE PVI engines-out 0 drift +3 predicted 24 halfwidth 22.5 climb-plan 7.7 go-around 1 PASS
+LATERAL_GATE PVI engines-out 1 drift -3 predicted 6 halfwidth 22.5 climb-plan 5.6 go-around 0 PASS
+LATERAL_GATE PVI engines-out 1 drift +3 predicted 24 halfwidth 22.5 climb-plan 5.6 go-around 0 PASS
+LATERAL_GATE PVI engines-out 2 drift -3 predicted 6 halfwidth 22.5 climb-plan -3.4 go-around 0 PASS
+LATERAL_GATE PVI engines-out 2 drift +3 predicted 24 halfwidth 22.5 climb-plan -3.4 go-around 0 PASS
+LATERAL_GATE ground-contact enters rollout PASS
+LATERAL_GATE jammed-flap safe-height returns to NAV PASS
+TERMINAL_STATE safe go-around arms terminal rejoin PASS
+TERMINAL_STATE terminal return stays slow; ordinary NAV unchanged PASS
+TERMINAL_STATE new engagement clears state PASS
+TERMINAL_STATE disengagement clears state PASS
+TERMINAL_STATE reset clears state PASS
+TERMINAL_STATE engine failure clears state PASS
+TERMINAL_STATE repair alone does not restore state PASS
+TERMINAL_STATE flap failure clears state PASS
+atlas_a180,CAP,mid,0,0,59942,0.0,standard,454.4,1.11,295.1,2.90,0,53.81,0.793,1.795,4.67,8.13,PASS,
+atlas_a180,CAP,mid,0,0,59942,0.0,comfort,1116.8,1.03,337.9,2.89,1,25.43,0.838,1.243,5.23,8.81,PASS,
+atlas_a180,CAP,mid,0,0,59942,6.0,standard,459.1,0.98,247.9,17.73,0,53.83,0.788,1.826,20.40,23.86,PASS,
+atlas_a180,CAP,mid,0,0,59942,6.0,comfort,733.8,0.44,171.8,0.32,0,25.69,0.844,1.274,6.63,10.29,PASS,
+atlas_a180,CAP,maximum,0,0,74385,0.0,standard,434.6,1.36,106.1,2.33,0,55.38,0.796,1.808,4.01,7.47,PASS,
+atlas_a180,CAP,maximum,0,0,74385,0.0,comfort,741.7,1.39,86.6,3.45,0,27.12,0.833,1.246,6.10,9.55,PASS,
+atlas_a180,CAP,maximum,0,0,74385,6.0,standard,430.7,1.23,93.4,11.92,0,55.38,0.771,1.829,16.38,19.83,PASS,
+atlas_a180,CAP,maximum,0,0,74385,6.0,comfort,717.6,2.25,110.6,6.38,0,26.93,0.832,1.269,10.33,13.78,PASS,
+atlas_a180,PVI,mid,0,0,59942,0.0,standard,409.5,1.32,39.6,1.08,0,53.89,0.599,1.810,6.54,10.46,PASS,
+atlas_a180,PVI,mid,0,0,59942,0.0,comfort,542.0,1.15,5.4,5.95,0,25.26,0.837,1.243,8.86,12.45,PASS,
+atlas_a180,PVI,mid,0,0,59942,6.0,standard,396.3,0.97,181.1,2.05,0,53.81,0.886,1.811,7.72,11.25,PASS,
+atlas_a180,PVI,mid,0,0,59942,6.0,comfort,595.8,0.95,187.4,1.54,0,25.40,0.816,1.288,3.23,6.61,PASS,
+atlas_a180,PVI,maximum,0,0,74385,0.0,standard,390.4,0.44,149.3,0.91,0,55.40,0.858,1.808,2.89,6.35,PASS,
+atlas_a180,PVI,maximum,0,0,74385,0.0,comfort,546.3,0.86,383.7,16.57,0,25.45,0.835,1.244,20.92,24.37,FAIL,gear contact leaves runway width
+atlas_a180,PVI,maximum,0,0,74385,6.0,standard,783.0,1.37,37.8,5.53,1,55.39,0.732,1.821,8.37,11.96,PASS,
+atlas_a180,PVI,maximum,0,0,74385,6.0,comfort,596.8,1.39,62.8,2.58,0,25.51,0.823,1.277,6.30,10.10,PASS,
+atlas_a180,CAP,legacy-fixture,0,0,56100,6.0,standard,409.5,0.79,310.5,1.41,0,53.36,0.733,1.788,6.96,10.46,PASS,
+atlas_a180,CAP,legacy-fixture,0,0,56100,0.0,comfort,1196.4,0.95,360.1,0.01,1,25.43,0.818,1.242,0.02,3.47,PASS,
+FAILED: 1 native-autoland failures

@@ -74,6 +74,18 @@ void main(){
 #if HAS_FLEET_CABIN
   if (FLEET_ON && !traf && gPS.w > .5 && uPartInst < 0) mid = fleetPanelId(vB, mid);
 #endif
+#if HAS_ATLAS || HAS_MERIDIAN
+  vec3 bezelN;
+  if(FLEET_ON && !traf && gPS.w>.5 && uPartInst<0 && fleetPrimaryBezelNormal(vB,mid,bezelN)) ln=bezelN;
+#endif
+#if HAS_JET
+  vec3 specterN;
+  if(JET_ON && !traf && gPS.w>.5 && uPartInst<0 && specterFittingNormal(vB-gM[22].xyz,mid,specterN)) ln=specterN;
+#endif
+#if HAS_ATLAS
+  vec3 tabletN;
+  if(FLEET_ON && !traf && gPS.w>.5 && uPartInst<0 && atlasNavHousingNormal(vB,mid,tabletN)) ln=tabletN;
+#endif
   vec3 conN;   // (the XR-40's consoles and display mounts: their own field's normal, cabin_windows.glsl)
 #if HAS_WRAITH   // (the XR-40's alone: cabin_windows.glsl)
   if (RESEARCH_ON && !traf && gPS.w > 0.5 && uPartInst < 0 && cabinConsoleNormal(vB - gM[22].xyz, int(gM[0].z + 0.5), mid, conN)) ln = conN;

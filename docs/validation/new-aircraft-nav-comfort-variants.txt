@@ -1,0 +1,11 @@
+Historical first-geometry checkpoint. Superseded by the final 4.05 m flap-root review in new-aircraft-round2-guidance-review.txt. Final exact fixture 25.43 degrees/.818–1.242g; two wider comfort bank exceptions remain.
+
+Atlas NAV comfort integration, 2026-10-10
+
+Exact regression: CAP, calm weather, full fuel and 100 kg payload (initial mass 56,100 kg), standard AP_NAV with passenger comfort enabled, the unchanged offset start in tests/flight_test.cpp. Baseline bank peak 27.14 degrees violated its 26-degree assertion; g remained 0.863..1.242.
+
+Retained narrow correction: non-emergency transport-category passenger NAV turns use the existing professional passenger 6-degree/s roll-rate schedule. Approach/flare, HOLD, emergency recovery, manual controls, geometry and specifications are unchanged by this correction. The exact regression peaks at 25.03 degrees with the same g range. The dedicated test includes the exact fixture and unchanged bank/g assertions; other matrix cases retain their existing safe-touchdown/on-runway-stop assertions and now also publish NAV bank/g telemetry.
+
+Remaining observed limit: CAP mid-load calm peaks at 26.78 degrees and makes one go-around; CAP maximum initial load in calm air peaks at 27.12 degrees; CAP maximum initial load with 6 m/s wind peaks at 26.93 degrees. All three land safely. These cases are not represented as passing a universal comfort-bank envelope.
+
+Rejected experiments: reducing the steady NAV bank command to 24 degrees, and adding outward-roll anticipation near the bank boundary, changed approach capture timing and produced maximum-load calm CAP lateral rollout excursions (about 78 m and 58 m from centre respectively). They were removed. The exact full-fleet comfort test passed the 24-degree experiment, but the independent landing matrix caught the regression. No runway or assertion was widened to accept it. More general guidance/rollout work belongs in a separate controller change with wider starting-state coverage.

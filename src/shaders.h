@@ -2,6 +2,7 @@
 #pragma once
 #include <cstdio>
 #include <string>
+#include "aircraft_build_family.h"
 #include "shaders_gen.h"   // the sources: src/shaders/*.glsl, embedded at build time (tools/embed_shaders.cmake)
 
 // The scene programs are put together from the GLSL modules (one constant per file in src/shaders), in an order that
@@ -14,8 +15,7 @@
 // shape is settled as the program compiles, and the code only another aircraft runs is cut from its source
 // (plane_common.glsl HAS_*, shader_prune.h): the program holds this aircraft and nothing else.
 inline std::string aircraftDefines(int model, const float packed[96]) {
-  const int eng = (int)(packed[2] + 0.5f);
-  std::string d = "#define AF_MODEL " + std::to_string(model) + "\n" + (eng == 6 ? "#define AF_WRAITH\n" : eng == 5 ? "#define AF_JET\n" : "#define AF_LIGHT\n");
+  std::string d = "#define AF_MODEL " + std::to_string(model) + "\n" + aircraftBuild::shaderDefine(aircraftBuild::familyOf(packed));
   d += "#define AF_PACKED_MODEL vec4[24](";
   for (int i = 0; i < 96; i++) {
     char b[32]; snprintf(b, sizeof b, "%.9g", packed[i]);   // (9 digits: the float itself, exactly)

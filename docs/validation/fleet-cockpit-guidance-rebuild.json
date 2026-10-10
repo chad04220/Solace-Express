@@ -1,0 +1,93 @@
+{
+  "binary_sha256": "5ed3edea36ad257b27ea9f4901ffef2cd55bb2845db6b504d9e269d8733f9ca3",
+  "method": "cmake game_objs --clean-first, then fresh diagnostic renderer and harness compile/link",
+  "header_consumer_count": 21,
+  "consumers": [
+    {
+      "object": "CMakeFiles/game_objs.dir/src/aero.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/aero_strips.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/aircraft.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/aircraft_hull.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/aircraft_mesh.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/aircraft_perf.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/aircraft_stunt.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/breakup.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/camera_feeds.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/career.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/entity_render.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/game.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/game_research_ui.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/game_ui.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/game_wraith.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/models.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/prop_disc.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/raster_renderer.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/renderer.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/terrain_mesh.cpp.o",
+      "rebuilt_after_start": true
+    },
+    {
+      "object": "CMakeFiles/game_objs.dir/src/traffic.cpp.o",
+      "rebuilt_after_start": true
+    }
+  ],
+  "manual_renderer_and_harness_rebuilt": true,
+  "pass": true
+}

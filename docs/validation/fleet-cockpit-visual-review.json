@@ -1,0 +1,1151 @@
+{
+  "scope": "All 15 aircraft: 136 native 1920x1080 initial cockpit frames reviewed with resized sheets and native detail crops. All 28 confirmed findings are resolved by verified native comparisons and retained in the 136-frame final post-refactor cockpit sweep. The later guidance-only build passes three exact parity fixtures.",
+  "snapshot": "fleet-initial",
+  "reviewed_aircraft": [
+    {
+      "model": 14,
+      "name": "Atlas A180",
+      "result": "resolved_native_verified",
+      "passed": [
+        "Revised normal-camera forward glazing is unobstructed.",
+        "Shared heading/flap/gear/fuel status is fully visible in normal/down/right views.",
+        "Pilot and copilot primary displays, yoke travel, pedals and seating clearances appear sound in inspected views.",
+        "Overhead live display and guarded hardware remain inside the crown."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/14_atlas_a180/atlas_a180_cockpit.png",
+          "sha256": "abb2a415fcfb7a24684faa9121e416e7618ffdd8d02e9616ca51ccc71d2830c9"
+        },
+        {
+          "path": "fleet-initial/14_atlas_a180/atlas_a180_cockpit_down.png",
+          "sha256": "d4be542b530fc94ad5992a0ac558a3970ecf3fc1e16a92f4e6a05cd10ba8722d"
+        },
+        {
+          "path": "fleet-initial/14_atlas_a180/atlas_a180_cockpit_right.png",
+          "sha256": "0a8499f5d871846db74c3dc1e9c8d4c4bbbf9c0facabecd6c30a863477afbb8c"
+        },
+        {
+          "path": "fleet-initial/14_atlas_a180/atlas_a180_cockpit_overhead.png",
+          "sha256": "e1612e54752f02a9c18ee78d58de190816a1791b7c88c8a8564da37f4b27f598"
+        },
+        {
+          "path": "fleet-initial/14_atlas_a180/atlas_a180_cockpit_down_positive.png",
+          "sha256": "ceabcb5d17efd022adb1bff8a2a2b23acdb45dfe53e81a2b53d25ccb0f49d5db"
+        },
+        {
+          "path": "fleet-initial/14_atlas_a180/atlas_a180_cockpit_down_throttle_full.png",
+          "sha256": "513d0c4af3c65f2d10aa47524f859857db72f739af8d883cafd14d0b99923ec0"
+        },
+        {
+          "path": "fleet-initial/14_atlas_a180/atlas_a180_cockpit_left.png",
+          "sha256": "20300ea1beb1d9bf82e12b4fa2811dbe4df1bf0fa942956f8d08c5e9958c2817"
+        },
+        {
+          "path": "fleet-initial/14_atlas_a180/atlas_a180_cockpit_down_negative.png",
+          "sha256": "a261c6230ae95a098c43eb9dbaa02d44d73b8ba861b4ec51c997b722f9f83a37"
+        },
+        {
+          "path": "fleet-initial/14_atlas_a180/atlas_a180_cockpit_down_throttle_off.png",
+          "sha256": "6025865432329ee3ea8b52f336fde17aa29df675fce88de107ab6dc7b5cf1935"
+        }
+      ]
+    },
+    {
+      "model": 13,
+      "name": "Larkspur L4",
+      "result": "resolved_native_verified",
+      "passed": [
+        "Normal forward visibility and pilot/copilot analog instrument legibility.",
+        "Control and pedal endpoints remain clear of displays and seat pans.",
+        "Throttle and mixture handles remain visible at full travel.",
+        "Four-seat cabin and roof/headroom verified in aft/right/overhead views."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/13_larkspur_l4/larkspur_l4_cockpit.png",
+          "sha256": "46e333f88ac2f9472f7b4e0361451740af63ea52d9f1d9a95e572a97cd15b986"
+        },
+        {
+          "path": "fleet-initial/13_larkspur_l4/larkspur_l4_cockpit_aft.png",
+          "sha256": "c34a56339a10ebf4e23977ade45a6a4a8809c9b3650b88f14c85e5081dac685d"
+        },
+        {
+          "path": "fleet-initial/13_larkspur_l4/larkspur_l4_cockpit_down.png",
+          "sha256": "e7b5a0e17b1f2b29ed971e1278bff0ee807859db39aae7054f2481ab9c3c09b1"
+        },
+        {
+          "path": "fleet-initial/13_larkspur_l4/larkspur_l4_cockpit_down_negative.png",
+          "sha256": "b16d7def19c778c0dda3dee6238ad86182d5a02e80de088cdd99e6534e57ea76"
+        },
+        {
+          "path": "fleet-initial/13_larkspur_l4/larkspur_l4_cockpit_down_positive.png",
+          "sha256": "4d1503f6358d57913ce50dc07461c39c2a6c572e111876cdf8cfef70b86bf7bd"
+        },
+        {
+          "path": "fleet-initial/13_larkspur_l4/larkspur_l4_cockpit_down_throttle_full.png",
+          "sha256": "2783dbf30a96d4cb49925a1e06fc8426308a972043ea92532a5d1b4c7001488b"
+        },
+        {
+          "path": "fleet-initial/13_larkspur_l4/larkspur_l4_cockpit_down_throttle_off.png",
+          "sha256": "42072ac916f125455cd0134d664b7d461255d23c3f0aa39155fe026479af10a9"
+        },
+        {
+          "path": "fleet-initial/13_larkspur_l4/larkspur_l4_cockpit_left.png",
+          "sha256": "f96e08dbc3dfede578847046c3d1f402e9cabd5d1598b611f0ef2efaaba25e47"
+        },
+        {
+          "path": "fleet-initial/13_larkspur_l4/larkspur_l4_cockpit_overhead.png",
+          "sha256": "d754adcdccbed010ee370b50d19a045a6343f2bd75b56d488a4c1db537744617"
+        },
+        {
+          "path": "fleet-initial/13_larkspur_l4/larkspur_l4_cockpit_right.png",
+          "sha256": "a585c97e452c0a8bce63e803f7eee20ae0da43161d5753f07b57969ae1803771"
+        }
+      ],
+      "contact_sheet": "fleet-initial/13_larkspur_l4/13_cockpit_qa.jpg",
+      "native_detail_views": [
+        "cockpit",
+        "cockpit_down",
+        "cockpit_right",
+        "cockpit_down_negative",
+        "cockpit_down_throttle_full",
+        "cockpit_aft"
+      ]
+    },
+    {
+      "model": 0,
+      "name": "Kestrel T2",
+      "result": "resolved_native_verified",
+      "passed": [
+        "Primary instruments and status display remain legible in normal and down views.",
+        "Full pitch/roll/yaw and throttle endpoint views show no verified instrument/control overlap.",
+        "Side/overhead glazing, seating and control support inspected in nine native source frames via overview and selected native detail crops."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/00_kestrel/kestrel_cockpit.png",
+          "sha256": "587b08e24ed0737d72996b26b5acf5f0d5104fd8276d233cb762b733004842c8"
+        },
+        {
+          "path": "fleet-initial/00_kestrel/kestrel_cockpit_down.png",
+          "sha256": "f633a595850a9ed02decefe8dab4ba0e5ac2db58e694eef9421ec136a37b3be1"
+        },
+        {
+          "path": "fleet-initial/00_kestrel/kestrel_cockpit_down_negative.png",
+          "sha256": "cb394f5f8e1206212ca3ff8aa7408c692f9a8c25f672553de6043e397188fcdf"
+        },
+        {
+          "path": "fleet-initial/00_kestrel/kestrel_cockpit_down_positive.png",
+          "sha256": "a2ee6295359063bef39cb7e5ec5b9137f5b991fcac48ba02f25cde685164dfa8"
+        },
+        {
+          "path": "fleet-initial/00_kestrel/kestrel_cockpit_down_throttle_full.png",
+          "sha256": "bcb0832fa5ca7c4212f15b1924b4a4abe8d5bb23313e2f83d9229acda1af8904"
+        },
+        {
+          "path": "fleet-initial/00_kestrel/kestrel_cockpit_down_throttle_off.png",
+          "sha256": "624609b7e852fff7e09b3fa804312462812b566a4456c6e853b69994eba791a7"
+        },
+        {
+          "path": "fleet-initial/00_kestrel/kestrel_cockpit_left.png",
+          "sha256": "79404298c634d1fbd2cc06c3164d192702c648fcc868f327a31d2072fb1e0452"
+        },
+        {
+          "path": "fleet-initial/00_kestrel/kestrel_cockpit_overhead.png",
+          "sha256": "e1903512c18e0b7dc99d96386b02ef6dcc72236708fade100b3f3c417efcfcae"
+        },
+        {
+          "path": "fleet-initial/00_kestrel/kestrel_cockpit_right.png",
+          "sha256": "a63d5f94f200f99e2caadd2f92a9bcc848287299399a24421bdef76085329bc5"
+        }
+      ],
+      "contact_sheet": "fleet-initial/00_kestrel/00_cockpit_qa.jpg",
+      "native_detail_views": [
+        "cockpit",
+        "cockpit_right",
+        "cockpit_down_throttle_full"
+      ]
+    },
+    {
+      "model": 1,
+      "name": "Wren 180",
+      "result": "resolved_native_verified",
+      "passed": [
+        "Primary instruments and status display remain legible in normal and down views.",
+        "Full pitch/roll/yaw and throttle endpoint views show no verified instrument/control overlap.",
+        "Side/overhead glazing, seating and control support inspected in nine native source frames via overview and selected native detail crops."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/01_wren/wren_cockpit.png",
+          "sha256": "179c82c6143efb39898083ef1850e5246c0b5b3902ab82ffdf0c2db6fe222cce"
+        },
+        {
+          "path": "fleet-initial/01_wren/wren_cockpit_down.png",
+          "sha256": "e094fbf1f9652267521824c1f6a735ae84223fdf1d58c0e2d2a505829ca46e3e"
+        },
+        {
+          "path": "fleet-initial/01_wren/wren_cockpit_down_negative.png",
+          "sha256": "0e5dad70a3f1e40e43cadd7dddc07034690cdf92cf3bda2d1099ab7786a30be6"
+        },
+        {
+          "path": "fleet-initial/01_wren/wren_cockpit_down_positive.png",
+          "sha256": "716bee26d8d68790d8daa54fb031baedcf49f033685c0cdaa443e3ce970e90d6"
+        },
+        {
+          "path": "fleet-initial/01_wren/wren_cockpit_down_throttle_full.png",
+          "sha256": "91542e0d778a142117c86e3ccc552a845edde20c07121112f0b8fc2b8be930c1"
+        },
+        {
+          "path": "fleet-initial/01_wren/wren_cockpit_down_throttle_off.png",
+          "sha256": "b35ae0aa4be483e47c76f4473ca8289431981988382fd3f20f3308e62058f9a3"
+        },
+        {
+          "path": "fleet-initial/01_wren/wren_cockpit_left.png",
+          "sha256": "1070a091bd004b1eccd8b92d3b330c28aeb8ed20e5db8d9d484c63bed7c730a3"
+        },
+        {
+          "path": "fleet-initial/01_wren/wren_cockpit_overhead.png",
+          "sha256": "4001877a02b09a9cfe336f478e172b81b8216997a3df6fc5761f0fa3e2814c10"
+        },
+        {
+          "path": "fleet-initial/01_wren/wren_cockpit_right.png",
+          "sha256": "35714255374cfe7e08f3ba4308b88d8549e6ae1de3c91dfd95389fa2b3c758c0"
+        }
+      ],
+      "contact_sheet": "fleet-initial/01_wren/01_cockpit_qa.jpg",
+      "native_detail_views": [
+        "cockpit",
+        "cockpit_right",
+        "cockpit_down_throttle_full"
+      ]
+    },
+    {
+      "model": 2,
+      "name": "Bushmaster STOL",
+      "result": "resolved_native_verified",
+      "passed": [
+        "Nine normal/down/side/overhead/control/throttle endpoint views inspected.",
+        "Raised analog modules, center sticks, pedal travel and power quadrant have no verified blocking overlap in reviewed views.",
+        "Instrument legibility and useful forward/side views retained."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/02_bush/bush_cockpit.png",
+          "sha256": "ccd7193bdcf894eb345186cdead8de8757a5aae8f83092a0d934531128b9a303"
+        },
+        {
+          "path": "fleet-initial/02_bush/bush_cockpit_down.png",
+          "sha256": "45257d58746fae409b4bc246e384c9c3c6502f2a67557df57cc1b06062873d4c"
+        },
+        {
+          "path": "fleet-initial/02_bush/bush_cockpit_down_negative.png",
+          "sha256": "f84ade5668e9bf5cd3e3ff2c024f6312af43146356a67684f5786506f9321cb3"
+        },
+        {
+          "path": "fleet-initial/02_bush/bush_cockpit_down_positive.png",
+          "sha256": "c77b424d1b8226fb12ff7580f637cc65aa050a440fa7ccebe76922cb5db98fa3"
+        },
+        {
+          "path": "fleet-initial/02_bush/bush_cockpit_down_throttle_full.png",
+          "sha256": "f5aa0a26e3409426495ff16e48853c852e7a829f5eb6856c87c2d5779d2bf62c"
+        },
+        {
+          "path": "fleet-initial/02_bush/bush_cockpit_down_throttle_off.png",
+          "sha256": "7ffb235f8077bf5961f562e7eb6a727b402ca5e0f0452a1418b652405c9788b1"
+        },
+        {
+          "path": "fleet-initial/02_bush/bush_cockpit_left.png",
+          "sha256": "dcc590abcd59fb0cb18ed656c71c13c25f4a98b495f7552022f8498cb0eb7f73"
+        },
+        {
+          "path": "fleet-initial/02_bush/bush_cockpit_overhead.png",
+          "sha256": "fa121707c1e3a6a65adeaf3dfca4758bdeaba79978d5439841b6c9713a691d9c"
+        },
+        {
+          "path": "fleet-initial/02_bush/bush_cockpit_right.png",
+          "sha256": "791dfdb3d9d48ec9e1122f8220b77d504299b1471b57e7c5717c1a3720c7fd6f"
+        }
+      ],
+      "contact_sheet": "fleet-initial/02_bush/02_cockpit_qa.jpg",
+      "native_detail_views": [
+        "cockpit",
+        "cockpit_right",
+        "cockpit_down_throttle_full"
+      ]
+    },
+    {
+      "model": 3,
+      "name": "Islander Twin",
+      "result": "resolved_native_verified",
+      "passed": [
+        "Nine forward/down/side/overhead/control/throttle endpoint views inspected.",
+        "Twin analog instrument workbench and shared status remain readable through full control travel.",
+        "Power-bank supports, yoke motion and visible pedal regions show no verified clipping in reviewed views.",
+        "Native deck/brow crop does not show the repeated crease shards found on models0/1/2/14."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/03_islander/islander_cockpit.png",
+          "sha256": "e82c32a2dd0a0ff70f2b1d18bb16ec046e1f030f73f395832497ceeb70e639b3"
+        },
+        {
+          "path": "fleet-initial/03_islander/islander_cockpit_down.png",
+          "sha256": "2a781ee23b15f8244585a6708a3471e1d16246f21935649016596153b9dd6c9f"
+        },
+        {
+          "path": "fleet-initial/03_islander/islander_cockpit_down_negative.png",
+          "sha256": "4ef9e23faffa8c28dc44d842bde5a99eb94ad639e08d51e35a21d84142b94190"
+        },
+        {
+          "path": "fleet-initial/03_islander/islander_cockpit_down_positive.png",
+          "sha256": "29754754adbedec507c43dc925ccaec39bc0f91f6dbf622d741874bbe99c50ed"
+        },
+        {
+          "path": "fleet-initial/03_islander/islander_cockpit_down_throttle_full.png",
+          "sha256": "7a8e92b8d64b82efb7155d02a18de650ca2f49852ac7c5c4df85958fd885b06a"
+        },
+        {
+          "path": "fleet-initial/03_islander/islander_cockpit_down_throttle_off.png",
+          "sha256": "d080f976c991c1f810147927ce865bdfb7a54b1efc2eeeed8d73c42deb0326ed"
+        },
+        {
+          "path": "fleet-initial/03_islander/islander_cockpit_left.png",
+          "sha256": "5cc74862c459c1afa608753cafc5fec92ae794a9c043a5554ee84e4522c2eddc"
+        },
+        {
+          "path": "fleet-initial/03_islander/islander_cockpit_overhead.png",
+          "sha256": "4a03559f5fb7c6cb4d31f12ab4de999a307f3bd866b7c6b80c0c96b89543c37c"
+        },
+        {
+          "path": "fleet-initial/03_islander/islander_cockpit_right.png",
+          "sha256": "be3055e21e1e58694ed136997e94b1204e8ac71a63cc4d63b1ae2e6e3ceee3f5"
+        }
+      ],
+      "contact_sheet": "fleet-initial/03_islander/03_cockpit_qa.jpg",
+      "native_detail_views": [
+        "cockpit",
+        "cockpit_right",
+        "cockpit_down_throttle_full"
+      ]
+    },
+    {
+      "model": 4,
+      "name": "Pelican Caravan",
+      "result": "resolved_native_verified",
+      "passed": [
+        "Nine cockpit views covering standard/side/overhead and full input/throttle endpoints inspected.",
+        "Pilot/copilot analog displays, shared status and linked yokes retain readable sightlines.",
+        "No verified dynamic control collision at inspected endpoints; exposed support and pedal geometry remain coherent."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/04_pelican/pelican_cockpit.png",
+          "sha256": "0b50db4b34ed50923ca047dfa3daecb24889dde51034ba1dae8b214f0552084b"
+        },
+        {
+          "path": "fleet-initial/04_pelican/pelican_cockpit_down.png",
+          "sha256": "58102b897a015cf07f2446c29cca5305eaa094b0f338a0c12e12762adcaab208"
+        },
+        {
+          "path": "fleet-initial/04_pelican/pelican_cockpit_down_negative.png",
+          "sha256": "9f238258437d002b3f2c11da0e96e7da3278c667bc440c8be5c8260286556e40"
+        },
+        {
+          "path": "fleet-initial/04_pelican/pelican_cockpit_down_positive.png",
+          "sha256": "8714b5e655305a4f054f8cb15dd625afade1d3dd18682bc84c1ee90e916f3228"
+        },
+        {
+          "path": "fleet-initial/04_pelican/pelican_cockpit_down_throttle_full.png",
+          "sha256": "baa1a9b4b5d5f6819627e8d555793a9248cca73f831c4fe39269068b96d46715"
+        },
+        {
+          "path": "fleet-initial/04_pelican/pelican_cockpit_down_throttle_off.png",
+          "sha256": "c265eda89239d079699dc619dd4a0055948e2472195017657147e836ae278e1d"
+        },
+        {
+          "path": "fleet-initial/04_pelican/pelican_cockpit_left.png",
+          "sha256": "f4a9e11ef51498577dce04545c9aeb8e6ff45369c99b9904762761fe49a7c058"
+        },
+        {
+          "path": "fleet-initial/04_pelican/pelican_cockpit_overhead.png",
+          "sha256": "93167c1f22b0bab04f40c156673decec4e7bf7f6b9df9ec0aafdfa9177344216"
+        },
+        {
+          "path": "fleet-initial/04_pelican/pelican_cockpit_right.png",
+          "sha256": "38ff9dc1e34435632102382484a42a6769b009a2e39db88fe67e1435616c6267"
+        }
+      ],
+      "contact_sheet": "fleet-initial/04_pelican/04_cockpit_qa.jpg",
+      "native_detail_views": [
+        "cockpit",
+        "cockpit_right",
+        "cockpit_down_throttle_full"
+      ]
+    },
+    {
+      "model": 5,
+      "name": "Meridian Q400",
+      "result": "resolved_native_verified",
+      "passed": [
+        "Nine normal/down/side/overhead and control/throttle endpoint views inspected.",
+        "Dual glass primary/navigation modules and shared engine/status displays stay legible through tested input endpoints.",
+        "Yokes and power bank move without a verified display or seat collision in the reviewed views."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/05_meridian/meridian_cockpit.png",
+          "sha256": "a9a9623be728c3a72d28a8e77b89ec305545e4e847a9afb57f59389b26eb867e"
+        },
+        {
+          "path": "fleet-initial/05_meridian/meridian_cockpit_down.png",
+          "sha256": "2e6796fd91f1711a9ab282b00f89a55148b4659920f59eba43401e6a8d0d101b"
+        },
+        {
+          "path": "fleet-initial/05_meridian/meridian_cockpit_down_negative.png",
+          "sha256": "53976d6a80ee3cf6cb8380ff95df772129d7d68d2095affd9a0198810bbe25c9"
+        },
+        {
+          "path": "fleet-initial/05_meridian/meridian_cockpit_down_positive.png",
+          "sha256": "a09f8cb52bac5393dd2e240c7d9f2843665c02cc3aae41c267d777ae58b9619a"
+        },
+        {
+          "path": "fleet-initial/05_meridian/meridian_cockpit_down_throttle_full.png",
+          "sha256": "694f01dbab738d7cff9f973b9ad52083081c2466d43bcae4e594abdf4f13f3a4"
+        },
+        {
+          "path": "fleet-initial/05_meridian/meridian_cockpit_down_throttle_off.png",
+          "sha256": "967738ed5f50520853332b6559e18b47fde10f8c3483c341f9e1e27e8a8298e6"
+        },
+        {
+          "path": "fleet-initial/05_meridian/meridian_cockpit_left.png",
+          "sha256": "27309a91d9e8dc4b3321a10257b843430afd2fbe51469ca7a4ae76274dc57f3a"
+        },
+        {
+          "path": "fleet-initial/05_meridian/meridian_cockpit_overhead.png",
+          "sha256": "fcecbe1f021afa54ffbd88db84f188458a971451f1cec70fc571ed38ee73e1b3"
+        },
+        {
+          "path": "fleet-initial/05_meridian/meridian_cockpit_right.png",
+          "sha256": "54570e596b02cbd1cd1f8cf8f0af857ac5be4c02f0ed916f0c7134094c9a3b2a"
+        }
+      ],
+      "contact_sheet": "fleet-initial/05_meridian/05_cockpit_qa.jpg",
+      "native_detail_views": [
+        "cockpit",
+        "cockpit_right",
+        "cockpit_overhead"
+      ]
+    },
+    {
+      "model": 6,
+      "name": "Starling 500 Jet",
+      "result": "resolved_native_verified",
+      "passed": [
+        "Nine cockpit directions and full input/throttle endpoints inspected.",
+        "Raised status, twin primary/navigation modules and engine display remain clear in inspected views.",
+        "Native rounded primary bezel is smooth enough that the model5/14 analytic-normal patch is not expanded to model6.",
+        "Full-control native crop shows coherent yoke, trim/power bank and pedal arrangement; no verified clipping was found."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/06_starling/starling_cockpit.png",
+          "sha256": "b464a926cd30b2701a20aa9cc70a26823663ed98b8d7f6736ff6d01c7b94eda3"
+        },
+        {
+          "path": "fleet-initial/06_starling/starling_cockpit_down.png",
+          "sha256": "7df93960103afa57b94284da662af330bba53ee5bc3b65ef28e4c4d8bfcecfff"
+        },
+        {
+          "path": "fleet-initial/06_starling/starling_cockpit_down_negative.png",
+          "sha256": "402dadda355da005005eba89688d86ff3b4ca82d446133be6b1bcd426e06c8b1"
+        },
+        {
+          "path": "fleet-initial/06_starling/starling_cockpit_down_positive.png",
+          "sha256": "83d7fe1665c0c0e56def4b640aa35550dc34cfcfda80148c0013b5e3750a1761"
+        },
+        {
+          "path": "fleet-initial/06_starling/starling_cockpit_down_throttle_full.png",
+          "sha256": "12110d845342f430cae42d02127f7bc1167e10088d982d51fbe026c439cd5d6b"
+        },
+        {
+          "path": "fleet-initial/06_starling/starling_cockpit_down_throttle_off.png",
+          "sha256": "81e807b15708733f8c4f04799b7ae67b1bba6fab47f7e99ce089371b5474b3a3"
+        },
+        {
+          "path": "fleet-initial/06_starling/starling_cockpit_left.png",
+          "sha256": "c62d9542acf2847a32a607f6c8099381a522cef51342c9d66bb4263f2414a7d3"
+        },
+        {
+          "path": "fleet-initial/06_starling/starling_cockpit_overhead.png",
+          "sha256": "8f14095573e3d8b8068282305f200be916cdffd337bdb8c21ba96f48e3c6e75a"
+        },
+        {
+          "path": "fleet-initial/06_starling/starling_cockpit_right.png",
+          "sha256": "174aa7aadd3f7d927d980a9175766904c8f1d5c65169284ed78fa5e17bb6ac92"
+        }
+      ],
+      "contact_sheet": "fleet-initial/06_starling/06_cockpit_qa.jpg",
+      "native_detail_views": [
+        "cockpit_down",
+        "cockpit_right",
+        "cockpit_down_positive"
+      ]
+    },
+    {
+      "model": 7,
+      "name": "Swift S6",
+      "result": "resolved_native_verified",
+      "passed": [
+        "Normal and side glazing, primary instruments, overhead and both crew arrangements reviewed at sheet scale with native detail crops.",
+        "Nine captured control and throttle states show no additional verified clipping or blocked display beyond listed findings."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/07_swift_s6/swift_s6_cockpit.png",
+          "sha256": "69972d8e87e34c01a31dfc96b264c67527f9506c165dd78b92638cb0c69f271f"
+        },
+        {
+          "path": "fleet-initial/07_swift_s6/swift_s6_cockpit_down.png",
+          "sha256": "d9f9dca57971affe0a3ea362243eee69b86c3e011fcdc9caa83c93a0d0080783"
+        },
+        {
+          "path": "fleet-initial/07_swift_s6/swift_s6_cockpit_down_negative.png",
+          "sha256": "042053fd6403ec52c707cce11216b299987efea8fcd183c7c91c89c5787e6d0b"
+        },
+        {
+          "path": "fleet-initial/07_swift_s6/swift_s6_cockpit_down_positive.png",
+          "sha256": "0706c41a3ff3763cd12562198631763ce8c89e9f7e731b6f9e829613dff3eb1a"
+        },
+        {
+          "path": "fleet-initial/07_swift_s6/swift_s6_cockpit_down_throttle_full.png",
+          "sha256": "60208ac30fd6b4d34d87889fe8bdc672fc88c3601102ce2a2485f956613cb43c"
+        },
+        {
+          "path": "fleet-initial/07_swift_s6/swift_s6_cockpit_down_throttle_off.png",
+          "sha256": "0f5f10439ff5e8c9226695b399f828e2d751e352bf59b8f594f29a67f292922a"
+        },
+        {
+          "path": "fleet-initial/07_swift_s6/swift_s6_cockpit_left.png",
+          "sha256": "a7709d05b76b3b067f7d92f9bf3b60909fed5fd31b6979fb8d82aea06496af14"
+        },
+        {
+          "path": "fleet-initial/07_swift_s6/swift_s6_cockpit_overhead.png",
+          "sha256": "6cb0ff03ec3e3c4346f3fd3eae4b9a070a5ae4e97f284208f047c03e7df0939d"
+        },
+        {
+          "path": "fleet-initial/07_swift_s6/swift_s6_cockpit_right.png",
+          "sha256": "944dc38038c4acb09ad3e10b5f0b5f5a6394578d742f48b2344ae8e4b177b81f"
+        }
+      ]
+    },
+    {
+      "model": 8,
+      "name": "Osprey C6",
+      "result": "resolved_native_verified",
+      "passed": [
+        "Normal and side glazing, primary instruments, overhead and both crew arrangements reviewed at sheet scale with native detail crops.",
+        "Nine captured control and throttle states show no additional verified clipping or blocked display beyond listed findings."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/08_osprey_c6/osprey_c6_cockpit.png",
+          "sha256": "63c9f780a2f503690947bea6bb0326752494e817a4dfbcd03742ed037675b3ae"
+        },
+        {
+          "path": "fleet-initial/08_osprey_c6/osprey_c6_cockpit_down.png",
+          "sha256": "608f03c0faec74109a1d83781df86afa086562603c958ba922506d43d75eebcb"
+        },
+        {
+          "path": "fleet-initial/08_osprey_c6/osprey_c6_cockpit_down_negative.png",
+          "sha256": "3add177e5a17ea9c8d55afb6be92122d2b341e0432b12a1f65887fff6f316ce8"
+        },
+        {
+          "path": "fleet-initial/08_osprey_c6/osprey_c6_cockpit_down_positive.png",
+          "sha256": "bda09b7188006d651099bb8676e708140e52beb7e215580fb5defe32b4738d8b"
+        },
+        {
+          "path": "fleet-initial/08_osprey_c6/osprey_c6_cockpit_down_throttle_full.png",
+          "sha256": "43a7542b6b3157c83511822cb87b12b3e5cadb53fc0f40bfcfe565f2200c36b9"
+        },
+        {
+          "path": "fleet-initial/08_osprey_c6/osprey_c6_cockpit_down_throttle_off.png",
+          "sha256": "e562f9ec15b9b7b98d94335923218bf648fdbf3cdb41dc907b9b8925bf066bde"
+        },
+        {
+          "path": "fleet-initial/08_osprey_c6/osprey_c6_cockpit_left.png",
+          "sha256": "74a6226bc6cecbba924bb23ee1172ab7af8543cbd98a8264a04a6ca4c05016b5"
+        },
+        {
+          "path": "fleet-initial/08_osprey_c6/osprey_c6_cockpit_overhead.png",
+          "sha256": "342e51462066cf0b832fac0ec685771399266e892bc5b194cb7a2296f4daf82d"
+        },
+        {
+          "path": "fleet-initial/08_osprey_c6/osprey_c6_cockpit_right.png",
+          "sha256": "e8e53a8f8173d55df7709f1f5b0753c6b549736ed864169023b1d71198a74394"
+        }
+      ]
+    },
+    {
+      "model": 9,
+      "name": "XR-10 Nightjar",
+      "result": "resolved_native_verified",
+      "passed": [
+        "Normal and side glazing, primary instruments, overhead and both crew arrangements reviewed at sheet scale with native detail crops.",
+        "Nine captured control and throttle states show no additional verified clipping or blocked display beyond listed findings."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/09_xr10_nightjar/xr10_nightjar_cockpit.png",
+          "sha256": "db5943a72a287ad30080ed0ef889b8d4ed6cf463b3c5b7519b6a8580b8e0d176"
+        },
+        {
+          "path": "fleet-initial/09_xr10_nightjar/xr10_nightjar_cockpit_down.png",
+          "sha256": "462ebae1b2ebcabd5231dd0e136588ab29fc83acee740c99f918a0d86f65675c"
+        },
+        {
+          "path": "fleet-initial/09_xr10_nightjar/xr10_nightjar_cockpit_down_negative.png",
+          "sha256": "bc69c16f1510588d6fb5826dcce4aae77aae0b6bd2fb0290fa64bee7d8dc4dcd"
+        },
+        {
+          "path": "fleet-initial/09_xr10_nightjar/xr10_nightjar_cockpit_down_positive.png",
+          "sha256": "8107a0df3a8df48f8ef3dd9db48fcd1a1fe03c0f9a19c52f7777fc431a003b3a"
+        },
+        {
+          "path": "fleet-initial/09_xr10_nightjar/xr10_nightjar_cockpit_down_throttle_full.png",
+          "sha256": "d0c2227944b14b7bbcb3da180551794f2c76dc0f8f6eb1fae6d071a670c9ae46"
+        },
+        {
+          "path": "fleet-initial/09_xr10_nightjar/xr10_nightjar_cockpit_down_throttle_off.png",
+          "sha256": "4f92bc03a8c835915d920f26627cde3f8e738b958d8abc8f79dc7f966c29ba53"
+        },
+        {
+          "path": "fleet-initial/09_xr10_nightjar/xr10_nightjar_cockpit_left.png",
+          "sha256": "d8de02885bd83c776209cffc66345a7d21328aee2e6da0be6c6eba8e35b889a5"
+        },
+        {
+          "path": "fleet-initial/09_xr10_nightjar/xr10_nightjar_cockpit_overhead.png",
+          "sha256": "a0928f5d21a5df0bfd70501f80062156e9ed7b49a83ccb539b6ecb556fafa6e0"
+        },
+        {
+          "path": "fleet-initial/09_xr10_nightjar/xr10_nightjar_cockpit_right.png",
+          "sha256": "7104c8d14af3f0c52f6380c7fab4d102699a38a18dacdf5805e27faee797ed9e"
+        }
+      ]
+    },
+    {
+      "model": 10,
+      "name": "XR-30 Specter",
+      "result": "resolved_native_verified",
+      "passed": [
+        "Nine native cockpit states reviewed at reduced sheet scale with native detail crops.",
+        "Primary and secondary instruments, side controls, throttle endpoints, glazing and overhead remained legible and clear in captured views.",
+        "Thin overhead toggles and the inner support-rim shading need native A/B; screens and control travel are otherwise coherent."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/10_xr30_specter/xr30_specter_cockpit.png",
+          "sha256": "0d8af0461b3cc26d3d53f2ede6b618746945424585659e2c8b79987861b5d6cc"
+        },
+        {
+          "path": "fleet-initial/10_xr30_specter/xr30_specter_cockpit_down.png",
+          "sha256": "bfdd741c5ccae88c172567275d773e4b3056d6e113c0c1644015d4854ecd4f3b"
+        },
+        {
+          "path": "fleet-initial/10_xr30_specter/xr30_specter_cockpit_down_negative.png",
+          "sha256": "033a48d8fa451df86d376ae425c829cc2059383be768c4d6f12b565563ec9917"
+        },
+        {
+          "path": "fleet-initial/10_xr30_specter/xr30_specter_cockpit_down_positive.png",
+          "sha256": "6b7c330bb42c76ebf7c16c8d562c61a8ae443905f540a0c800cf4796f7d28caa"
+        },
+        {
+          "path": "fleet-initial/10_xr30_specter/xr30_specter_cockpit_down_throttle_full.png",
+          "sha256": "7096a9255791f47b77e1e7e4106b47ec6fbdf673abca79661f6749a293acf637"
+        },
+        {
+          "path": "fleet-initial/10_xr30_specter/xr30_specter_cockpit_down_throttle_off.png",
+          "sha256": "edfdad42d8eb9328e0569f0ca4c6fcb0dc8e7a1d670e7f401d6a465e8eb8977b"
+        },
+        {
+          "path": "fleet-initial/10_xr30_specter/xr30_specter_cockpit_left.png",
+          "sha256": "c30731a0e99b104c026f50399fdc2fc668e8b7f31cf2f66dd878c3181e9f8b4c"
+        },
+        {
+          "path": "fleet-initial/10_xr30_specter/xr30_specter_cockpit_overhead.png",
+          "sha256": "939e3017f947c631eac5b2a3254e15c5b43589e1b9729a5dee989fc458d44dcc"
+        },
+        {
+          "path": "fleet-initial/10_xr30_specter/xr30_specter_cockpit_right.png",
+          "sha256": "f743953cbde0587fda98e843a234aa660fcdaef1dcdcd0946b6004335b36552b"
+        }
+      ]
+    },
+    {
+      "model": 11,
+      "name": "XR-20 Mantis",
+      "result": "no_confirmed_defect_native_rechecked",
+      "passed": [
+        "Nine native cockpit states reviewed at reduced sheet scale with native detail crops.",
+        "Primary and secondary instruments, side controls, throttle endpoints, glazing and overhead remained legible and clear in captured views.",
+        "Native lower-corner glass bevel steps are continuous minor2\u20133px raster/specular aliasing, not a confirmed gap or clipping defect. Independent reviewer agreed with intact cached-ray evidence."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/11_xr20_mantis/xr20_mantis_cockpit.png",
+          "sha256": "a196bc144e0e08ed93cfb26c8e1281adea0671055575e7646744ef778ae0760d"
+        },
+        {
+          "path": "fleet-initial/11_xr20_mantis/xr20_mantis_cockpit_down.png",
+          "sha256": "3180c709ca5484db3165e2b89010b6b486119c4c9ddb854904f8584e991f5ad4"
+        },
+        {
+          "path": "fleet-initial/11_xr20_mantis/xr20_mantis_cockpit_down_negative.png",
+          "sha256": "5e37d281e08ec3f2369b810772be78a3293c26deb8e9ab5605e1cccebc7b70eb"
+        },
+        {
+          "path": "fleet-initial/11_xr20_mantis/xr20_mantis_cockpit_down_positive.png",
+          "sha256": "ec3e84ed60886ac7c409991097b91ecce8fd156649e617540f1b62c8ef6cc9cc"
+        },
+        {
+          "path": "fleet-initial/11_xr20_mantis/xr20_mantis_cockpit_down_throttle_full.png",
+          "sha256": "abb2fde9ff4546c2076f9135eaf7eccde21057debc7fbb944ff7f84330a884f9"
+        },
+        {
+          "path": "fleet-initial/11_xr20_mantis/xr20_mantis_cockpit_down_throttle_off.png",
+          "sha256": "362c0e3f4220815d50cf8caf3321a2f90568d4d4add6ec8ce8f3e76d97930e55"
+        },
+        {
+          "path": "fleet-initial/11_xr20_mantis/xr20_mantis_cockpit_left.png",
+          "sha256": "d67def90b126baf61d8e2a65f8bfc5c5cd95f89ddfc96c3b2b4e4057de9391ae"
+        },
+        {
+          "path": "fleet-initial/11_xr20_mantis/xr20_mantis_cockpit_overhead.png",
+          "sha256": "74bc503ce9991c8a29587d7548741744b760323e20ec50e0ea2d5555ac07ef2f"
+        },
+        {
+          "path": "fleet-initial/11_xr20_mantis/xr20_mantis_cockpit_right.png",
+          "sha256": "f35794dbf3cbce9d8c1d682fa472a1b2584f3caaf18deb143f7a7afe66ce4f91"
+        }
+      ]
+    },
+    {
+      "model": 12,
+      "name": "XR-40 Wraith",
+      "result": "no_confirmed_defect_native_rechecked",
+      "passed": [
+        "Nine native cockpit states reviewed at reduced sheet scale plus native display, window-frame and console detail crops.",
+        "Primary/side displays, annunciator row, controls and pedals remain distinct and legible; no verified clipping, missing window face or new jagged trim defect.",
+        "Existing angular panel corners and decorative overhead hexagons are intentional authored geometry/material."
+      ],
+      "frames": [
+        {
+          "path": "fleet-initial/12_xr40_wraith/xr40_wraith_cockpit.png",
+          "sha256": "af637997b7fb024d4f0fa40f9b97cc46a6add45acd2070fda342b952ab4e86e4"
+        },
+        {
+          "path": "fleet-initial/12_xr40_wraith/xr40_wraith_cockpit_down.png",
+          "sha256": "38b333d8ecf60c6b6c2326183dd040c299b03dd5ad2c81b61cda9182aec9f7d2"
+        },
+        {
+          "path": "fleet-initial/12_xr40_wraith/xr40_wraith_cockpit_down_negative.png",
+          "sha256": "23d2bfed6128e84b27ba8aa2efc34ea2c76530b5a5e3a7d9b5da3c3b5709fb03"
+        },
+        {
+          "path": "fleet-initial/12_xr40_wraith/xr40_wraith_cockpit_down_positive.png",
+          "sha256": "fb87bcfab3588ee7c97949d0f7064ae37462df485564058234bae7af476e8f83"
+        },
+        {
+          "path": "fleet-initial/12_xr40_wraith/xr40_wraith_cockpit_down_throttle_full.png",
+          "sha256": "a054834e0f8e2b5107dd98ecf9699c521f6c937b59b66dfc02d31f4f0580c0cc"
+        },
+        {
+          "path": "fleet-initial/12_xr40_wraith/xr40_wraith_cockpit_down_throttle_off.png",
+          "sha256": "bf3a8d986e0061727dda11c07b2315224c7c4fe2f0ea483ddc42c600201cf92b"
+        },
+        {
+          "path": "fleet-initial/12_xr40_wraith/xr40_wraith_cockpit_left.png",
+          "sha256": "f56b5073534b192a8fd0e257ed89ed3090c5061dd57563f469555734945f87dc"
+        },
+        {
+          "path": "fleet-initial/12_xr40_wraith/xr40_wraith_cockpit_overhead.png",
+          "sha256": "c51d8db9bed45be71e362c19ac1c0aed76cfda4487d6d2ac8838a7f139494f4e"
+        },
+        {
+          "path": "fleet-initial/12_xr40_wraith/xr40_wraith_cockpit_right.png",
+          "sha256": "868b86b87d7d32bef47312b70c5043c0d498a9a6d1f0bcd4949d408e206103df"
+        }
+      ]
+    }
+  ],
+  "pending_models": [],
+  "findings": [
+    {
+      "id": "AT-C01",
+      "model": 14,
+      "status": "resolved_native_verified",
+      "area": "thrust/navigation tablet",
+      "observation": "At full-forward thrust the shafts pass through the lower navigation-tablet housing and obscure the lower live face.",
+      "evidence": "fleet-initial/14_atlas_a180/atlas_a180_cockpit_down_throttle_full.png",
+      "cpu_evidence": "Independent 1,050,092-sample source-mirrored scan per candidate: original shaft penetration 19.58 mm, conservative handle penetration 2.21 mm and live navigation-face ray obstruction 13.32 mm. A 95 mm aft pivot shift yields shaft clearance 58.33 mm, conservative handle clearance 46.37 mm, and two-crew full-face-ray clearance 13.09 mm. Candidate remains unapplied pending batch.",
+      "planned_validation": "Both-pilot tablet sightlines through full thrust travel, physical shaft/handle clearance, native down/full-thrust rerender.",
+      "initial_status": "queued_for_batch"
+    },
+    {
+      "id": "AT-C02",
+      "model": 14,
+      "status": "resolved_native_verified",
+      "area": "left glare-deck edge",
+      "observation": "Repeated teeth on the deck-to-shell silhouette are visible at native resolution. The cached vertices place the artifact on the sloped thin deck where it is clipped to the cabin skin.",
+      "evidence": "fleet-initial/14_atlas_a180/atlas_a180_cockpit.png",
+      "planned_validation": "Targeted smooth edge treatment and identical-camera native comparison.",
+      "initial_status": "queued_for_batch"
+    },
+    {
+      "id": "AT-C03",
+      "model": 14,
+      "status": "resolved_native_verified",
+      "area": "primary display lower bezel",
+      "observation": "Repeated triangular facets along the rounded lower bezel are visible at native resolution.",
+      "evidence": "fleet-initial/14_atlas_a180/atlas_a180_cockpit.png",
+      "planned_validation": "Analytic housing-normal/geometry diagnosis, then identical-camera native comparison without broad renderer changes.",
+      "initial_status": "queued_for_batch"
+    },
+    {
+      "id": "AT-C04",
+      "model": 14,
+      "status": "resolved_native_verified",
+      "area": "outer panel vents",
+      "observation": "The small outer panel vent housings float visibly in the windshield opening instead of connecting to the side console.",
+      "evidence": "fleet-initial/14_atlas_a180/atlas_a180_cockpit_left.png",
+      "planned_validation": "Place Atlas-only vent housings on side-console tops; verify contact and pilot/cockpit side views.",
+      "initial_status": "queued_for_batch"
+    },
+    {
+      "id": "L4-C01",
+      "model": 13,
+      "status": "resolved_native_verified",
+      "area": "front-seat shoulder webbing",
+      "observation": "The front-seat shoulder webbing shows broad dark jagged strips against the seat back in right and aft views. Source uses the shared angled 8 mm-thick strap geometry.",
+      "evidence": "fleet-initial/13_larkspur_l4/larkspur_l4_cockpit_aft.png",
+      "planned_validation": "Confirm thin-geometry/material edge cause across fleet, then same-camera native validation of narrowly scoped correction.",
+      "cpu_evidence": "Read-only native-camera cached-mesh ray checks match true/logarithmic depth at inspected pixels. Flat strap centers lie behind the sculpted seat bolsters; the strap disappears into the cushion over the middle of its length. Diagnosis in diagnostics/seat-webbing/larkspur-ray-report.txt.",
+      "initial_status": "queued_for_batch"
+    },
+    {
+      "id": "00-C01",
+      "model": 0,
+      "status": "resolved_native_verified",
+      "area": "glare-deck and windshield sill",
+      "observation": "Small bright triangular/jagged fragments persist where the thin glare deck clips into the cabin skin behind the brow.",
+      "evidence": "fleet-initial/00_kestrel/kestrel_cockpit.png",
+      "planned_validation": "Narrow rounded deck-to-shell junction, followed by same-camera native forward comparison.",
+      "initial_status": "queued_for_batch",
+      "postfix_result": "unresolved: inward rounding leaves blue mixed shell/deck flecks. Cached rays confirm the separate 5 mm contact gap remains; a hidden structural overlap is staged.",
+      "postfix_evidence": "cockpit-review-small/00_kestrel_post_native_details.jpg",
+      "round2_result": "pass: the final firewall overlap and pilot-brow return remove both residual pinholes. Deck, brow and sill joins are continuous, with the instrument-facing brow edge, height, depth and surrounding window contours retained.",
+      "round2_evidence": "cockpit-review-small/00_kestrel_final_native_contact.png"
+    },
+    {
+      "id": "00-C02",
+      "model": 0,
+      "status": "resolved_native_verified",
+      "area": "shared seat shoulder webbing",
+      "observation": "Shoulder webbing is partially buried by the sculpted side bolster, leaving dark broken patches and jagged upper edges. Same shared flat strap source as Larkspur.",
+      "evidence": "fleet-initial/00_kestrel/kestrel_cockpit_right.png",
+      "planned_validation": "Seat-following shoulder webbing preserving width/color, native side-view comparison and seat-contact geometry contract.",
+      "initial_status": "queued_for_batch",
+      "postfix_result": "pass: shoulder webbing is continuous on the unchanged padded seat.",
+      "postfix_evidence": "cockpit-review-small/00_kestrel_post_native_details.jpg"
+    },
+    {
+      "id": "01-C01",
+      "model": 1,
+      "status": "resolved_native_verified",
+      "area": "glare-deck and windshield sill",
+      "observation": "Small bright triangular/jagged fragments persist where the thin glare deck clips into the cabin skin behind the brow.",
+      "evidence": "fleet-initial/01_wren/wren_cockpit.png",
+      "planned_validation": "Narrow rounded deck-to-shell junction, followed by same-camera native forward comparison.",
+      "initial_status": "queued_for_batch",
+      "postfix_result": "unresolved: rounding reduces the torn deck contact but leaves a small bright fragment. Stage a hidden 20 mm deck/shell overlap shared with verified Kestrel/Bush contact cases.",
+      "postfix_evidence": "cockpit-review-small/01_wren_post_deck.jpg",
+      "round2_result": "pass: the final rear firewall fleck is gone; the connected deck/firewall joins retain their intended contours. The independently reviewed isolated vent highlight is unchanged.",
+      "round2_evidence": "cockpit-review-small/01_wren_final_native_contact.png"
+    },
+    {
+      "id": "01-C02",
+      "model": 1,
+      "status": "resolved_native_verified",
+      "area": "shared seat shoulder webbing",
+      "observation": "Shoulder webbing is partially buried by the sculpted side bolster, leaving dark broken patches and jagged upper edges. Same shared flat strap source as Larkspur.",
+      "evidence": "fleet-initial/01_wren/wren_cockpit_right.png",
+      "planned_validation": "Seat-following shoulder webbing preserving width/color, native side-view comparison and seat-contact geometry contract.",
+      "initial_status": "queued_for_batch",
+      "postfix_result": "pass: shoulder bands are continuous and follow the existing bolster.",
+      "postfix_evidence": "cockpit-review-small/01_wren_post_deck.jpg"
+    },
+    {
+      "id": "00-E01",
+      "model": 0,
+      "status": "resolved_native_verified",
+      "area": "upper windshield wing-root intersection",
+      "observation": "Exterior wing-root fragments are visible along upper glazing opening. Cached ray diagnosis and correction are owned by exterior QA worker.",
+      "evidence": "fleet-initial/00_kestrel/kestrel_cockpit.png",
+      "owner": "exterior",
+      "initial_status": "queued_exterior_owner",
+      "postfix_result": "pass: the upper-windshield wing-root shards are gone; the local interior boundary is smooth and continuous.",
+      "postfix_evidence": "cockpit-review-small/00_kestrel_post_native_details.jpg"
+    },
+    {
+      "id": "02-C01",
+      "model": 2,
+      "status": "resolved_native_verified",
+      "area": "glare-deck and windshield sill",
+      "observation": "Fine bright teeth appear on the deck-to-skin junction behind the right side of the raised primary panel.",
+      "evidence": "fleet-initial/02_bush/bush_cockpit.png",
+      "planned_validation": "Same-camera native comparison after a locally scoped geometric correction.",
+      "initial_status": "queued_for_batch",
+      "postfix_result": "unresolved: the fine jagged deck-to-skin contact line remains after inward rounding; a hidden structural overlap is staged.",
+      "postfix_evidence": "cockpit-review-small/02_bush_post_native_details.jpg",
+      "round2_result": "pass: the former open-looking firewall fragments are closed and the junction is continuous. Cached rays show the correct flat firewall normal and valid winding. Independent native review classifies the remaining small dark stair-step as minor mesh/raster faceting, not a hole or clipping defect; no further shape change is justified.",
+      "round2_evidence": "cockpit-review-small/02_bush_final_native_contact.png"
+    },
+    {
+      "id": "02-C02",
+      "model": 2,
+      "status": "resolved_native_verified",
+      "area": "specialized seat shoulder webbing",
+      "observation": "The flat shoulder webbing is buried behind sculpted bolsters, leaving dark patches and torn-looking exposed upper/outer edges.",
+      "evidence": "fleet-initial/02_bush/bush_cockpit_right.png",
+      "planned_validation": "Same-camera native comparison after a locally scoped geometric correction.",
+      "initial_status": "queued_for_batch",
+      "postfix_result": "pass: specialized-seat shoulder webbing follows the bolster and no longer breaks into patches.",
+      "postfix_evidence": "cockpit-review-small/02_bush_post_native_details.jpg"
+    },
+    {
+      "id": "02-E01",
+      "model": 2,
+      "status": "resolved_native_verified",
+      "owner": "exterior",
+      "area": "upper windshield wing-root intersection",
+      "observation": "Exterior owner confirms the same hard inside-only wing-root subtraction as Kestrel: native pixels (1330,183), (1340,185) and (1419,195) hit material2 near body (.081,.763,-1.926). A narrow interior-only junction repair is queued.",
+      "evidence": "fleet-initial/02_bush/bush_cockpit.png",
+      "initial_status": "queued_exterior_owner",
+      "postfix_result": "pass: the upper-windshield wing-root fragments are gone without changing the exterior wing profile.",
+      "postfix_evidence": "cockpit-review-small/02_bush_post_native_details.jpg"
+    },
+    {
+      "id": "03-C02",
+      "model": 3,
+      "status": "resolved_native_verified",
+      "area": "front-seat shoulder webbing",
+      "observation": "Same broken dark patches and upper outside fragments as other conventional seats, caused by the flat straps running behind bolsters.",
+      "evidence": "fleet-initial/03_islander/islander_cockpit_right.png",
+      "planned_validation": "Cushion-following webbing and same-camera native side comparison.",
+      "initial_status": "queued_for_batch"
+    },
+    {
+      "id": "L4-C02",
+      "model": 13,
+      "status": "resolved_native_verified",
+      "area": "small aft oval glazing",
+      "observation": "Exterior author confirms the separate small aft oval was intended as genuine glazing. It currently exists only in exterior material shading, with no matching physical interior shell aperture. Main-window end/pillar is correct, independently verified with cached aft-camera ray hits at z=0.40019 and0.40490.",
+      "evidence": "fleet-initial/13_larkspur_l4/larkspur_l4_cockpit_aft.png",
+      "planned_validation": "Reuse exact external rounded-rectangle envelope for Larkspur-only shell aperture; preserve main pillar and window placement; verify shared mask and native aft/side views.",
+      "initial_status": "queued_for_batch"
+    },
+    {
+      "id": "04-C02",
+      "model": 4,
+      "status": "resolved_native_verified",
+      "area": "front-seat shoulder webbing",
+      "observation": "Flat shared straps are partly buried by the seat bolsters, leaving disconnected dark patches.",
+      "evidence": "fleet-initial/04_pelican/pelican_cockpit_right.png",
+      "planned_validation": "Cushion-following webbing, unchanged lap belt/buckle and native right-view comparison.",
+      "initial_status": "queued_for_batch",
+      "postfix_result": "pass: shoulder bands are continuous on the unchanged padded seat.",
+      "postfix_evidence": "cockpit-review-small/04_pelican_post_firewall.jpg"
+    },
+    {
+      "id": "04-C03",
+      "model": 4,
+      "status": "resolved_native_verified",
+      "area": "exposed firewall top edge behind glare brow",
+      "observation": "Small stepped/faceted highlights appear along the flat low-firewall top. Cached ray witnesses are material145 on the sharp sdBox edge at body y=.388,z\u2248-3.96. Sampled true and vertex-log-depth ordering agree; this is not the gear-door overdraw issue.",
+      "evidence": "fleet-initial/04_pelican/pelican_cockpit.png",
+      "cpu_evidence": "Read-only 9000-pixel region: 1716 exposed firewall hits and no >1mm log-depth ordering error. Both fine/coarse triangles contribute, with hard-corner interpolated normals and occasional\u22481.1mm inward edge positions.",
+      "planned_validation": "Test a Pelican-only 10mm rounded firewall top/box edge, retaining envelope and shell fit; same-camera native detail comparison before accepting.",
+      "initial_status": "diagnosed_candidate_pending",
+      "postfix_result": "pass: the previously stepped firewall top now has a continuous rounded edge with no repeated facets; envelope and instruments retained.",
+      "postfix_evidence": "cockpit-review-small/04_pelican_post_firewall.jpg"
+    },
+    {
+      "id": "05-C02",
+      "model": 5,
+      "status": "resolved_native_verified",
+      "area": "front-seat shoulder webbing",
+      "observation": "Same partially buried flat shoulder straps and disconnected dark patches as the other conventional front seats.",
+      "evidence": "fleet-initial/05_meridian/meridian_cockpit_right.png",
+      "planned_validation": "Cushion-following webbing and native side comparison.",
+      "initial_status": "queued_for_batch",
+      "postfix_result": "pass: shoulder bands are continuous on the unchanged padded seat.",
+      "postfix_evidence": "cockpit-review-small/05_meridian_post_bezel.jpg"
+    },
+    {
+      "id": "05-C03",
+      "model": 5,
+      "status": "resolved_native_verified",
+      "area": "primary display lower bezel",
+      "observation": "Repeated diagonal facets along the rounded lower bezel match the shared housing-normal issue diagnosed on Atlas. Strongly visible in native lower-bezel crop at y990\u20131080.",
+      "evidence": "fleet-initial/05_meridian/meridian_cockpit.png",
+      "planned_validation": "Extend exact rounded-housing/chamfer analytic normal only to model5 primary static cockpit bezels; preserve its uncanted module frame; same-camera native comparison.",
+      "initial_status": "queued_for_batch",
+      "postfix_result": "pass: repeated primary lower-bezel diagonal facets are gone; unchanged housing contour and display content remain clear.",
+      "postfix_evidence": "cockpit-review-small/05_meridian_post_bezel.jpg"
+    },
+    {
+      "id": "06-C02",
+      "model": 6,
+      "status": "resolved_native_verified",
+      "area": "front-seat shoulder webbing",
+      "observation": "Flat strap sections disappear into the sculpted back/bolsters, matching the other conventional front seats.",
+      "evidence": "fleet-initial/06_starling/starling_cockpit_right.png",
+      "planned_validation": "Cushion-following shoulder webbing and native right-view comparison.",
+      "initial_status": "queued_for_batch",
+      "postfix_result": "pass: shoulder webbing is continuous. Left/right native views retain intentional inner shell/window trim faces. The rebuilt helper also explicitly preserves two exact opposite-face pairs.",
+      "postfix_evidence": "cockpit-review-small/06_starling_post_native.jpg"
+    },
+    {
+      "id": "07-C02",
+      "model": 7,
+      "status": "resolved_native_verified",
+      "area": "front-seat shoulder webbing",
+      "observation": "Flat shoulder strips are partially buried in the sculpted back/bolsters, matching the conventional fleet contact defect.",
+      "evidence": "fleet-initial/07_swift_s6/swift_s6_cockpit_right.png",
+      "planned_validation": "Cushion-following shoulder webbing with retained lap belt and native right-view comparison.",
+      "initial_status": "queued_for_batch"
+    },
+    {
+      "id": "07-C04",
+      "model": 7,
+      "status": "resolved_native_verified",
+      "area": "forward lower-left shell fleck",
+      "observation": "Native bright fleck at pixel889,598 maps to static cache triangle146476, whose geometric normal opposes all three mutually agreeing SDF field normals (dot approximately -0.9997). Shader gl_FrontFacing treatment lights the reversed triangle incorrectly.",
+      "evidence": "fleet-initial/07_swift_s6/swift_s6_cockpit.png",
+      "planned_validation": "Conservative static winding repair with exact opposite-face pair exclusion; native before/after Swift detail and double-sided surface regression. Ambiguous nearby triangles remain unchanged and must be assessed in native output.",
+      "initial_status": "queued_for_batch",
+      "next_action": "None: resolved and rechecked in the final integrated cockpit sweep.",
+      "round2_result": "pass: the residual blue firewall/shell fleck is gone after the hidden shell overlap. Native contact and full forward views retain the surrounding instrument, sill and support contours.",
+      "round2_evidence": "cockpit-review-small/07_swift_s6_round2_native_contact.png",
+      "historical_next_action": "Staged Swift-only firewall/shell rounded junction after the current priority capture batch; no live source mutation while captures run."
+    },
+    {
+      "id": "08-C02",
+      "model": 8,
+      "status": "resolved_native_verified",
+      "area": "front-seat shoulder webbing",
+      "observation": "Flat shoulder strips are partially buried in the sculpted back/bolsters, matching the conventional fleet contact defect.",
+      "evidence": "fleet-initial/08_osprey_c6/osprey_c6_cockpit_right.png",
+      "planned_validation": "Cushion-following shoulder webbing with retained lap belt and native right-view comparison.",
+      "initial_status": "queued_for_batch",
+      "postfix_result": "pass: shoulder webbing now follows the padded back and no longer breaks into buried fragments.",
+      "postfix_evidence": "cockpit-review-small/08_osprey_c6_post_shoulder.jpg"
+    },
+    {
+      "id": "09-C02",
+      "model": 9,
+      "status": "resolved_native_verified",
+      "area": "front-seat shoulder webbing",
+      "observation": "Flat shoulder strips are partially buried in the sculpted back/bolsters, matching the conventional fleet contact defect.",
+      "evidence": "fleet-initial/09_xr10_nightjar/xr10_nightjar_cockpit_right.png",
+      "planned_validation": "Cushion-following shoulder webbing with retained lap belt and native right-view comparison.",
+      "initial_status": "queued_for_batch"
+    },
+    {
+      "id": "09-C03",
+      "model": 9,
+      "status": "resolved_native_verified",
+      "area": "inner nose/window trim boundary",
+      "observation": "Fine and coarse cached witnesses show mixed shell11/firewall145 triangles with opposing gradients at the narrow5mm firewall-to-shell gap. Exact native bright pixel1202,549 hits triangle16214 near(.337,.227,-5.398); the agreeing-normal winding criterion properly skips it.",
+      "evidence": "fleet-initial/09_xr10_nightjar/xr10_nightjar_cockpit.png",
+      "planned_validation": "Nightjar-only20mm inward rounded firewall/skin intersection; keep aperture and exterior unchanged, require native same-camera comparison.",
+      "initial_status": "queued_for_batch",
+      "next_action": "None: resolved and rechecked in the final integrated cockpit sweep.",
+      "round2_result": "pass: the fine blue firewall/shell contact fragments are gone after the hidden overlap. The continuous firewall, coaming and window contours are retained.",
+      "round2_evidence": "cockpit-review-small/09_xr10_nightjar_round2_native_contact.png",
+      "historical_next_action": "Join the low firewall to the inner shell with a hidden20mm overlap, still40mm inside the outer surface; native verification required after the present batch."
+    },
+    {
+      "id": "10-C01",
+      "model": 10,
+      "status": "resolved_native_verified",
+      "area": "curved instrument-support inner rim",
+      "observation": "Native cockpit-down highlights form repeated triangles on the inner cylindrical support. Cached material44 rays at r=.47 show erroneous interpolated vertical normal components near the hard top edge.",
+      "evidence": "fleet-initial/10_xr30_specter/xr30_specter_cockpit_down.png",
+      "planned_validation": "Scoped exact normal from unchanged saddle field; native before/after crop and shader specialization checks.",
+      "initial_status": "queued_for_batch",
+      "postfix_result": "pass: the repeated triangular highlights on the inner saddle support are gone; unchanged curved geometry is smooth. Down and deflected-control views retain clear displays and controls.",
+      "postfix_evidence": "cockpit-review-small/10_specter_post_comparison.jpg"
+    },
+    {
+      "id": "10-C02",
+      "model": 10,
+      "status": "resolved_native_verified",
+      "area": "overhead toggle stems",
+      "observation": "The9mm capsule stems are under-resolved on the7.8mm fine mesh and show malformed facets and fragmented amber emission. Cached witnesses are material47 with mixed gradients; conservative winding alone does not fix them.",
+      "evidence": "fleet-initial/10_xr30_specter/xr30_specter_cockpit_overhead.png",
+      "planned_validation": "First evaluate exact normals for the unchanged capsule geometry in its tilted/repeated frame. If native silhouettes remain malformed, use a localized mesh/fixture repair preserving the authored shape.",
+      "initial_status": "queued_for_batch",
+      "postfix_result": "unresolved: exact normals do not recover the malformed 9 mm capsule silhouettes. A localized overhead-only 3.90625 mm extraction region is being staged and bounded; the rest of the cabin remains at its existing resolution.",
+      "postfix_evidence": "cockpit-review-small/10_specter_post_comparison.jpg",
+      "round2_result": "pass: all 27 authored capsule stems/crowns are continuous at native resolution; the broken amber tip patches are gone, and the full local overlap perimeter has no visible seam. No shader shape, material, control or part changed.",
+      "round2_evidence": "cockpit-review-small/10_xr30_specter_round2_native_detail.png"
+    },
+    {
+      "id": "AT-C05",
+      "model": 14,
+      "status": "resolved_native_verified",
+      "area": "inclined navigation tablet side bezel",
+      "observation": "Native full-throttle detail exposes a pre-existing highlight ripple on the tablet side/back bevel. Six exact cached rays show5\u201328degree field-normal errors on material145; the original primary-bezel correction did not cover this distinct housing.",
+      "evidence": "postrepair-gates/14_atlas_a180/atlas_a180_cockpit_down_throttle_full.png",
+      "cpu_evidence": "diagnostics/atlas-tablet-normal-candidate-report.json:23,999 candidate-vs-finite-gradient checks; maximum normal vector discrepancy4.98e-11.",
+      "planned_validation": "Scoped exact rounded-box normal in atlasNavFrame, material145 only, bounded to the tablet housing. Staged patch only until the current render batch finishes; native round2 full-throttle/side comparison required.",
+      "round2_result": "pass: the navigation-tablet side/back bevel no longer has repeated diagonal normal ripples. Native right/full/off views retain the authored contour, clear live display content and thrust-lever separation.",
+      "round2_evidence": "cockpit-review-small/14_atlas_a180_final_native_tablet_full.png"
+    }
+  ],
+  "phase": "all15_reviewed_all28_confirmed_findings_native_verified",
+  "initial_frame_count": 136,
+  "source_freeze_manifest": "new-aircraft-review/diagnostics/cockpit-postfix-source-freeze.json",
+  "remaining_confirmed_cockpit_defects": 0,
+  "minor_rendering_details_retained": [
+    {
+      "model": 2,
+      "observation": "Small dark continuous firewall/trim contact crease.",
+      "classification": "Minor mesh/raster faceting; independent native review and correct flat-face normal/winding do not justify another fillet."
+    },
+    {
+      "model": 1,
+      "observation": "Isolated bright point on existing vent edge.",
+      "classification": "Plausible specular highlight, verified material66; no missing skin or source change."
+    },
+    {
+      "model": 11,
+      "observation": "2\u20133 pixel continuous display-bevel steps.",
+      "classification": "Minor raster/specular aliasing; native rays remain on intact geometry."
+    }
+  ],
+  "final_integrated_signoff": {
+    "report": "fleet-cockpit-integrated-review.json",
+    "aircraft_count": 15,
+    "native_cockpit_frames": 136,
+    "result": "pass_no_new_confirmed_defect",
+    "frozen_visual_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+    "guidance_bridge": "fleet-cockpit-guidance-bridge.json",
+    "final_guidance_binary_sha256": "5ed3edea36ad257b27ea9f4901ffef2cd55bb2845db6b504d9e269d8733f9ca3",
+    "guidance_result": "pass_exact_3_of_3"
+  },
+  "historical_initial_scope": "All15 aircraft:136 native1920x1080 initial cockpit captures reviewed using resized sheets and native detail crops. Source fixes are applied; post-fix native acceptance is explicitly pending.",
+  "source_freeze_manifest_phase": "Historical first-postrepair freeze; final source hashes are recorded by final_integrated_signoff."
+}

@@ -1,0 +1,28 @@
+{
+  "detail_core_cells": 56,
+  "detail_overlap_cells": 170,
+  "detail_samples": 960081,
+  "detail_raw_vertices": 32706,
+  "detail_raw_triangles": 65018,
+  "lattice_vector_bytes": 31364616,
+  "peak_tracked_cpu_working_bytes": 39024536,
+  "before": {
+    "whole_cockpit_lattice_samples": 3299626,
+    "vertices": 81084,
+    "triangles": 117226,
+    "observed_bake_seconds": 16.9
+  },
+  "after": {
+    "whole_cockpit_lattice_samples": 4234168,
+    "vertices": 85106,
+    "triangles": 123678,
+    "observed_bake_seconds": 19.9
+  },
+  "vertex_index_data_delta_bytes": 206128,
+  "limits": "Tracked CPU vector peak excludes output mesh and GPU staging. Software-renderer bake timing is observational, not hardware performance evidence.",
+  "source_sha256": {
+    "postrepair-gates/10_xr30_specter/warm_cockpit.log": "6427ddace0c17677325f7a8d9606489d72ba34a8b3e42c60297e5fa82ba5cd8e",
+    "round2-independent/10_xr30_specter/warm_cockpit.log": "ce6bd8a7b1c45da98fc823c9d6a4f717e0ec23e90a52e0b42dc26326df697911",
+    "round2-independent/10_xr30_specter/xr30_specter_cockpit_overhead.png": "fc5c382c09e60e12d326f76f2f842c0d83af09ded6c16523f24b18c74d23e4c1"
+  }
+}

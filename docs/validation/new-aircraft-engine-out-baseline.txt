@@ -1,0 +1,22 @@
+aircraft,airport,load,engines_out,initial_mass_kg,wind_mps,mode,seconds,touchdown_sink_mps,stop_from_centre_m,cross_track_m,go_arounds,nav_max_bank_deg,nav_min_g,nav_max_g,max_rollout_cross_m,result,reason
+LATERAL_GATE CAP engines-out 0 drift -3 predicted 6 halfwidth 25.0 climb-plan 7.7 go-around 0 PASS
+LATERAL_GATE CAP engines-out 0 drift +3 predicted 24 halfwidth 25.0 climb-plan 7.7 go-around 0 PASS
+LATERAL_GATE CAP engines-out 1 drift -3 predicted 6 halfwidth 25.0 climb-plan 5.6 go-around 0 PASS
+LATERAL_GATE CAP engines-out 1 drift +3 predicted 24 halfwidth 25.0 climb-plan 5.6 go-around 0 PASS
+LATERAL_GATE CAP engines-out 2 drift -3 predicted 6 halfwidth 25.0 climb-plan -3.4 go-around 0 PASS
+LATERAL_GATE CAP engines-out 2 drift +3 predicted 24 halfwidth 25.0 climb-plan -3.4 go-around 0 PASS
+LATERAL_GATE PVI engines-out 0 drift -3 predicted 6 halfwidth 22.5 climb-plan 7.7 go-around 0 PASS
+LATERAL_GATE PVI engines-out 0 drift +3 predicted 24 halfwidth 22.5 climb-plan 7.7 go-around 0 FAIL
+LATERAL_GATE PVI engines-out 1 drift -3 predicted 6 halfwidth 22.5 climb-plan 5.6 go-around 0 PASS
+LATERAL_GATE PVI engines-out 1 drift +3 predicted 24 halfwidth 22.5 climb-plan 5.6 go-around 0 FAIL
+LATERAL_GATE PVI engines-out 2 drift -3 predicted 6 halfwidth 22.5 climb-plan -3.4 go-around 0 PASS
+LATERAL_GATE PVI engines-out 2 drift +3 predicted 24 halfwidth 22.5 climb-plan -3.4 go-around 0 PASS
+atlas_a180,CAP,mid,1,59942,0.0,comfort,494.1,0.00,11084.4,672.04,1,25.08,0.860,1.243,0.00,FAIL,Hit a rock formation
+atlas_a180,CAP,mid,1,59942,6.0,comfort,731.3,0.99,201.7,3.99,0,26.02,0.844,1.292,8.09,PASS,
+atlas_a180,CAP,maximum,1,74385,0.0,comfort,475.4,0.00,10649.3,306.29,1,25.09,0.860,1.244,0.00,FAIL,Crashed into trees
+atlas_a180,CAP,maximum,1,74385,6.0,comfort,823.4,1.02,9.3,0.23,0,25.94,0.853,1.275,9.57,PASS,
+atlas_a180,PVI,mid,1,59942,0.0,comfort,550.3,1.19,9.6,3.45,0,25.27,0.835,1.243,4.33,PASS,
+atlas_a180,PVI,mid,1,59942,6.0,comfort,590.5,1.31,190.8,15.78,0,25.36,0.810,1.275,19.44,PASS,
+atlas_a180,PVI,maximum,1,74385,0.0,comfort,508.0,0.00,1447.3,53.29,1,25.59,0.838,1.264,0.00,FAIL,Gear collapsed - hit at 1717 fpm
+atlas_a180,PVI,maximum,1,74385,6.0,comfort,583.5,1.48,66.2,0.85,0,25.71,0.826,1.273,5.97,PASS,
+FAILED: 5 engine-out failures

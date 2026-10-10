@@ -131,7 +131,7 @@ struct GameTest {
     for(int row=hangarCatalogCount()-2;row>=0;row--){g.in.pad=true;g.in.buttonsPressed=PAD_UP;frame();const int spec=hangarSpecAt(row);require(g.focusId==id(spec),"D-pad traverses catalog in reverse order");g.in.pad=true;g.in.buttonsPressed=PAD_A;frame();require(g.selHangar==spec,"gamepad A selects focused catalog row");}
     for(int row=kNumAircraft;row<hangarCatalogCount();row++){int spec=hangarSpecAt(row);g.focusId=id(spec);g.focusNav=true;frame();auto it=std::find_if(g.focusList.begin(),g.focusList.end(),[&](const Game::Focusable& f){return f.id==id(spec);});require(it!=g.focusList.end()&&it->y>=0&&it->y+it->h<=g_ren.H,"classified row scrolls on screen");g.in.mx=it->x+it->w*.5f;g.in.my=it->y+it->h*.5f;g.in.mPressed[0]=true;frame();require(g.selHangar==spec,"mouse selects all4classified rows");}
     require(g.career.money==money&&g.career.fleet.size()==fleet,"catalog selection never mutates economy");
-    puts("PASS13catalog keyboard/Enter and D-pad/A traversal, all4classified mouse targets, no classified economic controls");
+    puts("PASS complete catalog keyboard/Enter and D-pad/A traversal, all4classified mouse targets, no classified economic controls");
   }
   static void checkFreeFlightUI(Game& g) {
     auto require=[](bool ok,const char* why){if(!ok){fprintf(stderr,"FAIL: %s\n",why);exit(3);}};
@@ -140,7 +140,7 @@ struct GameTest {
     g.beginFreeFlightSetup();g.freeCraft=0;g.freeAirport=0;g.in=Input{};
     auto frame=[&](){g.gamepadMenus(1.f/60);g.focusNavigate();g_ren.uiBegin();FrameParams fp{};g.drawFreeFlightSetup(fp);g_ren.uiEnd();g.in=Input{};};
     frame();g.focusId=id(0,"free-flight-airframe");g.focusNav=true;
-    for(int i=0;i<kNumAircraft;i++){if(i){g.in.pressed[K_DOWN]=true;frame();}require(g.focusId==id(i,"free-flight-airframe"),"free-flight keyboard reaches all9aircraft");g.in.pressed[K_ENTER]=true;frame();require(g.freeCraft==i,"free-flight selects each aircraft without licence gate");g.selHangar=kWraith;FrameParams preview{};g.hangarPreviewCamera(preview);require(preview.plane.model==i&&preview.hangarPreview&&!preview.hangarClassified,"free-flight actual preview uses freeCraft, never career/classified selection");}
+    for(int i=0;i<kNumAircraft;i++){if(i){g.in.pressed[K_DOWN]=true;frame();}require(g.focusId==id(careerSpecAt(i),"free-flight-airframe"),"free-flight keyboard reaches every career aircraft");g.in.pressed[K_ENTER]=true;frame();require(g.freeCraft==careerSpecAt(i),"free-flight selects each aircraft without licence gate");g.selHangar=kWraith;FrameParams preview{};g.hangarPreviewCamera(preview);require(preview.plane.model==careerSpecAt(i)&&preview.hangarPreview&&!preview.hangarClassified,"free-flight actual preview uses freeCraft, never career/classified selection");}
     g.focusId=id(0,"free-flight-airport");g.focusNav=true;frame();
     for(int i=0;i<(int)g_world.airports.size();i++){if(i){g.in.pressed[K_DOWN]=true;frame();}require(g.focusId==id(i,"free-flight-airport"),"free-flight keyboard reaches every airport");g.in.pressed[K_ENTER]=true;frame();require(g.freeAirport==i,"free-flight selects each airport");}
     const float ss=g.S();auto L=hangarLayout(24*ss,126*ss,g_ren.W-48*ss,g_ren.H-146*ss,ss);float px=L.rightX+18*ss,iw=L.rightWidth-36*ss,yy=g_ren.H-189*ss;
@@ -148,7 +148,7 @@ struct GameTest {
     g.in.mx=px+iw*.25f;g.in.my=yy+40*ss;g.in.mPressed[0]=true;frame();require(!g.freeAirborne,"runway setup hit target");
     g.in.pressed[K_ESC]=true;frame();require(g.screen==SCR_MENU,"free-flight escape returns main menu");
     require(g.career.money==money&&g.career.fleet.size()==fleet&&g.career.location==location&&g.career.storyIndex==story,"free-flight UI leaves career untouched");
-    printf("PASS free-flight9aircraft + %zu airport keyboard selection, runway/airborne and Escape, career unchanged\n",g_world.airports.size());
+    printf("PASS free-flight %d aircraft + %zu airport keyboard selection, runway/airborne and Escape, career unchanged\n",kNumAircraft,g_world.airports.size());
   }
   static void setup(Game& g,const std::string& sc,float scale) {
     g.realTime=30;g.uiDt=1.f;g.set.uiScale=scale;g.assetDir="assets";g.saveDir=(std::filesystem::temp_directory_path()/"solace-ui-review-settings").string();std::filesystem::create_directories(g.saveDir);
@@ -191,7 +191,7 @@ int main(int argc,char**argv){
   const float scale=argc>5?atof(argv[5]):1;const bool full=argc>6&&std::string(argv[6])=="scene";
 #ifdef UI_REVIEW_FLEET_ONLY
   {std::istringstream scenes(argv[1]);std::string sc;
-    while(std::getline(scenes,sc,',')){bool fleetHangar=sc.rfind("hangar",0)==0&&atoi(sc.c_str()+6)>=0&&atoi(sc.c_str()+6)<=kWraith;bool freeSetup=sc.rfind("freeflight",0)==0&&atoi(sc.c_str()+10)>=0&&atoi(sc.c_str()+10)<kNumAircraft;bool allowed=fleetHangar||freeSetup||sc=="research10"||sc=="research20"||sc=="menuT5";if(!full||!allowed){fprintf(stderr,"Fleet diagnostic supports career hangar, research10/20, or fixed menuT5 only in scene mode.\n");return 2;}}}
+    while(std::getline(scenes,sc,',')){bool fleetHangar=sc.rfind("hangar",0)==0&&atoi(sc.c_str()+6)>=0&&atoi(sc.c_str()+6)<kAircraftCount;bool freeSetup=sc.rfind("freeflight",0)==0&&atoi(sc.c_str()+10)>=0&&isCareerAircraft(atoi(sc.c_str()+10));bool allowed=fleetHangar||freeSetup||sc=="research10"||sc=="research20"||sc=="menuT5";if(!full||!allowed){fprintf(stderr,"Fleet diagnostic supports career hangar, research10/20, or fixed menuT5 only in scene mode.\n");return 2;}}}
   printf("DIAGNOSTIC: exact standard fleet render passes; eight unused generic/research/marched startup programs omitted; pre-baked actual mesh with runtime no-march assertions. Not full-startup validation.\n");
 #endif
   std::filesystem::create_directories(argv[2]);

@@ -56,12 +56,16 @@ A pilot-career flight game for Windows with a detailed real-time 3D world drawn 
 | Starling 500 Jet | Light business jet | 7 / 700 kg | 260 km | 466 kt | 462 m | 527 m | 607 m paved | ATP |
 | Swift S6 | Retractable low-wing tourer | 3 / 420 kg | 140 km | 173 kt | 165 m | 392 m | 451 m paved | PPL |
 | Osprey C6 | Six-seat coastal charter twin | 5 / 270 kg | 110 km | 160 kt | 149 m | 389 m | 447 m paved | CPL |
+| Larkspur L4 | Four-seat shoulder-wing tourer | 3 / 130 kg | 115 km | 133 kt | 220 m | 384 m | 600 m paved | PPL |
+| Atlas A180 | 180-seat twin-engine transport | 180 / 6500 kg | 350 km | 513 kt | 1280 m | 779 m | 1900 m paved | ATP |
 
 Cruise, take-off roll and landing distance are what each aircraft actually does in the flight model (learned by flying it: `flight_test --table`); the runway it needs is the longer of the two at full weight, 15% to spare, longer at high fields.
 
 ## Controls
 
 The game shows no key prompts during flight. Open **Controls** from the main menu, the pause menu or the Settings tab to see every binding. To remap one, click its keyboard or controller cell and press the new key or button (Esc / Menu cancels, right-click clears the binding). A key that's already used in the same group swaps over, and **Reset to defaults** restores the table below. Bindings are saved in `settings.cfg`. The arrow keys, PgUp / PgDn, the number keys, the sticks and the triggers are fixed.
+
+**XR-40 manual VTOL (90-degree pod notch):** hold throttle-up (default **Shift**, **PgUp** or **+**) for full power, or hold **1–9** for a partial-power target. **RT** commands power proportionally; **LT** reduces it, and throttle-down or **0** commands idle. Releasing the power control commands idle and the engines wind down at their normal spool rate. Held controls must be released after pausing or changing input context before they can apply power again. Forward flight, the intermediate pod notches, and engaged autopilot retain their existing throttle controls.
 
 | Key (default) | Action | Gamepad (default) |
 |---|---|---|

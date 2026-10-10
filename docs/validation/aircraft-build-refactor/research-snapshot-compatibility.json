@@ -1,0 +1,126 @@
+{
+  "snapshot": "../new-aircraft-review/source-snapshots/final-round2",
+  "pruned_programs": {
+    "10_bake0.frag": {
+      "same": true,
+      "sha256": "1625eb52d858ddc132fc4a3ce6eb5db19e0ad6e1ad6baf21829e816a28037d10",
+      "bytes": 48113
+    },
+    "10_bake1.frag": {
+      "same": true,
+      "sha256": "cac30171586632ae0121a6aa307104c1cf4eae2b37cbc0e2c586def9791d68a9",
+      "bytes": 31158
+    },
+    "10_bake2.frag": {
+      "same": true,
+      "sha256": "3c1052a51509f2d27742be8bde3b91579fa1f2a5b409e084fa151904818e73ce",
+      "bytes": 48587
+    },
+    "10_bake3.frag": {
+      "same": true,
+      "sha256": "fdabee891b9d71eac65dc1f9f9eda9db8c274dba59b35c7348a42c198f5f3f88",
+      "bytes": 31632
+    },
+    "10_effects.frag": {
+      "same": true,
+      "sha256": "23ca1483bc39cc23eb614b20cb9bc23a7b88e5ffff327b66f9a0b281cab641e0",
+      "bytes": 23290
+    },
+    "10_mesh.frag": {
+      "same": true,
+      "sha256": "fb1f8eabdb7284e7b4c3c08bd6ab4072ff62e08dff62c8a088a1ab2e8845b74e",
+      "bytes": 93453
+    },
+    "10_mesh.vert": {
+      "same": true,
+      "sha256": "d65898d11df0423c97f20cce43f700527e63a44d95bd9d2e4179fb22c4286ba6",
+      "bytes": 3013
+    },
+    "10_mesh_safe.frag": {
+      "same": true,
+      "sha256": "991699c55f868d4bede5500063fc81be0598d8cdd0cfaafffde5086390fc467b",
+      "bytes": 93475
+    },
+    "10_objects.frag": {
+      "same": true,
+      "sha256": "d75aeac9ccd36dfe2608544bf59917567b10d76e2da58739c282b85f3044815f",
+      "bytes": 110220
+    },
+    "10_shadow.frag": {
+      "same": true,
+      "sha256": "41d379592263d1381ec6eda820fbd4a50533f28b28ee22c81350a7f67bda8986",
+      "bytes": 48115
+    },
+    "12_bake0.frag": {
+      "same": true,
+      "sha256": "dbf189f4e1dd6e60840d8bbbdf0191610cbfcce725d706d21c49e808dec17449",
+      "bytes": 58352
+    },
+    "12_bake1.frag": {
+      "same": true,
+      "sha256": "27849a1c761f1a2bcfdf88f83c49e32e4eeeaa8085da6e34e277152084744671",
+      "bytes": 37204
+    },
+    "12_bake2.frag": {
+      "same": true,
+      "sha256": "6b44226f982ddf2e1fa1656b787f30d4a3f88b19cc58114e369878eec6fa9f3d",
+      "bytes": 58826
+    },
+    "12_bake3.frag": {
+      "same": true,
+      "sha256": "46aa1f347a9da692cd04c09d16ec191c92e72f1cd4a626cea8238d6cbb8393ff",
+      "bytes": 37678
+    },
+    "12_effects.frag": {
+      "same": true,
+      "sha256": "9b1d375056f0366bb71923b879b51cfe8940d270e929638e7fe5c17e4e755108",
+      "bytes": 69673
+    },
+    "12_mesh.frag": {
+      "same": true,
+      "sha256": "8be030d1e1b22e619fd8c029f120d576bcef27ff58d970cb238c845c72b7cee8",
+      "bytes": 109965
+    },
+    "12_mesh.vert": {
+      "same": true,
+      "sha256": "d88cd17be12c5e1fe614a9c35f9b0b42a6c7cd963423049bc134c1f4a904f639",
+      "bytes": 2975
+    },
+    "12_mesh_safe.frag": {
+      "same": true,
+      "sha256": "9c36af4155345f1c2f4408a5dac2cfada2d428cbe8f7e377cbdcf4c6e0375e7a",
+      "bytes": 109987
+    },
+    "12_objects.frag": {
+      "same": true,
+      "sha256": "3c6bdc008daf94c21674bec9f11ec7260e3b67cc892cfd519cd749f59cdc0a15",
+      "bytes": 122423
+    },
+    "12_shadow.frag": {
+      "same": true,
+      "sha256": "335793efa1e9f1b6e2ec764ae5d0464b7cb4a8d6964e21940a3524b23e35088c",
+      "bytes": 54182
+    },
+    "mesh_depth.frag": {
+      "same": true,
+      "sha256": "b7354876db4d4b62f93bc77415ea7d902f88b174cdaa3fa3f30c763b24c65151",
+      "bytes": 4673
+    },
+    "part_pose.frag": {
+      "same": true,
+      "sha256": "ad5aa9e95356e3e8f31f0135dd590a51f2bd7db24e5639ea06345dbe03a5e72c",
+      "bytes": 33031
+    }
+  },
+  "pose_sources_identical": {
+    "src/aircraft_mesh.cpp": true,
+    "src/shaders/plane_parts.glsl": true,
+    "src/game.cpp": true,
+    "src/game_wraith.cpp": true,
+    "src/models.cpp": true,
+    "src/aircraft.cpp": true,
+    "src/renderer.h": true,
+    "src/mesh_validation.h": true
+  },
+  "limits": "Atlas-only plane_sdf source edit differs; these exact XR programs and pose sources are unchanged."
+}

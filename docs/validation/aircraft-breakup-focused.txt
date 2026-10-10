@@ -1,0 +1,123 @@
+Focused actual-source run, 2026-10-10 19:45 UTC. Serial standalone Linux compile; existing unchanged core objects reused. Aggregate rebuild remains separate.
+
+=== breakup_test.txt ===
+Kestrel T2       14 pieces: propeller L gear leg R gear leg gear leg L strut R strut L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 1 1 2 2 2 3 4 2 2 2 7 6
+  falls: propeller 84s 38m/s 7.1rad/s; L gear leg 123s 20m/s 0.9rad/s; R gear leg 124s 20m/s 1.1rad/s; gear leg 134s 18m/s 0.4rad/s; L strut 238s 12m/s 0.0rad/s; R strut 222s 13m/s 0.0rad/s; L tailplane 201s 13m/s 6.3rad/s; R tailplane 225s 11m/s 7.6rad/s; fin 294s 9m/s 7.3rad/s; L wing 124s 21m/s 4.1rad/s; R wing 139s 22m/s 4.8rad/s; nose 47s 57m/s 2.1rad/s; tail cone 56s 46m/s 1.0rad/s; centre section 79s 33m/s 1.5rad/s;  (0.7 us a step)
+Wren 180         12 pieces: propeller L gear leg R gear leg gear leg L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 1 1 2 3 4 1 1 2 7 4
+  falls: propeller 74s 31m/s 2.2rad/s; L gear leg 86s 29m/s 1.4rad/s; R gear leg 85s 29m/s 1.6rad/s; gear leg 87s 29m/s 0.5rad/s; L tailplane 207s 12m/s 7.7rad/s; R tailplane 219s 11m/s 8.1rad/s; fin 443s 5m/s 9.6rad/s; L wing 155s 35m/s 6.3rad/s; R wing 116s 36m/s 5.3rad/s; nose 42s 66m/s 1.7rad/s; tail cone 48s 56m/s 3.7rad/s; centre section 73s 28m/s 0.1rad/s;  (1.0 us a step)
+Bushmaster STOL  14 pieces: propeller L gear leg R gear leg gear leg L strut R strut L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 1 1 2 2 2 3 4 2 2 2 7 8
+  falls: propeller 73s 27m/s 3.9rad/s; L gear leg 98s 25m/s 0.6rad/s; R gear leg 99s 25m/s 0.7rad/s; gear leg 75s 34m/s 1.4rad/s; L strut 224s 12m/s 0.0rad/s; R strut 221s 10m/s 0.0rad/s; L tailplane 190s 12m/s 6.1rad/s; R tailplane 189s 14m/s 5.4rad/s; fin 212s 11m/s 12.3rad/s; L wing 121s 27m/s 3.5rad/s; R wing 121s 27m/s 3.5rad/s; nose 40s 71m/s 1.3rad/s; tail cone 47s 57m/s 3.9rad/s; centre section 63s 36m/s 1.1rad/s;  (0.7 us a step)
+Islander Twin    15 pieces: L propeller R propeller L nacelle R nacelle L gear leg R gear leg gear leg L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 3 3 1 1 1 2 3 3 4 4 3 6 4
+  falls: L propeller 56s 50m/s 3.2rad/s; R propeller 55s 54m/s 12.4rad/s; L nacelle 26s 150m/s 1.7rad/s; R nacelle 26s 150m/s 2.1rad/s; L gear leg 79s 31m/s 1.2rad/s; R gear leg 77s 32m/s 1.2rad/s; gear leg 63s 40m/s 0.9rad/s; L tailplane 190s 14m/s 4.3rad/s; R tailplane 194s 14m/s 4.4rad/s; fin 171s 14m/s 8.9rad/s; L wing 127s 29m/s 3.1rad/s; R wing 104s 29m/s 3.1rad/s; nose 41s 69m/s 0.2rad/s; tail cone 42s 67m/s 6.2rad/s; centre section 60s 42m/s 1.6rad/s;  (0.7 us a step)
+Pelican Caravan  14 pieces: propeller L gear leg R gear leg gear leg L strut R strut L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 1 1 2 2 2 3 1 2 2 2 6 6
+  falls: propeller 43s 66m/s 2.6rad/s; L gear leg 73s 35m/s 1.0rad/s; R gear leg 71s 35m/s 1.0rad/s; gear leg 70s 36m/s 0.9rad/s; L strut 145s 19m/s 0.1rad/s; R strut 149s 15m/s 0.1rad/s; L tailplane 152s 15m/s 6.4rad/s; R tailplane 177s 13m/s 6.7rad/s; fin 168s 13m/s 10.9rad/s; L wing 216s 8m/s 6.7rad/s; R wing 95s 19m/s 6.3rad/s; nose 37s 78m/s 1.0rad/s; tail cone 40s 72m/s 2.8rad/s; centre section 56s 44m/s 0.7rad/s;  (1.0 us a step)
+Meridian Q400    12 pieces: L propeller R propeller L nacelle R nacelle L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 1 1 1 1 3 2 2 1 2 4
+  falls: L propeller 27s 163m/s 4.5rad/s; R propeller 38s 66m/s 2.6rad/s; L nacelle 25s 172m/s 2.0rad/s; R nacelle 25s 171m/s 2.2rad/s; L tailplane 134s 39m/s 7.9rad/s; R tailplane 68s 46m/s 9.1rad/s; fin 123s 21m/s 7.9rad/s; L wing 39s 74m/s 3.9rad/s; R wing 34s 74m/s 3.8rad/s; nose 31s 109m/s 2.3rad/s; tail cone 33s 105m/s 0.8rad/s; centre section 55s 48m/s 1.8rad/s;  (0.7 us a step)
+Starling 500 Jet 10 pieces: L nacelle R nacelle L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 2 2 1 2 4 1 1 1 9 4
+  falls: L nacelle 40s 77m/s 0.7rad/s; R nacelle 39s 76m/s 0.6rad/s; L tailplane 222s 8m/s 11.1rad/s; R tailplane 236s 8m/s 11.1rad/s; fin 163s 15m/s 11.6rad/s; L wing 47s 62m/s 7.0rad/s; R wing 58s 65m/s 7.0rad/s; nose 33s 93m/s 1.3rad/s; tail cone 37s 80m/s 0.1rad/s; centre section 57s 46m/s 1.9rad/s;  (0.7 us a step)
+Swift S6          9 pieces: propeller L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 2 3 4 1 1 2 7 4
+  falls: propeller 79s 32m/s 4.7rad/s; L tailplane 156s 20m/s 9.5rad/s; R tailplane 106s 27m/s 8.0rad/s; fin 418s 6m/s 9.4rad/s; L wing 348s 7m/s 7.5rad/s; R wing 125s 27m/s 5.9rad/s; nose 37s 83m/s 0.5rad/s; tail cone 49s 54m/s 2.9rad/s; centre section 56s 46m/s 11.8rad/s;  (1.2 us a step)
+Osprey C6        12 pieces: L propeller R propeller L nacelle R nacelle L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 3 3 2 3 4 4 4 5 7 4
+  falls: L propeller 62s 50m/s 4.0rad/s; R propeller 51s 72m/s 11.7rad/s; L nacelle 28s 126m/s 0.3rad/s; R nacelle 29s 119m/s 0.6rad/s; L tailplane 228s 11m/s 6.6rad/s; R tailplane 244s 10m/s 6.9rad/s; fin 451s 5m/s 7.0rad/s; L wing 137s 24m/s 4.5rad/s; R wing 149s 23m/s 3.6rad/s; nose 43s 66m/s 2.5rad/s; tail cone 70s 36m/s 0.0rad/s; centre section 68s 36m/s 2.0rad/s;  (0.8 us a step)
+XR-10 Nightjar   10 pieces: L nacelle R nacelle L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 2 2 4 5 4 1 1 1 11 4
+  falls: L nacelle 37s 80m/s 0.3rad/s; R nacelle 42s 85m/s 0.2rad/s; L tailplane 206s 10m/s 12.7rad/s; R tailplane 194s 10m/s 12.7rad/s; fin 230s 10m/s 9.9rad/s; L wing 104s 24m/s 5.8rad/s; R wing 52s 38m/s 5.9rad/s; nose 33s 100m/s 0.5rad/s; tail cone 35s 93m/s 0.4rad/s; centre section 47s 54m/s 1.5rad/s;  (0.7 us a step)
+XR-30 Specter     5 pieces: L wing R wing nose tail cone centre section
+  tears: 3 3 3 3 4
+  falls: L wing 76s 46m/s 7.9rad/s; R wing 55s 55m/s 7.9rad/s; nose 32s 101m/s 0.1rad/s; tail cone 39s 109m/s 3.1rad/s; centre section 43s 115m/s 6.3rad/s;  (1.0 us a step)
+XR-20 Mantis      9 pieces: L canard R canard L fin R fin L wing R wing nose tail cone centre section
+  tears: 3 3 1 1 1 1 7 3 4
+  falls: L canard 55s 45m/s 20.7rad/s; R canard 147s 14m/s 21.0rad/s; L fin 95s 27m/s 18.2rad/s; R fin 85s 21m/s 15.7rad/s; L wing 38s 74m/s 8.1rad/s; R wing 38s 74m/s 8.1rad/s; nose 34s 93m/s 0.1rad/s; tail cone 30s 119m/s 0.8rad/s; centre section 43s 72m/s 3.0rad/s;  (0.6 us a step)
+XR-40 Wraith      5 pieces: L wing R wing nose tail cone centre section
+  tears: 3 3 3 3 4
+  falls: L wing 27s 149m/s 0.0rad/s; R wing 28s 148m/s 0.0rad/s; nose 31s 113m/s 2.3rad/s; tail cone 48s 59m/s 2.7rad/s; centre section 37s 88m/s 6.1rad/s;  (0.8 us a step)
+Larkspur L4      12 pieces: propeller L gear leg R gear leg gear leg L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 1 1 2 3 4 1 1 2 7 4
+  falls: propeller 78s 34m/s 17.1rad/s; L gear leg 101s 24m/s 1.5rad/s; R gear leg 100s 24m/s 1.1rad/s; gear leg 121s 20m/s 0.5rad/s; L tailplane 478s 5m/s 9.3rad/s; R tailplane 398s 5m/s 9.3rad/s; fin 414s 5m/s 8.5rad/s; L wing 115s 22m/s 5.2rad/s; R wing 153s 14m/s 6.0rad/s; nose 45s 61m/s 1.2rad/s; tail cone 64s 40m/s 4.4rad/s; centre section 73s 34m/s 1.2rad/s;  (0.8 us a step)
+Atlas A180       10 pieces: L nacelle R nacelle L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 3 3 2 2 1 4 4 1 5 3
+  falls: L nacelle 26s 178m/s 6.1rad/s; R nacelle 23s 191m/s 4.1rad/s; L tailplane 65s 42m/s 8.0rad/s; R tailplane 77s 40m/s 7.9rad/s; fin 254s 9m/s 3.5rad/s; L wing 50s 57m/s 3.0rad/s; R wing 59s 56m/s 3.0rad/s; nose 30s 120m/s 0.1rad/s; tail cone 33s 101m/s 1.5rad/s; centre section 41s 79m/s 5.0rad/s;  (0.6 us a step)
+skin panel 0.5 m, 3 kg/m^2: down from 1000 m in 301 s, sinking 2.7..4.2 m/s, spinning up to 15.2 rad/s
+breakup_test: every type comes apart by component, each surface with its piece, and every piece flies down
+
+=== prop_disc_test.txt ===
+PASS: 100677 checks; 9 prop aircraft, 12 model hubs, 100383 visible bound samples
+
+=== atlas_gear_geometry_test.txt ===
+Atlas actual stations: track 3.4500 mainZ 4.1733 gearHeight 3.6500; stowed min margin 0.0410m; swept outer x 3.9790m; door-to-wheel clearance 0.2605m; flap root 3.850m
+Door/truck sampled minimum 0.08000m at gear 0.36, body point (1.4006,-1.8500,5.4433)
+PASS: 339405 checks, 0 failures. CPU/source geometry; native raster and hardware validation are separate.
+
+=== wreck_pose_test.txt ===
+Wreck pose regression: 45 cases, 0 failures; separation pose, keyboard/pad, actuator mutation, moving shadow centre and live-frame recovery checks
+Wheel visual parity: 75 cases, 0 failures; all player/traffic radii, signed travel and packed dimensions
+
+=== Pre-fix production wheel parity (expected five Atlas failures) ===
+FAIL wheel visual parity: Atlas A180 travel -12.30
+FAIL wheel visual parity: Atlas A180 travel -0.21
+FAIL wheel visual parity: Atlas A180 travel 0.00
+FAIL wheel visual parity: Atlas A180 travel 0.21
+FAIL wheel visual parity: Atlas A180 travel 12.30
+Wheel visual parity: 75 cases, 5 failures; all player/traffic radii, signed travel and packed dimensions
+
+=== Pre-shadow-fix candidate (expected 45 failures) ===
+FAIL wreck pose: Kestrel T2 gear 0.00
+FAIL wreck pose: Kestrel T2 gear 0.35
+FAIL wreck pose: Kestrel T2 gear 1.00
+FAIL wreck pose: Wren 180 gear 0.00
+FAIL wreck pose: Wren 180 gear 0.35
+FAIL wreck pose: Wren 180 gear 1.00
+FAIL wreck pose: Bushmaster STOL gear 0.00
+FAIL wreck pose: Bushmaster STOL gear 0.35
+FAIL wreck pose: Bushmaster STOL gear 1.00
+FAIL wreck pose: Islander Twin gear 0.00
+FAIL wreck pose: Islander Twin gear 0.35
+FAIL wreck pose: Islander Twin gear 1.00
+FAIL wreck pose: Pelican Caravan gear 0.00
+FAIL wreck pose: Pelican Caravan gear 0.35
+FAIL wreck pose: Pelican Caravan gear 1.00
+FAIL wreck pose: Meridian Q400 gear 0.00
+FAIL wreck pose: Meridian Q400 gear 0.35
+FAIL wreck pose: Meridian Q400 gear 1.00
+FAIL wreck pose: Starling 500 Jet gear 0.00
+FAIL wreck pose: Starling 500 Jet gear 0.35
+FAIL wreck pose: Starling 500 Jet gear 1.00
+FAIL wreck pose: Swift S6 gear 0.00
+FAIL wreck pose: Swift S6 gear 0.35
+FAIL wreck pose: Swift S6 gear 1.00
+FAIL wreck pose: Osprey C6 gear 0.00
+FAIL wreck pose: Osprey C6 gear 0.35
+FAIL wreck pose: Osprey C6 gear 1.00
+FAIL wreck pose: XR-10 Nightjar gear 0.00
+FAIL wreck pose: XR-10 Nightjar gear 0.35
+FAIL wreck pose: XR-10 Nightjar gear 1.00
+FAIL wreck pose: XR-30 Specter gear 0.00
+FAIL wreck pose: XR-30 Specter gear 0.35
+FAIL wreck pose: XR-30 Specter gear 1.00
+FAIL wreck pose: XR-20 Mantis gear 0.00
+FAIL wreck pose: XR-20 Mantis gear 0.35
+FAIL wreck pose: XR-20 Mantis gear 1.00
+FAIL wreck pose: XR-40 Wraith gear 0.00
+FAIL wreck pose: XR-40 Wraith gear 0.35
+FAIL wreck pose: XR-40 Wraith gear 1.00
+FAIL wreck pose: Larkspur L4 gear 0.00
+FAIL wreck pose: Larkspur L4 gear 0.35
+FAIL wreck pose: Larkspur L4 gear 1.00
+FAIL wreck pose: Atlas A180 gear 0.00
+FAIL wreck pose: Atlas A180 gear 0.35
+FAIL wreck pose: Atlas A180 gear 1.00
+Wreck pose regression: 45 cases, 45 failures; separation pose, keyboard/pad, actuator mutation, moving shadow centre and live-frame recovery checks
+Wheel visual parity: 75 cases, 0 failures; all player/traffic radii, signed travel and packed dimensions
+
+=== Final source contracts ===
+PASS: 29 production gear/prop debris contracts; unique owners and captured separation poses
+PASS: 37 combined render contracts, including authored tyre radii and traffic stations

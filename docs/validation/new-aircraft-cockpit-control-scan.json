@@ -1,0 +1,54 @@
+{
+  "atlas_thrust_clearance": {
+    "shaft_to_navigation_m": 0.05833389978809617,
+    "handle_bound_to_navigation_m": 0.046374371317993365,
+    "two_crew_navigation_ray_m": 0.013168614855140042
+  },
+  "checks": 354433,
+  "failures": 0,
+  "control_scan": [
+    {
+      "model": 13,
+      "name": "Larkspur L4",
+      "sampled_states_per_seat": 81,
+      "minimum_control_to_instrument_ray_m": 0.19921666065789168,
+      "worst": {
+        "seat": -1,
+        "pitch": -1.0,
+        "roll": 0.0,
+        "target": [
+          -0.3,
+          0.21249999999999997,
+          -2.0980000000000003
+        ]
+      }
+    },
+    {
+      "model": 14,
+      "name": "Atlas A180",
+      "sampled_states_per_seat": 81,
+      "minimum_control_to_instrument_ray_m": 0.06447798903738512,
+      "worst": {
+        "seat": -1,
+        "pitch": -1.0,
+        "roll": 1.0,
+        "target": [
+          -0.7632218243123139,
+          0.44075000000000003,
+          -17.05237798681827
+        ]
+      }
+    }
+  ],
+  "atlas_navigation_pedestal_clearance_m": 0.07310475098405345,
+  "larkspur_power_sightline_clearance_m": 0.12816908983011446,
+  "atlas_status_sightline_clearance_m": 0.15319872798950443,
+  "violations": [],
+  "source_sha256": {
+    "src/shaders/plane_parts.glsl": "4d47156b1087bf8a0cc399a3c374d82918175f8bd66dd96b6012aa5c057ecbd0",
+    "src/shaders/cockpit_fittings.glsl": "347cd84ba6fa01a8c53817ce0d39e6a9dfa005c64cbde53625c9b5dee66d8e4c",
+    "assets/cockpits/layouts.json": "ce05d010c54b2853ed104aabbce8fa9e182f2f44f8ca019a33f53775ba8de2cb",
+    "src/models.cpp": "d87dc5a55c0260e64a7699173eb6c4d99f71930fbfa9af72ce19996c3017c168"
+  },
+  "limits": "Sampled primary-control/display-ray, power/status visibility and navigation/pedestal contract. Native raster, pedal floor contact, physical reach and performance are separate checks."
+}

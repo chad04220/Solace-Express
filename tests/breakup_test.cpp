@@ -5,6 +5,7 @@
 #include "../src/aircraft.h"
 #include "../src/models.h"
 #include "../src/aero.h"
+#include "../src/gear_breakup_geometry.h"
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
@@ -20,10 +21,121 @@ static float gearHeightFor(const AircraftSpec& s) { Plane p; p.reset(&s, vec3(0,
 int main() {
   setvbuf(stdout, nullptr, _IONBF, 0);
   int failures = 0;
-  for (int t = 0; t <= kWraith; t++) {
+  for (int t = 0; t < kAircraftCount; t++) {
     const AircraftSpec& s = kAircraft[t];
     const ModelDef& m = kModels[t];
     const float gh = gearHeightFor(s);
+    // Every extended assembly has one debris body. Test real wheel stations (the
+    // old regression checked half of the actual track and missed attached wheels).
+    for (float gear : {0.f, .2f, .21f, .3f, .65f, 1.f}) {
+      BreakPiece gp[kMaxBreakPieces];
+      const int gn = breakPieces(s, gear, gh, gp);
+      const bool fixed = !s.special && m.gear <= 2, separate = fixed || gear > .2f;
+      int owners[3] = {-1,-1,-1}, ng = 0, wings = 0;
+      for (int k=0;k<gn;++k) {
+        wings += gp[k].kind == BK_WING;
+        if (gp[k].kind != BK_GEAR) continue;
+        const int slot = gp[k].side < 0 ? 0 : gp[k].side > 0 ? 1 : 2;
+        assert(owners[slot] < 0); owners[slot]=k; ++ng;
+        assert(gp[k].rigidOnly);
+        if(gp[k].rigidOnly) assert(breakOwner(gp,gn,gp[k].C) != k);
+        BreakCut cut[kMaxBreakCuts]; assert(breakCuts(s,gp,gn,k,cut)>0);
+      }
+      assert(ng == (separate ? 3 : 0));
+      assert(gn<=kMaxBreakPieces && wings==2 && gp[gn-1].kind==BK_CENTRE);
+      if(t==kLarkspur || t==kAtlas) {
+        int kinds[BK_COUNT]={};
+        for(int j=0;j<gn;++j) {
+          ++kinds[gp[j].kind];
+          BreakCut cuts[kMaxBreakCuts];assert(breakCuts(s,gp,gn,j,cuts)>0);
+        }
+        assert(kinds[BK_WING]==2 && kinds[BK_TAIL]==2 && kinds[BK_FIN]==1);
+        assert(kinds[BK_NOSE]==1 && kinds[BK_AFT]==1 && kinds[BK_CENTRE]==1);
+        assert(kinds[BK_PROP]==(t==kLarkspur?1:0) && kinds[BK_NACELLE]==(t==kAtlas?2:0));
+        assert(gn==(t==kLarkspur?12:separate?13:10));
+        if(t==kAtlas) for(int side:{-1,1}) {
+          // Both real fan assemblies (including their spinner noses) and the
+          // aft core cone belong to their complete, separate nacelle body.
+          // The old legacy +.12 m end bound left the Atlas +.42 m tip behind.
+          for(float z:{m.nacZ0+.74f-.32f,m.nacZ0+.74f,m.nacZ0+m.nacLen+.42f}) {
+            const int owner=breakOwner(gp,gn,vec3(side*m.nacX,m.nacY,z));
+            assert(gp[owner].kind==BK_NACELLE && gp[owner].side==side);
+          }
+          for(int angle=0;angle<360;angle+=15) {
+            const float a=angle*DEG;
+            const vec3 rim(side*m.nacX+m.nacR*.90f*cosf(a),m.nacY+m.nacR*.90f*sinf(a),m.nacZ0+.74f);
+            const int owner=breakOwner(gp,gn,rim);
+            assert(gp[owner].kind==BK_NACELLE && gp[owner].side==side);
+          }
+        }
+      }
+      if (fixed) {
+        const GearStations gs = gearStations(s);
+        for (int sd : {-1,1}) for (float lateral : {-.06f,0.f,.06f}) for (float dy : {-.70f,0.f,.50f}) {
+          const vec3 wheel(sd*(gs.track+lateral),m.wheelR-gh+dy*m.wheelR,gs.mainZ);
+          const int own=owners[sd<0?0:1];
+          const vec3 d=wheel-gp[own].C;
+          assert(fabsf(d.x)<=gp[own].H.x && fabsf(d.y)<=gp[own].H.y && fabsf(d.z)<=gp[own].H.z);
+          assert(breakOwner(gp,gn,wheel)!=own); // no static skin is copied into the gear piece
+
+        }
+      }
+      if(separate) {
+        DebrisBody bodies[kMaxBreakPieces];
+        breakBodies(s,gp,gn,s.emptyMass,0,bodies);
+        for(int owner:owners) {
+          assert(owner>=0 && bodies[owner].mass>0 && finite3(bodies[owner].cg));
+          for(int corner=0;corner<8;++corner) {
+            const auto& body=bodies[owner];
+            const vec3 p((corner&1)?body.hi.x:body.lo.x,(corner&2)?body.hi.y:body.lo.y,(corner&4)?body.hi.z:body.lo.z);
+            assert(body.size+.001f>=2.f*length(p-body.cg));
+          }
+          vec3 p=bodies[owner].cg+vec3(0,50,0),v(20,0,0),w(0,0,1);quat q;
+          debrisStep(bodies[owner],p,v,q,w,vec3(0),1.225f,.1f);
+          assert(finite3(p)&&finite3(v)&&finite3(w));
+        }
+        const GearStations gs=gearStations(s);
+        const auto pose=gearBreakup::mainPose(s,m,gs,gh,gear);
+        const float radius=s.special?.38f:m.wheelR;
+        const vec3 wheel(gs.track,radius-gh,gs.mainZ);
+        auto posed=[&](vec3 p){return pose.hinge+pose.rotation.rotate(p-pose.hinge);};
+        auto inside=[&](int side,vec3 point){
+          point.x*=side;const DebrisBody& b=bodies[owners[side<0?0:1]];
+          assert(point.x>=b.lo.x-.001f&&point.x<=b.hi.x+.001f&&point.y>=b.lo.y-.001f&&point.y<=b.hi.y+.001f&&point.z>=b.lo.z-.001f&&point.z<=b.hi.z+.001f);
+        };
+        for(int side:{-1,1}) {
+          inside(side,pose.hinge);inside(side,posed(wheel));
+          const vec3 knee(gs.track,-2.40f,2.72f);
+          if(t==kAtlas) inside(side,posed(knee));
+          vec3 expected=posed(lerp(pose.hinge,wheel,.68f)+(t==kAtlas?(knee-pose.hinge)*.15f:vec3(0)));expected.x*=side;
+          assert(length(bodies[owners[side<0?0:1]].cg-expected)<.001f);
+          for(float axle:{-1.f,1.f})for(float tyre:{-1.f,1.f})for(int angle=0;angle<360;angle+=15)for(float shoulder:{-1.f,1.f}) {
+            const bool atlas=t==kAtlas;
+            const float x=atlas?tyre*.34f:!s.special&&m.gear==3?tyre*.22f:0.f;
+            const float z=atlas?axle*.62f:0.f;
+            const float half=atlas?.189f:!s.special&&m.gear==3?.154f:fixed?(m.gear==0?.065f:m.gear==1?.134f:.184f):.144f;
+            inside(side,posed(wheel+vec3(x+shoulder*half,cosf(angle*DEG)*radius,z+sinf(angle*DEG)*radius)));
+          }
+        }
+        if(t==kAtlas) { // independent matrix witness, including the yaw/roll order
+          const float up=clampf((1-gear)*1.25f,0,1);
+          const vec3 hinge(gs.track,-1.30f,2.72f),d=wheel-hinge;
+          const float dx=1.85f-gs.track,dz=-sqrtf(d.y*d.y+d.z*d.z-dx*dx);
+          const float a=-.5f*PI*smoothstepf(.25f,1.f,up);
+          const float b=atan2f(d.y*dz-d.z*dx,d.y*dx+d.z*dz)*smoothstepf(0,.65f,up);
+          const vec3 roll(cosf(a)*d.x-sinf(a)*d.y,sinf(a)*d.x+cosf(a)*d.y,d.z);
+          const vec3 actual=hinge+vec3(cosf(b)*roll.x-sinf(b)*roll.z,roll.y,sinf(b)*roll.x+cosf(b)*roll.z);
+          inside(1,actual);assert(length(actual-posed(wheel))<.001f);
+        }
+        if(s.taildragger) {
+          const DebrisBody& tail=bodies[owners[2]];
+          // The rendered tail wheel uses the model offset, not the calibrated
+          // contact-station tailY used to settle a complete aircraft on a runway.
+          const float bottom=-gh+.11f*s.fusLen;
+          assert(bottom>=tail.lo.y-.001f && bottom+.2f<=tail.hi.y+.001f);
+        }
+      }
+    }
     BreakPiece P[kMaxBreakPieces];
     const int n = breakPieces(s, 0.f, gh, P);
     assert(n >= 5 && n <= kMaxBreakPieces && P[n - 1].kind == BK_CENTRE);
@@ -47,12 +159,6 @@ int main() {
       }
       float pr[2][4]; const int np = modelProps(m, pr);
       for (int i = 0; i < np; i++) assert(P[breakOwner(P, n, vec3(pr[i][0], pr[i][1], pr[i][2]))].kind == BK_PROP);
-      if (m.gear <= 2) {   // fixed gear: the wheels come away with their legs
-        const GearStations gs = gearStations(s);
-        if (getenv("BRKDBG")) for (int i = 0; i < n; i++) printf("    %s C %.2f %.2f %.2f H %.2f %.2f %.2f\n", breakKindName(P[i].kind), P[i].C.x, P[i].C.y, P[i].C.z, P[i].H.x, P[i].H.y, P[i].H.z);
-        if (getenv("BRKDBG")) printf("    gear point %.2f %.2f %.2f (gh %.2f track %.2f)\n", 0.5f * gs.track, -gh + 0.15f, gs.mainZ, gh, gs.track);
-        for (int sd = -1; sd <= 1; sd += 2) assert(P[breakOwner(P, n, vec3(sd * 0.5f * gs.track, -gh + 0.15f, gs.mainZ))].kind == BK_GEAR);
-      }
       // the tips, the fin top and the tail cone
       assert(P[breakOwner(P, n, modelWingTip(m))].kind == BK_WING);
       const int ft = breakOwner(P, n, modelFinTop(m)); assert(P[ft].kind == BK_FIN || P[ft].kind == BK_TAIL);
@@ -81,6 +187,11 @@ int main() {
       // its contact box holds its centre of mass and is no bigger than the airframe
       const vec3 lo = B[i].lo, hi = B[i].hi;
       assert(hi.x > lo.x && hi.y > lo.y && hi.z > lo.z);
+      if(P[i].rigidOnly)
+        for(int corner=0;corner<8;++corner) {
+          const vec3 point((corner&1)?hi.x:lo.x,(corner&2)?hi.y:lo.y,(corner&4)?hi.z:lo.z);
+          assert(B[i].size+.001f>=2.f*length(point-B[i].cg));
+        }
       if (!(B[i].cg.x >= lo.x - 0.01f && B[i].cg.x <= hi.x + 0.01f && B[i].cg.y >= lo.y - 0.01f && B[i].cg.y <= hi.y + 0.01f && B[i].cg.z >= lo.z - 0.01f && B[i].cg.z <= hi.z + 0.01f)) { printf("  the %s's centre of mass is outside its box\n", breakKindName(P[i].kind)); failures++; }
       if (hi.x - lo.x > s.span + 2.f || hi.z - lo.z > s.fusLen + 4.f) { printf("  the %s's box (%.1f x %.1f x %.1f) is bigger than the airframe\n", breakKindName(P[i].kind), hi.x - lo.x, hi.y - lo.y, hi.z - lo.z); failures++; }
     }

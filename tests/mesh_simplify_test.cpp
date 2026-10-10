@@ -108,6 +108,27 @@ static Mesh sphere(float r, int nu, int nw) {
 }
 
 int main() {
+  {   // Thin broad slabs: the door-depth repair must retain the requested local edge bound.
+    Mesh m = box(0.5f, 20);
+    for (size_t v = 0; v < m.vb.size(); v += 8) {
+      m.vb[v] *= 3.06f; m.vb[v + 1] *= .024f; m.vb[v + 2] *= 1.553f;
+      vec3 n = normalize(vec3(m.vb[v + 3]/3.06f, m.vb[v + 4]/.024f, m.vb[v + 5]/1.553f));
+      m.vb[v + 3] = n.x; m.vb[v + 4] = n.y; m.vb[v + 5] = n.z;
+    }
+    Mesh s = m; size_t end = s.ib.size();
+    const float maxEdge = .20f;
+    simplifyMesh(s.vb, s.ib, end, .0008f, .04f, maxEdge);
+    float longest = 0.f;
+    for (size_t t = 0; t < s.ib.size(); t += 3) for (int k = 0; k < 3; k++) {
+      const float* a = &s.vb[size_t(s.ib[t + k])*8];
+      const float* b = &s.vb[size_t(s.ib[t + (k + 1)%3])*8];
+      longest = std::max(longest, length(vec3(a[0]-b[0], a[1]-b[1], a[2]-b[2])));
+    }
+    CHECK(longest <= maxEdge + 1e-5f, "thin slab exceeded its edge bound: %g", longest);
+    CHECK(deviation(m, s) < 1e-4f, "thin slab geometry changed during edge-bounded simplification");
+    CHECK(inward(s) == 0, "thin slab acquired inward faces");
+    printf("thin door: %zu -> %zu triangles, longest edge %.4f m\n", m.ib.size()/3, s.ib.size()/3, longest);
+  }
   {   // the box: its flat faces collapse; the corners, the edges and the painted panel's border stay exact
     Mesh m = box(0.5f, 40), s = m;
     size_t end = s.ib.size();

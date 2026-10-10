@@ -187,6 +187,41 @@ bool cabinWallNormal(vec3 q, int model, inout int mid, out vec3 wn){
   wn = -normalize(g + vec3(1e-6));
   return true;
 }
+#if HAS_JET
+// Exact normals for the unchanged XR-30 inner support rim and its small overhead toggles.
+// Their tight changes of gradient are smaller than the static cabin's fine lattice.
+bool specterFittingNormal(vec3 q,int mid,out vec3 n){
+  if(!JET_ON) return false;
+  if(mid==44){
+    float r=length(q.xz),a=atan(q.x,-q.z);
+    // Restrict this to the visible inner lip; the five display modules keep their own normals.
+    if(r<.46 || r>.506 || q.y<-.568 || q.y>-.499 || abs(a)>1.19) return false;
+    vec3 radial=vec3(q.x,0,q.z)/r;
+    float d=r-.71; n=radial;
+    float v=.47-r; if(v>d){d=v;n=-radial;}
+    v=abs(a)-1.18; if(v>d){d=v;n=sign(a)*vec3(-q.z,0,q.x)/r;}
+    v=q.y+.505; if(v>d){d=v;n=vec3(0,1,0);}
+    v=-.56-q.y; if(v>d){d=v;n=vec3(0,-1,0);}
+    v=.47+clamp(-.54-q.y,0.0,.02)-r;
+    if(v>d){d=v;n=normalize(-radial+vec3(0,q.y<-.54&&q.y>-.56?-1.0:0.0,0));}
+    return abs(d)<.008;
+  }
+  if(mid!=47) return false;
+  vec3 oq=q-vec3(0,.46,-.25);
+  const float c=.8525245221,s=.5226872289;
+  oq.yz=mat2(c,s,-s,c)*oq.yz;
+  if(abs(oq.x)>.23 || oq.y<-.050 || oq.y>-.012 || abs(oq.z)>.085) return false;
+  vec3 t=oq+vec3(0,.02,0);
+  t.xz-=clamp(floor(t.xz/vec2(.05,.06)+.5),vec2(-4,-1),vec2(4,1))*vec2(.05,.06);
+  vec3 axis=vec3(0,-.022,.008);
+  vec3 radial=t-axis*clamp(dot(t,axis)/dot(axis,axis),0.0,1.0);
+  float r=length(radial);
+  if(r<1e-6 || abs(r-.0045)>.007) return false;
+  n=radial/r;n.yz=mat2(c,-s,s,c)*n.yz;
+  return true;
+}
+#endif
+
 // The XR-40's side consoles and their displays' tilted mounts (wraith_cockpit_sdf.glsl) as a field of their own, for
 // the normal of a pixel on them: the mounts' rounded edges bend tighter than the cabin's fine lattice, and the mesh's
 // normals stepped round them in a sawtooth that the polished titanium's highlights picked out (the owner's report).

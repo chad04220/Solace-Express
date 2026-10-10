@@ -1,0 +1,28 @@
+type             gamPair      KJ   b0/b   sink     nv flapv tailGam  finGam    wash
+  spacing Kestrel T2 actual0.777 expected-from-loading0.742
+Kestrel T2          27.0    25.8   0.78   0.55      8     2    11.5    12.3    17.6
+  spacing Wren 180 actual0.764 expected-from-loading0.746
+Wren 180            29.8    29.1   0.76   0.56      8     2    14.9    19.2    18.8
+  spacing Bushmaster STOL actual0.816 expected-from-loading0.801
+Bushmaster STOL     28.1    27.5   0.82   0.44      8     2     9.6    14.2    31.5
+  spacing Islander Twin actual0.681 expected-from-loading0.604
+Islander Twin       54.5    46.4   0.68   0.86     10     3    13.1    14.4    20.1
+  spacing Pelican Caravan actual0.780 expected-from-loading0.751
+Pelican Caravan     43.5    41.9   0.78   0.56      8     2    19.5    28.5    25.1
+  spacing Meridian Q400 actual0.703 expected-from-loading0.607
+Meridian Q400      101.3    93.8   0.70   0.84      8     2    29.4   106.7    13.8
+  spacing Starling 500 Jet actual0.630 expected-from-loading0.624
+Starling 500 Jet    89.1    88.3   0.63   1.42      4     2    19.5    50.8     0.0
+  spacing Swift S6 actual0.757 expected-from-loading0.743
+Swift S6            34.0    33.4   0.76   0.63      8     2    13.7    15.2    20.6
+  spacing Osprey C6 actual0.672 expected-from-loading0.626
+Osprey C6           53.0    47.2   0.67   1.01     10     2     2.9    16.0    15.3
+  spacing XR-10 Nightjar actual0.734 expected-from-loading0.671
+XR-10 Nightjar      63.2    59.9   0.73   0.83      6     2     8.3    38.4     0.0
+  spacing XR-20 Mantis actual0.873 expected-from-loading0.735
+XR-20 Mantis        69.1    74.5   0.87   0.95      8     2     0.0    43.4     0.0
+  spacing Larkspur L4 actual0.758 expected-from-loading0.730
+Larkspur L4         30.1    29.1   0.76   0.55      8     2    12.8    19.4    20.0
+  spacing Atlas A180 actual0.553 expected-from-loading0.570
+Atlas A180         209.9   223.1   0.55   1.52      8     2   -65.1   129.7     0.0
+all wake checks passed

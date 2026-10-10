@@ -1,0 +1,109 @@
+{
+  "false_wing_paint_vertices_in_pods": 0,
+  "cache": "../new-aircraft-review/cache/mesh_3b9b0236c0db0047_4091cba658d7798c.bin",
+  "cache_sha256": "b47d160d9de0b31f9ea5a0cb99bb288f85b7eecb23a96998e7ad4e5660400dd3",
+  "cache_bytes": 18986904,
+  "native_bounds_csv": "../new-aircraft-review/atlas-ramp-final/14_atlas_a180/atlas_a180_gear_up_belly_geometry.csv",
+  "method": "Every actual baked PT36 vertex is posed at gear-up. All triangle interiors obey the same linear wing-edge halfspaces. The resulting bounds match native GPU readback.",
+  "shared_door_vertices": 13310,
+  "shared_door_triangles": 24616,
+  "closed_instances": [
+    {
+      "mirror": -1,
+      "leaf_side": -1,
+      "minimum_margin_m": {
+        "leading_edge_m": 2.372117874088519,
+        "trailing_edge_m": 0.09513189816513146,
+        "centreline_m": 0.3362236512872406,
+        "tip_m": 17.68418425723884
+      },
+      "bounds": [
+        [
+          -2.2158157427611584,
+          -2.1840000002086164,
+          -0.4502936865059788
+        ],
+        [
+          -0.3362236512872406,
+          -2.16,
+          2.4378511372435954
+        ]
+      ]
+    },
+    {
+      "mirror": -1,
+      "leaf_side": 1,
+      "minimum_margin_m": {
+        "leading_edge_m": 1.9128048533334245,
+        "trailing_edge_m": 0.09513189816513146,
+        "centreline_m": 1.6110379350464177,
+        "tip_m": 15.636699322385034
+      },
+      "bounds": [
+        [
+          -4.263300677614963,
+          -2.1840000002086164,
+          -0.1440466060587169
+        ],
+        [
+          -1.6110379350464177,
+          -2.16,
+          2.9305090948748864
+        ]
+      ]
+    },
+    {
+      "mirror": 1,
+      "leaf_side": -1,
+      "minimum_margin_m": {
+        "leading_edge_m": 2.372117874088519,
+        "trailing_edge_m": 0.09513189816513146,
+        "centreline_m": 0.3362236512872406,
+        "tip_m": 17.68418425723884
+      },
+      "bounds": [
+        [
+          0.3362236512872406,
+          -2.1840000002086164,
+          -0.4502936865059788
+        ],
+        [
+          2.2158157427611584,
+          -2.16,
+          2.4378511372435954
+        ]
+      ]
+    },
+    {
+      "mirror": 1,
+      "leaf_side": 1,
+      "minimum_margin_m": {
+        "leading_edge_m": 1.9128048533334245,
+        "trailing_edge_m": 0.09513189816513146,
+        "centreline_m": 1.6110379350464177,
+        "tip_m": 15.636699322385034
+      },
+      "bounds": [
+        [
+          1.6110379350464177,
+          -2.1840000002086164,
+          -0.1440466060587169
+        ],
+        [
+          4.263300677614963,
+          -2.16,
+          2.9305090948748864
+        ]
+      ]
+    }
+  ],
+  "max_cpu_native_gpu_bounds_difference_m": 5.051251137366819e-07,
+  "static_lower_root_paint_vertices": 8571,
+  "static_lower_root_minimum_margin_m": {
+    "leading_edge_m": 0.3529616594314575,
+    "trailing_edge_m": -0.0002987384796142578,
+    "centreline_m": 0.14787964522838593,
+    "tip_m": 15.078960418701172
+  },
+  "status": "PASS"
+}

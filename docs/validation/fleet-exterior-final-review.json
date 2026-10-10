@@ -1,0 +1,165 @@
+{
+  "reviewed_utc": "2026-10-10T22:01:00Z",
+  "status": "PASS: 15-aircraft final exterior visual regression review",
+  "native_resolution": [
+    1920,
+    1080
+  ],
+  "native_exterior_views": 147,
+  "models": [
+    {
+      "model": 0,
+      "folder": "00_kestrel",
+      "native_exterior_views": 11,
+      "sheet": "fleet-final/00_kestrel/00_exterior_qa.jpg",
+      "sheet_sha256": "e8ee4cd4244fea8667d422b460eeae2487b6284fe41b46cc994c620acb66b9ec",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 1,
+      "folder": "01_wren",
+      "native_exterior_views": 7,
+      "sheet": "fleet-final/01_wren/01_exterior_qa.jpg",
+      "sheet_sha256": "c6f9fce6fbd485d0f3828c7d807927b0ff142b89e7d8e8966d73f12c00153068",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 2,
+      "folder": "02_bush",
+      "native_exterior_views": 7,
+      "sheet": "fleet-final/02_bush/02_exterior_qa.jpg",
+      "sheet_sha256": "026f4f91cf7f77b2ec0a8dc132a50a9556fc34ad32cd624e96e5a8d3134267dd",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 3,
+      "folder": "03_islander",
+      "native_exterior_views": 7,
+      "sheet": "fleet-final/03_islander/03_exterior_qa.jpg",
+      "sheet_sha256": "590642e48781b87ecc826598067fe3413d4b5afb0f7057ddaf53c40c0a18c408",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 4,
+      "folder": "04_pelican",
+      "native_exterior_views": 7,
+      "sheet": "fleet-final/04_pelican/04_exterior_qa.jpg",
+      "sheet_sha256": "4e6b8f51493bf8dbea0fe75c4d04fee9997d041152ccc92dc9330dd5aa163f18",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 5,
+      "folder": "05_meridian",
+      "native_exterior_views": 9,
+      "sheet": "fleet-final/05_meridian/05_exterior_qa.jpg",
+      "sheet_sha256": "a5850e56cc305ae8a03f0437d2f1f43c2fc54081e2b9384919434ada2eee73e5",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 6,
+      "folder": "06_starling",
+      "native_exterior_views": 9,
+      "sheet": "fleet-final/06_starling/06_exterior_qa.jpg",
+      "sheet_sha256": "0faf346905c9724162a5036d9510374605f0ae48578539529db165f36aae7ea4",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 7,
+      "folder": "07_swift_s6",
+      "native_exterior_views": 9,
+      "sheet": "fleet-final/07_swift_s6/07_exterior_qa.jpg",
+      "sheet_sha256": "82bf004c16a48ecfd4ac8f7a115ba0f6b2a8aca015a1c5f7ed2f83cec422e218",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 8,
+      "folder": "08_osprey_c6",
+      "native_exterior_views": 9,
+      "sheet": "fleet-final/08_osprey_c6/08_exterior_qa.jpg",
+      "sheet_sha256": "0f550b4151cee09fd6a7d3091480fb7a1a92c10e1762f86e7cc196af93eda98e",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 9,
+      "folder": "09_xr10_nightjar",
+      "native_exterior_views": 9,
+      "sheet": "fleet-final/09_xr10_nightjar/09_exterior_qa.jpg",
+      "sheet_sha256": "7f977869627e961d227331bfa3c0d8b14ae9f740acbbc0c5c8cbf431d1b85fde",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 10,
+      "folder": "10_xr30_specter",
+      "native_exterior_views": 9,
+      "sheet": "fleet-final/10_xr30_specter/10_exterior_qa.jpg",
+      "sheet_sha256": "c9ce26fc116004e891e32fa7ea3e3d77a36265b9a2102d05679703efddd6d895",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 11,
+      "folder": "11_xr20_mantis",
+      "native_exterior_views": 9,
+      "sheet": "fleet-final/11_xr20_mantis/11_exterior_qa.jpg",
+      "sheet_sha256": "7e8c176cfefd08629fb524ba9dec49de35d6c7252994f3bfd63b03d150b8a687",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 12,
+      "folder": "12_xr40_wraith",
+      "native_exterior_views": 9,
+      "sheet": "fleet-final/12_xr40_wraith/12_exterior_qa.jpg",
+      "sheet_sha256": "ed75203dcb9adb75e49e2a756112641c6cfea19335221f06e8101be7391e72ee",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 13,
+      "folder": "13_larkspur_l4",
+      "native_exterior_views": 15,
+      "sheet": "fleet-final/13_larkspur_l4/13_exterior_qa.jpg",
+      "sheet_sha256": "d003b626949c3ee4ebfd7dd94591f95596e10ee60cec2ce51efa08329c5e03a8",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    },
+    {
+      "model": 14,
+      "folder": "14_atlas_a180",
+      "native_exterior_views": 21,
+      "sheet": "fleet-final/14_atlas_a180/14_exterior_qa.jpg",
+      "sheet_sha256": "76c9e1c2164356eeb4c297f3bb4cdb3c2bb50604684d1d0af919b3f9bab87d48",
+      "renderer_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "review": "PASS: multi-angle, gear-state and available breakup checks; no additional reproducible exterior geometry regression."
+    }
+  ],
+  "retained_repairs": [
+    "Kestrel and Larkspur wheel covers hide rims while preserving lower tread, including both steering limits.",
+    "Islander corrected control-surface belly/rear views remain pixel-exact to accepted repair captures.",
+    "Atlas closed/half/full bay frames remain pixel-exact to accepted final-ramp captures; approved cache identity4091cba658d7798c retained.",
+    "Atlas intake/fan, wraparound windshield, connected trailing-link gear, sealed bays and breakup views remain coherent.",
+    "Research aircraft silhouettes, retracting gear and family-specific geometry are unchanged in the reviewed views."
+  ],
+  "known_limitations": [
+    "Existing shared below-horizon reflection approximation can create the documented bright Atlas underside spot.",
+    "Native llvmpipe captures validate visuals and geometry, not RTX3070 frame time.",
+    "The renderer final capture-integrity check and final-source guidance-only parity bridge are owned separately; this report does not claim they have finished."
+  ],
+  "artifacts": [
+    "validation/final-exterior-image-comparisons.json",
+    "validation/final-atlas-bay-parity.json",
+    "validation/atlas-final-baked-projection.json",
+    "validation/atlas-underwing-cost-baselines.json",
+    "validation/atlas-compact-spot-lighting.json"
+  ]
+}

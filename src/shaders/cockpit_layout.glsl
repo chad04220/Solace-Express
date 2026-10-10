@@ -16,7 +16,7 @@ struct CockpitLayout {
 uniform vec4 uCockpitLayout[9]; // one selected model record, uploaded for live and bake passes
 
 #if HAS_FLEET_CABIN
-bool fleetCabin(){ return gModelId >= 0 && gModelId < 10; }
+bool fleetCabin(){ return (gModelId >= 0 && gModelId < 10) || MODEL_IS(13) || MODEL_IS(14); }
 #else
 bool fleetCabin(){ return false; }
 #endif

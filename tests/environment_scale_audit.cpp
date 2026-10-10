@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
   puts("STREETS: 7m carriageway, 1.5m sidewalk each side; cities84x56m, town140x112m, village168x112m blocks");
   puts("NOMINAL_FACADE_PITCH: houses2.9m, bungalow/farm3.0m, townhouse3.2m, apartment3.4m, tower3.6m, office/skyscraper3.7m; actual instance pitches are bounded below");
   puts("FLYABLE FLEET: main-wing span in physics vs production packed model; fuselage stations exclude attached hardware");
-  for (int i=0;i<=kWraith;i++) {
+  for (int i=0;i<kAircraftCount;i++) {
     const AircraftSpec& spec=kAircraft[i]; const ModelDef& model=kModels[i];
     Plane p; p.spec=&spec; float packed[96];packModel(spec,i,p.gearHeight(),packed);
     float span=packed[9*4]*2.f, fuselage=model.st[7][0]-model.st[0][0];

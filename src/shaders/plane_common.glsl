@@ -70,7 +70,9 @@
 #define HAS_OSPREY (AF_MODEL == 8)
 #define HAS_NIGHTJAR (AF_MODEL == 9)
 #define HAS_MANTIS (AF_MODEL == 11)
-#define HAS_FLEET_CABIN (AF_MODEL < 10)
+#define HAS_LARKSPUR (AF_MODEL == 13)
+#define HAS_ATLAS (AF_MODEL == 14)
+#define HAS_FLEET_CABIN (AF_MODEL < 10 || AF_MODEL == 13 || AF_MODEL == 14)
 #define MODEL_IS(n) ((n) == AF_MODEL && gModelId == (n))
 #else
 #define HAS_KESTREL HAS_FLEET
@@ -84,6 +86,8 @@
 #define HAS_OSPREY HAS_FLEET
 #define HAS_NIGHTJAR HAS_FLEET
 #define HAS_MANTIS HAS_FLEET
+#define HAS_LARKSPUR HAS_FLEET
+#define HAS_ATLAS HAS_FLEET
 #define HAS_FLEET_CABIN HAS_FLEET
 #define MODEL_IS(n) (gModelId == (n))
 #endif
@@ -154,6 +158,32 @@ vec3 fusSection(float z){
 }
 // The Mantis remains in the shared engine-4 path. Its centerline glass cockpit is a stable packed-model
 // discriminator, including traffic/bake passes that do not carry uModelId. No roster index or uniform layout changes.
+// Explicit packed variant identity, shared by own-aircraft and traffic passes. Low bit remains de-ice.
+int fleetVariant(){ return int(gM[19].w + 0.5)/2; }
+bool isLarkspur(){ return FLEET_ON && fleetVariant() == 13; }
+bool isAtlas(){ return FLEET_ON && fleetVariant() == 14; }
+// Shared passenger-glass outline: the material and Larkspur's physical rear aperture use one envelope.
+float fleetPassengerPane(vec3 p,vec3 sec){
+  int count=int(gM[20].x+.5);
+  if(count<=0) return 1e5;
+  float pw=(gM[20].z-gM[20].y)/float(count);
+  vec2 q=vec2(mod(p.z-gM[20].y,pw)-pw*.5,p.y-(sec.z+gM[20].w));
+  vec2 h=gM[21].xy;float radius=min(h.x,h.y)*.7;
+  vec2 d=abs(q)-h+radius;
+  float pane=length(max(d,0.0))+min(max(d.x,d.y),0.0)-radius;
+  return pane;
+}
+// The Atlas flight deck wraps onto the low sloping nose, rather than painting only lateral windows.
+// Shared signed pane mask for the shell cut and exterior glazing. Negative means a real open pane.
+float atlasWindow(vec3 p){
+  float front=max(max(-20.0-p.z,p.z+17.56),max(.42-p.y,p.y-1.53));
+  front=max(front,.032-abs(p.x));
+  front=max(front,.035-abs(abs(p.x)-1.14));
+  float side=max(max(-17.48-p.z,p.z+15.80),max(.55-p.y,p.y-1.43));
+  side=max(side,.78-abs(p.x));
+  return min(front,side);
+}
+
 bool isMantis(){ return int(gM[0].z + 0.5) == 4 && abs(gM[22].x) < 0.001 && gM[13].y < -3.0; }
 const float MT_CANT = 0.48;
 const float MT_FIN_X = 1.05;   // fin roots stay on the shoulders when the engine moves to the centerline
@@ -186,6 +216,29 @@ vec3 fuselagePaint(vec3 lp, vec3 sec){
   float fade = smoothstep(gM[2].x - 0.1, gM[3].x, lp.z);                  // grows in over the cowling
   float d = abs(lp.y - c);
   vec3 col = gColBase;
+#if HAS_LARKSPUR
+  if(isLarkspur()) {
+    // An ivory upper cabin, deep ocean lower shell and a rising copper tail accent.
+    float sweep=.06+.115*smoothstep(-.5,3.1,lp.z);
+    float line=lp.y-sec.z-sweep;
+    col=gColBase;
+    if(line<-.11) col=mix(gColStripe,vec3(.025,.060,.068),.35);
+    if(abs(line+.065)<.022 && lp.z>-3.90) col=vec3(.78,.39,.16);
+    if(lp.z<-2.7 && lp.y>sec.z+.55*sec.y) col=vec3(.10,.14,.15);
+    return col;
+  }
+#endif
+#if HAS_ATLAS
+  if(isAtlas()) {
+    // Broad blue belly and an ascending aft ribbon carry the flightline transport's own identity.
+    float aft=smoothstep(6.0,19.0,lp.z), line=lp.y-sec.z-(-.72+1.40*aft);
+    col=gColBase;
+    if(line<0.0) col=gColStripe*.74;
+    if(line>0.02 && line<.085) col=vec3(.25,.62,.68);
+    if(lp.z<-19.3) col=mix(col,vec3(.70,.73,.74),.12);
+    return col;
+  }
+#endif
   if (isMantis()) {
     // Graphite body, angular amber shoulder stripe and anti-glare nose. The form, rather than a recolor, leads.
     col=vec3(.105,.125,.15);

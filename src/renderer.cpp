@@ -732,11 +732,11 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel, int half) {
   glUniform4fv(U(p, "uI0"), 1, pv.I0); glUniform4fv(U(p, "uI1"), 1, pv.I1); glUniform4fv(U(p, "uI2"), 1, pv.I2);
   glUniform1f(U(p, "uTime"), fp.time); glUniform1i(U(p, "uCraterN"), 0);
   glUniform4f(U(p, "uDispMode"), panel ? 1.f : 0.f, (float)fp.dispCk, 0, 0);
-  glUniform1i(U(p, "uDisplayEngines"), pv.model>=0 && pv.model<=kWraith?kAircraft[pv.model].engines:2);
-  glUniform1i(U(p, "uDisplayRetract"), pv.model>=0 && pv.model<=kWraith ? (kAircraft[pv.model].retract?1:0) : (pv.M[1]>=3.f?1:0));
-  glUniform1i(U(p, "uDisplayPiston"), pv.model>=0 && pv.model<=kWraith && kAircraft[pv.model].engineType==ENG_PISTON?1:0);
+  glUniform1i(U(p, "uDisplayEngines"), validAircraft(pv.model)?kAircraft[pv.model].engines:2);
+  glUniform1i(U(p, "uDisplayRetract"), validAircraft(pv.model) ? (kAircraft[pv.model].retract?1:0) : (pv.M[1]>=3.f?1:0));
+  glUniform1i(U(p, "uDisplayPiston"), validAircraft(pv.model) && kAircraft[pv.model].engineType==ENG_PISTON?1:0);
   {   // (the jets with an afterburner: the research craft and the supersonic types - exhaust.h hasReheat)
-    const AircraftSpec* rs = pv.model>=0 && pv.model<=kWraith ? &kAircraft[pv.model] : nullptr;
+    const AircraftSpec* rs = validAircraft(pv.model) ? &kAircraft[pv.model] : nullptr;
     glUniform1i(U(p, "uDisplayReheat"), rs ? (rs->engineType==ENG_JET && (rs->special!=0 || rs->designMach>1.f) ? 1 : 0) : 1);
   }
   glUniform4fv(U(p, "uEngineHealth"), 1, pv.engineHealth);
@@ -749,7 +749,7 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel, int half) {
     // (wraith_cockpit_material.glsl), the XR-30's 0-6 (plane_material.glsl), a glass cockpit's 0 and 2
     // (cockpit_material.glsl, plane_material.glsl) - the XR-40's 8 pages cost 5. Half of them a frame (half: which),
     // alternately, so each page still changes at 30 Hz and every frame costs the same
-    const int sp = pv.model >= 0 && pv.model <= kWraith ? kAircraft[pv.model].special : 0;
+    const int sp = validAircraft(pv.model) ? kAircraft[pv.model].special : 0;
     const unsigned used = sp == 2 ? 0x4Fu : sp == 1 ? 0x7Fu : 0x05u;
     glEnable(GL_SCISSOR_TEST);
     for (int pg = 0, k = 0; pg < 8; pg++) {
@@ -1214,6 +1214,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
     float cockpit[36];packCockpitLayout(pv.model,cockpit);glUniform4fv(U(p,"uCockpitLayout"),9,cockpit);
     glUniform4fv(U(p, "uPS"), 1, pv.PS); glUniform4fv(U(p, "uCtl"), 1, pv.Ctl); glUniform4fv(U(p, "uPr"), 1, pv.Pr); glUniform3f(U(p, "uWheel"), pv.wheel[0], pv.wheel[1], pv.wheel[2]); glUniform1i(U(p, "uModelId"), pv.model);
     glUniform4fv(U(p, "uI0"), 1, pv.I0); glUniform4fv(U(p, "uI1"), 1, pv.I1); glUniform4fv(U(p, "uI2"), 1, pv.I2);
+    glUniform4fv(U(p, "uFanHealth"), 1, pv.engineHealth);
     glUniform3f(U(p, "uColBase"), pv.colBase.x, pv.colBase.y, pv.colBase.z);
     glUniform3f(U(p, "uColStripe"), pv.colStripe.x, pv.colStripe.y, pv.colStripe.z);
     glUniform3f(U(p, "uReg"), pv.reg[0], pv.reg[1], pv.reg[2]);

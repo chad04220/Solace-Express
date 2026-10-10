@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
     for (auto& w : k.wps) { float h = g_world.height(w.x, w.z); if (w.alt < h + 60) { printf("  !! %s waypoint below terrain (%.0f vs %.0f)\n", k.id.c_str(), w.alt, h); problems++; } }
     // choose cheapest option
     int best = -1; long long bestCost = 1LL << 40; bool needBuy = false;
-    for (int s = 0; s < kNumAircraft; s++) {
+    for (int s : kCareerAircraft) {
       Career tmp = c; std::string why;
       auto src = tmp.canFly(k, s, &why);
       long long cost;
@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
       if (k.forceAircraft >= 0) continue;   // (lessons are flown by hand: never quoted)
       Career t; t.newGame(); t.storyIndex = (int)i; t.location = k.from; t.money = 10000000;
       for (size_t j = 0; j < i; j++) t.license = std::max(t.license, g_story[j].grantLicense);
-      for (int si = 0; si < kNumAircraft; si++) {
+      for (int si : kCareerAircraft) {
         if (kAircraft[si].special || (quick && si != flownIn[i])) continue;
         t.fleet.clear(); if (k.ownedOnly) t.fleet.push_back({si, k.from, kAircraft[si].maxFuel, 1.f});
         if (t.canFly(k, si) == Career::SRC_NONE) continue;
@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
         for (auto& k : t.board) {
           if (k.timeLimitMin <= 0) continue;
           timed++; bool ok = false;
-          for (int si = 0; si < kNumAircraft && !ok; si++) if (!kAircraft[si].special && t.canFly(k, si) != Career::SRC_NONE) ok = t.plan(k, si, Career::SRC_RENT).minutesEst * 1.2f <= k.timeLimitMin;
+          for (int si : kCareerAircraft) if (!ok && !kAircraft[si].special && t.canFly(k, si) != Career::SRC_NONE) ok = t.plan(k, si, Career::SRC_RENT).minutesEst * 1.2f <= k.timeLimitMin;
           if (!ok) { tight++; printf("  !! %s (%s to %s): %.0f min, no type plans it with a fifth to spare\n", k.id.c_str(), g_world.airports[k.from].code, g_world.airports[k.to].code, k.timeLimitMin); }
         }
       }
@@ -117,8 +117,8 @@ int main(int argc, char** argv) {
     bool typed = a4 >= 0 && g_story[a4].requireSpec >= 0;
     if (typed) {
       Career t; t.newGame(); t.license = LIC_ATP; t.location = g_story[a4].from;
-      for (int si = 0; si < kNumAircraft; si++) if (!kAircraft[si].special) t.fleet.push_back({si, g_story[a4].from, kAircraft[si].maxFuel, 1.f});
-      for (int si = 0; si < kNumAircraft; si++) if (!kAircraft[si].special && (t.canFly(g_story[a4], si) != Career::SRC_NONE) != (si == g_story[a4].requireSpec)) typed = false;
+      for (int si : kCareerAircraft) if (!kAircraft[si].special) t.fleet.push_back({si, g_story[a4].from, kAircraft[si].maxFuel, 1.f});
+      for (int si : kCareerAircraft) if (!kAircraft[si].special && (t.canFly(g_story[a4], si) != Career::SRC_NONE) != (si == g_story[a4].requireSpec)) typed = false;
     }
     printf("Deadlines: %d timed jobs, %d without a type that plans them in time; A4 only in its jet %d\n", timed, tight, typed);
     problems += tight + !typed;

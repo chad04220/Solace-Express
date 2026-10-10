@@ -25,17 +25,17 @@ vec3 seaPoint() {
 }
 }
 
-static PerfModel s_perf[16]; static int s_perfState[16] = {};   // 0 not learned, 1 learning (provisional numbers), 2 learned
-static std::recursive_mutex s_perfM[16];   // (one per type: different types can be learned on different threads at once)
+static PerfModel s_perf[kAircraftCount]; static int s_perfState[kAircraftCount] = {};   // 0 not learned, 1 learning (provisional numbers), 2 learned
+static std::recursive_mutex s_perfM[kAircraftCount];   // (one per type: different types can be learned on different threads at once)
 // The learned models on disk, stamped with the build that learned them (another build learns them again)
 bool Plane::perfLoad(const std::string& path, const std::string& stamp) {
   FILE* f = fopen(path.c_str(), "rb"); if (!f) return false;
-  char st[64] = {}; uint32_t n = 0, sz = 0; PerfModel tmp[16];
+  char st[64] = {}; uint32_t n = 0, sz = 0; PerfModel tmp[kAircraftCount];
   bool ok = fread(st, 1, 64, f) == 64 && stamp == std::string(st, strnlen(st, 64)) && fread(&n, 4, 1, f) == 1 && fread(&sz, 4, 1, f) == 1
-            && n == (uint32_t)kNumAircraft && n <= 16 && sz == sizeof(PerfModel) && fread(tmp, sizeof(PerfModel), n, f) == n;
+            && n == (uint32_t)kNumAircraft && n <= kAircraftCount && sz == sizeof(PerfModel) && fread(tmp, sizeof(PerfModel), n, f) == n;
   fclose(f);
   if (!ok) return false;
-  for (uint32_t i = 0; i < n; i++) { std::lock_guard<std::recursive_mutex> lk(s_perfM[i]); if (!s_perfState[i]) { s_perf[i] = tmp[i]; s_perfState[i] = 2; } }
+  for (uint32_t i = 0; i < n; i++) { std::lock_guard<std::recursive_mutex> lk(s_perfM[careerSpecAt(i)]); const int spec = careerSpecAt(i); if (!s_perfState[spec]) { s_perf[spec] = tmp[i]; s_perfState[spec] = 2; } }
   return true;
 }
 void Plane::perfSave(const std::string& path, const std::string& stamp) {
@@ -43,20 +43,26 @@ void Plane::perfSave(const std::string& path, const std::string& stamp) {
   char st[64] = {}; strncpy(st, stamp.c_str(), 63);
   uint32_t n = (uint32_t)kNumAircraft, sz = sizeof(PerfModel);
   fwrite(st, 1, 64, f); fwrite(&n, 4, 1, f); fwrite(&sz, 4, 1, f);
-  for (uint32_t i = 0; i < n; i++) fwrite(&perf(&kAircraft[i]), sizeof(PerfModel), 1, f);
+  for (uint32_t i = 0; i < n; i++) fwrite(&perf(&kAircraft[careerSpecAt(i)]), sizeof(PerfModel), 1, f);
   fclose(f);
 }
 const PerfModel& Plane::perf(const AircraftSpec* sp) {
   PerfModel* cache = s_perf; int* state = s_perfState; std::recursive_mutex* m = s_perfM;
   int idx = (int)(sp - kAircraft);
-  if (idx < 0 || idx >= 16) { static PerfModel none; return none; }
+  if (idx < 0 || idx >= kAircraftCount) { static PerfModel none; return none; }
   std::lock_guard<std::recursive_mutex> lk(m[idx]);
   if (state[idx]) return cache[idx];   // (while learning, the test sorties fly on the provisional numbers below)
   state[idx] = 1;
   const AircraftSpec& s = *sp;
   PerfModel& P = cache[idx];
   Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
-  const float fuel = s.maxFuel * 0.6f, payload = 150.f;
+  // The appended production types count cabin occupants as well as hold cargo. In the older
+  // learner, 150 kg represented the payload even for an airliner, and full-weight runway tests
+  // omitted its passengers. Preserve the established fleet's envelopes while measuring these
+  // types at their real reference / design maximum masses.
+  const bool fullCabinEnvelope = s.fullCabinEnvelope;
+  const float cabinPayload = s.cargoKg + s.pax * 85.f + 85.f;
+  const float fuel = s.maxFuel * 0.6f, payload = performanceReferencePayload(s);
   const vec3 sea = seaPoint() + vec3(0, 1200.f, 0);
   const float W = (s.emptyMass + fuel + payload) * G0, rho = isaDensity(1200.f);
   P.vs1 = sqrtf(2.f * W / (rho * s.wingArea * aeroCLmaxFlown(s, 0)));   // (the wing's, unless its controls run out first)
@@ -142,7 +148,7 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
   P.sinkIdle = std::max(0.5f, -excessPower(std::max(P.vs0 * 1.25f, s.vref * 0.95f), true, 0.f, 16.f));
   // 4. cruise: level at 1500 m on the altitude hold, 75% power, mid weight; the true airspeed it settles at
   {
-    Plane p; p.reset(&s, seaPoint() + vec3(0, 1500.f, 0), 90.f, s.maxFuel * 0.5f, s.cargoKg * 0.5f, true, s.cruise);
+    Plane p; p.reset(&s, seaPoint() + vec3(0, 1500.f, 0), 90.f, s.maxFuel * 0.5f, fullCabinEnvelope ? cabinPayload * 0.5f : s.cargoKg * 0.5f, true, s.cruise);
     p.ctl.gearDown = !s.retract; p.gear = p.ctl.gearDown ? 1.f : 0.f; p.engineRunning = true; p.engineSpool = 0.75f;
     p.apEngage(Plane::AP_HOLD, -1, calm); p.apSpeed = 0; p.apAlt = p.pos.y; p.apHeading = p.heading();
     float sum = 0; int n = 0;
@@ -152,17 +158,19 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
   // 5. the take-off and landing rolls at full weight on a paved runway (Solace Capital), brought to sea level
   if (!s.special) {
     const Airport& a = g_world.airports[std::max(g_world.findAirport("CAP"), 0)];
-    const float mtowLoad = s.cargoKg, elevK = 1.f + a.elev / 3000.f;
+    const float mtowFuel = s.maxFuel * (fullCabinEnvelope ? 0.75f : 1.f);
+    const float mtowLoad = fullCabinEnvelope ? s.maxMass() - s.emptyMass - mtowFuel : s.cargoKg;
+    const float elevK = 1.f + a.elev / 3000.f;
     {
       Plane p; vec3 st = a.threshold(false) + a.dir() * 30.f; st.y = a.elev + 3.f;
-      p.reset(&s, st, a.heading, s.maxFuel, mtowLoad, false);
+      p.reset(&s, st, a.heading, mtowFuel, mtowLoad, false);
       p.engineRunning = true; p.engineSpool = 0.f; p.sceneryHits = false;
       vec3 p0;
       float t = 0;
       for (; t < 2.f; t += 1 / 60.f) { p.ctl.brake = 1; p.step(1 / 60.f, calm, t); }
       p0 = p.pos; P.toRoll = -1;
       for (; t < 120.f && !p.ev.crashed; t += 1 / 60.f) {
-        p.ctl.brake = 0; p.ctl.throttle = 1; p.ctl.flaps = s.taildragger ? 0.3f : 0.2f;
+        p.ctl.brake = 0; p.ctl.throttle = 1; p.ctl.flaps = s.taildragger ? 0.3f : s.takeoffFlap;
         if (p.ias > s.vr) p.ctl.pitch = clampf((10.f - p.pitchDeg()) * 0.08f - p.w.x * 0.5f, -1, 1);
         else if (s.taildragger && p.ias > s.vr * 0.5f) p.ctl.pitch = -0.3f;
         p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1, 1);
@@ -174,10 +182,10 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
     {
       // full flap, idle, then the brakes as hard as the type takes (a taildragger brakes gently, as the autopilot's
       // rollout does); Vs0 at this weight and the field's air
-      float W = (s.emptyMass + s.maxFuel + mtowLoad) * G0, rho = isaDensity(a.elev);
+      float W = (s.emptyMass + mtowFuel + mtowLoad) * G0, rho = isaDensity(a.elev);
       float vs0 = sqrtf(2.f * W / (rho * s.wingArea * aeroCLmaxFlown(s, 1)));
       Plane p; vec3 st = a.threshold(false) + a.dir() * 200.f; st.y = a.elev;
-      p.reset(&s, st, a.heading, s.maxFuel, mtowLoad, false);
+      p.reset(&s, st, a.heading, mtowFuel, mtowLoad, false);
       p.sceneryHits = false;
       for (int i = 0; i < 60; i++) p.step(1 / 60.f, calm, 0.f);   // (settled on its wheels)
       // (the roll starts at touchdown, 1.1 Vs0 - a taildragger's three-point at the stall: at 1.1 Vs0 in that attitude the
@@ -212,5 +220,8 @@ bool runwayOK(const AircraftSpec& s, const Airport& a) { return surfaceOK(s, a.s
 float AircraftSpec::runwayNeeded(float elev) const {
   const PerfModel& P = Plane::perf(this);
   float base = special || P.toRoll <= 0 || P.ldgRoll <= 0 ? runwayM : std::max(P.toRoll, P.ldgRoll) * 1.15f;
+  // Published dispatch floors retain margin for the flight segment, runway conditions and
+  // operational handling. A learned raw ground roll must not admit a 74 t transport to a short strip.
+  if (fullCabinEnvelope) base = std::max(base, runwayM);
   return base * (1.0f + elev / 3000.0f);
 }

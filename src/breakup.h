@@ -21,9 +21,10 @@ struct AircraftSpec;
 
 enum BreakKind { BK_PROP = 0, BK_NACELLE, BK_GEAR, BK_STRUT, BK_CANARD, BK_TAIL, BK_FIN, BK_WING, BK_NOSE, BK_AFT, BK_CENTRE, BK_COUNT };
 static const int kMaxBreakPieces = 16;
-struct BreakPiece { vec3 C, H; int kind; int side; };   // box centre and half extents (body), what it is, -1 left 0 centre 1 right
+struct BreakPiece { vec3 C, H; int kind; int side; bool rigidOnly = false; vec3 massCenter; };   // rigidOnly: owns complete gear parts, not a slice of surrounding skin
 
-// the components of type s, in the order their boxes claim the airframe (gearDown: the gear is out, 0..1; gearHeight:
+// the components of type s, in the order their boxes claim the airframe (rigidOnly pieces instead own complete
+// moving gear meshes). Fully stowed gear stays with the containing piece. gearDown: the gear is out, 0..1; gearHeight:
 // the wheels' bottom below the body origin, m). The centre section is the last, and also has what no box holds.
 int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPiece out[kMaxBreakPieces]);
 // the piece a body point belongs to

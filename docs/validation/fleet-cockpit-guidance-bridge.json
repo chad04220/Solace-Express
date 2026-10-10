@@ -1,0 +1,82 @@
+{
+  "created_utc": "2026-10-10T22:04:17Z",
+  "purpose": "Exact fixed-state visual parity following reviewed guidance-only change and complete consumer rebuild",
+  "fixtures": [
+    {
+      "model_folder": "14_atlas_a180",
+      "view": "front_loaded",
+      "before": "fleet-final/14_atlas_a180",
+      "after": "guidance-visual-parity/14_atlas_a180",
+      "exact_files": {
+        "_geometry.csv": true,
+        "_geometry.csv.topology.csv": true
+      },
+      "frame_metadata_identical": true,
+      "before_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "before_provenance": "fleet-final/14_atlas_a180/build_provenance.json",
+      "after_binary_sha256": "5ed3edea36ad257b27ea9f4901ffef2cd55bb2845db6b504d9e269d8733f9ca3",
+      "after_provenance": "guidance-visual-parity/14_atlas_a180/build_provenance.json",
+      "native_1080p": true,
+      "pixels_identical": true,
+      "mean_absolute_rgb_error": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "before_pixel_sha256": "6a13e6dddec103f8fe9409848a6d8f5bf17ff13b524f91fb88c04986e02f2949",
+      "after_pixel_sha256": "6a13e6dddec103f8fe9409848a6d8f5bf17ff13b524f91fb88c04986e02f2949"
+    },
+    {
+      "model_folder": "14_atlas_a180",
+      "view": "cockpit",
+      "before": "fleet-final/14_atlas_a180",
+      "after": "guidance-visual-parity/14_atlas_a180",
+      "exact_files": {
+        "_geometry.csv": true,
+        "_geometry.csv.topology.csv": true
+      },
+      "frame_metadata_identical": true,
+      "before_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "before_provenance": "fleet-final/14_atlas_a180/build_provenance.json",
+      "after_binary_sha256": "5ed3edea36ad257b27ea9f4901ffef2cd55bb2845db6b504d9e269d8733f9ca3",
+      "after_provenance": "guidance-visual-parity/14_atlas_a180/build_provenance.json",
+      "native_1080p": true,
+      "pixels_identical": true,
+      "mean_absolute_rgb_error": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "before_pixel_sha256": "3fb42a5c0d8d17b90e3bdbf4e55f527d5e3e016f490d3a89b8aa07e67e4bcc7d",
+      "after_pixel_sha256": "3fb42a5c0d8d17b90e3bdbf4e55f527d5e3e016f490d3a89b8aa07e67e4bcc7d"
+    },
+    {
+      "model_folder": "12_xr40_wraith",
+      "view": "refactor_wraith_weapons_belly",
+      "before": "refactor-after/12_xr40_wraith",
+      "after": "guidance-visual-parity/12_xr40_wraith",
+      "exact_files": {
+        "_geometry.csv": true,
+        "_geometry.csv.topology.csv": true,
+        "_frame_state.csv": true
+      },
+      "frame_metadata_identical": true,
+      "before_binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+      "before_provenance": "refactor-after/12_xr40_wraith/build_provenance.json",
+      "after_binary_sha256": "5ed3edea36ad257b27ea9f4901ffef2cd55bb2845db6b504d9e269d8733f9ca3",
+      "after_provenance": "guidance-visual-parity/12_xr40_wraith/build_provenance.json",
+      "native_1080p": true,
+      "pixels_identical": true,
+      "mean_absolute_rgb_error": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "before_pixel_sha256": "1d32426825938a81a438e7cb081ba6bc0488444f7620e61133aa3f9389395741",
+      "after_pixel_sha256": "1d32426825938a81a438e7cb081ba6bc0488444f7620e61133aa3f9389395741"
+    }
+  ],
+  "errors": [],
+  "fixture_count": 3,
+  "pass": true
+}

@@ -1,0 +1,285 @@
+{
+  "pre_underwing": {
+    "topology": [
+      {
+        "part": -1,
+        "vertices": 213956,
+        "indices": 1287330,
+        "triangles": 429110,
+        "vertex_bytes": 6846592,
+        "index_bytes": 5149320
+      },
+      {
+        "part": 11,
+        "vertices": 10343,
+        "indices": 51222,
+        "triangles": 17074,
+        "vertex_bytes": 330976,
+        "index_bytes": 204888
+      },
+      {
+        "part": 12,
+        "vertices": 9577,
+        "indices": 48486,
+        "triangles": 16162,
+        "vertex_bytes": 306464,
+        "index_bytes": 193944
+      },
+      {
+        "part": 13,
+        "vertices": 8536,
+        "indices": 42546,
+        "triangles": 14182,
+        "vertex_bytes": 273152,
+        "index_bytes": 170184
+      },
+      {
+        "part": 14,
+        "vertices": 3962,
+        "indices": 19488,
+        "triangles": 6496,
+        "vertex_bytes": 126784,
+        "index_bytes": 77952
+      },
+      {
+        "part": 33,
+        "vertices": 32842,
+        "indices": 166848,
+        "triangles": 55616,
+        "vertex_bytes": 1050944,
+        "index_bytes": 667392
+      },
+      {
+        "part": 34,
+        "vertices": 13314,
+        "indices": 69546,
+        "triangles": 23182,
+        "vertex_bytes": 426048,
+        "index_bytes": 278184
+      },
+      {
+        "part": 36,
+        "vertices": 11082,
+        "indices": 62484,
+        "triangles": 20828,
+        "vertex_bytes": 354624,
+        "index_bytes": 249936
+      },
+      {
+        "part": 37,
+        "vertices": 94,
+        "indices": 192,
+        "triangles": 64,
+        "vertex_bytes": 3008,
+        "index_bytes": 768
+      },
+      {
+        "part": 46,
+        "vertices": 33788,
+        "indices": 160098,
+        "triangles": 53366,
+        "vertex_bytes": 1081216,
+        "index_bytes": 640392
+      }
+    ],
+    "submitted_triangles": 855028,
+    "cache_bytes": 18432904
+  },
+  "underwing_box_candidate": {
+    "topology": [
+      {
+        "part": -1,
+        "vertices": 371120,
+        "indices": 2230308,
+        "triangles": 743436,
+        "vertex_bytes": 11875840,
+        "index_bytes": 8921232
+      },
+      {
+        "part": 11,
+        "vertices": 10283,
+        "indices": 50514,
+        "triangles": 16838,
+        "vertex_bytes": 329056,
+        "index_bytes": 202056
+      },
+      {
+        "part": 12,
+        "vertices": 9577,
+        "indices": 48486,
+        "triangles": 16162,
+        "vertex_bytes": 306464,
+        "index_bytes": 193944
+      },
+      {
+        "part": 13,
+        "vertices": 8536,
+        "indices": 42546,
+        "triangles": 14182,
+        "vertex_bytes": 273152,
+        "index_bytes": 170184
+      },
+      {
+        "part": 14,
+        "vertices": 3962,
+        "indices": 19488,
+        "triangles": 6496,
+        "vertex_bytes": 126784,
+        "index_bytes": 77952
+      },
+      {
+        "part": 33,
+        "vertices": 33384,
+        "indices": 168060,
+        "triangles": 56020,
+        "vertex_bytes": 1068288,
+        "index_bytes": 672240
+      },
+      {
+        "part": 34,
+        "vertices": 13314,
+        "indices": 69546,
+        "triangles": 23182,
+        "vertex_bytes": 426048,
+        "index_bytes": 278184
+      },
+      {
+        "part": 36,
+        "vertices": 13310,
+        "indices": 73848,
+        "triangles": 24616,
+        "vertex_bytes": 425920,
+        "index_bytes": 295392
+      },
+      {
+        "part": 37,
+        "vertices": 94,
+        "indices": 192,
+        "triangles": 64,
+        "vertex_bytes": 3008,
+        "index_bytes": 768
+      },
+      {
+        "part": 46,
+        "vertices": 33788,
+        "indices": 160098,
+        "triangles": 53366,
+        "vertex_bytes": 1081216,
+        "index_bytes": 640392
+      }
+    ],
+    "submitted_triangles": 1184842,
+    "cache_bytes": 27368256
+  },
+  "initial_before_depth_fix": {
+    "cache_bytes": 17832544,
+    "door_vertices": 102,
+    "door_triangles": 78,
+    "submitted_triangles": 772028
+  },
+  "material_diagnosis": {
+    "mixed_triangles_pre_underwing": 24693,
+    "mixed_triangles_underwing_box_candidate": 241541,
+    "new_mixed_wing_nacelle_triangles": 153754,
+    "note": "Round3 robust fairing ownership predicate staged; these are pre-fix costs, not accepted final budgets."
+  },
+  "final_streamlined": {
+    "topology": [
+      {
+        "part": -1,
+        "vertices": 221453,
+        "indices": 1332306,
+        "triangles": 444102,
+        "vertex_bytes": 7086496,
+        "index_bytes": 5329224
+      },
+      {
+        "part": 11,
+        "vertices": 10283,
+        "indices": 50514,
+        "triangles": 16838,
+        "vertex_bytes": 329056,
+        "index_bytes": 202056
+      },
+      {
+        "part": 12,
+        "vertices": 9577,
+        "indices": 48486,
+        "triangles": 16162,
+        "vertex_bytes": 306464,
+        "index_bytes": 193944
+      },
+      {
+        "part": 13,
+        "vertices": 8536,
+        "indices": 42546,
+        "triangles": 14182,
+        "vertex_bytes": 273152,
+        "index_bytes": 170184
+      },
+      {
+        "part": 14,
+        "vertices": 3962,
+        "indices": 19488,
+        "triangles": 6496,
+        "vertex_bytes": 126784,
+        "index_bytes": 77952
+      },
+      {
+        "part": 33,
+        "vertices": 33384,
+        "indices": 168060,
+        "triangles": 56020,
+        "vertex_bytes": 1068288,
+        "index_bytes": 672240
+      },
+      {
+        "part": 34,
+        "vertices": 13314,
+        "indices": 69546,
+        "triangles": 23182,
+        "vertex_bytes": 426048,
+        "index_bytes": 278184
+      },
+      {
+        "part": 36,
+        "vertices": 13310,
+        "indices": 73848,
+        "triangles": 24616,
+        "vertex_bytes": 425920,
+        "index_bytes": 295392
+      },
+      {
+        "part": 37,
+        "vertices": 94,
+        "indices": 192,
+        "triangles": 64,
+        "vertex_bytes": 3008,
+        "index_bytes": 768
+      },
+      {
+        "part": 46,
+        "vertices": 33788,
+        "indices": 160098,
+        "triangles": 53366,
+        "vertex_bytes": 1081216,
+        "index_bytes": 640392
+      }
+    ],
+    "cache_bytes": 18986904,
+    "submitted_triangles": 885508
+  },
+  "final_delta_vs_pre_underwing": {
+    "cache_bytes": 554000,
+    "cache_percent": 3.005494956193555,
+    "submitted_triangles": 30480,
+    "submitted_triangle_percent": 3.5647955388595554
+  },
+  "final_delta_vs_initial": {
+    "cache_bytes": 1154360,
+    "cache_percent": 6.473333249591318,
+    "submitted_triangles": 113480,
+    "submitted_triangle_percent": 14.698948742791718
+  },
+  "hardware_profile_gate": "Native images are llvmpipe visual evidence only. RTX3070 frame-time impact remains unmeasured; no hardware FPS claim."
+}

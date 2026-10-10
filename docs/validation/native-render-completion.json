@@ -1,0 +1,75 @@
+{
+  "completed_utc": "2026-10-10T22:05:07Z",
+  "pass": true,
+  "scope": "Final multi-angle production-renderer visual review of all 15 flyable aircraft, with fixed-state parity following the final guidance-only ABI change.",
+  "fleet_sweep": {
+    "binary_sha256": "a408baffd161bb610d729b6b6de254e1efc70faf64c8a632ef9bd59830ff0b41",
+    "native_images": 283,
+    "aircraft": 15,
+    "exterior_images": 147,
+    "cockpit_images": 136,
+    "render_frames": 1132,
+    "resolution": [
+      1920,
+      1080
+    ],
+    "all_png_and_pixel_hashes_verified": true,
+    "all_frame_gl_errors_zero": true,
+    "source_stable": true,
+    "production_geometry_materials_shaders": true,
+    "provenance": "fleet-final/frozen_build/build_provenance.json",
+    "integrity": "validation/native-evidence-fleet-final-complete.json",
+    "cache_and_source_details": "validation/fleet-final-capture-summary.json"
+  },
+  "final_guidance_bridge": {
+    "binary_sha256": "5ed3edea36ad257b27ea9f4901ffef2cd55bb2845db6b504d9e269d8733f9ca3",
+    "native_images": 3,
+    "fixtures": [
+      "Atlas front_loaded",
+      "Atlas cockpit",
+      "Wraith refactor_wraith_weapons_belly"
+    ],
+    "all_native_pixels_exact": true,
+    "all_frame_metadata_exact": true,
+    "all_uploaded_geometry_and_topology_exact": true,
+    "special_wraith_frame_state_exact": true,
+    "changed_sources": [
+      "src/aircraft.cpp",
+      "src/aircraft.h"
+    ],
+    "shader_embed_identical": true,
+    "harness_identical": true,
+    "current_live_inputs_exact": 286,
+    "complete_clean_adapter_consumer_rebuild": true,
+    "provenance": "guidance-visual-parity/frozen_build/build_provenance.json",
+    "parity": "validation/guidance-native-visual-parity.json",
+    "integrity": "validation/native-evidence-guidance-visual-parity.json",
+    "consumer_rebuild": "validation/guidance-adapter-consumer-rebuild.json",
+    "source_delta": "validation/final-guidance-visual-bridge-inputs.json"
+  },
+  "reviews": {
+    "exterior": "validation/fleet-exterior-final-review.json",
+    "cockpit": "../solace-new-aircraft/docs/validation/fleet-cockpit-integrated-review.json",
+    "prior_focused_gate_comparisons": "validation/final-accepted-gate-comparisons.json",
+    "final_winding_actual_bake_counts": "validation/final-cockpit-winding-by-cache.json",
+    "status": "All 15 exterior groups and all 15 cockpit groups accepted; no new confirmed defect. All 28 tracked cockpit findings remain resolved."
+  },
+  "other_exact_parity": {
+    "interface_refactor_fixtures": 8,
+    "report": "validation/refactor-native-parity.json"
+  },
+  "cache": {
+    "delivered_phase_meshes_built": 0,
+    "isolated_warm_meshes_built": 22,
+    "warm_phases": 30,
+    "delivered_shader_misses": 0,
+    "source_keyed_cache_files": 30
+  },
+  "limits": [
+    "Images use EGL llvmpipe, Medium quality, render scale 1. They do not establish hardware FPS or GPU memory performance.",
+    "The 283-view sweep predates only the final approved guidance/header change; the final build is linked by the separate exact three-fixture bridge, not a second 15-aircraft sweep.",
+    "Some older focused references predate subsequent intentional fixes: 45 of 56 named comparisons are pixel-exact, and the other 11 were independently reviewed for retained fixes.",
+    "Minor continuous mesh/raster faceting and the existing mirrored below-horizon sun-reflection approximation remain documented. No claim of artifact-free rendering from every possible camera.",
+    "An earlier Atlas warm process exited -9 during concurrent compilation; the isolated same-quality retry passed. See validation/fleet-final-cold-retry.json."
+  ]
+}

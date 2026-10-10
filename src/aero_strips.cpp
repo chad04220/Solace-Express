@@ -101,7 +101,8 @@ AeroGeom build(const AircraftSpec& s, int idx) {
     addPanel(g, AS_WING, (float)side, vec3(0, wy, wz), sp, n, wb, wcr, wct, wsw, washout, NW);
     // flaps from the fuselage's side to their share of the span, ailerons outboard of them to 94% (the drawn surfaces:
     // plane_parts.glsl partPoseCockpit, sdSurface)
-    float flapEnd = wb * m.flapFrac, flap0 = 0.55f * s.fusRad;
+    // Match the authored Atlas flap root, which starts outboard of the main-gear fairing (plane_parts.glsl).
+    float flapEnd = wb * m.flapFrac, flap0 = idx == kAtlas ? 4.05f : 0.55f * s.fusRad;
     addControl(g, first, g.nSt, vec3(0, wy, wz), sp, wb, NW, flap0, flapEnd, AC_FLAP, 0.26f);
     addControl(g, first, g.nSt, vec3(0, wy, wz), sp, wb, NW, flapEnd + 0.03f, wb * 0.94f, AC_AIL, 0.26f);
     for (int i = first; i < g.nSt; i++) {   // the fuselage carries the lift through where the wing passes it
@@ -271,7 +272,7 @@ void calibrate(AeroGeom& g, const AircraftSpec& s, int idx) {
   // the centre of gravity a static margin ahead of the neutral point, the tail set so it flies hands-off at cruise
   // (1500 m, the reference weight, the elevator neutral and the thrust that holds the speed along the engines' lines),
   // and the rigging that flies it straight there
-  const float W = (s.emptyMass + s.maxFuel * 0.6f + s.cargoKg * 0.5f) * G0;
+  const float W = (s.emptyMass + s.maxFuel * 0.6f + (s.fullCabinEnvelope ? performanceReferencePayload(s) : s.cargoKg * 0.5f)) * G0;
   float thr[4] = {};
   auto placeCG = [&](float sm) {
     // (subsonic, at most Mach 0.6: a supersonic type trims its cruise with the elevator - set for Mach 1, the XR-20's
@@ -434,17 +435,17 @@ void calibrate(AeroGeom& g, const AircraftSpec& s, int idx) {
 }  // namespace
 
 const AeroGeom& aeroGeom(const AircraftSpec& s) {
-  static AeroGeom cache[16]; static bool built[16] = {};
+  static AeroGeom cache[kAircraftCount]; static bool built[kAircraftCount] = {};
   static std::recursive_mutex mtx;
   std::lock_guard<std::recursive_mutex> lk(mtx);
   int idx = (int)(&s - kAircraft);
-  if (idx < 0 || idx >= kNumAircraft + 4) {
+  if (idx < 0 || idx >= kAircraftCount) {
     // a copy of a type's spec (a variant under test): its type's drawn airframe, with the copy's own numbers (engines,
     // power, weights), built afresh while the copy changes
     struct Var { const AircraftSpec* p = nullptr; AircraftSpec spec{}; AeroGeom g; };
     static Var var[8]; static int next = 0;
     int ti = -1;
-    for (int i = 0; i < kNumAircraft + 4 && ti < 0; i++) if (s.id && kAircraft[i].id && strcmp(s.id, kAircraft[i].id) == 0) ti = i;
+    for (int i = 0; i < kAircraftCount && ti < 0; i++) if (s.id && kAircraft[i].id && strcmp(s.id, kAircraft[i].id) == 0) ti = i;
     if (ti < 0) { static AeroGeom none; return none; }
     for (Var& v : var) if (v.p == &s && memcmp(&v.spec, &s, sizeof(s)) == 0) return v.g;
     Var& v = var[next]; next = (next + 1) % 8;

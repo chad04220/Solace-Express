@@ -23,10 +23,10 @@ static void valid(const ExhaustVisual& e) {
 }
 int main() {
   int expected[4] = {2, 2, 1, 4};
-  for (int m = 0; m < kNumAircraft + 4; ++m) {
+  for (int m = 0; m < kAircraftCount; ++m) {
     Plane p = running(m); ExhaustVisual e = build(p); valid(e);
-    check(e.count == (m < kNumAircraft ? 0 : expected[m - kNumAircraft]), "fleet capability and exact 2/2/1/4 nozzle counts");
-    if (m < kNumAircraft) continue;
+    check(e.count == (isCareerAircraft(m) ? 0 : expected[m - kNightjar]), "fleet capability and exact 2/2/1/4 nozzle counts");
+    if (isCareerAircraft(m)) continue;
     for (float spool : {0.f, .019f, .02f, .3f, .7f, .85f, .9f, .925f, 1.f}) {
       p.engineSpool = spool; e = build(p); valid(e);
       check(e.count == (spool < .02f ? 0 : p.spec->engines), "actual spool gates the off state");
