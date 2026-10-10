@@ -1147,7 +1147,9 @@ void Game::engageAutopilot() {
   if (apDest >= 0) {
     plane.apEngage(Plane::AP_NAV, apDest, wx);
     const Airport& a = g_world.airports[apDest];
-    if (!plane.apDecline.empty()) toast("Autopilot: unable to autoland at " + plane.apDecline + " - circling clear of the ground (it tries again as the wind changes)", vec3(1, 0.75f, 0.35f));
+    if (!plane.apOn) { toast("Autopilot: unable - " + plane.apDecline, vec3(1, 0.45f, 0.35f)); return; }   // (no power, no runway in reach)
+    if (plane.apAirport >= 0 && plane.apAirport != apDest) { toast("Autopilot: " + plane.apDecline, vec3(1, 0.75f, 0.35f)); toast(fmt("Autopilot: GLIDING to %s runway %02d", g_world.airports[plane.apAirport].code, g_world.airports[plane.apAirport].rwyNumber(plane.apRev)), vec3(0.6f, 1, 0.6f)); }
+    else if (!plane.apDecline.empty()) toast("Autopilot: unable to autoland at " + plane.apDecline + " - circling clear of the ground (it tries again as the wind changes)", vec3(1, 0.75f, 0.35f));
     else toast(fmt("Autopilot: AUTOLAND %s runway %02d", a.code, a.rwyNumber(plane.apRev)), vec3(0.6f, 1, 0.6f));
     toast("Any stick input hands control back", vec3(0.8f, 0.8f, 0.8f));
   } else {

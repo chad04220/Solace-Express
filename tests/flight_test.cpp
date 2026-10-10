@@ -551,6 +551,32 @@ int main(int argc, char** argv) {
       fails += !ok;
     }
   }
+  // ---------------- FLT-2 (the review of v3.44.0): the engine stops 2.5 km out on final, 350 m up, and the autoland is
+  // engaged again - it flew its usual plan (a climb to a cruise, a descent orbit) without the power for either and
+  // ditched. Now it glides the final it is on to the runway; from 20 km out, with nothing in reach, it says so
+  for (int far = 0; far < 2; far++) {
+    const int ai = g_world.findAirport("MDB"); const Airport& A = g_world.airports[ai];
+    const AircraftSpec& s = kAircraft[0];
+    Weather calm; calm.windSpeed = 0; calm.turbulence = 0;
+    const float out = far ? 20000.f : 2500.f;
+    vec3 at = A.threshold(false) - A.dir() * out; at.y = A.elev + 350.f;
+    Plane p; p.reset(&s, at, A.heading, s.maxFuel * 0.6f, 150, true, s.vref * 1.3f);
+    p.ctl.gearDown = true; p.gear = 1; p.ctl.throttle = 0.3f;
+    for (int e = 0; e < s.engines; e++) p.failNow(FAIL_ENGINE_TOTAL, e);
+    p.apEngage(Plane::AP_NAV, ai, calm);
+    const bool engaged = p.apOn;
+    int k = 0; bool landed = false;
+    for (; engaged && k < 300 * 60 && !p.ev.crashed; k++) {
+      p.step(1 / 60.f, calm, k / 60.f);
+      if (p.onGround && length(p.vel) < 1.f) { landed = true; break; }
+    }
+    const bool onRwy = g_world.onRunway(p.pos.x, p.pos.z, 5.f) == ai;
+    bool ok = far ? (!engaged && !p.apDecline.empty()) : (engaged && landed && onRwy && !p.ev.crashed);
+    printf("Dead-stick autoland %s on the MDB final, 350 m up: %s%s\n", far ? "20 km out" : "2.5 km out",
+           far ? (engaged ? "engaged" : ("declined: " + p.apDecline).c_str()) : p.ev.crashed ? p.ev.crashReason.c_str() : landed ? (onRwy ? "landed on the runway" : "landed off it") : "still flying",
+           ok ? "  ok" : "  FAIL");
+    fails += !ok;
+  }
   // ---------------- FLT-1 (the review of v3.44.0): a split-S asked for low down. Admitted from 700 m on the structure's
   // load - a pull the research jets' wings can't hold at the figure's entry speed - the XR-20, XR-30 and XR-40 flew into
   // the sea. Asked for at 700 m over the sea now, each climbs first (or gives it up) and none touches the water

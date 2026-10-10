@@ -831,6 +831,42 @@ void Plane::apEngage(int mode, int airport, const Weather& wx) {
   apAirport = airport; apStage = APS_NAV; apStageT = 0; apLeg = 0; apTurnDir = 0; apClimbDir = 0; apBled = false; apBleedT = 1e9f;
   apDecline.clear(); apHoldFor = -1;
   if (mode >= AP_NAV && airport >= 0) {
+    // without the power to hold its height (every engine out, or what is left can't: the review of v3.44.0, FLT-2) there
+    // is no climbing to a cruise and no descent orbit to fly: a straight-in final it can glide to - the field asked for,
+    // either end, else the nearest other within reach - flown from where it is; none: declined, said why, handed back
+    apSense();
+    if (apEnv.climb < 0.3f) {
+      const float L = glideRatio() * 0.8f;   // (a margin on the best glide: the turn onto it, the speed it has to fly)
+      auto path = [&](int ai, bool rv) {      // the distance to glide to that threshold, or -1: not a straight-in from here
+        const Airport& a = g_world.airports[ai];
+        const vec3 ld = rv ? -a.dir() : a.dir(), thr = a.threshold(rv);
+        vec3 rel = pos - thr; rel.y = 0;
+        const float along = rel.x * ld.x + rel.z * ld.z, cross = fabsf(rel.x * ld.z - rel.z * ld.x);
+        vec3 v = vel; v.y = 0; const float vl = length(v);
+        const float align = vl > 1.f ? (v.x * ld.x + v.z * ld.z) / vl : 0.f;
+        if (along > -300.f || align < 0.7f || cross > 200.f - along * 0.4f) return -1.f;
+        const float d = -along + cross;
+        return (pos.y - a.elev - 30.f) * L >= d ? d : -1.f;
+      };
+      int pick = -1; bool pickRev = false;
+      for (bool rv : {false, true}) if (pick < 0 && path(airport, rv) >= 0.f) { pick = airport; pickRev = rv; }
+      if (pick < 0) {   // (the others: the nearest within reach)
+        float nd = 1e9f;
+        for (int ai = 0; ai < (int)g_world.airports.size(); ai++) for (bool rv : {false, true}) {
+          const float d = ai == airport ? -1.f : path(ai, rv);
+          if (d >= 0.f && d < nd) { nd = d; pick = ai; pickRev = rv; }
+        }
+      }
+      if (pick < 0) {
+        apDecline = g_world.airports[airport].code + std::string(": no runway within gliding reach - fly the glide by hand");
+        apOn = false; apMode = AP_OFF; apAirport = -1;
+        return;
+      }
+      apAirport = pick; apRev = pickRev; apPlan(pick, pickRev, wx, true);
+      apMode = AP_APPR; apStage = APS_FINAL; apStageT = 0;
+      if (pick != airport) apDecline = g_world.airports[airport].code + std::string(": out of gliding reach - gliding to ") + g_world.airports[pick].code + " instead";
+      return;
+    }
     // runway end: the better of the two plans (terrain on the approach, headwind, how far away it is, and whether the
     // aircraft can stop on it and get down to it at all). Neither safe: the autoland is declined, said why, and the
     // autopilot circles clear of the ground (trying again as the wind changes) - the pilot lands by hand or picks another field (QA F1: committing to either
