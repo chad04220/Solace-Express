@@ -717,7 +717,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
         row("Operating costs", ops ? fmt("%s (%s)", fmtMoney(ops).c_str(), parts.c_str()) : std::string(e.fuel == Career::LaunchPlan::FUEL_INCLUDED ? "none - fuel included" : "none"), C_DIM);
         row("Est. net", fmtMoney(e.net), e.net >= 0 ? C_GOOD : C_BAD);
       }
-      row("Est. time", fmt("about %.0f min (+- %.0f)%s", e.minutesEst, e.minutesSigma, e.flown || c.forceAircraft >= 0 ? "" : "  - flying it on the autopilot..."), e.mayBeLate(c.timeLimitMin) ? C_BAD : C_TEXT);
+      row("Est. time", fmt("about %.0f min (+- %.0f)%s", e.minutesEst, e.minutesSigma, e.flown || c.forceAircraft >= 0 ? "" : e.flownFailed ? "  - estimated" : "  - flying it on the autopilot..."), e.mayBeLate(c.timeLimitMin) ? C_BAD : C_TEXT);
       {   // fuel and weight: the tanks at take-off (arrows: 5% of the tanks a step), the take-off weight against the
           // limit, the roll it needs here, and the uplift's price for an owned aircraft
         const AircraftSpec& sp = kAircraft[selAircraft];
@@ -766,7 +766,8 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   }
   {   // the route map in a hairline frame with corner ticks and a caption
     float mx = dx + dw - mapW - 22 * s, my = y + 60 * s;
-    drawMapView(mx, my, mapW, mapW, c.from, c.to, &c.wps);
+    const std::vector<Waypoint> rest(c.wps.begin() + std::clamp(c.wpStart, 0, (int)c.wps.size()), c.wps.end());   // (a job's next leg: the checkpoints still to fly)
+    drawMapView(mx, my, mapW, mapW, c.from, c.to, &rest);
     g_ren.rectOutline(mx - 4 * s, my - 4 * s, mapW + 8 * s, mapW + 8 * s, C_ACCENT, 0.2f, 2 * s, 1 * s);
 
     g_ren.text(mx - 4 * s, my - 22 * s, 11.5f * s, ellipsize(fmt("%s > %s", g_world.airports[c.from].code, g_world.airports[c.to].code), mapW, 11.5f * s), C_ACCENT, 0.9f, 0, false);

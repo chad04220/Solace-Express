@@ -32,6 +32,7 @@ struct Contract {
   // time (wind direction and strength, cloud, visibility, precipitation); the brief shows the forecast
   Weather wxEnd; bool wxShift = false;
   std::vector<Waypoint> wps;
+  int wpStart = 0;   // the first checkpoint still to fly (a job's next leg): its plan, range and quote count the route from it (the review of v3.44.0, CAR-4)
   std::vector<std::string> hints;  // lesson hints by phase (see Game::phase)
   bool startAirborne = false;
   bool story = false;
@@ -173,6 +174,7 @@ public:
     std::string challenge;
     float tCruise = 0, tClimb = 0, tOrbit = 0, tApproach = 0;   // the estimate's parts (min): en route, climbing, the descent orbit, the approach
     bool flown = false;   // minutesEst is the job flown on the autopilot in the background (else the quick estimate)
+    bool flownFailed = false;   // the background flight didn't get there: the quick estimate is all there is
     int fees() const { return positioning + ferry + hire; }
     bool mayBeLate(float timeLimitMin) const { return timeLimitMin > 0 && minutesEst + minutesSigma > timeLimitMin; }
   };
@@ -195,8 +197,9 @@ public:
     float patient = 1.f, comfort = 1.f;   // the ride so far (medevac, VIP): the next leg carries on from it
     bool surveyHistoryKnown = true;
     float surveySec = 0, surveyInSec = 0; // the survey pattern so far: seconds flown, and inside the altitude band (review S2: a diversion reset them)
+    bool holdViolated = false, landedAgainstGoAround = false;   // the tower's instructions ignored on an earlier leg (review of v3.44.0, CAR-6: a diversion dropped them)
     uint32_t id = 0;
-    Contract continuation() const { Contract k = c; k.from = at; k.startAirborne = false; return k; }   // the next leg's contract
+    Contract continuation() const { Contract k = c; k.from = at; k.startAirborne = false; k.wpStart = std::clamp(wpDone, 0, (int)c.wps.size()); return k; }   // the next leg's contract (the checkpoints keep their numbers)
   };
   std::optional<JobState> job;   // one at a time
   // what happens to a contract when a leg ends short: whole retake (lessons, checkrides), resume (the usual), resume
@@ -238,7 +241,8 @@ extern std::vector<Contract> g_story;
 // The job flown headless on the career autopilot (as startFlight sets it up: the runway into the wind, full tanks,
 // the load), a scripted takeoff, the checkpoints in turn, then the autopilot's approach and landing: the minutes it
 // takes, or a negative number if it didn't get there. About half a second of CPU: callers run it off the UI thread.
-float simulateFlightMinutes(const Contract& c, int specIdx, float* fuelKgOut = nullptr);
+// (climbOutOnly: just the scripted take-off - the minutes to 120 m above the ground, negative if it never got there)
+float simulateFlightMinutes(const Contract& c, int specIdx, float* fuelKgOut = nullptr, bool climbOutOnly = false);
 extern float kEstK[5];   // the flight-time estimate's fitted weights (Career::plan)
 void buildStory();
 bool replaceFile(const std::string& from, const std::string& to);   // moves `from` over `to` in one step (career saves, the settings file)

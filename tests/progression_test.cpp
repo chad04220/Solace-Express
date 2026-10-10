@@ -1,10 +1,12 @@
 // Validates the hand-designed campaign: every story contract must be flyable with an aircraft the
 // player can rent or afford, waypoints must clear terrain, and money pacing must not require a long grind.
 #include "../src/career.h"
+#include <cstdlib>
 int main() {
   g_world.build(); buildStory();
   Career c; c.newGame();
   int problems = 0; long grind = 0; int loans = 0;
+  std::vector<int> flownIn(g_story.size(), -1);   // (the type each story job is flown in below)
   for (size_t i = 0; i < g_story.size(); i++) {
     const Contract& k = g_story[i];
     // terrain clearance along route legs
@@ -31,6 +33,7 @@ int main() {
       if (cost < bestCost) { bestCost = cost; best = s; needBuy = src == Career::SRC_NONE; }
     }
     if (best < 0) { printf("  !! %s: NO aircraft can fly this contract (SOFTLOCK)\n", k.id.c_str()); problems++; continue; }
+    flownIn[i] = best;
     if (needBuy) {
       // the money model takes the loan when it can't pay cash: a quarter down, the rest per flight (C5). Grind, where
       // it remains, is the shortfall on the down payment; it must stay within a handful of freelance jobs.
@@ -62,6 +65,28 @@ int main() {
     auto lines = c.settle(k, best, src, r, &stars);
     int net = 0; for (auto& l : lines) net += l.amount;
     printf("%-3s %-42s %-17s %6.1fkm net %7d  bank %8d  lic %d\n", k.id.c_str(), k.title.c_str(), kAircraft[best].name, g_world.distanceKm(k.from, k.to), net, c.money, c.license);
+  }
+  // the background quote's take-off (simulateFlightMinutes, the review of v3.44.0 CAR-3): every story job the card
+  // quotes, in every type the player could pick for it when it's next, climbs out from its runway. Unsteered, one roll
+  // in five ran off the side and the card never got its flown time. (FLIGHT_QUICK, the sanitizer job: in the type the
+  // campaign above flies it in)
+  {
+    const bool quick = getenv("FLIGHT_QUICK") != nullptr;
+    int flown = 0;
+    for (size_t i = 0; i < g_story.size(); i++) {
+      const Contract& k = g_story[i];
+      if (k.forceAircraft >= 0) continue;   // (lessons are flown by hand: never quoted)
+      Career t; t.newGame(); t.storyIndex = (int)i; t.location = k.from; t.money = 10000000;
+      for (size_t j = 0; j < i; j++) t.license = std::max(t.license, g_story[j].grantLicense);
+      for (int si = 0; si < kNumAircraft; si++) {
+        if (kAircraft[si].special || (quick && si != flownIn[i])) continue;
+        t.fleet.clear(); if (k.ownedOnly) t.fleet.push_back({si, k.from, kAircraft[si].maxFuel, 1.f});
+        if (t.canFly(k, si) == Career::SRC_NONE) continue;
+        flown++;
+        if (simulateFlightMinutes(k, si, nullptr, true) <= 0) { printf("  !! %s: the background quote's take-off in the %s never climbed out\n", k.id.c_str(), kAircraft[si].name); problems++; }
+      }
+    }
+    printf("Background quote take-offs: %d flown\n", flown);
   }
   // every story contract has a continuation policy: lessons and checkrides are retaken whole, timed jobs and the
   // VIP charter resume against their clock, the medevac resumes with its destination, the rest resume

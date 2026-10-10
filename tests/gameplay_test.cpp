@@ -1136,6 +1136,71 @@ struct GameTest {
              beside, besideTd, apron, onRwy, ok ? "ok" : "FAIL");
       fails += !ok;
     }
+    {   // a checkpoint job's leg ends safely at a field (the review of v3.44.0, CAR-5): stopped on a runway with checkpoints
+        // left it waits to take off again, and the parking brake ends the leg there with the checkpoint flown carried; a
+        // hold instruction ignored on that leg is still charged at the delivery, through a save and reload (CAR-6)
+      Game q; q.initHeadless(); q.career.license = LIC_PPL; q.career.money = 50000; q.botControl = true; q.set.traffic = false;
+      const int via = g_world.findAirport("CAP");
+      Contract c; c.id = "CAR5_TEST"; c.title = "Checkpoint freight"; c.type = CT_CARGO; c.from = g_world.findAirport("MDB"); c.to = g_world.findAirport("ORC");
+      c.cargoKg = 40; c.payout = 1000; c.minLicense = LIC_PPL; c.wx = Weather(); c.wx.windSpeed = 0; c.wx.gust = 0; c.wx.turbulence = 0;
+      for (int i = 0; i < 2; i++) c.wps.push_back({g_world.airports[c.to].x + 3000.f * i, g_world.airports[c.to].z, 600.f});
+      q.career.location = c.from;
+      q.beginCareerFlight(c, 1, Career::SRC_RENT);
+      q.wpIndex = 1; q.result.wpDone = 1; q.result.holdViolated = true;
+      q.takeoffAnnounced = true; q.touchedDown = true; q.touchdownFpm = 100; q.engineAutoStarted = true; q.plane.sceneryHits = false; q.tdRunway = -2; q.parkingBrake = false;
+      const Airport& a = g_world.airports[via]; vec3 loc = a.pos(); loc.y = g_world.height(loc.x, loc.z) + q.plane.gearHeight() - 0.035f;
+      auto hold = [&](int frames) {
+        for (int i = 0; i < frames && q.screen == SCR_FLIGHT; i++) {
+          q.plane.pos = loc; q.plane.vel = vec3(); q.plane.w = vec3(); q.plane.q = quat::axisAngle(vec3(0, 1, 0), -a.heading * DEG);
+          q.plane.onGround = true; q.plane.ctl = Controls(); q.plane.ctl.brake = 1; q.plane.ctl.gearDown = true; q.update(0.05f);
+        }
+      };
+      hold(100);
+      bool told = false; for (auto& t : q.toasts) told |= t.text.find("parking brake") != std::string::npos;
+      const bool waits = q.screen == SCR_FLIGHT && told;
+      q.parkingBrake = true; hold(100);
+      const bool closed = q.screen == SCR_DEBRIEF && q.career.job && q.career.job->state == Career::JobState::RECOVERY && q.career.job->at == via
+                          && q.career.job->wpDone == 1;
+      const bool kept = closed && q.career.job->holdViolated;
+      bool reloaded = false, charged = false, resumed = false;
+      if (closed) {
+        const std::string path = "car6_test.sav";
+        Career r; reloaded = q.career.save(path) && r.load(path) && r.job && r.job->holdViolated == q.career.job->holdViolated && r.job->wpDone == 1;
+        remove(path.c_str());
+        q.career = r; q.continueJob(1, Career::SRC_RENT);
+        resumed = q.career.job && q.wpIndex == 1 && !q.result.holdViolated;
+        q.wpIndex = 2; q.result.wpDone = 2; q.flightClock = 300.f; q.plane.onGround = true; q.touchedDown = true; q.touchdownFpm = 200.f;
+        q.endFlight(true, "", OUT_SUCCESS);
+        for (auto& l : q.payout) charged |= l.label == "Took off against a hold instruction" && l.amount < 0;
+      }
+      const bool ok = waits && closed && kept && reloaded && resumed && charged;
+      printf("Checkpoint job leg: waits on the runway %d, parking brake ends the leg %d, hold violation kept %d, reloaded %d, continued %d, charged at delivery %d: %s\n",
+             waits, closed, kept, reloaded, resumed, charged, ok ? "ok" : "FAIL");
+      fails += !ok;
+    }
+    {   // a job's next leg is planned over the checkpoints still to fly (the review of v3.44.0, CAR-4): its range check,
+        // time and fuel are those of the same contract without the checkpoints flown, and it keeps their numbers
+      Career k; k.newGame(); k.license = LIC_ATP; k.money = 100000;
+      Contract c; c.id = "CAR4_TEST"; c.type = CT_SURVEY; c.from = g_world.findAirport("MDB"); c.to = g_world.findAirport("ORC"); c.cargoKg = 40; c.payout = 3000; c.minLicense = LIC_PPL;
+      const Airport& A = g_world.airports[c.from];
+      for (int i = 0; i < 6; i++) c.wps.push_back({A.x + 9000.f * cosf(i * 1.0472f), A.z + 9000.f * sinf(i * 1.0472f), A.elev + 600.f});
+      const int si = 1; bool same = true, numbered = true;
+      for (int done : {0, 3, 6}) {
+        Career::JobState J; J.c = c; J.at = g_world.findAirport("CAP"); J.wpDone = done; J.spec = si;
+        const Contract cont = J.continuation();
+        Contract direct = cont; direct.wps.erase(direct.wps.begin(), direct.wps.begin() + done); direct.wpStart = 0;
+        std::string w1, w2; k.location = J.at;
+        const Career::Source s1 = k.canFly(cont, si, &w1), s2 = k.canFly(direct, si, &w2);
+        const Career::LaunchPlan p1 = k.plan(cont, si, Career::SRC_RENT), p2 = k.plan(direct, si, Career::SRC_RENT);
+        const bool eq = s1 == s2 && w1 == w2 && fabsf(p1.minutesEst - p2.minutesEst) < 1e-3f && fabsf(p1.fuelKgEst - p2.fuelKgEst) < 1e-3f;
+        if (!eq) printf("  continuation after %d checkpoints: %d '%s' %.2f min %.1f kg, direct %d '%s' %.2f min %.1f kg\n", done, (int)s1, w1.c_str(), p1.minutesEst, p1.fuelKgEst, (int)s2, w2.c_str(), p2.minutesEst, p2.fuelKgEst);
+        same = same && eq;
+        numbered = numbered && cont.wps.size() == c.wps.size() && cont.wpStart == done;
+      }
+      const bool ok = same && numbered;
+      printf("Next leg planned over the checkpoints left: same as without those flown %d, checkpoints keep their numbers %d: %s\n", same, numbered, ok ? "ok" : "FAIL");
+      fails += !ok;
+    }
     {   // a refused autoland (the review of v3.31.0, F3): the Starling asked to land at Gull Rock's 480 m is told it can't
         // and circles clear of the ground - and, as the toast says, the stick takes the aircraft back
       Game q; q.initHeadless(); q.career.license = LIC_ATP; q.botControl = false; q.set.traffic = false;

@@ -205,9 +205,9 @@ float kEstK[5] = {1.24f, 1.03f, 0.43f, 0.f, 1.21f};
 
 static float contractKm(const Contract& c) {
   float km = g_world.distanceKm(c.from, c.to);
-  if (!c.wps.empty()) {
+  if ((size_t)c.wpStart < c.wps.size()) {   // (the checkpoints still to fly)
     km = 0; float x = g_world.airports[c.from].x, z = g_world.airports[c.from].z;
-    for (auto& w : c.wps) { km += sqrtf((w.x - x) * (w.x - x) + (w.z - z) * (w.z - z)) / 1000.f; x = w.x; z = w.z; }
+    for (size_t i = c.wpStart; i < c.wps.size(); i++) { const Waypoint& w = c.wps[i]; km += sqrtf((w.x - x) * (w.x - x) + (w.z - z) * (w.z - z)) / 1000.f; x = w.x; z = w.z; }
     km += sqrtf((g_world.airports[c.to].x - x) * (g_world.airports[c.to].x - x) + (g_world.airports[c.to].z - z) * (g_world.airports[c.to].z - z)) / 1000.f;
   }
   return km;
@@ -255,10 +255,10 @@ int Career::positioningCost(const Contract& c) const {
   return (int)(80 + 6 * g_world.distanceKm(location, c.from));
 }
 
-// The route the flight takes: departure, the checkpoints, the destination
+// The route the flight takes: departure, the checkpoints still to fly, the destination
 static std::vector<vec3> routePoints(const Contract& c) {
   std::vector<vec3> r; r.push_back(g_world.airports[c.from].pos());
-  for (auto& w : c.wps) r.push_back(vec3(w.x, 0, w.z));
+  for (size_t i = c.wpStart; i < c.wps.size(); i++) r.push_back(vec3(c.wps[i].x, 0, c.wps[i].z));
   r.push_back(g_world.airports[c.to].pos());
   return r;
 }
@@ -336,6 +336,7 @@ Career::LaunchPlan Career::plan(const Contract& c, int si, Source src) const {
 // the plan's time made the flown one (simulateFlightMinutes), and everything that follows from the time
 void Career::useFlownTime(LaunchPlan& e, const Contract& c, float minutes, float fuelKg) const {
   if (minutes > 0) { e.flown = true; finishPlan(e, c, minutes, fuelKg); }
+  else e.flownFailed = true;
 }
 
 // The fuel the quick estimate quotes. The engines burn Plane::fuelFlowMax at full power and 20% of it at idle, so a
@@ -395,7 +396,7 @@ void Career::finishPlan(LaunchPlan& e, const Contract& c, float minutes, float f
   else e.challenge = "Straightforward";
 }
 
-float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut) {
+float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut, bool climbOutOnly) {
   const AircraftSpec& s = kAircraft[si];
   const Airport& a = g_world.airports[c.from];
   Weather wx = c.wx;
@@ -411,16 +412,26 @@ float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut) {
   if (!c.startAirborne) { p.engineRunning = true; p.engineSpool = 0.f; }
   const float dt = 1 / 30.f;
   float t = c.startAirborne ? 0.f : 4.f;   // (the engine start and the brake release before the roll)
-  size_t wp = 0; int phase = c.startAirborne ? 1 : 0;   // 0 takeoff roll and initial climb, 1 the checkpoints, 2 the approach
+  size_t wp = (size_t)std::max(c.wpStart, 0); int phase = c.startAirborne ? 1 : 0;   // 0 takeoff roll and initial climb, 1 the checkpoints, 2 the approach
   for (int k = 0; k < 60 * 60 * 30; k++) {
     if (phase == 0) {
       p.ctl.brake = 0; p.ctl.throttle = 1; p.ctl.gearDown = true; p.ctl.flaps = s.retract ? 0.15f : 0.1f;
       p.ctl.pitch = p.ias > s.vref * 0.95f ? clampf(0.08f * (10.f - p.pitchDeg()), -1, 1) : 0.f;
+      // the roll steered down the centreline - rudder and nosewheel on the runway's heading, eased back towards the line;
+      // left alone the torque and a crosswind ran one take-off in five off the side (the review of v3.44.0, CAR-3)
+      if (p.onGround) {
+        const float hr = reverse ? h0 + 180.f : h0;
+        const vec3 rel = p.pos - start, right(cosf(hr * DEG), 0.f, sinf(hr * DEG));
+        const float off = rel.x * right.x + rel.z * right.z;   // (right of the centreline: +)
+        const float he = wrapAngle((hr - clampf(off * 0.5f, -8.f, 8.f) - p.heading()) * DEG) / DEG;
+        p.ctl.yaw = clampf(he * DEG * 3.f + p.w.y * 2.f, -1.f, 1.f);   // (w.y: yaw left)
+      } else p.ctl.yaw = clampf(p.beta * 3.f, -1.f, 1.f);
       // (and the runway's heading with the wings kept near level: a gust under one wing rolls it, and hands off the
       // climb-out wandered into the hills)
       if (!p.onGround) { float he = wrapAngle(((reverse ? h0 + 180.f : h0) - p.heading()) * DEG) / DEG; p.ctl.roll = clampf(0.05f * (clampf(he * 0.8f, -10.f, 10.f) - p.bankDeg()), -1, 1); }
       if (p.agl() > 120.f) { p.ctl.flaps = 0; if (s.retract) p.ctl.gearDown = false; phase = 1; }
     }
+    if (climbOutOnly && (phase == 1 || t > 300.f)) return phase == 1 ? t / 60.f : -1.f;
     if (phase == 1) {
       if (wp < c.wps.size()) {   // the checkpoints in turn, on the hold modes at each one's height
         vec3 d(c.wps[wp].x - p.pos.x, 0, c.wps[wp].z - p.pos.z);
@@ -625,6 +636,7 @@ std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan
   J.surveyHistoryKnown = J.surveyHistoryKnown && r.surveyHistoryKnown;
   J.surveySec = std::max(J.surveySec, r.surveySec); J.surveyInSec = std::max(J.surveyInSec, r.surveyInSec);   // (the leg's are the job's whole so far)
   J.wpDone = std::max(J.wpDone, r.wpDone);
+  J.holdViolated = J.holdViolated || r.holdViolated; J.landedAgainstGoAround = J.landedAgainstGoAround || r.landedAgainstGoAround;
   if (J.c.fragile && (r.maxG > 2.0f || r.minG < 0.0f || (r.landed && fabsf(r.touchdownFpm) > 400))) J.fragileHit = true;
   J.at = at; J.state = JobState::RECOVERY;
   location = at;
@@ -646,6 +658,7 @@ std::vector<PayoutLine> Career::settleJob(const FlightResult& r, const LaunchPla
   w.late = J.c.timeLimitMin > 0 && J.jobClockMin + r.flightMin > J.c.timeLimitMin;
   w.patient = std::min(J.patient, r.patient); w.comfort = std::min(J.comfort, r.comfort);
   w.surveyHistoryKnown = J.surveyHistoryKnown && r.surveyHistoryKnown;
+  w.holdViolated = J.holdViolated || r.holdViolated; w.landedAgainstGoAround = J.landedAgainstGoAround || r.landedAgainstGoAround;
   {   // the survey band over every leg (the last leg's counters carry the earlier legs': the larger is the job's whole)
     float st = std::max(J.surveySec, r.surveySec), si = std::max(J.surveyInSec, r.surveyInSec);
     if (st > 1.f) w.surveyInBand = si / st;
@@ -1091,6 +1104,7 @@ bool Career::save(const std::string& path) const {
     ok = ok && fprintf(f, "job2 %f %f %d\n", J.patient, J.comfort, J.ferryPaid ? 1 : 0) > 0;
     ok = ok && fprintf(f, "job3 %f %f\n", J.surveySec, J.surveyInSec) > 0;
     ok = ok && fprintf(f, "survey_known %d\n", J.surveyHistoryKnown ? 1 : 0) > 0;
+    if (J.holdViolated || J.landedAgainstGoAround) ok = ok && fprintf(f, "job_atc %d %d\n", J.holdViolated ? 1 : 0, J.landedAgainstGoAround ? 1 : 0) > 0;   // (only when set: a save without one stays readable by v3.44)
     ok = ok && fprintf(f, "plan %d %d %d %d %f %f %f %f %d\n", J.plan.positioning, J.plan.ferry, J.plan.hire, (int)J.plan.fuel, J.plan.fuelKgEst, J.plan.minutesEst, J.plan.minutesSigma, J.plan.fuelUpliftKg, J.plan.fuelCostEst) > 0;
     ok = ok && fprintf(f, "plan2 %d %f %d\n", J.plan.startAirport, J.plan.fuelLoadKg, J.plan.flown ? 1 : 0) > 0;
     const Contract& c = J.c;
@@ -1197,6 +1211,11 @@ bool Career::load(const std::string& path) {
       int known = 0;
       ok = c.job && fscanf(f, "%d", &known) == 1 && (known == 0 || known == 1);
       if (ok) { c.job->surveyHistoryKnown = known != 0; surveyKnownRead = true; }
+    }
+    else if (!strcmp(key, "job_atc")) {   // the tower's instructions ignored on an earlier leg (absent: none)
+      int hv = 0, ga = 0;
+      ok = c.job && fscanf(f, "%d %d", &hv, &ga) == 2 && (hv == 0 || hv == 1) && (ga == 0 || ga == 1);
+      if (ok) { c.job->holdViolated = hv != 0; c.job->landedAgainstGoAround = ga != 0; }
     }
     else if (!strcmp(key, "plan2")) {
       int airport = 0, flown = 0; float load = -1;

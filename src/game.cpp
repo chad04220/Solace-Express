@@ -148,6 +148,7 @@ std::string Game::expandHint(const std::string& raw, bool pad) const {
 void Game::applyQuote(const Contract& c, Career::LaunchPlan& e, bool start) {
   if (quoteJob.valid() && quoteJob.wait_for(std::chrono::seconds(0)) == std::future_status::ready) quoteFlown[quoteJobKey] = quoteJob.get();
   std::string key = fmt("%s|%d|%d|%d", c.id.c_str(), e.spec, c.from, c.to);
+  if (c.wpStart > 0) key += fmt("|w%d", c.wpStart);   // (a job's next leg: the checkpoints still to fly)
   auto it = quoteFlown.find(key);
   if (it != quoteFlown.end()) { career.useFlownTime(e, c, it->second.first, it->second.second); return; }
   if (!start || quoteJob.valid() || c.forceAircraft >= 0) return;   // (lessons are flown by hand: the quick estimate stands)
@@ -1632,10 +1633,17 @@ void Game::updateFlight(float dt) {
       // touchdown's runway, or where it stands when no touchdown was seen (a flight placed on the ground); stopping
       // near a field after landing beside or beyond its runway is an off-field landing, the load recovered by road
       const int rwy = tdRunway != -2 ? tdRunway : g_world.onRunway(plane.pos.x, plane.pos.z, 10.f);
-      if (wpIndex < (int)contract.wps.size()) {
-        if (stillTimer >= 1.25f && stillTimer - dt < 1.25f) toast("Checkpoints remaining - take off again to continue", vec3(1, 0.8f, 0.4f));
-      } else if (atField && rwy == ap && ap == contract.to) { endFlight(true, ""); return; }
-      else if (atField && rwy == ap) { result.divertedTo = ap; endFlight(false, fmt("Diverted to %s", g_world.airports[ap].name), OUT_DIVERTED); return; }
+      // checkpoints still to fly hold back only the arrival: on a field's runway the flight takes off again to go on,
+      // or the leg ends there with the parking brake set (a safe diversion - the job carries the checkpoints flown);
+      // anywhere else it is a field landing like any other (the review of v3.44.0, CAR-5: the leg could not be closed)
+      const bool wpsLeft = wpIndex < (int)contract.wps.size(), onField = atField && rwy == ap;
+      if (onField && wpsLeft && !parkingBrake) {
+        if (stillTimer >= 1.25f && stillTimer - dt < 1.25f) {   // (the first line as recorded for the voice)
+          toast("Checkpoints remaining - take off again to continue", vec3(1, 0.8f, 0.4f));
+          toast(expandHint("Or set the parking brake ({parkingBrake}) to end the leg here", padPrompts()), vec3(1, 0.8f, 0.4f), false);
+        }
+      } else if (onField && ap == contract.to && !wpsLeft) { endFlight(true, ""); return; }
+      else if (onField) { result.divertedTo = ap; endFlight(false, fmt(wpsLeft ? "Leg ended at %s with checkpoints remaining" : "Diverted to %s", g_world.airports[ap].name), OUT_DIVERTED); return; }
       else if (stillTimer > 3.f) { endFlight(false, atField ? "Landed off the runway" : "Landed off-airport", OUT_OFF_AIRPORT); return; }
     }
   } else stillTimer = 0;
