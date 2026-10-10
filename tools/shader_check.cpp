@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
     put(dir, "plane_mesh.frag", planeMeshFSAssembly(""));
     put(dir, "plane_mesh_depth.frag", planeMeshDepthFSAssembly());
     put(dir, "part_pose.frag", partPoseFSAssembly());
-    // the light-aircraft builds (AF_LIGHT: Renderer::pickAfPrograms)
+    // the light-aircraft builds (AF_LIGHT: Renderer::afPassProgram, when no research jet is among the aircraft covered)
     put(dir, "objects_light.frag", objectsFSAssembly("#define AF_LIGHT\n"));
     put(dir, "shadow_proxy_light.frag", shadowProxyFSAssembly("#define AF_LIGHT\n"));
     put(dir, "effects_light.frag", effectsFSAssembly("#define AF_LIGHT\n"));
@@ -75,6 +75,10 @@ int main(int argc, char** argv) {
       put(dir, ("hullbake_af" + n + ".frag").c_str(), hullBakeFSAssembly(d));
       put(dir, ("hullbake_normals_af" + n + ".frag").c_str(), hullBakeFSAssembly(d + "#define HULL_BAKE_NORMALS\n"));
       if (m == kWraith) put(dir, "plane_mesh_af12_probe.frag", planeMeshFSAssembly(d + "#define PROBE_MESH_SHADE\n"));   // (the analysis's probe build)
+      // and its own full-screen passes (raster_renderer.cpp afPassProgram): the march, its shadows; the XR-40's effects
+      put(dir, ("objects_af" + n + ".frag").c_str(), objectsFSAssembly(d));
+      put(dir, ("shadow_proxy_af" + n + ".frag").c_str(), shadowProxyFSAssembly(d));
+      if (m == kWraith) put(dir, "effects_af12.frag", effectsFSAssembly(d));
     }
   }
   // the small programs (Renderer::compilePrograms), as assembled and as pruned

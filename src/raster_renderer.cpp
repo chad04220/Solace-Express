@@ -11,45 +11,13 @@ bool Renderer::compileRaster(const std::function<void()>& step) {
   e.clear(); progLight = linkProgramCached(kFullscreenVS, lightFSAssembly(""), e);
   if (!progLight) { error = "Lighting shader: " + e; return false; }
   if (step) step();
-  // The shadow proxy and the effects pass each have builds with less in them, for a driver whose compiler fails on the
-  // whole even with its own options (linkProgramCached): NVIDIA's did on v3.35.0's and v3.36.0's. The first that builds
-  // is used and startup.log says which; the proxy's last resort is the maps-only build below. What each leaves out:
-  // the traffic's sun shadows marched (those without a map), the airframe's in the landing lights; the XR-40 cloak's
-  // view through its cloaked part, the research jets' exhaust flames.
-  static const char* const kProxyLess[] = {"", "#define PROXY_NO_TRAFFIC\n", "#define PROXY_NO_LIGHTS\n", "#define PROXY_NO_TRAFFIC\n#define PROXY_NO_LIGHTS\n"};
-  static const char* const kProxyLessName[] = {"", "the traffic's marched shadows", "the airframe's shadows in the lights", "the traffic's marched shadows and the airframe's in the lights"};
-  static const char* const kFxLess[] = {"", "#define FX_NO_CLOAK\n", "#define FX_NO_PLUMES\n", "#define FX_NO_CLOAK\n#define FX_NO_PLUMES\n"};
-  static const char* const kFxLessName[] = {"", "the cloak's view", "the jets' flames", "the cloak's view and the jets' flames"};
-  for (int v = 0; v < 2; v++) {   // (every aircraft, then the light aircraft alone: pickAfPrograms)
-    const std::string d = v ? "#define AF_LIGHT\n" : "";
-    const char* build = v ? "light aircraft build" : "every aircraft";
-    setCompileStage(v ? "aircraft (light aircraft build)" : "aircraft (every aircraft)");
-    e.clear(); progObjectsV[v] = linkProgramCached(kFullscreenVS, objectsFSAssembly(d), e);
-    if (!progObjectsV[v]) { error = "Objects shader: " + e; return false; }
-    if (step) step();
-    setCompileStage(v ? "aircraft shadows (light aircraft build)" : "aircraft shadows (every aircraft)");
-    std::string first;
-    for (int k = 0; k < 4 && !progShProxyV[v]; k++) {
-      e.clear(); progShProxyV[v] = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly(d + kProxyLess[k]), e);
-      if (k == 0) first = e;
-      if (progShProxyV[v] && k > 0) shaderNote(std::string("Shadow proxy (") + build + "): built without " + kProxyLessName[k]);
-    }
-    if (!progShProxyV[v] && proxyError.empty()) proxyError = "Shadow proxy shader: " + first;
-    if (progShProxyV[v] && step) step();   // unresolved variants finish when the maps fallback is available
-    setCompileStage(v ? "effects (light aircraft build)" : "effects (every aircraft)");
-    for (int k = 0; k < 4 && !progEffectsV[v]; k++) {
-      e.clear(); progEffectsV[v] = linkProgramCached(kFullscreenVS, effectsFSAssembly(d + kFxLess[k]), e);
-      if (k == 0) first = e;
-      if (progEffectsV[v] && k > 0) shaderNote(std::string("Effects (") + build + "): built without " + kFxLessName[k]);
-    }
-    if (!progEffectsV[v]) { error = "Effects shader: " + first; return false; }
-    if (step) step();
-  }
   setCompileStage("traffic propellers");
   e.clear(); progTrafficProps = linkProgramCached(kPropDiscVS, propDiscFSAssembly(), e);
   if (!progTrafficProps) { error = "Traffic prop shader: " + e; return false; }
   if (step) step();
-  progObjects = progObjectsV[0]; progShProxy = progShProxyV[0]; progEffects = progEffectsV[0];
+  // the airframes' full-screen passes at launch: only their builds with no airframe in them - the UFO and the debris'
+  // march, and the shadows from the maps alone. Every build with an aircraft's code is made the first time a frame
+  // needs it (afPassProgram), so an edit to one aircraft compiles nothing at launch
   setCompileStage("UFO and debris");
   e.clear(); progObjectsNoAf = linkProgramCached(kFullscreenVS, objectsFSAssembly("#define AF_LIGHT\n#define OBJ_NO_AF\n"), e);
   if (!progObjectsNoAf) { error = "Objects (UFO, debris) shader: " + e; return false; }
@@ -58,8 +26,6 @@ bool Renderer::compileRaster(const std::function<void()>& step) {
   e.clear(); progShProxyMaps = linkProgramCached(kFullscreenVS, shadowProxyFSAssembly("#define AF_LIGHT\n#define PROXY_MAPS_ONLY\n"), e);
   if (!progShProxyMaps) { error = "Shadow proxy (maps) shader: " + (proxyError.empty() ? e : proxyError + "\n" + e); return false; }
   if (step) step();
-  for (int v = 0; v < 2; v++) if (!progShProxyV[v]) { progShProxyV[v] = progShProxyMaps; if (step) step(); }
-  progShProxy = progShProxyV[0];
   // the airframe shadow maps: the baked mesh (and the moving hull) from a light, plain depth
   static const char* kShMapVS = "#version 330 core\nlayout(location = 0) in vec3 aPos; uniform mat4 uVP; uniform mat3 uRot; uniform vec3 uPos;\n"
     "uniform sampler2D uPartPose; uniform int uPartInst;\n"   // (a cockpit's rigid part at its pose: plane_mesh_vs.glsl)
@@ -78,14 +44,58 @@ bool Renderer::compileRaster(const std::function<void()>& step) {
   return compileTerrainMesh(step);
 }
 
-// The light build of the airframe programs when nothing in the frame is a research jet (engine code 5 or 6): the
-// player's aircraft (its wreck too) and every traffic aircraft drawn
-void Renderer::pickAfPrograms(const FrameParams& fp) {
-  bool research = fp.plane.M[2] > 4.5f;
-  for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); k++) research = research || fp.traffic[k].t[2] > 4.5f;
+// ---- the full-screen airframe passes' programs: the aircraft a pass covers this frame - all of one type: that type's
+// own build (its code alone); several types, or one without an own build: the shared build, the light aircraft's when
+// no research jet is among them. Each made the first time a frame needs it (from the binary cache after the first
+// launch); one that fails falls back to the shared, and the shared to the pass's own fallback (the caller's)
+GLuint Renderer::linkAfPass(int pass, const std::string& d, const std::string& who) {
+  // (the shadow proxy and the effects each have builds with less in them, for a driver whose compiler fails on the
+  // whole even with its own options (linkProgramCached): NVIDIA's did on v3.35.0's and v3.36.0's. The first that builds
+  // is used and startup.log says which. What each leaves out: the traffic's sun shadows marched (those without a map),
+  // the airframe's in the landing lights; the XR-40 cloak's view through its cloaked part, the research jets' flames)
+  static const char* const kProxyLess[] = {"", "#define PROXY_NO_TRAFFIC\n", "#define PROXY_NO_LIGHTS\n", "#define PROXY_NO_TRAFFIC\n#define PROXY_NO_LIGHTS\n"};
+  static const char* const kProxyLessName[] = {"", "the traffic's marched shadows", "the airframe's shadows in the lights", "the traffic's marched shadows and the airframe's in the lights"};
+  static const char* const kFxLess[] = {"", "#define FX_NO_CLOAK\n", "#define FX_NO_PLUMES\n", "#define FX_NO_CLOAK\n#define FX_NO_PLUMES\n"};
+  static const char* const kFxLessName[] = {"", "the cloak's view", "the jets' flames", "the cloak's view and the jets' flames"};
+  static const char* const kName[] = {"Aircraft", "Aircraft shadows", "Effects"};
+  const std::string name = std::string(kName[pass]) + " (" + who + ")";
+  setCompileStage(name.c_str());
+  std::string e, first; GLuint p = 0;
+  for (int k = 0; k < (pass == kAfObjects ? 1 : 4) && !p; k++) {
+    const std::string dk = d + (pass == kAfProxy ? kProxyLess[k] : pass == kAfEffects ? kFxLess[k] : "");
+    e.clear();
+    p = linkProgramCached(kFullscreenVS, pass == kAfObjects ? objectsFSAssembly(dk) : pass == kAfProxy ? shadowProxyFSAssembly(dk) : effectsFSAssembly(dk), e);
+    if (k == 0) first = e;
+    if (p && k > 0) shaderNote(name + ": built without " + (pass == kAfProxy ? kProxyLessName[k] : kFxLessName[k]));
+  }
+  setCompileStage("");
+  if (!p) {
+    shaderNote(name + " failed:\n" + first);
+    if (pass == kAfProxy && proxyError.empty()) proxyError = "Shadow proxy shader: " + first;
+  }
+  return p;
+}
+GLuint Renderer::afPassProgram(int pass, int model, bool research) {
+  if (model >= 0) {
+    AfOwn& a = afOwn[model];
+    if (!a.passTried[pass]) {
+      a.passTried[pass] = true;
+      float M[96]; packModelOf(model, M);
+      a.pass[pass] = linkAfPass(pass, aircraftDefines(model, M), std::string("the ") + kAircraft[model].name + "'s own");
+    }
+    if (a.pass[pass]) return a.pass[pass];
+  }
   static const bool all = getenv("AF_ALL") != nullptr;   // (debug: every aircraft build always)
   const int v = research || all ? 0 : 1;
-  progObjects = progObjectsV[v]; progShProxy = progShProxyV[v]; progEffects = progEffectsV[v];   // (the mesh draws: each aircraft its type's own, drawPlaneMesh)
+  if (!afSharedTried[pass][v]) { afSharedTried[pass][v] = true; afShared[pass][v] = linkAfPass(pass, v ? "#define AF_LIGHT\n" : "", v ? "light aircraft build" : "every aircraft"); }
+  return afShared[pass][v];
+}
+// one more aircraft a pass covers: model collects its type (-2 none yet, -1 several, or one without an own build) and
+// research whether a research jet is among them
+void Renderer::afCover(int& model, bool& research, const float* M, int claimed) {
+  const int m = afModelOf(M, claimed);
+  research = research || M[2] > 4.5f;
+  model = model == -2 ? m : model == m ? m : -1;
 }
 
 // The rigid parts' poses for this view: the player's aircraft's and the traffic's (computed again by the objects pass:
@@ -96,7 +106,7 @@ void Renderer::updatePartPoses(const FrameParams& fp) {
     auto pm = planeMeshes.find(hullKey(fp, fp.plane.PS[3] > 0.5f ? 1 : 0));
     if (pm != planeMeshes.end() && pm->second.ok) player = &pm->second;
   }
-  if (!meshOff && progPlaneMesh && fp.pano <= 0.f)
+  if (!meshOff && !meshFail && fp.pano <= 0.f)
     for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); k++) { auto it = planeMeshes.find(trafficModelKey(fp.traffic[k].t)); if (it != planeMeshes.end() && it->second.ok) traf[k] = &it->second; }
   computePartPoses(fp, player, traf);
 }
@@ -148,7 +158,7 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   // parts' too), else its full hull
   const PlaneMesh* trafMesh[kMaxTrafficDrawn] = {};
   const int trafN = std::min(fp.trafficN, kMaxTrafficDrawn);
-  if (!meshOff && progPlaneMesh) for (int k = 0; k < trafN; k++) { auto it = planeMeshes.find(trafficModelKey(fp.traffic[k].t)); if (it != planeMeshes.end() && it->second.ok) trafMesh[k] = &it->second; }
+  if (!meshOff && !meshFail) for (int k = 0; k < trafN; k++) { auto it = planeMeshes.find(trafficModelKey(fp.traffic[k].t)); if (it != planeMeshes.end() && it->second.ok) trafMesh[k] = &it->second; }
   if (fp.pano <= 0.f) drawTrafficHulls(fp, trafMesh); else trafHullOn = false;
   glBindFramebuffer(GL_FRAMEBUFFER, fboGB);
   GLenum gb[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
@@ -202,7 +212,14 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   // (only the UFO or the debris to march: the build without any airframe in it - on the owner's GPU the airframes'
   // code alone made the UFO's march more than twice as slow)
   static const bool objFull = getenv("OBJFULL") != nullptr;   // (debug: always the full build)
-  const GLuint prog = !afMarch && !objFull && progObjectsNoAf ? progObjectsNoAf : progObjects;
+  GLuint prog = progObjectsNoAf;
+  if (afMarch || objFull) {   // (the aircraft it marches: the player's, and the traffic with something to march)
+    int model = -2; bool research = false;
+    if (fp.plane.on) afCover(model, research, fp.plane.M, fp.plane.model);
+    for (int k = 0; k < trafN; k++) if (trafMarch & (1 << k)) afCover(model, research, fp.traffic[k].t, -1);
+    prog = afPassProgram(kAfObjects, model, research);
+  }
+  if (!prog) prog = progObjectsNoAf;   // (no build with the airframes: the UFO and the debris still)
   static const bool objDbg = getenv("OBJDBG") != nullptr;   // (debug: why the march runs)
   if (objDbg) { int nm = 0; for (int k = 0; k < trafN; k++) nm += (trafMarch >> k) & 1; printf("objects: march %d (plane on %d mesh %d hull %d wreck %d; traffic %d of %d; ufo %d debris %d)\n", (int)marchAny, (int)fp.plane.on, (int)meshOn, (int)hullOn, fp.wreck.pieces, nm, trafN, (int)fp.ufoOn, fp.wreck.debris); }
   setRT(prog, fp);
@@ -220,8 +237,8 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   // a new airframe or view: bake its mesh (or its hull) with the shaders' own shape code (used from the next frame on)
   if (!feedPass) {
-    if (meshUse && pm == planeMeshes.end()) { setRT(progHullBake, fp); bakePlaneMesh(fp, slot, meshK); }
-    else if (hullUse && !hulls.count(hullK)) { setRT(progHullBake, fp); bakeHull(fp, slot, hullK); }
+    if (meshUse && pm == planeMeshes.end()) bakePlaneMesh(fp, slot, meshK);   // (on the aircraft's own builder: beginHullBake)
+    else if (hullUse && !hulls.count(hullK)) bakeHull(fp, slot, hullK);
   }
 }
 
@@ -486,7 +503,14 @@ void Renderer::rasterShadowProxy(const FrameParams& fp) {
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);
   glViewport(0, 0, rw, rh);
   glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
-  setRT(proxyNeedsMarch(fp) ? progShProxy : progShProxyMaps, fp);   // (the airframe shadow maps: setRT)
+  GLuint prog = 0;
+  if (proxyNeedsMarch(fp)) {   // (the aircraft it may march: the player's, and every traffic aircraft without a map)
+    int model = -2; bool research = false;
+    if (fp.plane.on) afCover(model, research, fp.plane.M, fp.plane.model);
+    for (int k = 0; k < std::min(fp.trafficN, kMaxTrafficDrawn); k++) if (!(trafShOn & (1 << k))) afCover(model, research, fp.traffic[k].t, -1);
+    prog = afPassProgram(kAfProxy, model, research);
+  }
+  setRT(prog ? prog : progShProxyMaps, fp);   // (the airframe shadow maps: setRT)
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);
@@ -515,6 +539,11 @@ void Renderer::rasterEffects(const FrameParams& fp) {
   const bool effects = fp.fx.beams + fp.fx.bombs + fp.fx.blasts > 0 ||
     (intact && (p.propCount > 0 || p.vapor[0] > .01f || (!cockpit && p.exhaust.count > 0) || (engine == 6 && (cockpit || p.wr[4][3] > .001f))));
   if (!effects || rw > histW || rh > histH) { rasterTrafficProps(fp); return; }
+  // (the player's aircraft's: the XR-40's own - its cloak, its weapons, its hologram - else the light aircraft's build,
+  // which has no airframe in it: the propellers, the vapour and the flames; with no aircraft, every aircraft's)
+  const bool wraith = intact && engine == 6;
+  const GLuint progEffects = afPassProgram(kAfEffects, wraith ? afModelOf(p.M, p.model) : -1, wraith || !p.on);
+  if (!progEffects) { rasterTrafficProps(fp); return; }
   const int cur = histIdx ^ 1;
   glBindFramebuffer(GL_FRAMEBUFFER, fboTAA[cur]);
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);

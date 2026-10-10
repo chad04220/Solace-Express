@@ -42,7 +42,7 @@ mesh = read('src/aircraft_mesh.cpp')
 hull = read('src/aircraft_hull.cpp')
 assert 'afModelOf(trafK >= 0 ? fp.traffic[trafK].t : fp.plane.M, trafK >= 0 ? -1 : fp.plane.model)' in mesh, 'Lost per-aircraft mesh dispatch'
 assert 'afMeshProgram(own)' in mesh and 'planeMeshFSAssembly(aircraftDefines(model, M))' in mesh, 'Lost the aircraft\'s own mesh build'
-assert 'afBakePrograms(own, hullBakeProg)' in hull and 'hullBakeFSAssembly(aircraftDefines(model, M))' in mesh, 'Lost the aircraft\'s own bake'
+assert 'afBakePrograms(own, hullBakeProg)' in hull and 'hullBakeFSAssembly(aircraftDefines(model, M)' in mesh, 'Lost the aircraft\'s own bake'
 assert 'meshStamp(afModelOf(M, pv.model))' in mesh, 'The bodies\' cache must be stamped per aircraft'
 assembly = read('src/shaders.h')
 assert 'defines + "#define AF_MESH\\n"' in assembly
@@ -86,10 +86,24 @@ if a.shader_dir:
     }
     shading = ('shadeFleetCabin', 'fuselagePaint', 'ospreyCabinAlbedo', 'jetScreen', 'wraithScreen', 'shadeWraithCockpit')
     for m in range(13):
-        for prog in (f'plane_mesh_af{m}.frag', f'hullbake_af{m}.frag'):
+        for prog in (f'plane_mesh_af{m}.frag', f'hullbake_af{m}.frag', f'objects_af{m}.frag', f'shadow_proxy_af{m}.frag'):
             src = (a.shader_dir / 'pruned' / prog).read_text()
             for fn, owners in own_code.items():
                 defined = bool(re.search(r'^\w+\s+' + fn + r'\s*\(', src, re.M))
-                want = m in owners and not (prog.startswith('hullbake') and fn in shading)
+                want = m in owners and not (prog.startswith(('hullbake', 'shadow_proxy')) and fn in shading)   # (the march shades what it finds, as the mesh pass does)
                 assert defined == want, (prog, fn, 'defined' if defined else 'missing')
-    print('PASS: each aircraft\'s own mesh and bake programs hold its own code and no other aircraft\'s')
+    print('PASS: each aircraft\'s own mesh, bake, march and shadow programs hold its own code and no other aircraft\'s')
+    # the programs the launch builds hold no airframe at all, so no edit to an aircraft compiles anything at launch
+    # (each aircraft's are made as it is drawn); and each scenery class's holds only its class's surfaces
+    for prog in ('objects_noaf.frag', 'shadow_proxy_maps.frag', 'effects_light.frag', 'part_pose.frag'):
+        src = (a.shader_dir / 'pruned' / prog).read_text()
+        for fn in ('mapPlaneBody', 'mapPlane', 'mapJet', 'mapWraith', 'planeMaterialN', 'mapFleetPanel'):
+            assert not re.search(r'^\w+\s+' + fn + r'\s*\(', src, re.M), (prog, fn)
+    classes = {0: ('P_LEAFCARD', 'P_NEEDLE'), 1: ('P_ROCK',), 2: ('K_HANGAR', 'P_FENCE')}
+    for c in range(3):
+        src = (a.shader_dir / 'pruned' / f'entities_c{c}.frag').read_text()
+        for k, words in classes.items():
+            for w in words:
+                used = bool(re.search(r'part\s*==\s*' + w + r'|uKind\s*>=\s*' + w, src))
+                assert used == (k == c), (c, w, used)
+    print('PASS: the launch\'s programs hold no airframe; each scenery class\'s program holds its own surfaces alone')

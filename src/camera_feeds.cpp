@@ -25,7 +25,7 @@ bool Renderer::feedsWanted(const FrameParams& fp) const {
 }
 
 // Where each camera's lens sits: from the eye out along its direction, the first point outside the airframe's skin
-// (the outside shape, evaluated by the hull bake's program; the caller has its uniforms set for this aircraft).
+// (the outside shape, evaluated by the aircraft's builder: beginHullBake).
 void Renderer::measureFeedMounts(const FrameParams& fp) {
   const int rig = fp.feedRig;
   FeedMount mt[kMaxFeeds];
@@ -42,6 +42,7 @@ void Renderer::measureFeedMounts(const FrameParams& fp) {
   float ps[4] = {fp.plane.PS[0], fp.plane.PS[1], fp.plane.PS[2], 0.f}, ctl[4] = {0, 0, 0, 0};   // the outside shape, controls centred
   // A fresh distance query, independent of the last mesh's normal/AO mode or XR state arrays.
   beginHullBake(fp, 1, ps, ctl);
+  if (!hullBakeProg[0]) { g_feedMounts[rig].ok = true; return; }   // (no builder: the mounts as they are)
   std::vector<float> d;
   hullEval(pts, d);
   FeedMounts& fm = g_feedMounts[rig];
@@ -71,7 +72,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
   // bomb target even before release, so activating it does not allocate at the input edge.
   if (screenWindows && fp.feedRig != 2) return;
   if (!g_feedMounts[fp.feedRig].ok) {   // first sight of this craft: find the mounts (its cameras go up next frame)
-    if (progHullBake) { setRT(progHullBake, fp); measureFeedMounts(fp); }
+    if (!bakeOff) measureFeedMounts(fp);
     else g_feedMounts[fp.feedRig].ok = true;
     return;
   }

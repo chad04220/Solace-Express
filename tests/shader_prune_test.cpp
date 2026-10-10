@@ -32,7 +32,7 @@ int main() {
     check(!has(o, "dead(") && !has(o, "onlyDead"), "dead chain removed", o);
     check(has(o, "float helper(float x)") && has(o, "float helper(vec2 x)"), "both overloads of a used name kept", o);
     check(has(o, "float proto(float x);") && has(o, "float proto(float x){"), "prototype and definition of a used function kept", o);
-    check(has(o, "struct Mat") && has(o, "layout(location=0) out vec4 oColor;") && has(o, "const vec3 K") && has(o, "uniform float uA;"), "declarations kept", o);
+    check(has(o, "struct Mat") && has(o, "layout(location=0)out vec4 oColor;") && has(o, "const vec3 K") && has(o, "uniform float uA;"), "declarations kept", o);
     check(!has(o, "//") && !has(o, "/*"), "comments stripped", o);
     check(has(o, "void main()"), "main kept", o);
   }
@@ -84,9 +84,9 @@ int main() {
       "#endif\n"
       "}\n";
     const std::string o = shaderPrune::prune(src);
-    check(has(o, "o.x += swift();") && has(o, "float swift()"), "the live branch kept", o);
+    check(has(o, "o.x+=swift();") && has(o, "float swift()"), "the live branch kept", o);
     check(!has(o, "kestrel") && !has(o, "bake"), "dead branches and the functions only they called removed", o);
-    check(has(o, "o.z = 1.0;") && !has(o, "o.z = 2.0;"), "arithmetic, defined() and nested macros evaluated", o);
+    check(has(o, "o.z=1.0;") && !has(o, "o.z=2.0;"), "arithmetic, defined() and nested macros evaluated", o);
     check(!has(o, "#if") && !has(o, "#elif") && !has(o, "#else") && !has(o, "#endif"), "settled directives removed", o);
     check(has(o, "#define AF_MODEL 7"), "#defines kept", o);
   }
@@ -125,11 +125,11 @@ int main() {
       "}\n";
     const std::string o = shaderPrune::prune(src);
     check(has(o, "#ifdef GL_EXT_thing") && has(o, "#define B 1") && has(o, "#define B 2"), "unsettled group written out", o);
-    check(has(o, "o.x = 1.0;") && !has(o, "o.x = 2.0;"), "a settled group inside an unsettled one cut", o);
-    check(has(o, "#if B == 1") && has(o, "o.y = 1.0;"), "a macro defined differently by its branches is unknown after it", o);
-    check(!has(o, "o.z = 1.0;") && has(o, "#if defined(GL_EXT_other)") && has(o, "o.z = 2.0;") && has(o, "#elif A == 1") && has(o, "o.z = 3.0;") && !has(o, "o.z = 4.0;"),
+    check(has(o, "o.x=1.0;") && !has(o, "o.x=2.0;"), "a settled group inside an unsettled one cut", o);
+    check(has(o, "#if B == 1") && has(o, "o.y=1.0;"), "a macro defined differently by its branches is unknown after it", o);
+    check(!has(o, "o.z=1.0;") && has(o, "#if defined(GL_EXT_other)") && has(o, "o.z=2.0;") && has(o, "#elif A == 1") && has(o, "o.z=3.0;") && !has(o, "o.z=4.0;"),
           "decided-false branches dropped, an undecided one reopens the group, a decided-true one ends it", o);
-    check(has(o, "#if UNDEFINED_NAME") && has(o, "o.w = 1.0;"), "an undefined name in #if is left for the driver", o);
+    check(has(o, "#if UNDEFINED_NAME") && has(o, "o.w=1.0;"), "an undefined name in #if is left for the driver", o);
   }
   {   // an unused function inside a conditional block goes; the directives round it stay balanced
     const std::string src =
@@ -160,9 +160,33 @@ int main() {
     const std::string o = shaderPrune::prune(src);
     check(has(o, "float split("), "straddling declaration kept", o);
   }
-  {   // nothing to prune: the source comes back as it was, comments aside
-    const std::string src = "#version 330 core\nout vec4 o;\nvoid main(){ o = vec4(1.0); }\n";
+  {   // nothing to prune, and in the canonical layout: the source comes back as it was
+    const std::string src = "#version 330 core\nout vec4 o;\nvoid main(){o=vec4(1.0);}\n";
     check(shaderPrune::prune(src) == src, "untouched", shaderPrune::prune(src));
+  }
+  {   // the layout is canonical: re-indenting, re-aligning or spacing code out changes nothing the driver gets
+    const std::string a =
+      "#version 330 core\n"
+      "#define K(x) (x*2.0)\n"
+      "#define SUM 1.0 + \\\n"
+      "  2.0\n"
+      "out vec4 o;\n"
+      "float f(float x){return x*.5 + 1. + x .x - -x;}\n"
+      "void main(){ o = vec4(K(1.0) - -SUM + f(2.0)); }\n";
+    const std::string b =
+      "#version   330 core\n"
+      "  #define   K(x)  (x*2.0)\n"
+      "#define SUM 1.0 +   \\\n"
+      "        2.0   \n"
+      "\n\n"
+      "out    vec4 o;\t\n"
+      "float f( float x ) { return x * .5+1.+x.x- - x; }\n"
+      "\n    void   main ( ) {o=vec4( K( 1.0 )   -   -SUM+f(2.0)) ;}\n";
+    const std::string oa = shaderPrune::prune(a), ob = shaderPrune::prune(b);
+    check(oa == ob, "only the layout differs: the same program", oa + "----\n" + ob);
+    check(oa.compare(0, 18, "#version 330 core\n") == 0 && has(oa, "#define K(x) (x*2.0)") && has(oa, "#define SUM 1.0 + \\\n2.0"), "preprocessor lines keep their spaces", oa);
+    check(has(oa, "x*.5+1.+x.x- -x") && has(oa, "float f(float x)") && !has(oa, "\n\n"), "the spaces two tokens need, and only those", oa);
+    check(shaderPrune::prune(oa) == oa, "canonical: pruned twice, the same", oa);
   }
   {   // a name that is also a variable elsewhere is kept (conservative)
     const std::string src =

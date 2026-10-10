@@ -12,6 +12,7 @@
 #include "renderer.h"
 #include "models.h"
 #include "hull_mesh.h"
+#include "shaders.h"
 #include <unordered_map>
 
 namespace {
@@ -70,19 +71,28 @@ bool Renderer::linkBakePair(const std::string& bakeVS, const std::string& bakeFS
   return true;
 }
 
-bool Renderer::compileHull(const std::string& bakeVS, const std::string& bakeFS, const std::function<void()>& step) {
+bool Renderer::compileHull(const std::function<void()>& step) {
   std::string hdr = "#version 330 core\n", e;
   progHull = linkProgramCached(hdr + kHullVS, hdr + kHullFS, e);
   if (!progHull) shaderNote("Aircraft hull unavailable; using the unbounded distance-field renderer.\n" + e);
   if (step) step();
-  setCompileStage("aircraft distance-field bake");
-  GLuint pair[2];
-  if (!linkBakePair(bakeVS, bakeFS, pair, e, "aircraft surface-normal bake")) shaderNote("Aircraft bake unavailable; using the distance-field renderer.\n" + e);
-  progHullBake = pair[0]; progHullBakeNormal = pair[1];
-  // Distance and normal are a coupled field: settle their shared fallback before
-  // counting either. A reduced-field retry remains the same logical program.
-  if (step) { step(); step(); }
-  return progHull && progHullBake && progHullBakeNormal;
+  return progHull != 0;
+}
+
+// The shared builder (every aircraft's code), for an aircraft whose own failed: made the first time one does
+bool Renderer::sharedBakePrograms(GLuint out[2]) {
+  if (!sharedBakeTried) {
+    sharedBakeTried = true;
+    setCompileStage("aircraft bake (every aircraft)");
+    GLuint pair[2]; std::string e;
+    if (!linkBakePair(kFullscreenVS, hullBakeFSAssembly(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : ""), pair, e))
+      shaderNote("Aircraft bake unavailable; using the distance-field renderer.\n" + e);
+    progHullBake = pair[0]; progHullBakeNormal = pair[1];
+    setCompileStage("");
+  }
+  if (!progHullBake) return false;
+  out[0] = progHullBake; out[1] = progHullBakeNormal;
+  return true;
 }
 
 void Renderer::beginHullBake(const FrameParams& fp, int states, const float* ps, const float* ctl,
@@ -98,8 +108,9 @@ void Renderer::beginHullBake(const FrameParams& fp, int states, const float* ps,
   hullBakeSideX = hullBakeSideY = 1.f;
   hullBakeUploaded[0] = hullBakeUploaded[1] = false;
   // the aircraft's own pair (its code alone: a smaller program, and its edits rebuild its bodies alone), or the shared
+  // one; with neither, nothing can be built (the callers leave the airframe to the march: bakeOff)
   const int own = afModelOf(fp.plane.M, fp.plane.model);
-  if (own < 0 || !afBakePrograms(own, hullBakeProg)) { hullBakeProg[0] = progHullBake; hullBakeProg[1] = progHullBakeNormal; }
+  if ((own < 0 || !afBakePrograms(own, hullBakeProg)) && !sharedBakePrograms(hullBakeProg)) { hullBakeProg[0] = hullBakeProg[1] = 0; bakeOff = true; }
 }
 
 GLuint Renderer::bindHullBake(bool restore) {
@@ -216,6 +227,7 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
   std::vector<float> sps(128 * 4, 0.f), sct(128 * 4, 0.f), swr(128 * 4, 0.f), swr2(128 * 4, 0.f);
   for (int i = 0; i < ns; i++) for (int c = 0; c < 4; c++) { sps[i * 4 + c] = st[i].ps[c]; sct[i * 4 + c] = st[i].ctl[c]; swr[i * 4 + c] = st[i].wr[c]; swr2[i * 4 + c] = st[i].wr2[c]; }
   beginHullBake(fp, ns, sps.data(), sct.data(), swr.data(), swr2.data());
+  if (!hullBakeProg[0]) { hulls[key].ok = false; return; }   // (no builder: this session marches it)
 
   const float slack = 1.3f;   // the distance field may overstate distances by up to ~25%
   const float d1 = slack * halfDiag(kS1) + 0.05f + 0.02f;   // 0.25 m voxels: + half the largest step between states
@@ -384,7 +396,7 @@ uint64_t Renderer::hullKey(const FrameParams& fp, int slot) const {
 bool Renderer::hullWanted(const FrameParams& fp) const {
   const PlaneVisual& pv = fp.plane;
   if (pv.PS[3] > 0.5f) return false;   // (the cockpit is drawn from its mesh)
-  return !hullOff && progHull && progHullBake && pv.on && fp.wreck.pieces == 0 && pv.M[2] < 4.5f;
+  return !hullOff && progHull && !bakeOff && pv.on && fp.wreck.pieces == 0 && pv.M[2] < 4.5f;
 }
 
 void Renderer::ensureHullTarget() {

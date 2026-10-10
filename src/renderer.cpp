@@ -535,8 +535,8 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     setCompileStage("cloud accumulation");
     { std::string e; progCloudAcc = program(vsFS, kCloudAccFS, e); step(); }   // optional: without it the march's own frame is used
     if (!progMap) { error = "Map shader: " + error; return false; }
-    setCompileStage("the aircraft mesh builder");
-    compileHull(vsFS, hullBakeFSAssembly(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : ""), step);   // (the bake alone evaluates a part by its id: PART_BAKE)
+    setCompileStage("aircraft hulls");
+    compileHull(step);   // (the bodies' builders are each aircraft's own, made as its bodies are built: afBakePrograms)
     setCompileStage("cockpit displays");
     progDisp = program(vsFS, ms + kDispMain, error); step();
     // not fatal: without it the cockpit screens stay dark, but the game still runs (the error goes to startup.log)
@@ -1398,7 +1398,6 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   previousClassifiedHangar = classified;
   previousHangar = fp.hangarPreview; previousPreviewModel = fp.plane.model;
   curAlpha = &alphaSprites; curAdd = &addSprites;
-  pickAfPrograms(fp);
   if (!gpuQ[0]) glGenQueries(4, gpuQ);
   {
     int rq = (gpuQi + 1) % 4;   // issued three frames ago

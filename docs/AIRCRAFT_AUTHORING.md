@@ -499,10 +499,19 @@ puts whitecaps on the crests as the wind rises. A seaplane or a ditching reads t
   `MODEL_IS(n)`, never `gModelId == n`. The pruner (`shader_prune.h`) settles those conditionals before it drops what
   nothing calls, so another type's code is not in the program at all: wrap the **call site** (an `if (...) {...} else`
   with `#if HAS_X` ... `#endif` round it keeps the chain whole), and the functions only it calls go too.
-  `aircraft_specialization_test.py` checks each type's own programs hold its own functions and no other type's: add a
-  new type's own functions to its table. Each own build is made the first time its aircraft is drawn or baked (the
-  launch's prewarm draws every one), from the binary cache after the first launch; `AF_ALL=1` draws and bakes
-  everything with the shared builds, for an A/B.
+  The full-screen passes (the objects pass's march, the shadow proxy's, the effects) take the own build of the type
+  they cover when every aircraft they cover is that type, else a shared build. `aircraft_specialization_test.py`
+  checks each type's own programs hold its own functions and no other type's: add a new type's own functions to its
+  table. Each own build is made the first time its aircraft is drawn, baked or marched (the launch's prewarm draws
+  every one), from the binary cache after the first launch; the shared builds only if an own one fails or a pass covers
+  several types. **The launch compiles no program with an aircraft's code** (the test checks the ones it does build),
+  so an edit to one aircraft compiles that aircraft's programs alone. Keep it so: a new full-screen effect for one type
+  goes behind its `HAS_` switch, not into the light aircraft's effects build. `AF_ALL=1` draws and bakes everything
+  with the shared builds, for an A/B.
+- **What an edit compiles.** The binary cache is keyed by each program as the pruner leaves it: its comments,
+  unreached functions, settled conditionals and layout gone. So a comment, a re-indent or an edit to code a program
+  doesn't run compiles nothing; an edit to one aircraft's code compiles its own programs; an edit to code every light
+  aircraft shares compiles each light aircraft's own build (smaller, but one each).
 - **The scenery.** The trees, the rocks and the buildings (with the airport's fittings and the vehicles) each have their
   own pair of programs (`ENT_CLASS`, `ent_common.glsl`: `ENT_TREES`, `ENT_ROCKS`, `ENT_BUILDINGS`); each draw takes its
   kind's class's (`entities.h entClass`).

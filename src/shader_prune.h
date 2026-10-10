@@ -6,8 +6,10 @@
 // more goes. The program cache's key and the driver's compiler both see only that, so an edit reaches only the
 // programs that run the code it touched. Everything else - #version, preprocessor lines, uniforms, globals, structs,
 // constants - stays as it was, and a top-level declaration it can't read plainly is kept whole. Before any of that,
-// the conditionals the program's own #defines settle are cut to the branch it compiles (resolveConditionals).
+// the conditionals the program's own #defines settle are cut to the branch it compiles (resolveConditionals); after it,
+// the layout is made canonical (normalizeSpace), so re-indenting or re-spacing code compiles nothing again.
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -248,8 +250,43 @@ inline std::string resolveConditionals(const std::string& s) {
 // One top-level function definition or prototype: its text [b, e) and its name
 struct Decl { size_t b, e; std::string name; };
 
-inline std::string prune(const std::string& src) {
-  const std::string s = resolveConditionals(stripComments(src));
+// The source's layout made canonical: no blank lines, no blanks at a line's ends, and inside a line only the blanks
+// that keep two tokens apart (between two names or numbers, between two operator characters that would join, by a
+// '.' next to a name or a number) - each one space - so an edit that only re-indents, re-aligns or re-spaces code
+// changes no program. (A preprocessor line keeps a space for every run of blanks: "#define F (x)" is not "F(x)". The
+// line breaks stay, so the driver's messages still point at a line of the program.)
+inline bool keepSpace(char a, char b, bool numberBefore) {
+  static const char* ops = "+-*/%<>=!&|^";
+  if (idChar(a) && idChar(b)) return true;
+  if (strchr(ops, a) && strchr(ops, b)) return true;
+  return (b == '.' && numberBefore) || (a == '.' && b >= '0' && b <= '9');   // ("1 .5" is two numbers, "x .y" a field)
+}
+inline std::string normalizeSpace(const std::string& s) {
+  std::string o; o.reserve(s.size());
+  for (size_t at = 0; at < s.size();) {
+    size_t e = s.find('\n', at); if (e == std::string::npos) e = s.size();
+    size_t k = at; while (k < e && (s[k] == ' ' || s[k] == '\t' || s[k] == '\r')) k++;
+    const bool pp = k < e && s[k] == '#';
+    std::string line; line.reserve(e - k);
+    bool blank = false; size_t tok = 0;   // (tok: where the name or number ending the line so far begins)
+    for (; k < e; k++) {
+      const char c = s[k];
+      if (c == ' ' || c == '\t' || c == '\r') { blank = true; continue; }
+      const bool word = idChar(c) || c == '.';
+      if (blank && (pp || keepSpace(line.back(), c, tok < line.size() && line[tok] >= '0' && line[tok] <= '9'))) line += ' ';
+      if (!word || blank || line.empty() || !(idChar(line.back()) || line.back() == '.')) tok = line.size();
+      blank = false;
+      line += c;
+    }
+    if (blank && !line.empty() && line.back() == '\\') line += ' ';
+    if (!line.empty()) { o += line; o += '\n'; }
+    at = e + 1;
+  }
+  return o;
+}
+
+// the functions nothing reachable from main() calls, gone (the source settled and without its comments)
+inline std::string pruneFunctions(const std::string& s) {
   const size_t n = s.size();
   // ---- the top-level functions: at brace depth 0, a statement of plain identifiers, then "name(" ... ")" and a body
   // or ';'. (A statement with '=' or anything else before its '(' - a constant, layout(...), a struct - is not one;
@@ -360,10 +397,9 @@ inline std::string prune(const std::string& src) {
   size_t at = 0;
   for (size_t d = 0; d < decls.size(); d++) { if (!gone[d]) continue; o.append(s, at, decls[d].b - at); at = decls[d].e; }
   o.append(s, at, n - at);
-  std::string f; f.reserve(o.size());
-  int nl = 0;
-  for (char c : o) { if (c == '\n') { if (++nl > 1) continue; } else if (c != ' ' && c != '\t' && c != '\r') nl = 0; f += c; }
-  return f;
+  return o;
 }
+
+inline std::string prune(const std::string& src) { return normalizeSpace(pruneFunctions(resolveConditionals(stripComments(src)))); }
 
 }  // namespace shaderPrune

@@ -183,12 +183,8 @@ int partList(const float* M, bool inside, PartInst* out, int model = -1) {
 
 bool Renderer::compilePlaneMesh(const std::function<void()>& step) {
   std::string e;
-  // the shared build, every aircraft's code: an aircraft is drawn with it until its own is made (afMeshProgram), or if
-  // its own fails
-  setCompileStage("aircraft meshes (all aircraft)");
-  progPlaneMesh = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(""), e);
-  if (!progPlaneMesh) { error = "Aircraft mesh shader: " + e; return false; }
-  if (step) step();
+  // (no build with an aircraft's code at launch: each aircraft's own is made as it is first drawn - afMeshProgram - and
+  // the shared one only for an aircraft whose own fails - sharedMeshProgram)
   // the depth pre-pass; with uScrSkip the research cockpit's windows are cut (cabin_windows.glsl: the screens are holes)
   // (uCloakZ: a cloaked XR-40's sweeping front, body z - what lies ahead of it is see-through and writes no depth; -1e9 none)
   setCompileStage("aircraft mesh depth");
@@ -204,6 +200,17 @@ bool Renderer::compilePlaneMesh(const std::function<void()>& step) {
 }
 
 // ---- each aircraft's own builds (renderer.h AfOwn)
+GLuint Renderer::sharedMeshProgram() {
+  if (!sharedMeshTried) {
+    sharedMeshTried = true;
+    setCompileStage("aircraft meshes (all aircraft)");
+    std::string e;
+    progPlaneMesh = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(""), e);
+    setCompileStage("");
+    if (!progPlaneMesh) shaderNote("Aircraft mesh shader (every aircraft) failed: the aircraft are marched\n" + e);
+  }
+  return progPlaneMesh;
+}
 int Renderer::afModelOf(const float* M, int model) {
   static_assert(kAfModels == kWraith + 1, "one own build for each type in the roster");
   static const bool all = getenv("AF_ALL") != nullptr;   // (debug: every aircraft drawn and baked with the shared builds)
@@ -239,7 +246,7 @@ bool Renderer::afBakePrograms(int model, GLuint out[2]) {
     const std::string stage = std::string("aircraft bake (the ") + kAircraft[model].name + "'s own)";
     setCompileStage(stage.c_str());
     std::string e;
-    if (!linkBakePair(kFullscreenVS, hullBakeFSAssembly(aircraftDefines(model, M)), a.bake, e))
+    if (!linkBakePair(kFullscreenVS, hullBakeFSAssembly(aircraftDefines(model, M) + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "")), a.bake, e))
       shaderNote(std::string("Aircraft bake (the ") + kAircraft[model].name + "'s own build) failed: built with every aircraft's\n" + e);
     setCompileStage("");
   }
@@ -259,7 +266,7 @@ std::string Renderer::meshStamp(int model) {
 // every aircraft but a wreck
 bool Renderer::planeMeshWanted(const FrameParams& fp) const {
   const PlaneVisual& pv = fp.plane;
-  return !meshOff && progPlaneMesh && progHullBake && pv.on && fp.wreck.pieces == 0;   // (a cloaked XR-40 too: the mesh passes leave its cloaked part out)
+  return !meshOff && !meshFail && !bakeOff && pv.on && fp.wreck.pieces == 0;   // (a cloaked XR-40 too: the mesh passes leave its cloaked part out)
 }
 
 void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
@@ -298,12 +305,13 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   if (ib.empty()) {
     bakeBuilt++;
     if (onBakeStart) onBakeStart();   // (not in the cache, or unreadable: the launch's loading screen says it is building)
-    // ---- the field's states, on the bake program (bound by the caller)
+    // ---- the field's states, on the aircraft's builder (beginHullBake picks it, bindHullBake binds it)
     std::vector<HullState> st = hullStateList(M, inside, true);   // (the sweeps that move only rigid parts dropped)
     const int ns = (int)st.size();
     std::vector<float> sps(128 * 4, 0.f), sct(128 * 4, 0.f), swr(128 * 4, 0.f), swr2(128 * 4, 0.f);
     for (int i = 0; i < ns; i++) for (int c = 0; c < 4; c++) { sps[i * 4 + c] = st[i].ps[c]; sct[i * 4 + c] = st[i].ctl[c]; swr[i * 4 + c] = st[i].wr[c]; swr2[i * 4 + c] = st[i].wr2[c]; }
     beginHullBake(fp, ns, sps.data(), sct.data(), swr.data(), swr2.data());
+    if (!hullBakeProg[0]) { PM.ok = false; return; }   // (no builder: a failed bake, as below - this session marches it)
     auto mode = [&](int m, int s) { hullBakeMode = m; hullBakeState = s; };
     hullBakePart = -2;   // airframe without rigid parts: those are separate meshes below
     const float slack = 1.3f;   // the field may overstate distances by up to ~25%
@@ -1039,7 +1047,8 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   // (this aircraft's type's own build of the program: its code alone - afMeshProgram; else every aircraft's)
   const int own = afModelOf(trafK >= 0 ? fp.traffic[trafK].t : fp.plane.M, trafK >= 0 ? -1 : fp.plane.model);
   GLuint prog = own >= 0 ? afMeshProgram(own) : 0;
-  if (!prog) prog = progPlaneMesh;
+  if (!prog) prog = sharedMeshProgram();
+  if (!prog) { meshFail = true; return; }   // (no program: the march draws the airframes from the next frame)
   // the analysis's probe of the player's airframe shading (kProbeMeshShade): a build of its own, made the first time
   // it is asked for, so the game's programs carry no trace of it
   if ((dbgOff & kProbeMeshShade) && trafK < 0) {

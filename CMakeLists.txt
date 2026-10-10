@@ -257,8 +257,8 @@ if(Python3_Interpreter_FOUND AND NOT WIN32)
     --generated ${CMAKE_BINARY_DIR}/gen --cxx ${CMAKE_CXX_COMPILER})
 endif()
 
-# Explicit report-only fallback for software drivers unable to compile unused
-# all-aircraft variants. Exact standard AF_LIGHT scene programs; fleet hangar only.
+# The UI review on a software driver: the game's own programs (the launch builds none with an aircraft's code), with
+# the review's diagnostic checks; fleet hangar only.
 if(UNIX AND NOT APPLE AND Python3_Interpreter_FOUND)
   set(UI_FLEET_ADAPTER_DIR ${CMAKE_BINARY_DIR}/ui-fleet-adapter)
   set(UI_FLEET_ADAPTERS ${UI_FLEET_ADAPTER_DIR}/renderer.cpp ${UI_FLEET_ADAPTER_DIR}/raster_renderer.cpp ${UI_FLEET_ADAPTER_DIR}/aircraft_mesh.cpp)
