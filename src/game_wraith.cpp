@@ -11,12 +11,12 @@ const vec3 kLaserLens[2] = {vec3(-0.95f, -0.68f, -6.44f), vec3(0.95f, -0.68f, -6
 const float kBoltSpeed = 2000.f, kBoltStreak = 55.f, kBoltRange = 4500.f;   // muzzle speed (added to the craft's), streak, range
 // the bomb in its cradle (body coords)
 const vec3 kBayBomb(0.f, -0.31f, 0.1f);
-// a bomb's launch: from just below the cradle, thrown straight down - towards the ground, whatever the aircraft's
-// attitude - at kBombEject on top of the aircraft's own velocity (the release and the cockpit's impact marker alike)
+// a bomb's launch: from just below the cradle, thrown out of the belly - straight away from the craft, whichever way it
+// is turned - at kBombEject on top of the aircraft's own velocity (the release and the cockpit's impact marker alike)
 static constexpr float kBombEject = 25.f;   // m/s
 static void bombLaunch(const Plane& plane, vec3& p, vec3& v) {
   p = plane.pos + plane.q.rotate(kBayBomb - vec3(0, 0.25f, 0));
-  v = plane.vel + vec3(0, -kBombEject, 0);
+  v = plane.vel - plane.up() * kBombEject;
 }
 float groundAt(vec3 p) { return std::max(g_world.height(p.x, p.z), 0.f); }
 // first point where a segment from a (direction d, length L) meets the ground or the sea; t < 0 when clear
