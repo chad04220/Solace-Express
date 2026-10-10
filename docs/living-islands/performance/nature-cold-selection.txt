@@ -1,0 +1,8 @@
+cold_candidates=393 sampled_sites=32 best_camera=-8280.000000,849.224731,-3160.000000 omnidirectional_close_triangles=1676030
+close_species Fir 131
+close_species Spruce 128
+close_species Pine 52
+close_species Oak 0
+close_species Birch 0
+close_species Palm 0
+close_species Bush 2

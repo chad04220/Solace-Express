@@ -8,6 +8,8 @@ const int GB_SKY = 0, GB_TERRAIN = 1, GB_WATER = 2, GB_ENTITY = 3, GB_FOLIAGE = 
 // flags: a sun glint on painted skin; a display or gauge pixel (the post pass doesn't sharpen it); the TAA's history
 // class, moving (0.2) or rigid with the aircraft (0.5) - neither: a world pixel (1)
 const int GBF_GLINT = 1, GBF_DISPLAY = 2, GBF_MOVING = 4, GBF_RIGID = 8;
+// Environment-only surface lobes; emitted only by scenery, never by an aircraft program.
+const int GBF_ENV_GLASS = 16, GBF_ENV_CLEARCOAT = 32;
 // The shadow proxy's three light channels go to the brightest shadow-casting lights (the landing lights before the
 // strobes, the beacon and the nav lights, whichever are on this frame): light i's channel, or -1
 int gbShadowSlot(int i){

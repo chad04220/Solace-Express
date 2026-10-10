@@ -1,0 +1,457 @@
+--- a/src/entity_render.cpp
++++ b/src/entity_render.cpp
+@@ -70,6 +70,10 @@
+   const EntRanges shadowRanges = entBaseRangesFor(quality);
+   const float farAll = std::max(R.big, R.build) + 300.f, farDetail = std::max(std::max(R.tree, R.rock), R.bush) + 300.f;
+   vec3 cam = fp.camPos;
++  nearShadowCoverage.update(cam, fp.dt, shadowRanges.sh0, !feedPass, fp.hangarPreview,
++    [](float x, float z) { return g_world.groundHeight(x, z); });
++  float cR[2] = {R.sh0, R.sh1};
++  cR[0] = nearShadowCoverage.radius() > 0.f ? nearShadowCoverage.radius() : R.sh0;
+   const int ccx = Scenery::chunkOf(cam.x), ccz = Scenery::chunkOf(cam.z);
+   const int rad = (int)ceilf(farAll / Scenery::CH) + 1;
+   // how far beyond a shadow cascade a chunk's casters can still throw shadow into it: its tallest caster times the
+@@ -102,7 +106,7 @@
+         // only where its shadows can show: the shader fades each cascade out at kShFade1 of its radius, plus room for
+         // tall casters just outside. (A wider test re-rendered the far 4096^2 map nearly every frame in flight, since
+         // tree chunks keep streaming in a few km ahead.)
+-        float r = (c == 0 ? R.sh0 : R.sh1) * kShFade1 + std::max(300.f, chunkShPad(g_scenery.get(cx, cz)));
++        float r = cR[c] * kShFade1 + std::max(300.f, chunkShPad(g_scenery.get(cx, cz)));
+         float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
+         float ex = std::max(std::max(x0 - shCenter[c].x, shCenter[c].x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - shCenter[c].z, shCenter[c].z - z0 - Scenery::CH), 0.f);
+         if (ex < r && ez < r) shGen[c] = -1;
+@@ -177,7 +181,6 @@
+   // ------------------------------------------------ shadow cascades: which need re-rendering
+   bool sunUp = fp.sunDir.y > 0.03f;
+   vec3 L = normalize(fp.sunDir);
+-  float cR[2] = {R.sh0, R.sh1};
+   bool shDirty[2] = {false, false};
+   vec3 fwdH = normalize(vec3(-fp.camBack.x, 0, -fp.camBack.z) + vec3(1e-4f, 0, 0));
+   if (shRes != R.shRes && !feedPass) {   // (re)create the cascade maps
+--- a/src/renderer.cpp
++++ b/src/renderer.cpp
+@@ -1253,7 +1253,8 @@
+     glUniformMatrix4fv(U(p, "uShM0"), 1, GL_FALSE, shVP[0].m); glUniformMatrix4fv(U(p, "uShM1"), 1, GL_FALSE, shVP[1].m);
+     glUniform2f(U(p, "uShTexel"), shR[0] * 2.f / std::max(shRes, 1), shR[1] * 2.f / std::max(shRes, 1));
+     glUniform4f(U(p, "uShFade"), shIdeal[0].x, shIdeal[0].z, shIdeal[1].x, shIdeal[1].z);
+-    glUniform4f(U(p, "uShFadeR"), shR[0] * kShFade0, shR[0] * kShFade1, shR[1] * kShFade0, shR[1] * kShFade1);
++    const vec2 nearFade = nearShadowCoverage.fadeRadii(shR[0]);
++    glUniform4f(U(p, "uShFadeR"), nearFade.x, nearFade.y, shR[1] * kShFade0, shR[1] * kShFade1);
+     glUniform1f(U(p, "uTreeFar"), entTreeFar);
+   }
+   {
+--- a/src/renderer.h
++++ b/src/renderer.h
+@@ -1,6 +1,7 @@
+ // Solace Express - renderer interface
+ #pragma once
+ #include "benchmark_metrics.h"
++#include "near_shadow_coverage.h"
+ #include <array>
+ #include <chrono>
+ #include <functional>
+@@ -297,6 +298,7 @@
+   static constexpr float kShFade0 = 0.5f, kShFade1 = 0.78f;
+   vec3 shIdeal[2]; float entTreeFar = 4500.f;
+   mat4 shVP[2]; vec3 shCenter[2], shSun[2]; bool shValid[2] = {false, false}; int shGen[2] = {-1, -1}, shAge[2] = {0, 0}; float shR[2] = {0, 0};
++  NearShadowCoverage nearShadowCoverage;
+   EntMeshRange entRange[EK_COUNT];
+   std::vector<Ent> entStage;
+   uint64_t groundShadowKey[2] = {};   // the driven vehicles each cascade last drew (a change re-renders it)
+@@ -434,6 +436,7 @@
+     frameNo = 0; histIdx = 0; histValid = false; cloudAccValid = false;   // the next frame renders as if it were the first (exact test comparisons)
+     tshFront = -1; tshBack = 0; tshRow = 0; tshBaking = false;
+     for (bool& v : shValid) v = false;   // shadow cascades re-render
++    nearShadowCoverage.reset();
+   }
+ private:
+   GLuint screenFbo = 0;
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -379,3 +379,9 @@
+ target_include_directories(environment_chunk_bounds_test PRIVATE src)
+ add_test(NAME environment_chunk_bounds COMMAND environment_chunk_bounds_test)
+ add_dependencies(airport_layout_test environment_chunk_bounds_test)
++
++# Quantized, main-camera near-shadow coverage and actual-radius wiring contracts.
++add_executable(near_shadow_coverage_test tests/near_shadow_coverage_test.cpp ${ENVIRONMENT_SOURCES})
++target_include_directories(near_shadow_coverage_test PRIVATE src)
++add_test(NAME near_shadow_coverage COMMAND near_shadow_coverage_test ${CMAKE_SOURCE_DIR})
++add_dependencies(airport_layout_test near_shadow_coverage_test)
+--- /dev/null
++++ b/src/near_shadow_coverage.h
+@@ -0,0 +1,116 @@
++// Solace Express - bounded, CPU-testable main-camera near-shadow coverage.
++#pragma once
++#include "common.h"
++
++// Only the near cascade changes footprint; its allocation and the far cascade's
++// policy stay unchanged. The committed radius is constant during each fade leg.
++class NearShadowCoverage {
++public:
++  enum class Phase { Stable, Shrink, Expand };
++  static constexpr float kFadeFloor = 0.0001f;
++  static constexpr float kShrinkSeconds = 0.2f, kExpandSeconds = 0.3f;
++  static constexpr float kUpgradeSeconds = 0.25f, kDowngradeSeconds = 1.5f;
++  static constexpr float kSpeedSeconds = 0.35f;
++
++  void reset() { *this = NearShadowCoverage{}; }
++  float radius() const { return radius_; }
++  float speed() const { return speed_; }
++  float agl() const { return agl_; }
++  float fadeScale() const { return fade_; }
++  Phase phase() const { return phase_; }
++  int tier() const { return tier_; }
++
++  // Pass the map's ACTUAL radius, not a requested tier. Positive, strictly
++  // ordered radii avoid smoothstep(0,0) while the far cascade takes over.
++  // A positive actual radius is required for an enabled map. Before allocation
++  // actualRadius is zero and the renderer disables shadow sampling entirely.
++  vec2 fadeRadii(float actualRadius) const {
++    const float r = std::max(actualRadius, 0.f) * fade_;
++    return {r * 0.5f, r * 0.78f};
++  }
++
++  // The sampler is deliberately lazy: feeds and hangars neither read terrain
++  // nor mutate camera history, dwell, radius or handover state.
++  template<class GroundHeight>
++  bool update(vec3 camera, float dt, float qualityBase, bool mainView, bool hangar, GroundHeight&& groundHeight) {
++    if (!mainView || hangar) return false;
++    const float base = std::isfinite(qualityBase) && qualityBase >= 256.f ? qualityBase : 420.f;
++    const bool cameraOK = finite(camera);
++    const bool timeOK = std::isfinite(dt) && dt > 0.f && dt <= 0.25f;
++    if (!initialized_ || base != base_ || !cameraOK || !timeOK)
++      return conservative(base, camera, cameraOK && timeOK);
++    const float travel = length(camera - previous_);
++    // Cuts, teleports and suspended rendering must not become sustained camera
++    // speed. Ordinary flight up to 1200 m/s is supported at every test rate.
++    if (!hasCamera_ || !std::isfinite(travel) || travel > std::max(64.f, 1200.f * dt))
++      return conservative(base, camera, true);
++    const float instantSpeed = travel / dt;
++    if (!std::isfinite(instantSpeed)) return conservative(base, camera, true);
++    const float ground = groundHeight(camera.x, camera.z);
++    if (!std::isfinite(ground)) return conservative(base, camera, true);
++    previous_ = camera;
++    speed_ += (instantSpeed - speed_) * (-std::expm1(-dt / kSpeedSeconds));
++    agl_ = std::max(camera.y - std::max(ground, 0.f), 0.f);
++
++    if (phase_ != Phase::Stable) {
++      phaseTime_ += dt;
++      if (phase_ == Phase::Shrink) {
++        fade_ = std::max(kFadeFloor, 1.f - smoothstepf(0.f, kShrinkSeconds, phaseTime_));
++        if (phaseTime_ + 1e-6f < kShrinkSeconds) return false;
++        // A sudden climb/acceleration during the fade may cancel a narrowing
++        // request or promote it. Never commit a now-unsafe smaller footprint.
++        target_ = std::max(target_, risingTier());
++        const float next = radiusFor(target_);
++        const bool changed = next != radius_;
++        tier_ = target_; radius_ = next; phase_ = Phase::Expand;
++        phaseTime_ = 0.f; fade_ = kFadeFloor;
++        return changed;  // exactly one map-radius change, hidden by the far map
++      }
++      fade_ = std::max(kFadeFloor, smoothstepf(0.f, kExpandSeconds, phaseTime_));
++      if (phaseTime_ + 1e-6f >= kExpandSeconds) {
++        fade_ = 1.f; phase_ = Phase::Stable; phaseTime_ = 0.f;
++        candidate_ = tier_; dwell_ = 0.f;
++      }
++      return false;
++    }
++
++    int desired = std::max(tier_, risingTier());
++    if (desired == tier_) {
++      static constexpr float downAGL[3] = {25.f, 60.f, 125.f};
++      static constexpr float downSpeed[3] = {12.f, 25.f, 40.f};
++      while (desired > 0 && agl_ < downAGL[desired - 1] && speed_ < downSpeed[desired - 1]) --desired;
++    }
++    if (desired == tier_) { candidate_ = tier_; dwell_ = 0.f; return false; }
++    if (candidate_ != desired) { candidate_ = desired; dwell_ = 0.f; }
++    dwell_ += dt;
++    const float wait = desired > tier_ ? kUpgradeSeconds : kDowngradeSeconds;
++    if (dwell_ + 1e-6f >= wait) {
++      target_ = desired; phase_ = Phase::Shrink; phaseTime_ = 0.f; dwell_ = 0.f;
++    }
++    return false;
++  }
++
++private:
++  static bool finite(vec3 p) { return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z); }
++  float radiusFor(int tier) const { return tier == 0 ? 96.f : tier == 1 ? 160.f : tier == 2 ? 256.f : base_; }
++  int risingTier() const {
++    static constexpr float upAGL[3] = {35.f, 80.f, 160.f};
++    static constexpr float upSpeed[3] = {18.f, 32.f, 50.f};
++    int t = 0;
++    while (t < 3 && (agl_ > upAGL[t] || speed_ > upSpeed[t])) ++t;
++    return t;
++  }
++  bool conservative(float base, vec3 camera, bool remember) {
++    const bool changed = radius_ != base;
++    base_ = radius_ = base; tier_ = target_ = candidate_ = 3;
++    initialized_ = true; hasCamera_ = remember; previous_ = remember ? camera : vec3{};
++    speed_ = agl_ = dwell_ = phaseTime_ = 0.f; fade_ = 1.f; phase_ = Phase::Stable;
++    return changed;
++  }
++  bool initialized_ = false, hasCamera_ = false;
++  vec3 previous_;
++  float base_ = 0.f, radius_ = 0.f, speed_ = 0.f, agl_ = 0.f;
++  float dwell_ = 0.f, phaseTime_ = 0.f, fade_ = 1.f;
++  int tier_ = 3, target_ = 3, candidate_ = 3;
++  Phase phase_ = Phase::Stable;
++};
+--- /dev/null
++++ b/tests/near_shadow_coverage_test.cpp
+@@ -0,0 +1,255 @@
++// Quantized near-shadow policy, handover, invalid inputs and view isolation.
++#include "near_shadow_coverage.h"
++#include "entity_lod.h"
++#include "ground_vehicle.h"
++#include <limits>
++#include <array>
++#include <fstream>
++#include <iterator>
++#include <cctype>
++
++namespace {
++int checks = 0, failures = 0;
++void check(bool ok, const char* what) { ++checks; if (!ok) { ++failures; printf("FAIL %s\n", what); } }
++struct Sim {
++  NearShadowCoverage state;
++  vec3 camera{0, 1000, 0};
++  float dt = 1.f / 60.f, base = 420.f, ground = 998.f;
++  int reads = 0, commits = 0;
++  bool step(bool main = true, bool hangar = false) {
++    bool changed = state.update(camera, dt, base, main, hangar, [&](float x, float z) {
++      check(x == camera.x && z == camera.z, "terrain sampled at main camera"); ++reads; return ground;
++    });
++    commits += changed;
++    if (state.radius() > 0.f) {
++      vec2 f = state.fadeRadii(state.radius());
++      check(std::isfinite(f.x) && f.x > 0.f && f.y > f.x, "finite positive ordered fade bounds");
++      check(f.x <= .5f*state.radius() && f.y <= .78f*state.radius(), "fade never leaves map-safe radius");
++      check(state.radius() == 96.f || state.radius() == 160.f || state.radius() == 256.f || state.radius() == 300.f || state.radius() == 420.f || state.radius() == 520.f,
++            "committed radius is a discrete tier");
++      if (changed && state.phase() == NearShadowCoverage::Phase::Expand)
++        check(state.fadeScale() == NearShadowCoverage::kFadeFloor, "radius commit occurs at hidden handover frame");
++    }
++    return changed;
++  }
++  void run(float seconds, float speed = 0.f) {
++    const int n = int(std::ceil(seconds/dt));
++    for (int i=0;i<n;++i) { camera.x += speed*dt; step(); }
++  }
++  void setAGL(float agl) { ground = camera.y - agl; }
++  void settle(float agl = 2.f) { setAGL(agl); run(8.f); }
++};
++
++void qualityAndHandover() {
++  for (int quality=0;quality<3;++quality) {
++    Sim s; s.base=entBaseRangesFor(quality).sh0; s.step();
++    check(s.state.radius()==s.base,"initial radius is quality base");
++    s.run(1.4f);check(s.state.radius()==s.base,"downgrade dwell prevents early rebuild");
++    s.run(1.f);check(s.state.radius()==96.f&&s.state.fadeScale()==1.f,"stationary low camera settles to 96");
++    check(s.commits==2,"one initialization and one committed near rebuild");
++    const int commits=s.commits;
++    s.run(20.f);check(s.commits==commits,"static settled camera never churns radius");
++    s.setAGL(190);s.run(2.f);
++    check(s.state.radius()==s.base&&s.state.fadeScale()==1.f,"altitude restores every quality base");
++    s.settle();s.run(3.f,70.f);
++    check(s.state.radius()==s.base,"main-camera speed restores every quality base");
++    s.settle();check(s.state.radius()==96.f,"slow camera recovers close quality after speed decays");
++  }
++}
++
++void jitterAndDwell() {
++  const float centers[3]={30.f,70.f,142.f};
++  const float expected[3]={96.f,160.f,256.f};
++  for(int t=0;t<3;++t) {
++    Sim s;s.settle(t==0?2.f:t==1?45.f:95.f);
++    check(s.state.radius()==expected[t],"establish each non-base tier");
++    s.setAGL(centers[t]);s.run(2.f);const int before=s.commits;
++    for(int n=0;n<1800;++n) {s.setAGL(centers[t]+std::sin(float(n)*.1f)*.5f);s.step();}
++    check(s.commits==before,"stationary threshold hysteresis prevents jitter churn");
++  }
++  for(int t=0;t<3;++t) {
++    Sim s;s.settle(t==0?2.f:t==1?45.f:95.f);const int before=s.commits;
++    const float edge[3]={35.f,80.f,160.f};
++    for(int n=0;n<600;++n){s.setAGL(edge[t]+((n/5)%2?.25f:-.25f));s.step();}
++    check(s.commits==before,"stationary jitter across upgrade edge cannot accumulate dwell");
++  }
++  for(int t=0;t<3;++t) {
++    Sim s;s.settle(t==0?45.f:t==1?95.f:190.f);const int before=s.commits;
++    const float edge[3]={25.f,60.f,125.f};
++    for(int n=0;n<600;++n){s.setAGL(edge[t]+((n/6)%2?.25f:-.25f));s.step();}
++    check(s.commits==before,"stationary jitter across downgrade edge cannot accumulate dwell");
++  }
++  Sim s;s.settle();int before=s.commits;
++  // Threshold crossings shorter than the0.25s dwell must not accumulate.
++  for(int n=0;n<10;++n){s.setAGL(36);s.run(.1f);s.setAGL(34);s.run(.4f);}
++  check(s.commits==before,"interrupted upgrade dwell resets instead of accumulating");
++  s.setAGL(42);s.run(1.5f);check(s.state.radius()==160.f,"sustained threshold restores next tier");
++  s.setAGL(24);s.run(1.f);check(s.state.radius()==160.f,"downgrade requires 1.5s continuous dwell");
++  s.run(2.f);check(s.state.radius()==96.f,"sustained low altitude downgrades");
++}
++
++std::array<float,3> motionAtRate(int hz) {
++  Sim s;s.dt=1.f/hz;s.settle();
++  std::array<float,3> times{};const float target[3]={160,256,420};
++  for(int n=1;n<=hz*14;++n){
++    const float t=float(n)/hz;const float v=std::min(t*8.f,75.f);
++    s.camera.x+=v*s.dt;s.step();
++    for(int k=0;k<3;++k)if(!times[k]&&s.state.radius()==target[k])times[k]=t;
++  }
++  for(float t:times)check(t>0,"speed ramp visits every radius tier");
++  check(s.state.radius()==420.f,"speed ramp returns to base");
++  s.run(6.f);check(s.state.radius()==96.f,"camera stopping returns to close tier");
++  return times;
++}
++std::array<float,3> altitudeAtRate(int hz) {
++  Sim s;s.dt=1.f/hz;s.settle();std::array<float,3> times{};
++  const float target[3]={160,256,420};
++  for(int n=1;n<=hz*14;++n){
++    const float t=float(n)/hz;s.setAGL(std::min(2.f+t*20.f,210.f));s.step();
++    for(int k=0;k<3;++k)if(!times[k]&&s.state.radius()==target[k])times[k]=t;
++  }
++  for(float t:times)check(t>0,"AGL ramp visits every radius tier");
++  check(s.state.radius()==420.f,"high AGL restores base without camera motion");
++  return times;
++}
++void rates() {
++  auto a=motionAtRate(30),b=motionAtRate(60),c=motionAtRate(144);
++  for(int i=0;i<3;++i){check(std::fabs(a[i]-c[i])<.12f,"30/144Hz ramp commitment within frame quantization");check(std::fabs(b[i]-c[i])<.07f,"60/144Hz ramp commitment within frame quantization");}
++  a=altitudeAtRate(30);b=altitudeAtRate(60);c=altitudeAtRate(144);
++  for(int i=0;i<3;++i){check(std::fabs(a[i]-c[i])<.10f,"30/144Hz AGL ramp commitment within frame quantization");check(std::fabs(b[i]-c[i])<.06f,"60/144Hz AGL ramp commitment within frame quantization");}
++
++}
++
++void inputsAndIsolation() {
++  Sim s;s.settle();const float nan=std::numeric_limits<float>::quiet_NaN();
++  for(float dt:{0.f,-.01f,nan,std::numeric_limits<float>::infinity(),.5f}) {
++    s.dt=dt;s.step();check(s.state.radius()==s.base&&s.state.speed()==0.f,"invalid dt resets conservatively");
++    s.dt=1.f/60;s.settle();check(s.state.radius()==96.f,"valid samples recover after invalid dt");
++  }
++  s.dt=std::numeric_limits<float>::denorm_min();s.camera.x+=1.f;
++  int tinyReads=s.reads;s.step();
++  check(s.state.radius()==s.base&&s.state.speed()==0&&tinyReads==s.reads,"overflowing camera speed from tiny positive dt resets before terrain sampling");
++  s.dt=1.f/60;s.settle();
++  s.camera.x+=1000;s.step();check(s.state.radius()==s.base&&s.state.speed()==0.f,"teleport clears speed and restores base");
++  s.settle();s.camera.x=nan;int reads=s.reads;s.step();check(s.reads==reads,"nonfinite camera never reaches terrain sampler");
++  s.camera={0,1000,0};s.settle();s.ground=nan;s.step();check(s.state.radius()==s.base&&std::isfinite(s.state.speed()),"NaN ground cannot poison state");
++  s.ground=998;s.settle();s.base=520;s.step();check(s.state.radius()==520&&s.state.speed()==0,"quality change clears history");
++  s.settle();s.state.reset();s.step();check(s.state.radius()==520&&s.state.speed()==0,"temporal reset clears history");
++  // An ocean's seabed must not inflate camera altitude above the visible water.
++  s.ground=-300;s.camera.y=2;s.run(8.f);check(s.state.radius()==96&&s.state.agl()==2,"AGL uses sea level over water");
++  s.ground=900;s.camera.y=902;s.run(8.f);check(s.state.radius()==96&&s.state.agl()==2,"AGL uses local ground on mountains");
++  s.ground=910;s.run(3.f);check(s.state.agl()==0,"below-ground AGL is clamped");
++  // Freeze even in an active handover, with hostile feed data and quality.
++  s.ground=998;s.camera={0,1000,0};s.state.reset();s.step();s.run(1.6f);
++  check(s.state.phase()==NearShadowCoverage::Phase::Shrink,"isolation test is inside handover");
++  auto copy=s.state;reads=s.reads;int commits=s.commits;
++  for(int i=0;i<400;++i){s.camera={nan,nan,nan};s.base=300;s.dt=nan;s.step(false,false);s.step(true,true);}
++  check(reads==s.reads&&commits==s.commits,"feeds/hangar never sample terrain or commit radius");
++  check(s.state.radius()==copy.radius()&&s.state.speed()==copy.speed()&&s.state.phase()==copy.phase()&&s.state.fadeScale()==copy.fadeScale(),"feeds/hangar freeze main controller state");
++  s.camera={0,1000,0};s.base=520;s.dt=1.f/60;
++  for(int i=0;i<900;++i) {
++    s.camera.x+=s.dt*(i<300?22.f:0.f);
++    const bool a=s.step();
++    const bool b=copy.update(s.camera,s.dt,s.base,true,false,[&](float,float){return s.ground;});
++    check(a==b&&s.state.radius()==copy.radius()&&s.state.speed()==copy.speed()&&s.state.agl()==copy.agl()&&s.state.phase()==copy.phase()&&s.state.fadeScale()==copy.fadeScale(),"post-feed trajectory equals untouched controller including private history");
++  }
++  for(float base:{nan,-10.f,0.f,255.f}) {
++    NearShadowCoverage c;
++    c.update({0,2,0},1.f/60,base,true,false,[](float,float){return 0.f;});
++    check(c.radius()==420.f&&c.speed()==0.f,"invalid quality base uses conservative medium radius");
++  }
++
++}
++
++void fadeEndpointsAndCache() {
++  for(int hz:{30,60,144}) {
++    Sim s;s.dt=1.f/hz;s.step();
++    for(int n=0;n<hz*2&&s.state.phase()==NearShadowCoverage::Phase::Stable;++n)s.step();
++    check(s.state.phase()==NearShadowCoverage::Phase::Shrink&&s.state.fadeScale()==1.f,"shrink begins at full footprint");
++    float previous=1.f;int nearRebuilds=0;float actual=s.state.radius();
++    for(int n=0;n<hz;++n) {
++      const auto phase=s.state.phase();s.step();
++      if(phase==NearShadowCoverage::Phase::Shrink)check(s.state.fadeScale()<=previous,"shrink fade monotonically contracts");
++      if(phase==NearShadowCoverage::Phase::Expand)check(s.state.fadeScale()>=previous,"expand fade monotonically recovers");
++      if(actual!=s.state.radius()){++nearRebuilds;actual=s.state.radius();}
++      // The production radius mismatch invalidation compares actual map radius
++      // to committed cR; fading is only a uniform update, never another rebuild.
++      const auto f=s.state.fadeRadii(actual);
++      check(f.y<=actual*.78f&&actual*2.f/2048.f>0,"fade and texel size use the actual committed map");
++      previous=s.state.fadeScale();
++    }
++    check(nearRebuilds==1,"handover commits exactly one near radius");
++    check(s.state.phase()==NearShadowCoverage::Phase::Stable&&s.state.fadeScale()==1.f,"expand endpoint is exact full footprint");
++  }
++}
++
++void fastTakeoffDuringExpansion() {
++  for(int hz:{30,60,144}) {
++    Sim s;s.dt=1.f/hz;s.settle();s.setAGL(42);
++    for(int n=0;n<hz*2&&s.state.phase()!=NearShadowCoverage::Phase::Expand;++n)s.step();
++    check(s.state.radius()==160&&s.state.phase()==NearShadowCoverage::Phase::Expand,"takeoff test begins during smaller-map expansion");
++    s.setAGL(190);float elapsed=0;
++    while(elapsed<1.25f&&s.state.radius()!=s.base){s.camera.x+=75.f*s.dt;s.step();elapsed+=s.dt;}
++    check(s.state.radius()==s.base&&elapsed<.85f,"fast takeoff restores base within current expand plus upgrade dwell and shrink");
++    check(s.state.phase()==NearShadowCoverage::Phase::Expand&&s.state.fadeScale()==NearShadowCoverage::kFadeFloor,"fast takeoff also commits at hidden handover");
++  }
++}
++
++void transitionSafetyAndKeys() {
++  Sim s;s.step();s.run(1.6f);check(s.state.phase()==NearShadowCoverage::Phase::Shrink,"starts handover after dwell");
++  // Rise without a camera-position jump by lowering terrain during the shrink.
++  const int before=s.commits;
++  s.setAGL(190);s.run(.1f);
++  check(s.state.radius()==s.base&&s.state.phase()==NearShadowCoverage::Phase::Expand&&s.state.fadeScale()==NearShadowCoverage::kFadeFloor,"rising during shrink cancels unsafe narrowing at hidden handover");
++  check(s.commits==before&&s.state.agl()==190&&s.state.speed()==0,"cancelled narrowing neither resets camera nor rebuilds unchanged map");
++  s.run(.4f);
++  s.settle();
++  std::vector<GroundVehicleVisual> v(1);v[0].kind=EK_CAR;v[0].entity={300,0,0,0,1,1,1,.5f};
++  const vec3 center{};const float reach=1.f;
++  auto empty=groundVehicleShadowKey({},center,s.state.radius(),reach);
++  check(groundVehicleShadowKey(v,center,s.state.radius(),reach)==empty,"outside-small-radius dynamic vehicle cannot invalidate near map");
++  check(groundVehicleShadowKey(v,center,s.base,reach)!=empty,"base-radius vehicle key includes same distant vehicle");
++  const uint64_t far=groundVehicleShadowKey(v,center,2600.f,reach);
++  const float actual=s.state.radius();s.setAGL(42);s.run(.35f);
++  check(s.state.radius()==actual&&s.state.fadeScale()<1.f,"fade changes do not change culling footprint");
++  check(groundVehicleShadowKey(v,center,s.state.radius(),reach)==empty,"shrinking fade does not change actual-radius vehicle keys");
++  check(groundVehicleShadowKey(v,center,2600.f,reach)==far,"near policy leaves far vehicle keys unchanged");
++}
++
++std::string compact(std::string s) {
++  s.erase(std::remove_if(s.begin(),s.end(),[](unsigned char c){return std::isspace(c);}),s.end());return s;
++}
++std::string sourceFile(const std::string& path) {
++  std::ifstream f(path);check(bool(f),"source contract input is readable");
++  return compact(std::string(std::istreambuf_iterator<char>(f),std::istreambuf_iterator<char>()));
++}
++void sourceContract(const std::string& root) {
++  const auto entity=sourceFile(root+"/src/entity_render.cpp");
++  const auto renderer=sourceFile(root+"/src/renderer.cpp");
++  const auto header=sourceFile(root+"/src/renderer.h");
++  auto has=[&](const std::string& s,const char* needle,const char* why){check(s.find(compact(needle))!=std::string::npos,why);};
++  has(entity,"nearShadowCoverage.update(cam, fp.dt, shadowRanges.sh0, !feedPass, fp.hangarPreview,","main-camera dt and feed/hangar guard own adaptive update");
++  has(entity,"[](float x, float z) { return g_world.groundHeight(x, z); }","main-camera terrain sample is lazy");
++  has(entity,"float cR[2] = {R.sh0, R.sh1};","far radius still uses original quality policy");
++  has(entity,"cR[0] = nearShadowCoverage.radius() > 0.f ? nearShadowCoverage.radius() : R.sh0;","only near candidate radius uses committed controller state");
++  check(entity.find("cR[0]=nearShadowCoverage.radius()")<entity.find("autoadded="),"committed radius is available before new-chunk invalidation");
++  has(entity,"float r = cR[c] * kShFade1 + std::max(300.f, chunkShPad(g_scenery.get(cx, cz)));","new chunks invalidate actual committed coverage");
++  has(entity,"shR[c] != cR[c]","map radius mismatch invalidates the selected cascade once");
++  has(entity,"moved > cR[c] * 0.12f","coverage-safe movement refresh threshold is retained");
++  has(entity,"groundVehicleShadowKey(fp.groundVehicles,center,cR[c],shReach)","dynamic vehicle keys use actual committed culling radius");
++  has(entity,"float r = cR[c] + std::max(210.f, chunkShPad(ch));","chunk caster culling uses committed coverage");
++  has(entity,"float cr = cR[c] * kShFade1 + er;","instance caster culling uses committed coverage");
++  has(entity,"std::fabs(e.x-newCenter[c].x)<cR[c]+pad","dynamic vehicle caster culling uses committed coverage");
++  has(entity,"float texel = 2.f * cR[c] / shRes;","raster grid snapping uses committed map radius");
++  has(entity,"shR[c] = cR[c];","map rebuild records actual raster radius");
++  has(entity,"shRes = R.shRes;","quality map allocation is unchanged");
++  has(renderer,"glUniform2f(U(p, \"uShTexel\"), shR[0] * 2.f / std::max(shRes, 1), shR[1] * 2.f / std::max(shRes, 1));","texel uniforms use actual raster radii for both cascades");
++  has(renderer,"const vec2 nearFade = nearShadowCoverage.fadeRadii(shR[0]);","near fade derives from actual map radius");
++  has(renderer,"glUniform4f(U(p, \"uShFadeR\"), nearFade.x, nearFade.y, shR[1] * kShFade0, shR[1] * kShFade1);","handover affects only near fade bounds; far fade is unchanged");
++  has(header,"static constexpr float kShFade0 = 0.5f, kShFade1 = 0.78f;","controller and renderer share map-safe fade constants");
++  has(header,"NearShadowCoverage nearShadowCoverage;","adaptive state is per renderer");
++  has(header,"nearShadowCoverage.reset();","temporal resets also clear main-camera speed history");
++}
++}
++int main(int argc,char**argv){qualityAndHandover();jitterAndDwell();rates();inputsAndIsolation();fadeEndpointsAndCache();fastTakeoffDuringExpansion();transitionSafetyAndKeys();if(argc>1)sourceContract(argv[1]);else printf("Source wiring contract skipped: supply repository root.\n");printf("near_shadow_coverage_test: %d checks, %d failures\n",checks,failures);return failures?1:0;}
++

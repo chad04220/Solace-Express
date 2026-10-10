@@ -2,7 +2,9 @@
 // layer an albedo (stored as the square root of linear, alpha the roughness) and a normal map (x, y as DirectX's,
 // blue the height, alpha the ambient occlusion). A layer comes from the scanned set in assets/materials when it has
 // one (tools/pack_materials.py packs it) and from the procedural generator here when it doesn't - and the generator
-// is what the packer matches each scan's average colour, roughness and relief to (tools/material_dump).
+// is what the legacy packer matches each scan's average colour, roughness and relief to (tools/material_dump).
+// Seven ground/building/bark surfaces use separate environment-only natural-colour 512/2K scans packed by
+// tools/pack_environment_scans.py; they do not alter these aircraft/cockpit-compatible legacy layers.
 #include "materials.h"
 #include "world.h"   // hash2i
 #include <vector>

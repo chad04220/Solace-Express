@@ -35,6 +35,16 @@ inline bool entThins(int k) { return k <= EK_BUSH || (k >= EK_BOULDER && k <= EK
 struct EntKindInfo { const char* name; float hx, h, hz; };
 extern const EntKindInfo kEntInfo[EK_COUNT];
 
+// Physical doors, glazing and floor modules must retain human proportions.
+// Skyline diversity comes from the separately authored building types, rather
+// than stretching a two-metre doorway into a four-metre one.
+inline float entBuildingVerticalScale(int kind, float requested) {
+  if (kind == EK_APARTMENT) return 1.f;
+  if (kind == EK_SILO || kind == EK_WATERTOWER) return clampf(requested, .65f, 1.7f);
+  return clampf(requested, .92f, 1.08f);
+}
+
+
 // One placed entity (also the GPU instance record: 2 x vec4)
 struct Ent { float x, y, z, yaw, sx, sy, sz, seed; };
 inline float entThinKey(const Ent& e) { return fmodf(e.seed * 7.13f, 1.f); }   // (the entity vertex shader uses the same)
@@ -61,6 +71,10 @@ public:
   static constexpr int NC = 313;       // chunks per side (covers the 80 km world)
   // level 1: buildings and large rock formations (cheap, streamed far out); level 2: + trees, bushes, boulders
   struct Chunk {
+    // Globally unique generation identity, independent of pointer reuse. Mark
+    // direct fixture/editor mutations too; immutable published chunks keep it.
+    uint64_t revision = 0;
+    void markChanged();
     int level = 0;
     std::vector<Ent> ents;              // sorted by kind
     uint32_t off[EK_COUNT + 1] = {};    // ents[off[k], off[k+1]) are of kind k

@@ -1,0 +1,13 @@
+{
+  "samples": 3727360,
+  "empirical_lit_fraction": 0.27944067651098903,
+  "adjacent_both_lit_fraction": 0.2014892578125,
+  "independent_both_lit_at_observed_rate": 0.07808709168891921,
+  "minimum_lit_luminance_sampled": 0.05923362448811531,
+  "maximum_lit_luminance_sampled": 0.27984774112701416,
+  "daytime_emission_exactly_zero": true,
+  "additional_texture_samples": 0,
+  "additional_hsh_calls": 2,
+  "new_time_camera_or_lod_dependencies": false,
+  "visual_acceptance": "Requires actual captures; numerical results are insufficient."
+}

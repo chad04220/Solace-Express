@@ -235,7 +235,7 @@ if(Python3_Interpreter_FOUND)
   set(TERRAIN_MATERIAL_ACTUAL ${CMAKE_BINARY_DIR}/gen/terrain_material_actual.inc)
   add_custom_command(OUTPUT ${TERRAIN_MATERIAL_ACTUAL}
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/terrain_material_test.py --extract-only ${TERRAIN_MATERIAL_ACTUAL}
-    DEPENDS tests/terrain_material_test.py src/shaders/material_common.glsl src/shaders/terrain_material.glsl src/shaders/terrain_fs.glsl src/shaders/map_main.glsl
+    DEPENDS tests/terrain_material_test.py src/shaders/material_common.glsl src/shaders/terrain_material.glsl src/shaders/terrain_fs.glsl src/shaders/map_main.glsl src/shaders/ent_fs2.glsl src/shaders/water.glsl src/shaders/light_fs.glsl src/shaders/light_common.glsl src/shaders.h
     COMMENT "Extracting environment shader arithmetic for CPU validation")
   add_executable(terrain_material_test tests/terrain_material_math_test.cpp ${TERRAIN_MATERIAL_ACTUAL})
   target_include_directories(terrain_material_test PRIVATE src)
@@ -248,6 +248,8 @@ if(Python3_Interpreter_FOUND)
   if(GLSLANG_VALIDATOR)
     add_test(NAME shader_glsl_specialization COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/aircraft_specialization_test.py --shader-dir ${CMAKE_BINARY_DIR}/glsl --validator ${GLSLANG_VALIDATOR})
     set_tests_properties(shader_glsl_specialization PROPERTIES DEPENDS shader_glsl)
+    # The 34th startup program is assembled inline rather than by shader_check.
+    add_test(NAME shader_glsl_inline_wreck COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/inline_wreck_shader_test.py --validator ${GLSLANG_VALIDATOR})
   endif()
 endif()
 
@@ -287,3 +289,93 @@ if(UNIX AND NOT APPLE AND Python3_Interpreter_FOUND)
   target_compile_definitions(ui_review_hangar_harness PRIVATE UI_REVIEW_FLEET_ONLY=1)
   target_link_libraries(ui_review_hangar_harness PRIVATE ${CMAKE_DL_LIBS} pthread)
 endif()
+
+# Living-islands review: immutable runway evidence and bounded environment changes.
+set(ENVIRONMENT_SOURCES src/world.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
+add_executable(runway_preservation_test tests/runway_preservation_test.cpp ${ENVIRONMENT_SOURCES})
+target_include_directories(runway_preservation_test PRIVATE src)
+target_compile_definitions(runway_preservation_test PRIVATE SOLACE_RUNWAY_GOLDEN="${CMAKE_SOURCE_DIR}/tests/fixtures/runways_52317bb.golden")
+add_test(NAME runway_preservation COMMAND runway_preservation_test)
+add_executable(community_layout_test tests/community_layout_test.cpp ${ENVIRONMENT_SOURCES})
+target_include_directories(community_layout_test PRIVATE src)
+add_test(NAME community_layout COMMAND community_layout_test)
+add_executable(airport_environment_test tests/airport_environment_test.cpp ${CORE_SOURCES})
+target_include_directories(airport_environment_test PRIVATE src)
+add_test(NAME airport_environment COMMAND airport_environment_test)
+add_dependencies(airport_layout_test runway_preservation_test community_layout_test airport_environment_test)
+
+if(UNIX AND NOT APPLE AND Python3_Interpreter_FOUND)
+  set(ENV_REVIEW_DIR ${CMAKE_BINARY_DIR}/environment-review-adapter)
+  set(ENV_REVIEW_ADAPTERS ${ENV_REVIEW_DIR}/renderer.cpp ${ENV_REVIEW_DIR}/raster_renderer.cpp ${ENV_REVIEW_DIR}/entity_render.cpp)
+  add_custom_command(OUTPUT ${ENV_REVIEW_ADAPTERS}
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/validation/prepare_environment_review_adapter.py ${CMAKE_SOURCE_DIR}/src ${ENV_REVIEW_DIR}
+    DEPENDS tools/validation/prepare_environment_review_adapter.py src/renderer.cpp src/raster_renderer.cpp src/entity_render.cpp
+    COMMENT "Preparing environment-only review capture adapter")
+  set(ENV_REVIEW_SOURCES ${GAME_SOURCES})
+  list(REMOVE_ITEM ENV_REVIEW_SOURCES src/renderer.cpp src/raster_renderer.cpp src/entity_render.cpp)
+  add_executable(environment_review_harness EXCLUDE_FROM_ALL tests/environment_review_harness.cpp ${ENV_REVIEW_SOURCES} ${ENV_REVIEW_ADAPTERS} src/radio_stub.cpp)
+  add_dependencies(environment_review_harness shaders_gen)
+  target_include_directories(environment_review_harness PRIVATE src)
+  target_link_libraries(environment_review_harness PRIVATE ${CMAKE_DL_LIBS} pthread)
+endif()
+add_executable(volcano_effects_test tests/volcano_effects_test.cpp ${ENVIRONMENT_SOURCES})
+target_include_directories(volcano_effects_test PRIVATE src)
+add_test(NAME volcano_effects COMMAND volcano_effects_test)
+add_dependencies(airport_layout_test volcano_effects_test)
+
+add_executable(environment_asset_mesh_test tests/environment_asset_mesh_test.cpp src/entity_mesh.cpp ${ENVIRONMENT_SOURCES})
+target_include_directories(environment_asset_mesh_test PRIVATE src)
+add_test(NAME environment_asset_mesh COMMAND environment_asset_mesh_test)
+add_dependencies(hull_test environment_asset_mesh_test)
+if(Python3_Interpreter_FOUND)
+  add_test(NAME environment_scan_assets COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/environment_scan_assets_test.py --source-only)
+endif()
+# The upstream breakup test must also be built by the Linux sanitizer job's named targets.
+add_dependencies(aero_test breakup_test)
+
+# Staged metre-scale comparison using the actual flyable standard-fleet model.
+if(UNIX AND NOT APPLE AND Python3_Interpreter_FOUND)
+  add_executable(aircraft_scale_review_harness EXCLUDE_FROM_ALL tests/aircraft_scale_review_harness.cpp ${UI_FLEET_SOURCES} ${UI_FLEET_ADAPTERS} src/radio_stub.cpp)
+  add_dependencies(aircraft_scale_review_harness shaders_gen)
+  target_include_directories(aircraft_scale_review_harness PRIVATE src)
+  target_link_libraries(aircraft_scale_review_harness PRIVATE ${CMAKE_DL_LIBS} pthread)
+endif()
+
+# Measured production fleet/environment scale, including fixed apartment floor modules.
+add_executable(environment_scale_audit tests/environment_scale_audit.cpp ${CORE_SOURCES} src/entity_mesh.cpp)
+target_include_directories(environment_scale_audit PRIVATE src)
+add_test(NAME environment_scale_audit COMMAND environment_scale_audit ${CMAKE_SOURCE_DIR})
+add_dependencies(airport_layout_test environment_scale_audit)
+
+add_executable(environment_close_detail_test tests/environment_close_detail_test.cpp ${ENVIRONMENT_SOURCES})
+target_include_directories(environment_close_detail_test PRIVATE src)
+add_test(NAME environment_close_detail COMMAND environment_close_detail_test)
+add_dependencies(airport_layout_test environment_close_detail_test)
+
+# Isolated multi-angle environmental asset review using actual distance-selected detail.
+if(UNIX AND NOT APPLE AND Python3_Interpreter_FOUND)
+  add_executable(environment_asset_review_harness EXCLUDE_FROM_ALL tests/environment_asset_review_harness.cpp ${ENV_REVIEW_SOURCES} ${ENV_REVIEW_ADAPTERS} src/radio_stub.cpp)
+  add_dependencies(environment_asset_review_harness shaders_gen)
+  target_include_directories(environment_asset_review_harness PRIVATE src)
+  target_link_libraries(environment_asset_review_harness PRIVATE ${CMAKE_DL_LIBS} pthread)
+endif()
+
+add_executable(environment_nature_detail_test tests/environment_nature_detail_test.cpp src/entity_mesh.cpp ${ENVIRONMENT_SOURCES})
+target_include_directories(environment_nature_detail_test PRIVATE src)
+add_test(NAME environment_nature_detail COMMAND environment_nature_detail_test)
+add_dependencies(hull_test environment_nature_detail_test)
+
+add_executable(airport_construction_detail_test tests/airport_construction_detail_test.cpp src/entity_mesh.cpp ${ENVIRONMENT_SOURCES})
+target_include_directories(airport_construction_detail_test PRIVATE src)
+add_test(NAME airport_construction_detail COMMAND airport_construction_detail_test)
+add_dependencies(airport_layout_test airport_construction_detail_test)
+
+add_executable(environment_close_bounds_test tests/environment_close_bounds_test.cpp src/entity_mesh.cpp ${ENVIRONMENT_SOURCES})
+target_include_directories(environment_close_bounds_test PRIVATE src)
+add_test(NAME environment_close_bounds COMMAND environment_close_bounds_test)
+add_dependencies(airport_layout_test environment_close_bounds_test)
+
+add_executable(environment_chunk_bounds_test tests/environment_chunk_bounds_test.cpp src/entity_mesh.cpp ${ENVIRONMENT_SOURCES})
+target_include_directories(environment_chunk_bounds_test PRIVATE src)
+add_test(NAME environment_chunk_bounds COMMAND environment_chunk_bounds_test)
+add_dependencies(airport_layout_test environment_chunk_bounds_test)

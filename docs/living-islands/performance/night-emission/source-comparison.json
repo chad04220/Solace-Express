@@ -1,0 +1,17 @@
+{
+  "source": "/workspace/scratch/87b29863f015/solace-world-community/src/shaders/ent_fs2.glsl",
+  "before_sha256": "2b1a38deda46ffcab3aac0049325806138578eaec8cf2b2da48b5540d83fb124",
+  "candidate_sha256": "bd8adb4635ddaa0cf57e8dfa6e70bce60e766de137afcfa95603032df8784f10",
+  "current_sha256": "bd8adb4635ddaa0cf57e8dfa6e70bce60e766de137afcfa95603032df8784f10",
+  "current_equals_candidate": true,
+  "before_block_line_start": 520,
+  "before_block_line_end": 521,
+  "candidate_block_line_start": 520,
+  "candidate_block_line_end": 535,
+  "before_block_sha256": "9594f5b06e5fae42dd94e50cb44cdc02bc0d555669b2bb9d165313c397df7ac0",
+  "candidate_block_sha256": "99fced68ac03f78f8bad6908d585d278186882ca4fcd90994bb3be265ccd8ae7",
+  "prefix_equal": true,
+  "suffix_equal": true,
+  "unchanged_prefix_sha256": "e915a9b50fed138e87d8de64f95fac9013655170373654e161f842dac7726c4c",
+  "unchanged_suffix_sha256": "39e3c27e864d4d473fd17a42a15bfc22ca8296fafa810ee7bb8d079dacff54de"
+}

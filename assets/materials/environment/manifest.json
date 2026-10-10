@@ -1,0 +1,776 @@
+{
+  "schema": 2,
+  "provider": "Poly Haven",
+  "license": "CC0-1.0",
+  "license_url": "https://polyhaven.com/license",
+  "license_text_url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+  "photographic_source_policy": "https://docs.polyhaven.com/en/technical-standards/textures",
+  "packing": {
+    "albedo": "sqrt(sRGB_to_linear(source)); shader squares RGB",
+    "normal": "DirectX tangent X,Y in R,G; displacement in B",
+    "material": "source roughness in R; source ambient occlusion in G",
+    "filter": "linear-light box filter; filtered normal vectors renormalized",
+    "palette_matching": false,
+    "normal_gain": 1.0
+  },
+  "assets": [
+    {
+      "layer": 0,
+      "name": "grass",
+      "asset": "leafy_grass",
+      "page": "https://polyhaven.com/a/leafy_grass",
+      "authors": {
+        "Charlotte Baglioni": "All"
+      },
+      "tile_metres": 2.0,
+      "source_metadata": [
+        {
+          "kind": "files",
+          "url": "https://api.polyhaven.com/files/leafy_grass",
+          "cache_file": "leafy_grass_files.json",
+          "bytes": 29115,
+          "sha256": "705daf71157e399391d094d14cd9e932d5c337bb2c3044bb91823145162afc83"
+        },
+        {
+          "kind": "info",
+          "url": "https://api.polyhaven.com/info/leafy_grass",
+          "cache_file": "leafy_grass_info.json",
+          "bytes": 910,
+          "sha256": "513914aaef6fd3c12ade425faf8660fd9e18584952c2160ee13ebf6e5bc42112"
+        }
+      ],
+      "source_dimensions_mm": [
+        2000,
+        2000
+      ],
+      "source_files": [
+        {
+          "map": "Diffuse",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/leafy_grass/leafy_grass_diff_2k.png",
+          "cache_file": "leafy_grass_Diffuse.png",
+          "sha256": "9ae7994a36a7aedf5fe65dac49d5e096e9a8ff1d8a8e8ccb28df0c9c3a7a2d34",
+          "provider_md5": "91c82271318a5bbe69182404c6dff730",
+          "bytes": 23606854
+        },
+        {
+          "map": "nor_dx",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/leafy_grass/leafy_grass_nor_dx_2k.png",
+          "cache_file": "leafy_grass_nor_dx.png",
+          "sha256": "dec96db6a12360e6bd87c69524a236bbc7bf3fe6950886b4bf2d49f362832468",
+          "provider_md5": "47eec13603149d9cbbe7aeaf824a117c",
+          "bytes": 24429834
+        },
+        {
+          "map": "arm",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/leafy_grass/leafy_grass_arm_2k.png",
+          "cache_file": "leafy_grass_arm.png",
+          "sha256": "ae94a44475b5793ca72cc8f9ad26f0ccd03bc5f72b0992e5070a38f923ea0bf9",
+          "provider_md5": "1ea54cc3044070188a5b524cec83dac2",
+          "bytes": 18216000
+        },
+        {
+          "map": "Displacement",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/leafy_grass/leafy_grass_disp_2k.png",
+          "cache_file": "leafy_grass_Displacement.png",
+          "sha256": "506ed7d425d9a73f6881e17f03e2a0d2fa57893bb0555a4b86ad905d2cabe510",
+          "provider_md5": "540555d31b8bf2d674b818a7e2e61125",
+          "bytes": 7311977
+        }
+      ],
+      "mean_linear_albedo": [
+        0.3259201277057575,
+        0.23911385194544188,
+        0.10823637002007214
+      ],
+      "mean_roughness": 0.685738847801872,
+      "outputs": [
+        {
+          "path": "environment/00_grass_c.jpg",
+          "size": 512,
+          "bytes": 198806,
+          "sha256": "dedabccb5fbf5688b5fbb8c5e93fab50f1b8d9adf414e421a53a8e83699f8806"
+        },
+        {
+          "path": "environment/00_grass_n.jpg",
+          "size": 512,
+          "bytes": 426225,
+          "sha256": "6d9d2b7b6ab50415bf3538f8b0b1698934d4c11833f145807c51f525275d0108"
+        },
+        {
+          "path": "environment/00_grass_m.jpg",
+          "size": 512,
+          "bytes": 226952,
+          "sha256": "9d21344b61e99dec23c561380802004e4e0b8ae369a68afcd33236b15fcadad3"
+        },
+        {
+          "path": "high/00_grass_c.jpg",
+          "size": 2048,
+          "bytes": 3052029,
+          "sha256": "ddb46dd614c07e6a5d07714d6bc162f8d7e00d20c65e7b81cb780f4aa7164c96"
+        },
+        {
+          "path": "high/00_grass_n.jpg",
+          "size": 2048,
+          "bytes": 7300534,
+          "sha256": "79f3bb5ec27d58daff5f563ee2fc53b6a9dff4aa9137582caccb1b05df320643"
+        },
+        {
+          "path": "high/00_grass_m.jpg",
+          "size": 2048,
+          "bytes": 3895992,
+          "sha256": "09301f748b7455c24d3578dbe328fe640b1d71186192c3c4cb277d5f2bd0b269"
+        }
+      ]
+    },
+    {
+      "layer": 5,
+      "name": "asphalt",
+      "asset": "asphalt_04",
+      "page": "https://polyhaven.com/a/asphalt_04",
+      "authors": {
+        "Jenelle van Heerden": "Processing",
+        "Sergej Majboroda": "Photography"
+      },
+      "tile_metres": 4.04,
+      "source_metadata": [
+        {
+          "kind": "files",
+          "url": "https://api.polyhaven.com/files/asphalt_04",
+          "cache_file": "asphalt_04_files.json",
+          "bytes": 31624,
+          "sha256": "3c59761146e5c4f750ca8d2c46b29a19e1d51678551329390bf03e08b1ad4b25"
+        },
+        {
+          "kind": "info",
+          "url": "https://api.polyhaven.com/info/asphalt_04",
+          "cache_file": "asphalt_04_info.json",
+          "bytes": 1013,
+          "sha256": "a2c93c619e536a641e8f6d6d3bf720888a0e1ddbdbbd0c91b2e65b83f53f0dae"
+        }
+      ],
+      "source_dimensions_mm": [
+        4039.9999618530273,
+        4039.9999618530273
+      ],
+      "source_files": [
+        {
+          "map": "Diffuse",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/asphalt_04/asphalt_04_diff_2k.png",
+          "cache_file": "asphalt_04_Diffuse.png",
+          "sha256": "0e7d9123fb8e0d30a5802c3f27e7cb905eefb15b930697ecf15704492a1bb13a",
+          "provider_md5": "1d02e1ae30a4e6b9459fe2e054f37dc0",
+          "bytes": 23729192
+        },
+        {
+          "map": "nor_dx",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/asphalt_04/asphalt_04_nor_dx_2k.png",
+          "cache_file": "asphalt_04_nor_dx.png",
+          "sha256": "8e168c7cee3243947b55a28c08032cadfaf9e86f6c7d36fb14a3251389f2372e",
+          "provider_md5": "3d17b1a75201ad1a15b35983696a27bf",
+          "bytes": 23447019
+        },
+        {
+          "map": "arm",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/asphalt_04/asphalt_04_arm_2k.png",
+          "cache_file": "asphalt_04_arm.png",
+          "sha256": "f985686f0bfcd0092355d66aad06134354881a4ca71e171f475221fbf06145d2",
+          "provider_md5": "73ed862338d5e325e9a8f1ab6e8ba14a",
+          "bytes": 16995314
+        },
+        {
+          "map": "Displacement",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/asphalt_04/asphalt_04_disp_2k.png",
+          "cache_file": "asphalt_04_Displacement.png",
+          "sha256": "6df8e7244c40bbd2035b6005fb4fe7e1dcd133de8312aa9377589f48c4a983da",
+          "provider_md5": "11c7624add317c9a9e5ce4df9d93ec90",
+          "bytes": 6933024
+        }
+      ],
+      "mean_linear_albedo": [
+        0.2433546778694602,
+        0.22706942480374437,
+        0.21599294329504914
+      ],
+      "mean_roughness": 0.9330405508945177,
+      "outputs": [
+        {
+          "path": "environment/05_asphalt_c.jpg",
+          "size": 512,
+          "bytes": 95847,
+          "sha256": "66e786b50efad71451777cad5e86744c1e826883b42f2f76160678f58e44b0b0"
+        },
+        {
+          "path": "environment/05_asphalt_n.jpg",
+          "size": 512,
+          "bytes": 225369,
+          "sha256": "9b5d8a6e052f641995f70dd02083e98bf710dc0420943ca370e07e09291ea69e"
+        },
+        {
+          "path": "environment/05_asphalt_m.jpg",
+          "size": 512,
+          "bytes": 43240,
+          "sha256": "aa1882c3bf808bed3c681c292061203d3e68ca29d520799b8e569570f58954ae"
+        },
+        {
+          "path": "high/05_asphalt_c.jpg",
+          "size": 2048,
+          "bytes": 2141793,
+          "sha256": "58577278b97fd984b013261e51934e5395865bda110db756bad0d6c96d340290"
+        },
+        {
+          "path": "high/05_asphalt_n.jpg",
+          "size": 2048,
+          "bytes": 5513119,
+          "sha256": "806bbd7418368ebdd454625665f80cb21f196eabac14b10b5250ae90cf686313"
+        },
+        {
+          "path": "high/05_asphalt_m.jpg",
+          "size": 2048,
+          "bytes": 1009484,
+          "sha256": "8faccf73096690f52d09cc20c5dd2fb47169939797f0121beee813767d0511bc"
+        }
+      ]
+    },
+    {
+      "layer": 8,
+      "name": "concrete",
+      "asset": "concrete_floor_worn_001",
+      "page": "https://polyhaven.com/a/concrete_floor_worn_001",
+      "authors": {
+        "Dimitrios Savva": "Photography",
+        "Rico Cilliers": "Processing"
+      },
+      "tile_metres": 3.0,
+      "source_metadata": [
+        {
+          "kind": "files",
+          "url": "https://api.polyhaven.com/files/concrete_floor_worn_001",
+          "cache_file": "concrete_floor_worn_001_files.json",
+          "bytes": 37057,
+          "sha256": "08980460d563b8af368138d670472bff5baa627a3524023123585a6ef70f832a"
+        },
+        {
+          "kind": "info",
+          "url": "https://api.polyhaven.com/info/concrete_floor_worn_001",
+          "cache_file": "concrete_floor_worn_001_info.json",
+          "bytes": 979,
+          "sha256": "bd1764850c61d5d503f35186c41ab291dbbf5f447babb01a9a9d47cf3d438be3"
+        }
+      ],
+      "source_dimensions_mm": [
+        3000,
+        3000.000238418579
+      ],
+      "source_files": [
+        {
+          "map": "Diffuse",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/concrete_floor_worn_001/concrete_floor_worn_001_diff_2k.png",
+          "cache_file": "concrete_floor_worn_001_Diffuse.png",
+          "sha256": "843aae212472d07be046382c4f9480cf68c630f7b3a897eab17a57370e88c608",
+          "provider_md5": "3b574c02215a64268ba7152b62525542",
+          "bytes": 20982246
+        },
+        {
+          "map": "nor_dx",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/concrete_floor_worn_001/concrete_floor_worn_001_nor_dx_2k.png",
+          "cache_file": "concrete_floor_worn_001_nor_dx.png",
+          "sha256": "56a04b667b3995f649a6dc778919e2be42a64a45961a95ebceba99f24cd54463",
+          "provider_md5": "2a43c19cc282d806786705c1632a57e8",
+          "bytes": 22874193
+        },
+        {
+          "map": "arm",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/concrete_floor_worn_001/concrete_floor_worn_001_arm_2k.png",
+          "cache_file": "concrete_floor_worn_001_arm.png",
+          "sha256": "aba4e2463b185b920301b04259827172e15c156a6840e040e44727a37193fb24",
+          "provider_md5": "ad4e6ee02a45cc7606695ea6e6a27c59",
+          "bytes": 17319988
+        },
+        {
+          "map": "Displacement",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/concrete_floor_worn_001/concrete_floor_worn_001_disp_2k.png",
+          "cache_file": "concrete_floor_worn_001_Displacement.png",
+          "sha256": "31d3d4c9d339b5773a6872813e1cbdf793d21e6e4ad72aeb45c05a45a915ce4c",
+          "provider_md5": "944f6bdc45f4d36f5a9ec7904c5421d5",
+          "bytes": 9906565
+        }
+      ],
+      "mean_linear_albedo": [
+        0.09275351524481912,
+        0.09488062062249747,
+        0.08968079144700658
+      ],
+      "mean_roughness": 0.5412204975509827,
+      "outputs": [
+        {
+          "path": "environment/08_concrete_c.jpg",
+          "size": 512,
+          "bytes": 42869,
+          "sha256": "2364a2d36bf65e8e9034aa77be57dc8a8b5fa939ba3c75d6d283112618a44d2c"
+        },
+        {
+          "path": "environment/08_concrete_n.jpg",
+          "size": 512,
+          "bytes": 103526,
+          "sha256": "c6b4e78d1e90d81d97aceb3e8d70dce5c6bca986b187b38e5ffa44454dd98809"
+        },
+        {
+          "path": "environment/08_concrete_m.jpg",
+          "size": 512,
+          "bytes": 64836,
+          "sha256": "62703f165056ea56a81e2a1d14a64fd9c8ba9ca87bdf274978276f1773e9465a"
+        },
+        {
+          "path": "high/08_concrete_c.jpg",
+          "size": 2048,
+          "bytes": 796739,
+          "sha256": "a5308382fe62f990aa3d05fb4bb1366d1c427556190239ef58bce53e15950255"
+        },
+        {
+          "path": "high/08_concrete_n.jpg",
+          "size": 2048,
+          "bytes": 4287709,
+          "sha256": "3329aaad3592a8d6bbedfecbda7628b6740a2f44b8a5f91cd0a7115629207d23"
+        },
+        {
+          "path": "high/08_concrete_m.jpg",
+          "size": 2048,
+          "bytes": 1459494,
+          "sha256": "a2d3ebef6bf1923769a1d477b15f908184251826a9407beb0c7d8df92612b36a"
+        }
+      ]
+    },
+    {
+      "layer": 12,
+      "name": "brick",
+      "asset": "red_brick",
+      "page": "https://polyhaven.com/a/red_brick",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "tile_metres": 1.4,
+      "source_metadata": [
+        {
+          "kind": "files",
+          "url": "https://api.polyhaven.com/files/red_brick",
+          "cache_file": "red_brick_files.json",
+          "bytes": 31173,
+          "sha256": "84596c2f282a2a0b1d2f2a7f14ee938c663e1c41594dd84225e68498fb040b6f"
+        },
+        {
+          "kind": "info",
+          "url": "https://api.polyhaven.com/info/red_brick",
+          "cache_file": "red_brick_info.json",
+          "bytes": 908,
+          "sha256": "a8bb36d11e0bf6523f4332eaa60f348d31ff4f44ec96ac01f70512ff93b97d7b"
+        }
+      ],
+      "source_dimensions_mm": [
+        1399.999976158142,
+        1399.999976158142
+      ],
+      "source_files": [
+        {
+          "map": "Diffuse",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/red_brick/red_brick_diff_2k.png",
+          "cache_file": "red_brick_Diffuse.png",
+          "sha256": "4b814528cb900a65e2a2600254a06326d2966a6188b325283fdf74891e7e1f04",
+          "provider_md5": "5ff6f18025bccf81596feb4f0359fab5",
+          "bytes": 22217598
+        },
+        {
+          "map": "nor_dx",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/red_brick/red_brick_nor_dx_2k.png",
+          "cache_file": "red_brick_nor_dx.png",
+          "sha256": "05c81778ccf6dea670ec4d13facaccd91e551d5753a1d484a2cd1c80af4f572c",
+          "provider_md5": "b05f5c96dbdc0663d1f4bdd953a2c73d",
+          "bytes": 8905934
+        },
+        {
+          "map": "arm",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/red_brick/red_brick_arm_2k.png",
+          "cache_file": "red_brick_arm.png",
+          "sha256": "f7fc8dffeed054905d8ce5856a4b699d2fae0796a4fe670d06d9fff52d69ae17",
+          "provider_md5": "76e69b6931a61844a784b5e58d363bf3",
+          "bytes": 15276151
+        },
+        {
+          "map": "Displacement",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/red_brick/red_brick_disp_2k.png",
+          "cache_file": "red_brick_Displacement.png",
+          "sha256": "733166c31b1b7ba4fc772247edf3527a83f20d4d14d2571ab1674f0dfd28e12a",
+          "provider_md5": "6f59ffbd6ef53153afac554fcc9dc970",
+          "bytes": 6312343
+        }
+      ],
+      "mean_linear_albedo": [
+        0.2777583109840158,
+        0.13829383634918013,
+        0.08600018331508247
+      ],
+      "mean_roughness": 0.92481413148721,
+      "outputs": [
+        {
+          "path": "environment/12_brick_c.jpg",
+          "size": 512,
+          "bytes": 100903,
+          "sha256": "3116afd067a2f41df797533ec86e8942ab55451f2554f42c048c961d87a782d6"
+        },
+        {
+          "path": "environment/12_brick_n.jpg",
+          "size": 512,
+          "bytes": 279773,
+          "sha256": "36ec29a2ae6c40016b4c8e772b5d4123cb5481a65cb602d733754ec0096707ed"
+        },
+        {
+          "path": "environment/12_brick_m.jpg",
+          "size": 512,
+          "bytes": 125806,
+          "sha256": "ed978dd4e74340927f40c1597d833cf0f4c017987e3dda901c7b0a09c885756c"
+        },
+        {
+          "path": "high/12_brick_c.jpg",
+          "size": 2048,
+          "bytes": 1527165,
+          "sha256": "2842075a3c388582794b2f95bd2bbcd5be488e81ca8f02eb8ab94b23df680f0a"
+        },
+        {
+          "path": "high/12_brick_n.jpg",
+          "size": 2048,
+          "bytes": 4878971,
+          "sha256": "10ea9d9994cc49931bca40a232dfde241e051f19064222aee09de4b56282e395"
+        },
+        {
+          "path": "high/12_brick_m.jpg",
+          "size": 2048,
+          "bytes": 1983291,
+          "sha256": "3eb3a0e9f69784344c588f54f8ba64cf15ff22b80d5721cbe8e77406445f8af7"
+        }
+      ]
+    },
+    {
+      "layer": 11,
+      "name": "plaster",
+      "asset": "painted_plaster_wall",
+      "page": "https://polyhaven.com/a/painted_plaster_wall",
+      "authors": {
+        "Amal Kumar": "All"
+      },
+      "tile_metres": 2.0,
+      "source_metadata": [
+        {
+          "kind": "files",
+          "url": "https://api.polyhaven.com/files/painted_plaster_wall",
+          "cache_file": "painted_plaster_wall_files.json",
+          "bytes": 35805,
+          "sha256": "1bd19a9d80f00ff073f4a9a8e99375286f31604728fd5835b0d1c1d8add3fdd6"
+        },
+        {
+          "kind": "info",
+          "url": "https://api.polyhaven.com/info/painted_plaster_wall",
+          "cache_file": "painted_plaster_wall_info.json",
+          "bytes": 993,
+          "sha256": "a9984c650b59bcb530eaf6570723dfe42293680fa1643ff5258b8b89abe73e39"
+        }
+      ],
+      "source_dimensions_mm": [
+        2000,
+        2000
+      ],
+      "source_files": [
+        {
+          "map": "Diffuse",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/painted_plaster_wall/painted_plaster_wall_diff_2k.png",
+          "cache_file": "painted_plaster_wall_Diffuse.png",
+          "sha256": "5d3e476d633d873f2f9f443936a7d3f6a5830b5486c9bd704cef7c1f89dbb3cc",
+          "provider_md5": "a59f31e4461b4e9385e88030e32280d9",
+          "bytes": 22706294
+        },
+        {
+          "map": "nor_dx",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/painted_plaster_wall/painted_plaster_wall_nor_dx_2k.png",
+          "cache_file": "painted_plaster_wall_nor_dx.png",
+          "sha256": "148d654923ae5a5c4f9c248fabc74e06898578e583b5671d6ffb4ee159b897fd",
+          "provider_md5": "8d007431481ffbff0e0d86684eb66e11",
+          "bytes": 22789119
+        },
+        {
+          "map": "arm",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/painted_plaster_wall/painted_plaster_wall_arm_2k.png",
+          "cache_file": "painted_plaster_wall_arm.png",
+          "sha256": "8fc9a730b7ea6698d4109924984326b2a0c37a77489e425213e8b24962fc9cce",
+          "provider_md5": "89a4d4c345073c326ed4a29168e5e3f3",
+          "bytes": 14790707
+        },
+        {
+          "map": "Displacement",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/painted_plaster_wall/painted_plaster_wall_disp_2k.png",
+          "cache_file": "painted_plaster_wall_Displacement.png",
+          "sha256": "d06ef5198c90a6d2bd0cbecb2b15bdbcb572d43c06c5ca2f7ca792dff120ffbb",
+          "provider_md5": "3826b298ae896a8ff22e8cf5964e35cf",
+          "bytes": 6821414
+        }
+      ],
+      "mean_linear_albedo": [
+        0.4073239120113019,
+        0.3677827825644657,
+        0.3522324766716356
+      ],
+      "mean_roughness": 0.920439065738762,
+      "outputs": [
+        {
+          "path": "environment/11_plaster_c.jpg",
+          "size": 512,
+          "bytes": 53015,
+          "sha256": "3a2b37c4771df38a37506933b3a28492810b0b6c86ca08d7197e57042f1e6060"
+        },
+        {
+          "path": "environment/11_plaster_n.jpg",
+          "size": 512,
+          "bytes": 185436,
+          "sha256": "677e790c24acb13882925ca963cd463a0c9f3a91414e666c16ab25ce4ccba191"
+        },
+        {
+          "path": "environment/11_plaster_m.jpg",
+          "size": 512,
+          "bytes": 45738,
+          "sha256": "25691c5ec8d051e183035d56fa13185e916bc6d0e6761410a9cc78f107a4b763"
+        },
+        {
+          "path": "high/11_plaster_c.jpg",
+          "size": 2048,
+          "bytes": 1550965,
+          "sha256": "935cf14d618c40a021293211534814910bff23088468a5b1ee42e0af3d5b0dc9"
+        },
+        {
+          "path": "high/11_plaster_n.jpg",
+          "size": 2048,
+          "bytes": 4596581,
+          "sha256": "a833b94477ba9ef39dc19da48c2c52babe756f644598373caf6be5c0f6e83131"
+        },
+        {
+          "path": "high/11_plaster_m.jpg",
+          "size": 2048,
+          "bytes": 1083774,
+          "sha256": "694b88f92c44a466b4472e290b3184b7de3892e37a84d01e4c07b6142447f025"
+        }
+      ]
+    },
+    {
+      "layer": 9,
+      "name": "tiles",
+      "asset": "clay_roof_tiles_02",
+      "page": "https://polyhaven.com/a/clay_roof_tiles_02",
+      "authors": {
+        "Amal Kumar": "All"
+      },
+      "tile_metres": 2.5,
+      "source_metadata": [
+        {
+          "kind": "files",
+          "url": "https://api.polyhaven.com/files/clay_roof_tiles_02",
+          "cache_file": "clay_roof_tiles_02_files.json",
+          "bytes": 27876,
+          "sha256": "ca2c28956b8f4da5d7c3e50b5f099406805569e504b9dad64a0f37bba54b132d"
+        },
+        {
+          "kind": "info",
+          "url": "https://api.polyhaven.com/info/clay_roof_tiles_02",
+          "cache_file": "clay_roof_tiles_02_info.json",
+          "bytes": 958,
+          "sha256": "3fe1b55bf7e949f5ecd1e1d8f19e232f71bd0cf1f87ee920b6342a6f447a3e9d"
+        }
+      ],
+      "source_dimensions_mm": [
+        2500,
+        2500
+      ],
+      "source_files": [
+        {
+          "map": "Diffuse",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/clay_roof_tiles_02/clay_roof_tiles_02_diff_2k.png",
+          "cache_file": "clay_roof_tiles_02_Diffuse.png",
+          "sha256": "0d899b0e0ef4bd8e212fd78dda7c6f38a0b04f731885b8c12fa4343e86bb0233",
+          "provider_md5": "1818e6692e90edebac8195b72293b2aa",
+          "bytes": 22384677
+        },
+        {
+          "map": "nor_dx",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/clay_roof_tiles_02/clay_roof_tiles_02_nor_dx_2k.png",
+          "cache_file": "clay_roof_tiles_02_nor_dx.png",
+          "sha256": "d3fde0a282783c5948bf6715a5e56cc162201b5d328eb740e3f2b15dea603d8e",
+          "provider_md5": "9020df8373b21a0243f2a4e8b09e4744",
+          "bytes": 22043359
+        },
+        {
+          "map": "arm",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/clay_roof_tiles_02/clay_roof_tiles_02_arm_2k.png",
+          "cache_file": "clay_roof_tiles_02_arm.png",
+          "sha256": "34f981ff74ef27a9e739c06ac44446a0cb7e52172b5ff83f27be694f0ffba4be",
+          "provider_md5": "2b86441eab1715c8abfeb5d89bb21f63",
+          "bytes": 12967208
+        },
+        {
+          "map": "Displacement",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/clay_roof_tiles_02/clay_roof_tiles_02_disp_2k.png",
+          "cache_file": "clay_roof_tiles_02_Displacement.png",
+          "sha256": "09f49ee7be65bce1d54c1d75eed6c418d27e28d00cd8a4b56a195e8d88306e02",
+          "provider_md5": "9850066858da3c6419b329710ba3e4f3",
+          "bytes": 6201530
+        }
+      ],
+      "mean_linear_albedo": [
+        0.31378913540469716,
+        0.08626519147823877,
+        0.02645597548262041
+      ],
+      "mean_roughness": 0.916648780891606,
+      "outputs": [
+        {
+          "path": "environment/09_tiles_c.jpg",
+          "size": 512,
+          "bytes": 138758,
+          "sha256": "e5614e03ea157b496104bc325524de21875e4f4762e3172232eaf7c7e267eb85"
+        },
+        {
+          "path": "environment/09_tiles_n.jpg",
+          "size": 512,
+          "bytes": 286474,
+          "sha256": "34f43c9c824bdcfc6f2168787079effc886bc38a11f7755f5dbce41a62fa8435"
+        },
+        {
+          "path": "environment/09_tiles_m.jpg",
+          "size": 512,
+          "bytes": 122260,
+          "sha256": "9946abf9665d4f50c0542989c41474a9ec3df31c162a5125a11e3a5809c475f0"
+        },
+        {
+          "path": "high/09_tiles_c.jpg",
+          "size": 2048,
+          "bytes": 1832132,
+          "sha256": "baa6f8c05c9bc7911dfd6fd3fd3982b926c4fed6c3c57ea11f94d4fb3f682142"
+        },
+        {
+          "path": "high/09_tiles_n.jpg",
+          "size": 2048,
+          "bytes": 3333278,
+          "sha256": "35d54131881c2c95568187a266fc0207941a8b31c9958e77bd92b00b6ae7464c"
+        },
+        {
+          "path": "high/09_tiles_m.jpg",
+          "size": 2048,
+          "bytes": 1188310,
+          "sha256": "a485a0e1d030ae99779781bbe9cbed6465b4b1fa3eb9a5cd94ea0852f6036a87"
+        }
+      ]
+    },
+    {
+      "layer": 25,
+      "name": "bark",
+      "asset": "bark_brown_02",
+      "page": "https://polyhaven.com/a/bark_brown_02",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "tile_metres": 1.0,
+      "source_metadata": [
+        {
+          "kind": "files",
+          "url": "https://api.polyhaven.com/files/bark_brown_02",
+          "cache_file": "bark_brown_02_files.json",
+          "bytes": 30316,
+          "sha256": "5b09142a0882210ebe7cb7c8169dd40abafa79fc761b21c10fc4225c66a31232"
+        },
+        {
+          "kind": "info",
+          "url": "https://api.polyhaven.com/info/bark_brown_02",
+          "cache_file": "bark_brown_02_info.json",
+          "bytes": 921,
+          "sha256": "bb2e6c449c6942b2f72afd61c7d3b26d46eb9b6800c001a989fc02bf43b24676"
+        }
+      ],
+      "source_dimensions_mm": [
+        999.9990463256836,
+        999.998927116394
+      ],
+      "source_files": [
+        {
+          "map": "Diffuse",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/bark_brown_02/bark_brown_02_diff_2k.png",
+          "cache_file": "bark_brown_02_Diffuse.png",
+          "sha256": "e2c2563e4149bf06386f8e8db590d5c2d7e8f2459e3e08132fe616acb2d07085",
+          "provider_md5": "c2d57e5293da1d365ac395cae19b1d9b",
+          "bytes": 8514206
+        },
+        {
+          "map": "nor_dx",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/bark_brown_02/bark_brown_02_nor_dx_2k.png",
+          "cache_file": "bark_brown_02_nor_dx.png",
+          "sha256": "26afbd479437c245adf11c37573297cc57484f64fcc22a5f9a2e51f85895f98f",
+          "provider_md5": "10c1d0aed990a136b2c8ae64633b0374",
+          "bytes": 9323196
+        },
+        {
+          "map": "arm",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/bark_brown_02/bark_brown_02_arm_2k.png",
+          "cache_file": "bark_brown_02_arm.png",
+          "sha256": "00e5e5633f77f0f8d15884fc243818988a1bda1ab71ed888df64f6bbba9486fd",
+          "provider_md5": "b56615d5f886b6fcc8fefc44d7994e45",
+          "bytes": 6086265
+        },
+        {
+          "map": "Displacement",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/bark_brown_02/bark_brown_02_disp_2k.png",
+          "cache_file": "bark_brown_02_Displacement.png",
+          "sha256": "9428b672837475fac8fbd4377e5b10a8b344fa3f2a5ee8fed66cccff9c0e67d8",
+          "provider_md5": "8bc0ca06214c073060c7bafee313214d",
+          "bytes": 6555476
+        }
+      ],
+      "mean_linear_albedo": [
+        0.1298120385061123,
+        0.10683364552962316,
+        0.06469897066717303
+      ],
+      "mean_roughness": 0.9022920704154496,
+      "outputs": [
+        {
+          "path": "environment/25_bark_c.jpg",
+          "size": 512,
+          "bytes": 143863,
+          "sha256": "0bec94cf5a38baa9182acb6c2e96017f45482d75283a35af7aec5e5665b1023f"
+        },
+        {
+          "path": "environment/25_bark_n.jpg",
+          "size": 512,
+          "bytes": 366995,
+          "sha256": "e148cd7386f2ebba09495ea67ad9718ab7611a898df0bdb0d9809dbff4d78af2"
+        },
+        {
+          "path": "environment/25_bark_m.jpg",
+          "size": 512,
+          "bytes": 215637,
+          "sha256": "90e104acbb07a388911c9ac20787f858e3b6ab77e61a4e7533d7260202167d8b"
+        },
+        {
+          "path": "high/25_bark_c.jpg",
+          "size": 2048,
+          "bytes": 1820878,
+          "sha256": "ab76a27aa33760103f6b3197fd37c0a0b34b4a351185cf83035f1057b7fbbd2c"
+        },
+        {
+          "path": "high/25_bark_n.jpg",
+          "size": 2048,
+          "bytes": 4272660,
+          "sha256": "49238353c656054c8f3c70e19e797971777f1ea1673803f3c1eff446c7290134"
+        },
+        {
+          "path": "high/25_bark_m.jpg",
+          "size": 2048,
+          "bytes": 2316619,
+          "sha256": "472144df7e356cc0100aa0d643facaba14a62ae57e47ee06beb04412c1f72b65"
+        }
+      ]
+    }
+  ]
+}

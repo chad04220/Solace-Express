@@ -3,7 +3,8 @@
 
 in vec3 vW; in vec3 vL; in vec3 vLN; in vec4 vAux; flat in vec4 vInst; flat in vec3 vScale; flat in float vFade; flat in vec2 vLodK;
 uniform sampler2DArray uAlb; uniform sampler2DArray uNrm;
-uniform int uKind; uniform int uShadowPass; uniform vec3 uCam; uniform float uRwyLights; uniform float uNight; uniform float uWet; uniform float uSnow; uniform float uTime;
+uniform sampler2DArray uEnvAlb; uniform sampler2DArray uEnvNrm; uniform int uEnvMaterials;
+uniform int uKind; uniform int uLod; uniform int uShadowPass; uniform vec3 uCam; uniform float uRwyLights; uniform float uNight; uniform float uWet; uniform float uSnow; uniform float uTime;
 const int M_GRASS=0, M_FOREST=1, M_ROCK=2, M_SAND=3, M_SNOW=4, M_ASPHALT=5, M_GRAVEL=6, M_DIRT=7;
 const int M_CONCRETE=8, M_TILES=9, M_SLATE=10, M_PLASTER=11, M_BRICK=12, M_LEAVES=13, M_NEEDLES=14, M_PAINT=15;
 const int M_METAL=16, M_CORRUGATED=22, M_BARK=25, M_PLANKS=26, M_LITTER=27, M_SHINGLES=28, M_SIDING=29;
@@ -20,6 +21,23 @@ float hsh3(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7)))*43758.545
 float vn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f*f*(3.0 - 2.0*f);
   return mix(mix(mix(hsh3(i), hsh3(i + vec3(1,0,0)), f.x), mix(hsh3(i + vec3(0,1,0)), hsh3(i + vec3(1,1,0)), f.x), f.y),
              mix(mix(hsh3(i + vec3(0,0,1)), hsh3(i + vec3(1,0,1)), f.x), mix(hsh3(i + vec3(0,1,1)), hsh3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+#if ENT_TREES
+float coniferShootCoverage(vec2 uv, float shoot, float distanceFade){
+  float x = uv.x*2.0 - 1.0, u = abs(x), v = uv.y;
+  if (u < 0.023*(1.0 - 0.65*v)) return 1.0;
+  // Each card holds four pairs of short leafy shoots. Needle length is measured
+  // around those narrow branchlets, never from the central axis to the card edge.
+  float lean = 0.16 + 0.05*shoot, stagger = x < 0.0 ? 0.034 : 0.0;
+  float row = clamp(floor((v - u*lean - stagger)*4.0 - 0.45 + 0.5),0.0,3.0);
+  float center = (row + 0.45)*0.25 + stagger;
+  float across = abs(v - center - u*lean);
+  float extent = (0.92 - row*0.12)*(0.84 + 0.16*fract(shoot*7.13 + row*0.61));
+  if (u > extent || across > 0.083*(1.0 - 0.45*u)) return 0.0;
+  if (across < 0.009) return 1.0;
+  float needle = (u + across*0.8)*18.0 + shoot*3.0 + row*0.37;
+  return fract(needle) <= mix(0.58,0.86,distanceFade) ? 1.0 : 0.0;
+}
+#endif
 // foliage cut-outs: holes through the clumps towards their silhouettes (leafy edges, dappled shadows)
 bool leafCut(float viewEdge){
   int part = int(vAux.x + 0.5);
@@ -33,18 +51,23 @@ bool leafCut(float viewEdge){
     float n = vn3(vL*3.1 + vInst.x*13.0)*0.6 + vn3(vL*9.0 - vInst.x*7.0)*0.4;
     return n < 0.6*viewEdge - 0.06;
   }
-  if (part == P_LEAFCARD && uKind == K_PINE) {   // a tuft of needles radiating from the shoot
-    vec2 q = vec2(fract(vAux.z), vAux.w)*2.0 - 1.0; float r = length(q);
-    float a = atan(q.y, q.x)/6.2832 + 0.5;
-    float k = fract(a*46.0 + r*0.6 + hsh(vec2(floor(vAux.z), vInst.x))*7.0);
-    return r > 0.95 - 0.35*hsh(vec2(floor(a*46.0), floor(vAux.z))) || r < 0.06 || k > 0.5;
+  if (part == P_LEAFCARD && uKind == K_PINE) {   // elongated needle shoots, not radial pinwheel fans
+    float u = fract(vAux.z)*2.0 - 1.0, v = vAux.w;
+    float shoot = hsh(vec2(floor(vAux.z), vInst.x));
+    float axis = (shoot - 0.5)*0.22*v, across = abs(u - axis);
+    float envelope = (0.7 + 0.22*shoot)*(1.0 - 0.7*v*v)*smoothstep(0.0, 0.12, v);
+    if (across > envelope) return true;
+    if (across < 0.027*(1.0 - 0.6*v)) return false;   // tapered shoot
+    // Long needles slant toward the shoot tip, alternating and varying length along the stem.
+    float needle = (v + across*0.34)*14.0 + (u < axis ? 0.4 : 0.0) + shoot*3.0;
+    float pair = hsh(vec2(floor(needle), floor(vAux.z) + shoot*9.0));
+    if (across > envelope*(0.63 + 0.37*pair)) return true;
+    float far = smoothstep(25.0, 110.0, length(uCam - vW));
+    return fract(needle) > mix(0.32, 0.64, far);
   }
-  if (part == P_LEAFCARD && uKind <= K_SPRUCE) {   // a fir's flat spray: needles either side of the shoot, slanting forward, to a point at its tip
-    float u = abs(fract(vAux.z)*2.0 - 1.0), v = vAux.w;
-    if (u > 0.95*(1.0 - 0.8*v*v)*smoothstep(0.0, 0.1, v)) return true;
-    if (u < 0.06) return false;   // the shoot
-    float far = smoothstep(25.0, 110.0, length(uCam - vW));   // (needles finer than a pixel: a denser spray instead of shimmer)
-    return fract((v + u*0.4)*24.0 + hsh(vec2(floor(vAux.z), vInst.x))*3.0) > mix(0.45, 0.8, far);
+  if (part == P_LEAFCARD && uKind <= K_SPRUCE) {
+    float far = smoothstep(25.0, 110.0, length(uCam - vW));
+    return coniferShootCoverage(vec2(fract(vAux.z),vAux.w),hsh(vec2(floor(vAux.z),vInst.x)),far) < 0.5;
   }
   if (part == P_LEAFCARD) {   // the same jittered leaf ellipses, with only the four possible covering cells
     vec2 uv0 = vec2(fract(vAux.z), vAux.w);
@@ -77,6 +100,7 @@ bool leafCut(float viewEdge){
 #endif
 #if ENT_TREES
   if (part == P_FROND) {   // leaflets either side of the midrib
+    if (vAux.w < 0.0) return false;   // highest detail has individual modelled leaflets
     float a = abs(vAux.z);
     if (a < 0.07) return false;
     float l = fract(vAux.w*34.0 + a*2.2);

@@ -6,6 +6,9 @@
 #include <mutex>
 #include <thread>
 
+namespace { std::atomic<uint64_t> entityChunkRevision{1}; }
+void Scenery::Chunk::markChanged() { revision=entityChunkRevision.fetch_add(1,std::memory_order_relaxed); }
+
 Scenery g_scenery;
 
 // ---------------------------------------------------------------- worker pool for chunk generation
@@ -92,6 +95,7 @@ void Scenery::pump(std::vector<int>& installed) {
     int lastUse = p ? p->lastUse : 0;
     p.reset(new Chunk(std::move(j.c)));
     p->lastUse = lastUse;
+    p->markChanged();  // publication gets a fresh identity even after an older worker job
     installed.push_back(idx);
   }
 }
@@ -196,12 +200,12 @@ void put(Ctx& C, int kind, float x, float y, float z, float yaw, float sx, float
 }
 
 // building of a kind fitted to a footprint (half extents along its own x / z) on the lowest ground under it
-void putBuilding(Ctx& C, int kind, float x, float z, float yaw, float hw, float hd, float height, float seed) {
+void putBuilding(Ctx& C, int kind, float x, float z, float yaw, float hw, float hd, float height, float seed, float validatedGround = 1e9f) {
   const EntKindInfo& I = kEntInfo[kind];
   float sx = clampf(hw / I.hx, 0.7f, 1.3f), sz = clampf(hd / I.hz, 0.7f, 1.3f);
-  float sy = height > 0 ? clampf(height / I.h, 0.65f, 1.7f) : 0.9f + 0.2f * seed;
-  float g = footprintGround(x, z, yaw, I.hx * sx, I.hz * sz);
-  put(C, kind, x, g - 0.05f, z, yaw, sx, sy, sz, seed);
+  float sy = entBuildingVerticalScale(kind, height > 0 ? height / I.h : .9f + .2f * seed);
+  float g = validatedGround < 1e8f ? validatedGround : footprintGround(x, z, yaw, I.hx * sx, I.hz * sz) - .05f;
+  put(C, kind, x, g, z, yaw, sx, sy, sz, seed);
 }
 
 // The lighthouse stands on the shore of Lighthouse Key: the low land point nearest the sea around the village
@@ -303,72 +307,142 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
         for (auto& it : items[i]) if (C.inside(it.e.x, it.e.z)) C.out[it.kind]->push_back(it.e);
       }
     }
-    // ---------------------------------------------------------------- town lots (buildings L1, garden trees L2)
-    int i0 = (int)floorf(C.x0 / LOT) - 1, i1 = (int)floorf(C.x1 / LOT) + 1, j0 = (int)floorf(C.z0 / LOT) - 1, j1 = (int)floorf(C.z1 / LOT) + 1;
-    for (int j = j0; j <= j1; j++)
-      for (int i = i0; i <= i1; i++) {
-        Lot lot;
-        if (!g_world.lotAt(i, j, lot) || !C.inside(lot.cx, lot.cz)) continue;
-        float m[4]; g_world.maskTexel(lot.cx, lot.cz, m);
-        float urban = m[2], roadD = m[0] * ROAD_RANGE;
-        float hk = h2(i * 31 + 7, j * 17 - 3), hk2 = h2(i * 13 - 5, j * 29 + 11);
-        float yaw = (j & 1) ? 0.f : PI;   // front towards the street on this lot's z side (streets on even z lines)
-        int kind;
-        float height = 0;
-        if (lot.type == 1) {
-          float Ht = lot.wallH;
-          if (Ht > 38.f) { kind = hk < 0.4f ? EK_SKYSCRAPER : EK_TOWER; height = kind == EK_SKYSCRAPER ? Ht * 2.6f : Ht * 1.7f; }
-          else if (Ht > 19.f) { kind = hk < 0.5f ? EK_OFFICE : EK_APARTMENT; height = kind == EK_OFFICE ? Ht * 1.15f : Ht; }
-          else { kind = hk < 0.4f ? EK_SHOP : hk < 0.75f ? EK_TOWNHOUSE : EK_APARTMENT; height = kind == EK_APARTMENT ? std::max(Ht, 13.f) : 0.f; }
-        } else {
-          if (hk < 0.006f && m[1] > 0.25f) kind = EK_CHURCH;
-          else if (hk < 0.011f && urban > 0.08f) kind = EK_WATERTOWER;
-          else if (roadD < 34.f && hk < 0.1f) kind = EK_GASSTATION;
-          else if (urban > 0.2f) kind = hk < 0.35f ? EK_TOWNHOUSE : hk < 0.58f ? EK_SHOP : hk < 0.8f ? EK_HOUSE : EK_HOUSE_L;
-          else kind = hk < 0.38f ? EK_HOUSE : hk < 0.66f ? EK_HOUSE_HIP : hk < 0.88f ? EK_HOUSE_L : EK_FARMHOUSE;
-        }
-        bool house = kind == EK_HOUSE || kind == EK_HOUSE_HIP || kind == EK_HOUSE_L || kind == EK_FARMHOUSE;
-        if (L == 1) {
-          float hw = lot.hw, hd = lot.hd;
-          if (kind == EK_CHURCH || kind == EK_WATERTOWER || kind == EK_GASSTATION) { hw = kEntInfo[kind].hx; hd = kEntInfo[kind].hz; }
-          if (kind == EK_TOWNHOUSE || kind == EK_SHOP) { hw = std::max(hw, 7.f); hd = std::max(hd, 5.5f); }
-          putBuilding(C, kind, lot.cx, lot.cz, yaw, hw, hd, height, lot.seed);
-        } else if (house && lot.type == 0) {
-          // garden trees behind the house
-          for (int t = 0; t < 2; t++) {
-            float ht = h2(i * 5 + t * 71, j * 3 - t * 13);
-            if (ht > (t ? 0.25f : 0.6f)) continue;
-            float side = h2(i + t, j - 9) < 0.5f ? -1.f : 1.f;
-            float lx = side * (lot.hw + 2.5f + 3.f * ht), lz = -(lot.hd + 3.f + 2.f * hk2);
-            float c = cosf(yaw), s = sinf(yaw);
-            float x = lot.cx + c * lx + s * lz, z = lot.cz - s * lx + c * lz;
-            float b[4]; g_world.sampleBase(x, z, b);
-            int sp = b[3] > 0.45f ? EK_SPRUCE : (ht < 0.3f ? EK_BIRCH : EK_OAK);
-            float sc = 0.55f + 0.35f * h2(i - t * 7, j + 41);
-            put(C, sp, x, ground(x, z) - 0.15f, z, ht * 40.f, sc, sc * (0.9f + 0.2f * hk2), sc, h2(i * 3 + t, j * 7));
+    // ---------------------------------------------------------------- street-front communities
+    // Iterate only settlements touching this chunk, in their road-aligned local lot grids.
+    // A small margin lets garden/driveway items belong to the chunk containing their own centre.
+    for (int town = 0; town < kNumTowns; town++) {
+      const Town& T = kTowns[town];
+      if (T.x + T.r < C.x0 - 32.f || T.x - T.r > C.x1 + 32.f || T.z + T.r < C.z0 - 32.f || T.z - T.r > C.z1 + 32.f) continue;
+      vec2 lo(1e9f, 1e9f), hi(-1e9f, -1e9f);
+      for (int corner = 0; corner < 4; corner++) {
+        vec2 q = communityLocal(town, (corner & 1) ? C.x1 + 32.f : C.x0 - 32.f, (corner & 2) ? C.z1 + 32.f : C.z0 - 32.f);
+        lo.x = std::min(lo.x, q.x); lo.y = std::min(lo.y, q.y);
+        hi.x = std::max(hi.x, q.x); hi.y = std::max(hi.y, q.y);
+      }
+      for (int j = (int)floorf(lo.y / LOT); j <= (int)floorf(hi.y / LOT); j++)
+        for (int i = (int)floorf(lo.x / LOT); i <= (int)floorf(hi.x / LOT); i++) {
+          Lot lot;
+          if (!communityLot(g_world, town, i, j, lot)) {
+            // Courtyard lots deliberately excluded from the building grid become modest
+            // planted commons, not large empty lawns. Never fill ordinary vacant frontage.
+            if (L == 2) {
+              float lx = (i + .5f) * LOT, lz = (j + .5f) * LOT;
+              const CommunityPlan& plan = g_communityPlans[town];
+              vec2 p = communityWorld(town, lx, lz);
+              float key = h2(i * 23 + town * 97, j * 31 - town * 17);
+              if (C.inside(p.x, p.y) && !communityPark(town, lx, lz) && communityAt(p.x, p.y) == town &&
+                  communityStreetDistance(town, p.x, p.y) > 24.f) {
+                float mask[4]; g_world.maskTexel(p.x, p.y, mask);
+                float district = h2((int)floorf(lx / (plan.blockX * LOT)) + town * 13, (int)floorf(lz / (plan.blockZ * LOT)));
+                float probability = (mask[2] > .45f ? .7f : .24f) * (.45f + .55f * district);
+                if (mask[1] > .12f && key < probability && roadDistance(p.x, p.y) > 12.f && ground(p.x, p.y) > 3.f) {
+                  float base[4]; g_world.sampleBase(p.x, p.y, base);
+                  int kind = base[3] > .45f ? EK_SPRUCE : base[2] > .85f && key < .18f ? EK_PALM : key < .25f ? EK_BIRCH : EK_OAK;
+                  float sc = .65f + .2f * h2(i + town, j - town);
+                  put(C, kind, p.x, ground(p.x, p.y) - .15f, p.y, district * 6.28f, sc, sc, sc, h2(i * 7 + town, j * 11));
+                }
+              }
+            }
+            continue;
+          }
+          float m[4]; g_world.maskTexel(lot.cx, lot.cz, m);
+          float urban = m[2];
+          int si = i + town * 137, sj = j - town * 193;
+          float hk = h2(si * 31 + 7, sj * 17 - 3), hk2 = h2(si * 13 - 5, sj * 29 + 11);
+          float yaw = lot.yaw, c = cosf(yaw), s = sinf(yaw);
+          int kind; float height = 0.f;
+          if (lot.type == 1) {
+            float Ht = lot.wallH;
+            if (Ht > 38.f) { kind = hk < 0.4f ? EK_SKYSCRAPER : EK_TOWER; height = Ht * (kind == EK_SKYSCRAPER ? 2.6f : 1.7f); }
+            else if (Ht > 19.f) { kind = hk < 0.28f ? EK_OFFICE : EK_APARTMENT; height = Ht; }
+            else { kind = hk < 0.32f ? EK_SHOP : hk < 0.82f ? EK_TOWNHOUSE : EK_APARTMENT; height = kind == EK_APARTMENT ? std::max(Ht, 13.f) : 0.f; }
+          } else {
+            // Shops cluster on the main street; outskirts remain homes and gardens.
+            vec2 q = communityLocal(town, lot.cx, lot.cz);
+            bool mainStreet = fabsf(q.y) < LOT;
+            if (mainStreet && urban > 0.08f && hk < 0.24f) kind = EK_SHOP;
+            else if (urban > 0.23f) kind = hk < 0.42f ? EK_TOWNHOUSE : hk < 0.7f ? EK_HOUSE : EK_HOUSE_L;
+            else kind = hk < 0.38f ? EK_HOUSE : hk < 0.72f ? EK_HOUSE_HIP : hk < 0.93f ? EK_HOUSE_L : EK_FARMHOUSE;
+          }
+          bool house = kind == EK_HOUSE || kind == EK_HOUSE_HIP || kind == EK_HOUSE_L || kind == EK_FARMHOUSE;
+          if (L == 1) {
+            float hw = lot.hw, hd = lot.hd;
+            if (kind == EK_TOWNHOUSE || kind == EK_SHOP) { hw = std::max(hw, 7.f); hd = std::max(hd, 5.5f); }
+            if (C.inside(lot.cx, lot.cz)) putBuilding(C, kind, lot.cx, lot.cz, yaw, hw, hd, height, lot.seed, lot.ground);
+            // A bounded number of parked vehicles, aligned with a driveway beside the house.
+            if (house && hk2 < 0.18f) {
+              float side = 9.8f, x = lot.cx + c * side, z = lot.cz - s * side;
+              if (C.inside(x, z) && roadDistance(x, z) > 8.f && communityStreetDistance(town, x, z) > 6.f && ground(x, z) > 2.5f)
+                put(C, EK_CAR, x, footprintGround(x, z, yaw, .9f, 2.25f), z, yaw, 1.f, 1.f, 1.f, hk);
+            }
+          } else if (house) {
+            for (int t = 0; t < 2; t++) {
+              float ht = h2(si * 5 + t * 71, sj * 3 - t * 13);
+              if (ht > (t ? 0.12f : 0.4f)) continue;
+              float side = h2(si + t, sj - 9) < .5f ? -1.f : 1.f;
+              float lx = side * (lot.hw + 3.f), lz = -(lot.hd + 5.f);
+              float x = lot.cx + c * lx + s * lz, z = lot.cz - s * lx + c * lz;
+              if (!C.inside(x, z) || roadDistance(x, z) < 10.f || communityStreetDistance(town, x, z) < 9.f || ground(x, z) < 3.f) continue;
+              float base[4]; g_world.sampleBase(x, z, base);
+              int sp = base[3] > .45f ? EK_SPRUCE : base[2] > .85f && ground(x, z) < 70.f ? EK_PALM : ht < .3f ? EK_BIRCH : EK_OAK;
+              float sc = .55f + .25f * h2(si - t * 7, sj + 41);
+              put(C, sp, x, ground(x, z) - .15f, z, ht * 40.f, sc, sc, sc, h2(si * 3 + t, sj * 7));
+            }
           }
         }
+      // A green town square breaks the repeated roof pattern, with a single civic landmark
+      // and a few planted trees rather than filling every vacant plot with another building.
+      const CommunityPlan& plan = g_communityPlans[town];
+      float px = plan.blockX * LOT * .5f, pz = plan.blockZ * LOT * .5f;
+      vec2 civic = communityWorld(town, px, pz);
+      if (L == 1 && C.inside(civic.x, civic.y)) {
+        float g = ground(civic.x, civic.y), mask[4]; g_world.maskTexel(civic.x, civic.y, mask);
+        float yaw = atan2f(plan.sine, plan.cosine);
+        if (mask[1] > .18f && g > 3.f && roadDistance(civic.x, civic.y) > 24.f &&
+            fabsf(g - footprintGround(civic.x, civic.y, yaw, 6.f, 14.f)) < 2.f)
+          putBuilding(C, EK_CHURCH, civic.x, civic.y, yaw, 5.f, 13.f, T.kind == 2 ? 28.f : 23.f, h2(town, 739));
       }
+      if (L == 2) for (int iz = 0; iz < plan.blockZ; iz++) for (int ix = 0; ix < plan.blockX; ix++) {
+        float x = (ix + .5f) * LOT, z = (iz + .5f) * LOT;
+        if (hypotf(x - px, z - pz) < 25.f) continue;
+        vec2 p = communityWorld(town, x, z);
+        if (!C.inside(p.x, p.y) || roadDistance(p.x, p.y) < 10.f) continue;
+        float mask[4]; g_world.maskTexel(p.x, p.y, mask);
+        if (mask[1] < .12f || ground(p.x, p.y) < 3.f) continue;
+        float base[4]; g_world.sampleBase(p.x, p.y, base);
+        int kind = base[3] > .45f ? EK_SPRUCE : base[2] > .85f ? EK_PALM : EK_OAK;
+        float sc = .65f + .2f * h2(ix + town, iz - town);
+        put(C, kind, p.x, ground(p.x, p.y) - .15f, p.y, ix + iz * 2.f, sc, sc, sc, h2(ix + town * 31, iz));
+      }
+    }
 
     if (L == 1) {
       // ---------------------------------------------------------------- farmsteads on farmland (320 m grid)
       const float FC = 320.f;
-      for (int fj = (int)floorf(C.z0 / FC) - 1; fj <= (int)floorf(C.z1 / FC); fj++)
-        for (int fi = (int)floorf(C.x0 / FC) - 1; fi <= (int)floorf(C.x1 / FC); fi++) {
+      for (int fj = (int)floorf((C.z0 - 70.f) / FC); fj <= (int)floorf((C.z1 + 70.f) / FC); fj++)
+        for (int fi = (int)floorf((C.x0 - 70.f) / FC); fi <= (int)floorf((C.x1 + 70.f) / FC); fi++) {
           float x = (fi + 0.5f + (h2(fi * 7 + 1, fj * 3 - 2) - 0.5f) * 0.6f) * FC, z = (fj + 0.5f + (h2(fi - 4, fj * 9 + 5) - 0.5f) * 0.6f) * FC;
-          if (!C.inside(x, z) || h2(fi * 11 + 3, fj * 5 + 7) > 0.42f) continue;
+          if (h2(fi * 11 + 3, fj * 5 + 7) > 0.42f) continue;
           float m[4]; g_world.sampleMask(x, z, m);
-          if (m[3] < 0.45f || m[1] > 0.01f || m[0] * ROAD_RANGE < 30.f) continue;
+          int road = -1; float roadD = roadDistance(x, z, &road);
+          if (m[3] < .38f || m[1] > .025f || roadD < 55.f || roadD > 480.f || road < 0) continue;
           float g = ground(x, z);
           if (g < 4.f || fabsf(ground(x + 25, z) - ground(x - 25, z)) > 6.f || fabsf(ground(x, z + 25) - ground(x, z - 25)) > 6.f) continue;
-          float yaw = h2(fi + 13, fj - 17) * 2.f * PI, c = cosf(yaw), s = sinf(yaw);
+          const RoadSeg& route = g_roads[road];
+          float dx = route.bx - route.ax, dz = route.bz - route.az;
+          float along = clampf(((x - route.ax) * dx + (z - route.az) * dz) / (dx * dx + dz * dz), 0.f, 1.f);
+          float yaw = atan2f(route.ax + dx * along - x, route.az + dz * along - z), c = cosf(yaw), s = sinf(yaw);
           auto at = [&](float lx, float lz, float& wx, float& wz) { wx = x + c * lx + s * lz; wz = z - s * lx + c * lz; };
           float seed = h2(fi * 3, fj * 5), wx, wz;
-          putBuilding(C, EK_FARMHOUSE, x, z, yaw, 5.5f, 6.f, 0, seed);
-          at(24.f, -8.f, wx, wz); putBuilding(C, EK_BARN, wx, wz, yaw + PI * 0.5f, 6.f + 1.5f * seed, 9.f + 2.f * seed, 0, h2(fi, fj + 1));
-          at(36.f, 6.f, wx, wz); putBuilding(C, EK_SILO, wx, wz, yaw, 3.f, 3.f, 15.f + 8.f * seed, seed);
-          if (seed > 0.45f) { at(29.f, 9.f, wx, wz); putBuilding(C, EK_SILO, wx, wz, yaw, 2.6f, 2.6f, 13.f, seed * 0.7f); }
-          if (h2(fi - 3, fj + 8) > 0.45f) { at(-6.f, -26.f, wx, wz); putBuilding(C, EK_WAREHOUSE, wx, wz, yaw, 9.f, 7.f, 6.5f, seed); }
+          auto farmBuilding = [&](int kind, float bx, float bz, float a, float hw, float hd, float height, float hs) {
+            if (!C.inside(bx, bz) || roadDistance(bx, bz) < hypotf(hw, hd) + 8.f || ground(bx, bz) < 3.f) return;
+            putBuilding(C, kind, bx, bz, a, hw, hd, height, hs);
+          };
+          farmBuilding(EK_FARMHOUSE, x, z, yaw, 5.5f, 6.f, 0, seed);
+          at(24.f, -8.f, wx, wz); farmBuilding(EK_BARN, wx, wz, yaw + PI * 0.5f, 6.f + 1.5f * seed, 9.f + 2.f * seed, 0, h2(fi, fj + 1));
+          at(36.f, 6.f, wx, wz); farmBuilding(EK_SILO, wx, wz, yaw, 3.f, 3.f, 15.f + 8.f * seed, seed);
+          if (seed > 0.45f) { at(29.f, 9.f, wx, wz); farmBuilding(EK_SILO, wx, wz, yaw, 2.6f, 2.6f, 13.f, seed * 0.7f); }
+          if (h2(fi - 3, fj + 8) > 0.45f) { at(-6.f, -26.f, wx, wz); farmBuilding(EK_WAREHOUSE, wx, wz, yaw, 9.f, 7.f, 6.5f, seed); }
         }
       // ---------------------------------------------------------------- lighthouse
       { float lx, lz, ly; if (lighthouseSite(lx, lz, ly) && C.inside(lx, lz)) putBuilding(C, EK_LIGHTHOUSE, lx, lz, ly, 3.4f, 3.4f, 0, 0.5f); }
@@ -523,6 +597,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
   ch.off[EK_COUNT] = (uint32_t)ch.ents.size();
   if (ch.ents.empty()) { ch.ymin = 0; ch.ymax = 0; }
   ch.level = std::max(ch.level, level);
+  ch.markChanged();
 }
 
 void Scenery::trim(vec3 cam, float keepDetail, float keepAll, int frame) {
@@ -542,7 +617,7 @@ void Scenery::trim(vec3 cam, float keepDetail, float keepAll, int frame) {
           if (k > EK_SLAB) keep.insert(keep.end(), p->ents.begin() + p->off[k], p->ents.begin() + p->off[k + 1]);
         }
         off[EK_COUNT] = (uint32_t)keep.size();
-        p->ents.swap(keep); memcpy(p->off, off, sizeof off); p->level = 1;
+        p->ents.swap(keep); memcpy(p->off, off, sizeof off); p->level = 1; p->markChanged();
       }
     }
 }

@@ -1,0 +1,66 @@
+{
+  "input_sha256": {
+    "../living-islands-review/captures/hero-diagnostic-v7/kind_45_front_oblique_shadow_metadata.json": "73da55b2dc6f5ad1ea94ac2558b8a435786c3fa5bc762640c194392fdcf93669",
+    "../living-islands-review/captures/hero-diagnostic-v7/kind_45_front_oblique_shadow_near.f32": "da696dfdabf3fb87afdd5514e20c308f5d380c5818063d2e7ceb27218493e977",
+    "/tmp/solace-shadow-rollback/mesh_45_0.f32": "b53480f4de9b856c3bda5022312211abb81b4deb77cee8927dee3555f1cd7e96"
+  },
+  "origin": [
+    -577.0,
+    20.0,
+    -4413.0
+  ],
+  "resolution": 2048,
+  "near_radius_m": 96,
+  "texel_width_m": 0.09375,
+  "actual_occupied_texels": 809,
+  "predicted_occupied_texels": 809,
+  "coverage_mismatches": 0,
+  "depth_error_m": {
+    "mean": 0.0002248615396034074,
+    "p99": 0.0016065354264105274,
+    "max": 0.007118161940544709
+  },
+  "parts": [
+    {
+      "part": 8,
+      "texels": 145,
+      "caster_bias_m": [
+        0.06464718410063663,
+        0.48986238770878976
+      ]
+    },
+    {
+      "part": 14,
+      "texels": 21,
+      "caster_bias_m": [
+        0.13110437365616054,
+        0.5155649264629634
+      ]
+    },
+    {
+      "part": 21,
+      "texels": 594,
+      "caster_bias_m": [
+        0.04555133669791105,
+        0.49739724705045707
+      ]
+    },
+    {
+      "part": 27,
+      "texels": 25,
+      "caster_bias_m": [
+        0.09407237267052178,
+        0.5155654325846786
+      ]
+    },
+    {
+      "part": 29,
+      "texels": 24,
+      "caster_bias_m": [
+        0.09407237267045919,
+        0.18376911423996875
+      ]
+    }
+  ],
+  "limitations": "Unit-scale, yaw-zero isolated fixtures only; no foliage deformation or alpha-cutouts. Exact coplanar tie/raster fill rules may differ. Successful depth reproduction is not visual acceptance."
+}

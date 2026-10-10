@@ -1,0 +1,18 @@
+[0/2] Re-checking globbed directories...
+[1/18] Embedding GLSL shaders
+[2/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/traffic.cpp.obj
+[3/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_ui.cpp.obj
+[4/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/game.cpp.obj
+[5/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_research_ui.cpp.obj
+[6/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_wraith.cpp.obj
+[7/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/raster_renderer.cpp.obj
+[8/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/prop_disc.cpp.obj
+[9/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/terrain_mesh.cpp.obj
+[10/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/renderer.cpp.obj
+[11/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/entity_render.cpp.obj
+[12/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/aircraft_mesh.cpp.obj
+[13/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/aircraft_hull.cpp.obj
+[14/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/camera_feeds.cpp.obj
+[15/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/platform_win32.cpp.obj
+[16/18] Building CXX object CMakeFiles/SolaceExpress.dir/src/entity_mesh.cpp.obj
+[17/18] Linking CXX executable SolaceExpress.exe

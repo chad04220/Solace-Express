@@ -1,0 +1,420 @@
+Start testing: Oct 10 06:41 EDT
+----------------------------------------------------------
+10/54 Testing: airport_layouts
+10/54 Test: airport_layouts
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/airport_layout_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"airport_layouts" start time: Oct 10 06:41 EDT
+Output:
+----------------------------------------------------------
+MDB Meadowbrook Field           400 items
+HFS Harlan Farm Strip            28 items
+PVI Port Verde International    861 items
+CAP Solace Capital              927 items
+CDR Cedar Ridge                 373 items
+SMP Summit Pass                  19 items
+NPT Northpoint                  445 items
+LHK Lighthouse Key               22 items
+GLR Gull Rock                    25 items
+KLO Kaleo Regional              837 items
+PMB Palm Bay                     20 items
+VCF Volcano Crater Field         13 items
+FJH Fjordhaven                  435 items
+GLS Glacier Station              18 items
+FAR Far Isle                    479 items
+ORC Orchard Valley               31 items
+airport_layout_test: 4933 items, ok (0 problems)
+<end of output>
+Test time =  49.34 sec
+----------------------------------------------------------
+Test Passed.
+"airport_layouts" end time: Oct 10 06:42 EDT
+"airport_layouts" time elapsed: 00:00:49
+----------------------------------------------------------
+
+21/54 Testing: entity_raycast
+21/54 Test: entity_raycast
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/entity_raycast_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"entity_raycast" start time: Oct 10 06:42 EDT
+Output:
+----------------------------------------------------------
+entity_raycast_test: 5120 segments, 116 grazing passes a 2.5 m sweep misses, 0 missed by the raycast: ok
+<end of output>
+Test time =  58.53 sec
+----------------------------------------------------------
+Test Passed.
+"entity_raycast" end time: Oct 10 06:43 EDT
+"entity_raycast" time elapsed: 00:00:58
+----------------------------------------------------------
+
+22/54 Testing: world_cache
+22/54 Test: world_cache
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/world_cache_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"world_cache" start time: Oct 10 06:43 EDT
+Output:
+----------------------------------------------------------
+ok: first build generates
+ok: second build reads every array back identical
+ok: another build's stamp is rejected
+ok: a truncated file is rejected
+ok: trailing bytes are rejected
+ok: an empty height-bound array is rejected, nothing published
+all passed
+<end of output>
+Test time =  41.34 sec
+----------------------------------------------------------
+Test Passed.
+"world_cache" end time: Oct 10 06:43 EDT
+"world_cache" time elapsed: 00:00:41
+----------------------------------------------------------
+
+29/54 Testing: environment_foliage
+29/54 Test: environment_foliage
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/environment_foliage_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"environment_foliage" start time: Oct 10 06:43 EDT
+Output:
+----------------------------------------------------------
+foliage fade Fir: worst step 0.036 of an instance per 0.25% of the distance, density within 0.20% of the thinning
+foliage fade Bush: worst step 0.036 of an instance per 0.25% of the distance, density within 0.20% of the thinning
+detail cross-fade Fir: 340-400 m and 1700-2000 m, worst step 0.023 of a tree per 0.25% of the distance
+detail cross-fade Bush: 204-240 m and 850-1000 m, worst step 0.023 of a tree per 0.25% of the distance
+foliage ranges q0: four-tier flat-circle range-policy model, surviving instances +5.32..11.08%, vertices +9.64..17.38%; detail-stream area +21.76% (not measured frame cost)
+foliage ranges q1: four-tier flat-circle range-policy model, surviving instances +4.04..6.87%, vertices +8.59..15.34%; detail-stream area +21.92% (not measured frame cost)
+foliage ranges q2: four-tier flat-circle range-policy model, surviving instances +3.48..5.48%, vertices +6.33..13.07%; detail-stream area +23.12% (not measured frame cost)
+environment_foliage_test: deterministic finite meshes, fixed ABI, 150690 budgeted vertices, planted far skylines, 911400 exact leaf-coverage comparisons passed
+<end of output>
+Test time =   1.97 sec
+----------------------------------------------------------
+Test Passed.
+"environment_foliage" end time: Oct 10 06:43 EDT
+"environment_foliage" time elapsed: 00:00:01
+----------------------------------------------------------
+
+30/54 Testing: environment_buildings
+30/54 Test: environment_buildings
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/environment_building_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"environment_buildings" start time: Oct 10 06:43 EDT
+Output:
+----------------------------------------------------------
+building_mesh_test: 342993 checks, 0 failures
+<end of output>
+Test time =   0.41 sec
+----------------------------------------------------------
+Test Passed.
+"environment_buildings" end time: Oct 10 06:43 EDT
+"environment_buildings" time elapsed: 00:00:00
+----------------------------------------------------------
+
+32/54 Testing: terrain_material_math
+32/54 Test: terrain_material_math
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/terrain_material_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"terrain_material_math" start time: Oct 10 06:43 EDT
+Output:
+----------------------------------------------------------
+PASS: 745961 terrain material arithmetic checks (production-extracted GLSL; no GPU)
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"terrain_material_math" end time: Oct 10 06:43 EDT
+"terrain_material_math" time elapsed: 00:00:00
+----------------------------------------------------------
+
+43/54 Testing: runway_preservation
+43/54 Test: runway_preservation
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/runway_preservation_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"runway_preservation" start time: Oct 10 06:43 EDT
+Output:
+----------------------------------------------------------
+Runway shader: four immutable geometry/material/marking functions preserved
+Full-world terrain: 17523 frozen locations at 7/8/11 octaves (2 within explicitly allowed 600 m summit crater), max height delta elsewhere 0 m, preserved
+MDB: 10621 frozen terrain/contact samples, preserved
+MDB: 100 chunks, 57101 entity footprints, 124 navigation fixtures, clear/preserved
+HFS: 6123 frozen terrain/contact samples, preserved
+HFS: 63 chunks, 47700 entity footprints, 36 navigation fixtures, clear/preserved
+PVI: 24751 frozen terrain/contact samples, preserved
+PVI: 84 chunks, 19940 entity footprints, 174 navigation fixtures, clear/preserved
+CAP: 32285 frozen terrain/contact samples, preserved
+CAP: 240 chunks, 63169 entity footprints, 196 navigation fixtures, clear/preserved
+CDR: 9761 frozen terrain/contact samples, preserved
+CDR: 60 chunks, 32307 entity footprints, 120 navigation fixtures, clear/preserved
+SMP: 5733 frozen terrain/contact samples, preserved
+SMP: 81 chunks, 5873 entity footprints, 36 navigation fixtures, clear/preserved
+NPT: 14715 frozen terrain/contact samples, preserved
+NPT: 117 chunks, 6893 entity footprints, 142 navigation fixtures, clear/preserved
+LHK: 5343 frozen terrain/contact samples, preserved
+LHK: 63 chunks, 9185 entity footprints, 34 navigation fixtures, clear/preserved
+GLR: 4797 frozen terrain/contact samples, preserved
+GLR: 56 chunks, 1801 entity footprints, 40 navigation fixtures, clear/preserved
+KLO: 20757 frozen terrain/contact samples, preserved
+KLO: 135 chunks, 28569 entity footprints, 160 navigation fixtures, clear/preserved
+PMB: 7257 frozen terrain/contact samples, preserved
+PMB: 80 chunks, 25847 entity footprints, 42 navigation fixtures, clear/preserved
+VCF: 6437 frozen terrain/contact samples, preserved
+VCF: 80 chunks, 60504 entity footprints, 36 navigation fixtures, clear/preserved
+FJH: 12915 frozen terrain/contact samples, preserved
+FJH: 66 chunks, 16485 entity footprints, 134 navigation fixtures, clear/preserved
+GLS: 6847 frozen terrain/contact samples, preserved
+GLS: 81 chunks, 3291 entity footprints, 40 navigation fixtures, clear/preserved
+FAR: 17616 frozen terrain/contact samples, preserved
+FAR: 144 chunks, 82996 entity footprints, 150 navigation fixtures, clear/preserved
+ORC: 7667 frozen terrain/contact samples, preserved
+ORC: 90 chunks, 52201 entity footprints, 42 navigation fixtures, clear/preserved
+runway_preservation_test: PASS, 193625 terrain/contact samples, 1506 navigation fixtures, 1540 chunk visits, 513862 entity footprints; max height delta 0 m, max gradient delta 0 (0 failures)
+<end of output>
+Test time =  55.51 sec
+----------------------------------------------------------
+Test Passed.
+"runway_preservation" end time: Oct 10 06:44 EDT
+"runway_preservation" time elapsed: 00:00:55
+----------------------------------------------------------
+
+44/54 Testing: community_layout
+44/54 Test: community_layout
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/community_layout_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"community_layout" start time: Oct 10 06:44 EDT
+Output:
+----------------------------------------------------------
+Port Verde         3911 street-front buildings
+Solace Capital     3324 street-front buildings
+Kaleo Town          916 street-front buildings
+Fjordhaven           71 street-front buildings
+Northpoint          274 street-front buildings
+Meadowbrook         128 street-front buildings
+Cedar Ridge          90 street-front buildings
+Orchard Valley       53 street-front buildings
+Harlan               26 street-front buildings
+Palm Bay             75 street-front buildings
+Far Isle Resort     109 street-front buildings
+Lighthouse Key        7 street-front buildings
+Westvale            111 street-front buildings
+Riverton            147 street-front buildings
+Greenhollow         105 street-front buildings
+Saltmarsh            73 street-front buildings
+Kaleo Springs        36 street-front buildings
+Ice Harbor           46 street-front buildings
+9502 buildings, 476 tall, 18 inhabited towns, 45 roads, 36 parked cars sampled; 0 failures
+<end of output>
+Test time =  39.67 sec
+----------------------------------------------------------
+Test Passed.
+"community_layout" end time: Oct 10 06:45 EDT
+"community_layout" time elapsed: 00:00:39
+----------------------------------------------------------
+
+45/54 Testing: airport_environment
+45/54 Test: airport_environment
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/airport_environment_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"airport_environment" start time: Oct 10 06:45 EDT
+Output:
+----------------------------------------------------------
+MDB: 435 objects, 15 new service/landscape fixtures, 117 cars, 5 support vehicles
+HFS: 28 objects, 5 new service/landscape fixtures, 8 cars, 3 support vehicles
+PVI: 934 objects, 15 new service/landscape fixtures, 429 cars, 9 support vehicles
+CAP: 1017 objects, 16 new service/landscape fixtures, 424 cars, 9 support vehicles
+CDR: 406 objects, 15 new service/landscape fixtures, 100 cars, 5 support vehicles
+SMP: 19 objects, 5 new service/landscape fixtures, 6 cars, 1 support vehicles
+NPT: 493 objects, 15 new service/landscape fixtures, 114 cars, 5 support vehicles
+LHK: 22 objects, 5 new service/landscape fixtures, 7 cars, 1 support vehicles
+GLR: 25 objects, 5 new service/landscape fixtures, 8 cars, 1 support vehicles
+KLO: 904 objects, 16 new service/landscape fixtures, 441 cars, 8 support vehicles
+PMB: 20 objects, 5 new service/landscape fixtures, 6 cars, 1 support vehicles
+VCF: 13 objects, 3 new service/landscape fixtures, 0 cars, 3 support vehicles
+FJH: 476 objects, 15 new service/landscape fixtures, 124 cars, 5 support vehicles
+GLS: 18 objects, 3 new service/landscape fixtures, 0 cars, 3 support vehicles
+FAR: 531 objects, 15 new service/landscape fixtures, 120 cars, 5 support vehicles
+ORC: 31 objects, 5 new service/landscape fixtures, 11 cars, 3 support vehicles
+airport_environment_test: 97114 checks, 158 new fixtures, 0 failures
+<end of output>
+Test time =  31.35 sec
+----------------------------------------------------------
+Test Passed.
+"airport_environment" end time: Oct 10 06:45 EDT
+"airport_environment" time elapsed: 00:00:31
+----------------------------------------------------------
+
+46/54 Testing: volcano_effects
+46/54 Test: volcano_effects
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/volcano_effects_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"volcano_effects" start time: Oct 10 06:45 EDT
+Output:
+----------------------------------------------------------
+Volcano: 13561 checks, 0 failures
+<end of output>
+Test time =  28.47 sec
+----------------------------------------------------------
+Test Passed.
+"volcano_effects" end time: Oct 10 06:46 EDT
+"volcano_effects" time elapsed: 00:00:28
+----------------------------------------------------------
+
+47/54 Testing: environment_asset_mesh
+47/54 Test: environment_asset_mesh
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/environment_asset_mesh_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"environment_asset_mesh" start time: Oct 10 06:46 EDT
+Output:
+----------------------------------------------------------
+environment_asset_mesh_test: 6374862 checks, 0 failures; near/mid/far/hero vertices 46365/17961/7026/442110, total 513462 (CPU geometry only)
+<end of output>
+Test time =   0.77 sec
+----------------------------------------------------------
+Test Passed.
+"environment_asset_mesh" end time: Oct 10 06:46 EDT
+"environment_asset_mesh" time elapsed: 00:00:00
+----------------------------------------------------------
+
+49/54 Testing: environment_scale_audit
+49/54 Test: environment_scale_audit
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/environment_scale_audit" "/workspace/scratch/87b29863f015/solace-world-community"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"environment_scale_audit" start time: Oct 10 06:46 EDT
+Output:
+----------------------------------------------------------
+STREETS: 7m carriageway, 1.5m sidewalk each side; cities84x56m, town140x112m, village168x112m blocks
+NOMINAL_FACADE_PITCH: houses2.9m, bungalow/farm3.0m, townhouse3.2m, apartment3.4m, tower3.6m, office/skyscraper3.7m; actual instance pitches are bounded below
+FLYABLE FLEET: main-wing span in physics vs production packed model; fuselage stations exclude attached hardware
+AIRCRAFT,Kestrel T2,physics_span_m=10.100,packed_wing_span_m=10.100,nominal_fuselage_m=7.300,station_extent_m=7.300
+AIRCRAFT,Wren 180,physics_span_m=11.000,packed_wing_span_m=11.000,nominal_fuselage_m=8.300,station_extent_m=8.300
+AIRCRAFT,Bushmaster STOL,physics_span_m=12.400,packed_wing_span_m=12.400,nominal_fuselage_m=8.000,station_extent_m=8.000
+AIRCRAFT,Islander Twin,physics_span_m=14.900,packed_wing_span_m=14.900,nominal_fuselage_m=10.900,station_extent_m=10.930
+AIRCRAFT,Pelican Caravan,physics_span_m=15.900,packed_wing_span_m=15.900,nominal_fuselage_m=11.500,station_extent_m=11.500
+AIRCRAFT,Meridian Q400,physics_span_m=27.400,packed_wing_span_m=27.400,nominal_fuselage_m=26.000,station_extent_m=26.050
+AIRCRAFT,Starling 500 Jet,physics_span_m=15.900,packed_wing_span_m=15.900,nominal_fuselage_m=14.000,station_extent_m=14.000
+AIRCRAFT,Swift S6,physics_span_m=11.400,packed_wing_span_m=11.400,nominal_fuselage_m=8.600,station_extent_m=8.600
+AIRCRAFT,Osprey C6,physics_span_m=12.400,packed_wing_span_m=12.400,nominal_fuselage_m=9.800,station_extent_m=9.800
+AIRCRAFT,XR-10 Nightjar,physics_span_m=16.600,packed_wing_span_m=16.600,nominal_fuselage_m=16.300,station_extent_m=16.300
+AIRCRAFT,XR-30 Specter,physics_span_m=11.200,packed_wing_span_m=11.200,nominal_fuselage_m=17.200,station_extent_m=17.200
+AIRCRAFT,XR-20 Mantis,physics_span_m=13.200,packed_wing_span_m=13.200,nominal_fuselage_m=16.000,station_extent_m=16.000
+AIRCRAFT,XR-40 Wraith,physics_span_m=12.400,packed_wing_span_m=12.400,nominal_fuselage_m=16.500,station_extent_m=16.200
+CAR,actual_mesh_width_m=1.790,length_m=4.385,height_m=1.456
+BUILDINGS: measured LOD0 above-base roof/antenna height; footprint includes authored overhangs/porches
+BUILDING,House,n=2572,width_m=8.89..12.89,depth_m=11.08..15.24,height_m=8.65..10.15,vertical_scale=0.920..1.080,door_mesh_height_m=2.02..2.38
+BUILDING,Bungalow,n=1941,width_m=8.97..13.00,depth_m=11.72..15.87,height_m=5.89..6.91,vertical_scale=0.920..1.080,door_mesh_height_m=1.93..2.27
+BUILDING,L-house,n=1685,width_m=9.03..12.47,depth_m=10.32..14.19,height_m=8.28..9.72,vertical_scale=0.920..1.080,door_mesh_height_m=2.12..2.48
+BUILDING,Farmhouse,n=388,width_m=8.73..12.65,depth_m=9.13..12.54,height_m=9.20..10.80,vertical_scale=0.920..1.080,door_mesh_height_m=2.12..2.48
+BUILDING,Townhouses,n=1257,width_m=14.19..18.24,depth_m=12.02..15.63,height_m=10.67..12.53,vertical_scale=0.920..1.080,door_mesh_height_m=2.21..2.59
+BUILDING,Shop,n=359,width_m=14.24..18.30,depth_m=12.43..18.08,height_m=5.15..6.05,vertical_scale=0.920..1.080,door_mesh_height_m=2.21..2.59
+BUILDING,Apartments,n=652,width_m=14.20..18.24,depth_m=13.22..17.62,height_m=23.20..23.20,vertical_scale=1.000..1.000
+BUILDING,Office,n=173,width_m=14.56..18.68,depth_m=13.09..16.61,height_m=36.62..38.54,vertical_scale=0.920..0.968
+CURTAIN_WALL,Office,nominal_floor_pitch_m=3.700,actual_floor_pitch_m=3.404..3.583
+BUILDING,Tower,n=293,width_m=14.42..18.53,depth_m=14.42..16.48,height_m=73.60..86.40,vertical_scale=0.920..1.080
+BUILDING,Skyscraper,n=183,width_m=16.34..20.96,depth_m=14.70..18.66,height_m=124.20..145.80,vertical_scale=0.920..1.080
+CURTAIN_WALL,Skyscraper,nominal_floor_pitch_m=3.700,actual_floor_pitch_m=3.404..3.996
+BUILDING,Warehouse,n=1,width_m=18.60..18.60,depth_m=15.56..15.56,height_m=7.82..7.82,vertical_scale=0.920..0.920
+BUILDING,Barn,n=1,width_m=14.39..14.39,depth_m=20.77..20.77,height_m=10.61..10.61,vertical_scale=1.061..1.061
+BUILDING,Silo,n=6,width_m=5.72..6.60,depth_m=5.72..6.60,height_m=12.73..21.34,vertical_scale=0.684..1.147
+BUILDING,Church,n=14,width_m=10.80..10.80,depth_m=26.52..26.52,height_m=26.13..28.40,vertical_scale=0.920..1.000,door_mesh_height_m=2.94..3.20
+APARTMENT,shader_window_pitch_m=3.400,mesh_balcony_pitch_m=3.400..3.400,door_height_m=2.600..2.600
+VOLCANO,radius_m=0,elevation_m=1780.13..1780.13,height_above_centre_m=0.00..0.00
+VOLCANO,radius_m=145,elevation_m=1780.16..1786.82,height_above_centre_m=0.04..6.69
+VOLCANO,radius_m=340,elevation_m=2000.77..2026.50,height_above_centre_m=220.64..246.37
+VOLCANO,radius_m=520,elevation_m=1864.21..2106.39,height_above_centre_m=84.09..326.26
+VOLCANO,radius_m=600,elevation_m=1784.44..2064.23,height_above_centre_m=4.31..284.11
+VOLCANO_RATIO,floor_diameter_m=290,rim_diameter_m=680,outer_blend_diameter_m=1040,audit_disk_diameter_m=1200,cone_footprint_diameter_m=10400,rim_in_Kestrel_spans=67.33,rim_in_Meridian_spans=24.82
+CHECKS,0 failures
+<end of output>
+Test time =  31.49 sec
+----------------------------------------------------------
+Test Passed.
+"environment_scale_audit" end time: Oct 10 06:46 EDT
+"environment_scale_audit" time elapsed: 00:00:31
+----------------------------------------------------------
+
+50/54 Testing: environment_close_detail
+50/54 Test: environment_close_detail
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/environment_close_detail_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"environment_close_detail" start time: Oct 10 06:46 EDT
+Output:
+----------------------------------------------------------
+Close-detail policy: 3224602 checks, 0 failures
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"environment_close_detail" end time: Oct 10 06:46 EDT
+"environment_close_detail" time elapsed: 00:00:00
+----------------------------------------------------------
+
+51/54 Testing: environment_nature_detail
+51/54 Test: environment_nature_detail
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/environment_nature_detail_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"environment_nature_detail" start time: Oct 10 06:46 EDT
+Output:
+----------------------------------------------------------
+wood connectivity Fir: 582 / 582 supported components
+wood connectivity Spruce: 774 / 774 supported components
+wood connectivity Pine: 210 / 210 supported components
+wood connectivity Oak: 266 / 266 supported components
+wood connectivity Birch: 266 / 266 supported components
+wood connectivity Palm: 156 / 156 supported components
+wood connectivity Bush: 116 / 116 supported components
+environment_nature_detail_test: 1880801 checks, 0 failures. Counts are geometry budgets, not GPU timing.
+<end of output>
+Test time =   0.84 sec
+----------------------------------------------------------
+Test Passed.
+"environment_nature_detail" end time: Oct 10 06:46 EDT
+"environment_nature_detail" time elapsed: 00:00:00
+----------------------------------------------------------
+
+52/54 Testing: airport_construction_detail
+52/54 Test: airport_construction_detail
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/airport_construction_detail_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"airport_construction_detail" start time: Oct 10 06:46 EDT
+Output:
+----------------------------------------------------------
+airport construction detail: PASS (0 failures)
+<end of output>
+Test time =   1.47 sec
+----------------------------------------------------------
+Test Passed.
+"airport_construction_detail" end time: Oct 10 06:46 EDT
+"airport_construction_detail" time elapsed: 00:00:01
+----------------------------------------------------------
+
+53/54 Testing: environment_close_bounds
+53/54 Test: environment_close_bounds
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/environment_close_bounds_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"environment_close_bounds" start time: Oct 10 06:46 EDT
+Output:
+----------------------------------------------------------
+environment_close_bounds_test: 68475802 checks, 34025712 visible sampled vertices, 0 failures across every kind, 8 seeds, 4 yaws, 6 nonuniform/signed scales, 3 animation times, close-pair and all-LOD envelopes.
+<end of output>
+Test time =   9.66 sec
+----------------------------------------------------------
+Test Passed.
+"environment_close_bounds" end time: Oct 10 06:47 EDT
+"environment_close_bounds" time elapsed: 00:00:09
+----------------------------------------------------------
+
+54/54 Testing: environment_chunk_bounds
+54/54 Test: environment_chunk_bounds
+Command: "/workspace/scratch/87b29863f015/solace-world-community-asan-build/environment_chunk_bounds_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-asan-build
+"environment_chunk_bounds" start time: Oct 10 06:47 EDT
+Output:
+----------------------------------------------------------
+environment_chunk_bounds_test: 29320 checks, 2010 reach-zero protrusion cases, 0 failures.
+<end of output>
+Test time =   0.48 sec
+----------------------------------------------------------
+Test Passed.
+"environment_chunk_bounds" end time: Oct 10 06:47 EDT
+"environment_chunk_bounds" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 10 06:47 EDT

@@ -54,7 +54,10 @@ double keptArea(int k,double distance) {
 double modelVertices(const EntRanges& ranges,int k,const EntMeshRange& mesh) {
   float l0,l1;entLodLimits(ranges,k,l0,l1);
   double a0=keptArea(k,l0),a1=keptArea(k,l1),far=keptArea(k,entRangeOf(ranges,k));
-  return a0*mesh.count[0]+(a1-a0)*mesh.count[1]+(far-a1)*mesh.count[2];
+  // Compare range-policy changes using the same four authored meshes on each
+  // side. This is not a comparison with the former three-tier asset workload.
+  double hero=keptArea(k,entCloseLimit(ranges,k));
+  return hero*mesh.count[kEntCloseLod]+(a0-hero)*mesh.count[0]+(a1-a0)*mesh.count[1]+(far-a1)*mesh.count[2];
 }
 
 void foliageRanges(const EntMeshRange* meshes) {
@@ -110,7 +113,7 @@ void foliageRanges(const EntMeshRange* meshes) {
       minInstances=std::min(minInstances,instances);maxInstances=std::max(maxInstances,instances);
       minVertices=std::min(minVertices,vertices);maxVertices=std::max(maxVertices,vertices);
     }
-    printf("foliage ranges q%d: flat-circle model, surviving instances +%.2f..%.2f%%, vertices +%.2f..%.2f%%; detail-stream area +%.2f%% (not measured frame cost)\n",
+    printf("foliage ranges q%d: four-tier flat-circle range-policy model, surviving instances +%.2f..%.2f%%, vertices +%.2f..%.2f%%; detail-stream area +%.2f%% (not measured frame cost)\n",
       q,100*(minInstances-1),100*(maxInstances-1),100*(minVertices-1),100*(maxVertices-1),100*(streamRatio-1));
   }
 }
@@ -198,20 +201,26 @@ int main() {
   foliageRanges(r);
   assert(v.size()==again.size() && !memcmp(v.data(),again.data(),v.size()*sizeof(EVert)));
   assert(!memcmp(r,r2,sizeof r));
-  // Per-kind/LOD limits pinned to a7f8d30. Improvements must not hide a blanket geometry budget increase.
-  const int budgets[13][3]={{1188,168,36},{1620,204,36},{4974,804,198},{2934,396,78},
-    {3294,264,78},{990,264,108},{1248,120,60},{960,240,60},{960,240,60},{960,240,60},
-    {1680,300,180},{1638,465,126},{2052,618,147}};
+  // Authored four-tier botanical budgets. The far silhouettes keep their former
+  // cost; new near/hero branch geometry has explicit per-species limits.
+  static_assert(ENT_LODS==4,"review budgets when adding mesh slots");
+  const int budgets[13][ENT_LODS]={
+    {1638,204,36,15534},{1998,234,36,20430},{2664,852,198,7044},
+    {2322,468,78,16080},{2340,588,78,12048},{1206,264,108,7140},{840,240,60,5904},
+    {960,240,60,3840},{960,240,60,3840},{960,240,60,3840},
+    {1680,300,180,6720},{1638,465,126,8820},{2052,618,135,12024}
+  };
   int vertices=0;
   for(int k=0;k<=EK_SEASTACK;++k) for(int l=0;l<ENT_LODS;++l) {
     assert(r[k].count[l]>0 && r[k].count[l]%3==0 && r[k].count[l]<=budgets[k][l]);
-    if(k<=EK_BUSH) assert(r[k].count[l]==budgets[k][l]); // unchanged canopy/card density
+    if(l==2) assert(r[k].count[l]==budgets[k][l]); // preserve the established distant cost
+    assert(r[k].count[2]<r[k].count[1] && r[k].count[1]<r[k].count[0] && r[k].count[0]<r[k].count[3]);
     vertices+=r[k].count[l];
     for(int i=r[k].first[l];i<r[k].first[l]+r[k].count[l];++i) {
       const auto& e=v[i];
       const float values[]={e.px,e.py,e.pz,e.nx,e.ny,e.nz,e.part,e.ao,e.u,e.v};
       for(float value:values) assert(std::isfinite(value));
-      float nn=e.nx*e.nx+e.ny*e.ny+e.nz*e.nz;assert(nn>.01f && nn<4.f);
+      float nn=e.nx*e.nx+e.ny*e.ny+e.nz*e.nz;assert(std::abs(nn-1.f)<.001f);
       assert(e.ao>=0.f && e.ao<=1.001f);
       assert(e.py>=-2.f && e.py<=kEntInfo[k].h*1.3f+2.f);
       assert(fabsf(e.px)<kEntInfo[k].hx*3.f && fabsf(e.pz)<kEntInfo[k].hz*3.f);

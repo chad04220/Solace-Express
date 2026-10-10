@@ -1,0 +1,26 @@
+DETAIL foliage_closeup q1 Fir counts 364 3446 4356 15
+DETAIL foliage_closeup q1 Spruce counts 0 0 0 0
+DETAIL foliage_closeup q1 Pine counts 321 2959 4581 10
+DETAIL foliage_closeup q1 Oak counts 1006 8419 7613 36
+DETAIL foliage_closeup q1 Birch counts 478 4160 4743 13
+DETAIL foliage_closeup q1 Palm counts 0 0 0 0
+DETAIL foliage_closeup q1 Bush counts 182 246 87 3
+DETAIL foliage_closeup q1 Boulder counts 0 0 0 0
+DETAIL foliage_closeup q1 Block counts 0 0 0 0
+DETAIL foliage_closeup q1 Slab counts 0 0 0 0
+DETAIL foliage_closeup q1 Outcrop counts 0 0 180 0
+DETAIL foliage_closeup q1 Spire counts 0 0 3 0
+DETAIL foliage_closeup q1 Sea stack counts 0 2 13 0
+DETAIL foliage_closeup q2 Fir counts 471 4672 3124 21
+DETAIL foliage_closeup q2 Spruce counts 0 0 0 0
+DETAIL foliage_closeup q2 Pine counts 437 4129 3357 14
+DETAIL foliage_closeup q2 Oak counts 1382 10870 5467 54
+DETAIL foliage_closeup q2 Birch counts 643 5520 3462 18
+DETAIL foliage_closeup q2 Palm counts 0 0 0 0
+DETAIL foliage_closeup q2 Bush counts 238 251 76 4
+DETAIL foliage_closeup q2 Boulder counts 0 0 0 0
+DETAIL foliage_closeup q2 Block counts 0 0 0 0
+DETAIL foliage_closeup q2 Slab counts 0 0 0 0
+DETAIL foliage_closeup q2 Outcrop counts 0 0 1145 0
+DETAIL foliage_closeup q2 Spire counts 0 0 30 0
+DETAIL foliage_closeup q2 Sea stack counts 0 7 10 0

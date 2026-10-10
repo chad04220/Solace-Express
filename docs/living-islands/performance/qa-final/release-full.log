@@ -1,0 +1,1840 @@
+Start testing: Oct 10 07:18 EDT
+----------------------------------------------------------
+20/54 Testing: shader_glsl
+20/54 Test: shader_glsl
+Command: "/workspace/scratch/87b29863f015/solace-environment-publish/build-tools/python/cmake/data/bin/cmake" "-DCHECK=/workspace/scratch/87b29863f015/solace-world-community-build/shader_check" "-DVALIDATOR=/workspace/scratch/87b29863f015/solace-environment-publish/build-tools/glslang/bin/glslangValidator" "-DOUT=/workspace/scratch/87b29863f015/solace-world-community-build/glsl" "-P" "/workspace/scratch/87b29863f015/solace-world-community/tools/shader_check.cmake"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"shader_glsl" start time: Oct 10 07:18 EDT
+Output:
+----------------------------------------------------------
+-- all shaders valid
+<end of output>
+Test time =  46.17 sec
+----------------------------------------------------------
+Test Passed.
+"shader_glsl" end time: Oct 10 07:19 EDT
+"shader_glsl" time elapsed: 00:00:46
+----------------------------------------------------------
+
+7/54 Testing: campaign_progression
+7/54 Test: campaign_progression
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/progression_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"campaign_progression" start time: Oct 10 07:19 EDT
+Output:
+----------------------------------------------------------
+L1  Lesson 1: Takeoff and Climb                Kestrel T2           0.0km net     153  bank      753  lic 0
+L2  Lesson 2: Traffic Pattern and Landing      Kestrel T2           0.0km net     204  bank      957  lic 0
+L3  Lesson 3: Cross-Country to Harlan Farm     Kestrel T2           9.9km net     306  bank     1263  lic 0
+L4  Checkride: Private Pilot License           Kestrel T2          21.4km net     408  bank     1671  lic 1
+C1  Seed Delivery                              Kestrel T2          11.7km net     594  bank     2265  lic 1
+C2  Parts for the Port                         Kestrel T2          19.7km net     849  bank     3114  lic 1
+C3  Lighthouse Provisions                      Kestrel T2          22.1km net    1206  bank     4320  lic 1
+C4  Message in a Bottle                        Wren 180            28.2km net     770  bank     5090  lic 1
+C5  Gull Rock Generator                        Wren 180            20.2km net    1688  bank     6778  lic 1
+C6  Urgent Documents                           Wren 180            35.1km net    1484  bank     8262  lic 1
+C7  Valley Hardware                            Wren 180            22.1km net    1892  bank    10154  lic 1
+C8  Checkride: Commercial Pilot                Kestrel T2          20.4km net    2430  bank    12584  lic 2
+P1  First Passengers                           Wren 180            32.0km net    2402  bank    14986  lic 2
+P2  Hikers to the Hills                        Wren 180            12.6km net    1688  bank    16674  lic 2
+P3  Summit Pass Rescue Gear                    Bushmaster STOL     11.3km net    4854  bank    21528  lic 2
+P4  Medevac: Injured Climber                   Bushmaster STOL     17.2km net    5822  bank    27350  lic 2
+P5  Island Hopper                              Islander Twin       23.3km net    5424  bank    32774  lic 2
+P6  Beach Resort Shuttle                       Islander Twin       14.4km net    3996  bank    36770  lic 2
+P7  Volcano Research Station                   Islander Twin       27.0km net    7260  bank    44030  lic 2
+O1  Your Own Wings: Lodge Supplies             Bushmaster STOL     37.4km net   14280  bank    18310  lic 2
+O2  Ski Team Transfer                          Bushmaster STOL     17.0km net   13260  bank    31570  lic 2
+O3  Nordholm Crossing                          Bushmaster STOL     42.0km net   24480  bank    56050  lic 2
+O4  Glacier Station Resupply                   Bushmaster STOL     14.6km net   20400  bank    76450  lic 2
+O5  Ice Cores                                  Bushmaster STOL     14.6km net   17340  bank    93790  lic 2
+O6  Fjord Fish to Market                       Pelican Caravan     28.0km net   26540  bank    90330  lic 2
+O7  Far Isle Grand Opening                     Pelican Caravan     52.3km net   32660  bank   122990  lic 2
+O8  Checkride: Airline Transport Pilot         Pelican Caravan     30.5km net   14300  bank   137290  lic 3
+A1  Solace Regional: Launch Day                Meridian Q400       23.3km net   44040  bank   181330  lic 3
+A2  Northern Service                           Meridian Q400       28.0km net   49140  bank   230470  lic 3
+A3  West Coast Express                         Meridian Q400       53.4km net   54240  bank   284710  lic 3
+A4  The Minister's Jet                         Starling 500 Jet    68.0km net  124640  bank   149350  lic 3
+A5  Storm Run                                  Meridian Q400       86.3km net   74640  bank   223990  lic 3
+A6  The Grand Tour                             Starling 500 Jet    34.1km net  117155  bank   341145  lic 3
+A7  Finale: The Red-Eye                        Meridian Q400       52.3km net  140940  bank   482085  lic 3
+Total extra freelance money needed: $0 (1 loans taken), problems: 0, finished=1
+  board MDB lic1: 6 jobs avg $1571
+  board HFS lic1: 6 jobs avg $2846
+  board PVI lic1: 6 jobs avg $3716
+  board CAP lic1: 6 jobs avg $3343
+  board CDR lic1: 6 jobs avg $2253
+  board SMP lic2: 6 jobs avg $3039
+  board NPT lic1: 6 jobs avg $3558
+  board LHK lic1: 6 jobs avg $4051
+  board GLR lic1: 6 jobs avg $3524
+  board KLO lic1: 6 jobs avg $3355
+  board PMB lic1: 6 jobs avg $3496
+  board VCF lic2: 6 jobs avg $4655
+  board FJH lic1: 6 jobs avg $4313
+  board GLS lic2: 6 jobs avg $5800
+  board FAR lic1: 6 jobs avg $4487
+  board ORC lic1: 6 jobs avg $2845
+Earning path: 640 states checked, 0 without a way to earn
+<end of output>
+Test time =  23.31 sec
+----------------------------------------------------------
+Test Passed.
+"campaign_progression" end time: Oct 10 07:20 EDT
+"campaign_progression" time elapsed: 00:00:23
+----------------------------------------------------------
+
+3/54 Testing: flight_model
+3/54 Test: flight_model
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/flight_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"flight_model" start time: Oct 10 07:18 EDT
+Output:
+----------------------------------------------------------
+Kestrel T2       cd0 0.0206  liftoff   125m @29.6m/s (need  400)  climb   7.3m/s  cruise  59.7m/s (spec  50) a=-1.2  stall 22.4  fuelRange 34km 
+Wren 180         cd0 0.0216  liftoff   172m @32.4m/s (need  450)  climb   6.9m/s  cruise  65.5m/s (spec  60) a=-0.6  stall 27.7  fuelRange 57km 
+Bushmaster STOL  cd0 0.0184  liftoff   108m @25.9m/s (need  220)  climb   8.6m/s  cruise  67.0m/s (spec  55) a=-1.7  stall 22.4  fuelRange 60km 
+Islander Twin    cd0 0.0211  liftoff   225m @34.6m/s (need  420)  climb   5.9m/s  cruise  65.5m/s (spec  65) a= 0.0  stall 30.3  fuelRange 75km 
+Pelican Caravan  cd0 0.0192  liftoff   372m @40.4m/s (need  550)  climb   5.9m/s  cruise  73.5m/s (spec  85) a= 0.7  stall 37.4  fuelRange 110km 
+Meridian Q400    cd0 0.0249  liftoff   622m @57.3m/s (need 1100)  climb   8.5m/s  cruise 126.8m/s (spec 140) a=-0.2  stall 57.6  fuelRange 137km 
+Starling 500 Jet cd0 0.0183  liftoff   453m @60.9m/s (need 1250)  climb  16.7m/s  cruise 232.6m/s (spec 200) a=-2.2  stall 48.1  fuelRange 216km 
+Swift S6         cd0 0.0182  liftoff   182m @35.4m/s (need  600)  climb   8.2m/s  cruise  87.3m/s (spec  76) a=-1.0  stall 28.9  fuelRange 123km 
+Osprey C6        cd0 0.0232  liftoff   150m @34.4m/s (need  550)  climb   8.4m/s  cruise  81.4m/s (spec  74) a=-1.0  stall 28.1  fuelRange 94km 
+control directions checked
+Engine-out glide (Kestrel): 9.0:1 over 90 s, model says 10.6:1 ok
+Stuck-gear belly landing (Swift S6): skidded, stopped after 10 s  ok
+Belly landing on gravel is a crash: Belly landing - gear was up ok
+Twin engine-out (Islander, right): hands-off yaw +7.1 deg in 2 s, held +4.8 deg, height -10 m, power 0.50 ok
+Blocked pitot: reads 93 kt (was 93), truly 66 kt ok
+Icing: stall warning at 48 kt clean, 59 kt iced ok
+Alternator failure: battery flat after 420 s ok
+Split flap (left stuck up, split 0.83, held at -0.0 deg): rolls -46.5 deg in 3 s, held with 53% aileron; the autopilot matches the lever (0.00 / 0.00), bank -0.0 ok
+XR-20 single core: 336 thrust samples, maximum pair delta 0.000 N, static reheat 176000 N, fuel 0.990 kg/s ok
+XR-20 one-channel health: unused slots ignored, spool 0.878029, equal fuel burn, AP response 2.222 s ok
+XR-20 partial core loss: health 0.45, spool 0.45029, AP thrust fraction 0.121 ok
+XR-20 total core loss: zero powered force/fuel, AP glide only, yaw +0.000 deg (prior twin +1.505), restart inhibited ok
+Sustained research tiers at 1.5 km: XR-10 M1.260 XR-20 M1.914 XR-30 M2.717 XR-40 M4.329; level/settled yes ok
+Sustained research tiers at 3.0 km: XR-10 M1.327 XR-20 M1.966 XR-30 M2.760 XR-40 M4.371; level/settled yes ok
+Sustained research tiers at 8.0 km: XR-10 M1.437 XR-20 M2.062 XR-30 M2.845 XR-40 M4.460; level/settled yes ok
+Sustained research tiers at 12.0 km: XR-10 M1.500 XR-20 M2.125 XR-30 M2.902 XR-40 M4.526; level/settled yes ok
+Sustained overstress (XR-30): 51.7 g held, stress 0.55 of the way to failure, intact; full pull at Mach 3 peaks 80 g and snaps ok
+XR-30 level acceleration: Mach 2.65 after 40 s ok
+XR-30 cannot hover: nozzle 0.00, alt 437 m after 4 s ok
+XR-30 on the runway: full stick parked stays on its wheels, stick-back takeoff climbs away (100 m AGL) ok
+XR-30 approach speed level flight: alt 600 m, 155 kt ok
+XR-30 full-back pull: peak 18.9 g ok
+XR-30 unlimited pull at Mach 1.8 breaks the airframe: ok
+XR-30 pitch rate at Mach 1: 267 deg/s ok
+XR-30 pitch reversal to -60 deg/s: 0.06 s ok
+XR-30 roll rate 315 deg/s ok
+XR-40 hover: throttle 0.57 vs -0.00 m/s pitch -0.0 bank 0.0 drift 0.0 m/s ok
+XR-40 hover roll rate (pod thrust differential) 96 deg/s ok
+XR-40 top speed Mach 4.39 at 4000 m  ok
+XR-40 roll rate 401 deg/s ok
+XR-40 full pull at 600 m/s: 91 g ok
+AP hold Kestrel T2       hdg err  0.1  alt err   0.1 m  max bank 62.4  g +0.2..+2.4 (limits -3..+6)  roll-rate rms 0.82 deg/s  ok
+AP hold Wren 180         hdg err  0.4  alt err   0.2 m  max bank 62.3  g +0.1..+2.5 (limits -3..+6)  roll-rate rms 0.99 deg/s  ok
+AP hold Bushmaster STOL  hdg err  0.0  alt err   0.2 m  max bank 72.1  g +0.4..+3.5 (limits -3..+6)  roll-rate rms 0.87 deg/s  ok
+AP hold Islander Twin    hdg err  0.1  alt err   0.1 m  max bank 63.5  g +0.3..+2.6 (limits -3..+6)  roll-rate rms 1.05 deg/s  ok
+AP hold Pelican Caravan  hdg err  0.1  alt err   0.3 m  max bank 65.0  g +0.2..+2.9 (limits -3..+6)  roll-rate rms 1.33 deg/s  ok
+AP hold Meridian Q400    hdg err  0.0  alt err   0.1 m  max bank 64.7  g -0.2..+3.0 (limits -3..+6)  roll-rate rms 1.31 deg/s  ok
+AP hold Starling 500 Jet hdg err  0.0  alt err   0.1 m  max bank 73.2  g +0.2..+5.0 (limits -3..+6)  roll-rate rms 2.82 deg/s  ok
+AP hold Swift S6         hdg err  0.5  alt err   0.1 m  max bank 77.0  g +0.4..+3.8 (limits -3..+6)  roll-rate rms 1.35 deg/s  ok
+AP hold Osprey C6        hdg err  0.4  alt err   0.2 m  max bank 73.1  g +0.4..+3.4 (limits -3..+6)  roll-rate rms 1.35 deg/s  ok
+AP comfort hold Kestrel T2       hdg err  0.0  max bank 25.7  g 0.85..1.27  ok
+AP comfort route Kestrel T2       landed after  631 s  en-route max bank 25.1  g 0.84..1.25  ok
+AP comfort hold Wren 180         hdg err  0.0  max bank 25.6  g 0.84..1.26  ok
+AP comfort route Wren 180         landed after  594 s  en-route max bank 25.1  g 0.85..1.24  ok
+AP comfort hold Bushmaster STOL  hdg err  0.0  max bank 25.6  g 0.86..1.24  ok
+AP comfort route Bushmaster STOL  landed after  660 s  en-route max bank 25.2  g 0.83..1.27  ok
+AP comfort hold Islander Twin    hdg err  0.0  max bank 25.4  g 0.85..1.24  ok
+AP comfort route Islander Twin    landed after  580 s  en-route max bank 25.1  g 0.85..1.24  ok
+AP comfort hold Pelican Caravan  hdg err  0.0  max bank 25.2  g 0.85..1.25  ok
+AP comfort route Pelican Caravan  landed after  574 s  en-route max bank 25.1  g 0.85..1.25  ok
+AP comfort hold Meridian Q400    hdg err  0.0  max bank 25.1  g 0.85..1.26  ok
+AP comfort route Meridian Q400    landed after  426 s  en-route max bank 25.1  g 0.84..1.24  ok
+AP comfort hold Starling 500 Jet hdg err  0.0  max bank 25.0  g 0.86..1.26  ok
+AP comfort route Starling 500 Jet landed after  454 s  en-route max bank 25.0  g 0.84..1.24  ok
+AP comfort hold Swift S6         hdg err  0.0  max bank 25.4  g 0.86..1.24  ok
+AP comfort route Swift S6         landed after  583 s  en-route max bank 25.1  g 0.84..1.25  ok
+AP comfort hold Osprey C6        hdg err  0.0  max bank 25.3  g 0.86..1.25  ok
+AP comfort route Osprey C6        landed after  586 s  en-route max bank 25.1  g 0.85..1.24  ok
+AP autoland Kestrel T2       landed after  521 s  touchdown 0.6 m/s  stop  930 m from centre,  0.6 m off the centreline, go-arounds 0  ok
+AP autoland Wren 180         landed after  464 s  touchdown 1.1 m/s  stop  943 m from centre,  0.7 m off the centreline, go-arounds 0  ok
+AP autoland Bushmaster STOL  landed after  549 s  touchdown 1.6 m/s  stop  923 m from centre,  1.6 m off the centreline, go-arounds 0  ok
+AP autoland Islander Twin    landed after  464 s  touchdown 1.0 m/s  stop  958 m from centre,  0.8 m off the centreline, go-arounds 0  ok
+AP autoland Pelican Caravan  landed after  382 s  touchdown 1.1 m/s  stop  735 m from centre,  0.1 m off the centreline, go-arounds 0  ok
+AP autoland Meridian Q400    landed after  292 s  touchdown 0.6 m/s  stop  424 m from centre,  0.0 m off the centreline, go-arounds 0  ok
+AP autoland Starling 500 Jet landed after  279 s  touchdown 1.0 m/s  stop  308 m from centre,  0.1 m off the centreline, go-arounds 0  ok
+AP autoland Swift S6         landed after  398 s  touchdown 0.6 m/s  stop  848 m from centre,  1.2 m off the centreline, go-arounds 0  ok
+AP autoland Osprey C6        landed after  410 s  touchdown 0.8 m/s  stop 1018 m from centre,  1.0 m off the centreline, go-arounds 0  ok
+AP live Islander Twin    engine out reads vApp 30.6 vs1 27.7 thrust 0.56 climb   4.2 | landed after  477 s  touchdown 0.7 m/s  go-arounds 0  ok
+AP live Meridian Q400    engine out reads vApp 59.5 vs1 54.7 thrust 0.54 climb   6.4 | landed after  299 s  touchdown 1.1 m/s  go-arounds 0  ok
+AP live Starling 500 Jet engine out reads vApp 61.3 vs1 47.6 thrust 0.54 climb  24.0 | landed after  286 s  touchdown 0.8 m/s  go-arounds 0  ok
+AP live Pelican Caravan  full load  reads vApp 52.2 vs1 45.7 thrust 1.09 climb   3.6 | landed after  396 s  touchdown 0.7 m/s  go-arounds 0  ok
+AP live Meridian Q400    full load  reads vApp 75.8 vs1 69.7 thrust 1.09 climb   7.8 | landed after  325 s  touchdown 1.1 m/s  go-arounds 0  ok
+AP live Kestrel T2       iced       reads vApp 33.2 vs1 27.1 thrust 1.12 climb   6.8 | landed after  507 s  touchdown 0.7 m/s  go-arounds 0  ok
+AP live Meridian Q400    iced       reads vApp 66.9 vs1 61.6 thrust 1.09 climb  15.0 | landed after  285 s  touchdown 0.7 m/s  go-arounds 0  ok
+AP live Islander Twin    both out   reads climb -2.9, go-around no  ok
+Stunt Kestrel T2       LOOP          21.6 s  g  +1.0.. +5.0  heading change   1    ok
+Stunt Kestrel T2       AILERON ROLL  11.8 s  g  -0.3.. +3.8  heading change   4    ok
+Stunt Kestrel T2       BARREL ROLL   19.0 s  g  +1.0.. +4.7  heading change   3    ok
+Stunt Kestrel T2       IMMELMANN     20.8 s  g  -0.3.. +4.2  heading change 168    ok
+Stunt Kestrel T2       SPLIT-S       11.5 s  g  -0.7.. +4.9  heading change 177    ok
+Stunt Kestrel T2       CUBAN EIGHT   36.2 s  g  -0.4.. +4.9  heading change  20    ok
+Stunt Kestrel T2       WINGOVER      15.9 s  g  +0.9.. +3.3  heading change 175    ok
+Stunt Meridian Q400    LOOP          42.1 s  g  +1.0.. +4.8  heading change   0    ok
+Stunt Meridian Q400    AILERON ROLL  14.9 s  g  -0.3.. +3.3  heading change   2    ok
+Stunt Meridian Q400    BARREL ROLL   28.6 s  g  +1.0.. +4.1  heading change   2    ok
+Stunt Meridian Q400    IMMELMANN     37.3 s  g  -0.3.. +4.3  heading change 177    ok
+Stunt Meridian Q400    SPLIT-S       29.0 s  g  -0.5.. +4.8  heading change 176    ok
+Stunt Meridian Q400    CUBAN EIGHT   68.6 s  g  -0.2.. +4.5  heading change   6    ok
+Stunt Meridian Q400    WINGOVER      28.6 s  g  +1.0.. +3.2  heading change 172    ok
+Stunt XR-40 Wraith     LOOP          10.6 s  g  +1.0..+31.0  heading change   0    ok
+Stunt XR-40 Wraith     AILERON ROLL   1.3 s  g  -6.8..+17.2  heading change   0    ok
+Stunt XR-40 Wraith     BARREL ROLL    6.3 s  g  +0.8..+20.6  heading change   1    ok
+Stunt XR-40 Wraith     IMMELMANN      5.0 s  g  -7.4..+31.0  heading change 180    ok
+Stunt XR-40 Wraith     SPLIT-S      140.0 s  g  -1.4.. +6.7  heading change 177    ok
+Stunt XR-40 Wraith     CUBAN EIGHT   20.1 s  g  -0.1..+31.0  heading change  13    ok
+Stunt XR-40 Wraith     WINGOVER       7.7 s  g  -1.1..+22.6  heading change 167    ok
+Weather: still air still; gusts peak 11.7 m/s on 8.0 (reported 4); eddies 0.37 m/s rms for 0.40; ridge lift +5.0, lee sink -4.0 m/s; rain only under cloud yes (392 wet points); replay exact  ok
+0 failures
+<end of output>
+Test time =  98.71 sec
+----------------------------------------------------------
+Test Passed.
+"flight_model" end time: Oct 10 07:20 EDT
+"flight_model" time elapsed: 00:01:38
+----------------------------------------------------------
+
+18/54 Testing: ufo_encounter
+18/54 Test: ufo_encounter
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/encounter_timing_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"ufo_encounter" start time: Oct 10 07:20 EDT
+Output:
+----------------------------------------------------------
+ufo: t 12.0 hatch 1.00 laugh 0.00 wave 0.00, 20.6 m from the player
+Encounter t=0.00 hatch=0.000 laugh=0.000 wave=0.000 active=1: PASS
+Encounter t=8.00 hatch=0.000 laugh=0.000 wave=0.000 active=1: PASS
+Encounter t=9.00 hatch=0.500 laugh=0.000 wave=0.000 active=1: PASS
+Encounter t=10.00 hatch=1.000 laugh=0.000 wave=0.000 active=1: PASS
+Encounter t=12.00 hatch=1.000 laugh=0.000 wave=0.000 active=1: PASS
+Encounter t=15.80 hatch=1.000 laugh=0.000 wave=0.000 active=1: PASS
+Encounter t=16.30 hatch=1.000 laugh=1.000 wave=0.000 active=1: PASS
+Encounter t=17.00 hatch=1.000 laugh=1.000 wave=0.000 active=1: PASS
+Encounter t=18.50 hatch=1.000 laugh=0.648 wave=0.104 active=1: PASS
+Encounter t=19.00 hatch=1.000 laugh=0.000 wave=1.000 active=1: PASS
+Encounter t=20.00 hatch=1.000 laugh=0.000 wave=1.000 active=1: PASS
+Encounter t=21.00 hatch=1.000 laugh=0.000 wave=0.648 active=1: PASS
+Encounter t=22.00 hatch=0.500 laugh=0.000 wave=0.000 active=1: PASS
+Encounter t=23.00 hatch=0.000 laugh=0.000 wave=0.000 active=1: PASS
+Encounter t=26.50 hatch=0.000 laugh=0.000 wave=0.000 active=1: PASS
+Encounter t=26.51 hatch=0.000 laugh=0.000 wave=0.000 active=0: PASS
+J+K below one second does not summon: PASS
+J+K after one second summons: PASS
+Landing begins departure: PASS
+0 failures
+<end of output>
+Test time =  10.77 sec
+----------------------------------------------------------
+Test Passed.
+"ufo_encounter" end time: Oct 10 07:20 EDT
+"ufo_encounter" time elapsed: 00:00:10
+----------------------------------------------------------
+
+21/54 Testing: entity_raycast
+21/54 Test: entity_raycast
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/entity_raycast_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"entity_raycast" start time: Oct 10 07:20 EDT
+Output:
+----------------------------------------------------------
+entity_raycast_test: 5120 segments, 116 grazing passes a 2.5 m sweep misses, 0 missed by the raycast: ok
+<end of output>
+Test time =   8.98 sec
+----------------------------------------------------------
+Test Passed.
+"entity_raycast" end time: Oct 10 07:20 EDT
+"entity_raycast" time elapsed: 00:00:08
+----------------------------------------------------------
+
+22/54 Testing: world_cache
+22/54 Test: world_cache
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/world_cache_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"world_cache" start time: Oct 10 07:20 EDT
+Output:
+----------------------------------------------------------
+ok: first build generates
+ok: second build reads every array back identical
+ok: another build's stamp is rejected
+ok: a truncated file is rejected
+ok: trailing bytes are rejected
+ok: an empty height-bound array is rejected, nothing published
+all passed
+<end of output>
+Test time =   5.42 sec
+----------------------------------------------------------
+Test Passed.
+"world_cache" end time: Oct 10 07:20 EDT
+"world_cache" time elapsed: 00:00:05
+----------------------------------------------------------
+
+23/54 Testing: gameplay_loop
+23/54 Test: gameplay_loop
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/gameplay_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"gameplay_loop" start time: Oct 10 07:20 EDT
+Output:
+----------------------------------------------------------
+State regression: card operating costs and net use selected uplift rather than estimated fuel: ok
+State regression: selected tank, live plan, committed job and disk quote agree: ok
+  fuel tank 110.000 kg, prior 20.000 kg, uplift 90.000 kg, billed $277; route 38.296 kg / 9.618 min
+State regression: restart keeps accepted load and quote despite a newer estimate: ok
+State regression: diversion bills selected uplift once and retains the real remainder: ok
+State regression: continued leg saves and flies its own selected tank and uplift: ok
+State regression: final settlement bills the continuation quote exactly once: ok
+State regression: bad altitude exposure survives diversion, disk reload and continuation: ok
+State regression: second leg adds seconds, not averages or duplicated cumulative totals: ok
+State regression: upstream v3 job3 exposure remains known and exact: ok
+State regression: restart resets only the current leg and retains prior survey history: ok
+State regression: completed checkpoints preserve the 200/500 weighted ratio on the final leg: ok
+State regression: final survey payout uses all legs (40 percent, $3600 deduction), no false bonus: ok
+State regression: older save keeps checkpoints and clock with explicit unknown altitude history: ok
+State regression: migration marker survives the next v4 save: ok
+State regression: legacy history waiver is disclosed and invents neither bonus nor penalty: ok
+Free Flight: all 288 aircraft/airport/start combinations launch and return: ok
+Free Flight: runway parking, terrain-safe cruise starts, full tanks and zero fees: ok
+Free Flight: new-player career and career UI selections unchanged: ok
+Free Flight: setup/back never creates a career save: ok
+Free Flight: all research aircraft and invalid selections rejected without side effects: ok
+Free Flight: stale setup choices are clamped to available ordinary aircraft/airports: ok
+Free Flight: active job: baseline save created: ok
+Free Flight: active job: baseline is a valid reloadable career save: ok
+Free Flight: active job: launch and live update ignore job/ownership/licence/money: ok
+Free Flight: active job: restart/refill retains free mode and charges nothing: ok
+Free Flight: active job: pause return has no settlement or save: ok
+Free Flight: active job: first-frame wheel contact 0, stopped timer 0.000, career unchanged 1
+Free Flight: active job: real stopped-on-runway completion preserves career: ok
+Free Flight: active job: outcome 0 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: outcome 2 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: outcome 3 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: outcome 4 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: outcome 5 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: crash timer returns to free hangar without penalties: ok
+Free Flight: active job: loading cancellation does not close or save existing career attempt: ok
+Free Flight: active job: back to main menu preserves career save byte-for-byte: ok
+Free Flight: active job: unsaved career transaction neither blocks nor leaks into Free Flight: ok
+Free Flight: recovery job: baseline save created: ok
+Free Flight: recovery job: baseline is a valid reloadable career save: ok
+Free Flight: recovery job: launch and live update ignore job/ownership/licence/money: ok
+Free Flight: recovery job: restart/refill retains free mode and charges nothing: ok
+Free Flight: recovery job: pause return has no settlement or save: ok
+Free Flight: recovery job: first-frame wheel contact 0, stopped timer 0.000, career unchanged 1
+Free Flight: recovery job: real stopped-on-runway completion preserves career: ok
+Free Flight: recovery job: outcome 0 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: outcome 2 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: outcome 3 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: outcome 4 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: outcome 5 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: crash timer returns to free hangar without penalties: ok
+Free Flight: recovery job: loading cancellation does not close or save existing career attempt: ok
+Free Flight: recovery job: back to main menu preserves career save byte-for-byte: ok
+Free Flight: recovery job: unsaved career transaction neither blocks nor leaks into Free Flight: ok
+0 Free Flight failures
+Control voice regression: all 25 instructor/examiner phases resolve and decode on keyboard, pad and both remapped layouts: ok
+Control voice regression: recorded transcripts contain no fixed keyboard/controller instruction names: ok
+Control voice regression: all indexed recordings: 1068 decoded, 0 failed
+Control voice regression: lesson changes preserve decoding of the complete voice bank: ok
+Control voice regression: production hint queue speaks after mid-phase device switch and rebinding, without duplicate prompts: ok
+Control voice regression: landing hints name the held wheel brake action: ok
+Control voice regression: unknown mission or phase cannot select another lesson recording: ok
+Control voice regression: legacy fixed-control rows and mismatched lesson identity never resolve: ok
+Control voice regression: legacy, mismatched, missing, corrupt and absent voice assets warn once without false speech: ok
+Control voice regression: a new flight resets the missing-lesson warning: ok
+Voice line resolution (18 cases): ok
+Sun sweep (clear): 0 bad samples
+Sun sweep (storm): 0 bad samples
+Lesson 1: screen=3 success=1 wp=3/3 t=126s story=1 money=753 Contract complete!
+   voice: Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.
+   voice: Runway 05, Wind 050@4kt, scattered 4500ft, vis 10+km, 09:30
+   voice: TWR SX-VBJ, wind 050 at 4 knots. Runway 05, cleared for takeoff.
+   voice: STALL
+   voice: Nice! Hold a gentle climb about 7 degrees nose-up. Fly through the green rings.
+   voice: Positive climb!
+   voice: Checkpoint 1 of 3
+   voice: TWR Remain in the pattern.
+   voice: Checkpoint 2 of 3
+   voice: Reduce power slightly (CTRL) once level and trim with [ and ]. Rings show the path.
+   voice: All checkpoints passed!
+Lesson 1 tower calls: ok
+Landing: screen=3 success=1 touchdown=313 fpm  stars=3  money +520  location=MDB  Contract complete!
+   Rental: Wren 180               -250
+   Contract payment               700
+   Touchdown in the zone          35
+   Stable approach                21
+   Fuel reserve kept              14
+Arrival: 67 kt / 14 m over the threshold, down 273 m in, 639 m to spare of 1100, go-arounds 0
+   coaching: Well flown: 67 kt over the threshold, down 273 m in, 639 m to spare.
+Arrival recorded for coaching: ok
+   voice: TWR SX-LTI, wind 250 at 4 knots. Runway 05, cleared to land.
+   voice: Runway 21, Wind 250@4kt, scattered 4000ft, vis 10+km, 09:00
+   voice: ORC - Orchard Valley
+   voice: Good landing  313 fpm
+   voice: TWR Exit the runway when able.
+Arrival tower calls: ok
+   voice: TWR SX-LTI, wind 250 at 4 knots. Runway 05, cleared to land.
+   voice: Runway 21, Wind 250@4kt, scattered 4000ft, vis 10+km, 09:00
+   voice: ORC - Orchard Valley
+   voice: Good landing  313 fpm
+   voice: TWR Exit the runway when able.
+   voice: Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.
+   voice: Starting engine...
+   voice: Engine running. Release the parking brake with B.
+   voice: TWR SX-VBJ, Good morning. Advise when ready to taxi.
+   voice: TWR S-BJ, Hold position.
+   voice: TWR S-BJ, wind 050 at 4 knots. Runway 05, cleared for takeoff.
+Departure hold for traffic: ok
+   voice: TWR SX-LTI, Continue approach. The runway is occupied.
+   voice: Runway 21, Wind 250@4kt, scattered 4000ft, vis 10+km, 09:00
+   voice: ORC - Orchard Valley
+   voice: TWR S-TI, Go around. Aircraft on the runway.
+   voice: Good landing  330 fpm
+Arrival with the runway occupied: ok
+Parking brake at the start (Kestrel T2): running=1 brake=1.0 speed after 8 s at run-up power 0.01 m/s
+Parking brake at the start (Wren 180): running=1 brake=1.0 speed after 8 s at run-up power 0.00 m/s
+Parking brake at the start (Bushmaster STOL): running=1 brake=1.0 speed after 8 s at run-up power 0.01 m/s
+Parking brake at the start (Islander Twin): running=1 brake=1.0 speed after 8 s at run-up power 0.00 m/s
+Parking brake at the start (Pelican Caravan): running=1 brake=1.0 speed after 8 s at run-up power 0.00 m/s
+Parking brake at the start (Meridian Q400): running=1 brake=1.0 speed after 8 s at run-up power 0.00 m/s
+Parking brake at the start (Starling 500 Jet): running=1 brake=1.0 speed after 8 s at run-up power 0.00 m/s
+Parking brake at the start (Swift S6): running=1 brake=1.0 speed after 8 s at run-up power 0.00 m/s
+Parking brake at the start (Osprey C6): running=1 brake=1.0 speed after 8 s at run-up power 0.00 m/s
+   A4 quick estimate 10.5 min (en route 5.2, climb 0.3, approach 3.1); flown in the background 16.9 min
+A4 on the autopilot: flown 16.9 min, quoted 16.9 +- 2.5 min (limit 12), success 1: ok
+   fuel estimate L4 in the Kestrel T2: quoted 51.4 kg, burned 42.9 kg on the autopilot (x1.20), tanks 70 kg
+   fuel estimate C2 in the Wren 180: quoted 68.1 kg, burned 61.3 kg on the autopilot (x1.11), tanks 110 kg
+   fuel estimate C7 in the Pelican Caravan: quoted 165.5 kg, burned 163.3 kg on the autopilot (x1.01), tanks 420 kg
+   fuel estimate C2 in the Starling 500 Jet: quoted 234.5 kg, burned 196.2 kg on the autopilot (x1.20), tanks 1100 kg
+Quick fuel estimate: 4 of 4 legs quoted at 0.95-1.5x the burn and inside the tanks: ok
+Hint after rebinding the parking brake: "Press P to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle." voiced 1 (default voiced 1): ok
+Hint with a gamepad: "Press D-PAD LEFT to release the parking brake, then hold RT to add full throttle." voiced 1; autopilot named P / RS CLICK: ok
+ATC history after the flights so far: 16 lines (limit 64): ok
+A held from the menu into the flight: brake 0.0 while held, 1.0 when pressed again: ok
+A held across leaving the pause menu: brake 0.0: ok
+Controller lost in flight: paused 1: ok
+Aerobatics: LOOP flown once, then the pilot's 1; a throttle key mid-figure hands it back 1; from the autopilot's route, the route resumes 1: ok
+LB+RB held with the XR-40 armed: UI hidden 0 -> 0: ok
+Restart of a trial: still off the books 1: ok
+Debrief retry in an aircraft the job can't use: screen 1, attempt 0 -> 0 (Choose another aircraft: Meridian Q400 - Lesson aircraft only): ok
+Airborne research start (XR-30 Specter): parking brake 0, brake 0.0, gear 0.00 lever up: ok
+Airborne research start (XR-40 Wraith): parking brake 0, brake 0.0, gear 0.00 lever up: ok
+5 fps timing: 5.00 s simulated for 5.00 s of frames
+Dry with checkpoints left: screen=3 outcome=4 crashes +0 (Out of fuel with checkpoints remaining)
+Transactions: marker pending 1, settlement pending 1, retry saved 1, no double pay 1: ok
+Resumable job: accepted 1, leg closed 1, reloaded 1, continued 1, delivered 1, paid once 1, released 1, crash ends 1, lesson no job 1, leg state carried 1: ok
+Scoring lines: airmanship rewarded 1, violations charged 1: ok
+Fuel planning: uplift quoted 1, billed as quoted 1, remainder kept 1, no consumption bill 1, chosen fuel loaded 1: ok (money -49400)
+  settle outcome 1: crashes +0 repairs 0
+  settle outcome 2: crashes +0 repairs 0
+  settle outcome 3: crashes +0 repairs 0
+  settle outcome 4: crashes +0 repairs 0
+  settle outcome 5: crashes +1 repairs 1
+Engine-out landing (uninsured): success=1 touchdown 653 fpm, emergency bonus 1, repair 1, covered 0, premium 0, condition 0.920, money -465 ok
+Engine-out landing (insured): success=1 touchdown 651 fpm, emergency bonus 1, repair 0, covered 1, premium 60, condition 0.920, money +675 ok
+Failure chance: new 0.025, worn 0.060, lesson 0, serviced (Wren 180 serviced for $1100: as new.) ok
+Freelance job types over 192 boards: cargo 392 pax 374 medevac 21 vip 135 night 42 low-vis 52 survey 136, well formed 1: ok
+PPL board keeps the CPL kinds off: ok
+Job type scoring lines: ok
+Medevac flight (gentle): touchdown 352 fpm, patient 96%, bonus 1: ok
+Medevac flight (steep bank): touchdown 347 fpm, patient 77%, bonus 0: ok
+Dynamic weather: wind turned 179 deg, 18 kt, rain 1, autopilot re-picked the runway at 79 s (rev 0 -> 1): ok
+Trials: courses 1, spot scored 1, board sorted 1, STOL roll 1, gate time 1, formation 1, settings read twice 1 (Formation run: DNF): ok
+Airline: licence gate 1, hired 1, assigned 1, aircraft locked 1, tick 1 (net 4435), recall 1, incidents 1 over 60 days (repair charged once 1): ok
+Job meters at 1x / 4x: comfort lost 0.154 / 0.153 over a simulated minute: ok
+Diverted: career and aircraft at the diversion airport: ok
+No tower at a farm strip: ok
+Voice clips decode (1068): ok
+Voice coverage (142 messages): ok
+Pod setting grouped 1, HUD alias spoken in full 1: ok
+XR-20 single-engine HUD: partial 1 / total 1 warning, live glide guidance and voice ok
+   voice: TWR SX-LTI, Make straight-in runway 05, report final.
+   voice: TWR S-TI, wind 270 at 6 knots. Runway 05, cleared to land.
+   voice: ENGINE FAILURE  glide 10:1, best 102 kt
+Startup announcements pending 1, engine failure spoken 1, restart advice 0: ok
+Stale tower call dropped, fresh one said (dropped 1, fresh 1, stale 0): ok
+Menu focus navigation: first 1, down 1, right 1, mouse releases 1: ok
+Career launches: failed save flies nothing 1, failed continue keeps the job 1, cancelled loading 1, free flight keeps the job 1, debrief retry continues 1: ok
+Arrivals: 400 m beside the runway refused 1 (touched down there 1), runway then apron delivers 1, stopped on the runway delivers 1: ok
+Refused autoland: holds 1 (GLR: runway too short for the Starling 500 Jet (480 m, it needs 608 m)), says the stick takes over 1, stick takes over 1: ok
+Chosen fuel billed: quote 38 kg, tanks 110 kg, uplift 110 kg, charge $338 of $338, job's plan agrees 1: ok
+Survey record across a diversion: 300 s out of band before, 300 s (0 in band) carried on, bonus 0, docked 1: ok
+Checkride standard: 600 fpm passes 1, 601 fpm fails 1, hold violation fails 1, go-around ignored fails 1, all three fail 1: ok
+0 failures
+<end of output>
+Test time =  59.02 sec
+----------------------------------------------------------
+Test Passed.
+"gameplay_loop" end time: Oct 10 07:20 EDT
+"gameplay_loop" time elapsed: 00:00:59
+----------------------------------------------------------
+
+12/54 Testing: hull_mesh
+12/54 Test: hull_mesh
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/hull_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"hull_mesh" start time: Oct 10 07:20 EDT
+Output:
+----------------------------------------------------------
+hull_test: 300 random voxel grids, every mesh closed and consistently wound
+<end of output>
+Test time =   5.28 sec
+----------------------------------------------------------
+Test Passed.
+"hull_mesh" end time: Oct 10 07:21 EDT
+"hull_mesh" time elapsed: 00:00:05
+----------------------------------------------------------
+
+37/54 Testing: shader_glsl_specialization
+37/54 Test: shader_glsl_specialization
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/scratch/87b29863f015/solace-world-community/tests/aircraft_specialization_test.py" "--shader-dir" "/workspace/scratch/87b29863f015/solace-world-community-build/glsl" "--validator" "/workspace/scratch/87b29863f015/solace-environment-publish/build-tools/glslang/bin/glslangValidator"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"shader_glsl_specialization" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_safegear.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_af0.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_af1.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_af2.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_af3.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_af4.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_af5.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_af6.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_af7.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_af8.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_af9.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_af10.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_af11.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/plane_mesh_af12.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/terrain.frag
+/workspace/scratch/87b29863f015/solace-world-community-build/glsl/map.frag
+PASS: v3.39 family guards, per-aircraft dispatch, terrain-helper exclusion, projection skip
+PASS: the shared and all thirteen own aircraft mesh builds exclude terrain helpers; terrain/map retain them; all link
+PASS: each aircraft's own mesh, bake (outside and cockpit), march and shadow programs hold its own code and no other aircraft's
+PASS: the launch's programs hold no airframe; each scenery class's program holds its own surfaces alone
+<end of output>
+Test time =   8.29 sec
+----------------------------------------------------------
+Test Passed.
+"shader_glsl_specialization" end time: Oct 10 07:21 EDT
+"shader_glsl_specialization" time elapsed: 00:00:08
+----------------------------------------------------------
+
+2/54 Testing: cockpit_camera
+2/54 Test: cockpit_camera
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/cockpit_camera_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"cockpit_camera" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+Cockpit camera integration: 205 checks, 0 failures
+<end of output>
+Test time =   5.33 sec
+----------------------------------------------------------
+Test Passed.
+"cockpit_camera" end time: Oct 10 07:21 EDT
+"cockpit_camera" time elapsed: 00:00:05
+----------------------------------------------------------
+
+9/54 Testing: career_saves
+9/54 Test: career_saves
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/save_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"career_saves" start time: Oct 10 07:20 EDT
+Output:
+----------------------------------------------------------
+save_test: ok (0 failures)
+<end of output>
+Test time =  17.11 sec
+----------------------------------------------------------
+Test Passed.
+"career_saves" end time: Oct 10 07:21 EDT
+"career_saves" time elapsed: 00:00:17
+----------------------------------------------------------
+
+49/54 Testing: environment_scale_audit
+49/54 Test: environment_scale_audit
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/environment_scale_audit" "/workspace/scratch/87b29863f015/solace-world-community"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"environment_scale_audit" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+STREETS: 7m carriageway, 1.5m sidewalk each side; cities84x56m, town140x112m, village168x112m blocks
+NOMINAL_FACADE_PITCH: houses2.9m, bungalow/farm3.0m, townhouse3.2m, apartment3.4m, tower3.6m, office/skyscraper3.7m; actual instance pitches are bounded below
+FLYABLE FLEET: main-wing span in physics vs production packed model; fuselage stations exclude attached hardware
+AIRCRAFT,Kestrel T2,physics_span_m=10.100,packed_wing_span_m=10.100,nominal_fuselage_m=7.300,station_extent_m=7.300
+AIRCRAFT,Wren 180,physics_span_m=11.000,packed_wing_span_m=11.000,nominal_fuselage_m=8.300,station_extent_m=8.300
+AIRCRAFT,Bushmaster STOL,physics_span_m=12.400,packed_wing_span_m=12.400,nominal_fuselage_m=8.000,station_extent_m=8.000
+AIRCRAFT,Islander Twin,physics_span_m=14.900,packed_wing_span_m=14.900,nominal_fuselage_m=10.900,station_extent_m=10.930
+AIRCRAFT,Pelican Caravan,physics_span_m=15.900,packed_wing_span_m=15.900,nominal_fuselage_m=11.500,station_extent_m=11.500
+AIRCRAFT,Meridian Q400,physics_span_m=27.400,packed_wing_span_m=27.400,nominal_fuselage_m=26.000,station_extent_m=26.050
+AIRCRAFT,Starling 500 Jet,physics_span_m=15.900,packed_wing_span_m=15.900,nominal_fuselage_m=14.000,station_extent_m=14.000
+AIRCRAFT,Swift S6,physics_span_m=11.400,packed_wing_span_m=11.400,nominal_fuselage_m=8.600,station_extent_m=8.600
+AIRCRAFT,Osprey C6,physics_span_m=12.400,packed_wing_span_m=12.400,nominal_fuselage_m=9.800,station_extent_m=9.800
+AIRCRAFT,XR-10 Nightjar,physics_span_m=16.600,packed_wing_span_m=16.600,nominal_fuselage_m=16.300,station_extent_m=16.300
+AIRCRAFT,XR-30 Specter,physics_span_m=11.200,packed_wing_span_m=11.200,nominal_fuselage_m=17.200,station_extent_m=17.200
+AIRCRAFT,XR-20 Mantis,physics_span_m=13.200,packed_wing_span_m=13.200,nominal_fuselage_m=16.000,station_extent_m=16.000
+AIRCRAFT,XR-40 Wraith,physics_span_m=12.400,packed_wing_span_m=12.400,nominal_fuselage_m=16.500,station_extent_m=16.200
+CAR,actual_mesh_width_m=1.790,length_m=4.385,height_m=1.456
+BUILDINGS: measured LOD0 above-base roof/antenna height; footprint includes authored overhangs/porches
+BUILDING,House,n=2572,width_m=8.89..12.89,depth_m=11.08..15.24,height_m=8.65..10.15,vertical_scale=0.920..1.080,door_mesh_height_m=2.02..2.38
+BUILDING,Bungalow,n=1941,width_m=8.97..13.00,depth_m=11.72..15.87,height_m=5.89..6.91,vertical_scale=0.920..1.080,door_mesh_height_m=1.93..2.27
+BUILDING,L-house,n=1685,width_m=9.03..12.47,depth_m=10.32..14.19,height_m=8.28..9.72,vertical_scale=0.920..1.080,door_mesh_height_m=2.12..2.48
+BUILDING,Farmhouse,n=388,width_m=8.73..12.65,depth_m=9.13..12.54,height_m=9.20..10.80,vertical_scale=0.920..1.080,door_mesh_height_m=2.12..2.48
+BUILDING,Townhouses,n=1257,width_m=14.19..18.24,depth_m=12.02..15.63,height_m=10.67..12.53,vertical_scale=0.920..1.080,door_mesh_height_m=2.21..2.59
+BUILDING,Shop,n=359,width_m=14.24..18.30,depth_m=12.43..18.08,height_m=5.15..6.05,vertical_scale=0.920..1.080,door_mesh_height_m=2.21..2.59
+BUILDING,Apartments,n=652,width_m=14.20..18.24,depth_m=13.22..17.62,height_m=23.20..23.20,vertical_scale=1.000..1.000
+BUILDING,Office,n=173,width_m=14.56..18.68,depth_m=13.09..16.61,height_m=36.62..38.54,vertical_scale=0.920..0.968
+CURTAIN_WALL,Office,nominal_floor_pitch_m=3.700,actual_floor_pitch_m=3.404..3.583
+BUILDING,Tower,n=293,width_m=14.42..18.53,depth_m=14.42..16.48,height_m=73.60..86.40,vertical_scale=0.920..1.080
+BUILDING,Skyscraper,n=183,width_m=16.34..20.96,depth_m=14.70..18.66,height_m=124.20..145.80,vertical_scale=0.920..1.080
+CURTAIN_WALL,Skyscraper,nominal_floor_pitch_m=3.700,actual_floor_pitch_m=3.404..3.996
+BUILDING,Warehouse,n=1,width_m=18.60..18.60,depth_m=15.56..15.56,height_m=7.82..7.82,vertical_scale=0.920..0.920
+BUILDING,Barn,n=1,width_m=14.39..14.39,depth_m=20.77..20.77,height_m=10.61..10.61,vertical_scale=1.061..1.061
+BUILDING,Silo,n=6,width_m=5.72..6.60,depth_m=5.72..6.60,height_m=12.73..21.34,vertical_scale=0.684..1.147
+BUILDING,Church,n=14,width_m=10.80..10.80,depth_m=26.52..26.52,height_m=26.13..28.40,vertical_scale=0.920..1.000,door_mesh_height_m=2.94..3.20
+APARTMENT,shader_window_pitch_m=3.400,mesh_balcony_pitch_m=3.400..3.400,door_height_m=2.600..2.600
+VOLCANO,radius_m=0,elevation_m=1780.13..1780.13,height_above_centre_m=0.00..0.00
+VOLCANO,radius_m=145,elevation_m=1780.16..1786.82,height_above_centre_m=0.04..6.69
+VOLCANO,radius_m=340,elevation_m=2000.77..2026.50,height_above_centre_m=220.64..246.37
+VOLCANO,radius_m=520,elevation_m=1864.21..2106.39,height_above_centre_m=84.09..326.26
+VOLCANO,radius_m=600,elevation_m=1784.44..2064.23,height_above_centre_m=4.31..284.11
+VOLCANO_RATIO,floor_diameter_m=290,rim_diameter_m=680,outer_blend_diameter_m=1040,audit_disk_diameter_m=1200,cone_footprint_diameter_m=10400,rim_in_Kestrel_spans=67.33,rim_in_Meridian_spans=24.82
+CHECKS,0 failures
+<end of output>
+Test time =   5.46 sec
+----------------------------------------------------------
+Test Passed.
+"environment_scale_audit" end time: Oct 10 07:21 EDT
+"environment_scale_audit" time elapsed: 00:00:05
+----------------------------------------------------------
+
+24/54 Testing: terrain_shadow_bake
+24/54 Test: terrain_shadow_bake
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/terrain_shadow_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"terrain_shadow_bake" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+Failed to create /home/agent/.cache/mesa_shader_cache for shader cache (Read-only file system)---disabling.
+Failed to create /home/agent/.cache/mesa_shader_cache_db for shader cache (Read-only file system)---disabling.
+terrain shadow bake: 512 cases (129 in a mountain's shadow), 0 left in the sun that shouldn't be: ok
+<end of output>
+Test time =   6.62 sec
+----------------------------------------------------------
+Test Passed.
+"terrain_shadow_bake" end time: Oct 10 07:21 EDT
+"terrain_shadow_bake" time elapsed: 00:00:06
+----------------------------------------------------------
+
+10/54 Testing: airport_layouts
+10/54 Test: airport_layouts
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/airport_layout_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"airport_layouts" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+MDB Meadowbrook Field           400 items
+HFS Harlan Farm Strip            28 items
+PVI Port Verde International    861 items
+CAP Solace Capital              927 items
+CDR Cedar Ridge                 373 items
+SMP Summit Pass                  19 items
+NPT Northpoint                  445 items
+LHK Lighthouse Key               22 items
+GLR Gull Rock                    25 items
+KLO Kaleo Regional              837 items
+PMB Palm Bay                     20 items
+VCF Volcano Crater Field         13 items
+FJH Fjordhaven                  435 items
+GLS Glacier Station              18 items
+FAR Far Isle                    479 items
+ORC Orchard Valley               31 items
+airport_layout_test: 4933 items, ok (0 problems)
+<end of output>
+Test time =   6.13 sec
+----------------------------------------------------------
+Test Passed.
+"airport_layouts" end time: Oct 10 07:21 EDT
+"airport_layouts" time elapsed: 00:00:06
+----------------------------------------------------------
+
+11/54 Testing: terrain_envelope
+11/54 Test: terrain_envelope
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/envelope_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"terrain_envelope" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+envelope_test: 2940660 samples, 0 below the terrain, closest 0.050 m, mean gap at level 0 9.00 m: ok
+<end of output>
+Test time =   6.64 sec
+----------------------------------------------------------
+Test Passed.
+"terrain_envelope" end time: Oct 10 07:21 EDT
+"terrain_envelope" time elapsed: 00:00:06
+----------------------------------------------------------
+
+44/54 Testing: community_layout
+44/54 Test: community_layout
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/community_layout_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"community_layout" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+Port Verde         3911 street-front buildings
+Solace Capital     3324 street-front buildings
+Kaleo Town          916 street-front buildings
+Fjordhaven           71 street-front buildings
+Northpoint          274 street-front buildings
+Meadowbrook         128 street-front buildings
+Cedar Ridge          90 street-front buildings
+Orchard Valley       53 street-front buildings
+Harlan               26 street-front buildings
+Palm Bay             75 street-front buildings
+Far Isle Resort     109 street-front buildings
+Lighthouse Key        7 street-front buildings
+Westvale            111 street-front buildings
+Riverton            147 street-front buildings
+Greenhollow         105 street-front buildings
+Saltmarsh            73 street-front buildings
+Kaleo Springs        36 street-front buildings
+Ice Harbor           46 street-front buildings
+9502 buildings, 476 tall, 18 inhabited towns, 45 roads, 36 parked cars sampled; 0 failures
+<end of output>
+Test time =   6.27 sec
+----------------------------------------------------------
+Test Passed.
+"community_layout" end time: Oct 10 07:21 EDT
+"community_layout" time elapsed: 00:00:06
+----------------------------------------------------------
+
+46/54 Testing: volcano_effects
+46/54 Test: volcano_effects
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/volcano_effects_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"volcano_effects" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+Volcano: 13561 checks, 0 failures
+<end of output>
+Test time =   6.14 sec
+----------------------------------------------------------
+Test Passed.
+"volcano_effects" end time: Oct 10 07:21 EDT
+"volcano_effects" time elapsed: 00:00:06
+----------------------------------------------------------
+
+45/54 Testing: airport_environment
+45/54 Test: airport_environment
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/airport_environment_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"airport_environment" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+MDB: 435 objects, 15 new service/landscape fixtures, 117 cars, 5 support vehicles
+HFS: 28 objects, 5 new service/landscape fixtures, 8 cars, 3 support vehicles
+PVI: 934 objects, 15 new service/landscape fixtures, 429 cars, 9 support vehicles
+CAP: 1017 objects, 16 new service/landscape fixtures, 424 cars, 9 support vehicles
+CDR: 406 objects, 15 new service/landscape fixtures, 100 cars, 5 support vehicles
+SMP: 19 objects, 5 new service/landscape fixtures, 6 cars, 1 support vehicles
+NPT: 493 objects, 15 new service/landscape fixtures, 114 cars, 5 support vehicles
+LHK: 22 objects, 5 new service/landscape fixtures, 7 cars, 1 support vehicles
+GLR: 25 objects, 5 new service/landscape fixtures, 8 cars, 1 support vehicles
+KLO: 904 objects, 16 new service/landscape fixtures, 441 cars, 8 support vehicles
+PMB: 20 objects, 5 new service/landscape fixtures, 6 cars, 1 support vehicles
+VCF: 13 objects, 3 new service/landscape fixtures, 0 cars, 3 support vehicles
+FJH: 476 objects, 15 new service/landscape fixtures, 124 cars, 5 support vehicles
+GLS: 18 objects, 3 new service/landscape fixtures, 0 cars, 3 support vehicles
+FAR: 531 objects, 15 new service/landscape fixtures, 120 cars, 5 support vehicles
+ORC: 31 objects, 5 new service/landscape fixtures, 11 cars, 3 support vehicles
+airport_environment_test: 97114 checks, 158 new fixtures, 0 failures
+<end of output>
+Test time =   6.31 sec
+----------------------------------------------------------
+Test Passed.
+"airport_environment" end time: Oct 10 07:21 EDT
+"airport_environment" time elapsed: 00:00:06
+----------------------------------------------------------
+
+53/54 Testing: environment_close_bounds
+53/54 Test: environment_close_bounds
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/environment_close_bounds_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"environment_close_bounds" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+environment_close_bounds_test: 68475802 checks, 34025712 visible sampled vertices, 0 failures across every kind, 8 seeds, 4 yaws, 6 nonuniform/signed scales, 3 animation times, close-pair and all-LOD envelopes.
+<end of output>
+Test time =   1.95 sec
+----------------------------------------------------------
+Test Passed.
+"environment_close_bounds" end time: Oct 10 07:21 EDT
+"environment_close_bounds" time elapsed: 00:00:01
+----------------------------------------------------------
+
+42/54 Testing: shader_loading_contract
+42/54 Test: shader_loading_contract
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/scratch/87b29863f015/solace-world-community/tools/validation/shader_progress_contract.py" "--generated" "/workspace/scratch/87b29863f015/solace-world-community-build/gen" "--cxx" "/usr/bin/c++"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"shader_loading_contract" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+success: ok=1 completed=34 attempts=34
+optional cloud accumulation unavailable: ok=1 completed=34 attempts=34
+optional hull unavailable: ok=1 completed=34 attempts=34
+fatal scenery class: ok=0 completed=3 attempts=4
+fatal light: ok=0 completed=21 attempts=22
+fatal UFO and debris: ok=0 completed=23 attempts=24
+fatal maps-only shadows: ok=0 completed=24 attempts=25
+Logical shader completion contract: PASS
+bake pair, coupled retry: ok=1 programs=3,2 attempts=3
+bake pair, normal unavailable: ok=0 programs=0,0 attempts=2
+Bake pair coupling: PASS
+shadow proxy, two reduced builds failing: program=3 attempts=3
+objects, failing: program=0 attempts=1
+Full-screen builds: PASS
+<end of output>
+Test time =   1.31 sec
+----------------------------------------------------------
+Test Passed.
+"shader_loading_contract" end time: Oct 10 07:21 EDT
+"shader_loading_contract" time elapsed: 00:00:01
+----------------------------------------------------------
+
+5/54 Testing: breakup
+5/54 Test: breakup
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/breakup_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"breakup" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+Kestrel T2       14 pieces: propeller L gear leg R gear leg gear leg L strut R strut L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 1 2 2 2 2 3 4 2 2 3 7 9
+  falls: propeller 84s 38m/s 7.1rad/s; L gear leg 126s 19m/s 0.5rad/s; R gear leg 126s 19m/s 0.5rad/s; gear leg 141s 17m/s 0.4rad/s; L strut 238s 12m/s 0.0rad/s; R strut 222s 13m/s 0.0rad/s; L tailplane 201s 13m/s 6.3rad/s; R tailplane 225s 11m/s 7.6rad/s; fin 294s 9m/s 7.3rad/s; L wing 124s 21m/s 4.1rad/s; R wing 139s 22m/s 4.8rad/s; nose 47s 57m/s 2.1rad/s; tail cone 56s 46m/s 1.0rad/s; centre section 79s 33m/s 1.5rad/s;  (0.9 us a step)
+Wren 180         12 pieces: propeller L gear leg R gear leg gear leg L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 1 2 2 3 4 1 1 4 7 7
+  falls: propeller 74s 31m/s 2.2rad/s; L gear leg 108s 23m/s 0.8rad/s; R gear leg 108s 22m/s 0.9rad/s; gear leg 117s 21m/s 0.7rad/s; L tailplane 207s 12m/s 7.7rad/s; R tailplane 219s 11m/s 8.1rad/s; fin 443s 5m/s 9.6rad/s; L wing 155s 35m/s 6.3rad/s; R wing 116s 36m/s 5.3rad/s; nose 42s 66m/s 1.7rad/s; tail cone 48s 56m/s 3.7rad/s; centre section 73s 28m/s 0.1rad/s;  (1.1 us a step)
+Bushmaster STOL  13 pieces: propeller L gear leg R gear leg L strut R strut L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 1 2 2 2 3 4 2 2 4 7 10
+  falls: propeller 73s 27m/s 3.9rad/s; L gear leg 109s 23m/s 0.4rad/s; R gear leg 108s 24m/s 0.5rad/s; L strut 206s 14m/s 0.0rad/s; R strut 224s 12m/s 0.0rad/s; L tailplane 211s 11m/s 7.0rad/s; R tailplane 212s 14m/s 6.0rad/s; fin 199s 11m/s 12.3rad/s; L wing 112s 27m/s 3.5rad/s; R wing 119s 27m/s 3.5rad/s; nose 40s 71m/s 1.7rad/s; tail cone 47s 57m/s 4.1rad/s; centre section 67s 37m/s 1.1rad/s;  (0.7 us a step)
+Islander Twin    15 pieces: L propeller R propeller L nacelle R nacelle L gear leg R gear leg gear leg L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 3 3 1 1 2 2 3 3 4 4 5 6 6
+  falls: L propeller 56s 50m/s 3.2rad/s; R propeller 55s 54m/s 12.4rad/s; L nacelle 26s 150m/s 1.7rad/s; R nacelle 26s 150m/s 2.1rad/s; L gear leg 81s 30m/s 1.4rad/s; R gear leg 82s 30m/s 1.4rad/s; gear leg 93s 26m/s 1.4rad/s; L tailplane 190s 14m/s 4.3rad/s; R tailplane 194s 14m/s 4.4rad/s; fin 171s 14m/s 8.9rad/s; L wing 127s 29m/s 3.1rad/s; R wing 104s 29m/s 3.1rad/s; nose 41s 69m/s 0.2rad/s; tail cone 42s 67m/s 6.2rad/s; centre section 60s 42m/s 1.6rad/s;  (0.9 us a step)
+Pelican Caravan  14 pieces: propeller L gear leg R gear leg gear leg L strut R strut L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 1 2 2 2 2 3 1 2 2 4 6 9
+  falls: propeller 43s 66m/s 2.6rad/s; L gear leg 75s 33m/s 1.1rad/s; R gear leg 77s 33m/s 1.1rad/s; gear leg 91s 28m/s 1.1rad/s; L strut 145s 19m/s 0.1rad/s; R strut 149s 15m/s 0.1rad/s; L tailplane 152s 15m/s 6.4rad/s; R tailplane 177s 13m/s 6.7rad/s; fin 168s 13m/s 10.9rad/s; L wing 216s 8m/s 6.7rad/s; R wing 95s 19m/s 6.3rad/s; nose 37s 78m/s 1.0rad/s; tail cone 40s 72m/s 2.8rad/s; centre section 56s 44m/s 0.7rad/s;  (1.1 us a step)
+Meridian Q400    12 pieces: L propeller R propeller L nacelle R nacelle L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 1 1 1 1 3 2 2 1 2 4
+  falls: L propeller 27s 163m/s 4.5rad/s; R propeller 38s 66m/s 2.6rad/s; L nacelle 25s 172m/s 2.0rad/s; R nacelle 25s 171m/s 2.2rad/s; L tailplane 134s 39m/s 7.9rad/s; R tailplane 68s 46m/s 9.1rad/s; fin 123s 21m/s 7.9rad/s; L wing 39s 74m/s 3.9rad/s; R wing 34s 74m/s 3.8rad/s; nose 31s 109m/s 2.3rad/s; tail cone 33s 105m/s 0.8rad/s; centre section 55s 48m/s 1.8rad/s;  (0.8 us a step)
+Starling 500 Jet 10 pieces: L nacelle R nacelle L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 2 2 1 2 4 1 1 1 9 4
+  falls: L nacelle 40s 77m/s 0.7rad/s; R nacelle 39s 76m/s 0.6rad/s; L tailplane 222s 8m/s 11.1rad/s; R tailplane 236s 8m/s 11.1rad/s; fin 163s 15m/s 11.6rad/s; L wing 47s 62m/s 7.0rad/s; R wing 58s 65m/s 7.0rad/s; nose 33s 93m/s 1.3rad/s; tail cone 37s 80m/s 0.1rad/s; centre section 57s 46m/s 1.9rad/s;  (0.7 us a step)
+Swift S6          9 pieces: propeller L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 2 3 4 1 1 2 7 4
+  falls: propeller 79s 32m/s 4.7rad/s; L tailplane 156s 20m/s 9.5rad/s; R tailplane 106s 27m/s 8.0rad/s; fin 418s 6m/s 9.4rad/s; L wing 348s 7m/s 7.5rad/s; R wing 125s 27m/s 5.9rad/s; nose 37s 83m/s 0.5rad/s; tail cone 49s 54m/s 2.9rad/s; centre section 56s 46m/s 11.8rad/s;  (1.1 us a step)
+Osprey C6        12 pieces: L propeller R propeller L nacelle R nacelle L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 1 1 3 3 2 3 4 4 4 5 7 4
+  falls: L propeller 62s 50m/s 4.0rad/s; R propeller 51s 72m/s 11.7rad/s; L nacelle 28s 126m/s 0.3rad/s; R nacelle 29s 119m/s 0.6rad/s; L tailplane 228s 11m/s 6.6rad/s; R tailplane 244s 10m/s 6.9rad/s; fin 451s 5m/s 7.0rad/s; L wing 137s 24m/s 4.5rad/s; R wing 149s 23m/s 3.6rad/s; nose 43s 66m/s 2.5rad/s; tail cone 70s 36m/s 0.0rad/s; centre section 68s 36m/s 2.0rad/s;  (0.7 us a step)
+XR-10 Nightjar   10 pieces: L nacelle R nacelle L tailplane R tailplane fin L wing R wing nose tail cone centre section
+  tears: 2 2 4 5 4 1 1 1 11 4
+  falls: L nacelle 37s 80m/s 0.3rad/s; R nacelle 42s 85m/s 0.2rad/s; L tailplane 206s 10m/s 12.7rad/s; R tailplane 194s 10m/s 12.7rad/s; fin 230s 10m/s 9.9rad/s; L wing 104s 24m/s 5.8rad/s; R wing 52s 38m/s 5.9rad/s; nose 33s 100m/s 0.5rad/s; tail cone 35s 93m/s 0.4rad/s; centre section 47s 54m/s 1.5rad/s;  (0.7 us a step)
+XR-30 Specter     5 pieces: L wing R wing nose tail cone centre section
+  tears: 3 3 3 3 4
+  falls: L wing 76s 46m/s 7.9rad/s; R wing 55s 55m/s 7.9rad/s; nose 32s 101m/s 0.1rad/s; tail cone 39s 109m/s 3.1rad/s; centre section 43s 115m/s 6.3rad/s;  (0.9 us a step)
+XR-20 Mantis      9 pieces: L canard R canard L fin R fin L wing R wing nose tail cone centre section
+  tears: 3 3 1 1 1 1 7 3 4
+  falls: L canard 55s 45m/s 20.7rad/s; R canard 147s 14m/s 21.0rad/s; L fin 95s 27m/s 18.2rad/s; R fin 85s 21m/s 15.7rad/s; L wing 38s 74m/s 8.1rad/s; R wing 38s 74m/s 8.1rad/s; nose 34s 93m/s 0.1rad/s; tail cone 30s 119m/s 0.8rad/s; centre section 43s 72m/s 3.0rad/s;  (0.6 us a step)
+XR-40 Wraith      5 pieces: L wing R wing nose tail cone centre section
+  tears: 3 3 3 3 4
+  falls: L wing 27s 149m/s 0.0rad/s; R wing 28s 148m/s 0.0rad/s; nose 31s 113m/s 2.3rad/s; tail cone 48s 59m/s 2.7rad/s; centre section 37s 88m/s 6.1rad/s;  (0.8 us a step)
+skin panel 0.5 m, 3 kg/m^2: down from 1000 m in 301 s, sinking 2.7..4.2 m/s, spinning up to 15.2 rad/s
+breakup_test: every type comes apart by component, each surface with its piece, and every piece flies down
+<end of output>
+Test time =   1.07 sec
+----------------------------------------------------------
+Test Passed.
+"breakup" end time: Oct 10 07:21 EDT
+"breakup" time elapsed: 00:00:01
+----------------------------------------------------------
+
+43/54 Testing: runway_preservation
+43/54 Test: runway_preservation
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/runway_preservation_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"runway_preservation" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+Runway shader: four immutable geometry/material/marking functions preserved
+Full-world terrain: 17523 frozen locations at 7/8/11 octaves (2 within explicitly allowed 600 m summit crater), max height delta elsewhere 0 m, preserved
+MDB: 10621 frozen terrain/contact samples, preserved
+MDB: 100 chunks, 57101 entity footprints, 124 navigation fixtures, clear/preserved
+HFS: 6123 frozen terrain/contact samples, preserved
+HFS: 63 chunks, 47700 entity footprints, 36 navigation fixtures, clear/preserved
+PVI: 24751 frozen terrain/contact samples, preserved
+PVI: 84 chunks, 19940 entity footprints, 174 navigation fixtures, clear/preserved
+CAP: 32285 frozen terrain/contact samples, preserved
+CAP: 240 chunks, 63169 entity footprints, 196 navigation fixtures, clear/preserved
+CDR: 9761 frozen terrain/contact samples, preserved
+CDR: 60 chunks, 32307 entity footprints, 120 navigation fixtures, clear/preserved
+SMP: 5733 frozen terrain/contact samples, preserved
+SMP: 81 chunks, 5873 entity footprints, 36 navigation fixtures, clear/preserved
+NPT: 14715 frozen terrain/contact samples, preserved
+NPT: 117 chunks, 6893 entity footprints, 142 navigation fixtures, clear/preserved
+LHK: 5343 frozen terrain/contact samples, preserved
+LHK: 63 chunks, 9185 entity footprints, 34 navigation fixtures, clear/preserved
+GLR: 4797 frozen terrain/contact samples, preserved
+GLR: 56 chunks, 1801 entity footprints, 40 navigation fixtures, clear/preserved
+KLO: 20757 frozen terrain/contact samples, preserved
+KLO: 135 chunks, 28569 entity footprints, 160 navigation fixtures, clear/preserved
+PMB: 7257 frozen terrain/contact samples, preserved
+PMB: 80 chunks, 25847 entity footprints, 42 navigation fixtures, clear/preserved
+VCF: 6437 frozen terrain/contact samples, preserved
+VCF: 80 chunks, 60504 entity footprints, 36 navigation fixtures, clear/preserved
+FJH: 12915 frozen terrain/contact samples, preserved
+FJH: 66 chunks, 16485 entity footprints, 134 navigation fixtures, clear/preserved
+GLS: 6847 frozen terrain/contact samples, preserved
+GLS: 81 chunks, 3291 entity footprints, 40 navigation fixtures, clear/preserved
+FAR: 17616 frozen terrain/contact samples, preserved
+FAR: 144 chunks, 82996 entity footprints, 150 navigation fixtures, clear/preserved
+ORC: 7667 frozen terrain/contact samples, preserved
+ORC: 90 chunks, 52201 entity footprints, 42 navigation fixtures, clear/preserved
+runway_preservation_test: PASS, 193625 terrain/contact samples, 1506 navigation fixtures, 1540 chunk visits, 513862 entity footprints; max height delta 0 m, max gradient delta 0 (0 failures)
+<end of output>
+Test time =   6.48 sec
+----------------------------------------------------------
+Test Passed.
+"runway_preservation" end time: Oct 10 07:21 EDT
+"runway_preservation" time elapsed: 00:00:06
+----------------------------------------------------------
+
+17/54 Testing: mesh_simplify
+17/54 Test: mesh_simplify
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/mesh_simplify_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"mesh_simplify" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+box: 19200 -> 256 triangles, 9602 -> 130 vertices
+sphere: 16128 -> 5956 triangles
+mesh simplifier: all checks passed
+<end of output>
+Test time =   0.82 sec
+----------------------------------------------------------
+Test Passed.
+"mesh_simplify" end time: Oct 10 07:21 EDT
+"mesh_simplify" time elapsed: 00:00:00
+----------------------------------------------------------
+
+28/54 Testing: cockpit_layout_geometry
+28/54 Test: cockpit_layout_geometry
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/scratch/87b29863f015/solace-world-community/tests/conventional_cockpit_layout_test.py"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"cockpit_layout_geometry" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+{
+  "source_hashes": {
+    "src/models.cpp": "8e15d40d43e825bdcda3c04be3790620bf117e70bb26bc84aefcb30f657f1895",
+    "assets/cockpits/layouts.json": "c6ccbb6395a742fed887143cfabdf80285f25e7b1bb485e0be45275ea76b6a75",
+    "src/shaders/cockpit_layout.glsl": "b5ce5b566f297d8d2f6037450518ff85b626dd9ed41d898a2ad9ee2abd0f53da",
+    "src/shaders/cockpit_fittings.glsl": "c6a6822c020660dcd7654275b47b3f45ecf07c41121a9026aa592bbf709f4710",
+    "src/shaders/plane_sdf.glsl": "d017820f6c81dd46b81b94d1629f3acfd2d43c8104461335f2192407f009626c",
+    "src/shaders/plane_common.glsl": "14aa3d8e7db0bf518adfd9dacc2c0f17561a69b07cf4b5a3441dea9b153149b6"
+  },
+  "model2_forward_rays": [
+    {
+      "seat": -1,
+      "down_degrees": 0,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.06174229853322706,
+        "housing_0": 0.05216000000000007,
+        "satin_rim_0": 0.05716000000000006,
+        "pilot_brow": 0.046160000000000055,
+        "housing_1": 0.3631297616737305,
+        "satin_rim_1": 0.3948756731815065,
+        "housing_2": 0.29913445221120005,
+        "housing_3": 0.46828309490701975
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": -1,
+      "down_degrees": 1,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.04283971290298366,
+        "housing_0": 0.039871634290534835,
+        "satin_rim_0": 0.04658223065350016,
+        "pilot_brow": 0.033395586294711,
+        "housing_1": 0.35949545839606445,
+        "satin_rim_1": 0.3918694677260945,
+        "housing_2": 0.2891369504587729,
+        "housing_3": 0.45911781891001396
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": -1,
+      "down_degrees": 2,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.02317552718054632,
+        "housing_0": 0.02756222073635902,
+        "satin_rim_0": 0.035978230715747905,
+        "pilot_brow": 0.020616788501952102,
+        "housing_1": 0.35632150821406255,
+        "satin_rim_1": 0.3891892163753024,
+        "housing_2": 0.279182740211891,
+        "housing_3": 0.4498540148746198
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": -1,
+      "down_degrees": 3,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.0026713679721103614,
+        "housing_0": 0.015246302813995125,
+        "satin_rim_0": 0.025364259379792743,
+        "pilot_brow": 0.00783369653458796,
+        "housing_1": 0.3536254737546806,
+        "satin_rim_1": 0.3868472419053506,
+        "housing_2": 0.2692657879902397,
+        "housing_3": 0.44049939957485895
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": -1,
+      "down_degrees": 4,
+      "required": false,
+      "clear": false,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": -0.018760300944973184,
+        "housing_0": 0.0029315243917687195,
+        "satin_rim_0": 0.014751461764048571,
+        "pilot_brow": -0.004886572718762559,
+        "housing_1": 0.35142095773769294,
+        "satin_rim_1": 0.3848508796467205,
+        "housing_2": 0.25947898250230894,
+        "housing_3": 0.4310564271551267
+      },
+      "first_hits": {
+        "pilot_brow": {
+          "point": [
+            -0.25,
+            0.4837084504933961,
+            -1.912
+          ],
+          "sdf_m": -0.00013154950660385425
+        },
+        "windowed_shell": {
+          "point": [
+            -0.25,
+            0.4284662690580229,
+            -2.702
+          ],
+          "sdf_m": -0.001465811799162719
+        }
+      }
+    },
+    {
+      "seat": 1,
+      "down_degrees": 0,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.06174229853322706,
+        "housing_0": 0.31021844069758125,
+        "satin_rim_0": 0.34551426463959956,
+        "pilot_brow": 0.3039011068066715,
+        "housing_1": 0.09789999999999996,
+        "satin_rim_1": 0.10289999999999995,
+        "housing_2": 0.2821638894912,
+        "housing_3": 0.46828309490701975
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": 1,
+      "down_degrees": 1,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.04283971290298366,
+        "housing_0": 0.3081256771754657,
+        "satin_rim_0": 0.34381926002515145,
+        "pilot_brow": 0.30200980929104193,
+        "housing_1": 0.08436028335671955,
+        "satin_rim_1": 0.09107072536665199,
+        "housing_2": 0.27221575811779725,
+        "housing_3": 0.45911781891001396
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": 1,
+      "down_degrees": 2,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.02317552718054632,
+        "housing_0": 0.3064970936967487,
+        "satin_rim_0": 0.3424360467932308,
+        "pilot_brow": 0.30063738165813647,
+        "housing_1": 0.0707887767855882,
+        "satin_rim_1": 0.0792079756863749,
+        "housing_2": 0.26226156291763186,
+        "housing_3": 0.4498540148746198
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": 1,
+      "down_degrees": 3,
+      "required": true,
+      "clear": true,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": 0.0026713679721103614,
+        "housing_0": 0.3053434872380787,
+        "satin_rim_0": 0.34137216928334535,
+        "pilot_brow": 0.2997930698361411,
+        "housing_1": 0.05719580713740088,
+        "satin_rim_1": 0.06732582876503874,
+        "housing_2": 0.25236934106235126,
+        "housing_3": 0.44049939957485895
+      },
+      "first_hits": {}
+    },
+    {
+      "seat": 1,
+      "down_degrees": 4,
+      "required": false,
+      "clear": false,
+      "minimum_sampled_sdf_m": {
+        "windowed_shell": -0.018760300944973184,
+        "housing_0": 0.30467115093261776,
+        "satin_rim_0": 0.34063211241097163,
+        "pilot_brow": 0.2994820291282461,
+        "housing_1": 0.043584250126181404,
+        "satin_rim_1": 0.055420652521057864,
+        "housing_2": 0.24250841978230894,
+        "housing_3": 0.4310564271551267
+      },
+      "first_hits": {
+        "windowed_shell": {
+          "point": [
+            0.25,
+            0.4284662690580229,
+            -2.702
+          ],
+          "sdf_m": -0.001465811799162719
+        }
+      }
+    }
+  ],
+  "checks": 2568,
+  "failures": 0,
+  "fit": [
+    {
+      "model": 0,
+      "name": "Kestrel T2",
+      "minimum_glass_to_skin_m": 0.10619274266837406,
+      "worst_tile": 0
+    },
+    {
+      "model": 1,
+      "name": "Wren 180",
+      "minimum_glass_to_skin_m": 0.11202298271200842,
+      "worst_tile": 0
+    },
+    {
+      "model": 2,
+      "name": "Bushmaster STOL",
+      "minimum_glass_to_skin_m": 0.09290226537046693,
+      "worst_tile": 0
+    },
+    {
+      "model": 3,
+      "name": "Islander Twin",
+      "minimum_glass_to_skin_m": 0.1460162092962358,
+      "worst_tile": 0
+    },
+    {
+      "model": 4,
+      "name": "Pelican Caravan",
+      "minimum_glass_to_skin_m": 0.16770262068128958,
+      "worst_tile": 0
+    },
+    {
+      "model": 5,
+      "name": "Meridian Q400",
+      "minimum_glass_to_skin_m": 0.13420008122378008,
+      "worst_tile": 0
+    },
+    {
+      "model": 6,
+      "name": "Starling 500",
+      "minimum_glass_to_skin_m": 0.1414414066941563,
+      "worst_tile": 0
+    },
+    {
+      "model": 7,
+      "name": "Swift S6",
+      "minimum_glass_to_skin_m": 0.10606672611616455,
+      "worst_tile": 0
+    },
+    {
+      "model": 8,
+      "name": "Osprey C6",
+      "minimum_glass_to_skin_m": 0.131260360572632,
+      "worst_tile": 0
+    },
+    {
+      "model": 9,
+      "name": "XR-10 Nightjar",
+      "minimum_glass_to_skin_m": 0.1428756068693761,
+      "worst_tile": 1
+    }
+  ],
+  "violations": [],
+  "limits": "Conservative skin and source-data contract only. Production raster, moving control envelopes and GPU performance remain separate gates."
+}
+<end of output>
+Test time =   0.73 sec
+----------------------------------------------------------
+Test Passed.
+"cockpit_layout_geometry" end time: Oct 10 07:21 EDT
+"cockpit_layout_geometry" time elapsed: 00:00:00
+----------------------------------------------------------
+
+14/54 Testing: propeller_visuals
+14/54 Test: propeller_visuals
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/propeller_visual_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"propeller_visuals" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+Failed to create /home/agent/.cache/mesa_shader_cache for shader cache (Read-only file system)---disabling.
+Failed to create /home/agent/.cache/mesa_shader_cache_db for shader cache (Read-only file system)---disabling.
+2 blades: integrated alpha stopped/low/high 6183.11 6182.47 6182.34; high-RPM phase error 0.00000000
+3 blades: integrated alpha stopped/low/high 9273.32 9273.47 9273.50; high-RPM phase error 0.00000000
+4 blades: integrated alpha stopped/low/high 12364.90 12364.68 12364.28; high-RPM phase error 0.00000000
+PASS: 1496226 production shader checks; 2/3/4 blades, stopped/low/high RPM, AI/airline parity
+<end of output>
+Test time =   0.38 sec
+----------------------------------------------------------
+Test Passed.
+"propeller_visuals" end time: Oct 10 07:21 EDT
+"propeller_visuals" time elapsed: 00:00:00
+----------------------------------------------------------
+
+29/54 Testing: environment_foliage
+29/54 Test: environment_foliage
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/environment_foliage_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"environment_foliage" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+foliage fade Fir: worst step 0.036 of an instance per 0.25% of the distance, density within 0.20% of the thinning
+foliage fade Bush: worst step 0.036 of an instance per 0.25% of the distance, density within 0.20% of the thinning
+detail cross-fade Fir: 340-400 m and 1700-2000 m, worst step 0.023 of a tree per 0.25% of the distance
+detail cross-fade Bush: 204-240 m and 850-1000 m, worst step 0.023 of a tree per 0.25% of the distance
+foliage ranges q0: four-tier flat-circle range-policy model, surviving instances +5.32..11.08%, vertices +9.64..17.38%; detail-stream area +21.76% (not measured frame cost)
+foliage ranges q1: four-tier flat-circle range-policy model, surviving instances +4.04..6.87%, vertices +8.59..15.34%; detail-stream area +21.92% (not measured frame cost)
+foliage ranges q2: four-tier flat-circle range-policy model, surviving instances +3.48..5.48%, vertices +6.33..13.07%; detail-stream area +23.12% (not measured frame cost)
+environment_foliage_test: deterministic finite meshes, fixed ABI, 150690 budgeted vertices, planted far skylines, 911400 exact leaf-coverage comparisons passed
+<end of output>
+Test time =   0.69 sec
+----------------------------------------------------------
+Test Passed.
+"environment_foliage" end time: Oct 10 07:21 EDT
+"environment_foliage" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/54 Testing: aero_model
+4/54 Test: aero_model
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/aero_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"aero_model" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+type               Smod  Sspec    AR   MAC   wInc  flapA   tInc    xNP    cgZ    cgY    SM  aTrim  mainZ  noseZ
+Kestrel T2         13.7   14.9  7.42  1.38   4.95  12.53   2.07  -0.83  -1.02   0.03  0.14   0.12  -0.65  -2.63
+    glide 11.6:1 (gear down 10.6:1)
+    rigging: aileron +0.006 rudder +0.066  flaps to 100%   CLmax 1.61 (spec 1.45) at 18.5 deg  dM pitch 7304  roll 11073 (yaw 200)  yaw 2040 (roll -400)
+    Cn_beta +0.031  Cl_beta -0.089  Cl_p -0.623  Cm_q -12.73  Cn_r -0.068
+    Cl_beta with interconnect -0.089 (gain 0.00)
+    flown CLmax 1.45 clean, 2.00 flaps (wing 1.45, 2.00)
+    elevator to trim:  cruise 50 m/s a -0.4: -0.02  1.3 Vs1 28 m/s a 6.9: +0.19  Vref flap 24 m/s a 3.7: -0.11  1.1 Vs0 20 m/s a 9.8: +0.19
+Wren 180           14.4   16.2  8.39  1.33   4.98  14.92   2.61  -0.75  -0.94   0.01  0.14   0.15  -0.55  -2.99
+    glide 11.7:1 (gear down 10.5:1)
+    rigging: aileron +0.006 rudder +0.033  flaps to 100%   CLmax 1.64 (spec 1.50) at 19.0 deg  dM pitch 9050  roll 12751 (yaw 254)  yaw 3218 (roll -660)
+    Cn_beta +0.054  Cl_beta -0.108  Cl_p -0.613  Cm_q -17.57  Cn_r -0.092
+    Cl_beta with interconnect -0.108 (gain 0.00)
+    flown CLmax 1.50 clean, 2.15 flaps (wing 1.50, 2.15)
+    elevator to trim:  cruise 60 m/s a -0.3: -0.01  1.3 Vs1 34 m/s a 7.1: +0.18  Vref flap 29 m/s a 3.1: -0.35  1.1 Vs0 24 m/s a 9.6: +0.01
+Bushmaster STOL    21.7   21.5  7.08  1.75   5.29  18.64   1.73  -1.08  -1.33   0.00  0.14  -0.55  -1.57   3.60
+    glide 12.2:1 (gear down 10.7:1)
+    rigging: aileron +0.003 rudder +0.065  flaps to 100%   CLmax 2.11 (spec 1.85) at 23.0 deg  dM pitch 11754  roll 22190 (yaw 341)  yaw 2675 (roll -473)
+    Cn_beta +0.028  Cl_beta -0.067  Cl_p -0.699  Cm_q -8.69  Cn_r -0.052
+    Cl_beta with interconnect -0.067 (gain 0.00)
+    flown CLmax 1.61 clean, 2.48 flaps (wing 1.85, 2.80)
+    elevator to trim:  cruise 55 m/s a -1.0: -0.01  1.3 Vs1 29 m/s a 7.3: +0.27  Vref flap 23 m/s a 1.9: -0.03  1.1 Vs0 20 m/s a 8.7: +0.30
+Islander Twin      30.5   30.2  7.27  2.05   4.89  13.55   1.31  -1.32  -1.61  -0.08  0.14   0.16  -1.14  -3.92
+    glide 14.0:1 (gear down 11.4:1)
+    rigging: aileron +0.009 rudder +0.000  flaps to 100%   CLmax 1.70 (spec 1.55) at 18.0 deg  dM pitch 22217  roll 37983 (yaw 673)  yaw 9602 (roll -2046)
+    Cn_beta +0.071  Cl_beta -0.087  Cl_p -0.715  Cm_q -12.13  Cn_r -0.093
+    Cl_beta with interconnect -0.087 (gain 0.00)
+    flown CLmax 1.55 clean, 2.25 flaps (wing 1.55, 2.25)
+    elevator to trim:  cruise 65 m/s a -0.3: -0.04  1.3 Vs1 37 m/s a 6.9: +0.19  Vref flap 31 m/s a 3.3: -0.11  1.1 Vs0 26 m/s a 9.7: +0.23
+Pelican Caravan    27.4   25.9  9.21  1.74   4.49  14.41   2.38  -1.46  -1.67  -0.04  0.12  -0.38  -1.21  -4.14
+    glide 13.1:1 (gear down 10.7:1)
+    rigging: aileron +0.006 rudder +0.031  flaps to 100%   CLmax 1.72 (spec 1.60) at 16.0 deg  dM pitch 28155  roll 26456 (yaw 656)  yaw 7734 (roll -1508)
+    Cn_beta +0.053  Cl_beta -0.114  Cl_p -0.760  Cm_q -27.02  Cn_r -0.095
+    Cl_beta with interconnect -0.114 (gain 0.00)
+    flown CLmax 1.60 clean, 2.50 flaps (wing 1.60, 2.50)
+    elevator to trim:  cruise 85 m/s a -0.7: -0.01  1.3 Vs1 45 m/s a 6.1: +0.11  Vref flap 36 m/s a 1.7: -0.46  1.1 Vs0 30 m/s a 7.7: -0.21
+Meridian Q400      59.6   54.0 12.58  2.26   3.93  12.87   1.45   0.36   0.09  -0.21  0.12  -0.61   1.03  -9.36
+    glide 15.7:1 (gear down 11.7:1)
+    rigging: aileron +0.006 rudder -0.000  flaps to 100%   CLmax 1.61 (spec 1.50) at 25.5 deg  dM pitch 132466  roll 137187 (yaw 4054)  yaw 66117 (roll -15251)
+    Cn_beta +0.177  Cl_beta -0.180  Cl_p -0.784  Cm_q -69.58  Cn_r -0.319
+    Cl_beta with interconnect -0.180 (gain 0.00)
+    flown CLmax 1.43 clean, 2.26 flaps (wing 1.50, 2.30)
+    elevator to trim:  cruise 140 m/s a -0.9: -0.01  1.3 Vs1 73 m/s a 4.6: +0.05  Vref flap 58 m/s a 1.5: -0.25  1.1 Vs0 49 m/s a 6.5: -0.10
+Starling 500 Jet   27.8   30.0  9.04  1.86   4.52  15.86   1.46   0.66   0.48  -0.09  0.10  -1.88   1.03  -5.04
+    glide 19.9:1 (gear down 13.6:1)
+    rigging: aileron +0.000 rudder -0.000  flaps to 100%   CLmax 1.49 (spec 1.40) at 15.5 deg  dM pitch 35385  roll 33214 (yaw 732)  yaw 10981 (roll -3045)
+    Cn_beta +0.052  Cl_beta -0.101  Cl_p -0.603  Cm_q -26.28  Cn_r -0.147
+    Cl_beta with interconnect -0.101 (gain 0.00)
+    flown CLmax 1.40 clean, 2.15 flaps (wing 1.40, 2.15)
+    elevator to trim:  cruise 200 m/s a -2.0: -0.01  1.3 Vs1 60 m/s a 6.0: +0.11  Vref flap 49 m/s a 2.6: -0.06  1.1 Vs0 41 m/s a 7.9: +0.03
+Swift S6           17.1   17.1  7.54  1.55   4.36  15.62   0.47  -0.13  -0.35   0.01  0.14  -0.32   0.03  -3.10
+    glide 12.1:1 (gear down 10.2:1)
+    rigging: aileron +0.006 rudder +0.055  flaps to 100%   CLmax 1.71 (spec 1.65) at 19.0 deg  dM pitch 8880  roll 14510 (yaw 224)  yaw 2843 (roll -634)
+    Cn_beta +0.027  Cl_beta -0.082  Cl_p -0.619  Cm_q -11.55  Cn_r -0.083
+    Cl_beta with interconnect -0.082 (gain 0.00)
+    flown CLmax 1.65 clean, 2.43 flaps (wing 1.65, 2.43)
+    elevator to trim:  cruise 76 m/s a -0.7: -0.01  1.3 Vs1 35 m/s a 8.2: +0.23  Vref flap 29 m/s a 4.8: +0.30  1.1 Vs0 25 m/s a 11.6: +0.40
+Osprey C6          22.3   22.5  6.86  1.84   4.74  16.64  -0.46   0.01  -0.20  -0.05  0.11  -0.31   0.31  -3.53
+    glide 12.9:1 (gear down 10.8:1)
+    rigging: aileron +0.016 rudder +0.004  flaps to 100%   CLmax 1.74 (spec 1.65) at 18.5 deg  dM pitch 12597  roll 20598 (yaw 184)  yaw 5692 (roll -1747)
+    Cn_beta +0.037  Cl_beta -0.067  Cl_p -0.631  Cm_q -7.61  Cn_r -0.097
+    Cl_beta with interconnect -0.067 (gain 0.00)
+    flown CLmax 1.65 clean, 2.32 flaps (wing 1.65, 2.45)
+    elevator to trim:  cruise 74 m/s a -0.6: +0.01  1.3 Vs1 35 m/s a 8.0: +0.21  Vref flap 30 m/s a 4.3: +0.57  1.1 Vs0 25 m/s a 10.5: +0.72
+XR-10 Nightjar     38.2   38.2  7.21  2.51   1.89  10.31   0.99  -0.56  -0.72  -0.05  0.06  -0.97  -0.20  -5.87
+    glide 17.4:1 (gear down 12.0:1)
+    rigging: aileron +0.000 rudder -0.000  flaps to 100%   CLmax 1.60 (spec 1.55) at 20.0 deg  dM pitch 32179  roll 44140 (yaw 1265)  yaw 10580 (roll -2256)
+    Cn_beta +0.070  Cl_beta -0.015  Cl_p -0.585  Cm_q -9.36  Cn_r -0.093
+    Cl_beta with interconnect -0.054 (gain 0.55)
+    flown CLmax 1.55 clean, 2.10 flaps (wing 1.55, 2.10)
+    elevator to trim:  cruise 260 m/s a -1.4: -0.02  1.3 Vs1 55 m/s a 9.0: +0.12  Vref flap 47 m/s a 6.5: +0.26  1.1 Vs0 40 m/s a 12.2: +0.29
+XR-20 Mantis       29.7   30.0  5.86  2.37   3.85  18.70   6.33  -1.00  -1.14  -0.10  0.06  -2.60  -0.60  -5.76
+    glide 15.6:1 (gear down 10.7:1)
+    rigging: aileron +0.000 rudder +0.000  flaps to 0%   CLmax 1.77 (spec 1.55) at 21.0 deg  dM pitch 9833  roll 26760 (yaw 516)  yaw 10213 (roll -2449)
+    Cn_beta +0.048  Cl_beta +0.066  Cl_p -0.527  Cm_q -6.79  Cn_r -0.126
+    Cl_beta with interconnect -0.067 (gain 1.94)
+    flown CLmax 1.27 clean, 1.27 flaps (wing 1.55, 1.55)
+    elevator to trim:  cruise 330 m/s a -3.4: -0.08  1.3 Vs1 71 m/s a 4.5: +0.22  Vref flap 71 m/s a 4.5: +0.22  1.1 Vs0 60 m/s a 7.7: +0.40
+all ok
+<end of output>
+Test time =   0.27 sec
+----------------------------------------------------------
+Test Passed.
+"aero_model" end time: Oct 10 07:21 EDT
+"aero_model" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/54 Testing: aero_wake
+6/54 Test: aero_wake
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/aero_wake_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"aero_wake" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+type             gamPair      KJ   b0/b   sink     nv flapv tailGam  finGam    wash
+Kestrel T2          27.0    25.8   0.78   0.55      8     2    11.5    12.3    17.6
+Wren 180            29.8    29.1   0.76   0.56      8     2    14.9    19.2    18.8
+Bushmaster STOL     28.1    27.5   0.82   0.44      8     2     9.6    14.2    31.5
+Islander Twin       54.5    46.4   0.68   0.86     10     4    13.1    14.4    20.1
+Pelican Caravan     43.5    41.9   0.78   0.56      8     2    19.5    28.5    25.1
+Meridian Q400      101.3    93.8   0.70   0.84      8     3    29.4   106.7    13.8
+Starling 500 Jet    89.1    88.3   0.63   1.42      4     2    19.5    50.8     0.0
+Swift S6            34.0    33.4   0.76   0.63      8     2    13.7    15.2    20.6
+Osprey C6           53.0    47.2   0.67   1.01     10     3     2.9    16.0    15.3
+XR-10 Nightjar      63.2    59.9   0.73   0.83      6     2     8.3    38.4     0.0
+XR-20 Mantis        69.1    74.5   0.87   0.95      8     2     0.0    43.4     0.0
+all wake checks passed
+<end of output>
+Test time =   0.23 sec
+----------------------------------------------------------
+Test Passed.
+"aero_wake" end time: Oct 10 07:21 EDT
+"aero_wake" time elapsed: 00:00:00
+----------------------------------------------------------
+
+13/54 Testing: traffic_prop_discs
+13/54 Test: traffic_prop_discs
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/prop_disc_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"traffic_prop_discs" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+PASS: 100504 checks; 8 prop aircraft, 11 model hubs, 100383 visible bound samples
+<end of output>
+Test time =   0.23 sec
+----------------------------------------------------------
+Test Passed.
+"traffic_prop_discs" end time: Oct 10 07:21 EDT
+"traffic_prop_discs" time elapsed: 00:00:00
+----------------------------------------------------------
+
+38/54 Testing: shader_glsl_inline_wreck
+38/54 Test: shader_glsl_inline_wreck
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/scratch/87b29863f015/solace-world-community/tests/inline_wreck_shader_test.py" "--validator" "/workspace/scratch/87b29863f015/solace-environment-publish/build-tools/glslang/bin/glslangValidator"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"shader_glsl_inline_wreck" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+/tmp/solace-inline-wreck-qbz2y5un/wreck_shadow.vert
+/tmp/solace-inline-wreck-qbz2y5un/wreck_shadow.frag
+vert: 2214 bytes, SHA256 3d494a5f226d06ff0abca9bd0bf7e634a33974a829310b863102d41e8f6bada7
+frag: 1620 bytes, SHA256 7a1b885bb3aac64eb713a65d480b01c66779708b0a383e36536bac971f243193
+PASS: 1 additional production startup program; 2 exact shader stages compiled and linked
+<end of output>
+Test time =   0.19 sec
+----------------------------------------------------------
+Test Passed.
+"shader_glsl_inline_wreck" end time: Oct 10 07:21 EDT
+"shader_glsl_inline_wreck" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/54 Testing: shader_keywords
+8/54 Test: shader_keywords
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/shader_keyword_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"shader_keywords" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+PASS: no reserved GLSL words in the shaders
+<end of output>
+Test time =   0.30 sec
+----------------------------------------------------------
+Test Passed.
+"shader_keywords" end time: Oct 10 07:21 EDT
+"shader_keywords" time elapsed: 00:00:00
+----------------------------------------------------------
+
+54/54 Testing: environment_chunk_bounds
+54/54 Test: environment_chunk_bounds
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/environment_chunk_bounds_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"environment_chunk_bounds" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+environment_chunk_bounds_test: 29320 checks, 2010 reach-zero protrusion cases, 0 failures.
+<end of output>
+Test time =   0.13 sec
+----------------------------------------------------------
+Test Passed.
+"environment_chunk_bounds" end time: Oct 10 07:21 EDT
+"environment_chunk_bounds" time elapsed: 00:00:00
+----------------------------------------------------------
+
+51/54 Testing: environment_nature_detail
+51/54 Test: environment_nature_detail
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/environment_nature_detail_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"environment_nature_detail" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+wood connectivity Fir: 582 / 582 supported components
+wood connectivity Spruce: 774 / 774 supported components
+wood connectivity Pine: 210 / 210 supported components
+wood connectivity Oak: 266 / 266 supported components
+wood connectivity Birch: 266 / 266 supported components
+wood connectivity Palm: 156 / 156 supported components
+wood connectivity Bush: 116 / 116 supported components
+environment_nature_detail_test: 1880801 checks, 0 failures. Counts are geometry budgets, not GPU timing.
+<end of output>
+Test time =   0.13 sec
+----------------------------------------------------------
+Test Passed.
+"environment_nature_detail" end time: Oct 10 07:21 EDT
+"environment_nature_detail" time elapsed: 00:00:00
+----------------------------------------------------------
+
+35/54 Testing: environment_benchmark_runner
+35/54 Test: environment_benchmark_runner
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/scratch/87b29863f015/solace-world-community/tools/validation/test_environment_runner.py"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"environment_benchmark_runner" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.003s
+
+OK
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"environment_benchmark_runner" end time: Oct 10 07:21 EDT
+"environment_benchmark_runner" time elapsed: 00:00:00
+----------------------------------------------------------
+
+52/54 Testing: airport_construction_detail
+52/54 Test: airport_construction_detail
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/airport_construction_detail_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"airport_construction_detail" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+airport construction detail: PASS (0 failures)
+<end of output>
+Test time =   0.11 sec
+----------------------------------------------------------
+Test Passed.
+"airport_construction_detail" end time: Oct 10 07:21 EDT
+"airport_construction_detail" time elapsed: 00:00:00
+----------------------------------------------------------
+
+48/54 Testing: environment_scan_assets
+48/54 Test: environment_scan_assets
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/scratch/87b29863f015/solace-world-community/tests/environment_scan_assets_test.py" "--source-only"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"environment_scan_assets" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+leafy_grass: matched 512/2048 maps, verified packed hashes and recorded source hashes
+asphalt_04: matched 512/2048 maps, verified packed hashes and recorded source hashes
+concrete_floor_worn_001: matched 512/2048 maps, verified packed hashes and recorded source hashes
+red_brick: matched 512/2048 maps, verified packed hashes and recorded source hashes
+painted_plaster_wall: matched 512/2048 maps, verified packed hashes and recorded source hashes
+clay_roof_tiles_02: matched 512/2048 maps, verified packed hashes and recorded source hashes
+bark_brown_02: matched 512/2048 maps, verified packed hashes and recorded source hashes
+environment_scan_assets_test: 387 source-only checks passed
+<end of output>
+Test time =   0.10 sec
+----------------------------------------------------------
+Test Passed.
+"environment_scan_assets" end time: Oct 10 07:21 EDT
+"environment_scan_assets" time elapsed: 00:00:00
+----------------------------------------------------------
+
+34/54 Testing: environment_frame_statistics
+34/54 Test: environment_frame_statistics
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/scratch/87b29863f015/solace-world-community/tools/validation/test_analyze_frames.py"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"environment_frame_statistics" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.003s
+
+OK
+<end of output>
+Test time =   0.11 sec
+----------------------------------------------------------
+Test Passed.
+"environment_frame_statistics" end time: Oct 10 07:21 EDT
+"environment_frame_statistics" time elapsed: 00:00:00
+----------------------------------------------------------
+
+25/54 Testing: research_cockpit_layout
+25/54 Test: research_cockpit_layout
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/research_cockpit_layout_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"research_cockpit_layout" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+Wraith adjacent-screen near-face bridge clearance: 20.8 mm
+PASS: 1057616 checks; minimum inter-module glass clearance 6.5 mm, moving-control clearance 72.2 mm
+<end of output>
+Test time =   0.07 sec
+----------------------------------------------------------
+Test Passed.
+"research_cockpit_layout" end time: Oct 10 07:21 EDT
+"research_cockpit_layout" time elapsed: 00:00:00
+----------------------------------------------------------
+
+47/54 Testing: environment_asset_mesh
+47/54 Test: environment_asset_mesh
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/environment_asset_mesh_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"environment_asset_mesh" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+environment_asset_mesh_test: 6374862 checks, 0 failures; near/mid/far/hero vertices 46365/17961/7026/442110, total 513462 (CPU geometry only)
+<end of output>
+Test time =   0.10 sec
+----------------------------------------------------------
+Test Passed.
+"environment_asset_mesh" end time: Oct 10 07:21 EDT
+"environment_asset_mesh" time elapsed: 00:00:00
+----------------------------------------------------------
+
+33/54 Testing: terrain_material_source
+33/54 Test: terrain_material_source
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/scratch/87b29863f015/solace-world-community/tests/terrain_material_test.py" "--source-only"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"terrain_material_source" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+PASS: terrain material source contracts
+<end of output>
+Test time =   0.06 sec
+----------------------------------------------------------
+Test Passed.
+"terrain_material_source" end time: Oct 10 07:21 EDT
+"terrain_material_source" time elapsed: 00:00:00
+----------------------------------------------------------
+
+36/54 Testing: aircraft_specialization
+36/54 Test: aircraft_specialization
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/scratch/87b29863f015/solace-world-community/tests/aircraft_specialization_test.py"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"aircraft_specialization" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+PASS: v3.39 family guards, per-aircraft dispatch, terrain-helper exclusion, projection skip
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"aircraft_specialization" end time: Oct 10 07:21 EDT
+"aircraft_specialization" time elapsed: 00:00:00
+----------------------------------------------------------
+
+27/54 Testing: cockpit_layout_generated
+27/54 Test: cockpit_layout_generated
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/scratch/87b29863f015/solace-world-community/tools/generate_cockpit_layouts.py" "--check"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"cockpit_layout_generated" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+PASS: bounded cockpit layout upload and CPU records match authored data
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"cockpit_layout_generated" end time: Oct 10 07:21 EDT
+"cockpit_layout_generated" time elapsed: 00:00:00
+----------------------------------------------------------
+
+50/54 Testing: environment_close_detail
+50/54 Test: environment_close_detail
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/environment_close_detail_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"environment_close_detail" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+Close-detail policy: 3224602 checks, 0 failures
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"environment_close_detail" end time: Oct 10 07:21 EDT
+"environment_close_detail" time elapsed: 00:00:00
+----------------------------------------------------------
+
+26/54 Testing: cockpit_layout
+26/54 Test: cockpit_layout
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/cockpit_layout_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"cockpit_layout" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+PASS: 1090 cockpit layout/fit/focus checks
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"cockpit_layout" end time: Oct 10 07:21 EDT
+"cockpit_layout" time elapsed: 00:00:00
+----------------------------------------------------------
+
+30/54 Testing: environment_buildings
+30/54 Test: environment_buildings
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/environment_building_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"environment_buildings" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+building_mesh_test: 342993 checks, 0 failures
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"environment_buildings" end time: Oct 10 07:21 EDT
+"environment_buildings" time elapsed: 00:00:00
+----------------------------------------------------------
+
+32/54 Testing: terrain_material_math
+32/54 Test: terrain_material_math
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/terrain_material_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"terrain_material_math" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+PASS: 745961 terrain material arithmetic checks (production-extracted GLSL; no GPU)
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"terrain_material_math" end time: Oct 10 07:21 EDT
+"terrain_material_math" time elapsed: 00:00:00
+----------------------------------------------------------
+
+41/54 Testing: hangar_catalog
+41/54 Test: hangar_catalog
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/hangar_catalog_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"hangar_catalog" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+All 13 catalog entries unique; career order retained; four research entries locked in designation order: PASS
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"hangar_catalog" end time: Oct 10 07:21 EDT
+"hangar_catalog" time elapsed: 00:00:00
+----------------------------------------------------------
+
+15/54 Testing: reheat_exhaust
+15/54 Test: reheat_exhaust
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/exhaust_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"reheat_exhaust" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+Anchors: XR-10 (+/-1.630,0.160,5.910) radius .270; XR-20 (0,-.080,7.520) radius .4896
+XR-30 swept 231 poses; XR-40 swept 99 tilt/vane/yaw poses across all four pods.
+PASS: 9637 exhaust checks, 0 failures
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"reheat_exhaust" end time: Oct 10 07:21 EDT
+"reheat_exhaust" time elapsed: 00:00:00
+----------------------------------------------------------
+
+31/54 Testing: benchmark_metrics
+31/54 Test: benchmark_metrics
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/benchmark_metrics_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"benchmark_metrics" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+benchmark metrics: freshness, invalid samples, percentiles, CSV and scene parsing passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"benchmark_metrics" end time: Oct 10 07:21 EDT
+"benchmark_metrics" time elapsed: 00:00:00
+----------------------------------------------------------
+
+40/54 Testing: hangar_geometry
+40/54 Test: hangar_geometry
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/hangar_geometry_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"hangar_geometry" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+Hangar geometry: 3960 vertices, finite positions, unit normals, outward winding, fixed budget: PASS
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"hangar_geometry" end time: Oct 10 07:21 EDT
+"hangar_geometry" time elapsed: 00:00:00
+----------------------------------------------------------
+
+39/54 Testing: loading_progress
+39/54 Test: loading_progress
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/load_pacer_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"loading_progress" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+Loading progress tests passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"loading_progress" end time: Oct 10 07:21 EDT
+"loading_progress" time elapsed: 00:00:00
+----------------------------------------------------------
+
+1/54 Testing: cockpit_focus_zoom
+1/54 Test: cockpit_focus_zoom
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/cockpit_focus_zoom_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"cockpit_focus_zoom" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+Cockpit focus zoom: 14171 checks, 0 failures
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"cockpit_focus_zoom" end time: Oct 10 07:21 EDT
+"cockpit_focus_zoom" time elapsed: 00:00:00
+----------------------------------------------------------
+
+16/54 Testing: mesh_validation
+16/54 Test: mesh_validation
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/mesh_validation_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"mesh_validation" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+mesh_validation_test: finite attributes, oriented recovery, no-position-change, compaction, blob bounds, overhead edge bound and coarse/fine partitions passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"mesh_validation" end time: Oct 10 07:21 EDT
+"mesh_validation" time elapsed: 00:00:00
+----------------------------------------------------------
+
+19/54 Testing: shader_prune
+19/54 Test: shader_prune
+Command: "/workspace/scratch/87b29863f015/solace-world-community-build/shader_prune_test"
+Directory: /workspace/scratch/87b29863f015/solace-world-community-build
+"shader_prune" start time: Oct 10 07:21 EDT
+Output:
+----------------------------------------------------------
+shader_prune: all checks passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"shader_prune" end time: Oct 10 07:21 EDT
+"shader_prune" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 10 07:21 EDT

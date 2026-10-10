@@ -1,0 +1,23 @@
+[0/2] Re-checking globbed directories...
+[1/24] Extracting environment shader arithmetic for CPU validation
+PASS: terrain material source contracts; extracted production arithmetic
+[2/22] Building CXX object CMakeFiles/propeller_visual_test.dir/tests/propeller_visual_test.cpp.o
+[3/22] Linking CXX executable propeller_visual_test
+[4/22] Building CXX object CMakeFiles/game_objs.dir/src/raster_renderer.cpp.o
+[5/22] Building CXX object CMakeFiles/game_objs.dir/src/terrain_mesh.cpp.o
+[6/22] Building CXX object CMakeFiles/game_objs.dir/src/renderer.cpp.o
+[7/22] Building CXX object CMakeFiles/game_objs.dir/src/aircraft_mesh.cpp.o
+[8/22] Building CXX object CMakeFiles/game_objs.dir/src/entity_render.cpp.o
+[9/22] Building CXX object CMakeFiles/game_objs.dir/src/game.cpp.o
+[10/22] Building CXX object CMakeFiles/game_objs.dir/src/aircraft_hull.cpp.o
+[11/22] Linking CXX executable cockpit_camera_test
+[12/22] Building CXX object CMakeFiles/flight_test.dir/tests/flight_test.cpp.o
+[13/22] Building CXX object CMakeFiles/terrain_shadow_test.dir/tests/terrain_shadow_test.cpp.o
+[14/22] Linking CXX executable flight_test
+[15/22] Linking CXX executable gameplay_test
+[16/22] Linking CXX executable encounter_timing_test
+[17/22] Linking CXX executable terrain_shadow_test
+[18/22] Building CXX object CMakeFiles/shader_check.dir/tools/shader_check.cpp.o
+[19/22] Linking CXX executable shader_check
+[20/22] Building CXX object CMakeFiles/shader_keyword_test.dir/tests/shader_keyword_test.cpp.o
+[21/22] Linking CXX executable shader_keyword_test
