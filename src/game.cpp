@@ -3949,7 +3949,8 @@ void Game::debugScene(const std::string& name) {
     }
     // the weather in flight: straight and level on the autopilot from (x, altitude, z) for some seconds (through the
     // cloud and rain WX sets), then the chase camera (c), the cockpit (k) or a look back along the path flown from
-    // beside the aircraft (b: its wake through the cloud): wxfly_<x>_<z>_<alt m>_<hdg>_<seconds>_<cam>_<aircraft>
+    // beside the aircraft (b: its wake through the cloud; t from above and behind; w inside the channel half a km back;
+    // o off to the side of the hole it came out of the cloud by): wxfly_<x>_<z>_<alt m>_<hdg>_<seconds>_<cam>_<aircraft>
     float fsecs = 0; int fspec = 1;
     if (sscanf(name.c_str(), "wxfly_%f_%f_%f_%f_%f_%c_%d", &px, &pz, &agl, &hdg, &fsecs, &cm, &fspec) >= 5) {
       fspec = std::clamp(fspec, 0, kNumAircraft - 1);
@@ -3971,6 +3972,17 @@ void Game::debugScene(const std::string& name) {
       if (cm == 't' && cloudWake.size() >= 5) {   // (from above and behind, looking down along the path: its trench through a cloud top)
         const vec3 off(cloudOff.x, 0, cloudOff.y), A = cloudWake.back().c - off, B = cloudWake[cloudWake.size() - 5].c - off;
         dbgCam = true; dbgFollow = false; dbgCamPos = A + normalize(A - B) * 120.f + vec3(0, 140.f, 0); dbgCamLook = (A + B) * 0.5f;
+      }
+      if (cm == 'w' && cloudWake.size() >= 9) {   // (inside the channel half a kilometre back, looking on back along it)
+        const vec3 off(cloudOff.x, 0, cloudOff.y), A = cloudWake[cloudWake.size() - 5].c - off, B = cloudWake[cloudWake.size() - 9].c - off;
+        dbgCam = true; dbgFollow = false; dbgCamPos = A + vec3(0, 4.f, 0); dbgCamLook = B;
+      }
+      if (cm == 'o' && cloudWake.size() >= 2) {   // (off to the side, at the hole where the path came out of the cloud)
+        const vec3 off(cloudOff.x, 0, cloudOff.y);
+        int e = (int)cloudWake.size() - 1;
+        while (e > 0 && wxfield::cloudDensity(wx, cloudWake[e].c - off, true) < 0.25f) e--;
+        const vec3 E = cloudWake[e].c - off, d = normalize(cloudWake.back().c - cloudWake[std::max(e - 1, 0)].c), sd = normalize(cross(d, vec3(0, 1, 0)));
+        dbgCam = true; dbgFollow = false; dbgCamPos = E + d * 380.f + sd * 240.f + vec3(0, 30.f, 0); dbgCamLook = E;
       }
       if (cm == 'b') {   // (down the wake's own line: the path drifts a little off the heading)
         dbgCam = true; dbgFollow = false; vec3 f = plane.forward(); dbgCamPos = plane.pos - f * 8.f + vec3(0, 2.f, 0); dbgCamLook = plane.pos - f * 400.f;
