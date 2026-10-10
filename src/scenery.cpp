@@ -47,6 +47,17 @@ const Town kTowns[] = {
   {"Saltmarsh", -16500, 17700, 300, 0},
   {"Kaleo Springs", 23000, 14000, 360, 0},
   {"Ice Harbor", 31000, -24900, 270, 0},
+  // The eastern islands, settled (2026-10): Kaleo's plain - a port city on its east shore, a market town in the middle,
+  // villages round them - and a village each on Palm Bay's island, Far Isle and Nordholm's one level stretch of coast.
+  // Each site surveyed dry and level over its whole radius (every 28 m lot's footprint within 2.6 m).
+  {"Kailani", 25500, 1500, 1200, 2},
+  {"Canefield", 20500, -2500, 700, 1},
+  {"Ember Bay", 18500, -5500, 360, 0},
+  {"Mango Grove", 17500, 0, 360, 0},
+  {"Mill Creek", 23000, 5000, 360, 0},
+  {"Coral Cove", 29000, 17200, 300, 0},
+  {"Turtle Bay", 37800, 33400, 300, 0},
+  {"Skarvik", 35200, -26000, 300, 0},
 };
 const int kNumTowns = sizeof(kTowns) / sizeof(kTowns[0]);
 
@@ -238,8 +249,7 @@ void sceneryBaseMod(float x, float z, float& h, float& amp) {
   // The terrain is a strict preservation boundary: do not use new access roads here.
   float rd = roadDistanceIn(legacyRoads, x, z);
   amp *= lerpf(0.3f, 1.f, smoothstepf(10.f, 70.f, rd));
-  for (int i = 0; i < kNumTowns; i++) {
-    const Town& t = kTerrainTowns[i];
+  for (const Town& t : kTerrainTowns) {   // (the legacy list only: settlements added since leave the ground alone)
     float d = sqrtf((x - t.x) * (x - t.x) + (z - t.z) * (z - t.z));
     amp *= lerpf(0.4f, 1.f, smoothstepf(0.5f * t.r, 1.2f * t.r, d));
   }

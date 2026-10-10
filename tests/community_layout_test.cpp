@@ -66,7 +66,8 @@ int main() {
     // The central square exists in the plan even where airport/water masks suppress placement.
     check(communityPark(town, plan.blockX * LOT * .5f, plan.blockZ * LOT * .5f), "civic green is deterministic");
   }
-  check(total > 600 && total < 12000, "bounded, populated community density");
+  // (three cities since the eastern islands were settled: ~14,000; the world held ~15,600 buildings before v3.44)
+  check(total > 600 && total < 18000, "bounded, populated community density");
   check(occupiedTowns == kNumTowns, "all named communities inhabit suitable land");
   check(tall > 150 && tall < total / 5, "dense cities retain a substantial, bounded high-rise skyline");
   // Detail upgrades and direct generation must yield the same entities. Every community item
