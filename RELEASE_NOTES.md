@@ -1,3 +1,29 @@
+## What's new in v3.46.0
+
+### Two new aircraft
+- **Larkspur L4**: a four-seat shoulder-wing touring single with a three-blade propeller and covered wheels. It cruises a little faster than the Wren and needs about 600 m of paved runway. PPL; $46,000 to buy, $360 to rent.
+- **Atlas A180**: a 180-seat twin-engine airliner, the largest aircraft you can fly. It has swept wings and two underwing turbofans whose fans you can watch turn, spool down and stop. Its main gear folds into bays under the wings, and it has a full transport flight deck. It needs about 1,910 m of runway, so only Solace Capital and Port Verde International can take it. Kaleo Regional's 1,900 m is just short. ATP; $1,600,000 to buy, $18,000 to rent.
+- Both have their own exteriors and cockpits, and both are in Free Flight and in the career hangar. The four research craft stay where they were.
+
+### Gear and breakup, on every aircraft
+- In a crash, fixed gear and lowered retractable gear now come away in three pieces: the left main, the right main, and the nose or tail wheel. Gear that is retracted, or barely starting down, stays with the airframe, and the bay doors stay on it too.
+- A broken-up airframe keeps its pieces as they were when they separated. A propeller that comes off goes with its spinner and tumbles with it, and the controls, wheels and fans stop where they were.
+- The covered wheels on the Kestrel and the Larkspur now leave the tread showing underneath, and the nose wheel's cover turns with it.
+
+### Fleet visual pass
+- Every aircraft, the research craft included, was checked from outside and in the cockpit. 28 cockpit defects are fixed: windshield joins, controls and fittings that clipped, seat webbing, and trim. So is some shading on the Islander's control surfaces.
+
+### XR-40 VTOL power
+- At the full 90° pod setting you can now hold the power directly. Hold throttle-up (Shift, PgUp or +) for full power, or hold 1–9 for part power. RT gives proportional power. Let go and it drops to idle at the engines' usual spool rate. The other pod settings, forward flight and the autopilot work as before.
+
+### Good to know
+- **The first launch after updating takes longer, once.** The aircraft bodies and their learned performance are rebuilt.
+- **A career with a Larkspur or an Atlas in it can't be opened by an older version.** If you might go back to an older version, keep a copy of your save from before you buy, rent or finance one.
+- The new aircraft's names aren't recorded for the voices yet. They show on screen, and the voice says the rest of the line.
+- On the autopilot, the Atlas lands with both engines running in calm air and in wind. With one engine out, its autoland doesn't always make it, so fly those approaches yourself. Fully loaded, its passenger-comfort bank limit can run about a degree over.
+
+Please run `diagnostics.bat` on this version. Fly the Larkspur and the Atlas in Free Flight first, and look over the other aircraft's cockpits too.
+
 ## What's new in v3.45.1
 
 ### Fixed: the ground lost its textures
