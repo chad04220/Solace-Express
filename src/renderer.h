@@ -158,6 +158,7 @@ public:
   std::string matDir;          // the scanned material layers (assets/materials; empty or missing: procedural ones)
   int matScanned = 0;          // how many of the layers came from it
   int matEnvScanned = 0;       // 0 or kEnvMatLayers optional 2K environment layers, separate from the base array
+  bool envMatCompressed = false;   // the 2K layers block-compressed (BC3), not RGBA8 (genMaterials)
   int matEnvFallbackScanned = 0;  // genuine-colour environment-only 512 px layers for Low/fallback
   int dbgOff = 0;            // profiling: renderer features switched off (uDbg bits)
   // the analysis's cost probes, above the features' bits: one piece of the frame's work left out to time it (the picture

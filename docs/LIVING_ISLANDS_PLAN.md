@@ -214,6 +214,18 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
     a town and twenty-four off a city, 150 in all. They lie in 1.2 to 7 m of water within 70 m of the shore and 2.5 km
     of the town, 16 m apart, clear of the container terminal's quay, the ferries' berths and the runways, all lying to the same
     breeze, clear of the ferries' terminals. Each shows an anchor light at her masthead at night.
+- **The v3.48.0 diagnostics (RTX 3070 Laptop, 1080p).** Every scene holds 60 fps. Against v3.43 most scenes are 1 to
+  2 ms dearer in the world pass, the price of the roads, towns, landmarks and the deeper view. The night scene, on
+  Cedar Ridge's runway, went from 9.7 to 15.5 ms, and its terrain materials from 1.9 to 6.0 ms.
+  - The cost is the view, not the night: it is the only diagnostic scene on the ground, looking along it.
+  - There, every ground pixel reads the finest levels of the photographed 2K materials (v3.44), anisotropically, and
+    they were uploaded uncompressed (RGBA8, 300 MiB with their mipmaps). The crash scene, also on the ground, grew
+    most after it (9.6 to 12.6 ms).
+  - The 2K set is now block-compressed (BC3, `texture_compress.h`, encoded on all cores at launch: about 0.4 s), a
+    quarter of the bytes and of the texture traffic. It falls back to RGBA8 where the driver lacks S3TC.
+  - The image is unchanged: 41.7 dB over a runway frame, no difference visible up close.
+  - `startup.log` names which set loaded, and the analysis gains a `2K ground photographs (512)` row, the cost of the
+    set against the 512 one, for the next diagnostics to confirm.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

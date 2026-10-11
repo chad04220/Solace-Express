@@ -835,6 +835,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
     if (helperSkipped) fprintf(f, "Optional shader-cache preparation skipped unfinished work; main-context program loading completed independently.\n");
     fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits.load(), g_shaderCacheMisses.load());
+    fprintf(f, "Ground photographs: %s\n", g_ren.matEnvScanned ? (g_ren.envMatCompressed ? "2K, block-compressed (BC3)" : "2K, uncompressed") : g_ren.matEnvFallbackScanned ? "512" : "none (procedural)");
     fprintf(f, "Launch: shaders and islands %.1f s (islands %s), career %.1f s, renderer %.1f s, menu %.1f s, aircraft meshes %.1f s (%d built)\n",
             pace.tookOf("start"), g_world.fromCache ? "from the cache" : "generated", pace.tookOf("career"), pace.tookOf("renderer"), pace.tookOf("menu"), pace.tookOf("mesh"), g_ren.bakeBuilt);
     if (!g_ren.dispError.empty()) fprintf(f, "Display shader failed (cockpit screens disabled):\n%s\n", g_ren.dispError.c_str());
@@ -903,6 +904,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       static const struct { int bit; const char* name; } kFeat[] = {
         {1, "volumetric clouds"}, {2, "terrain shadows"}, {4, "scenery shadow maps"}, {8, "aircraft shadow"}, {16, "point lights"},
         {32, "cloud shadows"}, {64, "half terrain march steps"}, {128, "terrain materials"}, {256, "fog / aerial perspective"},
+        {1024, "2K ground photographs (512)"},
       };
       struct Summary { std::string sc; double ms, rt, scale; std::string top; };
       std::vector<Summary> sums;
@@ -1036,6 +1038,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       static const struct { int bit; const char* name; } kFeat[] = {
         {0, "everything on"}, {1, "volumetric clouds"}, {2, "terrain shadows"}, {4, "scenery shadow maps"}, {8, "aircraft shadow"},
         {16, "point lights"}, {32, "cloud shadows"}, {64, "half terrain march steps"}, {128, "terrain materials"}, {256, "fog / aerial perspective"},
+        {1024, "2K ground photographs (512)"},
       };
       if (pf) fprintf(pf, "GPU: %s\nRender %dx%d, quality %d. Each line: frame time with that feature off, and what it saves.\n", gpu.c_str(), g_ren.W, g_ren.H, g_ren.quality);
       g_ren.entSync = true;

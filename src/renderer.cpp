@@ -6,6 +6,7 @@
 #include "mesh_validation.h"
 #include "aircraft_geometry_source.h"
 #include "materials.h"
+#include "texture_compress.h"
 #include "shaders.h"
 #include "weather.h"
 #if defined(_MSC_VER)
@@ -457,6 +458,36 @@ void Renderer::genMaterials(const std::function<void(float, const std::string&)>
   for (int i = 0; i < 16 && glGetError() != 0; i++) {}
   glGetIntegerv(0x84FF, &maxAnisotropy);  // GL_MAX_TEXTURE_MAX_ANISOTROPY: capability query, may be unsupported
   bool anisotropy = glGetError() == 0 && maxAnisotropy >= 1.f;
+  // The 2K set block-compressed (BC3: texture_compress.h) where the driver takes S3TC: a quarter of the bytes. A view
+  // along the ground reads their finest levels on every pixel, anisotropically: uncompressed, 300 MiB of them cost the
+  // v3.48.0 diagnostics' night scene (on a runway) 4 ms of texture traffic
+  bool s3tc = false;
+  if (glGetStringi && glCompressedTexImage3D && !getenv("SOLACE_NO_BC")) {
+    GLint ne = 0; glGetIntegerv(GL_NUM_EXTENSIONS, &ne);
+    for (GLint i = 0; i < ne && !s3tc; i++) { const GLubyte* e = glGetStringi(GL_EXTENSIONS, (GLuint)i); s3tc = e && !strcmp((const char*)e, "GL_EXT_texture_compression_s3tc"); }
+    for (int i = 0; i < 16 && glGetError() != 0; i++) {}
+  }
+  envMatCompressed = false;
+  // every level of every layer encoded on all the cores, one upload a level; false (nothing kept) if the driver refuses
+  auto uploadBC3 = [&](const std::vector<uint8_t>& data, int size) {
+    std::vector<std::vector<uint8_t>> cur(kEnvMatLayers);
+    int w = size, h = size;
+    for (int level = 0;; level++) {
+      const size_t lb = bc3LevelBytes(w, h);
+      const int bw = std::max(1, (w + 3) / 4), bh = std::max(1, (h + 3) / 4);
+      std::vector<uint8_t> blocks(lb * kEnvMatLayers);
+      parallelFor(kEnvMatLayers * bh, [&](int j) {
+        const int l = j / bh, row = j % bh;
+        const uint8_t* src = level == 0 ? data.data() + (size_t)l * size * size * 4 : cur[l].data();
+        bc3Encode(src + (size_t)row * 4 * w * 4, w, std::min(4, h - row * 4), blocks.data() + l * lb + (size_t)row * bw * 16);
+      });
+      glCompressedTexImage3D(GL_TEXTURE_2D_ARRAY, level, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, w, h, kEnvMatLayers, 0, (GLsizei)blocks.size(), blocks.data());
+      if (glGetError() != 0) return false;
+      if (w == 1 && h == 1) { glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_LEVEL, level); return true; }
+      parallelFor(kEnvMatLayers, [&](int l) { int nw, nh; cur[l] = mipDown(level == 0 ? data.data() + (size_t)l * size * size * 4 : cur[l].data(), w, h, nw, nh); });
+      w = std::max(1, w / 2); h = std::max(1, h / 2);
+    }
+  };
   auto loadEnvironment = [&](int size, const char* folder, GLuint& colour, GLuint& normal) {
     if (maxSize < size) return false;
     bool ready = false;
@@ -473,10 +504,18 @@ void Renderer::genMaterials(const std::function<void(float, const std::string&)>
       auto upload = [&](GLuint& tex, const std::vector<uint8_t>& data) {
         for (int i = 0; i < 16 && glGetError() != 0; i++) {}
         glGenTextures(1, &tex); glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
-        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, size, size, kEnvMatLayers,
-                     0, GL_RGBA, GL_UNSIGNED_BYTE, data.data());
-        if (glGetError() != 0) return false;
-        glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+        bool packed = size == kEnvMatTS && s3tc && uploadBC3(data, size);
+        if (size == kEnvMatTS && s3tc && !packed) {   // (refused: uncompressed after all, in a texture of its own)
+          glDeleteTextures(1, &tex); glGenTextures(1, &tex); glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
+          for (int i = 0; i < 16 && glGetError() != 0; i++) {}
+        }
+        if (packed) envMatCompressed = true;
+        else {
+          glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, size, size, kEnvMatLayers,
+                       0, GL_RGBA, GL_UNSIGNED_BYTE, data.data());
+          if (glGetError() != 0) return false;
+          glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+        }
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -503,9 +542,9 @@ void Renderer::genMaterials(const std::function<void(float, const std::string&)>
 void Renderer::bindEnvironmentMaterials(GLuint p, int baseColourUnit, int baseNormalUnit) {
   GLint colour = U(p, "uEnvAlb"), normal = U(p, "uEnvNrm"), enabled = U(p, "uEnvMaterials");
   if (colour < 0 && normal < 0 && enabled < 0) return;  // aircraft specializations have no extra samplers
-  bool high = quality > 0 && matEnvScanned == kEnvMatLayers && texEnvAlb && texEnvNrm;
+  bool high = quality > 0 && !(dbgOff & 1024) && matEnvScanned == kEnvMatLayers && texEnvAlb && texEnvNrm;   // (dbgOff 1024: the 512 set, profiling)
   bool low = matEnvFallbackScanned == kEnvMatLayers && texEnvLowAlb && texEnvLowNrm;
-  bool use = envMaterialUnits && (high || low);
+  bool use = envMaterialUnits && (high || low) && !getenv("NOENV");
   glUniform1i(enabled, use ? 1 : 0);
   if (!envMaterialUnits) {  // no out-of-range bindings even on an unsupported context
     glUniform1i(colour, baseColourUnit); glUniform1i(normal, baseNormalUnit);

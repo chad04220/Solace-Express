@@ -71,6 +71,9 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_RG32F 0x8230
 #define GL_TEXTURE_BASE_LEVEL 0x813C
 #define GL_TEXTURE_MAX_LEVEL 0x813D
+#define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT 0x83F3
+#define GL_NUM_EXTENSIONS 0x821D
+#define GL_EXTENSIONS 0x1F03
 #define GL_RGBA8 0x8058
 #define GL_RGBA16F 0x881A
 #define GL_RGBA32F 0x8814
@@ -212,12 +215,15 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
   X(void, glGetBufferParameteriv, (GLenum, GLenum, GLint*)) \
   X(void, glDeleteProgram, (GLuint))
 
-// Optional entry points (ARB_get_program_binary, core in 4.1): null when the driver lacks them
+// Optional entry points (ARB_get_program_binary, core in 4.1; the compressed arrays' upload and the extensions' list,
+// core in 3.0): null when the driver lacks them
 #define GL_OPT_FUNCS(X) \
   X(void, glGetIntegerv, (GLenum, GLint*)) \
   X(void, glProgramParameteri, (GLuint, GLenum, GLint)) \
   X(void, glGetProgramBinary, (GLuint, GLsizei, GLsizei*, GLenum*, void*)) \
-  X(void, glProgramBinary, (GLuint, GLenum, const void*, GLsizei))
+  X(void, glProgramBinary, (GLuint, GLenum, const void*, GLsizei)) \
+  X(void, glCompressedTexImage3D, (GLenum, GLint, GLenum, GLsizei, GLsizei, GLsizei, GLint, GLsizei, const void*)) \
+  X(const GLubyte*, glGetStringi, (GLenum, GLuint))
 
 // Function pointers live in a namespace so they never clash with the system GL library's exports.
 namespace glf {

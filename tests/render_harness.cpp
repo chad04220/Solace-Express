@@ -238,6 +238,7 @@ void main(){
   g_ren.entSync = !getenv("ENTSTREAM");   // captures generate every scenery chunk in range up front
   printf("renderer ok (shader cache: %d loaded, %d compiled, %.0f s)\n", g_shaderCacheHits.load(), g_shaderCacheMisses.load(),
          std::chrono::duration<double>(std::chrono::steady_clock::now() - tInit).count());
+  printf("ground photographs: %s\n", g_ren.matEnvScanned ? (g_ren.envMatCompressed ? "2K, block-compressed (BC3)" : "2K, uncompressed") : g_ren.matEnvFallbackScanned ? "512" : "none");
   std::string scene = argc > 1 ? argv[1] : "default";
   // ---- a render server: everything loaded once (the context, the shaders, the islands, the textures, the aircraft
   // meshes, and the scenery as it is generated), then one shot per request. Requests are lines on a named pipe
