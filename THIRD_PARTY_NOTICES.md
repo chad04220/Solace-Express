@@ -46,6 +46,16 @@ All seven are CC0 1.0: https://polyhaven.com/license, https://ambientcg.com/lice
 hashes, dimensions and transformations. Source photographs/PNG downloads are not bundled; only the compact runtime
 maps are redistributed. The existing aircraft/cockpit-compatible material files remain unchanged.
 
+## Optional Earth data packs (Phase 0 tools)
+
+The offline `tools/earth/` prototype does not replace the game's world. Its checked-in synthetic test fixture is authored test data, not GRIP or a geographic survey. External sources are not silently relicensed by the tool. Each built pack records its own inputs, transformations, checksums and license notices.
+
+- **ETOPO 2022:** NOAA National Centers for Environmental Information (2022), *ETOPO 2022 15 Arc-Second Global Relief Model*, https://doi.org/10.25921/fd45-gt74. NOAA metadata identifies CC0-1.0: https://creativecommons.org/publicdomain/zero/1.0/. Regional source subsets and tile transformations are described in the pack. Heights are relative to EGM2008. Not for navigation; no accuracy or fitness warranty.
+- **OurAirports:** airport and runway data by OurAirports contributors, public domain / Unlicense, https://ourairports.com/data/. Retain the pinned source version and list regional selection and unit conversions. Not for navigation.
+- **GRIP4:** no GRIP geometry is bundled with this prototype. For later GRIP-derived packs, the owner selected CC BY 4.0 as a working assumption, with attribution to Meijer, Huijbregts, Schotten and Schipper, *Global patterns of current and future road infrastructure*, Environmental Research Letters 13, 064006 (2018), https://doi.org/10.1088/1748-9326/aabd42; dataset https://doi.org/10.5281/zenodo.6420961; license https://creativecommons.org/licenses/by/4.0/. State actual modifications and do not imply endorsement. Publisher CC0 statements conflict with CC BY metadata, and mixed upstream provenance remains unresolved. This working assumption does not establish legal clearance for every upstream contribution.
+
+See `docs/EARTH_DATA_SOURCES.md` for official sources, exact sample provenance and the unresolved terms discrepancy. Attribution notices and license links are not represented as copies of the full legal texts.
+
 ## Everything else
 
 All other code, shaders, textures (the rest procedurally generated at startup), audio (synthesised in real time, apart from the tower voices above), aircraft, map and campaign content are original to this project.

@@ -1,0 +1,92 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "synthetic-east-west",
+        "class": "primary",
+        "node_ids": [
+          "west",
+          "junction",
+          "east-mid",
+          "east"
+        ]
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -65.1,
+            32.4
+          ],
+          [
+            -64.8,
+            32.4
+          ],
+          [
+            -64.6,
+            32.4
+          ],
+          [
+            -64.4,
+            32.4
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "synthetic-north-south",
+        "class": "local",
+        "node_ids": [
+          "south",
+          "junction",
+          "north"
+        ]
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -64.8,
+            32.2
+          ],
+          [
+            -64.8,
+            32.4
+          ],
+          [
+            -64.8,
+            32.6
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "synthetic-short-bend",
+        "class": "secondary"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -64.9,
+            32.35
+          ],
+          [
+            -64.85,
+            32.351
+          ],
+          [
+            -64.8,
+            32.35
+          ]
+        ]
+      }
+    }
+  ]
+}
