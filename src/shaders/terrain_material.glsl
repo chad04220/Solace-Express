@@ -480,7 +480,9 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   if (wSand > 0.01) { vec4 s = groundSample(p.xz, M_SAND, 6.0, nTS, hL); float w = hblend(wSand, hC, 1.0 - hL);
     // (on an airfield's flattened grounds - a beach strip's - all of it is the transition, and the height blend dotted
     // it with the sand tile's bumps every 6 m: there the weight alone, a smooth mix)
-    w = mix(wSand, w, smoothstep(1.0, 4.0, base.y));
+    // (and there in patches, sand or grass: a faint weight over a whole flat airfield read as a veil of haze)
+    float patchy = smoothstep(0.3, 0.7, wSand + (vnoise(p.xz/30.0) - 0.5)*0.6 + (vnoise(p.xz/7.0) - 0.5)*0.3);
+    w = mix(patchy, w, smoothstep(1.0, 4.0, base.y));
     // dry sand in drifts and patches; wet at the waterline, a little above it where the waves run up: darker, glossier
     float wetS = smoothstep(1.1 + 0.5*hNoise, 0.2, p.y);
     vec3 sc = s.rgb*mix(vec3(1.0), vec3(1.08,1.04,0.95), lush)*(0.85 + 0.3*vnoise(p.xz/70.0))*mix(1.0, 0.55, wetS);
@@ -511,6 +513,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
     m.alb = mix(m.alb, c, townW); m.rough = mix(m.rough, mix(lawn.a, pave.a, yard), townW); m.nrm = mix(m.nrm, mix(nG2, nP, yard), townW);
   }
   // ---- roads (the network, road_network.h): each class's cross-section, its markings stopping at junctions
+  float roadCover = 0.0;   // (how much of the pixel a road's platform takes: the airfield's mowing keeps off it)
   {
     float across, along; vec2 direction; int cls; bool junction;
     if (roadAt(p.xz, across, along, direction, cls, junction)) {
@@ -599,6 +602,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       }
       c = mix(c, pc, onPaving); rough = mix(rough, tx.a, onPaving); nrm = mix(nrm, nTS, onPaving);
       m.alb = mix(m.alb, c, onVerge); m.rough = mix(m.rough, rough, onVerge); m.nrm = mix(m.nrm, nrm, onVerge);
+      roadCover = onVerge;
       // street lamps at night, every 30 m along a street's pavements, staggered side to side: their pools of light
       if (cls == 4 && uNight > 0.01) {
         float side = across > 0.0 ? 1.0 : 0.0, k = floor(along/30.0 + 0.5*side);
@@ -633,6 +637,20 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
     vec2 across = vec2(-along.y, along.x);
     vec2 footprint = vec2(abs(dot(pixelDx, along)) + abs(dot(pixelDy, along)), abs(dot(pixelDx, across)) + abs(dot(pixelDy, across)));
     bool onRw, paved; runwayMaterial(ai, auv, m, p, footprint, onRw, paved);
+    // the rest of its flattened grounds, beyond the strip's mown margins: cut in broad bands along the runway, a lighter
+    // swath and a darker turn about, with the longer grass of the rough left in patches between them - olive, duller
+    vec4 dim = uApDim[ai];
+    bool margin = abs(auv.x) < dim.x*0.5 + 120.0 && abs(auv.y) < dim.y*0.5 + 60.0;
+    float grounds = (1.0 - smoothstep(2.0, 3.0, base.y))*(1.0 - roadCover)*(1.0 - smoothstep(0.02, 0.1, msk.y))*(1.0 - wSnow)*(1.0 - wSand)*step(1.0, p.y)*
+                    smoothstep(0.0, 200.0, min(dim.x*0.5 + 600.0 - abs(auv.x), 600.0 - abs(auv.y)));   // (faded out before airportAt's edge)
+    if (!onRw && !paved && !margin && grounds > 0.01) {
+      float swath = terrainStripeCoverage(auv.y/16.0, 0.5, footprint.y/16.0);
+      float rough = smoothstep(0.52, 0.64, vnoise(p.xz/170.0) + 0.35*(vnoise(p.xz/37.0) - 0.5));
+      vec3 mown = m.alb*mix(vec3(1.03, 1.05, 0.96), vec3(0.94, 0.96, 0.9), swath);
+      vec3 longer = m.alb*vec3(0.86, 0.84, 0.66)*(0.9 + 0.2*vnoise(p.xz/9.0));
+      m.alb = mix(m.alb, mix(mown, longer, rough), grounds);
+      m.rough = mix(m.rough, 0.95, rough*grounds);
+    }
   }
   // ---- impact crater: churned earth, scorched blast ring, smouldering embers in the pit
   int ci = uCraterN > 0 ? craterAt(p.xz, 2.6) : -1;

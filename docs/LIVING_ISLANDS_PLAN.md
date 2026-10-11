@@ -292,8 +292,15 @@ Done so far (after v3.48):
   headland, a cliff's foot. There are 126 of them, in small clusters at the foot of the steep coasts. `landmarks_test`
   checks the bay is clear and every stack is off a cliff.
 
-Still to look at: the airfields' grass, flat and even from low level; the haze from altitude; forest edges, the water
-along the shore and the clouds, from the cockpit.
+- **The airfields' grounds**, beyond the mown margins of their strips, were one flat, even green from low level. Now
+  they are cut in broad 16 m bands along the runway, a lighter swath and a darker one, with the longer grass of the
+  rough left in olive patches between them. The pattern fades out well before the airfield's edge and keeps off its
+  roads and buildings.
+- **On a low airfield** (Palm Bay's, 4 m up, beside the beach), the beach sand's weight lay faintly over all of its
+  flattened ground and read as a veil of haze. On flattened ground the sand now lies in patches with ragged edges,
+  sand or grass.
+
+Still to look at: the haze from altitude; forest edges, the water along the shore and the clouds, from the cockpit.
 
 ## Contracts kept throughout
 
