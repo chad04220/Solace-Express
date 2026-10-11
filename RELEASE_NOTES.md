@@ -33,6 +33,9 @@
 - **The sun and the moon are drawn at the size they look to the eye.** In the sky each is half a degree across. The game shows a 55-74° view on a monitor that fills about 30° of your vision, so at their true size they would look half as big as they do through a real window; they're drawn twice that size to make up for it. The sun is darker towards its edge, a little flattened as it sets, and its glare comes from the bloom.
 - **The moon is the same size as the sun, as it is in the real sky.** It goes through its phases, matching the real moon's phase on today's date. A new moon is a hairline sliver near the sun, with the rest of its disc faintly lit by earthshine, and a full moon rises as the sun sets. It shows its darker seas, is pale by day and bright by night, and reddens low down. Moonlight now comes from where the moon actually is, and it is stronger nearer full moon.
 
+### The aircraft come ready-built
+- **All 15 aircraft now ship with their bodies already built,** at full quality, outside and cockpit, the research craft included. The game no longer has to build them on your PC on the first launch after an update. It checks each one against the version it came with, and if one is missing or doesn't match, it builds that one itself as before. (Prepared by Codex.)
+
 ### Good to know
 - **The first launch after updating takes longer, once.** The islands are regenerated: some roads take different routes, and every settlement is laid out anew.
 
