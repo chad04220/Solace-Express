@@ -21,7 +21,7 @@ static float pct(std::vector<float> v, float q) {
   std::sort(v.begin(), v.end());
   return v[std::min(v.size() - 1, (size_t)(q * v.size()))];
 }
-static const char* kClass[RC_COUNT] = {"highway", "road", "lane", "track", "street", "yard"};
+static const char* kClass[RC_COUNT] = {"highway", "road", "lane", "track", "street", "yard", "circuit", "pitlane"};
 
 int main() {
   buildTestWorld();

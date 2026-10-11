@@ -9,7 +9,8 @@
 
 class World;
 
-enum RoadClass : uint8_t { RC_HIGHWAY = 0, RC_ROAD = 1, RC_LANE = 2, RC_TRACK = 3, RC_STREET = 4, RC_YARD = 5, RC_COUNT };
+enum RoadClass : uint8_t { RC_HIGHWAY = 0, RC_ROAD = 1, RC_LANE = 2, RC_TRACK = 3, RC_STREET = 4, RC_YARD = 5, RC_CIRCUIT = 6, RC_PITLANE = 7,
+                           RC_COUNT };   // (8 at most: the class is 3 bits of a segment's code, roads.glsl)
 
 // Each class's design (m): the paved half width (edge line to edge line, the central reserve included), the level
 // platform's half width (shoulders, verges); the steepest grade anywhere along it (rise over run, never exceeded: its
@@ -26,9 +27,15 @@ inline const RoadSpec& roadSpec(int c) {
     {1.9f, 2.8f, 0.15f, 25.f, 12.f, 4.f},       // track: gravel
     {3.5f, 6.0f, 0.12f, 20.f, 12.f, 3.f},       // street: two 3.5 m lanes between kerbs, 2.5 m pavements (settlements.h)
     {11.f, 13.f, 0.05f, 10.f, 6.f, 2.f},        // farmyard: a yard of gravel and concrete 22 m wide, 42 m long, near level (addFarmsteads)
+    {7.5f, 16.f, 0.06f, 25.f, 10.f, 6.f},       // circuit: a racetrack 15 m wide, 8.5 m of run-off either side (addRacetrack)
+    {6.f, 7.5f, 0.06f, 20.f, 8.f, 4.f},         // pit lane: 12 m beside the circuit's main straight, its fast lane and its working lane
   };
   return k[c];
 }
+
+// The racetrack's circuit (addRacetrack, settlements.h) starts on its main straight at its pit lane's mouth: the start
+// line this far along it (roads.glsl circuitStartLine: the terrain paints it there, and the grid behind it)
+static const float CIRCUIT_START_LINE = 430.f;
 
 struct RoadPoint { float x, z, h; };   // the centreline and its graded height
 struct RoadPath {
@@ -67,8 +74,9 @@ enum : uint8_t { RS_BRIDGE = 1, RS_NOGRADE = 2, RS_ENDA = 4, RS_ENDB = 8 };
 static const float ROAD_BANK_MAX = 50.f;            // the widest cut or fill bank beyond a platform's edge (m)
 // (a street's narrower: it follows the ground closely, and a town's grid of them would crowd the texels' lists; a
 // farm's track and yard narrower still: never more than 3.5 m off the ground, so 7 m of bank at the most - and four
-// hundred farms' worth of 50 m reaches overflowed the lists)
-inline float roadBankMax(int cls) { return cls == RC_STREET ? 20.f : cls == RC_TRACK || cls == RC_YARD ? 12.f : ROAD_BANK_MAX; }
+// hundred farms' worth of 50 m reaches overflowed the lists; the racetrack's circuit, laid within 5 m of the ground, a
+// street's, its pit lane, at the circuit's height beside it, a track's)
+inline float roadBankMax(int cls) { return cls == RC_STREET || cls == RC_CIRCUIT ? 20.f : cls == RC_TRACK || cls == RC_YARD || cls == RC_PITLANE ? 12.f : ROAD_BANK_MAX; }
 static const float ROAD_BANK_RUN = 2.f;             // a bank's run for its rise (1 in 2, on average: rounded at its top
                                                     // and toe, at most 1 in 1.33 at its middle)
 struct RoadSegment { float ax, az, bx, bz, ah, bh, along; uint16_t path; uint8_t cls, flags; };

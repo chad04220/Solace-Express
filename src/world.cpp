@@ -322,6 +322,7 @@ void World::build(const std::string& cachePath, const std::string& stamp, bool s
   // the settlements grown over the ground and along those roads, and their streets added to the network
   settlements = buildSettlementFields(*this);
   addSettlementStreets(*this, settlements, roads);
+  addRacetrack(*this, settlements, roads);    // (the racetrack's circuit, its pit lane and its road in)
   addFarmsteads(*this, settlements, roads);   // (and the farms out in the fields, each at the end of its track)
   farms = farmsteadsOf(roads);
   buildRoadGrid(roads, roadGrid);

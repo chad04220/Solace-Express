@@ -72,6 +72,7 @@ void sceneryBakeRoadFurniture(const World& world) {
     put(EK_GUARDRAIL, (a + b) * 0.5f, (ha + hb) * 0.5f, atan2f(-dir.y, dir.x), len / 16.f, 1.f, 1.f, 0.5f + std::clamp((hb - ha) / len, -0.3f, 0.3f));
   };
 
+  const Racetrack race = racetrackOf(net);
   for (size_t pi = 0; pi < net.paths.size(); pi++) {
     const RoadPath& P = net.paths[pi];
     if (P.pts.size() < 2) continue;
@@ -144,6 +145,11 @@ void sceneryBakeRoadFurniture(const World& world) {
     // wires run to the next, 15 to 55 m on and never more than 2 m off the line its side of the road takes
     if ((P.cls == RC_ROAD || P.cls == RC_LANE) && L.length() > 120.f) {
       const float sd = hash2i(ipi, 41) < 0.5f ? 1.f : -1.f, off = spec.halfPlatform + 3.5f;
+      auto inPaddock = [&](vec2 p) {   // (the racetrack's paddock, its road along it: the transporters stand there)
+        if (!race.found) return false;
+        const float s = dot2(p - race.o, race.u), v = dot2(p - race.o, vec2(-race.u.y, race.u.x));
+        return s > 140.f && s < 670.f && v > -100.f && v < 0.f;
+      };
       auto spot = [&](float s) { const Station st = L.at(s); return st.p + rightOf(st.d) * (sd * off); };
       std::vector<vec2> line;   // the poles in order (a gap: a pole refused, so the wires stop there)
       std::vector<bool> stands;
@@ -151,7 +157,7 @@ void sceneryBakeRoadFurniture(const World& world) {
       while (s < L.length() - 20.f) {
         const vec2 p = spot(s);
         const Station st = L.at(s);
-        const bool ok = !L.nearBridge(s, 25.f) && share(p) > 1.2f && clearOf(p, -1, 1.5f) && !st.bridge;
+        const bool ok = !L.nearBridge(s, 25.f) && share(p) > 1.2f && clearOf(p, -1, 1.5f) && !st.bridge && !inPaddock(p);
         line.push_back(p); stands.push_back(ok);
         // the next: the furthest of 15 to 55 m on whose wires keep within 2 m of the line between (round a hairpin, near)
         float next = s + 15.f;

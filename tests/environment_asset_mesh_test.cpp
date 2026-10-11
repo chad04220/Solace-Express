@@ -62,7 +62,8 @@ int main() {
     {228,168,138,444},{534,144,12,1398},{180,108,84,504},{342,198,54,1062},   // (road furniture: street lamp, guardrail, road sign, utility pole)
     {1044,648,396,1812},{1290,885,627,2046},{5214,3138,1947,5958},   // (landmarks: wind turbine, shipwreck, platform,
     {1536,702,282,3720},{1182,1146,1146,1662},{2454,1590,990,2706},   // observatory, star fort, landing stage,
-    {5046,2598,1206,6774},{2676,1920,426,12756},{1182,858,582,1302},{2040,2040,1080,6216},{1566,1134,918,1998}   // stadium, quay, gantry, containers, ship)
+    {5046,2598,1206,6774},{2676,1920,426,12756},{1182,858,582,1302},{2040,2040,1080,6216},{1566,1134,918,1998},   // stadium, quay, gantry, containers, ship,
+    {1752,1140,396,2208},{732,660,276,1032},{828,798,270,2124},{1296,816,216,1410}   // pit garages, pit wall, grandstand, transporter)
   };
   size_t cursor=0;int totals[ENT_LODS]={};
   for(int k=0;k<EK_COUNT;++k) for(int lod=0;lod<ENT_LODS;++lod) {

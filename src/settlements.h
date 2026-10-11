@@ -61,3 +61,20 @@ void addSettlementStreets(const World& world, const std::vector<SettlementField>
 // cached or not
 void addFarmsteads(const World& world, const std::vector<SettlementField>& fields, RoadNetwork& net);
 std::vector<Farmstead> farmsteadsOf(const RoadNetwork& net);
+
+// The racetrack (docs/LIVING_ISLANDS_PLAN.md, Phase C): a circuit of 3.9 km (class RC_CIRCUIT, one closed path) laid
+// where the ground is level enough for it, out in the country, with its pit lane (RC_PITLANE) beside the main straight
+// and a road from its paddock to the nearest road. After the streets, before the farms (which keep clear of it). Its
+// frame is read back off the network (racetrackOf), cached or not: o, the circuit's start - on its main straight at
+// the pit lane's mouth - and u, the way it's raced there; a place's s along u from o, and v across it to the right
+// (-u.y, u.x): the infield's side
+void addRacetrack(const World& world, const std::vector<SettlementField>& fields, RoadNetwork& net);
+struct Racetrack { bool found = false; vec2 o, u; int circuit = -1, pitLane = -1;
+                   vec2 at(float s, float v) const { return o + u * s + vec2(-u.y, u.x) * v; } };
+Racetrack racetrackOf(const RoadNetwork& net);
+// The circuit's centreline in its own frame (s, v), closed: its first point its last
+std::vector<vec2> circuitLine();
+// Where it lies in its frame: the pits' side of the main straight (v < 0) - the pit lane's centre 26 m off the
+// circuit's, between them the pit wall; the garages behind the pit lane, the paddock and its road behind them; across
+// the track (v > 0) the grandstands
+static const float RACE_PITLANE_V = -26.f, RACE_PITWALL_V = -17.25f, RACE_GARAGE_V = -43.5f, RACE_PADDOCK_V = -80.f, RACE_STAND_V = 36.f;

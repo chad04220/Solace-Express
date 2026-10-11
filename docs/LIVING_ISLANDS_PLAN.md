@@ -82,9 +82,10 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   - None stands on another road's platform, on a bridge, or by an airfield. `entity_kind_numbers` holds the shaders'
     kind numbers to the enum.
 - **A limit to watch.** The road grid lists each segment under every 39 m texel its banks reach, and those lists are
-  addressed with 19 bits. They now hold 490k of 524k entries, so tracks and yards reach only 12 m beyond their
-  platforms (streets 20 m, other roads 50 m). `roads_test` fails if any segment goes unlisted or the lists come
-  within a texel's worth of the limit. New roads (Phase C's access roads) need that headroom, or a wider packing.
+  addressed with 19 bits. They now hold 492k of 524k entries, so tracks, yards and the pit lane reach only 12 m
+  beyond their platforms (streets and the racetrack's circuit 20 m, other roads 50 m). `roads_test` fails if any
+  segment goes unlisted or the lists come within a texel's worth of the limit. New roads (Phase C's access roads)
+  need that headroom, or a wider packing. `road_class_numbers` holds roads.glsl's widths and reaches to roadSpec's.
 - **Phase A is done.** Phase C's hand-built landmarks are under way, then life on the roads (Phase D).
 - **Phase C, the wind farm (after v3.48, `landmarks.cpp`, `landmarks_test`).** Ten 3 MW turbines stand 300 m apart
   along the crest of a ridge (the best one on the mild green hills, 80 to 700 m up). They are out of the settlements,
@@ -124,6 +125,22 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
     its rails and bays marked, fenders, bollards and ladders down the wall. Four ship-to-shore gantry cranes stand on
     it, blue and red, booms out over the water. Behind them are blocks of containers stacked one to four high, each
     its own line's colour, and a 230 m container ship lies alongside, loaded.
+- **Phase C: the racetrack (after v3.48, `addRacetrack`, `landmarks_test`).** A 3.9 km circuit on Kaleo's eastern
+  plain, 6 km from Kailani: the level ground it needs, found on the base map (every 300 m and 15 degrees) and then
+  laid on the ground, out of the settlements, 3 km from the runways, and clear of every road.
+  - The circuit and its pit lane are the network's own roads (classes `RC_CIRCUIT` and `RC_PITLANE`), graded and
+    cached with it, so farms and lots keep off them, and a road runs from the paddock to the nearest road.
+  - The layout: a 1 km main straight, turn 1 (a right-hander), a kink, the back straight, a hairpin, a long left, and
+    two right-handers back onto the straight.
+  - The terrain paints a 15 m dark track with white edges. Round every bend it lays red-and-white kerbs and, on the
+    outside, a gravel trap; the shader reads the bend's curvature from the circuit's own segments. The run-off is
+    mown grass, and the main straight carries a chequered start line and the grid.
+  - Along the main straight stand four blocks of eight pit garages (`EK_PITS`), their bays lit in the teams' colours
+    on the boxes painted in the pit lane, and the pit wall (`EK_PITWALL`) with its crews' stands and debris fence.
+  - Across the track stand three grandstands (`EK_GRANDSTAND`) behind a catch fence, and a fourth faces turn 1.
+  - The teams' transporters (`EK_TRANSPORTER`) are in the paddock, a car park of 500 cars is behind the stands, and
+    guardrails line the outside of every bend.
+  - Its grounds are meadow with lone trees: no wood, no crops, nothing on the run-off.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

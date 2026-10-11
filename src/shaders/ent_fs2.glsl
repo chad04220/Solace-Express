@@ -476,6 +476,40 @@ void main(){
       else if (part == P_GLASS) { alb = vec3(0.04); emit = vec3(1.0, 0.9, 0.7)*uNight*0.6; }
       else alb = vec3(0.35, 0.36, 0.36);
       rough = 0.5;
+    } else if (uKind == K_PITS) {   // pit garages: rendered white, each bay lit within in its team's colours, the offices glazed
+      vec3 team = pal(hsh(vec2(vAux.z*3.1 + 1.0, seed*53.0)), vec3(0.75, 0.06, 0.05), vec3(0.05, 0.2, 0.6), vec3(0.95, 0.5, 0.05), vec3(0.08, 0.45, 0.25));
+      if (part == P_DOOR) {   // (the bay: its floor grey, its back wall white under a band of the team's colour, lit from above)
+        alb = n0.y > 0.5 ? vec3(0.32, 0.33, 0.35) : n0.y < -0.5 ? vec3(0.85) : mix(vec3(0.82), team, step(2.6, mp.y)*step(mp.y, 4.2));
+        rough = 0.4;
+        emit = alb*(0.25 + 1.2*uNight);
+      } else if (part == P_SIGN) { alb = mix(team, vec3(0.92), step(0.62, fract(mp.y/0.65 + 0.3))); emit = alb*uNight*0.8; rough = 0.4; }
+      else if (part == P_GLASS) { alb = vec3(0.05, 0.08, 0.1); rough = 0.08; metal = 0.3; emit = vec3(1.0, 0.92, 0.78)*uNight*0.7; }
+      else if (part == P_ROOF) { alb = vec3(0.9, 0.91, 0.92); rough = 0.35; metal = 0.3; }
+      else if (part == P_METAL) { alb = vec3(0.6); metal = 0.6; rough = 0.35; }
+      else alb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nb, rough)*(part == P_WALL ? vec3(1.02, 1.03, 1.05) : vec3(0.7));
+    } else if (uKind == K_PITWALL) {   // the pit wall: concrete painted white, a red band along its top, the crews' stands
+      if (part == P_WALL) { alb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nb, rough)*mix(vec3(1.0), vec3(0.75, 0.08, 0.06)/0.8, step(0.75, mp.y)); }
+      else if (part == P_ROOF) alb = livery;
+      else if (part == P_DARK) { alb = vec3(0.02); rough = 0.15; emit = vec3(0.3, 0.45, 0.6)*0.3; }
+      else { alb = vec3(0.55); metal = 0.6; rough = 0.4; }
+    } else if (uKind == K_TRANSPORTER) {   // a team's transporter: in the team's colours, a white band along it, its cab glazed
+      vec3 team = pal(seed*7.3, vec3(0.75, 0.06, 0.05), vec3(0.05, 0.2, 0.6), vec3(0.95, 0.5, 0.05), vec3(0.08, 0.45, 0.25));
+      if (part == P_PAINT) { alb = mix(team, vec3(0.9), step(2.3, mp.y)*step(mp.y, 2.7)); rough = 0.3; metal = 0.2; }
+      else if (part == P_GLASS) { alb = vec3(0.04); rough = 0.05; }
+      else if (part == P_TRIM) alb = team*0.7;
+      else { alb = vec3(0.05); rough = 0.7; }
+    } else if (uKind == K_GRANDSTAND) {   // a grandstand: its seats in rows, a block of colour to each section between the aisles
+      // and people in them, its walls concrete, its roof white
+      if (part == P_PAINT) {
+        float row = fract(mp.y/0.55), sec = floor((mp.x + 60.0)/20.0);
+        alb = mix(vec3(0.07, 0.2, 0.5), vec3(0.7, 0.08, 0.06), step(0.5, fract(sec*0.5)));
+        alb = mix(alb, vec3(0.88), step(0.88, fract(mp.y/9.0)));   // (a white band through them)
+        alb *= row < 0.35 ? 0.55 : 1.0;
+        alb = mix(alb, vec3(0.55, 0.42, 0.35), step(0.62, hsh(floor(vec2(mp.x/0.55, mp.y/0.55))))*0.65);   // (the crowd)
+        rough = 0.6;
+      } else if (part == P_ROOF) { alb = vec3(0.88, 0.89, 0.9); rough = 0.35; metal = 0.3; }
+      else if (part == P_METAL) { alb = vec3(0.62); metal = 0.6; rough = 0.35; }
+      else alb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nb, rough)*(part == P_TRIM ? vec3(0.72) : vec3(0.92, 0.92, 0.9));
     } else if (uKind == K_OBSERVATORY) {   // an observatory: its drum and building rendered white, its dome silver, the slit open on its face
       if (part == P_ROOF) {
         alb = vec3(0.86, 0.87, 0.88); metal = 0.55; rough = 0.22;

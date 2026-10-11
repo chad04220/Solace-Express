@@ -345,6 +345,24 @@ bool roadAt(vec2 p, out float across, out float along, out vec2 dir, out int cls
   return best < 0.0;
 }
 
+// The circuit's bend at a point along it (road_network.h RC_CIRCUIT, the only one): how fast it turns over the 30 m
+// about `along` (1/m; + to the right, the side of positive across), from its own segments listed with the point - its
+// straights one long segment each, its bends many short ones. 0 where its neighbours aren't listed (a long straight's
+// middle)
+float circuitBend(vec2 p, float along){
+  uint h = roadHead(p); int n = int((h >> 19u) & 63u), e0 = int(h & 0x7FFFFu);
+  vec2 d0 = vec2(0.0), d1 = vec2(0.0);
+  for (int k = 0; k < 63; k++) {
+    if (k >= n) break;
+    vec4 a = roadTexel(2*(e0 + k)), b = roadTexel(2*(e0 + k) + 1);
+    if ((int(b.w) & 7) != 6) continue;
+    vec2 ab = a.zw - a.xy; float L = max(length(ab), 1e-3);
+    if (along - 15.0 >= b.z && along - 15.0 <= b.z + L) d0 = ab/L;
+    if (along + 15.0 >= b.z && along + 15.0 <= b.z + L) d1 = ab/L;
+  }
+  return dot(d0, d0) > 0.5 && dot(d1, d1) > 0.5 ? (d0.x*d1.y - d0.y*d1.x)/30.0 : 0.0;
+}
+
 // The graded roads' own surface normal where their platform is - level across, tilted along by the road's grade -
 // blended back into the mesh's n over the platform's last metre. (A far chunk's cell spans a road and its banks: its
 // normal, their average, lit the paving as though it lay on the hillside, and laid rock on it where the banks were steep)
@@ -504,14 +522,27 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       // by the lanes and tracks
       float onPaving = terrainLineCoverage(x, paved, roadFoot);
       float onVerge = 1.0 - smoothstep(verge - 1.2, verge, x);
-      vec3 nV; vec4 vg = matSample(p.xz, cls == 4 ? M_CONCRETE : cls <= 1 ? M_GRAVEL : M_DIRT, cls == 4 ? 3.0 : 6.0, nV);
-      vec3 c = mix(m.alb, vg.rgb*(cls == 4 ? 0.92 : cls <= 1 ? 0.95 : 0.8), cls == 4 ? 1.0 : cls <= 1 ? 0.85 : 0.45);
+      bool concrete = cls == 4 || cls == 7;
+      vec3 nV; vec4 vg = matSample(p.xz, concrete ? M_CONCRETE : cls <= 1 ? M_GRAVEL : M_DIRT, concrete ? 3.0 : 6.0, nV);
+      vec3 c = mix(m.alb, vg.rgb*(concrete ? 0.92 : cls <= 1 ? 0.95 : 0.8), concrete ? 1.0 : cls <= 1 ? 0.85 : cls == 6 ? 0.0 : 0.45);
       if (cls == 4) {   // a street's pavement: flags, their joints, a kerb at the paving's edge
         onVerge = 1.0 - smoothstep(verge - 0.15, verge, x);
         c *= 0.94 + 0.06*terrainStripeCoverage(along/1.6, 0.92, alongFoot/1.6);
         c = mix(c, vec3(0.62, 0.61, 0.58), terrainLineCoverage(x - paved - 0.12, 0.12, roadFoot));
       }
-      float rough = mix(m.rough, vg.a, 0.8); vec3 nrm = mix(m.nrm, nV, 0.8);
+      float rough = mix(m.rough, vg.a, cls == 6 ? 0.0 : 0.8); vec3 nrm = mix(m.nrm, nV, cls == 6 ? 0.0 : 0.8);
+      if (cls == 6) {   // the circuit's run-off: mown grass, its stripes along it; round a bend a kerb red and white at the
+        // track's edge, and on its outside a gravel trap
+        c *= 0.9 + 0.12*terrainStripeCoverage(along/12.0, 0.5, alongFoot/12.0);
+        float k = circuitBend(p.xz, along), bendy = smoothstep(1.0/400.0, 1.0/250.0, abs(k));
+        float kerb = terrainLineCoverage(x - paved - 0.6, 0.6, roadFoot)*bendy;
+        c = mix(c, mix(vec3(0.62, 0.08, 0.06), vec3(0.85), terrainStripeCoverage(along/3.0, 0.5, alongFoot/3.0)), kerb);
+        rough = mix(rough, 0.6, kerb);
+        float trap = (1.0 - smoothstep(verge - 1.5, verge - 0.5, x))*smoothstep(paved + 2.5, paved + 3.5, x)*step(across*k, 0.0)*
+                     smoothstep(1.0/300.0, 1.0/180.0, abs(k));
+        vec3 nG; vec4 gr = matSample(p.xz, M_GRAVEL, 4.0, nG);
+        c = mix(c, mix(gr.rgb, vec3(0.74, 0.64, 0.47), 0.55)*(0.9 + 0.15*vnoise(p.xz/2.3)), trap); rough = mix(rough, gr.a, trap); nrm = mix(nrm, nG, trap);
+      }
       vec4 tx; vec3 pc;
       if (cls == 3) {   // a farm track: two wheel ruts of gravel, grass along the middle
         tx = matSample(p.xz, M_GRAVEL, 5.0, nTS);
@@ -527,7 +558,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       } else {
         tx = matSample(p.xz, M_ASPHALT, 4.0, nTS);
         // highways newest and darkest; country lanes worn paler, patched
-        pc = tx.rgb*(cls == 0 ? 0.72 : cls == 1 ? 0.82 : cls == 4 ? 0.8 : 0.95);
+        pc = tx.rgb*(cls == 0 ? 0.72 : cls == 1 ? 0.82 : cls == 4 ? 0.8 : cls == 6 ? 0.6 : cls == 7 ? 0.78 : 0.95);
         if (cls == 2) pc *= 0.9 + 0.2*vnoise(p.xz/7.0);
         float paint = 0.0, yellow = 0.0;
         if (!junction) {
@@ -540,6 +571,27 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
           } else if (cls == 1) {   // two-lane road: a dashed centre line, solid edge lines
             yellow = terrainLineCoverage(x, 0.08, roadFoot)*terrainStripeCoverage(along/12.0, 0.5, alongFoot/12.0);
             paint = max(paint, terrainLineCoverage(x - 3.5, 0.08, roadFoot));
+          } else if (cls == 6) {   // the circuit: its edge lines; on the main straight the start line, chequered, and
+            // the grid behind it - each place's mark across its half of the track, side to side, 8 m apart
+            // (road_network.h CIRCUIT_START_LINE, roads.glsl: the path starts at the pit lane's mouth)
+            paint = max(paint, terrainLineCoverage(x - paved + 0.35, 0.12, roadFoot));
+            float sl = along - circuitStartLine();
+            if (sl > -0.1 && sl < 1.3) {
+              float chk = mod(floor(across/0.6) + floor(sl/0.6), 2.0);
+              pc = mix(pc, vec3(0.03), chk*0.9); paint = max(paint, 1.0 - chk);
+            }
+            if (sl < -2.0 && sl > -162.0) {
+              float slot = floor((-sl - 2.0)/8.0), side = mod(slot, 2.0) < 0.5 ? 1.0 : -1.0;
+              float mark = terrainLineCoverage(-sl - 2.0 - slot*8.0 - 0.1, 0.1, alongFoot)*terrainLineCoverage(across*side - 3.4, 2.4, roadFoot);
+              paint = max(paint, mark);
+            }
+          } else if (cls == 7) {   // the pit lane: its edges, the fast lane (the circuit's side) from the working lane,
+            // and before the garages (across < 0) each crew's box, 12 m along
+            paint = max(paint, terrainLineCoverage(x - paved + 0.3, 0.1, roadFoot));
+            paint = max(paint, terrainLineCoverage(across + 0.3, 0.1, roadFoot));
+            float box = terrainStripeCoverage(along/12.0 + 0.005, 0.01, alongFoot/12.0)*terrainLineCoverage(across + 3.1, 2.6, roadFoot);
+            paint = max(paint, box);
+            yellow = max(yellow, terrainLineCoverage(across + 5.4, 0.08, roadFoot));
           }
         }
         pc = mix(pc, vec3(0.78), paint*0.9);

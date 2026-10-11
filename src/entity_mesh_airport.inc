@@ -1281,6 +1281,95 @@ void buildAirportKind(MB& mb, int kind, int lod) {
       mb.box(vec3(-3.f, 12.f, -112.f), vec3(3.f, 30.f, -106.f), P_PAINT, 0x3B | 8);   // the funnel
       break;
     }
+    case EK_PITS: {   // a racetrack's pit garages: eight 12 m garages along x, their open fronts (+z, z 10) on the pit lane - the
+      // crews' bays lit within (P_DOOR, u: the garage, its team's colours) - the team offices over them glazed along the
+      // front, the roof terrace and its canopy reaching out over the pit lane; the plinth down to the ground
+      mb.box(vec3(-48.f, -1.5f, -10.f), vec3(48.f, 6.f, 8.5f), P_WALL, 1 | 2 | 16);
+      for (int i = 0; i < 8; i++) {
+        const float x0 = -48.f + i * 12.f;
+        mb.box(vec3(x0, -1.5f, 8.5f), vec3(x0 + 1.f, 6.f, 10.f), P_WALL, 0x3B & ~8);   // (the pillar)
+        const size_t at = mb.o.size();
+        mb.quad(vec3(x0 + 1.f, 0.f, 8.5f), vec3(x0 + 11.f, 0.f, 8.5f), vec3(x0 + 11.f, 5.f, 8.5f), vec3(x0 + 1.f, 5.f, 8.5f), P_DOOR, vec3(x0 + 6.f, 2.5f, 0.f));
+        if (d1) { mb.quad(vec3(x0 + 1.f, 5.f, 8.5f), vec3(x0 + 11.f, 5.f, 8.5f), vec3(x0 + 11.f, 5.f, 10.f), vec3(x0 + 1.f, 5.f, 10.f), P_DOOR, vec3(x0 + 6.f, 8.f, 9.f));
+                  mb.quad(vec3(x0 + 1.f, -0.2f, 8.5f), vec3(x0 + 11.f, -0.2f, 8.5f), vec3(x0 + 11.f, -0.2f, 10.f), vec3(x0 + 1.f, -0.2f, 10.f), P_DOOR, vec3(x0 + 6.f, -3.f, 9.f)); }
+        if (lod == 3) {   // (up close: the bay's side walls, the team's board over it)
+          for (float x : {x0 + 1.f, x0 + 11.f}) mb.quad(vec3(x, -0.2f, 8.5f), vec3(x, -0.2f, 10.f), vec3(x, 5.f, 10.f), vec3(x, 5.f, 8.5f), P_DOOR, vec3(x < x0 + 6.f ? x0 - 5.f : x0 + 17.f, 2.5f, 9.f));
+          mb.box(vec3(x0 + 2.f, 5.2f, 10.f), vec3(x0 + 10.f, 5.85f, 10.12f), P_SIGN, 0x3F);
+        }
+        for (size_t q = at; q < mb.o.size(); q++) mb.o[q].u = (float)i;
+      }
+      mb.box(vec3(47.f, -1.5f, 8.5f), vec3(48.f, 6.f, 10.f), P_WALL, 0x33);   // (the last pillar)
+      mb.box(vec3(-48.f, 5.f, 8.5f), vec3(48.f, 6.f, 10.f), P_WALL, 4 | 32);   // (the lintel)
+      mb.box(vec3(-48.f, 6.f, -10.f), vec3(48.f, 10.5f, 9.f), P_WALL, 1 | 2 | 16 | 32);   // the offices
+      mb.box(vec3(-47.8f, 6.6f, 9.f), vec3(47.8f, 10.f, 9.05f), P_GLASS, 32);
+      if (d0) for (float x = -48.f; x <= 48.f; x += 6.f) mb.box(vec3(x - 0.15f, 6.f, 9.f), vec3(x + 0.15f, 10.5f, 9.2f), P_WALL, 0x3F);   // (mullions)
+      mb.box(vec3(-48.f, 10.5f, -10.f), vec3(48.f, 11.f, 10.5f), P_TRIM, 0x3F);   // the terrace
+      mb.box(vec3(-48.f, 13.f, -6.f), vec3(48.f, 13.5f, 11.f), P_ROOF, 0x3F);     // its canopy
+      if (d1) for (float x = -44.f; x <= 44.f; x += lod == 2 ? 22.f : 11.f)
+        for (float z : {-5.f, 9.5f}) mb.cyl(vec3(x, 11.f, z), vec3(x, 13.f, z), 0.12f, 0.12f, 6, P_METAL, false, false);
+      if (lod == 3) {   // (the terrace's glass balustrade, its handrail)
+        mb.box(vec3(-48.f, 11.f, 10.3f), vec3(48.f, 12.1f, 10.35f), P_GLASS, 0x3F);
+        mb.box(vec3(-48.f, 12.1f, 10.27f), vec3(48.f, 12.16f, 10.38f), P_METAL, 0x3F);
+      }
+      break;
+    }
+    case EK_PITWALL: {   // 48 m of the pit wall between the pit lane (-z) and the track (+z): concrete, the debris fence over it
+      // on posts, and two of the crews' stands on the pit lane side - a platform, its screens and a roof
+      mb.box(vec3(-24.f, -1.f, -0.3f), vec3(24.f, 1.1f, 0.3f), P_WALL, 0x3B);
+      for (float x = -24.f; x < 24.f; x += lod == 2 ? 12.f : 4.f) mb.cyl(vec3(x, 1.1f, 0.25f), vec3(x, 4.2f, 0.25f), 0.06f, 0.06f, 4, P_METAL, false, false);
+      mb.quad(vec3(-24.f, 1.1f, 0.25f), vec3(24.f, 1.1f, 0.25f), vec3(24.f, 4.1f, 0.25f), vec3(-24.f, 4.1f, 0.25f), P_FENCE, vec3(0, 2.f, -1.f));
+      for (float c : {-12.f, 12.f}) {
+        mb.box(vec3(c - 4.f, 1.f, -2.8f), vec3(c + 4.f, 1.25f, -0.3f), P_METAL, 0x3F);   // the platform
+        mb.box(vec3(c - 4.f, 3.5f, -3.f), vec3(c + 4.f, 3.7f, 0.2f), P_ROOF, 0x3F);     // its roof
+        if (d1) for (float x : {c - 3.8f, c + 3.8f}) for (float z : {-2.6f, -0.5f}) mb.cyl(vec3(x, -0.5f, z), vec3(x, 3.5f, z), 0.07f, 0.07f, 4, P_METAL, false, false);
+        if (d0) mb.box(vec3(c - 3.5f, 1.9f, -0.6f), vec3(c + 3.5f, 2.6f, -0.45f), P_DARK, 0x3F);   // (the screens)
+        if (lod == 3) for (float x = c - 3.f; x <= c + 3.f; x += 1.5f) mb.box(vec3(x - 0.25f, 1.25f, -2.0f), vec3(x + 0.25f, 1.8f, -1.5f), P_DARK, 0x3B);   // (stools)
+      }
+      break;
+    }
+    case EK_GRANDSTAND: {   // a 120 m grandstand facing the track (+z): its seats raked from 2 m at the front rail to 18 m at the
+      // back (P_PAINT: the shader's rows and colours), the walls under them, its roof cantilevered out over them from
+      // the columns at the back, the aisles up through them every 20 m
+      const float zf = 14.f, zb = -12.f, yf = 2.f, yb = 18.f;
+      mb.quad(vec3(-60.f, yf, zf), vec3(60.f, yf, zf), vec3(60.f, yb, zb), vec3(-60.f, yb, zb), P_PAINT, vec3(0, -20.f, -30.f));
+      mb.box(vec3(-60.f, -1.f, zf), vec3(60.f, yf, 16.f), P_WALL, 0x3F & ~4);   // the front wall
+      mb.box(vec3(-60.f, -1.f, -16.f), vec3(60.f, 21.f, zb), P_WALL, 0x3F & ~4); // the back
+      for (float x : {-60.f, 60.f})   // (its ends)
+        mb.quad(vec3(x, -1.f, zf), vec3(x, yf, zf), vec3(x, yb, zb), vec3(x, -1.f, zb), P_WALL, vec3(0, 5.f, 0));
+      mb.box(vec3(-61.f, 24.f, -16.f), vec3(61.f, 24.6f, 12.f), P_ROOF, 0x3F);   // the roof
+      for (float x = -60.f; x <= 60.f; x += lod == 2 ? 40.f : 15.f) {   // its columns, and its trusses over it
+        mb.box(vec3(x - 0.35f, 21.f, -15.6f), vec3(x + 0.35f, 24.f, -14.9f), P_METAL, 0x3B);
+        if (d1) {
+          mb.box(vec3(x - 0.2f, 24.6f, -16.f), vec3(x + 0.2f, 26.5f, -13.f), P_METAL, 0x3F);
+          for (float side : {-1.f, 1.f}) mb.tri(vec3(x, 24.6f, 12.f), vec3(x, 26.5f, -13.f), vec3(x, 24.6f, -13.f), P_METAL, vec3(x + side, 25.f, 0.f));
+        }
+      }
+      if (d0) for (float x = -40.f; x <= 40.f; x += 20.f) {   // (the aisles)
+        const float t = 0.06f;
+        mb.quad(vec3(x - 0.6f, yf + t, zf), vec3(x + 0.6f, yf + t, zf), vec3(x + 0.6f, yb + t, zb), vec3(x - 0.6f, yb + t, zb), P_TRIM, vec3(x, -20.f, -30.f));
+      }
+      mb.box(vec3(-60.f, yf, zf - 0.1f), vec3(60.f, yf + 1.f, zf), P_TRIM, 0x3F);   // (the front rail's wall)
+      if (lod == 3)   // (up close: the stairs at the ends, the rail along the back)
+        for (float x : {-61.2f, 61.2f}) for (int k = 0; k < 18; k++) mb.box(vec3(x - 1.1f, k * 1.1f - 1.f, 15.f - k * 1.6f), vec3(x + 1.1f, k * 1.1f + 0.1f - 1.f, 16.f - k * 1.6f), P_TRIM, 0x3F);
+      break;
+    }
+    case EK_TRANSPORTER: {   // a team's transporter, 16.6 m: the tractor's cab (+z) and its box trailer in the team's colours (P_PAINT,
+      // the shader's), the wheels under them
+      mb.box(vec3(-1.25f, 0.55f, 5.6f), vec3(1.25f, 3.5f, 8.3f), P_PAINT, 0x3B);   // the cab
+      mb.box(vec3(-1.2f, 2.0f, 8.3f), vec3(1.2f, 3.2f, 8.32f), P_GLASS, 32);
+      mb.box(vec3(-1.3f, 1.05f, -8.3f), vec3(1.3f, 4.1f, 5.3f), P_PAINT, 0x3B | 4);   // the trailer
+      mb.box(vec3(-1.0f, 0.5f, -8.f), vec3(1.0f, 1.05f, 7.5f), P_DARK, 0x33);       // (the chassis)
+      for (float z : {7.2f, 4.f, -4.8f, -6.2f, -7.6f}) {   // (the wheels; far off, an axle's pair one block)
+        if (!d1) { mb.box(vec3(-1.25f, 0.f, z - 0.5f), vec3(1.25f, 1.f, z + 0.5f), P_DARK, 0x33); continue; }
+        for (float x : {-1.1f, 1.1f}) mb.cyl(vec3(x - 0.15f, 0.5f, z), vec3(x + 0.15f, 0.5f, z), 0.5f, 0.5f, d0 ? 10 : 6, P_DARK, true, true);
+      }
+      if (lod == 3) {   // (up close: the mirrors, the trailer's doors and its awning rail)
+        for (float x : {-1.45f, 1.45f}) mb.box(vec3(x - 0.05f, 2.2f, 7.9f), vec3(x + 0.05f, 2.8f, 8.1f), P_DARK, 0x3F);
+        mb.box(vec3(-1.31f, 1.3f, -8.32f), vec3(1.31f, 3.9f, -8.3f), P_TRIM, 16);
+        mb.box(vec3(1.3f, 3.85f, -7.f), vec3(1.42f, 3.95f, 4.f), P_METAL, 0x3F);
+      }
+      break;
+    }
     case EK_POLE: {   // a wooden pole, a crossarm, three insulators; up close, its three wires to the next pole along +z
       mb.cyl(vec3(0, -0.5f, 0), vec3(0, 9.f, 0), 0.14f, 0.11f, d0 ? 10 : d1 ? 6 : 4, P_WOOD, true, false);
       mb.box(vec3(-1.05f, 8.15f, -0.06f), vec3(1.05f, 8.3f, 0.06f), P_WOOD, lod == 2 ? 8 | 16 | 32 : 0x3F);

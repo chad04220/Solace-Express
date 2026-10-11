@@ -343,7 +343,7 @@ void profile(const World& world, RoadPath& path, float h0, float h1, const std::
   for (int k = 1; k < n; k++) ds[k] = hypotf(path.pts[k].x - path.pts[k - 1].x, path.pts[k].z - path.pts[k - 1].z);
   std::vector<float> along(n, 0.f);
   for (int k = 1; k < n; k++) along[k] = along[k - 1] + ds[k];
-  const float half = (path.cls == RC_HIGHWAY ? 300.f : path.cls == RC_ROAD ? 140.f : path.cls == RC_LANE ? 70.f : 50.f) * 0.5f;
+  const float half = (path.cls == RC_HIGHWAY ? 300.f : path.cls == RC_ROAD || path.cls == RC_CIRCUIT ? 140.f : path.cls == RC_LANE ? 70.f : 50.f) * 0.5f;
   const float deck = 9.f;   // a bridge's deck over the sea
   const float steepest = s.maxGrade;
   // the ground (over the sea, the deck's height) averaged along the road, the nearer the more (by distance: the points

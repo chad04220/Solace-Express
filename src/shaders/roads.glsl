@@ -11,6 +11,7 @@
 uniform usampler2D uRoadGrid;
 const float ROAD_BANK_MAX = 50.0;   // the widest cut or fill bank beyond a platform's edge
 const float ROAD_BANK_RUN = 2.0;    // a bank's run for its rise, on average
+float circuitStartLine(){ return 430.0; }   // the circuit's start line, along it from its pit lane's mouth (road_network.h)
 float forestTexel(ivec2 i){ return float(texelFetch(uRoadGrid, clamp(i, ivec2(0), ivec2(MASKN-1)), 0).r >> 25u)/127.0; }
 float forestAt(vec2 p){
   vec2 f = (p + WH)/MTEX - 0.5; vec2 fl = floor(f); ivec2 i = ivec2(fl); vec2 t = f - fl;
@@ -19,9 +20,9 @@ float forestAt(vec2 p){
 }
 vec4 roadTexel(int i){ return texelFetch(uData, ivec2(i & 4095, 1 + (i >> 12)), 0); }
 uint roadHead(vec2 p){ return texelFetch(uRoadGrid, clamp(ivec2(floor((wrapW(p) + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0).r; }
-float roadHalfPlatform(int c){ return c == 0 ? 16.0 : c == 1 ? 6.5 : c == 2 ? 4.0 : c == 3 ? 2.8 : c == 4 ? 6.0 : 13.0; }   // (road_network.h roadSpec)
-float roadHalfPaved(int c){ return c == 0 ? 12.4 : c == 1 ? 4.6 : c == 2 ? 2.9 : c == 3 ? 1.9 : c == 4 ? 3.5 : 11.0; }
-float roadBankMax(int c){ return c == 4 ? 20.0 : c == 3 || c == 5 ? 12.0 : ROAD_BANK_MAX; }   // (road_network.h)
+float roadHalfPlatform(int c){ return c == 0 ? 16.0 : c == 1 ? 6.5 : c == 2 ? 4.0 : c == 3 ? 2.8 : c == 4 ? 6.0 : c == 5 ? 13.0 : c == 6 ? 16.0 : 7.5; }   // (road_network.h roadSpec)
+float roadHalfPaved(int c){ return c == 0 ? 12.4 : c == 1 ? 4.6 : c == 2 ? 2.9 : c == 3 ? 1.9 : c == 4 ? 3.5 : c == 5 ? 11.0 : c == 6 ? 7.5 : 6.0; }
+float roadBankMax(int c){ return c == 4 || c == 6 ? 20.0 : c == 3 || c == 5 || c == 7 ? 12.0 : ROAD_BANK_MAX; }   // (road_network.h)
 // The ground with the roads built into it, from the natural ground g: each graded road's platform level across at its
 // height, its banks blending back to g (bridges and the stretches by an airfield leave the ground alone; an end at a
 // bridge stops square, carried on under the deck's slab, then falling away). Mirrors roadGrade in road_network.cpp
@@ -62,4 +63,5 @@ float roadHalfPlatform(int c){ return 0.0; }
 float roadHalfPaved(int c){ return 0.0; }
 float roadBankMax(int c){ return 0.0; }
 float roadGrade(vec2 p, float g){ return g; }
+float circuitStartLine(){ return 0.0; }
 #endif

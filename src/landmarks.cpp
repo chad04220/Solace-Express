@@ -242,6 +242,123 @@ void lighthouseKey(const World& world, std::vector<PlacedEnt>& out) {
   const float lift = std::max(0.f, world.groundHeight(shore.x, shore.y, 8) - 1.3f);
   out.push_back({EK_JETTY, {c.x, lift, c.y, atan2f(dir.x, dir.y), 1.f, 1.f, 1.f, 0.5f}});
 }
+
+// The racetrack (its circuit, its pit lane and its road in are the network's: addRacetrack, settlements.h). Along the
+// main straight's pit side, behind the pit lane, four blocks of eight garages - each bay where the pit lane's boxes are
+// painted (every 12 m along it: terrain_material.glsl) - and the pit wall between the pit lane and the track; across
+// the track three grandstands behind a catch fence, and a fourth on the outside of turn 1; the teams' transporters
+// in the paddock behind the garages; a car park behind the grandstands; a guardrail round the outside of every bend.
+// Its grounds cleared: the run-off, the pits, the stands and the car park
+void racetrack(const World& world, std::vector<PlacedEnt>& out) {
+  const Racetrack R = racetrackOf(world.roads);
+  if (!R.found || R.pitLane < 0) return;
+  const RoadPath &C = world.roads.paths[R.circuit], &P = world.roads.paths[R.pitLane];
+  const vec2 r(-R.u.y, R.u.x);
+  auto sOf = [&](float x, float z) { return dot2(vec2(x, z) - R.o, R.u); };
+  auto yawTo = [](vec2 f) { return atan2f(f.x, f.y); };   // (a mesh's front, its +z, that way)
+  // along a path's stretch beside the main straight: its height at s, and its distance along from its start
+  auto beside = [&](const RoadPath& path, float s, float* along = nullptr) {
+    float a = 0.f;
+    for (size_t k = 0; k + 1 < path.pts.size(); k++) {
+      const RoadPoint &A = path.pts[k], &B = path.pts[k + 1];
+      const float s0 = sOf(A.x, A.z), s1 = sOf(B.x, B.z), L = hypotf(B.x - A.x, B.z - A.z);
+      if (s >= s0 && s <= s1 && s1 > s0) {
+        const float t = (s - s0) / (s1 - s0);
+        if (along) *along = a + t * L;
+        return A.h + (B.h - A.h) * t;
+      }
+      a += L;
+    }
+    if (along) *along = 0.f;
+    return path.pts[0].h;
+  };
+  auto put = [&](int kind, vec2 p, float y, float yaw, float sx, float sy, float sz, float seed) { out.push_back({kind, {p.x, y, p.y, yaw, sx, sy, sz, seed}}); };
+  // ---- the garages, their bays on the pit lane's boxes: the first from where 12 m along the lane falls past s 214
+  float along0 = 0.f; beside(P, 214.f, &along0);
+  const float s0 = 214.f + (ceilf(along0 / 12.f) * 12.f - along0);
+  for (int i = 0; i < 4; i++) {
+    const float sc = s0 + 48.f + 96.f * i;
+    const float y = 0.5f * (beside(P, sc - 48.f) + beside(P, sc + 48.f));
+    put(EK_PITS, R.at(sc, RACE_GARAGE_V), y - 0.05f, yawTo(r), 1.f, 1.f, 1.f, 0.13f + 0.21f * i);
+    for (int k = 0; k < 8; k++) {   // (each team's transporter in the paddock behind its garage, nose to it)
+      const vec2 t = R.at(sc - 42.f + 12.f * k, -63.5f);
+      put(EK_TRANSPORTER, t, world.groundHeight(t.x, t.y, 8), yawTo(r), 1.f, 1.f, 1.f, hash2i(i * 8 + k, 41));
+    }
+  }
+  // ---- the pit wall, from where the pit lane runs beside the track to where it leaves it
+  for (float s = 174.f; s <= 606.f; s += 48.f) put(EK_PITWALL, R.at(s, RACE_PITWALL_V), beside(C, s), yawTo(r), 1.f, 1.f, 1.f, hash2i((int)s, 7));
+  // ---- the grandstands opposite, and the catch fence before them
+  for (float s : {310.f, 430.f, 550.f}) put(EK_GRANDSTAND, R.at(s, RACE_STAND_V), beside(C, s) - 0.1f, yawTo(r * -1.f), 1.f, 1.f, 1.f, 0.5f);
+  for (float s = 260.f; s <= 600.f; s += 20.f) put(EK_FENCE, R.at(s, 17.5f), beside(C, s), yawTo(r), 1.f, 1.f, 1.f, 0.5f);
+  // ---- the fourth grandstand, facing turn 1 from its outside (unless the road in passes there)
+  {
+    const vec2 out1 = R.u * 0.7071f - r * 0.7071f, c = R.at(931.8f, 13.2f) + out1 * 38.f, along1(-out1.y, out1.x);
+    bool clear = true;
+    for (float a : {-60.f, 0.f, 60.f}) for (float d : {-16.f, 16.f}) {
+      const vec2 q = c + along1 * a + out1 * d;
+      clear = clear && roadEdgeDistance(world.roadGrid, q.x, q.y) > 3.f;
+    }
+    if (clear) {
+      float lo = 1e9f;
+      for (float a : {-55.f, 0.f, 55.f}) for (float d : {-14.f, 14.f}) { const vec2 q = c + along1 * a + out1 * d; lo = std::min(lo, world.groundHeight(q.x, q.y, 8)); }
+      put(EK_GRANDSTAND, c, lo - 0.1f, yawTo(out1 * -1.f), 1.f, 1.f, 1.f, 0.5f);
+      g_clearings.push_back(vec3(c.x, c.y, 70.f));
+    }
+  }
+  // ---- the car park behind the grandstands: rows facing each other in pairs, three in four places taken, on the
+  // grass; none on a road or within 30 m of the circuit
+  for (float v : {72.f, 78.f, 90.f, 96.f, 108.f, 114.f})
+    for (float s = 262.f; s <= 600.f; s += 2.9f) {
+      const vec2 p = R.at(s, v);
+      const float h = hash2i((int)(s * 10.f), (int)v);
+      if (h > 0.75f || roadEdgeDistance(world.roadGrid, p.x, p.y) < 30.f - roadSpec(RC_CIRCUIT).halfPlatform) continue;
+      const vec2 nose = ((int)v % 18 == 0) ? r * -1.f : r;
+      put(EK_CAR, p, world.groundHeight(p.x, p.y, 8), yawTo(nose), 1.f, 1.f, 1.f, hash2i((int)(s * 7.f), (int)v * 3));
+    }
+  // ---- the guardrails round the outside of every bend (its radius under 250 m, judged over 20 m either way), 15.4 m
+  // out from the centreline at the run-off's edge, in 16 m lengths along it, facing the track
+  {
+    const int n = (int)C.pts.size();
+    std::vector<float> along(n, 0.f);
+    for (int k = 1; k < n; k++) along[k] = along[k - 1] + hypotf(C.pts[k].x - C.pts[k - 1].x, C.pts[k].z - C.pts[k - 1].z);
+    auto pointAt = [&](float a, float* h, vec2* d) {
+      int k = 0; while (k + 2 < n && along[k + 1] < a) k++;
+      const float t = std::clamp((a - along[k]) / std::max(along[k + 1] - along[k], 1e-3f), 0.f, 1.f);
+      const vec2 A(C.pts[k].x, C.pts[k].z), B(C.pts[k + 1].x, C.pts[k + 1].z);
+      if (h) *h = C.pts[k].h + (C.pts[k + 1].h - C.pts[k].h) * t;
+      if (d) *d = (B - A) * (1.f / std::max(length(B - A), 1e-3f));
+      return A + (B - A) * t;
+    };
+    auto bend = [&](float a) {   // (+ turning right)
+      vec2 d0, d1; pointAt(std::max(a - 20.f, 0.f), nullptr, &d0); pointAt(std::min(a + 20.f, along.back()), nullptr, &d1);
+      return (d0.x * d1.y - d0.y * d1.x) / 40.f;
+    };
+    float a = 0.f;
+    while (a + 16.f < along.back()) {
+      const float k0 = bend(a + 8.f);
+      if (fabsf(k0) < 1.f / 250.f) { a += 4.f; continue; }
+      const float side = k0 > 0.f ? -1.f : 1.f;   // (the outside: away from the turn)
+      // (16 m along the rail's own line, out on the bend's outside: so much less along the centreline)
+      const float step = 16.f / (1.f + 15.4f * fabsf(k0));
+      float ha, hb; vec2 da, db;
+      const vec2 pa = pointAt(a, &ha, &da), pb = pointAt(a + step, &hb, &db);
+      vec2 A = pa + vec2(-da.y, da.x) * (15.4f * side), B = pb + vec2(-db.y, db.x) * (15.4f * side);
+      vec2 front = vec2(da.y, -da.x) * side;   // (towards the track)
+      if (dot2(front, vec2(-(B - A).y, (B - A).x)) < 0.f) std::swap(A, B), std::swap(ha, hb);
+      const vec2 u = B - A; const float len = length(u);
+      if (len > 4.f) put(EK_GUARDRAIL, (A + B) * 0.5f, 0.5f * (ha + hb), atan2f(-u.y / len, u.x / len), len / 16.f, 1.f, 1.f, 0.5f + std::clamp((hb - ha) / len, -0.3f, 0.3f));
+      a += step;
+    }
+  }
+  // ---- its grounds cleared: the run-off all round, the pits, the paddock, the stands and the car park
+  float run = 1e9f;
+  for (size_t k = 1; k < C.pts.size(); k++) {   // (a 26 m circle every 25 m round it)
+    run += hypotf(C.pts[k].x - C.pts[k - 1].x, C.pts[k].z - C.pts[k - 1].z);
+    if (run >= 25.f) { g_clearings.push_back(vec3(C.pts[k].x, C.pts[k].z, 26.f)); run = 0.f; }
+  }
+  for (float s = 120.f; s <= 680.f; s += 40.f)
+    for (float v : {-95.f, -65.f, -35.f, 25.f, 55.f, 85.f, 115.f}) { const vec2 p = R.at(s, v); g_clearings.push_back(vec3(p.x, p.y, 30.f)); }
+}
 }  // namespace
 
 void sceneryBakeLandmarks(const World& world) {
@@ -254,6 +371,7 @@ void sceneryBakeLandmarks(const World& world) {
   observatory(world, out);
   starFort(world, out);
   lighthouseKey(world, out);
+  racetrack(world, out);
   for (const PlacedEnt& c : civicLandmarks()) {   // (the cities': placed with their lots; their grounds cleared)
     out.push_back(c);
     if (c.kind == EK_STADIUM) g_clearings.push_back(vec3(c.e.x, c.e.z, 105.f));

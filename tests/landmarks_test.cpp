@@ -1,7 +1,8 @@
 // The landmarks (landmarks.cpp; docs/LIVING_ISLANDS_PLAN.md, Phase C), each where the world has room for it. A stone
 // circle on a bare summit, its stones standing (two fallen) round a clearing no tree grows in; a wreck on a reef in
 // warm shallows, open water round her; an offshore platform in deep water out of sight of no land; three observatory
-// domes on Mount Kaleo's rim; a star fort on a cape; Lighthouse Key's cottages and landing stage. The wind
+// domes on Mount Kaleo's rim; a star fort on a cape; Lighthouse Key's cottages and landing stage; the cities' stadium and
+// container terminal; the racetrack, its circuit and pit lane, its buildings and its grounds. The wind
 // farm: a row of turbines along a ridge's crest, 300 m and more apart, on the hills under the snow, out of the settlements, off the
 // roads and 6 km or more from every runway; each in its own chunk's scenery; found the same every time.
 #include "../src/scenery.h"
@@ -12,6 +13,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+
+float airportInfluence(float x, float z);   // world.cpp
 
 static int failures = 0, checks = 0;
 static void check(bool ok, const char* what) { checks++; if (!ok) { if (failures < 20) std::printf("FAIL: %s\n", what); failures++; } }
@@ -165,6 +168,120 @@ int main() {
       }
     }
     check(stadiums == 1 && quays == 1 && cranes == 4 && stacks >= 6 && ships == 1, "the stadium; the terminal's quay, four cranes, its containers and a ship");
+  }
+  // ---- the racetrack: its circuit closed, 3.9 km, on dry ground out of the settlements and away from the runways, never
+  // more than 5 m off the ground nor steeper than 6%, no other road on it; its pit lane beside the main straight at its
+  // height, out of it and back; a road from the paddock to the network; its buildings each where they belong, off the
+  // roads' paving; its grounds clear of trees
+  {
+    const Racetrack R = racetrackOf(w.roads);
+    check(R.found && R.pitLane >= 0, "a racetrack, its circuit and pit lane");
+    if (R.found && R.pitLane >= 0) {
+      const RoadPath &C = w.roads.paths[R.circuit], &P = w.roads.paths[R.pitLane];
+      float len = 0.f; bool dry = true, out = true, onGround = true, gentle = true;
+      for (size_t k = 0; k < C.pts.size(); k++) {
+        const RoadPoint& q = C.pts[k];
+        if (k) {
+          const float run = hypotf(q.x - C.pts[k - 1].x, q.z - C.pts[k - 1].z); len += run;
+          gentle = gentle && fabsf(q.h - C.pts[k - 1].h) <= 0.06f * run + 1e-3f;
+        }
+        dry = dry && w.groundHeight(q.x, q.z) >= 3.f;
+        out = out && settlementShare(w.settlements, q.x, q.z) >= 1.3f && airportInfluence(q.x, q.z) <= 0.f;
+        for (const Airport& a : w.airports) out = out && hypotf(q.x - a.x, q.z - a.z) >= 3000.f;
+        onGround = onGround && fabsf(q.h - w.naturalHeight(q.x, q.z)) <= 5.f;
+      }
+      check(hypotf(C.pts.front().x - C.pts.back().x, C.pts.front().z - C.pts.back().z) < 0.01f && len > 3800.f && len < 4000.f, "the circuit closed, 3.9 km round");
+      check(dry && out, "the circuit on dry land, out of the settlements, 3 km and more from the runways");
+      check(onGround && gentle, "the circuit within 5 m of the ground, nowhere steeper than 6%");
+      // (the main straight straight, from the pit lane's mouth past the start line to turn 1)
+      bool straight = true;
+      for (const RoadPoint& q : C.pts) {
+        const float sv = dot2(vec2(q.x, q.z) - R.o, R.u), vv = dot2(vec2(q.x, q.z) - R.o, vec2(-R.u.y, R.u.x));
+        if (sv > 1.f && sv < 890.f && fabsf(vv) < 30.f) straight = straight && fabsf(vv) < 0.3f;
+      }
+      check(straight, "the main straight straight, its start line on it");
+      int crossing = 0;
+      for (const RoadSegment& sg : w.roadGrid.segs) {
+        if (sg.path == R.circuit || sg.path == R.pitLane) continue;
+        for (size_t k = 0; k < C.pts.size(); k += 2) {
+          const vec2 a(sg.ax, sg.az), b(sg.bx, sg.bz), q(C.pts[k].x, C.pts[k].z), d = b - a;
+          if (fabsf(q.x - a.x) > 600.f && fabsf(q.x - b.x) > 600.f) continue;
+          const float t = std::clamp(dot2(q - a, d) / std::max(dot2(d, d), 1e-6f), 0.f, 1.f);
+          crossing += length(a + d * t - q) < roadSpec(RC_CIRCUIT).halfPlatform + roadSpec(sg.cls).halfPlatform;
+        }
+      }
+      check(crossing == 0, "no other road on the circuit");
+      bool beside = true;
+      for (const RoadPoint& q : P.pts) {
+        const float sv = dot2(vec2(q.x, q.z) - R.o, R.u), vv = dot2(vec2(q.x, q.z) - R.o, vec2(-R.u.y, R.u.x));
+        if (sv > 150.f && sv < 620.f) beside = beside && fabsf(vv - RACE_PITLANE_V) < 0.5f;
+        float best = 1e9f, hb = 0.f;
+        for (const RoadPoint& c : C.pts) { const float d = hypotf(c.x - q.x, c.z - q.z); if (d < best) { best = d; hb = c.h; } }
+        beside = beside && fabsf(q.h - hb) < 0.3f;
+      }
+      const float in = hypotf(P.pts.front().x - R.at(10.f, 0.f).x, P.pts.front().z - R.at(10.f, 0.f).y), back = hypotf(P.pts.back().x - R.at(780.f, 0.f).x, P.pts.back().z - R.at(780.f, 0.f).y);
+      check(beside && in < 1.f && back < 1.f, "the pit lane beside the main straight at its height, out of the circuit and back into it");
+      bool reached = false;   // (its far end on a highway, a road or a lane of the network's)
+      for (size_t pi = 0; pi < w.roads.paths.size(); pi++) {
+        const RoadPath& p = w.roads.paths[pi];
+        if (p.cls != RC_ROAD || p.from >= 0 || p.pts.size() < 2) continue;
+        const vec2 f(p.pts.front().x, p.pts.front().z), b(p.pts.back().x, p.pts.back().z);
+        if (length(f - R.at(170.f, RACE_PADDOCK_V)) > 5.f && length(f - R.at(640.f, RACE_PADDOCK_V)) > 5.f) continue;
+        for (const RoadSegment& sg : w.roadGrid.segs) {
+          if (sg.path == pi || sg.cls > RC_LANE) continue;
+          const vec2 a(sg.ax, sg.az), d = vec2(sg.bx, sg.bz) - a;
+          const float t = std::clamp(dot2(b - a, d) / std::max(dot2(d, d), 1e-6f), 0.f, 1.f);
+          reached = reached || length(a + d * t - b) < 1.f;
+        }
+      }
+      check(reached, "a road from the paddock to the network");
+      int pits = 0, walls = 0, stands = 0, vans = 0, cars = 0, rails = 0, onPaving = 0, railsOff = 0;
+      for (const PlacedEnt& p : items) {
+        const Ent& e = p.e; const float c = cosf(e.yaw), s = sinf(e.yaw);
+        auto at = [&](float x, float z) { return vec2(e.x + c * x + s * z, e.z - s * x + c * z); };
+        auto paved = [&](vec2 q) { int sg = -1; const float d = roadEdgeDistance(w.roadGrid, q.x, q.y, &sg);
+                                   return sg >= 0 && d + roadSpec(w.roadGrid.segs[sg].cls).halfPlatform - roadSpec(w.roadGrid.segs[sg].cls).halfPaved < 0.f; };
+        const EntKindInfo& I = kEntInfo[p.kind];
+        if (p.kind == EK_PITS || p.kind == EK_GRANDSTAND || p.kind == EK_TRANSPORTER || p.kind == EK_CAR) {
+          if (p.kind == EK_CAR && hypotf(e.x - R.at(430.f, 90.f).x, e.z - R.at(430.f, 90.f).y) > 400.f) continue;   // (the car park's)
+          pits += p.kind == EK_PITS; stands += p.kind == EK_GRANDSTAND; vans += p.kind == EK_TRANSPORTER; cars += p.kind == EK_CAR;
+          for (float a : {-1.f, 0.f, 1.f}) for (float b : {-1.f, 1.f}) onPaving += paved(at(a * I.hx * e.sx * 0.98f, b * I.hz * e.sz * 0.98f));
+        }
+        if (p.kind == EK_PITWALL) walls++;
+        if (p.kind == EK_GUARDRAIL) {
+          float best = 1e9f;
+          for (const RoadPoint& q : C.pts) best = std::min(best, hypotf(q.x - e.x, q.z - e.z));
+          if (best > 100.f) continue;   // (the network's own)
+          rails++; railsOff += best < 13.5f || best > 17.f;
+        }
+      }
+      std::printf("racetrack at %.0f %.0f heading %.0f: %.0f m round; %d garages blocks, %d of pit wall, %d grandstands, %d transporters, %d cars, %d guardrails\n",
+                  R.o.x, R.o.y, atan2f(R.u.x, R.u.y) * 57.3f, len, pits, walls, stands, vans, cars, rails);
+      check(pits == 4 && walls == 10 && stands >= 3 && vans == 32 && cars >= 300 && rails >= 40, "the racetrack's garages, pit wall, grandstands, transporters, car park and guardrails");
+      check(onPaving == 0, "none of the racetrack's buildings, transporters or cars on a road's paving");
+      int furnished = 0;   // (no pole, sign or lamp in a building, a transporter or a grandstand)
+      for (const RoadFurniture& f : roadFurniture())
+        for (const PlacedEnt& p : items) {
+          if (p.kind != EK_PITS && p.kind != EK_GRANDSTAND && p.kind != EK_TRANSPORTER && p.kind != EK_PITWALL) continue;
+          const Ent& e = p.e; const float c = cosf(e.yaw), s = sinf(e.yaw), dx = f.e.x - e.x, dz = f.e.z - e.z;
+          const float lx = c * dx - s * dz, lz = s * dx + c * dz;
+          furnished += fabsf(lx) < kEntInfo[p.kind].hx * e.sx + 1.f && fabsf(lz) < kEntInfo[p.kind].hz * e.sz + 1.f;
+        }
+      check(furnished == 0, "no road furniture in the racetrack's buildings or among its transporters");
+      check(railsOff == 0, "the circuit's guardrails at the run-off's edge");
+      int trees = 0;
+      for (size_t k = 0; k < C.pts.size(); k += 25) {
+        const Scenery::Chunk* ch = g_scenery.ensure(Scenery::chunkOf(C.pts[k].x), Scenery::chunkOf(C.pts[k].z), 2);
+        for (int kk = 0; kk <= EK_BUSH; kk++)
+          for (uint32_t n = ch->off[kk]; n < ch->off[kk + 1]; n++) {
+            float best = 1e9f;
+            for (size_t q = 0; q < C.pts.size(); q++) best = std::min(best, hypotf(C.pts[q].x - ch->ents[n].x, C.pts[q].z - ch->ents[n].z));
+            trees += best < 20.f;
+          }
+      }
+      check(trees == 0, "no tree or bush on the circuit's run-off");
+      g_scenery.clear();
+    }
   }
   // in their chunks' scenery, as generated
   for (size_t i = 0; i < turbines.size(); i += 3) {

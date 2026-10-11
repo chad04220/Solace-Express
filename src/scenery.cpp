@@ -185,11 +185,12 @@ void World::bakeMask() {
     for (int i = 0; i < MASK_N; i++) {
       float x = -WORLD_HALF + (i + 0.5f) * MASK_TEXEL, z = -WORLD_HALF + (j + 0.5f) * MASK_TEXEL;
       float b[4]; sampleBase(x, z, b);
-      float rd = roadEdgeDistance(roadGrid, x, z) + 6.f;   // (as roadDistance measures it)
+      int rs = -1; const float re = roadEdgeDistance(roadGrid, x, z, &rs), rd = re + 6.f;   // (as roadDistance measures it)
+      const bool raceGround = rs >= 0 && re < 250.f && roadGrid.segs[rs].cls >= RC_CIRCUIT;   // (the racetrack's: meadow, no wood, no crops)
       // forest-patch noise baked once instead of evaluating 3 octaves of value noise at every ray-march step: the top 7
       // bits of the texel's road word
       uint32_t& head = roadGrid.head[(size_t)j * MASK_N + i];
-      head = (head & 0x1FFFFFFu) | (uint32_t)lroundf(clampf(coverFbm(x / 1400.f + 3.1f, z / 1400.f, 3) / 0.875f, 0, 1) * 127.f) << 25;
+      head = (head & 0x1FFFFFFu) | (raceGround ? 0u : (uint32_t)lroundf(clampf(coverFbm(x / 1400.f + 3.1f, z / 1400.f, 3) / 0.875f, 0, 1) * 127.f) << 25);
       // the settlements (settlements.h, their lots): their ground as far as their buildings and gardens - the woods
       // and the fields come up to the last houses, and fill the gaps between the streets - its core urban
       float dens = 0, urban = 0;
@@ -208,7 +209,8 @@ void World::bakeMask() {
       float a = 0;
       if (b[0] > 0.5f) {
         a = smoothstepf(4.f, 15.f, b[0]) * smoothstepf(420.f, 260.f, b[0]) * smoothstepf(0.4f, 0.6f, b[2]) * smoothstepf(45.f, 25.f, b[1]) *
-            smoothstepf(0.32f, 0.5f, valueNoise(x / 3000.f + 7.7f, z / 3000.f - 3.3f)) * (1.f - smoothstepf(0.04f, 0.3f, dens)) * (1.f - smoothstepf(0.01f, 0.1f, ai));
+            smoothstepf(0.32f, 0.5f, valueNoise(x / 3000.f + 7.7f, z / 3000.f - 3.3f)) * (1.f - smoothstepf(0.04f, 0.3f, dens)) * (1.f - smoothstepf(0.01f, 0.1f, ai)) *
+            (raceGround ? 0.f : 1.f);
       } else {
         float da; nearestAirport(x, z, &da);
         a = (ai < 0.001f && da > 2800.f && b[0] < -1.f && b[0] > -18.f) ? 1.f : 0.f;   // sea stacks allowed
@@ -500,7 +502,7 @@ void sceneryBakeCommunityLots(const World& world) {
   for (int pass = 0; pass < 2; pass++)
     for (size_t pi = 0; pi < world.roads.paths.size(); pi++) {
       const RoadPath& P = world.roads.paths[pi];
-      if (P.cls == RC_HIGHWAY || P.cls == RC_TRACK || P.cls == RC_YARD || (pass == 0) != (P.cls != RC_STREET) || P.pts.size() < 2) continue;   // (no lots along a farm's track or in its yard)
+      if (P.cls == RC_HIGHWAY || (P.cls >= RC_TRACK && P.cls != RC_STREET) || (pass == 0) != (P.cls != RC_STREET) || P.pts.size() < 2) continue;   // (no lots along a farm's track or in its yard, nor by the racetrack)
       const float half = roadSpec(P.cls).halfPlatform;
       std::vector<float> along(P.pts.size(), 0.f);
       for (size_t k = 1; k < P.pts.size(); k++) along[k] = along[k - 1] + hypotf(P.pts[k].x - P.pts[k - 1].x, P.pts[k].z - P.pts[k - 1].z);

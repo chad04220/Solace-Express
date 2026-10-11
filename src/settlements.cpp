@@ -144,9 +144,10 @@ float SettlementField::at(float x, float z) const {
 }
 
 std::vector<SettlementField> buildSettlementFields(const World& world) {
+  // (the network's own roads: those before its first street - the streets, the racetrack and the farms come after
+  // them, laid over the fields, and a world read from its cache has them all)
   RoadIndex roads;
-  for (size_t pi = 0; pi < world.roads.paths.size(); pi++)
-    if (world.roads.paths[pi].cls != RC_STREET) roads.addPath(world.roads.paths[pi], (int)pi);
+  for (size_t pi = 0; pi < world.roads.paths.size() && world.roads.paths[pi].cls != RC_STREET; pi++) roads.addPath(world.roads.paths[pi], (int)pi);
   std::vector<SettlementField> fields(kNumTowns);
   parallelFor(kNumTowns, [&](int t) { fields[t] = makeField(world, roads, t); });
   return fields;
@@ -383,6 +384,12 @@ void addFarmsteads(const World& world, const std::vector<SettlementField>& field
   std::vector<vec2> yards;
   for (const RoadPath& p : net.paths)
     if (p.cls == RC_YARD && !p.pts.empty()) yards.push_back(vec2(p.pts.front().x, p.pts.front().z));
+  const Racetrack race = racetrackOf(net);
+  auto atRace = [&](vec2 p) {   // (within the racetrack's grounds: its infield, the land round it)
+    if (!race.found) return false;
+    const float s = dot2(p - race.o, race.u), v = dot2(p - race.o, vec2(-race.u.y, race.u.x));
+    return s > -450.f && s < 1250.f && v > -300.f && v < 900.f;
+  };
   const float FC = 300.f;
   const int n = (int)ceilf(2.f * WORLD_HALF / FC);
   for (int fj = 0; fj < n; fj++)
@@ -394,7 +401,7 @@ void addFarmsteads(const World& world, const std::vector<SettlementField>& field
       if (b[0] < 5.f) continue;
       const float farm = smoothstepf(4.f, 15.f, b[0]) * smoothstepf(420.f, 260.f, b[0]) * smoothstepf(0.4f, 0.6f, b[2]) * smoothstepf(45.f, 25.f, b[1]) *
                          smoothstepf(0.32f, 0.5f, valueNoise(site.x / 3000.f + 7.7f, site.y / 3000.f - 3.3f));
-      if (farm < 0.35f || airportInfluence(site.x, site.y) > 0.001f) continue;
+      if (farm < 0.35f || airportInfluence(site.x, site.y) > 0.001f || atRace(site)) continue;
       int town = -1; const float share = settlementShare(fields, site.x, site.y, &town);
       if (town >= 0 && share < 1.4f) continue;
       // the yard's ground: dry, and level enough (5 m at most across it and round it); no road within 80 m, no other
@@ -423,7 +430,7 @@ void addFarmsteads(const World& world, const std::vector<SettlementField>& field
             auto it = idx.cells.find(RoadIndex::key(i, j)); if (it == idx.cells.end()) continue;
             for (int id : it->second) {
               const RoadIndex::Seg& sgm = idx.segs[id];
-              if (sgm.cls == RC_STREET || sgm.cls == RC_YARD || std::find(tried.begin(), tried.end(), sgm.path) != tried.end()) continue;
+              if (sgm.cls == RC_STREET || sgm.cls == RC_YARD || sgm.cls == RC_CIRCUIT || sgm.cls == RC_PITLANE || std::find(tried.begin(), tried.end(), sgm.path) != tried.end()) continue;
               const vec2 e = sgm.b - sgm.a; const float u = std::clamp(dot2(site - sgm.a, e) / std::max(dot2(e, e), 1e-6f), 0.f, 1.f);
               const float q = length(sgm.a + e * u - site);
               if (q < d) { d = q; sg = id; t = u; }
@@ -477,4 +484,199 @@ std::vector<Farmstead> farmsteadsOf(const RoadNetwork& net) {
     farms.push_back({cx, cz, dx / l, dz / l, hash2i((int)floorf(cx), (int)floorf(cz))});
   }
   return farms;
+}
+
+// ---------------------------------------------------------------- the racetrack (Phase C)
+std::vector<vec2> circuitLine() {
+  // each leg a straight (R 0) or a bend of radius R through deg (+ to the right), as it's raced from the pit lane's
+  // mouth: the main straight; turn 1, a right-hander; a kink left and right; turn 4, right onto the back straight; the
+  // hairpin; a long left; the run up to the last corners, right and right again onto the main straight
+  struct Leg { float len, R, deg; };
+  static const Leg legs[] = {{900.f, 0.f, 0.f}, {0.f, 45.f, 90.f}, {250.f, 0.f, 0.f}, {0.f, 150.f, -40.f}, {0.f, 150.f, 40.f},
+                             {150.f, 0.f, 0.f}, {0.f, 60.f, 90.f}, {900.f, 0.f, 0.f}, {0.f, 30.f, 160.f}, {150.f, 0.f, 0.f},
+                             {0.f, 80.f, -130.f}, {450.f, 0.f, 0.f}, {0.f, 100.f, 60.f}};
+  std::vector<vec2> pts{vec2(0.f, 0.f)};
+  vec2 p(0.f, 0.f); float th = 0.f;
+  auto straight = [&](float len) {
+    const int n = std::max(1, (int)ceilf(len / 4.f)); const vec2 from = p, d(cosf(th), sinf(th));
+    for (int i = 1; i <= n; i++) pts.push_back(from + d * (len * i / n));
+    p = pts.back();
+  };
+  auto bend = [&](float R, float deg) {
+    const float a = deg * DEG, sg = a > 0.f ? 1.f : -1.f;
+    const int n = std::max(2, (int)ceilf(fabsf(a) * R / 4.f));
+    const vec2 c = p + vec2(-sinf(th), cosf(th)) * (R * sg);
+    for (int i = 1; i <= n; i++) { const float t = th + a * i / n; pts.push_back(c - vec2(-sinf(t), cosf(t)) * (R * sg)); }
+    th += a; p = pts.back();
+  };
+  for (const Leg& L : legs) { if (L.R > 0.f) bend(L.R, L.deg); else straight(L.len); }
+  // (heading back up the far side: on to where a 70 m bend to the right comes out on the main straight's line, then
+  // along it to the start)
+  straight(p.y - 70.f); bend(70.f, 90.f); straight(-p.x);
+  pts.back() = vec2(0.f, 0.f);
+  return pts;
+}
+
+Racetrack racetrackOf(const RoadNetwork& net) {
+  Racetrack R;
+  for (size_t pi = 0; pi < net.paths.size(); pi++) {
+    const RoadPath& p = net.paths[pi];
+    if (p.cls == RC_PITLANE) R.pitLane = (int)pi;
+    if (p.cls != RC_CIRCUIT || p.pts.size() < 3 || R.found) continue;
+    R.o = vec2(p.pts[0].x, p.pts[0].z);
+    for (const RoadPoint& q : p.pts)
+      if (length(vec2(q.x, q.z) - R.o) >= 100.f) { R.u = (vec2(q.x, q.z) - R.o) * (1.f / length(vec2(q.x, q.z) - R.o)); break; }
+    R.found = true; R.circuit = (int)pi;
+  }
+  return R;
+}
+
+// Where the circuit goes: the level ground it needs, out of the settlements and 3 km from the runways, its whole
+// length and everything beside it 60 m and more from any road. Searched on the base map every 300 m and 15 degrees -
+// the main straight within 4 m of level (its pits and grandstands stand beside it), the circuit nowhere steeper than 5%
+// once smoothed over 180 m, the least ground to move under it, the nearer a town or a city the better - then the best
+// such place laid out on the ground itself: the circuit within 5 m of the ground everywhere, its pit lane, and a road
+// from its paddock to the nearest road that crosses nothing on the way
+void addRacetrack(const World& world, const std::vector<SettlementField>& fields, RoadNetwork& net) {
+  const std::vector<vec2> line = circuitLine();
+  std::vector<vec2> track;   // (every 20 m)
+  for (size_t k = 0; k < line.size(); k += 5) track.push_back(line[k]);
+  const int nTrack = (int)track.size();
+  int nStraight = 0; while (nStraight < nTrack && track[nStraight].x <= 900.f && fabsf(track[nStraight].y) < 1.f) nStraight++;
+  std::vector<vec2> grounds;   // (the pits, the paddock and its road, the grandstands, the car park)
+  for (float s = 130.f; s <= 660.f; s += 30.f)
+    for (float v : {-90.f, -70.f, -50.f, -30.f, 25.f, 45.f, 70.f, 110.f, 150.f}) grounds.push_back(vec2(s, v));
+  auto base = [&](vec2 p) { float b[4]; world.sampleBase(p.x, p.y, b); return b[0]; };
+  struct Site { float score; vec2 o, u; };
+  const float step = 300.f;
+  const int n = (int)(2.f * WORLD_HALF / step);
+  std::vector<std::vector<Site>> rows(n);
+  parallelFor(n, [&](int j) {
+    std::vector<float> hs(nTrack), sm(nTrack);
+    for (int i = 0; i < n; i++) {
+      const vec2 o(-WORLD_HALF + (i + 0.5f) * step, -WORLD_HALF + (j + 0.5f) * step);
+      if (base(o) < 6.f || base(o) > 350.f) continue;
+      for (int d = 0; d < 24; d++) {
+        const vec2 u(cosf(d * 15.f * DEG), sinf(d * 15.f * DEG)), r(-u.y, u.x);
+        auto at = [&](vec2 q) { return o + u * q.x + r * q.y; };
+        float lo = 1e9f, hi = -1e9f; bool ok = true;
+        for (int k = 0; k < nStraight && ok; k++) { const float h = base(at(track[k])); lo = std::min(lo, h); hi = std::max(hi, h); ok = hi - lo <= 4.f && h >= 6.f; }
+        if (!ok) continue;
+        const float straightH = 0.5f * (lo + hi), straightRange = hi - lo;
+        for (int k = 0; k < nTrack && ok; k++) { hs[k] = base(at(track[k])); ok = hs[k] >= 5.f && hs[k] <= 400.f; lo = std::min(lo, hs[k]); hi = std::max(hi, hs[k]); }
+        if (!ok || hi - lo > 35.f) continue;
+        for (const vec2& g : grounds) {
+          const float h = base(at(g));
+          ok = ok && h >= 5.f && fabsf(h - straightH) <= (g.y > 60.f ? 8.f : 5.f);
+        }
+        if (!ok) continue;
+        // (the circuit's profile smoothed over 180 m, round the loop: its grade, and the ground off it)
+        float earth = 0.f, steep = 0.f;
+        for (int k = 0; k < nTrack; k++) {
+          float sum = 0.f; for (int q = -4; q <= 4; q++) sum += hs[(k + q + nTrack) % nTrack];
+          sm[k] = sum / 9.f;
+        }
+        for (int k = 0; k < nTrack; k++) { earth += fabsf(hs[k] - sm[k]); steep = std::max(steep, fabsf(sm[(k + 1) % nTrack] - sm[k]) / 20.f); }
+        if (steep > 0.05f) continue;
+        float town = 1e9f;
+        for (int t = 0; t < kNumTowns; t++) if (kTowns[t].kind >= 1) town = std::min(town, length(vec2(kTowns[t].x, kTowns[t].z) - at(vec2(400.f, 300.f))));
+        rows[j].push_back({earth / nTrack + 0.05f * (hi - lo) + 0.5f * straightRange + town / 5000.f, o, u});
+      }
+    }
+  });
+  std::vector<Site> sites;
+  for (auto& r : rows) sites.insert(sites.end(), r.begin(), r.end());
+  std::sort(sites.begin(), sites.end(), [](const Site& a, const Site& b) {
+    return a.score != b.score ? a.score < b.score : a.o.x != b.o.x ? a.o.x < b.o.x : a.o.y != b.o.y ? a.o.y < b.o.y : atan2f(a.u.y, a.u.x) < atan2f(b.u.y, b.u.x); });
+  RoadIndex idx;
+  for (size_t pi = 0; pi < net.paths.size(); pi++) idx.addPath(net.paths[pi], (int)pi);
+  int tried = 0;
+  for (const Site& S : sites) {
+    if (++tried > 300) break;
+    const vec2 r(-S.u.y, S.u.x);
+    auto at = [&](vec2 q) { return S.o + S.u * q.x + r * q.y; };
+    bool ok = true;
+    for (int k = 0; k < nTrack && ok; k++) {
+      const vec2 p = at(track[k]);
+      ok = settlementShare(fields, p.x, p.y) >= 1.3f && airportInfluence(p.x, p.y) <= 0.f && idx.nearest(p, 80.f, -1) > 1e8f &&
+           world.groundHeight(p.x, p.y, 8) >= 4.f;
+      for (const Airport& a : world.airports) ok = ok && hypotf(p.x - a.x, p.y - a.z) >= 3000.f;
+    }
+    for (size_t k = 0; k < grounds.size() && ok; k++) {
+      const vec2 p = at(grounds[k]);
+      ok = settlementShare(fields, p.x, p.y) >= 1.3f && airportInfluence(p.x, p.y) <= 0.f && idx.nearest(p, 40.f, -1) > 1e8f && world.groundHeight(p.x, p.y, 8) >= 4.f;
+    }
+    if (!ok) continue;
+    // the circuit, on the ground: within 5 m of it all the way round (its run-off's banks no higher than a road's)
+    std::vector<vec2> wl; for (const vec2& q : line) wl.push_back(at(q));
+    const float h0 = world.groundHeight(S.o.x, S.o.y, 8);
+    RoadPath circuit = layRoad(world, RC_CIRCUIT, wl, h0, h0, {});
+    if (circuit.pts.size() < 100) continue;
+    for (const RoadPoint& q : circuit.pts) ok = ok && fabsf(q.h - world.naturalHeight(q.x, q.z)) <= 5.f;
+    if (!ok) continue;
+    // its pit lane, out of the circuit 10 m past the start of the main straight and back in 120 m before turn 1, at
+    // the circuit's height beside it
+    RoadPath pit = layRoad(world, RC_PITLANE, {at(vec2(10.f, 0.f)), at(vec2(130.f, RACE_PITLANE_V)), at(vec2(640.f, RACE_PITLANE_V)), at(vec2(780.f, 0.f))}, h0, h0, {});
+    auto straightH = [&](float s) {   // (the circuit's height along its main straight)
+      for (size_t k = 0; k + 1 < circuit.pts.size(); k++) {
+        const float s0 = dot2(vec2(circuit.pts[k].x, circuit.pts[k].z) - S.o, S.u), s1 = dot2(vec2(circuit.pts[k + 1].x, circuit.pts[k + 1].z) - S.o, S.u);
+        if (s >= s0 && s <= s1) return circuit.pts[k].h + (circuit.pts[k + 1].h - circuit.pts[k].h) * (s - s0) / std::max(s1 - s0, 1e-3f);
+      }
+      return circuit.pts[0].h;
+    };
+    for (RoadPoint& q : pit.pts) q.h = straightH(dot2(vec2(q.x, q.z) - S.o, S.u));
+    // the paddock's road behind the garages, and on from either end to the nearest highway, road or lane (not across
+    // the circuit, nor along a bridge), the nearest first
+    RoadIndex with = idx;
+    with.addPath(circuit, (int)net.paths.size()); with.addPath(pit, (int)net.paths.size() + 1);
+    RoadPath access; bool laid = false;
+    for (int end = 0; end < 2 && !laid; end++) {
+      const vec2 from = at(vec2(end ? 640.f : 170.f, RACE_PADDOCK_V)), other = at(vec2(end ? 170.f : 640.f, RACE_PADDOCK_V));
+      std::vector<int> tried;
+      for (int attempt = 0; attempt < 3 && !laid; attempt++) {
+        float d = 1e9f; int sg = -1; float t = 0.f;
+        const float reach = 2500.f;
+        for (int jj = RoadIndex::cell(from.y - reach); jj <= RoadIndex::cell(from.y + reach); jj++)
+          for (int ii = RoadIndex::cell(from.x - reach); ii <= RoadIndex::cell(from.x + reach); ii++) {
+            auto it = idx.cells.find(RoadIndex::key(ii, jj)); if (it == idx.cells.end()) continue;
+            for (int id : it->second) {
+              const RoadIndex::Seg& sgm = idx.segs[id];
+              if (sgm.cls > RC_LANE || std::find(tried.begin(), tried.end(), sgm.path) != tried.end()) continue;
+              const vec2 e = sgm.b - sgm.a; const float uu = std::clamp(dot2(from - sgm.a, e) / std::max(dot2(e, e), 1e-6f), 0.f, 1.f);
+              const float q = length(sgm.a + e * uu - from);
+              if (q < d) { d = q; sg = id; t = uu; }
+            }
+          }
+        if (d > reach) break;
+        const RoadIndex::Seg road = idx.segs[sg];
+        tried.push_back(road.path);
+        const vec2 J = road.a + (road.b - road.a) * t;
+        const RoadPath& P = net.paths[road.path];
+        bool bridged = false;   // (not off a bridge)
+        for (size_t k = 0; k + 1 < P.pts.size(); k++)
+          if (P.bridge[k] && length(vec2(P.pts[k].x, P.pts[k].z) - J) + length(vec2(P.pts[k + 1].x, P.pts[k + 1].z) - J) < length(vec2(P.pts[k + 1].x - P.pts[k].x, P.pts[k + 1].z - P.pts[k].z)) + 60.f) bridged = true;
+        if (bridged) continue;
+        const vec2 dir = (J - from) * (1.f / std::max(length(J - from), 1e-3f)), side(-dir.y, dir.x);
+        const float run = length(J - from);
+        const std::vector<vec2> way = {other, from, from + dir * (run * 0.5f) + side * (run * 0.08f), J};
+        std::vector<RoadPin> crossing;
+        for (size_t k = 1; k + 1 < way.size(); k++) with.crossings(way[k], way[k + 1], -1, crossing);
+        crossing.erase(std::remove_if(crossing.begin(), crossing.end(), [&](const RoadPin& c) { return hypotf(c.x - J.x, c.z - J.y) < 3.f; }), crossing.end());
+        if (!crossing.empty()) continue;
+        bool near = false;   // (40 m and more off the circuit once away from the paddock)
+        for (int k = 0; k < nTrack; k++) {
+          const vec2 p = at(track[k]);
+          for (size_t w = 1; w + 1 < way.size(); w++) {
+            const vec2 e = way[w + 1] - way[w]; const float uu = std::clamp(dot2(p - way[w], e) / std::max(dot2(e, e), 1e-6f), 0.f, 1.f);
+            near = near || length(way[w] + e * uu - p) < 56.f;
+          }
+        }
+        if (near) continue;
+        laid = layPath(world, with, net, RC_ROAD, way, &access);
+      }
+    }
+    if (!laid) continue;
+    net.paths.push_back(std::move(circuit)); net.paths.push_back(std::move(pit)); net.paths.push_back(std::move(access));
+    return;
+  }
 }

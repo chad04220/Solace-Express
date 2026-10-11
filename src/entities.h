@@ -28,13 +28,14 @@ enum EntKind {
   // landmarks (landmarks.cpp): a wind turbine's rotor turns and yaws into the wind (ent_vs.glsl)
   EK_WINDTURBINE, EK_SHIPWRECK, EK_PLATFORM, EK_OBSERVATORY, EK_STARFORT, EK_JETTY,
   EK_STADIUM, EK_QUAY, EK_GANTRY, EK_CONTAINERS, EK_CONTAINERSHIP,
+  EK_PITS, EK_PITWALL, EK_GRANDSTAND, EK_TRANSPORTER,   // (the racetrack's)
   EK_COUNT
 };
 // The road network's bridges (bridges.h) are no kind of entity: each is drawn as its own mesh where it stands
 // (bridge_mesh.h). This is their material's id in the scenery programs (ent_fs1.glsl K_BRIDGE) and what Scenery::collide
 // reports for them (kBridgeKind + 1)
 static const int kBridgeKind = EK_COUNT;
-static_assert(kBridgeKind == 71, "ent_fs1.glsl K_BRIDGE");
+static_assert(kBridgeKind == 75, "ent_fs1.glsl K_BRIDGE");
 enum EntClass { EC_TREE = 0, EC_ROCK, EC_BUILDING };
 inline int entClass(int k) { return k <= EK_BUSH ? EC_TREE : k <= EK_SEASTACK ? EC_ROCK : EC_BUILDING; }
 // Distance thinning of the small, numerous kinds (trees, bushes, boulders): an instance is drawn while its key is below
