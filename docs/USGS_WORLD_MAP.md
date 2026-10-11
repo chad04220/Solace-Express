@@ -26,6 +26,21 @@ sidecar, source audit/manifest, exact sample configuration, credit notice and
 labeled elevation preview. It also contains the separately verified sample pack
 and measurement records. Raw downloads are reproducible from the URLs above.
 
+The delivery ZIP is **675,246,138 bytes**, SHA-256
+`e2c73659133353f43fbe55326b2f94bb781ca680ad1b00eb1bc781f46b7f13da`.
+It is delivered as two numbered byte parts because the single-file save failed.
+Download both `.zip.001` and `.zip.002` into one directory, then reassemble:
+
+```sh
+python3 tools/usgs_world_map/join_downloads.py --parts-dir /path/to/downloads \
+  --output /data/earth/Solace-Express-Global-Elevation.zip
+```
+
+The helper verifies both part sizes/SHA-256 and the complete ZIP digest before
+publishing a new output file. This is transport splitting only; the ENVI input
+and v1 pack contract are unchanged. Keep the extracted source and sample outside
+Git. The full archive passes ZIP CRC checks and all 37 payload hashes.
+
 Prepared geometry is north-up, west-to-east, single-band Float32 BSQ,
 little-endian, zero header offset: **21,600 × 10,800** cells. Nominal geographic
 bounds are `[-180,-90,180,90]`; affine `(a,b,c,d,e,f)` is
