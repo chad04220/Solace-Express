@@ -393,6 +393,18 @@ void main(){
       alb = mix(alb, kerbAlb, kerb); rough = mix(rough, roughC, kerb); nb = normalize(mix(nb, nbC, kerb));
     } else if (part == P_METAL) {   // the lanes' steel rail, galvanised
       alb = triS(lp, n0, M_METAL, 2.0, 0.3, nb, rough)*vec3(0.74, 0.76, 0.77); metal = 0.6; rough = max(rough, 0.38);
+    } else if (part == P_PAINT) {   // a main span's steel, painted: a truss grey-green, an arch white; weathered a little
+      alb = triS(lp, n0, M_METAL, 3.0, 0.4, nb, rough);
+      alb = (vAux.z > 0.5 ? vec3(0.86, 0.87, 0.85) : vec3(0.3, 0.39, 0.35))*(0.86 + 0.14*dot(alb, vec3(0.33)));
+      alb *= 0.92 + 0.08*vn3(lp*0.3); if (n0.y < -0.5) alb *= 0.8;
+      metal = 0.25; rough = 0.42;
+    } else if (part == P_BRICK) {   // a masonry viaduct: dressed sandstone blocks, the arch ring's voussoirs lighter
+      float lum = dot(triS(lp, n0, M_BRICK, 2.4, 0.6, nb, rough), vec3(0.3, 0.55, 0.15));
+      alb = vec3(0.66, 0.57, 0.46)*(0.5 + 0.7*lum)*(0.86 + 0.24*vn3(lp*0.6));
+      if (vAux.z > 0.5 && vAux.w < 0.85) alb *= 1.12;
+      alb *= mix(0.6, 1.0, smoothstep(-0.3, 1.8, wy));
+      if (n0.y < -0.5) alb *= 0.8;
+      rough = max(rough, 0.8);
     } else {
       // concrete: the parapets, the slab's edges and the girders, the piers and abutments - streaked by the rain, the
       // undersides darker, and over the sea a wet, darker band at the waterline

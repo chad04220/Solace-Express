@@ -31,6 +31,16 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   surface and markings between concrete parapets (a kerb and a steel rail on the lanes), on a box girder. Its piers go
   down to the ground or the sea floor, with an abutment at each end. They are drawn and shadowed like the buildings,
   they are solid, and nothing grows up into them (`bridges_test`).
+- **Phase A, item 5: arch and truss spans done (after v3.48).** Each long crossing of the water (200 m or more, on a
+  highway or a road) carries one main span over its deepest water, wherever the deck turns no more than 12 degrees
+  across it. The span stands on two heavier piers, with nothing under it:
+  - a highway's is a steel Warren truss over two spans, continuous over a pier between them (160 m, 11 m high);
+  - a road's is a white tied arch (125 m, rising 23 m), its hangers carrying the deck and its ribs braced together
+    over the road.
+  - Every mountain lane's viaduct is now masonry: a sandstone arch between each pair of supports, its spandrels solid
+    up to the road and its parapets stone (19 arches, rising 7 to 13 m).
+  - The steel and the spandrels are solid where they are drawn, the road under the steel is clear, each arch is open
+    under its crown, and the scenery stays under the arches (`bridges_test`).
 - **Phase B, items 1 and 3 begun (v3.47, `settlements.h`, `community_layout`).** Each settlement grows over an effort
   field from its centre: steep ground is dear, a road cheap to build along, and the sea and airfields can't be built
   on. Its streets are network roads of class RC_STREET: a grid core turned to the main road in towns and cities, and
@@ -75,7 +85,7 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   addressed with 19 bits. They now hold 490k of 524k entries, so tracks and yards reach only 12 m beyond their
   platforms (streets 20 m, other roads 50 m). `roads_test` fails if any segment goes unlisted or the lists come
   within a texel's worth of the limit. New roads (Phase C's access roads) need that headroom, or a wider packing.
-- **Still to come in Phase A:** item 5's arch and truss spans for the longest crossings.
+- **Phase A is done.** Phase C's hand-built landmarks come next, then life on the roads (Phase D).
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network
