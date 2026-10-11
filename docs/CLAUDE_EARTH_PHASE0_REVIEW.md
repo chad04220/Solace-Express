@@ -32,9 +32,10 @@ Start with [global source handoff and reproduction](USGS_WORLD_MAP.md), then rev
 4. The 37-test `usgs_world_map` suite is registered with CTest. Review its hostile
    inputs and split-archive cleanup tests alongside the existing 56 Earth tests.
 
-The audited code revision is `11bee2a804fd9eaf2a8b4bfb6851aeae4f86a8cb`; this
-combined revision adds review documentation and checked-in evidence without
-changing that audited code. [Verification summary](validation/earth-global-handoff/verification-summary.json)
+The audited code revision is `11bee2a804fd9eaf2a8b4bfb6851aeae4f86a8cb`; the initial
+combined revision added review documentation and checked-in evidence without
+changing that audited code. The native Windows follow-up below makes one further
+assembly guard correction. [Verification summary](validation/earth-global-handoff/verification-summary.json)
 records 56/56 Earth tests, 37/37 helper tests, five focused CTest passes, and four
 expected regression failures against the older implementation.
 The [real-source rebuild](validation/earth-global-handoff/pinned-real-rebuild.json)
@@ -48,6 +49,17 @@ the producer's recorded audit; this independent recheck did not redownload NOAA'
 GeoTIFF or the GMTED archive. No full-global tile pack or runtime Earth loader was
 built. The sample's N2 quadrature has an observed N2-to-N8 difference up to 38.36 m;
 review quadrature quality before approving a production global build.
+
+### Combined native Windows follow-up
+
+The [first combined CI run](https://github.com/chad04220/Solace-Express/actions/runs/38116185230)
+passed all three Linux sanitizer shards, the aircraft bake and 86 of 87 native
+Windows CTest entries. The new helper suite caught a Windows-specific behavior:
+exclusive file creation followed an existing dangling staging symlink. The
+assembly helper now explicitly rejects existing or symlinked staging entries
+before opening them. The original target-preservation assertions are unchanged;
+an additional platform-independent regression requires rejection before any open.
+The helper suite now contains 38 tests. The [follow-up verification record](validation/earth-global-handoff/windows-staging-followup.json) records local tests and regression sensitivity. Native CI for this correction must pass.
 
 ## Source choices
 

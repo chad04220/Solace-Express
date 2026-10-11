@@ -137,7 +137,7 @@ publisher. Keep source files, headers and packs unchanged throughout each comman
 and use isolated, single-writer directories. The existing v1 pack format, tile
 writer, sampler, verifier and committed 20-tile inventory are unchanged.
 
-`usgs_world_map` is registered with CTest alongside `earth_pack`. Its 37 offline
+`usgs_world_map` is registered with CTest alongside `earth_pack`. Its 38 offline
 regressions use synthetic ENVI rasters and split-download parts, including real
 pack builds, source/header mutation, corrupted-but-rehashed tile payloads,
 legitimate quadrature differences, seam checks and assembly cleanup. The suite
@@ -147,7 +147,7 @@ Symlink tests skip only when the host denies creating symlinks.
 
 The Phase 0 Windows `as_posix()` snapshot correction and its cross-platform
 `PureWindowsPath` regression from `745b5538` are included. Local Linux validation
-passes all 56 Earth tests and all 37 handoff tests without skips; native Windows
+passes all 56 Earth tests and all 38 handoff tests without skips; native Windows
 CI remains the authority for the Windows result. Run both registered suites with:
 
 ```sh

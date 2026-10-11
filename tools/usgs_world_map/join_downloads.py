@@ -21,6 +21,10 @@ def main():
         raise ValueError("output already exists; choose a new file")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary = args.output.with_name(args.output.name + ".assembling")
+    # On Windows, exclusive creation can follow a dangling file symlink.
+    # Reject the directory entry before opening; never create its target.
+    if temporary.exists() or temporary.is_symlink():
+        raise ValueError("staging already exists; choose a new output file")
     complete = hashlib.sha256()
     opened = False
     try:

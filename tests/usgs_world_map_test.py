@@ -473,6 +473,18 @@ class JoinDownloadsTests(LocalFixture):
                 self.assertTrue(path.is_symlink())
                 path.unlink()
 
+    def test_staging_symlink_is_rejected_before_exclusive_open(self):
+        # Require the explicit guard on every OS. Native Windows may follow a
+        # dangling symlink even for open("xb"), unlike the Linux test host.
+        staging = self.staging
+        with mock.patch.object(Path, "is_symlink", lambda path: path == staging), \
+             mock.patch.object(Path, "open", side_effect=AssertionError("must not open staging")) as opened:
+            with self.assertRaisesRegex(ValueError, "staging already exists"):
+                self.join()
+            opened.assert_not_called()
+        self.assertFalse(self.output.exists())
+        self.assertFalse(self.staging.exists())
+
     def test_symlink_part_is_rejected_and_owned_staging_cleaned(self):
         part = self.parts / "part.1"
         outside = self.root / "outside-part"
