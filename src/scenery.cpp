@@ -459,7 +459,7 @@ void sceneryBakeCommunityLots(const World& world) {
   for (size_t pi = 0; pi < world.roads.paths.size(); pi++) {
     const RoadPath& P = world.roads.paths[pi];
     if (P.cls != RC_STREET) continue;
-    float acc = 0.f;
+    float acc = 0.f, arc = 0.f;
     for (size_t k = 1; k < P.pts.size(); k++) {
       const vec2 a(P.pts[k - 1].x, P.pts[k - 1].z), b(P.pts[k].x, P.pts[k].z);
       const float l = length(b - a); if (l < 1e-3f) continue;
@@ -469,12 +469,16 @@ void sceneryBakeCommunityLots(const World& world) {
         int town = -1; const float share = settlementShare(world.settlements, at.x, at.y, &town);
         if (town < 0 || kTowns[town].kind == 0 || share > 0.6f) continue;
         for (float side : {-1.f, 1.f}) {
+          // (not on a street lamp: road_furniture.cpp stands them on the right, as it runs, 15 m on and every 30 m, on
+          // the left every 30 m)
+          const float r = fmodf(arc + s + (side > 0.f ? 15.f : 0.f), 30.f);
+          if (std::min(r, 30.f - r) < 3.f) continue;
           const vec2 p = at + n * (side * (roadSpec(RC_STREET).halfPaved + 1.2f));
           if (roads.nearest(p, 8.f, (int)pi, nullptr, nullptr, true) < 4.f || ground(p.x, p.y) < 2.5f) continue;   // (another road: a junction)
           tree(p.x, p.y, hash2i((int)p.x, (int)p.y), 0.55f + 0.15f * hash2i((int)p.y, (int)p.x));
         }
       }
-      acc = fmodf(acc + l, 14.f);
+      acc = fmodf(acc + l, 14.f); arc += l;
     }
   }
 }

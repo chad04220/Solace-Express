@@ -887,6 +887,65 @@ void buildAirportKind(MB& mb, int kind, int lod) {
         mb.quad(vec3(x - 0.3f, 18.98f, -0.25f), vec3(x + 0.3f, 18.98f, -0.25f), vec3(x + 0.3f, 18.98f, 0.3f), vec3(x - 0.3f, 18.98f, 0.3f), P_LAMP, vec3(0, 19.5f, 0)); }
       break;
     }
+    // ---- road furniture (scenery.h roadFurniture)
+    case EK_STREETLAMP: {   // a galvanised column on its base, an outreach arm over the road (+z), the lantern's glass under its head
+      mb.box(vec3(-0.17f, -0.3f, -0.17f), vec3(0.17f, 0.6f, 0.17f), P_METAL, 0x3B);
+      mb.cyl(vec3(0, 0.6f, 0), vec3(0, 9.5f, 0), 0.085f, 0.055f, d0 ? 10 : d1 ? 6 : 4, P_METAL, true, false);
+      if (d1) {   // (the arm rising out of the column's top and bending over the road)
+        mb.cyl(vec3(0, 9.35f, 0), vec3(0, 9.68f, 0.55f), 0.05f, 0.045f, d0 ? 6 : 4, P_METAL, false, false);
+        mb.cyl(vec3(0, 9.68f, 0.55f), vec3(0, 9.8f, 1.45f), 0.045f, 0.04f, d0 ? 6 : 4, P_METAL, false, false);
+      } else mb.box(vec3(-0.04f, 9.45f, 0.f), vec3(0.04f, 9.75f, 1.45f), P_METAL, 0x3F);
+      mb.box(vec3(-0.17f, 9.7f, 1.3f), vec3(0.17f, 9.88f, 2.05f), P_METAL, 0x3B);
+      mb.box(vec3(-0.14f, 9.68f, 1.36f), vec3(0.14f, 9.7f, 1.99f), P_LAMP, 4);
+      if (lod == 3) {   // (up close: the flange at the column's foot, its service door, the arm's cap, the lantern's rim)
+        mb.cyl(vec3(0, 0.6f, 0), vec3(0, 0.75f, 0), 0.13f, 0.09f, 12, P_METAL, true, false);
+        mb.box(vec3(-0.05f, 0.95f, 0.08f), vec3(0.05f, 1.35f, 0.095f), P_DARK, 32);
+        mb.cyl(vec3(0, 9.8f, 1.45f), vec3(0, 9.81f, 1.52f), 0.05f, 0.05f, 6, P_METAL, true, true);
+        mb.box(vec3(-0.175f, 9.67f, 1.29f), vec3(0.175f, 9.7f, 2.06f), P_METAL, 0x3F & ~8);
+      }
+      break;
+    }
+    case EK_GUARDRAIL: {   // 16 m of steel W-beam on posts every 2 m, facing the traffic (+z); laid end to end along a road
+      if (d0) {   // (the beam's two ridges and the valley between them)
+        mb.box(vec3(-8.f, 0.66f, 0.03f), vec3(8.f, 0.81f, 0.12f), P_METAL, 0x3F & ~3);
+        mb.box(vec3(-8.f, 0.49f, 0.03f), vec3(8.f, 0.64f, 0.12f), P_METAL, 0x3F & ~3);
+        mb.box(vec3(-8.f, 0.62f, 0.02f), vec3(8.f, 0.68f, 0.06f), P_METAL, 32);
+      } else mb.box(vec3(-8.f, 0.49f, 0.03f), vec3(8.f, 0.81f, 0.12f), P_METAL, d1 ? 0x3F & ~3 : 8 | 32);
+      for (int i = 0; lod != 2 && i < 8; i += d0 ? 1 : 2) {
+        const float x = -7.f + i * 2.f;
+        mb.box(vec3(x - 0.05f, -0.4f, -0.12f), vec3(x + 0.05f, 0.76f, 0.f), P_METAL, 0x3B);
+        if (d0) mb.box(vec3(x - 0.04f, 0.53f, 0.f), vec3(x + 0.04f, 0.72f, 0.03f), P_METAL, 0x3B);
+        if (lod == 3) for (float y : {0.56f, 0.74f})   // (the bolts through the beam into its post)
+          mb.cyl(vec3(x, y, 0.12f), vec3(x, y, 0.135f), 0.016f, 0.016f, 6, P_METAL, true, false);
+      }
+      break;
+    }
+    case EK_ROADSIGN: {   // a direction sign: a panel on two posts, facing the traffic coming up to the junction (+z)
+      for (float x : {-0.85f, 0.85f}) mb.cyl(vec3(x, -0.3f, -0.05f), vec3(x, 2.95f, -0.05f), 0.045f, 0.045f, d0 ? 8 : 4, P_METAL, true, false);
+      mb.box(vec3(-1.25f, 1.45f, -0.03f), vec3(1.25f, 2.95f, 0.f), P_METAL, d1 ? 0x3F & ~32 : 16);
+      mb.box(vec3(-1.25f, 1.45f, 0.f), vec3(1.25f, 2.95f, 0.004f), P_SIGN, 32);
+      if (lod == 3) {   // (behind the panel its two stiffening channels, clamped to the posts; the posts' caps)
+        for (float y : {1.8f, 2.6f}) mb.box(vec3(-1.15f, y - 0.04f, -0.09f), vec3(1.15f, y + 0.04f, -0.03f), P_METAL, 0x3F & ~32);
+        for (float x : {-0.85f, 0.85f}) {
+          for (float y : {1.8f, 2.6f}) mb.box(vec3(x - 0.07f, y - 0.06f, -0.11f), vec3(x + 0.07f, y + 0.06f, -0.08f), P_METAL, 0x3F & ~32);
+          mb.cyl(vec3(x, 2.95f, -0.05f), vec3(x, 2.98f, -0.05f), 0.05f, 0.04f, 8, P_METAL, true, false);
+        }
+      }
+      break;
+    }
+    case EK_POLE: {   // a wooden pole, a crossarm, three insulators; up close, its three wires to the next pole along +z
+      mb.cyl(vec3(0, -0.5f, 0), vec3(0, 9.f, 0), 0.14f, 0.11f, d0 ? 10 : d1 ? 6 : 4, P_WOOD, true, false);
+      mb.box(vec3(-1.05f, 8.15f, -0.06f), vec3(1.05f, 8.3f, 0.06f), P_WOOD, lod == 2 ? 8 | 16 | 32 : 0x3F);
+      const float wx[3] = {-0.9f, 0.35f, 0.9f};
+      if (d1) for (float x : wx) mb.cyl(vec3(x, 8.3f, 0), vec3(x, 8.5f, 0), 0.05f, 0.035f, d0 ? 8 : 4, P_TRIM, true, false);
+      if (lod == 3)   // (50 m of each, sagging 0.55 m at mid-span: the instance's z scale stretches it to the next pole)
+        for (float x : wx)
+          for (int i = 0; i < 10; i++) {
+            auto at = [&](int j) { const float t = j / 10.f; return vec3(x, 8.5f - 2.2f * t * (1.f - t), 50.f * t); };
+            mb.cyl(at(i), at(i + 1), 0.02f, 0.02f, 4, P_WIRE, false, false);
+          }
+      break;
+    }
   }
   if(lod==3){airportHeroAccents(mb,kind);for(size_t i=first;i<mb.o.size();++i)if(mb.o[i].part==P_WALL)mb.o[i].u=1.f;}
 }

@@ -411,7 +411,22 @@ void main(){
     float s2 = fract(seed*13.31), s3 = fract(seed*3.77);
     vec3 livery = s3 < 0.5 ? pal(s3*2.0, vec3(0.7, 0.07, 0.06), vec3(0.06, 0.2, 0.55), vec3(0.05, 0.4, 0.2), vec3(0.9, 0.5, 0.05))
                            : pal(s3*2.0 - 1.0, vec3(0.04, 0.08, 0.25), vec3(0.0, 0.45, 0.5), vec3(0.45, 0.06, 0.25), vec3(0.15, 0.15, 0.17));
-    if (part == P_WALL) {
+    if (part == P_WIRE) { alb = vec3(0.045, 0.045, 0.05); rough = 0.45; metal = 0.4; }
+    else if (part == P_WOOD) {   // a utility pole: creosoted, some weathered grey, the grain running up it
+      alb = mix(vec3(0.22, 0.155, 0.1), vec3(0.4, 0.37, 0.33), step(0.7, hsh(vec2(vInst.y*3.1, vInst.w))));
+      alb *= 0.8 + 0.25*vn3(vec3(lp.x*9.0, lp.y*0.35, lp.z*9.0)); rough = 0.85; metal = 0.0;
+    } else if (uKind == K_POLE && part == P_TRIM) { alb = vec3(0.4, 0.27, 0.18); rough = 0.15; metal = 0.0; }   // glazed insulators
+    else if (uKind == K_ROADSIGN && part == P_SIGN) {   // a direction sign: green on a highway, blue off it; a white border and three names
+      alb = seed < 0.5 ? vec3(0.03, 0.29, 0.13) : vec3(0.04, 0.15, 0.44); rough = 0.35; metal = 0.0;
+      vec2 q = vec2(mp.x, mp.y - 2.2);   // (from the panel's centre: 2.5 x 1.5 m)
+      float edge = min(1.25 - abs(q.x), 0.75 - abs(q.y));
+      bool white = edge > 0.045 && edge < 0.085;
+      float row = floor((0.6 - q.y)/0.4), ry = q.y - (0.4 - row*0.4), gx = q.x + 1.05;
+      if (row >= 0.0 && row <= 2.0 && abs(ry) < 0.085 && gx > 0.0 && gx < 1.1 + 0.95*hsh(vec2(row, seed*17.0)))
+        white = white || (fract(gx/0.13) < 0.78 && hsh(vec2(floor(gx/0.13), row + seed*31.0)) > 0.12);   // (letters)
+      if (white) alb = vec3(0.9);
+      emit = alb*uNight*0.25;   // (retroreflective sheeting: a little light back at night)
+    } else if (part == P_WALL) {
       if (uKind == K_TERMINAL || uKind == K_CTRL || uKind == K_MAST) alb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nb, rough)*vec3(0.9, 0.89, 0.86);
       else if (uKind == K_FBO) alb = triS(lp, n0, M_PLASTER, 2.5, 0.6, nb, rough)*pal(s2, vec3(0.95, 0.93, 0.88), vec3(0.85, 0.88, 0.92), vec3(0.93, 0.86, 0.74), vec3(0.8, 0.82, 0.8));
       else if (uKind == K_JETBRIDGE) {
@@ -489,7 +504,7 @@ void main(){
       alb = mod(floor(mp.y/hb), 2.0) < 0.5 ? vec3(0.95) : vec3(0.75, 0.1, 0.06); rough = 0.5;
       if (uKind != K_WINDSOCK && mp.y > (uKind == K_CTRL ? 33.5 : uKind == K_MAST ? 11.5 : 1e9)) emit = vec3(1.0, 0.08, 0.04)*uNight*(4.0 + 3.0*step(0.5, fract(uTime*0.8)));
     }
-    else if (part == P_LAMP) { alb = vec3(0.9); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.93, 0.8)*(0.15 + 10.0*uNight); }
+    else if (part == P_LAMP) { alb = vec3(0.9); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.93, 0.8)*((uKind == K_LAMPPOST ? 0.0 : 0.15) + 10.0*uNight); }
     else if (part == P_SIGN) { alb = uKind == K_PUMP ? vec3(0.75, 0.1, 0.06) : vec3(0.08, 0.22, 0.55); rough = 0.4; emit = alb*uNight*2.5; }
     else if (part == P_CANOPY) { alb = vec3(0.9); if (n0.y < -0.5) emit = vec3(1.0, 0.97, 0.9)*uNight*2.5; rough = 0.4; }
     else if(part>=27 && part<33) {

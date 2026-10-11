@@ -63,6 +63,15 @@ void main(){
   }
 #endif
   vec3 lp = posed*iB.xyz;
+#if ENT_BUILDINGS
+  // road furniture on a grade (seed 0.5 + rise over run): a guardrail's beam follows it along its length (x), a pole's
+  // wires run up or down it to the next pole (z); a pole with no next (seed 2) has none, and no wire casts a shadow
+  if (uKind == 57) lp.y += lp.x*(iB.w - 0.5);   // (EK_GUARDRAIL: entities.h)
+  if (uKind == 59) {                             // (EK_POLE)
+    if (abs(aAux.x - 40.0) < 0.5 && (iB.w > 1.5 || uShadowPass != 0)) lp = vec3(0.0, 8.5, 0.0);
+    else if (iB.w < 1.5) lp.y += lp.z*(iB.w - 0.5);
+  }
+#endif
   // foliage sways a little in the wind, more towards the top and the frond tips
 #if ENT_TREES
   if (uKind <= 6 && (aAux.x < 3.5 || aAux.x > 17.5) && uShadowPass == 0) {

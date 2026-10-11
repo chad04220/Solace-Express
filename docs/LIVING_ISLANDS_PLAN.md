@@ -56,13 +56,26 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
     a second barn, and a lorry or a car. All stand clear of every road, with no tree or bush in the compound.
   - The fields between are hedged: trees and bushes stand along the borders of the terrain's field patchwork
     (`fieldPatch`, the CPU mirror of the shader's), with a few lone trees in the pastures and none in the crops.
+- **Phase A, item 6: road furniture (after v3.48, `road_furniture.cpp`, `roads_test`).** It is laid along the
+  network when the world is built or loaded, and each scenery chunk takes its own share:
+  - About 23,500 street lamps. On every street they stand on the pavement where the terrain shader already pooled
+    their light: 30 m apart, side to side, with the street trees kept off them. They also line the highways' verges
+    through and near the towns and cities, and the roads through each settlement. Their lanterns light at night.
+  - About 8,400 lengths of steel W-beam guardrail. They run down every highway's central reserve, with an opening
+    wherever another road joins. They also run along any road standing 2.5 m or more over its fill, and for 30 m onto
+    each bridge, up to the deck's joint. Each 16 m length is sheared to the road's grade in the vertex shader.
+  - About 2,300 wooden poles along the country roads and lanes, one side, each carrying three wires to the next. The
+    next pole is the furthest one, 15 to 55 m on, whose wires stay within 2 m of the roadside. The wires follow the
+    grade in the vertex shader, are drawn only within 160 m, and cast no shadow.
+  - Direction signs where a road or lane joins another out of town (green near a highway, blue elsewhere), and a
+    settlement's name sign where a road comes into it.
+  - None stands on another road's platform, on a bridge, or by an airfield. `entity_kind_numbers` holds the shaders'
+    kind numbers to the enum.
 - **A limit to watch.** The road grid lists each segment under every 39 m texel its banks reach, and those lists are
   addressed with 19 bits. They now hold 490k of 524k entries, so tracks and yards reach only 12 m beyond their
   platforms (streets 20 m, other roads 50 m). `roads_test` fails if any segment goes unlisted or the lists come
   within a texel's worth of the limit. New roads (Phase C's access roads) need that headroom, or a wider packing.
-- **Still to come in Phase A:**
-  - Item 5: arch and truss spans for the longest crossings.
-  - Item 6: road furniture.
+- **Still to come in Phase A:** item 5's arch and truss spans for the longest crossings.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

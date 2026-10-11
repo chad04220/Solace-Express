@@ -36,7 +36,7 @@ add_custom_target(aircraft_geometry_gen DEPENDS ${AIRCRAFT_GEOMETRY_GEN})
 # renderer, the UI, the audio): each compiled once, as object libraries, for every program that links them besides the
 # game itself, which keeps its own build (on MSVC it links the static runtime, with its own flags). Before this every
 # test compiled the shared sources itself: the islands' five 39 times over (the review of v3.44.0, ENG-1).
-set(ENVIRONMENT_SOURCES src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
+set(ENVIRONMENT_SOURCES src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
 set(CORE_ONLY_SOURCES
   src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/weather.cpp src/hive_combat.cpp src/hive_loadout.cpp src/hive_world_collision.cpp)
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
@@ -441,6 +441,7 @@ if(Python3_Interpreter_FOUND)
   add_test(NAME hive_game_integration COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/hive_game_integration_test.py)
   add_test(NAME enemy_render_contract COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/enemy_render_contract_test.py)
   add_test(NAME tool_games_diskless COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/tool_games_diskless_test.py)
+  add_test(NAME entity_kind_numbers COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/entity_kind_numbers_test.py)
   add_test(NAME ci_test_selection COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/ci_select_test.py ${CMAKE_BINARY_DIR} $<CONFIG>)
   set_tests_properties(ci_test_selection PROPERTIES SKIP_RETURN_CODE 77)
 endif()

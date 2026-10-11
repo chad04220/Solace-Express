@@ -117,6 +117,7 @@ const EntKindInfo kEntInfo[EK_COUNT] = {
   {"Windsock", 1.9f, 6.6f, 1.9f}, {"Beacon", 1.2f, 15.f, 1.2f}, {"Parked aircraft", 5.5f, 2.7f, 4.2f}, {"Parked airliner", 17.f, 11.5f, 19.5f},
   {"Jet bridge", 1.6f, 5.6f, 10.f}, {"Car", 0.9f, 1.5f, 2.25f}, {"Truck", 1.25f, 3.1f, 4.5f}, {"Fence", 10.f, 2.4f, 0.1f},
   {"Localizer", 18.f, 3.2f, 1.f}, {"Radar", 5.f, 22.f, 5.f}, {"Mast", 1.5f, 12.f, 1.5f}, {"Floodlight mast", 1.5f, 20.f, 1.5f},
+  {"Street lamp", 0.3f, 10.f, 1.f}, {"Guardrail", 8.f, 0.9f, 0.2f}, {"Road sign", 1.3f, 3.f, 0.12f}, {"Utility pole", 1.05f, 9.f, 0.2f},
 };
 
 static inline float h2(int a, int b) { return hash2i(a, b); }
@@ -396,6 +397,8 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
         if (C.inside(lorry.x, lorry.y) && seed > 0.35f) put(C, EK_TRUCK, lorry.x, ground(lorry.x, lorry.y), lorry.y, facing(lorry) + 1.3f, 1.f, 1.f, 1.f, seed);
         if (C.inside(car.x, car.y)) put(C, EK_CAR, car.x, ground(car.x, car.y), car.y, square(in), 1.f, 1.f, 1.f, h2((int)F.x - 3, (int)F.z));
       }
+      // ---------------------------------------------------------------- road furniture (road_furniture.cpp)
+      for (auto r = roadFurnitureIn(cx, cz); r.first != r.second; ++r.first) C.out[r.first->kind]->push_back(r.first->e);
       // ---------------------------------------------------------------- lighthouse
       { float lx, lz, ly; if (lighthouseSite(lx, lz, ly) && C.inside(lx, lz)) putBuilding(C, EK_LIGHTHOUSE, lx, lz, ly, 3.4f, 3.4f, 0, 0.5f); }
       // ---------------------------------------------------------------- sea stacks (70 m cells)
@@ -546,6 +549,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
   if (!g_world.bridges.empty())
     for (int k = 0; k < EK_COUNT; k++)
       lists[k].erase(std::remove_if(lists[k].begin(), lists[k].end(), [&](const Ent& e) {
+        if (k == EK_GUARDRAIL) return false;   // (laid up to a deck's joint, at the road's height: the parapets carry on)
         float under;
         const float R = std::max(kEntInfo[k].hx * e.sx, kEntInfo[k].hz * e.sz);
         return bridgeOver(g_world.bridges, e.x, e.z, R, &under) && e.y + kEntInfo[k].h * e.sy > under - 0.5f;
@@ -568,6 +572,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
       ch.ymin = std::min(ch.ymin, e.y); ch.ymax = std::max(ch.ymax, e.y + kEntInfo[k].h * e.sy);
       ch.hmax = std::max(ch.hmax, kEntInfo[k].h * e.sy);
       float R = hypotf(kEntInfo[k].hx * e.sx, kEntInfo[k].hz * e.sz);   // (a big terminal reaches well into the next chunk)
+      if (k == EK_POLE && e.seed < 1.5f) R = std::max(R, 50.f * e.sz + 1.f);   // (a pole's wires, to the next pole)
       ch.reach = std::max({ch.reach, x0 - (e.x - R), e.x + R - (x0 + CH), z0 - (e.z - R), e.z + R - (z0 + CH)});
     }
   }

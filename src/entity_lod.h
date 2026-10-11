@@ -28,6 +28,9 @@ inline float entRangeOf(const EntRanges& r, int k) {
   if (k == EK_PAPI) return 3500.f;
   if (k == EK_CAR || k == EK_FUEL_PUMP) return std::min(r.build, 1600.f);
   if (k == EK_FENCE) return std::min(r.build, 1100.f);
+  if (k == EK_GUARDRAIL) return std::min(r.build, 1500.f);
+  if (k == EK_ROADSIGN) return std::min(r.build, 2000.f);
+  if (k == EK_STREETLAMP || k == EK_POLE) return std::min(r.build, 3000.f);
   if (k == EK_WINDSOCK || k == EK_TRUCK || k == EK_LOCALIZER) return std::min(r.build, 2500.f);
   if (k == EK_GA_PLANE || k == EK_JETBRIDGE || k == EK_MAST || k == EK_FLOODMAST || k == EK_BEACON) return std::min(r.build, 4500.f);
   if (k == EK_BUSH) return r.bush;
@@ -83,6 +86,7 @@ inline float entCloseLimit(const EntRanges& r, int k) {
   if (entClass(k) == EC_ROCK) return (k >= EK_OUTCROP ? 155.f : 55.f)*q;
   if (k == EK_CAR) return 85.f*q;
   if (k == EK_TRUCK) return 120.f*q;
+  if (k == EK_POLE) return 160.f*q;   // (its wires are the close mesh's only: past this they're under a pixel)
   return std::clamp(std::max(i.h, std::max(i.hx,i.hz)*2.f)*7.f, 55.f, 280.f)*q;
 }
 inline int entDetailAt(float d, float close, float l0, float l1) {

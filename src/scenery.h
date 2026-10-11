@@ -2,6 +2,7 @@
 // (entity placement) and in the shaders (ground materials). Trees, rocks and buildings: entities.h
 #pragma once
 #include "world.h"
+#include "entities.h"
 
 static const int MASK_N = 2048;
 static const float MASK_TEXEL = 2.0f * WORLD_HALF / MASK_N;
@@ -29,6 +30,13 @@ float coverFbm(float x, float z, int oct);        // same as GLSL fbm2()
 // border, how far into its field (0 on the hedge between two fields, the hedge drawn under 0.035), and its crop
 // (0..1: under 0.76 a crop, ploughland or an orchard row; above, a pasture)
 void fieldPatch(float x, float z, float& border, float& crop);
+// The road furniture (road_furniture.cpp; docs/LIVING_ISLANDS_PLAN.md, Phase A item 6) - street lamps, guardrails,
+// direction signs, poles and their wires - laid along the network once the world is built or loaded (after its
+// bridges), and each chunk's handed to it as it is generated
+struct RoadFurniture { int kind; Ent e; };
+void sceneryBakeRoadFurniture(const World& world);
+const std::vector<RoadFurniture>& roadFurniture();
+std::pair<const RoadFurniture*, const RoadFurniture*> roadFurnitureIn(int cx, int cz);   // (the items centred in that chunk)
 void sceneryInit();  // build shared road tables before any threaded use
 void sceneryBaseMod(float x, float z, float& h, float& amp);  // flatten roads / towns in the base map
 

@@ -4,11 +4,15 @@
 // bank could join them; and where a road runs onto a bridge the deck takes up the road's bed at its own height and
 // width, the bed stopping square at the joint under the deck's slab.
 #include "../src/world.h"
+#include "../src/scenery.h"
 #include "test_world.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <vector>
+
+float airportInfluence(float x, float z);   // world.cpp
 
 static int fails = 0, checks = 0;
 static void check(bool ok, const char* what) { checks++; if (!ok) { fails++; printf("FAIL %s\n", what); } }
@@ -165,6 +169,49 @@ int main() {
     }
   }
   check(joints > 0, "there are joints to look at");
+  // ---- the road furniture (road_furniture.cpp): each kind out along the network; on dry land, off the airfields; the
+  // poles and signs off every platform; the street lamps where the terrain shader pools their light; each pole's wires
+  // ending at the next pole; laid out the same every time
+  {
+    const std::vector<RoadFurniture> items = roadFurniture();
+    int n[EK_COUNT] = {}, offPool = 0, loose = 0, onRoad = 0;
+    std::vector<vec2> poles;
+    for (const RoadFurniture& f : items) if (f.kind == EK_POLE) poles.push_back(vec2(f.e.x, f.e.z));
+    for (const RoadFurniture& f : items) {
+      const Ent& e = f.e;
+      n[f.kind]++;
+      check(f.kind >= EK_STREETLAMP && f.kind <= EK_POLE && std::isfinite(e.x + e.y + e.z + e.yaw + e.sx + e.sy + e.sz + e.seed), "road furniture: its kinds, finite");
+      check(e.y > 0.5f && airportInfluence(e.x, e.z) <= 0.001f, "road furniture on dry land, off the airfields");
+      int sg = -1; const float edge = roadEdgeDistance(w.roadGrid, e.x, e.z, &sg);
+      if (f.kind == EK_POLE || f.kind == EK_ROADSIGN) onRoad += edge < 0.9f;
+      if (f.kind == EK_STREETLAMP && sg >= 0 && w.roadGrid.segs[sg].cls == RC_STREET) {   // (as roads.glsl roadAt and the pools)
+        const RoadSegment& r = w.roadGrid.segs[sg];
+        const float dx = r.bx - r.ax, dz = r.bz - r.az, L = std::max(hypotf(dx, dz), 1e-3f);
+        const float t = std::clamp(((e.x - r.ax) * dx + (e.z - r.az) * dz) / (L * L), 0.f, 1.f), along = r.along + t * L;
+        const float qx = e.x - (r.ax + dx * t), qz = e.z - (r.az + dz * t), across = (dx * qz - dz * qx) / L;
+        const float k = fmodf(along - (across > 0.f ? 15.f : 0.f) + 3000.f, 30.f);
+        offPool += std::min(k, 30.f - k) > 0.6f;
+      }
+      if (f.kind == EK_GUARDRAIL) check(e.seed >= 0.2f && e.seed <= 0.8f, "a guardrail's grade within reason");
+      if (f.kind == EK_POLE && e.seed < 1.5f) {   // (its wires' far end: 50 m on along its front, scaled, up its grade)
+        const float d = 50.f * e.sz, ex = e.x + sinf(e.yaw) * d, ez = e.z + cosf(e.yaw) * d;
+        bool met = false;
+        for (const vec2& q : poles) met = met || hypotf(q.x - ex, q.y - ez) < 0.05f;
+        loose += !met;
+      }
+    }
+    printf("road furniture: %d street lamps (%d off their pools), %d guardrails, %d signs, %d poles (%d wires to no pole); %d on a road\n",
+           n[EK_STREETLAMP], offPool, n[EK_GUARDRAIL], n[EK_ROADSIGN], n[EK_POLE], loose, onRoad);
+    check(n[EK_STREETLAMP] > 5000 && n[EK_GUARDRAIL] > 2000 && n[EK_ROADSIGN] > 60 && n[EK_POLE] > 1500, "road furniture of every kind");
+    check(offPool * 100 <= n[EK_STREETLAMP], "the street lamps where their light is pooled");
+    check(loose == 0, "each pole's wires end at the next pole");
+    check(onRoad == 0, "no pole or sign on a road");
+    sceneryBakeRoadFurniture(w);
+    const std::vector<RoadFurniture>& again = roadFurniture();
+    bool same = again.size() == items.size();
+    for (size_t i = 0; same && i < items.size(); i++) same = again[i].kind == items[i].kind && !memcmp(&again[i].e, &items[i].e, sizeof(Ent));
+    check(same, "the road furniture laid out the same every time");
+  }
   printf("roads: %zu paths, %zu bridges with %d joints; %d checks, %d failures\n", net.paths.size(), w.bridges.size(), joints, checks, fails);
   return fails ? 1 : 0;
 }
