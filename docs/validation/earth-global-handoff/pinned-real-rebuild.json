@@ -1,0 +1,43 @@
+{
+  "config_sha256": "0126b236234471cd156b62dd742bf94c727910b194bb53926b8985b32076ae95",
+  "convergence": {
+    "N4_to_N8": {
+      "max_absolute_difference_m": 6.280269696249434,
+      "mean_absolute_difference_m": 0.17996341841341573
+    },
+    "N8_to_N16": {
+      "max_absolute_difference_m": 1.3732568643081322,
+      "mean_absolute_difference_m": 0.039687289523217636
+    },
+    "limitation": "Sparse convergence diagnostic relative to the same interpolated ETOPO source, not a global error bound or true terrain accuracy.",
+    "max_quantization_error_m_on_probes": 0.4999785975078339,
+    "probe_core_indices": "16,48,...,240 on each axis of each sample tile",
+    "probe_count": 1280,
+    "quadrature": {
+      "comparison_N": 8,
+      "max_absolute_difference_m": 38.35633705153941,
+      "mean_absolute_difference_m": 0.9137952796961818,
+      "pack_N": 2
+    },
+    "source": {
+      "bytes": 933120000,
+      "path": "etopo2022_surface_60s.bin",
+      "sha256": "522c6329ed7a8c08c14718e164b04ba203d23c51212371146b789baa419c9895"
+    },
+    "source_header": {
+      "bytes": 658,
+      "path": "etopo2022_surface_60s.hdr",
+      "sha256": "fffb4f6c3051d382557744a7e32775664220338255921f5b867fc7c7f947a86f"
+    },
+    "source_matches_pack": true
+  },
+  "elapsed_build_seconds": 49.390793111000676,
+  "files_matching_delivered_sample": 22,
+  "pack_manifest_sha256": "cddc55d760f1397d29cedcff34facbb19d132dc97cc3da493dd670ad7102f4b4",
+  "source_header_pin": {
+    "bytes": 658,
+    "sha256": "fffb4f6c3051d382557744a7e32775664220338255921f5b867fc7c7f947a86f"
+  },
+  "status": "passed",
+  "tiles": 20
+}

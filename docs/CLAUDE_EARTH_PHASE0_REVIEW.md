@@ -2,13 +2,52 @@
 
 Branch: `codex/earth-data-phase0-20261011`
 Base: `efbe9369483286bc557d83496bfcf95bfc6fa944` on Claude's working branch.
-Status: published offline review prototype. No runtime world integration.
+Status: combined Phase 0 and hardened global-elevation handoff, prepared for Claude review. Native CI for this combined revision must pass before integration. No runtime world integration.
 
 ## Scope
 
 This phase provides offline source adapters, tangent-cube elevation tiles, road topology clipping, airport-table normalization, and a checksummed world-pack directory. It does not replace terrain, alter the current Solace archipelago, change aircraft meshes, relocate airports, change saves, or introduce globe physics. Those remain later phases.
 
 The user approved developing Phase 0 in the existing workspace, routine coordination in issue #2, and publishing this review branch.
+
+## Combined review revision (2026-10-11)
+
+This branch now includes the complete prepared-global-source handoff from
+[PR #4](https://github.com/chad04220/Solace-Express/pull/4), its verified split-download
+assembly helper, and the reviewed fixes. It preserves the Phase 0 Windows test
+correction at `745b5538582e0d698205096cf1b869c34af983d5`. Review this single branch
+against the original base above; do not merge the older PR #4 snapshot separately.
+
+Start with [global source handoff and reproduction](USGS_WORLD_MAP.md), then review:
+
+1. `make-sample` binds the binary **and header** to unique preparation-manifest
+   inventory records; missing, duplicate, changed or symlinked inputs fail before
+   config creation. The shared builder validates the optional expected header pin
+   before parsing geometry. Legacy unpinned configs remain compatible.
+2. `convergence` binds both source files to the pack's recorded source hashes
+   before sampling. The 0.5 m quantization check uses the pack's own quadrature N;
+   N8/N16 convergence comparisons are reported separately.
+3. Config creation is exclusive, including existing files, dangling/live symlinks
+   and a destination created after preflight. Rejection must not alter any target.
+4. The 37-test `usgs_world_map` suite is registered with CTest. Review its hostile
+   inputs and split-archive cleanup tests alongside the existing 56 Earth tests.
+
+The audited code revision is `11bee2a804fd9eaf2a8b4bfb6851aeae4f86a8cb`; this
+combined revision adds review documentation and checked-in evidence without
+changing that audited code. [Verification summary](validation/earth-global-handoff/verification-summary.json)
+records 56/56 Earth tests, 37/37 helper tests, five focused CTest passes, and four
+expected regression failures against the older implementation.
+The [real-source rebuild](validation/earth-global-handoff/pinned-real-rebuild.json)
+uses the hardened header-pinned path: all 22 files of the 20-tile delivered sample
+match byte-for-byte, and all 1,280 source-bound convergence probes reproduce.
+The maximum measured quantization residual is 0.4999786 m.
+
+The complete prepared source contains 233,280,000 Float32 cells. Raw sources and
+large artifacts remain outside Git. Original-to-prepared bit equivalence remains
+the producer's recorded audit; this independent recheck did not redownload NOAA's
+GeoTIFF or the GMTED archive. No full-global tile pack or runtime Earth loader was
+built. The sample's N2 quadrature has an observed N2-to-N8 difference up to 38.36 m;
+review quadrature quality before approving a production global build.
 
 ## Source choices
 
@@ -32,7 +71,7 @@ The owner has a separate ChatGPT agent investigating USGS EarthExplorer imagery.
 
 The [first review-branch CI run](https://github.com/chad04220/Solace-Express/actions/runs/38111775265) passed all 91 Linux sanitizer CTest cases and the complete aircraft bake. The native Windows build passed, but one of 86 Windows CTest cases failed: `earth_pack`. Its malicious-payload test raised `KeyError` before reaching the validator because the test snapshot helper used Windows backslash paths while manifest keys use forward slashes.
 
-The follow-up changes only the test helper to `relative_to(root).as_posix()` and adds a `PureWindowsPath` regression that also exercises Windows spelling on Linux. The regression rejects the old helper. All 56 Earth tests pass locally with the correction; the validator and all malformed-payload assertions are unchanged. Native CI remains the authority for the follow-up's Windows result.
+The follow-up changes only the test helper to `relative_to(root).as_posix()` and adds a `PureWindowsPath` regression that also exercises Windows spelling on Linux. The regression rejects the old helper. All 56 Earth tests pass locally with the correction; the validator and all malformed-payload assertions are unchanged. The [corrected Phase 0 CI run](https://github.com/chad04220/Solace-Express/actions/runs/38113246257) subsequently passed all 86 native Windows CTest entries, all three Linux sanitizer shards, and aircraft packaging. The combined revision still requires its own native CI pass.
 
 ## Sample measurement boundaries
 

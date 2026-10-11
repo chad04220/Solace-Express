@@ -1,0 +1,261 @@
+{
+  "builds": [
+    {
+      "child_peak_RSS_KiB_linux": 282360,
+      "command": [
+        "python3",
+        "-m",
+        "tools.earth",
+        "build",
+        "--config",
+        "source-prep/representative-L4.config.json",
+        "--output",
+        "sample-A"
+      ],
+      "elapsed_seconds": 36.53120196300006,
+      "stderr": "",
+      "stdout": {
+        "airport_count": 0,
+        "elevation_tiles": 20,
+        "payload_bytes": 1397780,
+        "source_bytes": 933120658,
+        "status": "built-and-verified"
+      }
+    },
+    {
+      "child_peak_RSS_KiB_linux": 282456,
+      "command": [
+        "python3",
+        "-m",
+        "tools.earth",
+        "build",
+        "--config",
+        "source-prep/representative-L4.config.json",
+        "--output",
+        "sample-B"
+      ],
+      "elapsed_seconds": 36.49941757799934,
+      "stderr": "",
+      "stdout": {
+        "airport_count": 0,
+        "elevation_tiles": 20,
+        "payload_bytes": 1397780,
+        "source_bytes": 933120658,
+        "status": "built-and-verified"
+      }
+    }
+  ],
+  "contract_test_suite": {
+    "command": "python3 tests/earth_pack_test.py",
+    "result": "OK",
+    "seconds": 8.835,
+    "skips": 0,
+    "tests": 55
+  },
+  "interface_commit": "ebcbba8c4c5f839894cd2f326c4818454c29fa2f",
+  "quadrature_probe": {
+    "N4_to_N8": {
+      "max_absolute_difference_m": 6.280269696249434,
+      "mean_absolute_difference_m": 0.17996341841341573
+    },
+    "N8_to_N16": {
+      "max_absolute_difference_m": 1.3732568643081322,
+      "mean_absolute_difference_m": 0.039687289523217636
+    },
+    "limitation": "Sparse convergence diagnostic relative to the same interpolated ETOPO source, not a global error bound or true terrain accuracy.",
+    "max_quantization_error_m_on_probes": 0.4999785975078339,
+    "probe_core_indices": "16,48,...,240 on each axis of each sample tile",
+    "probe_count": 1280,
+    "quadrature": {
+      "comparison_N": 8,
+      "max_absolute_difference_m": 38.35633705153941,
+      "mean_absolute_difference_m": 0.9137952796961818,
+      "pack_N": 2
+    },
+    "source": {
+      "bytes": 933120000,
+      "path": "etopo2022_surface_60s.bin",
+      "sha256": "522c6329ed7a8c08c14718e164b04ba203d23c51212371146b789baa419c9895"
+    }
+  },
+  "sample": {
+    "apron_core_exact_match_counts": {
+      "corner": 8,
+      "cross_face": 512,
+      "same_face": 6144
+    },
+    "elevation_bytes": 1396943,
+    "manifest": {
+      "bytes": 6150,
+      "path": "manifest.json",
+      "sha256": "cddc55d760f1397d29cedcff34facbb19d132dc97cc3da493dd670ad7102f4b4"
+    },
+    "pack_bytes": 1403930,
+    "producer": {
+      "codec": "zstd",
+      "codec_version": {
+        "library": "1.5.7",
+        "python_package": "0.25.0"
+      },
+      "version": "0.1.0"
+    },
+    "same_environment_repeat_all_file_hashes_match": true,
+    "sampling": {
+      "area_samples": 2,
+      "method": "bilinear-jacobian-midpoint-quadrature"
+    },
+    "status": "verified",
+    "tile_count": 20
+  },
+  "source_preparation": {
+    "adapter_result": {
+      "bytes": 933120000,
+      "header_sha256": "fffb4f6c3051d382557744a7e32775664220338255921f5b867fc7c7f947a86f",
+      "sha256": "522c6329ed7a8c08c14718e164b04ba203d23c51212371146b789baa419c9895",
+      "source_sha256": "9d27d4b8ea8e76977e2988bca667d7c8fa68b927355feffcddd6b4875a7fd08e"
+    },
+    "environment": {
+      "gdal_translate": "GDAL 3.8.4, released 2024/02/08",
+      "numpy": "2.3.5",
+      "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+      "python": "3.12.14",
+      "rasterio": "1.5.2",
+      "rasterio_gdal": "3.12.2"
+    },
+    "files": [
+      {
+        "bytes": 837,
+        "path": "NOAA-CC0-notice.txt",
+        "sha256": "8cac172f5ee4a63f641ab120fadd6305fb266fc273b2042e1134c40ad86c2785"
+      },
+      {
+        "bytes": 933120000,
+        "path": "etopo2022_surface_60s.bin",
+        "sha256": "522c6329ed7a8c08c14718e164b04ba203d23c51212371146b789baa419c9895"
+      },
+      {
+        "bytes": 981,
+        "path": "etopo2022_surface_60s.bin.aux.xml",
+        "sha256": "641b9c6f383948b3974bf39465f202eb0b89ebb88b49cedb8000d1a8da22efeb"
+      },
+      {
+        "bytes": 658,
+        "path": "etopo2022_surface_60s.hdr",
+        "sha256": "fffb4f6c3051d382557744a7e32775664220338255921f5b867fc7c7f947a86f"
+      },
+      {
+        "bytes": 2232050,
+        "path": "global-elevation-diagnostic.png",
+        "sha256": "58505ca2c0905f3b0a45885a67e4e71afa815603ff3822d5d2b17d3e87eb4f30"
+      },
+      {
+        "bytes": 4286,
+        "path": "source-audit.json",
+        "sha256": "86fd31a9a94481ba9ec9b894a04c9876830bbe47615b6e0e2f988506bb206ab0"
+      }
+    ],
+    "format": "solace-global-elevation-source-preparation",
+    "gmted_comparison": {
+      "bytes": 277229566,
+      "datum_source": "https://pubs.usgs.gov/of/2011/1073/pdf/of2011-1073.pdf",
+      "license": "USGS public domain with requested credit",
+      "path": "mn30_grd.zip",
+      "sha256": "dfd0d6c6486f4da22109be6107c93a70ef9917a5b6f954cd82d87cf8b920149d",
+      "status": "Separate comparison source only; not converted, blended or sampled into the ETOPO pack",
+      "url": "https://edcintl.cr.usgs.gov/downloads/sciweb1/shared/topo/downloads/GMTED/Grid_ZipFiles/mn30_grd.zip",
+      "version": "GMTED2010-mean-30arcsec",
+      "vertical_reference": "EGM96-dominant; source report documents other local datums"
+    },
+    "interface_commit": "ebcbba8c4c5f839894cd2f326c4818454c29fa2f",
+    "measured": {
+      "audit_seconds": 3.0246022209994408,
+      "child_peak_RSS_KiB_linux": 271976,
+      "conversion_seconds": 4.449135492000096,
+      "process_peak_RSS_KiB_linux": 271976
+    },
+    "original": {
+      "bytes": 465969062,
+      "metadata": {
+        "affine_a_b_c_d_e_f": [
+          0.016666666666666666,
+          0.0,
+          -180.0,
+          0.0,
+          -0.016666666666666666,
+          90.0
+        ],
+        "bands": 1,
+        "bounds_west_south_east_north": [
+          -180.0,
+          -90.0,
+          180.0,
+          90.0
+        ],
+        "column_order": "west-to-east",
+        "crs": "EPSG:9518",
+        "driver": "GTiff",
+        "dtype": "float32",
+        "height": 10800,
+        "nodata": -99999.0,
+        "registration": "pixel-area",
+        "row_order": "north-to-south",
+        "width": 21600
+      },
+      "path": "ETOPO_2022_v1_60s_N90W180_surface.tif",
+      "sha256": "9d27d4b8ea8e76977e2988bca667d7c8fa68b927355feffcddd6b4875a7fd08e",
+      "url": "https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO2022/data/60s/60s_surface_elev_gtif/ETOPO_2022_v1_60s_N90W180_surface.tif",
+      "version": "ETOPO2022-v1-surface-60arcsec"
+    },
+    "preflight": {
+      "GDAL_CACHEMAX_MiB": 128,
+      "audit_strip_bytes_per_array": 22118400,
+      "available_disk_bytes": 26246160384,
+      "memory": {
+        "MemAvailable_bytes": 9723244544,
+        "MemTotal_bytes": 10451460096
+      },
+      "note": "Disk recommendation includes prepared raster, packaging and headroom; source already exists. No large global tile pack is built.",
+      "prepared_binary_exact_bytes": 933120000,
+      "recommended_incremental_disk_bytes": 2866468864
+    },
+    "prepared": {
+      "bytes": 933120000,
+      "metadata": {
+        "affine_a_b_c_d_e_f": [
+          0.0166666666666667,
+          -0.0,
+          -180.0,
+          -0.0,
+          -0.0166666666666667,
+          90.0
+        ],
+        "bands": 1,
+        "bounds_west_south_east_north": [
+          -180.0,
+          -90.00000000000037,
+          180.00000000000074,
+          90.0
+        ],
+        "column_order": "west-to-east",
+        "crs": "EPSG:9518",
+        "driver": "ENVI",
+        "dtype": "float32",
+        "height": 10800,
+        "nodata": -99999.0,
+        "registration": "pixel-area",
+        "row_order": "north-to-south",
+        "width": 21600
+      },
+      "path": "etopo2022_surface_60s.bin",
+      "sha256": "522c6329ed7a8c08c14718e164b04ba203d23c51212371146b789baa419c9895",
+      "vertical_reference": "EGM2008 orthometric metres"
+    },
+    "terms": {
+      "credit_doi": "https://doi.org/10.25921/fd45-gt74",
+      "license_id": "CC0-1.0",
+      "notice": "NOAA-CC0-notice.txt"
+    },
+    "transformation": "tools.earth prepare-raster at ebcbba8c4c5f839894cd2f326c4818454c29fa2f; GDAL GTiff->ENVI Float32 BSQ; same cells and bounds; no resampling, quantization or vertical transformation; canonical header description",
+    "version": 1
+  }
+}

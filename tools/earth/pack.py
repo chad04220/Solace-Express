@@ -170,15 +170,25 @@ def build_pack(config, output, codec=None):
     if source_format == "grid-json":
         elevation = Grid.from_json(source_path)
     elif source_format == "envi":
-        elevation = EnviGrid(source_path)
-        # The header controls geometry; record it as a separate hashed source.
+        # The header controls geometry/byte order. Verify an optional expected
+        # record before EnviGrid reads it, then record the actual hashed source.
         header = source_path.with_suffix(".hdr")
-        if not header.exists():
+        if not header.exists() and not header.is_symlink():
             header = Path(str(source_path) + ".hdr")
         header_spec = dict(elevation_spec, path=str(header))
         header_spec.pop("sha256", None)
         header_spec.pop("origin", None)
+        expected_header = elevation_spec.get("header")
+        if "header" in elevation_spec:
+            if not isinstance(expected_header, dict) or set(expected_header) != {"sha256", "bytes"}:
+                raise ValueError("invalid expected ENVI header record")
+            _check_sha(expected_header["sha256"])
+            _bounded_int(expected_header["bytes"], "expected ENVI header bytes", 64 * 1024, 1)
+            header_spec["sha256"] = expected_header["sha256"]
         _, header_source = _source(base, header_spec, "elevation-header", licenses)
+        if expected_header is not None and header_source["bytes"] != expected_header["bytes"]:
+            raise ValueError("ENVI header byte count mismatch")
+        elevation = EnviGrid(source_path)
         sources.append(header_source)
     else:
         raise ValueError("unsupported elevation source format")

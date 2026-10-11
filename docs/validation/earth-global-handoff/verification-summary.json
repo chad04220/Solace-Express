@@ -1,0 +1,38 @@
+{
+  "commit": "11bee2a804fd9eaf2a8b4bfb6851aeae4f86a8cb",
+  "base": "9dafa81dab6bd8b8a702247c8343395fdec27176",
+  "earth_tests": {
+    "passed": 56,
+    "skipped": 0
+  },
+  "handoff_tests": {
+    "passed": 37,
+    "skipped": 0
+  },
+  "focused_ctest": {
+    "passed": 5,
+    "failed": 0,
+    "tests": [
+      "earth_pack",
+      "usgs_world_map",
+      "ci_test_selection",
+      "shader_prune",
+      "aircraft_geometry_source"
+    ]
+  },
+  "old_implementation_sensitivity": {
+    "expected_failures": 4,
+    "unexpected_errors": 0,
+    "note": "Four new targeted regressions fail against the previous helpers as expected; no unexpected errors."
+  },
+  "native_windows_run": false,
+  "full_real_pinned_rebuild": "pinned-real-rebuild.json",
+  "limits": [
+    "Focused local tests, not the complete game build/test matrix.",
+    "Native Windows validation is pending CI.",
+    "Original NOAA GeoTIFF and GMTED archives were not redownloaded.",
+    "No full-global tile pack or runtime Earth integration was performed."
+  ],
+  "verification_scope": "Audited code imported unchanged into the combined Phase 0 review branch; integration adds only documentation and this evidence.",
+  "preserved_phase0_head": "745b5538582e0d698205096cf1b869c34af983d5"
+}

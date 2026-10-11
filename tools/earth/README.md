@@ -204,7 +204,15 @@ Optional `roads` is another source specification (`format:geojson`); optional
 `airports` has `airports` and `runways` CSV source specifications. Omit missing
 layers instead of claiming empty files are complete global data. Each layer is
 separately described and replaceable at build time. Elevation `format:envi` also
-records the header as a separate hashed input.
+records the header as a separate hashed input. For a reviewed ENVI source, also
+pin `elevation.header` to an object containing exactly `sha256` (the expected
+64-character lowercase digest) and `bytes` (an integer from 1 through 65536).
+The builder verifies both before opening the raster reader. The header is
+`INPUT.hdr`, falling back to `INPUT.bin.hdr` only if the first is absent; a
+symlink is never accepted. Legacy configs without this optional record remain
+valid. The pin is build-input validation only: it does not change the emitted
+v1 source records or pack format. Keep the binary and header immutable during
+the build, in an isolated single-writer input directory.
 
 For a transformed input, include optional `origin` with exact `url`, `sha256`,
 `bytes`, `transformation` fields describing the original downloaded bytes. The
