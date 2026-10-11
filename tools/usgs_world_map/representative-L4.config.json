@@ -1,0 +1,146 @@
+{
+  "area_samples": 2,
+  "codec": "zstd",
+  "coverage": "20 selected L4 tiles: Himalaya, California coast, Atlantic, Greenland, Mariana, both poles, antimeridian and a cube-face edge. Bounded diagnostic sample; not a complete global tile inventory.",
+  "elevation": {
+    "description": "North-up WGS84 geographic Float32; EGM2008 heights unchanged; complete 360x180 global source",
+    "format": "envi",
+    "license_id": "CC0-1.0",
+    "license_path": "NOAA-CC0-notice.txt",
+    "origin": {
+      "bytes": 465969062,
+      "sha256": "9d27d4b8ea8e76977e2988bca667d7c8fa68b927355feffcddd6b4875a7fd08e",
+      "transformation": "tools.earth prepare-raster at ebcbba8c4c5f839894cd2f326c4818454c29fa2f; GDAL GTiff->ENVI Float32 BSQ; same cells and bounds; no resampling, quantization or vertical transformation; canonical header description",
+      "url": "https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO2022/data/60s/60s_surface_elev_gtif/ETOPO_2022_v1_60s_N90W180_surface.tif"
+    },
+    "path": "etopo2022_surface_60s.bin",
+    "resolution_arcsec": 60,
+    "sha256": "522c6329ed7a8c08c14718e164b04ba203d23c51212371146b789baa419c9895",
+    "url": "https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO2022/data/60s/60s_surface_elev_gtif/ETOPO_2022_v1_60s_N90W180_surface.tif",
+    "version": "ETOPO2022-v1-surface-60arcsec"
+  },
+  "name": "etopo2022-global-source-representative-L4",
+  "tiles": [
+    {
+      "face": "py",
+      "level": 4,
+      "x": 7,
+      "y": 12
+    },
+    {
+      "face": "py",
+      "level": 4,
+      "x": 8,
+      "y": 12
+    },
+    {
+      "face": "ny",
+      "level": 4,
+      "x": 2,
+      "y": 15
+    },
+    {
+      "face": "ny",
+      "level": 4,
+      "x": 3,
+      "y": 15
+    },
+    {
+      "face": "ny",
+      "level": 4,
+      "x": 13,
+      "y": 14
+    },
+    {
+      "face": "ny",
+      "level": 4,
+      "x": 14,
+      "y": 14
+    },
+    {
+      "face": "pz",
+      "level": 4,
+      "x": 5,
+      "y": 5
+    },
+    {
+      "face": "nx",
+      "level": 4,
+      "x": 1,
+      "y": 10
+    },
+    {
+      "face": "px",
+      "level": 4,
+      "x": 15,
+      "y": 7
+    },
+    {
+      "face": "py",
+      "level": 4,
+      "x": 0,
+      "y": 7
+    },
+    {
+      "face": "nx",
+      "level": 4,
+      "x": 7,
+      "y": 7
+    },
+    {
+      "face": "nx",
+      "level": 4,
+      "x": 8,
+      "y": 7
+    },
+    {
+      "face": "pz",
+      "level": 4,
+      "x": 7,
+      "y": 7
+    },
+    {
+      "face": "pz",
+      "level": 4,
+      "x": 7,
+      "y": 8
+    },
+    {
+      "face": "pz",
+      "level": 4,
+      "x": 8,
+      "y": 7
+    },
+    {
+      "face": "pz",
+      "level": 4,
+      "x": 8,
+      "y": 8
+    },
+    {
+      "face": "nz",
+      "level": 4,
+      "x": 7,
+      "y": 7
+    },
+    {
+      "face": "nz",
+      "level": 4,
+      "x": 7,
+      "y": 8
+    },
+    {
+      "face": "nz",
+      "level": 4,
+      "x": 8,
+      "y": 7
+    },
+    {
+      "face": "nz",
+      "level": 4,
+      "x": 8,
+      "y": 8
+    }
+  ],
+  "version": 1
+}
