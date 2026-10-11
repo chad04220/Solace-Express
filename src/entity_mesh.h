@@ -9,6 +9,7 @@ enum EntPart { P_BARK = 0, P_LEAF, P_FROND, P_NEEDLE, P_ROCK, P_WALL, P_ROOF, P_
                P_AWNING, P_WOOD, P_DARK, P_LAMP, P_SIGN, P_CANOPY, P_LEAFCARD, P_RLAMP, P_PAPI,
                P_PAINT, P_STRIPE, P_SOCK, P_BEACON, P_FENCE, P_OBST, P_WHEEL0, P_WHEEL1, P_WHEEL2, P_WHEEL3, P_WHEEL4, P_WHEEL5 };
 static const int P_WIRE = 40;   // a utility pole's wires to the next (ent_vs.glsl: run to it, dropped from the shadows)
+static const int P_BLADE = 41;  // a wind turbine's blades (ent_vs.glsl: they turn about the hub)
 // Slots 0/1/2 retain established near/mid/far tiers; 3 is close inspection detail.
 static const int ENT_LODS = 4;
 struct EntMeshRange { int first[ENT_LODS], count[ENT_LODS]; };

@@ -423,7 +423,9 @@ void main(){
     float s2 = fract(seed*13.31), s3 = fract(seed*3.77);
     vec3 livery = s3 < 0.5 ? pal(s3*2.0, vec3(0.7, 0.07, 0.06), vec3(0.06, 0.2, 0.55), vec3(0.05, 0.4, 0.2), vec3(0.9, 0.5, 0.05))
                            : pal(s3*2.0 - 1.0, vec3(0.04, 0.08, 0.25), vec3(0.0, 0.45, 0.5), vec3(0.45, 0.06, 0.25), vec3(0.15, 0.15, 0.17));
-    if (part == P_WIRE) { alb = vec3(0.045, 0.045, 0.05); rough = 0.45; metal = 0.4; }
+    if (uKind == K_WINDTURBINE && (part == P_PAINT || part == P_BLADE)) {   // a wind turbine: white, a little weathered
+      alb = vec3(0.9, 0.91, 0.9)*(0.93 + 0.07*vn3(lp*0.15)); if (n0.y < -0.5) alb *= 0.85; rough = 0.32; metal = 0.0;
+    } else if (part == P_WIRE) { alb = vec3(0.045, 0.045, 0.05); rough = 0.45; metal = 0.4; }
     else if (part == P_WOOD) {   // a utility pole: creosoted, some weathered grey, the grain running up it
       alb = mix(vec3(0.22, 0.155, 0.1), vec3(0.4, 0.37, 0.33), step(0.7, hsh(vec2(vInst.y*3.1, vInst.w))));
       alb *= 0.8 + 0.25*vn3(vec3(lp.x*9.0, lp.y*0.35, lp.z*9.0)); rough = 0.85; metal = 0.0;
@@ -516,7 +518,9 @@ void main(){
       alb = mod(floor(mp.y/hb), 2.0) < 0.5 ? vec3(0.95) : vec3(0.75, 0.1, 0.06); rough = 0.5;
       if (uKind != K_WINDSOCK && mp.y > (uKind == K_CTRL ? 33.5 : uKind == K_MAST ? 11.5 : 1e9)) emit = vec3(1.0, 0.08, 0.04)*uNight*(4.0 + 3.0*step(0.5, fract(uTime*0.8)));
     }
-    else if (part == P_LAMP) { alb = vec3(0.9); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.93, 0.8)*((uKind == K_LAMPPOST ? 0.0 : 0.15) + 10.0*uNight); }
+    else if (part == P_LAMP && uKind == K_WINDTURBINE) {   // its aviation light: red, flashing once every two seconds after dark
+      alb = vec3(0.5, 0.05, 0.03); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.06, 0.03)*uNight*8.0*step(0.75, fract(uTime*0.5 + seed*3.7));
+    } else if (part == P_LAMP) { alb = vec3(0.9); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.93, 0.8)*((uKind == K_LAMPPOST ? 0.0 : 0.15) + 10.0*uNight); }
     else if (part == P_SIGN) { alb = uKind == K_PUMP ? vec3(0.75, 0.1, 0.06) : vec3(0.08, 0.22, 0.55); rough = 0.4; emit = alb*uNight*2.5; }
     else if (part == P_CANOPY) { alb = vec3(0.9); if (n0.y < -0.5) emit = vec3(1.0, 0.97, 0.9)*uNight*2.5; rough = 0.4; }
     else if(part>=27 && part<33) {

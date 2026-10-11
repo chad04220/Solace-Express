@@ -85,7 +85,13 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   addressed with 19 bits. They now hold 490k of 524k entries, so tracks and yards reach only 12 m beyond their
   platforms (streets 20 m, other roads 50 m). `roads_test` fails if any segment goes unlisted or the lists come
   within a texel's worth of the limit. New roads (Phase C's access roads) need that headroom, or a wider packing.
-- **Phase A is done.** Phase C's hand-built landmarks come next, then life on the roads (Phase D).
+- **Phase A is done.** Phase C's hand-built landmarks are under way, then life on the roads (Phase D).
+- **Phase C, the wind farm (after v3.48, `landmarks.cpp`, `landmarks_test`).** Ten 3 MW turbines stand 300 m apart
+  along the crest of a ridge (the best one on the mild green hills, 80 to 700 m up). They are out of the settlements,
+  off the roads, and 6 km or more from every runway. Each is a 90 m tower with its nacelle and three 45 m blades. The
+  rotor turns 14 times a minute once the wind is over 2.5 m/s and yaws to face the wind (`ent_vs.glsl`, both passes),
+  and a red aviation light flashes on each nacelle at night. The landmarks are found when the world is built or loaded,
+  on the base height map, and handed to the scenery chunks like the road furniture (`PlacedByChunk`).
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

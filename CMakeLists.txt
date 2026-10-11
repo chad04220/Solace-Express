@@ -36,7 +36,7 @@ add_custom_target(aircraft_geometry_gen DEPENDS ${AIRCRAFT_GEOMETRY_GEN})
 # renderer, the UI, the audio): each compiled once, as object libraries, for every program that links them besides the
 # game itself, which keeps its own build (on MSVC it links the static runtime, with its own flags). Before this every
 # test compiled the shared sources itself: the islands' five 39 times over (the review of v3.44.0, ENG-1).
-set(ENVIRONMENT_SOURCES src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
+set(ENVIRONMENT_SOURCES src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/landmarks.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
 set(CORE_ONLY_SOURCES
   src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/weather.cpp src/hive_combat.cpp src/hive_loadout.cpp src/hive_world_collision.cpp)
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
@@ -650,6 +650,10 @@ add_executable(roads_test tests/roads_test.cpp ${ENV_OBJS})
 target_include_directories(roads_test PRIVATE src)
 add_test(NAME roads COMMAND roads_test)
 set_tests_properties(roads PROPERTIES COST 20)
+# the landmarks (landmarks.cpp): each where the world has room for it
+add_executable(landmarks_test tests/landmarks_test.cpp ${ENV_OBJS})
+target_include_directories(landmarks_test PRIVATE src)
+add_test(NAME landmarks COMMAND landmarks_test)
 
 # The islands, generated once a test run (tests/test_world.cpp, the "world" fixture: ctest runs it before any test
 # below, even when asked for just one) and loaded by the tests that fly over them (tests/test_world.h) instead of each
@@ -669,7 +673,7 @@ foreach(t airport_environment airport_layouts cockpit_camera community_layout uf
           environment_scale_audit flight_model_1 flight_model_2 flight_model_3 gameplay_loop_1 gameplay_loop_2 gameplay_loop_3
           gameplay_loop_4 campaign_progression_1 campaign_progression_2 campaign_progression_3 career_saves military_career military_career_fastmath military_gameplay hive_world_collision hive_world_collision_fastmath terrain_shadow_bake
           volcano_effects new_aircraft_performance new_aircraft_autoland_larkspur new_aircraft_autoland_atlas new_aircraft_go_around
-          vtol_throttle wreck_pose bridges roads road_grade_gpu menu_plan_cache)
+          vtol_throttle wreck_pose bridges roads landmarks road_grade_gpu menu_plan_cache)
   if(TEST ${t})
     set_property(TEST ${t} APPEND PROPERTY FIXTURES_REQUIRED world)
     set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT "SOLACE_TEST_WORLD=${CMAKE_BINARY_DIR}/test_world.bin")
@@ -679,7 +683,7 @@ foreach(t airport_environment_test airport_layout_test cockpit_camera_test commu
           entity_raycast_test envelope_test environment_scale_audit flight_test gameplay_test progression_test save_test
           military_career_test military_career_fastmath_test military_gameplay_test hive_world_collision_test hive_world_collision_fastmath_test
           terrain_shadow_test volcano_effects_test new_aircraft_performance_test new_aircraft_autoland_test vtol_throttle_test
-          bridges_test roads_test road_grade_gpu_test menu_plan_cache_test)
+          bridges_test roads_test landmarks_test road_grade_gpu_test menu_plan_cache_test)
   if(TARGET ${t})
     add_dependencies(${t} test_world)
   endif()

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """The scenery's kinds as the shaders number them (a source contract). entities.h's EntKind is the order of the instance
 lists and of the meshes; the entity programs know a kind by its number - ent_fs1.glsl's K_ constants, and a literal
-here and there in ent_vs.glsl (the windsock, the guardrail, the pole) - and the bridges' material comes after every
+here and there in ent_vs.glsl (the windsock, the guardrail, the pole, the wind turbine) - and the bridges' material comes after every
 kind (K_BRIDGE, kBridgeKind). Adding a kind anywhere but at the end renumbers the rest: each of these must follow, or
-a kind is drawn with another's material (v3.48's city towers moved twelve). The pole's wires' part number is shared
-the same way (entity_mesh.h P_WIRE)."""
+a kind is drawn with another's material (v3.48's city towers moved twelve). The pole's wires' and the turbine's blades'
+part numbers are shared the same way (entity_mesh.h P_WIRE, P_BLADE)."""
 import pathlib, re, sys
 
 root = pathlib.Path(__file__).resolve().parents[1]
@@ -50,16 +50,17 @@ literals = re.findall(r'uKind\s*==\s*(\d+)[^\n]*//\s*\((EK_\w+)', vs)
 for value, ek in literals:
     if index.get(ek) != int(value):
         fail('ent_vs.glsl: uKind == %s is said to be %s, which is %s' % (value, ek, index.get(ek)))
-for need in ('EK_WINDSOCK', 'EK_GUARDRAIL', 'EK_POLE'):
+for need in ('EK_WINDSOCK', 'EK_GUARDRAIL', 'EK_POLE', 'EK_WINDTURBINE'):
     if need not in [ek for _, ek in literals]:
         fail('ent_vs.glsl: no literal for %s found' % need)
 
-# the wires' part
+# the parts the vertex shader moves: a pole's wires, a turbine's blades
 mesh = read('src/entity_mesh.h')
-pw = re.search(r'P_WIRE\s*=\s*(\d+)', mesh)
-fw = re.search(r'P_WIRE\s*=\s*(\d+)', fs1)
-if not pw or not fw or pw.group(1) != fw.group(1) or ('aAux.x - %s.0' % pw.group(1)) not in vs:
-    fail('P_WIRE differs between entity_mesh.h, ent_fs1.glsl and ent_vs.glsl')
+for part in ('P_WIRE', 'P_BLADE'):
+    pm = re.search(part + r'\s*=\s*(\d+)', mesh)
+    pf = re.search(part + r'\s*=\s*(\d+)', fs1)
+    if not pm or not pf or pm.group(1) != pf.group(1) or ('aAux.x - %s.0' % pm.group(1)) not in vs:
+        fail('%s differs between entity_mesh.h, ent_fs1.glsl and ent_vs.glsl' % part)
 
 print('entity_kind_numbers: %d kinds, %d shader constants, %d literals; %d failures' % (len(kinds), len(consts), len(literals), failures))
 sys.exit(1 if failures else 0)

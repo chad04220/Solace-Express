@@ -118,6 +118,7 @@ const EntKindInfo kEntInfo[EK_COUNT] = {
   {"Jet bridge", 1.6f, 5.6f, 10.f}, {"Car", 0.9f, 1.5f, 2.25f}, {"Truck", 1.25f, 3.1f, 4.5f}, {"Fence", 10.f, 2.4f, 0.1f},
   {"Localizer", 18.f, 3.2f, 1.f}, {"Radar", 5.f, 22.f, 5.f}, {"Mast", 1.5f, 12.f, 1.5f}, {"Floodlight mast", 1.5f, 20.f, 1.5f},
   {"Street lamp", 0.3f, 10.f, 1.f}, {"Guardrail", 8.f, 0.9f, 0.2f}, {"Road sign", 1.3f, 3.f, 0.12f}, {"Utility pole", 1.05f, 9.f, 0.2f},
+  {"Wind turbine", 2.5f, 138.f, 2.5f},   // (its tower: the rotor, 46 m round the hub at 92 m, isn't solid)
 };
 
 static inline float h2(int a, int b) { return hash2i(a, b); }
@@ -399,6 +400,8 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
       }
       // ---------------------------------------------------------------- road furniture (road_furniture.cpp)
       for (auto r = roadFurnitureIn(cx, cz); r.first != r.second; ++r.first) C.out[r.first->kind]->push_back(r.first->e);
+      // ---------------------------------------------------------------- landmarks (landmarks.cpp)
+      for (auto r = landmarksIn(cx, cz); r.first != r.second; ++r.first) C.out[r.first->kind]->push_back(r.first->e);
       // ---------------------------------------------------------------- lighthouse
       { float lx, lz, ly; if (lighthouseSite(lx, lz, ly) && C.inside(lx, lz)) putBuilding(C, EK_LIGHTHOUSE, lx, lz, ly, 3.4f, 3.4f, 0, 0.5f); }
       // ---------------------------------------------------------------- sea stacks (70 m cells)

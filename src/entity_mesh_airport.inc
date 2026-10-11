@@ -933,6 +933,42 @@ void buildAirportKind(MB& mb, int kind, int lod) {
       }
       break;
     }
+    case EK_WINDTURBINE: {   // a 3 MW turbine: a tapered tower to 90 m, the nacelle, the hub at 92.2 m and three 45 m blades turning
+      // in the plane z = 4 (facing +z: ent_vs.glsl yaws it all into the wind and turns the blades, P_BLADE, about the hub)
+      const int sg = lod == 3 ? 24 : lod == 0 ? 16 : lod == 1 ? 10 : 6;
+      mb.cyl(vec3(0, -0.6f, 0), vec3(0, 0.4f, 0), 4.f, 4.f, sg, P_TRIM, true, false);   // (its foundation's plinth)
+      mb.cyl(vec3(0, 0.4f, 0), vec3(0, 90.f, 0), 2.2f, 1.45f, sg, P_PAINT, true, false);
+      mb.box(vec3(-1.75f, 90.4f, -8.f), vec3(1.75f, 94.f, 3.2f), P_PAINT, 0x3F);
+      if (d1) mb.box(vec3(-1.5f, 89.9f, -1.6f), vec3(1.5f, 90.4f, 1.6f), P_PAINT, 0x3F);   // (the yaw bearing's housing)
+      mb.cyl(vec3(0, 92.2f, 3.2f), vec3(0, 92.2f, 6.6f), 1.7f, 0.25f, d0 ? 16 : 8, P_PAINT, false, true);   // the spinner
+      mb.box(vec3(-0.22f, 94.f, -7.2f), vec3(0.22f, 94.35f, -6.75f), P_LAMP, 0x3F);   // (the aviation light: red at night)
+      const int segs = d0 ? 7 : d1 ? 4 : 2;
+      for (int k = 0; k < 3; k++) {   // each blade: root to tip, its chord narrowing and twisting towards the tip
+        const float a = k * 2.0944f; const vec3 r(sinf(a), cosf(a), 0.f), c0(cosf(a), -sinf(a), 0.f), hub(0, 92.2f, 4.f);
+        // (its section: the leading edge (w 1), its thickest 30% of the chord back (w 0), the trailing edge (w -1))
+        auto edge = [&](int i, float w, float face) {
+          const float t = (float)i / segs, rad = 1.6f + 44.4f * t, chord = 3.3f - 2.7f * t, tw = 0.35f * (1.f - t);
+          const vec3 cd = c0 * cosf(tw) + vec3(0, 0, 1) * sinf(tw), nd = vec3(0, 0, 1) * cosf(tw) - c0 * sinf(tw);
+          const float thick = (0.55f - 0.48f * t) * 0.5f;
+          return hub + r * rad + cd * (w > 0.5f ? 0.3f * chord : w < -0.5f ? -0.7f * chord : 0.f) + nd * (w == 0.f ? face * thick : 0.f);
+        };
+        for (int i = 0; i < segs; i++)
+          for (float face : {-1.f, 1.f}) {   // (each face from the leading edge over its thickest to the trailing edge)
+            const vec3 ref = hub - vec3(0, 0, face * 50.f);
+            mb.quad(edge(i, 1.f, face), edge(i + 1, 1.f, face), edge(i + 1, 0.f, face), edge(i, 0.f, face), P_BLADE, ref);
+            mb.quad(edge(i, 0.f, face), edge(i + 1, 0.f, face), edge(i + 1, -1.f, face), edge(i, -1.f, face), P_BLADE, ref);
+          }
+        if (lod == 3) mb.cyl(hub + r * 0.9f, hub + r * 2.2f, 1.05f, 0.95f, 12, P_BLADE, false, false);   // (the root's collar)
+      }
+      if (lod == 3) {   // (up close: the tower's flanges, its door and steps, the nacelle's cooler and mast)
+        for (float y : {28.f, 58.f}) { const float rr = 2.2f - 0.75f * y / 90.f + 0.04f; mb.cyl(vec3(0, y - 0.15f, 0), vec3(0, y + 0.15f, 0), rr, rr, sg, P_PAINT, false, false); }
+        mb.box(vec3(-0.55f, 0.4f, 2.05f), vec3(0.55f, 2.6f, 2.3f), P_DARK, 32);
+        mb.box(vec3(-0.9f, -0.2f, 2.1f), vec3(0.9f, 0.4f, 3.4f), P_TRIM, 0x3B);
+        mb.box(vec3(-1.4f, 94.f, -6.2f), vec3(1.4f, 94.6f, -3.8f), P_PAINT, 0x3B);
+        mb.cyl(vec3(0, 94.f, -5.f), vec3(0, 96.f, -5.f), 0.05f, 0.05f, 6, P_METAL, false, true);
+      }
+      break;
+    }
     case EK_POLE: {   // a wooden pole, a crossarm, three insulators; up close, its three wires to the next pole along +z
       mb.cyl(vec3(0, -0.5f, 0), vec3(0, 9.f, 0), 0.14f, 0.11f, d0 ? 10 : d1 ? 6 : 4, P_WOOD, true, false);
       mb.box(vec3(-1.05f, 8.15f, -0.06f), vec3(1.05f, 8.3f, 0.06f), P_WOOD, lod == 2 ? 8 | 16 | 32 : 0x3F);

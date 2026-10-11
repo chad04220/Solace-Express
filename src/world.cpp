@@ -266,7 +266,7 @@ void World::build(const std::string& cachePath, const std::string& stamp, bool s
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
   g_worldStage = cachePath.empty() ? 2 : 1;
   fromCache = !cachePath.empty() && loadCache(cachePath, stamp);
-  if (fromCache) { sceneryInit(); settlements = buildSettlementFields(*this); farms = farmsteadsOf(roads); sceneryBakeCommunityLots(*this); boxes.clear(); bridges = buildBridges(*this); sceneryBakeRoadFurniture(*this); g_worldStage = 3; return; }
+  if (fromCache) { sceneryInit(); settlements = buildSettlementFields(*this); farms = farmsteadsOf(roads); sceneryBakeCommunityLots(*this); boxes.clear(); bridges = buildBridges(*this); sceneryBakeRoadFurniture(*this); sceneryBakeLandmarks(*this); g_worldStage = 3; return; }
   g_worldStage = 2;
   hm.resize((size_t)HM_N * HM_N * 4);
   sceneryInit();
@@ -332,6 +332,7 @@ void World::build(const std::string& cachePath, const std::string& stamp, bool s
   boxes.clear();
   bridges = buildBridges(*this);
   sceneryBakeRoadFurniture(*this);
+  sceneryBakeLandmarks(*this);
   if (!cachePath.empty() && save) saveCache(cachePath, stamp);
   g_worldStage = 3;
 }

@@ -59,7 +59,8 @@ int main() {
     {312,114,78,5916},{504,228,132,5868},{264,210,90,1344},{846,594,96,16782},{726,462,318,4950},{288,132,90,1800},
     {636,288,96,5088},{324,228,222,2478},{360,228,228,4428},{468,216,180,2478},{906,702,294,18129},{3408,2220,852,62838},{276,240,144,4956},
     {3279,1623,96,25569},{1476,792,168,24918},{90,66,42,300},{960,498,72,1716},{1572,372,372,5220},{210,183,75,894},{120,96,96,1872},
-    {228,168,138,444},{534,144,12,1398},{180,108,84,504},{342,198,54,1062}   // (road furniture: street lamp, guardrail, road sign, utility pole)
+    {228,168,138,444},{534,144,12,1398},{180,108,84,504},{342,198,54,1062},   // (road furniture: street lamp, guardrail, road sign, utility pole)
+    {1044,648,396,1812}   // (landmarks: wind turbine)
   };
   size_t cursor=0;int totals[ENT_LODS]={};
   for(int k=0;k<EK_COUNT;++k) for(int lod=0;lod<ENT_LODS;++lod) {
@@ -73,7 +74,7 @@ int main() {
       const auto&e=v[i];const float values[]={e.px,e.py,e.pz,e.nx,e.ny,e.nz,e.part,e.ao,e.u,e.v};
       for(float f:values) check(std::isfinite(f),"finite vertex",k,lod);
       check(std::abs(e.nx*e.nx+e.ny*e.ny+e.nz*e.nz-1.f)<.001f,"unit normal",k,lod);
-      check(((e.part>=P_BARK && e.part<=P_WHEEL5) || (k==EK_POLE && e.part==P_WIRE)) && e.part==std::floor(e.part),"valid material slot",k,lod);
+      check(((e.part>=P_BARK && e.part<=P_WHEEL5) || (k==EK_POLE && e.part==P_WIRE) || (k==EK_WINDTURBINE && e.part==P_BLADE)) && e.part==std::floor(e.part),"valid material slot",k,lod);
       if((i-r[k].first[lod])%3==0) {
         const auto&b=v[i+1];const auto&c=v[i+2];
         vec3 n=cross(vec3(b.px-e.px,b.py-e.py,b.pz-e.pz),vec3(c.px-e.px,c.py-e.py,c.pz-e.pz));

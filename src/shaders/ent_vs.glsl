@@ -41,6 +41,24 @@ void main(){
   vec3 posed=aPos, posedN=aNrm;
   int wheel=int(aAux.x+.5)-27;
 #if ENT_BUILDINGS
+  if (uKind == 60) {   // (EK_WINDTURBINE: entities.h) its blades turn about the hub (at 92.2 m) once the wind is over 2.5 m/s,
+    // 14 a minute; the nacelle, hub and rotor (all above the tower's top) yaw so the rotor faces into the wind
+    float sp = length(uWind.xz);
+    if (abs(aAux.x - 41.0) < 0.5) {
+      float a = uTime*1.47*step(2.5, sp) + fract(iB.w*7.31)*6.2832, ca = cos(a), sa = sin(a);
+      vec2 q = posed.xy - vec2(0.0, 92.2);
+      posed.xy = vec2(0.0, 92.2) + vec2(ca*q.x - sa*q.y, sa*q.x + ca*q.y);
+      posedN.xy = vec2(ca*posedN.x - sa*posedN.y, sa*posedN.x + ca*posedN.y);
+    }
+    if (posed.y > 89.5 && sp > 0.5) {
+      vec2 f = -uWind.xz/sp;
+      float d = atan(f.x, f.y) - iA.w, cd = cos(d), sd = sin(d);
+      posed.xz = vec2(cd*posed.x + sd*posed.z, -sd*posed.x + cd*posed.z);
+      posedN.xz = vec2(cd*posedN.x + sd*posedN.z, -sd*posedN.x + cd*posedN.z);
+    }
+  }
+#endif
+#if ENT_BUILDINGS
   if(wheel>=0 && wheel<6) {
     float a=wheel<4?uWheel0[wheel]:uWheel1[wheel-4], c=cos(a),s=sin(a);
     vec2 q=aPos.yz-aAux.zw;

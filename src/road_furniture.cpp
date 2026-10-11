@@ -10,8 +10,7 @@
 float airportInfluence(float x, float z);   // world.cpp
 
 namespace {
-std::vector<RoadFurniture> g_items;
-std::vector<int> g_chunkOf;   // (each item's chunk, ascending: the items sorted by it)
+PlacedByChunk g_furniture;
 
 // A path's centre line: where it is s metres along, which way it runs there, the road's height, on a bridge or not
 struct Station { vec2 p, d; float h; bool bridge; };
@@ -216,21 +215,25 @@ void sceneryBakeRoadFurniture(const World& world) {
       }
     }
   }
-  // by chunk, so each chunk takes its own as it is generated
   for (RoadFurniture& f : out) f.e.yaw = remainderf(f.e.yaw, 6.2831853f);
-  std::vector<int> key(out.size());
-  for (size_t i = 0; i < out.size(); i++) key[i] = Scenery::chunkOf(out[i].e.z) * Scenery::NC + Scenery::chunkOf(out[i].e.x);
-  std::vector<size_t> order(out.size());
+  g_furniture.build(out);
+}
+
+void PlacedByChunk::build(const std::vector<PlacedEnt>& all) {
+  std::vector<int> key(all.size());
+  for (size_t i = 0; i < all.size(); i++) key[i] = Scenery::chunkOf(all[i].e.z) * Scenery::NC + Scenery::chunkOf(all[i].e.x);
+  std::vector<size_t> order(all.size());
   for (size_t i = 0; i < order.size(); i++) order[i] = i;
   std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key[a] < key[b]; });
-  g_items.clear(); g_chunkOf.clear();
-  for (size_t i : order) { g_items.push_back(out[i]); g_chunkOf.push_back(key[i]); }
+  items.clear(); chunk.clear();
+  for (size_t i : order) { items.push_back(all[i]); chunk.push_back(key[i]); }
 }
 
-const std::vector<RoadFurniture>& roadFurniture() { return g_items; }
-
-std::pair<const RoadFurniture*, const RoadFurniture*> roadFurnitureIn(int cx, int cz) {
+std::pair<const PlacedEnt*, const PlacedEnt*> PlacedByChunk::in(int cx, int cz) const {
   const int k = cz * Scenery::NC + cx;
-  const auto lo = std::lower_bound(g_chunkOf.begin(), g_chunkOf.end(), k), hi = std::upper_bound(lo, g_chunkOf.end(), k);
-  return {g_items.data() + (lo - g_chunkOf.begin()), g_items.data() + (hi - g_chunkOf.begin())};
+  const auto lo = std::lower_bound(chunk.begin(), chunk.end(), k), hi = std::upper_bound(lo, chunk.end(), k);
+  return {items.data() + (lo - chunk.begin()), items.data() + (hi - chunk.begin())};
 }
+
+const std::vector<RoadFurniture>& roadFurniture() { return g_furniture.items; }
+std::pair<const RoadFurniture*, const RoadFurniture*> roadFurnitureIn(int cx, int cz) { return g_furniture.in(cx, cz); }
