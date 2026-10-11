@@ -317,112 +317,51 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
         for (auto& it : items[i]) if (C.inside(it.e.x, it.e.z)) C.out[it.kind]->push_back(it.e);
       }
     }
-    // ---------------------------------------------------------------- street-front communities
-    // Iterate only settlements touching this chunk, in their road-aligned local lot grids.
-    // A small margin lets garden/driveway items belong to the chunk containing their own centre.
-    for (int town = 0; town < kNumTowns; town++) {
-      const Town& T = kTowns[town];
-      if (T.x + T.r < C.x0 - 32.f || T.x - T.r > C.x1 + 32.f || T.z + T.r < C.z0 - 32.f || T.z - T.r > C.z1 + 32.f) continue;
-      vec2 lo(1e9f, 1e9f), hi(-1e9f, -1e9f);
-      for (int corner = 0; corner < 4; corner++) {
-        vec2 q = communityLocal(town, (corner & 1) ? C.x1 + 32.f : C.x0 - 32.f, (corner & 2) ? C.z1 + 32.f : C.z0 - 32.f);
-        lo.x = std::min(lo.x, q.x); lo.y = std::min(lo.y, q.y);
-        hi.x = std::max(hi.x, q.x); hi.y = std::max(hi.y, q.y);
-      }
-      for (int j = (int)floorf(lo.y / LOT); j <= (int)floorf(hi.y / LOT); j++)
-        for (int i = (int)floorf(lo.x / LOT); i <= (int)floorf(hi.x / LOT); i++) {
-          Lot lot;
-          if (!communityLot(g_world, town, i, j, lot)) {
-            // Courtyard lots deliberately excluded from the building grid become modest
-            // planted commons, not large empty lawns. Never fill ordinary vacant frontage.
-            if (L == 2) {
-              float lx = (i + .5f) * LOT, lz = (j + .5f) * LOT;
-              const CommunityPlan& plan = g_communityPlans[town];
-              vec2 p = communityWorld(town, lx, lz);
-              float key = h2(i * 23 + town * 97, j * 31 - town * 17);
-              if (C.inside(p.x, p.y) && !communityPark(town, lx, lz) && communityAt(p.x, p.y) == town &&
-                  communityStreetDistance(town, p.x, p.y) > 24.f) {
-                float mask[4]; g_world.maskTexel(p.x, p.y, mask);
-                float district = h2((int)floorf(lx / (plan.blockX * LOT)) + town * 13, (int)floorf(lz / (plan.blockZ * LOT)));
-                float probability = (mask[2] > .45f ? .7f : .24f) * (.45f + .55f * district);
-                if (mask[1] > .12f && key < probability && roadDistance(p.x, p.y) > 12.f && ground(p.x, p.y) > 3.f) {
-                  float base[4]; g_world.sampleBase(p.x, p.y, base);
-                  int kind = base[3] > .45f ? EK_SPRUCE : base[2] > .85f && key < .18f ? EK_PALM : key < .25f ? EK_BIRCH : EK_OAK;
-                  float sc = .65f + .2f * h2(i + town, j - town);
-                  put(C, kind, p.x, ground(p.x, p.y) - .15f, p.y, district * 6.28f, sc, sc, sc, h2(i * 7 + town, j * 11));
-                }
-              }
-            }
-            continue;
+    // ---------------------------------------------------------------- the settlements (scenery.h): their buildings,
+    // each on its lot facing its road; a car on a house's drive; trees in the gardens behind the houses, on the
+    // pavements of the centres' streets and in their parks
+    {
+      std::vector<int> ids;
+      lotsIn(C.x0 - 32.f, C.z0 - 32.f, C.x1 + 32.f, C.z1 + 32.f, ids);
+      const std::vector<Lot>& lots = settlementLots();
+      for (int id : ids) {
+        const Lot& lot = lots[id];
+        const float c = cosf(lot.yaw), s = sinf(lot.yaw);
+        auto at = [&](float lx, float lz, float& x, float& z) { x = lot.cx + c * lx + s * lz; z = lot.cz - s * lx + c * lz; };
+        const int si = (int)floorf(lot.cx), sj = (int)floorf(lot.cz);
+        const bool house = lot.kind == EK_HOUSE || lot.kind == EK_HOUSE_HIP || lot.kind == EK_HOUSE_L || lot.kind == EK_FARMHOUSE;
+        if (L == 1) {
+          if (C.inside(lot.cx, lot.cz)) putBuilding(C, lot.kind, lot.cx, lot.cz, lot.yaw, lot.hw, lot.hd, 0.f, lot.seed, lot.ground);
+          // (a car on the drive beside a house, nose to the road)
+          if (house && h2(si * 13 - 5, sj * 29 + 11) < 0.35f) {
+            float x, z; at((lot.hw + 2.2f) * (lot.seed < 0.5f ? 1.f : -1.f), lot.hd - 1.5f, x, z);
+            if (C.inside(x, z) && roadDistance(x, z) > 7.f && ground(x, z) > 2.5f)
+              put(C, EK_CAR, x, footprintGround(x, z, lot.yaw, .9f, 2.25f), z, lot.yaw, 1.f, 1.f, 1.f, h2(si, sj));
           }
-          float m[4]; g_world.maskTexel(lot.cx, lot.cz, m);
-          float urban = m[2];
-          int si = i + town * 137, sj = j - town * 193;
-          float hk = h2(si * 31 + 7, sj * 17 - 3), hk2 = h2(si * 13 - 5, sj * 29 + 11);
-          float yaw = lot.yaw, c = cosf(yaw), s = sinf(yaw);
-          int kind; float height = 0.f;
-          if (lot.type == 1) {
-            float Ht = lot.wallH;
-            if (Ht > 38.f) { kind = hk < 0.4f ? EK_SKYSCRAPER : EK_TOWER; height = Ht * (kind == EK_SKYSCRAPER ? 2.6f : 1.7f); }
-            else if (Ht > 19.f) { kind = hk < 0.28f ? EK_OFFICE : EK_APARTMENT; height = Ht; }
-            else { kind = hk < 0.32f ? EK_SHOP : hk < 0.82f ? EK_TOWNHOUSE : EK_APARTMENT; height = kind == EK_APARTMENT ? std::max(Ht, 13.f) : 0.f; }
-          } else {
-            // Shops cluster on the main street; outskirts remain homes and gardens.
-            vec2 q = communityLocal(town, lot.cx, lot.cz);
-            bool mainStreet = fabsf(q.y) < LOT;
-            if (mainStreet && urban > 0.08f && hk < 0.24f) kind = EK_SHOP;
-            else if (urban > 0.23f) kind = hk < 0.42f ? EK_TOWNHOUSE : hk < 0.7f ? EK_HOUSE : EK_HOUSE_L;
-            else kind = hk < 0.38f ? EK_HOUSE : hk < 0.72f ? EK_HOUSE_HIP : hk < 0.93f ? EK_HOUSE_L : EK_FARMHOUSE;
-          }
-          bool house = kind == EK_HOUSE || kind == EK_HOUSE_HIP || kind == EK_HOUSE_L || kind == EK_FARMHOUSE;
-          if (L == 1) {
-            float hw = lot.hw, hd = lot.hd;
-            if (kind == EK_TOWNHOUSE || kind == EK_SHOP) { hw = std::max(hw, 7.f); hd = std::max(hd, 5.5f); }
-            if (C.inside(lot.cx, lot.cz)) putBuilding(C, kind, lot.cx, lot.cz, yaw, hw, hd, height, lot.seed, lot.ground);
-            // A bounded number of parked vehicles, aligned with a driveway beside the house.
-            if (house && hk2 < 0.18f) {
-              float side = 9.8f, x = lot.cx + c * side, z = lot.cz - s * side;
-              if (C.inside(x, z) && roadDistance(x, z) > 8.f && communityStreetDistance(town, x, z) > 6.f && ground(x, z) > 2.5f)
-                put(C, EK_CAR, x, footprintGround(x, z, yaw, .9f, 2.25f), z, yaw, 1.f, 1.f, 1.f, hk);
-            }
-          } else if (house) {
-            for (int t = 0; t < 2; t++) {
-              float ht = h2(si * 5 + t * 71, sj * 3 - t * 13);
-              if (ht > (t ? 0.12f : 0.4f)) continue;
-              float side = h2(si + t, sj - 9) < .5f ? -1.f : 1.f;
-              float lx = side * (lot.hw + 3.f), lz = -(lot.hd + 5.f);
-              float x = lot.cx + c * lx + s * lz, z = lot.cz - s * lx + c * lz;
-              if (!C.inside(x, z) || roadDistance(x, z) < 10.f || communityStreetDistance(town, x, z) < 9.f || ground(x, z) < 3.f) continue;
-              float base[4]; g_world.sampleBase(x, z, base);
-              int sp = base[3] > .45f ? EK_SPRUCE : base[2] > .85f && ground(x, z) < 70.f ? EK_PALM : ht < .3f ? EK_BIRCH : EK_OAK;
-              float sc = .55f + .25f * h2(si - t * 7, sj + 41);
-              put(C, sp, x, ground(x, z) - .15f, z, ht * 40.f, sc, sc, sc, h2(si * 3 + t, sj * 7));
-            }
+        } else if (house || lot.kind == EK_TOWNHOUSE) {
+          // the back garden: a tree or two, or three (a terrace's, one in three); now and then one in the front
+          for (int t = 0; t < 4; t++) {
+            const float ht = h2(si * 5 + t * 71, sj * 3 - t * 13);
+            if (ht > (lot.kind == EK_TOWNHOUSE ? (t ? 0.f : 0.33f) : t == 0 ? 0.9f : t == 1 ? 0.65f : t == 2 ? 0.35f : 0.3f)) continue;
+            float x, z;
+            if (t == 3) at((h2(si + t, sj - 9) < 0.5f ? -1.f : 1.f) * (lot.hw + 1.5f), lot.hd + 2.5f, x, z);   // (the front garden)
+            else at((h2(si + t, sj - 9) - 0.5f) * 2.f * (lot.hw + 2.f), -(lot.hd + 3.f + 7.f * h2(si - t, sj + 3)), x, z);
+            if (!C.inside(x, z) || roadDistance(x, z) < 9.f || ground(x, z) < 2.5f) continue;
+            float base[4]; g_world.sampleBase(x, z, base);
+            const int sp = base[3] > .45f ? EK_SPRUCE : base[2] > .85f && ground(x, z) < 70.f ? EK_PALM : ht < .3f ? EK_BIRCH : EK_OAK;
+            const float sc = .55f + .25f * h2(si - t * 7, sj + 41);
+            put(C, sp, x, ground(x, z) - .15f, z, ht * 40.f, sc, sc, sc, h2(si * 3 + t, sj * 7));
           }
         }
-      // A green town square breaks the repeated roof pattern, with a single civic landmark
-      // and a few planted trees rather than filling every vacant plot with another building.
-      const CommunityPlan& plan = g_communityPlans[town];
-      float px = plan.blockX * LOT * .5f, pz = plan.blockZ * LOT * .5f;
-      vec2 civic = communityWorld(town, px, pz);
-      if (L == 1 && C.inside(civic.x, civic.y)) {
-        float g = ground(civic.x, civic.y), mask[4]; g_world.maskTexel(civic.x, civic.y, mask);
-        float yaw = atan2f(plan.sine, plan.cosine);
-        if (mask[1] > .18f && g > 3.f && roadDistance(civic.x, civic.y) > 24.f &&
-            fabsf(g - footprintGround(civic.x, civic.y, yaw, 6.f, 14.f)) < 2.f)
-          putBuilding(C, EK_CHURCH, civic.x, civic.y, yaw, 5.f, 13.f, T.kind == 2 ? 28.f : 23.f, h2(town, 739));
       }
-      if (L == 2) for (int iz = 0; iz < plan.blockZ; iz++) for (int ix = 0; ix < plan.blockX; ix++) {
-        float x = (ix + .5f) * LOT, z = (iz + .5f) * LOT;
-        if (hypotf(x - px, z - pz) < 25.f) continue;
-        vec2 p = communityWorld(town, x, z);
-        if (!C.inside(p.x, p.y) || roadDistance(p.x, p.y) < 10.f) continue;
-        float mask[4]; g_world.maskTexel(p.x, p.y, mask);
-        if (mask[1] < .12f || ground(p.x, p.y) < 3.f) continue;
-        float base[4]; g_world.sampleBase(p.x, p.y, base);
-        int kind = base[3] > .45f ? EK_SPRUCE : base[2] > .85f ? EK_PALM : EK_OAK;
-        float sc = .65f + .2f * h2(ix + town, iz - town);
-        put(C, kind, p.x, ground(p.x, p.y) - .15f, p.y, ix + iz * 2.f, sc, sc, sc, h2(ix + town * 31, iz));
+      if (L == 2) {
+        treesIn(C.x0, C.z0, C.x1, C.z1, ids);
+        const std::vector<TreeSpot>& trees = settlementTrees();
+        for (int id : ids) {
+          const TreeSpot& t = trees[id];
+          if (!C.inside(t.x, t.z)) continue;
+          put(C, t.kind, t.x, ground(t.x, t.z) - .15f, t.z, t.seed * 40.f, t.scale, t.scale, t.scale, t.seed);
+        }
       }
     }
 

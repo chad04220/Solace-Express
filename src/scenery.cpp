@@ -1,7 +1,9 @@
 // Solace Express - towns, roads, farmland, forests, rocks and buildings (CPU side; mirrored in shaders.h)
 #include "scenery.h"
 #include "airport_layout.h"
+#include "entities.h"
 #include <mutex>
+#include <unordered_map>
 
 // ---------------------------------------------------------------- hand-placed settlements (metres)
 // Immutable legacy coordinates are part of the heightfield recipe, including places that
@@ -79,8 +81,6 @@ static const float kRoadPolys[][18] = {
   {2, 35.f, 35.f, 36.f, 34.f},
   {3, -15.3f, 3.25f, -14.f, 4.f, -18.f, 9.f},
 };
-std::vector<CommunityPlan> g_communityPlans;
-static void invalidateCommunityLotCache();
 // The roads the islands were first drawn with: gone from the map (the road network replaced them, road_network.h), kept
 // only as part of the heightfield's recipe - the ground along them was smoothed, and that ground is preserved
 static std::vector<RoadSeg> legacyRoads;
@@ -94,30 +94,10 @@ static void initRoads() {
                                         // last segment, to (0, 0), is part of the recipe too)
         legacyRoads.push_back({p[1 + 2 * i] * 1000.f, p[2 + 2 * i] * 1000.f, p[3 + 2 * i] * 1000.f, p[4 + 2 * i] * 1000.f});
     }
-    for (const Town& t : kTowns) g_communityPlans.push_back({1.f, 0.f, t.kind == 2 ? 3 : t.kind == 1 ? 5 : 6, t.kind == 2 ? 2 : 4});
   });
 }
 
-// Each settlement's street grid turned to the road that runs into its centre (the network's nearest segment within twice
-// its radius; none: the grid stays square to the map)
-void sceneryAlignCommunities(const World& world) {
-  initRoads();
-  for (int i = 0; i < kNumTowns; i++) {
-    const Town& t = kTowns[i];
-    float best = 2.f * t.r, c = 1.f, s = 0.f;
-    for (const RoadSegment& r : world.roadGrid.segs) {
-      const float dx = r.bx - r.ax, dz = r.bz - r.az, length = hypotf(dx, dz);
-      if (length < 1.f) continue;
-      const float u = clampf(((t.x - r.ax) * dx + (t.z - r.az) * dz) / (length * length), 0.f, 1.f);
-      const float distance = hypotf(r.ax + u * dx - t.x, r.az + u * dz - t.z);
-      if (distance < best) { best = distance; c = dx / length; s = -dz / length; }
-    }
-    g_communityPlans[i].cosine = c; g_communityPlans[i].sine = s;
-  }
-  invalidateCommunityLotCache();
-}
-
-void sceneryInit() { initRoads(); invalidateCommunityLotCache(); }
+void sceneryInit() { initRoads(); }
 
 static float roadDistanceIn(const std::vector<RoadSeg>& roads, float x, float z, int* segOut = nullptr) {
   float best = 1e9f; int bi = -1, k = 0;
@@ -138,6 +118,10 @@ static float roadDistanceIn(const std::vector<RoadSeg>& roads, float x, float z,
 float roadDistance(float x, float z, int* segOut) { return roadEdgeDistance(g_world.roadGrid, x, z, segOut) + 6.f; }
 
 int communityAt(float x, float z) {
+  if (!g_world.settlements.empty()) {   // (the settlements' own extents, once they're grown)
+    int town = -1; const float share = settlementShare(g_world.settlements, x, z, &town);
+    return share < 1.f ? town : -1;
+  }
   int best = -1; float distance = 1.f;
   for (int i = 0; i < kNumTowns; i++) {
     const Town& t = kTowns[i];
@@ -145,33 +129,6 @@ int communityAt(float x, float z) {
     if (d < distance) { best = i; distance = d; }
   }
   return best;
-}
-
-vec2 communityLocal(int town, float x, float z) {
-  const Town& t = kTowns[town]; const CommunityPlan& p = g_communityPlans[town];
-  float dx = x - t.x, dz = z - t.z;
-  return vec2(p.cosine * dx - p.sine * dz, p.sine * dx + p.cosine * dz);
-}
-
-vec2 communityWorld(int town, float x, float z) {
-  const Town& t = kTowns[town]; const CommunityPlan& p = g_communityPlans[town];
-  return vec2(t.x + p.cosine * x + p.sine * z, t.z - p.sine * x + p.cosine * z);
-}
-
-float communityStreetDistance(int town, float x, float z, float* yaw) {
-  vec2 q = communityLocal(town, x, z); const CommunityPlan& p = g_communityPlans[town];
-  float bx = p.blockX * LOT, bz = p.blockZ * LOT;
-  float dx = q.x - floorf(q.x / bx + 0.5f) * bx, dz = q.y - floorf(q.y / bz + 0.5f) * bz;
-  if (yaw) {
-    float a = atan2f(p.sine, p.cosine);
-    *yaw = a + (fabsf(dx) < fabsf(dz) ? (dx > 0.f ? -PI * 0.5f : PI * 0.5f) : (dz > 0.f ? PI : 0.f));
-  }
-  return std::min(fabsf(dx), fabsf(dz));
-}
-
-bool communityPark(int town, float localX, float localZ) {
-  const CommunityPlan& p = g_communityPlans[town];
-  return floorf(localX / (p.blockX * LOT)) == 0.f && floorf(localZ / (p.blockZ * LOT)) == 0.f;
 }
 
 float valueNoise(float x, float z) {
@@ -207,7 +164,7 @@ extern float airportInfluence(float x, float z);
 
 void World::bakeMask() {
   initRoads();
-  sceneryAlignCommunities(*this);
+  sceneryBakeCommunityLots(*this);   // (first: a settlement's ground is as far as its buildings)
   mask.assign((size_t)MASK_N * MASK_N * 4, 0);
   if (roadGrid.head.empty()) roadGrid.head.assign((size_t)MASK_N * MASK_N, 0);
   parallelFor(MASK_N, [&](int j) {
@@ -219,17 +176,17 @@ void World::bakeMask() {
       // bits of the texel's road word
       uint32_t& head = roadGrid.head[(size_t)j * MASK_N + i];
       head = (head & 0x1FFFFFFu) | (uint32_t)lroundf(clampf(coverFbm(x / 1400.f + 3.1f, z / 1400.f, 3) / 0.875f, 0, 1) * 127.f) << 25;
+      // the settlements (settlements.h, their lots): their ground as far as their buildings and gardens - the woods
+      // and the fields come up to the last houses, and fill the gaps between the streets - its core urban
       float dens = 0, urban = 0;
-      for (int k = 0; k < kNumTowns; k++) {
-        const Town& t = kTowns[k];
-        float d = sqrtf((x - t.x) * (x - t.x) + (z - t.z) * (z - t.z));
-        if (d > t.r) continue;
-        float core = smoothstepf(t.r, 0.15f * t.r, d);
-        float edge = smoothstepf(t.r, 0.8f * t.r, d);
-        float dn = t.kind == 2 ? lerpf(0.45f, 0.92f, core) : t.kind == 1 ? lerpf(0.35f, 0.8f, core) : lerpf(0.22f, 0.6f, core);
-        float ub = t.kind == 2 ? smoothstepf(0.85f * t.r, 0.f, d) : t.kind == 1 ? 0.62f * smoothstepf(0.7f * t.r, 0.f, d) : 0.2f * core;
-        dens = std::max(dens, dn * edge * (0.75f + 0.5f * valueNoise(x / 220.f, z / 220.f)));
-        urban = std::max(urban, ub);
+      int town = -1; const float share = settlementShare(settlements, x, z, &town);
+      if (town >= 0 && share < 1.15f) {
+        std::vector<int> near; lotsIn(x - 70.f, z - 70.f, x + 70.f, z + 70.f, near);
+        float d = 1e9f;
+        for (int id : near) { const Lot& L = settlementLots()[id]; d = std::min(d, hypotf(L.cx - x, L.cz - z) - std::max(L.hw, L.hd)); }
+        const int kind = kTowns[town].kind;
+        dens = smoothstepf(45.f, 8.f, d) * (kind == 2 ? 0.95f : kind == 1 ? 0.85f : 0.65f) * (0.85f + 0.3f * valueNoise(x / 220.f, z / 220.f));
+        urban = (kind == 2 ? smoothstepf(0.65f, 0.15f, share) : kind == 1 ? 0.62f * smoothstepf(0.5f, 0.05f, share) : 0.2f * smoothstepf(0.4f, 0.f, share)) * smoothstepf(0.f, 0.3f, dens);
       }
       float ai = airportInfluence(x, z);
       bool land = b[0] > 2.5f;
@@ -249,7 +206,6 @@ void World::bakeMask() {
       o[3] = (uint8_t)lroundf(clampf(a, 0, 1) * 255.f);
     }
   });
-  sceneryBakeCommunityLots(*this);
 }
 
 void World::sampleMask(float x, float z, float out[4]) const {
@@ -282,107 +238,218 @@ float World::forestAt(float x, float z) const {
 
 float World::groundHeight(float x, float z, int octaves) const { return height(x, z, octaves); }
 
-// Lots live in the settlement's local grid, with frontage on real drawn streets.
-// The finite 28 m lattice bounds both generation cost and building density.
-static bool calculateCommunityLot(const World& world, int town, int i, int j, Lot& L) {
-  L = {}; L.town = town;
-  float lx = (i + 0.5f) * LOT, lz = (j + 0.5f) * LOT;
-  if (communityPark(town, lx, lz)) return false;
-  vec2 center = communityWorld(town, lx, lz);
-  L.cx = center.x; L.cz = center.y;
-  if (communityAt(L.cx, L.cz) != town) return false;
-  float street = communityStreetDistance(town, L.cx, L.cz, &L.yaw);
-  if (street > 21.f) return false; // courtyards and back gardens, not another random row
-  int si = i + town * 137, sj = j - town * 193;
-  L.seed = hash2i(si * 17 + 3, sj * 19 + 5);
-  float m[4]; world.maskTexel(L.cx, L.cz, m);
-  if (m[1] < 0.025f || hash2i(si * 11 + 5, sj * 13 - 1) > m[1] * 1.12f) return false;
-  float h3 = hash2i(si + 3, sj - 7), h4 = hash2i(si - 9, sj + 4), h5 = hash2i(si + 15, sj + 21);
-  // Neighbours share a street line; small along-frontage variation avoids a stamped array.
-  float jitter = (hash2i(si * 3, sj * 5) - 0.5f) * 2.f;
-  L.cx += cosf(L.yaw) * jitter; L.cz -= sinf(L.yaw) * jitter;
-  communityStreetDistance(town, L.cx, L.cz, &L.yaw);
-  float urban = m[2];
-  L.type = urban > 0.48f ? 1 : 0;
-  if (L.type == 1) {
-    L.hw = 7.f + 2.f * h3; L.hd = 6.f + 2.f * h4;
-    // Dense island cities retain a substantial skyline. Height grows towards the core;
-    // floor-height steps and coherent street frontage replace arbitrary scattered towers.
-    L.wallH = 8.f + 3.2f * floorf(urban * urban * 58.f * powf(h5, 1.15f) / 3.2f);
-    if (kTowns[town].kind == 2 && urban > 0.65f && L.seed < 0.25f) L.wallH = 44.f + 20.f * h5;
-    L.roofH = 0.f; L.ridgeX = 0;
-  } else {
-    L.hw = 4.f + 1.8f * h3; L.hd = 4.8f + 1.8f * h4;
-    L.wallH = 3.2f + (urban > 0.2f || h5 > 0.78f ? 3.f : 0.f);
-    L.roofH = 1.8f + h5; L.ridgeX = L.seed < 0.5f ? 1 : 0;
+// ---------------------------------------------------------------- the settlements' lots
+// Every building's place along a street or a road through a settlement, facing it: what stands there by how far out in
+// the settlement it is - towers at a city's heart, offices and apartments round them, shops and terraces, then houses
+// with their gardens, farmhouses at the edge, warehouses on the roads out of a town - its frontage, its setback from the
+// road and the gap to the next as that kind has them; never on a road's platform, on another building, over the sea or
+// an airfield, nor on ground falling more than its footprint can take. Laid out once the world is built or loaded.
+namespace {
+std::vector<Lot> g_lots;
+std::vector<TreeSpot> g_trees;
+std::unordered_map<int64_t, std::vector<int>> g_lotCells, g_treeCells;
+const float kLotCell = 64.f;
+int64_t lotKey(int i, int j) { return (int64_t)i * 1000003 + j; }
+void cellsAdd(std::unordered_map<int64_t, std::vector<int>>& cells, float x, float z, int id) {
+  cells[lotKey((int)floorf(x / kLotCell), (int)floorf(z / kLotCell))].push_back(id);
+}
+void cellsIn(const std::unordered_map<int64_t, std::vector<int>>& cells, float x0, float z0, float x1, float z1, std::vector<int>& out) {
+  out.clear();
+  for (int j = (int)floorf(z0 / kLotCell); j <= (int)floorf(z1 / kLotCell); j++)
+    for (int i = (int)floorf(x0 / kLotCell); i <= (int)floorf(x1 / kLotCell); i++) {
+      auto it = cells.find(lotKey(i, j)); if (it == cells.end()) continue;
+      out.insert(out.end(), it->second.begin(), it->second.end());
+    }
+}
+
+// what stands on a lot: its kind, half frontage and depth, setback from the road's platform, the gap to the next
+struct LotPlan { int kind; float hw, hd, setback, gap; };
+LotPlan planLot(int townKind, float share, int cls, float h, float h2, vec2 at) {
+  // (by district: a little further in here, further out there - no zone a ring)
+  share = std::max(0.f, share + (valueNoise(at.x / 350.f + 17.f, at.y / 350.f - 5.f) - 0.5f) * (townKind == 0 ? 0.1f : 0.2f));
+  auto plan = [&](int k, float setback, float gap) {
+    const EntKindInfo& I = kEntInfo[k];
+    return LotPlan{k, I.hx * (0.88f + 0.24f * h2), I.hz * (0.92f + 0.16f * h), setback, gap};
+  };
+  auto house = [&]() { return h < 0.38f ? plan(EK_HOUSE, 6.f, 6.f) : h < 0.7f ? plan(EK_HOUSE_HIP, 6.f, 6.f) : plan(EK_HOUSE_L, 7.f, 7.f); };
+  const bool road = cls != RC_STREET;
+  if (road && townKind > 0 && share > 0.72f && h < 0.22f) return plan(EK_WAREHOUSE, 10.f, 10.f);   // (a town's way out)
+  if (townKind == 2) {   // (a city: its towers at the very heart, offices and flats round them, then terraces and houses)
+    if (share < 0.06f) return h < 0.55f ? plan(EK_SKYSCRAPER, 8.f, 14.f) : plan(EK_TOWER, 6.f, 10.f);
+    if (share < 0.15f) return h < 0.3f ? plan(EK_TOWER, 6.f, 10.f) : h < 0.7f ? plan(EK_OFFICE, 4.f, 6.f) : plan(EK_APARTMENT, 3.f, 4.f);
+    if (share < 0.3f) return road && h < 0.3f ? plan(EK_SHOP, 0.8f, 0.5f) : h < 0.25f ? plan(EK_OFFICE, 4.f, 6.f) : h < 0.65f ? plan(EK_APARTMENT, 3.f, 4.f) : plan(EK_TOWNHOUSE, 2.5f, 0.5f);
+    if (share < 0.5f) return road && h < 0.3f ? plan(EK_SHOP, 0.8f, 0.5f) : h < 0.3f ? plan(EK_APARTMENT, 3.f, 4.f) : h < 0.65f ? plan(EK_TOWNHOUSE, 2.5f, 0.5f) : house();
+    if (share < 0.75f) return h < 0.3f ? plan(EK_TOWNHOUSE, 2.5f, 0.5f) : house();
+    return house();
   }
-  // Include minimum fitted mesh sizes and wider shop/townhouse fronts in the support
-  // envelope. The cached base then covers the actual chosen mesh without resampling its
-  // footprint every time a chunk is streamed. It also makes road exclusion conservative.
-  float supportW = std::max(L.hw, 4.2f), supportD = L.hd;
-  float kindKey = hash2i(si * 31 + 7, sj * 17 - 3);
-  bool shopFront = fabsf(lz) < LOT && urban > .08f && kindKey < .24f;
-  if (L.type == 1) { supportW = std::max(supportW, 7.f); supportD = std::max(supportD, 7.f); }
-  else if (urban > .23f || shopFront) { supportW = std::max(supportW, 7.f); supportD = std::max(supportD, 5.5f); }
-  if (roadDistance(L.cx, L.cz) < hypotf(supportW, supportD) + 7.f) return false;
-  float low = world.groundHeight(L.cx, L.cz, 7), high = low;
-  float c = cosf(L.yaw), s = sinf(L.yaw);
-  for (int k = 0; k < 4; k++) {
-    float x = (k & 1) ? supportW : -supportW, z = (k & 2) ? supportD : -supportD;
-    float gx = L.cx + c * x + s * z, gz = L.cz - s * x + c * z;
-    float h = world.groundHeight(gx, gz, 7);
-    if (airportInfluence(gx, gz) > 0.02f) return false;
-    low = std::min(low, h); high = std::max(high, h);
+  if (townKind == 1) {
+    if (share < 0.15f) return h < 0.4f ? plan(EK_SHOP, 0.8f, 0.5f) : h < 0.65f ? plan(EK_APARTMENT, 3.f, 4.f) : h < 0.95f ? plan(EK_TOWNHOUSE, 2.5f, 0.5f) : plan(EK_OFFICE, 4.f, 6.f);
+    if (share < 0.42f) return road && h < 0.3f ? plan(EK_SHOP, 0.8f, 0.5f) : h < 0.5f ? plan(EK_TOWNHOUSE, 2.5f, 0.5f) : house();
+    if (share > 0.85f && h > 0.9f) return plan(EK_FARMHOUSE, 12.f, 20.f);
+    return house();
   }
-  if (low < 2.5f || high - low > 2.6f) return false;
-  L.ground = low - 0.05f; L.present = true;
+  if (share < 0.3f) return road && h < 0.3f ? plan(EK_SHOP, 0.8f, 0.5f) : h < 0.55f ? plan(EK_TOWNHOUSE, 2.5f, 0.5f) : house();
+  if (share > 0.8f && h > 0.65f) return plan(EK_FARMHOUSE, 12.f, 20.f);
+  return house();
+}
+
+// an oriented rectangle: centre, its frontage's direction (unit), half extents along it and back from it
+struct Footprint { vec2 c, u; float hw, hd; };
+bool overlaps(const Footprint& a, const Footprint& b) {
+  const vec2 av(-a.u.y, a.u.x), bv(-b.u.y, b.u.x), d = b.c - a.c;
+  for (vec2 ax : {a.u, av, b.u, bv}) {
+    const float ra = a.hw * fabsf(dot2(ax, a.u)) + a.hd * fabsf(dot2(ax, av)), rb = b.hw * fabsf(dot2(ax, b.u)) + b.hd * fabsf(dot2(ax, bv));
+    if (fabsf(dot2(d, ax)) > ra + rb) return false;
+  }
   return true;
 }
+}  // namespace
 
-namespace {
-struct CommunityLotCache {
-  int range = 0, side = 0;
-  std::vector<Lot> lots;
-};
-std::vector<CommunityLotCache> communityLotCache;
-const World* communityLotWorld = nullptr;
-}
-
-static void invalidateCommunityLotCache() { communityLotWorld = nullptr; }
+const std::vector<Lot>& settlementLots() { return g_lots; }
+const std::vector<TreeSpot>& settlementTrees() { return g_trees; }
+void lotsIn(float x0, float z0, float x1, float z1, std::vector<int>& out) { cellsIn(g_lotCells, x0, z0, x1, z1, out); }
+void treesIn(float x0, float z0, float x1, float z1, std::vector<int>& out) { cellsIn(g_treeCells, x0, z0, x1, z1, out); }
 
 void sceneryBakeCommunityLots(const World& world) {
-  // World setup runs before chunk streaming. Keep expensive slope/airport checks here,
-  // not in every neighbouring chunk and again when that chunk upgrades to tree detail.
-  communityLotWorld = nullptr;
-  communityLotCache.resize(kNumTowns);
-  parallelFor(kNumTowns, [&](int town) {
-    CommunityLotCache& cache = communityLotCache[town];
-    cache.range = (int)ceilf(kTowns[town].r / LOT) + 1;
-    cache.side = cache.range * 2 + 1;
-    cache.lots.resize((size_t)cache.side * cache.side);
-    for (int j = -cache.range; j <= cache.range; j++)
-      for (int i = -cache.range; i <= cache.range; i++)
-        calculateCommunityLot(world, town, i, j, cache.lots[(size_t)(j + cache.range) * cache.side + i + cache.range]);
-  });
-  communityLotWorld = &world;
-}
-
-bool communityLot(const World& world, int town, int i, int j, Lot& L) {
-  if (town < 0 || town >= kNumTowns) { L = {}; return false; }
-  if (communityLotWorld == &world) {
-    const CommunityLotCache& cache = communityLotCache[town];
-    if (i < -cache.range || i > cache.range || j < -cache.range || j > cache.range) { L = {}; return false; }
-    L = cache.lots[(size_t)(j + cache.range) * cache.side + i + cache.range];
-    return L.present;
+  g_lots.clear(); g_trees.clear(); g_lotCells.clear(); g_treeCells.clear();
+  if (world.settlements.empty()) return;
+  RoadIndex roads;
+  for (size_t pi = 0; pi < world.roads.paths.size(); pi++) roads.addPath(world.roads.paths[pi], (int)pi);
+  std::unordered_map<int64_t, std::vector<int>> placed;   // (the footprints so far, with their margins, in 64 m cells)
+  std::vector<Footprint> prints;
+  auto ground = [&](float x, float z) { return world.groundHeight(x, z, 7); };
+  // a footprint, if it can stand there: on dry, buildable ground, clear of the roads and of the buildings so far
+  auto fits = [&](const Footprint& f, float margin, float fall, int town, float maxShare, float& base) {
+    const vec2 v(-f.u.y, f.u.x);
+    float lo = 1e9f, hi = -1e9f;
+    for (int k = 0; k < 9; k++) {
+      const float a = (k % 3 - 1) * f.hw, b = (k / 3 - 1) * f.hd;
+      const vec2 p = f.c + f.u * a + v * b;
+      const float g = ground(p.x, p.y);
+      lo = std::min(lo, g); hi = std::max(hi, g);
+      if (g < 2.5f || airportInfluence(p.x, p.y) > 0.02f) return false;
+      if (roads.nearest(p, 3.f, -1, nullptr, nullptr, true) < 1.f) return false;   // (a platform within a metre)
+      int t = -1; const float share = settlementShare(world.settlements, p.x, p.y, &t);
+      if (t != town || share > maxShare) return false;
+    }
+    if (hi - lo > fall) return false;
+    Footprint g = f; g.hw += margin; g.hd += margin;
+    std::vector<int> near;
+    cellsIn(placed, f.c.x - 80.f, f.c.y - 80.f, f.c.x + 80.f, f.c.y + 80.f, near);
+    for (int id : near) if (overlaps(g, prints[id])) return false;
+    base = lo - 0.05f;
+    return true;
+  };
+  auto claim = [&](const Footprint& f, float margin) {
+    Footprint g = f; g.hw += margin; g.hd += margin;
+    const int id = (int)prints.size(); prints.push_back(g);
+    // (in every cell its corners reach)
+    const float r = hypotf(g.hw, g.hd);
+    for (int j = (int)floorf((g.c.y - r) / kLotCell); j <= (int)floorf((g.c.y + r) / kLotCell); j++)
+      for (int i = (int)floorf((g.c.x - r) / kLotCell); i <= (int)floorf((g.c.x + r) / kLotCell); i++) placed[lotKey(i, j)].push_back(id);
+  };
+  auto addLot = [&](const Footprint& f, int kind, float base, float seed, int town, int street, float share) {
+    Lot L = {};
+    L.present = true; L.cx = f.c.x; L.cz = f.c.y; L.hw = f.hw; L.hd = f.hd; L.ground = base;
+    const vec2 front(-f.u.y, f.u.x);   // (local +z: the frontage turned a quarter - towards the road)
+    L.yaw = atan2f(front.x, front.y);
+    L.kind = kind; L.seed = seed; L.town = town; L.street = street; L.share = share;
+    L.type = kind == EK_APARTMENT || kind == EK_OFFICE || kind == EK_TOWER || kind == EK_SKYSCRAPER ? 1 : 0;
+    L.wallH = kEntInfo[kind].h; L.roofH = 0.f; L.ridgeX = seed < 0.5f ? 1 : 0;
+    const int id = (int)g_lots.size(); g_lots.push_back(L); cellsAdd(g_lotCells, L.cx, L.cz, id);
+  };
+  auto tree = [&](float x, float z, float key, float scale) {
+    float base[4]; world.sampleBase(x, z, base);
+    const int kind = base[3] > .45f ? EK_SPRUCE : base[2] > .85f && ground(x, z) < 70.f && key < 0.5f ? EK_PALM : key < 0.3f ? EK_BIRCH : EK_OAK;
+    const int id = (int)g_trees.size(); g_trees.push_back({x, z, scale, kind, key}); cellsAdd(g_treeCells, x, z, id);
+  };
+  // ---- each settlement's centre: a church on its main road, and in a town or a city a park beside it
+  for (const SettlementField& F : world.settlements) {
+    const vec2 g(F.gx, F.gz), u(F.axisC, F.axisS), v(-F.axisS, F.axisC);
+    const float roadEdge = roadSpec(RC_ROAD).halfPlatform;
+    for (float side : {1.f, -1.f}) {
+      Footprint f{g + v * (side * (roadEdge + 8.f + kEntInfo[EK_CHURCH].hz)), u * -side, kEntInfo[EK_CHURCH].hx, kEntInfo[EK_CHURCH].hz};
+      float base;
+      if (!fits(f, 3.f, 2.5f, F.town, 1.f, base)) continue;
+      claim(f, 3.f); addLot(f, EK_CHURCH, base, hash2i(F.town, 739), F.town, -1, 0.f);
+      if (F.kind > 0) {   // (the park across the way: trees on a loose grid, its ground claimed from the lots)
+        const float R = F.kind == 2 ? 75.f : 55.f;
+        const vec2 pc = g - v * (side * (roadEdge + 6.f + R));
+        Footprint park{pc, u, R * 0.8f, R * 0.8f};
+        float pb;
+        if (fits(park, 0.f, 6.f, F.town, 1.f, pb)) {
+          claim(park, 0.f);
+          for (float a = -R; a <= R; a += 11.f) for (float b = -R; b <= R; b += 11.f) {
+            const float key = hash2i((int)(pc.x + a), (int)(pc.y + b));
+            const vec2 p = pc + u * (a + (key - 0.5f) * 6.f) + v * (b + (hash2i((int)(pc.y + b), (int)(pc.x + a)) - 0.5f) * 6.f);
+            if (hypotf(a, b) > R || key > 0.55f || roads.nearest(p, 6.f, -1, nullptr, nullptr, true) < 3.f) continue;
+            tree(p.x, p.y, key, 0.7f + 0.3f * key);
+          }
+        }
+      }
+      break;
+    }
   }
-  return calculateCommunityLot(world, town, i, j, L);
-}
-
-bool World::lotAt(int i, int j, Lot& L) const {
-  // Compatibility query for a world-space cell. Chunk generation uses local indices directly.
-  float x = (i + 0.5f) * LOT, z = (j + 0.5f) * LOT;
-  int town = communityAt(x, z);
-  if (town < 0) { L = {}; return false; }
-  vec2 q = communityLocal(town, x, z);
-  return communityLot(*this, town, (int)floorf(q.x / LOT), (int)floorf(q.y / LOT), L);
+  // ---- along the roads, then the streets: each side walked, a lot wherever one fits
+  for (int pass = 0; pass < 2; pass++)
+    for (size_t pi = 0; pi < world.roads.paths.size(); pi++) {
+      const RoadPath& P = world.roads.paths[pi];
+      if (P.cls == RC_HIGHWAY || (pass == 0) != (P.cls != RC_STREET) || P.pts.size() < 2) continue;
+      const float half = roadSpec(P.cls).halfPlatform;
+      std::vector<float> along(P.pts.size(), 0.f);
+      for (size_t k = 1; k < P.pts.size(); k++) along[k] = along[k - 1] + hypotf(P.pts[k].x - P.pts[k - 1].x, P.pts[k].z - P.pts[k - 1].z);
+      for (int sideI = 0; sideI < 2; sideI++) {
+        const float side = sideI ? 1.f : -1.f;
+        size_t k = 0;
+        for (float s = 6.f + 8.f * hash2i((int)pi, sideI); s < along.back() - 4.f;) {
+          while (k + 2 < P.pts.size() && along[k + 1] < s) k++;
+          if (k < P.bridge.size() && P.bridge[k]) { s += 10.f; continue; }
+          const RoadPoint &A = P.pts[k], &B = P.pts[k + 1];
+          const float t = std::clamp((s - along[k]) / std::max(along[k + 1] - along[k], 1e-3f), 0.f, 1.f);
+          const vec2 at(A.x + (B.x - A.x) * t, A.z + (B.z - A.z) * t), d = vec2(B.x - A.x, B.z - A.z) * (1.f / std::max(along[k + 1] - along[k], 1e-3f));
+          const vec2 out = vec2(-d.y, d.x) * side;
+          int town = -1; const float share = settlementShare(world.settlements, at.x, at.y, &town);
+          const float reach = P.cls == RC_STREET ? 1.f : 1.1f;   // (houses strung out a little way along the roads out)
+          if (town < 0 || share >= reach) { s += 12.f; continue; }
+          const int ix = (int)floorf(at.x / 3.f) * 7 + sideI, iz = (int)floorf(at.y / 3.f);
+          const float h = hash2i(ix + 911, iz - 77), h2v = hash2i(ix - 31, iz + 503), sparse = hash2i(ix + 5, iz + 9);
+          const LotPlan L = planLot(kTowns[town].kind, share, P.cls, h, h2v, at);
+          // (thinning out towards the edge)
+          if (sparse < smoothstepf(0.7f, reach, share) * 0.75f) { s += L.hw * 2.f + L.gap; continue; }
+          const float dist = half + L.setback + L.hd;
+          Footprint f{at + out * dist, d * side, L.hw, L.hd};
+          f.u = vec2(-out.y, out.x);   // (the frontage along the road, its front - local +z - towards it)
+          float base;
+          const bool big = L.kind == EK_TOWER || L.kind == EK_SKYSCRAPER || L.kind == EK_OFFICE || L.kind == EK_WAREHOUSE;
+          if (fits(f, std::max(0.25f, L.gap * 0.5f), big ? 3.5f : 2.6f, town, reach, base)) {
+            claim(f, std::max(0.25f, L.gap * 0.5f));
+            addLot(f, L.kind, base, h2v, town, (int)pi, share);
+            s += L.hw * 2.f + L.gap;
+          } else s += 4.f;
+        }
+      }
+    }
+  // ---- street trees: along the streets of a town's or a city's centre, on the pavements every 14 m, clear of the
+  // junctions and of the buildings' fronts
+  for (size_t pi = 0; pi < world.roads.paths.size(); pi++) {
+    const RoadPath& P = world.roads.paths[pi];
+    if (P.cls != RC_STREET) continue;
+    float acc = 0.f;
+    for (size_t k = 1; k < P.pts.size(); k++) {
+      const vec2 a(P.pts[k - 1].x, P.pts[k - 1].z), b(P.pts[k].x, P.pts[k].z);
+      const float l = length(b - a); if (l < 1e-3f) continue;
+      const vec2 d = (b - a) * (1.f / l), n(-d.y, d.x);
+      for (float s = 14.f - acc; s < l; s += 14.f) {
+        const vec2 at = a + d * s;
+        int town = -1; const float share = settlementShare(world.settlements, at.x, at.y, &town);
+        if (town < 0 || kTowns[town].kind == 0 || share > 0.6f) continue;
+        for (float side : {-1.f, 1.f}) {
+          const vec2 p = at + n * (side * (roadSpec(RC_STREET).halfPaved + 1.2f));
+          if (roads.nearest(p, 8.f, (int)pi, nullptr, nullptr, true) < 4.f || ground(p.x, p.y) < 2.5f) continue;   // (another road: a junction)
+          tree(p.x, p.y, hash2i((int)p.x, (int)p.y), 0.55f + 0.15f * hash2i((int)p.y, (int)p.x));
+        }
+      }
+      acc = fmodf(acc + l, 14.f);
+    }
+  }
 }

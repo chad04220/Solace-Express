@@ -17,7 +17,7 @@ static float pct(std::vector<float> v, float q) {
   std::sort(v.begin(), v.end());
   return v[std::min(v.size() - 1, (size_t)(q * v.size()))];
 }
-static const char* kClass[RC_COUNT] = {"highway", "road", "lane", "track"};
+static const char* kClass[RC_COUNT] = {"highway", "road", "lane", "track", "street"};
 
 int main() {
   buildTestWorld();
@@ -61,7 +61,8 @@ int main() {
   for (int c = 0; c < RC_COUNT; c++) {
     if (bend[c].empty()) continue;
     printf("%-7s change of grade p99 %.2f of its K's, radius p5 %.2f of its own (%zu points)\n", kClass[c], pct(bend[c], 0.99f), pct(radius[c], 0.05f), bend[c].size());
-    check(pct(bend[c], 0.99f) <= 1.05f, "crests and sags rounded to the class's K");
+    // (a street's: level through its junctions and crossings, then away at its grade - as a town's slow streets are)
+    if (c != RC_STREET) check(pct(bend[c], 0.99f) <= 1.05f, "crests and sags rounded to the class's K");
     check(radius[c].empty() || pct(radius[c], 0.05f) >= (c == RC_HIGHWAY ? 0.75f : 0.85f), "bends no tighter than the class's radius off the climbs");
   }
   // ---- the bed: level across the platform, the banks a cut or fill could stand at; where no other road is near
@@ -82,7 +83,7 @@ int main() {
       tilt[s.cls].push_back(fabsf(w.height(x + nx * 0.8f * P, z + nz * 0.8f * P) - w.height(x - nx * 0.8f * P, z - nz * 0.8f * P)) / (1.6f * P));
       for (float side : {-1.f, 1.f}) {   // (the steepest metre out to the bank's reach, beyond the natural ground's own)
         float worst = 0, prev = w.height(x + nx * side * P, z + nz * side * P);
-        for (float o = P + 1.f; o <= P + ROAD_BANK_MAX; o += 1.f) {
+        for (float o = P + 1.f; o <= P + roadBankMax(s.cls); o += 1.f) {
           const float px = x + nx * side * o, pz = z + nz * side * o, h = w.height(px, pz);
           worst = std::max(worst, fabsf(h - prev) - fabsf(w.naturalHeight(px, pz) - w.naturalHeight(px - nx * side, pz - nz * side)));
           prev = h;

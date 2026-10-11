@@ -26,7 +26,7 @@ include_directories(${CMAKE_BINARY_DIR}/gen)
 # renderer, the UI, the audio): each compiled once, as object libraries, for every program that links them besides the
 # game itself, which keeps its own build (on MSVC it links the static runtime, with its own flags). Before this every
 # test compiled the shared sources itself: the islands' five 39 times over (the review of v3.44.0, ENG-1).
-set(ENVIRONMENT_SOURCES src/world.cpp src/road_network.cpp src/bridges.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
+set(ENVIRONMENT_SOURCES src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
 set(CORE_ONLY_SOURCES
   src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/weather.cpp)
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})

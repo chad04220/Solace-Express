@@ -31,6 +31,15 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   surface and markings between concrete parapets (a kerb and a steel rail on the lanes), on a box girder. Its piers go
   down to the ground or the sea floor, with an abutment at each end. They are drawn and shadowed like the buildings,
   they are solid, and nothing grows up into them (`bridges_test`).
+- **Phase B, items 1 and 3 begun (v3.47, `settlements.h`, `community_layout`).** Each settlement grows over an effort
+  field from its centre: steep ground is dear, a road cheap to build along, and the sea and airfields can't be built
+  on. Its streets are network roads of class RC_STREET: a grid core turned to the main road in towns and cities, and
+  round it branches that hold a 12% grade, keep 40 m apart, and join the next street or end in a turning. They meet
+  every road level, pinned at the crossing, with a level landing past the other road's platform. Lots go along every
+  street and road (not the highways), zoned from the heart out, facing their road, clear of the platforms and of each
+  other. Each settlement has a church on its main road, and a park in the towns and cities. Street trees line the
+  centres and the gardens have trees. The mask's town ground follows the buildings, so woods and fields come up to
+  the last houses. 26 settlements, about 23,000 buildings, 305 km of streets.
 - **Still to come in Phase A:**
   - Item 5: arch and truss spans for the longest crossings.
   - Item 6: road furniture.

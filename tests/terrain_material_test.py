@@ -63,13 +63,11 @@ assert function(mat,'groundSample').count('texA(')==3 and function(mat,'groundSa
 assert 'n1b.xy = groundRotatedNormal(n1b.xy*2.0 - 1.0)*0.5 + 0.5;' in mat
 assert 'm.alb *= 1.0 - 0.35*uWet*(1.0-wSnow);' in terrain
 assert 'm.rough = mix(m.rough, m.rough*0.35, uWet*(1.0-wSnow));' in terrain
-assert 'communityStreetPaint(q, block, footprint)' in terrain
-assert 'COMMUNITY_INFO = 320, COMMUNITY_PLAN = 352, COMMUNITY_META = 383' in terrain
-assert 'clamp(int(dataAt(COMMUNITY_META).x + 0.5), 0, 31)' in terrain
-assert 'bool park = bi.x == 0.0 && bi.y == 0.0;' in terrain
-assert 'rd < 3.5' in terrain and 'rd < 5.0' in terrain and 'rd < 21.0' in terrain
-assert 'plan.x*pixelDx.x - plan.y*pixelDx.y' in terrain
-assert 'plan.x*pixelDy.x - plan.y*pixelDy.y' in terrain
+# the settlements' streets are the network's roads (class 4: kerbs, pavements, lamps); their ground between, by the mask
+assert 'communityGrid' not in terrain and 'COMMUNITY_META' not in terrain
+assert 'if (cls == 4) {   // a street\'s pavement' in terrain
+assert 'if (cls == 4 && uNight > 0.01) {' in terrain
+assert 'float yard = smoothstep(0.25, 0.55, msk.z' in terrain
 assert 'len, wid, footprint, m)' in terrain, 'Airport paint needs local analytical footprints'
 assert 'fieldMaterial(p.xz, msk.w*(1.0 - wRock), pixelDx, pixelDy, m)' in terrain
 assert 'float onAccess = ' not in terrain  # topology is boolean, coverage only filters paint
@@ -159,7 +157,7 @@ functions=[function(mat,n) for n in ('groundRotatedNormal','terrainTriNormal','a
 # Test the actual production projection weights, including the release's skip and renormalization.
 weight_body=terrain_tri.split('{',1)[1].split('vec3 nx',1)[0]
 functions += ['vec3 terrainProjectionWeights(vec3 n){'+weight_body+'return weight; }']
-functions += [function(terrain,n) for n in ('terrainLineCoverage','terrainStripeIntegral','terrainStripeCoverage','terrainDetailWeight','communityStreetDistance','communityStreetPaint')]
+functions += [function(terrain,n) for n in ('terrainLineCoverage','terrainStripeIntegral','terrainStripeCoverage','terrainDetailWeight')]
 functions += [function(ent,n) for n in ('entityProjectionWeights','entityDetailNormal','entityDetailFade','entityLine','entityRoomFaceDistances')]
 functions += [function(ent_cut,'coniferShootCoverage')]
 functions += [function(light_fs,n) for n in ('environmentShadowOffsets','environmentShadowPlaneGradient','environmentShadowTapDepth','environmentWallShadowFilter')]

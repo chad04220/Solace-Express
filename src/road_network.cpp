@@ -321,7 +321,7 @@ std::vector<vec2> resample(const std::vector<vec2>& p, float spacing, float minC
 }  // namespace
 
 bool roadByAirfield(const RoadPoint& A, const RoadPoint& B, int cls) {
-  const float reach = roadSpec(cls).halfPlatform + ROAD_BANK_MAX;
+  const float reach = roadSpec(cls).halfPlatform + roadBankMax(cls);
   const float dx = B.x - A.x, dz = B.z - A.z, L = std::max(hypotf(dx, dz), 1e-3f), nx = -dz / L, nz = dx / L;
   for (int q = 0; q <= 4; q++)
     for (int side = -2; side <= 2; side++) {
@@ -335,7 +335,7 @@ namespace {
 
 // the graded profile: the ground smoothed along the road, never steeper than the class allows; over water at least the
 // deck clearance. Bridges: over water, or where the road runs well above the ground for long enough
-void profile(const World& world, RoadPath& path, float h0, float h1) {
+void profile(const World& world, RoadPath& path, float h0, float h1, const std::vector<std::pair<int, float>>& pins = {}) {
   const RoadSpec& s = roadSpec(path.cls);
   const int n = (int)path.pts.size();
   std::vector<float> ground(n), ds(n, 0.f);
@@ -370,12 +370,14 @@ void profile(const World& world, RoadPath& path, float h0, float h1) {
   // by an airfield's grounds the road lies on the ground as it is (buildRoadGrid paints it there, ungraded): its points
   // held there, as its ends are
   std::vector<uint8_t> airfield(n - 1), held(n, 0);
+  std::vector<float> heldH(ground);
   for (int k = 0; k + 1 < n; k++) if ((airfield[k] = roadByAirfield(path.pts[k], path.pts[k + 1], path.cls))) held[k] = held[k + 1] = 1;
+  for (const auto& pin : pins) if (pin.first > 0 && pin.first < n - 1) { held[pin.first] = 1; heldH[pin.first] = pin.second; }   // (and where it crosses a road)
   // the funnels' ceiling and the bridges' deck clearance, then the grade limit forward and back until it settles (the
   // ends held where the road meets a town or another road, the points by an airfield on its ground); the grade has the
   // last word elsewhere
   std::vector<float> h = target;
-  auto hold = [&](int k) { if (held[k]) h[k] = ground[k]; };
+  auto hold = [&](int k) { if (held[k]) h[k] = heldH[k]; };
   for (int k = 0; k < n; k++) hold(k);
   // (the held points never move: each pass clamps the rest against them, until a pass changes nothing)
   for (int it = 0; it < 40; it++) {
@@ -679,6 +681,39 @@ RoadNetwork buildRoadNetwork(const World& world) {
   return net;
 }
 
+RoadPath layRoad(const World& world, RoadClass cls, const std::vector<vec2>& line, float h0, float h1, const std::vector<RoadPin>& pins) {
+  RoadPath path; path.cls = cls;
+  if (line.size() < 2) return path;
+  const RoadSpec& s = roadSpec(cls);
+  const float ds = s.spacing / ceilf(s.spacing / std::clamp(s.minRadius / 12.f, 2.f, 10.f));
+  std::vector<vec2> pts = resample(densify(fillet(line, s.minRadius), ds), s.spacing, ds);
+  // each pin a point of its own, exactly where it is (on the segment nearest it)
+  std::vector<std::pair<int, float>> held;
+  for (const RoadPin& pin : pins) {
+    const vec2 c(pin.x, pin.z);
+    size_t at = 0; float best = 1e9f, tb = 0.f;
+    for (size_t k = 0; k + 1 < pts.size(); k++) {
+      const vec2 d = pts[k + 1] - pts[k];
+      const float t = std::clamp(((c.x - pts[k].x) * d.x + (c.y - pts[k].y) * d.y) / std::max(d.x * d.x + d.y * d.y, 1e-6f), 0.f, 1.f);
+      const float e = length(pts[k] + d * t - c);
+      if (e < best) { best = e; at = k; tb = t; }
+    }
+    if (best > 2.f) continue;
+    if (tb > 0.f && tb < 1.f) {
+      const vec2 q = pts[at] + (pts[at + 1] - pts[at]) * tb;
+      if (length(q - pts[at]) < 0.5f) tb = 0.f;
+      else if (length(q - pts[at + 1]) < 0.5f) tb = 1.f;
+      else { pts.insert(pts.begin() + at + 1, q); for (auto& h : held) if (h.first > (int)at) h.first++; }
+    }
+    held.push_back({(int)at + (tb > 0.f ? 1 : 0), pin.h});
+  }
+  for (const vec2& p : pts) path.pts.push_back({p.x, p.y, 0.f});
+  if (path.pts.size() < 2) return path;
+  profile(world, path, h0, h1, held);
+  path.bridge.assign(path.pts.size() - 1, 0);
+  return path;
+}
+
 // ---------------------------------------------------------------- the grid the terrain and the material read
 int RoadGrid::cell(float v) { return std::clamp((int)floorf((v + WORLD_HALF) / (2.f * WORLD_HALF / N)), 0, N - 1); }
 
@@ -736,7 +771,7 @@ void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid) {
   std::vector<std::vector<uint32_t>> at((size_t)RoadGrid::N * RoadGrid::N);
   for (size_t si = 0; si < grid.segs.size(); si++) {
     const RoadSegment& s = grid.segs[si];
-    const float R = roadSpec(s.cls).halfPlatform + ROAD_BANK_MAX;
+    const float R = roadSpec(s.cls).halfPlatform + roadBankMax(s.cls);
     const int i0 = RoadGrid::cell(std::min(s.ax, s.bx) - R), i1 = RoadGrid::cell(std::max(s.ax, s.bx) + R);
     const int j0 = RoadGrid::cell(std::min(s.az, s.bz) - R), j1 = RoadGrid::cell(std::max(s.az, s.bz) + R);
     const float dx = s.bx - s.ax, dz = s.bz - s.az, L2 = std::max(dx * dx + dz * dz, 1e-6f);
@@ -804,7 +839,7 @@ float roadGrade(const RoadGrid& grid, float x, float z, float g) {
     // past an end at a bridge: under the deck's slab for 2 m, then falling away at 1 in 1.5 to the ground
     const bool bridgeEnd = (tr < 0.f && (s.flags & RS_ENDA)) || (tr > 1.f && (s.flags & RS_ENDB));
     if (bridgeEnd) hr -= 0.3f;
-    const float bank = std::clamp(fabsf(g - hr) * ROAD_BANK_RUN, 4.f, ROAD_BANK_MAX);
+    const float bank = std::clamp(fabsf(g - hr) * ROAD_BANK_RUN, 4.f, roadBankMax(s.cls));
     float w = 1.f - smoothstepf(P, P + bank, d);
     if (bridgeEnd) w *= 1.f - smoothstepf(2.f, 2.f + std::clamp(fabsf(g - hr) * 1.5f, 1.f, 20.f), past);
     if (w <= 0.f) continue;
@@ -819,7 +854,22 @@ float roadGrade(const RoadGrid& grid, float x, float z, float g) {
 
 float roadEdgeDistance(const RoadGrid& grid, float x, float z, int* seg) {
   if (seg) *seg = -1;
-  if (grid.nearHead.empty()) return 1e9f;
+  // the place's own texel first: its list holds every segment whose banks could reach it, so a platform within the
+  // narrowest banks' reach (a street's) is found exactly - however crowded a city's coarse cell, whose list keeps only
+  // the 255 segments nearest its centre
+  float fine = 1e9f; int fineSeg = -1;
+  if (!grid.head.empty()) {
+    const uint32_t h = grid.head[(size_t)RoadGrid::cell(z) * RoadGrid::N + RoadGrid::cell(x)];
+    for (uint32_t k = RoadGrid::first(h), e = k + RoadGrid::count(h); k < e; k++) {
+      const RoadSegment& s = grid.segs[grid.list[k]];
+      const float dx = s.bx - s.ax, dz = s.bz - s.az;
+      const float t = std::clamp(((x - s.ax) * dx + (z - s.az) * dz) / std::max(dx * dx + dz * dz, 1e-3f), 0.f, 1.f);
+      const float d = hypotf(s.ax + dx * t - x, s.az + dz * t - z) - roadSpec(s.cls).halfPlatform;
+      if (d < fine) { fine = d; fineSeg = (int)grid.list[k]; }
+    }
+  }
+  if (fine <= roadBankMax(RC_STREET)) { if (seg) *seg = fineSeg; return fine; }
+  if (grid.nearHead.empty()) { if (seg) *seg = fineSeg; return fine; }
   const float CS = 2.f * WORLD_HALF / RoadGrid::NC;
   const int i = std::clamp((int)floorf((x + WORLD_HALF) / CS), 0, RoadGrid::NC - 1), j = std::clamp((int)floorf((z + WORLD_HALF) / CS), 0, RoadGrid::NC - 1);
   const uint32_t h = grid.nearHead[(size_t)j * RoadGrid::NC + i];
@@ -831,6 +881,7 @@ float roadEdgeDistance(const RoadGrid& grid, float x, float z, int* seg) {
     const float d = hypotf(s.ax + dx * t - x, s.az + dz * t - z) - roadSpec(s.cls).halfPlatform;
     if (d < best) { best = d; if (seg) *seg = (int)grid.nearList[k]; }
   }
+  if (fine < best) { best = fine; if (seg) *seg = fineSeg; }
   return best > 500.f ? 1e9f : best;
 }
 
@@ -839,7 +890,7 @@ std::vector<float> roadEntryRows(const RoadGrid& grid) {
   d.reserve(grid.list.size() * 8 + ROAD_DATA_W * 4);
   for (uint32_t si : grid.list) {
     const RoadSegment& r = grid.segs[si];
-    const float e[8] = {r.ax, r.az, r.bx, r.bz, r.ah, r.bh, r.along, (float)(r.cls + 4 * r.flags + 64 * r.path)};
+    const float e[8] = {r.ax, r.az, r.bx, r.bz, r.ah, r.bh, r.along, (float)(r.cls + 8 * r.flags + 128 * r.path)};
     d.insert(d.end(), e, e + 8);
   }
   d.resize((d.size() + ROAD_DATA_W * 4 - 1) / (ROAD_DATA_W * 4) * (ROAD_DATA_W * 4), 0.f);

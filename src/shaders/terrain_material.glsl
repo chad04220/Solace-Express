@@ -44,37 +44,6 @@ vec4 craterRockMaterial(vec3 p, vec3 n, vec2 pixelDx, vec2 pixelDy, out vec3 nor
   return rock;
 }
 
-// Static scene slots mirror Renderer::init and the CPU community layout. No new sampler. (Its constants are the
-// function's own: a top-level declaration survives pruning into every program of the world library - the aircraft
-// bodies' bake among them, whose cache key it would change; see tests/fixtures/aircraft_bake.fnv)
-bool communityGrid(vec2 p, out vec2 q, out vec4 plan){
-  const int COMMUNITY_INFO = 320, COMMUNITY_PLAN = 352, COMMUNITY_META = 383;
-  float best = 1.0; int nearest = -1;
-  int count = clamp(int(dataAt(COMMUNITY_META).x + 0.5), 0, 31);
-  vec2 delta = vec2(0.0);
-  for (int i = 0; i < 31; i++) {
-    if (i >= count) break;
-    vec4 town = dataAt(COMMUNITY_INFO + i);
-    float radius = max(town.z, 1.0), d = length(p - town.xy)/radius;
-    if (d < best) { best = d; nearest = i; delta = p - town.xy; }
-  }
-  if (nearest < 0) { q = vec2(0.0); plan = vec4(1.0, 0.0, 112.0, 84.0); return false; }
-  plan = dataAt(COMMUNITY_PLAN + nearest);
-  q = vec2(plan.x*delta.x - plan.y*delta.y, plan.y*delta.x + plan.x*delta.y);
-  return true;
-}
-float communityStreetDistance(vec2 q, vec2 block){
-  vec2 d = abs(q - floor(q/block + 0.5)*block);
-  return min(d.x, d.y);
-}
-float communityStreetPaint(vec2 q, vec2 block, vec2 footprint){
-  vec2 d = abs(q - floor(q/block + 0.5)*block);
-  float xRoad = terrainLineCoverage(d.x, 0.15, footprint.x)*terrainStripeCoverage(q.y/12.0, 0.5, footprint.y/12.0);
-  float zRoad = terrainLineCoverage(d.y, 0.15, footprint.y)*terrainStripeCoverage(q.x/12.0, 0.5, footprint.x/12.0);
-  // Stop paint before the crossing; suppress it smoothly over a pixel at distant intersections.
-  return max(xRoad*(1.0 - terrainLineCoverage(d.y, 4.5, footprint.y)), zRoad*(1.0 - terrainLineCoverage(d.x, 4.5, footprint.x)));
-}
-
 uniform float uTreeFar;   // beyond this the forest is the ground texture alone (entity_render.cpp)
 vec3 terrainNormal(vec2 p, float t){
   float e = max(0.25, t*0.0012);
@@ -361,10 +330,10 @@ bool roadAt(vec2 p, out float across, out float along, out vec2 dir, out int cls
     if (k >= n) break;
     vec4 a = roadTexel(2*(e0 + k)), b = roadTexel(2*(e0 + k) + 1);
     int code = int(b.w);
-    if ((code & 4) != 0) continue;
-    int c = code & 3, pid = code >> 6;
+    if ((code & 8) != 0) continue;
+    int c = code & 7, pid = code >> 7;
     vec2 ab = a.zw - a.xy; float L = max(length(ab), 1e-3), tr = dot(p - a.xy, ab)/(L*L), t = clamp(tr, 0.0, 1.0);
-    if (((code & 16) != 0 && tr < 0.0) || ((code & 32) != 0 && tr > 1.0)) continue;   // (past an end at a bridge: under its deck)
+    if (((code & 32) != 0 && tr < 0.0) || ((code & 64) != 0 && tr > 1.0)) continue;   // (past an end at a bridge: under its deck)
     vec2 q = p - (a.xy + ab*t);
     float e = length(q) - roadHalfPlatform(c);   // (outside the verge: > 0)
     if (e < 1.0 && path >= 0 && pid != path && min(e, best) < 0.0) junction = true;
@@ -388,10 +357,10 @@ vec3 roadSurfaceNormal(vec2 p, vec3 n){
     if (k >= cnt) break;
     vec4 a = roadTexel(2*(e0 + k)), b = roadTexel(2*(e0 + k) + 1);
     int code = int(b.w);
-    if ((code & 12) != 0) continue;   // (a bridge's ground, an airfield's: as they are)
+    if ((code & 24) != 0) continue;   // (a bridge's ground, an airfield's: as they are)
     vec2 ab = a.zw - a.xy; float L = max(length(ab), 1e-3), tr = dot(p - a.xy, ab)/(L*L), t = clamp(tr, 0.0, 1.0);
-    if (((code & 16) != 0 && tr < 0.0) || ((code & 32) != 0 && tr > 1.0)) continue;
-    float e = length(p - (a.xy + ab*t)) - roadHalfPlatform(code & 3);
+    if (((code & 32) != 0 && tr < 0.0) || ((code & 64) != 0 && tr > 1.0)) continue;
+    float e = length(p - (a.xy + ab*t)) - roadHalfPlatform(code & 7);
     if (e < best) { best = e; vec2 dir = ab/L; float gr = (b.y - b.x)/L; nr = normalize(vec3(-gr*dir.x, 1.0, -gr*dir.y)); }
   }
   return normalize(mix(n, nr, 1.0 - smoothstep(-1.0, 0.0, best)));
@@ -507,43 +476,21 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   }
   if (wSnow > 0.01) { vec4 s = groundSample(p.xz, M_SNOW, 8.0, nTS, hL); float w = hblend(wSnow, hC, 1.0 - hC);   // snow fills hollows first
     m.alb = mix(m.alb, s.rgb, w); m.rough = mix(m.rough, s.a, w); m.nrm = mix(m.nrm, nTS, w); }
-  // ---- town-centred, road-aligned streets, sidewalks, forecourts and green block interiors.
-  // Geometry/park semantics match scenery.cpp; only materials change, never terrain height.
+  // ---- the settlements' ground between their streets (settlements.h; the streets are the network's roads, below):
+  // gardens and lawns out in the suburbs - kept greener than the fields, a darker bed or a path here and there - and in
+  // the centres the paving of yards, forecourts and car parks
   if (msk.y > 0.02 && p.y > 1.0) {
-    vec2 q; vec4 plan;
-    if (communityGrid(p.xz, q, plan)) {
-      vec2 dx = vec2(plan.x*pixelDx.x - plan.y*pixelDx.y, plan.y*pixelDx.x + plan.x*pixelDx.y);
-      vec2 dy = vec2(plan.x*pixelDy.x - plan.y*pixelDy.y, plan.y*pixelDy.x + plan.x*pixelDy.y);
-      vec2 footprint = abs(dx) + abs(dy), block = plan.zw;
-      float rd = communityStreetDistance(q, block);
-      vec2 bi = floor(q/block);
-      bool park = bi.x == 0.0 && bi.y == 0.0;
-      float townW = smoothstep(0.02, 0.15, msk.y);
-      vec4 tx; vec3 c;
-      if (rd < 3.5) {
-        tx = matSample(p.xz, M_ASPHALT, 4.0, nTS); c = tx.rgb*0.9;
-        c = mix(c, vec3(0.7), communityStreetPaint(q, block, footprint));
-      } else if (rd < 5.0 || (!park && rd < 21.0 && msk.z > 0.45)) {
-        tx = matSample(p.xz, M_CONCRETE, 3.0, nTS); c = tx.rgb*(rd < 5.0 ? 1.0 : 0.91);
-      } else {
-        tx = matSample(p.xz, M_GRASS, 2.0, nTS);
-        // Reuse the surrounding biome's moisture/slope/macro tint. Raw grass here used
-        // to overwrite that variation with identically bright lime-green town blocks.
-        vec3 lawn = mix(vec3(dot(tx.rgb, vec3(0.2126, 0.7152, 0.0722))), tx.rgb, 0.55);
-        float maintained = hash2i(ivec2(bi) + ivec2(47, 19));
-        c = lawn*grassTint*(0.86 + 0.14*maintained);
-        c *= mix(vec3(1.0), vec3(1.12, 0.96, 0.77), maintained*0.3);
-        if (park || (msk.z > 0.45 && rd > 21.0 && maintained > 0.65)) {
-          vec2 courtyard = q - (bi + 0.5)*block;
-          float walk = park ? max(terrainLineCoverage(courtyard.x, 0.8, footprint.x), terrainLineCoverage(courtyard.y, 0.8, footprint.y))
-                            : (maintained > 0.82 ? terrainLineCoverage(courtyard.x, 0.65, footprint.x) : terrainLineCoverage(courtyard.y, 0.65, footprint.y));
-          c = mix(c, vec3(0.19, 0.155, 0.105), walk*0.75);
-        }
-      }
-      m.alb = mix(m.alb, c, townW); m.rough = mix(m.rough, tx.a, townW); m.nrm = mix(m.nrm, nTS, townW);
-      vec2 corner = abs(q - floor(q/block + 0.5)*block) - 4.5;
-      m.emit += vec3(1.0, 0.75, 0.4)*smoothstep(8.0, 0.0, length(corner))*uNight*0.35*townW;
-    }
+    float townW = smoothstep(0.02, 0.2, msk.y);
+    float yard = smoothstep(0.25, 0.55, msk.z + (vnoise(p.xz/45.0) - 0.5)*0.35);
+    vec3 nG2; vec4 lawn = matSample(p.xz, M_GRASS, 2.0, nG2);
+    vec3 green = mix(vec3(dot(lawn.rgb, vec3(0.2126, 0.7152, 0.0722))), lawn.rgb, 0.6)*grassTint*vec3(0.95, 1.06, 0.9);
+    float beds = smoothstep(0.68, 0.76, vnoise(p.xz/7.0))*(1.0 - yard);
+    green = mix(green, vec3(0.22, 0.18, 0.12), beds*0.3);
+    vec3 nP; vec4 pave = matSample(p.xz, M_CONCRETE, 3.0, nP);
+    vec3 paved = pave.rgb*(0.82 + 0.16*vnoise(p.xz/23.0));
+    paved = mix(paved, vec3(0.2, 0.2, 0.21), smoothstep(0.6, 0.66, vnoise(p.xz/31.0 + 4.1))*0.7);   // (a car park's asphalt)
+    vec3 c = mix(green, paved, yard);
+    m.alb = mix(m.alb, c, townW); m.rough = mix(m.rough, mix(lawn.a, pave.a, yard), townW); m.nrm = mix(m.nrm, mix(nG2, nP, yard), townW);
   }
   // ---- roads (the network, road_network.h): each class's cross-section, its markings stopping at junctions
   {
@@ -557,8 +504,13 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       // by the lanes and tracks
       float onPaving = terrainLineCoverage(x, paved, roadFoot);
       float onVerge = 1.0 - smoothstep(verge - 1.2, verge, x);
-      vec3 nV; vec4 vg = matSample(p.xz, cls <= 1 ? M_GRAVEL : M_DIRT, 6.0, nV);
-      vec3 c = mix(m.alb, vg.rgb*(cls <= 1 ? 0.95 : 0.8), cls <= 1 ? 0.85 : 0.45);
+      vec3 nV; vec4 vg = matSample(p.xz, cls == 4 ? M_CONCRETE : cls <= 1 ? M_GRAVEL : M_DIRT, cls == 4 ? 3.0 : 6.0, nV);
+      vec3 c = mix(m.alb, vg.rgb*(cls == 4 ? 0.92 : cls <= 1 ? 0.95 : 0.8), cls == 4 ? 1.0 : cls <= 1 ? 0.85 : 0.45);
+      if (cls == 4) {   // a street's pavement: flags, their joints, a kerb at the paving's edge
+        onVerge = 1.0 - smoothstep(verge - 0.15, verge, x);
+        c *= 0.94 + 0.06*terrainStripeCoverage(along/1.6, 0.92, alongFoot/1.6);
+        c = mix(c, vec3(0.62, 0.61, 0.58), terrainLineCoverage(x - paved - 0.12, 0.12, roadFoot));
+      }
       float rough = mix(m.rough, vg.a, 0.8); vec3 nrm = mix(m.nrm, nV, 0.8);
       vec4 tx; vec3 pc;
       if (cls == 3) {   // a farm track: two wheel ruts of gravel, grass along the middle
@@ -567,7 +519,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       } else {
         tx = matSample(p.xz, M_ASPHALT, 4.0, nTS);
         // highways newest and darkest; country lanes worn paler, patched
-        pc = tx.rgb*(cls == 0 ? 0.72 : cls == 1 ? 0.82 : 0.95);
+        pc = tx.rgb*(cls == 0 ? 0.72 : cls == 1 ? 0.82 : cls == 4 ? 0.8 : 0.95);
         if (cls == 2) pc *= 0.9 + 0.2*vnoise(p.xz/7.0);
         float paint = 0.0, yellow = 0.0;
         if (!junction) {
@@ -587,6 +539,12 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       }
       c = mix(c, pc, onPaving); rough = mix(rough, tx.a, onPaving); nrm = mix(nrm, nTS, onPaving);
       m.alb = mix(m.alb, c, onVerge); m.rough = mix(m.rough, rough, onVerge); m.nrm = mix(m.nrm, nrm, onVerge);
+      // street lamps at night, every 30 m along a street's pavements, staggered side to side: their pools of light
+      if (cls == 4 && uNight > 0.01) {
+        float side = across > 0.0 ? 1.0 : 0.0, k = floor(along/30.0 + 0.5*side);
+        vec2 lamp = vec2(along - (k - 0.5*side)*30.0, x - (paved + 1.0));
+        m.emit += vec3(1.0, 0.78, 0.45)*0.5*uNight*smoothstep(9.0, 0.0, length(lamp))*onVerge;
+      }
     }
   }
   // ---- airport surfaces

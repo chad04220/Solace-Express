@@ -16,19 +16,9 @@ extern const Town kTowns[];
 extern const int kNumTowns;
 struct RoadSeg { float ax, az, bx, bz; };
 
-// A settlement's street axes follow its incoming road. Block dimensions are whole lots,
-// uploaded unchanged to the terrain material; these affect scenery, never ground height.
-struct CommunityPlan { float cosine, sine; int blockX, blockZ; };
-extern std::vector<CommunityPlan> g_communityPlans;
+// The settlement at a place (settlements.h: as far as each has grown; before they have, within its radius), -1 none
 int communityAt(float x, float z);
-vec2 communityLocal(int town, float x, float z);
-vec2 communityWorld(int town, float x, float z);
-float communityStreetDistance(int town, float x, float z, float* yaw = nullptr);
-bool communityPark(int town, float localX, float localZ);
-bool communityLot(const World& world, int town, int i, int j, struct Lot& out);
-// Called once the road network is built or read from the cache: the street grids turned to the roads into them.
-void sceneryAlignCommunities(const World& world);
-void sceneryBakeCommunityLots(const World& world); // setup-only: immutable O(1) streaming lookup
+void sceneryBakeCommunityLots(const World& world); // the lots and the planted trees, once the world is built or loaded
 
 // From the nearest road of g_world's network within 500 m (1e9: none): its platform's edge, plus 6 m. segOut: the
 // segment (World::roadGrid.segs)
@@ -39,4 +29,13 @@ void sceneryInit();  // build shared road tables before any threaded use
 void sceneryBaseMod(float x, float z, float& h, float& amp);  // flatten roads / towns in the base map
 
 
-struct Lot { bool present; float cx, cz, hw, hd, wallH, roofH, ground; int type; int ridgeX; float seed; float yaw; int town; };
+// A building's place in a settlement: its centre, its half frontage and depth (along its own x and z: its front, +z,
+// faces the road), the ground it stands on, its kind (entities.h EK_), the settlement, the road it fronts
+// (World::roads.paths) and how far out in the settlement (settlementShare)
+struct Lot { bool present; float cx, cz, hw, hd, wallH, roofH, ground; int type; int ridgeX; float seed; float yaw; int town; int kind; int street; float share; };
+const std::vector<Lot>& settlementLots();
+void lotsIn(float x0, float z0, float x1, float z1, std::vector<int>& out);   // the lots whose centres lie in the box
+// A tree planted in a settlement: on a street's pavement or in a park
+struct TreeSpot { float x, z, scale; int kind; float seed; };
+const std::vector<TreeSpot>& settlementTrees();
+void treesIn(float x0, float z0, float x1, float z1, std::vector<int>& out);

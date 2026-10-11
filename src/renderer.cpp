@@ -869,15 +869,7 @@ bool Renderer::init(int w, int h, const std::function<void(float, const std::str
       d[64 + i] = {b.c.x, b.c.y, b.c.z, (float)b.airport};
       d[192 + i] = {b.h.x, b.h.y, b.h.z, (float)b.kind};
     }
-    // Community street plans share the CPU placement frame. Slots 320..383 were unused;
-    // keep airport box dimensions through 319 and airport bounds from 384 intact.
-    const int townCount = std::min(31, std::min(kNumTowns, (int)g_communityPlans.size()));
-    for (int i = 0; i < townCount; ++i) {
-      const Town& town = kTowns[i]; const CommunityPlan& plan = g_communityPlans[i];
-      d[320 + i] = {town.x, town.z, town.r, (float)town.kind};
-      d[352 + i] = {plan.cosine, plan.sine, plan.blockX * LOT, plan.blockZ * LOT};
-    }
-    d[383] = {(float)townCount, 0, 0, 0};
+    // (slots 320..383 held the settlements' street grids until their streets became the network's roads, v3.47: unused)
     // [384,400) / [400,416): world bounds of each airport's buildings + their box range (lets the shader skip airports)
     d.resize(416, V4{0, 0, 0, 0});
     int nb = std::min(128, (int)g_world.boxes.size());

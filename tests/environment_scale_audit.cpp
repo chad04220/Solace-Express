@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
   std::set<std::pair<int,int>> chunks;
   for(int t=0;t<kNumTowns;t++) {
     const Town& town=kTowns[t];
-    if(town.kind==2)check(g_communityPlans[t].blockX*LOT==84.f&&g_communityPlans[t].blockZ*LOT==56.f,"city block dimensions remain 84 by 56 metres");
+    if(town.kind==2)check(g_world.settlements[t].core>0.f&&g_world.settlements[t].core<g_world.settlements[t].budget,"a city has its core");
     for(int cz=Scenery::chunkOf(town.z-town.r);cz<=Scenery::chunkOf(town.z+town.r);cz++)
       for(int cx=Scenery::chunkOf(town.x-town.r);cx<=Scenery::chunkOf(town.x+town.r);cx++)chunks.insert({cx,cz});
   }

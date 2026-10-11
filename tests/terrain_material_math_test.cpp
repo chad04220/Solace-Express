@@ -109,23 +109,6 @@ int main(){
   near(terrainStripeCoverage(.25f,.5f,.01f),1,2e-6f,"resolved stripe retained");
   near(terrainStripeCoverage(.75f,.5f,.01f),0,0,"resolved gap retained");
   near(terrainStripeCoverage(-1e-6f,.5f,.1f),terrainStripeCoverage(1e-6f,.5f,.1f),3e-5f,"no fract-boundary jump");
-  // Road-aligned community grid is tested in its local frame; CPU supplies the matching transform.
-  for(vec2 block:{vec2(112,84),vec2(140,112),vec2(168,112)}){
-    auto town=[&](float x,float z,float width){return communityStreetPaint(vec2(x,z),block,vec2(width,width));};
-    near(town(0,14,.01f),1,3e-5f,"vertical street dash follows local Z");
-    near(town(2,14,.01f),0,0,"street sides unpainted");
-    near(town(0,8,.01f),0,0,"vertical street dash gap");
-    near(town(14,0,.01f),1,3e-5f,"horizontal dash follows local X");
-    near(town(14,2,.01f),0,0,"horizontal street sides unpainted");
-    near(town(0,2,.01f),0,0,"intersection suppresses paint");
-    near(town(0,0,.01f),0,0,"intersection has no centreline cross");
-    near(town(-block.x,-10,.01f),town(0,14,.01f),3e-5f,"negative local grid keeps dash phase");
-    near(town(-10,-block.y,.01f),town(14,0,.01f),3e-5f,"negative horizontal phase");
-    near(town(0,14,1),.3f,1e-5f,"subpixel community paint preserves energy");
-    near(communityStreetDistance(vec2(0,25),block),0,0,"street centre");
-    near(communityStreetDistance(vec2(-3.5f,-20),block),3.5f,0,"negative-coordinate asphalt edge");
-    near(communityStreetDistance(vec2(block.x*.5f,block.y*.5f),block),std::min(block.x,block.y)*.5f,0,"green block interior");
-  }
   // Actual entity production arithmetic: flat maps preserve all axes/hemispheres, and
   // tangent perturbations never invert a surface. Cardinal walls now need 2 reads, not 6.
   for(vec3 n:normals){

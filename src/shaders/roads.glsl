@@ -5,7 +5,7 @@
 #ifndef PART_BAKE
 // uRoadGrid: R32UI per mask texel - the baked forest noise (top 7 bits), how many road entries reach the texel (next
 // 6), the first of them (low 19); the entries are uData's rows from 1 on, two texels each (Renderer's upload):
-// (a.x, a.z, b.x, b.z), (a.h, b.h, distance along the road at a, class + 4 x flags + 64 x path); flags 1 a bridge's
+// (a.x, a.z, b.x, b.z), (a.h, b.h, distance along the road at a, class + 8 x flags + 128 x path); flags 1 a bridge's
 // span (the ground below left alone, no paint), 2 by an airfield's grounds (painted on the ground as it is), 4 and 8
 // its end a or b at a bridge (the platform stopping square at the joint)
 uniform usampler2D uRoadGrid;
@@ -19,8 +19,9 @@ float forestAt(vec2 p){
 }
 vec4 roadTexel(int i){ return texelFetch(uData, ivec2(i & 4095, 1 + (i >> 12)), 0); }
 uint roadHead(vec2 p){ return texelFetch(uRoadGrid, clamp(ivec2(floor((wrapW(p) + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0).r; }
-float roadHalfPlatform(int c){ return c == 0 ? 16.0 : c == 1 ? 6.5 : c == 2 ? 4.0 : 2.8; }   // (road_network.h roadSpec)
-float roadHalfPaved(int c){ return c == 0 ? 12.4 : c == 1 ? 4.6 : c == 2 ? 2.9 : 1.9; }
+float roadHalfPlatform(int c){ return c == 0 ? 16.0 : c == 1 ? 6.5 : c == 2 ? 4.0 : c == 3 ? 2.8 : 6.0; }   // (road_network.h roadSpec)
+float roadHalfPaved(int c){ return c == 0 ? 12.4 : c == 1 ? 4.6 : c == 2 ? 2.9 : c == 3 ? 1.9 : 3.5; }
+float roadBankMax(int c){ return c == 4 ? 20.0 : ROAD_BANK_MAX; }
 // The ground with the roads built into it, from the natural ground g: each graded road's platform level across at its
 // height, its banks blending back to g (bridges and the stretches by an airfield leave the ground alone; an end at a
 // bridge stops square, carried on under the deck's slab, then falling away). Mirrors roadGrade in road_network.cpp
@@ -35,14 +36,14 @@ float roadGrade(vec2 p, float g){
     if (k >= n) break;
     vec4 a = roadTexel(2*(e0 + k)), b = roadTexel(2*(e0 + k) + 1);
     int code = int(b.w);
-    if ((code & 12) != 0) continue;
+    if ((code & 24) != 0) continue;
     vec2 ab = a.zw - a.xy; float L2 = max(dot(ab, ab), 1e-3), L = sqrt(L2), tr = dot(p - a.xy, ab)/L2, t = clamp(tr, 0.0, 1.0);
-    float d = length(a.xy + ab*t - p), P = roadHalfPlatform(code & 3);
+    float d = length(a.xy + ab*t - p), P = roadHalfPlatform(code & 7);
     float hr = b.x + (b.y - b.x)*clamp(tr, -P/L, 1.0 + P/L);   // (past an end: on along its grade)
     float past = max(max(-tr, tr - 1.0), 0.0)*L;
-    bool bridgeEnd = (tr < 0.0 && (code & 16) != 0) || (tr > 1.0 && (code & 32) != 0);
+    bool bridgeEnd = (tr < 0.0 && (code & 32) != 0) || (tr > 1.0 && (code & 64) != 0);
     if (bridgeEnd) hr -= 0.3;
-    float w = 1.0 - smoothstep(P, P + clamp(abs(g - hr)*ROAD_BANK_RUN, 4.0, ROAD_BANK_MAX), d);
+    float w = 1.0 - smoothstep(P, P + clamp(abs(g - hr)*ROAD_BANK_RUN, 4.0, roadBankMax(code & 7)), d);
     if (bridgeEnd) w *= 1.0 - smoothstep(2.0, 2.0 + clamp(abs(g - hr)*1.5, 1.0, 20.0), past);
     if (w <= 0.0) continue;
     float w4 = w*w; w4 *= w4;
@@ -59,5 +60,6 @@ vec4 roadTexel(int i){ return vec4(0.0); }
 uint roadHead(vec2 p){ return 0u; }
 float roadHalfPlatform(int c){ return 0.0; }
 float roadHalfPaved(int c){ return 0.0; }
+float roadBankMax(int c){ return 0.0; }
 float roadGrade(vec2 p, float g){ return g; }
 #endif

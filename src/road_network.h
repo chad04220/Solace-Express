@@ -9,7 +9,7 @@
 
 class World;
 
-enum RoadClass : uint8_t { RC_HIGHWAY = 0, RC_ROAD = 1, RC_LANE = 2, RC_TRACK = 3, RC_COUNT };
+enum RoadClass : uint8_t { RC_HIGHWAY = 0, RC_ROAD = 1, RC_LANE = 2, RC_TRACK = 3, RC_STREET = 4, RC_COUNT };
 
 // Each class's design (m): the paved half width (edge line to edge line, the central reserve included), the level
 // platform's half width (shoulders, verges); the steepest grade anywhere along it (rise over run, never exceeded: its
@@ -24,6 +24,7 @@ inline const RoadSpec& roadSpec(int c) {
     {4.6f, 6.5f, 0.09f, 140.f, 20.f, 18.f},     // road: two 3.4 m lanes, 0.9 m shoulders
     {2.9f, 4.0f, 0.12f, 45.f, 15.f, 7.f},       // lane: a single 5.8 m carriageway, no lines
     {1.9f, 2.8f, 0.15f, 25.f, 12.f, 4.f},       // track: gravel
+    {3.5f, 6.0f, 0.12f, 20.f, 12.f, 3.f},       // street: two 3.5 m lanes between kerbs, 2.5 m pavements (settlements.h)
   };
   return k[c];
 }
@@ -44,6 +45,12 @@ struct RoadNetwork {
 
 // Deterministic for a given world (its heightfield and airports); takes a few seconds.
 RoadNetwork buildRoadNetwork(const World& world);
+// A road of class cls along a line laid out already (a settlement's street, settlements.cpp): its corners rounded, its
+// points spaced and its profile graded as the network's own are, its ends at h0 and h1 - and wherever a pin is, a
+// point exactly there held at the pin's height (where it crosses a road built before it: the two meet level). Never a
+// bridge.
+struct RoadPin { float x, z, h; };
+RoadPath layRoad(const World& world, RoadClass cls, const std::vector<vec2>& line, float h0, float h1, const std::vector<RoadPin>& pins);
 // Whether a stretch of road (A to B, of class cls) runs by an airfield's grounds - its platform or banks would reach
 // them: there it lies on the ground as it is, painted, never graded (an airfield's terrain is never reshaped), its
 // profile held on that ground
@@ -57,6 +64,8 @@ bool roadByAirfield(const RoadPoint& A, const RoadPoint& B, int cls);
 // span like a spill-through abutment's
 enum : uint8_t { RS_BRIDGE = 1, RS_NOGRADE = 2, RS_ENDA = 4, RS_ENDB = 8 };
 static const float ROAD_BANK_MAX = 50.f;            // the widest cut or fill bank beyond a platform's edge (m)
+// (a street's narrower: it follows the ground closely, and a town's grid of them would crowd the texels' lists)
+inline float roadBankMax(int cls) { return cls == RC_STREET ? 20.f : ROAD_BANK_MAX; }
 static const float ROAD_BANK_RUN = 2.f;             // a bank's run for its rise (1 in 2, on average: rounded at its top
                                                     // and toe, at most 1 in 1.33 at its middle)
 struct RoadSegment { float ax, az, bx, bz, ah, bh, along; uint16_t path; uint8_t cls, flags; };
@@ -82,6 +91,7 @@ float roadGrade(const RoadGrid& grid, float x, float z, float g);
 // The nearest road within 500 m: how far its platform's edge is (negative: on it), the segment (-1 and 1e9: none)
 float roadEdgeDistance(const RoadGrid& grid, float x, float z, int* seg = nullptr);
 // The grid's entries as the shaders read them (roads.glsl roadTexel): two RGBA32F texels each, in list order - rows 1..
-// of a 4096-wide uData (row 0 is the caller's own); the floats of those rows, padded to whole rows
+// of a 4096-wide uData (row 0 is the caller's own); the floats of those rows, padded to whole rows. The second's w:
+// class + 8 x flags + 128 x path
 static const int ROAD_DATA_W = 4096;
 std::vector<float> roadEntryRows(const RoadGrid& grid);

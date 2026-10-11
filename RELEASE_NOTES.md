@@ -9,13 +9,20 @@
 - **From the air,** the ground along the roads is drawn in finer detail out to about 2 km, and road surfaces are lit as the flat surfaces they are. A distant road no longer looks as if it lies tilted on the hillside.
 - Beside an airfield, a road lies on the airfield's ground as it is, as before. The airfields themselves are untouched.
 
+### Towns, villages and cities that grow like real ones
+- **No more circles.** Each settlement has grown out from its centre over the ground around it: along its roads, up the gentler slopes, stopping at the shore and the airfields. Steep ground holds it back. The woods and fields come right up to the last houses and fill the gaps between the suburbs.
+- **Real streets.** Every street is now a road of its own, graded into the ground, with kerbs, pavements and street lamps that light at night. It meets the roads and the other streets level at its junctions. A town or a city has a grid of blocks at its centre, turned to its main road. Round that, streets branch off, curve with the lie of the land, and end in a turning or meet the next. A village grows along its main road with a few lanes off it.
+- **Buildings face their street.** Every building stands on its own lot along a street or a road, set back from it as its kind would be. At a city's heart stand the towers, with offices and flats round them, then shops and terraces, then houses with front and back gardens. Farmhouses sit at the edge, and warehouses line the roads out of the bigger towns.
+- **Each place has its centre.** A church stands on the main road, with a park across the way in the towns and cities. The town-centre streets are lined with trees, and the gardens have their own.
+- About 23,000 buildings in all, up from about 14,000.
+
 ### Bridges
 - The roads now cross the water and the steepest mountain gullies on bridges: twelve in all, seven over the water. Each is a concrete deck on piers, carrying its road's surface and markings between parapets, with an abutment at each end. The bridges are lit and cast shadows like the buildings, and they're solid: fly under the deck between the piers, not into it. Until now, a road stopped at the water's edge and carried on from the far side.
 - **Each bridge joins its road without a seam.** The deck is as wide as the road, and its ends are square to it. The road meets the deck at the deck's height, and the markings run straight on across. Under each end, the embankment slopes away beneath the first span.
 - Nothing grows up through a bridge. Trees and buildings under one stay below its deck.
 
 ### Good to know
-- **The first launch after updating takes longer, once.** The islands are regenerated, and some roads now take different routes.
+- **The first launch after updating takes longer, once.** The islands are regenerated: some roads take different routes, and every settlement is laid out anew.
 
 Please run `diagnostics.bat` on this version.
 

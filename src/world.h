@@ -3,6 +3,7 @@
 #include "common.h"
 #include "road_network.h"
 #include "bridges.h"
+#include "settlements.h"
 #include <string>
 
 static const float WORLD_HALF = 40000.0f;  // the islands span [-40km, 40km] on x and z
@@ -74,6 +75,7 @@ public:
   RoadNetwork roads;
   RoadGrid roadGrid;
   std::vector<Bridge> bridges;   // a structure under each of the network's bridge spans (bridges.h): made from it, not cached
+  std::vector<SettlementField> settlements;   // each settlement's extent (settlements.h): from the ground and the roads, not cached
   std::vector<uint8_t> mask; // RGBA8: road distance, building density, urbanness, farmland / sea-stack flag
   std::vector<float> hmax[HMAX_LEVELS];   // upper bound of the terrain per cell, level L has HMAX_N>>L cells per side
   // cachePath: the generated arrays are read from there when its stamp matches (a launch after the first skips the
@@ -93,7 +95,6 @@ public:
   void maskTexel(float x, float z, float out[4]) const;    // nearest texel (matches shader texelFetch)
   float forestAt(float x, float z) const;                  // baked forest-patch noise, manual bilinear (matches shader)
   float groundHeight(float x, float z, int octaves = 8) const;          // same as height()
-  bool lotAt(int i, int j, Lot& out) const;                 // a town lot with a building on it (entities.cpp picks the building)
   int findAirport(const char* code) const;
   // Terrain height (m) at a world position (bare ground, the roads graded into it). octaves controls detail fidelity.
   float height(float x, float z, int octaves = 8) const;

@@ -1,5 +1,7 @@
-// Community planning is deterministic, bounded, aligned with the rendered street grid,
-// and contains no water/slope/airport-overlapping buildings. No GL or display required.
+// The settlements (settlements.h, scenery.h): grown over the ground with their streets on the road network, every
+// building on a lot along a road or a street and facing it, clear of the roads and of each other, on dry, buildable
+// ground off the runways; a skyline at the cities' hearts; deterministic, bounded per chunk, streamed the same however
+// it is reached. No GL or display required.
 #include "../src/scenery.h"
 #include "../src/entities.h"
 #include "../src/airport_layout.h"
@@ -13,7 +15,7 @@ static int failures = 0;
 static void check(bool value, const char* message) { if (!value) { if (failures < 16) std::printf("FAIL: %s\n", message); failures++; } }
 int main() {
   buildTestWorld();
-  check(g_communityPlans.size() == (size_t)kNumTowns, "every community has a shared street plan");
+  check(g_world.settlements.size() == (size_t)kNumTowns, "every settlement has grown");
   // The road network (road_network.h): every settlement and airfield on it, its roads on dry land or bridges, off the
   // runways' protected rectangles, graded within their class's limit
   const RoadNetwork& net = g_world.roads;
@@ -65,47 +67,81 @@ int main() {
     alone++; std::printf("  not on the network: node %zu (kind %d) at %.0f %.0f\n", n, net.nodes[n].kind, net.nodes[n].x, net.nodes[n].z);
   }
   check(alone == 0, "every settlement and airfield is on the road network (an airfield alone on its island aside)");
-  Lot invalid;
-  check(!communityLot(g_world, -1, 0, 0, invalid) && !communityLot(g_world, kNumTowns, 0, 0, invalid), "invalid public town indices are rejected");
-  int total = 0, tall = 0, occupiedTowns = 0, cars = 0;
-  for (int town = 0; town < kNumTowns; town++) {
-    const Town& t = kTowns[town]; const CommunityPlan& plan = g_communityPlans[town];
-    check(fabsf(plan.cosine * plan.cosine + plan.sine * plan.sine - 1.f) < 2e-6f, "street frame is orthonormal");
-    int range = (int)ceilf(t.r / LOT) + 1, count = 0;
-    for (int j = -range; j <= range; j++) for (int i = -range; i <= range; i++) {
-      Lot lot, again;
-      if (!communityLot(g_world, town, i, j, lot)) continue;
-      count++; total++; tall += lot.wallH > 38.f;
-      check(communityLot(g_world, town, i, j, again) && lot.cx == again.cx && lot.cz == again.cz && lot.yaw == again.yaw && lot.wallH == again.wallH, "lot generation is deterministic");
-      check(communityAt(lot.cx, lot.cz) == town, "lot stays in its own settlement");
-      vec2 local = communityLocal(town, lot.cx, lot.cz), back = communityWorld(town, local.x, local.y);
-      check(hypotf(back.x - lot.cx, back.y - lot.cz) < .01f, "local/world frame round trip");
-      check(!communityPark(town, local.x, local.y), "town square is reserved from ordinary buildings");
-      float d = communityStreetDistance(town, lot.cx, lot.cz);
-      check(d <= 21.f && d > 10.f, "every building has street frontage and a setback");
-      float forward = communityStreetDistance(town, lot.cx + sinf(lot.yaw) * 2.f, lot.cz + cosf(lot.yaw) * 2.f);
-      check(forward < d - 1.9f, "building entrance faces the nearest street");
-      check(roadDistance(lot.cx, lot.cz) >= hypotf(lot.hw, lot.hd) + 7.f, "regional road footprint exclusion");
-      float low = 1e9f, high = -1e9f;
-      for (int k = 0; k < 4; k++) {
-        float x = (k & 1) ? lot.hw : -lot.hw, z = (k & 2) ? lot.hd : -lot.hd;
-        float wx = lot.cx + cosf(lot.yaw) * x + sinf(lot.yaw) * z, wz = lot.cz - sinf(lot.yaw) * x + cosf(lot.yaw) * z;
-        float h = g_world.groundHeight(wx, wz, 7); low = std::min(low, h); high = std::max(high, h);
-        check(h > 2.5f && g_world.onRunway(wx, wz, 60.f) < 0, "footprint is dry and clear of runways");
-        check(communityStreetDistance(town, wx, wz) >= 3.5f, "no building corner intersects a local street");
-      }
-      check(high - low <= 2.6f + .001f, "sloped sites rejected without changing terrain");
-    }
-    std::printf("%-18s %4d street-front buildings\n", t.name, count);
-    occupiedTowns += count > 0;
-    if (t.kind == 2) check(count > 150, "city retains a populated low-rise fabric");
-    // The central square exists in the plan even where airport/water masks suppress placement.
-    check(communityPark(town, plan.blockX * LOT * .5f, plan.blockZ * LOT * .5f), "civic green is deterministic");
+  // ---- the streets: the network's, in every town and city
+  int streets = 0; std::vector<int> townStreets(kNumTowns, 0);
+  for (const RoadPath& p : net.paths) {
+    if (p.cls != RC_STREET) continue;
+    streets++;
+    int t = -1; settlementShare(g_world.settlements, p.pts[p.pts.size() / 2].x, p.pts[p.pts.size() / 2].z, &t);
+    if (t >= 0) townStreets[t]++;
+    check(p.from < 0 && p.to < 0 && p.bridge.size() + 1 == p.pts.size(), "a street joins no node and is never a bridge");
   }
-  // (three cities since the eastern islands were settled: ~14,000; the world held ~15,600 buildings before v3.44)
-  check(total > 600 && total < 18000, "bounded, populated community density");
-  check(occupiedTowns == kNumTowns, "all named communities inhabit suitable land");
-  check(tall > 150 && tall < total / 5, "dense cities retain a substantial, bounded high-rise skyline");
+  for (int t = 0; t < kNumTowns; t++) if (kTowns[t].kind == 2) check(townStreets[t] >= 30, "a city has its streets");
+  check(streets > 300, "the settlements have their streets");
+  // ---- the lots
+  RoadIndex roads;
+  for (size_t pi = 0; pi < net.paths.size(); pi++) roads.addPath(net.paths[pi], (int)pi);
+  const std::vector<Lot> lots = settlementLots();
+  sceneryBakeCommunityLots(g_world);
+  const std::vector<Lot>& again = settlementLots();
+  bool same = lots.size() == again.size();
+  for (size_t i = 0; same && i < lots.size(); i++) same = lots[i].cx == again[i].cx && lots[i].cz == again[i].cz && lots[i].yaw == again[i].yaw && lots[i].kind == again[i].kind;
+  check(same, "the lots are laid out the same every time");
+  int total = 0, tall = 0, occupiedTowns = 0, cars = 0;
+  std::vector<int> count(kNumTowns, 0);
+  for (size_t li = 0; li < lots.size(); li++) {
+    const Lot& lot = lots[li];
+    total++; tall += lot.wallH > 38.f; count[lot.town]++;
+    int t = -1; const float share = settlementShare(g_world.settlements, lot.cx, lot.cz, &t);
+    check(t == lot.town && share < 1.15f, "a lot lies in its own settlement");
+    const float c = cosf(lot.yaw), s = sinf(lot.yaw);
+    auto at = [&](float x, float z) { return vec2(lot.cx + c * x + s * z, lot.cz - s * x + c * z); };
+    // its front on its road, a setback from the platform's edge; facing it
+    const float front = roads.nearest(at(0.f, lot.hd), 16.f, -1, nullptr, nullptr, true);
+    check(front >= 0.5f && front <= 13.f, "a building fronts a road, set back from it");
+    if (lot.street >= 0) {   // (nearer its own road a step further out from its front)
+      auto toStreet = [&](vec2 p) {
+        const RoadPath& r = net.paths[lot.street]; float best = 1e9f;
+        for (size_t k = 0; k + 1 < r.pts.size(); k++) {
+          const vec2 a(r.pts[k].x, r.pts[k].z), d = vec2(r.pts[k + 1].x, r.pts[k + 1].z) - a;
+          const float t = std::clamp(dot2(p - a, d) / std::max(dot2(d, d), 1e-6f), 0.f, 1.f);
+          best = std::min(best, length(a + d * t - p));
+        }
+        return best;
+      };
+      check(toStreet(at(0.f, lot.hd + 2.f)) < toStreet(at(0.f, lot.hd)), "a building faces its road");
+    }
+    float low = 1e9f, high = -1e9f;
+    for (int k = 0; k < 9; k++) {
+      const vec2 p = at((k % 3 - 1) * lot.hw, (k / 3 - 1) * lot.hd);
+      const float h = g_world.groundHeight(p.x, p.y, 7); low = std::min(low, h); high = std::max(high, h);
+      check(h >= 2.5f && g_world.onRunway(p.x, p.y, 60.f) < 0, "a footprint is dry and clear of the runways");
+      check(roads.nearest(p, 3.f, -1, nullptr, nullptr, true) >= 0.99f, "no building stands on a road");
+    }
+    const bool big = lot.kind == EK_TOWER || lot.kind == EK_SKYSCRAPER || lot.kind == EK_OFFICE || lot.kind == EK_WAREHOUSE;
+    check(high - low <= (big ? 3.5f : 2.6f) + .001f, "steep sites refused, the ground left as it is");
+    // no two buildings in one another
+    std::vector<int> near; lotsIn(lot.cx - 60.f, lot.cz - 60.f, lot.cx + 60.f, lot.cz + 60.f, near);
+    for (int o : near) {
+      if (o <= (int)li) continue;
+      const Lot& b = lots[o];
+      const vec2 ua(c, -s), va(s, c), ub(cosf(b.yaw), -sinf(b.yaw)), vb(sinf(b.yaw), cosf(b.yaw)), d(b.cx - lot.cx, b.cz - lot.cz);
+      bool apart = false;
+      for (vec2 ax : {ua, va, ub, vb}) {
+        const float ra = lot.hw * fabsf(dot2(ax, ua)) + lot.hd * fabsf(dot2(ax, va)), rb = b.hw * fabsf(dot2(ax, ub)) + b.hd * fabsf(dot2(ax, vb));
+        apart = apart || fabsf(dot2(d, ax)) > ra + rb - 0.01f;
+      }
+      check(apart, "no two buildings stand in each other");
+    }
+  }
+  for (int town = 0; town < kNumTowns; town++) {
+    std::printf("%-18s %4d buildings, %3d streets\n", kTowns[town].name, count[town], townStreets[town]);
+    occupiedTowns += count[town] > 0;
+    if (kTowns[town].kind == 2) check(count[town] > 1000, "a city is built up");
+  }
+  check(total > 4000 && total < 40000, "bounded, populated settlements");
+  check(occupiedTowns == kNumTowns, "every settlement is lived in");
+  check(tall > 60 && tall < total / 10, "the cities' skylines, at their hearts");
   // Detail upgrades and direct generation must yield the same entities. Every community item
   // owns its centre's chunk, including trees and parked cars that cross a lot/chunk boundary.
   for (int town : {0, 1, 5, 10}) {
@@ -121,20 +157,14 @@ int main() {
         cars += kind == EK_CAR;
       }
       size_t buildings = chunk->off[EK_RWYLIGHT] - chunk->off[EK_HOUSE];
-      check(buildings < 120, "28m frontage lattice bounds community buildings per chunk");
-      check(chunk->ents.size() < 2000, "detail budget includes the existing 6m forest lattice");
+      check(buildings < 400, "a chunk's buildings bounded");
+      check(chunk->ents.size() < 4000, "a chunk's entities bounded");
       g_scenery.clear(); chunk = g_scenery.ensure(cx, cz, 2);
       check(upgraded.size() == chunk->ents.size() && (upgraded.empty() || !std::memcmp(upgraded.data(), chunk->ents.data(), upgraded.size() * sizeof(Ent))), "streaming level upgrade matches direct detailed generation");
       g_scenery.clear();
     }
   }
   check(cars > 0, "communities contain driveway activity");
-  Lot cached, raw;
-  bool cachedPresent = communityLot(g_world, 0, -5, -5, cached);
-  sceneryInit(); // A new world setup invalidates the derived cache before any generation.
-  bool rawPresent = communityLot(g_world, 0, -5, -5, raw);
-  check(cachedPresent == rawPresent && cached.cx == raw.cx && cached.cz == raw.cz && cached.yaw == raw.yaw && cached.wallH == raw.wallH, "uncached fallback preserves cached lot data");
-  sceneryBakeCommunityLots(g_world);
   std::printf("%d buildings, %d tall, %d inhabited towns, %zu road paths, %d parked cars sampled; %d failures\n", total, tall, occupiedTowns, g_world.roads.paths.size(), cars, failures);
   return failures ? 1 : 0;
 }
