@@ -850,8 +850,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   // time it is drawn after an update, then loaded from the cache) and the seconds that took.
   struct BodyLoad { int ready = 0, cached = 0, built = 0, refused = 0, programs = 0; double secs = 0, programSecs = 0; };
   auto buildBodies = [&](BodyLoad& r) {
+    // (every Game a tool makes is diskless, as the tool's own: its scenes' crashes, fees and settlements stay in memory.
+    // v3.47.0's diagnostics charged the player's career for their break-up scenes: these Games saved to its folder)
     Game* g = new Game();
-    g->saveDir = game.saveDir;
+    g->saveDir = game.saveDir; g->diskless = true;
     g->initHeadless(); g->iconTex = iconTex;
     const int b0 = g_ren.bakeBuilt, p0 = g_ren.prebuiltMeshHits, m0 = g_ren.prebuiltMeshMisses, c0 = g_ren.meshCacheHits, s0 = g_shaderCacheMisses;
     const long long u0 = g_shaderCompileUs;
@@ -913,7 +915,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         SetWindowTextA(g_hwnd, ("Solace Express - analysing " + sc).c_str());
         g_ren.entSync = true;
         Game* g = new Game();
-        g->saveDir = game.saveDir;
+        g->saveDir = game.saveDir; g->diskless = true;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
         g_ren.entSync = false;
         auto frames = [&](int n) { for (int i = 0; i < n; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); } };
@@ -1048,7 +1050,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
           SetWindowTextA(g_hwnd, ("Solace Express - profiling " + sc + ": " + F.name).c_str());
           Game* g = new Game();
-          g->saveDir = game.saveDir;
+          g->saveDir = game.saveDir; g->diskless = true;
           g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
           g_ren.entSync = false; g_ren.dbgOff = F.bit;
           for (int i = 0; i < 30; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); }
@@ -1169,7 +1171,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         static std::string bakingScene; bakingScene = sc; static bool bakeNoted = false; bakeNoted = false;
         g_ren.bakeYield = [] { if (!bakeNoted) { bakeNoted = true; SetWindowTextA(g_hwnd, ("Solace Express - baking the airframe meshes for " + bakingScene + " (once; cached afterwards)").c_str()); } pumpB(); };
         Game* g = new Game();
-        g->saveDir = game.saveDir;
+        g->saveDir = game.saveDir; g->diskless = true;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
         g_ren.setRenderScale(1.f);   // explicit benchmark invariant; does not change saved settings
         fprintf(bf, "\nScene %s; requested WX=%s\n", sc.c_str(), getenv("WX") ? getenv("WX") : "(scene/default)");
@@ -1294,7 +1296,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         SetWindowTextA(g_hwnd, ("Solace Express - rendering loading pictures " + std::to_string(++done) + " / " + std::to_string(jobs.size()) + ": " + J.second).c_str());
         g_ren.entSync = true;
         Game* g = new Game();
-        g->saveDir = game.saveDir; g->assetDir = game.assetDir;
+        g->saveDir = game.saveDir; g->diskless = true; g->assetDir = game.assetDir;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(J.first);
         for (int i = 0; i < 4; i++) { g->update(1.f / 30.f); g->render(); }
         for (int i = 0; i < 40; i++) { g->update(1.f / 240.f); g->render(); }   // the TAA settles (barely moving)
@@ -1347,7 +1349,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
         SetWindowTextA(g_hwnd, ("Solace Express - rendering " + sc).c_str());
         Game* g = new Game();
-        g->saveDir = game.saveDir;
+        g->saveDir = game.saveDir; g->diskless = true;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
         for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
         for (int i = 0; i < 24; i++) g->render();   // TAA settles
