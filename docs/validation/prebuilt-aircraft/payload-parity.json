@@ -1,0 +1,308 @@
+{
+  "schema": 1,
+  "checked": 30,
+  "all_exact": true,
+  "comparison": "raw payload bytes and fine split; verified before transport and after lossless extract",
+  "bodies": [
+    {
+      "model": 0,
+      "slot": 0,
+      "asset_filename": "aircraft_00_0_4839bee49d1e5231b3fe3306ea30770695de9e1386b869ff8a33af61dbcb984c.mesh",
+      "baseline": "mesh_1cd15c40b439524f_858c3d4777ba3f7c.bin",
+      "payload_bytes": 1461548,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "6636c38d3e6a3628c67bcd86e06aa765e6ca95fa68c6b60a0d1e33d5f758cf13",
+      "exact": true
+    },
+    {
+      "model": 0,
+      "slot": 1,
+      "asset_filename": "aircraft_00_1_2293afe3c90aa9254298c059d8951670b281dca3577f4f234bfc4e96d3ee73e9.mesh",
+      "baseline": "mesh_70158983ff7f24ad_f7d0acd17b8c6dae.bin",
+      "payload_bytes": 8727616,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "388b2782f341044a8f358acff34ba1deb9b13f5bd44ab5774ea3c9b20a497bc4",
+      "exact": true
+    },
+    {
+      "model": 1,
+      "slot": 0,
+      "asset_filename": "aircraft_01_0_8a318ed61fa3e461ad6e55d1287e8de7b2c507255fee937b20bb64359689d61c.mesh",
+      "baseline": "mesh_305dcd10ebc8ef5b_c35739420e1b6042.bin",
+      "payload_bytes": 1535340,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "324323dca4dd819374a24d5cdcc78ba2206b68bc54583618875d2081ee4319c4",
+      "exact": true
+    },
+    {
+      "model": 1,
+      "slot": 1,
+      "asset_filename": "aircraft_01_1_40b5f081fcdb256425ae3cb069b8392c83772a5b2c029cf00450285155d63d23.mesh",
+      "baseline": "mesh_d29abee52f43c7e3_cb59234a2382bc0c.bin",
+      "payload_bytes": 9148272,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "955172443599a4546023faf19a06cf5101d852d03c703f73dfef42ebabddbea5",
+      "exact": true
+    },
+    {
+      "model": 2,
+      "slot": 0,
+      "asset_filename": "aircraft_02_0_4c8989b60e2c45e83be045ae8c32dbd4de0acff555c5495c12cbff5b397696c0.mesh",
+      "baseline": "mesh_694b68f64e67847f_c27c7231d159f148.bin",
+      "payload_bytes": 1974828,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "b414475da1bdaac987cd000dd2ffdef64eafd6c5b470cd8de9e3fa0ebc1a6de2",
+      "exact": true
+    },
+    {
+      "model": 2,
+      "slot": 1,
+      "asset_filename": "aircraft_02_1_e64956ced788a30eb5d5f9c44af782b70b7d4eae2b724a5705ffe75250445e1e.mesh",
+      "baseline": "mesh_54e042c2bfd3d052_03c4f29a2a6f9a6e.bin",
+      "payload_bytes": 10265012,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "2958a385e0954c6101de0aef1bad635b330140da323cd0e1637d19421c42f25c",
+      "exact": true
+    },
+    {
+      "model": 3,
+      "slot": 0,
+      "asset_filename": "aircraft_03_0_624532ff346e4ac09004c3a64323a29b87be8e0f04183718cbd5341443ce25f8.mesh",
+      "baseline": "mesh_f542a387294d2dfc_6e71b25248a4f108.bin",
+      "payload_bytes": 2260020,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "db314d1ddc4bfa877e7ac48ef1bdd5863aa112d71f19a7c479ddf163cb4c1244",
+      "exact": true
+    },
+    {
+      "model": 3,
+      "slot": 1,
+      "asset_filename": "aircraft_03_1_86c63692e38621e6e4d87ce8e5f6b4dd454900cde024ff121708f41ddf735937.mesh",
+      "baseline": "mesh_57635454748c81c9_90c4a35e5092b6ba.bin",
+      "payload_bytes": 11360912,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "9eb46c4e2cc441c4ddfa8b5a9edd90edeb8a78b0ea7f91a781afc74563616838",
+      "exact": true
+    },
+    {
+      "model": 4,
+      "slot": 0,
+      "asset_filename": "aircraft_04_0_fce1b18ef92edcd57b3812a39acda17c99e769c218ca90ec61ed0aa9f755f2f8.mesh",
+      "baseline": "mesh_552f2e27ab459582_e3b24192c6af8cc0.bin",
+      "payload_bytes": 2592956,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "9937f5c8eaccb4074e44159e99040bea5cc31d88d09b808344b69a921a6478d8",
+      "exact": true
+    },
+    {
+      "model": 4,
+      "slot": 1,
+      "asset_filename": "aircraft_04_1_df3ce04defeadd202ebf7c9c0b72367e0fc256ffb3ff29bc7b0fa5e395cf9739.mesh",
+      "baseline": "mesh_4101220c1c4fe8e8_527e41bbe1f63132.bin",
+      "payload_bytes": 13463136,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "8084e59cca1b8982398976a27761657d64ab2678c4e60ea0305d2c23ae7bda61",
+      "exact": true
+    },
+    {
+      "model": 5,
+      "slot": 0,
+      "asset_filename": "aircraft_05_0_b9eae87a684946e9f7049cedfe0e6b74fac6fd43d8b53fce05e38d410d79bddf.mesh",
+      "baseline": "mesh_57da05530524f3f9_631b605700cde120.bin",
+      "payload_bytes": 7831816,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "1ab57f9a79aa6033b5daec27a5aec35cde3c10282ead5181d22e8aaee2c1c5b6",
+      "exact": true
+    },
+    {
+      "model": 5,
+      "slot": 1,
+      "asset_filename": "aircraft_05_1_a2babd402bcb945da1bac8563fa24650c73cd92c71f989077ec5bcdc84dbe89a.mesh",
+      "baseline": "mesh_76f1e145dc5db74c_9565fb24920bf132.bin",
+      "payload_bytes": 21700860,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "447d9d6b8731becf2008b6a85c80014a7571c87587e675b9e753e2707da849c4",
+      "exact": true
+    },
+    {
+      "model": 6,
+      "slot": 0,
+      "asset_filename": "aircraft_06_0_cea2a6a6e5a334eb6d2289f7c4bd898bf3582ca31e38410a3a37358e2199da56.mesh",
+      "baseline": "mesh_b0500ebbb52f9c04_e30f1a5b890816e0.bin",
+      "payload_bytes": 4119868,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "05d5d2acee6b3ce000b60e21463d9254e21e2cc2a0472d3c4a9fdfffb7dddad7",
+      "exact": true
+    },
+    {
+      "model": 6,
+      "slot": 1,
+      "asset_filename": "aircraft_06_1_54563ccfdbc772bedb6a274feedb2f8970c5e936bde232e5d02d9f1ba5717baa.mesh",
+      "baseline": "mesh_27b952ef5017162b_664f464843885b1a.bin",
+      "payload_bytes": 16538228,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "5fdd86b3522234b8444e138d5bce53cdad16b54021bbca9ca1352ff50ea8f650",
+      "exact": true
+    },
+    {
+      "model": 7,
+      "slot": 0,
+      "asset_filename": "aircraft_07_0_0b8ed3d7947da4fbb1d365b8fda64689f4b15ae3a97b04c011e4bc22ea515640.mesh",
+      "baseline": "mesh_23b11940e53015b0_ea6a8030f89f6bc8.bin",
+      "payload_bytes": 2066452,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "cf54c13bd92d85f7803696f4fc6dd7babe2800cc2e039550d7a887b76c90c958",
+      "exact": true
+    },
+    {
+      "model": 7,
+      "slot": 1,
+      "asset_filename": "aircraft_07_1_3057e7252427db7d76f8dcf5f3b89042d634a0d36f5571ea94cb930bf655688b.mesh",
+      "baseline": "mesh_3dcb6a9c1adad171_814ff3865110fa06.bin",
+      "payload_bytes": 10883964,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "f56fd9c62c1d498b9ca0cb434a85fa8c021210469de88d835a0ac08ac673335e",
+      "exact": true
+    },
+    {
+      "model": 8,
+      "slot": 0,
+      "asset_filename": "aircraft_08_0_845861d3d229e8589db614f54eaf062646db044fa0f1936049d9afe24258b0b3.mesh",
+      "baseline": "mesh_5d7b3954d3e712ac_5db74d710dd9deb6.bin",
+      "payload_bytes": 2741620,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "6f154b16b019c90b7732439c6991be893d20c4d35ff90bc0e39c21877f30e090",
+      "exact": true
+    },
+    {
+      "model": 8,
+      "slot": 1,
+      "asset_filename": "aircraft_08_1_9e31cec51de274a3246606c5e821aa12770ddfd6ad3213ec5e92ead154a9b7f9.mesh",
+      "baseline": "mesh_ac6ce77e367072c6_50d10075146ef21a.bin",
+      "payload_bytes": 15274912,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "aaf143b3f6a3257ee5c3add22f8af597ddc553128c2b867c401af7b3770275f1",
+      "exact": true
+    },
+    {
+      "model": 9,
+      "slot": 0,
+      "asset_filename": "aircraft_09_0_aac122006b3836377c8893ee554c3a080628054c460d0635e7918ea6a0fb7b87.mesh",
+      "baseline": "mesh_bcf6b2c2eae198f2_57a22b072c054c26.bin",
+      "payload_bytes": 3686628,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "8ba52fc40f2d98f6ccdc1dbc0c4fb40e2624a957ad1fb8ebece8d41885879cf7",
+      "exact": true
+    },
+    {
+      "model": 9,
+      "slot": 1,
+      "asset_filename": "aircraft_09_1_72b8f0891b78c45eca330ce0b8d582a15928ec5b13d2979a807c6c98e1da4d56.mesh",
+      "baseline": "mesh_17c50329314094ba_749358508ce27f6e.bin",
+      "payload_bytes": 16150992,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "d9325fb92bcf37aebdb52d2766115ca2192b5eb49486dbdc4093a8bfc48ea89c",
+      "exact": true
+    },
+    {
+      "model": 10,
+      "slot": 0,
+      "asset_filename": "aircraft_10_0_ede2d7eafd3a0abdcf7c6305339ca52e965611882f5499dbee105ddf14f47f10.mesh",
+      "baseline": "mesh_77ef35218fd80e7a_e6c69d895f72241c.bin",
+      "payload_bytes": 4654988,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "33d47c8d607a9074fa084ec61f1c7deb65abb4689526193e815497f77d160a3a",
+      "exact": true
+    },
+    {
+      "model": 10,
+      "slot": 1,
+      "asset_filename": "aircraft_10_1_45cf5fa153129e060d783a36253a10b63ccf6de4665b15149d90849f003c45b3.mesh",
+      "baseline": "mesh_4c68d07786c7a684_5724926aa4490f70.bin",
+      "payload_bytes": 4306940,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "d2316d0f23c3174cb19e399c7ea7ad9cd2b7179a8612b21061800a8f055f008c",
+      "exact": true
+    },
+    {
+      "model": 11,
+      "slot": 0,
+      "asset_filename": "aircraft_11_0_4dabad7d989553d9fcaa6707ff0a17d5fe08eb263f2e8dd3e146686eea36eb41.mesh",
+      "baseline": "mesh_2c51c6b59cdd3217_d9c9b92fb6d4070a.bin",
+      "payload_bytes": 4781844,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "d1678c2a9f0678f38f24279fd3e7b888c26d00b843e4b7ffa0f9bd5c11d34188",
+      "exact": true
+    },
+    {
+      "model": 11,
+      "slot": 1,
+      "asset_filename": "aircraft_11_1_3c5707f76b7026f0babaf18660f3cef9f399cfea96bea12b1344b4d4d9ba240d.mesh",
+      "baseline": "mesh_45ca4e1b4970671c_4bf0248d2b57148e.bin",
+      "payload_bytes": 18658668,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "3c6ff53f2c2fd84b1c401e0470c748c35888b6708be67db942b08f18bedfe9d2",
+      "exact": true
+    },
+    {
+      "model": 12,
+      "slot": 0,
+      "asset_filename": "aircraft_12_0_d6ec2c3c7429b9d832e948f90c18559b845fa017e8c87c2e5f05156011365726.mesh",
+      "baseline": "mesh_7cdfb0faf9b7791f_87108bdd8f6242d2.bin",
+      "payload_bytes": 7660852,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "17ee75347c915fc218eb044a78c35daaa258b40d094a16f935d9c34398e16e2e",
+      "exact": true
+    },
+    {
+      "model": 12,
+      "slot": 1,
+      "asset_filename": "aircraft_12_1_f9c5f4dbd976eb1b7631478bdbe324cf41e0d8480f5159e665c856b3bb03cfdd.mesh",
+      "baseline": "mesh_62b501d35c0cccd7_406bdaea624bee02.bin",
+      "payload_bytes": 6474308,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "4febac4c339a919427e08658f74524841dd5eb4fe78e1880d3fbafbf956873a0",
+      "exact": true
+    },
+    {
+      "model": 13,
+      "slot": 0,
+      "asset_filename": "aircraft_13_0_1969760ce98bfe7fc898a6a6e0bdc6c6243a72167dcebabbe5733ef400a80dc2.mesh",
+      "baseline": "mesh_7f6d43d423b33ed0_78869bcc86086800.bin",
+      "payload_bytes": 1733508,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "def0732d7f25b2633d4f01d65d2bc5713a610fc8ce3c6cae36d025721a739356",
+      "exact": true
+    },
+    {
+      "model": 13,
+      "slot": 1,
+      "asset_filename": "aircraft_13_1_de60369425e73a7705146adcd05cd51b0fe7fec59413b714f56809ba805a25ae.mesh",
+      "baseline": "mesh_3970886ae1447d26_5ece31ea9834cbce.bin",
+      "payload_bytes": 11570524,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "e86fc242e6ce9238b7250ec29c8f0492841d41be25f3685a6d49e13d098c2a2a",
+      "exact": true
+    },
+    {
+      "model": 14,
+      "slot": 0,
+      "asset_filename": "aircraft_14_0_a31b69849637b661dced8d7c450c0c72a8224363117467b9c5bb372973178cf7.mesh",
+      "baseline": "mesh_3b9b0236c0db0047_9ab7ad1e6a490058.bin",
+      "payload_bytes": 18986880,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "222c4b96495e25db0e07aa091f30fb0f6f51f8168fe833f70fc28cbe7626ad75",
+      "exact": true
+    },
+    {
+      "model": 14,
+      "slot": 1,
+      "asset_filename": "aircraft_14_1_4a841bc6a4fbdf8186073f818991ca7982b12a40774d71b3fe8b4550ad501acd.mesh",
+      "baseline": "mesh_fa174847133dad0f_aff3a656bdb3cc38.bin",
+      "payload_bytes": 51172628,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "payload_sha256": "6aa2abc3ff01481ff5fa8a2845d7eabd11ecd361c7f379f203087143497f06a8",
+      "exact": true
+    }
+  ]
+}

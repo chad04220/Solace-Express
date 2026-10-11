@@ -6,7 +6,9 @@ source, header, shader or fixture picks what uses it, and not what doesn't.
 Usage: ci_select_test.py <build dir> [config]. Exits 77 (skipped) where the build has no CMake file-API answer yet:
 CMakeLists.txt asks for one, and the next configure gives it.
 """
-import glob, os, sys
+import glob, ntpath, os, sys
+from types import SimpleNamespace
+from unittest.mock import patch
 
 SRC = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(SRC, "tools", "ci"))
@@ -20,6 +22,27 @@ if not glob.glob(os.path.join(build, ".cmake", "api", "v1", "reply", "index-*.js
 model = st.Model(SRC, build, config)
 names = {t["name"] for t in model.tests}
 fails = 0
+
+
+# Exercise Windows path semantics on every host, including a system Python on C:
+# with the Actions checkout on D:. Such tools are external, not source inputs.
+win_model = st.Model.__new__(st.Model)
+win_model.src = r"D:\a\Solace-Express\Solace-Express"
+with patch.object(st, "os", SimpleNamespace(path=ntpath, sep="\\")):
+    for path, expected in (
+        (r"C:\hostedtoolcache\windows\Python\3.12\python.exe", None),
+        (r"C:/Program Files/CMake/bin/cmake.exe", None),
+        (r"D:\a\Solace-Express\Solace-Express\src\game.cpp", "src/game.cpp"),
+        (r"d:\a\Solace-Express\Solace-Express\tests\flight_test.cpp", "tests/flight_test.cpp"),
+        (r"src\game.cpp", "src/game.cpp"),
+        (win_model.src, "."),
+        (r"D:\a\external\tool.exe", None),
+        (r"\\server\share\tool.exe", None),
+    ):
+        actual = win_model.rel(path)
+        ok = actual == expected
+        print(f"{'ok  ' if ok else 'FAIL'} Windows source path {path}: {actual!r}")
+        fails += not ok
 
 
 def check(changed, mode=None, picks=(), skips=()):

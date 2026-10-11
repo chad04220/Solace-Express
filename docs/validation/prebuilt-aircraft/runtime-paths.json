@@ -1,0 +1,672 @@
+{
+  "results": [
+    {
+      "case": "packaged_over_legacy",
+      "package_unchanged": true,
+      "package_directory_mode": "0o555",
+      "hits": 1,
+      "misses": 0,
+      "built": 0,
+      "expected_route": [
+        1,
+        0,
+        0
+      ],
+      "checks": [
+        {
+          "file": "kestrel_front.png",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_frame_state.csv",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.meta",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.moving_hull.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.pose_matrices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.pose_types",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.static.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.static.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.topology.csv",
+          "exact": true
+        }
+      ],
+      "pass": true,
+      "timing": {
+        "body_seconds": 0.276434469,
+        "display_shader_seconds": 0.097758686,
+        "gl_frames_zero": true
+      }
+    },
+    {
+      "case": "missing_to_legacy",
+      "package_unchanged": true,
+      "package_directory_mode": "0o555",
+      "hits": 0,
+      "misses": 1,
+      "built": 0,
+      "expected_route": [
+        0,
+        1,
+        0
+      ],
+      "checks": [
+        {
+          "file": "kestrel_front.png",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_frame_state.csv",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.meta",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.moving_hull.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.pose_matrices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.pose_types",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.static.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.static.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.topology.csv",
+          "exact": true
+        }
+      ],
+      "pass": true,
+      "timing": {
+        "body_seconds": 0.283948021,
+        "display_shader_seconds": 0.090863564,
+        "gl_frames_zero": true
+      }
+    },
+    {
+      "case": "stale_to_legacy",
+      "package_unchanged": true,
+      "package_directory_mode": "0o555",
+      "hits": 0,
+      "misses": 1,
+      "built": 0,
+      "expected_route": [
+        0,
+        1,
+        0
+      ],
+      "checks": [
+        {
+          "file": "kestrel_front.png",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_frame_state.csv",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.meta",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.moving_hull.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.pose_matrices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.pose_types",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.static.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.static.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.topology.csv",
+          "exact": true
+        }
+      ],
+      "pass": true,
+      "timing": {
+        "body_seconds": 0.272191069,
+        "display_shader_seconds": 0.08761386,
+        "gl_frames_zero": true
+      }
+    },
+    {
+      "case": "corrupt_to_legacy",
+      "package_unchanged": true,
+      "package_directory_mode": "0o555",
+      "hits": 0,
+      "misses": 1,
+      "built": 0,
+      "expected_route": [
+        0,
+        1,
+        0
+      ],
+      "checks": [
+        {
+          "file": "kestrel_front.png",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_frame_state.csv",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.meta",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.moving_hull.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.pose_matrices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.pose_types",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.static.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.static.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.topology.csv",
+          "exact": true
+        }
+      ],
+      "pass": true,
+      "timing": {
+        "body_seconds": 0.380315448,
+        "display_shader_seconds": 0.09083088,
+        "gl_frames_zero": true
+      }
+    },
+    {
+      "case": "missing_to_bake",
+      "package_unchanged": true,
+      "package_directory_mode": "0o555",
+      "hits": 0,
+      "misses": 1,
+      "built": 1,
+      "expected_route": [
+        0,
+        1,
+        1
+      ],
+      "checks": [
+        {
+          "file": "kestrel_front.png",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_frame_state.csv",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.meta",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.moving_hull.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part11.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part12.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part13.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part14.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part33.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.centre",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.part34.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.pose_matrices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.pose_types",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.static.indices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.exact.static.vertices",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front_geometry.csv.topology.csv",
+          "exact": true
+        }
+      ],
+      "pass": true,
+      "timing": {
+        "body_seconds": 5.404053307,
+        "display_shader_seconds": 0.090053526,
+        "gl_frames_zero": true
+      }
+    }
+  ],
+  "pass": true,
+  "schema": 1,
+  "scope": "Five representative Kestrel exterior tests; each disposable package holds only the selected body. All 30 valid bodies were tested separately. Package directories were mode0555/files0444; original package/cache sources were hashed and unchanged."
+}

@@ -1,0 +1,4 @@
+# Canonical mesh source fingerprints must match Linux producers and Windows builds.
+/src/** text eol=lf
+/tools/** text eol=lf
+/CMakeLists.txt text eol=lf

@@ -165,7 +165,7 @@ bool Renderer::sharedBakePrograms(GLuint out[2]) { if (!progHullBake) return fal
 
 using namespace audit;
 void setup(Renderer& r, FrameParams& fp) {
-  renderer=&r;r.progHullBake=101;r.progHullBakeNormal=102;r.vaoEmpty=99;r.texTraffic=901;r.W=r.rw=800;r.H=r.rh=600;r.texTSh[0]=777;r.tshFront=0;
+  renderer=&r;r.progHullBake=101;r.progHullBakeNormal=102;r.sharedBakeFullQuality=true;r.vaoEmpty=99;r.texTraffic=901;r.W=r.rw=800;r.H=r.rh=600;r.texTSh[0]=777;r.tshFront=0;
   fp.plane.on=true;fp.plane.model=7;fp.feedRig=2;
   fp.cloudDet=vec3(.25f,.5f,.75f);fp.cloudBoil=2.f;fp.wakeN=FrameParams::kWakeMax;
   for(int i=0;i<fp.wakeN;i++)for(int j=0;j<4;j++){fp.wake[i][j]=float(i*4+j);fp.wakeP[i][j]=float(i*4+j)*.03125f;fp.wakeG[i][j]=float(i*4+j)*.0625f;}
@@ -187,19 +187,21 @@ void resetLinkTest() {links.clear();failField=failNormal=failSafeField=failSafeN
 void cleanup(Renderer& r) {for(GLuint p:{r.progHull,r.progHullBake,r.progHullBakeNormal})if(p)glDeleteProgram(p);}
 // the field / normal pair as a builder links it (Renderer::linkBakePair: each aircraft's own, or the shared one)
 static bool linkPair(Renderer& r, const std::string& vs, const std::string& fs) {
-  GLuint o[2] = {0, 0}; std::string e; const bool ok = r.linkBakePair(vs, fs, o, e); r.progHullBake = o[0]; r.progHullBakeNormal = o[1]; return ok;
+  GLuint o[2] = {0, 0}; std::string e; r.sharedBakeFullQuality = true; // prove every reduced/failed result clears old provenance
+  const bool ok = r.linkBakePair(vs, fs, o, e, nullptr, &r.sharedBakeFullQuality); r.progHullBake = o[0]; r.progHullBakeNormal = o[1]; return ok;
 }
 void fallbacks() {
   const std::string vs="#version 330 core\nvoid main(){}",fs="#version 330 core\nvec2 mapPlaneBody(vec3 p); void main(){}";
-  {resetLinkTest();Renderer r;check(linkPair(r,vs,fs),"pair succeeds normally");check(links.size()==2&&!links[0].safe&&!links[1].safe,"both normal builds retain full field");cleanup(r);}
-  {resetLinkTest();failField=true;Renderer r;check(linkPair(r,vs,fs),"field fallback succeeds");check(links.size()==3&&!links[0].normal&&links[1].safe&&links[1].retry&&links[2].normal&&links[2].safe,"field fallback forces same safe normal field");cleanup(r);}
-  {resetLinkTest();failNormal=true;Renderer r;check(linkPair(r,vs,fs),"normal fallback succeeds");check(links.size()==4&&links[1].normal&&!links[1].safe&&links[2].normal&&links[2].safe&&links[2].retry&&!links[3].normal&&links[3].safe,"normal fallback rebuilds field with same safe geometry");check(livePrograms.size()==2,"replaced field program deleted (the pair alone: no hull program in a builder)");cleanup(r);}
+  {resetLinkTest();Renderer r;check(linkPair(r,vs,fs),"pair succeeds normally");check(links.size()==2&&!links[0].safe&&!links[1].safe,"both normal builds retain full field");check(r.sharedBakeFullQuality,"normal pair is eligible for canonical geometry export");cleanup(r);}
+  {resetLinkTest();failField=true;Renderer r;check(linkPair(r,vs,fs),"field fallback succeeds");check(!r.sharedBakeFullQuality,"safe field pair cannot be canonical export provenance");check(links.size()==3&&!links[0].normal&&links[1].safe&&links[1].retry&&links[2].normal&&links[2].safe,"field fallback forces same safe normal field");cleanup(r);}
+  {resetLinkTest();failNormal=true;Renderer r;check(linkPair(r,vs,fs),"normal fallback succeeds");check(!r.sharedBakeFullQuality,"safe normal pair cannot be canonical export provenance");check(links.size()==4&&links[1].normal&&!links[1].safe&&links[2].normal&&links[2].safe&&links[2].retry&&!links[3].normal&&links[3].safe,"normal fallback rebuilds field with same safe geometry");check(livePrograms.size()==2,"replaced field program deleted (the pair alone: no hull program in a builder)");cleanup(r);}
   {resetLinkTest();failNormal=historicalReject=true;Renderer r;check(linkPair(r,vs,fs),"historical rejection follows matched fallback");check(g_shaderNotes.find("an earlier launch")!=std::string::npos,"historical fallback note retained");cleanup(r);}
-  {resetLinkTest();failField=failSafeField=true;Renderer r;check(!linkPair(r,vs,fs),"field terminal fallback failure propagated");check(!r.progHullBake&&!r.progHullBakeNormal&&s_safeUseless,"failed pair disabled with upstream useless guard");cleanup(r);}
+  {resetLinkTest();failField=failSafeField=true;Renderer r;check(!linkPair(r,vs,fs),"field terminal fallback failure propagated");check(!r.sharedBakeFullQuality,"failed pair clears canonical provenance");check(!r.progHullBake&&!r.progHullBakeNormal&&s_safeUseless,"failed pair disabled with upstream useless guard");cleanup(r);}
   {resetLinkTest();failNormal=failSafeNormal=true;Renderer r;check(!linkPair(r,vs,fs),"normal terminal fallback failure propagated");check(!r.progHullBake&&!r.progHullBakeNormal,"successful sibling deleted after normal failure");cleanup(r);}
   {resetLinkTest();failNormal=failSafeField=true;Renderer r;check(!linkPair(r,vs,fs),"field rebuild failure after successful normal fallback propagated");check(!r.progHullBake&&!r.progHullBakeNormal,"all surviving programs deleted on pair rebuild failure");cleanup(r);}
   {resetLinkTest();failNormal=nonVendorFailure=true;Renderer r;check(!linkPair(r,vs,fs),"ordinary failure propagated");check(links.size()==2,"ordinary error gets no NVIDIA retry");cleanup(r);}
   {resetLinkTest();bool safe=true;std::string err;GLuint p=linkProgramCached(vs,fs,err,&safe);check(p&&!safe,"optional safe output reset on first-link success");glDeleteProgram(p);}
+  {resetLinkTest();Renderer r;const std::string safeFs=fs.substr(0,fs.find('\n')+1)+"#define NV_SAFE_GEAR\n"+fs.substr(fs.find('\n')+1);check(linkPair(r,vs,safeFs),"explicit reduced pair still links for runtime fallback");check(!r.sharedBakeFullQuality,"explicit reduced source cannot be canonical export provenance");cleanup(r);}
   check(livePrograms.empty(),"all fallback test programs released");
   std::set<std::string> distinct;for(const auto& x:variantSources)distinct.insert(x.second);
   check(variantSources.size()==4&&distinct.size()==4,"field/normal and full/safe source variants all distinct for cache identity");
@@ -208,6 +210,7 @@ int main() {
   bindMock();Renderer r;FrameParams fp{};setup(r,fp);
   float ps[8]={1,2,3,1,5,6,7,1},ctl[8]={9,10,11,12,13,14,15,16},wr[8]={17,18,19,20,21,22,23,24},wr2[8]={25,26,27,28,29,30,31,32};
   r.beginHullBake(fp,2,ps,ctl,wr,wr2);fp.plane.M[0]=999;
+  check(r.hullBakeFullQuality&&!r.hullBakeOwnBuilder,"shared quality propagates but cannot masquerade as per-aircraft export provenance");
   check(r.hullBakeFrame.plane.M[0]!=999,"frame is copied before caller mutation");
   check(r.hullBakePS[7]==1&&r.hullBakePS[8]==0&&r.hullBakeWr2[7]==32&&r.hullBakeWr2[8]==0,"state upload copies active rows and zeros inactive rows");
   r.hullBakeState=1;r.hullBakePart=14;r.hullBakeSideX=-1;r.hullBakeSideY=.25f;

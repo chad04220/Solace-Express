@@ -587,6 +587,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   // (--raster, from older scripts, is accepted and ignored: there is one renderer)
   const bool tool = cmdLine.find("--bench ") != std::string::npos || cmdLine.find("--shots ") != std::string::npos || cmdLine.find("--profile ") != std::string::npos || cmdLine.find("--analyze") != std::string::npos || cmdLine.find("--loadshots") != std::string::npos;
   auto exists = [](const std::string& p) { return !p.empty() && GetFileAttributesA(p.c_str()) != INVALID_FILE_ATTRIBUTES; };
+  g_ren.prebuiltAircraftDir = game.assetDir + "\\aircraft"; // immutable full-quality geometry bundled beside the exe
   g_ren.checkMeshCache();
   const bool perfFresh = game.cacheDir.empty() || !exists(game.cacheDir + "\\perf.bin");
   LoadPacer pace;

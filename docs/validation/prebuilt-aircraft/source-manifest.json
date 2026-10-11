@@ -1,0 +1,607 @@
+{
+  "schema": 1,
+  "digest": "25b0ebe6af771a254ed9011d43a42b59cb21625ece22a53bcc84340c04be062c",
+  "geometry_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+  "files": [
+    {
+      "path": "src/aero.cpp",
+      "sha256": "bfec0b5238a974db9d7d6451b6a1ea6f043ff04dbd93c14413d4ee31c78c5fb1",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aero.h",
+      "sha256": "4d4a8798deabd6fac735a5be1fbb79070335ce236c31336cd5c15395d5ad97b4",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aero_strips.cpp",
+      "sha256": "33e1e4c281efa0d58d14263c7c651a687890868705aad02a4e2e8216048229d0",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aero_wake.h",
+      "sha256": "9cfe33b5af57ff884cacd1205a900c6d1e9d426af4a3792165b95f020f9ec4ed",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft.cpp",
+      "sha256": "d9ac097c7c3b043cc4845134cbd7aa6538146573b67486212cdd11135bf99f8f",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft.h",
+      "sha256": "6fcaed36e10a4ceebc5823b58fe2305430fa339280046d9a4d590ee762dd7354",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_build_family.h",
+      "sha256": "7a8c5d02c233338c77141287db7ee278af0282b706783d355a58da5494a8c83f",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_hull.cpp",
+      "sha256": "29687587ad17b50154c723fa2014ab8e64490cefd977566a5ecce2b3ec0c932f",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_mesh.cpp",
+      "sha256": "2a16941e32dea08cb5e4ec3e8948a303715b99672a4359a5f7247431ed8e2bd7",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_mesh_asset.cpp",
+      "sha256": "600002cc78268559bab2ddb793c7a9e1eff6c37edf568fb67ef8997c7b849f8c",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_mesh_asset.h",
+      "sha256": "f7d99143ed737e8099c57363d34314f8d84efc9721d3f11ec05e4ab8b7b61162",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_mesh_build.h",
+      "sha256": "54f63358ab91e0e674a04f5e1f3a6b51aea4c5ab68c8102d869f42bcabb03e43",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_mesh_build_fleet.h",
+      "sha256": "dd0eba7fa971ae2073793e2c41978b2ced803479274493c5b71b9dd85c99f81b",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_mesh_build_research_gear.h",
+      "sha256": "ed5848b30f09b651c24365ae053324662f29bf6a0374b99cb20d4e95f9406352",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_mesh_build_specter.h",
+      "sha256": "096bb1e7182f5508fb5c6e6b09854d5371651a5484c4b2e37194f32419767d3c",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_mesh_build_types.h",
+      "sha256": "b7740429bdec674e2f875e64d8cb864c9b9240a0619bfaf2d3ff95333abc785a",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_mesh_build_wraith.h",
+      "sha256": "99b417b5d66b22566d843f9beb632ad0eb9be57b63c6a06eb2d129a33581f446",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_mesh_orientation.h",
+      "sha256": "3ebeab7252c8f8e74cbbf587d5dcca2fe0dfd05d580a72e7c34e172d61081c8b",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_mesh_overhead.h",
+      "sha256": "f5e36e4cc355cf900d288ccc1e0e520eff1954591f33978896f3074a20dcf383",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_mesh_planar.h",
+      "sha256": "798583065367aefa64f8620f765350a04cc8f956ca309423055461c370a7d280",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/aircraft_mesh_specter_detail.h",
+      "sha256": "b1e08ce186ff31125c82363ec9eaebab0670c3a09a522a02b194dcf55be43a09",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/cockpit_focus_zoom.h",
+      "sha256": "61443c9fbdb4195623c8394dcb36a0808270c8c383a20d7214961ceab059c042",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/cockpit_layout_data.h",
+      "sha256": "3c8899520537a30f9b34e4f3846603f90584137aa4e3be86d71dca7f00355d8a",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/common.h",
+      "sha256": "3487b6b0bbc929e00ff742af04f301f945dd3a50932640a5d40e369774058a5c",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/gl.h",
+      "sha256": "1fffe4494384a38fedb496b800d5de53b7068690965cdd4819b96a3b86789925",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/hull_mesh.h",
+      "sha256": "f4017e7e623a26719d4b401e8327d8ee88b1593a27659c6d3a3130874b51fcf5",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/mesh_simplify.h",
+      "sha256": "a0ace37f229ee42cce9529af391e605f93a5891666d526091fb496aba0cdbc03",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/mesh_validation.h",
+      "sha256": "1f5869534d286b21ab792cd62eb65650e2ef5a270478da33796d642230b46da7",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/models.cpp",
+      "sha256": "d87dc5a55c0260e64a7699173eb6c4d99f71930fbfa9af72ce19996c3017c168",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/models.h",
+      "sha256": "8c984cc34b6d5299cd5b22c75fa019539b8ed7c329ee0997dd94b49aa188ac2c",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/renderer.cpp",
+      "sha256": "546337d5c485edece6cdfb3b0cd68dbdd4d361488b9386a1fa506feb290c6d15",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/renderer.h",
+      "sha256": "83ed9315bbffe80cd24bd038f57292149aaea02925d55b44c5d065527c184fe5",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/shader_prune.h",
+      "sha256": "193bca8a650ec6be2ec283d0bb96fbbae2ba7d7083d40d556fc0aa2989173055",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/shaders.h",
+      "sha256": "00bdbd99e4ffa05a1b3991634436d192afd01589243bf2fe697925ed8a7626ee",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/weather.cpp",
+      "sha256": "336d8b6e5bc60ba42e0aeddff31cd1b7efc325ef3c1202256dd4d3f8e62334dd",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/weather.h",
+      "sha256": "f1df6b3697f24fe3d12382372e4b8a966df4d7ee7f05dd9bb94363c1464d9b6b",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/wheel_motion.h",
+      "sha256": "7c569d628fd3f85f06b70153169a38d7412ae7b923dfc9a8b17217b1352160ab",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/world.h",
+      "sha256": "88d085b27c5823d2722381c370ca7cfe7ad5cea351def81ad112f6ede4d9c112",
+      "kind": "cpu"
+    },
+    {
+      "path": "tools/aircraft_geometry_inputs.cmake",
+      "sha256": "f4b692d3fcc22cfcab3fc6449f0a0c89293cbbccd1a5b92bb8996e29039312b1",
+      "kind": "cpu"
+    },
+    {
+      "path": "tools/generate_aircraft_geometry_source.cmake",
+      "sha256": "53b3ccea1d49c8ed360b1021a364a718783a918ea51cde84bc42921bcf1159b4",
+      "kind": "cpu"
+    },
+    {
+      "path": "src/shaders/af_shmap.glsl",
+      "sha256": "eb081244d1879183a129dcc3a9bcfe044d8d9d31a748d88e93baee0c8d021313",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/cabin_windows.glsl",
+      "sha256": "9d88a8ea903cae5b8cdea7f59385e739969ed977ddd2e69d90927e915558ab32",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/cloud_acc_fs.glsl",
+      "sha256": "2298b9f1e65120f01cb000680635742ae906eaf9a99633c5bce8496ce1c49bd9",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/cloud_comp_fs.glsl",
+      "sha256": "8d0bd36b2da73b125531ae3baf3f966786f4acaf610ad21487932fc5228bd6ae",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/cloud_main.glsl",
+      "sha256": "ab99f58e3c8f88863da041c9d7c2918cb5788d5e1f0c557713173b8fb1d77528",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/clouds.glsl",
+      "sha256": "0a5feaf70750e07f285a7089cd5f174185e22ee445b62e80b8a11fde23487285",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/cockpit_fittings.glsl",
+      "sha256": "347cd84ba6fa01a8c53817ce0d39e6a9dfa005c64cbde53625c9b5dee66d8e4c",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/cockpit_layout.glsl",
+      "sha256": "63e1bda17892a3068199f98833bcce91f8d1d756395810368bd375485fb2c103",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/cockpit_material.glsl",
+      "sha256": "2b0fb7ecf9c0f91afc878ca9c625f3b183d25a49ddc9637e5449998b5c5bd920",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/common.glsl",
+      "sha256": "fe1262ed136eec9e6fdad6935aff559ff0be891dda98b6e02edb9ed71bc4f69e",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/disp_main.glsl",
+      "sha256": "ea05e36fce39bd713571bedfdf8e2b40a1f158be8b9568ff33e3ea3f59d6064e",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/down_fs.glsl",
+      "sha256": "e6167082026593f3b88a004b28d2fb8b20d9c19bcf38c934268adc91d82a56e0",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/effects_fs.glsl",
+      "sha256": "ca785a7cbcfe972e49831e36fc5e164671b1cfe0805394d610f76ec0b58ddd14",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/ent_common.glsl",
+      "sha256": "50bc1a9805ef5658d141e1cdd472f9db7f71ba82d6c2a9da1b2c2d8a70bbae84",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/ent_fs1.glsl",
+      "sha256": "77a0c391c721630b526024118f2c620bcf3f61467c1a0b466b61c6b92f0d2400",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/ent_fs2.glsl",
+      "sha256": "bd8adb4635ddaa0cf57e8dfa6e70bce60e766de137afcfa95603032df8784f10",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/ent_shadow_fs.glsl",
+      "sha256": "ebe8cf8b691c6f674f0fe89c0fcc49e88e941f4e5a13312abfeb6ec0f52b2010",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/ent_vs.glsl",
+      "sha256": "f1cf262bc87ae38c9e030e6f964987f0759fbd841831bdbc266c06075c3324eb",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/feed_rays_fs.glsl",
+      "sha256": "22df557ca2d322e5ea431d6361f1537ba5faf80a5b4577663c91a0e03984de3b",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/feeds.glsl",
+      "sha256": "34ec9ba4b83fa7645f50efc84d4d0cdbffe778d75ddbdd7f0a7199e48f479751",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/fullscreen_vs.glsl",
+      "sha256": "ba915a380452eb6b74f91e157c890da1adf8fc6f0b14daa72819d65a746a2d22",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/g_lens.glsl",
+      "sha256": "2e9a6f65f0c9a2233a5c288e28bef0c9672f0984cfa43e9dbebf89f4df01068a",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/gb_write.glsl",
+      "sha256": "9592638fc8da9b44fce12a95cfc0d2e6e84062ac463c9bf223f72b5e92394b3e",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/gbuffer.glsl",
+      "sha256": "a8687b22e9b974c8e8ccefd1e2f0438c2d889ee42970d72802ef1f0746152ec8",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/hull_bake_main.glsl",
+      "sha256": "d95d9edd45f942070b7d2981a9347e313e9b68e7293d30fe5a3790d8380011c8",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/light_common.glsl",
+      "sha256": "523ab40ae2f0263b591fc667c65567addcde6a5b45b934e6902f3fa2d96b6dd9",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/light_fs.glsl",
+      "sha256": "0e5e1b85730366a157cfab2cc4c1e98dcf2da43aa84b4e54e5dfb5b2c85deae2",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/map_main.glsl",
+      "sha256": "a45578123d13179a3ea0b5f89f8800dc0caab8418be9d856953a1052c149e339",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/material_common.glsl",
+      "sha256": "eead4268e803e9269fc5e2f2a65366039d408bc45f2e88f475883dad49d22d75",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/noise_tex.glsl",
+      "sha256": "9e31769b00d1357cbc59111d29cbdbf8d5c8780bcfe32621da5dc65a8d01acf0",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/objects_fs.glsl",
+      "sha256": "d4e0e8750f2b4962594c370b8477371d7d987f8b833f492599305f88f07e4236",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/plane_common.glsl",
+      "sha256": "c8c514c7590910dec2f9f74764d11ab1a2c0b7979fd40201abd9c6769b2fd076",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/plane_fx.glsl",
+      "sha256": "60130eff38f90f5b24e2f83d73611ab6afb97d1e53bc028cc553db05bec45ca7",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/plane_gb.glsl",
+      "sha256": "5b84b641c55a4ec42bb01893cfa53d29a591eba47ee0b84c791ba480eead164a",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/plane_light.glsl",
+      "sha256": "3d1edd71c9c7fc13471888d48e6c2ea091f7a11967453c1772d20c23e1b0dfa5",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/plane_material.glsl",
+      "sha256": "b212dd423b2b929ac587dbe658f351998e2ac5d6d765174019277b27406831a1",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/plane_mesh_fs.glsl",
+      "sha256": "0235b216464d5f2dba691106bbdaa5c35f8e3ac41c5f29dac26a1bea3ec30ac5",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/plane_mesh_vs.glsl",
+      "sha256": "bb4ca785ea32ca7d61848278b6cb7b6feb8ce37293afb3ddc904eb507799527f",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/plane_parts.glsl",
+      "sha256": "4d47156b1087bf8a0cc399a3c374d82918175f8bd66dd96b6012aa5c057ecbd0",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/plane_screens.glsl",
+      "sha256": "45f8b26ad17ee3a653e915bff1ffe191e6177255c431a20bc4384950a4f62ea7",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/plane_sdf.glsl",
+      "sha256": "da584ce6a46eb8389ec5d9cc5c1e8bf929e8ea3b19e44ef3c7567004b5ad10c3",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/plane_trace.glsl",
+      "sha256": "1b6ef4f31099d26f869c60477d850ae8228ed85bf73420d74332721999caa6bd",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/post_fs.glsl",
+      "sha256": "c510afc567185817ba56060274f4f5de3cbcdfe40c18b88fdbf6ee2ae0226297",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/prop_disc_fs.glsl",
+      "sha256": "2b1135d978eb29617a29886a50582bd4460b2c0f7f80f7fc84ffa375aa75da15",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/prop_disc_vs.glsl",
+      "sha256": "ababf094bc33f9beb72617e1da834ee0667f05ad2bfaa5b1e2587e67c4b957d2",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/propeller.glsl",
+      "sha256": "37a0c47ded64b764b9a7a6da644748af34bc2496cf6c4932239cf58e337e6846",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/ray_fs.glsl",
+      "sha256": "3964fecd1944a0e58c852e1df44be540bc845fba4299bf758bfe274ad08f8328",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/ray_mask_fs.glsl",
+      "sha256": "41c9a68871458fa4de25315adc9ea458ccadd85518dd9f9cb406e97d51d99dc6",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/raytrace_displays.glsl",
+      "sha256": "b90dfa78a2e7fc41063b11778a59f856b38c5acaaba32ef1835fec85cad708d8",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/raytrace_text.glsl",
+      "sha256": "06457b6403b44e399ba949fbe65bc8e01f52fa348d70cc0ebbe1c387fc8151c4",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/raytrace_ufo.glsl",
+      "sha256": "a5c1a2869e7f228ac3fe358fdbbcbef109513c6e7b1f8605d6c1fdee873b91f1",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/research_cockpit_layout.glsl",
+      "sha256": "f11dfb1c75aa6677d77df64bc149d09d7ed27572923e893d57e8750ee4f380e2",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/roads.glsl",
+      "sha256": "2f677bbff010719c1b5c15c94a57886ffb7bf51b78382ea861f828210117b7fc",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/rt_io.glsl",
+      "sha256": "5d2b6353e102e71c15ec0d6e521f5b390f47177b7be5ecd790b318046884ff77",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/rt_prims.glsl",
+      "sha256": "eae567505ba6b7877c99fd6617ae2296fb3d689f8ce12f0091538c72ca4e0730",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/scene_uniforms.glsl",
+      "sha256": "a27b59bd160d6740693a493f38492f5570c57abcd1573a94bc23f28150b6ce53",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/shadow_proxy_fs.glsl",
+      "sha256": "3509db602cba7edd630c5320d70f24c8013ffb366076f12af21dc269b4faee0a",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/sprite_fs.glsl",
+      "sha256": "544ed3ff1b8be208ef7aa6c1ba049b57f4ec81259f31b5d13ed75983130879ba",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/sprite_vs.glsl",
+      "sha256": "a1b7e02462efff42f745fb51d0c3972601a5a0af1c8dc0ce2133df7c2b04e761",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/taa_fs.glsl",
+      "sha256": "c3f5e128b2bc99f38efd42d48fc48076e89ca8e308b6919fc6295ab960624ee5",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/terrain_fs.glsl",
+      "sha256": "40b1c4bc05de4672d88a098e023bbfd940e965f8b0c3e2f8bb3838d9fc918ba8",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/terrain_material.glsl",
+      "sha256": "2bdd9a19344733bb0e5766c44e57a54735902a506bc11425eb4d28e3413421cd",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/terrain_trace.glsl",
+      "sha256": "02d766f2255f8b61669c82eab04d1278a42b99a1af5bdf185006d04e27a6074d",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/terrain_vs.glsl",
+      "sha256": "7cffb9a6e06cfdddc0eb00293c1d661c97d0137720b786ce965608f61ff73744",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/tsh_bake_main.glsl",
+      "sha256": "832ac1b18e9413d2792ea2654cd0d1e5ce42c2650dc55933e129516258be3533",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/ui_fs.glsl",
+      "sha256": "c3c46f1aded23fce821d322bf23f18a7b457aafe2e63b16bdb96d0fd9a19cb38",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/ui_vs.glsl",
+      "sha256": "6866f9b1624296c0f88018cccadd233b89ad1f5b49d9aac433b7d39eebad82db",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/up_fs.glsl",
+      "sha256": "db6f34518ad3f3ea07f681bd544fb00d452b79b9568ff3f1913a78cc518a9b62",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/view_uniforms.glsl",
+      "sha256": "e6242af5efa1572b53d6217b5067eb183c173fbd44ed33d43f71df10211a4c10",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/water.glsl",
+      "sha256": "a088635b8ea283723ba73b8bad9bb44ac375c55cf415251c81efc94e512bc855",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/water_fs.glsl",
+      "sha256": "f6794473255a2fbe24346b9304a2cd1d7f2330e0a39bb8f51eec55b1c2a51578",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/water_vs.glsl",
+      "sha256": "0c1da12209d2e84f701f77b034cd65653df969fa84e5b21f9e1bea3cda2cad31",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/wraith_cockpit_common.glsl",
+      "sha256": "ced4ba7865f624317585585f04ebea6b6a978ae319fcb8bf3eb0ade71390ac3a",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/wraith_cockpit_material.glsl",
+      "sha256": "adf1f9613d4b6d7e3da63e253297dc30d4dfcf493756a88b5dbba3ff8ec8e04d",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/wraith_cockpit_sdf.glsl",
+      "sha256": "d8b4d617386ad995499140646cd00a7ca85429002f2c710e6cc74e005f00dc92",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/wraith_fx.glsl",
+      "sha256": "9e9ebecdd78fa57e749f2ff7793e4ae4f3411dbfc62ea975e47b781213e7bcd2",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/wraith_material.glsl",
+      "sha256": "0b5e4c331c246a0c188bd148cf40bbfbbfea0b451c4222b1a81a276d24265258",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/wraith_sdf.glsl",
+      "sha256": "d851d642e1c8c97c9eddcfdfa8ec5bbd9f8efc1a303b2e4b0e868d74451bae7a",
+      "kind": "shader"
+    },
+    {
+      "path": "src/shaders/wreck_clip.glsl",
+      "sha256": "610ebc1a0f43ac46cbc13c93cd655fdac6a889aec40ebb7b809b933ce0716637",
+      "kind": "shader"
+    },
+    {
+      "path": "tools/mesh_assets/export_aircraft_meshes.cpp",
+      "sha256": "5eb49aa63d16ade17847dc20e2c5c668d32d2126301058b9a44b074a32b65d20",
+      "kind": "producer"
+    }
+  ]
+}

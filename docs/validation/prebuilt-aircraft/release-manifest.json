@@ -1,0 +1,1813 @@
+{
+  "algorithm_version": 24,
+  "asset_count": 30,
+  "assets": [
+    {
+      "algorithm_version": 24,
+      "bytes": 1461740,
+      "checksum_sha256": "e1dfcd6037869b26eccfad659e4a6275c115b68c600e156cd25834e12a186625",
+      "file": "aircraft_00_0_4839bee49d1e5231b3fe3306ea30770695de9e1386b869ff8a33af61dbcb984c.mesh",
+      "fine_start_index": 96396,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "4839bee49d1e5231b3fe3306ea30770695de9e1386b869ff8a33af61dbcb984c",
+      "index_count": 96396,
+      "model_id": "kestrel",
+      "model_index": 0,
+      "model_name": "Kestrel T2",
+      "part_count": 6,
+      "part_index_count": 54300,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        34
+      ],
+      "part_vertex_count": 10689,
+      "part_word_count": 139830,
+      "payload_bytes": 1461548,
+      "profile": 1,
+      "sha256": "290cceacd90249e0e55c52652fbfb8ebd577f506df52acdcecd0838fd75cb02c",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 32132,
+      "vertex_count": 16145,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 8727808,
+      "checksum_sha256": "78718e2a2971c005799c27f67666bcfb0dbc6063af1e386e4e99a41fb218d620",
+      "file": "aircraft_00_1_2293afe3c90aa9254298c059d8951670b281dca3577f4f234bfc4e96d3ee73e9.mesh",
+      "fine_start_index": 335448,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "2293afe3c90aa9254298c059d8951670b281dca3577f4f234bfc4e96d3ee73e9",
+      "index_count": 660741,
+      "model_id": "kestrel",
+      "model_index": 0,
+      "model_name": "Kestrel T2",
+      "part_count": 10,
+      "part_index_count": 167724,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        34,
+        0,
+        1,
+        2,
+        3
+      ],
+      "part_vertex_count": 29195,
+      "part_word_count": 401314,
+      "payload_bytes": 8727616,
+      "profile": 1,
+      "sha256": "5536ae7dcb5204af9caab68cdd5cd6460698a8c4933debf22d2813c1d9323091",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 220247,
+      "vertex_count": 139981,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 1535532,
+      "checksum_sha256": "a4da5ed4754f0d6c3b343217e866bd0c29653eb4513c45c8a72cd62579424913",
+      "file": "aircraft_01_0_8a318ed61fa3e461ad6e55d1287e8de7b2c507255fee937b20bb64359689d61c.mesh",
+      "fine_start_index": 85158,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "8a318ed61fa3e461ad6e55d1287e8de7b2c507255fee937b20bb64359689d61c",
+      "index_count": 85158,
+      "model_id": "wren",
+      "model_index": 1,
+      "model_name": "Wren 180",
+      "part_count": 6,
+      "part_index_count": 69354,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        34
+      ],
+      "part_vertex_count": 14453,
+      "part_word_count": 184996,
+      "payload_bytes": 1535340,
+      "profile": 1,
+      "sha256": "d819dcbc9b9858e60c8d41ae089b640f2e51585a7d0900925969f3aaf61f09c2",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 28386,
+      "vertex_count": 14210,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 9148464,
+      "checksum_sha256": "2a9d055cc629144e38d75a3a4bf30a9e8658001450b481a1217c9c2b739eca91",
+      "file": "aircraft_01_1_40b5f081fcdb256425ae3cb069b8392c83772a5b2c029cf00450285155d63d23.mesh",
+      "fine_start_index": 343809,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "40b5f081fcdb256425ae3cb069b8392c83772a5b2c029cf00450285155d63d23",
+      "index_count": 689151,
+      "model_id": "wren",
+      "model_index": 1,
+      "model_name": "Wren 180",
+      "part_count": 10,
+      "part_index_count": 184206,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        34,
+        0,
+        1,
+        2,
+        3
+      ],
+      "part_vertex_count": 32727,
+      "part_word_count": 446052,
+      "payload_bytes": 9148272,
+      "profile": 1,
+      "sha256": "7d82cf46953991845de77b9f4c8be435fd25d673447480d52334f11a80cf199e",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 229717,
+      "vertex_count": 143983,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 1975020,
+      "checksum_sha256": "27dd2783eeda3c03f82f944273435e262ff491c8dd2a1366e1e16a49ed8343cd",
+      "file": "aircraft_02_0_4c8989b60e2c45e83be045ae8c32dbd4de0acff555c5495c12cbff5b397696c0.mesh",
+      "fine_start_index": 138708,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "4c8989b60e2c45e83be045ae8c32dbd4de0acff555c5495c12cbff5b397696c0",
+      "index_count": 138708,
+      "model_id": "bush",
+      "model_index": 2,
+      "model_name": "Bushmaster STOL",
+      "part_count": 6,
+      "part_index_count": 66372,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        35
+      ],
+      "part_vertex_count": 12894,
+      "part_word_count": 169542,
+      "payload_bytes": 1974828,
+      "profile": 1,
+      "sha256": "f132bcd78a779effb5a872bef7681d401fe7461fd8bf3bd449ef54599f255b2e",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 46236,
+      "vertex_count": 23182,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 10265204,
+      "checksum_sha256": "55572e2678fea7a92ea80561c1bf5f9faa36b0284754292411bbc1aeaa1ef991",
+      "file": "aircraft_02_1_e64956ced788a30eb5d5f9c44af782b70b7d4eae2b724a5705ffe75250445e1e.mesh",
+      "fine_start_index": 401832,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "e64956ced788a30eb5d5f9c44af782b70b7d4eae2b724a5705ffe75250445e1e",
+      "index_count": 779304,
+      "model_id": "bush",
+      "model_index": 2,
+      "model_name": "Bushmaster STOL",
+      "part_count": 10,
+      "part_index_count": 196878,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        35,
+        0,
+        1,
+        2,
+        3
+      ],
+      "part_vertex_count": 34266,
+      "part_word_count": 471036,
+      "payload_bytes": 10265012,
+      "profile": 1,
+      "sha256": "32e684c7329a87ed8fa676f6aab38685448af29880e9f908ed4bde425c81a8a8",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 259768,
+      "vertex_count": 164489,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 2260212,
+      "checksum_sha256": "3d72de9598693dd62c00b36813cdc2ec71d16948ded4b73a35bcaea31decbd49",
+      "file": "aircraft_03_0_624532ff346e4ac09004c3a64323a29b87be8e0f04183718cbd5341443ce25f8.mesh",
+      "fine_start_index": 149622,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "624532ff346e4ac09004c3a64323a29b87be8e0f04183718cbd5341443ce25f8",
+      "index_count": 149622,
+      "model_id": "islander",
+      "model_index": 3,
+      "model_name": "Islander Twin",
+      "part_count": 6,
+      "part_index_count": 78228,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        34
+      ],
+      "part_vertex_count": 17116,
+      "part_word_count": 215174,
+      "payload_bytes": 2260020,
+      "profile": 1,
+      "sha256": "5a5196f300a2d0b657f573a2b29ce9bc9bd1de9fd68143747eba1069ba009b52",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 49874,
+      "vertex_count": 25026,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 11361104,
+      "checksum_sha256": "fe5c5a2d393e3da574340e0c314e6d790094adf6b208a015aa640621eadc10e3",
+      "file": "aircraft_03_1_86c63692e38621e6e4d87ce8e5f6b4dd454900cde024ff121708f41ddf735937.mesh",
+      "fine_start_index": 464334,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "86c63692e38621e6e4d87ce8e5f6b4dd454900cde024ff121708f41ddf735937",
+      "index_count": 817284,
+      "model_id": "islander",
+      "model_index": 3,
+      "model_name": "Islander Twin",
+      "part_count": 11,
+      "part_index_count": 239886,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        34,
+        0,
+        1,
+        2,
+        4,
+        5
+      ],
+      "part_vertex_count": 45370,
+      "part_word_count": 602879,
+      "payload_bytes": 11360912,
+      "profile": 1,
+      "sha256": "ca714a89310bee6ed7f4f7d8956a3de3f1f16b3584caf8cb336caf30ac4a7b15",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 272428,
+      "vertex_count": 177508,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 2593148,
+      "checksum_sha256": "f363a2945d0f1116c7ff6cef26b45992986d20058df0bef0f7880693d966c0be",
+      "file": "aircraft_04_0_fce1b18ef92edcd57b3812a39acda17c99e769c218ca90ec61ed0aa9f755f2f8.mesh",
+      "fine_start_index": 174336,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "fce1b18ef92edcd57b3812a39acda17c99e769c218ca90ec61ed0aa9f755f2f8",
+      "index_count": 174336,
+      "model_id": "pelican",
+      "model_index": 4,
+      "model_name": "Pelican Caravan",
+      "part_count": 6,
+      "part_index_count": 91740,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        34
+      ],
+      "part_vertex_count": 18742,
+      "part_word_count": 241694,
+      "payload_bytes": 2592956,
+      "profile": 1,
+      "sha256": "86266487692aebb5969a985c3f5f93d772d18dfc693252fa2334299d8eed0b55",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 58112,
+      "vertex_count": 29026,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 13463328,
+      "checksum_sha256": "f70f16eb52e373cb90a3fb30cb501f1957bc329638fc4fc50be6e04dbe40885a",
+      "file": "aircraft_04_1_df3ce04defeadd202ebf7c9c0b72367e0fc256ffb3ff29bc7b0fa5e395cf9739.mesh",
+      "fine_start_index": 530712,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "df3ce04defeadd202ebf7c9c0b72367e0fc256ffb3ff29bc7b0fa5e395cf9739",
+      "index_count": 995442,
+      "model_id": "pelican",
+      "model_index": 4,
+      "model_name": "Pelican Caravan",
+      "part_count": 11,
+      "part_index_count": 265860,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        34,
+        0,
+        1,
+        2,
+        4,
+        5
+      ],
+      "part_vertex_count": 46829,
+      "part_word_count": 640525,
+      "payload_bytes": 13463136,
+      "profile": 1,
+      "sha256": "d9b4cffebefc95ef11d6c12a92ee0e52f05df596990aaf6dcc659229b0f2419a",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 331814,
+      "vertex_count": 216227,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 7832008,
+      "checksum_sha256": "adfb7a895d0a15b9b2733fb6ddabf4e7d41c1794afe03ec2848e7b8e25c3956c",
+      "file": "aircraft_05_0_b9eae87a684946e9f7049cedfe0e6b74fac6fd43d8b53fce05e38d410d79bddf.mesh",
+      "fine_start_index": 505860,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "b9eae87a684946e9f7049cedfe0e6b74fac6fd43d8b53fce05e38d410d79bddf",
+      "index_count": 505860,
+      "model_id": "meridian",
+      "model_index": 5,
+      "model_name": "Meridian Q400",
+      "part_count": 8,
+      "part_index_count": 291285,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        36,
+        34,
+        37
+      ],
+      "part_vertex_count": 60780,
+      "part_word_count": 777549,
+      "payload_bytes": 7831816,
+      "profile": 1,
+      "sha256": "9015c33e3b504ba2bfdf622bb827b17dc38bdae18c20ac732da4747f109744e8",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 168620,
+      "vertex_count": 84318,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 21701052,
+      "checksum_sha256": "b04027c503ce54d0f8b61df9e3662fe8aa2104afcaca224ccbfdc4e6e59f3a6c",
+      "file": "aircraft_05_1_a2babd402bcb945da1bac8563fa24650c73cd92c71f989077ec5bcdc84dbe89a.mesh",
+      "fine_start_index": 842790,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "a2babd402bcb945da1bac8563fa24650c73cd92c71f989077ec5bcdc84dbe89a",
+      "index_count": 1418094,
+      "model_id": "meridian",
+      "model_index": 5,
+      "model_name": "Meridian Q400",
+      "part_count": 13,
+      "part_index_count": 626529,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        36,
+        34,
+        37,
+        0,
+        1,
+        2,
+        4,
+        5
+      ],
+      "part_vertex_count": 113978,
+      "part_word_count": 1538392,
+      "payload_bytes": 21700860,
+      "profile": 1,
+      "sha256": "9d30ebdb09359ca00101269dd70e88fec996ed64646b75c88478dbcb1a77fed0",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 472698,
+      "vertex_count": 308591,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 4120060,
+      "checksum_sha256": "95e52c0d7f85bc9726f0b0a1c83752b159ac90c55d9b818d1e8744853d3062f6",
+      "file": "aircraft_06_0_cea2a6a6e5a334eb6d2289f7c4bd898bf3582ca31e38410a3a37358e2199da56.mesh",
+      "fine_start_index": 314508,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "cea2a6a6e5a334eb6d2289f7c4bd898bf3582ca31e38410a3a37358e2199da56",
+      "index_count": 314508,
+      "model_id": "starling",
+      "model_index": 6,
+      "model_name": "Starling 500 Jet",
+      "part_count": 8,
+      "part_index_count": 113178,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        36,
+        34,
+        37
+      ],
+      "part_vertex_count": 23394,
+      "part_word_count": 300354,
+      "payload_bytes": 4119868,
+      "profile": 1,
+      "sha256": "b44fa980f52a1f11012bb13fe641db521b1fbaa9f26d2831bfe9885346aff7df",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 104836,
+      "vertex_count": 51888,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 16538420,
+      "checksum_sha256": "9a49145ace48156fcfb7bccd750d636ce2d8b20edb9205ef8a67354270912aef",
+      "file": "aircraft_06_1_54563ccfdbc772bedb6a274feedb2f8970c5e936bde232e5d02d9f1ba5717baa.mesh",
+      "fine_start_index": 716511,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "54563ccfdbc772bedb6a274feedb2f8970c5e936bde232e5d02d9f1ba5717baa",
+      "index_count": 1269543,
+      "model_id": "starling",
+      "model_index": 6,
+      "model_name": "Starling 500 Jet",
+      "part_count": 13,
+      "part_index_count": 291510,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        36,
+        34,
+        37,
+        0,
+        1,
+        2,
+        4,
+        5
+      ],
+      "part_vertex_count": 52138,
+      "part_word_count": 708653,
+      "payload_bytes": 16538228,
+      "profile": 1,
+      "sha256": "94dd6cf8e4148a5204c0d4e1ccef124cd612fe9d5eeeb2e96cd0f6a9bdf46c3a",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 423181,
+      "vertex_count": 269545,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 2066644,
+      "checksum_sha256": "f7f74419daff4e99a5b18cb8c24ea7692919a97b08e83f2df9dbd4ea448473ac",
+      "file": "aircraft_07_0_0b8ed3d7947da4fbb1d365b8fda64689f4b15ae3a97b04c011e4bc22ea515640.mesh",
+      "fine_start_index": 129498,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "0b8ed3d7947da4fbb1d365b8fda64689f4b15ae3a97b04c011e4bc22ea515640",
+      "index_count": 129498,
+      "model_id": "swift_s6",
+      "model_index": 7,
+      "model_name": "Swift S6",
+      "part_count": 8,
+      "part_index_count": 79698,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        36,
+        34,
+        37
+      ],
+      "part_vertex_count": 16787,
+      "part_word_count": 214018,
+      "payload_bytes": 2066452,
+      "profile": 1,
+      "sha256": "93956a7a4462056d85473e5ed3422d40260b129738567f4831f0fb38aee299ac",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 43166,
+      "vertex_count": 21637,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 10884156,
+      "checksum_sha256": "c0528fa121ba7a3cb3696af5a263a43a3ee6d3248dd2f29b8eafa442cbe03533",
+      "file": "aircraft_07_1_3057e7252427db7d76f8dcf5f3b89042d634a0d36f5571ea94cb930bf655688b.mesh",
+      "fine_start_index": 392442,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "3057e7252427db7d76f8dcf5f3b89042d634a0d36f5571ea94cb930bf655688b",
+      "index_count": 809718,
+      "model_id": "swift_s6",
+      "model_index": 7,
+      "model_name": "Swift S6",
+      "part_count": 12,
+      "part_index_count": 216492,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        36,
+        34,
+        37,
+        0,
+        1,
+        2,
+        3
+      ],
+      "part_vertex_count": 38900,
+      "part_word_count": 527728,
+      "payload_bytes": 10883964,
+      "profile": 1,
+      "sha256": "eec08bce129717e6693be4a30709e34b4931617541bb3cb0e70d71186b7d899d",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 269906,
+      "vertex_count": 172943,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 2741812,
+      "checksum_sha256": "58a17ccd886d2ba895ee8b9bdf8d48001119e80b25208c30f9217dbb98cdca34",
+      "file": "aircraft_08_0_845861d3d229e8589db614f54eaf062646db044fa0f1936049d9afe24258b0b3.mesh",
+      "fine_start_index": 188076,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "845861d3d229e8589db614f54eaf062646db044fa0f1936049d9afe24258b0b3",
+      "index_count": 188076,
+      "model_id": "osprey_c6",
+      "model_index": 8,
+      "model_name": "Osprey C6",
+      "part_count": 8,
+      "part_index_count": 91896,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        36,
+        34,
+        37
+      ],
+      "part_vertex_count": 19290,
+      "part_word_count": 246240,
+      "payload_bytes": 2741620,
+      "profile": 1,
+      "sha256": "c0e1b51600a0230d4012d2d2c86dfdf49ad13ddcc592fd0caca236b539d102d7",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 62692,
+      "vertex_count": 31386,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 15275104,
+      "checksum_sha256": "fa719624828916fe9f52a5d63bd665a54aed025dcc73a30631e30cc3c52c87d1",
+      "file": "aircraft_08_1_9e31cec51de274a3246606c5e821aa12770ddfd6ad3213ec5e92ead154a9b7f9.mesh",
+      "fine_start_index": 618630,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "9e31cec51de274a3246606c5e821aa12770ddfd6ad3213ec5e92ead154a9b7f9",
+      "index_count": 1159488,
+      "model_id": "osprey_c6",
+      "model_index": 8,
+      "model_name": "Osprey C6",
+      "part_count": 13,
+      "part_index_count": 256776,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        36,
+        34,
+        37,
+        0,
+        1,
+        2,
+        4,
+        5
+      ],
+      "part_vertex_count": 46295,
+      "part_word_count": 627175,
+      "payload_bytes": 15274912,
+      "profile": 1,
+      "sha256": "ec5efe96ecaf2644d9eda8acbec1a7fa93825bdcb7cf570e76ef475c571cf066",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 386496,
+      "vertex_count": 254008,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 3686820,
+      "checksum_sha256": "9194df9d42a13b3437a317b3c4f60833a28888baaf8ef52affa152a382627580",
+      "file": "aircraft_09_0_aac122006b3836377c8893ee554c3a080628054c460d0635e7918ea6a0fb7b87.mesh",
+      "fine_start_index": 246798,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "aac122006b3836377c8893ee554c3a080628054c460d0635e7918ea6a0fb7b87",
+      "index_count": 246798,
+      "model_id": "xr10_nightjar",
+      "model_index": 9,
+      "model_name": "XR-10 Nightjar",
+      "part_count": 8,
+      "part_index_count": 133194,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        36,
+        34,
+        37
+      ],
+      "part_vertex_count": 26836,
+      "part_word_count": 347906,
+      "payload_bytes": 3686628,
+      "profile": 1,
+      "sha256": "0f81d4382a7381dc13e6eba5111600f0de086979b00b939606a994d5d9c515ff",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 82266,
+      "vertex_count": 40869,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 16151184,
+      "checksum_sha256": "80300b6ac698896c3090cbfcf1154b037e961b825972334a106ec8585784637e",
+      "file": "aircraft_09_1_72b8f0891b78c45eca330ce0b8d582a15928ec5b13d2979a807c6c98e1da4d56.mesh",
+      "fine_start_index": 678498,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "72b8f0891b78c45eca330ce0b8d582a15928ec5b13d2979a807c6c98e1da4d56",
+      "index_count": 1201758,
+      "model_id": "xr10_nightjar",
+      "model_index": 9,
+      "model_name": "XR-10 Nightjar",
+      "part_count": 13,
+      "part_index_count": 313542,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        36,
+        34,
+        37,
+        0,
+        1,
+        2,
+        4,
+        5
+      ],
+      "part_vertex_count": 55836,
+      "part_word_count": 760269,
+      "payload_bytes": 16150992,
+      "profile": 1,
+      "sha256": "755022a676dd84ae6fd92fd159ba756935b555af200ccfebc46fb8d618d52c0b",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 400586,
+      "vertex_count": 259465,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 4655180,
+      "checksum_sha256": "487d3b7512b52c06a0153f5fdf804fcd6dbc34664838c89541a8e4c49b78f1c4",
+      "file": "aircraft_10_0_ede2d7eafd3a0abdcf7c6305339ca52e965611882f5499dbee105ddf14f47f10.mesh",
+      "fine_start_index": 298920,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "ede2d7eafd3a0abdcf7c6305339ca52e965611882f5499dbee105ddf14f47f10",
+      "index_count": 298920,
+      "model_id": "xr30_specter",
+      "model_index": 10,
+      "model_name": "XR-30 Specter",
+      "part_count": 10,
+      "part_index_count": 172140,
+      "part_types": [
+        30,
+        31,
+        32,
+        38,
+        39,
+        40,
+        43,
+        41,
+        42,
+        44
+      ],
+      "part_vertex_count": 36970,
+      "part_word_count": 467930,
+      "payload_bytes": 4654988,
+      "profile": 1,
+      "sha256": "293178a8b28c2924b1504c45fb75822a835d12ee88a69b31b680f267b8dc13e1",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 99640,
+      "vertex_count": 49612,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 4307132,
+      "checksum_sha256": "0675843982da228ae7cd7040d7281e4f1320576fc20d8554e1c2915adc9fc4fc",
+      "file": "aircraft_10_1_45cf5fa153129e060d783a36253a10b63ccf6de4665b15149d90849f003c45b3.mesh",
+      "fine_start_index": 164742,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "45cf5fa153129e060d783a36253a10b63ccf6de4665b15149d90849f003c45b3",
+      "index_count": 371034,
+      "model_id": "xr30_specter",
+      "model_index": 10,
+      "model_name": "XR-30 Specter",
+      "part_count": 3,
+      "part_index_count": 9747,
+      "part_types": [
+        6,
+        7,
+        10
+      ],
+      "part_vertex_count": 1887,
+      "part_word_count": 24852,
+      "payload_bytes": 4306940,
+      "profile": 1,
+      "sha256": "fa901db123b4369a1031a4a37746bf8e27751f49410dbd1283984792fb581f5c",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 123678,
+      "vertex_count": 85106,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 4782036,
+      "checksum_sha256": "53e59ffc8df5b4e609cf69ada2386d4b9d489f3c5f39547d4a05304f061e7725",
+      "file": "aircraft_11_0_4dabad7d989553d9fcaa6707ff0a17d5fe08eb263f2e8dd3e146686eea36eb41.mesh",
+      "fine_start_index": 337554,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "4dabad7d989553d9fcaa6707ff0a17d5fe08eb263f2e8dd3e146686eea36eb41",
+      "index_count": 337554,
+      "model_id": "xr20_mantis",
+      "model_index": 11,
+      "model_name": "XR-20 Mantis",
+      "part_count": 8,
+      "part_index_count": 158514,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        36,
+        34,
+        37
+      ],
+      "part_vertex_count": 31459,
+      "part_word_count": 410210,
+      "payload_bytes": 4781844,
+      "profile": 1,
+      "sha256": "756e524b0ec5662236bb46e9ac942c74359624f47447bec98bb0ca1ee5da0f31",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 112518,
+      "vertex_count": 55962,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 18658860,
+      "checksum_sha256": "c429b2750cb895425efb47ba9b0dfd16461557cad3511ff02bcfb2b680d349b3",
+      "file": "aircraft_11_1_3c5707f76b7026f0babaf18660f3cef9f399cfea96bea12b1344b4d4d9ba240d.mesh",
+      "fine_start_index": 809454,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "3c5707f76b7026f0babaf18660f3cef9f399cfea96bea12b1344b4d4d9ba240d",
+      "index_count": 1392423,
+      "model_id": "xr20_mantis",
+      "model_index": 11,
+      "model_name": "XR-20 Mantis",
+      "part_count": 11,
+      "part_index_count": 298314,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        36,
+        34,
+        37,
+        6,
+        7,
+        2
+      ],
+      "part_vertex_count": 53677,
+      "part_word_count": 727763,
+      "payload_bytes": 18658668,
+      "profile": 1,
+      "sha256": "eccfd4b86dde0ce2c650dedb7ef40f5fcffc3847ebe71e07ece1863dcc0d7a3a",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 464141,
+      "vertex_count": 318060,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 7661044,
+      "checksum_sha256": "71fe6c8a90b0ca88354a42fad589bdf6f1a16977bc2f223081e59128549ccaa6",
+      "file": "aircraft_12_0_d6ec2c3c7429b9d832e948f90c18559b845fa017e8c87c2e5f05156011365726.mesh",
+      "fine_start_index": 334536,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "d6ec2c3c7429b9d832e948f90c18559b845fa017e8c87c2e5f05156011365726",
+      "index_count": 334536,
+      "model_id": "xr40_wraith",
+      "model_index": 12,
+      "model_name": "XR-40 Wraith",
+      "part_count": 22,
+      "part_index_count": 405114,
+      "part_types": [
+        15,
+        17,
+        18,
+        19,
+        20,
+        21,
+        16,
+        23,
+        22,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        39,
+        40,
+        43,
+        41,
+        42,
+        44,
+        45
+      ],
+      "part_vertex_count": 91463,
+      "part_word_count": 1136884,
+      "payload_bytes": 7660852,
+      "profile": 1,
+      "sha256": "805986c7f24c3b427a58190f0223c298312e52646d86216dd8a357031ca229b3",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 111512,
+      "vertex_count": 55474,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 6474500,
+      "checksum_sha256": "443de97272b1bbb9139b5cf05949d5d767824011bf66314ccff96a7ea375f2c6",
+      "file": "aircraft_12_1_f9c5f4dbd976eb1b7631478bdbe324cf41e0d8480f5159e665c856b3bb03cfdd.mesh",
+      "fine_start_index": 98535,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "f9c5f4dbd976eb1b7631478bdbe324cf41e0d8480f5159e665c856b3bb03cfdd",
+      "index_count": 527754,
+      "model_id": "xr40_wraith",
+      "model_index": 12,
+      "model_name": "XR-40 Wraith",
+      "part_count": 3,
+      "part_index_count": 9669,
+      "part_types": [
+        8,
+        9,
+        10
+      ],
+      "part_vertex_count": 2235,
+      "part_word_count": 27558,
+      "payload_bytes": 6474308,
+      "profile": 1,
+      "sha256": "a946edb508373bcb42b8dcc7c5444326019be029cff9dcc0f061e62f23e73b2c",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 175918,
+      "vertex_count": 132908,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 1733700,
+      "checksum_sha256": "d5176f7a4b0867806f319ab7582e327258a3f3d05bd9102584eb38db6b047d73",
+      "file": "aircraft_13_0_1969760ce98bfe7fc898a6a6e0bdc6c6243a72167dcebabbe5733ef400a80dc2.mesh",
+      "fine_start_index": 108312,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "1969760ce98bfe7fc898a6a6e0bdc6c6243a72167dcebabbe5733ef400a80dc2",
+      "index_count": 108312,
+      "model_id": "larkspur_l4",
+      "model_index": 13,
+      "model_name": "Larkspur L4",
+      "part_count": 6,
+      "part_index_count": 69558,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        34
+      ],
+      "part_vertex_count": 13790,
+      "part_word_count": 179896,
+      "payload_bytes": 1733508,
+      "profile": 1,
+      "sha256": "b3efea0c10bd11ab8f7195afe062a2c0bbe4ae64c8f79d31a8b9c43910e1cfa1",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 36104,
+      "vertex_count": 18146,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 11570716,
+      "checksum_sha256": "6a5366f7be322aa78c56b21d09421a4e8b182b5698ddaf3bcb6a0420e366f4c1",
+      "file": "aircraft_13_1_de60369425e73a7705146adcd05cd51b0fe7fec59413b714f56809ba805a25ae.mesh",
+      "fine_start_index": 442632,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "de60369425e73a7705146adcd05cd51b0fe7fec59413b714f56809ba805a25ae",
+      "index_count": 894930,
+      "model_id": "larkspur_l4",
+      "model_index": 13,
+      "model_name": "Larkspur L4",
+      "part_count": 10,
+      "part_index_count": 205422,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        33,
+        34,
+        0,
+        1,
+        2,
+        3
+      ],
+      "part_vertex_count": 35800,
+      "part_word_count": 491852,
+      "payload_bytes": 11570524,
+      "profile": 1,
+      "sha256": "c750b91daafbfd9b5ae4eced87e4ae33d1474ace8474b791f86b3990aacf8e1b",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 298310,
+      "vertex_count": 188231,
+      "view": "cockpit"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 18987072,
+      "checksum_sha256": "54760bc986fa5b45abf8d6b58b68c81412a8e98cfeeb2592fbf10c3810a9a64c",
+      "file": "aircraft_14_0_a31b69849637b661dced8d7c450c0c72a8224363117467b9c5bb372973178cf7.mesh",
+      "fine_start_index": 1332306,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "a31b69849637b661dced8d7c450c0c72a8224363117467b9c5bb372973178cf7",
+      "index_count": 1332306,
+      "model_id": "atlas_a180",
+      "model_index": 14,
+      "model_name": "Atlas A180",
+      "part_count": 9,
+      "part_index_count": 632778,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        46,
+        33,
+        36,
+        34,
+        37
+      ],
+      "part_vertex_count": 126248,
+      "part_word_count": 1642789,
+      "payload_bytes": 18986880,
+      "profile": 1,
+      "sha256": "4900ac308460d9869621d75740c192c5ec029e6cdb6d5b5d92cdeca5a2900ccc",
+      "slot": 0,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 444102,
+      "vertex_count": 221453,
+      "view": "exterior"
+    },
+    {
+      "algorithm_version": 24,
+      "bytes": 51172820,
+      "checksum_sha256": "db7748af54b9f3d7e3fee3b909458ec14bebf0b2a4e2e014e06a0312e8bd2a6f",
+      "file": "aircraft_14_1_4a841bc6a4fbdf8186073f818991ca7982b12a40774d71b3fe8b4550ad501acd.mesh",
+      "fine_start_index": 2061447,
+      "format_version": 1,
+      "full_quality": true,
+      "hull_float_count": 1,
+      "hull_triangle_count": 0,
+      "identity": "4a841bc6a4fbdf8186073f818991ca7982b12a40774d71b3fe8b4550ad501acd",
+      "index_count": 3380256,
+      "model_id": "atlas_a180",
+      "model_index": 14,
+      "model_name": "Atlas A180",
+      "part_count": 14,
+      "part_index_count": 1283298,
+      "part_types": [
+        11,
+        12,
+        13,
+        14,
+        46,
+        33,
+        36,
+        34,
+        37,
+        0,
+        1,
+        2,
+        4,
+        5
+      ],
+      "part_vertex_count": 231106,
+      "part_word_count": 3132188,
+      "payload_bytes": 51172628,
+      "profile": 1,
+      "sha256": "6535215642dd44723d2672601770ff4678fa1c815d7d4d51ecb73c9329d3efa7",
+      "slot": 1,
+      "source_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+      "triangle_count": 1126752,
+      "vertex_count": 785089,
+      "view": "cockpit"
+    }
+  ],
+  "bake_report_sha256": "192bc2e41e4992bbf08500198b89129d66db6e91096e6b06f0a2b57967e978ea",
+  "bundle": "SolaceExpress-aircraft",
+  "compression": "ZIP-DEFLATE-lossless",
+  "format_version": 1,
+  "full_quality": true,
+  "producer": {
+    "gl": {
+      "renderer": "llvmpipe (LLVM 19.1.7, 256 bits)",
+      "vendor": "Mesa",
+      "version": "4.5 (Core Profile) Mesa 25.0.7-2+deb13u1"
+    },
+    "implementation": "production-strict-fresh-v1"
+  },
+  "quantization": "none",
+  "schema": 1,
+  "shader_binaries": false,
+  "source": {
+    "digest": "25b0ebe6af771a254ed9011d43a42b59cb21625ece22a53bcc84340c04be062c",
+    "files": [
+      {
+        "kind": "cpu",
+        "path": "src/aero.cpp",
+        "sha256": "bfec0b5238a974db9d7d6451b6a1ea6f043ff04dbd93c14413d4ee31c78c5fb1"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aero.h",
+        "sha256": "4d4a8798deabd6fac735a5be1fbb79070335ce236c31336cd5c15395d5ad97b4"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aero_strips.cpp",
+        "sha256": "33e1e4c281efa0d58d14263c7c651a687890868705aad02a4e2e8216048229d0"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aero_wake.h",
+        "sha256": "9cfe33b5af57ff884cacd1205a900c6d1e9d426af4a3792165b95f020f9ec4ed"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft.cpp",
+        "sha256": "d9ac097c7c3b043cc4845134cbd7aa6538146573b67486212cdd11135bf99f8f"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft.h",
+        "sha256": "6fcaed36e10a4ceebc5823b58fe2305430fa339280046d9a4d590ee762dd7354"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_build_family.h",
+        "sha256": "7a8c5d02c233338c77141287db7ee278af0282b706783d355a58da5494a8c83f"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_hull.cpp",
+        "sha256": "29687587ad17b50154c723fa2014ab8e64490cefd977566a5ecce2b3ec0c932f"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_mesh.cpp",
+        "sha256": "2a16941e32dea08cb5e4ec3e8948a303715b99672a4359a5f7247431ed8e2bd7"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_mesh_asset.cpp",
+        "sha256": "600002cc78268559bab2ddb793c7a9e1eff6c37edf568fb67ef8997c7b849f8c"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_mesh_asset.h",
+        "sha256": "f7d99143ed737e8099c57363d34314f8d84efc9721d3f11ec05e4ab8b7b61162"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_mesh_build.h",
+        "sha256": "54f63358ab91e0e674a04f5e1f3a6b51aea4c5ab68c8102d869f42bcabb03e43"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_mesh_build_fleet.h",
+        "sha256": "dd0eba7fa971ae2073793e2c41978b2ced803479274493c5b71b9dd85c99f81b"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_mesh_build_research_gear.h",
+        "sha256": "ed5848b30f09b651c24365ae053324662f29bf6a0374b99cb20d4e95f9406352"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_mesh_build_specter.h",
+        "sha256": "096bb1e7182f5508fb5c6e6b09854d5371651a5484c4b2e37194f32419767d3c"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_mesh_build_types.h",
+        "sha256": "b7740429bdec674e2f875e64d8cb864c9b9240a0619bfaf2d3ff95333abc785a"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_mesh_build_wraith.h",
+        "sha256": "99b417b5d66b22566d843f9beb632ad0eb9be57b63c6a06eb2d129a33581f446"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_mesh_orientation.h",
+        "sha256": "3ebeab7252c8f8e74cbbf587d5dcca2fe0dfd05d580a72e7c34e172d61081c8b"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_mesh_overhead.h",
+        "sha256": "f5e36e4cc355cf900d288ccc1e0e520eff1954591f33978896f3074a20dcf383"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_mesh_planar.h",
+        "sha256": "798583065367aefa64f8620f765350a04cc8f956ca309423055461c370a7d280"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/aircraft_mesh_specter_detail.h",
+        "sha256": "b1e08ce186ff31125c82363ec9eaebab0670c3a09a522a02b194dcf55be43a09"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/cockpit_focus_zoom.h",
+        "sha256": "61443c9fbdb4195623c8394dcb36a0808270c8c383a20d7214961ceab059c042"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/cockpit_layout_data.h",
+        "sha256": "3c8899520537a30f9b34e4f3846603f90584137aa4e3be86d71dca7f00355d8a"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/common.h",
+        "sha256": "3487b6b0bbc929e00ff742af04f301f945dd3a50932640a5d40e369774058a5c"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/gl.h",
+        "sha256": "1fffe4494384a38fedb496b800d5de53b7068690965cdd4819b96a3b86789925"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/hull_mesh.h",
+        "sha256": "f4017e7e623a26719d4b401e8327d8ee88b1593a27659c6d3a3130874b51fcf5"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/mesh_simplify.h",
+        "sha256": "a0ace37f229ee42cce9529af391e605f93a5891666d526091fb496aba0cdbc03"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/mesh_validation.h",
+        "sha256": "1f5869534d286b21ab792cd62eb65650e2ef5a270478da33796d642230b46da7"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/models.cpp",
+        "sha256": "d87dc5a55c0260e64a7699173eb6c4d99f71930fbfa9af72ce19996c3017c168"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/models.h",
+        "sha256": "8c984cc34b6d5299cd5b22c75fa019539b8ed7c329ee0997dd94b49aa188ac2c"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/renderer.cpp",
+        "sha256": "546337d5c485edece6cdfb3b0cd68dbdd4d361488b9386a1fa506feb290c6d15"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/renderer.h",
+        "sha256": "83ed9315bbffe80cd24bd038f57292149aaea02925d55b44c5d065527c184fe5"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/shader_prune.h",
+        "sha256": "193bca8a650ec6be2ec283d0bb96fbbae2ba7d7083d40d556fc0aa2989173055"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/shaders.h",
+        "sha256": "00bdbd99e4ffa05a1b3991634436d192afd01589243bf2fe697925ed8a7626ee"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/weather.cpp",
+        "sha256": "336d8b6e5bc60ba42e0aeddff31cd1b7efc325ef3c1202256dd4d3f8e62334dd"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/weather.h",
+        "sha256": "f1df6b3697f24fe3d12382372e4b8a966df4d7ee7f05dd9bb94363c1464d9b6b"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/wheel_motion.h",
+        "sha256": "7c569d628fd3f85f06b70153169a38d7412ae7b923dfc9a8b17217b1352160ab"
+      },
+      {
+        "kind": "cpu",
+        "path": "src/world.h",
+        "sha256": "88d085b27c5823d2722381c370ca7cfe7ad5cea351def81ad112f6ede4d9c112"
+      },
+      {
+        "kind": "cpu",
+        "path": "tools/aircraft_geometry_inputs.cmake",
+        "sha256": "f4b692d3fcc22cfcab3fc6449f0a0c89293cbbccd1a5b92bb8996e29039312b1"
+      },
+      {
+        "kind": "cpu",
+        "path": "tools/generate_aircraft_geometry_source.cmake",
+        "sha256": "53b3ccea1d49c8ed360b1021a364a718783a918ea51cde84bc42921bcf1159b4"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/af_shmap.glsl",
+        "sha256": "eb081244d1879183a129dcc3a9bcfe044d8d9d31a748d88e93baee0c8d021313"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/cabin_windows.glsl",
+        "sha256": "9d88a8ea903cae5b8cdea7f59385e739969ed977ddd2e69d90927e915558ab32"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/cloud_acc_fs.glsl",
+        "sha256": "2298b9f1e65120f01cb000680635742ae906eaf9a99633c5bce8496ce1c49bd9"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/cloud_comp_fs.glsl",
+        "sha256": "8d0bd36b2da73b125531ae3baf3f966786f4acaf610ad21487932fc5228bd6ae"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/cloud_main.glsl",
+        "sha256": "ab99f58e3c8f88863da041c9d7c2918cb5788d5e1f0c557713173b8fb1d77528"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/clouds.glsl",
+        "sha256": "0a5feaf70750e07f285a7089cd5f174185e22ee445b62e80b8a11fde23487285"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/cockpit_fittings.glsl",
+        "sha256": "347cd84ba6fa01a8c53817ce0d39e6a9dfa005c64cbde53625c9b5dee66d8e4c"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/cockpit_layout.glsl",
+        "sha256": "63e1bda17892a3068199f98833bcce91f8d1d756395810368bd375485fb2c103"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/cockpit_material.glsl",
+        "sha256": "2b0fb7ecf9c0f91afc878ca9c625f3b183d25a49ddc9637e5449998b5c5bd920"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/common.glsl",
+        "sha256": "fe1262ed136eec9e6fdad6935aff559ff0be891dda98b6e02edb9ed71bc4f69e"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/disp_main.glsl",
+        "sha256": "ea05e36fce39bd713571bedfdf8e2b40a1f158be8b9568ff33e3ea3f59d6064e"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/down_fs.glsl",
+        "sha256": "e6167082026593f3b88a004b28d2fb8b20d9c19bcf38c934268adc91d82a56e0"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/effects_fs.glsl",
+        "sha256": "ca785a7cbcfe972e49831e36fc5e164671b1cfe0805394d610f76ec0b58ddd14"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/ent_common.glsl",
+        "sha256": "50bc1a9805ef5658d141e1cdd472f9db7f71ba82d6c2a9da1b2c2d8a70bbae84"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/ent_fs1.glsl",
+        "sha256": "77a0c391c721630b526024118f2c620bcf3f61467c1a0b466b61c6b92f0d2400"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/ent_fs2.glsl",
+        "sha256": "bd8adb4635ddaa0cf57e8dfa6e70bce60e766de137afcfa95603032df8784f10"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/ent_shadow_fs.glsl",
+        "sha256": "ebe8cf8b691c6f674f0fe89c0fcc49e88e941f4e5a13312abfeb6ec0f52b2010"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/ent_vs.glsl",
+        "sha256": "f1cf262bc87ae38c9e030e6f964987f0759fbd841831bdbc266c06075c3324eb"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/feed_rays_fs.glsl",
+        "sha256": "22df557ca2d322e5ea431d6361f1537ba5faf80a5b4577663c91a0e03984de3b"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/feeds.glsl",
+        "sha256": "34ec9ba4b83fa7645f50efc84d4d0cdbffe778d75ddbdd7f0a7199e48f479751"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/fullscreen_vs.glsl",
+        "sha256": "ba915a380452eb6b74f91e157c890da1adf8fc6f0b14daa72819d65a746a2d22"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/g_lens.glsl",
+        "sha256": "2e9a6f65f0c9a2233a5c288e28bef0c9672f0984cfa43e9dbebf89f4df01068a"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/gb_write.glsl",
+        "sha256": "9592638fc8da9b44fce12a95cfc0d2e6e84062ac463c9bf223f72b5e92394b3e"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/gbuffer.glsl",
+        "sha256": "a8687b22e9b974c8e8ccefd1e2f0438c2d889ee42970d72802ef1f0746152ec8"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/hull_bake_main.glsl",
+        "sha256": "d95d9edd45f942070b7d2981a9347e313e9b68e7293d30fe5a3790d8380011c8"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/light_common.glsl",
+        "sha256": "523ab40ae2f0263b591fc667c65567addcde6a5b45b934e6902f3fa2d96b6dd9"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/light_fs.glsl",
+        "sha256": "0e5e1b85730366a157cfab2cc4c1e98dcf2da43aa84b4e54e5dfb5b2c85deae2"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/map_main.glsl",
+        "sha256": "a45578123d13179a3ea0b5f89f8800dc0caab8418be9d856953a1052c149e339"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/material_common.glsl",
+        "sha256": "eead4268e803e9269fc5e2f2a65366039d408bc45f2e88f475883dad49d22d75"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/noise_tex.glsl",
+        "sha256": "9e31769b00d1357cbc59111d29cbdbf8d5c8780bcfe32621da5dc65a8d01acf0"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/objects_fs.glsl",
+        "sha256": "d4e0e8750f2b4962594c370b8477371d7d987f8b833f492599305f88f07e4236"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/plane_common.glsl",
+        "sha256": "c8c514c7590910dec2f9f74764d11ab1a2c0b7979fd40201abd9c6769b2fd076"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/plane_fx.glsl",
+        "sha256": "60130eff38f90f5b24e2f83d73611ab6afb97d1e53bc028cc553db05bec45ca7"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/plane_gb.glsl",
+        "sha256": "5b84b641c55a4ec42bb01893cfa53d29a591eba47ee0b84c791ba480eead164a"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/plane_light.glsl",
+        "sha256": "3d1edd71c9c7fc13471888d48e6c2ea091f7a11967453c1772d20c23e1b0dfa5"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/plane_material.glsl",
+        "sha256": "b212dd423b2b929ac587dbe658f351998e2ac5d6d765174019277b27406831a1"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/plane_mesh_fs.glsl",
+        "sha256": "0235b216464d5f2dba691106bbdaa5c35f8e3ac41c5f29dac26a1bea3ec30ac5"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/plane_mesh_vs.glsl",
+        "sha256": "bb4ca785ea32ca7d61848278b6cb7b6feb8ce37293afb3ddc904eb507799527f"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/plane_parts.glsl",
+        "sha256": "4d47156b1087bf8a0cc399a3c374d82918175f8bd66dd96b6012aa5c057ecbd0"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/plane_screens.glsl",
+        "sha256": "45f8b26ad17ee3a653e915bff1ffe191e6177255c431a20bc4384950a4f62ea7"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/plane_sdf.glsl",
+        "sha256": "da584ce6a46eb8389ec5d9cc5c1e8bf929e8ea3b19e44ef3c7567004b5ad10c3"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/plane_trace.glsl",
+        "sha256": "1b6ef4f31099d26f869c60477d850ae8228ed85bf73420d74332721999caa6bd"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/post_fs.glsl",
+        "sha256": "c510afc567185817ba56060274f4f5de3cbcdfe40c18b88fdbf6ee2ae0226297"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/prop_disc_fs.glsl",
+        "sha256": "2b1135d978eb29617a29886a50582bd4460b2c0f7f80f7fc84ffa375aa75da15"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/prop_disc_vs.glsl",
+        "sha256": "ababf094bc33f9beb72617e1da834ee0667f05ad2bfaa5b1e2587e67c4b957d2"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/propeller.glsl",
+        "sha256": "37a0c47ded64b764b9a7a6da644748af34bc2496cf6c4932239cf58e337e6846"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/ray_fs.glsl",
+        "sha256": "3964fecd1944a0e58c852e1df44be540bc845fba4299bf758bfe274ad08f8328"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/ray_mask_fs.glsl",
+        "sha256": "41c9a68871458fa4de25315adc9ea458ccadd85518dd9f9cb406e97d51d99dc6"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/raytrace_displays.glsl",
+        "sha256": "b90dfa78a2e7fc41063b11778a59f856b38c5acaaba32ef1835fec85cad708d8"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/raytrace_text.glsl",
+        "sha256": "06457b6403b44e399ba949fbe65bc8e01f52fa348d70cc0ebbe1c387fc8151c4"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/raytrace_ufo.glsl",
+        "sha256": "a5c1a2869e7f228ac3fe358fdbbcbef109513c6e7b1f8605d6c1fdee873b91f1"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/research_cockpit_layout.glsl",
+        "sha256": "f11dfb1c75aa6677d77df64bc149d09d7ed27572923e893d57e8750ee4f380e2"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/roads.glsl",
+        "sha256": "2f677bbff010719c1b5c15c94a57886ffb7bf51b78382ea861f828210117b7fc"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/rt_io.glsl",
+        "sha256": "5d2b6353e102e71c15ec0d6e521f5b390f47177b7be5ecd790b318046884ff77"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/rt_prims.glsl",
+        "sha256": "eae567505ba6b7877c99fd6617ae2296fb3d689f8ce12f0091538c72ca4e0730"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/scene_uniforms.glsl",
+        "sha256": "a27b59bd160d6740693a493f38492f5570c57abcd1573a94bc23f28150b6ce53"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/shadow_proxy_fs.glsl",
+        "sha256": "3509db602cba7edd630c5320d70f24c8013ffb366076f12af21dc269b4faee0a"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/sprite_fs.glsl",
+        "sha256": "544ed3ff1b8be208ef7aa6c1ba049b57f4ec81259f31b5d13ed75983130879ba"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/sprite_vs.glsl",
+        "sha256": "a1b7e02462efff42f745fb51d0c3972601a5a0af1c8dc0ce2133df7c2b04e761"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/taa_fs.glsl",
+        "sha256": "c3f5e128b2bc99f38efd42d48fc48076e89ca8e308b6919fc6295ab960624ee5"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/terrain_fs.glsl",
+        "sha256": "40b1c4bc05de4672d88a098e023bbfd940e965f8b0c3e2f8bb3838d9fc918ba8"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/terrain_material.glsl",
+        "sha256": "2bdd9a19344733bb0e5766c44e57a54735902a506bc11425eb4d28e3413421cd"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/terrain_trace.glsl",
+        "sha256": "02d766f2255f8b61669c82eab04d1278a42b99a1af5bdf185006d04e27a6074d"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/terrain_vs.glsl",
+        "sha256": "7cffb9a6e06cfdddc0eb00293c1d661c97d0137720b786ce965608f61ff73744"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/tsh_bake_main.glsl",
+        "sha256": "832ac1b18e9413d2792ea2654cd0d1e5ce42c2650dc55933e129516258be3533"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/ui_fs.glsl",
+        "sha256": "c3c46f1aded23fce821d322bf23f18a7b457aafe2e63b16bdb96d0fd9a19cb38"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/ui_vs.glsl",
+        "sha256": "6866f9b1624296c0f88018cccadd233b89ad1f5b49d9aac433b7d39eebad82db"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/up_fs.glsl",
+        "sha256": "db6f34518ad3f3ea07f681bd544fb00d452b79b9568ff3f1913a78cc518a9b62"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/view_uniforms.glsl",
+        "sha256": "e6242af5efa1572b53d6217b5067eb183c173fbd44ed33d43f71df10211a4c10"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/water.glsl",
+        "sha256": "a088635b8ea283723ba73b8bad9bb44ac375c55cf415251c81efc94e512bc855"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/water_fs.glsl",
+        "sha256": "f6794473255a2fbe24346b9304a2cd1d7f2330e0a39bb8f51eec55b1c2a51578"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/water_vs.glsl",
+        "sha256": "0c1da12209d2e84f701f77b034cd65653df969fa84e5b21f9e1bea3cda2cad31"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/wraith_cockpit_common.glsl",
+        "sha256": "ced4ba7865f624317585585f04ebea6b6a978ae319fcb8bf3eb0ade71390ac3a"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/wraith_cockpit_material.glsl",
+        "sha256": "adf1f9613d4b6d7e3da63e253297dc30d4dfcf493756a88b5dbba3ff8ec8e04d"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/wraith_cockpit_sdf.glsl",
+        "sha256": "d8b4d617386ad995499140646cd00a7ca85429002f2c710e6cc74e005f00dc92"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/wraith_fx.glsl",
+        "sha256": "9e9ebecdd78fa57e749f2ff7793e4ae4f3411dbfc62ea975e47b781213e7bcd2"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/wraith_material.glsl",
+        "sha256": "0b5e4c331c246a0c188bd148cf40bbfbbfea0b451c4222b1a81a276d24265258"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/wraith_sdf.glsl",
+        "sha256": "d851d642e1c8c97c9eddcfdfa8ec5bbd9f8efc1a303b2e4b0e868d74451bae7a"
+      },
+      {
+        "kind": "shader",
+        "path": "src/shaders/wreck_clip.glsl",
+        "sha256": "610ebc1a0f43ac46cbc13c93cd655fdac6a889aec40ebb7b809b933ce0716637"
+      },
+      {
+        "kind": "producer",
+        "path": "tools/mesh_assets/export_aircraft_meshes.cpp",
+        "sha256": "5eb49aa63d16ade17847dc20e2c5c668d32d2126301058b9a44b074a32b65d20"
+      }
+    ],
+    "geometry_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+    "schema": 1
+  },
+  "source_revision": "72d0af0b23defb8067dd697f87d94384b39a412b",
+  "total_mesh_bytes": 293791880
+}

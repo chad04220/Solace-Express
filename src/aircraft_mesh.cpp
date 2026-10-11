@@ -21,6 +21,7 @@
 #include "aircraft_mesh_specter_detail.h"
 #include "aircraft_mesh_orientation.h"
 #include "aircraft_mesh_planar.h"
+#include "aircraft_geometry_source.h"
 #include <filesystem>
 #include <cmath>
 #include <cstdio>
@@ -142,7 +143,7 @@ bool Renderer::afBakePrograms(int model, int slot, GLuint out[2]) {
     const std::string stage = "aircraft bake (" + who + ")";
     setCompileStage(stage.c_str());
     std::string e;
-    if (!linkBakePair(kFullscreenVS, hullBakeFSAssembly(bakeDefines(model, slot)), a.bake[slot], e))
+    if (!linkBakePair(kFullscreenVS, hullBakeFSAssembly(bakeDefines(model, slot)), a.bake[slot], e, nullptr, &a.bakeFullQuality[slot]))
       shaderNote("Aircraft bake (" + who + ", its own build) failed: built with every aircraft's\n" + e);
     setCompileStage("");
   }
@@ -160,6 +161,61 @@ std::string Renderer::meshStamp(int model, int slot) {
   return a.stamp[slot];
 }
 
+// Source-semantic canonical identity, independent of the compiler's floating-point evaluation as well as
+// the GPU driver. The source contract covers model/spec/layout/packing and all CPU builders. Hashing runtime
+// float bits or aircraftDefines' decimal constants here would make equivalent /fp:fast and strict builds miss.
+// Full-quality shader sources are hashed without host-generated model constants; this conservatively includes
+// all families while actual construction remains each aircraft's own unchanged builder. Only canonical runtime
+// model inputs may use this identity (the exact local pack is checked below); custom geometry always falls back.
+aircraftAsset::Identity Renderer::prebuiltAircraftIdentity(int model, int slot) {
+  if (model < 0 || model >= kAfModels || slot < 0 || slot > 1) return {};
+  aircraftAsset::Identity& id = afOwn[model].portableIdentity[slot];
+  if (id.geometry != aircraftAsset::Digest{}) return id;
+  id.model = (uint32_t)model; id.slot = (uint32_t)slot;
+  id.source = aircraftAsset::fromHex(kAircraftGeometrySourceDigest);
+  std::string input = "SolaceExpress-aircraft-canonical-source-profile1\n";
+  // Both views' source identities are shared across the roster; no shader program is compiled here.
+  static const std::string outside = meshGeometryStamp("#define AF_OUTSIDE\n");
+  static const std::string cockpit = meshGeometryStamp("");
+  input += slot == 0 ? outside : cockpit;
+  auto word = [&](uint32_t w) { for (int i = 0; i < 4; i++) input += (char)(uint8_t)(w >> (8 * i)); };
+  word(aircraftAsset::kFormatVersion); word(aircraftAsset::kCanonicalProfile); word(aircraftMesh::kAlgorithmVersion);
+  word((uint32_t)model); word((uint32_t)slot);
+  input += kAircraft[model].id;
+  id.geometry = aircraftAsset::sha256(input.data(), input.size());
+  return id;
+}
+std::string Renderer::prebuiltAircraftFilename(int model, int slot) {
+  return aircraftAsset::filename(prebuiltAircraftIdentity(model, slot));
+}
+
+bool Renderer::exportPrebuiltAircraft(const FrameParams& fp, int slot, const std::string& outputDir, std::string& exportError) {
+  exportError.clear();
+  if (aircraftExportCapture) { exportError = "aircraft export is already running"; return false; }
+  if (slot < 0 || slot > 1 || fp.plane.model < 0 || fp.plane.model >= kAfModels || !fp.plane.on || fp.wreck.pieces || quality < 0) {
+    exportError = "export requires a canonical intact aircraft and view"; return false;
+  }
+  if (getenv("AF_ALL") || getenv("CLIPDBG")) { exportError = "debug/shared geometry cannot be exported as canonical"; return false; }
+  float M[96]; packModelOf(fp.plane.model, M);
+  if (std::memcmp(M, fp.plane.M, sizeof M)) { exportError = "custom model parameters cannot be exported as canonical"; return false; }
+  std::error_code ec;
+  if (!std::filesystem::is_directory(outputDir, ec)) { exportError = "export output directory must already exist"; return false; }
+  aircraftAsset::MeshData data;
+  aircraftExportCapture = &data; aircraftExportComplete = false;
+  aircraftExportError = "production bake did not produce a valid full-quality mesh";
+  // An export only needs the production bake's empty VAO, not the unrelated terrain/scene initialization.
+  if (!vaoEmpty) glGenVertexArrays(1, &vaoEmpty);
+  try {
+    bakePlaneMesh(fp, slot, hullKey(fp, slot));
+  } catch (const std::exception& e) {
+    aircraftExportCapture = nullptr; exportError = std::string("aircraft export failed: ") + e.what(); return false;
+  }
+  aircraftExportCapture = nullptr;
+  if (!aircraftExportComplete) { exportError = aircraftExportError; return false; }
+  const aircraftAsset::Identity id = prebuiltAircraftIdentity(fp.plane.model, slot);
+  return aircraftAsset::write((std::filesystem::path(outputDir) / aircraftAsset::filename(id)).string(), id, data, exportError);
+}
+
 // every aircraft but a wreck, and one whose mesh pass has no program (meshProgramFor: it alone is marched)
 bool Renderer::planeMeshWanted(const FrameParams& fp) {
   const PlaneVisual& pv = fp.plane;
@@ -171,13 +227,34 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   const PlaneVisual& pv = fp.plane;
   const float* M = pv.M;
   const bool inside = slot == 1;
-  PlaneMesh& PM = planeMeshes[key];
+  PlaneMesh exportMesh;
+  PlaneMesh& PM = aircraftExportCapture ? exportMesh : planeMeshes[key];
   PM.key = key; PM.movKey = key ^ 0x4d4f56494e47ull;
   std::vector<float> vb, hullTri; std::vector<uint32_t> ib; uint32_t fineStart = 0;   // (fineStart: where the fine patch's indices begin)
   std::vector<uint32_t> partBlob;   // the rigid parts: per part its type, float count, index count, vertices (8 floats each), indices
-  // the cache
+  // A packaged full-quality body takes priority even when this driver's old cache contains reduced fallback
+  // geometry. Missing/stale/corrupt assets never modify GPU state or the read-only package directory.
+  const int own = afModelOf(M, pv.model);
+  float canonicalM[96]; if (own >= 0) packModelOf(own, canonicalM);
+  const bool canonical = own >= 0 && pv.model == own && std::memcmp(M, canonicalM, sizeof canonicalM) == 0;
+  if (!aircraftExportCapture && !prebuiltAircraftDir.empty() && canonical && !getenv("AF_ALL") && !getenv("CLIPDBG")) {
+    aircraftAsset::MeshData data; std::string assetError;
+    const aircraftAsset::Identity id = prebuiltAircraftIdentity(own, slot);
+    const std::string assetPath = (std::filesystem::path(prebuiltAircraftDir) / aircraftAsset::filename(id)).string();
+    if (aircraftAsset::read(assetPath, id, data, assetError)) {
+      vb.swap(data.vertices); ib.swap(data.indices); hullTri.swap(data.hull); partBlob.swap(data.parts); fineStart = data.fineStart;
+      prebuiltMeshHits++;
+      if (getenv("HULLDBG")) printf("mesh %s: packaged full-quality asset (%zu vertices)\n", inside ? "cockpit" : "outside", vb.size() / 8);
+      bakeLog("loaded packaged aircraft mesh " + aircraftAsset::filename(id));
+    } else {
+      prebuiltMeshMisses++;
+      if (assetError != "aircraft asset unavailable") bakeLog("rejected packaged aircraft mesh " + aircraftAsset::filename(id) + ": " + assetError);
+    }
+  }
+  // The existing writable driver-local cache, then the original bake. Legacy caches have no full-quality
+  // provenance and are never promoted to canonical assets by the exporter.
   std::string path;
-  if (!g_shaderCacheDir.empty()) {
+  if (ib.empty() && !aircraftExportCapture && !g_shaderCacheDir.empty()) {
     const std::string stamp = meshStamp(afModelOf(M, pv.model), inside ? 1 : 0);   // (the type's own: built with its own builder for this body)
     char name[64]; snprintf(name, sizeof name, "/mesh_%016llx_%s.bin", (unsigned long long)key, stamp.c_str());
     path = g_shaderCacheDir + name;
@@ -195,7 +272,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       fclose(f);
       ok = ok && aircraftMesh::valid(vb, ib) && aircraftMesh::validBlob(partBlob);
       for (float x : hullTri) ok = ok && aircraftMesh::finite(x);
-      if (!ok) { vb.clear(); ib.clear(); hullTri.clear(); partBlob.clear(); std::error_code ec; std::filesystem::remove(path, ec); }
+      if (!ok) { vb.clear(); ib.clear(); hullTri.clear(); partBlob.clear(); fineStart = 0; std::error_code ec; std::filesystem::remove(path, ec); }
       else if (getenv("HULLDBG")) printf("mesh %s: from the cache (%zu vertices)\n", inside ? "cockpit" : "outside", vb.size() / 8);
     }
   }
@@ -212,6 +289,10 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     const auto tProg = std::chrono::steady_clock::now();
     beginHullBake(fp, ns, sps.data(), sct.data(), swr.data(), swr2.data());   // (its programs built, if the cache hasn't them)
     progS = std::chrono::duration<double>(std::chrono::steady_clock::now() - tProg).count() - bakeEvalS - bakeYieldS;
+    if (aircraftExportCapture && (!hullBakeFullQuality || !hullBakeOwnBuilder)) {
+      aircraftExportError = "canonical export requires this aircraft's full-quality bake pair; reduced/shared fallback rejected";
+      PM.ok = false; return;
+    }
     if (!hullBakeProg[0]) { PM.ok = false; return; }   // (no builder: a failed bake, as below - this session marches it)
     auto mode = [&](int m, int s) { hullBakeMode = m; hullBakeState = s; };
     // (where the bake goes, phase by phase - wall time, and of it the field's evaluation and the frames shown: HULLDBG)
@@ -947,6 +1028,14 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       bakeLog(line);
       if (getenv("HULLDBG")) printf("%s\n", line);
     }
+    if (aircraftExportCapture) {
+      // Capture every final array before any upload or loss of the moving-hull eye flag. The format validator
+      // rejects the entire body on failure; it never repairs, simplifies, omits or normalizes any geometry.
+      aircraftAsset::MeshData data;
+      data.vertices.swap(vb); data.indices.swap(ib); data.hull.swap(hullTri); data.parts.swap(partBlob); data.fineStart = fineStart;
+      if (!aircraftAsset::valid(data, aircraftExportError)) { PM.ok = false; return; }
+      *aircraftExportCapture = std::move(data); aircraftExportComplete = true; return;
+    }
     if (!path.empty()) {   // atomic publication: never replace a valid cache with a partial file
       const std::string tmp = path + ".tmp." + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
       if (FILE* f = fopen(tmp.c_str(), "wb")) {
@@ -1226,6 +1315,14 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
 // them all; an update that changes an aircraft builds that aircraft's again) - for the loading bar's pacing and wording
 void Renderer::checkMeshCache() {
   meshCached = false;
+  if (!prebuiltAircraftDir.empty() && !getenv("AF_ALL") && !getenv("CLIPDBG")) {
+    for (int model = 0; model < kAfModels; model++) for (int slot = 0; slot < 2; slot++) {
+      std::error_code ec;
+      if (std::filesystem::is_regular_file(std::filesystem::path(prebuiltAircraftDir) / prebuiltAircraftFilename(model, slot), ec)) {
+        meshCached = true; return; // pacing hint only; the actual load fully validates before trusting it
+      }
+    }
+  }
   if (g_shaderCacheDir.empty()) return;
   std::vector<std::string> tails;
   for (int m = -1; m < kAfModels; m++) for (int slot = 0; slot < 2; slot++) tails.push_back("_" + meshStamp(m, slot) + ".bin");

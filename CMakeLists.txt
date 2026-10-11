@@ -22,6 +22,16 @@ add_custom_command(OUTPUT ${SHADER_GEN}
 add_custom_target(shaders_gen DEPENDS ${SHADER_GEN})
 include_directories(${CMAKE_BINARY_DIR}/gen)
 
+# Portable mesh provenance is regenerated on content changes, not just configure.
+include(${CMAKE_SOURCE_DIR}/tools/aircraft_geometry_inputs.cmake)
+set(AIRCRAFT_GEOMETRY_GEN ${CMAKE_BINARY_DIR}/gen/aircraft_geometry_source.h)
+add_custom_command(OUTPUT ${AIRCRAFT_GEOMETRY_GEN} ${CMAKE_BINARY_DIR}/gen/aircraft_geometry_source.json
+  COMMAND ${CMAKE_COMMAND} -DSRC_DIR=${CMAKE_SOURCE_DIR} -DOUT=${AIRCRAFT_GEOMETRY_GEN}
+    -P ${CMAKE_SOURCE_DIR}/tools/generate_aircraft_geometry_source.cmake
+  DEPENDS ${AIRCRAFT_GEOMETRY_CPU_INPUTS} ${SHADER_SRCS} ${AIRCRAFT_GEOMETRY_PRODUCER_INPUTS}
+  COMMENT "Fingerprinting aircraft asset build inputs")
+add_custom_target(aircraft_geometry_gen DEPENDS ${AIRCRAFT_GEOMETRY_GEN})
+
 # The islands (the terrain, the roads, the scenery), the rest of the flight and career core, and the game's own (the
 # renderer, the UI, the audio): each compiled once, as object libraries, for every program that links them besides the
 # game itself, which keeps its own build (on MSVC it links the static runtime, with its own flags). Before this every
@@ -31,13 +41,14 @@ set(CORE_ONLY_SOURCES
   src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/weather.cpp)
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
 set(GAME_ONLY_SOURCES
+  src/aircraft_mesh_asset.cpp
   src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_wraith.cpp src/renderer.cpp src/materials.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp)
 set(GAME_SOURCES ${CORE_SOURCES} src/entity_mesh.cpp src/bridge_mesh.cpp ${GAME_ONLY_SOURCES})
 add_library(env_objs OBJECT ${ENVIRONMENT_SOURCES})
 add_library(core_objs OBJECT ${CORE_ONLY_SOURCES})
 add_library(mesh_objs OBJECT src/entity_mesh.cpp src/bridge_mesh.cpp)
 add_library(game_objs OBJECT EXCLUDE_FROM_ALL ${GAME_ONLY_SOURCES})
-add_dependencies(game_objs shaders_gen)
+add_dependencies(game_objs shaders_gen aircraft_geometry_gen)
 if(MSVC)
   foreach(t env_objs core_objs mesh_objs game_objs)
     target_compile_definitions(${t} PRIVATE _CRT_SECURE_NO_WARNINGS)
@@ -53,6 +64,7 @@ if(WIN32)
     enable_language(RC)
   endif()
   add_executable(SolaceExpress WIN32 ${GAME_SOURCES} src/platform_win32.cpp src/radio_win.cpp assets/app.rc)
+  add_dependencies(SolaceExpress aircraft_geometry_gen)
   target_link_libraries(SolaceExpress PRIVATE opengl32 gdi32 winmm mfplay mfplat mfuuid ole32 uuid)
   if(MSVC)
     set_property(TARGET SolaceExpress PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -69,6 +81,10 @@ if(UNIX AND NOT APPLE)
   add_executable(ui_review_harness EXCLUDE_FROM_ALL tests/ui_review_harness.cpp ${GAME_OBJS} src/radio_stub.cpp)
   add_dependencies(ui_review_harness shaders_gen)
   target_link_libraries(ui_review_harness PRIVATE ${CMAKE_DL_LIBS} pthread)
+  add_executable(aircraft_mesh_export EXCLUDE_FROM_ALL tools/mesh_assets/export_aircraft_meshes.cpp ${GAME_OBJS} src/radio_stub.cpp)
+  add_dependencies(aircraft_mesh_export shaders_gen aircraft_geometry_gen)
+  target_include_directories(aircraft_mesh_export PRIVATE src)
+  target_link_libraries(aircraft_mesh_export PRIVATE ${CMAKE_DL_LIBS} pthread)
 endif()
 
 # Development render harness on Linux (Xvfb + Mesa): test frames, and a render server (render_harness serve) that keeps
@@ -112,6 +128,9 @@ add_executable(hull_test tests/hull_test.cpp)
 add_executable(prop_disc_test tests/prop_disc_test.cpp ${CORE_OBJS})
 add_executable(exhaust_test tests/exhaust_test.cpp ${CORE_OBJS})
 add_executable(mesh_validation_test tests/mesh_validation_test.cpp)
+add_executable(portable_mesh_adversarial_test tests/portable_mesh_adversarial_test.cpp src/aircraft_mesh_asset.cpp)
+target_include_directories(portable_mesh_adversarial_test PRIVATE src)
+add_dependencies(mesh_validation_test portable_mesh_adversarial_test)
 target_include_directories(mesh_validation_test PRIVATE src)
 add_executable(aircraft_build_contract_test tests/aircraft_build_contract_test.cpp)
 add_dependencies(mesh_validation_test aircraft_build_contract_test)
@@ -297,6 +316,16 @@ endforeach()
 add_test(NAME research_cockpit_layout COMMAND research_cockpit_layout_test)
 add_test(NAME cockpit_layout COMMAND cockpit_layout_test)
 find_package(Python3 COMPONENTS Interpreter QUIET)
+add_test(NAME portable_mesh_adversarial COMMAND portable_mesh_adversarial_test)
+if(Python3_Interpreter_FOUND)
+  if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_test(NAME portable_mesh_identity COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/portable_mesh_identity_test.py ${CMAKE_CXX_COMPILER} ${CMAKE_COMMAND})
+  endif()
+  add_test(NAME portable_mesh_checkout COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/portable_mesh_checkout_test.py)
+  add_test(NAME aircraft_mesh_workflow COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/aircraft_mesh_workflow_test.py)
+  add_test(NAME mesh_asset_tools COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/mesh_assets/test_mesh_assets.py)
+  add_test(NAME aircraft_geometry_source COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/aircraft_geometry_source_test.py ${CMAKE_COMMAND})
+endif()
 # CI runs the tests a change can affect (tools/ci/select_tests.py, build.yml), worked out from CMake's description of
 # this build (its file API): asked for here, answered from the next configure on (CI asks before its first)
 file(WRITE ${CMAKE_BINARY_DIR}/.cmake/api/v1/query/codemodel-v2 "")

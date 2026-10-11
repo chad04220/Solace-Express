@@ -1,5 +1,6 @@
 // Solace Express - renderer interface
 #pragma once
+#include "aircraft_mesh_asset.h"
 #include "benchmark_metrics.h"
 #include <array>
 #include <chrono>
@@ -70,6 +71,7 @@ struct WreckVisual {
 // Shader programs, compiled once and then loaded from the driver-binary cache in g_shaderCacheDir (empty: no cache)
 extern std::string g_shaderCacheDir;
 extern std::atomic<int> g_shaderCacheHits, g_shaderCacheMisses;   // bumped from several GL threads at startup
+std::string meshGeometryStamp(const std::string& defines); // SHA256 of full-quality shader geometry, CPU builder contract; no driver
 std::string meshCacheStamp(const std::string& defines = "");     // fingerprint of the sources the aircraft mesh bake depends on + the driver
 std::string shaderCacheStamp();   // fingerprint of all shader sources + the driver (current context needed)
 bool writePNG(const char* path, int w, int h, const std::vector<uint8_t>& rgbBottomUp);
@@ -145,6 +147,13 @@ public:
   static constexpr int kProbeScenery = 1 << 12, kProbeTerrain = 1 << 13, kProbeMarch = 1 << 14, kProbeMeshShade = 1 << 15;
   bool screenWindows = getenv("SCREENFEEDS") == nullptr;   // the research craft's displays are windows (no camera feeds but the bomb camera's; SCREENFEEDS=1 brings the cameras back)
   int bakeCount = 0;   // airframe meshes and hulls baked or loaded so far (the research terminal's warm-up waits for a frame that bakes nothing)
+  // Read-only distributed bodies are preferred to the writable, driver-local cache.
+  std::string prebuiltAircraftDir = "assets/aircraft";
+  int prebuiltMeshHits = 0, prebuiltMeshMisses = 0;
+  aircraftAsset::Identity prebuiltAircraftIdentity(int model, int slot);
+  std::string prebuiltAircraftFilename(int model, int slot);
+  // A trusted export is always a fresh production bake, never a relabeled legacy cache.
+  bool exportPrebuiltAircraft(const FrameParams& fp, int slot, const std::string& outputDir, std::string& exportError);
   int bakeBuilt = 0;   // of them, built from scratch (not loaded from the mesh cache): the diagnostics report it
   std::function<void()> bakeYield;   // called between the bake's evaluation batches (the benchmark answers the window's messages during a long bake)
   // a long bake shows a frame (bakeYield) about every 30 ms of real time: between its GPU bands and inside its long CPU
@@ -176,7 +185,7 @@ public:
   bool compilePrograms(std::atomic<int>* done);  // scene programs; safe on a worker thread with a shared context
   // the bodies' builder as a pair - the field's distance, and its normals and cabin occlusion - settled together on a
   // driver's fallback (aircraft_hull.cpp)
-  bool linkBakePair(const std::string& bakeVS, const std::string& bakeFS, GLuint out[2], std::string& e, const char* normalStage = nullptr);
+  bool linkBakePair(const std::string& bakeVS, const std::string& bakeFS, GLuint out[2], std::string& e, const char* normalStage = nullptr, bool* fullQuality = nullptr);
   // a full-screen airframe pass's build (raster_renderer.cpp), with the reduced builds tried in turn
   enum { kAfObjects = 0, kAfProxy = 1, kAfEffects = 2 };
   GLuint linkAfPass(int pass, const std::string& defines, const std::string& who);
@@ -393,6 +402,10 @@ private:
   int hullBakeStates = 0, hullBakeMode = 0, hullBakeState = 0, hullBakePart = -1;
   float hullBakeSideX = 1.f, hullBakeSideY = 1.f;
   bool hullBakeUploaded[2] = {false, false};
+  bool hullBakeFullQuality = false, hullBakeOwnBuilder = false, sharedBakeFullQuality = false;
+  aircraftAsset::MeshData* aircraftExportCapture = nullptr; // non-null only inside the explicit exporter
+  bool aircraftExportComplete = false;
+  std::string aircraftExportError;
   GLuint hullBakeProg[2] = {};   // the bake's distance and normal programs: the aircraft's own pair, or the shared one (beginHullBake)
   void beginHullBake(const FrameParams& fp, int states, const float* ps, const float* ctl,
                      const float* wr = nullptr, const float* wr2 = nullptr);
@@ -480,7 +493,7 @@ private:
   static constexpr int kAfModels = kAircraftCount;   // (the whole roster, kAircraft: the career types and the research craft)
   // (the bake: a builder pair for each of its bodies - [0] the outside's, without the cabin's code (AF_OUTSIDE), [1] the
   // cockpit's - each with its own stamp, so a cockpit's edit builds that cockpit's body alone)
-  struct AfOwn { GLuint mesh = 0, probe = 0, bake[2][2] = {}, pass[3] = {}; bool meshTried = false, bakeTried[2] = {}, passTried[3] = {}; std::string stamp[2]; };
+  struct AfOwn { GLuint mesh = 0, probe = 0, bake[2][2] = {}, pass[3] = {}; bool meshTried = false, bakeTried[2] = {}, passTried[3] = {}; bool bakeFullQuality[2] = {}; std::string stamp[2]; aircraftAsset::Identity portableIdentity[2]; };
   AfOwn afOwn[kAfModels];
   uint64_t afKeys[kAfModels] = {}; bool afKeysSet = false;   // (each type's packed model's key: trafficModelKey)
   int afModelOf(const float* M, int model);   // the type whose packed model M is (model: the type it claims, -1 any), or -1: the shared builds

@@ -1,0 +1,17 @@
+[
+  {"model":0,"views":["front","cockpit"]},
+  {"model":1,"views":["front","cockpit"]},
+  {"model":2,"views":["front","cockpit"]},
+  {"model":3,"views":["front","cockpit"]},
+  {"model":4,"views":["front","cockpit"]},
+  {"model":5,"views":["front","cockpit"]},
+  {"model":6,"views":["front","cockpit"]},
+  {"model":7,"views":["front","cockpit"]},
+  {"model":8,"views":["front","cockpit"]},
+  {"model":9,"views":["front","cockpit"]},
+  {"model":10,"views":["refactor_specter_neutral_rear","refactor_specter_vector_rear","cockpit_refactor_specter_vector"]},
+  {"model":11,"views":["front","cockpit"]},
+  {"model":12,"views":["refactor_wraith_hover_belly","refactor_wraith_weapons_belly","refactor_wraith_weapons_empty_belly","refactor_wraith_cloak_front","cockpit_refactor_wraith_hover"]},
+  {"model":13,"views":["front","cockpit","wheel_nose_yaw_left","wheel_nose_yaw_right"]},
+  {"model":14,"views":["front_loaded","bay_gear_pct000_belly","bay_gear_pct050_belly","bay_gear_pct100_belly","fan_running_phase0","fan_running_phase1","fan_left_running_failed_left_phase1","cockpit","cockpit_down_positive","cockpit_down_negative"]}
+]

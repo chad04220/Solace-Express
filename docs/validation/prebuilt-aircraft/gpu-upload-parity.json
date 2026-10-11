@@ -1,0 +1,890 @@
+{
+  "schema": 1,
+  "routes": [
+    {
+      "route": "original_cold",
+      "pass": true,
+      "checks": 1080,
+      "fixtures": [
+        {
+          "fixture": "kestrel_cockpit_geometry.csv",
+          "body_sha256": "2ab28fe911db1945e91f6ccea402cfac7786dbd6b2bd0da8c1fa7e42749830f6",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "kestrel_front_geometry.csv",
+          "body_sha256": "812c99a1d67ed3dcb204660a82547fa6c4e6d804407eb770ae56776b9d6bf7b7",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "wren_cockpit_geometry.csv",
+          "body_sha256": "85162f89b0a09a2781b8477f6ec1c9be5b36999f597e077b41b8236476ae6195",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "wren_front_geometry.csv",
+          "body_sha256": "aeef5c305f58a01b190edf5e0de8abe242ca63403f1023844197d0b04be5dd11",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "bush_cockpit_geometry.csv",
+          "body_sha256": "c08e9d101a12d2dc077e5534157cfc88d56c0e52e2b0a3f56b6a90154d4d1869",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "bush_front_geometry.csv",
+          "body_sha256": "10349df6ac95f03e3e557cefe2842d59432b8ec7efa65b9a67257b3de237d6d7",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "islander_cockpit_geometry.csv",
+          "body_sha256": "3d1309f2babaa695f6d8eacf5f60fb1f926d3504c03f54e4cdbb1a4aeaa6bcf1",
+          "checks": 26,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "islander_front_geometry.csv",
+          "body_sha256": "d47828be32135df5b9029b01a67e28cac67da5cfb93ea1e29f5ac18d2e318b18",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "pelican_cockpit_geometry.csv",
+          "body_sha256": "7e8160dd4a6ee7fa3d7114565875e73aea207df998a187796a2ecb96d851005d",
+          "checks": 26,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "pelican_front_geometry.csv",
+          "body_sha256": "0c04590ee5e4c48abd241f06ab524bd4d55ef27b9df27678fa5a7f60ef28d78a",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "meridian_cockpit_geometry.csv",
+          "body_sha256": "66d12547e54420f83a6c9fd225e3a36772332acd9889ad30ad17fdfb1d1b7058",
+          "checks": 30,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "meridian_front_geometry.csv",
+          "body_sha256": "9cc843689a11baf88e76a2e08e78bc804dc7a6de529ba43e95dc3fd1dce2e11c",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "starling_cockpit_geometry.csv",
+          "body_sha256": "b54a0f7ff429289d59ad3fc934103fc150d1bb53cb3ce93b2e9100f68e50dfb6",
+          "checks": 30,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "starling_front_geometry.csv",
+          "body_sha256": "7513f95821a60ee90ee9b12edfa048b6603ab7f58b32ce3b170e1bd783269c13",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "swift_s6_cockpit_geometry.csv",
+          "body_sha256": "0ba66528ecea83c0596eead9ed72057f71d6f7cdd78272729d1c9d2be52a8c1a",
+          "checks": 28,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "swift_s6_front_geometry.csv",
+          "body_sha256": "94b8de7e8e412a90de82c82ed5190401ceeba0dc08202c50494f7b8b181a4e2d",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "osprey_c6_cockpit_geometry.csv",
+          "body_sha256": "3b6002057b78345b2868ca3912306fecf9161f271e60f362194972e5a8bb8810",
+          "checks": 30,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "osprey_c6_front_geometry.csv",
+          "body_sha256": "1b5bbf3b7833d8a58caacd6c5f9cbc5b728cff151f92e41784a8bbe159e7098e",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr10_nightjar_cockpit_geometry.csv",
+          "body_sha256": "36e4d402a7e7f5be6f6bd91ef8c5f5476ffb3d1ab4b146cb5744ddf553a3d3a5",
+          "checks": 30,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr10_nightjar_front_geometry.csv",
+          "body_sha256": "622d3e0764641bb1772f6beec8d397c22ccedcb5a6b1f1994c122ecc8b8f453f",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr30_specter_cockpit_refactor_specter_vector_geometry.csv",
+          "body_sha256": "5f056994c26fb643100b1d8ce85f72d6b081a5ebc506a618071e36914cba0017",
+          "checks": 10,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr30_specter_refactor_specter_neutral_rear_geometry.csv",
+          "body_sha256": "6da303d9151a984ebdc9c6c0fc30ba17720e419ab4ec0da5712f5ffade29d09c",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr30_specter_refactor_specter_vector_rear_geometry.csv",
+          "body_sha256": "6da303d9151a984ebdc9c6c0fc30ba17720e419ab4ec0da5712f5ffade29d09c",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr20_mantis_cockpit_geometry.csv",
+          "body_sha256": "26107de4856db1113b9e4148879468355cd4ea1f3bed626cb1d2587a9cbe4e65",
+          "checks": 26,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr20_mantis_front_geometry.csv",
+          "body_sha256": "737b95fd6cda9cecad3e8d86ba4069d94abed6456bdc72c3202a30d20b3bc1dd",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr40_wraith_cockpit_refactor_wraith_hover_geometry.csv",
+          "body_sha256": "095106c48cc1724fadb47528e096408422ccaac6b93677138c5d7f1562bd17b8",
+          "checks": 10,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr40_wraith_refactor_wraith_cloak_front_geometry.csv",
+          "body_sha256": "939a36a5ca2f7c2aca66abe3f1f88ac057e14b6d3a66c6f888cf28a5e59f55e4",
+          "checks": 48,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr40_wraith_refactor_wraith_hover_belly_geometry.csv",
+          "body_sha256": "939a36a5ca2f7c2aca66abe3f1f88ac057e14b6d3a66c6f888cf28a5e59f55e4",
+          "checks": 48,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr40_wraith_refactor_wraith_weapons_belly_geometry.csv",
+          "body_sha256": "939a36a5ca2f7c2aca66abe3f1f88ac057e14b6d3a66c6f888cf28a5e59f55e4",
+          "checks": 48,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr40_wraith_refactor_wraith_weapons_empty_belly_geometry.csv",
+          "body_sha256": "939a36a5ca2f7c2aca66abe3f1f88ac057e14b6d3a66c6f888cf28a5e59f55e4",
+          "checks": 48,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "larkspur_l4_cockpit_geometry.csv",
+          "body_sha256": "3fc055d8e02351a301222e3eea07b467da924ad17d019fccce13078c7cb6cadf",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "larkspur_l4_front_geometry.csv",
+          "body_sha256": "3731285bff022107dc39dbd0bbdf24e5e8f87a96248025ed3ec8c71e3a2da6f3",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "larkspur_l4_wheel_nose_yaw_left_geometry.csv",
+          "body_sha256": "3731285bff022107dc39dbd0bbdf24e5e8f87a96248025ed3ec8c71e3a2da6f3",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "larkspur_l4_wheel_nose_yaw_right_geometry.csv",
+          "body_sha256": "3731285bff022107dc39dbd0bbdf24e5e8f87a96248025ed3ec8c71e3a2da6f3",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_bay_gear_pct000_belly_geometry.csv",
+          "body_sha256": "b47d160d9de0b31f9ea5a0cb99bb288f85b7eecb23a96998e7ad4e5660400dd3",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_bay_gear_pct050_belly_geometry.csv",
+          "body_sha256": "b47d160d9de0b31f9ea5a0cb99bb288f85b7eecb23a96998e7ad4e5660400dd3",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_bay_gear_pct100_belly_geometry.csv",
+          "body_sha256": "b47d160d9de0b31f9ea5a0cb99bb288f85b7eecb23a96998e7ad4e5660400dd3",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_cockpit_down_negative_geometry.csv",
+          "body_sha256": "3b60834a2d962fc958aa08338d50de625fcc65137735a2c64ade1471815b79c4",
+          "checks": 32,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_cockpit_down_positive_geometry.csv",
+          "body_sha256": "3b60834a2d962fc958aa08338d50de625fcc65137735a2c64ade1471815b79c4",
+          "checks": 32,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_cockpit_geometry.csv",
+          "body_sha256": "3b60834a2d962fc958aa08338d50de625fcc65137735a2c64ade1471815b79c4",
+          "checks": 32,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_fan_left_running_failed_left_phase1_geometry.csv",
+          "body_sha256": "b47d160d9de0b31f9ea5a0cb99bb288f85b7eecb23a96998e7ad4e5660400dd3",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_fan_running_phase0_geometry.csv",
+          "body_sha256": "b47d160d9de0b31f9ea5a0cb99bb288f85b7eecb23a96998e7ad4e5660400dd3",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_fan_running_phase1_geometry.csv",
+          "body_sha256": "b47d160d9de0b31f9ea5a0cb99bb288f85b7eecb23a96998e7ad4e5660400dd3",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_front_loaded_geometry.csv",
+          "body_sha256": "b47d160d9de0b31f9ea5a0cb99bb288f85b7eecb23a96998e7ad4e5660400dd3",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "original_local_cache",
+      "pass": true,
+      "checks": 684,
+      "fixtures": [
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "2ab28fe911db1945e91f6ccea402cfac7786dbd6b2bd0da8c1fa7e42749830f6",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "812c99a1d67ed3dcb204660a82547fa6c4e6d804407eb770ae56776b9d6bf7b7",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "85162f89b0a09a2781b8477f6ec1c9be5b36999f597e077b41b8236476ae6195",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "aeef5c305f58a01b190edf5e0de8abe242ca63403f1023844197d0b04be5dd11",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "5f056994c26fb643100b1d8ce85f72d6b081a5ebc506a618071e36914cba0017",
+          "checks": 10,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "6da303d9151a984ebdc9c6c0fc30ba17720e419ab4ec0da5712f5ffade29d09c",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "26107de4856db1113b9e4148879468355cd4ea1f3bed626cb1d2587a9cbe4e65",
+          "checks": 26,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "737b95fd6cda9cecad3e8d86ba4069d94abed6456bdc72c3202a30d20b3bc1dd",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "095106c48cc1724fadb47528e096408422ccaac6b93677138c5d7f1562bd17b8",
+          "checks": 10,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "939a36a5ca2f7c2aca66abe3f1f88ac057e14b6d3a66c6f888cf28a5e59f55e4",
+          "checks": 48,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "3fc055d8e02351a301222e3eea07b467da924ad17d019fccce13078c7cb6cadf",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "3731285bff022107dc39dbd0bbdf24e5e8f87a96248025ed3ec8c71e3a2da6f3",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "3b60834a2d962fc958aa08338d50de625fcc65137735a2c64ade1471815b79c4",
+          "checks": 32,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "b47d160d9de0b31f9ea5a0cb99bb288f85b7eecb23a96998e7ad4e5660400dd3",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "c08e9d101a12d2dc077e5534157cfc88d56c0e52e2b0a3f56b6a90154d4d1869",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "10349df6ac95f03e3e557cefe2842d59432b8ec7efa65b9a67257b3de237d6d7",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "3d1309f2babaa695f6d8eacf5f60fb1f926d3504c03f54e4cdbb1a4aeaa6bcf1",
+          "checks": 26,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "d47828be32135df5b9029b01a67e28cac67da5cfb93ea1e29f5ac18d2e318b18",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "7e8160dd4a6ee7fa3d7114565875e73aea207df998a187796a2ecb96d851005d",
+          "checks": 26,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "0c04590ee5e4c48abd241f06ab524bd4d55ef27b9df27678fa5a7f60ef28d78a",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "66d12547e54420f83a6c9fd225e3a36772332acd9889ad30ad17fdfb1d1b7058",
+          "checks": 30,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "9cc843689a11baf88e76a2e08e78bc804dc7a6de529ba43e95dc3fd1dce2e11c",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "b54a0f7ff429289d59ad3fc934103fc150d1bb53cb3ce93b2e9100f68e50dfb6",
+          "checks": 30,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "7513f95821a60ee90ee9b12edfa048b6603ab7f58b32ce3b170e1bd783269c13",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "0ba66528ecea83c0596eead9ed72057f71d6f7cdd78272729d1c9d2be52a8c1a",
+          "checks": 28,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "94b8de7e8e412a90de82c82ed5190401ceeba0dc08202c50494f7b8b181a4e2d",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "3b6002057b78345b2868ca3912306fecf9161f271e60f362194972e5a8bb8810",
+          "checks": 30,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "1b5bbf3b7833d8a58caacd6c5f9cbc5b728cff151f92e41784a8bbe159e7098e",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_cockpit_geometry.csv",
+          "body_sha256": "36e4d402a7e7f5be6f6bd91ef8c5f5476ffb3d1ab4b146cb5744ddf553a3d3a5",
+          "checks": 30,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "body_outside_geometry.csv",
+          "body_sha256": "622d3e0764641bb1772f6beec8d397c22ccedcb5a6b1f1994c122ecc8b8f453f",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        }
+      ]
+    },
+    {
+      "route": "extracted_package",
+      "pass": true,
+      "checks": 1080,
+      "fixtures": [
+        {
+          "fixture": "kestrel_cockpit_geometry.csv",
+          "body_sha256": "5536ae7dcb5204af9caab68cdd5cd6460698a8c4933debf22d2813c1d9323091",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "kestrel_front_geometry.csv",
+          "body_sha256": "290cceacd90249e0e55c52652fbfb8ebd577f506df52acdcecd0838fd75cb02c",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "wren_cockpit_geometry.csv",
+          "body_sha256": "7d82cf46953991845de77b9f4c8be435fd25d673447480d52334f11a80cf199e",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "wren_front_geometry.csv",
+          "body_sha256": "d819dcbc9b9858e60c8d41ae089b640f2e51585a7d0900925969f3aaf61f09c2",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "bush_cockpit_geometry.csv",
+          "body_sha256": "32e684c7329a87ed8fa676f6aab38685448af29880e9f908ed4bde425c81a8a8",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "bush_front_geometry.csv",
+          "body_sha256": "f132bcd78a779effb5a872bef7681d401fe7461fd8bf3bd449ef54599f255b2e",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "islander_cockpit_geometry.csv",
+          "body_sha256": "ca714a89310bee6ed7f4f7d8956a3de3f1f16b3584caf8cb336caf30ac4a7b15",
+          "checks": 26,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "islander_front_geometry.csv",
+          "body_sha256": "5a5196f300a2d0b657f573a2b29ce9bc9bd1de9fd68143747eba1069ba009b52",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "pelican_cockpit_geometry.csv",
+          "body_sha256": "d9b4cffebefc95ef11d6c12a92ee0e52f05df596990aaf6dcc659229b0f2419a",
+          "checks": 26,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "pelican_front_geometry.csv",
+          "body_sha256": "86266487692aebb5969a985c3f5f93d772d18dfc693252fa2334299d8eed0b55",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "meridian_cockpit_geometry.csv",
+          "body_sha256": "9d30ebdb09359ca00101269dd70e88fec996ed64646b75c88478dbcb1a77fed0",
+          "checks": 30,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "meridian_front_geometry.csv",
+          "body_sha256": "9015c33e3b504ba2bfdf622bb827b17dc38bdae18c20ac732da4747f109744e8",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "starling_cockpit_geometry.csv",
+          "body_sha256": "94dd6cf8e4148a5204c0d4e1ccef124cd612fe9d5eeeb2e96cd0f6a9bdf46c3a",
+          "checks": 30,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "starling_front_geometry.csv",
+          "body_sha256": "b44fa980f52a1f11012bb13fe641db521b1fbaa9f26d2831bfe9885346aff7df",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "swift_s6_cockpit_geometry.csv",
+          "body_sha256": "eec08bce129717e6693be4a30709e34b4931617541bb3cb0e70d71186b7d899d",
+          "checks": 28,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "swift_s6_front_geometry.csv",
+          "body_sha256": "93956a7a4462056d85473e5ed3422d40260b129738567f4831f0fb38aee299ac",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "osprey_c6_cockpit_geometry.csv",
+          "body_sha256": "ec5efe96ecaf2644d9eda8acbec1a7fa93825bdcb7cf570e76ef475c571cf066",
+          "checks": 30,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "osprey_c6_front_geometry.csv",
+          "body_sha256": "c0e1b51600a0230d4012d2d2c86dfdf49ad13ddcc592fd0caca236b539d102d7",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr10_nightjar_cockpit_geometry.csv",
+          "body_sha256": "755022a676dd84ae6fd92fd159ba756935b555af200ccfebc46fb8d618d52c0b",
+          "checks": 30,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr10_nightjar_front_geometry.csv",
+          "body_sha256": "0f81d4382a7381dc13e6eba5111600f0de086979b00b939606a994d5d9c515ff",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr30_specter_cockpit_refactor_specter_vector_geometry.csv",
+          "body_sha256": "fa901db123b4369a1031a4a37746bf8e27751f49410dbd1283984792fb581f5c",
+          "checks": 10,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr30_specter_refactor_specter_neutral_rear_geometry.csv",
+          "body_sha256": "293178a8b28c2924b1504c45fb75822a835d12ee88a69b31b680f267b8dc13e1",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr30_specter_refactor_specter_vector_rear_geometry.csv",
+          "body_sha256": "293178a8b28c2924b1504c45fb75822a835d12ee88a69b31b680f267b8dc13e1",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr20_mantis_cockpit_geometry.csv",
+          "body_sha256": "eccfd4b86dde0ce2c650dedb7ef40f5fcffc3847ebe71e07ece1863dcc0d7a3a",
+          "checks": 26,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr20_mantis_front_geometry.csv",
+          "body_sha256": "756e524b0ec5662236bb46e9ac942c74359624f47447bec98bb0ca1ee5da0f31",
+          "checks": 20,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr40_wraith_cockpit_refactor_wraith_hover_geometry.csv",
+          "body_sha256": "a946edb508373bcb42b8dcc7c5444326019be029cff9dcc0f061e62f23e73b2c",
+          "checks": 10,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr40_wraith_refactor_wraith_cloak_front_geometry.csv",
+          "body_sha256": "805986c7f24c3b427a58190f0223c298312e52646d86216dd8a357031ca229b3",
+          "checks": 48,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr40_wraith_refactor_wraith_hover_belly_geometry.csv",
+          "body_sha256": "805986c7f24c3b427a58190f0223c298312e52646d86216dd8a357031ca229b3",
+          "checks": 48,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr40_wraith_refactor_wraith_weapons_belly_geometry.csv",
+          "body_sha256": "805986c7f24c3b427a58190f0223c298312e52646d86216dd8a357031ca229b3",
+          "checks": 48,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "xr40_wraith_refactor_wraith_weapons_empty_belly_geometry.csv",
+          "body_sha256": "805986c7f24c3b427a58190f0223c298312e52646d86216dd8a357031ca229b3",
+          "checks": 48,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "larkspur_l4_cockpit_geometry.csv",
+          "body_sha256": "c750b91daafbfd9b5ae4eced87e4ae33d1474ace8474b791f86b3990aacf8e1b",
+          "checks": 24,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "larkspur_l4_front_geometry.csv",
+          "body_sha256": "b3efea0c10bd11ab8f7195afe062a2c0bbe4ae64c8f79d31a8b9c43910e1cfa1",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "larkspur_l4_wheel_nose_yaw_left_geometry.csv",
+          "body_sha256": "b3efea0c10bd11ab8f7195afe062a2c0bbe4ae64c8f79d31a8b9c43910e1cfa1",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "larkspur_l4_wheel_nose_yaw_right_geometry.csv",
+          "body_sha256": "b3efea0c10bd11ab8f7195afe062a2c0bbe4ae64c8f79d31a8b9c43910e1cfa1",
+          "checks": 16,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_bay_gear_pct000_belly_geometry.csv",
+          "body_sha256": "4900ac308460d9869621d75740c192c5ec029e6cdb6d5b5d92cdeca5a2900ccc",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_bay_gear_pct050_belly_geometry.csv",
+          "body_sha256": "4900ac308460d9869621d75740c192c5ec029e6cdb6d5b5d92cdeca5a2900ccc",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_bay_gear_pct100_belly_geometry.csv",
+          "body_sha256": "4900ac308460d9869621d75740c192c5ec029e6cdb6d5b5d92cdeca5a2900ccc",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_cockpit_down_negative_geometry.csv",
+          "body_sha256": "6535215642dd44723d2672601770ff4678fa1c815d7d4d51ecb73c9329d3efa7",
+          "checks": 32,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_cockpit_down_positive_geometry.csv",
+          "body_sha256": "6535215642dd44723d2672601770ff4678fa1c815d7d4d51ecb73c9329d3efa7",
+          "checks": 32,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_cockpit_geometry.csv",
+          "body_sha256": "6535215642dd44723d2672601770ff4678fa1c815d7d4d51ecb73c9329d3efa7",
+          "checks": 32,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_fan_left_running_failed_left_phase1_geometry.csv",
+          "body_sha256": "4900ac308460d9869621d75740c192c5ec029e6cdb6d5b5d92cdeca5a2900ccc",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_fan_running_phase0_geometry.csv",
+          "body_sha256": "4900ac308460d9869621d75740c192c5ec029e6cdb6d5b5d92cdeca5a2900ccc",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_fan_running_phase1_geometry.csv",
+          "body_sha256": "4900ac308460d9869621d75740c192c5ec029e6cdb6d5b5d92cdeca5a2900ccc",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        },
+        {
+          "fixture": "atlas_a180_front_loaded_geometry.csv",
+          "body_sha256": "4900ac308460d9869621d75740c192c5ec029e6cdb6d5b5d92cdeca5a2900ccc",
+          "checks": 22,
+          "different_files": [],
+          "pass": true
+        }
+      ]
+    }
+  ],
+  "local_centres": {
+    "checks": 282,
+    "pass": true,
+    "zero_bake_and_shader_work": true,
+    "gl_errors": [
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0"
+    ]
+  },
+  "pass": true
+}
