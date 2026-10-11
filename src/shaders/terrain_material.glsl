@@ -362,8 +362,9 @@ bool roadAt(vec2 p, out float across, out float along, out vec2 dir, out int cls
     vec4 a = roadTexel(2*(e0 + k)), b = roadTexel(2*(e0 + k) + 1);
     int code = int(b.w);
     if ((code & 4) != 0) continue;
-    int c = code & 3, pid = code >> 4;
-    vec2 ab = a.zw - a.xy; float L = max(length(ab), 1e-3), t = clamp(dot(p - a.xy, ab)/(L*L), 0.0, 1.0);
+    int c = code & 3, pid = code >> 6;
+    vec2 ab = a.zw - a.xy; float L = max(length(ab), 1e-3), tr = dot(p - a.xy, ab)/(L*L), t = clamp(tr, 0.0, 1.0);
+    if (((code & 16) != 0 && tr < 0.0) || ((code & 32) != 0 && tr > 1.0)) continue;   // (past an end at a bridge: under its deck)
     vec2 q = p - (a.xy + ab*t);
     float e = length(q) - roadHalfPlatform(c);   // (outside the verge: > 0)
     if (e < 1.0 && path >= 0 && pid != path && min(e, best) < 0.0) junction = true;
@@ -373,6 +374,27 @@ bool roadAt(vec2 p, out float across, out float along, out vec2 dir, out int cls
     }
   }
   return best < 0.0;
+}
+
+// The graded roads' own surface normal where their platform is - level across, tilted along by the road's grade -
+// blended back into the mesh's n over the platform's last metre. (A far chunk's cell spans a road and its banks: its
+// normal, their average, lit the paving as though it lay on the hillside, and laid rock on it where the banks were steep)
+vec3 roadSurfaceNormal(vec2 p, vec3 n){
+  uint h = roadHead(p); int cnt = int((h >> 19u) & 63u);
+  if (cnt == 0) return n;
+  int e0 = int(h & 0x7FFFFu);
+  float best = 1e9; vec3 nr = n;
+  for (int k = 0; k < 63; k++) {
+    if (k >= cnt) break;
+    vec4 a = roadTexel(2*(e0 + k)), b = roadTexel(2*(e0 + k) + 1);
+    int code = int(b.w);
+    if ((code & 12) != 0) continue;   // (a bridge's ground, an airfield's: as they are)
+    vec2 ab = a.zw - a.xy; float L = max(length(ab), 1e-3), tr = dot(p - a.xy, ab)/(L*L), t = clamp(tr, 0.0, 1.0);
+    if (((code & 16) != 0 && tr < 0.0) || ((code & 32) != 0 && tr > 1.0)) continue;
+    float e = length(p - (a.xy + ab*t)) - roadHalfPlatform(code & 3);
+    if (e < best) { best = e; vec2 dir = ab/L; float gr = (b.y - b.x)/L; nr = normalize(vec3(-gr*dir.x, 1.0, -gr*dir.y)); }
+  }
+  return normalize(mix(n, nr, 1.0 - smoothstep(-1.0, 0.0, best)));
 }
 
 // farmland: Voronoi field patchwork with crop rows and hedgerows

@@ -2,7 +2,8 @@
 // centreline; every stretch over water is one; its piers stand on the ground or the sea floor and carry the girders,
 // never more than 60 m apart; it is solid where it is drawn and open under its deck between the piers; its mesh is
 // whole. And the roads don't hang off the hillsides any more: no lane or track stands far above the ground off a
-// bridge, and no bridge over dry ground runs along a slope (v3.45 had 2 km of lane viaduct on stilts down Kaleo's side)
+// bridge, and no bridge over dry ground runs along a slope unless it stands high over it (v3.45 had 2 km of lane
+// viaduct on stilts down Kaleo's side)
 #include "../src/bridge_mesh.h"
 #include "../src/entities.h"
 #include "test_world.h"
@@ -75,6 +76,7 @@ int main() {
     check(!bridgeCollide(w.bridges, vec3(c.x, c.h + 40.f, c.z), 0.5f), "nothing over the deck");
     const float tDown = bridgeRaycast(w.bridges, vec3(c.x, c.h + 50.f, c.z), vec3(0, -1, 0), 100.f);
     check(fabsf(tDown - 50.f) < 0.05f, "a ray down meets the road surface");
+    if (fabsf(tDown - 50.f) >= 0.05f) printf("  bridge on path %d (%d..%d, %zu points, %.0f m) at %.0f %.0f: the ray met it at %.2f\n", b.path, b.first, b.last, b.deck.size(), b.length, c.x, c.z, tDown);
     check(g_scenery.collide(vec3(c.x, c.h + 0.4f, c.z), 0.5f) == kBridgeKind + 1, "the scenery's collision reports the bridge");
     int kind = -1; const float ts = g_scenery.raycast(vec3(c.x, c.h + 50.f, c.z), vec3(0, -1, 0), 100.f, &kind);
     check(ts >= 0.f && fabsf(ts - 50.f) < 0.05f && kind == 0, "the scenery's raycast stops at the bridge (no entity)");
@@ -88,10 +90,12 @@ int main() {
       const float x = (p0.x + p1.x) * 0.5f, z = (p0.z + p1.z) * 0.5f, y = std::min(p0.top, p1.top) - 2.5f, g = std::max(w.groundHeight(x, z), 0.f);
       if (y - g > 1.5f) check(!bridgeCollide(w.bridges, vec3(x, y, z), 0.5f), "open under the deck between the piers");
     }
-    // over dry ground it crosses something: most of its points not on a slope running across it
+    // over dry ground it crosses something: most of its points not on a slope running across it - or it stands high
+    // above the slope, a viaduct along it where a fill would have been more than 15 m high
     if (!b.water) {
       int slope = 0;
       for (size_t i = 0; i < b.deck.size(); i++) {
+        if (b.deck[i].h - w.naturalHeight(b.deck[i].x, b.deck[i].z) > 15.f) continue;
         const size_t a = i > 0 ? i - 1 : i, e = std::min(i + 1, b.deck.size() - 1);
         const float dx = b.deck[e].x - b.deck[a].x, dz = b.deck[e].z - b.deck[a].z, l = std::max(hypotf(dx, dz), 1e-3f);
         const float off = roadSpec(b.cls).halfPlatform + 20.f, px = -dz / l * off, pz = dx / l * off;
@@ -107,10 +111,11 @@ int main() {
     for (size_t k = 0; k < p.pts.size(); k++) {
       const bool br = (k > 0 && p.bridge[k - 1]) || (k + 1 < p.pts.size() && p.bridge[k]);
       const float g = w.naturalHeight(p.pts[k].x, p.pts[k].z);
-      if (!br && g >= 0.5f) worst = std::max(worst, p.pts[k].h - g);
+      if (!br && g >= 0.5f && p.pts[k].h - g > worst) { worst = p.pts[k].h - g; if (worst > 18.f) printf("  %s %d->%d point %zu at %.0f %.0f: %.1f m over the ground\n", p.cls == RC_LANE ? "lane" : "track", p.from, p.to, k, p.pts[k].x, p.pts[k].z, worst); }
     }
   }
-  check(worst < 15.f, "no lane or track stands more than 15 m over the ground off a bridge");
+  // (more than 15 m clear along a hillside for 45 m or more is a viaduct: a fill's crest between two short of it, no higher)
+  check(worst < 18.f, "no lane or track stands more than 18 m over the ground off a bridge");
   // the meshes: one per bridge, whole, the road surface at the road's height
   std::vector<EVert> verts; std::vector<BridgeMeshRange> ranges;
   buildBridgeMeshes(w.bridges, verts, ranges);

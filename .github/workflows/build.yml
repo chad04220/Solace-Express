@@ -70,7 +70,7 @@ jobs:
                    --jq '[.[] | select(.event == "push" or .event == "workflow_dispatch" or .event == "schedule")][0].headSha // ""' || true)
             if [ -n "$base" ] && ! git fetch -q --no-tags --depth=1 origin "$base"; then base=""; fi
           fi
-          python3 tools/ci/select_tests.py --build-dir build --exclude "shader_glsl|terrain_shadow_bake" --shards 3 --shard ${{ matrix.shard }} ${base:+--base "$base"}
+          python3 tools/ci/select_tests.py --build-dir build --exclude "shader_glsl|terrain_shadow_bake|road_grade_gpu" --shards 3 --shard ${{ matrix.shard }} ${base:+--base "$base"}
       - name: Build
         if: steps.pick.outputs.mode != 'none'
         run: |
@@ -84,14 +84,14 @@ jobs:
           UBSAN_OPTIONS: print_stacktrace=1
           FLIGHT_QUICK: 1   # (the flight model's type-by-type checks on one of each kind of aircraft: the Windows job flies them all)
           PICKED: ${{ steps.pick.outputs.regex }}
-        run: ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake" -R "$PICKED"
+        run: ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake|road_grade_gpu" -R "$PICKED"
       - name: Test, every type (nightly)   # (FLIGHT_QUICK unset - set at all, even empty, it counts)
         if: github.event_name == 'schedule' && steps.pick.outputs.mode != 'none'
         env:
           ASAN_OPTIONS: detect_leaks=0
           UBSAN_OPTIONS: print_stacktrace=1
           PICKED: ${{ steps.pick.outputs.regex }}
-        run: ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake" -R "$PICKED"
+        run: ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake|road_grade_gpu" -R "$PICKED"
 
   windows:
     if: github.event_name != 'schedule' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)

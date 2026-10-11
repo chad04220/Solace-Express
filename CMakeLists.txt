@@ -32,7 +32,7 @@ set(CORE_ONLY_SOURCES
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
 set(GAME_ONLY_SOURCES
   src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_wraith.cpp src/renderer.cpp src/materials.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp)
-set(GAME_SOURCES ${CORE_SOURCES} src/entity_mesh.cpp ${GAME_ONLY_SOURCES})
+set(GAME_SOURCES ${CORE_SOURCES} src/entity_mesh.cpp src/bridge_mesh.cpp ${GAME_ONLY_SOURCES})
 add_library(env_objs OBJECT ${ENVIRONMENT_SOURCES})
 add_library(core_objs OBJECT ${CORE_ONLY_SOURCES})
 add_library(mesh_objs OBJECT src/entity_mesh.cpp src/bridge_mesh.cpp)
@@ -279,10 +279,15 @@ if(UNIX AND NOT APPLE)   # the terrain-shadow bake shader run on software GL thr
   add_executable(terrain_shadow_test tests/terrain_shadow_test.cpp src/gl.cpp ${ENV_OBJS})
   target_link_libraries(terrain_shadow_test PRIVATE ${CMAKE_DL_LIBS})
   add_test(NAME terrain_shadow_bake COMMAND terrain_shadow_test)
+  # the roads graded into the ground by the shaders against the C++ (roads.glsl and road_network.cpp, kept in step)
+  add_executable(road_grade_gpu_test tests/road_grade_gpu_test.cpp src/gl.cpp ${ENV_OBJS})
+  target_link_libraries(road_grade_gpu_test PRIVATE ${CMAKE_DL_LIBS})
+  add_test(NAME road_grade_gpu COMMAND road_grade_gpu_test)
+  set_tests_properties(road_grade_gpu PROPERTIES COST 5)
 endif()
 
 # everything that includes the shader headers waits for the generated constants
-foreach(t SolaceExpress gameplay_test encounter_timing_test shader_keyword_test shader_check terrain_shadow_test)
+foreach(t SolaceExpress gameplay_test encounter_timing_test shader_keyword_test shader_check terrain_shadow_test road_grade_gpu_test)
   if(TARGET ${t})
     add_dependencies(${t} shaders_gen)
   endif()
@@ -499,6 +504,11 @@ add_executable(bridges_test tests/bridges_test.cpp ${MESH_OBJS} ${ENV_OBJS})
 target_include_directories(bridges_test PRIVATE src)
 add_test(NAME bridges COMMAND bridges_test)
 set_tests_properties(bridges PROPERTIES COST 15)
+# the road network's layout and the ground built under it (road_network.h): grades, curves, the bed, the joints
+add_executable(roads_test tests/roads_test.cpp ${ENV_OBJS})
+target_include_directories(roads_test PRIVATE src)
+add_test(NAME roads COMMAND roads_test)
+set_tests_properties(roads PROPERTIES COST 20)
 
 # The islands, generated once a test run (tests/test_world.cpp, the "world" fixture: ctest runs it before any test
 # below, even when asked for just one) and loaded by the tests that fly over them (tests/test_world.h) instead of each
@@ -517,7 +527,7 @@ foreach(t airport_environment airport_layouts cockpit_camera community_layout uf
           environment_scale_audit flight_model_1 flight_model_2 flight_model_3 gameplay_loop_1 gameplay_loop_2 gameplay_loop_3
           gameplay_loop_4 campaign_progression_1 campaign_progression_2 campaign_progression_3 career_saves terrain_shadow_bake
           volcano_effects new_aircraft_performance new_aircraft_autoland_larkspur new_aircraft_autoland_atlas new_aircraft_go_around
-          vtol_throttle wreck_pose bridges)
+          vtol_throttle wreck_pose bridges roads road_grade_gpu)
   if(TEST ${t})
     set_property(TEST ${t} APPEND PROPERTY FIXTURES_REQUIRED world)
     set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT "SOLACE_TEST_WORLD=${CMAKE_BINARY_DIR}/test_world.bin")
@@ -526,7 +536,7 @@ endforeach()
 foreach(t airport_environment_test airport_layout_test cockpit_camera_test community_layout_test encounter_timing_test
           entity_raycast_test envelope_test environment_scale_audit flight_test gameplay_test progression_test save_test
           terrain_shadow_test volcano_effects_test new_aircraft_performance_test new_aircraft_autoland_test vtol_throttle_test
-          bridges_test)
+          bridges_test roads_test road_grade_gpu_test)
   if(TARGET ${t})
     add_dependencies(${t} test_world)
   endif()

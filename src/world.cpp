@@ -422,7 +422,7 @@ int World::findAirport(const char* code) const {
 // segment's highest end: the bounds of the terrain lift to it
 template <class F> static void forEachRoadCell(const RoadGrid& grid, float cs, int n, float slack, F f) {
   for (const RoadSegment& s : grid.segs) {
-    if (s.flags) continue;
+    if (s.flags & (RS_BRIDGE | RS_NOGRADE)) continue;
     const float R = roadSpec(s.cls).halfPlatform + ROAD_BANK_MAX + slack, top = std::max(s.ah, s.bh);
     auto cell = [&](float v) { return std::clamp((int)floorf((v + WORLD_HALF) / cs), 0, n - 1); };
     for (int j = cell(std::min(s.az, s.bz) - R); j <= cell(std::max(s.az, s.bz) + R); j++)

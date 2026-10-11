@@ -62,6 +62,9 @@ void buildBridgeMeshes(const std::vector<Bridge>& bridges, std::vector<EVert>& o
       const float cs = std::max(dot(a, a0), 0.5f);   // (the mitre: the deck keeps its width through a bend)
       ac[i] = a / cs;
     }
+    // its ends square to the road running onto it, where the road's graded bed stops square too
+    if (b.inX != 0.f || b.inZ != 0.f) { dir[0] = vec3(b.inX, 0, b.inZ); ac[0] = vec3(-b.inZ, 0, b.inX); }
+    if (b.outX != 0.f || b.outZ != 0.f) { dir[n - 1] = vec3(b.outX, 0, b.outZ); ac[n - 1] = vec3(-b.outZ, 0, b.outX); }
     const float H = b.halfDeck, w = 0.35f, s = 0.35f, D = b.depth, g = H * 0.72f;
     const bool barrier = b.cls <= RC_ROAD;
     const float par = barrier ? bridgeParapet(b.cls) : 0.25f;   // (the lanes: a kerb, the steel rail above it)

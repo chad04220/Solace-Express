@@ -6,8 +6,9 @@
 
 namespace {
 
-// The deck's edge beyond the paving: a kerb (and on the highways and roads a narrow walkway), then the parapet
-float deckHalf(int cls) { return roadSpec(cls).halfPaved + (cls <= RC_ROAD ? 0.9f : 0.45f) + 0.35f; }
+// The deck as wide as the road's platform, so its edges run on from the graded bed's: beyond the paving, where the
+// ground has its verge, a kerb and walkway, the parapet at the edge
+float deckHalf(int cls) { return roadSpec(cls).halfPlatform; }
 
 // An oriented box: centre, unit axes and half sizes along them
 struct OBox { vec3 c, ax, ay, az; float hx, hy, hz; };
@@ -38,7 +39,9 @@ float segmentHits(const OBox& b, vec3 a, vec3 d, float L) {
 // The solid parts of a bridge, deck segment by segment (its slab, its two parapets) and pier by pier
 template <class F> void forEachBox(const Bridge& b, F&& f) {
   const float par = bridgeParapet(b.cls);
-  for (size_t i = 0; i + 1 < b.deck.size(); i++) {
+  const size_t n = b.deck.size();
+  auto level = [&](size_t i) { const float dx = b.deck[i + 1].x - b.deck[i].x, dz = b.deck[i + 1].z - b.deck[i].z, l = std::max(hypotf(dx, dz), 1e-6f); return vec2(dx / l, dz / l); };
+  for (size_t i = 0; i + 1 < n; i++) {
     const RoadPoint &A = b.deck[i], &B = b.deck[i + 1];
     vec3 a(A.x, A.h, A.z), c(B.x, B.h, B.z);
     vec3 along = c - a; const float len = length(along);
@@ -48,9 +51,15 @@ template <class F> void forEachBox(const Bridge& b, F&& f) {
     vec3 up = cross(across, along);
     if (up.y < 0) up = up * -1.f;
     const vec3 mid = (a + c) * 0.5f;
-    f(OBox{mid - up * (b.depth * 0.5f), across, up, along, b.halfDeck, b.depth * 0.5f, len * 0.5f});   // the slab and girders
+    // (each box overlapping its neighbours by the mitre the bend between them leaves open at the outer edge - and a
+    // few centimetres more, so the joint on the centreline is inside both rather than on two faces' edge)
+    const vec2 d = level(i);
+    float bend = 0.f;
+    for (size_t j : {i - 1, i + 1}) if (j < n - 1) { const vec2 e = level(j); bend = std::max(bend, fabsf(d.x * e.y - d.y * e.x)); }
+    const float hz = len * 0.5f + b.halfDeck * bend + 0.05f;
+    f(OBox{mid - up * (b.depth * 0.5f), across, up, along, b.halfDeck, b.depth * 0.5f, hz});   // the slab and girders
     for (float s : {-1.f, 1.f})   // the parapets, standing on its edges
-      f(OBox{mid + across * (s * (b.halfDeck - 0.2f)) + up * (par * 0.5f), across, up, along, 0.2f, par * 0.5f, len * 0.5f});
+      f(OBox{mid + across * (s * (b.halfDeck - 0.2f)) + up * (par * 0.5f), across, up, along, 0.2f, par * 0.5f, hz});
   }
   for (const BridgePier& p : b.piers) {
     const vec3 ux(p.ux, 0.f, p.uz), vx(-p.uz, 0.f, p.ux);
@@ -79,6 +88,8 @@ std::vector<Bridge> buildBridges(const World& world) {
       }
       b.length = along[e] - along[k];
       b.halfDeck = deckHalf(b.cls);
+      if (k > 0) { const float dx = P.pts[k].x - P.pts[k - 1].x, dz = P.pts[k].z - P.pts[k - 1].z, l = std::max(hypotf(dx, dz), 1e-3f); b.inX = dx / l; b.inZ = dz / l; }
+      if (e + 1 < n) { const float dx = P.pts[e + 1].x - P.pts[e].x, dz = P.pts[e + 1].z - P.pts[e].z, l = std::max(hypotf(dx, dz), 1e-3f); b.outX = dx / l; b.outZ = dz / l; }
       // how high it stands (the deck's underside over the ground or the water): the piers further apart the higher
       // it stands, and the girders that much deeper
       float clear = 0;

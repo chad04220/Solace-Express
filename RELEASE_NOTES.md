@@ -1,15 +1,21 @@
 ## What's new in v3.47.0
 
+### Roads laid out the way roads are
+- **No road is steeper than its kind allows:** 6% on the highways, 9% on the roads, 12% on the country lanes. The routes are now found at those grades, so a road can follow the ground. Before, lanes reached 19%, and stretches of road stood tens of metres off a hillside or cut deep into it.
+- **Up a mountain, the roads climb in switchbacks:** long legs across the slope and proper hairpins, not a sawtooth of short zigzags.
+- **The curves are round.** Every curve is at least as wide as its road needs (450 m on the highways, 140 m on the roads, 45 m on the lanes), except a hairpin up a slope. Each curve is drawn smoothly. Crests and dips are rounded too, longer on the faster roads.
+- **The ground under a road is a flat, level bed,** with banks either side cut or filled at about 1 in 2 and rounded at the top and bottom. Before, the bed could tilt where pieces of road met, and a highway's could sit a third of a metre off its own slope.
+- **No more doubled roads.** Where a road's way follows another road, it now joins it at a junction and leaves it at another. Before, it ran alongside a few metres away, about 73 km of doubled road in all.
+- **From the air,** the ground along the roads is drawn in finer detail out to about 2 km, and road surfaces are lit as the flat surfaces they are. A distant road no longer looks as if it lies tilted on the hillside.
+- Beside an airfield, a road lies on the airfield's ground as it is, as before. The airfields themselves are untouched.
+
 ### Bridges
-- The roads now cross the water on bridges. Each is a concrete deck on piers, carrying its road's surface and markings between parapets, with an abutment at each end. The bridges are lit and cast shadows like the buildings, and they're solid: fly under the deck between the piers, not into it.
-- There are five: the four sea crossings and a road over a ravine. Until now, a road stopped at the water's edge and carried on from the far side.
+- The roads now cross the water and the steepest mountain gullies on bridges: twelve in all, seven over the water. Each is a concrete deck on piers, carrying its road's surface and markings between parapets, with an abutment at each end. The bridges are lit and cast shadows like the buildings, and they're solid: fly under the deck between the piers, not into it. Until now, a road stopped at the water's edge and carried on from the far side.
+- **Each bridge joins its road without a seam.** The deck is as wide as the road, and its ends are square to it. The road meets the deck at the deck's height, and the markings run straight on across. Under each end, the embankment slopes away beneath the first span.
 - Nothing grows up through a bridge. Trees and buildings under one stay below its deck.
 
-### Mountain lanes
-- Lanes and tracks on steep hillsides now follow the ground, cut into the slope as a shelf. Before, where the slope fell faster than a lane could, the lane stood off the hill in the air, nearly 5 km of it in all. Those stretches weren't drawn at all: the lane stopped, then started again further down.
-
 ### Good to know
-- **The first launch after updating takes longer, once.** The islands are regenerated.
+- **The first launch after updating takes longer, once.** The islands are regenerated, and some roads now take different routes.
 
 Please run `diagnostics.bat` on this version.
 

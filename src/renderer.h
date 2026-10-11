@@ -511,6 +511,11 @@ private:
   void rasterTrafficShadowMaps(const FrameParams& fp);
   GLuint iboTerrain = 0, vaoTerrain = 0, vboTerrainInst = 0, vaoWater = 0, vboWater = 0, iboWater = 0; int waterIdx = 0;
   std::vector<float> terrInst; int terrChunks = 0;
+  // where the graded roads are, for the terrain mesh's detail along them: per level (level 0 the heightfield's texels,
+  // each level up a quarter as many cells) the narrowest graded road's half platform whose platform or the 20 m beside
+  // it reaches the cell (m, rounded up; 0: none)
+  std::vector<std::vector<uint8_t>> roadLod;
+  void buildRoadLod();
   bool compileRaster(const std::function<void()>& step = {});
   bool compileTerrainMesh(const std::function<void()>& step = {});
   void initTerrainMesh();

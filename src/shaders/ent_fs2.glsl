@@ -362,7 +362,8 @@ void main(){
       vec3 kerbAlb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nbC, roughC)*vec3(0.84, 0.83, 0.8);
       if (rc == 3) alb = triS(lp, n0, M_GRAVEL, 5.0, 0.4, nb, rough)*0.9;
       else {
-        alb = triS(lp, n0, M_ASPHALT, 4.0, 0.35, nb, rough)*(rc == 0 ? 0.72 : rc == 1 ? 0.82 : 0.86);
+        alb = triS(lp, n0, M_ASPHALT, 4.0, 0.35, nb, rough)*(rc == 0 ? 0.72 : rc == 1 ? 0.82 : 0.95);
+        if (rc == 2) alb *= 0.9 + 0.2*vn3(lp*vec3(1.0/7.0, 0.0, 1.0/7.0));   // (a lane worn paler, patched: as on the ground)
         float paint = 0.0, yellow = 0.0;
         if (rc == 0) {   // dual carriageway: the central reserve's barrier, the lane lines and the edges
           alb = mix(alb, kerbAlb*0.95, entityLine(x, 2.0, fx));

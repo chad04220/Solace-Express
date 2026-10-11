@@ -24,6 +24,15 @@ int main() {
     if (p.to >= 0) joined[p.to]++;
     check(p.pts.size() >= 2 && p.bridge.size() + 1 == p.pts.size(), "a path has points and a bridge flag per segment");
     float length = 0; for (size_t k = 1; k < p.pts.size(); k++) length += hypotf(p.pts[k].x - p.pts[k - 1].x, p.pts[k].z - p.pts[k - 1].z);
+    // (by an airfield, and 100 m either side, the road lies on the airfield's ground as it is: never graded)
+    std::vector<uint8_t> byAirfield(p.pts.size(), 0);
+    {
+      std::vector<float> along(p.pts.size(), 0.f);
+      for (size_t k = 1; k < p.pts.size(); k++) along[k] = along[k - 1] + hypotf(p.pts[k].x - p.pts[k - 1].x, p.pts[k].z - p.pts[k - 1].z);
+      for (size_t k = 0; k + 1 < p.pts.size(); k++)
+        if (roadByAirfield(p.pts[k], p.pts[k + 1], p.cls))
+          for (size_t q = 0; q < p.pts.size(); q++) byAirfield[q] = byAirfield[q] || (along[q] > along[k] - 100.f && along[q] < along[k + 1] + 100.f);
+    }
     for (size_t k = 0; k < p.pts.size(); k++) {
       const RoadPoint& q = p.pts[k];
       check(std::isfinite(q.x + q.z + q.h), "finite road points");
@@ -41,7 +50,7 @@ int main() {
         check(run > 0.5f, "no zero-length road segments");
         // (ends too far apart in height for the road's length: the shortfall spread evenly along it)
         const float spread = fabsf(p.pts.back().h - p.pts.front().h) / std::max(length, 1.f);
-        const bool steep = fabsf(q.h - o.h) > (roadSpec(p.cls).maxGrade * 1.05f + spread) * run + 0.05f;
+        const bool steep = !byAirfield[k] && !byAirfield[k - 1] && fabsf(q.h - o.h) > (roadSpec(p.cls).maxGrade * 1.05f + spread) * run + 0.05f;
         if (steep) std::printf("  steep: path %d->%d class %d at %.0f %.0f: %.1f m over %.1f m\n", p.from, p.to, (int)p.cls, q.x, q.z, q.h - o.h, run);
         check(!steep, "roads graded within their class's limit");
       }

@@ -23,7 +23,10 @@ struct Bridge {
   bool water = false;                   // over the sea (else a viaduct over a valley or a hillside)
   std::vector<RoadPoint> deck;          // the centreline, the abutments' ends included: the road's own points and heights
   std::vector<float> along;             // the distance along the road at each deck point (m, from the path's start)
-  float halfDeck = 0;                   // the deck's half width, parapets included (m)
+  float halfDeck = 0;                   // the deck's half width, parapets included: the road's platform's (m)
+  float inX = 0, inZ = 0, outX = 0, outZ = 0;   // the road's direction onto its first point and off its last (unit,
+                                                // level; zero where the road starts or ends on it): its ends square to
+                                                // the road there, as the road's graded bed ends square to it (roadGrade)
   float depth = 0;                      // the structure's depth under the road surface (slab and girders, m)
   float length = 0;                     // between the abutments (m)
   std::vector<BridgePier> piers;
