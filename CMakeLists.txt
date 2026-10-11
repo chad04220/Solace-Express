@@ -126,11 +126,23 @@ add_executable(hive_world_benchmark EXCLUDE_FROM_ALL tests/hive_world_benchmark.
 add_executable(hive_combat_test tests/hive_combat_test.cpp src/hive_combat.cpp)
 # Match Windows /fp:fast semantics so finite-input guards cannot disappear under release optimization.
 add_executable(hive_combat_fastmath_test tests/hive_combat_test.cpp src/hive_combat.cpp)
+# MSVC's Visual Studio generator uses source.obj; Ninja/Make preserve source.cpp.o
+# (or source.cpp.obj). Exclude the strict object before linking its fast-math copy.
+# Check both naming styles at configure time, including similarly named objects
+# that must remain, so a Linux-only build cannot hide another MSVC duplicate link.
+foreach(source career hive_world_collision)
+  set(${source}_object_filter "(^|/)${source}([.]cpp)?[.](o|obj)$")
+  set(object_filter_probe "core.dir/${source}.cpp.o;core.dir/${source}.cpp.obj;core.dir/Release/${source}.obj;${source}.obj;core.dir/other_${source}.obj;core.dir/${source}_test.cpp.o")
+  list(FILTER object_filter_probe EXCLUDE REGEX "${${source}_object_filter}")
+  if(NOT object_filter_probe STREQUAL "core.dir/other_${source}.obj;core.dir/${source}_test.cpp.o")
+    message(FATAL_ERROR "Fast-math object exclusion failed for ${source}: ${object_filter_probe}")
+  endif()
+endforeach()
 add_executable(military_career_fastmath_test tests/military_career_test.cpp src/career.cpp ${ENV_OBJS}
-  "$<FILTER:$<TARGET_OBJECTS:core_objs>,EXCLUDE,career[.]cpp[.](o|obj)$>")
+  "$<FILTER:$<TARGET_OBJECTS:core_objs>,EXCLUDE,${career_object_filter}>")
 add_executable(hive_loadout_fastmath_test tests/hive_loadout_test.cpp src/hive_loadout.cpp)
 add_executable(hive_world_collision_fastmath_test tests/hive_world_collision_test.cpp src/hive_world_collision.cpp ${ENV_OBJS}
-  "$<FILTER:$<TARGET_OBJECTS:core_objs>,EXCLUDE,hive_world_collision[.]cpp[.](o|obj)$>")
+  "$<FILTER:$<TARGET_OBJECTS:core_objs>,EXCLUDE,${hive_world_collision_object_filter}>")
 foreach(t hive_combat_fastmath_test military_career_fastmath_test hive_loadout_fastmath_test hive_world_collision_fastmath_test)
   if(MSVC)
     target_compile_options(${t} PRIVATE /fp:fast)
