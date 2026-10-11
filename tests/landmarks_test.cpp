@@ -118,6 +118,54 @@ int main() {
     }
   }
   check(domes == 3 && forts == 1 && jetties == 1 && cottages == 2, "the observatory's three domes, a star fort, Lighthouse Key's cottages and landing stage");
+  // the cities': Solace Capital's stadium in the city on level ground no road crosses, no building in it; Port Verde's
+  // terminal - its quay's wall at 8 m of water, its apron reclaimed from the shallows back to the land, four cranes on
+  // it, a ship alongside in the water
+  {
+    RoadIndex roads;
+    for (size_t pi = 0; pi < w.roads.paths.size(); pi++) roads.addPath(w.roads.paths[pi], (int)pi);
+    int stadiums = 0, quays = 0, cranes = 0, stacks = 0, ships = 0;
+    const Ent* quay = nullptr;
+    for (const PlacedEnt& p : items) if (p.kind == EK_QUAY) quay = &p.e;
+    for (const PlacedEnt& p : items) {
+      const Ent& e = p.e; const float c = cosf(e.yaw), s = sinf(e.yaw);
+      auto at = [&](float x, float z) { return vec2(e.x + c * x + s * z, e.z - s * x + c * z); };   // (local to world, as ent_vs)
+      if (p.kind == EK_STADIUM) {
+        stadiums++;
+        int town = -1; settlementShare(w.settlements, e.x, e.z, &town);
+        check(town >= 0 && !strcmp(kTowns[town].name, "Solace Capital"), "the stadium in Solace Capital");
+        float lo = 1e9f, hi = -1e9f; bool clear = true;
+        for (float a = -92.f; a <= 92.f; a += 23.f) for (float b = -74.f; b <= 74.f; b += 18.5f) {
+          const vec2 q = at(a, b); const float g = w.groundHeight(q.x, q.y);
+          lo = std::min(lo, g); hi = std::max(hi, g);
+          clear = clear && roads.nearest(q, 3.f, -1, nullptr, nullptr, true) >= 1.f;
+        }
+        check(hi - lo <= 5.5f && clear, "the stadium on level ground no road crosses");
+        std::vector<int> near; lotsIn(e.x - 120.f, e.z - 120.f, e.x + 120.f, e.z + 120.f, near);
+        int inside = 0;
+        for (int id : near) { const Lot& L = settlementLots()[id]; const float dx = L.cx - e.x, dz = L.cz - e.z;
+          const float lx = dx * c - dz * s, lz = dx * s + dz * c; inside += fabsf(lx) < 92.f && fabsf(lz) < 74.f; }
+        check(inside == 0, "no building in the stadium");
+      }
+      if (p.kind == EK_QUAY) {
+        quays++;
+        int landed = 0;
+        for (float x = -200.f; x <= 200.f; x += 50.f) {
+          const vec2 sea = at(x, 30.f), apron = at(x, -60.f), back = at(x, -124.f);
+          check(w.groundHeight(sea.x, sea.y) < -8.f && w.groundHeight(apron.x, apron.y) <= e.y + 0.3f && w.groundHeight(apron.x, apron.y) > -12.5f, "the quay at deep water, its apron over the land and the shallows");
+          landed += w.groundHeight(back.x, back.y) > 0.f;
+        }
+        check(landed >= 5 && e.y >= 3.f, "the quay's apron reaching back to the land, 3 m and more over the sea");
+      }
+      if (p.kind == EK_GANTRY) { cranes++; check(quay && fabsf(e.y - quay->y) < 0.01f, "a crane on the quay"); }
+      if (p.kind == EK_CONTAINERS) stacks++;
+      if (p.kind == EK_CONTAINERSHIP) {
+        ships++;
+        check(e.y == 0.f && w.groundHeight(e.x, e.z) < -8.f, "the container ship afloat alongside, in deep water");
+      }
+    }
+    check(stadiums == 1 && quays == 1 && cranes == 4 && stacks >= 6 && ships == 1, "the stadium; the terminal's quay, four cranes, its containers and a ship");
+  }
   // in their chunks' scenery, as generated
   for (size_t i = 0; i < turbines.size(); i += 3) {
     const Ent& t = turbines[i];

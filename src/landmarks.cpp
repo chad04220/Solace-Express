@@ -254,6 +254,13 @@ void sceneryBakeLandmarks(const World& world) {
   observatory(world, out);
   starFort(world, out);
   lighthouseKey(world, out);
+  for (const PlacedEnt& c : civicLandmarks()) {   // (the cities': placed with their lots; their grounds cleared)
+    out.push_back(c);
+    if (c.kind == EK_STADIUM) g_clearings.push_back(vec3(c.e.x, c.e.z, 105.f));
+    if (c.kind == EK_QUAY)
+      for (float x = -180.f; x <= 180.f; x += 90.f)
+        g_clearings.push_back(vec3(c.e.x + cosf(c.e.yaw) * x - sinf(c.e.yaw) * 62.f, c.e.z - sinf(c.e.yaw) * x - cosf(c.e.yaw) * 62.f, 80.f));
+  }
   g_landmarks.build(out);
 }
 

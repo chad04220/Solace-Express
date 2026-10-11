@@ -52,6 +52,9 @@ void sceneryBakeLandmarks(const World& world);
 const std::vector<PlacedEnt>& landmarks();
 std::pair<const PlacedEnt*, const PlacedEnt*> landmarksIn(int cx, int cz);
 const std::vector<vec3>& landmarkClearings();
+// The cities' landmarks, placed with their lots (sceneryBakeCommunityLots): Solace Capital's stadium, Port Verde's
+// container terminal - its quay, cranes, container stacks and a ship alongside
+const std::vector<PlacedEnt>& civicLandmarks();
 // Lighthouse Key's light (entities.cpp): its place in that world, and which way it looks out to sea
 bool findLighthouseSite(const World& world, float& x, float& z, float& yaw);
 void sceneryInit();  // build shared road tables before any threaded use

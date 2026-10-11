@@ -113,6 +113,17 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
     under slate, a magazine, and its flag.
   - Lighthouse Key now has its keepers' two cottages behind the light, and a timber landing stage on the nearest shore
     with a fishing boat moored alongside.
+- **Phase C: the cities' landmarks (after v3.48).** Each is placed with the cities' lots (`sceneryBakeCommunityLots`), on
+  ground no road crosses (checked on a fine grid) and claimed before any lot:
+  - Solace Capital's stadium stands on the flattest dry ground at the city's edge that it fits, beside the highway. It
+    is an oval bowl 184 x 148 m: a striped, lined pitch, two tiers of blue seats (a white band, people here and there),
+    the concourse wall with its fins, and the roof ring with its floodlights. After dark the pitch and stands glow as
+    if floodlit.
+  - Port Verde's container terminal stands 4 km from the city, which is on a hill: its quay is reclaimed from the
+    shallows on the nearest straight 430 m of shore with 8 m of water at the berth. It has a concrete apron 5 m up with
+    its rails and bays marked, fenders, bollards and ladders down the wall. Four ship-to-shore gantry cranes stand on
+    it, blue and red, booms out over the water. Behind them are blocks of containers stacked one to four high, each
+    its own line's colour, and a 230 m container ship lies alongside, loaded.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

@@ -2,6 +2,7 @@
 #include "scenery.h"
 #include "airport_layout.h"
 #include "entities.h"
+#include <cstring>
 #include <mutex>
 #include <unordered_map>
 
@@ -260,6 +261,7 @@ float World::groundHeight(float x, float z, int octaves) const { return height(x
 namespace {
 std::vector<Lot> g_lots;
 std::vector<TreeSpot> g_trees;
+std::vector<PlacedEnt> g_civic;   // (the cities' landmarks: sceneryBakeCommunityLots)
 std::unordered_map<int64_t, std::vector<int>> g_lotCells, g_treeCells;
 const float kLotCell = 64.f;
 int64_t lotKey(int i, int j) { return (int64_t)i * 1000003 + j; }
@@ -324,12 +326,13 @@ bool overlaps(const Footprint& a, const Footprint& b) {
 }  // namespace
 
 const std::vector<Lot>& settlementLots() { return g_lots; }
+const std::vector<PlacedEnt>& civicLandmarks() { return g_civic; }
 const std::vector<TreeSpot>& settlementTrees() { return g_trees; }
 void lotsIn(float x0, float z0, float x1, float z1, std::vector<int>& out) { cellsIn(g_lotCells, x0, z0, x1, z1, out); }
 void treesIn(float x0, float z0, float x1, float z1, std::vector<int>& out) { cellsIn(g_treeCells, x0, z0, x1, z1, out); }
 
 void sceneryBakeCommunityLots(const World& world) {
-  g_lots.clear(); g_trees.clear(); g_lotCells.clear(); g_treeCells.clear();
+  g_lots.clear(); g_trees.clear(); g_lotCells.clear(); g_treeCells.clear(); g_civic.clear();
   if (world.settlements.empty()) return;
   RoadIndex roads;
   for (size_t pi = 0; pi < world.roads.paths.size(); pi++) roads.addPath(world.roads.paths[pi], (int)pi);
@@ -406,6 +409,89 @@ void sceneryBakeCommunityLots(const World& world) {
         }
       }
       break;
+    }
+  }
+  // ---- the cities' landmarks (docs/LIVING_ISLANDS_PLAN.md, Phase C), each on ground no road crosses (on a fine grid:
+  // fits() looks only at a footprint's corners, edges and middle) and claimed before the lots: Solace Capital's stadium,
+  // on the flattest dry ground nearest its heart that it fits; Port Verde's container terminal, along a straight 430 m
+  // of its shore with deep water off it and low, flat land behind
+  auto open = [&](const Footprint& f, float step, float lowest, float highest, float fall, float& lo, float& hi) {
+    const vec2 v(-f.u.y, f.u.x);
+    lo = 1e9f; hi = -1e9f;
+    for (float a = -f.hw; a <= f.hw + 0.1f; a += step)
+      for (float b = -f.hd; b <= f.hd + 0.1f; b += step) {
+        const vec2 p = f.c + f.u * a + v * b;
+        const float g = ground(p.x, p.y);
+        lo = std::min(lo, g); hi = std::max(hi, g);
+        if (g < lowest || g > highest || hi - lo > fall || airportInfluence(p.x, p.y) > 0.02f) return false;
+        if (roads.nearest(p, 4.f, -1, nullptr, nullptr, true) < 2.f) return false;
+      }
+    std::vector<int> near;
+    cellsIn(placed, f.c.x - 300.f, f.c.y - 300.f, f.c.x + 300.f, f.c.y + 300.f, near);
+    for (int id : near) if (overlaps(f, prints[id])) return false;
+    return true;
+  };
+  for (const SettlementField& F : world.settlements) {
+    if (!strcmp(kTowns[F.town].name, "Solace Capital")) {
+      const vec2 u(F.axisC, F.axisS);
+      float bestShare = 1e9f, base = 0.f; Footprint best{};
+      for (float dz = -2600.f; dz <= 2600.f; dz += 50.f)
+        for (float dx = -2600.f; dx <= 2600.f; dx += 50.f) {
+          const vec2 c(F.cx + dx, F.cz + dz);
+          int t = -1; const float share = settlementShare(world.settlements, c.x, c.y, &t);
+          if (t != F.town || share < 0.3f || share > 1.15f || share >= bestShare) continue;
+          const Footprint f{c, u, 96.f, 80.f};
+          float lo, hi;
+          if (!open(f, 12.f, 2.5f, 1e9f, 5.f, lo, hi)) continue;
+          bestShare = share; best = f; base = lo;
+        }
+      if (bestShare < 1e8f) { claim(best, 6.f); g_civic.push_back({EK_STADIUM, {best.c.x, base - 0.1f, best.c.y, atan2f(-u.y, u.x), 1.f, 1.f, 1.f, 0.5f}}); }
+    }
+    if (!strcmp(kTowns[F.town].name, "Port Verde")) {
+      // (the city stands on its hill, its shore 4 km off: the terminal is reclaimed from the shallows there out to 8 m of
+      // water at its berth - its apron's back on the land, the nearest such stretch to the city)
+      float bestScore = 1e9f, top = 0.f; vec2 at, sea;
+      for (float dz = -6000.f; dz <= 6000.f; dz += 25.f)
+        for (float dx = -6000.f; dx <= 6000.f; dx += 25.f) {
+          const vec2 P(F.cx + dx, F.cz + dz);
+          const float dist = hypotf(dx, dz);
+          if (dist >= bestScore) continue;
+          const float g = ground(P.x, P.y);
+          if (g < -7.f || g > 3.f) continue;
+          int t = -1; const float share = settlementShare(world.settlements, P.x, P.y, &t);
+          if (t >= 0 && t != F.town && share < 1.2f) continue;
+          for (int k = 0; k < 16; k++) {
+            const vec2 d(cosf(k * 0.3927f), sinf(k * 0.3927f)), a(-d.y, d.x);
+            bool ok = true; int landed = 0;
+            for (float s = -215.f; s <= 215.f && ok; s += 30.f) {
+              const vec2 Q = P + a * s;
+              ok = ground(Q.x + d.x * 20.f, Q.y + d.y * 20.f) < -8.f && ground(Q.x + d.x * 45.f, Q.y + d.y * 45.f) < -8.f;
+              landed += ground(Q.x - d.x * 125.f, Q.y - d.y * 125.f) > 0.5f;
+            }
+            if (!ok || landed < 8) continue;
+            const Footprint f{P - d * 62.f, a, 215.f, 62.f};
+            float lo, hi;
+            if (!open(f, 20.f, -12.f, 6.f, 18.f, lo, hi)) continue;
+            bestScore = dist; at = P; sea = d; top = std::max(hi + 0.2f, 3.f);
+            break;
+          }
+        }
+      if (bestScore < 1e8f) {
+        const vec2 a(-sea.y, sea.x);
+        claim(Footprint{at - sea * 62.f, a, 215.f, 62.f}, 8.f);
+        const float yaw = atan2f(sea.x, sea.y);   // (local +z out to sea, along the quay +x)
+        auto here = [&](float x, float z) { return at + vec2(sea.y, -sea.x) * x + sea * z; };
+        g_civic.push_back({EK_QUAY, {at.x, top, at.y, yaw, 1.f, 1.f, 1.f, 0.5f}});
+        for (float x : {-140.f, -50.f, 40.f, 130.f}) { const vec2 p = here(x, -18.f); g_civic.push_back({EK_GANTRY, {p.x, top, p.y, yaw, 1.f, 1.f, 1.f, hash2i((int)p.x, 3)}}); }
+        for (float z : {-58.f, -78.f, -98.f})
+          for (float x : {-160.f, -78.f, 4.f, 86.f}) {
+            const vec2 p = here(x, z); const float h = hash2i((int)p.x, (int)p.y);
+            if (h < 0.15f) continue;   // (a block or two away on the ships)
+            g_civic.push_back({EK_CONTAINERS, {p.x, top, p.y, yaw + (h < 0.55f ? 3.14159f : 0.f), 1.f, 1.f, 1.f, h}});
+          }
+        const vec2 ship = here(-20.f, 20.f);   // (alongside, her length along the quay)
+        g_civic.push_back({EK_CONTAINERSHIP, {ship.x, 0.f, ship.y, atan2f(sea.y, -sea.x), 1.f, 1.f, 1.f, 0.5f}});
+      }
     }
   }
   // ---- along the roads, then the streets: each side walked, a lot wherever one fits. A city's first lot near its heart

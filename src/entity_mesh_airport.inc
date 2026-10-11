@@ -1168,6 +1168,119 @@ void buildAirportKind(MB& mb, int kind, int lod) {
       if (lod == 3) mb.cyl(vec3(3.7f, 2.6f, 15.f), vec3(3.7f, 5.5f, 15.f), 0.05f, 0.05f, 4, P_METAL, false, true);
       break;
     }
+    case EK_STADIUM: {   // a football stadium 184 x 148 m: the pitch, two tiers of seats rising round it in an oval bowl
+      // (P_PAINT: the shader's rows and colours), the concourse's outer wall with its fins, the roof ring over the
+      // upper tier and the floodlights under its inner edge
+      const int N = lod == 3 ? 72 : lod == 0 ? 56 : lod == 1 ? 36 : 20;
+      auto ring = [&](float a, float b, float y, float t) { return vec3(a * cosf(t), y, b * sinf(t)); };
+      auto band = [&](float a0, float b0, float y0, float a1, float b1, float y1, int part, vec3 ref) {
+        for (int i = 0; i < N; i++) {
+          const float t0 = 6.2832f * i / N, t1 = 6.2832f * (i + 1) / N;
+          mb.quad(ring(a0, b0, y0, t0), ring(a0, b0, y0, t1), ring(a1, b1, y1, t1), ring(a1, b1, y1, t0), part, ref);
+        }
+      };
+      mb.box(vec3(-55.f, -0.5f, -36.f), vec3(55.f, 0.25f, 36.f), P_AWNING, 8);   // the pitch
+      band(64.f, 46.f, 0.25f, 66.f, 48.f, 1.4f, P_TRIM, vec3(0, 40.f, 0));   // (the wall round the pitch)
+      band(66.f, 48.f, 1.4f, 80.f, 62.f, 13.f, P_PAINT, vec3(0, -40.f, 0));   // the lower tier
+      band(80.f, 62.f, 13.f, 82.f, 64.f, 13.f, P_TRIM, vec3(0, -40.f, 0));    // (the walkway between the tiers)
+      band(82.f, 64.f, 13.f, 82.f, 64.f, 15.5f, P_TRIM, vec3(0, 15.f, 0));
+      band(82.f, 64.f, 15.5f, 90.f, 72.f, 26.f, P_PAINT, vec3(0, -40.f, 0)); // the upper tier
+      band(90.f, 72.f, 26.f, 92.f, 74.f, 28.f, P_TRIM, vec3(0, -40.f, 0));
+      band(92.f, 74.f, 28.f, 92.f, 74.f, -1.f, P_WALL, vec3(0, 14.f, 0));     // the outer wall
+      band(93.f, 75.f, 30.5f, 76.f, 58.f, 31.f, P_ROOF, vec3(0, -40.f, 0));  // the roof ring, its top
+      band(93.f, 75.f, 29.7f, 76.f, 58.f, 30.2f, P_ROOF, vec3(0, 60.f, 0));  // (and its underside)
+      if (d1) for (int i = 0; i < N; i += lod == 2 ? 4 : 2) {   // (the roof's struts down to the wall's top)
+        const float t = 6.2832f * i / N;
+        mb.cyl(ring(91.f, 73.f, 27.5f, t), ring(91.5f, 73.5f, 29.8f, t), 0.25f, 0.25f, 4, P_METAL, false, false);
+      }
+      for (int i = 0; i < N; i++) {   // the floodlights: a strip under the roof's inner edge, facing the pitch
+        const float t0 = 6.2832f * i / N, t1 = 6.2832f * (i + 0.6f) / N;
+        mb.quad(ring(77.f, 59.f, 29.6f, t0), ring(77.f, 59.f, 29.6f, t1), ring(78.f, 60.f, 29.6f, t1), ring(78.f, 60.f, 29.6f, t0), P_LAMP, vec3(0, 40.f, 0));
+      }
+      if (d0) for (int i = 0; i < N; i += 2) {   // the facade's fins
+        const float t = 6.2832f * i / N; const vec3 o = ring(92.4f, 74.4f, 0.f, t), r = normalize(vec3(cosf(t) / 92.f, 0.f, sinf(t) / 74.f));
+        mb.box(o - r * 0.4f + vec3(0, -1.f, 0) - vec3(-r.z, 0, r.x) * 0.3f, o + r * 0.4f + vec3(0, 28.f, 0) + vec3(-r.z, 0, r.x) * 0.3f, P_WALL, 0x3F);
+      }
+      if (lod == 3)   // (up close: the goals)
+        for (float x : {-52.f, 52.f}) {
+          for (float z : {-3.7f, 3.7f}) mb.cyl(vec3(x, 0.25f, z), vec3(x, 2.69f, z), 0.06f, 0.06f, 6, P_METAL, false, true);
+          mb.cyl(vec3(x, 2.69f, -3.7f), vec3(x, 2.69f, 3.7f), 0.06f, 0.06f, 6, P_METAL, false, false);
+        }
+      break;
+    }
+    case EK_QUAY: {   // a container terminal's quay: its apron 430 m along the water and 125 m deep (top y 0), the quay wall down
+      // into the sea at its seaward edge (+z), fenders along the wall and bollards along its edge
+      mb.box(vec3(-215.f, -16.f, -125.f), vec3(215.f, 0.f, 0.f), P_TRIM, 0x3F & ~4 & ~8);
+      mb.quad(vec3(-215.f, 0.f, -125.f), vec3(-215.f, 0.f, 0.f), vec3(215.f, 0.f, 0.f), vec3(215.f, 0.f, -125.f), P_ROOF, vec3(0, -10.f, -60.f));
+      for (float x = -205.f; x <= 205.f; x += lod == 2 ? 40.f : 20.f) {
+        mb.box(vec3(x - 0.9f, -4.f, 0.f), vec3(x + 0.9f, -0.8f, 0.6f), P_DARK, 0x3F);   // (fenders)
+        if (d1) mb.cyl(vec3(x + 10.f, 0.f, -1.2f), vec3(x + 10.f, 0.7f, -1.2f), 0.3f, 0.36f, d0 ? 10 : 6, P_DARK, false, true);   // (bollards)
+      }
+      if (lod == 3)   // (up close: the steel ladders down the wall, every 40 m)
+        for (float x = -195.f; x <= 195.f; x += 40.f) {
+          for (float o : {-0.25f, 0.25f}) mb.box(vec3(x + o - 0.03f, -8.f, 0.05f), vec3(x + o + 0.03f, 0.3f, 0.12f), P_METAL, 0x3F);
+          for (float y = -7.7f; y < 0.f; y += 0.3f) mb.box(vec3(x - 0.25f, y - 0.015f, 0.06f), vec3(x + 0.25f, y + 0.015f, 0.1f), P_METAL, 0x3F);
+        }
+      break;
+    }
+    case EK_GANTRY: {   // a ship-to-shore crane, 72 m: four legs straddling its rails (local z -15 and +15), the portal's beams, the
+      // boom at 46 m from 50 m behind the legs to 60 m out over the water (+z), the A-frame over the legs, stays to the
+      // boom's ends, the machinery house and the trolley
+      for (float x : {-9.f, 9.f}) for (float z : {-15.f, 15.f}) mb.box(vec3(x - 0.9f, 0.f, z - 0.9f), vec3(x + 0.9f, 44.f, z + 0.9f), P_PAINT, 0x3B);
+      for (float z : {-15.f, 15.f}) mb.box(vec3(-9.9f, 36.f, z - 1.f), vec3(9.9f, 44.f, z + 1.f), P_PAINT, 0x3F);   // (portal beams)
+      for (float x : {-9.f, 9.f}) {
+        mb.box(vec3(x - 0.9f, 10.f, -15.f), vec3(x + 0.9f, 12.f, 15.f), P_PAINT, 0x3F);   // (sill beams)
+        mb.box(vec3(x - 1.f, 44.f, -50.f), vec3(x + 1.f, 48.f, 62.f), P_PAINT, 0x3F);    // the boom's girders
+        mb.cyl(vec3(x, 44.f, -15.f), vec3(x * 0.4f, 70.f, 0.f), 0.7f, 0.6f, 6, P_PAINT, false, false);   // the A-frame
+        mb.cyl(vec3(x, 44.f, 15.f), vec3(x * 0.4f, 70.f, 0.f), 0.7f, 0.6f, 6, P_PAINT, false, false);
+        if (d1) { mb.cyl(vec3(x * 0.4f, 70.f, 0.f), vec3(x, 48.f, 62.f), 0.25f, 0.25f, 4, P_METAL, false, false);   // (stays)
+                  mb.cyl(vec3(x * 0.4f, 70.f, 0.f), vec3(x, 48.f, -50.f), 0.25f, 0.25f, 4, P_METAL, false, false); }
+      }
+      mb.box(vec3(-4.f, 69.f, -1.5f), vec3(4.f, 71.f, 1.5f), P_PAINT, 0x3F);
+      if (d1) for (float z = -46.f; z <= 58.f; z += lod == 0 || lod == 3 ? 8.f : 26.f) mb.box(vec3(-9.f, 46.5f, z - 0.3f), vec3(9.f, 47.5f, z + 0.3f), P_PAINT, 0x3F);   // (cross beams)
+      mb.box(vec3(-6.f, 48.f, -48.f), vec3(6.f, 54.f, -36.f), P_WALL, 0x3B | 8);   // the machinery house
+      mb.box(vec3(-4.f, 41.f, 20.f), vec3(4.f, 44.f, 26.f), P_WALL, 0x3F);         // the trolley and its cab
+      if (lod == 3) for (float x : {-9.f, 9.f}) for (float z : {-15.f, 15.f}) mb.box(vec3(x - 1.4f, 0.f, z - 2.f), vec3(x + 1.4f, 1.6f, z + 2.f), P_DARK, 0x3B);   // (bogies)
+      break;
+    }
+    case EK_CONTAINERS: {   // a block of containers: six 40-footers end to end (12.2 m) by six abreast (2.44 m), stacked one to four
+      // high by its own pattern; u: each container's number (the shader colours it)
+      int id = 0;
+      for (int i = 0; i < 6; i++)
+        for (int j = 0; j < 6; j++) {
+          const int high = 1 + (int)(hash2i(i * 7 + 1, j * 3 + 5) * 3.99f);
+          const float x0 = -36.6f + i * 12.2f, z0 = -7.32f + j * 2.44f;
+          for (int k = 0; k < (lod == 2 ? 1 : high); k++) {
+            const float y0 = k * 2.6f, y1 = lod == 2 ? high * 2.6f : y0 + 2.59f;
+            const size_t at = mb.o.size();
+            mb.box(vec3(x0 + 0.05f, y0, z0 + 0.04f), vec3(x0 + 12.15f, y1, z0 + 2.4f), P_PAINT, k + 1 == high || lod == 2 ? 0x3B : 0x33);
+            if (lod == 3 && (i == 0 || i == 5))   // (up close: the doors' locking bars on the block's ends)
+              for (float z : {0.5f, 0.95f, 1.45f, 1.9f}) {
+                const float xe = i == 0 ? x0 + 0.02f : x0 + 12.18f;
+                mb.box(vec3(xe - 0.02f, y0 + 0.15f, z0 + z - 0.02f), vec3(xe + 0.02f, y1 - 0.15f, z0 + z + 0.02f), P_PAINT, 0x3F);
+              }
+            for (size_t q = at; q < mb.o.size(); q++) mb.o[q].u = (float)(id % 97);
+            id++;
+          }
+        }
+      break;
+    }
+    case EK_CONTAINERSHIP: {   // a 230 m container ship alongside (y 0 the sea, her bow +z): her hull, the containers in her bays
+      // (u: each bay's colour) four and five high, her bridge house aft, its funnel
+      hullLoft(mb, 0.f, -115.f, 115.f, 16.f, -12.f, 12.f, lod == 3 ? 28 : lod == 0 ? 20 : lod == 1 ? 12 : 8, P_PAINT, P_TRIM);
+      int bay = 0;
+      for (float z = -78.f; z <= 76.f; z += 13.f, bay++) {   // (the bays forward of her house, each a block of boxes)
+        const float hi = 12.f + 2.6f * (4 + (bay % 3 == 0 ? 1 : 0)), w = z > 60.f ? 9.f : 13.f;
+        const size_t at = mb.o.size();
+        mb.box(vec3(-w, 12.f, z - 6.f), vec3(w, hi, z + 6.f), P_STRIPE, 0x3B);
+        for (size_t q = at; q < mb.o.size(); q++) mb.o[q].u = (float)bay;
+      }
+      mb.box(vec3(-13.f, 12.f, -104.f), vec3(13.f, 38.f, -92.f), P_WALL, 0x3B | 8);   // the bridge house
+      mb.box(vec3(-17.f, 34.f, -102.f), vec3(17.f, 36.f, -94.f), P_WALL, 0x3F);       // (its wings)
+      mb.box(vec3(-12.f, 33.f, -91.95f), vec3(12.f, 35.f, -91.9f), P_GLASS, 32);
+      mb.box(vec3(-3.f, 12.f, -112.f), vec3(3.f, 30.f, -106.f), P_PAINT, 0x3B | 8);   // the funnel
+      break;
+    }
     case EK_POLE: {   // a wooden pole, a crossarm, three insulators; up close, its three wires to the next pole along +z
       mb.cyl(vec3(0, -0.5f, 0), vec3(0, 9.f, 0), 0.14f, 0.11f, d0 ? 10 : d1 ? 6 : 4, P_WOOD, true, false);
       mb.box(vec3(-1.05f, 8.15f, -0.06f), vec3(1.05f, 8.3f, 0.06f), P_WOOD, lod == 2 ? 8 | 16 | 32 : 0x3F);

@@ -423,7 +423,60 @@ void main(){
     float s2 = fract(seed*13.31), s3 = fract(seed*3.77);
     vec3 livery = s3 < 0.5 ? pal(s3*2.0, vec3(0.7, 0.07, 0.06), vec3(0.06, 0.2, 0.55), vec3(0.05, 0.4, 0.2), vec3(0.9, 0.5, 0.05))
                            : pal(s3*2.0 - 1.0, vec3(0.04, 0.08, 0.25), vec3(0.0, 0.45, 0.5), vec3(0.45, 0.06, 0.25), vec3(0.15, 0.15, 0.17));
-    if (uKind == K_OBSERVATORY) {   // an observatory: its drum and building rendered white, its dome silver, the slit open on its face
+    if (uKind == K_STADIUM) {   // a stadium: its pitch striped and lined, its seats in rows (blue, a white band), its roof white
+      if (part == P_AWNING) {
+        alb = vec3(0.16, 0.38, 0.12)*(0.88 + 0.12*step(0.5, fract(mp.x/11.0)));   // (mown in stripes)
+        vec2 q = abs(mp.xz); float w = 0.12;
+        bool line = abs(q.x - 52.5) < w && q.y < 34.0 || abs(q.y - 34.0) < w && q.x < 52.5 || abs(mp.x) < w && q.y < 34.0 ||
+                    abs(length(mp.xz) - 9.15) < w || (abs(q.x - 36.0) < w && q.y < 20.15) || (abs(q.y - 20.15) < w && q.x > 36.0 && q.x < 52.5);
+        if (line && q.x < 52.6 && q.y < 34.1) alb = vec3(0.9);
+        rough = 0.85;
+        emit = alb*vec3(1.0, 1.0, 0.95)*uNight*2.6;   // (floodlit after dark: the deferred lights don't reach in here)
+      } else if (part == P_PAINT) {
+        float sector = atan(mp.z, mp.x), row = fract(mp.y/0.8);
+        alb = mix(vec3(0.08, 0.2, 0.5), vec3(0.85), step(0.82, fract(sector*3.0/3.1416 + 0.1)));
+        alb *= row < 0.35 ? 0.55 : 1.0;   // (each row's step in its own shadow)
+        alb = mix(alb, vec3(0.5, 0.4, 0.35), step(0.75, hsh(floor(vec2(sector*80.0, mp.y/0.8))))*0.6);   // (people here and there)
+        rough = 0.6;
+        emit = alb*uNight*1.4*(1.0 - smoothstep(20.0, 27.0, mp.y)*0.5);
+      } else if (part == P_ROOF) { alb = vec3(0.9, 0.91, 0.92); rough = 0.35; }
+      else if (part == P_WALL) { alb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nb, rough)*vec3(0.88, 0.9, 0.93); }
+      else if (part == P_LAMP) { alb = vec3(0.9); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.98, 0.92)*(0.3 + 14.0*uNight); }
+      else if (part == P_METAL) { alb = vec3(0.7); metal = 0.6; rough = 0.35; }
+      else alb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nb, rough)*0.75;
+    } else if (uKind == K_QUAY) {   // a quay: its apron's concrete marked out in yellow (the cranes' rails dark), its wall wet below the tide
+      alb = triS(lp, n0, M_CONCRETE, 4.0, 0.5, nb, rough)*vec3(0.78, 0.78, 0.76);
+      if (part == P_ROOF) {
+        float rails = min(abs(mp.z + 3.0), abs(mp.z + 33.0));
+        if (rails < 0.12) alb = vec3(0.12);
+        else if (abs(rails - 0.6) < 0.08 || abs(mp.z + 45.0) < 0.1 || (mp.z < -48.0 && abs(fract((mp.x + 3.0)/12.5) - 0.5) > 0.49)) alb = vec3(0.8, 0.65, 0.12);
+      }
+      if (part == P_DARK) alb = vec3(0.04);
+      alb *= mix(0.45, 1.0, smoothstep(-0.5, 2.0, wy));
+      rough = 0.8;
+    } else if (uKind == K_GANTRY) {   // a gantry crane: blue, or red, its house white
+      alb = part == P_PAINT ? (seed < 0.5 ? vec3(0.1, 0.27, 0.55) : vec3(0.68, 0.1, 0.07)) : part == P_WALL ? vec3(0.9) : part == P_DARK ? vec3(0.06) : vec3(0.55);
+      alb *= 0.9 + 0.1*vn3(lp*0.2); rough = 0.45; metal = part == P_METAL ? 0.6 : 0.1;
+    } else if (uKind == K_CONTAINERS) {   // the containers: each its line's colour, ribbed, weathered
+      float h = hsh(vec2(vAux.z, seed*97.0));
+      vec3 col = h < 0.18 ? vec3(0.1, 0.3, 0.55) : h < 0.32 ? vec3(0.62, 0.12, 0.08) : h < 0.44 ? vec3(0.1, 0.4, 0.2) : h < 0.56 ? vec3(0.85, 0.42, 0.08) :
+                 h < 0.68 ? vec3(0.55, 0.55, 0.55) : h < 0.78 ? vec3(0.85, 0.85, 0.82) : h < 0.9 ? vec3(0.4, 0.24, 0.14) : vec3(0.8, 0.68, 0.1);
+      float rib = abs(n0.y) < 0.5 ? 0.86 + 0.14*step(0.5, fract((abs(n0.x) > 0.5 ? mp.z : mp.x)/0.3)) : 1.0;
+      alb = col*rib*(0.8 + 0.25*vn3(lp*0.6)); rough = 0.55; metal = 0.2;
+    } else if (uKind == K_CONTAINERSHIP) {   // a container ship: her hull dark blue over red, her boxes in many colours, her house white
+      if (part == P_PAINT) alb = mp.y < -1.0 ? vec3(0.45, 0.08, 0.06) : mp.y > 26.0 ? vec3(0.05) : vec3(0.08, 0.12, 0.25);
+      else if (part == P_STRIPE) {
+        vec3 b = floor(vec3(mp.x/2.44, mp.y/2.6, mp.z/12.2));
+        float h = hsh(b.xy + vec2(b.z*13.0, vAux.z*7.0));
+        alb = h < 0.2 ? vec3(0.1, 0.3, 0.55) : h < 0.35 ? vec3(0.62, 0.12, 0.08) : h < 0.5 ? vec3(0.85, 0.42, 0.08) : h < 0.65 ? vec3(0.55) :
+              h < 0.8 ? vec3(0.85, 0.85, 0.82) : vec3(0.1, 0.4, 0.2);
+        vec3 f = fract(vec3(mp.x/2.44, mp.y/2.6, mp.z/12.2));
+        if (min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y)) < 0.04) alb *= 0.45;   // (the boxes' joints)
+      } else if (part == P_WALL) alb = vec3(0.9, 0.9, 0.88);
+      else if (part == P_GLASS) { alb = vec3(0.04); emit = vec3(1.0, 0.9, 0.7)*uNight*0.6; }
+      else alb = vec3(0.35, 0.36, 0.36);
+      rough = 0.5;
+    } else if (uKind == K_OBSERVATORY) {   // an observatory: its drum and building rendered white, its dome silver, the slit open on its face
       if (part == P_ROOF) {
         alb = vec3(0.86, 0.87, 0.88); metal = 0.55; rough = 0.22;
         if (abs(atan(mp.x, mp.z)) < 0.11 && mp.y > 8.6) { alb = vec3(0.02); metal = 0.0; rough = 0.9; }
