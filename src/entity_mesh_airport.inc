@@ -570,6 +570,28 @@ void airportAirlinerDetailed(MB& mb) {
   airportRoundBox(mb,{-1.4f,1.1f,-4.f},{1.4f,1.6f,2.5f},.18f,5,P_PAINT);
 }
 
+// A hull lofted along z from its stern (z0) to its bow (z1): its half beam through the length (fuller at the stern,
+// a fine entry at the bow), each side from the deck edge down round the bilge to the keel, the deck across, the
+// transom closed. xo: its centreline across the frame
+void hullLoft(MB& mb, float xo, float z0, float z1, float beam, float keel, float deck, int stations, int hullPart, int deckPart) {
+  auto halfW = [&](float t) { return t < 0.08f ? beam * (0.84f + 0.16f * t / 0.08f) : t < 0.68f ? beam : std::max(beam * sqrtf(std::max(0.f, (1.f - t) / 0.32f)), 0.15f); };   // (the stem 0.3 m across)
+  auto deckY = [&](float t) { const float b = std::max(0.f, (t - 0.75f) / 0.25f); return deck + 1.4f * b * b; };   // (the sheer, up to the bow)
+  auto sec = [&](float t, int k, float side) {   // (k: 0 the deck edge, 1 the bilge's top, 2 and 3 round it, 4 the keel)
+    const float w = halfW(t), y[5] = {deckY(t), keel + 0.45f * (deck - keel), keel + 0.08f * (deck - keel), keel + 0.01f * (deck - keel), keel};
+    const float x[5] = {w, w, w * 0.8f, w * 0.4f, 0.f};
+    return vec3(xo + side * x[k], y[k], z0 + (z1 - z0) * t);
+  };
+  for (int i = 0; i < stations; i++) {
+    const float ta = (float)i / stations, tb = (float)(i + 1) / stations;
+    const vec3 in(xo, (keel + deck) * 0.5f, z0 + (z1 - z0) * (ta + tb) * 0.5f);
+    for (float side : {-1.f, 1.f})
+      for (int k = 0; k < 4; k++) mb.quad(sec(ta, k, side), sec(tb, k, side), sec(tb, k + 1, side), sec(ta, k + 1, side), hullPart, in);
+    mb.quad(sec(ta, 0, -1.f), sec(tb, 0, -1.f), sec(tb, 0, 1.f), sec(ta, 0, 1.f), deckPart, vec3(xo, keel - 20.f, in.z));
+  }
+  for (float side : {-1.f, 1.f})   // (the transom)
+    for (int k = 0; k < 4; k++) mb.tri(vec3(xo, (keel + deck) * 0.5f, z0), sec(0.f, k, side), sec(0.f, k + 1, side), hullPart, vec3(xo, (keel + deck) * 0.5f, z0 + 5.f));
+}
+
 void buildAirportKind(MB& mb, int kind, int lod) {
   const size_t first=mb.o.size();
   bool d0 = lod == 0 || lod == 3, d1 = lod != 2;
@@ -967,6 +989,104 @@ void buildAirportKind(MB& mb, int kind, int lod) {
         mb.box(vec3(-1.4f, 94.f, -6.2f), vec3(1.4f, 94.6f, -3.8f), P_PAINT, 0x3B);
         mb.cyl(vec3(0, 94.f, -5.f), vec3(0, 96.f, -5.f), 0.05f, 0.05f, 6, P_METAL, false, true);
       }
+      break;
+    }
+    case EK_SHIPWRECK: {   // a 72 m coaster aground on a reef, listing 12 degrees to port and down 3 by the stern: her rusting hull,
+      // her deck and its open holds, the bridge house and funnel aft, the foremast, a tear in her side amidships
+      const size_t w0 = mb.o.size();
+      hullLoft(mb, 0.f, -36.f, 36.f, 5.5f, -4.2f, 4.f, lod == 3 ? 24 : lod == 0 ? 16 : lod == 1 ? 10 : 6, P_PAINT, P_ROOF);
+      for (float z : {-12.f, 3.f, 16.f}) {   // (the hatch coamings, their covers gone: the holds open)
+        mb.box(vec3(-3.4f, 3.9f, z - 5.f), vec3(3.4f, 5.1f, z + 5.f), P_METAL, 0x3F & ~8 & ~4);
+        mb.box(vec3(-3.3f, 5.05f, z - 4.9f), vec3(3.3f, 5.1f, z + 4.9f), P_DARK, 8);
+      }
+      mb.box(vec3(-4.7f, 4.f, -34.f), vec3(4.7f, 11.5f, -24.f), P_WALL, 0x3B);
+      mb.box(vec3(-4.f, 11.5f, -31.f), vec3(4.f, 14.2f, -25.f), P_WALL, 0x3B | 8);
+      mb.box(vec3(-3.6f, 12.4f, -25.05f), vec3(3.6f, 13.6f, -24.95f), P_GLASS, 32);
+      if (d1) mb.box(vec3(-4.6f, 7.f, -24.05f), vec3(4.6f, 8.6f, -23.95f), P_GLASS, 32);
+      mb.cyl(vec3(0, 11.5f, -32.5f), vec3(0, 18.f, -32.5f), 1.45f, 1.3f, d0 ? 14 : 8, P_PAINT, false, true);
+      mb.cyl(vec3(0, 4.f, 25.f), vec3(0, 17.f, 25.f), 0.28f, 0.2f, d0 ? 8 : 5, P_METAL, false, true);
+      if (d1) mb.box(vec3(-3.5f, 13.f, 24.85f), vec3(3.5f, 13.3f, 25.15f), P_METAL, 0x3F);
+      mb.quad(vec3(5.52f, -1.2f, -2.f), vec3(5.52f, -1.4f, 4.5f), vec3(5.52f, 2.4f, 3.6f), vec3(5.52f, 2.1f, -1.3f), P_DARK, vec3(0, 0, 1.f));
+      if (lod == 3) {   // (up close: the rails along her deck, the bridge's wings, a ventilator or two)
+        for (float side : {-1.f, 1.f}) {
+          mb.box(vec3(side * 5.4f - 0.03f, 4.9f, -22.f), vec3(side * 5.4f + 0.03f, 4.96f, 22.f), P_METAL, 0x3F);
+          mb.box(vec3(side * 6.2f - 1.5f, 11.f, -25.6f), vec3(side * 6.2f + 1.5f, 11.3f, -24.f), P_WALL, 0x3F);
+          mb.cyl(vec3(side * 2.5f, 4.f, 9.f), vec3(side * 2.5f, 6.4f, 9.f), 0.35f, 0.35f, 10, P_METAL, false, true);
+        }
+      }
+      const float cr = cosf(0.21f), sr = sinf(0.21f), cp = cosf(0.052f), sp = sinf(0.052f);
+      for (size_t i = w0; i < mb.o.size(); i++) {   // (her list and her trim)
+        EVert& v = mb.o[i];
+        auto turn = [&](float& x, float& y, float& z) { const float x1 = x * cr - y * sr, y1 = x * sr + y * cr; x = x1; y = y1 * cp + z * sp; z = -y1 * sp + z * cp; };
+        turn(v.px, v.py, v.pz); turn(v.nx, v.ny, v.nz);
+      }
+      break;
+    }
+    case EK_PLATFORM: {   // a fixed production platform in deep water (y 0 the sea): its four-legged jacket from the sea floor, two
+      // decks and their modules, the quarters under the helideck, the drilling derrick, a crane, the flare boom and its
+      // flame (P_LAMP), and a supply vessel standing off its west face. u: each part's colour (ent_fs2.glsl)
+      auto paint = [&](size_t from, float c) { for (size_t i = from; i < mb.o.size(); i++) mb.o[i].u = c; };
+      const int sg = lod == 3 ? 16 : lod == 0 ? 12 : lod == 1 ? 8 : 5;
+      size_t at = mb.o.size();
+      auto leg = [&](float sx, float sz, float y) { const float t = (y + 90.f) / 114.f; return vec3(sx * (13.f - 3.f * t), y, sz * (13.f - 3.f * t)); };
+      for (float sx : {-1.f, 1.f}) for (float sz : {-1.f, 1.f}) mb.cyl(leg(sx, sz, -90.f), leg(sx, sz, 24.f), 1.3f, 1.1f, sg, P_PAINT, false, true);
+      std::vector<float> levels = {-2.f, 13.f}; if (d0) levels.insert(levels.begin(), {-60.f, -30.f});
+      const float corner[5][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}, {-1, -1}};
+      for (size_t l = 0; l < levels.size(); l++)
+        for (int f = 0; f < 4; f++) {
+          mb.cyl(leg(corner[f][0], corner[f][1], levels[l]), leg(corner[f + 1][0], corner[f + 1][1], levels[l]), 0.45f, 0.45f, 6, P_PAINT, false, false);
+          if (d1 && l + 1 < levels.size()) {   // (X bracing between the levels)
+            mb.cyl(leg(corner[f][0], corner[f][1], levels[l]), leg(corner[f + 1][0], corner[f + 1][1], levels[l + 1]), 0.35f, 0.35f, 6, P_PAINT, false, false);
+            mb.cyl(leg(corner[f + 1][0], corner[f + 1][1], levels[l]), leg(corner[f][0], corner[f][1], levels[l + 1]), 0.35f, 0.35f, 6, P_PAINT, false, false);
+          }
+        }
+      paint(at, 0.f); at = mb.o.size();
+      mb.box(vec3(-17.f, 24.f, -17.f), vec3(17.f, 25.5f, 17.f), P_PAINT, 0x3F);
+      mb.box(vec3(-17.f, 31.f, -17.f), vec3(17.f, 32.5f, 17.f), P_PAINT, 0x3F);
+      for (float sx : {-1.f, 1.f}) for (float sz : {-1.f, 1.f}) mb.box(vec3(sx * 10.f - 0.6f, 25.5f, sz * 10.f - 0.6f), vec3(sx * 10.f + 0.6f, 31.f, sz * 10.f + 0.6f), P_PAINT, 0x33);
+      mb.box(vec3(2.f, 25.5f, -15.f), vec3(15.f, 30.8f, 0.f), P_PAINT, 0x3B);
+      mb.box(vec3(0.f, 32.5f, -4.f), vec3(16.f, 40.f, 16.f), P_PAINT, 0x3B);
+      mb.box(vec3(2.f, 32.5f, -16.f), vec3(12.f, 36.f, -6.f), P_PAINT, 0x3B);
+      paint(at, 2.f); at = mb.o.size();
+      mb.box(vec3(-15.f, 25.5f, -8.f), vec3(-2.f, 30.8f, 8.f), P_PAINT, 0x3B);
+      if (d1) for (float z : {4.f, 10.f}) mb.cyl(vec3(2.f, 34.f, z), vec3(14.f, 34.f, z), 1.6f, 1.6f, sg, P_PAINT, true, true);   // (separators)
+      paint(at, 3.f); at = mb.o.size();
+      mb.box(vec3(-17.f, 32.5f, -17.f), vec3(-3.f, 44.f, -5.f), P_PAINT, 0x3B);   // the quarters
+      // the derrick: four posts tapering from its base to its crown block, rings every 6 m, braced on each face
+      const vec3 dc(7.f, 36.f, -11.f);
+      auto post = [&](float sx, float sz, float y) { const float t = (y - 36.f) / 42.f, h = 4.f - 3.3f * t; return vec3(dc.x + sx * h, y, dc.z + sz * h); };
+      for (float sx : {-1.f, 1.f}) for (float sz : {-1.f, 1.f}) mb.cyl(post(sx, sz, 36.f), post(sx, sz, 78.f), 0.25f, 0.18f, 5, P_PAINT, false, true);
+      if (lod != 2)
+        for (float y = 42.f; y < 78.f; y += 6.f)
+          for (int f = 0; f < 4; f++) {
+            mb.cyl(post(corner[f][0], corner[f][1], y), post(corner[f + 1][0], corner[f + 1][1], y), 0.12f, 0.12f, 4, P_PAINT, false, false);
+            if (d0) mb.cyl(post(corner[f][0], corner[f][1], y - 6.f), post(corner[f + 1][0], corner[f + 1][1], y), 0.09f, 0.09f, 4, P_PAINT, false, false);
+          }
+      mb.box(vec3(dc.x - 1.f, 78.f, dc.z - 1.f), vec3(dc.x + 1.f, 79.5f, dc.z + 1.f), P_PAINT, 0x3F);
+      paint(at, 1.f); at = mb.o.size();
+      mb.cyl(vec3(-10.f, 44.f, -12.f), vec3(-10.f, 44.6f, -12.f), 11.f, 11.f, lod == 3 ? 32 : 20, P_PAINT, true, true);   // the helideck
+      paint(at, 5.f); at = mb.o.size();
+      mb.cyl(vec3(15.f, 32.5f, 15.f), vec3(15.f, 40.f, 15.f), 1.2f, 1.2f, sg, P_PAINT, false, true);   // the crane: pedestal, cab, boom
+      mb.box(vec3(13.5f, 40.f, 13.5f), vec3(16.5f, 43.f, 17.5f), P_PAINT, 0x3F);
+      mb.cyl(vec3(15.f, 41.f, 17.f), vec3(-2.f, 60.f, 34.f), 0.7f, 0.35f, 6, P_PAINT, true, true);
+      if (d0) for (float side : {-1.f, 1.f}) mb.box(vec3(-17.4f, 34.f, -14.f + side * 3.f - 1.2f), vec3(-16.9f, 36.f, -14.f + side * 3.f + 1.2f), P_PAINT, 0x3F);   // (lifeboats)
+      paint(at, 0.f); at = mb.o.size();
+      if (d0) for (float o : {-0.9f, 0.9f}) mb.cyl(vec3(17.f, 31.f, o), vec3(52.f, 58.f, o * 0.4f), 0.35f, 0.25f, 6, P_PAINT, false, false);   // the flare boom
+      mb.cyl(vec3(17.f, 32.f, 0.f), vec3(52.f, 58.f, 0.f), d0 ? 0.3f : 0.7f, d0 ? 0.25f : 0.5f, 6, P_PAINT, false, false);
+      mb.cyl(vec3(52.f, 58.f, 0.f), vec3(52.f, 60.f, 0.f), 0.6f, 0.6f, 8, P_PAINT, false, true);
+      paint(at, 2.f); at = mb.o.size();
+      for (int k = 0; k < 3; k++) {   // its flame: three crossed blades of fire
+        const float a = k * 1.0472f; const vec3 ax(cosf(a), 0.f, sinf(a));
+        const vec3 b0 = vec3(52.f, 60.f, 0.f), mid = vec3(54.f, 66.f, 0.f), top = vec3(57.f, 74.f, 0.f);
+        mb.quad(b0 - ax * 0.6f, b0 + ax * 0.6f, mid + ax * 2.6f, mid - ax * 2.6f, P_LAMP, mid + vec3(ax.z, 0, -ax.x) * 5.f);
+        mb.quad(mid - ax * 2.6f, mid + ax * 2.6f, top + ax * 0.2f, top - ax * 0.2f, P_LAMP, mid + vec3(ax.z, 0, -ax.x) * 5.f);
+      }
+      // the supply vessel off its west face: her red hull, her bridge forward, her open after deck
+      hullLoft(mb, -40.f, -30.f, 30.f, 6.5f, -4.f, 2.5f, lod == 3 ? 16 : lod == 0 ? 10 : 6, P_PAINT, P_PAINT);
+      paint(at, 4.f); at = mb.o.size();
+      mb.box(vec3(-45.5f, 2.5f, 10.f), vec3(-34.5f, 9.5f, 22.f), P_PAINT, 0x3B);
+      mb.box(vec3(-44.5f, 9.5f, 13.f), vec3(-35.5f, 12.f, 21.f), P_PAINT, 0x3B | 8);
+      paint(at, 1.f);
       break;
     }
     case EK_POLE: {   // a wooden pole, a crossarm, three insulators; up close, its three wires to the next pole along +z

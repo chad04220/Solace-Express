@@ -92,6 +92,18 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   rotor turns 14 times a minute once the wind is over 2.5 m/s and yaws to face the wind (`ent_vs.glsl`, both passes),
   and a red aviation light flashes on each nacelle at night. The landmarks are found when the world is built or loaded,
   on the base height map, and handed to the scenery chunks like the road furniture (`PlacedByChunk`).
+- **Phase C: the stone circle, the wreck and the platform (after v3.48).** Each is found by its own search
+  (`landmarks.cpp`) and checked by `landmarks_test`:
+  - The stone circle stands on the most prominent bare summit, out of the settlements and off the roads: fourteen
+    standing stones 3 to 4 m tall in a ring 26 m across, two more fallen beside their places, and a flat stone at the
+    centre. Its clearing is kept free of trees, bushes and boulders. The stones are rock entities, given to their chunk
+    with its other rocks at the finer detail level, so trimming the scenery back doesn't lose them.
+  - The wreck is a 72 m coaster aground on a reef in warm, clear shallows (the floor 1.5 to 4 m down, open water round
+    her). She lists 12 degrees and sits down by the stern, rust through her black paint, her holds open, weed below the
+    tide line.
+  - The offshore platform stands in deep water 6 to 12 km from the nearest land. It has a yellow four-legged jacket,
+    two decks of modules, the quarters (lit windows at night) under a marked helideck, a drilling derrick and a crane.
+    Its flare burns at the end of its boom, flickering, and a red supply vessel lies off its west face.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

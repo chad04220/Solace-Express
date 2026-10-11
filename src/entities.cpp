@@ -119,6 +119,7 @@ const EntKindInfo kEntInfo[EK_COUNT] = {
   {"Localizer", 18.f, 3.2f, 1.f}, {"Radar", 5.f, 22.f, 5.f}, {"Mast", 1.5f, 12.f, 1.5f}, {"Floodlight mast", 1.5f, 20.f, 1.5f},
   {"Street lamp", 0.3f, 10.f, 1.f}, {"Guardrail", 8.f, 0.9f, 0.2f}, {"Road sign", 1.3f, 3.f, 0.12f}, {"Utility pole", 1.05f, 9.f, 0.2f},
   {"Wind turbine", 2.5f, 138.f, 2.5f},   // (its tower: the rotor, 46 m round the hub at 92 m, isn't solid)
+  {"Shipwreck", 7.f, 22.f, 37.f}, {"Offshore platform", 22.f, 80.f, 22.f},   // (the wreck from its keel; the platform from the sea)
 };
 
 static inline float h2(int a, int b) { return hash2i(a, b); }
@@ -401,7 +402,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
       // ---------------------------------------------------------------- road furniture (road_furniture.cpp)
       for (auto r = roadFurnitureIn(cx, cz); r.first != r.second; ++r.first) C.out[r.first->kind]->push_back(r.first->e);
       // ---------------------------------------------------------------- landmarks (landmarks.cpp)
-      for (auto r = landmarksIn(cx, cz); r.first != r.second; ++r.first) C.out[r.first->kind]->push_back(r.first->e);
+      for (auto r = landmarksIn(cx, cz); r.first != r.second; ++r.first) if (r.first->kind > EK_SLAB) C.out[r.first->kind]->push_back(r.first->e);
       // ---------------------------------------------------------------- lighthouse
       { float lx, lz, ly; if (lighthouseSite(lx, lz, ly) && C.inside(lx, lz)) putBuilding(C, EK_LIGHTHOUSE, lx, lz, ly, 3.4f, 3.4f, 0, 0.5f); }
       // ---------------------------------------------------------------- sea stacks (70 m cells)
@@ -457,11 +458,14 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           put(C, EK_SPIRE, x, footprintGround(x, z, yaw, 3.f * sc, 3.f * sc) - 1.f, z, yaw, sc, sc * (0.8f + 0.5f * h2(pi, pj - 4)), sc, h2(pi * 5, pj));
         }
     } else {
-      // (each farm's compound - its yard and the buildings round it - is kept clear of trees and bushes)
-      std::vector<vec2> farmsNear;
+      // (each farm's compound - its yard and the buildings round it - and each landmark's clearing are kept clear of
+      // trees, bushes and boulders)
+      std::vector<vec3> clearings;   // (x, z, radius)
       for (const Farmstead& F : g_world.farms)
-        if (F.x > C.x0 - 60.f && F.x < C.x1 + 60.f && F.z > C.z0 - 60.f && F.z < C.z1 + 60.f) farmsNear.push_back(vec2(F.x, F.z));
-      auto inFarmstead = [&](float x, float z) { for (const vec2& f : farmsNear) if ((x - f.x) * (x - f.x) + (z - f.y) * (z - f.y) < 48.f * 48.f) return true; return false; };
+        if (F.x > C.x0 - 60.f && F.x < C.x1 + 60.f && F.z > C.z0 - 60.f && F.z < C.z1 + 60.f) clearings.push_back(vec3(F.x, F.z, 48.f));
+      for (const vec3& c : landmarkClearings())
+        if (c.x > C.x0 - c.z && c.x < C.x1 + c.z && c.y > C.z0 - c.z && c.y < C.z1 + c.z) clearings.push_back(vec3(c.x, c.y, c.z));
+      auto inFarmstead = [&](float x, float z) { for (const vec3& f : clearings) if ((x - f.x) * (x - f.x) + (z - f.y) * (z - f.y) < f.z * f.z) return true; return false; };
       // ---------------------------------------------------------------- forests and lone trees (6 m cells)
       const float TC = 6.f;
       for (int tj = (int)floorf(C.z0 / TC); tj <= (int)floorf((C.z1 - 1e-3f) / TC); tj++)
@@ -529,7 +533,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float hp = h2(ri * 5 - 13, rj * 3 + 29);
           if (hp > 0.3f) continue;
           float x = (ri + 0.5f + (h2(ri + 41, rj - 9) - 0.5f) * 0.6f) * ROCK_CELL, z = (rj + 0.5f + (h2(ri - 21, rj + 63) - 0.5f) * 0.6f) * ROCK_CELL;
-          if (!C.inside(x, z)) continue;
+          if (!C.inside(x, z) || inFarmstead(x, z)) continue;
           float b[4]; g_world.sampleBase(x, z, b);
           if (b[1] < 0.01f) continue;
           float g = ground(x, z);
@@ -545,6 +549,9 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float sc = r / kEntInfo[k].hx, sy = sc * (0.75f + 0.4f * h2(ri, rj + 3));
           put(C, k, x, g - 0.22f * kEntInfo[k].h * sy, z, h2(ri - 5, rj) * 6.28f, sc, sy, sc * (0.8f + 0.4f * h2(ri + 2, rj)), h2(ri * 11, rj * 13));
         }
+      // ---------------------------------------------------------------- landmarks' stones (landmarks.cpp: the rocks
+      // kinds a chunk drops when it is trimmed back, so with its other level-2 scenery)
+      for (auto r = landmarksIn(cx, cz); r.first != r.second; ++r.first) if (r.first->kind <= EK_SLAB) C.out[r.first->kind]->push_back(r.first->e);
     }
   }
   // nothing grows or stands up into a bridge: what is under a deck's footprint and would reach its girders goes (the

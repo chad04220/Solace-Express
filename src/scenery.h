@@ -45,10 +45,13 @@ using RoadFurniture = PlacedEnt;
 void sceneryBakeRoadFurniture(const World& world);
 const std::vector<RoadFurniture>& roadFurniture();
 std::pair<const RoadFurniture*, const RoadFurniture*> roadFurnitureIn(int cx, int cz);   // (the items centred in that chunk)
-// The landmarks (landmarks.cpp; Phase C), each where the world has room for it: a wind farm along a ridge
+// The landmarks (landmarks.cpp; Phase C), each where the world has room for it: a wind farm along a ridge, a stone
+// circle on a bare summit, a wreck on a reef, an offshore platform. Their clearings (x, z, radius) are kept clear of
+// trees, bushes and boulders
 void sceneryBakeLandmarks(const World& world);
 const std::vector<PlacedEnt>& landmarks();
 std::pair<const PlacedEnt*, const PlacedEnt*> landmarksIn(int cx, int cz);
+const std::vector<vec3>& landmarkClearings();
 void sceneryInit();  // build shared road tables before any threaded use
 void sceneryBaseMod(float x, float z, float& h, float& amp);  // flatten roads / towns in the base map
 

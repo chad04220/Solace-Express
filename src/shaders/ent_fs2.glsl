@@ -423,7 +423,34 @@ void main(){
     float s2 = fract(seed*13.31), s3 = fract(seed*3.77);
     vec3 livery = s3 < 0.5 ? pal(s3*2.0, vec3(0.7, 0.07, 0.06), vec3(0.06, 0.2, 0.55), vec3(0.05, 0.4, 0.2), vec3(0.9, 0.5, 0.05))
                            : pal(s3*2.0 - 1.0, vec3(0.04, 0.08, 0.25), vec3(0.0, 0.45, 0.5), vec3(0.45, 0.06, 0.25), vec3(0.15, 0.15, 0.17));
-    if (uKind == K_WINDTURBINE && (part == P_PAINT || part == P_BLADE)) {   // a wind turbine: white, a little weathered
+    if (uKind == K_SHIPWRECK) {   // a wreck: rust through the old black paint, white gone to grey on her house, weed below the tide
+      float rust = smoothstep(0.4, 0.8, vn3(lp*vec3(0.22, 0.55, 0.22)) + 0.35*vn3(lp*1.9) + (part == P_PAINT ? 0.0 : 0.18));
+      vec3 coat = part == P_WALL ? vec3(0.66, 0.64, 0.58) : part == P_PAINT ? vec3(0.07, 0.07, 0.075) : vec3(0.28, 0.26, 0.24);
+      alb = mix(coat, mix(vec3(0.34, 0.15, 0.06), vec3(0.52, 0.27, 0.1), vn3(lp*2.3)), rust);
+      alb *= 0.82 + 0.26*vn3(vec3(lp.x*3.0, lp.y*0.18, lp.z*3.0));   // (streaks running down her)
+      if (part == P_DARK || part == P_GLASS) alb = vec3(0.025);
+      alb = mix(alb*vec3(0.42, 0.5, 0.36), alb, smoothstep(0.1, 1.6, wy));
+      rough = part == P_GLASS ? 0.35 : 0.88; metal = 0.1;
+    } else if (uKind == K_PLATFORM) {   // a platform: its jacket and crane yellow, its quarters and derrick white, its decks grey
+      float c = vAux.z;
+      vec3 col = c < 0.5 ? vec3(0.86, 0.6, 0.07) : c < 1.5 ? vec3(0.9, 0.9, 0.88) : c < 2.5 ? vec3(0.44, 0.46, 0.47) :
+                 c < 3.5 ? vec3(0.13, 0.28, 0.52) : c < 4.5 ? vec3(0.68, 0.09, 0.07) : vec3(0.12, 0.24, 0.15);
+      alb = col*(0.84 + 0.16*vn3(lp*0.4)); rough = 0.55; metal = 0.15;
+      if (c > 0.5 && c < 1.5 && abs(n0.y) < 0.5 && mp.y > 33.0 && mp.y < 43.5 && mp.x < -2.9 && fract(mp.y/3.0) > 0.5 && fract(mp.y/3.0) < 0.78 && fract((mp.x + mp.z)/2.4) < 0.55) {
+        alb = vec3(0.05, 0.06, 0.07); rough = 0.15; emit = vec3(1.0, 0.9, 0.72)*uNight*0.9;   // (the quarters' windows)
+      }
+      if (c > 4.5 && n0.y > 0.5) {   // the helideck: its yellow edge, a white circle and the H
+        vec2 q = mp.xz - vec2(-10.0, -12.0); float r = length(q);
+        if (r > 10.3) alb = vec3(0.85, 0.75, 0.1);
+        else if (abs(r - 7.0) < 0.35 || (abs(q.x) < 2.9 && abs(q.y) < 0.35) || (abs(abs(q.x) - 2.6) < 0.35 && abs(q.y) < 3.2)) alb = vec3(0.88);
+      }
+      alb *= mix(0.4, 1.0, smoothstep(-0.5, 3.0, wy));   // (the splash zone)
+      if (part == P_LAMP) {   // the flare: fire flickering up the flame
+        float f = vn3(vec3(lp.x*0.35, lp.y*0.5 - uTime*4.0, lp.z*0.35)) + 0.5*vn3(vec3(lp.x*1.1, lp.y*1.4 - uTime*7.0, lp.z*1.1));
+        alb = vec3(0.0); rough = 1.0; metal = 0.0; cls = 3.0; nb = n0;
+        emit = mix(vec3(1.0, 0.32, 0.05), vec3(1.0, 0.85, 0.45), smoothstep(0.6, 1.2, f))*(2.0 + 2.5*f)*(1.0 + 2.0*uNight);
+      }
+    } else if (uKind == K_WINDTURBINE && (part == P_PAINT || part == P_BLADE)) {   // a wind turbine: white, a little weathered
       alb = vec3(0.9, 0.91, 0.9)*(0.93 + 0.07*vn3(lp*0.15)); if (n0.y < -0.5) alb *= 0.85; rough = 0.32; metal = 0.0;
     } else if (part == P_WIRE) { alb = vec3(0.045, 0.045, 0.05); rough = 0.45; metal = 0.4; }
     else if (part == P_WOOD) {   // a utility pole: creosoted, some weathered grey, the grain running up it
