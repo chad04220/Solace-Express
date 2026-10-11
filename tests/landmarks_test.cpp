@@ -350,9 +350,43 @@ int main() {
       const int ia = w.roads.nodes[r.townA].island, ib = w.roads.nodes[r.townB].island;
       check(ia != ib && find(ia & 63) != find(ib & 63), "each ferry joining two islands no other route has joined");
       root[find(ia & 63)] = find(ib & 63);
+      // her terminals: a causeway from the land out to the linkspan, her berth beyond it in water deep enough for her, and
+      // her way out straight from it
       for (int e = 0; e < 2; e++) {
-        const int t = e ? r.townB : r.townA; const vec2 h = e ? r.pts.back() : r.pts.front();
-        check(hypotf(h.x - kTowns[t].x, h.y - kTowns[t].z) <= 4600.f && w.naturalHeight(h.x, h.y) < -6.f, "a ferry's harbour off its town, 6 m deep");
+        const int t = e ? r.townB : r.townA; const vec2 h = e ? r.pts.back() : r.pts.front(), out = e ? r.pts[r.pts.size() - 2] : r.pts[1];
+        const FerryPier& P = r.pier[e];
+        check(P.lengths >= 1 && P.lengths <= 8 && fabsf(length(P.dir) - 1.f) < 1e-3f, "a terminal's causeway, 40 to 320 m long");
+        check(hypotf(h.x - kTowns[t].x, h.y - kTowns[t].z) <= 5000.f && w.naturalHeight(h.x, h.y) < -4.5f, "a ferry's berth off her town, 4.5 m deep");
+        check(length(P.root + P.dir * (40.f * P.lengths + kFerryBerth) - h) < 0.01f, "her berth beyond the causeway's linkspan");
+        check(w.naturalHeight(P.root.x, P.root.y) > 0.f && w.naturalHeight(h.x - P.dir.x * 60.f, h.y - P.dir.y * 60.f) < 0.f, "the causeway from the land out over the water");
+        const vec2 way = out - h;
+        check(length(way) >= 240.f && (way.x * P.dir.x + way.y * P.dir.y) / length(way) > 0.999f, "her way out straight from the linkspan, 250 m");
+        int segs = 0, spans = 0;
+        for (const PlacedEnt& p : items) {
+          const vec2 q(p.e.x - P.root.x, p.e.z - P.root.y); const float along = q.x * P.dir.x + q.y * P.dir.y, off = fabsf(q.x * P.dir.y - q.y * P.dir.x);
+          if (p.kind == EK_FERRYPIER && off < 0.01f && fabsf(fmodf(along - 20.f + 0.005f, 40.f)) < 0.01f && along < 40.f * P.lengths) segs++;
+          if (p.kind == EK_LINKSPAN && off < 0.01f && fabsf(along - 40.f * P.lengths - 5.f) < 0.01f) spans++;
+        }
+        check(segs == P.lengths && spans == 1, "the causeway's lengths and the linkspan at its head");
+        // nothing built on it
+        int built = 0;
+        for (float a = 0.f; a <= 40.f * P.lengths; a += 40.f) {
+          const vec2 q = P.root + P.dir * a;
+          const Scenery::Chunk* ch = g_scenery.ensure(Scenery::chunkOf(q.x), Scenery::chunkOf(q.y), 2);
+          for (int k = EK_HOUSE; k <= EK_GASSTATION; k++)
+            for (uint32_t n = ch->off[k]; n < ch->off[k + 1]; n++) {
+              const Ent& b = ch->ents[n]; const vec2 v(b.x - P.root.x, b.z - P.root.y);
+              const float al = v.x * P.dir.x + v.y * P.dir.y, of = fabsf(v.x * P.dir.y - v.y * P.dir.x);
+              if (al > -15.f && al < 40.f * P.lengths + 15.f && of < 14.f + std::max(kEntInfo[k].hx * b.sx, kEntInfo[k].hz * b.sz)) built++;
+            }
+        }
+        check(built == 0, "no building on a terminal's causeway");
+        // docked end-on to the linkspan
+        vec2 at, hd; bool dk = false; int ends = 0;
+        for (float tt = 0.f; tt < 2.f * (r.along.back() / kFerrySpeed + kFerryDwell); tt += 10.f)
+          if (ferryAt(r, tt, at, hd, &dk) && dk && length(at - h) < 1.f) { ends++; check(fabsf(hd.x * P.dir.x + hd.y * P.dir.y) > 0.999f, "a ferry alongside end-on to the linkspan"); }
+        check(ends > 0, "a ferry at her berth for her wait");
+        std::printf("  %s's terminal: a causeway of %d lengths, her berth %.0f m out, %.1f m deep\n", kTowns[t].name, P.lengths, 40.f * P.lengths + kFerryBerth - 12.f, -w.naturalHeight(h.x, h.y));
       }
       check(r.along.size() == r.pts.size() && r.along.back() > 1000.f, "a ferry's route measured along");
       for (size_t k = 0; k + 1 < r.pts.size(); k++) {
@@ -418,6 +452,11 @@ int main() {
       if (town >= 0) per[town]++;
       if (e.y != 0.f || g > -1.2f || g < -7.f || town < 0 || hypotf(e.x - quay.x, e.z - quay.y) < 450.f) badYacht++;
       for (const FerryRoute& r : F) for (const vec2& h : {r.pts.front(), r.pts.back()}) if (hypotf(e.x - h.x, e.z - h.y) < 250.f) inHarbour++;
+      for (const FerryRoute& r : F)
+        for (const FerryPier& P : r.pier) {
+          const vec2 v(e.x - P.root.x, e.z - P.root.y); const float al = v.x * P.dir.x + v.y * P.dir.y;
+          if (al > -20.f && al < 40.f * P.lengths + kFerryBerth + 60.f && fabsf(v.x * P.dir.y - v.y * P.dir.x) < 60.f) inHarbour++;
+        }
       for (size_t j = i + 1; j < yachts.size(); j++) if (hypotf(yachts[j].x - e.x, yachts[j].z - e.z) < 16.f) crowded++;
     }
     int towns = 0, over = 0;
@@ -425,7 +464,7 @@ int main() {
     std::printf("yachts: %zu off %d towns\n", yachts.size(), towns);
     check(towns >= 4 && yachts.size() >= 40, "yachts moored off the coastal towns");
     check(badYacht == 0, "each yacht afloat in 1.2 to 7 m of water off a town, clear of the terminal's quay");
-    check(crowded == 0 && inHarbour == 0 && over == 0, "the yachts 16 m apart, out of the ferries' way, a few to each town");
+    check(crowded == 0 && inHarbour == 0 && over == 0, "the yachts 16 m apart, clear of the ferries' terminals and berths, a few to each town");
   }
   // in their chunks' scenery, as generated
   for (size_t i = 0; i < turbines.size(); i += 3) {

@@ -549,6 +549,32 @@ void main(){
       else if (part == P_LAMP) { alb = vec3(0.9); cls = 3.0; nb = n0; emit = vec3(1.0, 0.95, 0.85)*(0.1 + 6.0*uNight); }
       else { alb = vec3(0.75); metal = 0.6; }
       rough = part == P_GLASS ? rough : 0.35;
+    } else if (uKind == K_FERRYPIER || uKind == K_LINKSPAN) {   // a ferry terminal: its causeway's armour stone, each block its
+      // own shade, dark and weeded below the tide; its roadway's asphalt, lanes marked; concrete coping and quay wall; the
+      // linkspan's steel in the line's blue, its ramp's plate grey edged in yellow; its lamps lit at dusk
+      if (part == P_BRICK) {   // (the armour stone)
+        vec3 blk = floor(lp*vec3(0.55, 0.8, 0.55));
+        alb = triS(lp, n0, M_ROCK, 2.0, 0.6, nb, rough)*vec3(0.66, 0.64, 0.6)*(0.7 + 0.45*hsh(blk.xz + blk.y*7.3));
+        alb = mix(alb*vec3(0.4, 0.46, 0.34), alb, smoothstep(-0.6, 1.2, wy));   // (weed and wet below the tide line)
+        rough = 0.9;
+      } else if (part == P_ROOF && uKind == K_FERRYPIER) {
+        alb = triS(lp, n0, M_ASPHALT, 3.0, 0.5, nb, rough)*0.55;
+        float ax = abs(mp.x);
+        if ((ax < 0.08 && fract(mp.z/6.0) < 0.5) || abs(ax - 5.9) < 0.08) alb = vec3(0.85);
+        rough = max(rough, 0.8);
+      } else if (part == P_ROOF) {   // (the ramp's chequer plate, a yellow band down each side)
+        alb = vec3(0.32, 0.33, 0.34)*(0.85 + 0.15*step(0.5, fract((mp.x + mp.z)/0.25)));
+        if (abs(mp.x) > 3.5) alb = vec3(0.85, 0.65, 0.08);
+        metal = 0.5; rough = 0.55;
+      } else if (part == P_TRIM) {
+        alb = triS(lp, n0, M_CONCRETE, 4.0, 0.5, nb, rough)*vec3(0.8, 0.8, 0.78);
+        alb *= mix(0.45, 1.0, smoothstep(-0.5, 1.8, wy));
+        rough = 0.8;
+      } else if (part == P_PAINT) { alb = vec3(0.08, 0.2, 0.5)*(0.9 + 0.15*vn3(lp*0.3)); metal = 0.3; rough = 0.45; }
+      else if (part == P_WALL) { alb = vec3(0.9, 0.9, 0.88); rough = 0.5; }
+      else if (part == P_LAMP) { alb = vec3(0.9); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.86, 0.62)*(0.2 + 9.0*lampOn(hsh(vec2(vAux.z, 3.7)))); }
+      else if (part == P_METAL) { alb = vec3(0.45); metal = 0.6; rough = 0.4; }
+      else { alb = vec3(0.05); rough = 0.7; }
     } else if (uKind == K_GRANDSTAND) {   // a grandstand: its seats in rows, a block of colour to each section between the aisles
       // and people in them, its walls concrete, its roof white
       if (part == P_PAINT) {

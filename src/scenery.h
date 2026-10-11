@@ -66,8 +66,13 @@ std::vector<int> reservoirTexels(const World& world, const Reservoir& r);
 bool reservoirMask(const World& world, const Reservoir& r, LakeMask& out);
 // The ferries (Phase D): a route over the sea between two coastal towns on different islands, from harbour to harbour -
 // as few routes as join every island, the shortest - found with the landmarks; one ferry on each, on a timetable (its
-// place a matter of the time alone: the same on every run), and the yachts moored off each coastal town (landmarks())
-struct FerryRoute { int townA = -1, townB = -1; std::vector<vec2> pts; std::vector<float> along; };
+// place a matter of the time alone: the same on every run), and the yachts moored off each coastal town (landmarks()).
+// At each end a terminal: a causeway from the shore out in 40 m lengths (EK_FERRYPIER), the linkspan at its head
+// (EK_LINKSPAN), the berth beyond it - the route's first (last) point, where she lies end-on to the linkspan - and her
+// way out straight to sea from it (the route's second point)
+struct FerryPier { vec2 root, dir; int lengths = 0; };   // (its landward end, the way out along it, its 40 m lengths)
+static const float kFerryBerth = 68.f;                   // (the berth's way beyond the causeway's end: the ramp, half her)
+struct FerryRoute { int townA = -1, townB = -1; std::vector<vec2> pts; std::vector<float> along; FerryPier pier[2]; };
 const std::vector<FerryRoute>& ferryRoutes();
 static const float kFerrySpeed = 9.f, kFerryDwell = 150.f;   // (m/s: 17.5 knots; s at each end)
 // where the ferries are at time t (s): each its route's EK_FERRY, at the waterline, her bows along her route (she runs

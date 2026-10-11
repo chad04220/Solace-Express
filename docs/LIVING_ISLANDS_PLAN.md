@@ -188,13 +188,22 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   once on. Each street lamp comes on with its photocell within the first of the dusk, as does the pool of light under
   it. Around 18:00 the street lamps and the first windows are lit; by 18:15, most of the town.
 - **Phase D: ferries and yachts (after v3.48, `landmarks.cpp`, `landmarks_test`).** Five ferries join the islands into
-  one network: Kaleo Springs to Coral Cove (27 km), Port Verde to Lighthouse Key, Palm Bay to Turtle Bay, Solace
-  Capital to Mango Grove and Fjordhaven to Ember Bay (15 to 19 km).
-  - Each coastal town's harbour is the nearest water 6 m deep, clear of the container terminal. Between each two
-    islands the nearest pair of harbours, 32 km apart at most, is a candidate route, and as few as join every island
-    are kept, the shortest first.
-  - Each route is found by sea: A* over 200 m cells of water 6 m deep (dearer under 15 m), then drawn taut, every leg
-    straight as long as the water under it stays 3 m deep. No route passes under a bridge too low for her.
+  one network: Mill Creek to Coral Cove (9 km), Port Verde to Lighthouse Key, Palm Bay to Turtle Bay, Solace Capital
+  to Mango Grove and Fjordhaven to Ember Bay (15 to 19 km).
+  - Each coastal town's harbour is the nearest water 6 m deep, clear of the container terminal. Its ferry terminal
+    runs from 12 m inside the nearest shore straight out past the harbour: a causeway (`EK_FERRYPIER`) in as few 40 m
+    lengths as leave the berth beyond its linkspan deep enough for her (4.5 m under her middle, 2.5 m under her ends
+    and sides), with a straight way out from it, 250 m over 4 m and more. A town whose shore allows none within eight
+    lengths has no ferry.
+  - The causeway has a 14 m roadway 3 m over the sea, lanes marked, a concrete coping, lamp posts and bollards, and
+    armour stone sloping into the sea. At its head stand a quay wall and the linkspan (`EK_LINKSPAN`): a steel ramp
+    down to her car deck under its lifting gantry, in the line's blue, with a fendered mooring dolphin either side of
+    the berth. Nothing is built on the causeway, and no yacht moors by it.
+  - Between each two islands the nearest pair of terminals, 32 km apart at most, is a candidate route, and as few as
+    join every island are kept, the shortest first.
+  - Each route runs from her berth straight out to sea, across, and in to the other berth, so she lies end-on to each
+    linkspan. The crossing is found by sea: A* over 200 m cells of water 6 m deep (dearer under 15 m), then drawn taut,
+    every leg straight as long as the water under it stays 3 m deep. No route passes under a bridge too low for her.
   - Each ferry (`EK_FERRY`) is a double-ended 100 m ro-pax ferry: white over navy, two glazed saloon decks, a wheelhouse
     and car-deck doors at each end, a funnel either side, lifeboats. She runs her route at 9 m/s (17 knots), waits 150 s
     at each end and comes back stern first, never turning round. Her place is a matter of the time alone, from her own
@@ -203,8 +212,8 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
     sidelights at the end she is heading for, and a stern light at the other.
   - The yachts (`EK_BOAT`): ten-metre sloops at their moorings off every coastal town, eight off a village, fourteen off
     a town and twenty-four off a city, 150 in all. They lie in 1.2 to 7 m of water within 70 m of the shore and 2.5 km
-    of the town, 16 m apart, clear of the terminal's quay, the ferries' harbours and the runways, all lying to the same
-    breeze. Each shows an anchor light at her masthead at night.
+    of the town, 16 m apart, clear of the container terminal's quay, the ferries' berths and the runways, all lying to the same
+    breeze, clear of the ferries' terminals. Each shows an anchor light at her masthead at night.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

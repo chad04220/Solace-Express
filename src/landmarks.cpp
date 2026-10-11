@@ -441,26 +441,61 @@ bool seaRoute(const World& world, vec2 a, vec2 b, std::vector<vec2>& out) {
   return true;
 }
 
-// The routes: between the coastal towns of each two islands, harbour to harbour, the nearest pair (32 km at the most);
-// of those as few as join every island, the shortest first (Kruskal's)
+// A coastal town's ferry terminal: from its harbour back to the nearest shore, the causeway's line - from 12 m inside the
+// shore straight out past the harbour - in as few 40 m lengths as leave the berth beyond its linkspan in water deep
+// enough for her (4.5 m under her middle, 2.5 m under her ends and her sides) and a straight way out from it, 250 m
+// over 4 m and more to water 6 m deep. Eight lengths at the most; none for a town whose shore allows none
+bool ferryPier(const World& world, int t, FerryPier& P, vec2& berth, vec2& out) {
+  vec2 h; if (!harbourOf(world, t, h)) return false;
+  vec2 S; bool found = false;
+  for (float r = 10.f; r <= 600.f && !found; r += 10.f)
+    for (int a = 0; a < 72; a++) {
+      const vec2 p = h + vec2(cosf(a * 0.0873f), sinf(a * 0.0873f)) * r;
+      if (world.naturalHeight(p.x, p.y) > 0.5f) { S = p; found = true; break; }
+    }
+  if (!found) return false;
+  P.dir = (h - S) * (1.f / std::max(length(h - S), 1e-3f));
+  P.root = S - P.dir * 12.f;
+  const vec2 d = P.dir, side(-d.y, d.x);
+  auto deep = [&](vec2 a, vec2 b, float under) {
+    const int n = std::max(1, (int)(length(b - a) / 8.f));
+    for (int k = 0; k <= n; k++) { const vec2 m = a + (b - a) * ((float)k / n); if (world.naturalHeight(m.x, m.y) > -under) return false; }
+    return true;
+  };
+  for (int n = 1; n <= 8; n++) {
+    const vec2 B = P.root + d * (40.f * n + kFerryBerth), O = B + d * 250.f;
+    bool ok = deep(B - d * 20.f, B + d * 20.f, 4.5f) && deep(B - d * 48.f, B + d * 48.f, 2.5f);
+    for (float s : {-9.f, 9.f}) ok = ok && deep(B + side * s - d * 40.f, B + side * s + d * 40.f, 2.5f);
+    ok = ok && deep(B, O, 4.f) && world.naturalHeight(O.x, O.y) < -6.f;
+    if (ok) { P.lengths = n; berth = B; out = O; return true; }
+  }
+  return false;
+}
+
+// The routes: between the coastal towns of each two islands, terminal to terminal, the nearest pair (32 km at the most);
+// of those as few as join every island, the shortest first (Kruskal's). Each from its berth out to sea, across by sea,
+// and in to the other's berth
 void ferries(const World& world) {
   g_ferries.clear();
   const auto& N = world.roads.nodes;
-  struct Cand { float d; int a, b; vec2 ha, hb; };
+  struct Cand { float d; int a, b; };
   std::vector<Cand> cand;
-  std::vector<int> isl(kNumTowns, -1); std::vector<vec2> hb(kNumTowns); std::vector<bool> coast(kNumTowns, false);
-  for (int t = 0; t < kNumTowns && t < (int)N.size(); t++) { isl[t] = N[t].island; coast[t] = harbourOf(world, t, hb[t]); }
+  std::vector<int> isl(kNumTowns, -1); std::vector<FerryPier> pier(kNumTowns); std::vector<vec2> berth(kNumTowns), out(kNumTowns);
+  std::vector<bool> coast(kNumTowns, false);
+  for (int t = 0; t < kNumTowns && t < (int)N.size(); t++) { isl[t] = N[t].island; coast[t] = ferryPier(world, t, pier[t], berth[t], out[t]); }
   for (int a = 0; a < kNumTowns; a++)
     for (int b = a + 1; b < kNumTowns; b++)
-      if (coast[a] && coast[b] && isl[a] != isl[b] && length(hb[a] - hb[b]) < 32000.f) cand.push_back({length(hb[a] - hb[b]), a, b, hb[a], hb[b]});
+      if (coast[a] && coast[b] && isl[a] != isl[b] && length(berth[a] - berth[b]) < 32000.f) cand.push_back({length(berth[a] - berth[b]), a, b});
   std::sort(cand.begin(), cand.end(), [](const Cand& x, const Cand& y) { return x.d != y.d ? x.d < y.d : x.a != y.a ? x.a < y.a : x.b < y.b; });
   std::vector<int> root(64); for (int i = 0; i < 64; i++) root[i] = i;
   auto find = [&](int i) { while (root[i] != i) i = root[i] = root[root[i]]; return i; };
   for (const Cand& c : cand) {
     const int ra = find(isl[c.a] & 63), rb = find(isl[c.b] & 63);
     if (ra == rb) continue;
-    FerryRoute r; r.townA = c.a; r.townB = c.b;
-    if (!seaRoute(world, c.ha, c.hb, r.pts)) continue;
+    FerryRoute r; r.townA = c.a; r.townB = c.b; r.pier[0] = pier[c.a]; r.pier[1] = pier[c.b];
+    std::vector<vec2> sea;
+    if (!seaRoute(world, out[c.a], out[c.b], sea)) continue;
+    r.pts.push_back(berth[c.a]); r.pts.insert(r.pts.end(), sea.begin(), sea.end()); r.pts.push_back(berth[c.b]);
     r.along.assign(r.pts.size(), 0.f);
     for (size_t k = 1; k < r.pts.size(); k++) r.along[k] = r.along[k - 1] + length(r.pts[k] - r.pts[k - 1]);
     root[ra] = rb;
@@ -468,14 +503,32 @@ void ferries(const World& world) {
   }
 }
 
+// Each route's terminals: the causeway's lengths and the linkspan at its head
+void ferryTerminals(std::vector<PlacedEnt>& out) {
+  for (const FerryRoute& r : g_ferries)
+    for (const FerryPier& P : r.pier) {
+      const float yaw = atan2f(P.dir.x, P.dir.y);
+      for (int k = 0; k < P.lengths; k++) {
+        const vec2 c = P.root + P.dir * (20.f + 40.f * k);
+        out.push_back({EK_FERRYPIER, {c.x, 0.f, c.y, yaw, 1.f, 1.f, 1.f, 0.5f}});
+      }
+      const vec2 L = P.root + P.dir * (40.f * P.lengths + 5.f);
+      out.push_back({EK_LINKSPAN, {L.x, 0.f, L.y, yaw, 1.f, 1.f, 1.f, 0.5f}});
+      g_clearings.push_back(vec3(P.root.x, P.root.y, 30.f));
+    }
+}
+
 // The yachts moored off each coastal town: in 1.2 to 7 m of water within 70 m of its shore and 2.5 km of its centre,
 // the nearest to it first, 16 m apart - eight off a village, fourteen off a town, twenty-four off a city - clear of the
-// terminal's quay and of the ferries' harbours, all lying to the same breeze
+// container terminal's quay and of the ferries' terminals and berths, all lying to the same breeze
 void harbourBoats(const World& world, std::vector<PlacedEnt>& out) {
   vec2 quay(1e9f, 1e9f);
   for (const PlacedEnt& p : civicLandmarks()) if (p.kind == EK_QUAY) quay = vec2(p.e.x, p.e.z);
-  std::vector<vec2> harbours;
-  for (const FerryRoute& r : g_ferries) { harbours.push_back(r.pts.front()); harbours.push_back(r.pts.back()); }
+  std::vector<vec2> harbours, pierA, pierB;   // (the berths; the terminals' causeways out to them and on past them)
+  for (const FerryRoute& r : g_ferries) {
+    harbours.push_back(r.pts.front()); harbours.push_back(r.pts.back());
+    for (const FerryPier& P : r.pier) { pierA.push_back(P.root); pierB.push_back(P.root + P.dir * (40.f * P.lengths + kFerryBerth + 60.f)); }
+  }
   for (int t = 0; t < kNumTowns; t++) {
     const vec2 c(kTowns[t].x, kTowns[t].z);
     std::vector<std::pair<float, vec2>> spots;
@@ -486,6 +539,10 @@ void harbourBoats(const World& world, std::vector<PlacedEnt>& out) {
         bool shore = false, near = false;
         for (int k = 0; k < 8 && !shore; k++) shore = world.naturalHeight(x + 70.f * cosf(k * 0.785f), z + 70.f * sinf(k * 0.785f)) > 0.5f;
         for (const vec2& h : harbours) near = near || length(p - h) < 250.f;
+        for (size_t k = 0; k < pierA.size() && !near; k++) {
+          const vec2 ab = pierB[k] - pierA[k]; const float u = std::clamp(((p.x - pierA[k].x) * ab.x + (p.y - pierA[k].y) * ab.y) / std::max(ab.x * ab.x + ab.y * ab.y, 1.f), 0.f, 1.f);
+          near = length(pierA[k] + ab * u - p) < 80.f;
+        }
         if (shore && !near && clearOfRunways(world, x, z, 1500.f)) spots.push_back({d, p});
       }
     std::sort(spots.begin(), spots.end(), [](const auto& a, const auto& b) { return a.first != b.first ? a.first < b.first : a.second.x < b.second.x; });
@@ -516,6 +573,7 @@ void sceneryBakeLandmarks(const World& world) {
   racetrack(world, out);
   fjordhavenDam(world, out);
   ferries(world);
+  ferryTerminals(out);
   harbourBoats(world, out);
   for (const PlacedEnt& c : civicLandmarks()) {   // (the cities': placed with their lots; their grounds cleared)
     out.push_back(c);

@@ -1474,6 +1474,55 @@ void buildAirportKind(MB& mb, int kind, int lod) {
       if (lod == 3) mb.cyl(vec3(0, 12.5f, 1.f), vec3(0, 0.95f, 4.8f), 0.012f, 0.012f, 3, P_METAL, false, false);   // (the forestay)
       break;
     }
+    case EK_FERRYPIER: {   // 40 m of a ferry terminal's causeway (z -20 to 20, out to sea along +z): its roadway 14 m wide and 3 m
+      // over the sea (P_ROOF: the shader's lanes), a concrete coping and kerbs along its edges, its sides armour stone
+      // sloping down into the sea and the sea floor (and into the land at its root); lamp posts and bollards along it
+      for (float s : {-1.f, 1.f}) {
+        mb.quad(vec3(s * 7.f, 2.4f, -20.f), vec3(s * 7.f, 2.4f, 20.f), vec3(s * 25.6f, -10.f, 20.f), vec3(s * 25.6f, -10.f, -20.f), P_BRICK, vec3(0, -4.f, 0));
+        mb.box(vec3(s > 0.f ? 6.6f : -7.05f, 2.4f, -20.f), vec3(s > 0.f ? 7.05f : -6.6f, 3.25f, 20.f), P_TRIM, (s > 0.f ? 2 : 1) | 8);
+        mb.quad(vec3(-7.f * s, 3.f, s * 20.f), vec3(7.f * s, 3.f, s * 20.f), vec3(25.6f * s, -10.f, s * 20.f), vec3(-25.6f * s, -10.f, s * 20.f), P_BRICK, vec3(0, -4.f, 0));   // (its ends: the root's, the head's)
+      }
+      mb.quad(vec3(-6.6f, 3.f, -20.f), vec3(-6.6f, 3.f, 20.f), vec3(6.6f, 3.f, 20.f), vec3(6.6f, 3.f, -20.f), P_ROOF, vec3(0, -4.f, 0));
+      if (d0) for (float z : {-10.f, 10.f}) {   // (a lamp post either side, staggered)
+        const float x = z < 0.f ? -6.8f : 6.8f;
+        mb.cyl(vec3(x, 3.25f, z), vec3(x, 11.f, z), 0.12f, 0.09f, 6, P_METAL, true, false);
+        mb.cyl(vec3(x, 11.f, z), vec3(x * 0.8f, 11.2f, z), 0.06f, 0.06f, 4, P_METAL, false, false);
+        mb.box(vec3(x * 0.8f - 0.35f, 10.95f, z - 0.2f), vec3(x * 0.8f + 0.35f, 11.15f, z + 0.2f), P_LAMP, 0x3F);
+      }
+      if (d1) for (float z : {-15.f, 5.f}) for (float s : {-1.f, 1.f}) mb.cyl(vec3(s * 6.85f, 3.25f, z), vec3(s * 6.85f, 3.85f, z), 0.22f, 0.27f, d0 ? 8 : 5, P_DARK, false, true);   // (bollards)
+      if (lod == 3)   // (up close: a guard rail along each edge on its posts)
+        for (float s : {-1.f, 1.f}) {
+          mb.box(vec3(s * 6.75f - 0.05f, 3.95f, -20.f), vec3(s * 6.75f + 0.05f, 4.1f, 20.f), P_METAL, 1 | 2 | 8);
+          for (float z = -18.f; z <= 18.f; z += 4.f) mb.box(vec3(s * 6.75f - 0.04f, 3.25f, z - 0.04f), vec3(s * 6.75f + 0.04f, 3.95f, z + 0.04f), P_METAL, 0x33);
+        }
+      break;
+    }
+    case EK_LINKSPAN: {   // a ferry terminal's head (out to sea along +z): its quay wall (z -13 to -3, the causeway's end under it),
+      // the linkspan - a steel ramp 8 m wide hinged at the quay and sloping 16 m out to a ferry's car deck - its lifting
+      // gantry over the ramp's end, and a mooring dolphin either side of the berth, fendered (a ferry's end at z 13)
+      mb.box(vec3(-11.f, -10.f, -13.f), vec3(11.f, 3.2f, -3.f), P_TRIM, 0x3F & ~4);
+      mb.quad(vec3(-4.f, 3.2f, -3.f), vec3(4.f, 3.2f, -3.f), vec3(4.f, 2.2f, 13.f), vec3(-4.f, 2.2f, 13.f), P_ROOF, vec3(0, 0.f, 5.f));   // the ramp
+      mb.quad(vec3(-4.f, 2.6f, -3.f), vec3(4.f, 2.6f, -3.f), vec3(4.f, 1.4f, 13.f), vec3(-4.f, 1.4f, 13.f), P_PAINT, vec3(0, 3.f, 5.f));   // (its underside)
+      for (float s : {-1.f, 1.f}) {
+        mb.quad(vec3(s * 4.f, 3.2f, -3.f), vec3(s * 4.f, 2.2f, 13.f), vec3(s * 4.f, 1.4f, 13.f), vec3(s * 4.f, 2.6f, -3.f), P_PAINT, vec3(0, 2.f, 5.f));
+        mb.box(vec3(s * 4.f - 0.1f, 2.6f, -3.f), vec3(s * 4.f + 0.1f, 3.9f, 13.f), P_PAINT, 0x3F);   // (its side rails)
+        mb.box(vec3(s * 6.f - 0.6f, -4.f, 8.4f), vec3(s * 6.f + 0.6f, 14.f, 9.6f), P_PAINT, 0x3B);   // the gantry's towers
+        mb.cyl(vec3(s * 14.f, -8.f, 10.f), vec3(s * 14.f, 3.6f, 10.f), 2.2f, 2.2f, d0 ? 14 : d1 ? 10 : 6, P_TRIM, true, false);   // (the dolphins)
+        if (d1) mb.box(vec3(s * 11.6f - 0.3f, -1.5f, 9.f), vec3(s * 11.6f + 0.3f, 3.f, 11.f), P_DARK, 0x3F);   // (their fenders)
+        if (d0) mb.cyl(vec3(s * 6.f, 13.f, 9.f), vec3(s * 3.5f, 2.5f, 12.8f), 0.04f, 0.04f, 3, P_METAL, false, false);   // (the hoist's wires)
+      }
+      mb.box(vec3(-6.6f, 13.f, 8.3f), vec3(6.6f, 14.6f, 9.7f), P_PAINT, 0x3F);   // (its beam, the hoist's house on it)
+      if (d1) mb.box(vec3(-2.f, 14.6f, 8.2f), vec3(2.f, 16.4f, 9.8f), P_WALL, 0x3B);
+      if (d0) for (float s : {-1.f, 1.f}) mb.box(vec3(s * 9.f - 0.3f, 3.2f, -10.f), vec3(s * 9.f + 0.3f, 9.f, -9.4f), P_METAL, 0x3B),
+                                          mb.box(vec3(s * 9.f - 0.35f, 9.f, -10.1f), vec3(s * 9.f + 0.35f, 9.3f, -9.3f), P_LAMP, 0x3F);   // (the quay's lamps)
+      if (lod == 3)   // (up close: the steel ladders down the quay wall either side of the ramp, its hinge's pins)
+        for (float s : {-1.f, 1.f}) {
+          for (float o : {-0.25f, 0.25f}) mb.box(vec3(s * 7.5f + o - 0.03f, -4.f, -2.95f), vec3(s * 7.5f + o + 0.03f, 3.5f, -2.88f), P_METAL, 0x3F);
+          for (float y = -3.7f; y < 3.2f; y += 0.3f) mb.box(vec3(s * 7.5f - 0.25f, y - 0.015f, -2.94f), vec3(s * 7.5f + 0.25f, y + 0.015f, -2.9f), P_METAL, 0x3F);
+          mb.cyl(vec3(s * 3.f, 2.9f, -3.f), vec3(s * 4.3f, 2.9f, -3.f), 0.25f, 0.25f, 8, P_DARK, true, true);
+        }
+      break;
+    }
     case EK_POLE: {   // a wooden pole, a crossarm, three insulators; up close, its three wires to the next pole along +z
       mb.cyl(vec3(0, -0.5f, 0), vec3(0, 9.f, 0), 0.14f, 0.11f, d0 ? 10 : d1 ? 6 : 4, P_WOOD, true, false);
       mb.box(vec3(-1.05f, 8.15f, -0.06f), vec3(1.05f, 8.3f, 0.06f), P_WOOD, lod == 2 ? 8 | 16 | 32 : 0x3F);
