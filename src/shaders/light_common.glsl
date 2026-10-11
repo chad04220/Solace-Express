@@ -155,25 +155,52 @@ vec3 shadeSurface(vec3 p, vec3 n, vec3 rd, Mat m, float shadow){
   return col;
 }
 
-// optical depth along a ray through an exponential layer of scale height H: integral of exp(-y/H) over the path
+// optical depth along a ray through an exponential layer of scale height H: integral of exp(-y/H) over the path - as
+// the difference of the layer's density at its two ends, each at most 1 (written as one end's times a growth factor it
+// overflowed on a long stretch down from high above the layer: infinity times nothing, and the pixel black)
 float layerDepth(float y0, float dy, float t, float H){
-  float a = exp(-max(y0, 0.0)/H), k = dy*t/H;
-  return abs(k) > 1e-3 ? a*H*(1.0 - exp(-k))/dy : a*t;
+  float y = max(y0, 0.0), k = dy*t/H;
+  return abs(k) > 1e-3 ? H*(exp(-y/H) - exp(min(-(y + dy*t)/H, 60.0)))/dy : exp(-y/H)*t;
+}
+// the air along the ray ro + rd s to s = t (ro the camera): the optical depths of the Rayleigh layer (8 km), the haze
+// (1.1 km) and the weather's own (8 km) - on a round world in stretches, each with its height straight between its
+// ends' heights on the sphere (planetAlt: the ray climbs away from the curve), the layers' integral exact along each
+vec3 airDepth(vec3 ro, vec3 rd, float t){
+#ifdef ROUND_WORLD
+  int N = uPlanetR > 0.0 ? int(clamp(t/40000.0, 0.0, 11.0)) + 1 : 1;
+  vec3 od = vec3(0.0);
+  float s0 = 0.0, a0 = ro.y;
+  for (int i = 1; i <= 12; i++) {
+    if (i > N) break;
+    float s1 = t*float(i)/float(N), a1 = planetAlt(ro, rd, s1), L = s1 - s0, k = (a1 - a0)/max(L, 1e-3);
+    od += vec3(layerDepth(a0, k, L, 8000.0), layerDepth(a0, k, L, 1100.0), layerDepth(a0, k, L, 8000.0));
+    s0 = s1; a0 = a1;
+  }
+  return od;
+#else
+  return vec3(layerDepth(ro.y, rd.y, t, 8000.0), layerDepth(ro.y, rd.y, t, 1100.0), layerDepth(ro.y, rd.y, t, 8000.0));
+#endif
 }
 // Aerial perspective: Rayleigh scattering (blue light scatters most, so distance turns hills blue and drains their
 // contrast) plus a low haze layer whose density follows the weather's visibility and that glows around the sun.
-// Both thin out with altitude. The in-scattered light is the horizon sky's, so far terrain melts into the sky.
-vec3 applyFog(vec3 col, vec3 ro, vec3 rd, float t){
+// All thin out with altitude: from high up the world below is seen through the air's depth, not the distance, and
+// the limb through the whole of it. The in-scattered light is the horizon sky's, so far terrain melts into the sky.
+// rd: the view from the camera (the path); rdL: the same as the place seen sees it (its level, its sun: LOCAL_SUN)
+vec3 applyFog(vec3 col, vec3 ro, vec3 rd, float t, vec3 rdL){
   if ((uDbg & 256) != 0) return col;
-  float odR = layerDepth(ro.y, rd.y, t, 8000.0), odM = layerDepth(ro.y, rd.y, t, 1100.0);
+  vec3 od = airDepth(ro, rd, t);
   vec3 bR = vec3(5.8e-6, 13.5e-6, 33.1e-6);
   float bM = 3e-6 + uFogB*0.8;
-  vec3 tau = bR*odR + vec3(bM*odM) + uFogB*0.03*t;
+  vec3 tau = bR*od.x + vec3(bM*od.y) + uFogB*0.03*od.z;
   vec3 T = exp(-tau);
-  float mu = dot(rd, uSunDir), mp = max(mu, 0.0);
-  vec3 fogCol = skyColor(normalize(vec3(rd.x, 0.06, rd.z)))*vec3(0.9, 0.94, 1.0);
+  float mu = dot(rdL, uSunDir), mp = max(mu, 0.0);
+  vec3 fogCol = skyColor(normalize(vec3(rdL.x, 0.06, rdL.z)))*vec3(0.9, 0.94, 1.0);
   // forward scattering by the haze: a broad warm glow towards the sun, stronger the hazier the air
-  float hazeW = clamp(bM*odM/max(dot(tau, vec3(0.333)), 1e-6), 0.0, 1.0);
+  float hazeW = clamp(bM*od.y/max(dot(tau, vec3(0.333)), 1e-6), 0.0, 1.0);
   fogCol += uSunCol*(pow(mp, 8.0)*0.22 + pow(mp, 2.5)*0.07*hazeW);
+  // (the horizon's colour is the air's glow along a level path; a place looked down on from above sees its own column's
+  // glow - the zenith's, dimmer - over it: the islands from orbit through a blue veil, not under a white one)
+  fogCol *= mix(1.0, 0.45, clamp(-rdL.y*2.0 - 0.15, 0.0, 1.0));
   return col*T + fogCol*(1.0 - T);
 }
+vec3 applyFog(vec3 col, vec3 ro, vec3 rd, float t){ return applyFog(col, ro, rd, t, rd); }

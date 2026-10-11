@@ -316,8 +316,10 @@ void Renderer::drawEntities(const FrameParams& fp) {
       // Rebuild this authored all-LOD union only when chunk content changes.
       auto& chunkBounds=entityChunkBounds[size_t(lcz+dz)*Scenery::NC+lcx+dx];
       const auto& actual=chunkBounds.get(*ch,allEntityBounds);
+      // (on the round world the chunk is drawn lower by as much as the curve falls away over its furthest corner: planet.h)
+      const float fall = planetRadius() > 0.f ? dmax * dmax / (2.f * planetRadius()) : 0.f;
       bool inView=dmin<farAll && (fp.pano>0.f || (chunkBounds.valid &&
-        boxVisible(actual.lo.x+ox,actual.lo.y,actual.lo.z+oz,actual.hi.x+ox,actual.hi.y,actual.hi.z+oz)));
+        boxVisible(actual.lo.x+ox,actual.lo.y-fall,actual.lo.z+oz,actual.hi.x+ox,actual.hi.y,actual.hi.z+oz)));
       bool inSh[2] = {false, false};
       for (int c = 0; c < 2; c++)
         if (shDirty[c]) {
@@ -547,12 +549,13 @@ void Renderer::drawEntities(const FrameParams& fp) {
       glUniformMatrix4fv(glGetUniformLocation(p, "uPanoView"), 1, GL_FALSE, pv.m);
       glUniform2f(glGetUniformLocation(p, "uPano"), fp.pano, fp.panoTanY);
       glUniform2f(glGetUniformLocation(p, "uJit"), jitX, jitY);
-      glUniform1f(glGetUniformLocation(p, "uLogC"), 2.f / log2f(40000.f + 1.f));
+      glUniform1f(glGetUniformLocation(p, "uLogC"), logDepthC());
       glUniform1f(glGetUniformLocation(p, "uTime"), fp.time);
       glUniform3f(glGetUniformLocation(p, "uWind"), fp.windSock.x, fp.windSock.y, fp.windSock.z);
       glUniform1i(glGetUniformLocation(p, "uShadowPass"), 0);
       glUniform3f(glGetUniformLocation(p, "uCam"), cam.x, cam.y, cam.z);
       glUniform3f(glGetUniformLocation(p, "uCamV"), cam.x, cam.y, cam.z);
+      glUniform1f(glGetUniformLocation(p, "uPlanetR"), fp.pano > 0.f ? 0.f : planetRadius());   // (the round world: planet.h)
       glUniform1f(glGetUniformLocation(p, "uNight"), fp.night);
       glUniform1f(glGetUniformLocation(p, "uRwyLights"), fp.rwyLights);
       glUniform1f(glGetUniformLocation(p, "uWet"), fp.wet);

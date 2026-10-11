@@ -750,7 +750,7 @@ void main(){
   }
   vec3 wn = vec3(cy*nb.x + sy*nb.z, nb.y, -sy*nb.x + cy*nb.z);
   if (dot(wn, V) < -0.2) wn = normalize(wn + V*0.5);   // bumped normals must not face away from the camera
-  oG0 = vec4(dist, octEnc(normalize(wn)), cls == 1.0 ? 4.0 : 3.0);   // GB_FOLIAGE / GB_ENTITY (kGBuffer)
+  oG0 = vec4(length(vC - uCam), octEnc(normalize(wn)), cls == 1.0 ? 4.0 : 3.0);   // GB_FOLIAGE / GB_ENTITY (kGBuffer); the distance to where it is drawn
   oG1 = vec4(sqrt(clamp(alb, 0.0, 1.0)), clamp(rough, 0.03, 1.0));
   oG2 = vec4(max(emit, vec3(0.0)), metal);
   oG3 = vec4(1.0, 1.0, 1.0, float(surfaceFlags)/255.0);

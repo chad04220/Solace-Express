@@ -32,7 +32,7 @@ inline std::string aircraftDefines(int model, const float packed[96]) {
 // hull bake and the display atlas each add their own main to it.
 inline std::string worldLibAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace + kTerrainTrace +
-         kMaterialCommon + kLightCommon + kClouds + kTerrainMaterial + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
+         kMaterialCommon + kPlanet + kLightCommon + kClouds + kTerrainMaterial + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kCockpitMaterial + kPlaneMaterial + kWater + kAfShMap + kPlaneLight;
 }
@@ -46,24 +46,25 @@ inline std::string sdfAssembly(const std::string& defines) {
 
 // ---- the scenery's instanced meshes (entity_render.cpp): a build for each class (ENT_CLASS, ent_common.glsl: the trees,
 // the rocks, the buildings and vehicles), each with its class's code alone; each draw takes its kind's class's
-inline std::string entVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kEntCommon + kEntVS; }
+inline std::string spriteVSAssembly() { return std::string("#version 330 core\n#define ROUND_WORLD\n") + kPlanet + kSpriteVS; }
+inline std::string entVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + "#define ROUND_WORLD\n" + kEntCommon + kPlanet + kEntVS; }
 inline std::string entFSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kEntCommon + kEntFS1 + kEntFS2; }
 inline std::string entShadowFSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kEntCommon + kEntFS1 + kEntShadowFS; }
 inline std::string entClassDefines(int c) { return "#define ENT_CLASS " + std::to_string(c) + "\n"; }
 
 // ---- the raster renderer's programs (raster_renderer.cpp, terrain_mesh.cpp)
-inline std::string terrainVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kCommonGLSL + kSceneUniforms + kRoads + kTerrainVS; }
+inline std::string terrainVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + "#define ROUND_WORLD\n" + kCommonGLSL + kSceneUniforms + kRoads + kPlanet + kTerrainVS; }
 inline std::string terrainFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + "#define ENV_MATERIALS\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kMaterialCommon + kTerrainMaterial + kGBuffer + kGBWrite + kTerrainFS;
 }
-inline std::string waterVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + kWaterVS; }
+inline std::string waterVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + "#define ROUND_WORLD\n" + kPlanet + kWaterVS; }
 inline std::string waterFSAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + "#define ENV_MATERIALS\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kMaterialCommon + kLightCommon + kClouds + kWater + kGBuffer + kGBWrite + kWaterFS;
+  return std::string("#version 330 core\n") + defines + "#define ENV_MATERIALS\n#define LOCAL_SUN\n#define ROUND_WORLD\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kMaterialCommon + kPlanet + kLightCommon + kClouds + kWater + kGBuffer + kGBWrite + kWaterFS;
 }
 // the objects pass: the aircraft, traffic, debris and UFO fields marched into the G-buffer (no terrain, no clouds)
 inline std::string objectsFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace +
-         kMaterialCommon + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
+         kMaterialCommon + kPlanet + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kCockpitMaterial + kPlaneMaterial + kAfShMap + kPlaneLight + kGBuffer + kGBWrite + kPlaneGB + kObjectsFS;
 }
@@ -96,19 +97,19 @@ inline std::string planeMeshDepthFSAssembly() {
 }
 inline std::string planeMeshFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + "#define AF_MESH\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kWreckClip + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace +
-         kMaterialCommon + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
+         kMaterialCommon + kPlanet + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kCabinWindows + kWraithCockpitSDF + kWraithCockpitMaterial +
          kCockpitMaterial + kPlaneMaterial + kAfShMap + kPlaneLight + kGBuffer + kGBWrite + kPlaneGB + kPlaneMeshFS;
 }
 // the shadow proxy: the airframe fields' shadows on what is in the G-buffer, for the lighting pass
 inline std::string shadowProxyFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace +
-         kWraithSDF + kWraithCockpitCommon + kWraithCockpitSDF + kMaterialCommon + kLightCommon + kGBuffer + kAfShMap + kShadowProxyFS;
+         kWraithSDF + kWraithCockpitCommon + kWraithCockpitSDF + kMaterialCommon + kPlanet + kLightCommon + kGBuffer + kAfShMap + kShadowProxyFS;
 }
 // the effects pass: the effects over the lit frame (its cloak needs the airframe's field)
 inline std::string effectsFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace +
-         kMaterialCommon + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
+         kMaterialCommon + kPlanet + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
          kFeeds + kPlaneFx + kWraithSDF + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kGBuffer + kPropellerGLSL + kEffectsFS;
 }
@@ -117,5 +118,5 @@ inline std::string postFSAssembly() { return std::string("#version 330 core\n") 
 inline std::string uiFSAssembly() { return std::string("#version 330 core\n") + kGLens + kUIFS; }
 inline std::string propDiscFSAssembly() { return std::string("#version 330 core\n") + kPropellerGLSL + kPropDiscFS; }
 inline std::string lightFSAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kRoads + kMaterialCommon + kLightCommon + kClouds + kGBuffer + kLightFS;
+  return std::string("#version 330 core\n") + defines + "#define LOCAL_SUN\n#define ROUND_WORLD\n" + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kRoads + kMaterialCommon + kPlanet + kLightCommon + kClouds + kGBuffer + kLightFS;
 }

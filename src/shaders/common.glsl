@@ -100,47 +100,83 @@ uniform vec3 uSunDir; uniform vec3 uSunCol; uniform float uNight; uniform float 
 uniform float uCloudCover; uniform float uCloudBase; uniform float uFogB; uniform float uWet; uniform float uSnow;
 uniform vec2 uWindOff; uniform float uLightning; uniform float uStorm;
 uniform vec3 uWindV;   // surface wind velocity (m/s, the way the air moves)
+#ifdef LOCAL_SUN
+uniform float uSunDim;   // the weather's share of the sunlight (Game::computeSun): sunLightAt's times it
+// (a pass that shades the round world, planet.glsl: the sun as the place being shaded sees it, in that place's own
+// level, and its light as it reaches that place - set per pixel; every use of uSunDir and uSunCol after this reads
+// them. The uniforms themselves: sunDirUniform(), sunColUniform())
+vec3 sunDirUniform(){ return uSunDir; }
+vec3 sunColUniform(){ return uSunCol; }
+vec3 gSunDir = vec3(0.0, 1.0, 0.0), gSunCol = vec3(0.0);
+#define uSunDir gSunDir
+#define uSunCol gSunCol
+#endif
 
-vec3 skyColor(vec3 rd){
+// The air along a ray rising at y (its direction's height) from h up - in the ground's own measure, what a ray from
+// the sea at that angle meets: a ray upwards meets the air above h, a ray below the level sees the air down to its
+// lowest point on a round world (radius R; 0 flat) and back up beyond it - the limb's bright band from on high
+float skyAir(float y, float h, float R, float c, float lo){
+  float dens = exp(-max(h, 0.0)/8000.0);
+  float k = y >= 0.0 ? dens : 2.0*exp(-max(R > 0.0 ? (R + h)*sqrt(max(1.0 - y*y, 0.0)) - R : h, 0.0)/8000.0) - dens;
+  return k/max(max(y, lo)*1.4 + c, 0.02);
+}
+// The sunlight reaching h up with the sun at height y in that place's own level (Game::computeSun, exactly, but for the
+// weather's share): through the air above it, from over a horizon dipped below the level from up there
+vec3 sunLightAt(float y, float h, float R){
+  h = max(h, 0.0);
+  float dip = R > 0.0 ? sqrt(max(1.0 - (R/(R + h))*(R/(R + h)), 0.0)) : 0.0;
+  return exp(-vec3(0.10, 0.23, 0.56)*skyAir(y, h, R, 0.08, -1.0)*0.45)*smoothstep(-0.06, 0.05, y + dip);
+}
+// The sky seen from h up (m; R the planet's radius, 0 flat): at the ground as it always was, and thinning above it -
+// the blue darkening to the black of space by a hundred kilometres, the sun a white disc, the stars out by day, the
+// horizon dipping below the level and the air along it a bright band over the limb
+vec3 skyColorAt(vec3 rd, float h, float R){
   vec3 sd = uSunDir;
-  float sunH = sd.y;
+  h = max(h, 0.0);
+  float dip = R > 0.0 ? sqrt(max(1.0 - (R/(R + h))*(R/(R + h)), 0.0)) : 0.0;   // (the sine of the horizon's dip)
+  float sunH = sd.y, sunE = sunH + dip;   // (the sun's height, and over the horizon seen from here)
   float y = max(rd.y, 0.0);
   // optical depths (cheap analytic approximation of Rayleigh + Mie single scattering)
-  float odV = 1.0/(y*1.4 + 0.075);
-  float odS = 1.0/max(sunH*1.4 + 0.08, 0.02);   // positive and bounded once the sun is down (was negative just below the horizon)
+  float odV = skyAir(rd.y, h, R, 0.075, 0.0);
+  float odS = skyAir(sunH, h, R, 0.08, -1.0);   // positive and bounded once the sun is down (was negative just below the horizon)
   vec3 beta = vec3(0.10, 0.23, 0.56);
   vec3 sunExt = exp(-beta*odS*0.45);
   float mu = dot(rd, sd);
   float ray = 0.75*(1.0+mu*mu);
   float g = 0.76; float mie = (1.0-g*g)/(4.0*PI*pow(1.0+g*g-2.0*g*mu, 1.5));
   vec3 inscat = (beta*ray*1.6 + vec3(0.11)*mie*0.9) * sunExt * (1.0-exp(-beta*odV*0.3)) / beta;
-  vec3 col = inscat * 2.3 * smoothstep(-0.12, 0.05, sunH);
+  vec3 col = inscat * 2.3 * smoothstep(-0.12, 0.05, sunE);
   // golden-hour glow towards the sun and less magenta in the upper sky (cheap multiple-scattering / ozone hack)
-  float low = smoothstep(0.35, 0.0, sunH) * smoothstep(-0.15, 0.0, sunH);
+  float low = smoothstep(0.35, 0.0, sunE) * smoothstep(-0.15, 0.0, sunE);
   float hz = pow(clamp(1.0 - y, 0.0, 1.0), 3.0);
+  float air = exp(-h/8000.0);   // (the air above, against the ground's: its glows thin out with it)
   col *= mix(vec3(1.0), vec3(0.7, 0.85, 1.05), low * (1.0 - hz));
-  col += vec3(1.0, 0.42, 0.12) * pow(max(mu, 0.0), 4.0) * hz * low * 1.4;
-  col += vec3(0.9, 0.55, 0.3) * hz * low * 0.12;
+  col += vec3(1.0, 0.42, 0.12) * pow(max(mu, 0.0), 4.0) * hz * low * 1.4 * min(odV*0.075, 1.0);
+  col += vec3(0.9, 0.55, 0.3) * hz * low * 0.12 * min(odV*0.075, 1.0);
   // twilight / night sky
-  vec3 night = vec3(0.006, 0.011, 0.028) * (1.0 - 0.5*y) + vec3(0.02,0.012,0.03)*pow(clamp(1.0-y,0.0,1.0), 6.0)*smoothstep(-0.3, 0.0, sunH);
-  col += night;
-  // overcast flattening
-  float oc = smoothstep(0.55, 1.0, uCloudCover);
+  vec3 night = vec3(0.006, 0.011, 0.028) * (1.0 - 0.5*y) + vec3(0.02,0.012,0.03)*pow(clamp(1.0-y,0.0,1.0), 6.0)*smoothstep(-0.3, 0.0, sunE);
+  col += night * (0.1 + 0.9*air);
+  // overcast flattening (from under the cloud, and in it: not from high over its top)
+  float oc = smoothstep(0.55, 1.0, uCloudCover) * (1.0 - smoothstep(uCloudBase + 2500.0, uCloudBase + 9000.0, h));
   vec3 grey = vec3(0.55,0.58,0.62) * (0.012 + 0.988*smoothstep(-0.12, 0.4, sunH)) * (0.9 - 0.3*uStorm);
   col = mix(col, grey * (0.75 + 0.25*y), oc*0.85);
   // sun disc
   float sunDisc = smoothstep(0.99985, 0.99992, mu);
   col += sunExt * sunDisc * 60.0 * (1.0 - oc);
-  // stars
-  if (uNight > 0.01 && rd.y > 0.0) {
+  // stars: at night, and from high in a sky gone dark by day (above the horizon, its dip from up there)
+  float space = smoothstep(12000.0, 45000.0, h) * clamp(1.0 - dot(col, vec3(0.3, 0.5, 0.2))*6.0, 0.0, 1.0);
+  float stars = max(uNight, space);
+  if (stars > 0.01 && rd.y > -dip) {
     vec3 sp = rd*300.0; vec3 ci = floor(sp);
     float st = hash3(ci); vec3 fp = fract(sp) - 0.5;
     float s = smoothstep(0.995, 1.0, st) * smoothstep(0.12, 0.0, length(fp)) * (1.0 - oc);
-    col += vec3(0.8,0.85,1.0) * s * 2.0 * uNight * smoothstep(0.0, 0.2, rd.y);
+    col += vec3(0.8,0.85,1.0) * s * 2.0 * stars * mix(smoothstep(0.0, 0.2, rd.y), 1.0, space);
     // moon
     vec3 md = normalize(vec3(-0.4, 0.55, 0.6));
-    col += vec3(0.9,0.92,1.0) * smoothstep(0.9993, 0.9996, dot(rd, md)) * 3.0 * uNight * (1.0-oc);
+    col += vec3(0.9,0.92,1.0) * smoothstep(0.9993, 0.9996, dot(rd, md)) * 3.0 * stars * (1.0-oc);
   }
   col += vec3(0.7,0.75,1.0) * uLightning * 0.8 * oc;
   return col;
 }
+// the sky from the ground (the ambient, the haze's colour, the reflections: the air as the world below sees it)
+vec3 skyColor(vec3 rd){ return skyColorAt(rd, 0.0, 0.0); }

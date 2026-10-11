@@ -1,7 +1,7 @@
 //! kEntFS1
 //! Shared material code (G-buffer pass; the shadow pass only uses the cut-outs)
 
-in vec3 vW; in vec3 vL; in vec3 vLN; in vec4 vAux; flat in vec4 vInst; flat in vec3 vScale; flat in float vFade; flat in vec2 vLodK;
+in vec3 vW; in vec3 vL; in vec3 vLN; in vec4 vAux; in vec3 vC; flat in vec4 vInst; flat in vec3 vScale; flat in float vFade; flat in vec2 vLodK;
 uniform sampler2DArray uAlb; uniform sampler2DArray uNrm;
 uniform sampler2DArray uEnvAlb; uniform sampler2DArray uEnvNrm; uniform int uEnvMaterials;
 uniform int uKind; uniform int uLod; uniform int uShadowPass; uniform vec3 uCam; uniform float uRwyLights; uniform float uNight; uniform float uWet; uniform float uSnow; uniform float uTime;

@@ -257,7 +257,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kRoads, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kGLens, kUIVS, kUIFS, kEntCommon, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
+  for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kRoads, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kGLens, kUIVS, kUIFS, kEntCommon, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap, kPlanet}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -613,7 +613,7 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     if (!progEnt[c] || !progEntSh[c]) { error = "Entity shader: " + error; return false; }
   }
   setCompileStage("particles and sprites");
-  progSprite = program(kSpriteVS, kSpriteFS, error); if (progSprite) step();
+  progSprite = program(spriteVSAssembly(), kSpriteFS, error); if (progSprite) step();
   setCompileStage("bloom and light shafts");
   progDown = program(vsFS, kDownFS, error); if (progDown) step();
   progUp = program(vsFS, kUpFS, error); if (progUp) step();
@@ -632,7 +632,8 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     setCompileStage("terrain shadows");
     { std::string e; progTShBake = program(vsFS, ms + kTShBakeMain, e); step(); }   // optional: without it the terrain casts no sun shadow
     setCompileStage("clouds");
-    { std::string e; progClouds = program(vsFS, ms + kCloudMain, e); step(); }       // optional: without them no clouds
+    // (the clouds over the round world: ROUND_WORLD - planet.glsl - which the shared library's other programs leave out)
+    { std::string e; progClouds = program(vsFS, worldLibAssembly(std::string("#define ROUND_WORLD\n") + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "")) + kCloudMain, e); step(); }       // optional: without them no clouds
     { std::string e; progCloudComp = program(vsFS, kCloudCompFS, e); step(); }
     setCompileStage("cloud accumulation");
     { std::string e; progCloudAcc = program(vsFS, kCloudAccFS, e); step(); }   // optional: without it the march's own frame is used
@@ -1082,6 +1083,7 @@ mat4 Renderer::viewMat(const FrameParams& fp) const {
 
 bool Renderer::project(const FrameParams& fp, vec3 p, float& sx, float& sy) const {
   mat4 vp = viewProj(fp);
+  if (fp.pano <= 0.f) p = planetPos(p, fp.camPos);   // (where it is drawn: the round world, planet.h)
   float x = vp(0, 0) * p.x + vp(0, 1) * p.y + vp(0, 2) * p.z + vp(0, 3);
   float y = vp(1, 0) * p.x + vp(1, 1) * p.y + vp(1, 2) * p.z + vp(1, 3);
   float w = vp(3, 0) * p.x + vp(3, 1) * p.y + vp(3, 2) * p.z + vp(3, 3);
@@ -1101,6 +1103,8 @@ void Renderer::reportGLError(int stampIdx) {
 
 void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUseProgram(p);
+  glUniform1f(U(p, "uPlanetR"), fp.pano > 0.f ? 0.f : planetRadius());   // (the round world: planet.h; a panorama feed's camera keeps it flat)
+  glUniform1f(U(p, "uSunDim"), fp.sunDim);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(U(p, "uAlb"), 1);
   glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D_ARRAY, texNrm); glUniform1i(U(p, "uNrm"), 2);
@@ -1388,6 +1392,7 @@ void Renderer::drawSprites(const FrameParams& fp, float texW, float texH, float 
   glUniformMatrix4fv(U(progSprite, "uViewProj"), 1, GL_FALSE, vp.m);
   { mat4 v = viewMat(fp); glUniformMatrix4fv(U(progSprite, "uPanoView"), 1, GL_FALSE, v.m); glUniform2f(U(progSprite, "uPano"), fp.pano, fp.panoTanY); }
   glUniform3f(U(progSprite, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
+  glUniform1f(U(progSprite, "uPlanetR"), fp.pano > 0.f ? 0.f : planetRadius());
   glUniform3f(U(progSprite, "uCamR"), fp.camRight.x, fp.camRight.y, fp.camRight.z);
   glUniform3f(U(progSprite, "uCamU"), fp.camUp.x, fp.camUp.y, fp.camUp.z);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progSprite, "uDepth"), 0);
@@ -1510,7 +1515,26 @@ void Renderer::lightClassifiedHangar(const FrameParams& fp) {
   glBindVertexArray(vaoEmpty);glDrawArrays(GL_TRIANGLES,0,3);depthValid=true;
 }
 
-void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites) {
+// The round world (planet.h) for what is placed whole rather than built from vertices: the traffic and the UFO, drawn
+// where the curve takes them - the march, the meshes and their hulls all read their places from here (the scenery, the
+// ground, the sea and the sprites curve in their vertex shaders). Turned with it they are not: a few hundredths of a
+// degree at the distances they are seen from.
+static const FrameParams& roundFrame(const FrameParams& fp, FrameParams& out) {
+  const float R = fp.pano > 0.f ? 0.f : planetRadius();
+  if (R <= 0.f || (fp.trafficN <= 0 && !fp.ufoOn)) return fp;
+  out = fp;
+  for (int k = 0; k < std::min(out.trafficN, kMaxTrafficDrawn); k++) {
+    float* t = out.traffic[k].t;
+    const vec3 c = planetPos(vec3(t[24 * 4], t[24 * 4 + 1], t[24 * 4 + 2]), fp.camPos, R);
+    t[24 * 4] = c.x; t[24 * 4 + 1] = c.y; t[24 * 4 + 2] = c.z;
+  }
+  if (out.ufoOn) out.ufoPos = planetPos(out.ufoPos, fp.camPos, R);
+  return out;
+}
+
+void Renderer::renderScene(const FrameParams& fpFlat, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites) {
+  static FrameParams fpRound;   // (no per-frame allocation of a large struct on the stack)
+  const FrameParams& fp = roundFrame(fpFlat, fpRound);
   const bool classified = fp.hangarPreview && fp.hangarClassified;
   if (classified != previousClassifiedHangar || fp.hangarPreview != previousHangar || (fp.hangarPreview && fp.plane.model != previousPreviewModel)) histValid = false;
   previousClassifiedHangar = classified;

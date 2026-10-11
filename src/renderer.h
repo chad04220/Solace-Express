@@ -12,11 +12,17 @@
 #include "aircraft.h"
 #include "gl.h"
 #include "world.h"
+#include "planet.h"
 #include "entity_mesh.h"
 #include "bridge_mesh.h"
 #include "ground_vehicle.h"
 #include "feed_cameras.h"
 #include "exhaust.h"
+
+// Logarithmic depth (every raster pass: gl_Position.z from log2(1 + w)): 0.3 m to the far side of the round world's
+// horizon from a thousand kilometres up (planet.h) at the 32-bit depth's precision - a millionth of the distance
+static const float kLogDepthFar = 2.0e7f;
+inline float logDepthC() { return 2.f / log2f(kLogDepthFar + 1.f); }
 
 struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft, bill = 0; };   // bill > 0: x,y,z is the centre of a camera-facing square of that half size
 enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7, SPR_RIBBON = 8, SPR_FLAME = 9 };
@@ -94,6 +100,7 @@ struct FrameParams {
   float planeTerrSh = 1.f;   // terrain's sun shadow at the player's aircraft (one value for the whole airframe, from the CPU)
   bool prefetchOn = false; vec3 prefetchPos;   // scenery to have the worker threads build ahead (the menu tour's next place)
   float cloudCover = 0.3f, cloudBase = 1500, fogB = 0.0001f, wet = 0, snow = 0, lightning = 0, storm = 0;
+  float sunDim = 1.f;   // the weather's share of the sunlight (Game::computeSun): the lighting pass's sunLightAt times it
   vec2 windOff;
   vec3 wind;   // surface wind velocity (m/s, the way the air moves): the sea's waves, the clouds' lean
   vec3 windSock;   // the surface wind with its gusts where the camera is (the windsocks swing with them)
@@ -522,8 +529,8 @@ private:
   void ensureShadowMaps();
   void rasterShadowMaps(const FrameParams& fp);
   void rasterTrafficShadowMaps(const FrameParams& fp);
-  GLuint iboTerrain = 0, vaoTerrain = 0, vboTerrainInst = 0, vaoWater = 0, vboWater = 0, iboWater = 0; int waterIdx = 0;
-  std::vector<float> terrInst; int terrChunks = 0;
+  GLuint iboTerrain = 0, iboTerrainCoarse = 0, vaoTerrain = 0, vboTerrainInst = 0, vaoWater = 0, vboWater = 0, iboWater = 0; int waterIdx = 0;
+  std::vector<float> terrInst, terrInstCoarse; int terrChunks = 0, terrChunksCoarse = 0;   // (coarse: every other grid line - terrain_mesh.cpp)
   // where the graded roads are, for the terrain mesh's detail along them: per level (level 0 the heightfield's texels,
   // each level up a quarter as many cells) the narrowest graded road's half platform whose platform or the 20 m beside
   // it reaches the cell (m, rounded up; 0: none)

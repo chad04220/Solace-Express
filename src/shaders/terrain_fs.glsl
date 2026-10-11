@@ -1,6 +1,6 @@
 //! kTerrainFS
 //! The ground's material into the G-buffer (terrainMaterial), lit later by the lighting pass.
-in vec3 vW; in vec3 vN;
+in vec3 vW; in vec3 vN; in vec3 vC;
 void main(){
   vec2 pixelDx = dFdx(vW.xz), pixelDy = dFdy(vW.xz);   // before the divergent sea-floor discard
   // the sea floor, from above the sea: the sea is drawn over it. Left in, a shallow bank a few decimetres down fought
@@ -8,7 +8,7 @@ void main(){
   // than that across the far chunks' large triangles - and a few kilometres off it broke through in a lattice of pale
   // sandy dashes laid out like the chunks' grid
   if (vW.y < 0.0 && uCamPos.y > 0.0) discard;
-  vec3 p = vW; vec3 rd = p - uCamPos; float t = length(rd);
+  vec3 p = vW; float t = length(vC - uCamPos);   // (t: the distance to where it is drawn, the lighting pass's)
   vec2 pw = wrapW(p.xz);
   vec3 n = roadSurfaceNormal(pw, normalize(vN));
   vec3 pl = vec3(pw.x, p.y, pw.y);   // (the ground's own place: across the map's seam, the islands on the far side; y the height)

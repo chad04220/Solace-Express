@@ -142,7 +142,7 @@ int main() {
   std::string h = "#version 330 core\n";
   int bad = scan("scene_lib.frag", lib) + scan("map.frag", kMapMain) + scan("disp.frag", kDispMain);
   bad += scan("terrain.vert", terrainVSAssembly("")) + scan("terrain.frag", terrainFSAssembly("")) + scan("water.vert", waterVSAssembly("")) + scan("water.frag", waterFSAssembly("")) + scan("light.frag", lightFSAssembly("")) + scan("objects.frag", objectsFSAssembly("")) + scan("shadow_proxy.frag", shadowProxyFSAssembly("")) + scan("effects.frag", effectsFSAssembly("")) + scan("plane_mesh.vert", planeMeshVSAssembly("")) + scan("plane_mesh.frag", planeMeshFSAssembly("")) + scan("objects_light.frag", objectsFSAssembly("#define AF_LIGHT\n")) + scan("plane_mesh_light.frag", planeMeshFSAssembly("#define AF_LIGHT\n"));
-  bad += scan("fullscreen.vert", kFullscreenVS) + scan("sprite.vert", kSpriteVS) + scan("sprite.frag", kSpriteFS);
+  bad += scan("fullscreen.vert", kFullscreenVS) + scan("sprite.vert", spriteVSAssembly()) + scan("sprite.frag", kSpriteFS);
   bad += scan("down.frag", kDownFS) + scan("up.frag", kUpFS) + scan("raymask.frag", kRayMaskFS) + scan("ray.frag", kRayFS);
   bad += scan("prop_disc.vert", kPropDiscVS) + scan("prop_disc.frag", propDiscFSAssembly());
   bad += scan("taa.frag", kTaaFS) + scan("post.frag", postFSAssembly());

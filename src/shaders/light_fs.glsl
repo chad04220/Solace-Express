@@ -175,16 +175,21 @@ void main(){
   // Capture before the sky/deferred branches. A geometric receiver plane avoids
   // treating scanned plaster relief as a different shadow slope in every pixel.
   vec3 receiverDx = dFdx(rd*g0.x), receiverDy = dFdy(rd*g0.x);
-  if (cls == GB_SKY) { oColor = vec4(skyColor(rd), 1.0); oDepth = 1e6; oCloudMask = 1.0; return; }
+  if (cls == GB_SKY) { gSunDir = sunDirUniform(); gSunCol = sunColUniform(); oColor = vec4(skyColorAt(rd, ro.y, uPlanetR), 1.0); oDepth = 1e6; oCloudMask = 1.0; return; }
   float t = g0.x;
-  vec3 p = ro + rd*t, n = octDec(g0.yz);
+  // the round world (kPlanet): the point was drawn at ro + rd t; it is at p in the flat world - every lookup's, the
+  // G-buffer's normal's - and it is shaded there, in its own level: the view and the sun turned as it sees them (so
+  // the far side of the curve falls into its own dusk)
+  vec3 rdC = rd, p = planetFlat(ro + rd*t, ro), n = octDec(g0.yz);
+  rd = planetTurn(rd, p, ro, -1.0); gSunDir = planetTurn(sunDirUniform(), p, ro, -1.0);
+  gSunCol = sunLightAt(gSunDir.y, p.y, uPlanetR)*uSunDim;
   gEnvironmentReceiverNormal = n;
   gEnvironmentReceiverEntity = cls == GB_ENTITY;
   if (cls == GB_TERRAIN || cls == GB_ENTITY) {
     vec3 plane = cross(receiverDx,receiverDy);
     float norm2 = dot(plane,plane);
     if (norm2 > 1e-12 && max(length(receiverDx),length(receiverDy)) < max(0.5,t*0.015)) {
-      plane *= inversesqrt(norm2);
+      plane = planetTurn(plane*inversesqrt(norm2), p, ro, -1.0);
       if (dot(plane,n) < 0.0) plane = -plane;
       if (dot(plane,n) > 0.25) gEnvironmentReceiverNormal = plane;
     }
@@ -225,7 +230,7 @@ void main(){
     if ((flags & GBF_GLINT) != 0) { vec3 h = normalize(-rd + uSunDir); col += uSunCol*pow(max(dot(n, h), 0.0), 400.0)*sh*3.0; }   // painted skin
   }
   bool sealed = cls == GB_POD || cls == GB_DISPLAY;   // the cockpit: nothing outside the aircraft reaches it
-  if (!sealed) col = applyFog(col, ro, rd, t);
+  if (!sealed) col = applyFog(col, ro, rdC, t, rd);
   if (any(isnan(col)) || any(isinf(col)) || !(col.r + col.g + col.b < 1e7)) col = vec3(0.0);
   // the TAA's history class: 1 world, 0.5 rigid with the aircraft (0.55 a display), 0.2 moving, 0 none
   float taa = (flags & GBF_MOVING) != 0 ? 0.2 : (flags & GBF_RIGID) != 0 ? ((flags & GBF_DISPLAY) != 0 ? 0.55 : 0.5) : cls == GB_DISPLAY ? 0.0 : 1.0;

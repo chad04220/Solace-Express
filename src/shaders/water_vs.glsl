@@ -5,13 +5,15 @@ layout(location = 0) in vec2 aXZ;   // the grid around the origin
 uniform mat4 uVP; uniform vec2 uJit; uniform float uLogC; uniform vec3 uCamPos;
 uniform mat4 uPanoView; uniform vec2 uPano;
 out vec3 vW;
+out vec3 vC;   // where it is drawn: on the round world (kPlanet)
 void main(){
   vec3 wp = vec3(uCamPos.x + aXZ.x, 0.0, uCamPos.z + aXZ.y);
   vW = wp;
-  gl_Position = uVP*vec4(wp, 1.0);
+  vec3 cp = planetPos(wp, uCamPos); vC = cp;
+  gl_Position = uVP*vec4(cp, 1.0);
   bool behind = false;
   if (uPano.x > 0.0) {
-    vec3 c = (uPanoView*vec4(wp, 1.0)).xyz; float a = atan(c.x, -c.z), dd = length(c);
+    vec3 c = (uPanoView*vec4(cp, 1.0)).xyz; float a = atan(c.x, -c.z), dd = length(c);
     gl_Position = vec4(a/uPano.x*dd, c.y/max(length(c.xz), 1e-3)/uPano.y*dd, 0.0, dd); behind = abs(a) > 1.9;
   }
   gl_Position.xy -= 2.0*uJit*gl_Position.w;

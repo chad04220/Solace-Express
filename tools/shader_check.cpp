@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
   // the small programs (Renderer::compilePrograms), as assembled and as pruned
   put(dir, "fullscreen.vert", kFullscreenVS);
   put(dir, "ui.vert", kUIVS); put(dir, "ui.frag", uiFSAssembly());
-  put(dir, "sprite.vert", kSpriteVS); put(dir, "sprite.frag", kSpriteFS);
+  put(dir, "sprite.vert", spriteVSAssembly()); put(dir, "sprite.frag", kSpriteFS);
   put(dir, "bloom_down.frag", kDownFS); put(dir, "bloom_up.frag", kUpFS);
   put(dir, "ray_mask.frag", kRayMaskFS); put(dir, "rays.frag", kRayFS); put(dir, "feed_rays.frag", kFeedRaysFS);
   put(dir, "post.frag", postFSAssembly()); put(dir, "taa.frag", kTaaFS);

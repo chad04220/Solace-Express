@@ -21,6 +21,12 @@
 - **Each bridge joins its road without a seam.** The deck is as wide as the road, and its ends are square to it. The road meets the deck at the deck's height, and the markings run straight on across. Under each end, the embankment slopes away beneath the first span.
 - Nothing grows up through a bridge. Trees and buildings under one stay below its deck.
 
+### A round world, all the way to space
+- **The world is now drawn as a planet the size of the Earth.** Climb, and the horizon drops away below you and curves. The islands' copies, repeating every 100 km, spread across the planet as far as you can see. Distant ground sinks below the horizon the way it does on a real planet. Near you nothing changes: runways, approaches and everything within a few kilometres look exactly as before.
+- **The view now reaches the horizon** instead of stopping at 40 km. From 10 km up you can see ground hundreds of kilometres away; from 100 km up, thousands. The haze thins as you climb, so the view straight down stays clear while the horizon fades into the bright band of air along it.
+- **The sky thins out with height.** Above about 20 km it darkens to deep blue, and by 100 km it is black, with a glowing blue limb along the curve of the planet. The sun becomes a hard white disc above the air, and at sunset you can see day turn to night across the planet below. Clouds follow the curve too.
+- The far copies of the islands are drawn from a lighter mesh. In our tests the view from orbit took less time to draw than flying low over a town.
+
 ### Good to know
 - **The first launch after updating takes longer, once.** The islands are regenerated: some roads take different routes, and every settlement is laid out anew.
 

@@ -9,6 +9,7 @@ uniform int uLod; uniform vec2 uLodL; uniform float uCloseLod;   // the detail l
 uniform vec3 uWind;   // surface wind velocity (windsocks)
 uniform mat4 uPanoView; uniform vec2 uPano;   // a panoramic camera feed: projected onto its cylinder (camRay)
 out vec3 vW; out vec3 vL; out vec3 vLN; out vec4 vAux;
+out vec3 vC;   // where it is drawn: on the round world (kPlanet; the shadow pass's light space stays flat)
 flat out float vFade;   // 1 whole .. 0 gone: an instance's dissolve in or out at its thinning turn and the draw limit
 flat out vec2 vLodK;    // the share of the screen-door this detail level keeps, [lo, hi): two levels cross-fading split it
 flat out vec4 vInst;   // seed, yaw, scale y, instance height
@@ -92,15 +93,16 @@ void main(){
 #endif
   vW = wp; vL = wheel>=0 && wheel<6 ? aPos*iB.xyz : lp; vLN = ln; vAux = aAux;
   vInst = vec4(iB.w, iA.w, iB.y, iA.y); vScale = iB.xyz;
-  gl_Position = uVP*vec4(wp, 1.0);
+  vec3 cp = uShadowPass == 0 ? planetPos(wp, uCamV) : wp; vC = cp;
+  gl_Position = uVP*vec4(cp, 1.0);
   bool behind = false;
   if (uShadowPass == 0 && uPano.x > 0.0) {   // (the whole triangle is dropped where it reaches round behind the camera)
-    vec3 c = (uPanoView*vec4(wp, 1.0)).xyz; float a = atan(c.x, -c.z), d = length(c);
+    vec3 c = (uPanoView*vec4(cp, 1.0)).xyz; float a = atan(c.x, -c.z), d = length(c);
     gl_Position = vec4(a/uPano.x*d, c.y/max(length(c.xz), 1e-3)/uPano.y*d, 0.0, d); behind = abs(a) > 1.9;
   }
   if (uShadowPass == 0) {
     gl_Position.xy -= 2.0*uJit*gl_Position.w;   // the frame's sub-pixel jitter
-    gl_Position.z = (log2(max(1e-6, 1.0 + gl_Position.w))*uLogC - 1.0)*gl_Position.w;   // logarithmic depth: 0.3 m .. 40 km
+    gl_Position.z = (log2(max(1e-6, 1.0 + gl_Position.w))*uLogC - 1.0)*gl_Position.w;   // logarithmic depth (renderer.h kLogDepthFar)
     if (behind) gl_Position.z = 2.0*gl_Position.w;
   }
 }

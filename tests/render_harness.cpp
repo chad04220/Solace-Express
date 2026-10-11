@@ -239,7 +239,8 @@ void main(){
   std::string scene = argc > 1 ? argv[1] : "default";
   // ---- a render server: everything loaded once (the context, the shaders, the islands, the textures, the aircraft
   // meshes, and the scenery as it is generated), then one shot per request. Requests are lines on a named pipe
-  // (SERVE_REQ, default /tmp/claude-0/sp/rs.req): "<scene> [frames=N] [taam=N] [bench=N] [dbgoff=N] [out=path]";
+  // (SERVE_REQ, default /tmp/claude-0/sp/rs.req): "<scene> [frames=N] [taam=N] [bench=N] [dbgoff=N] [out=path] [NAME=value]"
+  // (NAME=value: an environment setting for this shot and the ones after it - AT, CAMPITCH, WX, TOD ...);
   // (settle=N: N frames a 240th of a second apart, the anti-aliasing settling as for the loading pictures)
   // each reply ("ok <path> <seconds>") goes to SERVE_REP (/tmp/claude-0/sp/rs.rep). tools/render_client.sh sends one.
   if (scene == "serve") {
@@ -269,6 +270,7 @@ void main(){
           std::string key = tok[k].substr(0, e), v = tok[k].substr(e + 1);
           if (key == "frames") frames = atoi(v.c_str()); else if (key == "taam") taam = atoi(v.c_str()); else if (key == "bench") bench = atoi(v.c_str()); else if (key == "settle") settle = atoi(v.c_str());
           else if (key == "dbgoff") g_ren.dbgOff = atoi(v.c_str()); else if (key == "out") out = v;
+          else if (!key.empty() && isupper((unsigned char)key[0])) setenv(key.c_str(), v.c_str(), 1);   // (AT=..., CAMPITCH=..., WX=...: the scene's own settings)
         }
         g_ren.resetTemporal();
         Game* g = new Game();

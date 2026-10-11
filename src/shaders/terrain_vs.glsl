@@ -9,6 +9,7 @@ uniform mat4 uVP; uniform vec2 uJit; uniform float uLogC; uniform vec3 uCamPos;
 uniform mat4 uPanoView; uniform vec2 uPano;   // a panoramic camera feed: projected onto its cylinder (camRay)
 uniform float uSplit;                         // a chunk is split while the camera is within uSplit chunk sizes of it
 out vec3 vW; out vec3 vN;
+out vec3 vC;   // where it is drawn: on the round world (kPlanet)
 const int C = 32;
 int octAt(float d){ return d < 600.0 ? 11 : (d < 3000.0 ? 9 : (d < 12000.0 ? 7 : 5)); }   // (terrainNormal's thresholds)
 float hAt(vec2 xz, float d){ return terrainH(xz, octAt(d)); }
@@ -53,13 +54,14 @@ void main(){
   vec3 n = normalize(vec3(hAt(xz - vec2(e, 0.0), d) - hAt(xz + vec2(e, 0.0), d), 2.0*e, hAt(xz - vec2(0.0, e), d) - hAt(xz + vec2(0.0, e), d)));
   vec3 wp = vec3(xz.x, h, xz.y);
   vW = wp; vN = n;
-  gl_Position = uVP*vec4(wp, 1.0);
+  vec3 cp = planetPos(wp, uCamPos); vC = cp;
+  gl_Position = uVP*vec4(cp, 1.0);
   bool behind = false;
   if (uPano.x > 0.0) {   // (the whole triangle is dropped where it reaches round behind the camera)
-    vec3 c = (uPanoView*vec4(wp, 1.0)).xyz; float a = atan(c.x, -c.z), dd = length(c);
+    vec3 c = (uPanoView*vec4(cp, 1.0)).xyz; float a = atan(c.x, -c.z), dd = length(c);
     gl_Position = vec4(a/uPano.x*dd, c.y/max(length(c.xz), 1e-3)/uPano.y*dd, 0.0, dd); behind = abs(a) > 1.9;
   }
   gl_Position.xy -= 2.0*uJit*gl_Position.w;   // the TAA's sub-pixel jitter
-  gl_Position.z = (log2(max(1e-6, 1.0 + gl_Position.w))*uLogC - 1.0)*gl_Position.w;   // logarithmic depth: 0.3 m .. 40 km
+  gl_Position.z = (log2(max(1e-6, 1.0 + gl_Position.w))*uLogC - 1.0)*gl_Position.w;   // logarithmic depth (renderer.h kLogDepthFar)
   if (behind) gl_Position.z = 2.0*gl_Position.w;
 }

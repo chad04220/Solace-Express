@@ -303,10 +303,14 @@ if(UNIX AND NOT APPLE)   # the terrain-shadow bake shader run on software GL thr
   target_link_libraries(road_grade_gpu_test PRIVATE ${CMAKE_DL_LIBS})
   add_test(NAME road_grade_gpu COMMAND road_grade_gpu_test)
   set_tests_properties(road_grade_gpu PROPERTIES COST 5)
+  # the round world's sphere in the shaders against the C++ (planet.glsl and planet.h, kept in step)
+  add_executable(planet_gpu_test tests/planet_gpu_test.cpp src/gl.cpp)
+  target_link_libraries(planet_gpu_test PRIVATE ${CMAKE_DL_LIBS})
+  add_test(NAME planet_gpu COMMAND planet_gpu_test)
 endif()
 
 # everything that includes the shader headers waits for the generated constants
-foreach(t SolaceExpress gameplay_test encounter_timing_test shader_keyword_test shader_check terrain_shadow_test road_grade_gpu_test)
+foreach(t SolaceExpress gameplay_test encounter_timing_test shader_keyword_test shader_check terrain_shadow_test road_grade_gpu_test planet_gpu_test)
   if(TARGET ${t})
     add_dependencies(${t} shaders_gen)
   endif()

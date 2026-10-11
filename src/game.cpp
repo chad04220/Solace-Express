@@ -977,13 +977,22 @@ void Game::toast(const std::string& s, vec3 col, bool voiced) {
 }
 
 // ------------------------------------------------------------------ sun & sky
-void Game::computeSun(float tod, vec3& dir, vec3& col, float& night) const {
+void Game::computeSun(float tod, vec3& dir, vec3& col, float& night, float h, float* dim) const {
   float a = (tod - 6.f) / 12.f * PI;
   dir = normalize(vec3(cosf(a), sinf(a) * 0.93f, 0.35f + 0.1f * sinf(a)));
   float y = dir.y;
-  float od = 1.f / std::max(y * 1.4f + 0.08f, 0.02f);   // optical depth: positive and bounded (x50) once the sun is down
-  col = vec3(expf(-0.10f * od * 0.45f), expf(-0.23f * od * 0.45f), expf(-0.56f * od * 0.45f)) * smoothstepf(-0.06f, 0.05f, y);
-  col = col * (1.f - 0.75f * wx.cloudCover * wx.cloudCover) * (wx.storm ? 0.6f : 1.f);
+  // the sunlight reaching h up (common.glsl sunLightAt, exactly): through the air above it, and from up there over a
+  // horizon that has dipped below the level - an aircraft high over the dusk is still in the sun, and above the air
+  // it is the sun's own white
+  h = std::max(h, 0.f);
+  const float R = planetRadius(), dens = expf(-h / 8000.f), dip = R > 0.f ? sqrtf(std::max(1.f - (R / (R + h)) * (R / (R + h)), 0.f)) : 0.f;
+  const float lowest = R > 0.f ? (R + h) * sqrtf(std::max(1.f - y * y, 0.f)) - R : h;
+  const float k = y >= 0.f ? dens : 2.f * expf(-std::max(lowest, 0.f) / 8000.f) - dens;
+  float od = k / std::max(y * 1.4f + 0.08f, 0.02f);   // optical depth: positive and bounded (x50) once the sun is down
+  col = vec3(expf(-0.10f * od * 0.45f), expf(-0.23f * od * 0.45f), expf(-0.56f * od * 0.45f)) * smoothstepf(-0.06f, 0.05f, y + dip);
+  const float weather = (1.f - 0.75f * wx.cloudCover * wx.cloudCover) * (wx.storm ? 0.6f : 1.f);
+  col = col * weather;
+  if (dim) *dim = weather;
   night = smoothstepf(0.06f, -0.14f, y);
 }
 
@@ -2651,7 +2660,7 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
 FrameParams Game::buildFrame() {
   FrameParams fp;
   fp.time = realTime; fp.dt = std::max(lastDt, 1e-4f);
-  computeSun(timeOfDay, fp.sunDir, fp.sunCol, fp.night);
+  computeSun(timeOfDay, fp.sunDir, fp.sunCol, fp.night, plane.pos.y, &fp.sunDim);   // (the sun on the aircraft; the lighting pass works out the rest place by place)
   {   // terrain's soft sun shadow at the aircraft: the same march as the shader's terrainShadow, done once here instead
       // of for every pixel of the airframe and cockpit
     float res = 1.f, t = 2.f;

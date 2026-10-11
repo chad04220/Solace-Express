@@ -438,7 +438,7 @@ private:
   void updateCamera(float dt);
   void updateParticles(float dt);
   void spawn(vec3 p, vec3 v, float life, float size, float grow, vec3 col, float alpha, int kind, float drag = 1.f, float buoy = 0.f);
-  void computeSun(float tod, vec3& dir, vec3& col, float& night) const;
+  void computeSun(float tod, vec3& dir, vec3& col, float& night, float h = 0.f, float* dim = nullptr) const;   // (h: seen from that height - planet.h; dim: the weather's share of it)
   FrameParams buildFrame();
   void buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, std::vector<SpriteVert>& add);
   void feedAudio();

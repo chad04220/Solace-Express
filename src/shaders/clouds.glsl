@@ -150,6 +150,14 @@ float rainColumn(vec3 p){
   float c = cov - (1.05 - uCloudCover*0.75);
   return smoothstep(-0.25, 0.15, c)*(0.35 + 0.65*smoothstep(0.42, 0.62, cov))*(uStorm > 0.5 ? 1.0 : 0.85);
 }
+// where along s the height ro.y + rd.y s + A s^2 (A > 0) crosses a level c below the start (c = ro.y - level): the two
+// roots in order, or (1, 0) where it never does
+vec2 shellRoots(float A, float b, float c){
+  float D = b*b - 4.0*A*c;
+  if (D < 0.0) return vec2(1.0, 0.0);
+  float q = -0.5*(b + (b >= 0.0 ? 1.0 : -1.0)*sqrt(D)), r0 = q/A, r1 = abs(q) > 1e-20 ? c/q : r0;
+  return vec2(min(r0, r1), max(r0, r1));
+}
 float hgPhase(float c, float g){ float g2 = g*g; return (1.0 - g2)/(12.566*pow(max(1.0 + g2 - 2.0*g*c, 1e-4), 1.5)); }
 int gCloudLite = 0;   // reflections: half the steps, no rain shafts, no wake
 // how far the light seen along this ray was scattered, weighted by how much each step gave (kCloudMain: the clouds'
@@ -159,12 +167,28 @@ vec4 cloudLayer(vec3 ro, vec3 rd, float tmax, float jitter){
   float thick = 900.0 + 900.0*uCloudCover;
   float yb = uCloudBase, yt = uCloudBase + thick;
   float t0, t1;
-  if (abs(rd.y) < 1e-4) { if (ro.y < yb || ro.y > yt) return vec4(0,0,0,1); t0 = 0.0; t1 = 30000.0; }
+  // on the round world (kPlanet) the layer is a shell: the ray's height over the sea climbs as ro.y + rd.y s + A s^2
+  // (A the curve's), so it can run in under the layer's top and out again before it ever meets its base - the cloud
+  // tops' horizon from above. The nearer stretch of the ray inside the shell is marched
+#ifdef ROUND_WORLD
+  float A = uPlanetR > 0.0 ? (rd.x*rd.x + rd.z*rd.z)/(2.0*uPlanetR) : 0.0, Rp = uPlanetR;
+#else
+  float A = 0.0, Rp = 0.0;
+#endif
+  if (A > 1e-12) {
+    vec2 top = shellRoots(A, rd.y, ro.y - yt), base = shellRoots(A, rd.y, ro.y - yb);
+    if (top.x > top.y) return vec4(0,0,0,1);   // (the ray stays over the tops)
+    vec2 a = base.x <= base.y ? vec2(top.x, min(top.y, base.x)) : top, b = base.x <= base.y ? vec2(max(top.x, base.y), top.y) : vec2(1.0, 0.0);
+    a = vec2(max(a.x, 0.0), a.y); b = vec2(max(b.x, 0.0), b.y);
+    vec2 iv = a.y > a.x ? a : b;
+    t0 = iv.x; t1 = iv.y;
+  } else if (abs(rd.y) < 1e-4) { if (ro.y < yb || ro.y > yt) return vec4(0,0,0,1); t0 = 0.0; t1 = 30000.0; }
   else {
     float ta = (yb - ro.y)/rd.y, tb = (yt - ro.y)/rd.y;
     t0 = max(min(ta,tb), 0.0); t1 = max(ta,tb);
   }
-  t1 = min(t1, min(tmax, 45000.0));
+  // (as far as the layer's own horizon from high over it)
+  t1 = min(t1, min(tmax, max(45000.0, Rp > 0.0 ? 2.0*sqrt(2.0*Rp*max(ro.y - yb, 0.0)) : 0.0)));
   if (t1 <= t0) return vec4(0,0,0,1);
   int N = (uQuality > 1 ? 56 : (uQuality > 0 ? 40 : 24)) >> gCloudLite;
   float dt = (t1 - t0)/float(N);
@@ -184,7 +208,11 @@ vec4 cloudLayer(vec3 ro, vec3 rd, float tmax, float jitter){
     if (t > t1) break;
     COST(2);
     float dts = inside ? clamp(2.0*sqrt(max(t, 1.0)*span)/float(N), 8.0, dt*2.5) : dt;
+#ifdef ROUND_WORLD
+    vec3 p = planetFlat(ro + rd*t, ro);   // (the flat world's: where the cloud is)
+#else
     vec3 p = ro + rd*t;
+#endif
     vec3 ps = p; float wk = 0.0;
     if (uWakeN > 1 && gCloudLite == 0) wk = wakeAt(p, ps);   // (the cloud here is the cloud where the wake's flow brought this air from)
     float d = cloudDensity(ps, 1)*(1.0 - wk);

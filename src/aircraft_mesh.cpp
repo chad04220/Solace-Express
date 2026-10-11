@@ -1234,7 +1234,7 @@ void Renderer::drawPlaneMeshDepth(const FrameParams& fp, const PlaneMesh& pm, co
   // to it: plane_mesh_vs.glsl)
   mat4 vp = viewProjRel(fp, 0.01f, 2000.f);
   const vec3 rp = pos - fp.camPos;
-  const float logC = 2.f / log2f(40000.f + 1.f);
+  const float logC = logDepthC();
   glBindVertexArray(pm.vao);
   // the research craft's displays as windows: the cabin is sealed, so a screen must be a hole through the whole
   // airframe, not a missing pane with the pod's structure behind it. The pre-pass and the material pass cut every
@@ -1273,7 +1273,7 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   if (!noPre && !depthDone) drawPlaneMeshDepth(fp, pm, rot, pos, trafK);
   mat4 vp = viewProjRel(fp, 0.01f, 2000.f);
   const vec3 rp = pos - fp.camPos;
-  const float logC = 2.f / log2f(40000.f + 1.f);
+  const float logC = logDepthC();
   const bool scrSkip = screenWindows && trafK < 0 && fp.plane.PS[3] > 0.5f && (int)(fp.plane.M[2] + 0.5f) >= 5;
   // (this aircraft's type's own build of the program: its code alone - afMeshProgram; else every aircraft's)
   const int own = afModelOf(trafK >= 0 ? fp.traffic[trafK].t : fp.plane.M, trafK >= 0 ? -1 : fp.plane.model);

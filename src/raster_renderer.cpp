@@ -239,7 +239,7 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   setRT(prog, fp);
   glUniform1i(U(prog, "uTrafMarch"), trafMarch);
   for (int i = 0; i < 3; i++) { glActiveTexture(GL_TEXTURE0 + 8 + i); glBindTexture(GL_TEXTURE_2D, 0); }   // (the G-buffer is the target here, never read)
-  glUniform1f(U(prog, "uLogC"), 2.f / log2f(40000.f + 1.f));
+  glUniform1f(U(prog, "uLogC"), logDepthC());
   glUniform1i(U(prog, "uMeshOn"), meshOn ? 1 : 0);
   glActiveTexture(GL_TEXTURE0 + 28); glBindTexture(GL_TEXTURE_2D, sceneZ ? texDepthCopy : 0); glUniform1i(U(prog, "uSceneZ"), 28); glUniform1i(U(prog, "uSceneZOn"), sceneZ ? 1 : 0);
   glBindVertexArray(vaoEmpty);
@@ -685,7 +685,7 @@ bool Renderer::rasterCloak(const FrameParams& fp) {
   glUseProgram(progCloak);
   glUniformMatrix4fv(U(progCloak, "uVP"), 1, GL_FALSE, vp.m);
   glUniform2f(U(progCloak, "uJit"), jitX, jitY);
-  glUniform1f(U(progCloak, "uLogC"), 2.f / log2f(40000.f + 1.f));
+  glUniform1f(U(progCloak, "uLogC"), logDepthC());
   glUniformMatrix3fv(U(progCloak, "uRot"), 1, GL_FALSE, pv.rot);
   glUniform3f(U(progCloak, "uPos"), rp.x, rp.y, rp.z);
   glUniform1f(U(progCloak, "uCloakZ"), pv.wr[6][1]);
