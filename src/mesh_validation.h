@@ -10,10 +10,12 @@
 namespace aircraftMesh {
 // Explicit algorithm manifest: change when extraction/projection/simplification changes.
 inline constexpr uint32_t kAlgorithmVersion = 24;
-inline constexpr uint32_t kMaxPartType = 46; // update alongside the PT_* enum when adding a rigid part
+inline constexpr uint32_t kMaxPartType = 50; // update alongside the PT_* enum when adding a rigid part
+inline constexpr const char* kWraithLoadoutManifest = "wraith-loadout3:verified-planar-and-round-face-normals;separate-rigid-kinetic-charged-penetrator-emp;3mm-lattice;shared-mount-poses;selected-parts-all-passes";
 inline constexpr float kAtlasDoorMaxEdge = .20f;
 inline constexpr const char* kAlgorithmManifest = "mesh24:upstream-part-creases;exterior-edge500mm;finite-gradient-adjacency;prune-zero-area;semantic-fixtures;compact-flat;bounded-workers;nightjar-overhead-edge80mm;atlas-main-door-edge200mm;islander-verified-planar;conventional-cabin-coherent-winding;atlas-swept-root-bays;specter-toggle-detail3.90625mm";
 inline bool finite(float f) { uint32_t bits; std::memcpy(&bits, &f, sizeof bits); return (bits & 0x7f800000u) != 0x7f800000u; }
+inline bool finite(double f) { uint64_t bits; std::memcpy(&bits, &f, sizeof bits); return (bits & 0x7ff0000000000000ull) != 0x7ff0000000000000ull; }
 inline bool normalValid(const float* p) {
   if (!finite(p[0]) || !finite(p[1]) || !finite(p[2])) return false;
   const float l2 = p[0]*p[0] + p[1]*p[1] + p[2]*p[2];
@@ -46,7 +48,7 @@ inline bool repairNormals(std::vector<float>& v, const std::vector<uint32_t>& ix
     double x=B[0]-A[0],y=B[1]-A[1],z=B[2]-A[2], u=C[0]-A[0],w=C[1]-A[1],r=C[2]-A[2];
     std::array<double,3> n={y*r-z*w,z*u-x*r,x*w-y*u};
     const double area=n[0]*n[0]+n[1]*n[1]+n[2]*n[2];
-    if (!std::isfinite(area) || area < 1e-28) continue;
+    if (!finite(area) || area < 1e-28) continue;
     double orient=0; for (uint32_t q : {a,b,c}) if (!bad[q]) for (int j=0;j<3;j++) orient+=n[j]*v[q*8+3+j];
     if (orient<0) for (double& f:n) f=-f;
     for (uint32_t q : {a,b,c}) if (bad[q]) {
@@ -57,7 +59,7 @@ inline bool repairNormals(std::vector<float>& v, const std::vector<uint32_t>& ix
   for (size_t i=0;i<nv;i++) if (bad[i]) {
     auto n=sums[i]; double l2=n[0]*n[0]+n[1]*n[1]+n[2]*n[2];
     if (l2<1e-28) { n=largest[i]; l2=maxArea[i]; }
-    if (!(l2>1e-28) || !std::isfinite(l2)) return false;
+    if (!(l2>1e-28) || !finite(l2)) return false;
     for (int j=0;j<3;j++) v[i*8+3+j]=(float)(n[j]/std::sqrt(l2));
   }
   return true;
@@ -75,7 +77,7 @@ inline bool pruneDegenerate(std::vector<float>& v, std::vector<uint32_t>& ix) {
     const double x=(double)B[0]-A[0],y=(double)B[1]-A[1],z=(double)B[2]-A[2];
     const double u=(double)C[0]-A[0],w=(double)C[1]-A[1],r=(double)C[2]-A[2];
     const double nx=y*r-z*w,ny=z*u-x*r,nz=x*w-y*u,area=nx*nx+ny*ny+nz*nz;
-    if (!std::isfinite(area)) return false;
+    if (!finite(area)) return false;
     if (area <= 1e-28) continue;
     ix[out++]=a;ix[out++]=b;ix[out++]=c;
   }

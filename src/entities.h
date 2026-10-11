@@ -92,6 +92,8 @@ public:
   float obstacleTop(float x, float z, float r);      // the highest treetop or roof within r of (x, z) (m; -1e9: none)
   // First entity a segment (a, unit d, length L) passes through: distance along it, or -1 (kindOut = kind + 1)
   float raycast(vec3 a, vec3 d, float L, int* kindOut = nullptr, Ent* entOut = nullptr);
+  // Conservative sphere sweep against the same authored entity proxies, with explicit radius.
+  float sweepSphere(vec3 a, vec3 d, float L, float radius, int* kindOut = nullptr, Ent* entOut = nullptr);
   // Craters destroy what stands in them (x, z, radius)
   std::vector<vec3> craters;
   bool destroyed(const Ent& e) const;

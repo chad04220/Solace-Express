@@ -2,6 +2,7 @@
 // weapons out in the world (laser bolts, plasma bombs, detonations and their glassed craters)
 #include "game.h"
 #include "entities.h"
+#include "hive_world_collision.h"
 
 namespace {
 float frand() { return (rand() % 10000) * 0.0001f; }
@@ -76,14 +77,21 @@ void Game::wraithControls(float dt) {
 // streaks away from the turret, however fast the Wraith is flying.
 void Game::fireLaser() {
   WraithState& W = wraith;
+  const auto& gun=hive::forwardSpec(combatLoadout.forward);
   int s = W.laserSide; W.laserSide ^= 1; W.shots++;
   vec3 a = plane.pos + plane.q.rotate(kLaserLens[s]);
   vec3 aim = plane.pos + plane.forward() * 650.f;   // the two turrets converge 650 m ahead
   vec3 d = normalize(aim - a);
-  W.bolts.push_back({a, plane.vel + d * kBoltSpeed, d, 0.f, 0.f, kBoltRange / kBoltSpeed, false});
+  W.bolts.push_back({a, plane.vel + d * gun.speed, d, 0.f, 0.f, kBoltRange / gun.speed, false, combatLoadout.forward});
+  const float mass=std::max(1.f,plane.mass());
+  const vec3 impulse=-d*gun.recoilImpulseNs;
+  plane.vel+=impulse/mass;
+  const vec3 moment=cross(kLaserLens[s],plane.q.conj().rotate(impulse));
+  const float massRatio=mass/std::max(1.f,plane.spec->emptyMass);
+  plane.w+=vec3(moment.x/std::max(1.f,plane.spec->Ixx*massRatio),moment.y/std::max(1.f,plane.spec->Iyy*massRatio),moment.z/std::max(1.f,plane.spec->Izz*massRatio));
   W.laserGlow = 1.f;
   g_audio.trigger(SFX_LASER, 0.8f);
-  spawn(a, plane.vel, 0.06f, 0.9f, 2.f, vec3(1.f, 0.3f, 0.45f) * 3.f, 1.f, SPR_GLOW, 0.f, 0.f);   // muzzle flash
+  spawn(a, plane.vel, 0.06f, 0.9f, 2.f, gun.colour * 2.f, 1.f, SPR_GLOW, 0.f, 0.f);   // muzzle flash
 }
 
 // laser scorch craters: a new hit close to an old one deepens and widens it instead of adding another
@@ -152,19 +160,34 @@ void Game::updateBolts(float dt) {
   WraithState& W = wraith;
   for (auto& b : W.bolts) {
     b.age += dt;
+    const auto& gun=hive::forwardSpec(b.kind);
+    b.v.y-=G0*gun.gravity*dt;
     if (b.hit) { b.len -= kBoltSpeed * dt; continue; }   // the streak runs into the impact point
     float segL = length(b.v) * dt;
     vec3 sd = b.v / std::max(length(b.v), 1e-3f), a = b.h;
     float tHit = -1.f; int craft = -1;
-    float tg = groundHit(a, sd, segL);
-    if (tg >= 0) tHit = tg;
+    const float worldFraction=hiveWorldSweep(a,a+sd*segL,0);
+    if(worldFraction<=1.f) tHit=segL*worldFraction;
     float tt = 0; int k = traffic.rayHit(a, sd, tHit >= 0 ? tHit : segL, tt);
     if (k >= 0) { tHit = tt; craft = k; }
-    int ek = 0; Ent hitEnt; float te = g_scenery.raycast(a, sd, tHit >= 0 ? tHit : segL, &ek, &hitEnt);
+    // Match the zero-radius projectile/world query; legacy raycast inflates scenery
+    // by 0.4 m and would stop a bolt before the authoritative contact surface.
+    int ek = 0; Ent hitEnt; float te = g_scenery.sweepSphere(a, sd, tHit >= 0 ? tHit : segL, 0.f, &ek, &hitEnt);
     if (te >= 0) { tHit = te; craft = -1; } else ek = 0;
     if (ufo.on && ufo.t < 20.f) {   // tag the UFO and it decides it has seen enough
       vec3 rel = ufo.pos - a; float along = dot(rel, sd);
       if (along > 0 && along < (tHit >= 0 ? tHit : segL) && length(rel - sd * along) < 9.f) { ufo.t = 23.f; toast("The visitors don't appreciate that...", vec3(0.4f, 1.f, 0.6f)); }
+    }
+    const float limit=tHit>=0?tHit:segL;
+    hive::ShotContact contact;
+    hiveCombat.playerShot(a,a+sd*limit,gun.damage,hiveWorld(),&contact);
+    if(contact.kind==hive::ShotContactKind::Actor || contact.kind==hive::ShotContactKind::Bomb) {
+      b.h=a+sd*(limit*contact.fraction); b.hit=true; continue;
+    }
+    if(contact.kind==hive::ShotContactKind::World) {
+      const float actual=limit*contact.fraction;
+      if(tHit<0 || actual<tHit-.01f) { craft=-1; ek=0; }
+      tHit=actual;
     }
     if (tHit >= 0) { b.h = a + sd * tHit; b.hit = true; laserImpact(b.h, craft, ek, ek ? &hitEnt : nullptr); }
     else { b.h = a + b.v * dt; b.len = std::min(kBoltStreak, b.len + kBoltSpeed * dt); }
@@ -252,7 +275,24 @@ void Game::buildFeedCameras(FrameParams& fp) {
   }
 }
 
-void Game::detonate(vec3 p, bool water) {
+void Game::detonate(vec3 p, bool water, hive::BombSet kind, const vec3* queryOrigin) {
+  const auto& payload=hive::bombSpec(kind);
+  // Keep the visual/crater exactly on the surface, but begin visibility queries just outside it.
+  // Radius-aware swept impacts already leave the bomb centre clear of walls/airframes.
+  vec3 query=queryOrigin?*queryOrigin:p; query.y=std::max(query.y,groundAt(query)+.1f);
+  if(kind==hive::BombSet::EMP) hiveCombat.playerEMP(query,payload.radius,payload.disruption,hiveWorld());
+  else hiveCombat.playerBlast(query,payload.radius,payload.damage,hiveWorld());
+  if(kind!=hive::BombSet::Plasma) {
+    g_audio.trigger(kind==hive::BombSet::EMP?SFX_LASER:SFX_BOOM,.65f);
+    // EMP is an electrical transient; conventional explosive throws fragments and dust, never a plasma cloud.
+    for(int i=0;i<48;++i) spawn(p+vec3(0,1,0),rndDir()*(kind==hive::BombSet::EMP?95.f:45.f),.3f+frand()*.8f,.22f,.25f,payload.colour*2.f,1,SPR_SPARK,.4f,kind==hive::BombSet::EMP?0:-1);
+    spawn(p,vec3(),.16f,kind==hive::BombSet::EMP?18.f:10.f,6,payload.colour*2.f,.8f,SPR_GLOW,0,0);
+    if(kind==hive::BombSet::Penetrator) {
+      for(int i=0;i<20;++i) spawn(p,rndDir()*12.f+vec3(0,12,0),4.f+frand()*2,3,5,water?vec3(.7f,.8f,.85f):vec3(.23f,.2f,.17f),.65f,SPR_SMOKE,.8f,.3f);
+      if(!water) addScorch(p.x,p.z,5.f,1.3f);
+    }
+    return;
+  }
   WraithState& W = wraith;
   W.blasts.push_back({p, water ? 80.f : 100.f, 0.f, 7.f, water});
   if (W.blasts.size() > 6) W.blasts.erase(W.blasts.begin());
@@ -326,34 +366,48 @@ void Game::updateWraith(float dt) {
   bool wantOpen = W.bombQueue > 0 || W.bayHold > 0 || (wr && W.armed && !plane.onGround);   // weapons hot: bay stays open
   W.bay = clampf(W.bay + (wantOpen ? 3.f : -2.f) * dt, 0.f, 1.f);
   W.bayHold = std::max(0.f, W.bayHold - dt);
-  W.bombLoaded = std::min(1.f, W.bombLoaded + dt / 0.8f);
-  if (W.bombQueue > 0 && W.bay > 0.95f && W.bombLoaded >= 1.f && !plane.onGround) {
+  W.bombLoaded = combatLoadout.bombs>0 ? std::min(1.f, W.bombLoaded + dt / 0.8f) : 0.f;
+  if (W.bombQueue > 0 && W.bay > 0.95f && W.bombLoaded >= 1.f && !plane.onGround && combatLoadout.releaseBomb()) {
     vec3 p, v; bombLaunch(plane, p, v);
-    W.bombs.push_back({p, v, 0.f});
+    W.bombs.push_back({p, v, 0.f, combatLoadout.bomb});
     W.bombLoaded = 0; W.bombQueue--; W.bayHold = 0.6f; W.dropped++;
     g_audio.trigger(SFX_GEAR_CLUNK, 0.6f);
-    toast("PLASMA BOMB AWAY", vec3(0.7f, 0.4f, 1.f));
+    toast(std::string(hive::bombSpec(combatLoadout.bomb).name)+" AWAY", hive::bombSpec(combatLoadout.bomb).colour);
   }
-  if (W.bombQueue > 0 && plane.onGround) W.bombQueue = 0;
+  if (W.bombQueue > 0 && (plane.onGround || combatLoadout.bombs<=0)) W.bombQueue = 0;
   // laser bolts fly, then new ones leave the lenses (after the physics step, from where the turrets are now)
   updateBolts(dt);
   W.laserCD -= dt;
-  if (wr && W.wantFire && W.lasers > 0.97f && W.laserCD <= 0) { fireLaser(); W.laserCD = 0.12f; }
+  if (combatLoadout.step(dt,wr && W.wantFire && W.lasers > 0.97f)) fireLaser();
   W.wantFire = false;
   // bombs fall (a little drag), trail violet sparks, and go off on the ground, the sea or near an aircraft
   for (size_t i = 0; i < W.bombs.size(); i++) {
     WraithState::Bomb& b = W.bombs[i];
     b.t += dt;
     b.v += vec3(0, -G0, 0) * dt - b.v * (2e-5f * length(b.v) * dt);
+    const vec3 previous=b.p;
     b.p += b.v * dt;
-    if (frand() < 0.6f) spawn(b.p, b.v * 0.9f + rndDir() * 3.f, 0.4f, 0.25f, 0.5f, vec3(0.6f, 0.25f, 1.f) * 3.f, 1.f, SPR_SPARK, 2.f, 0.f);
-    float g = groundAt(b.p);
-    bool near = false; float tt;
-    if (traffic.rayHit(b.p, vec3(0, -1, 0), 1.f, tt) >= 0) near = true;
-    for (auto& c : traffic.craft) if (c.alive && c.role != TrafficCraft::ESCORT && length(c.pos - b.p) < 25.f) near = true;
-    if (b.p.y <= g || near || b.t > 60.f) {
-      vec3 at = b.p; if (at.y < g) at.y = g;
-      detonate(at, g_world.height(at.x, at.z) < 0.3f && at.y < 1.f);
+    if (b.kind!=hive::BombSet::Penetrator && frand() < 0.35f) spawn(b.p, b.v * 0.9f + rndDir() * 3.f, 0.4f, 0.25f, 0.5f, vec3(0.6f, 0.25f, 1.f) * 3.f, 1.f, SPR_SPARK, 2.f, 0.f);
+    const float radius=.29f;
+    const vec3 end=b.p;
+    float hit=hiveWorldSweep(previous,end,radius);
+    for(const auto& actor:hiveCombat.actors) if(actor.alive) {
+      auto proxy=actor; proxy.position=previous+hiveCombat.displacement(previous,actor.position);
+      hit=std::min(hit,hive::actorHitFraction(proxy,previous,end,radius));
+    }
+    const float travel=length(end-previous);
+    if(travel>.001f) {
+      float distance=0;
+      const float limit=travel*std::min(hit,1.f);
+      if(traffic.rayHit(previous,(end-previous)/travel,limit,distance)>=0) hit=std::min(hit,distance/travel);
+    }
+    if (hit<=1.f || b.t>60.f) {
+      vec3 at=hit<=1.f?lerp(previous,end,clampf(hit,0.f,1.f)):end;
+      const float ground=groundAt(at);
+      if(at.y<=ground+radius+.02f) at.y=ground;
+      b.p=at;
+      const vec3 query=travel>.001f?at-(end-previous)/travel*.1f:at+vec3(0,.1f,0);
+      detonate(at, g_world.height(at.x, at.z) < 0.3f && at.y < 1.f,b.kind,&query);
       if (i == 0 && W.cam.on && W.cam.phase == 0) {   // the bomb the camera was chasing went off: pull out to watch it
         W.cam.phase = 1; W.cam.t = 0; W.cam.blastP = at;
         vec3 h = W.cam.pos - at; h.y = 0;
@@ -362,6 +416,7 @@ void Game::updateWraith(float dt) {
       W.bombs.erase(W.bombs.begin() + i); i--;
     }
   }
+  syncCombatPayload();
   updateBombCam(dt);
   for (auto& bl : W.blasts) bl.age += dt / bl.dur;
   W.blasts.erase(std::remove_if(W.blasts.begin(), W.blasts.end(), [](const WraithState::Blast& b) { return b.age >= 1.f; }), W.blasts.end());
@@ -371,12 +426,13 @@ void Game::wraithVisual(FrameParams& fp) {
   const WraithState& W = wraith;
   PlaneVisual& pv = fp.plane;
   if (plane.spec && plane.spec->special == 2 && pv.on) {
+    pv.wrBombSet=(int)combatLoadout.bomb;
     for (int i = 0; i < 4; i++) { pv.wr[0][i] = plane.podTilt[i]; pv.wr[1][i] = plane.podYaw[i]; pv.wr[2][i] = exhaustPodThrust(plane, i); pv.wr[3][i] = plane.podVane[i]; }
     if (plane.onGround && !plane.engineRunning) for (int i = 0; i < 4; i++) pv.wr[0][i] = plane.nozzle * 0.5f * PI;
     pv.wr[4][0] = fmodf(plane.fanAngle, 6.2832f * 8.f); pv.wr[4][1] = W.bay; pv.wr[4][2] = W.lasers; pv.wr[4][3] = W.stealth;
     pv.wr[5][0] = plane.surf.x; pv.wr[5][1] = plane.surf.y; pv.wr[5][2] = plane.surf.z; pv.wr[5][3] = W.laserGlow;
     if (const char* e = getenv("WRSURF")) pv.wr[5][1] = (float)atof(e);   // (render checks: hold a ruddervator deflection)
-    pv.wr[6][0] = W.bombLoaded; pv.wr[6][1] = W.front; pv.wr[6][2] = W.armed ? 1.f : 0.f;
+    pv.wr[6][0] = W.bombLoaded; pv.wr[6][1] = W.front; pv.wr[6][2] = W.armed ? 1.f : 0.f; pv.wr[6][3]=(float)combatLoadout.forward;
   }
   FxVisual& fx = fp.fx;
   fx.beams = 0;
@@ -388,10 +444,20 @@ void Game::wraithVisual(FrameParams& fp) {
     float* A = fx.beamA[fx.beams]; float* B = fx.beamB[fx.beams];
     A[0] = tail.x; A[1] = tail.y; A[2] = tail.z; A[3] = 0.22f;
     B[0] = b.h.x; B[1] = b.h.y; B[2] = b.h.z; B[3] = k;
+    const vec3 col=hive::forwardSpec(b.kind).colour; float* style=fx.beamStyle[fx.beams];
+    if(b.kind==hive::ForwardSet::Pulse) style[0]=style[1]=style[2]=style[3]=0; // original crimson sheath/white core
+    else { style[0]=col.x;style[1]=col.y;style[2]=col.z;style[3]=b.kind==hive::ForwardSet::Kinetic?.65f:1.8f; }
     fx.beams++;
   }
   fx.bombs = 0;
-  for (size_t i = 0; i < W.bombs.size() && fx.bombs < 8; i++) { float* o = fx.bomb[fx.bombs++]; o[0] = W.bombs[i].p.x; o[1] = W.bombs[i].p.y; o[2] = W.bombs[i].p.z; o[3] = 0.29f; }
+  for (size_t i = 0; i < W.bombs.size() && fx.bombs < 8; i++) {
+    int n=fx.bombs++; const auto& bomb=W.bombs[i]; float* o=fx.bomb[n];
+    o[0]=bomb.p.x; o[1]=bomb.p.y; o[2]=bomb.p.z; o[3]=.29f;
+    const auto& c=hive::bombSpec(bomb.kind).colour; float* st=fx.bombStyle[n];
+    st[0]=c.x; st[1]=c.y; st[2]=c.z; st[3]=(float)bomb.kind;
+    const auto frame=length(bomb.v)>.001f?hive::bodyFrame(bomb.v):hive::bodyFrame(plane.forward(),plane.up());
+    for(int j=0;j<3;++j) { fx.bombRot[n][j]=frame.right[j];fx.bombRot[n][3+j]=frame.up[j];fx.bombRot[n][6+j]=frame.back[j]; }
+  }
   fx.blasts = 0;
   for (size_t i = 0; i < W.blasts.size() && fx.blasts < 6; i++) {
     const WraithState::Blast& b = W.blasts[i];
@@ -420,6 +486,7 @@ void Game::wraithVisual(FrameParams& fp) {
     fx.feed[0] = W.cam.look.x; fx.feed[1] = W.cam.look.y; fx.feed[2] = W.cam.look.z; fx.feed[3] = 1.f;
   }
   // (the glassed craters and the laser scorch pits are drawn with the crash crater's: Game::refreshGroundPits)
+  hiveVisual(fp);
   // a young detonation lights up its surroundings (borrowing the exhaust light)
   for (const auto& b : W.blasts)
     if (b.age < 0.4f) {
@@ -428,4 +495,48 @@ void Game::wraithVisual(FrameParams& fp) {
       fp.flameLight = lerp(vec3(0.5f, 0.2f, 1.f), vec3(1.f, 0.85f, 1.f), k * k) * (45000.f * k * k);
       break;
     }
+}
+
+void Game::hiveVisual(FrameParams& fp) {
+  fp.enemyN=0; fp.hiveOrdnanceN=0;
+  if(!militaryFlight && !(researchFlight && resCard<0 && specIdx==kWraith)) return;
+  if(screen==SCR_LOADING) {
+    // Explicit cache warmup has no fake scene instances and cannot cast phantom shadows.
+    if(!headless) { g_ren.warmEnemyTypes(); if(specIdx==kWraith) g_ren.warmWraithStores(fp); }
+    return;
+  }
+  for(const auto& a:hiveCombat.actors) if(a.alive && fp.enemyN<kMaxEnemyCraft) {
+    auto& v=fp.enemies[fp.enemyN++]; v=EnemyCraftVisual(); v.type=(EnemyCraftType)(int)a.type;
+    v.pos=plane.pos+hiveCombat.displacement(plane.pos,a.position);
+    const auto frame=hive::bodyFrame(a.velocity);
+    for(int j=0;j<3;++j) { v.rot[j]=frame.right[j]; v.rot[3+j]=frame.up[j]; v.rot[6+j]=frame.back[j]; }
+    v.state[0]=clampf(length(a.velocity)/hive::roleSpec(a.type).cruise,.25f,1.f);
+    v.state[1]=a.type==hive::Type::Cantor?(a.relayTarget && a.relayInterrupted<=0?.85f:0.f):a.phase==hive::Phase::Telegraph?.5f:a.phase==hive::Phase::Firing?1.f:0.f;
+    v.state[2]=a.shield; v.state[3]=a.relayInterrupted>0?1.f:0.f;
+  }
+  // The support relay is an interruptible line-of-sight link, visually distinct from a damage bolt.
+  for(const auto& a:hiveCombat.actors) if(a.alive && a.relayTarget && a.relayInterrupted<=0 && fp.fx.beams<16) {
+    const auto* target=hiveCombat.find(a.relayTarget); if(!target || !target->alive) continue;
+    vec3 from=plane.pos+hiveCombat.displacement(plane.pos,a.position);
+    vec3 to=from+hiveCombat.displacement(a.position,target->position);
+    int i=fp.fx.beams++; float* A=fp.fx.beamA[i];float* B=fp.fx.beamB[i];float* style=fp.fx.beamStyle[i];
+    A[0]=from.x;A[1]=from.y;A[2]=from.z;A[3]=.16f;
+    B[0]=to.x;B[1]=to.y;B[2]=to.z;B[3]=.3f;
+    style[0]=.2f;style[1]=.9f;style[2]=.7f;style[3]=1;
+  }
+  // Every live hit-capable projectile gets an independent visual slot; player bolts/relays cannot starve them.
+  static_assert(kMaxHiveOrdnance>=hive::MaxProjectiles,"Visible ordnance capacity must cover the simulation");
+  for(const auto& p:hiveCombat.projectiles) if(p.alive && fp.hiveOrdnanceN<kMaxHiveOrdnance) {
+    auto& v=fp.hiveOrdnance[fp.hiveOrdnanceN++];
+    v.head=plane.pos+hiveCombat.displacement(plane.pos,p.position);
+    // A newly emitted bolt has not yet travelled the full exposure-length trail.
+    // The core's shared lifetime preserves the exact firing-time origin without
+    // adding a renderer-only clock or changing projectile simulation/balance.
+    const float age=std::max(0.f,hive::projectileLifetime(p.weapon)-p.life);
+    v.tail=v.head-normalize(p.velocity+vec3(0,0,.001f))*std::min(35.f,length(p.velocity)*std::min(.025f,age));
+    v.radius=p.weapon==hive::Weapon::Lance?.75f:p.weapon==hive::Weapon::Bomb?.45f:.18f;
+    v.color=p.weapon==hive::Weapon::Lance?vec3(.5f,.45f,1.f):vec3(1.f,.45f,.2f);
+    v.intensity=p.weapon==hive::Weapon::Bomb?.3f:.85f;
+    v.kind=p.weapon==hive::Weapon::Bomb?1:0;
+  }
 }

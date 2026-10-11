@@ -1,6 +1,8 @@
 // Solace Express - career progression and hand-designed story campaign
 #include "career.h"
+#include "finite_float.h"
 #include <cmath>
+#include <limits>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #ifndef NOMINMAX
@@ -216,6 +218,39 @@ static float contractKm(const Contract& c) {
 
 void Career::newGame() { *this = Career(); location = g_world.findAirport("MDB"); refreshBoard(); }
 
+Contract Career::militaryContract(int kind) const {
+  Contract c;
+  if (kind < 0 || kind > 2 || location < 0 || location >= (int)g_world.airports.size()) {
+    c.id = "MIL_INVALID"; c.type = CT_MIL_RECON; c.forceAircraft = -1; return c;
+  }
+  static const char* titles[] = {"Hive reconnaissance", "Defend the island", "Strike the command group"};
+  static const char* briefs[] = {
+    "A supplied reconnaissance aircraft. Identify the assigned contacts with line-of-sight sensor dwell, then extract. Avoid combat.",
+    "An outfitted XR-40 is supplied. Protect the installation through every announced attack wave, then extract.",
+    "An outfitted XR-40 is supplied. Eliminate the designated relay and command targets, then extract."};
+  c.id = fmt("MIL_%d_%u_%d", kind, boardSeed, location);
+  c.title = titles[kind]; c.brief = briefs[kind]; c.type = CT_MIL_RECON + kind;
+  c.from = c.to = location; c.forceAircraft = kind == 0 ? 0 : kWraith;
+  c.startAirborne = true; c.courtesy = true; c.minLicense = LIC_STUDENT;
+  c.payout = 600 + kind * 600;
+  c.wx = W(45.f, 4.f, 0.f, 0.05f, 0.15f, 6500.f, 40.f, 0, false, 12.f);
+  return c;
+}
+bool Career::beginMilitary(const Contract& c) {
+  if (!isMilitaryContract(c.type) || military.activeAttempt || attemptOpen || attempt == std::numeric_limits<uint32_t>::max()) return false;
+  if (canFly(c, c.forceAircraft) != SRC_MILITARY) return false;
+  military.activeAttempt = ++attempt; attemptOpen = true;
+  military.activeKind = c.type - CT_MIL_RECON; military.activeAirport = c.from;
+  military.missionSeed = boardSeed ^ (attempt * 0x9e3779b9u) ^ uint32_t(military.activeKind + 1);
+  return true;
+}
+void Career::abandonMilitaryAttempt() {
+  if (!military.activeAttempt) return;
+  military.lastSettledAttempt = military.activeAttempt;
+  military.activeAttempt = 0; military.activeKind = military.activeAirport = -1; military.missionSeed = 0;
+  attemptOpen = false;
+}
+
 const Contract* Career::nextStory() const { return storyIndex < (int)g_story.size() ? &g_story[storyIndex] : nullptr; }
 
 int Career::ownedIndexFor(int specIdx) const {
@@ -226,6 +261,14 @@ int Career::ownedIndexFor(int specIdx) const {
 static float routeTopOf(const Contract& c);
 Career::Source Career::canFly(const Contract& c, int si, std::string* why) const {
   auto no = [&](const std::string& w) { if (why) *why = w; return SRC_NONE; };
+  if (si < 0 || si >= kAircraftCount) return no("Unknown aircraft");
+  if (isMilitaryContract(c.type)) {
+    const int kind = c.type - CT_MIL_RECON;
+    const int expected = kind == 0 ? 0 : kWraith;
+    if (c.forceAircraft != expected || si != expected) return no("Use the supplied mission aircraft");
+    if (c.from < 0 || c.from >= (int)g_world.airports.size() || c.to != c.from) return no("Invalid military staging location");
+    return SRC_MILITARY;
+  }
   if (!isCareerAircraft(si)) return no("Not available in the career fleet");
   const AircraftSpec& s = kAircraft[si];
   if (c.forceAircraft >= 0) return si == c.forceAircraft ? SRC_LESSON : no("Lesson aircraft only");
@@ -253,7 +296,7 @@ Career::Source Career::canFly(const Contract& c, int si, std::string* why) const
 }
 
 int Career::positioningCost(const Contract& c) const {
-  if (c.from == location || c.type == CT_LESSON || c.courtesy) return 0;
+  if (isMilitaryContract(c.type) || c.from == location || c.type == CT_LESSON || c.courtesy) return 0;
   if (money < 1500) return 0;  // courtesy ride when broke - never softlock
   return (int)(80 + 6 * g_world.distanceKm(location, c.from));
 }
@@ -286,6 +329,13 @@ static float routeTopOf(const Contract& c) { return routeTop(routePoints(c)); }
 Career::LaunchPlan Career::plan(const Contract& c, int si, Source src) const {
   const AircraftSpec& s = kAircraft[si];
   LaunchPlan e; e.spec = si; e.src = src; e.startAirport = c.from;
+  if (isMilitaryContract(c.type)) {
+    e.src = src == SRC_MILITARY ? canFly(c, si) : SRC_NONE;
+    e.fuel = LaunchPlan::FUEL_INCLUDED; e.fuelLoadKg = s.maxFuel;
+    e.minutesEst = 12.f; e.minutesSigma = 4.f; e.net = e.src == SRC_MILITARY ? c.payout : 0;
+    e.challenge = "Mission objectives and extraction required; supplied aircraft and fuel; service credits only";
+    return e;
+  }
   e.positioning = positioningCost(c);
   e.ferry = src == SRC_OWNED ? ferryCost(c, si) : 0;
   e.hire = src == SRC_RENT ? s.rentFee : 0;
@@ -608,6 +658,7 @@ void Career::refreshBoard() {
 }
 
 Career::JobPolicy Career::policyOf(const Contract& c) {
+  if (isMilitaryContract(c.type)) return POL_RETAKE;
   if (c.type == CT_FERRY || c.type == CT_TRIAL) return POL_UNSET;        // a free flight or a trial is not a job
   if (c.forceAircraft >= 0 || c.grantLicense >= 0 || c.type == CT_LESSON) return POL_RETAKE;   // lessons and checkrides are flown whole
   if (c.type == CT_MEDEVAC) return POL_MEDEVAC;
@@ -712,6 +763,34 @@ bool Career::refuel(int fi, std::string* msg) {
 
 std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, const FlightResult& r, int* stars, const LaunchPlan* plan) {
   std::vector<PayoutLine> L;
+  if (isMilitaryContract(c.type) || src == SRC_MILITARY) {
+    if (stars) *stars = 0;
+    const bool accepted = isMilitaryContract(c.type) && src == SRC_MILITARY &&
+      military.activeAttempt != 0 && military.activeAttempt == attempt &&
+      military.activeAttempt > military.lastSettledAttempt && military.activeKind == c.type - CT_MIL_RECON &&
+      military.activeAirport == c.from && canFly(c, si) == SRC_MILITARY;
+    if (!accepted) return {{"No unsettled military sortie", 0}};
+    auto boundedAdd = [](int a, int b) { return int(std::min<int64_t>(int64_t(a) + b, 2000000000)); };
+    // Freeze the complete outcome ledger together at its storage bound. Independent
+    // saturation would break successes + failures == sorties and invalidate the save.
+    const bool recordSortie = military.sorties < 2000000000;
+    if (recordSortie) ++military.sorties;
+    if (floatValidation::finite(r.flightMin)) military.hours = std::min(1000000.f, military.hours + clampf(r.flightMin, 0.f, 1440.f) / 60.f);
+    if (r.success && r.outcome == OUT_SUCCESS) {
+      const int reward = 600 + military.activeKind * 600;
+      if (recordSortie) ++military.successes;
+      military.credits = boundedAdd(military.credits, reward);
+      if (recordSortie && military.activeKind == 0) ++military.intelligence;
+      military.rank = std::min(10, military.successes / 3);
+      if (stars) *stars = 3;
+      L.push_back({"Military service credits (separate from civilian funds)", reward});
+    } else {
+      if (recordSortie) ++military.failures;
+      L.push_back({r.failReason.empty() ? "Military sortie incomplete" : r.failReason, 0});
+    }
+    abandonMilitaryAttempt();
+    return L;
+  }
   const AircraftSpec& s = kAircraft[si];
   int pos = plan ? plan->positioning : positioningCost(c), ferry = plan ? plan->ferry : src == SRC_OWNED ? ferryCost(c, si) : 0;
   int hire = plan ? plan->hire : src == SRC_RENT ? s.rentFee : 0;
@@ -996,7 +1075,7 @@ void Career::airlineTick(std::vector<PayoutLine>& L, float minutes) {
 }
 
 float Career::failureChance(Source src, int si) const {
-  if (src == SRC_LESSON || src == SRC_NONE || kAircraft[si].special) return 0.f;
+  if (src == SRC_MILITARY || src == SRC_LESSON || src == SRC_NONE || kAircraft[si].special) return 0.f;
   if (src == SRC_RENT) return 0.02f;
   int oi = ownedIndexFor(si);
   float cond = oi >= 0 ? clampf(fleet[oi].condition, 0.f, 1.f) : 1.f;
@@ -1103,8 +1182,11 @@ bool Career::save(const std::string& path) const {
   std::string tmp = path + ".tmp";
   FILE* f = fopen(tmp.c_str(), "w");
   if (!f) return false;
-  bool ok = fprintf(f, "solace_save 4\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\nattempt %u\nattempt_open %d\n",
+  bool ok = fprintf(f, "solace_save 5\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\nattempt %u\nattempt_open %d\n",
                     money, license, reputation, location, storyIndex, flights, landings, crashes, hours, bestLandingFpm, boardSeed, finished ? 1 : 0, attempt, attemptOpen ? 1 : 0) > 0;
+  ok = ok && fprintf(f, "military %d %d %d %d %d %d %.9g %u %u %u %d %d\n",
+    military.rank, military.credits, military.sorties, military.successes, military.failures, military.intelligence,
+    military.hours, military.activeAttempt, military.lastSettledAttempt, military.missionSeed, military.activeKind, military.activeAirport) > 0;
   ok = ok && fprintf(f, "fleet %d\n", (int)fleet.size()) > 0;
   for (auto& p : fleet) ok = ok && fprintf(f, "plane %s %d %f %f\n", kAircraft[p.spec].id, p.location, p.fuel, p.condition) > 0;
   if (loan.open()) ok = ok && fprintf(f, "loan %s %d %d %d %f\n", kAircraft[loan.spec].id, loan.balance, loan.payment, loan.missed, loan.rate) > 0;
@@ -1155,11 +1237,11 @@ bool Career::load(const std::string& path) {
   FILE* f = fopen(path.c_str(), "r");
   if (!f) return false;
   Career c; char key[64]; int ver = 0;
-  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 4) { fclose(f); return false; }
+  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 5) { fclose(f); return false; }
   const int nApt = (int)g_world.airports.size();
   bool ok = true;
   unsigned have = 0;   // mandatory fields seen (version 2: every field, the fleet count and the end marker)
-  int fleetN = -1; bool ended = false, surveyRead = false, surveyKnownRead = false, plan2Read = false;
+  int fleetN = -1; bool ended = false, militaryRead = false, surveyRead = false, surveyKnownRead = false, plan2Read = false;
   auto rdI = [&](int& v, unsigned bit) { ok = ok && fscanf(f, "%d", &v) == 1; have |= bit; };
   auto rdF = [&](float& v) { ok = ok && fscanf(f, "%f", &v) == 1 && std::isfinite(v); };
   while (ok && fscanf(f, "%63s", key) == 1) {
@@ -1178,6 +1260,13 @@ bool Career::load(const std::string& path) {
     else if (!strcmp(key, "finished")) { rdI(fin, 2048); ok = ok && (fin == 0 || fin == 1); c.finished = fin != 0; }
     else if (!strcmp(key, "attempt")) ok = fscanf(f, "%u", &c.attempt) == 1;
     else if (!strcmp(key, "attempt_open")) { int ao = 0; ok = fscanf(f, "%d", &ao) == 1 && (ao == 0 || ao == 1); c.attemptOpen = ao != 0; }
+    else if (!strcmp(key, "military")) {
+      MilitaryRecord& m = c.military;
+      ok = ver >= 5 && !militaryRead && fscanf(f, "%d %d %d %d %d %d %f %u %u %u %d %d",
+        &m.rank, &m.credits, &m.sorties, &m.successes, &m.failures, &m.intelligence, &m.hours,
+        &m.activeAttempt, &m.lastSettledAttempt, &m.missionSeed, &m.activeKind, &m.activeAirport) == 12;
+      militaryRead = true;
+    }
     else if (!strcmp(key, "fleet")) ok = fscanf(f, "%d", &fleetN) == 1 && fleetN >= 0;
     else if (!strcmp(key, "plane")) {
       char id[64]; int loc = -1; float fuel = 0, cond = 1.f; int spec = -1;
@@ -1256,7 +1345,7 @@ bool Career::load(const std::string& path) {
       ok = c.job && fscanf(f, "%63s %d %d %d %d %d %d %f %d %d %d %d %d %d %d %d %d", id, &k.type, &k.from, &k.to, &k.cargoKg, &k.pax, &k.payout, &k.timeLimitMin,
                            &k.minLicense, &own, &fr, &sa, &k.repBonusPct, &k.chapter, &k.grantLicense, &k.forceAircraft, &cy) == 17;
       k.courtesy = cy != 0;
-      ok = ok && k.type >= 0 && k.type < CT_COUNT && k.from >= 0 && k.from < nApt && k.to >= 0 && k.to < nApt && k.cargoKg >= 0 && k.pax >= 0 && std::isfinite(k.timeLimitMin)
+      ok = ok && k.type >= 0 && k.type < CT_COUNT && !isMilitaryContract(k.type) && k.from >= 0 && k.from < nApt && k.to >= 0 && k.to < nApt && k.cargoKg >= 0 && k.pax >= 0 && std::isfinite(k.timeLimitMin)
            && k.minLicense >= LIC_STUDENT && k.minLicense <= LIC_ATP;
       if (ok) { k.id = id; k.ownedOnly = own != 0; k.fragile = fr != 0; k.startAirborne = sa != 0; k.story = false; c.job->c = k; }
     }
@@ -1287,6 +1376,17 @@ bool Career::load(const std::string& path) {
        && c.location >= 0 && c.location < nApt
        && c.storyIndex >= 0 && c.storyIndex <= (int)g_story.size()
        && c.flights >= 0 && c.landings >= 0 && c.crashes >= 0 && c.hours >= 0;
+  if (ver >= 5) {
+    const MilitaryRecord& m = c.military;
+    ok = ok && militaryRead && m.rank >= 0 && m.rank <= 10 && m.credits >= 0 && m.credits <= 2000000000 &&
+      m.sorties >= 0 && m.sorties <= 2000000000 && m.successes >= 0 && m.failures >= 0 &&
+      int64_t(m.successes) + m.failures == m.sorties && m.rank == std::min(10, m.successes / 3) &&
+      m.intelligence >= 0 && m.intelligence <= m.successes && floatValidation::finite(m.hours) && m.hours >= 0 && m.hours <= 1000000.f &&
+      m.lastSettledAttempt <= c.attempt;
+    if (m.activeAttempt) ok = ok && c.attemptOpen && m.activeAttempt == c.attempt && m.activeAttempt > m.lastSettledAttempt &&
+      m.activeKind >= 0 && m.activeKind <= 2 && m.activeAirport >= 0 && m.activeAirport < nApt;
+    else ok = ok && m.activeKind == -1 && m.activeAirport == -1 && m.missionSeed == 0;
+  }
   if (!ok) return false;
   if (c.job) {
     if (ver >= 4 && (!surveyRead || !surveyKnownRead || !plan2Read)) return false;

@@ -57,8 +57,8 @@
       {
         std::ifstream input(root / "career.sav"); std::string line, v3;
         while (std::getline(input, line)) {
-          if (line.rfind("survey_known ", 0) == 0 || line.rfind("plan2 ", 0) == 0) continue;
-          if (line == "solace_save 4") line = "solace_save 3";
+          if (line.rfind("survey_known ", 0) == 0 || line.rfind("plan2 ", 0) == 0 || line.rfind("military ", 0) == 0) continue;
+          if (line.rfind("solace_save ", 0) == 0) line = "solace_save 3";
           v3 += line + "\n";
         }
         input.close(); { std::ofstream out(root / "upstream-v3.sav"); out << v3; }
@@ -77,12 +77,12 @@
       // A legitimate older v3 recovery save lacks the new fields. Migrate its unknowable history explicitly.
       q.beginCareerFlight(c, 1, Career::SRC_RENT); q.wpIndex = 6; q.flightClock = 300; divert();
       std::ifstream input(root / "career.sav"); std::string line, old;
-      while (std::getline(input, line)) { if (line.rfind("job3 ", 0) == 0 || line.rfind("survey_known ", 0) == 0 || line.rfind("survey ", 0) == 0 || line.rfind("plan2 ", 0) == 0) continue; if (line == "solace_save 4") line = "solace_save 3"; old += line + "\n"; }
+      while (std::getline(input, line)) { if (line.rfind("job3 ", 0) == 0 || line.rfind("survey_known ", 0) == 0 || line.rfind("survey ", 0) == 0 || line.rfind("plan2 ", 0) == 0 || line.rfind("military ", 0) == 0) continue; if (line.rfind("solace_save ", 0) == 0) line = "solace_save 3"; old += line + "\n"; }
       input.close(); { std::ofstream output(root / "legacy.sav"); output << old; }
       Career legacy; bool migrated = legacy.load((root / "legacy.sav").string()); q.career = legacy;
       check(migrated && q.career.job && q.career.job->wpDone == 6 && !q.career.job->surveyHistoryKnown && near(q.career.job->jobClockMin, 5.f), "older save keeps checkpoints and clock with explicit unknown altitude history");
       q.continueJob(1, Career::SRC_RENT); saved = reload();
-      check(saved && q.career.job && !q.career.job->surveyHistoryKnown, "migration marker survives the next v4 save");
+      check(saved && q.career.job && !q.career.job->surveyHistoryKnown, "migration marker survives the next current-format save");
       q.flightClock = 120; q.plane.onGround = true; q.touchedDown = true; q.touchdownFpm = 200; q.endFlight(true, "", OUT_SUCCESS);
       bool disclosed = false; for (const auto& l : q.payout) disclosed |= l.label.find("older save") != std::string::npos && l.amount == 0;
       check(disclosed && amount(q.payout, "Survey altitude held") == 0, "legacy history waiver is disclosed and invents neither bonus nor penalty");

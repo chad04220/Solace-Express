@@ -522,6 +522,7 @@ void Game::drawResearch(const FrameParams& fp) {
     float cx = L.cx, cy = L.cy, R = L.r;
     // interaction: drag to turn, wheel to zoom, right stick turns
     bool inStage = hovered(L.px0, L.top, L.px1 - L.px0, L.bot - L.top);
+    if(resCraft==kWraith && resCard<0 && in.my>=std::max(L.top+20*s,L.bot-240*s)) inStage=false;
     if (inStage && in.mPressed[0]) resDrag = true;
     if (!in.mDown[0]) resDrag = false;
     if (resDrag) { resYaw += in.mdx * 0.008f; resPitch = clampf(resPitch + in.mdy * 0.006f, -0.5f, 1.0f); resIdleT = 0; }
@@ -679,8 +680,13 @@ void Game::drawResearch(const FrameParams& fp) {
     g_ren.glow(bx, by, bw, bh, ACC, (hov ? 0.35f : 0.15f) * e, 0, 14 * s);
     g_ren.text(bx + bw * 0.5f, by + 9 * s, 16 * hs, std::string("INITIATE  ") + RC.num, R_TEXT, e, 1, false);
     g_ren.text(bx + bw * 0.5f, by + 29 * s, 9 * hs, resCard >= 0 ? std::string("TEST CARD  ") + kResCards[resCard].id + "  " + kResCards[resCard].title : "FREE ROAM  //  NOT RECORDED IN LOGBOOK", resCard >= 0 ? ACC : R_DIM, e, 1, false);
-    if (click(bx, by, bw, bh) || in.pressed[K_ENTER]) { launchResearch(); return; }
+    const bool rangeStart=resCraft==kWraith && resCard<0 && (in.buttonsPressed & PAD_START);
+    if (click(bx, by, bw, bh) || (in.pressed[K_ENTER] && !focusNav) || rangeStart) {
+      in.buttonsPressed &= ~PAD_START; in.pressed[K_ENTER]=false;
+      launchResearch(); return;
+    }
   }
+  if(resCraft==kWraith && resCard<0) drawCombatPractice(L.px0+12*s,std::max(L.top+20*s,L.bot-240*s),std::max(180*s,L.px1-L.px0-24*s));
   g_ren.text(W * 0.5f, H - 22 * s, 10.5f * s, padPrompts() ? "L-STICK CURSOR   A SELECT   X SWITCH AIRFRAME   R-STICK ROTATE   LB / RB SITE   START INITIATE   B ABORT"
                                                      : "TAB SWITCH AIRFRAME   <- / -> SITE   DRAG ROTATE   WHEEL ZOOM   ENTER INITIATE   ESC ABORT",
              R_DIM, 0.75f * e, 1, false);
@@ -690,3 +696,26 @@ void Game::drawResearch(const FrameParams& fp) {
 // the research craft in the terminal's order, for its warm-up (game.cpp): outside the file's unnamed namespace
 int resCraftCount() { return kNumResCraft; }
 int resCraftAt(int k) { return k >= 0 && k < kNumResCraft ? kResCraft[k].idx : -1; }
+
+// Data-driven XR-40 equipment choices; the same controls are available in the paused range.
+void Game::drawCombatPractice(float x,float y,float width) {
+  const float s=std::min(S(),width/350.f), h=30*s;
+  g_ren.rect(x-8*s,y-8*s,width+16*s,224*s,vec3(.005f,.015f,.025f),.94f,4*s);
+  auto change=[&]() { if(researchFlight) clearPracticeEncounter(); };
+  const auto& gun=hive::forwardSpec(practiceForward);
+  const auto& bomb=hive::bombSpec(practiceBomb);
+  g_ren.text(x,y,11*s,ellipsize("XR-40 RANGE / KIT CHANGE RESETS ENCOUNTER",width,11*s),vec3(.55f,.8f,1),1);y+=20*s;
+  if(button(x,y,width,h,std::string("FORWARD: ")+gun.name+"  >##practice_forward")) { practiceForward=(hive::ForwardSet)(((int)practiceForward+1)%3);change(); }
+  y+=h+4*s;
+  g_ren.text(x,y,10*s,ellipsize(gun.description,width,10*s),vec3(.65f,.7f,.75f),1);y+=18*s;
+  if(button(x,y,width,h,std::string("PAYLOAD: ")+bomb.name+"  >##practice_bomb")) { practiceBomb=(hive::BombSet)(((int)practiceBomb+1)%3);change(); }
+  y+=h+4*s;
+  g_ren.text(x,y,10*s,ellipsize(bomb.description,width,10*s),vec3(.65f,.7f,.75f),1);y+=18*s;
+  const char* waveNames[]={"Needle lead","Bastion lead","Cantor lead","Archon lead"};
+  if(button(x,y,width,h,std::string("MIXED WAVE: ")+waveNames[practiceWave]+"  >##practice_wave")) practiceWave=(practiceWave+1)%4;
+  y+=h+8*s;
+  if(researchFlight) {
+    if(button(x,y,width*.48f,h,"Spawn wave",hiveCombat.aliveCount()<hive::MaxActors)) spawnPracticeWave();
+    if(button(x+width*.52f,y,width*.48f,h,"Clear / rearm")) clearPracticeEncounter();
+  } else g_ren.text(x,y,11*s,ellipsize("Launch Free Roam; pause for enemy controls.",width,11*s),vec3(.65f,.7f,.75f),1);
+}

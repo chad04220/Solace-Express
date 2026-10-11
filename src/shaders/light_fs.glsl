@@ -204,7 +204,8 @@ void main(){
     if (sunVis > 0.0) {
       if (cls == GB_UFO) sh = cloudShadow(p);
       else if (cls == GB_DEBRIS) sh = g3.z;
-      else if (cls == GB_PLANE || cls == GB_TRAFFIC || cls == GB_WRECK) { sh = g3.z*g3.y; if (sh > 0.0) sh *= cloudShadow(p)*entShadow(p, n); }
+      else if (cls == GB_ENEMY) { sh = g3.y*gShProxy.r*terrainShadow(p+n*.1,uSunDir,t); if(sh>0.)sh*=cloudShadow(p)*entShadow(p,n); }
+      else if (cls == GB_PLANE || cls == GB_TRAFFIC || cls == GB_WRECK) { sh = g3.z*g3.y*gShProxy.r; if (sh > 0.0) sh *= cloudShadow(p)*entShadow(p, n); }
       else { sh = terrainShadow(p + n*0.5 + (cls == GB_ENTITY || cls == GB_FOLIAGE ? vec3(0.0, 0.5, 0.0) : vec3(0.0)), uSunDir, t); if (sh > 0.0) sh *= environmentShadow(p, n, t)*cloudShadow(p)*gShProxy.r; }
     }
     bool environment = cls == GB_TERRAIN || cls == GB_ENTITY || cls == GB_FOLIAGE;

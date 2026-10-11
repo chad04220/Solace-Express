@@ -1,5 +1,6 @@
 // Solace Express - OpenGL renderer: deferred rasterizer + sprites + post + UI
 #include "renderer.h"
+#include "hive_ordnance_sprites.h"
 #include "shader_prune.h"
 #include "models.h"
 #include "mesh_validation.h"
@@ -256,7 +257,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kRoads, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithSDF, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kGLens, kUIVS, kUIFS, kEntCommon, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap}) h = fnv1a(src, h);
+  for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kRoads, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithWeaponSDF, kWraithSDF, kWraithStoreMaterial, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kGLens, kUIVS, kUIFS, kEntCommon, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap, kEnemyCommon, kEnemyNeedle, kEnemyBastion, kEnemyHeavyCommon, kEnemyCantor, kEnemyArchon, kEnemyMaterial, kEnemyMeshVS, kEnemyMeshFS, kEnemyShadow, kReleasedStoreVS, kReleasedStoreFS}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -270,6 +271,7 @@ std::string shaderCacheStamp() {
 // aircraft's bodies alone - Renderer::meshStamp)
 std::string meshCacheStamp(const std::string& defines) {
   uint64_t h = fnv1a(aircraftMesh::kAlgorithmManifest, 1469598103934665603ull);
+  if(defines.empty() || defines.find("#define AF_WRAITH") != std::string::npos) h=fnv1a(aircraftMesh::kWraithLoadoutManifest,h);
   // (the bake programs as the driver gets them, cut to what they run: an edit to a material, a light or a comment
   // leaves every aircraft body as it was; one to a shape the bake evaluates builds them again)
   h = fnv1a(shaderPrune::prune(hullBakeFSAssembly(defines)), h);
@@ -1121,9 +1123,14 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   if (shOn) glUniformMatrix4fv(U(p, "uAfShVP"), 4, GL_FALSE, shMapVP[0].m);
   // (the array samplers always on their own units, maps or not: left at unit 0 beside uHM - a 2D sampler - every draw
   // of the program fails validation and draws nothing: the objects pass lost wrecks, debris, the UFO and the march)
+  glUniform1i(U(p, "uStoreShOn"), storeShOn);
+  glUniform1i(U(p, "uStoreMeshOn"), storeMeshOn);
+  if(storeShOn){glUniformMatrix4fv(U(p,"uStoreShVP"),8,GL_FALSE,storeShVP[0].m);glUniform1fv(U(p,"uStoreShFade"),8,storeShFade);}
+  glUniform1i(U(p, "uEnemyShOn"), enemyShOn);
+  if (enemyShOn) glUniformMatrix4fv(U(p, "uEnemyShVP"), kMaxEnemyCraft, GL_FALSE, enemyShVP[0].m);
   glUniform1i(U(p, "uTrafShOn"), trafShOn);   // the traffic's sun shadow maps (layers 4 + k), for the proxy
   if (trafShOn) glUniformMatrix4fv(U(p, "uTrafShVP"), kMaxTrafficDrawn, GL_FALSE, trafShVP[0].m);
-  glActiveTexture(GL_TEXTURE0 + 26); glBindTexture(GL_TEXTURE_2D_ARRAY, shOn || trafShOn ? texShMap : 0); glUniform1i(U(p, "uAfShMap"), 26);
+  glActiveTexture(GL_TEXTURE0 + 26); glBindTexture(GL_TEXTURE_2D_ARRAY, shOn || trafShOn || enemyShOn || storeShOn ? texShMap : 0); glUniform1i(U(p, "uAfShMap"), 26);
   glActiveTexture(GL_TEXTURE0 + 27); glBindTexture(GL_TEXTURE_2D_ARRAY, shOn ? texShMov : 0); glUniform1i(U(p, "uAfShMov"), 27);
   // the cabin's sun map (cockpit view) on unit 22: 12 is the far scenery cascade's (bound below, it took this one's place);
   // 22 is otherwise only the lighting pass's (its G-buffer extras), which reads no cabin map, and this binds it again
@@ -1252,11 +1259,12 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUniform1i(U(p, "uLensN"), pv.lensN);
   if (pv.lensN) { glUniform4fv(U(p, "uLensP"), pv.lensN, &pv.lensP[0][0]); glUniform4fv(U(p, "uLensC"), pv.lensN, &pv.lensC[0][0]); glUniform4fv(U(p, "uLensD"), pv.lensN, &pv.lensD[0][0]); }
   glUniform4fv(U(p, "uWr"), 7, &pv.wr[0][0]);
+  glUniform1i(U(p, "uWrBombSet"), std::clamp(pv.wrBombSet,0,2));
   {
     const FxVisual& fx = fp.fx;
     glUniform1i(U(p, "uFxBeams"), fx.beams); glUniform1i(U(p, "uFxBombs"), fx.bombs); glUniform1i(U(p, "uFxBlasts"), fx.blasts);
-    if (fx.beams) { glUniform4fv(U(p, "uBeamA"), fx.beams, &fx.beamA[0][0]); glUniform4fv(U(p, "uBeamB"), fx.beams, &fx.beamB[0][0]); }
-    if (fx.bombs) glUniform4fv(U(p, "uBombs"), fx.bombs, &fx.bomb[0][0]);
+    if (fx.beams) { glUniform4fv(U(p, "uBeamA"), fx.beams, &fx.beamA[0][0]); glUniform4fv(U(p, "uBeamB"), fx.beams, &fx.beamB[0][0]); glUniform4fv(U(p, "uBeamStyle"), fx.beams, &fx.beamStyle[0][0]); }
+    if (fx.bombs) { glUniform4fv(U(p, "uBombs"), fx.bombs, &fx.bomb[0][0]); glUniform4fv(U(p, "uBombStyle"), fx.bombs, &fx.bombStyle[0][0]); }
     if (fx.blasts) { glUniform4fv(U(p, "uBlast"), fx.blasts, &fx.blast[0][0]); glUniform4fv(U(p, "uBlastI"), fx.blasts, &fx.blastI[0][0]); }
     glUniform4fv(U(p, "uPip"), 1, fx.pip);
     glUniform4fv(U(p, "uFeed"), 1, fx.feed);
@@ -1404,6 +1412,16 @@ void Renderer::drawSprites(const FrameParams& fp, float texW, float texH, float 
     glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
     glBufferData(GL_ARRAY_BUFFER, (*curAdd).size() * sizeof(SpriteVert), (*curAdd).data(), GL_STREAM_DRAW);
     glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(*curAdd).size());
+  }
+  std::vector<SpriteVert> ordnanceBody, ordnanceGlow;
+  buildHiveOrdnanceSprites(fp,H,ordnanceBody,ordnanceGlow);
+  if(!ordnanceBody.empty()){
+    glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ZERO,GL_ONE);
+    glBufferData(GL_ARRAY_BUFFER,ordnanceBody.size()*sizeof(SpriteVert),ordnanceBody.data(),GL_STREAM_DRAW);glDrawArrays(GL_TRIANGLES,0,(GLsizei)ordnanceBody.size());
+  }
+  if(!ordnanceGlow.empty()){
+    glBlendFuncSeparate(GL_ONE,GL_ONE,GL_ZERO,GL_ONE);
+    glBufferData(GL_ARRAY_BUFFER,ordnanceGlow.size()*sizeof(SpriteVert),ordnanceGlow.data(),GL_STREAM_DRAW);glDrawArrays(GL_TRIANGLES,0,(GLsizei)ordnanceGlow.size());
   }
   glDisable(GL_BLEND);
 }
@@ -1553,6 +1571,7 @@ void Renderer::renderScene(const FrameParams& fp, const std::vector<SpriteVert>&
   if (classified) { shOn = 0; shMovOn = false; shCabOn = false; }
   if (!classified) rasterShadowMaps(fp);   // (the airframe's shadow maps: the feeds' and the main view's proxy both read them)
   if (!classified) rasterTrafficShadowMaps(fp);
+  if (!classified) { rasterEnemyShadowMaps(fp); prepareReleasedStores(fp); rasterReleasedStoreShadows(fp); } else { enemyShOn = 0; storeShOn=storeMeshOn=0; }
   stamp(1);
   // the cockpit display atlases, before the objects pass samples them. The pages: half of those the cockpit shows each
   // frame, so each page at 30 Hz with the same cost every frame (the whole 9 Mpx atlas every other frame put ~3 ms on

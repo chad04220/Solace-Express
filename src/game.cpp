@@ -7,6 +7,7 @@
 #include <thread>
 #include "airport_layout.h"
 #include "entities.h"
+#include "hive_world_collision.h"
 #include "scenery.h"
 #include "models.h"
 #include "menu_layout.h"
@@ -443,6 +444,7 @@ void Game::continuationWaivers(Career::LaunchPlan& p, const Contract& c, int spe
 void Game::restartFlight() {
   if (freeFlight) { launchFreeFlight(); return; }
   if (researchFlight) { launchResearch(); return; }
+  if (militaryFlight) { Contract c=contract; auto p=launchPlan; startFlight(c,specIdx,source,&p); return; }
   const bool iso = isolatedFlight, leg = jobLeg;
   Contract c = contract;
   const Career::LaunchPlan p = launchPlan;   // retry the accepted load and price, even if a newer estimate has arrived
@@ -453,6 +455,7 @@ void Game::restartFlight() {
 // The debrief's second button: a job waiting at its stop flies on from there with its clock, ride and paid fees (as
 // the hub's Continue does); anything else (a lesson, a checkride, a job that ended) is flown again from the start
 void Game::retryFromDebrief() {
+  if (isMilitaryContract(contract.type)) { launchMilitary(contract.type-CT_MIL_RECON); return; }
   // the aircraft must still be one the job can be flown in: if it is gone (repossessed, sold) or no longer suits, the
   // hub's chooser offers the ones that can, with the reason (the review of v3.31.0, C2: a repossessed aircraft flew)
   std::string why;
@@ -486,7 +489,8 @@ void Game::practiseApproach(int spec, Career::Source src) {
 void Game::beginFreeFlightSetup() {
   freeCraft = validCareerSelection(freeCraft);
   freeAirport = g_world.airports.empty() ? 0 : std::clamp(freeAirport, 0, (int)g_world.airports.size() - 1);
-  freeFlight = isolatedFlight = researchFlight = false;
+  freeFlight = isolatedFlight = researchFlight = militaryFlight = false;
+  hiveCombat.reset(1,WRAP_SPAN);
   paused = showMap = showRadio = settingsFromPause = false;
   confirmNew = confirmRes = false;
   atc.cancel(); commsPending.clear(); toasts.clear();
@@ -533,7 +537,8 @@ void Game::launchFreeFlight() {
 }
 
 void Game::returnToFreeFlight() {
-  freeFlight = isolatedFlight = researchFlight = false;
+  freeFlight = isolatedFlight = researchFlight = militaryFlight = false;
+  hiveCombat.reset(1,WRAP_SPAN);
   paused = showMap = showRadio = settingsFromPause = false;
   dbgCam = dbgFollow = false;
   atc.cancel(); commsPending.clear(); toasts.clear();
@@ -577,7 +582,7 @@ void Game::init(bool buildWorld, const std::function<void(float, const std::stri
   if (hasSave && career.attemptOpen) {   // the last session ended inside a flight: the career stands as it was before it
     toast(fmt("Your last flight was interrupted: you are back at %s", g_world.airports[career.location].name), vec3(1.f, 0.8f, 0.4f));
     // an accepted job whose leg never ended waits where the leg began (the hub's recovery card offers it again)
-    commit([](Career& k) { k.attemptOpen = false; if (k.job && k.job->state == Career::JobState::ACTIVE) k.job->state = Career::JobState::RECOVERY; });
+    commit([](Career& k) { if (k.military.activeAttempt) { k.abandonMilitaryAttempt(); return; } k.attemptOpen = false; if (k.job && k.job->state == Career::JobState::ACTIVE) k.job->state = Career::JobState::RECOVERY; });
   }
   if (!hasSave) {
     career.newGame();
@@ -622,7 +627,7 @@ void Game::rollFailures(const Contract& c, int spec, Career::Source src) {
 void Game::updateJobMeters(float dt, float gs) {
   (void)gs;
   const Contract& c = contract;
-  if (researchFlight || isolatedFlight || crashed) return;
+  if (researchFlight || isolatedFlight || militaryFlight || crashed) return;
   bool air = !plane.onGround && takeoffAnnounced;
   if (c.type == CT_MEDEVAC || c.type == CT_VIP) {
     float& m = c.type == CT_MEDEVAC ? result.patient : result.comfort;
@@ -993,6 +998,9 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   if (!g_ren.dispError.empty() && !dispWarned && !headless) { dispWarned = true; toast("Cockpit display shader failed on this GPU (details in startup.log)", vec3(1.f, 0.45f, 0.35f)); }
   contract = c; specIdx = spec; source = src;
   launchPlan = finalized ? *finalized : finalizeLaunchPlan(c, spec, src);   // accepted quote, tank load and bill agree
+  militaryFlight=isMilitaryContract(c.type); militarySettled=false; militaryHull=100; militarySiteLabels={};
+  hiveCombat.reset(1,WRAP_SPAN); combatLoadout.reset();
+  combatCollisionWarm=false; combatCollisionWarmMs=0; combatPrefetchCursor=0;
   researchFlight = freeFlight = false;   // isolated launchers set their own mode after the shared reset
   wx = c.wx; wxStart = c.wx; timeOfDay = wx.timeOfDay; apRepickT = 0;
   wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet; wx.cloudBoil = cloudBoil;
@@ -1010,6 +1018,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   float hdg = reverse ? h0 + 180.f : h0;
   vec3 start = a.threshold(reverse) + (reverse ? -a.dir() : a.dir()) * 30.f;
   float payloadKg = (float)c.cargoKg + c.pax * 85.f + 85.f;
+  combatBasePayload=payloadKg;
   float fuel = launchPlan.fuelLoadKg;
   launchFuelKg = -1;
   plane.reset(&s, start, hdg, fuel, payloadKg, c.startAirborne, s.cruise);
@@ -1051,9 +1060,22 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   toast(fmt("Runway %02d, %s", a.rwyNumber(reverse), wx.describe().c_str()), vec3(0.8f, 0.8f, 0.8f));
   atcF.dep = c.from; atcF.arr = c.to; atcF.depRev = reverse;
   if (c.startAirborne) atcF.phase = 3;
+  if (militaryFlight) setupMilitaryEncounter();
 }
 
 void Game::endFlight(bool success, const std::string& reason, FlightOutcome outcome) {
+  if (militaryFlight) {
+    if(militarySettled) return;
+    militarySettled=true;
+    success=success && hiveCombat.mission.status==hive::MissionStatus::Success && !crashed && militaryHull>0;
+    result.success=success; result.outcome=success?OUT_SUCCESS:outcome; result.failReason=reason; result.flightMin=flightClock/60.f;
+    result.fuelUsedKg=std::max(0.f,fuelStart-plane.fuel); result.maxG=plane.maxG; result.minG=plane.minG;
+    commit([&](Career& k) { payout=k.settle(contract,specIdx,Career::SRC_MILITARY,result,&stars,&launchPlan); });
+    lastSuccess=success; debriefTitle=success?"Military sortie complete":reason.empty()?"Military sortie aborted":reason;
+    coaching.clear(); screen=SCR_DEBRIEF; paused=false; showMap=false;
+    g_audio.trigger(success?SFX_SUCCESS:SFX_FAIL);
+    return;
+  }
   if (freeFlight) {
     returnToFreeFlight();
     toast(success || outcome == OUT_DIVERTED || outcome == OUT_OFF_AIRPORT ? "Free flight complete" : reason.empty() || outcome == OUT_ABANDONED ? "Back in the Free Flight hangar" : reason,
@@ -1061,6 +1083,7 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
     return;
   }
   if (researchFlight) {  // research flights never touch the career: back to the research menu
+    hiveCombat.reset(1,WRAP_SPAN);
     researchFlight = false; paused = false; showMap = false;
     screen = SCR_RESEARCH; resOpened = realTime;
     if (!reason.empty()) toast(reason, success ? vec3(0.6f, 1, 0.7f) : vec3(1, 0.5f, 0.4f));
@@ -1350,7 +1373,8 @@ void Game::flightControls(float dt) {
   // time acceleration
   if (actPressed(ACT_TIME)) {
     float dd = length(vec3(wrapCoord(plane.pos.x - dest().x), 0, wrapCoord(plane.pos.z - dest().z)));
-    if (!apCruising() && (plane.onGround || plane.agl() < 250.f || dd < 3500.f)) { timeAccel = 1; toast("Time acceleration only available in cruise", vec3(1, 0.7f, 0.4f)); }
+    if(militaryFlight || hiveCombat.aliveCount()>0 || hiveCombat.mission.status==hive::MissionStatus::Active) { timeAccel=1; toast("Combat runs at real time"); }
+    else if (!apCruising() && (plane.onGround || plane.agl() < 250.f || dd < 3500.f)) { timeAccel = 1; toast("Time acceleration only available in cruise", vec3(1, 0.7f, 0.4f)); }
     else { timeAccel = timeAccel >= 4 ? 1 : timeAccel * 2; toast(fmt("Time x%.0f", timeAccel)); }
   }
   // Only the explicitly selected 90-degree hover notch uses momentary manual power. Resolve it after the pod
@@ -1402,6 +1426,7 @@ void Game::updateFlight(float dt) {
     bool approach = plane.apOn && plane.apMode == Plane::AP_APPR && plane.apStage != Plane::APS_NAV;
     if ((!apCruising() && (plane.agl() < 250.f || dd < 3500.f)) || approach || plane.onGround || crashed) { timeAccel = 1; toast("Time acceleration off"); }
   }
+  if(militaryFlight || hiveCombat.aliveCount()>0 || hiveCombat.mission.status==hive::MissionStatus::Active) timeAccel=1;
   float simDt = dt * timeAccel;
   vec3 prevPos = plane.pos;
   refreshGroundPits();   // (what the wheels, the weapons and the wreckage meet this frame)
@@ -1452,14 +1477,16 @@ void Game::updateFlight(float dt) {
 
   updateUfo(simDt);
   // AI traffic
-  traffic.enabled = set.traffic;
-  airlineTraffic(simDt);
+  traffic.enabled = set.traffic && !militaryFlight;
+  if(!militaryFlight) airlineTraffic(simDt);
   if (traffic.update(simDt, plane.pos, plane.vel, plane.onGround || crashed, plane.spec->span) && !crashed && !plane.ev.crashed) {
     plane.ev.crashed = true; plane.ev.crashReason = "Mid-air collision";
   }
   for (auto& f : traffic.puffs) spawn(f.p, f.v, f.life, f.size, f.grow, f.col, f.alpha, f.kind, 1.f, 0.f);
   for (auto& b : traffic.booms) g_audio.trigger(SFX_BOOM, b.second);
   updateWraith(simDt);
+  updateHive(simDt);
+  if(screen!=SCR_FLIGHT) return;
   for (float f : traffic.flybys) g_audio.trigger(SFX_FLYBY, f);
   for (auto& m : traffic.radio) toast(m, vec3(1.f, 0.78f, 0.3f));
   // entertainment: O + P held for a second while flying summons the Spectre display pair (again: sends them home).
@@ -1674,7 +1701,7 @@ void Game::updateFlight(float dt) {
   if (flightClock < 0.1f) lowFuelWarned = false;
   if (!lowFuelWarned && plane.fuel < plane.spec->maxFuel * 0.15f) { lowFuelWarned = true; g_audio.trigger(SFX_BEEP); toast("LOW FUEL", vec3(1, 0.5f, 0.2f)); }
   // completion
-  if (plane.onGround && takeoffAnnounced && gs < 2.5f && !researchFlight) {
+  if (plane.onGround && takeoffAnnounced && gs < 2.5f && !researchFlight && !militaryFlight) {
     stillTimer += dt;
     if (stillTimer > 1.2f) {
       float dA; int ap = g_world.nearestAirport(plane.pos.x, plane.pos.z, &dA);
@@ -1697,6 +1724,7 @@ void Game::updateFlight(float dt) {
       else if (stillTimer > 3.f) { endFlight(false, atField ? "Landed off the runway" : "Landed off-airport", OUT_OFF_AIRPORT); return; }
     }
   } else stillTimer = 0;
+  if (militaryFlight && plane.fuel<=0 && plane.onGround && gs<1.f) { endFlight(false,"Military sortie out of fuel",OUT_OUT_OF_FUEL); return; }
   if (plane.fuel <= 0 && plane.onGround && gs < 1.f && !takeoffAnnounced) { endFlight(false, "Out of fuel", OUT_OUT_OF_FUEL); return; }
   if (plane.fuel <= 0 && plane.onGround && gs < 1.f && takeoffAnnounced) {
     // stopped dry: done, unless this is the destination with nothing left to fly (the completion check above ends
@@ -1734,6 +1762,7 @@ bool Game::loadingShadowPending() const {
   return g_ren.tshRequiredPending(direction.y);
 }
 void Game::updateLoading(float dt) {
+  warmCombatCollision();
   loadT += dt;
   if (loadReadyT < 0) {
     dbgCam = false;
@@ -1788,8 +1817,9 @@ void Game::updateLoading(float dt) {
     // a career flight that never left the loading screen: its attempt closes and its job waits at its stop, as after
     // an interrupted session (nothing is charged: no leg was flown); an unsaved close shows as pending and blocks launches
     if (career.attemptOpen && !isolatedFlight && !researchFlight)
-      commit([](Career& k) { k.attemptOpen = false; if (k.job && k.job->state == Career::JobState::ACTIVE) k.job->state = Career::JobState::RECOVERY; });
+      commit([](Career& k) { if (k.military.activeAttempt) { k.abandonMilitaryAttempt(); return; } k.attemptOpen = false; if (k.job && k.job->state == Career::JobState::ACTIVE) k.job->state = Career::JobState::RECOVERY; });
     screen = researchFlight ? SCR_RESEARCH : SCR_HUB;
+    militaryFlight=false; hiveCombat.reset(1,WRAP_SPAN);
     researchFlight = false;   // (nothing of the cancelled session carries into the next flight)
   }
 }
@@ -1897,7 +1927,9 @@ void Game::gamepadMenus(float dt) {
   // research menu: D-pad also steps through launch sites, Start launches
   if (screen == SCR_RESEARCH) {
     int n = (int)g_world.airports.size();
-    if (in.buttonsPressed & PAD_START) in.pressed[K_ENTER] = true;
+    // XR-40 range selectors use focus; Start remains a distinct launch action rather
+    // than also activating the selected equipment control through synthetic Enter.
+    if ((in.buttonsPressed & PAD_START) && !(resCraft==kWraith && resCard<0)) in.pressed[K_ENTER] = true;
     if (in.buttonsPressed & PAD_RB) resAirport = (resAirport + 1) % n;
     if (in.buttonsPressed & PAD_LB) resAirport = (resAirport + n - 1) % n;
   }
@@ -1916,8 +1948,9 @@ void Game::focusNavigate() {
   int dx = 0, dy = 0;
   if ((keys && in.pressed[K_LEFT]) || (in.buttonsPressed & PAD_LEFT)) dx = -1;
   if ((keys && in.pressed[K_RIGHT]) || (in.buttonsPressed & PAD_RIGHT)) dx = 1;
-  if ((keys && in.pressed[K_UP]) || (in.buttonsPressed & PAD_UP)) dy = -1;
-  if ((keys && in.pressed[K_DOWN]) || (in.buttonsPressed & PAD_DOWN)) dy = 1;
+  const bool rangeKeys=screen==SCR_RESEARCH && resCraft==kWraith && resCard<0;
+  if (((keys || rangeKeys) && in.pressed[K_UP]) || (in.buttonsPressed & PAD_UP)) dy = -1;
+  if (((keys || rangeKeys) && in.pressed[K_DOWN]) || (in.buttonsPressed & PAD_DOWN)) dy = 1;
   if (!dx && !dy) { if (focusNav) { bool still = false; for (auto& f : focusPrev) if (f.id == focusId) still = true; if (!still && !focusPrev.empty()) focusId = focusPrev[0].id; } return; }
   if (focusPrev.empty()) return;
   const Focusable* cur = nullptr; for (auto& f : focusPrev) if (f.id == focusId) cur = &f;
@@ -1975,6 +2008,7 @@ void Game::launchResearch() {
   startFlight(c, resCraft, Career::SRC_OWNED);
   launchFuelKg = careerFuelChoice;
   researchFlight = true;
+  combatLoadout.reset(practiceForward,practiceBomb);
   toasts.clear();
   { std::string nm = rs.name; for (char& ch : nm) ch = (char)toupper((unsigned char)ch); toast(nm + (resCard >= 0 ? std::string(" // TEST CARD ") + kResCards[resCard].title : std::string(" // RESEARCH FLIGHT")), wr ? vec3(0.75f, 0.45f, 1.f) : rs.special ? vec3(0.4f, 0.9f, 1) : vec3(0.35f, 0.95f, 0.8f)); }
   if (resCard >= 0) toast(fmt("STEP 1 of %d: %s", kResCards[resCard].n, kResCards[resCard].steps[0].label), vec3(0.9f, 0.9f, 0.6f));
@@ -1986,6 +2020,7 @@ void Game::launchResearch() {
     settleAirborneStart();   // (startFlight parked it for a start on the ground)
     camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 4, 26));
   } else if (wr) toast("F/V tilts the four thruster pods: full down for vertical takeoff", vec3(0.7f, 0.9f, 1));
+  combatBasePayload=plane.payload; syncCombatPayload();
   prevMach = 0;
 }
 
@@ -3680,7 +3715,7 @@ void Game::updateComms(float dt) {
     else if (m.lessonPhase >= 0) lessonUnavailable();
   }
   commsPending.clear();
-  if (screen == SCR_FLIGHT && !crashed && !researchFlight) updateAtc(dt);
+  if (screen == SCR_FLIGHT && !crashed && !researchFlight && !militaryFlight) updateAtc(dt);
   // while someone is talking the music and the engine sit lower (a headset's comms priority): quick down, slow up
   voiceDuck = approach(voiceDuck, atc.busy() && live ? 1.f : 0.f, atc.busy() ? 6.f : 1.5f, dt);
   AtcVoice::Tx st = atc.update(dt);
@@ -4711,5 +4746,228 @@ void Game::debugScene(const std::string& name) {
     toasts.clear();
     if (name == "gpsap") { showMap = true; uiAnim[0x6e61u] = 1.f; }
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
+  }
+}
+
+// Military sorties are career-backed loaners; research practice uses the same combat engine off the books.
+void Game::launchMilitary(int kind) {
+  Contract c = career.militaryContract(std::clamp(kind, 0, 2));
+  if (career.canFly(c, c.forceAircraft) != Career::SRC_MILITARY) return;
+  bool begun=false;
+  if (!commitLaunch([&](Career& k) { begun=k.beginMilitary(c); }) || !begun) return;
+  const auto p = career.plan(c, c.forceAircraft, Career::SRC_MILITARY);
+  startFlight(c, c.forceAircraft, Career::SRC_MILITARY, &p);
+}
+
+hive::WorldCallbacks Game::hiveWorld() {
+  hive::WorldCallbacks w;
+  w.terrainHeight = [](void*, float x, float z) { return std::max(0.f, pitGround(x,z,g_world.height(x,z))); };
+  w.sweepFraction = [](void*, const vec3& a, const vec3& b, float radius) { return hiveWorldSweep(a,b,radius); };
+  w.sweepIncludesTerrain = true;
+  return w;
+}
+
+void Game::setupMilitaryEncounter() {
+  hiveCombat.reset(career.military.missionSeed, WRAP_SPAN);
+  militaryHull = 100; militarySettled = false;
+  combatLoadout.reset(hive::ForwardSet::Pulse, contract.type == CT_MIL_STRIKE ? hive::BombSet::Penetrator : hive::BombSet::Plasma);
+  // Separate insertion and objective areas. Mission positions remain canonical over world seams.
+  vec3 origin=plane.pos; origin.y=std::max(origin.y,g_world.height(origin.x,origin.z)+650.f);
+  plane.pos=origin;
+  hive::MissionConfig m; m.extraction=origin; m.extractionRadius=300;
+  vec3 f=plane.forward(); f.y=0; f=normalize(f+vec3(0,0,.0001f));
+  vec3 right=cross(f,vec3(0,1,0));
+  auto point=[&](float distance,float side,float altitude) { vec3 p=origin+f*distance+right*side; p.x=wrapCoord(p.x); p.z=wrapCoord(p.z); p.y=std::max(altitude,g_world.height(p.x,p.z)+250.f); return p; };
+  // Select the exact same authored airport entities the scenery generator renders and collides with.
+  // Sensor aim points sit just above each roof, never inside a building or at an arbitrary airborne marker.
+  auto site=[&](int airport,int preferred,int index) {
+    std::vector<AptItem> items; airportItems(airport,items);
+    const AptItem* picked=nullptr;
+    const int priorities[]={preferred,EK_CTRL_TOWER,EK_FBO,EK_ARCH_HANGAR,EK_HANGAR,EK_T_HANGAR};
+    for(int kind:priorities) {
+      for(const auto& item:items) if(item.kind==kind) { picked=&item;break; }
+      if(picked) break;
+    }
+    hive::Objective o; o.id=100+index;
+    if(picked) {
+      const auto& e=picked->e; const auto& info=kEntInfo[picked->kind];
+      o.position=vec3(e.x,e.y+info.h*e.sy+2.f,e.z);
+      o.radius=clampf(std::max(info.hx*e.sx,info.hz*e.sz),8.f,35.f);
+      militarySiteLabels[index]=std::string(g_world.airports[airport].code)+" "+info.name;
+    } else {
+      // Every authored airport has a hangar; keep a safe airport navigation point for custom worlds.
+      const auto& a=g_world.airports[airport]; o.position=a.pos()+vec3(0,3,0);o.radius=10;
+      militarySiteLabels[index]=std::string(a.code)+" operations site";
+    }
+    return o;
+  };
+  if (contract.type==CT_MIL_RECON) {
+    m.kind=hive::MissionKind::Recon; m.objectiveCount=std::min(3,(int)g_world.airports.size()); m.scanRange=1500; m.scanSeconds=5;
+    std::vector<int> airports; for(int i=0;i<(int)g_world.airports.size();++i) airports.push_back(i);
+    std::stable_sort(airports.begin(),airports.end(),[&](int a,int b) { return length(hiveCombat.displacement(origin,g_world.airports[a].pos()))<length(hiveCombat.displacement(origin,g_world.airports[b].pos())); });
+    const int preferred[]={EK_CTRL_TOWER,EK_HANGAR,EK_FUEL_TANK};
+    for(int i=0;i<m.objectiveCount;++i) m.objectives[i]=site(airports[i],preferred[i],i);
+    contract.brief="Photograph the marked airport structures with five seconds of clear sensor view each. Keep each site ahead and within 1.5 km, then return to the airborne extraction gate.";
+    for(int i=0;i<m.objectiveCount;++i) contract.brief+=" "+militarySiteLabels[i]+".";
+    // Introductory unarmed security survey: no compulsory pursuer until bounded detection/escape patrols exist.
+  } else if (contract.type==CT_MIL_DEFENSE) {
+    m.kind=hive::MissionKind::Defense; m.objectiveCount=1;
+    m.objectives[0]=site(contract.from,EK_CTRL_TOWER,0); m.objectives[0].health=600;
+    contract.brief="Protect "+militarySiteLabels[0]+" through all three Hive waves, then return to the airborne extraction gate. The existing runway and airport remain unchanged.";
+    m.waveCount=3;
+    for(int i=0;i<3;++i) { auto& w=m.waves[i]; w.at=i*28.f; w.position=m.objectives[0].position+f*(2600.f+i*150.f)+right*((i-1)*500.f); w.position.y=std::max(m.objectives[0].position.y+650.f,g_world.height(w.position.x,w.position.z)+300.f); w.count=i==2?3:2; w.types[0]=hive::Type::Needle; w.types[1]=hive::Type::Bastion; w.types[2]=hive::Type::Cantor; }
+  } else {
+    m.kind=hive::MissionKind::Strike; m.targetCount=2;
+    m.targetIds[0]=hiveCombat.spawn(hive::Type::Archon,point(4300,0,origin.y+150));
+    m.targetIds[1]=hiveCombat.spawn(hive::Type::Cantor,point(4000,500,origin.y+200));
+    hiveCombat.spawn(hive::Type::Needle,point(3500,-450,origin.y));
+  }
+  hiveCombat.startMission(m);
+  syncCombatPayload();
+  toast("MILITARY LOANER / return to extraction after objectives",vec3(.35f,.85f,1));
+  if(m.objectiveCount>0) toast((m.kind==hive::MissionKind::Recon?"FIRST SCAN: ":"PROTECT: ")+militarySiteLabels[0],vec3(.35f,.85f,1));
+}
+void Game::clearPracticeEncounter() {
+  if (!researchFlight || resCard>=0 || specIdx!=kWraith) return;
+  hiveCombat.reset(1,WRAP_SPAN); militaryHull=100;
+  combatCollisionWarm=false; combatCollisionWarmMs=0; combatPrefetchCursor=0;
+  // A range reset clears ordnance and damage together; it cannot touch the career.
+  wraith=WraithState(); g_scenery.resetDamage();
+  combatLoadout.reset(practiceForward,practiceBomb);
+  syncCombatPayload();
+}
+void Game::spawnPracticeWave() {
+  if (!researchFlight || resCard>=0 || specIdx!=kWraith || crashed) return;
+  hive::MissionConfig m; m.kind=hive::MissionKind::Practice; hiveCombat.startMission(m);
+  for(int i=0;i<4 && hiveCombat.aliveCount()<hive::MaxActors;++i) {
+    vec3 p=plane.pos+plane.forward()*(1700.f+i*240.f)+plane.right()*((i-1.5f)*260.f);
+    p.y=std::max(p.y,g_world.height(p.x,p.z)+300.f);
+    hiveCombat.spawn((hive::Type)((practiceWave+i)%4),p);
+  }
+  // The range control is an explicit setup action; prepare its new corridors before resuming combat.
+  combatCollisionWarm=false; warmCombatCollision();
+  toast("Practice wave spawned (8 craft maximum)",vec3(.7f,.6f,1));
+}
+std::string Game::hiveObjectiveText() const {
+  const auto& m=hiveCombat.mission;
+  if (m.status==hive::MissionStatus::Extract) return fmt("RETURN TO EXTRACTION  %.0f m",length(hiveCombat.displacement(plane.pos,m.config.extraction)));
+  if(m.config.kind==hive::MissionKind::Recon) {
+    int n=0; float scan=0; float nearest=1e9f; int target=0;
+    for(int i=0;i<m.config.objectiveCount;++i) { const auto& o=m.config.objectives[i]; n+=o.scanned; if(!o.scanned) { float d=length(hiveCombat.displacement(plane.pos,o.position)); if(d<nearest) { nearest=d; target=i+1; scan=o.scan; } } }
+    return fmt("SCAN %d/%d / %s %.0f m / SENSOR %.0f%%",n,m.config.objectiveCount,target>0?militarySiteLabels[target-1].c_str():"EXTRACTION",nearest,100*scan/std::max(.1f,m.config.scanSeconds));
+  }
+  if(m.config.kind==hive::MissionKind::Defense) return fmt("DEFEND %s %.0f%% / WAVE %d/%d / HOSTILES %d",militarySiteLabels[0].c_str(),100*m.config.objectives[0].health/600.f,m.nextWave,m.config.waveCount,hiveCombat.aliveCount());
+  if(m.config.kind==hive::MissionKind::Strike) return fmt("STRIKE HIVE COMMAND / HOSTILES %d / HULL %.0f%%",hiveCombat.aliveCount(),militaryHull);
+  return fmt("PRACTICE / HOSTILES %d / HULL %.0f%% / PAUSE FOR RANGE CONTROLS",hiveCombat.aliveCount(),militaryHull);
+}
+void Game::syncCombatPayload() {
+  if(specIdx!=kWraith || !(militaryFlight || (researchFlight && resCard<0))) return;
+  // A fixed non-equipment baseline prevents repeated swaps/rearms from accumulating mass.
+  plane.payload=std::max(0.f,combatBasePayload)+combatLoadout.massKg();
+}
+void Game::warmCombatCollision() {
+  if(combatCollisionWarm || !(militaryFlight || (researchFlight && resCard<0 && specIdx==kWraith))) return;
+  const auto start=std::chrono::steady_clock::now();
+  // Query the production collision path without stepping Combat or touching mission clocks.
+  // Radius and nearest-image coordinates match later actor/weapon queries.
+  auto corridor=[&](vec3 a,vec3 b,float radius) { hiveWorldSweep(a,a+hiveCombat.displacement(a,b),radius); };
+  corridor(plane.pos,plane.pos+plane.forward()*500.f,12.f);
+  const auto& m=hiveCombat.mission.config;
+  for(const auto& a:hiveCombat.actors) if(a.alive) {
+    corridor(a.position,plane.pos,0);
+    corridor(a.position,a.position+a.velocity*2.f,hive::roleSpec(a.type).radius);
+  }
+  for(int i=0;i<m.objectiveCount;++i) {
+    const vec3 p=m.objectives[i].position;
+    corridor(p+vec3(0,1500,0),p,1.f);
+    corridor(p+vec3(-500,350,0),p+vec3(500,350,0),20.f);
+  }
+  for(int i=0;i<m.waveCount;++i) {
+    const auto& w=m.waves[i];
+    const vec3 target=m.objectiveCount?m.objectives[0].position:plane.pos;
+    corridor(w.position,target,0);
+    corridor(w.position,plane.pos,0);
+  }
+  combatCollisionWarmMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();
+  combatCollisionWarm=true;
+}
+void Game::prefetchCombatCollision() {
+  // Use the supported worker queue (the renderer's main-thread pump installs results).
+  // Queue at most ONE missing level-2 chunk per update, or generate one when no workers exist.
+  // A cache miss in an authoritative sweep still generates synchronously.
+  constexpr int slots=hive::MaxActors+1, neighborhoods=9, total=slots*neighborhoods;
+  for(int n=0;n<total;++n) {
+    const int item=combatPrefetchCursor++%total, slot=item%slots, offset=item/slots;
+    vec3 p;
+    if(slot==hive::MaxActors) p=plane.pos+plane.vel*2.f;
+    else { const auto& a=hiveCombat.actors[slot]; if(!a.alive) continue; p=a.position+a.velocity*2.f; }
+    p.x=wrapCoord(p.x+(offset%3-1)*Scenery::CH); p.z=wrapCoord(p.z+(offset/3-1)*Scenery::CH);
+    const int cx=Scenery::chunkOf(p.x),cz=Scenery::chunkOf(p.z);
+    const auto* chunk=g_scenery.get(cx,cz);
+    if(!chunk || chunk->level<2) {
+      if(g_scenery.workers()>0) g_scenery.request(cx,cz,2);
+      else g_scenery.ensure(cx,cz,2);
+      break;
+    }
+  }
+  combatPrefetchCursor%=total;
+}
+void Game::updateHive(float dt) {
+  if(!militaryFlight && !(researchFlight && resCard<0 && specIdx==kWraith)) return;
+  if(dt>0 && !paused) prefetchCombatCollision();
+  hive::PlayerSnapshot p; p.position=plane.pos; p.velocity=plane.vel; p.forward=plane.forward(); p.alive=!crashed && !plane.ev.crashed; p.scanning=militaryFlight && contract.type==CT_MIL_RECON;
+  p.up=plane.up();
+  auto box=[&](vec3 center,vec3 halfExtent) {
+    if(p.bodyBoxCount<hive::MaxPlayerBoxes) p.bodyBoxes[p.bodyBoxCount++]={center,halfExtent};
+  };
+  if(specIdx==kWraith) {
+    // Coarse local collision volumes follow wrSection, diamond-wing panels and the four articulated pods.
+    // Unlike the old 12 m sphere, empty air above/below the thin wings is not a hit.
+    box(vec3(0,-.10f,-6.3f),vec3(.65f,.38f,2.1f));
+    box(vec3(0,-.06f,.05f),vec3(1.31f,.60f,4.45f));
+    box(vec3(0,-.12f,6.15f),vec3(1.10f,.38f,1.65f));
+    for(int side:{-1,1}) {
+      box(vec3(side*2.15f,-.24f,.1f),vec3(.95f,.14f,3.3f));
+      box(vec3(side*4.65f,-.24f,2.0f),vec3(1.55f,.12f,1.3f));
+    }
+    for(int i=0;i<4;++i) {
+      const float tilt=plane.podTilt[i];
+      box(kWraithPods[i],vec3(.55f,.55f*std::fabs(cosf(tilt))+1.52f*std::fabs(sinf(tilt)),1.52f*std::fabs(cosf(tilt))+.55f*std::fabs(sinf(tilt))));
+    }
+    box(vec3(0,1.0f,6.1f),vec3(3.0f,1.0f,1.1f));
+  } else if(validAircraft(specIdx)) {
+    const auto& m=kModels[specIdx];
+    for(int i=0;i<7;++i) {
+      const float* a=m.st[i]; const float* b=m.st[i+1];
+      box(vec3(0,(a[3]+b[3])*.5f,(a[0]+b[0])*.5f),vec3(std::max(a[1],b[1]),std::max(a[2],b[2])+std::fabs(a[3]-b[3])*.5f,std::fabs(b[0]-a[0])*.5f));
+    }
+    auto surface=[&](const float* wing) {
+      const float chord=(wing[1]+wing[2])*.5f;
+      for(int side:{-1,1}) box(vec3(side*wing[0]*.5f,wing[4]+sinf(wing[6]*DEG)*wing[0]*.5f,wing[5]+wing[3]*.5f+chord*.5f),vec3(wing[0]*.5f,.12f,chord*.5f));
+    };
+    surface(m.wing); surface(m.ht);
+    box(vec3(0,m.vt[4]+m.vt[0]*.5f,m.vt[5]+m.vt[1]*.5f),vec3(.12f,m.vt[0]*.5f,m.vt[1]*.5f));
+  }
+  hiveCombat.step(dt,p,hiveWorld(),paused);
+  for(int i=0;i<hiveCombat.eventCount;++i) {
+    const auto& e=hiveCombat.events[i];
+    vec3 at=plane.pos+hiveCombat.displacement(plane.pos,e.position);
+    if(e.type==hive::EventType::PlayerDamage && !crashed) {
+      militaryHull=std::max(0.f,militaryHull-e.value);
+      plane.w+=vec3(.015f,.009f,.02f)*std::min(e.value,30.f);
+      g_audio.trigger(SFX_BEEP,.4f);
+      if(militaryHull<=0) { plane.ev.crashed=true; plane.ev.crashReason="Hull lost to Hive fire"; }
+    }
+    if(e.type==hive::EventType::Death || e.type==hive::EventType::Hit || e.type==hive::EventType::Fire) {
+      int n=e.type==hive::EventType::Death?28:e.type==hive::EventType::Hit?8:3;
+      for(int j=0;j<n;++j) spawn(at,vec3(sparkRng.range(-15,15),sparkRng.range(-4,18),sparkRng.range(-15,15)),.25f+sparkRng.uni()*.5f,.2f,.3f,vec3(1,.55f,.24f)*2,1,SPR_SPARK,.6f,-1);
+      if(e.type==hive::EventType::Death) { ++wraith.kills; g_audio.trigger(SFX_BOOM,.45f); for(int j=0;j<8;++j) spawn(at,vec3(0,5+j,0),2.f,3.f,4.f,vec3(.12f),.6f,SPR_SMOKE,1,0); }
+    }
+    if(e.type==hive::EventType::ScanComplete) toast("Intelligence site recorded",vec3(.3f,1,.7f));
+  }
+  hiveCombat.clearEvents();
+  if(militaryFlight && !militarySettled && !crashed && !plane.ev.crashed) {
+    if(hiveCombat.mission.status==hive::MissionStatus::Success) endFlight(true,"Military objectives secured");
+    else if(hiveCombat.mission.status==hive::MissionStatus::Failed) endFlight(false,"Military objective lost",OUT_ABANDONED);
   }
 }

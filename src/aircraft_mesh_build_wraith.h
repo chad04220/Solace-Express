@@ -11,7 +11,10 @@ inline bool partBox(int type, vec3& lo, vec3& hi, float& h) {
     case PT_WR_VANEY: lo = vec3(-0.024f, -0.26f, -0.085f); hi = vec3(0.024f, 0.26f, 0.085f); h = 0.003f; return true;
     case PT_WR_PETAL: lo = vec3(0.24f, -0.17f, 0.92f); hi = vec3(0.5f, 0.17f, 1.4f); h = 0.004f; return true;
     case PT_WR_DOOR: lo = vec3(-0.545f, -0.04f, -1.68f); hi = vec3(0.015f, 0.012f, 1.68f); h = 0.006f; return true;
-    case PT_WR_BOMB: lo = vec3(-0.31f, -0.31f, -0.31f); hi = vec3(0.31f, 0.31f, 0.31f); h = 0.006f; return true;
+    case PT_WR_BOMB: lo = vec3(-0.31f, -0.31f, -0.31f); hi = vec3(0.31f, 0.31f, 0.31f); h = 0.003f; return true;
+    case PT_WR_KINETIC: case PT_WR_CHARGED: lo=vec3(-.175f,-.145f,-1.15f); hi=vec3(.175f,.145f,.365f); h=.003f; return true;
+    case PT_WR_PENETRATOR: lo=vec3(-.255f,-.255f,-.95f); hi=vec3(.255f,.255f,.87f); h=.003f; return true;
+    case PT_WR_EMP: lo=vec3(-.235f,-.235f,-.54f); hi=vec3(.235f,.235f,.54f); h=.003f; return true;
     case PT_WR_HATCH: lo = vec3(-0.415f, -0.014f, -0.515f); hi = vec3(0.015f, 0.036f, 0.515f); h = 0.004f; return true;
     case PT_WR_TURRET: lo = vec3(-0.175f, -0.145f, -0.94f); hi = vec3(0.175f, 0.145f, 0.365f); h = 0.004f; return true;
     case PT_WR_MUZZLE: lo = vec3(-0.06f, -0.08f, -1.15f); hi = vec3(0.06f, 0.04f, -0.66f); h = 0.003f; return true;
@@ -40,8 +43,9 @@ inline int parts(const float*, bool inside, PartInst* out, int) {
       for (int k = -1; k <= 1; k += 2) { out[n++] = {PT_WR_VANEO, (float)i, (float)k}; out[n++] = {PT_WR_VANEY, (float)i, (float)k}; }
       for (int j = 0; j < 10; j++) out[n++] = {PT_WR_PETAL, (float)i, (float)j};
     }
-    out[n++] = {PT_WR_BOMB, 0, 0};
+    out[n++] = {PT_WR_BOMB, 0, 0}; out[n++] = {PT_WR_PENETRATOR, 0, 0}; out[n++] = {PT_WR_EMP, 0, 0};
     for (int s = -1; s <= 1; s += 2) {
+      out[n++] = {PT_WR_KINETIC, (float)s, 0}; out[n++] = {PT_WR_CHARGED, (float)s, 0};
       out[n++] = {PT_WR_DOOR, (float)s, 0}; out[n++] = {PT_WR_HATCH, (float)s, 0}; out[n++] = {PT_WR_TURRET, (float)s, 0}; out[n++] = {PT_WR_MUZZLE, (float)s, 0}; out[n++] = {PT_WR_ARM, (float)s, 0};
       out[n++] = {PT_WR_ELEVON, (float)s, 0}; out[n++] = {PT_WR_RUDV, (float)s, 0};
       out[n++] = {PT_JT_LEGM, (float)s, 0}; out[n++] = {PT_JT_WHEELM, (float)s, 0}; out[n++] = {PT_JT_DOORM, (float)s, -1}; out[n++] = {PT_JT_DOORM, (float)s, 1};   // its gear (the XR-30's parts)

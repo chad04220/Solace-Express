@@ -15,6 +15,8 @@
 #include "shaders.h"
 #include "hull_mesh.h"
 #include "aircraft_mesh_build.h"
+#include "wraith_loadout_parts.h"
+#include "wraith_hardware_normals.h"
 #include "mesh_simplify.h"
 #include "mesh_validation.h"
 #include "aircraft_mesh_overhead.h"
@@ -904,6 +906,15 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         nCr++;
       }
       if (getenv("HULLDBG")) printf("mesh part %d: %d corners on creases\n", po->type, nCr);
+      if (int(pv.M[2]+.5f)==6 && !wraithLoadout::roundSurfaces(po->type).empty()) {
+        aircraftMesh::PlanarRepairStats flatStats;
+        if (!aircraftMesh::repairVerifiedPlanarNormals(po->vb,po->ib,cn,flatStats)) {
+          fprintf(stderr,"Rejected invalid Wraith planar-part input; using SDF fallback\n"); return;
+        }
+        if(getenv("HULLDBG"))printf("Wraith part %d: %zu verified planar faces repaired\n",po->type,flatStats.repaired);
+        const auto repaired=wraithLoadout::repairRoundNormals(po->type,po->vb,po->ib);
+        if(getenv("HULLDBG"))printf("Wraith part %d: %zu verified round faces repaired\n",po->type,repaired);
+      }
       // Islander's thin control surfaces have proven planar faces whose edge
       // corner normals smeared across long triangles. Reuse the existing inset
       // samples; curved edges retain their smooth normals and geometry is fixed.
@@ -1040,7 +1051,7 @@ void Renderer::computePartPoses(const FrameParams& fp, const PlaneMesh* player, 
     }
     addRevision(fp.plane.M, 96); addRevision(fp.plane.PS, 4); addRevision(fp.plane.Ctl, 4);
     addRevision(fp.plane.wheel, 3); addRevision(fp.plane.flame, 4); addRevision(&fp.plane.wr[0][0], 28);
-    revision.push_back((float)fp.plane.model);
+    revision.push_back((float)fp.plane.model); revision.push_back((float)fp.plane.wrBombSet);
     float foot[4],seat[2];modelCabinFit(fp.plane.model,fp.plane.M[21*4+3],foot,seat);addRevision(foot,4);addRevision(seat,2);
     float cockpit[36];packCockpitLayout(fp.plane.model,cockpit);addRevision(cockpit,36);
   }
@@ -1060,7 +1071,9 @@ void Renderer::computePartPoses(const FrameParams& fp, const PlaneMesh* player, 
     std::stable_sort(pl, pl + np, [](const PartInst& a, const PartInst& b) { return a.type < b.type; });
     PoseOwner& O = poseOwner[owner]; O.pm = pm; O.base = (int)poseType.size(); O.n = 0;
     for (int i = 0; i < np && (int)poseType.size() < kMaxPoseInst; i++) {
-      if (owner == 0 && pl[i].type == 23 && fp.plane.wr[6][0] <= 0.f) continue;
+      const int forward=owner==0?int(fp.plane.wr[6][3]+.5f):0;
+      const int bomb=owner==0?fp.plane.wrBombSet:0;
+      if(!wraithLoadout::selected(pl[i].type,forward,bomb,owner!=0 || fp.plane.wr[6][0]>0.f))continue;
       bool have = false; for (auto& P : pm->parts) have = have || P.type == pl[i].type;
       if (!have) continue;
       poseType.push_back(pl[i].type); O.n++;

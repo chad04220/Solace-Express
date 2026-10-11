@@ -1,0 +1,292 @@
+Test project /workspace/scratch/87b29863f015/solace-hive-military-build
+      Start 96: test_world
+ 1/96 Test #96: test_world .......................   Passed    7.22 sec
+      Start  9: new_aircraft_autoland_atlas
+ 2/96 Test  #9: new_aircraft_autoland_atlas ......   Passed   50.26 sec
+      Start 10: new_aircraft_go_around
+ 3/96 Test #10: new_aircraft_go_around ...........   Passed   43.47 sec
+      Start 49: gameplay_loop_4
+ 4/96 Test #49: gameplay_loop_4 ..................   Passed   33.57 sec
+      Start 48: gameplay_loop_3
+ 5/96 Test #48: gameplay_loop_3 ..................   Passed   36.81 sec
+      Start  8: new_aircraft_autoland_larkspur
+ 6/96 Test  #8: new_aircraft_autoland_larkspur ...   Passed   40.68 sec
+      Start 52: flight_model_2
+ 7/96 Test #52: flight_model_2 ...................   Passed   61.13 sec
+      Start 84: runway_preservation
+ 8/96 Test #84: runway_preservation ..............   Passed    8.40 sec
+      Start 54: flight_model_3
+ 9/96 Test #54: flight_model_3 ...................   Passed   49.71 sec
+      Start 53: campaign_progression_2
+10/96 Test #53: campaign_progression_2 ...........   Passed   19.92 sec
+      Start 51: campaign_progression_1
+11/96 Test #51: campaign_progression_1 ...........   Passed   19.67 sec
+      Start 55: campaign_progression_3
+12/96 Test #55: campaign_progression_3 ...........   Passed   24.96 sec
+      Start 47: gameplay_loop_2
+13/96 Test #47: gameplay_loop_2 ..................   Passed   20.81 sec
+      Start 50: flight_model_1
+14/96 Test #50: flight_model_1 ...................   Passed   30.84 sec
+      Start 45: world_cache
+15/96 Test #45: world_cache ......................   Passed    6.75 sec
+      Start 46: gameplay_loop_1
+16/96 Test #46: gameplay_loop_1 ..................***Failed   13.46 sec
+State regression: card operating costs and net use selected uplift rather than estimated fuel: ok
+State regression: selected tank, live plan, committed job and disk quote agree: ok
+  fuel tank 110.000 kg, prior 20.000 kg, uplift 90.000 kg, billed $277; route 35.730 kg / 9.149 min
+State regression: restart keeps accepted load and quote despite a newer estimate: ok
+State regression: diversion bills selected uplift once and retains the real remainder: ok
+State regression: continued leg saves and flies its own selected tank and uplift: ok
+State regression: final settlement bills the continuation quote exactly once: ok
+State regression: bad altitude exposure survives diversion, disk reload and continuation: ok
+State regression: second leg adds seconds, not averages or duplicated cumulative totals: ok
+State regression: upstream v3 job3 exposure remains known and exact: FAIL
+State regression: restart resets only the current leg and retains prior survey history: ok
+State regression: completed checkpoints preserve the 200/500 weighted ratio on the final leg: ok
+State regression: final survey payout uses all legs (40 percent, $3600 deduction), no false bonus: ok
+State regression: older save keeps checkpoints and clock with explicit unknown altitude history: FAIL
+State regression: migration marker survives the next v4 save: FAIL
+State regression: legacy history waiver is disclosed and invents neither bonus nor penalty: FAIL
+Free Flight: all 352 aircraft/airport/start combinations launch and return: ok
+Free Flight: runway parking, terrain-safe cruise starts, full tanks and zero fees: ok
+Free Flight: new-player career and career UI selections unchanged: ok
+Free Flight: setup/back never creates a career save: ok
+Free Flight: all research aircraft and invalid selections rejected without side effects: ok
+Free Flight: stale setup choices are clamped to available ordinary aircraft/airports: ok
+Free Flight: active job: baseline save created: ok
+Free Flight: active job: baseline is a valid reloadable career save: ok
+Free Flight: active job: launch and live update ignore job/ownership/licence/money: ok
+Free Flight: active job: restart/refill retains free mode and charges nothing: ok
+Free Flight: active job: pause return has no settlement or save: ok
+Free Flight: active job: first-frame wheel contact 0, stopped timer 0.000, career unchanged 1
+Free Flight: active job: real stopped-on-runway completion preserves career: ok
+Free Flight: active job: outcome 0 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: outcome 2 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: outcome 3 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: outcome 4 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: outcome 5 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: active job: crash timer returns to free hangar without penalties: ok
+Free Flight: active job: loading cancellation does not close or save existing career attempt: ok
+Free Flight: active job: back to main menu preserves career save byte-for-byte: ok
+Free Flight: active job: unsaved career transaction neither blocks nor leaks into Free Flight: ok
+Free Flight: recovery job: baseline save created: ok
+Free Flight: recovery job: baseline is a valid reloadable career save: ok
+Free Flight: recovery job: launch and live update ignore job/ownership/licence/money: ok
+Free Flight: recovery job: restart/refill retains free mode and charges nothing: ok
+Free Flight: recovery job: pause return has no settlement or save: ok
+Free Flight: recovery job: first-frame wheel contact 0, stopped timer 0.000, career unchanged 1
+Free Flight: recovery job: real stopped-on-runway completion preserves career: ok
+Free Flight: recovery job: outcome 0 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: outcome 2 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: outcome 3 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: outcome 4 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: outcome 5 bypasses scoring, debt, XP/progress and save: ok
+Free Flight: recovery job: crash timer returns to free hangar without penalties: ok
+Free Flight: recovery job: loading cancellation does not close or save existing career attempt: ok
+Free Flight: recovery job: back to main menu preserves career save byte-for-byte: ok
+Free Flight: recovery job: unsaved career transaction neither blocks nor leaks into Free Flight: ok
+0 Free Flight failures
+Wreck pose regression: 45 cases, 0 failures; separation pose, keyboard/pad, actuator mutation, moving shadow centre and live-frame recovery checks
+Wheel visual parity: 75 cases, 0 failures; all player/traffic radii, signed travel and packed dimensions
+Control voice regression: all 25 instructor/examiner phases resolve and decode on keyboard, pad and both remapped layouts: ok
+Control voice regression: recorded transcripts contain no fixed keyboard/controller instruction names: ok
+Control voice regression: all indexed recordings: 1068 decoded, 0 failed
+Control voice regression: lesson changes preserve decoding of the complete voice bank: ok
+Control voice regression: production hint queue speaks after mid-phase device switch and rebinding, without duplicate prompts: ok
+Control voice regression: landing hints name the held wheel brake action: ok
+Control voice regression: unknown mission or phase cannot select another lesson recording: ok
+Control voice regression: legacy fixed-control rows and mismatched lesson identity never resolve: ok
+Control voice regression: legacy, mismatched, missing, corrupt and absent voice assets warn once without false speech: ok
+Control voice regression: a new flight resets the missing-lesson warning: ok
+Aircraft voice regression: all 15 aircraft retain exact displayed identity, count and Nyx priority: ok
+Aircraft voice regression: all 13 existing aircraft keep their actual recorded names: ok
+Aircraft voice regression: Larkspur and Atlas use only decoded Splash/count/down recordings, without false aircraft names: ok
+Aircraft voice regression: missing base/count/down clips and broken indexed aircraft names still reject speech: ok
+Voice line resolution (18 cases): ok
+Sun sweep (clear): 0 bad samples
+Sun sweep (storm): 0 bad samples
+4 failures
+
+      Start 19: career_saves
+17/96 Test #19: career_saves .....................   Passed   12.79 sec
+      Start 60: ci_test_selection
+18/96 Test #60: ci_test_selection ................   Passed    0.91 sec
+      Start 61: renderer_cpu_mocks
+19/96 Test #61: renderer_cpu_mocks ...............   Passed   26.84 sec
+      Start 37: hull_mesh
+20/96 Test #37: hull_mesh ........................   Passed    4.58 sec
+      Start 16: breakup
+21/96 Test #16: breakup ..........................   Passed    1.19 sec
+      Start  7: new_aircraft_performance
+22/96 Test  #7: new_aircraft_performance .........   Passed    5.19 sec
+      Start 94: environment_close_bounds
+23/96 Test #94: environment_close_bounds .........   Passed    1.63 sec
+      Start 42: ufo_encounter
+24/96 Test #42: ufo_encounter ....................   Passed    1.15 sec
+      Start 44: entity_raycast
+25/96 Test #44: entity_raycast ...................   Passed    3.87 sec
+      Start 41: mesh_simplify
+26/96 Test #41: mesh_simplify ....................   Passed    0.89 sec
+      Start  2: wreck_pose
+27/96 Test  #2: wreck_pose .......................   Passed    1.44 sec
+      Start 12: atlas_gear_geometry
+28/96 Test #12: atlas_gear_geometry ..............   Passed    1.25 sec
+      Start 36: terrain_envelope
+29/96 Test #36: terrain_envelope .................   Passed    0.55 sec
+      Start 90: environment_scale_audit
+30/96 Test #90: environment_scale_audit ..........   Passed    0.49 sec
+      Start 14: cockpit_camera
+31/96 Test #14: cockpit_camera ...................   Passed    0.15 sec
+      Start 85: community_layout
+32/96 Test #85: community_layout .................   Passed    0.22 sec
+      Start 35: airport_layouts
+33/96 Test #35: airport_layouts ..................   Passed    0.11 sec
+      Start 86: airport_environment
+34/96 Test #86: airport_environment ..............   Passed    0.12 sec
+      Start 87: volcano_effects
+35/96 Test #87: volcano_effects ..................   Passed    0.10 sec
+      Start  1: vtol_throttle
+36/96 Test  #1: vtol_throttle ....................   Passed    0.14 sec
+      Start  3: aircraft_build_contract
+37/96 Test  #3: aircraft_build_contract ..........***Failed    0.00 sec
+FAIL: bounded instance count, model 12, part -1
+FAIL: ordered part types and sides, model 12, part -1
+FAIL: bounded instance count, model 12, part -1
+FAIL: ordered part types and sides, model 12, part -1
+aircraft_build_contract: 1459 checks across 15 aircraft, FAIL
+
+      Start  4: specter_toggle_detail
+38/96 Test  #4: specter_toggle_detail ............   Passed    0.02 sec
+      Start  5: mesh_planar
+39/96 Test  #5: mesh_planar ......................   Passed    0.00 sec
+      Start  6: mesh_orientation
+40/96 Test  #6: mesh_orientation .................   Passed    0.00 sec
+      Start 11: new_aircraft_exterior
+41/96 Test #11: new_aircraft_exterior ............   Passed    0.25 sec
+      Start 13: cockpit_focus_zoom
+42/96 Test #13: cockpit_focus_zoom ...............   Passed    0.00 sec
+      Start 15: aero_model
+43/96 Test #15: aero_model .......................   Passed    0.28 sec
+      Start 17: aero_wake
+44/96 Test #17: aero_wake ........................   Passed    0.25 sec
+      Start 18: shader_keywords
+45/96 Test #18: shader_keywords ..................   Passed    0.29 sec
+      Start 20: military_career
+46/96 Test #20: military_career ..................   Passed    8.58 sec
+      Start 21: military_gameplay
+47/96 Test #21: military_gameplay ................   Passed    2.36 sec
+      Start 22: hive_combat
+48/96 Test #22: hive_combat ......................   Passed    0.00 sec
+      Start 23: hive_combat_fastmath
+49/96 Test #23: hive_combat_fastmath .............   Passed    0.00 sec
+      Start 24: military_career_fastmath
+50/96 Test #24: military_career_fastmath .........   Passed    8.41 sec
+      Start 25: hive_world_collision
+51/96 Test #25: hive_world_collision .............   Passed    0.16 sec
+      Start 26: hive_loadout
+52/96 Test #26: hive_loadout .....................   Passed    0.00 sec
+      Start 27: hive_loadout_fastmath
+53/96 Test #27: hive_loadout_fastmath ............   Passed    0.00 sec
+      Start 28: hive_world_collision_fastmath
+54/96 Test #28: hive_world_collision_fastmath ....   Passed    0.14 sec
+      Start 29: enemy_surface_mesh
+55/96 Test #29: enemy_surface_mesh ...............   Passed    0.02 sec
+      Start 30: hive_ordnance_visual
+56/96 Test #30: hive_ordnance_visual .............   Passed    0.00 sec
+      Start 31: wraith_loadout_clearance
+57/96 Test #31: wraith_loadout_clearance .........   Passed    0.00 sec
+      Start 32: enemy_mesh_cache
+58/96 Test #32: enemy_mesh_cache .................   Passed    0.00 sec
+      Start 33: enemy_bake_guard
+59/96 Test #33: enemy_bake_guard .................   Passed    0.00 sec
+      Start 34: enemy_fleet_validity_fastmath
+60/96 Test #34: enemy_fleet_validity_fastmath ....   Passed    0.00 sec
+      Start 38: traffic_prop_discs
+61/96 Test #38: traffic_prop_discs ...............   Passed    0.27 sec
+      Start 39: reheat_exhaust
+62/96 Test #39: reheat_exhaust ...................   Passed    0.01 sec
+      Start 40: mesh_validation
+63/96 Test #40: mesh_validation ..................   Passed    0.00 sec
+      Start 43: shader_prune
+64/96 Test #43: shader_prune .....................***Failed    0.05 sec
+shader_prune: all checks passed
+aircraft bake hash 7e7e0e9b31bc3985, fixture 5b76a88417657f77
+FAIL: the aircraft bodies' bake is unchanged (tests/fixtures/aircraft_bake.fnv: update it only with an aircraft edit)
+----
+
+----
+
+      Start 56: research_cockpit_layout
+65/96 Test #56: research_cockpit_layout ..........   Passed    0.07 sec
+      Start 57: cockpit_layout
+66/96 Test #57: cockpit_layout ...................   Passed    0.00 sec
+      Start 58: hive_game_integration
+67/96 Test #58: hive_game_integration ............   Passed    0.03 sec
+      Start 59: enemy_render_contract
+68/96 Test #59: enemy_render_contract ............   Passed    0.03 sec
+      Start 62: cockpit_layout_generated
+69/96 Test #62: cockpit_layout_generated .........   Passed    0.03 sec
+      Start 63: cockpit_layout_geometry
+70/96 Test #63: cockpit_layout_geometry ..........   Passed    0.66 sec
+      Start 64: cockpit_surface_contact
+71/96 Test #64: cockpit_surface_contact ..........   Passed    0.69 sec
+      Start 65: aircraft_build_interface
+72/96 Test #65: aircraft_build_interface .........   Passed    0.03 sec
+      Start 66: atlas_fairing_material
+73/96 Test #66: atlas_fairing_material ...........   Passed    0.29 sec
+      Start 67: atlas_door_depth
+74/96 Test #67: atlas_door_depth .................   Passed    0.10 sec
+      Start 68: atlas_windshield_contract
+75/96 Test #68: atlas_windshield_contract ........   Passed    1.18 sec
+      Start 69: gear_breakup_render_contract
+76/96 Test #69: gear_breakup_render_contract .....   Passed    0.05 sec
+      Start 70: wheel_cover_geometry
+77/96 Test #70: wheel_cover_geometry .............   Passed    0.06 sec
+      Start 71: new_aircraft_cockpit_contract
+78/96 Test #71: new_aircraft_cockpit_contract ....   Passed    3.14 sec
+      Start 72: environment_foliage
+79/96 Test #72: environment_foliage ..............   Passed    0.63 sec
+      Start 73: environment_buildings
+80/96 Test #73: environment_buildings ............   Passed    0.05 sec
+      Start 74: benchmark_metrics
+81/96 Test #74: benchmark_metrics ................   Passed    0.00 sec
+      Start 75: terrain_material_math
+82/96 Test #75: terrain_material_math ............   Passed    0.01 sec
+      Start 76: terrain_material_source
+83/96 Test #76: terrain_material_source ..........   Passed    0.06 sec
+      Start 77: environment_frame_statistics
+84/96 Test #77: environment_frame_statistics .....   Passed    0.09 sec
+      Start 78: environment_benchmark_runner
+85/96 Test #78: environment_benchmark_runner .....   Passed    0.09 sec
+      Start 79: aircraft_specialization
+86/96 Test #79: aircraft_specialization ..........   Passed    0.04 sec
+      Start 80: loading_progress
+87/96 Test #80: loading_progress .................   Passed    0.00 sec
+      Start 81: hangar_geometry
+88/96 Test #81: hangar_geometry ..................   Passed    0.00 sec
+      Start 82: hangar_catalog
+89/96 Test #82: hangar_catalog ...................   Passed    0.01 sec
+      Start 83: shader_loading_contract
+90/96 Test #83: shader_loading_contract ..........   Passed    1.28 sec
+      Start 88: environment_asset_mesh
+91/96 Test #88: environment_asset_mesh ...........   Passed    0.10 sec
+      Start 89: environment_scan_assets
+92/96 Test #89: environment_scan_assets ..........   Passed    0.14 sec
+      Start 91: environment_close_detail
+93/96 Test #91: environment_close_detail .........   Passed    0.01 sec
+      Start 92: environment_nature_detail
+94/96 Test #92: environment_nature_detail ........   Passed    0.11 sec
+      Start 93: airport_construction_detail
+95/96 Test #93: airport_construction_detail ......   Passed    0.12 sec
+      Start 95: environment_chunk_bounds
+96/96 Test #95: environment_chunk_bounds .........   Passed    0.12 sec
+
+97% tests passed, 3 tests failed out of 96
+
+Total Test time (real) = 561.65 sec
+
+The following tests FAILED:
+	  3 - aircraft_build_contract (Failed)
+	 43 - shader_prune (Failed)
+	 46 - gameplay_loop_1 (Failed)
+Errors while running CTest
