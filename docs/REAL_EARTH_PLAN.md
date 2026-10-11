@@ -18,7 +18,8 @@ Each phase comes with deliverables and tests you can run headless, without a GPU
 
 Claude reviews and merges each phase.
 
-Tracking: Claude's task #187 (and #186, procedural landmasses, which can fill where real data is coarse).
+Tracking: Claude's task #187. The owner has chosen the real Earth over generated landmasses: everything outside Solace
+comes from real data, with the game's procedural detail only on top of it where the data is coarser than the eye.
 
 ---
 
