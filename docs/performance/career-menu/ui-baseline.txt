@@ -1,0 +1,2 @@
+L1 120 real UI generations: full_plan_calls=120 mean_ms=17.134649 p50_ms=16.867961 p95_ms=19.958302 max_ms=23.316530
+C1 120 real UI generations: full_plan_calls=120 mean_ms=14.974586 p50_ms=14.792893 p95_ms=16.132867 max_ms=18.223023

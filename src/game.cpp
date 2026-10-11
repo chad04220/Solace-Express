@@ -159,8 +159,9 @@ std::string Game::expandHint(const std::string& raw, bool pad) const {
 // The flown time for a job's plan when it's in; else (start) a background flight is begun for it if none is running
 void Game::applyQuote(const Contract& c, Career::LaunchPlan& e, bool start) {
   if (quoteJob.valid() && quoteJob.wait_for(std::chrono::seconds(0)) == std::future_status::ready) quoteFlown[quoteJobKey] = quoteJob.get();
-  std::string key = fmt("%s|%d|%d|%d", c.id.c_str(), e.spec, c.from, c.to);
-  if (c.wpStart > 0) key += fmt("|w%d", c.wpStart);   // (a job's next leg: the checkpoints still to fly)
+  // An ID alone is not a route: FREE, a continued job, or a changed forecast
+  // can keep its ID while its estimated time and fuel change.
+  std::string key = menuPlan::quoteInputs(c, e.spec);
   auto it = quoteFlown.find(key);
   if (it != quoteFlown.end()) { career.useFlownTime(e, c, it->second.first, it->second.second); return; }
   if (!start || quoteJob.valid() || c.forceAircraft >= 0) return;   // (lessons are flown by hand: the quick estimate stands)
@@ -385,6 +386,17 @@ bool Game::commitLaunch(const std::function<void(Career&)>& change) {
   pendingCareer.reset(); saveWhy.clear();
   hubMsg = "The career could not be saved (disk full or folder not writable): the flight was not started. Try again."; hubMsgTime = 6;
   return false;
+}
+// Reuse only the expensive, unchanged route calculation. The flown quote, paid
+// continuation fees, selected tank and current uplift are applied to a fresh copy.
+// Both the visible figures and the Fly gate use this path, including a selection
+// or fuel change made later in the same UI frame.
+Career::LaunchPlan Game::menuLaunchPlan(const Contract& c, int spec, Career::Source src, bool continuing, bool startQuote) {
+  Career::LaunchPlan p = menuPlanCache.get(career, c, spec, src);
+  if (continuing) continuationWaivers(p, c, spec, src);
+  applyQuote(c, p, startQuote);
+  career.planFuel(p, c, chosenFuel(c, spec, src, p));
+  return p;
 }
 Career::LaunchPlan Game::finalizeLaunchPlan(const Contract& c, int spec, Career::Source src) {
   Career::LaunchPlan p = career.plan(c, spec, src);
