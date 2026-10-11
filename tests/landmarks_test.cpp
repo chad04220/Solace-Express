@@ -2,7 +2,8 @@
 // circle on a bare summit, its stones standing (two fallen) round a clearing no tree grows in; a wreck on a reef in
 // warm shallows, open water round her; an offshore platform in deep water out of sight of no land; three observatory
 // domes on Mount Kaleo's rim; a star fort on a cape; Lighthouse Key's cottages and landing stage; the cities' stadium and
-// container terminal; the racetrack, its circuit and pit lane, its buildings and its grounds. The wind
+// container terminal; the racetrack, its circuit and pit lane, its buildings and its grounds; the Fjordhaven dam and its
+// lake. The wind
 // farm: a row of turbines along a ridge's crest, 300 m and more apart, on the hills under the snow, out of the settlements, off the
 // roads and 6 km or more from every runway; each in its own chunk's scenery; found the same every time.
 #include "../src/scenery.h"
@@ -280,6 +281,61 @@ int main() {
           }
       }
       check(trees == 0, "no tree or bush on the circuit's run-off");
+      g_scenery.clear();
+    }
+  }
+  // ---- the Fjordhaven dam and its lake: the dam across a gorge in the northern mountains, its abutments in ground as
+  // high as its crest, the valley below it dry; the lake flat at its level wherever the ground lies under it, held by
+  // the ground all round (but at the dam), drowning no road, no settlement, no runway; nothing growing in it
+  {
+    const Reservoir& r = w.reservoir; const LakeMask& L = w.lake;
+    int dams = 0; const Ent* dam = nullptr;
+    for (const PlacedEnt& p : items) if (p.kind == EK_DAM) { dams++; dam = &p.e; }
+    check(r.on > 0.f && L.n > 0 && dams == 1, "the Fjordhaven dam and its lake");
+    if (r.on > 0.f && L.n > 0 && dam) {
+      int fj = -1; for (int t = 0; t < kNumTowns; t++) if (!strcmp(kTowns[t].name, "Fjordhaven")) fj = t;
+      check(fj >= 0 && hypotf(r.x - kTowns[fj].x, r.z - kTowns[fj].z) < 14000.f, "the dam within 14 km of Fjordhaven");
+      const vec2 P(r.x, r.z), v(r.vx, r.vz), u(-v.y, v.x), A = r.archCentre();
+      for (float s : {-0.5f, 0.5f}) { const vec2 q = P + u * (s * r.chord); check(w.naturalHeight(q.x, q.y) >= r.floor + r.crest - 1.f, "the dam's abutments as high as its crest"); }
+      const vec2 below = P - v * 150.f;
+      check(w.naturalHeight(below.x, below.y) < r.level - 10.f && fabsf(w.height(below.x, below.y) - w.naturalHeight(below.x, below.y)) < 0.01f, "the valley below the dam dry, its ground as it was");
+      check(fabsf(dam->y - (r.floor - 4.f)) < 0.01f && fabsf(dam->y + 67.f * dam->sy - r.level) < 0.05f, "the dam's foot in the floor, its water line at the lake's level");
+      int wet = 0, notFlat = 0, roads = 0, town = 0, runway = 0, leaks = 0;
+      for (int j = 0; j < L.n; j++)
+        for (int i = 0; i < L.n; i++) {
+          const float x = L.x0 + (i + 0.5f) * L.cell, z = L.z0 + (j + 0.5f) * L.cell;
+          const bool inMask = L.m[(size_t)j * L.n + i] > 0.5f, under = w.naturalHeight(x, z) < r.level;
+          if (inMask && under) {
+            wet++;
+            notFlat += fabsf(w.height(x, z) - r.level) > 0.01f;
+            roads += roadEdgeDistance(w.roadGrid, x, z) < 0.f;
+            town += settlementShare(w.settlements, x, z) < 1.5f;
+            runway += airportInfluence(x, z) > 0.f;
+          }
+          // (where the mask ends, the ground holds the water in - but at the dam)
+          if (inMask && i > 0 && j > 0 && i < L.n - 1 && j < L.n - 1)
+            for (int d = 0; d < 4; d++) {
+              const int ni = i + (d == 0) - (d == 1), nj = j + (d == 2) - (d == 3);
+              if (L.m[(size_t)nj * L.n + ni] > 0.5f) continue;
+              const vec2 q(L.x0 + (ni + 0.5f) * L.cell, L.z0 + (nj + 0.5f) * L.cell);
+              leaks += w.naturalHeight(q.x, q.y) < r.level && length(q - A) > r.archR() + 12.f;
+            }
+        }
+      std::printf("Fjordhaven dam at %.0f %.0f: chord %.0f m, crest %.0f m over its floor (%.0f m); lake %.2f km2 at %.1f m\n",
+                  r.x, r.z, r.chord, r.crest, r.floor, wet * L.cell * L.cell / 1e6f, r.level);
+      check(wet * L.cell * L.cell > 1e5f, "a lake of 0.1 km2 and more");
+      check(notFlat == 0, "the lake flat at its level");
+      check(roads == 0 && town == 0 && runway == 0, "the lake drowning no road, no settlement, no runway");
+      check(leaks == 0, "the lake held by the ground all round but at the dam");
+      int growing = 0;
+      for (int cz = Scenery::chunkOf(L.z0); cz <= Scenery::chunkOf(L.z0 + L.n * L.cell); cz++)
+        for (int cx = Scenery::chunkOf(L.x0); cx <= Scenery::chunkOf(L.x0 + L.n * L.cell); cx++) {
+          const Scenery::Chunk* ch = g_scenery.ensure(cx, cz, 2);
+          for (int k = 0; k <= EK_SEASTACK; k++)
+            for (uint32_t n = ch->off[k]; n < ch->off[k + 1]; n++)
+              if (w.underLake(ch->ents[n].x, ch->ents[n].z)) { if (growing++ < 5) std::printf("  %s in the lake at %.0f %.0f\n", kEntInfo[k].name, ch->ents[n].x, ch->ents[n].z); }
+        }
+      check(growing == 0, "no tree, bush or rock in the lake");
       g_scenery.clear();
     }
   }

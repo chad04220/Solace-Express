@@ -7,6 +7,8 @@
 #include "world.h"
 #include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <unordered_set>
 
 float airportInfluence(float x, float z);   // world.cpp
 
@@ -359,6 +361,17 @@ void racetrack(const World& world, std::vector<PlacedEnt>& out) {
   for (float s = 120.f; s <= 680.f; s += 40.f)
     for (float v : {-95.f, -65.f, -35.f, 25.f, 55.f, 85.f, 115.f}) { const vec2 p = R.at(s, v); g_clearings.push_back(vec3(p.x, p.y, 30.f)); }
 }
+
+// The Fjordhaven dam (its gorge and lake: world.h Reservoir, built into the world's heightmap): the arch across the
+// gorge, its crown upstream, its foot 4 m into the valley floor, scaled to its chord and height; its lake against it. The
+// gorge's walls round it cleared
+void fjordhavenDam(const World& world, std::vector<PlacedEnt>& out) {
+  const Reservoir& r = world.reservoir;
+  if (r.on <= 0.f) return;
+  const vec2 v(r.vx, r.vz), o = r.crown() - v * (55.f * r.scale());
+  out.push_back({EK_DAM, {o.x, r.floor - 4.f, o.y, atan2f(v.x, v.y), r.scale(), (r.crest + 4.f) / 70.f, r.scale(), 0.5f}});
+  g_clearings.push_back(vec3(o.x, o.y, 0.5f * r.chord + 60.f));
+}
 }  // namespace
 
 void sceneryBakeLandmarks(const World& world) {
@@ -372,6 +385,7 @@ void sceneryBakeLandmarks(const World& world) {
   starFort(world, out);
   lighthouseKey(world, out);
   racetrack(world, out);
+  fjordhavenDam(world, out);
   for (const PlacedEnt& c : civicLandmarks()) {   // (the cities': placed with their lots; their grounds cleared)
     out.push_back(c);
     if (c.kind == EK_STADIUM) g_clearings.push_back(vec3(c.e.x, c.e.z, 105.f));
@@ -386,3 +400,155 @@ const std::vector<vec3>& landmarkClearings() { return g_clearings; }
 
 const std::vector<PlacedEnt>& landmarks() { return g_landmarks.items; }
 std::pair<const PlacedEnt*, const PlacedEnt*> landmarksIn(int cx, int cz) { return g_landmarks.in(cx, cz); }
+
+// ---------------------------------------------------------------- the Fjordhaven reservoir
+vec2 Reservoir::crown() const { return vec2(x, z) + vec2(vx, vz) * (archR() * (1.f - sqrtf(1.f - 0.6944f))); }   // (sin of its half-angle: 150/180)
+vec2 Reservoir::archCentre() const { return crown() - vec2(vx, vz) * archR(); }
+
+// The texels the lake covers: from 60 m above the dam's crown, every texel joined to it whose ground is under the
+// water's level, none within 45 m of the dam's upstream face (its mesh carries the water to its face) - nor any, should
+// the water reach 3 km from the dam or the sea: it would spill
+std::vector<int> reservoirTexels(const World& world, const Reservoir& r) {
+  const vec2 P(r.x, r.z), v(r.vx, r.vz), A = r.archCentre(), start = r.crown() + v * 60.f;
+  const float keep = r.archR() + 45.f;
+  auto texel = [](float c) { return std::clamp((int)floorf((c + WORLD_HALF) / HM_TEXEL), 0, HM_N - 1); };
+  auto centre = [](int i) { return -WORLD_HALF + (i + 0.5f) * HM_TEXEL; };
+  std::vector<int> wet, queue{texel(start.y) * HM_N + texel(start.x)};
+  std::unordered_set<int> seen(queue.begin(), queue.end());
+  if (world.naturalHeight(centre(texel(start.x)), centre(texel(start.y))) >= r.level) return wet;
+  while (!queue.empty()) {
+    const int k = queue.back(); queue.pop_back(); wet.push_back(k);
+    const int i = k % HM_N, j = k / HM_N;
+    for (int d = 0; d < 4; d++) {
+      const int ni = i + (d == 0) - (d == 1), nj = j + (d == 2) - (d == 3), nk = nj * HM_N + ni;
+      if (ni < 0 || nj < 0 || ni >= HM_N || nj >= HM_N || seen.count(nk)) continue;
+      const vec2 p(centre(ni), centre(nj));
+      if (length(p - A) < keep) continue;
+      const float g = world.naturalHeight(p.x, p.y);
+      if (g >= r.level) continue;
+      if (g < 1.f || length(p - P) > 3000.f) return {};   // (it would spill)
+      seen.insert(nk); queue.push_back(nk);
+    }
+  }
+  std::sort(wet.begin(), wet.end());
+  return wet;
+}
+
+// The gorge: within 14 km of Fjordhaven, on the mountains' flanks (60 to 1300 m), a valley whose walls rise 60 to 80 m
+// over its floor within a chord of 400 m at the most, its floor rising gently upstream (and staying under the water)
+// and falling away downstream - searched every 50 m and 15 degrees. Of those whose lake holds (it spills nowhere), drowns
+// no road, no settlement and no airfield, nor leaves dry ground between itself and the dam: the largest lake, and the
+// dam that holds it the shortest
+bool findReservoir(const World& world, Reservoir& out) {
+  int fj = -1; for (int t = 0; t < kNumTowns; t++) if (!strcmp(kTowns[t].name, "Fjordhaven")) fj = t;
+  if (fj < 0) return false;
+  const vec2 F(kTowns[fj].x, kTowns[fj].z);
+  const float step = 50.f; const int n = (int)(28000.f / step);
+  std::vector<std::vector<Reservoir>> rows(n);
+  parallelFor(n, [&](int j) {
+    const float z = F.y - 14000.f + j * step;
+    for (int i = 0; i < n; i++) {
+      const float x = F.x - 14000.f + i * step;
+      if (hypotf(x - F.x, z - F.y) > 14000.f) continue;
+      const float g0 = world.naturalHeight(x, z);
+      if (g0 < 60.f || g0 > 1300.f) continue;
+      for (float D : {80.f, 70.f, 60.f})
+        for (int d = 0; d < 12; d++) {
+          const vec2 u(cosf(d * 15.f * DEG), sinf(d * 15.f * DEG));
+          float tl = -1.f, tr = -1.f;
+          for (float t = 10.f; t <= 200.f && (tl < 0.f || tr < 0.f); t += 10.f) {
+            if (tl < 0.f && world.naturalHeight(x - u.x * t, z - u.y * t) >= g0 + D) tl = t;
+            if (tr < 0.f && world.naturalHeight(x + u.x * t, z + u.y * t) >= g0 + D) tr = t;
+          }
+          if (tl < 0.f || tr < 0.f) continue;
+          for (float sg : {-1.f, 1.f}) {
+            const vec2 v = vec2(-u.y, u.x) * sg;
+            const float up = world.naturalHeight(x + v.x * 250.f, z + v.y * 250.f), dn = world.naturalHeight(x - v.x * 250.f, z - v.y * 250.f);
+            if (up < g0 || up > g0 + D - 10.f || dn > g0 - 3.f) continue;
+            // (the chord centred between the walls, the dam's foot 4 m into the floor, its crest D over it)
+            const vec2 P = vec2(x, z) + u * (0.5f * (tr - tl));
+            Reservoir r; r.on = 1.f; r.x = P.x; r.z = P.y; r.vx = v.x; r.vz = v.y; r.chord = tl + tr; r.floor = g0; r.crest = D;
+            r.level = g0 - 4.f + 67.f * (D + 4.f) / 70.f;
+            rows[j].push_back(r);
+          }
+        }
+    }
+  });
+  std::vector<Reservoir> cand;
+  for (auto& r : rows) cand.insert(cand.end(), r.begin(), r.end());
+  std::vector<float> area(cand.size(), 0.f);
+  parallelFor((int)cand.size(), [&](int c) {
+    const Reservoir& r = cand[c];
+    const std::vector<int> wet = reservoirTexels(world, r);
+    if (wet.size() < 60) return;   // (0.09 km2 at least)
+    const vec2 A = r.archCentre(), v(r.vx, r.vz);
+    for (int k : wet) {
+      const float x = -WORLD_HALF + (k % HM_N + 0.5f) * HM_TEXEL, z = -WORLD_HALF + (k / HM_N + 0.5f) * HM_TEXEL;
+      if (roadEdgeDistance(world.roadGrid, x, z) < 25.f || settlementShare(world.settlements, x, z) < 1.5f || !clearOfRunways(world, x, z, 3000.f)) return;
+      // (beside the dam, past where its mesh carries the water: the lake no nearer it than its arch's ends)
+      const vec2 d = vec2(x, z) - A; const float r0 = length(d);
+      if (r0 < r.archR() + 90.f && dot2(d, v) < r0 * cosf(75.f * DEG)) return;
+    }
+    if (roadEdgeDistance(world.roadGrid, r.x, r.z) < 60.f) return;
+    area[c] = wet.size() * HM_TEXEL * HM_TEXEL;
+  });
+  std::vector<int> order;
+  for (size_t c = 0; c < cand.size(); c++) if (area[c] > 0.f) order.push_back((int)c);
+  std::sort(order.begin(), order.end(), [&](int a, int b) {
+    return fabsf(area[a] - area[b]) > 1.f ? area[a] > area[b] : cand[a].chord != cand[b].chord ? cand[a].chord < cand[b].chord : a < b; });
+  for (int c : order) {
+    Reservoir r = cand[c];
+    // the lake's square: round its texels, three texels' margin; then its fine mask, which must not spill out of it
+    const std::vector<int> wet = reservoirTexels(world, r);
+    float x0 = 1e9f, x1 = -1e9f, z0 = 1e9f, z1 = -1e9f;
+    for (int k : wet) {
+      const float x = -WORLD_HALF + (k % HM_N + 0.5f) * HM_TEXEL, z = -WORLD_HALF + (k / HM_N + 0.5f) * HM_TEXEL;
+      x0 = std::min(x0, x); x1 = std::max(x1, x); z0 = std::min(z0, z); z1 = std::max(z1, z);
+    }
+    r.cx = 0.5f * (x0 + x1); r.cz = 0.5f * (z0 + z1); r.r = 0.5f * std::max(x1 - x0, z1 - z0) + 3.f * HM_TEXEL;
+    LakeMask m;
+    if (!reservoirMask(world, r, m)) continue;
+    out = r;
+    return true;
+  }
+  return false;
+}
+
+bool reservoirMask(const World& world, const Reservoir& r, LakeMask& out) {
+  out = LakeMask();
+  const float cell = out.cell; const int n = (int)ceilf(2.f * r.r / cell);
+  out.n = n; out.x0 = r.cx - 0.5f * n * cell; out.z0 = r.cz - 0.5f * n * cell; out.m.assign((size_t)n * n, 0.f);
+  auto centre = [&](int i, int j) { return vec2(out.x0 + (i + 0.5f) * cell, out.z0 + (j + 0.5f) * cell); };
+  const vec2 A = r.archCentre(), start = r.crown() + vec2(r.vx, r.vz) * 60.f;
+  const float keep = r.archR() + 2.f;   // (the water up to 2 m off the dam's face: the mask's edge falls inside the dam)
+  std::vector<float> g((size_t)n * n);
+  parallelFor(n, [&](int j) { for (int i = 0; i < n; i++) { const vec2 p = centre(i, j); g[(size_t)j * n + i] = world.naturalHeight(p.x, p.y); } });
+  auto open = [&](int i, int j) { return length(centre(i, j) - A) >= keep; };
+  const int si = (int)floorf((start.x - out.x0) / cell), sj = (int)floorf((start.y - out.z0) / cell);
+  if (si <= 0 || sj <= 0 || si >= n - 1 || sj >= n - 1 || g[(size_t)sj * n + si] >= r.level) return false;
+  std::vector<int> queue{sj * n + si};
+  out.m[(size_t)sj * n + si] = 1.f;
+  while (!queue.empty()) {
+    const int k = queue.back(); queue.pop_back();
+    const int i = k % n, j = k / n;
+    if (i == 0 || j == 0 || i == n - 1 || j == n - 1) return false;   // (it would spill out of its square)
+    for (int d = 0; d < 4; d++) {
+      const int ni = i + (d == 0) - (d == 1), nj = j + (d == 2) - (d == 3), nk = nj * n + ni;
+      if (out.m[nk] > 0.f || !open(ni, nj) || g[nk] >= r.level) continue;
+      out.m[nk] = 1.f; queue.push_back(nk);
+    }
+  }
+  for (int pass = 0; pass < 2; pass++) {   // (on into the shore two cells: the mask's edge lies under the ground)
+    std::vector<float> m = out.m;
+    for (int j = 1; j < n - 1; j++)
+      for (int i = 1; i < n - 1; i++) {
+        const size_t k = (size_t)j * n + i;
+        if (out.m[k] > 0.f || !open(i, j) || g[k] < r.level) continue;
+        bool next = false;
+        for (int dj = -1; dj <= 1; dj++) for (int di = -1; di <= 1; di++) next = next || out.m[k + (size_t)(dj * n + di)] > 0.f;
+        if (next) m[k] = 1.f;
+      }
+    out.m.swap(m);
+  }
+  return true;
+}

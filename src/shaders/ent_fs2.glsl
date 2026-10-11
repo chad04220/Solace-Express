@@ -498,6 +498,21 @@ void main(){
       else if (part == P_GLASS) { alb = vec3(0.04); rough = 0.05; }
       else if (part == P_TRIM) alb = team*0.7;
       else { alb = vec3(0.05); rough = 0.7; }
+    } else if (uKind == K_DAM) {   // the dam: concrete in its lifts and blocks, weathered in streaks down its face; its gates and
+      // steel dark
+      if (part == P_WALL || part == P_TRIM) {
+        alb = triS(lp, n0, M_CONCRETE, 4.0, 0.5, nb, rough)*(part == P_TRIM ? vec3(0.9, 0.9, 0.88) : vec3(0.82, 0.82, 0.8));
+        float lift = smoothstep(0.03, 0.0, abs(fract(mp.y/3.0) - 0.5) - 0.47);
+        alb *= 1.0 - 0.18*lift*step(0.5, abs(n0.x) + abs(n0.z));
+        alb *= 0.82 + 0.22*vn3(vec3(lp.x*0.35, lp.y*0.012, lp.z*0.35));   // (streaks down the face)
+        alb *= mix(0.75, 1.0, smoothstep(0.0, 25.0, mp.y));
+        rough = max(rough, 0.75);
+      } else if (part == P_DARK) { alb = vec3(0.07, 0.08, 0.09); metal = 0.5; rough = 0.5; }
+      else if (part == P_METAL) { alb = vec3(0.18, 0.24, 0.3); metal = 0.6; rough = 0.4; }
+      else if (part == P_ROOF) alb = vec3(0.35, 0.36, 0.38);
+      else if (part == P_GLASS) { alb = vec3(0.04, 0.06, 0.08); rough = 0.08; emit = vec3(1.0, 0.92, 0.78)*uNight*0.5; }
+      else if (part == P_LAMP) { alb = vec3(0.9); cls = 3.0; nb = n0; emit = vec3(1.0, 0.85, 0.6)*(0.2 + 6.0*uNight); }
+      else alb = vec3(0.3, 0.22, 0.15);
     } else if (uKind == K_GRANDSTAND) {   // a grandstand: its seats in rows, a block of colour to each section between the aisles
       // and people in them, its walls concrete, its roof white
       if (part == P_PAINT) {

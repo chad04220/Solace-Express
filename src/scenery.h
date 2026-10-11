@@ -57,6 +57,13 @@ const std::vector<vec3>& landmarkClearings();
 const std::vector<PlacedEnt>& civicLandmarks();
 // Lighthouse Key's light (entities.cpp): its place in that world, and which way it looks out to sea
 bool findLighthouseSite(const World& world, float& x, float& z, float& yaw);
+// The Fjordhaven dam's gorge and its lake's level (world.h Reservoir), on the natural ground once the roads are laid
+// (World::build); and the heightmap texels its water reaches (indices into World::hm's texels; empty: it would spill)
+bool findReservoir(const World& world, Reservoir& out);
+std::vector<int> reservoirTexels(const World& world, const Reservoir& r);
+// Its lake's mask (world.h LakeMask) over its square, from the natural ground: false if the water would reach the
+// square's edge (spill)
+bool reservoirMask(const World& world, const Reservoir& r, LakeMask& out);
 void sceneryInit();  // build shared road tables before any threaded use
 void sceneryBaseMod(float x, float z, float& h, float& amp);  // flatten roads / towns in the base map
 

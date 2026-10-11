@@ -124,7 +124,7 @@ const EntKindInfo kEntInfo[EK_COUNT] = {
   {"Stadium", 92.f, 31.f, 74.f}, {"Quay", 215.f, 1.f, 63.f}, {"Gantry crane", 16.f, 72.f, 35.f}, {"Container stack", 37.f, 10.6f, 7.5f},
   {"Container ship", 17.f, 40.f, 115.f},   // (the quay from its apron's top; the ship from the sea)
   {"Pit garages", 48.f, 13.5f, 11.f}, {"Pit wall", 24.f, 1.1f, 3.f}, {"Grandstand", 60.f, 24.f, 16.f},   // (the pit wall: its concrete; the fence above it isn't solid)
-  {"Race transporter", 1.3f, 4.1f, 8.3f},
+  {"Race transporter", 1.3f, 4.1f, 8.3f}, {"Dam", 160.f, 72.f, 60.f},   // (the dam: its arch and powerhouse; its lake's edge beyond)
 };
 
 static inline float h2(int a, int b) { return hash2i(a, b); }
@@ -437,7 +437,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float hp = h2(oi * 5 + 9, oj * 7 - 1);
           if (hp > 0.4f) continue;
           float x = (oi + 0.5f + (h2(oi + 3, oj - 8) - 0.5f) * 0.7f) * OC, z = (oj + 0.5f + (h2(oi - 6, oj + 2) - 0.5f) * 0.7f) * OC;
-          if (!C.inside(x, z)) continue;
+          if (!C.inside(x, z) || g_world.underLake(x, z)) continue;
           float b[4]; g_world.sampleBase(x, z, b);
           if (b[1] < 0.01f) continue;
           float g = ground(x, z);
@@ -457,7 +457,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float hp = h2(pi * 3 - 11, pj * 13 + 4);
           if (hp > 0.3f) continue;
           float x = (pi + 0.5f + (h2(pi + 9, pj) - 0.5f) * 0.7f) * SPC, z = (pj + 0.5f + (h2(pi, pj + 9) - 0.5f) * 0.7f) * SPC;
-          if (!C.inside(x, z)) continue;
+          if (!C.inside(x, z) || g_world.underLake(x, z)) continue;
           float b[4]; g_world.sampleBase(x, z, b);
           float g = ground(x, z);
           float p = 0.3f * smoothstepf(110.f, 260.f, b[1]) * smoothstepf(0.45f, 0.75f, b[2]) * smoothstepf(40.f, 80.f, g) * smoothstepf(950.f, 700.f, g);
@@ -484,7 +484,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float hp = h2(ti * 3 + 11, tj * 5 - 7);
           if (hp > 0.62f) continue;   // the most a cell can be planted
           float x = (ti + 0.5f + (h2(ti + 101, tj - 31) - 0.5f) * 0.7f) * TC, z = (tj + 0.5f + (h2(ti - 57, tj + 77) - 0.5f) * 0.7f) * TC;
-          if (!C.inside(x, z) || inFarmstead(x, z)) continue;
+          if (!C.inside(x, z) || inFarmstead(x, z) || g_world.underLake(x, z)) continue;
           float b[4]; g_world.sampleBase(x, z, b);
           if (b[1] < 2.5f) continue;   // airport grounds and flattened land
           float g = ground(x, z);
@@ -519,7 +519,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float hp = h2(bi * 9 - 4, bj * 7 + 13);
           if (hp > 0.9f) continue;   // (the most a cell can be planted: a hedgerow's; elsewhere at most 0.3, as before)
           float x = (bi + 0.5f + (h2(bi + 41, bj - 3) - 0.5f) * 0.8f) * BC, z = (bj + 0.5f + (h2(bi - 8, bj + 33) - 0.5f) * 0.8f) * BC;
-          if (!C.inside(x, z) || inFarmstead(x, z)) continue;
+          if (!C.inside(x, z) || inFarmstead(x, z) || g_world.underLake(x, z)) continue;
           float b[4]; g_world.sampleBase(x, z, b);
           if (b[1] < 2.5f) continue;
           float g = ground(x, z);
@@ -544,7 +544,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float hp = h2(ri * 5 - 13, rj * 3 + 29);
           if (hp > 0.3f) continue;
           float x = (ri + 0.5f + (h2(ri + 41, rj - 9) - 0.5f) * 0.6f) * ROCK_CELL, z = (rj + 0.5f + (h2(ri - 21, rj + 63) - 0.5f) * 0.6f) * ROCK_CELL;
-          if (!C.inside(x, z) || inFarmstead(x, z)) continue;
+          if (!C.inside(x, z) || inFarmstead(x, z) || g_world.underLake(x, z)) continue;
           float b[4]; g_world.sampleBase(x, z, b);
           if (b[1] < 0.01f) continue;
           float g = ground(x, z);

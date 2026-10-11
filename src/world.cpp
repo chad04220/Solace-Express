@@ -262,11 +262,11 @@ float airportInfluence(float x, float z) {
 
 void World::build(const std::string& cachePath, const std::string& stamp, bool save) {
   airports.assign(std::begin(kAirports), std::end(kAirports));
-  roads = RoadNetwork(); roadGrid = RoadGrid(); bridges.clear(); settlements.clear(); farms.clear();   // (the natural ground first: the roads are routed over it)
+  roads = RoadNetwork(); roadGrid = RoadGrid(); bridges.clear(); settlements.clear(); farms.clear(); reservoir = Reservoir();   // (the natural ground first: the roads are routed over it)
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
   g_worldStage = cachePath.empty() ? 2 : 1;
   fromCache = !cachePath.empty() && loadCache(cachePath, stamp);
-  if (fromCache) { sceneryInit(); settlements = buildSettlementFields(*this); farms = farmsteadsOf(roads); sceneryBakeCommunityLots(*this); boxes.clear(); bridges = buildBridges(*this); sceneryBakeRoadFurniture(*this); sceneryBakeLandmarks(*this); g_worldStage = 3; return; }
+  if (fromCache) { sceneryInit(); buildLakeMask(); settlements = buildSettlementFields(*this); farms = farmsteadsOf(roads); sceneryBakeCommunityLots(*this); boxes.clear(); bridges = buildBridges(*this); sceneryBakeRoadFurniture(*this); sceneryBakeLandmarks(*this); g_worldStage = 3; return; }
   g_worldStage = 2;
   hm.resize((size_t)HM_N * HM_N * 4);
   sceneryInit();
@@ -326,6 +326,9 @@ void World::build(const std::string& cachePath, const std::string& stamp, bool s
   addFarmsteads(*this, settlements, roads);   // (and the farms out in the fields, each at the end of its track)
   farms = farmsteadsOf(roads);
   buildRoadGrid(roads, roadGrid);
+  // the Fjordhaven reservoir: its dam's gorge, and its lake's water (World::height has it from here on)
+  findReservoir(*this, reservoir);
+  buildLakeMask();
   bakeMask();
   buildHMax();
   buildEnvelope();
@@ -341,7 +344,7 @@ void World::build(const std::string& cachePath, const std::string& stamp, bool s
 // The generated world on disk: its height and mask textures, height bounds and terrain envelope, stamped with the
 // build that made them (any other build generates again)
 namespace {
-const uint32_t kWorldMagic = 0x574c4434u;   // "WLD4": the road network, its grid and the forest noise in one R32UI texel
+const uint32_t kWorldMagic = 0x574c4435u;   // "WLD5": the road network, its grid and the forest noise in one R32UI texel; the reservoir
 template <class T> void putVec(FILE* f, const std::vector<T>& v) { uint64_t n = v.size(); fwrite(&n, 8, 1, f); if (n) fwrite(v.data(), sizeof(T), n, f); }
 template <class T> bool getVec(FILE* f, std::vector<T>& v, uint64_t expect) {
   uint64_t n = 0; if (fread(&n, 8, 1, f) != 1 || n != expect) return false;
@@ -390,18 +393,21 @@ bool World::loadCache(const std::string& path, const std::string& stamp) {
   for (int L = 0; ok && L < HMAX_LEVELS; L++) { const uint64_t n = (uint64_t)(HMAX_N >> L); ok = getVec(f, w.hmax[L], n * n); }
   ok = ok && getVec(f, w.tpV0, (uint64_t)(HM_N + 1) * (HM_N + 1));
   for (int L = 0; ok && L < TP_LEVELS; L++) { const uint64_t n = (uint64_t)(HM_N >> L); ok = getVec(f, w.tpM[L], n * n); }
+  std::vector<float> res;
+  ok = ok && getVec(f, res, RESERVOIR_FLOATS);
+  if (ok) { static_assert(sizeof(Reservoir) == RESERVOIR_FLOATS * sizeof(float), "the reservoir's floats"); memcpy(&w.reservoir, res.data(), sizeof(Reservoir)); }
   ok = ok && fgetc(f) == EOF;   // (nothing after the last array: not some other format's file)
   fclose(f);
   // (and every number in it a number: a NaN height in a well-formed file loaded, and the terrain and the flight model
   // ran on it - the review of v3.44.0, WLD-4)
   auto finite = [](const std::vector<float>& v) { for (float x : v) if (!std::isfinite(x)) return false; return true; };
-  ok = ok && finite(w.hm) && finite(w.tpV0);
+  ok = ok && finite(w.hm) && finite(w.tpV0) && finite(res);
   for (int L = 0; ok && L < HMAX_LEVELS; L++) ok = finite(w.hmax[L]);
   for (int L = 0; ok && L < TP_LEVELS; L++) ok = finite(w.tpM[L]);
   for (size_t i = 0; ok && i < w.roadGrid.segs.size(); i++) { const RoadSegment& r = w.roadGrid.segs[i]; ok = std::isfinite(r.ax + r.az + r.bx + r.bz + r.ah + r.bh + r.along); }
   if (!ok) return false;
   hm.swap(w.hm); mask.swap(w.mask); tpV0.swap(w.tpV0);
-  std::swap(roads, w.roads); std::swap(roadGrid, w.roadGrid);
+  std::swap(roads, w.roads); std::swap(roadGrid, w.roadGrid); reservoir = w.reservoir;
   for (int L = 0; L < HMAX_LEVELS; L++) hmax[L].swap(w.hmax[L]);
   for (int L = 0; L < TP_LEVELS; L++) tpM[L].swap(w.tpM[L]);
   return true;
@@ -416,6 +422,7 @@ void World::saveCache(const std::string& path, const std::string& stamp) const {
   for (int L = 0; L < HMAX_LEVELS; L++) putVec(f, hmax[L]);
   putVec(f, tpV0);
   for (int L = 0; L < TP_LEVELS; L++) putVec(f, tpM[L]);
+  { std::vector<float> res(RESERVOIR_FLOATS); memcpy(res.data(), &reservoir, sizeof(Reservoir)); putVec(f, res); }
   bool ok = !ferror(f); fclose(f);
   remove(path.c_str());
   if (!ok || rename(tmp.c_str(), path.c_str()) != 0) remove(tmp.c_str());
@@ -424,6 +431,15 @@ void World::saveCache(const std::string& path, const std::string& stamp) const {
 int World::findAirport(const char* code) const {
   for (size_t i = 0; i < airports.size(); i++) if (!strcmp(airports[i].code, code)) return (int)i;
   return -1;
+}
+
+// Every cell of an n x n grid over the map (cell size cs) the lake's square reaches, with its level
+template <class F> static void forEachLakeCell(const World& w, float cs, int n, F f) {
+  if (!w.lake.n) return;
+  auto cell = [&](float v) { return std::clamp((int)floorf((v + WORLD_HALF) / cs), 0, n - 1); };
+  const float s = w.lake.n * w.lake.cell;
+  for (int j = cell(w.lake.z0 - w.lake.cell); j <= cell(w.lake.z0 + s + w.lake.cell); j++)
+    for (int i = cell(w.lake.x0 - w.lake.cell); i <= cell(w.lake.x0 + s + w.lake.cell); i++) f(i, j, w.reservoir.level);
 }
 
 // Every cell of an n x n grid over the map (cell size cs) that a graded road segment's platform or banks reach, with the
@@ -470,6 +486,8 @@ void World::buildHMax() {
   // the roads: a fill can lift the ground above anything the heightfield bounds - every cell a graded road's platform or
   // banks reach holds at least its highest end
   forEachRoadCell(roadGrid, 2.f * WORLD_HALF / HMAX_N, HMAX_N, 2.f * HM_TEXEL, [&](int i, int j, float top) {
+    float& m = hmax[0][(size_t)j * HMAX_N + i]; m = std::max(m, top + 4.f); });
+  forEachLakeCell(*this, 2.f * WORLD_HALF / HMAX_N, HMAX_N, [&](int i, int j, float top) {   // (and the lake: its level over its square)
     float& m = hmax[0][(size_t)j * HMAX_N + i]; m = std::max(m, top + 4.f); });
   for (int L = 1; L < HMAX_LEVELS; L++) {
     int n = HMAX_N >> L, pn = n * 2;
@@ -531,6 +549,9 @@ void World::buildEnvelope() {
   // the roads (as in buildHMax): every vertex of a cell a graded road reaches at least its highest end - so the
   // triangles over that cell stay above the platform and its banks too
   forEachRoadCell(roadGrid, HM_TEXEL, N, HM_TEXEL, [&](int i, int j, float top) {
+    for (int dj = 0; dj <= 1; dj++) for (int di = 0; di <= 1; di++) {
+      float& v = tpV0[(size_t)(j + dj) * NV + i + di]; v = std::max(v, top + 0.5f); } });
+  forEachLakeCell(*this, HM_TEXEL, N, [&](int i, int j, float top) {
     for (int dj = 0; dj <= 1; dj++) for (int di = 0; di <= 1; di++) {
       float& v = tpV0[(size_t)(j + dj) * NV + i + di]; v = std::max(v, top + 0.5f); } });
   tpM[0].assign((size_t)N * N, 0.f);
@@ -684,8 +705,23 @@ float World::naturalHeight(float x, float z, int octaves) const {
 float World::height(float x, float z, int octaves) const {
   // bare ground: trees, rocks and buildings are separate entities (entities.h); the roads are built into it
   x = wrapCoord(x); z = wrapCoord(z);
-  return roadGrade(roadGrid, x, z, naturalHeight(x, z, octaves));
+  return lakeGround(x, z, roadGrade(roadGrid, x, z, naturalHeight(x, z, octaves)));
 }
+
+void World::buildLakeMask() {
+  lake = LakeMask();
+  if (reservoir.on > 0.f && !reservoirMask(*this, reservoir, lake)) { reservoir = Reservoir(); lake = LakeMask(); }
+}
+float World::lakeMaskAt(float x, float z) const {   // (exactly roads.glsl lakeMaskAt)
+  if (!lake.n) return 0.f;
+  const float fx = (x - lake.x0) / lake.cell - 0.5f, fz = (z - lake.z0) / lake.cell - 0.5f;
+  if (fx < -1.f || fz < -1.f || fx > (float)lake.n || fz > (float)lake.n) return 0.f;
+  const int i = (int)floorf(fx), j = (int)floorf(fz); const float tx = fx - i, tz = fz - j;
+  auto m = [&](int a, int b) { return a < 0 || b < 0 || a >= lake.n || b >= lake.n ? 0.f : lake.m[(size_t)b * lake.n + a]; };
+  return (m(i, j) * (1.f - tx) + m(i + 1, j) * tx) * (1.f - tz) + (m(i, j + 1) * (1.f - tx) + m(i + 1, j + 1) * tx) * tz;
+}
+float World::lakeGround(float x, float z, float g) const { return lake.n && lakeMaskAt(x, z) > 0.5f ? std::max(g, reservoir.level) : g; }
+bool World::underLake(float x, float z) const { return lake.n && lakeMaskAt(x, z) > 0.5f && naturalHeight(x, z) < reservoir.level + 0.3f; }
 
 vec3 World::normal(float x, float z) const {
   const float e = 2.0f;

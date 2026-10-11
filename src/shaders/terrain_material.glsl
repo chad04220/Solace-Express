@@ -607,6 +607,25 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       }
     }
   }
+  // ---- the Fjordhaven reservoir's lake (world.h Reservoir): where its mask has water and the natural ground lies under
+  // its level (built in there: roads.glsl lakeGround) - judged on the ground itself, not the mesh over it, so its shore
+  // follows the ground's contour at any distance - deep green water, rippling; the shore just above it darkened, wet
+  {
+    float lm = lakeMaskAt(p.xz);
+    if (lm > 0.0) {
+      vec2 pw = wrapW(p.xz);
+      float nat = base.y < 0.01 ? base.x : base.x + base.y*terrainFbm(pw/2200.0, 7);
+      float level = lakeLevel(), lake = step(0.5, lm)*(1.0 - step(level, nat));
+      m.alb *= 1.0 - 0.35*(1.0 - smoothstep(level, level + 1.5, nat))*(1.0 - lake);
+      if (lake > 0.0) {
+        vec2 q = p.xz/9.0;
+        vec3 ripple = normalize(vec3((vnoise(q + uTime*vec2(0.11, 0.05)) - vnoise(q*1.7 - uTime*vec2(0.04, 0.09) + 5.3))*0.18,
+                                     (vnoise(q.yx*1.3 + uTime*vec2(0.07, -0.06) + 2.1) - vnoise(q*0.8 + 9.7))*0.18, 1.0));
+        m.alb = vec3(0.018, 0.04, 0.045)*(0.9 + 0.2*vnoise(p.xz/140.0));
+        m.rough = 0.05; m.metal = 0.0; m.nrm = ripple;
+      }
+    }
+  }
   // ---- airport surfaces
   vec2 auv, along; int ai = airportAt(p.xz, auv, along);
   if (ai >= 0) {

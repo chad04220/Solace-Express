@@ -141,6 +141,20 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   - The teams' transporters (`EK_TRANSPORTER`) are in the paddock, a car park of 500 cars is behind the stands, and
     guardrails line the outside of every bend.
   - Its grounds are meadow with lone trees: no wood, no crops, nothing on the run-off.
+- **Phase C: the Fjordhaven dam (after v3.48, `findReservoir`, `landmarks_test`).** A concrete arch dam across a gorge
+  in the mountains 4 km north-west of Fjordhaven. It is 80 m high on a 370 m chord, and holds a lake of 0.28 km² at
+  531 m.
+  - The gorge is searched for within 14 km of the town, every 50 m and 15 degrees. Its walls must rise 60 to 80 m
+    within a 400 m chord, its floor rise gently upstream and fall away below. The lake is flood-filled to the crest
+    less its freeboard and must spill nowhere and drown no road, settlement or runway. The largest lake wins.
+  - The lake is built into the ground as the roads are (`World::lakeGround`, roads.glsl `lakeGround`). An 8 m mask
+    over its square, made from the natural ground whenever the world is built or loaded, lifts the ground to the
+    water's level wherever the water lies.
+  - Its shore is therefore the ground's own contour at any distance, and an aircraft meets the water as it meets
+    the sea. The terrain paints it deep green and rippling, with a wet margin, judged per pixel on the natural ground.
+  - The dam (`EK_DAM`): its arch about a centre downstream, thick at its foot and thin at its crest, carried into the
+    rock past its abutments. A road runs along its crest between parapets, with five spillway gates and their gantry
+    at its crown, and a powerhouse at its toe with its penstocks down the face. Nothing grows in the lake.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

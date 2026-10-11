@@ -65,6 +65,27 @@ struct Weather {
   std::string describe() const;
 };
 
+// The Fjordhaven reservoir (docs/LIVING_ISLANDS_PLAN.md, Phase C; landmarks.cpp findReservoir): an arch dam across a
+// gorge in the northern mountains and the lake behind it. The dam: its chord's middle on the valley floor (x, z), the
+// way up the valley (vx, vz), its chord (between its abutments, m), its floor's height there and its crest's above that;
+// the water's level; a square round the lake (its centre cx, cz, half its side r). Cached with the world. The lake is
+// built into the ground as the roads are (World::height, common.glsl groundH / terrainH): wherever its mask says water
+// the ground stands at least at its level - so its shore is wherever the natural ground rises out of it - and the
+// terrain paints it as water there
+struct Reservoir {
+  float on = 0, x = 0, z = 0, vx = 0, vz = 1, chord = 0, crest = 0, floor = 0, level = 0, cx = 0, cz = 0, r = 0;
+  float scale() const { return chord / 300.f; }   // (the dam's mesh is drawn for a 300 m chord)
+  float archR() const { return 180.f * scale(); }   // its upstream face's radius
+  vec2 crown() const;   // its upstream face's middle
+  vec2 archCentre() const;   // the centre of its arch, downstream
+};
+static const int RESERVOIR_FLOATS = 12;
+// The lake's mask (landmarks.cpp reservoirMask): over the reservoir's square, per 8 m cell (its centre at x0 + (i + 0.5)
+// cell), 1 where the water lies - the cells joined to the dam's face under its level, and two cells on into the ground
+// that rises out of it (so the mask's edge lies under the shore) - else 0; read bilinear, water over 0.5. Made again
+// from the natural ground whenever the world is built or loaded; the renderer hands it to the shaders (uData)
+struct LakeMask { float x0 = 0, z0 = 0, cell = 8.f; int n = 0; std::vector<float> m; };
+
 class World {
 public:
   std::vector<Airport> airports;
@@ -77,6 +98,12 @@ public:
   std::vector<Bridge> bridges;   // a structure under each of the network's bridge spans (bridges.h): made from it, not cached
   std::vector<SettlementField> settlements;   // each settlement's extent (settlements.h): from the ground and the roads, not cached
   std::vector<Farmstead> farms;   // the farmsteads' yards (settlements.h): read back off the network, not cached
+  Reservoir reservoir;            // the Fjordhaven dam and its lake (above): cached
+  LakeMask lake;                  // where its water lies (above): made from the reservoir, not cached
+  void buildLakeMask();
+  float lakeMaskAt(float x, float z) const;              // the mask, bilinear (0 off it)
+  float lakeGround(float x, float z, float g) const;     // the ground g with the lake in it
+  bool underLake(float x, float z) const;                // under the water: nothing grows or stands there
   std::vector<uint8_t> mask; // RGBA8: road distance, building density, urbanness, farmland / sea-stack flag
   std::vector<float> hmax[HMAX_LEVELS];   // upper bound of the terrain per cell, level L has HMAX_N>>L cells per side
   // cachePath: the generated arrays are read from there when its stamp matches (a launch after the first skips the

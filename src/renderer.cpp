@@ -884,7 +884,7 @@ bool Renderer::init(int w, int h, const std::function<void(float, const std::str
   glBindTexture(GL_TEXTURE_2D, texHM);
   ready("Uploading world data");
   {
-    std::vector<V4> d(384, V4{0, 0, 0, 0});   // ([0, 64): the old roads' segments, unused since the road network)
+    std::vector<V4> d(384, V4{0, 0, 0, 0});   // ([0, 3): the reservoir's lake, below; [3, 64): unused, the old roads' segments once)
     for (int i = 0; i < (int)g_world.boxes.size() && i < 128; i++) {
       const Box& b = g_world.boxes[i];
       d[64 + i] = {b.c.x, b.c.y, b.c.z, (float)b.airport};
@@ -919,6 +919,17 @@ bool Renderer::init(int w, int h, const std::function<void(float, const std::str
     d.resize(W, V4{0, 0, 0, 0});
     const std::vector<float> rows = roadEntryRows(g_world.roadGrid);
     for (size_t i = 0; i < rows.size(); i += 4) d.push_back({rows[i], rows[i + 1], rows[i + 2], rows[i + 3]});
+    // then the Fjordhaven reservoir's lake (roads.glsl lakeMaskAt): row 0's first texels its level, its mask's square and
+    // the row its cells start on; the cells four to a texel from there
+    {
+      const LakeMask& L = g_world.lake;
+      d[0] = {0.f, 0.f, 0.f, g_world.reservoir.level};
+      d[1] = {L.x0, L.z0, L.cell, (float)L.n};
+      d[2] = {(float)(d.size() / W), 0.f, 0.f, 0.f};
+      for (size_t i = 0; i < L.m.size(); i += 4)
+        d.push_back({L.m[i], i + 1 < L.m.size() ? L.m[i + 1] : 0.f, i + 2 < L.m.size() ? L.m[i + 2] : 0.f, i + 3 < L.m.size() ? L.m[i + 3] : 0.f});
+      d.resize((d.size() + W - 1) / W * W, V4{0, 0, 0, 0});
+    }
     glGenTextures(1, &texData); glBindTexture(GL_TEXTURE_2D, texData);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, W, (GLsizei)(d.size() / W), 0, GL_RGBA, GL_FLOAT, d.data());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);

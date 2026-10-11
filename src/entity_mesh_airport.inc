@@ -1370,6 +1370,70 @@ void buildAirportKind(MB& mb, int kind, int lod) {
       }
       break;
     }
+    case EK_DAM: {   // a concrete arch dam for a 300 m chord, 70 m high (the instance's scale fits it to its gorge): its arch about
+      // a centre 125 m downstream (-z) of the origin - the upstream face (+z) 180 m round it, the downstream 28 m inside
+      // that at its foot and 8 m at its crest - carried 6 degrees on past its abutments into the rock; the road along
+      // its crest between parapets; the spillway's gates and piers at its crown (the water's level at 67 m: world.h
+      // Reservoir, its lake built into the ground up to the face); the powerhouse at its toe, its penstocks down the face
+      const int N = lod == 3 ? 56 : lod == 0 ? 40 : lod == 1 ? 24 : 12, M = lod == 3 ? 10 : lod == 0 ? 7 : lod == 1 ? 4 : 2;
+      const float cz = -125.f, R = 180.f, a0 = 62.f * DEG;
+      auto th = [](float y) { return 28.f - 20.f * y / 70.f; };
+      auto at = [&](float r, float a, float y) { return vec3(r * sinf(a), y, cz + r * cosf(a)); };
+      for (int i = 0; i < N; i++) {
+        const float A0 = -a0 + 2.f * a0 * i / N, A1 = -a0 + 2.f * a0 * (i + 1) / N;
+        for (int j = 0; j < M; j++) {
+          const float y0 = 70.f * j / M, y1 = 70.f * (j + 1) / M;
+          mb.quad(at(R, A0, y0), at(R, A1, y0), at(R, A1, y1), at(R, A0, y1), P_WALL, vec3(0, 35.f, cz));   // (upstream)
+          mb.quad(at(R - th(y0), A0, y0), at(R - th(y0), A1, y0), at(R - th(y1), A1, y1), at(R - th(y1), A0, y1), P_WALL, vec3(0, 35.f, cz + 400.f));
+        }
+        mb.quad(at(R - 8.f, A0, 70.f), at(R - 8.f, A1, 70.f), at(R, A1, 70.f), at(R, A0, 70.f), P_TRIM, vec3(0, 0.f, cz + R - 4.f));   // the crest
+        for (float r : {R - 0.3f, R - 7.7f})   // (its parapets, both faces of each)
+          for (float sg : {-1.f, 1.f}) {
+            const float am = 0.5f * (A0 + A1);
+            mb.quad(at(r, A0, 70.f), at(r, A1, 70.f), at(r, A1, 71.1f), at(r, A0, 71.1f), P_TRIM, at(r - sg, am, 70.5f));
+          }
+      }
+      for (float s : {-1.f, 1.f})   // (its ends, in the rock)
+        mb.quad(at(R, s * a0, 0.f), at(R - th(0.f), s * a0, 0.f), at(R - th(70.f), s * a0, 70.f), at(R, s * a0, 70.f), P_WALL, vec3(0, 35.f, cz + R - 10.f));
+      // the spillway at its crown: five gates between six piers, a gantry over them
+      for (int g = 0; g < 6; g++) {
+        const float a = (g - 2.5f) * 4.f * DEG;
+        const vec3 c = at(R - 4.f, a, 0.f);
+        const vec3 e(cosf(a), 0, -sinf(a)), f(sinf(a), 0, cosf(a));   // (along the crest, out of the face)
+        auto pier = [&](float y0, float y1) {
+          const vec3 lo = c + e * -1.2f + f * -5.f, hi = c + e * 1.2f + f * 5.f;
+          mb.box(vec3(std::min(lo.x, hi.x), y0, std::min(lo.z, hi.z)), vec3(std::max(lo.x, hi.x), y1, std::max(lo.z, hi.z)), P_WALL, 0x3B);
+        };
+        pier(58.f, 74.f);
+        if (g < 5) {
+          const float ag = (g - 2.f) * 4.f * DEG;
+          mb.quad(at(R + 0.05f, ag - 1.6f * DEG, 59.f), at(R + 0.05f, ag + 1.6f * DEG, 59.f), at(R + 0.05f, ag + 1.6f * DEG, 69.f), at(R + 0.05f, ag - 1.6f * DEG, 69.f), P_DARK, vec3(0, 64.f, cz));
+        }
+      }
+      if (d1) {
+        const float aL = -12.f * DEG, aR = 12.f * DEG;
+        for (float r : {R - 2.f, R - 6.f}) for (int k = 0; k < (d0 ? 12 : 4); k++) {
+          const float b0 = aL + (aR - aL) * k / (d0 ? 12 : 4), b1 = aL + (aR - aL) * (k + 1) / (d0 ? 12 : 4);
+          mb.cyl(at(r, b0, 74.f), at(r, b1, 74.f), 0.4f, 0.4f, 4, P_METAL, false, false);   // (the gantry's rails)
+        }
+        mb.box(vec3(-4.f, 74.f, cz + R - 7.f), vec3(4.f, 77.f, cz + R - 1.f), P_METAL, 0x3F);   // (its crab)
+      }
+      // the powerhouse at the toe, downstream, its penstocks down the face into it
+      const float zt = cz + R - th(0.f);   // (the face's foot at the crown)
+      mb.box(vec3(-26.f, 0.f, zt - 34.f), vec3(26.f, 17.f, zt - 6.f), P_WALL, 0x3B);
+      mb.box(vec3(-27.f, 17.f, zt - 35.f), vec3(27.f, 18.f, zt - 5.f), P_ROOF, 0x3F);
+      mb.box(vec3(-25.f, 9.f, zt - 34.05f), vec3(25.f, 14.f, zt - 34.f), P_GLASS, 16);
+      for (float x : {-15.f, -5.f, 5.f, 15.f}) {
+        const vec3 top = at(R - th(48.f) - 0.6f, asinf(x / (R - th(48.f))), 48.f), foot(x, 18.f, zt - 6.f);
+        mb.cyl(top, foot + vec3(0, 0, 0.f), 1.4f, 1.4f, d0 ? 12 : 6, P_METAL, false, false);
+      }
+      if (lod == 3) {   // (up close: the crest's lamps, the powerhouse's doors)
+        for (int k = -6; k <= 6; k++) { const vec3 b = at(R - 7.4f, k * 9.f * DEG, 71.1f); mb.cyl(b, b + vec3(0, 4.5f, 0), 0.08f, 0.07f, 6, P_METAL, true, false);
+                                        mb.box(b + vec3(-0.25f, 4.4f, -0.25f), b + vec3(0.25f, 4.7f, 0.25f), P_LAMP, 0x3F); }
+        for (float x : {-18.f, 0.f, 18.f}) mb.box(vec3(x - 2.5f, 0.f, zt - 34.08f), vec3(x + 2.5f, 6.f, zt - 34.f), P_DOOR, 16);
+      }
+      break;
+    }
     case EK_POLE: {   // a wooden pole, a crossarm, three insulators; up close, its three wires to the next pole along +z
       mb.cyl(vec3(0, -0.5f, 0), vec3(0, 9.f, 0), 0.14f, 0.11f, d0 ? 10 : d1 ? 6 : 4, P_WOOD, true, false);
       mb.box(vec3(-1.05f, 8.15f, -0.06f), vec3(1.05f, 8.3f, 0.06f), P_WOOD, lod == 2 ? 8 | 16 | 32 : 0x3F);

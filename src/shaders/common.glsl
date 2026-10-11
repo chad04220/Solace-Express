@@ -83,14 +83,15 @@ vec4 maskAt(vec2 p){
 }
 vec4 maskTexel(vec2 p){ return texelFetch(uMask, clamp(ivec2(floor((wrapW(p) + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0); }
 float roadGrade(vec2 p, float g);   // the ground with the roads built into it (roads.glsl)
-float groundH(vec2 p, int oct){ p = wrapW(p); vec4 b = baseAt(p); return roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct)); }
-// Terrain height: the bare heightfield (trees, rocks and buildings are separate entities) with the roads built into it,
-// plus impact craters
+float lakeGround(vec2 p, float g);  // and the Fjordhaven reservoir's lake (roads.glsl)
+float groundH(vec2 p, int oct){ p = wrapW(p); vec4 b = baseAt(p); return lakeGround(p, roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct))); }
+// Terrain height: the bare heightfield (trees, rocks and buildings are separate entities) with the roads and the lake
+// built into it, plus impact craters
 float terrainH(vec2 p, int oct){
   COST(0);
   p = wrapW(p);
   vec4 b = baseAt(p);
-  float g = roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct));
+  float g = lakeGround(p, roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct)));
   if (uCraterN > 0 && g > 0.3) g += craterH(p);
   return g;
 }

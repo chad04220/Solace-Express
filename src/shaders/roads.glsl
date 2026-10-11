@@ -12,6 +12,28 @@ uniform usampler2D uRoadGrid;
 const float ROAD_BANK_MAX = 50.0;   // the widest cut or fill bank beyond a platform's edge
 const float ROAD_BANK_RUN = 2.0;    // a bank's run for its rise, on average
 float circuitStartLine(){ return 430.0; }   // the circuit's start line, along it from its pit lane's mouth (road_network.h)
+// The Fjordhaven reservoir's lake (world.h Reservoir, LakeMask), from row 0 of uData (Renderer's upload): its level
+// (texel 0's w), its mask's square (texel 1: x0, z0, cell, cells a side; 0 cells: no lake) and the row its cells start on
+// (texel 2's x: four to a texel); the ground with it built in, exactly World::lakeGround
+float lakeLevel(){ return texelFetch(uData, ivec2(0, 0), 0).w; }
+float lakeMaskAt(vec2 p){
+  vec4 L = texelFetch(uData, ivec2(1, 0), 0);
+  int n = int(L.w);
+  if (n <= 0) return 0.0;
+  vec2 f = (p - L.xy)/L.z - 0.5;
+  if (f.x < -1.0 || f.y < -1.0 || f.x > float(n) || f.y > float(n)) return 0.0;
+  int row0 = int(texelFetch(uData, ivec2(2, 0), 0).x);
+  ivec2 i = ivec2(floor(f)); vec2 t = f - vec2(i);
+  float m[4];
+  for (int k = 0; k < 4; k++) {
+    ivec2 c = i + ivec2(k & 1, k >> 1);
+    if (c.x < 0 || c.y < 0 || c.x >= n || c.y >= n) { m[k] = 0.0; continue; }
+    int idx = c.y*n + c.x, tx = idx >> 2;
+    m[k] = texelFetch(uData, ivec2(tx & 4095, row0 + (tx >> 12)), 0)[idx & 3];
+  }
+  return (m[0]*(1.0 - t.x) + m[1]*t.x)*(1.0 - t.y) + (m[2]*(1.0 - t.x) + m[3]*t.x)*t.y;
+}
+float lakeGround(vec2 p, float g){ return lakeMaskAt(p) > 0.5 ? max(g, lakeLevel()) : g; }
 float forestTexel(ivec2 i){ return float(texelFetch(uRoadGrid, clamp(i, ivec2(0), ivec2(MASKN-1)), 0).r >> 25u)/127.0; }
 float forestAt(vec2 p){
   vec2 f = (p + WH)/MTEX - 0.5; vec2 fl = floor(f); ivec2 i = ivec2(fl); vec2 t = f - fl;
@@ -64,4 +86,7 @@ float roadHalfPaved(int c){ return 0.0; }
 float roadBankMax(int c){ return 0.0; }
 float roadGrade(vec2 p, float g){ return g; }
 float circuitStartLine(){ return 0.0; }
+float lakeLevel(){ return 0.0; }
+float lakeMaskAt(vec2 p){ return 0.0; }
+float lakeGround(vec2 p, float g){ return g; }
 #endif
