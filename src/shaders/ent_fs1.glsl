@@ -15,7 +15,8 @@ const int P_BARK=0, P_LEAF=1, P_FROND=2, P_NEEDLE=3, P_ROCK=4, P_WALL=5, P_ROOF=
 const int P_AWNING=12, P_WOOD=13, P_DARK=14, P_LAMP=15, P_SIGN=16, P_CANOPY=17, P_LEAFCARD=18, P_RLAMP=19, P_PAPI=20;
 const int P_PAINT=21, P_STRIPE=22, P_SOCK=23, P_BEACON=24, P_FENCE=25, P_OBST=26;
 const int K_HANGAR=32, K_ARCH=33, K_THANGAR=34, K_TERMINAL=35, K_CTRL=36, K_FBO=37, K_FUELTANK=38, K_PUMP=39, K_WINDSOCK=40, K_BEACON=41;
-const int K_GAPLANE=42, K_AIRLINER=43, K_JETBRIDGE=44, K_CAR=45, K_TRUCK=46, K_FENCE=47, K_LOC=48, K_RADAR=49, K_MAST=50, K_FLOOD=51;
+const int K_GAPLANE=42, K_AIRLINER=43, K_JETBRIDGE=44, K_CAR=45, K_TRUCK=46, K_FENCE=47, K_LOC=48, K_RADAR=49, K_MAST=50, K_FLOOD=51, K_BRIDGE=52;
+const int P_DECK=33;   // a bridge deck's road surface, P_DECK + its road class (bridge_mesh.h): vAux.zw across and along it (m)
 float hsh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
 float hsh3(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7)))*43758.5453); }
 float vn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f*f*(3.0 - 2.0*f);

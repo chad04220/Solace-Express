@@ -1,3 +1,18 @@
+## What's new in v3.47.0
+
+### Bridges
+- The roads now cross the water on bridges. Each is a concrete deck on piers, carrying its road's surface and markings between parapets, with an abutment at each end. The bridges are lit and cast shadows like the buildings, and they're solid: fly under the deck between the piers, not into it.
+- There are five: the four sea crossings and a road over a ravine. Until now, a road stopped at the water's edge and carried on from the far side.
+- Nothing grows up through a bridge. Trees and buildings under one stay below its deck.
+
+### Mountain lanes
+- Lanes and tracks on steep hillsides now follow the ground, cut into the slope as a shelf. Before, where the slope fell faster than a lane could, the lane stood off the hill in the air, nearly 5 km of it in all. Those stretches weren't drawn at all: the lane stopped, then started again further down.
+
+### Good to know
+- **The first launch after updating takes longer, once.** The islands are regenerated.
+
+Please run `diagnostics.bat` on this version.
+
 ## What's new in v3.46.0
 
 ### Two new aircraft

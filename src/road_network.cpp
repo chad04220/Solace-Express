@@ -250,6 +250,9 @@ void profile(const World& world, RoadPath& path, float h0, float h1) {
   const float spacing = s.spacing, window = path.cls == RC_HIGHWAY ? 300.f : path.cls == RC_ROAD ? 140.f : 70.f;
   const int w = std::max(1, (int)roundf(window / spacing * 0.5f));
   const float deck = 9.f;   // a bridge's deck over the sea
+  // the steepest the profile may climb: the class's grade, a lane's or a track's pitching steeper for a stretch (the
+  // routes are found at the class's grade, but a hillside falling faster than that left them hanging in the air)
+  const float steepest = path.cls >= RC_LANE ? s.maxGrade * 1.6f : s.maxGrade;
   std::vector<float> target(n);
   for (int k = 0; k < n; k++) {
     float sum = 0, wsum = 0;
@@ -271,9 +274,9 @@ void profile(const World& world, RoadPath& path, float h0, float h1) {
   for (int it = 0; it < 6; it++) {
     for (int k = 0; k < n; k++) h[k] = std::min(ground[k] < 0.5f ? std::max(h[k], deck) : h[k], ceiling[k]);
     h[0] = h0;
-    for (int k = 1; k < n; k++) h[k] = std::clamp(h[k], h[k - 1] - s.maxGrade * ds[k], h[k - 1] + s.maxGrade * ds[k]);
+    for (int k = 1; k < n; k++) h[k] = std::clamp(h[k], h[k - 1] - steepest * ds[k], h[k - 1] + steepest * ds[k]);
     h[n - 1] = h1;
-    for (int k = n - 2; k >= 0; k--) h[k] = std::clamp(h[k], h[k + 1] - s.maxGrade * ds[k + 1], h[k + 1] + s.maxGrade * ds[k + 1]);
+    for (int k = n - 2; k >= 0; k--) h[k] = std::clamp(h[k], h[k + 1] - steepest * ds[k + 1], h[k + 1] + steepest * ds[k + 1]);
   }
   // ends too far apart in height for the road's length at its class's grade (a mountain strip's access road, say):
   // what the start is still short of spread along the whole road, a steadily steeper climb rather than a cliff
@@ -282,10 +285,21 @@ void profile(const World& world, RoadPath& path, float h0, float h1) {
   float sk = 0;
   for (int k = 0; k < n; k++) { if (k) sk += ds[k]; h[k] += r * (1.f - sk / std::max(total, 1e-3f)); }
   for (int k = 0; k < n; k++) path.pts[k].h = h[k];
+  // across a steep hillside (the ground either side of the road differing by more than a third of the way between)
+  // a road standing clear of it is a shelf, graded into the slope; a bridge only where it crosses something - a ravine,
+  // a gully - with the ground falling away on both sides
+  std::vector<uint8_t> hillside(n, 0);
+  for (int k = 0; k < n; k++) {
+    const int a = std::max(k - 1, 0), b = std::min(k + 1, n - 1);
+    float dx = path.pts[b].x - path.pts[a].x, dz = path.pts[b].z - path.pts[a].z; const float l = std::max(hypotf(dx, dz), 1e-3f);
+    const float off = s.halfPlatform + 20.f, px = -dz / l * off, pz = dx / l * off;
+    const float gl = world.groundHeight(path.pts[k].x + px, path.pts[k].z + pz, 8), gr = world.groundHeight(path.pts[k].x - px, path.pts[k].z - pz, 8);
+    hillside[k] = fabsf(gl - gr) > 0.66f * off;
+  }
   path.bridge.assign(n - 1, 0);
   for (int k = 0; k + 1 < n; k++) {
     const bool water = ground[k] < 0.5f || ground[k + 1] < 0.5f;
-    const bool high = h[k] - ground[k] > 9.f && h[k + 1] - ground[k + 1] > 9.f;
+    const bool high = h[k] - ground[k] > 9.f && h[k + 1] - ground[k + 1] > 9.f && !(hillside[k] && hillside[k + 1]);
     path.bridge[k] = water || high;
   }
   // (a span shorter than three segments over dry ground is an embankment, not a bridge)

@@ -8,7 +8,7 @@ and vehicle meshes, photographic materials, shallow water and volcano crater sta
 Each phase ships as a version, measured on the owner's RTX 3070 laptop through `diagnostics.bat` (native 1080p,
 60 fps or better everywhere) before the next starts.
 
-## Where it stands (v3.45)
+## Where it stands (v3.47)
 
 - 26 settlements, 14,098 street-front buildings. Since v3.44, Kaleo's east has a port city (Kailani), a market town
   (Canefield) and three villages, and Palm Bay's island, Far Isle and Nordholm's coast have a village each.
@@ -17,8 +17,15 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   found by A* over the terrain. The roads are graded into the ground (on the CPU and in every shader's `terrainH`)
   and painted by class. Runways, airfield grounds and approach funnels are untouched
   (`tests/fixtures/RUNWAY_BASELINE.md`, road-grading exception).
+- **Phase A, item 5 under way.** A beam bridge on piers stands under every span the network leaves to a bridge
+  (`bridges.h`, `bridge_mesh.h`): the four sea crossings and a road over a ravine. Each carries its road's surface and
+  markings between concrete parapets (a kerb and a steel rail on the lanes), on a box girder. Its piers go down to the
+  ground or the sea floor, with an abutment at each end. They are drawn and shadowed like the buildings, they are solid,
+  and nothing grows up into them. Lanes and tracks may pitch to 1.6 times their class's grade rather than stand off a
+  hillside, and a road high over a steep cross-slope is graded into it as a shelf. That removed v3.45's nearly 5 km of
+  lane viaduct on the mountainsides (`bridges_test`).
 - **Still to come in Phase A:**
-  - Item 5: bridges are spans the ground is left alone under, not yet meshes.
+  - Item 5: arch and truss spans for the longest crossings.
   - Item 6: road furniture.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 

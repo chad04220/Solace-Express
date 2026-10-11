@@ -31,6 +31,26 @@ bool Renderer::initEntities() {
   return true;
 }
 
+// The bridges' meshes, built where they stand from the world's bridges (bridge_mesh.h), with an instance buffer for the
+// copies of the islands they are drawn in (an instance's position: the copy's offset)
+void Renderer::uploadBridges() {
+  std::vector<EVert> verts;
+  buildBridgeMeshes(g_world.bridges, verts, bridgeRange);
+  bridgeFrom = g_world.bridges.data(); bridgeFromN = g_world.bridges.size();
+  if (!vaoBridge) { glGenVertexArrays(1, &vaoBridge); glGenBuffers(1, &vboBridge); glGenBuffers(1, &vboBridgeInst); }
+  glBindVertexArray(vaoBridge);
+  glBindBuffer(GL_ARRAY_BUFFER, vboBridge);
+  glBufferData(GL_ARRAY_BUFFER, std::max<size_t>(verts.size(), 1) * sizeof(EVert), verts.empty() ? nullptr : verts.data(), GL_STATIC_DRAW);
+  glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(EVert), (void*)0);
+  glEnableVertexAttribArray(1); glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(EVert), (void*)12);
+  glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(EVert), (void*)24);
+  glBindBuffer(GL_ARRAY_BUFFER, vboBridgeInst);
+  glBufferData(GL_ARRAY_BUFFER, 9 * sizeof(Ent), nullptr, GL_STREAM_DRAW);
+  glEnableVertexAttribArray(3); glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)0); glVertexAttribDivisor(3, 1);
+  glEnableVertexAttribArray(4); glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)16); glVertexAttribDivisor(4, 1);
+  glBindVertexArray(0);
+}
+
 // G-buffer at the render resolution (kGBuffer): (distance, octahedral normal, class) | sqrt albedo, roughness | emission (HDR), metal | ambient occlusion
 void Renderer::createGBuffer() {
   auto mk = [&](GLuint& t, GLenum ifmt, GLenum fmt, GLenum type) {
@@ -237,6 +257,27 @@ void Renderer::drawEntities(const FrameParams& fp) {
     nextGroundKey[c]=groundVehicleShadowKey(fp.groundVehicles,center,cR[c],shReach);
     if(nextGroundKey[c]!=groundShadowKey[c]) shDirty[c]=true;
   }
+  // ------------------------------------------------ the bridges: each in range and in view, in each copy of the islands; and
+  // those that throw shadow into a cascade being redrawn
+  if (g_worldStage >= 3 && (bridgeFrom != (const void*)g_world.bridges.data() || bridgeFromN != g_world.bridges.size())) uploadBridges();
+  struct BridgeDraw { int bridge, copy; };
+  std::vector<BridgeDraw> bridgeView, bridgeSh[2];
+  {
+    const float far = std::max(R.build, R.big);
+    for (size_t bi = 0; bi < bridgeRange.size() && bi < g_world.bridges.size(); bi++) {
+      if (!bridgeRange[bi].count) continue;
+      const Bridge& b = g_world.bridges[bi];
+      for (size_t ci = 0; ci < copies.size(); ci++) {
+        const float x0 = b.minX + copies[ci].ox, x1 = b.maxX + copies[ci].ox, z0 = b.minZ + copies[ci].oz, z1 = b.maxZ + copies[ci].oz;
+        const float dx = std::max({x0 - cam.x, cam.x - x1, 0.f}), dz = std::max({z0 - cam.z, cam.z - z1, 0.f});
+        if (dx * dx + dz * dz < far * far && boxVisible(x0, b.minY, z0, x1, b.maxY, z1)) bridgeView.push_back({(int)bi, (int)ci});
+        for (int c = 0; c < 2 && sunUp && !feedPass; c++) {
+          const float pad = (b.maxY - b.minY) * shReach + 60.f, r = cR[c] + pad;
+          if (shDirty[c] && x1 > newCenter[c].x - r && x0 < newCenter[c].x + r && z1 > newCenter[c].z - r && z0 < newCenter[c].z + r) bridgeSh[c].push_back({(int)bi, (int)ci});
+        }
+      }
+    }
+  }
   // ------------------------------------------------ gather instances into (pass, kind, lod) buckets
   static std::vector<Ent> bucket[3][EK_COUNT][ENT_LODS];   // pass 0 view, 1/2 shadow cascades
   for (auto& a : bucket) for (auto& b : a) for (auto& v : b) v.clear();
@@ -408,6 +449,30 @@ void Renderer::drawEntities(const FrameParams& fp) {
       glDrawArraysInstanced(GL_TRIANGLES, entRange[d.kind].first[d.lod], entRange[d.kind].count[d.lod], d.count);
     }
   };
+  // the bridges: their meshes with the buildings' program, one instance at each copy's offset (no thinning or detail
+  // levels: uLod -1)
+  std::vector<Ent> bridgeInst;
+  for (const Copy& cp : copies) bridgeInst.push_back(Ent{cp.ox, 0.f, cp.oz, 0.f, 1.f, 1.f, 1.f, 0.5f});
+  if (vaoBridge && !bridgeInst.empty()) {
+    glBindBuffer(GL_ARRAY_BUFFER, vboBridgeInst); glBufferData(GL_ARRAY_BUFFER, bridgeInst.size() * sizeof(Ent), bridgeInst.data(), GL_STREAM_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);   // (the entities' instance pointers are set against theirs)
+  }
+  auto issueBridges = [&](GLuint prog, const std::vector<BridgeDraw>& list) {
+    if (list.empty() || !vaoBridge) return;
+    glUseProgram(prog);
+    glBindVertexArray(vaoBridge); glBindBuffer(GL_ARRAY_BUFFER, vboBridgeInst);
+    glUniform1i(glGetUniformLocation(prog, "uKind"), kBridgeKind); glUniform1f(glGetUniformLocation(prog, "uFar"), 1e9f);
+    glUniform1f(glGetUniformLocation(prog, "uThin"), 0.f); glUniform1f(glGetUniformLocation(prog, "uThinRef"), 1.f);
+    glUniform1i(glGetUniformLocation(prog, "uLod"), -1); glUniform2f(glGetUniformLocation(prog, "uLodL"), 0.f, 0.f);
+    glUniform1f(glGetUniformLocation(prog, "uCloseLod"), 0.f);
+    glUniform4f(glGetUniformLocation(prog, "uWheel0"), 0, 0, 0, 0); glUniform2f(glGetUniformLocation(prog, "uWheel1"), 0, 0);
+    for (const BridgeDraw& d : list) {
+      glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.copy * sizeof(Ent)));
+      glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)(d.copy * sizeof(Ent) + 16));
+      glDrawArraysInstanced(GL_TRIANGLES, bridgeRange[d.bridge].first, bridgeRange[d.bridge].count, 1);
+    }
+    glBindVertexArray(vaoEnt); glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
+  };
   auto bindMats = [&](GLuint prog) {
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(glGetUniformLocation(prog, "uAlb"), 0);
     glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texNrm); glUniform1i(glGetUniformLocation(prog, "uNrm"), 1);
@@ -446,6 +511,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
     }
     glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(1.5f, 2.f);
     issue(progEntSh, draws[1 + c]);
+    issueBridges(progEntSh[EC_BUILDING], bridgeSh[c]);
     groundShadowKey[c]=nextGroundKey[c];
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
@@ -466,7 +532,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
     drawPlaneMeshDepth(fp, *earlyMesh, fp.plane.rot, fp.plane.pos, -1);
     glBindVertexArray(vaoEnt); glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
   }
-  if (!draws[0].empty()) {
+  if (!draws[0].empty() || !bridgeView.empty()) {
     // near detail levels first, and buildings and rocks before trees: the big near occluders fill the depth buffer
     // early, so less of what lies behind them gets shaded
     std::stable_sort(draws[0].begin(), draws[0].end(), [](const Draw& a, const Draw& b) {
@@ -492,7 +558,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
       glUniform1f(glGetUniformLocation(p, "uWet"), fp.wet);
       glUniform1f(glGetUniformLocation(p, "uSnow"), fp.snow);
     }
-    if (!(dbgOff & kProbeScenery)) issue(progEnt, draws[0]);
+    if (!(dbgOff & kProbeScenery)) { issueBridges(progEnt[EC_BUILDING], bridgeView); issue(progEnt, draws[0]); }
   }
   glDisable(GL_DEPTH_TEST);
   glBindVertexArray(0);

@@ -16,6 +16,11 @@ float entityLine(float d, float halfWidth, float footprint){
   float w = max(footprint, 0.00001);
   return clamp((min(d + w*0.5, halfWidth) - max(d - w*0.5, -halfWidth))/w, 0.0, 1.0);
 }
+// a dash at the start of every period (v in periods): on for the duty's share of it, anti-aliased over the footprint f
+float entityDash(float v, float duty, float f){
+  float t = fract(v);
+  return max(entityLine(t - duty*0.5, duty*0.5, f), entityLine(t - 1.0 - duty*0.5, duty*0.5, f));
+}
 vec3 entityProjectionWeights(vec3 n){
   vec3 w = pow(abs(n), vec3(4.0)); w /= dot(w, vec3(1.0));
   w = max(w - 0.02, 0.0); return w/dot(w, vec3(1.0));
@@ -343,7 +348,49 @@ void main(){
   } else
 #endif
 #if ENT_BUILDINGS
-  if (uKind >= K_HANGAR) {
+  if (uKind == K_BRIDGE) {
+    // ---------------------------------------------------------------- the road network's bridges (bridge_mesh.h)
+    metal = 0.0;
+    if (part >= P_DECK) {
+      // the deck's road: its class's surface and markings, as the ground's roads paint theirs (terrain_material.glsl's
+      // roads; vAux.z across the road, vAux.w the road's distance along, so the dashes run on from the ground's)
+      int rc = part - P_DECK;
+      float x = abs(vAux.z), along = vAux.w;
+      float fx = max(abs(entUvDx.x) + abs(entUvDy.x), 1e-3), fa = max(abs(entUvDx.y) + abs(entUvDy.y), 1e-3);
+      float paved = rc == 0 ? 12.4 : rc == 1 ? 4.6 : rc == 2 ? 2.9 : 1.9;   // (road_network.h roadSpec)
+      vec3 nbC = n0; float roughC;
+      vec3 kerbAlb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nbC, roughC)*vec3(0.84, 0.83, 0.8);
+      if (rc == 3) alb = triS(lp, n0, M_GRAVEL, 5.0, 0.4, nb, rough)*0.9;
+      else {
+        alb = triS(lp, n0, M_ASPHALT, 4.0, 0.35, nb, rough)*(rc == 0 ? 0.72 : rc == 1 ? 0.82 : 0.86);
+        float paint = 0.0, yellow = 0.0;
+        if (rc == 0) {   // dual carriageway: the central reserve's barrier, the lane lines and the edges
+          alb = mix(alb, kerbAlb*0.95, entityLine(x, 2.0, fx));
+          paint = max(paint, entityLine(x - 2.35, 0.1, fx));
+          paint = max(paint, entityLine(x - 5.95, 0.08, fx)*entityDash(along/12.0, 0.25, fa/12.0));
+          paint = max(paint, entityLine(x - 9.55, 0.1, fx));
+        } else if (rc == 1) {   // two-lane road: a dashed centre line, solid edge lines
+          yellow = entityLine(x, 0.08, fx)*entityDash(along/12.0, 0.5, fa/12.0);
+          paint = entityLine(x - 3.5, 0.08, fx);
+        }
+        alb = mix(alb, vec3(0.78), paint*0.9);
+        alb = mix(alb, vec3(0.82, 0.68, 0.22), yellow*0.9);
+      }
+      float kerb = 1.0 - entityLine(x, paved, fx);   // beyond the paving: the kerb and the walkway
+      alb = mix(alb, kerbAlb, kerb); rough = mix(rough, roughC, kerb); nb = normalize(mix(nb, nbC, kerb));
+    } else if (part == P_METAL) {   // the lanes' steel rail, galvanised
+      alb = triS(lp, n0, M_METAL, 2.0, 0.3, nb, rough)*vec3(0.74, 0.76, 0.77); metal = 0.6; rough = max(rough, 0.38);
+    } else {
+      // concrete: the parapets, the slab's edges and the girders, the piers and abutments - streaked by the rain, the
+      // undersides darker, and over the sea a wet, darker band at the waterline
+      alb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nb, rough)*vec3(0.85, 0.84, 0.81);
+      alb *= 0.9 + 0.14*vn3(vec3(lp.x*0.8, lp.y*0.05, lp.z*0.8));
+      if (n0.y < -0.5) alb *= 0.82;
+      alb *= mix(0.5, 1.0, smoothstep(-0.3, 1.8, wy));
+      rough = max(rough, 0.7);
+    }
+    if (uSnow > 0.05) alb = mix(alb, vec3(0.9), smoothstep(0.6, 0.9, n0.y)*uSnow*0.8);
+  } else if (uKind >= K_HANGAR) {
     // ---------------------------------------------------------------- airport buildings, aircraft, vehicles, furniture
     vec3 mp = lp/vScale;   // mesh coordinates (the instance scale removed)
     bool sideX = abs(n0.x) > 0.5;

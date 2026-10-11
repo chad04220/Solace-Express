@@ -2,6 +2,7 @@
 #pragma once
 #include "common.h"
 #include "road_network.h"
+#include "bridges.h"
 #include <string>
 
 static const float WORLD_HALF = 40000.0f;  // the islands span [-40km, 40km] on x and z
@@ -72,6 +73,7 @@ public:
   // material paints from - per mask texel the road segments that reach it, and the baked forest noise
   RoadNetwork roads;
   RoadGrid roadGrid;
+  std::vector<Bridge> bridges;   // a structure under each of the network's bridge spans (bridges.h): made from it, not cached
   std::vector<uint8_t> mask; // RGBA8: road distance, building density, urbanness, farmland / sea-stack flag
   std::vector<float> hmax[HMAX_LEVELS];   // upper bound of the terrain per cell, level L has HMAX_N>>L cells per side
   // cachePath: the generated arrays are read from there when its stamp matches (a launch after the first skips the

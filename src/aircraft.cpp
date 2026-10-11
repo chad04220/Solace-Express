@@ -658,7 +658,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     if (hk) {
       int k = hk - 1, cl = entClass(k);
       ev.crashed = true;
-      ev.crashReason = cl == EC_TREE ? (k == EK_BUSH ? "Ploughed into the scrub" : "Crashed into trees") : cl == EC_ROCK ? "Hit a rock formation" : fmt("Collided with a %s", k == EK_SILO ? "silo" : k == EK_CHURCH ? "church" : k == EK_LIGHTHOUSE ? "lighthouse" : k == EK_WATERTOWER ? "water tower" : "building");
+      ev.crashReason = cl == EC_TREE ? (k == EK_BUSH ? "Ploughed into the scrub" : "Crashed into trees") : cl == EC_ROCK ? "Hit a rock formation" : fmt("Collided with a %s", k == kBridgeKind ? "bridge" : k == EK_SILO ? "silo" : k == EK_CHURCH ? "church" : k == EK_LIGHTHOUSE ? "lighthouse" : k == EK_WATERTOWER ? "water tower" : "building");
       return;
     }
   }

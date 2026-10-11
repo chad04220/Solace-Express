@@ -12,6 +12,7 @@
 #include "gl.h"
 #include "world.h"
 #include "entity_mesh.h"
+#include "bridge_mesh.h"
 #include "ground_vehicle.h"
 #include "feed_cameras.h"
 #include "exhaust.h"
@@ -296,6 +297,12 @@ private:
   // ---- environment entities: instanced meshes -> G-buffer (lit by the lighting pass) + sun shadow cascades
   GLuint progEnt[3] = {}, progEntSh[3] = {};   // the scenery's programs, a build for each class (entities.h entClass: shaders.h entFSAssembly)
   GLuint vaoEnt = 0, vboEntMesh = 0, vboEntInst = 0;
+  // the road network's bridges (bridge_mesh.h): each built where it stands, uploaded once the world they came from is
+  // (drawEntities), drawn by the buildings' programs once for each copy of the islands in range
+  GLuint vaoBridge = 0, vboBridge = 0, vboBridgeInst = 0;
+  std::vector<BridgeMeshRange> bridgeRange;
+  const void* bridgeFrom = nullptr; size_t bridgeFromN = 0;
+  void uploadBridges();
   GLuint fboGB = 0, texGB[5] = {0, 0, 0, 0, 0}, texGBDepth = 0, fboShProxy = 0;   // (texGB[4]: the raster renderer's shadow proxy)
   GLuint fboSh[2] = {0, 0}, texSh[2] = {0, 0}; int shRes = 0;
   // shadows fade between kShFade0 and kShFade1 x the cascade radius around shIdeal (camera-anchored, so a cached

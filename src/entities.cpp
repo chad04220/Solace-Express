@@ -583,6 +583,15 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
         }
     }
   }
+  // nothing grows or stands up into a bridge: what is under a deck's footprint and would reach its girders goes (the
+  // ground under a bridge is left as it was, so the masks keep nothing off it)
+  if (!g_world.bridges.empty())
+    for (int k = 0; k < EK_COUNT; k++)
+      lists[k].erase(std::remove_if(lists[k].begin(), lists[k].end(), [&](const Ent& e) {
+        float under;
+        const float R = std::max(kEntInfo[k].hx * e.sx, kEntInfo[k].hz * e.sz);
+        return bridgeOver(g_world.bridges, e.x, e.z, R, &under) && e.y + kEntInfo[k].h * e.sy > under - 0.5f;
+      }), lists[k].end());
   ch.ents.clear();
   // The per-kind lists already know the final size. Reserve once before concatenation so streaming a dense
   // chunk does not repeatedly copy its instances or retain a doubled growth allocation.
@@ -672,6 +681,7 @@ float Scenery::obstacleTop(float x, float z, float r) {
   return top;
 }
 int Scenery::collide(vec3 p, float r, Ent* entOut) {
+  if (bridgeCollide(g_world.bridges, p, r)) return kBridgeKind + 1;   // (the road network's bridges: no entity, entOut unset)
   float pad = entityPad();
   int c0x = chunkOf(p.x - r - pad), c1x = chunkOf(p.x + r + pad), c0z = chunkOf(p.z - r - pad), c1z = chunkOf(p.z + r + pad);
   for (int cz = c0z; cz <= c1z; cz++)
@@ -789,5 +799,8 @@ float Scenery::raycast(vec3 a, vec3 d, float L, int* kindOut, Ent* entOut) {
       }
     }
   if (best >= 0.f) { if (kindOut) *kindOut = bestK + 1; if (entOut) *entOut = bestE; }
+  // the road network's bridges stop it too (nearer than any entity: kindOut 0, no entity to damage)
+  const float tb = bridgeRaycast(g_world.bridges, a, d, L);
+  if (tb >= 0.f && (best < 0.f || tb < best)) { best = tb; if (kindOut) *kindOut = 0; }
   return best;
 }

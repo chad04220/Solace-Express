@@ -12,7 +12,8 @@ class World;
 enum RoadClass : uint8_t { RC_HIGHWAY = 0, RC_ROAD = 1, RC_LANE = 2, RC_TRACK = 3, RC_COUNT };
 
 // Cross-section of each class (m): the paved half width (edge line to edge line, the central reserve included), the
-// level platform's half width (shoulders, verges), and the steepest grade it is laid at.
+// level platform's half width (shoulders, verges), and the grade its routes are found at (a lane or a track may pitch
+// to 1.6 times it for a stretch, rather than leave the hillside it is on)
 struct RoadSpec { float halfPaved, halfPlatform, maxGrade, minRadius, spacing; };
 inline const RoadSpec& roadSpec(int c) {
   static const RoadSpec k[RC_COUNT] = {
