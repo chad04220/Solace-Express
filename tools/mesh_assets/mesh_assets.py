@@ -298,7 +298,8 @@ def bundle(directory, output, source, roster, revision):
         with tempfile.TemporaryDirectory(prefix=".mesh-bundle-check-", dir=output.parent) as check:
             extracted = Path(check) / "aircraft"
             extract(Path(temporary), extracted, source, roster)
-        with open(temporary, "rb") as stream:
+        # Windows requires a writable handle for fsync; r+b preserves the ZIP bytes.
+        with open(temporary, "r+b") as stream:
             os.fsync(stream.fileno())
         atomic_write(directory / MANIFEST_NAME, manifest_bytes)
         # Report serialization is canonical in archives; unchanged producer text need not be rewritten.

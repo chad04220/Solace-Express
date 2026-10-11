@@ -8,6 +8,7 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 import mesh_assets as assets
@@ -111,6 +112,35 @@ class MeshToolTests(unittest.TestCase):
             assets.bundle(self.raw, output, self.source, self.roster, "fixture")
         self.assertEqual(output.read_bytes(), b"previous-good-release")
         self.assertFalse((self.raw / assets.MANIFEST_NAME).exists())
+
+    def test_bundle_sync_uses_writable_handle(self):
+        real_open = open
+        opened = []
+
+        def checked_open(path, *args, **kwargs):
+            stream = real_open(path, *args, **kwargs)
+            if Path(path).name.startswith(".assets.zip."):
+                if not stream.writable():
+                    stream.close()
+                    self.fail("Windows requires a writable handle for ZIP fsync")
+                opened.append(stream)
+            return stream
+
+        with patch.object(assets, "open", checked_open, create=True):
+            self.bundle()
+        self.assertEqual(len(opened), 1)
+        self.assertTrue(opened[0].closed)
+
+    def test_bundle_sync_failure_preserves_existing_output(self):
+        output = self.root / "assets.zip"
+        output.write_bytes(b"previous-good-release")
+        with patch.object(assets.os, "fsync", side_effect=OSError("sync failed")):
+            with self.assertRaisesRegex(OSError, "sync failed"):
+                assets.bundle(self.raw, output, self.source, self.roster, "fixture")
+        self.assertEqual(output.read_bytes(), b"previous-good-release")
+        self.assertFalse((self.raw / assets.MANIFEST_NAME).exists())
+        self.assertFalse(list(self.root.glob(".assets.zip.*")))
+        self.assertFalse(list(self.root.glob(".mesh-bundle-check-*")))
 
     def test_shader_binary_or_unexpected_file_is_rejected(self):
         (self.raw / "driver.bin").write_bytes(b"not distributable")
