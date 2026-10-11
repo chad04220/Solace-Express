@@ -1,4 +1,5 @@
 // Solace Express - game flow, flight session, cameras, particles, lights, audio feed
+#include "road_traffic.h"
 #include "volcano_effects.h"
 #include "game.h"
 #include "sky.h"
@@ -3221,6 +3222,24 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
   float night = fp.night;
   float lowVis = smoothstepf(8000.f, 2000.f, wx.visibility) + (wx.cloudCover > 0.8f ? 0.3f : 0.f);
   float lightI = clampf(night + lowVis * 0.6f + 0.12f, 0, 1);
+  // the traffic's lamps at range (road_traffic.h): two headlights white, two tail lights red, a pixel's point each - up
+  // close the modelled lamps are the light (ent_fs2.glsl)
+  if (night > 0.05f) {
+    const vec2 off(fp.camPos.x - wrapCoord(fp.camPos.x), fp.camPos.z - wrapCoord(fp.camPos.z));   // (in the copy of the islands the camera is over)
+    for (const RoadCar& c : g_roadTraffic.all()) {
+      vec3 at; vec2 h;
+      if (!g_roadTraffic.place(g_world, c, at, h)) continue;
+      at.x += off.x; at.z += off.y;
+      const float dl = length(at - fp.camPos), fade = smoothstepf(40.f, 160.f, dl);
+      if (fade <= 0.f || dl > RoadTraffic::kDrawn + 400.f) continue;
+      const float L = c.kind == EK_CAR ? 2.2f : 8.3f;
+      const vec3 f(h.x, 0.f, h.y), r(-h.y, 0.f, h.x);
+      for (float s : {-0.6f, 0.6f}) {
+        bill(add, at + f * L + r * s + vec3(0, 0.75f, 0), dl * 0.0016f, vec3(1.f, 0.93f, 0.8f) * (5.f * night * fade), 1.f, SPR_GLOW, 2.f);
+        bill(add, at - f * L + r * s + vec3(0, 0.9f, 0), dl * 0.0013f, vec3(1.f, 0.05f, 0.02f) * (4.f * night * fade), 1.f, SPR_GLOW, 2.f);
+      }
+    }
+  }
   // runway lighting
   for (size_t ai = 0; ai < g_world.airports.size(); ai++) {
     const Airport& a = g_world.airports[ai];

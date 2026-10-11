@@ -87,7 +87,7 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   beyond their platforms (streets and the racetrack's circuit 20 m, other roads 50 m). `roads_test` fails if any
   segment goes unlisted or the lists come within a texel's worth of the limit. New roads (Phase C's access roads)
   need that headroom, or a wider packing. `road_class_numbers` holds roads.glsl's widths and reaches to roadSpec's.
-- **Phase A is done, and Phase C's twelve landmarks are built.** Life on the roads is next (Phase D).
+- **Phase A is done, and Phase C's twelve landmarks are built.** Phase D, life on the roads, has begun.
 - **Phase C, the wind farm (after v3.48, `landmarks.cpp`, `landmarks_test`).** Ten 3 MW turbines stand 300 m apart
   along the crest of a ridge (the best one on the mild green hills, 80 to 700 m up). They are out of the settlements,
   off the roads, and 6 km or more from every runway. Each is a 90 m tower with its nacelle and three 45 m blades. The
@@ -168,6 +168,20 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
     The outermost are anchored highest, and the two fans meet at the span's middle.
   - The pylons and stays are bridge members, drawn and solid like the truss's and the arch's; the road between the
     legs stays clear.
+- **Phase D: traffic (after v3.48, `road_traffic.h`, `road_traffic_test`).** Cars and lorries drive the highways,
+  roads, lanes and streets within 2 km of the camera: up to 1,200 of them, 20 a kilometre on a highway, 14 on a
+  street, 10 on a road, 2 on a lane.
+  - Each keeps to its lane on the right of its road and on its surface, bridges included. A highway has two lanes
+    each way: the fast at 110 km/h and the slow at 86, where the lorries keep. A road runs at 80, a lane at 47 and a
+    street at 36.
+  - Every car in a lane holds that lane's pace and keeps 10 m behind the one ahead. At its road's end it carries on
+    along a road that meets it or one it ends on, waiting its turn while that way is taken, and turns back at a dead
+    end.
+  - Cars appear and leave out of sight, beyond the 1.6 km they are drawn to (and the ring fills afresh after a jump).
+    They are drawn with the scenery's own cars and the transporter as a lorry, batched into the same instanced draws,
+    and kept out of the cached shadow cascades.
+  - At night their headlights burn white and their tail lights red, with a glint each at range, as the runway lights
+    have.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

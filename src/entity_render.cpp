@@ -4,6 +4,7 @@
 #include "entity_shaders.h"
 #include "entity_lod.h"
 #include "entity_bounds.h"
+#include "road_traffic.h"
 #include <chrono>
 
 namespace {
@@ -395,6 +396,28 @@ void Renderer::drawEntities(const FrameParams& fp) {
     }
   }
 
+  // ------------------------------------------------ the traffic on the roads (road_traffic.h): moved on once a frame, its
+  // cars drawn with the scenery's own of their kinds (in each copy of the islands that's near). Never in the shadow
+  // cascades: they are kept from frame to frame, and a moving car's shadow would stay behind
+  if (!feedPass && g_worldStage >= 3) g_roadTraffic.update(g_world, cam, fp.dt);
+  {
+    static std::vector<std::pair<int, Ent>> traffic;
+    traffic.clear(); g_roadTraffic.instances(g_world, traffic);
+    for (const Copy& cp : copies)
+      for (const auto& ke : traffic) {
+        const int k = ke.first; Ent e = ke.second; e.x += cp.ox; e.z += cp.oz;
+        const float d = length(vec3(e.x, e.y, e.z) - cam);
+        if (d >= std::min(entRangeOf(R, k), RoadTraffic::kDrawn)) continue;
+        if (fp.pano <= 0.f && !boxVisible(e.x - 9.f, e.y - 1.f, e.z - 9.f, e.x + 9.f, e.y + 5.f, e.z + 9.f)) continue;
+        float l0, l1; entLodLimits(R, k, l0, l1);
+        const float close = feedPass ? 0.f : entCloseLimit(R, k);
+        const int lod = entDetailAt(d, close, l0, l1);
+        if (entRange[k].count[lod] == 0) continue;
+        bucket[0][k][lod].push_back(e);
+        const int also = entDetailAlso(k, d, close, l0, l1);
+        if (also >= 0 && entRange[k].count[also] > 0) bucket[0][k][also].push_back(e);
+      }
+  }
   double tGather = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count();
   // ------------------------------------------------ upload all buckets at once
   entStage.clear();

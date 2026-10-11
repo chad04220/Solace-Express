@@ -1359,6 +1359,10 @@ void buildAirportKind(MB& mb, int kind, int lod) {
       mb.box(vec3(-1.2f, 2.0f, 8.3f), vec3(1.2f, 3.2f, 8.32f), P_GLASS, 32);
       mb.box(vec3(-1.3f, 1.05f, -8.3f), vec3(1.3f, 4.1f, 5.3f), P_PAINT, 0x3B | 4);   // the trailer
       mb.box(vec3(-1.0f, 0.5f, -8.f), vec3(1.0f, 1.05f, 7.5f), P_DARK, 0x33);       // (the chassis)
+      for (float x : {-0.95f, 0.95f}) {   // (its lamps: head, tail)
+        mb.box(vec3(x - 0.2f, 0.75f, 8.3f), vec3(x + 0.2f, 1.0f, 8.36f), P_LAMP, 32);
+        mb.box(vec3(x - 0.15f, 1.1f, -8.36f), vec3(x + 0.15f, 1.35f, -8.3f), P_LAMP, 16);
+      }
       for (float z : {7.2f, 4.f, -4.8f, -6.2f, -7.6f}) {   // (the wheels; far off, an axle's pair one block)
         if (!d1) { mb.box(vec3(-1.25f, 0.f, z - 0.5f), vec3(1.25f, 1.f, z + 0.5f), P_DARK, 0x33); continue; }
         for (float x : {-1.1f, 1.1f}) mb.cyl(vec3(x - 0.15f, 0.5f, z), vec3(x + 0.15f, 0.5f, z), 0.5f, 0.5f, d0 ? 10 : 6, P_DARK, true, true);

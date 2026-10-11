@@ -498,11 +498,14 @@ void main(){
       else if (part == P_ROOF) alb = livery;
       else if (part == P_DARK) { alb = vec3(0.02); rough = 0.15; emit = vec3(0.3, 0.45, 0.6)*0.3; }
       else { alb = vec3(0.55); metal = 0.6; rough = 0.4; }
-    } else if (uKind == K_TRANSPORTER) {   // a team's transporter: in the team's colours, a white band along it, its cab glazed
+    } else if (uKind == K_TRANSPORTER) {   // a team's transporter (a lorry on the roads): in the team's colours, a white band
+      // along it, its cab glazed; driving (seed 2 and more: road_traffic.h), its lamps lit at night - white ahead, red behind
       vec3 team = pal(seed*7.3, vec3(0.75, 0.06, 0.05), vec3(0.05, 0.2, 0.6), vec3(0.95, 0.5, 0.05), vec3(0.08, 0.45, 0.25));
       if (part == P_PAINT) { alb = mix(team, vec3(0.9), step(2.3, mp.y)*step(mp.y, 2.7)); rough = 0.3; metal = 0.2; }
       else if (part == P_GLASS) { alb = vec3(0.04); rough = 0.05; }
       else if (part == P_TRIM) alb = team*0.7;
+      else if (part == P_LAMP) { alb = mp.z > 0.0 ? vec3(0.85) : vec3(0.5, 0.03, 0.02); rough = 0.1;
+                                 emit = seed >= 2.0 ? (mp.z > 0.0 ? vec3(1.0, 0.94, 0.82)*9.0 : vec3(1.0, 0.05, 0.02)*4.0)*uNight : vec3(0.0); }
       else { alb = vec3(0.05); rough = 0.7; }
     } else if (uKind == K_DAM) {   // the dam: concrete in its lifts and blocks, weathered in streaks down its face; its gates and
       // steel dark
@@ -668,7 +671,8 @@ void main(){
         if (uLod != 3 && (win || ck)) { alb = vec3(0.03, 0.04, 0.05); rough = 0.08; cls = 3.0; nb = n0; emit = win ? vec3(1.0, 0.9, 0.7)*uNight*0.5 : vec3(0.0); }
         if (uLod != 3 && abs(abs(mp.z - 11.6) - 0.5) < 0.04 && mp.y > 2.2 && mp.y < 4.3 && abs(mp.x) > 1.5) alb *= 0.5;   // hero mesh has fitted panes and physical door seams
       }
-    } else if (part == P_STRIPE) { alb = uKind == K_CAR ? vec3(0.38, 0.008, 0.006) : livery; rough = uKind == K_CAR ? 0.16 : 0.3; }
+    } else if (part == P_STRIPE) { alb = uKind == K_CAR ? vec3(0.38, 0.008, 0.006) : livery; rough = uKind == K_CAR ? 0.16 : 0.3;
+      if (uKind == K_CAR && seed >= 2.0) emit = vec3(1.0, 0.05, 0.02)*uNight*4.0; }   // (its tail lights, driving at night)
     else if (part == P_SOCK) { float b = floor(clamp((mp.x - 0.15)/0.72, 0.0, 4.99)); alb = mod(b, 2.0) < 0.5 ? vec3(0.95, 0.3, 0.03) : vec3(0.92); rough = 0.85; }
     else if (part == P_BEACON) {   // aerodrome beacon: alternating white and green beams sweeping round
       float a = atan(lp.z, lp.x) - uTime*1.6;
@@ -940,7 +944,8 @@ void main(){
         }
         emit = vec3(0.0); rough = max(0.065, min(0.24, entNormalWidth*0.55));
       }
-      if (headlamp) { alb = vec3(0.24, 0.235, 0.215); emit = vec3(0.0); rough = 0.085; }
+      if (headlamp) { alb = vec3(0.24, 0.235, 0.215); emit = vec3(0.0); rough = 0.085;
+                      if (seed >= 2.0) emit = vec3(1.0, 0.94, 0.82)*uNight*9.0; }   // (driving: road_traffic.h - its headlights on at night)
     }
     if ((uKind == K_CAR || uKind == K_TRUCK) && part == P_PAINT) {
       surfaceFlags |= ENTITY_CLEARCOAT;
