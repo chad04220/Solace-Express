@@ -1,0 +1,48 @@
+Start: 2026-10-11T02:01:52Z
+Compiler: g++ (Debian 14.2.0-19) 14.2.0
+Flags: -std=c++17 -O1 -g1 -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -pthread -Isrc
+ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+BUILD hive_combat
+2026-10-11T02:01:52Z
+RUN hive_combat
+Hive combat: 422 checks, 0 failures
+BUILD hive_loadout
+2026-10-11T02:01:58Z
+RUN hive_loadout
+hive_loadout_test: ammunition, thermal, charge, bomb cooldown, invalid time checks passed
+BUILD enemy_mesh_cache
+2026-10-11T02:02:00Z
+RUN enemy_mesh_cache
+PASS enemy cache little-endian roundtrip, authored-bounds/source/algorithm invalidation, checksum bit flips, allocation limits, truncation/trailer rejection, preserved outputs and atomic corruption replacement
+FOCUSED_SMALL_TESTS_PASSED 2026-10-11T02:02:02Z
+BUILD world collision with instrumented terrain/scenery dependencies
+COMPILE world
+2026-10-11T02:02:02Z
+COMPILE road_network
+2026-10-11T02:02:07Z
+COMPILE scenery
+2026-10-11T02:02:13Z
+COMPILE entities
+2026-10-11T02:02:14Z
+COMPILE airport_scenery
+2026-10-11T02:02:19Z
+COMPILE hive_world_collision
+2026-10-11T02:02:20Z
+RUN world collision
+2026-10-11T02:02:22Z
+hive_world_collision: 50 checks passed
+VERIFY source remained frozen
+src/hive_combat.cpp: OK
+src/hive_combat.h: OK
+src/hive_loadout.cpp: OK
+src/hive_loadout.h: OK
+src/hive_world_collision.cpp: OK
+src/finite_float.h: OK
+src/common.h: OK
+src/enemy_mesh_cache.h: OK
+src/mesh_validation.h: OK
+tests/hive_combat_test.cpp: OK
+tests/hive_loadout_test.cpp: OK
+tests/hive_world_collision_test.cpp: OK
+tests/enemy_mesh_cache_test.cpp: OK
+ALL_FOCUSED_SANITIZERS_PASSED 2026-10-11T02:02:23Z

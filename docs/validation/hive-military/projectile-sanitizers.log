@@ -1,0 +1,9 @@
+Sun Oct 11 02:52:21 UTC 2026
+Hive combat: 422 checks, 0 failures
+hive_loadout_test: ammunition, thermal, charge, bomb cooldown, invalid time checks passed
+0149130afbc984c5e0899b5c8b568826aea35207ea11e178f2ceb23786349034  src/hive_combat.cpp
+68e065385738614a10459832f16d6cb405ec25a60166d5fcd68a2fccfe8b5a21  src/hive_combat.h
+effee88bba4d93c5fd4e5a9614b502365a04f2e59256794646dd14e90885f1b1  src/hive_loadout.cpp
+804ab50e69b8d27f174b80202146b6d0e258809d9a8d3cf014a1941e8b8b3104  src/hive_loadout.h
+d08fd600fbb7bca0d570c24957d71989bcbbe03109327479ed4f887baa373a58  tests/hive_combat_test.cpp
+8561c2db6355c087e0032d0f3804b6fa84e74b138cf138d89143aca6957a02ee  tests/hive_loadout_test.cpp

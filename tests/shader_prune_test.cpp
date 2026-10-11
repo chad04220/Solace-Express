@@ -233,5 +233,18 @@ int main() {
     if (want != got) printf("aircraft bake hash %s, fixture %s\n", got, want.c_str());
     check(want == got, "the aircraft bodies' bake is unchanged (tests/fixtures/aircraft_bake.fnv: update it only with an aircraft edit)", "");
   }
+  // New loadout geometry must not invalidate the existing non-Wraith family bakes.
+  for (const auto& family : {std::pair<const char*,uint64_t>{"AF_LIGHT",0xc9df3f37c31b4da2ull}, {"AF_JET",0x4c0d9343f2d600b6ull}}) {
+    uint64_t h=1469598103934665603ull;
+    for(const char* n:{"","#define HULL_BAKE_NORMALS\n"})
+      for(unsigned char c:shaderPrune::prune(hullBakeFSAssembly(std::string("#define ")+family.first+"\n"+n)))h=(h^c)*1099511628211ull;
+    check(h==family.second,"non-Wraith family bake identity preserved",family.first);
+  }
+  for(int kind=0;kind<3;kind++) {
+    const std::string s=shaderPrune::prune(releasedStoreFSAssembly(kind));
+    check(s.size()<14000 && !has(s,"mapWraith(") && !has(s,"wrKineticCartridge(") && !has(s,"wrChargedCartridge("),
+      "released hardware program contains one payload, no aircraft or gun fields",s.substr(0,100));
+    check(has(s,"shadeWraithStore(") && has(s,"releasedStoreField("),"released store shares detailed field and exact bay materials","");
+  }
   return fails ? 1 : 0;
 }

@@ -1,0 +1,5 @@
+L1 120 real UI generations: full_plan_calls=0 mean_ms=0.054638 p50_ms=0.049311 p95_ms=0.083164 max_ms=0.173863
+C1 120 real UI generations: full_plan_calls=0 mean_ms=0.090859 p50_ms=0.083365 p95_ms=0.115444 max_ms=0.460083
+Hangar steady: 120 full-fleet UI+preview-CPU frames: full_plan_calls=0 quote_job_started=0 mean_ms=0.060305 p50_ms=0.054922 p95_ms=0.095106 max_ms=0.161560
+Hangar aircraft-switches: 120 full-fleet UI+preview-CPU frames: full_plan_calls=0 quote_job_started=0 mean_ms=0.048820 p50_ms=0.056515 p95_ms=0.077274 max_ms=0.084818
+Hangar fuel-changes: 120 full-fleet UI+preview-CPU frames: full_plan_calls=0 quote_job_started=0 mean_ms=0.059844 p50_ms=0.055172 p95_ms=0.077403 max_ms=0.418186

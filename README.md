@@ -1,5 +1,11 @@
 # Solace Express
 
+## Hive military review: back up careers before testing
+
+This experimental branch writes **save format 5 whenever a career is saved**, including civilian-only play. Older releases cannot read that format. Before launching this build, keep an independent copy of your existing career saves from `%APPDATA%\SolaceExpress` outside that folder. Do not rely on the rotating `.bak` file: subsequent saves can replace it with a format-5 backup. Restore your independent pre-test copy if returning to an older release.
+
+Military missions, enemy combat and XR-40 loadouts are review features. Native Windows/RTX 3070 gameplay and frame-time validation are still required. See `docs/CLAUDE_HIVE_MILITARY_REVIEW.md` in the source for coverage and limitations.
+
 *Formerly Air Xpress. On first launch, saves, settings and radio stations move from `%APPDATA%\AirXpress` to `%APPDATA%\SolaceExpress`.*
 
 A pilot-career flight game for Windows with a detailed real-time 3D world drawn on the GPU. You start as a student with a permit, earn your licences, rent small planes to haul cargo, rent bigger ones to fly passengers, then buy your own aircraft for longer, harder contracts: mountain strips, glaciers, volcano fields, night storms and finally your own airline (the AIRLINE tab: hired pilots fly your aircraft on routes while you fly your own work, and their flights pass you as traffic in your livery).

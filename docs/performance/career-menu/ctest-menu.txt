@@ -1,0 +1,7 @@
+Test project /workspace/scratch/87b29863f015/solace-menu-fps-build
+    Start 1: menu_plan_cache
+1/1 Test #1: menu_plan_cache ..................   Passed    3.44 sec
+
+100% tests passed out of 1
+
+Total Test time (real) =   3.44 sec

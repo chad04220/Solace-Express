@@ -57,7 +57,7 @@ void main(){
   vec3 p = ro + rd*t, n = octDec(g0.yz);
   float sunS = 1.0;
   bool ground = cls == GB_TERRAIN || cls == GB_ENTITY || cls == GB_FOLIAGE;
-  if (ground && uSunDir.y > -0.05 && t < 3000.0) {
+  if ((ground || cls == GB_ENEMY) && uSunDir.y > -0.05 && t < 3000.0) {
     float m = (uAfShOn & 1) != 0 ? shMapLookup(0, p, n) : -1.0;
 #ifdef PROXY_MAPS_ONLY
     sunS = m >= 0.0 ? mix(m, 1.0, uWr[4].w*0.88) : 1.0;
@@ -70,6 +70,7 @@ void main(){
     if (uTrafficN > 0) sunS *= trafficShadowMaps(p, n);
 #endif
   }
+  if ((ground || cls == GB_PLANE || cls == GB_TRAFFIC || cls == GB_WRECK) && uSunDir.y > -.05 && t < 3000.) sunS *= enemyShadowMaps(p,n)*storeShadowMaps(p,n);
   vec3 ls = vec3(1.0);
   for (int i = 0; i < 12; i++) {
     if (i >= uPLN) break;

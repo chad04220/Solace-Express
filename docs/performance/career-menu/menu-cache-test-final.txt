@@ -1,0 +1,2 @@
+Real Contracts UI CPU-only steady average 0.0500 ms; 1 full plans before, 1 after 120 frames.
+624 checks, 0 failures. No GPU, display cadence or RTX FPS claim.

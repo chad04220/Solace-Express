@@ -75,7 +75,7 @@ void main(){
   vec3 wp = vec3(c*lp.x + s*lp.z, lp.y, -s*lp.x + c*lp.z) + iA.xyz;
   vec3 ln = normalize(posedN/iB.xyz);
 #if ENT_BUILDINGS
-  if (uKind == 40 && abs(aAux.x - 23.0) < 0.5) {
+  if (uKind == 44 && abs(aAux.x - 23.0) < 0.5) {   // (EK_WINDSOCK: entities.h)
     // windsock: the sock (modelled along +x from the pole top) streams downwind, filling out by ~15 kt and drooping
     // when calm, with a little flutter. Built straight in world space, then expressed back in the instance frame.
     vec2 w = uWind.xz; float sp = length(w), k = clamp(sp/7.7, 0.0, 1.0);

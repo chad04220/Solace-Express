@@ -24,8 +24,11 @@ const int PT_YOKE_SHAFT = 0, PT_YOKE_WHEEL = 1, PT_PEDAL = 2, PT_THR_KNOB = 3, P
           // (the gear's struts, wheels and doors serve the XR-40 too: it has the same gear in other bays)
           PT_JT_NOZZLE = 38, PT_JT_LEGM = 39, PT_JT_WHEELM = 40, PT_JT_LEGN = 41, PT_JT_WHEELN = 42, PT_JT_DOORM = 43, PT_JT_DOORN = 44,
           PT_WR_ACT = 45, PT_ATLAS_FAN = 46;   // the XR-40's pods' hydraulic tilt actuators (stretched along their axis as the pods tilt)
+#if !defined(PART_BAKE) || (!defined(AF_LIGHT) && !defined(AF_JET))
+const int PT_WR_KINETIC = 47, PT_WR_CHARGED = 48, PT_WR_PENETRATOR = 49, PT_WR_EMP = 50;
+#endif
 bool partIsJet(int k){ return (k >= PT_JT_ELEVON && k <= PT_JT_RUDDER) || (k >= PT_JT_NOZZLE && k <= PT_JT_DOORN); }
-bool partIsWraith(int k){ return (k >= PT_WR_PODF && k <= PT_WR_RUDV) || k == PT_WR_ACT; }
+bool partIsWraith(int k){ return (k >= PT_WR_PODF && k <= PT_WR_RUDV) || k == PT_WR_ACT || (k >= PT_WR_KINETIC && k <= PT_WR_EMP); }
 const vec3 WRP_POD[4] = vec3[4](vec3(-2.35, -0.08, -3.3), vec3(2.35, -0.08, -3.3), vec3(-2.75, 0.05, 3.45), vec3(2.75, 0.05, 3.45));   // (wraith_sdf.glsl WR_POD)
 int gPartMode = -1;   // -1: the whole aircraft, its parts posed; -2: without its parts; >= 0: that part alone, in its own frame
 struct Pose { mat3 R; vec3 T; };   // (R is a rotation for the cockpit parts; for a control surface an affine map: its deflection
@@ -117,9 +120,9 @@ Pose wrPartPose(int k, vec2 sd){
   float las = gWr[4].z;
   vec3 L0 = vec3(0.95, -0.1 - 0.12*0.0025443 - 0.18, -5.1);   // (wraith_sdf.glsl: the turret's frame)
   if (k == PT_WR_DOOR) { X.R = S*partRxy(gWr[4].y*1.75); X.T = S*vec3(0.53, -0.575, 0.1); }
-  else if (k == PT_WR_BOMB) { X.R = mat3(max(gWr[6].x, 1e-3)); X.T = vec3(0.0, -0.305, 0.1); }
+  else if (k == PT_WR_BOMB || k == PT_WR_PENETRATOR || k == PT_WR_EMP) { X.R = mat3(max(gWr[6].x, 1e-3)); X.T = vec3(0.0, -0.305, 0.1); }
   else if (k == PT_WR_HATCH) { X.R = S*partRxy(-las*1.9); X.T = S*(L0 + vec3(0.2, -0.17, 0.0)); }
-  else if (k == PT_WR_TURRET) { X.R = S; X.T = S*(L0 + vec3(0.0, -0.38*las, -0.25*las)); }
+  else if (k == PT_WR_TURRET || k == PT_WR_KINETIC || k == PT_WR_CHARGED) { X.R = S; X.T = S*(L0 + vec3(0.0, -0.38*las, -0.25*las)); }
   else if (k == PT_WR_MUZZLE) { X.R = S; X.T = S*(L0 + vec3(0.0, -0.38*las, -0.25*las + 0.15*(1.0 - las))); }
   else if (k == PT_WR_ARM) {   // (it telescopes: scaled along its own axis)
     vec3 u = normalize(vec3(0.0, -0.38, -0.25));

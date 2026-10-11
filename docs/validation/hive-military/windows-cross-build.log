@@ -1,0 +1,9 @@
+[0/2] Re-checking globbed directories...
+[1/9] Building CXX object CMakeFiles/SolaceExpress.dir/src/hive_combat.cpp.obj
+[2/9] Building CXX object CMakeFiles/SolaceExpress.dir/src/game.cpp.obj
+[3/9] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_ui.cpp.obj
+[4/9] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_research_ui.cpp.obj
+[5/9] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_wraith.cpp.obj
+[6/9] Building CXX object CMakeFiles/SolaceExpress.dir/src/renderer.cpp.obj
+[7/9] Building CXX object CMakeFiles/SolaceExpress.dir/src/platform_win32.cpp.obj
+[8/9] Linking CXX executable SolaceExpress.exe

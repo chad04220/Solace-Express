@@ -263,9 +263,9 @@ void addSettlementStreets(const World& world, const std::vector<SettlementField>
   // ---- round the cores and through the villages: streets branching off the roads and streets every so far, out to
   // either side by turns, each finding its way over the ground - holding its grade, wandering a little, keeping 40 m
   // from the next street (room for the lots between) - until it has gone its length, reached the settlement's edge or
-  // found nowhere to go; ending at another street where it meets one, in a turning where it doesn't. Twice: the second
-  // round branches off the first's
-  auto branch = [&](const SettlementField& F, vec2 from, vec2 dir, int parent, float maxLen, uint32_t seed) {
+  // found nowhere to go (or short of minLen: not built); ending at another street where it meets one, in a turning
+  // where it doesn't. Three rounds, each branching off the last's
+  auto branch = [&](const SettlementField& F, vec2 from, vec2 dir, int parent, float maxLen, uint32_t seed, float minLen = 60.f) {
     std::vector<vec2> line{from};
     vec2 pos = from; float heading = atan2f(dir.y, dir.x), run = 0.f;
     const float step = 12.f;
@@ -292,7 +292,7 @@ void addSettlementStreets(const World& world, const std::vector<SettlementField>
       }
       line.push_back(next); pos = next; heading = nh; run += step;
     }
-    if (run < 60.f && !joined) return false;
+    if (run < minLen && !joined) return false;
     return lay(line);
   };
   // the core's streets carried on out from its edge, wandering as the ground has them
@@ -331,6 +331,35 @@ void addSettlementStreets(const World& world, const std::vector<SettlementField>
         const uint32_t seed = (uint32_t)(pi * 7919 + k * 104729 + round * 13);
         const float len = (F.kind == 0 ? 120.f : 150.f) + (F.kind == 0 ? 140.f : 250.f) * hash2i((int)(seed % 100003), (int)round);
         branch(F, b, out, (int)pi, round ? len * 0.75f : len, seed);
+      }
+    }
+  }
+  // ---- and the closes: short streets (48 m and more) into the back-land the rounds leave - off each street every
+  // 70 m, to either side, wherever the ground 60 m out is still open (no street within 34 m of it), so a block's middle
+  // is reached from its streets and built on rather than left a field behind the houses
+  const size_t parents = net.paths.size();
+  for (size_t pi = 0; pi < parents; pi++) {
+    const RoadPath P = net.paths[pi];
+    if (P.cls != RC_STREET) continue;
+    const float half = roadSpec(P.cls).halfPlatform;
+    float acc = 35.f * hash2i((int)pi, 41);
+    for (size_t k = 1; k < P.pts.size(); k++) {
+      const vec2 a(P.pts[k - 1].x, P.pts[k - 1].z), b(P.pts[k].x, P.pts[k].z);
+      acc += length(b - a);
+      if (acc < 70.f || k + 1 >= P.pts.size()) continue;
+      int town = -1;
+      const float share = settlementShare(fields, b.x, b.y, &town);
+      if (town < 0 || share >= 0.85f) continue;
+      const SettlementField& F = fields[town];
+      if (F.kind > 0 && share < F.core / F.budget * 0.9f) continue;   // (the core has its grid)
+      acc = 0.f;
+      const vec2 d = (b - a) * (1.f / std::max(length(b - a), 1e-3f));
+      for (int side = 0; side < 2; side++) {
+        const vec2 out = side ? vec2(-d.y, d.x) : vec2(d.y, -d.x);
+        if (idx.nearest(b + out * (half + 30.f), 32.f, (int)pi) < 1e8f || idx.nearest(b + out * (half + 60.f), 34.f, -1) < 1e8f) continue;
+        if (!inside(b + out * (half + 60.f), F, 0.95f)) continue;
+        const uint32_t seed = (uint32_t)(pi * 6151 + k * 92821 + side * 17);
+        branch(F, b, out, (int)pi, 72.f + 48.f * hash2i((int)(seed % 100003), 3), seed, 48.f);
       }
     }
   }

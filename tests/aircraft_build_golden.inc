@@ -1,6 +1,9 @@
 // Pre-refactor build inputs and output contracts captured on 2026-10-10.
 // The fixture deliberately freezes inputs; it is independent of later aircraft tuning.
 // Source: original aircraft_mesh.cpp partList/bounds and hull_mesh.h hullStateList.
+// 2026-10-11: only XR-40 exterior lists updated for six selected-loadout instances
+// (two payload variants plus paired kinetic/charged guns); all other goldens unchanged.
+// XR-40 plasma cage detail lattice alone refined6mm→3mm after native close-up QA.
 // Part bounds allow 2 micrometres for cross-platform math-library rounding.
 namespace buildGolden {
 static const float kPacked[15][96] = {
@@ -70,8 +73,8 @@ static const List lists[] = {
   {11,0,11,17, 8473699593938676705ull},
   {11,1,-1,21, 15751763698184810713ull},
   {11,1,11,21, 15751763698184810713ull},
-  {12,0,-1,99, 11685127348734820535ull},
-  {12,0,12,99, 11685127348734820535ull},
+  {12,0,-1,105, 17260077259135059748ull},
+  {12,0,12,105, 17260077259135059748ull},
   {12,1,-1,4, 2716414270171978987ull},
   {12,1,12,4, 2716414270171978987ull},
   {13,0,-1,10, 12092916215658042431ull},
@@ -237,7 +240,7 @@ static const Plan plans[] = {
   {12,20,0, {0.00300000003f,-0.0240000002f,-0.25999999f,-0.0850000009f,0.0240000002f,0.25999999f,0.0850000009f}},
   {12,21,0, {0.00400000019f,0.239999995f,-0.170000002f,0.920000017f,0.5f,0.170000002f,1.39999998f}},
   {12,22,0, {0.00600000005f,-0.545000017f,-0.0399999991f,-1.67999995f,0.0149999997f,0.0120000001f,1.67999995f}},
-  {12,23,0, {0.00600000005f,-0.310000002f,-0.310000002f,-0.310000002f,0.310000002f,0.310000002f,0.310000002f}},
+  {12,23,0, {0.00300000003f,-0.310000002f,-0.310000002f,-0.310000002f,0.310000002f,0.310000002f,0.310000002f}},
   {12,24,0, {0.00400000019f,-0.414999992f,-0.0140000004f,-0.514999986f,0.0149999997f,0.0359999985f,0.514999986f}},
   {12,25,0, {0.00400000019f,-0.174999997f,-0.144999996f,-0.939999998f,0.174999997f,0.144999996f,0.36500001f}},
   {12,26,0, {0.00300000003f,-0.0599999987f,-0.0799999982f,-1.14999998f,0.0599999987f,0.0399999991f,-0.660000026f}},

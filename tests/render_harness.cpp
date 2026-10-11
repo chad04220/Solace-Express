@@ -3,6 +3,8 @@
 #include <unistd.h>
 // Development harness: renders test frames on Linux (Xvfb + Mesa) to validate shaders and visuals.
 #include <X11/Xlib.h>
+#undef None      // (Xlib's macros are values' names in the game's headers - hive_combat.h's None and
+#undef Success   // Success - and unused here)
 #include <dlfcn.h>
 #include "../src/renderer.h"
 #include "../src/shaders.h"

@@ -70,15 +70,20 @@ float Game::S() const {
   return g_ren.W > 0 ? std::min(byH, g_ren.W / (1280.f / 1.4f)) : byH;   // (no window, headless: by the height alone)
 }
 
+// (the pointer: the mouse's, or the left stick's cursor; while the D-pad leads, the focus's place - focusNavigate)
 bool Game::pointerOverOverlay() const {
+  const bool fp = focusNav && focusPointer;
+  const float mx = fp ? focusPointerX : in.mx, my = fp ? focusPointerY : in.my;
   return showRadio && !radioDrawing && radioRect[2] > 0.f &&
-         in.mx >= radioRect[0] && in.mx < radioRect[0] + radioRect[2] && in.my >= radioRect[1] && in.my < radioRect[1] + radioRect[3];
+         mx >= radioRect[0] && mx < radioRect[0] + radioRect[2] && my >= radioRect[1] && my < radioRect[1] + radioRect[3];
 }
 
 bool Game::hovered(float x, float y, float w, float h) const {
   if (pointerOverOverlay()) return false;   // (beneath the radio panel: it owns the pointer there)
-  if (hitClipOn && (in.mx < hitClip[0] || in.mx >= hitClip[2] || in.my < hitClip[1] || in.my >= hitClip[3])) return false;
-  return in.mx >= x && in.mx < x + w && in.my >= y && in.my < y + h;
+  const bool fp = focusNav && focusPointer;
+  const float mx = fp ? focusPointerX : in.mx, my = fp ? focusPointerY : in.my;
+  if (hitClipOn && (mx < hitClip[0] || mx >= hitClip[2] || my < hitClip[1] || my >= hitClip[3])) return false;
+  return mx >= x && mx < x + w && my >= y && my < y + h;
 }
 
 // Eases a per-widget value toward target (hover glows, sliding indicators)
@@ -188,6 +193,52 @@ bool Game::focusHere(uint32_t id, float x, float y, float w, float h, bool* acti
     if (*activated) { in.pressed[K_ENTER] = in.pressed[' '] = false; g_audio.trigger(SFX_CLICK); }
   }
   return f;
+}
+
+uint32_t Game::uiId(float x, float y, const std::string& s) { return uid(x, y, s); }
+bool Game::focusAdjust(uint32_t id, float x, float y, float w, float h, int* step) {
+  const float s = S();
+  focusList.push_back({id, x, y, w, h, true});
+  const bool f = focusNav && focusId == id;
+  if (f) g_ren.rectOutline(x - 3 * s, y - 3 * s, w + 6 * s, h + 6 * s, C_ACCENT, 0.7f + 0.3f * sinf(realTime * 6.f), 6 * s, 2.f * s);
+  if (step) { *step = f ? focusStep : 0; if (*step) g_audio.trigger(SFX_CLICK); }
+  return f;
+}
+
+void Game::focusScrollPixels(size_t first, uint32_t id, float x, float top, float w, float bottom, float& scroll, bool wheeled, bool scrolls) {
+  const float s = S();
+  const size_t end = focusList.size();
+  // (a window that scrolls: its scroll bar, at its right edge, a stop of its own - focused, the right stick scrolls it)
+  if (scrolls) focusHere(id, x + w - 12 * s, top, 12 * s, bottom - top);
+  if (!focusNav) return;
+  for (size_t k = first; k < end; ++k) if (focusList[k].id == focusId) {
+    const float fy = focusList[k].y, fh = focusList[k].h;
+    if (fy >= top && fy + fh <= bottom) return;
+    if (!wheeled) { if (fy < top) scroll -= top - fy + 8 * s; else scroll += fy + fh - bottom + 8 * s; return; }
+    // the window moved under the focus: it goes along, to the nearest control still shown (or the scroll bar)
+    uint32_t best = id; float bd = 1e18f;
+    for (size_t j = first; j < end; ++j) {
+      const Focusable& f = focusList[j];
+      if (f.y < top || f.y + f.h > bottom) continue;
+      const float d = fabsf(f.y + f.h * 0.5f - (fy + fh * 0.5f));
+      if (d < bd) { bd = d; best = f.id; }
+    }
+    focusId = best;
+    return;
+  }
+}
+
+void Game::focusScrollRows(const std::function<uint32_t(int)>& idOf, int count, int& rowsFirst, int visible, int perRow, bool wheeled) {
+  if (!focusNav || count <= 0) return;
+  for (int i = 0; i < count; ++i) if (idOf(i) == focusId) {
+    const int row = i / perRow;
+    if (row >= rowsFirst && row < rowsFirst + visible) return;
+    if (wheeled) {   // (scrolled away from the focus: it goes along, onto the nearest row still shown)
+      const int r = row < rowsFirst ? rowsFirst : rowsFirst + visible - 1;
+      focusId = idOf(std::clamp(r * perRow + i % perRow, 0, count - 1));
+    } else rowsFirst = row < rowsFirst ? row : row - visible + 1;
+    return;
+  }
 }
 
 std::vector<std::string> wrap(const std::string& s, float width, float size) {   // (shared with the research terminal)
@@ -430,6 +481,7 @@ void Game::drawLoading() {
 }
 
 // ------------------------------------------------------------------ main menu
+void Game::enterCareerHub() { screen = SCR_HUB; hubTab = TAB_CONTRACTS; hubList = 0; selContract = 0; selAircraft = -1; }
 void Game::drawMenu() {
   float W = (float)g_ren.W, H = (float)g_ren.H;
   float s = std::min(S(), std::min(H / 690.f, W / 1040.f));
@@ -447,15 +499,15 @@ void Game::drawMenu() {
   if (hasSave) {
     const Airport& ap = g_world.airports[career.location];
     g_ren.text(x + 24 * s, y + 36 * s, 15 * s, ellipsize(std::string(licenseName(career.license)) + " / " + ap.code, bw, 15 * s), C_TEXT, 1);
-    if (button(x + 24 * s, y + 64 * s, bw, 34 * s, "Continue career", true, true)) { screen = SCR_HUB; career.refreshBoard(); }
+    if (button(x + 24 * s, y + 64 * s, bw, 34 * s, "Continue career", true, true)) { enterCareerHub(); career.refreshBoard(); }
   } else g_ren.text(x + 24 * s, y + 40 * s, 15 * s, "Start small. Build your airline.", C_TEXT, 1);
   y += (hasSave ? 130 : 102) * s;
   if (in.pressed[K_ESC]) { confirmNew = false; confirmRes = false; }
   if (!confirmNew) {
-    if (button(x, y, cw, 42 * s, "New career", true, !hasSave)) { if (hasSave) confirmNew = true; else { pendingCareer.reset(); career.newGame(); saveGame(); screen = SCR_HUB; } }
+    if (button(x, y, cw, 42 * s, "New career", true, !hasSave)) { if (hasSave) confirmNew = true; else { pendingCareer.reset(); career.newGame(); saveGame(); enterCareerHub(); } }
   } else {
     g_ren.text(x, y - 14 * s, 11 * s, "Replace your saved career?", C_WARN, 1);
-    if (button(x, y, (cw - 10 * s) * 0.5f, 42 * s, "Overwrite save", true, true)) { pendingCareer.reset(); career.newGame(); saveGame(); confirmNew = false; screen = SCR_HUB; }
+    if (button(x, y, (cw - 10 * s) * 0.5f, 42 * s, "Overwrite save", true, true)) { pendingCareer.reset(); career.newGame(); saveGame(); confirmNew = false; enterCareerHub(); }
     if (button(x + (cw + 10 * s) * 0.5f, y, (cw - 10 * s) * 0.5f, 42 * s, "Cancel")) confirmNew = false;
   }
   y += 54 * s;
@@ -586,6 +638,27 @@ void Game::drawMapView(float x, float y, float w, float h, int from, int to, con
 
 void Game::drawHubContracts(float x, float y, float w, float h) {
   float s = S();
+  if(hubList==2) {
+    panel(x,y,w,h);
+    if(button(x+20*s,y+16*s,130*s,32*s,"< Civilian work")) { hubList=0; return; }
+    g_ren.text(x+180*s,y+20*s,21*s,"MILITARY SERVICE / OUTFITTED LOANERS",C_ACCENT,1);
+    g_ren.text(x+28*s,y+52*s,12*s,fmt("SERVICE RANK %d / %d SC / %d SORTIES / %d SUCCESSES / %d INTELLIGENCE",career.military.rank,career.military.credits,career.military.sorties,career.military.successes,career.military.intelligence),C_GOOD,1);
+    float yy=y+84*s;
+    for(int kind=0;kind<3;++kind) {
+      Contract c=career.militaryContract(kind);
+      const float rowH=std::min(142*s,(h-167*s)/3.f);
+      card(x+20*s,yy,w-40*s,rowH-10*s,militarySelection==kind,false,C_ACCENT);
+      g_ren.text(x+36*s,yy+10*s,18*s,c.title,C_TEXT,1);
+      float ty=yy+35*s;
+      for(auto& line:wrap(c.brief,w-285*s,12*s)) { if(ty>yy+rowH-20*s) break; g_ren.text(x+36*s,ty,12*s,line,C_DIM,1);ty+=17*s; }
+      if(button(x+w-228*s,yy+18*s,190*s,38*s,kind==0?"Fly recon loaner":"Fly outfitted XR-40",!commitBlocked(),true)) { militarySelection=kind; launchMilitary(kind); return; }
+      g_ren.text(x+w-225*s,yy+64*s,12*s,fmt("Award: %d service credits",c.payout),C_GOOD,1);
+      yy+=rowH;
+    }
+    g_ren.text(x+28*s,y+h-55*s,12*s,"Separate service record. Supplied aircraft, fuel and stores. Civilian jobs and finances stay intact.",C_DIM,1);
+    if(!hubMsg.empty()) g_ren.text(x+28*s,y+h-30*s,12*s,hubMsg,C_WARN,1);
+    return;
+  }
   float lw = std::min(w * 0.29f, 370 * s);
   panel(x, y, lw, h);
   // build card list: story, free flight, freelance
@@ -604,9 +677,10 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   selContract = std::clamp(selContract, 0, (int)cards.size() - 1);
   float cy = y + 14 * s;
   {   // the list switch: the work, or the trials (off the books, scored on a local board)
-    float sw = (lw - 40 * s) * 0.5f;
+    float sw = (lw - 48 * s) / 3.f;
     if (button(x + 16 * s, cy - 4 * s, sw, 26 * s, hubList == 0 ? "WORK" : "work", true, hubList == 0) && hubList != 0) { hubList = 0; selContract = 0; selAircraft = -1; }
     if (button(x + 24 * s + sw, cy - 4 * s, sw, 26 * s, hubList == 1 ? "TRIALS" : "trials", true, hubList == 1) && hubList != 1) { hubList = 1; selContract = 0; selAircraft = -1; }
+    if(button(x+32*s+sw*2,cy-4*s,sw,26*s,"Military")) { hubList=2; selContract=0; return; }
     cy += 32 * s;
   }
   if (hubList == 0) { header(x + 16 * s, cy, lw - 32 * s, ellipsize(career.finished ? "CAMPAIGN COMPLETE - FREELANCE JOBS CONTINUE" : "AVAILABLE WORK", lw - 60 * s, 13 * s)); cy += 28 * s; }
@@ -617,20 +691,27 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   const int visCards = std::max(1, (int)floorf((listBot - listTop + 8 * s) / step)), nCards = (int)cards.size();
   static int listScroll = 0; static int listFor = -1, selSeen = -1;
   if (listFor != hubList) { listFor = hubList; listScroll = 0; }
-  if (hovered(x, listTop, lw, listBot - listTop) && in.wheel != 0) { listScroll -= (int)in.wheel; in.wheel = 0; }
+  bool cardsWheeled = false;
+  if (hovered(x, listTop, lw, listBot - listTop) && in.wheel != 0) { listScroll -= (int)in.wheel; in.wheel = 0; cardsWheeled = true; }
   if (selSeen != selContract) {   // a new selection (keys, a stick) scrolls itself into view
     selSeen = selContract;
     if (selContract < listScroll) listScroll = selContract;
     if (selContract >= listScroll + visCards) listScroll = selContract - visCards + 1;
   }
+  // the D-pad walks the cards (A takes one): stepping off the window's edge scrolls the list a card (the card just
+  // past each edge is in the walk), the right stick scrolling it takes the focus along
+  auto cardId = [&](int i) { return uid(0, (float)(i + 1000 * hubList), "contract-card"); };
+  focusScrollRows(cardId, nCards, listScroll, visCards, 1, cardsWheeled);
   listScroll = std::clamp(listScroll, 0, std::max(0, nCards - visCards));
+  for (int i : {listScroll - 1, listScroll + visCards}) if (i >= 0 && i < nCards) focusList.push_back({cardId(i), x + 10 * s, cy + (i - listScroll) * step, lw - 20 * s, chh});
   if (listScroll > 0) g_ren.text(x + lw - 18 * s, listTop - 24 * s, 12 * s, fmt("^ %d more", listScroll), C_DIM, 1, 2);
   if (listScroll + visCards < nCards) g_ren.text(x + lw - 18 * s, listBot - 6 * s, 12 * s, fmt("%d more v", nCards - listScroll - visCards), C_DIM, 1, 2);
   for (int i = listScroll; i < nCards && i < listScroll + visCards; i++) {
     bool sel = i == selContract;
     bool hov = hovered(x + 10 * s, cy, lw - 20 * s, chh);
     card(x + 10 * s, cy, lw - 20 * s, chh, sel, hov, cards[i].job ? C_GOOD : cards[i].story ? C_WARN : C_ACCENT);
-    if (hov && in.mPressed[0]) { selContract = i; selAircraft = -1; launchFuelKg = -1; g_audio.trigger(SFX_CLICK); }
+    bool take = false; focusHere(cardId(i), x + 10 * s, cy, lw - 20 * s, chh, &take);
+    if ((hov && !focusNav && in.mPressed[0]) || take) { selContract = i; selAircraft = -1; launchFuelKg = -1; if (!take) g_audio.trigger(SFX_CLICK); }
     if (cards[i].trial >= 0) {
       int k = cards[i].trial;
       auto it = trialBest.find(trialId(k));
@@ -685,8 +766,10 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   const float detTop = py, detBot = chooserTop - 10 * s;
   static float detScroll = 0.f, detMax = 0.f; static int detFor = -1;
   if (detFor != hubList * 1000 + selContract) { detFor = hubList * 1000 + selContract; detScroll = 0.f; detMax = 0.f; }
-  if (hovered(px, detTop, textW, detBot - detTop) && in.wheel != 0) { detScroll -= in.wheel * 48.f * s; in.wheel = 0; }
+  bool detWheeled = false;   // (the region with its scroll bar beside it: the bar is the region's own stop in the D-pad's walk)
+  if (hovered(px, detTop, textW + 14 * s, detBot - detTop) && in.wheel != 0) { detScroll -= in.wheel * 48.f * s; in.wheel = 0; detWheeled = true; }
   detScroll = std::clamp(detScroll, 0.f, detMax);
+  const size_t detFocus0 = focusList.size();
   auto inView = [&](float yy, float hh) { return yy >= detTop && yy + hh <= detBot; };   // (a control scrolled out of the region is neither drawn nor clickable)
   g_ren.uiClip(px - 4 * s, detTop, px + textW + 4 * s, detBot);
   py -= detScroll;
@@ -730,12 +813,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   if (isCareerAircraft(selAircraft)) {   // for the aircraft picked below (last frame's choice)
     auto esrc = career.canFly(c, selAircraft);
     if (esrc != Career::SRC_NONE) {
-      // (the plan runs the autopilot's approach planner: cached for this job, aircraft and career state)
-      static std::string planKey; static Career::LaunchPlan e;
-      std::string key = fmt("%s|%d|%d|%d|%d|%u", c.id.c_str(), selAircraft, (int)esrc, career.location, career.money < 1500, career.boardSeed);
-      if (key != planKey) { e = career.plan(c, selAircraft, esrc); if (cd.job) continuationWaivers(e, c, selAircraft, esrc); planKey = key; }   // (a job leg: quoted as it will be charged - C3)
-      if (!e.flown) applyQuote(c, e, true);   // (the flown time replaces the quick estimate when it's in)
-      career.planFuel(e, c, chosenFuel(c, selAircraft, esrc, e));   // selected uplift also drives costs and net
+      Career::LaunchPlan e = menuLaunchPlan(c, selAircraft, esrc, cd.job, true);
       int ops = e.fees() + e.fuelCostEst;
       if (c.payout > 0 || ops > 0) {
         std::string parts;
@@ -759,8 +837,14 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
           std::string v = fmt("%.0f kg (%.0f%%)  -  take-off %.0f of %.0f kg%s", fuel, 100.f * fuel / sp.maxFuel, mass, sp.maxMass(), heavy ? "  OVERWEIGHT" : "");
           if (roll > 0) v += fmt(", roll ~%.0f m", roll);
           if (ef.fuel == Career::LaunchPlan::FUEL_PURCHASED) v += ef.fuelUpliftKg > 0.5f ? fmt(", uplift %.0f kg for %s", ef.fuelUpliftKg, fmtMoney(ef.fuelCostEst).c_str()) : " (tanks hold it)";
-          if (inView(py - 4 * s, 24 * s) && button(px + 130 * s - 36 * s, py - 4 * s, 28 * s, 24 * s, "<")) launchFuelKg = std::max(sp.maxFuel * 0.1f, fuel - sp.maxFuel * 0.05f);
-          if (inView(py - 4 * s, 24 * s) && button(px + textW - 30 * s, py - 4 * s, 28 * s, 24 * s, ">")) launchFuelKg = std::min(sp.maxFuel, fuel + sp.maxFuel * 0.05f);
+          {   // the fuel row: with the D-pad's focus on it, left / right take 5% off or put it on (the arrows are the mouse's)
+            int step = 0; focusAdjust(uid(0, (float)selAircraft, "job-fuel"), px, py - 4 * s, textW, 24 * s, &step);
+            if (step) launchFuelKg = std::clamp(fuel + step * sp.maxFuel * 0.05f, sp.maxFuel * 0.1f, sp.maxFuel);
+            const size_t arrows = focusList.size();
+            if (inView(py - 4 * s, 24 * s) && button(px + 130 * s - 36 * s, py - 4 * s, 28 * s, 24 * s, "<")) launchFuelKg = std::max(sp.maxFuel * 0.1f, fuel - sp.maxFuel * 0.05f);
+            if (inView(py - 4 * s, 24 * s) && button(px + textW - 30 * s, py - 4 * s, 28 * s, 24 * s, ">")) launchFuelKg = std::min(sp.maxFuel, fuel + sp.maxFuel * 0.05f);
+            focusList.resize(arrows);
+          }
           float pyRow = py;
           row("Fuel", v, heavy ? C_BAD : C_TEXT);
           (void)pyRow;
@@ -786,6 +870,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   if (c.from != career.location && c.type != CT_LESSON) { int pc = career.positioningCost(c); row("Positioning", pc ? fmt("Airline ticket to %s: %s", A.code, fmtMoney(pc).c_str()) : "Free courtesy ride", C_DIM); }
   g_ren.uiClipOff();
   detMax = std::max(0.f, py + detScroll - detBot);   // (how far the region scrolls: next frame's limit)
+  focusScrollPixels(detFocus0, uid(0, 0, "job-details-scroll"), px, detTop, textW + 14 * s, detBot, detScroll, detWheeled, detMax > 0.f);
   if (detMax > 0.f) {   // a thin bar beside the text: where the view is in the briefing
     const float trackH = detBot - detTop, barH = std::max(20 * s, trackH * trackH / (trackH + detMax));
     g_ren.rect(px + textW + 8 * s, detTop, 3 * s, trackH, C_ACCENT, 0.12f);
@@ -826,8 +911,17 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   const int totalRows = (kNumAircraft + 1) / 2, visRows = std::max(1, (int)floorf((chooserBot - py + 6 * s) / rowStep));
   static int chooserScroll = 0; static int chooserFor = -1;
   if (chooserFor != hubList * 1000 + selContract) { chooserFor = hubList * 1000 + selContract; chooserScroll = 0; }
-  if (hovered(px, py, iw, visRows * rowStep) && in.wheel != 0) { chooserScroll -= (int)in.wheel; in.wheel = 0; }
+  bool chooserWheeled = false;
+  if (hovered(px, py, iw, visRows * rowStep) && in.wheel != 0) { chooserScroll -= (int)in.wheel; in.wheel = 0; chooserWheeled = true; }
+  // the D-pad walks the aircraft (A takes one; one it can't fly shows why): stepping off the window's edge scrolls the
+  // rows (the row just past each edge is in the walk), the right stick scrolling them takes the focus along
+  auto craftId = [&](int j) { return uid(0, (float)order[j], "job-aircraft"); };
+  focusScrollRows(craftId, kNumAircraft, chooserScroll, visRows, 2, chooserWheeled);
   chooserScroll = std::clamp(chooserScroll, 0, std::max(0, totalRows - visRows));
+  for (int r : {chooserScroll - 1, chooserScroll + visRows}) for (int c2 = 0; c2 < 2; c2++) {
+    const int j = r * 2 + c2;
+    if (r >= 0 && j < kNumAircraft) focusList.push_back({craftId(j), px + c2 * (colW + 10 * s), py + (r - chooserScroll) * rowStep, colW, rowH});
+  }
   int hidden = 0, below = 0, above = chooserScroll * 2;
   // a row whose name or status had to be shortened shows them in full under it while it's pointed at, or while it's
   // the chosen one and nothing else is (the review of v3.33.0, U2: at 140% the names and the reasons an aircraft
@@ -844,7 +938,8 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     bool sel = selAircraft == i;
     bool hov = hovered(rx, ry, colW, rowH) && src != Career::SRC_NONE;
     card(rx, ry, colW, rowH, sel, hov, src == Career::SRC_NONE ? C_DIM * 0.4f : src == Career::SRC_OWNED ? C_GOOD : C_ACCENT);
-    if (hov && in.mPressed[0]) { selAircraft = i; launchFuelKg = -1; g_audio.trigger(SFX_CLICK); }
+    bool take = false; focusHere(craftId(j), rx, ry, colW, rowH, &take);
+    if (((hov && !focusNav && in.mPressed[0]) || take) && src != Career::SRC_NONE) { selAircraft = i; launchFuelKg = -1; if (!take) g_audio.trigger(SFX_CLICK); }
     // (the name and the status share the row: each kept to its side, shortened when the row is narrow)
     const float nameW = g_ren.textWidth(kAircraft[i].name, 15 * s), nameMax = colW - 24 * s;
     g_ren.text(rx + 10 * s, ry + 7 * s, 15 * s, nameW > nameMax ? ellipsize(kAircraft[i].name, nameMax, 15 * s) : std::string(kAircraft[i].name), src == Career::SRC_NONE ? C_DIM * 0.6f : C_TEXT, 1);
@@ -884,7 +979,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   bool overweight = false;
   if (selAircraft >= 0) {
     const AircraftSpec& sp = kAircraft[selAircraft]; auto esrc = career.canFly(c, selAircraft);
-    if (!sp.special && esrc != Career::SRC_NONE) { Career::LaunchPlan e0 = career.plan(c, selAircraft, esrc); float fuel = chosenFuel(c, selAircraft, esrc, e0); overweight = sp.emptyMass + fuel + c.cargoKg + c.pax * 85.f + 85.f > sp.maxMass() + 0.5f; }
+    if (!sp.special && esrc != Career::SRC_NONE) { Career::LaunchPlan e0 = menuLaunchPlan(c, selAircraft, esrc, cd.job, false); float fuel = e0.fuelLoadKg; overweight = sp.emptyMass + fuel + c.cargoKg + c.pax * 85.f + 85.f > sp.maxMass() + 0.5f; }
   }
   bool can = selAircraft >= 0 && !commitBlocked() && !otherWhileJob && !overweight;
   if (cd.job) {
@@ -919,15 +1014,14 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
   const float top = y + 78 * s, bottom = y + h - 30 * s, rowH = 68 * s;
   const int visible = std::max(1, (int)((bottom - top) / rowH));
   static int first = 0, lastSel = -1;
-  if (hovered(x, top, lw, bottom - top) && in.wheel) { first -= (int)in.wheel; in.wheel = 0; }
+  bool catalogWheeled = false;
+  if (hovered(x, top, lw, bottom - top) && in.wheel) { first -= (int)in.wheel; in.wheel = 0; catalogWheeled = true; }
   if (lastSel != selHangar) { if (selectedRow < first) first = selectedRow; if (selectedRow >= first + visible) first = selectedRow - visible + 1; lastSel = selHangar; }
   auto catalogId = [&](int spec) { return uid(0, (float)spec, "hangar-catalog-airframe"); };
   // Register the entire catalog, including offscreen rows, for arrow / D-pad navigation.
   // Identity is per airframe and never changes with scrolling or a redacted display name.
-  if (focusNav) for (int row = 0; row < catalogCount; ++row) if (focusId == catalogId(hangarSpecAt(row))) {
-    if (row < first) first = row;
-    else if (row >= first + visible) first = row - visible + 1;
-  }
+  // (the focus moving brings its row into view; the list scrolled by the right stick takes the focus along)
+  focusScrollRows([&](int row) { return catalogId(hangarSpecAt(row)); }, catalogCount, first, visible, 1, catalogWheeled);
   first = std::clamp(first, 0, std::max(0, catalogCount - visible));
   for (int row = 0; row < catalogCount; ++row)
     focusList.push_back({catalogId(hangarSpecAt(row)), x + 10 * s, top + (row - first) * rowH, lw - 20 * s, rowH - 8 * s});
@@ -987,7 +1081,8 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
   header(px, y + 20 * s, iw, "AIRFRAME / OWNERSHIP");
   static float scroll = 0, contentH = 0; static int inspectFor = -1;
   if (inspectFor != selHangar) { inspectFor = selHangar; scroll = 0; contentH = 0; }
-  if (hovered(rx, regTop, rw, regBot - regTop) && in.wheel) { scroll -= in.wheel * 48 * s; in.wheel = 0; }
+  bool inspectWheeled = false;
+  if (hovered(rx, regTop, rw, regBot - regTop) && in.wheel) { scroll -= in.wheel * 48 * s; in.wheel = 0; inspectWheeled = true; }
   const float maxScroll = std::max(0.f, contentH - (regBot - regTop));
   scroll = std::clamp(scroll, 0.f, maxScroll);
   const size_t focus0 = focusList.size();
@@ -1070,11 +1165,7 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
     g_ren.rect(rx + rw - 7 * s, regTop + (track - thumb) * std::min(scroll / limit, 1.f), 2 * s, thumb, C_ACCENT, 0.8f);
     g_ren.text(px, y + h - 17 * s, 10 * s, ellipsize("SCROLL / SPECIFICATIONS + FLEET SERVICES", iw, 10 * s), C_DIM, 0.8f, 0, false);
   }
-  if (focusNav) for (size_t k = focus0; k < focusList.size(); ++k) if (focusList[k].id == focusId) {
-    const float fy = focusList[k].y, fh = focusList[k].h;
-    if (fy < regTop) scroll -= regTop - fy + 8 * s;
-    else if (fy + fh > regBot) scroll += fy + fh - regBot + 8 * s;
-  }
+  focusScrollPixels(focus0, uid(0, 0, "hangar-details-scroll"), rx, regTop, rw, regBot, scroll, inspectWheeled, contentH > regBot - regTop);
 }
 
 // Standalone, career-independent sandbox setup. Its catalog intentionally excludes research teasers.
@@ -1101,9 +1192,10 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   const int craftVisible = std::max(1, (int)((craftBottom - craftTop) / craftStep));
   static int craftFirst = 0, craftSeen = -1, airportFirst = 0, airportSeen = -1;
   auto craftId = [&](int i) { return uid(0, (float)i, "free-flight-airframe"); };
-  if (hovered(x, craftTop, lw, craftBottom - craftTop) && in.wheel) { craftFirst -= (int)in.wheel; in.wheel = 0; }
+  bool craftWheeled = false, airportWheeled = false;
+  if (hovered(x, craftTop, lw, craftBottom - craftTop) && in.wheel) { craftFirst -= (int)in.wheel; in.wheel = 0; craftWheeled = true; }
   if (craftSeen != freeCraft) { const int row = careerRowFor(freeCraft); if (row < craftFirst) craftFirst = row; if (row >= craftFirst + craftVisible) craftFirst = row - craftVisible + 1; craftSeen = freeCraft; }
-  if (focusNav) for (int i = 0; i < kNumAircraft; ++i) if (focusId == craftId(careerSpecAt(i))) { if (i < craftFirst) craftFirst = i; if (i >= craftFirst + craftVisible) craftFirst = i - craftVisible + 1; }
+  focusScrollRows([&](int i) { return craftId(careerSpecAt(i)); }, kNumAircraft, craftFirst, craftVisible, 1, craftWheeled);
   craftFirst = std::clamp(craftFirst, 0, std::max(0, kNumAircraft - craftVisible));
   for (int i = 0; i < kNumAircraft; ++i) {
     const int spec = careerSpecAt(i);
@@ -1132,9 +1224,9 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   const float airportTop = y + 54 * s, airportBottom = y + h - 200 * s, airportStep = 49 * s;
   const int airportVisible = std::max(1, (int)((airportBottom - airportTop) / airportStep));
   auto airportId = [&](int i) { return uid(0, (float)i, "free-flight-airport"); };
-  if (hovered(rx, airportTop, rw, airportBottom - airportTop) && in.wheel) { airportFirst -= (int)in.wheel; in.wheel = 0; }
+  if (hovered(rx, airportTop, rw, airportBottom - airportTop) && in.wheel) { airportFirst -= (int)in.wheel; in.wheel = 0; airportWheeled = true; }
   if (airportSeen != freeAirport) { if (freeAirport < airportFirst) airportFirst = freeAirport; if (freeAirport >= airportFirst + airportVisible) airportFirst = freeAirport - airportVisible + 1; airportSeen = freeAirport; }
-  if (focusNav) for (int i = 0; i < airportCount; ++i) if (focusId == airportId(i)) { if (i < airportFirst) airportFirst = i; if (i >= airportFirst + airportVisible) airportFirst = i - airportVisible + 1; }
+  focusScrollRows(airportId, airportCount, airportFirst, airportVisible, 1, airportWheeled);
   airportFirst = std::clamp(airportFirst, 0, std::max(0, airportCount - airportVisible));
   for (int i = 0; i < airportCount; ++i) {
     const float ay = airportTop + (i - airportFirst) * airportStep;
@@ -1170,12 +1262,12 @@ void Game::drawHubAirline(float x, float y, float w, float h) {
   float lw = std::min(w * 0.5f, 620 * s);
   panel(x, y, lw, h); panel(x + lw + 16 * s, y, w - lw - 16 * s, h);
   static float airScroll[2] = {0, 0}, airContent[2] = {0, 0};
-  int activeColumn = 0; float clipX = x, clipW = lw; size_t focusStart = 0;
+  int activeColumn = 0; float clipX = x, clipW = lw; size_t focusStart = 0; bool airWheeled[2] = {false, false};
   const float clipTop = y + 16 * s, clipBottom = y + h - 24 * s;
   auto beginColumn = [&](int col, float left, float width) {
     activeColumn = col; clipX = left; clipW = width;
     float limit = std::max(0.f, airContent[col] - (clipBottom - clipTop));
-    if (hovered(left, clipTop, width, clipBottom - clipTop) && in.wheel) { airScroll[col] -= in.wheel * 48 * s; in.wheel = 0; }
+    if (hovered(left, clipTop, width, clipBottom - clipTop) && in.wheel) { airScroll[col] -= in.wheel * 48 * s; in.wheel = 0; airWheeled[col] = true; }
     airScroll[col] = std::clamp(airScroll[col], 0.f, limit);
     buttonContentOffsetY = airScroll[col];
     focusStart = focusList.size();
@@ -1193,11 +1285,7 @@ void Game::drawHubAirline(float x, float y, float w, float h) {
       g_ren.rect(clipX + clipW - 7 * s, clipTop, 2 * s, track, C_DIM, 0.16f);
       g_ren.rect(clipX + clipW - 7 * s, clipTop + (track - thumb) * std::min(airScroll[col] / limit, 1.f), 2 * s, thumb, C_ACCENT, 0.8f);
     }
-    if (focusNav) for (size_t k = focusStart; k < focusList.size(); ++k) if (focusList[k].id == focusId) {
-      const float fy = focusList[k].y, fh = focusList[k].h;
-      if (fy < clipTop) airScroll[col] -= clipTop - fy + 8 * s;
-      else if (fy + fh > clipBottom) airScroll[col] += fy + fh - clipBottom + 8 * s;
-    }
+    focusScrollPixels(focusStart, uid(0, (float)col, "airline-scroll"), clipX, clipTop, clipW, clipBottom, airScroll[col], airWheeled[col], limit > 0);
   };
   float px = x + 20 * s, py = beginColumn(0, x, lw), iw = lw - 40 * s;
   header(px, py, iw, "YOUR ROUTES"); py += 28 * s;
@@ -1298,8 +1386,10 @@ void Game::drawHubLogbook(float x, float y, float w, float h) {
   const float top = y + 72 * s, bottom = y + h - 20 * s;
   for (int column = 0; column < 2; ++column) {
     float bx = column ? dx : x, bw = column ? dw : lw, px = bx + 24 * s, iw = bw - 48 * s;
-    if (hovered(bx, top, bw, bottom - top) && in.wheel) { scroll[column] -= in.wheel * 48 * s; in.wheel = 0; }
+    bool wheeled = false;
+    if (hovered(bx, top, bw, bottom - top) && in.wheel) { scroll[column] -= in.wheel * 48 * s; in.wheel = 0; wheeled = true; }
     scroll[column] = std::clamp(scroll[column], 0.f, std::max(0.f, total[column] - (bottom - top)));
+    const size_t columnFocus0 = focusList.size();
     g_ren.uiClip(bx + 12 * s, top, bx + bw - 12 * s, bottom);
     float py = top - scroll[column];
     if (!column) {
@@ -1350,6 +1440,7 @@ void Game::drawHubLogbook(float x, float y, float w, float h) {
       g_ren.rect(bx + bw - 7 * s, top, 2 * s, track, C_DIM, 0.15f);
       g_ren.rect(bx + bw - 7 * s, top + (track - thumb) * std::min(scroll[column] / limit, 1.f), 2 * s, thumb, C_ACCENT, 0.8f);
     }
+    focusScrollPixels(columnFocus0, uid(0, (float)column, "logbook-scroll"), bx, top, bw, bottom, scroll[column], wheeled, limit > 0);
   }
 }
 
@@ -1381,7 +1472,8 @@ void Game::drawSettings(float x, float y, float w, float h) {
   // rows sat below a 1080p screen). A control outside the region takes no clicks.
   const float rs = 42 * s, regTop = py, regBot = y + h - 24 * s;
   static float genScroll = 0.f, genMax = 0.f;
-  if (hovered(x - 8 * s, regTop, w + 16 * s, regBot - regTop) && in.wheel != 0) { genScroll -= in.wheel * 48.f * s; in.wheel = 0; }
+  bool genWheeled = false;
+  if (hovered(x - 8 * s, regTop, w + 16 * s, regBot - regTop) && in.wheel != 0) { genScroll -= in.wheel * 48.f * s; in.wheel = 0; genWheeled = true; }
   genScroll = std::clamp(genScroll, 0.f, genMax);
   buttonContentOffsetY = genScroll;
   const size_t focus0 = focusList.size();
@@ -1400,6 +1492,10 @@ void Game::drawSettings(float x, float y, float w, float h) {
     g_ren.glow(kx - 6 * s, py + 10 * s, 12 * s, 12 * s, C_ACCENT, 0.3f + 0.4f * hk, 6 * s, 8 * s);
     g_ren.rect(kx - 6 * s, py + 10 * s, 12 * s, 12 * s, mixc(C_ACCENT, vec3(1, 1, 1), 0.3f * hk), 1, 6 * s);
     if (hv && in.mDown[0]) v = lo + clampf((in.mx - x - 296 * s) / (200 * s), 0, 1) * (hi - lo);
+    {   // the track in the D-pad's walk: with the focus on it, left / right step the value
+      int st = 0; focusAdjust(uid(x, py + buttonContentOffsetY, "slider:" + label), x + 296 * s, py, 200 * s, 32 * s, &st);
+      if (st) v = clampf(v + st * step, lo, hi);
+    }
     if (button(x + 506 * s, py, 36 * s, 32 * s, "+")) v = clampf(v + step, lo, hi);
     g_ren.text(x + 556 * s, py + 6 * s, 16 * s, disp, C_TEXT, 1);
     py += rs;
@@ -1472,14 +1568,9 @@ void Game::drawSettings(float x, float y, float w, float h) {
     g_ren.rect(x + w + 2 * s, regTop, 3 * s, th, C_ACCENT, 0.12f, 1.5f * s);
     g_ren.rect(x + w + 2 * s, by, 3 * s, bh, C_ACCENT, 0.7f, 1.5f * s);
   }
-  // the control with keyboard / D-pad focus scrolled into view (next frame draws it there)
-  if (focusNav)
-    for (size_t k = focus0; k < focusList.size(); k++)
-      if (focusList[k].id == focusId) {
-        const float fy = focusList[k].y, fh = focusList[k].h;
-        if (fy < regTop) genScroll -= regTop - fy + 8 * s;
-        else if (fy + fh > regBot) genScroll += fy + fh - regBot + 8 * s;
-      }
+  // the control with keyboard / D-pad focus scrolled into view (next frame draws it there); the list scrolled by the
+  // right stick takes the focus along
+  focusScrollPixels(focus0, uid(0, (float)settingsPage, "settings-scroll"), x - 8 * s, regTop, w + 16 * s, regBot, genScroll, genWheeled, genMax > 0.f);
   saveSettings();
   (void)w;
 }
@@ -1508,16 +1599,25 @@ void Game::drawControls(float x, float y, float w, float h) {
   float footH = 92 * s;
   int visible = std::max(4, (int)((h - footH) / rowH));
   int maxScroll = std::max(0, (int)rows.size() - visible);
+  const int ctlBefore = ctlScroll;
   if (hovered(x, y, w, visible * rowH) && in.wheel != 0) { ctlScroll -= (int)in.wheel * 2; in.wheel = 0; }
   if (in.pad && bindCapture < 0 && fabsf(in.ry) > 0.5f) { ctlScrollAcc += in.ry * uiDt * 12.f; }
   while (ctlScrollAcc > 1.f) { ctlScroll--; ctlScrollAcc -= 1.f; }
   while (ctlScrollAcc < -1.f) { ctlScroll++; ctlScrollAcc += 1.f; }
+  const bool ctlWheeled = ctlScroll != ctlBefore;
   // (each cell is in the keyboard / D-pad walk, the rows scrolled out of view too: the walk moves into them and the list
   // follows the focus)
   auto cellId = [](int act, int dev) { return 0xB1D00000u + (uint32_t)act * 2u + (uint32_t)dev; };
+  ctlScroll = std::clamp(ctlScroll, 0, maxScroll);
   if (focusNav && focusId >= cellId(0, 0) && focusId < cellId(ACT_COUNT, 0)) {
-    const int act = (int)((focusId - cellId(0, 0)) / 2u);
-    for (int i = 0; i < (int)rows.size(); i++) if (rows[i].act == act) { if (i < ctlScroll) ctlScroll = i; if (i >= ctlScroll + visible) ctlScroll = i - visible + 1; }
+    const int act = (int)((focusId - cellId(0, 0)) / 2u), dev = (int)((focusId - cellId(0, 0)) % 2u);
+    for (int i = 0; i < (int)rows.size(); i++) if (rows[i].act == act && (i < ctlScroll || i >= ctlScroll + visible)) {
+      if (!ctlWheeled) { if (i < ctlScroll) ctlScroll = i; else ctlScroll = i - visible + 1; break; }
+      // (the list scrolled away from the focus by the stick: it goes along, to the nearest action still shown)
+      const int from = i < ctlScroll ? ctlScroll : std::min((int)rows.size(), ctlScroll + visible) - 1, dir = i < ctlScroll ? 1 : -1;
+      for (int r = from; r >= ctlScroll && r < std::min((int)rows.size(), ctlScroll + visible); r += dir) if (rows[r].act >= 0) { focusId = cellId(rows[r].act, dev); break; }
+      break;
+    }
   }
   ctlScroll = std::clamp(ctlScroll, 0, maxScroll);
   float sy = anim(0xc7151u, (float)ctlScroll, 18);
@@ -1619,7 +1719,8 @@ void Game::drawRadioPanel(float x, float y) {
     int i = radioScroll + k;
     if (i >= (int)stations.size()) break;
     bool cur = i == set.radioStation && radio.state() != Radio::IDLE;
-    if (button(x + 14 * s, py, bw, 30 * s, ellipsize(stations[i].first, bw - 20 * s, std::min(30 * s * 0.46f, 18 * s)), true, cur)) {
+    // (its identity is its place in the list, not the station: the focus keeps its row as the right stick scrolls it)
+    if (button(x + 14 * s, py, bw, 30 * s, ellipsize(stations[i].first, bw - 20 * s, std::min(30 * s * 0.46f, 18 * s)) + "##radio-row-" + std::to_string(k), true, cur)) {
       set.radioStation = i; radio.setVolume(radioLevel()); radio.play(stations[i].second); saveSettings();
     }
     py += 34 * s;
@@ -1790,6 +1891,17 @@ void Game::drawHud(const FrameParams& fp) {
   const Airport& d = dest();
   bool toWp = wpIndex < (int)contract.wps.size();
   vec3 target = toWp ? vec3(contract.wps[wpIndex].x, contract.wps[wpIndex].alt, contract.wps[wpIndex].z) : d.pos();
+  std::string combatTarget;
+  if(militaryFlight) {
+    const auto& m=hiveCombat.mission;
+    if(m.status==hive::MissionStatus::Extract) { target=m.config.extraction; combatTarget="EXTRACTION"; }
+    else if(m.config.kind==hive::MissionKind::Recon || m.config.kind==hive::MissionKind::Defense) {
+      float nearest=1e20f;
+      for(int i=0;i<m.config.objectiveCount;++i) { const auto& o=m.config.objectives[i]; if(o.scanned) continue;
+        float dd=length(hiveCombat.displacement(plane.pos,o.position)); if(dd<nearest) { nearest=dd;target=o.position;combatTarget=(m.config.kind==hive::MissionKind::Recon?"SCAN SITE ":"DEFEND ")+militarySiteLabels[i]; }
+      }
+    } else { for(int i=0;i<m.config.targetCount;++i) { auto* a=hiveCombat.find(m.config.targetIds[i]); if(a && a->alive) { target=a->position;combatTarget="STRIKE TARGET";break; } } }
+  }
   target.x = nearCopy(target.x, plane.pos.x); target.z = nearCopy(target.z, plane.pos.z);   // (the short way round the map)
   vec3 to = target - plane.pos;
   float dist = length(vec3(to.x, 0, to.z));
@@ -1802,7 +1914,7 @@ void Game::drawHud(const FrameParams& fp) {
   {
     hudStrip(0, 0, W, band, 1.f);
     // left: what this flight is, and the objective
-    const char* kind = freeFlight ? "FREE FLIGHT" : researchFlight ? "RESEARCH" : contract.type == CT_LESSON ? "LESSON" : contract.type == CT_TRIAL ? "TRIAL" : contract.type == CT_FERRY ? "FREE FLIGHT" : "CONTRACT";
+    const char* kind = militaryFlight ? "MILITARY" : freeFlight ? "FREE FLIGHT" : researchFlight ? "RESEARCH" : contract.type == CT_LESSON ? "LESSON" : contract.type == CT_TRIAL ? "TRIAL" : contract.type == CT_FERRY ? "FREE FLIGHT" : "CONTRACT";
     vec3 kc = researchFlight ? vec3(0.75f, 0.45f, 1.f) : contract.type == CT_LESSON ? C_GOOD : C_ACCENT;
     g_ren.rect(0, 0, 3 * s, band, kc, 0.95f);
     float kw = g_ren.text(14 * s, 6 * s, 9.5f * s, kind, kc, 1, 0, false);
@@ -1811,6 +1923,7 @@ void Game::drawHud(const FrameParams& fp) {
     std::string obj = toWp ? fmt("CHECKPOINT %d / %d", wpIndex + 1, (int)contract.wps.size()) : fmt("LAND  %s  %s", d.code, d.name);
     if (freeFlight) obj = "FREE ROAM / NO MISSION / CAREER UNCHANGED";
     else if (researchFlight) obj = resCard >= 0 ? (resCardDone ? std::string(kResCards[resCard].id) + "  CARD COMPLETE" : fmt("%s  STEP %d/%d  %s", kResCards[resCard].id, resStep + 1, kResCards[resCard].n, kResCards[resCard].steps[std::min(resStep, kResCards[resCard].n - 1)].label)) : fmt("FREE ROAM  -  MACH %.2f", plane.mach);
+    if(militaryFlight || (researchFlight && resCard<0 && specIdx==kWraith)) obj=hiveObjectiveText();
     g_ren.text(14 * s, 24 * s, 12 * s, ellipsize(obj, leftW, 12 * s), mag, 1, 0, false);
     {   // the nav line under it: distance and time to the target
       std::string nav = fmt("%s   BRG %03.0f   ETE %s", dist < 1000.f ? fmt("%.0f m", dist).c_str() : set.metric ? fmt("%.1f km", dist / 1000.f).c_str() : fmt("%.1f nm", dist / 1852.f).c_str(), brg, gs > 10 ? fmt("%d:%02d", (int)(dist / gs) / 60, (int)(dist / gs) % 60).c_str() : "--:--");
@@ -2170,14 +2283,15 @@ void Game::drawHud(const FrameParams& fp) {
       g_ren.rect(x - tw2 * 0.5f - 6 * s, y - 2 * s, tw2 + 12 * s, 19 * s, vec3(0.01f, 0.02f, 0.04f), 0.7f, 4 * s);
       g_ren.text(x, y, 13 * s, t, mag, 1, 1);
     };
-    vec3 tgt3 = target; if (!toWp) tgt3.y = d.elev + 3.f;
+    vec3 tgt3 = target; if (!toWp && combatTarget.empty()) tgt3.y = d.elev + 3.f;
     float sx, sy;
     vec3 rel3 = tgt3 - fp.camPos;
     float zc = dot(rel3, -fp.camBack);
     const float bandT = band + 100 * s, bandB = cockpit ? H - 70 * s : tilesTop - 40 * s, bandC = 0.5f * (bandT + bandB), bandH = std::max(40 * s, 0.5f * (bandB - bandT));
     bool onS = zc > 1.f && g_ren.project(fp, tgt3, sx, sy) && sx > rail + 20 * s && sx < W - rail - 20 * s && sy > bandT && sy < bandB;
     std::string lab = dist < 1000.f ? fmt("%.0f m", length(rel3)) : fmt("%.1f km", dist / 1000.f);
-    if (toWp && fabsf(target.y - plane.pos.y) > 45.f) lab += fmt("  %s%s", target.y > plane.pos.y ? "+" : "-", fmtAlt(fabsf(target.y - plane.pos.y)).c_str());
+    if(!combatTarget.empty()) lab=combatTarget+" / "+lab;
+    if ((toWp || !combatTarget.empty()) && fabsf(target.y - plane.pos.y) > 45.f) lab += fmt("  %s%s", target.y > plane.pos.y ? "+" : "-", fmtAlt(fabsf(target.y - plane.pos.y)).c_str());
     if (onS) {
       float gx, gy; vec3 gpt(tgt3.x, g_world.height(tgt3.x, tgt3.z), tgt3.z);
       if (toWp && g_ren.project(fp, gpt, gx, gy) && gy > sy + 8 * s) {
@@ -2205,6 +2319,25 @@ void Game::drawHud(const FrameParams& fp) {
       float pulse2 = 1.f + 0.12f * sinf(realTime * 5.f);
       hudDart(ex2 + dir.x * 11 * s * pulse2, ey2 + dir.y * 11 * s * pulse2, dir.x, dir.y, 22 * s * pulse2, 9 * s, mag, 1.f);
       label(ex2 - dir.x * 48 * s, ey2 - dir.y * 48 * s - 8 * s, lab);
+    }
+  }
+  if(militaryFlight || (researchFlight && specIdx==kWraith)) {
+    if(specIdx==kWraith) {
+      const auto& gun=hive::forwardSpec(combatLoadout.forward);
+      const auto& bomb=hive::bombSpec(combatLoadout.bomb);
+      const float xx=rail+16*s, yy=band+32*s;
+      g_ren.text(xx,yy,12*s,fmt("%s / %d RDS / HEAT %.0f%%%s",gun.name,combatLoadout.rounds,100*combatLoadout.heat,combatLoadout.overheated?" / COOLING":""),combatLoadout.overheated?C_WARN:gun.colour,1);
+      g_ren.text(xx,yy+18*s,12*s,fmt("%s / %d STORES / HULL %.0f%%",bomb.name,combatLoadout.bombs,militaryHull),C_TEXT,1);
+      if(gun.charge>0 && combatLoadout.charge>0) g_ren.text(xx,yy+36*s,12*s,fmt("CHARGING %.0f%%",100*combatLoadout.charge/gun.charge),gun.colour,1);
+    }
+    for(const auto& a:hiveCombat.actors) if(a.alive) {
+      vec3 p=plane.pos+hiveCombat.displacement(plane.pos,a.position); float sx,sy;
+      if(g_ren.project(fp,p,sx,sy) && sx>rail+10*s && sx<W-rail-10*s && sy>band+90*s && sy<H-120*s) {
+        vec3 col=a.phase==hive::Phase::Telegraph?C_WARN:C_BAD;
+        g_ren.rectOutline(sx-14*s,sy-14*s,28*s,28*s,col,.8f,0,1*s);
+        const char* names[]={"NEEDLE","BASTION","CANTOR","ARCHON"};
+        g_ren.text(sx,sy+18*s,10*s,fmt("%s %.1f km",names[(int)a.type],length(p-plane.pos)/1000),col,1,1,false);
+      }
     }
   }
   // (the radio: under the tower recall on the left)
@@ -2490,8 +2623,9 @@ void Game::drawPause() {
     if (settingsPage == 1 && button(W * 0.5f - pw * 0.5f + 24 * s, H - 120 * s - 4 * s - 48 * s, 150 * s, 36 * s, "Back", true, true)) { settingsFromPause = false; bindCapture = -1; }
     return;
   }
-  s = std::min(s, std::min(H / 540.f, W / 520.f));
-  float pw = 410 * s, ph = 450 * s, x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
+  const bool combatPractice=researchFlight && resCard<0 && specIdx==kWraith;
+  s = std::min(s, std::min(H / (combatPractice?820.f:540.f), W / 520.f));
+  float pw = 410 * s, ph = (combatPractice?740.f:450.f) * s, x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
   panel(x, y, pw, ph, 0.95f);
   g_ren.text(x + 30 * s, y + 24 * s, 11 * s, "FLIGHT OPERATIONS / ON HOLD", C_ACCENT, 1, 0, false);
   g_ren.text(x + 30 * s, y + 49 * s, 32 * s, "Flight paused", C_TEXT, 1);
@@ -2507,6 +2641,7 @@ void Game::drawPause() {
   if (button(x + 30 * s + bw * 0.52f, by, bw * 0.48f, bh, uiHidden ? "Show flight UI" : "Hide flight UI")) uiHidden = !uiHidden;   // (also LB+RB held)
   by += bh + 12 * s;
   if (button(x + 30 * s, by, bw, bh, freeFlight ? "Return to Free Flight" : researchFlight ? "End research flight" : "Abandon flight")) endFlight(false, researchFlight ? "" : "Abandoned flight", OUT_ABANDONED);
+  if(combatPractice) drawCombatPractice(x+30*s,by+bh+18*s,bw);
   if (showRadio) drawRadioPanel(20 * s, 60 * s);
 }
 
@@ -2545,8 +2680,10 @@ void Game::drawDebrief() {
   const std::string payKey = debriefTitle + "|" + contract.id + "|" + std::to_string(payout.size()) + "|" + std::to_string(total);
   if (payKey != payFor) { payFor = payKey; payScroll = 0.f; }
   const float payMax = std::max(0.f, bodyH - (bodyBot - bodyTop));
-  if (hovered(x, bodyTop, pw, bodyBot - bodyTop) && in.wheel != 0) { payScroll -= in.wheel * 48.f * s; in.wheel = 0; }
+  bool payWheeled = false;
+  if (hovered(x, bodyTop, pw, bodyBot - bodyTop) && in.wheel != 0) { payScroll -= in.wheel * 48.f * s; in.wheel = 0; payWheeled = true; }
   payScroll = std::clamp(payScroll, 0.f, payMax);
+  const size_t payFocus0 = focusList.size();
   g_ren.uiClip(x, bodyTop - 2 * s, x + pw, bodyBot);
   py = bodyTop - payScroll;
   auto row = [&](const std::string& k, const std::string& v) { g_ren.text(px, py, 16 * s, k, C_DIM, 1); g_ren.text(px + 230 * s, py, 16 * s, ellipsize(v, pw - 290 * s, 16 * s), C_TEXT, 1); py += 24 * s; };
@@ -2566,11 +2703,12 @@ void Game::drawDebrief() {
   py += 10 * s;
   header(px, py, pw - 60 * s, "SETTLEMENT"); py += 24 * s;
   for (auto& l : payout) {
-    float vw = g_ren.text(x + pw - 30 * s, py, 16 * s, fmtMoney(l.amount), l.amount >= 0 ? C_GOOD : C_BAD, 1, 2);
+    float vw = g_ren.text(x + pw - 30 * s, py, 16 * s, isMilitaryContract(contract.type)?fmt("%d SC",l.amount):fmtMoney(l.amount), l.amount >= 0 ? C_GOOD : C_BAD, 1, 2);
     g_ren.text(px, py, 16 * s, ellipsize(l.label, pw - 80 * s - vw, 16 * s), C_TEXT, 1);
     py += 24 * s;
   }
   bodyH = py + payScroll - bodyTop;
+  focusScrollPixels(payFocus0, uid(0, 0, "debrief-scroll"), x, bodyTop, pw, bodyBot, payScroll, payWheeled, payMax > 0.f);
   g_ren.uiClipOff();
   if (payMax > 0.f) {   // a thin bar at the panel's edge: where the view is in the body
     const float trackH = bodyBot - bodyTop, barH = std::max(20 * s, trackH * trackH / (trackH + payMax));
@@ -2578,8 +2716,8 @@ void Game::drawDebrief() {
     g_ren.rect(x + pw - 18 * s, bodyTop + (trackH - barH) * payScroll / payMax, 3 * s, barH, C_ACCENT, 0.7f);
   }
   g_ren.rect(px, totalY - 8 * s, pw - 60 * s, 1 * s, C_ACCENT, 0.5f);
-  g_ren.text(px, totalY, 18 * s, "Total", C_TEXT, 1);
-  g_ren.text(x + pw - 30 * s, totalY, 18 * s, fmtMoney(total), total >= 0 ? C_GOOD : C_BAD, 1, 2);
+  g_ren.text(px, totalY, 18 * s, isMilitaryContract(contract.type)?"Service credits":"Total", C_TEXT, 1);
+  g_ren.text(x + pw - 30 * s, totalY, 18 * s, isMilitaryContract(contract.type)?fmt("%d SC",total):fmtMoney(total), total >= 0 ? C_GOOD : C_BAD, 1, 2);
   if (newLic) fitText(px, licY, pw - 60 * s, 22 * s, 14 * s, std::string("NEW LICENCE: ") + licenseName(career.license), C_WARN);
   { float cy = campY; for (auto& l : campaignLines) { g_ren.text(px, cy, 18 * s, l, C_ACCENT, 1); cy += 24 * s; } }
   if (commitBlocked()) {   // the settlement above is what will be saved; until it is, the career stands as before the flight
@@ -2587,6 +2725,6 @@ void Game::drawDebrief() {
     if (button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, "Retry save")) retryCommit();
   }
   if (button(x + pw - 230 * s, y + ph - 66 * s, 200 * s, 46 * s, "Continue", true, true) || in.pressed[K_ENTER]) { retryCommit(); screen = SCR_HUB; hubTab = TAB_CONTRACTS; selContract = 0; selAircraft = -1; }
-  const bool jobWaits = career.job && career.job->state == Career::JobState::RECOVERY;
+  const bool jobWaits = !isMilitaryContract(contract.type) && career.job && career.job->state == Career::JobState::RECOVERY;
   if (!lastSuccess && !commitBlocked() && button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, jobWaits ? "Continue job" : "Try again")) retryFromDebrief();
 }

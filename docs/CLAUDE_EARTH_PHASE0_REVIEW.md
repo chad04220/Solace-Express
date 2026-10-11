@@ -1,8 +1,40 @@
 # Real Earth Phase 0 review
 
 Branch: `codex/earth-data-phase0-20261011`
-Base: `efbe9369483286bc557d83496bfcf95bfc6fa944` on Claude's working branch.
-Status: combined Phase 0 and hardened global-elevation handoff, prepared for Claude review. Native CI for this combined revision must pass before integration. No runtime world integration.
+Original Phase 0 base: `efbe9369483286bc557d83496bfcf95bfc6fa944`.
+Release integration base: published [`v3.48.0`](https://github.com/chad04220/Solace-Express/releases/tag/v3.48.0), exact commit `4f27e198ccfc9a6e683acec46c473043f82031ca`.
+Status: combined Phase 0 and hardened global-elevation handoff, updated to v3.48.0 for Claude review. Native CI for this release-aligned revision must pass before integration. No runtime Earth integration.
+
+## Published v3.48.0 integration (2026-10-11)
+
+The release was published at **06:52:35 UTC** and its tag was verified before
+integration. This branch merges that exact release into the previously published
+Phase 0/global-handoff head `b24e9f7fd14551eac553b9693bfcd6b8a9b84f88`, preserving
+both histories. The complete runtime source and release workflow remain identical
+to v3.48.0. All Earth tools, fixtures and the 56-test Earth / 38-test handoff suites
+remain identical to the previously reviewed head. The only merge conflict was
+third-party notices; both the Earth-data and Yale star-catalog attribution sections
+are retained. Both offline suites stay registered alongside the new upstream tests.
+
+The release includes diagnostic-save fix
+[`2e47fa2`](https://github.com/chad04220/Solace-Express/commit/2e47fa2d6de898e84594f3c6c60ece044c0cae9f).
+All six Windows tool-created Games are set diskless before initialization. Its
+source-contract regression is preserved; this is not a local native Windows
+diagnostics playthrough. The release also supplies the new sky, city skylines,
+Hive/military work, controller navigation, career-menu fixes, and XR-40 aircraft
+bundle correction without additional runtime edits in this integration.
+
+The prior combined head passed [all native CI](https://github.com/chad04220/Solace-Express/actions/runs/38118013576),
+including 87/87 Windows CTest entries, three Linux sanitizer shards, the aircraft
+bake and Windows packaging. The earlier evidence below describes its own historical
+checkpoints; it is not substituted for verification of this release-aligned tree.
+Current local checks and exact preservation hashes are recorded in
+[the v3.48 integration evidence](validation/earth-v348-integration/verification-summary.json).
+Local validation passes all 112 configured CTest entries, all three additional
+GLSL checks, 56 Earth tests, 38 handoff tests and 21 mesh-packaging checks. Both
+the Linux Release and Windows LLVM-MinGW game builds pass. The pinned 20-tile
+real-source rebuild matches all 22 delivered files and all 1,280 convergence probes.
+The new branch-head CI must be checked separately before declaring it ready.
 
 ## Scope
 
@@ -16,7 +48,7 @@ This branch now includes the complete prepared-global-source handoff from
 [PR #4](https://github.com/chad04220/Solace-Express/pull/4), its verified split-download
 assembly helper, and the reviewed fixes. It preserves the Phase 0 Windows test
 correction at `745b5538582e0d698205096cf1b869c34af983d5`. Review this single branch
-against the original base above; do not merge the older PR #4 snapshot separately.
+against the release integration base above; do not merge the older PR #4 snapshot separately.
 
 Start with [global source handoff and reproduction](USGS_WORLD_MAP.md), then review:
 
@@ -59,7 +91,7 @@ exclusive file creation followed an existing dangling staging symlink. The
 assembly helper now explicitly rejects existing or symlinked staging entries
 before opening them. The original target-preservation assertions are unchanged;
 an additional platform-independent regression requires rejection before any open.
-The helper suite now contains 38 tests. The [follow-up verification record](validation/earth-global-handoff/windows-staging-followup.json) records local tests and regression sensitivity. Native CI for this correction must pass.
+The helper suite now contains 38 tests. The [follow-up verification record](validation/earth-global-handoff/windows-staging-followup.json) records local tests and regression sensitivity. The correction subsequently passed [native CI](https://github.com/chad04220/Solace-Express/actions/runs/38118013576); the release-aligned revision has its own CI gate above.
 
 ## Source choices
 
@@ -71,19 +103,19 @@ Actual sample work uses NOAA ETOPO 2022 surface elevations at 60 and 30 arc-seco
 
 The owner has a separate ChatGPT agent investigating USGS EarthExplorer imagery. This branch adds no imagery implementation. USGS identifies Landsat data as [public domain](https://www.usgs.gov/faqs/are-landsat-data-cloud-still-considered-be-within-public-domain) and permits reuse/redistribution with [requested source credit](https://www.usgs.gov/faqs/are-there-any-restrictions-use-or-redistribution-landsat-data). Other datasets offered through the portal still require their own license review. Later alignment needs dataset/product IDs, acquisition dates, geographic bounds, horizontal CRS, pixel size, and the DEM's vertical datum; source checksums and processing history should accompany that handoff.
 
-## Validation checkpoint
+## Original Phase 0 validation checkpoint
 
 - Linux Release baseline builds successfully.
 - Windows LLVM-MinGW cross-build links successfully. Native Windows runtime was not tested locally.
 - All 91 pre-existing CTest entries completed without failures; `ci_test_selection` was initially skipped before the CMake file-API reply existed. After reconfiguration, it passed.
 - The Earth suite passes all 55 tests, including real GDAL adapter regressions, 67,584 seam address pairs, corner/apron checks, topology, deterministic outputs, malformed packs and Windows checkout hashes. The final focused CTest run passes 4/4 (`earth_pack`, `ci_test_selection`, `shader_prune`, `aircraft_geometry_source`), with no skips in that run. An independent 12-check adapter/safety smoke also passes.
-- No `src/` or shader changes are part of this phase.
+- No `src/` or shader changes were authored by Phase 0; the release merge now carries upstream runtime changes unchanged.
 
 ### Native Windows CI portability correction
 
 The [first review-branch CI run](https://github.com/chad04220/Solace-Express/actions/runs/38111775265) passed all 91 Linux sanitizer CTest cases and the complete aircraft bake. The native Windows build passed, but one of 86 Windows CTest cases failed: `earth_pack`. Its malicious-payload test raised `KeyError` before reaching the validator because the test snapshot helper used Windows backslash paths while manifest keys use forward slashes.
 
-The follow-up changes only the test helper to `relative_to(root).as_posix()` and adds a `PureWindowsPath` regression that also exercises Windows spelling on Linux. The regression rejects the old helper. All 56 Earth tests pass locally with the correction; the validator and all malformed-payload assertions are unchanged. The [corrected Phase 0 CI run](https://github.com/chad04220/Solace-Express/actions/runs/38113246257) subsequently passed all 86 native Windows CTest entries, all three Linux sanitizer shards, and aircraft packaging. The combined revision still requires its own native CI pass.
+The follow-up changes only the test helper to `relative_to(root).as_posix()` and adds a `PureWindowsPath` regression that also exercises Windows spelling on Linux. The regression rejects the old helper. All 56 Earth tests pass locally with the correction; the validator and all malformed-payload assertions are unchanged. The [corrected Phase 0 CI run](https://github.com/chad04220/Solace-Express/actions/runs/38113246257) subsequently passed all 86 native Windows CTest entries, all three Linux sanitizer shards, and aircraft packaging. The pre-release combined revision later passed its own [native CI](https://github.com/chad04220/Solace-Express/actions/runs/38118013576).
 
 ## Sample measurement boundaries
 

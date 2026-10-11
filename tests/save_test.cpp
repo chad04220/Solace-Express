@@ -89,7 +89,7 @@ int main() {
   }
   {   // QA S1: a committed freelance job of every type round-trips (the night, IFR and survey types were rejected on load)
     for (int ty = CT_LESSON; ty < CT_COUNT; ty++) {
-      if (ty == CT_TRIAL) continue;
+      if (ty == CT_TRIAL || isMilitaryContract(ty)) continue; // military records are separate from civilian jobs
       Career j; j.newGame(); j.license = LIC_ATP; j.money = 50000;
       Career::JobState J; J.c.id = fmt("job_%d", ty); J.c.type = (ContractType)ty; J.c.from = 0; J.c.to = 1; J.c.payout = 900; J.c.timeLimitMin = 90; J.c.story = false;
       J.spec = 1; J.src = Career::SRC_RENT; J.state = Career::JobState::ACTIVE; J.at = 0; J.id = 7;

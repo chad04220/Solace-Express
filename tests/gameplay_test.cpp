@@ -1310,6 +1310,95 @@ struct GameTest {
         const bool ok = on && on == off && off != other && plain != off;
         printf("Toggle focus across its label: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
       }
+      {   // a new career over a saved one: "Overwrite save" opens its hub on the work tab, never on the tab the menu's own
+          // Settings button left it on (v3.47.0 opened the new career on Settings) - clicked where the menu draws it
+        namespace fs = std::filesystem;
+        const fs::path dir = fs::temp_directory_path() / "solace_overwrite_test";
+        std::error_code ec; fs::remove_all(dir, ec); fs::create_directories(dir, ec);
+        const int W0 = g_ren.W, H0 = g_ren.H; g_ren.W = 1920; g_ren.H = 1080;
+        Game q; q.initHeadless(); q.saveDir = dir.string();
+        q.hubTab = TAB_SETTINGS; q.settingsPage = 0; q.hubList = 2;   // (the menu's Settings visited first; the military list)
+        q.screen = SCR_MENU; q.hasSave = true; q.confirmNew = true; q.in = Input();
+        g_ren.uiBegin(); q.focusList.clear(); q.drawMenu();
+        const auto drawn = q.focusList;
+        bool found = false;
+        for (const auto& e : drawn) {   // (the confirmation's button: the one whose identity is "Overwrite save" where it stands)
+          q.focusList.clear(); q.button(e.x, e.y, e.w, e.h, "Overwrite save");
+          if (q.focusList.empty() || q.focusList.back().id != e.id) continue;
+          found = true;
+          q.in = Input(); q.in.mx = e.x + e.w * 0.5f; q.in.my = e.y + e.h * 0.5f; q.in.mDown[0] = q.in.mPressed[0] = true;
+          g_ren.uiBegin(); q.focusList.clear(); q.drawMenu();
+          break;
+        }
+        const bool ok = found && q.screen == SCR_HUB && q.hubTab == TAB_CONTRACTS && q.hubList == 0 && !q.confirmNew && fs::exists(dir / "career.sav");
+        printf("Overwrite save opens the new career on its work tab (found %d, screen %d, tab %d, list %d): %s\n", found, (int)q.screen, q.hubTab, q.hubList, ok ? "ok" : "FAIL");
+        fails += !ok;
+        fs::remove_all(dir, ec); g_ren.W = W0; g_ren.H = H0; g_ren.uiBegin();
+      }
+      {   // the controller in the menus (the owner's ask, v3.48): the D-pad and the face buttons reach everything, the
+          // right stick scrolls. An "adjust" control takes left / right as its value and keeps the focus; the focus is
+          // the pointer while the D-pad leads (the right stick scrolls the window it is in); the job board's cards walk
+          // off the window's edge and scroll it, A takes a card and an aircraft, the fuel row steps with left / right,
+          // and the right stick scrolling the cards takes the focus along
+        bool adjustStays, adjustPointer, adjustMoves;
+        {
+          Game a; a.initHeadless(); a.screen = SCR_MENU; a.in = Input();
+          auto list = [&]() { a.focusList = {{11u, 100.f, 300.f, 200.f, 40.f, true}, {22u, 400.f, 300.f, 200.f, 40.f}, {33u, 100.f, 400.f, 200.f, 40.f}}; };
+          list(); a.focusNavigate(); a.in.endFrame();
+          list(); a.focusNav = true; a.focusId = 11u; a.in.buttonsPressed = PAD_RIGHT; a.focusNavigate();
+          adjustStays = a.focusId == 11u && a.focusStep == 1;
+          adjustPointer = a.hovered(100.f, 300.f, 200.f, 40.f) && !a.hovered(400.f, 300.f, 200.f, 40.f);   // (the mouse at 0, 0)
+          a.in.endFrame(); list(); a.in.buttonsPressed = PAD_DOWN; a.focusNavigate();
+          adjustMoves = a.focusId == 33u && a.focusStep == 0;
+        }
+        const int W0 = g_ren.W, H0 = g_ren.H; g_ren.W = 1280; g_ren.H = 720;
+        Game q; q.initHeadless(); q.career.license = LIC_PPL; q.career.storyIndex = 4; q.career.refreshBoard();
+        q.screen = SCR_HUB; q.hubTab = TAB_CONTRACTS; q.selContract = 0; q.selAircraft = -1; q.in = Input();
+        auto frame = [&](uint32_t pad, bool enter = false, float wheel = 0.f) {
+          q.in.buttonsPressed = pad; q.in.pressed[K_ENTER] = enter; q.in.wheel = wheel;
+          q.focusNavigate(); g_ren.uiBegin(); q.drawHub(); q.in.endFrame();
+        };
+        auto cardId = [](int i) { return Game::uiId(0, (float)i, "contract-card"); };
+        auto cardAt = [&]() { for (int i = 0; i < 64; i++) if (q.focusId == cardId(i)) return i; return -1; };
+        q.hubList = 1; frame(0); q.hubList = 0; frame(0); frame(0);   // (the list's scroll back to its top)
+        // the right stick (the wheel) scrolling the cards with the focus on the first takes the focus along
+        q.focusNav = true; q.focusId = cardId(0); frame(0);
+        frame(0, false, -2.f);
+        const int followed = cardAt();
+        // down the cards from the top, off the window's edge: every card in turn, the list scrolling
+        q.hubList = 1; frame(0); q.hubList = 0; frame(0);
+        q.focusNav = true; q.focusId = cardId(0); frame(0);
+        int last = 0; bool inOrder = true;
+        for (int k = 0; k < 24; k++) { frame(PAD_DOWN); const int at = cardAt(); if (at < 0) break; inOrder = inOrder && (at == last || at == last + 1); last = at; }
+        q.focusNav = true; q.focusId = cardId(last); frame(0);   // (past the last card the walk goes on, off the list)
+        frame(0, true);
+        const bool cardTaken = q.selContract == last;
+        // A on an aircraft row takes it (the first other one it can fly)
+        frame(0);
+        bool craftTaken = false;
+        const int sel0 = q.selAircraft;
+        for (int i = 0; i < kAircraftCount && !craftTaken; i++) {
+          if (i == sel0) continue;
+          const uint32_t id = Game::uiId(0, (float)i, "job-aircraft");
+          bool there = false; for (auto& f : q.focusList) there = there || f.id == id;
+          if (!there) continue;
+          q.focusNav = true; q.focusId = id; frame(0); frame(0, true);
+          craftTaken = q.selAircraft == i;
+        }
+        // the fuel row: right puts 5% of the tanks on
+        frame(0);
+        const uint32_t fuelId = Game::uiId(0, (float)q.selAircraft, "job-fuel");
+        bool fuelThere = false; for (auto& f : q.focusList) fuelThere = fuelThere || f.id == fuelId;
+        q.focusNav = true; q.focusId = fuelId; frame(0);
+        const float fuel0 = q.launchFuelKg;
+        frame(PAD_RIGHT);
+        const bool fuelStepped = fuelThere && q.focusId == fuelId && q.launchFuelKg > 0.f && q.launchFuelKg != fuel0;
+        g_ren.W = W0; g_ren.H = H0; g_ren.uiBegin();
+        const bool ok = adjustStays && adjustPointer && adjustMoves && followed == 2 && inOrder && last >= 5 && cardTaken && craftTaken && fuelStepped;
+        printf("Controller in the menus: adjust stays %d, pointer %d, moves %d; stick scroll takes focus to card %d; D-pad walked cards 0..%d in order %d, A took it %d; A took an aircraft %d; fuel stepped %d: %s\n",
+               adjustStays, adjustPointer, adjustMoves, followed, last, inOrder, cardTaken, craftTaken, fuelStepped, ok ? "ok" : "FAIL");
+        fails += !ok;
+      }
       {   // the career's launches and their saves (the review of v3.24.0, R4-R6): a launch whose save fails flies nothing and
           // leaves nothing pending; a cancelled loading screen leaves the job waiting at its stop; a free flight beside a
           // waiting job leaves it as it is, at launch and at settlement; the debrief's retry flies a waiting job on
@@ -1457,7 +1546,7 @@ struct GameTest {
         Game q; q.initHeadless(); q.career.license = LIC_CPL; q.career.money = 50000; q.career.location = g_world.findAirport("ORC");
         Contract c = g_story[4]; const int si = 1; q.career.fleet.push_back({si, c.from, 0.f, 1.f});
         float kg = -1; float minutes = simulateFlightMinutes(c, si, &kg);
-        q.quoteFlown[fmt("%s|%d|%d|%d", c.id.c_str(), si, c.from, c.to)] = {minutes, kg};
+        q.quoteFlown[menuPlan::quoteInputs(c, si)] = {minutes, kg};
         q.launchFuelKg = kAircraft[si].maxFuel;
         const int expect = (int)(kAircraft[si].maxFuel * q.career.fuelPrice(c.from, si));
         q.beginCareerFlight(c, si, Career::SRC_OWNED);

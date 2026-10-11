@@ -40,6 +40,26 @@ def rehash(data):
 
 
 class MeshToolTests(unittest.TestCase):
+    def test_constants_follow_the_game_validator(self):
+        header = (Path(__file__).resolve().parents[2] / "src" / "mesh_validation.h").read_text(encoding="utf-8")
+        self.assertEqual(assets.MAX_PART_TYPE, int(re.search(r"kMaxPartType\s*=\s*(\d+)", header).group(1)))
+        self.assertEqual(assets.ALGORITHM_VERSION, int(re.search(r"kAlgorithmVersion\s*=\s*(\d+)", header).group(1)))
+        self.assertGreaterEqual(assets.MAX_PART_TYPE, 50)   # (the XR-40's weapon parts, 47-50)
+
+    def test_newest_part_type_accepted(self):
+        name, data = mesh_bytes()
+        data = bytearray(data)
+        at = 192 + 24 * 4 + 4 * 4   # (the rigid part block's type word, after the static vertices, indices and hull)
+        struct.pack_into("<I", data, at, assets.MAX_PART_TYPE)
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / name
+            path.write_bytes(rehash(data))
+            self.assertIn(assets.MAX_PART_TYPE, assets.inspect_asset(path)["part_types"])
+            struct.pack_into("<I", data, at, assets.MAX_PART_TYPE + 1)
+            path.write_bytes(rehash(data))
+            with self.assertRaises(assets.AssetError):
+                assets.inspect_asset(path)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
@@ -202,7 +222,7 @@ class MeshToolTests(unittest.TestCase):
         original = self.first_asset().read_bytes()
         for offset, fmt, value in ((192, "<f", float("nan")), (204, "<f", float("inf")),
                                    (212, "<f", 0.), (220, "<f", 2.), (288, "<I", 3),
-                                   (300, "<f", 0.5), (304, "<I", 47), (308, "<I", 0xffffffff)):
+                                   (300, "<f", 0.5), (304, "<I", assets.MAX_PART_TYPE + 1), (308, "<I", 0xffffffff)):
             self.first_asset().write_bytes(original)
             self.mutate(offset, fmt, value)
             self.assert_bad_asset()

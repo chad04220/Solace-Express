@@ -100,6 +100,15 @@ uniform vec3 uSunDir; uniform vec3 uSunCol; uniform float uNight; uniform float 
 uniform float uCloudCover; uniform float uCloudBase; uniform float uFogB; uniform float uWet; uniform float uSnow;
 uniform vec2 uWindOff; uniform float uLightning; uniform float uStorm;
 uniform vec3 uWindV;   // surface wind velocity (m/s, the way the air moves)
+#ifdef SKY_BODIES
+uniform vec3 uMoonDir; uniform float uMoonLit;   // the moon (sky.h): towards it, and the share of its disc the sun lights
+// value noise for the moon's seas (fixed on its face: it keeps one face to us)
+float moonNoise(vec2 p){
+  vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
+  float n = dot(i, vec2(1.0, 57.0));
+  return mix(mix(hash1(n), hash1(n + 1.0), f.x), mix(hash1(n + 57.0), hash1(n + 58.0), f.x), f.y);
+}
+#endif
 #ifdef LOCAL_SUN
 uniform float uSunDim;   // the weather's share of the sunlight (Game::computeSun): sunLightAt's times it
 // (a pass that shades the round world, planet.glsl: the sun as the place being shaded sees it, in that place's own
@@ -160,23 +169,52 @@ vec3 skyColorAt(vec3 rd, float h, float R){
   float oc = smoothstep(0.55, 1.0, uCloudCover) * (1.0 - smoothstep(uCloudBase + 2500.0, uCloudBase + 9000.0, h));
   vec3 grey = vec3(0.55,0.58,0.62) * (0.012 + 0.988*smoothstep(-0.12, 0.4, sunH)) * (0.9 - 0.3*uStorm);
   col = mix(col, grey * (0.75 + 0.25*y), oc*0.85);
-  // sun disc
-  float sunDisc = smoothstep(0.99985, 0.99992, mu);
-  col += sunExt * sunDisc * 60.0 * (1.0 - oc);
-  // stars: at night, and from high in a sky gone dark by day (above the horizon, its dip from up there)
-  float space = smoothstep(12000.0, 45000.0, h) * clamp(1.0 - dot(col, vec3(0.3, 0.5, 0.2))*6.0, 0.0, 1.0);
-  float stars = max(uNight, space);
-  if (stars > 0.01 && rd.y > -dip) {
-    vec3 sp = rd*300.0; vec3 ci = floor(sp);
-    float st = hash3(ci); vec3 fp = fract(sp) - 0.5;
-    float s = smoothstep(0.995, 1.0, st) * smoothstep(0.12, 0.0, length(fp)) * (1.0 - oc);
-    col += vec3(0.8,0.85,1.0) * s * 2.0 * stars * mix(smoothstep(0.0, 0.2, rd.y), 1.0, space);
-    // moon
-    vec3 md = normalize(vec3(-0.4, 0.55, 0.6));
-    col += vec3(0.9,0.92,1.0) * smoothstep(0.9993, 0.9996, dot(rd, md)) * 3.0 * stars * (1.0-oc);
-  }
+
   col += vec3(0.7,0.75,1.0) * uLightning * 0.8 * oc;
   return col;
 }
 // the sky from the ground (the ambient, the haze's colour, the reflections: the air as the world below sees it)
 vec3 skyColor(vec3 rd){ return skyColorAt(rd, 0.0, 0.0); }
+// The sun's and the moon's discs where the sky itself is seen (the lighting pass's sky; never the haze's colour, which
+// samples the sky low over the horizon all round: a disc there drew a line down every hazed surface under it). sky:
+// the sky's colour behind them (skyColorAt), h and R as there
+vec3 skyDiscs(vec3 rd, vec3 sky, float h, float R){
+  vec3 sd = uSunDir, col = vec3(0.0);
+  h = max(h, 0.0);
+  float dip = R > 0.0 ? sqrt(max(1.0 - (R/(R + h))*(R/(R + h)), 0.0)) : 0.0;
+  float sunE = sd.y + dip;
+  vec3 beta = vec3(0.10, 0.23, 0.56);
+  vec3 sunExt = exp(-beta*skyAir(sd.y, h, R, 0.08, -1.0)*0.45);
+  float oc = smoothstep(0.55, 1.0, uCloudCover) * (1.0 - smoothstep(uCloudBase + 2500.0, uCloudBase + 9000.0, h));
+  // The sun's and the moon's discs are drawn at twice their true size (each half a degree across): the size they look
+  // to the eye through a window. The game fits a 55-74 degree view onto a monitor the eye sees as about 30, which would
+  // shrink them to half that; the two still match, as they do in the sky.
+  const float DISC = 2.0;
+  // the sun's disc (0.27 degrees in radius, times DISC), darker towards its limb, squashed a little by the air's
+  // refraction as it nears the horizon; its glare is the bloom's
+  vec3 dsun = rd - sd; dsun.y /= 1.0 - 0.17*exp(-max(sunE, 0.0)*60.0);
+  float sa = length(dsun)/(0.004653*DISC);
+  float sunDisc = (1.0 - smoothstep(0.88, 1.12, sa))*(1.0 - 0.6*(1.0 - sqrt(max(1.0 - sa*sa, 0.0))));
+  col += sunExt * sunDisc * 160.0 * (1.0 - oc);
+#ifdef SKY_BODIES
+  // the moon (0.26 degrees in radius, times DISC), a sphere lit from where the sun stands - its phase - with its darker seas and the faint
+  // earthshine on its night side; pale by day, bright by night, reddened low down as the sun is (the stars:
+  // light_fs.glsl starLight)
+  {
+    vec3 md = uMoonDir;
+    vec3 e1 = normalize(cross(md, vec3(0.0, 1.0, 0.0)) + vec3(1e-6, 0.0, 0.0)), e2 = cross(e1, md);
+    vec2 q = vec2(dot(rd - md, e1), dot(rd - md, e2))/(0.00452*DISC);
+    float q2 = dot(q, q);
+    if (q2 < 1.25 && dot(rd, md) > 0.0 && md.y > -dip - 0.02) {
+      vec3 n = q.x*e1 + q.y*e2 - sqrt(max(1.0 - q2, 0.0))*md;
+      float lit = smoothstep(-0.03, 0.08, dot(n, sd));
+      float seas = smoothstep(0.42, 0.7, moonNoise(q*1.7 + vec2(3.1, 7.4))*0.65 + moonNoise(q*4.3 + vec2(11.0, 2.0))*0.35);
+      float edge = 1.0 - smoothstep(0.94, 1.06, sqrt(q2));
+      float dark = 1.0 - smoothstep(0.02, 0.25, dot(sky, vec3(0.3, 0.5, 0.2)));   // (the sky behind it)
+      vec3 moonExt = exp(-beta*skyAir(rd.y, h, R, 0.08, -1.0)*0.45);
+      col += moonExt*edge*(1.0 - oc)*mix(0.3, 2.6, dark)*(vec3(1.0, 0.97, 0.92)*lit*(1.0 - 0.38*seas) + vec3(0.0035, 0.004, 0.006)*(1.0 - lit));
+    }
+  }
+#endif
+  return col;
+}

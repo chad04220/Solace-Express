@@ -1,3 +1,37 @@
+## What's new in v3.48.0
+
+### Military service and the Hive (a first look)
+- **A Military list in the career hub's Contracts tab** (the "Military" button beside Work and Trials). Military service has its own record: rank, service credits, sorties, successes and intelligence. Your civilian jobs, aircraft, loans, reputation and money are never touched by it.
+- **The service lends you the aircraft, fuel and stores.** A reconnaissance flight goes in an ordinary loaner: fly within 1.5 km of each of the three sites with the site ahead of you until the scan completes (five seconds each), then fly to the extraction point. Defense and strike flights go in an XR-40 outfitted for the job. A mission ends at its objective and the extraction, not on landing.
+- **Four enemy craft of the Hive:** the Needle interceptor (charges, then fires a burst of three pulses: break away when you see the charge), the Bastion bomber (flies bombing runs at the site you defend; its bombs can be shot down), the Cantor relay (shields its allies; an EMP knocks the link down) and the Archon command ship (heavily shielded, calls in Needle escorts as it is damaged). Each is a detailed model of its own.
+- **The XR-40's weapons:** three forward weapons (Pulse laser, heat-limited; Kinetic burst, a cannon with finite rounds and ballistic drop; Charged heavy, hold to charge) and three payloads (Plasma, a wide blast; Penetrator, compact and hard-hitting; EMP, which strips shields and relays but does no hull damage). Each is modelled on the aircraft, and its weight and recoil count.
+- **A practice range for the XR-40:** in the research terminal, pick the XR-40 and Free Roam, then choose a forward weapon, a payload and the wave's leader. Pause during the flight to spawn a wave or to clear and rearm. Practice never touches your career.
+- This is a first version: recon sites aren't defended yet, and a mission interrupted mid-flight can't be resumed (it is cleared safely).
+
+### Cities with a skyline
+- **Four new building types for the cities:** a 236 m supertall that steps back twice and ends in a spire, a 124 m round glass tower, a 20-storey residential tower block with balconies up its front, and a mid-rise office block with shops at street level whose windows and signs light up at night.
+- **Each city's skyline now rises to its centre.** Every city has a landmark supertall near its heart, ringed by skyscrapers and round towers, then towers and tower blocks, then the office blocks, then flats, terraces and houses. A district's character no longer pushes a city's tallest buildings out of its centre.
+- **The suburbs are filled in.** Short closes now run off the streets into the open ground behind the houses, about a thousand of them. That adds about 4,000 homes, close to 27,000 buildings in all, so the middles of the blocks are lived in rather than left as fields.
+
+### A controller for everything in the menus
+- **The D-pad and A now reach every control in every menu:** the job board's cards, the job's aircraft, the research terminal's aircraft, test cards and options, and everything that was already reachable. Moving past the end of a list with the D-pad scrolls it.
+- **Values change with left and right.** With the fuel row highlighted, the D-pad's left and right take off or add 5% of the tanks. The same works on every settings slider, and on the research terminal's launch site and time of day.
+- **The right stick scrolls the window you have highlighted,** and the highlight moves along with the scroll. A window with nothing to press in it, like a long briefing, is highlighted by its scroll bar.
+
+### Faster career menu
+- The job board works out its estimates once and keeps them, so moving around the board, the job details and the hangar no longer recalculates every route each frame. (Prepared by Codex.)
+
+### Fixes
+- **Starting a new career over a saved one opened the Settings tab** if you had visited Settings from the main menu first. "Overwrite save", "New career" and "Continue career" now always open on the job board.
+- **The diagnostics no longer charge your career.** Their crash and break-up scenes used to save a fee into your career. Every part of the diagnostics now leaves your career and settings untouched.
+- **The diagnostics report is clearer.** It shows how many aircraft bodies loaded ready-built, from your PC's cache or were built from scratch, and how long the aircraft's own shader programs took to compile, which is most of that step's time now.
+
+### Good to know
+- **Keep a copy of your career save if you might go back to an older version.** This version saves careers in a new format (with room for the military record), and v3.47.0 and earlier can't open a career it has saved. It reads your existing career as before.
+- **The first launch after updating takes longer, once.** The islands are regenerated: the suburbs have new streets and the cities new buildings.
+
+Please run `diagnostics.bat` on this version, and fly a military mission and the XR-40 practice range with the controller too.
+
 ## What's new in v3.47.0
 
 ### Roads laid out the way roads are
@@ -26,6 +60,15 @@
 - **The view now reaches the horizon** instead of stopping at 40 km. From 10 km up you can see ground hundreds of kilometres away; from 100 km up, thousands. The haze thins as you climb, so the view straight down stays clear while the horizon fades into the bright band of air along it.
 - **The sky thins out with height.** Above about 20 km it darkens to deep blue, and by 100 km it is black, with a glowing blue limb along the curve of the planet. The sun becomes a hard white disc above the air, and at sunset you can see day turn to night across the planet below. Clouds follow the curve too.
 - The far copies of the islands are drawn from a lighter mesh. In our tests the view from orbit took less time to draw than flying low over a town.
+
+### The sun, the moon and the stars
+- **The real night sky.** About 8,400 real stars, every one the eye can see on the darkest night, from the Yale Bright Star Catalogue. They're at their real brightness and in their real colours: Betelgeuse orange, Rigel blue-white. Orion, the Pleiades and every other constellation are where they should be, and the sky turns with the hours. The Milky Way glows on the darkest nights.
+- **How many you see depends on the sky behind them.** On a dark night they're all out; in twilight only the brightest show. Near the horizon they're dimmer and twinkle. By day there are none, until you climb high enough that the sky above goes dark: from about 20-30 km up the stars are out in daylight, and above the air they never go away.
+- **The sun and the moon are drawn at the size they look to the eye.** In the sky each is half a degree across. The game shows a 55-74° view on a monitor that fills about 30° of your vision, so at their true size they would look half as big as they do through a real window; they're drawn twice that size to make up for it. The sun is darker towards its edge, a little flattened as it sets, and its glare comes from the bloom.
+- **The moon is the same size as the sun, as it is in the real sky.** It goes through its phases, matching the real moon's phase on today's date. A new moon is a hairline sliver near the sun, with the rest of its disc faintly lit by earthshine, and a full moon rises as the sun sets. It shows its darker seas, is pale by day and bright by night, and reddens low down. Moonlight now comes from where the moon actually is, and it is stronger nearer full moon.
+
+### The aircraft come ready-built
+- **All 15 aircraft now ship with their bodies already built,** at full quality, outside and cockpit, the research craft included. The game no longer has to build them on your PC on the first launch after an update. It checks each one against the version it came with, and if one is missing or doesn't match, it builds that one itself as before. (Prepared by Codex.)
 
 ### Good to know
 - **The first launch after updating takes longer, once.** The islands are regenerated: some roads take different routes, and every settlement is laid out anew.

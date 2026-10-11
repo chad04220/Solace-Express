@@ -107,7 +107,9 @@ const EntKindInfo kEntInfo[EK_COUNT] = {
   {"Spire", 3.5f, 24.f, 3.5f}, {"Sea stack", 10.f, 30.f, 9.f},
   {"House", 4.5f, 8.6f, 5.5f}, {"Bungalow", 5.0f, 5.8f, 5.0f}, {"L-house", 6.0f, 8.2f, 6.0f}, {"Farmhouse", 5.5f, 9.0f, 6.0f},
   {"Townhouses", 9.0f, 10.5f, 5.5f}, {"Shop", 7.0f, 5.5f, 7.0f}, {"Apartments", 9.0f, 22.f, 7.0f}, {"Office", 9.0f, 38.f, 9.0f},
-  {"Tower", 10.f, 80.f, 10.f}, {"Skyscraper", 9.0f, 135.f, 9.0f}, {"Warehouse", 12.f, 8.5f, 9.0f}, {"Barn", 6.0f, 10.f, 9.0f},
+  {"Tower", 10.f, 80.f, 10.f}, {"Skyscraper", 9.0f, 135.f, 9.0f},
+  {"Supertall", 12.f, 236.f, 12.f}, {"Round tower", 9.5f, 124.f, 9.5f}, {"Tower block", 14.f, 64.f, 7.5f}, {"Office block", 15.f, 31.f, 11.f},
+  {"Warehouse", 12.f, 8.5f, 9.0f}, {"Barn", 6.0f, 10.f, 9.0f},
   {"Silo", 3.0f, 19.f, 3.0f}, {"Church", 5.0f, 28.f, 13.f}, {"Water tower", 5.2f, 28.f, 5.2f}, {"Lighthouse", 3.4f, 27.f, 3.4f},
   {"Gas station", 8.0f, 5.5f, 7.0f}, {"Runway light", 0.12f, 0.42f, 0.12f}, {"PAPI unit", 0.45f, 0.8f, 0.35f},
   {"Hangar", 20.f, 13.f, 16.f}, {"Arch hangar", 9.f, 7.5f, 12.f}, {"T-hangars", 24.f, 4.8f, 7.f}, {"Terminal", 60.f, 15.f, 20.f},
@@ -663,10 +665,15 @@ int Scenery::collide(vec3 p, float r, Ent* entOut) {
 // Segment against the same shapes collide() uses (tree crown cylinders, rock ellipsoids, building boxes), inflated by
 // the bolt radius, solved exactly: nothing between samples can be missed.
 float Scenery::raycast(vec3 a, vec3 d, float L, int* kindOut, Ent* entOut) {
-  const float r = 0.4f;
+  return sweepSphere(a, d, L, 0.4f, kindOut, entOut);
+}
+
+float Scenery::sweepSphere(vec3 a, vec3 d, float L, float r, int* kindOut, Ent* entOut) {
+  if (!std::isfinite(L) || L < 0 || !std::isfinite(r) || r < 0 || r > 1000.f) return -1.f;
+  for (int i = 0; i < 3; ++i) if (!std::isfinite(a[i]) || !std::isfinite(d[i])) return -1.f;
   vec3 b = a + d * L;
-  float g = std::max(std::min(g_world.groundHeight(a.x, a.z, 4), g_world.groundHeight(b.x, b.z, 4)), 0.f);
-  if (std::min(a.y, b.y) - g > 220.f) return -1.f;
+  // Endpoint ground heights cannot reject a ridge or a tall building between them.
+  // Per-chunk vertical bounds below provide the safe early rejection instead.
   // slab test of the segment against an axis-aligned box in some frame (o, dir given in that frame)
   auto slab = [&](vec3 o, vec3 dir, vec3 mn, vec3 mx, float& t0) {
     float tn = 0.f, tf = L;
@@ -730,7 +737,7 @@ float Scenery::raycast(vec3 a, vec3 d, float L, int* kindOut, Ent* entOut) {
             float c = cosf(e.yaw), s = sinf(e.yaw);
             vec3 lo(c * o.x - s * o.z, o.y, s * o.x + c * o.z), ld(c * d.x - s * d.z, d.y, s * d.x + c * d.z);
             float t0;
-            if (slab(lo, ld, vec3(-I.hx * e.sx - r, -1.f - r, -I.hz * e.sz - r), vec3(I.hx * e.sx + r, H + r * 0.5f, I.hz * e.sz + r), t0)) t = t0;
+            if (slab(lo, ld, vec3(-I.hx * e.sx - r, -1.f - r, -I.hz * e.sz - r), vec3(I.hx * e.sx + r, H + r, I.hz * e.sz + r), t0)) t = t0;
           }
           if (t < 0.f || t > L || (best >= 0.f && t >= best) || destroyed(e)) continue;
           best = t; bestK = k; bestE = e;

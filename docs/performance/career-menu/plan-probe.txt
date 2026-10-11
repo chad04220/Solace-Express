@@ -1,0 +1,4 @@
+L1 MDB->MDB aircraft=0 cold_plan_ms=69.442 warm_p50_ms=15.231 p95=17.174 max=18.104 process_cpu_mean_ms=15.351 minutes=9.3174 fuel_kg=28.9835 chunks=114
+C1 ORC->MDB aircraft=1 cold_plan_ms=18.222 warm_p50_ms=16.440 p95=23.846 max=27.493 process_cpu_mean_ms=17.341 minutes=9.5191 fuel_kg=38.4832 chunks=114
+P1 NPT->PVI aircraft=1 cold_plan_ms=52.424 warm_p50_ms=14.250 p95=19.421 max=21.339 process_cpu_mean_ms=14.398 minutes=16.5344 fuel_kg=71.0181 chunks=188
+A4 PVI->FAR aircraft=6 cold_plan_ms=68.376 warm_p50_ms=8.209 p95=8.829 max=9.196 process_cpu_mean_ms=8.254 minutes=10.6925 fuel_kg=374.1580 chunks=342

@@ -56,6 +56,13 @@ The offline `tools/earth/` prototype does not replace the game's world. Its chec
 
 See `docs/EARTH_DATA_SOURCES.md` for official sources, exact sample provenance and the unresolved terms discrepancy. Attribution notices and license links are not represented as copies of the full legal texts.
 
+## The stars (`src/star_catalog.h`)
+
+The night sky's stars are the Yale Bright Star Catalogue, 5th revised edition: D. Hoffleit and W. H. Warren Jr., Yale
+University Observatory, 1991, as distributed by NASA's Astronomical Data Center and the CDS (catalogue V/50), from
+<http://tdc-www.harvard.edu/catalogs/bsc5.html>. `tools/generate_star_catalog.py` keeps each star to visual magnitude
+6.5: its position (J2000), magnitude and B-V colour index.
+
 ## Everything else
 
 All other code, shaders, textures (the rest procedurally generated at startup), audio (synthesised in real time, apart from the tower voices above), aircraft, map and campaign content are original to this project.

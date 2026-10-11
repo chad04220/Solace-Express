@@ -10,7 +10,13 @@ void main(){
   if (soft <= 0.0) discard;
   vec2 c = vUV*2.0 - 1.0; float r2 = dot(c,c);
   vec4 o;
-  if (kind == 0) {        // soft smoke / dust puff (lit)
+  if(kind==10){ // opaque ordnance, rendered independently of the bounded beam effects
+    if(r2>1.)discard;
+    float nz=sqrt(max(0.,1.-r2));
+    vec3 n=normalize(vec3(c,nz));
+    float light=.22+.78*max(0.,dot(n,normalize(vec3(.35,.65,.7))));
+    o=vec4(vCol.rgb*(uAmb+uSunCol*light)+vec3(.08)*pow(nz,30.),vCol.a);
+  } else if (kind == 0) {        // soft smoke / dust puff (lit)
     float a = smoothstep(1.0, 0.0, r2); a *= a;
     vec3 n = normalize(vec3(c, sqrt(max(1.0-r2, 0.0))));
     float l = 0.55 + 0.45*max(dot(n, normalize(uSunDir + vec3(0,0.3,0))), 0.0);

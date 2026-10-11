@@ -13,6 +13,9 @@
 #include "breakup.h"
 #include "traffic.h"
 #include "career.h"
+#include "hive_combat.h"
+#include "hive_loadout.h"
+#include "menu_plan_cache.h"
 #include "renderer.h"
 #include "entities.h"
 #include "audio.h"
@@ -140,6 +143,9 @@ private:
   int freeCraft = 0, freeAirport = 0;
   bool freeAirborne = false;
   void beginFreeFlightSetup();
+  // the main menu into the career: its hub on the work tab and list, nothing chosen (never the tab the menu's own
+  // Settings or Controls button, or an earlier visit, left it on)
+  void enterCareerHub();
   void cancelFreeFlightSetup();
   void launchFreeFlight();
   void returnToFreeFlight();
@@ -148,6 +154,8 @@ private:
   void restartFlight();          // the pause menu's Restart: the same flight again, in the same mode (practice, trial, job leg)
   // a job leg's fees as they will be charged: the hire and ferry already paid are waived for the same aircraft only
   void continuationWaivers(Career::LaunchPlan& p, const Contract& c, int spec, Career::Source src) const;
+  menuPlan::Cache menuPlanCache;
+  Career::LaunchPlan menuLaunchPlan(const Contract& c, int spec, Career::Source src, bool continuing, bool startQuote);
   float launchFuelKg = -1;       // the fuel chosen on the job card for the next flight (-1: the plan's default)
   Career::LaunchPlan finalizeLaunchPlan(const Contract& c, int spec, Career::Source src);
   float chosenFuel(const Contract& c, int spec, Career::Source src, const Career::LaunchPlan& p) const;   // what the tanks hold at take-off
@@ -287,9 +295,9 @@ private:
     bool fireLatch = true;   // a click / Enter still held from the launch menu doesn't fire (or arm) until released
     float laserCD = 0, laserGlow = 0; int laserSide = 0;
     float bay = 0, bayHold = 0, bombLoaded = 1; int bombQueue = 0;  // bomb bay doors, bomb in the cradle 0..1, pending drops
-    struct Bolt { vec3 h, v, d; float len, age, life; bool hit; };   // head, world velocity, aim; streak length behind the head
+    struct Bolt { vec3 h, v, d; float len, age, life; bool hit; hive::ForwardSet kind = hive::ForwardSet::Pulse; };   // head, world velocity, aim; streak length behind the head
     bool wantFire = false;
-    struct Bomb { vec3 p, v; float t; };
+    struct Bomb { vec3 p, v; float t; hive::BombSet kind = hive::BombSet::Plasma; };
     struct Blast { vec3 p; float R, age, dur; bool water; };
     struct Crater { float x, z, R, D; };
     std::vector<Bolt> bolts; std::vector<Bomb> bombs; std::vector<Blast> blasts; std::vector<Crater> craters;
@@ -300,6 +308,29 @@ private:
     int kills = 0;
     int shots = 0, dropped = 0;   // laser bolts fired, bombs released (the test cards count them)
   } wraith;
+  hive::Combat hiveCombat;
+  hive::Loadout combatLoadout;
+  hive::ForwardSet practiceForward = hive::ForwardSet::Pulse;
+  hive::BombSet practiceBomb = hive::BombSet::Plasma;
+  int practiceWave = 0, militarySelection = 0;
+  float militaryHull = 100, combatBasePayload = 85;
+  std::array<std::string,hive::MaxObjectives> militarySiteLabels;
+  bool militaryFlight = false, militarySettled = false;
+  bool combatCollisionWarm = false;
+  double combatCollisionWarmMs = 0;
+  int combatPrefetchCursor = 0;
+  void launchMilitary(int kind);
+  void setupMilitaryEncounter();
+  void spawnPracticeWave();
+  void clearPracticeEncounter();
+  void updateHive(float dt);
+  void syncCombatPayload();
+  void warmCombatCollision();
+  void prefetchCombatCollision();
+  void hiveVisual(FrameParams& fp);
+  hive::WorldCallbacks hiveWorld();
+  std::string hiveObjectiveText() const;
+  void drawCombatPractice(float x, float y, float width);
   void wraithControls(float dt);
   void updateWraith(float dt);
   void wraithVisual(FrameParams& fp);
@@ -309,7 +340,7 @@ private:
   void updateBolts(float dt);
   void laserImpact(vec3 at, int craft, int entKind, const Ent* ent);
   void addScorch(float x, float z, float R, float D);
-  void detonate(vec3 p, bool water);
+  void detonate(vec3 p, bool water, hive::BombSet kind = hive::BombSet::Plasma, const vec3* queryOrigin = nullptr);
   void fireball(vec3 c, vec3 baseV, float R, bool air, bool water);
   void updateBombCam(float dt);
   void updateLoading(float dt);
@@ -459,10 +490,26 @@ private:
   // E5.4: keyboard / D-pad focus through the menus. Every enabled button registers itself for the frame; the arrow
   // keys (outside flight) and the D-pad move the focus to the nearest button in that direction, Enter / Space / A
   // press it. Moving the mouse hands control back to the cursor.
-  struct Focusable { uint32_t id; float x, y, w, h; };
+  // A control that takes a value (fuel, a slider, a site) is "adjust": with the focus on it, the D-pad's left / right
+  // step its value (focusStep) rather than move the focus off it.
+  struct Focusable { uint32_t id; float x, y, w, h; bool adjust = false; };
   std::vector<Focusable> focusList, focusPrev;
   uint32_t focusId = 0; bool focusNav = false; int focusScreen = -1;
+  int focusStep = 0;   // this frame's D-pad left / right on an "adjust" control with the focus: -1, 0, 1
+  // While the D-pad has the focus, the pointer is where the focus is (hovered): the right stick's scroll goes to the
+  // window the focus is in, as the wheel to the one under the mouse
+  bool focusPointer = false; float focusPointerX = 0, focusPointerY = 0;
   void focusNavigate();
+  // an "adjust" control in the walk: true when it has the focus; *step its D-pad left / right this frame
+  bool focusAdjust(uint32_t id, float x, float y, float w, float h, int* step);
+  static uint32_t uiId(float x, float y, const std::string& s);   // a control's identity, as the UI makes it (tests name controls by it)
+  // A scrolled window and the focus, both ways, over its controls [first, end of focusList): the D-pad taking the focus
+  // to one out of view scrolls the window to it; the window scrolled (wheeled: the wheel, the right stick) takes the
+  // focus along, onto the nearest it still shows. A window with no control in view (a briefing, a breakdown) is
+  // itself a stop in the walk (id), so the right stick can scroll it.
+  void focusScrollPixels(size_t first, uint32_t id, float x, float top, float w, float bottom, float& scroll, bool wheeled, bool scrolls = true);
+  // the same for a list scrolled by rows: rows [0, count) by idOf, rowsFirst its first shown, visible of them
+  void focusScrollRows(const std::function<uint32_t(int)>& idOf, int count, int& rowsFirst, int visible, int perRow, bool wheeled);
   void panel(float x, float y, float w, float h, float a = 0.78f);
   void hudPanel(float x, float y, float w, float h, float a = 1.f);
   void header(float x, float y, float w, const std::string& label);

@@ -842,14 +842,21 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     if (!g_shaderNotes.empty()) fprintf(f, "%s", g_shaderNotes.c_str());   // (programs the driver's compiler rejected, and what built instead)
     fclose(f);
   }
-  // Every aircraft body (outside and cockpit, the research craft's too) built or loaded before the tools draw a scene:
-  // the benchmark then never times a body being built, nor a traffic aircraft marched for want of its mesh, and the
-  // screenshots show the meshes the game shows. Returns how many were built from scratch and the seconds it took.
-  auto buildBodies = [&](int& built, double& secs) {
+  // Every aircraft body (outside and cockpit, the research craft's too) loaded or built before the tools draw a scene,
+  // with the shader programs that draw it: the benchmark then never times a body or a program being built, nor a
+  // traffic aircraft marched for want of its mesh, and the screenshots show the meshes the game shows. What it took:
+  // the bodies ready-built (the release's aircraft folder), from this PC's mesh cache or built from scratch, the
+  // packaged ones missing or refused, and the programs compiled for them (each aircraft type's own: compiled the first
+  // time it is drawn after an update, then loaded from the cache) and the seconds that took.
+  struct BodyLoad { int ready = 0, cached = 0, built = 0, refused = 0, programs = 0; double secs = 0, programSecs = 0; };
+  auto buildBodies = [&](BodyLoad& r) {
+    // (every Game a tool makes is diskless, as the tool's own: its scenes' crashes, fees and settlements stay in memory.
+    // v3.47.0's diagnostics charged the player's career for their break-up scenes: these Games saved to its folder)
     Game* g = new Game();
-    g->saveDir = game.saveDir;
+    g->saveDir = game.saveDir; g->diskless = true;
     g->initHeadless(); g->iconTex = iconTex;
-    const int b0 = g_ren.bakeBuilt;
+    const int b0 = g_ren.bakeBuilt, p0 = g_ren.prebuiltMeshHits, m0 = g_ren.prebuiltMeshMisses, c0 = g_ren.meshCacheHits, s0 = g_shaderCacheMisses;
+    const long long u0 = g_shaderCompileUs;
     LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0);
     g_ren.bakeYield = [] { pumpB(); };
     g->prewarm([](float f, const std::string& what) {
@@ -858,7 +865,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     }, true);
     g_ren.bakeYield = nullptr;
     QueryPerformanceCounter(&t1);
-    built = g_ren.bakeBuilt - b0; secs = (double)(t1.QuadPart - t0.QuadPart) / freq.QuadPart;
+    r.built = g_ren.bakeBuilt - b0; r.secs = (double)(t1.QuadPart - t0.QuadPart) / freq.QuadPart;
+    r.ready = g_ren.prebuiltMeshHits - p0; r.refused = g_ren.prebuiltMeshMisses - m0; r.cached = g_ren.meshCacheHits - c0;
+    r.programs = g_shaderCacheMisses - s0; r.programSecs = (g_shaderCompileUs - u0) * 1e-6;
     delete g;
   };
   // Analysis: SolaceExpress.exe --analyze [scenes] - a thorough look at where the frame time goes, written to
@@ -882,7 +891,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       CreateDirectoryA((dir + "\\analysis").c_str(), nullptr);
       FILE* af = fopen((dir + "\\analysis.txt").c_str(), "w");
       if (!af) return 1;
-      { int built = 0; double secs = 0; buildBodies(built, secs); }   // (as the game's launch does: the traffic drawn from its meshes, as in flight)
+      { BodyLoad r; buildBodies(r); }   // (as the game's launch does: the traffic drawn from its meshes, as in flight)
       fprintf(af, "Solace Express performance analysis\nGPU: %s\nCPU threads: %u   Quality: %d   Window: %dx%d\n",
               gpu.c_str(), std::thread::hardware_concurrency(), g_ren.quality, g_ren.W, g_ren.H);
       fprintf(af, "\nHow to read this: 'ms' is wall-clock time per frame with the GPU finished (vsync off). Per-pass times are\n"
@@ -906,7 +915,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         SetWindowTextA(g_hwnd, ("Solace Express - analysing " + sc).c_str());
         g_ren.entSync = true;
         Game* g = new Game();
-        g->saveDir = game.saveDir;
+        g->saveDir = game.saveDir; g->diskless = true;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
         g_ren.entSync = false;
         auto frames = [&](int n) { for (int i = 0; i < n; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); } };
@@ -1041,7 +1050,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
           SetWindowTextA(g_hwnd, ("Solace Express - profiling " + sc + ": " + F.name).c_str());
           Game* g = new Game();
-          g->saveDir = game.saveDir;
+          g->saveDir = game.saveDir; g->diskless = true;
           g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
           g_ren.entSync = false; g_ren.dbgOff = F.bit;
           for (int i = 0; i < 30; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); }
@@ -1139,9 +1148,15 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
                 phase, w.cloudCover, w.cloudBase, w.precip, w.storm ? 1 : 0, w.windSpeed * MS_TO_KT, w.windFrom, w.gust * MS_TO_KT, w.turbulence, g->benchmarkTimeOfDay(), w.visibility);
       };
       if (cl.find("--nobodies") == std::string::npos) {   // (--nobodies: the shader compile timing alone)
-        int built = 0; double secs = 0;
-        buildBodies(built, secs);
-        if (bf) { fprintf(bf, "aircraft bodies: %d built from scratch in %.1f s (the rest loaded from the cache)\n\n", built, secs); fflush(bf); }
+        BodyLoad r; buildBodies(r);
+        if (bf) {
+          fprintf(bf, "aircraft bodies: %d ready-built (the aircraft folder), %d from this PC's mesh cache, %d built from scratch",
+                  r.ready, r.cached, r.built);
+          if (r.refused) fprintf(bf, "; %d packaged bodies missing or refused (compile.log says why)", r.refused);
+          fprintf(bf, "\n  %.1f s in all; of it %.1f s compiling %d shader programs for them (each aircraft type's own: compiled the first"
+                      " time it is drawn after an update, then loaded from the cache)\n\n", r.secs, r.programSecs, r.programs);
+          fflush(bf);
+        }
       }
       g_ren.entSync = true;
       g_ren.syncTiming = false;   // normal async GPU queries; never serialized per-pass debug timing
@@ -1156,7 +1171,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         static std::string bakingScene; bakingScene = sc; static bool bakeNoted = false; bakeNoted = false;
         g_ren.bakeYield = [] { if (!bakeNoted) { bakeNoted = true; SetWindowTextA(g_hwnd, ("Solace Express - baking the airframe meshes for " + bakingScene + " (once; cached afterwards)").c_str()); } pumpB(); };
         Game* g = new Game();
-        g->saveDir = game.saveDir;
+        g->saveDir = game.saveDir; g->diskless = true;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
         g_ren.setRenderScale(1.f);   // explicit benchmark invariant; does not change saved settings
         fprintf(bf, "\nScene %s; requested WX=%s\n", sc.c_str(), getenv("WX") ? getenv("WX") : "(scene/default)");
@@ -1281,7 +1296,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         SetWindowTextA(g_hwnd, ("Solace Express - rendering loading pictures " + std::to_string(++done) + " / " + std::to_string(jobs.size()) + ": " + J.second).c_str());
         g_ren.entSync = true;
         Game* g = new Game();
-        g->saveDir = game.saveDir; g->assetDir = game.assetDir;
+        g->saveDir = game.saveDir; g->diskless = true; g->assetDir = game.assetDir;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(J.first);
         for (int i = 0; i < 4; i++) { g->update(1.f / 30.f); g->render(); }
         for (int i = 0; i < 40; i++) { g->update(1.f / 240.f); g->render(); }   // the TAA settles (barely moving)
@@ -1324,7 +1339,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
       std::string dir(exe, n); dir = dir.substr(0, dir.find_last_of("\\/")) + "\\shots";
       CreateDirectoryA(dir.c_str(), nullptr);
-      { int built = 0; double secs = 0; buildBodies(built, secs); }
+      { BodyLoad r; buildBodies(r); }
       g_ren.entSync = true;
       for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
         std::string sc = list.substr(a, b - a);
@@ -1334,7 +1349,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
         SetWindowTextA(g_hwnd, ("Solace Express - rendering " + sc).c_str());
         Game* g = new Game();
-        g->saveDir = game.saveDir;
+        g->saveDir = game.saveDir; g->diskless = true;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
         for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
         for (int i = 0; i < 24; i++) g->render();   // TAA settles

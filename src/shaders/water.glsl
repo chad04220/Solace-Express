@@ -156,6 +156,13 @@ vec3 waterShade(vec3 p, vec3 rd, float t, vec2 pixelDx, vec2 pixelDy){
   vec3 hv = normalize(v + uSunDir);
   float ndh = max(dot(n, hv), 0.0);
   float spec = pow(ndh, ex)*(ex + 8.0)/(900.0 + 8.0)*120.0 + pow(ndh, 90.0)*1.5;
-  return mix(lit, refl, fres) + uSunCol*spec*sh*(1.0 - foam)*(1.0 - smoothstep(0.5, 1.0, uCloudCover));
+  vec3 glint = uSunCol*spec*sh;
+#ifdef SKY_BODIES
+  // the moon's: the same lobe in its light (its phase, its height) - its path across the sea at night
+  vec3 hm = normalize(v + uMoonDir);
+  float ndm = max(dot(n, hm), 0.0), mspec = pow(ndm, ex)*(ex + 8.0)/(900.0 + 8.0)*120.0 + pow(ndm, 90.0)*1.5;
+  glint += vec3(0.055, 0.06, 0.07)*mspec*uMoonLit*smoothstep(-0.02, 0.05, uMoonDir.y)*max(uNight, 0.25);
+#endif
+  return mix(lit, refl, fres) + glint*(1.0 - foam)*(1.0 - smoothstep(0.5, 1.0, uCloudCover));
   // night: runway/town light reflections handled by overlay pass glow
 }

@@ -265,8 +265,9 @@ void cellsIn(const std::unordered_map<int64_t, std::vector<int>>& cells, float x
 // what stands on a lot: its kind, half frontage and depth, setback from the road's platform, the gap to the next
 struct LotPlan { int kind; float hw, hd, setback, gap; };
 LotPlan planLot(int townKind, float share, int cls, float h, float h2, vec2 at) {
-  // (by district: a little further in here, further out there - no zone a ring)
-  share = std::max(0.f, share + (valueNoise(at.x / 350.f + 17.f, at.y / 350.f - 5.f) - 0.5f) * (townKind == 0 ? 0.1f : 0.2f));
+  // (by district: a little further in here, further out there - no zone a ring; but a city's heart is always its heart)
+  const float calm = townKind == 2 ? smoothstepf(0.f, 0.2f, share) : 1.f;
+  share = std::max(0.f, share + (valueNoise(at.x / 350.f + 17.f, at.y / 350.f - 5.f) - 0.5f) * (townKind == 0 ? 0.1f : 0.2f) * calm);
   auto plan = [&](int k, float setback, float gap) {
     const EntKindInfo& I = kEntInfo[k];
     return LotPlan{k, I.hx * (0.88f + 0.24f * h2), I.hz * (0.92f + 0.16f * h), setback, gap};
@@ -274,10 +275,14 @@ LotPlan planLot(int townKind, float share, int cls, float h, float h2, vec2 at) 
   auto house = [&]() { return h < 0.38f ? plan(EK_HOUSE, 6.f, 6.f) : h < 0.7f ? plan(EK_HOUSE_HIP, 6.f, 6.f) : plan(EK_HOUSE_L, 7.f, 7.f); };
   const bool road = cls != RC_STREET;
   if (road && townKind > 0 && share > 0.72f && h < 0.22f) return plan(EK_WAREHOUSE, 10.f, 10.f);   // (a town's way out)
-  if (townKind == 2) {   // (a city: its towers at the very heart, offices and flats round them, then terraces and houses)
-    if (share < 0.06f) return h < 0.55f ? plan(EK_SKYSCRAPER, 8.f, 14.f) : plan(EK_TOWER, 6.f, 10.f);
-    if (share < 0.15f) return h < 0.3f ? plan(EK_TOWER, 6.f, 10.f) : h < 0.7f ? plan(EK_OFFICE, 4.f, 6.f) : plan(EK_APARTMENT, 3.f, 4.f);
-    if (share < 0.3f) return road && h < 0.3f ? plan(EK_SHOP, 0.8f, 0.5f) : h < 0.25f ? plan(EK_OFFICE, 4.f, 6.f) : h < 0.65f ? plan(EK_APARTMENT, 3.f, 4.f) : plan(EK_TOWNHOUSE, 2.5f, 0.5f);
+  if (townKind == 2) {
+    // a city: its skyline peaks at the heart - the supertalls, the skyscrapers and round towers about them - and falls
+    // away through towers and tower blocks to the mid-rise office blocks, then flats, terraces and houses
+    if (share < 0.04f) return h < 0.3f ? plan(EK_SUPERTALL, 10.f, 18.f) : h < 0.65f ? plan(EK_SKYSCRAPER, 8.f, 14.f) : plan(EK_ROUNDTOWER, 8.f, 14.f);
+    if (share < 0.08f) return h < 0.25f ? plan(EK_SKYSCRAPER, 8.f, 14.f) : h < 0.45f ? plan(EK_ROUNDTOWER, 8.f, 14.f) : h < 0.7f ? plan(EK_TOWER, 6.f, 10.f) : plan(EK_SLABTOWER, 6.f, 10.f);
+    if (share < 0.13f) return h < 0.15f ? plan(EK_TOWER, 6.f, 10.f) : h < 0.35f ? plan(EK_SLABTOWER, 6.f, 10.f) : h < 0.55f ? plan(EK_OFFICE, 4.f, 6.f) : h < 0.85f ? plan(EK_MIDRISE, 2.f, 3.f) : plan(EK_APARTMENT, 3.f, 4.f);
+    if (share < 0.19f) return h < 0.4f ? plan(EK_MIDRISE, 1.f, 1.f) : h < 0.55f ? plan(EK_OFFICE, 4.f, 6.f) : h < 0.65f ? plan(EK_SLABTOWER, 6.f, 10.f) : plan(EK_APARTMENT, 3.f, 4.f);
+    if (share < 0.3f) return road && h < 0.3f ? plan(EK_SHOP, 0.8f, 0.5f) : h < 0.15f ? plan(EK_MIDRISE, 1.f, 1.f) : h < 0.25f ? plan(EK_OFFICE, 4.f, 6.f) : h < 0.65f ? plan(EK_APARTMENT, 3.f, 4.f) : plan(EK_TOWNHOUSE, 2.5f, 0.5f);
     if (share < 0.5f) return road && h < 0.3f ? plan(EK_SHOP, 0.8f, 0.5f) : h < 0.3f ? plan(EK_APARTMENT, 3.f, 4.f) : h < 0.65f ? plan(EK_TOWNHOUSE, 2.5f, 0.5f) : house();
     if (share < 0.75f) return h < 0.3f ? plan(EK_TOWNHOUSE, 2.5f, 0.5f) : house();
     return house();
@@ -354,7 +359,7 @@ void sceneryBakeCommunityLots(const World& world) {
     const vec2 front(-f.u.y, f.u.x);   // (local +z: the frontage turned a quarter - towards the road)
     L.yaw = atan2f(front.x, front.y);
     L.kind = kind; L.seed = seed; L.town = town; L.street = street; L.share = share;
-    L.type = kind == EK_APARTMENT || kind == EK_OFFICE || kind == EK_TOWER || kind == EK_SKYSCRAPER ? 1 : 0;
+    L.type = kind == EK_APARTMENT || kind == EK_OFFICE || (kind >= EK_TOWER && kind <= EK_MIDRISE) ? 1 : 0;
     L.wallH = kEntInfo[kind].h; L.roofH = 0.f; L.ridgeX = seed < 0.5f ? 1 : 0;
     const int id = (int)g_lots.size(); g_lots.push_back(L); cellsAdd(g_lotCells, L.cx, L.cz, id);
   };
@@ -390,7 +395,9 @@ void sceneryBakeCommunityLots(const World& world) {
       break;
     }
   }
-  // ---- along the roads, then the streets: each side walked, a lot wherever one fits
+  // ---- along the roads, then the streets: each side walked, a lot wherever one fits. A city's first lot near its heart
+  // is its landmark, the supertall, wherever the first site for one fits
+  std::vector<char> landmark(kNumTowns, 0);
   for (int pass = 0; pass < 2; pass++)
     for (size_t pi = 0; pi < world.roads.paths.size(); pi++) {
       const RoadPath& P = world.roads.paths[pi];
@@ -413,17 +420,22 @@ void sceneryBakeCommunityLots(const World& world) {
           if (town < 0 || share >= reach) { s += 12.f; continue; }
           const int ix = (int)floorf(at.x / 3.f) * 7 + sideI, iz = (int)floorf(at.y / 3.f);
           const float h = hash2i(ix + 911, iz - 77), h2v = hash2i(ix - 31, iz + 503), sparse = hash2i(ix + 5, iz + 9);
-          const LotPlan L = planLot(kTowns[town].kind, share, P.cls, h, h2v, at);
+          LotPlan L = planLot(kTowns[town].kind, share, P.cls, h, h2v, at);
+          if (kTowns[town].kind == 2 && !landmark[town] && share < 0.08f) {
+            const EntKindInfo& I = kEntInfo[EK_SUPERTALL];
+            L = LotPlan{EK_SUPERTALL, I.hx, I.hz, 10.f, 18.f};
+          }
           // (thinning out towards the edge)
           if (sparse < smoothstepf(0.7f, reach, share) * 0.75f) { s += L.hw * 2.f + L.gap; continue; }
           const float dist = half + L.setback + L.hd;
           Footprint f{at + out * dist, d * side, L.hw, L.hd};
           f.u = vec2(-out.y, out.x);   // (the frontage along the road, its front - local +z - towards it)
           float base;
-          const bool big = L.kind == EK_TOWER || L.kind == EK_SKYSCRAPER || L.kind == EK_OFFICE || L.kind == EK_WAREHOUSE;
+          const bool big = (L.kind >= EK_OFFICE && L.kind <= EK_MIDRISE) || L.kind == EK_WAREHOUSE;
           if (fits(f, std::max(0.25f, L.gap * 0.5f), big ? 3.5f : 2.6f, town, reach, base)) {
             claim(f, std::max(0.25f, L.gap * 0.5f));
             addLot(f, L.kind, base, h2v, town, (int)pi, share);
+            landmark[town] = landmark[town] || L.kind == EK_SUPERTALL;
             s += L.hw * 2.f + L.gap;
           } else s += 4.f;
         }

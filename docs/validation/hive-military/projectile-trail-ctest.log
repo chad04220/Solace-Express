@@ -1,0 +1,23 @@
+Test project /workspace/scratch/87b29863f015/solace-hive-military-build
+    Start 98: test_world
+1/9 Test #98: test_world .......................   Passed    6.38 sec
+    Start 21: military_gameplay
+2/9 Test #21: military_gameplay ................   Passed    2.61 sec
+    Start 22: hive_combat
+3/9 Test #22: hive_combat ......................   Passed    0.01 sec
+    Start 23: hive_combat_fastmath
+4/9 Test #23: hive_combat_fastmath .............   Passed    0.00 sec
+    Start 26: hive_loadout
+5/9 Test #26: hive_loadout .....................   Passed    0.00 sec
+    Start 27: hive_loadout_fastmath
+6/9 Test #27: hive_loadout_fastmath ............   Passed    0.00 sec
+    Start 30: hive_ordnance_visual
+7/9 Test #30: hive_ordnance_visual .............   Passed    0.00 sec
+    Start 60: hive_game_integration
+8/9 Test #60: hive_game_integration ............   Passed    0.04 sec
+    Start 61: enemy_render_contract
+9/9 Test #61: enemy_render_contract ............   Passed    0.03 sec
+
+100% tests passed out of 9
+
+Total Test time (real) =   9.08 sec

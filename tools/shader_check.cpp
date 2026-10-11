@@ -17,6 +17,12 @@ static void put(const std::string& dir, const char* name, const std::string& src
   if (FILE* f = fopen((dir + "/pruned/" + name).c_str(), "w")) { fputs(shaderPrune::prune(src).c_str(), f); fclose(f); }
 }
 
+// the program as the renderer hands it to the driver only (shader_prune.h): for a build whose whole source is not a
+// program by design - see the light aircraft's and the jets' bakes below
+static void putPruned(const std::string& dir, const char* name, const std::string& src) {
+  if (FILE* f = fopen((dir + "/pruned/" + name).c_str(), "w")) { fputs(shaderPrune::prune(src).c_str(), f); fclose(f); }
+}
+
 int main(int argc, char** argv) {
   std::string dir = argc > 1 ? argv[1] : ".";
   { std::error_code ec; std::filesystem::create_directories(dir + "/pruned", ec); }
@@ -72,10 +78,16 @@ int main(int argc, char** argv) {
       float M[96]; packModelOf(m, M);
       const std::string d = aircraftDefines(m, M), n = std::to_string(m);
       put(dir, ("plane_mesh_af" + n + ".frag").c_str(), planeMeshFSAssembly(d));
-      put(dir, ("hullbake_af" + n + ".frag").c_str(), hullBakeFSAssembly(d));   // (the cockpit body's builder)
-      put(dir, ("hullbake_normals_af" + n + ".frag").c_str(), hullBakeFSAssembly(d + "#define HULL_BAKE_NORMALS\n"));
-      put(dir, ("hullbake_out_af" + n + ".frag").c_str(), hullBakeFSAssembly(d + "#define AF_OUTSIDE\n"));   // (the outside body's: no cabin)
-      put(dir, ("hullbake_normals_out_af" + n + ".frag").c_str(), hullBakeFSAssembly(d + "#define AF_OUTSIDE\n#define HULL_BAKE_NORMALS\n"));
+      // A light aircraft's or a jet's own bake leaves out the XR-40 weapons' declarations (part ids, payload uniform:
+      // plane_parts.glsl, scene_uniforms.glsl), so its program - and the families' pinned bake identities
+      // (shader_prune_test) - stay as before the weapons; the XR-40's code that names them is in its source but never
+      // reached, and pruned before any driver sees it. Those bakes are checked as compiled: pruned.
+      const bool trimmed = d.find("#define AF_LIGHT") != std::string::npos || d.find("#define AF_JET") != std::string::npos;
+      auto bake = trimmed ? putPruned : put;
+      bake(dir, ("hullbake_af" + n + ".frag").c_str(), hullBakeFSAssembly(d));   // (the cockpit body's builder)
+      bake(dir, ("hullbake_normals_af" + n + ".frag").c_str(), hullBakeFSAssembly(d + "#define HULL_BAKE_NORMALS\n"));
+      bake(dir, ("hullbake_out_af" + n + ".frag").c_str(), hullBakeFSAssembly(d + "#define AF_OUTSIDE\n"));   // (the outside body's: no cabin)
+      bake(dir, ("hullbake_normals_out_af" + n + ".frag").c_str(), hullBakeFSAssembly(d + "#define AF_OUTSIDE\n#define HULL_BAKE_NORMALS\n"));
       if (m == kWraith) put(dir, "plane_mesh_af12_probe.frag", planeMeshFSAssembly(d + "#define PROBE_MESH_SHADE\n"));   // (the analysis's probe build)
       // and its own full-screen passes (raster_renderer.cpp afPassProgram): the march, its shadows; the XR-40's effects
       put(dir, ("objects_af" + n + ".frag").c_str(), objectsFSAssembly(d));
