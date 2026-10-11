@@ -730,12 +730,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   if (isCareerAircraft(selAircraft)) {   // for the aircraft picked below (last frame's choice)
     auto esrc = career.canFly(c, selAircraft);
     if (esrc != Career::SRC_NONE) {
-      // (the plan runs the autopilot's approach planner: cached for this job, aircraft and career state)
-      static std::string planKey; static Career::LaunchPlan e;
-      std::string key = fmt("%s|%d|%d|%d|%d|%u", c.id.c_str(), selAircraft, (int)esrc, career.location, career.money < 1500, career.boardSeed);
-      if (key != planKey) { e = career.plan(c, selAircraft, esrc); if (cd.job) continuationWaivers(e, c, selAircraft, esrc); planKey = key; }   // (a job leg: quoted as it will be charged - C3)
-      if (!e.flown) applyQuote(c, e, true);   // (the flown time replaces the quick estimate when it's in)
-      career.planFuel(e, c, chosenFuel(c, selAircraft, esrc, e));   // selected uplift also drives costs and net
+      Career::LaunchPlan e = menuLaunchPlan(c, selAircraft, esrc, cd.job, true);
       int ops = e.fees() + e.fuelCostEst;
       if (c.payout > 0 || ops > 0) {
         std::string parts;
@@ -884,7 +879,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   bool overweight = false;
   if (selAircraft >= 0) {
     const AircraftSpec& sp = kAircraft[selAircraft]; auto esrc = career.canFly(c, selAircraft);
-    if (!sp.special && esrc != Career::SRC_NONE) { Career::LaunchPlan e0 = career.plan(c, selAircraft, esrc); float fuel = chosenFuel(c, selAircraft, esrc, e0); overweight = sp.emptyMass + fuel + c.cargoKg + c.pax * 85.f + 85.f > sp.maxMass() + 0.5f; }
+    if (!sp.special && esrc != Career::SRC_NONE) { Career::LaunchPlan e0 = menuLaunchPlan(c, selAircraft, esrc, cd.job, false); float fuel = e0.fuelLoadKg; overweight = sp.emptyMass + fuel + c.cargoKg + c.pax * 85.f + 85.f > sp.maxMass() + 0.5f; }
   }
   bool can = selAircraft >= 0 && !commitBlocked() && !otherWhileJob && !overweight;
   if (cd.job) {

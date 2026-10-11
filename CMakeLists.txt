@@ -172,6 +172,16 @@ else()
   add_executable(vtol_throttle_test tests/vtol_throttle_test.cpp ${GAME_OBJS} src/radio_stub.cpp)
   target_link_libraries(vtol_throttle_test PRIVATE ${CMAKE_DL_LIBS})
 endif()
+# Exact career-menu estimate cache and production UI generation, CPU only.
+if(WIN32)
+  add_executable(menu_plan_cache_test tests/menu_plan_cache_test.cpp ${GAME_OBJS} src/radio_win.cpp)
+  target_link_libraries(menu_plan_cache_test PRIVATE opengl32 gdi32 winmm mfplay mfplat mfuuid ole32 uuid)
+else()
+  add_executable(menu_plan_cache_test tests/menu_plan_cache_test.cpp ${GAME_OBJS} src/radio_stub.cpp)
+  target_link_libraries(menu_plan_cache_test PRIVATE ${CMAKE_DL_LIBS})
+endif()
+add_dependencies(menu_plan_cache_test shaders_gen)
+add_dependencies(gameplay_test menu_plan_cache_test)
 add_dependencies(vtol_throttle_test shaders_gen)
 add_dependencies(cockpit_camera_test shaders_gen)
 add_executable(cockpit_focus_zoom_test tests/cockpit_focus_zoom_test.cpp)
@@ -179,6 +189,7 @@ add_executable(cockpit_focus_zoom_test tests/cockpit_focus_zoom_test.cpp)
 add_dependencies(gameplay_test cockpit_camera_test vtol_throttle_test)
 add_dependencies(shader_keyword_test cockpit_focus_zoom_test)
 enable_testing()
+add_test(NAME menu_plan_cache COMMAND menu_plan_cache_test)
 add_test(NAME vtol_throttle COMMAND vtol_throttle_test)
 add_test(NAME wreck_pose COMMAND ${CMAKE_COMMAND} -E env SOLACE_WRECK_POSE_ONLY=1 $<TARGET_FILE:gameplay_test>)
 add_test(NAME aircraft_build_contract COMMAND aircraft_build_contract_test)
@@ -511,7 +522,7 @@ foreach(t airport_environment airport_layouts cockpit_camera community_layout uf
           environment_scale_audit flight_model_1 flight_model_2 flight_model_3 gameplay_loop_1 gameplay_loop_2 gameplay_loop_3
           gameplay_loop_4 campaign_progression_1 campaign_progression_2 campaign_progression_3 career_saves terrain_shadow_bake
           volcano_effects new_aircraft_performance new_aircraft_autoland_larkspur new_aircraft_autoland_atlas new_aircraft_go_around
-          vtol_throttle wreck_pose)
+          vtol_throttle wreck_pose menu_plan_cache)
   if(TEST ${t})
     set_property(TEST ${t} APPEND PROPERTY FIXTURES_REQUIRED world)
     set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT "SOLACE_TEST_WORLD=${CMAKE_BINARY_DIR}/test_world.bin")
@@ -519,7 +530,7 @@ foreach(t airport_environment airport_layouts cockpit_camera community_layout uf
 endforeach()
 foreach(t airport_environment_test airport_layout_test cockpit_camera_test community_layout_test encounter_timing_test
           entity_raycast_test envelope_test environment_scale_audit flight_test gameplay_test progression_test save_test
-          terrain_shadow_test volcano_effects_test new_aircraft_performance_test new_aircraft_autoland_test vtol_throttle_test)
+          terrain_shadow_test volcano_effects_test new_aircraft_performance_test new_aircraft_autoland_test vtol_throttle_test menu_plan_cache_test)
   if(TARGET ${t})
     add_dependencies(${t} test_world)
   endif()

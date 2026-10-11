@@ -12,7 +12,7 @@
       Game q; fresh(q); Contract c = g_story[4]; const int spec = 1;
       q.career.location = c.from; q.career.fleet.push_back({spec, c.from, 20.f, 1.f});
       float routeFuel = -1; float minutes = simulateFlightMinutes(c, spec, &routeFuel);
-      const std::string key = fmt("%s|%d|%d|%d", c.id.c_str(), spec, c.from, c.to);
+      const std::string key = menuPlan::quoteInputs(c, spec);
       q.quoteFlown[key] = {minutes, routeFuel}; q.launchFuelKg = kAircraft[spec].maxFuel;
       const float uplift = q.launchFuelKg - 20.f;
       const int expected = (int)(uplift * q.career.fuelPrice(c.from, spec));

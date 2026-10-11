@@ -1,0 +1,42 @@
+{
+  "base": "72d0af0b23defb8067dd697f87d94384b39a412b",
+  "date_utc": "2026-10-11",
+  "focused_checks": 624,
+  "focused_failures": 0,
+  "gameplay_parts": {
+    "1": "passed, zero failures",
+    "2": "passed, zero failures",
+    "3": "passed, zero failures",
+    "4": "passed, zero failures"
+  },
+  "linux_release_build": "passed",
+  "windows_x64_llvm_mingw_cross_build": "passed: SolaceExpress.exe and menu_plan_cache_test.exe link",
+  "native_windows_runtime": "not run",
+  "gpu_rendering": "not run",
+  "full_repository_test_suite": "not run",
+  "publication": "local only, not pushed",
+  "evidence_sha256": {
+    "menu-cache-test-final.txt": "a863ad7d626ab4ab4f5cf2456cc8dcc5244f9d78e169af722e966b6d2499796c",
+    "ctest-menu.txt": "c739649103e87b7b81939946d22d2635605bfa16a63a2e2ba1a8a13d30c2d671",
+    "plan-probe.txt": "7e0ddc459f5d5e178c12a6f3ed45b9235a0503b65213046cecb3e41002775d17",
+    "ui-patched.txt": "00e27c42cadd56dfb5c1bb4780a881e5fe39783e5a011b153f939442aa744dab",
+    "ui-baseline.txt": "506c1544e5ba15cb00ffe67162d3902d30262cc0ae6e206015515551626ea7a5",
+    "ui-patched-hangar.txt": "da320d115736e00ae0451255466eb368368c8fb73fcdf83286086ca9e2d9fa08"
+  },
+  "hangar": {
+    "frames": 360,
+    "full_plan_calls": 0,
+    "quote_jobs_started": 0,
+    "cases": [
+      "steady full fleet",
+      "all aircraft switches",
+      "owned fuel changes"
+    ],
+    "cpu_only_mean_ms": [
+      0.060305,
+      0.04882,
+      0.059844
+    ]
+  },
+  "ctest_menu_plan_cache": "passed (fixture reused from byte-identical world base)"
+}

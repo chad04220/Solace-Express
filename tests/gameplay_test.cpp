@@ -1457,7 +1457,7 @@ struct GameTest {
         Game q; q.initHeadless(); q.career.license = LIC_CPL; q.career.money = 50000; q.career.location = g_world.findAirport("ORC");
         Contract c = g_story[4]; const int si = 1; q.career.fleet.push_back({si, c.from, 0.f, 1.f});
         float kg = -1; float minutes = simulateFlightMinutes(c, si, &kg);
-        q.quoteFlown[fmt("%s|%d|%d|%d", c.id.c_str(), si, c.from, c.to)] = {minutes, kg};
+        q.quoteFlown[menuPlan::quoteInputs(c, si)] = {minutes, kg};
         q.launchFuelKg = kAircraft[si].maxFuel;
         const int expect = (int)(kAircraft[si].maxFuel * q.career.fuelPrice(c.from, si));
         q.beginCareerFlight(c, si, Career::SRC_OWNED);

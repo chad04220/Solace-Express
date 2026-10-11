@@ -13,6 +13,7 @@
 #include "breakup.h"
 #include "traffic.h"
 #include "career.h"
+#include "menu_plan_cache.h"
 #include "renderer.h"
 #include "entities.h"
 #include "audio.h"
@@ -148,6 +149,8 @@ private:
   void restartFlight();          // the pause menu's Restart: the same flight again, in the same mode (practice, trial, job leg)
   // a job leg's fees as they will be charged: the hire and ferry already paid are waived for the same aircraft only
   void continuationWaivers(Career::LaunchPlan& p, const Contract& c, int spec, Career::Source src) const;
+  menuPlan::Cache menuPlanCache;
+  Career::LaunchPlan menuLaunchPlan(const Contract& c, int spec, Career::Source src, bool continuing, bool startQuote);
   float launchFuelKg = -1;       // the fuel chosen on the job card for the next flight (-1: the plan's default)
   Career::LaunchPlan finalizeLaunchPlan(const Contract& c, int spec, Career::Source src);
   float chosenFuel(const Contract& c, int spec, Career::Source src, const Career::LaunchPlan& p) const;   // what the tanks hold at take-off
