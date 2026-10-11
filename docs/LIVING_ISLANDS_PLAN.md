@@ -34,7 +34,8 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
 - **Phase A, item 5: arch and truss spans done (after v3.48).** Each long crossing of the water (200 m or more, on a
   highway or a road) carries one main span over its deepest water, wherever the deck turns no more than 12 degrees
   across it. The span stands on two heavier piers, with nothing under it:
-  - a highway's is a steel Warren truss over two spans, continuous over a pier between them (160 m, 11 m high);
+  - a highway's is a steel Warren truss over two spans, continuous over a pier between them (160 m, 11 m high) -
+    and where the crossing is 400 m and more, the strait bridge (Phase C, below);
   - a road's is a white tied arch (125 m, rising 23 m), its hangers carrying the deck and its ribs braced together
     over the road.
   - Every mountain lane's viaduct is now masonry: a sandstone arch between each pair of supports, its spandrels solid
@@ -86,7 +87,7 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   beyond their platforms (streets and the racetrack's circuit 20 m, other roads 50 m). `roads_test` fails if any
   segment goes unlisted or the lists come within a texel's worth of the limit. New roads (Phase C's access roads)
   need that headroom, or a wider packing. `road_class_numbers` holds roads.glsl's widths and reaches to roadSpec's.
-- **Phase A is done.** Phase C's hand-built landmarks are under way, then life on the roads (Phase D).
+- **Phase A is done, and Phase C's twelve landmarks are built.** Life on the roads is next (Phase D).
 - **Phase C, the wind farm (after v3.48, `landmarks.cpp`, `landmarks_test`).** Ten 3 MW turbines stand 300 m apart
   along the crest of a ridge (the best one on the mild green hills, 80 to 700 m up). They are out of the settlements,
   off the roads, and 6 km or more from every runway. Each is a 90 m tower with its nacelle and three 45 m blades. The
@@ -155,6 +156,18 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   - The dam (`EK_DAM`): its arch about a centre downstream, thick at its foot and thin at its crest, carried into the
     rock past its abutments. A road runs along its crest between parapets, with five spillway gates and their gantry
     at its crown, and a powerhouse at its toe with its penstocks down the face. Nothing grows in the lake.
+- **Phase C: the strait bridge (after v3.48, `bridges.h` `BM_STAYED`, `bridges_test`).** The network gives no highway
+  a crossing of the bay by Port Verde, so the strait bridge is the highway's longest crossing of the water: 498 m over
+  the strait on the highway from Solace Capital to Northpoint, 9 km short of Northpoint.
+  - It is cable-stayed: a highway crossing of 400 m and more takes a main span of half its length (200 to 300 m; here
+    249 m) over its deepest water.
+  - The span hangs between two concrete H-pylons rising 55 m over the road (0.22 of the span). Each pylon stands on a
+    widened main pier, its legs past the deck's edges and leaning in a little, with a beam across high over the
+    traffic and another at their heads.
+  - From each leg a plane of white-sheathed stays fans out either way, a semi-fan of ten, every 12 m along the deck.
+    The outermost are anchored highest, and the two fans meet at the span's middle.
+  - The pylons and stays are bridge members, drawn and solid like the truss's and the arch's; the road between the
+    legs stays clear.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network
@@ -189,7 +202,8 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
 
 Each built as its own set of meshes, placed by hand, and meant to be flown past and looked down on:
 
-- **Strait bridge**: a cable-stayed bridge carrying the coast highway across the south bay by Port Verde.
+- **Strait bridge**: a cable-stayed bridge carrying the coast highway across the south bay by Port Verde. (Built on
+  the highway's longest crossing of the water instead: no highway crosses that bay.)
 - **Kaleo observatory**: telescope domes on the volcano's rim, reached by a switchback road.
 - **Lighthouse Key**: the lighthouse, keeper's cottages, a landing stage and cliffs.
 - **Fjordhaven dam**: a concrete arch dam with its reservoir in the northern mountains.

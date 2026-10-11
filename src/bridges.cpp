@@ -147,11 +147,13 @@ std::vector<Bridge> buildBridges(const World& world) {
       b.stone = !b.water && b.cls >= RC_LANE && clear >= 6.f;
       if (b.stone) b.depth = 1.2f;
       // a long crossing of the water: its main span over the deepest stretch of water straight enough for it (12 degrees
-      // of bend at the most), 30 m or more from the abutments - a highway's a truss of two spans, a road's a tied arch
+      // of bend at the most), 30 m or more from the abutments - a highway's a truss of two spans, a road's a tied arch,
+      // and a highway's of 400 m and more cable-stayed, its main span half of it (200 to 300 m), its pylons a fifth or so
+      // of that over the road
       auto groundAt = [&](float s) { vec3 c, d, x; bridgeFrame(b, s, c, d, x); return world.groundHeight(c.x, c.z, 8); };
       if (b.water && b.length >= 200.f && b.cls <= RC_ROAD) {
-        const bool truss = b.cls == RC_HIGHWAY;
-        const float W = truss ? 2.f * std::clamp(0.16f * b.length, 60.f, 85.f) : std::clamp(0.4f * b.length, 90.f, 125.f);
+        const bool stayed = b.cls == RC_HIGHWAY && b.length >= 400.f, truss = b.cls == RC_HIGHWAY && !stayed;
+        const float W = stayed ? std::clamp(0.5f * b.length, 200.f, 300.f) : truss ? 2.f * std::clamp(0.16f * b.length, 60.f, 85.f) : std::clamp(0.4f * b.length, 90.f, 125.f);
         float best = -1e9f, at = 0.f;
         for (float sc = along[k] + 30.f + W * 0.5f; sc <= along[e] - 30.f - W * 0.5f; sc += 5.f) {
           const float a0 = sc - W * 0.5f, a1 = sc + W * 0.5f;
@@ -167,8 +169,8 @@ std::vector<Bridge> buildBridges(const World& world) {
           if (score > best) { best = score; at = sc; }
         }
         if (best > -1e8f) {
-          b.main = truss ? BM_TRUSS : BM_ARCH; b.main0 = at - W * 0.5f; b.main1 = at + W * 0.5f;
-          b.mainRise = truss ? std::clamp(W * 0.5f / 7.f, 8.f, 12.f) : W / 5.5f;
+          b.main = stayed ? BM_STAYED : truss ? BM_TRUSS : BM_ARCH; b.main0 = at - W * 0.5f; b.main1 = at + W * 0.5f;
+          b.mainRise = stayed ? std::clamp(0.22f * W, 45.f, 70.f) : truss ? std::clamp(W * 0.5f / 7.f, 8.f, 12.f) : W / 5.5f;
         }
       }
       // the piers: evenly between the supports - the abutments, and a main span's piers - none where the deck rests on
@@ -188,6 +190,7 @@ std::vector<Bridge> buildBridges(const World& world) {
         const float tall = pr.top - pr.bottom;
         pr.halfThick = std::clamp(0.7f + 0.012f * tall, 0.7f, 2.0f) * (mainPier ? 1.8f : 1.f);
         pr.halfWidth = b.stone ? b.halfDeck : b.cls == RC_HIGHWAY ? b.halfDeck * 0.62f : b.cls == RC_ROAD ? b.halfDeck * 0.5f : 1.1f;
+        if (mainPier && b.main == BM_STAYED) pr.halfWidth = b.halfDeck + 4.5f;   // (a pylon's: its cap under both legs)
         if (b.stone) pr.halfThick = std::clamp(0.045f * spacing, 1.2f, 2.2f);
         b.piers.push_back(pr);
       };

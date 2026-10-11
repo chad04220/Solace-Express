@@ -2,8 +2,10 @@
 // bridge (road_network.h RoadPath::bridge - over water, or the road standing well clear of the ground), its deck the
 // road's own graded centreline, carried on piers down to the ground or the sea floor between abutments at its ends.
 // A long crossing of the water takes its deepest straight stretch in one main span on two heavier piers: a steel
-// through truss on a highway (two spans, continuous over a pier between), a tied arch on a road. A viaduct carrying a
-// mountain lane is masonry: an arch between each pair of supports, the spandrels solid up to the road.
+// through truss on a highway (two spans, continuous over a pier between), a tied arch on a road - and a highway's
+// crossing of 400 m and more, the strait's (Phase C), cable-stayed: two concrete pylons, the deck hung from them by
+// two planes of stays fanning out either way. A viaduct carrying a mountain lane is masonry: an arch between each pair
+// of supports, the spandrels solid up to the road.
 // Derived from the road network whenever the world is built or loaded (World::bridges): nothing of it is cached. The
 // renderer draws them (bridge_mesh.h), the scenery collision makes them solid (Scenery::collide / raycast).
 #pragma once
@@ -24,13 +26,13 @@ struct BridgePier {
   bool main = false;   // a main span's (heavier)
 };
 
-enum BridgeMain : uint8_t { BM_NONE = 0, BM_TRUSS, BM_ARCH };
+enum BridgeMain : uint8_t { BM_NONE = 0, BM_TRUSS, BM_ARCH, BM_STAYED };
 // a masonry arch between two supports (distances along the road, m): its intrados springs `rise` under its crown,
 // which is kBridgeCrown under the deck's underside
 struct BridgeArch { float s0, s1, rise; };
 static const float kBridgeCrown = 0.15f;
-// a steel member of a main span's structure: a box section from a to b, its half width (level, across it) and half
-// depth; colour 0 a truss's grey-green, 1 an arch's white
+// a member of a main span's structure: a box section from a to b, its half width (level, across it) and half depth;
+// colour 0 a truss's grey-green steel, 1 an arch's white, 2 a pylon's concrete, 3 a stay's cable
 struct BridgeMember { vec3 a, b; float hw, hh; int colour; };
 
 struct Bridge {
@@ -47,7 +49,8 @@ struct Bridge {
   float length = 0;                     // between the abutments (m)
   std::vector<BridgePier> piers;
   BridgeMain main = BM_NONE;            // a main span: its kind, its ends (distances along the road), its structure's
-  float main0 = 0, main1 = 0, mainRise = 0;   // height over the road (a truss's) or rise (an arch's crown over the tie)
+  float main0 = 0, main1 = 0, mainRise = 0;   // height over the road (a truss's, a pylon's) or rise (an arch's crown
+                                              // over the tie)
   bool stone = false;                   // a masonry viaduct, its arches
   std::vector<BridgeArch> arches;
   float minX = 0, minY = 0, minZ = 0, maxX = 0, maxY = 0, maxZ = 0;   // the bounds of all of it
@@ -104,6 +107,32 @@ template <class F> void forEachBridgeMember(const Bridge& b, F&& f) {
       f(BridgeMember{at(sp(i), 1.f, T), at(sp(i + 1), -1.f, T), 0.08f, 0.12f, 0});
     }
     for (int i : {1, Q - 1}) f(BridgeMember{at(sp(i), -1.f, T - 1.8f), at(sp(i), 1.f, T - 1.8f), 0.15f, 0.3f, 0});       // portals
+  } else if (b.main == BM_STAYED) {   // cable-stayed: a pylon on each main pier, the stays from it to the deck's edges
+    // A pylon is an H: two legs from the pier's cap past the deck's edges, leaning in a little, to mainRise over the
+    // road; a beam across between them high over the traffic and another at their heads. From each leg a plane of
+    // stays fans out either way along the deck - a semi-fan, the outermost from the highest - every 12 m from 15 m
+    // off the pylon to the main span's middle, and as far into the side span
+    const float H = b.mainRise, len = b.main1 - b.main0;
+    const int N = std::max(4, (int)floorf((len * 0.5f - 15.f) / 12.f) + 1);
+    for (float s0 : {b.main0, b.main1}) {
+      vec3 c, d, a; bridgeFrame(b, s0, c, d, a);
+      auto leg = [&](float side, float y) {   // (its centre at height y over the road)
+        const float t = std::clamp((y + b.depth + 1.f) / (H + b.depth + 1.f), 0.f, 1.f);
+        return c + a * (side * (b.halfDeck + 2.6f - 1.4f * t)) + vec3(0, y, 0);
+      };
+      for (float side : {-1.f, 1.f}) f(BridgeMember{leg(side, -b.depth - 1.f), leg(side, H + 1.5f), 1.6f, 1.9f, 2});
+      for (float y : {0.55f * H, H - 2.f}) f(BridgeMember{leg(-1.f, y), leg(1.f, y), 1.2f, 1.4f, 2});
+      for (float side : {-1.f, 1.f})
+        for (float dirS : {-1.f, 1.f})
+          for (int i = 0; i < N; i++) {
+            const float s = s0 + dirS * (15.f + 12.f * i);
+            if (s < b.along.front() + 4.f || s > b.along.back() - 4.f) continue;
+            vec3 cs, ds, as; bridgeFrame(b, s, cs, ds, as);
+            const vec3 deck = cs + as * (side * (b.halfDeck + 0.6f)) + vec3(0, 0.3f, 0);
+            const vec3 top = leg(side, H - 3.f - 1.4f * (N - 1 - i)) + d * (dirS * 0.8f) - a * (side * 0.5f);
+            f(BridgeMember{deck, top, 0.11f, 0.11f, 3});
+          }
+    }
   } else {   // a tied arch: two ribs rising from the ends of the tie, hangers down to it, braced across over the road
     const float R = b.mainRise, len = b.main1 - b.main0;
     const int N = 24;

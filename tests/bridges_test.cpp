@@ -1,8 +1,9 @@
 // The road network's bridges (bridges.h, bridge_mesh.h): every span the network flags has one, its deck the road's own
 // centreline; every stretch over water is one; its piers stand on the ground or the sea floor and carry the girders,
 // never more than 60 m apart; it is solid where it is drawn and open under its deck between the piers; its mesh is
-// whole. A long crossing of the water has its main span - a truss on a highway, a tied arch on a road - its steel
-// solid and the road under it clear; a mountain lane's viaduct is masonry, open under each arch and solid above it.
+// whole. A long crossing of the water has its main span - a truss on a highway, a tied arch on a road, the strait's
+// highway crossing cable-stayed - its structure solid and the road under it clear; a mountain lane's viaduct is masonry,
+// open under each arch and solid above it.
 // And the roads don't hang off the hillsides any more: no lane or track stands far above the ground off a
 // bridge, and no bridge over dry ground runs along a slope unless it stands high over it (v3.45 had 2 km of lane
 // viaduct on stilts down Kaleo's side)
@@ -40,7 +41,7 @@ int main() {
       if (w.naturalHeight(p.pts[k].x, p.pts[k].z) < 0.5f && w.naturalHeight(p.pts[k + 1].x, p.pts[k + 1].z) < 0.5f) check(p.bridge[k] != 0, "a road over the water is on a bridge");
   }
   check(runs == (int)w.bridges.size() && runs > 0, "one bridge per span, and there are some");
-  int water = 0, piers = 0, mains[3] = {};
+  int water = 0, piers = 0, mains[4] = {};
   for (const Bridge& b : w.bridges) {
     water += b.water;
     // the piers: on the ground (or into the sea floor), up to the girders, clear of the ground below the deck
@@ -108,16 +109,26 @@ int main() {
       for (const BridgePier& p : b.piers) { mainPiers += p.main; under += !p.main && p.s > b.main0 + 1.f && p.s < b.main1 - 1.f; }
       check(mainPiers == (b.main == BM_TRUSS ? 3 : 2) && under == 0, "a main span stands on its main piers, nothing under it");
       check(b.main1 - b.main0 >= 90.f && b.main0 > b.along.front() + 25.f && b.main1 < b.along.back() - 25.f, "a main span is long, and clear of the abutments");
-      check(b.main == BM_TRUSS ? b.mainRise >= 8.f && b.mainRise <= 12.f : b.mainRise >= (b.main1 - b.main0) / 6.5f && b.mainRise <= (b.main1 - b.main0) / 4.5f, "a main span's truss or arch in proportion");
+      const float W = b.main1 - b.main0;
+      check(b.main == BM_TRUSS ? b.mainRise >= 8.f && b.mainRise <= 12.f : b.main == BM_STAYED ? b.mainRise >= 0.18f * W && b.mainRise <= 0.3f * W && W >= 200.f
+                                                                          : b.mainRise >= W / 6.5f && b.mainRise <= W / 4.5f, "a main span's truss, arch or pylons in proportion");
       int members = 0; bool finite = true;
       forEachBridgeMember(b, [&](const BridgeMember& mb) { members++; finite = finite && std::isfinite(mb.a.x + mb.a.y + mb.a.z + mb.b.x + mb.b.y + mb.b.z); });
       check(members > 60 && finite, "a main span has its steel");
       for (float u : {0.3f, 0.5f, 0.7f}) {
         vec3 c, d, x; bridgeFrame(b, b.main0 + (b.main1 - b.main0) * u, c, d, x);
         check(!bridgeCollide(w.bridges, c + vec3(0, 5.f, 0), 1.f), "the road under a main span's steel is clear");
+        if (b.main == BM_STAYED) continue;
         const float top = b.main == BM_TRUSS ? b.mainRise : 0.4f + b.mainRise * 4.f * u * (1.f - u);
         check(bridgeCollide(w.bridges, c + x * (b.halfDeck + 0.4f) + vec3(0, top, 0), 0.3f), "a main span's truss or arch is solid");
       }
+      if (b.main == BM_STAYED)   // (its pylons solid beside the road, and up over it; between their legs the road clear)
+        for (float s : {b.main0, b.main1}) {
+          vec3 c, d, x; bridgeFrame(b, s, c, d, x);
+          for (float side : {-1.f, 1.f}) check(bridgeCollide(w.bridges, c + x * (side * (b.halfDeck + 2.f)) + vec3(0, b.mainRise * 0.5f, 0), 0.3f), "a pylon's legs are solid");
+          check(bridgeCollide(w.bridges, c + vec3(0, b.mainRise - 2.f, 0), 0.3f), "a pylon's head is solid");
+          check(!bridgeCollide(w.bridges, c + vec3(0, 6.f, 0), 1.f), "the road between a pylon's legs is clear");
+        }
     }
     // a masonry viaduct: open under each arch at its crown, solid in the spandrel over its springing; the scenery kept
     // under the arch, not just the slab
@@ -148,8 +159,8 @@ int main() {
     }
   }
   int stoneArches = 0; for (const Bridge& b : w.bridges) stoneArches += (int)b.arches.size();
-  printf("main spans: %d truss, %d tied arch; %d masonry arches\n", mains[BM_TRUSS], mains[BM_ARCH], stoneArches);
-  check(mains[BM_TRUSS] >= 1 && mains[BM_ARCH] >= 1 && stoneArches >= 5, "the long crossings have their main spans, the mountain viaducts their arches");
+  printf("main spans: %d truss, %d tied arch, %d cable-stayed; %d masonry arches\n", mains[BM_TRUSS], mains[BM_ARCH], mains[BM_STAYED], stoneArches);
+  check(mains[BM_STAYED] == 1 && mains[BM_ARCH] >= 1 && stoneArches >= 5, "the long crossings have their main spans (the strait's cable-stayed), the mountain viaducts their arches");
   // the lanes and tracks hug the ground off their bridges
   float worst = 0;
   for (const RoadPath& p : w.roads.paths) {

@@ -393,6 +393,12 @@ void main(){
       alb = mix(alb, kerbAlb, kerb); rough = mix(rough, roughC, kerb); nb = normalize(mix(nb, nbC, kerb));
     } else if (part == P_METAL) {   // the lanes' steel rail, galvanised
       alb = triS(lp, n0, M_METAL, 2.0, 0.3, nb, rough)*vec3(0.74, 0.76, 0.77); metal = 0.6; rough = max(rough, 0.38);
+    } else if (part == P_PAINT && vAux.z > 1.5) {   // a cable-stayed span's pylons, concrete; its stays, sheathed white
+      if (vAux.z > 2.5) { alb = vec3(0.82, 0.83, 0.84); metal = 0.3; rough = 0.3; }
+      else {
+        alb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nb, rough)*vec3(0.88, 0.88, 0.86);
+        alb *= 0.88 + 0.16*vn3(vec3(lp.x*0.3, lp.y*0.02, lp.z*0.3)); rough = max(rough, 0.7);
+      }
     } else if (part == P_PAINT) {   // a main span's steel, painted: a truss grey-green, an arch white; weathered a little
       alb = triS(lp, n0, M_METAL, 3.0, 0.4, nb, rough);
       alb = (vAux.z > 0.5 ? vec3(0.86, 0.87, 0.85) : vec3(0.3, 0.39, 0.35))*(0.86 + 0.14*dot(alb, vec3(0.33)));
