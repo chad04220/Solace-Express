@@ -67,6 +67,7 @@ static GLuint compile(GLenum type, const std::string& src, std::string& err) {
 // driver without the extension) falls back to compiling.
 std::string g_shaderCacheDir;
 std::atomic<int> g_shaderCacheHits{0}, g_shaderCacheMisses{0};
+std::atomic<long long> g_shaderCompileUs{0};
 static uint64_t fnv1a(const std::string& s, uint64_t h = 1469598103934665603ull) {
   for (unsigned char c : s) { h ^= c; h *= 1099511628211ull; }
   return h;
@@ -162,10 +163,12 @@ static GLuint linkOnce(const std::string& vsIn, const std::string& fsIn, std::st
   compileLog("building " + what);
   GLuint v = compile(GL_VERTEX_SHADER, vs, err), f = compile(GL_FRAGMENT_SHADER, fs, err);
   auto secs = [&]() { char b[32]; snprintf(b, sizeof b, "%.1f s", std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count()); return std::string(b); };
+  auto spent = [&]() { g_shaderCompileUs += std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count(); };
   auto reject = [&]() {   // (an internal error of the driver's compiler: remembered, see linkProgramCached)
     std::string l = err.substr(err0); size_t c = l.find("error"); l = c == std::string::npos ? l.substr(0, 160) : l.substr(c, 160);
     for (char& ch : l) if (ch == '\n' || ch == '\r') ch = ' ';
     compileLog("FAILED " + what + " after " + secs() + ": " + l);
+    spent();
     if (cache && variant) remove((path + ".try").c_str());
     if (!cache || err.find("C9999", err0) == std::string::npos) return;
     if (FILE* fo = fopen((path + ".rej").c_str(), "wb")) { fwrite(err.data() + err0, 1, err.size() - err0, fo); fclose(fo); }
@@ -186,6 +189,7 @@ static GLuint linkOnce(const std::string& vsIn, const std::string& fsIn, std::st
   glDeleteShader(v); glDeleteShader(f);
   g_shaderCacheMisses++;
   compileLog("built " + what + " in " + secs());
+  spent();
   if (cache && variant) remove((path + ".try").c_str());
   if (cache) {
     GLint len = 0; glGetProgramiv(p, GL_PROGRAM_BINARY_LENGTH, &len);

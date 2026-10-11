@@ -77,6 +77,7 @@ struct WreckVisual {
 // Shader programs, compiled once and then loaded from the driver-binary cache in g_shaderCacheDir (empty: no cache)
 extern std::string g_shaderCacheDir;
 extern std::atomic<int> g_shaderCacheHits, g_shaderCacheMisses;   // bumped from several GL threads at startup
+extern std::atomic<long long> g_shaderCompileUs;   // the time spent compiling programs (not loading them from the cache), us
 std::string meshGeometryStamp(const std::string& defines); // SHA256 of full-quality shader geometry, CPU builder contract; no driver
 std::string meshCacheStamp(const std::string& defines = "");     // fingerprint of the sources the aircraft mesh bake depends on + the driver
 std::string shaderCacheStamp();   // fingerprint of all shader sources + the driver (current context needed)
@@ -159,6 +160,7 @@ public:
   // Read-only distributed bodies are preferred to the writable, driver-local cache.
   std::string prebuiltAircraftDir = "assets/aircraft";
   int prebuiltMeshHits = 0, prebuiltMeshMisses = 0;
+  int meshCacheHits = 0;   // bodies loaded from this driver's own mesh cache (not packaged, not built)
   aircraftAsset::Identity prebuiltAircraftIdentity(int model, int slot);
   std::string prebuiltAircraftFilename(int model, int slot);
   // A trusted export is always a fresh production bake, never a relabeled legacy cache.

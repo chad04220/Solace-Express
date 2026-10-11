@@ -11,8 +11,9 @@ rem   diagnostics.bat loading   renders the loading-screen pictures (the "loadin
 rem
 rem The full run:
 rem   1. system report: GPU and driver, CPU, memory, Windows, monitors with their refresh rates
-rem   2. first-run shader compile time (the cache - %LOCALAPPDATA%\SolaceExpress - is set aside), then the time to build
-rem      every aircraft body from scratch with the shaders cached; the shader compile log of both
+rem   2. first-run shader compile time (the cache - %LOCALAPPDATA%\SolaceExpress - is set aside), then the time to load
+rem      every aircraft with the shaders cached: its bodies ready-built from the aircraft folder (v3.47 on), its own
+rem      shader programs compiled; the shader compile log of both
 rem   Diagnostics v2: every benchmark and screenshot run first builds (or loads) every aircraft body, outside and
 rem   cockpit, the research craft's too, and each scene warms until nothing is being built or streamed before it is
 rem   timed: no number includes a body being built or a traffic aircraft drawn the slow way for want of its body.
@@ -21,6 +22,10 @@ rem   shader compile log and any error log are collected, the cache's size is re
 rem   is timed (the trees' fades and detail cross-fades). Then break-ups: a light aircraft coming apart in the air
 rem   and one flown into the ground (each piece drawn from the aircraft's mesh, each impact's crater and dust), and the
 rem   XR-30 coming apart with the research craft.
+rem   Diagnostics v4: the aircraft bodies come ready-built with the game (the aircraft folder), so step 2 no longer
+rem   times them being built: it reports how many loaded ready-built, from the PC's own cache or (a missing or refused
+rem   one) built from scratch, and how long the aircraft's own shader programs took to compile - most of its time now.
+rem   The system report counts the ready-built bodies beside the exe.
 rem   3. benchmark, full screen at 1920x1080: frame time and
 rem      the GPU time of every pass for each scene (the HUD, the cockpit, night, a forest); then the research craft and their
 rem      cockpits in their own file (the heaviest scenes: if one stalls the GPU, the rest of the numbers are already written)
@@ -50,7 +55,7 @@ if /i "%MODE%"=="shots" goto shots
 
 echo [1/6] System report ...
 set INFO=%OUT%\system.txt
-echo Solace Express %VER%  (diagnostics v3) > "%INFO%"
+echo Solace Express %VER%  (diagnostics v4) > "%INFO%"
 echo date %DATE% %TIME% >> "%INFO%"
 rem (the GPU's memory from its driver's registry entry: Win32_VideoController.AdapterRAM is 32 bits and reads 4095 MB
 rem for any card with 4 GB or more)
@@ -65,9 +70,12 @@ powershell -NoProfile -Command ^
   "Get-CimInstance Win32_VideoController | ForEach-Object { $o += ('  current mode {0}x{1} @ {2} Hz' -f $_.CurrentHorizontalResolution, $_.CurrentVerticalResolution, $_.CurrentRefreshRate) };" ^
   "$o += '--- Power'; $p = powercfg /getactivescheme; $o += ('  ' + $p);" ^
   "$o | Out-File -Append -Encoding utf8 '%INFO%'" 2>nul
+set NMESH=0
+if exist aircraft for %%f in (aircraft\*.mesh) do set /a NMESH+=1
+echo --- Aircraft: %NMESH% ready-built bodies in the aircraft folder>> "%INFO%"
 type "%INFO%"
 
-echo [2/6] First-run shader compile time, then every aircraft body built from scratch (the cache is set aside) ...
+echo [2/6] First-run shader compile time, then every aircraft loaded and its shader programs compiled (the cache is set aside) ...
 call :findcache
 set OLDCACHE=%CACHE%
 if defined CACHE (
@@ -80,10 +88,10 @@ powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath '
 if exist "%APPDATA%\SolaceExpress\startup.log" copy /y "%APPDATA%\SolaceExpress\startup.log" "%OUT%\startup_firstrun.log" >nul
 call :findcache
 if defined CACHE if exist "%CACHE%\compile.log" copy /y "%CACHE%\compile.log" "%OUT%\compile_firstrun.log" >nul
-powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--bench menu --size 1920x1080 --out %OUT%\compile_run2.txt' -Wait }; $line = ('second run, shaders cached, every aircraft body built from scratch: {0:N1} s (the body build alone is in compile_run2.txt)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::AppendAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
+powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--bench menu --size 1920x1080 --out %OUT%\compile_run2.txt' -Wait }; $line = ('second run, shaders cached: every aircraft loaded (its bodies ready-built) and its own shader programs compiled: {0:N1} s (the breakdown is in compile_run2.txt)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::AppendAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
 call :findcache
 if defined OLDCACHE if exist "%OLDCACHE%.aside" (
-  rem the two runs built a fresh cache with this version's shaders and every aircraft body: it stays, the old one goes
+  rem the two runs built a fresh cache with this version's shaders and every aircraft's programs: it stays, the old one goes
   rem (it is put back only if the runs left no cache anywhere)
   if defined CACHE (rmdir /s /q "%OLDCACHE%.aside") else (move /y "%OLDCACHE%.aside" "%OLDCACHE%" >nul)
 )
