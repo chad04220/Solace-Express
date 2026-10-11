@@ -120,7 +120,10 @@ class Model:
     def rel(self, p):
         """A path in the source tree, relative to it (None if it is elsewhere: the build tree, the system)."""
         p = os.path.realpath(p if os.path.isabs(p) else os.path.join(self.src, p))
-        r = os.path.relpath(p, self.src)
+        try:
+            r = os.path.relpath(p, self.src)
+        except ValueError:   # Windows: another drive/share is outside the source tree
+            return None
         return None if r.startswith("..") or os.path.isabs(r) else r.replace(os.sep, "/")
 
     def target_of(self, path):
