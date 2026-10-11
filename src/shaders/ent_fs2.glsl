@@ -97,6 +97,11 @@ vec3 triSFrame(vec3 p, vec3 n, int frame, int layer, float sc, float bump, inout
 }
 vec2 octEnc(vec3 n){ n /= abs(n.x) + abs(n.y) + abs(n.z); vec2 e = n.y >= 0.0 ? n.xz : (1.0 - abs(n.zx))*vec2(n.x >= 0.0 ? 1.0 : -1.0, n.z >= 0.0 ? 1.0 : -1.0); return e; }
 vec3 pal(float s, vec3 a, vec3 b, vec3 c, vec3 d){ float k = fract(s)*4.0; return k < 1.0 ? a : k < 2.0 ? b : k < 3.0 ? c : d; }
+// A window's light coming on at dusk (Phase D): each at its own moment as the dark falls - its key in [0, 1) - a few
+// at first, every one by full dark, and on near its full brightness once it is
+float duskOn(float key){ return step(key, uNight*1.6 - 0.15)*smoothstep(0.02, 0.3, uNight); }
+// A street lamp's: on its photocell, all of them within the first of the dusk
+float lampOn(float key){ return step(0.08 + 0.12*key, uNight)*smoothstep(0.02, 0.25, uNight); }
 // procedural windows on a facade: returns 1 inside a pane, frame in .y; cell id in .zw
 vec4 windowGrid(vec2 q, vec2 cell, vec2 pane, float y0){
   vec2 g = vec2(q.x/cell.x, (q.y - y0)/cell.y);
@@ -688,7 +693,7 @@ void main(){
     }
     else if (part == P_LAMP && uKind == K_WINDTURBINE) {   // its aviation light: red, flashing once every two seconds after dark
       alb = vec3(0.5, 0.05, 0.03); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.06, 0.03)*uNight*8.0*step(0.75, fract(uTime*0.5 + seed*3.7));
-    } else if (part == P_LAMP) { alb = vec3(0.9); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.93, 0.8)*((uKind == K_LAMPPOST ? 0.0 : 0.15) + 10.0*uNight); }
+    } else if (part == P_LAMP) { alb = vec3(0.9); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.93, 0.8)*(uKind == K_LAMPPOST ? 10.0*lampOn(fract(seed*7.7)) : 0.15 + 10.0*uNight); }
     else if (part == P_SIGN) { alb = uKind == K_PUMP ? vec3(0.75, 0.1, 0.06) : vec3(0.08, 0.22, 0.55); rough = 0.4; emit = alb*uNight*2.5; }
     else if (part == P_CANOPY) { alb = vec3(0.9); if (n0.y < -0.5) emit = vec3(1.0, 0.97, 0.9)*uNight*2.5; rough = 0.4; }
     else if(part>=27 && part<33) {
@@ -800,7 +805,7 @@ void main(){
           roomTint /= dot(roomTint,vec3(0.2126,0.7152,0.0722));
           // Linear luminance stays within 0.05915..0.28 for a lit pane at full night.
           float roomLuminance = mix(0.065,0.28,fract(zoneState*7.13))*mix(0.9,1.0,paneState);
-          emit = roomTint*(lit*uNight*roomLuminance);
+          emit = roomTint*(lit*duskOn(fract(zoneState*3.71 + paneState*0.23))*roomLuminance);
         }
       } else if (uKind == K_SHOP || uKind == K_MIDRISE) { emit = vec3(1.0, 0.85, 0.6)*uNight*1.6; alb = vec3(0.05, 0.06, 0.07); }
       else if (uKind == K_GAS) emit = vec3(1.0, 0.95, 0.85)*uNight*1.8;
@@ -893,7 +898,7 @@ void main(){
           alb = mix(alb,room,paneCoverage); rough = mix(rough,0.08,paneCoverage); metal = 0.0; nb = n0;
           if (paneCoverage > 0.5) { surfaceFlags |= ENTITY_GLASS; cls = 3.0; }
           float lit = step(0.65,paneSeed);
-          emit = mix(vec3(1.0,0.73,0.44),vec3(0.85,0.9,1.0),step(0.85,paneSeed))*lit*uNight*roomLight*1.2*paneCoverage;
+          emit = mix(vec3(1.0,0.73,0.44),vec3(0.85,0.9,1.0),step(0.85,paneSeed))*lit*duskOn(fract(paneSeed*5.13))*roomLight*1.2*paneCoverage;
         }
       }
       if (uKind == K_TOWER && !side && n0.z > 0.0 && nominal.y < 3.5 && abs(nominal.x) < 1.45) {
@@ -921,7 +926,7 @@ void main(){
         float dust = 1.0 - smoothstep(0.0, 0.12, paneUV.y);
         rough += dust*0.11*detail;
         float lit = step(0.65, paneSeed);
-        emit = mix(vec3(1.0, 0.73, 0.44), vec3(0.85, 0.9, 1.0), step(0.85, paneSeed))*lit*uNight*roomLight*1.2;
+        emit = mix(vec3(1.0, 0.73, 0.44), vec3(0.85, 0.9, 1.0), step(0.85, paneSeed))*lit*duskOn(fract(paneSeed*5.13))*roomLight*1.2;
       }
       if (uKind == K_PUMP) { alb = vec3(0.022,0.034,0.025); rough = 0.2; emit = vec3(0.0); }   // instrument face, not a room
       if (vehicle && !headlamp) {

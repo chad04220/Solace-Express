@@ -603,7 +603,8 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       if (cls == 4 && uNight > 0.01) {
         float side = across > 0.0 ? 1.0 : 0.0, k = floor(along/30.0 + 0.5*side);
         vec2 lamp = vec2(along - (k - 0.5*side)*30.0, x - (paved + 1.0));
-        m.emit += vec3(1.0, 0.78, 0.45)*0.5*uNight*smoothstep(9.0, 0.0, length(lamp))*onVerge;
+        float on = step(0.08 + 0.12*hash2i(ivec2(int(k), int(side) + 7)), uNight)*smoothstep(0.02, 0.25, uNight);   // (each on its photocell at dusk)
+        m.emit += vec3(1.0, 0.78, 0.45)*0.5*on*smoothstep(9.0, 0.0, length(lamp))*onVerge;
       }
     }
   }

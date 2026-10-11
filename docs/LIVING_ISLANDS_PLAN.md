@@ -182,6 +182,10 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
     and kept out of the cached shadow cascades.
   - At night their headlights burn white and their tail lights red, with a glint each at range, as the runway lights
     have.
+- **Phase D: the lights at dusk.** The towns light up as the dark falls rather than fading up all at once. Each
+  window comes on at its own moment, a few at first dusk and every one by full dark, at close to its full brightness
+  once on. Each street lamp comes on with its photocell within the first of the dusk, as does the pool of light under
+  it. Around 18:00 the street lamps and the first windows are lit; by 18:15, most of the town.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network
