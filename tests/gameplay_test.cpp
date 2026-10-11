@@ -1335,7 +1335,7 @@ struct GameTest {
         fails += !ok;
         fs::remove_all(dir, ec); g_ren.W = W0; g_ren.H = H0; g_ren.uiBegin();
       }
-      {   // the controller in the menus (the owner's ask, v3.47): the D-pad and the face buttons reach everything, the
+      {   // the controller in the menus (the owner's ask, v3.48): the D-pad and the face buttons reach everything, the
           // right stick scrolls. An "adjust" control takes left / right as its value and keeps the focus; the focus is
           // the pointer while the D-pad leads (the right stick scrolls the window it is in); the job board's cards walk
           // off the window's edge and scroll it, A takes a card and an aircraft, the fuel row steps with left / right,

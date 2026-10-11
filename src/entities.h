@@ -13,7 +13,7 @@ enum EntKind {
   EK_BOULDER, EK_BLOCK, EK_SLAB, EK_OUTCROP, EK_SPIRE, EK_SEASTACK,
   // buildings
   EK_HOUSE, EK_HOUSE_HIP, EK_HOUSE_L, EK_FARMHOUSE, EK_TOWNHOUSE, EK_SHOP, EK_APARTMENT, EK_OFFICE, EK_TOWER, EK_SKYSCRAPER,
-  EK_SUPERTALL, EK_ROUNDTOWER, EK_SLABTOWER, EK_MIDRISE,   // (a city's skyline: v3.47; the shaders' K_ numbers follow)
+  EK_SUPERTALL, EK_ROUNDTOWER, EK_SLABTOWER, EK_MIDRISE,   // (a city's skyline: v3.48; the shaders' K_ numbers follow)
   EK_WAREHOUSE, EK_BARN, EK_SILO, EK_CHURCH, EK_WATERTOWER, EK_LIGHTHOUSE, EK_GASSTATION,
   // airport fixtures (seed = lamp colour: 0 white, 1 amber, 2 green, 3 red)
   EK_RWYLIGHT,

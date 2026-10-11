@@ -670,7 +670,7 @@ void buildDetailedBuilding(MB& mb,int kind) {
   for(size_t i=begin;i+2<mb.o.size();i+=3)if((int)mb.o[i].part==P_TRIM&&std::max({mb.o[i].py,mb.o[i+1].py,mb.o[i+2].py})<=.61f)for(int j=0;j<3;++j)mb.o[i+j].u=2;
 }
 
-// A city's skyline (v3.47): a stepped supertall, a round glass tower, a residential slab and a mid-rise office block
+// A city's skyline (v3.48): a stepped supertall, a round glass tower, a residential slab and a mid-rise office block
 // with shops at street level. Their windows are the shader's at every detail level (ent_fs2 entityFacadePane and the
 // curtain-wall grid, in step with the numbers here), so the close mesh (lod 3) is the near one with its construction
 // added - mullion caps, rail caps, balcony screens, sills - never a second set of openings that could disagree.
