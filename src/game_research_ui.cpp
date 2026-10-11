@@ -434,7 +434,14 @@ void Game::drawResearch(const FrameParams& fp) {
   // selection changes re-run the scan and the decryption
   if (resCraft != resLastCraft) { resLastCraft = resCraft; resSelT = realTime; g_audio.trigger(SFX_BEEP, 0.4f); }
   float selT = realTime - resSelT;
-  auto click = [&](float x, float y, float w, float h) { bool c = hovered(x, y, w, h) && in.mPressed[0]; if (c) { in.mPressed[0] = false; g_audio.trigger(SFX_CLICK); } return c; };
+  // a click, or with id a stop in the D-pad's walk too (A takes it); id 0: the mouse's only (an arrow beside a control
+  // the D-pad steps itself)
+  auto click = [&](float x, float y, float w, float h, uint32_t id = 0) {
+    bool take = false; if (id) focusHere(id, x, y, w, h, &take);
+    const bool c = (hovered(x, y, w, h) && !focusNav && in.mPressed[0]) || take;
+    if (c) { in.mPressed[0] = false; if (!take) g_audio.trigger(SFX_CLICK); }
+    return c;
+  };
   // ------------------------------------------------------------------ frame: tint, scanlines, top band
   g_ren.rectGrad(0, 0, W, H, vec3(0, 0.01f, 0.02f), vec3(0.01f, 0, 0.01f), 0.35f * e);
   g_ren.rect(0, 0, L.px0 - 6 * s, H, R_INK, 0.45f * e); g_ren.rect(L.px1 + 6 * s, 0, W - L.px1 - 6 * s, H, R_INK, 0.45f * e);
@@ -488,7 +495,7 @@ void Game::drawResearch(const FrameParams& fp) {
           g_ren.rect(bx + q * bw / 20.f, by + 2 * s, bw / 20.f - 2 * s, 8 * f * s, b == 2 ? R_AMBER : c, (on ? 0.85f : 0.12f) * e);
         }
       }
-      if (y + h <= L.bot && click(x, y, w, h)) resCraft = craft;
+      if (y + h <= L.bot && click(x, y, w, h, 0x7E5C0000u + (uint32_t)k)) resCraft = craft;
       y += h + 12 * s;
     }
     if (in.pressed[K_TAB] || (in.buttonsPressed & PAD_X)) resCraft = kResCraft[(resCraftSlot(resCraft) + 1) % kNumResCraft].idx;
@@ -507,7 +514,7 @@ void Game::drawResearch(const FrameParams& fp) {
       g_ren.text(x + 8 * s, y + rh * 0.5f - fs * 0.52f, fs, num, done ? R_GREEN : R_DIM, e, 0, false);
       g_ren.text(x + 62 * s, y + rh * 0.5f - fs * 0.52f, fs, title, sel ? R_TEXT : done ? R_GREEN : ACC, e, 0, false);
       if (done) g_ren.text(x + w - 8 * s, y + rh * 0.5f - fs * 0.52f, fs, "SIGNED", R_GREEN, e, 2, false);
-      if (click(x, y, w, rh)) resCard = idx;
+      if (click(x, y, w, rh, 0x7E5D0000u + (uint32_t)(idx + 1))) resCard = idx;
       y += rh;
     };
     cardRow(-1, "--", "FREE ROAM", false);
@@ -634,33 +641,37 @@ void Game::drawResearch(const FrameParams& fp) {
     // laid out for a 1280 px wide bar and squeezed (fonts included) when the window is narrower, so nothing overlaps
     const float hs = s * std::clamp((x1 - x0) / (1232.f * s), 0.55f, 1.f);
     float cx = x0 + 16 * hs, cy = y0 + 12 * s;
-    auto chip = [&](float x, float y, float w, float hh, const std::string& t, bool on) {
+    auto chip = [&](float x, float y, float w, float hh, const std::string& t, bool on, uint32_t id = 0) {
       bool hov = hovered(x, y, w, hh);
       g_ren.rect(x, y, w, hh, on ? ACC * 0.25f : R_INK, (on ? 0.9f : 0.7f) * e);
       g_ren.rectOutline(x, y, w, hh, ACC, (on ? 0.9f : hov ? 0.6f : 0.25f) * e, 0, 1 * s);
       if (on) g_ren.rect(x, y + hh - 2 * s, w, 2 * s, ACC, e);
       g_ren.text(x + w * 0.5f, y + hh * 0.5f - 6.5f * s, 11.5f * hs, t, on ? R_TEXT : R_DIM, e, 1, false);
-      return click(x, y, w, hh);
+      return click(x, y, w, hh, id);
     };
     int na = (int)g_world.airports.size();
-    if (chip(cx, cy + 16 * s, 96 * hs, 34 * s, "<  ABORT", false) || in.pressed[K_ESC]) { screen = SCR_MENU; return; }
+    if (chip(cx, cy + 16 * s, 96 * hs, 34 * s, "<  ABORT", false, 0x7E5E0001u) || in.pressed[K_ESC]) { screen = SCR_MENU; return; }
     cx += 112 * hs;
     // site
     g_ren.text(cx, cy, 10 * hs, "INSERTION SITE", R_DIM, e, 0, false);
     const Airport& a = g_world.airports[resAirport];
     float sw = 290 * hs;
+    {   // the site itself in the D-pad's walk: left / right step it (the arrows are the mouse's; LB / RB step it too)
+      int step = 0; focusAdjust(0x7E5E0002u, cx + 30 * hs, cy + 12 * s, sw - 34 * hs, 40 * s, &step);
+      if (step) resAirport = (resAirport + na + step) % na;
+    }
     if (chip(cx, cy + 16 * s, 26 * hs, 34 * s, "<", false) || in.pressed[K_LEFT]) resAirport = (resAirport + na - 1) % na;
     g_ren.text(cx + 36 * hs, cy + 16 * s, 16 * hs, ellipsize(std::string(a.code) + "  " + a.name, sw - 44 * hs, 16 * hs), R_TEXT, e, 0, false);
     g_ren.text(cx + 36 * hs, cy + 36 * s, 10 * hs, ellipsize(fmt("RWY %02d/%02d  //  %.0f M %s  //  ELEV %.0f M", a.rwyNumber(false), a.rwyNumber(true), a.length, surfaceName(a.surface), a.elev), sw - 44 * hs, 10 * hs), R_DIM, e, 0, false);
     if (chip(cx + sw, cy + 16 * s, 26 * hs, 34 * s, ">", false) || in.pressed[K_RIGHT]) resAirport = (resAirport + 1) % na;
     float c2 = cx + sw + 40 * hs;
     g_ren.text(c2, cy, 10 * hs, "INSERTION", R_DIM, e, 0, false);
-    if (chip(c2, cy + 16 * s, 86 * hs, 34 * s, "AIRBORNE", resAirborne)) resAirborne = true;
-    if (chip(c2 + 90 * hs, cy + 16 * s, 76 * hs, 34 * s, "RUNWAY", !resAirborne)) resAirborne = false;
+    if (chip(c2, cy + 16 * s, 86 * hs, 34 * s, "AIRBORNE", resAirborne, 0x7E5E0003u)) resAirborne = true;
+    if (chip(c2 + 90 * hs, cy + 16 * s, 76 * hs, 34 * s, "RUNWAY", !resAirborne, 0x7E5E0004u)) resAirborne = false;
     float c3 = c2 + 182 * hs;
     g_ren.text(c3, cy, 10 * hs, "ATMOSPHERE", R_DIM, e, 0, false);
     const char* wxs[] = {"CLEAR", "OVERCAST", "STORM"};
-    for (int i = 0; i < 3; i++) if (chip(c3 + i * 80 * hs, cy + 16 * s, 76 * hs, 34 * s, wxs[i], resWx == i)) resWx = i;
+    for (int i = 0; i < 3; i++) if (chip(c3 + i * 80 * hs, cy + 16 * s, 76 * hs, 34 * s, wxs[i], resWx == i, 0x7E5E0010u + (uint32_t)i)) resWx = i;
     // time of day slider (the preview's light follows it)
     float c4 = c3 + 256 * hs, tw = std::max(50 * hs, x1 - 16 * hs - 226 * hs - c4);
     g_ren.text(c4, cy, 10 * hs, fmt("LOCAL TIME  %02d:00", (int)resTime), R_DIM, e, 0, false);
@@ -670,6 +681,8 @@ void Game::drawResearch(const FrameParams& fp) {
       g_ren.rect(c4, by, tw * f, 3 * s, ACC, 0.9f * e);
       g_ren.rect(c4 + tw * f - 5 * s, by - 6 * s, 10 * s, 15 * s, ACC, e, 2 * s);
       if (hovered(c4 - 6 * s, cy + 12 * s, tw + 12 * s, 36 * s) && in.mDown[0] && !resDrag) resTime = floorf(5.f + clampf((in.mx - c4) / tw, 0, 1) * 16.f + 0.5f);
+      int step = 0; focusAdjust(0x7E5E0020u, c4 - 6 * s, cy + 12 * s, tw + 12 * s, 36 * s, &step);   // (left / right: an hour)
+      if (step) resTime = clampf(resTime + step, 5.f, 21.f);
     }
     // initiate / abort
     float bw = 210 * hs, bx = x1 - 16 * hs - bw, bh = 46 * s, by = y0 + (h - bh) * 0.5f;
@@ -681,13 +694,13 @@ void Game::drawResearch(const FrameParams& fp) {
     g_ren.text(bx + bw * 0.5f, by + 9 * s, 16 * hs, std::string("INITIATE  ") + RC.num, R_TEXT, e, 1, false);
     g_ren.text(bx + bw * 0.5f, by + 29 * s, 9 * hs, resCard >= 0 ? std::string("TEST CARD  ") + kResCards[resCard].id + "  " + kResCards[resCard].title : "FREE ROAM  //  NOT RECORDED IN LOGBOOK", resCard >= 0 ? ACC : R_DIM, e, 1, false);
     const bool rangeStart=resCraft==kWraith && resCard<0 && (in.buttonsPressed & PAD_START);
-    if (click(bx, by, bw, bh) || (in.pressed[K_ENTER] && !focusNav) || rangeStart) {
+    if (click(bx, by, bw, bh, 0x7E5E0030u) || (in.pressed[K_ENTER] && !focusNav) || rangeStart) {
       in.buttonsPressed &= ~PAD_START; in.pressed[K_ENTER]=false;
       launchResearch(); return;
     }
   }
   if(resCraft==kWraith && resCard<0) drawCombatPractice(L.px0+12*s,std::max(L.top+20*s,L.bot-240*s),std::max(180*s,L.px1-L.px0-24*s));
-  g_ren.text(W * 0.5f, H - 22 * s, 10.5f * s, padPrompts() ? "L-STICK CURSOR   A SELECT   X SWITCH AIRFRAME   R-STICK ROTATE   LB / RB SITE   START INITIATE   B ABORT"
+  g_ren.text(W * 0.5f, H - 22 * s, 10.5f * s, padPrompts() ? "D-PAD MOVE / STEP   A SELECT   X SWITCH AIRFRAME   R-STICK ROTATE   LB / RB SITE   START INITIATE   B ABORT"
                                                      : "TAB SWITCH AIRFRAME   <- / -> SITE   DRAG ROTATE   WHEEL ZOOM   ENTER INITIATE   ESC ABORT",
              R_DIM, 0.75f * e, 1, false);
   if (fmodf(realTime, 1.4f) < 1.0f) g_ren.text(W - 24 * s, H - 22 * s, 10.5f * s, "CLASSIFIED", R_RED, 0.85f * e, 2, false);

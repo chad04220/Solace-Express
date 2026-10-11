@@ -1960,6 +1960,9 @@ void Game::gamepadMenus(float dt) {
 // its own left / right for the site) and with the D-pad everywhere a menu is up; the mouse takes over again when it moves
 void Game::focusNavigate() {
   focusPrev.swap(focusList); focusList.clear();
+  focusStep = 0; focusPointer = false;
+  // (the focus's place, for the pointer while the D-pad leads: hovered, the right stick's scroll)
+  auto point = [&]() { if (focusNav) for (auto& f : focusPrev) if (f.id == focusId) { focusPointer = true; focusPointerX = f.x + f.w * 0.5f; focusPointerY = f.y + f.h * 0.5f; } };
   bool menus = screen != SCR_FLIGHT || paused || crashed;
   int scr = screen * 4 + (paused ? 1 : 0) + (screen == SCR_HUB ? hubTab * 8 : 0);
   if (!menus) { focusNav = false; return; }
@@ -1972,14 +1975,15 @@ void Game::focusNavigate() {
   const bool rangeKeys=screen==SCR_RESEARCH && resCraft==kWraith && resCard<0;
   if (((keys || rangeKeys) && in.pressed[K_UP]) || (in.buttonsPressed & PAD_UP)) dy = -1;
   if (((keys || rangeKeys) && in.pressed[K_DOWN]) || (in.buttonsPressed & PAD_DOWN)) dy = 1;
-  if (!dx && !dy) { if (focusNav) { bool still = false; for (auto& f : focusPrev) if (f.id == focusId) still = true; if (!still && !focusPrev.empty()) focusId = focusPrev[0].id; } return; }
+  if (!dx && !dy) { if (focusNav) { bool still = false; for (auto& f : focusPrev) if (f.id == focusId) still = true; if (!still && !focusPrev.empty()) focusId = focusPrev[0].id; } point(); return; }
   if (focusPrev.empty()) return;
   const Focusable* cur = nullptr; for (auto& f : focusPrev) if (f.id == focusId) cur = &f;
   if (!focusNav || !cur) {   // first press: the top-left button
     const Focusable* best = &focusPrev[0];
     for (auto& f : focusPrev) if (f.y + f.x * 0.02f < best->y + best->x * 0.02f) best = &f;
-    focusNav = true; focusId = best->id; g_audio.trigger(SFX_HOVER, 0.5f); return;
+    focusNav = true; focusId = best->id; g_audio.trigger(SFX_HOVER, 0.5f); point(); return;
   }
+  if (dx && !dy && cur->adjust) { focusStep = dx; point(); return; }   // (left / right step the value of what has the focus)
   float cx = cur->x + cur->w * 0.5f, cy = cur->y + cur->h * 0.5f;
   const Focusable* best = nullptr; float bestScore = 1e18f;
   for (auto& f : focusPrev) {
@@ -1991,10 +1995,11 @@ void Game::focusNavigate() {
     if (score < bestScore) { bestScore = score; best = &f; }
   }
   if (best) { focusId = best->id; g_audio.trigger(SFX_HOVER, 0.5f); }
+  point();
 }
 
 void Game::drawPadCursor() {
-  if (!in.pad || realTime - padCursorT > 6.f) return;
+  if (!in.pad || realTime - padCursorT > 6.f || focusNav) return;   // (the D-pad's focus is outlined where it is)
   if (screen == SCR_FLIGHT && !paused && !crashed) return;
   float s = S(), x = in.mx, y = in.my;
   float pulse = 0.5f + 0.5f * sinf(realTime * 5.f);

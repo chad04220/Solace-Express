@@ -490,10 +490,26 @@ private:
   // E5.4: keyboard / D-pad focus through the menus. Every enabled button registers itself for the frame; the arrow
   // keys (outside flight) and the D-pad move the focus to the nearest button in that direction, Enter / Space / A
   // press it. Moving the mouse hands control back to the cursor.
-  struct Focusable { uint32_t id; float x, y, w, h; };
+  // A control that takes a value (fuel, a slider, a site) is "adjust": with the focus on it, the D-pad's left / right
+  // step its value (focusStep) rather than move the focus off it.
+  struct Focusable { uint32_t id; float x, y, w, h; bool adjust = false; };
   std::vector<Focusable> focusList, focusPrev;
   uint32_t focusId = 0; bool focusNav = false; int focusScreen = -1;
+  int focusStep = 0;   // this frame's D-pad left / right on an "adjust" control with the focus: -1, 0, 1
+  // While the D-pad has the focus, the pointer is where the focus is (hovered): the right stick's scroll goes to the
+  // window the focus is in, as the wheel to the one under the mouse
+  bool focusPointer = false; float focusPointerX = 0, focusPointerY = 0;
   void focusNavigate();
+  // an "adjust" control in the walk: true when it has the focus; *step its D-pad left / right this frame
+  bool focusAdjust(uint32_t id, float x, float y, float w, float h, int* step);
+  static uint32_t uiId(float x, float y, const std::string& s);   // a control's identity, as the UI makes it (tests name controls by it)
+  // A scrolled window and the focus, both ways, over its controls [first, end of focusList): the D-pad taking the focus
+  // to one out of view scrolls the window to it; the window scrolled (wheeled: the wheel, the right stick) takes the
+  // focus along, onto the nearest it still shows. A window with no control in view (a briefing, a breakdown) is
+  // itself a stop in the walk (id), so the right stick can scroll it.
+  void focusScrollPixels(size_t first, uint32_t id, float x, float top, float w, float bottom, float& scroll, bool wheeled, bool scrolls = true);
+  // the same for a list scrolled by rows: rows [0, count) by idOf, rowsFirst its first shown, visible of them
+  void focusScrollRows(const std::function<uint32_t(int)>& idOf, int count, int& rowsFirst, int visible, int perRow, bool wheeled);
   void panel(float x, float y, float w, float h, float a = 0.78f);
   void hudPanel(float x, float y, float w, float h, float a = 1.f);
   void header(float x, float y, float w, const std::string& label);
