@@ -25,6 +25,10 @@ void sceneryBakeCommunityLots(const World& world); // the lots and the planted t
 float roadDistance(float x, float z, int* segOut = nullptr);
 float valueNoise(float x, float z);               // same as GLSL vnoise()
 float coverFbm(float x, float z, int oct);        // same as GLSL fbm2()
+// The farmland's field at a place, as the terrain draws its patchwork (terrain_material.glsl fieldMaterial, in step):
+// border, how far into its field (0 on the hedge between two fields, the hedge drawn under 0.035), and its crop
+// (0..1: under 0.76 a crop, ploughland or an orchard row; above, a pasture)
+void fieldPatch(float x, float z, float& border, float& crop);
 void sceneryInit();  // build shared road tables before any threaded use
 void sceneryBaseMod(float x, float z, float& h, float& amp);  // flatten roads / towns in the base map
 

@@ -17,7 +17,7 @@ static float pct(std::vector<float> v, float q) {
   std::sort(v.begin(), v.end());
   return v[std::min(v.size() - 1, (size_t)(q * v.size()))];
 }
-static const char* kClass[RC_COUNT] = {"highway", "road", "lane", "track", "street"};
+static const char* kClass[RC_COUNT] = {"highway", "road", "lane", "track", "street", "yard"};
 
 int main() {
   buildTestWorld();
@@ -61,9 +61,26 @@ int main() {
   for (int c = 0; c < RC_COUNT; c++) {
     if (bend[c].empty()) continue;
     printf("%-7s change of grade p99 %.2f of its K's, radius p5 %.2f of its own (%zu points)\n", kClass[c], pct(bend[c], 0.99f), pct(radius[c], 0.05f), bend[c].size());
-    // (a street's: level through its junctions and crossings, then away at its grade - as a town's slow streets are)
-    if (c != RC_STREET) check(pct(bend[c], 0.99f) <= 1.05f, "crests and sags rounded to the class's K");
+    // (a street's, a farm track's and its yard's: level through its junctions and crossings, then away at its grade - as
+    // a town's slow streets are, and a farm's tracks)
+    if (c != RC_STREET && c != RC_TRACK && c != RC_YARD) check(pct(bend[c], 0.99f) <= 1.05f, "crests and sags rounded to the class's K");
     check(radius[c].empty() || pct(radius[c], 0.05f) >= (c == RC_HIGHWAY ? 0.75f : 0.85f), "bends no tighter than the class's radius off the climbs");
+  }
+  // ---- every segment listed under the texel at its middle (unless that texel's list is full: a junction's), the lists
+  // all within the 19 bits a texel's first entry has - past them a texel lists nothing, and its roads lie on the ground
+  // as it is
+  {
+    const RoadGrid& g = w.roadGrid;
+    int unlisted = 0;
+    for (size_t si = 0; si < g.segs.size(); si++) {
+      const RoadSegment& s = g.segs[si];
+      const uint32_t h = g.head[(size_t)RoadGrid::cell((s.az + s.bz) * 0.5f) * RoadGrid::N + RoadGrid::cell((s.ax + s.bx) * 0.5f)];
+      bool found = RoadGrid::count(h) >= 63;
+      for (uint32_t k = RoadGrid::first(h), e = k + RoadGrid::count(h); k < e && !found; k++) found = g.list[k] == si;
+      unlisted += !found;
+    }
+    printf("the texels' lists: %zu entries of %u; %d segments unlisted\n", g.list.size(), 0x7FFFFu, unlisted);
+    check(unlisted == 0 && g.list.size() + 63 <= 0x7FFFFu, "every segment listed where it lies, the lists within their bits");
   }
   // ---- the bed: level across the platform, the banks a cut or fill could stand at; where no other road is near
   std::vector<float> tilt[RC_COUNT], bank[RC_COUNT];

@@ -8,7 +8,7 @@ and vehicle meshes, photographic materials, shallow water and volcano crater sta
 Each phase ships as a version, measured on the owner's RTX 3070 laptop through `diagnostics.bat` (native 1080p,
 60 fps or better everywhere) before the next starts.
 
-## Where it stands (v3.47)
+## Where it stands (v3.48 and after)
 
 - 26 settlements, 14,098 street-front buildings. Since v3.44, Kaleo's east has a port city (Kailani), a market town
   (Canefield) and three villages, and Palm Bay's island, Far Isle and Nordholm's coast have a village each.
@@ -40,6 +40,26 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   other. Each settlement has a church on its main road, and a park in the towns and cities. Street trees line the
   centres and the gardens have trees. The mask's town ground follows the buildings, so woods and fields come up to
   the last houses. 26 settlements, about 23,000 buildings, 305 km of streets.
+- **City skylines (v3.48).** Each city peaks at its heart: a landmark supertall, then skyscrapers, round towers,
+  tower blocks and office blocks, thinning to mid-rise and then houses. Mean height is 118 to 127 m at the heart of
+  Port Verde and Solace Capital, and 84 m in Kailani. Suburbs fill in with closes, short cul-de-sacs off the
+  branch streets.
+- **Phase B, item 2: farmsteads (after v3.48).** There are about 380 farms out in the farmland, clear of the
+  settlements and the airfields and at least 280 m apart (`addFarmsteads`, `community_layout`).
+  - Each is a near-level yard of gravel, concrete and mud (class RC_YARD) at the end of a gravel track (RC_TRACK) of
+    up to 1.3 km.
+  - The track leaves the nearest road, lane or neighbouring farm's track square to it, crosses nothing, and keeps
+    62 m clear of every other farm.
+  - The yard and track are network paths, graded and banked like the streets and cached with the world, so
+    `World::farms` is read back off the network.
+  - Round each yard stand a farmhouse by the way in, a barn across the far end with its silos, a machine shed, often
+    a second barn, and a lorry or a car. All stand clear of every road, with no tree or bush in the compound.
+  - The fields between are hedged: trees and bushes stand along the borders of the terrain's field patchwork
+    (`fieldPatch`, the CPU mirror of the shader's), with a few lone trees in the pastures and none in the crops.
+- **A limit to watch.** The road grid lists each segment under every 39 m texel its banks reach, and those lists are
+  addressed with 19 bits. They now hold 490k of 524k entries, so tracks and yards reach only 12 m beyond their
+  platforms (streets 20 m, other roads 50 m). `roads_test` fails if any segment goes unlisted or the lists come
+  within a texel's worth of the limit. New roads (Phase C's access roads) need that headroom, or a wider packing.
 - **Still to come in Phase A:**
   - Item 5: arch and truss spans for the longest crossings.
   - Item 6: road furniture.

@@ -262,11 +262,11 @@ float airportInfluence(float x, float z) {
 
 void World::build(const std::string& cachePath, const std::string& stamp, bool save) {
   airports.assign(std::begin(kAirports), std::end(kAirports));
-  roads = RoadNetwork(); roadGrid = RoadGrid(); bridges.clear(); settlements.clear();   // (the natural ground first: the roads are routed over it)
+  roads = RoadNetwork(); roadGrid = RoadGrid(); bridges.clear(); settlements.clear(); farms.clear();   // (the natural ground first: the roads are routed over it)
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
   g_worldStage = cachePath.empty() ? 2 : 1;
   fromCache = !cachePath.empty() && loadCache(cachePath, stamp);
-  if (fromCache) { sceneryInit(); settlements = buildSettlementFields(*this); sceneryBakeCommunityLots(*this); boxes.clear(); bridges = buildBridges(*this); g_worldStage = 3; return; }
+  if (fromCache) { sceneryInit(); settlements = buildSettlementFields(*this); farms = farmsteadsOf(roads); sceneryBakeCommunityLots(*this); boxes.clear(); bridges = buildBridges(*this); g_worldStage = 3; return; }
   g_worldStage = 2;
   hm.resize((size_t)HM_N * HM_N * 4);
   sceneryInit();
@@ -322,6 +322,8 @@ void World::build(const std::string& cachePath, const std::string& stamp, bool s
   // the settlements grown over the ground and along those roads, and their streets added to the network
   settlements = buildSettlementFields(*this);
   addSettlementStreets(*this, settlements, roads);
+  addFarmsteads(*this, settlements, roads);   // (and the farms out in the fields, each at the end of its track)
+  farms = farmsteadsOf(roads);
   buildRoadGrid(roads, roadGrid);
   bakeMask();
   buildHMax();

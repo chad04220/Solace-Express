@@ -76,6 +76,7 @@ public:
   RoadGrid roadGrid;
   std::vector<Bridge> bridges;   // a structure under each of the network's bridge spans (bridges.h): made from it, not cached
   std::vector<SettlementField> settlements;   // each settlement's extent (settlements.h): from the ground and the roads, not cached
+  std::vector<Farmstead> farms;   // the farmsteads' yards (settlements.h): read back off the network, not cached
   std::vector<uint8_t> mask; // RGBA8: road distance, building density, urbanness, farmland / sea-stack flag
   std::vector<float> hmax[HMAX_LEVELS];   // upper bound of the terrain per cell, level L has HMAX_N>>L cells per side
   // cachePath: the generated arrays are read from there when its stamp matches (a launch after the first skips the

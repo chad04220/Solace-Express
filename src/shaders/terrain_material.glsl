@@ -516,6 +516,14 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       if (cls == 3) {   // a farm track: two wheel ruts of gravel, grass along the middle
         tx = matSample(p.xz, M_GRAVEL, 5.0, nTS);
         pc = mix(tx.rgb*0.9, m.alb*0.9, (1.0 - smoothstep(0.35, 0.75, x))*0.7);
+      } else if (cls == 5) {   // a farmyard: gravel, a concrete apron before the buildings, worn and muddy where it's driven
+        tx = matSample(p.xz, M_GRAVEL, 5.0, nTS);
+        vec3 nC; vec4 con = matSample(p.xz, M_CONCRETE, 3.0, nC);
+        float apron = smoothstep(0.55, 0.62, vnoise(p.xz/9.0 + 3.7));
+        pc = mix(tx.rgb*0.85, con.rgb*0.9, apron);
+        pc *= 0.82 + 0.18*vnoise(p.xz/3.1);
+        pc = mix(pc, vec3(0.16, 0.13, 0.09), smoothstep(0.62, 0.8, vnoise(p.xz/5.3 - 1.9))*0.55);   // (mud)
+        tx.a = mix(tx.a, con.a, apron); nTS = mix(nTS, nC, apron);
       } else {
         tx = matSample(p.xz, M_ASPHALT, 4.0, nTS);
         // highways newest and darkest; country lanes worn paler, patched

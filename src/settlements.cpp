@@ -165,6 +165,66 @@ float settlementShare(const std::vector<SettlementField>& fields, float x, float
   return best;
 }
 
+// Lay a path of a class along a line (a street, a farm track, a farmyard): level with every road it crosses, its ends at
+// the height of any road it starts or stops on; never on a fill or in a cut more than 3.5 m, nor anywhere steeper than
+// its class may be (it should lie on its ground: else not built). With out, the path laid is handed back, not added.
+static bool layPath(const World& world, RoadIndex& idx, RoadNetwork& net, RoadClass cls, const std::vector<vec2>& line, RoadPath* out = nullptr) {
+  auto ground = [&](vec2 p) { return world.groundHeight(p.x, p.y, 8); };
+  if (line.size() < 2) return false;
+  std::vector<RoadPin> pins;
+  for (size_t k = 0; k + 1 < line.size(); k++) idx.crossings(line[k], line[k + 1], -1, pins);
+  auto endHeight = [&](vec2 p) {
+    int sg = -1; float t = 0.f;
+    if (idx.nearest(p, 1.5f, -1, &sg, &t) < 1e8f) return idx.segs[sg].ha + (idx.segs[sg].hb - idx.segs[sg].ha) * t;
+    return ground(p);
+  };
+  pins.erase(std::remove_if(pins.begin(), pins.end(), [&](const RoadPin& p) {   // (not at its ends: those are its ends' heights)
+    return hypotf(p.x - line.front().x, p.z - line.front().y) < 3.f || hypotf(p.x - line.back().x, p.z - line.back().y) < 3.f; }), pins.end());
+  // level through each junction and crossing, out to 4 m past the other road's platform: a side street meets the
+  // road it leaves at its height, and only then climbs (else the road's own bed dipped at every junction)
+  std::vector<float> arc(line.size(), 0.f);
+  for (size_t k = 1; k < line.size(); k++) arc[k] = arc[k - 1] + length(line[k] - line[k - 1]);
+  auto arcOf = [&](vec2 q) {
+    float best = 1e9f, at = 0.f;
+    for (size_t k = 0; k + 1 < line.size(); k++) {
+      const vec2 d = line[k + 1] - line[k]; const float t = std::clamp(dot2(q - line[k], d) / std::max(dot2(d, d), 1e-6f), 0.f, 1.f);
+      const float e = length(line[k] + d * t - q);
+      if (e < best) { best = e; at = arc[k] + (arc[k + 1] - arc[k]) * t; }
+    }
+    return at;
+  };
+  auto pointAt = [&](float s) {
+    size_t k = 0; while (k + 2 < line.size() && arc[k + 1] < s) k++;
+    const float t = std::clamp((s - arc[k]) / std::max(arc[k + 1] - arc[k], 1e-3f), 0.f, 1.f);
+    return line[k] + (line[k + 1] - line[k]) * t;
+  };
+  auto otherHalf = [&](vec2 q) { int sg = -1; idx.nearest(q, 3.f, -1, &sg); return sg >= 0 ? roadSpec(idx.segs[sg].cls).halfPlatform : 0.f; };
+  std::vector<RoadPin> landings;
+  auto landing = [&](vec2 q, float h, int dirs) {
+    const float s = arcOf(q), L = otherHalf(q) + 4.f;
+    for (int sgn : {-1, 1}) {
+      if (!(dirs & (sgn < 0 ? 1 : 2))) continue;
+      const float t = s + sgn * L;
+      if (t <= 2.f || t >= arc.back() - 2.f) continue;
+      const vec2 at = pointAt(t); landings.push_back({at.x, at.y, h});
+    }
+  };
+  for (const RoadPin& p : pins) landing(vec2(p.x, p.z), p.h, 3);
+  const float h0 = endHeight(line.front()), h1 = endHeight(line.back());
+  if (idx.nearest(line.front(), 1.5f, -1) < 1e8f) landing(line.front(), h0, 2);
+  if (idx.nearest(line.back(), 1.5f, -1) < 1e8f) landing(line.back(), h1, 1);
+  pins.insert(pins.end(), landings.begin(), landings.end());
+  RoadPath p = layRoad(world, cls, line, h0, h1, pins);
+  if (p.pts.size() < 2) return false;
+  for (const RoadPoint& q : p.pts) if (fabsf(q.h - world.naturalHeight(q.x, q.z)) > 3.5f) return false;
+  for (size_t k = 0; k + 1 < p.pts.size(); k++)   // (nor where its crossings leave it steeper than a street may be)
+    if (fabsf(p.pts[k + 1].h - p.pts[k].h) > roadSpec(cls).maxGrade * hypotf(p.pts[k + 1].x - p.pts[k].x, p.pts[k + 1].z - p.pts[k].z) + 0.001f) return false;
+  if (out) { *out = std::move(p); return true; }
+  const int pi = (int)net.paths.size();
+  idx.addPath(p, pi); net.paths.push_back(std::move(p));
+  return true;
+}
+
 void addSettlementStreets(const World& world, const std::vector<SettlementField>& fields, RoadNetwork& net) {
   RoadIndex idx;
   for (size_t pi = 0; pi < net.paths.size(); pi++) idx.addPath(net.paths[pi], (int)pi);
@@ -174,62 +234,7 @@ void addSettlementStreets(const World& world, const std::vector<SettlementField>
     int t; const float share = settlementShare(fields, p.x, p.y, &t);
     return t == F.town && share < limit && ground(p) >= 2.5f && airportInfluence(p.x, p.y) < 0.02f;
   };
-  // lay a street along a line: level with every road it crosses, its ends at the height of any road it starts or
-  // stops on; never on a fill or in a cut more than 3.5 m (it should lie on its ground: else not built)
-  auto lay = [&](const std::vector<vec2>& line) {
-    if (line.size() < 2) return false;
-    std::vector<RoadPin> pins;
-    for (size_t k = 0; k + 1 < line.size(); k++) idx.crossings(line[k], line[k + 1], -1, pins);
-    auto endHeight = [&](vec2 p) {
-      int sg = -1; float t = 0.f;
-      if (idx.nearest(p, 1.5f, -1, &sg, &t) < 1e8f) return idx.segs[sg].ha + (idx.segs[sg].hb - idx.segs[sg].ha) * t;
-      return ground(p);
-    };
-    pins.erase(std::remove_if(pins.begin(), pins.end(), [&](const RoadPin& p) {   // (not at its ends: those are its ends' heights)
-      return hypotf(p.x - line.front().x, p.z - line.front().y) < 3.f || hypotf(p.x - line.back().x, p.z - line.back().y) < 3.f; }), pins.end());
-    // level through each junction and crossing, out to 4 m past the other road's platform: a side street meets the
-    // road it leaves at its height, and only then climbs (else the road's own bed dipped at every junction)
-    std::vector<float> arc(line.size(), 0.f);
-    for (size_t k = 1; k < line.size(); k++) arc[k] = arc[k - 1] + length(line[k] - line[k - 1]);
-    auto arcOf = [&](vec2 q) {
-      float best = 1e9f, at = 0.f;
-      for (size_t k = 0; k + 1 < line.size(); k++) {
-        const vec2 d = line[k + 1] - line[k]; const float t = std::clamp(dot2(q - line[k], d) / std::max(dot2(d, d), 1e-6f), 0.f, 1.f);
-        const float e = length(line[k] + d * t - q);
-        if (e < best) { best = e; at = arc[k] + (arc[k + 1] - arc[k]) * t; }
-      }
-      return at;
-    };
-    auto pointAt = [&](float s) {
-      size_t k = 0; while (k + 2 < line.size() && arc[k + 1] < s) k++;
-      const float t = std::clamp((s - arc[k]) / std::max(arc[k + 1] - arc[k], 1e-3f), 0.f, 1.f);
-      return line[k] + (line[k + 1] - line[k]) * t;
-    };
-    auto otherHalf = [&](vec2 q) { int sg = -1; idx.nearest(q, 3.f, -1, &sg); return sg >= 0 ? roadSpec(idx.segs[sg].cls).halfPlatform : 0.f; };
-    std::vector<RoadPin> landings;
-    auto landing = [&](vec2 q, float h, int dirs) {
-      const float s = arcOf(q), L = otherHalf(q) + 4.f;
-      for (int sgn : {-1, 1}) {
-        if (!(dirs & (sgn < 0 ? 1 : 2))) continue;
-        const float t = s + sgn * L;
-        if (t <= 2.f || t >= arc.back() - 2.f) continue;
-        const vec2 at = pointAt(t); landings.push_back({at.x, at.y, h});
-      }
-    };
-    for (const RoadPin& p : pins) landing(vec2(p.x, p.z), p.h, 3);
-    const float h0 = endHeight(line.front()), h1 = endHeight(line.back());
-    if (idx.nearest(line.front(), 1.5f, -1) < 1e8f) landing(line.front(), h0, 2);
-    if (idx.nearest(line.back(), 1.5f, -1) < 1e8f) landing(line.back(), h1, 1);
-    pins.insert(pins.end(), landings.begin(), landings.end());
-    RoadPath p = layRoad(world, RC_STREET, line, h0, h1, pins);
-    if (p.pts.size() < 2) return false;
-    for (const RoadPoint& q : p.pts) if (fabsf(q.h - world.naturalHeight(q.x, q.z)) > 3.5f) return false;
-    for (size_t k = 0; k + 1 < p.pts.size(); k++)   // (nor where its crossings leave it steeper than a street may be)
-      if (fabsf(p.pts[k + 1].h - p.pts[k].h) > roadSpec(RC_STREET).maxGrade * hypotf(p.pts[k + 1].x - p.pts[k].x, p.pts[k + 1].z - p.pts[k].z) + 0.001f) return false;
-    const int pi = (int)net.paths.size();
-    idx.addPath(p, pi); net.paths.push_back(std::move(p));
-    return true;
-  };
+  auto lay = [&](const std::vector<vec2>& line) { return layPath(world, idx, net, RC_STREET, line); };
   // ---- the cores: a grid of streets turned to the main road, blocks of 110 x 80 m in a city, 100 x 75 in a town;
   // each line of it built where it runs through the core over buildable ground, but not along a road there already
   std::vector<int> core;   // (the core's streets: the suburbs carry them on out)
@@ -363,4 +368,113 @@ void addSettlementStreets(const World& world, const std::vector<SettlementField>
       }
     }
   }
+}
+
+// ---- the farmsteads (Phase B2): on a jittered 300 m grid over the farmland (as the terrain's mask has it: World::bakeMask,
+// no settlement here), each where the ground is level and dry, clear of the settlements and the airfields, 80 m to
+// 1.3 km from a road, a lane or a neighbouring farm's track: a yard of gravel and concrete 22 x 42 m (RC_YARD: its ground
+// levelled and banked as a road's is) at the end of a gravel track (RC_TRACK) that leaves the road square to it and
+// bends a little on its way. Neither crosses another road nor bridges anything, the track keeps clear of the other
+// farms, and the yards keep 280 m apart.
+void addFarmsteads(const World& world, const std::vector<SettlementField>& fields, RoadNetwork& net) {
+  RoadIndex idx;
+  for (size_t pi = 0; pi < net.paths.size(); pi++) idx.addPath(net.paths[pi], (int)pi);
+  auto commit = [&](RoadPath p) { const int pi = (int)net.paths.size(); idx.addPath(p, pi); net.paths.push_back(std::move(p)); };
+  std::vector<vec2> yards;
+  for (const RoadPath& p : net.paths)
+    if (p.cls == RC_YARD && !p.pts.empty()) yards.push_back(vec2(p.pts.front().x, p.pts.front().z));
+  const float FC = 300.f;
+  const int n = (int)ceilf(2.f * WORLD_HALF / FC);
+  for (int fj = 0; fj < n; fj++)
+    for (int fi = 0; fi < n; fi++) {
+      if (hash2i(fi * 11 + 3, fj * 5 + 7) > 0.55f) continue;
+      const vec2 site(-WORLD_HALF + (fi + 0.5f + (hash2i(fi * 7 + 1, fj * 3 - 2) - 0.5f) * 0.6f) * FC,
+                      -WORLD_HALF + (fj + 0.5f + (hash2i(fi - 4, fj * 9 + 5) - 0.5f) * 0.6f) * FC);
+      float b[4]; world.sampleBase(site.x, site.y, b);
+      if (b[0] < 5.f) continue;
+      const float farm = smoothstepf(4.f, 15.f, b[0]) * smoothstepf(420.f, 260.f, b[0]) * smoothstepf(0.4f, 0.6f, b[2]) * smoothstepf(45.f, 25.f, b[1]) *
+                         smoothstepf(0.32f, 0.5f, valueNoise(site.x / 3000.f + 7.7f, site.y / 3000.f - 3.3f));
+      if (farm < 0.35f || airportInfluence(site.x, site.y) > 0.001f) continue;
+      int town = -1; const float share = settlementShare(fields, site.x, site.y, &town);
+      if (town >= 0 && share < 1.4f) continue;
+      // the yard's ground: dry, and level enough (5 m at most across it and round it); no road within 80 m, no other
+      // yard within 280 m (its land)
+      float lo = 1e9f, hi = -1e9f;
+      for (int k = 0; k < 25; k++) {
+        const vec2 q = site + vec2((k % 5 - 2) * 12.f, (k / 5 - 2) * 12.f);
+        const float g = world.groundHeight(q.x, q.y, 8);
+        lo = std::min(lo, g); hi = std::max(hi, g);
+      }
+      if (lo < 3.f || hi - lo > 5.f || idx.nearest(site, 80.f, -1) < 1e8f) continue;
+      bool crowded = false;
+      for (const vec2& y : yards) crowded |= length(y - site) < 280.f;
+      if (crowded) continue;
+      // the way in: a track from the nearest road, lane or neighbour's track within 1.3 km (a farm gate on no street) -
+      // or, should that way cross a road or pass through another farm, from the next nearest
+      auto clear = [&](vec2 q, float r) { for (const vec2& y : yards) if (length(q - y) < r) return false; return true; };
+      std::vector<int> tried;
+      RoadPath yard, track;
+      bool laid = false;
+      for (int attempt = 0; attempt < 3 && !laid; attempt++) {
+        float d = 1e9f; int sg = -1; float t = 0.f;
+        const float reach = 1300.f;
+        for (int j = RoadIndex::cell(site.y - reach); j <= RoadIndex::cell(site.y + reach); j++)
+          for (int i = RoadIndex::cell(site.x - reach); i <= RoadIndex::cell(site.x + reach); i++) {
+            auto it = idx.cells.find(RoadIndex::key(i, j)); if (it == idx.cells.end()) continue;
+            for (int id : it->second) {
+              const RoadIndex::Seg& sgm = idx.segs[id];
+              if (sgm.cls == RC_STREET || sgm.cls == RC_YARD || std::find(tried.begin(), tried.end(), sgm.path) != tried.end()) continue;
+              const vec2 e = sgm.b - sgm.a; const float u = std::clamp(dot2(site - sgm.a, e) / std::max(dot2(e, e), 1e-6f), 0.f, 1.f);
+              const float q = length(sgm.a + e * u - site);
+              if (q < d) { d = q; sg = id; t = u; }
+            }
+          }
+        if (d > reach) break;
+        const RoadIndex::Seg road = idx.segs[sg];
+        tried.push_back(road.path);
+        vec2 onRoad = road.a + (road.b - road.a) * t;
+        if (road.cls == RC_TRACK && !clear(onRoad, 70.f)) {   // (off a neighbour's track: joining it clear of its farm)
+          float best = 1e9f;
+          for (const RoadPoint& q : net.paths[road.path].pts)
+            if (clear(vec2(q.x, q.z), 70.f) && length(vec2(q.x, q.z) - site) < best) { best = length(vec2(q.x, q.z) - site); onRoad = vec2(q.x, q.z); }
+          if (best > reach) continue;
+        }
+        const vec2 dir = (site - onRoad) * (1.f / std::max(length(site - onRoad), 1e-3f)), side(-dir.y, dir.x);
+        const vec2 yardFront = site - dir * 10.f, yardBack = site + dir * 10.f;   // (its platform 13 m round that: 46 m long)
+        // the track: square off the road, a gentle bend half way, onto the yard's front; crossing nothing, and 62 m
+        // clear of every other farm's yard (its buildings)
+        const float run = length(yardFront - onRoad), bend = (hash2i(fi + 31, fj - 17) - 0.5f) * std::min(40.f, run * 0.25f);
+        const std::vector<vec2> line = {onRoad, onRoad + dir * std::min(20.f, run * 0.2f), onRoad + dir * (run * 0.55f) + side * bend, yardFront};
+        std::vector<RoadPin> crossing;
+        for (size_t k = 1; k + 1 < line.size(); k++) idx.crossings(line[k], line[k + 1], -1, crossing);
+        bool through = !crossing.empty();
+        for (size_t k = 0; k + 1 < line.size() && !through; k++) {
+          const vec2 e = line[k + 1] - line[k];
+          for (const vec2& y : yards) {
+            const float u = std::clamp(dot2(y - line[k], e) / std::max(dot2(e, e), 1e-6f), 0.f, 1.f);
+            through |= length(line[k] + e * u - y) < 62.f;
+          }
+        }
+        if (through) continue;
+        if (!layPath(world, idx, net, RC_YARD, {yardFront, yardBack}, &yard) || !layPath(world, idx, net, RC_TRACK, line, &track)) continue;
+        bool bridged = false;
+        for (uint8_t f : yard.bridge) bridged |= f != 0;
+        for (uint8_t f : track.bridge) bridged |= f != 0;
+        laid = !bridged;
+      }
+      if (!laid) continue;
+      yards.push_back(site); commit(std::move(yard)); commit(std::move(track));
+    }
+}
+
+std::vector<Farmstead> farmsteadsOf(const RoadNetwork& net) {
+  std::vector<Farmstead> farms;
+  for (const RoadPath& p : net.paths) {
+    if (p.cls != RC_YARD || p.pts.size() < 2) continue;
+    const RoadPoint &a = p.pts.front(), &b = p.pts.back();
+    const float dx = b.x - a.x, dz = b.z - a.z, l = std::max(hypotf(dx, dz), 1e-3f);
+    const float cx = (a.x + b.x) * 0.5f, cz = (a.z + b.z) * 0.5f;
+    farms.push_back({cx, cz, dx / l, dz / l, hash2i((int)floorf(cx), (int)floorf(cz))});
+  }
+  return farms;
 }

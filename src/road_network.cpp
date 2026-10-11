@@ -786,7 +786,7 @@ void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid) {
   for (size_t c = 0; c < at.size(); c++) {
     if (at[c].empty()) continue;
     const size_t n = std::min<size_t>(at[c].size(), 63);   // (never more than a few dozen: junctions of three roads)
-    if (grid.list.size() + n > 0x7FFFFu) break;            // (the 19 bits a texel's first entry has: 2.6 times today's)
+    if (grid.list.size() + n > 0x7FFFFu) break;            // (the 19 bits a texel's first entry has: roads_test watches)
     grid.head[c] = (uint32_t)n << 19 | (uint32_t)grid.list.size();
     grid.list.insert(grid.list.end(), at[c].begin(), at[c].begin() + n);
   }

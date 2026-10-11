@@ -368,33 +368,34 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
     }
 
     if (L == 1) {
-      // ---------------------------------------------------------------- farmsteads on farmland (320 m grid)
-      const float FC = 320.f;
-      for (int fj = (int)floorf((C.z0 - 70.f) / FC); fj <= (int)floorf((C.z1 + 70.f) / FC); fj++)
-        for (int fi = (int)floorf((C.x0 - 70.f) / FC); fi <= (int)floorf((C.x1 + 70.f) / FC); fi++) {
-          float x = (fi + 0.5f + (h2(fi * 7 + 1, fj * 3 - 2) - 0.5f) * 0.6f) * FC, z = (fj + 0.5f + (h2(fi - 4, fj * 9 + 5) - 0.5f) * 0.6f) * FC;
-          if (h2(fi * 11 + 3, fj * 5 + 7) > 0.42f) continue;
-          float m[4]; g_world.sampleMask(x, z, m);
-          int road = -1; float roadD = roadDistance(x, z, &road);
-          if (m[3] < .38f || m[1] > .025f || roadD < 55.f || roadD > 480.f || road < 0) continue;
-          float g = ground(x, z);
-          if (g < 4.f || fabsf(ground(x + 25, z) - ground(x - 25, z)) > 6.f || fabsf(ground(x, z + 25) - ground(x, z - 25)) > 6.f) continue;
-          const RoadSegment& route = g_world.roadGrid.segs[road];
-          float dx = route.bx - route.ax, dz = route.bz - route.az;
-          float along = clampf(((x - route.ax) * dx + (z - route.az) * dz) / (dx * dx + dz * dz), 0.f, 1.f);
-          float yaw = atan2f(route.ax + dx * along - x, route.az + dz * along - z), c = cosf(yaw), s = sinf(yaw);
-          auto at = [&](float lx, float lz, float& wx, float& wz) { wx = x + c * lx + s * lz; wz = z - s * lx + c * lz; };
-          float seed = h2(fi * 3, fj * 5), wx, wz;
-          auto farmBuilding = [&](int kind, float bx, float bz, float a, float hw, float hd, float height, float hs) {
-            if (!C.inside(bx, bz) || roadDistance(bx, bz) < hypotf(hw, hd) + 8.f || ground(bx, bz) < 3.f) return;
-            putBuilding(C, kind, bx, bz, a, hw, hd, height, hs);
-          };
-          farmBuilding(EK_FARMHOUSE, x, z, yaw, 5.5f, 6.f, 0, seed);
-          at(24.f, -8.f, wx, wz); farmBuilding(EK_BARN, wx, wz, yaw + PI * 0.5f, 6.f + 1.5f * seed, 9.f + 2.f * seed, 0, h2(fi, fj + 1));
-          at(36.f, 6.f, wx, wz); farmBuilding(EK_SILO, wx, wz, yaw, 3.f, 3.f, 15.f + 8.f * seed, seed);
-          if (seed > 0.45f) { at(29.f, 9.f, wx, wz); farmBuilding(EK_SILO, wx, wz, yaw, 2.6f, 2.6f, 13.f, seed * 0.7f); }
-          if (h2(fi - 3, fj + 8) > 0.45f) { at(-6.f, -26.f, wx, wz); farmBuilding(EK_WAREHOUSE, wx, wz, yaw, 9.f, 7.f, 6.5f, seed); }
-        }
+      // ---------------------------------------------------------------- farmsteads (World::farms): round each yard -
+      // the farmhouse by the way in, facing the yard; the barn across its far end; a machine shed along one side; the
+      // silos by the barn; often a second shed; a lorry or a car in the yard. Each building faces the yard and stands
+      // clear of its platform and of every road
+      for (const Farmstead& F : g_world.farms) {
+        if (F.x < C.x0 - 90.f || F.x > C.x1 + 90.f || F.z < C.z0 - 90.f || F.z > C.z1 + 90.f) continue;
+        const vec2 in(F.dx, F.dz), across(-F.dz, F.dx);
+        const float seed = F.seed, mirror = h2((int)F.x, (int)F.z + 7) < 0.5f ? 1.f : -1.f;   // (the house on one side or the other)
+        auto at = [&](float a, float b) { return vec2(F.x, F.z) + across * (a * mirror) + in * b; };
+        auto facing = [&](vec2 p) { const vec2 v = vec2(F.x, F.z) - p; return atan2f(v.x, v.y); };   // (its front, local +z, to the yard)
+        auto farmBuilding = [&](int kind, vec2 p, float yaw, float hw, float hd, float height, float hs) {
+          if (!C.inside(p.x, p.y) || roadDistance(p.x, p.y) - 6.f < std::max(hw, hd) + 1.f || ground(p.x, p.y) < 3.f) return;
+          putBuilding(C, kind, p.x, p.y, yaw, hw, hd, height, hs);
+        };
+        auto square = [](vec2 front) { return atan2f(front.x, front.y); };   // (its front, local +z, along front)
+        // (the yard's platform: 13 m either side of its centre line, from 23 m before its centre to 23 m beyond)
+        const vec2 house = at(-23.f, -6.f), barn = at(0.f, 36.f), shed = at(26.f, 4.f);
+        farmBuilding(EK_FARMHOUSE, house, square(across * mirror), 5.5f, 6.f, 0, seed);
+        farmBuilding(EK_BARN, barn, square(in * -1.f), 6.f + 1.5f * seed, 9.f + 2.f * seed, 0, h2((int)F.x + 1, (int)F.z));
+        farmBuilding(EK_WAREHOUSE, shed, square(across * -mirror), 9.f + 2.f * seed, 7.f, 6.5f, seed);
+        farmBuilding(EK_SILO, at(16.f, 30.f), 0.f, 3.f, 3.f, 15.f + 8.f * seed, seed);
+        if (seed > 0.4f) farmBuilding(EK_SILO, at(23.f, 30.f), 0.f, 2.6f, 2.6f, 13.f, seed * 0.7f);
+        if (seed < 0.6f) farmBuilding(EK_BARN, at(-24.f, 18.f), square(across * mirror), 5.f, 8.f, 0, h2((int)F.z, (int)F.x));
+        // (in the yard: the farm's lorry, or a car by the house)
+        const vec2 lorry = at(5.f, 6.f), car = at(-8.f, -10.f);
+        if (C.inside(lorry.x, lorry.y) && seed > 0.35f) put(C, EK_TRUCK, lorry.x, ground(lorry.x, lorry.y), lorry.y, facing(lorry) + 1.3f, 1.f, 1.f, 1.f, seed);
+        if (C.inside(car.x, car.y)) put(C, EK_CAR, car.x, ground(car.x, car.y), car.y, square(in), 1.f, 1.f, 1.f, h2((int)F.x - 3, (int)F.z));
+      }
       // ---------------------------------------------------------------- lighthouse
       { float lx, lz, ly; if (lighthouseSite(lx, lz, ly) && C.inside(lx, lz)) putBuilding(C, EK_LIGHTHOUSE, lx, lz, ly, 3.4f, 3.4f, 0, 0.5f); }
       // ---------------------------------------------------------------- sea stacks (70 m cells)
@@ -450,6 +451,11 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           put(C, EK_SPIRE, x, footprintGround(x, z, yaw, 3.f * sc, 3.f * sc) - 1.f, z, yaw, sc, sc * (0.8f + 0.5f * h2(pi, pj - 4)), sc, h2(pi * 5, pj));
         }
     } else {
+      // (each farm's compound - its yard and the buildings round it - is kept clear of trees and bushes)
+      std::vector<vec2> farmsNear;
+      for (const Farmstead& F : g_world.farms)
+        if (F.x > C.x0 - 60.f && F.x < C.x1 + 60.f && F.z > C.z0 - 60.f && F.z < C.z1 + 60.f) farmsNear.push_back(vec2(F.x, F.z));
+      auto inFarmstead = [&](float x, float z) { for (const vec2& f : farmsNear) if ((x - f.x) * (x - f.x) + (z - f.y) * (z - f.y) < 48.f * 48.f) return true; return false; };
       // ---------------------------------------------------------------- forests and lone trees (6 m cells)
       const float TC = 6.f;
       for (int tj = (int)floorf(C.z0 / TC); tj <= (int)floorf((C.z1 - 1e-3f) / TC); tj++)
@@ -457,7 +463,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float hp = h2(ti * 3 + 11, tj * 5 - 7);
           if (hp > 0.62f) continue;   // the most a cell can be planted
           float x = (ti + 0.5f + (h2(ti + 101, tj - 31) - 0.5f) * 0.7f) * TC, z = (tj + 0.5f + (h2(ti - 57, tj + 77) - 0.5f) * 0.7f) * TC;
-          if (!C.inside(x, z)) continue;
+          if (!C.inside(x, z) || inFarmstead(x, z)) continue;
           float b[4]; g_world.sampleBase(x, z, b);
           if (b[1] < 2.5f) continue;   // airport grounds and flattened land
           float g = ground(x, z);
@@ -469,7 +475,14 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float treeline = smoothstepf(1500.f - cold * 900.f, 1100.f - cold * 700.f, g);
           float fd = smoothstepf(0.42f - 0.1f * lush, 0.5f - 0.1f * lush, fn) * treeline;
           fd = std::max(fd, 0.022f * treeline);
-          fd *= smoothstepf(4.f, 9.f, g) * smoothstepf(2.5f, 8.f, amp) * smoothstepf(9.f, 18.f, roadD) * (1.f - smoothstepf(0.03f, 0.2f, town)) * (1.f - 0.9f * farm);
+          // farmland: the trees stand in the hedgerows between the fields (the terrain's patchwork: fieldPatch) and alone
+          // here and there in a pasture, never out in a crop
+          if (farm > 0.05f) {
+            float border, crop; fieldPatch(x, z, border, crop);
+            const float fdField = (border < 0.03f ? 0.6f : crop >= 0.76f ? 0.02f : 0.f) * treeline;
+            fd += (fdField - fd) * smoothstepf(0.12f, 0.4f, farm);
+          }
+          fd *= smoothstepf(4.f, 9.f, g) * smoothstepf(2.5f, 8.f, amp) * smoothstepf(9.f, 18.f, roadD) * (1.f - smoothstepf(0.03f, 0.2f, town));
           if (hp > fd * 0.56f) continue;
           float sp = h2(ti * 13 + 1, tj * 7 + 3), sp2 = h2(ti * 5 - 9, tj * 11 + 2), hv = h2(ti - 3, tj + 19);
           int k = treeSpecies(g, lush, cold, sp, sp2);
@@ -483,9 +496,9 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
       for (int bj = (int)floorf(C.z0 / BC); bj <= (int)floorf((C.z1 - 1e-3f) / BC); bj++)
         for (int bi = (int)floorf(C.x0 / BC); bi <= (int)floorf((C.x1 - 1e-3f) / BC); bi++) {
           float hp = h2(bi * 9 - 4, bj * 7 + 13);
-          if (hp > 0.3f) continue;
+          if (hp > 0.9f) continue;   // (the most a cell can be planted: a hedgerow's; elsewhere at most 0.3, as before)
           float x = (bi + 0.5f + (h2(bi + 41, bj - 3) - 0.5f) * 0.8f) * BC, z = (bj + 0.5f + (h2(bi - 8, bj + 33) - 0.5f) * 0.8f) * BC;
-          if (!C.inside(x, z)) continue;
+          if (!C.inside(x, z) || inFarmstead(x, z)) continue;
           float b[4]; g_world.sampleBase(x, z, b);
           if (b[1] < 2.5f) continue;
           float g = ground(x, z);
@@ -494,8 +507,12 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float treeline = smoothstepf(1700.f - b[3] * 900.f, 1200.f - b[3] * 700.f, g);
           float fn = g_world.forestAt(x, z);
           float edge = smoothstepf(0.3f, 0.42f, fn) * smoothstepf(0.6f, 0.46f, fn);   // forest margins are scrubby
-          float p = (0.05f + 0.25f * edge) * treeline * smoothstepf(2.5f, 8.f, b[1]) * smoothstepf(8.f, 14.f, m[0] * ROAD_RANGE) *
-                    (1.f - smoothstepf(0.03f, 0.2f, m[1])) * (1.f - 0.85f * m[3]) * (0.5f + 0.5f * b[2]);
+          float p = (0.05f + 0.25f * edge) * (0.5f + 0.5f * b[2]);
+          if (m[3] > 0.05f) {   // (farmland: the hedgerows are thick with them, the fields clear)
+            float border, crop; fieldPatch(x, z, border, crop);
+            p += ((border < 0.035f ? 0.8f : crop >= 0.76f ? 0.01f : 0.f) - p) * smoothstepf(0.12f, 0.4f, m[3]);
+          }
+          p *= treeline * smoothstepf(2.5f, 8.f, b[1]) * smoothstepf(8.f, 14.f, m[0] * ROAD_RANGE) * (1.f - smoothstepf(0.03f, 0.2f, m[1]));
           if (hp > p) continue;
           float sc = 0.6f + 0.8f * h2(bi * 3, bj * 5);
           put(C, EK_BUSH, x, g - 0.1f, z, h2(bi, bj * 3) * 6.28f, sc, sc * (0.8f + 0.4f * h2(bi + 1, bj)), sc, h2(bi * 7, bj * 13));

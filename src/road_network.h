@@ -9,7 +9,7 @@
 
 class World;
 
-enum RoadClass : uint8_t { RC_HIGHWAY = 0, RC_ROAD = 1, RC_LANE = 2, RC_TRACK = 3, RC_STREET = 4, RC_COUNT };
+enum RoadClass : uint8_t { RC_HIGHWAY = 0, RC_ROAD = 1, RC_LANE = 2, RC_TRACK = 3, RC_STREET = 4, RC_YARD = 5, RC_COUNT };
 
 // Each class's design (m): the paved half width (edge line to edge line, the central reserve included), the level
 // platform's half width (shoulders, verges); the steepest grade anywhere along it (rise over run, never exceeded: its
@@ -25,6 +25,7 @@ inline const RoadSpec& roadSpec(int c) {
     {2.9f, 4.0f, 0.12f, 45.f, 15.f, 7.f},       // lane: a single 5.8 m carriageway, no lines
     {1.9f, 2.8f, 0.15f, 25.f, 12.f, 4.f},       // track: gravel
     {3.5f, 6.0f, 0.12f, 20.f, 12.f, 3.f},       // street: two 3.5 m lanes between kerbs, 2.5 m pavements (settlements.h)
+    {11.f, 13.f, 0.05f, 10.f, 6.f, 2.f},        // farmyard: a yard of gravel and concrete 22 m wide, 42 m long, near level (addFarmsteads)
   };
   return k[c];
 }
@@ -64,8 +65,10 @@ bool roadByAirfield(const RoadPoint& A, const RoadPoint& B, int cls);
 // span like a spill-through abutment's
 enum : uint8_t { RS_BRIDGE = 1, RS_NOGRADE = 2, RS_ENDA = 4, RS_ENDB = 8 };
 static const float ROAD_BANK_MAX = 50.f;            // the widest cut or fill bank beyond a platform's edge (m)
-// (a street's narrower: it follows the ground closely, and a town's grid of them would crowd the texels' lists)
-inline float roadBankMax(int cls) { return cls == RC_STREET ? 20.f : ROAD_BANK_MAX; }
+// (a street's narrower: it follows the ground closely, and a town's grid of them would crowd the texels' lists; a
+// farm's track and yard narrower still: never more than 3.5 m off the ground, so 7 m of bank at the most - and four
+// hundred farms' worth of 50 m reaches overflowed the lists)
+inline float roadBankMax(int cls) { return cls == RC_STREET ? 20.f : cls == RC_TRACK || cls == RC_YARD ? 12.f : ROAD_BANK_MAX; }
 static const float ROAD_BANK_RUN = 2.f;             // a bank's run for its rise (1 in 2, on average: rounded at its top
                                                     // and toe, at most 1 in 1.33 at its middle)
 struct RoadSegment { float ax, az, bx, bz, ah, bh, along; uint16_t path; uint8_t cls, flags; };
@@ -76,7 +79,7 @@ struct RoadGrid {
   // many entries in the next 6, the first of them in the low 19
   std::vector<uint32_t> head;
   std::vector<uint32_t> list;                       // the entries: segment indices
-  // a coarser index for the nearest road further off (scenery: farmsteads up to 480 m from theirs): 500 m cells, each
+  // a coarser index for the nearest road further off (scenery: what stands well away from one): 500 m cells, each
   // listing the segments within 500 m of it
   static const int NC = 160;
   std::vector<uint32_t> nearHead, nearList;         // (first << 8 | count; count < 256)

@@ -141,6 +141,19 @@ float valueNoise(float x, float z) {
   return ab + (cd - ab) * tz;
 }
 
+void fieldPatch(float x, float z, float& border, float& crop) {
+  const float qx = x / 170.f + valueNoise(x / 600.f, z / 600.f) * 0.6f, qz = z / 170.f + valueNoise(x / 600.f + 7.3f, z / 600.f + 7.3f) * 0.6f;
+  const float gx = floorf(qx), gz = floorf(qz), fx = qx - gx, fz = qz - gz;
+  float d1 = 9.f, d2 = 9.f; int idx = 0, idz = 0;
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+    const int cx = (int)gx + i, cz = (int)gz + j;
+    const float rx = i + hash2i(cx + 91, cz + 7) - fx, rz = j + hash2i(cx - 3, cz + 55) - fz, d = rx * rx + rz * rz;
+    if (d < d1) { d2 = d1; d1 = d; idx = cx; idz = cz; } else if (d < d2) d2 = d;
+  }
+  border = sqrtf(d2) - sqrtf(d1);
+  crop = hash2i(idx + 13, idz + 31);
+}
+
 float coverFbm(float x, float z, int oct) {
   float s = 0, a = 0.5f;
   for (int i = 0; i < oct; i++) { s += a * valueNoise(x, z); x = x * 2.02f + 13.7f; z = z * 2.02f - 7.1f; a *= 0.5f; }
@@ -401,7 +414,7 @@ void sceneryBakeCommunityLots(const World& world) {
   for (int pass = 0; pass < 2; pass++)
     for (size_t pi = 0; pi < world.roads.paths.size(); pi++) {
       const RoadPath& P = world.roads.paths[pi];
-      if (P.cls == RC_HIGHWAY || (pass == 0) != (P.cls != RC_STREET) || P.pts.size() < 2) continue;
+      if (P.cls == RC_HIGHWAY || P.cls == RC_TRACK || P.cls == RC_YARD || (pass == 0) != (P.cls != RC_STREET) || P.pts.size() < 2) continue;   // (no lots along a farm's track or in its yard)
       const float half = roadSpec(P.cls).halfPlatform;
       std::vector<float> along(P.pts.size(), 0.f);
       for (size_t k = 1; k < P.pts.size(); k++) along[k] = along[k - 1] + hypotf(P.pts[k].x - P.pts[k - 1].x, P.pts[k].z - P.pts[k - 1].z);

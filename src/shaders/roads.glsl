@@ -19,9 +19,9 @@ float forestAt(vec2 p){
 }
 vec4 roadTexel(int i){ return texelFetch(uData, ivec2(i & 4095, 1 + (i >> 12)), 0); }
 uint roadHead(vec2 p){ return texelFetch(uRoadGrid, clamp(ivec2(floor((wrapW(p) + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0).r; }
-float roadHalfPlatform(int c){ return c == 0 ? 16.0 : c == 1 ? 6.5 : c == 2 ? 4.0 : c == 3 ? 2.8 : 6.0; }   // (road_network.h roadSpec)
-float roadHalfPaved(int c){ return c == 0 ? 12.4 : c == 1 ? 4.6 : c == 2 ? 2.9 : c == 3 ? 1.9 : 3.5; }
-float roadBankMax(int c){ return c == 4 ? 20.0 : ROAD_BANK_MAX; }
+float roadHalfPlatform(int c){ return c == 0 ? 16.0 : c == 1 ? 6.5 : c == 2 ? 4.0 : c == 3 ? 2.8 : c == 4 ? 6.0 : 13.0; }   // (road_network.h roadSpec)
+float roadHalfPaved(int c){ return c == 0 ? 12.4 : c == 1 ? 4.6 : c == 2 ? 2.9 : c == 3 ? 1.9 : c == 4 ? 3.5 : 11.0; }
+float roadBankMax(int c){ return c == 4 ? 20.0 : c == 3 || c == 5 ? 12.0 : ROAD_BANK_MAX; }   // (road_network.h)
 // The ground with the roads built into it, from the natural ground g: each graded road's platform level across at its
 // height, its banks blending back to g (bridges and the stretches by an airfield leave the ground alone; an end at a
 // bridge stops square, carried on under the deck's slab, then falling away). Mirrors roadGrade in road_network.cpp

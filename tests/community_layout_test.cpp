@@ -1,7 +1,7 @@
 // The settlements (settlements.h, scenery.h): grown over the ground with their streets on the road network, every
 // building on a lot along a road or a street and facing it, clear of the roads and of each other, on dry, buildable
 // ground off the runways; a skyline at the cities' hearts; deterministic, bounded per chunk, streamed the same however
-// it is reached. No GL or display required.
+// it is reached; the farmsteads out in the farmland. No GL or display required.
 #include "../src/scenery.h"
 #include "../src/entities.h"
 #include "../src/airport_layout.h"
@@ -10,6 +10,8 @@
 #include <cstring>
 #include <set>
 #include <utility>
+
+float airportInfluence(float x, float z);   // world.cpp
 
 static int failures = 0;
 static void check(bool value, const char* message) { if (!value) { if (failures < 16) std::printf("FAIL: %s\n", message); failures++; } }
@@ -184,6 +186,42 @@ int main() {
     }
   }
   check(cars > 0, "communities contain driveway activity");
+  // ---- the farmsteads (World::farms): out in the farmland, clear of the settlements and the airfields, each a near-level
+  // yard at the end of a gravel track; round it, its farmhouse, barn and silo, clear of every road; no tree in the yard
+  const std::vector<Farmstead>& farms = g_world.farms;
+  check(farms.size() > 150 && farms.size() < 1000, "the farmland has its farmsteads");
+  int yards = 0, tracks = 0;
+  for (const RoadPath& p : net.paths) { yards += p.cls == RC_YARD; tracks += p.cls == RC_TRACK; }
+  check(yards == (int)farms.size() && tracks >= yards, "each farmstead its yard, reached by its track");
+  int whole = 0, sampled = 0;
+  for (size_t f = 0; f < farms.size(); f++) {
+    const Farmstead& F = farms[f];
+    int town = -1; const float share = settlementShare(g_world.settlements, F.x, F.z, &town);
+    check(town < 0 || share >= 1.4f, "a farmstead lies out of the settlements");
+    check(airportInfluence(F.x, F.z) <= 0.001f, "a farmstead lies off the airfields' grounds");
+    for (size_t g = f + 1; g < farms.size(); g++) check(hypotf(farms[g].x - F.x, farms[g].z - F.z) >= 280.f, "farmsteads have their land between them");
+    if (f % 4) continue;
+    sampled++;
+    int n[EK_COUNT] = {}, inYard = 0;
+    for (int cz = Scenery::chunkOf(F.z - 60.f); cz <= Scenery::chunkOf(F.z + 60.f); cz++)
+      for (int cx = Scenery::chunkOf(F.x - 60.f); cx <= Scenery::chunkOf(F.x + 60.f); cx++) {
+        const Scenery::Chunk* chunk = g_scenery.ensure(cx, cz, 2);
+        for (int kind = 0; kind < EK_COUNT; kind++)
+          for (uint32_t e = chunk->off[kind]; e < chunk->off[kind + 1]; e++) {
+            const Ent& E = chunk->ents[e];
+            const float d = hypotf(E.x - F.x, E.z - F.z);
+            if (d > 60.f) continue;
+            n[kind]++;
+            if (entClass(kind) == EC_TREE && d < 30.f) inYard++;
+            if (kind >= EK_HOUSE && kind <= EK_GASSTATION) check(roads.nearest(vec2(E.x, E.z), 3.f, -1, nullptr, nullptr, true) >= 0.99f, "no farm building stands on a road");
+          }
+      }
+    check(inYard == 0, "no tree or bush in a farmyard");
+    whole += n[EK_FARMHOUSE] >= 1 && n[EK_BARN] >= 1 && n[EK_SILO] >= 1;
+  }
+  g_scenery.clear();
+  std::printf("%zu farmsteads; %d of %d sampled with their farmhouse, barn and silo\n", farms.size(), whole, sampled);
+  check(whole * 10 >= sampled * 9, "a farmstead has its farmhouse, barn and silo");
   std::printf("%d buildings, %d tall, %d inhabited towns, %zu road paths, %d parked cars sampled; %d failures\n", total, tall, occupiedTowns, g_world.roads.paths.size(), cars, failures);
   return failures ? 1 : 0;
 }

@@ -13,6 +13,8 @@
 #include <vector>
 
 class World;
+// A farmstead's yard: its centre, the way in from its track (unit), a seed (entities.cpp stands the buildings round it)
+struct Farmstead { float x, z, dx, dz, seed; };
 
 static const float SETTLE_CELL = 20.f;   // the effort field's cells (m)
 
@@ -53,3 +55,9 @@ std::vector<SettlementField> buildSettlementFields(const World& world);
 float settlementShare(const std::vector<SettlementField>& fields, float x, float z, int* town = nullptr);
 // The settlements' streets, laid out and added to the network
 void addSettlementStreets(const World& world, const std::vector<SettlementField>& fields, RoadNetwork& net);
+// The farmsteads out in the farmland, clear of the settlements and the airfields: each a level yard (a short path of
+// class RC_YARD, its ground levelled and banked as a road's is) at the end of a gravel track (RC_TRACK) from the
+// nearest road, lane or neighbour's track. After the streets; the farms are read back off the network (farmsteadsOf),
+// cached or not
+void addFarmsteads(const World& world, const std::vector<SettlementField>& fields, RoadNetwork& net);
+std::vector<Farmstead> farmsteadsOf(const RoadNetwork& net);
