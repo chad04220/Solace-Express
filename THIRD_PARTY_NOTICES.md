@@ -46,6 +46,13 @@ All seven are CC0 1.0: https://polyhaven.com/license, https://ambientcg.com/lice
 hashes, dimensions and transformations. Source photographs/PNG downloads are not bundled; only the compact runtime
 maps are redistributed. The existing aircraft/cockpit-compatible material files remain unchanged.
 
+## The stars (`src/star_catalog.h`)
+
+The night sky's stars are the Yale Bright Star Catalogue, 5th revised edition: D. Hoffleit and W. H. Warren Jr., Yale
+University Observatory, 1991, as distributed by NASA's Astronomical Data Center and the CDS (catalogue V/50), from
+<http://tdc-www.harvard.edu/catalogs/bsc5.html>. `tools/generate_star_catalog.py` keeps each star to visual magnitude
+6.5: its position (J2000), magnitude and B-V colour index.
+
 ## Everything else
 
 All other code, shaders, textures (the rest procedurally generated at startup), audio (synthesised in real time, apart from the tower voices above), aircraft, map and campaign content are original to this project.

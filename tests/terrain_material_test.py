@@ -138,7 +138,9 @@ environment_surface = environment_surface.replace('*(1.0 - m.metal)', '').replac
 assert compact(environment_surface)==compact(function(lighting,'shadeSurface')), 'Only diffuse irradiance/metal energy and reflected environment may differ from shared aircraft shading'
 assert 'cls == GB_TERRAIN || cls == GB_ENTITY || cls == GB_FOLIAGE' in light_fs
 assert hashlib.sha256(function(lighting,'ambientLight').encode()).hexdigest()=='3c6f5f484c7431cc7b9fa0e62a9935a58e3ede3061eef241e4c6105277b1a3db', 'Shared aircraft light changed'
-assert hashlib.sha256(function(lighting,'shadeSurface').encode()).hexdigest()=='9e6030fc4c2d379a189d8fadd6a67339e43a6005e5b5739eda3ef77628f60176', 'Shared aircraft light changed'
+# (v3.47: its moonlight from where the moon stands and as much as its phase gives - sky.h - on purpose, the aircraft's
+# as everything else's)
+assert hashlib.sha256(function(lighting,'shadeSurface').encode()).hexdigest()=='38f6c3e4da6fb6999d347ac9b3702a67b43dd79a954090f46e8f236aeafd4d64', 'Shared aircraft light changed'
 assert 'cls == GB_ENTITY && (flags & GBF_ENV_GLASS) != 0' in light_fs
 assert 'cls == GB_ENTITY && (flags & GBF_ENV_CLEARCOAT) != 0' in light_fs
 assert function(light_fs, 'shadeEnvironmentGlazing').count('for (') == 1

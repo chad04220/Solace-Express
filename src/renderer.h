@@ -101,6 +101,8 @@ struct FrameParams {
   bool prefetchOn = false; vec3 prefetchPos;   // scenery to have the worker threads build ahead (the menu tour's next place)
   float cloudCover = 0.3f, cloudBase = 1500, fogB = 0.0001f, wet = 0, snow = 0, lightning = 0, storm = 0;
   float sunDim = 1.f;   // the weather's share of the sunlight (Game::computeSun): the lighting pass's sunLightAt times it
+  // the sky's bodies (sky.h): the game's frame into the equator's (the stars), towards the moon, the share of it lit
+  float skyRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1}; vec3 moonDir = vec3(-0.4f, 0.55f, 0.6f); float moonLit = 0.5f;
   vec2 windOff;
   vec3 wind;   // surface wind velocity (m/s, the way the air moves): the sea's waves, the clouds' lean
   vec3 windSock;   // the surface wind with its gusts where the camera is (the windsocks swing with them)
@@ -536,6 +538,10 @@ private:
   // it reaches the cell (m, rounded up; 0: none)
   std::vector<std::vector<uint8_t>> roadLod;
   void buildRoadLod();
+  // the stars (sky.cpp): the catalogue binned for the lighting pass's lookup; bound with the sky's frame for a view
+  GLuint texStarCells = 0, texStars = 0; int starCellsG = 0, starTexW = 0;
+  void initStars();
+  void bindSky(GLuint p, const FrameParams& fp);
   bool compileRaster(const std::function<void()>& step = {});
   bool compileTerrainMesh(const std::function<void()>& step = {});
   void initTerrainMesh();

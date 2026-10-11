@@ -27,6 +27,12 @@
 - **The sky thins out with height.** Above about 20 km it darkens to deep blue, and by 100 km it is black, with a glowing blue limb along the curve of the planet. The sun becomes a hard white disc above the air, and at sunset you can see day turn to night across the planet below. Clouds follow the curve too.
 - The far copies of the islands are drawn from a lighter mesh. In our tests the view from orbit took less time to draw than flying low over a town.
 
+### The sun, the moon and the stars
+- **The real night sky.** About 8,400 real stars, every one the eye can see on the darkest night, from the Yale Bright Star Catalogue. They're at their real brightness and in their real colours: Betelgeuse orange, Rigel blue-white. Orion, the Pleiades and every other constellation are where they should be, and the sky turns with the hours. The Milky Way glows on the darkest nights.
+- **How many you see depends on the sky behind them.** On a dark night they're all out; in twilight only the brightest show. Near the horizon they're dimmer and twinkle. By day there are none, until you climb high enough that the sky above goes dark: from about 20-30 km up the stars are out in daylight, and above the air they never go away.
+- **The sun and the moon are drawn at the size they look to the eye.** In the sky each is half a degree across. The game shows a 55-74° view on a monitor that fills about 30° of your vision, so at their true size they would look half as big as they do through a real window; they're drawn twice that size to make up for it. The sun is darker towards its edge, a little flattened as it sets, and its glare comes from the bloom.
+- **The moon is the same size as the sun, as it is in the real sky.** It goes through its phases, matching the real moon's phase on today's date. A new moon is a hairline sliver near the sun, with the rest of its disc faintly lit by earthshine, and a full moon rises as the sun sets. It shows its darker seas, is pale by day and bright by night, and reddens low down. Moonlight now comes from where the moon actually is, and it is stronger nearer full moon.
+
 ### Good to know
 - **The first launch after updating takes longer, once.** The islands are regenerated: some roads take different routes, and every settlement is laid out anew.
 

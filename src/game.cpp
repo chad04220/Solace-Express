@@ -1,6 +1,7 @@
 // Solace Express - game flow, flight session, cameras, particles, lights, audio feed
 #include "volcano_effects.h"
 #include "game.h"
+#include "sky.h"
 #include "load_pacer.h"
 #include <chrono>
 #include <ctime>
@@ -978,8 +979,7 @@ void Game::toast(const std::string& s, vec3 col, bool voiced) {
 
 // ------------------------------------------------------------------ sun & sky
 void Game::computeSun(float tod, vec3& dir, vec3& col, float& night, float h, float* dim) const {
-  float a = (tod - 6.f) / 12.f * PI;
-  dir = normalize(vec3(cosf(a), sinf(a) * 0.93f, 0.35f + 0.1f * sinf(a)));
+  dir = sunDirectionAt(tod);   // (its path: sky.h)
   float y = dir.y;
   // the sunlight reaching h up (common.glsl sunLightAt, exactly): through the air above it, and from up there over a
   // horizon that has dipped below the level - an aircraft high over the dusk is still in the sun, and above the air
@@ -2661,6 +2661,11 @@ FrameParams Game::buildFrame() {
   FrameParams fp;
   fp.time = realTime; fp.dt = std::max(lastDt, 1e-4f);
   computeSun(timeOfDay, fp.sunDir, fp.sunCol, fp.night, plane.pos.y, &fp.sunDim);   // (the sun on the aircraft; the lighting pass works out the rest place by place)
+  {   // the stars and the moon (sky.h): the sky turning with the sun's hour, the moon at today's phase
+    const SkyBodies sb = skyBodiesAt(timeOfDay);
+    for (int i = 0; i < 9; i++) fp.skyRot[i] = sb.toEquator[i];
+    fp.moonDir = sb.moonDir; fp.moonLit = sb.moonLit;
+  }
   {   // terrain's soft sun shadow at the aircraft: the same march as the shader's terrainShadow, done once here instead
       // of for every pixel of the airframe and cockpit
     float res = 1.f, t = 2.f;

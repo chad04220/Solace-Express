@@ -128,9 +128,13 @@ vec3 shadeSurface(vec3 p, vec3 n, vec3 rd, Mat m, float shadow){
   vec3 v = -rd;
   vec3 col = pbr(n, v, uSunDir, m.alb, m.rough, m.metal, uSunCol*shadow*3.2);
   col += m.alb*ambientLight(n)*(0.55 + 0.45*n.y);
-  // moonlight
-  vec3 md = normalize(vec3(-0.4, 0.55, 0.6));
-  col += pbr(n, v, md, m.alb, m.rough, m.metal, vec3(0.05,0.07,0.12)*uNight);
+  // moonlight: from where the moon stands, as much as its phase gives (some even with none: the stars, the air's glow)
+#ifdef SKY_BODIES
+  vec3 md = uMoonDir, mk = vec3(0.05,0.07,0.12)*uNight*mix(0.25, 1.0, smoothstep(-0.05, 0.1, md.y)*(0.25 + 0.75*uMoonLit));
+#else
+  vec3 md = normalize(vec3(-0.4, 0.55, 0.6)), mk = vec3(0.05,0.07,0.12)*uNight;
+#endif
+  col += pbr(n, v, md, m.alb, m.rough, m.metal, mk);
   // specular environment reflection
   vec3 r = reflect(rd, n);
   vec3 F = fresnelSchlick(max(dot(n, v), 0.0), mix(vec3(0.04), m.alb, m.metal));

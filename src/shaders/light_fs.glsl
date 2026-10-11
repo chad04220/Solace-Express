@@ -107,9 +107,13 @@ vec3 shadeEnvironmentSurface(vec3 p, vec3 n, vec3 rd, Mat m, float shadow){
   vec3 v = -rd;
   vec3 col = pbr(n, v, uSunDir, m.alb, m.rough, m.metal, uSunCol*shadow*3.2);
   col += m.alb*environmentAmbientLight(n)*(0.55 + 0.45*n.y)*(1.0 - m.metal);
-  // moonlight
-  vec3 md = normalize(vec3(-0.4, 0.55, 0.6));
-  col += pbr(n, v, md, m.alb, m.rough, m.metal, vec3(0.05,0.07,0.12)*uNight);
+  // moonlight: from where the moon stands, as much as its phase gives (some even with none: the stars, the air's glow)
+#ifdef SKY_BODIES
+  vec3 md = uMoonDir, mk = vec3(0.05,0.07,0.12)*uNight*mix(0.25, 1.0, smoothstep(-0.05, 0.1, md.y)*(0.25 + 0.75*uMoonLit));
+#else
+  vec3 md = normalize(vec3(-0.4, 0.55, 0.6)), mk = vec3(0.05,0.07,0.12)*uNight;
+#endif
+  col += pbr(n, v, md, m.alb, m.rough, m.metal, mk);
   // specular environment reflection
   vec3 r = reflect(rd, n);
   vec3 F = fresnelSchlick(max(dot(n, v), 0.0), mix(vec3(0.04), m.alb, m.metal));
@@ -166,6 +170,52 @@ vec3 shadeEnvironmentGlazing(vec3 p, vec3 n, vec3 rd, Mat m, float shadow){
   return col + m.emit*(1.0 - F);
 }
 
+// The stars (sky.cpp: the Yale Bright Star Catalogue to magnitude 6.5, binned on a cube in the equator's frame): each
+// one within a few pixels of this one, a point spread over about a pixel and coloured by its spectrum. How faint a star
+// still shows follows the sky behind it - all of them on a dark night, the brightest in twilight, none by day - and by
+// day the eye's adaptation to the sunlit world until the sky above has gone dark: from 20-30 km up they are out in
+// daylight. Low down the air dims them and makes them twinkle; the Milky Way glows under the darkest skies.
+uniform usampler2D uStarCells; uniform sampler2D uStars; uniform mat3 uSkyRot; uniform int uStarG; uniform int uStarW;
+vec3 starLight(vec3 rd, vec3 sky, float h){
+  if (uStarG <= 0) return vec3(0.0);
+  float R = uPlanetR, hc = max(h, 0.0), dip = R > 0.0 ? sqrt(max(1.0 - (R/(R + hc))*(R/(R + hc)), 0.0)) : 0.0;
+  if (rd.y < -dip || dot(rd, uMoonDir) > 0.99996) return vec3(0.0);   // (below the horizon; behind the moon: common.glsl skyDiscs)
+  float Ls = max(dot(sky, vec3(0.2126, 0.7152, 0.0722)), 0.01);
+  float mlim = 6.5 - 6.0*log(Ls/0.01)/log(10.0) - 3.5*smoothstep(-0.1, 0.05, sunDirUniform().y)*(1.0 - smoothstep(12000.0, 30000.0, hc));
+  if (mlim < -2.0) return vec3(0.0);
+  // the cell this pixel's direction falls in (sky.cpp starCell, exactly)
+  vec3 e = uSkyRot*rd, a = abs(e);
+  int face; vec2 uv;
+  if (a.x >= a.y && a.x >= a.z) { face = e.x > 0.0 ? 0 : 1; uv = e.yz/a.x; }
+  else if (a.y >= a.z) { face = e.y > 0.0 ? 2 : 3; uv = e.xz/a.y; }
+  else { face = e.z > 0.0 ? 4 : 5; uv = e.xy/a.z; }
+  ivec2 c = clamp(ivec2(floor((uv*0.5 + 0.5)*float(uStarG))), ivec2(0), ivec2(uStarG - 1));
+  uvec2 oc = texelFetch(uStarCells, ivec2(face*uStarG + c.x, c.y), 0).xy;
+  float pix = 2.0*uTanHalf/uRes.y;   // (a pixel's angle)
+  float air = skyAir(rd.y, hc, R, 0.075, 0.0);   // (the air along the line of sight: the ground's zenith 0.68)
+  float ext = 0.25*air, tw = 0.07*exp(-hc/8000.0)*min(air, 8.0);
+  vec3 sum = vec3(0.0);
+  for (int i = 0; i < 48; i++) {
+    if (uint(i) >= oc.y) break;
+    int k = 2*(int(oc.x) + i);
+    vec4 s0 = texelFetch(uStars, ivec2(k % uStarW, k/uStarW), 0);
+    float r = length(e - s0.xyz)/pix;
+    if (r > 3.5) continue;
+    float m = s0.w + ext, b = pow(10.0, 0.4*(mlim - m))*(1.0 - smoothstep(mlim, mlim + 1.0, m));
+    if (b <= 0.0) continue;
+    vec4 s1 = texelFetch(uStars, ivec2((k + 1) % uStarW, (k + 1)/uStarW), 0);
+    sum += s1.rgb*b*(1.0 + tw*sin(uTime*11.0 + s1.w*61.0)*sin(uTime*17.3 + s1.w*23.0))*exp(-r*r*0.78);   // (0.8 px: it outlasts the anti-aliasing)
+  }
+  // the Milky Way: a band about the galactic equator (its pole and centre in the equator's frame), brightest towards
+  // the centre in Sagittarius, mottled with its star clouds and dark lanes
+  vec3 ngp = vec3(-0.8676, -0.1981, 0.4560), gc = vec3(-0.0548, -0.8734, -0.4838);
+  float gb = dot(e, ngp), gl = atan(dot(e, cross(ngp, gc)), dot(e, gc));
+  float mott = moonNoise(vec2(gl*9.0, gb*30.0))*0.6 + moonNoise(vec2(gl*25.0, gb*80.0) + 5.0)*0.4;
+  float band = exp(-gb*gb/0.025)*(0.45 + 0.55*exp(-gl*gl/1.2))*(0.35 + 1.1*mott);
+  vec3 mw = vec3(0.85, 0.88, 1.0)*band*0.012*smoothstep(4.5, 6.3, mlim)*exp(-ext);
+  return sum*0.45*Ls + mw;
+}
+
 void main(){
   ivec2 px = ivec2(gl_FragCoord.xy);
   vec4 g0 = texelFetch(uGB0, px, 0);
@@ -175,7 +225,11 @@ void main(){
   // Capture before the sky/deferred branches. A geometric receiver plane avoids
   // treating scanned plaster relief as a different shadow slope in every pixel.
   vec3 receiverDx = dFdx(rd*g0.x), receiverDy = dFdy(rd*g0.x);
-  if (cls == GB_SKY) { gSunDir = sunDirUniform(); gSunCol = sunColUniform(); oColor = vec4(skyColorAt(rd, ro.y, uPlanetR), 1.0); oDepth = 1e6; oCloudMask = 1.0; return; }
+  if (cls == GB_SKY) {
+    gSunDir = sunDirUniform(); gSunCol = sunColUniform();
+    vec3 sky = skyColorAt(rd, ro.y, uPlanetR);
+    oColor = vec4(sky + skyDiscs(rd, sky, ro.y, uPlanetR) + starLight(rd, sky, ro.y), 1.0); oDepth = 1e6; oCloudMask = 1.0; return;
+  }
   float t = g0.x;
   // the round world (kPlanet): the point was drawn at ro + rd t; it is at p in the flat world - every lookup's, the
   // G-buffer's normal's - and it is shaded there, in its own level: the view and the sun turned as it sees them (so

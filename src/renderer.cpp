@@ -933,7 +933,7 @@ bool Renderer::init(int w, int h, const std::function<void(float, const std::str
   genMinimap(); ready("Preparing scenery meshes");
   if (!initEntities()) return false;
   ready("Preparing terrain geometry");
-  initTerrainMesh(); ready("Allocating render targets");
+  initTerrainMesh(); initStars(); ready("Allocating render targets");
   W = w; H = h;
   createTargets(); ready("Renderer ready");
   ok = true;
@@ -1105,6 +1105,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUseProgram(p);
   glUniform1f(U(p, "uPlanetR"), fp.pano > 0.f ? 0.f : planetRadius());   // (the round world: planet.h; a panorama feed's camera keeps it flat)
   glUniform1f(U(p, "uSunDim"), fp.sunDim);
+  { const vec3 m = normalize(fp.moonDir); glUniform3f(U(p, "uMoonDir"), m.x, m.y, m.z); glUniform1f(U(p, "uMoonLit"), fp.moonLit); }   // (the moon: sky.h)
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(U(p, "uAlb"), 1);
   glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D_ARRAY, texNrm); glUniform1i(U(p, "uNrm"), 2);

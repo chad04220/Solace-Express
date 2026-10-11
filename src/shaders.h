@@ -59,7 +59,7 @@ inline std::string terrainFSAssembly(const std::string& defines) {
 }
 inline std::string waterVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + "#define ROUND_WORLD\n" + kPlanet + kWaterVS; }
 inline std::string waterFSAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + "#define ENV_MATERIALS\n#define LOCAL_SUN\n#define ROUND_WORLD\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kMaterialCommon + kPlanet + kLightCommon + kClouds + kWater + kGBuffer + kGBWrite + kWaterFS;
+  return std::string("#version 330 core\n") + defines + "#define ENV_MATERIALS\n#define LOCAL_SUN\n#define ROUND_WORLD\n#define SKY_BODIES\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kMaterialCommon + kPlanet + kLightCommon + kClouds + kWater + kGBuffer + kGBWrite + kWaterFS;
 }
 // the objects pass: the aircraft, traffic, debris and UFO fields marched into the G-buffer (no terrain, no clouds)
 inline std::string objectsFSAssembly(const std::string& defines) {
@@ -118,5 +118,5 @@ inline std::string postFSAssembly() { return std::string("#version 330 core\n") 
 inline std::string uiFSAssembly() { return std::string("#version 330 core\n") + kGLens + kUIFS; }
 inline std::string propDiscFSAssembly() { return std::string("#version 330 core\n") + kPropellerGLSL + kPropDiscFS; }
 inline std::string lightFSAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + "#define LOCAL_SUN\n#define ROUND_WORLD\n" + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kRoads + kMaterialCommon + kPlanet + kLightCommon + kClouds + kGBuffer + kLightFS;
+  return std::string("#version 330 core\n") + defines + "#define LOCAL_SUN\n#define ROUND_WORLD\n#define SKY_BODIES\n" + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kRoads + kMaterialCommon + kPlanet + kLightCommon + kClouds + kGBuffer + kLightFS;
 }

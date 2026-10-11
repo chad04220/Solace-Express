@@ -42,7 +42,7 @@ set(CORE_ONLY_SOURCES
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
 set(GAME_ONLY_SOURCES
   src/aircraft_mesh_asset.cpp
-  src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_wraith.cpp src/renderer.cpp src/materials.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp)
+  src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_wraith.cpp src/renderer.cpp src/materials.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp src/sky.cpp)
 set(GAME_SOURCES ${CORE_SOURCES} src/entity_mesh.cpp src/bridge_mesh.cpp ${GAME_ONLY_SOURCES})
 add_library(env_objs OBJECT ${ENVIRONMENT_SOURCES})
 add_library(core_objs OBJECT ${CORE_ONLY_SOURCES})
