@@ -18,7 +18,8 @@ const int P_PAINT=21, P_STRIPE=22, P_SOCK=23, P_BEACON=24, P_FENCE=25, P_OBST=26
 const int K_HANGAR=36, K_ARCH=37, K_THANGAR=38, K_TERMINAL=39, K_CTRL=40, K_FBO=41, K_FUELTANK=42, K_PUMP=43, K_WINDSOCK=44, K_BEACON=45;
 const int K_GAPLANE=46, K_AIRLINER=47, K_JETBRIDGE=48, K_CAR=49, K_TRUCK=50, K_FENCE=51, K_LOC=52, K_RADAR=53, K_MAST=54, K_FLOOD=55;
 const int K_LAMPPOST=56, K_RAIL=57, K_ROADSIGN=58, K_POLE=59;   // (road furniture)
-const int K_WINDTURBINE=60, K_SHIPWRECK=61, K_PLATFORM=62, K_BRIDGE=63;   // (landmarks; the bridges after every kind)
+const int K_WINDTURBINE=60, K_SHIPWRECK=61, K_PLATFORM=62, K_OBSERVATORY=63, K_STARFORT=64, K_JETTY=65;   // (landmarks)
+const int K_BRIDGE=66;   // (the bridges, after every kind)
 const int P_WIRE=40;   // a utility pole's wires (entity_mesh.h)
 const int P_BLADE=41;  // a wind turbine's blades (entity_mesh.h)
 const int P_DECK=33;   // a bridge deck's road surface, P_DECK + its road class (bridge_mesh.h): vAux.zw across and along it (m)

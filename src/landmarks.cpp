@@ -151,6 +151,97 @@ void offshorePlatform(const World& world, std::vector<PlacedEnt>& out) {
   if (best > 1e8f) return;
   out.push_back({EK_PLATFORM, {at.x, 0.f, at.y, hash2i((int)at.y, (int)at.x) * 6.2832f, 1.f, 1.f, 1.f, 0.5f}});
 }
+
+// The Kaleo observatory: three telescope domes along the rim of Mount Kaleo's crater, where the rim is highest, 2.5 km
+// and more from the crater field's runway, each on its own ground and facing out over the island; a clearing of 18 m
+void observatory(const World& world, std::vector<PlacedEnt>& out) {
+  const vec2 cone(25000.f, -9000.f);   // (world.cpp kCones: Mount Kaleo)
+  float best = -1e9f, bestA = 0.f, bestR = 0.f;
+  for (int a = 0; a < 144; a++)
+    for (float r = 250.f; r <= 1500.f; r += 25.f) {
+      const vec2 p = cone + vec2(cosf(a * 0.0436f), sinf(a * 0.0436f)) * r;
+      const float g = baseAt(world, p.x, p.y);
+      if (g > best && clearOfRunways(world, p.x, p.y, 2500.f)) { best = g; bestA = a * 0.0436f; bestR = r; }
+    }
+  if (best < 500.f) return;
+  const float da[3] = {0.f, 0.13f, -0.12f}, size[3] = {1.f, 0.8f, 1.15f};
+  for (int i = 0; i < 3; i++) {
+    // (along the rim: at each angle the radius where it's highest, near the first's)
+    const float a = bestA + da[i];
+    float hi = -1e9f, rr = bestR;
+    for (float r = std::max(bestR - 150.f, 250.f); r <= bestR + 150.f; r += 10.f) {
+      const float g = baseAt(world, cone.x + cosf(a) * r, cone.y + sinf(a) * r);
+      if (g > hi) { hi = g; rr = r; }
+    }
+    const vec2 p = cone + vec2(cosf(a), sinf(a)) * rr, outward(cosf(a), sinf(a));
+    if (!clearOfRunways(world, p.x, p.y, 2500.f)) continue;
+    float lo = 1e9f;
+    for (int k = 0; k < 8; k++) lo = std::min(lo, world.groundHeight(p.x + 7.f * size[i] * cosf(k * 0.785f), p.y + 7.f * size[i] * sinf(k * 0.785f), 8));
+    out.push_back({EK_OBSERVATORY, {p.x, lo, p.y, atan2f(outward.x, outward.y), size[i], size[i], size[i], 0.5f}});
+    g_clearings.push_back(vec3(p.x, p.y, 18.f));
+  }
+}
+
+// The star fort: on a cape - water two thirds of the way round it 350 m out, low (5 to 35 m up), level enough for the
+// fort (6 m at the most across 130 m) - out of the settlements, off the roads, 2.5 km and more from the runways; the
+// most surrounded by the sea of such places. Its clearing 75 m
+void starFort(const World& world, std::vector<PlacedEnt>& out) {
+  float best = -1e9f; vec2 at;
+  for (float z = -WORLD_HALF + 1000.f; z < WORLD_HALF - 1000.f; z += 100.f)
+    for (float x = -WORLD_HALF + 1000.f; x < WORLD_HALF - 1000.f; x += 100.f) {
+      const float g = baseAt(world, x, z);
+      if (g < 5.f || g > 35.f) continue;
+      int sea = 0;
+      for (int k = 0; k < 16; k++) sea += baseAt(world, x + 350.f * cosf(k * 0.3927f), z + 350.f * sinf(k * 0.3927f)) < 0.f;
+      if (sea < 10 || sea <= best) continue;
+      float lo = 1e9f, hi = -1e9f;
+      for (int k = 0; k < 12; k++) {
+        const float h = world.groundHeight(x + 66.f * cosf(k * 0.5236f), z + 66.f * sinf(k * 0.5236f), 8);
+        lo = std::min(lo, h); hi = std::max(hi, h);
+      }
+      if (lo < 2.f || hi - lo > 6.f) continue;
+      if (!clearOfRunways(world, x, z, 2500.f) || settlementShare(world.settlements, x, z) < 1.3f || roadEdgeDistance(world.roadGrid, x, z) < 90.f) continue;
+      best = (float)sea; at = vec2(x, z);
+    }
+  if (best < 0.f) return;
+  float lo = 1e9f;
+  for (int k = 0; k < 12; k++) lo = std::min(lo, world.groundHeight(at.x + 40.f * cosf(k * 0.5236f), at.y + 40.f * sinf(k * 0.5236f), 8));
+  out.push_back({EK_STARFORT, {at.x, lo, at.y, hash2i((int)at.x, (int)at.y) * 6.2832f, 1.f, 1.f, 1.f, 0.5f}});
+  g_clearings.push_back(vec3(at.x, at.y, 75.f));
+}
+
+// Lighthouse Key: the keepers' two cottages behind the light, landward, and the landing stage on the nearest shore - its
+// deck from the land (the ground there 0.3 to 2.5 m up: the stage raised to meet it) out 45 m over water 1 m deep and more
+void lighthouseKey(const World& world, std::vector<PlacedEnt>& out) {
+  float lx, lz, yaw;
+  if (!findLighthouseSite(world, lx, lz, yaw)) return;
+  const vec2 L(lx, lz), seaward(sinf(yaw), cosf(yaw)), side(-seaward.y, seaward.x);
+  for (float sd : {-1.f, 1.f}) {
+    const vec2 c = L - seaward * 34.f + side * (sd * 11.f);
+    float lo = 1e9f;
+    for (int k = 0; k < 4; k++) lo = std::min(lo, world.groundHeight(c.x + ((k & 1) ? 5.f : -5.f), c.y + ((k & 2) ? 5.f : -5.f), 8));
+    if (lo < 2.f) continue;
+    out.push_back({EK_HOUSE_HIP, {c.x, lo - 0.05f, c.y, atan2f(seaward.x, seaward.y), 0.85f, 1.f, 0.85f, 0.3f + 0.4f * (sd > 0.f)}});
+    g_clearings.push_back(vec3(c.x, c.y, 12.f));
+  }
+  float best = 1e9f; vec2 shore, dir;
+  for (float r = 40.f; r <= 450.f; r += 10.f)
+    for (int a = 0; a < 72; a++) {
+      const vec2 u(cosf(a * 0.0873f), sinf(a * 0.0873f)), s = L + u * r;
+      const float g = world.groundHeight(s.x, s.y, 8);
+      if (g < 0.3f || g > 2.5f || r >= best) continue;
+      for (int b = 0; b < 24; b++) {   // (out over the water)
+        const vec2 d(cosf(b * 0.2618f), sinf(b * 0.2618f));
+        bool ok = world.groundHeight(s.x + d.x * 8.f, s.y + d.y * 8.f, 8) < 0.f;
+        for (float t = 15.f; t <= 45.f && ok; t += 6.f) ok = world.groundHeight(s.x + d.x * t, s.y + d.y * t, 8) < -1.f;
+        if (ok) { best = r; shore = s; dir = d; break; }
+      }
+    }
+  if (best > 1e8f) return;
+  const vec2 c = shore + dir * 19.5f;   // (its deck's landward 6 m over the shore)
+  const float lift = std::max(0.f, world.groundHeight(shore.x, shore.y, 8) - 1.3f);
+  out.push_back({EK_JETTY, {c.x, lift, c.y, atan2f(dir.x, dir.y), 1.f, 1.f, 1.f, 0.5f}});
+}
 }  // namespace
 
 void sceneryBakeLandmarks(const World& world) {
@@ -160,6 +251,9 @@ void sceneryBakeLandmarks(const World& world) {
   stoneCircle(world, out);
   shipwreck(world, out);
   offshorePlatform(world, out);
+  observatory(world, out);
+  starFort(world, out);
+  lighthouseKey(world, out);
   g_landmarks.build(out);
 }
 

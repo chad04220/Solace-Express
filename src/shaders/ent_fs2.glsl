@@ -423,7 +423,36 @@ void main(){
     float s2 = fract(seed*13.31), s3 = fract(seed*3.77);
     vec3 livery = s3 < 0.5 ? pal(s3*2.0, vec3(0.7, 0.07, 0.06), vec3(0.06, 0.2, 0.55), vec3(0.05, 0.4, 0.2), vec3(0.9, 0.5, 0.05))
                            : pal(s3*2.0 - 1.0, vec3(0.04, 0.08, 0.25), vec3(0.0, 0.45, 0.5), vec3(0.45, 0.06, 0.25), vec3(0.15, 0.15, 0.17));
-    if (uKind == K_SHIPWRECK) {   // a wreck: rust through the old black paint, white gone to grey on her house, weed below the tide
+    if (uKind == K_OBSERVATORY) {   // an observatory: its drum and building rendered white, its dome silver, the slit open on its face
+      if (part == P_ROOF) {
+        alb = vec3(0.86, 0.87, 0.88); metal = 0.55; rough = 0.22;
+        if (abs(atan(mp.x, mp.z)) < 0.11 && mp.y > 8.6) { alb = vec3(0.02); metal = 0.0; rough = 0.9; }
+      } else if (part == P_WALL) { alb = triS(lp, n0, M_PLASTER, 2.5, 0.6, nb, rough)*vec3(0.93, 0.92, 0.9); }
+      else if (part == P_GLASS) { alb = vec3(0.05, 0.07, 0.09); rough = 0.1; cls = 3.0; nb = n0; emit = vec3(1.0, 0.85, 0.6)*uNight*0.4; }
+      else if (part == P_DOOR) { alb = vec3(0.35, 0.36, 0.38); rough = 0.4; }
+      else if (part == P_METAL) { alb = vec3(0.6); metal = 0.7; rough = 0.3; }
+      else alb = triS(lp, n0, M_CONCRETE, 3.0, 0.5, nb, rough)*0.8;
+      if (uSnow > 0.05) alb = mix(alb, vec3(0.92), smoothstep(0.5, 0.9, n0.y)*uSnow*0.7);
+    } else if (uKind == K_STARFORT) {   // a star fort: weathered stone, grass along the ramparts' tops, the barracks whitewashed under slate
+      if (part == P_BRICK) {
+        float lum = dot(triS(lp, n0, M_BRICK, 1.8, 0.6, nb, rough), vec3(0.3, 0.55, 0.15));
+        alb = vec3(0.58, 0.55, 0.49)*(0.55 + 0.7*lum)*(0.85 + 0.25*vn3(lp*0.35));
+        alb *= mix(0.75, 1.0, smoothstep(-1.0, 1.5, mp.y));   // (damp at its foot)
+        rough = 0.85;
+      } else if (part == P_AWNING) { alb = triS(lp, n0, M_GRASS, 3.0, 0.8, nb, rough)*vec3(0.85, 1.0, 0.75); rough = 0.9; }
+      else if (part == P_WALL) { alb = triS(lp, n0, M_PLASTER, 2.5, 0.6, nb, rough)*vec3(0.92, 0.91, 0.87); }
+      else if (part == P_ROOF) { alb = triS(lp, n0, M_SLATE, 2.0, 0.5, nb, rough)*vec3(0.55, 0.57, 0.6); }
+      else if (part == P_STRIPE) {   // the flag: blue, a white Scandinavian cross
+        vec2 f = vec2(mp.x + 4.0, mp.y - 14.9);
+        alb = (abs(f.x - 1.1) < 0.18 || abs(f.y - 0.95) < 0.18) ? vec3(0.92) : vec3(0.08, 0.2, 0.55); rough = 0.8;
+      } else if (part == P_METAL) { alb = vec3(0.85); rough = 0.4; }
+      else alb = vec3(0.03);
+    } else if (uKind == K_JETTY) {   // a landing stage: weathered timber, the boat's hull blue with a white band, her wheelhouse white
+      if (part == P_WOOD) { alb = vec3(0.42, 0.38, 0.33)*(0.75 + 0.35*vn3(vec3(lp.x*6.0, lp.y*0.6, lp.z*0.4))); alb *= mix(0.45, 1.0, smoothstep(-0.3, 1.2, wy)); rough = 0.9; }
+      else if (part == P_PAINT) { alb = mp.y > 0.45 ? vec3(0.88, 0.88, 0.86) : vec3(0.1, 0.25, 0.55); alb *= mix(0.6, 1.0, smoothstep(-0.2, 0.3, wy)); rough = 0.4; }
+      else if (part == P_WALL) { alb = vec3(0.9, 0.9, 0.87); rough = 0.5; }
+      else { alb = vec3(0.12); metal = 0.6; rough = 0.5; }
+    } else if (uKind == K_SHIPWRECK) {   // a wreck: rust through the old black paint, white gone to grey on her house, weed below the tide
       float rust = smoothstep(0.4, 0.8, vn3(lp*vec3(0.22, 0.55, 0.22)) + 0.35*vn3(lp*1.9) + (part == P_PAINT ? 0.0 : 0.18));
       vec3 coat = part == P_WALL ? vec3(0.66, 0.64, 0.58) : part == P_PAINT ? vec3(0.07, 0.07, 0.075) : vec3(0.28, 0.26, 0.24);
       alb = mix(coat, mix(vec3(0.34, 0.15, 0.06), vec3(0.52, 0.27, 0.1), vn3(lp*2.3)), rust);

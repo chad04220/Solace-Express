@@ -120,6 +120,7 @@ const EntKindInfo kEntInfo[EK_COUNT] = {
   {"Street lamp", 0.3f, 10.f, 1.f}, {"Guardrail", 8.f, 0.9f, 0.2f}, {"Road sign", 1.3f, 3.f, 0.12f}, {"Utility pole", 1.05f, 9.f, 0.2f},
   {"Wind turbine", 2.5f, 138.f, 2.5f},   // (its tower: the rotor, 46 m round the hub at 92 m, isn't solid)
   {"Shipwreck", 7.f, 22.f, 37.f}, {"Offshore platform", 22.f, 80.f, 22.f},   // (the wreck from its keel; the platform from the sea)
+  {"Observatory", 9.f, 14.5f, 6.5f}, {"Star fort", 62.f, 8.2f, 62.f}, {"Landing stage", 5.5f, 2.6f, 25.5f},
 };
 
 static inline float h2(int a, int b) { return hash2i(a, b); }
@@ -191,6 +192,25 @@ bool Scenery::damage(const Ent& e, int kind, int amount) {
 }
 
 // ------------------------------------------------------------------ placement helpers
+// The lighthouse on Lighthouse Key: the low land point nearest the sea around the village (3 to 16 m up, the sea 45 m
+// on beyond it), and the way it looks out to sea
+bool findLighthouseSite(const World& world, float& lx, float& lz, float& yaw) {
+  const Town* T = nullptr;
+  for (int i = 0; i < kNumTowns; i++) if (!strcmp(kTowns[i].name, "Lighthouse Key")) T = &kTowns[i];
+  if (!T) return false;
+  auto ground = [&](float x, float z) { return world.groundHeight(x, z, 7); };
+  float best = 1e9f;
+  for (float r = 80.f; r <= 700.f; r += 20.f)
+    for (int a = 0; a < 72; a++) {
+      float ang = a * 5.f * DEG, dx = cosf(ang), dz = sinf(ang);
+      float x = T->x + dx * r, z = T->z + dz * r, g = ground(x, z);
+      if (g < 3.f || g > 16.f || ground(x + dx * 45.f, z + dz * 45.f) > -0.5f) continue;
+      float score = r * 0.02f + fabsf(g - 7.f);
+      if (score < best) { best = score; lx = x; lz = z; yaw = atan2f(dx, dz); }
+    }
+  return best < 1e8f;
+}
+
 namespace {
 struct Ctx {
   std::vector<Ent>* out[EK_COUNT];
@@ -225,25 +245,11 @@ void putBuilding(Ctx& C, int kind, float x, float z, float yaw, float hw, float 
 
 // The lighthouse stands on the shore of Lighthouse Key: the low land point nearest the sea around the village
 bool lighthouseSite(float& lx, float& lz, float& yaw) {
-  static int state = 0; static float sx = 0, sz = 0, sy = 0;
+  static bool found = false; static float sx = 0, sz = 0, sy = 0;
   static std::once_flag once;   // (the scenery workers ask at the same time: found once, then only read)
-  std::call_once(once, [&] {
-    state = 2;
-    const Town* T = nullptr;
-    for (int i = 0; i < kNumTowns; i++) if (!strcmp(kTowns[i].name, "Lighthouse Key")) T = &kTowns[i];
-    float best = 1e9f;
-    if (T)
-      for (float r = 80.f; r <= 700.f; r += 20.f)
-        for (int a = 0; a < 72; a++) {
-          float ang = a * 5.f * DEG, dx = cosf(ang), dz = sinf(ang);
-          float x = T->x + dx * r, z = T->z + dz * r, g = ground(x, z);
-          if (g < 3.f || g > 16.f || ground(x + dx * 45.f, z + dz * 45.f) > -0.5f) continue;
-          float score = r * 0.02f + fabsf(g - 7.f);
-          if (score < best) { best = score; sx = x; sz = z; sy = atan2f(dx, dz); state = 1; }
-        }
-  });
+  std::call_once(once, [&] { found = findLighthouseSite(g_world, sx, sz, sy); });
   lx = sx; lz = sz; yaw = sy;
-  return state == 1;
+  return found;
 }
 
 // tree species for a site
@@ -254,6 +260,7 @@ int treeSpecies(float g, float lush, float cold, float sp, float sp2) {
   return sp2 < 0.58f ? EK_OAK : sp2 < 0.84f ? EK_BIRCH : sp2 < 0.9f ? EK_PINE : EK_FIR;
 }
 }  // namespace
+
 
 // ------------------------------------------------------------------ chunk generation
 void Scenery::generate(Chunk& ch, int cx, int cz, int level) {

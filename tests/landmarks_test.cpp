@@ -1,12 +1,14 @@
 // The landmarks (landmarks.cpp; docs/LIVING_ISLANDS_PLAN.md, Phase C), each where the world has room for it. A stone
 // circle on a bare summit, its stones standing (two fallen) round a clearing no tree grows in; a wreck on a reef in
-// warm shallows, open water round her; an offshore platform in deep water out of sight of no land. The wind
+// warm shallows, open water round her; an offshore platform in deep water out of sight of no land; three observatory
+// domes on Mount Kaleo's rim; a star fort on a cape; Lighthouse Key's cottages and landing stage. The wind
 // farm: a row of turbines along a ridge's crest, 300 m and more apart, on the hills under the snow, out of the settlements, off the
 // roads and 6 km or more from every runway; each in its own chunk's scenery; found the same every time.
 #include "../src/scenery.h"
 #include "../src/entities.h"
 #include "../src/settlements.h"
 #include "test_world.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -86,6 +88,36 @@ int main() {
     }
   }
   check(wrecks == 1 && platforms == 1, "a wreck and a platform");
+  // the observatory's domes on Mount Kaleo's rim, clear of the crater field's runway; the star fort on a cape, its site
+  // level; Lighthouse Key's cottages behind the light, its landing stage from the land out over the water
+  int domes = 0, forts = 0, jetties = 0, cottages = 0;
+  float lx = 0, lz = 0, ly = 0; const bool light = findLighthouseSite(w, lx, lz, ly);
+  for (const PlacedEnt& p : items) {
+    const Ent& e = p.e;
+    if (p.kind == EK_OBSERVATORY) {
+      domes++;
+      const float r = hypotf(e.x - 25000.f, e.z + 9000.f);
+      check(r > 250.f && r < 1700.f && e.y > 1500.f, "a dome on Mount Kaleo's rim");
+      for (const Airport& a : w.airports) check(hypotf(e.x - a.x, e.z - a.z) >= 2500.f, "a dome clear of the runways");
+      check(e.y <= w.groundHeight(e.x, e.z) + 0.01f, "a dome on its ground (its drum's foot at the lowest)");
+    }
+    if (p.kind == EK_STARFORT) {
+      forts++;
+      int sea = 0; float lo = 1e9f, hi = -1e9f;
+      for (int k = 0; k < 16; k++) { float b[4]; w.sampleBase(e.x + 350.f * cosf(k * 0.3927f), e.z + 350.f * sinf(k * 0.3927f), b); sea += b[0] < 0.f; }
+      for (int k = 0; k < 12; k++) { const float h = w.groundHeight(e.x + 66.f * cosf(k * 0.5236f), e.z + 66.f * sinf(k * 0.5236f)); lo = std::min(lo, h); hi = std::max(hi, h); }
+      check(sea >= 10 && lo >= 2.f && hi - lo <= 6.f, "the star fort on a cape, its site dry and level");
+      check(roadEdgeDistance(w.roadGrid, e.x, e.z) >= 90.f && settlementShare(w.settlements, e.x, e.z) >= 1.3f, "the star fort off the roads, out of the settlements");
+    }
+    if (p.kind == EK_HOUSE_HIP && light && hypotf(e.x - lx, e.z - lz) < 60.f) cottages++;
+    if (p.kind == EK_JETTY) {
+      jetties++;
+      const float dx = sinf(e.yaw), dz = cosf(e.yaw);
+      check(w.groundHeight(e.x - dx * 21.f, e.z - dz * 21.f) > 0.f && w.groundHeight(e.x + dx * 24.f, e.z + dz * 24.f) < -1.f, "the landing stage from the land out over the water");
+      check(light && hypotf(e.x - lx, e.z - lz) < 500.f, "the landing stage by the light");
+    }
+  }
+  check(domes == 3 && forts == 1 && jetties == 1 && cottages == 2, "the observatory's three domes, a star fort, Lighthouse Key's cottages and landing stage");
   // in their chunks' scenery, as generated
   for (size_t i = 0; i < turbines.size(); i += 3) {
     const Ent& t = turbines[i];
@@ -103,8 +135,8 @@ int main() {
   if (!turbines.empty()) std::printf("wind farm: %zu turbines, from %.0f %.0f (%.0f m) to %.0f %.0f, facing %.0f deg\n", turbines.size(), turbines.front().x, turbines.front().z,
                                      turbines.front().y, turbines.back().x, turbines.back().z, turbines.front().yaw * 57.2958f);
   for (const PlacedEnt& p : items)
-    if (p.kind == EK_SHIPWRECK || p.kind == EK_PLATFORM || (p.kind == EK_SLAB && p.e.sx > 1.f))
-      std::printf("%s at %.0f %.0f (%.1f m)\n", p.kind == EK_SHIPWRECK ? "wreck" : p.kind == EK_PLATFORM ? "platform" : "stone circle", p.e.x, p.e.z, p.e.y);
+    if (p.kind == EK_SHIPWRECK || p.kind == EK_PLATFORM || (p.kind == EK_SLAB && p.e.sx > 1.f) || p.kind >= EK_OBSERVATORY || p.kind == EK_HOUSE_HIP)
+      std::printf("%s at %.0f %.0f (%.1f m), facing %.0f\n", kEntInfo[p.kind].name, p.e.x, p.e.z, p.e.y, p.e.yaw * 57.3f);
   std::printf("landmarks: %zu placed; %d checks, %d failures\n", items.size(), checks, failures);
   return failures ? 1 : 0;
 }

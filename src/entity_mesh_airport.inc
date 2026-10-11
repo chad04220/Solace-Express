@@ -1089,6 +1089,85 @@ void buildAirportKind(MB& mb, int kind, int lod) {
       paint(at, 1.f);
       break;
     }
+    case EK_OBSERVATORY: {   // a telescope's dome on its drum - the drum 12 m across and 8 m high, the dome over it (its slit facing
+      // +z: the shader's) - and the control building beside it
+      const int sg = lod == 3 ? 40 : lod == 0 ? 28 : lod == 1 ? 18 : 10, bands = lod == 3 ? 12 : lod == 0 ? 8 : lod == 1 ? 5 : 3;
+      mb.cyl(vec3(0, -1.5f, 0), vec3(0, 8.f, 0), 6.f, 6.f, sg, P_WALL, false, false);
+      auto P = [&](float a, float b) { return vec3(6.15f * cosf(a) * sinf(b), 8.f + 6.15f * sinf(a), 6.15f * cosf(a) * cosf(b)); };
+      for (int i = 0; i < bands; i++) {
+        const float a0 = 1.5708f * i / bands, a1 = 1.5708f * (i + 1) / bands;
+        for (int k = 0; k < sg; k++) {
+          const float b0 = 6.2832f * k / sg, b1 = 6.2832f * (k + 1) / sg;
+          if (i + 1 == bands) mb.tri(P(a0, b0), P(a0, b1), P(a1, 0.f), P_ROOF, vec3(0, 8.f, 0));
+          else mb.quad(P(a0, b0), P(a0, b1), P(a1, b1), P(a1, b0), P_ROOF, vec3(0, 8.f, 0));
+        }
+      }
+      mb.box(vec3(-15.f, -1.f, -4.f), vec3(-6.f, 4.f, 4.f), P_WALL, 0x3B);
+      mb.box(vec3(-15.3f, 4.f, -4.3f), vec3(-5.7f, 4.4f, 4.3f), P_TRIM, 0x3F);
+      mb.box(vec3(-12.f, 0.f, 4.f), vec3(-10.6f, 2.3f, 4.06f), P_DOOR, 32);
+      if (d1) mb.cyl(vec3(-13.f, 4.4f, -2.f), vec3(-13.f, 9.f, -2.f), 0.05f, 0.05f, 4, P_METAL, false, true);   // (an antenna)
+      if (lod == 3) {   // (up close: the dome's track ring, the drum's plinth, the building's windows)
+        mb.cyl(vec3(0, 7.85f, 0), vec3(0, 8.15f, 0), 6.3f, 6.3f, sg, P_METAL, false, false);
+        mb.cyl(vec3(0, -1.5f, 0), vec3(0, 0.6f, 0), 6.35f, 6.35f, sg, P_TRIM, true, false);
+        for (float z : {-2.5f, 0.5f}) mb.box(vec3(-15.06f, 1.4f, z), vec3(-15.f, 2.8f, z + 1.6f), P_GLASS, 1);
+      }
+      break;
+    }
+    case EK_STARFORT: {   // a bastioned fort 124 m across: five bastions and the curtains between them, their ramparts 7 m high -
+      // the scarp battered, a parapet along its crest, the rampart's top grassed (P_AWNING) - the gatehouse, two barracks, the
+      // magazine and the flagstaff
+      std::vector<vec2> trace;
+      const float da[5] = {-0.35f, -0.26f, 0.f, 0.26f, 0.35f}, dr[5] = {36.f, 45.f, 62.f, 45.f, 36.f};
+      for (int i = 0; i < 5; i++) for (int k = 0; k < 5; k++) { const float a = i * 1.2566f + da[k]; trace.push_back(vec2(sinf(a), cosf(a)) * dr[k]); }
+      auto in = [&](vec2 p, float d) { return p * ((length(p) - d) / length(p)); };
+      auto at = [&](vec2 p, float y) { return vec3(p.x, y, p.y); };
+      const size_t n = trace.size();
+      for (size_t k = 0; k < n; k++) {
+        const vec2 a = trace[k], b = trace[(k + 1) % n], m = (a + b) * 0.5f;
+        const vec3 outside = at(m * 3.f, 4.f), inside = vec3(0, 4.f, 0);
+        mb.quad(at(a, -3.f), at(b, -3.f), at(in(b, 2.5f), 7.f), at(in(a, 2.5f), 7.f), P_BRICK, inside);                  // the scarp
+        mb.quad(at(in(a, 2.5f), 7.f), at(in(b, 2.5f), 7.f), at(in(b, 2.5f), 8.2f), at(in(a, 2.5f), 8.2f), P_BRICK, inside);   // the parapet
+        mb.quad(at(in(a, 2.5f), 8.2f), at(in(b, 2.5f), 8.2f), at(in(b, 3.5f), 8.2f), at(in(a, 3.5f), 8.2f), P_BRICK, vec3(0, -10.f, 0));
+        mb.quad(at(in(a, 3.5f), 8.2f), at(in(b, 3.5f), 8.2f), at(in(b, 3.5f), 7.f), at(in(a, 3.5f), 7.f), P_BRICK, outside);
+        mb.quad(at(in(a, 3.5f), 7.f), at(in(b, 3.5f), 7.f), at(in(b, 10.f), 7.f), at(in(a, 10.f), 7.f), P_AWNING, vec3(0, -10.f, 0));   // the rampart's top
+        mb.quad(at(in(a, 10.f), 7.f), at(in(b, 10.f), 7.f), at(in(b, 10.f), -1.f), at(in(a, 10.f), -1.f), P_BRICK, outside);       // its inner face
+        if (lod == 3 && k % 5 == 2)   // (up close: a gun on each bastion's point)
+          mb.cyl(at(in(a, 4.5f), 7.6f), at(in(a, 2.2f), 7.9f), 0.22f, 0.18f, 8, P_DARK, true, true);
+      }
+      const vec2 g = (trace[4] + trace[5]) * 0.5f, gd = g * (1.f / length(g));   // the gatehouse, astride a curtain
+      const size_t g0 = mb.o.size();
+      mb.box(vec3(-5.f, -1.f, -9.f), vec3(5.f, 10.f, 1.5f), P_BRICK, 0x3B);
+      mb.box(vec3(-2.f, -1.f, 1.5f), vec3(2.f, 4.5f, 1.56f), P_DARK, 32);
+      mb.gable(-5.4f, 5.4f, -9.4f, 1.9f, 10.f, 12.5f, true, 0.f, P_ROOF, P_BRICK);
+      { const float c = gd.y, s = gd.x;   // (turned to face out of the fort along the curtain's normal, moved onto it)
+        for (size_t i = g0; i < mb.o.size(); i++) { EVert& v = mb.o[i];
+          const float x = v.px, z = v.pz, nx = v.nx, nz = v.nz;
+          v.px = c * x + s * z + g.x; v.pz = -s * x + c * z + g.y; v.nx = c * nx + s * nz; v.nz = -s * nx + c * nz; } }
+      for (float z : {-22.f, 14.f}) {   // the barracks: whitewashed, slate-roofed
+        mb.box(vec3(-18.f, -1.f, z), vec3(18.f, 6.f, z + 8.f), P_WALL, 0x3B);
+        mb.gable(-18.4f, 18.4f, z - 0.4f, z + 8.4f, 6.f, 8.6f, false, d1 ? 0.4f : 0.f, P_ROOF, P_WALL);
+      }
+      mb.box(vec3(8.f, -1.f, -6.f), vec3(15.f, 4.f, 2.f), P_BRICK, 0x3B);   // the magazine
+      mb.gable(7.6f, 15.4f, -6.4f, 2.4f, 4.f, 6.f, true, 0.f, P_ROOF, P_BRICK);
+      mb.cyl(vec3(-4.f, -1.f, 0.f), vec3(-4.f, 17.f, 0.f), 0.13f, 0.08f, d0 ? 8 : 4, P_METAL, false, true);   // the flagstaff and its flag
+      mb.quad(vec3(-4.f, 14.9f, 0.f), vec3(-1.f, 14.9f, 0.f), vec3(-1.f, 16.8f, 0.f), vec3(-4.f, 16.8f, 0.f), P_STRIPE, vec3(-2.5f, 16.f, 1.f));
+      mb.quad(vec3(-4.f, 14.9f, 0.f), vec3(-4.f, 16.8f, 0.f), vec3(-1.f, 16.8f, 0.f), vec3(-1.f, 14.9f, 0.f), P_STRIPE, vec3(-2.5f, 16.f, -1.f));
+      break;
+    }
+    case EK_JETTY: {   // a timber landing stage 3 m wide: from the shore (z -25.5, its first 6 m over the land) out 45 m over the
+      // water, its deck 1.6 m up on piles every 4 m, a rail along it, bollards at its head; a fishing boat moored alongside
+      mb.box(vec3(-1.5f, 1.35f, -25.5f), vec3(1.5f, 1.6f, 25.5f), P_WOOD, 0x3F);
+      for (float z = -19.f; z <= 25.f; z += 4.f) for (float x : {-1.35f, 1.35f}) mb.cyl(vec3(x, -4.f, z), vec3(x, 1.35f, z), 0.15f, 0.15f, d0 ? 8 : 4, P_WOOD, false, false);
+      if (d1) for (float x : {-1.42f, 1.42f}) {
+        mb.box(vec3(x - 0.05f, 2.45f, -19.f), vec3(x + 0.05f, 2.55f, 21.f), P_WOOD, 0x3F);
+        for (float z = -19.f; z <= 21.f; z += 4.f) mb.box(vec3(x - 0.05f, 1.6f, z - 0.05f), vec3(x + 0.05f, 2.45f, z + 0.05f), P_WOOD, 0x33);
+      }
+      for (float x : {-1.1f, 1.1f}) mb.cyl(vec3(x, 1.6f, 24.6f), vec3(x, 2.1f, 24.6f), 0.14f, 0.16f, d0 ? 10 : 6, P_METAL, false, true);
+      hullLoft(mb, 3.7f, 9.f, 19.f, 1.5f, -0.7f, 0.9f, lod == 3 ? 12 : lod == 0 ? 8 : 4, P_PAINT, P_WOOD);   // the boat
+      mb.box(vec3(2.8f, 0.9f, 14.f), vec3(4.6f, 2.6f, 16.5f), P_WALL, 0x3B | 8);
+      if (lod == 3) mb.cyl(vec3(3.7f, 2.6f, 15.f), vec3(3.7f, 5.5f, 15.f), 0.05f, 0.05f, 4, P_METAL, false, true);
+      break;
+    }
     case EK_POLE: {   // a wooden pole, a crossarm, three insulators; up close, its three wires to the next pole along +z
       mb.cyl(vec3(0, -0.5f, 0), vec3(0, 9.f, 0), 0.14f, 0.11f, d0 ? 10 : d1 ? 6 : 4, P_WOOD, true, false);
       mb.box(vec3(-1.05f, 8.15f, -0.06f), vec3(1.05f, 8.3f, 0.06f), P_WOOD, lod == 2 ? 8 | 16 | 32 : 0x3F);

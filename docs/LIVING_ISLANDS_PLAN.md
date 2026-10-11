@@ -104,6 +104,15 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   - The offshore platform stands in deep water 6 to 12 km from the nearest land. It has a yellow four-legged jacket,
     two decks of modules, the quarters (lit windows at night) under a marked helideck, a drilling derrick and a crane.
     Its flare burns at the end of its boom, flickering, and a red supply vessel lies off its west face.
+- **Phase C: the observatory, the star fort and Lighthouse Key (after v3.48).**
+  - Three telescope domes stand along Mount Kaleo's crater rim at about 2,010 m, where the rim is highest, 2.5 km and
+    more from the crater field's runway. Each is a white drum under a silver dome with its slit open, beside its
+    control building.
+  - The star fort stands on the cape most surrounded by the sea, level and dry, 124 m across. It has five bastions and
+    their curtains, stone ramparts 7 m high with a parapet and a grassed top, a gatehouse, two whitewashed barracks
+    under slate, a magazine, and its flag.
+  - Lighthouse Key now has its keepers' two cottages behind the light, and a timber landing stage on the nearest shore
+    with a fishing boat moored alongside.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

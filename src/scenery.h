@@ -52,6 +52,8 @@ void sceneryBakeLandmarks(const World& world);
 const std::vector<PlacedEnt>& landmarks();
 std::pair<const PlacedEnt*, const PlacedEnt*> landmarksIn(int cx, int cz);
 const std::vector<vec3>& landmarkClearings();
+// Lighthouse Key's light (entities.cpp): its place in that world, and which way it looks out to sea
+bool findLighthouseSite(const World& world, float& x, float& z, float& yaw);
 void sceneryInit();  // build shared road tables before any threaded use
 void sceneryBaseMod(float x, float z, float& h, float& amp);  // flatten roads / towns in the base map
 
