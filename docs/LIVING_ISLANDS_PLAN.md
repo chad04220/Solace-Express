@@ -284,6 +284,17 @@ harbours, trains if a line earns its place, lights coming on across the towns at
 Terrain materials, water, vegetation, clouds and lighting looked at again against the aircraft, scene by scene, from
 the cockpit at low level and from altitude.
 
+Done so far (after v3.48):
+
+- **The sea stacks** stood anywhere in 1 to 18 m of water: 266 of them, 21 off a steep shore. A dozen dark pillars
+  were scattered across the open bay south of Port Verde. Now a stack stands only off a cliffed shore
+  (`seaStackShore`): land within 220 m rising 14 m within 40 m of the water's edge, or 26 m within 100 m - a
+  headland, a cliff's foot. There are 126 of them, in small clusters at the foot of the steep coasts. `landmarks_test`
+  checks the bay is clear and every stack is off a cliff.
+
+Still to look at: the airfields' grass, flat and even from low level; the haze from altitude; forest edges, the water
+along the shore and the clouds, from the cockpit.
+
 ## Contracts kept throughout
 
 - Every runway, its markings, lights and approach surfaces exactly as they are (`runway_preservation_test`).

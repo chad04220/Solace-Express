@@ -52,6 +52,9 @@ void sceneryBakeLandmarks(const World& world);
 const std::vector<PlacedEnt>& landmarks();
 std::pair<const PlacedEnt*, const PlacedEnt*> landmarksIn(int cx, int cz);
 const std::vector<vec3>& landmarkClearings();
+// Whether a sea stack may stand at (x, z), in the sea: off a cliffed shore - land within 220 m of it rising 14 m within
+// 40 m of the water's edge (or 26 m within 100 m): a headland, a cliff's foot - never out in an open bay or off a beach
+bool seaStackShore(float x, float z);
 // The cities' landmarks, placed with their lots (sceneryBakeCommunityLots): Solace Capital's stadium, Port Verde's
 // container terminal - its quay, cranes, container stacks and a ship alongside
 const std::vector<PlacedEnt>& civicLandmarks();

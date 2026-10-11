@@ -466,6 +466,27 @@ int main() {
     check(badYacht == 0, "each yacht afloat in 1.2 to 7 m of water off a town, clear of the terminal's quay");
     check(crowded == 0 && inHarbour == 0 && over == 0, "the yachts 16 m apart, clear of the ferries' terminals and berths, a few to each town");
   }
+  // the sea stacks: off the cliffed shores alone - none out in the open bay south of Port Verde, a few at the foot of
+  // the steep eastern coast
+  {
+    int stacks = 0, offCliffs = 0, inBay = 0, east = 0;
+    auto scan = [&](float x0, float z0, float x1, float z1, bool eastern) {
+      for (int cz = Scenery::chunkOf(z0); cz <= Scenery::chunkOf(z1); cz++)
+        for (int cx = Scenery::chunkOf(x0); cx <= Scenery::chunkOf(x1); cx++) {
+          const Scenery::Chunk* ch = g_scenery.ensure(cx, cz, 2);
+          for (uint32_t n = ch->off[EK_SEASTACK]; n < ch->off[EK_SEASTACK + 1]; n++) {
+            const Ent& e = ch->ents[n]; stacks++; east += eastern;
+            offCliffs += seaStackShore(e.x, e.z);
+            inBay += e.x > -32000.f && e.x < -29000.f && e.z > 14800.f && e.z < 18000.f;
+          }
+        }
+    };
+    scan(-34000.f, 8000.f, -27000.f, 22000.f, false);
+    scan(25000.f, -28000.f, 30000.f, -12000.f, true);
+    std::printf("sea stacks: %d off Port Verde, %d off the eastern cliffs\n", stacks - east, east);
+    check(offCliffs == stacks && inBay == 0 && east >= 3, "the sea stacks off the cliffed shores, none out in an open bay");
+    g_scenery.clear();
+  }
   // in their chunks' scenery, as generated
   for (size_t i = 0; i < turbines.size(); i += 3) {
     const Ent& t = turbines[i];

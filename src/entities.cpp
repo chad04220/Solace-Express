@@ -267,6 +267,17 @@ int treeSpecies(float g, float lush, float cold, float sp, float sp2) {
 }
 }  // namespace
 
+bool seaStackShore(float x, float z) {
+  for (int k = 0; k < 12; k++) {
+    const float ca = cosf(k * 0.5236f), sa = sinf(k * 0.5236f);
+    for (float d = 30.f; d <= 220.f; d += 30.f)
+      if (g_world.naturalHeight(x + ca * d, z + sa * d) > 0.f) {   // (the shore this way: steep behind it?)
+        if (g_world.naturalHeight(x + ca * (d + 40.f), z + sa * (d + 40.f)) > 14.f || g_world.naturalHeight(x + ca * (d + 100.f), z + sa * (d + 100.f)) > 26.f) return true;
+        break;
+      }
+  }
+  return false;
+}
 
 // ------------------------------------------------------------------ chunk generation
 void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
@@ -418,7 +429,8 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
       for (auto r = landmarksIn(cx, cz); r.first != r.second; ++r.first) if (r.first->kind > EK_SLAB) C.out[r.first->kind]->push_back(r.first->e);
       // ---------------------------------------------------------------- lighthouse
       { float lx, lz, ly; if (lighthouseSite(lx, lz, ly) && C.inside(lx, lz)) putBuilding(C, EK_LIGHTHOUSE, lx, lz, ly, 3.4f, 3.4f, 0, 0.5f); }
-      // ---------------------------------------------------------------- sea stacks (70 m cells)
+      // ---------------------------------------------------------------- sea stacks (70 m cells): off the cliffed shores
+      // alone, close in (seaStackShore) - an open bay or a beach has none
       for (int sj = (int)floorf(C.z0 / STACK_CELL); sj <= (int)floorf((C.z1 - 1e-3f) / STACK_CELL); sj++)
         for (int si = (int)floorf(C.x0 / STACK_CELL); si <= (int)floorf((C.x1 - 1e-3f) / STACK_CELL); si++) {
           float x = (si + 0.5f + (h2(si + 17, sj) - 0.5f) * 0.4f) * STACK_CELL, z = (sj + 0.5f + (h2(si, sj + 23) - 0.5f) * 0.4f) * STACK_CELL;
@@ -428,7 +440,8 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float m[4]; g_world.sampleMask(x, z, m);
           if (m[3] < 0.5f) continue;
           float depthOk = smoothstepf(-16.f, -4.f, g) * smoothstepf(-0.5f, -2.5f, g);
-          if (h2(si * 7 + 3, sj * 11 - 5) > 0.025f * depthOk) continue;
+          if (h2(si * 7 + 3, sj * 11 - 5) > 0.18f * depthOk) continue;
+          if (!seaStackShore(x, z)) continue;
           float r = 7.f + 8.f * h2(si, sj + 31), H = 14.f + 30.f * h2(si + 5, sj + 9);
           put(C, EK_SEASTACK, x, g - 1.5f, z, h2(si - 3, sj + 3) * 6.28f, r / 10.f, (H - g + 1.5f) / 30.f, r / 10.f * (0.8f + 0.3f * h2(si, sj)), h2(si * 3, sj));
         }
