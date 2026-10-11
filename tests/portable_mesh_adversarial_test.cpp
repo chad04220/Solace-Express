@@ -140,7 +140,7 @@ int main() {
   badWord(vertex+7*4,bits(1.01f),"out-of-range ambient occlusion rejected");
   badWord(index,uint32_t(original.vertices.size()/8),"static out-of-range index rejected");
   badWord(hull+(original.hull.size()-1)*4,bits(.5f),"nonboolean hull eye flag rejected");
-  badWord(part,47,"unassigned part type rejected");
+  badWord(part,aircraftMesh::kMaxPartType+1,"unassigned part type rejected");   // (one past the last PT_*)
   badWord(part+4,UINT32_MAX,"oversized part vertex count rejected");
   badWord(part+8,UINT32_MAX,"oversized part index count rejected");
   badWord(part+8,2,"nontriangular part topology rejected");

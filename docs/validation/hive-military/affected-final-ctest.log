@@ -1,0 +1,61 @@
+Test project /workspace/scratch/87b29863f015/solace-hive-military-build
+      Start 98: test_world
+ 1/28 Test #98: test_world .......................   Passed    6.41 sec
+      Start 50: gameplay_loop_4
+ 2/28 Test #50: gameplay_loop_4 ..................   Passed   36.44 sec
+      Start 49: gameplay_loop_3
+ 3/28 Test #49: gameplay_loop_3 ..................   Passed   35.32 sec
+      Start 48: gameplay_loop_2
+ 4/28 Test #48: gameplay_loop_2 ..................   Passed   21.24 sec
+      Start 47: gameplay_loop_1
+ 5/28 Test #47: gameplay_loop_1 ..................   Passed   12.49 sec
+      Start 62: ci_test_selection
+ 6/28 Test #62: ci_test_selection ................   Passed    0.94 sec
+      Start 63: renderer_cpu_mocks
+ 7/28 Test #63: renderer_cpu_mocks ...............   Passed   27.52 sec
+      Start  3: aircraft_build_contract
+ 8/28 Test  #3: aircraft_build_contract ..........   Passed    0.00 sec
+      Start 20: military_career
+ 9/28 Test #20: military_career ..................   Passed    8.56 sec
+      Start 21: military_gameplay
+10/28 Test #21: military_gameplay ................   Passed    2.77 sec
+      Start 22: hive_combat
+11/28 Test #22: hive_combat ......................   Passed    0.01 sec
+      Start 23: hive_combat_fastmath
+12/28 Test #23: hive_combat_fastmath .............   Passed    0.00 sec
+      Start 24: military_career_fastmath
+13/28 Test #24: military_career_fastmath .........   Passed   10.06 sec
+      Start 25: hive_world_collision
+14/28 Test #25: hive_world_collision .............   Passed    0.18 sec
+      Start 26: hive_loadout
+15/28 Test #26: hive_loadout .....................   Passed    0.00 sec
+      Start 27: hive_loadout_fastmath
+16/28 Test #27: hive_loadout_fastmath ............   Passed    0.00 sec
+      Start 28: hive_world_collision_fastmath
+17/28 Test #28: hive_world_collision_fastmath ....   Passed    0.17 sec
+      Start 29: enemy_surface_mesh
+18/28 Test #29: enemy_surface_mesh ...............   Passed    0.03 sec
+      Start 30: hive_ordnance_visual
+19/28 Test #30: hive_ordnance_visual .............   Passed    0.00 sec
+      Start 31: wraith_loadout_clearance
+20/28 Test #31: wraith_loadout_clearance .........   Passed    0.00 sec
+      Start 32: enemy_mesh_cache
+21/28 Test #32: enemy_mesh_cache .................   Passed    0.00 sec
+      Start 33: enemy_bake_guard
+22/28 Test #33: enemy_bake_guard .................   Passed    0.00 sec
+      Start 34: enemy_fleet_validity_fastmath
+23/28 Test #34: enemy_fleet_validity_fastmath ....   Passed    0.00 sec
+      Start 44: shader_prune
+24/28 Test #44: shader_prune .....................   Passed    0.09 sec
+      Start 60: hive_game_integration
+25/28 Test #60: hive_game_integration ............   Passed    0.04 sec
+      Start 61: enemy_render_contract
+26/28 Test #61: enemy_render_contract ............   Passed    0.03 sec
+      Start 67: aircraft_build_interface
+27/28 Test #67: aircraft_build_interface .........   Passed    0.03 sec
+      Start 85: shader_loading_contract
+28/28 Test #85: shader_loading_contract ..........   Passed    1.54 sec
+
+100% tests passed out of 28
+
+Total Test time (real) = 163.91 sec

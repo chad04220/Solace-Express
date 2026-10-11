@@ -39,7 +39,16 @@ uniform int uPLN; uniform vec4 uPLP[12]; uniform vec4 uPLC[12]; uniform vec4 uPL
 // 1 green, 2 clear)
 uniform int uLensN; uniform vec4 uLensP[6]; uniform vec4 uLensC[6]; uniform vec4 uLensD[6];
 uniform vec4 uWr[7];   // XR-40 Wraith animation and weapons state (see mapWraith)
+#ifndef PART_BAKE
+uniform int uStoreMeshOn; // released store already rendered as native hardware; effects add glow only
+#endif
+#if !defined(PART_BAKE) || (!defined(AF_LIGHT) && !defined(AF_JET))
+uniform int uWrBombSet; // explicit carried payload selection, geometry is separate cached rigid parts
+#endif
 uniform int uFxBeams; uniform vec4 uBeamA[16]; uniform vec4 uBeamB[16];   // laser bolts: tail + radius, head + intensity
+#ifndef PART_BAKE
+uniform vec4 uBeamStyle[16]; uniform vec4 uBombStyle[8];
+#endif
 uniform int uFxBombs; uniform vec4 uBombs[8];                           // dark-energy bombs in flight: centre + radius
 uniform int uFxBlasts; uniform vec4 uBlast[6]; uniform vec4 uBlastI[6]; // detonations: centre + radius, age 0..1 + intensity
 uniform vec4 uVapor;   // transonic vapour cone: density, start z, start radius, length (body space)

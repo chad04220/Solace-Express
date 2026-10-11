@@ -1,0 +1,66 @@
+{
+  "needle-final-render.log": {
+    "bytes": 2121,
+    "sha256": "8cf4788faa68eb44f2fcff981d9e9d9b29cd2bf6ba44fc9dbcddfe95026e54b3"
+  },
+  "XR40-Kinetic-Weapon.jpg": {
+    "bytes": 189446,
+    "sha256": "f411574c536a64750db766b2d1b5796939a0f6d613de8035f97ff6f560779c81"
+  },
+  "Archon-Progress.jpg": {
+    "bytes": 227416,
+    "sha256": "fda11f43eba6fef6f356a566e32552cedaa8dc200db0e42868499edcb12515b8"
+  },
+  "Military-Mission-Menu.jpg": {
+    "bytes": 187793,
+    "sha256": "23819634f0180d22492eadfe87b51d2644edab9b5f971b8914a0aa1b7c310732"
+  },
+  "combat-render.log": {
+    "bytes": 3804,
+    "sha256": "73ae368614fc5f664db366e7966fefdf5df6b05e8d6f77a91a7384d19103e5d1"
+  },
+  "XR40-EMP-Payload.jpg": {
+    "bytes": 80214,
+    "sha256": "4f9c8fecc86e796d0e05594815640c9254facb8f5b1353c17084cf955d54651b"
+  },
+  "Bastion-Progress.jpg": {
+    "bytes": 175422,
+    "sha256": "40ffd90e0c25a56cee1d9a1eb88a75d25d1dcacf4c8d1abe2a8cf070049beff1"
+  },
+  "sanitizers.log": {
+    "bytes": 1678,
+    "sha256": "595a56762a980e04aa86edb206eee6adce185f11a5f44a1c0f53fafe315b242c"
+  },
+  "projectile-sanitizers.log": {
+    "bytes": 684,
+    "sha256": "69f3b23bf86b245a13ad895758e1a7c5be855860eef86df570b8466fff731745"
+  },
+  "windows-cross-build.log": {
+    "bytes": 635,
+    "sha256": "5594771e85dcb6d1b30ddb8f8a361399b31b468bc7bf4ae3dd67cf1343064470"
+  },
+  "world-benchmark.txt": {
+    "bytes": 1564,
+    "sha256": "6644360a5cca8a2dc5f49d761bee4bee2c9cb65223eccbbdc8f12089de11e774"
+  },
+  "XR40-Charged-Weapon.jpg": {
+    "bytes": 182797,
+    "sha256": "9d7cf26b04ffae6b9f2e75c1bbe5ea086688ff5e29cc638b9955ca5b5a019bc2"
+  },
+  "projectile-trail-ctest.log": {
+    "bytes": 1055,
+    "sha256": "487564218cd4b954b56be1326f319db641d8fb9a0e782d463459e631fff8c218"
+  },
+  "affected-final-ctest.log": {
+    "bytes": 3151,
+    "sha256": "8fd3df56c973b977a8154ec5ff930aef4183d669a06a4d173987e4d59d03b675"
+  },
+  "full-cpu-ctest.log": {
+    "bytes": 17532,
+    "sha256": "915b295b5ba033799ccdeef058d0bb098d76af1bdb8ab35f33e388d71a460b0f"
+  },
+  "Cantor-Progress.jpg": {
+    "bytes": 178460,
+    "sha256": "06a7aad6a1050105159c01617b08b05d9c2705e837288f0094cf9d016778018e"
+  }
+}

@@ -170,7 +170,11 @@ vec2 mapWraith(vec3 p){
     if (gPartMode != -2) res = opU(res, vec2(sdRoundBox(vec3(dr.x + 0.265, dr.y + 0.014, dq.z), vec3(0.265, 0.014, 1.66), 0.004), 81.0));
     float bl = gWr[6].x;
     vec3 bc = vec3(0.0, by + 0.27, 0.1);
-    if (bl > 0.01 && gPartMode != -2) res = opU(res, vec2(length(p - bc) - 0.29*bl, 89.0));
+    if (bl > 0.01 && gPartMode != -2) {
+      int payload=gOwn?clamp(uWrBombSet,0,2):0;
+      vec2 bomb=wrWeaponPartField(payload==1?PT_WR_PENETRATOR:payload==2?PT_WR_EMP:PT_WR_BOMB,(p-vec3(0.,-.305,.1))/bl);bomb.x*=bl;
+      res=opU(res,bomb);
+    }
     // the cradle stays when the bomb has gone
     float cr = min(sdCapsule(ap, vec3(0.0, by + 0.5, -0.2), vec3(0.22, bc.y + 0.12, -0.2), 0.03), sdCapsule(ap, vec3(0.0, by + 0.5, 0.4), vec3(0.22, bc.y + 0.12, 0.4), 0.03));
     res = opU(res, vec2(cr, 92.0));
@@ -185,6 +189,11 @@ vec2 mapWraith(vec3 p){
     vec3 hq = lq - vec3(0.2, -0.17, 0.0); hq.xy = rot2(hq.xy, las*1.9);
     res = opU(res, vec2(sdRoundBox(hq + vec3(0.2, -0.012, 0.0), vec3(0.2, 0.012, 0.5), 0.004), 81.0));
     vec3 tq = lq - vec3(0.0, -0.38*las, -0.25*las);
+    int gun=gOwn?int(gWr[6].w+.5):0;
+    if(gun>0){
+      res=opU(res,wrWeaponPartField(gun==1?PT_WR_KINETIC:PT_WR_CHARGED,tq));
+      res=opU(res,vec2(sdCapsule(lq,vec3(0.,.05,.1),vec3(0.,-.38*las+.05,-.25*las+.1),.045),90.));
+    }else{
     float house = sdRoundBox(tq, vec3(0.13, 0.1, 0.32), 0.035);
     float arm = sdCapsule(lq, vec3(0.0, 0.05, 0.1), vec3(0.0, -0.38*las + 0.05, -0.25*las + 0.1), 0.045);
     res = opU(res, vec2(min(house, arm), 90.0));
@@ -194,6 +203,7 @@ vec2 mapWraith(vec3 p){
     rings = max(rings, max(bq.z - 0.0, -bq.z - 0.45));
     res = opU(res, vec2(min(barrel, rings), 92.0));
     res = opU(res, vec2(length(bq - vec3(0.0, 0.0, -0.62 - 0.15*las)) - 0.05, 91.0));
+    }
     }
   }
   // faceted canopy
@@ -262,7 +272,7 @@ vec2 wrPartField(int k, vec3 l){
   if (k == PT_WR_VANEY) return vec2(sdBox(l, vec3(0.01, 0.33*0.75, 0.07)), 84.0);
   if (k == PT_WR_PETAL) return vec2(wrPetals(l, 0.5, true), 84.0);
   if (k == PT_WR_DOOR) return vec2(sdRoundBox(vec3(l.x + 0.265, l.y + 0.014, l.z), vec3(0.265, 0.014, 1.66), 0.004), 81.0);
-  if (k == PT_WR_BOMB) return vec2(length(l) - 0.29, 89.0);
+  if (k == PT_WR_BOMB || (k >= PT_WR_KINETIC && k <= PT_WR_EMP)) return wrWeaponPartField(k,l);
   if (k == PT_WR_HATCH) return vec2(sdRoundBox(l + vec3(0.2, -0.012, 0.0), vec3(0.2, 0.012, 0.5), 0.004), 81.0);
   if (k == PT_WR_TURRET || k == PT_WR_MUZZLE) {   // (the turret at full reach; the muzzle: the barrel's sliding tip)
     vec3 bq = l - vec3(0.0, -0.02, -0.32);

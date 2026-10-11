@@ -8,8 +8,10 @@
 // C6: the freelance board posts medevacs (a patient who must be flown gently and fast), VIP charters (a live comfort
 // meter), night freight (both ends lit, the landing light on for the touchdown), low-visibility runs (cloud base and
 // visibility at minimums: be lined up when you break out, or go around) and surveys (a ring pattern at one altitude)
-enum ContractType { CT_LESSON = 0, CT_CARGO, CT_PAX, CT_MEDEVAC, CT_VIP, CT_TOUR, CT_FERRY, CT_NIGHT, CT_IFR, CT_SURVEY, CT_TRIAL, CT_COUNT };
-inline const char* contractTypeName(int t) { static const char* n[] = {"Lesson", "Cargo", "Passengers", "Medevac", "VIP Charter", "Scenic Tour", "Free Flight", "Night Freight", "Low-Vis Run", "Survey", "Trial"}; return n[t]; }
+enum ContractType { CT_LESSON = 0, CT_CARGO, CT_PAX, CT_MEDEVAC, CT_VIP, CT_TOUR, CT_FERRY, CT_NIGHT, CT_IFR, CT_SURVEY, CT_TRIAL, CT_MIL_RECON, CT_MIL_DEFENSE, CT_MIL_STRIKE, CT_COUNT };
+inline const char* contractTypeName(int t) { static const char* n[] = {"Lesson", "Cargo", "Passengers", "Medevac", "VIP Charter", "Scenic Tour", "Free Flight", "Night Freight", "Low-Vis Run", "Survey", "Trial", "Military Recon", "Military Defense", "Military Strike"}; return t >= 0 && t < CT_COUNT ? n[t] : "Unknown"; }
+
+inline bool isMilitaryContract(int type) { return type >= CT_MIL_RECON && type <= CT_MIL_STRIKE; }
 
 struct Waypoint { float x, z, alt; };  // alt = metres MSL (ring centre)
 
@@ -112,11 +114,21 @@ public:
   void payLoan(std::vector<PayoutLine>& L);       // one payment at a settlement (called by settle / closeLeg)
   bool attemptOpen = false;    // a flight was in progress when this career was saved (the save before the flight)
 
+  // Military loaners and service rewards never enter the civilian fleet/economy.
+  struct MilitaryRecord {
+    int rank = 0, credits = 0, sorties = 0, successes = 0, failures = 0, intelligence = 0;
+    float hours = 0.f;
+    uint32_t activeAttempt = 0, lastSettledAttempt = 0, missionSeed = 0;
+    int activeKind = -1, activeAirport = -1;
+  } military;
+  Contract militaryContract(int kind) const; // 0 recon, 1 defense, 2 strike
+  bool beginMilitary(const Contract& c);     // call inside the normal transactional commit
+  void abandonMilitaryAttempt();            // interrupted session: no reward; restart from briefing
   void newGame();
   const Contract* nextStory() const;
   void refreshBoard();
   // Which aircraft can fly a contract and how it would be sourced
-  enum Source { SRC_NONE = 0, SRC_LESSON, SRC_RENT, SRC_OWNED };
+  enum Source { SRC_NONE = 0, SRC_LESSON, SRC_RENT, SRC_OWNED, SRC_MILITARY };
   // Failures and maintenance (C7). An owned aircraft wears with the hours and the hard landings; its condition sets
   // the chance something breaks on a flight (rentals a fixed low chance, lessons none). Repairs after a failure or a
   // belly landing are charged unless the insurance (a premium per flight) is on; a service restores the condition.

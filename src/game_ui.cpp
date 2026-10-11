@@ -586,6 +586,27 @@ void Game::drawMapView(float x, float y, float w, float h, int from, int to, con
 
 void Game::drawHubContracts(float x, float y, float w, float h) {
   float s = S();
+  if(hubList==2) {
+    panel(x,y,w,h);
+    if(button(x+20*s,y+16*s,130*s,32*s,"< Civilian work")) { hubList=0; return; }
+    g_ren.text(x+180*s,y+20*s,21*s,"MILITARY SERVICE / OUTFITTED LOANERS",C_ACCENT,1);
+    g_ren.text(x+28*s,y+52*s,12*s,fmt("SERVICE RANK %d / %d SC / %d SORTIES / %d SUCCESSES / %d INTELLIGENCE",career.military.rank,career.military.credits,career.military.sorties,career.military.successes,career.military.intelligence),C_GOOD,1);
+    float yy=y+84*s;
+    for(int kind=0;kind<3;++kind) {
+      Contract c=career.militaryContract(kind);
+      const float rowH=std::min(142*s,(h-167*s)/3.f);
+      card(x+20*s,yy,w-40*s,rowH-10*s,militarySelection==kind,false,C_ACCENT);
+      g_ren.text(x+36*s,yy+10*s,18*s,c.title,C_TEXT,1);
+      float ty=yy+35*s;
+      for(auto& line:wrap(c.brief,w-285*s,12*s)) { if(ty>yy+rowH-20*s) break; g_ren.text(x+36*s,ty,12*s,line,C_DIM,1);ty+=17*s; }
+      if(button(x+w-228*s,yy+18*s,190*s,38*s,kind==0?"Fly recon loaner":"Fly outfitted XR-40",!commitBlocked(),true)) { militarySelection=kind; launchMilitary(kind); return; }
+      g_ren.text(x+w-225*s,yy+64*s,12*s,fmt("Award: %d service credits",c.payout),C_GOOD,1);
+      yy+=rowH;
+    }
+    g_ren.text(x+28*s,y+h-55*s,12*s,"Separate service record. Supplied aircraft, fuel and stores. Civilian jobs and finances stay intact.",C_DIM,1);
+    if(!hubMsg.empty()) g_ren.text(x+28*s,y+h-30*s,12*s,hubMsg,C_WARN,1);
+    return;
+  }
   float lw = std::min(w * 0.29f, 370 * s);
   panel(x, y, lw, h);
   // build card list: story, free flight, freelance
@@ -604,9 +625,10 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   selContract = std::clamp(selContract, 0, (int)cards.size() - 1);
   float cy = y + 14 * s;
   {   // the list switch: the work, or the trials (off the books, scored on a local board)
-    float sw = (lw - 40 * s) * 0.5f;
+    float sw = (lw - 48 * s) / 3.f;
     if (button(x + 16 * s, cy - 4 * s, sw, 26 * s, hubList == 0 ? "WORK" : "work", true, hubList == 0) && hubList != 0) { hubList = 0; selContract = 0; selAircraft = -1; }
     if (button(x + 24 * s + sw, cy - 4 * s, sw, 26 * s, hubList == 1 ? "TRIALS" : "trials", true, hubList == 1) && hubList != 1) { hubList = 1; selContract = 0; selAircraft = -1; }
+    if(button(x+32*s+sw*2,cy-4*s,sw,26*s,"Military")) { hubList=2; selContract=0; return; }
     cy += 32 * s;
   }
   if (hubList == 0) { header(x + 16 * s, cy, lw - 32 * s, ellipsize(career.finished ? "CAMPAIGN COMPLETE - FREELANCE JOBS CONTINUE" : "AVAILABLE WORK", lw - 60 * s, 13 * s)); cy += 28 * s; }
@@ -1790,6 +1812,17 @@ void Game::drawHud(const FrameParams& fp) {
   const Airport& d = dest();
   bool toWp = wpIndex < (int)contract.wps.size();
   vec3 target = toWp ? vec3(contract.wps[wpIndex].x, contract.wps[wpIndex].alt, contract.wps[wpIndex].z) : d.pos();
+  std::string combatTarget;
+  if(militaryFlight) {
+    const auto& m=hiveCombat.mission;
+    if(m.status==hive::MissionStatus::Extract) { target=m.config.extraction; combatTarget="EXTRACTION"; }
+    else if(m.config.kind==hive::MissionKind::Recon || m.config.kind==hive::MissionKind::Defense) {
+      float nearest=1e20f;
+      for(int i=0;i<m.config.objectiveCount;++i) { const auto& o=m.config.objectives[i]; if(o.scanned) continue;
+        float dd=length(hiveCombat.displacement(plane.pos,o.position)); if(dd<nearest) { nearest=dd;target=o.position;combatTarget=(m.config.kind==hive::MissionKind::Recon?"SCAN SITE ":"DEFEND ")+militarySiteLabels[i]; }
+      }
+    } else { for(int i=0;i<m.config.targetCount;++i) { auto* a=hiveCombat.find(m.config.targetIds[i]); if(a && a->alive) { target=a->position;combatTarget="STRIKE TARGET";break; } } }
+  }
   target.x = nearCopy(target.x, plane.pos.x); target.z = nearCopy(target.z, plane.pos.z);   // (the short way round the map)
   vec3 to = target - plane.pos;
   float dist = length(vec3(to.x, 0, to.z));
@@ -1802,7 +1835,7 @@ void Game::drawHud(const FrameParams& fp) {
   {
     hudStrip(0, 0, W, band, 1.f);
     // left: what this flight is, and the objective
-    const char* kind = freeFlight ? "FREE FLIGHT" : researchFlight ? "RESEARCH" : contract.type == CT_LESSON ? "LESSON" : contract.type == CT_TRIAL ? "TRIAL" : contract.type == CT_FERRY ? "FREE FLIGHT" : "CONTRACT";
+    const char* kind = militaryFlight ? "MILITARY" : freeFlight ? "FREE FLIGHT" : researchFlight ? "RESEARCH" : contract.type == CT_LESSON ? "LESSON" : contract.type == CT_TRIAL ? "TRIAL" : contract.type == CT_FERRY ? "FREE FLIGHT" : "CONTRACT";
     vec3 kc = researchFlight ? vec3(0.75f, 0.45f, 1.f) : contract.type == CT_LESSON ? C_GOOD : C_ACCENT;
     g_ren.rect(0, 0, 3 * s, band, kc, 0.95f);
     float kw = g_ren.text(14 * s, 6 * s, 9.5f * s, kind, kc, 1, 0, false);
@@ -1811,6 +1844,7 @@ void Game::drawHud(const FrameParams& fp) {
     std::string obj = toWp ? fmt("CHECKPOINT %d / %d", wpIndex + 1, (int)contract.wps.size()) : fmt("LAND  %s  %s", d.code, d.name);
     if (freeFlight) obj = "FREE ROAM / NO MISSION / CAREER UNCHANGED";
     else if (researchFlight) obj = resCard >= 0 ? (resCardDone ? std::string(kResCards[resCard].id) + "  CARD COMPLETE" : fmt("%s  STEP %d/%d  %s", kResCards[resCard].id, resStep + 1, kResCards[resCard].n, kResCards[resCard].steps[std::min(resStep, kResCards[resCard].n - 1)].label)) : fmt("FREE ROAM  -  MACH %.2f", plane.mach);
+    if(militaryFlight || (researchFlight && resCard<0 && specIdx==kWraith)) obj=hiveObjectiveText();
     g_ren.text(14 * s, 24 * s, 12 * s, ellipsize(obj, leftW, 12 * s), mag, 1, 0, false);
     {   // the nav line under it: distance and time to the target
       std::string nav = fmt("%s   BRG %03.0f   ETE %s", dist < 1000.f ? fmt("%.0f m", dist).c_str() : set.metric ? fmt("%.1f km", dist / 1000.f).c_str() : fmt("%.1f nm", dist / 1852.f).c_str(), brg, gs > 10 ? fmt("%d:%02d", (int)(dist / gs) / 60, (int)(dist / gs) % 60).c_str() : "--:--");
@@ -2170,14 +2204,15 @@ void Game::drawHud(const FrameParams& fp) {
       g_ren.rect(x - tw2 * 0.5f - 6 * s, y - 2 * s, tw2 + 12 * s, 19 * s, vec3(0.01f, 0.02f, 0.04f), 0.7f, 4 * s);
       g_ren.text(x, y, 13 * s, t, mag, 1, 1);
     };
-    vec3 tgt3 = target; if (!toWp) tgt3.y = d.elev + 3.f;
+    vec3 tgt3 = target; if (!toWp && combatTarget.empty()) tgt3.y = d.elev + 3.f;
     float sx, sy;
     vec3 rel3 = tgt3 - fp.camPos;
     float zc = dot(rel3, -fp.camBack);
     const float bandT = band + 100 * s, bandB = cockpit ? H - 70 * s : tilesTop - 40 * s, bandC = 0.5f * (bandT + bandB), bandH = std::max(40 * s, 0.5f * (bandB - bandT));
     bool onS = zc > 1.f && g_ren.project(fp, tgt3, sx, sy) && sx > rail + 20 * s && sx < W - rail - 20 * s && sy > bandT && sy < bandB;
     std::string lab = dist < 1000.f ? fmt("%.0f m", length(rel3)) : fmt("%.1f km", dist / 1000.f);
-    if (toWp && fabsf(target.y - plane.pos.y) > 45.f) lab += fmt("  %s%s", target.y > plane.pos.y ? "+" : "-", fmtAlt(fabsf(target.y - plane.pos.y)).c_str());
+    if(!combatTarget.empty()) lab=combatTarget+" / "+lab;
+    if ((toWp || !combatTarget.empty()) && fabsf(target.y - plane.pos.y) > 45.f) lab += fmt("  %s%s", target.y > plane.pos.y ? "+" : "-", fmtAlt(fabsf(target.y - plane.pos.y)).c_str());
     if (onS) {
       float gx, gy; vec3 gpt(tgt3.x, g_world.height(tgt3.x, tgt3.z), tgt3.z);
       if (toWp && g_ren.project(fp, gpt, gx, gy) && gy > sy + 8 * s) {
@@ -2205,6 +2240,25 @@ void Game::drawHud(const FrameParams& fp) {
       float pulse2 = 1.f + 0.12f * sinf(realTime * 5.f);
       hudDart(ex2 + dir.x * 11 * s * pulse2, ey2 + dir.y * 11 * s * pulse2, dir.x, dir.y, 22 * s * pulse2, 9 * s, mag, 1.f);
       label(ex2 - dir.x * 48 * s, ey2 - dir.y * 48 * s - 8 * s, lab);
+    }
+  }
+  if(militaryFlight || (researchFlight && specIdx==kWraith)) {
+    if(specIdx==kWraith) {
+      const auto& gun=hive::forwardSpec(combatLoadout.forward);
+      const auto& bomb=hive::bombSpec(combatLoadout.bomb);
+      const float xx=rail+16*s, yy=band+32*s;
+      g_ren.text(xx,yy,12*s,fmt("%s / %d RDS / HEAT %.0f%%%s",gun.name,combatLoadout.rounds,100*combatLoadout.heat,combatLoadout.overheated?" / COOLING":""),combatLoadout.overheated?C_WARN:gun.colour,1);
+      g_ren.text(xx,yy+18*s,12*s,fmt("%s / %d STORES / HULL %.0f%%",bomb.name,combatLoadout.bombs,militaryHull),C_TEXT,1);
+      if(gun.charge>0 && combatLoadout.charge>0) g_ren.text(xx,yy+36*s,12*s,fmt("CHARGING %.0f%%",100*combatLoadout.charge/gun.charge),gun.colour,1);
+    }
+    for(const auto& a:hiveCombat.actors) if(a.alive) {
+      vec3 p=plane.pos+hiveCombat.displacement(plane.pos,a.position); float sx,sy;
+      if(g_ren.project(fp,p,sx,sy) && sx>rail+10*s && sx<W-rail-10*s && sy>band+90*s && sy<H-120*s) {
+        vec3 col=a.phase==hive::Phase::Telegraph?C_WARN:C_BAD;
+        g_ren.rectOutline(sx-14*s,sy-14*s,28*s,28*s,col,.8f,0,1*s);
+        const char* names[]={"NEEDLE","BASTION","CANTOR","ARCHON"};
+        g_ren.text(sx,sy+18*s,10*s,fmt("%s %.1f km",names[(int)a.type],length(p-plane.pos)/1000),col,1,1,false);
+      }
     }
   }
   // (the radio: under the tower recall on the left)
@@ -2490,8 +2544,9 @@ void Game::drawPause() {
     if (settingsPage == 1 && button(W * 0.5f - pw * 0.5f + 24 * s, H - 120 * s - 4 * s - 48 * s, 150 * s, 36 * s, "Back", true, true)) { settingsFromPause = false; bindCapture = -1; }
     return;
   }
-  s = std::min(s, std::min(H / 540.f, W / 520.f));
-  float pw = 410 * s, ph = 450 * s, x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
+  const bool combatPractice=researchFlight && resCard<0 && specIdx==kWraith;
+  s = std::min(s, std::min(H / (combatPractice?820.f:540.f), W / 520.f));
+  float pw = 410 * s, ph = (combatPractice?740.f:450.f) * s, x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
   panel(x, y, pw, ph, 0.95f);
   g_ren.text(x + 30 * s, y + 24 * s, 11 * s, "FLIGHT OPERATIONS / ON HOLD", C_ACCENT, 1, 0, false);
   g_ren.text(x + 30 * s, y + 49 * s, 32 * s, "Flight paused", C_TEXT, 1);
@@ -2507,6 +2562,7 @@ void Game::drawPause() {
   if (button(x + 30 * s + bw * 0.52f, by, bw * 0.48f, bh, uiHidden ? "Show flight UI" : "Hide flight UI")) uiHidden = !uiHidden;   // (also LB+RB held)
   by += bh + 12 * s;
   if (button(x + 30 * s, by, bw, bh, freeFlight ? "Return to Free Flight" : researchFlight ? "End research flight" : "Abandon flight")) endFlight(false, researchFlight ? "" : "Abandoned flight", OUT_ABANDONED);
+  if(combatPractice) drawCombatPractice(x+30*s,by+bh+18*s,bw);
   if (showRadio) drawRadioPanel(20 * s, 60 * s);
 }
 
@@ -2566,7 +2622,7 @@ void Game::drawDebrief() {
   py += 10 * s;
   header(px, py, pw - 60 * s, "SETTLEMENT"); py += 24 * s;
   for (auto& l : payout) {
-    float vw = g_ren.text(x + pw - 30 * s, py, 16 * s, fmtMoney(l.amount), l.amount >= 0 ? C_GOOD : C_BAD, 1, 2);
+    float vw = g_ren.text(x + pw - 30 * s, py, 16 * s, isMilitaryContract(contract.type)?fmt("%d SC",l.amount):fmtMoney(l.amount), l.amount >= 0 ? C_GOOD : C_BAD, 1, 2);
     g_ren.text(px, py, 16 * s, ellipsize(l.label, pw - 80 * s - vw, 16 * s), C_TEXT, 1);
     py += 24 * s;
   }
@@ -2578,8 +2634,8 @@ void Game::drawDebrief() {
     g_ren.rect(x + pw - 18 * s, bodyTop + (trackH - barH) * payScroll / payMax, 3 * s, barH, C_ACCENT, 0.7f);
   }
   g_ren.rect(px, totalY - 8 * s, pw - 60 * s, 1 * s, C_ACCENT, 0.5f);
-  g_ren.text(px, totalY, 18 * s, "Total", C_TEXT, 1);
-  g_ren.text(x + pw - 30 * s, totalY, 18 * s, fmtMoney(total), total >= 0 ? C_GOOD : C_BAD, 1, 2);
+  g_ren.text(px, totalY, 18 * s, isMilitaryContract(contract.type)?"Service credits":"Total", C_TEXT, 1);
+  g_ren.text(x + pw - 30 * s, totalY, 18 * s, isMilitaryContract(contract.type)?fmt("%d SC",total):fmtMoney(total), total >= 0 ? C_GOOD : C_BAD, 1, 2);
   if (newLic) fitText(px, licY, pw - 60 * s, 22 * s, 14 * s, std::string("NEW LICENCE: ") + licenseName(career.license), C_WARN);
   { float cy = campY; for (auto& l : campaignLines) { g_ren.text(px, cy, 18 * s, l, C_ACCENT, 1); cy += 24 * s; } }
   if (commitBlocked()) {   // the settlement above is what will be saved; until it is, the career stands as before the flight
@@ -2587,6 +2643,6 @@ void Game::drawDebrief() {
     if (button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, "Retry save")) retryCommit();
   }
   if (button(x + pw - 230 * s, y + ph - 66 * s, 200 * s, 46 * s, "Continue", true, true) || in.pressed[K_ENTER]) { retryCommit(); screen = SCR_HUB; hubTab = TAB_CONTRACTS; selContract = 0; selAircraft = -1; }
-  const bool jobWaits = career.job && career.job->state == Career::JobState::RECOVERY;
+  const bool jobWaits = !isMilitaryContract(contract.type) && career.job && career.job->state == Career::JobState::RECOVERY;
   if (!lastSuccess && !commitBlocked() && button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, jobWaits ? "Continue job" : "Try again")) retryFromDebrief();
 }

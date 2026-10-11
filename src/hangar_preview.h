@@ -58,7 +58,8 @@ out vec3 vP,vN,vColour; flat out int vKind;
 void main(){ vP=aP; vN=aN; vColour=aColour; vKind=int(aKind+.5);
  gl_Position=uVP*vec4(aP+uOrigin-uEye,1);
  gl_Position.xy-=2.0*uJit*gl_Position.w;
- gl_Position.z=(log2(max(1e-6,1.0+gl_Position.w))*(2.0/log2(40001.0))-1.0)*gl_Position.w;
+ // Keep conventional homogeneous clipping: room quads may cross behind the eye.
+ // The fragment shader writes the shared logarithmic depth after correct clipping.
 }
 )GLSL";
 static const char* kFS = R"GLSL(#version 330 core

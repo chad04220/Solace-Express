@@ -53,10 +53,15 @@ vec3 cloakSkin(vec3 world, vec3 n, vec3 rd, vec3 lp, float front){
 // each beam segment, cut by the scene depth). Dark-energy bombs: black spheres wrapped in crawling violet plasma
 // with a halo. Detonations: an expanding shell of violet fire around a collapsing black core, a flat shock ring
 // and arcing filaments; the core swallows the light behind it.
+// (not in the bake: it builds the airframe alone, without the weapons' effects or their style uniforms)
+#ifndef PART_BAKE
 vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t){
   for (int i = 0; i < 16; i++) {
     if (i >= uFxBeams) break;
     vec3 a = uBeamA[i].xyz, b = uBeamB[i].xyz; float r = uBeamA[i].w, I = uBeamB[i].w;
+    bool styled=dot(uBeamStyle[i].rgb,uBeamStyle[i].rgb)>.0001;
+    vec3 tint=styled?uBeamStyle[i].rgb:vec3(1.,.08,.2);
+    if(uBeamStyle[i].w>0.)r*=uBeamStyle[i].w;
     vec3 u = b - a; float L = length(u); u /= max(L, 1e-3);
     vec3 w0 = ro - a; float bb = dot(rd, u), dd = dot(rd, w0), ee = dot(u, w0), den = 1.0 - bb*bb;
     float sR = den > 1e-5 ? (bb*ee - dd)/den : 0.0, sB = den > 1e-5 ? (ee - bb*dd)/den : ee;
@@ -65,20 +70,38 @@ vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t){
     float d = length(ro + rd*sR - (a + u*sB));
     float core = exp(-d*d/(r*r*0.25)), halo = pow(r*r/(d*d + r*r), 1.6);
     float flick = 0.85 + 0.15*sin(uTime*90.0 + sB*0.3);
-    col += (vec3(1.0, 0.9, 0.95)*core*6.0 + vec3(1.0, 0.08, 0.2)*halo*1.6)*I*flick;
+    col += ((styled?mix(vec3(1.),tint,.18):vec3(1.0,0.9,0.95))*core*6.0 + tint*halo*1.6)*I*flick;
   }
   for (int i = 0; i < 8; i++) {
     if (i >= uFxBombs) break;
     vec3 c = uBombs[i].xyz; float R = uBombs[i].w;
+    int kind=int(uBombStyle[i].w+.5);
+    vec3 tint=dot(uBombStyle[i].rgb,uBombStyle[i].rgb)>.0001?uBombStyle[i].rgb:vec3(.6,.18,1.);
     vec3 oc = ro - c; float b = dot(oc, rd), h = b*b - dot(oc, oc) + R*R;
     float tc = -b; if (tc < 0.0) continue;
     float dmin = length(oc + rd*tc);
+    if((uStoreMeshOn&(1<<i))!=0){
+      // The cached hardware owns depth/silhouette. Keep only faint local emission.
+      if(kind!=1&&tc<t+R*.3)col+=tint*exp(-max(dmin-R*.8,0.)/(R*.25))*(kind==2?.08:.18);
+      continue;
+    }
     if (h > 0.0 && -b - sqrt(h) < t) {
       vec3 n = normalize(oc + rd*(-b - sqrt(h)));
+      if(kind==1){ // unpowered armor-piercing body: metal, no imaginary plasma halo
+       float diffuse=max(0.,dot(n,uSunDir));
+       float spec=pow(max(0.,dot(reflect(-uSunDir,n),-rd)),48.);
+       col=vec3(.09,.105,.12)*(.22+diffuse)*max(uSunCol,vec3(.03))+spec*.6*uSunCol;
+       continue;
+      }
+      if(kind==2){ // shielded EMP capacitor: a small energized equatorial band
+       float band=1.-smoothstep(.10,.18,abs(n.y));
+       col=vec3(.035,.055,.065)*(.3+max(0.,dot(n,uSunDir)))+tint*band*.8;
+       continue;
+      }
       float fres = pow(1.0 - abs(dot(n, rd)), 2.5);
       float vein = vnoise3(n*5.0 + vec3(uTime*1.7)) + 0.5*vnoise3(n*13.0 - vec3(uTime*2.9));
-      col = vec3(0.003) + vec3(0.6, 0.18, 1.0)*(fres*3.0 + pow(smoothstep(0.8, 1.2, vein), 2.0)*5.0) + vec3(0.25, 0.75, 1.0)*pow(smoothstep(1.1, 1.35, vein), 3.0)*6.0;
-    } else if (tc < t) col += vec3(0.5, 0.15, 1.0)*exp(-(dmin - R)/(R*0.7))*0.9;
+      col = vec3(0.003) + tint*(fres*3.0 + pow(smoothstep(0.8, 1.2, vein), 2.0)*5.0) + vec3(0.25, 0.75, 1.0)*pow(smoothstep(1.1, 1.35, vein), 3.0)*6.0;
+    } else if (tc < t && kind==0) col += tint*exp(-(dmin - R)/(R*0.7))*0.9;
   }
   for (int i = 0; i < 6; i++) {
     if (i >= uFxBlasts) break;
@@ -161,3 +184,4 @@ vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t){
   }
   return col;
 }
+#endif

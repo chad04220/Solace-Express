@@ -13,6 +13,8 @@
 #include "breakup.h"
 #include "traffic.h"
 #include "career.h"
+#include "hive_combat.h"
+#include "hive_loadout.h"
 #include "renderer.h"
 #include "entities.h"
 #include "audio.h"
@@ -287,9 +289,9 @@ private:
     bool fireLatch = true;   // a click / Enter still held from the launch menu doesn't fire (or arm) until released
     float laserCD = 0, laserGlow = 0; int laserSide = 0;
     float bay = 0, bayHold = 0, bombLoaded = 1; int bombQueue = 0;  // bomb bay doors, bomb in the cradle 0..1, pending drops
-    struct Bolt { vec3 h, v, d; float len, age, life; bool hit; };   // head, world velocity, aim; streak length behind the head
+    struct Bolt { vec3 h, v, d; float len, age, life; bool hit; hive::ForwardSet kind = hive::ForwardSet::Pulse; };   // head, world velocity, aim; streak length behind the head
     bool wantFire = false;
-    struct Bomb { vec3 p, v; float t; };
+    struct Bomb { vec3 p, v; float t; hive::BombSet kind = hive::BombSet::Plasma; };
     struct Blast { vec3 p; float R, age, dur; bool water; };
     struct Crater { float x, z, R, D; };
     std::vector<Bolt> bolts; std::vector<Bomb> bombs; std::vector<Blast> blasts; std::vector<Crater> craters;
@@ -300,6 +302,29 @@ private:
     int kills = 0;
     int shots = 0, dropped = 0;   // laser bolts fired, bombs released (the test cards count them)
   } wraith;
+  hive::Combat hiveCombat;
+  hive::Loadout combatLoadout;
+  hive::ForwardSet practiceForward = hive::ForwardSet::Pulse;
+  hive::BombSet practiceBomb = hive::BombSet::Plasma;
+  int practiceWave = 0, militarySelection = 0;
+  float militaryHull = 100, combatBasePayload = 85;
+  std::array<std::string,hive::MaxObjectives> militarySiteLabels;
+  bool militaryFlight = false, militarySettled = false;
+  bool combatCollisionWarm = false;
+  double combatCollisionWarmMs = 0;
+  int combatPrefetchCursor = 0;
+  void launchMilitary(int kind);
+  void setupMilitaryEncounter();
+  void spawnPracticeWave();
+  void clearPracticeEncounter();
+  void updateHive(float dt);
+  void syncCombatPayload();
+  void warmCombatCollision();
+  void prefetchCombatCollision();
+  void hiveVisual(FrameParams& fp);
+  hive::WorldCallbacks hiveWorld();
+  std::string hiveObjectiveText() const;
+  void drawCombatPractice(float x, float y, float width);
   void wraithControls(float dt);
   void updateWraith(float dt);
   void wraithVisual(FrameParams& fp);
@@ -309,7 +334,7 @@ private:
   void updateBolts(float dt);
   void laserImpact(vec3 at, int craft, int entKind, const Ent* ent);
   void addScorch(float x, float z, float R, float D);
-  void detonate(vec3 p, bool water);
+  void detonate(vec3 p, bool water, hive::BombSet kind = hive::BombSet::Plasma, const vec3* queryOrigin = nullptr);
   void fireball(vec3 c, vec3 baseV, float R, bool air, bool water);
   void updateBombCam(float dt);
   void updateLoading(float dt);

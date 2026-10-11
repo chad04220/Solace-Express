@@ -148,6 +148,7 @@ void Renderer::rasterWorld(const FrameParams& fp) {
 // pass that writes the G-buffer with depth (the terrain and the scenery occlude them through the depth test). The
 // player's aircraft starts its march on its rasterized hull.
 void Renderer::rasterObjects(const FrameParams& fp) {
+  for(int k=0;k<std::clamp(fp.enemyN,0,kMaxEnemyCraft);k++)if(enemyCraftValid(fp.enemies[k]))ensureEnemyMesh(int(fp.enemies[k].type));
   hullOn = false;
   updatePartPoses(fp);
   const int slot = fp.plane.PS[3] > 0.5f ? 1 : 0;
@@ -177,6 +178,8 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   glViewport(0, 0, rw, rh);
   glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
   glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
+  drawReleasedStores(fp);
+  drawEnemyMeshes(fp); // after the world clear and explicit G-buffer/depth binding, including feeds and inspection views
   if (meshOn) drawPlaneMesh(fp, pm->second, fp.plane.rot, fp.plane.pos, -1, earlyMesh == &pm->second);   // (its depth is in since the frame began)
   earlyMesh = nullptr;
   // a broken-up aircraft: its pieces from its outside mesh (baked below if it has none yet)
@@ -598,7 +601,10 @@ void Renderer::rasterEffects(const FrameParams& fp) {
   // (the player's aircraft's: the XR-40's own - its cloak, its weapons, its hologram; wrecked too, its bombs still falling
   // and its blasts burning - else the light aircraft's build, which has no airframe in it: the propellers, the vapour and
   // the flames; with no aircraft, or weapons in the air with no XR-40 flying, every aircraft's)
-  const bool wraith = p.on && (int)(p.M[2] + 0.5f) == 6, weapons = fp.fx.beams + fp.fx.bombs + fp.fx.blasts > 0;
+  const bool weapons = fp.fx.beams + fp.fx.bombs + fp.fx.blasts > 0;
+  // A hidden/destroyed Wraith retains its packed identity while its ordnance lives.
+  // Do not compile every aircraft's cloak/field just because its hull is not drawn.
+  const bool wraith = (p.on || weapons) && (int)(p.M[2] + 0.5f) == 6;
   const GLuint progEffects = afPassProgram(kAfEffects, wraith ? afModelOf(p.M, p.model) : -1, wraith || weapons || !p.on);
   if (!progEffects) { rasterTrafficProps(fp); return; }
   const bool cloakTex = wraith && rasterCloak(fp);   // (the cloaked part's surface from the mesh: no march in the effects)

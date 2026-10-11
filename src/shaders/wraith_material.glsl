@@ -4,6 +4,7 @@
 // heat-tinted titanium nozzles and vanes, glowing turbine cores, violet cloak-emitter strips, a dark bay, the
 // dark-energy bomb, laser housings and their emitter lenses, chrome actuator rods
 void shadeWraith(inout Mat m, int mid, vec3 lp, vec3 ln, float t){
+  if(shadeWraithStore(m,mid,lp,ln))return;
   vec3 nT; vec4 tx;
   float pulse = 0.75 + 0.25*sin(uTime*2.5);
   if (mid == 80 || mid == 81 || mid == 83) {
@@ -20,7 +21,6 @@ void shadeWraith(inout Mat m, int mid, vec3 lp, vec3 ln, float t){
     if (mid == 83) { m.alb = base*0.9; m.metal = 0.3; m.rough = 0.45; }       // pod shells
     if (abs(lp.x) < 0.04 && ln.y > 0.6) m.alb = mix(m.alb, gColStripe*0.3, 0.6); // spine stripe
   }
-  else if (mid == 82) { m.alb = vec3(0.28, 0.2, 0.08); m.metal = 0.95; m.rough = 0.08; }   // smoked gold film
   else if (mid == 84) {
     tx = triSample(lp, ln, M_METAL, 0.8, nT); m.alb = tx.rgb*vec3(0.24, 0.23, 0.25); m.metal = 0.85; m.rough = clamp(tx.a*0.7, 0.18, 0.55); m.nrm = nT;
     float heat = clamp(uWr[2].x + uWr[2].y + uWr[2].z + uWr[2].w, 0.0, 4.0)*0.25;
@@ -32,15 +32,17 @@ void shadeWraith(inout Mat m, int mid, vec3 lp, vec3 ln, float t){
   else if (mid == 87) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = gColStripe*(1.0 + 2.0*uNight)*pulse*(1.0 + 3.0*uWr[4].w); }
   else if (mid == 88) { tx = triSample(lp, ln, M_METAL, 0.5, nT); m.alb = tx.rgb*vec3(0.07, 0.07, 0.08); m.metal = 0.6; m.rough = 0.5; m.nrm = nT;
     if (abs(fract(lp.z*2.0) - 0.5) < 0.03) m.emit = gColStripe*0.4*uWr[4].y; }                       // bay lights when open
-  else if (mid == 89) {   // dark-energy bomb: black glassy core, violet plasma veins crawling over it
-    vec3 bc = lp - vec3(0.0, -0.3, 0.1);
-    float vein = vnoise3(bc*9.0 + vec3(0.0, uTime*2.0, 0.0)) + 0.5*vnoise3(bc*21.0 - vec3(uTime*3.0));
-    m.alb = vec3(0.005); m.rough = 0.05; m.metal = 0.0;
-    m.emit = vec3(0.55, 0.15, 1.0)*pow(smoothstep(0.75, 1.15, vein), 2.0)*6.0 + vec3(0.2, 0.7, 1.0)*pow(smoothstep(1.05, 1.3, vein), 3.0)*8.0;
+  else if (mid == 91) {
+    float f=uWr[5].w; int weapon=int(uWr[6].w+.5);
+    if(weapon==0){ // original Pulse finish/emission, byte-for-byte numeric values
+      m.alb=vec3(0.1,0.02,0.02);m.rough=0.02;
+      m.emit=vec3(1.0,0.15,0.25)*(0.6*uWr[4].z+25.0*f);
+    }else{
+      vec3 tint=weapon==1?vec3(1.,.38,.055):vec3(.18,.55,1.);
+      m.alb=weapon==1?vec3(.055,.06,.065):tint*.1;
+      m.metal=weapon==1?.9:.35;m.rough=weapon==1?.32:.02;
+      m.emit=tint*((weapon==1?0.:.6*uWr[4].z)+25.*f);
+    }
   }
-  else if (mid == 90) { tx = triSample(lp, ln, M_METAL, 0.9, nT); m.alb = tx.rgb*vec3(0.12, 0.12, 0.13); m.metal = 0.8; m.rough = 0.4; m.nrm = nT;
-    if (abs(fract(lp.z*14.0) - 0.5) < 0.08) m.alb *= 0.5; }                                           // cooling slots
-  else if (mid == 91) { float f = uWr[5].w; m.alb = vec3(0.1, 0.02, 0.02); m.rough = 0.02; m.emit = vec3(1.0, 0.15, 0.25)*(0.6*uWr[4].z + 25.0*f); }
-  else if (mid == 92) { m.alb = vec3(0.75, 0.76, 0.78); m.metal = 1.0; m.rough = 0.12; }
-  else if (mid == 93) { m.alb = vec3(0.01); m.rough = 0.9; }
+
 }

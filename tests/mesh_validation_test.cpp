@@ -29,7 +29,8 @@ int main() {
   size_t at=blob.size();blob.resize(at+v.size());std::memcpy(blob.data()+at,v.data(),v.size()*4);blob.insert(blob.end(),ix.begin(),ix.end());
   assert(validBlob(blob));
   auto atlasFan=blob;atlasFan[0]=46;assert(validBlob(atlasFan));
-  atlasFan[0]=47;assert(!validBlob(atlasFan)); // the next unassigned rigid-part ID is rejected
+  atlasFan[0]=kMaxPartType;assert(validBlob(atlasFan)); // newest assigned rigid-part ID
+  atlasFan[0]=kMaxPartType+1;assert(!validBlob(atlasFan)); // next unassigned ID
   auto badBlob=blob;badBlob[0]=kMaxPartType+1;assert(!validBlob(badBlob));
   badBlob=blob;badBlob[1]=std::numeric_limits<uint32_t>::max();assert(!validBlob(badBlob));
   badBlob=blob;badBlob.push_back(0);assert(!validBlob(badBlob));

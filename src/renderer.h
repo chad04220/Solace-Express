@@ -18,6 +18,7 @@
 #include "ground_vehicle.h"
 #include "feed_cameras.h"
 #include "exhaust.h"
+#include "enemy_fleet.h"
 
 // Logarithmic depth (every raster pass: gl_Position.z from log2(1 + w)): 0.3 m to the far side of the round world's
 // horizon from a thousand kilometres up (planet.h) at the 32-bit depth's precision - a millionth of the distance
@@ -28,6 +29,7 @@ struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft, bill = 0; };   
 enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7, SPR_RIBBON = 8, SPR_FLAME = 9 };
 
 struct PlaneVisual {
+  int wrBombSet = 0; // Wraith carried payload: plasma / penetrator / EMP
   bool on = false;
   vec3 pos; float rot[9];  // body->world, column-major
   float M[24 * 4];          // model geometry (models.cpp packModel)
@@ -43,12 +45,15 @@ struct PlaneVisual {
   float flame[4] = {0, 0, 0, 0};  // research jet exhaust: spool, reheat, nozzle vector angle (rad), mach
   float vapor[4] = {0, 0, 0, 0};  // transonic vapour cone: density, start z, start radius, length (body space)
   int lensN = 0; float lensP[6][4] = {}, lensC[6][4] = {}, lensD[6][4] = {};   // light fixtures (body space): lens centre | emission | axis + tint
-  float wr[7][4] = {};            // XR-40: pod tilts, yaw vanes, thrusts, pitch vanes | fan, bay, lasers, stealth | surfaces, laser fire | bomb, cloak front, armed
+  float wr[7][4] = {};            // XR-40: pod tilts, yaw vanes, thrusts, pitch vanes | fan, bay, lasers, stealth | surfaces, laser fire | bomb, cloak front, armed, forward weapon ID
 };
 
 // XR-40 weapons in the world (see weaponsFx in shaders.h)
 struct FxVisual {
   int beams = 0; float beamA[16][4], beamB[16][4]; // laser bolts: tail + radius, head + intensity
+  float beamStyle[16][4] = {}; // RGB tint + radius multiplier; zero preserves legacy crimson
+  float bombRot[8][9] = {}; // body->world, local -Z along released-store velocity
+  float bombStyle[8][4] = {}; // RGB tint + kind: 0 plasma, 1 penetrator, 2 EMP
   int bombs = 0; float bomb[8][4];                 // dark-energy bombs: centre + radius
   int blasts = 0; float blast[6][4], blastI[6][4]; // detonations: centre + radius, age 0..1 + intensity
   float pip[4] = {0, 0, 0, 0};                     // XR-40 bomb impact prediction: world point + valid
@@ -89,6 +94,10 @@ void shaderNote(const std::string& s);      // (adds a line to it; safe from the
 GLint U(GLuint prog, const char* name);   // a uniform's location (cached per program; name must be a string literal)
 
 struct FrameParams {
+  int hiveOrdnanceN = 0;
+  HiveOrdnanceVisual hiveOrdnance[kMaxHiveOrdnance];
+  int enemyN = 0;
+  EnemyCraftVisual enemies[kMaxEnemyCraft]; // separate enemy registry; no player/catalog slots
   bool hangarClassified = false; // locked showroom: geometry-only, ultra-low light
   bool hangarPreview = false;  // isolated indoor preview; the aircraft uses its normal rendering path
   vec3 hangarOrigin; float hangarSize = 12.f;  // floor centre and max airframe span/length, world metres
@@ -206,6 +215,8 @@ public:
   GLuint mapTex() const { return texMap; }
   void resize(int w, int h);
   void setRenderScale(float s);   // the render resolution only: the TAA history stays at display resolution, no pop
+  void warmWraithStores(const FrameParams& fp); // explicit exterior hardware warmup even from cockpit view
+  void warmEnemyTypes(); // explicit loading bake: no scene actors or phantom shadows
   void renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites);
   mat4 viewProj(const FrameParams& fp, float zNear = 0.5f, float zFar = 90000.f) const;
   mat4 viewProjRel(const FrameParams& fp, float zNear, float zFar) const;   // the same from the camera at the origin
@@ -349,6 +360,19 @@ private:
   struct PartMesh { int type = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; vec3 c; };   // (c: its middle, in its own frame)   // a cockpit's rigid moving part, in its own frame (plane_parts.glsl)
   struct PlaneMesh { std::vector<PartMesh> parts; uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; };
   std::unordered_map<uint64_t, PlaneMesh> planeMeshes;
+  struct EnemyMesh { GLuint vao=0, vbo=0, ebo=0, material=0; int indices=0; bool attempted=false; };
+  EnemyMesh enemyMeshes[kEnemyCraftTypes];
+  int enemyShOn=0; mat4 enemyShVP[kMaxEnemyCraft];
+  void ensureEnemyMesh(int type);
+  void rasterEnemyShadowMaps(const FrameParams& fp);
+  void drawEnemyMeshes(const FrameParams& fp);
+  GLuint progReleasedStore[3]={}; bool releasedStoreTried=false;
+  int storeShOn=0, storeMeshOn=0; mat4 storeShVP[8]; float storeShFade[8]={};
+  void prepareReleasedStores(const FrameParams& fp);
+  const PartMesh* releasedStoreMesh(const FrameParams& fp,int kind) const;
+  void rasterReleasedStoreShadows(const FrameParams& fp);
+  void drawReleasedStores(const FrameParams& fp);
+
   GLuint progTrafficProps = 0;
   void rasterTrafficProps(const FrameParams& fp);
   GLuint progPlaneMesh = 0, progPlaneMeshDepth = 0;   // (progPlaneMesh: the shared build, every aircraft's code - made only if an aircraft's own fails: sharedMeshProgram)
@@ -529,7 +553,7 @@ private:
   GLuint progShProxyMaps = 0, progObjectsNoAf = 0;   // (progObjectsNoAf: the objects pass with only the UFO and the debris to march)
   bool proxyNeedsMarch(const FrameParams& fp) const;
   int trafShOn = 0; mat4 trafShVP[kMaxTrafficDrawn];
-  static constexpr int kShMapRes = 1024, kShLayers = 4 + kMaxTrafficDrawn;
+  static constexpr int kShMapRes = 1024, kShLayers = 4 + kMaxTrafficDrawn + kMaxEnemyCraft + 8;
   void ensureShadowMaps();
   void rasterShadowMaps(const FrameParams& fp);
   void rasterTrafficShadowMaps(const FrameParams& fp);
