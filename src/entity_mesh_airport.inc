@@ -1438,6 +1438,42 @@ void buildAirportKind(MB& mb, int kind, int lod) {
       }
       break;
     }
+    case EK_FERRY: {   // a double-ended ro-pax ferry, 100 m: a bow either way (she runs both ways, never turning round), her
+      // hull (P_PAINT: white over navy, the antifouling red below the waterline at y 0), the car deck's ends dark, two
+      // decks of saloons glazed along her sides, a wheelhouse at each end, the funnels amidships either side, lifeboats
+      const int st = lod == 3 ? 14 : lod == 0 ? 10 : lod == 1 ? 6 : 4;
+      hullLoft(mb, 0.f, 0.f, 50.f, 9.f, -4.5f, 6.f, st, P_PAINT, P_ROOF);
+      hullLoft(mb, 0.f, 0.f, -50.f, 9.f, -4.5f, 6.f, st, P_PAINT, P_ROOF);
+      mb.box(vec3(-8.6f, 6.f, -36.f), vec3(8.6f, 15.f, 36.f), P_WALL, 0x3B);   // the saloons
+      for (float y : {8.8f, 12.4f}) mb.box(vec3(-8.65f, y, -33.f), vec3(8.65f, y + 1.6f, 33.f), P_GLASS, 1 | 2);
+      mb.box(vec3(-7.f, 15.f, -26.f), vec3(7.f, 18.f, 26.f), P_WALL, 0x3B);    // the upper deck
+      for (float s : {-1.f, 1.f}) {
+        mb.box(vec3(-8.f, 15.f, s > 0.f ? 26.f : -32.f), vec3(8.f, 19.5f, s > 0.f ? 32.f : -26.f), P_WALL, 0x3B);   // (a wheelhouse at each end)
+        mb.box(vec3(-7.8f, 17.f, s > 0.f ? 32.f : -32.05f), vec3(7.8f, 19.f, s > 0.f ? 32.05f : -32.f), P_GLASS, s > 0.f ? 32 : 16);
+        mb.box(vec3(-6.f, 1.f, s > 0.f ? 46.f : -46.2f), vec3(6.f, 5.5f, s > 0.f ? 46.2f : -46.f), P_DARK, s > 0.f ? 32 : 16);   // (the car deck's doors)
+        mb.box(vec3(s * 6.5f - 1.5f, 18.f, -4.f), vec3(s * 6.5f + 1.5f, 25.f, 4.f), P_STRIPE, 0x3B | 8);   // (a funnel)
+        if (d1) for (float z = -20.f; z <= 20.f; z += lod == 2 ? 40.f : 13.3f)
+          mb.box(vec3(s * 8.7f - (s > 0.f ? 0.f : 1.4f), 13.2f, z - 3.5f), vec3(s * 8.7f + (s > 0.f ? 1.4f : 0.f), 14.6f, z + 3.5f), P_TRIM, 0x3F);   // (lifeboats)
+      }
+      if (d0) for (float s : {-1.f, 1.f}) mb.cyl(vec3(0, 19.5f, s * 29.f), vec3(0, 26.f, s * 29.f), 0.15f, 0.12f, 6, P_METAL, true, false);   // (masts)
+      if (lod == 3)   // (up close: the rails along her decks)
+        for (float s : {-1.f, 1.f}) { mb.box(vec3(s * 8.6f - 0.04f, 15.f, -36.f), vec3(s * 8.6f + 0.04f, 16.1f, 36.f), P_METAL, 1 | 2 | 8);
+                                      mb.box(vec3(s * 7.f - 0.04f, 18.f, -26.f), vec3(s * 7.f + 0.04f, 19.1f, 26.f), P_METAL, 1 | 2 | 8); }
+      break;
+    }
+    case EK_BOAT: {   // a 10 m sailing yacht at her mooring (bow +z, the waterline y 0): her hull, her cabin and its windows, the
+      // mast and boom, the mainsail furled on it under its cover, the anchor light at the masthead
+      hullLoft(mb, 0.f, -5.f, 5.f, 1.7f, -0.7f, 0.9f, lod == 3 ? 12 : lod == 0 ? 8 : lod == 1 ? 6 : 4, P_PAINT, P_ROOF);
+      mb.box(vec3(-1.1f, 0.9f, -1.8f), vec3(1.1f, 1.55f, 1.4f), P_WALL, 0x3B | 8);
+      if (d1) for (float s : {-1.f, 1.f}) mb.box(vec3(s * 1.1f - 0.01f, 1.15f, -1.2f), vec3(s * 1.1f + 0.01f, 1.4f, 0.9f), P_GLASS, s > 0.f ? 2 : 1);
+      mb.cyl(vec3(0, 0.9f, 1.f), vec3(0, 14.f, 1.f), 0.08f, 0.06f, d0 ? 6 : 4, P_METAL, true, false);
+      mb.cyl(vec3(0, 2.2f, 1.f), vec3(0, 2.2f, -3.6f), 0.06f, 0.06f, 4, P_METAL, false, true);
+      if (d1) mb.cyl(vec3(0, 2.45f, 0.8f), vec3(0, 2.45f, -3.4f), 0.22f, 0.16f, d0 ? 8 : 5, P_TRIM, true, true);
+      if (d0) { mb.box(vec3(-0.08f, 13.95f, 0.92f), vec3(0.08f, 14.12f, 1.08f), P_LAMP, 0x3F);
+                for (float s : {-1.f, 1.f}) mb.cyl(vec3(0, 13.f, 1.f), vec3(s * 1.5f, 0.95f, 1.2f), 0.012f, 0.012f, 3, P_METAL, false, false); }   // (the shrouds)
+      if (lod == 3) mb.cyl(vec3(0, 12.5f, 1.f), vec3(0, 0.95f, 4.8f), 0.012f, 0.012f, 3, P_METAL, false, false);   // (the forestay)
+      break;
+    }
     case EK_POLE: {   // a wooden pole, a crossarm, three insulators; up close, its three wires to the next pole along +z
       mb.cyl(vec3(0, -0.5f, 0), vec3(0, 9.f, 0), 0.14f, 0.11f, d0 ? 10 : d1 ? 6 : 4, P_WOOD, true, false);
       mb.box(vec3(-1.05f, 8.15f, -0.06f), vec3(1.05f, 8.3f, 0.06f), P_WOOD, lod == 2 ? 8 | 16 | 32 : 0x3F);

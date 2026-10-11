@@ -64,6 +64,16 @@ std::vector<int> reservoirTexels(const World& world, const Reservoir& r);
 // Its lake's mask (world.h LakeMask) over its square, from the natural ground: false if the water would reach the
 // square's edge (spill)
 bool reservoirMask(const World& world, const Reservoir& r, LakeMask& out);
+// The ferries (Phase D): a route over the sea between two coastal towns on different islands, from harbour to harbour -
+// as few routes as join every island, the shortest - found with the landmarks; one ferry on each, on a timetable (its
+// place a matter of the time alone: the same on every run), and the yachts moored off each coastal town (landmarks())
+struct FerryRoute { int townA = -1, townB = -1; std::vector<vec2> pts; std::vector<float> along; };
+const std::vector<FerryRoute>& ferryRoutes();
+static const float kFerrySpeed = 9.f, kFerryDwell = 150.f;   // (m/s: 17.5 knots; s at each end)
+// where the ferries are at time t (s): each its route's EK_FERRY, at the waterline, her bows along her route (she runs
+// both ways); docked: true while she waits at a harbour
+void ferryInstances(float t, std::vector<std::pair<int, Ent>>& out);
+bool ferryAt(const FerryRoute& r, float t, vec2& at, vec2& heading, bool* docked = nullptr);
 void sceneryInit();  // build shared road tables before any threaded use
 void sceneryBaseMod(float x, float z, float& h, float& amp);  // flatten roads / towns in the base map
 

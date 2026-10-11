@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <queue>
 #include <unordered_set>
 
 float airportInfluence(float x, float z);   // world.cpp
@@ -15,6 +16,7 @@ float airportInfluence(float x, float z);   // world.cpp
 namespace {
 PlacedByChunk g_landmarks;
 std::vector<vec3> g_clearings;
+std::vector<FerryRoute> g_ferries;
 
 float baseAt(const World& w, float x, float z, int c = 0) { float b[4]; w.sampleBase(x, z, b); return b[c]; }
 bool clearOfRunways(const World& w, float x, float z, float r) {
@@ -372,6 +374,133 @@ void fjordhavenDam(const World& world, std::vector<PlacedEnt>& out) {
   out.push_back({EK_DAM, {o.x, r.floor - 4.f, o.y, atan2f(v.x, v.y), r.scale(), (r.crest + 4.f) / 70.f, r.scale(), 0.5f}});
   g_clearings.push_back(vec3(o.x, o.y, 0.5f * r.chord + 60.f));
 }
+
+// ---- the sea's traffic (Phase D)
+// A coastal town's harbour: the nearest place to its centre where the sea is 6 m deep, within 4.5 km (clear of the
+// container terminal's quay); none for a town inland
+bool harbourOf(const World& world, int t, vec2& at) {
+  const vec2 c(kTowns[t].x, kTowns[t].z);
+  vec2 quay(1e9f, 1e9f);
+  for (const PlacedEnt& p : civicLandmarks()) if (p.kind == EK_QUAY) quay = vec2(p.e.x, p.e.z);
+  for (float r = 100.f; r <= 4500.f; r += 50.f)
+    for (int a = 0; a < 90; a++) {
+      const vec2 p = c + vec2(cosf(a * 0.0698f), sinf(a * 0.0698f)) * r;
+      if (world.naturalHeight(p.x, p.y) < -6.f && length(p - quay) > 500.f) { at = p; return true; }
+    }
+  return false;
+}
+
+// The way by sea from a to b: A* over 200 m cells of open water (6 m deep and more; dearer under 15 m), then drawn
+// taut - each leg straight as far as the water under it stays 3 m deep
+bool seaRoute(const World& world, vec2 a, vec2 b, std::vector<vec2>& out) {
+  const float C = 200.f, margin = 8000.f;
+  const float x0 = std::min(a.x, b.x) - margin, z0 = std::min(a.y, b.y) - margin;
+  const int nx = (int)((std::max(a.x, b.x) + margin - x0) / C) + 1, nz = (int)((std::max(a.y, b.y) + margin - z0) / C) + 1;
+  auto centre = [&](int i, int j) { return vec2(x0 + (i + 0.5f) * C, z0 + (j + 0.5f) * C); };
+  std::vector<float> depth((size_t)nx * nz);
+  parallelFor(nz, [&](int j) { for (int i = 0; i < nx; i++) { const vec2 p = centre(i, j); depth[(size_t)j * nx + i] = -world.naturalHeight(p.x, p.y); } });
+  const int si = std::clamp((int)((a.x - x0) / C), 0, nx - 1), sj = std::clamp((int)((a.y - z0) / C), 0, nz - 1);
+  const int ti = std::clamp((int)((b.x - x0) / C), 0, nx - 1), tj = std::clamp((int)((b.y - z0) / C), 0, nz - 1);
+  std::vector<float> cost((size_t)nx * nz, 1e30f); std::vector<int> from((size_t)nx * nz, -1);
+  using QE = std::pair<float, int>;
+  std::priority_queue<QE, std::vector<QE>, std::greater<QE>> q;
+  const int s = sj * nx + si, goal = tj * nx + ti;
+  cost[s] = 0.f; q.push({0.f, s});
+  while (!q.empty()) {
+    const auto [f, k] = q.top(); q.pop();
+    if (k == goal) break;
+    const int i = k % nx, j = k / nx;
+    const float h = length(centre(i, j) - centre(ti, tj));
+    if (f > cost[k] + h + 1e-3f) continue;
+    for (int dj = -1; dj <= 1; dj++)
+      for (int di = -1; di <= 1; di++) {
+        if (!di && !dj) continue;
+        const int ni = i + di, nj = j + dj; if (ni < 0 || nj < 0 || ni >= nx || nj >= nz) continue;
+        const int nk = nj * nx + ni;
+        if (depth[nk] < 6.f && nk != goal) continue;
+        const float c = cost[k] + C * (di && dj ? 1.4142f : 1.f) * (depth[nk] < 15.f ? 3.f : 1.f);
+        if (c < cost[nk]) { cost[nk] = c; from[nk] = k; q.push({c + length(centre(ni, nj) - centre(ti, tj)), nk}); }
+      }
+  }
+  if (from[goal] < 0) return false;
+  std::vector<vec2> cells;
+  for (int k = goal; k >= 0; k = from[k]) cells.push_back(centre(k % nx, k / nx));
+  std::reverse(cells.begin(), cells.end());
+  cells.front() = a; cells.back() = b;
+  auto clear = [&](vec2 p, vec2 q2) {
+    const int n = std::max(1, (int)(length(q2 - p) / 40.f));
+    for (int k = 0; k <= n; k++) { const vec2 m = p + (q2 - p) * ((float)k / n); if (world.naturalHeight(m.x, m.y) > -3.f) return false; }
+    return true;
+  };
+  out.assign(1, a);
+  for (size_t i = 0; i + 1 < cells.size();) {
+    size_t j = cells.size() - 1;
+    while (j > i + 1 && !clear(cells[i], cells[j])) j--;
+    out.push_back(cells[j]); i = j;
+  }
+  return true;
+}
+
+// The routes: between the coastal towns of each two islands, harbour to harbour, the nearest pair (32 km at the most);
+// of those as few as join every island, the shortest first (Kruskal's)
+void ferries(const World& world) {
+  g_ferries.clear();
+  const auto& N = world.roads.nodes;
+  struct Cand { float d; int a, b; vec2 ha, hb; };
+  std::vector<Cand> cand;
+  std::vector<int> isl(kNumTowns, -1); std::vector<vec2> hb(kNumTowns); std::vector<bool> coast(kNumTowns, false);
+  for (int t = 0; t < kNumTowns && t < (int)N.size(); t++) { isl[t] = N[t].island; coast[t] = harbourOf(world, t, hb[t]); }
+  for (int a = 0; a < kNumTowns; a++)
+    for (int b = a + 1; b < kNumTowns; b++)
+      if (coast[a] && coast[b] && isl[a] != isl[b] && length(hb[a] - hb[b]) < 32000.f) cand.push_back({length(hb[a] - hb[b]), a, b, hb[a], hb[b]});
+  std::sort(cand.begin(), cand.end(), [](const Cand& x, const Cand& y) { return x.d != y.d ? x.d < y.d : x.a != y.a ? x.a < y.a : x.b < y.b; });
+  std::vector<int> root(64); for (int i = 0; i < 64; i++) root[i] = i;
+  auto find = [&](int i) { while (root[i] != i) i = root[i] = root[root[i]]; return i; };
+  for (const Cand& c : cand) {
+    const int ra = find(isl[c.a] & 63), rb = find(isl[c.b] & 63);
+    if (ra == rb) continue;
+    FerryRoute r; r.townA = c.a; r.townB = c.b;
+    if (!seaRoute(world, c.ha, c.hb, r.pts)) continue;
+    r.along.assign(r.pts.size(), 0.f);
+    for (size_t k = 1; k < r.pts.size(); k++) r.along[k] = r.along[k - 1] + length(r.pts[k] - r.pts[k - 1]);
+    root[ra] = rb;
+    g_ferries.push_back(std::move(r));
+  }
+}
+
+// The yachts moored off each coastal town: in 1.2 to 7 m of water within 70 m of its shore and 2.5 km of its centre,
+// the nearest to it first, 16 m apart - eight off a village, fourteen off a town, twenty-four off a city - clear of the
+// terminal's quay and of the ferries' harbours, all lying to the same breeze
+void harbourBoats(const World& world, std::vector<PlacedEnt>& out) {
+  vec2 quay(1e9f, 1e9f);
+  for (const PlacedEnt& p : civicLandmarks()) if (p.kind == EK_QUAY) quay = vec2(p.e.x, p.e.z);
+  std::vector<vec2> harbours;
+  for (const FerryRoute& r : g_ferries) { harbours.push_back(r.pts.front()); harbours.push_back(r.pts.back()); }
+  for (int t = 0; t < kNumTowns; t++) {
+    const vec2 c(kTowns[t].x, kTowns[t].z);
+    std::vector<std::pair<float, vec2>> spots;
+    for (float z = c.y - 2500.f; z <= c.y + 2500.f; z += 20.f)
+      for (float x = c.x - 2500.f; x <= c.x + 2500.f; x += 20.f) {
+        const vec2 p(x, z); const float d = length(p - c), g = world.naturalHeight(x, z);
+        if (d > 2500.f || g > -1.2f || g < -7.f || length(p - quay) < 450.f) continue;
+        bool shore = false, near = false;
+        for (int k = 0; k < 8 && !shore; k++) shore = world.naturalHeight(x + 70.f * cosf(k * 0.785f), z + 70.f * sinf(k * 0.785f)) > 0.5f;
+        for (const vec2& h : harbours) near = near || length(p - h) < 250.f;
+        if (shore && !near && clearOfRunways(world, x, z, 1500.f)) spots.push_back({d, p});
+      }
+    std::sort(spots.begin(), spots.end(), [](const auto& a, const auto& b) { return a.first != b.first ? a.first < b.first : a.second.x < b.second.x; });
+    const int most = kTowns[t].kind == 2 ? 24 : kTowns[t].kind == 1 ? 14 : 8;
+    std::vector<vec2> moored;
+    for (const auto& sp : spots) {
+      if ((int)moored.size() >= most) break;
+      bool crowded = false; for (const vec2& m : moored) crowded = crowded || length(m - sp.second) < 16.f;
+      if (crowded) continue;
+      moored.push_back(sp.second);
+      const float h = hash2i((int)sp.second.x, (int)sp.second.y);
+      out.push_back({EK_BOAT, {sp.second.x, 0.f, sp.second.y, 0.7f + 0.3f * (h - 0.5f), 0.9f + 0.2f * h, 0.9f + 0.2f * h, 0.9f + 0.2f * h, h}});
+    }
+  }
+}
 }  // namespace
 
 void sceneryBakeLandmarks(const World& world) {
@@ -386,6 +515,8 @@ void sceneryBakeLandmarks(const World& world) {
   lighthouseKey(world, out);
   racetrack(world, out);
   fjordhavenDam(world, out);
+  ferries(world);
+  harbourBoats(world, out);
   for (const PlacedEnt& c : civicLandmarks()) {   // (the cities': placed with their lots; their grounds cleared)
     out.push_back(c);
     if (c.kind == EK_STADIUM) g_clearings.push_back(vec3(c.e.x, c.e.z, 105.f));
@@ -551,4 +682,39 @@ bool reservoirMask(const World& world, const Reservoir& r, LakeMask& out) {
     out.m.swap(m);
   }
   return true;
+}
+
+const std::vector<FerryRoute>& ferryRoutes() { return g_ferries; }
+
+// A ferry's place at time t: her route's length each way at kFerrySpeed, kFerryDwell at each end; each route's timetable
+// set off by its own amount. Her bows along the route from A to B (out stern first on the way back: she's double-ended);
+// the heading a look 120 m along it, so she comes round her turns
+bool ferryAt(const FerryRoute& r, float t, vec2& at, vec2& heading, bool* docked) {
+  if (r.pts.size() < 2) return false;
+  const float L = r.along.back(), run = L / kFerrySpeed, T = 2.f * (run + kFerryDwell);
+  float ph = fmodf(t + T * hash2i(r.townA * 7 + 1, r.townB * 13 + 5), T); if (ph < 0.f) ph += T;
+  float s; bool dock = false;
+  if (ph < kFerryDwell) { s = 0.f; dock = true; }
+  else if (ph < kFerryDwell + run) s = (ph - kFerryDwell) * kFerrySpeed;
+  else if (ph < 2.f * kFerryDwell + run) { s = L; dock = true; }
+  else s = L - (ph - 2.f * kFerryDwell - run) * kFerrySpeed;
+  auto pointAt = [&](float x) {
+    x = std::clamp(x, 0.f, L);
+    size_t k = 0; while (k + 2 < r.along.size() && r.along[k + 1] < x) k++;
+    const float u = std::clamp((x - r.along[k]) / std::max(r.along[k + 1] - r.along[k], 1e-3f), 0.f, 1.f);
+    return r.pts[k] + (r.pts[k + 1] - r.pts[k]) * u;
+  };
+  at = pointAt(s);
+  const vec2 ahead = pointAt(std::min(s + 120.f, L)) - pointAt(std::max(s - 120.f, 0.f));
+  heading = ahead * (1.f / std::max(length(ahead), 1e-3f));
+  if (docked) *docked = dock;
+  return true;
+}
+
+void ferryInstances(float t, std::vector<std::pair<int, Ent>>& out) {
+  for (const FerryRoute& r : g_ferries) {
+    vec2 at, h;
+    if (!ferryAt(r, t, at, h)) continue;
+    out.push_back({EK_FERRY, Ent{at.x, 0.f, at.y, atan2f(h.x, h.y), 1.f, 1.f, 1.f, 0.5f}});
+  }
 }

@@ -527,6 +527,28 @@ void main(){
       else if (part == P_GLASS) { alb = vec3(0.04, 0.06, 0.08); rough = 0.08; emit = vec3(1.0, 0.92, 0.78)*uNight*0.5; }
       else if (part == P_LAMP) { alb = vec3(0.9); cls = 3.0; nb = n0; emit = vec3(1.0, 0.85, 0.6)*(0.2 + 6.0*uNight); }
       else alb = vec3(0.3, 0.22, 0.15);
+    } else if (uKind == K_FERRY) {   // a ferry: white over navy, red below her waterline, her saloons lit at night, her funnels in the
+      // line's colours
+      if (part == P_PAINT) alb = mp.y < -0.3 ? vec3(0.45, 0.08, 0.06) : mp.y < 2.6 ? vec3(0.05, 0.1, 0.25) : mp.y < 3.4 ? vec3(0.9, 0.55, 0.1) : vec3(0.9);
+      else if (part == P_WALL) alb = vec3(0.92, 0.93, 0.94);
+      else if (part == P_GLASS) { alb = vec3(0.04, 0.06, 0.08); rough = 0.08; emit = vec3(1.0, 0.9, 0.72)*uNight*0.9; }
+      else if (part == P_STRIPE) alb = mp.y > 23.5 ? vec3(0.05) : mp.y > 21.5 ? vec3(0.9) : vec3(0.08, 0.2, 0.5);
+      else if (part == P_TRIM) alb = vec3(0.95, 0.45, 0.05);
+      else if (part == P_ROOF) alb = vec3(0.3, 0.38, 0.34);
+      else if (part == P_METAL) { alb = vec3(0.7); metal = 0.5; }
+      else alb = vec3(0.06);
+      rough = part == P_GLASS ? rough : 0.4;
+      alb *= mix(0.6, 1.0, smoothstep(-0.5, 1.0, wy));   // (wet at the waterline)
+    } else if (uKind == K_BOAT) {   // a yacht: her hull white, or navy, or racing green; her cabin cream; her sail cover blue; her
+      // anchor light lit at night
+      if (part == P_PAINT) alb = mp.y < -0.15 ? vec3(0.08, 0.1, 0.18) : pal(seed*3.1, vec3(0.92), vec3(0.06, 0.1, 0.25), vec3(0.92), vec3(0.05, 0.2, 0.12));
+      else if (part == P_WALL) alb = vec3(0.88, 0.86, 0.8);
+      else if (part == P_ROOF) alb = vec3(0.7, 0.62, 0.5);   // (teak)
+      else if (part == P_GLASS) { alb = vec3(0.03); rough = 0.06; }
+      else if (part == P_TRIM) alb = pal(seed*5.7, vec3(0.1, 0.25, 0.55), vec3(0.1, 0.3, 0.6), vec3(0.75, 0.1, 0.08), vec3(0.85));
+      else if (part == P_LAMP) { alb = vec3(0.9); cls = 3.0; nb = n0; emit = vec3(1.0, 0.95, 0.85)*(0.1 + 6.0*uNight); }
+      else { alb = vec3(0.75); metal = 0.6; }
+      rough = part == P_GLASS ? rough : 0.35;
     } else if (uKind == K_GRANDSTAND) {   // a grandstand: its seats in rows, a block of colour to each section between the aisles
       // and people in them, its walls concrete, its roof white
       if (part == P_PAINT) {

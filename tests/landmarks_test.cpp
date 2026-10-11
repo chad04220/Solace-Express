@@ -3,7 +3,7 @@
 // warm shallows, open water round her; an offshore platform in deep water out of sight of no land; three observatory
 // domes on Mount Kaleo's rim; a star fort on a cape; Lighthouse Key's cottages and landing stage; the cities' stadium and
 // container terminal; the racetrack, its circuit and pit lane, its buildings and its grounds; the Fjordhaven dam and its
-// lake. The wind
+// lake; the ferries' routes across open water between the islands, their timetables, and the yachts off the towns. The wind
 // farm: a row of turbines along a ridge's crest, 300 m and more apart, on the hills under the snow, out of the settlements, off the
 // roads and 6 km or more from every runway; each in its own chunk's scenery; found the same every time.
 #include "../src/scenery.h"
@@ -338,6 +338,94 @@ int main() {
       check(growing == 0, "no tree, bush or rock in the lake");
       g_scenery.clear();
     }
+  }
+  // the sea's traffic: the ferries, harbour to harbour across open water, joining the islands; the yachts off the towns
+  {
+    const std::vector<FerryRoute>& F = ferryRoutes();
+    check(!F.empty(), "ferries between the islands");
+    std::vector<int> root(64); for (int i = 0; i < 64; i++) root[i] = i;
+    auto find = [&](int i) { while (root[i] != i) i = root[i] = root[root[i]]; return i; };
+    int shallow = 0, lowDeck = 0, offRoute = 0, jumps = 0, dry = 0, docks = 0;
+    for (const FerryRoute& r : F) {
+      const int ia = w.roads.nodes[r.townA].island, ib = w.roads.nodes[r.townB].island;
+      check(ia != ib && find(ia & 63) != find(ib & 63), "each ferry joining two islands no other route has joined");
+      root[find(ia & 63)] = find(ib & 63);
+      for (int e = 0; e < 2; e++) {
+        const int t = e ? r.townB : r.townA; const vec2 h = e ? r.pts.back() : r.pts.front();
+        check(hypotf(h.x - kTowns[t].x, h.y - kTowns[t].z) <= 4600.f && w.naturalHeight(h.x, h.y) < -6.f, "a ferry's harbour off its town, 6 m deep");
+      }
+      check(r.along.size() == r.pts.size() && r.along.back() > 1000.f, "a ferry's route measured along");
+      for (size_t k = 0; k + 1 < r.pts.size(); k++) {
+        const vec2 a = r.pts[k], b = r.pts[k + 1];
+        const int n = std::max(1, (int)(length(b - a) / 10.f));
+        for (int j = 0; j <= n; j++) { const vec2 p = a + (b - a) * ((float)j / n); if (w.naturalHeight(p.x, p.y) > -2.f) shallow++; }
+        // under a bridge only where the girders clear her mast
+        for (const Bridge& br : w.bridges)
+          for (size_t d = 0; d + 1 < br.deck.size(); d++) {
+            const vec2 c(br.deck[d].x, br.deck[d].z), e2(br.deck[d + 1].x, br.deck[d + 1].z);
+            const vec2 r1 = b - a, r2 = e2 - c; const float den = r1.x * r2.y - r1.y * r2.x;
+            if (fabsf(den) < 1e-6f) continue;
+            const float u = ((c.x - a.x) * r2.y - (c.y - a.y) * r2.x) / den, v = ((c.x - a.x) * r1.y - (c.y - a.y) * r1.x) / den;
+            if (u < 0.f || u > 1.f || v < 0.f || v > 1.f) continue;
+            const float under = br.deck[d].h + (br.deck[d + 1].h - br.deck[d].h) * v - br.depth;
+            if (under < kEntInfo[EK_FERRY].h + 3.f) { if (lowDeck++ < 3) std::printf("  ferry %s-%s under a bridge %.0f m up at %.0f %.0f\n", kTowns[r.townA].name, kTowns[r.townB].name, under, a.x + r1.x * u, a.y + r1.y * u); }
+          }
+      }
+      // her timetable: out, a wait, back, a wait; on her route, over the water, never faster than her speed
+      const float T = 2.f * (r.along.back() / kFerrySpeed + kFerryDwell);
+      vec2 last; bool first = true; int docked = 0;
+      for (float t = 0.f; t < T; t += 2.f) {
+        vec2 at, hd; bool dk = false;
+        check(ferryAt(r, t, at, hd, &dk), "a ferry somewhere at every time");
+        docked += dk;
+        if (fabsf(length(hd) - 1.f) > 1e-3f) jumps++;
+        if (!first && length(at - last) > 2.f * kFerrySpeed * 1.01f + 0.01f) jumps++;
+        if (w.naturalHeight(at.x, at.y) > -2.f) dry++;
+        float best = 1e9f;
+        for (size_t k = 0; k + 1 < r.pts.size(); k++) {
+          const vec2 a = r.pts[k], ab = r.pts[k + 1] - a; const float u = std::clamp(((at.x - a.x) * ab.x + (at.y - a.y) * ab.y) / std::max(ab.x * ab.x + ab.y * ab.y, 1e-6f), 0.f, 1.f);
+          best = std::min(best, length(a + ab * u - at));
+        }
+        if (best > 0.5f) offRoute++;
+        last = at; first = false;
+      }
+      if (fabsf(docked * 2.f - 2.f * kFerryDwell) > 6.f) docks++;
+      vec2 a0, a1, hd;
+      ferryAt(r, 123.f, a0, hd); ferryAt(r, 123.f + T, a1, hd);
+      check(length(a0 - a1) < 0.5f, "a ferry's timetable repeating every round trip");
+      std::printf("ferry %s - %s: %.1f km, %zu legs, round trip %.0f min\n", kTowns[r.townA].name, kTowns[r.townB].name, r.along.back() / 1000.f, r.pts.size() - 1, T / 60.f);
+    }
+    check(shallow == 0, "the ferries' routes over open water, 2 m deep and more all the way");
+    check(lowDeck == 0, "no ferry under a bridge too low for her");
+    check(offRoute == 0 && jumps == 0 && dry == 0, "each ferry on her route, at her speed, afloat");
+    check(docks == 0, "each ferry alongside at each end for her wait");
+    // every island a coastal town is on reached by them (32 km of sea and less between)
+    std::vector<int> coastal;
+    for (const FerryRoute& r : F) for (int t : {r.townA, r.townB}) coastal.push_back(find(w.roads.nodes[t].island & 63));
+    std::sort(coastal.begin(), coastal.end()); coastal.erase(std::unique(coastal.begin(), coastal.end()), coastal.end());
+    check(coastal.size() == 1, "the ferries joining their islands into one network");
+    // the yachts: afloat at the sea's level in the shallows off a town, 16 m and more apart, clear of the quay and the
+    // ferries' harbours; a few off each coastal town and no more than its share
+    vec2 quay(1e9f, 1e9f);
+    for (const PlacedEnt& p : items) if (p.kind == EK_QUAY) quay = vec2(p.e.x, p.e.z);
+    std::vector<Ent> yachts; std::vector<int> per(kNumTowns, 0);
+    for (const PlacedEnt& p : items) if (p.kind == EK_BOAT) yachts.push_back(p.e);
+    int badYacht = 0, crowded = 0, inHarbour = 0;
+    for (size_t i = 0; i < yachts.size(); i++) {
+      const Ent& e = yachts[i]; const float g = w.naturalHeight(e.x, e.z);
+      int town = -1; float best = 2500.f;
+      for (int t = 0; t < kNumTowns; t++) { const float d = hypotf(e.x - kTowns[t].x, e.z - kTowns[t].z); if (d <= best) { best = d; town = t; } }
+      if (town >= 0) per[town]++;
+      if (e.y != 0.f || g > -1.2f || g < -7.f || town < 0 || hypotf(e.x - quay.x, e.z - quay.y) < 450.f) badYacht++;
+      for (const FerryRoute& r : F) for (const vec2& h : {r.pts.front(), r.pts.back()}) if (hypotf(e.x - h.x, e.z - h.y) < 250.f) inHarbour++;
+      for (size_t j = i + 1; j < yachts.size(); j++) if (hypotf(yachts[j].x - e.x, yachts[j].z - e.z) < 16.f) crowded++;
+    }
+    int towns = 0, over = 0;
+    for (int t = 0; t < kNumTowns; t++) { towns += per[t] > 0; if (per[t] > (kTowns[t].kind == 2 ? 24 : kTowns[t].kind == 1 ? 14 : 8) * 2) over++; }
+    std::printf("yachts: %zu off %d towns\n", yachts.size(), towns);
+    check(towns >= 4 && yachts.size() >= 40, "yachts moored off the coastal towns");
+    check(badYacht == 0, "each yacht afloat in 1.2 to 7 m of water off a town, clear of the terminal's quay");
+    check(crowded == 0 && inHarbour == 0 && over == 0, "the yachts 16 m apart, out of the ferries' way, a few to each town");
   }
   // in their chunks' scenery, as generated
   for (size_t i = 0; i < turbines.size(); i += 3) {

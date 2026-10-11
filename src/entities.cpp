@@ -125,6 +125,7 @@ const EntKindInfo kEntInfo[EK_COUNT] = {
   {"Container ship", 17.f, 40.f, 115.f},   // (the quay from its apron's top; the ship from the sea)
   {"Pit garages", 48.f, 13.5f, 11.f}, {"Pit wall", 24.f, 1.1f, 3.f}, {"Grandstand", 60.f, 24.f, 16.f},   // (the pit wall: its concrete; the fence above it isn't solid)
   {"Race transporter", 1.3f, 4.1f, 8.3f}, {"Dam", 160.f, 72.f, 60.f},   // (the dam: its arch and powerhouse; its lake's edge beyond)
+  {"Ferry", 9.f, 27.f, 50.f}, {"Yacht", 1.8f, 14.f, 5.2f},   // (from the sea: y 0 the waterline)
 };
 
 static inline float h2(int a, int b) { return hash2i(a, b); }

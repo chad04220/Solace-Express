@@ -3239,6 +3239,30 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
         bill(add, at - f * L + r * s + vec3(0, 0.9f, 0), dl * 0.0013f, vec3(1.f, 0.05f, 0.02f) * (4.f * night * fade), 1.f, SPR_GLOW, 2.f);
       }
     }
+    // the ferries' navigation lights (scenery.h): her two masthead lights white, at the end she's heading for a sidelight
+    // either side (red to port, green to starboard), a white stern light at the other; out to 15 km
+    for (const FerryRoute& fr : ferryRoutes()) {
+      vec2 p0, p1, h; bool docked = false;
+      if (!ferryAt(fr, fp.time, p0, h, &docked) || !ferryAt(fr, fp.time + 1.f, p1, h)) continue;
+      const vec3 at(p0.x + off.x, 0.f, p0.y + off.y);
+      const float dl = length(at - fp.camPos), fade = smoothstepf(60.f, 300.f, dl);
+      if (fade <= 0.f || dl > 15000.f) continue;
+      const vec2 mv = p1 - p0; const vec2 g = length(mv) > 0.1f ? mv * (1.f / length(mv)) : h;   // (the way she's going)
+      const vec3 f(g.x, 0.f, g.y), r(-g.y, 0.f, g.x), hz(h.x, 0.f, h.y);
+      const float sz = dl * 0.0016f, I = 5.f * night * fade;
+      for (float s : {-29.f, 29.f}) bill(add, at + hz * s + vec3(0, 26.3f, 0), sz, vec3(1.f, 0.95f, 0.85f) * I, 1.f, SPR_GLOW, 2.f);
+      bill(add, at + f * 29.f - r * 8.3f + vec3(0, 18.5f, 0), sz, vec3(1.f, 0.06f, 0.03f) * I, 1.f, SPR_GLOW, 2.f);
+      bill(add, at + f * 29.f + r * 8.3f + vec3(0, 18.5f, 0), sz, vec3(0.1f, 1.f, 0.35f) * I, 1.f, SPR_GLOW, 2.f);
+      bill(add, at - f * 32.5f + vec3(0, 16.f, 0), sz, vec3(1.f, 0.95f, 0.85f) * (0.8f * I), 1.f, SPR_GLOW, 2.f);
+    }
+    // and the yachts' anchor lights at their mastheads, out to 4 km
+    for (const PlacedEnt& p : landmarks()) {
+      if (p.kind != EK_BOAT) continue;
+      const vec3 at(p.e.x + sinf(p.e.yaw) * p.e.sz + off.x, 14.1f * p.e.sy, p.e.z + cosf(p.e.yaw) * p.e.sz + off.y);
+      const float dl = length(at - fp.camPos), fade = smoothstepf(40.f, 160.f, dl);
+      if (fade <= 0.f || dl > 4000.f) continue;
+      bill(add, at, dl * 0.0012f, vec3(1.f, 0.95f, 0.85f) * (3.f * night * fade), 1.f, SPR_GLOW, 2.f);
+    }
   }
   // runway lighting
   for (size_t ai = 0; ai < g_world.airports.size(); ai++) {
