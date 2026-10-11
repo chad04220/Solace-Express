@@ -87,8 +87,9 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   beyond their platforms (streets and the racetrack's circuit 20 m, other roads 50 m). `roads_test` fails if any
   segment goes unlisted or the lists come within a texel's worth of the limit. New roads (Phase C's access roads)
   need that headroom, or a wider packing. `road_class_numbers` holds roads.glsl's widths and reaches to roadSpec's.
-- **Phase A is done, and Phase C's twelve landmarks are built.** Phase D is built: traffic on the roads, the towns'
-  lights at dusk, ferries between the islands and yachts in the harbours. Phase E, the visual pass, is next.
+- **Phases A to D are done:** the road network, the settlements, Phase C's twelve landmarks, and Phase D's traffic on
+  the roads, the towns' lights at dusk, ferries between the islands and yachts in the harbours. Phase E, the visual
+  pass, has had its first round (below).
 - **Phase C, the wind farm (after v3.48, `landmarks.cpp`, `landmarks_test`).** Ten 3 MW turbines stand 300 m apart
   along the crest of a ridge (the best one on the mild green hills, 80 to 700 m up). They are out of the settlements,
   off the roads, and 6 km or more from every runway. Each is a 90 m tower with its nacelle and three 45 m blades. The
@@ -300,7 +301,12 @@ Done so far (after v3.48):
   flattened ground and read as a veil of haze. On flattened ground the sand now lies in patches with ragged edges,
   sand or grass.
 
-Still to look at: the haze from altitude; forest edges, the water along the shore and the clouds, from the cockpit.
+- **Looked at and left as they are:** the haze from altitude, which is as thick as the weather's visibility makes it
+  (40 km: 60% of the way to the horizon's colour at 10 km); the forest along the coasts; the water along the beaches
+  and the yachts on it; the clouds from under their base and from above them; the cities from 40 m over their streets;
+  the farmland's patchwork from 800 m, pale where the wheat is ripe; Kailani's lights at dusk.
+- All of it rendered with the photographed materials (the render harness's `MATDIR` pointed at `assets/materials`:
+  without it the harness draws the procedural set).
 
 ## Contracts kept throughout
 
