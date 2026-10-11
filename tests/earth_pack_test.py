@@ -11,7 +11,7 @@ import csv
 import hashlib
 import json
 import math
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import shutil
 import struct
 import subprocess
@@ -84,7 +84,7 @@ def ghost_address(face, level, i, j):
 
 
 def file_snapshot(root):
-    return {str(p.relative_to(root)): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
+    return {p.relative_to(root).as_posix(): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
 
 
 def write_json(path, value):
@@ -97,6 +97,19 @@ def feature(ident, coords, node_ids=None, cls="primary"):
         props["node_ids"] = node_ids
     return {"type": "Feature", "properties": props,
             "geometry": {"type": "LineString", "coordinates": coords}}
+
+
+class SnapshotTests(unittest.TestCase):
+    def test_windows_snapshot_keys_match_manifest_paths(self):
+        # Exercise Windows path spelling even when this test runs on Linux.
+        relative = PureWindowsPath("elevation/ny/6/49_56.elv")
+        payload = mock.Mock()
+        payload.relative_to.return_value = relative
+        payload.is_file.return_value = True
+        payload.read_bytes.return_value = b"payload"
+        root = mock.Mock()
+        root.rglob.return_value = [payload]
+        self.assertEqual(file_snapshot(root), {"elevation/ny/6/49_56.elv": b"payload"})
 
 
 class JsonTests(unittest.TestCase):

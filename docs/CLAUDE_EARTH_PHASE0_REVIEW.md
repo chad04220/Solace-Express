@@ -2,13 +2,13 @@
 
 Branch: `codex/earth-data-phase0-20261011`
 Base: `efbe9369483286bc557d83496bfcf95bfc6fa944` on Claude's working branch.
-Status: validated local offline review prototype. No runtime world integration or publication.
+Status: published offline review prototype. No runtime world integration.
 
 ## Scope
 
 This phase provides offline source adapters, tangent-cube elevation tiles, road topology clipping, airport-table normalization, and a checksummed world-pack directory. It does not replace terrain, alter the current Solace archipelago, change aircraft meshes, relocate airports, change saves, or introduce globe physics. Those remain later phases.
 
-The user approved developing Phase 0 in the existing workspace and routine coordination in issue #2. A review-branch push still needs approval.
+The user approved developing Phase 0 in the existing workspace, routine coordination in issue #2, and publishing this review branch.
 
 ## Source choices
 
@@ -27,6 +27,12 @@ The owner has a separate ChatGPT agent investigating USGS EarthExplorer imagery.
 - All 91 pre-existing CTest entries completed without failures; `ci_test_selection` was initially skipped before the CMake file-API reply existed. After reconfiguration, it passed.
 - The Earth suite passes all 55 tests, including real GDAL adapter regressions, 67,584 seam address pairs, corner/apron checks, topology, deterministic outputs, malformed packs and Windows checkout hashes. The final focused CTest run passes 4/4 (`earth_pack`, `ci_test_selection`, `shader_prune`, `aircraft_geometry_source`), with no skips in that run. An independent 12-check adapter/safety smoke also passes.
 - No `src/` or shader changes are part of this phase.
+
+### Native Windows CI portability correction
+
+The [first review-branch CI run](https://github.com/chad04220/Solace-Express/actions/runs/38111775265) passed all 91 Linux sanitizer CTest cases and the complete aircraft bake. The native Windows build passed, but one of 86 Windows CTest cases failed: `earth_pack`. Its malicious-payload test raised `KeyError` before reaching the validator because the test snapshot helper used Windows backslash paths while manifest keys use forward slashes.
+
+The follow-up changes only the test helper to `relative_to(root).as_posix()` and adds a `PureWindowsPath` regression that also exercises Windows spelling on Linux. The regression rejects the old helper. All 56 Earth tests pass locally with the correction; the validator and all malformed-payload assertions are unchanged. Native CI remains the authority for the follow-up's Windows result.
 
 ## Sample measurement boundaries
 
