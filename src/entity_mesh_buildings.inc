@@ -670,7 +670,109 @@ void buildDetailedBuilding(MB& mb,int kind) {
   for(size_t i=begin;i+2<mb.o.size();i+=3)if((int)mb.o[i].part==P_TRIM&&std::max({mb.o[i].py,mb.o[i+1].py,mb.o[i+2].py})<=.61f)for(int j=0;j<3;++j)mb.o[i+j].u=2;
 }
 
+// A city's skyline (v3.47): a stepped supertall, a round glass tower, a residential slab and a mid-rise office block
+// with shops at street level. Their windows are the shader's at every detail level (ent_fs2 entityFacadePane and the
+// curtain-wall grid, in step with the numbers here), so the close mesh (lod 3) is the near one with its construction
+// added - mullion caps, rail caps, balcony screens, sills - never a second set of openings that could disagree.
+void buildCityTower(MB& mb, int kind, int lod) {
+  const bool hero = lod == 3, d0 = lod == 0 || hero, d1 = lod <= 1 || hero;
+  const size_t begin = mb.o.size();
+  switch (kind) {
+    case EK_SUPERTALL: {
+      plinth(mb, 12.f, 12.f, 0.3f);
+      mb.box(vec3(-11.4f, 0.3f, -11.4f), vec3(11.4f, 8.4f, 11.4f), P_GLASS, 0x33);   // the double-height lobby, set back
+      mb.box(vec3(-12.f, 8.4f, -12.f), vec3(12.f, 9.2f, 12.f), P_TRIM, 0x3F);         // transfer band
+      // three shafts stepping back at 140 and 190 m, a ledge at each step and a crown
+      const float tier[3][3] = {{10.5f, 9.2f, 140.f}, {8.7f, 141.2f, 190.f}, {6.9f, 191.2f, 216.f}};
+      for (int t = 0; t < 3; t++) {
+        const float h = tier[t][0], l = t < 2 ? h + 0.4f : 7.3f, top = t < 2 ? tier[t][2] + 1.2f : 219.f;
+        mb.box(vec3(-h, tier[t][1], -h), vec3(h, tier[t][2], h), P_GLASS, 0x33);
+        mb.box(vec3(-l, tier[t][2], -l), vec3(l, top, l), P_TRIM, 0x3F);
+      }
+      if (d1) { mb.box(vec3(-4.5f, 219.f, -4.5f), vec3(4.5f, 223.f, 4.5f), P_DARK, 0x3B);
+        mb.cyl(vec3(0, 223.f, 0), vec3(0, 236.f, 0), 0.9f, 0.12f, 6, P_METAL, false, false); }
+      if (d0) {
+        for (int i = 0; i < 4; i++) { const float x = i & 1 ? 10.5f : -10.5f, z = i & 2 ? 10.5f : -10.5f;   // corner fins
+          mb.box(vec3(x - 0.35f, 9.2f, z - 0.35f), vec3(x + 0.35f, 140.f, z + 0.35f), P_TRIM); }
+        door(mb, 0.f, 11.4f, 3.0f, 3.2f, 0.3f);
+      }
+      if (hero)   // pressure caps on the mullions: each face's bays measured from its corners (the shader's module)
+        for (int t = 0; t < 3; t++) {
+          const float h = tier[t][0]; const int bays = (int)roundf(2.f * h / 1.5f);
+          for (int s = 0; s < 4; s++) { BFace f = s == 0 ? bFront(h) : s == 1 ? bBack(-h) : s == 2 ? bLeft(-h) : bRight(h);
+            for (int b = 1; b < bays; b++) { const float u = -h + b * 2.f * h / bays;
+              f.block(mb, u - 0.03f, tier[t][1], 0.004f, u + 0.03f, tier[t][2], 0.07f, P_METAL, 0.85f); } }
+        }
+      break;
+    }
+    case EK_ROUNDTOWER: {
+      const int sg = d0 ? 24 : d1 ? 16 : 10; const float rot = PI / sg;   // (a face, not a corner, square to the door)
+      mb.cyl(vec3(0, -3.f, 0), vec3(0, 0.3f, 0), 9.62f, 9.62f, sg, P_TRIM, true, false, 1, 1, rot);    // plinth
+      mb.cyl(vec3(0, 0.3f, 0), vec3(0, 6.1f, 0), 8.8f, 8.8f, sg, P_GLASS, false, false, 1, 1, rot);     // the lobby, set back
+      mb.cyl(vec3(0, 6.1f, 0), vec3(0, 6.9f, 0), 9.5f, 9.5f, sg, P_TRIM, true, true, 1, 1, rot);        // canopy band
+      mb.cyl(vec3(0, 6.9f, 0), vec3(0, 116.f, 0), 9.1f, 9.1f, sg, P_GLASS, false, false, 1, 1, rot);
+      mb.cyl(vec3(0, 116.f, 0), vec3(0, 119.f, 0), 9.4f, 9.4f, sg, P_TRIM, true, true, 1, 1, rot);      // crown ring
+      if (d1) { mb.cyl(vec3(0, 119.f, 0), vec3(0, 122.5f, 0), 5.5f, 5.5f, sg / 2, P_DARK, true, false, 1, 1, rot);
+        mb.cyl(vec3(0, 122.5f, 0), vec3(0, 124.f, 0), 0.25f, 0.08f, 5, P_METAL, false, false); }
+      if (d0) door(mb, 0.f, 8.7f, 2.4f, 3.0f, 0.3f);
+      if (hero)   // a cap on each of the 36 mullions (every 10 degrees from +x, as the shader's grid)
+        for (int i = 0; i < 36; i++) { const float a = i * 2.f * PI / 36.f; const vec3 d(cosf(a), 0, sinf(a));
+          BFace f(d * 9.1f, vec3(-d.z, 0, d.x), d);
+          f.block(mb, -0.03f, 6.9f, -0.08f, 0.03f, 116.f, 0.07f, P_METAL, 0.85f); }
+      break;
+    }
+    case EK_SLABTOWER: {
+      plinth(mb, 14.f, 7.5f, 0.5f);
+      mb.box(vec3(-14.f, 0.5f, -7.5f), vec3(14.f, 61.6f, 7.5f), P_WALL, 0x33);
+      mb.box(vec3(-14.f, 61.6f, -7.5f), vec3(14.f, 62.4f, 7.5f), P_TRIM, 0x33);   // parapet
+      mb.box(vec3(-14.f, 61.4f, -7.5f), vec3(14.f, 61.6f, 7.5f), P_DARK, 8);      // one roof plane, no coplanar wall cap
+      if (d1) mb.box(vec3(-4.f, 61.6f, -2.5f), vec3(4.f, 64.f, 2.5f), P_TRIM, 0x3B);   // lift and stair overrun
+      if (d0) {
+        // twenty floors of 3 m: a balcony along each above the ground, its glazed rail, plain end bays either side
+        for (int f = 1; f < 20; f++) { const float y = 0.5f + f * 3.f;
+          mb.box(vec3(-10.5f, y - 0.2f, 7.5f), vec3(10.5f, y, 8.9f), P_TRIM, 0x3F & ~16);
+          mb.box(vec3(-10.5f, y, 8.8f), vec3(10.5f, y + 1.05f, 8.9f), P_GLASS, 0x3F & ~4);
+        }
+        door(mb, 0.f, 7.5f, 2.4f, 2.6f, 0.5f);
+      }
+      if (hero)   // rail caps, and screens between the three flats on each floor
+        for (int f = 1; f < 20; f++) { const float y = 0.5f + f * 3.f;
+          mb.box(vec3(-10.5f, y + 1.05f, 8.78f), vec3(10.5f, y + 1.1f, 8.92f), P_METAL, 0x3B, 0.85f);
+          for (float x : {-4.5f, 4.5f}) mb.box(vec3(x - 0.06f, y, 7.5f), vec3(x + 0.06f, y + 2.8f, 8.8f), P_TRIM, 1 | 2 | 32, 0.85f);
+        }
+      break;
+    }
+    case EK_MIDRISE: {
+      plinth(mb, 15.f, 11.f, 0.3f);
+      mb.box(vec3(-14.4f, 0.3f, -10.4f), vec3(14.4f, 4.6f, 10.4f), P_GLASS, 0x33);   // shopfronts, under the first floor
+      mb.box(vec3(-15.f, 4.6f, -11.f), vec3(15.f, 5.3f, 11.f), P_TRIM, 0x3F & ~8);   // its soffit and band
+      mb.box(vec3(-15.f, 5.3f, -11.f), vec3(15.f, 28.6f, 11.f), P_WALL, 0x33);       // six office floors of 3.85 m
+      mb.box(vec3(-15.f, 28.6f, -11.f), vec3(15.f, 29.4f, 11.f), P_TRIM, 0x33);      // parapet
+      mb.box(vec3(-15.f, 28.4f, -11.f), vec3(15.f, 28.6f, 11.f), P_DARK, 8);
+      if (d1) { mb.box(vec3(-6.f, 28.6f, -5.f), vec3(6.f, 31.f, 3.f), P_DARK, 0x3B);
+        mb.box(vec3(-14.f, 3.6f, 10.4f), vec3(14.f, 4.4f, 10.5f), P_SIGN, 32); }   // the shops' fascia
+      if (d0) {
+        door(mb, 0.f, 10.4f, 2.6f, 3.0f, 0.3f);
+        for (int i = 0; i < 4; i++) { const float x = i & 1 ? 14.7f : -14.7f, z = i & 2 ? 10.7f : -10.7f;   // corner piers
+          mb.box(vec3(x - 0.3f, 0.3f, z - 0.3f), vec3(x + 0.3f, 4.6f, z + 0.3f), P_TRIM, 0x33); }
+      }
+      if (hero)   // a sill under each floor's ribbon of windows, all round
+        for (int f = 0; f < 6; f++) { const float y = 6.2f + f * 3.85f;
+          for (int s = 0; s < 4; s++) { BFace w = s == 0 ? bFront(11.f) : s == 1 ? bBack(-11.f) : s == 2 ? bLeft(-15.f) : bRight(15.f);
+            const float half = s < 2 ? 14.3f : 10.6f;
+            w.block(mb, -half, y - 0.14f, 0.f, half, y - 0.02f, 0.12f, P_TRIM, 0.85f); }
+        }
+      break;
+    }
+    default: break;
+  }
+  // as buildDetailedBuilding's: the street-level stone weathers (P_TRIM aux.u 2 below 0.61 m)
+  if (hero) for (size_t i = begin; i + 2 < mb.o.size(); i += 3)
+    if ((int)mb.o[i].part == P_TRIM && std::max({mb.o[i].py, mb.o[i + 1].py, mb.o[i + 2].py}) <= .61f) for (int j = 0; j < 3; ++j) mb.o[i + j].u = 2;
+}
+
 void buildBuilding(MB& mb, int kind, int lod) {
+  if (kind >= EK_SUPERTALL && kind <= EK_MIDRISE) { buildCityTower(mb, kind, lod); return; }
   if (lod == 3) {
     if (kind == EK_RWYLIGHT || kind == EK_PAPI) { buildBuilding(mb, kind, 0); return; }
     buildDetailedBuilding(mb, kind); return;

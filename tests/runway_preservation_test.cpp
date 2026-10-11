@@ -63,6 +63,9 @@ bool readGolden(FILE* f,Golden& g) {
   size_t nf=0;if(fscanf(f,"%zu",&nf)!=1||nf>10000)return false;
   g.fixtures.resize(nf);
   for(auto& p:g.fixtures)if(fscanf(f,"%d %a %a %a %a %a %a %a %a",&p.kind,&p.e.x,&p.e.y,&p.e.z,&p.e.yaw,&p.e.sx,&p.e.sy,&p.e.sz,&p.e.seed)!=9)return false;
+  // The fixture's kinds are numbered as the enum stood at its capture (runway light 30, PAPI 31); the kinds added
+  // since (v3.47's city towers) moved them, never what they are
+  for(auto& p:g.fixtures){if(p.kind!=30&&p.kind!=31)return false;p.kind=p.kind==30?EK_RWYLIGHT:EK_PAPI;}
   return true;
 }
 

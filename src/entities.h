@@ -13,6 +13,7 @@ enum EntKind {
   EK_BOULDER, EK_BLOCK, EK_SLAB, EK_OUTCROP, EK_SPIRE, EK_SEASTACK,
   // buildings
   EK_HOUSE, EK_HOUSE_HIP, EK_HOUSE_L, EK_FARMHOUSE, EK_TOWNHOUSE, EK_SHOP, EK_APARTMENT, EK_OFFICE, EK_TOWER, EK_SKYSCRAPER,
+  EK_SUPERTALL, EK_ROUNDTOWER, EK_SLABTOWER, EK_MIDRISE,   // (a city's skyline: v3.47; the shaders' K_ numbers follow)
   EK_WAREHOUSE, EK_BARN, EK_SILO, EK_CHURCH, EK_WATERTOWER, EK_LIGHTHOUSE, EK_GASSTATION,
   // airport fixtures (seed = lamp colour: 0 white, 1 amber, 2 green, 3 red)
   EK_RWYLIGHT,
@@ -27,7 +28,7 @@ enum EntKind {
 // (bridge_mesh.h). This is their material's id in the scenery programs (ent_fs1.glsl K_BRIDGE) and what Scenery::collide
 // reports for them (kBridgeKind + 1)
 static const int kBridgeKind = EK_COUNT;
-static_assert(kBridgeKind == 52, "ent_fs1.glsl K_BRIDGE");
+static_assert(kBridgeKind == 56, "ent_fs1.glsl K_BRIDGE");
 enum EntClass { EC_TREE = 0, EC_ROCK, EC_BUILDING };
 inline int entClass(int k) { return k <= EK_BUSH ? EC_TREE : k <= EK_SEASTACK ? EC_ROCK : EC_BUILDING; }
 // Distance thinning of the small, numerous kinds (trees, bushes, boulders): an instance is drawn while its key is below

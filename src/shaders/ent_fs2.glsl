@@ -167,6 +167,18 @@ vec4 entityFacadePane(vec3 p, vec3 n, int kind){
     if (front && base < 1.0 && a.y < 3.0 && abs(a.x) < 1.2) return vec4(0.0);
     return a;
   }
+  if (kind == K_SLABTOWER) {   // twenty floors of 3 m; balcony doors behind the balconies, the entrance mid-front
+    if (side) return entityFacadeGrid(q, vec2(-4.5,2.25), vec2(3.0,3.0), vec2(4,20), vec2(1.6,1.5));
+    vec4 a = entityFacadeGrid(q, vec2(-12.0,2.25), vec2(3.0,3.0), vec2(9,20), vec2(1.6,1.5));
+    if (front && abs(a.x) < 10.5) {
+      if (a.y < 3.0) return abs(a.x) < 1.0 ? vec4(0.0) : a;
+      a.y -= 0.5; a.w = 2.2;
+    }
+    return a;
+  }
+  if (kind == K_MIDRISE)   // six office floors of 3.85 m over the shops: ribbons of narrow panes
+    return side ? entityFacadeGrid(q, vec2(-9.75,7.2), vec2(1.5,3.85), vec2(14,6), vec2(1.35,2.0))
+                : entityFacadeGrid(q, vec2(-13.5,7.2), vec2(1.5,3.85), vec2(19,6), vec2(1.35,2.0));
   if (kind == K_WAREHOUSE) {
     if (front) return vec4(0.0);
     return entityFacadeGrid(q, vec2(side ? -6.0 : -9.0,5.4), vec2(3.0,1.0), vec2(side ? 5 : 7,1), vec2(2.35,0.7));
@@ -525,6 +537,8 @@ void main(){
         tint = pal(fract(unit*0.61 + seed), vec3(0.95, 0.85, 0.7), vec3(0.85, 0.6, 0.5), vec3(0.75, 0.82, 0.88), vec3(0.95, 0.93, 0.88));
       } else if (uKind == K_SHOP || uKind == K_GAS) { tint = pal(s2, vec3(0.9, 0.88, 0.84), vec3(0.85, 0.7, 0.55), vec3(0.7, 0.75, 0.8), vec3(0.95, 0.9, 0.8)); }
       else if (uKind == K_APART) { layer = s1 < 0.4 ? M_BRICK : M_CONCRETE; tint = s1 < 0.4 ? vec3(0.9, 0.8, 0.75) : pal(s2, vec3(0.92, 0.9, 0.85), vec3(0.85, 0.78, 0.7), vec3(0.8, 0.82, 0.85), vec3(0.95, 0.85, 0.75)); tsc = layer == M_CONCRETE ? 3.0 : 4.0; }
+      else if (uKind == K_SLABTOWER) { layer = s1 < 0.3 ? M_BRICK : M_CONCRETE; tint = s1 < 0.3 ? vec3(0.88, 0.78, 0.7) : pal(s2, vec3(0.9, 0.89, 0.86), vec3(0.93, 0.86, 0.74), vec3(0.78, 0.8, 0.82), vec3(0.85, 0.8, 0.72)); tsc = 3.0; }
+      else if (uKind == K_MIDRISE) { layer = s1 < 0.4 ? M_BRICK : M_CONCRETE; tint = s1 < 0.4 ? pal(s2, vec3(0.95, 0.8, 0.72), vec3(0.8, 0.62, 0.55), vec3(0.9, 0.86, 0.8), vec3(0.75, 0.7, 0.66)) : pal(s2, vec3(0.92, 0.86, 0.74), vec3(0.88, 0.87, 0.83), vec3(0.72, 0.72, 0.72), vec3(0.95, 0.88, 0.7)); tsc = 2.0; }
       else if (uKind == K_TOWER) { layer = M_CONCRETE; tint = pal(s2, vec3(0.85, 0.83, 0.8), vec3(0.7, 0.68, 0.66), vec3(0.9, 0.86, 0.78), vec3(0.6, 0.62, 0.66)); tsc = 3.0; }
       else if (uKind == K_WAREHOUSE) { layer = M_CORRUGATED; tint = pal(s2, vec3(0.75, 0.78, 0.8), vec3(0.55, 0.62, 0.72), vec3(0.85, 0.82, 0.72), vec3(0.6, 0.65, 0.6)); tsc = 4.0; }
       else if (uKind == K_CHURCH) { layer = M_CONCRETE; tint = vec3(0.86, 0.8, 0.7); tsc = 1.6; }
@@ -551,7 +565,7 @@ void main(){
       cls = 3.0; rough = 0.05; metal = 0.1;
       vec3 tint = pal(s2, vec3(0.05, 0.09, 0.12), vec3(0.06, 0.1, 0.09), vec3(0.08, 0.08, 0.1), vec3(0.1, 0.08, 0.06));
       alb = tint;
-      if (uKind == K_OFFICE || uKind == K_SKY) {
+      if (uKind == K_OFFICE || uKind == K_SKY || uKind == K_SUPERTALL || uKind == K_ROUND) {
         vec3 nominal = lp/vScale;
         float glassU = sideX ? nominal.z : nominal.x;
         float module = 1.55, start = 0.0, base = 0.3;
@@ -560,8 +574,16 @@ void main(){
           // projected X/Z grid that changes spacing when the instance is scaled.
           glassU = dot(nominal,vec3(-n0.z,0.0,n0.x));
           module = 1.45; start = -2.323761; base = 6.9;
+        } else if (uKind == K_SUPERTALL) {
+          // each shaft's bays measured from its corners (buildCityTower's caps)
+          float h = nominal.y < 140.6 ? 10.5 : nominal.y < 190.6 ? 8.7 : 6.9;
+          module = 2.0*h/floor(2.0*h/1.5 + 0.5); start = -h; base = 9.2;
+        } else if (uKind == K_ROUND) {
+          // round the drum: 36 bays from +x (arc length on the 9.1 m shaft)
+          glassU = atan(nominal.z, nominal.x)*9.1; module = 2.0*3.14159265*9.1/36.0; base = 6.9;
         }
         float fl = fract((nominal.y - base)/3.7);
+        if (nominal.y < base - 0.5) fl = 0.5;   // (the lobbies: one tall storey of glass)
         float mul = abs(fract((glassU - start)/module + 0.5) - 0.5)*module;
         bool spandrel = fl < 0.24, mullion = mul < 0.025;
         if (spandrel || mullion) { alb = spandrel ? tint*2.2 + vec3(0.05) : vec3(0.35); rough = 0.35; metal = 0.6; cls = 2.0; }
@@ -581,9 +603,9 @@ void main(){
           float roomLuminance = mix(0.065,0.28,fract(zoneState*7.13))*mix(0.9,1.0,paneState);
           emit = roomTint*(lit*uNight*roomLuminance);
         }
-      } else if (uKind == K_SHOP) { emit = vec3(1.0, 0.85, 0.6)*uNight*1.6; alb = vec3(0.05, 0.06, 0.07); }
+      } else if (uKind == K_SHOP || uKind == K_MIDRISE) { emit = vec3(1.0, 0.85, 0.6)*uNight*1.6; alb = vec3(0.05, 0.06, 0.07); }
       else if (uKind == K_GAS) emit = vec3(1.0, 0.95, 0.85)*uNight*1.8;
-      else if (uKind == K_APART) { alb = vec3(0.12, 0.16, 0.18); rough = 0.12; }
+      else if (uKind == K_APART || uKind == K_SLABTOWER) { alb = vec3(0.12, 0.16, 0.18); rough = 0.12; }
     } else if (part == P_METAL) {
       metal = 0.7;
       if (uKind == K_SILO) { alb = triSFrame(lp, n0, 1, M_CORRUGATED, 2.0, 0.6, nb, rough)*vec3(0.85); rough = 0.4; }
@@ -608,7 +630,7 @@ void main(){
     else if (part == P_AWNING) { alb = mix(pal(s2, vec3(0.7, 0.1, 0.1), vec3(0.1, 0.35, 0.2), vec3(0.15, 0.25, 0.55), vec3(0.8, 0.55, 0.1)), vec3(0.92), step(0.5, fract(lp.x/0.9))); rough = 0.85; }
     else if (part == P_DARK) {
       alb = triS(lp, n0, M_GRAVEL, 2.0, 0.5, nb, rough)*0.45;
-      if (n0.y > 0.75 && (uKind == K_SHOP || uKind == K_APART || uKind == K_OFFICE || uKind == K_TOWNHOUSE)) {
+      if (n0.y > 0.75 && (uKind == K_SHOP || uKind == K_APART || uKind == K_OFFICE || uKind == K_TOWNHOUSE || uKind == K_SLABTOWER || uKind == K_MIDRISE)) {
         // Seeded flat-roof finishes: weathered bitumen or warm reflective membrane. Keep the existing grain and
         // normal sample; no new texture, pass, instance or sub-pixel pattern is needed to break up the roof field.
         vec3 finish = mix(vec3(0.055, 0.066, 0.078), vec3(0.27, 0.25, 0.21), step(0.58, s2));
@@ -642,7 +664,7 @@ void main(){
 #if ENT_BUILDINGS
   // The simple far meshes use exactly the high mesh's nominal opening layout. This
   // preserves pane counts and placement across the complementary0/3 screen-door fade.
-  if (uKind <= K_GAS && uLod != 3 && (part == P_WALL || (part == P_WOOD && uKind == K_BARN))) {
+  if (uKind <= K_GAS && (uLod != 3 || (uKind >= K_SUPERTALL && uKind <= K_MIDRISE)) && (part == P_WALL || (part == P_WOOD && uKind == K_BARN))) {
     if (vAux.z < 0.5) {
       vec3 nominal = lp/vScale;
       bool side = abs(n0.x) > 0.5;
@@ -657,7 +679,7 @@ void main(){
         float frameCoverage = entityLine(delta.x,opening.z*0.5+0.045,footprint.x)*entityLine(delta.y,opening.w*0.5+0.045,footprint.y);
         bool sash = uKind <= K_TOWNHOUSE || (uKind == K_APART && opening.w < 2.0) || uKind == K_BARN;
         if (sash) paneCoverage *= 1.0 - entityLine(delta.y,0.022,footprint.y);
-        if ((sash && opening.z > 1.65) || uKind == K_CHURCH || (uKind == K_APART && opening.w > 2.0))
+        if ((sash && opening.z > 1.65) || uKind == K_CHURCH || ((uKind == K_APART || uKind == K_SLABTOWER) && opening.w > 2.0))
           paneCoverage *= 1.0 - entityLine(delta.x,0.025,footprint.x);
         if (uKind == K_CHURCH) {
           float spring = opening.w*0.5 - opening.z*0.5;

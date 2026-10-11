@@ -118,7 +118,7 @@ int main() {
       check(h >= 2.5f && g_world.onRunway(p.x, p.y, 60.f) < 0, "a footprint is dry and clear of the runways");
       check(roads.nearest(p, 3.f, -1, nullptr, nullptr, true) >= 0.99f, "no building stands on a road");
     }
-    const bool big = lot.kind == EK_TOWER || lot.kind == EK_SKYSCRAPER || lot.kind == EK_OFFICE || lot.kind == EK_WAREHOUSE;
+    const bool big = (lot.kind >= EK_OFFICE && lot.kind <= EK_MIDRISE) || lot.kind == EK_WAREHOUSE;
     check(high - low <= (big ? 3.5f : 2.6f) + .001f, "steep sites refused, the ground left as it is");
     // no two buildings in one another
     std::vector<int> near; lotsIn(lot.cx - 60.f, lot.cz - 60.f, lot.cx + 60.f, lot.cz + 60.f, near);
@@ -142,6 +142,25 @@ int main() {
   check(total > 4000 && total < 40000, "bounded, populated settlements");
   check(occupiedTowns == kNumTowns, "every settlement is lived in");
   check(tall > 60 && tall < total / 10, "the cities' skylines, at their hearts");
+  // each city's skyline, kind by kind: its range of towers, highest at the heart and falling away from it
+  for (int town = 0; town < kNumTowns; town++) {
+    if (kTowns[town].kind != 2) continue;
+    int n[EK_COUNT] = {}; double sum[3] = {}; int in[3] = {};
+    for (const Lot& lot : lots) {
+      if (lot.town != town) continue;
+      n[lot.kind]++;
+      const float share = settlementShare(g_world.settlements, lot.cx, lot.cz, nullptr);
+      const int band = share < 0.06f ? 0 : share < 0.17f ? 1 : 2;
+      sum[band] += lot.wallH; in[band]++;
+    }
+    const double mean[3] = {sum[0] / std::max(in[0], 1), sum[1] / std::max(in[1], 1), sum[2] / std::max(in[2], 1)};
+    std::printf("  %s: %d supertall, %d skyscrapers, %d round towers, %d towers, %d tower blocks, %d offices, %d office blocks;"
+                " mean height %.0f m at the heart, %.0f m round it, %.0f m beyond\n", kTowns[town].name, n[EK_SUPERTALL],
+                n[EK_SKYSCRAPER], n[EK_ROUNDTOWER], n[EK_TOWER], n[EK_SLABTOWER], n[EK_OFFICE], n[EK_MIDRISE], mean[0], mean[1], mean[2]);
+    check(n[EK_SUPERTALL] >= 1 && n[EK_SKYSCRAPER] >= 1 && n[EK_ROUNDTOWER] >= 1 && n[EK_SLABTOWER] >= 3 && n[EK_MIDRISE] >= 5,
+          "a city's skyline has its range of towers");
+    check(mean[0] > mean[1] * 1.5 && mean[1] > mean[2] * 1.5, "a city's skyline peaks at its heart");
+  }
   // Detail upgrades and direct generation must yield the same entities. Every community item
   // owns its centre's chunk, including trees and parked cars that cross a lot/chunk boundary.
   for (int town : {0, 1, 5, 10}) {
