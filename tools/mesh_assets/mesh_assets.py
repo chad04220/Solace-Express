@@ -23,6 +23,23 @@ import zipfile
 
 FORMAT_VERSION = 1
 ALGORITHM_VERSION = 24
+
+
+def _validator_constant(name: str) -> int:
+    """A constant of the game's own mesh validator (src/mesh_validation.h), read rather than copied: the game assigns
+    the rigid-part types, and a bundle must accept every body its exporter writes (v3.48.0's release failed on the
+    XR-40's weapon parts, 47-50, against a copied limit of 46)."""
+    header = Path(__file__).resolve().parents[2] / "src" / "mesh_validation.h"
+    try:
+        match = re.search(r"\b" + name + r"\s*=\s*(\d+)\s*;", header.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise SystemExit(f"Cannot read {header}: {error}")
+    if not match:
+        raise SystemExit(f"{name} not found in {header}")
+    return int(match.group(1))
+
+
+MAX_PART_TYPE = _validator_constant("kMaxPartType")
 PROFILE = 1
 HEADER_BYTES = 192
 MAX_FILE_BYTES = 512 * 1024 * 1024
@@ -183,7 +200,7 @@ def inspect_asset(path, expected_source=None):
         while offset < size:
             require(size - offset >= 12, f"Truncated rigid part: {path}")
             part_type, part_nf, part_ni = struct.unpack_from("<3I", data, offset)
-            require(part_type <= 46 and part_type not in part_types and offset + 12 + 4 * (part_nf + part_ni) <= size,
+            require(part_type <= MAX_PART_TYPE and part_type not in part_types and offset + 12 + 4 * (part_nf + part_ni) <= size,
                     f"Invalid or duplicate rigid-part bounds/type: {path}")
             offset = _mesh_vertices(data, offset + 12, part_nf, part_ni, f"{path.name} part {part_count}")
             part_count += 1
