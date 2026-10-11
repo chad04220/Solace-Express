@@ -3,6 +3,7 @@
 #include "shader_prune.h"
 #include "models.h"
 #include "mesh_validation.h"
+#include "aircraft_geometry_source.h"
 #include "materials.h"
 #include "shaders.h"
 #include "weather.h"
@@ -261,6 +262,19 @@ std::string shaderCacheStamp() {
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
   return b;
+}
+
+// Portable geometry identity: both actual full-quality bake programs and their vertex stage,
+// plus the build-generated CPU source dependency contract. Shader binaries retain the driver key below.
+std::string meshGeometryStamp(const std::string& defines) {
+  std::string source = "SolaceExpress-aircraft-geometry-v1\n";
+  auto add = [&](const std::string& value) { source += std::to_string(value.size()) + ":"; source += value; };
+  add(kAircraftGeometrySourceDigest);
+  add(aircraftMesh::kAlgorithmManifest);
+  add(shaderPrune::prune(kFullscreenVS));
+  add(shaderPrune::prune(hullBakeFSAssembly(defines)));
+  add(shaderPrune::prune(hullBakeFSAssembly(defines + "#define HULL_BAKE_NORMALS\n")));
+  return aircraftAsset::hex(aircraftAsset::sha256(source.data(), source.size()));
 }
 
 // The aircraft bodies' cache key: only the sources the mesh bake's results come from (the aircraft fields, their

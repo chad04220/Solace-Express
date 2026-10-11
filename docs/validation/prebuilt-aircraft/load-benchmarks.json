@@ -1,0 +1,2998 @@
+{
+  "modes": [
+    {
+      "mode": "driver_local",
+      "binary_sha256": "2a680658eef1c65c507fc8e4a6b4e8f7c8d548a942b4266cc5b0fd98cc6dbd57",
+      "first_process_body_seconds": 0.953150999,
+      "median_total_body_seconds": 0.953150999,
+      "median_process_wall_seconds": 1.052558739000233,
+      "per_body": [
+        {
+          "model": 0,
+          "slot": 0,
+          "first_process_seconds": 0.257247062,
+          "median_seconds": 0.255320414,
+          "min_seconds": 0.240714214,
+          "max_seconds": 0.270788281
+        },
+        {
+          "model": 0,
+          "slot": 1,
+          "first_process_seconds": 0.027144547,
+          "median_seconds": 0.023777614,
+          "min_seconds": 0.022847649,
+          "max_seconds": 0.027144547
+        },
+        {
+          "model": 1,
+          "slot": 0,
+          "first_process_seconds": 0.016817436,
+          "median_seconds": 0.016817436,
+          "min_seconds": 0.015783158,
+          "max_seconds": 0.017809908
+        },
+        {
+          "model": 1,
+          "slot": 1,
+          "first_process_seconds": 0.025467848,
+          "median_seconds": 0.024795241,
+          "min_seconds": 0.023093555,
+          "max_seconds": 0.025467848
+        },
+        {
+          "model": 2,
+          "slot": 0,
+          "first_process_seconds": 0.016632624,
+          "median_seconds": 0.016632624,
+          "min_seconds": 0.015329637,
+          "max_seconds": 0.017183205
+        },
+        {
+          "model": 2,
+          "slot": 1,
+          "first_process_seconds": 0.025729904,
+          "median_seconds": 0.025501361,
+          "min_seconds": 0.024001348,
+          "max_seconds": 0.026635163
+        },
+        {
+          "model": 3,
+          "slot": 0,
+          "first_process_seconds": 0.017259006,
+          "median_seconds": 0.016613077,
+          "min_seconds": 0.015594809,
+          "max_seconds": 0.017259006
+        },
+        {
+          "model": 3,
+          "slot": 1,
+          "first_process_seconds": 0.029303735,
+          "median_seconds": 0.028238777,
+          "min_seconds": 0.025756954,
+          "max_seconds": 0.029303735
+        },
+        {
+          "model": 4,
+          "slot": 0,
+          "first_process_seconds": 0.016677848,
+          "median_seconds": 0.016061696,
+          "min_seconds": 0.015528647,
+          "max_seconds": 0.016677848
+        },
+        {
+          "model": 4,
+          "slot": 1,
+          "first_process_seconds": 0.030187801,
+          "median_seconds": 0.029888196,
+          "min_seconds": 0.027842862,
+          "max_seconds": 0.033415617
+        },
+        {
+          "model": 5,
+          "slot": 0,
+          "first_process_seconds": 0.020094735,
+          "median_seconds": 0.020094735,
+          "min_seconds": 0.019404494,
+          "max_seconds": 0.021368697
+        },
+        {
+          "model": 5,
+          "slot": 1,
+          "first_process_seconds": 0.036381536,
+          "median_seconds": 0.036492182,
+          "min_seconds": 0.035754163,
+          "max_seconds": 0.03863746
+        },
+        {
+          "model": 6,
+          "slot": 0,
+          "first_process_seconds": 0.017459777,
+          "median_seconds": 0.017459777,
+          "min_seconds": 0.01663057,
+          "max_seconds": 0.01887348
+        },
+        {
+          "model": 6,
+          "slot": 1,
+          "first_process_seconds": 0.030294048,
+          "median_seconds": 0.030555933,
+          "min_seconds": 0.029661735,
+          "max_seconds": 0.033264406
+        },
+        {
+          "model": 7,
+          "slot": 0,
+          "first_process_seconds": 0.016068357,
+          "median_seconds": 0.016068357,
+          "min_seconds": 0.015698602,
+          "max_seconds": 0.01809183
+        },
+        {
+          "model": 7,
+          "slot": 1,
+          "first_process_seconds": 0.0228806,
+          "median_seconds": 0.023362073,
+          "min_seconds": 0.02257856,
+          "max_seconds": 0.026214693
+        },
+        {
+          "model": 8,
+          "slot": 0,
+          "first_process_seconds": 0.015864369,
+          "median_seconds": 0.015864369,
+          "min_seconds": 0.01561133,
+          "max_seconds": 0.01721242
+        },
+        {
+          "model": 8,
+          "slot": 1,
+          "first_process_seconds": 0.027953467,
+          "median_seconds": 0.028421505,
+          "min_seconds": 0.027953467,
+          "max_seconds": 0.03254979
+        },
+        {
+          "model": 9,
+          "slot": 0,
+          "first_process_seconds": 0.016232302,
+          "median_seconds": 0.016910559,
+          "min_seconds": 0.016082474,
+          "max_seconds": 0.018837313
+        },
+        {
+          "model": 9,
+          "slot": 1,
+          "first_process_seconds": 0.027703965,
+          "median_seconds": 0.02798774,
+          "min_seconds": 0.027475901,
+          "max_seconds": 0.033045241
+        },
+        {
+          "model": 10,
+          "slot": 0,
+          "first_process_seconds": 0.01558458,
+          "median_seconds": 0.016364757,
+          "min_seconds": 0.01558458,
+          "max_seconds": 0.01804267
+        },
+        {
+          "model": 10,
+          "slot": 1,
+          "first_process_seconds": 0.016302331,
+          "median_seconds": 0.016286873,
+          "min_seconds": 0.015879186,
+          "max_seconds": 0.024767289
+        },
+        {
+          "model": 11,
+          "slot": 0,
+          "first_process_seconds": 0.017277961,
+          "median_seconds": 0.017477451,
+          "min_seconds": 0.016944111,
+          "max_seconds": 0.019944265
+        },
+        {
+          "model": 11,
+          "slot": 1,
+          "first_process_seconds": 0.034221901,
+          "median_seconds": 0.033858849,
+          "min_seconds": 0.031381413,
+          "max_seconds": 0.036175064
+        },
+        {
+          "model": 12,
+          "slot": 0,
+          "first_process_seconds": 0.018725915,
+          "median_seconds": 0.018742156,
+          "min_seconds": 0.018477425,
+          "max_seconds": 0.020222181
+        },
+        {
+          "model": 12,
+          "slot": 1,
+          "first_process_seconds": 0.019664917,
+          "median_seconds": 0.019664917,
+          "min_seconds": 0.018923582,
+          "max_seconds": 0.023018777
+        },
+        {
+          "model": 13,
+          "slot": 0,
+          "first_process_seconds": 0.015885028,
+          "median_seconds": 0.015885028,
+          "min_seconds": 0.015505193,
+          "max_seconds": 0.020034262
+        },
+        {
+          "model": 13,
+          "slot": 1,
+          "first_process_seconds": 0.025768405,
+          "median_seconds": 0.025510428,
+          "min_seconds": 0.025131895,
+          "max_seconds": 0.035415065
+        },
+        {
+          "model": 14,
+          "slot": 0,
+          "first_process_seconds": 0.031431887,
+          "median_seconds": 0.029576367,
+          "min_seconds": 0.029289105,
+          "max_seconds": 0.033198602
+        },
+        {
+          "model": 14,
+          "slot": 1,
+          "first_process_seconds": 0.064887107,
+          "median_seconds": 0.065149364,
+          "min_seconds": 0.062920049,
+          "max_seconds": 0.068365188
+        }
+      ],
+      "trials": [
+        {
+          "repeat": 0,
+          "wall_seconds": 1.052558739000233,
+          "body_seconds": 0.953150999,
+          "bodies": [
+            {
+              "model": 0,
+              "slot": 0,
+              "seconds": 0.257247062,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 0,
+              "slot": 1,
+              "seconds": 0.027144547,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 0,
+              "seconds": 0.016817436,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 1,
+              "seconds": 0.025467848,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 0,
+              "seconds": 0.016632624,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 1,
+              "seconds": 0.025729904,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 0,
+              "seconds": 0.017259006,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 1,
+              "seconds": 0.029303735,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 0,
+              "seconds": 0.016677848,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 1,
+              "seconds": 0.030187801,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 0,
+              "seconds": 0.020094735,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 1,
+              "seconds": 0.036381536,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 0,
+              "seconds": 0.017459777,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 1,
+              "seconds": 0.030294048,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 0,
+              "seconds": 0.016068357,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 1,
+              "seconds": 0.0228806,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 0,
+              "seconds": 0.015864369,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 1,
+              "seconds": 0.027953467,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 0,
+              "seconds": 0.016232302,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 1,
+              "seconds": 0.027703965,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 0,
+              "seconds": 0.01558458,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 1,
+              "seconds": 0.016302331,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 0,
+              "seconds": 0.017277961,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 1,
+              "seconds": 0.034221901,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 0,
+              "seconds": 0.018725915,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 1,
+              "seconds": 0.019664917,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 0,
+              "seconds": 0.015885028,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 1,
+              "seconds": 0.025768405,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 0,
+              "seconds": 0.031431887,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 1,
+              "seconds": 0.064887107,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            }
+          ],
+          "log": "driver_local-0.log",
+          "log_sha256": "93ab96b4851950a7d813e2564de25d19c347091efe571b53411d4ab123ff888b"
+        },
+        {
+          "repeat": 1,
+          "wall_seconds": 0.9817590739985462,
+          "body_seconds": 0.90958374,
+          "bodies": [
+            {
+              "model": 0,
+              "slot": 0,
+              "seconds": 0.240714214,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 0,
+              "slot": 1,
+              "seconds": 0.023777614,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 0,
+              "seconds": 0.015783158,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 1,
+              "seconds": 0.023093555,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 0,
+              "seconds": 0.016046682,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 1,
+              "seconds": 0.024578168,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 0,
+              "seconds": 0.015976718,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 1,
+              "seconds": 0.025756954,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 0,
+              "seconds": 0.015528647,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 1,
+              "seconds": 0.027842862,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 0,
+              "seconds": 0.019649388,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 1,
+              "seconds": 0.035754163,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 0,
+              "seconds": 0.016723683,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 1,
+              "seconds": 0.029661735,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 0,
+              "seconds": 0.015935581,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 1,
+              "seconds": 0.02257856,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 0,
+              "seconds": 0.015691399,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 1,
+              "seconds": 0.028058081,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 0,
+              "seconds": 0.016910559,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 1,
+              "seconds": 0.027475901,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 0,
+              "seconds": 0.015750548,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 1,
+              "seconds": 0.016286873,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 0,
+              "seconds": 0.016944111,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 1,
+              "seconds": 0.03244153,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 0,
+              "seconds": 0.018774225,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 1,
+              "seconds": 0.018979596,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 0,
+              "seconds": 0.015510623,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 1,
+              "seconds": 0.025131895,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 0,
+              "seconds": 0.029306668,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 1,
+              "seconds": 0.062920049,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            }
+          ],
+          "log": "driver_local-1.log",
+          "log_sha256": "01b8911443765b5c11a0a9e9c76576bccf7bcc2bb34721946663c002727572b0"
+        },
+        {
+          "repeat": 2,
+          "wall_seconds": 0.9929452939977637,
+          "body_seconds": 0.918304136,
+          "bodies": [
+            {
+              "model": 0,
+              "slot": 0,
+              "seconds": 0.243309676,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 0,
+              "slot": 1,
+              "seconds": 0.022847649,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 0,
+              "seconds": 0.01599975,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 1,
+              "seconds": 0.023436391,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 0,
+              "seconds": 0.015329637,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 1,
+              "seconds": 0.024001348,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 0,
+              "seconds": 0.015594809,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 1,
+              "seconds": 0.025915828,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 0,
+              "seconds": 0.01567042,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 1,
+              "seconds": 0.028141546,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 0,
+              "seconds": 0.019404494,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 1,
+              "seconds": 0.036492182,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 0,
+              "seconds": 0.01663057,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 1,
+              "seconds": 0.030555933,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 0,
+              "seconds": 0.015698602,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 1,
+              "seconds": 0.023362073,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 0,
+              "seconds": 0.01561133,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 1,
+              "seconds": 0.028421505,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 0,
+              "seconds": 0.016082474,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 1,
+              "seconds": 0.02798774,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 0,
+              "seconds": 0.016364757,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 1,
+              "seconds": 0.015879186,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 0,
+              "seconds": 0.018162381,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 1,
+              "seconds": 0.031381413,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 0,
+              "seconds": 0.018477425,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 1,
+              "seconds": 0.018923582,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 0,
+              "seconds": 0.015505193,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 1,
+              "seconds": 0.025510428,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 0,
+              "seconds": 0.029289105,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 1,
+              "seconds": 0.068316709,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            }
+          ],
+          "log": "driver_local-2.log",
+          "log_sha256": "c4328681deaed58f0190b72710d272534795c8ecc194ec5ab8ece16b8fc2a444"
+        },
+        {
+          "repeat": 3,
+          "wall_seconds": 1.0761636969982646,
+          "body_seconds": 0.995136632,
+          "bodies": [
+            {
+              "model": 0,
+              "slot": 0,
+              "seconds": 0.270788281,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 0,
+              "slot": 1,
+              "seconds": 0.024967991,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 0,
+              "seconds": 0.016886465,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 1,
+              "seconds": 0.024795241,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 0,
+              "seconds": 0.017183205,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 1,
+              "seconds": 0.026635163,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 0,
+              "seconds": 0.016613077,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 1,
+              "seconds": 0.028238777,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 0,
+              "seconds": 0.016061696,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 1,
+              "seconds": 0.029888196,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 0,
+              "seconds": 0.021368697,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 1,
+              "seconds": 0.03863746,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 0,
+              "seconds": 0.017741951,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 1,
+              "seconds": 0.033148862,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 0,
+              "seconds": 0.016086852,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 1,
+              "seconds": 0.026214693,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 0,
+              "seconds": 0.01721242,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 1,
+              "seconds": 0.03254979,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 0,
+              "seconds": 0.017370302,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 1,
+              "seconds": 0.033045241,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 0,
+              "seconds": 0.01804267,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 1,
+              "seconds": 0.016182339,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 0,
+              "seconds": 0.017477451,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 1,
+              "seconds": 0.033858849,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 0,
+              "seconds": 0.020222181,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 1,
+              "seconds": 0.020546081,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 0,
+              "seconds": 0.016566441,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 1,
+              "seconds": 0.02524247,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 0,
+              "seconds": 0.033198602,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 1,
+              "seconds": 0.068365188,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            }
+          ],
+          "log": "driver_local-3.log",
+          "log_sha256": "dda53933b0a489be1e713806097fd05af91d43e047d4d727d55fb086ecefb2eb"
+        },
+        {
+          "repeat": 4,
+          "wall_seconds": 1.0792297079897253,
+          "body_seconds": 0.998755071,
+          "bodies": [
+            {
+              "model": 0,
+              "slot": 0,
+              "seconds": 0.255320414,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 0,
+              "slot": 1,
+              "seconds": 0.023574958,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 0,
+              "seconds": 0.017809908,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 1,
+              "seconds": 0.024817683,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 0,
+              "seconds": 0.016654444,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 1,
+              "seconds": 0.025501361,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 0,
+              "seconds": 0.017157207,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 1,
+              "seconds": 0.028627648,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 0,
+              "seconds": 0.016437533,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 1,
+              "seconds": 0.033415617,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 0,
+              "seconds": 0.020679769,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 1,
+              "seconds": 0.038084184,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 0,
+              "seconds": 0.01887348,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 1,
+              "seconds": 0.033264406,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 0,
+              "seconds": 0.01809183,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 1,
+              "seconds": 0.024374922,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 0,
+              "seconds": 0.016999493,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 1,
+              "seconds": 0.029871845,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 0,
+              "seconds": 0.018837313,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 1,
+              "seconds": 0.030554912,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 0,
+              "seconds": 0.016983535,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 1,
+              "seconds": 0.024767289,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 0,
+              "seconds": 0.019944265,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 1,
+              "seconds": 0.036175064,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 0,
+              "seconds": 0.018742156,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 1,
+              "seconds": 0.023018777,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 0,
+              "seconds": 0.020034262,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 1,
+              "seconds": 0.035415065,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 0,
+              "seconds": 0.029576367,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 1,
+              "seconds": 0.065149364,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            }
+          ],
+          "log": "driver_local-4.log",
+          "log_sha256": "56a9240ec8771155f8a54670786785553be7c8a7e4954186ced42f3ff12ca755"
+        }
+      ]
+    },
+    {
+      "mode": "packaged",
+      "binary_sha256": "7e292e2f9ec22994a9ac7c12256fa7d6b0e889bc3418ca2ac5ec1866d242ca9f",
+      "first_process_body_seconds": 1.846680365,
+      "median_total_body_seconds": 1.846680365,
+      "median_process_wall_seconds": 1.9242769310076255,
+      "per_body": [
+        {
+          "model": 0,
+          "slot": 0,
+          "first_process_seconds": 0.261081919,
+          "median_seconds": 0.261226267,
+          "min_seconds": 0.260883491,
+          "max_seconds": 0.331913158
+        },
+        {
+          "model": 0,
+          "slot": 1,
+          "first_process_seconds": 0.04853313,
+          "median_seconds": 0.050291583,
+          "min_seconds": 0.04853313,
+          "max_seconds": 0.061500887
+        },
+        {
+          "model": 1,
+          "slot": 0,
+          "first_process_seconds": 0.007620101,
+          "median_seconds": 0.008236594,
+          "min_seconds": 0.007620101,
+          "max_seconds": 0.009501991
+        },
+        {
+          "model": 1,
+          "slot": 1,
+          "first_process_seconds": 0.05030754,
+          "median_seconds": 0.052627794,
+          "min_seconds": 0.05030754,
+          "max_seconds": 0.057724404
+        },
+        {
+          "model": 2,
+          "slot": 0,
+          "first_process_seconds": 0.009088553,
+          "median_seconds": 0.009088553,
+          "min_seconds": 0.009004628,
+          "max_seconds": 0.010007347
+        },
+        {
+          "model": 2,
+          "slot": 1,
+          "first_process_seconds": 0.057081102,
+          "median_seconds": 0.0602504,
+          "min_seconds": 0.056449262,
+          "max_seconds": 0.061705677
+        },
+        {
+          "model": 3,
+          "slot": 0,
+          "first_process_seconds": 0.011192695,
+          "median_seconds": 0.011192695,
+          "min_seconds": 0.010240961,
+          "max_seconds": 0.013602335
+        },
+        {
+          "model": 3,
+          "slot": 1,
+          "first_process_seconds": 0.062296212,
+          "median_seconds": 0.064198983,
+          "min_seconds": 0.062296212,
+          "max_seconds": 0.069641182
+        },
+        {
+          "model": 4,
+          "slot": 0,
+          "first_process_seconds": 0.012349331,
+          "median_seconds": 0.012349331,
+          "min_seconds": 0.011997939,
+          "max_seconds": 0.014183425
+        },
+        {
+          "model": 4,
+          "slot": 1,
+          "first_process_seconds": 0.072473384,
+          "median_seconds": 0.074075779,
+          "min_seconds": 0.072473384,
+          "max_seconds": 0.11863695
+        },
+        {
+          "model": 5,
+          "slot": 0,
+          "first_process_seconds": 0.038671873,
+          "median_seconds": 0.039568487,
+          "min_seconds": 0.038213084,
+          "max_seconds": 0.063181463
+        },
+        {
+          "model": 5,
+          "slot": 1,
+          "first_process_seconds": 0.119787102,
+          "median_seconds": 0.120821847,
+          "min_seconds": 0.118250267,
+          "max_seconds": 0.147130519
+        },
+        {
+          "model": 6,
+          "slot": 0,
+          "first_process_seconds": 0.019380609,
+          "median_seconds": 0.019367065,
+          "min_seconds": 0.018958928,
+          "max_seconds": 0.019970123
+        },
+        {
+          "model": 6,
+          "slot": 1,
+          "first_process_seconds": 0.081891008,
+          "median_seconds": 0.081891008,
+          "min_seconds": 0.080196719,
+          "max_seconds": 0.097816702
+        },
+        {
+          "model": 7,
+          "slot": 0,
+          "first_process_seconds": 0.009855326,
+          "median_seconds": 0.009855326,
+          "min_seconds": 0.009563836,
+          "max_seconds": 0.014422165
+        },
+        {
+          "model": 7,
+          "slot": 1,
+          "first_process_seconds": 0.052085367,
+          "median_seconds": 0.052085367,
+          "min_seconds": 0.051354592,
+          "max_seconds": 0.067553934
+        },
+        {
+          "model": 8,
+          "slot": 0,
+          "first_process_seconds": 0.014098875,
+          "median_seconds": 0.012520499,
+          "min_seconds": 0.012443926,
+          "max_seconds": 0.014098875
+        },
+        {
+          "model": 8,
+          "slot": 1,
+          "first_process_seconds": 0.081426196,
+          "median_seconds": 0.077481505,
+          "min_seconds": 0.075605101,
+          "max_seconds": 0.084051499
+        },
+        {
+          "model": 9,
+          "slot": 0,
+          "first_process_seconds": 0.018413305,
+          "median_seconds": 0.017200397,
+          "min_seconds": 0.016748588,
+          "max_seconds": 0.018413305
+        },
+        {
+          "model": 9,
+          "slot": 1,
+          "first_process_seconds": 0.091266779,
+          "median_seconds": 0.084609523,
+          "min_seconds": 0.079789953,
+          "max_seconds": 0.091266779
+        },
+        {
+          "model": 10,
+          "slot": 0,
+          "first_process_seconds": 0.022093871,
+          "median_seconds": 0.022093871,
+          "min_seconds": 0.021354079,
+          "max_seconds": 0.025974728
+        },
+        {
+          "model": 10,
+          "slot": 1,
+          "first_process_seconds": 0.021933664,
+          "median_seconds": 0.020158132,
+          "min_seconds": 0.019428038,
+          "max_seconds": 0.024180771
+        },
+        {
+          "model": 11,
+          "slot": 0,
+          "first_process_seconds": 0.022591534,
+          "median_seconds": 0.023041619,
+          "min_seconds": 0.021912055,
+          "max_seconds": 0.026226896
+        },
+        {
+          "model": 11,
+          "slot": 1,
+          "first_process_seconds": 0.096597329,
+          "median_seconds": 0.096319458,
+          "min_seconds": 0.094073504,
+          "max_seconds": 0.136985766
+        },
+        {
+          "model": 12,
+          "slot": 0,
+          "first_process_seconds": 0.042424022,
+          "median_seconds": 0.039965203,
+          "min_seconds": 0.036126344,
+          "max_seconds": 0.042424022
+        },
+        {
+          "model": 12,
+          "slot": 1,
+          "first_process_seconds": 0.031538635,
+          "median_seconds": 0.030398411,
+          "min_seconds": 0.029806134,
+          "max_seconds": 0.031538635
+        },
+        {
+          "model": 13,
+          "slot": 0,
+          "first_process_seconds": 0.008278802,
+          "median_seconds": 0.007922132,
+          "min_seconds": 0.007814592,
+          "max_seconds": 0.008278802
+        },
+        {
+          "model": 13,
+          "slot": 1,
+          "first_process_seconds": 0.064462961,
+          "median_seconds": 0.059025048,
+          "min_seconds": 0.057425051,
+          "max_seconds": 0.064462961
+        },
+        {
+          "model": 14,
+          "slot": 0,
+          "first_process_seconds": 0.100147604,
+          "median_seconds": 0.095590997,
+          "min_seconds": 0.094033298,
+          "max_seconds": 0.100147604
+        },
+        {
+          "model": 14,
+          "slot": 1,
+          "first_process_seconds": 0.317711536,
+          "median_seconds": 0.285539284,
+          "min_seconds": 0.28133624,
+          "max_seconds": 0.317711536
+        }
+      ],
+      "trials": [
+        {
+          "repeat": 0,
+          "wall_seconds": 1.9242769310076255,
+          "body_seconds": 1.846680365,
+          "bodies": [
+            {
+              "model": 0,
+              "slot": 0,
+              "seconds": 0.261081919,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 0,
+              "slot": 1,
+              "seconds": 0.04853313,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 0,
+              "seconds": 0.007620101,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 1,
+              "seconds": 0.05030754,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 0,
+              "seconds": 0.009088553,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 1,
+              "seconds": 0.057081102,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 0,
+              "seconds": 0.011192695,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 1,
+              "seconds": 0.062296212,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 0,
+              "seconds": 0.012349331,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 1,
+              "seconds": 0.072473384,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 0,
+              "seconds": 0.038671873,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 1,
+              "seconds": 0.119787102,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 0,
+              "seconds": 0.019380609,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 1,
+              "seconds": 0.081891008,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 0,
+              "seconds": 0.009855326,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 1,
+              "seconds": 0.052085367,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 0,
+              "seconds": 0.014098875,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 1,
+              "seconds": 0.081426196,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 0,
+              "seconds": 0.018413305,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 1,
+              "seconds": 0.091266779,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 0,
+              "seconds": 0.022093871,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 1,
+              "seconds": 0.021933664,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 0,
+              "seconds": 0.022591534,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 1,
+              "seconds": 0.096597329,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 0,
+              "seconds": 0.042424022,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 1,
+              "seconds": 0.031538635,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 0,
+              "seconds": 0.008278802,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 1,
+              "seconds": 0.064462961,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 0,
+              "seconds": 0.100147604,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 1,
+              "seconds": 0.317711536,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            }
+          ],
+          "log": "packaged-0.log",
+          "log_sha256": "ee7a6013821e54a7c5698e2ec5e2b346d78b45839f1d036f8d1d60396de6775f"
+        },
+        {
+          "repeat": 1,
+          "wall_seconds": 2.0633197499992093,
+          "body_seconds": 1.970509076,
+          "bodies": [
+            {
+              "model": 0,
+              "slot": 0,
+              "seconds": 0.331913158,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 0,
+              "slot": 1,
+              "seconds": 0.061500887,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 0,
+              "seconds": 0.009201793,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 1,
+              "seconds": 0.057724404,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 0,
+              "seconds": 0.010007347,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 1,
+              "seconds": 0.061705677,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 0,
+              "seconds": 0.013602335,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 1,
+              "seconds": 0.069641182,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 0,
+              "seconds": 0.014183425,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 1,
+              "seconds": 0.11863695,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 0,
+              "seconds": 0.063181463,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 1,
+              "seconds": 0.147130519,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 0,
+              "seconds": 0.019000956,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 1,
+              "seconds": 0.080323432,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 0,
+              "seconds": 0.009653001,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 1,
+              "seconds": 0.051354592,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 0,
+              "seconds": 0.012456119,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 1,
+              "seconds": 0.075605101,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 0,
+              "seconds": 0.016748588,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 1,
+              "seconds": 0.079789953,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 0,
+              "seconds": 0.021354079,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 1,
+              "seconds": 0.019428038,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 0,
+              "seconds": 0.021912055,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 1,
+              "seconds": 0.094073504,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 0,
+              "seconds": 0.039965203,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 1,
+              "seconds": 0.029806134,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 0,
+              "seconds": 0.007814592,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 1,
+              "seconds": 0.057425051,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 0,
+              "seconds": 0.094033298,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 1,
+              "seconds": 0.28133624,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            }
+          ],
+          "log": "packaged-1.log",
+          "log_sha256": "2177d99da3b6e456874b949f1902a5fef9a0a1ffddbb08ad5d9119595073ce8a"
+        },
+        {
+          "repeat": 2,
+          "wall_seconds": 1.8402557839872316,
+          "body_seconds": 1.764201562,
+          "bodies": [
+            {
+              "model": 0,
+              "slot": 0,
+              "seconds": 0.260883491,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 0,
+              "slot": 1,
+              "seconds": 0.049150947,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 0,
+              "seconds": 0.007828337,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 1,
+              "seconds": 0.051070156,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 0,
+              "seconds": 0.009078436,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 1,
+              "seconds": 0.056449262,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 0,
+              "seconds": 0.010240961,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 1,
+              "seconds": 0.063012913,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 0,
+              "seconds": 0.012098475,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 1,
+              "seconds": 0.07376892,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 0,
+              "seconds": 0.038213084,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 1,
+              "seconds": 0.118250267,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 0,
+              "seconds": 0.018958928,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 1,
+              "seconds": 0.080196719,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 0,
+              "seconds": 0.009563836,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 1,
+              "seconds": 0.051500944,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 0,
+              "seconds": 0.012443926,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 1,
+              "seconds": 0.076287059,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 0,
+              "seconds": 0.017200397,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 1,
+              "seconds": 0.079852842,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 0,
+              "seconds": 0.021729786,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 1,
+              "seconds": 0.019880597,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 0,
+              "seconds": 0.023041619,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 1,
+              "seconds": 0.094219334,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 0,
+              "seconds": 0.036126344,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 1,
+              "seconds": 0.030234628,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 0,
+              "seconds": 0.007881565,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 1,
+              "seconds": 0.057867011,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 0,
+              "seconds": 0.094216097,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 1,
+              "seconds": 0.282954681,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            }
+          ],
+          "log": "packaged-2.log",
+          "log_sha256": "542d38143f524f6335050361c7638145ca9d442c741546d230ab573423748286"
+        },
+        {
+          "repeat": 3,
+          "wall_seconds": 1.9076201999996556,
+          "body_seconds": 1.834694348,
+          "bodies": [
+            {
+              "model": 0,
+              "slot": 0,
+              "seconds": 0.261226267,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 0,
+              "slot": 1,
+              "seconds": 0.050291583,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 0,
+              "seconds": 0.008236594,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 1,
+              "seconds": 0.052627794,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 0,
+              "seconds": 0.009782681,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 1,
+              "seconds": 0.0602504,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 0,
+              "seconds": 0.01074183,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 1,
+              "seconds": 0.065220698,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 0,
+              "seconds": 0.011997939,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 1,
+              "seconds": 0.074075779,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 0,
+              "seconds": 0.039568487,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 1,
+              "seconds": 0.120821847,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 0,
+              "seconds": 0.019367065,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 1,
+              "seconds": 0.097816702,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 0,
+              "seconds": 0.014422165,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 1,
+              "seconds": 0.067553934,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 0,
+              "seconds": 0.012520499,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 1,
+              "seconds": 0.077481505,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 0,
+              "seconds": 0.017082488,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 1,
+              "seconds": 0.084609523,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 0,
+              "seconds": 0.022170574,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 1,
+              "seconds": 0.020158132,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 0,
+              "seconds": 0.023065984,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 1,
+              "seconds": 0.096319458,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 0,
+              "seconds": 0.036733039,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 1,
+              "seconds": 0.030682569,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 0,
+              "seconds": 0.008012749,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 1,
+              "seconds": 0.060725782,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 0,
+              "seconds": 0.095590997,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 1,
+              "seconds": 0.285539284,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            }
+          ],
+          "log": "packaged-3.log",
+          "log_sha256": "2ca3caa105b064db6aeadfd203486d77635f119a8de2c305279a15b4c28b49c8"
+        },
+        {
+          "repeat": 4,
+          "wall_seconds": 2.0023057270009303,
+          "body_seconds": 1.924999076,
+          "bodies": [
+            {
+              "model": 0,
+              "slot": 0,
+              "seconds": 0.27138708,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 0,
+              "slot": 1,
+              "seconds": 0.053569781,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 0,
+              "seconds": 0.009501991,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 1,
+              "slot": 1,
+              "seconds": 0.057203822,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 0,
+              "seconds": 0.009004628,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 2,
+              "slot": 1,
+              "seconds": 0.061595756,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 0,
+              "seconds": 0.011717509,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 3,
+              "slot": 1,
+              "seconds": 0.064198983,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 0,
+              "seconds": 0.012474603,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 4,
+              "slot": 1,
+              "seconds": 0.075321819,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 0,
+              "seconds": 0.041024657,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 5,
+              "slot": 1,
+              "seconds": 0.128977392,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 0,
+              "seconds": 0.019970123,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 6,
+              "slot": 1,
+              "seconds": 0.085474367,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 0,
+              "seconds": 0.01054237,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 7,
+              "slot": 1,
+              "seconds": 0.056046765,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 0,
+              "seconds": 0.014032452,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 8,
+              "slot": 1,
+              "seconds": 0.084051499,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 0,
+              "seconds": 0.018222372,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 9,
+              "slot": 1,
+              "seconds": 0.090475111,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 0,
+              "seconds": 0.025974728,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 10,
+              "slot": 1,
+              "seconds": 0.024180771,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 0,
+              "seconds": 0.026226896,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 11,
+              "slot": 1,
+              "seconds": 0.136985766,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 0,
+              "seconds": 0.041760873,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 12,
+              "slot": 1,
+              "seconds": 0.030398411,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 0,
+              "seconds": 0.007922132,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 13,
+              "slot": 1,
+              "seconds": 0.059025048,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 0,
+              "seconds": 0.099150238,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            },
+            {
+              "model": 14,
+              "slot": 1,
+              "seconds": 0.298581133,
+              "shader_hits": 0,
+              "shader_misses": 0,
+              "built": 0
+            }
+          ],
+          "log": "packaged-4.log",
+          "log_sha256": "24c4403ebec8ac08561486069350ff1946be03a0e3e6d399b80958c4fd5e90c0"
+        }
+      ]
+    }
+  ],
+  "pass": true,
+  "scope": "Each trial is a new EGL process and new GPU allocations; operating-system file cache is warm and was not flushed. Production load/checksum/upload path only, no scene/world/display programs or SDF geometry work. No RTX 3070/hardware startup guarantee."
+}

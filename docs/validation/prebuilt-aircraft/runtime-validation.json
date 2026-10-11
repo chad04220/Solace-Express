@@ -1,0 +1,110 @@
+{
+  "result": "PASS",
+  "written_utc": "2026-10-11T01:45:49.800416+00:00",
+  "baseline_commit": "72d0af0",
+  "build_source_digest": "25b0ebe6af771a254ed9011d43a42b59cb21625ece22a53bcc84340c04be062c",
+  "geometry_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+  "archive": {
+    "bytes": 149316793,
+    "sha256": "dea672b5b6861ab1ff404aa2c9f45b2c2e7cbf795525ece5dc5730b79780f65b"
+  },
+  "exact_quality": {
+    "bodies": 30,
+    "payload_bytes": 293786120,
+    "static_vertices": 4354468,
+    "static_triangles": 6935836,
+    "part_vertices": 1341150,
+    "part_triangles": 2357734,
+    "baseline_cold_gpu_checks": 1080,
+    "baseline_local_gpu_checks": 684,
+    "baseline_local_part_centre_checks": 282,
+    "package_gpu_checks": 1080,
+    "native_gpu_buffer_checks": 1620,
+    "native_images": 44,
+    "pixels_per_image": [
+      1920,
+      1080
+    ],
+    "frames_per_fixture": 4,
+    "frames_each_sweep": 176,
+    "zero_pixel_differences": true,
+    "zero_precision_or_quality_reductions": true,
+    "all_gl_errors_zero": true,
+    "package_hits": 30,
+    "package_misses": 0,
+    "package_bakes": 0,
+    "fallback_cases": 5
+  },
+  "timing_seconds": {
+    "original_full_cold_body_work": 746.112796772,
+    "driver_local_load_upload": {
+      "first_new_process": 0.953150999,
+      "median_5_new_processes": 0.953150999,
+      "median_process_wall": 1.052558739000233
+    },
+    "packaged_load_checksum_upload": {
+      "first_new_process": 1.846680365,
+      "median_5_new_processes": 1.846680365,
+      "median_process_wall": 1.9242769310076255
+    },
+    "fresh_package_sweep_body_work": 9.810806255,
+    "original_cockpit_display_shader_work": 4.556820919,
+    "package_cockpit_display_shader_work": 4.083455143,
+    "original_all_shader_work": 233.32092493,
+    "package_all_shader_work": 96.153951025,
+    "fallbacks": {
+      "packaged_over_legacy": {
+        "body_seconds": 0.276434469,
+        "display_shader_seconds": 0.097758686,
+        "gl_frames_zero": true
+      },
+      "missing_to_legacy": {
+        "body_seconds": 0.283948021,
+        "display_shader_seconds": 0.090863564,
+        "gl_frames_zero": true
+      },
+      "stale_to_legacy": {
+        "body_seconds": 0.272191069,
+        "display_shader_seconds": 0.08761386,
+        "gl_frames_zero": true
+      },
+      "corrupt_to_legacy": {
+        "body_seconds": 0.380315448,
+        "display_shader_seconds": 0.09083088,
+        "gl_frames_zero": true
+      },
+      "missing_to_bake": {
+        "body_seconds": 5.404053307,
+        "display_shader_seconds": 0.090053526,
+        "gl_frames_zero": true
+      }
+    },
+    "one_time_producer_export_wall": 730.1664652140025
+  },
+  "conditions": {
+    "renderer": "Mesa llvmpipe LLVM 19.1.7, OpenGL 4.5, Mesa 25.0.7-2+deb13u1",
+    "geometry_and_load_threads": 1,
+    "package_native_threads": 3,
+    "resolution": "native 1920x1080 Medium, scale1",
+    "geometry_trials": "All original cold meshes were freshly produced by 72d0af0. Every portable mesh was freshly produced with strict export; no legacy cache import.",
+    "load_trials": "Five new EGL processes per mode; OS file cache warm and never flushed, each process creates fresh GPU allocations. No geometry or shader work in measured load-only trials.",
+    "native_trials": "44 fixed camera/animation-state fixtures, each drawn four times; this is articulated state coverage, not a continuous-motion video. Candidate writable shader and Mesa caches started empty.",
+    "timing_overlap": "Cold body work includes builder program creation and GPU upload. Shader timings are separately reported and overlap body/init timing; do not add them together. Display/scene compilation remains independent of packaged geometry. Sweep totals span 30 separate exterior/cockpit processes, not one game startup wall time.",
+    "atlas_reference": "Atlas cockpit exact AO reference is a fresh original baseline at actual Game startup Pr.x=754.166687. Diagnostic Pr.x=1.1 differs only in tiny PT46 AO floats, but all three native cockpit screenshots are pixel-identical. Corrected exporter matches actual startup exactly.",
+    "limits": "Same-driver exact transport/integration evidence. No Windows GPU runtime, RTX 3070 timing/FPS/startup guarantee, all-camera proof, or cross-driver freshly procedural array-equality claim."
+  },
+  "evidence_files": {
+    "native": "native-parity.json",
+    "gpu_uploads": "gpu-upload-parity.json",
+    "timings": "load-benchmarks.json",
+    "fallbacks": "runtime-paths.json",
+    "atlas": "atlas-startup.json",
+    "source_invariants": "source-invariants.json",
+    "producer": "production.json",
+    "payloads": "payload-parity.json",
+    "source": "source-manifest.json",
+    "release": "release-manifest.json",
+    "adapters": "adapter-provenance.json"
+  },
+  "raw_artifacts": "Large raw PNGs, GPU buffers, cache bodies, executable/object files and logs are retained outside Git. The reproduction harness regenerates them in a separate workspace."
+}

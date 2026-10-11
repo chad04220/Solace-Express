@@ -1,0 +1,515 @@
+{
+  "schema": 1,
+  "pass": true,
+  "complete": true,
+  "native_images": 44,
+  "gpu_exact_checks": 1620,
+  "reference_note": "Atlas cockpit uses the unchanged original renderer and actual Game prewarm bake state (Pr.x=754.166687). This explicit reference preserves exact AO bytes; the ordinary original phase1.1 captures remain preserved and all three are independently pixel-identical.",
+  "models": [
+    {
+      "model": 0,
+      "views": [
+        "front",
+        "cockpit"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "kestrel_cockpit.png",
+          "baseline_pixel_sha256": "0c44a33b0e26560801475ac15cbf4c2dc2d3b5474f78f7c1bbfbebcfbfce721a",
+          "package_pixel_sha256": "0c44a33b0e26560801475ac15cbf4c2dc2d3b5474f78f7c1bbfbebcfbfce721a",
+          "exact": true
+        },
+        {
+          "file": "kestrel_front.png",
+          "baseline_pixel_sha256": "6beb03bc169d919bf78d6c37e949f8bfc3d5025c9d1d118e7a6ffd99adfa04ec",
+          "package_pixel_sha256": "6beb03bc169d919bf78d6c37e949f8bfc3d5025c9d1d118e7a6ffd99adfa04ec",
+          "exact": true
+        }
+      ],
+      "checks": 71,
+      "gpu_exact_checks": 60,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "4d16258d302ccf0de611237f0c856453b41716e423f3eb778ed16b1986dd5cb9"
+    },
+    {
+      "model": 1,
+      "views": [
+        "front",
+        "cockpit"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "wren_cockpit.png",
+          "baseline_pixel_sha256": "b948f0a984a56a2f450566b153a81c257c3d3f5005b8979038ccd4f610577bff",
+          "package_pixel_sha256": "b948f0a984a56a2f450566b153a81c257c3d3f5005b8979038ccd4f610577bff",
+          "exact": true
+        },
+        {
+          "file": "wren_front.png",
+          "baseline_pixel_sha256": "00796b6a08b8ff0ecc905dac418e54a9c80dbd6b666670acdce76208b6e180d3",
+          "package_pixel_sha256": "00796b6a08b8ff0ecc905dac418e54a9c80dbd6b666670acdce76208b6e180d3",
+          "exact": true
+        }
+      ],
+      "checks": 71,
+      "gpu_exact_checks": 60,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "42def85d007e51b2577a118324e9452e66153e24465f48dc8f67914bf2951548"
+    },
+    {
+      "model": 2,
+      "views": [
+        "front",
+        "cockpit"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "bush_cockpit.png",
+          "baseline_pixel_sha256": "8abc8e01d4aba5814ad1b6961777cf3ae053cf55921ff2c2fd3cb90d4518176e",
+          "package_pixel_sha256": "8abc8e01d4aba5814ad1b6961777cf3ae053cf55921ff2c2fd3cb90d4518176e",
+          "exact": true
+        },
+        {
+          "file": "bush_front.png",
+          "baseline_pixel_sha256": "d02f73d7cc9d1697a6300dc2c900bb40e7eb7ddc05766c7afa362604ef556e8f",
+          "package_pixel_sha256": "d02f73d7cc9d1697a6300dc2c900bb40e7eb7ddc05766c7afa362604ef556e8f",
+          "exact": true
+        }
+      ],
+      "checks": 71,
+      "gpu_exact_checks": 60,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "08ed8f4446b3fd9c42c29b6d3652222e76e1f4bdb12e9de420a96745b83fb86d"
+    },
+    {
+      "model": 3,
+      "views": [
+        "front",
+        "cockpit"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "islander_cockpit.png",
+          "baseline_pixel_sha256": "18a17976cc5857d34f15f1eefe802b909b34787c1bb1d1863fda3747817899f0",
+          "package_pixel_sha256": "18a17976cc5857d34f15f1eefe802b909b34787c1bb1d1863fda3747817899f0",
+          "exact": true
+        },
+        {
+          "file": "islander_front.png",
+          "baseline_pixel_sha256": "e8eb94a17c04296b57889ff9805285d960fcb62fc4b9a0329c6a1708c04a5520",
+          "package_pixel_sha256": "e8eb94a17c04296b57889ff9805285d960fcb62fc4b9a0329c6a1708c04a5520",
+          "exact": true
+        }
+      ],
+      "checks": 74,
+      "gpu_exact_checks": 63,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "39ee13d6f207aad683157f19b24bc21d05e73bb805bc64e9be8ced48b4001272"
+    },
+    {
+      "model": 4,
+      "views": [
+        "front",
+        "cockpit"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "pelican_cockpit.png",
+          "baseline_pixel_sha256": "17b6040edbd30bf3d2edabf2b568035cce7c48fd4df896fb240191839971b1e4",
+          "package_pixel_sha256": "17b6040edbd30bf3d2edabf2b568035cce7c48fd4df896fb240191839971b1e4",
+          "exact": true
+        },
+        {
+          "file": "pelican_front.png",
+          "baseline_pixel_sha256": "4076778fbe67b946a2c80291d65106423f1d5f7f94536b07b6b9ebd23be329b3",
+          "package_pixel_sha256": "4076778fbe67b946a2c80291d65106423f1d5f7f94536b07b6b9ebd23be329b3",
+          "exact": true
+        }
+      ],
+      "checks": 74,
+      "gpu_exact_checks": 63,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "b2d2ce2dad67b3ce5fff17dc5c31b098145e131f387432553aef251f38c7517d"
+    },
+    {
+      "model": 5,
+      "views": [
+        "front",
+        "cockpit"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "meridian_cockpit.png",
+          "baseline_pixel_sha256": "c486e75867e50a2246b0ad351d33fff59c6155592be7791359aeb9a87cf3ae6f",
+          "package_pixel_sha256": "c486e75867e50a2246b0ad351d33fff59c6155592be7791359aeb9a87cf3ae6f",
+          "exact": true
+        },
+        {
+          "file": "meridian_front.png",
+          "baseline_pixel_sha256": "403f62f15dd8a14fab6ba9858a57cd6015fcc0a038f3090035880a208b9dc3a9",
+          "package_pixel_sha256": "403f62f15dd8a14fab6ba9858a57cd6015fcc0a038f3090035880a208b9dc3a9",
+          "exact": true
+        }
+      ],
+      "checks": 86,
+      "gpu_exact_checks": 75,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "3558d6f29e64fb917271ad15247157cb8895e4ff630ff850f68b8232def1b2ac"
+    },
+    {
+      "model": 6,
+      "views": [
+        "front",
+        "cockpit"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "starling_cockpit.png",
+          "baseline_pixel_sha256": "30e8b0276f7050de35039730d8ad0aaf872a7ba6dd32f2292aab0fe86fd88dd5",
+          "package_pixel_sha256": "30e8b0276f7050de35039730d8ad0aaf872a7ba6dd32f2292aab0fe86fd88dd5",
+          "exact": true
+        },
+        {
+          "file": "starling_front.png",
+          "baseline_pixel_sha256": "13609296792de259dc56a4d60f3c1d321cd853c0045d4eeed17aedf7d6ae2b77",
+          "package_pixel_sha256": "13609296792de259dc56a4d60f3c1d321cd853c0045d4eeed17aedf7d6ae2b77",
+          "exact": true
+        }
+      ],
+      "checks": 86,
+      "gpu_exact_checks": 75,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "907720307a00baff4629e67f64e0a90f283887e214cc5aa30cdd0f3836b1b0f0"
+    },
+    {
+      "model": 7,
+      "views": [
+        "front",
+        "cockpit"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "swift_s6_cockpit.png",
+          "baseline_pixel_sha256": "b3d442d7d665924ddbf1b947be407b23fe22787631e59f4f976a23dda1f70f34",
+          "package_pixel_sha256": "b3d442d7d665924ddbf1b947be407b23fe22787631e59f4f976a23dda1f70f34",
+          "exact": true
+        },
+        {
+          "file": "swift_s6_front.png",
+          "baseline_pixel_sha256": "b02671af0d0c6d5c3a4b50c69f0c4bb6e2aea675033a21cc0f96982147f57ad4",
+          "package_pixel_sha256": "b02671af0d0c6d5c3a4b50c69f0c4bb6e2aea675033a21cc0f96982147f57ad4",
+          "exact": true
+        }
+      ],
+      "checks": 83,
+      "gpu_exact_checks": 72,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "9a77908229f201add2fbdde066360a7e840797ba1d207a1ec1f03cee342879d0"
+    },
+    {
+      "model": 8,
+      "views": [
+        "front",
+        "cockpit"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "osprey_c6_cockpit.png",
+          "baseline_pixel_sha256": "c1abe1376760be198c457b5cd6d7d2873a72e22fa2a67bfac0719cf3e4c3d500",
+          "package_pixel_sha256": "c1abe1376760be198c457b5cd6d7d2873a72e22fa2a67bfac0719cf3e4c3d500",
+          "exact": true
+        },
+        {
+          "file": "osprey_c6_front.png",
+          "baseline_pixel_sha256": "27f5780da5b99139eaff5c13868b43ef172c8f75a61be38e30a6142573347a70",
+          "package_pixel_sha256": "27f5780da5b99139eaff5c13868b43ef172c8f75a61be38e30a6142573347a70",
+          "exact": true
+        }
+      ],
+      "checks": 86,
+      "gpu_exact_checks": 75,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "3da2b4c5936cbdfd3a3e5ad145e4ec9305d3731f74001a776a1f38eeb0020abc"
+    },
+    {
+      "model": 9,
+      "views": [
+        "front",
+        "cockpit"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "xr10_nightjar_cockpit.png",
+          "baseline_pixel_sha256": "bd2105af52f45f5d5e246b6adbe847f896f5ef8694f25fd722fb7ea2dbf4ce15",
+          "package_pixel_sha256": "bd2105af52f45f5d5e246b6adbe847f896f5ef8694f25fd722fb7ea2dbf4ce15",
+          "exact": true
+        },
+        {
+          "file": "xr10_nightjar_front.png",
+          "baseline_pixel_sha256": "313712b936876f74cbb837934910cc4e1f27999e8caa5e259c69db4fb0c26ff4",
+          "package_pixel_sha256": "313712b936876f74cbb837934910cc4e1f27999e8caa5e259c69db4fb0c26ff4",
+          "exact": true
+        }
+      ],
+      "checks": 86,
+      "gpu_exact_checks": 75,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "fe063a83cfc9b0949d16dfc9352f3fc35f13eea9b85677284410746fa294dd22"
+    },
+    {
+      "model": 10,
+      "views": [
+        "refactor_specter_neutral_rear",
+        "refactor_specter_vector_rear",
+        "cockpit_refactor_specter_vector"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "xr30_specter_cockpit_refactor_specter_vector.png",
+          "baseline_pixel_sha256": "c81e641915eb404f27144496c44a4394446ebc0c78eb9451a15a66ead1f32b41",
+          "package_pixel_sha256": "c81e641915eb404f27144496c44a4394446ebc0c78eb9451a15a66ead1f32b41",
+          "exact": true
+        },
+        {
+          "file": "xr30_specter_refactor_specter_neutral_rear.png",
+          "baseline_pixel_sha256": "9b7bb9a7ee1bc331db184c3dffa8ea45d6c34247b5f11971837890ad75aed6c5",
+          "package_pixel_sha256": "9b7bb9a7ee1bc331db184c3dffa8ea45d6c34247b5f11971837890ad75aed6c5",
+          "exact": true
+        },
+        {
+          "file": "xr30_specter_refactor_specter_vector_rear.png",
+          "baseline_pixel_sha256": "a96196f1e86c08742c81121d16880d87bb76312343d3fbe908772be51f3f8296",
+          "package_pixel_sha256": "a96196f1e86c08742c81121d16880d87bb76312343d3fbe908772be51f3f8296",
+          "exact": true
+        }
+      ],
+      "checks": 102,
+      "gpu_exact_checks": 87,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "d36f4245fdde6dc9264afedafe9c10c84bbf1153f952a42670a823704db85a56"
+    },
+    {
+      "model": 11,
+      "views": [
+        "front",
+        "cockpit"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "xr20_mantis_cockpit.png",
+          "baseline_pixel_sha256": "7ce1b1e0c180ca59db952c688291a33aecee537a591ce419b63285b78bf2c037",
+          "package_pixel_sha256": "7ce1b1e0c180ca59db952c688291a33aecee537a591ce419b63285b78bf2c037",
+          "exact": true
+        },
+        {
+          "file": "xr20_mantis_front.png",
+          "baseline_pixel_sha256": "bd4dd082b2fc91c53e9369fb7cb6c61989c7d2719d230f0adc6746afea891e35",
+          "package_pixel_sha256": "bd4dd082b2fc91c53e9369fb7cb6c61989c7d2719d230f0adc6746afea891e35",
+          "exact": true
+        }
+      ],
+      "checks": 80,
+      "gpu_exact_checks": 69,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "92288003f26300b5c4c46dc9611698f5402ba6fbd498669c28df72b926e8f597"
+    },
+    {
+      "model": 12,
+      "views": [
+        "refactor_wraith_hover_belly",
+        "refactor_wraith_weapons_belly",
+        "refactor_wraith_weapons_empty_belly",
+        "refactor_wraith_cloak_front",
+        "cockpit_refactor_wraith_hover"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "xr40_wraith_cockpit_refactor_wraith_hover.png",
+          "baseline_pixel_sha256": "1cbcd736f9bccaefb10d6a7b3eb131b4084d5a6a6d9c70ecb444b67656161e58",
+          "package_pixel_sha256": "1cbcd736f9bccaefb10d6a7b3eb131b4084d5a6a6d9c70ecb444b67656161e58",
+          "exact": true
+        },
+        {
+          "file": "xr40_wraith_refactor_wraith_cloak_front.png",
+          "baseline_pixel_sha256": "b9cdae86ae7788f94497e7b25014bf4243dedbf7a9dd6c62e7c3a7fa6e677a29",
+          "package_pixel_sha256": "b9cdae86ae7788f94497e7b25014bf4243dedbf7a9dd6c62e7c3a7fa6e677a29",
+          "exact": true
+        },
+        {
+          "file": "xr40_wraith_refactor_wraith_hover_belly.png",
+          "baseline_pixel_sha256": "90535f6e0b24e47a3315b05f3a66a77eb6ef3fc8990efd46794dc410c315c6ef",
+          "package_pixel_sha256": "90535f6e0b24e47a3315b05f3a66a77eb6ef3fc8990efd46794dc410c315c6ef",
+          "exact": true
+        },
+        {
+          "file": "xr40_wraith_refactor_wraith_weapons_belly.png",
+          "baseline_pixel_sha256": "1d32426825938a81a438e7cb081ba6bc0488444f7620e61133aa3f9389395741",
+          "package_pixel_sha256": "1d32426825938a81a438e7cb081ba6bc0488444f7620e61133aa3f9389395741",
+          "exact": true
+        },
+        {
+          "file": "xr40_wraith_refactor_wraith_weapons_empty_belly.png",
+          "baseline_pixel_sha256": "909a3ce3ed987f735f2c3c4eee43629233aab69c693cb81341ce4cfcd9a8da90",
+          "package_pixel_sha256": "909a3ce3ed987f735f2c3c4eee43629233aab69c693cb81341ce4cfcd9a8da90",
+          "exact": true
+        }
+      ],
+      "checks": 326,
+      "gpu_exact_checks": 303,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "a7c9c4bc91707d4832b457002d44a264d950ee42b70de9bb7e187757f3eda5f8"
+    },
+    {
+      "model": 13,
+      "views": [
+        "front",
+        "cockpit",
+        "wheel_nose_yaw_left",
+        "wheel_nose_yaw_right"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "larkspur_l4_cockpit.png",
+          "baseline_pixel_sha256": "4baa8835728981b5bea6de45b14298014a81691098b62b1dcf00cadd9ee0d7eb",
+          "package_pixel_sha256": "4baa8835728981b5bea6de45b14298014a81691098b62b1dcf00cadd9ee0d7eb",
+          "exact": true
+        },
+        {
+          "file": "larkspur_l4_front.png",
+          "baseline_pixel_sha256": "b4282dcccd98dda1f133769e693d1055e2b4aa378d657e1e8a0130bd8bbb2f78",
+          "package_pixel_sha256": "b4282dcccd98dda1f133769e693d1055e2b4aa378d657e1e8a0130bd8bbb2f78",
+          "exact": true
+        },
+        {
+          "file": "larkspur_l4_wheel_nose_yaw_left.png",
+          "baseline_pixel_sha256": "7f29afbed864f857a7046b71ae8e104eab7cef7ffc8d5657bf69430038901fd6",
+          "package_pixel_sha256": "7f29afbed864f857a7046b71ae8e104eab7cef7ffc8d5657bf69430038901fd6",
+          "exact": true
+        },
+        {
+          "file": "larkspur_l4_wheel_nose_yaw_right.png",
+          "baseline_pixel_sha256": "e1a2fa10f172767b404f44711e780d168ff4abe10286d7f7268ff6fa4c7caa82",
+          "package_pixel_sha256": "e1a2fa10f172767b404f44711e780d168ff4abe10286d7f7268ff6fa4c7caa82",
+          "exact": true
+        }
+      ],
+      "checks": 127,
+      "gpu_exact_checks": 108,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "ca5fb72a14d0dfd6e69bf8892e71711ce66569917010b3e78dde4ff8d3a7aa24"
+    },
+    {
+      "model": 14,
+      "views": [
+        "front_loaded",
+        "bay_gear_pct000_belly",
+        "bay_gear_pct050_belly",
+        "bay_gear_pct100_belly",
+        "fan_running_phase0",
+        "fan_running_phase1",
+        "fan_left_running_failed_left_phase1",
+        "cockpit",
+        "cockpit_down_positive",
+        "cockpit_down_negative"
+      ],
+      "pass": true,
+      "native_images": [
+        {
+          "file": "atlas_a180_bay_gear_pct000_belly.png",
+          "baseline_pixel_sha256": "4efe1e751b57f6b27a84ab45500a15286d708a97f556024b7e1d2e6089ddac05",
+          "package_pixel_sha256": "4efe1e751b57f6b27a84ab45500a15286d708a97f556024b7e1d2e6089ddac05",
+          "exact": true
+        },
+        {
+          "file": "atlas_a180_bay_gear_pct050_belly.png",
+          "baseline_pixel_sha256": "5d5057a8c7e26d8bfe973d03958cc275712a0c76654041972137f8ab1ce23c96",
+          "package_pixel_sha256": "5d5057a8c7e26d8bfe973d03958cc275712a0c76654041972137f8ab1ce23c96",
+          "exact": true
+        },
+        {
+          "file": "atlas_a180_bay_gear_pct100_belly.png",
+          "baseline_pixel_sha256": "1dfb9ec5a102faf5d23cc01a0ef86f50ad224470e1f3dc72089c2547a02c2457",
+          "package_pixel_sha256": "1dfb9ec5a102faf5d23cc01a0ef86f50ad224470e1f3dc72089c2547a02c2457",
+          "exact": true
+        },
+        {
+          "file": "atlas_a180_cockpit.png",
+          "baseline_pixel_sha256": "be696b7d1dabe03f0ccbef281225261c0993f1e6a1a190cf2f58ee84bdbc19ed",
+          "package_pixel_sha256": "be696b7d1dabe03f0ccbef281225261c0993f1e6a1a190cf2f58ee84bdbc19ed",
+          "exact": true
+        },
+        {
+          "file": "atlas_a180_cockpit_down_negative.png",
+          "baseline_pixel_sha256": "c1a3e9e44a84d4aedee36e11ae413f150c76fd612e0b1d99053f5f044b07a4d0",
+          "package_pixel_sha256": "c1a3e9e44a84d4aedee36e11ae413f150c76fd612e0b1d99053f5f044b07a4d0",
+          "exact": true
+        },
+        {
+          "file": "atlas_a180_cockpit_down_positive.png",
+          "baseline_pixel_sha256": "b1d71e6d87f308160b355acd14b84d2fdba30d499e1aafdef8f736896db7e7fd",
+          "package_pixel_sha256": "b1d71e6d87f308160b355acd14b84d2fdba30d499e1aafdef8f736896db7e7fd",
+          "exact": true
+        },
+        {
+          "file": "atlas_a180_fan_left_running_failed_left_phase1.png",
+          "baseline_pixel_sha256": "e3967dddc3c2bd88feb3ae2e7612741568920405ceb86dd8b123e6e4433f34b9",
+          "package_pixel_sha256": "e3967dddc3c2bd88feb3ae2e7612741568920405ceb86dd8b123e6e4433f34b9",
+          "exact": true
+        },
+        {
+          "file": "atlas_a180_fan_running_phase0.png",
+          "baseline_pixel_sha256": "26391d81a93c12e1d98fad62edefc0bda655deadd27734634d95c64171fa3cdf",
+          "package_pixel_sha256": "26391d81a93c12e1d98fad62edefc0bda655deadd27734634d95c64171fa3cdf",
+          "exact": true
+        },
+        {
+          "file": "atlas_a180_fan_running_phase1.png",
+          "baseline_pixel_sha256": "c86c3d2cc4d37dc51f625995f83a971c80a860e7cc62ef3add59c9cb1fb8e27b",
+          "package_pixel_sha256": "c86c3d2cc4d37dc51f625995f83a971c80a860e7cc62ef3add59c9cb1fb8e27b",
+          "exact": true
+        },
+        {
+          "file": "atlas_a180_front_loaded.png",
+          "baseline_pixel_sha256": "65f0b5d20949ea3a19c4d36b772796abb89040daa3d21bb3724fe8357f249905",
+          "package_pixel_sha256": "65f0b5d20949ea3a19c4d36b772796abb89040daa3d21bb3724fe8357f249905",
+          "exact": true
+        }
+      ],
+      "checks": 418,
+      "gpu_exact_checks": 375,
+      "different_files": [],
+      "extra_gpu_files": [],
+      "verified_file_rows_sha256": "8f72f4fca7a20eec5a87e7985a9852dcd594684c2352bb9325eda6f9a433ed89"
+    }
+  ],
+  "raw_verification_report_sha256": "ea5a663e55c343d7d90ef8c9758b6047a159f25004675cbff48d24dc837740ea",
+  "row_hash_definition": "For each model, SHA256 of compact JSON rows [filename, reference_file_sha256, exact] in original sorted verification order. Full raw readbacks/report remain outside Git."
+}

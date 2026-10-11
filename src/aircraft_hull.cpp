@@ -47,7 +47,8 @@ void main(){
 
 // The bake's two programs - the field's distance, and its normals and cabin occlusion (HULL_BAKE_NORMALS) - built as
 // a pair: the shared one, and each aircraft's own (afBakePrograms)
-bool Renderer::linkBakePair(const std::string& bakeVS, const std::string& bakeFS, GLuint out[2], std::string& e, const char* normalStage) {
+bool Renderer::linkBakePair(const std::string& bakeVS, const std::string& bakeFS, GLuint out[2], std::string& e, const char* normalStage, bool* fullQuality) {
+  if (fullQuality) *fullQuality = false;
   auto define = [](const std::string& s, const char* d) { const size_t at = s.find('\n') + 1; return s.substr(0, at) + d + s.substr(at); };
   const std::string normalFS = define(bakeFS, "#define HULL_BAKE_NORMALS\n");
   bool safeField = false, safeNormal = false;
@@ -68,6 +69,7 @@ bool Renderer::linkBakePair(const std::string& bakeVS, const std::string& bakeFS
     out[0] = out[1] = 0;
     return false;
   }
+  if (fullQuality) *fullQuality = !safeField && !safeNormal && bakeFS.find("#define NV_SAFE_GEAR") == std::string::npos;
   return true;
 }
 
@@ -85,7 +87,7 @@ bool Renderer::sharedBakePrograms(GLuint out[2]) {
     sharedBakeTried = true;
     setCompileStage("aircraft bake (every aircraft)");
     GLuint pair[2]; std::string e;
-    if (!linkBakePair(kFullscreenVS, hullBakeFSAssembly(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : ""), pair, e))
+    if (!linkBakePair(kFullscreenVS, hullBakeFSAssembly(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : ""), pair, e, nullptr, &sharedBakeFullQuality))
       shaderNote("Aircraft bake unavailable; using the distance-field renderer.\n" + e);
     progHullBake = pair[0]; progHullBakeNormal = pair[1];
     setCompileStage("");
@@ -111,7 +113,12 @@ void Renderer::beginHullBake(const FrameParams& fp, int states, const float* ps,
   // one; with neither, nothing can be built: each caller marks what it was building as not built, and that aircraft's
   // airframe is left to the march (every other type keeps its builder and its bodies)
   const int own = afModelOf(fp.plane.M, fp.plane.model), slot = ps && ps[3] > 0.5f ? 1 : 0;   // (the body: the states' inside flag)
-  if ((own < 0 || !afBakePrograms(own, slot, hullBakeProg)) && !sharedBakePrograms(hullBakeProg)) hullBakeProg[0] = hullBakeProg[1] = 0;
+  hullBakeOwnBuilder = own >= 0 && afBakePrograms(own, slot, hullBakeProg);
+  hullBakeFullQuality = hullBakeOwnBuilder ? afOwn[own].bakeFullQuality[slot] : false;
+  if (!hullBakeOwnBuilder) {
+    if (sharedBakePrograms(hullBakeProg)) hullBakeFullQuality = sharedBakeFullQuality;
+    else hullBakeProg[0] = hullBakeProg[1] = 0;
+  }
 }
 
 GLuint Renderer::bindHullBake(bool restore) {

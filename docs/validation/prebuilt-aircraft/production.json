@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "base_commit": "72d0af0b23defb8067dd697f87d94384b39a412b",
+  "source_digest": "25b0ebe6af771a254ed9011d43a42b59cb21625ece22a53bcc84340c04be062c",
+  "geometry_digest": "12e3710931e791adb24b9531501db3e7a5132e4866249f36e9a5837ee9d75743",
+  "source_input_count": 120,
+  "windows_manifest_matches_linux": true,
+  "windows_verification": "LLVM-MinGW cross-build; not native MSVC execution",
+  "producer": {
+    "vendor": "Mesa",
+    "renderer": "llvmpipe (LLVM 19.1.7, 256 bits)",
+    "version": "4.5 (Core Profile) Mesa 25.0.7-2+deb13u1"
+  },
+  "producer_binary_sha256": "55bc7c58f7fcf0872b5e73644b5c0305fddbf22d723937f25b190112d27290af",
+  "producer_policy": "one fresh strict production bake per subprocess; all 30 complete before publication",
+  "canonical_startup_state": {
+    "propeller_phase_f32_bits": "443c8aab",
+    "propeller_phase_expression": "(3.f + 1.f/60.f) * 250.f",
+    "running_visual_blur": 1,
+    "blades": "max(authored blades, 2)",
+    "engine_health": "1 for authored engines, 0 for absent engines",
+    "reference": "Game::prewarm -> update(1/60) -> menuTour -> fillPlaneVisual"
+  },
+  "asset_count": 30,
+  "total_mesh_bytes": 293791880,
+  "total_static_vertices": 4354468,
+  "total_static_triangles": 6935836,
+  "total_rigid_part_vertices": 1341150,
+  "total_rigid_part_triangles": 2357734,
+  "canonical_export_wall_seconds": 730.1664652140025,
+  "timing_scope": "producer-side fresh geometry export only; not player startup or native GPU performance",
+  "zip_bytes": 149316793,
+  "zip_sha256": "dea672b5b6861ab1ff404aa2c9f45b2c2e7cbf795525ece5dc5730b79780f65b",
+  "zip_lossless_extract_validated": true,
+  "all_30_payloads_and_fine_splits_exact": true,
+  "baseline_reference": "29 diagnostic-state original production bodies; Atlas cockpit uses independently baked actual first-launch startup state",
+  "tool_tests_passed": 17,
+  "runtime_render_acceptance": "Passed same-driver 44-fixture native parity, all30 package loads/GPU uploads and five representative fallback routes; Windows GPU and full startup/FPS acceptance remain untested."
+}

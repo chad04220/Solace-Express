@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "adapters": [
+    {
+      "source_stable_during_build": true,
+      "sources_changed_during_build": [],
+      "harness_sha256": "280611bc3174a8c93ccb05904895804f43be462e472211c907a595ab6ae2c44c",
+      "readback_sha256": "acadbdee4aa3cecf6e4ceaa3923b69f1742f582a915ea5604b1eaeddeb08bc42",
+      "shader_embed_sha256": "bdc13b4bd332010f8a79304129f4753d52ce690d2a5358b9730a1aa9d204dfe2",
+      "binary_sha256": "b22f08ed301b3cd66895763eba847e6fe392585ba09617d716e6a1dcae9af903",
+      "adapter": "baseline",
+      "production_reference": "72d0af0",
+      "source_file_count": 289,
+      "linked_object_count": 32,
+      "source_hash_manifest_sha256": "559afe2231fefd1a1c835aaa46bbbb5a4c3e999286588d6fcc9829163eeac043",
+      "raw_provenance_sha256": "2c038ab08f62426c7310e5cd54adb39f711b88e69321ec22bf2bb422e70deda5"
+    },
+    {
+      "source_stable_during_build": true,
+      "sources_changed_during_build": [],
+      "harness_sha256": "964f35337706ee329ec420a84a123b65a82b874d13aa4944851e51a7d9039449",
+      "readback_sha256": "acadbdee4aa3cecf6e4ceaa3923b69f1742f582a915ea5604b1eaeddeb08bc42",
+      "shader_embed_sha256": "bdc13b4bd332010f8a79304129f4753d52ce690d2a5358b9730a1aa9d204dfe2",
+      "binary_sha256": "a9da8073072d66ebe6ee938b17d6a0bfb396a0482809258b227e6efde66e6120",
+      "adapter": "baseline-prewarm",
+      "production_reference": "72d0af0",
+      "source_file_count": 289,
+      "linked_object_count": 32,
+      "source_hash_manifest_sha256": "559afe2231fefd1a1c835aaa46bbbb5a4c3e999286588d6fcc9829163eeac043",
+      "raw_provenance_sha256": "062cf7159e741d532f6fb33bbf1e9296b91ff1b8f35c67ff5a20e82935ee444e"
+    },
+    {
+      "source_stable_during_build": true,
+      "sources_changed_during_build": [],
+      "harness_sha256": "7de7fadbc6a6581f1f1f1cb79be9544ab85f7ae04820f408329716cf1dc9be35",
+      "readback_sha256": "acadbdee4aa3cecf6e4ceaa3923b69f1742f582a915ea5604b1eaeddeb08bc42",
+      "shader_embed_sha256": "bdc13b4bd332010f8a79304129f4753d52ce690d2a5358b9730a1aa9d204dfe2",
+      "binary_sha256": "24c185111724c7b39a84535c7354f2ff04ccd96c66fef67edda950c2c5b91855",
+      "adapter": "candidate-startup",
+      "production_reference": "build digest 25b0ebe6af771a254ed9011d43a42b59cb21625ece22a53bcc84340c04be062c",
+      "source_file_count": 291,
+      "linked_object_count": 33,
+      "source_hash_manifest_sha256": "ce92bdd3e3875eca5403f86ba32e2e40b0b01e51e9f1bfaaf1791c249d5fcf2d",
+      "raw_provenance_sha256": "00e9ab60af5dd2dc808cfda16a522986cc7965d331692e902d23c38ad04b62fb"
+    }
+  ],
+  "source_hash_manifest_definition": "SHA256 of compact, key-sorted JSON mapping source-relative filenames to file SHA256. Raw build/object trees are not committed.",
+  "reproduction_note": "Adapter binary hashes record this run. Compiler/build paths and toolchain differences may change executable bytes; compare recorded source digests and freshly generated same-driver results rather than relabeling artifacts."
+}

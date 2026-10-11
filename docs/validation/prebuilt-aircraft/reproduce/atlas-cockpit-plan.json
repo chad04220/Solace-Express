@@ -1,0 +1,10 @@
+[
+  {
+    "model": 14,
+    "views": [
+      "cockpit",
+      "cockpit_down_positive",
+      "cockpit_down_negative"
+    ]
+  }
+]
