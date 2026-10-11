@@ -143,6 +143,9 @@ private:
   int freeCraft = 0, freeAirport = 0;
   bool freeAirborne = false;
   void beginFreeFlightSetup();
+  // the main menu into the career: its hub on the work tab and list, nothing chosen (never the tab the menu's own
+  // Settings or Controls button, or an earlier visit, left it on)
+  void enterCareerHub();
   void cancelFreeFlightSetup();
   void launchFreeFlight();
   void returnToFreeFlight();

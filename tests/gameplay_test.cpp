@@ -1310,6 +1310,31 @@ struct GameTest {
         const bool ok = on && on == off && off != other && plain != off;
         printf("Toggle focus across its label: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
       }
+      {   // a new career over a saved one: "Overwrite save" opens its hub on the work tab, never on the tab the menu's own
+          // Settings button left it on (v3.47.0 opened the new career on Settings) - clicked where the menu draws it
+        namespace fs = std::filesystem;
+        const fs::path dir = fs::temp_directory_path() / "solace_overwrite_test";
+        std::error_code ec; fs::remove_all(dir, ec); fs::create_directories(dir, ec);
+        const int W0 = g_ren.W, H0 = g_ren.H; g_ren.W = 1920; g_ren.H = 1080;
+        Game q; q.initHeadless(); q.saveDir = dir.string();
+        q.hubTab = TAB_SETTINGS; q.settingsPage = 0; q.hubList = 2;   // (the menu's Settings visited first; the military list)
+        q.screen = SCR_MENU; q.hasSave = true; q.confirmNew = true; q.in = Input();
+        g_ren.uiBegin(); q.focusList.clear(); q.drawMenu();
+        const auto drawn = q.focusList;
+        bool found = false;
+        for (const auto& e : drawn) {   // (the confirmation's button: the one whose identity is "Overwrite save" where it stands)
+          q.focusList.clear(); q.button(e.x, e.y, e.w, e.h, "Overwrite save");
+          if (q.focusList.empty() || q.focusList.back().id != e.id) continue;
+          found = true;
+          q.in = Input(); q.in.mx = e.x + e.w * 0.5f; q.in.my = e.y + e.h * 0.5f; q.in.mDown[0] = q.in.mPressed[0] = true;
+          g_ren.uiBegin(); q.focusList.clear(); q.drawMenu();
+          break;
+        }
+        const bool ok = found && q.screen == SCR_HUB && q.hubTab == TAB_CONTRACTS && q.hubList == 0 && !q.confirmNew && fs::exists(dir / "career.sav");
+        printf("Overwrite save opens the new career on its work tab (found %d, screen %d, tab %d, list %d): %s\n", found, (int)q.screen, q.hubTab, q.hubList, ok ? "ok" : "FAIL");
+        fails += !ok;
+        fs::remove_all(dir, ec); g_ren.W = W0; g_ren.H = H0; g_ren.uiBegin();
+      }
       {   // the career's launches and their saves (the review of v3.24.0, R4-R6): a launch whose save fails flies nothing and
           // leaves nothing pending; a cancelled loading screen leaves the job waiting at its stop; a free flight beside a
           // waiting job leaves it as it is, at launch and at settlement; the debrief's retry flies a waiting job on

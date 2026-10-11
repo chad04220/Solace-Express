@@ -430,6 +430,7 @@ void Game::drawLoading() {
 }
 
 // ------------------------------------------------------------------ main menu
+void Game::enterCareerHub() { screen = SCR_HUB; hubTab = TAB_CONTRACTS; hubList = 0; selContract = 0; selAircraft = -1; }
 void Game::drawMenu() {
   float W = (float)g_ren.W, H = (float)g_ren.H;
   float s = std::min(S(), std::min(H / 690.f, W / 1040.f));
@@ -447,15 +448,15 @@ void Game::drawMenu() {
   if (hasSave) {
     const Airport& ap = g_world.airports[career.location];
     g_ren.text(x + 24 * s, y + 36 * s, 15 * s, ellipsize(std::string(licenseName(career.license)) + " / " + ap.code, bw, 15 * s), C_TEXT, 1);
-    if (button(x + 24 * s, y + 64 * s, bw, 34 * s, "Continue career", true, true)) { screen = SCR_HUB; career.refreshBoard(); }
+    if (button(x + 24 * s, y + 64 * s, bw, 34 * s, "Continue career", true, true)) { enterCareerHub(); career.refreshBoard(); }
   } else g_ren.text(x + 24 * s, y + 40 * s, 15 * s, "Start small. Build your airline.", C_TEXT, 1);
   y += (hasSave ? 130 : 102) * s;
   if (in.pressed[K_ESC]) { confirmNew = false; confirmRes = false; }
   if (!confirmNew) {
-    if (button(x, y, cw, 42 * s, "New career", true, !hasSave)) { if (hasSave) confirmNew = true; else { pendingCareer.reset(); career.newGame(); saveGame(); screen = SCR_HUB; } }
+    if (button(x, y, cw, 42 * s, "New career", true, !hasSave)) { if (hasSave) confirmNew = true; else { pendingCareer.reset(); career.newGame(); saveGame(); enterCareerHub(); } }
   } else {
     g_ren.text(x, y - 14 * s, 11 * s, "Replace your saved career?", C_WARN, 1);
-    if (button(x, y, (cw - 10 * s) * 0.5f, 42 * s, "Overwrite save", true, true)) { pendingCareer.reset(); career.newGame(); saveGame(); confirmNew = false; screen = SCR_HUB; }
+    if (button(x, y, (cw - 10 * s) * 0.5f, 42 * s, "Overwrite save", true, true)) { pendingCareer.reset(); career.newGame(); saveGame(); confirmNew = false; enterCareerHub(); }
     if (button(x + (cw + 10 * s) * 0.5f, y, (cw - 10 * s) * 0.5f, 42 * s, "Cancel")) confirmNew = false;
   }
   y += 54 * s;
