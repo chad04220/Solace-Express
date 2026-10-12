@@ -1,4 +1,4 @@
-// Solace Express - aerobatics on the autopilot
+// Somnium Volandi - aerobatics on the autopilot
 //
 // Each figure is a short list of steps the pilot flies through the shared inner loops (Plane::apRates): pull through
 // so many degrees of pitch at the figure's load factor, roll through so many degrees at full rate, hold a line, and so

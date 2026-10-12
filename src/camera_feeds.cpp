@@ -1,4 +1,4 @@
-// Solace Express - camera feeds: the research jets' cockpit cameras drawn into the feed atlas (see feed_cameras.h)
+// Somnium Volandi - camera feeds: the research jets' cockpit cameras drawn into the feed atlas (see feed_cameras.h)
 #include "renderer.h"
 #include <algorithm>
 #include <cstdio>

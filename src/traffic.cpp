@@ -1,4 +1,4 @@
-// Solace Express - AI traffic (see traffic.h). Kinematic aircraft: airport traffic follows taxi lines and flies real
+// Somnium Volandi - AI traffic (see traffic.h). Kinematic aircraft: airport traffic follows taxi lines and flies real
 // circuits with glideslope approaches; cruisers cross the map; XR-30 formations make high-speed passes; a display team
 // flies an aerobatic sequence with smoke.
 #include "traffic.h"

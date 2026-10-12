@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Solace Express - the night sky's stars: writes src/star_catalog.h from the Yale Bright Star Catalogue, 5th revised
+"""Somnium Volandi - the night sky's stars: writes src/star_catalog.h from the Yale Bright Star Catalogue, 5th revised
 edition (Hoffleit & Warren 1991; NASA ADC / CDS catalogue V/50, public domain), as published at
 http://tdc-www.harvard.edu/catalogs/bsc5.dat.gz.
 

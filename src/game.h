@@ -1,4 +1,4 @@
-// Solace Express - game state, flight session, cameras, effects, UI
+// Somnium Volandi - game state, flight session, cameras, effects, UI
 #pragma once
 #include <functional>
 #include <optional>

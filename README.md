@@ -1,14 +1,14 @@
 # Somnium Volandi
 
-## Somnium Volandi UI rebrand — Claude review branch
+## The new name: Somnium Volandi
 
-The game identity, icon, startup page and civilian screens now use midnight blue, platinum and brass. NIGHTGLASS Research uses emerald code that falls and crosses the display, periodically resolving a face, wing or helix. Military Career uses matte field panels, recessed fasteners and amber deployment controls. Loading shows the current operation, measured stage/batch progress, a subsystem checklist and completed-work progress. Settings → General → Menu animation offers reduced motion. Existing career and cache directories retain their original names for continuity.
+Solace Express is now **Somnium Volandi** ("the dream of flying"). The game is `SomniumVolandi.exe`, released as `SomniumVolandi-windows-x64.zip`, and it starts fresh: saves, settings and radio stations live in `%APPDATA%\SomniumVolandi`, and the shader cache and other rebuildable data in `%LOCALAPPDATA%\SomniumVolandi`. Nothing is carried over from the old `SolaceExpress` folders, and the first launch compiles its shaders again. To keep a career, copy the files from `%APPDATA%\SolaceExpress` into `%APPDATA%\SomniumVolandi` before the first launch; the old folders can then be deleted. The islands keep their names.
 
-See [the Claude review handoff](docs/CLAUDE_SOMNIUM_VOLANDI_UI_REVIEW.md) for implementation details, screenshots, validation and integration notes. The CMake target `SolaceExpress` remains compatible with existing build commands and outputs `SomniumVolandi.exe`; release packages use `SomniumVolandi-windows-x64`.
+The game identity, icon, startup page and civilian screens use midnight blue, platinum and brass. NIGHTGLASS Research uses emerald code that falls and crosses the display, periodically resolving a face, wing or helix. Military Career uses matte field panels, recessed fasteners and amber deployment controls. Loading shows the current operation, measured stage/batch progress, a subsystem checklist and completed-work progress. Settings → General → Menu animation offers reduced motion. See [the review handoff](docs/CLAUDE_SOMNIUM_VOLANDI_UI_REVIEW.md) for implementation details, screenshots and validation.
 
 ## Hive military review: back up careers before testing
 
-This experimental branch writes **save format 6 whenever a career is saved**, including civilian-only play. Older releases cannot read that format. Before launching this build, keep an independent copy of your existing career saves from `%APPDATA%\SolaceExpress` outside that folder. Do not rely on the rotating `.bak` file: subsequent saves can replace it with a format-6 backup. Restore your independent pre-test copy if returning to an older release.
+This experimental branch writes **save format 6 whenever a career is saved**, including civilian-only play. Older releases cannot read that format. Before launching this build, keep an independent copy of your existing career saves from `%APPDATA%\SomniumVolandi` outside that folder. Do not rely on the rotating `.bak` file: subsequent saves can replace it with a format-6 backup. Restore your independent pre-test copy if returning to an older release.
 
 The military service review adds a clean olive terminal with assigned-aircraft previews, nine funded XR sorties, and aircraft-specific loading screens. XR-10/20/30 carry reconnaissance work; XR-40 adds precision hover work and armed interception, defense and strike. See `docs/CLAUDE_MILITARY_CAREER_REVIEW.md` for the new catalogue, controls, finite-ammunition tests and validation limits. Missions unlock in board order after successful extraction; completed sorties remain replayable, and locked cards show a classified aircraft silhouette. Existing mission IDs remain stable. Saves migrate forward to v6 with explicit per-mission completion; old aggregate service records are preserved without guessing prior mission identities. Older builds cannot read v6 saves; keep your independent backup when switching builds.
 
@@ -16,7 +16,7 @@ Research XR-40 equipment choices now live in the terminal side rail, and researc
 
 Military missions, enemy combat and XR-40 loadouts are review features. Native Windows/RTX 3070 gameplay and frame-time validation are still required. See `docs/CLAUDE_HIVE_MILITARY_REVIEW.md` in the source for coverage and limitations.
 
-*Formerly Air Xpress. On first launch, saves, settings and radio stations move from `%APPDATA%\AirXpress` to `%APPDATA%\SolaceExpress`.*
+*Formerly Solace Express, and before that Air Xpress.*
 
 A pilot-career flight game for Windows with a detailed real-time 3D world drawn on the GPU. You start as a student with a permit, earn your licences, rent small planes to haul cargo, rent bigger ones to fly passengers, then buy your own aircraft for longer, harder contracts: mountain strips, glaciers, volcano fields, night storms and finally your own airline (the AIRLINE tab: hired pilots fly your aircraft on routes while you fly your own work, and their flights pass you as traffic in your livery).
 
@@ -163,7 +163,7 @@ Two more airframes round out the register. The **XR-10 Nightjar** is the program
 
 ## Internet radio
 
-Press **R** in flight, or use the **Radio** button in the hub. Stations come from `%APPDATA%\SolaceExpress\radio_stations.txt`, which is created on first run. Add one line per station:
+Press **R** in flight, or use the **Radio** button in the hub. Stations come from `%APPDATA%\SomniumVolandi\radio_stations.txt`, which is created on first run. Add one line per station:
 
 ```
 My Station|https://example.com/stream.mp3
@@ -187,11 +187,11 @@ The presets include SomaFM, Radio Paradise and KEXP, plus free US East Coast pub
 
 **Startup.** The first thing on screen is the intro: the game's icon in a rotating ring, the title and a progress bar. The intro animates on its own thread with its own OpenGL context, separate from everything else, so loading never freezes it. The first time a new version starts, the shaders are compiled by a hidden helper copy of the game (graphics drivers can stall every other drawing call of the process doing a big compile), which writes them to the shader cache; the game then loads them from there. While it plays, the shaders load on a worker thread with another context and the world is generated on another thread (its heightmap, scenery masks and the terrain textures are split across every CPU core), so the screen keeps animating at 60 Hz. When both are done, the menu tour's first place is loaded (every tree and building in range, the shadows) and every aircraft's hull is built, rendered offscreen while the intro still plays, so the menu opens complete. During the menu tour the next place loads in the background while the current one plays.
 
-Save data, settings and the radio list live in `%APPDATA%\SolaceExpress` (Roaming: they're yours, and go with your profile). What the game builds for this machine - the compiled shaders, the islands, each aircraft's learned performance and its body meshes - is cached in `%LOCALAPPDATA%\SolaceExpress` (Local: the shaders are your GPU's and driver's own, and none of it needs to travel). The first launch builds it, later ones load it in a moment, and deleting the folder only means the next launch builds it again. A game update, driver update or different GPU simply rebuilds what changed. (Versions before 3.42 kept it in a `shadercache` folder next to `SomniumVolandi.exe`; the first launch moves it over.)
+Save data, settings and the radio list live in `%APPDATA%\SomniumVolandi` (Roaming: they're yours, and go with your profile). What the game builds for this machine - the compiled shaders, the islands, each aircraft's learned performance and its body meshes - is cached in `%LOCALAPPDATA%\SomniumVolandi` (Local: the shaders are your GPU's and driver's own, and none of it needs to travel). The first launch builds it, later ones load it in a moment, and deleting the folder only means the next launch builds it again. A game update, driver update or different GPU simply rebuilds what changed. (Versions before 3.42 kept it in a `shadercache` folder next to `SomniumVolandi.exe`; the first launch moves it over.)
 
 **Performance.** The cloud and terrain noise fields are baked at startup into tileable textures (a 1024² coverage map and a 128³ noise volume), so the GPU samples them with its texture hardware instead of evaluating hashed noise per sample; the cloud march takes long strides through clear air and half the steps for water reflections. Scenery chunks that lie wholly in one level of detail are handed to the GPU in one block, and the vertex shader does the distance thinning per instance.
 
-**Laptops with two GPUs.** The game asks NVIDIA Optimus and AMD switchable graphics for the dedicated GPU. If it still starts on the integrated one (very slow loading, or a shader error at startup), set `SomniumVolandi.exe` to *High performance* in Windows Settings → System → Display → Graphics. The intro screen shows the loading progress. Each launch writes that GPU's name to `%APPDATA%\SolaceExpress\startup.log`.
+**Laptops with two GPUs.** The game asks NVIDIA Optimus and AMD switchable graphics for the dedicated GPU. If it still starts on the integrated one (very slow loading, or a shader error at startup), set `SomniumVolandi.exe` to *High performance* in Windows Settings → System → Display → Graphics. The intro screen shows the loading progress. Each launch writes that GPU's name to `%APPDATA%\SomniumVolandi\startup.log`.
 
 ## Building
 

@@ -56,7 +56,7 @@ puts("Logical shader completion contract: PASS");
  printf("objects, failing: program=%u attempts=%d\\n",p,calls);if(p||calls!=1)return 1;
  puts("Full-screen builds: PASS");}}
 '''
-with tempfile.TemporaryDirectory(prefix='solace-shader-progress-') as tmp:
+with tempfile.TemporaryDirectory(prefix='somnium-shader-progress-') as tmp:
  source = Path(tmp) / 'progress_mock.cpp'
  binary = Path(tmp) / 'progress_mock'
  source.write_text(pre + hull + '\n'.join(parts) + main)

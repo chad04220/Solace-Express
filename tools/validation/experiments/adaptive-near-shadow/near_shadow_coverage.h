@@ -1,6 +1,6 @@
 // DISABLED EXPERIMENT: not part of the production renderer or CMake targets.
 // See README.md for the rejected coverage tradeoff and standalone-only use.
-// Solace Express - bounded, CPU-testable main-camera near-shadow coverage.
+// Somnium Volandi - bounded, CPU-testable main-camera near-shadow coverage.
 #pragma once
 #include "common.h"
 

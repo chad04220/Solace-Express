@@ -1,4 +1,4 @@
-// Solace Express - aircraft hull meshes. The light aircraft are exact distance-field shapes; finding them took every
+// Somnium Volandi - aircraft hull meshes. The light aircraft are exact distance-field shapes; finding them took every
 // pixel near the aircraft up to a hundred and more samples of the whole airframe (the cockpit view ~28 on average).
 // Each airframe now gets a triangle hull, built once from that same shape: a closed surface of voxel faces that
 // holds the airframe in every position of its gear, flaps, steering and controls. Rasterized with the aircraft, the

@@ -1,4 +1,4 @@
-// Solace Express - the terrain mesh and the sea for the raster renderer (renderer.h). A quadtree of 32 x 32-quad
+// Somnium Volandi - the terrain mesh and the sea for the raster renderer (renderer.h). A quadtree of 32 x 32-quad
 // chunks is picked around the camera every frame: a chunk is split while the camera is within kSplit chunk sizes of
 // it, from a root chunk covering the world (2500 m cells) down to 0.3 m cells right under the camera - and along the
 // graded roads further still, until its cells are no wider than half the road's platform or a small fraction of the

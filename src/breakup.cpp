@@ -1,4 +1,4 @@
-// Solace Express - how an airframe comes apart, and how its pieces fly (breakup.h)
+// Somnium Volandi - how an airframe comes apart, and how its pieces fly (breakup.h)
 #include "breakup.h"
 #include "aircraft.h"
 #include "models.h"

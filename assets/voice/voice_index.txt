@@ -1,4 +1,4 @@
-# Solace Express voices (tools/voice_import.py): id <tab> file <tab> subtitle [<tab> speaker <tab> priority <tab> kind <tab> alias <tab> mission], or @lookup <tab> value
+# Somnium Volandi voices (tools/voice_import.py): id <tab> file <tab> subtitle [<tab> speaker <tab> priority <tab> kind <tab> alias <tab> mission], or @lookup <tab> value
 symbol.tower_north.A	tower_north/symbol.tower_north.A.wav	Ay.
 symbol.tower_north.B	tower_north/symbol.tower_north.B.wav	Bee.
 symbol.tower_north.C	tower_north/symbol.tower_north.C.wav	See.

@@ -21,8 +21,8 @@ def generate(source, destination):
     subprocess.run([cmake, f"-DSRC_DIR={source}", f"-DOUT={header}", "-P",
                     str(source / "tools/generate_aircraft_geometry_source.cmake")], check=True)
     data = json.loads((destination / "aircraft_geometry_source.json").read_text())
-    cpu = "solace-aircraft-cpu-source-v1\n"
-    full = "solace-aircraft-build-source-v1\n"
+    cpu = "somnium-aircraft-cpu-source-v1\n"
+    full = "somnium-aircraft-build-source-v1\n"
     for item in data["files"]:
         actual = hashlib.sha256((source / item["path"]).read_bytes()).hexdigest()
         check(actual == item["sha256"], "source hash mismatch")
@@ -36,7 +36,7 @@ def generate(source, destination):
     check(data["geometry_digest"] in header.read_text(), "compiled CPU digest")
     return data
 
-with tempfile.TemporaryDirectory(prefix="solace-geometry-source-") as temp:
+with tempfile.TemporaryDirectory(prefix="somnium-geometry-source-") as temp:
     temp = Path(temp)
     source = temp / "source"
     (source / "tools").mkdir(parents=True)

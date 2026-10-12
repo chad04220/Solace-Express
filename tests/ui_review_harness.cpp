@@ -200,7 +200,7 @@ struct GameTest {
     g.career.military.rank=std::min(10,g.career.military.successes/3);
   }
   static void setup(Game& g,const std::string& sc,float scale) {
-    g.realTime=30;g.uiDt=1.f;g.set.uiScale=scale;g.assetDir="assets";g.saveDir=(std::filesystem::temp_directory_path()/"solace-ui-review-settings").string();std::filesystem::create_directories(g.saveDir);
+    g.realTime=30;g.uiDt=1.f;g.set.uiScale=scale;g.assetDir="assets";g.saveDir=(std::filesystem::temp_directory_path()/"somnium-ui-review-settings").string();std::filesystem::create_directories(g.saveDir);
     if(!g.iconTex){int w,h;std::vector<uint8_t> px;if(readImage(getenv("UI_ICON")?getenv("UI_ICON"):"assets/icon.png",w,h,px))g.iconTex=g_ren.makeTexture(px.data(),w,h);}
     if(sc.rfind("military_pause",0)==0 || sc.rfind("military_debrief",0)==0) {
       const bool pause=sc.rfind("military_pause",0)==0;

@@ -1,4 +1,4 @@
-// Solace Express - game flow, flight session, cameras, particles, lights, audio feed
+// Somnium Volandi - game flow, flight session, cameras, particles, lights, audio feed
 #include "road_traffic.h"
 #include "volcano_effects.h"
 #include "game.h"

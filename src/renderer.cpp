@@ -1,4 +1,4 @@
-// Solace Express - OpenGL renderer: deferred rasterizer + sprites + post + UI
+// Somnium Volandi - OpenGL renderer: deferred rasterizer + sprites + post + UI
 #include "renderer.h"
 #include "hive_ordnance_sprites.h"
 #include "shader_prune.h"
@@ -275,7 +275,7 @@ std::string shaderCacheStamp() {
 // Portable geometry identity: both actual full-quality bake programs and their vertex stage,
 // plus the build-generated CPU source dependency contract. Shader binaries retain the driver key below.
 std::string meshGeometryStamp(const std::string& defines) {
-  std::string source = "SolaceExpress-aircraft-geometry-v1\n";
+  std::string source = "SomniumVolandi-aircraft-geometry-v1\n";
   auto add = [&](const std::string& value) { source += std::to_string(value.size()) + ":"; source += value; };
   add(kAircraftGeometrySourceDigest);
   add(aircraftMesh::kAlgorithmManifest);
@@ -466,7 +466,7 @@ void Renderer::genMaterials(const std::function<void(float, const std::string&)>
   // along the ground reads their finest levels on every pixel, anisotropically: uncompressed, 300 MiB of them cost the
   // v3.48.0 diagnostics' night scene (on a runway) 4 ms of texture traffic
   bool s3tc = false;
-  if (glGetStringi && glCompressedTexImage3D && !getenv("SOLACE_NO_BC")) {
+  if (glGetStringi && glCompressedTexImage3D && !getenv("SOMNIUM_NO_BC")) {
     GLint ne = 0; glGetIntegerv(GL_NUM_EXTENSIONS, &ne);
     for (GLint i = 0; i < ne && !s3tc; i++) { const GLubyte* e = glGetStringi(GL_EXTENSIONS, (GLuint)i); s3tc = e && !strcmp((const char*)e, "GL_EXT_texture_compression_s3tc"); }
     for (int i = 0; i < 16 && glGetError() != 0; i++) {}
@@ -1112,7 +1112,7 @@ static uint8_t foveaRate(float r, float f) {
 }
 void Renderer::initFoveation() {
   vrsAvailable = false;
-  if (getenv("SOLACE_NO_VRS") || !glGetIntegerv || !glGetStringi || !glBindShadingRateImageNV || !glShadingRateImagePaletteNV) return;
+  if (getenv("SOMNIUM_NO_VRS") || !glGetIntegerv || !glGetStringi || !glBindShadingRateImageNV || !glShadingRateImagePaletteNV) return;
   bool ext = false;
   GLint ne = 0; glGetIntegerv(GL_NUM_EXTENSIONS, &ne);
   for (GLint i = 0; i < ne && !ext; i++) { const GLubyte* e = glGetStringi(GL_EXTENSIONS, (GLuint)i); ext = e && !strcmp((const char*)e, "GL_NV_shading_rate_image"); }

@@ -1,4 +1,4 @@
-// Solace Express - per-aircraft 3D model definitions (shared by the aircraft's shape code, the cockpit camera and the props)
+// Somnium Volandi - per-aircraft 3D model definitions (shared by the aircraft's shape code, the cockpit camera and the props)
 #pragma once
 #include "common.h"
 

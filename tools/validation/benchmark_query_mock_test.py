@@ -50,7 +50,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--cxx', default='c++')
 parser.add_argument('--sanitize', action='store_true')
 args = parser.parse_args()
-with tempfile.TemporaryDirectory(prefix='solace-query-mock-') as tmp:
+with tempfile.TemporaryDirectory(prefix='somnium-query-mock-') as tmp:
     cpp, binary = Path(tmp) / 'mock.cpp', Path(tmp) / 'mock'
     cpp.write_text(code)
     flags = ['-fsanitize=address,undefined', '-fno-omit-frame-pointer'] if args.sanitize else []

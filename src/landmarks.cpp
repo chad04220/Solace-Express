@@ -1,4 +1,4 @@
-// Solace Express - the landmarks (docs/LIVING_ISLANDS_PLAN.md, Phase C): each found where the world has room for it
+// Somnium Volandi - the landmarks (docs/LIVING_ISLANDS_PLAN.md, Phase C): each found where the world has room for it
 // once the world is built or loaded (after its road furniture), and handed to the scenery chunks as they are generated
 // (entities.cpp). Each search is deterministic and runs on the base height map (World::sampleBase), so it is quick.
 #include "scenery.h"

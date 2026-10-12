@@ -229,7 +229,7 @@ int main() {
     }
     char got[24]; snprintf(got, sizeof got, "%016llx", (unsigned long long)h);
     std::string want;
-    if (FILE* f = fopen(SOLACE_SOURCE_DIR "/tests/fixtures/aircraft_bake.fnv", "r")) { char b[64] = {}; if (fscanf(f, "%63s", b) == 1) want = b; fclose(f); }
+    if (FILE* f = fopen(SOMNIUM_SOURCE_DIR "/tests/fixtures/aircraft_bake.fnv", "r")) { char b[64] = {}; if (fscanf(f, "%63s", b) == 1) want = b; fclose(f); }
     if (want != got) printf("aircraft bake hash %s, fixture %s\n", got, want.c_str());
     check(want == got, "the aircraft bodies' bake is unchanged (tests/fixtures/aircraft_bake.fnv: update it only with an aircraft edit)", "");
   }

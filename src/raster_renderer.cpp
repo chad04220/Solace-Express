@@ -1,4 +1,4 @@
-// Solace Express - the renderer: a deferred pipeline that draws every surface with the
+// Somnium Volandi - the renderer: a deferred pipeline that draws every surface with the
 // rasterizer and lights the frame once. Its parts: the scenery pass and its shadow cascades, the
 // terrain-shadow bake, the display atlases, the cloud pass, and everything after the lit frame (TAA, sprites, bloom,
 // light shafts, post). See docs/RENDERER_REBUILD.md.

@@ -92,12 +92,12 @@ def main():
     if not exe.is_file(): p.error('executable not found')
     if out.exists(): p.error('output directory exists; choose a new directory to preserve previous evidence')
     out.mkdir(parents=True)
-    appdata = out / 'isolated_appdata'; settings = appdata / 'SolaceExpress'; settings.mkdir(parents=True)
+    appdata = out / 'isolated_appdata'; settings = appdata / 'SomniumVolandi'; settings.mkdir(parents=True)
     (settings/'settings.cfg').write_text(f'quality {args.quality}\nrenderRes 0\nfpsTarget 0\ntraffic 1\nfov 55\nfullscreen 0\n', encoding='ascii')
     env = os.environ.copy()
     for key in DEBUG_ENV: env.pop(key, None)
     env['APPDATA'] = str(appdata)
-    manifest = {'schema': 'solace-environment-benchmark-v1', 'utc': datetime.now(timezone.utc).isoformat(),
+    manifest = {'schema': 'somnium-environment-benchmark-v1', 'utc': datetime.now(timezone.utc).isoformat(),
                 'run_id': uuid.uuid4().hex, 'binary_sha256': hashlib.sha256(exe.read_bytes()).hexdigest(),
                 'source_commit_caller_supplied': args.commit, 'host': platform.platform(),
                 'frames_per_case': args.frames, 'quality': args.quality, 'native_output': [1920, 1080],

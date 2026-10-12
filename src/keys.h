@@ -1,4 +1,4 @@
-// Solace Express - key and gamepad button codes shared by the game, the platform layer and the tests
+// Somnium Volandi - key and gamepad button codes shared by the game, the platform layer and the tests
 #pragma once
 
 // Virtual key codes (Windows VK values)

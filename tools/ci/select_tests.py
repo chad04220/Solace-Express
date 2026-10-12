@@ -138,7 +138,7 @@ class Model:
         tj = self.targets[name]
         deps, why = set(), []
         incdirs = [i["path"] for g in tj.get("compileGroups", []) for i in g.get("includes", [])]
-        for g in tj.get("compileGroups", []):   # (a program told where files are reads them: SOLACE_ASSETS, SOLACE_SOURCE_DIR)
+        for g in tj.get("compileGroups", []):   # (a program told where files are reads them: SOMNIUM_ASSETS, SOMNIUM_SOURCE_DIR)
             for d in g.get("defines", []):
                 v = d.get("define", "").split("=", 1)[-1].strip('"')
                 r = self.rel(v) if os.path.isabs(v) else None

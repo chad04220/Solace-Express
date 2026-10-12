@@ -1,4 +1,4 @@
-// Solace Express - airport ground plan, shared by the scenery placement, the AI traffic and (mirrored in GLSL in
+// Somnium Volandi - airport ground plan, shared by the scenery placement, the AI traffic and (mirrored in GLSL in
 // runwayMaterial) the terrain shader. Coordinates are runway-local: u along the runway (positive towards the
 // direction of the first designator), v across it, positive to the right; `side` is the side the facilities are on.
 //

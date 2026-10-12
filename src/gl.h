@@ -1,4 +1,4 @@
-// Solace Express - minimal OpenGL 3.3 core loader (no external headers needed)
+// Somnium Volandi - minimal OpenGL 3.3 core loader (no external headers needed)
 #pragma once
 #include <cstddef>
 #include <cstdint>

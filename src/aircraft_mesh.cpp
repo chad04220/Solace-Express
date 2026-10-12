@@ -1,4 +1,4 @@
-// Solace Express - the aircraft mesh (renderer rebuild R2, docs/RENDERER_REBUILD.md): the part of the airframe that
+// Somnium Volandi - the aircraft mesh (renderer rebuild R2, docs/RENDERER_REBUILD.md): the part of the airframe that
 // never moves, baked from its distance field as a mesh, so the raster renderer rasterizes it and marches the field only
 // where something moves.
 //
@@ -175,7 +175,7 @@ aircraftAsset::Identity Renderer::prebuiltAircraftIdentity(int model, int slot) 
   if (id.geometry != aircraftAsset::Digest{}) return id;
   id.model = (uint32_t)model; id.slot = (uint32_t)slot;
   id.source = aircraftAsset::fromHex(kAircraftGeometrySourceDigest);
-  std::string input = "SolaceExpress-aircraft-canonical-source-profile1\n";
+  std::string input = "SomniumVolandi-aircraft-canonical-source-profile1\n";
   // Both views' source identities are shared across the roster; no shader program is compiled here.
   static const std::string outside = meshGeometryStamp("#define AF_OUTSIDE\n");
   static const std::string cockpit = meshGeometryStamp("");

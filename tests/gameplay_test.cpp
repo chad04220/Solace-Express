@@ -34,21 +34,21 @@ struct GameTest {
     // 3 the parking brake, the quote and the fuel estimates; 4 the rest
     auto in = [&](int k) { return part == 0 || part == k; };
     Game g; g.initHeadless(); g.botControl = true;
-    if (getenv("SOLACE_WRECK_POSE_ONLY")) return wreckPoseRegressions() + wheelVisualRegressions();
-    if (getenv("SOLACE_FREE_FLIGHT_ONLY")) return freeFlightRegressions();
-    int fails = getenv("SOLACE_VOICE_ONLY") || !in(1) ? 0 : stateRegressions() + freeFlightRegressions() + wreckPoseRegressions() + wheelVisualRegressions();
-    if (getenv("SOLACE_STATE_ONLY")) { printf("%d state failures\n", fails); return fails; }
-#ifdef SOLACE_ASSETS
-    bool voices = g.atc.load(std::string(SOLACE_ASSETS) + "/voice");   // the tower voices (the audio is rendered below, as the audio thread would)
+    if (getenv("SOMNIUM_WRECK_POSE_ONLY")) return wreckPoseRegressions() + wheelVisualRegressions();
+    if (getenv("SOMNIUM_FREE_FLIGHT_ONLY")) return freeFlightRegressions();
+    int fails = getenv("SOMNIUM_VOICE_ONLY") || !in(1) ? 0 : stateRegressions() + freeFlightRegressions() + wreckPoseRegressions() + wheelVisualRegressions();
+    if (getenv("SOMNIUM_STATE_ONLY")) { printf("%d state failures\n", fails); return fails; }
+#ifdef SOMNIUM_ASSETS
+    bool voices = g.atc.load(std::string(SOMNIUM_ASSETS) + "/voice");   // the tower voices (the audio is rendered below, as the audio thread would)
     if (!voices) { printf("Voice index: FAIL (assets/voice/voice_index.txt did not load; the voice checks below need it)\n"); fails++; }
 #else
     bool voices = false;
 #endif
-    if (in(1) || getenv("SOLACE_VOICE_ONLY")) fails += controlVoiceRegressions();
-#ifdef SOLACE_ASSETS
-    if (in(1) || getenv("SOLACE_VOICE_ONLY")) fails += aircraftVoiceRegressions(std::string(SOLACE_ASSETS) + "/voice");
+    if (in(1) || getenv("SOMNIUM_VOICE_ONLY")) fails += controlVoiceRegressions();
+#ifdef SOMNIUM_ASSETS
+    if (in(1) || getenv("SOMNIUM_VOICE_ONLY")) fails += aircraftVoiceRegressions(std::string(SOMNIUM_ASSETS) + "/voice");
 #endif
-    if (getenv("SOLACE_VOICE_ONLY")) { printf("%d voice failures\n", fails); return fails; }
+    if (getenv("SOMNIUM_VOICE_ONLY")) { printf("%d voice failures\n", fails); return fails; }
     static float abuf[2 * 4096];
     if (voices && in(1)) {   // the voice lines resolve for the game's messages, fixed and assembled from fragments
       struct Case { const char* msg; const char* mission; bool pad, want; } cases[] = {
@@ -324,7 +324,7 @@ struct GameTest {
         q.warnWas[1] = true; const bool holds = q.atc.valid(w);
         q.warnWas[1] = false; const bool passed = !q.atc.valid(w);
         namespace fs = std::filesystem;
-        const fs::path vd = fs::temp_directory_path() / "solace_bad_voice"; fs::create_directories(vd);
+        const fs::path vd = fs::temp_directory_path() / "somnium_bad_voice"; fs::create_directories(vd);
         { std::ofstream ix(vd / "voice_index.txt"); ix << "bad.trunc\ttrunc.wav\tTruncated.\nbad.empty\tempty.wav\tEmpty.\n"; }
         { std::ofstream f(vd / "trunc.wav", std::ios::binary); f.write("RIFF\x24\0\0\0WAVEfmt \x10\0\0\0\x01\0", 22); }   // (the fmt chunk cut off)
         { std::ofstream f(vd / "empty.wav", std::ios::binary); const char h[] = "RIFF\x24\0\0\0WAVEfmt \x10\0\0\0\x01\0\x01\0\x40\x1f\0\0\x80\x3e\0\0\x02\0\x10\0data\0\0\0\0"; f.write(h, sizeof h - 1); }
@@ -1313,7 +1313,7 @@ struct GameTest {
       {   // a new career over a saved one: "Overwrite save" opens its hub on the work tab, never on the tab the menu's own
           // Settings button left it on (v3.47.0 opened the new career on Settings) - clicked where the menu draws it
         namespace fs = std::filesystem;
-        const fs::path dir = fs::temp_directory_path() / "solace_overwrite_test";
+        const fs::path dir = fs::temp_directory_path() / "somnium_overwrite_test";
         std::error_code ec; fs::remove_all(dir, ec); fs::create_directories(dir, ec);
         const int W0 = g_ren.W, H0 = g_ren.H; g_ren.W = 1920; g_ren.H = 1080;
         Game q; q.initHeadless(); q.saveDir = dir.string();
@@ -1403,7 +1403,7 @@ struct GameTest {
           // leaves nothing pending; a cancelled loading screen leaves the job waiting at its stop; a free flight beside a
           // waiting job leaves it as it is, at launch and at settlement; the debrief's retry flies a waiting job on
         namespace fs = std::filesystem;
-        const fs::path root = fs::temp_directory_path() / "solace_lifecycle_test";
+        const fs::path root = fs::temp_directory_path() / "somnium_lifecycle_test";
         std::error_code ec; fs::remove_all(root, ec); fs::create_directories(root, ec);
         const std::string bad = (root / "absent" / "x").string(), good = root.string();
         auto fresh = [&](Game& q) { q.initHeadless(); q.career.license = LIC_PPL; q.career.storyIndex = 4; q.screen = SCR_HUB; };

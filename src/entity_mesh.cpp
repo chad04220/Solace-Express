@@ -1,4 +1,4 @@
-// Solace Express - procedural meshes for trees, rock formations and buildings
+// Somnium Volandi - procedural meshes for trees, rock formations and buildings
 #include "entity_mesh.h"
 #include <map>
 

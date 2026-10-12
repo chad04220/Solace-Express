@@ -1,4 +1,4 @@
-// Solace Express - block compression for the photographed 2K ground materials (renderer.cpp genMaterials): BC3 (DXT5),
+// Somnium Volandi - block compression for the photographed 2K ground materials (renderer.cpp genMaterials): BC3 (DXT5),
 // a BC1 colour block for RGB and a BC4 block for alpha in each 4x4, a quarter of RGBA8's bytes. A low-level view along
 // the ground - a runway from the cockpit - samples their finest levels on every pixel, anisotropically; uncompressed
 // (300 MiB with their mipmaps) that cost the v3.48.0 diagnostics' night scene 4 ms of texture traffic.

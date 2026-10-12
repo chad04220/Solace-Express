@@ -83,7 +83,7 @@ def main():
     parser.add_argument("cmake")
     args = parser.parse_args()
     count, source = fixture_source()
-    with tempfile.TemporaryDirectory(prefix="solace-portable-identity-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="somnium-portable-identity-") as temporary:
         directory = Path(temporary)
         generated = directory / "gen"
         generated.mkdir()

@@ -1,4 +1,4 @@
-// Solace Express - career: licenses, contracts, fleet, money, save/load
+// Somnium Volandi - career: licenses, contracts, fleet, money, save/load
 #pragma once
 #include "common.h"
 #include "world.h"

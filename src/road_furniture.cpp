@@ -1,4 +1,4 @@
-// Solace Express - the road furniture (docs/LIVING_ISLANDS_PLAN.md, Phase A item 6): laid along the network once the
+// Somnium Volandi - the road furniture (docs/LIVING_ISLANDS_PLAN.md, Phase A item 6): laid along the network once the
 // world is built or loaded, then handed to each scenery chunk as it is generated (entities.cpp).
 #include "scenery.h"
 #include "entities.h"

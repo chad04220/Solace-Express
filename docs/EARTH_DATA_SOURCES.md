@@ -1,4 +1,4 @@
-# Solace Express Phase 0: source and redistribution review
+# Somnium Volandi Phase 0: source and redistribution review
 
 Checked **2026-10-11 UTC**. This is a source/terms review, not a legal opinion. Evidence and raw samples are outside the repository. No raw global dataset or road archive was downloaded or committed. No source was published. Local numeric sources were fetched through official read-only HTTP/OPeNDAP routes.
 
@@ -22,7 +22,7 @@ Official sources:
 
 The metadata identifies **CC0-1.0 worldwide**, in addition to U.S. public-domain status. The guide permits private, academic and commercial uses. Retain the accuracy/liability disclaimer and navigation warning. Horizontal coordinates are WGS84 longitude/latitude (EPSG:4326); heights are metres relative to **EGM2008** (EPSG:3855), not WGS84 ellipsoidal heights. The 30″ and 60″ products are downsampled from 15″; only 15″ has accompanying source-ID grids. This is a terrain/bathymetry source, not navigation data.
 
-Suggested credit: NOAA National Centers for Environmental Information (2022), ETOPO 2022 15 Arc-Second Global Relief Model, https://doi.org/10.25921/fd45-gt74, accessed 2026-10-11. Regional surface subset and game-tile transformations by the Solace Express project. CC0-1.0. Not for navigation.
+Suggested credit: NOAA National Centers for Environmental Information (2022), ETOPO 2022 15 Arc-Second Global Relief Model, https://doi.org/10.25921/fd45-gt74, accessed 2026-10-11. Regional surface subset and game-tile transformations by the Somnium Volandi project. CC0-1.0. Not for navigation.
 
 ### Verified small-subset route
 
@@ -91,7 +91,7 @@ Under the working CC BY 4.0 approach, retain authors, source, license/disclaimer
 
 GRIP4 (Version 4 – 2018), J. R. Meijer, M. A. J. Huijbregts, C. G. J. Schotten and A. M. Schipper. Global patterns of current and future road infrastructure, Environmental Research Letters 13, 064006 (2018), https://doi.org/10.1088/1748-9326/aabd42. Dataset: https://doi.org/10.5281/zenodo.6420961. Used under the project's CC BY 4.0 working assumption: https://creativecommons.org/licenses/by/4.0/. Supplied without warranties and not suitable for navigation. No endorsement implied.
 
-Append a truthful transformation notice matching the actual output, for example: “Changes by Solace Express: selected regional features, clipped lines to cube tiles, simplified geometry, quantized tile coordinates, retained source road classes, and generated deterministic tile/node identifiers.” Do not claim unperformed transformations. Keep the preceding uncertainty note in provenance. If no GRIP geometry is present, say so rather than suggesting synthetic tests derive from GRIP.
+Append a truthful transformation notice matching the actual output, for example: “Changes by Somnium Volandi: selected regional features, clipped lines to cube tiles, simplified geometry, quantized tile coordinates, retained source road classes, and generated deterministic tile/node identifiers.” Do not claim unperformed transformations. Keep the preceding uncertainty note in provenance. If no GRIP geometry is present, say so rather than suggesting synthetic tests derive from GRIP.
 
 ### Official archive sizes/checksums (not downloaded)
 
@@ -131,7 +131,7 @@ Downloaded as `GRIP4_AttributeDescription.xlsx`: **23,947 bytes**, SHA-256 `38ce
 - Runway source: https://raw.githubusercontent.com/davidmegginson/ourairports-data/ecead39624006017b34acf27a4b098c9cc8a4635/runways.csv
 - License: https://raw.githubusercontent.com/davidmegginson/ourairports-data/ecead39624006017b34acf27a4b098c9cc8a4635/LICENSE
 
-The official data page releases the data into the public domain, permits competing/reused datasets, requests but does not require credit, and disclaims accuracy/fitness. The official repository's LICENSE is the Unlicense. Suggested credit: “Airport and runway data: OurAirports contributors, public domain; source snapshot ecead39624006017b34acf27a4b098c9cc8a4635, retrieved 2026-10-11; regional selection and unit conversion by Solace Express.”
+The official data page releases the data into the public domain, permits competing/reused datasets, requests but does not require credit, and disclaims accuracy/fitness. The official repository's LICENSE is the Unlicense. Suggested credit: “Airport and runway data: OurAirports contributors, public domain; source snapshot ecead39624006017b34acf27a4b098c9cc8a4635, retrieved 2026-10-11; regional selection and unit conversion by Somnium Volandi.”
 
 The country CSV endpoint repeatedly returned HTTP 502. A small, reproducible alternative was verified: HTTP Range requests to the pinned `airports.csv` (response 206), bytes **0–1023** for the header and **10000000–10065535** for a segment containing TXKF. The exact matching complete row was selected. This is an actual TXKF sample, not evidence of all airports in Bermuda. The full pinned runway CSV was small enough to fetch; selected `airport_ident=TXKF`.
 

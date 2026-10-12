@@ -140,7 +140,7 @@ def analyze(path, metric, process_id=None, swap_chain=None, target_fps=60.0, sce
     if metric.casefold() not in kinds:
         warnings.append("Unrecognized metric semantics: this distribution may be a component timer and must not be called frame rate.")
     return {
-        "schema": "solace-frame-statistics-v1",
+        "schema": "somnium-frame-statistics-v1",
         "input": str(Path(path).resolve()),
         "input_sha256": hashlib.sha256(data).hexdigest(),
         "metric": actual_metric,

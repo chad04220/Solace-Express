@@ -1,4 +1,4 @@
-// Solace Express - hand-built aircraft geometry. Dimensions are metres in body coordinates (+z aft).
+// Somnium Volandi - hand-built aircraft geometry. Dimensions are metres in body coordinates (+z aft).
 #include "models.h"
 #include "cockpit_layout_data.h"
 #include "cockpit_focus_zoom.h"

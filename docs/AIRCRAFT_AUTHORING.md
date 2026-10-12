@@ -1,6 +1,6 @@
-# Solace Express — Aircraft Authoring Guide
+# Somnium Volandi — Aircraft Authoring Guide
 
-How to add an aircraft to Solace Express, from its numbers to its shape, materials, moving parts, cockpit, weapons,
+How to add an aircraft to Somnium Volandi, from its numbers to its shape, materials, moving parts, cockpit, weapons,
 sound, career role and tests. It is written for whoever adds the next type, a person or an AI assistant, and reflects
 the original v3.33.0 architecture, with roster, cache and capability guidance updated for the October 2026 two-aircraft review. Where the code and this guide disagree, the code wins: fix the guide in the same change.
 
@@ -255,7 +255,7 @@ width, headrest, dome light, armrests, visor height and slope, overhead, vents).
   conventional research type uses `special = 0` with `designMach`, `gPos`, `gNeg` (the XR-10 and XR-20).
 - **Learned performance.** At launch, `Plane::perf` flies short test sorties per type (stall speeds, best climb, idle
   sink, roll rate, pitch response, g per stick, take-off and landing distances) at the test weight (60% fuel, 150 kg
-  aboard, 1200 m) and caches them in `perf.bin` in the cache folder (`%LOCALAPPDATA%\SolaceExpress`), stamped with the build.
+  aboard, 1200 m) and caches them in `perf.bin` in the cache folder (`%LOCALAPPDATA%\SomniumVolandi`), stamped with the build.
 - **One autopilot, no per-type code.** Every step it is on, `Plane::apSense()` reads what the aircraft can do *now* into
   `Plane::apEnv` (`ApEnvelope`, `aircraft.h`): the learned envelope corrected for the weight (stall and approach speeds
   with √weight, landing distance with weight, a heavier airframe pulling fewer g per stick), the air (density), ice (up
@@ -453,7 +453,7 @@ The constants live in `scene_uniforms.glsl` (and `ent_fs1.glsl` for the scenery)
    the mean), `bump` (relief against the procedural layer's), `brightness` (scale the matched mean: the generator's
    sand was twice a real beach's and blew out to a textureless white), `flip` (upside down, for a wall layer with an
    up).
-4. **Pack:** `tools/pack_materials.py --old /tmp/old --only N` (downloads are cached in `~/.cache/solace-materials`).
+4. **Pack:** `tools/pack_materials.py --old /tmp/old --only N` (downloads are cached in `~/.cache/somnium-materials`).
    It prints the repeat, the content's scale against its real size, the colours matched and the relief gain.
 5. **Look at it** next to the old layer (the `_c.jpg` against the dump's `_alb.ppm`), then in the game: the render
    harness reads `assets/materials` (`MATDIR=""` for the procedural look), so render the same scenes both ways -
@@ -528,7 +528,7 @@ puts whitecaps on the crests as the wind rises. A seaplane or a ditching reads t
 - **The scenery.** The trees, the rocks and the buildings (with the airport's fittings and the vehicles) each have their
   own pair of programs (`ENT_CLASS`, `ent_common.glsl`: `ENT_TREES`, `ENT_ROCKS`, `ENT_BUILDINGS`); each draw takes its
   kind's class's (`entities.h entClass`).
-- **Caches.** Compiled programs are cached by source in the cache folder (`%LOCALAPPDATA%\SolaceExpress`); the first launch of a new build compiles them.
+- **Caches.** Compiled programs are cached by source in the cache folder (`%LOCALAPPDATA%\SomniumVolandi`); the first launch of a new build compiles them.
   Meshes are cached by a stamp of the builder that made them, as the driver gets it (`Renderer::meshStamp`: the type's
   own pruned bake pair for that body, plus the GPU driver). Each aircraft has two builders: the outside body's has no
   cabin code (`AF_OUTSIDE`, `HAS_CABIN` 0 - keep cockpit-only code behind `#if HAS_CABIN`), the cockpit's has it. So
@@ -709,8 +709,8 @@ cockpit muffling inside. A new type gets its sound from `engineType`, `engines`,
    - `apv_<CODE>_<view>_<hour>`, `mountain`, `sunset`, `storm`: the world, for textures and the sea;
    - `wcam_<x>_<z>_<height>_<yaw>_<pitch>[_<hour>]`: a free camera anywhere (metres above the ground, yaw 0 north). The harness loads
      the scanned textures from `assets/materials` (`MATDIR=""` for the procedural ones, §7.4).
-6. **On the owner's GPU:** `SolaceExpress.exe --shots gav_<i>_120_10_0,ckv<i>_0_-8_11 --size 1920x1080`, then
-   `diagnostics.bat` for the frame-time gate (§8). `SolaceExpress.exe --loadshots` re-renders every loading picture.
+6. **On the owner's GPU:** `SomniumVolandi.exe --shots gav_<i>_120_10_0,ckv<i>_0_-8_11 --size 1920x1080`, then
+   `diagnostics.bat` for the frame-time gate (§8). `SomniumVolandi.exe --loadshots` re-renders every loading picture.
 
 ---
 

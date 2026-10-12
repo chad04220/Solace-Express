@@ -1,4 +1,4 @@
-// Solace Express - procedural meshes for the environment entities (four levels of detail per kind)
+// Somnium Volandi - procedural meshes for the environment entities (four levels of detail per kind)
 #pragma once
 #include "entities.h"
 

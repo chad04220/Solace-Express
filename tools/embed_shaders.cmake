@@ -1,4 +1,4 @@
-# Solace Express - embeds the GLSL sources (src/shaders/*.glsl) as C++ string constants: writes OUT (shaders_gen.h).
+# Somnium Volandi - embeds the GLSL sources (src/shaders/*.glsl) as C++ string constants: writes OUT (shaders_gen.h).
 # Each file starts with "//! <constant name>" and optional further "//!" lines (documentation, not part of the
 # shader); the rest of the file is the shader source, byte for byte (CR stripped). The constant is written as
 # adjacent raw-string pieces of at most 15000 bytes (MSVC's limit for one literal is 16380).

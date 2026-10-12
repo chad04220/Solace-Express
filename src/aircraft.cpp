@@ -1,4 +1,4 @@
-// Solace Express - aircraft roster and 6-DOF flight model
+// Somnium Volandi - aircraft roster and 6-DOF flight model
 #include "aircraft.h"
 #include "aero.h"
 #include "entities.h"

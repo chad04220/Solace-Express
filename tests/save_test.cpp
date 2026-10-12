@@ -28,9 +28,9 @@ int main() {
     Career a = live; a.attempt = 17; a.attemptOpen = true;
     check(a.save("save_test_v3.sav"), "v3 save writes");
     Career b; b.newGame(); check(b.load("save_test_v3.sav") && b.attempt == 17 && b.attemptOpen, "v3 round trip keeps the attempt marker");
-    writeFile("save_test_v2.sav", "solace_save 2\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nfleet 1\nplane kestrel 1 20\nend\n");
+    writeFile("save_test_v2.sav", "somnium_save 2\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nfleet 1\nplane kestrel 1 20\nend\n");
     Career v2; v2.newGame(); check(v2.load("save_test_v2.sav") && v2.money == 900 && v2.attempt == 0 && !v2.attemptOpen, "v2 save loads with the marker closed");
-    writeFile("save_test_bad.sav", "solace_save 3\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nattempt 3\nattempt_open 7\nfleet 0\nend\n");
+    writeFile("save_test_bad.sav", "somnium_save 3\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nattempt 3\nattempt_open 7\nfleet 0\nend\n");
     Career x = r; check(!x.load("save_test_bad.sav"), "a marker that isn't 0 or 1 is rejected");
     remove("save_test_v3.sav"); remove("save_test_v3.sav.bak"); remove("save_test_v2.sav");
   }
@@ -56,12 +56,12 @@ int main() {
       Career::Pilot p; p.name = "A. Okafor"; p.rating = 2; p.wage = 220; al.hirePilot(p, &m); check(al.assignRoute(1, 3, 0, &m), m.c_str()); al.airline.earned = 1234; al.airline.incidents = 2;
       check(al.save("save_test_air.sav"), "airline save writes");
       Career b2; b2.newGame(); check(b2.load("save_test_air.sav") && b2.airline.pilots.size() == 1 && b2.airline.pilots[0].name == "A. Okafor" && b2.airline.pilots[0].rating == 2 && b2.airline.routes.size() == 1 && b2.airline.routes[0].fleetIdx == 1 && b2.airline.routes[0].to == 3 && b2.airline.earned == 1234 && b2.airline.incidents == 2, "round trip keeps the airline");
-      writeFile("save_test_air_bad.sav", "solace_save 3\nmoney 900\nlicense 3\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nattempt 3\nattempt_open 0\nfleet 0\nroute 0 1 2 0 0 0\nend\n");
+      writeFile("save_test_air_bad.sav", "somnium_save 3\nmoney 900\nlicense 3\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nattempt 3\nattempt_open 0\nfleet 0\nroute 0 1 2 0 0 0\nend\n");
       Career x2 = r; check(!x2.load("save_test_air_bad.sav"), "a route without its aircraft is rejected");
       remove("save_test_air.sav"); remove("save_test_air.sav.bak"); remove("save_test_air_bad.sav");
     }
     { Career i2 = a; i2.insured = true; check(i2.save("save_test_ins.sav"), "insured save writes"); Career j; j.newGame(); check(j.load("save_test_ins.sav") && j.insured && !b.insured, "round trip keeps the insurance"); remove("save_test_ins.sav"); remove("save_test_ins.sav.bak"); }
-    writeFile("save_test_v2b.sav", "solace_save 2\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nfleet 1\nplane kestrel 1 20\nend\n");
+    writeFile("save_test_v2b.sav", "somnium_save 2\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nfleet 1\nplane kestrel 1 20\nend\n");
     Career v2; v2.newGame(); check(v2.load("save_test_v2b.sav") && v2.fleet.size() == 1 && v2.fleet[0].condition > 0.99f && !v2.loan.open(), "v2 plane line reads as a new aircraft without a loan");
     {   // a payment comes off each settlement; three missed payments repossess the aircraft
       Career d = b; std::vector<PayoutLine> L; int bal = d.loan.balance; d.money = 1000000;
@@ -148,24 +148,24 @@ int main() {
 
   // each of these must be rejected and leave the career as it was
   const char* bad[] = {
-    "solace_save 1\nlicense 1\nplane kestrel 999 70\n",                                   // fleet airport out of range
-    "solace_save 1\n",                                                                    // header only
-    "solace_save 7\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // unknown future version
-    "solace_save 6\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // current version, missing mandatory records
-    "solace_save 1\nmoney 5\nlicense 9\nlocation 0\nstory 0\n",                           // bad license
-    "solace_save 1\nmoney 5\nlicense 0\nlocation -3\nstory 0\n",                          // bad location
-    "solace_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 999\n",                         // story past the end
-    "solace_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nhours nan\n",                // non-finite
-    "solace_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nplane nosuchplane 0 10\n",   // unknown aircraft
-    "solace_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nplane kestrel 0\n",          // truncated line
-    "solace_save 1\nmoney 5\nlicense 0\nlocation\n",                                      // truncated value
+    "somnium_save 1\nlicense 1\nplane kestrel 999 70\n",                                   // fleet airport out of range
+    "somnium_save 1\n",                                                                    // header only
+    "somnium_save 7\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // unknown future version
+    "somnium_save 6\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // current version, missing mandatory records
+    "somnium_save 1\nmoney 5\nlicense 9\nlocation 0\nstory 0\n",                           // bad license
+    "somnium_save 1\nmoney 5\nlicense 0\nlocation -3\nstory 0\n",                          // bad location
+    "somnium_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 999\n",                         // story past the end
+    "somnium_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nhours nan\n",                // non-finite
+    "somnium_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nplane nosuchplane 0 10\n",   // unknown aircraft
+    "somnium_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nplane kestrel 0\n",          // truncated line
+    "somnium_save 1\nmoney 5\nlicense 0\nlocation\n",                                      // truncated value
     "garbage",
     // malformed states (the review of v3.44.0, CAR-11)
-    "solace_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nfinished 999\n",                                   // a marker past 0 / 1
-    "solace_save 1\nmoney 5\nlicense 0\nrep -4\nlocation 0\nstory 0\n",                                         // negative reputation
-    "solace_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane kestrel 0 10\nplane kestrel 0 10\n",         // two of one type
-    "solace_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane kestrel 0 10\nloan kestrel 5000 0 0 0.05\n", // an open loan with no payment
-    "solace_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane kestrel 0 10\nplane wren 0 10\npilot Ann 1 100\npilot Bo 1 100\nroute 0 0 1 0 0 0\nroute 0 1 2 1 0 0\n",   // one aircraft on two routes
+    "somnium_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nfinished 999\n",                                   // a marker past 0 / 1
+    "somnium_save 1\nmoney 5\nlicense 0\nrep -4\nlocation 0\nstory 0\n",                                         // negative reputation
+    "somnium_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane kestrel 0 10\nplane kestrel 0 10\n",         // two of one type
+    "somnium_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane kestrel 0 10\nloan kestrel 5000 0 0 0.05\n", // an open loan with no payment
+    "somnium_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane kestrel 0 10\nplane wren 0 10\npilot Ann 1 100\npilot Bo 1 100\nroute 0 0 1 0 0 0\nroute 0 1 2 1 0 0\n",   // one aircraft on two routes
   };
   int i = 0;
   for (const char* b : bad) {
@@ -178,6 +178,9 @@ int main() {
   // old saves without the end marker still load
   writeFile("save_test_old.sav", "airxpress_save 1\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nplane kestrel 1 20\n");
   { Career c; c.newGame(); check(c.load("save_test_old.sav") && c.money == 900 && c.fleet.size() == 1, "legacy save loads"); }
+  // a career copied by hand from the Solace Express folder (the game's previous name) loads too
+  writeFile("save_test_old.sav", "solace_save 1\nmoney 700\nlicense 1\nrep 3\nlocation 1\nstory 4\nplane kestrel 1 20\n");
+  { Career c; c.newGame(); check(c.load("save_test_old.sav") && c.money == 700 && c.fleet.size() == 1, "Solace Express save loads"); }
 
   // a failed write keeps the previous save
   std::string before = readFile(p);
@@ -213,7 +216,7 @@ int main() {
   // recovered from the backup with a damaged primary: saving again never rotates the damaged file over the backup
   {
     std::string good = readFile(p);
-    writeFile(p, "solace_save 2\nmoney 5\n");   // damaged primary
+    writeFile(p, "somnium_save 2\nmoney 5\n");   // damaged primary
     Career c; c.newGame();
     check(!c.load(p) && c.load(p + ".bak"), "damaged primary, good backup");
     check(c.save(p), "save after recovery");

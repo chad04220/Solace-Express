@@ -1,6 +1,6 @@
 // Prepared dynamic draw packet; existing airport furniture remains stationary.
-#ifndef SOLACE_PREPARED_GROUND_VEHICLE_H
-#define SOLACE_PREPARED_GROUND_VEHICLE_H
+#ifndef SOMNIUM_PREPARED_GROUND_VEHICLE_H
+#define SOMNIUM_PREPARED_GROUND_VEHICLE_H
 #include "entities.h"
 #include "wheel_motion.h"
 #include <array>

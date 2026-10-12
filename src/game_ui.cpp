@@ -1,4 +1,4 @@
-// Solace Express - menus, hub screens and flight HUD
+// Somnium Volandi - menus, hub screens and flight HUD
 #include "aero.h"
 #include "game.h"
 #include "menu_layout.h"

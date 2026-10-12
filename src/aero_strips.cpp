@@ -1,4 +1,4 @@
-// Solace Express - the strip model (aero.h): the airframe's forces and moments from its drawn shape.
+// Somnium Volandi - the strip model (aero.h): the airframe's forces and moments from its drawn shape.
 // Methods: strip theory with a Schrenk spanwise loading and lifting-line induced drag; the DATCOM / Helmbold lift slope
 // with Prandtl-Glauert below Mach 1 and Ackeret above; thin-aerofoil flap effectiveness with a viscous falloff; a
 // first-order separation lag for the stall (Goman-Khrabrov); slender-body (Munk) and crossflow forces on the fuselage;

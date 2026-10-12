@@ -1,4 +1,4 @@
-// Solace Express - the bridges' meshes (bridge_mesh.h)
+// Somnium Volandi - the bridges' meshes (bridge_mesh.h)
 #include "bridge_mesh.h"
 #include <algorithm>
 #include <cmath>

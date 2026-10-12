@@ -1,4 +1,4 @@
-// Solace Express - environment entities: trees, bushes, rock formations and buildings.
+// Somnium Volandi - environment entities: trees, bushes, rock formations and buildings.
 // The terrain is a plain heightfield; everything standing on it is a separate entity placed deterministically
 // from the world masks, streamed in 256 m chunks around the camera and drawn as instanced meshes.
 #pragma once

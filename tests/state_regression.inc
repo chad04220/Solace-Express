@@ -1,6 +1,6 @@
   static int stateRegressions() {
     namespace fs = std::filesystem;
-    const fs::path root = fs::temp_directory_path() / ("solace_state_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    const fs::path root = fs::temp_directory_path() / ("somnium_state_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     fs::create_directories(root);
     int fails = 0;
     auto check = [&](bool ok, const char* name) { printf("State regression: %s: %s\n", name, ok ? "ok" : "FAIL"); fails += !ok; };
@@ -59,7 +59,7 @@
         std::ifstream input(root / "career.sav"); std::string line, v3;
         while (std::getline(input, line)) {
           if (line.rfind("survey_known ", 0) == 0 || line.rfind("plan2 ", 0) == 0 || line.rfind("military ", 0) == 0 || line.rfind("military_progress ", 0) == 0) continue;
-          if (line.rfind("solace_save ", 0) == 0) line = "solace_save 3";
+          if (line.rfind("somnium_save ", 0) == 0) line = "somnium_save 3";
           v3 += line + "\n";
         }
         input.close(); { std::ofstream out(root / "upstream-v3.sav"); out << v3; }
@@ -78,7 +78,7 @@
       // A legitimate older v3 recovery save lacks the new fields. Migrate its unknowable history explicitly.
       q.beginCareerFlight(c, 1, Career::SRC_RENT); q.wpIndex = 6; q.flightClock = 300; divert();
       std::ifstream input(root / "career.sav"); std::string line, old;
-      while (std::getline(input, line)) { if (line.rfind("job3 ", 0) == 0 || line.rfind("survey_known ", 0) == 0 || line.rfind("survey ", 0) == 0 || line.rfind("plan2 ", 0) == 0 || line.rfind("military ", 0) == 0 || line.rfind("military_progress ", 0) == 0) continue; if (line.rfind("solace_save ", 0) == 0) line = "solace_save 3"; old += line + "\n"; }
+      while (std::getline(input, line)) { if (line.rfind("job3 ", 0) == 0 || line.rfind("survey_known ", 0) == 0 || line.rfind("survey ", 0) == 0 || line.rfind("plan2 ", 0) == 0 || line.rfind("military ", 0) == 0 || line.rfind("military_progress ", 0) == 0) continue; if (line.rfind("somnium_save ", 0) == 0) line = "somnium_save 3"; old += line + "\n"; }
       input.close(); { std::ofstream output(root / "legacy.sav"); output << old; }
       Career legacy; bool migrated = legacy.load((root / "legacy.sav").string()); q.career = legacy;
       check(migrated && q.career.job && q.career.job->wpDone == 6 && !q.career.job->surveyHistoryKnown && near(q.career.job->jobClockMin, 5.f), "older save keeps checkpoints and clock with explicit unknown altitude history");

@@ -1,5 +1,15 @@
 ## What's new in v3.49.3
 
+### Solace Express is now Somnium Volandi
+- **A new name, "the dream of flying",** with a new icon and startup page. The game is `SomniumVolandi.exe` and the download is `SomniumVolandi-windows-x64.zip`.
+- **A fresh start.** Saves, settings and radio stations now live in `%APPDATA%\SomniumVolandi`, and the shader cache in `%LOCALAPPDATA%\SomniumVolandi`. Nothing is carried over from the old `SolaceExpress` folders, so the first launch compiles the shaders again (a few minutes, once). **To keep a career,** copy the files from `%APPDATA%\SolaceExpress` into `%APPDATA%\SomniumVolandi` before you start the new version. Afterwards both old `SolaceExpress` folders can be deleted.
+- The islands keep their names: Solace Capital and the Solace Islands are still on the map.
+
+### New menus and loading screens
+- **Each part of the game has its own look:** midnight blue, platinum and brass for the civilian screens; falling emerald code for the NIGHTGLASS research terminal; matte field panels with amber controls for military service.
+- **Loading shows what it's doing:** the current step, how much of each stage is done, a checklist of the parts being prepared and the time so far. Flight preparation and the research warm-up show theirs too.
+- **Settings, General, Menu animation** can reduce the menus' motion.
+
 ### Foveated shading (NVIDIA RTX cards)
 - **When a scene is too heavy, the edges of the screen now give way before the centre.** On cards with NVIDIA's variable-rate shading (the RTX 20 series and later), Auto resolution first shades the ground and the scenery towards the screen's edges more coarsely: one shade for each 2×2 block of pixels, then each 4×4 block, in rings round the centre that widen as needed. The middle of the screen stays at full resolution. Only once the edges are as coarse as they go does the whole frame's resolution drop, as before. When the frame rate recovers, the full resolution comes back first, then the edges.
 - **The aircraft, the cockpit and its displays are never coarsened,** so the instruments stay sharp.

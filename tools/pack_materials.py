@@ -16,7 +16,7 @@ the same palette everywhere the world was tuned with it, the detail of a photogr
 the material_dump tool (cmake --build build --target material_dump; build/material_dump DIR).
 
   tools/pack_materials.py --old DIR [--out assets/materials] [--cache DIR] [--only 0,5,19]
-Needs Python 3 with numpy and Pillow, and curl; downloads are cached (default ~/.cache/solace-materials).
+Needs Python 3 with numpy and Pillow, and curl; downloads are cached (default ~/.cache/somnium-materials).
 """
 import argparse, io, json, os, subprocess, sys, zipfile
 import numpy as np
@@ -202,7 +202,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--old", required=True, help="the procedural layers (material_dump's output)")
     ap.add_argument("--out", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "materials"))
-    ap.add_argument("--cache", default=os.path.join(os.path.expanduser("~"), ".cache", "solace-materials"))
+    ap.add_argument("--cache", default=os.path.join(os.path.expanduser("~"), ".cache", "somnium-materials"))
     ap.add_argument("--only", default="", help="comma-separated layer numbers")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True); os.makedirs(a.cache, exist_ok=True)

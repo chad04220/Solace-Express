@@ -1,6 +1,6 @@
 // Shared cosmetic rolling state. Does not alter contacts, friction or flight forces.
-#ifndef SOLACE_PREPARED_WHEEL_MOTION_H
-#define SOLACE_PREPARED_WHEEL_MOTION_H
+#ifndef SOMNIUM_PREPARED_WHEEL_MOTION_H
+#define SOMNIUM_PREPARED_WHEEL_MOTION_H
 #include <cmath>
 #include <algorithm>
 

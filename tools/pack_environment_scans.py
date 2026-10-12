@@ -31,7 +31,7 @@ MAPS = ('Diffuse', 'nor_dx', 'arm', 'Displacement')
 # the owner's choice after the first photographic set, whose "Leafy Grass" is mostly fallen leaves, turned every
 # meadow on the islands khaki. Every other layer keeps its scan's natural colour and roughness.
 PALETTE_MATCH = {0: ('00_grass_c.jpg', '00_grass_m.jpg')}
-USER_AGENT = 'SolaceExpress-material-packer/1.0 (CC0 offline material preparation)'
+USER_AGENT = 'SomniumVolandi-material-packer/1.0 (CC0 offline material preparation)'
 
 
 def fetch(url, path):

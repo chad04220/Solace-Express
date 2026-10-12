@@ -33,7 +33,7 @@ build-mesh/aircraft_mesh_export out/aircraft-raw
 python3 tools/mesh_assets/mesh_assets.py bundle \
   --input out/aircraft-raw \
   --source-manifest build-mesh/gen/aircraft_geometry_source.json \
-  --output out/SolaceExpress-aircraft.zip
+  --output out/SomniumVolandi-aircraft.zip
 ```
 
 For a software-Mesa producer, set `LIBGL_ALWAYS_SOFTWARE=1` and, if appropriate,
@@ -70,17 +70,17 @@ python3 tools/mesh_assets/mesh_assets.py validate \
   --input out/aircraft-raw \
   --source-manifest build-mesh/gen/aircraft_geometry_source.json
 python3 tools/mesh_assets/mesh_assets.py extract \
-  --input out/SolaceExpress-aircraft.zip \
+  --input out/SomniumVolandi-aircraft.zip \
   --source-manifest build-mesh/gen/aircraft_geometry_source.json \
-  --output dist/SolaceExpress/aircraft
+  --output dist/SomniumVolandi/aircraft
 ```
 
 `extract` refuses an existing destination. Stage a new release directory instead
 of overwriting the user's installation or cache. Include the resulting
-`aircraft/` directory beside `SolaceExpress.exe` in the final game ZIP. The native
+`aircraft/` directory beside `SomniumVolandi.exe` in the final game ZIP. The native
 development default is `assets/aircraft/`; the Windows game resolves `aircraft/`
 relative to its executable, independently of its launch working directory.
-Never package `%LOCALAPPDATA%/SolaceExpress`, a `shadercache` directory, `*.bin`
+Never package `%LOCALAPPDATA%/SomniumVolandi`, a `shadercache` directory, `*.bin`
 program binaries, driver rejection markers, or arbitrary files from an old
 review cache.
 

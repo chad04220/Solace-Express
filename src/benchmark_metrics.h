@@ -1,4 +1,4 @@
-// Solace Express - CPU-only benchmark helpers; no driver calls or timing side effects.
+// Somnium Volandi - CPU-only benchmark helpers; no driver calls or timing side effects.
 #pragma once
 #include <algorithm>
 #include <cmath>

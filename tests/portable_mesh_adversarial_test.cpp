@@ -157,7 +157,7 @@ int main() {
   }
   {auto d=original;d.indices[0]=UINT32_MAX;auto b=encoded;check(!encode(id,d,b,error)&&b==encoded,"invalid encode leaves previous bytes intact");}
 
-  const auto root=std::filesystem::temp_directory_path()/std::filesystem::path("solace-portable-audit-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+  const auto root=std::filesystem::temp_directory_path()/std::filesystem::path("somnium-portable-audit-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
   std::error_code ec;std::filesystem::create_directories(root,ec);
   check(!ec,"create isolated file-test directory");
   if(!ec) {

@@ -1,4 +1,4 @@
-// Solace Express - the airframe's wake: the vortices its surfaces trail and its engines' wash
+// Somnium Volandi - the airframe's wake: the vortices its surfaces trail and its engines' wash
 //
 // Each step the strip model's circulation (aero.h AeroOut::gam) becomes the vortices the surfaces leave behind them.
 // Wherever the circulation changes along a surface's span, the change leaves the trailing edge as vorticity

@@ -28,7 +28,7 @@ def main():
         "tools/generate_aircraft_geometry_source.cmake", "tools/mesh_assets/export_aircraft_meshes.cpp",
         "tools/mesh_assets/future_producer.cpp", "CMakeLists.txt",
     ]
-    with tempfile.TemporaryDirectory(prefix="solace-portable-checkout-") as name:
+    with tempfile.TemporaryDirectory(prefix="somnium-portable-checkout-") as name:
         root = Path(name)
         git(root, "init", "--quiet")
         shutil.copyfile(attributes, root / ".gitattributes")

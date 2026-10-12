@@ -1,4 +1,4 @@
-# Working together on Solace Express
+# Working together on Somnium Volandi
 
 Two AI agents work on this game for the owner (**chad04220**), who has the final say on everything:
 
@@ -74,7 +74,7 @@ things it can do headlessly.
 
 ## Useful tools in the release zip
 
-One batch file, `diagnostics.bat`, next to `SolaceExpress.exe`:
+One batch file, `diagnostics.bat`, next to `SomniumVolandi.exe`:
 
 | Run | What it produces |
 |---|---|
@@ -84,5 +84,5 @@ One batch file, `diagnostics.bat`, next to `SolaceExpress.exe`:
 | `diagnostics.bat menu [kbps]` | `menu.mp4`: the main-menu montage pre-rendered, played on the menu instead of rendering it live |
 | `diagnostics.bat loading` | the loading-screen pictures in `loading\` |
 
-Logs: `%APPDATA%\SolaceExpress\startup.log` (GPU, shader cache, shader errors). Saves and settings are in the same
+Logs: `%APPDATA%\SomniumVolandi\startup.log` (GPU, shader cache, shader errors). Saves and settings are in the same
 folder (`career.sav` with its `.bak`, `settings.cfg`, `radio_stations.txt`).

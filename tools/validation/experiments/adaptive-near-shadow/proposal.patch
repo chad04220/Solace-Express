@@ -43,7 +43,7 @@
 --- a/src/renderer.h
 +++ b/src/renderer.h
 @@ -1,6 +1,7 @@
- // Solace Express - renderer interface
+ // Somnium Volandi - renderer interface
  #pragma once
  #include "benchmark_metrics.h"
 +#include "near_shadow_coverage.h"
@@ -81,7 +81,7 @@
 --- /dev/null
 +++ b/src/near_shadow_coverage.h
 @@ -0,0 +1,116 @@
-+// Solace Express - bounded, CPU-testable main-camera near-shadow coverage.
++// Somnium Volandi - bounded, CPU-testable main-camera near-shadow coverage.
 +#pragma once
 +#include "common.h"
 +

@@ -148,7 +148,7 @@ def main():
     self_test()
     vertex, fragment = assemble((ROOT/'src/raster_renderer.cpp').read_text(),
                                 (ROOT/'src/shaders/wreck_clip.glsl').read_text())
-    with tempfile.TemporaryDirectory(prefix='solace-inline-wreck-') as directory:
+    with tempfile.TemporaryDirectory(prefix='somnium-inline-wreck-') as directory:
         paths = []
         for stage, source in [('vert', vertex), ('frag', fragment)]:
             path = Path(directory)/f'wreck_shadow.{stage}'

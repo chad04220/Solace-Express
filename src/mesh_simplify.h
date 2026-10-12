@@ -1,4 +1,4 @@
-// Solace Express - simplifying the baked aircraft meshes (aircraft_mesh.cpp). Surface nets put a vertex in every
+// Somnium Volandi - simplifying the baked aircraft meshes (aircraft_mesh.cpp). Surface nets put a vertex in every
 // lattice cube the surface crosses, so a flat panel carries as many triangles as a curved nose: the XR-40's airframe and
 // parts came to ~9 million. This collapses edges in order of their quadric error (Garland & Heckbert), each vertex
 // moving onto a neighbour - never to a new point - so every vertex that stays is one the bake pulled onto the field's

@@ -1,4 +1,4 @@
-// Solace Express - internet radio streaming (Windows Media Foundation on Windows)
+// Somnium Volandi - internet radio streaming (Windows Media Foundation on Windows)
 #pragma once
 #include <string>
 

@@ -76,7 +76,7 @@ struct GameTest {
           "independent engine health reaches live cockpit instruments");
     check(instrumentFrame.plane.engineHealth[2]==0 && instrumentFrame.plane.engineHealth[3]==0,
           "absent engine slots remain absent in cockpit upload");
-    const auto dir=std::filesystem::temp_directory_path()/("solace_camera_settings_"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto dir=std::filesystem::temp_directory_path()/("somnium_camera_settings_"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(dir);g.saveDir=dir.string();g.saveSettings();g.set.cockpitFocusZoom=true;g.loadSettings();
     check(!g.set.cockpitFocusZoom,"focus preference round trips through settings");
     std::filesystem::remove_all(dir);

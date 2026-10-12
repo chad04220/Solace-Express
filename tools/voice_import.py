@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Import the Solace Express voice packs into assets/voice.
+"""Import the Somnium Volandi voice packs into assets/voice.
 
     python3 tools/voice_import.py <Solace-Express-Alphabet-and-Tower-Voice-Pack> <Solace-Express-Voice-Pack>
 
@@ -117,7 +117,7 @@ def main(tower_pack, orig_pack=None):
         for c in o["aircraft_names"]: rows.append("@craft.%s\t%s" % (c["name"], c["id"]))
         rows = apply_lesson_overrides(rows, out)
     with open(os.path.join(out, "voice_index.txt"), "w") as f:
-        f.write("# Solace Express voices (tools/voice_import.py): id <tab> file <tab> subtitle [<tab> speaker <tab> priority <tab> kind <tab> alias <tab> mission], or @lookup <tab> value\n")
+        f.write("# Somnium Volandi voices (tools/voice_import.py): id <tab> file <tab> subtitle [<tab> speaker <tab> priority <tab> kind <tab> alias <tab> mission], or @lookup <tab> value\n")
         f.write("\n".join(rows) + "\n")
     print("imported %d clips" % n)
 

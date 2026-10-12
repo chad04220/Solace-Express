@@ -1,4 +1,4 @@
-// Solace Express - the sky's bodies (sky.h): the celestial sphere turning with the sun's path, the moon at its phase,
+// Somnium Volandi - the sky's bodies (sky.h): the celestial sphere turning with the sun's path, the moon at its phase,
 // and the stars uploaded for the lighting pass's per-pixel lookup (light_fs.glsl starLight).
 #include "sky.h"
 #include "renderer.h"

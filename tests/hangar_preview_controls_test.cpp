@@ -41,7 +41,7 @@ struct GameTest {
     const auto originalBomb = g.practiceBomb;
     const int originalWave = g.practiceWave;
     namespace fs = std::filesystem;
-    const auto root = fs::temp_directory_path() / ("solace_hangar_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto root = fs::temp_directory_path() / ("somnium_hangar_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     fs::create_directories(root);
     auto snapshot = [&](const char* name) {
       const auto file = root/name; if (!g.career.save(file.string())) return std::string("SAVE FAILED");

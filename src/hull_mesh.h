@@ -1,4 +1,4 @@
-// Solace Express - the aircraft hull's faces from its voxels (aircraft_hull.cpp builds the voxels; hull_test checks
+// Somnium Volandi - the aircraft hull's faces from its voxels (aircraft_hull.cpp builds the voxels; hull_test checks
 // the mesh is closed). Level-1 voxels: 0 empty, 1 solid, 2 split into 4x4x4 sub-voxels (mask, bit x + 4y + 16z).
 // With `fine`, every face is laid on the sub-voxel lattice (unit U = the sub-voxel size), else on the voxel lattice.
 #pragma once

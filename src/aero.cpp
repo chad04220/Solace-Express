@@ -1,4 +1,4 @@
-// Solace Express - aerodynamics from each airframe's geometry (see aero.h)
+// Somnium Volandi - aerodynamics from each airframe's geometry (see aero.h)
 // Methods: the component drag build-up and the lift-slope / span-efficiency estimates of Raymer, "Aircraft Design: A
 // Conceptual Approach" ch. 12 (DATCOM lift slope, Torenbeek fuselage wetted area, Korn critical Mach).
 #include "aero.h"

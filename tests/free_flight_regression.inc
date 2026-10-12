@@ -1,6 +1,6 @@
   static int freeFlightRegressions() {
     namespace fs = std::filesystem;
-    const fs::path root = fs::temp_directory_path() / ("solace_free_flight_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    const fs::path root = fs::temp_directory_path() / ("somnium_free_flight_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     fs::create_directories(root);
     int fails = 0;
     auto check = [&](bool ok, const std::string& name) { printf("Free Flight: %s: %s\n", name.c_str(), ok ? "ok" : "FAIL"); fails += !ok; };

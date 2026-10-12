@@ -1,4 +1,4 @@
-// Solace Express - the research programme terminal (Project NIGHTGLASS): a biometric access sequence, then the
+// Somnium Volandi - the research programme terminal (Project NIGHTGLASS): a biometric access sequence, then the
 // airframe selection with a live 3D preview of the chosen craft, its decrypted specification and
 // manoeuvre envelope, and the sortie parameters.
 #include "game.h"

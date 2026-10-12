@@ -7,13 +7,13 @@ Original proposal base: `a7f8d30ec39c89dacded275e33a8750d6719138c`. This branch 
 The existing command remains valid and still defaults to 120 measured frames:
 
 ```bat
-SolaceExpress.exe --bench air,storm,night --size 1920x1080 --fullscreen --out bench.txt
+SomniumVolandi.exe --bench air,storm,night --size 1920x1080 --fullscreen --out bench.txt
 ```
 
 For a longer capture with raw data:
 
 ```bat
-SolaceExpress.exe --bench apv_CAP_1_12 --size 1920x1080 --fullscreen --bench-frames 7200 --bench-csv --out bench_airport.txt
+SomniumVolandi.exe --bench apv_CAP_1_12 --size 1920x1080 --fullscreen --bench-frames 7200 --bench-csv --out bench_airport.txt
 ```
 
 The report and `bench_airport.txt.frames.csv` contain:
@@ -34,7 +34,7 @@ Vsync-off is requested, and whether WGL accepted the request is reported; the be
 Plain comma-separated scene lists retain their meaning. Weather presets use nine comma-separated values, so separate weather-bearing scenes with semicolons:
 
 ```bat
-SolaceExpress.exe --bench "look_0_-4000_200_15_600_5_16@0.95,600,1,1,20,200,8,0.35,16;apv_CAP_1_22" --size 1920x1080 --fullscreen --bench-csv
+SomniumVolandi.exe --bench "look_0_-4000_200_15_600_5_16@0.95,600,1,1,20,200,8,0.35,16;apv_CAP_1_22" --size 1920x1080 --fullscreen --bench-csv
 ```
 
 Weather order: cloud cover, cloud base metres, precipitation (0 none / 1 rain / 2 snow), storm (0/1), wind knots, wind-from degrees, gust knots, turbulence, hour. Incomplete, nonfinite or comma-ambiguous weather lists are rejected instead of becoming accidental extra scenes.
@@ -46,7 +46,7 @@ Important existing preset limitation: `apv_`, `wcam_`, `apt` and `loadshot_` sta
 The Python standard-library runner lives at `tools/environment_benchmark.py`. A dry run is the default:
 
 ```bat
-python tools\environment_benchmark.py --exe C:\Games\SolaceExpress\SolaceExpress.exe --out C:\Benchmarks\solace-run-01 --commit COMMIT_SHA
+python tools\environment_benchmark.py --exe C:\Games\SomniumVolandi\SomniumVolandi.exe --out C:\Benchmarks\solace-run-01 --commit COMMIT_SHA
 ```
 
 Add `--run` to execute. `--frames 7200 --repeats 3 --quality 1` are the defaults; quality 1 matches the reviewed baseline (Medium). Native resolution does not imply maximum quality. Repeat with `--quality 2` (High) as a separate optional check if that is the desired preset. Test both the original and candidate build with the **same explicit quality**. Do not call a lower-quality comparison a full-quality optimization. Use `--case airport_storm`, etc., for a targeted rerun. The output directory must be new, so prior evidence is preserved.

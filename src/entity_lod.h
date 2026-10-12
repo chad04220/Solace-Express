@@ -1,4 +1,4 @@
-// Solace Express - shared, CPU-testable scenery range policy (metres).
+// Somnium Volandi - shared, CPU-testable scenery range policy (metres).
 #pragma once
 #include "entities.h"
 

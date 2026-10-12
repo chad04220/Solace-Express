@@ -1,4 +1,4 @@
-// Solace Express - the airframe's wake (aero_wake.h)
+// Somnium Volandi - the airframe's wake (aero_wake.h)
 #include "aero_wake.h"
 #include "aero.h"
 #include <algorithm>

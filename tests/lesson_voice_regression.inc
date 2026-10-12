@@ -1,8 +1,8 @@
 // Included inside GameTest so these checks exercise the production private hint/comms paths.
   static int controlVoiceRegressions() {
-#ifdef SOLACE_ASSETS
+#ifdef SOMNIUM_ASSETS
     Game q; q.initHeadless();
-    if (!q.atc.load(std::string(SOLACE_ASSETS) + "/voice")) { printf("Control voice regression: voice assets missing: FAIL\n"); return 1; }
+    if (!q.atc.load(std::string(SOMNIUM_ASSETS) + "/voice")) { printf("Control voice regression: voice assets missing: FAIL\n"); return 1; }
     int fails = 0, covered = 0;
     auto check = [&](bool ok, const char* name) { printf("Control voice regression: %s: %s\n", name, ok ? "ok" : "FAIL"); fails += !ok; };
     bool all = true, neutral = true;
@@ -49,7 +49,7 @@
           && !q.atc.resolveLesson("", 0, "", invalid) && !q.atc.resolveLesson("UNKNOWN", 0, "", invalid),
           "unknown mission or phase cannot select another lesson recording");
     namespace fs = std::filesystem;
-    const fs::path root = fs::temp_directory_path() / ("solace_lesson_voice_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    const fs::path root = fs::temp_directory_path() / ("somnium_lesson_voice_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     bool rejectsLegacy = true, warnsOnce = true, resetsWarning = true;
     for (int mode = 0; mode < 5; mode++) {
       const fs::path dir = root / std::to_string(mode); fs::create_directories(dir);

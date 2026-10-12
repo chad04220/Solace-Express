@@ -184,7 +184,7 @@ if args.extract_only:
     if not output.exists() or output.read_text()!=arithmetic:output.write_text(arithmetic)
     print('PASS: terrain material source contracts; extracted production arithmetic')
     raise SystemExit(0)
-with tempfile.TemporaryDirectory(prefix='solace-terrain-material-') as tmp:
+with tempfile.TemporaryDirectory(prefix='somnium-terrain-material-') as tmp:
     out=Path(tmp)
     (out/'terrain_material_actual.inc').write_text(arithmetic)
     compiler=[args.cxx] if args.cxx else shlex.split(os.environ.get('CXX') or ('cl' if os.name=='nt' and shutil.which('cl') else 'c++'))

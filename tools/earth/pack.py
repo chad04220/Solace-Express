@@ -233,7 +233,7 @@ def build_pack(config, output, codec=None, *, sampler="scalar"):
         for license_id, raw in sorted(licenses.items()):
             write("licenses/" + license_id + ".txt", raw, "license")
         manifest = {
-            "format": "solace-earth-pack", "format_version": FORMAT_VERSION,
+            "format": "somnium-earth-pack", "format_version": FORMAT_VERSION,
             "tool": {"version": TOOL_VERSION, "codec": selected_codec, "codec_version": codec_version},
             "name": name, "coverage": coverage, "scheme": SCHEME, "quantization": QUANTIZATION,
             "sampling": {"method": "bilinear-jacobian-midpoint-quadrature", "area_samples": area_samples},
@@ -296,7 +296,7 @@ def verify_pack(root):
     manifest = strict_json(read_bounded(root / "manifest.json", MAX_MANIFEST_BYTES))
     keys = {"format", "format_version", "tool", "name", "coverage", "scheme", "quantization", "sampling",
             "road_tolerance_m", "sources", "tiles", "files", "measurements"}
-    if not isinstance(manifest, dict) or set(manifest) != keys or manifest["format"] != "solace-earth-pack" or type(manifest["format_version"]) is not int or manifest["format_version"] != FORMAT_VERSION:
+    if not isinstance(manifest, dict) or set(manifest) != keys or manifest["format"] != "somnium-earth-pack" or type(manifest["format_version"]) is not int or manifest["format_version"] != FORMAT_VERSION:
         raise ValueError("unsupported pack manifest")
     if canonical_json(manifest["scheme"]) != canonical_json(SCHEME) or canonical_json(manifest["quantization"]) != canonical_json(QUANTIZATION):
         raise ValueError("unsupported pack grid or quantization")

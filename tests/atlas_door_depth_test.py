@@ -6,7 +6,7 @@ The simplifier edge-bound behavior is separately covered by mesh_simplify_test.
 import argparse, math, os, re
 from pathlib import Path
 arg=argparse.ArgumentParser();arg.add_argument('--edge',type=float);args=arg.parse_args()
-root=Path(os.environ.get('SOLACE_SOURCE_ROOT',Path(__file__).resolve().parents[1]))
+root=Path(os.environ.get('SOMNIUM_SOURCE_ROOT',Path(__file__).resolve().parents[1]))
 if args.edge is None:
  source=(root/'src/mesh_validation.h').read_text()
  match=re.search(r'kAtlasDoorMaxEdge\s*=\s*([0-9.]+)f',source)

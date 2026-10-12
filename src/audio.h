@@ -1,4 +1,4 @@
-// Solace Express - procedural audio engine (engine synthesis, environment, effects, UI)
+// Somnium Volandi - procedural audio engine (engine synthesis, environment, effects, UI)
 #pragma once
 #include "common.h"
 #include <atomic>

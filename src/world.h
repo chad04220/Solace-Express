@@ -1,4 +1,4 @@
-// Solace Express - world: hand-designed archipelago, terrain, airports, weather
+// Somnium Volandi - world: hand-designed archipelago, terrain, airports, weather
 #pragma once
 #include "common.h"
 #include "road_network.h"

@@ -154,7 +154,7 @@
         "sha256": "86fd31a9a94481ba9ec9b894a04c9876830bbe47615b6e0e2f988506bb206ab0"
       }
     ],
-    "format": "solace-global-elevation-source-preparation",
+    "format": "somnium-global-elevation-source-preparation",
     "gmted_comparison": {
       "bytes": 277229566,
       "datum_source": "https://pubs.usgs.gov/of/2011/1073/pdf/of2011-1073.pdf",

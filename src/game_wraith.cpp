@@ -1,4 +1,4 @@
-// Solace Express - XR-40 Wraith systems: the cloak, the retracting laser turrets, the bomb bay and the dark-energy
+// Somnium Volandi - XR-40 Wraith systems: the cloak, the retracting laser turrets, the bomb bay and the dark-energy
 // weapons out in the world (laser bolts, plasma bombs, detonations and their glassed craters)
 #include "game.h"
 #include "entities.h"

@@ -28,7 +28,7 @@
     // A partial/broken pack must still fail closed: fallback is for absent name metadata,
     // never permission to pretend a required clip (or an indexed name) was available.
     namespace fs = std::filesystem;
-    const fs::path root = fs::temp_directory_path() / ("solace_aircraft_voice_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    const fs::path root = fs::temp_directory_path() / ("somnium_aircraft_voice_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     fs::create_directories(root);
     bool required = true;
     for (const char* missing : {"fragment.nyx.splash", "fragment.nyx.n14", "fragment.nyx.down", "fragment.nyx.craft_wren"}) {

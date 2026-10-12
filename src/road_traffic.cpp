@@ -1,4 +1,4 @@
-// Solace Express - the traffic on the road network (road_traffic.h)
+// Somnium Volandi - the traffic on the road network (road_traffic.h)
 #include "road_traffic.h"
 #include "world.h"
 #include <algorithm>

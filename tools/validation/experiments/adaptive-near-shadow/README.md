@@ -55,8 +55,8 @@ c++ -std=c++17 -O2 -pthread \
   -Itools/validation/experiments/adaptive-near-shadow -Isrc \
   tools/validation/experiments/adaptive-near-shadow/near_shadow_coverage_test.cpp \
   src/entities.cpp src/scenery.cpp src/world.cpp src/airport_scenery.cpp \
-  -o /tmp/solace-near-shadow-prototype-test
-/tmp/solace-near-shadow-prototype-test
+  -o /tmp/somnium-near-shadow-prototype-test
+/tmp/somnium-near-shadow-prototype-test
 ```
 
 The archived standalone invocation passed 183,999 checks after production

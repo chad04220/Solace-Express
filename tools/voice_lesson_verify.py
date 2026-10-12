@@ -48,7 +48,7 @@ def main():
     print("25 lesson rows: exact manifest/index agreement, no fixed control names, verified audio hashes and WAV structure")
 
     # Verify ordinary reimport on a private copy; never alter checked-in audio.
-    with tempfile.TemporaryDirectory(prefix="solace-lesson-import-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="somnium-lesson-import-") as tmp:
         test = Path(tmp)
         for row in manifest["lines"]:
             dest = test / row["file"]

@@ -1,4 +1,4 @@
-// Solace Express - the islands' road network (road_network.h)
+// Somnium Volandi - the islands' road network (road_network.h)
 #include "road_network.h"
 #include "world.h"
 #include "scenery.h"

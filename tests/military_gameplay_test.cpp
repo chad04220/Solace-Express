@@ -15,7 +15,7 @@ struct GameTest {
   static int run() {
     namespace fs = std::filesystem;
     buildTestWorld(); buildStory(); g_audio.init(48000);
-    const fs::path root=fs::temp_directory_path() / ("solace_military_game_"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    const fs::path root=fs::temp_directory_path() / ("somnium_military_game_"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     fs::create_directories(root);
     int failures=0, checks=0;
     auto check=[&](bool ok,const std::string& label) { ++checks; failures+=!ok; printf("Military game: %s: %s\n",label.c_str(),ok?"PASS":"FAIL"); };

@@ -1,4 +1,4 @@
-// Solace Express - tower controller voices
+// Somnium Volandi - tower controller voices
 #pragma once
 #include "common.h"
 #include <functional>

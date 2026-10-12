@@ -1,4 +1,4 @@
-// Solace Express - the UFO encounter's timeline (Codex's test): hatch, laugh and wave beats, the 26.5 s end, J+K summon, departure on landing.
+// Somnium Volandi - the UFO encounter's timeline (Codex's test): hatch, laugh and wave beats, the 26.5 s end, J+K summon, departure on landing.
 // The scene starts the encounter at its beginning (ufo0): the checks set its clock themselves, so flying the game on
 // to the screenshot's 12 s first only cost time (360 frames of the whole game: under the sanitizers, half the test)
 #include "../src/game.h"

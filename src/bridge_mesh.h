@@ -1,4 +1,4 @@
-// Solace Express - the bridges' meshes (bridges.h): each bridge built where it stands, in world coordinates, drawn by
+// Somnium Volandi - the bridges' meshes (bridges.h): each bridge built where it stands, in world coordinates, drawn by
 // the buildings' programs as one instance at the origin (entity_render.cpp) and lit and shadowed like them
 #pragma once
 #include "entity_mesh.h"

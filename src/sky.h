@@ -1,4 +1,4 @@
-// Solace Express - the sky's bodies: the sun's path, the celestial sphere turning with it, the moon and its phase, and
+// Somnium Volandi - the sky's bodies: the sun's path, the celestial sphere turning with it, the moon and its phase, and
 // the stars from the Yale Bright Star Catalogue (star_catalog.h). The sun keeps the path it always had (sunDirectionAt);
 // the stars turn about the pole that path implies - the islands' latitude, about 6 degrees north - with the sun where
 // it stands among them in late January, and the moon is out at its phase on today's date. The lighting pass draws them

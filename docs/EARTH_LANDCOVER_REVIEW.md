@@ -1,4 +1,4 @@
-# Solace Express: Esri / Impact Observatory land-cover source review
+# Somnium Volandi: Esri / Impact Observatory land-cover source review
 
 Verified: 2026-10-11 UTC. Scope: read-only source, metadata, access and licensing research. No implementation, imagery downloads, accounts, terms acceptance, service subscriptions or external publishing.
 
@@ -70,7 +70,7 @@ Exact returned COG asset URL:
 
 https://io-10m-annual-lulc.s3.us-west-2.amazonaws.com/60W_2024.tif
 
-An HTTP HEAD request returned 200, `Content-Length: 79851388`, `Accept-Ranges: bytes`, `Last-Modified: Mon, 23 Jun 2025 20:03:06 GMT`, and ETag `c7ca8830334945d77ef2f4c10a3a6101-10`. The multipart ETag is not a verified content checksum. No raster bytes were downloaded. This is an availability example, **not a chosen Solace Express region**.
+An HTTP HEAD request returned 200, `Content-Length: 79851388`, `Accept-Ranges: bytes`, `Last-Modified: Mon, 23 Jun 2025 20:03:06 GMT`, and ETag `c7ca8830334945d77ef2f4c10a3a6101-10`. The multipart ETag is not a verified content checksum. No raster bytes were downloaded. This is an availability example, **not a chosen Somnium Volandi region**.
 
 ## Release and metadata discrepancies
 
@@ -90,7 +90,7 @@ CC BY 4.0 permits copying, redistribution and adaptations, including commercial 
 
 Suggested attribution template, to complete with the selected year/release:
 
-> Land-cover data derived from Impact Observatory, Esri and Microsoft, 10m Annual Land Use Land Cover, [year/release], licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Clipped, reprojected and reclassified for Solace Express. Source: [actual source URL].
+> Land-cover data derived from Impact Observatory, Esri and Microsoft, 10m Annual Land Use Land Cover, [year/release], licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Clipped, reprojected and reclassified for Somnium Volandi. Source: [actual source URL].
 
 Authoritative license URLs:
 

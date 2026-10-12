@@ -1,4 +1,4 @@
-// Solace Express - renderer interface
+// Somnium Volandi - renderer interface
 #pragma once
 #include "aircraft_mesh_asset.h"
 #include "benchmark_metrics.h"

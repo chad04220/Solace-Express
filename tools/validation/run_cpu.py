@@ -36,5 +36,5 @@ def run(out):
 
 if args.output:
     raise SystemExit(run(args.output.resolve()))
-with tempfile.TemporaryDirectory(prefix='solace-renderer-validation-') as folder:
+with tempfile.TemporaryDirectory(prefix='somnium-renderer-validation-') as folder:
     raise SystemExit(run(Path(folder)))

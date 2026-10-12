@@ -1,4 +1,4 @@
-// Solace Express - the settlements' extent and streets (docs/LIVING_ISLANDS_PLAN.md, Phase B). Each settlement grows
+// Somnium Volandi - the settlements' extent and streets (docs/LIVING_ISLANDS_PLAN.md, Phase B). Each settlement grows
 // over the ground from its centre and along the roads into it as far as building there is worth the effort - steep
 // ground dear, a road cheap to build along, the sea and an airfield's grounds never - rather than filling a circle.
 // Its streets: in a town or a city a grid at its core, turned to its main road; round that, and through a village,

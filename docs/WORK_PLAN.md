@@ -1,4 +1,4 @@
-# Solace Express — Work Plan
+# Somnium Volandi — Work Plan
 
 The owner's work plan from v3.9.4 (`f8b8537`), cut down to what is still open (2026-10-07, v3.32.0, with Codex's
 review of v3.31.0 folded in). Every finished item, with its spec, is in this file's history (`git log -p

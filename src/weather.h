@@ -1,4 +1,4 @@
-// Solace Express - the weather's fields: the wind an aircraft flies through and where the clouds and the rain are.
+// Somnium Volandi - the weather's fields: the wind an aircraft flies through and where the clouds and the rain are.
 // The wind is the mean wind's profile and veer, gusts that come through in bursts, eddies carried along by the air
 // (frozen turbulence: the faster you fly, the quicker the bumps, and a gust under one wing rolls you), the lift on a
 // ridge's windward face and the sink and rotors in its lee, thermals under fair-weather cumulus, the bumps inside a

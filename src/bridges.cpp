@@ -1,4 +1,4 @@
-// Solace Express - the road network's bridges: their structure (bridges.h)
+// Somnium Volandi - the road network's bridges: their structure (bridges.h)
 #include "bridges.h"
 #include "world.h"
 #include <algorithm>

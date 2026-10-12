@@ -256,7 +256,7 @@ def prepare(args):
     if args.preview:
         preview(prepared, output / "global-elevation-diagnostic.png")
     transform = "tools.earth prepare-raster at " + INTERFACE_COMMIT + "; GDAL GTiff->ENVI Float32 BSQ; same cells and bounds; no resampling, quantization or vertical transformation; canonical header description"
-    manifest = {"format": "solace-global-elevation-source-preparation", "version": 1,
+    manifest = {"format": "somnium-global-elevation-source-preparation", "version": 1,
                 "interface_commit": INTERFACE_COMMIT,
                 "original": {**origin, "url": ETOPO_URL, "version": "ETOPO2022-v1-surface-60arcsec", "metadata": metadata(source)},
                 "prepared": {**file_record(prepared), "metadata": metadata(prepared), "vertical_reference": "EGM2008 orthometric metres"},

@@ -1,4 +1,4 @@
-// Solace Express - BC3 (DXT5) block compression (texture_compress.h): a BC1 colour block (two 5:6:5 endpoints along the
+// Somnium Volandi - BC3 (DXT5) block compression (texture_compress.h): a BC1 colour block (two 5:6:5 endpoints along the
 // block's principal colour axis, inset a little, then refined by least squares; four colours, 2 bits a texel) and a
 // BC4 alpha block (its two extremes, eight values, 3 bits a texel) for each 4x4.
 #include "texture_compress.h"

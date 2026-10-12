@@ -1,4 +1,4 @@
-// Solace Express - shared math and utilities
+// Somnium Volandi - shared math and utilities
 #pragma once
 #include <cmath>
 #include <cstdint>

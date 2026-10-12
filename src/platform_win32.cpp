@@ -340,22 +340,18 @@ static std::string userDir() {
   char buf[MAX_PATH] = {};
   DWORD n = GetEnvironmentVariableA("APPDATA", buf, MAX_PATH);
   if (!n) return ".";
-  std::string d = std::string(buf) + "\\SolaceExpress";
-  // the game used to be called Air Xpress: carry its saves, settings, stations and shader cache over
-  std::string old = std::string(buf) + "\\AirXpress";
-  if (GetFileAttributesA(d.c_str()) == INVALID_FILE_ATTRIBUTES && GetFileAttributesA(old.c_str()) != INVALID_FILE_ATTRIBUTES)
-    if (!MoveFileExA(old.c_str(), d.c_str(), 0)) return old;   // in use or locked: keep using it as it is
+  std::string d = std::string(buf) + "\\SomniumVolandi";   // (a new start: the old names' folders are left as they are)
   CreateDirectoryA(d.c_str(), nullptr);
   return d;
 }
 
-// Child process: SolaceExpress.exe --build-shader-cache "<dir>" compiles every program into the binary cache and
+// Child process: SomniumVolandi.exe --build-shader-cache "<dir>" compiles every program into the binary cache and
 // exits, reporting progress on stdout ("<programs done>" lines, then "m <programs compiled>"). The game runs the long
 // first-time compile this way because NVIDIA's driver holds a process-wide lock while it links the big scene programs: no
 // thread of the compiling process, whatever its context, can draw until it lets go, so the intro froze. A separate
 // process has its own driver state, and the game then loads the finished programs from the cache in a moment.
 static int buildShaderCacheChild(HINSTANCE hInst, const std::string& dir) {
-  WNDCLASSEXW wc = {sizeof(wc)}; wc.style = CS_OWNDC; wc.lpfnWndProc = DefWindowProcW; wc.hInstance = hInst; wc.lpszClassName = L"SolaceExpressCompile";
+  WNDCLASSEXW wc = {sizeof(wc)}; wc.style = CS_OWNDC; wc.lpfnWndProc = DefWindowProcW; wc.hInstance = hInst; wc.lpszClassName = L"SomniumVolandiCompile";
   RegisterClassExW(&wc);
   HWND hw = CreateWindowExW(0, wc.lpszClassName, L"", WS_POPUP, 0, 0, 8, 8, nullptr, nullptr, hInst, nullptr);
   if (!hw) return 2;
@@ -393,7 +389,7 @@ static int buildShaderCacheChild(HINSTANCE hInst, const std::string& dir) {
   return ok ? 0 : 1;
 }
 
-// Where the launch keeps what it builds: %LOCALAPPDATA%\SolaceExpress. Local, not Roaming: none of it is the player's
+// Where the launch keeps what it builds: %LOCALAPPDATA%\SomniumVolandi. Local, not Roaming: none of it is the player's
 // (it is all rebuilt at will), the shader binaries are this GPU's and driver's alone, and a roaming profile would carry
 // hundreds of MB between machines at every sign-in. Where Local can't be written, next to the game, then with the save
 // data, as before. A cache in either of those old places (a shadercache folder) is moved over once - a rename on the
@@ -418,7 +414,7 @@ static std::string cacheDirFor(const std::string& exeDir, const std::string& sav
   char local[MAX_PATH] = {};
   const DWORD n = GetEnvironmentVariableA("LOCALAPPDATA", local, MAX_PATH);
   if (n && n < MAX_PATH) {
-    const std::string dir = std::string(local) + "\\SolaceExpress";
+    const std::string dir = std::string(local) + "\\SomniumVolandi";
     if (GetFileAttributesA(dir.c_str()) == INVALID_FILE_ATTRIBUTES)
       for (const std::string& old : olds)
         if (GetFileAttributesA(old.c_str()) != INVALID_FILE_ATTRIBUTES && MoveFileExA(old.c_str(), dir.c_str(), 0)) break;
@@ -506,7 +502,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   }
   bool cached = false;
   {   // what the launch builds - the shader programs as the driver compiled them, the islands, each type's learned
-      // performance, the aircraft bodies - is kept in %LOCALAPPDATA%\SolaceExpress (cacheDirFor, above)
+      // performance, the aircraft bodies - is kept in %LOCALAPPDATA%\SomniumVolandi (cacheDirFor, above)
     char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
     std::string exeDir = std::string(exe, n);
     size_t sl = exeDir.find_last_of("\\/");
@@ -559,7 +555,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   game.iconTex = iconTex;
   // Shaders compile on a worker thread with its own context (sharing objects with the main one) on a hidden
   // window, while another thread generates the world and the main thread animates the intro at 60 Hz.
-  WNDCLASSEXW wc2 = {sizeof(wc2)}; wc2.style = CS_OWNDC; wc2.lpfnWndProc = DefWindowProcW; wc2.hInstance = hInst; wc2.lpszClassName = L"SolaceExpressGL";
+  WNDCLASSEXW wc2 = {sizeof(wc2)}; wc2.style = CS_OWNDC; wc2.lpfnWndProc = DefWindowProcW; wc2.hInstance = hInst; wc2.lpszClassName = L"SomniumVolandiGL";
   RegisterClassExW(&wc2);
   HWND hw2 = CreateWindowExW(0, wc2.lpszClassName, L"", WS_POPUP, 0, 0, 8, 8, nullptr, nullptr, hInst, nullptr);
   HDC dc2 = hw2 ? GetDC(hw2) : nullptr;
@@ -881,7 +877,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     r.programs = g_shaderCacheMisses - s0; r.programSecs = (g_shaderCompileUs - u0) * 1e-6;
     delete g;
   };
-  // Analysis: SolaceExpress.exe --analyze [scenes] - a thorough look at where the frame time goes, written to
+  // Analysis: SomniumVolandi.exe --analyze [scenes] - a thorough look at where the frame time goes, written to
   // analysis.txt (with a picture of each scene in the "analysis" folder), all at 1920x1080: CPU vs GPU (update /
   // submit / wait), exact per-pass GPU times (the GPU is waited on at each pass boundary), frame time against render
   // resolution (does it scale with pixel count?) and what each feature costs.
@@ -1054,7 +1050,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       return 0;
     }
   }
-  // Profile: SolaceExpress.exe --profile scene1,scene2,... renders each scene at 1920x1080 once normally and once with
+  // Profile: SomniumVolandi.exe --profile scene1,scene2,... renders each scene at 1920x1080 once normally and once with
   // each feature switched off (Renderer::dbgOff), and writes profile.txt next to the exe: what every
   // feature costs on this GPU
   {
@@ -1114,7 +1110,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       return 0;
     }
   }
-  // Benchmark: SolaceExpress.exe --bench scene1,scene2,... [--size WxH] times each scene (wall clock with the GPU flushed,
+  // Benchmark: SomniumVolandi.exe --bench scene1,scene2,... [--size WxH] times each scene (wall clock with the GPU flushed,
   // plus the GPU time of every pass) and writes bench.txt next to the exe. Optional --bench-frames N
   // and --bench-csv add long runs and raw CPU/app-present/fresh delayed GPU samples; no per-frame waits.
   {
@@ -1314,7 +1310,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       return allValid && !ioFailed && !closeFailed ? 0 : 2;
     }
   }
-  // Loading-screen pictures: SolaceExpress.exe --loadshots renders every airport (and every aircraft in flight) at
+  // Loading-screen pictures: SomniumVolandi.exe --loadshots renders every airport (and every aircraft in flight) at
   // 1920x1080 with all scenery generated and the anti-aliasing settled, and saves them at 1280x720 (averaged down) in
   // the "loading" folder next to the exe, where the pre-flight loading screen picks them up.
   {
@@ -1362,7 +1358,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       return 0;
     }
   }
-  // Development captures: SolaceExpress.exe --shots scene1,scene2,... [--size 1920x1080] renders each debug scene
+  // Development captures: SomniumVolandi.exe --shots scene1,scene2,... [--size 1920x1080] renders each debug scene
   // (see Game::debugScene) with all scenery generated up front and saves shots\<scene>.png next to the exe.
   {
     std::string cl = GetCommandLineA();

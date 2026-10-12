@@ -1,4 +1,4 @@
-// Solace Express - what stands at each airport: hangars, terminals, towers, fuel, parked aircraft, vehicles, fences
+// Somnium Volandi - what stands at each airport: hangars, terminals, towers, fuel, parked aircraft, vehicles, fences
 // and navigation aids, laid out on the ground plan in airport_layout.h. Built once per airport; the scenery chunks
 // pick up the items that fall inside them.
 #include "airport_layout.h"

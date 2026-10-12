@@ -1,4 +1,4 @@
-// Solace Express - the round world. The world itself is flat - the islands' 100 km square repeating on every side
+// Somnium Volandi - the round world. The world itself is flat - the islands' 100 km square repeating on every side
 // (world.h WRAP_HALF) - and so are the physics; what is drawn lays it over a sphere about the point under the camera,
 // each place keeping its distance from that point (an azimuthal equidistant wrap: planet.glsl kPlanet, in step with
 // this). Near the camera nothing moves; further off the ground falls away round the curve, the horizon dips as the

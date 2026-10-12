@@ -1,4 +1,4 @@
-// Solace Express - aircraft specs and flight dynamics
+// Somnium Volandi - aircraft specs and flight dynamics
 #pragma once
 #include "common.h"
 #include "world.h"

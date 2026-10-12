@@ -1,4 +1,4 @@
-// Solace Express - aerodynamics from each airframe's geometry
+// Somnium Volandi - aerodynamics from each airframe's geometry
 //
 // The drag is built up component by component (fuselage, wing, tails, nacelles, struts, gear, cooling, leakage) from
 // the shape in the spec: wetted areas, fineness and thickness ratios give the form factors, and the skin friction comes

@@ -1,4 +1,4 @@
-// Solace Express - hand-designed archipelago "The Solace Islands"
+// Somnium Volandi - hand-designed archipelago "The Solace Islands"
 #include "world.h"
 #include "world_load_progress.h"
 #include <cstdio>

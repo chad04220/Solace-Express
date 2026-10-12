@@ -1,4 +1,4 @@
-// Solace Express - how an airframe comes apart, and how its pieces fly.
+// Somnium Volandi - how an airframe comes apart, and how its pieces fly.
 //
 // The pieces are the aircraft's own components: its propellers, engine nacelles, landing gear legs, wing struts, fin,
 // each half of the tail (or canard), each wing, and the fuselage in three - the nose, the centre section and the tail

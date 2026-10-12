@@ -1,4 +1,4 @@
-// Solace Express - camera feeds for the research jets' cockpit displays
+// Somnium Volandi - camera feeds for the research jets' cockpit displays
 #pragma once
 #include "common.h"
 #include "aircraft.h"

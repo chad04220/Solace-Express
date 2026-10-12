@@ -1,4 +1,4 @@
-// Solace Express - the traffic on the road network (docs/LIVING_ISLANDS_PLAN.md, Phase D): cars and lorries driving the
+// Somnium Volandi - the traffic on the road network (docs/LIVING_ISLANDS_PLAN.md, Phase D): cars and lorries driving the
 // highways, roads, lanes and streets around the camera, each on the right of its road at its lane's speed, carrying on
 // through the junctions (onto a road that meets its end, or along the one its road ends on) and turning back at a dead
 // end. Only drawn, never flown into: they come and go out of sight - past the 1.6 km a car is drawn to - and leave beyond

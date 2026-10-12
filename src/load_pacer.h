@@ -1,4 +1,4 @@
-// Solace Express - the launch's loading bar: the share of the launch's steps that is done.
+// Somnium Volandi - the launch's loading bar: the share of the launch's steps that is done.
 //
 // The launch is a list of steps, each a count of things to do: the shader programs (one each, built or loaded from the
 // cache) with the islands beside them, the career, the renderer, the menu, and each aircraft's mesh. The bar shows

@@ -11,7 +11,7 @@ rem   diagnostics.bat loading   renders the loading-screen pictures (the "loadin
 rem
 rem The full run:
 rem   1. system report: GPU and driver, CPU, memory, Windows, monitors with their refresh rates
-rem   2. first-run shader compile time (the cache - %LOCALAPPDATA%\SolaceExpress - is set aside), then the time to load
+rem   2. first-run shader compile time (the cache - %LOCALAPPDATA%\SomniumVolandi - is set aside), then the time to load
 rem      every aircraft with the shaders cached: its bodies ready-built from the aircraft folder (v3.47 on), its own
 rem      shader programs compiled; the shader compile log of both
 rem   Diagnostics v2: every benchmark and screenshot run first builds (or loads) every aircraft body, outside and
@@ -50,7 +50,7 @@ set OUT=diagnostics
 if exist "%OUT%" rmdir /s /q "%OUT%"
 mkdir "%OUT%"
 rem (an error.log already there is an earlier launch's: kept apart, so the one collected at the end is these runs')
-if exist "%APPDATA%\SolaceExpress\error.log" move /y "%APPDATA%\SolaceExpress\error.log" "%OUT%\error_before.log" >nul
+if exist "%APPDATA%\SomniumVolandi\error.log" move /y "%APPDATA%\SomniumVolandi\error.log" "%OUT%\error_before.log" >nul
 if /i "%MODE%"=="shots" goto shots
 
 echo [1/6] System report ...
@@ -83,9 +83,9 @@ if defined CACHE (
   move /y "%CACHE%" "%CACHE%.aside" >nul 2>"%OUT%\cache_aside.txt"
   if exist "%CACHE%" echo The shader cache %CACHE% could not be set aside, so the first run below is not a cold compile.>>"%OUT%\cache_aside.txt"
 )
-if exist "%APPDATA%\SolaceExpress\startup.log" del /q "%APPDATA%\SolaceExpress\startup.log"
+if exist "%APPDATA%\SomniumVolandi\startup.log" del /q "%APPDATA%\SomniumVolandi\startup.log"
 powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SomniumVolandi.exe' -ArgumentList '--bench menu --nobodies --size 1920x1080 --out %OUT%\compile_run.txt' -Wait }; $line = ('first run with an empty shader cache: {0:N1} s (compiles the shaders, then times the menu scene once; no aircraft bodies built)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::WriteAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
-if exist "%APPDATA%\SolaceExpress\startup.log" copy /y "%APPDATA%\SolaceExpress\startup.log" "%OUT%\startup_firstrun.log" >nul
+if exist "%APPDATA%\SomniumVolandi\startup.log" copy /y "%APPDATA%\SomniumVolandi\startup.log" "%OUT%\startup_firstrun.log" >nul
 call :findcache
 if defined CACHE if exist "%CACHE%\compile.log" copy /y "%CACHE%\compile.log" "%OUT%\compile_firstrun.log" >nul
 powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SomniumVolandi.exe' -ArgumentList '--bench menu --size 1920x1080 --out %OUT%\compile_run2.txt' -Wait }; $line = ('second run, shaders cached: every aircraft loaded (its bodies ready-built) and its own shader programs compiled: {0:N1} s (the breakdown is in compile_run2.txt)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::AppendAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
@@ -126,9 +126,9 @@ if /i "%MODE%"=="shots" goto finish
 
 :logs
 echo [6/6] Logs and settings ...
-if exist "%APPDATA%\SolaceExpress\startup.log" copy /y "%APPDATA%\SolaceExpress\startup.log" "%OUT%\startup.log" >nul
-if exist "%APPDATA%\SolaceExpress\settings.cfg" copy /y "%APPDATA%\SolaceExpress\settings.cfg" "%OUT%\settings.cfg" >nul
-if exist "%APPDATA%\SolaceExpress\error.log" copy /y "%APPDATA%\SolaceExpress\error.log" "%OUT%\error.log" >nul
+if exist "%APPDATA%\SomniumVolandi\startup.log" copy /y "%APPDATA%\SomniumVolandi\startup.log" "%OUT%\startup.log" >nul
+if exist "%APPDATA%\SomniumVolandi\settings.cfg" copy /y "%APPDATA%\SomniumVolandi\settings.cfg" "%OUT%\settings.cfg" >nul
+if exist "%APPDATA%\SomniumVolandi\error.log" copy /y "%APPDATA%\SomniumVolandi\error.log" "%OUT%\error.log" >nul
 call :findcache
 if defined CACHE (
   if exist "%CACHE%\compile.log" copy /y "%CACHE%\compile.log" "%OUT%\compile.log" >nul
@@ -154,12 +154,12 @@ pause
 exit /b 0
 
 :findcache
-rem where the game keeps its cache (platform_win32.cpp cacheDirFor): %LOCALAPPDATA%\SolaceExpress; next to the game, or
+rem where the game keeps its cache (platform_win32.cpp cacheDirFor): %LOCALAPPDATA%\SomniumVolandi; next to the game, or
 rem with the save data, only where Local can't be written (or by a version before v3.42)
 set CACHE=
-if defined LOCALAPPDATA if exist "%LOCALAPPDATA%\SolaceExpress" set CACHE=%LOCALAPPDATA%\SolaceExpress
+if defined LOCALAPPDATA if exist "%LOCALAPPDATA%\SomniumVolandi" set CACHE=%LOCALAPPDATA%\SomniumVolandi
 if not defined CACHE if exist shadercache set CACHE=%CD%\shadercache
-if not defined CACHE if exist "%APPDATA%\SolaceExpress\shadercache" set CACHE=%APPDATA%\SolaceExpress\shadercache
+if not defined CACHE if exist "%APPDATA%\SomniumVolandi\shadercache" set CACHE=%APPDATA%\SomniumVolandi\shadercache
 goto :eof
 
 :loading

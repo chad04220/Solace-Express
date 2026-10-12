@@ -1,4 +1,4 @@
-// Solace Express - tower controller voices (see atc.h)
+// Somnium Volandi - tower controller voices (see atc.h)
 #include "atc.h"
 #include "audio.h"
 #include <algorithm>

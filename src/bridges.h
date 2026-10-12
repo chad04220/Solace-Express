@@ -1,4 +1,4 @@
-// Solace Express - the road network's bridges (Phase A item 5): a structure under every span the network flags as a
+// Somnium Volandi - the road network's bridges (Phase A item 5): a structure under every span the network flags as a
 // bridge (road_network.h RoadPath::bridge - over water, or the road standing well clear of the ground), its deck the
 // road's own graded centreline, carried on piers down to the ground or the sea floor between abutments at its ends.
 // A long crossing of the water takes its deepest straight stretch in one main span on two heavier piers: a steel

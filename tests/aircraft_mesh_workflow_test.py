@@ -34,27 +34,27 @@ class AircraftMeshWorkflowTests(unittest.TestCase):
 
     def test_producer_validation_precedes_narrow_artifact(self):
         producer = job('aircraft-meshes')
-        bundle = 'mesh_assets.py bundle --input out/aircraft-raw --source-manifest build-mesh/gen/aircraft_geometry_source.json --output out/SolaceExpress-aircraft.zip'
+        bundle = 'mesh_assets.py bundle --input out/aircraft-raw --source-manifest build-mesh/gen/aircraft_geometry_source.json --output out/SomniumVolandi-aircraft.zip'
         validate = 'mesh_assets.py validate --input out/aircraft-raw --source-manifest build-mesh/gen/aircraft_geometry_source.json'
         self.assertLess(producer.index('aircraft_mesh_export out/aircraft-raw'), producer.index(bundle))
         self.assertLess(producer.index(bundle), producer.index(validate))
         self.assertLess(producer.index(validate), producer.index('actions/upload-artifact@'))
-        self.assertIn('name: SolaceExpress-aircraft', producer)
-        self.assertIn('path: out/SolaceExpress-aircraft.zip', producer)
+        self.assertIn('name: SomniumVolandi-aircraft', producer)
+        self.assertIn('path: out/SomniumVolandi-aircraft.zip', producer)
         self.assertIn('if-no-files-found: error', producer)
         self.assertIn('python tools/mesh_assets/test_mesh_assets.py', producer)
 
     def test_consumer_checks_its_own_source_before_packaging(self):
         consumer = job('windows')
         self.assertIn('needs: [aircraft-meshes]', consumer)
-        self.assertIn('name: SolaceExpress-aircraft\n          path: mesh-bundle', consumer)
-        extract = 'mesh_assets.py extract --input mesh-bundle/SolaceExpress-aircraft.zip --source-manifest build/gen/aircraft_geometry_source.json --output dist/SolaceExpress/aircraft'
-        validate = 'mesh_assets.py validate --input dist/SolaceExpress/aircraft --source-manifest build/gen/aircraft_geometry_source.json'
+        self.assertIn('name: SomniumVolandi-aircraft\n          path: mesh-bundle', consumer)
+        extract = 'mesh_assets.py extract --input mesh-bundle/SomniumVolandi-aircraft.zip --source-manifest build/gen/aircraft_geometry_source.json --output dist/SomniumVolandi/aircraft'
+        validate = 'mesh_assets.py validate --input dist/SomniumVolandi/aircraft --source-manifest build/gen/aircraft_geometry_source.json'
         self.assertLess(consumer.index('cmake --build build --config Release'), consumer.index(extract))
         self.assertLess(consumer.index('actions/download-artifact@'), consumer.index(extract))
         self.assertLess(consumer.index(extract), consumer.index(validate))
         self.assertLess(consumer.index(validate), consumer.index('Compress-Archive'))
-        self.assertIn('Compress-Archive -Path dist/SolaceExpress/*', consumer)
+        self.assertIn('Compress-Archive -Path dist/SomniumVolandi/*', consumer)
         self.assertNotIn('Expand-Archive', consumer)
 
     def test_consumer_and_producer_have_identical_event_scope(self):
@@ -73,7 +73,7 @@ class AircraftMeshWorkflowTests(unittest.TestCase):
     def test_release_waits_for_bake_and_existing_tests(self):
         release = job('release')
         self.assertIn('needs: [linux-sanitizers, aircraft-meshes, windows]', release)
-        self.assertIn('files: dist/SolaceExpress-windows-x64.zip', release)
+        self.assertIn('files: dist/SomniumVolandi-windows-x64.zip', release)
 
 
 if __name__ == '__main__':

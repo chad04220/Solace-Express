@@ -1,4 +1,4 @@
-// Solace Express - shader sources and the programs assembled from them
+// Somnium Volandi - shader sources and the programs assembled from them
 #pragma once
 #include <cstdio>
 #include <string>

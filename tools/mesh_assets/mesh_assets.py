@@ -132,8 +132,8 @@ def source_manifest(path, source_root):
     require(len(names) == len(set(names)) and all(group == sorted(group) for group in kind_names.values()),
             "Source paths must be unique and sorted within kind")
     require(names == kind_names["cpu"] + kind_names["shader"] + kind_names["producer"], "Source groups must be CPU, shader, producer")
-    cpu_digest = hashlib.sha256(("solace-aircraft-cpu-source-v1\n" + records["cpu"] + records["producer"]).encode()).hexdigest()
-    full_digest = hashlib.sha256(("solace-aircraft-build-source-v1\n" + records["cpu"] + records["shader"] + records["producer"]).encode()).hexdigest()
+    cpu_digest = hashlib.sha256(("somnium-aircraft-cpu-source-v1\n" + records["cpu"] + records["producer"]).encode()).hexdigest()
+    full_digest = hashlib.sha256(("somnium-aircraft-build-source-v1\n" + records["cpu"] + records["shader"] + records["producer"]).encode()).hexdigest()
     require((cpu_digest, full_digest) == (value["geometry_digest"], value["digest"]), "Source manifest digest mismatch")
     return value
 
@@ -262,7 +262,7 @@ def inspect_directory(directory, source, roster):
 def build_manifest(source, report, meshes, revision):
     require(isinstance(revision, str) and revision and len(revision) <= 200, "Missing source revision")
     return {
-        "schema": 1, "bundle": "SolaceExpress-aircraft", "asset_count": len(meshes),
+        "schema": 1, "bundle": "SomniumVolandi-aircraft", "asset_count": len(meshes),
         "format_version": FORMAT_VERSION, "algorithm_version": ALGORITHM_VERSION,
         "full_quality": True, "compression": "ZIP-DEFLATE-lossless", "quantization": "none",
         "shader_binaries": False, "source_revision": revision, "source": source,

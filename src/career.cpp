@@ -1,4 +1,4 @@
-// Solace Express - career progression and hand-designed story campaign
+// Somnium Volandi - career progression and hand-designed story campaign
 #include "career.h"
 #include "military_missions.h"
 #include "finite_float.h"
@@ -1205,7 +1205,7 @@ bool Career::save(const std::string& path) const {
   std::string tmp = path + ".tmp";
   FILE* f = fopen(tmp.c_str(), "w");
   if (!f) return false;
-  bool ok = fprintf(f, "solace_save 6\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\nattempt %u\nattempt_open %d\n",
+  bool ok = fprintf(f, "somnium_save 6\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\nattempt %u\nattempt_open %d\n",
                     money, license, reputation, location, storyIndex, flights, landings, crashes, hours, bestLandingFpm, boardSeed, finished ? 1 : 0, attempt, attemptOpen ? 1 : 0) > 0;
   ok = ok && fprintf(f, "military %d %d %d %d %d %d %.9g %u %u %u %d %d\n",
     military.rank, military.credits, military.sorties, military.successes, military.failures, military.intelligence,
@@ -1261,7 +1261,7 @@ bool Career::load(const std::string& path) {
   FILE* f = fopen(path.c_str(), "r");
   if (!f) return false;
   Career c; char key[64]; int ver = 0;
-  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 6) { fclose(f); return false; }
+  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "somnium_save") && strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 6) { fclose(f); return false; }
   const int nApt = (int)g_world.airports.size();
   bool ok = true;
   unsigned have = 0;   // mandatory fields seen (version 2: every field, the fleet count and the end marker)

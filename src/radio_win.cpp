@@ -1,4 +1,4 @@
-// Solace Express - internet radio via Media Foundation (MFPlay). Streams MP3/AAC over HTTP/HTTPS.
+// Somnium Volandi - internet radio via Media Foundation (MFPlay). Streams MP3/AAC over HTTP/HTTPS.
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif

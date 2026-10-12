@@ -1,4 +1,4 @@
-// Solace Express - the weather's fields (weather.h): the wind, the clouds and the rain round the aircraft
+// Somnium Volandi - the weather's fields (weather.h): the wind, the clouds and the rain round the aircraft
 #include "weather.h"
 #include <mutex>
 

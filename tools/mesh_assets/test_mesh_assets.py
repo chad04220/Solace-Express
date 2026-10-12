@@ -276,8 +276,8 @@ class MeshToolTests(unittest.TestCase):
             files.append({"path": name, "sha256": digest, "kind": kind})
             records[kind] = f"{name}:{digest}\n"
         source = {"schema": 1, "files": files,
-                  "geometry_digest": hashlib.sha256(("solace-aircraft-cpu-source-v1\n" + records["cpu"] + records["producer"]).encode()).hexdigest(),
-                  "digest": hashlib.sha256(("solace-aircraft-build-source-v1\n" + "".join(records.values())).encode()).hexdigest()}
+                  "geometry_digest": hashlib.sha256(("somnium-aircraft-cpu-source-v1\n" + records["cpu"] + records["producer"]).encode()).hexdigest(),
+                  "digest": hashlib.sha256(("somnium-aircraft-build-source-v1\n" + "".join(records.values())).encode()).hexdigest()}
         path = self.root / "source.json"
         path.write_bytes(assets.canonical_json(source))
         self.assertEqual(assets.source_manifest(path, source_root), source)

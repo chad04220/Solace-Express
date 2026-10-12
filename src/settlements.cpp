@@ -1,4 +1,4 @@
-// Solace Express - the settlements' extent and streets (settlements.h)
+// Somnium Volandi - the settlements' extent and streets (settlements.h)
 #include "settlements.h"
 #include "world.h"
 #include "scenery.h"

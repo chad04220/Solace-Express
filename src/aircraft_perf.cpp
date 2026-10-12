@@ -1,4 +1,4 @@
-// Solace Express - learning each aircraft's envelope by flying it (see PerfModel in aircraft.h)
+// Somnium Volandi - learning each aircraft's envelope by flying it (see PerfModel in aircraft.h)
 #include "aircraft.h"
 #include "aero.h"
 #include <mutex>

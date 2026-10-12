@@ -1,4 +1,4 @@
-// Solace Express - procedural audio synthesis
+// Somnium Volandi - procedural audio synthesis
 //
 // Piston engines are modelled per cylinder: every firing event excites a bank of exhaust/body
 // resonators with an impulse plus a short noise burst. Each cylinder has a slightly different

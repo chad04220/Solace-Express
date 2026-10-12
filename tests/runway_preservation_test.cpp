@@ -11,8 +11,8 @@
 #include <string>
 #include <vector>
 
-#ifndef SOLACE_RUNWAY_GOLDEN
-#define SOLACE_RUNWAY_GOLDEN "tests/fixtures/runways_52317bb.golden"
+#ifndef SOMNIUM_RUNWAY_GOLDEN
+#define SOMNIUM_RUNWAY_GOLDEN "tests/fixtures/runways_52317bb.golden"
 #endif
 
 void airportGroundsCap(float x, float z, float& grounds, float& cap);   // world.cpp
@@ -290,7 +290,7 @@ void testScenery(const Golden& g) {
 } // namespace
 
 int main(int argc,char** argv) {
-  const char* path=argc>1?argv[1]:SOLACE_RUNWAY_GOLDEN;
+  const char* path=argc>1?argv[1]:SOMNIUM_RUNWAY_GOLDEN;
   FILE* f=fopen(path,"rb");if(!f){printf("FAIL: cannot read immutable fixture %s\n",path);return 1;}
   uint64_t fingerprint=14695981039346656037ull;
   for(int ch;(ch=fgetc(f))!=EOF;)if(ch!='\r')fingerprint=(fingerprint^(uint8_t)ch)*1099511628211ull;

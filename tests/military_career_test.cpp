@@ -263,7 +263,7 @@ int main() {
   const std::string valid = serialized(base);
   Career persistedBase = base; persistedBase.airline.log.clear(); const std::string persistedCivil = civilianState(persistedBase);
   for (int version = 1; version <= 4; ++version) {
-    std::string old = replaceLine(valid, "solace_save ", "solace_save " + std::to_string(version));
+    std::string old = replaceLine(valid, "somnium_save ", "somnium_save " + std::to_string(version));
     old = replaceLine(old, "military ", "");
     old = replaceLine(old, "military_progress ", "");
     if (version <= 2) { old = replaceLine(old, "attempt ", ""); old = replaceLine(old, "attempt_open ", ""); }
@@ -273,7 +273,7 @@ int main() {
           loaded.military.activeKind == -1 && civilianState(loaded).find("money 12600") != std::string::npos,
           "legacy migration initializes military without erasing civilian career");
     check(civilianState(loaded) == persistedCivil, "migration preserves every serialized civilian field, fleet, loan, job and airline");
-    const std::string upgraded = serialized(loaded); check(upgraded.find("solace_save 6\n") == 0, "legacy career saves as v6");
+    const std::string upgraded = serialized(loaded); check(upgraded.find("somnium_save 6\n") == 0, "legacy career saves as v6");
     Career again; check(again.load(path), "upgraded legacy save reloads");
   }
   { // Original compact v1 career, without a fleet count, attempt marker or end marker.
@@ -283,7 +283,7 @@ int main() {
   }
   { // Old aggregate success totals cannot identify which missions were actually completed.
     const Career veteran = unlockedFor(base, military::CommandStrike);
-    auto old = replaceLine(serialized(veteran), "solace_save ", "solace_save 5");
+    auto old = replaceLine(serialized(veteran), "somnium_save ", "somnium_save 5");
     old = replaceLine(old, "military_progress ", "");
     writeFile(old); Career migrated;
     check(migrated.load(path), "v5 aggregate veteran record migrates");
@@ -300,7 +300,7 @@ int main() {
           "migrated unknown history stays unknown through v6 restart");
   }
   for (int kind = 0; kind < military::kMissionCount; ++kind) {
-    auto legacy = replaceLine(valid, "solace_save ", "solace_save 5");
+    auto legacy = replaceLine(valid, "somnium_save ", "somnium_save 5");
     legacy = replaceLine(legacy, "military_progress ", "");
     legacy = replaceLine(legacy, "attempt ", "attempt 41");
     legacy = replaceLine(legacy, "attempt_open ", "attempt_open 1");
@@ -344,7 +344,7 @@ int main() {
             "unknown, negative, overflowing or malformed completion bits rejected");
   rejects(replaceLine(valid, "military_progress ", "military_progress 8"), base,
           "completion without a corresponding recorded success rejected before ledger saturation");
-  rejects(replaceLine(valid, "solace_save ", "solace_save 5"), base, "v5 does not accept a disguised v6 completion field");
+  rejects(replaceLine(valid, "somnium_save ", "somnium_save 5"), base, "v5 does not accept a disguised v6 completion field");
   const std::string emptyRecord = "military 0 0 0 0 0 0 0 0 0 0 -1 -1";
   rejects(replaceLine(valid, "military ", emptyRecord + "\n" + emptyRecord), base, "duplicate military record rejected");
   const char* corrupt[] = {

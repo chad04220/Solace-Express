@@ -10,8 +10,8 @@ Run from the repository root so material/icon/loading resources resolve. Save da
 
 ```sh
 export LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=4
-export MESA_SHADER_CACHE_DIR=/tmp/solace-ui-mesa
-export SHADERCACHE=/tmp/solace-ui-cache
+export MESA_SHADER_CACHE_DIR=/tmp/somnium-ui-mesa
+export SHADERCACHE=/tmp/somnium-ui-cache
 build/ui_review_harness interactions,menu,contracts,airline,pause,hangar0,research10,research20,research,research40 /tmp/ui1080 1920 1080 1
 build/ui_review_harness interactions,menu,hangar0,research10,research20,research,research40 /tmp/ui720 1280 720 1.4
 build/ui_review_harness intro_0_1,intro_0.42_3,intro_0.999_5,intro_1_8,loading_0.57_5,loading_ready /tmp/loading 1280 720 1

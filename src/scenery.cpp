@@ -1,4 +1,4 @@
-// Solace Express - towns, roads, farmland, forests, rocks and buildings (CPU side; mirrored in shaders.h)
+// Somnium Volandi - towns, roads, farmland, forests, rocks and buildings (CPU side; mirrored in shaders.h)
 #include "scenery.h"
 #include "airport_layout.h"
 #include "entities.h"
