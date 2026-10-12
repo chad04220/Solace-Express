@@ -227,6 +227,18 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   - The image is unchanged: 41.7 dB over a runway frame, no difference visible up close.
   - `startup.log` names which set loaded, and the analysis gains a `2K ground photographs (512)` row, the cost of the
     set against the 512 one, for the next diagnostics to confirm.
+  - **The v3.49.0 diagnostics proved that wrong:** the night scene was unchanged (15.5 ms), and the 512 set saved
+    nothing there. The compression stays (a quarter of the memory), but the cause was elsewhere.
+  - **The cause: the terrain was drawn far to near.** Its chunks went to the GPU in the quadtree's order, the islands'
+    copies from -K to K, so the far copies came first. Since v3.47 the view reaches the horizon, and from the ground
+    every copy out to it lies in the same few rows above the horizon line: each was shaded in full - its farmland's
+    field patchwork the dearest part - then hidden by the nearer ground.
+  - The chunks are now drawn nearest first, so the depth test turns away what a nearer chunk hides before its
+    material is worked out. On the software renderer the night scene's world pass falls from 2,149 to 1,317 ms (its
+    terrain material from about 1,150 to 400 ms, under v3.43's 650), and the cockpit scene's from 719 to 647 ms. The
+    airborne scenes are unchanged, and the picture is the same to the level.
+  - The analysis also gains a row for each part of the ground's material (airfield surfaces, roads, the towns'
+    ground and fields, the detail layers) and for anisotropic filtering, for the next diagnostics.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

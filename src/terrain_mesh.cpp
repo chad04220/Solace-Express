@@ -252,6 +252,24 @@ void Renderer::selectTerrainChunks(const FrameParams& fp) {
     if ((kx != 0 || kz != 0) && ex * ex + ez * ez > reach * reach) continue;
     visit(TP_LEVELS - 1, -WORLD_HALF + copyX, -WORLD_HALF + copyZ, false);
   }
+  // nearest first, each list: the depth test then turns away the ground a nearer chunk has already hidden before its
+  // material is worked out. In the quadtree's order (and the copies' from -K to K) the far copies of the islands came
+  // first - from the ground, every one of them out to the horizon shaded in the same few rows over it, then hidden
+  // (the v3.48.0 diagnostics' night scene on a runway: its terrain material 1.9 ms in v3.43, 5.5 ms)
+  auto nearestFirst = [&](std::vector<float>& v) {
+    const size_t n = v.size() / 4;
+    std::vector<std::pair<float, uint32_t>> order(n);
+    for (size_t i = 0; i < n; i++) {
+      const float h = 0.5f * v[i * 4 + 2] * TP_CHUNK, dx = v[i * 4] + h - cam.x, dz = v[i * 4 + 1] + h - cam.z;
+      order[i] = {dx * dx + dz * dz, (uint32_t)i};
+    }
+    std::sort(order.begin(), order.end());
+    std::vector<float> sorted(v.size());
+    for (size_t i = 0; i < n; i++) std::copy_n(&v[order[i].second * 4], 4, &sorted[i * 4]);
+    v.swap(sorted);
+  };
+  static const bool unsorted = getenv("TERRUNSORTED") != nullptr;   // (debug: the old order, to compare)
+  if (!unsorted) { nearestFirst(terrInst); nearestFirst(terrInstCoarse); }
   terrChunks = (int)terrInst.size() / 4; terrChunksCoarse = (int)terrInstCoarse.size() / 4;
   static const bool chunkDbg = getenv("CHUNKDBG") != nullptr;   // (debug: the chunks drawn, and how many copies of the islands they span)
   if (chunkDbg) printf("terrain: %d chunks + %d coarse, copies out to %d, reach %.0f km (camera %.0f m up)\n", terrChunks, terrChunksCoarse, K, reach * 0.001f, cam.y);
