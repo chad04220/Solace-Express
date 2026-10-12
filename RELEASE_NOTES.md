@@ -1,3 +1,10 @@
+## What's new in v3.49.3
+
+### Diagnostics
+- **The analysis's per-feature rows now hold steady in moving scenes.** In v3.49.2 each row was compared with one base measurement taken at the start, while the aircraft flew on and the graphics card's clocks wandered. Over a scene the frame time drifted by up to 2 ms, so in the flying scenes every feature seemed to save (or cost) about the same. Each row is now measured base, off, off, base and compared with its own base, so a steady drift cancels out.
+
+Please run `diagnostics.bat` on this version.
+
 ## What's new in v3.49.2
 
 ### Military service

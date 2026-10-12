@@ -980,31 +980,46 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           fprintf(af, "  -> 100%% takes %.2fx as long as 67%% (2.23x the pixels): %s\n", r,
                   r > 1.8 ? "per-pixel work dominates" : r > 1.35 ? "mostly per-pixel, with a fixed cost besides" : "a fixed per-frame cost dominates (not pixel work)");
         }
-        // 4. features
+        // 4. features, and 5. the probes: each row timed as base, off, off, base, its saving against its own base. A
+        // flight's view changes as it is measured, and the GPU's clocks wander: v3.49.2's rows, each against one base
+        // taken first, drifted by up to 2 ms over a scene (every feature "saved" about the same). In this order a
+        // steady drift cancels
+        struct Paired { double base, off; };
+        auto paired = [&](int bit) {
+          Paired r{0, 0};
+          for (int k = 0; k < 4; k++) {
+            const bool off = k == 1 || k == 2;
+            g_ren.dbgOff = off ? bit : 0;
+            frames(3);   // (settled after the switch)
+            glFinish(); LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0); frames(12); glFinish(); QueryPerformanceCounter(&t1);
+            (off ? r.off : r.base) += qpcMs(t0, t1) / 12 / 2;
+          }
+          g_ren.dbgOff = 0;
+          return r;
+        };
+        auto rows = [&](const char* title, const char* verb, const auto& list, bool ranked, std::string& top, double& topSave) {
+          std::vector<Paired> got; double baseAvg = 0;
+          for (const auto& F : list) { got.push_back(paired(F.bit)); baseAvg += got.back().base; }
+          baseAvg /= std::max<size_t>(got.size(), 1);
+          fprintf(af, "%s; base %.2f ms, each row against its own base (base, off, off, base):\n", title, baseAvg);
+          size_t i = 0;
+          for (const auto& F : list) {
+            const Paired& r = got[i++];
+            fprintf(af, "  %-26s %7.2f ms   %s %6.2f ms (%4.1f%%)\n", F.name, r.off, verb, r.base - r.off, (r.base - r.off) / r.base * 100.0);
+            if (ranked && r.base - r.off > topSave) { topSave = r.base - r.off; top = F.name; }
+          }
+        };
         std::string top; double topSave = 0;
         {
-          double base = timed(30);
-          fprintf(af, "Features (frame time with it switched off; base %.2f ms):\n", base);
-          for (const auto& F : kFeat) {
-            g_ren.dbgOff = F.bit;
-            double ms = timed(30);
-            g_ren.dbgOff = 0;
-            fprintf(af, "  %-26s %7.2f ms   saves %6.2f ms (%4.1f%%)\n", F.name, ms, base - ms, (base - ms) / base * 100.0);
-            if (base - ms > topSave) { topSave = base - ms; top = F.name; }
-          }
+          rows("Features: frame time with it switched off", "saves", kFeat, true, top, topSave);
           // 5. where the frame goes: one piece of the work left out at a time (Renderer::kProbe*: the picture is wrong
           // while one is, and these are not settings)
           static const struct { int bit; const char* name; } kProbe[] = {
             {Renderer::kProbeScenery, "scenery (buildings, trees)"}, {Renderer::kProbeTerrain, "terrain"},
             {Renderer::kProbeMarch, "airframe march"}, {Renderer::kProbeMeshShade, "own airframe's shading"},
           };
-          fprintf(af, "Work (frame time with it left out; base %.2f ms):\n", base);
-          for (const auto& P : kProbe) {
-            g_ren.dbgOff = P.bit;
-            double ms = timed(30);
-            g_ren.dbgOff = 0;
-            fprintf(af, "  %-26s %7.2f ms   costs %6.2f ms (%4.1f%%)\n", P.name, ms, base - ms, (base - ms) / base * 100.0);
-          }
+          std::string unused; double unusedSave = 0;
+          rows("Work: frame time with it left out", "costs", kProbe, false, unused, unusedSave);
         }
         // a picture of the scene for reference
         frames(3); glFinish();
