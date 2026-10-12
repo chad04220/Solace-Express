@@ -108,7 +108,13 @@ class EnviGrid(Grid):
         fields = dict((key.strip().lower(), value.strip()) for key, value in
                       re.findall(r"([^\n=]+)=\s*(\{[^}]*\}|[^\n]*)", text))
         def integer(key, default=None):
-            return int(fields[key] if key in fields else default)
+            value = fields.get(key, default)
+            if value is None:
+                raise ValueError("ENVI header lacks " + key)
+            try:
+                return int(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("invalid ENVI " + key) from exc
         self.width, self.height = integer("samples"), integer("lines")
         if not 2 <= self.width <= 200000 or not 2 <= self.height <= 100000:
             raise ValueError("unsupported ENVI dimensions")

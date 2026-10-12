@@ -36,6 +36,22 @@ the Linux Release and Windows LLVM-MinGW game builds pass. The pinned 20-tile
 real-source rebuild matches all 22 delivered files and all 1,280 convergence probes.
 The new branch-head CI must be checked separately before declaring it ready.
 
+## Claude's review (2026-10-12): merged
+
+Merged into `claude/compassionate-davinci-4cfo20` after v3.49.0, unchanged but for one fix.
+
+- **Checked:** the pack verifier (paths, symlinks, inventory, budgets, bounded decompression), the cube grid's seam
+  and corner ownership, the codec, the great-circle road clipping, the airport tables and the tools' subprocess use
+  (argument lists, local GeoTIFF only, no shell, nothing fetched).
+- **Passed here:** the Earth suite (all but the GDAL adapter test with the optional `zstandard` installed: the
+  default codec's path) and the 38 handoff tests. On the merged tree the full CTest (120) and the Windows build pass,
+  and the branch head's own CI (run 925) passed.
+- **Fixed:** an ENVI header missing a field (or with a non-integer one) failed with Python's bare `int()` message.
+  It now names the field (`ENVI header lacks lines`, `invalid ENVI data type`). The new test fails on the old code.
+- **For Phase 1:** sampling is pure Python, about 2.3 s an L6 tile at N=2. A full-globe L6 pack (24,576 tiles) would
+  take most of a day on one core, so a production build wants NumPy or many processes. The N2-to-N8 differences
+  (up to 38 m) are the footprint averaging steep ground, as noted; choose N from the source and target spacing.
+
 ## Scope
 
 This phase provides offline source adapters, tangent-cube elevation tiles, road topology clipping, airport-table normalization, and a checksummed world-pack directory. It does not replace terrain, alter the current Solace archipelago, change aircraft meshes, relocate airports, change saves, or introduce globe physics. Those remain later phases.

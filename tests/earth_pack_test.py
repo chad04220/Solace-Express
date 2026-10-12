@@ -438,6 +438,17 @@ class ElevationTests(unittest.TestCase):
             with self.assertRaises(REJECT):
                 elevation.EnviGrid(path)
 
+    def test_envi_header_missing_or_malformed_fields_are_named(self):
+        path = self.make_envi("fields.bin", [[1, 2], [3, 4]])
+        header = path.with_suffix(".hdr")
+        complete = header.read_text(encoding="ascii")
+        for field, text in (("lines", complete.replace("lines = 2\n", "")),
+                            ("data type", complete.replace("data type = 4", "data type = four"))):
+            header.write_text(text, encoding="ascii")
+            with self.assertRaises(ValueError) as caught:
+                elevation.EnviGrid(path)
+            self.assertIn(field, str(caught.exception))
+
     def test_envi_nodata_and_global_poles(self):
         path = self.make_envi("nodata.bin", [[-9999, 2], [3, 4]], nodata=-9999)
         source = elevation.EnviGrid(path)
