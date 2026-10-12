@@ -112,6 +112,7 @@ static void compileLog(const std::string& line) {
   }
 }
 void Renderer::bakeLog(const std::string& line) { compileLog(line); }
+thread_local std::function<void(const std::string&)> g_onProgramBuild;
 static thread_local std::string g_compileWhat;   // what linkProgramCached is building (for compile.log)
 static GLuint linkOnce(const std::string& vsIn, const std::string& fsIn, std::string& err, bool& rejectedBefore, const char* variant) {
   // (each stage cut to what it runs, before the cache's key and the compiler see it: shader_prune.h)
@@ -163,6 +164,7 @@ static GLuint linkOnce(const std::string& vsIn, const std::string& fsIn, std::st
   const size_t err0 = err.size();
   const std::string what = g_compileWhat + (variant ? std::string(" with ") + variant : std::string());
   compileLog("building " + what);
+  if (g_onProgramBuild) g_onProgramBuild(what);   // (the loading screen and the diagnostics say it is compiling)
   GLuint v = compile(GL_VERTEX_SHADER, vs, err), f = compile(GL_FRAGMENT_SHADER, fs, err);
   auto secs = [&]() { char b[32]; snprintf(b, sizeof b, "%.1f s", std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count()); return std::string(b); };
   auto spent = [&]() { g_shaderCompileUs += std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count(); };

@@ -84,7 +84,9 @@ public:
   // and `progress` gets the pacer's fraction
   void prewarm(const std::function<void(float, const std::string&)>& progress, bool allCraft = false, class LoadPacer* pace = nullptr, int menuStep = -1, const std::vector<int>* itemSteps = nullptr);
   static std::vector<std::pair<int, bool>> prewarmItems(bool allCraft);   // (aircraft, cockpit) in the order prewarm builds them
-  static std::string prewarmLabel(int craft, bool inside, bool fresh);
+  // what preparing an aircraft's body (inside: its cockpit's) is doing: 0 starting, 1 read ready-built from the aircraft
+  // folder, 2 read from this PC's mesh cache, 3 building it, 4 compiling its shader programs
+  static std::string prewarmLabel(int craft, bool inside, int stage);
   int prewarmCraft = -1; bool prewarmInside = false;   // the menu tour shows this aircraft instead (prewarm only)
   bool wantFullscreenToggle = false;
   std::function<void()> platformPresent;   // swaps the window's buffers and answers its messages (platform_win32 sets it): a frame shown from inside a long bake

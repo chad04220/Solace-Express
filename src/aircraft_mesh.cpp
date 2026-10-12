@@ -246,6 +246,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     if (aircraftAsset::read(assetPath, id, data, assetError)) {
       vb.swap(data.vertices); ib.swap(data.indices); hullTri.swap(data.hull); partBlob.swap(data.parts); fineStart = data.fineStart;
       prebuiltMeshHits++;
+      if (onBodyLoaded) onBodyLoaded(true);
       if (getenv("HULLDBG")) printf("mesh %s: packaged full-quality asset (%zu vertices)\n", inside ? "cockpit" : "outside", vb.size() / 8);
       bakeLog("loaded packaged aircraft mesh " + aircraftAsset::filename(id));
     } else {
@@ -275,7 +276,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       ok = ok && aircraftMesh::valid(vb, ib) && aircraftMesh::validBlob(partBlob);
       for (float x : hullTri) ok = ok && aircraftMesh::finite(x);
       if (!ok) { vb.clear(); ib.clear(); hullTri.clear(); partBlob.clear(); fineStart = 0; std::error_code ec; std::filesystem::remove(path, ec); }
-      else { meshCacheHits++; if (getenv("HULLDBG")) printf("mesh %s: from the cache (%zu vertices)\n", inside ? "cockpit" : "outside", vb.size() / 8); }
+      else { meshCacheHits++; if (onBodyLoaded) onBodyLoaded(false); if (getenv("HULLDBG")) printf("mesh %s: from the cache (%zu vertices)\n", inside ? "cockpit" : "outside", vb.size() / 8); }
     }
   }
   const auto tBake = std::chrono::steady_clock::now();

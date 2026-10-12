@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <functional>   // (linkOnce tells g_onProgramBuild, defined with it, as a program starts to compile)
 #include <map>
 #include <mutex>
 #include <set>

@@ -2981,8 +2981,15 @@ std::vector<std::pair<int, bool>> Game::prewarmItems(bool allCraft) {
   for (int i = 0; i < kAircraftCount; i++) if (allCraft || !kAircraft[i].special) { todo.push_back({i, false}); todo.push_back({i, true}); }
   return todo;
 }
-std::string Game::prewarmLabel(int craft, bool inside, bool fresh) {
-  return std::string(fresh ? "Building the " : "Loading the ") + kAircraft[craft].name + (inside ? " cockpit's mesh" : "'s mesh") + (fresh ? "  (once: kept for the next launch)" : "  from the cache");
+std::string Game::prewarmLabel(int craft, bool inside, int stage) {
+  const std::string what = std::string("the ") + kAircraft[craft].name + (inside ? "'s cockpit" : "'s body");
+  switch (stage) {
+    case 1: return "Loaded " + what + ", ready-built";
+    case 2: return "Loaded " + what + " from this PC's cache";
+    case 3: return "Building " + what + "  (once: kept for the next launch)";
+    case 4: return std::string("Compiling the ") + kAircraft[craft].name + "'s shader programs  (once after an update)";
+    default: return "Preparing " + what;
+  }
 }
 // A start in the air (a career leg that opens airborne, an airborne research sortie): the gear up where it retracts, the
 // parking brake and the wheel brakes off, so nothing holds the aircraft back or hangs out in the wind from the first frame
@@ -3021,14 +3028,20 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   for (size_t k = 0; k < todo.size() && !quit; k++) {
     prewarmCraft = todo[k].first; prewarmInside = todo[k].second;
     if (pace && itemSteps && k < itemSteps->size()) pace->begin((*itemSteps)[k]);
-    // worded as a cache read; a bake that begins (its cache missing or unreadable) says so
+    // worded as it goes: where its body came from (ready-built, this PC's cache, or built), and its shader programs
+    // compiling - after an update, the most of this step's time
     const std::string count = fmt("   %d of %d", (int)k + 1, (int)todo.size());
-    progress(pace ? pace->fraction() : 0.35f + 0.65f * k / todo.size(), prewarmLabel(prewarmCraft, prewarmInside, false) + count);
-    g_ren.onBakeStart = [&] {
-      progress(pace ? pace->fraction() : 0.35f + 0.65f * k / todo.size(), prewarmLabel(prewarmCraft, prewarmInside, true) + count);
+    bool saying = false;   // (the launch's progress draws a frame, which may compile a program of its own: not said again)
+    auto say = [&](int stage) {
+      if (saying) return;
+      saying = true; progress(pace ? pace->fraction() : 0.35f + 0.65f * k / todo.size(), prewarmLabel(prewarmCraft, prewarmInside, stage) + count); saying = false;
     };
+    say(0);
+    g_ren.onBodyLoaded = [&](bool packaged) { say(packaged ? 1 : 2); };
+    g_ren.onBakeStart = [&] { say(3); };
+    g_onProgramBuild = [&](const std::string&) { say(4); };
     realTime = 3.f; frame();   // bakes it at the end of the frame, if this view uses one
-    g_ren.onBakeStart = nullptr;
+    g_ren.onBodyLoaded = nullptr; g_ren.onBakeStart = nullptr; g_onProgramBuild = nullptr;
   }
   prewarmCraft = -1; prewarmInside = false;
   realTime = 0.f;

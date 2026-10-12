@@ -861,7 +861,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0);
     g_ren.bakeYield = [] { pumpB(); };
     g->prewarm([](float f, const std::string& what) {
-      SetWindowTextA(g_hwnd, ("Solace Express - building the aircraft bodies " + std::to_string((int)(f * 100.f)) + "%  (" + what + ")").c_str());
+      SetWindowTextA(g_hwnd, ("Solace Express - preparing the aircraft " + std::to_string((int)(f * 100.f)) + "%  (" + what + ")").c_str());
       pumpB();
     }, true);
     g_ren.bakeYield = nullptr;

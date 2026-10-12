@@ -82,6 +82,8 @@ struct WreckVisual {
 // Shader programs, compiled once and then loaded from the driver-binary cache in g_shaderCacheDir (empty: no cache)
 extern std::string g_shaderCacheDir;
 extern std::atomic<int> g_shaderCacheHits, g_shaderCacheMisses;   // bumped from several GL threads at startup
+extern thread_local std::function<void(const std::string&)> g_onProgramBuild;   // called, on the thread that set it, as a program
+                                                                                 // not in the cache begins to compile (what it is)
 extern std::atomic<long long> g_shaderCompileUs;   // the time spent compiling programs (not loading them from the cache), us
 std::string meshGeometryStamp(const std::string& defines); // SHA256 of full-quality shader geometry, CPU builder contract; no driver
 std::string meshCacheStamp(const std::string& defines = "");     // fingerprint of the sources the aircraft mesh bake depends on + the driver
@@ -248,6 +250,8 @@ public:
   void setCompileStage(const char* s) { std::lock_guard<std::mutex> lk(stageMu); stageName = s; }
   std::mutex stageMu; std::string stageName;
   bool meshCached = false;
+  std::function<void(bool packaged)> onBodyLoaded;   // an aircraft body read whole: ready-built from the aircraft folder (true)
+                                                    // or from this PC's mesh cache (false): the loading screen's wording
   std::function<void()> onBakeStart;   // called as an aircraft mesh begins to build (not read from the cache): the loading screen's wording   // this build's aircraft meshes are in the cache already (checkMeshCache: a launch reads them, it builds none)
   void checkMeshCache();
   // environment entities: entSync generates every chunk in range before drawing (headless captures)

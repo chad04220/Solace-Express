@@ -584,8 +584,11 @@ the other side, a hinged surface's deflection about its swept and tapered hinge,
 
 ## 10. Baking
 
-At launch every aircraft's meshes are built or read from the cache, outside and cockpit, research craft included.
-That's the "Building the <name> cockpit's mesh" step, one of the loading bar's counted steps (`load_pacer.h`). In `bakePlaneMesh`:
+At launch every aircraft's meshes are prepared, outside and cockpit, research craft included: read ready-built from
+the release's aircraft folder, else from this PC's mesh cache, else built. The loading bar counts a step for each
+(`load_pacer.h`) and says which it was ("Loaded the <name>'s body, ready-built", "... from this PC's cache", "Building
+the <name>'s cockpit"), and "Compiling the <name>'s shader programs" while its own programs compile, which after an
+update is most of the step's time. A build, in `bakePlaneMesh`:
 
 1. **States.** The field is sampled on the GPU in every gear, flap, steering and control state the hull sweep lists
    (`hullStateList`).
