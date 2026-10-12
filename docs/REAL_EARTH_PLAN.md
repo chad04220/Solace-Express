@@ -34,8 +34,10 @@ sampler (`codex/earth-sampling-performance-review-20261012`). One Phase 0 delive
   the coarse levels, with the difficult-probe checks), not N2 everywhere. The owner needs these numbers for decision 2
   in section 7.
 
-**Phase 1 may start** once the owner has placed Solace (decision 1 in section 7). Decisions 2 to 4 are needed by
-Phases 2 and 3, not by Phase 1.
+**Phase 1 may start: the owner has placed Solace** (decision 1 in section 7, 2026-10-12): east of Bermuda, centred at
+**32.5° N, 58.0° W**, in deep water about 600 km east of the island. The islands' square is laid true to north: the
+game's −z (heading 0) is true north at that centre and +x is east. Decisions 2 to 4 are needed by Phases 2 and 3, not
+by Phase 1.
 
 What changed on the game's side since this plan was written, and matters to the later phases:
 
@@ -186,7 +188,7 @@ Keep each phase reviewable: one subsystem per branch, with no reformatting of fi
   - Re-basing must change nothing the physics can feel, so test it the way the seam is tested: `tests/flight_test.cpp` part 2 flies an aircraft across the seam and checks it flies on as it was.
 - Conversions: tile ↔ direction ↔ local frame. Bearings and great-circle distances: the career's distances, the GPS, ATC.
 - **The Solace patch's placement.**
-  - A constant lat/lon for the islands' centre, plus the rotation of their square to north. Suggestion: about **32.5° N, 58° W**, roughly 600 km east of Bermuda (32.3° N, 64.8° W) in deep water. **The owner picks.**
+  - A constant lat/lon for the islands' centre, plus the rotation of their square to north. **Decided (2026-10-12): 32.5° N, 58.0° W**, roughly 600 km east of Bermuda (32.3° N, 64.8° W) in deep water, the square laid true to north (−z north, +x east at the centre).
   - Inside the patch, local coordinates are exactly today's x and z, so all of Solace's content and tests stay as they are.
 - **Tests:**
   - lat/lon ↔ local round trips (to a millimetre near the origin);
@@ -299,7 +301,7 @@ This is design work with the owner first:
 
 ## 7. Decisions for the owner (ask in issue #2 before Phase 1)
 
-1. **Where Solace sits.** The suggestion is about 32.5° N, 58° W, east of Bermuda in deep water. The alternative is nearer the coast, on the continental shelf, so the sea floor round it is shallow.
+1. **Where Solace sits. Decided (2026-10-12):** 32.5° N, 58.0° W, east of Bermuda in deep water, laid true to north.
 2. **How much data ships with the game.**
    - A 60″ global base: small, maybe a few hundred MB.
    - A 30″ base, ≈ 1 km: around a gigabyte or more.
