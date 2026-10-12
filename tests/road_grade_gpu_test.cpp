@@ -98,7 +98,7 @@ int main() {
     }
   const int W = 1024, H = (int)((s.size() + W - 1) / W);
   s.resize((size_t)W * H, Sample{0.f, 0.f, 0.f, 0.f});
-  std::string fs = std::string("#version 330 core\n") + kCommonGLSL + kSceneUniforms + kRoads +
+  std::string fs = std::string("#version 330 core\n#define GROUND_ROADS\n") + kCommonGLSL + kSceneUniforms + kRoads +
                    "uniform sampler2D uSamples; layout(location=0) out vec4 oColor;\n"
                    "void main(){ vec4 q = texelFetch(uSamples, ivec2(gl_FragCoord.xy), 0); RoadHit r = roadQuery(q.xy);\n"
                    "  oColor = vec4(roadGrade(q.xy, q.z), r.on ? r.across : 1e6, min(r.edge, 5.0), float(r.cls) + (r.junction ? 8.0 : 0.0)); }\n";

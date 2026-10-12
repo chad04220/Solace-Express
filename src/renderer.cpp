@@ -675,7 +675,7 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
     // aerial imagery, the terrain-shadow bake, the clouds, the hull and mesh bakes, the cockpit display atlases
     std::string ms = worldLibAssembly(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "");
     setCompileStage("the GPS map");
-    progMap = program(vsFS, ms + kMapMain, error); if (progMap) step();
+    progMap = program(vsFS, mapFSAssembly(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : ""), error); if (progMap) step();
     setCompileStage("terrain shadows");
     { std::string e; progTShBake = program(vsFS, ms + kTShBakeMain, e); step(); }   // optional: without it the terrain casts no sun shadow
     setCompileStage("clouds");

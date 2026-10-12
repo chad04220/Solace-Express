@@ -76,6 +76,10 @@ float roadGrade(vec2 p, float g){
   }
   return W > 0.0 ? g + (hs/ws - g)*W : g;
 }
+// (GROUND_ROADS: only the programs that paint the ground - the terrain's and the GPS map's - define it. Every other
+// program built with this library keeps its source, and its cached build, without the struct below: the pruner keeps
+// structs whether or not anything uses them)
+#ifdef GROUND_ROADS
 // The road at a point (the network, road_network.h), once for the ground's normal and its paint: the nearest platform's
 // signed distance across from its centreline (+ right of its direction), the distance along it, its direction and class;
 // on: on its paving or verge (bridge decks are their own meshes: never painted here); junction: a second road's paving
@@ -116,6 +120,7 @@ RoadHit roadQuery(vec2 p){
 // (A far chunk's cell spans a road and its banks: its normal, their average, lit the paving as though it lay on the
 // hillside, and laid rock on it where the banks were steep)
 vec3 roadNormal(RoadHit r, vec3 n){ return normalize(mix(n, r.nr, 1.0 - smoothstep(-1.0, 0.0, r.edge))); }
+#endif
 #else
 // (the bake: inert stand-ins, so the world library still compiles as assembled; nothing it runs calls them, and the
 // pruner drops them with everything else unreachable)

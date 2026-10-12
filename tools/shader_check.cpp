@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
   }
   {
     std::string ms = worldLibAssembly("");
-    put(dir, "map.frag", ms + kMapMain);
+    put(dir, "map.frag", mapFSAssembly(""));
     put(dir, "tshbake.frag", ms + kTShBakeMain);
     put(dir, "clouds.frag", ms + kCloudMain);
     put(dir, "hullbake.frag", worldLibAssembly("#define PART_BAKE\n") + kHullBakeMain);

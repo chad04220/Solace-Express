@@ -36,6 +36,8 @@ inline std::string worldLibAssembly(const std::string& defines) {
          kFeeds + kPlaneFx + kWraithWeaponSDF + kWraithSDF + kWraithStoreMaterial + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
          kCockpitMaterial + kPlaneMaterial + kWater + kAfShMap + kPlaneLight;
 }
+// the GPS map's aerial imagery: the ground's material over the islands (GROUND_ROADS: the roads painted, roads.glsl)
+inline std::string mapFSAssembly(const std::string& defines) { return worldLibAssembly(defines + "#define GROUND_ROADS\n") + kMapMain; }
 // the aircraft bodies' bake (aircraft_mesh.cpp, aircraft_hull.cpp): the fields evaluated part by part (PART_BAKE), and
 // with HULL_BAKE_NORMALS their normals and cabin occlusion
 inline std::string hullBakeFSAssembly(const std::string& defines) { return worldLibAssembly(defines + "#define PART_BAKE\n") + kHullBakeMain; }
@@ -55,7 +57,7 @@ inline std::string entClassDefines(int c) { return "#define ENT_CLASS " + std::t
 // ---- the raster renderer's programs (raster_renderer.cpp, terrain_mesh.cpp)
 inline std::string terrainVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + "#define ROUND_WORLD\n" + kCommonGLSL + kSceneUniforms + kRoads + kPlanet + kTerrainVS; }
 inline std::string terrainFSAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + "#define ENV_MATERIALS\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kMaterialCommon + kTerrainMaterial + kGBuffer + kGBWrite + kTerrainFS;
+  return std::string("#version 330 core\n") + defines + "#define ENV_MATERIALS\n#define GROUND_ROADS\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kMaterialCommon + kTerrainMaterial + kGBuffer + kGBWrite + kTerrainFS;
 }
 inline std::string waterVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + "#define ROUND_WORLD\n" + kPlanet + kWaterVS; }
 inline std::string waterFSAssembly(const std::string& defines) {

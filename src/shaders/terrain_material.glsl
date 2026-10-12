@@ -368,9 +368,9 @@ void fieldMaterial(vec2 p, float farm, vec2 pixelDx, vec2 pixelDy, inout Mat m){
   m.nrm = mix(m.nrm, nTS, farm*0.6);
 }
 
-// (road: roadQuery at p.xz, the caller's - the ground's normal wants it first. Never in the aircraft bodies' bake, which
-// has no roads, PART_BAKE)
-#ifndef PART_BAKE
+// (road: roadQuery at p.xz, the caller's - the ground's normal wants it first. Only in the programs that paint the
+// ground, GROUND_ROADS: roads.glsl)
+#ifdef GROUND_ROADS
 Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixelDy, RoadHit road){
   vec2 groundFoot = abs(pixelDx) + abs(pixelDy);
   Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
