@@ -18,6 +18,9 @@
 ### Faster on the ground
 - **The roads cost less to draw.** Each pixel near a road now looks the road up once instead of twice, and checks only the roads actually passing through its patch of ground: about 3 instead of 15, on average. On the test renderer, low over a town, the roads now take about 35 to 40% less time to draw, and the ground as a whole about 5% less. Nothing looks different.
 
+### Behind the scenes
+- Codex's offline tools for building real-world terrain can now sample elevation about 16 times faster when NumPy is installed, writing byte-identical files. Nothing in the game uses them yet.
+
 Please run `diagnostics.bat` on this version.
 
 ## What's new in v3.49.1

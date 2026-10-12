@@ -1,0 +1,193 @@
+{
+  "area_samples": 8,
+  "cases": [
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 1.2187229003757238e-10,
+      "mean_unrounded_difference_m": 2.0131309451871523e-12,
+      "name": "Himalaya",
+      "payload_bytes": 57309,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 54.76789254946149,
+      "speedup_sampling_and_encode": 52.005777832131926,
+      "tile": {
+        "face": "py",
+        "level": 4,
+        "x": 7,
+        "y": 12
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.02621154700000261
+          ],
+          "median_sample_and_encode_seconds": 0.5088124620001508,
+          "median_sample_seconds": 0.48260091500014823,
+          "payload_sha256": "962479b661c3688fbb6424d1b5c35854f6c90c01eca2cc59727fbae049b606fd",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.48260091500014823
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.030152799999996205
+          ],
+          "median_sample_and_encode_seconds": 26.461187856999913,
+          "median_sample_seconds": 26.431035056999917,
+          "payload_sha256": "962479b661c3688fbb6424d1b5c35854f6c90c01eca2cc59727fbae049b606fd",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            26.431035056999917
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 4.4565240386873484e-11,
+      "mean_unrounded_difference_m": 6.891662490567208e-13,
+      "name": "north-pole",
+      "payload_bytes": 73168,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 49.26155785468323,
+      "speedup_sampling_and_encode": 46.90359257349541,
+      "tile": {
+        "face": "pz",
+        "level": 4,
+        "x": 8,
+        "y": 8
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.028658820999680756
+          ],
+          "median_sample_and_encode_seconds": 0.5817336279997107,
+          "median_sample_seconds": 0.55307480700003,
+          "payload_sha256": "1c592e011798c242b96e112eaaf0d5856b39df0cf72d7454f6525558651d2e4e",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.55307480700003
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.04007047100003547
+          ],
+          "median_sample_and_encode_seconds": 27.285397073999775,
+          "median_sample_seconds": 27.24532660299974,
+          "payload_sha256": "1c592e011798c242b96e112eaaf0d5856b39df0cf72d7454f6525558651d2e4e",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            27.24532660299974
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 2.455635694786906e-10,
+      "mean_unrounded_difference_m": 8.239515326993362e-12,
+      "name": "Himalaya",
+      "payload_bytes": 73895,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 54.918957381759554,
+      "speedup_sampling_and_encode": 52.188549287913744,
+      "tile": {
+        "face": "py",
+        "level": 6,
+        "x": 29,
+        "y": 51
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.026238508000005822
+          ],
+          "median_sample_and_encode_seconds": 0.5187376260000747,
+          "median_sample_seconds": 0.49249911800006885,
+          "payload_sha256": "5ad7d835ff54254d9bd2917e994e7f8ce494fb0070a7cf40568f9bb959d42e2b",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.49249911800006885
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.024626090000310796
+          ],
+          "median_sample_and_encode_seconds": 27.072164162000263,
+          "median_sample_seconds": 27.047538071999952,
+          "payload_sha256": "5ad7d835ff54254d9bd2917e994e7f8ce494fb0070a7cf40568f9bb959d42e2b",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            27.047538071999952
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 3.2741809263825417e-11,
+      "mean_unrounded_difference_m": 4.848223392501432e-13,
+      "name": "north-pole",
+      "payload_bytes": 57219,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 53.85042385710725,
+      "speedup_sampling_and_encode": 51.13293734535076,
+      "tile": {
+        "face": "pz",
+        "level": 6,
+        "x": 32,
+        "y": 32
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.027231940000092436
+          ],
+          "median_sample_and_encode_seconds": 0.5288440190001893,
+          "median_sample_seconds": 0.5016120790000969,
+          "payload_sha256": "5e9436dd6fc06d5d9fd69aad14be585942d94a5972ff25d65721cf49c1f0431e",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.5016120790000969
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.029325023000183137
+          ],
+          "median_sample_and_encode_seconds": 27.041348089000167,
+          "median_sample_seconds": 27.012023065999983,
+          "payload_sha256": "5e9436dd6fc06d5d9fd69aad14be585942d94a5972ff25d65721cf49c1f0431e",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            27.012023065999983
+          ]
+        }
+      }
+    }
+  ],
+  "codec": "zstd",
+  "environment": {
+    "numpy": "2.3.5",
+    "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+    "processor": "",
+    "python": "3.12.14"
+  },
+  "repeat": 1,
+  "schema": "earth-sampling-benchmark-v1",
+  "scope": "Selected tiles only; observed warm-process wall timings, not a global build or terrain truth.",
+  "source": {
+    "bytes": 933120000,
+    "header_bytes": 658,
+    "header_sha256": "fffb4f6c3051d382557744a7e32775664220338255921f5b867fc7c7f947a86f",
+    "sha256": "522c6329ed7a8c08c14718e164b04ba203d23c51212371146b789baa419c9895"
+  }
+}

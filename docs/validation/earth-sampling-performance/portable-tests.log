@@ -1,0 +1,9 @@
+test_invalid_backend_or_n_fails_before_sampling (__main__.PortableSamplerTests.test_invalid_backend_or_n_fails_before_sampling) ... ok
+test_missing_numpy_has_actionable_explicit_error (__main__.PortableSamplerTests.test_missing_numpy_has_actionable_explicit_error) ... ok
+test_required_numpy_suite_cannot_silently_skip (__main__.PortableSamplerTests.test_required_numpy_suite_cannot_silently_skip) ... ok
+test_scalar_import_and_sampling_without_site_packages (__main__.PortableSamplerTests.test_scalar_import_and_sampling_without_site_packages) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.428s
+
+OK

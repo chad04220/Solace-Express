@@ -1,0 +1,66 @@
+{
+  "date_utc": "2026-10-12",
+  "sampler_sha256": "f64be78812143166fded77a02571c9693f9c14abfd07277d67c138c1d88f317b",
+  "independent_tests": {
+    "earth_pack": {
+      "passed": 57
+    },
+    "required_numpy": {
+      "passed": 15,
+      "seconds": 21.566
+    },
+    "portable_no_site_packages": {
+      "passed": 4
+    },
+    "source_handoff": {
+      "passed": 38
+    },
+    "missing_required_numpy_fails": true
+  },
+  "real_source_probes": {
+    "count": 3840,
+    "faces": 6,
+    "levels": [
+      0,
+      4,
+      6,
+      16
+    ],
+    "N": [
+      1,
+      2,
+      3,
+      5,
+      7,
+      8,
+      15,
+      16
+    ],
+    "max_unrounded_difference_m": 1.348325895378366e-10,
+    "quantized_mismatches": 0
+  },
+  "adversarial_full_tile_cases": {
+    "count": 9,
+    "byte_order": "big-endian",
+    "header_offset": 19,
+    "coverage": "rounding ties and supported height limits; matched bytes or inherited scalar rejection"
+  },
+  "resolved_findings": [
+    {
+      "finding": "Vector/scalar ulps could choose different nodata stencils at source-cell boundaries.",
+      "resolution": "Pre-gather exact scalar-coordinate/source-sampling fallback near integer, coverage and cap boundaries; both stencil directions and full-tile reproduction tested."
+    },
+    {
+      "finding": "Two sequential Python suites in one PowerShell workflow step could mask the first failure.",
+      "resolution": "Separate workflow step per suite."
+    }
+  ],
+  "workflow": {
+    "linux_windows_matrix": true,
+    "dependencies_pinned": true,
+    "requested_numpy_cannot_skip": true,
+    "existing_build_yml_unchanged": true,
+    "native_windows_execution": "Not run locally; required after publication."
+  },
+  "remaining_blockers": []
+}

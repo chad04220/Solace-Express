@@ -1,0 +1,20 @@
+test_batch_addresses_match_canonical_reference_all_faces (__main__.NumpySamplerTests.test_batch_addresses_match_canonical_reference_all_faces) ... ok
+test_bilinear_byte_order_offset_wrap_caps_and_invalid_data (__main__.NumpySamplerTests.test_bilinear_byte_order_offset_wrap_caps_and_invalid_data) ... ok
+test_full_tile_near_nodata_boundary_matches_scalar (__main__.NumpySamplerTests.test_full_tile_near_nodata_boundary_matches_scalar) ... ok
+test_full_tiles_lossless_identity_repeatability_and_all_aprons (__main__.NumpySamplerTests.test_full_tiles_lossless_identity_repeatability_and_all_aprons) ... ok
+test_hidden_ridge_keeps_requested_n_instead_of_adapting (__main__.NumpySamplerTests.test_hidden_ridge_keeps_requested_n_instead_of_adapting) ... ok
+test_json_grid_is_explicitly_rejected (__main__.NumpySamplerTests.test_json_grid_is_explicitly_rejected) ... ok
+test_nodata_stencil_at_float_boundary_matches_scalar (__main__.NumpySamplerTests.test_nodata_stencil_at_float_boundary_matches_scalar) ... ok
+test_pack_identity_with_envi_and_failed_build_cleanup (__main__.NumpySamplerTests.test_pack_identity_with_envi_and_failed_build_cleanup) ... ok
+test_regional_antimeridian_and_coverage_fail_closed (__main__.NumpySamplerTests.test_regional_antimeridian_and_coverage_fail_closed) ... ok
+test_rounding_ties_recompute_using_scalar_and_batches_are_bounded (__main__.NumpySamplerTests.test_rounding_ties_recompute_using_scalar_and_batches_are_bounded) ... ok
+test_unrounded_n1_n2_n8_n16_matches_scalar_probes (__main__.NumpySamplerTests.test_unrounded_n1_n2_n8_n16_matches_scalar_probes) ... ok
+test_invalid_backend_or_n_fails_before_sampling (__main__.PortableSamplerTests.test_invalid_backend_or_n_fails_before_sampling) ... ok
+test_missing_numpy_has_actionable_explicit_error (__main__.PortableSamplerTests.test_missing_numpy_has_actionable_explicit_error) ... ok
+test_required_numpy_suite_cannot_silently_skip (__main__.PortableSamplerTests.test_required_numpy_suite_cannot_silently_skip) ... ok
+test_scalar_import_and_sampling_without_site_packages (__main__.PortableSamplerTests.test_scalar_import_and_sampling_without_site_packages) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 21.462s
+
+OK

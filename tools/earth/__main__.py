@@ -14,6 +14,8 @@ def main(argv=None):
     build.add_argument("--config", required=True)
     build.add_argument("--output", required=True)
     build.add_argument("--codec", choices=("zstd", "zlib"))
+    build.add_argument("--sampler", choices=("scalar", "numpy"), default="scalar",
+                       help="scalar reference (default) or optional NumPy ENVI sampling")
     verify = commands.add_parser("verify", help="verify untrusted pack without modifying it")
     verify.add_argument("pack")
     for name in ("prepare-opendap", "prepare-grip", "prepare-raster"):
@@ -27,7 +29,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         if args.command == "build":
-            manifest = build_pack(args.config, args.output, args.codec)
+            manifest = build_pack(args.config, args.output, args.codec, sampler=args.sampler)
             result = {"status": "built-and-verified", "output": args.output, **manifest["measurements"]}
         elif args.command == "verify":
             manifest = verify_pack(args.pack)

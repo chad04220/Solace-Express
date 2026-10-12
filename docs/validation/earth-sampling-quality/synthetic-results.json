@@ -1,0 +1,53 @@
+{
+  "baseline": "7954f2b71567021b207c9ddb28f3e2e1591d922c",
+  "cases": [
+    {
+      "name": "one-source-node-ridge",
+      "source_cells_per_target": 16,
+      "values": {
+        "1": 9999.99999999999,
+        "2": 0.0,
+        "4": 0.0,
+        "8": 0.0,
+        "16": 625.0009651022175,
+        "32": 625.0009708468499,
+        "64": 625.0009722830071,
+        "128": 625.0009726420477,
+        "256": 625.0009727318022
+      },
+      "description": "Bilinear triangular ridge of height 10000 m; no source error or discontinuous sampler. All smaller power-of-two rules can miss the ridge identically."
+    },
+    {
+      "name": "one-source-node-ridge",
+      "source_cells_per_target": 64,
+      "values": {
+        "1": 9999.999999999964,
+        "2": 0.0,
+        "4": 0.0,
+        "8": 0.0,
+        "16": 0.0,
+        "32": 3.4694176134760503e-14,
+        "64": 156.2502448659574,
+        "128": 156.25024495571787,
+        "256": 156.2502449781571
+      },
+      "description": "Bilinear triangular ridge of height 10000 m; no source error or discontinuous sampler. All smaller power-of-two rules can miss the ridge identically."
+    },
+    {
+      "name": "one-source-node-ridge",
+      "source_cells_per_target": 128,
+      "values": {
+        "1": 9999.999999999929,
+        "2": 0.0,
+        "4": 0.0,
+        "8": 0.0,
+        "16": 0.0,
+        "32": 0.0,
+        "64": 2.7755600265868864e-13,
+        "128": 78.12512252273899,
+        "256": 78.12512253395872
+      },
+      "description": "Bilinear triangular ridge of height 10000 m; no source error or discontinuous sampler. All smaller power-of-two rules can miss the ridge identically."
+    }
+  ]
+}

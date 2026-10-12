@@ -1,0 +1,6 @@
+{
+  "baseline": "7954f2b71567021b207c9ddb28f3e2e1591d922c",
+  "checked_against_original_N2_pack_samples": 140,
+  "mismatches": [],
+  "maximum_quantization_difference_m": 0.49891558938270464
+}
