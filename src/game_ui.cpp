@@ -1536,6 +1536,12 @@ void Game::drawSettings(float x, float y, float w, float h) {
   const char* q[] = {"Low", "Medium", "High"};
   for (int i = 0; i < 3; i++) if (button(x + 250 * s + i * 100 * s, py, 92 * s, 32 * s, q[i], true, set.quality == i)) { set.quality = i; g_ren.quality = i; }
   py += rs;
+  if (g_ren.vrsAvailable) {   // (NVIDIA's variable-rate shading: RTX cards)
+    toggle("Foveated shading", set.foveate, "Edges first", "Off");
+    py -= 6 * s;
+    note(set.resMode == 1 ? fmt("Auto resolution softens the screen's edges before the centre%s", g_ren.foveation > 0.f ? fmt(" (now %.0f%%)", g_ren.foveation * 100.f).c_str() : "")
+                          : std::string("works with Auto resolution"));
+  }
   slider("Master volume", set.master, 0, 1, 0.05f, fmt("%.0f%%", set.master * 100));
   slider("Engine volume", set.engineVol, 0, 1.5f, 0.05f, fmt("%.0f%%", set.engineVol * 100));
   slider("Effects volume", set.sfxVol, 0, 1.5f, 0.05f, fmt("%.0f%%", set.sfxVol * 100));

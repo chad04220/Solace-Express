@@ -162,6 +162,8 @@ public:
   int matEnvScanned = 0;       // 0 or kEnvMatLayers optional 2K environment layers, separate from the base array
   bool anisoOff = false;           // (dbgOff 65536 in force: the material arrays' anisotropy set to 1)
   bool envMatCompressed = false;   // the 2K layers block-compressed (BC3), not RGBA8 (genMaterials)
+  GLuint texVrs = 0; int vrsTileW = 16, vrsTileH = 16, vrsW = 0, vrsH = 0, vrsBuiltRw = 0, vrsBuiltRh = 0; float vrsBuiltF = -1.f;
+  void initFoveation();
   int matEnvFallbackScanned = 0;  // genuine-colour environment-only 512 px layers for Low/fallback
   int dbgOff = 0;            // profiling: renderer features switched off (uDbg bits)
   // the analysis's cost probes, above the features' bits: one piece of the frame's work left out to time it (the picture
@@ -172,6 +174,17 @@ public:
   // numbers): above the probes, whose bits they shared in v3.49.1 - its roads row left the scenery out too, its towns
   // row the whole terrain, its detail row the airframe march
   static constexpr int kDbgAniso = 1 << 16, kDbgRoads = 1 << 17, kDbgTowns = 1 << 18, kDbgDetail = 1 << 19, kDbgRoadPaint = 1 << 20;
+  static constexpr int kDbgFoveaMax = 1 << 21;   // (the analysis: the strongest foveation forced, to time what it saves)
+  static constexpr int kDbgPrepassOn = 1 << 22;  // (the analysis: the ground's depth prepass switched on, to time it)
+  // Foveated shading (NV_shading_rate_image, on the cards that have it: NVIDIA RTX). The world's G-buffer - the
+  // scenery, the ground and the sea of the main view - is shaded at full rate round the screen's centre and once for
+  // 2 x 2 or 4 x 4 pixels further out, by `foveation`: 0 full rate everywhere, 1 the narrowest centre and the coarsest
+  // edges. Game's Auto resolution raises it before it lowers the render resolution. The aircraft, the cockpit and
+  // its displays are never coarsened (they are drawn in the objects pass)
+  bool vrsAvailable = false;
+  float foveation = 0.f;
+  bool beginFoveation();   // the rate image bound and on for the main view's world draws; false: full rate
+  void endFoveation();
   bool screenWindows = getenv("SCREENFEEDS") == nullptr;   // the research craft's displays are windows (no camera feeds but the bomb camera's; SCREENFEEDS=1 brings the cameras back)
   int bakeCount = 0;   // airframe meshes and hulls baked or loaded so far (the research terminal's warm-up waits for a frame that bakes nothing)
   // Read-only distributed bodies are preferred to the writable, driver-local cache.
@@ -582,7 +595,14 @@ private:
   bool compileTerrainMesh(const std::function<void()>& step = {});
   void initTerrainMesh();
   void selectTerrainChunks(const FrameParams& fp);
-  void drawTerrainMesh(const FrameParams& fp);
+  // 0: the ground and the sea. 1: the ground's depth alone, before the scenery (the prepass: what the hills hide fails
+  // the depth test before it is shaded). 2: after the prepass, the ground shaded where its depth went in, then the sea
+  void drawTerrainMesh(const FrameParams& fp, int mode = 0);
+  GLuint progTerrainDepth = 0; bool terrainDepthTried = false;
+  // the prepass is off by default: on the software renderer it cost more than the hidden scenery it saved (the
+  // terrain's vertices twice); the analysis times it on the player's card (kDbgPrepassOn). TERRPRE=1 forces it on
+  bool terrainPrepass = false;
+  bool terrainPrepassed = false;   // (drawEntities ran the prepass: rasterWorld shades the ground in mode 2)
   void rasterWorld(const FrameParams& fp);
   void rasterObjects(const FrameParams& fp);
   void rasterShadowProxy(const FrameParams& fp);

@@ -981,6 +981,7 @@ bool Renderer::init(int w, int h, const std::function<void(float, const std::str
   maxH = 0;
   for (size_t i = 0; i < g_world.hm.size(); i += 4) maxH = std::max(maxH, g_world.hm[i] + g_world.hm[i + 1] * 1.5f);
   maxH += 20;
+  initFoveation();   // (NV_shading_rate_image where the driver has it: renderer.h)
   ready("Preparing surface materials");
   genMaterials([&](float fraction, const std::string& stage) {
     if (progress) progress((completed + clampf(fraction, 0.f, .99f)) / 11.f, stage);
@@ -1097,6 +1098,74 @@ void Renderer::setRenderScale(float s) {
   renderScale = s;
   if (ok) { scaleDims(); depthValid = false; }   // (the targets stay: only the part drawn changes)
 }
+
+// ---------------------------------------------------------------- foveated shading (renderer.h)
+// The driver's tile (16 x 16 pixels on NVIDIA) gets one entry of the rate image: 0 full rate, 1 one shade for 2 x 2
+// pixels, 2 for 4 x 4. Rings round the render target's centre, their radius in half-diagonals (the corners at 1): full
+// rate inside R = 1.05 - 0.75 f, then 2 x 2, and from f = 0.5 on 4 x 4 beyond R + 0.3. At f = 1 a third of the way to
+// the corners stays sharp
+static uint8_t foveaRate(float r, float f) {
+  const float R = 1.05f - 0.75f * f;
+  return r < R ? 0 : (f < 0.5f || r < R + 0.3f) ? 1 : 2;
+}
+void Renderer::initFoveation() {
+  vrsAvailable = false;
+  if (getenv("SOLACE_NO_VRS") || !glGetIntegerv || !glGetStringi || !glBindShadingRateImageNV || !glShadingRateImagePaletteNV) return;
+  bool ext = false;
+  GLint ne = 0; glGetIntegerv(GL_NUM_EXTENSIONS, &ne);
+  for (GLint i = 0; i < ne && !ext; i++) { const GLubyte* e = glGetStringi(GL_EXTENSIONS, (GLuint)i); ext = e && !strcmp((const char*)e, "GL_NV_shading_rate_image"); }
+  for (int i = 0; i < 16 && glGetError() != 0; i++) {}
+  if (!ext) return;
+  GLint tw = 0, th = 0, pal = 0;
+  glGetIntegerv(GL_SHADING_RATE_IMAGE_TEXEL_WIDTH_NV, &tw); glGetIntegerv(GL_SHADING_RATE_IMAGE_TEXEL_HEIGHT_NV, &th);
+  glGetIntegerv(GL_SHADING_RATE_IMAGE_PALETTE_SIZE_NV, &pal);
+  if (glGetError() != 0 || tw <= 0 || th <= 0 || pal < 3) { for (int i = 0; i < 16 && glGetError() != 0; i++) {} return; }
+  const GLenum rates[3] = {GL_SHADING_RATE_1_INVOCATION_PER_PIXEL_NV, GL_SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV, GL_SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV};
+  glShadingRateImagePaletteNV(0, 0, 3, rates);
+  if (glGetError() != 0) { for (int i = 0; i < 16 && glGetError() != 0; i++) {} return; }
+  vrsTileW = tw; vrsTileH = th; vrsW = vrsH = 0; vrsBuiltF = -1.f;
+  vrsAvailable = true;
+}
+bool Renderer::beginFoveation() {
+  const float f = (dbgOff & kDbgFoveaMax) ? 1.f : std::clamp(foveation, 0.f, 1.f);
+  if (!vrsAvailable || f <= 0.f) return false;
+  const int tw = (rw + vrsTileW - 1) / vrsTileW, th = (rh + vrsTileH - 1) / vrsTileH;
+  if (f != vrsBuiltF || rw != vrsBuiltRw || rh != vrsBuiltRh) {
+    std::vector<uint8_t> img((size_t)tw * th);
+    const float cx = rw * 0.5f, cy = rh * 0.5f, hd = 0.5f * sqrtf((float)rw * rw + (float)rh * rh);
+    for (int j = 0; j < th; j++) for (int i = 0; i < tw; i++) {
+      const float x = std::min((i + 0.5f) * vrsTileW, (float)rw) - cx, y = std::min((j + 0.5f) * vrsTileH, (float)rh) - cy;
+      img[(size_t)j * tw + i] = foveaRate(sqrtf(x * x + y * y) / hd, f);
+    }
+    for (int i = 0; i < 16 && glGetError() != 0; i++) {}
+    if (tw != vrsW || th != vrsH) {   // (a new size: a new texture, immutable where the driver can - the extension may want it)
+      if (texVrs) glDeleteTextures(1, &texVrs);
+      glGenTextures(1, &texVrs);
+      glBindTexture(GL_TEXTURE_2D, texVrs);
+      if (glTexStorage2D) glTexStorage2D(GL_TEXTURE_2D, 1, GL_R8UI, tw, th);
+      else glTexImage2D(GL_TEXTURE_2D, 0, GL_R8UI, tw, th, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, nullptr);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      vrsW = tw; vrsH = th;
+    } else glBindTexture(GL_TEXTURE_2D, texVrs);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, tw, th, GL_RED_INTEGER, GL_UNSIGNED_BYTE, img.data());
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glBindShadingRateImageNV(texVrs);
+    glEnable(GL_SHADING_RATE_IMAGE_NV);
+    // a driver that refuses the image (or its format) gets no more tries: Auto resolution goes on without it
+    if (glGetError() != 0) {
+      glDisable(GL_SHADING_RATE_IMAGE_NV); for (int i = 0; i < 16 && glGetError() != 0; i++) {}
+      vrsAvailable = false; foveation = 0.f;
+      return false;
+    }
+    vrsBuiltF = f; vrsBuiltRw = rw; vrsBuiltRh = rh;
+    return true;
+  }
+  glBindShadingRateImageNV(texVrs);
+  glEnable(GL_SHADING_RATE_IMAGE_NV);
+  return true;
+}
+void Renderer::endFoveation() { glDisable(GL_SHADING_RATE_IMAGE_NV); }
 
 void Renderer::resize(int w, int h) {
   if (w < 16 || h < 16) return;

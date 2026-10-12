@@ -263,6 +263,31 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
     them streets and farm tracks, which have no markings.
   - `road_grade_gpu` checks the shader's road against every entry of its texel at 590,000 places: on the same road,
     across it to a centimetre, the same junctions.
+- **The v3.49.2 diagnostics:** the frame as v3.49.1's, within the noise. Two things learnt:
+  - The analysis's rows drifted: each was compared with one base taken first while a flying scene flew on (rjetc
+    slid from 11.7 to 10.0 ms over its rows), so only the scenes that hold still read true. Each row is now timed
+    base, off, off, base against its own base.
+  - Where it holds still (the night runway; the city at night), the buildings and trees cost 3.8 and 4.9 ms, the
+    ground's material 3.8 and 1.1 (anisotropic filtering 1.6 of the night's), the clouds 1.8 at night and 5.0 in the
+    storm; the roads and the towns' ground nothing.
+- **What the scenery's time is** (software renderer, the night runway and a town from 150 m and 30 m):
+  - Trees are nearly all of it at night: 26,000 of them in view (1.7 million triangles: 16,000 at the farthest
+    level, 2 to 7.8 km), against 379 buildings. Without them the scenery costs 65 ms of 440.
+  - Most of the night's trees are hidden behind the ground but shaded anyway: the scenery is drawn before the
+    terrain. Drawing the terrain first saves 20% of the night's world pass but loses as much over a town, where the
+    buildings hide the ground (shaded first, then covered); the far trees alone after the ground saves 8 to 18% at
+    night and costs 0 to 9% low over the town.
+  - A depth prepass of the ground (`drawTerrainMesh` mode 1; the scenery, then the ground shaded at LEQUAL, the
+    vertex shader's position invariant: the picture identical) costs the terrain's vertices twice: on the software
+    renderer, 40 to 120 ms more, and it did not cut the hidden trees there. It is built in but off
+    (`Renderer::terrainPrepass`; `TERRPRE=1`), its program built only when asked for; the analysis's "ground depth
+    first ON" row times it on the player's card.
+- **Foveated shading** (v3.49.3): on cards with NV_shading_rate_image, the main view's G-buffer of the world (the
+  scenery, the ground, the sea) is shaded in rings round the screen's centre, full rate inside, then once for 2 x 2
+  and 4 x 4 pixels (`Renderer::foveation`, 0 to 1). Auto resolution raises it in steps of an eighth every 0.4 s
+  before it lowers the render resolution, and lowers it last. The objects pass (the aircraft, the cockpit, its
+  displays) is never coarsened. It can't be seen on the software renderer: the analysis times it at its strongest
+  and saves each scene's picture with it on.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

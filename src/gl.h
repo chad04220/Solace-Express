@@ -74,6 +74,15 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT 0x83F3
 #define GL_NUM_EXTENSIONS 0x821D
 #define GL_EXTENSIONS 0x1F03
+// NV_shading_rate_image (variable-rate shading, NVIDIA RTX): Renderer's foveated shading
+#define GL_R8UI 0x8232
+#define GL_SHADING_RATE_IMAGE_NV 0x9563
+#define GL_SHADING_RATE_1_INVOCATION_PER_PIXEL_NV 0x9565
+#define GL_SHADING_RATE_1_INVOCATION_PER_2X2_PIXELS_NV 0x9568
+#define GL_SHADING_RATE_1_INVOCATION_PER_4X4_PIXELS_NV 0x956B
+#define GL_SHADING_RATE_IMAGE_TEXEL_WIDTH_NV 0x955C
+#define GL_SHADING_RATE_IMAGE_TEXEL_HEIGHT_NV 0x955D
+#define GL_SHADING_RATE_IMAGE_PALETTE_SIZE_NV 0x955E
 #define GL_RGBA8 0x8058
 #define GL_RGBA16F 0x881A
 #define GL_RGBA32F 0x8814
@@ -216,14 +225,17 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
   X(void, glDeleteProgram, (GLuint))
 
 // Optional entry points (ARB_get_program_binary, core in 4.1; the compressed arrays' upload and the extensions' list,
-// core in 3.0): null when the driver lacks them
+// core in 3.0; NV_shading_rate_image): null when the driver lacks them
 #define GL_OPT_FUNCS(X) \
   X(void, glGetIntegerv, (GLenum, GLint*)) \
   X(void, glProgramParameteri, (GLuint, GLenum, GLint)) \
   X(void, glGetProgramBinary, (GLuint, GLsizei, GLsizei*, GLenum*, void*)) \
   X(void, glProgramBinary, (GLuint, GLenum, const void*, GLsizei)) \
   X(void, glCompressedTexImage3D, (GLenum, GLint, GLenum, GLsizei, GLsizei, GLsizei, GLint, GLsizei, const void*)) \
-  X(const GLubyte*, glGetStringi, (GLenum, GLuint))
+  X(const GLubyte*, glGetStringi, (GLenum, GLuint)) \
+  X(void, glTexStorage2D, (GLenum, GLsizei, GLenum, GLsizei, GLsizei)) \
+  X(void, glBindShadingRateImageNV, (GLuint)) \
+  X(void, glShadingRateImagePaletteNV, (GLuint, GLuint, GLsizei, const GLenum*))
 
 // Function pointers live in a namespace so they never clash with the system GL library's exports.
 namespace glf {

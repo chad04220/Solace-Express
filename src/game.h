@@ -52,6 +52,7 @@ struct Settings {
   int radioStation = 0;
   float mouseSens = 1.0f;
   int resMode = 1;   // 0 native, 1 auto (holds the frame-rate target, the default), 2 85%, 3 75%, 4 67% (TAA upscales to the display)
+  bool foveate = true;   // Auto resolution sheds the screen's edges first (foveated shading: Renderer::foveation), where the card can
   int fpsTarget = 60;   // the frame-rate cap (30 / 60 / 90 / 120 / 144 / 240); 0: the monitor's refresh rate (vsync). 60 by default: a 240 Hz screen would otherwise ask for 240 fps
   float fov = 55;      // the outside views' vertical field of view (degrees); the cockpit's is 19 wider
   bool cockpitFocusZoom = true; // smoothly magnify a display as the view approaches its centre

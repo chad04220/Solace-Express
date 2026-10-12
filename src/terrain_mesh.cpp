@@ -276,14 +276,24 @@ void Renderer::selectTerrainChunks(const FrameParams& fp) {
 }
 
 // Draws the terrain and the sea into the bound G-buffer (depth-tested against what is there already)
-void Renderer::drawTerrainMesh(const FrameParams& fp) {
+void Renderer::drawTerrainMesh(const FrameParams& fp, int mode) {
   if (!progTerrain || !vaoTerrain) return;
-  selectTerrainChunks(fp);
+  const bool pre = mode == 1, after = mode == 2;
+  if (pre && !progTerrainDepth) {   // (built the first time the prepass is asked for: it is off by default, renderer.h)
+    if (terrainDepthTried) return;
+    terrainDepthTried = true;
+    std::string de; progTerrainDepth = linkProgramCached(terrainVSAssembly(""), terrainDepthFSAssembly(), de);
+    if (!progTerrainDepth) return;
+  }
+  if (!after) selectTerrainChunks(fp);   // (after the prepass: its chunks, already in the buffer)
   if (terrInst.empty() && terrInstCoarse.empty()) return;
-  glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
+  // the shading pass after a prepass: only where the ground's own depth went in and nothing nearer has since (the
+  // scenery); equal depth, the vertex shader's position being invariant
+  glEnable(GL_DEPTH_TEST); glDepthFunc(after ? GL_LEQUAL : GL_LESS); glDepthMask(after ? GL_FALSE : GL_TRUE);
   glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
+  if (pre) glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
   mat4 vp = viewProj(fp), view = viewMat(fp);
-  GLuint p = progTerrain;
+  GLuint p = pre ? progTerrainDepth : progTerrain;
   setRT(p, fp);
   glUniformMatrix4fv(U(p, "uVP"), 1, GL_FALSE, vp.m);
   glUniformMatrix4fv(U(p, "uPanoView"), 1, GL_FALSE, view.m);
@@ -294,9 +304,11 @@ void Renderer::drawTerrainMesh(const FrameParams& fp) {
   glBindVertexArray(vaoTerrain); glBindBuffer(GL_ARRAY_BUFFER, vboTerrainInst);
   // (one buffer: the full chunks, then the coarse ones - drawn from there with the coarse grid's indices)
   const size_t fineBytes = terrInst.size() * sizeof(float), coarseBytes = terrInstCoarse.size() * sizeof(float);
-  glBufferData(GL_ARRAY_BUFFER, fineBytes + coarseBytes, nullptr, GL_STREAM_DRAW);
-  if (fineBytes) glBufferSubData(GL_ARRAY_BUFFER, 0, fineBytes, terrInst.data());
-  if (coarseBytes) glBufferSubData(GL_ARRAY_BUFFER, fineBytes, coarseBytes, terrInstCoarse.data());
+  if (!after) {
+    glBufferData(GL_ARRAY_BUFFER, fineBytes + coarseBytes, nullptr, GL_STREAM_DRAW);
+    if (fineBytes) glBufferSubData(GL_ARRAY_BUFFER, 0, fineBytes, terrInst.data());
+    if (coarseBytes) glBufferSubData(GL_ARRAY_BUFFER, fineBytes, coarseBytes, terrInstCoarse.data());
+  }
   if (!(dbgOff & kProbeTerrain)) {
     if (terrChunks) glDrawElementsInstanced(GL_TRIANGLES, kChunkVerts, GL_UNSIGNED_SHORT, nullptr, terrChunks);
     if (terrChunksCoarse) {
@@ -306,6 +318,8 @@ void Renderer::drawTerrainMesh(const FrameParams& fp) {
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboTerrain); glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 16, (void*)0);
     }
   }
+  glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
+  if (pre) { glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); glBindVertexArray(0); glDisable(GL_DEPTH_TEST); return; }   // (the sea comes with the shading pass)
   // the sea
   if (progWater && vaoWater && fp.camPos.y > -0.5f) {
     p = progWater;

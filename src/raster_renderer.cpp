@@ -140,7 +140,10 @@ void Renderer::rasterWorld(const FrameParams& fp) {
   GLenum gb[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
   glDrawBuffers(4, gb);
   glViewport(0, 0, rw, rh);
-  drawTerrainMesh(fp);
+  const bool fovea = !feedPass && fp.pano <= 0.f && beginFoveation();   // (the main view's ground and sea foveated where the card can: renderer.h)
+  drawTerrainMesh(fp, terrainPrepassed ? 2 : 0);   // (its depth already in, before the scenery: drawEntities)
+  if (fovea) endFoveation();
+  terrainPrepassed = false;
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 

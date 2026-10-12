@@ -1,9 +1,16 @@
 ## What's new in v3.49.3
 
+### Foveated shading (NVIDIA RTX cards)
+- **When a scene is too heavy, the edges of the screen now give way before the centre.** On cards with NVIDIA's variable-rate shading (the RTX 20 series and later), Auto resolution first shades the ground and the scenery towards the screen's edges more coarsely: one shade for each 2×2 block of pixels, then each 4×4 block, in rings round the centre that widen as needed. The middle of the screen stays at full resolution. Only once the edges are as coarse as they go does the whole frame's resolution drop, as before. When the frame rate recovers, the full resolution comes back first, then the edges.
+- **The aircraft, the cockpit and its displays are never coarsened,** so the instruments stay sharp.
+- **A new setting, "Foveated shading"** (Settings, under Render quality), turns it off. It shows only on cards that support it; other cards keep Auto resolution exactly as it was.
+
 ### Diagnostics
 - **The analysis's per-feature rows now hold steady in moving scenes.** In v3.49.2 each row was compared with one base measurement taken at the start, while the aircraft flew on and the graphics card's clocks wandered. Over a scene the frame time drifted by up to 2 ms, so in the flying scenes every feature seemed to save (or cost) about the same. Each row is now measured base, off, off, base and compared with its own base, so a steady drift cancels out.
+- **The report says whether your card can do foveated shading,** times what it saves at its strongest ("foveated shading ON, max"), and saves a picture of each scene with it on (`analysis\<scene>_foveated.png`) beside the normal one, so you can see what it costs the picture.
+- **Where the buildings and trees' time goes:** in testing, trees were about 85% of it, and on the night runway most of those trees were hidden behind the ground but drawn anyway. A way to skip them is built in but switched off: it draws the ground's depth before the scenery, and on the software renderer it cost more than it saved. The new "ground depth first ON" row times it on your graphics card, to decide whether to switch it on.
 
-Please run `diagnostics.bat` on this version.
+Please run `diagnostics.bat` on this version, and play a little with Auto resolution on: the screen's edges should soften only when the frame rate drops.
 
 ## What's new in v3.49.2
 

@@ -836,6 +836,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     if (helperSkipped) fprintf(f, "Optional shader-cache preparation skipped unfinished work; main-context program loading completed independently.\n");
     fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits.load(), g_shaderCacheMisses.load());
     fprintf(f, "Ground photographs: %s\n", g_ren.matEnvScanned ? (g_ren.envMatCompressed ? "2K, block-compressed (BC3)" : "2K, uncompressed") : g_ren.matEnvFallbackScanned ? "512" : "none (procedural)");
+    fprintf(f, "Foveated shading: %s\n", g_ren.vrsAvailable ? "available (NVIDIA variable-rate shading)" : "not available on this card (Auto resolution lowers the whole frame)");
     fprintf(f, "Launch: shaders and islands %.1f s (islands %s), career %.1f s, renderer %.1f s, menu %.1f s, aircraft meshes %.1f s (%d built)\n",
             pace.tookOf("start"), g_world.fromCache ? "from the cache" : "generated", pace.tookOf("career"), pace.tookOf("renderer"), pace.tookOf("menu"), pace.tookOf("mesh"), g_ren.bakeBuilt);
     if (!g_ren.dispError.empty()) fprintf(f, "Display shader failed (cockpit screens disabled):\n%s\n", g_ren.dispError.c_str());
@@ -907,6 +908,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         {1024, "2K ground photographs (512)"}, {2048, "airfield surfaces"}, {Renderer::kDbgRoads, "roads on the ground"},
         {Renderer::kDbgRoadPaint, "roads' paint (lookup kept)"}, {Renderer::kDbgTowns, "towns' ground and fields"},
         {Renderer::kDbgDetail, "ground detail layers"}, {Renderer::kDbgAniso, "anisotropic filtering"},
+        {Renderer::kDbgFoveaMax, "foveated shading ON, max"},   // (switched on, not off: what it saves at its most)
+        {Renderer::kDbgPrepassOn, "ground depth first ON"},       // (the prepass switched on: what it saves, or costs)
       };
       struct Summary { std::string sc; double ms, rt, scale; std::string top; };
       std::vector<Summary> sums;
@@ -1021,9 +1024,15 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           std::string unused; double unusedSave = 0;
           rows("Work: frame time with it left out", "costs", kProbe, false, unused, unusedSave);
         }
-        // a picture of the scene for reference
+        // a picture of the scene for reference; and where the card has it, the same with foveated shading at its
+        // strongest, to see what it costs the picture
         frames(3); glFinish();
         g_ren.screenshotPNG((dir + "\\analysis\\" + sc + ".png").c_str());
+        if (g_ren.vrsAvailable) {
+          g_ren.dbgOff = Renderer::kDbgFoveaMax; frames(8); glFinish();
+          g_ren.screenshotPNG((dir + "\\analysis\\" + sc + "_foveated.png").c_str());
+          g_ren.dbgOff = 0;
+        }
         double rt = passSum[3];   // (the objects pass: the airframes)
         sums.push_back({sc, ms100, rt, ms67 > 0 ? ms100 / ms67 : 0, top});
         fflush(af);

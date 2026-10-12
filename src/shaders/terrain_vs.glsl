@@ -10,6 +10,7 @@ uniform mat4 uPanoView; uniform vec2 uPano;   // a panoramic camera feed: projec
 uniform float uSplit;                         // a chunk is split while the camera is within uSplit chunk sizes of it
 out vec3 vW; out vec3 vN;
 out vec3 vC;   // where it is drawn: on the round world (kPlanet)
+invariant gl_Position;   // (the depth prepass and the shading pass, two programs on this one shader, meet at exactly equal depth: Renderer::drawTerrainMesh)
 const int C = 32;
 int octAt(float d){ return d < 600.0 ? 11 : (d < 3000.0 ? 9 : (d < 12000.0 ? 7 : 5)); }   // (terrainNormal's thresholds)
 float hAt(vec2 xz, float d){ return terrainH(xz, octAt(d)); }

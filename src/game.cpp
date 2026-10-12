@@ -240,6 +240,7 @@ void Game::loadSettings() {
     else if (s == "renderer") {}   // (the old renderer choice: there is one renderer now)
     else if (s == "fov") set.fov = clampf(v, 40.f, 80.f);
     else if (s == "cockpitFocusZoom") set.cockpitFocusZoom = v != 0;
+    else if (s == "foveate") set.foveate = v != 0;
     else if (s == "headLook") set.headLook = v != 0;
     else if (s == "cbHud") set.cbHud = v != 0;
     else if (s == "uiScale") set.uiScale = clampf(v, 0.8f, 1.4f);
@@ -261,7 +262,7 @@ bool Game::saveSettings() {
   std::string t = fmt("quality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
   t += fmt("renderRes %d\nfpsTarget %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
-  t += fmt("cockpitFocusZoom %d\n", set.cockpitFocusZoom);
+  t += fmt("cockpitFocusZoom %d\nfoveate %d\n", set.cockpitFocusZoom, set.foveate);
   for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   for (const std::string& id : resDone) t += "rescard." + id + " 1\n";
   for (auto& tb : trialBest) for (size_t i = 0; i < tb.second.size(); i++) t += fmt("trial.%s.%d %f\n", tb.first.c_str(), (int)i, tb.second[i]);
@@ -635,7 +636,7 @@ void Game::init(bool buildWorld, const std::function<void(float, const std::stri
   report(4 + kNumAircraft, "Voice library indexed");
 }
 
-void Game::initHeadless() { headless = true; career.newGame(); set.resMode = 0; failuresArmed = false; }   // tools and tests render at the full resolution; nothing breaks unless the test breaks it
+void Game::initHeadless() { headless = true; career.newGame(); set.resMode = 0; failuresArmed = false; g_ren.foveation = 0.f; }   // tools and tests render at the full resolution; nothing breaks unless the test breaks it
 
 // ------------------------------------------------------------------ failures (C7)
 void Game::rollFailures(const Contract& c, int spec, Career::Source src) {
@@ -4000,17 +4001,28 @@ void Game::update(float dt) {
   if (!headless && g_ren.ok) {   // render resolution: native, a fixed scale, or adjusted to hold 60 fps on the GPU
     static const float fixedScale[5] = {1.f, 1.f, 0.85f, 0.75f, 0.67f};
     float want = fixedScale[std::clamp(set.resMode, 0, 4)];
+    // with foveated shading (Renderer::foveation, where the card has it) the screen's edges go coarser first, a step
+    // every 0.4 s, and the centre stays at the full resolution; only when they are as coarse as they go does the
+    // render resolution drop. Back the other way: the full resolution first, then the edges
+    const bool fovea = set.foveate && g_ren.vrsAvailable;
+    if (!fovea) g_ren.foveation = 0.f;
     if (set.resMode == 1) {
       autoScaleT += dt;
       float gms = g_ren.gpuMs;
       if (gms > 0 && autoScaleT > 0.4f) {
         // (the GPU budget of the frame-rate target, with 8% to spare; up again only with a quarter of it free)
         float budget = 1000.f / effectiveHz() * 0.92f;
-        if (gms > budget) { autoScale = std::max(0.5f, autoScale * std::sqrt(budget * 0.97f / gms)); autoScaleT = 0; }
-        else if (gms < budget * 0.75f && autoScale < 1.f) { autoScale = std::min(1.f, autoScale + 0.05f); autoScaleT = 0; }   // (up again only with a quarter of the budget free)
+        if (gms > budget) {
+          if (fovea && g_ren.foveation < 1.f) g_ren.foveation = std::min(1.f, g_ren.foveation + 0.125f);
+          else autoScale = std::max(0.5f, autoScale * std::sqrt(budget * 0.97f / gms));
+          autoScaleT = 0;
+        } else if (gms < budget * 0.75f) {   // (up again only with a quarter of the budget free)
+          if (autoScale < 1.f) { autoScale = std::min(1.f, autoScale + 0.05f); autoScaleT = 0; }
+          else if (g_ren.foveation > 0.f) { g_ren.foveation = std::max(0.f, g_ren.foveation - 0.125f); autoScaleT = 0; }
+        }
       }
       want = autoScale;
-    } else autoScale = 1.f;
+    } else { autoScale = 1.f; g_ren.foveation = 0.f; }
     want = floorf(want * 20.f + 0.5f) / 20.f;   // 5% steps: the targets are rebuilt only when it changes
     if (fabsf(g_ren.renderScale - want) > 1e-3f) g_ren.setRenderScale(want);
   }

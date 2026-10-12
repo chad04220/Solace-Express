@@ -560,6 +560,16 @@ void Renderer::drawEntities(const FrameParams& fp) {
     drawPlaneMeshDepth(fp, *earlyMesh, fp.plane.rot, fp.plane.pos, -1);
     glBindVertexArray(vaoEnt); glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
   }
+  // the ground's depth before the scenery (where switched on: renderer.h terrainPrepass): what a hill or a plateau's
+  // edge hides - trees beyond it, most of a runway view's scenery - fails the depth test before it is shaded. The
+  // ground is shaded after the scenery, only where it shows (rasterWorld, drawTerrainMesh mode 2)
+  static const bool forcePre = getenv("TERRPRE") != nullptr;
+  terrainPrepassed = false;
+  if ((terrainPrepass || forcePre || (dbgOff & kDbgPrepassOn)) && (progTerrainDepth || !terrainDepthTried)) {
+    drawTerrainMesh(fp, 1); terrainPrepassed = progTerrainDepth != 0;
+    glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE); glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
+    glBindVertexArray(vaoEnt); glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
+  }
   if (!draws[0].empty() || !bridgeView.empty()) {
     // near detail levels first, and buildings and rocks before trees: the big near occluders fill the depth buffer
     // early, so less of what lies behind them gets shaded
@@ -587,7 +597,10 @@ void Renderer::drawEntities(const FrameParams& fp) {
       glUniform1f(glGetUniformLocation(p, "uWet"), fp.wet);
       glUniform1f(glGetUniformLocation(p, "uSnow"), fp.snow);
     }
+    // (the main view's scenery foveated where the card can: renderer.h foveation; never a camera feed's)
+    const bool fovea = !feedPass && fp.pano <= 0.f && beginFoveation();
     if (!(dbgOff & kProbeScenery)) { issueBridges(progEnt[EC_BUILDING], bridgeView); issue(progEnt, draws[0]); }
+    if (fovea) endFoveation();
   }
   glDisable(GL_DEPTH_TEST);
   glBindVertexArray(0);

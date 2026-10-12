@@ -48,6 +48,7 @@ int main(int argc, char** argv) {
     put(dir, "hullbake_normals.frag", worldLibAssembly("#define PART_BAKE\n#define HULL_BAKE_NORMALS\n") + kHullBakeMain);
     put(dir, "displays.frag", ms + kDispMain);
     put(dir, "terrain.vert", terrainVSAssembly("")); put(dir, "terrain.frag", terrainFSAssembly(""));
+    put(dir, "terrain_depth.frag", terrainDepthFSAssembly());
     put(dir, "water.vert", waterVSAssembly("")); put(dir, "water.frag", waterFSAssembly(""));
     put(dir, "light.frag", lightFSAssembly(""));
     put(dir, "objects.frag", objectsFSAssembly(""));
