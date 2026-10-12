@@ -7,9 +7,9 @@
 #include "ui_identity.h"
 
 namespace {
-const vec3 R_ICE = svui::code, R_DIM = svui::codeDim, R_TEXT(.88f,.98f,.91f), R_RED(1.f,.43f,.30f);
-const vec3 R_AMBER(1.f, 0.72f, 0.26f), R_GREEN(0.4f, 1.f, 0.62f), R_VIOLET(0.8f, 0.5f, 1.f), R_INK = svui::codeInk;
-const vec3 R_TEAL(0.3f, 0.95f, 0.8f), R_EMBER(1.f, 0.58f, 0.22f);
+const vec3 R_ICE = svui::code, R_DIM = svui::codeDim, R_TEXT(.90f,.95f,1.f), R_RED(1.f,.43f,.30f);
+const vec3 R_AMBER(1.f, 0.72f, 0.26f), R_READY(.58f,.82f,1.f), R_VIOLET(.62f,.65f,1.f), R_INK = svui::codeInk;
+const vec3 R_SKY(.40f,.77f,1.f), R_COBALT(.44f,.57f,1.f);
 const char* kGlyphs = "0123456789ABCDEF#%&@$*+=<>/\\|";
 const float kPreviewControlsHeight = 56.f;
 
@@ -34,7 +34,7 @@ struct ResCraftInfo {
 // T/W static in full reheat at sea level with 70% fuel and the pilot, roll rate at full aileron at 200 m/s - it grows
 // with speed on conventional controls - and the time a full cell lasts in full reheat)
 const ResCraftInfo kResCraft[] = {
-  {kNightjar, "NG-XR10-N  //  BLK 0", "XR-10", "NIGHTJAR", R_TEAL, {0.36f, 0.35f, 0.92f}, "SUPERSONIC TWIN-JET DEMONSTRATOR",
+  {kNightjar, "NG-XR10-N  //  BLK 0", "XR-10", "NIGHTJAR", R_SKY, {0.36f, 0.35f, 0.92f}, "SUPERSONIC TWIN-JET DEMONSTRATOR",
    {{"CONFIGURATION", "Tapered low wing, conventional tail", -1}, {"PROPULSION", "2 x 30 kN rated, reheat", 0.15f},
     {"THRUST / WEIGHT", "1.8 : 1 static reheat", 0.30f}, {"TOP SPEED", "Mach 1.44 at 8 km", 0.36f},
     {"VECTORING", "None - conventional controls", 0.f}, {"ROLL RATE", "190 deg/s at 200 m/s", 0.48f},
@@ -42,7 +42,7 @@ const ResCraftInfo kResCraft[] = {
    12.f, -6.f, 6.f, 9.f, -4.f, 1.44f, 0.25f,
    {"Conventional controls: no FBW, no vectoring", "Flaps and gear as any jet; approach speed follows weight", "Fuel burns: a 1,300 kg cell, plan the sortie",
     "Long hard runways only", "T/W reference: sea level, 70% fuel + pilot"}, "XR10"},
-  {kMantis, "NG-XR20-M  //  BLK 2", "XR-20", "MANTIS", R_EMBER, {0.52f, 0.55f, 0.7f}, "FORWARD-SWEPT SYSTEMS DEMONSTRATOR",
+  {kMantis, "NG-XR20-M  //  BLK 2", "XR-20", "MANTIS", R_COBALT, {0.52f, 0.55f, 0.7f}, "FORWARD-SWEPT SYSTEMS DEMONSTRATOR",
    {{"CONFIGURATION", "Forward sweep, canards, twin fins", -1}, {"PROPULSION", "1 x 88 kN rated, reheat", 0.30f},
     {"THRUST / WEIGHT", "2.4 : 1 static reheat", 0.42f}, {"TOP SPEED", "Mach 2.06 at 8 km", 0.52f},
     {"SYSTEMS", "Single-seat live research cockpit", 0.5f}, {"ROLL RATE", "215 deg/s at 200 m/s", 0.54f},
@@ -110,7 +110,7 @@ void corners(float x, float y, float w, float h, float L, float t, vec3 c, float
 }
 // a panel with a cut corner, a hairline frame and a title tab
 void slab(float x, float y, float w, float h, float s, vec3 acc, float a) {
-  g_ren.rectGrad(x, y, w, h, vec3(.015f,.043f,.024f), svui::codeInk, 0.94f * a);
+  g_ren.rectGrad(x, y, w, h, svui::codePanel, svui::codeInk, 0.94f * a);
   g_ren.rectOutline(x, y, w, h, acc, 0.22f * a, 0, 1 * s);
   corners(x - 1 * s, y - 1 * s, w + 2 * s, h + 2 * s, 12 * s, 2 * s, acc, 0.85f * a);
   for (int i = 0; i < 3; i++) g_ren.rect(x + w - (14 + i * 7) * s, y + 5 * s, 4 * s, 2 * s, acc, 0.6f * a);
@@ -279,12 +279,12 @@ void Game::drawResearch(const FrameParams& fp) {
     auto stagePanel = [&](int k, const char* title, float t0, float t1, bool ok) {
       float x = gap + k * (pw + gap);
       float ap = A * smoothstepf(t0 - 0.2f, t0, T);
-      slab(x, py0, pw, ph, s, ok ? R_GREEN : R_ICE, ap);
-      tag(x + 14 * s, py0 + 12 * s, s, title, ok ? R_GREEN : R_ICE, ap);
-      g_ren.text(x + pw - 14 * s, py0 + 12 * s, 11.5f * s, ok ? "VERIFIED" : T >= t0 ? "SCANNING" : "STANDBY", ok ? R_GREEN : T >= t0 ? R_AMBER : R_DIM, ap * (ok || fmodf(aT, 0.5f) < 0.33f ? 1.f : 0.3f), 2, false);
+      slab(x, py0, pw, ph, s, ok ? R_READY : R_ICE, ap);
+      tag(x + 14 * s, py0 + 12 * s, s, title, ok ? R_READY : R_ICE, ap);
+      g_ren.text(x + pw - 14 * s, py0 + 12 * s, 11.5f * s, ok ? "VERIFIED" : T >= t0 ? "SCANNING" : "STANDBY", ok ? R_READY : T >= t0 ? R_AMBER : R_DIM, ap * (ok || fmodf(aT, 0.5f) < 0.33f ? 1.f : 0.3f), 2, false);
       float prog = clampf((T - t0) / (t1 - t0), 0, 1);
       g_ren.rect(x + 14 * s, py0 + ph - 18 * s, pw - 28 * s, 3 * s, R_ICE, 0.12f * ap);
-      g_ren.rect(x + 14 * s, py0 + ph - 18 * s, (pw - 28 * s) * prog, 3 * s, ok ? R_GREEN : R_ICE, 0.9f * ap);
+      g_ren.rect(x + 14 * s, py0 + ph - 18 * s, (pw - 28 * s) * prog, 3 * s, ok ? R_READY : R_ICE, 0.9f * ap);
       return x;
     };
     {
@@ -302,7 +302,7 @@ void Game::drawResearch(const FrameParams& fp) {
           float x2 = cx + cosf(th) * r * rx * 1.25f, y2 = cy + 0.15f * ry + sinf(th) * r * ry * (th > 3.1416f ? 1.35f : 0.9f);
           float ex = (x2 - cx) / rx, ey = (y2 - cy) / ry;
           bool in = ex * ex + ey * ey < 1.f;
-          if (in && have) { bool lit = y2 < bar; g_ren.line(px, py, x2, y2, 1.4f * s, lit ? (ok ? R_GREEN : R_ICE) : R_DIM, ap * (lit ? 0.85f : 0.22f)); }
+          if (in && have) { bool lit = y2 < bar; g_ren.line(px, py, x2, y2, 1.4f * s, lit ? (ok ? R_READY : R_ICE) : R_DIM, ap * (lit ? 0.85f : 0.22f)); }
           px = x2; py = y2; have = in;
         }
       }
@@ -320,7 +320,7 @@ void Game::drawResearch(const FrameParams& fp) {
       float tyy = py0 + ph * 0.8f;
       int mcount = std::min(23, (int)((T - t0) / (t1 - t0) * 23.f));
       g_ren.text(x + 16 * s, tyy, 12 * s, fmt("MINUTIAE      %02d / 23", std::max(0, mcount)), R_DIM, ap, 0, false);
-      g_ren.text(x + 16 * s, tyy + 18 * s, 12 * s, ok ? "RIDGE MATCH   99.981 %" : fmt("RIDGE MATCH   %06.3f %%", 40.f + 59.f * clampf((T - t0) / (t1 - t0), 0, 1) + rnd01((uint32_t)(aT * 30)) * 0.9f), ok ? R_GREEN : R_ICE, ap, 0, false);
+      g_ren.text(x + 16 * s, tyy + 18 * s, 12 * s, ok ? "RIDGE MATCH   99.981 %" : fmt("RIDGE MATCH   %06.3f %%", 40.f + 59.f * clampf((T - t0) / (t1 - t0), 0, 1) + rnd01((uint32_t)(aT * 30)) * 0.9f), ok ? R_READY : R_ICE, ap, 0, false);
     }
     // ---- 2: retina
     {
@@ -329,7 +329,7 @@ void Game::drawResearch(const FrameParams& fp) {
       float cx = x + pw * 0.5f, cy = py0 + ph * 0.43f, R = std::min(pw, ph) * 0.3f;
       float p = clampf((T - t0) / (t1 - t0), 0, 1);
       float pr = R * (0.36f - 0.12f * smoothstepf(0.2f, 0.6f, p));   // the pupil contracts in the scan light
-      vec3 ic = ok ? R_GREEN : R_ICE;
+      vec3 ic = ok ? R_READY : R_ICE;
       for (int i = 0; i < 140; i++) {   // iris fibres
         float th = i / 140.f * 6.2832f + rnd01(i) * 0.03f, r1 = R * (0.92f + 0.08f * rnd01(i + 300));
         g_ren.line(cx + cosf(th) * pr, cy + sinf(th) * pr, cx + cosf(th) * r1, cy + sinf(th) * r1, 1 * s, ic, ap * (0.15f + 0.35f * rnd01(i + 77)));
@@ -360,8 +360,8 @@ void Game::drawResearch(const FrameParams& fp) {
       g_ren.line(cx, cy - R * 1.5f, cx, cy - R * 1.15f, 1 * s, ic, ap); g_ren.line(cx, cy + R * 1.15f, cx, cy + R * 1.5f, 1 * s, ic, ap);
       float tyy = py0 + ph * 0.8f;
       std::string hsx; for (int i = 0; i < 3; i++) hsx += hexWord(hsh(i * 91 + (ok ? 7 : (int)(aT * 20))), 4) + " ";
-      g_ren.text(x + 16 * s, tyy, 12 * s, "IRIS CODE     " + hsx, ok ? R_GREEN : R_DIM, ap, 0, false);
-      g_ren.text(x + 16 * s, tyy + 18 * s, 12 * s, ok ? "HAMMING DIST  0.0031   MATCH" : fmt("HAMMING DIST  %.4f", 0.5f - 0.49f * p), ok ? R_GREEN : R_ICE, ap, 0, false);
+      g_ren.text(x + 16 * s, tyy, 12 * s, "IRIS CODE     " + hsx, ok ? R_READY : R_DIM, ap, 0, false);
+      g_ren.text(x + 16 * s, tyy + 18 * s, 12 * s, ok ? "HAMMING DIST  0.0031   MATCH" : fmt("HAMMING DIST  %.4f", 0.5f - 0.49f * p), ok ? R_READY : R_ICE, ap, 0, false);
     }
     // ---- 3: neural signature
     {
@@ -377,14 +377,14 @@ void Game::drawResearch(const FrameParams& fp) {
           float u = i / 90.f, ph2 = u * 18.f + aT * (3.f + tr), noise = (rnd01(i * 7 + tr * 1000 + (int)(aT * 12)) - 0.5f) * (1.f - p);
           float y = by + (sinf(ph2 * (1 + tr * 0.4f)) * 0.5f + sinf(ph2 * 2.7f + tr) * 0.3f + noise * 1.2f) * 12 * s;
           float xx = gx + u * gw;
-          g_ren.line(lxp, lyp, xx, y, 1.3f * s, ok ? R_GREEN : (tr == 3 ? R_AMBER : R_ICE), ap * 0.85f);
+          g_ren.line(lxp, lyp, xx, y, 1.3f * s, ok ? R_READY : (tr == 3 ? R_AMBER : R_ICE), ap * 0.85f);
           lxp = xx; lyp = y;
         }
         g_ren.text(gx, by - 30 * s, 10 * s, fmt("CH-%d  %s", tr + 1, tr == 3 ? "THETA" : tr == 2 ? "ALPHA" : tr == 1 ? "BETA" : "GAMMA"), R_DIM, ap, 0, false);
       }
       float tyy = py0 + ph * 0.8f;
       g_ren.text(x + 16 * s, tyy, 12 * s, fmt("HEART RATE    %d BPM", 64 + (int)(6 * sinf(aT * 2.f))), R_DIM, ap, 0, false);
-      g_ren.text(x + 16 * s, tyy + 18 * s, 12 * s, ok ? "NEURAL MATCH  CONFIRMED" : fmt("COHERENCE     %.2f", 0.2f + 0.79f * p), ok ? R_GREEN : R_ICE, ap, 0, false);
+      g_ren.text(x + 16 * s, tyy + 18 * s, 12 * s, ok ? "NEURAL MATCH  CONFIRMED" : fmt("COHERENCE     %.2f", 0.2f + 0.79f * p), ok ? R_READY : R_ICE, ap, 0, false);
     }
     // ---- the warm-up's bar, where the grant's banner comes: the scans' share done (the warm-up's, eased), what it is
     // on and how much of that is left; the ticks are where the fingerprint and the retina scans complete
@@ -410,12 +410,12 @@ void Game::drawResearch(const FrameParams& fp) {
       } else if (loadingShadowPending()) { what = "TERRAIN LIGHTING"; detail = "BAKING THE SITE'S TERRAIN SHADOW"; }
       else { what = "SYSTEMS CHECK"; detail = "VERIFYING THE SITE BEFORE ACCESS"; }
       const bool ready = !resWarm && p >= 1.f;
-      const vec3 c = ready ? R_GREEN : R_ICE;
+      const vec3 c = ready ? R_READY : R_ICE;
       const int percent = ready ? 100 : std::min(99, (int)(p * 100.f));   // (floored: 100% only when it is all done)
       g_ren.text(bx, by, 13 * s, fit("INITIALIZING  //  " + what + (ready || fmodf(aT, 0.6f) < 0.4f ? "" : " _"), bw - 80 * s, 13 * s), c, ab, 0, false);
       g_ren.text(bx + bw, by - 6 * s, 20 * s, fmt("%d%%", percent), c, ab, 2, false);
       g_ren.rect(bx, by + 24 * s, bw, 4 * s, R_ICE, 0.12f * ab, 2 * s);
-      if (p > 0.f) g_ren.rectGrad(bx, by + 24 * s, bw * p, 4 * s, ready ? R_GREEN : R_DIM, c, ab, 2 * s);
+      if (p > 0.f) g_ren.rectGrad(bx, by + 24 * s, bw * p, 4 * s, ready ? R_READY : R_DIM, c, ab, 2 * s);
       for (float tk : {1.75f, 2.9f}) g_ren.rect(bx + bw * (tk - kResScan0) / span, by + 31 * s, 1 * s, 4 * s, p * span + kResScan0 >= tk ? c : R_DIM, 0.6f * ab);
       g_ren.text(bx, by + 38 * s, 11.5f * s, fit(detail, bw, 11.5f * s), R_DIM, ab, 0, false);
       if(resWarm&&!resLoadTask.empty()&&resTaskUnits>0){
@@ -428,11 +428,11 @@ void Game::drawResearch(const FrameParams& fp) {
     if (T > 3.75f) {
       float g = smoothstepf(3.75f, 3.95f, T);
       float flash = std::max(0.f, 1.f - (T - 4.05f) * 4.f) * (T > 4.05f ? 1.f : 0.f);
-      g_ren.rect(0, 0, W, H, R_GREEN, 0.12f * flash * A);
+      g_ren.rect(0, 0, W, H, R_READY, 0.12f * flash * A);
       float by = py0 + ph + 26 * s;
       g_ren.rect(0, by - 6 * s, W, 64 * s, R_INK, 0.85f * g * A);
-      g_ren.rect(0, by - 6 * s, W, 1 * s, R_GREEN, 0.6f * g * A); g_ren.rect(0, by + 58 * s, W, 1 * s, R_GREEN, 0.6f * g * A);
-      g_ren.text(W * 0.5f, by + 2 * s, 30 * s, decrypt("ACCESS GRANTED  //  PROJECT NIGHTGLASS", T - 3.75f, 0.006f), R_GREEN, g * A, 1, false);
+      g_ren.rect(0, by - 6 * s, W, 1 * s, R_READY, 0.6f * g * A); g_ren.rect(0, by + 58 * s, W, 1 * s, R_READY, 0.6f * g * A);
+      g_ren.text(W * 0.5f, by + 2 * s, 30 * s, decrypt("ACCESS GRANTED  //  PROJECT NIGHTGLASS", T - 3.75f, 0.006f), R_READY, g * A, 1, false);
       g_ren.text(W * 0.5f, by + 38 * s, 12 * s, decrypt("SUBJECT VERIFIED  -  CLEARANCE OMEGA-BLACK  -  WELCOME BACK, CAPTAIN", T - 3.8f, 0.004f), R_TEXT, g * A, 1, false);
     }
     // shutters open into the terminal
@@ -455,7 +455,7 @@ void Game::drawResearch(const FrameParams& fp) {
     return c;
   };
   // ------------------------------------------------------------------ frame: tint, scanlines, top band
-  g_ren.rectGrad(0, 0, W, H, svui::codeInk, vec3(.004f,.012f,.008f), 0.35f * e);
+  g_ren.rectGrad(0, 0, W, H, svui::codeInk, vec3(.004f,.010f,.028f), 0.35f * e);
   // Code stays behind the opaque data rails and the live aircraft.
   svui::matrix(g_ren,0,46*s,W,H-46*s,realTime,.27f*e,set.menuMotion,L.cx,L.cy,(L.px1-L.px0)*.42f,(L.bot-L.top)*.31f);
   g_ren.rect(0, 0, L.px0 - 6 * s, H, R_INK, 0.94f * e); g_ren.rect(L.px1 + 6 * s, 0, W - L.px1 - 6 * s, H, R_INK, 0.94f * e);
@@ -545,9 +545,9 @@ void Game::drawResearch(const FrameParams& fp) {
       bool sel = resCard == idx, hov = hovered(x, y, w, rh);
       if (sel || hov) g_ren.rect(x, y, w, rh, ACC, (sel ? 0.18f : 0.08f) * e);
       if (sel) g_ren.rect(x, y, 2 * s, rh, ACC, e);
-      g_ren.text(x + 8 * s, y + rh * 0.5f - fs * 0.52f, fs, num, done ? R_GREEN : R_DIM, e, 0, false);
-      g_ren.text(x + 62 * s, y + rh * 0.5f - fs * 0.52f, fs, title, sel ? R_TEXT : done ? R_GREEN : ACC, e, 0, false);
-      if (done) g_ren.text(x + w - 8 * s, y + rh * 0.5f - fs * 0.52f, fs, "SIGNED", R_GREEN, e, 2, false);
+      g_ren.text(x + 8 * s, y + rh * 0.5f - fs * 0.52f, fs, num, done ? R_READY : R_DIM, e, 0, false);
+      g_ren.text(x + 62 * s, y + rh * 0.5f - fs * 0.52f, fs, title, sel ? R_TEXT : done ? R_READY : ACC, e, 0, false);
+      if (done) g_ren.text(x + w - 8 * s, y + rh * 0.5f - fs * 0.52f, fs, "SIGNED", R_READY, e, 2, false);
       if (click(x, y, w, rh, 0x7E5D0000u + (uint32_t)(idx + 1))) resCard = idx;
       y += rh;
     };

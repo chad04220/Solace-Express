@@ -232,7 +232,7 @@ struct GameTest {
       if(sc.find("helix")!=std::string::npos)g.realTime=43;
       const auto tick=sc.find("_t");if(tick!=std::string::npos)g.realTime=atof(sc.c_str()+tick+2);
       if(sc.find("reduced")!=std::string::npos)g.set.menuMotion=false;
-    } else if(sc.rfind("research",0)==0||sc=="menuT5")g.debugScene(sc);
+    } else if(sc.rfind("research",0)==0||sc=="menuT5")g.debugScene(sc=="research30"?"research":sc);
     if(sc.rfind("hangar",0)==0){g.screen=SCR_HUB;g.hubTab=TAB_HANGAR;g.selHangar=atoi(sc.c_str()+6);}
     if((sc.rfind("hangar",0)==0 || sc.rfind("freeflight",0)==0) &&
        (sc.find("rotated")!=std::string::npos || sc.find("zoomed")!=std::string::npos)) {
@@ -292,8 +292,8 @@ int main(int argc,char**argv){
   const float scale=argc>5?atof(argv[5]):1;const bool full=argc>6&&std::string(argv[6])=="scene";
 #ifdef UI_REVIEW_FLEET_ONLY
   {std::istringstream scenes(argv[1]);std::string sc;
-    while(std::getline(scenes,sc,',')){bool fleetHangar=sc.rfind("hangar",0)==0&&atoi(sc.c_str()+6)>=0&&atoi(sc.c_str()+6)<kAircraftCount;bool freeSetup=sc.rfind("freeflight",0)==0&&atoi(sc.c_str()+10)>=0&&isCareerAircraft(atoi(sc.c_str()+10));bool allowed=fleetHangar||freeSetup||sc=="research10"||sc=="research20"||sc=="menuT5";if(!full||!allowed){fprintf(stderr,"Fleet diagnostic supports career hangar, research10/20, or fixed menuT5 only in scene mode.\n");return 2;}}}
-  printf("DIAGNOSTIC: production startup programs; standard fleet-only scenes with pre-baked actual meshes and availability assertions. Not native Windows startup validation.\n");
+    while(std::getline(scenes,sc,',')){bool fleetHangar=sc.rfind("hangar",0)==0&&atoi(sc.c_str()+6)>=0&&atoi(sc.c_str()+6)<kAircraftCount;bool freeSetup=sc.rfind("freeflight",0)==0&&atoi(sc.c_str()+10)>=0&&isCareerAircraft(atoi(sc.c_str()+10));bool research=sc=="research10"||sc=="research20"||sc.rfind("research30",0)==0||sc.rfind("research40",0)==0;bool military=sc.rfind("military",0)==0&&sc.find("loading")==std::string::npos&&sc.find("pause")==std::string::npos&&sc.find("debrief")==std::string::npos;bool allowed=fleetHangar||freeSetup||research||military||sc=="menuT5";if(!full||!allowed){fprintf(stderr,"Preview diagnostic supports hangar, free flight, Research, Military and fixed menuT5 scenes in scene mode.\n");return 2;}}}
+  printf("DIAGNOSTIC: production startup and rendering programs; pre-baked actual selected meshes and availability assertions. UI_VERIFY_PREVIEWS also checks actual GPU aircraft pixels and classified outline privacy. Not native Windows startup validation.\n");
 #endif
   std::filesystem::create_directories(argv[2]);
   if(!initGL(W,H)){puts("surfaceless EGL init failed");return 1;}

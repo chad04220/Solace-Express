@@ -3251,8 +3251,8 @@ void Game::militaryPreviewCamera(FrameParams& fp) {
   fp.camPos=C; fp.camBack=-look; fp.camRight=normalize(cross(look,vec3(0,1,0))); fp.camUp=cross(fp.camRight,look);
   fp.vignette=.45f; fp.prefetchOn=true; fp.prefetchPos=demo.pos;
   fp.trafficN=0; fp.ufoOn=false; fp.feedRig=fp.dispMode=0;
-  // Reuse the hangar's material-independent silhouette pass. Only shape and a
-  // soft rim survive; registrations, paint, cockpit screens and effects cannot leak.
+  // Reuse the hangar's geometry-only outline. Registrations, paint, cockpit
+  // screens and effects cannot leak into a classified preview.
   // FrameParams is rebuilt each frame, so an unlocked selection immediately returns
   // to its normal outdoor aircraft render without retaining classified materials.
   if (classified) {
@@ -3269,7 +3269,7 @@ void Game::militaryPreviewCamera(FrameParams& fp) {
     std::fill(std::begin(fp.plane.vapor),std::end(fp.plane.vapor),0.f);
     std::memset(fp.plane.wr,0,sizeof(fp.plane.wr));
     // The terminal's olive glass is darker than the civilian hangar overlay.
-    // Lift only this material-free silhouette so its rim stays discernible there.
+    // Lift only this material-free outline so it stays discernible there.
     fp.exposure=3.f; fp.vignette=.25f;
   }
 }
@@ -3281,10 +3281,12 @@ void Game::militaryLoadingCamera(FrameParams& fp) {
   fillPlaneVisual(fp.plane,plane,propAngle,false);
   fp.dispMode=fp.feedRig=0; fp.fovY=32.f*DEG;
   const float W=std::max(g_ren.W,1), H=std::max(g_ren.H,1), th=tanf(fp.fovY*.5f);
+  const LoadingLayout L=loadingLayout(W,H);
   const float D=std::max(sp.span,sp.fusLen)*2.7f;
   const vec3 P=plane.pos, C=P+plane.right()*(D*.7f)+plane.forward()*(D*.65f)+vec3(0,D*.3f,0);
   const vec3 f=normalize(P-C), r=normalize(cross(f,vec3(0,1,0))), u=cross(r,f);
-  const vec3 aim=P-r*(.1f*D*th*W/H)-u*(.26f*D*th);
+  const float centerY=(L.artTop+L.artBottom)*.5f, ny=(H*.5f-centerY)/(H*.5f);
+  const vec3 aim=P-r*(.1f*D*th*W/H)-u*(ny*D*th);
   const vec3 look=normalize(aim-C);
   fp.camPos=C; fp.camBack=-look; fp.camRight=normalize(cross(look,vec3(0,1,0))); fp.camUp=cross(fp.camRight,look);
   fp.prefetchOn=true; fp.prefetchPos=plane.pos; fp.vignette=.35f;

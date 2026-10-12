@@ -1,6 +1,6 @@
 # Somnium Volandi — UI and loading rebrand
 
-The game now presents itself as **Somnium Volandi** (“the dream of flight”). Civilian screens share a midnight-blue, platinum and brass identity; NIGHTGLASS Research has moving emerald code; Military Career uses matte field instruments and amber deployment controls. Startup and pre-flight loading explain the work behind their progress bars.
+The game now presents itself as **Somnium Volandi** (“the dream of flight”). Civilian screens share a midnight-blue, platinum and brass identity; NIGHTGLASS Research has moving electric-blue code; Military Career uses matte field instruments and amber deployment controls. Startup and pre-flight loading explain the work behind their progress bars.
 
 This implementation is on `codex/somnium-volandi-ui-rebrand-20261012`, based on the active default branch `claude/compassionate-davinci-4cfo20` at `a6cb4b7409442da824df1bf0339fb9e06e8bee94` (v3.49.2 diagnostics update). It is prepared for Claude's review and integration. No merge or release deployment is part of this handoff.
 
@@ -10,9 +10,9 @@ This implementation is on `codex/somnium-volandi-ui-rebrand-20261012`, based on 
 | --- | --- | --- |
 | Startup | Wing-and-horizon icon, two-line title, navigation chart | Current operation, task bar, subsystem checklist and overall progress |
 | Main menu and civilian hub | Midnight blue, platinum text, brass selection | Existing career, free flight, hangar, airline, logbook, settings and controls navigation |
-| Research | Emerald on deep green-black, terminal typography | Falling code and crossing packets; periodic glyph face, swept wing and helix; opaque data rails and a quiet region around the live aircraft |
+| Research | Electric blue on deep blue-black, terminal typography | Falling code and crossing packets; periodic glyph face, swept wing and helix; opaque data rails and a quiet region around the live aircraft |
 | Military Career | Charcoal/olive metal, edge wear, recessed fasteners | Existing mission register, saved service metrics, briefing, equipment, preview controls and clear amber deployment action |
-| Flight preparation | Context-specific brass, emerald or field amber | Scene, scenery, terrain-lighting and readiness stage bars; remaining chunks, rendered frames and elapsed time |
+| Flight preparation | Context-specific brass, electric blue or field amber | Scene, scenery, terrain-lighting and readiness stage bars; remaining chunks, rendered frames and elapsed time |
 
 `src/ui_identity.h` owns the brand colours, vector drawing helpers, field surfaces and code effect. The effect uses the game's existing glyph atlas. Fixed character-cell positions preserve the designs despite the atlas's proportional font. The work is bounded to 76 columns × 40 rows, and has no extra shaders, textures, simulation entities or expanding particle buffers.
 
@@ -37,6 +37,8 @@ The intro reads the tracker from its independent context and draws the actual co
 
 Research warm-up also shows measured mesh-phase/batch activity. Its overall bar reads `resWork`; the decorative biometric sequence can ease toward that work without changing the loading percentage. The terminal still waits for the existing scenery/bake/lighting readiness gate.
 
+A shallow bottom strip preserves the mission, departure/route, aircraft, weather, all four stage bars and elapsed/work detail. Its shared layout leaves the central aircraft image open; the native military fallback camera targets that same clear region. Classified Hangar and Military previews use a screen-space outline derived from the actual aircraft G-buffer, with an ink interior. No paint, materials, cockpit screens or emissive effects are exposed. Changing aircraft also clears the previous model’s temporal history in outdoor Research/Military previews, preventing the previous airframe from lingering in the new view.
+
 Pre-flight progress exposes the existing scene work as four stages: 10% initial rendered setup, 65% observed scenery completion, 15% terrain-lighting readiness and 10% verification. A completed launch still requires **two distinct stable rendered frames**. Repeated updates without a render cannot open the flight. Optional absent terrain-shadow programs still cannot deadlock readiness. Percentages below completion are floored and capped at 99%; 100% belongs to readiness.
 
 ## Build and integration
@@ -47,11 +49,11 @@ Existing `%APPDATA%\SolaceExpress` saves/settings/radio data and `%LOCALAPPDATA%
 
 The conservative aircraft provenance contract fingerprints several renderer/mesh files touched by loading observations. **Use the normal matching-source aircraft producer and packaging workflow.** Do not carry forward an old mesh manifest or weaken provenance checks to avoid regeneration. The instrumentation does not alter geometry calculations, but the current source manifest must still match the packaged assets.
 
-One review-tool repair aligns `prepare_ui_hangar_adapter.py` with the base's already-renamed `fpFlat` argument: its assertions are inserted after the production flat-to-round frame conversion. The adapter remains test-only. Its capture diagnostic was corrected to describe the startup programs it actually builds.
+One review-tool repair aligns `prepare_ui_hangar_adapter.py` with the base's already-renamed `fpFlat` argument: its assertions are inserted after the production flat-to-round frame conversion. The adapter remains test-only and builds all production startup programs. It now supports the full roster, pre-bakes the real selected mesh, and can assert that actual aircraft pixels exist in the G-buffer and that classified interiors remain hidden.
 
 ## Visual review
 
-[Preview gallery and validation](somnium-volandi-review/README.md) contains the new icon, startup/ready screens, real 3D menu/Hangar/Research/Military captures and explicit UI-only layouts for the XR-40 terminal and compact views. The isolated code-field captures show the face, wing and helix at useful points in the animation cycle.
+[Preview gallery and validation](somnium-volandi-review/README.md) contains the new icon, startup/ready screens, real 3D menu/Hangar/Research/Military captures and actual aircraft previews throughout the full roster, plus explicit UI-only compact layouts. The isolated code-field captures show the face, wing and helix at useful points in the animation cycle.
 
 UI-only loading screenshots use deterministic tracker/scene fixtures to exercise layout. They are not traces of loading a particular PC. Live 3D captures use the production renderer on Mesa llvmpipe; the fleet adapter adds preparation/availability assertions and is identified in the logs.
 

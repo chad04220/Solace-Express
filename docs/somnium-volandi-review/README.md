@@ -4,17 +4,38 @@
 
 ![Rebrand overview](previews/Overview.jpg)
 
-The main menu, Hangar, Research XR-10 and Military Career XR-10 images below render the actual game scene. The startup/loading and XR-40 layouts render the production UI against deterministic review fixtures. The code motifs are the isolated native ambient effect, shown without the aircraft-protection fade. These distinctions are intentional; none of the images is a generated concept mockup.
+The main menu, Hangar, all four Research airframes and Military aircraft images below render the actual game scene. The startup/loading images render the production UI against explicit review states. The XR-40 and compact Research/Military files retain their earlier Layout filenames, but now include the actual aircraft render. The code motifs are the isolated native ambient effect, shown without the aircraft-protection fade. These distinctions are intentional; none of the images is a generated concept mockup.
 
 | Capture | View |
 | --- | --- |
 | Startup and completed state | [Startup](previews/Startup.png), [Ready](previews/Startup-Ready.png) |
 | Main menu and showroom | [Main menu, live 3D](previews/Main-Menu.png), [Hangar, live 3D](previews/Hangar.png) |
-| Research | [XR-10, live 3D](previews/Research.png), [XR-40 layout](previews/Research-XR40-Layout.png), [Access/loading layout](previews/Research-Boot-Layout.png) |
-| Military Career | [XR-10, live 3D](previews/Military-Career.png), [XR-40 layout](previews/Military-XR40-Layout.png), [Loading layout](previews/Military-Loading-Layout.png) |
+| Research | [XR-10, live 3D](previews/Research.png), [XR-40, live 3D](previews/Research-XR40-Layout.png), [Access/loading layout](previews/Research-Boot-Layout.png) |
+| Military Career | [XR-10, live 3D](previews/Military-Career.png), [XR-40, live 3D](previews/Military-XR40-Layout.png), [Loading layout](previews/Military-Loading-Layout.png) |
 | Civilian preparation | [Loading](previews/Flight-Loading-Layout.png), [Ready to fly](previews/Flight-Ready-Layout.png) |
 | Compact window | [Startup](previews/Compact-Startup.png), [Research](previews/Compact-Research-Layout.png), [Military Career](previews/Compact-Military-Layout.png) |
 | Ambient code | [Face](previews/Code-Face.png), [Swept wing](previews/Code-Wing.png), [Helix](previews/Code-Helix.png) |
+
+## Blue Research and aircraft visibility update
+
+Research now uses electric blue, ice-blue highlights and deep blue-black surfaces throughout its terminal, access sequence, code motifs and flight preparation. Military retains its olive/charcoal/amber identity. Classified aircraft show a clear outline of their real rendered geometry with all material details hidden. Model changes clear temporal history in indoor and outdoor previews.
+
+Flight-loading details occupy a shallow bottom strip rather than covering the aircraft photograph. It preserves departure/route, aircraft, weather, four readiness bars, current work, percentage and elapsed/counter detail. Minimum font sizes keep the compact strip readable. The native fallback camera uses the same unobstructed image region.
+
+[All 15 aircraft previews](previews/All-Aircraft-Previews.jpg) · [52 native preview states / 104 verified frames](native-preview-validation.json) · [Render log](logs/blue-native-preview-render.log) · [Compact render log](logs/blue-native-compact-render.log)
+
+| Additional capture | View |
+| --- | --- |
+| Research native aircraft | [XR-20](previews/Research-XR20.png), [XR-30](previews/Research-XR30.png), [XR-40](previews/Research-XR40-Layout.png) |
+| Classified military outlines | [XR-20](previews/Military-Classified-XR20.png), [XR-40](previews/Military-Classified-XR40.png) |
+| Loading image visibility | [Wraith loading](previews/Military-Loading-XR40.png), [Compact loading](previews/Compact-Military-Loading.png) |
+| Blue code animation | [Animated face reveal](previews/Code-Motion.gif) |
+
+All 15 Hangar previews are in [previews/airframes](previews/airframes). Native render checks cover 15 Hangar entries, 11 Free Flight entries, all four Research airframes, and the nine Military assignments in fresh/locked and unlocked states at 1280×720. Four additional 800×600/140% states cover classified Hangar, Research, unlocked Military and classified Military. Every frame has actual aircraft G-buffer pixels. Classified frames also require visible outline pixels and a hidden interior before the UI is drawn. The diagnostic pre-bakes the selected production mesh; it is not a cold-start benchmark.
+
+A further 16 rendered frames checked aircraft changes across the four Research models and locked/unlocked XR-20/XR-40 Military assignments after temporal-history reset was corrected. [Transition render log](logs/blue-preview-transitions.log).
+
+The native Release build and Windows x64 cross-build passed. Loading progress, gameplay, preview input, catalog and geometry checks passed. Additional regression checks project the entire assigned loading aircraft between the header and strip for all nine missions at five viewport sizes. The 800×600/140% interaction batch and reduced-motion equality were checked after the blue-theme changes.
 
 ## Validation
 

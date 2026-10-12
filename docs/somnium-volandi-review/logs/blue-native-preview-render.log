@@ -1,0 +1,209 @@
+DIAGNOSTIC: production startup and rendering programs; pre-baked actual selected meshes and availability assertions. UI_VERIFY_PREVIEWS also checks actual GPU aircraft pixels and classified outline privacy. Not native Windows startup validation.
+GL: llvmpipe (LLVM 20.1.2, 256 bits); 1280x720; UI scale 1.00; actual full scene
+INIT 9.1% Allocating geometry buffers
+INIT 18.2% Uploading terrain textures
+INIT 27.3% Uploading world data
+INIT 36.4% Preparing surface materials
+INIT 40.5% Preparing photographed environment materials
+INIT 40.5% Decoding 512 px grass
+INIT 40.7% Decoding 512 px asphalt
+INIT 40.9% Decoding 512 px concrete
+INIT 41.1% Decoding 512 px brick
+INIT 41.3% Decoding 512 px plaster
+INIT 41.6% Decoding 512 px tiles
+INIT 41.8% Decoding 512 px bark
+INIT 42.0% Uploading photographed environment materials
+INIT 42.3% Photographed environment materials ready
+INIT 42.3% Decoding 2K grass
+INIT 42.6% Decoding 2K asphalt
+INIT 42.9% Decoding 2K concrete
+INIT 43.3% Decoding 2K brick
+INIT 43.6% Decoding 2K plaster
+INIT 44.0% Decoding 2K tiles
+INIT 44.3% Decoding 2K bark
+INIT 44.6% Uploading photographed environment materials
+INIT 45.4% Photographed environment materials ready
+INIT 45.5% Preparing cloud textures
+INIT 54.5% Preparing ocean spectrum
+INIT 63.6% Preparing navigation map
+INIT 72.7% Preparing scenery meshes
+INIT 81.8% Preparing terrain geometry
+INIT 90.9% Allocating render targets
+INIT 100.0% Renderer ready
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=5783 outline_pixels=0 hidden_pixels=0 bounds=475,381,747,489
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=5775 outline_pixels=0 hidden_pixels=0 bounds=475,381,746,488
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar0.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=1 classified=0 aircraft_pixels=5304 outline_pixels=0 hidden_pixels=0 bounds=472,375,742,490
+PREVIEW VERIFIED model=1 classified=0 aircraft_pixels=5314 outline_pixels=0 hidden_pixels=0 bounds=471,375,742,490
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar1.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=2 classified=0 aircraft_pixels=3995 outline_pixels=0 hidden_pixels=0 bounds=473,396,745,465
+PREVIEW VERIFIED model=2 classified=0 aircraft_pixels=3979 outline_pixels=0 hidden_pixels=0 bounds=472,396,745,465
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar2.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=3 classified=0 aircraft_pixels=6309 outline_pixels=0 hidden_pixels=0 bounds=470,377,749,488
+PREVIEW VERIFIED model=3 classified=0 aircraft_pixels=6318 outline_pixels=0 hidden_pixels=0 bounds=469,376,748,487
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar3.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=4 classified=0 aircraft_pixels=5365 outline_pixels=0 hidden_pixels=0 bounds=472,380,748,483
+PREVIEW VERIFIED model=4 classified=0 aircraft_pixels=5354 outline_pixels=0 hidden_pixels=0 bounds=472,380,748,483
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar4.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=5 classified=0 aircraft_pixels=5622 outline_pixels=0 hidden_pixels=0 bounds=471,369,731,483
+PREVIEW VERIFIED model=5 classified=0 aircraft_pixels=5611 outline_pixels=0 hidden_pixels=0 bounds=470,369,730,483
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar5.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=6 classified=0 aircraft_pixels=6284 outline_pixels=0 hidden_pixels=0 bounds=465,369,719,494
+PREVIEW VERIFIED model=6 classified=0 aircraft_pixels=6293 outline_pixels=0 hidden_pixels=0 bounds=465,369,718,494
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar6.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=7 classified=0 aircraft_pixels=5729 outline_pixels=0 hidden_pixels=0 bounds=469,379,729,488
+PREVIEW VERIFIED model=7 classified=0 aircraft_pixels=5715 outline_pixels=0 hidden_pixels=0 bounds=468,379,729,488
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar7.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=8 classified=0 aircraft_pixels=7020 outline_pixels=0 hidden_pixels=0 bounds=464,374,725,503
+PREVIEW VERIFIED model=8 classified=0 aircraft_pixels=7049 outline_pixels=0 hidden_pixels=0 bounds=463,373,725,503
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar8.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=9 classified=1 aircraft_pixels=6173 outline_pixels=2182 hidden_pixels=3991 bounds=471,374,736,490
+PREVIEW VERIFIED model=9 classified=1 aircraft_pixels=6158 outline_pixels=2178 hidden_pixels=3980 bounds=471,375,736,490
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar9.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=10 classified=1 aircraft_pixels=5914 outline_pixels=1561 hidden_pixels=4353 bounds=508,380,691,496
+PREVIEW VERIFIED model=10 classified=1 aircraft_pixels=5897 outline_pixels=1546 hidden_pixels=4351 bounds=508,381,690,497
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar10.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=11 classified=1 aircraft_pixels=5852 outline_pixels=1831 hidden_pixels=4021 bounds=501,391,729,503
+PREVIEW VERIFIED model=11 classified=1 aircraft_pixels=5860 outline_pixels=1831 hidden_pixels=4029 bounds=500,390,728,502
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar11.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=7593 outline_pixels=1800 hidden_pixels=5793 bounds=500,383,692,499
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=7577 outline_pixels=1794 hidden_pixels=5783 bounds=499,384,691,499
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar12.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=13 classified=0 aircraft_pixels=5811 outline_pixels=0 hidden_pixels=0 bounds=469,374,741,490
+PREVIEW VERIFIED model=13 classified=0 aircraft_pixels=5816 outline_pixels=0 hidden_pixels=0 bounds=469,375,741,490
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar13.png
+DIAGNOSTIC pre-baking selected production mesh
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=5341 outline_pixels=0 hidden_pixels=0 bounds=475,373,701,483
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=5342 outline_pixels=0 hidden_pixels=0 bounds=474,372,700,483
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/hangar14.png
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=5784 outline_pixels=0 hidden_pixels=0 bounds=476,381,747,489
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=5789 outline_pixels=0 hidden_pixels=0 bounds=475,381,747,489
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/freeflight0.png
+PREVIEW VERIFIED model=1 classified=0 aircraft_pixels=5321 outline_pixels=0 hidden_pixels=0 bounds=472,375,742,490
+PREVIEW VERIFIED model=1 classified=0 aircraft_pixels=5310 outline_pixels=0 hidden_pixels=0 bounds=471,375,742,490
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/freeflight1.png
+PREVIEW VERIFIED model=2 classified=0 aircraft_pixels=3989 outline_pixels=0 hidden_pixels=0 bounds=472,396,746,465
+PREVIEW VERIFIED model=2 classified=0 aircraft_pixels=4000 outline_pixels=0 hidden_pixels=0 bounds=472,396,745,465
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/freeflight2.png
+PREVIEW VERIFIED model=3 classified=0 aircraft_pixels=6319 outline_pixels=0 hidden_pixels=0 bounds=470,377,748,488
+PREVIEW VERIFIED model=3 classified=0 aircraft_pixels=6303 outline_pixels=0 hidden_pixels=0 bounds=469,377,748,488
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/freeflight3.png
+PREVIEW VERIFIED model=4 classified=0 aircraft_pixels=5359 outline_pixels=0 hidden_pixels=0 bounds=472,380,749,483
+PREVIEW VERIFIED model=4 classified=0 aircraft_pixels=5361 outline_pixels=0 hidden_pixels=0 bounds=472,379,748,482
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/freeflight4.png
+PREVIEW VERIFIED model=5 classified=0 aircraft_pixels=5617 outline_pixels=0 hidden_pixels=0 bounds=471,369,730,483
+PREVIEW VERIFIED model=5 classified=0 aircraft_pixels=5625 outline_pixels=0 hidden_pixels=0 bounds=470,369,730,483
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/freeflight5.png
+PREVIEW VERIFIED model=6 classified=0 aircraft_pixels=6299 outline_pixels=0 hidden_pixels=0 bounds=466,369,719,493
+PREVIEW VERIFIED model=6 classified=0 aircraft_pixels=6310 outline_pixels=0 hidden_pixels=0 bounds=465,369,719,494
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/freeflight6.png
+PREVIEW VERIFIED model=7 classified=0 aircraft_pixels=5713 outline_pixels=0 hidden_pixels=0 bounds=469,379,729,488
+PREVIEW VERIFIED model=7 classified=0 aircraft_pixels=5727 outline_pixels=0 hidden_pixels=0 bounds=468,379,729,487
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/freeflight7.png
+PREVIEW VERIFIED model=8 classified=0 aircraft_pixels=7037 outline_pixels=0 hidden_pixels=0 bounds=464,374,726,503
+PREVIEW VERIFIED model=8 classified=0 aircraft_pixels=7022 outline_pixels=0 hidden_pixels=0 bounds=463,374,725,503
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/freeflight8.png
+PREVIEW VERIFIED model=13 classified=0 aircraft_pixels=5810 outline_pixels=0 hidden_pixels=0 bounds=469,375,741,490
+PREVIEW VERIFIED model=13 classified=0 aircraft_pixels=5810 outline_pixels=0 hidden_pixels=0 bounds=469,374,741,490
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/freeflight13.png
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=5348 outline_pixels=0 hidden_pixels=0 bounds=475,372,701,483
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=5334 outline_pixels=0 hidden_pixels=0 bounds=475,373,700,483
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/freeflight14.png
+PREVIEW VERIFIED model=9 classified=0 aircraft_pixels=16086 outline_pixels=0 hidden_pixels=0 bounds=376,242,796,336
+PREVIEW VERIFIED model=9 classified=0 aircraft_pixels=16250 outline_pixels=0 hidden_pixels=0 bounds=377,242,796,335
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/research10.png
+PREVIEW VERIFIED model=11 classified=0 aircraft_pixels=17294 outline_pixels=0 hidden_pixels=0 bounds=396,254,771,359
+PREVIEW VERIFIED model=11 classified=0 aircraft_pixels=17416 outline_pixels=0 hidden_pixels=0 bounds=397,253,773,357
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/research20.png
+PREVIEW VERIFIED model=10 classified=0 aircraft_pixels=18372 outline_pixels=0 hidden_pixels=0 bounds=456,256,801,356
+PREVIEW VERIFIED model=10 classified=0 aircraft_pixels=18462 outline_pixels=0 hidden_pixels=0 bounds=453,256,801,355
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/research30.png
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=18577 outline_pixels=0 hidden_pixels=0 bounds=459,256,814,350
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=18633 outline_pixels=0 hidden_pixels=0 bounds=458,257,815,350
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/research40.png
+MILITARY REVIEW: mission=3 state=available completion_bits=0. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=9 classified=0 aircraft_pixels=7525 outline_pixels=0 hidden_pixels=0 bounds=464,298,746,368
+PREVIEW VERIFIED model=9 classified=0 aircraft_pixels=7573 outline_pixels=0 hidden_pixels=0 bounds=465,298,746,367
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military3_locked.png
+MILITARY REVIEW: mission=4 state=classified completion_bits=0. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=11 classified=1 aircraft_pixels=8079 outline_pixels=1731 hidden_pixels=6348 bounds=476,312,729,374
+PREVIEW VERIFIED model=11 classified=1 aircraft_pixels=8144 outline_pixels=1739 hidden_pixels=6405 bounds=476,312,730,374
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military4_locked.png
+MILITARY REVIEW: mission=5 state=classified completion_bits=0. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=10 classified=1 aircraft_pixels=8410 outline_pixels=1584 hidden_pixels=6826 bounds=511,306,754,373
+PREVIEW VERIFIED model=10 classified=1 aircraft_pixels=8453 outline_pixels=1588 hidden_pixels=6865 bounds=509,305,753,372
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military5_locked.png
+MILITARY REVIEW: mission=6 state=classified completion_bits=0. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=8590 outline_pixels=1465 hidden_pixels=7125 bounds=516,310,756,369
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=8616 outline_pixels=1456 hidden_pixels=7160 bounds=515,310,756,369
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military6_locked.png
+MILITARY REVIEW: mission=7 state=classified completion_bits=0. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=8579 outline_pixels=1456 hidden_pixels=7123 bounds=516,309,755,369
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=8613 outline_pixels=1468 hidden_pixels=7145 bounds=515,310,756,369
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military7_locked.png
+MILITARY REVIEW: mission=1 state=classified completion_bits=0. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=8583 outline_pixels=1457 hidden_pixels=7126 bounds=516,310,756,370
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=8611 outline_pixels=1456 hidden_pixels=7155 bounds=515,309,756,369
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military1_locked.png
+MILITARY REVIEW: mission=8 state=classified completion_bits=0. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=8588 outline_pixels=1462 hidden_pixels=7126 bounds=516,310,755,369
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=8608 outline_pixels=1459 hidden_pixels=7149 bounds=515,310,756,369
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military8_locked.png
+MILITARY REVIEW: mission=9 state=classified completion_bits=0. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=8579 outline_pixels=1460 hidden_pixels=7119 bounds=516,309,755,369
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=8615 outline_pixels=1468 hidden_pixels=7147 bounds=515,310,756,369
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military9_locked.png
+MILITARY REVIEW: mission=2 state=classified completion_bits=0. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=8579 outline_pixels=1462 hidden_pixels=7117 bounds=516,310,756,370
+PREVIEW VERIFIED model=12 classified=1 aircraft_pixels=8617 outline_pixels=1460 hidden_pixels=7157 bounds=515,309,755,369
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military2_locked.png
+MILITARY REVIEW: mission=3 state=available completion_bits=0. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=9 classified=0 aircraft_pixels=7521 outline_pixels=0 hidden_pixels=0 bounds=465,298,745,367
+PREVIEW VERIFIED model=9 classified=0 aircraft_pixels=7577 outline_pixels=0 hidden_pixels=0 bounds=465,298,746,367
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military3_unlocked.png
+MILITARY REVIEW: mission=4 state=available completion_bits=8. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=11 classified=0 aircraft_pixels=8066 outline_pixels=0 hidden_pixels=0 bounds=476,312,729,375
+PREVIEW VERIFIED model=11 classified=0 aircraft_pixels=8163 outline_pixels=0 hidden_pixels=0 bounds=476,312,729,374
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military4_unlocked.png
+MILITARY REVIEW: mission=5 state=available completion_bits=24. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=10 classified=0 aircraft_pixels=8418 outline_pixels=0 hidden_pixels=0 bounds=511,306,756,373
+PREVIEW VERIFIED model=10 classified=0 aircraft_pixels=8456 outline_pixels=0 hidden_pixels=0 bounds=509,306,755,373
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military5_unlocked.png
+MILITARY REVIEW: mission=6 state=available completion_bits=56. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=8579 outline_pixels=0 hidden_pixels=0 bounds=516,309,755,369
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=8613 outline_pixels=0 hidden_pixels=0 bounds=515,310,756,369
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military6_unlocked.png
+MILITARY REVIEW: mission=7 state=available completion_bits=120. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=8583 outline_pixels=0 hidden_pixels=0 bounds=516,310,756,370
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=8611 outline_pixels=0 hidden_pixels=0 bounds=515,309,756,369
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military7_unlocked.png
+MILITARY REVIEW: mission=1 state=available completion_bits=248. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=8588 outline_pixels=0 hidden_pixels=0 bounds=516,310,755,369
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=8608 outline_pixels=0 hidden_pixels=0 bounds=515,310,756,369
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military1_unlocked.png
+MILITARY REVIEW: mission=8 state=available completion_bits=250. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=8579 outline_pixels=0 hidden_pixels=0 bounds=516,309,755,369
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=8615 outline_pixels=0 hidden_pixels=0 bounds=515,310,756,369
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military8_unlocked.png
+MILITARY REVIEW: mission=9 state=available completion_bits=506. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=8579 outline_pixels=0 hidden_pixels=0 bounds=516,310,756,370
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=8617 outline_pixels=0 hidden_pixels=0 bounds=515,309,755,369
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military9_unlocked.png
+MILITARY REVIEW: mission=2 state=available completion_bits=1018. Fixture progression; live UI and aircraft renderer.
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=8585 outline_pixels=0 hidden_pixels=0 bounds=516,310,756,369
+PREVIEW VERIFIED model=12 classified=0 aircraft_pixels=8613 outline_pixels=0 hidden_pixels=0 bounds=515,310,756,369
+WROTE /workspace/scratch/0f492b9c4a27/somnium-blue-previews/military2_unlocked.png

@@ -533,14 +533,14 @@ if(Python3_Interpreter_FOUND AND NOT WIN32)
 endif()
 
 # The UI review on a software driver: the game's own programs (the launch builds none with an aircraft's code), with
-# the review's diagnostic checks; fleet hangar only.
+# the review's diagnostic checks; selected aircraft previews across the whole roster.
 if(UNIX AND NOT APPLE AND Python3_Interpreter_FOUND)
   set(UI_FLEET_ADAPTER_DIR ${CMAKE_BINARY_DIR}/ui-fleet-adapter)
   set(UI_FLEET_ADAPTERS ${UI_FLEET_ADAPTER_DIR}/renderer.cpp ${UI_FLEET_ADAPTER_DIR}/raster_renderer.cpp ${UI_FLEET_ADAPTER_DIR}/aircraft_mesh.cpp)
   add_custom_command(OUTPUT ${UI_FLEET_ADAPTERS}
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/prepare_ui_hangar_adapter.py ${CMAKE_SOURCE_DIR}/src ${UI_FLEET_ADAPTER_DIR}
     DEPENDS tools/prepare_ui_hangar_adapter.py src/renderer.cpp src/raster_renderer.cpp src/aircraft_mesh.cpp
-    COMMENT "Generating test-only standard-fleet startup adapters")
+    COMMENT "Generating test-only aircraft preview diagnostic adapters")
   set(UI_FLEET_SOURCES ${GAME_SOURCES})
   list(REMOVE_ITEM UI_FLEET_SOURCES src/renderer.cpp src/raster_renderer.cpp src/aircraft_mesh.cpp)
   add_executable(ui_review_hangar_harness EXCLUDE_FROM_ALL tests/ui_review_harness.cpp ${UI_FLEET_SOURCES} ${UI_FLEET_ADAPTERS} src/radio_stub.cpp)

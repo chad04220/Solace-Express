@@ -2,7 +2,7 @@
 
 ## Somnium Volandi UI rebrand — Claude review branch
 
-The game identity, icon, startup page and civilian screens now use midnight blue, platinum and brass. NIGHTGLASS Research uses emerald code that falls and crosses the display, periodically resolving a face, wing or helix. Military Career uses matte field panels, recessed fasteners and amber deployment controls. Loading shows the current operation, measured stage/batch progress, a subsystem checklist and completed-work progress. Settings → General → Menu animation offers reduced motion. Existing career and cache directories retain their original names for continuity.
+The game identity, icon, startup page and civilian screens now use midnight blue, platinum and brass. NIGHTGLASS Research uses electric-blue code on deep blue-black panels that falls and crosses the display, periodically resolving a face, wing or helix. Military Career uses matte field panels, recessed fasteners and amber deployment controls. Loading shows the current operation, measured stage/batch progress, a subsystem checklist and completed-work progress. Pre-flight details occupy a shallow bottom strip so aircraft photographs remain visible; classified previews show a clear outline of the real rendered shape. Settings → General → Menu animation offers reduced motion. Existing career and cache directories retain their original names for continuity.
 
 See [the Claude review handoff](docs/CLAUDE_SOMNIUM_VOLANDI_UI_REVIEW.md) for implementation details, screenshots, validation and integration notes. The CMake target `SolaceExpress` remains compatible with existing build commands and outputs `SomniumVolandi.exe`; release packages use `SomniumVolandi-windows-x64`.
 

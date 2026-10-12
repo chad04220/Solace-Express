@@ -1619,7 +1619,9 @@ void Renderer::renderScene(const FrameParams& fpFlat, const std::vector<SpriteVe
     glGetError();   // (anisotropy may be unsupported)
   }
   const bool classified = fp.hangarPreview && fp.hangarClassified;
-  if (classified != previousClassifiedHangar || fp.hangarPreview != previousHangar || (fp.hangarPreview && fp.plane.model != previousPreviewModel)) histValid = false;
+  // Changing the aircraft must discard the previous body's temporal history in
+  // outdoor Research/Military previews as well as the indoor showroom.
+  if (classified != previousClassifiedHangar || fp.hangarPreview != previousHangar || (fp.plane.on && fp.plane.model != previousPreviewModel)) histValid = false;
   previousClassifiedHangar = classified;
   previousHangar = fp.hangarPreview; previousPreviewModel = fp.plane.model;
   curAlpha = &alphaSprites; curAdd = &addSprites;
