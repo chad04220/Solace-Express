@@ -1,3 +1,38 @@
+## What's new in v3.49.0
+
+### Life on the islands
+- **Traffic on the roads.** Cars and lorries drive the highways, roads, lanes and streets around you, up to 1,200 at a time, each in its lane on the right of its road. Lorries keep to a highway's slow lane. They keep their distance, wait their turn at junctions and turn round at dead ends. At night their headlights and tail lights burn, and from the air each light shows as a point.
+- **The towns light up as it gets dark,** a window at a time rather than all at once. The street lamps come on at dusk with the pools of light under them. Around 18:00 the first windows are lit, and by 18:15 most of the town.
+- **Ferries between the islands.** Five double-ended ferries join every island into one network, crossing at 17 knots from terminal to terminal and waiting at each end before coming back. Each terminal has a stone causeway out from the shore, a loading ramp under its lifting frame, and a mooring post either side of the berth. At night the ferries' saloons are lit and their navigation lights show.
+- **Yachts in the harbours:** 150 of them moored off the coastal towns, each with an anchor light at night.
+
+### Landmarks worth flying past
+- **A wind farm** of ten turbines along a ridge, turning into the wind, red lights on their nacelles at night.
+- **A stone circle** on a bare summit, **a wreck** aground on a reef in the shallows, and **an offshore platform** far out to sea, its flare burning.
+- **Three observatory domes** on Mount Kaleo's crater rim, **a star fort** on a cape, and on **Lighthouse Key** the keepers' cottages and a landing stage with a fishing boat alongside.
+- **Solace Capital's stadium,** its stands lit at night, and **Port Verde's container terminal:** a quay with four cranes, stacks of containers and a ship alongside.
+- **A racetrack** on Kaleo's eastern plain: a 3.9 km circuit with its kerbs, gravel traps and start line, the pit lane and garages, grandstands, the teams' transporters and a car park.
+- **The Fjordhaven dam:** a concrete arch dam across a mountain gorge, holding a lake. The lake is real water: you can see its shore from any distance and land on it as on the sea.
+- **The strait bridge,** a cable-stayed span between two 55 m concrete towers on the highway to Northpoint.
+
+### Bridges, farms and the roadside
+- **The longest crossings have proper bridges:** a steel truss on the highways, a white tied arch on the roads, and stone-arched viaducts on the mountain lanes. They're solid: fly under the arches, not into them.
+- **About 380 farms** stand out in the farmland, each at the end of its own gravel track: a farmhouse, barns and silos, a machine shed and a vehicle round a yard. Hedges and trees line the fields.
+- **Along the roads:** about 23,500 street lamps that light at night, guardrails on the highways and over the embankments, wooden poles carrying their wires along the country roads, and direction and name signs.
+
+### Smoother on the ground
+- **The photographed ground textures are now compressed** to a quarter of their size. Taxiing, taking off and landing look the same as before but should cost the graphics card noticeably less. In v3.48.0's diagnostics, the scene on a runway at night took 15.5 ms a frame; the textures were most of that.
+
+### Looking right
+- **Sea stacks stand off the cliffs only,** in small clusters at the foot of the steep coasts. They no longer stand out in open bays.
+- **The airfields' grass is mown in broad bands** along the runway, with patches of longer grass between. A low airfield by the beach has patches of sand rather than a pale haze over it.
+
+### Good to know
+- **The first launch after updating takes longer, once.** The islands are regenerated with the new roads, farms and landmarks.
+- Your career saves as before; nothing in it changes.
+
+Please run `diagnostics.bat` on this version: its report now shows what the photographed ground textures cost on your graphics card ("2K ground photographs").
+
 ## What's new in v3.48.0
 
 ### Military service and the Hive (a first look)
