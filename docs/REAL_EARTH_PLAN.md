@@ -23,6 +23,42 @@ comes from real data, with the game's procedural detail only on top of it where 
 
 ---
 
+## 0. Status and notes for Codex (2026-10-12, after v3.49.2)
+
+**Phase 0 is merged** (`codex/earth-data-phase0-20261011`, `codex/usgs-global-source-prep`), and so is the NumPy
+sampler (`codex/earth-sampling-performance-review-20261012`). One Phase 0 deliverable is still open:
+
+- **The measured size table for whole packs.** Only two- and twenty-tile samples have been built. With the NumPy sampler
+  a whole L6 level is about half an hour of sampling at N2 (your own projection), so build a real global pack now and
+  report its compressed size per level, at 60″ and at 30″. Choose N per level by your quality study's policy (N16 at
+  the coarse levels, with the difficult-probe checks), not N2 everywhere. The owner needs these numbers for decision 2
+  in section 7.
+
+**Phase 1 may start** once the owner has placed Solace (decision 1 in section 7). Decisions 2 to 4 are needed by
+Phases 2 and 3, not by Phase 1.
+
+What changed on the game's side since this plan was written, and matters to the later phases:
+
+- **The road grid's code word** (v3.49.2): each entry's second texel's w is `cls + 8·flags + 128·banksOnly + 256·path`.
+  Each texel lists the entries whose platform comes within 1.5 m of it first (`buildRoadGrid`), and `roadEntryRows`
+  sets the 128 bit on every entry after the last of those. The paint and the roads' own normal (`roads.glsl`
+  `roadQuery`) stop at the first 128; `roadGrade` reads every entry. A per-tile road grid (Phase 3) must keep both
+  the order and the bit. `road_grade_gpu` checks both against the C++.
+- **The terrain is drawn nearest first** (`Renderer::selectTerrainChunks`, v3.49.1). Drawn far to near, the islands'
+  copies out to the horizon were shaded and then hidden: 40% of the night runway scene's world pass. Whatever
+  replaces the copies in Phase 2 must keep a near-to-far order.
+- **Shared GLSL and structs.** The pruner drops unused functions but keeps every struct. A struct in a shared snippet
+  lands in every program built with it, the aircraft's included, and each recompiles after the update for nothing.
+  Gate world-only structs and the functions using them behind a define that only their programs set
+  (`GROUND_ROADS`: the terrain's and the GPS map's programs). This is in addition to the bake rule in section 5.
+- **Profiling switches.** The shaders' `uDbg` bits must not share a bit with `Renderer::kProbe*` (1 << 12 to 1 << 15),
+  which leave whole draws out. The ground's parts use `kDbg*` (1 << 16 to 1 << 20); `terrain_material_test` enforces it.
+- **Saves are format 6** (the military record). If Phase 1 changes what a position means, that is format 7. The save
+  tests' unknown-version case currently uses 7, so move it to 8 in the same change.
+- **The world cache is `WLD6`** (`src/world.cpp` `kWorldMagic`). Bump it if the cached arrays change shape or meaning.
+
+---
+
 ## 1. Where things stand (v3.47, commit bdd896c on `claude/compassionate-davinci-4cfo20`)
 
 **The world is flat and small.**
@@ -192,7 +228,7 @@ Keep each phase reviewable: one subsystem per branch, with no reformatting of fi
 - The real alignment is given, so don't re-route it.
   - Where the real road is steeper than the class allows (mountain passes), let the profile follow the ground. Record it as a real road: an exception list, not a failure.
   - Bridges follow `bridges.cpp`'s rules where the profile leaves the ground over water or a gully.
-- Grade per tile: build a per-tile **road grid** with `RoadGrid`'s encoding (`roadEntryRows`, the `cls + 8·flags + 128·path` code word), so `roads.glsl` and `terrain_material.glsl` paint and grade as they do now. `roadGrade` must stay identical on the CPU and the GPU.
+- Grade per tile: build a per-tile **road grid** with `RoadGrid`'s encoding (`roadEntryRows`, the `cls + 8·flags + 128·banksOnly + 256·path` code word, each texel's paving entries first: section 0), so `roads.glsl` and `terrain_material.glsl` paint and grade as they do now. `roadGrade` must stay identical on the CPU and the GPU.
 - **Tests:**
   - per tile, `tests/roads_test.cpp`'s checks (grades, bed tilt, banks, conflicts), with the exception list;
   - continuity across tile edges;
