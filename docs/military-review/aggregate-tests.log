@@ -1,0 +1,231 @@
+Test project /workspace/scratch/87b29863f015/solace-military-build
+        Start 113: test_world
+        Start  96: runway_preservation
+        Start  46: world_cache
+        Start  72: ci_test_selection
+  1/113 Test  #72: ci_test_selection ................   Passed    2.85 sec
+        Start  73: renderer_cpu_mocks
+  2/113 Test #113: test_world .......................   Passed   30.60 sec
+        Start  10: new_aircraft_autoland_atlas
+  3/113 Test  #96: runway_preservation ..............   Passed   32.94 sec
+        Start  11: new_aircraft_go_around
+  4/113 Test  #46: world_cache ......................   Passed   33.78 sec
+        Start  50: gameplay_loop_4
+  5/113 Test  #73: renderer_cpu_mocks ...............   Passed   35.43 sec
+        Start  49: gameplay_loop_3
+  6/113 Test  #50: gameplay_loop_4 ..................   Passed   35.29 sec
+        Start   9: new_aircraft_autoland_larkspur
+  7/113 Test  #49: gameplay_loop_3 ..................   Passed   35.17 sec
+        Start  53: flight_model_2
+  8/113 Test  #11: new_aircraft_go_around ...........   Passed   43.52 sec
+        Start  55: flight_model_3
+  9/113 Test  #10: new_aircraft_autoland_atlas ......   Passed   49.62 sec
+        Start  54: campaign_progression_2
+ 10/113 Test  #53: flight_model_2 ...................   Passed   22.25 sec
+        Start  52: campaign_progression_1
+ 11/113 Test  #54: campaign_progression_2 ...........   Passed   21.75 sec
+        Start  56: campaign_progression_3
+ 12/113 Test  #55: flight_model_3 ...................   Passed   25.54 sec
+        Start  48: gameplay_loop_2
+ 13/113 Test   #9: new_aircraft_autoland_larkspur ...   Passed   42.47 sec
+        Start  51: flight_model_1
+ 14/113 Test  #52: campaign_progression_1 ...........   Passed   21.69 sec
+        Start  47: gameplay_loop_1
+ 15/113 Test  #48: gameplay_loop_2 ..................   Passed   20.23 sec
+        Start  20: career_saves
+ 16/113 Test  #51: flight_model_1 ...................   Passed   14.42 sec
+        Start  38: hull_mesh
+ 17/113 Test  #56: campaign_progression_3 ...........   Passed   25.83 sec
+        Start  17: breakup
+ 18/113 Test  #17: breakup ..........................   Passed    0.96 sec
+        Start   8: new_aircraft_performance
+ 19/113 Test  #38: hull_mesh ........................   Passed    4.01 sec
+        Start 109: roads
+ 20/113 Test  #47: gameplay_loop_1 ..................   Passed   12.92 sec
+        Start 106: environment_close_bounds
+ 21/113 Test #106: environment_close_bounds .........   Passed    1.68 sec
+        Start  61: usgs_world_map
+ 22/113 Test   #8: new_aircraft_performance .........   Passed    6.34 sec
+        Start  43: ufo_encounter
+ 23/113 Test  #20: career_saves .....................   Passed   13.01 sec
+        Start 108: bridges
+ 24/113 Test #108: bridges ..........................   Passed    1.89 sec
+        Start  45: entity_raycast
+ 25/113 Test  #43: ufo_encounter ....................   Passed    2.68 sec
+        Start  42: mesh_simplify
+ 26/113 Test  #42: mesh_simplify ....................   Passed    0.85 sec
+        Start   3: wreck_pose
+ 27/113 Test   #3: wreck_pose .......................   Passed    3.88 sec
+        Start  25: military_career_fastmath
+ 28/113 Test  #45: entity_raycast ...................   Passed    7.21 sec
+        Start  60: earth_pack
+ 29/113 Test  #61: usgs_world_map ...................   Passed   20.05 sec
+        Start  21: military_career
+ 30/113 Test  #60: earth_pack .......................   Passed   12.53 sec
+        Start  13: atlas_gear_geometry
+ 31/113 Test  #13: atlas_gear_geometry ..............   Passed    1.04 sec
+        Start  62: portable_mesh_identity
+ 32/113 Test  #62: portable_mesh_identity ...........   Passed    7.98 sec
+        Start   1: menu_plan_cache
+ 33/113 Test #109: roads ............................   Passed   40.18 sec
+        Start  22: military_gameplay
+ 34/113 Test  #22: military_gameplay ................   Passed    5.83 sec
+        Start 110: landmarks
+ 35/113 Test  #25: military_career_fastmath .........   Passed   39.22 sec
+        Start  37: terrain_envelope
+ 36/113 Test #110: landmarks ........................   Passed    7.23 sec
+        Start 102: environment_scale_audit
+ 37/113 Test  #37: terrain_envelope .................   Passed    3.10 sec
+        Start  83: new_aircraft_cockpit_contract
+ 38/113 Test #102: environment_scale_audit ..........   Passed    2.58 sec
+        Start 111: road_traffic
+ 39/113 Test  #83: new_aircraft_cockpit_contract ....   Passed    3.64 sec
+        Start  15: cockpit_camera
+ 40/113 Test #111: road_traffic .....................   Passed    3.84 sec
+        Start  97: community_layout
+ 41/113 Test  #15: cockpit_camera ...................   Passed    4.41 sec
+        Start   2: vtol_throttle
+ 42/113 Test  #21: military_career ..................   Passed   41.16 sec
+        Start  29: hive_world_collision_fastmath
+ 43/113 Test   #2: vtol_throttle ....................   Passed    3.55 sec
+        Start  26: hive_world_collision
+ 44/113 Test  #29: hive_world_collision_fastmath ....   Passed    3.74 sec
+        Start  95: shader_loading_contract
+ 45/113 Test  #97: community_layout .................   Passed    7.57 sec
+        Start  36: airport_layouts
+ 46/113 Test  #95: shader_loading_contract ..........   Passed    1.02 sec
+        Start  98: airport_environment
+ 47/113 Test  #26: hive_world_collision .............   Passed    1.76 sec
+        Start  99: volcano_effects
+ 48/113 Test  #36: airport_layouts ..................   Passed    1.76 sec
+        Start  80: atlas_windshield_contract
+ 49/113 Test   #1: menu_plan_cache ..................   Passed   33.73 sec
+        Start  76: cockpit_surface_contact
+ 50/113 Test  #98: airport_environment ..............   Passed    1.89 sec
+        Start  84: environment_foliage
+ 51/113 Test  #80: atlas_windshield_contract ........   Passed    0.98 sec
+        Start  75: cockpit_layout_geometry
+ 52/113 Test  #76: cockpit_surface_contact ..........   Passed    0.63 sec
+        Start  19: shader_keywords
+ 53/113 Test  #99: volcano_effects ..................   Passed    2.08 sec
+        Start  78: atlas_fairing_material
+ 54/113 Test  #75: cockpit_layout_geometry ..........   Passed    0.68 sec
+        Start  16: aero_model
+ 55/113 Test  #78: atlas_fairing_material ...........   Passed    0.53 sec
+        Start  65: mesh_asset_tools
+ 56/113 Test  #19: shader_keywords ..................   Passed    0.56 sec
+        Start  39: traffic_prop_discs
+ 57/113 Test  #84: environment_foliage ..............   Passed    0.98 sec
+        Start  18: aero_wake
+ 58/113 Test  #16: aero_model .......................   Passed    0.28 sec
+        Start  12: new_aircraft_exterior
+ 59/113 Test  #65: mesh_asset_tools .................   Passed    0.26 sec
+        Start  66: aircraft_geometry_source
+ 60/113 Test  #12: new_aircraft_exterior ............   Passed    0.26 sec
+        Start 100: environment_asset_mesh
+ 61/113 Test  #39: traffic_prop_discs ...............   Passed    0.47 sec
+        Start 107: environment_chunk_bounds
+ 62/113 Test  #18: aero_wake ........................   Passed    0.51 sec
+        Start 104: environment_nature_detail
+ 63/113 Test #100: environment_asset_mesh ...........   Passed    0.26 sec
+        Start 105: airport_construction_detail
+ 64/113 Test  #66: aircraft_geometry_source .........   Passed    0.42 sec
+        Start 101: environment_scan_assets
+ 65/113 Test #107: environment_chunk_bounds .........   Passed    0.24 sec
+        Start  89: environment_frame_statistics
+ 66/113 Test #104: environment_nature_detail ........   Passed    0.23 sec
+        Start  79: atlas_door_depth
+ 67/113 Test #105: airport_construction_detail ......   Passed    0.17 sec
+        Start  90: environment_benchmark_runner
+ 68/113 Test  #89: environment_frame_statistics .....   Passed    0.10 sec
+        Start  64: aircraft_mesh_workflow
+ 69/113 Test  #79: atlas_door_depth .................   Passed    0.09 sec
+        Start  57: research_cockpit_layout
+ 70/113 Test #101: environment_scan_assets ..........   Passed    0.21 sec
+        Start  88: terrain_material_source
+ 71/113 Test  #64: aircraft_mesh_workflow ...........   Passed    0.07 sec
+        Start  44: shader_prune
+ 72/113 Test  #57: research_cockpit_layout ..........   Passed    0.09 sec
+        Start  63: portable_mesh_checkout
+ 73/113 Test  #90: environment_benchmark_runner .....   Passed    0.13 sec
+        Start  82: wheel_cover_geometry
+ 74/113 Test  #44: shader_prune .....................   Passed    0.07 sec
+        Start  85: environment_buildings
+ 75/113 Test  #88: terrain_material_source ..........   Passed    0.08 sec
+        Start  81: gear_breakup_render_contract
+ 76/113 Test  #82: wheel_cover_geometry .............   Passed    0.09 sec
+        Start  91: aircraft_specialization
+ 77/113 Test  #85: environment_buildings ............   Passed    0.06 sec
+        Start  71: road_class_numbers
+ 78/113 Test  #81: gear_breakup_render_contract .....   Passed    0.07 sec
+        Start  67: hive_game_integration
+ 79/113 Test  #63: portable_mesh_checkout ...........   Passed    0.12 sec
+        Start  74: cockpit_layout_generated
+ 80/113 Test  #71: road_class_numbers ...............   Passed    0.03 sec
+        Start  77: aircraft_build_interface
+ 81/113 Test  #67: hive_game_integration ............   Passed    0.03 sec
+        Start  70: entity_kind_numbers
+ 82/113 Test  #77: aircraft_build_interface .........   Passed    0.02 sec
+        Start  69: tool_games_diskless
+ 83/113 Test  #91: aircraft_specialization ..........   Passed    0.06 sec
+        Start  68: enemy_render_contract
+ 84/113 Test  #70: entity_kind_numbers ..............   Passed    0.03 sec
+        Start  30: enemy_surface_mesh
+ 85/113 Test  #74: cockpit_layout_generated .........   Passed    0.04 sec
+        Start   5: specter_toggle_detail
+ 86/113 Test   #5: specter_toggle_detail ............   Passed    0.03 sec
+        Start 103: environment_close_detail
+ 87/113 Test  #69: tool_games_diskless ..............   Passed    0.05 sec
+ 88/113 Test  #30: enemy_surface_mesh ...............   Passed    0.04 sec
+        Start  87: terrain_material_math
+        Start  59: portable_mesh_adversarial
+ 89/113 Test #103: environment_close_detail .........   Passed    0.01 sec
+        Start  24: hive_combat_fastmath
+ 90/113 Test  #68: enemy_render_contract ............   Passed    0.06 sec
+        Start  23: hive_combat
+ 91/113 Test  #59: portable_mesh_adversarial ........   Passed    0.01 sec
+        Start  94: hangar_catalog
+ 92/113 Test  #23: hive_combat ......................   Passed    0.01 sec
+        Start  58: cockpit_layout
+ 93/113 Test  #24: hive_combat_fastmath .............   Passed    0.02 sec
+        Start  40: reheat_exhaust
+ 94/113 Test  #94: hangar_catalog ...................   Passed    0.01 sec
+ 95/113 Test  #58: cockpit_layout ...................   Passed    0.01 sec
+        Start   4: aircraft_build_contract
+        Start  41: mesh_validation
+ 96/113 Test  #87: terrain_material_math ............   Passed    0.03 sec
+        Start  34: enemy_bake_guard
+ 97/113 Test  #41: mesh_validation ..................   Passed    0.01 sec
+        Start 112: texture_compress
+ 98/113 Test   #4: aircraft_build_contract ..........   Passed    0.01 sec
+ 99/113 Test  #40: reheat_exhaust ...................   Passed    0.01 sec
+        Start  86: benchmark_metrics
+        Start  31: hive_ordnance_visual
+100/113 Test  #34: enemy_bake_guard .................   Passed    0.01 sec
+101/113 Test #112: texture_compress .................   Passed    0.01 sec
+102/113 Test  #86: benchmark_metrics ................   Passed    0.00 sec
+        Start  92: loading_progress
+        Start   6: mesh_planar
+        Start  93: hangar_geometry
+103/113 Test  #31: hive_ordnance_visual .............   Passed    0.01 sec
+104/113 Test  #92: loading_progress .................   Passed    0.01 sec
+105/113 Test   #6: mesh_planar ......................   Passed    0.01 sec
+        Start  14: cockpit_focus_zoom
+        Start   7: mesh_orientation
+        Start  33: enemy_mesh_cache
+106/113 Test  #93: hangar_geometry ..................   Passed    0.02 sec
+107/113 Test  #14: cockpit_focus_zoom ...............   Passed    0.01 sec
+108/113 Test   #7: mesh_orientation .................   Passed    0.01 sec
+109/113 Test  #33: enemy_mesh_cache .................   Passed    0.00 sec
+        Start  32: wraith_loadout_clearance
+        Start  28: hive_loadout_fastmath
+        Start  27: hive_loadout
+        Start  35: enemy_fleet_validity_fastmath
+110/113 Test  #32: wraith_loadout_clearance .........   Passed    0.01 sec
+111/113 Test  #28: hive_loadout_fastmath ............   Passed    0.01 sec
+112/113 Test  #27: hive_loadout .....................   Passed    0.01 sec
+113/113 Test  #35: enemy_fleet_validity_fastmath ....   Passed    0.02 sec
+
+100% tests passed out of 113
+
+Total Test time (real) = 202.05 sec

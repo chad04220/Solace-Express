@@ -14,6 +14,7 @@
 #include "models.h"
 #include "menu_layout.h"
 #include "hangar_catalog.h"
+#include "military_missions.h"
 
 static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bool inside);
 
@@ -559,6 +560,28 @@ void Game::returnToFreeFlight() {
   screen = SCR_FREE_FLIGHT;
 }
 
+// Return a service loaner without leaving weapon effects or damaged scenery behind on the civilian hub.
+// Closing an unflown attempt is saved transactionally; a failed save remains pending and blocks another launch.
+void Game::returnToMilitary() {
+  if (career.military.activeAttempt && !commitBlocked())
+    commit([](Career& k) { k.abandonMilitaryAttempt(); });
+  militaryFlight = militarySettled = researchFlight = freeFlight = isolatedFlight = false;
+  paused = showMap = showRadio = settingsFromPause = false;
+  crashed = completed = landed = false; dbgCam = dbgFollow = false;
+  hiveCombat.reset(1, WRAP_SPAN); combatLoadout.reset(); militaryHull = 100;
+  combatCollisionWarm = false; combatCollisionWarmMs = 0; combatPrefetchCursor = 0;
+  wraith = WraithState(); wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
+  bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
+  for (auto& smoke : pieceTrail) smoke.clear();
+  tipOn = airBreak = false; trailT = 0; wakeGap = true; wakeOdo = 0;
+  craterR = craterD = 0; boomT = -1; g_groundPits.clear(); g_scenery.craters.clear(); g_scenery.resetDamage();
+  traffic.reset(); atc.cancel(); commsPending.clear(); toasts.clear();
+  g_ren.entBudgetMs = 2.5f;
+  source = Career::SRC_NONE; screen = SCR_HUB; hubTab = TAB_CONTRACTS; hubList = 2;
+  in.pressed[K_ESC] = in.pressed[K_ENTER] = in.pressed[' '] = false;
+  in.mPressed[0] = false; in.buttonsPressed &= ~(PAD_A | PAD_B | PAD_START);
+}
+
 void Game::init(bool buildWorld, const std::function<void(float, const std::string&)>& progress) {
   const float units = float(kNumAircraft + 4);
   auto report = [&](int done, const std::string& detail) { if (progress) progress(done / units, detail); };
@@ -1016,6 +1039,15 @@ void Game::computeSun(float tod, vec3& dir, vec3& col, float& night, float h, fl
 
 // ------------------------------------------------------------------ flight session
 void Game::startFlight(const Contract& c, int spec, Career::Source src, const Career::LaunchPlan* finalized) {
+  // All military entry points, including direct starts and pause retries, require
+  // the already committed, unsettled career attempt. UI visibility is not access control.
+  if (isMilitaryContract(c.type) || src == Career::SRC_MILITARY) {
+    const auto& m = career.military;
+    if (src != Career::SRC_MILITARY || !isMilitaryContract(c.type) || commitBlocked() ||
+        !career.attemptOpen || !m.activeAttempt || m.activeAttempt != career.attempt ||
+        m.activeAttempt <= m.lastSettledAttempt || m.activeKind != c.type-CT_MIL_RECON ||
+        m.activeAirport != c.from || career.canFly(c,spec) != Career::SRC_MILITARY) return;
+  }
   static bool dispWarned = false;   // say once if the cockpit display shader could not be built on this GPU
   if (!g_ren.dispError.empty() && !dispWarned && !headless) { dispWarned = true; toast("Cockpit display shader failed on this GPU (details in startup.log)", vec3(1.f, 0.45f, 0.35f)); }
   contract = c; specIdx = spec; source = src;
@@ -1784,6 +1816,15 @@ bool Game::loadingShadowPending() const {
   return g_ren.tshRequiredPending(direction.y);
 }
 void Game::updateLoading(float dt) {
+  if (militaryFlight || isMilitaryContract(contract.type)) {
+    const auto& m = career.military;
+    if (!militaryFlight || source != Career::SRC_MILITARY || commitBlocked() ||
+        !career.attemptOpen || !m.activeAttempt || m.activeAttempt != career.attempt ||
+        m.activeAttempt <= m.lastSettledAttempt || m.activeKind != contract.type-CT_MIL_RECON ||
+        m.activeAirport != contract.from || career.canFly(contract,specIdx) != Career::SRC_MILITARY) {
+      returnToMilitary(); return;
+    }
+  }
   warmCombatCollision();
   loadT += dt;
   if (loadReadyT < 0) {
@@ -1836,6 +1877,7 @@ void Game::updateLoading(float dt) {
   if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) {   // back out to where the flight was chosen
     dbgCam = false; g_ren.entBudgetMs = 2.5f;
     if (freeFlight) { returnToFreeFlight(); return; }
+    if (militaryFlight) { returnToMilitary(); return; }
     // a career flight that never left the loading screen: its attempt closes and its job waits at its stop, as after
     // an interrupted session (nothing is charged: no leg was flown); an unsaved close shows as pending and blocks launches
     if (career.attemptOpen && !isolatedFlight && !researchFlight)
@@ -1949,9 +1991,8 @@ void Game::gamepadMenus(float dt) {
   // research menu: D-pad also steps through launch sites, Start launches
   if (screen == SCR_RESEARCH) {
     int n = (int)g_world.airports.size();
-    // XR-40 range selectors use focus; Start remains a distinct launch action rather
-    // than also activating the selected equipment control through synthetic Enter.
-    if ((in.buttonsPressed & PAD_START) && !(resCraft==kWraith && resCard<0)) in.pressed[K_ENTER] = true;
+    // Every research airframe has focusable preview controls. Start remains a
+    // distinct launch action, never an extra activation of the focused control.
     if (in.buttonsPressed & PAD_RB) resAirport = (resAirport + 1) % n;
     if (in.buttonsPressed & PAD_LB) resAirport = (resAirport + n - 1) % n;
   }
@@ -1969,15 +2010,29 @@ void Game::focusNavigate() {
   if (!menus) { focusNav = false; return; }
   if (scr != focusScreen) { focusScreen = scr; focusNav = false; }
   if (fabsf(in.mdx) + fabsf(in.mdy) > 0.5f || in.mPressed[0]) focusNav = false;
-  bool keys = screen != SCR_RESEARCH;
+  const bool researchViewFocus = screen == SCR_RESEARCH && focusNav &&
+    focusId >= 0x7E5F0030u && focusId < 0x7E5F0035u;
+  bool keys = screen != SCR_RESEARCH || researchViewFocus;
   int dx = 0, dy = 0;
   if ((keys && in.pressed[K_LEFT]) || (in.buttonsPressed & PAD_LEFT)) dx = -1;
   if ((keys && in.pressed[K_RIGHT]) || (in.buttonsPressed & PAD_RIGHT)) dx = 1;
-  const bool rangeKeys=screen==SCR_RESEARCH && resCraft==kWraith && resCard<0;
-  if (((keys || rangeKeys) && in.pressed[K_UP]) || (in.buttonsPressed & PAD_UP)) dy = -1;
-  if (((keys || rangeKeys) && in.pressed[K_DOWN]) || (in.buttonsPressed & PAD_DOWN)) dy = 1;
+  if (researchViewFocus) in.pressed[K_LEFT] = in.pressed[K_RIGHT] = false;
+  if (in.pressed[K_UP] || (in.buttonsPressed & PAD_UP)) dy = -1;
+  if (in.pressed[K_DOWN] || (in.buttonsPressed & PAD_DOWN)) dy = 1;
   if (!dx && !dy) { if (focusNav) { bool still = false; for (auto& f : focusPrev) if (f.id == focusId) still = true; if (!still && !focusPrev.empty()) focusId = focusPrev[0].id; } point(); return; }
   if (focusPrev.empty()) return;
+  // Tab switches research airframes and unfocused Left/Right selects the site.
+  // Give keyboard-only pilots a complete, deterministic Up/Down control walk;
+  // spatial-only vertical movement strands controls in neighbouring columns.
+  if (screen == SCR_RESEARCH && (in.pressed[K_UP] || in.pressed[K_DOWN]) &&
+      !(in.buttonsPressed & (PAD_UP | PAD_DOWN))) {
+    int index = -1;
+    if (focusNav) for (size_t i = 0; i < focusPrev.size(); ++i)
+      if (focusPrev[i].id == focusId) index = int(i);
+    index = index < 0 ? 0 : std::clamp(index + dy, 0, int(focusPrev.size()) - 1);
+    focusNav = true; focusId = focusPrev[index].id;
+    g_audio.trigger(SFX_HOVER,.5f); point(); return;
+  }
   const Focusable* cur = nullptr; for (auto& f : focusPrev) if (f.id == focusId) cur = &f;
   if (!focusNav || !cur) {   // first press: the top-left button
     const Focusable* best = &focusPrev[0];
@@ -2851,6 +2906,7 @@ FrameParams Game::buildFrame() {
     fp.fovY = (camMode == 1 ? set.fov + 19.f : set.fov) * DEG;
     if (camMode == 3) fp.fovY = clampf(2.f * atanf(std::max(plane.spec->span, plane.spec->fusLen) * (botControl ? 0.42f : 1.5f) / length(plane.pos - camPos)), 4.f * DEG, 60.f * DEG);
     if (camMode == 1) fp.fovY = 2.f * atanf(tanf((set.fov + 19.f) * 0.5f * DEG) / ckZoom);   // cockpit zoom: lean in to read the displays
+    if (screen == SCR_LOADING && militaryFlight) militaryLoadingCamera(fp);
     fp.landLight = landingLight && plane.engineRunning ? (0.3f + 0.7f * fp.night) : 0.f;
     fp.landLightPos = plane.pos + plane.forward() * (plane.spec->fusLen * 0.4f);
     fp.landLightDir = normalize(plane.forward() - plane.up() * 0.1f);
@@ -2863,7 +2919,7 @@ FrameParams Game::buildFrame() {
       fp.plane = wreckPlanePose; fp.plane.pos = worldPos;
       memcpy(fp.plane.rot, worldRot, sizeof worldRot);
     }
-    buildFeedCameras(fp);
+    if (!(screen == SCR_LOADING && militaryFlight)) buildFeedCameras(fp);
     if (boomT >= 0 && boomT < 1.6f && !(length(fp.flameLight) > 0.f)) {   // an explosion's flash lights the scene, fading as the fireball cools
       float k = boomT < 0.08f ? boomT / 0.08f : expf(-(boomT - 0.08f) * 2.6f);
       fp.flameLightPos = boomP; fp.flameLight = vec3(1.f, 0.6f, 0.28f) * (boomI * k);
@@ -2881,7 +2937,7 @@ FrameParams Game::buildFrame() {
     // (not in the research jets' sealed pods: their windows are displays, and with no glass to bead on, the drops
     // streamed over the cabin's own frames and panels - more than 1.3 m from the eye, the depth the post pass takes
     // for "seen through the glass" - in the XR-40 at night in a storm)
-    if (camMode == 1 && !crashed && !plane.spec->special) {
+    if (camMode == 1 && !crashed && !plane.spec->special && !(screen == SCR_LOADING && militaryFlight)) {
       fp.rainLens = wx.precip == 1 ? rainNow : 0.f;
       fp.glassMist = mistNow;
       vec3 f = normalize(plane.forward() - plane.up() * 0.45f);
@@ -2894,7 +2950,7 @@ FrameParams Game::buildFrame() {
       fp.rainFlow[0] = 0.5f + 0.5f * ndc.x; fp.rainFlow[1] = 0.5f + 0.5f * ndc.y; fp.rainFlow[2] = sign;
       fp.rainFlow[3] = smoothstepf(6.f, 45.f, plane.airspeed);
     }
-    fp.sealedCockpit = camMode == 1 && plane.spec->special && !crashed;
+    fp.sealedCockpit = camMode == 1 && plane.spec->special && !crashed && !(screen == SCR_LOADING && militaryFlight);
     fp.trafficN = traffic.fillVisuals(fp.camPos, fp.traffic, kMaxTrafficDrawn, nullptr);
     fp.ufoOn = ufo.on && length(ufo.pos - fp.camPos) < 20000.f;
     if (fp.ufoOn) {
@@ -3054,6 +3110,7 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
 void Game::menuBackgroundCamera(FrameParams& fp) {
   if (screen == SCR_MENU && !getenv("MENUORBIT")) { menuTour(fp); return; }
   if (screen == SCR_RESEARCH) { researchPreviewCamera(fp); return; }
+  if (screen == SCR_HUB && hubTab == TAB_CONTRACTS && hubList == 2) { militaryPreviewCamera(fp); return; }
   if (screen == SCR_FREE_FLIGHT || (screen == SCR_HUB && hubTab == TAB_HANGAR)) { hangarPreviewCamera(fp); return; }
   // A Wren circles over the islands while the camera chases it in a slow arc
   static Plane demo;
@@ -3089,6 +3146,7 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
 // displayed airframe; purchasing, fuel, wear and the active flight remain untouched.
 void Game::hangarPreviewCamera(FrameParams& fp) {
   const int craft = screen == SCR_FREE_FLIGHT ? validCareerSelection(freeCraft) : std::clamp(selHangar, 0, kAircraftCount - 1);
+  hangarView.select(craft, screen == SCR_FREE_FLIGHT);
   const AircraftSpec& sp = kAircraft[craft];
   static Plane demo;
   if (demo.spec != &sp) demo.reset(&sp, vec3(0), 0, sp.maxFuel, 85, false, 0);
@@ -3107,7 +3165,9 @@ void Game::hangarPreviewCamera(FrameParams& fp) {
     pitch = atan2f(dy, dz) + asinf(clampf((wr-.1f)/r, -1.f, 1.f));
     height = wr - (wr-gh)*cosf(pitch) + stations.mainZ*sinf(pitch);
   }
-  demo.q = quat::axisAngle(vec3(1, 0, 0), pitch);
+  // Turn the parked airframe about world-up, rather than orbiting through the
+  // showroom's opaque walls. Yaw after parking pitch preserves all tyre heights.
+  demo.q = quat::axisAngle(vec3(0, 1, 0), hangarView.yaw) * quat::axisAngle(vec3(1, 0, 0), pitch);
   demo.pos = vec3(0, height, 0);
   demo.vel = vec3(0); demo.onGround = true; demo.engineRunning = false;
   demo.gear = 1.f; demo.flaps = 0; demo.nozzle = 0; demo.rpm = 0; demo.engineSpool = 0; demo.n1 = 0;
@@ -3139,19 +3199,89 @@ void Game::hangarPreviewCamera(FrameParams& fp) {
   const float s = S(), W = float(std::max(g_ren.W, 1)), H = float(std::max(g_ren.H, 1));
   const HangarLayout L = hangarLayout(24*s, 126*s, W-48*s, H-146*s, s);
   const float cx = L.previewX + L.previewWidth * 0.5f, cy = L.previewY + L.previewHeight * 0.5f;
-  fp.fovY = 34.f * DEG;
-  const float th = tanf(fp.fovY * 0.5f);
-  const float radius = std::max(sp.span, sp.fusLen) * 0.59f;
-  const float pixels = std::max(1.f, std::min(L.previewWidth, L.previewHeight) * 0.56f);
-  const float distance = H * 0.5f * radius / (pixels * th);
+  const float radius = std::max(sp.span, sp.fusLen) * 0.65f;
+  const float pixels = std::max(1.f, std::min(L.previewWidth, L.previewHeight) * 0.40f);
   const vec3 focus = demo.pos + vec3(0, sp.fusRad * 0.45f, 0);
-  const vec3 C = focus + normalize(vec3(0.40f, 0.24f, -1.f)) * distance;
+  const vec3 viewingRay = normalize(vec3(0.40f, 0.24f, -1.f));
+  // Keep the eye below the lowest roof beams and inside the side walls even on
+  // tall/narrow windows. Zoom changes only the lens, never this safe position.
+  const float roomDistance = std::min((fp.hangarSize * .54f - focus.y) / viewingRay.y,
+                                      fp.hangarSize * 1.10f / viewingRay.x);
+  const float fitDistance = H * .5f * radius / (pixels * tanf(17.f * DEG));
+  const float distance = std::max(radius * 1.25f, std::min(fitDistance, roomDistance));
+  const float th = H * .5f * radius / (pixels * distance * clampf(hangarView.zoom, .75f, 1.35f));
+  fp.fovY = 2.f * atanf(th);
+  const vec3 C = focus + viewingRay * distance;
   const vec3 f0 = normalize(focus - C), r0 = normalize(cross(f0, vec3(0, 1, 0))), u0 = cross(r0, f0);
   const float nx = (cx - W*0.5f)/(W*0.5f), ny = (H*0.5f-cy)/(H*0.5f);
   const vec3 aim = focus - r0*(nx*distance*th*(W/H)) - u0*(ny*distance*th);
   const vec3 fwd = normalize(aim-C);
   fp.camPos = C; fp.camBack = -fwd; fp.camRight = normalize(cross(fwd, vec3(0,1,0))); fp.camUp = cross(fp.camRight,fwd);
   fp.exposure = 1.f; fp.vignette = 0.32f;
+}
+
+// The military terminal shows the exact mission-assigned airframe through the research scene's native renderer.
+// Its demo plane never enters the career fleet or the active flight session.
+void Game::militaryPreviewCamera(FrameParams& fp) {
+  const Contract c = career.militaryContract(militarySelection);
+  const bool classified = !career.militaryMissionUnlocked(militarySelection);
+  const int craft = c.forceAircraft >= 0 && c.forceAircraft < kAircraftCount ? c.forceAircraft : 0;
+  const AircraftSpec& sp = kAircraft[craft];
+  const Airport& a = g_world.airports[std::clamp(c.from, 0, (int)g_world.airports.size()-1)];
+  Plane demo; demo.reset(&sp, a.pos(), a.heading+180.f, sp.maxFuel, 85, true, sp.cruise);
+  demo.pos = a.pos() + a.dir()*1800.f;
+  demo.pos.y = std::max(a.elev, g_world.height(demo.pos.x,demo.pos.z)) + 650.f;
+  demo.gear = 0; demo.flaps = demo.nozzle = 0; demo.rpm = 0; demo.ctl.throttle = .45f;
+  fillPlaneVisual(fp.plane,demo,0,false);
+  const ResLayout L = militaryLayout();
+  const float W = std::max(g_ren.W,1), H = std::max(g_ren.H,1);
+  fp.fovY = 32.f*DEG; const float th = tanf(fp.fovY*.5f);
+  const float D = H*.5f*std::max(sp.span,sp.fusLen)*.36f / (std::max(L.r,1.f)*th*std::clamp(resZoom,.6f,1.4f));
+  const float yaw = resYaw+a.heading*DEG, pitch = std::clamp(resPitch,.04f,.85f);
+  const vec3 P = demo.pos, C = P+vec3(sinf(yaw)*cosf(pitch),sinf(pitch),-cosf(yaw)*cosf(pitch))*D;
+  const vec3 f = normalize(P-C), r = normalize(cross(f,vec3(0,1,0))), u = cross(r,f);
+  const vec3 aim = P-r*((L.cx-W*.5f)/(W*.5f)*D*th*W/H)-u*((H*.5f-L.cy)/(H*.5f)*D*th);
+  const vec3 look = normalize(aim-C);
+  fp.camPos=C; fp.camBack=-look; fp.camRight=normalize(cross(look,vec3(0,1,0))); fp.camUp=cross(fp.camRight,look);
+  fp.vignette=.45f; fp.prefetchOn=true; fp.prefetchPos=demo.pos;
+  fp.trafficN=0; fp.ufoOn=false; fp.feedRig=fp.dispMode=0;
+  // Reuse the hangar's material-independent silhouette pass. Only shape and a
+  // soft rim survive; registrations, paint, cockpit screens and effects cannot leak.
+  // FrameParams is rebuilt each frame, so an unlocked selection immediately returns
+  // to its normal outdoor aircraft render without retaining classified materials.
+  if (classified) {
+    fp.hangarPreview = fp.hangarClassified = true;
+    // Keep the whole interactive orbit inside the room. A normal-sized showroom
+    // puts its opaque walls between the long terminal camera and the aircraft.
+    fp.hangarSize = std::max(12.f,D*3.f);
+    fp.hangarOrigin = demo.pos-vec3(0,fp.hangarSize*.28f,0);
+    fp.prefetchOn=false; fp.cloudCover=fp.fogB=fp.wet=fp.snow=fp.storm=0;
+    fp.lightning=0; fp.wind=fp.windSock=vec3(0); fp.planeTerrSh=1;
+    fp.plN=0; fp.sunCol=vec3(0); fp.sealedCockpit=true;
+    fp.landLight=0; fp.plane.lensN=0; fp.plane.exhaust=ExhaustVisual{};
+    std::fill(std::begin(fp.plane.flame),std::end(fp.plane.flame),0.f);
+    std::fill(std::begin(fp.plane.vapor),std::end(fp.plane.vapor),0.f);
+    std::memset(fp.plane.wr,0,sizeof(fp.plane.wr));
+    // The terminal's olive glass is darker than the civilian hangar overlay.
+    // Lift only this material-free silhouette so its rim stays discernible there.
+    fp.exposure=3.f; fp.vignette=.25f;
+  }
+}
+
+// A loading preview is a camera over the actual frozen sortie, never a substitute aircraft or a separate simulation.
+// The same frame still streams the mission world and contributes to the existing readiness checks.
+void Game::militaryLoadingCamera(FrameParams& fp) {
+  const AircraftSpec& sp = *plane.spec;
+  fillPlaneVisual(fp.plane,plane,propAngle,false);
+  fp.dispMode=fp.feedRig=0; fp.fovY=32.f*DEG;
+  const float W=std::max(g_ren.W,1), H=std::max(g_ren.H,1), th=tanf(fp.fovY*.5f);
+  const float D=std::max(sp.span,sp.fusLen)*2.7f;
+  const vec3 P=plane.pos, C=P+plane.right()*(D*.7f)+plane.forward()*(D*.65f)+vec3(0,D*.3f,0);
+  const vec3 f=normalize(P-C), r=normalize(cross(f,vec3(0,1,0))), u=cross(r,f);
+  const vec3 aim=P-r*(.1f*D*th*W/H)-u*(.26f*D*th);
+  const vec3 look=normalize(aim-C);
+  fp.camPos=C; fp.camBack=-look; fp.camRight=normalize(cross(look,vec3(0,1,0))); fp.camUp=cross(fp.camRight,look);
+  fp.prefetchOn=true; fp.prefetchPos=plane.pos; fp.vignette=.35f;
 }
 
 // The preview: the selected craft hangs in the air over the chosen launch site, at the sortie's time of day, and the
@@ -3180,6 +3310,17 @@ void Game::researchPreviewCamera(FrameParams& fp) {
   }
   demo.pos = P; demo.rpm = 0; demo.flaps = 0; demo.nozzle = 0;
   fillPlaneVisual(fp.plane, demo, 0.f, resWarm && resWarmCk);   // (warming up, each craft's cockpit for a frame too: its cabin shell bakes now, not when the sortie opens)
+  if (sp.special == 2) {
+    // Preview the chosen hardware, not the live flight's old loadout. This is
+    // visual-only: no ammunition, encounter or career state changes in the terminal.
+    fp.plane.wr[6][3] = float(practiceForward);
+    fp.plane.wrBombSet = int(practiceBomb);
+    fp.plane.wr[6][0] = 1.f;
+    if (!resWarm && resCard < 0) {
+      fp.plane.wr[4][1] = 1.f; // open payload bay for equipment inspection
+      fp.plane.wr[4][2] = 1.f; // deployed forward hardware, weapons remain safe
+    }
+  }
   resPrevPos = P; resPrevQ = demo.q;
   // orbit
   ResLayout L = researchLayout();
@@ -3896,7 +4037,7 @@ void Game::update(float dt) {
   if (in.pressed[0x72]) showPerf = !showPerf;   // F3
   gamepadMenus(dt);
   focusNavigate();
-  if (screen == SCR_HUB && in.pad && !((in.buttons & PAD_LB) && (in.buttons & PAD_RB))) {   // the shoulders step through the hub's tabs
+  if (screen == SCR_HUB && !(hubTab == TAB_CONTRACTS && hubList == 2) && in.pad && !((in.buttons & PAD_LB) && (in.buttons & PAD_RB))) {   // the shoulders step through the hub's tabs
     const int nTabs = TAB_SETTINGS + 1;
     if (in.buttonsPressed & PAD_RB) { hubTab = (hubTab + 1) % nTabs; g_audio.trigger(SFX_CLICK); }
     if (in.buttonsPressed & PAD_LB) { hubTab = (hubTab + nTabs - 1) % nTabs; g_audio.trigger(SFX_CLICK); }
@@ -4838,7 +4979,8 @@ void Game::debugScene(const std::string& name) {
 
 // Military sorties are career-backed loaners; research practice uses the same combat engine off the books.
 void Game::launchMilitary(int kind) {
-  Contract c = career.militaryContract(std::clamp(kind, 0, 2));
+  if (!military::mission(kind)) return;
+  Contract c = career.militaryContract(kind);
   if (career.canFly(c, c.forceAircraft) != Career::SRC_MILITARY) return;
   bool begun=false;
   if (!commitLaunch([&](Career& k) { begun=k.beginMilitary(c); }) || !begun) return;
@@ -4857,9 +4999,14 @@ hive::WorldCallbacks Game::hiveWorld() {
 void Game::setupMilitaryEncounter() {
   hiveCombat.reset(career.military.missionSeed, WRAP_SPAN);
   militaryHull = 100; militarySettled = false;
-  combatLoadout.reset(hive::ForwardSet::Pulse, contract.type == CT_MIL_STRIKE ? hive::BombSet::Penetrator : hive::BombSet::Plasma);
+  const auto* mission = military::missionForContract(contract.type);
+  if (!mission) return; // Career launch validates the catalogue before committing the attempt.
+  for(auto& label:militarySiteLabels) label.clear();
+  combatLoadout.reset(mission->forward, mission->bomb);
   // Separate insertion and objective areas. Mission positions remain canonical over world seams.
   vec3 origin=plane.pos; origin.y=std::max(origin.y,g_world.height(origin.x,origin.z)+650.f);
+  if(mission->id==military::HighAltitudeIntel) origin.y=4500.f;
+  camPos+=origin-plane.pos; // Keep the flight camera with the supplied insertion altitude.
   plane.pos=origin;
   hive::MissionConfig m; m.extraction=origin; m.extractionRadius=300;
   vec3 f=plane.forward(); f.y=0; f=normalize(f+vec3(0,0,.0001f));
@@ -4872,7 +5019,13 @@ void Game::setupMilitaryEncounter() {
     const AptItem* picked=nullptr;
     const int priorities[]={preferred,EK_CTRL_TOWER,EK_FBO,EK_ARCH_HANGAR,EK_HANGAR,EK_T_HANGAR};
     for(int kind:priorities) {
-      for(const auto& item:items) if(item.kind==kind) { picked=&item;break; }
+      for(const auto& item:items) if(item.kind==kind) {
+        const auto& e=item.e; const auto& info=kEntInfo[item.kind];
+        const vec3 roof(e.x,e.y+info.h*e.sy+2.f,e.z);
+        bool used=false;
+        for(int j=0;j<index;++j) used|=length(hiveCombat.displacement(roof,m.objectives[j].position))<1.f;
+        if(!used) { picked=&item;break; }
+      }
       if(picked) break;
     }
     hive::Objective o; o.id=100+index;
@@ -4888,26 +5041,54 @@ void Game::setupMilitaryEncounter() {
     }
     return o;
   };
-  if (contract.type==CT_MIL_RECON) {
-    m.kind=hive::MissionKind::Recon; m.objectiveCount=std::min(3,(int)g_world.airports.size()); m.scanRange=1500; m.scanSeconds=5;
+  contract.brief=mission->brief;
+  if (mission->objective==hive::MissionKind::Recon) {
+    m.kind=hive::MissionKind::Recon; m.scanRange=mission->scanRange; m.scanSeconds=mission->scanSeconds;
+    const bool local=mission->id==military::LocalSurvey || mission->id==military::HoverScan;
+    const int wanted=mission->id==military::HoverScan?1:(mission->id==military::LocalSurvey || mission->id==military::HighAltitudeIntel)?2:3;
+    m.objectiveCount=local?wanted:std::min(wanted,(int)g_world.airports.size());
     std::vector<int> airports; for(int i=0;i<(int)g_world.airports.size();++i) airports.push_back(i);
     std::stable_sort(airports.begin(),airports.end(),[&](int a,int b) { return length(hiveCombat.displacement(origin,g_world.airports[a].pos()))<length(hiveCombat.displacement(origin,g_world.airports[b].pos())); });
     const int preferred[]={EK_CTRL_TOWER,EK_HANGAR,EK_FUEL_TANK};
-    for(int i=0;i<m.objectiveCount;++i) m.objectives[i]=site(airports[i],preferred[i],i);
-    contract.brief="Photograph the marked airport structures with five seconds of clear sensor view each. Keep each site ahead and within 1.5 km, then return to the airborne extraction gate.";
-    for(int i=0;i<m.objectiveCount;++i) contract.brief+=" "+militarySiteLabels[i]+".";
-    // Introductory unarmed security survey: no compulsory pursuer until bounded detection/escape patrols exist.
-  } else if (contract.type==CT_MIL_DEFENSE) {
+    for(int i=0;i<m.objectiveCount;++i) {
+      m.objectives[i]=site(local?contract.from:airports[i],preferred[i],i);
+      contract.brief+=" "+militarySiteLabels[i]+".";
+    }
+    // Sensors are the objective: unarmed XR sorties do not spawn unavoidable pursuing enemies.
+    // The precision hover sortie carries defensive stores, but no combat is needed to complete it.
+  } else if (mission->objective==hive::MissionKind::Defense) {
+    const bool heavy=mission->id==military::HeavyDefense;
     m.kind=hive::MissionKind::Defense; m.objectiveCount=1;
-    m.objectives[0]=site(contract.from,EK_CTRL_TOWER,0); m.objectives[0].health=600;
-    contract.brief="Protect "+militarySiteLabels[0]+" through all three Hive waves, then return to the airborne extraction gate. The existing runway and airport remain unchanged.";
-    m.waveCount=3;
-    for(int i=0;i<3;++i) { auto& w=m.waves[i]; w.at=i*28.f; w.position=m.objectives[0].position+f*(2600.f+i*150.f)+right*((i-1)*500.f); w.position.y=std::max(m.objectives[0].position.y+650.f,g_world.height(w.position.x,w.position.z)+300.f); w.count=i==2?3:2; w.types[0]=hive::Type::Needle; w.types[1]=hive::Type::Bastion; w.types[2]=hive::Type::Cantor; }
+    m.objectives[0]=site(contract.from,heavy?EK_HANGAR:EK_CTRL_TOWER,0); m.objectives[0].health=600;
+    contract.brief+=" Protected site: "+militarySiteLabels[0]+".";
+    m.waveCount=heavy?4:3;
+    for(int i=0;i<m.waveCount;++i) {
+      auto& w=m.waves[i]; w.at=i*(heavy?32.f:28.f);
+      w.position=m.objectives[0].position+f*(2600.f+i*150.f)+right*((i-1)*500.f);
+      w.position.x=wrapCoord(w.position.x); w.position.z=wrapCoord(w.position.z);
+      w.position.y=std::max(m.objectives[0].position.y+650.f,g_world.height(w.position.x,w.position.z)+300.f);
+      // Four bomber-led waves, bounded to the supplied 48 heavy rounds and six Plasma stores.
+      // Solo bomber, fighter escort, relay escort, fighter escort: no stacked blast damage is required.
+      w.count=heavy?(i==0?1:2):(i==2?3:2);
+      w.types[0]=heavy?hive::Type::Bastion:hive::Type::Needle;
+      w.types[1]=heavy?(i==2?hive::Type::Cantor:hive::Type::Needle):hive::Type::Bastion;
+      w.types[2]=hive::Type::Cantor;
+    }
   } else {
-    m.kind=hive::MissionKind::Strike; m.targetCount=2;
-    m.targetIds[0]=hiveCombat.spawn(hive::Type::Archon,point(4300,0,origin.y+150));
-    m.targetIds[1]=hiveCombat.spawn(hive::Type::Cantor,point(4000,500,origin.y+200));
-    hiveCombat.spawn(hive::Type::Needle,point(3500,-450,origin.y));
+    m.kind=hive::MissionKind::Strike;
+    if(mission->id==military::Interception) {
+      m.targetCount=3;
+      for(int i=0;i<3;++i) m.targetIds[i]=hiveCombat.spawn(hive::Type::Needle,point(2600.f+i*550.f,(i-1)*750.f,origin.y+float(i)*140.f));
+    } else if(mission->id==military::RelaySuppression) {
+      m.targetCount=3;
+      for(int i=0;i<3;++i) m.targetIds[i]=hiveCombat.spawn(hive::Type::Cantor,point(4000.f+i*200.f,(i-1)*550.f,origin.y+120.f));
+      for(int i=0;i<2;++i) hiveCombat.spawn(hive::Type::Bastion,point(3400.f,(i?1.f:-1.f)*650.f,origin.y));
+    } else {
+      m.targetCount=2;
+      m.targetIds[0]=hiveCombat.spawn(hive::Type::Archon,point(4300,0,origin.y+150));
+      m.targetIds[1]=hiveCombat.spawn(hive::Type::Cantor,point(4000,500,origin.y+200));
+      hiveCombat.spawn(hive::Type::Needle,point(3500,-450,origin.y));
+    }
   }
   hiveCombat.startMission(m);
   syncCombatPayload();
@@ -4941,10 +5122,29 @@ std::string Game::hiveObjectiveText() const {
   if(m.config.kind==hive::MissionKind::Recon) {
     int n=0; float scan=0; float nearest=1e9f; int target=0;
     for(int i=0;i<m.config.objectiveCount;++i) { const auto& o=m.config.objectives[i]; n+=o.scanned; if(!o.scanned) { float d=length(hiveCombat.displacement(plane.pos,o.position)); if(d<nearest) { nearest=d; target=i+1; scan=o.scan; } } }
-    return fmt("SCAN %d/%d / %s %.0f m / SENSOR %.0f%%",n,m.config.objectiveCount,target>0?militarySiteLabels[target-1].c_str():"EXTRACTION",nearest,100*scan/std::max(.1f,m.config.scanSeconds));
+    const auto* spec=military::missionForContract(contract.type);
+    // Mandatory sensor conditions lead the HUD line: long site names are ellipsized by the flight UI.
+    if(spec && spec->id==military::HighAltitudeIntel) {
+      if(plane.pos.y<spec->minAltitude) return "SCAN PAUSED / CLIMB TO 3500 m MSL";
+      if(plane.pos.y>spec->maxAltitude) return "SCAN PAUSED / DESCEND BELOW 6500 m MSL";
+      const float speed=sqrtf(plane.vel.x*plane.vel.x+plane.vel.z*plane.vel.z);
+      if(speed<spec->minSpeed) return fmt("SCAN PAUSED / SPEED %.0f kt / NEED 350+",speed*MS_TO_KT);
+    }
+    if(spec && spec->id==military::HoverScan) {
+      const float speed=length(plane.vel), above=plane.pos.y-m.config.objectives[0].position.y;
+      if(speed>spec->maxSpeed) return fmt("SCAN PAUSED / SLOW FROM %.0f TO 23 kt",speed*MS_TO_KT);
+      if(above<spec->minAltitude) return "SCAN PAUSED / CLIMB 30-120 m ABOVE ROOF";
+      if(above>spec->maxAltitude) return "SCAN PAUSED / DESCEND 30-120 m ABOVE ROOF";
+    }
+    return fmt("SCAN %d/%d %.0f%% / %s %.0f m",n,m.config.objectiveCount,100*scan/std::max(.1f,m.config.scanSeconds),target>0?militarySiteLabels[target-1].c_str():"EXTRACTION",nearest);
   }
   if(m.config.kind==hive::MissionKind::Defense) return fmt("DEFEND %s %.0f%% / WAVE %d/%d / HOSTILES %d",militarySiteLabels[0].c_str(),100*m.config.objectives[0].health/600.f,m.nextWave,m.config.waveCount,hiveCombat.aliveCount());
-  if(m.config.kind==hive::MissionKind::Strike) return fmt("STRIKE HIVE COMMAND / HOSTILES %d / HULL %.0f%%",hiveCombat.aliveCount(),militaryHull);
+  if(m.config.kind==hive::MissionKind::Strike) {
+    int destroyed=0; for(int i=0;i<m.config.targetCount;++i) destroyed+=m.targetsDestroyed[i];
+    const auto* spec=military::missionForContract(contract.type);
+    const char* role=spec && spec->id==military::Interception?"INTERCEPT NEEDLES":spec && spec->id==military::RelaySuppression?"STRIKE CANTOR RELAYS":"STRIKE HIVE COMMAND";
+    return fmt("%s / TARGETS %d/%d / HOSTILES %d / HULL %.0f%%",role,destroyed,m.config.targetCount,hiveCombat.aliveCount(),militaryHull);
+  }
   return fmt("PRACTICE / HOSTILES %d / HULL %.0f%% / PAUSE FOR RANGE CONTROLS",hiveCombat.aliveCount(),militaryHull);
 }
 void Game::syncCombatPayload() {
@@ -5002,7 +5202,13 @@ void Game::prefetchCombatCollision() {
 void Game::updateHive(float dt) {
   if(!militaryFlight && !(researchFlight && resCard<0 && specIdx==kWraith)) return;
   if(dt>0 && !paused) prefetchCombatCollision();
-  hive::PlayerSnapshot p; p.position=plane.pos; p.velocity=plane.vel; p.forward=plane.forward(); p.alive=!crashed && !plane.ev.crashed; p.scanning=militaryFlight && contract.type==CT_MIL_RECON;
+  hive::PlayerSnapshot p; p.position=plane.pos; p.velocity=plane.vel; p.forward=plane.forward(); p.alive=!crashed && !plane.ev.crashed; p.scanning=false;
+  if(militaryFlight) {
+    const auto* mission=military::missionForContract(contract.type);
+    const float roof=hiveCombat.mission.config.objectiveCount?hiveCombat.mission.config.objectives[0].position.y:0.f;
+    const float speed=mission && mission->id==military::HighAltitudeIntel?sqrtf(plane.vel.x*plane.vel.x+plane.vel.z*plane.vel.z):length(plane.vel);
+    p.scanning=mission && military::sensorEnvelope(*mission,plane.pos.y,speed,roof);
+  }
   p.up=plane.up();
   auto box=[&](vec3 center,vec3 halfExtent) {
     if(p.bodyBoxCount<hive::MaxPlayerBoxes) p.bodyBoxes[p.bodyBoxCount++]={center,halfExtent};

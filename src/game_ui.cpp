@@ -400,10 +400,14 @@ void Game::drawLoading() {
     while (!text.empty() && g_ren.textWidth(text + "...", size) > room) text.pop_back();
     return text + "...";
   };
+  const bool military = militaryFlight;
+  const vec3 accent = military ? vec3(.68f,.79f,.39f) : C_ACCENT;
+  const vec3 ink = military ? vec3(.04f,.065f,.028f) : C_INK;
+  const vec3 dim = military ? vec3(.66f,.72f,.58f) : C_DIM;
   bool air = !plane.onGround;
   const Airport& ap = g_world.airports[air ? contract.to : contract.from];
   // a picture rendered by render_loading.bat - the airport, or the aircraft in flight - when there is one on disk
-  std::string key = air ? fmt("air_%d", (int)(plane.spec - kAircraft)) : std::string(ap.code);
+  std::string key = (military || air) ? fmt("air_%d", (int)(plane.spec - kAircraft)) : std::string(ap.code);
   auto li = loadImg.find(key);
   if (li == loadImg.end()) {
     unsigned tex = 0; int w = 0, h = 0; std::vector<uint8_t> px;
@@ -413,13 +417,13 @@ void Game::drawLoading() {
     li = loadImg.emplace(key, tex).first;
   }
   unsigned pic = li->second;
-  if (!loadMap && !pic) {   // otherwise the aerial image of the airport, rendered once from the real terrain
+  if (!military && !loadMap && !pic) {   // otherwise the aerial image of the airport, rendered once from the real terrain
     loadMap = true; gpsMapValid = false;
     g_ren.renderMap(ap.x, ap.z, 2400.f, 1536);
   }
   float rt = loadReadyT >= 0 ? loadT - loadReadyT : 0.f;
   float cover = 1.f - smoothstepf(0.f, 1.4f, rt);   // the card fades out onto the live shot once the scenery is in
-  if (cover > 0.001f) {
+  if (cover > 0.001f && (!military || pic)) {
     g_ren.rect(0, 0, W, H, vec3(0.01f, 0.02f, 0.035f), cover);
     if (pic) {   // slow push-in over the picture (cropped to fill the screen)
       float z = 1.f - 0.06f * std::min(loadT, 12.f) / 12.f, asp = (W / H) / (16.f / 9.f);
@@ -440,43 +444,45 @@ void Game::drawLoading() {
   g_ren.rectGrad(0, 0, W, 90 * s, vec3(0.0f, 0.01f, 0.02f), vec3(0, 0, 0), 0.55f);
   // header
   bool research = researchFlight;
-  g_ren.text(40 * s, 26 * s, 13 * s, research ? "CONFIDENTIAL RESEARCH FLIGHT" : contract.type == CT_LESSON ? "FLIGHT LESSON" : "CONTRACT", C_ACCENT, 1, 0, false);
+  g_ren.text(40 * s, 26 * s, 13 * s, military ? "SOLACE DEFENSE / SORTIE PREPARATION" : research ? "CONFIDENTIAL RESEARCH FLIGHT" : contract.type == CT_LESSON ? "FLIGHT LESSON" : "CONTRACT", accent, 1, 0, false);
   g_ren.text(40 * s, 44 * s, 30 * s, fitLoading(contract.title, W - 80 * s, 30 * s), C_TEXT, 1);
   // mission card
   float cx = 40 * s, cy = H - 282 * s, cw = std::min(780 * s, W - 80 * s);
-  g_ren.rect(cx - 18 * s, cy - 18 * s, cw + 36 * s, 278 * s, vec3(0.012f, 0.026f, 0.043f), 0.91f, 12 * s);
-  g_ren.rectOutline(cx - 18 * s, cy - 18 * s, cw + 36 * s, 278 * s, C_ACCENT, 0.2f, 12 * s, 1 * s);
+  g_ren.rect(cx - 18 * s, cy - 18 * s, cw + 36 * s, 278 * s, (military ? vec3(.025f,.04f,.021f) : vec3(0.012f, 0.026f, 0.043f)), 0.91f, 12 * s);
+  g_ren.rectOutline(cx - 18 * s, cy - 18 * s, cw + 36 * s, 278 * s, accent, 0.2f, 12 * s, 1 * s);
   const Airport& from = g_world.airports[contract.from];
   const Airport& to = g_world.airports[contract.to];
-  header(cx, cy, cw, air ? "IN FLIGHT  //  INBOUND" : "DEPARTURE");
+  if (military) g_ren.text(cx, cy, 12*s, "SERVICE AIRCRAFT / EQUIPMENT AND FUEL INCLUDED", dim, 1, 0, false);
+  else header(cx, cy, cw, air ? "IN FLIGHT  //  INBOUND" : "DEPARTURE");
   g_ren.text(cx, cy + 26 * s, 40 * s, fmt("%s", ap.code), C_TEXT, 1);
-  g_ren.text(cx + g_ren.textWidth(ap.code, 40 * s) + 16 * s, cy + 40 * s, 20 * s, fitLoading(ap.name, cw - g_ren.textWidth(ap.code, 40 * s) - 16 * s, 20 * s), C_DIM, 1);
+  g_ren.text(cx + g_ren.textWidth(ap.code, 40 * s) + 16 * s, cy + 40 * s, 20 * s, fitLoading(ap.name, cw - g_ren.textWidth(ap.code, 40 * s) - 16 * s, 20 * s), dim, 1);
   float ly = cy + 86 * s;
   auto kv = [&](float x, const char* k, const std::string& v, float room) {
-    g_ren.text(x, ly, 11 * s, k, C_DIM, 1, 0, false);
+    g_ren.text(x, ly, 11 * s, k, dim, 1, 0, false);
     g_ren.text(x, ly + 15 * s, 17 * s, fitLoading(v, room, 17 * s), C_TEXT, 1);
   };
   kv(cx, "AIRCRAFT", plane.spec->name, cw / 3 - 20 * s);
   if (contract.from != contract.to) kv(cx + cw / 3, "ROUTE", fmt("%s  >  %s", from.code, to.code), cw / 3 - 20 * s);
   kv(cx + cw * (contract.from == contract.to ? 1.f : 2.f) / 3, "CONDITIONS", wx.describe(),
      cw * (contract.from == contract.to ? 2.f : 1.f) / 3 - 20 * s);
+  if (military) g_ren.text(W-40*s, 44*s, 14*s, fitLoading(plane.spec->name, W*.35f,14*s),accent,1,2,false);
   // progress / ready prompt
   float by = H - 70 * s, bw = cw, bh = 8 * s;
   if (loadReadyT < 0) {
     g_ren.text(cx, by - 24 * s, 13 * s, loadFrames < 2 ? "Preparing flight scene" : g_ren.entPending > 0 ? "Loading nearby scenery" : loadingShadowPending() ? "Preparing terrain shadows" : "Checking flight readiness", C_TEXT, 0.9f, 0, false);
-    g_ren.text(cx + bw, by - 24 * s, 13 * s, fmt("%d%%", std::min(99, (int)(clampf(loadShown, 0.f, 1.f) * 100.f))), C_ACCENT, 1, 2, false);
-    g_ren.rect(cx, by, bw, bh, C_ACCENT, 0.12f, 2 * s);
-    if (loadShown > 0.f) g_ren.rectGrad(cx, by, bw * loadShown, bh, C_ACCENT * 0.7f, C_ACCENT, 1, 2 * s);
-    g_ren.text(cx, by + 19 * s, 11 * s, fitLoading(g_ren.entPending > 0 ? fmt("%d scenery chunks remaining", g_ren.entPending) : loadingShadowPending() ? "Waiting for the terrain shadow pass" : "Verifying the scene before departure", bw, 11 * s), C_DIM, 0.9f, 0, false);
+    g_ren.text(cx + bw, by - 24 * s, 13 * s, fmt("%d%%", std::min(99, (int)(clampf(loadShown, 0.f, 1.f) * 100.f))), accent, 1, 2, false);
+    g_ren.rect(cx, by, bw, bh, accent, 0.12f, 2 * s);
+    if (loadShown > 0.f) g_ren.rectGrad(cx, by, bw * loadShown, bh, accent * 0.7f, accent, 1, 2 * s);
+    g_ren.text(cx, by + 19 * s, 11 * s, fitLoading(g_ren.entPending > 0 ? fmt("%d scenery chunks remaining", g_ren.entPending) : loadingShadowPending() ? "Waiting for the terrain shadow pass" : "Verifying the scene before departure", bw, 11 * s), dim, 0.9f, 0, false);
     float hx = cx + bw * loadShown;
-    g_ren.glow(hx - 4 * s, by - 2 * s, 8 * s, bh + 4 * s, C_ACCENT, 0.5f + 0.3f * sinf(realTime * 6.f), 4 * s, 14 * s);
+    g_ren.glow(hx - 4 * s, by - 2 * s, 8 * s, bh + 4 * s, accent, 0.5f + 0.3f * sinf(realTime * 6.f), 4 * s, 14 * s);
   } else {
     float pulse = 0.6f + 0.4f * sinf(realTime * 3.f);
     float bx = cx, bwid = 380 * s;
-    g_ren.glow(bx, by - 12 * s, bwid, 40 * s, C_ACCENT, 0.25f * pulse, 4 * s, 16 * s);
-    g_ren.rectGrad(bx, by - 12 * s, bwid, 40 * s, C_ACCENT * 1.05f, C_ACCENT * 0.6f, 0.95f, 4 * s);
-    g_ren.text(bx + bwid * 0.5f, by - 1 * s, 17 * s, padPrompts() ? "PRESS  A  TO FLY" : "CLICK OR PRESS ENTER TO FLY", C_INK, 1, 1, false);
-    g_ren.text(bx + bwid + 20 * s, by + 1 * s, 13 * s, padPrompts() ? "B  BACK" : "ESC  BACK", C_DIM, 0.9f, 0, false);
+    g_ren.glow(bx, by - 12 * s, bwid, 40 * s, accent, 0.25f * pulse, 4 * s, 16 * s);
+    g_ren.rectGrad(bx, by - 12 * s, bwid, 40 * s, accent * 1.05f, accent * 0.6f, 0.95f, 4 * s);
+    g_ren.text(bx + bwid * 0.5f, by - 1 * s, 17 * s, padPrompts() ? "PRESS  A  TO FLY" : "CLICK OR PRESS ENTER TO FLY", ink, 1, 1, false);
+    g_ren.text(bx + bwid + 20 * s, by + 1 * s, 13 * s, padPrompts() ? "B  BACK" : "ESC  BACK", dim, 0.9f, 0, false);
   }
 }
 
@@ -527,6 +533,7 @@ void Game::drawMenu() {
 
 // ------------------------------------------------------------------ hub
 void Game::drawHub() {
+  if (hubTab == TAB_CONTRACTS && hubList == 2) { FrameParams fp{}; drawMilitary(fp); return; }
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   uiGlass = true;   // (panels and cards in the hub's glass style; reset at the end)
   // A steady backdrop keeps small data legible without obscuring the hangar exhibit.
@@ -638,27 +645,7 @@ void Game::drawMapView(float x, float y, float w, float h, int from, int to, con
 
 void Game::drawHubContracts(float x, float y, float w, float h) {
   float s = S();
-  if(hubList==2) {
-    panel(x,y,w,h);
-    if(button(x+20*s,y+16*s,130*s,32*s,"< Civilian work")) { hubList=0; return; }
-    g_ren.text(x+180*s,y+20*s,21*s,"MILITARY SERVICE / OUTFITTED LOANERS",C_ACCENT,1);
-    g_ren.text(x+28*s,y+52*s,12*s,fmt("SERVICE RANK %d / %d SC / %d SORTIES / %d SUCCESSES / %d INTELLIGENCE",career.military.rank,career.military.credits,career.military.sorties,career.military.successes,career.military.intelligence),C_GOOD,1);
-    float yy=y+84*s;
-    for(int kind=0;kind<3;++kind) {
-      Contract c=career.militaryContract(kind);
-      const float rowH=std::min(142*s,(h-167*s)/3.f);
-      card(x+20*s,yy,w-40*s,rowH-10*s,militarySelection==kind,false,C_ACCENT);
-      g_ren.text(x+36*s,yy+10*s,18*s,c.title,C_TEXT,1);
-      float ty=yy+35*s;
-      for(auto& line:wrap(c.brief,w-285*s,12*s)) { if(ty>yy+rowH-20*s) break; g_ren.text(x+36*s,ty,12*s,line,C_DIM,1);ty+=17*s; }
-      if(button(x+w-228*s,yy+18*s,190*s,38*s,kind==0?"Fly recon loaner":"Fly outfitted XR-40",!commitBlocked(),true)) { militarySelection=kind; launchMilitary(kind); return; }
-      g_ren.text(x+w-225*s,yy+64*s,12*s,fmt("Award: %d service credits",c.payout),C_GOOD,1);
-      yy+=rowH;
-    }
-    g_ren.text(x+28*s,y+h-55*s,12*s,"Separate service record. Supplied aircraft, fuel and stores. Civilian jobs and finances stay intact.",C_DIM,1);
-    if(!hubMsg.empty()) g_ren.text(x+28*s,y+h-30*s,12*s,hubMsg,C_WARN,1);
-    return;
-  }
+  if(hubList==2) { FrameParams fp{}; drawMilitary(fp); return; }
   float lw = std::min(w * 0.29f, 370 * s);
   panel(x, y, lw, h);
   // build card list: story, free flight, freelance
@@ -1000,6 +987,21 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   else if (!can) g_ren.text(px, y + h - 50 * s, 14 * s, "Tip: check the Hangar to buy an aircraft, or earn your next licence through the story.", C_DIM, 1);
 }
 
+void Game::drawHangarPreviewControls(float x, float y, float w) {
+  // A shared strip below both showroom stages. Native buttons preserve the
+  // existing palette, keyboard focus, mouse hit targets and controller A.
+  const float s = S(), controlW = (w - 48 * s) / 5.f, controlX = x + 12 * s;
+  const float controlY = y + 23 * s, controlStep = controlW + 6 * s;
+  g_ren.rect(x, y, w, 56 * s, C_PANEL, 0.9f, 4 * s);
+  g_ren.text(controlX + controlW + 3 * s, y + 8 * s, 9 * s, "ROTATE", C_DIM, 1, 1, false);
+  g_ren.text(controlX + 3 * controlW + 15 * s, y + 8 * s, 9 * s, fmt("ZOOM %.2fx", hangarView.zoom), C_DIM, 1, 1, false);
+  if (button(controlX, controlY, controlW, 26 * s, "<##hangar-rotate-left")) hangarView.rotate(-15 * DEG);
+  if (button(controlX + controlStep, controlY, controlW, 26 * s, ">##hangar-rotate-right")) hangarView.rotate(15 * DEG);
+  if (button(controlX + 2 * controlStep, controlY, controlW, 26 * s, "-##hangar-zoom-out")) hangarView.magnify(-.1f);
+  if (button(controlX + 3 * controlStep, controlY, controlW, 26 * s, "+##hangar-zoom-in")) hangarView.magnify(.1f);
+  if (button(controlX + 4 * controlStep, controlY, controlW, 26 * s, "Reset##hangar-reset")) hangarView.reset();
+}
+
 void Game::drawHubHangar(float x, float y, float w, float h) {
   const float s = S();
   const HangarLayout layout = hangarLayout(x, y, w, h, s);
@@ -1045,13 +1047,13 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
   g_ren.text(x + 18 * s, y + h - 22 * s, 11 * s, ellipsize(fmt("%02d - %02d / %02d   SCROLL", first + 1, std::min(catalogCount, first + visible), catalogCount), lw - 36 * s, 11 * s), C_DIM, 0.85f, 0, false);
   const AircraftSpec& a = kAircraft[selHangar];
   const bool classified = hangarResearchLocked(selHangar);
+  hangarView.select(selHangar, false);
   // The real selected aircraft is framed here by the hangar scene camera. No opaque panel covers it.
   g_ren.rectGrad(vx, y, vw, 82 * s, vec3(0.01f, 0.023f, 0.038f), vec3(0.02f, 0.04f, 0.06f), 0.84f, 4 * s);
   g_ren.text(vx + 18 * s, y + 13 * s, 11 * s, classified ? "CLASSIFIED AIRFRAME" : "AIRCRAFT INSPECTION", classified ? C_WARN : C_ACCENT, 1, 0, false);
   fitText(vx + 18 * s, y + 33 * s, vw - 36 * s, 28 * s, 16 * s, classified ? std::string(hangarResearchDesignation(selHangar)) + " / REDACTED" : a.name, C_TEXT);
-  g_ren.rect(vx, y + h - 56 * s, vw, 56 * s, C_PANEL, 0.9f, 4 * s);
-  g_ren.text(vx + 18 * s, y + h - 43 * s, 11 * s, "ROLE", C_DIM, 1, 0, false);
-  g_ren.text(vx + 18 * s, y + h - 25 * s, 14 * s, ellipsize(classified ? "CLASSIFIED / RESEARCH ACCESS ONLY" : a.role, vw - 36 * s, 14 * s), C_TEXT, 1);
+  g_ren.text(vx + 18 * s, y + 66 * s, 10 * s, ellipsize(classified ? "CLASSIFIED / RESEARCH ACCESS ONLY" : a.role, vw - 36 * s, 10 * s), C_DIM, 1, 0, false);
+  drawHangarPreviewControls(vx, y + h - 56 * s, vw);
   // Inspector is independently scrollable. Every economic action survives at large UI scales.
   const float px = rx + 20 * s, iw = rw - 40 * s, regTop = y + 54 * s, regBot = y + h - 24 * s;
   if (classified) {
@@ -1212,13 +1214,13 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   }
   g_ren.text(x + 18 * s, y + h - 22 * s, 11 * s, ellipsize(fmt("%02d - %02d / %02d   SCROLL", craftFirst + 1, std::min(kNumAircraft, craftFirst + craftVisible), kNumAircraft), lw - 36 * s, 11 * s), C_DIM, 0.85f, 0, false);
   const AircraftSpec& spec = kAircraft[freeCraft];
+  hangarView.select(freeCraft, true);
   const float vx = L.previewX, vw = L.previewWidth;
   g_ren.rectGrad(vx, y, vw, 82 * s, C_PANEL, C_PANEL2, 0.86f, 4 * s);
   g_ren.text(vx + 18 * s, y + 13 * s, 11 * s, "READY FOR FREE FLIGHT", C_ACCENT, 1, 0, false);
   fitText(vx + 18 * s, y + 33 * s, vw - 36 * s, 28 * s, 16 * s, spec.name, C_TEXT);
-  g_ren.rect(vx, y + h - 56 * s, vw, 56 * s, C_PANEL, 0.93f, 4 * s);
-  g_ren.text(vx + 18 * s, y + h - 43 * s, 11 * s, "CRUISE / RANGE", C_DIM, 1, 0, false);
-  g_ren.text(vx + 18 * s, y + h - 25 * s, 15 * s, ellipsize(fmt("%s / %.0f km", fmtSpeed(spec.cruise).c_str(), spec.rangeKm), vw - 36 * s, 15 * s), C_TEXT, 1);
+  g_ren.text(vx + 18 * s, y + 66 * s, 10 * s, ellipsize(fmt("CRUISE / RANGE   %s / %.0f km", fmtSpeed(spec.cruise).c_str(), spec.rangeKm), vw - 36 * s, 10 * s), C_DIM, 1, 0, false);
+  drawHangarPreviewControls(vx, y + h - 56 * s, vw);
   const float px = rx + 18 * s, iw = rw - 36 * s;
   header(px, y + 20 * s, iw, "STARTING AIRPORT");
   const float airportTop = y + 54 * s, airportBottom = y + h - 200 * s, airportStep = 49 * s;
@@ -2613,6 +2615,7 @@ void Game::drawGps() {
 
 // ------------------------------------------------------------------ hidden research menu (U + I on the main menu)
 void Game::drawPause() {
+  if (militaryFlight && !settingsFromPause) { drawMilitaryPause(); return; }
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.55f);
   if (settingsFromPause) {
@@ -2646,6 +2649,7 @@ void Game::drawPause() {
 }
 
 void Game::drawDebrief() {
+  if (isMilitaryContract(contract.type)) { drawMilitaryDebrief(); return; }
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.35f);
   float pw = std::min(720 * s, W - 40 * s), ph = std::min(760 * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;

@@ -55,9 +55,10 @@
       meter(100.f, true); q.wpIndex = 2; divert(); saved = reload();
       check(saved && q.career.job && near(q.career.job->surveySec, 400.f) && near(q.career.job->surveyInSec, 100.f), "second leg adds seconds, not averages or duplicated cumulative totals");
       {
+        // Downgrade the fixture honestly: v3 has neither military ledger nor v6 progress.
         std::ifstream input(root / "career.sav"); std::string line, v3;
         while (std::getline(input, line)) {
-          if (line.rfind("survey_known ", 0) == 0 || line.rfind("plan2 ", 0) == 0 || line.rfind("military ", 0) == 0) continue;
+          if (line.rfind("survey_known ", 0) == 0 || line.rfind("plan2 ", 0) == 0 || line.rfind("military ", 0) == 0 || line.rfind("military_progress ", 0) == 0) continue;
           if (line.rfind("solace_save ", 0) == 0) line = "solace_save 3";
           v3 += line + "\n";
         }
@@ -77,7 +78,7 @@
       // A legitimate older v3 recovery save lacks the new fields. Migrate its unknowable history explicitly.
       q.beginCareerFlight(c, 1, Career::SRC_RENT); q.wpIndex = 6; q.flightClock = 300; divert();
       std::ifstream input(root / "career.sav"); std::string line, old;
-      while (std::getline(input, line)) { if (line.rfind("job3 ", 0) == 0 || line.rfind("survey_known ", 0) == 0 || line.rfind("survey ", 0) == 0 || line.rfind("plan2 ", 0) == 0 || line.rfind("military ", 0) == 0) continue; if (line.rfind("solace_save ", 0) == 0) line = "solace_save 3"; old += line + "\n"; }
+      while (std::getline(input, line)) { if (line.rfind("job3 ", 0) == 0 || line.rfind("survey_known ", 0) == 0 || line.rfind("survey ", 0) == 0 || line.rfind("plan2 ", 0) == 0 || line.rfind("military ", 0) == 0 || line.rfind("military_progress ", 0) == 0) continue; if (line.rfind("solace_save ", 0) == 0) line = "solace_save 3"; old += line + "\n"; }
       input.close(); { std::ofstream output(root / "legacy.sav"); output << old; }
       Career legacy; bool migrated = legacy.load((root / "legacy.sav").string()); q.career = legacy;
       check(migrated && q.career.job && q.career.job->wpDone == 6 && !q.career.job->surveyHistoryKnown && near(q.career.job->jobClockMin, 5.f), "older save keeps checkpoints and clock with explicit unknown altitude history");

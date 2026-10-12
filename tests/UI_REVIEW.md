@@ -52,3 +52,16 @@ LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=1 GALLIVM_PERF=nopt \
 Final camera checks additionally cover all three transformed tyre supports (within0.1mm of the showroom floor) and zero propeller blur/phase for parked prop aircraft. Verified at720p/140%,1080p/100%, and1080p/115%.
 
 The interactions batch also traverses all13hangar rows through keyboard and D-pad activation, checks mouse selection and absent economic controls for all4classified entries, traverses all9FreeFlight aircraft and all16airports, and checks runway/airborne setup, Escape return, and unchanged career state. Every Free Flight selection also builds the actual preview frame with a conflicting classified career selection and asserts that the rendered model is the selected free aircraft, with normal showroom lighting. Core launch/pause/retry/career-file isolation has separate gameplay regressions.
+
+
+## Military terminal and sortie review
+
+The `militaryN` scenes select stable military mission ID N on a fresh career (board IDs 3,4,5,6,7,1,8,9,2); only ID 3 is initially available. Use `military4_locked`, `military4_unlocked` and `military4_completed` to compare the same XR-20 silhouette, unlocked aircraft and replay state. The unlocked/completed screenshot fixtures explicitly seed prerequisite success records; gameplay tests separately prove genuine objective/extraction unlocks. `militaryNscroll` exercises the right-hand briefing's scroll region. `military_loadingN` launches the real supplied mission and updates the loading readiness path between completed render frames; `military_loadingNlive` suppresses only the packaged photo in the fixture to exercise native exterior fallback. `military_pauseN` and `military_debriefN` show production military pause and aborted-sortie results.
+
+For this review, full production startup and native aircraft rendering succeeded on Mesa llvmpipe without the older fleet-only diagnostic substitutions above. See `docs/CLAUDE_MILITARY_CAREER_REVIEW.md` for measured coverage and committed native captures. UI-only mode remains layout evidence only.
+
+## Research equipment and preview controls
+
+Use `research40`, `research40_kinetic_emp_underside`, `research40_heavy_penetrator_underside`, `research40_testcard` and optional `_focus`/`_scroll` suffixes. The selected-kit fixtures alter only UI selection/inspection pose and use the native preview model. `_scroll` needs at least three frames. At 1280×720 with UI scale1.4, check the compact two-by-two airframe tiles and actual test-card targets, not just the equipment rail.
+
+`hangar0_rotated`, `hangar0_zoomed`, `hangar12_rotated` (classified XR-40) and `freeflight0_rotated` use the native safe showroom turntable/lens. The shared controls should remain below the aircraft and leave purchase/departure state untouched.

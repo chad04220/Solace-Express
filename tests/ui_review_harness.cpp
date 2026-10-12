@@ -4,6 +4,7 @@
 #include "../src/menu_layout.h"
 #include "../src/hangar_catalog.h"
 #include "../src/models.h"
+#include "../src/military_missions.h"
 #include <dlfcn.h>
 #include <filesystem>
 #include <sstream>
@@ -29,7 +30,7 @@ static bool initGL(int W,int H){
 struct GameTest {
   static void checkInteractions(Game& g) {
     auto require=[](bool ok,const char* why){if(!ok){fprintf(stderr,"FAIL: %s\n",why);exit(3);}};
-    auto frame=[&](){g_ren.uiBegin();FrameParams fp{};g.drawResearch(fp);g_ren.uiEnd();g.in=Input{};};
+    auto frame=[&](){g.focusList.clear();g_ren.uiBegin();FrameParams fp{};g.drawResearch(fp);g_ren.uiEnd();g.in=Input{};};
     const int ids[]={kNightjar,kMantis,kResearchJet,kWraith};
     require(g.resCraft==kResearchJet,"original research default is XR-30");
     g.debugScene("research10");
@@ -37,14 +38,12 @@ struct GameTest {
       require(g.resCraft==ids[i],"research keyboard sequence");
       g.in.pressed[K_TAB]=true;frame();
     }
-    // Exercise the original terminal's adaptive cards, not the discarded redesign's fixed rows.
+    // Click the actual adaptive cards: tall viewports use the original list, constrained ones compact tiles.
     auto L=g.researchLayout();const float s=g.S();
-    int nCardsMax=0;
-    for(int craft:ids){int n=0;for(int i=0;i<Game::kNumResCards;i++)if(Game::kResCards[i].craft==craft)n++;nCardsMax=std::max(nCardsMax,n);}
-    const float cardY=L.top+22*s,listH=(30+18*(nCardsMax+1)+40)*s;
-    const float cardH=clampf((L.bot-cardY-12*s*3-listH)/4,64*s,150*s);
     for(int cycle=0;cycle<3;cycle++) for(int i=0;i<4;i++){
-      g.in.mx=L.lx+20*s;g.in.my=cardY+i*(cardH+12*s)+cardH*.5f;g.in.mPressed[0]=true;frame();
+      Game::Focusable target{};for(const auto& f:g.focusList)if(f.id==0x7E5C0000u+uint32_t(i))target=f;
+      require(target.id,"research adaptive layout exposes each airframe target");
+      g.in.mx=target.x+target.w*.5f;g.in.my=target.y+target.h*.5f;g.in.mPressed[0]=true;frame();
       require(g.resCraft==ids[i],"research mouse airframe selection");
     }
     g.resCard=0;g.resCraft=kWraith;frame();require(g.resCard==-1,"incompatible research test cleared");
@@ -77,6 +76,42 @@ struct GameTest {
       }
       printf("PASS tab %d offscreen action focus identity and reachability\n",tab);
     }
+  }
+  static void checkResearchLoadout(Game& g) {
+    auto require=[](bool ok,const char* why){if(!ok){fprintf(stderr,"FAIL: %s\n",why);exit(3);}};
+    g.debugScene("research40");g.in=Input{};g.uiDt=1.f/60;g.focusNav=false;g.resIdleT=0;
+    auto frame=[&](){g.gamepadMenus(1.f/60);g.focusNavigate();g_ren.uiBegin();FrameParams fp{};
+      g.researchPreviewCamera(fp);g.drawResearch(fp);g_ren.uiEnd();g.in.endFrame();};
+    auto control=[&](uint32_t id){for(const auto& f:g.focusList)if(f.id==id)return f;return Game::Focusable{};};
+    frame();frame();const auto L=g.researchLayout();const float s=g.S();
+    for(uint32_t id:{0x7E5F0010u,0x7E5F0011u,0x7E5F0012u}) {
+      const auto f=control(id);
+      require(f.id==id && f.x>=L.rx && f.x+f.w<=L.rx+L.rw && f.y>=L.top+36*s && f.y+f.h<=L.bot-24*s,
+        "research equipment is visible inside right rail, outside aircraft stage");
+      const float yaw=g.resYaw;g.focusNav=false;g.in.mx=f.x+f.w*.5f;g.in.my=f.y+f.h*.5f;
+      g.in.mPressed[0]=g.in.mDown[0]=true;g.in.mdx=12;frame();
+      require(!g.resDrag && std::fabs(g.resYaw-yaw)<.001f,"research rail click cannot drag aircraft preview");
+      g.in.mDown[0]=false;frame();
+    }
+    FrameParams equipped{};g.researchPreviewCamera(equipped);
+    require(equipped.plane.model==kWraith && equipped.plane.wrBombSet==int(g.practiceBomb) &&
+      int(equipped.plane.wr[6][3])==int(g.practiceForward) && equipped.plane.wr[6][0]>0,
+      "research render frame carries selected weapon and payload model");
+    for(uint32_t id:{0x7E5F0030u,0x7E5F0031u,0x7E5F0032u,0x7E5F0033u,0x7E5F0034u}) {
+      const auto f=control(id);
+      require(f.id==id && f.x>=L.px0 && f.x+f.w<=L.px1+.01f && f.y>=L.bot-56*s && f.y+f.h<=L.bot,
+        "research preview controls fit a dedicated strip outside aircraft stage and equipment rail");
+    }
+    const float yaw=g.resYaw;g.focusNav=false;g.in.mx=L.cx;g.in.my=L.bot-76*s;
+    g.in.mPressed[0]=g.in.mDown[0]=true;g.in.mdx=20;frame();
+    require(g.resDrag && std::fabs(g.resYaw-yaw-.16f)<.001f,"lower aircraft stage accepts drag across former equipment overlay");
+    g.in.mDown[0]=false;frame();g.in.mx=L.rx+L.rw*.5f;g.in.my=L.bot-40*s;g.in.wheel=-1000;frame();frame();
+    require(control(0x7E5F0010u).y<L.top+36*s,"research specifications scroll beneath their clipped rail");
+    g.focusNav=true;g.focusId=0x7E5F0010u;frame();frame();
+    require(control(0x7E5F0010u).y>=L.top+36*s-.01f,"focused equipment scrolls back into view");
+    g.in=Input{};g.focusNav=false;g.in.pressed[K_ESC]=true;frame();
+    require(g.screen==SCR_MENU,"research loadout review returns without launching");
+    printf("PASS research right-rail kit layout, native preview equipment fields, no clickthrough, full-stage drag and focus scroll\n");
   }
   static void checkLoading(Game& g) {
     auto require=[](bool ok,const char* why){if(!ok){fprintf(stderr,"FAIL: %s\n",why);exit(3);}};
@@ -150,12 +185,55 @@ struct GameTest {
     require(g.career.money==money&&g.career.fleet.size()==fleet&&g.career.location==location&&g.career.storyIndex==story,"free-flight UI leaves career untouched");
     printf("PASS free-flight %d aircraft + %zu airport keyboard selection, runway/airborne and Escape, career unchanged\n",kNumAircraft,g_world.airports.size());
   }
+  // Review fixtures retain production launch gates: later mission captures have an explicit coherent
+  // prerequisite history. Ordinary military<ID> / _locked scenes always use fresh-career visibility.
+  static void militaryPrerequisites(Game& g,int selected,bool completed=false) {
+    if(selected==military::LegacyRecon)return;
+    for(int id:military::kBoardMissionIds) {
+      if(id==selected && !completed)break;
+      g.career.military.completedMissions|=uint32_t(1)<<id;
+      ++g.career.military.successes; ++g.career.military.sorties;
+      if(id==selected)break;
+    }
+    g.career.military.rank=std::min(10,g.career.military.successes/3);
+  }
   static void setup(Game& g,const std::string& sc,float scale) {
     g.realTime=30;g.uiDt=1.f;g.set.uiScale=scale;g.assetDir="assets";g.saveDir=(std::filesystem::temp_directory_path()/"solace-ui-review-settings").string();std::filesystem::create_directories(g.saveDir);
     if(!g.iconTex){int w,h;std::vector<uint8_t> px;if(readImage(getenv("UI_ICON")?getenv("UI_ICON"):"assets/icon.png",w,h,px))g.iconTex=g_ren.makeTexture(px.data(),w,h);}
+    if(sc.rfind("military_pause",0)==0 || sc.rfind("military_debrief",0)==0) {
+      const bool pause=sc.rfind("military_pause",0)==0;
+      const int id=atoi(sc.c_str()+(pause?14:16));militaryPrerequisites(g,id);
+      g.launchMilitary(id); g.paused=pause;
+      if(!pause) g.endFlight(false,"Military sortie aborted",OUT_ABANDONED);
+      g.toasts.clear();g.in=Input{};
+    } else if(sc.rfind("military_loading",0)==0) {
+      const int id=atoi(sc.c_str()+16);militaryPrerequisites(g,id);g.launchMilitary(id);g.screen=SCR_LOADING;
+      g.toasts.clear(); g.in=Input{};
+      if(sc.find("live")!=std::string::npos) g.loadImg[fmt("air_%d",g.specIdx)]=0;
+    } else if(sc.rfind("military",0)==0) {
+      g.screen=SCR_HUB; g.hubTab=TAB_CONTRACTS; g.hubList=2; g.militarySelection=atoi(sc.c_str()+8);
+      if(sc.find("_unlocked")!=std::string::npos || sc.find("_completed")!=std::string::npos)
+        militaryPrerequisites(g,g.militarySelection,sc.find("_completed")!=std::string::npos);
+      printf("MILITARY REVIEW: mission=%d state=%s completion_bits=%u. Fixture progression; live UI and aircraft renderer.\n",
+        g.militarySelection,g.career.militaryMissionCompleted(g.militarySelection)?"completed/replayable":
+        g.career.militaryMissionUnlocked(g.militarySelection)?"available":"classified",g.career.military.completedMissions);
+    }
     if(sc.rfind("freeflight",0)==0){g.beginFreeFlightSetup();g.freeCraft=atoi(sc.c_str()+10);g.freeAirborne=sc.find("airborne")!=std::string::npos;}
-    if(sc.rfind("research",0)==0||sc=="menuT5")g.debugScene(sc);
+    if(sc.rfind("research40",0)==0) {
+      g.debugScene("research40");
+      if(sc.find("kinetic_emp")!=std::string::npos){g.practiceForward=hive::ForwardSet::Kinetic;g.practiceBomb=hive::BombSet::EMP;g.practiceWave=3;}
+      if(sc.find("heavy_penetrator")!=std::string::npos){g.practiceForward=hive::ForwardSet::Heavy;g.practiceBomb=hive::BombSet::Penetrator;g.practiceWave=1;}
+      if(sc.find("testcard")!=std::string::npos)for(int i=0;i<Game::kNumResCards;++i)if(Game::kResCards[i].craft==kWraith){g.resCard=i;break;}
+      if(sc.find("underside")!=std::string::npos){g.resPitch=-.35f;g.resYaw=2.15f;g.resZoom=1.1f;}
+      if(sc.find("focus")!=std::string::npos){g.focusScreen=SCR_RESEARCH*4;g.focusNav=true;g.focusId=0x7E5F0011u;}
+    } else if(sc.rfind("research",0)==0||sc=="menuT5")g.debugScene(sc);
     if(sc.rfind("hangar",0)==0){g.screen=SCR_HUB;g.hubTab=TAB_HANGAR;g.selHangar=atoi(sc.c_str()+6);}
+    if((sc.rfind("hangar",0)==0 || sc.rfind("freeflight",0)==0) &&
+       (sc.find("rotated")!=std::string::npos || sc.find("zoomed")!=std::string::npos)) {
+      FrameParams selected{};g.hangarPreviewCamera(selected);
+      if(sc.find("rotated")!=std::string::npos)g.hangarView.yaw=90*DEG;
+      if(sc.find("zoomed")!=std::string::npos)g.hangarView.zoom=1.35f;
+    }
     if(sc.find("airline_active")!=std::string::npos){g.career.money=1000000;g.career.license=LIC_ATP;g.career.storyIndex=(int)g_story.size();for(int i=0;i<5;i++){g.career.fleet.push_back({i,g.career.location,50,.9f});g.career.airline.pilots.push_back({"Review pilot "+std::to_string(i+1),2,200});}}
     if(sc=="logbook"){g.screen=SCR_HUB;g.hubTab=TAB_LOGBOOK;}
     if(sc=="menu_saved"||sc=="menu_overwrite"){g.hasSave=true;g.confirmNew=sc=="menu_overwrite";}
@@ -175,7 +253,10 @@ struct GameTest {
     if(frame==1 && sc.find("scroll")!=std::string::npos){g.in.mx=g_ren.W*.85f;g.in.my=g_ren.H*.5f;g.in.wheel=-100;}
   }
   static void draw(Game& g,const std::string& sc) {
-    if(sc.rfind("menu",0)==0)g.drawMenu();
+    if(sc.rfind("military_pause",0)==0)g.drawPause();
+    else if(sc.rfind("military_debrief",0)==0)g.drawDebrief();
+    else if(sc.rfind("military_loading",0)==0)g.drawLoading();
+    else if(sc.rfind("menu",0)==0)g.drawMenu();
     else if(sc=="pause")g.drawPause();
     else if(sc.rfind("freeflight",0)==0){FrameParams fp{};g.drawFreeFlightSetup(fp);}
     else if(sc.rfind("intro",0)==0){float p=.4f,t=5;sscanf(sc.c_str(),"intro_%f_%f",&p,&t);g.shaderFirstRun=true;g.drawIntro(p,fmt("Preparing GPU shader cache: Terrain program 4 of %d | Building islands",Renderer::kProgramCount),t,g.iconTex,1.f);}
@@ -186,7 +267,7 @@ struct GameTest {
 };
 int main(int argc,char**argv){
   setvbuf(stdout,nullptr,_IONBF,0);
-  if(argc<3){fprintf(stderr,"Usage: ui_review_harness scenes(comma separated) output-dir [W H ui-scale scene-mode]\n");return 2;}
+  if(argc<3){fprintf(stderr,"Usage: ui_review_harness scenes(comma separated) output-dir [W H ui-scale scene-mode]\nMilitary state pairs: military4_locked,military4_unlocked,military4_completed; fresh initial: military3\n");return 2;}
   const int W=argc>3?atoi(argv[3]):1920,H=argc>4?atoi(argv[4]):1080;
   const float scale=argc>5?atof(argv[5]):1;const bool full=argc>6&&std::string(argv[6])=="scene";
 #ifdef UI_REVIEW_FLEET_ONLY
@@ -207,10 +288,10 @@ int main(int argc,char**argv){
   std::istringstream input(argv[1]);std::string sc;
   while(std::getline(input,sc,',')){
     Game* g=new Game();g->initHeadless();GameTest::setup(*g,sc,scale);
-    if(sc=="interactions"){GameTest::checkInteractions(*g);GameTest::checkScrollFocus(*g);GameTest::checkLoading(*g);GameTest::checkHangarFraming(*g);GameTest::checkCatalog(*g);GameTest::checkFreeFlightUI(*g);delete g;continue;}
+    if(sc=="interactions"){GameTest::checkInteractions(*g);GameTest::checkResearchLoadout(*g);GameTest::checkScrollFocus(*g);GameTest::checkLoading(*g);GameTest::checkHangarFraming(*g);GameTest::checkCatalog(*g);GameTest::checkFreeFlightUI(*g);delete g;continue;}
     for(int f=0;f<(full?(getenv("FRAMES")?atoi(getenv("FRAMES")):1):3);f++){
       GameTest::scrollSetup(*g,sc,f);
-      if(full){g->render();}else{
+      if(full){if(sc.rfind("military_loading",0)==0) g->update(1.f/30.f); g->render();}else{
         glBindFramebuffer(GL_FRAMEBUFFER,0);glViewport(0,0,W,H);glClearColor(.014f,.025f,.042f,1);glClear(GL_COLOR_BUFFER_BIT);
         g_ren.uiBegin();GameTest::draw(*g,sc);g_ren.uiEnd();
       }

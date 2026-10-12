@@ -1,0 +1,5 @@
+47caa3f83de940e3b3e430f8135813ab898d73b4cc392330d8dd3c723edd1085  docs/military-review/military-debrief.png
+2616e5191ebc5ac6d065edfaef668371357498db383b9ceec981acd5ce5bea37  docs/military-review/military-loading-live-xr40.png
+7c3cbb1346428cdbf7325fddd51dcd469422203f7ae137b5599d1806c360244e  docs/military-review/military-pause.png
+6e358bb5a612777ce15824a791a5179b4968f164a3987469b0367f09e0a08819  docs/military-review/military-terminal-xr10.png
+b141a06befe56b3f7e89ffd21b8fd0c38b1ec3d12990babe310ae447145f2258  docs/military-review/military-terminal-xr40.png

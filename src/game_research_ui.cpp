@@ -10,6 +10,7 @@ const vec3 R_ICE(0.42f, 0.93f, 1.f), R_DIM(0.36f, 0.55f, 0.66f), R_TEXT(0.88f, 0
 const vec3 R_AMBER(1.f, 0.72f, 0.26f), R_GREEN(0.4f, 1.f, 0.62f), R_VIOLET(0.8f, 0.5f, 1.f), R_INK(0.0f, 0.015f, 0.03f);
 const vec3 R_TEAL(0.3f, 0.95f, 0.8f), R_EMBER(1.f, 0.58f, 0.22f);
 const char* kGlyphs = "0123456789ABCDEF#%&@$*+=<>/\\|";
+const float kPreviewControlsHeight = 56.f;
 
 // the airframes on the register, in the order of their cards (the XR number order); every craft-specific piece of
 // the terminal reads from here, so a new research craft is one more row
@@ -161,8 +162,9 @@ Game::ResLayout Game::researchLayout() const {
   L.rw = std::min(380 * s, W * 0.31f); L.rx = W - 24 * s - L.rw;
   L.top = 62 * s; L.bot = H - 132 * s;
   L.px0 = L.lx + L.lw + 18 * s; L.px1 = L.rx - 18 * s;
-  L.cx = 0.5f * (L.px0 + L.px1); L.cy = 0.5f * (L.top + L.bot);
-  L.r = std::max(60 * s, 0.45f * std::min(L.px1 - L.px0, L.bot - L.top));
+  const float stageBot = L.bot - kPreviewControlsHeight * s;
+  L.cx = 0.5f * (L.px0 + L.px1); L.cy = 0.5f * (L.top + stageBot);
+  L.r = std::max(60 * s, 0.45f * std::min(L.px1 - L.px0, stageBot - L.top));
   return L;
 }
 
@@ -241,6 +243,9 @@ void Game::drawResearch(const FrameParams& fp) {
   const float T = resSeq, aT = realTime - resOpened;
   bool wr = resCraft == kWraith;
   const ResCraftInfo& RC = kResCraft[resCraftSlot(resCraft)];
+  // The native preview was built before this draw. Keep its dossier and callouts together
+  // until the following frame when an airframe/test-card click has changed the selection.
+  const bool displayedRange = wr && resCard < 0;
   vec3 ACC = RC.colour;
   // ------------------------------------------------------------------ biometric access sequence
   if (T < kIntro) {
@@ -469,34 +474,54 @@ void Game::drawResearch(const FrameParams& fp) {
     int nCardsMax = 0;
     for (int k = 0; k < kNumResCraft; k++) { int n = 0; for (int i = 0; i < kNumResCards; i++) if (kResCards[i].craft == kResCraft[k].idx) n++; nCardsMax = std::max(nCardsMax, n); }
     float listH = 30 * s + 18 * s * (nCardsMax + 1) + 40 * s;
-    float h = clampf((L.bot - y - 12 * s * (kNumResCraft - 1) - listH) / kNumResCraft, 64 * s, 150 * s), f = h / (150 * s);
-    for (int k = 0; k < kNumResCraft; k++) {
-      const ResCraftInfo& C = kResCraft[k];
-      int craft = C.idx;
-      bool sel = resCraft == craft, hov = hovered(x, y, w, h);
-      vec3 c = C.colour;
-      float lift = anim(0x5e10 + k, sel ? 1.f : hov ? 0.5f : 0.f, 10.f);
-      g_ren.rectGrad(x, y, w, h, c * (0.05f + 0.08f * lift), vec3(0, 0.01f, 0.02f), 0.85f * e);
-      g_ren.rectOutline(x, y, w, h, c, (0.18f + 0.5f * lift) * e, 0, 1 * s);
-      if (sel) { corners(x - 3 * s, y - 3 * s, w + 6 * s, h + 6 * s, 14 * s, 2 * s, c, e); g_ren.glow(x, y, w, h, c, 0.12f * e, 0, 14 * s); }
-      // a glint that runs across the selected card
-      if (sel) { float gx = x + fmodf(realTime * 0.6f, 1.6f) * w - 0.3f * w; if (gx > x && gx < x + w - 30 * s) g_ren.rect(gx, y + 1, 30 * s, h - 2, c, 0.05f * e); }
-      g_ren.text(x + 14 * s, y + 10 * f * s, 10.5f * f * s, C.code, R_DIM, e, 0, false);
-      g_ren.text(x + 14 * s, y + 26 * f * s, 34 * f * s, C.num, sel ? R_TEXT : c, e, 0, false);
-      g_ren.text(x + 14 * s, y + 66 * f * s, 14 * f * s, C.name, c, e, 0, false);
-      silhouette(craft, x + w - 58 * f * s, y + 58 * f * s, 44 * f * s, c, (0.45f + 0.5f * lift) * e, 1.3f * s);
-      const char* bl[3] = {"VELOCITY", "AGILITY", "SIGNATURE"};
-      for (int b = 0; b < 3; b++) {
-        float by = y + (92 + b * 17) * f * s;
-        g_ren.text(x + 14 * s, by, 10 * f * s, bl[b], R_DIM, e, 0, false);
-        float bx = x + 90 * s, bw = w - 104 * s;
-        for (int q = 0; q < 20; q++) {
-          bool on = q < (int)(C.bars[b] * 20 + 0.5f);
-          g_ren.rect(bx + q * bw / 20.f, by + 2 * s, bw / 20.f - 2 * s, 8 * f * s, b == 2 ? R_AMBER : c, (on ? 0.85f : 0.12f) * e);
-        }
+    const float availableCardH = (L.bot - y - 12 * s * (kNumResCraft - 1) - listH) / kNumResCraft;
+    if (availableCardH < 64 * s) {
+      // A compact register preserves room for every test card. Tiny stacked statistics
+      // are less useful here than readable airframe names and real reachable row targets.
+      const float gap = 12 * s, tw = (w - gap) * .5f;
+      const float th = clampf((L.bot - y - listH - 2 * gap) * .5f, 48 * s, 90 * s);
+      for (int k = 0; k < kNumResCraft; ++k) {
+        const ResCraftInfo& C = kResCraft[k];
+        const float tx = x + (k % 2) * (tw + gap), ty = y + (k / 2) * (th + gap);
+        const bool sel = resCraft == C.idx, hov = hovered(tx, ty, tw, th);
+        g_ren.rectGrad(tx, ty, tw, th, C.colour * (sel ? .13f : hov ? .09f : .05f), R_INK, .85f * e);
+        g_ren.rectOutline(tx, ty, tw, th, C.colour, (sel ? .68f : hov ? .48f : .22f) * e, 0, s);
+        if (sel) corners(tx - 3 * s, ty - 3 * s, tw + 6 * s, th + 6 * s, 10 * s, 2 * s, C.colour, e);
+        g_ren.text(tx + 10 * s, ty + 8 * s, 23 * s, C.num, sel ? R_TEXT : C.colour, e, 0, false);
+        g_ren.text(tx + 10 * s, ty + th - 17 * s, 10.5f * s, C.name, C.colour, e, 0, false);
+        if (click(tx, ty, tw, th, 0x7E5C0000u + uint32_t(k))) resCraft = C.idx;
       }
-      if (y + h <= L.bot && click(x, y, w, h, 0x7E5C0000u + (uint32_t)k)) resCraft = craft;
-      y += h + 12 * s;
+      y += 2 * (th + gap);
+    } else {
+      float h = clampf(availableCardH, 64 * s, 150 * s), f = h / (150 * s);
+      for (int k = 0; k < kNumResCraft; k++) {
+        const ResCraftInfo& C = kResCraft[k];
+        int craft = C.idx;
+        bool sel = resCraft == craft, hov = hovered(x, y, w, h);
+        vec3 c = C.colour;
+        float lift = anim(0x5e10 + k, sel ? 1.f : hov ? 0.5f : 0.f, 10.f);
+        g_ren.rectGrad(x, y, w, h, c * (0.05f + 0.08f * lift), vec3(0, 0.01f, 0.02f), 0.85f * e);
+        g_ren.rectOutline(x, y, w, h, c, (0.18f + 0.5f * lift) * e, 0, 1 * s);
+        if (sel) { corners(x - 3 * s, y - 3 * s, w + 6 * s, h + 6 * s, 14 * s, 2 * s, c, e); g_ren.glow(x, y, w, h, c, 0.12f * e, 0, 14 * s); }
+        // a glint that runs across the selected card
+        if (sel) { float gx = x + fmodf(realTime * 0.6f, 1.6f) * w - 0.3f * w; if (gx > x && gx < x + w - 30 * s) g_ren.rect(gx, y + 1, 30 * s, h - 2, c, 0.05f * e); }
+        g_ren.text(x + 14 * s, y + 10 * f * s, 10.5f * f * s, C.code, R_DIM, e, 0, false);
+        g_ren.text(x + 14 * s, y + 26 * f * s, 34 * f * s, C.num, sel ? R_TEXT : c, e, 0, false);
+        g_ren.text(x + 14 * s, y + 66 * f * s, 14 * f * s, C.name, c, e, 0, false);
+        silhouette(craft, x + w - 58 * f * s, y + 58 * f * s, 44 * f * s, c, (0.45f + 0.5f * lift) * e, 1.3f * s);
+        const char* bl[3] = {"VELOCITY", "AGILITY", "SIGNATURE"};
+        for (int b = 0; b < 3; b++) {
+          float by = y + (92 + b * 17) * f * s;
+          g_ren.text(x + 14 * s, by, 10 * f * s, bl[b], R_DIM, e, 0, false);
+          float bx = x + 90 * s, bw = w - 104 * s;
+          for (int q = 0; q < 20; q++) {
+            bool on = q < (int)(C.bars[b] * 20 + 0.5f);
+            g_ren.rect(bx + q * bw / 20.f, by + 2 * s, bw / 20.f - 2 * s, 8 * f * s, b == 2 ? R_AMBER : c, (on ? 0.85f : 0.12f) * e);
+          }
+        }
+        if (y + h <= L.bot && click(x, y, w, h, 0x7E5C0000u + (uint32_t)k)) resCraft = craft;
+        y += h + 12 * s;
+      }
     }
     if (in.pressed[K_TAB] || (in.buttonsPressed & PAD_X)) resCraft = kResCraft[(resCraftSlot(resCraft) + 1) % kNumResCraft].idx;
     // the test cards for this craft (a finished one keeps its tick), or free roam
@@ -527,9 +552,9 @@ void Game::drawResearch(const FrameParams& fp) {
   // ------------------------------------------------------------------ centre: the 3D preview stage
   {
     float cx = L.cx, cy = L.cy, R = L.r;
+    const float stageBot = L.bot - kPreviewControlsHeight * s;
     // interaction: drag to turn, wheel to zoom, right stick turns
-    bool inStage = hovered(L.px0, L.top, L.px1 - L.px0, L.bot - L.top);
-    if(resCraft==kWraith && resCard<0 && in.my>=std::max(L.top+20*s,L.bot-240*s)) inStage=false;
+    bool inStage = hovered(L.px0, L.top, L.px1 - L.px0, stageBot - L.top);
     if (inStage && in.mPressed[0]) resDrag = true;
     if (!in.mDown[0]) resDrag = false;
     if (resDrag) { resYaw += in.mdx * 0.008f; resPitch = clampf(resPitch + in.mdy * 0.006f, -0.5f, 1.0f); resIdleT = 0; }
@@ -546,9 +571,11 @@ void Game::drawResearch(const FrameParams& fp) {
       g_ren.line(cx + cosf(th) * (R * 1.1f), cy + sinf(th) * (R * 1.1f), cx + cosf(th) * (R * 1.1f + L1), cy + sinf(th) * (R * 1.1f + L1), 1 * s, ACC, 0.5f * e);
     }
     float brg = fmodf(fmodf(resYaw / DEG, 360.f) + 360.f, 360.f);
-    g_ren.text(cx, std::min(cy + R * 1.1f + 14 * s, L.bot - 16 * s), 11 * s, fmt("VIEW  %03.0f  //  ELEV %+03.0f  //  ZOOM %.1fx      DRAG TO ROTATE  -  WHEEL TO ZOOM", brg, resPitch / DEG, resZoom), R_DIM, e, 1, false);
+    const std::string viewText = fmt("VIEW  %03.0f  //  ELEV %+03.0f  //  ZOOM %.1fx", brg, resPitch / DEG, resZoom);
+    const float viewSize = 11 * s * std::min(1.f, (L.px1 - L.px0 - 24 * s) / std::max(1.f, g_ren.textWidth(viewText, 11 * s)));
+    g_ren.text(cx, std::min(cy + R * 1.1f + 14 * s, stageBot - 16 * s), viewSize, viewText, R_DIM, e, 1, false);
     // brackets on the stage
-    float sx0 = L.px0, sy0 = L.top, sw = L.px1 - L.px0, sh = L.bot - L.top;
+    float sx0 = L.px0, sy0 = L.top, sw = L.px1 - L.px0, sh = stageBot - L.top;
     corners(sx0, sy0, sw, sh, 18 * s, 2 * s, ACC, 0.7f * e);
     g_ren.text(sx0 + 10 * s, sy0 + 8 * s, 11 * s, "LIVE RENDER  //  " + std::string(g_world.airports[resAirport].code) + " RANGE", ACC, e, 0, false);
     // re-scan band after a selection change
@@ -561,16 +588,16 @@ void Game::drawResearch(const FrameParams& fp) {
     // callouts: points on the actual airframe, projected from the live render
     struct Call { vec3 b; const char* t; float side; };
     std::vector<Call> calls;
-    float fl = kAircraft[resCraft].fusLen * 0.5f;
+    float fl = kAircraft[RC.idx].fusLen * 0.5f;
     if (wr) calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  PASSIVE", -1}, {kWraithPods[1], "POD 2  //  130 kN  0-90 DEG", 1},
                      {kWraithPods[2], "POD 3  //  VECTORING VANES", -1}, {vec3(6.2f, -0.24f, 2.0f), "FACETED SKIN  //  CLOAK MESH", 1}};
-    else if (resCraft == kResearchJet) calls = {{vec3(0, 0, -fl), "SYNTHETIC-VISION POD", -1}, {vec3(2.1f, 0.1f, -4.4f), "CANARD  //  ALL-MOVING", 1},
+    else if (RC.idx == kResearchJet) calls = {{vec3(0, 0, -fl), "SYNTHETIC-VISION POD", -1}, {vec3(2.1f, 0.1f, -4.4f), "CANARD  //  ALL-MOVING", 1},
                   {vec3(5.62f, -0.38f, 4.4f), "CRANKED DELTA  //  NO FLAPS", 1}, {vec3(-0.82f, -0.12f, 7.75f), "2D NOZZLE  //  +-29 DEG", -1}};
     else {   // a conventional airframe: its parts from the parametric model
-      const ModelDef& md = kModels[resCraft];
+      const ModelDef& md = kModels[RC.idx];
       vec3 tip = modelWingTip(md), fin = modelFinTop(md);
-      calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  TEST RADAR", -1}, {tip, resCraft == kMantis ? "FORWARD SWEEP  //  SLOTTED FLAPS" : "TAPERED WING  //  SLOTTED FLAPS", 1},
-               {vec3(-md.nacX, md.nacY, md.nacZ0 + md.nacLen * 0.5f), resCraft == kMantis ? "CENTERLINE CORE  //  88 kN RATED" : "TURBOFAN  //  30 kN RATED", -1}, {fin, resCraft == kMantis ? "TWIN CANTED FINS" : "CONVENTIONAL TAIL", 1}};
+      calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  TEST RADAR", -1}, {tip, RC.idx == kMantis ? "FORWARD SWEEP  //  SLOTTED FLAPS" : "TAPERED WING  //  SLOTTED FLAPS", 1},
+               {vec3(-md.nacX, md.nacY, md.nacZ0 + md.nacLen * 0.5f), RC.idx == kMantis ? "CENTERLINE CORE  //  88 kN RATED" : "TURBOFAN  //  30 kN RATED", -1}, {fin, RC.idx == kMantis ? "TWIN CANTED FINS" : "CONVENTIONAL TAIL", 1}};
     }
     float ca = e * smoothstepf(0.6f, 1.3f, selT);
     int ci = 0;
@@ -579,39 +606,96 @@ void Game::drawResearch(const FrameParams& fp) {
       if (!g_ren.project(fp, resPrevPos + resPrevQ.rotate(c.b), px, py)) continue;
       // each side has a slot near the top and one near the bottom of the stage, away from the craft
       int slot = 0; for (int q = 0; q < ci; q++) if (calls[q].side == c.side) slot++;
-      float lx = c.side > 0 ? L.px1 - 12 * s : L.px0 + 12 * s, ly = slot == 0 ? L.top + 58 * s : L.bot - 40 * s;
-      float ex = lx + (c.side > 0 ? -170 * s : 170 * s);
+      float lx = c.side > 0 ? L.px1 - 12 * s : L.px0 + 12 * s, ly = slot == 0 ? L.top + 58 * s : stageBot - 40 * s;
+      const float callWidth = std::max(s, (L.px1 - L.px0) * .5f - 20 * s);
+      float ex = lx + (c.side > 0 ? -1.f : 1.f) * std::min(170 * s, callWidth);
       g_ren.rect(px - 3 * s, py - 3 * s, 6 * s, 6 * s, ACC, ca, 3 * s);
       ring(px, py, 8 * s + 2 * s * sinf(realTime * 3 + ci), 1 * s, ACC, 0.6f * ca, 20);
       g_ren.line(px, py, ex, ly, 1 * s, ACC, 0.6f * ca);
       g_ren.line(ex, ly, lx, ly, 1 * s, ACC, 0.6f * ca);
-      g_ren.text(c.side > 0 ? lx : lx, ly - 15 * s, 10.5f * s, decrypt(c.t, selT - 0.8f - ci * 0.1f, 0.01f), R_TEXT, ca, c.side > 0 ? 2 : 0, false);
+      g_ren.text(lx, ly - 15 * s, 10.5f * s, ellipsize(decrypt(c.t, selT - 0.8f - ci * 0.1f, 0.01f), callWidth, 10.5f * s), R_TEXT, ca, c.side > 0 ? 2 : 0, false);
       ci++;
+    }
+    // Dedicated view controls sit below the stage. The same reduced stage dimensions feed
+    // researchPreviewCamera, so the native model is framed above these buttons too.
+    const float gap = 6 * s, bw = (sw - 4 * gap) / 5.f, by = stageBot + 10 * s, bh = 32 * s;
+    const float fs = std::min(10.5f * s, bw / 7.5f);
+    const char* labels[] = {"< ROTATE", "ROTATE >", "ZOOM -", "ZOOM +", "RESET"};
+    for (int i = 0; i < 5; ++i) {
+      const float bx = sx0 + i * (bw + gap);
+      const bool hov = hovered(bx, by, bw, bh), focused = focusNav && focusId == 0x7E5F0030u + uint32_t(i);
+      g_ren.rectGrad(bx, by, bw, bh, R_VIOLET * (hov || focused ? .19f : .10f), R_INK, .85f * e);
+      g_ren.rectOutline(bx, by, bw, bh, R_VIOLET, (hov || focused ? .85f : .36f) * e, 0, s);
+      g_ren.text(bx + bw * .5f, by + (bh - fs) * .5f, fs, labels[i], focused ? R_TEXT : R_VIOLET, e, 1, false);
+      if (click(bx, by, bw, bh, 0x7E5F0030u + uint32_t(i))) {
+        if (i < 2) resYaw += (i ? 1.f : -1.f) * 15.f * DEG;
+        else if (i < 4) resZoom = clampf(resZoom * (i == 2 ? .9f : 1.1f), .6f, 1.8f);
+        else { resYaw = .7f; resPitch = .15f; resZoom = 1.f; }
+        resIdleT = 0; resDrag = false;
+      }
     }
   }
   // ------------------------------------------------------------------ right: specification, envelope, notes
   {
     float x = L.rx, y = L.top, w = L.rw;
-    tag(x, y, s, "SPECIFICATION  //  DECRYPTED", ACC, e); y += 24 * s;
+    const bool range = displayedRange;
+    tag(x, y, s, range ? "RANGE CONFIGURATION  //  XR-40" : "SPECIFICATION  //  DECRYPTED", ACC, e); y += 24 * s;
     slab(x, y, w, L.bot - y, s, ACC, e);
     float px = x + 14 * s, iw = w - 28 * s, py = y + 12 * s;
-    g_ren.text(px, py, 11 * s, decrypt(RC.title, selT, 0.01f), ACC, e, 0, false); py += 18 * s;
+    // The equipment owns the existing side rail, never the live aircraft stage. At compact
+    // sizes the whole rail scrolls, rather than pinning the kit above a one-line specification.
+    // Keep this transient viewport state on the Game instance, including capture/test instances.
+    float& rangeScroll = uiAnim[0x7E5F0100u]; float& rangeContent = uiAnim[0x7E5F0101u];
+    float& railFor = uiAnim[0x7E5F0102u]; float& railOpened = uiAnim[0x7E5F0103u];
+    const int railKey = RC.idx * 2 + (range ? 1 : 0);
+    if (railFor != railKey || railOpened != resOpened) { railFor = float(railKey); railOpened = resOpened; rangeScroll = rangeContent = 0.f; }
+    const float railTop = py, railBot = L.bot - 24 * s;
+    const size_t railFocus0 = focusList.size();
+    bool rangeWheeled = false;
+    if (range) {
+      if (hovered(x, railTop, w, railBot - railTop) && in.wheel != 0) {
+        rangeScroll -= in.wheel * 44 * s; in.wheel = 0; rangeWheeled = true;
+      }
+      rangeScroll = std::clamp(rangeScroll, 0.f, std::max(0.f, rangeContent - (railBot - railTop)));
+      hitClipOn = true; hitClip[0] = x + 8 * s; hitClip[1] = railTop;
+      hitClip[2] = x + w - 8 * s; hitClip[3] = railBot;
+      g_ren.uiClip(hitClip[0], hitClip[1], hitClip[2], hitClip[3]);
+      py -= rangeScroll;
+      drawCombatPractice(px, py, iw);
+      py += 212 * std::min(s, iw / 250.f);
+      g_ren.rect(px, py, iw, s, ACC, .22f * e); py += 16 * s;
+      tag(px, py, s, "SPECIFICATION  //  DECRYPTED", ACC, e); py += 24 * s;
+    }
+    if (range) {
+      for (const auto& line : wrap(RC.title, iw, 11 * s)) {
+        g_ren.text(px, py, 11 * s, decrypt(line, selT, .01f), ACC, e, 0, false); py += 15 * s;
+      }
+      py += 3 * s;
+    } else {
+      g_ren.text(px, py, 11 * s, decrypt(RC.title, selT, 0.01f), ACC, e, 0, false); py += 18 * s;
+    }
     const SpecRow* rows = RC.rows;
     for (int i = 0; i < 8; i++) {
       float rt = selT - 0.1f - i * 0.06f;
       g_ren.text(px, py, 10 * s, rows[i].k, R_DIM, e, 0, false);
-      g_ren.text(px + 112 * s, py - 1 * s, 12 * s, decrypt(rows[i].v, rt, 0.012f), R_TEXT, e, 0, false);
+      float extra = 0.f;
+      if (range) {
+        const auto lines = wrap(rows[i].v, iw - 112 * s, 12 * s);
+        for (size_t line = 0; line < lines.size(); ++line)
+          g_ren.text(px + 112 * s, py - s + line * 16 * s, 12 * s, decrypt(lines[line], rt, .012f), R_TEXT, e, 0, false);
+        extra = std::max(0, int(lines.size()) - 1) * 16 * s;
+      } else g_ren.text(px + 112 * s, py - 1 * s, 12 * s, decrypt(rows[i].v, rt, 0.012f), R_TEXT, e, 0, false);
       if (rows[i].bar >= 0) {
         float f = rows[i].bar * smoothstepf(0.f, 0.5f, rt);
-        g_ren.rect(px + 112 * s, py + 15 * s, iw - 112 * s, 2 * s, ACC, 0.12f * e);
-        g_ren.rect(px + 112 * s, py + 15 * s, (iw - 112 * s) * f, 2 * s, rows[i].k[0] == 'S' && wr ? R_AMBER : ACC, 0.9f * e);
+        g_ren.rect(px + 112 * s, py + extra + 15 * s, iw - 112 * s, 2 * s, ACC, 0.12f * e);
+        g_ren.rect(px + 112 * s, py + extra + 15 * s, (iw - 112 * s) * f, 2 * s, rows[i].k[0] == 'S' && wr ? R_AMBER : ACC, 0.9f * e);
       }
-      py += 23 * s;
+      py += 23 * s + extra;
     }
     // manoeuvre envelope (V-n): load factor against Mach
     py += 6 * s;
     tag(px, py, s, "MANOEUVRE ENVELOPE", ACC, e); py += 20 * s;
-    float ch = std::min(120 * s, L.bot - py - 120 * s);
+    float ch = range ? 120 * s : std::min(120 * s, L.bot - py - 120 * s);
     if (ch > 50 * s) {
       float gx0 = px + 26 * s, gw = iw - 30 * s, gy0 = py, gh = ch;
       float mMax = RC.idx == kNightjar ? 1.6f : (RC.vMax > 1.5f ? 4.f : 1.f), nTop = RC.nTop, nBot = RC.nBot, nStep = RC.nStep;   // each craft on its own scale
@@ -632,7 +716,25 @@ void Game::drawResearch(const FrameParams& fp) {
       py += gh + 22 * s;
     }
     tag(px, py, s, "HANDLING DIRECTIVES", ACC, e); py += 20 * s;
-    for (int i = 0; i < 5 && py < L.bot - 16 * s; i++) { g_ren.text(px, py, 11 * s, std::string("> ") + RC.notes[i], R_DIM, e, 0, false); py += 16 * s; }
+    for (int i = 0; i < 5 && (range || py < L.bot - 16 * s); i++) {
+      if (range) {
+        for (const auto& line : wrap(std::string("> ") + RC.notes[i], iw, 11 * s)) {
+          g_ren.text(px, py, 11 * s, line, R_DIM, e, 0, false); py += 16 * s;
+        }
+      } else { g_ren.text(px, py, 11 * s, std::string("> ") + RC.notes[i], R_DIM, e, 0, false); py += 16 * s; }
+    }
+    if (range) {
+      rangeContent = py + rangeScroll - railTop + 4 * s;
+      hitClipOn = false; g_ren.uiClipOff();
+      const float viewH = railBot - railTop, limit = std::max(0.f, rangeContent - viewH);
+      if (limit > 0) {
+        const float thumb = std::max(24 * s, viewH * viewH / rangeContent);
+        g_ren.rect(x + w - 5 * s, railTop, 2 * s, viewH, R_DIM, .18f * e);
+        g_ren.rect(x + w - 5 * s, railTop + (viewH - thumb) * std::min(rangeScroll / limit, 1.f), 2 * s, thumb, ACC, .85f * e);
+        g_ren.text(px, L.bot - 16 * s, 9.5f * s, ellipsize(padPrompts() ? "R-STICK SCROLL  //  EQUIPMENT + SPECS" : "SCROLL  //  EQUIPMENT + SPECIFICATIONS", iw, 9.5f * s), R_DIM, e, 0, false);
+      }
+      focusScrollPixels(railFocus0, 0x7E5F0020u, x, railTop, w, railBot, rangeScroll, rangeWheeled, limit > 0);
+    }
   }
   // ------------------------------------------------------------------ bottom: sortie parameters
   {
@@ -693,16 +795,22 @@ void Game::drawResearch(const FrameParams& fp) {
     g_ren.glow(bx, by, bw, bh, ACC, (hov ? 0.35f : 0.15f) * e, 0, 14 * s);
     g_ren.text(bx + bw * 0.5f, by + 9 * s, 16 * hs, std::string("INITIATE  ") + RC.num, R_TEXT, e, 1, false);
     g_ren.text(bx + bw * 0.5f, by + 29 * s, 9 * hs, resCard >= 0 ? std::string("TEST CARD  ") + kResCards[resCard].id + "  " + kResCards[resCard].title : "FREE ROAM  //  NOT RECORDED IN LOGBOOK", resCard >= 0 ? ACC : R_DIM, e, 1, false);
-    const bool rangeStart=resCraft==kWraith && resCard<0 && (in.buttonsPressed & PAD_START);
-    if (click(bx, by, bw, bh, 0x7E5E0030u) || (in.pressed[K_ENTER] && !focusNav) || rangeStart) {
+    const bool start = (in.buttonsPressed & PAD_START) != 0;
+    if (click(bx, by, bw, bh, 0x7E5E0030u) || (in.pressed[K_ENTER] && !focusNav) || start) {
       in.buttonsPressed &= ~PAD_START; in.pressed[K_ENTER]=false;
       launchResearch(); return;
     }
   }
-  if(resCraft==kWraith && resCard<0) drawCombatPractice(L.px0+12*s,std::max(L.top+20*s,L.bot-240*s),std::max(180*s,L.px1-L.px0-24*s));
-  g_ren.text(W * 0.5f, H - 22 * s, 10.5f * s, padPrompts() ? "D-PAD MOVE / STEP   A SELECT   X SWITCH AIRFRAME   R-STICK ROTATE   LB / RB SITE   START INITIATE   B ABORT"
-                                                     : "TAB SWITCH AIRFRAME   <- / -> SITE   DRAG ROTATE   WHEEL ZOOM   ENTER INITIATE   ESC ABORT",
-             R_DIM, 0.75f * e, 1, false);
+  const bool range = displayedRange;
+  const bool viewFocus = focusNav && focusId >= 0x7E5F0030u && focusId <= 0x7E5F0034u;
+  const char* prompts = padPrompts() ? (range ? "D-PAD MOVE / STEP   A SELECT   X AIRFRAME   R-STICK ROTATE / SCROLL   LB / RB SITE   START INITIATE   B ABORT"
+                                                          : "D-PAD MOVE / STEP   A SELECT   X SWITCH AIRFRAME   R-STICK ROTATE   LB / RB SITE   START INITIATE   B ABORT")
+                                     : (viewFocus ? "ARROWS MOVE FOCUS   ENTER SELECT   TAB AIRFRAME   DRAG ROTATE   WHEEL ZOOM / SCROLL   ESC ABORT"
+                                                  : range ? "UP / DOWN FOCUS   ENTER SELECT / INITIATE   TAB AIRFRAME   <- / -> SITE   DRAG ROTATE   WHEEL ZOOM / SCROLL   ESC ABORT"
+                                                          : "UP / DOWN FOCUS   ENTER SELECT / INITIATE   TAB AIRFRAME   <- / -> SITE   DRAG ROTATE   WHEEL ZOOM   ESC ABORT");
+  const float promptLeft = 24 * s, promptRight = W - 44 * s - g_ren.textWidth("CLASSIFIED", 10.5f * s);
+  const float promptSize = 10.5f * s * std::min(1.f, (promptRight - promptLeft) / std::max(1.f, g_ren.textWidth(prompts, 10.5f * s)));
+  g_ren.text((promptLeft + promptRight) * .5f, H - 22 * s, promptSize, prompts, R_DIM, 0.75f * e, 1, false);
   if (fmodf(realTime, 1.4f) < 1.0f) g_ren.text(W - 24 * s, H - 22 * s, 10.5f * s, "CLASSIFIED", R_RED, 0.85f * e, 2, false);
 }
 
@@ -712,6 +820,49 @@ int resCraftAt(int k) { return k >= 0 && k < kNumResCraft ? kResCraft[k].idx : -
 
 // Data-driven XR-40 equipment choices; the same controls are available in the paused range.
 void Game::drawCombatPractice(float x,float y,float width) {
+  if (screen == SCR_RESEARCH) {
+    const float s = std::min(S(), width / 250.f), a = smoothstepf(4.9f, 5.4f, resSeq);
+    // Stable identities survive value changes, rail scrolling and UI scaling. A clipped row
+    // still participates in focus navigation, but cannot activate until it is fully visible.
+    auto selector = [&](uint32_t id, float yy, const char* label, const char* value, int index, int count) {
+      const float h = 38 * s;
+      focusList.push_back({id, x, yy, width, h});
+      const bool visible = !hitClipOn || (yy >= hitClip[1] && yy + h <= hitClip[3]);
+      const bool focused = focusNav && focusId == id, hov = visible && hovered(x, yy, width, h);
+      g_ren.rectGrad(x, yy, width, h, R_VIOLET * (hov || focused ? .18f : .09f), R_INK, .9f * a);
+      g_ren.rectOutline(x, yy, width, h, R_VIOLET, (focused ? .9f : hov ? .65f : .3f) * a, 0, s);
+      g_ren.rect(x, yy + 8 * s, 2 * s, h - 16 * s, R_VIOLET, .9f * a);
+      g_ren.text(x + 10 * s, yy + 5 * s, 9 * s, label, R_DIM, a, 0, false);
+      g_ren.text(x + width - 10 * s, yy + 5 * s, 9 * s, fmt("%02d / %02d", index + 1, count), R_DIM, a, 2, false);
+      g_ren.text(x + 10 * s, yy + 19 * s, 12 * s, ellipsize(value, width - 42 * s, 12 * s), R_TEXT, a, 0, false);
+      g_ren.text(x + width - 12 * s, yy + 19 * s, 12 * s, ">", R_VIOLET, a, 2, false);
+      if (focused) corners(x - 3 * s, yy - 3 * s, width + 6 * s, h + 6 * s, 8 * s, s, R_VIOLET, a);
+      const bool take = visible && focused && (in.pressed[K_ENTER] || in.pressed[' ']);
+      if (take || (hov && !focusNav && in.mPressed[0])) {
+        in.mPressed[0] = false;
+        if (take) in.pressed[K_ENTER] = in.pressed[' '] = false;
+        g_audio.trigger(SFX_CLICK);
+        return true;
+      }
+      return false;
+    };
+    auto description = [&](float yy, const char* text) {
+      const auto lines = wrap(text, width - 4 * s, 10 * s);
+      for (size_t i = 0; i < std::min(size_t(2), lines.size()); ++i)
+        g_ren.text(x + 2 * s, yy + i * 12 * s, 10 * s, lines[i], R_DIM, a, 0, false);
+    };
+    const bool forwardChanged = selector(0x7E5F0010u, y, "FORWARD EMITTER", hive::forwardSpec(practiceForward).name, int(practiceForward), int(hive::ForwardSet::Count));
+    description(y + 44 * s, hive::forwardSpec(practiceForward).description);
+    const bool bombChanged = selector(0x7E5F0011u, y + 72 * s, "PAYLOAD", hive::bombSpec(practiceBomb).name, int(practiceBomb), int(hive::BombSet::Count));
+    description(y + 116 * s, hive::bombSpec(practiceBomb).description);
+    const char* waveNames[] = {"Needle lead", "Bastion lead", "Cantor lead", "Archon lead"};
+    const bool waveChanged = selector(0x7E5F0012u, y + 144 * s, "MIXED WAVE", waveNames[practiceWave], practiceWave, 4);
+    g_ren.text(x + 2 * s, y + 194 * s, 9.5f * s, ellipsize("FREE ROAM  //  PAUSE TO SPAWN OR REARM", width - 4 * s, 9.5f * s), R_DIM, a, 0, false);
+    if (forwardChanged) practiceForward = hive::ForwardSet((int(practiceForward) + 1) % int(hive::ForwardSet::Count));
+    if (bombChanged) practiceBomb = hive::BombSet((int(practiceBomb) + 1) % int(hive::BombSet::Count));
+    if (waveChanged) practiceWave = (practiceWave + 1) % 4;
+    return;
+  }
   const float s=std::min(S(),width/350.f), h=30*s;
   g_ren.rect(x-8*s,y-8*s,width+16*s,224*s,vec3(.005f,.015f,.025f),.94f,4*s);
   auto change=[&]() { if(researchFlight) clearPracticeEncounter(); };

@@ -1,6 +1,8 @@
 // Solace Express - career progression and hand-designed story campaign
 #include "career.h"
+#include "military_missions.h"
 #include "finite_float.h"
+#include <charconv>
 #include <cmath>
 #include <limits>
 #ifdef _WIN32
@@ -218,26 +220,38 @@ static float contractKm(const Contract& c) {
 
 void Career::newGame() { *this = Career(); location = g_world.findAirport("MDB"); refreshBoard(); }
 
+bool Career::militaryMissionCompleted(int kind) const {
+  return (military.completedMissions & military::completionBit(kind)) != 0;
+}
+bool Career::militaryMissionUnlocked(int kind) const {
+  if (!military::mission(kind)) return false;
+  if (kind == military::LegacyRecon || militaryMissionCompleted(kind)) return true;
+  // Require the complete prefix, not just the previous mission: an already accepted legacy
+  // sortie can finish out of order, but its recorded success must not open a later shortcut.
+  for (int predecessor : military::kBoardMissionIds) {
+    if (predecessor == kind) return true;
+    if (!militaryMissionCompleted(predecessor)) return false;
+  }
+  return false;
+}
+
 Contract Career::militaryContract(int kind) const {
   Contract c;
-  if (kind < 0 || kind > 2 || location < 0 || location >= (int)g_world.airports.size()) {
+  const auto* mission = military::mission(kind);
+  if (!mission || location < 0 || location >= (int)g_world.airports.size()) {
     c.id = "MIL_INVALID"; c.type = CT_MIL_RECON; c.forceAircraft = -1; return c;
   }
-  static const char* titles[] = {"Hive reconnaissance", "Defend the island", "Strike the command group"};
-  static const char* briefs[] = {
-    "A supplied reconnaissance aircraft. Identify the assigned contacts with line-of-sight sensor dwell, then extract. Avoid combat.",
-    "An outfitted XR-40 is supplied. Protect the installation through every announced attack wave, then extract.",
-    "An outfitted XR-40 is supplied. Eliminate the designated relay and command targets, then extract."};
   c.id = fmt("MIL_%d_%u_%d", kind, boardSeed, location);
-  c.title = titles[kind]; c.brief = briefs[kind]; c.type = CT_MIL_RECON + kind;
-  c.from = c.to = location; c.forceAircraft = kind == 0 ? 0 : kWraith;
+  c.title = mission->title; c.brief = mission->brief; c.type = mission->contractType;
+  c.from = c.to = location; c.forceAircraft = mission->aircraft;
   c.startAirborne = true; c.courtesy = true; c.minLicense = LIC_STUDENT;
-  c.payout = 600 + kind * 600;
+  c.payout = mission->reward;
   c.wx = W(45.f, 4.f, 0.f, 0.05f, 0.15f, 6500.f, 40.f, 0, false, 12.f);
   return c;
 }
 bool Career::beginMilitary(const Contract& c) {
   if (!isMilitaryContract(c.type) || military.activeAttempt || attemptOpen || attempt == std::numeric_limits<uint32_t>::max()) return false;
+  if (!militaryMissionUnlocked(c.type - CT_MIL_RECON)) return false;
   if (canFly(c, c.forceAircraft) != SRC_MILITARY) return false;
   military.activeAttempt = ++attempt; attemptOpen = true;
   military.activeKind = c.type - CT_MIL_RECON; military.activeAirport = c.from;
@@ -264,9 +278,16 @@ Career::Source Career::canFly(const Contract& c, int si, std::string* why) const
   if (si < 0 || si >= kAircraftCount) return no("Unknown aircraft");
   if (isMilitaryContract(c.type)) {
     const int kind = c.type - CT_MIL_RECON;
-    const int expected = kind == 0 ? 0 : kWraith;
+    const auto* mission = military::mission(kind);
+    if (!mission || c.id != fmt("MIL_%d_%u_%d", kind, boardSeed, c.from)) return no("Invalid military mission identity");
+    const int expected = mission->aircraft;
     if (c.forceAircraft != expected || si != expected) return no("Use the supplied mission aircraft");
     if (c.from < 0 || c.from >= (int)g_world.airports.size() || c.to != c.from) return no("Invalid military staging location");
+    // Preserve the exact accepted token from older saves. This exception can finish that
+    // sortie only; beginMilitary still gates every new attempt on ordered progression.
+    const bool acceptedAttempt = attemptOpen && military.activeAttempt && military.activeAttempt == attempt &&
+      military.activeAttempt > military.lastSettledAttempt && military.activeKind == kind && military.activeAirport == c.from;
+    if (!militaryMissionUnlocked(kind) && !acceptedAttempt) return no("CLASSIFIED: complete the preceding missions first");
     return SRC_MILITARY;
   }
   if (!isCareerAircraft(si)) return no("Not available in the career fleet");
@@ -765,7 +786,7 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
   std::vector<PayoutLine> L;
   if (isMilitaryContract(c.type) || src == SRC_MILITARY) {
     if (stars) *stars = 0;
-    const bool accepted = isMilitaryContract(c.type) && src == SRC_MILITARY &&
+    const bool accepted = isMilitaryContract(c.type) && src == SRC_MILITARY && attemptOpen &&
       military.activeAttempt != 0 && military.activeAttempt == attempt &&
       military.activeAttempt > military.lastSettledAttempt && military.activeKind == c.type - CT_MIL_RECON &&
       military.activeAirport == c.from && canFly(c, si) == SRC_MILITARY;
@@ -777,10 +798,12 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
     if (recordSortie) ++military.sorties;
     if (floatValidation::finite(r.flightMin)) military.hours = std::min(1000000.f, military.hours + clampf(r.flightMin, 0.f, 1440.f) / 60.f);
     if (r.success && r.outcome == OUT_SUCCESS) {
-      const int reward = 600 + military.activeKind * 600;
+      const auto& mission = *military::mission(military.activeKind);
+      const int reward = mission.reward;
+      military.completedMissions |= military::completionBit(mission.id);
       if (recordSortie) ++military.successes;
       military.credits = boundedAdd(military.credits, reward);
-      if (recordSortie && military.activeKind == 0) ++military.intelligence;
+      if (recordSortie && mission.intelligence) ++military.intelligence;
       military.rank = std::min(10, military.successes / 3);
       if (stars) *stars = 3;
       L.push_back({"Military service credits (separate from civilian funds)", reward});
@@ -1182,11 +1205,12 @@ bool Career::save(const std::string& path) const {
   std::string tmp = path + ".tmp";
   FILE* f = fopen(tmp.c_str(), "w");
   if (!f) return false;
-  bool ok = fprintf(f, "solace_save 5\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\nattempt %u\nattempt_open %d\n",
+  bool ok = fprintf(f, "solace_save 6\nmoney %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\nattempt %u\nattempt_open %d\n",
                     money, license, reputation, location, storyIndex, flights, landings, crashes, hours, bestLandingFpm, boardSeed, finished ? 1 : 0, attempt, attemptOpen ? 1 : 0) > 0;
   ok = ok && fprintf(f, "military %d %d %d %d %d %d %.9g %u %u %u %d %d\n",
     military.rank, military.credits, military.sorties, military.successes, military.failures, military.intelligence,
     military.hours, military.activeAttempt, military.lastSettledAttempt, military.missionSeed, military.activeKind, military.activeAirport) > 0;
+  ok = ok && fprintf(f, "military_progress %u\n", military.completedMissions) > 0;
   ok = ok && fprintf(f, "fleet %d\n", (int)fleet.size()) > 0;
   for (auto& p : fleet) ok = ok && fprintf(f, "plane %s %d %f %f\n", kAircraft[p.spec].id, p.location, p.fuel, p.condition) > 0;
   if (loan.open()) ok = ok && fprintf(f, "loan %s %d %d %d %f\n", kAircraft[loan.spec].id, loan.balance, loan.payment, loan.missed, loan.rate) > 0;
@@ -1237,11 +1261,11 @@ bool Career::load(const std::string& path) {
   FILE* f = fopen(path.c_str(), "r");
   if (!f) return false;
   Career c; char key[64]; int ver = 0;
-  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 5) { fclose(f); return false; }
+  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 6) { fclose(f); return false; }
   const int nApt = (int)g_world.airports.size();
   bool ok = true;
   unsigned have = 0;   // mandatory fields seen (version 2: every field, the fleet count and the end marker)
-  int fleetN = -1; bool ended = false, militaryRead = false, surveyRead = false, surveyKnownRead = false, plan2Read = false;
+  int fleetN = -1; bool ended = false, militaryRead = false, militaryProgressRead = false, surveyRead = false, surveyKnownRead = false, plan2Read = false;
   auto rdI = [&](int& v, unsigned bit) { ok = ok && fscanf(f, "%d", &v) == 1; have |= bit; };
   auto rdF = [&](float& v) { ok = ok && fscanf(f, "%f", &v) == 1 && std::isfinite(v); };
   while (ok && fscanf(f, "%63s", key) == 1) {
@@ -1266,6 +1290,16 @@ bool Career::load(const std::string& path) {
         &m.rank, &m.credits, &m.sorties, &m.successes, &m.failures, &m.intelligence, &m.hours,
         &m.activeAttempt, &m.lastSettledAttempt, &m.missionSeed, &m.activeKind, &m.activeAirport) == 12;
       militaryRead = true;
+    }
+    else if (!strcmp(key, "military_progress")) {
+      char bits[32] = {};
+      ok = ver >= 6 && !militaryProgressRead && fscanf(f, "%31s", bits) == 1;
+      if (ok) {
+        const char* end = bits + strlen(bits);
+        const auto parsed = std::from_chars(bits, end, c.military.completedMissions);
+        ok = parsed.ec == std::errc() && parsed.ptr == end;
+      }
+      militaryProgressRead = true;
     }
     else if (!strcmp(key, "fleet")) ok = fscanf(f, "%d", &fleetN) == 1 && fleetN >= 0;
     else if (!strcmp(key, "plane")) {
@@ -1384,8 +1418,18 @@ bool Career::load(const std::string& path) {
       m.intelligence >= 0 && m.intelligence <= m.successes && floatValidation::finite(m.hours) && m.hours >= 0 && m.hours <= 1000000.f &&
       m.lastSettledAttempt <= c.attempt;
     if (m.activeAttempt) ok = ok && c.attemptOpen && m.activeAttempt == c.attempt && m.activeAttempt > m.lastSettledAttempt &&
-      m.activeKind >= 0 && m.activeKind <= 2 && m.activeAirport >= 0 && m.activeAirport < nApt;
+      military::mission(m.activeKind) != nullptr && m.activeAirport >= 0 && m.activeAirport < nApt;
     else ok = ok && m.activeKind == -1 && m.activeAirport == -1 && m.missionSeed == 0;
+    if (ver >= 6) {
+      int completed = 0;
+      for (int id = 0; id < military::kMissionCount; ++id) if (c.militaryMissionCompleted(id)) ++completed;
+      // The aggregate ledger freezes as one unit at its storage bound. Genuine later
+      // successes still earn per-mission completion, even if the frozen success total is zero.
+      ok = ok && militaryProgressRead && !(m.completedMissions & ~military::kKnownMissionMask) &&
+        (completed <= m.successes || m.sorties == 2000000000);
+    }
+    // v5 has only aggregate totals. Keep those and valid accepted tokens, but never infer
+    // mission identities from successes, rank, credits or the last mission flown.
   }
   if (!ok) return false;
   if (c.job) {
