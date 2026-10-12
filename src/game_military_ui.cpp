@@ -2,12 +2,13 @@
 // with a quiet olive palette and only live career/mission information.
 #include "game.h"
 #include "military_missions.h"
+#include "ui_identity.h"
 
 std::vector<std::string> wrap(const std::string& s, float width, float size);
 
 namespace {
-const vec3 M_INK(.018f,.026f,.018f), M_PANEL(.040f,.057f,.038f), M_EDGE(.32f,.39f,.25f);
-const vec3 M_ACCENT(.68f,.77f,.43f), M_TEXT(.94f,.95f,.88f), M_DIM(.66f,.71f,.59f);
+const vec3 M_INK = svui::field, M_PANEL = svui::fieldPanel, M_EDGE(.34f,.40f,.29f);
+const vec3 M_ACCENT = svui::olive, M_TEXT(.96f,.95f,.88f), M_DIM(.69f,.73f,.64f);
 const vec3 M_WARN(.94f,.72f,.37f), M_BAD(.96f,.49f,.36f);
 float militaryScale(float requested) {
   return std::min(requested, std::min(g_ren.H / 720.f, g_ren.W / 1120.f));
@@ -19,8 +20,7 @@ std::string fit(const std::string& text, float width, float size) {
   return out+"...";
 }
 void surface(float x,float y,float w,float h,float s,float opacity=1.f) {
-  g_ren.rectGrad(x,y,w,h,M_PANEL,M_INK,.97f*opacity,4*s);
-  g_ren.rectOutline(x,y,w,h,M_EDGE,.48f*opacity,4*s,s);
+  svui::fieldSurface(g_ren,x,y,w,h,s,opacity);
 }
 void label(float x,float y,float width,float s,const std::string& text) {
   const float tw=g_ren.text(x,y,11.5f*s,text,M_DIM,1,0,false);
@@ -61,7 +61,7 @@ bool Game::militaryButton(uint32_t id,float x,float y,float w,float h,const std:
   const bool focused=enabled && focusNav && focusId==id;
   const bool hoveredNow=enabled && (hovered(x,y,w,h)||focused);
   const float glow=anim(id,hoveredNow?1.f:0.f,14);
-  const vec3 fill=primary ? M_ACCENT*(.82f+.16f*glow) : M_PANEL+M_ACCENT*(.045f+.065f*glow);
+  const vec3 fill=primary ? svui::amber*(.88f+.12f*glow) : M_PANEL+M_ACCENT*(.045f+.065f*glow);
   g_ren.rect(x,y,w,h,enabled?fill:M_PANEL,.97f,3*s);
   g_ren.rectOutline(x,y,w,h,enabled?M_ACCENT:M_EDGE,enabled?(.25f+.35f*glow):.35f,3*s,s);
   if(focused) g_ren.rectOutline(x-3*s,y-3*s,w+6*s,h+6*s,M_ACCENT,.95f,5*s,2*s);
@@ -101,11 +101,15 @@ void Game::drawMilitary(const FrameParams& fp) {
   // Keep the actual aircraft visible. Opaque instrument surfaces belong to the
   // left and right columns; the central stage is intentionally unobstructed.
   g_ren.rect(0,0,W,H,M_INK,.30f);
+  // Sparse field-chart contours occupy only the empty aircraft stage.
+  for(int k=0;k<6;++k){const float yy=L.top+(42+k*43)*s;g_ren.line(L.px0,yy,L.px1,yy+22*s,s,M_EDGE,.16f);}
+  g_ren.rectOutline(L.px0+12*s,L.top+18*s,54*s,54*s,M_EDGE,.35f,0,s);
   g_ren.rect(0,0,W,120*s,M_INK,.95f);
   g_ren.rect(0,H-94*s,W,94*s,M_INK,.97f);
+  svui::chevrons(g_ren,24*s,4*s,160*s,s,svui::amber,.45f);
   rule(24*s,68*s,W-48*s,s);
-  g_ren.text(24*s,16*s,28*s,"MILITARY SERVICE",M_TEXT,1,0,false);
-  g_ren.text(25*s,49*s,10.5f*s,"SOLACE DEFENSE COMMAND  /  SORTIE OPERATIONS",M_ACCENT,1,0,false);
+  g_ren.text(24*s,16*s,28*s,"MILITARY CAREER",M_TEXT,1,0,false);
+  g_ren.text(25*s,49*s,10.5f*s,"SOMNIUM VOLANDI  /  DEFENSE COMMAND",M_ACCENT,1,0,false);
   // Actual saved career record, without implying an invented rank threshold.
   const float statLeft=std::max(500*s,W-520*s),statW=(W-statLeft-24*s)/4;
   auto stat=[&](int col,const char* title,const std::string& value) {

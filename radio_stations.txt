@@ -1,4 +1,4 @@
-# Solace Express internet radio stations
+# Somnium Volandi internet radio stations
 # stations-version 2
 # One per line:  Name|URL   (MP3 or AAC HTTP/HTTPS streams). Add your own below.
 # The game keeps its copy in %APPDATA%\SolaceExpress\radio_stations.txt - edit that one; new presets are merged in on updates.

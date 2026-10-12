@@ -5,6 +5,8 @@
 #include "../src/hangar_catalog.h"
 #include "../src/models.h"
 #include "../src/military_missions.h"
+#include "../src/load_pacer.h"
+#include "../src/ui_identity.h"
 #include <dlfcn.h>
 #include <filesystem>
 #include <sstream>
@@ -226,6 +228,10 @@ struct GameTest {
       if(sc.find("testcard")!=std::string::npos)for(int i=0;i<Game::kNumResCards;++i)if(Game::kResCards[i].craft==kWraith){g.resCard=i;break;}
       if(sc.find("underside")!=std::string::npos){g.resPitch=-.35f;g.resYaw=2.15f;g.resZoom=1.1f;}
       if(sc.find("focus")!=std::string::npos){g.focusScreen=SCR_RESEARCH*4;g.focusNav=true;g.focusId=0x7E5F0011u;}
+      if(sc.find("face")!=std::string::npos)g.realTime=61;
+      if(sc.find("helix")!=std::string::npos)g.realTime=43;
+      const auto tick=sc.find("_t");if(tick!=std::string::npos)g.realTime=atof(sc.c_str()+tick+2);
+      if(sc.find("reduced")!=std::string::npos)g.set.menuMotion=false;
     } else if(sc.rfind("research",0)==0||sc=="menuT5")g.debugScene(sc);
     if(sc.rfind("hangar",0)==0){g.screen=SCR_HUB;g.hubTab=TAB_HANGAR;g.selHangar=atoi(sc.c_str()+6);}
     if((sc.rfind("hangar",0)==0 || sc.rfind("freeflight",0)==0) &&
@@ -243,8 +249,9 @@ struct GameTest {
     if(sc.rfind("loading",0)==0){
       g.contract=g_story[0];g.plane.spec=&kAircraft[0];g.wx=g.contract.wx;
       g.loadT=5;g.loadShown=.57f;g.loadMap=true;g.screen=SCR_LOADING;
+      g.loadFrames=2;g.loadPend0=80;g.loadStableFrames=0;g_ren.entPending=32;g.loadShown=.64f;
       sscanf(sc.c_str(),"loading_%f_%f",&g.loadShown,&g.loadT);
-      if(sc.find("ready")!=std::string::npos){g.loadReadyT=g.loadT;g.loadShown=1;}
+      if(sc.find("ready")!=std::string::npos){g.loadReadyT=g.loadT;g.loadShown=1;g.loadStableFrames=2;g_ren.entPending=0;}
       // No map shader is initialized in UI-only mode. Real packaged photographs remain available.
     }
   }
@@ -253,13 +260,26 @@ struct GameTest {
     if(frame==1 && sc.find("scroll")!=std::string::npos){g.in.mx=g_ren.W*.85f;g.in.my=g_ren.H*.5f;g.in.wheel=-100;}
   }
   static void draw(Game& g,const std::string& sc) {
-    if(sc.rfind("military_pause",0)==0)g.drawPause();
+    if(sc.rfind("matrix",0)==0){
+      float t=sc.find("wing")!=std::string::npos?25.f:sc.find("helix")!=std::string::npos?43.f:7.f;
+      if(sc.rfind("matrix_t",0)==0)t=atof(sc.c_str()+8);
+      g_ren.rect(0,0,float(g_ren.W),float(g_ren.H),svui::codeInk,1);
+      svui::matrix(g_ren,0,0,float(g_ren.W),float(g_ren.H),t,.85f,sc.find("reduced")==std::string::npos);
+    }
+    else if(sc.rfind("military_pause",0)==0)g.drawPause();
     else if(sc.rfind("military_debrief",0)==0)g.drawDebrief();
     else if(sc.rfind("military_loading",0)==0)g.drawLoading();
     else if(sc.rfind("menu",0)==0)g.drawMenu();
     else if(sc=="pause")g.drawPause();
     else if(sc.rfind("freeflight",0)==0){FrameParams fp{};g.drawFreeFlightSetup(fp);}
-    else if(sc.rfind("intro",0)==0){float p=.4f,t=5;sscanf(sc.c_str(),"intro_%f_%f",&p,&t);g.shaderFirstRun=true;g.drawIntro(p,fmt("Preparing GPU shader cache: Terrain program 4 of %d | Building islands",Renderer::kProgramCount),t,g.iconTex,1.f);}
+    else if(sc.rfind("intro",0)==0){
+      float p=.4f,t=5;sscanf(sc.c_str(),"intro_%f_%f",&p,&t);g.shaderFirstRun=true;
+      LoadPacer pace;int ids[6];const char* labels[]={"GRAPHICS & WORLD","SHADER CACHE","PILOT SYSTEMS","RENDERER","MENU SCENERY","AIRCRAFT"};
+      for(int i=0;i<6;++i)ids[i]=pace.add(labels[i],10,0,labels[i]);
+      const int at=std::min(5,int(p*6));pace.begin(ids[at]);pace.setSub(p*6-at);pace.task("Surface field / GPU rows",32,128);
+      if(p>=1)pace.end();
+      g.drawIntro(p,p>=1?"All flight systems ready":"Preparing aircraft geometry: XR-40 Wraith / exterior | Surface field evaluation",t,g.iconTex,1.f,g_ren,&pace);
+    }
     else if(sc.rfind("loading",0)==0)g.drawLoading();
     else if(sc.rfind("research",0)==0){FrameParams fp{};g.drawResearch(fp);}
     else g.drawHub();
@@ -273,7 +293,7 @@ int main(int argc,char**argv){
 #ifdef UI_REVIEW_FLEET_ONLY
   {std::istringstream scenes(argv[1]);std::string sc;
     while(std::getline(scenes,sc,',')){bool fleetHangar=sc.rfind("hangar",0)==0&&atoi(sc.c_str()+6)>=0&&atoi(sc.c_str()+6)<kAircraftCount;bool freeSetup=sc.rfind("freeflight",0)==0&&atoi(sc.c_str()+10)>=0&&isCareerAircraft(atoi(sc.c_str()+10));bool allowed=fleetHangar||freeSetup||sc=="research10"||sc=="research20"||sc=="menuT5";if(!full||!allowed){fprintf(stderr,"Fleet diagnostic supports career hangar, research10/20, or fixed menuT5 only in scene mode.\n");return 2;}}}
-  printf("DIAGNOSTIC: exact standard fleet render passes; eight unused generic/research/marched startup programs omitted; pre-baked actual mesh with runtime no-march assertions. Not full-startup validation.\n");
+  printf("DIAGNOSTIC: production startup programs; standard fleet-only scenes with pre-baked actual meshes and availability assertions. Not native Windows startup validation.\n");
 #endif
   std::filesystem::create_directories(argv[2]);
   if(!initGL(W,H)){puts("surfaceless EGL init failed");return 1;}

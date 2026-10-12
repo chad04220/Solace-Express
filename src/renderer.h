@@ -258,6 +258,9 @@ public:
   std::function<void(bool packaged)> onBodyLoaded;   // an aircraft body read whole: ready-built from the aircraft folder (true)
                                                     // or from this PC's mesh cache (false): the loading screen's wording
   std::function<void()> onBakeStart;   // called as an aircraft mesh begins to build (not read from the cache): the loading screen's wording   // this build's aircraft meshes are in the cache already (checkMeshCache: a launch reads them, it builds none)
+  std::function<void(float,const std::string&)> onMeshProgress; // completed workflow phases, never elapsed-time estimates
+  std::function<void(int,int,const std::string&)> onMeshBatch; // actual GPU field bands in the current evaluation
+  std::function<void(float,int,int)> onMaterialProgress; // worker-safe observation of completed base material layers
   void checkMeshCache();
   // environment entities: entSync generates every chunk in range before drawing (headless captures)
   bool entSync = false;

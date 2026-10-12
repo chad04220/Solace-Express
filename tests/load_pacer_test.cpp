@@ -7,6 +7,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <thread>
 
 static bool near(float a, float b) { return std::fabs(a - b) < 0.0001f; }
 int main() {
@@ -53,5 +54,24 @@ int main() {
   assert(easeLoadProgress(0, 0, 100) == 0);
   assert(easeLoadProgress(0.9f, 1, 0.001f) == 1);
   assert(easeLoadProgress(0, 0.9999f, 100) < 1);
+  // The independent intro sees one coherent plan, grouped subsystems and a
+  // restarting task bar, without crediting a GPU batch as a finished mesh.
+  LoadPacer observed;
+  int first=observed.add("mesh0",9,9,"AIRCRAFT"),second=observed.add("mesh1",9,9,"AIRCRAFT");
+  int optional=observed.add("cache",4,0,"SHADER CACHE");
+  observed.begin(first);observed.setSub(3.f/9);observed.task("Surface field / GPU rows",32,128);
+  auto snap=observed.snapshot();assert(snap.step==1&&snap.steps==3&&snap.groups.size()==2);
+  assert(near(snap.stageFraction,1.f/3)&&near(snap.taskFraction,.25f));
+  assert(near(snap.groups[0].done,3)&&near(snap.groups[0].units,18));
+  const float before=observed.fraction();observed.task("Next field / GPU rows",0,64);
+  assert(observed.fraction()==before&&observed.snapshot().taskFraction==0);
+  observed.task("Invalid",std::numeric_limits<float>::quiet_NaN(),0);
+  assert(observed.snapshot().taskLabel=="Next field / GPU rows");
+  observed.begin(second);assert(observed.snapshot().taskFraction<0);
+  std::thread writer([&]{for(int i=1;i<=90;++i){observed.setSub(i/90.f);observed.task("GPU rows",float(i),90);}});
+  for(int i=0;i<500;++i){auto read=observed.snapshot();assert(read.overall>=before&&read.overall<=1&&read.groups[0].done<=18);}
+  writer.join();observed.skipRemaining(optional);observed.end();
+  snap=observed.snapshot();assert(snap.overall==1&&snap.stageFraction==1&&snap.taskFraction<0);
+  assert(snap.groups[1].units==0&&snap.groups[1].done==0&&snap.groups[1].skipped==4); // skipped work never becomes completed
   std::cout << "Loading progress tests passed\n";
 }

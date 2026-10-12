@@ -1,13 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <title>Solace Express application icon</title>
-  <defs>
-    <linearGradient id="sunset" x1="0" y1="150" x2="0" y2="242" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ff9723"/><stop offset="1" stop-color="#cc6041"/>
-    </linearGradient>
-    <clipPath id="badge"><rect x="14" y="14" width="228" height="228" rx="43"/></clipPath>
-  </defs>
-  <rect x="8" y="8" width="240" height="240" rx="49" fill="#ffb838"/>
-  <rect x="14" y="14" width="228" height="228" rx="43" fill="#0e1c30"/>
-  <path d="M14 150H242V242H14Z" fill="url(#sunset)" clip-path="url(#badge)"/>
-  <polygon points="128,30 140,64 140,110 230,140 230,156 140,140 136,200 166,218 166,230 128,222 90,230 90,218 120,200 116,140 26,156 26,140 116,110 116,64" fill="#f5f5fa"/>
+  <title>Somnium Volandi — the dream of flight</title>
+  <desc>A platinum split wing rises through a brass orbital horizon on midnight blue.</desc>
+  <defs><linearGradient id="night" x2="0" y2="1"><stop stop-color="#1b283b"/><stop offset="1" stop-color="#070f1d"/></linearGradient></defs>
+  <rect x="8" y="8" width="240" height="240" rx="50" fill="#e8bc78"/>
+  <rect x="12" y="12" width="232" height="232" rx="46" fill="url(#night)"/>
+  <path d="M46.4 90 A90 90 0 0 1 209.6 90" fill="none" stroke="#e8bc78" stroke-width="3"/>
+  <path d="M213.6 155.8 A90 90 0 0 1 42.4 155.8" fill="none" stroke="#517885" stroke-width="2"/>
+  <polygon points="123,65 113,119 42,157 42,172 106,151 123,199 116,137" fill="#f4f3e8"/><polygon points="133,65 143,119 214,157 214,172 150,151 133,199 140,137" fill="#f4f3e8"/>
+  <path d="M128 67V194 M72 219H184" fill="none" stroke="#e8bc78" stroke-width="2.5"/>
+  <path d="M128 28L132 36L128 44L124 36Z" fill="#e8bc78"/>
 </svg>

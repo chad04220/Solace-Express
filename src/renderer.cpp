@@ -420,10 +420,12 @@ void Renderer::genMaterials(const std::function<void(float, const std::string&)>
   const int L = kMatLayers, TS = kMatTS;
   std::vector<uint8_t> alb((size_t)TS * TS * 4 * L), nrm((size_t)TS * TS * 4 * L);
   std::atomic<int> scanned{0};
+  int layersDone=0;std::mutex materialProgressMu;
   parallelFor(L, [&](int l) {   // the layers are independent: one per core at a time
     uint8_t* a = &alb[(size_t)l * TS * TS * 4]; uint8_t* n = &nrm[(size_t)l * TS * TS * 4];
     if (loadMaterialLayer(matDir, l, a, n)) scanned++;
     else materialProcLayer(l, a, n);
+    if(onMaterialProgress){std::lock_guard<std::mutex> lk(materialProgressMu);++layersDone;onMaterialProgress(.45f*layersDone/L,layersDone,L);}
   });
   matScanned = scanned;
   auto up = [&](GLuint& tex, std::vector<uint8_t>& d) {

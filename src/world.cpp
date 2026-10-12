@@ -1,5 +1,6 @@
 // Solace Express - hand-designed archipelago "The Solace Islands"
 #include "world.h"
+#include "world_load_progress.h"
 #include <cstdio>
 #include <cstring>
 #include "scenery.h"
@@ -261,13 +262,23 @@ float airportInfluence(float x, float z) {
 }
 
 void World::build(const std::string& cachePath, const std::string& stamp, bool save) {
+  g_worldLoadProgress=0.f;g_worldLoadTask="Reading island cache";
   airports.assign(std::begin(kAirports), std::end(kAirports));
   roads = RoadNetwork(); roadGrid = RoadGrid(); bridges.clear(); settlements.clear(); farms.clear(); reservoir = Reservoir();   // (the natural ground first: the roads are routed over it)
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
   g_worldStage = cachePath.empty() ? 2 : 1;
   fromCache = !cachePath.empty() && loadCache(cachePath, stamp);
-  if (fromCache) { sceneryInit(); buildLakeMask(); settlements = buildSettlementFields(*this); farms = farmsteadsOf(roads); sceneryBakeCommunityLots(*this); boxes.clear(); bridges = buildBridges(*this); sceneryBakeRoadFurniture(*this); sceneryBakeLandmarks(*this); g_worldStage = 3; return; }
+  if (fromCache) {
+    worldLoadStage(.60f,"Preparing cached terrain and lakes");sceneryInit();buildLakeMask();
+    worldLoadStage(.68f,"Preparing cached settlements");settlements=buildSettlementFields(*this);farms=farmsteadsOf(roads);sceneryBakeCommunityLots(*this);
+    worldLoadStage(.80f,"Preparing cached bridges");boxes.clear();bridges=buildBridges(*this);
+    worldLoadStage(.88f,"Preparing road furniture");sceneryBakeRoadFurniture(*this);
+    worldLoadStage(.94f,"Preparing landmarks");sceneryBakeLandmarks(*this);
+    worldLoadStage(1.f,"Islands ready");g_worldStage=3;return;
+  }
   g_worldStage = 2;
+  worldLoadStage(.02f,"Sampling island terrain");
+  std::atomic<int> sampledRows{0};
   hm.resize((size_t)HM_N * HM_N * 4);
   sceneryInit();
   parallelFor(HM_N, [&](int j) {   // rows are independent; spread over every core
@@ -275,11 +286,14 @@ void World::build(const std::string& cachePath, const std::string& stamp, bool s
       float x = -WORLD_HALF + (i + 0.5f) * HM_TEXEL, z = -WORLD_HALF + (j + 0.5f) * HM_TEXEL;
       computeTexel(x, z, &hm[((size_t)j * HM_N + i) * 4]);
     }
+    worldLoadProgress(.02f+.12f*float(sampledRows.fetch_add(1)+1)/HM_N);
   });
   // Smooth the ground heights with a separable 1-2-1 filter (twice): bilinear interpolation of the raw samples leaves
   // visible creases along the grid on big smooth landforms (volcano flanks, ridges, sea cliffs) - a faceted, low-poly
   // look. Flat areas (airport grounds, the sea floor plateau) are unchanged by it.
   {
+    worldLoadStage(.14f,"Smoothing terrain / four row passes");
+    std::atomic<int> smoothRows{0};
     std::vector<float> tmp((size_t)HM_N * HM_N);
     for (int pass = 0; pass < 2; pass++) {
       parallelFor(HM_N, [&](int j) {
@@ -288,18 +302,22 @@ void World::build(const std::string& cachePath, const std::string& stamp, bool s
           const float* r = &hm[(size_t)j * HM_N * 4];
           tmp[(size_t)j * HM_N + i] = (r[i0 * 4] + 2.f * r[i * 4] + r[i1 * 4]) * 0.25f;
         }
+        worldLoadProgress(.14f+.12f*float(smoothRows.fetch_add(1)+1)/(4*HM_N));
       });
       parallelFor(HM_N, [&](int j) {
         int j0 = std::max(j - 1, 0), j1 = std::min(j + 1, HM_N - 1);
         for (int i = 0; i < HM_N; i++)
           hm[((size_t)j * HM_N + i) * 4] = (tmp[(size_t)j0 * HM_N + i] + 2.f * tmp[(size_t)j * HM_N + i] + tmp[(size_t)j1 * HM_N + i]) * 0.25f;
+        worldLoadProgress(.14f+.12f*float(smoothRows.fetch_add(1)+1)/(4*HM_N));
       });
     }
   }
+  worldLoadStage(.26f,"Resolving inland drainage");
   for (int pass = 0; pass < 4 && fillInlandPits() > 0; pass++) {}   // (until none is left: see fillInlandPits)
   // A real summit bowl for Mount Kaleo. The original procedural detail overwhelms
   // its shallow analytic depression; carve only this bounded, airport-free summit.
   // All terrain outside the 520 m texel-centre disk remains byte-identical.
+  worldLoadStage(.30f,"Shaping the volcano summit");
   const int vx0 = std::max(0, (int)((25000.f - 520.f + WORLD_HALF) / HM_TEXEL));
   const int vx1 = std::min(HM_N - 1, (int)((25000.f + 520.f + WORLD_HALF) / HM_TEXEL));
   const int vz0 = std::max(0, (int)((-9000.f - 520.f + WORLD_HALF) / HM_TEXEL));
@@ -318,26 +336,40 @@ void World::build(const std::string& cachePath, const std::string& stamp, bool s
     t[1] = lerpf(t[1], .7f + 24.f * wall, weight);
   }
   // the roads, routed over the finished natural ground (World::height grades them in from here on)
+  worldLoadStage(.34f,"Routing roads over terrain");
   roads = buildRoadNetwork(*this);
   // the settlements grown over the ground and along those roads, and their streets added to the network
+  worldLoadStage(.46f,"Laying out settlements");
   settlements = buildSettlementFields(*this);
+  worldLoadStage(.52f,"Connecting settlement streets");
   addSettlementStreets(*this, settlements, roads);
   addRacetrack(*this, settlements, roads);    // (the racetrack's circuit, its pit lane and its road in)
+  worldLoadStage(.58f,"Placing farm tracks");
   addFarmsteads(*this, settlements, roads);   // (and the farms out in the fields, each at the end of its track)
   farms = farmsteadsOf(roads);
+  worldLoadStage(.64f,"Indexing road surfaces");
   buildRoadGrid(roads, roadGrid);
   // the Fjordhaven reservoir: its dam's gorge, and its lake's water (World::height has it from here on)
+  worldLoadStage(.70f,"Preparing reservoirs and lake masks");
   findReservoir(*this, reservoir);
   buildLakeMask();
+  worldLoadStage(.75f,"Baking terrain material masks");
   bakeMask();
+  worldLoadStage(.80f,"Building height bounds");
   buildHMax();
+  worldLoadStage(.84f,"Building terrain envelopes");
   buildEnvelope();
   // Airport buildings are raster scenery entities now (airport_scenery.cpp); the old analytic box list stays empty
   boxes.clear();
+  worldLoadStage(.88f,"Assembling bridges");
   bridges = buildBridges(*this);
+  worldLoadStage(.92f,"Placing roadside furniture");
   sceneryBakeRoadFurniture(*this);
+  worldLoadStage(.95f,"Placing landmarks");
   sceneryBakeLandmarks(*this);
+  worldLoadStage(.98f,"Writing reusable island cache");
   if (!cachePath.empty() && save) saveCache(cachePath, stamp);
+  worldLoadStage(1.f,"Islands ready");
   g_worldStage = 3;
 }
 

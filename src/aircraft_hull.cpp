@@ -204,6 +204,7 @@ void Renderer::hullEvalBatch(const vec3* pts, size_t n, float* out, const float*
     const int r1 = std::min(rows, r0 + 32);
     glEnable(GL_SCISSOR_TEST); glScissor(0, r0, TW, r1 - r0); glViewport(0, 0, TW, rows);
     glDrawArrays(GL_TRIANGLES, 0, 3); glDisable(GL_SCISSOR_TEST); glFinish();
+    if(onMeshBatch)onMeshBatch(r1,rows,hullBakeMode==2?"Surface normals / GPU rows":hullBakeMode==4?"Interior field / GPU rows":"Surface field / GPU rows");
     if (bakeYield && bakeDue()) {
       yieldTimed(); hullBakeUploaded[0] = hullBakeUploaded[1] = false; bindHullBake(true);
       glBindFramebuffer(GL_FRAMEBUFFER, fboHOut); glDrawBuffers(1, &c0);
