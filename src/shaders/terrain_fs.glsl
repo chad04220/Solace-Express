@@ -11,7 +11,7 @@ void main(){
   vec3 p = vW; float t = length(vC - uCamPos);   // (t: the distance to where it is drawn, the lighting pass's)
   vec2 pw = wrapW(p.xz);
   RoadHit road = noRoad();
-  if ((uDbg & 4096) == 0) road = roadQuery(pw);   // (dbgOff 4096: the roads left out, profiling)
+  if ((uDbg & 131072) == 0) road = roadQuery(pw);   // (dbgOff 131072, renderer.h kDbgRoads: the roads left out, profiling)
   vec3 n = roadNormal(road, normalize(vN));
   vec3 pl = vec3(pw.x, p.y, pw.y);   // (the ground's own place: across the map's seam, the islands on the far side; y the height)
   Mat m = terrainMaterial(pl, n, t, baseAt(pl.xz), pixelDx, pixelDy, road);

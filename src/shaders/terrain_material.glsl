@@ -376,7 +376,8 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
   if ((uDbg & 128) != 0) { m.alb = vec3(0.2, 0.3, 0.12); m.rough = 0.9; return m; }
   // (profiling, Renderer::dbgOff: a part of the material left out on its own - the diagnostics' analysis times each)
-  bool detailOn = (uDbg & 16384) == 0, townOn = (uDbg & 8192) == 0, roadsOn = (uDbg & 4096) == 0;
+  // (bits above Renderer::kProbe*, 1 << 12 to 1 << 15, which leave out whole draws: renderer.h kDbg*)
+  bool detailOn = (uDbg & 524288) == 0, townOn = (uDbg & 262144) == 0, roadsOn = (uDbg & (131072 | 1048576)) == 0;   // (1048576: the roads' paint alone, their lookup kept)
   float lush = base.z, cold = base.w;
   float slope = 1.0 - n.y;
   float hNoise = tfbm(p.xz/900.0);

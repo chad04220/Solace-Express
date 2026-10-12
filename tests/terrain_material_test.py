@@ -164,6 +164,16 @@ functions += [function(ent,n) for n in ('entityProjectionWeights','entityDetailN
 functions += [function(ent_cut,'coniferShootCoverage')]
 functions += [function(light_fs,n) for n in ('environmentShadowOffsets','environmentShadowPlaneGradient','environmentShadowTapDepth','environmentWallShadowFilter')]
 functions += [function(water,n) for n in ('waterTransmission','waterDetailFrame','waterWarpFootprint')]
+# the shaders' profiling switches (uDbg) never share a bit with the analysis's probes (renderer.h kProbe*), which leave
+# whole draws out: v3.49.1's roads row left the scenery out too, its towns row the terrain, its detail row the march
+probe_bits=0
+for v in re.findall(r'kProbe\w+\s*=\s*1\s*<<\s*(\d+)',(ROOT/'src/renderer.h').read_text()): probe_bits|=1<<int(v)
+assert probe_bits==0xF000, 'renderer.h probes moved: %x'%probe_bits
+for glsl in sorted((ROOT/'src/shaders').glob('*.glsl')):
+    for mask in re.findall(r'uDbg\s*&\s*\(?([0-9|\s]+)\)?',glsl.read_text()):
+        bits=0
+        for v in mask.split('|'): bits|=int(v)
+        assert bits & probe_bits==0, '%s: uDbg & %s shares a bit with Renderer::kProbe*'%(glsl.name,mask.strip())
 # GLSL's unsuffixed floating literals are float; retain that arithmetic in the C++ host.
 arithmetic=re.sub(r'(?<![\w.])((?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?|\d+[eE][+-]?\d+)(?![\w.])', r'\1f', '\n\n'.join(functions))+'\n'
 if args.source_only:

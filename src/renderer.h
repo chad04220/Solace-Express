@@ -168,6 +168,10 @@ public:
   // is wrong while one is on): the scenery's G-buffer draws, the terrain's, the objects pass's march, the player's
   // airframe mesh shaded flat (a build of its own, made when first asked for: drawPlaneMesh, PROBE_MESH_SHADE)
   static constexpr int kProbeScenery = 1 << 12, kProbeTerrain = 1 << 13, kProbeMarch = 1 << 14, kProbeMeshShade = 1 << 15;
+  // the ground material's parts, each left out alone (terrain_material.glsl, terrain_fs.glsl: the shaders spell the same
+  // numbers): above the probes, whose bits they shared in v3.49.1 - its roads row left the scenery out too, its towns
+  // row the whole terrain, its detail row the airframe march
+  static constexpr int kDbgAniso = 1 << 16, kDbgRoads = 1 << 17, kDbgTowns = 1 << 18, kDbgDetail = 1 << 19, kDbgRoadPaint = 1 << 20;
   bool screenWindows = getenv("SCREENFEEDS") == nullptr;   // the research craft's displays are windows (no camera feeds but the bomb camera's; SCREENFEEDS=1 brings the cameras back)
   int bakeCount = 0;   // airframe meshes and hulls baked or loaded so far (the research terminal's warm-up waits for a frame that bakes nothing)
   // Read-only distributed bodies are preferred to the writable, driver-local cache.

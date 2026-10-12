@@ -1610,8 +1610,8 @@ static const FrameParams& roundFrame(const FrameParams& fp, FrameParams& out) {
 void Renderer::renderScene(const FrameParams& fpFlat, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites) {
   static FrameParams fpRound;   // (no per-frame allocation of a large struct on the stack)
   const FrameParams& fp = roundFrame(fpFlat, fpRound);
-  if (((dbgOff & 65536) != 0) != anisoOff) {   // (profiling, dbgOff 65536: the material arrays without anisotropic filtering)
-    anisoOff = (dbgOff & 65536) != 0;
+  if (((dbgOff & kDbgAniso) != 0) != anisoOff) {   // (profiling: the material arrays without anisotropic filtering)
+    anisoOff = (dbgOff & kDbgAniso) != 0;
     for (GLuint t : {texAlb, texNrm, texEnvAlb, texEnvNrm, texEnvLowAlb, texEnvLowNrm})
       if (t) { glBindTexture(GL_TEXTURE_2D_ARRAY, t); glTexParameterf(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_ANISOTROPY, anisoOff ? 1.f : 8.f); }
     glGetError();   // (anisotropy may be unsupported)
