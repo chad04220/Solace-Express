@@ -1,3 +1,20 @@
+## What's new in v3.49.1
+
+### Faster on the ground
+- **Taxiing, take-offs and landings cost the graphics card much less.** Since v3.47 the view reaches the horizon, and the ground was drawn from the far side in: from a runway, every distant copy of the islands was drawn into the same few rows just above the horizon, its fields and all, and then hidden behind the nearer ground. The ground is now drawn nearest first, so what's hidden is skipped before it is shaded. Nothing looks different. In testing, the night scene on Cedar Ridge's runway took about 40% less time to draw its world, and the cockpit view about 10% less. The flight from altitude is unchanged.
+- **A correction to v3.49.0's notes:** compressing the photographed ground textures halves the memory they take, but it was not what made the runway views slow. The fix above is.
+
+### Clearer loading
+- **The loading screen and the diagnostics now say what preparing the aircraft is doing.** Every aircraft comes ready-built, and after an update most of the wait is each aircraft compiling its shader programs, once. The progress line now says "Loaded the <aircraft>'s body, ready-built", and "Compiling the <aircraft>'s shader programs (once after an update)" while they compile, instead of "building the aircraft bodies" and "from the cache".
+
+### Diagnostics
+- **The analysis times the ground's shading part by part:** the airfields, the roads, the towns' ground and fields, the detail layers and anisotropic filtering each get a row of their own, so the next report shows exactly where the ground's time goes on your graphics card.
+
+### Behind the scenes
+- Codex's offline tools for building real-world terrain from public map data (the first step towards a real Earth) are now part of the project, with their tests. Nothing in the game uses them yet.
+
+Please run `diagnostics.bat` on this version.
+
 ## What's new in v3.49.0
 
 ### Life on the islands
