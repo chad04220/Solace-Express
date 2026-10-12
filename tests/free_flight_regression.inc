@@ -7,6 +7,23 @@
     auto near = [](float a, float b) { return fabsf(a - b) < 0.001f; };
     auto bytes = [](const fs::path& path) { std::ifstream f(path, std::ios::binary); return std::string(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()); };
     auto snapshot = [&](const Career& c) { const auto path = root / "snapshot.sav"; if (!c.save(path.string())) return std::string("SAVE FAILED"); return bytes(path); };
+    // Live Free Flight unwraps Solace. Returning to the menu restores the authored
+    // chart asynchronously; use a private cache and leave it alive until all Games
+    // (and their loader/retirement jobs) have been destroyed below.
+    g_world.saveCache((root / "world.bin").string(), kTestWorldStamp);
+    auto restoreMenu = [&](Game& q, const std::string& label) {
+      check(q.screen == SCR_REGION_LOADING && q.regionJob.valid(), label + ": menu return gates readers during Solace restoration");
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(5);
+      while (q.screen == SCR_REGION_LOADING && q.regionJob.valid() && std::chrono::steady_clock::now() < deadline) {
+        q.update(1.f / 60.f); q.in.endFrame();
+        if (q.regionJob.valid()) q.regionJob.wait_for(std::chrono::milliseconds(2));
+      }
+      const bool ready = q.screen == SCR_MENU && !q.regionJob.valid() && q.regionError.empty() &&
+        !g_world.procedural && g_world.repeating && g_world.regionId == "solace";
+      check(ready,
+        label + ": authored Solace is ready before menu assertions or another launch");
+      return ready;
+    };
 
     // All airports and all ordinary airframes are available to a new, penniless
     // student without a fleet. Every start is a fresh aircraft with full tanks.
@@ -56,6 +73,7 @@
     // owned aircraft's fuel/wear, a loan, airline, progress and exact save bytes.
     for (Career::JobState::State state : {Career::JobState::ACTIVE, Career::JobState::RECOVERY}) {
       Game q; q.initHeadless(); q.botControl = true; q.set.traffic = false; q.failuresArmed = true;
+      q.cacheDir = root.string(); q.buildStamp = kTestWorldStamp;
       const std::string label = state == Career::JobState::ACTIVE ? "active job" : "recovery job";
       const fs::path dir = root / label; fs::create_directories(dir); q.saveDir = dir.string();
       q.career.money = 13; q.career.license = LIC_STUDENT; q.career.reputation = 7; q.career.storyIndex = 2;
@@ -103,6 +121,7 @@
       q.launchFreeFlight(); q.screen = SCR_LOADING; q.in.pressed[K_ESC] = true; q.updateLoading(1.f / 60.f); q.in.endFrame();
       check(q.screen == SCR_FREE_FLIGHT && !q.freeFlight && unchanged(), label + ": loading cancellation does not close or save existing career attempt");
       q.cancelFreeFlightSetup();
+      if (!restoreMenu(q, label)) return fails;
       check(q.screen == SCR_MENU && unchanged(), label + ": back to main menu preserves career save byte-for-byte");
 
       // A failed career transaction stays pending; Free Flight neither depends on it
@@ -111,6 +130,7 @@
       const std::string pending = snapshot(*q.pendingCareer);
       q.beginFreeFlightSetup(); q.update(0.05f); q.in.endFrame(); q.launchFreeFlight(); q.update(0.05f); q.in.endFrame();
       q.endFlight(false, "", OUT_ABANDONED); q.update(0.05f); q.in.endFrame(); q.cancelFreeFlightSetup();
+      if (!restoreMenu(q, label + ": pending transaction")) return fails;
       check(q.screen == SCR_MENU && snapshot(q.career) == before && q.pendingCareer && snapshot(*q.pendingCareer) == pending && bytes(save) == before && fs::last_write_time(save) == modified && q.saveWhy == "Pending test save", label + ": unsaved career transaction neither blocks nor leaks into Free Flight");
     }
     std::error_code ec; fs::remove_all(root, ec);

@@ -1,8 +1,10 @@
 # Procedural Earth review handoff
 
-Local branch: `codex/procedural-earth-regions-20261012`, based on `d1b2c99`.
-This is a review branch, not a pushed change or release. Tests and measurements
-below must be interpreted with their explicit scope.
+Review branch: `codex/procedural-earth-regions-20261012`, based on `d1b2c99`.
+Initial publication `94546c98aee144bfa13687903f005fbdc9c516d1` preserved the exact
+tested local tree. This remains review work, not a release. Tests and measurements
+below must be interpreted with their explicit scope. The first full CI run found
+additional cross-platform failures; see the corrective follow-up at the end.
 
 ## What is implemented
 
@@ -277,3 +279,19 @@ Pinned evidence: [CMake](https://github.com/chad04220/Solace-Express/blob/faa662
 Highest-risk shared files are CMakeLists.txt, Game/UI, World, renderer/terrain/
 raster/entity rendering, career serialization, and tests/ui_review_harness.cpp.
 Current local evidence must not be claimed to validate that unperformed merge.
+
+## Published CI follow-up (2026-10-12)
+
+The first full CI run on the published review commit failed in the shader bake
+identity guard, the older Free Flight regression fixture, the Windows temporary
+save path, the MSVC fast-math transport tolerance, and the sanitizer stale-candidate
+fixture. Sampling on both platforms, aircraft generation, and sanitizer shard 1
+passed. The failures and scoped corrections are documented in
+[`validation/procedural-regions/ci-corrections-20261012.md`](validation/procedural-regions/ci-corrections-20261012.md).
+Existing assertions, numerical tolerances, and pinned aircraft bake identities
+were retained. The corrective source has separate local evidence; the original
+render measurements above do not establish Windows/RTX runtime performance.
+
+Read the latest exact-commit CI result in
+[the coordination thread](https://github.com/chad04220/Solace-Express/issues/2#issuecomment-6133278045)
+before integrating. No rebrand/foveation merge or release is part of this repair.

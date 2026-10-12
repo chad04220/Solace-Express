@@ -127,7 +127,7 @@ vec3 roadNormal(RoadHit r, vec3 n){ return normalize(mix(n, r.nr, 1.0 - smoothst
 // pruner drops them with everything else unreachable)
 float forestAt(vec2 p){ return 0.0; }
 vec4 roadTexel(int i){ return vec4(0.0); }
-uint roadHead(vec2 p){ if (uUnwrappedWorld != 0 && max(abs(p.x), abs(p.y)) > WH) return 0u; return 0u; }
+uint roadHead(vec2 p){ return 0u; }
 float roadHalfPlatform(int c){ return 0.0; }
 float roadHalfPaved(int c){ return 0.0; }
 float roadBankMax(int c){ return 0.0; }

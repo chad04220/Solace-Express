@@ -29,6 +29,7 @@ public:
 private:
   Chart from_, to_;
   double headingDelta_ = 0;
+  double horizontalCos_ = 1, horizontalSin_ = 0;
   quat rotation_;
 };
 } // namespace regionTravel

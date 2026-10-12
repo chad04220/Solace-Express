@@ -49,13 +49,20 @@ Change::Change(const Chart& from, const Chart& to, vec3 focus) : from_(from), to
   const auto oldTangent = from.localDouble(ahead) - from.localDouble(at);
   const auto newTangent = to.localDouble(ahead) - to.localDouble(at);
   headingDelta_ = std::remainder(chartHeading(newTangent) - chartHeading(oldTangent), 360.);
+  const double angle = headingDelta_ * geo::kDegrees;
+  horizontalCos_ = std::cos(angle);
+  horizontalSin_ = std::sin(angle);
   // Positive quaternion Y rotates -z west; chart headings increase eastward.
-  rotation_ = quat::axisAngle(vec3(0, 1, 0), float(-headingDelta_ * geo::kDegrees));
+  rotation_ = quat::axisAngle(vec3(0, 1, 0), float(-angle));
 }
 vec3 Change::point(vec3 local) const { return to_.local(from_.position(local)); }
 vec3 Change::vector(vec3 local) const {
   require(finite(local.x) && finite(local.y) && finite(local.z), "non-finite regional vector");
-  return rotation_.rotate(local);
+  // A float quaternion is only approximately unit length; its cross products
+  // can add speed drift under fast math. Rotate horizontally in double and
+  // narrow just once, retaining the altitude-axis component exactly.
+  return {float(horizontalCos_ * double(local.x) - horizontalSin_ * double(local.z)), local.y,
+          float(horizontalSin_ * double(local.x) + horizontalCos_ * double(local.z))};
 }
 quat Change::attitude(quat q) const {
   require(finite(q.w) && finite(q.x) && finite(q.y) && finite(q.z), "non-finite regional attitude");

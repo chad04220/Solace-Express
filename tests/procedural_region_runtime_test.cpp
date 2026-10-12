@@ -162,6 +162,17 @@ struct GameTest {
     // candidate. Waiting is test setup only; production flight never waits here.
     game.retireEarthPrefetch();
     if (game.earthRetireJob.valid()) game.earthRetireJob.get();
+    // Prepare the real payload during fixture setup. The gate below tests
+    // unresolved-future ownership and retirement, not cold generation speed.
+    // Keep the generated cache for the later production prefetch checks.
+    auto completedCandidate = std::make_unique<Game::PrefetchedRegion>();
+    completedCandidate->region = expected;
+    completedCandidate->world = std::make_unique<World>();
+    {
+      ScopedParallelLimit threadBudget(2);
+      completedCandidate->world->buildProcedural(
+        expected, (root / "procedural-world.bin").string(), stamp, true);
+    }
     std::promise<void> releaseCandidate;
     auto candidateGate = releaseCandidate.get_future();
     game.earthPrefetchId = expected.id;
@@ -170,12 +181,9 @@ struct GameTest {
     // Deliberately omit the cancellation scope in this gated fixture: even an
     // uncooperative stage must never make future destruction block the flight.
     game.earthPrefetchJob = std::async(std::launch::async,
-      [f = std::move(candidateGate), expected, root, stamp]() mutable {
-        f.wait(); ScopedParallelLimit threadBudget(2);
-        auto candidate = std::make_unique<Game::PrefetchedRegion>();
-        candidate->region = expected; candidate->world = std::make_unique<World>();
-        candidate->world->buildProcedural(expected, (root / "procedural-world.bin").string(), stamp, true);
-        return candidate;
+      [f = std::move(candidateGate), candidate = std::move(completedCandidate)]() mutable {
+        f.wait();
+        return std::move(candidate);
       });
     const auto beforeLate = std::chrono::steady_clock::now();
     game.updateEarthFlight();
@@ -309,11 +317,18 @@ struct GameTest {
       std::chrono::steady_clock::now() - beforeReverse < std::chrono::milliseconds(250),
       "reversing course does not destroy or join an unresolved prefetch future");
     check(uncooperativeCancel->requested, "heading reprioritization requests cooperative cancellation without waiting for the worker");
+    const auto staleReleasedAt = std::chrono::steady_clock::now();
     releaseCandidate.set_value();
-    const auto staleDeadline = std::chrono::steady_clock::now() + std::chrono::minutes(5);
+    const auto staleDeadline = staleReleasedAt + std::chrono::minutes(5);
     while (game.earthPrefetchJob.valid() && std::chrono::steady_clock::now() < staleDeadline) {
       game.updateEarthFlight(); std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
+    printf("Region runtime: stale candidate wait %.3f ms, prefetch_valid=%d retirement_valid=%d candidate_present=%d in_flight=%d resident_unchanged=%d error=\"%s\"\n",
+      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - staleReleasedAt).count(),
+      game.earthPrefetchJob.valid(), game.earthRetireJob.valid(), game.earthPrefetch != nullptr,
+      game.screen == SCR_FLIGHT, g_world.regionId == A.id, game.earthPrefetchError.c_str());
+    check(!game.earthPrefetchJob.valid(), "gated obsolete candidate future is consumed before the retirement deadline");
+    check(game.earthPrefetchError.empty(), "gated obsolete candidate completes without preparation errors");
     check(game.screen == SCR_FLIGHT && g_world.regionId == A.id && !game.earthPrefetch && game.earthRetireJob.valid(),
       "completed obsolete candidate is retired off-thread without changing the resident chart");
     if (game.earthRetireJob.valid()) game.earthRetireJob.get();

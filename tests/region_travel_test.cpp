@@ -181,6 +181,35 @@ void transportTests() {
     worstJump, worstDirection, worstSpeed, worstAttitude);
 }
 
+void planarRotationTests() {
+  double worstSpeed = 0, worstOracle = 0;
+  // Polar meridian convergence sweeps the complete rotation range, including
+  // near-half-turns where float quaternion rotation accumulates scale error.
+  for (double pole : {-90., 90.}) {
+    const regionTravel::Chart from({pole, 0, 0});
+    for (int step = -720; step <= 720; ++step) {
+      const regionTravel::Chart to({pole > 0 ? 89.9 : -89.9, step * .25, 0});
+      const regionTravel::Change change(from, to, {});
+      for (vec3 v : {vec3(210, 7, -98), vec3(-120, -21, 300), vec3(0, 100, 0), vec3()}) {
+        const vec3 moved = change.vector(v);
+        // Independent polar-coordinate oracle: preserve horizontal magnitude
+        // and add heading, rather than reuse a quaternion or matrix product.
+        const double radius = std::hypot(double(v.x), double(v.z));
+        const double angle = std::atan2(double(v.x), -double(v.z)) + change.headingDelta() * geo::kDegrees;
+        const geo::Double3 oracle(radius * std::sin(angle), v.y, -radius * std::cos(angle));
+        const double oracleError = geo::length(geo::Double3(moved) - oracle);
+        const double speedError = std::abs(dist(moved) - dist(v));
+        worstOracle = std::max(worstOracle, oracleError);
+        worstSpeed = std::max(worstSpeed, speedError);
+        expect(oracleError < .000025, "planar transport matches independent polar oracle within float narrowing budget");
+        expect(speedError < .00012, "full-angle transport preserves physical speed");
+        expect(moved.y == v.y, "full-angle transport preserves vertical speed exactly");
+      }
+    }
+  }
+  printf("Planar rotation sweep: speed %.9g m/s, independent polar oracle %.9g m/s\n", worstSpeed, worstOracle);
+}
+
 void ownershipBoundaryTests() {
   using namespace geo;
   double maxRadius = 0, maxJump = 0, maxDirection = 0;
@@ -350,7 +379,7 @@ void flightTests() {
 
 int main() {
   try {
-    chartTests(); transportTests(); ownershipBoundaryTests(); invalidInputTests();
+    chartTests(); transportTests(); planarRotationTests(); ownershipBoundaryTests(); invalidInputTests();
 #ifndef REGION_TRAVEL_MATH_ONLY
     flightTests();
 #endif

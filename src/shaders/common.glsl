@@ -16,8 +16,11 @@ const int HMN = 2048;
 const float TEXEL = 39.0625;
 const float PI = 3.14159265;
 uniform sampler2D uHM;
+#ifndef PART_BAKE
+// World topology must not invalidate the aircraft-only bake program/cache.
 uniform int uUnwrappedWorld; // one nonrepeating chart during Earth free flight
 uniform int uProceduralWorld; // authored-place-only features stay on Solace
+#endif
 uniform vec4 uCrater[24]; uniform int uCraterN;  // impact craters: x, z, radius, depth (negative depth: dark-energy blast)
 uniform vec3 uCraterB;   // circle (x, z, radius) around every crater's influence
 int craterAt(vec2 p, float k){ if (length(p - uCraterB.xy) > uCraterB.z) return -1;
@@ -39,9 +42,15 @@ float hash1(float n){ return fract(sin(n)*43758.5453); }
 float hash3(vec3 p){ p = fract(p*0.3183099+0.1); p*=17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
 // The islands span [-WH, WH], in 10 km of open sea all round, and there the map wraps: what is anywhere is what is at
 // its place in [-50, 50) km (world.h wrapCoord, exactly)
+#ifndef PART_BAKE
 vec2 wrapW(vec2 p){ if (uUnwrappedWorld != 0) return p; return p - 100000.0*floor((p + 50000.0)/100000.0); }
+#else
+vec2 wrapW(vec2 p){ return p - 100000.0*floor((p + 50000.0)/100000.0); }
+#endif
 vec4 baseAt(vec2 p){
+#ifndef PART_BAKE
   if (uUnwrappedWorld != 0 && max(abs(p.x), abs(p.y)) >= WH + 3000.0) return vec4(-80.0, 0.0, 0.0, 0.0);
+#endif
   p = wrapW(p);
   vec2 f = (p + WH)/TEXEL - 0.5; vec2 fl = floor(f); ivec2 i = ivec2(fl); vec2 t = f - fl;
   ivec2 mx = ivec2(HMN-1);
@@ -78,14 +87,20 @@ float fbm2(vec2 p, int oct){ float s=0.0, a=0.5; for(int i=0;i<8;i++){ if(i>=oct
 uniform sampler2D uMask; uniform sampler2D uRoadId;
 const int MASKN = 2048; const float MTEX = 39.0625;
 vec4 maskAt(vec2 p){
+#ifndef PART_BAKE
   if (uUnwrappedWorld != 0 && max(abs(p.x), abs(p.y)) > WH) return vec4(1.0, 0.0, 0.0, 0.0);
+#endif
   p = wrapW(p);
   vec2 f = (p + WH)/MTEX - 0.5; vec2 fl = floor(f); ivec2 i = ivec2(fl); vec2 t = f - fl; ivec2 mx = ivec2(MASKN-1);
   vec4 a = texelFetch(uMask, clamp(i, ivec2(0), mx), 0), b = texelFetch(uMask, clamp(i+ivec2(1,0), ivec2(0), mx), 0);
   vec4 c = texelFetch(uMask, clamp(i+ivec2(0,1), ivec2(0), mx), 0), d = texelFetch(uMask, clamp(i+ivec2(1,1), ivec2(0), mx), 0);
   return (a*(1.0-t.x)+b*t.x)*(1.0-t.y) + (c*(1.0-t.x)+d*t.x)*t.y;
 }
+#ifndef PART_BAKE
 vec4 maskTexel(vec2 p){ if (uUnwrappedWorld != 0 && max(abs(p.x), abs(p.y)) > WH) return vec4(1.0, 0.0, 0.0, 0.0); return texelFetch(uMask, clamp(ivec2(floor((wrapW(p) + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0); }
+#else
+vec4 maskTexel(vec2 p){ return texelFetch(uMask, clamp(ivec2(floor((wrapW(p) + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0); }
+#endif
 float roadGrade(vec2 p, float g);   // the ground with the roads built into it (roads.glsl)
 float lakeGround(vec2 p, float g);  // and the Fjordhaven reservoir's lake (roads.glsl)
 float groundH(vec2 p, int oct){ p = wrapW(p); vec4 b = baseAt(p); return lakeGround(p, roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct))); }

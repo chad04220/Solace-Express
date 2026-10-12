@@ -1,0 +1,5 @@
+Region runtime: stale candidate wait 4.259 ms, prefetch_valid=0 retirement_valid=1 candidate_present=0 in_flight=1 resident_unchanged=1 error=""
+Region runtime: gated obsolete candidate future is consumed before the retirement deadline: ok
+Region runtime: gated obsolete candidate completes without preparation errors: ok
+Region runtime: completed obsolete candidate is retired off-thread without changing the resident chart: ok
+Region runtime: real cancellation request 0.025 ms, worker retirement 31.168 ms

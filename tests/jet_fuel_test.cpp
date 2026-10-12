@@ -8,6 +8,7 @@
 #include <cstring>
 #include <cmath>
 #include <chrono>
+#include <filesystem>
 
 namespace {
 int failures = 0;
@@ -133,14 +134,15 @@ void saveAndCost() {
   Career c;c.newGame();c.money=1000000;c.fleet.clear();
   // Historical saved kilograms remain kilograms: no tank-percent migration or free uplift.
   c.fleet.push_back({6,c.location,1100,1});c.fleet.push_back({kAtlas,c.location,14000,1});
-  const std::string path="/tmp/solace-jet-fuel-save-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())+".cfg";
+  const std::string path=(std::filesystem::temp_directory_path()/
+    ("solace-jet-fuel-save-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())+".cfg")).string();
   check(c.save(path),"save old jet fuel quantities");Career d;check(d.load(path),"load old jet fuel quantities");
   check(d.fleet.size()==2&&d.fleet[0].fuel==1100&&d.fleet[1].fuel==14000,"old saved kilograms preserved exactly");
   std::string msg;int money=d.money;
   const int cost=(int)((kAircraft[6].maxFuel-1100)*d.fuelPrice(d.location,6));
   check(d.refuel(0,&msg)&&d.fleet[0].fuel==kAircraft[6].maxFuel&&money-d.money==cost,"refuel bills actual newly added kilograms");
   money=d.money;check(!d.refuel(0,&msg)&&money==d.money,"full tank cannot be billed twice");
-  std::remove(path.c_str());std::remove((path+".bak").c_str());
+  for(const char* suffix:{"",".bak",".tmp"})std::remove((path+suffix).c_str());
 }
 }
 int main(int argc,char**argv) {
