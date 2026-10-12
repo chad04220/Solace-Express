@@ -317,34 +317,6 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, vec2 footprint, out b
   }
 }
 
-// The road paved at a point (the network, road_network.h): signed distance across it from its centreline (+ right of
-// its direction), the distance along it, its direction and class; false: no road's paving or verge here. A second road's
-// paving overlapping it - a junction - stops the markings. Bridge decks are their own meshes: never painted here.
-bool roadAt(vec2 p, out float across, out float along, out vec2 dir, out int cls, out bool junction){
-  across = 1e9; along = 0.0; dir = vec2(1.0, 0.0); cls = 1; junction = false;
-  uint h = roadHead(p); int n = int((h >> 19u) & 63u);
-  if (n == 0) return false;
-  int e0 = int(h & 0x7FFFFu), path = -1;
-  float best = 1e9;
-  for (int k = 0; k < 63; k++) {
-    if (k >= n) break;
-    vec4 a = roadTexel(2*(e0 + k)), b = roadTexel(2*(e0 + k) + 1);
-    int code = int(b.w);
-    if ((code & 8) != 0) continue;
-    int c = code & 7, pid = code >> 7;
-    vec2 ab = a.zw - a.xy; float L = max(length(ab), 1e-3), tr = dot(p - a.xy, ab)/(L*L), t = clamp(tr, 0.0, 1.0);
-    if (((code & 32) != 0 && tr < 0.0) || ((code & 64) != 0 && tr > 1.0)) continue;   // (past an end at a bridge: under its deck)
-    vec2 q = p - (a.xy + ab*t);
-    float e = length(q) - roadHalfPlatform(c);   // (outside the verge: > 0)
-    if (e < 1.0 && path >= 0 && pid != path && min(e, best) < 0.0) junction = true;
-    if (e < best) {
-      best = e; path = pid; cls = c; dir = ab/L; along = b.z + t*L;
-      across = length(q)*(dir.x*q.y - dir.y*q.x < 0.0 ? -1.0 : 1.0);
-    }
-  }
-  return best < 0.0;
-}
-
 // The circuit's bend at a point along it (road_network.h RC_CIRCUIT, the only one): how fast it turns over the 30 m
 // about `along` (1/m; + to the right, the side of positive across), from its own segments listed with the point - its
 // straights one long segment each, its bends many short ones. 0 where its neighbours aren't listed (a long straight's
@@ -361,27 +333,6 @@ float circuitBend(vec2 p, float along){
     if (along + 15.0 >= b.z && along + 15.0 <= b.z + L) d1 = ab/L;
   }
   return dot(d0, d0) > 0.5 && dot(d1, d1) > 0.5 ? (d0.x*d1.y - d0.y*d1.x)/30.0 : 0.0;
-}
-
-// The graded roads' own surface normal where their platform is - level across, tilted along by the road's grade -
-// blended back into the mesh's n over the platform's last metre. (A far chunk's cell spans a road and its banks: its
-// normal, their average, lit the paving as though it lay on the hillside, and laid rock on it where the banks were steep)
-vec3 roadSurfaceNormal(vec2 p, vec3 n){
-  uint h = roadHead(p); int cnt = int((h >> 19u) & 63u);
-  if (cnt == 0) return n;
-  int e0 = int(h & 0x7FFFFu);
-  float best = 1e9; vec3 nr = n;
-  for (int k = 0; k < 63; k++) {
-    if (k >= cnt) break;
-    vec4 a = roadTexel(2*(e0 + k)), b = roadTexel(2*(e0 + k) + 1);
-    int code = int(b.w);
-    if ((code & 24) != 0) continue;   // (a bridge's ground, an airfield's: as they are)
-    vec2 ab = a.zw - a.xy; float L = max(length(ab), 1e-3), tr = dot(p - a.xy, ab)/(L*L), t = clamp(tr, 0.0, 1.0);
-    if (((code & 32) != 0 && tr < 0.0) || ((code & 64) != 0 && tr > 1.0)) continue;
-    float e = length(p - (a.xy + ab*t)) - roadHalfPlatform(code & 7);
-    if (e < best) { best = e; vec2 dir = ab/L; float gr = (b.y - b.x)/L; nr = normalize(vec3(-gr*dir.x, 1.0, -gr*dir.y)); }
-  }
-  return normalize(mix(n, nr, 1.0 - smoothstep(-1.0, 0.0, best)));
 }
 
 // farmland: Voronoi field patchwork with crop rows and hedgerows
@@ -417,7 +368,10 @@ void fieldMaterial(vec2 p, float farm, vec2 pixelDx, vec2 pixelDy, inout Mat m){
   m.nrm = mix(m.nrm, nTS, farm*0.6);
 }
 
-Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixelDy){
+// (road: roadQuery at p.xz, the caller's - the ground's normal wants it first. Never in the aircraft bodies' bake, which
+// has no roads, PART_BAKE)
+#ifndef PART_BAKE
+Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixelDy, RoadHit road){
   vec2 groundFoot = abs(pixelDx) + abs(pixelDy);
   Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
   if ((uDbg & 128) != 0) { m.alb = vec3(0.2, 0.3, 0.12); m.rough = 0.9; return m; }
@@ -517,8 +471,8 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   // ---- roads (the network, road_network.h): each class's cross-section, its markings stopping at junctions
   float roadCover = 0.0;   // (how much of the pixel a road's platform takes: the airfield's mowing keeps off it)
   {
-    float across, along; vec2 direction; int cls; bool junction;
-    if (roadsOn && roadAt(p.xz, across, along, direction, cls, junction)) {
+    float across = road.across, along = road.along; vec2 direction = road.dir; int cls = road.cls; bool junction = road.junction;
+    if (roadsOn && road.on) {
       vec2 side = vec2(-direction.y, direction.x);
       float roadFoot = max(abs(dot(pixelDx, side)) + abs(dot(pixelDy, side)), 1e-3);
       float alongFoot = max(abs(dot(pixelDx, direction)) + abs(dot(pixelDy, direction)), 1e-3);
@@ -713,3 +667,4 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   m.rough = mix(m.rough, m.rough*0.35, uWet*(1.0-wSnow));
   return m;
 }
+#endif

@@ -5,9 +5,10 @@
 #ifndef PART_BAKE
 // uRoadGrid: R32UI per mask texel - the baked forest noise (top 7 bits), how many road entries reach the texel (next
 // 6), the first of them (low 19); the entries are uData's rows from 1 on, two texels each (Renderer's upload):
-// (a.x, a.z, b.x, b.z), (a.h, b.h, distance along the road at a, class + 8 x flags + 128 x path); flags 1 a bridge's
-// span (the ground below left alone, no paint), 2 by an airfield's grounds (painted on the ground as it is), 4 and 8
-// its end a or b at a bridge (the platform stopping square at the joint)
+// (a.x, a.z, b.x, b.z), (a.h, b.h, distance along the road at a, class + 8 x flags + 128 x banks-only + 256 x path);
+// flags 1 a bridge's span (the ground below left alone, no paint), 2 by an airfield's grounds (painted on the ground as
+// it is), 4 and 8 its end a or b at a bridge (the platform stopping square at the joint); banks-only: none from this
+// entry on in the texel's list paves the texel (each texel's paving entries listed first: the paint reads no further)
 uniform usampler2D uRoadGrid;
 const float ROAD_BANK_MAX = 50.0;   // the widest cut or fill bank beyond a platform's edge
 const float ROAD_BANK_RUN = 2.0;    // a bank's run for its rise, on average
@@ -75,6 +76,46 @@ float roadGrade(vec2 p, float g){
   }
   return W > 0.0 ? g + (hs/ws - g)*W : g;
 }
+// The road at a point (the network, road_network.h), once for the ground's normal and its paint: the nearest platform's
+// signed distance across from its centreline (+ right of its direction), the distance along it, its direction and class;
+// on: on its paving or verge (bridge decks are their own meshes: never painted here); junction: a second road's paving
+// within a metre - its markings stop. And the graded roads' own surface (roadNormal): the nearest of their platforms -
+// how far its edge (edge), its normal, level across and tilted along by its grade (nr). Only the texel's entries paving
+// it are read: listed first, the rest only bank the ground (marked 128 from the first of them, roadEntryRows).
+struct RoadHit { bool on; float across, along; vec2 dir; int cls; bool junction; float edge; vec3 nr; };
+RoadHit noRoad(){ RoadHit r; r.on = false; r.across = 1e9; r.along = 0.0; r.dir = vec2(1.0, 0.0); r.cls = 1; r.junction = false; r.edge = 1e9; r.nr = vec3(0.0, 1.0, 0.0); return r; }
+RoadHit roadQuery(vec2 p){
+  RoadHit r = noRoad();
+  uint h = roadHead(p); int n = int((h >> 19u) & 63u);
+  if (n == 0) return r;
+  int e0 = int(h & 0x7FFFFu), path = -1;
+  float best = 1e9, other = 1e9;   // (other: the nearest platform of any road but the nearest's)
+  for (int k = 0; k < 63; k++) {
+    if (k >= n) break;
+    vec4 b = roadTexel(2*(e0 + k) + 1);
+    int code = int(b.w);
+    if ((code & 128) != 0) break;   // (the rest only bank the ground here)
+    if ((code & 8) != 0) continue;   // (a bridge's span)
+    vec4 a = roadTexel(2*(e0 + k));
+    int c = code & 7, pid = code >> 8;
+    vec2 ab = a.zw - a.xy; float L = max(length(ab), 1e-3), tr = dot(p - a.xy, ab)/(L*L), t = clamp(tr, 0.0, 1.0);
+    if (((code & 32) != 0 && tr < 0.0) || ((code & 64) != 0 && tr > 1.0)) continue;   // (past an end at a bridge: under its deck)
+    vec2 q = p - (a.xy + ab*t), dir = ab/L;
+    float e = length(q) - roadHalfPlatform(c);   // (outside the verge: > 0)
+    if ((code & 16) == 0 && e < r.edge) { r.edge = e; float gr = (b.y - b.x)/L; r.nr = normalize(vec3(-gr*dir.x, 1.0, -gr*dir.y)); }   // (an airfield's road: on the ground as it is)
+    if (e < best) {
+      if (pid != path) { other = best; path = pid; }   // (the nearest so far: every other road's nearest)
+      best = e; r.cls = c; r.dir = dir; r.along = b.z + t*L;
+      r.across = length(q)*(dir.x*q.y - dir.y*q.x < 0.0 ? -1.0 : 1.0);
+    } else if (pid != path) other = min(other, e);
+  }
+  r.on = best < 0.0; r.junction = r.on && other < 1.0;
+  return r;
+}
+// The ground's normal n with a graded road's platform in it: its own, blended back into n over the platform's last metre.
+// (A far chunk's cell spans a road and its banks: its normal, their average, lit the paving as though it lay on the
+// hillside, and laid rock on it where the banks were steep)
+vec3 roadNormal(RoadHit r, vec3 n){ return normalize(mix(n, r.nr, 1.0 - smoothstep(-1.0, 0.0, r.edge))); }
 #else
 // (the bake: inert stand-ins, so the world library still compiles as assembled; nothing it runs calls them, and the
 // pruner drops them with everything else unreachable)

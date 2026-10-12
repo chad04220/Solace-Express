@@ -1,3 +1,10 @@
+## What's new in v3.49.2
+
+### Faster on the ground
+- **The roads cost the ground far less to draw.** Your v3.49.1 diagnostics showed the roads were the most expensive part of the ground on your graphics card: 3 to 5 ms a frame on the runways and low over the towns. For every pixel within reach of a road's embankments, as much as 100 m from the road itself, the ground checked that road twice. Now each pixel checks once, and only the roads actually passing through its patch of ground. Nothing looks different.
+
+Please run `diagnostics.bat` on this version.
+
 ## What's new in v3.49.1
 
 ### Faster on the ground

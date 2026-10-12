@@ -344,7 +344,7 @@ void World::build(const std::string& cachePath, const std::string& stamp, bool s
 // The generated world on disk: its height and mask textures, height bounds and terrain envelope, stamped with the
 // build that made them (any other build generates again)
 namespace {
-const uint32_t kWorldMagic = 0x574c4435u;   // "WLD5": the road network, its grid and the forest noise in one R32UI texel; the reservoir
+const uint32_t kWorldMagic = 0x574c4436u;   // "WLD6": the road network, its grid (each texel's paving entries first) and the forest noise in one R32UI texel; the reservoir
 template <class T> void putVec(FILE* f, const std::vector<T>& v) { uint64_t n = v.size(); fwrite(&n, 8, 1, f); if (n) fwrite(v.data(), sizeof(T), n, f); }
 template <class T> bool getVec(FILE* f, std::vector<T>& v, uint64_t expect) {
   uint64_t n = 0; if (fread(&n, 8, 1, f) != 1 || n != expect) return false;

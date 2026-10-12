@@ -103,6 +103,6 @@ float roadGrade(const RoadGrid& grid, float x, float z, float g);
 float roadEdgeDistance(const RoadGrid& grid, float x, float z, int* seg = nullptr);
 // The grid's entries as the shaders read them (roads.glsl roadTexel): two RGBA32F texels each, in list order - rows 1..
 // of a 4096-wide uData (row 0 is the caller's own); the floats of those rows, padded to whole rows. The second's w:
-// class + 8 x flags + 128 x path
+// class + 8 x flags + 128 x (none from here on in its texel's list paves the texel: only roadGrade reads on) + 256 x path
 static const int ROAD_DATA_W = 4096;
 std::vector<float> roadEntryRows(const RoadGrid& grid);

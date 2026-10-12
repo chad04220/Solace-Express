@@ -239,6 +239,21 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
     airborne scenes are unchanged, and the picture is the same to the level.
   - The analysis also gains a row for each part of the ground's material (airfield surfaces, roads, the towns'
     ground and fields, the detail layers) and for anisotropic filtering, for the next diagnostics.
+- **The v3.49.1 diagnostics:** the night scene's frame fell from 15.5 to 13.9 ms, less than the software renderer
+  promised. The new rows put the roads first among the ground's costs: 3 to 5 ms in the ground and low scenes (rjet,
+  rjetc, the XR-40 over the city by night), then the towns' ground and fields (1 to 3 ms) and anisotropic filtering
+  (1.2 to 2.1 ms).
+  - Every ground pixel in a mask texel (39 m) that any road's banks reached looked through all of that texel's entries
+    twice: once for the road's own surface normal (`terrain_fs`), once for its paint (`roadAt`). A highway's banks
+    reach 66 m, so a band nearly 200 m wide along each one paid for the loop, though only its platform's pixels use it.
+  - Now one pass (`roads.glsl` `roadQuery`) gives both, and reads only the entries whose platform comes within 1.5 m of
+    the texel: `buildRoadGrid` lists those first, and `roadEntryRows` marks the first of the rest (128 in the code,
+    the path moved to 256 x) so the loop stops there. `roadGrade`, under the terrain's vertices, still reads them all.
+  - The junction test (where the markings stop) is exact now: a second road's platform within a metre. The old one
+    also stopped them where another road came first in the texel's list - 8.5% of the paving's places, nearly all of
+    them streets and farm tracks, which have no markings.
+  - `road_grade_gpu` checks the shader's road against every entry of its texel at 590,000 places: on the same road,
+    across it to a centimetre, the same junctions.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

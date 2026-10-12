@@ -735,6 +735,15 @@ void simplify(const RoadPath& p, int a, int b, float tol, std::vector<uint8_t>& 
   keep[at] = 1;
   simplify(p, a, at, tol, keep); simplify(p, at, b, tol, keep);
 }
+// Whether a segment's platform comes within a metre and a half of a texel (its square: from its centre, the
+// half-diagonal as slack) - the ground's paint and its roads' normal (roads.glsl roadQuery) read no other; the rest of a
+// texel's list only banks the ground (roadGrade)
+bool pavesTexel(const RoadSegment& s, int i, int j) {
+  const float T = 2.f * WORLD_HALF / RoadGrid::N, cx = -WORLD_HALF + (i + 0.5f) * T, cz = -WORLD_HALF + (j + 0.5f) * T;
+  const float dx = s.bx - s.ax, dz = s.bz - s.az, L2 = std::max(dx * dx + dz * dz, 1e-6f);
+  const float t = std::clamp(((cx - s.ax) * dx + (cz - s.az) * dz) / L2, 0.f, 1.f);
+  return hypotf(s.ax + dx * t - cx, s.az + dz * t - cz) <= roadSpec(s.cls).halfPlatform + 1.5f + T * 0.7072f;
+}
 }  // namespace
 
 void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid) {
@@ -785,6 +794,9 @@ void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid) {
   }
   for (size_t c = 0; c < at.size(); c++) {
     if (at[c].empty()) continue;
+    // those paving the texel first: the painting reads no further (roadEntryRows marks where it can stop)
+    const int ci = (int)(c % RoadGrid::N), cj = (int)(c / RoadGrid::N);
+    std::stable_partition(at[c].begin(), at[c].end(), [&](uint32_t si) { return pavesTexel(grid.segs[si], ci, cj); });
     const size_t n = std::min<size_t>(at[c].size(), 63);   // (never more than a few dozen: junctions of three roads)
     if (grid.list.size() + n > 0x7FFFFu) break;            // (the 19 bits a texel's first entry has: roads_test watches)
     grid.head[c] = (uint32_t)n << 19 | (uint32_t)grid.list.size();
@@ -886,11 +898,21 @@ float roadEdgeDistance(const RoadGrid& grid, float x, float z, int* seg) {
 }
 
 std::vector<float> roadEntryRows(const RoadGrid& grid) {
+  // each texel's entries after its last paving one: only the ground's banks read them (whatever the list's order - a
+  // grid built by buildRoadGrid lists the paving ones first)
+  std::vector<uint8_t> banksOnly(grid.list.size(), 0);
+  for (size_t c = 0; c < grid.head.size(); c++) {
+    const uint32_t k0 = RoadGrid::first(grid.head[c]), n = RoadGrid::count(grid.head[c]);
+    if (n == 0 || k0 + n > grid.list.size()) continue;
+    uint32_t last = k0;   // (one past the last paving entry)
+    for (uint32_t k = k0; k < k0 + n; k++) if (pavesTexel(grid.segs[grid.list[k]], (int)(c % RoadGrid::N), (int)(c / RoadGrid::N))) last = k + 1;
+    for (uint32_t k = last; k < k0 + n; k++) banksOnly[k] = 1;
+  }
   std::vector<float> d;
   d.reserve(grid.list.size() * 8 + ROAD_DATA_W * 4);
-  for (uint32_t si : grid.list) {
-    const RoadSegment& r = grid.segs[si];
-    const float e[8] = {r.ax, r.az, r.bx, r.bz, r.ah, r.bh, r.along, (float)(r.cls + 8 * r.flags + 128 * r.path)};
+  for (size_t k = 0; k < grid.list.size(); k++) {
+    const RoadSegment& r = grid.segs[grid.list[k]];
+    const float e[8] = {r.ax, r.az, r.bx, r.bz, r.ah, r.bh, r.along, (float)(r.cls + 8 * r.flags + 128 * banksOnly[k] + 256 * r.path)};
     d.insert(d.end(), e, e + 8);
   }
   d.resize((d.size() + ROAD_DATA_W * 4 - 1) / (ROAD_DATA_W * 4) * (ROAD_DATA_W * 4), 0.f);
