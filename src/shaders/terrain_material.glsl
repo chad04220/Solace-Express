@@ -421,6 +421,8 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   vec2 groundFoot = abs(pixelDx) + abs(pixelDy);
   Mat m; m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
   if ((uDbg & 128) != 0) { m.alb = vec3(0.2, 0.3, 0.12); m.rough = 0.9; return m; }
+  // (profiling, Renderer::dbgOff: a part of the material left out on its own - the diagnostics' analysis times each)
+  bool detailOn = (uDbg & 16384) == 0, townOn = (uDbg & 8192) == 0, roadsOn = (uDbg & 4096) == 0;
   float lush = base.z, cold = base.w;
   float slope = 1.0 - n.y;
   float hNoise = tfbm(p.xz/900.0);
@@ -457,13 +459,13 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   // round flower heads up close; further out only the patch's tint survives (no aliasing squares)
   vec2 fc = floor(p.xz*1.3), ff = fract(p.xz*1.3) - 0.5 - (vec2(hash2i(ivec2(fc) + ivec2(3, 1)), hash2i(ivec2(fc) + ivec2(-5, 7))) - 0.5)*0.5;
   float flPatch = smoothstep(0.62, 0.7, vnoise(p.xz/35.0));
-  float fl = flPatch*mix(0.12, step(0.9, hash2i(ivec2(fc)))*smoothstep(0.2, 0.1, length(ff)), smoothstep(120.0, 40.0, t));
+  float fl = (detailOn ? 1.0 : 0.0)*flPatch*mix(0.12, step(0.9, hash2i(ivec2(fc)))*smoothstep(0.2, 0.1, length(ff)), smoothstep(120.0, 40.0, t));
   float flNear = smoothstep(120.0, 40.0, t);   // far away a meadow in flower only warms slightly (no grey-violet patches)
   vec3 flCol = mix(vec3(0.95,0.85,0.2), mix(vec3(0.95,0.85,0.2), vec3(0.75,0.35,0.85), step(0.5, vnoise(p.xz/20.0))), flNear);
   m.alb = mix(m.alb, flCol*m.alb/max(dot(m.alb, vec3(0.333)), 1e-3)*mix(0.33, 1.0, flNear), fl*(1.0 - cold)*mix(0.35, 0.7, flNear));
-  if (wDirt > 0.01) { vec4 d = groundSample(p.xz, M_DIRT, 7.0, nTS, hL); float w = hblend(wDirt, hC, hL);
+  if (detailOn && wDirt > 0.01) { vec4 d = groundSample(p.xz, M_DIRT, 7.0, nTS, hL); float w = hblend(wDirt, hC, hL);
     m.alb = mix(m.alb, d.rgb, w); m.rough = mix(m.rough, d.a, w); m.nrm = mix(m.nrm, nTS, w); hC = mix(hC, hL, w); }
-  if (wForest > 0.01) {
+  if (detailOn && wForest > 0.01) {
     // forest floor under the trees: leaf litter, needles and moss
     vec4 f = groundSample(p.xz, M_LITTER, 4.0, nTS, hL); float w = hblend(wForest*0.85, hC, hL);
     vec3 litter = f.rgb*mix(vec3(1.0), vec3(0.8, 0.9, 0.85), cold)*0.6;   // shaded by the canopy (no bright speckle between the trees)
@@ -476,8 +478,8 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       tint *= 0.85 + 0.3*vnoise(p.xz/160.0);   // stands of different age and species
       m.alb = mix(m.alb, cn.rgb*tint*0.8, far); m.rough = mix(m.rough, 0.9, far); m.nrm = mix(m.nrm, nTS, far); }
   }
-  if (msk.w > 0.05 && p.y > 0.5) fieldMaterial(p.xz, msk.w*(1.0 - wRock), pixelDx, pixelDy, m);
-  if (wSand > 0.01) { vec4 s = groundSample(p.xz, M_SAND, 6.0, nTS, hL); float w = hblend(wSand, hC, 1.0 - hL);
+  if (townOn && msk.w > 0.05 && p.y > 0.5) fieldMaterial(p.xz, msk.w*(1.0 - wRock), pixelDx, pixelDy, m);
+  if (detailOn && wSand > 0.01) { vec4 s = groundSample(p.xz, M_SAND, 6.0, nTS, hL); float w = hblend(wSand, hC, 1.0 - hL);
     // (on an airfield's flattened grounds - a beach strip's - all of it is the transition, and the height blend dotted
     // it with the sand tile's bumps every 6 m: there the weight alone, a smooth mix)
     // (and there in patches, sand or grass: a faint weight over a whole flat airfield read as a veil of haze)
@@ -487,19 +489,19 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
     float wetS = smoothstep(1.1 + 0.5*hNoise, 0.2, p.y);
     vec3 sc = s.rgb*mix(vec3(1.0), vec3(1.08,1.04,0.95), lush)*(0.85 + 0.3*vnoise(p.xz/70.0))*mix(1.0, 0.55, wetS);
     m.alb = mix(m.alb, sc, w); m.rough = mix(m.rough, mix(s.a, s.a*0.45, wetS), w); m.nrm = mix(m.nrm, nTS, w); hC = mix(hC, hL, w); }
-  if (wRock > 0.01) {
+  if (detailOn && wRock > 0.01) {
     vec3 nr; vec4 r = terrainTriSample(p, n, M_ROCK, 18.0, nr);
     float w = hblend(wRock, hC, dot(r.rgb, vec3(0.6))*1.6);
     vec3 rockTint = mix(vec3(1.0,0.95,0.88), vec3(0.75,0.72,0.72), cold);
     if (base.y > 300.0 && lush > 0.9) rockTint = vec3(0.55,0.5,0.5);
     m.alb = mix(m.alb, r.rgb*rockTint, w); m.rough = mix(m.rough, r.a, w); m.nrm = mix(m.nrm, nr, w); hC = mix(hC, 0.8, w);
   }
-  if (wSnow > 0.01) { vec4 s = groundSample(p.xz, M_SNOW, 8.0, nTS, hL); float w = hblend(wSnow, hC, 1.0 - hC);   // snow fills hollows first
+  if (detailOn && wSnow > 0.01) { vec4 s = groundSample(p.xz, M_SNOW, 8.0, nTS, hL); float w = hblend(wSnow, hC, 1.0 - hC);   // snow fills hollows first
     m.alb = mix(m.alb, s.rgb, w); m.rough = mix(m.rough, s.a, w); m.nrm = mix(m.nrm, nTS, w); }
   // ---- the settlements' ground between their streets (settlements.h; the streets are the network's roads, below):
   // gardens and lawns out in the suburbs - kept greener than the fields, a darker bed or a path here and there - and in
   // the centres the paving of yards, forecourts and car parks
-  if (msk.y > 0.02 && p.y > 1.0) {
+  if (townOn && msk.y > 0.02 && p.y > 1.0) {
     float townW = smoothstep(0.02, 0.2, msk.y);
     float yard = smoothstep(0.25, 0.55, msk.z + (vnoise(p.xz/45.0) - 0.5)*0.35);
     vec3 nG2; vec4 lawn = matSample(p.xz, M_GRASS, 2.0, nG2);
@@ -516,7 +518,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   float roadCover = 0.0;   // (how much of the pixel a road's platform takes: the airfield's mowing keeps off it)
   {
     float across, along; vec2 direction; int cls; bool junction;
-    if (roadAt(p.xz, across, along, direction, cls, junction)) {
+    if (roadsOn && roadAt(p.xz, across, along, direction, cls, junction)) {
       vec2 side = vec2(-direction.y, direction.x);
       float roadFoot = max(abs(dot(pixelDx, side)) + abs(dot(pixelDy, side)), 1e-3);
       float alongFoot = max(abs(dot(pixelDx, direction)) + abs(dot(pixelDy, direction)), 1e-3);
@@ -632,7 +634,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
     }
   }
   // ---- airport surfaces
-  vec2 auv, along; int ai = airportAt(p.xz, auv, along);
+  vec2 auv = vec2(0.0), along = vec2(1.0, 0.0); int ai = (uDbg & 2048) == 0 ? airportAt(p.xz, auv, along) : -1;
   if (ai >= 0) {
     vec2 across = vec2(-along.y, along.x);
     vec2 footprint = vec2(abs(dot(pixelDx, along)) + abs(dot(pixelDy, along)), abs(dot(pixelDx, across)) + abs(dot(pixelDy, across)));

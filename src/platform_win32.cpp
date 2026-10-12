@@ -904,7 +904,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       static const struct { int bit; const char* name; } kFeat[] = {
         {1, "volumetric clouds"}, {2, "terrain shadows"}, {4, "scenery shadow maps"}, {8, "aircraft shadow"}, {16, "point lights"},
         {32, "cloud shadows"}, {64, "half terrain march steps"}, {128, "terrain materials"}, {256, "fog / aerial perspective"},
-        {1024, "2K ground photographs (512)"},
+        {1024, "2K ground photographs (512)"}, {2048, "airfield surfaces"}, {4096, "roads on the ground"},
+        {8192, "towns' ground and fields"}, {16384, "ground detail layers"}, {65536, "anisotropic filtering"},
       };
       struct Summary { std::string sc; double ms, rt, scale; std::string top; };
       std::vector<Summary> sums;
@@ -1038,7 +1039,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       static const struct { int bit; const char* name; } kFeat[] = {
         {0, "everything on"}, {1, "volumetric clouds"}, {2, "terrain shadows"}, {4, "scenery shadow maps"}, {8, "aircraft shadow"},
         {16, "point lights"}, {32, "cloud shadows"}, {64, "half terrain march steps"}, {128, "terrain materials"}, {256, "fog / aerial perspective"},
-        {1024, "2K ground photographs (512)"},
+        {1024, "2K ground photographs (512)"}, {2048, "airfield surfaces"}, {4096, "roads on the ground"},
+        {8192, "towns' ground and fields"}, {16384, "ground detail layers"}, {65536, "anisotropic filtering"},
       };
       if (pf) fprintf(pf, "GPU: %s\nRender %dx%d, quality %d. Each line: frame time with that feature off, and what it saves.\n", gpu.c_str(), g_ren.W, g_ren.H, g_ren.quality);
       g_ren.entSync = true;

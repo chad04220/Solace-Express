@@ -10,7 +10,7 @@ void main(){
   if (vW.y < 0.0 && uCamPos.y > 0.0) discard;
   vec3 p = vW; float t = length(vC - uCamPos);   // (t: the distance to where it is drawn, the lighting pass's)
   vec2 pw = wrapW(p.xz);
-  vec3 n = roadSurfaceNormal(pw, normalize(vN));
+  vec3 n = (uDbg & 4096) == 0 ? roadSurfaceNormal(pw, normalize(vN)) : normalize(vN);   // (dbgOff 4096: the roads left out, profiling)
   vec3 pl = vec3(pw.x, p.y, pw.y);   // (the ground's own place: across the map's seam, the islands on the far side; y the height)
   Mat m = terrainMaterial(pl, n, t, baseAt(pl.xz), pixelDx, pixelDy);
   vec3 ns = applyTS(n, m.nrm, terrainBumpStrength(t));
