@@ -240,15 +240,24 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   - The analysis also gains a row for each part of the ground's material (airfield surfaces, roads, the towns'
     ground and fields, the detail layers) and for anisotropic filtering, for the next diagnostics.
 - **The v3.49.1 diagnostics:** the night scene's frame fell from 15.5 to 13.9 ms, less than the software renderer
-  promised. The new rows put the roads first among the ground's costs: 3 to 5 ms in the ground and low scenes (rjet,
-  rjetc, the XR-40 over the city by night), then the towns' ground and fields (1 to 3 ms) and anisotropic filtering
-  (1.2 to 2.1 ms).
-  - Every ground pixel in a mask texel (39 m) that any road's banks reached looked through all of that texel's entries
-    twice: once for the road's own surface normal (`terrain_fs`), once for its paint (`roadAt`). A highway's banks
-    reach 66 m, so a band nearly 200 m wide along each one paid for the loop, though only its platform's pixels use it.
-  - Now one pass (`roads.glsl` `roadQuery`) gives both, and reads only the entries whose platform comes within 1.5 m of
-    the texel: `buildRoadGrid` lists those first, and `roadEntryRows` marks the first of the rest (128 in the code,
-    the path moved to 256 x) so the loop stops there. `roadGrade`, under the terrain's vertices, still reads them all.
+  promised. Its new rows put the roads first among the ground's costs (3 to 5 ms) - wrongly.
+  - Those rows' switches shared bits with the analysis's cost probes (renderer.h `kProbe*`, 1 << 12 to 1 << 15, which
+    leave whole draws out): "roads on the ground" (4096) also left out the scenery, and matched the "scenery" probe to
+    a few tenths of a millisecond in every scene; "towns' ground and fields" (8192) the terrain mesh; "ground detail
+    layers" (16384) the airframe march. The switches now sit above the probes (`kDbgRoads`, `kDbgTowns`, `kDbgDetail`,
+    `kDbgRoadPaint`, `kDbgAniso`), and `terrain_material_test` fails any shader mask that shares a probe's bit.
+  - What the rows measured truly, in the ground and low scenes: the buildings and trees 2.5 to 3.7 ms, the terrain
+    materials 2 to 4 ms, anisotropic filtering 1.2 to 1.8 ms, the airfield surfaces about 1 ms.
+  - The roads were made cheaper on the strength of the wrong row, and stay so. Every ground pixel in a mask texel
+    (39 m) that any road's banks reached looked through all of that texel's entries twice: once for the road's own
+    surface normal (`terrain_fs`), once for its paint (`roadAt`) - 7.6 entries on average, 15 reads. Now one pass
+    (`roads.glsl` `roadQuery`, compiled only into the terrain's and the GPS map's programs: `GROUND_ROADS`) gives
+    both, reading only the entries whose platform comes within 1.5 m of the texel - 3.0 on average, none in 37% of
+    texels: `buildRoadGrid` lists those first, and `roadEntryRows` marks the first of the rest (128 in the code, the
+    path moved to 256 x) so the loop stops there. `roadGrade`, under the terrain's vertices, still reads them all.
+    On the software renderer over a town, the scenery left out (four runs of the old build, three of the new), the
+    roads' cost fell from 159 to 93 ms of the world pass looking across the town and from 280 to 185 ms looking down
+    on it: the pass about 5% quicker.
   - The junction test (where the markings stop) is exact now: a second road's platform within a metre. The old one
     also stopped them where another road came first in the texel's list - 8.5% of the paving's places, nearly all of
     them streets and farm tracks, which have no markings.

@@ -1,7 +1,10 @@
 ## What's new in v3.49.2
 
+### The diagnostics, corrected
+- **v3.49.1's new rows for the parts of the ground measured the wrong things.** Their switches shared settings with the analysis's other probes: "roads on the ground" also hid every building and tree, "towns' ground and fields" hid the whole ground, and "ground detail layers" hid the ray-traced parts of the aircraft. So the roads looked like the most expensive part of the ground, when it was really the buildings and trees (2.5 to 3.7 ms on the runway and low-level scenes). Each row now measures only its own part, a new row times the roads' painting alone, and a check stops the settings colliding again.
+
 ### Faster on the ground
-- **The roads cost the ground far less to draw.** Your v3.49.1 diagnostics showed the roads were the most expensive part of the ground on your graphics card: 3 to 5 ms a frame on the runways and low over the towns. For every pixel within reach of a road's embankments, as much as 100 m from the road itself, the ground checked that road twice. Now each pixel checks once, and only the roads actually passing through its patch of ground. Nothing looks different.
+- **The roads cost less to draw.** Each pixel near a road now looks the road up once instead of twice, and checks only the roads actually passing through its patch of ground: about 3 instead of 15, on average. On the test renderer, low over a town, the roads now take about 35 to 40% less time to draw, and the ground as a whole about 5% less. Nothing looks different.
 
 Please run `diagnostics.bat` on this version.
 
