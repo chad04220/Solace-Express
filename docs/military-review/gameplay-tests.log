@@ -1,0 +1,385 @@
+Military game: snapshot writes: PASS
+Military game: loading collision warmup preserves all simulation clocks, actor state and ammunition: PASS
+Military collision setup: kind=0 warmup_ms=36.171 (measured separately from simulation)
+Military game: warmup is idempotent and bounded prefetch does not advance simulation: PASS
+Military game: loaner launches in dedicated career-backed mode 0: PASS
+Military game: correct recon/combat loaner 0: PASS
+Military game: launch commits active token 0: PASS
+Military game: loaner payload includes kit/stores only for combat XR40: PASS
+Military game: supplied aircraft has full included fuel and no maintenance roll: PASS
+Military game: snapshot writes: PASS
+Military game: launch preserves complete civilian career: PASS
+Military game: restart retains accepted token/seed and resets encounter/loadout: PASS
+Military game: unmet objectives cannot settle as success: PASS
+Military game: snapshot writes: PASS
+Military game: failed military settlement leaves civilian state intact: PASS
+Military game: debrief retry creates a fresh military attempt despite waiting civilian job: PASS
+Military game: snapshot writes: PASS
+Military game: loading collision warmup preserves all simulation clocks, actor state and ammunition: PASS
+Military collision setup: kind=1 warmup_ms=16.939 (measured separately from simulation)
+Military game: warmup is idempotent and bounded prefetch does not advance simulation: PASS
+Military game: loaner launches in dedicated career-backed mode 1: PASS
+Military game: correct recon/combat loaner 1: PASS
+Military game: launch commits active token 1: PASS
+Military game: loaner payload includes kit/stores only for combat XR40: PASS
+Military game: supplied aircraft has full included fuel and no maintenance roll: PASS
+Military game: snapshot writes: PASS
+Military game: launch preserves complete civilian career: PASS
+Military game: restart retains accepted token/seed and resets encounter/loadout: PASS
+Military game: unmet objectives cannot settle as success: PASS
+Military game: snapshot writes: PASS
+Military game: failed military settlement leaves civilian state intact: PASS
+Military game: debrief retry creates a fresh military attempt despite waiting civilian job: PASS
+Military game: snapshot writes: PASS
+Military game: loading collision warmup preserves all simulation clocks, actor state and ammunition: PASS
+Military collision setup: kind=2 warmup_ms=13.964 (measured separately from simulation)
+Military game: warmup is idempotent and bounded prefetch does not advance simulation: PASS
+Military game: loaner launches in dedicated career-backed mode 2: PASS
+Military game: correct recon/combat loaner 2: PASS
+Military game: launch commits active token 2: PASS
+Military game: loaner payload includes kit/stores only for combat XR40: PASS
+Military game: supplied aircraft has full included fuel and no maintenance roll: PASS
+Military game: snapshot writes: PASS
+Military game: launch preserves complete civilian career: PASS
+Military game: restart retains accepted token/seed and resets encounter/loadout: PASS
+Military game: unmet objectives cannot settle as success: PASS
+Military game: snapshot writes: PASS
+Military game: failed military settlement leaves civilian state intact: PASS
+Military game: debrief retry creates a fresh military attempt despite waiting civilian job: PASS
+Military game: snapshot writes: PASS
+Military game: recon config has three scan sites: PASS
+Military game: unarmed introductory recon has no unavoidable pursuing enemy: PASS
+Military game: recon target is an actual labeled airport structure: PASS
+Military game: recon site accumulates real line-of-sight dwell 0: PASS
+Military game: recon target is an actual labeled airport structure: PASS
+Military game: recon site accumulates real line-of-sight dwell 1: PASS
+Military game: recon target is an actual labeled airport structure: PASS
+Military game: recon site accumulates real line-of-sight dwell 2: PASS
+Military game: all scans require extraction before reward: PASS
+Military game: recon extraction settles intelligence and service credits: PASS
+Military game: snapshot writes: PASS
+Military game: snapshot writes: PASS
+Military game: snapshot writes: PASS
+Military game: repeated completion cannot double-pay or mutate civilian state: PASS
+Military game: snapshot writes: PASS
+Military game: defense resolves every authored wave and preserves installation: PASS
+Military game: defense does not pay before extraction: PASS
+Military game: snapshot writes: PASS
+Military game: defense extraction pays service record only: PASS
+Military game: lost defense objective fails without another reward: PASS
+Military game: snapshot writes: PASS
+Military game: strike records two designated stable IDs: PASS
+Military game: strike target destruction gates extraction instead of immediate payout: PASS
+Military game: snapshot writes: PASS
+Military game: strike extraction completes separate service settlement: PASS
+Military game: snapshot writes: PASS
+Military game: pause freezes combat and equipment timers: PASS
+Military game: military simulation rejects time acceleration: PASS
+Military game: enemy projectile damage enters the real Game crash path: PASS
+Military game: crash timer settles one military failure: PASS
+Military game: snapshot writes: PASS
+Military game: combat crash does not charge civilian repairs or crash statistics: PASS
+Military game: explicit abort settles and closes military token: PASS
+Military game: loading cancellation returns to hub and clears runtime/token: PASS
+Military game: snapshot writes: PASS
+Military game: canceling before flight preserves civilian waiting job and grants nothing: PASS
+Military game: elapsed loading time and launch spam cannot start simulation or certify unrendered work: PASS
+Military game: completed scene frame with pending scenery stays behind loading screen: PASS
+Military game: a new mesh bake invalidates loading stability: PASS
+Military game: repeated updates of one renderer frame cannot fabricate a second completed frame: PASS
+Military game: two distinct stable scene frames unlock briefing confirmation without advancing flight: PASS
+Military game: prepared military scene waits for an explicit launch confirmation: PASS
+Military game: controller confirmation enters flight once and consumes launch input without simulating the loading frame: PASS
+Military game: simulation begins only on the next actual flight update: PASS
+Military game: snapshot writes: PASS
+Military game: keyboard loading Back closes the loaner attempt on the military board: PASS
+Military game: loading Back is consumed before the destination board draws: PASS
+Military game: snapshot writes: PASS
+Military game: loading Back grants no result and preserves all civilian state: PASS
+Military game: a canceled loading attempt can be relaunched with a fresh token: PASS
+Military game: failed cancellation save keeps one pending close while discarding the runtime flight: PASS
+Military game: snapshot writes: PASS
+Military game: snapshot writes: PASS
+Military game: snapshot writes: PASS
+Military game: snapshot writes: PASS
+Military game: pending loading cancellation blocks a second launch without replacing the pending close: PASS
+Military game: snapshot writes: PASS
+Military game: retrying canceled launch save closes only its token and preserves civilian records: PASS
+Military game: snapshot writes: PASS
+Military game: controller loading Back closes the loaner attempt on the military board: PASS
+Military game: loading Back is consumed before the destination board draws: PASS
+Military game: snapshot writes: PASS
+Military game: loading Back grants no result and preserves all civilian state: PASS
+Military game: a canceled loading attempt can be relaunched with a fresh token: PASS
+Military game: failed cancellation save keeps one pending close while discarding the runtime flight: PASS
+Military game: snapshot writes: PASS
+Military game: snapshot writes: PASS
+Military game: snapshot writes: PASS
+Military game: snapshot writes: PASS
+Military game: pending loading cancellation blocks a second launch without replacing the pending close: PASS
+Military game: snapshot writes: PASS
+Military game: retrying canceled launch save closes only its token and preserves civilian records: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission launches its catalogued XR loaner 3: PASS
+Military game: mission objective, equipment and physical payload agree with catalogue 3: PASS
+Military game: loading preview shows the actual selected frozen aircraft and streams its mission position 3: PASS
+Military game: noncombat XR mission has authored sensors and no compulsory pursuers 3: PASS
+Military game: XR sensors complete real labeled site dwell 3/0: PASS
+Military game: XR sensors complete real labeled site dwell 3/1: PASS
+Military game: expanded mission requires extraction before any service reward 3: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission settles exactly its service reward without civilian changes 3: PASS
+Military game: expanded retry preserves mission identity, aircraft and equipment with a fresh attempt 3: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission launches its catalogued XR loaner 4: PASS
+Military game: mission objective, equipment and physical payload agree with catalogue 4: PASS
+Military game: loading preview shows the actual selected frozen aircraft and streams its mission position 4: PASS
+Military game: noncombat XR mission has authored sensors and no compulsory pursuers 4: PASS
+Military game: XR sensors complete real labeled site dwell 4/0: PASS
+Military game: XR sensors complete real labeled site dwell 4/1: PASS
+Military game: XR sensors complete real labeled site dwell 4/2: PASS
+Military game: expanded mission requires extraction before any service reward 4: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission settles exactly its service reward without civilian changes 4: PASS
+Military game: expanded retry preserves mission identity, aircraft and equipment with a fresh attempt 4: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission launches its catalogued XR loaner 5: PASS
+Military game: mission objective, equipment and physical payload agree with catalogue 5: PASS
+Military game: loading preview shows the actual selected frozen aircraft and streams its mission position 5: PASS
+Military game: noncombat XR mission has authored sensors and no compulsory pursuers 5: PASS
+Military game: sensor rejects unsuitable actual aircraft speed 5: PASS
+Military game: vertical motion cannot bypass reconnaissance speed requirements 5: PASS
+Military game: sensor rejects aircraft below the required altitude envelope 5: PASS
+Military game: sensor rejects aircraft above the required altitude envelope 5: PASS
+Military game: XR sensors complete real labeled site dwell 5/0: PASS
+Military game: XR sensors complete real labeled site dwell 5/1: PASS
+Military game: expanded mission requires extraction before any service reward 5: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission settles exactly its service reward without civilian changes 5: PASS
+Military game: expanded retry preserves mission identity, aircraft and equipment with a fresh attempt 5: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission launches its catalogued XR loaner 6: PASS
+Military game: mission objective, equipment and physical payload agree with catalogue 6: PASS
+Military game: loading preview shows the actual selected frozen aircraft and streams its mission position 6: PASS
+Military game: noncombat XR mission has authored sensors and no compulsory pursuers 6: PASS
+Military game: sensor rejects unsuitable actual aircraft speed 6: PASS
+Military game: vertical motion cannot bypass reconnaissance speed requirements 6: PASS
+Military game: sensor rejects aircraft below the required altitude envelope 6: PASS
+Military game: sensor rejects aircraft above the required altitude envelope 6: PASS
+Military game: XR sensors complete real labeled site dwell 6/0: PASS
+Military game: expanded mission requires extraction before any service reward 6: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission settles exactly its service reward without civilian changes 6: PASS
+Military game: expanded retry preserves mission identity, aircraft and equipment with a fresh attempt 6: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission launches its catalogued XR loaner 7: PASS
+Military game: mission objective, equipment and physical payload agree with catalogue 7: PASS
+Military game: loading preview shows the actual selected frozen aircraft and streams its mission position 7: PASS
+Military game: armed XR mission fires its supplied finite physical gun 7: PASS
+Military game: expanded armed sweep has three separately designated target IDs 7: PASS
+Military game: expanded strike targets have unique IDs and the advertised enemy roles 7: PASS
+Military game: expanded mission requires extraction before any service reward 7: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission settles exactly its service reward without civilian changes 7: PASS
+Military game: expanded retry preserves mission identity, aircraft and equipment with a fresh attempt 7: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission launches its catalogued XR loaner 8: PASS
+Military game: mission objective, equipment and physical payload agree with catalogue 8: PASS
+Military game: loading preview shows the actual selected frozen aircraft and streams its mission position 8: PASS
+Military game: armed XR mission fires its supplied finite physical gun 8: PASS
+Military game: heavy defense is four bomber-led waves rather than the introductory encounter: PASS
+Military game: expanded defense resolves every scheduled wave and protects the actual site: PASS
+Military game: expanded mission requires extraction before any service reward 8: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission settles exactly its service reward without civilian changes 8: PASS
+Military game: expanded retry preserves mission identity, aircraft and equipment with a fresh attempt 8: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission launches its catalogued XR loaner 9: PASS
+Military game: mission objective, equipment and physical payload agree with catalogue 9: PASS
+Military game: loading preview shows the actual selected frozen aircraft and streams its mission position 9: PASS
+Military game: armed XR mission fires its supplied finite physical gun 9: PASS
+Military game: expanded armed sweep has three separately designated target IDs 9: PASS
+Military game: expanded strike targets have unique IDs and the advertised enemy roles 9: PASS
+Military game: optional relay escorts may remain alive after designated targets are destroyed: PASS
+Military game: expanded mission requires extraction before any service reward 9: PASS
+Military game: snapshot writes: PASS
+Military game: expanded mission settles exactly its service reward without civilian changes 9: PASS
+Military game: expanded retry preserves mission identity, aircraft and equipment with a fresh attempt 9: PASS
+Military game: heavy defense fits supplied finite equipment with every fifth gun round missing and no splash advantage: PASS
+Military finite-ammo budget: shielded=0 targets=7 shots=38 misses=7 bombs=4 remaining_rounds=10 remaining_bombs=2
+Military game: finite-ammo heavy defense reaches real extraction and successful settlement: PASS
+Military game: heavy defense fits supplied finite equipment even with 100 shield on every hostile: PASS
+Military finite-ammo budget: shielded=1 targets=7 shots=37 misses=0 bombs=4 remaining_rounds=11 remaining_bombs=2
+Military game: finite-ammo heavy defense reaches real extraction and successful settlement: PASS
+Military game: armed sortie completes live enemy AI and authored cadence with 25-percent intentional gun misses 1: PASS
+Military dynamic-ammo: mission=1 seconds=93.3 rounds=233/500 misses=58 bombs=3/6 enemy_projectiles=28 hull=100.0 objective=511.0 status=2
+Military game: live-AI finite-ammo sortie reaches successful extraction 1: PASS
+Military game: armed sortie completes live enemy AI and authored cadence with 25-percent intentional gun misses 2: PASS
+Military dynamic-ammo: mission=2 seconds=81.0 rounds=214/500 misses=53 bombs=1/8 enemy_projectiles=44 hull=100.0 objective=0.0 status=2
+Military game: live-AI finite-ammo sortie reaches successful extraction 2: PASS
+Military game: armed sortie completes live enemy AI and authored cadence with 25-percent intentional gun misses 7: PASS
+Military dynamic-ammo: mission=7 seconds=9.8 rounds=51/360 misses=12 bombs=0/4 enemy_projectiles=5 hull=100.0 objective=0.0 status=2
+Military game: live-AI finite-ammo sortie reaches successful extraction 7: PASS
+Military game: armed sortie completes live enemy AI and authored cadence with 25-percent intentional gun misses 8: PASS
+Military dynamic-ammo: mission=8 seconds=169.1 rounds=42/48 misses=10 bombs=4/6 enemy_projectiles=79 hull=100.0 objective=422.0 status=2
+Military game: live-AI finite-ammo sortie reaches successful extraction 8: PASS
+Military game: armed sortie completes live enemy AI and authored cadence with 25-percent intentional gun misses 9: PASS
+Military dynamic-ammo: mission=9 seconds=69.6 rounds=19/48 misses=4 bombs=3/4 enemy_projectiles=12 hull=100.0 objective=0.0 status=2
+Military game: live-AI finite-ammo sortie reaches successful extraction 9: PASS
+Military game: cleanup regression uses an actual authored airport entity: PASS
+Military game: cleanup regression damages an entity through the production scenery path: PASS
+Military game: snapshot writes: PASS
+Military game: returning loaner clears mode, source, hull damage, collision warm state and all enemy rendering: PASS
+Military game: returning loaner clears all weapon effects, held controls, craters and destroyed civilian scenery: PASS
+Military game: military return cannot leave trail, breakup or shockwave artifacts on the hub: PASS
+Military game: snapshot writes: PASS
+Military game: repeated loaner cleanup never duplicates or changes settlement: PASS
+Military game: snapshot writes: PASS
+Military game: civilian free flight after military return has no loaner equipment, enemies, damage or extra charges: PASS
+Military game: snapshot writes: PASS
+Military game: snapshot writes: PASS
+Military game: invalid military mission IDs cannot launch or commit an attempt: PASS
+Military game: military board covers all four XR models and admits only the exact player loaner, never enemy roles: PASS
+Military game: snapshot writes: PASS
+Military game: previewing every loaner is read-only to the whole career: PASS
+Military game: full player beam budget never hides any of 96 live enemy projectiles: PASS
+Military game: loading warmup does not manufacture drawable or shadow-casting actors: PASS
+Military game: shot eight metres above fuselage misses instead of hitting old 12-metre sphere: PASS
+Military game: shot through authored fuselage still applies damage: PASS
+Military game: banked wing collision uses aircraft up/orientation: PASS
+Military game: snapshot writes: PASS
+Military game: snapshot writes: PASS
+Military game: failed launch save never starts flight or leaves a pending token: PASS
+Military game: failed settlement keeps civilian/current career unchanged and queues one result: PASS
+Military game: repeated abort while save is pending cannot settle twice: PASS
+Military game: retry saves exactly one completed military transaction: PASS
+Military game: first-tick projectile trail stays at actual firing origin for role 0: PASS
+Military game: 8ms-old projectile cannot show 25ms of prior travel 0: PASS
+Military game: mature projectile keeps original steady trail length for role 0: PASS
+Military game: first-tick projectile trail stays at actual firing origin for role 1: PASS
+Military game: 8ms-old projectile cannot show 25ms of prior travel 1: PASS
+Military game: mature projectile keeps original steady trail length for role 1: PASS
+Military game: Cantor relay role does not invent a projectile trail: PASS
+Military game: first-tick projectile trail stays at actual firing origin for role 3: PASS
+Military game: 8ms-old projectile cannot show 25ms of prior travel 3: PASS
+Military game: mature projectile keeps original steady trail length for role 3: PASS
+Military game: player bolt stops on shaped hull instead of frame-end position: PASS
+Military game: intercepting a Hive bomb consumes the player bolt at exact contact: PASS
+Military game: fast bomb crossing Hive hull detonates at swept contact, not frame end: PASS
+Military game: airport supplies actual building for bomb collision regression: PASS
+Military game: real building obstructs fast bomb segment: PASS
+Military game: fast bomb selects actual nearest world obstruction: PASS
+Military game: normal land plasma detonation retains crater behavior: PASS
+Military game: accurate world contact consumes bolt before an intervening building: PASS
+Military game: building blocks blast line of sight: PASS
+Military game: building still shields enemies from EMP and explosive damage: PASS
+Military game: wall-contact regression finds exact authored scenery surface: PASS
+Military game: wall contact nudges blast query outside so near-side enemy takes damage: PASS
+Military game: wall still shields far-side enemy after origin clearance: PASS
+Military game: wall detonation visual remains at exact contact: PASS
+Military game: surface EMP reaches exposed enemy from clearance-adjusted query origin: PASS
+Military game: surface blast damages visible enemy while visual remains exactly on water: PASS
+Military game: snapshot writes: PASS
+Military game: research practice launches outside military career: PASS
+Military game: repeated wave requests remain bounded at eight actors: PASS
+Military game: equipment swap clears encounter, ordnance and held controls: PASS
+Military game: equipment swap refills selected stores and practice hull: PASS
+Military game: gun recoil uses impulse divided by actual aircraft mass: PASS
+Military game: firing reduces physical ammunition mass: PASS
+Military game: selected forward weapon fires through Game equipment and projectile path: PASS
+Military game: released bomb leaves aircraft payload mass: PASS
+Military game: selected payload consumes a finite physical store: PASS
+Military game: released rigid payload aligns to velocity and carried model uses selected type: PASS
+Military game: EMP detonation routes through shield/relay disruption without hull damage: PASS
+Military game: repeated rearm replaces equipment mass instead of accumulating it: PASS
+Military game: research restart retains selected equipment but clears encounter: PASS
+Military game: snapshot writes: PASS
+Military game: practice launch/fire/bomb/reset/restart/exit preserve exact career bytes: PASS
+Military game: snapshot writes: PASS
+Military game: research loading cancellation does not close civilian active attempt: PASS
+Military game: practice encounter spawning is restricted to XR-40: PASS
+Military game: test-card sorties cannot spawn free-roam practice waves: PASS
+Military game: snapshot writes: PASS
+Military game: rejected practice operations cannot advance or settle career: PASS
+Military game: snapshot writes: PASS
+Military game: military terminal clears hidden civilian radio overlay before interaction: PASS
+Military game: keyboard walks and selects all nine military rows with focused row kept visible at 1920: PASS
+Military game: controller D-pad and A select the full military register in reverse at 1920: PASS
+Military game: military board focus IDs are unique and expose civilian return plus deploy at 1920: PASS
+Military game: mouse mission selection changes assignment without deploying: PASS
+Military game: snapshot writes: PASS
+Military game: military menu traversal and preview leave all career bytes unchanged: PASS
+Military game: pending save removes Deploy from keyboard/controller focus and provides Retry save: PASS
+Military game: keyboard deploy uses selected mission and does not carry its Enter into weapons: PASS
+Military game: military pause controls fit and expose restart plus abort at 1920: PASS
+Military game: keyboard pause Restart keeps the same military attempt and mission: PASS
+Military game: controller pause Abort settles once into the military debrief: PASS
+Military game: controller A on debrief Retry launches only the selected military retry: PASS
+Military game: controller B while Retry is focused returns without synthetic Enter launching another sortie: PASS
+Military game: controller Back from military board returns to civilian work in one step: PASS
+Military game: keyboard Escape from military board returns to civilian work in one step: PASS
+Military game: snapshot writes: PASS
+Military game: military terminal clears hidden civilian radio overlay before interaction: PASS
+Military game: keyboard walks and selects all nine military rows with focused row kept visible at 1280: PASS
+Military game: controller D-pad and A select the full military register in reverse at 1280: PASS
+Military game: military board focus IDs are unique and expose civilian return plus deploy at 1280: PASS
+Military game: mouse mission selection changes assignment without deploying: PASS
+Military game: snapshot writes: PASS
+Military game: military menu traversal and preview leave all career bytes unchanged: PASS
+Military game: pending save removes Deploy from keyboard/controller focus and provides Retry save: PASS
+Military game: keyboard deploy uses selected mission and does not carry its Enter into weapons: PASS
+Military game: military pause controls fit and expose restart plus abort at 1280: PASS
+Military game: keyboard pause Restart keeps the same military attempt and mission: PASS
+Military game: controller pause Abort settles once into the military debrief: PASS
+Military game: controller A on debrief Retry launches only the selected military retry: PASS
+Military game: controller B while Retry is focused returns without synthetic Enter launching another sortie: PASS
+Military game: controller Back from military board returns to civilian work in one step: PASS
+Military game: keyboard Escape from military board returns to civilian work in one step: PASS
+Military game: snapshot writes: PASS
+Military game: military terminal clears hidden civilian radio overlay before interaction: PASS
+Military game: keyboard walks and selects all nine military rows with focused row kept visible at 960: PASS
+Military game: controller D-pad and A select the full military register in reverse at 960: PASS
+Military game: military board focus IDs are unique and expose civilian return plus deploy at 960: PASS
+Military game: mouse mission selection changes assignment without deploying: PASS
+Military game: snapshot writes: PASS
+Military game: military menu traversal and preview leave all career bytes unchanged: PASS
+Military game: pending save removes Deploy from keyboard/controller focus and provides Retry save: PASS
+Military game: keyboard deploy uses selected mission and does not carry its Enter into weapons: PASS
+Military game: military pause controls fit and expose restart plus abort at 960: PASS
+Military game: keyboard pause Restart keeps the same military attempt and mission: PASS
+Military game: controller pause Abort settles once into the military debrief: PASS
+Military game: controller A on debrief Retry launches only the selected military retry: PASS
+Military game: controller B while Retry is focused returns without synthetic Enter launching another sortie: PASS
+Military game: controller Back from military board returns to civilian work in one step: PASS
+Military game: keyboard Escape from military board returns to civilian work in one step: PASS
+Military game: snapshot writes: PASS
+Military game: controller A pager begins at first visible mission with Back disabled: PASS
+Military game: controller A advances visible mission pages to the disabled forward boundary without deploying: PASS
+Military game: controller A reverses mission pages to the first-row boundary: PASS
+Military game: keyboard Enter pager begins at first visible mission with Back disabled: PASS
+Military game: keyboard Enter advances visible mission pages to the disabled forward boundary without deploying: PASS
+Military game: keyboard Enter reverses mission pages to the first-row boundary: PASS
+Military game: controller A briefing begins at top with Read up disabled: PASS
+Military game: controller A reads the whole long briefing until Read down disables at the bottom: PASS
+Military game: controller A returns briefing to the top and restores Read down: PASS
+Military game: keyboard Enter briefing begins at top with Read up disabled: PASS
+Military game: keyboard Enter reads the whole long briefing until Read down disables at the bottom: PASS
+Military game: keyboard Enter returns briefing to the top and restores Read down: PASS
+Military game: briefing weapon, store, nozzle and lift text uses current remapped keyboard/controller labels: PASS
+Military game: snapshot writes: PASS
+Military game: pagination, whole-brief reading and remapped control previews preserve career bytes: PASS
+Military game: snapshot writes: PASS
+Military game: research equipment exposes three focusable selectors: PASS
+Military game: keyboard Down reaches research equipment without stealing site arrows: PASS
+Military game: repeated keyboard selector cycles retain stable focus 0: PASS
+Military game: repeated keyboard selector cycles retain stable focus 1: PASS
+Military game: repeated keyboard selector cycles retain stable focus 2: PASS
+Military game: controller A cycles equipment and retains focus: PASS
+Military game: mouse click cycles only selected payload control: PASS
+Military game: research Right retains launch-site selection: PASS
+Military game: controller Start launches while focused without also changing equipment: PASS
+Military game: 1080p practice pause controls fit the viewport without scrolling: PASS
+Military game: controller Back resumes from practice pause: PASS
+Military game: snapshot writes: PASS
+Military game: controller Back cancels terminal and all equipment/input actions preserve career: PASS
+Military gameplay: 374 checks, 0 failures

@@ -1,0 +1,254 @@
+[0/2] Re-checking globbed directories...
+[1/223] Building CXX object CMakeFiles/env_objs.dir/src/bridges.cpp.obj
+[2/223] Building CXX object CMakeFiles/env_objs.dir/src/settlements.cpp.obj
+[3/223] Building CXX object CMakeFiles/env_objs.dir/src/road_network.cpp.obj
+[4/223] Building CXX object CMakeFiles/env_objs.dir/src/world.cpp.obj
+[5/223] Building CXX object CMakeFiles/env_objs.dir/src/road_traffic.cpp.obj
+[6/223] Building CXX object CMakeFiles/env_objs.dir/src/landmarks.cpp.obj
+[7/223] Building CXX object CMakeFiles/env_objs.dir/src/scenery.cpp.obj
+[8/223] Building CXX object CMakeFiles/env_objs.dir/src/road_furniture.cpp.obj
+[9/223] Building CXX object CMakeFiles/env_objs.dir/src/airport_scenery.cpp.obj
+[10/223] Building CXX object CMakeFiles/portable_mesh_adversarial_test.dir/tests/portable_mesh_adversarial_test.cpp.obj
+[11/223] Building CXX object CMakeFiles/portable_mesh_adversarial_test.dir/src/aircraft_mesh_asset.cpp.obj
+[12/223] Building CXX object CMakeFiles/specter_toggle_detail_test.dir/tests/specter_toggle_detail_test.cpp.obj
+[13/223] Building CXX object CMakeFiles/env_objs.dir/src/entities.cpp.obj
+[14/223] Building CXX object CMakeFiles/aircraft_build_contract_test.dir/tests/aircraft_build_contract_test.cpp.obj
+[15/223] Linking CXX executable portable_mesh_adversarial_test.exe
+[16/223] Linking CXX executable aircraft_build_contract_test.exe
+[17/223] Building CXX object CMakeFiles/mesh_planar_test.dir/tests/mesh_planar_test.cpp.obj
+In file included from /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/vector:62,
+                 from /workspace/scratch/87b29863f015/solace-military-career-review/src/mesh_validation.h:3,
+                 from /workspace/scratch/87b29863f015/solace-military-career-review/src/aircraft_mesh_planar.h:3,
+                 from /workspace/scratch/87b29863f015/solace-military-career-review/tests/mesh_planar_test.cpp:4:
+In static member function ‘static _Up* std::__copy_move<_IsMove, true, std::random_access_iterator_tag>::__copy_m(_Tp*, _Tp*, _Up*) [with _Tp = const float; _Up = float; bool _IsMove = false]’,
+    inlined from ‘_OI std::__copy_move_a2(_II, _II, _OI) [with bool _IsMove = false; _II = const float*; _OI = float*]’ at /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/stl_algobase.h:521:30,
+    inlined from ‘_OI std::__copy_move_a1(_II, _II, _OI) [with bool _IsMove = false; _II = const float*; _OI = float*]’ at /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/stl_algobase.h:548:42,
+    inlined from ‘_OI std::__copy_move_a(_II, _II, _OI) [with bool _IsMove = false; _II = const float*; _OI = float*]’ at /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/stl_algobase.h:555:31,
+    inlined from ‘_OI std::copy(_II, _II, _OI) [with _II = const float*; _OI = float*]’ at /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/stl_algobase.h:651:7,
+    inlined from ‘static _ForwardIterator std::__uninitialized_copy<true>::__uninit_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = const float*; _ForwardIterator = float*]’ at /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/stl_uninitialized.h:147:27,
+    inlined from ‘_ForwardIterator std::uninitialized_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = const float*; _ForwardIterator = float*]’ at /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/stl_uninitialized.h:185:15,
+    inlined from ‘_ForwardIterator std::__uninitialized_copy_a(_InputIterator, _InputIterator, _ForwardIterator, allocator<_Tp>&) [with _InputIterator = const float*; _ForwardIterator = float*; _Tp = float]’ at /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/stl_uninitialized.h:373:37,
+    inlined from ‘void std::vector<_Tp, _Alloc>::_M_range_insert(iterator, _ForwardIterator, _ForwardIterator, std::forward_iterator_tag) [with _ForwardIterator = const float*; _Tp = float; _Alloc = std::allocator<float>]’ at /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/vector.tcc:984:34,
+    inlined from ‘std::vector<_Tp, _Alloc>::iterator std::vector<_Tp, _Alloc>::insert(const_iterator, std::initializer_list<_Tp>) [with _Tp = float; _Alloc = std::allocator<float>]’ at /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/stl_vector.h:1416:17,
+    inlined from ‘int main()’ at /workspace/scratch/87b29863f015/solace-military-career-review/tests/mesh_planar_test.cpp:14:52:
+/workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/stl_algobase.h:452:30: warning: writing 16 bytes into a region of size 0 [-Wstringop-overflow=]
+  452 |             __builtin_memmove(__result, __first, sizeof(_Tp) * _Num);
+      |             ~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/x86_64-w64-mingw32/bits/c++allocator.h:33,
+                 from /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/allocator.h:46,
+                 from /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/vector:63:
+In member function ‘_Tp* std::__new_allocator<_Tp>::allocate(size_type, const void*) [with _Tp = float]’,
+    inlined from ‘static _Tp* std::allocator_traits<std::allocator<_Tp1> >::allocate(allocator_type&, size_type) [with _Tp = float]’ at /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/alloc_traits.h:515:28,
+    inlined from ‘std::_Vector_base<_Tp, _Alloc>::pointer std::_Vector_base<_Tp, _Alloc>::_M_allocate(std::size_t) [with _Tp = float; _Alloc = std::allocator<float>]’ at /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/stl_vector.h:380:33,
+    inlined from ‘void std::vector<_Tp, _Alloc>::_M_range_insert(iterator, _ForwardIterator, _ForwardIterator, std::forward_iterator_tag) [with _ForwardIterator = const float*; _Tp = float; _Alloc = std::allocator<float>]’ at /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/vector.tcc:1013:40,
+    inlined from ‘std::vector<_Tp, _Alloc>::iterator std::vector<_Tp, _Alloc>::insert(const_iterator, std::initializer_list<_Tp>) [with _Tp = float; _Alloc = std::allocator<float>]’ at /workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/stl_vector.h:1416:17,
+    inlined from ‘int main()’ at /workspace/scratch/87b29863f015/solace-military-career-review/tests/mesh_planar_test.cpp:14:52:
+/workspace/scratch/87b29863f015/military-toolchain/root/usr/lib/gcc/x86_64-w64-mingw32/14-posix/include/c++/bits/new_allocator.h:151:55: note: at offset 32 into destination object of size 32 allocated by ‘operator new’
+  151 |         return static_cast<_Tp*>(_GLIBCXX_OPERATOR_NEW(__n * sizeof(_Tp)));
+      |                                                       ^
+[18/223] Linking CXX executable specter_toggle_detail_test.exe
+[19/223] Linking CXX executable mesh_planar_test.exe
+[20/223] Extracting environment shader arithmetic for CPU validation
+PASS: terrain material source contracts; extracted production arithmetic
+[21/223] Building CXX object CMakeFiles/test_world.dir/tests/test_world.cpp.obj
+[22/223] Linking CXX executable test_world.exe
+[23/223] Building CXX object CMakeFiles/mesh_orientation_test.dir/tests/mesh_orientation_test.cpp.obj
+[24/223] Linking CXX executable mesh_orientation_test.exe
+[25/223] Building CXX object CMakeFiles/core_objs.dir/src/aircraft_stunt.cpp.obj
+[26/223] Building CXX object CMakeFiles/core_objs.dir/src/aero.cpp.obj
+[27/223] Building CXX object CMakeFiles/core_objs.dir/src/aircraft_perf.cpp.obj
+[28/223] Building CXX object CMakeFiles/core_objs.dir/src/aero_wake.cpp.obj
+[29/223] Building CXX object CMakeFiles/core_objs.dir/src/aero_strips.cpp.obj
+[30/223] Building CXX object CMakeFiles/core_objs.dir/src/breakup.cpp.obj
+[31/223] Building CXX object CMakeFiles/core_objs.dir/src/aircraft.cpp.obj
+[32/223] Building CXX object CMakeFiles/core_objs.dir/src/models.cpp.obj
+[33/223] Building CXX object CMakeFiles/core_objs.dir/src/weather.cpp.obj
+[34/223] Building CXX object CMakeFiles/core_objs.dir/src/hive_loadout.cpp.obj
+[35/223] Building CXX object CMakeFiles/core_objs.dir/src/hive_world_collision.cpp.obj
+[36/223] Building CXX object CMakeFiles/core_objs.dir/src/hive_combat.cpp.obj
+[37/223] Building CXX object CMakeFiles/mesh_objs.dir/src/bridge_mesh.cpp.obj
+[38/223] Building CXX object CMakeFiles/game_objs.dir/src/aircraft_mesh_asset.cpp.obj
+[39/223] Building CXX object CMakeFiles/core_objs.dir/src/career.cpp.obj
+[40/223] Building CXX object CMakeFiles/game_objs.dir/src/traffic.cpp.obj
+[41/223] Building CXX object CMakeFiles/game_objs.dir/src/game_research_ui.cpp.obj
+[42/223] Building CXX object CMakeFiles/game_objs.dir/src/game_ui.cpp.obj
+[43/223] Building CXX object CMakeFiles/mesh_objs.dir/src/entity_mesh.cpp.obj
+[44/223] Building CXX object CMakeFiles/game_objs.dir/src/game_military_ui.cpp.obj
+[45/223] Building CXX object CMakeFiles/game_objs.dir/src/materials.cpp.obj
+[46/223] Building CXX object CMakeFiles/game_objs.dir/src/texture_compress.cpp.obj
+[47/223] Building CXX object CMakeFiles/game_objs.dir/src/game_wraith.cpp.obj
+[48/223] Building CXX object CMakeFiles/game_objs.dir/src/prop_disc.cpp.obj
+[49/223] Building CXX object CMakeFiles/game_objs.dir/src/raster_renderer.cpp.obj
+[50/223] Building CXX object CMakeFiles/game_objs.dir/src/terrain_mesh.cpp.obj
+[51/223] Building CXX object CMakeFiles/game_objs.dir/src/renderer.cpp.obj
+[52/223] Building CXX object CMakeFiles/game_objs.dir/src/game.cpp.obj
+[53/223] Building CXX object CMakeFiles/game_objs.dir/src/aircraft_hull.cpp.obj
+[54/223] Building CXX object CMakeFiles/game_objs.dir/src/camera_feeds.cpp.obj
+[55/223] Building CXX object CMakeFiles/game_objs.dir/src/gl.cpp.obj
+[56/223] Building CXX object CMakeFiles/game_objs.dir/src/entity_render.cpp.obj
+[57/223] Building CXX object CMakeFiles/game_objs.dir/src/sky.cpp.obj
+[58/223] Building CXX object CMakeFiles/game_objs.dir/src/audio.cpp.obj
+[59/223] Building CXX object CMakeFiles/game_objs.dir/src/enemy_fleet.cpp.obj
+[60/223] Building CXX object CMakeFiles/game_objs.dir/src/atc.cpp.obj
+[61/223] Building CXX object CMakeFiles/new_aircraft_autoland_test.dir/tests/new_aircraft_autoland_test.cpp.obj
+[62/223] Building CXX object CMakeFiles/new_aircraft_exterior_test.dir/tests/new_aircraft_exterior_test.cpp.obj
+[63/223] Building CXX object CMakeFiles/game_objs.dir/src/aircraft_mesh.cpp.obj
+[64/223] Building CXX object CMakeFiles/new_aircraft_performance_test.dir/tests/new_aircraft_performance_test.cpp.obj
+[65/223] Building CXX object CMakeFiles/breakup_test.dir/tests/breakup_test.cpp.obj
+[66/223] Building CXX object CMakeFiles/cockpit_layout_test.dir/tests/cockpit_layout_test.cpp.obj
+[67/223] Building CXX object CMakeFiles/research_cockpit_layout_test.dir/tests/research_cockpit_layout_test.cpp.obj
+[68/223] Building CXX object CMakeFiles/hive_world_collision_test.dir/tests/hive_world_collision_test.cpp.obj
+[69/223] Building CXX object CMakeFiles/atlas_gear_geometry_test.dir/tests/atlas_gear_geometry_test.cpp.obj
+[70/223] Building CXX object CMakeFiles/military_career_test.dir/tests/military_career_test.cpp.obj
+[71/223] Building CXX object CMakeFiles/hive_combat_test.dir/src/hive_combat.cpp.obj
+[72/223] Building CXX object CMakeFiles/game_objs.dir/src/enemy_mesh.cpp.obj
+[73/223] Building CXX object CMakeFiles/hive_combat_test.dir/tests/hive_combat_test.cpp.obj
+[74/223] Building CXX object CMakeFiles/hive_combat_fastmath_test.dir/src/hive_combat.cpp.obj
+[75/223] Building CXX object CMakeFiles/hive_loadout_fastmath_test.dir/tests/hive_loadout_test.cpp.obj
+[76/223] Building CXX object CMakeFiles/hive_loadout_fastmath_test.dir/src/hive_loadout.cpp.obj
+[77/223] Building CXX object CMakeFiles/hive_world_collision_fastmath_test.dir/tests/hive_world_collision_test.cpp.obj
+[78/223] Building CXX object CMakeFiles/hive_combat_fastmath_test.dir/tests/hive_combat_test.cpp.obj
+[79/223] Building CXX object CMakeFiles/hive_world_collision_fastmath_test.dir/src/hive_world_collision.cpp.obj
+[80/223] Building CXX object CMakeFiles/hive_loadout_test.dir/src/hive_loadout.cpp.obj
+[81/223] Building CXX object CMakeFiles/hive_loadout_test.dir/tests/hive_loadout_test.cpp.obj
+[82/223] Building CXX object CMakeFiles/hive_ordnance_visual_test.dir/tests/hive_ordnance_visual_test.cpp.obj
+[83/223] Building CXX object CMakeFiles/enemy_surface_mesh_test.dir/tests/enemy_surface_mesh_test.cpp.obj
+[84/223] Building CXX object CMakeFiles/military_career_fastmath_test.dir/tests/military_career_test.cpp.obj
+[85/223] Building CXX object CMakeFiles/enemy_bake_guard_test.dir/tests/enemy_bake_guard_test.cpp.obj
+[86/223] Building CXX object CMakeFiles/wraith_loadout_clearance_test.dir/tests/wraith_loadout_clearance_test.cpp.obj
+[87/223] Building CXX object CMakeFiles/enemy_fleet_validity_test.dir/tests/enemy_fleet_validity_test.cpp.obj
+[88/223] Building CXX object CMakeFiles/enemy_fleet_validity_test.dir/src/enemy_fleet.cpp.obj
+[89/223] Building CXX object CMakeFiles/military_career_fastmath_test.dir/src/career.cpp.obj
+[90/223] Building CXX object CMakeFiles/mesh_validation_test.dir/tests/mesh_validation_test.cpp.obj
+[91/223] Building CXX object CMakeFiles/enemy_mesh_cache_test.dir/tests/enemy_mesh_cache_test.cpp.obj
+[92/223] Building CXX object CMakeFiles/prop_disc_test.dir/tests/prop_disc_test.cpp.obj
+[93/223] Building CXX object CMakeFiles/exhaust_test.dir/tests/exhaust_test.cpp.obj
+[94/223] Building CXX object CMakeFiles/cockpit_camera_test.dir/tests/cockpit_camera_test.cpp.obj
+[95/223] Building CXX object CMakeFiles/military_gameplay_test.dir/src/radio_win.cpp.obj
+[96/223] Building CXX object CMakeFiles/cockpit_camera_test.dir/src/radio_win.cpp.obj
+[97/223] Building CXX object CMakeFiles/vtol_throttle_test.dir/src/radio_win.cpp.obj
+[98/223] Building CXX object CMakeFiles/vtol_throttle_test.dir/tests/vtol_throttle_test.cpp.obj
+[99/223] Building CXX object CMakeFiles/cockpit_focus_zoom_test.dir/tests/cockpit_focus_zoom_test.cpp.obj
+[100/223] Building CXX object CMakeFiles/menu_plan_cache_test.dir/src/radio_win.cpp.obj
+[101/223] Building CXX object CMakeFiles/environment_foliage_test.dir/tests/environment_foliage_test.cpp.obj
+[102/223] Building CXX object CMakeFiles/environment_building_test.dir/tests/environment_building_test.cpp.obj
+[103/223] Building CXX object CMakeFiles/benchmark_metrics_test.dir/tools/validation/benchmark_metrics_test.cpp.obj
+[104/223] Building CXX object CMakeFiles/shader_prune_test.dir/tests/shader_prune_test.cpp.obj
+[105/223] Building CXX object CMakeFiles/menu_plan_cache_test.dir/tests/menu_plan_cache_test.cpp.obj
+[106/223] Building CXX object CMakeFiles/load_pacer_test.dir/tests/load_pacer_test.cpp.obj
+[107/223] Building CXX object CMakeFiles/hangar_geometry_test.dir/tests/hangar_geometry_test.cpp.obj
+[108/223] Building CXX object CMakeFiles/terrain_material_test.dir/tests/terrain_material_math_test.cpp.obj
+[109/223] Building CXX object CMakeFiles/military_gameplay_test.dir/tests/military_gameplay_test.cpp.obj
+[110/223] Building CXX object CMakeFiles/hangar_catalog_test.dir/tests/hangar_catalog_test.cpp.obj
+[111/223] Building CXX object CMakeFiles/airport_environment_test.dir/tests/airport_environment_test.cpp.obj
+[112/223] Building CXX object CMakeFiles/runway_preservation_test.dir/tests/runway_preservation_test.cpp.obj
+[113/223] Building CXX object CMakeFiles/community_layout_test.dir/tests/community_layout_test.cpp.obj
+[114/223] Building CXX object CMakeFiles/environment_asset_mesh_test.dir/tests/environment_asset_mesh_test.cpp.obj
+[115/223] Building CXX object CMakeFiles/environment_scale_audit.dir/tests/environment_scale_audit.cpp.obj
+[116/223] Building CXX object CMakeFiles/airport_construction_detail_test.dir/tests/airport_construction_detail_test.cpp.obj
+[117/223] Building CXX object CMakeFiles/volcano_effects_test.dir/tests/volcano_effects_test.cpp.obj
+[118/223] Building CXX object CMakeFiles/environment_nature_detail_test.dir/tests/environment_nature_detail_test.cpp.obj
+[119/223] Linking CXX executable new_aircraft_performance_test.exe
+[120/223] Building CXX object CMakeFiles/environment_close_detail_test.dir/tests/environment_close_detail_test.cpp.obj
+[121/223] Linking CXX executable new_aircraft_autoland_test.exe
+[122/223] Linking CXX executable atlas_gear_geometry_test.exe
+[123/223] Linking CXX executable new_aircraft_exterior_test.exe
+[124/223] Linking CXX executable breakup_test.exe
+[125/223] Linking CXX executable cockpit_layout_test.exe
+[126/223] Linking CXX executable research_cockpit_layout_test.exe
+[127/223] Linking CXX executable military_career_test.exe
+[128/223] Linking CXX executable hive_combat_test.exe
+[129/223] Linking CXX executable hive_world_collision_test.exe
+[130/223] Linking CXX executable hive_combat_fastmath_test.exe
+[131/223] Linking CXX executable hive_loadout_fastmath_test.exe
+[132/223] Linking CXX executable military_career_fastmath_test.exe
+[133/223] Building CXX object CMakeFiles/environment_close_bounds_test.dir/tests/environment_close_bounds_test.cpp.obj
+[134/223] Linking CXX executable hive_loadout_test.exe
+[135/223] Linking CXX executable hive_world_collision_fastmath_test.exe
+[136/223] Linking CXX executable enemy_surface_mesh_test.exe
+[137/223] Linking CXX executable hive_ordnance_visual_test.exe
+[138/223] Linking CXX executable enemy_mesh_cache_test.exe
+[139/223] Linking CXX executable enemy_bake_guard_test.exe
+[140/223] Linking CXX executable wraith_loadout_clearance_test.exe
+[141/223] Linking CXX executable enemy_fleet_validity_test.exe
+[142/223] Linking CXX executable mesh_validation_test.exe
+[143/223] Linking CXX executable prop_disc_test.exe
+[144/223] Linking CXX executable exhaust_test.exe
+[145/223] Linking CXX executable cockpit_camera_test.exe
+[146/223] Linking CXX executable military_gameplay_test.exe
+[147/223] Linking CXX executable cockpit_focus_zoom_test.exe
+[148/223] Linking CXX executable vtol_throttle_test.exe
+[149/223] Linking CXX executable menu_plan_cache_test.exe
+[150/223] Linking CXX executable shader_prune_test.exe
+[151/223] Linking CXX executable environment_building_test.exe
+[152/223] Linking CXX executable environment_foliage_test.exe
+[153/223] Linking CXX executable terrain_material_test.exe
+[154/223] Linking CXX executable benchmark_metrics_test.exe
+[155/223] Linking CXX executable hangar_geometry_test.exe
+[156/223] Linking CXX executable load_pacer_test.exe
+[157/223] Linking CXX executable runway_preservation_test.exe
+[158/223] Linking CXX executable community_layout_test.exe
+[159/223] Linking CXX executable hangar_catalog_test.exe
+[160/223] Linking CXX executable airport_environment_test.exe
+[161/223] Linking CXX executable volcano_effects_test.exe
+[162/223] Linking CXX executable environment_asset_mesh_test.exe
+[163/223] Linking CXX executable environment_nature_detail_test.exe
+[164/223] Linking CXX executable environment_close_detail_test.exe
+[165/223] Linking CXX executable environment_scale_audit.exe
+[166/223] Linking CXX executable airport_construction_detail_test.exe
+[167/223] Linking CXX executable environment_close_bounds_test.exe
+[168/223] Building CXX object CMakeFiles/environment_chunk_bounds_test.dir/tests/environment_chunk_bounds_test.cpp.obj
+[169/223] Linking CXX executable environment_chunk_bounds_test.exe
+[170/223] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_research_ui.cpp.obj
+[171/223] Building CXX object CMakeFiles/SolaceExpress.dir/src/career.cpp.obj
+[172/223] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_wraith.cpp.obj
+[173/223] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_military_ui.cpp.obj
+[174/223] Building CXX object CMakeFiles/flight_test.dir/tests/flight_test.cpp.obj
+[175/223] Building CXX object CMakeFiles/aero_test.dir/tests/aero_test.cpp.obj
+[176/223] Building CXX object CMakeFiles/aero_wake_test.dir/tests/aero_wake_test.cpp.obj
+[177/223] Building CXX object CMakeFiles/progression_test.dir/tests/progression_test.cpp.obj
+[178/223] Building CXX object CMakeFiles/SolaceExpress.dir/src/platform_win32.cpp.obj
+[179/223] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_ui.cpp.obj
+[180/223] Building CXX object CMakeFiles/airport_layout_test.dir/tests/airport_layout_test.cpp.obj
+[181/223] Building CXX object CMakeFiles/save_test.dir/tests/save_test.cpp.obj
+[182/223] Building CXX object CMakeFiles/envelope_test.dir/tests/envelope_test.cpp.obj
+[183/223] Building CXX object CMakeFiles/hull_test.dir/tests/hull_test.cpp.obj
+[184/223] Building CXX object CMakeFiles/entity_raycast_test.dir/tests/entity_raycast_test.cpp.obj
+[185/223] Building CXX object CMakeFiles/mesh_simplify_test.dir/tests/mesh_simplify_test.cpp.obj
+[186/223] Building CXX object CMakeFiles/shader_keyword_test.dir/tests/shader_keyword_test.cpp.obj
+[187/223] Building CXX object CMakeFiles/autoland_sweep.dir/tests/autoland_sweep.cpp.obj
+[188/223] Building CXX object CMakeFiles/world_cache_test.dir/tests/world_cache_test.cpp.obj
+[189/223] Building CXX object CMakeFiles/gameplay_test.dir/src/radio_win.cpp.obj
+[190/223] Building CXX object CMakeFiles/SolaceExpress.dir/src/game.cpp.obj
+[191/223] Building CXX object CMakeFiles/encounter_timing_test.dir/src/radio_win.cpp.obj
+[192/223] Building CXX object CMakeFiles/encounter_timing_test.dir/tests/encounter_timing_test.cpp.obj
+[193/223] Building CXX object CMakeFiles/bridges_test.dir/tests/bridges_test.cpp.obj
+[194/223] Building CXX object CMakeFiles/shader_check.dir/tools/shader_check.cpp.obj
+[195/223] Building CXX object CMakeFiles/landmarks_test.dir/tests/landmarks_test.cpp.obj
+[196/223] Building CXX object CMakeFiles/roads_test.dir/tests/roads_test.cpp.obj
+[197/223] Building CXX object CMakeFiles/road_traffic_test.dir/tests/road_traffic_test.cpp.obj
+[198/223] Linking CXX executable SolaceExpress.exe
+[199/223] Linking CXX executable flight_test.exe
+[200/223] Linking CXX executable aero_test.exe
+[201/223] Building CXX object CMakeFiles/texture_compress_test.dir/src/texture_compress.cpp.obj
+[202/223] Linking CXX executable aero_wake_test.exe
+[203/223] Linking CXX executable progression_test.exe
+[204/223] Linking CXX executable shader_keyword_test.exe
+[205/223] Linking CXX executable save_test.exe
+[206/223] Linking CXX executable airport_layout_test.exe
+[207/223] Linking CXX executable envelope_test.exe
+[208/223] Linking CXX executable hull_test.exe
+[209/223] Linking CXX executable mesh_simplify_test.exe
+[210/223] Building CXX object CMakeFiles/texture_compress_test.dir/tests/texture_compress_test.cpp.obj
+[211/223] Linking CXX executable entity_raycast_test.exe
+[212/223] Linking CXX executable autoland_sweep.exe
+[213/223] Linking CXX executable shader_check.exe
+[214/223] Linking CXX executable world_cache_test.exe
+[215/223] Linking CXX executable bridges_test.exe
+[216/223] Linking CXX executable encounter_timing_test.exe
+[217/223] Linking CXX executable landmarks_test.exe
+[218/223] Linking CXX executable roads_test.exe
+[219/223] Linking CXX executable road_traffic_test.exe
+[220/223] Linking CXX executable texture_compress_test.exe
+[221/223] Building CXX object CMakeFiles/gameplay_test.dir/tests/gameplay_test.cpp.obj
+[222/223] Linking CXX executable gameplay_test.exe

@@ -42,7 +42,7 @@ set(CORE_ONLY_SOURCES
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
 set(GAME_ONLY_SOURCES
   src/aircraft_mesh_asset.cpp
-  src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_wraith.cpp src/renderer.cpp src/materials.cpp src/texture_compress.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp src/sky.cpp src/enemy_fleet.cpp src/enemy_mesh.cpp)
+  src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_military_ui.cpp src/game_wraith.cpp src/renderer.cpp src/materials.cpp src/texture_compress.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp src/sky.cpp src/enemy_fleet.cpp src/enemy_mesh.cpp)
 set(GAME_SOURCES ${CORE_SOURCES} src/entity_mesh.cpp src/bridge_mesh.cpp ${GAME_ONLY_SOURCES})
 add_library(env_objs OBJECT ${ENVIRONMENT_SOURCES})
 add_library(core_objs OBJECT ${CORE_ONLY_SOURCES})
@@ -242,6 +242,19 @@ if(MSVC)
 endif()
 add_dependencies(military_gameplay_test shaders_gen)
 add_dependencies(gameplay_test military_gameplay_test)
+# Showroom controls and safe turntable/lens bounds against the real Game and room geometry.
+if(WIN32)
+  add_executable(hangar_preview_controls_test tests/hangar_preview_controls_test.cpp ${GAME_OBJS} src/radio_win.cpp)
+  target_link_libraries(hangar_preview_controls_test PRIVATE opengl32 gdi32 winmm mfplay mfplat mfuuid ole32 uuid)
+else()
+  add_executable(hangar_preview_controls_test tests/hangar_preview_controls_test.cpp ${GAME_OBJS} src/radio_stub.cpp)
+  target_link_libraries(hangar_preview_controls_test PRIVATE ${CMAKE_DL_LIBS})
+endif()
+if(MSVC)
+  target_compile_definitions(hangar_preview_controls_test PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+add_dependencies(hangar_preview_controls_test shaders_gen)
+add_dependencies(gameplay_test hangar_preview_controls_test)
 # The UFO encounter's timeline against the real Game::updateUfo (no GL)
 if(WIN32)
   add_executable(encounter_timing_test tests/encounter_timing_test.cpp ${GAME_OBJS} src/radio_win.cpp)
@@ -309,6 +322,7 @@ add_test(NAME shader_keywords COMMAND shader_keyword_test)
 add_test(NAME career_saves COMMAND save_test)
 add_test(NAME military_career COMMAND military_career_test)
 add_test(NAME military_gameplay COMMAND military_gameplay_test)
+add_test(NAME hangar_preview_controls COMMAND hangar_preview_controls_test)
 add_test(NAME hive_combat COMMAND hive_combat_test)
 add_test(NAME hive_combat_fastmath COMMAND hive_combat_fastmath_test)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/military_career_fastmath)
@@ -679,7 +693,7 @@ add_test(NAME test_world COMMAND test_world ${CMAKE_BINARY_DIR}/test_world.bin)
 set_tests_properties(test_world PROPERTIES FIXTURES_SETUP world COST 1000)
 foreach(t airport_environment airport_layouts cockpit_camera community_layout ufo_encounter entity_raycast terrain_envelope
           environment_scale_audit flight_model_1 flight_model_2 flight_model_3 gameplay_loop_1 gameplay_loop_2 gameplay_loop_3
-          gameplay_loop_4 campaign_progression_1 campaign_progression_2 campaign_progression_3 career_saves military_career military_career_fastmath military_gameplay hive_world_collision hive_world_collision_fastmath terrain_shadow_bake
+          gameplay_loop_4 campaign_progression_1 campaign_progression_2 campaign_progression_3 career_saves military_career military_career_fastmath military_gameplay hangar_preview_controls hive_world_collision hive_world_collision_fastmath terrain_shadow_bake
           volcano_effects new_aircraft_performance new_aircraft_autoland_larkspur new_aircraft_autoland_atlas new_aircraft_go_around
           vtol_throttle wreck_pose bridges roads landmarks road_traffic road_grade_gpu menu_plan_cache)
   if(TEST ${t})
@@ -689,7 +703,7 @@ foreach(t airport_environment airport_layouts cockpit_camera community_layout uf
 endforeach()
 foreach(t airport_environment_test airport_layout_test cockpit_camera_test community_layout_test encounter_timing_test
           entity_raycast_test envelope_test environment_scale_audit flight_test gameplay_test progression_test save_test
-          military_career_test military_career_fastmath_test military_gameplay_test hive_world_collision_test hive_world_collision_fastmath_test
+          military_career_test military_career_fastmath_test military_gameplay_test hangar_preview_controls_test hive_world_collision_test hive_world_collision_fastmath_test
           terrain_shadow_test volcano_effects_test new_aircraft_performance_test new_aircraft_autoland_test vtol_throttle_test
           bridges_test roads_test landmarks_test road_traffic_test road_grade_gpu_test menu_plan_cache_test)
   if(TARGET ${t})

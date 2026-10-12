@@ -314,7 +314,7 @@ private:
   hive::Loadout combatLoadout;
   hive::ForwardSet practiceForward = hive::ForwardSet::Pulse;
   hive::BombSet practiceBomb = hive::BombSet::Plasma;
-  int practiceWave = 0, militarySelection = 0;
+  int practiceWave = 0, militarySelection = 3;
   float militaryHull = 100, combatBasePayload = 85;
   std::array<std::string,hive::MaxObjectives> militarySiteLabels;
   bool militaryFlight = false, militarySettled = false;
@@ -371,6 +371,18 @@ private:
 
   // hub selections
   int selContract = 0, selAircraft = -1, selHangar = 0, freeDest = 0;
+  // Inspection-only turntable. Never shared with research, military or the flight camera.
+  struct HangarView {
+    float yaw = 0.f, zoom = 1.f;
+    int craft = -1;
+    bool freeFlight = false;
+    void reset() { yaw = 0.f; zoom = 1.f; }
+    void select(int model, bool free) {
+      if (craft != model || freeFlight != free) { craft = model; freeFlight = free; reset(); }
+    }
+    void rotate(float delta) { yaw = std::remainder(yaw + delta, 2.f * PI); }
+    void magnify(float delta) { zoom = clampf(zoom + delta, .75f, 1.35f); }
+  } hangarView;
   bool freeFlightCard = false;
   std::string hubMsg; float hubMsgTime = 0;
 
@@ -557,6 +569,14 @@ private:
   void drawResearch(const FrameParams& fp);   // game_research_ui.cpp
   struct ResLayout { float lx, lw, rx, rw, top, bot, px0, px1, cx, cy, r; };   // the terminal's columns and preview ring
   ResLayout researchLayout() const;
+  ResLayout militaryLayout() const;
+  void drawMilitary(const FrameParams& fp);
+  void drawMilitaryPause();
+  void drawMilitaryDebrief();
+  bool militaryButton(uint32_t id, float x, float y, float w, float h, const std::string& label, bool enabled = true, bool primary = false);
+  void militaryPreviewCamera(FrameParams& fp);
+  void militaryLoadingCamera(FrameParams& fp);
+  void returnToMilitary();
   void researchPreviewCamera(FrameParams& fp);
   void launchResearch();
   void jetEffects(float dt);
@@ -565,6 +585,7 @@ private:
   void drawHub();
   void drawHubContracts(float x, float y, float w, float h);
   void drawHubHangar(float x, float y, float w, float h);
+  void drawHangarPreviewControls(float x, float y, float w);
   void drawHubLogbook(float x, float y, float w, float h);
   void drawHubAirline(float x, float y, float w, float h);
   int airSelPlane = 0, airSelDest = 0, airSelPilot = 0;   // the airline tab's route set-up

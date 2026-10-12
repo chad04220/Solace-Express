@@ -4,6 +4,10 @@
 
 This experimental branch writes **save format 5 whenever a career is saved**, including civilian-only play. Older releases cannot read that format. Before launching this build, keep an independent copy of your existing career saves from `%APPDATA%\SolaceExpress` outside that folder. Do not rely on the rotating `.bak` file: subsequent saves can replace it with a format-5 backup. Restore your independent pre-test copy if returning to an older release.
 
+The military service review adds a clean olive terminal with assigned-aircraft previews, nine funded XR sorties, and aircraft-specific loading screens. XR-10/20/30 carry reconnaissance work; XR-40 adds precision hover work and armed interception, defense and strike. See `docs/CLAUDE_MILITARY_CAREER_REVIEW.md` for the new catalogue, controls, finite-ammunition tests and validation limits. Missions unlock in board order after successful extraction; completed sorties remain replayable, and locked cards show a classified aircraft silhouette. Existing mission IDs remain stable. Saves migrate forward to v6 with explicit per-mission completion; old aggregate service records are preserved without guessing prior mission identities. Older builds cannot read v6 saves; keep your independent backup when switching builds.
+
+Research XR-40 equipment choices now live in the terminal side rail, and research, career Hangar and Free Flight previews have style-matched Rotate/Zoom/Reset controls. See `docs/CLAUDE_PREVIEW_CONTROLS_REVIEW.md` for input, compact-layout and native-render evidence.
+
 Military missions, enemy combat and XR-40 loadouts are review features. Native Windows/RTX 3070 gameplay and frame-time validation are still required. See `docs/CLAUDE_HIVE_MILITARY_REVIEW.md` in the source for coverage and limitations.
 
 *Formerly Air Xpress. On first launch, saves, settings and radio stations move from `%APPDATA%\AirXpress` to `%APPDATA%\SolaceExpress`.*

@@ -1,5 +1,17 @@
 ## What's new in v3.49.2
 
+### Military service
+- **A new military terminal** with nine funded sorties in the XR aircraft, from an XR-10 survey of your own airfield to an XR-40 strike on the Hive's command group: reconnaissance at speed and altitude in the XR-30, a precision hover scan, interception, two installation defenses and a relay strike. Each comes with its own aircraft, equipment and award, and military awards stay separate from your civilian money.
+- **Missions unlock in order.** Only the first is open at the start. Each sortie you complete (objective done, then extracted) opens the next, and finished ones can be flown again. Locked missions show their aircraft as a classified silhouette.
+- The loading screen shows the aircraft you're actually flying, and Escape or controller B there no longer also acts on the menu behind it.
+
+### Hangar and research previews
+- **Rotate, zoom and reset the aircraft** in the career Hangar, Free Flight and the research terminal.
+- The XR-40's equipment choices in the research terminal moved to the side panel, so they no longer cover the aircraft, and the preview carries the hardware you picked.
+
+### Saves
+- **Save format 6** records which military missions you've completed. Your existing saves load forward with their service record intact. Older versions of the game can't read format 6, so keep a copy of your saves if you switch back.
+
 ### The diagnostics, corrected
 - **v3.49.1's new rows for the parts of the ground measured the wrong things.** Their switches shared settings with the analysis's other probes: "roads on the ground" also hid every building and tree, "towns' ground and fields" hid the whole ground, and "ground detail layers" hid the ray-traced parts of the aircraft. So the roads looked like the most expensive part of the ground, when it was really the buildings and trees (2.5 to 3.7 ms on the runway and low-level scenes). Each row now measures only its own part, a new row times the roads' painting alone, and a check stops the settings colliding again.
 
