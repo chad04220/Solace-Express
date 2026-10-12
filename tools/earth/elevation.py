@@ -248,29 +248,51 @@ def decode_tile(data):
     return {"tile": tile, "offset_m": offset, "heights": values, "codec": next(k for k, v in CODECS.items() if v == codec)}
 
 
-def build_elevation(tile, source, area_samples=1, codec="zstd"):
-    """Sample bilinear values; N>1 adds Jacobian-weighted N×N quadrature.
+def sample_cell(tile, source, col, row, area_samples):
+    """Scalar reference for one canonical cell, before metre quantization."""
+    face, i, j = sample_location(tile, col, row)
+    count = SAMPLES * (1 << tile.level)
+    total = weight_sum = 0.0
+    for sy in range(area_samples):
+        v = 2 * (j + (sy + .5) / area_samples) / count - 1
+        for sx in range(area_samples):
+            u = 2 * (i + (sx + .5) / area_samples) / count - 1
+            lat, lon = direction_to_latlon(face_uv_to_direction(face, u, v))
+            weight = cube_area_weight(u, v) if area_samples > 1 else 1.0
+            total += source.sample(lat, lon) * weight
+            weight_sum += weight
+    return total / weight_sum
+
+
+def sample_elevation(tile, source, area_samples=1, *, sampler="scalar"):
+    """Unrounded values using the requested backend and unchanged quadrature N.
+
+    The standard-library scalar backend remains the default and reference.
+    NumPy is optional, explicitly selected, and supports validated ENVI inputs.
+    """
+    if type(area_samples) is not int or not 1 <= area_samples <= 16:
+        raise ValueError("area_samples must be an integer in [1, 16]")
+    if sampler == "numpy":
+        # Do not import NumPy for the portable scalar path or verifier.
+        try:
+            from .sampling_numpy import sample_envi
+        except ImportError as exc:
+            raise ValueError("numpy sampling requires the optional NumPy package; use --sampler scalar") from exc
+        return sample_envi(tile, source, area_samples)
+    if sampler != "scalar":
+        raise ValueError("unsupported elevation sampler")
+    return [sample_cell(tile, source, col, row, area_samples)
+            for row in range(-1, SAMPLES + 1)
+            for col in range(-1, SAMPLES + 1)]
+
+
+def build_elevation(tile, source, area_samples=1, codec="zstd", *, sampler="scalar"):
+    """Sample bilinear values with the same N×N Jacobian-weighted quadrature.
 
     N=1 samples the centre. N>1 integrates bilinear source samples over the
     target pixel's face-coordinate footprint using spherical area weights.
     Select N from the source/target spacing (documented CLI default: 2).
     This is bounded midpoint quadrature, not an exact raster-cell integral.
     """
-    if type(area_samples) is not int or not 1 <= area_samples <= 16:
-        raise ValueError("area_samples must be an integer in [1, 16]")
-    count = SAMPLES * (1 << tile.level)
-    result = []
-    for row in range(-1, SAMPLES + 1):
-        for col in range(-1, SAMPLES + 1):
-            face, i, j = sample_location(tile, col, row)
-            total = weight_sum = 0.0
-            for sy in range(area_samples):
-                v = 2 * (j + (sy + .5) / area_samples) / count - 1
-                for sx in range(area_samples):
-                    u = 2 * (i + (sx + .5) / area_samples) / count - 1
-                    lat, lon = direction_to_latlon(face_uv_to_direction(face, u, v))
-                    weight = cube_area_weight(u, v) if area_samples > 1 else 1.0
-                    total += source.sample(lat, lon) * weight
-                    weight_sum += weight
-            result.append(total / weight_sum)
-    return encode_tile(tile, result, codec)
+    return encode_tile(tile, sample_elevation(tile, source, area_samples,
+                                             sampler=sampler), codec)

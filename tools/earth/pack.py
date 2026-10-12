@@ -123,7 +123,7 @@ def _source(base, spec, source_id, licenses):
     return path, record
 
 
-def build_pack(config, output, codec=None):
+def build_pack(config, output, codec=None, *, sampler="scalar"):
     """Build into a new pack directory with atomic final rename.
 
     Isolated, single-writer output is required: portable rename is not an atomic
@@ -141,6 +141,8 @@ def build_pack(config, output, codec=None):
         base = Path.cwd()
     if not isinstance(config, dict) or (type(config.get("version")) is not int or config.get("version") != 1):
         raise ValueError("unsupported build configuration")
+    if sampler not in ("scalar", "numpy"):
+        raise ValueError("unsupported elevation sampler")
     name = _string(config.get("name"), "pack name", 128)
     coverage = _string(config.get("coverage"), "coverage description")
     tiles_spec = config.get("tiles")
@@ -223,7 +225,7 @@ def build_pack(config, output, codec=None):
             path.write_bytes(raw)
             files.append({"path": rel, "kind": kind, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()})
         for tile in tiles:
-            write("elevation/" + tile.key + ".elv", build_elevation(tile, elevation, area_samples, selected_codec), "elevation")
+            write("elevation/" + tile.key + ".elv", build_elevation(tile, elevation, area_samples, selected_codec, sampler=sampler), "elevation")
             if config.get("roads") is not None:
                 write("roads/" + tile.key + ".json", canonical_json(tile_roads(road_features, tile, tolerance)), "roads")
         if config.get("airports") is not None:

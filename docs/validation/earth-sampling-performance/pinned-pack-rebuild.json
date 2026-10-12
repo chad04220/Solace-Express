@@ -1,0 +1,18 @@
+[
+  {
+    "repeat": "A",
+    "build_verify_seconds": 2.12406657099973,
+    "files": 22,
+    "matches_delivered_pack": true,
+    "manifest_sha256": "cddc55d760f1397d29cedcff34facbb19d132dc97cc3da493dd670ad7102f4b4",
+    "elevation_tiles": 20
+  },
+  {
+    "repeat": "B",
+    "build_verify_seconds": 2.085663943000327,
+    "files": 22,
+    "matches_delivered_pack": true,
+    "manifest_sha256": "cddc55d760f1397d29cedcff34facbb19d132dc97cc3da493dd670ad7102f4b4",
+    "elevation_tiles": 20
+  }
+]

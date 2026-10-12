@@ -30,6 +30,25 @@ No install or download happens implicitly. A build override is explicit:
 python3 -m tools.earth build --config CONFIG.json --output NEW_PACK --codec zstd
 ```
 
+The default sampler remains the standard-library reference. An **explicit optional
+NumPy backend** accelerates ENVI sources at exactly the configured `area_samples`:
+
+```sh
+# Reproduced with Python 3.12; install only in the environment you choose.
+python -m pip install -r tools/earth/requirements-numpy.txt
+python -m tools.earth build --config CONFIG.json --output NEW_PACK --sampler numpy
+python tests/earth_sampling_test.py --require-numpy
+```
+
+Use `--sampler scalar` (the default) for dependency-free builds or JSON/custom
+sources. Nothing is installed automatically. The NumPy path uses a read-only
+mmap and fixed 4,096-cell batches, with scalar fallback around numeric boundaries.
+Pack v1 bytes/schema and the default N=2 remain unchanged. Backend choice is an
+execution option; retain the command and package versions with build evidence.
+See [performance measurements](../../docs/EARTH_SAMPLING_PERFORMANCE.md) and the
+[separate sampling-quality study](../../docs/EARTH_SAMPLING_QUALITY.md). Faster
+N2 sampling does not remove quadrature error or create finer source detail.
+
 ENVI sampling uses standard-library mmap; conversion from local ETOPO GeoTIFFs
 needs the separately installed official GDAL `gdal_translate` utility. The road
 adapter accepts GeoJSON exported from GRIP with GDAL's `ogr2ogr`. Neither is

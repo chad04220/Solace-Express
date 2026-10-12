@@ -1,0 +1,97 @@
+{
+  "baseline_commit": "7954f2b71567021b207c9ddb28f3e2e1591d922c",
+  "source_binary_sha256": "522c6329ed7a8c08c14718e164b04ba203d23c51212371146b789baa419c9895",
+  "source_header_sha256": "fffb4f6c3051d382557744a7e32775664220338255921f5b867fc7c7f947a86f",
+  "files": [
+    {
+      "path": "docs/EARTH_SAMPLING_QUALITY.md",
+      "bytes": 11768,
+      "sha256": "cc3765bb70304be6ca03fb899606cdbf2c80fe1b6e49aeed4d1ad269219f0eea"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/baseline/tools/earth/__init__.py",
+      "bytes": 122,
+      "sha256": "42cb95e9b70ed11a484c8977cfc983de3eb48e4bf4fd388e0700a0befef9a7d8"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/baseline/tools/earth/common.py",
+      "bytes": 1868,
+      "sha256": "36ec41afc7a3dae17a4c2fe47749756fce1b32b0cb31028f8a179da65d9332fb"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/baseline/tools/earth/cube.py",
+      "bytes": 6113,
+      "sha256": "c892429d65f12c85bccb0bf1c77fc82bf4b1a41910802519fa4f834b76e61d8c"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/baseline/tools/earth/elevation.py",
+      "bytes": 13769,
+      "sha256": "6943f75c4117856bf997badd005da061a2e6fc9986657415de188801f7119a73"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/deep-probes-all.csv",
+      "bytes": 22259,
+      "sha256": "3adcfd337cc7b8d1ef198d78417075625cbe7d00815b92edbb35a469acbd19eb"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/deep-probes.csv",
+      "bytes": 10716,
+      "sha256": "7042630f6662f24dd46759e1f0c069e63d61d570f2772e9a68c415beeb59b199"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/deep-results.json",
+      "bytes": 8177,
+      "sha256": "d5e66397de3d0ccb506239985bfd33fcf3311c7dbe365c2c3dd119ebe9c25edc"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/deepen.py",
+      "bytes": 1686,
+      "sha256": "1484eea51e86f3fe2b9164a7a477ddd7b86164452d7aa62f0c4613222bfbaad6"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/diagnostics.json",
+      "bytes": 3538,
+      "sha256": "f0acb3b56aff4f624251348a3dcb00cedd15eabe0a57306517c8bf9a412a40a4"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/oracle-check.json",
+      "bytes": 192,
+      "sha256": "86b31cbc397de782d8bca94deb6a51534c69af362c4a118522c290b047a8d868"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/probes.csv",
+      "bytes": 206787,
+      "sha256": "799c7bee5fbd847b8ba93f4434ff358441c4317175383fd47326dd51d795e220"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/real-results.json",
+      "bytes": 18160,
+      "sha256": "c87a32bf047242ca43a5f4a03b823f54b180245c9ac710661f5d155b1a89de40"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/reference-check.json",
+      "bytes": 3491,
+      "sha256": "be09cdf64aff47223c1e213b3ffda04ffc1f315fbe3ee9af4b49a127bb8d2dde"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/reference_check.py",
+      "bytes": 836,
+      "sha256": "e51de5a384edd4ffb4e32b7070287c8ffa1d28b6d27849e9db618f53c84890df"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/study.py",
+      "bytes": 8907,
+      "sha256": "859008e9735600059b36b80b81324666c22d859f83ee8f954861b93116f2c2c0"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/summarize.py",
+      "bytes": 1166,
+      "sha256": "990065f4e8f6e2d63c644e5777f5b785f24cadea3438220d91eb00f752d8a899"
+    },
+    {
+      "path": "docs/validation/earth-sampling-quality/synthetic-results.json",
+      "bytes": 1670,
+      "sha256": "06647cf4d44645deaa992f17fb40254260d846562d8154ce178a2b7f80c04c66"
+    }
+  ]
+}

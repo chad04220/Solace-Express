@@ -1,0 +1,9 @@
+{
+  "baseline": "7954f2b71567021b207c9ddb28f3e2e1591d922c",
+  "envi_reader_identical_to_baseline": true,
+  "envi_class_sha256": "aa474463e78c69a10757191fd137d04d2a4f445626df60a7ac714974985bf66d",
+  "runtime_diff": "",
+  "pack_format_version": 1,
+  "pack_tool_version": "0.1.0",
+  "note": "ENVI reader including Claude missing/malformed-field diagnostics, codecs and runtime assets unchanged; optional backend only."
+}

@@ -1,0 +1,1041 @@
+{
+  "area_samples": 2,
+  "cases": [
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 6.268692231969908e-10,
+      "mean_unrounded_difference_m": 4.638828002958776e-12,
+      "name": "Himalaya",
+      "payload_bytes": 57562,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 48.57439729664798,
+      "speedup_sampling_and_encode": 28.34967903704657,
+      "tile": {
+        "face": "py",
+        "level": 4,
+        "x": 7,
+        "y": 12
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.026483817000098497,
+            0.025972044999889476,
+            0.025550658000156545
+          ],
+          "median_sample_and_encode_seconds": 0.06233071099995868,
+          "median_sample_seconds": 0.035846893999860185,
+          "payload_sha256": "f2109ab25a743e154fa28b6c1a686f108f086921848212cc1c4a77471ea060a4",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.035846893999860185,
+            0.03658514300013849,
+            0.035308925000208546
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.0292430129998138,
+            0.025649166999755835,
+            0.025814379999701487
+          ],
+          "median_sample_and_encode_seconds": 1.7670556509997368,
+          "median_sample_seconds": 1.7412412710000353,
+          "payload_sha256": "f2109ab25a743e154fa28b6c1a686f108f086921848212cc1c4a77471ea060a4",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.7595371580000574,
+            1.687705618000109,
+            1.7412412710000353
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 5.438778316602111e-10,
+      "mean_unrounded_difference_m": 1.9366388066269025e-11,
+      "name": "California-coast",
+      "payload_bytes": 82376,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 49.08202906645214,
+      "speedup_sampling_and_encode": 29.231602812790307,
+      "tile": {
+        "face": "ny",
+        "level": 4,
+        "x": 2,
+        "y": 15
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.025195759999860456,
+            0.024920241000017995,
+            0.024287008999635873
+          ],
+          "median_sample_and_encode_seconds": 0.06101887899967551,
+          "median_sample_seconds": 0.03582311899981505,
+          "payload_sha256": "dfc7706bc192efdcb6a3217ef1df6106f98157776fd7fbc03a82b0885c0d7eb1",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.03582311899981505,
+            0.035524515000361134,
+            0.03684647099998983
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.024636708999878465,
+            0.025408267000329943,
+            0.024151546999746643
+          ],
+          "median_sample_and_encode_seconds": 1.783679635000226,
+          "median_sample_seconds": 1.758271367999896,
+          "payload_sha256": "dfc7706bc192efdcb6a3217ef1df6106f98157776fd7fbc03a82b0885c0d7eb1",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.7268789569998262,
+            1.758271367999896,
+            1.9318171790000633
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 1.7416823538951576e-10,
+      "mean_unrounded_difference_m": 6.629306935876722e-13,
+      "name": "Atlantic",
+      "payload_bytes": 87380,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 48.48415164037237,
+      "speedup_sampling_and_encode": 28.3471841451418,
+      "tile": {
+        "face": "px",
+        "level": 4,
+        "x": 2,
+        "y": 8
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.026295147000382713,
+            0.02577629400002479,
+            0.025210231999608368
+          ],
+          "median_sample_and_encode_seconds": 0.06191078799975003,
+          "median_sample_seconds": 0.035668138999881194,
+          "payload_sha256": "4dfe81f121f671c119fc2682f8d5d32ae4c875dc06b7c88aa0a5ccc506578482",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.035668138999881194,
+            0.034947357999953965,
+            0.03670055600014166
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.025657047999629867,
+            0.025185625999711192,
+            0.025505881999833946
+          ],
+          "median_sample_and_encode_seconds": 1.7549965079997492,
+          "median_sample_seconds": 1.7293394600001193,
+          "payload_sha256": "4dfe81f121f671c119fc2682f8d5d32ae4c875dc06b7c88aa0a5ccc506578482",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.7293394600001193,
+            1.7166307160000542,
+            1.8424187240002539
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 7.080416253302246e-10,
+      "mean_unrounded_difference_m": 3.656000499753691e-12,
+      "name": "Greenland",
+      "payload_bytes": 58176,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 45.57864040781447,
+      "speedup_sampling_and_encode": 28.29523254247023,
+      "tile": {
+        "face": "pz",
+        "level": 4,
+        "x": 5,
+        "y": 5
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.028024869000091712,
+            0.02510341100014557,
+            0.02543164100006834
+          ],
+          "median_sample_and_encode_seconds": 0.06473284699995929,
+          "median_sample_seconds": 0.03962943599981372,
+          "payload_sha256": "370d892d0b2924422ab4331dc3a28a0f62f739d802919994f7ce243f6030362e",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.04062630899989017,
+            0.03962943599981372,
+            0.03780481099965982
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.027846855000007054,
+            0.02537514599998758,
+            0.027700095000000147
+          ],
+          "median_sample_and_encode_seconds": 1.8316309589999946,
+          "median_sample_seconds": 1.806255813000007,
+          "payload_sha256": "370d892d0b2924422ab4331dc3a28a0f62f739d802919994f7ce243f6030362e",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.7718515420001495,
+            1.806255813000007,
+            1.8137899110001854
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 2.892193151637912e-10,
+      "mean_unrounded_difference_m": 4.364401341446278e-12,
+      "name": "Mariana",
+      "payload_bytes": 88856,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 48.43957933378423,
+      "speedup_sampling_and_encode": 28.72225407005144,
+      "tile": {
+        "face": "nx",
+        "level": 4,
+        "x": 1,
+        "y": 10
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.024507626999820786,
+            0.024580034999871714,
+            0.02489261999971859
+          ],
+          "median_sample_and_encode_seconds": 0.05978955299997324,
+          "median_sample_seconds": 0.034965495000051305,
+          "payload_sha256": "04a5eb35d2253d0eceb595caf82183804333a9dcee2793b04373e6385eee7ca7",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.03443833100027405,
+            0.035209518000101525,
+            0.034965495000051305
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.024481848000050377,
+            0.0235768630000166,
+            0.02380155700029718
+          ],
+          "median_sample_and_encode_seconds": 1.7172907320000377,
+          "median_sample_seconds": 1.693713869000021,
+          "payload_sha256": "04a5eb35d2253d0eceb595caf82183804333a9dcee2793b04373e6385eee7ca7",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.7613011129997176,
+            1.693713869000021,
+            1.6587962989997322
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 2.546585164964199e-10,
+      "mean_unrounded_difference_m": 1.1097583601625695e-12,
+      "name": "north-pole",
+      "payload_bytes": 73436,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 42.968804382583926,
+      "speedup_sampling_and_encode": 26.373641041924188,
+      "tile": {
+        "face": "pz",
+        "level": 4,
+        "x": 8,
+        "y": 8
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.025152977999823634,
+            0.024336253000001307,
+            0.02515113499975996
+          ],
+          "median_sample_and_encode_seconds": 0.06366127199999028,
+          "median_sample_seconds": 0.03850829400016664,
+          "payload_sha256": "9419b49bfc7dd8dad9511fda4c1f48f74af5e8ea554f26e5e8b52a6592ba5ecb",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.03850829400016664,
+            0.03996022399996946,
+            0.037673002000246925
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.02432418399985181,
+            0.024615448000076867,
+            0.025230371999896306
+          ],
+          "median_sample_and_encode_seconds": 1.6789795360000426,
+          "median_sample_seconds": 1.6546553520001908,
+          "payload_sha256": "9419b49bfc7dd8dad9511fda4c1f48f74af5e8ea554f26e5e8b52a6592ba5ecb",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.6546553520001908,
+            1.6402963709997493,
+            1.682365664000372
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 5.002220859751105e-12,
+      "mean_unrounded_difference_m": 1.0557757287121292e-13,
+      "name": "south-pole",
+      "payload_bytes": 44427,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 42.955511142657315,
+      "speedup_sampling_and_encode": 26.35503389144172,
+      "tile": {
+        "face": "nz",
+        "level": 4,
+        "x": 8,
+        "y": 8
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.024865359000159515,
+            0.02634006199969008,
+            0.02627583699995739
+          ],
+          "median_sample_and_encode_seconds": 0.06567145999997592,
+          "median_sample_seconds": 0.03969576000008601,
+          "payload_sha256": "161261b13773ee99b4d45e1f8014e8f8eb50d9f61b09a82ea5e6fd26816d53a3",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.03969576000008601,
+            0.039331398000285844,
+            0.04056947999970362
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.02516609700023764,
+            0.026518638999732502,
+            0.025621892999879492
+          ],
+          "median_sample_and_encode_seconds": 1.7307735539998248,
+          "median_sample_seconds": 1.7051516609999453,
+          "payload_sha256": "161261b13773ee99b4d45e1f8014e8f8eb50d9f61b09a82ea5e6fd26816d53a3",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.6821386859996892,
+            1.8158794979999584,
+            1.7051516609999453
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 4.501998773775995e-10,
+      "mean_unrounded_difference_m": 8.621200622572413e-13,
+      "name": "antimeridian",
+      "payload_bytes": 76167,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 48.274947558236995,
+      "speedup_sampling_and_encode": 28.538348784078707,
+      "tile": {
+        "face": "nx",
+        "level": 4,
+        "x": 8,
+        "y": 8
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.02544566799997483,
+            0.025917488999766647,
+            0.02536865399997623
+          ],
+          "median_sample_and_encode_seconds": 0.06097057700026198,
+          "median_sample_seconds": 0.03552490900028715,
+          "payload_sha256": "72c9b2d37eddc8f2b650c26dbf164028dcbe2511534745a763c6ed6defc21a3f",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.03552490900028715,
+            0.03610782600026141,
+            0.0350772329998108
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.025036473000000115,
+            0.030803622000348696,
+            0.025357745999826875
+          ],
+          "median_sample_and_encode_seconds": 1.7399995920000038,
+          "median_sample_seconds": 1.7149631190000036,
+          "payload_sha256": "72c9b2d37eddc8f2b650c26dbf164028dcbe2511534745a763c6ed6defc21a3f",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.7149631190000036,
+            1.7185193939999408,
+            1.697674730000017
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 3.7971403799019754e-11,
+      "mean_unrounded_difference_m": 8.244372799575757e-14,
+      "name": "cube-edge",
+      "payload_bytes": 54159,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 48.61213334809378,
+      "speedup_sampling_and_encode": 28.729550259704293,
+      "tile": {
+        "face": "px",
+        "level": 4,
+        "x": 15,
+        "y": 8
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.025933848000022408,
+            0.02554295700019793,
+            0.027335944999776984
+          ],
+          "median_sample_and_encode_seconds": 0.06205132600007346,
+          "median_sample_seconds": 0.036144006999620615,
+          "payload_sha256": "4568997e886bdf408eb55f6b215423196aaf2bff2b9415db075bc6a7a7587ba1",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.03611747800005105,
+            0.036144006999620615,
+            0.03944677000026786
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.02645312599997851,
+            0.025669401000413927,
+            0.027853133999997226
+          ],
+          "median_sample_and_encode_seconds": 1.7827066890004062,
+          "median_sample_seconds": 1.7570372879999923,
+          "payload_sha256": "4568997e886bdf408eb55f6b215423196aaf2bff2b9415db075bc6a7a7587ba1",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.8198355899999115,
+            1.7570372879999923,
+            1.6936643479998565
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 1.5756995708215982e-10,
+      "mean_unrounded_difference_m": 7.466792576275431e-13,
+      "name": "cube-corner",
+      "payload_bytes": 51885,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 46.89632857562471,
+      "speedup_sampling_and_encode": 26.25271839899091,
+      "tile": {
+        "face": "px",
+        "level": 4,
+        "x": 15,
+        "y": 15
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.026473856999928103,
+            0.027855240999997477,
+            0.031988949999686156
+          ],
+          "median_sample_and_encode_seconds": 0.06876014199997371,
+          "median_sample_seconds": 0.03792640100027711,
+          "payload_sha256": "499a3462ac79d58373f71fa4ddd80d1705b97a1948751a0c796686e17b0ce13b",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.03719393099981971,
+            0.040904900999976235,
+            0.03792640100027711
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.02755593600022621,
+            0.026531682000040746,
+            0.025410755000393692
+          ],
+          "median_sample_and_encode_seconds": 1.8051406449999376,
+          "median_sample_seconds": 1.778608962999897,
+          "payload_sha256": "499a3462ac79d58373f71fa4ddd80d1705b97a1948751a0c796686e17b0ce13b",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.7664336499997262,
+            1.778608962999897,
+            1.8787758239996037
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 6.421032594516873e-10,
+      "mean_unrounded_difference_m": 1.880513550966121e-11,
+      "name": "Himalaya",
+      "payload_bytes": 73326,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 50.22858203563743,
+      "speedup_sampling_and_encode": 30.185414872271927,
+      "tile": {
+        "face": "py",
+        "level": 6,
+        "x": 29,
+        "y": 51
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.024659279999923456,
+            0.024838606999765034,
+            0.023981731999811018
+          ],
+          "median_sample_and_encode_seconds": 0.059318423999684455,
+          "median_sample_seconds": 0.035147972000231675,
+          "payload_sha256": "1de5936e7ae3de26a9d36cbcc1c4e4e81464743829b9770d94ae367276240b42",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.034659143999761,
+            0.03564263700036463,
+            0.035147972000231675
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.02463044499972966,
+            0.0261168209999596,
+            0.025118442999882973
+          ],
+          "median_sample_and_encode_seconds": 1.7905512379998072,
+          "median_sample_seconds": 1.7654327949999242,
+          "payload_sha256": "1de5936e7ae3de26a9d36cbcc1c4e4e81464743829b9770d94ae367276240b42",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.7376710980001917,
+            1.7701689629998327,
+            1.7654327949999242
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 5.440483619167935e-10,
+      "mean_unrounded_difference_m": 1.607787598095089e-11,
+      "name": "California-coast",
+      "payload_bytes": 53930,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 51.58241935527846,
+      "speedup_sampling_and_encode": 30.552818464080573,
+      "tile": {
+        "face": "ny",
+        "level": 6,
+        "x": 8,
+        "y": 62
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.025018354000167164,
+            0.02585396699987541,
+            0.025169639000068855
+          ],
+          "median_sample_and_encode_seconds": 0.062209504999827914,
+          "median_sample_seconds": 0.0363555379999525,
+          "payload_sha256": "4b64af4a43b68a58021361bd0931ea367c778ab0859b36c4a325e3c32c82274d",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.03620347200012475,
+            0.0363555379999525,
+            0.04005048399994848
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.026040745000045717,
+            0.026520898999933706,
+            0.025369105999743624
+          ],
+          "median_sample_and_encode_seconds": 1.9006757130000551,
+          "median_sample_seconds": 1.8753066070003115,
+          "payload_sha256": "4b64af4a43b68a58021361bd0931ea367c778ab0859b36c4a325e3c32c82274d",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.8571737439997378,
+            2.015102054000181,
+            1.8753066070003115
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 1.2641976354643703e-10,
+      "mean_unrounded_difference_m": 2.708371488874314e-13,
+      "name": "Atlantic",
+      "payload_bytes": 58624,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 48.3548776725952,
+      "speedup_sampling_and_encode": 28.344457063530193,
+      "tile": {
+        "face": "px",
+        "level": 6,
+        "x": 10,
+        "y": 32
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.025289667999913945,
+            0.026868726999964565,
+            0.025519549999899027
+          ],
+          "median_sample_and_encode_seconds": 0.05981162000034601,
+          "median_sample_seconds": 0.034521952000432066,
+          "payload_sha256": "2ef79024ddf9f28eb2796bcdb3273b0270c94280f034856f44a135bb1e4028f9",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.034521952000432066,
+            0.03458977300033439,
+            0.03419149000001198
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.02602312899989556,
+            0.027803188000234513,
+            0.0253826759999356
+          ],
+          "median_sample_and_encode_seconds": 1.6953278949999913,
+          "median_sample_seconds": 1.6693047660000957,
+          "payload_sha256": "2ef79024ddf9f28eb2796bcdb3273b0270c94280f034856f44a135bb1e4028f9",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.6693047660000957,
+            1.7044299969998065,
+            1.661603546999686
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 5.002220859751105e-12,
+      "mean_unrounded_difference_m": 2.1656587679678073e-13,
+      "name": "Greenland",
+      "payload_bytes": 16321,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 47.46999246435938,
+      "speedup_sampling_and_encode": 28.871231924831918,
+      "tile": {
+        "face": "pz",
+        "level": 6,
+        "x": 23,
+        "y": 22
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.02364514099963344,
+            0.02387242899976627,
+            0.02371411400008583
+          ],
+          "median_sample_and_encode_seconds": 0.05907774099978269,
+          "median_sample_seconds": 0.03543260000014925,
+          "payload_sha256": "6b2401bb424e6b31b693414eb8080fda588eb59db298f75c8cec2646fba91cea",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.03543260000014925,
+            0.03454794300023423,
+            0.035755708999658964
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.023661907000132487,
+            0.033130555000298045,
+            0.02320467599975018
+          ],
+          "median_sample_and_encode_seconds": 1.7056471619998774,
+          "median_sample_seconds": 1.681985254999745,
+          "payload_sha256": "6b2401bb424e6b31b693414eb8080fda588eb59db298f75c8cec2646fba91cea",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.681985254999745,
+            1.8172947049997674,
+            1.6604593320003005
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 3.6288838600739837e-10,
+      "mean_unrounded_difference_m": 7.213741038789474e-12,
+      "name": "Mariana",
+      "payload_bytes": 68415,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 48.510008676173626,
+      "speedup_sampling_and_encode": 28.51420567277617,
+      "tile": {
+        "face": "nx",
+        "level": 6,
+        "x": 5,
+        "y": 42
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.025460412000029464,
+            0.025499743000182207,
+            0.025335688999803097
+          ],
+          "median_sample_and_encode_seconds": 0.060192995999841514,
+          "median_sample_seconds": 0.03485730700003842,
+          "payload_sha256": "5268f7963c0bf1f91878dc6e5433f523085f9cbb98c21f06b8cddc0717dadb84",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.033982188000209135,
+            0.03522041199994419,
+            0.03485730700003842
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.025899552999817388,
+            0.02542720300016299,
+            0.025138052999864158
+          ],
+          "median_sample_and_encode_seconds": 1.7163554680000743,
+          "median_sample_seconds": 1.6909282649999113,
+          "payload_sha256": "5268f7963c0bf1f91878dc6e5433f523085f9cbb98c21f06b8cddc0717dadb84",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.8691535470002236,
+            1.6909282649999113,
+            1.6787336150000556
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 3.128661774098873e-10,
+      "mean_unrounded_difference_m": 6.339590298013648e-13,
+      "name": "north-pole",
+      "payload_bytes": 57505,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 47.48923495862463,
+      "speedup_sampling_and_encode": 28.052749994519157,
+      "tile": {
+        "face": "pz",
+        "level": 6,
+        "x": 32,
+        "y": 32
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.02651424199984831,
+            0.027737021000120876,
+            0.027642058999845176
+          ],
+          "median_sample_and_encode_seconds": 0.06512703999987934,
+          "median_sample_seconds": 0.03790045799996733,
+          "payload_sha256": "84b0e2dfbdda95f08f95974a0ee7f415034ed11ccd791ed2df8a218da945468e",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.03790045799996733,
+            0.03739001899975847,
+            0.038484298000184936
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.025912207000146736,
+            0.025485802999810403,
+            0.02712881599973116
+          ],
+          "median_sample_and_encode_seconds": 1.8269925709996642,
+          "median_sample_seconds": 1.799863754999933,
+          "payload_sha256": "84b0e2dfbdda95f08f95974a0ee7f415034ed11ccd791ed2df8a218da945468e",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.6938021369996932,
+            1.908706531000007,
+            1.799863754999933
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 7.73070496506989e-12,
+      "mean_unrounded_difference_m": 6.77366141463748e-14,
+      "name": "south-pole",
+      "payload_bytes": 28243,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 44.266052470667454,
+      "speedup_sampling_and_encode": 26.810701492879208,
+      "tile": {
+        "face": "nz",
+        "level": 6,
+        "x": 32,
+        "y": 32
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.02666765399999349,
+            0.028165493000415154,
+            0.028577445999871998
+          ],
+          "median_sample_and_encode_seconds": 0.06873930600022504,
+          "median_sample_seconds": 0.04104836900023656,
+          "payload_sha256": "f4103c81ee39b23ab3efa325d61e31d4c9bdfe56140f605cbbf900a7cfcfb9c8",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.04108540400011407,
+            0.04057381299980989,
+            0.04104836900023656
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.025899757999923168,
+            0.024951091000275483,
+            0.028129828999681195
+          ],
+          "median_sample_and_encode_seconds": 1.8429490139997142,
+          "median_sample_seconds": 1.817049255999791,
+          "payload_sha256": "f4103c81ee39b23ab3efa325d61e31d4c9bdfe56140f605cbbf900a7cfcfb9c8",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.817049255999791,
+            1.7268592759996864,
+            1.8363382110001112
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 7.148628355935216e-10,
+      "mean_unrounded_difference_m": 3.8116277489346334e-13,
+      "name": "antimeridian",
+      "payload_bytes": 49467,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 48.22355693887997,
+      "speedup_sampling_and_encode": 28.036652227993763,
+      "tile": {
+        "face": "nx",
+        "level": 6,
+        "x": 32,
+        "y": 32
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.026185341000200424,
+            0.027239400000325986,
+            0.03659678299982261
+          ],
+          "median_sample_and_encode_seconds": 0.06379481200019654,
+          "median_sample_seconds": 0.03655541199987056,
+          "payload_sha256": "1d6bd1a96aebc573f262d609d9a3c7e783c036f45b4b626b55b5654bd08ad44a",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.03676495299987437,
+            0.03655541199987056,
+            0.03551811800025462
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.025760965999779728,
+            0.02625194599977476,
+            0.02638290599998072
+          ],
+          "median_sample_and_encode_seconds": 1.7885929579997537,
+          "median_sample_seconds": 1.762831991999974,
+          "payload_sha256": "1d6bd1a96aebc573f262d609d9a3c7e783c036f45b4b626b55b5654bd08ad44a",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.762831991999974,
+            1.8970340850000866,
+            1.687753437000083
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 5.434230843093246e-11,
+      "mean_unrounded_difference_m": 1.0022112997813554e-13,
+      "name": "cube-edge",
+      "payload_bytes": 40637,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 43.1539992046136,
+      "speedup_sampling_and_encode": 25.6941318057101,
+      "tile": {
+        "face": "px",
+        "level": 6,
+        "x": 63,
+        "y": 32
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.02885829900014869,
+            0.029413284999918687,
+            0.0276195659998848
+          ],
+          "median_sample_and_encode_seconds": 0.06676621300039187,
+          "median_sample_seconds": 0.039115215000038006,
+          "payload_sha256": "596a2d2a0e9a4dec28a3a1e0dd27cd9ff73540e38537aa633f4ecc1a95aac285",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.03790791400024318,
+            0.04068938199998229,
+            0.039115215000038006
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.027521920000253886,
+            0.02720408800041696,
+            0.03383469300024444
+          ],
+          "median_sample_and_encode_seconds": 1.715499877000184,
+          "median_sample_seconds": 1.68797795699993,
+          "payload_sha256": "596a2d2a0e9a4dec28a3a1e0dd27cd9ff73540e38537aa633f4ecc1a95aac285",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.68797795699993,
+            1.6845205529998566,
+            1.823304988000018
+          ]
+        }
+      }
+    },
+    {
+      "lossless_codec_roundtrip": true,
+      "max_unrounded_difference_m": 1.0652456694515422e-10,
+      "mean_unrounded_difference_m": 1.261768861111624e-12,
+      "name": "cube-corner",
+      "payload_bytes": 32051,
+      "payloads_identical": true,
+      "quantized_mismatches": 0,
+      "speedup_sampling": 45.15217545258891,
+      "speedup_sampling_and_encode": 27.299309765659764,
+      "tile": {
+        "face": "px",
+        "level": 6,
+        "x": 63,
+        "y": 63
+      },
+      "timings": {
+        "numpy": {
+          "encode_seconds": [
+            0.025904652000008355,
+            0.02619224000000031,
+            0.02502711500028454
+          ],
+          "median_sample_and_encode_seconds": 0.0648258100000021,
+          "median_sample_seconds": 0.03863357000000178,
+          "payload_sha256": "e77c6ec205fc08a6085a7f9cffde9d4a5df7e014a35138b447f16217154bb23d",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            0.04172945299978892,
+            0.03863357000000178,
+            0.0386154129996612
+          ]
+        },
+        "scalar": {
+          "encode_seconds": [
+            0.024868079000043508,
+            0.025708198999836895,
+            0.025310136999905808
+          ],
+          "median_sample_and_encode_seconds": 1.7696998679998615,
+          "median_sample_seconds": 1.7443897309999556,
+          "payload_sha256": "e77c6ec205fc08a6085a7f9cffde9d4a5df7e014a35138b447f16217154bb23d",
+          "repeat_payload_identity": true,
+          "sampling_seconds": [
+            1.719328561999646,
+            1.7632810869999958,
+            1.7443897309999556
+          ]
+        }
+      }
+    }
+  ],
+  "codec": "zstd",
+  "environment": {
+    "numpy": "2.3.5",
+    "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+    "processor": "",
+    "python": "3.12.14"
+  },
+  "repeat": 3,
+  "schema": "earth-sampling-benchmark-v1",
+  "scope": "Selected tiles only; observed warm-process wall timings, not a global build or terrain truth.",
+  "source": {
+    "bytes": 933120000,
+    "header_bytes": 658,
+    "header_sha256": "fffb4f6c3051d382557744a7e32775664220338255921f5b867fc7c7f947a86f",
+    "sha256": "522c6329ed7a8c08c14718e164b04ba203d23c51212371146b789baa419c9895"
+  }
+}
