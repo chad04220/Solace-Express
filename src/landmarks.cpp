@@ -11,16 +11,10 @@
 #include <queue>
 #include <unordered_set>
 
-float airportInfluence(float x, float z);   // world.cpp
-
 namespace {
-PlacedByChunk g_landmarks;
-std::vector<vec3> g_clearings;
-std::vector<FerryRoute> g_ferries;
-
 float baseAt(const World& w, float x, float z, int c = 0) { float b[4]; w.sampleBase(x, z, b); return b[c]; }
 bool clearOfRunways(const World& w, float x, float z, float r) {
-  if (airportInfluence(x, z) > 0.f) return false;
+  if (airportInfluence(w, x, z) > 0.f) return false;
   for (const Airport& a : w.airports) if (hypotf(x - a.x, z - a.z) < r) return false;
   return true;
 }
@@ -33,7 +27,7 @@ void windFarms(const World& world, std::vector<PlacedEnt>& out) {
   auto base = [&](float x, float z) { float b[4]; world.sampleBase(x, z, b); return b[0]; };
   auto cold = [&](float x, float z) { float b[4]; world.sampleBase(x, z, b); return b[3]; };
   auto fit = [&](vec2 p) {   // (a turbine's own place: high, clear of the airfields, the settlements and the roads)
-    if (base(p.x, p.y) < 80.f || base(p.x, p.y) > 700.f || cold(p.x, p.y) > 0.3f || airportInfluence(p.x, p.y) > 0.f) return false;
+    if (base(p.x, p.y) < 80.f || base(p.x, p.y) > 700.f || cold(p.x, p.y) > 0.3f || airportInfluence(world, p.x, p.y) > 0.f) return false;
     for (const Airport& a : world.airports) if (hypotf(p.x - a.x, p.y - a.z) < 6000.f) return false;
     if (settlementShare(world.settlements, p.x, p.y) < 2.f) return false;
     return roadEdgeDistance(world.roadGrid, p.x, p.y) > 40.f;
@@ -43,6 +37,7 @@ void windFarms(const World& world, std::vector<PlacedEnt>& out) {
   std::vector<Row> rows;
   for (float z = -WORLD_HALF + 2000.f; z < WORLD_HALF - 2000.f; z += 400.f)
     for (float x = -WORLD_HALF + 2000.f; x < WORLD_HALF - 2000.f; x += 400.f) {
+      generationCheckpoint();
       if (base(x, z) < 120.f || base(x, z) > 700.f || cold(x, z) > 0.3f) continue;
       for (int d = 0; d < 12; d++) {
         const float th = d * 0.2618f; const vec2 u(sinf(th), cosf(th)), v(-u.y, u.x);
@@ -61,6 +56,7 @@ void windFarms(const World& world, std::vector<PlacedEnt>& out) {
   std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.score != b.score ? a.score > b.score : (a.c.x != b.c.x ? a.c.x < b.c.x : a.c.y < b.c.y); });
   std::vector<vec2> farms;
   for (const Row& r : rows) {
+    generationCheckpoint();
     if (farms.size() >= 2 || (!farms.empty() && r.score < rows.front().score * 0.6f)) break;
     bool near = false; for (const vec2& f : farms) near = near || length(f - r.c) < 12000.f;
     if (near) continue;
@@ -83,10 +79,11 @@ void windFarms(const World& world, std::vector<PlacedEnt>& out) {
 // The stone circle: on the most prominent bare summit - higher by 12 m and more than the ground 400 m round it every
 // way, its top near level, no wood on it - out of the settlements, off the roads, 2 km and more from the runways. Sixteen stones in a
 // ring 13 m across, two of them gone (fallen, lying beside their places), a flat stone at the centre; its clearing 28 m
-void stoneCircle(const World& world, std::vector<PlacedEnt>& out) {
+void stoneCircle(const World& world, WorldSceneryState& state, std::vector<PlacedEnt>& out) {
   float best = 0.f; vec2 at;
   for (float z = -WORLD_HALF + 1000.f; z < WORLD_HALF - 1000.f; z += 125.f)
     for (float x = -WORLD_HALF + 1000.f; x < WORLD_HALF - 1000.f; x += 125.f) {
+      generationCheckpoint();
       const float g = baseAt(world, x, z);
       if (g < 120.f || g > 650.f || baseAt(world, x, z, 3) > 0.5f) continue;
       float rim = -1e9f;
@@ -113,7 +110,7 @@ void stoneCircle(const World& world, std::vector<PlacedEnt>& out) {
     out.push_back({EK_BLOCK, {p.x, g - 0.45f, p.y, atan2f(in.x, in.y), 0.6f + 0.1f * h, 2.5f + 0.6f * h, 0.42f + 0.06f * h, seed}});
   }
   out.push_back({EK_SLAB, {at.x, world.groundHeight(at.x, at.y, 8) - 0.3f, at.y, 0.6f, 1.2f, 0.7f, 0.8f, 0.0003f}});
-  g_clearings.push_back(vec3(at.x, at.y, 28.f));
+  state.clearings.push_back(vec3(at.x, at.y, 28.f));
 }
 
 // The wreck: on a reef in warm, clear shallows - the sea floor 1.5 to 4 m down, open water 150 m round it every way -
@@ -123,6 +120,7 @@ void shipwreck(const World& world, std::vector<PlacedEnt>& out) {
   float best = -1e9f; vec2 at;
   for (float z = -WORLD_HALF + 1000.f; z < WORLD_HALF - 1000.f; z += 150.f)
     for (float x = -WORLD_HALF + 1000.f; x < WORLD_HALF - 1000.f; x += 150.f) {
+      generationCheckpoint();
       const float g = baseAt(world, x, z);
       if (g > -1.5f || g < -4.f || baseAt(world, x, z, 3) > 0.25f) continue;
       bool open = true;
@@ -142,6 +140,7 @@ void offshorePlatform(const World& world, std::vector<PlacedEnt>& out) {
   float best = 1e9f; vec2 at;
   for (float z = -WORLD_HALF + 4000.f; z < WORLD_HALF - 4000.f; z += 1000.f)
     for (float x = -WORLD_HALF + 4000.f; x < WORLD_HALF - 4000.f; x += 1000.f) {
+      generationCheckpoint();
       if (baseAt(world, x, z) > -60.f) continue;
       bool deep = true;
       for (int k = 0; k < 8 && deep; k++) deep = baseAt(world, x + 1000.f * cosf(k * 0.7854f), z + 1000.f * sinf(k * 0.7854f)) < -60.f;
@@ -158,11 +157,13 @@ void offshorePlatform(const World& world, std::vector<PlacedEnt>& out) {
 
 // The Kaleo observatory: three telescope domes along the rim of Mount Kaleo's crater, where the rim is highest, 2.5 km
 // and more from the crater field's runway, each on its own ground and facing out over the island; a clearing of 18 m
-void observatory(const World& world, std::vector<PlacedEnt>& out) {
+void observatory(const World& world, WorldSceneryState& state, std::vector<PlacedEnt>& out) {
+  if (world.procedural) return;   // Mount Kaleo's authored crater is unique to Solace.
   const vec2 cone(25000.f, -9000.f);   // (world.cpp kCones: Mount Kaleo)
   float best = -1e9f, bestA = 0.f, bestR = 0.f;
   for (int a = 0; a < 144; a++)
     for (float r = 250.f; r <= 1500.f; r += 25.f) {
+      generationCheckpoint();
       const vec2 p = cone + vec2(cosf(a * 0.0436f), sinf(a * 0.0436f)) * r;
       const float g = baseAt(world, p.x, p.y);
       if (g > best && clearOfRunways(world, p.x, p.y, 2500.f)) { best = g; bestA = a * 0.0436f; bestR = r; }
@@ -174,6 +175,7 @@ void observatory(const World& world, std::vector<PlacedEnt>& out) {
     const float a = bestA + da[i];
     float hi = -1e9f, rr = bestR;
     for (float r = std::max(bestR - 150.f, 250.f); r <= bestR + 150.f; r += 10.f) {
+      generationCheckpoint();
       const float g = baseAt(world, cone.x + cosf(a) * r, cone.y + sinf(a) * r);
       if (g > hi) { hi = g; rr = r; }
     }
@@ -182,17 +184,18 @@ void observatory(const World& world, std::vector<PlacedEnt>& out) {
     float lo = 1e9f;
     for (int k = 0; k < 8; k++) lo = std::min(lo, world.groundHeight(p.x + 7.f * size[i] * cosf(k * 0.785f), p.y + 7.f * size[i] * sinf(k * 0.785f), 8));
     out.push_back({EK_OBSERVATORY, {p.x, lo, p.y, atan2f(outward.x, outward.y), size[i], size[i], size[i], 0.5f}});
-    g_clearings.push_back(vec3(p.x, p.y, 18.f));
+    state.clearings.push_back(vec3(p.x, p.y, 18.f));
   }
 }
 
 // The star fort: on a cape - water two thirds of the way round it 350 m out, low (5 to 35 m up), level enough for the
 // fort (6 m at the most across 130 m) - out of the settlements, off the roads, 2.5 km and more from the runways; the
 // most surrounded by the sea of such places. Its clearing 75 m
-void starFort(const World& world, std::vector<PlacedEnt>& out) {
+void starFort(const World& world, WorldSceneryState& state, std::vector<PlacedEnt>& out) {
   float best = -1e9f; vec2 at;
   for (float z = -WORLD_HALF + 1000.f; z < WORLD_HALF - 1000.f; z += 100.f)
     for (float x = -WORLD_HALF + 1000.f; x < WORLD_HALF - 1000.f; x += 100.f) {
+      generationCheckpoint();
       const float g = baseAt(world, x, z);
       if (g < 5.f || g > 35.f) continue;
       int sea = 0;
@@ -211,12 +214,12 @@ void starFort(const World& world, std::vector<PlacedEnt>& out) {
   float lo = 1e9f;
   for (int k = 0; k < 12; k++) lo = std::min(lo, world.groundHeight(at.x + 40.f * cosf(k * 0.5236f), at.y + 40.f * sinf(k * 0.5236f), 8));
   out.push_back({EK_STARFORT, {at.x, lo, at.y, hash2i((int)at.x, (int)at.y) * 6.2832f, 1.f, 1.f, 1.f, 0.5f}});
-  g_clearings.push_back(vec3(at.x, at.y, 75.f));
+  state.clearings.push_back(vec3(at.x, at.y, 75.f));
 }
 
 // Lighthouse Key: the keepers' two cottages behind the light, landward, and the landing stage on the nearest shore - its
 // deck from the land (the ground there 0.3 to 2.5 m up: the stage raised to meet it) out 45 m over water 1 m deep and more
-void lighthouseKey(const World& world, std::vector<PlacedEnt>& out) {
+void lighthouseKey(const World& world, WorldSceneryState& state, std::vector<PlacedEnt>& out) {
   float lx, lz, yaw;
   if (!findLighthouseSite(world, lx, lz, yaw)) return;
   const vec2 L(lx, lz), seaward(sinf(yaw), cosf(yaw)), side(-seaward.y, seaward.x);
@@ -226,7 +229,7 @@ void lighthouseKey(const World& world, std::vector<PlacedEnt>& out) {
     for (int k = 0; k < 4; k++) lo = std::min(lo, world.groundHeight(c.x + ((k & 1) ? 5.f : -5.f), c.y + ((k & 2) ? 5.f : -5.f), 8));
     if (lo < 2.f) continue;
     out.push_back({EK_HOUSE_HIP, {c.x, lo - 0.05f, c.y, atan2f(seaward.x, seaward.y), 0.85f, 1.f, 0.85f, 0.3f + 0.4f * (sd > 0.f)}});
-    g_clearings.push_back(vec3(c.x, c.y, 12.f));
+    state.clearings.push_back(vec3(c.x, c.y, 12.f));
   }
   float best = 1e9f; vec2 shore, dir;
   for (float r = 40.f; r <= 450.f; r += 10.f)
@@ -253,7 +256,7 @@ void lighthouseKey(const World& world, std::vector<PlacedEnt>& out) {
 // the track three grandstands behind a catch fence, and a fourth on the outside of turn 1; the teams' transporters
 // in the paddock behind the garages; a car park behind the grandstands; a guardrail round the outside of every bend.
 // Its grounds cleared: the run-off, the pits, the stands and the car park
-void racetrack(const World& world, std::vector<PlacedEnt>& out) {
+void racetrack(const World& world, WorldSceneryState& state, std::vector<PlacedEnt>& out) {
   const Racetrack R = racetrackOf(world.roads);
   if (!R.found || R.pitLane < 0) return;
   const RoadPath &C = world.roads.paths[R.circuit], &P = world.roads.paths[R.pitLane];
@@ -306,7 +309,7 @@ void racetrack(const World& world, std::vector<PlacedEnt>& out) {
       float lo = 1e9f;
       for (float a : {-55.f, 0.f, 55.f}) for (float d : {-14.f, 14.f}) { const vec2 q = c + along1 * a + out1 * d; lo = std::min(lo, world.groundHeight(q.x, q.y, 8)); }
       put(EK_GRANDSTAND, c, lo - 0.1f, yawTo(out1 * -1.f), 1.f, 1.f, 1.f, 0.5f);
-      g_clearings.push_back(vec3(c.x, c.y, 70.f));
+      state.clearings.push_back(vec3(c.x, c.y, 70.f));
     }
   }
   // ---- the car park behind the grandstands: rows facing each other in pairs, three in four places taken, on the
@@ -358,30 +361,30 @@ void racetrack(const World& world, std::vector<PlacedEnt>& out) {
   float run = 1e9f;
   for (size_t k = 1; k < C.pts.size(); k++) {   // (a 26 m circle every 25 m round it)
     run += hypotf(C.pts[k].x - C.pts[k - 1].x, C.pts[k].z - C.pts[k - 1].z);
-    if (run >= 25.f) { g_clearings.push_back(vec3(C.pts[k].x, C.pts[k].z, 26.f)); run = 0.f; }
+    if (run >= 25.f) { state.clearings.push_back(vec3(C.pts[k].x, C.pts[k].z, 26.f)); run = 0.f; }
   }
   for (float s = 120.f; s <= 680.f; s += 40.f)
-    for (float v : {-95.f, -65.f, -35.f, 25.f, 55.f, 85.f, 115.f}) { const vec2 p = R.at(s, v); g_clearings.push_back(vec3(p.x, p.y, 30.f)); }
+    for (float v : {-95.f, -65.f, -35.f, 25.f, 55.f, 85.f, 115.f}) { const vec2 p = R.at(s, v); state.clearings.push_back(vec3(p.x, p.y, 30.f)); }
 }
 
 // The Fjordhaven dam (its gorge and lake: world.h Reservoir, built into the world's heightmap): the arch across the
 // gorge, its crown upstream, its foot 4 m into the valley floor, scaled to its chord and height; its lake against it. The
 // gorge's walls round it cleared
-void fjordhavenDam(const World& world, std::vector<PlacedEnt>& out) {
+void fjordhavenDam(const World& world, WorldSceneryState& state, std::vector<PlacedEnt>& out) {
   const Reservoir& r = world.reservoir;
   if (r.on <= 0.f) return;
   const vec2 v(r.vx, r.vz), o = r.crown() - v * (55.f * r.scale());
   out.push_back({EK_DAM, {o.x, r.floor - 4.f, o.y, atan2f(v.x, v.y), r.scale(), (r.crest + 4.f) / 70.f, r.scale(), 0.5f}});
-  g_clearings.push_back(vec3(o.x, o.y, 0.5f * r.chord + 60.f));
+  state.clearings.push_back(vec3(o.x, o.y, 0.5f * r.chord + 60.f));
 }
 
 // ---- the sea's traffic (Phase D)
 // A coastal town's harbour: the nearest place to its centre where the sea is 6 m deep, within 4.5 km (clear of the
 // container terminal's quay); none for a town inland
 bool harbourOf(const World& world, int t, vec2& at) {
-  const vec2 c(kTowns[t].x, kTowns[t].z);
+  const vec2 c(world.towns[t].x, world.towns[t].z);
   vec2 quay(1e9f, 1e9f);
-  for (const PlacedEnt& p : civicLandmarks()) if (p.kind == EK_QUAY) quay = vec2(p.e.x, p.e.z);
+  for (const PlacedEnt& p : civicLandmarks(world)) if (p.kind == EK_QUAY) quay = vec2(p.e.x, p.e.z);
   for (float r = 100.f; r <= 4500.f; r += 50.f)
     for (int a = 0; a < 90; a++) {
       const vec2 p = c + vec2(cosf(a * 0.0698f), sinf(a * 0.0698f)) * r;
@@ -407,6 +410,7 @@ bool seaRoute(const World& world, vec2 a, vec2 b, std::vector<vec2>& out) {
   const int s = sj * nx + si, goal = tj * nx + ti;
   cost[s] = 0.f; q.push({0.f, s});
   while (!q.empty()) {
+    generationCheckpoint();
     const auto [f, k] = q.top(); q.pop();
     if (k == goal) break;
     const int i = k % nx, j = k / nx;
@@ -475,22 +479,26 @@ bool ferryPier(const World& world, int t, FerryPier& P, vec2& berth, vec2& out) 
 // The routes: between the coastal towns of each two islands, terminal to terminal, the nearest pair (32 km at the most);
 // of those as few as join every island, the shortest first (Kruskal's). Each from its berth out to sea, across by sea,
 // and in to the other's berth
-void ferries(const World& world) {
-  g_ferries.clear();
+void ferries(const World& world, WorldSceneryState& state) {
+  state.ferries.clear();
   const auto& N = world.roads.nodes;
+  const int townCount = (int)world.towns.size();
   struct Cand { float d; int a, b; };
   std::vector<Cand> cand;
-  std::vector<int> isl(kNumTowns, -1); std::vector<FerryPier> pier(kNumTowns); std::vector<vec2> berth(kNumTowns), out(kNumTowns);
-  std::vector<bool> coast(kNumTowns, false);
-  for (int t = 0; t < kNumTowns && t < (int)N.size(); t++) { isl[t] = N[t].island; coast[t] = ferryPier(world, t, pier[t], berth[t], out[t]); }
-  for (int a = 0; a < kNumTowns; a++)
-    for (int b = a + 1; b < kNumTowns; b++)
-      if (coast[a] && coast[b] && isl[a] != isl[b] && length(berth[a] - berth[b]) < 32000.f) cand.push_back({length(berth[a] - berth[b]), a, b});
+  std::vector<int> isl(townCount, -1); std::vector<FerryPier> pier(townCount); std::vector<vec2> berth(townCount), out(townCount);
+  std::vector<bool> coast(townCount, false);
+  for (int t = 0; t < townCount && t < (int)N.size(); t++) { isl[t] = N[t].island; coast[t] = ferryPier(world, t, pier[t], berth[t], out[t]); }
+  for (int a = 0; a < townCount; a++)
+    for (int b = a + 1; b < townCount; b++)
+      if (coast[a] && coast[b] && (!world.procedural || (isl[a] >= 0 && isl[b] >= 0)) && isl[a] != isl[b] && length(berth[a] - berth[b]) < 32000.f) cand.push_back({length(berth[a] - berth[b]), a, b});
   std::sort(cand.begin(), cand.end(), [](const Cand& x, const Cand& y) { return x.d != y.d ? x.d < y.d : x.a != y.a ? x.a < y.a : x.b < y.b; });
-  std::vector<int> root(64); for (int i = 0; i < 64; i++) root[i] = i;
+  // Preserve the original island aliases for Solace; generated archipelagos may have more than 64 islands.
+  const int islandCount = world.procedural ? (isl.empty() ? 0 : *std::max_element(isl.begin(), isl.end()) + 1) : 64;
+  std::vector<int> root(islandCount); for (int i = 0; i < islandCount; i++) root[i] = i;
   auto find = [&](int i) { while (root[i] != i) i = root[i] = root[root[i]]; return i; };
   for (const Cand& c : cand) {
-    const int ra = find(isl[c.a] & 63), rb = find(isl[c.b] & 63);
+    generationCheckpoint();
+    const int ra = find(world.procedural ? isl[c.a] : isl[c.a] & 63), rb = find(world.procedural ? isl[c.b] : isl[c.b] & 63);
     if (ra == rb) continue;
     FerryRoute r; r.townA = c.a; r.townB = c.b; r.pier[0] = pier[c.a]; r.pier[1] = pier[c.b];
     std::vector<vec2> sea;
@@ -499,13 +507,13 @@ void ferries(const World& world) {
     r.along.assign(r.pts.size(), 0.f);
     for (size_t k = 1; k < r.pts.size(); k++) r.along[k] = r.along[k - 1] + length(r.pts[k] - r.pts[k - 1]);
     root[ra] = rb;
-    g_ferries.push_back(std::move(r));
+    state.ferries.push_back(std::move(r));
   }
 }
 
 // Each route's terminals: the causeway's lengths and the linkspan at its head
-void ferryTerminals(std::vector<PlacedEnt>& out) {
-  for (const FerryRoute& r : g_ferries)
+void ferryTerminals(WorldSceneryState& state, std::vector<PlacedEnt>& out) {
+  for (const FerryRoute& r : state.ferries)
     for (const FerryPier& P : r.pier) {
       const float yaw = atan2f(P.dir.x, P.dir.y);
       for (int k = 0; k < P.lengths; k++) {
@@ -514,7 +522,7 @@ void ferryTerminals(std::vector<PlacedEnt>& out) {
       }
       const vec2 L = P.root + P.dir * (40.f * P.lengths + 5.f);
       out.push_back({EK_LINKSPAN, {L.x, 0.f, L.y, yaw, 1.f, 1.f, 1.f, 0.5f}});
-      g_clearings.push_back(vec3(P.root.x, P.root.y, 30.f));
+      state.clearings.push_back(vec3(P.root.x, P.root.y, 30.f));
     }
 }
 
@@ -523,17 +531,18 @@ void ferryTerminals(std::vector<PlacedEnt>& out) {
 // container terminal's quay and of the ferries' terminals and berths, all lying to the same breeze
 void harbourBoats(const World& world, std::vector<PlacedEnt>& out) {
   vec2 quay(1e9f, 1e9f);
-  for (const PlacedEnt& p : civicLandmarks()) if (p.kind == EK_QUAY) quay = vec2(p.e.x, p.e.z);
+  for (const PlacedEnt& p : civicLandmarks(world)) if (p.kind == EK_QUAY) quay = vec2(p.e.x, p.e.z);
   std::vector<vec2> harbours, pierA, pierB;   // (the berths; the terminals' causeways out to them and on past them)
-  for (const FerryRoute& r : g_ferries) {
+  for (const FerryRoute& r : ferryRoutes(world)) {
     harbours.push_back(r.pts.front()); harbours.push_back(r.pts.back());
     for (const FerryPier& P : r.pier) { pierA.push_back(P.root); pierB.push_back(P.root + P.dir * (40.f * P.lengths + kFerryBerth + 60.f)); }
   }
-  for (int t = 0; t < kNumTowns; t++) {
-    const vec2 c(kTowns[t].x, kTowns[t].z);
+  for (int t = 0; t < (int)world.towns.size(); t++) {
+    const vec2 c(world.towns[t].x, world.towns[t].z);
     std::vector<std::pair<float, vec2>> spots;
     for (float z = c.y - 2500.f; z <= c.y + 2500.f; z += 20.f)
       for (float x = c.x - 2500.f; x <= c.x + 2500.f; x += 20.f) {
+        generationCheckpoint();
         const vec2 p(x, z); const float d = length(p - c), g = world.naturalHeight(x, z);
         if (d > 2500.f || g > -1.2f || g < -7.f || length(p - quay) < 450.f) continue;
         bool shore = false, near = false;
@@ -546,9 +555,10 @@ void harbourBoats(const World& world, std::vector<PlacedEnt>& out) {
         if (shore && !near && clearOfRunways(world, x, z, 1500.f)) spots.push_back({d, p});
       }
     std::sort(spots.begin(), spots.end(), [](const auto& a, const auto& b) { return a.first != b.first ? a.first < b.first : a.second.x < b.second.x; });
-    const int most = kTowns[t].kind == 2 ? 24 : kTowns[t].kind == 1 ? 14 : 8;
+    const int most = world.towns[t].kind == 2 ? 24 : world.towns[t].kind == 1 ? 14 : 8;
     std::vector<vec2> moored;
     for (const auto& sp : spots) {
+      generationCheckpoint();
       if ((int)moored.size() >= most) break;
       bool crowded = false; for (const vec2& m : moored) crowded = crowded || length(m - sp.second) < 16.f;
       if (crowded) continue;
@@ -560,35 +570,40 @@ void harbourBoats(const World& world, std::vector<PlacedEnt>& out) {
 }
 }  // namespace
 
-void sceneryBakeLandmarks(const World& world) {
+void sceneryBakeLandmarks(World& world) {
+  generationPhase(GenerationPhase::Landmarks);
+  WorldSceneryState& state = sceneryStateForBuild(world);
   std::vector<PlacedEnt> out;
-  g_clearings.clear();
+  state.clearings.clear();
   windFarms(world, out);
-  stoneCircle(world, out);
+  stoneCircle(world, state, out);
   shipwreck(world, out);
   offshorePlatform(world, out);
-  observatory(world, out);
-  starFort(world, out);
-  lighthouseKey(world, out);
-  racetrack(world, out);
-  fjordhavenDam(world, out);
-  ferries(world);
-  ferryTerminals(out);
+  observatory(world, state, out);
+  starFort(world, state, out);
+  lighthouseKey(world, state, out);
+  racetrack(world, state, out);
+  fjordhavenDam(world, state, out);
+  ferries(world, state);
+  ferryTerminals(state, out);
   harbourBoats(world, out);
-  for (const PlacedEnt& c : civicLandmarks()) {   // (the cities': placed with their lots; their grounds cleared)
+  for (const PlacedEnt& c : civicLandmarks(world)) {   // (the cities': placed with their lots; their grounds cleared)
     out.push_back(c);
-    if (c.kind == EK_STADIUM) g_clearings.push_back(vec3(c.e.x, c.e.z, 105.f));
+    if (c.kind == EK_STADIUM) state.clearings.push_back(vec3(c.e.x, c.e.z, 105.f));
     if (c.kind == EK_QUAY)
       for (float x = -180.f; x <= 180.f; x += 90.f)
-        g_clearings.push_back(vec3(c.e.x + cosf(c.e.yaw) * x - sinf(c.e.yaw) * 62.f, c.e.z - sinf(c.e.yaw) * x - cosf(c.e.yaw) * 62.f, 80.f));
+        state.clearings.push_back(vec3(c.e.x + cosf(c.e.yaw) * x - sinf(c.e.yaw) * 62.f, c.e.z - sinf(c.e.yaw) * x - cosf(c.e.yaw) * 62.f, 80.f));
   }
-  g_landmarks.build(out);
+  generationCheckpoint();
+  state.landmarks.build(out);
 }
 
-const std::vector<vec3>& landmarkClearings() { return g_clearings; }
-
-const std::vector<PlacedEnt>& landmarks() { return g_landmarks.items; }
-std::pair<const PlacedEnt*, const PlacedEnt*> landmarksIn(int cx, int cz) { return g_landmarks.in(cx, cz); }
+const std::vector<vec3>& landmarkClearings(const World& world) { return sceneryState(world).clearings; }
+const std::vector<PlacedEnt>& landmarks(const World& world) { return sceneryState(world).landmarks.items; }
+std::pair<const PlacedEnt*, const PlacedEnt*> landmarksIn(const World& world, int cx, int cz) { return sceneryState(world).landmarks.in(cx, cz); }
+const std::vector<vec3>& landmarkClearings() { return landmarkClearings(g_world); }
+const std::vector<PlacedEnt>& landmarks() { return landmarks(g_world); }
+std::pair<const PlacedEnt*, const PlacedEnt*> landmarksIn(int cx, int cz) { return landmarksIn(g_world, cx, cz); }
 
 // ---------------------------------------------------------------- the Fjordhaven reservoir
 vec2 Reservoir::crown() const { return vec2(x, z) + vec2(vx, vz) * (archR() * (1.f - sqrtf(1.f - 0.6944f))); }   // (sin of its half-angle: 150/180)
@@ -606,6 +621,7 @@ std::vector<int> reservoirTexels(const World& world, const Reservoir& r) {
   std::unordered_set<int> seen(queue.begin(), queue.end());
   if (world.naturalHeight(centre(texel(start.x)), centre(texel(start.y))) >= r.level) return wet;
   while (!queue.empty()) {
+    generationCheckpoint();
     const int k = queue.back(); queue.pop_back(); wet.push_back(k);
     const int i = k % HM_N, j = k / HM_N;
     for (int d = 0; d < 4; d++) {
@@ -629,9 +645,10 @@ std::vector<int> reservoirTexels(const World& world, const Reservoir& r) {
 // no road, no settlement and no airfield, nor leaves dry ground between itself and the dam: the largest lake, and the
 // dam that holds it the shortest
 bool findReservoir(const World& world, Reservoir& out) {
-  int fj = -1; for (int t = 0; t < kNumTowns; t++) if (!strcmp(kTowns[t].name, "Fjordhaven")) fj = t;
+  if (world.procedural) return false;   // The authored Fjordhaven reservoir is Solace-only.
+  int fj = -1; for (int t = 0; t < (int)world.towns.size(); t++) if (!strcmp(world.towns[t].name, "Fjordhaven")) fj = t;
   if (fj < 0) return false;
-  const vec2 F(kTowns[fj].x, kTowns[fj].z);
+  const vec2 F(world.towns[fj].x, world.towns[fj].z);
   const float step = 50.f; const int n = (int)(28000.f / step);
   std::vector<std::vector<Reservoir>> rows(n);
   parallelFor(n, [&](int j) {
@@ -686,6 +703,7 @@ bool findReservoir(const World& world, Reservoir& out) {
   std::sort(order.begin(), order.end(), [&](int a, int b) {
     return fabsf(area[a] - area[b]) > 1.f ? area[a] > area[b] : cand[a].chord != cand[b].chord ? cand[a].chord < cand[b].chord : a < b; });
   for (int c : order) {
+    generationCheckpoint();
     Reservoir r = cand[c];
     // the lake's square: round its texels, three texels' margin; then its fine mask, which must not spill out of it
     const std::vector<int> wet = reservoirTexels(world, r);
@@ -718,6 +736,7 @@ bool reservoirMask(const World& world, const Reservoir& r, LakeMask& out) {
   std::vector<int> queue{sj * n + si};
   out.m[(size_t)sj * n + si] = 1.f;
   while (!queue.empty()) {
+    generationCheckpoint();
     const int k = queue.back(); queue.pop_back();
     const int i = k % n, j = k / n;
     if (i == 0 || j == 0 || i == n - 1 || j == n - 1) return false;   // (it would spill out of its square)
@@ -742,7 +761,8 @@ bool reservoirMask(const World& world, const Reservoir& r, LakeMask& out) {
   return true;
 }
 
-const std::vector<FerryRoute>& ferryRoutes() { return g_ferries; }
+const std::vector<FerryRoute>& ferryRoutes(const World& world) { return sceneryState(world).ferries; }
+const std::vector<FerryRoute>& ferryRoutes() { return ferryRoutes(g_world); }
 
 // A ferry's place at time t: her route's length each way at kFerrySpeed, kFerryDwell at each end; each route's timetable
 // set off by its own amount. Her bows along the route from A to B (out stern first on the way back: she's double-ended);
@@ -769,10 +789,12 @@ bool ferryAt(const FerryRoute& r, float t, vec2& at, vec2& heading, bool* docked
   return true;
 }
 
-void ferryInstances(float t, std::vector<std::pair<int, Ent>>& out) {
-  for (const FerryRoute& r : g_ferries) {
+void ferryInstances(const World& world, float t, std::vector<std::pair<int, Ent>>& out) {
+  for (const FerryRoute& r : ferryRoutes(world)) {
     vec2 at, h;
     if (!ferryAt(r, t, at, h)) continue;
     out.push_back({EK_FERRY, Ent{at.x, 0.f, at.y, atan2f(h.x, h.y), 1.f, 1.f, 1.f, 0.5f}});
   }
 }
+
+void ferryInstances(float t, std::vector<std::pair<int, Ent>>& out) { ferryInstances(g_world, t, out); }

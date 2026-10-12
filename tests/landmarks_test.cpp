@@ -22,7 +22,7 @@ static void check(bool ok, const char* what) { checks++; if (!ok) { if (failures
 
 int main() {
   buildTestWorld();
-  const World& w = g_world;
+  World& w = g_world;
   const std::vector<PlacedEnt> items = landmarks();
   std::vector<Ent> turbines;
   for (const PlacedEnt& p : items) if (p.kind == EK_WINDTURBINE) turbines.push_back(p.e);

@@ -47,7 +47,7 @@ The checklist for a new type is §17. The fill-in template is §18.
 - **Units:** metres, kilograms, seconds. Speeds in `AircraftSpec` are **m/s** (the UI shows knots). Prop power is
   **watts per engine**; jet thrust is **newtons per engine**. Angles in the model rows are **degrees** where the
   field says so; the shaders work in radians.
-- **The world** is an 80 × 80 km archipelago, so ranges are game scale (45–300 km for career types). Airports run
+- **Local missions** use the 80 × 80 km archipelago. Piston/turboprop ranges retain game scaling; jet fuel is physical and independent of map size. Airports run
   from 480 m strips (Gull Rock) to 2.8 km runways; one gravel strip is at 1650 m elevation.
 - **C++ rows** are aggregate initialisers: field order is law. Floats carry `f`, colours are `vec3(r, g, b)` in
   linear 0–1. Avoid pure white and pure black in liveries: the sun blows them out or crushes them.
@@ -122,7 +122,7 @@ struct AircraftSpec {
   float power;                 // W per engine (prop) or N per engine (jet)
   float v0;                    // props: static-thrust knee speed (m/s); jets 0
   float vr, vref, cruise;      // rotate, approach reference, cruise (m/s)
-  float rangeKm, runwayM;      // game-scale range (sets the fuel flow); runway at sea level until the learned distances replace it
+  float rangeKm, runwayM;      // descriptive range (sets only legacy non-jet burn); runway at sea level until learned distances replace it
   bool roughOK, taildragger, retract;
   float Ixx, Iyy, Izz;         // roll, pitch, yaw inertia (kg m^2)
   float elevPow, ailPow, rudPow;   // control power: ~0.38–0.45 / 0.045–0.07 / 0.05–0.07 for conventional types
@@ -136,11 +136,14 @@ struct AircraftSpec {
   float gearHeightM = 0;          // positive authored contact-height override, else derive from geometry
   float takeoffFlap = 0.2f;        // recommended takeoff flap setting (legacy taildraggers keep 0.3)
   float gearTrackM = 0;           // positive authored main-wheel half-track override, else derive from span
+  float jetDryTsfc = 0, jetWetTsfc = 0; // kg/(N s); non-jets leave zero
+  float fuelCruiseAlt = 0, fuelCruiseTas = 0, fuelCruiseSpool = 0;
+  float maxTakeoffMass = 0;       // explicit kg, zero retains legacy calculation
 };
 ```
 
 What the game derives from these by itself: the drag build-up, lift slope and span efficiency (`aero.cpp`, from the
-geometry), the fuel flow (from `rangeKm` and `cruise`), the maximum take-off mass (`maxMass()`), the runway it needs
+geometry), the fuel flow (explicit TSFC for jets; `rangeKm`/`cruise` for legacy non-jets), the maximum take-off mass (`maxMass()`), the runway it needs
 (`runwayNeeded`, from the learned take-off and landing at full weight, +15%, longer at altitude), the engine sound, the
 registration and call sign, the hangar and market cards, and the README's performance table (`flight_test --table`).
 
@@ -250,7 +253,7 @@ width, headrest, dome light, armrests, visor height and slope, overhead, vents).
   critical Mach. Cruise speed and climb come out of it; nothing is tuned. A wrong number shows up as a wrong cruise in
   `flight_test`, so fix the shape or the power, not the drag.
 - **`special`** switches whole paths in `Plane::substep` (`aircraft.cpp`): 1, the XR-30 (fly-by-wire, pitch thrust
-  vectoring, no fuel burn, the research drag rise, a 50 g structure); 2, the XR-40 (four tilting thruster pods,
+  vectoring, finite jet fuel burn, the research drag rise, a 40 g structure); 2, the XR-40 (four tilting thruster pods,
   vertical flight, a 90 g structure). A new Tier B type with new physics needs a new value and a new path. A
   conventional research type uses `special = 0` with `designMach`, `gPos`, `gNeg` (the XR-10 and XR-20).
 - **Learned performance.** At launch, `Plane::perf` flies short test sorties per type (stall speeds, best climb, idle
@@ -794,7 +797,7 @@ With `g = 9.81`, `ρ = 1.225` and the mass at maximum `m = emptyMass + maxFuel +
 | Inertia | `Ixx ≈ 0.12·m·(b/2)²`, `Iyy ≈ 0.18·m·(L/2)²`, `Izz ≈ Ixx + Iyy` | within ±40 % |
 | Geometry | `fusLen ≈ st[7].z − st[0].z`, `fusRad ≈ max half height`, `b ≈ 2·wing[0]`, `S ≈ 2·wing[0]·(root + tip)/2` plus carry-through | within 10 % |
 | Prop clearance | nose: `gearHeight + st[0].y − propR`; nacelles: `gearHeight + nacY − propR` | ≥ 0.25 m |
-| Career fit | licence, price and rent between neighbours of similar size; `rangeKm` 40–300 | sensible |
+| Career fit | licence, price and rent between neighbours of similar size; non-jet `rangeKm` 40–300, jets validated in real kilometres | sensible |
 
 ---
 
@@ -810,7 +813,7 @@ Spec values (the learned numbers are in the README's table):
 | Islander Twin | Nine-seat utility twin | 9 / 900 kg | 90 km | 126 kt | 420 m, rough | CPL | 85 000 / 900 |
 | Pelican Caravan | Single turboprop hauler | 12 / 1400 kg | 130 km | 165 kt | 550 m, rough | CPL | 120 000 / 1600 |
 | Meridian Q400 | Regional turboprop airliner | 40 / 4500 kg | 170 km | 272 kt | 1100 m | ATP | 600 000 / 8000 |
-| Starling 500 Jet | Light business jet | 7 / 700 kg | 260 km | 389 kt | 1250 m | ATP | 260 000 / — |
+| Starling 500 Jet | Light business jet | 7 / 700 kg | 4350 km | 389 kt | 1250 m | ATP | 260 000 / — |
 | Swift S6 | Retractable low-wing tourer | 3 / 420 kg | 140 km | 148 kt | 600 m | PPL | 68 000 / 600 |
 | Osprey C6 | Six-seat coastal charter twin | 5 / 270 kg | 110 km | 144 kt | 550 m | CPL | 68 000 / 650 |
 
@@ -830,3 +833,7 @@ small regional jet, an agricultural or utility taildragger. Not possible without
 ## Authored cockpit interiors
 
 See [Cockpit interiors](COCKPIT_INTERIORS.md) for the bounded layout records, CPU/shader fit contract, rigid-control families, live display mapping and representative-crew verification. Preserve the latest exterior and gear definitions when changing cabin data.
+
+### Jet fuel authoring
+
+Jets use explicit usable kilograms, dry/reheat TSFC, an efficient-cruise reference and MTOW. Never tune fuel burn backward from a map-scaled range or exempt `special` aircraft from consumption. See [JET_FUEL.md](JET_FUEL.md) for units, source assumptions, mission starting-load policy and required endurance tests.

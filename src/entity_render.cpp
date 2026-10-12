@@ -13,6 +13,18 @@ EntLocalBounds closeEntityBounds[EK_COUNT],allEntityBounds[EK_COUNT];
 std::vector<EntChunkBoundsCache> entityChunkBounds;
 }
 
+void Renderer::resetWorldEntities(bool rebuildBridges) {
+  entityChunkBounds.assign(size_t(Scenery::NC) * Scenery::NC, EntChunkBoundsCache{});
+  entStage.clear(); entDrawn = entChunks = entPending = 0;
+  entFrame = entGenCount = 0;
+  groundShadowKey[0] = groundShadowKey[1] = 0;
+  shGen[0] = shGen[1] = -1;
+  shAge[0] = shAge[1] = 0;
+  // Streaming publication supplies prebuilt GPU bridge geometry; synchronous reloads still rebuild it.
+  if (rebuildBridges) uploadBridges();
+  shValid[0] = shValid[1] = false;
+}
+
 bool Renderer::initEntities() {
   std::vector<EVert> verts;
   buildEntityMeshes(verts, entRange);
@@ -97,7 +109,8 @@ void Renderer::drawEntities(const FrameParams& fp) {
   // chunks are the islands' own, looked up from where the camera is relative to that copy and drawn moved by its offset
   struct Copy { float ox, oz; };
   std::vector<Copy> copies;
-  for (int kz = -1; kz <= 1; kz++) for (int kx = -1; kx <= 1; kx++) {
+  const int copiesEachSide = g_world.repeating ? 1 : 0;
+  for (int kz = -copiesEachSide; kz <= copiesEachSide; kz++) for (int kx = -copiesEachSide; kx <= copiesEachSide; kx++) {
     const float ox = kx * WRAP_SPAN, oz = kz * WRAP_SPAN;
     const float ex = std::max(std::max(-WORLD_HALF + ox - cam.x, cam.x - (WORLD_HALF + ox)), 0.f), ez = std::max(std::max(-WORLD_HALF + oz - cam.z, cam.z - (WORLD_HALF + oz)), 0.f);
     if (ex * ex + ez * ez < farAll * farAll) copies.push_back({ox, oz});

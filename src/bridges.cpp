@@ -116,9 +116,11 @@ float bridgeIntrados(const Bridge& b, float s) {
 }
 
 std::vector<Bridge> buildBridges(const World& world) {
+  generationCheckpoint();
   std::vector<Bridge> out;
   const auto& paths = world.roads.paths;
   for (size_t pi = 0; pi < paths.size(); pi++) {
+    generationCheckpoint();
     const RoadPath& P = paths[pi];
     const int n = (int)P.pts.size();
     if (n < 2 || (int)P.bridge.size() < n - 1) continue;
@@ -156,6 +158,7 @@ std::vector<Bridge> buildBridges(const World& world) {
         const float W = stayed ? std::clamp(0.5f * b.length, 200.f, 300.f) : truss ? 2.f * std::clamp(0.16f * b.length, 60.f, 85.f) : std::clamp(0.4f * b.length, 90.f, 125.f);
         float best = -1e9f, at = 0.f;
         for (float sc = along[k] + 30.f + W * 0.5f; sc <= along[e] - 30.f - W * 0.5f; sc += 5.f) {
+          generationCheckpoint();
           const float a0 = sc - W * 0.5f, a1 = sc + W * 0.5f;
           if (groundAt(a0) > 0.f || groundAt(a1) > 0.f || groundAt(sc) > -0.5f) continue;
           float turn = 0.f;

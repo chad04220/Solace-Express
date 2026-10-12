@@ -123,6 +123,11 @@ public:
   int wreckRev = 0;   // bumps whenever something is destroyed (the renderer refreshes its shadow maps)
   // Drops tree-level data of chunks far from the camera and whole chunks further out
   void trim(vec3 cam, float keepDetail, float keepAll, int frame);
+  // Clear queued work, wait for active chunk generation, then discard all chunks.
+  // No concurrent request/ensure/pump: safe to replace g_world after this returns.
+  void beginDrain(); // reject new async requests; never waits for old workers
+  bool isDrained() const;
+  void resumeStreaming();
   void clear();
   size_t generated() const;
   // Background generation on worker threads (generate() only reads g_world). request() queues a chunk and returns

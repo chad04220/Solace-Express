@@ -25,7 +25,7 @@ static const char* kClass[RC_COUNT] = {"highway", "road", "lane", "track", "stre
 
 int main() {
   buildTestWorld();
-  const World& w = g_world;
+  World& w = g_world;
   const RoadNetwork& net = w.roads;
   // ---- along each road: its grade, its vertical curves, its bends, off the stretches by an airfield (on the ground as
   // it is there) and a road whose ends stand too far apart for its length (the shortfall spread along it)

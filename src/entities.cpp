@@ -21,7 +21,9 @@ struct Scenery::Async {
   std::unordered_map<int, int> busy;   // chunk index -> level being generated (main thread only)
   std::vector<std::thread> threads;
   bool stop = false;
+  bool draining = false;
   int epoch = 0;                       // bumped by clear(): results from before it are dropped
+  int active = 0;                      // workers reading the active world outside the queue lock
 };
 
 Scenery::Scenery() : async(new Async()) {
@@ -37,10 +39,13 @@ Scenery::Scenery() : async(new Async()) {
           A.cv.wait(lk, [&] { return A.stop || !A.todo.empty(); });
           if (A.stop) return;
           j = std::move(A.todo.front()); A.todo.pop_front();
+          A.active++;
         }
         generate(j.c, j.cx, j.cz, j.level);
         std::lock_guard<std::mutex> lk(A.m);
         A.done.push_back(std::move(j));
+        A.active--;
+        A.cv.notify_all();
       }
     });
 }
@@ -53,14 +58,32 @@ Scenery::~Scenery() {
 
 int Scenery::workers() const { return (int)async->threads.size(); }
 
-void Scenery::clear() {
-  chunks.clear();
+void Scenery::beginDrain() {
   std::lock_guard<std::mutex> lk(async->m);
-  async->todo.clear(); async->busy.clear(); async->epoch++;
+  async->draining = true; async->todo.clear(); async->busy.clear(); async->epoch++;
+}
+bool Scenery::isDrained() const {
+  std::lock_guard<std::mutex> lk(async->m);
+  return async->draining && async->active == 0 && async->todo.empty();
+}
+void Scenery::resumeStreaming() {
+  std::lock_guard<std::mutex> lk(async->m);
+  async->draining = false;
+}
+
+void Scenery::clear() {
+  // No new request/ensure/pump may run concurrently. A region replacement must wait for
+  // readers of the old world, rather than merely throwing their eventual results away.
+  std::unique_lock<std::mutex> lk(async->m);
+  async->draining = true; async->todo.clear(); async->busy.clear(); async->epoch++;
+  async->cv.wait(lk, [&] { return async->active == 0; });
+  async->done.clear();
+  chunks.clear(); async->draining = false;
 }
 
 bool Scenery::request(int cx, int cz, int level) {
   Async& A = *async;
+  { std::lock_guard<std::mutex> lk(A.m); if (A.draining) return false; }
   if (A.threads.empty() || cx < 0 || cz < 0 || cx >= NC || cz >= NC) return false;
   int idx = cz * NC + cx;
   auto it = A.busy.find(idx);
@@ -201,8 +224,9 @@ bool Scenery::damage(const Ent& e, int kind, int amount) {
 // The lighthouse on Lighthouse Key: the low land point nearest the sea around the village (3 to 16 m up, the sea 45 m
 // on beyond it), and the way it looks out to sea
 bool findLighthouseSite(const World& world, float& lx, float& lz, float& yaw) {
+  if (world.procedural) return false;   // Lighthouse Key is an authored Solace landmark.
   const Town* T = nullptr;
-  for (int i = 0; i < kNumTowns; i++) if (!strcmp(kTowns[i].name, "Lighthouse Key")) T = &kTowns[i];
+  for (const Town& town : world.towns) if (!strcmp(town.name, "Lighthouse Key")) T = &town;
   if (!T) return false;
   auto ground = [&](float x, float z) { return world.groundHeight(x, z, 7); };
   float best = 1e9f;
@@ -249,13 +273,29 @@ void putBuilding(Ctx& C, int kind, float x, float z, float yaw, float hw, float 
   put(C, kind, x, g, z, yaw, sx, sy, sz, seed);
 }
 
+// The active region's immutable, lazily populated geometry. Reset only after all
+// scenery workers have finished, before replacing the world they refer to.
+struct EntityRegionCache {
+  std::once_flag lighthouseOnce, airportOnce, padOnce;
+  bool lighthouseFound = false;
+  float lighthouseX = 0.f, lighthouseZ = 0.f, lighthouseYaw = 0.f, pad = 20.f;
+  struct Bounds { float x0, z0, x1, z1; };
+  std::vector<std::vector<AptItem>> airportItems;
+  std::vector<Bounds> airportBounds;
+};
+std::unique_ptr<EntityRegionCache>& regionCache() {
+  static std::unique_ptr<EntityRegionCache> cache(new EntityRegionCache());
+  return cache;
+}
+
 // The lighthouse stands on the shore of Lighthouse Key: the low land point nearest the sea around the village
 bool lighthouseSite(float& lx, float& lz, float& yaw) {
-  static bool found = false; static float sx = 0, sz = 0, sy = 0;
-  static std::once_flag once;   // (the scenery workers ask at the same time: found once, then only read)
-  std::call_once(once, [&] { found = findLighthouseSite(g_world, sx, sz, sy); });
-  lx = sx; lz = sz; yaw = sy;
-  return found;
+  EntityRegionCache& cache = *regionCache();
+  std::call_once(cache.lighthouseOnce, [&] {
+    cache.lighthouseFound = findLighthouseSite(g_world, cache.lighthouseX, cache.lighthouseZ, cache.lighthouseYaw);
+  });
+  lx = cache.lighthouseX; lz = cache.lighthouseZ; yaw = cache.lighthouseYaw;
+  return cache.lighthouseFound;
 }
 
 // tree species for a site
@@ -266,6 +306,13 @@ int treeSpecies(float g, float lush, float cold, float sp, float sp2) {
   return sp2 < 0.58f ? EK_OAK : sp2 < 0.84f ? EK_BIRCH : sp2 < 0.9f ? EK_PINE : EK_FIR;
 }
 }  // namespace
+
+void sceneryResetWorldCaches() {
+  g_scenery.clear();
+  regionCache().reset(new EntityRegionCache());
+  g_scenery.craters.clear();
+  g_scenery.resetDamage();
+}
 
 bool seaStackShore(float x, float z) {
   for (int k = 0; k < 12; k++) {
@@ -326,11 +373,11 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
       }
     // ---------------------------------------------------------------- airport buildings, aircraft, vehicles (L1)
     if (L == 1) {
-      static std::once_flag once;
-      static std::vector<std::vector<AptItem>> items;
-      struct Bounds { float x0, z0, x1, z1; };
-      static std::vector<Bounds> boxes;   // extent of each airport's items
-      std::call_once(once, [] {
+      EntityRegionCache& cache = *regionCache();
+      auto& items = cache.airportItems;
+      auto& boxes = cache.airportBounds;
+      using Bounds = EntityRegionCache::Bounds;
+      std::call_once(cache.airportOnce, [&] {
         items.resize(g_world.airports.size()); boxes.resize(g_world.airports.size());
         for (size_t i = 0; i < items.size(); i++) {
           airportItems((int)i, items[i]);
@@ -625,7 +672,7 @@ void Scenery::trim(vec3 cam, float keepDetail, float keepAll, int frame) {
       auto& p = chunks[(size_t)cz * NC + cx];
       if (!p) continue;
       float x = chunkX0(cx) + CH * 0.5f, z = chunkX0(cz) + CH * 0.5f;
-      const float ddx = wrapCoord(x - cam.x), ddz = wrapCoord(z - cam.z);   // (the short way: a chunk the far side of the map's seam is drawn there too)
+      const float ddx = g_world.wrap(x - cam.x), ddz = g_world.wrap(z - cam.z);   // (the short way: a chunk the far side of the map's seam is drawn there too)
       float d = sqrtf(ddx * ddx + ddz * ddz);
       if (d > keepAll && frame - p->lastUse > 120) { p.reset(); continue; }
       if (d > keepDetail && p->level >= 2 && frame - p->lastUse > 120) {   // (not a chunk prefetched for where the camera goes next)
@@ -647,24 +694,33 @@ void Scenery::trim(vec3 cam, float keepDetail, float keepAll, int frame) {
 // within 20 m, the airport buildings are measured from the layouts), and skip each chunk the query doesn't come within
 // that chunk's own reach of.
 static float outside(float v, float lo, float hi) { return v < lo ? lo - v : v > hi ? v - hi : 0.f; }
+// Convert only inside the finite local chunk domain. Ocean queries can be many
+// charts away: reject them before integer conversion and never enumerate empty
+// coordinates between a distant query and the current chart.
+static int boundedChunk(float v) {
+  if (!(v >= -WORLD_HALF)) return -1;
+  if (v >= Scenery::chunkX0(Scenery::NC)) return Scenery::NC;
+  return Scenery::chunkOf(v);
+}
 static float entityPad() {
-  static float pad = 20.f;
-  static std::once_flag once;
-  std::call_once(once, [] {
+  EntityRegionCache& cache = *regionCache();
+  std::call_once(cache.padOnce, [&] {
     std::vector<AptItem> items;
     for (int i = 0; i < (int)g_world.airports.size(); i++) {
       items.clear(); airportItems(i, items);
-      for (auto& it : items) pad = std::max(pad, hypotf(kEntInfo[it.kind].hx * it.e.sx, kEntInfo[it.kind].hz * it.e.sz) + 2.f);
+      for (auto& it : items) cache.pad = std::max(cache.pad, hypotf(kEntInfo[it.kind].hx * it.e.sx, kEntInfo[it.kind].hz * it.e.sz) + 2.f);
     }
   });
-  return pad;
+  return cache.pad;
 }
 // what an approach has to clear besides the ground: the tops of the trees and buildings near a point on its path
 float Scenery::obstacleTop(float x, float z, float r) {
   float top = -1e9f;
   const float pad = entityPad();
-  for (int cz = chunkOf(z - r - pad); cz <= chunkOf(z + r + pad); cz++)
-    for (int cx = chunkOf(x - r - pad); cx <= chunkOf(x + r + pad); cx++) {
+  const int z0 = std::max(0, boundedChunk(z - r - pad)), z1 = std::min(NC - 1, boundedChunk(z + r + pad));
+  const int x0 = std::max(0, boundedChunk(x - r - pad)), x1 = std::min(NC - 1, boundedChunk(x + r + pad));
+  for (int cz = z0; cz <= z1; cz++)
+    for (int cx = x0; cx <= x1; cx++) {
       Chunk* ch = ensure(cx, cz, 2);
       if (!ch || ch->ents.empty() || ch->ymax <= top) continue;
       for (int k = 0; k < EK_COUNT; k++) {
@@ -682,7 +738,8 @@ float Scenery::obstacleTop(float x, float z, float r) {
 int Scenery::collide(vec3 p, float r, Ent* entOut) {
   if (bridgeCollide(g_world.bridges, p, r)) return kBridgeKind + 1;   // (the road network's bridges: no entity, entOut unset)
   float pad = entityPad();
-  int c0x = chunkOf(p.x - r - pad), c1x = chunkOf(p.x + r + pad), c0z = chunkOf(p.z - r - pad), c1z = chunkOf(p.z + r + pad);
+  const int c0x = std::max(0, boundedChunk(p.x - r - pad)), c1x = std::min(NC - 1, boundedChunk(p.x + r + pad));
+  const int c0z = std::max(0, boundedChunk(p.z - r - pad)), c1z = std::min(NC - 1, boundedChunk(p.z + r + pad));
   for (int cz = c0z; cz <= c1z; cz++)
     for (int cx = c0x; cx <= c1x; cx++) {
       float ox = outside(p.x, chunkX0(cx), chunkX0(cx) + CH), oz = outside(p.z, chunkX0(cz), chunkX0(cz) + CH);
@@ -750,8 +807,10 @@ float Scenery::sweepSphere(vec3 a, vec3 d, float L, float r, int* kindOut, Ent* 
   float pad = entityPad() + r;   // (chunks and reach: see collide)
   float sx0 = std::min(a.x, b.x), sx1 = std::max(a.x, b.x), sz0 = std::min(a.z, b.z), sz1 = std::max(a.z, b.z);
   float ylo = std::min(a.y, b.y) - r, yhi = std::max(a.y, b.y) + r;
-  for (int cz = chunkOf(sz0 - pad); cz <= chunkOf(sz1 + pad); cz++)
-    for (int cx = chunkOf(sx0 - pad); cx <= chunkOf(sx1 + pad); cx++) {
+  const int c0z = std::max(0, boundedChunk(sz0 - pad)), c1z = std::min(NC - 1, boundedChunk(sz1 + pad));
+  const int c0x = std::max(0, boundedChunk(sx0 - pad)), c1x = std::min(NC - 1, boundedChunk(sx1 + pad));
+  for (int cz = c0z; cz <= c1z; cz++)
+    for (int cx = c0x; cx <= c1x; cx++) {
       float cx0 = chunkX0(cx), cz0 = chunkX0(cz);
       float gx = std::max({cx0 - sx1, sx0 - (cx0 + CH), 0.f}), gz = std::max({cz0 - sz1, sz0 - (cz0 + CH), 0.f});   // box gap
       if (gx * gx + gz * gz > pad * pad) continue;

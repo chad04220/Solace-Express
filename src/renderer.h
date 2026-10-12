@@ -13,6 +13,10 @@
 #include "gl.h"
 #include "world.h"
 #include "planet.h"
+#include "geo.h"
+#include "distant_regions.h"
+#include <future>
+#include <deque>
 #include "entity_mesh.h"
 #include "bridge_mesh.h"
 #include "ground_vehicle.h"
@@ -199,12 +203,12 @@ public:
 
   bool initUI(int w, int h);                     // UI program + font only (the intro screen)
   // Logical linked programs: top-level 22 (the scenery's 6: a pair for each class), hull 1, raster 7, aircraft mesh 2,
-  // terrain/water 2. None has an aircraft's code but the parts' poses (plane_parts.glsl).
+  // terrain/water/distant-region 3. None has an aircraft's code but the parts' poses (plane_parts.glsl).
   // Retries do not add units; finalized optional fallbacks/unavailable features do. (Each aircraft's own builds are
   // made when it is first drawn or baked - the launch's prewarm draws every one: afMeshProgram, afBakePrograms; the
   // bodies' builder has no shared build at launch at all: sharedBakePrograms.)
-  static constexpr int kProgramCount = 22 + 1 + 7 + 2 + 2;
-  static_assert(kProgramCount == 34, "Update the logical shader progress contract when adding a program");
+  static constexpr int kProgramCount = 22 + 1 + 7 + 2 + 3;
+  static_assert(kProgramCount == 35, "Update the logical shader progress contract when adding a program");
   float terrainCeiling() const { return maxH; }   // highest point of the terrain (m)
   // analysis tool (--analyze, the harness's BENCHWALL): exact per-pass times (the GPU is waited on at every pass boundary)
   bool syncTiming = false; double passWall[11] = {};   // (kPasses)
@@ -218,6 +222,76 @@ public:
   enum { kAfObjects = 0, kAfProxy = 1, kAfEffects = 2 };
   GLuint linkAfPass(int pass, const std::string& defines, const std::string& who);
   bool init(int w, int h, const std::function<void(float, const std::string&)>& progress = {});                       // everything else (runs compilePrograms itself if not done yet)
+  // CPU map preparation is safe on the region loader after world generation; GPU publication stays on the GL thread.
+  struct V4 { float x, y, z, w; };
+  using FarTerrainVertex = horizon::Vertex;
+  struct WorldUploadData {
+    std::vector<V4> data;
+    std::vector<uint32_t> roadHead;
+    std::vector<std::vector<uint8_t>> minimapLevels, roadLod;
+    std::vector<EVert> bridgeVertices;
+    std::vector<BridgeMeshRange> bridgeRanges;
+    float ceiling = 20.f;
+    std::vector<FarTerrainVertex> farVertices;
+    regionalSurface::Handle surface;
+    geo::Position origin;
+    std::string regionId;
+    uint64_t worldSeed = procedural::kDefaultWorldSeed;
+    uint32_t generatorVersion = procedural::kGeneratorVersion;
+  };
+  static std::vector<uint8_t> prepareWorldMinimap(const World& world);
+  static std::vector<uint8_t> prepareWorldMinimap() { return prepareWorldMinimap(g_world); }
+  // No GL or g_world access: called by the CPU region builder before publication.
+  static WorldUploadData prepareWorldUpload(const World& world);
+  static size_t worldDataStorageRows(size_t rows) {
+    // GL software drivers specialize power-of-two and 1-row samplers differently. Keep this table NPOT.
+    return rows < 3 ? 3 : ((rows & (rows - 1)) == 0 ? rows + 1 : rows);
+  }
+  static bool regionIdentityCompatible(const std::string& id, uint64_t seed, uint32_t version, uint64_t currentSeed) {
+    return version == procedural::kGeneratorVersion && (id == "solace" || seed == currentSeed);
+  }
+  void beginRegionUploadFrame();
+  void updateRegionHorizon(geo::Position viewer, uint64_t worldSeed);
+  size_t horizonUploadBytesThisFrame = 0, horizonUploadBytesTotal = 0, horizonCacheBytes = 0;
+  size_t horizonCpuBuildCount = 0;
+  size_t horizonCpuGridBytes = 0, horizonPendingGridBytes = 0;
+  int horizonPinnedMeshes = 0;
+  double horizonUploadMsThisFrame = 0;
+  int horizonWantedMeshes = 0, horizonReadyMeshes = 0, horizonResidentMeshes = 0, horizonPeakResidentMeshes = 0;
+  int horizonPendingMeshes = 0;
+  unsigned horizonJobsStarted = 0;
+  bool horizonSelectionComplete = true, horizonCpuPending = false;
+  std::string horizonError;
+  // All following calls belong to the GL thread. Candidate is immutable and must live at a stable address until
+  // ready/cancelled. After ready, move the candidate into g_world then commit in the SAME main-frame boundary.
+  bool beginWorldUpload(const World& candidate, WorldUploadData&& data);
+  bool pumpWorldUpload(size_t byteBudget = 2 * 1024 * 1024, double timeBudgetMs = 1.5);
+  bool worldUploadReady() const;
+  regionalSurface::Handle worldUploadSurface() const { return worldStage.farProxy.surface; }
+  // Accepted, resident GPU representation, independent of this frame's camera/FOV culling.
+  regionalSurface::Handle drawableRegionSurface(const std::string& regionId) const;
+  const std::string& worldUploadError() const { return worldStageError; }
+  bool commitWorldUpload(WorldUploadData* retired = nullptr);
+  void cancelWorldUpload(WorldUploadData* retired = nullptr); // call while the GL context is alive, including shutdown
+  size_t worldUploadBytesThisFrame = 0, worldUploadBytesTotal = 0;
+  double worldUploadMsThisFrame = 0, worldUploadMaxMs = 0;
+  unsigned worldUploadFrames = 0;
+  static float regionTerrainLodBlend(float distance) { return smoothstepf(90000.f, 110000.f, distance); }
+  int distantRegionDraws = 0; // coarse detailed proxies and cached neighborhood meshes drawn this view
+  double worldUploadBeginMs = 0, worldUploadCancelMs = 0, worldUploadCommitMs = 0;
+  // Optional diagnostic synchronization is only for render evidence; ordinary flight never waits on these timers.
+  bool profileRegionRender = false;
+  double regionTerrainRenderMs = 0, regionShadowRenderMs = 0, regionLightingRenderMs = 0;
+  // Aircraft shadow, traffic shadow, enemy/store shadows, displays, feeds, objects, shadow proxy, postprocessing.
+  std::array<double, 8> regionAuxRenderMs{};
+  int regionWorldDataRows = 0, regionStagedDataRows = 0;
+  int terrainShadowRowsThisFrame = 0;
+  static int terrainShadowRowBudget(bool streaming, bool first, bool black, int remaining) {
+    return std::min(remaining, streaming ? 8 : (first || black ? 2048 : 64));
+  }
+  bool streamingShadowPending() const { return tshStreaming; }
+  void reloadWorld(const std::vector<uint8_t>& minimap);
+  void setWorldTopology();
   GLuint makeTexture(const uint8_t* rgba, int w, int h);
   void renderMap(float cx, float cz, float half, int N);   // GPS aerial image into mapTex()
   GLuint mapTex() const { return texMap; }
@@ -279,7 +353,7 @@ private:
   int cw = 0, ch = 0;
   // baked terrain sun shadow (world space): front = the one the shaders read, back = the one being baked
   GLuint progTShBake = 0, texTSh[2] = {0, 0}, fboTSh = 0;
-  int tshFront = -1, tshBack = 0, tshRow = 0; bool tshBaking = false; vec3 tshSun, tshBakeSun;
+  int tshFront = -1, tshBack = 0, tshRow = 0; bool tshBaking = false, tshStreaming = false; vec3 tshSun, tshBakeSun;
   static constexpr int kTShN = 2048, kTShRows = 64;   // texels per side, rows baked per frame
   void bakeTerrainShadow(const FrameParams& fp);            // the terrain sun-shadow bake, a band of rows a frame
   bool depthValid = false;   // the depth target holds a frame
@@ -294,7 +368,6 @@ private:
   GLuint texEnvLowAlb = 0, texEnvLowNrm = 0;
   bool envMaterialUnits = false;
   void bindEnvironmentMaterials(GLuint p, int baseColourUnit = 1, int baseNormalUnit = 2);
-  struct V4 { float x, y, z, w; };
   GLuint fboScene = 0, texColor = 0, texDepth = 0, fboSprite = 0;
   // temporal AA: the lighting pass writes texRaw; the resolve blends it with the reprojected history into texHist[cur] + texColor
   GLuint texRaw = 0, texHist[2] = {0, 0}, fboTAA[2] = {0, 0};
@@ -489,6 +562,64 @@ private:
   int feedRigNow = 0;
   bool feedPass = false;               // drawing a camera feed (the scenery pass leaves streaming and shadows alone)
   bool feedsWanted(const FrameParams& fp) const;
+  static std::vector<V4> prepareWorldData(const World& world);
+  static std::vector<std::vector<uint8_t>> prepareRoadLod(const World& world);
+  struct WorldUploadSlice {
+    unsigned texture = 0; int level = 0, width = 0, height = 0, row = 0;
+    GLenum internalFormat = 0, format = 0, type = 0;
+    size_t rowBytes = 0; const void* source = nullptr; bool allocated = false;
+  };
+  struct FarRegionGpu {
+    GLuint vao = 0, vbo = 0;
+    size_t uploaded = 0; int count = 0;
+    geo::Position origin; std::string regionId;
+    uint64_t worldSeed = procedural::kDefaultWorldSeed;
+    uint32_t generatorVersion = procedural::kGeneratorVersion;
+    regionalSurface::Handle surface;
+    bool ready = false, accepted = false;
+  } activeFarRegion, previousFarRegion;
+  GLuint progFarRegion = 0;
+  // Three slots are reserved for detailed active/candidate/previous representations; all other charts are tiny
+  // analytic silhouettes. Together these own no more than 64 coarse GPU meshes, never extra full Worlds.
+  static constexpr size_t kHorizonCacheLimit = horizon::kMaxRegions - 3;
+  struct HorizonBatch {
+    horizon::Selection selection; std::vector<horizon::Mesh> meshes;
+    uint64_t generation = 0; geo::Position viewer;
+  };
+  std::unordered_map<std::string, FarRegionGpu> horizonCache;
+  std::future<HorizonBatch> horizonJob;
+  std::deque<horizon::Mesh> horizonPending;
+  horizon::Selection horizonSelection;
+  geo::Position horizonViewer, horizonSelectedViewer;
+  uint64_t horizonSeed = 0, horizonGeneration = 0;
+  bool horizonContext = false, horizonHasSelection = false;
+  std::chrono::steady_clock::time_point horizonRetryAt{};
+  bool horizonPinned(const std::string& id, bool requireReady) const;
+  bool reserveHorizonSlot(const std::string& id, bool preservePinned = false);
+  void refreshHorizonStats();
+  void publishFarSurfaces();
+  void retainHorizonMesh(FarRegionGpu& mesh);
+  static void prepareFarTerrain(const World& world, WorldUploadData& data);
+  static void destroyFarRegion(FarRegionGpu& region);
+  static void allocateFarRegion(FarRegionGpu& region);
+  void reloadFarTerrain(const World& world);
+  float activeTerrainFarBlend(const FrameParams& fp) const;
+  bool activeTerrainIsDistant(const FrameParams& fp) const { return activeTerrainFarBlend(fp) >= 1.f; }
+  void drawFarRegions(const FrameParams& fp, bool warm = false);
+  void warmFarTerrain();
+  struct WorldUploadStage {
+    WorldUploadData data;
+    FarRegionGpu farProxy;
+    GLuint textures[6] = {}; // height, mask, road index, maximum-height chain, world data, navigation map
+    GLuint bridgeVao = 0, bridgeVbo = 0, bridgeInst = 0;
+    std::vector<WorldUploadSlice> slices;
+    size_t nextSlice = 0, bridgeBytes = 0;
+    bool active = false, ready = false, repeating = false, bridgeAllocated = false;
+  } worldStage;
+  std::string worldStageError;
+  void uploadWorldData();
+  void uploadMinimap(const std::vector<uint8_t>& img);
+  void resetWorldEntities(bool rebuildBridges = true);
   void measureFeedMounts(const FrameParams& fp);
   void renderFeeds(const FrameParams& fp, const std::function<void(GLuint, const FrameParams&)>& setRT, const std::function<void(const FrameParams&, GLuint)>& trace,
                    const std::function<void(const FrameParams&)>& effects);
@@ -503,9 +634,9 @@ public:
   // Optional/unused sun shadows must not block a loading screen forever.
   bool tshRequiredPending(float sunHeight) const { return progTShBake != 0 && sunHeight >= 0.02f && tshPending(); }
   void followSeam(vec3 d) { prevCamPos += d; prevPlanePos += d; }   // the camera came back in over the map's seam: the last frame is where it was, relative
-  void resetTemporal() {   // forget every frame-to-frame accumulation (TAA history, jitter/seed sequence, terrain-shadow bake):
+  void resetTemporal(bool streamedWorld = false) {   // forget every frame-to-frame accumulation (TAA history, jitter/seed sequence, terrain-shadow bake):
     frameNo = 0; histIdx = 0; histValid = false; cloudAccValid = false;   // the next frame renders as if it were the first (exact test comparisons)
-    tshFront = -1; tshBack = 0; tshRow = 0; tshBaking = false;
+    tshFront = -1; tshBack = 0; tshRow = 0; tshBaking = false; tshStreaming = streamedWorld;
     for (bool& v : shValid) v = false;   // shadow cascades re-render
   }
 private:

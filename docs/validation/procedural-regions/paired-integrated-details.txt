@@ -1,0 +1,968 @@
+Start testing: Oct 12 15:34 EDT
+----------------------------------------------------------
+123/137 Testing: test_world
+123/137 Test: test_world
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/test_world" "/workspace/scratch/87b29863f015/solace-procedural-regions-build/test_world.bin"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"test_world" start time: Oct 12 15:34 EDT
+Output:
+----------------------------------------------------------
+the run's islands, generated and written to /workspace/scratch/87b29863f015/solace-procedural-regions-build/test_world.bin: ok
+<end of output>
+Test time =  18.99 sec
+----------------------------------------------------------
+Test Passed.
+"test_world" end time: Oct 12 15:35 EDT
+"test_world" time elapsed: 00:00:18
+----------------------------------------------------------
+
+130/137 Testing: procedural_region_runtime
+130/137 Test: procedural_region_runtime
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/procedural_region_runtime_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"procedural_region_runtime" start time: Oct 12 15:35 EDT
+Output:
+----------------------------------------------------------
+Region runtime: baseline career saved: ok
+Region runtime: research jet honors the accepted initial fuel plan rather than forcing full tanks: ok
+Region runtime: explicit selected fuel takes precedence over a research jet plan: ok
+Region runtime: all research aircraft start on runway or airborne with finite full tanks and no career mutation: ok
+Region runtime: staged destination cannot fly the old resident terrain: ok
+Region runtime: loading gates simulation and waits for the prior quote without touching career: ok
+Region runtime: repeated load requests cannot replace an in-flight build: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: Earth destination publishes the generated World and resets its airport selection: ok
+Region runtime: every generated airport supports real runway/airborne flight, restart and return with career intact: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: second Earth destination replaces the first without career mutation: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: A to B to A preserves deterministic geography and airport identity: ok
+Region runtime: restart with a pending Earth route uses the resident departure instead of rejecting or loading the target: ok
+Region runtime: setting a geographic route never moves the aircraft or turns the chart into a torus: ok
+Region runtime: crossing before candidate readiness keeps the active chart and never opens a loading screen or joins the worker: ok
+Region runtime: aircraft physics and flight clock continue while the next region is still building: ok
+Region runtime: Atlas A180 4x Game baseline stays responsive after separately recorded cold performance learning: ok
+Region runtime: Atlas A180 actual 4x cruise advances eight simulation seconds without joining the gated candidate (responsiveness only): ok
+Region runtime: Atlas A180 4x simulated ground speed 236.3 m/s, effective geographic speed 945.2 m/s, cold baseline 889.611 ms, warm baseline max 0.406 ms, gated update max 0.633 ms
+Region runtime: XR-10 Nightjar 4x Game baseline stays responsive after separately recorded cold performance learning: ok
+Region runtime: XR-10 Nightjar actual 4x cruise advances eight simulation seconds without joining the gated candidate (responsiveness only): ok
+Region runtime: XR-10 Nightjar 4x simulated ground speed 263.3 m/s, effective geographic speed 1053.1 m/s, cold baseline 832.567 ms, warm baseline max 0.423 ms, gated update max 0.511 ms
+Region runtime: synthetic 1000 m/s progression and abrupt reversals retain one gated candidate without loading screens, joins or piled-up futures: ok
+Region runtime: synthetic fast scheduler maximum 0.006 ms over 40 direction-changing steps
+Region runtime: distant proxy can become drawable while the aircraft is safely over ocean: ok
+Region runtime: published foreign proxy terrain is solid while its full collision World is still gated: ok
+Region runtime: real aircraft contact hits the visible foreign proxy and pins its surface instead of descending through late detail: ok
+Region runtime: reversing course does not destroy or join an unresolved prefetch future: ok
+Region runtime: heading reprioritization requests cooperative cancellation without waiting for the worker: ok
+Region runtime: completed obsolete candidate is retired off-thread without changing the resident chart: ok
+Region runtime: real terrain generation cancels cooperatively and retires off-thread without altering active collision terrain or career: ok
+Region runtime: real cancellation request 0.051 ms, worker retirement 20.812 ms
+Region runtime: cancelled speculation silently restarts the current owner instead of failing the route: ok
+Region runtime: ready detail and local airports stay pending while the aircraft is near the published collision proxy: ok
+Region runtime: landed proxy contact cannot be replaced by full terrain underneath the aircraft: ok
+Region runtime: low-altitude all-water crossing may promote safely without an arbitrary250m ocean altitude restriction: ok
+Region runtime: ready candidate publishes over ocean even at 150 km visibility, without any midflight loading screen: ok
+Region runtime: boundary continuation preserves Earth position, altitude, speed, fuel, engine/failure state, clock and turbulence frame: ok
+Region runtime: chase/cockpit preserve body-relative look; orbit alone rotates by chart convergence: ok
+Region runtime: new airport indices are valid and distant open ocean does not repeat islands: ok
+Region runtime: stationary post-transition evaluation does not ping-pong at a seam: ok
+Region runtime: normal air traffic spawns and simulates against the new region airports after publication without touching career: ok
+Region runtime: main menu waits for authored Solace restoration: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: Solace terrain and every legacy airport index restored before main menu: ok
+Region runtime: Escape queues a safe return while loading remains gated: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: cancel joins loading, restores Solace and preserves the pending career transaction: ok
+Region runtime: initial Free Flight preparation drains a pending career quote before aircraft launch: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: initial reader barrier resumes the requested launch and preserves its selected airport: ok
+Region runtime: ordinary Solace Free Flight enables Earth travel without selecting a route: ok
+Region runtime: same-Solace Earth route waits for background quote readers while keeping the flight screen active: ok
+Region runtime: focus loss while a region prepares pauses the active flight normally: ok
+Region runtime: authored Solace can join Earth travel without moving the plane or resuming after focus loss: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: leaving an unwrapped authored Solace flight restores legacy topology before main menu: ok
+Region runtime: ordinary Solace relaunch activates nonrepeating Earth travel without a route picker: ok
+Region runtime: ordinary Solace Earth flight returns safely to setup: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: quitting relaunched Solace Free Flight restores authored career topology without saving: ok
+0 procedural region runtime failures
+<end of output>
+Test time =  44.49 sec
+----------------------------------------------------------
+Test Passed.
+"procedural_region_runtime" end time: Oct 12 15:35 EDT
+"procedural_region_runtime" time elapsed: 00:00:44
+----------------------------------------------------------
+
+58/137 Testing: flight_model_2
+58/137 Test: flight_model_2
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/flight_test" "--part" "2"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"flight_model_2" start time: Oct 12 15:35 EDT
+Output:
+----------------------------------------------------------
+Map seam: crossed at 6.6 s, the same flight reckoned a period away (0.000 m, 0.0000 m/s apart) ok
+Map seam: autopilot to LHK (23 km the short way) crossed it east 1, turned at most 6 deg off, 13 km to go ok
+AP hold Kestrel T2       hdg err  0.1  alt err   0.1 m  max bank 62.4  g +0.2..+2.4 (limits -3..+6)  roll-rate rms 0.82 deg/s  ok
+AP hold Wren 180         hdg err  0.4  alt err   0.2 m  max bank 62.3  g +0.1..+2.5 (limits -3..+6)  roll-rate rms 0.99 deg/s  ok
+AP hold Bushmaster STOL  hdg err  0.0  alt err   0.2 m  max bank 72.1  g +0.4..+3.5 (limits -3..+6)  roll-rate rms 0.87 deg/s  ok
+AP hold Islander Twin    hdg err  0.1  alt err   0.1 m  max bank 63.5  g +0.3..+2.6 (limits -3..+6)  roll-rate rms 1.05 deg/s  ok
+AP hold Pelican Caravan  hdg err  0.1  alt err   0.3 m  max bank 65.0  g +0.2..+2.9 (limits -3..+6)  roll-rate rms 1.33 deg/s  ok
+AP hold Meridian Q400    hdg err  0.0  alt err   0.1 m  max bank 64.7  g -0.2..+3.0 (limits -3..+6)  roll-rate rms 1.31 deg/s  ok
+AP hold Starling 500 Jet hdg err  0.1  alt err   0.1 m  max bank 73.5  g -0.1..+5.0 (limits -3..+6)  roll-rate rms 2.55 deg/s  ok
+AP hold Swift S6         hdg err  0.5  alt err   0.1 m  max bank 77.0  g +0.4..+3.8 (limits -3..+6)  roll-rate rms 1.35 deg/s  ok
+AP hold Osprey C6        hdg err  0.4  alt err   0.2 m  max bank 73.1  g +0.4..+3.4 (limits -3..+6)  roll-rate rms 1.35 deg/s  ok
+AP hold Larkspur L4      hdg err  0.1  alt err   0.1 m  max bank 62.6  g +0.2..+2.7 (limits -2..+4)  roll-rate rms 0.95 deg/s  ok
+AP hold Atlas A180       hdg err  0.0  alt err   0.1 m  max bank 47.5  g +0.6..+1.8 (limits -1..+2)  roll-rate rms 1.79 deg/s  ok
+AP comfort hold Kestrel T2       hdg err  0.0  max bank 25.7  g 0.85..1.27  ok
+AP comfort route Kestrel T2       landed after  631 s  en-route max bank 25.1  g 0.84..1.25  ok
+AP comfort hold Wren 180         hdg err  0.0  max bank 25.6  g 0.84..1.26  ok
+AP comfort route Wren 180         landed after  594 s  en-route max bank 25.1  g 0.85..1.24  ok
+AP comfort hold Bushmaster STOL  hdg err  0.0  max bank 25.6  g 0.86..1.24  ok
+AP comfort route Bushmaster STOL  landed after  660 s  en-route max bank 25.2  g 0.83..1.27  ok
+AP comfort hold Islander Twin    hdg err  0.0  max bank 25.4  g 0.85..1.24  ok
+AP comfort route Islander Twin    landed after  580 s  en-route max bank 25.1  g 0.85..1.24  ok
+AP comfort hold Pelican Caravan  hdg err  0.0  max bank 25.2  g 0.85..1.25  ok
+AP comfort route Pelican Caravan  landed after  574 s  en-route max bank 25.1  g 0.85..1.25  ok
+AP comfort hold Meridian Q400    hdg err  0.0  max bank 25.1  g 0.85..1.26  ok
+AP comfort route Meridian Q400    landed after  426 s  en-route max bank 25.1  g 0.84..1.24  ok
+AP comfort hold Starling 500 Jet hdg err  0.0  max bank 25.0  g 0.86..1.27  ok
+AP comfort route Starling 500 Jet landed after  354 s  en-route max bank 25.0  g 0.84..1.24  ok
+AP comfort hold Swift S6         hdg err  0.0  max bank 25.4  g 0.86..1.24  ok
+AP comfort route Swift S6         landed after  583 s  en-route max bank 25.1  g 0.84..1.25  ok
+AP comfort hold Osprey C6        hdg err  0.0  max bank 25.3  g 0.86..1.25  ok
+AP comfort route Osprey C6        landed after  586 s  en-route max bank 25.1  g 0.85..1.24  ok
+AP comfort hold Larkspur L4      hdg err  0.0  max bank 25.4  g 0.85..1.24  ok
+AP comfort route Larkspur L4      landed after  593 s  en-route max bank 25.1  g 0.85..1.22  ok
+AP comfort hold Atlas A180       hdg err  0.0  max bank 25.0  g 0.88..1.26  ok
+AP comfort route Atlas A180       landed after  905 s  en-route max bank 25.2  g 0.85..1.24  ok
+0 failures
+<end of output>
+Test time =  45.92 sec
+----------------------------------------------------------
+Test Passed.
+"flight_model_2" end time: Oct 12 15:36 EDT
+"flight_model_2" time elapsed: 00:00:45
+----------------------------------------------------------
+
+53/137 Testing: gameplay_loop_2
+53/137 Test: gameplay_loop_2
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/gameplay_test" "--part" "2"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build/gameplay_2
+"gameplay_loop_2" start time: Oct 12 15:36 EDT
+Output:
+----------------------------------------------------------
+Lesson 1: screen=3 success=1 wp=3/3 t=126s story=1 money=753 Contract complete!
+   voice: Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.
+   voice: Runway 05, Wind 050@4kt, scattered 4500ft, vis 10+km, 09:30
+   voice: TWR SX-VBJ, wind 050 at 4 knots. Runway 05, cleared for takeoff.
+   voice: Nice! Hold a gentle climb about 7 degrees nose-up. Fly through the green rings.
+   voice: Positive climb!
+   voice: Checkpoint 1 of 3
+   voice: TWR Remain in the pattern.
+   voice: Checkpoint 2 of 3
+   voice: Reduce power slightly (CTRL) once level and trim with [ and ]. Rings show the path.
+   voice: All checkpoints passed!
+Lesson 1 tower calls: ok
+Landing: screen=3 success=1 touchdown=313 fpm  stars=3  money +520  location=MDB  Contract complete!
+   Rental: Wren 180               -250
+   Contract payment               700
+   Touchdown in the zone          35
+   Stable approach                21
+   Fuel reserve kept              14
+Arrival: 67 kt / 14 m over the threshold, down 273 m in, 639 m to spare of 1100, go-arounds 0
+   coaching: Well flown: 67 kt over the threshold, down 273 m in, 639 m to spare.
+Arrival recorded for coaching: ok
+   voice: TWR SX-LTI, wind 250 at 4 knots. Runway 05, cleared to land.
+   voice: Runway 21, Wind 250@4kt, scattered 4000ft, vis 10+km, 09:00
+   voice: ORC - Orchard Valley
+   voice: Good landing  313 fpm
+   voice: TWR Exit the runway when able.
+Arrival tower calls: ok
+   voice: TWR SX-LTI, wind 250 at 4 knots. Runway 05, cleared to land.
+   voice: Runway 21, Wind 250@4kt, scattered 4000ft, vis 10+km, 09:00
+   voice: ORC - Orchard Valley
+   voice: Good landing  313 fpm
+   voice: TWR Exit the runway when able.
+   voice: Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.
+   voice: Starting engine...
+   voice: Engine running. Release the parking brake with B.
+   voice: TWR SX-VBJ, Good morning. Advise when ready to taxi.
+   voice: TWR S-BJ, Hold position.
+   voice: TWR S-BJ, wind 050 at 4 knots. Runway 05, cleared for takeoff.
+Departure hold for traffic: ok
+Hold from where it was heard: creeping through the call 1 fined 0, moving once heard fined 1: ok
+   voice: TWR SX-LTI, Continue approach. The runway is occupied.
+   voice: Runway 21, Wind 250@4kt, scattered 4000ft, vis 10+km, 09:00
+   voice: ORC - Orchard Valley
+   voice: TWR S-TI, Go around. Aircraft on the runway.
+   voice: Good landing  356 fpm
+Arrival with the runway occupied: ok
+Runway occupancy after clearance: late incursion takes the landing clearance back 1, a stuck runway is cleared before the departure 1: ok
+Tower for a GPS alternate: arrival tower CAP (contract MDB), phase 5: ok
+Audio: radio at master x radio 1, unducked after a pause 1, hazard call kept while it holds 1 and dropped once passed 1, bad clips refused 1: ok
+Craters and wrecks: crater dug into the ground 1, aircraft rests on its floor 1 (rose 0.5 m), the first bomb's damage kept after eight 1, a seam wreck in both chunks 1: ok
+Map seam: crossed 1, still flying 1, camera within 21 m of the aircraft, its smoke within 529 m: ok
+Autoland, runway occupied: go-around called at 87 s, climbed away to 150 m, fined 0: ok
+Autoland, runway occupied (unable to climb away): go-around called at 59 s, landed, fined 0: ok
+0 failures
+<end of output>
+Test time =  18.52 sec
+----------------------------------------------------------
+Test Passed.
+"gameplay_loop_2" end time: Oct 12 15:37 EDT
+"gameplay_loop_2" time elapsed: 00:00:18
+----------------------------------------------------------
+
+23/137 Testing: career_saves
+23/137 Test: career_saves
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/save_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"career_saves" start time: Oct 12 15:37 EDT
+Output:
+----------------------------------------------------------
+save_test: ok (0 failures)
+<end of output>
+Test time =  12.47 sec
+----------------------------------------------------------
+Test Passed.
+"career_saves" end time: Oct 12 15:37 EDT
+"career_saves" time elapsed: 00:00:12
+----------------------------------------------------------
+
+137/137 Testing: jet_fuel
+137/137 Test: jet_fuel
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/jet_fuel_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"jet_fuel" start time: Oct 12 15:37 EDT
+Output:
+----------------------------------------------------------
+MODEL starling tank 2200 mtow 8000 full_payload 1380 full_payload_fuel 2020 idle 75.3 max_static 1674.0 nominal 365.2 kg/h range 4337 km reserve30 183 kg
+MODEL xr10_nightjar tank 2200 mtow 8800 full_payload 185 full_payload_fuel 2200 idle 213.8 max_static 23328.0 nominal 885.7 kg/h range 2146 km reserve30 443 kg
+MODEL xr30_specter tank 6000 mtow 15800 full_payload 85 full_payload_fuel 6000 idle 983.7 max_static 110246.4 nominal 2784.3 kg/h range 1939 km reserve30 1392 kg
+MODEL xr20_mantis tank 3200 mtow 10300 full_payload 85 full_payload_fuel 3200 idle 327.9 max_static 36748.8 nominal 993.4 kg/h range 2783 km reserve30 497 kg
+MODEL xr40_wraith tank 6000 mtow 18000 full_payload 85 full_payload_fuel 6000 idle 1166.4 max_static 134991.4 nominal 1552.5 kg/h range 3478 km reserve30 776 kg
+MODEL atlas_a180 tank 20000 mtow 79000 full_payload 21885 full_payload_fuel 15115 idle 527.3 max_static 11718.0 nominal 2852.4 kg/h range 5806 km reserve30 1426 kg
+METER starling throttle 0.00 predicted 1.10498 actual 1.10498 kg
+METER starling throttle 0.65 predicted 16.38045 actual 16.38037 kg
+METER starling throttle 1.00 predicted 23.70714 actual 23.70703 kg
+METER xr10_nightjar throttle 0.00 predicted 3.13672 actual 3.13672 kg
+METER xr10_nightjar throttle 0.65 predicted 50.69009 actual 50.69116 kg
+METER xr10_nightjar throttle 1.00 predicted 439.20142 actual 439.24976 kg
+METER xr30_specter throttle 0.00 predicted 14.42890 actual 14.42871 kg
+METER xr30_specter throttle 0.65 predicted 215.66344 actual 215.67285 kg
+METER xr30_specter throttle 1.00 predicted 1919.75708 actual 1920.10352 kg
+METER xr20_mantis throttle 0.00 predicted 4.80963 actual 4.80957 kg
+METER xr20_mantis throttle 0.65 predicted 77.72481 actual 77.72705 kg
+METER xr20_mantis throttle 1.00 predicted 691.87775 actual 691.97534 kg
+METER xr40_wraith throttle 0.00 predicted 17.10936 actual 17.10938 kg
+METER xr40_wraith throttle 0.65 predicted 314.58090 actual 314.61230 kg
+METER xr40_wraith throttle 1.00 predicted 2789.57300 actual 2790.77881 kg
+METER atlas_a180 throttle 0.00 predicted 7.73486 actual 7.73438 kg
+METER atlas_a180 throttle 0.65 predicted 114.66314 actual 114.66211 kg
+METER atlas_a180 throttle 1.00 predicted 165.95000 actual 165.94922 kg
+HOVER xr40_wraith used 505.9 kg in 120 s model 505.9 flow 14971 kg/h vs 0.014 altitude 800.8
+QUOTE starling quick 112.2 kg actual 104.3 kg time 11.24 min ratio 1.076
+QUOTE atlas_a180 quick 760.9 kg actual 818.4 kg time 13.07 min ratio 0.930
+CRUISE starling seconds 120.0 crash 0 alt 11000 target 11000 speed 200.00 target 200.00 spool 0.5468 burn 12.17 model 12.18 kg steady 365.1 kg/h mean_burn_equivalent_range 4339 km nominal 4337 km
+CRUISE xr10_nightjar seconds 120.0 crash 0 alt 10000 target 10000 speed 240.00 target 240.00 spool 0.2880 burn 29.53 model 29.53 kg steady 885.8 kg/h mean_burn_equivalent_range 2146 km nominal 2146 km
+CRUISE xr20_mantis seconds 120.0 crash 0 alt 10000 target 10000 speed 240.00 target 240.00 spool 0.2067 burn 32.96 model 32.96 kg steady 987.5 kg/h mean_burn_equivalent_range 2800 km nominal 2783 km
+CRUISE xr30_specter seconds 120.0 crash 0 alt 10019 target 10000 speed 250.09 target 250.00 spool 0.2155 burn 80.36 model 80.37 kg steady 2799.8 kg/h mean_burn_equivalent_range 1929 km nominal 1939 km
+CRUISE xr40_wraith seconds 120.0 crash 0 alt 9999 target 10000 speed 250.01 target 250.00 spool 0.0697 burn 55.95 model 55.95 kg steady 1580.9 kg/h mean_burn_equivalent_range 3416 km nominal 3478 km
+CRUISE atlas_a180 seconds 120.0 crash 0 alt 11000 target 11000 speed 230.04 target 230.00 spool 0.6230 burn 94.47 model 94.49 kg steady 2843.5 kg/h mean_burn_equivalent_range 5825 km nominal 5806 km
+Jet fuel: 0 failures
+<end of output>
+Test time =  15.28 sec
+----------------------------------------------------------
+Test Passed.
+"jet_fuel" end time: Oct 12 15:37 EDT
+"jet_fuel" time elapsed: 00:00:15
+----------------------------------------------------------
+
+119/137 Testing: roads
+119/137 Test: roads
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/roads_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"roads" start time: Oct 12 15:37 EDT
+Output:
+----------------------------------------------------------
+highway change of grade p99 1.00 of its K's, radius p5 0.89 of its own (4216 points)
+road    change of grade p99 1.00 of its K's, radius p5 1.44 of its own (9019 points)
+lane    change of grade p99 1.00 of its K's, radius p5 1.59 of its own (3631 points)
+track   change of grade p99 3.76 of its K's, radius p5 80.49 of its own (16130 points)
+street  change of grade p99 5.96 of its K's, radius p5 7.01 of its own (34888 points)
+yard    change of grade p99 1.00 of its K's, radius p5 0.00 of its own (1113 points)
+circuit change of grade p99 0.46 of its K's, radius p5 1.25 of its own (479 points)
+pitlane change of grade p99 0.26 of its K's, radius p5 14.39 of its own (99 points)
+the texels' lists: 492032 entries of 524287; 0 segments unlisted
+highway across its platform: tilt p99 0.0014 max 0.0197; banks p99 0.67 max 0.95 beyond the ground's own slope
+road    across its platform: tilt p99 0.0024 max 0.0296; banks p99 0.67 max 1.11 beyond the ground's own slope
+lane    across its platform: tilt p99 0.0173 max 0.0712; banks p99 0.69 max 1.42 beyond the ground's own slope
+track   across its platform: tilt p99 0.0015 max 0.0448; banks p99 0.18 max 0.73 beyond the ground's own slope
+street  across its platform: tilt p99 0.0026 max 0.0252; banks p99 0.37 max 0.70 beyond the ground's own slope
+yard    across its platform: tilt p99 0.0000 max 0.0000; banks p99 0.41 max 0.52 beyond the ground's own slope
+circuit across its platform: tilt p99 0.0010 max 0.0013; banks p99 0.35 max 0.38 beyond the ground's own slope
+11 pairs of points too close for the height between them
+road furniture: 23534 street lamps (12 off their pools), 8379 guardrails, 77 signs, 2358 poles (0 wires to no pole); 0 on a road
+roads: 2935 paths, 12 bridges with 24 joints; 149735 checks, 0 failures
+<end of output>
+Test time =  32.16 sec
+----------------------------------------------------------
+Test Passed.
+"roads" end time: Oct 12 15:38 EDT
+"roads" time elapsed: 00:00:32
+----------------------------------------------------------
+
+126/137 Testing: regional_surface
+126/137 Test: regional_surface
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/regional_surface_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"regional_surface" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+SURFACE pr1-1-3-22 separation_km=260 projected_triangle_max_error_m=0.000092
+SURFACE pr1-1-3-22 separation_km=1200 projected_triangle_max_error_m=0.000336
+SURFACE pr1-0-31-16 separation_km=260 projected_triangle_max_error_m=0.000076
+SURFACE pr1-0-31-16 separation_km=1200 projected_triangle_max_error_m=0.000320
+SURFACE pr1-1-15-16 separation_km=260 projected_triangle_max_error_m=0.000076
+SURFACE pr1-1-15-16 separation_km=1200 projected_triangle_max_error_m=0.000351
+SURFACE pr1-4-16-16 separation_km=260 projected_triangle_max_error_m=0.000096
+SURFACE pr1-4-16-16 separation_km=1200 projected_triangle_max_error_m=0.000305
+SURFACE pr1-5-15-16 separation_km=260 projected_triangle_max_error_m=0.000073
+SURFACE pr1-5-15-16 separation_km=1200 projected_triangle_max_error_m=0.000153
+SURFACE_CONTACT_BENCH queries=10000 wall_ms=19.324
+SURFACE_FULL_CACHE_BENCH surfaces=64 queries=10000 wall_ms=21.946 sweep1100m_ms=1.160
+PASS regional surfaces: 36044 checks
+<end of output>
+Test time =   0.17 sec
+----------------------------------------------------------
+Test Passed.
+"regional_surface" end time: Oct 12 15:38 EDT
+"regional_surface" time elapsed: 00:00:00
+----------------------------------------------------------
+
+127/137 Testing: regional_surface_fastmath
+127/137 Test: regional_surface_fastmath
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/regional_surface_fastmath_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"regional_surface_fastmath" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+SURFACE pr1-1-3-22 separation_km=260 projected_triangle_max_error_m=0.000061
+SURFACE pr1-1-3-22 separation_km=1200 projected_triangle_max_error_m=0.000305
+SURFACE pr1-0-31-16 separation_km=260 projected_triangle_max_error_m=0.000072
+SURFACE pr1-0-31-16 separation_km=1200 projected_triangle_max_error_m=0.000313
+SURFACE pr1-1-15-16 separation_km=260 projected_triangle_max_error_m=0.000061
+SURFACE pr1-1-15-16 separation_km=1200 projected_triangle_max_error_m=0.000275
+SURFACE pr1-4-16-16 separation_km=260 projected_triangle_max_error_m=0.000092
+SURFACE pr1-4-16-16 separation_km=1200 projected_triangle_max_error_m=0.000244
+SURFACE pr1-5-15-16 separation_km=260 projected_triangle_max_error_m=0.000076
+SURFACE pr1-5-15-16 separation_km=1200 projected_triangle_max_error_m=0.000137
+SURFACE_CONTACT_BENCH queries=10000 wall_ms=19.695
+SURFACE_FULL_CACHE_BENCH surfaces=64 queries=10000 wall_ms=21.512 sweep1100m_ms=1.141
+PASS regional surfaces: 36044 checks
+<end of output>
+Test time =   0.18 sec
+----------------------------------------------------------
+Test Passed.
+"regional_surface_fastmath" end time: Oct 12 15:38 EDT
+"regional_surface_fastmath" time elapsed: 00:00:00
+----------------------------------------------------------
+
+128/137 Testing: region_generation_cancellation
+128/137 Test: region_generation_cancellation
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/region_generation_cancellation_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"region_generation_cancellation" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+CANCEL archetype=Archipelago target=terrain actual=terrain latency_ms=1.732 active_reads=125
+region generation cancellation: 19 checks, 0 failures; worst_observed_cancel_ms=1.732
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"region_generation_cancellation" end time: Oct 12 15:38 EDT
+"region_generation_cancellation" time elapsed: 00:00:00
+----------------------------------------------------------
+
+1/137 Testing: earth_geodesy
+1/137 Test: earth_geodesy
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/geo_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"earth_geodesy" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+Geo: 8404 checks, 0 failures; max local float 0.00025094609 m, double 4.99745435e-09 m, patch 1.89726572e-09 m, rigid 1.56126793e-09 m, attitude axis 3.089629e-07
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"earth_geodesy" end time: Oct 12 15:38 EDT
+"earth_geodesy" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/137 Testing: earth_geodesy_fastmath
+2/137 Test: earth_geodesy_fastmath
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/geo_fastmath_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"earth_geodesy_fastmath" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+Geo: 8404 checks, 0 failures; max local float 0.000250947656 m, double 4.93413777e-09 m, patch 1.89638635e-09 m, rigid 1.78241895e-09 m, attitude axis 2.24225746e-07
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"earth_geodesy_fastmath" end time: Oct 12 15:38 EDT
+"earth_geodesy_fastmath" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/137 Testing: earth_rebase_flight
+3/137 Test: earth_rebase_flight
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/geo_flight_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"earth_rebase_flight" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+Inertial EUS Solace      : 5 rebases, max path 0.224000 m, velocity 0.0012961 m/s, acceleration 2.83e-09 m/s^2, attitude 7.39e-08; rebase jumps 0 m / 7.62e-06 m/s / 1.89e-09 m/s^2 / 7.56e-08 ok
+Inertial EUS date line   : 5 rebases, max path 0.041329 m, velocity 0.0006485 m/s, acceleration 7.54e-09 m/s^2, attitude 9.3e-08; rebase jumps 9.09e-13 m / 1.18e-05 m/s / 2.71e-09 m/s^2 / 1.32e-07 ok
+Inertial EUS near pole   : 4 rebases, max path 0.146316 m, velocity 0.0007515 m/s, acceleration 8.53e-09 m/s^2, attitude 1.85e-07; rebase jumps 7.28e-12 m / 8.01e-06 m/s / 3.59e-09 m/s^2 / 2.88e-07 ok
+Plane canonical calm     : 1 rebase at 0.800 s, continued 29.20 s; max path 0.001953 m, velocity 0.0000443 m/s, attitude 1.14e-06, body rate 1.75e-06, wind 0 m/s, g 2.62e-06, IAS 0.00108 m/s, density 0, fuel 0 kg; transport 0.000249 m / 0.000249 vector / 2.15e-07 attitude, body unchanged yes ok
+Plane canonical turbulent: 1 rebase at 0.783 s, continued 29.22 s; max path 0.001964 m, velocity 0.0000679 m/s, attitude 1.39e-06, body rate 2.34e-06, wind 9.71e-05 m/s, g 1.69e-05, IAS 0.00107 m/s, density 5.96e-07, fuel 0 kg; transport 0.000622 m / 0.000849 vector / 2.53e-07 attitude, body unchanged yes ok
+Geographic flight invariance: 0 failures
+<end of output>
+Test time =   1.92 sec
+----------------------------------------------------------
+Test Passed.
+"earth_rebase_flight" end time: Oct 12 15:38 EDT
+"earth_rebase_flight" time elapsed: 00:00:01
+----------------------------------------------------------
+
+62/137 Testing: terrain_shadow_bake
+62/137 Test: terrain_shadow_bake
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/terrain_shadow_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"terrain_shadow_bake" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+Failed to create /home/agent/.cache/mesa_shader_cache for shader cache (Read-only file system)---disabling.
+Failed to create /home/agent/.cache/mesa_shader_cache_db for shader cache (Read-only file system)---disabling.
+terrain shadow bake: 512 cases (129 in a mountain's shadow), 0 left in the sun that shouldn't be: ok
+<end of output>
+Test time =   2.28 sec
+----------------------------------------------------------
+Test Passed.
+"terrain_shadow_bake" end time: Oct 12 15:38 EDT
+"terrain_shadow_bake" time elapsed: 00:00:02
+----------------------------------------------------------
+
+105/137 Testing: shader_loading_contract
+105/137 Test: shader_loading_contract
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/scratch/87b29863f015/solace-procedural-regions-review/tools/validation/shader_progress_contract.py" "--generated" "/workspace/scratch/87b29863f015/solace-procedural-regions-build/gen" "--cxx" "/usr/bin/c++"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"shader_loading_contract" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+success: ok=1 completed=35 attempts=35
+optional cloud accumulation unavailable: ok=1 completed=35 attempts=35
+optional hull unavailable: ok=1 completed=35 attempts=35
+fatal scenery class: ok=0 completed=3 attempts=4
+fatal light: ok=0 completed=21 attempts=22
+fatal UFO and debris: ok=0 completed=23 attempts=24
+fatal maps-only shadows: ok=0 completed=24 attempts=25
+fatal distant regional terrain: ok=0 completed=34 attempts=35
+Logical shader completion contract: PASS
+bake pair, coupled retry: ok=1 programs=3,2 attempts=3
+bake pair, normal unavailable: ok=0 programs=0,0 attempts=2
+Bake pair coupling: PASS
+shadow proxy, two reduced builds failing: program=3 attempts=3
+objects, failing: program=0 attempts=1
+Full-screen builds: PASS
+<end of output>
+Test time =   1.35 sec
+----------------------------------------------------------
+Test Passed.
+"shader_loading_contract" end time: Oct 12 15:38 EDT
+"shader_loading_contract" time elapsed: 00:00:01
+----------------------------------------------------------
+
+120/137 Testing: landmarks
+120/137 Test: landmarks
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/landmarks_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"landmarks" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+racetrack at 19250 950 heading 165: 3887 m round; 4 garages blocks, 10 of pit wall, 4 grandstands, 32 transporters, 525 cars, 73 guardrails
+Fjordhaven dam at 14851 -31655: chord 370 m, crest 80 m over its floor (455 m); lake 0.28 km2 at 531.4 m
+  Mill Creek's terminal: a causeway of 1 lengths, her berth 96 m out, 7.7 m deep
+  Coral Cove's terminal: a causeway of 3 lengths, her berth 176 m out, 6.9 m deep
+ferry Mill Creek - Coral Cove: 9.2 km, 3 legs, round trip 39 min
+  Port Verde's terminal: a causeway of 4 lengths, her berth 216 m out, 5.7 m deep
+  Lighthouse Key's terminal: a causeway of 1 lengths, her berth 96 m out, 7.6 m deep
+ferry Port Verde - Lighthouse Key: 15.5 km, 4 legs, round trip 62 min
+  Palm Bay's terminal: a causeway of 1 lengths, her berth 96 m out, 9.0 m deep
+  Turtle Bay's terminal: a causeway of 3 lengths, her berth 176 m out, 5.2 m deep
+ferry Palm Bay - Turtle Bay: 16.6 km, 4 legs, round trip 66 min
+  Solace Capital's terminal: a causeway of 2 lengths, her berth 136 m out, 5.9 m deep
+  Mango Grove's terminal: a causeway of 1 lengths, her berth 96 m out, 6.5 m deep
+ferry Solace Capital - Mango Grove: 16.8 km, 3 legs, round trip 67 min
+  Fjordhaven's terminal: a causeway of 1 lengths, her berth 96 m out, 8.8 m deep
+  Ember Bay's terminal: a causeway of 2 lengths, her berth 136 m out, 6.2 m deep
+ferry Fjordhaven - Ember Bay: 19.0 km, 3 legs, round trip 76 min
+yachts: 150 off 16 towns
+sea stacks: 0 off Port Verde, 12 off the eastern cliffs
+wind farm: 10 turbines, from -22586 -14672 (282 m) to -24614 -14128, facing 15 deg
+Offshore platform at 8000 -35000 (0.0 m), facing 212
+Dam at 14882 -31647 (451.0 m), facing 75
+Ferry pier at 17996 -25855 (0.0 m), facing -0
+Linkspan at 17996 -25830 (0.0 m), facing -0
+Yacht at 35680 -24900 (0.0 m), facing 43
+Yacht at 35700 -24900 (0.0 m), facing 32
+Yacht at 35720 -24900 (0.0 m), facing 35
+Yacht at 30780 -24700 (0.0 m), facing 47
+Yacht at 30800 -24680 (0.0 m), facing 47
+Yacht at 30760 -24720 (0.0 m), facing 41
+Yacht at 30820 -24660 (0.0 m), facing 44
+Yacht at 30740 -24740 (0.0 m), facing 44
+Yacht at 30780 -24680 (0.0 m), facing 36
+Yacht at 30760 -24700 (0.0 m), facing 49
+Yacht at 35640 -24880 (0.0 m), facing 39
+Yacht at 35600 -24860 (0.0 m), facing 37
+Yacht at 35660 -24880 (0.0 m), facing 41
+Yacht at 35620 -24860 (0.0 m), facing 35
+Yacht at 35680 -24880 (0.0 m), facing 33
+Yacht at 30840 -24640 (0.0 m), facing 36
+Observatory at 25070 -9322 (2011.5 m), facing 168
+Observatory at 25115 -9320 (2011.0 m), facing 160
+Observatory at 25030 -9319 (2005.9 m), facing 175
+Ferry pier at 17705 -6741 (0.0 m), facing -130
+Ferry pier at 17675 -6767 (0.0 m), facing -130
+Linkspan at 17656 -6783 (0.0 m), facing -130
+Yacht at 17500 -6500 (0.0 m), facing 44
+Yacht at 17480 -6480 (0.0 m), facing 43
+Yacht at 17440 -6420 (0.0 m), facing 40
+Yacht at 17420 -6400 (0.0 m), facing 44
+Yacht at 17460 -6460 (0.0 m), facing 48
+Yacht at 17440 -6440 (0.0 m), facing 42
+Yacht at 17420 -6420 (0.0 m), facing 36
+Yacht at 17400 -6400 (0.0 m), facing 34
+Shipwreck at 12900 -3900 (0.2 m), facing 135
+Yacht at -27740 -3400 (0.0 m), facing 46
+Yacht at -27740 -3420 (0.0 m), facing 43
+Yacht at -27740 -3440 (0.0 m), facing 45
+Yacht at -27740 -3460 (0.0 m), facing 47
+Yacht at -27740 -3480 (0.0 m), facing 39
+Yacht at -27740 -3380 (0.0 m), facing 32
+Yacht at -27740 -3360 (0.0 m), facing 37
+Yacht at -27740 -3340 (0.0 m), facing 33
+Ferry pier at 16124 -1043 (0.0 m), facing -100
+Linkspan at 16099 -1047 (0.0 m), facing -100
+Yacht at 15840 -580 (0.0 m), facing 45
+Yacht at 15900 -740 (0.0 m), facing 47
+Yacht at 15880 -700 (0.0 m), facing 40
+Ferry pier at -818 -370 (0.0 m), facing 55
+Ferry pier at -785 -347 (0.0 m), facing 55
+Linkspan at -765 -332 (0.0 m), facing 55
+Yacht at 15800 -480 (0.0 m), facing 36
+Yacht at 15840 -560 (0.0 m), facing 42
+Yacht at 15820 -520 (0.0 m), facing 33
+Yacht at 15820 -540 (0.0 m), facing 41
+Yacht at 15820 -560 (0.0 m), facing 45
+Stadium at -4200 -100 (92.3 m), facing 53
+Grandstand at 19485 20 (89.4 m), facing 30
+Race transporter at 19319 446 (90.2 m), facing 75
+Pit garages at 19353 399 (91.4 m), facing 75
+Race transporter at 19323 434 (90.4 m), facing 75
+Race transporter at 19326 422 (90.7 m), facing 75
+Race transporter at 19329 411 (90.9 m), facing 75
+Race transporter at 19332 399 (91.0 m), facing 75
+Race transporter at 19335 388 (91.2 m), facing 75
+Race transporter at 19338 376 (91.4 m), facing 75
+Race transporter at 19341 364 (91.8 m), facing 75
+Race transporter at 19344 353 (92.2 m), facing 75
+Pit wall at 19378 407 (91.3 m), facing 75
+Pit wall at 19390 360 (92.4 m), facing 75
+Grandstand at 19427 428 (91.0 m), facing -105
+Pit garages at 19278 677 (87.6 m), facing 75
+Race transporter at 19251 701 (85.9 m), facing 75
+Race transporter at 19254 689 (86.1 m), facing 75
+Race transporter at 19257 677 (86.3 m), facing 75
+Race transporter at 19260 666 (86.6 m), facing 75
+Race transporter at 19264 654 (86.9 m), facing 75
+Race transporter at 19267 643 (87.2 m), facing 75
+Race transporter at 19270 631 (87.6 m), facing 75
+Pit garages at 19303 584 (89.3 m), facing 75
+Race transporter at 19273 619 (87.8 m), facing 75
+Race transporter at 19276 608 (88.4 m), facing 75
+Race transporter at 19279 596 (88.8 m), facing 75
+Race transporter at 19282 585 (89.0 m), facing 75
+Race transporter at 19285 573 (89.2 m), facing 75
+Race transporter at 19288 561 (89.3 m), facing 75
+Race transporter at 19291 550 (89.4 m), facing 75
+Race transporter at 19295 538 (89.4 m), facing 75
+Pit garages at 19328 491 (90.3 m), facing 75
+Race transporter at 19298 527 (89.5 m), facing 75
+Race transporter at 19301 515 (89.5 m), facing 75
+Race transporter at 19304 503 (89.6 m), facing 75
+Race transporter at 19307 492 (89.7 m), facing 75
+Race transporter at 19310 480 (89.7 m), facing 75
+Race transporter at 19313 469 (89.8 m), facing 75
+Race transporter at 19316 457 (89.9 m), facing 75
+Pit wall at 19303 685 (87.5 m), facing 75
+Pit wall at 19316 638 (88.4 m), facing 75
+Pit wall at 19328 592 (89.6 m), facing 75
+Pit wall at 19340 546 (90.2 m), facing 75
+Pit wall at 19353 499 (90.1 m), facing 75
+Pit wall at 19365 453 (90.4 m), facing 75
+Grandstand at 19365 660 (88.1 m), facing -105
+Grandstand at 19396 544 (90.1 m), facing -105
+Race transporter at 19248 712 (85.7 m), facing 75
+Pit wall at 19278 777 (86.8 m), facing 75
+Pit wall at 19291 731 (86.9 m), facing 75
+Yacht at 26640 1200 (0.0 m), facing 47
+Yacht at 26640 1180 (0.0 m), facing 45
+Yacht at 26640 1160 (0.0 m), facing 40
+Yacht at 26640 1140 (0.0 m), facing 33
+Yacht at 26660 1200 (0.0 m), facing 36
+Yacht at 26640 1460 (0.0 m), facing 39
+Yacht at 26640 1440 (0.0 m), facing 48
+Yacht at 26640 1420 (0.0 m), facing 33
+Yacht at 26640 1400 (0.0 m), facing 39
+Yacht at 26660 1420 (0.0 m), facing 49
+Yacht at 26660 1400 (0.0 m), facing 45
+Yacht at 26660 1380 (0.0 m), facing 44
+Yacht at 26660 1360 (0.0 m), facing 32
+Yacht at 26660 1340 (0.0 m), facing 37
+Yacht at 26660 1320 (0.0 m), facing 38
+Yacht at 26660 1300 (0.0 m), facing 44
+Yacht at 26660 1280 (0.0 m), facing 38
+Yacht at 26660 1260 (0.0 m), facing 41
+Yacht at 26660 1240 (0.0 m), facing 46
+Yacht at 26660 1220 (0.0 m), facing 48
+Yacht at 26640 1480 (0.0 m), facing 44
+Yacht at 26660 1520 (0.0 m), facing 44
+Yacht at 26660 1540 (0.0 m), facing 41
+Yacht at 26680 1580 (0.0 m), facing 32
+Ferry pier at 25995 6951 (0.0 m), facing 100
+Linkspan at 26020 6947 (0.0 m), facing 100
+Yacht at -4560 7520 (0.0 m), facing 48
+Yacht at -4520 7500 (0.0 m), facing 37
+Yacht at -4500 7500 (0.0 m), facing 47
+Yacht at -4480 7500 (0.0 m), facing 41
+Yacht at -4460 7500 (0.0 m), facing 47
+Yacht at -4220 7440 (0.0 m), facing 37
+Yacht at -4200 7440 (0.0 m), facing 44
+Yacht at -4180 7740 (0.0 m), facing 37
+Yacht at 16020 8120 (0.0 m), facing 38
+Yacht at 16000 8100 (0.0 m), facing 42
+Yacht at 15980 8080 (0.0 m), facing 33
+Yacht at 16060 8160 (0.0 m), facing 39
+Yacht at 16040 8140 (0.0 m), facing 40
+Yacht at 16060 8180 (0.0 m), facing 42
+Yacht at 16040 8160 (0.0 m), facing 46
+Yacht at 16300 8380 (0.0 m), facing 39
+Yacht at 16280 8380 (0.0 m), facing 43
+Yacht at 16100 8220 (0.0 m), facing 40
+Yacht at 16080 8200 (0.0 m), facing 44
+Yacht at 16400 8380 (0.0 m), facing 48
+Yacht at 16340 8380 (0.0 m), facing 46
+Yacht at 16320 8380 (0.0 m), facing 41
+Slab at 24875 8750 (195.2 m), facing 34
+Yacht at 22380 13740 (0.0 m), facing 46
+Yacht at 22380 13800 (0.0 m), facing 45
+Yacht at 22380 13780 (0.0 m), facing 33
+Yacht at 22360 13820 (0.0 m), facing 38
+Yacht at 22380 13760 (0.0 m), facing 43
+Yacht at 22360 13800 (0.0 m), facing 39
+Yacht at 22340 13860 (0.0 m), facing 46
+Yacht at 22360 13780 (0.0 m), facing 37
+Ferry pier at -31072 14141 (0.0 m), facing -90
+Ferry pier at -31112 14141 (0.0 m), facing -90
+Linkspan at -31137 14141 (0.0 m), facing -90
+Ferry pier at -30992 14141 (0.0 m), facing -90
+Ferry pier at -31032 14141 (0.0 m), facing -90
+Container stack at -25710 14671 (5.2 m), facing 23
+Quay at -25525 14700 (5.2 m), facing 23
+Gantry crane at -25661 14737 (5.2 m), facing 23
+Gantry crane at -25578 14703 (5.2 m), facing 23
+Gantry crane at -25495 14668 (5.2 m), facing 23
+Gantry crane at -25412 14634 (5.2 m), facing 23
+Container stack at -25619 14676 (5.2 m), facing 23
+Container stack at -25544 14645 (5.2 m), facing 23
+Container stack at -25468 14614 (5.2 m), facing 23
+Container stack at -25551 14626 (5.2 m), facing 203
+Container stack at -25475 14595 (5.2 m), facing 203
+Container stack at -25635 14639 (5.2 m), facing 203
+Container stack at -25559 14608 (5.2 m), facing 23
+Container stack at -25483 14577 (5.2 m), facing 23
+Container ship at -25536 14726 (0.0 m), facing 113
+Ferry pier at 28981 15658 (0.0 m), facing -165
+Ferry pier at 28971 15619 (0.0 m), facing -165
+Ferry pier at 28960 15580 (0.0 m), facing -165
+Linkspan at 28954 15556 (0.0 m), facing -165
+Yacht at 29180 15600 (0.0 m), facing 43
+Yacht at 29200 15600 (0.0 m), facing 39
+Yacht at 29180 15580 (0.0 m), facing 38
+Yacht at 29200 15580 (0.0 m), facing 44
+Yacht at 29220 15580 (0.0 m), facing 43
+Yacht at 29240 15580 (0.0 m), facing 34
+Yacht at 29260 15580 (0.0 m), facing 35
+Yacht at 29280 15580 (0.0 m), facing 36
+Yacht at -16580 18080 (0.0 m), facing 44
+Yacht at -16600 18080 (0.0 m), facing 43
+Yacht at -16320 18040 (0.0 m), facing 38
+Yacht at -16360 18060 (0.0 m), facing 45
+Yacht at -16280 18020 (0.0 m), facing 32
+Yacht at -16400 18080 (0.0 m), facing 38
+Yacht at -16340 18060 (0.0 m), facing 43
+Yacht at -16300 18040 (0.0 m), facing 42
+Yacht at 900 22200 (0.0 m), facing 35
+Yacht at 26800 22200 (0.0 m), facing 45
+Yacht at 26780 22200 (0.0 m), facing 40
+Yacht at 26740 22180 (0.0 m), facing 36
+Yacht at 26760 22200 (0.0 m), facing 34
+Yacht at 26680 22140 (0.0 m), facing 32
+Yacht at 26700 22160 (0.0 m), facing 34
+Yacht at 26720 22180 (0.0 m), facing 49
+Yacht at 840 22240 (0.0 m), facing 44
+Yacht at 820 22260 (0.0 m), facing 44
+Yacht at 840 22260 (0.0 m), facing 41
+Yacht at 860 22240 (0.0 m), facing 37
+Yacht at 820 22280 (0.0 m), facing 48
+Yacht at 880 22220 (0.0 m), facing 47
+Yacht at 800 22300 (0.0 m), facing 37
+Yacht at 26780 22220 (0.0 m), facing 42
+Ferry pier at 27003 22299 (0.0 m), facing -15
+Linkspan at 26996 22323 (0.0 m), facing -15
+Star fort at -12300 22800 (7.0 m), facing 41
+Bungalow at -32667 28454 (7.2 m), facing 30
+Bungalow at -32687 28465 (7.5 m), facing 30
+Landing stage at -32608 28513 (0.0 m), facing 45
+Yacht at -32720 28580 (0.0 m), facing 43
+Yacht at -32760 28600 (0.0 m), facing 33
+Yacht at -32700 28580 (0.0 m), facing 32
+Yacht at -32740 28600 (0.0 m), facing 43
+Yacht at -32720 28600 (0.0 m), facing 40
+Ferry pier at -32517 28432 (0.0 m), facing 40
+Linkspan at -32501 28451 (0.0 m), facing 40
+Yacht at -32840 28640 (0.0 m), facing 36
+Yacht at -32800 28620 (0.0 m), facing 38
+Yacht at -32780 28620 (0.0 m), facing 41
+Yacht at 38520 32940 (0.0 m), facing 39
+Yacht at 38520 32920 (0.0 m), facing 47
+Yacht at 38540 32920 (0.0 m), facing 34
+Yacht at 38540 32900 (0.0 m), facing 44
+Yacht at 38560 32880 (0.0 m), facing 34
+Yacht at 38540 33060 (0.0 m), facing 33
+Yacht at 38540 33040 (0.0 m), facing 38
+Yacht at 38540 33020 (0.0 m), facing 39
+Linkspan at 38755 33202 (0.0 m), facing 150
+Ferry pier at 38703 33293 (0.0 m), facing 150
+Ferry pier at 38723 33258 (0.0 m), facing 150
+Ferry pier at 38743 33224 (0.0 m), facing 150
+Yacht at 33680 36520 (0.0 m), facing 39
+Yacht at 33700 36540 (0.0 m), facing 40
+Yacht at 33640 36500 (0.0 m), facing 43
+Yacht at 33660 36520 (0.0 m), facing 34
+Yacht at 33720 36560 (0.0 m), facing 43
+Yacht at 33740 36580 (0.0 m), facing 38
+Yacht at 33760 36600 (0.0 m), facing 48
+Yacht at 34000 36760 (0.0 m), facing 32
+landmarks: 898 placed; 10029 checks, 0 failures
+<end of output>
+Test time =   4.22 sec
+----------------------------------------------------------
+Test Passed.
+"landmarks" end time: Oct 12 15:38 EDT
+"landmarks" time elapsed: 00:00:04
+----------------------------------------------------------
+
+121/137 Testing: road_traffic
+121/137 Test: road_traffic
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/road_traffic_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"road_traffic" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+road traffic: up to 950 cars round the camera; 7084 looked at: 0 out of their lane, 0 on the wrong side, 2 off the road's surface, 0 crowded, 0 lorries in a highway's fast lane; 773 through junctions, 0 jumps, 0 appearing in sight
+road_traffic: 331229 checks, 0 failures
+<end of output>
+Test time =   1.84 sec
+----------------------------------------------------------
+Test Passed.
+"road_traffic" end time: Oct 12 15:38 EDT
+"road_traffic" time elapsed: 00:00:01
+----------------------------------------------------------
+
+124/137 Testing: procedural_regions
+124/137 Test: procedural_regions
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/procedural_regions_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"procedural_regions" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+procedural_regions_test: 200795 checks, 0 failures
+<end of output>
+Test time =   0.16 sec
+----------------------------------------------------------
+Test Passed.
+"procedural_regions" end time: Oct 12 15:38 EDT
+"procedural_regions" time elapsed: 00:00:00
+----------------------------------------------------------
+
+125/137 Testing: distant_regions
+125/137 Test: distant_regions
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/distant_regions_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"distant_regions" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+distant_regions_test: 543420 checks, 0 failures
+<end of output>
+Test time =   0.86 sec
+----------------------------------------------------------
+Test Passed.
+"distant_regions" end time: Oct 12 15:38 EDT
+"distant_regions" time elapsed: 00:00:00
+----------------------------------------------------------
+
+129/137 Testing: region_scenery
+129/137 Test: region_scenery
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/region_scenery_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"region_scenery" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+region scenery: 34 checks, 0 failures
+<end of output>
+Test time =   0.17 sec
+----------------------------------------------------------
+Test Passed.
+"region_scenery" end time: Oct 12 15:38 EDT
+"region_scenery" time elapsed: 00:00:00
+----------------------------------------------------------
+
+131/137 Testing: procedural_recipe_placement
+131/137 Test: procedural_recipe_placement
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/procedural_world_test" "--recipe-only" "--region" "all"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"procedural_recipe_placement" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+RECIPE id=pr1-3-27-28 archetype=Archipelago
+RECIPE id=pr1-3-26-28 archetype=Continental fragments
+RECIPE id=pr1-3-26-29 archetype=Volcanic chain
+RECIPE id=pr1-3-28-29 archetype=Volcanic chain
+RECIPE id=pr1-3-27-30 archetype=Volcanic chain
+RECIPE id=pr1-3-28-28 archetype=Continental fragments
+RECIPE id=pr1-1-9-19 archetype=Atolls
+RECIPE id=pr1-1-25-24 archetype=Volcanic chain
+RECIPE id=pr1-4-17-7 archetype=Fjords
+RECIPE id=pr1-5-27-0 archetype=Continental fragments
+RECIPE id=pr1-1-18-9 archetype=Archipelago
+PROCESS peak_rss_kib=2388
+procedural_world_test: 151 checks, 0 failures
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"procedural_recipe_placement" end time: Oct 12 15:38 EDT
+"procedural_recipe_placement" time elapsed: 00:00:00
+----------------------------------------------------------
+
+132/137 Testing: nonrepeating_scenery
+132/137 Test: nonrepeating_scenery
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/nonrepeating_scenery_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"nonrepeating_scenery" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+nonrepeating scenery: 28 checks, 0 failures, remote ocean queries 0.000037 s
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"nonrepeating_scenery" end time: Oct 12 15:38 EDT
+"nonrepeating_scenery" time elapsed: 00:00:00
+----------------------------------------------------------
+
+133/137 Testing: region_travel
+133/137 Test: region_travel
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/region_travel_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"region_travel" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+Chart: roundtrip 0 m, independent oracle 2.8294373e-09 m, geographic narrowing 0.00256428233 m
+Transport: position jump 0.00102067087 m, direction chord 1.00340922e-05, speed 4.8542053e-05 m/s, attitude axis 4.80548009e-07
+Ownership edges: 180 face / 4 pole / 30 date-line crossings, max chart radius 251.564 km, jump 0.00752853708 m, direction chord 0.000225694765
+Live chart flight: continued 2 s, maximum path 0.0126448344 m, speed 0.000115702354 m/s, fuel 0 kg
+Regional surface travel: 43601 checks, 0 failures
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"region_travel" end time: Oct 12 15:38 EDT
+"region_travel" time elapsed: 00:00:00
+----------------------------------------------------------
+
+134/137 Testing: region_travel_fastmath
+134/137 Test: region_travel_fastmath
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/region_travel_fastmath_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"region_travel_fastmath" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+Chart: roundtrip 0 m, independent oracle 3.00091772e-09 m, geographic narrowing 0.0025642823 m
+Transport: position jump 0.0010206709 m, direction chord 1.00343257e-05, speed 4.53124538e-05 m/s, attitude axis 5.49527672e-07
+Ownership edges: 180 face / 4 pole / 30 date-line crossings, max chart radius 251.564 km, jump 0.00752853609 m, direction chord 0.000225694764
+Live chart flight: continued 2 s, maximum path 0.0126448356 m, speed 0.000115702354 m/s, fuel 0 kg
+Regional surface travel: 43601 checks, 0 failures
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"region_travel_fastmath" end time: Oct 12 15:38 EDT
+"region_travel_fastmath" time elapsed: 00:00:00
+----------------------------------------------------------
+
+135/137 Testing: region_scenery_isolation
+135/137 Test: region_scenery_isolation
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/region_scenery_isolation_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"region_scenery_isolation" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+regional scenery isolation: 22 checks, 0 failures; 195 active-flight reads during parallel baking
+<end of output>
+Test time =   0.13 sec
+----------------------------------------------------------
+Test Passed.
+"region_scenery_isolation" end time: Oct 12 15:38 EDT
+"region_scenery_isolation" time elapsed: 00:00:00
+----------------------------------------------------------
+
+136/137 Testing: world_upload_budget
+136/137 Test: world_upload_budget
+Command: "/workspace/scratch/87b29863f015/solace-procedural-regions-build/world_upload_budget_test"
+Directory: /workspace/scratch/87b29863f015/solace-procedural-regions-build
+"world_upload_budget" start time: Oct 12 15:38 EDT
+Output:
+----------------------------------------------------------
+Initial high-altitude neighborhood: ready=22 frames=250 elapsed_ms=316.974
+Horizon asynchronous settle: initial wanted=22, final wanted=31, resident/peak=63/64, jobs=131 builds=253 bytes=190740240 frames=2799 elapsed_ms=3311.546 worst_update_ms=1.350
+Resident collision grids: 16774128 bytes, pending=0 bytes, published=0 bytes
+Publication CPU ms: begin=0.107 cancel=0.180 commit=0.265
+PASS world upload: 110863128 bytes in 296 budgeted frames; CPU isolation, empty allocations, 256 KiB batches, ready-only publication, cancellation, failure recovery, bounded handles
+<end of output>
+Test time =   3.60 sec
+----------------------------------------------------------
+Test Passed.
+"world_upload_budget" end time: Oct 12 15:38 EDT
+"world_upload_budget" time elapsed: 00:00:03
+----------------------------------------------------------
+
+End testing: Oct 12 15:38 EDT

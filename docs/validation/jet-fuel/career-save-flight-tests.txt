@@ -1,0 +1,13 @@
+Test project /workspace/scratch/87b29863f015/solace-jet-fuel-build
+    Start 123: test_world
+1/4 Test #123: test_world .......................   Passed   21.05 sec
+    Start  61: campaign_progression_3
+    Start  56: flight_model_1
+2/4 Test  #61: campaign_progression_3 ...........   Passed   27.11 sec
+    Start  23: career_saves
+3/4 Test  #56: flight_model_1 ...................   Passed   29.92 sec
+4/4 Test  #23: career_saves .....................   Passed   12.70 sec
+
+100% tests passed out of 4
+
+Total Test time (real) =  60.86 sec

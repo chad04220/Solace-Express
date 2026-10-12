@@ -1,0 +1,15 @@
+Test project /workspace/scratch/87b29863f015/solace-jet-fuel-build
+    Start 123: test_world
+1/5 Test #123: test_world .......................   Passed   19.09 sec
+    Start  13: new_aircraft_autoland_atlas
+    Start  14: new_aircraft_go_around
+2/5 Test  #14: new_aircraft_go_around ...........   Passed   39.45 sec
+    Start 133: jet_fuel
+3/5 Test  #13: new_aircraft_autoland_atlas ......   Passed   42.34 sec
+    Start  11: new_aircraft_performance
+4/5 Test  #11: new_aircraft_performance .........   Passed    6.39 sec
+5/5 Test #133: jet_fuel .........................   Passed   10.72 sec
+
+100% tests passed out of 5
+
+Total Test time (real) =  69.26 sec

@@ -21,7 +21,7 @@ struct AircraftSpec {
   float power;                 // W per engine (prop) or N thrust per engine (jet)
   float v0;                    // static-thrust knee speed for props (m/s)
   float vr, vref, cruise;      // rotate, approach, cruise speeds (m/s)
-  float rangeKm, runwayM;      // design range (game scale) and runway need at sea level
+  float rangeKm, runwayM;      // nominal range (jets: efficient cruise, no reserve) and sea-level runway need
   bool roughOK, taildragger, retract;
   float Ixx, Iyy, Izz;         // roll, pitch, yaw inertia (kg m^2)
   float elevPow, ailPow, rudPow;
@@ -29,7 +29,7 @@ struct AircraftSpec {
   // visual model
   float fusLen, fusRad, wingY, wingZ; int engLayout, tail;
   vec3 colBase, colStripe;
-  int special = 0;             // 1 = XR-30 research jet: fly-by-wire, pitch thrust vectoring, no fuel burn; 2 = XR-40 Wraith
+  int special = 0;             // 1 = XR-30 research jet: fly-by-wire, pitch thrust vectoring; 2 = XR-40 Wraith (both consume fuel)
   // the research craft's performance tier (0: a conventional type). Below 1 the type is held just under the sound
   // barrier by its drag rise; above 1 the engines have reheat and the drag rise is the research jets'. gPos / gNeg are
   // the structural limits (0: the type's defaults); the airframe takes a sustained overstress before it lets go
@@ -40,14 +40,20 @@ struct AircraftSpec {
   float gearHeightM = 0;       // positive: authored wheel contact height; 0: derive from legacy geometry
   float takeoffFlap = 0.2f;    // recommended take-off setting; taildraggers retain their 0.3 default
   float gearTrackM = 0;       // positive: main-wheel half-track; 0: derive from legacy geometry
+  // Jet fuel model: kg / (N s), sea-level static dry / reheat TSFC. Zero preserves
+  // the legacy piston/turboprop model. These are engineering assumptions, not engine certificates.
+  float jetDryTsfc = 0, jetWetTsfc = 0;
+  float fuelCruiseAlt = 0, fuelCruiseTas = 0, fuelCruiseSpool = 0;
+  float maxTakeoffMass = 0;     // explicit kg; zero preserves the legacy payload-based envelope
+  float maxFuelForPayload(float payloadKg) const { return std::max(0.f, std::min(maxFuel, maxMass() - emptyMass - std::max(0.f, payloadKg))); }
   float gLimitPos() const { return gPos > 0 ? gPos : special == 2 ? 90.f : special ? 50.f : 5.8f; }
   float gLimitNeg() const { return gNeg < 0 ? gNeg : special == 2 ? -45.f : special ? -25.f : -3.f; }
   // the runway it needs: the longer of its learned take-off and landing distances at full weight (Plane::perf), 15% to
   // spare, longer with the field's elevation (runwayM until the type has been learned, and for the research jets)
   float runwayNeeded(float elev) const;
-  // the most it may weigh at take-off: full tanks and a full load don't go together (three quarters of the fuel with
-  // everything aboard, or all of it with a lighter load)
-  float maxMass() const { return emptyMass + maxFuel * 0.75f + cargoKg + pax * 85.f + 85.f; }
+  // Maximum take-off mass: jets have an explicit envelope. Legacy non-jets keep the
+  // original three-quarter-tank/full-load convention. Full tanks can require less payload.
+  float maxMass() const { return maxTakeoffMass > 0 ? maxTakeoffMass : emptyMass + maxFuel * 0.75f + cargoKg + pax * 85.f + 85.f; }
   float fuelPriceBase() const { return engineType == ENG_PISTON ? 2.2f : 1.4f; }   // $ per kg at a hub
 };
 
@@ -295,7 +301,11 @@ public:
   float agl() const;
   float gearHeight() const;
   float mass() const { return spec->emptyMass + fuel + payload; }
-  float fuelFlowMax() const;   // kg/s at full throttle
+  float fuelFlowMax() const;   // kg/s, all engines, sea-level static maximum (includes reheat)
+  float fuelFlowAt(float spool, float tas, float rho = -1.f, float live = 1.f) const; // shared simulation/planning kg/s
+  float fuelFlowKgS() const;   // present engine state; zero with engines off / tanks empty
+  float nominalFuelFlowKgS() const; // published efficient-cruise reference, all engines
+  float nominalRangeKm() const; // remaining fuel, reference cruise, no reserve
   float spoolRate() const;     // how fast the engines follow the throttle (spool fraction per second)
   float thrustAt(float spool, float V, float vf, float rho = -1.f) const;   // all engines' thrust (N) at this spool, airspeed and forward airspeed, in the air it is in (or rho's)
   float liftThrustMax() const; // the thrust it can direct straight down (N): vectored lift
@@ -310,6 +320,7 @@ public:
   ApEnvelope apEnv;            // what it can do now (apSense)
   void apSense();              // read it: the learned envelope, corrected for weight, air, configuration and condition
 private:
+  double fuelBurnRemainder = 0; // keeps sub-gram jet burn at 240 Hz from rounding away in large tanks
   void substep(float dt, const Weather& wx, float time);
   void apGuidance(float dt);
   void apControl(float dt);

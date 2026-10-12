@@ -407,13 +407,14 @@ void Game::drawLoading() {
   bool air = !plane.onGround;
   const Airport& ap = g_world.airports[air ? contract.to : contract.from];
   // a picture rendered by render_loading.bat - the airport, or the aircraft in flight - when there is one on disk
-  std::string key = (military || air) ? fmt("air_%d", (int)(plane.spec - kAircraft)) : std::string(ap.code);
+  std::string key = g_world.procedural ? g_world.regionId + "/" + ap.code :
+    (military || air) ? fmt("air_%d", (int)(plane.spec - kAircraft)) : std::string(ap.code);
   auto li = loadImg.find(key);
   if (li == loadImg.end()) {
     unsigned tex = 0; int w = 0, h = 0; std::vector<uint8_t> px;
     // a picture rendered on this PC by render_loading.bat (.png) wins over the one that ships with the game (.jpg)
     for (const char* ext : {".png", ".jpg"})
-      if (!tex && readImage((assetDir + "/loading/" + key + ext).c_str(), w, h, px)) tex = g_ren.makeTexture(px.data(), w, h);
+      if (!g_world.procedural && !tex && readImage((assetDir + "/loading/" + key + ext).c_str(), w, h, px)) tex = g_ren.makeTexture(px.data(), w, h);
     li = loadImg.emplace(key, tex).first;
   }
   unsigned pic = li->second;
@@ -444,7 +445,7 @@ void Game::drawLoading() {
   g_ren.rectGrad(0, 0, W, 90 * s, vec3(0.0f, 0.01f, 0.02f), vec3(0, 0, 0), 0.55f);
   // header
   bool research = researchFlight;
-  g_ren.text(40 * s, 26 * s, 13 * s, military ? "SOLACE DEFENSE / SORTIE PREPARATION" : research ? "CONFIDENTIAL RESEARCH FLIGHT" : contract.type == CT_LESSON ? "FLIGHT LESSON" : "CONTRACT", accent, 1, 0, false);
+  g_ren.text(40 * s, 26 * s, 13 * s, military ? "SOLACE DEFENSE / SORTIE PREPARATION" : research ? "CONFIDENTIAL RESEARCH FLIGHT" : freeFlight ? "FREE FLIGHT / DEPARTURE PREPARATION" : contract.type == CT_LESSON ? "FLIGHT LESSON" : "CONTRACT", accent, 1, 0, false);
   g_ren.text(40 * s, 44 * s, 30 * s, fitLoading(contract.title, W - 80 * s, 30 * s), C_TEXT, 1);
   // mission card
   float cx = 40 * s, cy = H - 282 * s, cw = std::min(780 * s, W - 80 * s);
@@ -966,7 +967,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   bool overweight = false;
   if (selAircraft >= 0) {
     const AircraftSpec& sp = kAircraft[selAircraft]; auto esrc = career.canFly(c, selAircraft);
-    if (!sp.special && esrc != Career::SRC_NONE) { Career::LaunchPlan e0 = menuLaunchPlan(c, selAircraft, esrc, cd.job, false); float fuel = e0.fuelLoadKg; overweight = sp.emptyMass + fuel + c.cargoKg + c.pax * 85.f + 85.f > sp.maxMass() + 0.5f; }
+    if (esrc != Career::SRC_NONE) { Career::LaunchPlan e0 = menuLaunchPlan(c, selAircraft, esrc, cd.job, false); float fuel = e0.fuelLoadKg; overweight = sp.emptyMass + fuel + c.cargoKg + c.pax * 85.f + 85.f > sp.maxMass() + 0.5f; }
   }
   bool can = selAircraft >= 0 && !commitBlocked() && !otherWhileJob && !overweight;
   if (cd.job) {
@@ -1171,8 +1172,108 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
 }
 
 // Standalone, career-independent sandbox setup. Its catalog intentionally excludes research teasers.
+// This screen deliberately reads only immutable request metadata and atomic stage flags.
+// The worker may be replacing every byte of the resident World underneath it.
+void Game::drawRegionLoading() {
+  const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  const float x = W * .12f, w = W * .76f, y = H * .29f;
+  g_ren.rectGrad(0, 0, W, H, vec3(.008f, .025f, .045f), C_PANEL, 1);
+  g_ren.text(x, y, 12 * s, "FREE FLIGHT / REGION PREPARATION", C_ACCENT, 1, 0, false);
+  fitText(x, y + 34 * s, w, 30 * s, 18 * s, loadingRegion.name, C_TEXT);
+  const int stage = regionLoadStage.load();
+  std::string detail = stage == 0 ? "Finishing background work from the previous region" :
+    stage == 1 ? (g_worldStage.load() == 1 ? "Checking the region cache" : "Generating terrain, airports, roads and settlements") :
+    stage == 2 ? "Preparing the region navigation map" : "Uploading terrain and refreshing the renderer";
+  if (!regionError.empty()) detail = "Region preparation failed: " + regionError;
+  fitText(x, y + 92 * s, w, 16 * s, 11 * s, detail, regionError.empty() ? C_DIM : C_WARN);
+  g_ren.rect(x, y + 131 * s, w, 4 * s, C_ACCENT, .12f, 2 * s);
+  if (regionError.empty()) {
+    const float t = .5f + .5f * sinf(realTime * 1.7f);
+    g_ren.rect(x + t * w * .8f, y + 131 * s, w * .2f, 4 * s, C_ACCENT, .9f, 2 * s);
+  }
+  g_ren.text(x, y + 155 * s, 12 * s, "The next region replaces the previous one. Your career is unchanged.", C_DIM, 1);
+  if (!regionError.empty()) {
+    if (button(x, y + 200 * s, 190 * s, 38 * s, "Retry region")) { loadFreeRegion(freeRegion, regionAfterLoad); return; }
+    if (button(x + 205 * s, y + 200 * s, 240 * s, 38 * s, "Restore Solace / Main menu")) { loadFreeRegion(0, SCR_MENU); return; }
+  } else if (regionCancel) {
+    g_ren.text(x, y + 205 * s, 13 * s, "Returning to Solace as soon as the current build finishes...", C_WARN, 1);
+  } else if (button(x, y + 200 * s, 250 * s, 38 * s, "Cancel / Return to Solace")) regionCancel = true;
+}
+
+void Game::drawRegionPicker() {
+  initFreeRegions();
+  const bool flying = screen == SCR_FLIGHT && freeFlight;
+  const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  const float x = 48 * s, w = W - 96 * s, y = 139 * s;
+  const float h = std::min(w * .5f, H - 310 * s);
+  g_ren.rect(0, 0, W, H, C_PANEL, .97f);
+  g_ren.text(x, 24 * s, 27 * s, "EARTH DESTINATIONS", C_TEXT, 1);
+  g_ren.text(x, 67 * s, 13 * s, flying ? "Select a destination to fly to. Your aircraft stays at its current Earth position." : "Click any Earth address to choose a repeatable island region.", C_DIM, 1);
+  g_ren.text(x, 91 * s, 11 * s, "Invented landscapes and airports. These are not real-world coastlines.", C_WARN, 1);
+  if (button(W - 225 * s, 23 * s, 177 * s, 35 * s, flying ? "Back to flight" : "Back to aircraft") || in.pressed[K_ESC]) {
+    freeRegionMap = false; in.pressed[K_ESC] = false; return;
+  }
+  g_ren.rect(x, y, w, h, vec3(.015f, .07f, .10f), 1, 3 * s);
+  for (int lon = -180; lon <= 180; lon += 30) {
+    const float px = x + (lon + 180.f) / 360.f * w;
+    g_ren.line(px, y, px, y + h, 1, C_ACCENT, lon == 0 ? .36f : .12f);
+    if (lon % 60 == 0) g_ren.text(px, y + h + 6 * s, 9 * s, fmt("%d", lon), C_DIM, 1, 1, false);
+  }
+  for (int lat = -90; lat <= 90; lat += 30) {
+    const float py = y + (90.f - lat) / 180.f * h;
+    g_ren.line(x, py, x + w, py, 1, C_ACCENT, lat == 0 ? .36f : .12f);
+    g_ren.text(x - 8 * s, py - 5 * s, 9 * s, fmt("%d", lat), C_DIM, 1, 2, false);
+  }
+  // Every click resolves a bounded cube-cell descriptor; no global terrain allocation.
+  if (hovered(x, y, w, h) && in.mPressed[0]) {
+    const double longitude = std::clamp((double)(in.mx - x) / w * 360.0 - 180.0, -180.0, 180.0);
+    const double latitude = std::clamp(90.0 - (double)(in.my - y) / h * 180.0, -90.0, 90.0);
+    chooseFreeRegion(procedural::describe({latitude, longitude, 0}));
+    g_audio.trigger(SFX_CLICK);
+  }
+  for (int i = 0; i < (int)freeRegions.size(); ++i) {
+    const auto& r = freeRegions[i];
+    const float px = x + (float)(r.origin.longitude + 180.0) / 360.f * w;
+    const float py = y + (float)(90.0 - r.origin.latitude) / 180.f * h;
+    const bool selected = i == freeRegion;
+    g_ren.rect(px - (selected ? 5.f : 3.f) * s, py - (selected ? 5.f : 3.f) * s,
+      (selected ? 10.f : 6.f) * s, (selected ? 10.f : 6.f) * s, selected ? C_WARN : C_ACCENT, 1, 3 * s);
+    if (selected) g_ren.text(std::clamp(px, x + 120 * s, x + w - 120 * s), std::clamp(py - 22 * s, y + 5 * s, y + h - 30 * s), 12 * s, r.name, C_TEXT, 1, 1);
+  }
+  if (button(x + w - 84 * s, y + h + 4 * s, 36 * s, 25 * s, "<")) freeRegion = (freeRegion + (int)freeRegions.size() - 1) % (int)freeRegions.size();
+  if (button(x + w - 36 * s, y + h + 4 * s, 36 * s, 25 * s, ">")) freeRegion = (freeRegion + 1) % (int)freeRegions.size();
+  const auto& region = freeRegions[freeRegion];
+  if (flying) {
+    const float px = x + (float)(earthPosition.longitude + 180.) / 360.f * w;
+    const float py = y + (float)(90. - earthPosition.latitude) / 180.f * h;
+    g_ren.rectOutline(px - 7 * s, py - 7 * s, 14 * s, 14 * s, C_GOOD, 1, 7 * s, 2 * s);
+    g_ren.text(px, py + 10 * s, 10 * s, "YOU", C_GOOD, 1, 1);
+  }
+  const float infoY = y + h + 32 * s;
+  fitText(x, infoY, w - 245 * s, 19 * s, 12 * s, region.name, C_TEXT);
+  g_ren.text(x, infoY + 28 * s, 11 * s, fmt("%+.2f latitude / %+.2f longitude / %s", region.origin.latitude,
+    region.origin.longitude, region.authored ? "Original Solace" : procedural::archetypeName(region.archetype)), C_ACCENT, 1);
+  const std::string routeInfo = flying && !earthPrefetchError.empty() ? "Terrain preparation failed. Set the route again to retry; flight remains available." : flying && earthFacilitiesPending ? "Local airports unavailable until detail is active. Visible coarse terrain is solid." : flying ? fmt("%.0f km to destination / nearby regions prepare as you fly", geo::surfaceDistance(earthPosition, region.origin) / 1000.) :
+    "Fly across open ocean. Nearby regions prepare in the background.";
+  g_ren.text(x, infoY + 51 * s, 10 * s, routeInfo, earthPrefetchError.empty() ? C_DIM : C_WARN, 1);
+  if (flying && plane.spec) {
+    const float range = plane.nominalRangeKm();
+    const bool beyondRange = geo::surfaceDistance(earthPosition, region.origin) / 1000. > range;
+    g_ren.text(x, infoY + 71 * s, 10 * s, fmt("%s / nominal range at current fuel %.0f km, no reserve%s", plane.spec->name, range,
+      beyondRange ? " / ROUTE EXCEEDS RANGE" : ""), beyondRange ? C_WARN : C_DIM, 1);
+  }
+  if (button(x + w - 230 * s, infoY, 230 * s, 40 * s,
+      flying ? (plane.onGround ? "Set departure route" : "Set route / heading hold") : region.id == g_world.regionId ? "Use this region" : "Load selected region", true, true)) {
+    freeRegionMap = false;
+    if (flying) setEarthDestination(region); else loadFreeRegion(freeRegion);
+    return;
+  }
+}
+
 void Game::drawFreeFlightSetup(const FrameParams& fp) {
   (void)fp;
+  initFreeRegions();
+  if (freeRegionMap) { drawRegionPicker(); return; }
   const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   const float x = 24 * s, y = 126 * s, w = W - 48 * s, h = H - 146 * s;
   const HangarLayout L = hangarLayout(x, y, w, h, s);
@@ -1184,8 +1285,17 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   uiGlass = true;
   g_ren.rectGrad(0, 0, W, 110 * s, C_PANEL, vec3(0.007f, 0.018f, 0.032f), 0.96f);
   g_ren.text(x, 22 * s, 28 * s, "FREE FLIGHT", C_TEXT, 1);
-  g_ren.text(x, 61 * s, 14 * s, "Any aircraft. Any airport. No fees, missions or career changes.", C_DIM, 1);
-  g_ren.text(x, 94 * s, 10 * s, "01 / AIRCRAFT       02 / STARTING AIRPORT       03 / TAKE FLIGHT", C_ACCENT, 1, 0, false);
+  g_ren.text(x, 61 * s, 14 * s, "Fly Solace or generated Earth destinations. No fees, missions or career changes.", C_DIM, 1);
+  const float selectW = std::max(240 * s, W - 490 * s);
+  if (button(x, 86 * s, 30 * s, 28 * s, "<")) freeRegion = (freeRegion + (int)freeRegions.size() - 1) % (int)freeRegions.size();
+  if (button(x + selectW - 30 * s, 86 * s, 30 * s, 28 * s, ">")) freeRegion = (freeRegion + 1) % (int)freeRegions.size();
+  const auto& region = freeRegions[freeRegion];
+  const bool resident = region.id == g_world.regionId;
+  g_ren.text(x + 40 * s, 89 * s, 13 * s, ellipsize(region.name, selectW - 80 * s, 13 * s), resident ? C_ACCENT : C_WARN, 1);
+  if (button(x + selectW + 12 * s, 86 * s, 150 * s, 28 * s, resident ? "Region loaded" : "Load region", !resident, !resident)) {
+    loadFreeRegion(freeRegion); uiGlass = false; return;
+  }
+  if (button(x + selectW + 174 * s, 86 * s, 180 * s, 28 * s, "Choose on Earth map")) { freeRegionMap = true; uiGlass = false; return; }
   if (button(W - 220 * s, 25 * s, 196 * s, 38 * s, "Back to main menu")) { cancelFreeFlightSetup(); uiGlass = false; return; }
   panel(x, y, lw, h); panel(rx, y, rw, h);
   g_ren.text(x + 18 * s, y + 18 * s, 22 * s, "Aircraft", C_TEXT, 1);
@@ -1222,6 +1332,20 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   g_ren.text(vx + 18 * s, y + 66 * s, 10 * s, ellipsize(fmt("CRUISE / RANGE   %s / %.0f km", fmtSpeed(spec.cruise).c_str(), spec.rangeKm), vw - 36 * s, 10 * s), C_DIM, 1, 0, false);
   drawHangarPreviewControls(vx, y + h - 56 * s, vw);
   const float px = rx + 18 * s, iw = rw - 36 * s;
+  if (!resident) {
+    auto wrapText = [&](float tx, float ty, float width, float size, const std::string& text, vec3 color) {
+      for (const auto& line : wrap(text, width, size)) { g_ren.text(tx, ty, size, line, color, 1); ty += size * 1.45f; }
+    };
+    header(px, y + 20 * s, iw, "DESTINATION SELECTED");
+    wrapText(px, y + 58 * s, iw, 14 * s, region.name, C_TEXT);
+    wrapText(px, y + 120 * s, iw, 12 * s, "Load this region to generate its terrain and choose a starting airport.", C_DIM);
+    wrapText(px, y + 210 * s, iw, 11 * s, region.authored ? "Original Solace airports and career geography." :
+      fmt("%+.2f / %+.2f\n%s\nGenerator v%u / %s", region.origin.latitude, region.origin.longitude,
+        procedural::archetypeName(region.archetype), region.generatorVersion, region.id.c_str()), C_ACCENT);
+    uiGlass = false;
+    if (in.pressed[K_ESC]) cancelFreeFlightSetup();
+    return;
+  }
   header(px, y + 20 * s, iw, "STARTING AIRPORT");
   const float airportTop = y + 54 * s, airportBottom = y + h - 200 * s, airportStep = 49 * s;
   const int airportVisible = std::max(1, (int)((airportBottom - airportTop) / airportStep));
@@ -1800,7 +1924,7 @@ void Game::drawMinimap(float x, float y, float sz, float range) {
   g_ren.image(g_ren.minimapTex, x, y, sz, sz, u0, v0, u1, v1, 0.95f);
   g_ren.flushUIPublic();
   auto toS = [&](float wx_, float wz, bool& inside) {   // (at the copy nearest the aircraft: across the map's seam, the far side's)
-    float px = x + (wrapCoord(wx_ - plane.pos.x) + range) / (2 * range) * sz, py = y + (wrapCoord(wz - plane.pos.z) + range) / (2 * range) * sz;
+    float px = x + (g_world.wrap(wx_ - plane.pos.x) + range) / (2 * range) * sz, py = y + (g_world.wrap(wz - plane.pos.z) + range) / (2 * range) * sz;
     inside = px > x && px < x + sz && py > y && py < y + sz;
     return vec2(clampf(px, x, x + sz), clampf(py, y, y + sz));
   };
@@ -1904,7 +2028,7 @@ void Game::drawHud(const FrameParams& fp) {
       }
     } else { for(int i=0;i<m.config.targetCount;++i) { auto* a=hiveCombat.find(m.config.targetIds[i]); if(a && a->alive) { target=a->position;combatTarget="STRIKE TARGET";break; } } }
   }
-  target.x = nearCopy(target.x, plane.pos.x); target.z = nearCopy(target.z, plane.pos.z);   // (the short way round the map)
+  target.x = g_world.nearPoint(target.x, plane.pos.x); target.z = g_world.nearPoint(target.z, plane.pos.z);   // (the short way round the map)
   vec3 to = target - plane.pos;
   float dist = length(vec3(to.x, 0, to.z));
   float brg = wrapDeg360(atan2f(to.x, -to.z) / DEG);
@@ -1923,12 +2047,24 @@ void Game::drawHud(const FrameParams& fp) {
     float leftW = W * 0.5f - 230 * s - 14 * s;
     g_ren.text(14 * s + kw + 10 * s, 5 * s, 13 * s, ellipsize(contract.title, leftW - kw - 10 * s, 13 * s), C_TEXT, 1, 0, false);
     std::string obj = toWp ? fmt("CHECKPOINT %d / %d", wpIndex + 1, (int)contract.wps.size()) : fmt("LAND  %s  %s", d.code, d.name);
-    if (freeFlight) obj = "FREE ROAM / NO MISSION / CAREER UNCHANGED";
+    if (freeFlight) {
+      obj = "FREE ROAM / NO MISSION / CAREER UNCHANGED";
+      if (earthDestination) obj = "EARTH ROUTE / " + earthDestination->name;
+      if (earthFacilitiesPending) obj = earthPromotionDeferred ? "TERRAIN CONTACT PROTECTED / AIRPORTS PENDING" : "DETAIL PREPARING / LOCAL AIRPORTS UNAVAILABLE";
+    }
     else if (researchFlight) obj = resCard >= 0 ? (resCardDone ? std::string(kResCards[resCard].id) + "  CARD COMPLETE" : fmt("%s  STEP %d/%d  %s", kResCards[resCard].id, resStep + 1, kResCards[resCard].n, kResCards[resCard].steps[std::min(resStep, kResCards[resCard].n - 1)].label)) : fmt("FREE ROAM  -  MACH %.2f", plane.mach);
     if(militaryFlight || (researchFlight && resCard<0 && specIdx==kWraith)) obj=hiveObjectiveText();
     g_ren.text(14 * s, 24 * s, 12 * s, ellipsize(obj, leftW, 12 * s), mag, 1, 0, false);
     {   // the nav line under it: distance and time to the target
       std::string nav = fmt("%s   BRG %03.0f   ETE %s", dist < 1000.f ? fmt("%.0f m", dist).c_str() : set.metric ? fmt("%.1f km", dist / 1000.f).c_str() : fmt("%.1f nm", dist / 1852.f).c_str(), brg, gs > 10 ? fmt("%d:%02d", (int)(dist / gs) / 60, (int)(dist / gs) % 60).c_str() : "--:--");
+      if (freeFlight && earthFlight) {
+        nav = fmt("%+.3f LAT  %+.3f LON", earthPosition.latitude, earthPosition.longitude);
+        if (earthDestination) {
+          const auto bearing = regionTravel::Chart(flightRegion.origin).bearing(plane.pos, earthDestination->origin);
+          nav = fmt("%.1f km  BRG %03.0f  %s", geo::surfaceDistance(earthPosition, earthDestination->origin) / 1000.,
+            bearing.value_or(0.), earthCourseHold ? "HEADING HOLD" : "MANUAL");
+        }
+      }
       g_ren.text(14 * s, 40 * s, 10.5f * s, ellipsize(nav, leftW, 10.5f * s), C_DIM, 1, 0, false);
     }
     // centre: heading tape with the bearing caret, the autopilot bug and the turn cue
@@ -2128,7 +2264,7 @@ void Game::drawHud(const FrameParams& fp) {
     if (sp.engineType == ENG_PISTON) tiles.push_back({"RPM", plane.engineRunning ? fmt("%.0f", plane.rpm) : (plane.starterTime > 0 ? "CRANK" : "OFF"), plane.engineRunning ? C_TEXT : C_BAD, plane.engineRunning ? clampf(plane.rpm / sp.maxRpm, 0.f, 1.f) : 0.f});
     else tiles.push_back({"N1", plane.engineRunning ? fmt("%.1f%%", plane.n1) : (plane.starterTime > 0 ? fmt("ST %.0f", plane.n1) : "OFF"), plane.engineRunning ? C_TEXT : C_BAD, clampf(plane.n1 / 100.f, 0.f, 1.f)});
     float fuelFrac = plane.fuel / std::max(sp.maxFuel, 1.f);
-    if (sp.special) { tiles.push_back({"FUEL", "CELL", C_ACCENT, 1.f}); tiles.push_back({"MACH", fmt("%.2f", plane.mach), plane.mach > sp.designMach * 0.95f ? C_WARN : C_TEXT, -1.f}); }
+    if (sp.special) { tiles.push_back({"FUEL", fmt("%.0f%%", fuelFrac * 100), fuelFrac < 0.15f ? C_BAD : C_TEXT, fuelFrac}); tiles.push_back({"MACH", fmt("%.2f", plane.mach), plane.mach > sp.designMach * 0.95f ? C_WARN : C_TEXT, -1.f}); }
     else { tiles.push_back({"FUEL", fmt("%.0f%%", fuelFrac * 100), fuelFrac < 0.15f ? C_BAD : C_TEXT, fuelFrac}); tiles.push_back({"RANGE", fmt("%.0f km", plane.rangeLeftKm()), fuelFrac < 0.15f ? C_BAD : C_TEXT, -1.f}); }
     if (sp.special == 2) {
       const vec3 VIO(0.8f, 0.5f, 1.f);
@@ -2384,7 +2520,7 @@ void Game::drawGps() {
   vec2 C(mcx, mcy);
   // (a place on the map at its copy nearest the aircraft - across the map's seam, the far side's; toR: a point given
   // relative to the aircraft as it is, the grid and the track ahead)
-  auto toS = [&](float wx_, float wz) { return vec2(mcx + wrapCoord(wx_ - plane.pos.x) * k, mcy + wrapCoord(wz - plane.pos.z) * k); };
+  auto toS = [&](float wx_, float wz) { return vec2(mcx + g_world.wrap(wx_ - plane.pos.x) * k, mcy + g_world.wrap(wz - plane.pos.z) * k); };
   auto toR = [&](float wx_, float wz) { return vec2(mcx + (wx_ - plane.pos.x) * k, mcy + (wz - plane.pos.z) * k); };
   auto inside = [&](vec2 p, float m) { return p.x > mx + m && p.x < x1 - m && p.y > my + m && p.y < y1 - m; };
   auto seg = [&](vec2 a, vec2 b, float th, vec3 c, float al) { if (clipSeg(a, b, mx, my, x1, y1)) g_ren.line(a.x, a.y, b.x, b.y, th, c, al * e); };
@@ -2446,7 +2582,7 @@ void Game::drawGps() {
   pts.push_back(vec2(dest().x, dest().z));
   int activeLeg = std::min(wpIndex, (int)pts.size() - 2);
   for (int i = 0; i + 1 < (int)pts.size(); i++) {
-    vec2 a = toS(pts[i].x, pts[i].y), b(a.x + wrapCoord(pts[i + 1].x - pts[i].x) * k, a.y + wrapCoord(pts[i + 1].y - pts[i].y) * k);   // (each leg the short way)
+    vec2 a = toS(pts[i].x, pts[i].y), b(a.x + g_world.wrap(pts[i + 1].x - pts[i].x) * k, a.y + g_world.wrap(pts[i + 1].y - pts[i].y) * k);   // (each leg the short way)
     bool act = i == activeLeg, done = i < activeLeg;
     if (act) { a = C; b = toS(pts[i + 1].x, pts[i + 1].y); seg(a, b, 6 * s, MAG, 0.18f); dashed(a, b, 3 * s, MAG, 1.f, 10 * s, -T * 40 * s); }
     else dashed(a, b, 2 * s, done ? C_DIM : MAG, done ? 0.35f : 0.6f, 6 * s, 0);
@@ -2538,15 +2674,15 @@ void Game::drawGps() {
   panel(sx, sy, sw, sh, 0.95f * e);
   float px = sx + 18 * s, py = sy + 16 * s, vw = sw - 36 * s;
   vec3 target = wpIndex < (int)contract.wps.size() ? vec3(contract.wps[wpIndex].x, contract.wps[wpIndex].alt, contract.wps[wpIndex].z) : dest().pos();
-  vec3 to = target - plane.pos; to.x = wrapCoord(to.x); to.z = wrapCoord(to.z);   // (the short way round the map)
+  vec3 to = target - plane.pos; to.x = g_world.wrap(to.x); to.z = g_world.wrap(to.z);   // (the short way round the map)
   float dist = length(vec3(to.x, 0, to.z));
   float brg = wrapDeg360(atan2f(to.x, -to.z) / DEG);
   float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
   float trk = gs > 2 ? wrapDeg360(atan2f(plane.vel.x, -plane.vel.z) / DEG) : plane.heading();
   // remaining route distance
   float remain = dist;
-  { vec2 prev(target.x, target.z); for (int i = wpIndex + 1; i < (int)contract.wps.size(); i++) { vec2 p(contract.wps[i].x, contract.wps[i].z); remain += length(vec3(wrapCoord(p.x - prev.x), 0, wrapCoord(p.y - prev.y))); prev = p; }
-    if (wpIndex < (int)contract.wps.size()) remain += length(vec3(wrapCoord(dest().x - prev.x), 0, wrapCoord(dest().z - prev.y))); }
+  { vec2 prev(target.x, target.z); for (int i = wpIndex + 1; i < (int)contract.wps.size(); i++) { vec2 p(contract.wps[i].x, contract.wps[i].z); remain += length(vec3(g_world.wrap(p.x - prev.x), 0, g_world.wrap(p.y - prev.y))); prev = p; }
+    if (wpIndex < (int)contract.wps.size()) remain += length(vec3(g_world.wrap(dest().x - prev.x), 0, g_world.wrap(dest().z - prev.y))); }
   auto kv = [&](const char* kname, const std::string& v, vec3 c = C_TEXT, float vs = 16.f) {
     g_ren.text(px, py + 2 * s, 12 * s, kname, C_DIM, e, 0, false);
     g_ren.text(px + vw, py, vs * s, ellipsize(v, vw - 70 * s, vs * s), c, e, 2);
@@ -2615,6 +2751,7 @@ void Game::drawGps() {
 
 // ------------------------------------------------------------------ hidden research menu (U + I on the main menu)
 void Game::drawPause() {
+  if (freeFlight && freeRegionMap) { drawRegionPicker(); return; }
   if (militaryFlight && !settingsFromPause) { drawMilitaryPause(); return; }
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.55f);
@@ -2627,8 +2764,8 @@ void Game::drawPause() {
     return;
   }
   const bool combatPractice=researchFlight && resCard<0 && specIdx==kWraith;
-  s = std::min(s, std::min(H / (combatPractice?820.f:540.f), W / 520.f));
-  float pw = 410 * s, ph = (combatPractice?740.f:450.f) * s, x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
+  s = std::min(s, std::min(H / (combatPractice?820.f:freeFlight?600.f:540.f), W / 520.f));
+  float pw = 410 * s, ph = (combatPractice?740.f:freeFlight?510.f:450.f) * s, x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
   panel(x, y, pw, ph, 0.95f);
   g_ren.text(x + 30 * s, y + 24 * s, 11 * s, "FLIGHT OPERATIONS / ON HOLD", C_ACCENT, 1, 0, false);
   g_ren.text(x + 30 * s, y + 49 * s, 32 * s, "Flight paused", C_TEXT, 1);
@@ -2643,6 +2780,10 @@ void Game::drawPause() {
   if (button(x + 30 * s, by, bw * 0.48f, bh, showRadio ? "Hide radio" : "Radio")) showRadio = !showRadio;
   if (button(x + 30 * s + bw * 0.52f, by, bw * 0.48f, bh, uiHidden ? "Show flight UI" : "Hide flight UI")) uiHidden = !uiHidden;   // (also LB+RB held)
   by += bh + 12 * s;
+  if (freeFlight) {
+    if (button(x + 30 * s, by, bw, bh, "Earth destinations / Set route")) { openEarthPicker(); return; }
+    by += bh + 12 * s;
+  }
   if (button(x + 30 * s, by, bw, bh, freeFlight ? "Return to Free Flight" : researchFlight ? "End research flight" : "Abandon flight")) endFlight(false, researchFlight ? "" : "Abandoned flight", OUT_ABANDONED);
   if(combatPractice) drawCombatPractice(x+30*s,by+bh+18*s,bw);
   if (showRadio) drawRadioPanel(20 * s, 60 * s);

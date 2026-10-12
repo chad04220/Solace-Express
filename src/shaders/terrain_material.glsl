@@ -641,7 +641,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   // irregular wall to 340 m, then blend to untouched terrain by 520 m.
   vec2 volcanoQ = p.xz - vec2(25000.0, -9000.0);
   float craterRadius = length(volcanoQ);
-  if (craterRadius < 550.0 && p.y > 1300.0) {
+  if (uProceduralWorld == 0 && craterRadius < 550.0 && p.y > 1300.0) {
     float crust = vnoise(volcanoQ/46.0 + vec2(7.1, 3.2));
     float ash = 1.0 - smoothstep(300.0, 535.0, craterRadius + (crust - 0.5)*100.0);
     float rubble = smoothstep(0.02, 0.8, ash + (crust - 0.5)*0.45);

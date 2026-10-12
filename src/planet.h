@@ -1,8 +1,8 @@
-// Solace Express - the round world. The world itself is flat - the islands' 100 km square repeating on every side
-// (world.h WRAP_HALF) - and so are the physics; what is drawn lays it over a sphere about the point under the camera,
-// each place keeping its distance from that point (an azimuthal equidistant wrap: planet.glsl kPlanet, in step with
-// this). Near the camera nothing moves; further off the ground falls away round the curve, the horizon dips as the
-// camera climbs, and from high enough the islands repeat across a round world under a sky gone black.
+// Solace Express - camera-relative visual curvature at Earth radius. The authored chart keeps its legacy
+// repeating topology in career flight. Procedural Earth Free Flight uses nonrepeating regional surface charts.
+// Physics still uses a local level chart; region_travel preserves the geographic flight state across charts.
+// Drawing wraps chart distances over a sphere around the camera nadir (an azimuthal equidistant projection,
+// matched by planet.glsl). This visual sphere is not a claim of native orbital/ECEF flight dynamics.
 #pragma once
 #include "common.h"
 #include <cmath>

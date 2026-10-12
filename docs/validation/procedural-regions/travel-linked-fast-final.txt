@@ -1,0 +1,5 @@
+Chart: roundtrip 0 m, independent oracle 3.00091772e-09 m, geographic narrowing 0.0025642823 m
+Transport: position jump 0.0010206709 m, direction chord 1.00343257e-05, speed 4.53124538e-05 m/s, attitude axis 5.49527672e-07
+Ownership edges: 180 face / 4 pole / 30 date-line crossings, max chart radius 251.564 km, jump 0.00752853609 m, direction chord 0.000225694764
+Live chart flight: continued 2 s, maximum path 0.0126448356 m, speed 0.000115702354 m/s, fuel 0 kg
+Regional surface travel: 43601 checks, 0 failures

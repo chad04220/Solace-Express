@@ -37,12 +37,13 @@ float lakeMaskAt(vec2 p){
 float lakeGround(vec2 p, float g){ return lakeMaskAt(p) > 0.5 ? max(g, lakeLevel()) : g; }
 float forestTexel(ivec2 i){ return float(texelFetch(uRoadGrid, clamp(i, ivec2(0), ivec2(MASKN-1)), 0).r >> 25u)/127.0; }
 float forestAt(vec2 p){
+  if (uUnwrappedWorld != 0 && max(abs(p.x), abs(p.y)) > WH) return 0.0;
   vec2 f = (p + WH)/MTEX - 0.5; vec2 fl = floor(f); ivec2 i = ivec2(fl); vec2 t = f - fl;
   float a = forestTexel(i), b = forestTexel(i + ivec2(1,0)), c = forestTexel(i + ivec2(0,1)), d = forestTexel(i + ivec2(1,1));
   return ((a*(1.0-t.x)+b*t.x)*(1.0-t.y) + (c*(1.0-t.x)+d*t.x)*t.y)*0.875;
 }
 vec4 roadTexel(int i){ return texelFetch(uData, ivec2(i & 4095, 1 + (i >> 12)), 0); }
-uint roadHead(vec2 p){ return texelFetch(uRoadGrid, clamp(ivec2(floor((wrapW(p) + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0).r; }
+uint roadHead(vec2 p){ if (uUnwrappedWorld != 0 && max(abs(p.x), abs(p.y)) > WH) return 0u; return texelFetch(uRoadGrid, clamp(ivec2(floor((wrapW(p) + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0).r; }
 float roadHalfPlatform(int c){ return c == 0 ? 16.0 : c == 1 ? 6.5 : c == 2 ? 4.0 : c == 3 ? 2.8 : c == 4 ? 6.0 : c == 5 ? 13.0 : c == 6 ? 16.0 : 7.5; }   // (road_network.h roadSpec)
 float roadHalfPaved(int c){ return c == 0 ? 12.4 : c == 1 ? 4.6 : c == 2 ? 2.9 : c == 3 ? 1.9 : c == 4 ? 3.5 : c == 5 ? 11.0 : c == 6 ? 7.5 : 6.0; }
 float roadBankMax(int c){ return c == 4 || c == 6 ? 20.0 : c == 3 || c == 5 || c == 7 ? 12.0 : ROAD_BANK_MAX; }   // (road_network.h)
@@ -126,7 +127,7 @@ vec3 roadNormal(RoadHit r, vec3 n){ return normalize(mix(n, r.nr, 1.0 - smoothst
 // pruner drops them with everything else unreachable)
 float forestAt(vec2 p){ return 0.0; }
 vec4 roadTexel(int i){ return vec4(0.0); }
-uint roadHead(vec2 p){ return 0u; }
+uint roadHead(vec2 p){ if (uUnwrappedWorld != 0 && max(abs(p.x), abs(p.y)) > WH) return 0u; return 0u; }
 float roadHalfPlatform(int c){ return 0.0; }
 float roadHalfPaved(int c){ return 0.0; }
 float roadBankMax(int c){ return 0.0; }

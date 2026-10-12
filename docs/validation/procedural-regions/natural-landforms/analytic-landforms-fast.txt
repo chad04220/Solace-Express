@@ -1,0 +1,6 @@
+ATOLL 0 radial_span=0.265 widths=0.03:0.3 gap_rays=15
+ATOLL 1 radial_span=0.33 widths=0.03:0.265 gap_rays=34
+ATOLL 2 radial_span=0.175 widths=0.025:0.25 gap_rays=14
+ATOLL 3 radial_span=0.2025 widths=0.035:0.265 gap_rays=26
+FJORD central_channel_shift=-6350
+procedural_landforms_test: 99597 checks, 0 failures

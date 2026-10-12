@@ -1,0 +1,37 @@
+[
+  {
+    "region": "first",
+    "reference": "/workspace/scratch/87b29863f015/procedural-region-evidence/worlds/world-caches-lqn8i2ls/region-0-a.bin",
+    "current": "/workspace/scratch/87b29863f015/procedural-region-evidence/isolation-1738/regions/world-caches-9p8xqq55/region-0-a.bin",
+    "returncode": 0,
+    "output": "CACHE_COMPARE identical_bytes=140595605\nPROCESS peak_rss_kib=9344\nprocedural_world_test: 1 checks, 0 failures\n"
+  },
+  {
+    "region": "pr1-1-9-19",
+    "reference": "/workspace/scratch/87b29863f015/procedural-region-evidence/worlds/world-caches-lqn8i2ls/region-1-a.bin",
+    "current": "/workspace/scratch/87b29863f015/procedural-region-evidence/isolation-1738/regions/world-caches-9p8xqq55/region-1-a.bin",
+    "returncode": 0,
+    "output": "CACHE_COMPARE identical_bytes=140414286\nPROCESS peak_rss_kib=9344\nprocedural_world_test: 1 checks, 0 failures\n"
+  },
+  {
+    "region": "pr1-1-25-24",
+    "reference": "/workspace/scratch/87b29863f015/procedural-region-evidence/worlds/world-caches-lqn8i2ls/volcanic-rss.bin",
+    "current": "/workspace/scratch/87b29863f015/procedural-region-evidence/isolation-1738/regions/world-caches-9p8xqq55/region-2-a.bin",
+    "returncode": 0,
+    "output": "CACHE_COMPARE identical_bytes=140572856\nPROCESS peak_rss_kib=9344\nprocedural_world_test: 1 checks, 0 failures\n"
+  },
+  {
+    "region": "pr1-4-17-7",
+    "reference": "/workspace/scratch/87b29863f015/procedural-region-evidence/worlds/world-caches-lqn8i2ls/region-2-a.bin",
+    "current": "/workspace/scratch/87b29863f015/procedural-region-evidence/isolation-1738/regions/world-caches-9p8xqq55/region-3-a.bin",
+    "returncode": 0,
+    "output": "CACHE_COMPARE identical_bytes=140644179\nPROCESS peak_rss_kib=9344\nprocedural_world_test: 1 checks, 0 failures\n"
+  },
+  {
+    "region": "pr1-3-28-28",
+    "reference": "/workspace/scratch/87b29863f015/procedural-region-evidence/worlds/world-caches-lqn8i2ls/descriptor-mismatch.bin",
+    "current": "/workspace/scratch/87b29863f015/procedural-region-evidence/isolation-1738/regions/world-caches-9p8xqq55/region-4-a.bin",
+    "returncode": 0,
+    "output": "CACHE_COMPARE identical_bytes=141844956\nPROCESS peak_rss_kib=9344\nprocedural_world_test: 1 checks, 0 failures\n"
+  }
+]

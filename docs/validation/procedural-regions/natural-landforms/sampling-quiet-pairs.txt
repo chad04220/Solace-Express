@@ -1,0 +1,19 @@
+Quiet window: sequential frozen pre-change / frozen revision-2 -O2 binaries, 3 paired repetitions
+PAIR 1 BEFORE
+pr1-1-9-19 sample_count=2097152 seconds=0.342511 ns_per_sample=163.3 memory=2292 sum=-161258657.312
+pr1-4-17-7 sample_count=2097152 seconds=0.535001 ns_per_sample=255.1 memory=2292 sum=278108422.191
+PAIR 1 AFTER
+pr1-1-9-19 sample_count=2097152 seconds=0.332524 ns_per_sample=158.6 memory=15308 sum=-161472745.877
+pr1-4-17-7 sample_count=2097152 seconds=0.760803 ns_per_sample=362.8 memory=15308 sum=261378610.812
+PAIR 2 BEFORE
+pr1-1-9-19 sample_count=2097152 seconds=0.320328 ns_per_sample=152.7 memory=2292 sum=-161258657.312
+pr1-4-17-7 sample_count=2097152 seconds=0.535832 ns_per_sample=255.5 memory=2292 sum=278108422.191
+PAIR 2 AFTER
+pr1-1-9-19 sample_count=2097152 seconds=0.330935 ns_per_sample=157.8 memory=15308 sum=-161472745.877
+pr1-4-17-7 sample_count=2097152 seconds=0.695179 ns_per_sample=331.5 memory=15308 sum=261378610.812
+PAIR 3 BEFORE
+pr1-1-9-19 sample_count=2097152 seconds=0.323476 ns_per_sample=154.2 memory=2292 sum=-161258657.312
+pr1-4-17-7 sample_count=2097152 seconds=0.565111 ns_per_sample=269.5 memory=2292 sum=278108422.191
+PAIR 3 AFTER
+pr1-1-9-19 sample_count=2097152 seconds=0.302548 ns_per_sample=144.3 memory=15308 sum=-161472745.877
+pr1-4-17-7 sample_count=2097152 seconds=0.697104 ns_per_sample=332.4 memory=15308 sum=261378610.812

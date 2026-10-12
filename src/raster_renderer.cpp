@@ -234,6 +234,16 @@ void Renderer::rasterObjects(const FrameParams& fp) {
     int model = -2; bool research = false;
     if (fp.plane.on && fp.wreck.pieces == 0) afCover(model, research, fp.plane.M, fp.plane.model);
     for (int k = 0; k < trafN; k++) if (trafMarch & (1 << k)) afCover(model, research, fp.traffic[k].t, -1);
+    static const bool regionRenderDiag = getenv("REGION_RENDER_DIAG") != nullptr;
+    if (regionRenderDiag) {
+      fprintf(stderr, "REGION_RENDER_DIAG aircraft selection frame=%d model=%d research=%d player_on=%d player_model=%d player_own=%d trafN=%d trafMarch=0x%x AF_ALL=%d\n",
+        frameNo, model, int(research), int(fp.plane.on), fp.plane.model,
+        fp.plane.on ? afModelOf(fp.plane.M, fp.plane.model) : -2, trafN, unsigned(trafMarch), getenv("AF_ALL") != nullptr);
+      for (int k = 0; k < trafN; ++k)
+        fprintf(stderr, "REGION_RENDER_DIAG aircraft traffic=%d marched=%d own=%d packed_engine=%.9g packed_variant=%.9g\n",
+          k, int((trafMarch & (1 << k)) != 0), afModelOf(fp.traffic[k].t, -1), double(fp.traffic[k].t[2]), double(fp.traffic[k].t[79]));
+      fflush(stderr);
+    }
     prog = afPassProgram(kAfObjects, model, research);
   }
   if (!prog) prog = progObjectsNoAf;   // (no build with the airframes: the UFO and the debris still)

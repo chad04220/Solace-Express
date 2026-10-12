@@ -7,10 +7,7 @@
 #include <algorithm>
 #include <cmath>
 
-float airportInfluence(float x, float z);   // world.cpp
-
 namespace {
-PlacedByChunk g_furniture;
 
 // A path's centre line: where it is s metres along, which way it runs there, the road's height, on a bridge or not
 struct Station { vec2 p, d; float h; bool bridge; };
@@ -50,7 +47,8 @@ inline float crossz(vec2 a, vec2 b) { return a.x * b.y - a.y * b.x; }
 inline float yawFacing(vec2 front) { return atan2f(front.x, front.y); }   // (an entity's front, its local +z, along front)
 }  // namespace
 
-void sceneryBakeRoadFurniture(const World& world) {
+void sceneryBakeRoadFurniture(World& world) {
+  generationCheckpoint();
   std::vector<RoadFurniture> out;
   const RoadNetwork& net = world.roads;
   RoadIndex roads;
@@ -61,7 +59,7 @@ void sceneryBakeRoadFurniture(const World& world) {
   };
   // off every platform but its own path's by `clear` metres (a junction's mouth left open), on dry land, off the airfields
   auto clearOf = [&](vec2 p, int pi, float clear) {
-    return ground(p) > 1.f && airportInfluence(p.x, p.y) <= 0.001f && roads.nearest(p, clear + 1.f, pi, nullptr, nullptr, true) >= clear;
+    return ground(p) > 1.f && airportInfluence(world, p.x, p.y) <= 0.001f && roads.nearest(p, clear + 1.f, pi, nullptr, nullptr, true) >= clear;
   };
   // a guardrail from a to b (heights ha, hb) facing `front`: 16 m lengths stretched to fit, their beam on the grade
   auto rail = [&](vec2 a, float ha, vec2 b, float hb, vec2 front) {
@@ -74,6 +72,7 @@ void sceneryBakeRoadFurniture(const World& world) {
 
   const Racetrack race = racetrackOf(net);
   for (size_t pi = 0; pi < net.paths.size(); pi++) {
+    generationCheckpoint();
     const RoadPath& P = net.paths[pi];
     if (P.pts.size() < 2) continue;
     const Line L(P);
@@ -121,7 +120,7 @@ void sceneryBakeRoadFurniture(const World& world) {
         const float e = std::min(s + seg, run.second);
         const Station a = L.at(s), b = L.at(e), m = L.at((s + e) * 0.5f);
         bool held = false;   // (by an airfield the road lies on its ground as it is: no furniture)
-        for (const Station& q : {a, m, b}) held |= airportInfluence(q.p.x, q.p.y) > 0.001f;
+        for (const Station& q : {a, m, b}) held |= airportInfluence(world, q.p.x, q.p.y) > 0.001f;
         if (held) continue;
         bool junction = false;   // (the reserve open where another road joins)
         for (const Station& q : {a, m, b}) junction |= roads.nearest(q.p, spec.halfPlatform + 3.f, ipi, nullptr, nullptr, true) <= 3.f;
@@ -155,6 +154,7 @@ void sceneryBakeRoadFurniture(const World& world) {
       std::vector<bool> stands;
       float s = 20.f;
       while (s < L.length() - 20.f) {
+        generationCheckpoint();
         const vec2 p = spot(s);
         const Station st = L.at(s);
         const bool ok = !L.nearBridge(s, 25.f) && share(p) > 1.2f && clearOf(p, -1, 1.5f) && !st.bridge && !inPaddock(p);
@@ -211,6 +211,7 @@ void sceneryBakeRoadFurniture(const World& world) {
       }
       float was = share(L.at(0.f).p);
       for (float s = 10.f; s <= L.length(); s += 10.f) {
+        generationCheckpoint();
         const float now = share(L.at(s).p);
         if ((was >= 1.f) != (now >= 1.f)) {   // (its edge between s - 10 and s: the sign where the fields begin, out from it)
           const float out = was >= 1.f ? -1.f : 1.f;
@@ -222,10 +223,11 @@ void sceneryBakeRoadFurniture(const World& world) {
     }
   }
   for (RoadFurniture& f : out) f.e.yaw = remainderf(f.e.yaw, 6.2831853f);
-  g_furniture.build(out);
+  sceneryStateForBuild(world).furniture.build(out);
 }
 
 void PlacedByChunk::build(const std::vector<PlacedEnt>& all) {
+  generationCheckpoint();
   std::vector<int> key(all.size());
   for (size_t i = 0; i < all.size(); i++) key[i] = Scenery::chunkOf(all[i].e.z) * Scenery::NC + Scenery::chunkOf(all[i].e.x);
   std::vector<size_t> order(all.size());
@@ -236,10 +238,13 @@ void PlacedByChunk::build(const std::vector<PlacedEnt>& all) {
 }
 
 std::pair<const PlacedEnt*, const PlacedEnt*> PlacedByChunk::in(int cx, int cz) const {
+  if (items.empty()) return {nullptr, nullptr};
   const int k = cz * Scenery::NC + cx;
   const auto lo = std::lower_bound(chunk.begin(), chunk.end(), k), hi = std::upper_bound(lo, chunk.end(), k);
   return {items.data() + (lo - chunk.begin()), items.data() + (hi - chunk.begin())};
 }
 
-const std::vector<RoadFurniture>& roadFurniture() { return g_furniture.items; }
-std::pair<const RoadFurniture*, const RoadFurniture*> roadFurnitureIn(int cx, int cz) { return g_furniture.in(cx, cz); }
+const std::vector<RoadFurniture>& roadFurniture(const World& world) { return sceneryState(world).furniture.items; }
+std::pair<const RoadFurniture*, const RoadFurniture*> roadFurnitureIn(const World& world, int cx, int cz) { return sceneryState(world).furniture.in(cx, cz); }
+const std::vector<RoadFurniture>& roadFurniture() { return roadFurniture(g_world); }
+std::pair<const RoadFurniture*, const RoadFurniture*> roadFurnitureIn(int cx, int cz) { return roadFurnitureIn(g_world, cx, cz); }

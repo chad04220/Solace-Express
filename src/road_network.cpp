@@ -40,6 +40,7 @@ struct Grid {
 };
 
 Grid makeGrid(const World& world) {
+  generationCheckpoint();
   Grid g;
   g.h.resize((size_t)GN * GN); g.slope.resize(g.h.size()); g.blocked.resize(g.h.size()); g.island.assign(g.h.size(), -1);
   parallelFor(GN, [&](int j) {
@@ -51,7 +52,7 @@ Grid makeGrid(const World& world) {
       bool near = false;
       for (const Airport& a : world.airports) near = near || hypotf(x - a.x, z - a.z) < hypotf(a.length * 0.5f + 820.f, 980.f);
       if (!near) continue;
-      float grounds, cap; airportGroundsCap(x, z, grounds, cap);
+      float grounds, cap; airportGroundsCap(world, x, z, grounds, cap);
       g.blocked[Grid::idx(i, j)] = grounds > 0.001f;
       for (const Airport& a : world.airports) {
         const vec2 q = aptLocal(a, vec3(x, 0, z));
@@ -69,10 +70,12 @@ Grid makeGrid(const World& world) {
   // islands: land cells joined edge to edge (the shallows between two islands are not land)
   std::vector<int> stack;
   for (int s = 0; s < GN * GN; s++) {
+    if ((s & 1023) == 0) generationCheckpoint();
     if (g.h[s] < 0.5f || g.island[s] >= 0) continue;
     const int id = g.islands++;
     stack.push_back(s); g.island[s] = id;
     while (!stack.empty()) {
+      generationCheckpoint();
       const int c = stack.back(); stack.pop_back();
       const int ci = c % GN, cj = c / GN;
       const int nb[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
@@ -169,6 +172,7 @@ struct Router {
     cost[start] = 0; from[start] = -1; seen[start] = search;
     open.push({H(start), 0.f, start});
     while (!open.empty()) {
+      generationCheckpoint();
       const QE e = open.top(); open.pop();
       const int c0 = e.n;
       if (e.g > cost[c0]) continue;   // (a stale entry: the cell was reached more cheaply since; its own cost, exactly)
@@ -215,6 +219,7 @@ std::vector<vec2> straighten(const Router& r, const std::vector<int>& cells, int
   std::vector<vec2> out{p[0]};
   size_t i = 0;
   while (i + 1 < p.size()) {
+    generationCheckpoint();
     size_t best = i + 1;
     for (size_t j = std::min(p.size() - 1, i + 400); j > i + 1; j--) {
       const float lc = r.line(p[i], p[j], c);
@@ -281,6 +286,7 @@ void ease(std::vector<vec2>& p, float R, float maxShift, const std::function<boo
   std::vector<int> work; work.reserve(n);
   for (int k = n - 2; k >= 1; k--) work.push_back(k);
   for (long budget = 400L * n; !work.empty() && budget > 0; budget--) {
+    if ((budget & 255) == 0) generationCheckpoint();
     const int k = work.back(); work.pop_back(); queued[k] = 0;
     const vec2 a = p[k - 1], b = p[k], c = p[k + 1], w = c - a;
     const float lu = length(b - a), lv = length(c - b), lw = length(w);
@@ -320,12 +326,14 @@ std::vector<vec2> resample(const std::vector<vec2>& p, float spacing, float minC
 
 }  // namespace
 
-bool roadByAirfield(const RoadPoint& A, const RoadPoint& B, int cls) {
+static bool roadByAirfieldImpl(const World* world, const RoadPoint& A, const RoadPoint& B, int cls) {
   const float reach = roadSpec(cls).halfPlatform + roadBankMax(cls);
   const float dx = B.x - A.x, dz = B.z - A.z, L = std::max(hypotf(dx, dz), 1e-3f), nx = -dz / L, nz = dx / L;
   for (int q = 0; q <= 4; q++)
     for (int side = -2; side <= 2; side++) {
-      float grounds, cap; airportGroundsCap(A.x + dx * q / 4 + nx * reach * side / 2, A.z + dz * q / 4 + nz * reach * side / 2, grounds, cap);
+      float grounds, cap;
+      const float x = A.x + dx * q / 4 + nx * reach * side / 2, z = A.z + dz * q / 4 + nz * reach * side / 2;
+      if (world) airportGroundsCap(*world, x, z, grounds, cap); else airportGroundsCap(x, z, grounds, cap);
       if (grounds > 0.f) return true;
     }
   return false;
@@ -336,6 +344,7 @@ namespace {
 // the graded profile: the ground smoothed along the road, never steeper than the class allows; over water at least the
 // deck clearance. Bridges: over water, or where the road runs well above the ground for long enough
 void profile(const World& world, RoadPath& path, float h0, float h1, const std::vector<std::pair<int, float>>& pins = {}) {
+  generationCheckpoint();
   const RoadSpec& s = roadSpec(path.cls);
   const int n = (int)path.pts.size();
   std::vector<float> ground(n), ds(n, 0.f);
@@ -364,14 +373,14 @@ void profile(const World& world, RoadPath& path, float h0, float h1, const std::
   // ground that is itself no higher; nor below the ground there, should that stand higher)
   std::vector<float> ceiling(n), floor(n);
   for (int k = 0; k < n; k++) {
-    ceiling[k] = std::max(airportFunnelCeiling(path.pts[k].x, path.pts[k].z) - 1.f, ground[k]);
+    ceiling[k] = std::max(airportFunnelCeiling(world, path.pts[k].x, path.pts[k].z) - 1.f, ground[k]);
     floor[k] = ground[k] < 0.5f ? std::min(deck, ceiling[k]) : -1e9f;
   }
   // by an airfield's grounds the road lies on the ground as it is (buildRoadGrid paints it there, ungraded): its points
   // held there, as its ends are
   std::vector<uint8_t> airfield(n - 1), held(n, 0);
   std::vector<float> heldH(ground);
-  for (int k = 0; k + 1 < n; k++) if ((airfield[k] = roadByAirfield(path.pts[k], path.pts[k + 1], path.cls))) held[k] = held[k + 1] = 1;
+  for (int k = 0; k + 1 < n; k++) if ((airfield[k] = roadByAirfieldImpl(&world, path.pts[k], path.pts[k + 1], path.cls))) held[k] = held[k + 1] = 1;
   for (const auto& pin : pins) if (pin.first > 0 && pin.first < n - 1) { held[pin.first] = 1; heldH[pin.first] = pin.second; }   // (and where it crosses a road)
   // the funnels' ceiling and the bridges' deck clearance, then the grade limit forward and back until it settles (the
   // ends held where the road meets a town or another road, the points by an airfield on its ground); the grade has the
@@ -460,14 +469,20 @@ void profile(const World& world, RoadPath& path, float h0, float h1, const std::
 
 }  // namespace
 
+bool roadByAirfield(const RoadPoint& A, const RoadPoint& B, int cls) { return roadByAirfieldImpl(nullptr, A, B, cls); }
+bool roadByAirfield(const World& world, const RoadPoint& A, const RoadPoint& B, int cls) { return roadByAirfieldImpl(&world, A, B, cls); }
+
 RoadNetwork buildRoadNetwork(const World& world) {
+  generationCheckpoint();
   RoadNetwork net;
+  const int townCount = (int)world.towns.size();
   const Grid g = makeGrid(world);
+  generationPhase(GenerationPhase::RoadRouting);
   Router router(g);
   // ---- the nodes: every settlement's centre, every airfield's landside gate
-  for (int t = 0; t < kNumTowns; t++) {
-    const int c = Grid::idx(Grid::cell(kTowns[t].x), Grid::cell(kTowns[t].z));
-    net.nodes.push_back({kTowns[t].x, kTowns[t].z, kTowns[t].kind, g.island[c]});
+  for (int t = 0; t < townCount; t++) {
+    const int c = Grid::idx(Grid::cell(world.towns[t].x), Grid::cell(world.towns[t].z));
+    net.nodes.push_back({world.towns[t].x, world.towns[t].z, world.towns[t].kind, g.island[c]});
   }
   for (size_t ai = 0; ai < world.airports.size(); ai++) {
     const Airport& a = world.airports[ai]; const AptLayout L = aptLayout(a, (int)ai);
@@ -494,7 +509,7 @@ RoadNetwork buildRoadNetwork(const World& world) {
   auto join = [&](const Link& l) { comp[root(l.a)] = root(l.b); links.push_back(l); adj[l.a].push_back({l.b, l.d}); adj[l.b].push_back({l.a, l.d}); };
   auto pairsOn = [&](int isl, int minKind) {
     std::vector<Link> cand;
-    for (int p = 0; p < kNumTowns; p++) for (int q = p + 1; q < kNumTowns; q++) {
+    for (int p = 0; p < townCount; p++) for (int q = p + 1; q < townCount; q++) {
       const RoadNode &A = net.nodes[p], &B = net.nodes[q];
       if (A.island != isl || B.island != isl || A.kind < minKind || B.kind < minKind) continue;
       cand.push_back({p, q, hypotf(A.x - B.x, A.z - B.z), minKind >= 1 ? RC_HIGHWAY : RC_ROAD});
@@ -503,6 +518,7 @@ RoadNetwork buildRoadNetwork(const World& world) {
     return cand;
   };
   for (int isl = 0; isl < g.islands; isl++) {
+    generationCheckpoint();
     for (const Link& l : pairsOn(isl, 1))
       if (root(l.a) != root(l.b) || (net.nodes[l.a].kind == 2 && net.nodes[l.b].kind == 2)) join(l);
     const std::vector<Link> cand = pairsOn(isl, 0);
@@ -517,7 +533,7 @@ RoadNetwork buildRoadNetwork(const World& world) {
     }
   }
   std::vector<Link> straits;   // settlements on different islands, nearest first (tried after the islands' own roads)
-  for (int p = 0; p < kNumTowns; p++) for (int q = p + 1; q < kNumTowns; q++) {
+  for (int p = 0; p < townCount; p++) for (int q = p + 1; q < townCount; q++) {
     const RoadNode &A = net.nodes[p], &B = net.nodes[q];
     const float d = hypotf(A.x - B.x, A.z - B.z);
     if (A.island >= 0 && B.island >= 0 && A.island != B.island && d < 14000.f) straits.push_back({p, q, d, RC_ROAD});
@@ -630,6 +646,7 @@ RoadNetwork buildRoadNetwork(const World& world) {
   std::vector<int> isl(g.islands); std::iota(isl.begin(), isl.end(), 0);
   std::function<int(int)> islRoot = [&](int x) { return isl[x] == x ? x : isl[x] = islRoot(isl[x]); };
   for (const Link& l : straits) {
+    generationCheckpoint();
     const int ia = islRoot(net.nodes[l.a].island), ib = islRoot(net.nodes[l.b].island);
     if (ia == ib) continue;
     if (link(l, 3500.f)) isl[ia] = ib;
@@ -637,6 +654,7 @@ RoadNetwork buildRoadNetwork(const World& world) {
   // ---- every airfield's gate (and any settlement still alone) to the nearest road or settlement on its island: a
   // search outward until it reaches one
   for (int i = 0; i < N; i++) {
+    generationCheckpoint();
     const RoadNode& A = net.nodes[i];
     if (A.island < 0) continue;
     bool joined = false;
@@ -645,14 +663,14 @@ RoadNetwork buildRoadNetwork(const World& world) {
     goal.assign(g.h.size(), 0);
     bool any = false;
     for (size_t c = 0; c < goal.size(); c++) if (router.roadCell[c] && g.island[c] == A.island) { goal[c] = 1; any = true; }
-    std::vector<int> townCell(kNumTowns, -1);
-    for (int t = 0; t < kNumTowns; t++) if (t != i && net.nodes[t].island == A.island) { townCell[t] = cellOf(net.nodes[t]); goal[townCell[t]] = 1; any = true; }
+    std::vector<int> townCell(townCount, -1);
+    for (int t = 0; t < townCount; t++) if (t != i && net.nodes[t].island == A.island) { townCell[t] = cellOf(net.nodes[t]); goal[townCell[t]] = 1; any = true; }
     if (!any) continue;
     int i0, j0, i1, j1; window(vec2(A.x, A.z), vec2(A.x, A.z), 9000.f, i0, j0, i1, j1);
     router.access = A.kind == 3;
     // (a strip's access road: a country lane, narrower and allowed steeper - the mountain strips' climb; and any other
     // place's whose road would have to be steeper than a road may be)
-    RoadClass cls = A.kind == 3 && world.airports[i - kNumTowns].size == 0 ? RC_LANE : RC_ROAD;
+    RoadClass cls = A.kind == 3 && world.airports[i - townCount].size == 0 ? RC_LANE : RC_ROAD;
     std::vector<int> cells = route(cellOf(A), goal, vec2(-1e9f, -1e9f), cls, i0, j0, i1, j1);
     if (cls == RC_ROAD && router.steepest > 1.f) {
       std::vector<int> lane = route(cellOf(A), goal, vec2(-1e9f, -1e9f), RC_LANE, i0, j0, i1, j1);
@@ -662,7 +680,7 @@ RoadNetwork buildRoadNetwork(const World& world) {
     // the far end: a settlement it reached, or the nearest point of the road it reached, at that road's height
     vec2 end(Grid::cx(cells.back() % GN), Grid::cx(cells.back() / GN));
     float hEnd = world.groundHeight(end.x, end.y, 8); int to = -1;
-    for (int t = 0; t < kNumTowns; t++) if (townCell[t] == cells.back()) { end = vec2(net.nodes[t].x, net.nodes[t].z); hEnd = world.groundHeight(end.x, end.y, 8); to = t; }
+    for (int t = 0; t < townCount; t++) if (townCell[t] == cells.back()) { end = vec2(net.nodes[t].x, net.nodes[t].z); hEnd = world.groundHeight(end.x, end.y, 8); to = t; }
     if (to < 0) {
       const vec2 reached = end;
       float bd = 1e9f;
@@ -682,6 +700,7 @@ RoadNetwork buildRoadNetwork(const World& world) {
 }
 
 RoadPath layRoad(const World& world, RoadClass cls, const std::vector<vec2>& line, float h0, float h1, const std::vector<RoadPin>& pins) {
+  generationCheckpoint();
   RoadPath path; path.cls = cls;
   if (line.size() < 2) return path;
   const RoadSpec& s = roadSpec(cls);
@@ -715,7 +734,7 @@ RoadPath layRoad(const World& world, RoadClass cls, const std::vector<vec2>& lin
 }
 
 // ---------------------------------------------------------------- the grid the terrain and the material read
-int RoadGrid::cell(float v) { return std::clamp((int)floorf((v + WORLD_HALF) / (2.f * WORLD_HALF / N)), 0, N - 1); }
+int RoadGrid::cell(float v) { return (int)std::clamp(floorf((v + WORLD_HALF) / (2.f * WORLD_HALF / N)), 0.f, float(N - 1)); }
 
 namespace {
 // a path's points with those within tol of the straight line between their neighbours dropped (Douglas-Peucker, the
@@ -746,16 +765,18 @@ bool pavesTexel(const RoadSegment& s, int i, int j) {
 }
 }  // namespace
 
-void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid) {
+static void buildRoadGridImpl(const World* world, const RoadNetwork& net, RoadGrid& grid) {
+  generationCheckpoint();
   grid.segs.clear(); grid.list.clear(); grid.head.assign((size_t)RoadGrid::N * RoadGrid::N, 0);
   for (size_t pi = 0; pi < net.paths.size(); pi++) {
+    generationCheckpoint();
     const RoadPath& p = net.paths[pi];
     const int n = (int)p.pts.size();
     if (n < 2) continue;
     // each run of bridge, of road by an airfield, of graded road kept whole (its ends kept), the points along it
     // simplified
     std::vector<uint8_t> airfield(n - 1);
-    for (int k = 0; k + 1 < n; k++) airfield[k] = roadByAirfield(p.pts[k], p.pts[k + 1], p.cls);
+    for (int k = 0; k + 1 < n; k++) airfield[k] = roadByAirfieldImpl(world, p.pts[k], p.pts[k + 1], p.cls);
     std::vector<uint8_t> keep(n, 0); keep[0] = keep[n - 1] = 1;
     for (int k = 1; k + 1 < n; k++) if (p.bridge[k - 1] != p.bridge[k] || airfield[k - 1] != airfield[k]) keep[k] = 1;
     for (int a = 0; a < n - 1; ) { int b = a + 1; while (!keep[b]) b++; simplify(p, a, b, 0.15f, keep); a = b; }
@@ -779,6 +800,7 @@ void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid) {
   const float T = 2.f * WORLD_HALF / RoadGrid::N;
   std::vector<std::vector<uint32_t>> at((size_t)RoadGrid::N * RoadGrid::N);
   for (size_t si = 0; si < grid.segs.size(); si++) {
+    generationCheckpoint();
     const RoadSegment& s = grid.segs[si];
     const float R = roadSpec(s.cls).halfPlatform + roadBankMax(s.cls);
     const int i0 = RoadGrid::cell(std::min(s.ax, s.bx) - R), i1 = RoadGrid::cell(std::max(s.ax, s.bx) + R);
@@ -793,6 +815,7 @@ void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid) {
     }
   }
   for (size_t c = 0; c < at.size(); c++) {
+    if ((c & 1023u) == 0) generationCheckpoint();
     if (at[c].empty()) continue;
     // those paving the texel first: the painting reads no further (roadEntryRows marks where it can stop)
     const int ci = (int)(c % RoadGrid::N), cj = (int)(c / RoadGrid::N);
@@ -807,6 +830,7 @@ void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid) {
   std::vector<std::vector<uint32_t>> near((size_t)RoadGrid::NC * RoadGrid::NC);
   auto ccell = [&](float v) { return std::clamp((int)floorf((v + WORLD_HALF) / CS), 0, RoadGrid::NC - 1); };
   for (size_t si = 0; si < grid.segs.size(); si++) {
+    generationCheckpoint();
     const RoadSegment& s = grid.segs[si];
     const float dx = s.bx - s.ax, dz = s.bz - s.az, L2 = std::max(dx * dx + dz * dz, 1e-6f);
     for (int j = ccell(std::min(s.az, s.bz) - reach); j <= ccell(std::max(s.az, s.bz) + reach); j++)
@@ -819,6 +843,7 @@ void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid) {
   }
   grid.nearHead.assign(near.size(), 0); grid.nearList.clear();
   for (size_t c = 0; c < near.size(); c++) {
+    if ((c & 1023u) == 0) generationCheckpoint();
     if (near[c].empty()) continue;
     // (a cell with more than 255 segments within 500 m keeps the nearest to its centre)
     if (near[c].size() > 255) {
@@ -831,6 +856,9 @@ void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid) {
     grid.nearList.insert(grid.nearList.end(), near[c].begin(), near[c].end());
   }
 }
+
+void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid) { buildRoadGridImpl(nullptr, net, grid); }
+void buildRoadGrid(const World& world, const RoadNetwork& net, RoadGrid& grid) { buildRoadGridImpl(&world, net, grid); }
 
 float roadGrade(const RoadGrid& grid, float x, float z, float g) {
   if (grid.head.empty()) return g;
@@ -883,7 +911,7 @@ float roadEdgeDistance(const RoadGrid& grid, float x, float z, int* seg) {
   if (fine <= roadBankMax(RC_STREET)) { if (seg) *seg = fineSeg; return fine; }
   if (grid.nearHead.empty()) { if (seg) *seg = fineSeg; return fine; }
   const float CS = 2.f * WORLD_HALF / RoadGrid::NC;
-  const int i = std::clamp((int)floorf((x + WORLD_HALF) / CS), 0, RoadGrid::NC - 1), j = std::clamp((int)floorf((z + WORLD_HALF) / CS), 0, RoadGrid::NC - 1);
+  const int i = (int)std::clamp(floorf((x + WORLD_HALF) / CS), 0.f, float(RoadGrid::NC - 1)), j = (int)std::clamp(floorf((z + WORLD_HALF) / CS), 0.f, float(RoadGrid::NC - 1));
   const uint32_t h = grid.nearHead[(size_t)j * RoadGrid::NC + i];
   float best = 1e9f;
   for (uint32_t k = h >> 8, e = k + (h & 255u); k < e; k++) {
@@ -898,10 +926,12 @@ float roadEdgeDistance(const RoadGrid& grid, float x, float z, int* seg) {
 }
 
 std::vector<float> roadEntryRows(const RoadGrid& grid) {
+  generationCheckpoint();
   // each texel's entries after its last paving one: only the ground's banks read them (whatever the list's order - a
   // grid built by buildRoadGrid lists the paving ones first)
   std::vector<uint8_t> banksOnly(grid.list.size(), 0);
   for (size_t c = 0; c < grid.head.size(); c++) {
+    if ((c & 1023u) == 0) generationCheckpoint();
     const uint32_t k0 = RoadGrid::first(grid.head[c]), n = RoadGrid::count(grid.head[c]);
     if (n == 0 || k0 + n > grid.list.size()) continue;
     uint32_t last = k0;   // (one past the last paving entry)
@@ -911,6 +941,7 @@ std::vector<float> roadEntryRows(const RoadGrid& grid) {
   std::vector<float> d;
   d.reserve(grid.list.size() * 8 + ROAD_DATA_W * 4);
   for (size_t k = 0; k < grid.list.size(); k++) {
+    if ((k & 1023u) == 0) generationCheckpoint();
     const RoadSegment& r = grid.segs[grid.list[k]];
     const float e[8] = {r.ax, r.az, r.bx, r.bz, r.ah, r.bh, r.along, (float)(r.cls + 8 * r.flags + 128 * banksOnly[k] + 256 * r.path)};
     d.insert(d.end(), e, e + 8);

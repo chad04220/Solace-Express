@@ -1,0 +1,8 @@
+BACKGROUND threads_limit=2 active_chart_populated=1 active_reads=251 active_chunks=1 active_lots=26764 build_seconds=0.278
+REGION id=pr1-1-25-24 name=Lumen Volcanic Chain archetype=Volcanic chain from_cache=1 build_seconds=0.278
+AIRPORTS count=4 objects=598 solid_collisions=4 max_flatness_m=0.000000 max_approach_excess_m=-11.570816
+SETTLEMENTS towns=4 dry_lots=1668 road_paths=176 road_segments=2463 road_collision_probes=64
+MEMORY world_owned_capacity_bytes=141016122 recipe_bytes=15313 streamed_chunks=54
+FLIGHT chart_repeating=0 boundary_crossings=4
+PROCESS peak_rss_kib=304776
+procedural_world_test: 4594 checks, 0 failures

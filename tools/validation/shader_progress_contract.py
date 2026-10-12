@@ -32,13 +32,14 @@ static void finish(){} static void del(GLuint){}
 main='''int main(){glFinish=finish;glDeleteProgram=del;
 struct Case {const char* name;std::set<int> fail;int retry;bool ok;int completed;int calls;};
 for(const auto& c:std::vector<Case>{
-  {"success",{},0,true,34,34},
-  {"optional cloud accumulation unavailable",{19},0,true,34,34},
-  {"optional hull unavailable",{20},0,true,34,34},
+  {"success",{},0,true,Renderer::kProgramCount,Renderer::kProgramCount},
+  {"optional cloud accumulation unavailable",{19},0,true,Renderer::kProgramCount,Renderer::kProgramCount},
+  {"optional hull unavailable",{20},0,true,Renderer::kProgramCount,Renderer::kProgramCount},
   {"fatal scenery class",{3},0,false,3,4},
   {"fatal light",{22},0,false,21,22},
   {"fatal UFO and debris",{24},0,false,23,24},
-  {"fatal maps-only shadows",{25},0,false,24,25}
+  {"fatal maps-only shadows",{25},0,false,24,25},
+  {"fatal distant regional terrain",{Renderer::kProgramCount},0,false,Renderer::kProgramCount-1,Renderer::kProgramCount}
 }){calls=0;fail=c.fail;normalFallbackAt=c.retry;Renderer r;std::atomic<int> done{0};bool ok=r.compilePrograms(&done);printf("%s: ok=%d completed=%d attempts=%d\\n",c.name,ok,done.load(),calls);if(ok!=c.ok||done!=c.completed||calls!=c.calls){puts(r.error.c_str());return 1;}}
 puts("Logical shader completion contract: PASS");
 // the bodies' builder, made when a body is built (not at launch): its distance and normal programs are one field

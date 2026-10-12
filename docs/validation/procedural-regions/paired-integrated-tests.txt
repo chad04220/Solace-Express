@@ -1,0 +1,57 @@
+Test project /workspace/scratch/87b29863f015/solace-procedural-regions-build
+      Start 123: test_world
+ 1/26 Test #123: test_world .......................   Passed   18.99 sec
+      Start 130: procedural_region_runtime
+ 2/26 Test #130: procedural_region_runtime ........   Passed   44.49 sec
+      Start  58: flight_model_2
+ 3/26 Test  #58: flight_model_2 ...................   Passed   45.92 sec
+      Start  53: gameplay_loop_2
+ 4/26 Test  #53: gameplay_loop_2 ..................   Passed   18.52 sec
+      Start  23: career_saves
+ 5/26 Test  #23: career_saves .....................   Passed   12.47 sec
+      Start 137: jet_fuel
+ 6/26 Test #137: jet_fuel .........................   Passed   15.28 sec
+      Start 119: roads
+ 7/26 Test #119: roads ............................   Passed   32.16 sec
+      Start 126: regional_surface
+ 8/26 Test #126: regional_surface .................   Passed    0.17 sec
+      Start 127: regional_surface_fastmath
+ 9/26 Test #127: regional_surface_fastmath ........   Passed    0.18 sec
+      Start 128: region_generation_cancellation
+10/26 Test #128: region_generation_cancellation ...   Passed    0.03 sec
+      Start   1: earth_geodesy
+11/26 Test   #1: earth_geodesy ....................   Passed    0.00 sec
+      Start   2: earth_geodesy_fastmath
+12/26 Test   #2: earth_geodesy_fastmath ...........   Passed    0.00 sec
+      Start   3: earth_rebase_flight
+13/26 Test   #3: earth_rebase_flight ..............   Passed    1.92 sec
+      Start  62: terrain_shadow_bake
+14/26 Test  #62: terrain_shadow_bake ..............   Passed    2.28 sec
+      Start 105: shader_loading_contract
+15/26 Test #105: shader_loading_contract ..........   Passed    1.35 sec
+      Start 120: landmarks
+16/26 Test #120: landmarks ........................   Passed    4.22 sec
+      Start 121: road_traffic
+17/26 Test #121: road_traffic .....................   Passed    1.84 sec
+      Start 124: procedural_regions
+18/26 Test #124: procedural_regions ...............   Passed    0.16 sec
+      Start 125: distant_regions
+19/26 Test #125: distant_regions ..................   Passed    0.86 sec
+      Start 129: region_scenery
+20/26 Test #129: region_scenery ...................   Passed    0.17 sec
+      Start 131: procedural_recipe_placement
+21/26 Test #131: procedural_recipe_placement ......   Passed    0.02 sec
+      Start 132: nonrepeating_scenery
+22/26 Test #132: nonrepeating_scenery .............   Passed    0.04 sec
+      Start 133: region_travel
+23/26 Test #133: region_travel ....................   Passed    0.09 sec
+      Start 134: region_travel_fastmath
+24/26 Test #134: region_travel_fastmath ...........   Passed    0.09 sec
+      Start 135: region_scenery_isolation
+25/26 Test #135: region_scenery_isolation .........   Passed    0.13 sec
+      Start 136: world_upload_budget
+26/26 Test #136: world_upload_budget ..............   Passed    3.60 sec
+
+100% tests passed out of 26
+
+Total Test time (real) = 204.98 sec

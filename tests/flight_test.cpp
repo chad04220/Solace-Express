@@ -217,7 +217,7 @@ int main(int argc, char** argv) {
           samples++;
         }
     ok = ok && maxThrustDelta == 0.f && fabsf(p.thrustAt(1.f, 0.f, 0.f, 1.225f) - 176000.f) < 0.1f
-            && p.fuelFlowMax() == old.fuelFlowMax() && fabsf(p.fuelFlowMax() - 0.990f) < 0.00001f
+            && p.fuelFlowMax() == old.fuelFlowMax() && fabsf(p.fuelFlowMax() - 176000.f * single.jetWetTsfc) < 0.0001f
             && p.spoolRate() == old.spoolRate() && p.spoolRate() == 0.45f;
     printf("XR-20 single core: %d thrust samples, maximum pair delta %.3f N, static reheat %.0f N, fuel %.3f kg/s %s\n",
            samples, maxThrustDelta, p.thrustAt(1.f, 0.f, 0.f, 1.225f), p.fuelFlowMax(), ok ? "ok" : "FAIL"); fails += !ok;
@@ -258,7 +258,8 @@ int main(int argc, char** argv) {
            singleYaw, twinYaw, ok ? "ok" : "FAIL"); fails += !ok;
   }
   // ---------------- research tiers: actual sustained level flight, not designMach labels or a diving peak.
-  // designMach is the onset of extra drag, not a hard speed cap. Keep the XR-30 / XR-40 physics unchanged.
+  // designMach is the onset of extra drag, not a hard speed cap. Hold fuel mass constant
+  // in this aerodynamic-envelope fixture; finite reheat endurance is covered by jet_fuel_test.
   if (in(1)) {
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
     struct LevelResult { float mach = 0, minAlt = 1e9f, maxAlt = -1e9f, vs = 0, accel = 0; bool intact = true; };
@@ -272,9 +273,10 @@ int main(int argc, char** argv) {
         integral = clampf(integral + error / 60.f, -7500.f, 7500.f);   // (enough to hold the supersonic trim change: the lift's centre moves aft)
         p.ctl.pitch = clampf(error * 0.002f - p.vel.y * 0.01f - p.w.x * 0.3f + integral * 0.00004f, -1.f, 1.f);
         p.ctl.roll = clampf(-p.bankDeg() * 0.05f + p.w.z * 0.3f, -1.f, 1.f);
+        p.fuel = s.maxFuel * .7f; // fixed-weight thrust/drag measurement, not an endurance claim
         p.step(1 / 60.f, calm, i / 60.f);
         // Recycle horizontal position over the same open sea so chart bounds do not truncate a sustained test.
-        // All flight state (altitude, attitude, velocity, fuel, mass, controls and forces) continues normally.
+        // Altitude, attitude, velocity, controls and forces continue; fuel mass is fixed above.
         p.pos.x = -39000; p.pos.z = 35000;
         if (i == 210 * 60) vFrom = p.airspeed;
         if (i >= 210 * 60) { r.mach += p.mach; r.vs += p.vel.y; r.minAlt = std::min(r.minAlt, p.pos.y); r.maxAlt = std::max(r.maxAlt, p.pos.y); n++; }

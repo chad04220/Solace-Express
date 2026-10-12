@@ -1,0 +1,2 @@
+CANCEL archetype=Archipelago target=terrain actual=terrain latency_ms=1.913 active_reads=125
+region generation cancellation: 19 checks, 0 failures; worst_observed_cancel_ms=1.913

@@ -1,0 +1,31 @@
+Test project /workspace/scratch/87b29863f015/solace-procedural-regions-build
+      Start 123: test_world
+      Start   1: earth_geodesy
+      Start   2: earth_geodesy_fastmath
+ 1/13 Test   #1: earth_geodesy ....................   Passed    0.00 sec
+      Start 124: procedural_regions
+ 2/13 Test   #2: earth_geodesy_fastmath ...........   Passed    0.01 sec
+      Start 125: region_scenery
+ 3/13 Test #124: procedural_regions ...............   Passed    0.30 sec
+      Start 128: nonrepeating_scenery
+ 4/13 Test #128: nonrepeating_scenery .............   Passed    0.09 sec
+      Start 129: region_travel
+ 5/13 Test #125: region_scenery ...................   Passed    0.43 sec
+      Start 130: region_travel_fastmath
+ 6/13 Test #129: region_travel ....................   Passed    0.26 sec
+      Start 131: region_scenery_isolation
+ 7/13 Test #130: region_travel_fastmath ...........   Passed    0.28 sec
+ 8/13 Test #131: region_scenery_isolation .........   Passed    0.23 sec
+ 9/13 Test #123: test_world .......................   Passed   20.90 sec
+      Start  23: career_saves
+      Start 119: roads
+      Start 118: bridges
+10/13 Test #118: bridges ..........................   Passed    2.38 sec
+      Start 120: landmarks
+11/13 Test #120: landmarks ........................   Passed    5.32 sec
+12/13 Test  #23: career_saves .....................   Passed   16.22 sec
+13/13 Test #119: roads ............................   Passed   40.01 sec
+
+100% tests passed out of 13
+
+Total Test time (real) =  60.91 sec

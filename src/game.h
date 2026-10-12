@@ -9,6 +9,8 @@
 #include <future>
 #include <map>
 #include "world.h"
+#include "procedural_regions.h"
+#include "region_travel.h"
 #include "aircraft.h"
 #include "breakup.h"
 #include "traffic.h"
@@ -68,12 +70,13 @@ struct TipPt { vec3 p; float age, a; int seg; AirSwirl sw; bool caught = false; 
 struct Particle { vec3 p, v; float life, maxLife, size, grow; vec3 col; float alpha; int kind; float drag, buoy; bool instant = false; bool fresh = true;
                   bool air = false, passed = false, caught = false; AirSwirl sw; };  // instant: no fade-in (trails); air: a parcel of the air (a cloud wisp) the airframe's flow moves (passed: behind its wing; caught: turning round one of its vortices)
 
-enum GameScreen { SCR_MENU = 0, SCR_HUB, SCR_FLIGHT, SCR_DEBRIEF, SCR_RESEARCH, SCR_LOADING, SCR_FREE_FLIGHT };
+enum GameScreen { SCR_MENU = 0, SCR_HUB, SCR_FLIGHT, SCR_DEBRIEF, SCR_RESEARCH, SCR_LOADING, SCR_FREE_FLIGHT, SCR_REGION_LOADING };
 enum HubTab { TAB_CONTRACTS = 0, TAB_HANGAR, TAB_AIRLINE, TAB_LOGBOOK, TAB_SETTINGS };
 
 class Game {
   friend struct GameTest;
 public:
+  ~Game();
   bool botControl = false;  // tests drive plane.ctl directly
   Input in;
   bool quit = false;
@@ -94,7 +97,9 @@ public:
   bool wantPacing = false;       // the frame-rate target changed: the platform layer re-applies its pacing
   // sceneOnly: the scene without the menu on top (captures of the menu's scenery)
   bool sceneOnly = false;
-  void focusLost() { if (screen == SCR_FLIGHT && !crashed) paused = true; }   // the window lost focus: a flight pauses
+  void focusLost() {
+    if (screen == SCR_FLIGHT && !crashed) paused = true;
+  }   // the window lost focus: a flight pauses
   Settings set;
   std::string saveDir;
   // A tool session (diagnostics.bat's --bench, --shots, --profile, --analyze, --loadshots): its flights - crashes among
@@ -143,7 +148,48 @@ private:
   // Its own selection and return screen keep the career's hangar and job card untouched.
   bool freeFlight = false;
   int freeCraft = 0, freeAirport = 0;
-  bool freeAirborne = false;
+  bool freeAirborne = false, freeLaunchPending = false;
+  // One active chart plus one immutable background candidate. Initial/menu replacements gate readers.
+  std::vector<procedural::Descriptor> freeRegions;
+  int freeRegion = 0;
+  bool freeRegionMap = false;
+  procedural::Descriptor loadingRegion;
+  GameScreen regionAfterLoad = SCR_FREE_FLIGHT;
+  std::future<std::vector<uint8_t>> regionJob;
+  std::atomic<int> regionLoadStage{0}; // 0 draining readers, 1 building, 2 preparing navigation, 3 publishing
+  std::string regionError;
+  float regionLoadTime = 0;
+  bool regionCancel = false, regionResumePaused = false;
+  bool earthFlight = false, earthCourseHold = false;
+  procedural::Descriptor flightRegion;
+  geo::Position earthPosition;
+  std::optional<procedural::Descriptor> earthDestination;
+  std::optional<regionTravel::Change> regionPoseChange;
+  struct PrefetchedRegion {
+    procedural::Descriptor region;
+    std::unique_ptr<World> world;
+    Renderer::WorldUploadData upload;
+    bool gpuStarted = false;
+  };
+  std::future<std::unique_ptr<PrefetchedRegion>> earthPrefetchJob;
+  std::shared_ptr<GenerationCancelState> earthPrefetchCancel;
+  std::unique_ptr<PrefetchedRegion> earthPrefetch;
+  std::future<void> earthRetireJob;
+  std::string earthPrefetchId, earthPrefetchFailedId, earthPrefetchError;
+  bool earthSceneryDraining = false, earthFacilitiesPending = false, earthPromotionDeferred = false;
+  void retireEarthPrefetch(); // never joins a running job on the flight thread
+  void updateEarthSurfaceContext();
+  bool earthPromotionSafe(const World& candidate, const regionTravel::Change& change) const;
+  void updateEarthFlight();
+  void continueEarthFlight();
+  void setEarthDestination(const procedural::Descriptor& region);
+  void openEarthPicker();
+  void initFreeRegions();
+  void chooseFreeRegion(const procedural::Descriptor& region);
+  void loadFreeRegion(int index, GameScreen after = SCR_FREE_FLIGHT);
+  void updateRegionLoading(float dt);
+  void drawRegionLoading();
+  void drawRegionPicker();
   void beginFreeFlightSetup();
   // the main menu into the career: its hub on the work tab and list, nothing chosen (never the tab the menu's own
   // Settings or Controls button, or an earlier visit, left it on)
