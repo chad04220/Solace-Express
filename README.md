@@ -2,9 +2,9 @@
 
 ## The new name: Somnium Volandi
 
-Solace Express is now **Somnium Volandi** ("the dream of flying"). The game is `SomniumVolandi.exe`, released as `SomniumVolandi-windows-x64.zip`, and it starts fresh: saves, settings and radio stations live in `%APPDATA%\SomniumVolandi`, and the shader cache and other rebuildable data in `%LOCALAPPDATA%\SomniumVolandi`. Nothing is carried over from the old `SolaceExpress` folders, and the first launch compiles its shaders again. To keep a career, copy the files from `%APPDATA%\SolaceExpress` into `%APPDATA%\SomniumVolandi` before the first launch; the old folders can then be deleted. The islands keep their names.
+Somnium Volandi is now **Somnium Volandi** ("the dream of flying"). The game is `SomniumVolandi.exe`, released as `SomniumVolandi-windows-x64.zip`, and it starts fresh: saves, settings and radio stations live in `%APPDATA%\SomniumVolandi`, and the shader cache and other rebuildable data in `%LOCALAPPDATA%\SomniumVolandi`. Nothing is carried over from the old `SomniumVolandi` folders, and the first launch compiles its shaders again. To keep a career, copy the files from `%APPDATA%\SomniumVolandi` into `%APPDATA%\SomniumVolandi` before the first launch; the old folders can then be deleted. The islands keep their names.
 
-The game identity, icon, startup page and civilian screens use midnight blue, platinum and brass. NIGHTGLASS Research uses emerald code that falls and crosses the display, periodically resolving a face, wing or helix. Military Career uses matte field panels, recessed fasteners and amber deployment controls. Loading shows the current operation, measured stage/batch progress, a subsystem checklist and completed-work progress. Settings → General → Menu animation offers reduced motion. See [the review handoff](docs/CLAUDE_SOMNIUM_VOLANDI_UI_REVIEW.md) for implementation details, screenshots and validation.
+The game identity, icon, startup page and civilian screens use midnight blue, platinum and brass. NIGHTGLASS Research uses electric-blue code on deep blue-black panels that falls and crosses the display, periodically resolving a face, wing or helix. Military Career uses matte field panels, recessed fasteners and amber deployment controls. Loading shows the current operation, measured stage/batch progress, a subsystem checklist and completed-work progress. Settings → General → Menu animation offers reduced motion. See [the review handoff](docs/CLAUDE_SOMNIUM_VOLANDI_UI_REVIEW.md) for implementation details, screenshots and validation.
 
 ## Hive military review: back up careers before testing
 
@@ -16,7 +16,7 @@ Research XR-40 equipment choices now live in the terminal side rail, and researc
 
 Military missions, enemy combat and XR-40 loadouts are review features. Native Windows/RTX 3070 gameplay and frame-time validation are still required. See `docs/CLAUDE_HIVE_MILITARY_REVIEW.md` in the source for coverage and limitations.
 
-*Formerly Solace Express, and before that Air Xpress.*
+*Formerly Somnium Volandi, and before that Air Xpress.*
 
 A pilot-career flight game for Windows with a detailed real-time 3D world drawn on the GPU. You start as a student with a permit, earn your licences, rent small planes to haul cargo, rent bigger ones to fly passengers, then buy your own aircraft for longer, harder contracts: mountain strips, glaciers, volcano fields, night storms and finally your own airline (the AIRLINE tab: hired pilots fly your aircraft on routes while you fly your own work, and their flights pass you as traffic in your livery).
 

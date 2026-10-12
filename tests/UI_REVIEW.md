@@ -32,33 +32,30 @@ The research terminal is restored to approved base `473d4201eb22a59ef6549b487172
 
 The `interactions` mode asserts the original XR-30 default, three full keyboard selection cycles, three mouse-selection cycles using the original adaptive card layout, incompatible research test reset, departure site wrap in both directions, the original runway/airborne and weather chip targets, and Escape return. It intentionally avoids launch or purchasing actions.
 
-Regression mode also checks hangar/airline keyboard focus identity through automatic scrolling, loading readiness gated by distinct rendered frames, absent optional shadow-shader readiness, and all thirteen catalog aircraft dimension endpoints projected inside the production hangar viewport. Projection checks are CPU geometry evidence, not rendered-aircraft evidence.
+Regression mode also checks hangar/airline keyboard focus identity through automatic scrolling, loading readiness gated by distinct rendered frames, absent optional shadow-shader readiness, and all fifteen catalog aircraft dimension endpoints projected inside the production hangar viewport. Projection checks are CPU geometry evidence, not rendered-aircraft evidence.
 
-## Explicit fleet-only startup diagnostic
+## Native aircraft preview diagnostic
 
-On the review VM, full production initialization was killed (exit137) twice: first at the hull builder, then with serialized/no-optimization Mesa at the generic all-aircraft renderer. A third attempt omitting only research variants was also killed at the fleet objects shader. No actual-scene frame came from these attempts. UI-only captures do not cover that failure.
+`ui_review_hangar_harness` is a separate review target that copies three renderer translation units and adds preparation and verification assertions. It builds every production startup program, pre-bakes the actual selected aircraft mesh before drawing, and preserves geometry, materials, moving parts, gear, camera, lighting, shadows, terrain and post-processing. It accepts all 15 Hangar models, the 11 career Free Flight models, all four Research models, and locked/unlocked Military assignment fixtures. It is a rendered-preview check, not a native Windows cold-start benchmark.
 
-`ui_review_hangar_harness` is an explicitly separate diagnostic target. Its build-time generator copies three C++ translation units into the build directory and omits eight unused startup programs: generic and fleet marched aircraft objects/shadows, generic effects, generic aircraft mesh, and XR-30/XR-40 mesh variants. The selected production aircraft mesh is fully baked before the first frame. Runtime assertions abort if either the aircraft objects march or marched shadow proxy would be needed; neither can be silently omitted. The existing maps-only shadow variant is selected only when the production condition already selects it. It compiles the exact existing fleet (`AF_LIGHT`) mesh and effects variants, with no shader-text, geometry, material, gear, pose, lighting, shadow, terrain, or post-process substitutions. It validates the reduced completed-program total (production total minus8). Production files and the normal application build stay unchanged.
-
-The executable permits only compatible fleet hangar scenes, freeflight0..8 setup scenes, research10/research20 (which use the same standard fleet specialization), and menuT5 (the fixed first tour shot). Every frame additionally requires a compatible special=0 model and aborts if either omitted march would be needed. XR-30/XR-40 are rejected. Images from it can validate actual compatible aircraft and scene passes, but cannot validate full production startup or XR-30/XR-40 rendering. The diagnostic limitation must accompany delivered captures.
+With `UI_VERIFY_PREVIEWS=1`, each rendered frame is checked for actual aircraft pixels in the G-buffer. A UI diagram or loading photograph cannot satisfy this check. Classified frames additionally require a visible geometry outline and a hidden ink interior in the lighting result before the UI is drawn. A missing mesh, blank aircraft pass or invalid classified result aborts the diagnostic.
 
 ```sh
 cmake --build build --target ui_review_hangar_harness -j2
-LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=1 GALLIVM_PERF=nopt \
-  MESA_SHADER_CACHE_MAX_SIZE=8G FRAMES=3 \
-  build/ui_review_hangar_harness hangar0 /tmp/fleet-hangar1080 1920 1080 1 scene
+SHADERCACHE=/tmp/somnium-scene-cache UI_VERIFY_PREVIEWS=1 FRAMES=2 \
+  build/ui_review_hangar_harness hangar0,hangar9,hangar10,hangar11,hangar12,research10,research20,research30,research40,military4_locked,military4_unlocked /tmp/aircraft-previews 1280 720 1 scene
 ```
 
 Final camera checks additionally cover all three transformed tyre supports (within0.1mm of the showroom floor) and zero propeller blur/phase for parked prop aircraft. Verified at720p/140%,1080p/100%, and1080p/115%.
 
-The interactions batch also traverses all13hangar rows through keyboard and D-pad activation, checks mouse selection and absent economic controls for all4classified entries, traverses all9FreeFlight aircraft and all16airports, and checks runway/airborne setup, Escape return, and unchanged career state. Every Free Flight selection also builds the actual preview frame with a conflicting classified career selection and asserts that the rendered model is the selected free aircraft, with normal showroom lighting. Core launch/pause/retry/career-file isolation has separate gameplay regressions.
+The interactions batch also traverses all15hangar rows through keyboard and D-pad activation, checks mouse selection and absent economic controls for all4classified entries, traverses all11FreeFlight aircraft and all16airports, and checks runway/airborne setup, Escape return, and unchanged career state. Every Free Flight selection also builds the actual preview frame with a conflicting classified career selection and asserts that the rendered model is the selected free aircraft, with normal showroom lighting. Core launch/pause/retry/career-file isolation has separate gameplay regressions.
 
 
 ## Military terminal and sortie review
 
 The `militaryN` scenes select stable military mission ID N on a fresh career (board IDs 3,4,5,6,7,1,8,9,2); only ID 3 is initially available. Use `military4_locked`, `military4_unlocked` and `military4_completed` to compare the same XR-20 silhouette, unlocked aircraft and replay state. The unlocked/completed screenshot fixtures explicitly seed prerequisite success records; gameplay tests separately prove genuine objective/extraction unlocks. `militaryNscroll` exercises the right-hand briefing's scroll region. `military_loadingN` launches the real supplied mission and updates the loading readiness path between completed render frames; `military_loadingNlive` suppresses only the packaged photo in the fixture to exercise native exterior fallback. `military_pauseN` and `military_debriefN` show production military pause and aborted-sortie results.
 
-For this review, full production startup and native aircraft rendering succeeded on Mesa llvmpipe without the older fleet-only diagnostic substitutions above. See `docs/CLAUDE_MILITARY_CAREER_REVIEW.md` for measured coverage and committed native captures. UI-only mode remains layout evidence only.
+For this review, full production startup and native aircraft rendering succeeded on Mesa llvmpipe using the normal rendering programs. See `docs/CLAUDE_MILITARY_CAREER_REVIEW.md` for measured coverage and committed native captures. UI-only mode remains layout evidence only.
 
 ## Research equipment and preview controls
 

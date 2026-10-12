@@ -1,0 +1,1883 @@
+{
+  "renderer": "Mesa llvmpipe LLVM 20.1.2",
+  "mode": "Production rendering programs; test-only selected mesh pre-bake and pixel assertions",
+  "preview_states": 52,
+  "verified_frames": 104,
+  "aircraft_models": 15,
+  "classified_frames": 28,
+  "native_windows_run": false,
+  "records": [
+    {
+      "scene": "hangar0",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 0,
+          "classified": false,
+          "aircraft_pixels": 5783,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            475,
+            381,
+            747,
+            489
+          ]
+        },
+        {
+          "model": 0,
+          "classified": false,
+          "aircraft_pixels": 5775,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            475,
+            381,
+            746,
+            488
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar1",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 1,
+          "classified": false,
+          "aircraft_pixels": 5304,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            472,
+            375,
+            742,
+            490
+          ]
+        },
+        {
+          "model": 1,
+          "classified": false,
+          "aircraft_pixels": 5314,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            471,
+            375,
+            742,
+            490
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar2",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 2,
+          "classified": false,
+          "aircraft_pixels": 3995,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            473,
+            396,
+            745,
+            465
+          ]
+        },
+        {
+          "model": 2,
+          "classified": false,
+          "aircraft_pixels": 3979,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            472,
+            396,
+            745,
+            465
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar3",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 3,
+          "classified": false,
+          "aircraft_pixels": 6309,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            470,
+            377,
+            749,
+            488
+          ]
+        },
+        {
+          "model": 3,
+          "classified": false,
+          "aircraft_pixels": 6318,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            469,
+            376,
+            748,
+            487
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar4",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 4,
+          "classified": false,
+          "aircraft_pixels": 5365,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            472,
+            380,
+            748,
+            483
+          ]
+        },
+        {
+          "model": 4,
+          "classified": false,
+          "aircraft_pixels": 5354,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            472,
+            380,
+            748,
+            483
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar5",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 5,
+          "classified": false,
+          "aircraft_pixels": 5622,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            471,
+            369,
+            731,
+            483
+          ]
+        },
+        {
+          "model": 5,
+          "classified": false,
+          "aircraft_pixels": 5611,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            470,
+            369,
+            730,
+            483
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar6",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 6,
+          "classified": false,
+          "aircraft_pixels": 6284,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            465,
+            369,
+            719,
+            494
+          ]
+        },
+        {
+          "model": 6,
+          "classified": false,
+          "aircraft_pixels": 6293,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            465,
+            369,
+            718,
+            494
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar7",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 7,
+          "classified": false,
+          "aircraft_pixels": 5729,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            469,
+            379,
+            729,
+            488
+          ]
+        },
+        {
+          "model": 7,
+          "classified": false,
+          "aircraft_pixels": 5715,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            468,
+            379,
+            729,
+            488
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar8",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 8,
+          "classified": false,
+          "aircraft_pixels": 7020,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            464,
+            374,
+            725,
+            503
+          ]
+        },
+        {
+          "model": 8,
+          "classified": false,
+          "aircraft_pixels": 7049,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            463,
+            373,
+            725,
+            503
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar9",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 9,
+          "classified": true,
+          "aircraft_pixels": 6173,
+          "outline_pixels": 2182,
+          "hidden_pixels": 3991,
+          "bounds": [
+            471,
+            374,
+            736,
+            490
+          ]
+        },
+        {
+          "model": 9,
+          "classified": true,
+          "aircraft_pixels": 6158,
+          "outline_pixels": 2178,
+          "hidden_pixels": 3980,
+          "bounds": [
+            471,
+            375,
+            736,
+            490
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar10",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 10,
+          "classified": true,
+          "aircraft_pixels": 5914,
+          "outline_pixels": 1561,
+          "hidden_pixels": 4353,
+          "bounds": [
+            508,
+            380,
+            691,
+            496
+          ]
+        },
+        {
+          "model": 10,
+          "classified": true,
+          "aircraft_pixels": 5897,
+          "outline_pixels": 1546,
+          "hidden_pixels": 4351,
+          "bounds": [
+            508,
+            381,
+            690,
+            497
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar11",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 11,
+          "classified": true,
+          "aircraft_pixels": 5852,
+          "outline_pixels": 1831,
+          "hidden_pixels": 4021,
+          "bounds": [
+            501,
+            391,
+            729,
+            503
+          ]
+        },
+        {
+          "model": 11,
+          "classified": true,
+          "aircraft_pixels": 5860,
+          "outline_pixels": 1831,
+          "hidden_pixels": 4029,
+          "bounds": [
+            500,
+            390,
+            728,
+            502
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar12",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 7593,
+          "outline_pixels": 1800,
+          "hidden_pixels": 5793,
+          "bounds": [
+            500,
+            383,
+            692,
+            499
+          ]
+        },
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 7577,
+          "outline_pixels": 1794,
+          "hidden_pixels": 5783,
+          "bounds": [
+            499,
+            384,
+            691,
+            499
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar13",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 13,
+          "classified": false,
+          "aircraft_pixels": 5811,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            469,
+            374,
+            741,
+            490
+          ]
+        },
+        {
+          "model": 13,
+          "classified": false,
+          "aircraft_pixels": 5816,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            469,
+            375,
+            741,
+            490
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar14",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 14,
+          "classified": false,
+          "aircraft_pixels": 5341,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            475,
+            373,
+            701,
+            483
+          ]
+        },
+        {
+          "model": 14,
+          "classified": false,
+          "aircraft_pixels": 5342,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            474,
+            372,
+            700,
+            483
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "freeflight0",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 0,
+          "classified": false,
+          "aircraft_pixels": 5784,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            476,
+            381,
+            747,
+            489
+          ]
+        },
+        {
+          "model": 0,
+          "classified": false,
+          "aircraft_pixels": 5789,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            475,
+            381,
+            747,
+            489
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "freeflight1",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 1,
+          "classified": false,
+          "aircraft_pixels": 5321,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            472,
+            375,
+            742,
+            490
+          ]
+        },
+        {
+          "model": 1,
+          "classified": false,
+          "aircraft_pixels": 5310,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            471,
+            375,
+            742,
+            490
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "freeflight2",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 2,
+          "classified": false,
+          "aircraft_pixels": 3989,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            472,
+            396,
+            746,
+            465
+          ]
+        },
+        {
+          "model": 2,
+          "classified": false,
+          "aircraft_pixels": 4000,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            472,
+            396,
+            745,
+            465
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "freeflight3",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 3,
+          "classified": false,
+          "aircraft_pixels": 6319,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            470,
+            377,
+            748,
+            488
+          ]
+        },
+        {
+          "model": 3,
+          "classified": false,
+          "aircraft_pixels": 6303,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            469,
+            377,
+            748,
+            488
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "freeflight4",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 4,
+          "classified": false,
+          "aircraft_pixels": 5359,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            472,
+            380,
+            749,
+            483
+          ]
+        },
+        {
+          "model": 4,
+          "classified": false,
+          "aircraft_pixels": 5361,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            472,
+            379,
+            748,
+            482
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "freeflight5",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 5,
+          "classified": false,
+          "aircraft_pixels": 5617,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            471,
+            369,
+            730,
+            483
+          ]
+        },
+        {
+          "model": 5,
+          "classified": false,
+          "aircraft_pixels": 5625,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            470,
+            369,
+            730,
+            483
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "freeflight6",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 6,
+          "classified": false,
+          "aircraft_pixels": 6299,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            466,
+            369,
+            719,
+            493
+          ]
+        },
+        {
+          "model": 6,
+          "classified": false,
+          "aircraft_pixels": 6310,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            465,
+            369,
+            719,
+            494
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "freeflight7",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 7,
+          "classified": false,
+          "aircraft_pixels": 5713,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            469,
+            379,
+            729,
+            488
+          ]
+        },
+        {
+          "model": 7,
+          "classified": false,
+          "aircraft_pixels": 5727,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            468,
+            379,
+            729,
+            487
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "freeflight8",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 8,
+          "classified": false,
+          "aircraft_pixels": 7037,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            464,
+            374,
+            726,
+            503
+          ]
+        },
+        {
+          "model": 8,
+          "classified": false,
+          "aircraft_pixels": 7022,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            463,
+            374,
+            725,
+            503
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "freeflight13",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 13,
+          "classified": false,
+          "aircraft_pixels": 5810,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            469,
+            375,
+            741,
+            490
+          ]
+        },
+        {
+          "model": 13,
+          "classified": false,
+          "aircraft_pixels": 5810,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            469,
+            374,
+            741,
+            490
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "freeflight14",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 14,
+          "classified": false,
+          "aircraft_pixels": 5348,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            475,
+            372,
+            701,
+            483
+          ]
+        },
+        {
+          "model": 14,
+          "classified": false,
+          "aircraft_pixels": 5334,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            475,
+            373,
+            700,
+            483
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "research10",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 9,
+          "classified": false,
+          "aircraft_pixels": 16086,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            376,
+            242,
+            796,
+            336
+          ]
+        },
+        {
+          "model": 9,
+          "classified": false,
+          "aircraft_pixels": 16250,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            377,
+            242,
+            796,
+            335
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "research20",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 11,
+          "classified": false,
+          "aircraft_pixels": 17294,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            396,
+            254,
+            771,
+            359
+          ]
+        },
+        {
+          "model": 11,
+          "classified": false,
+          "aircraft_pixels": 17416,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            397,
+            253,
+            773,
+            357
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "research30",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 10,
+          "classified": false,
+          "aircraft_pixels": 18372,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            456,
+            256,
+            801,
+            356
+          ]
+        },
+        {
+          "model": 10,
+          "classified": false,
+          "aircraft_pixels": 18462,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            453,
+            256,
+            801,
+            355
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "research40",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 18577,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            459,
+            256,
+            814,
+            350
+          ]
+        },
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 18633,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            458,
+            257,
+            815,
+            350
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military3_locked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 9,
+          "classified": false,
+          "aircraft_pixels": 7525,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            464,
+            298,
+            746,
+            368
+          ]
+        },
+        {
+          "model": 9,
+          "classified": false,
+          "aircraft_pixels": 7573,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            465,
+            298,
+            746,
+            367
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military4_locked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 11,
+          "classified": true,
+          "aircraft_pixels": 8079,
+          "outline_pixels": 1731,
+          "hidden_pixels": 6348,
+          "bounds": [
+            476,
+            312,
+            729,
+            374
+          ]
+        },
+        {
+          "model": 11,
+          "classified": true,
+          "aircraft_pixels": 8144,
+          "outline_pixels": 1739,
+          "hidden_pixels": 6405,
+          "bounds": [
+            476,
+            312,
+            730,
+            374
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military5_locked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 10,
+          "classified": true,
+          "aircraft_pixels": 8410,
+          "outline_pixels": 1584,
+          "hidden_pixels": 6826,
+          "bounds": [
+            511,
+            306,
+            754,
+            373
+          ]
+        },
+        {
+          "model": 10,
+          "classified": true,
+          "aircraft_pixels": 8453,
+          "outline_pixels": 1588,
+          "hidden_pixels": 6865,
+          "bounds": [
+            509,
+            305,
+            753,
+            372
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military6_locked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 8590,
+          "outline_pixels": 1465,
+          "hidden_pixels": 7125,
+          "bounds": [
+            516,
+            310,
+            756,
+            369
+          ]
+        },
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 8616,
+          "outline_pixels": 1456,
+          "hidden_pixels": 7160,
+          "bounds": [
+            515,
+            310,
+            756,
+            369
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military7_locked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 8579,
+          "outline_pixels": 1456,
+          "hidden_pixels": 7123,
+          "bounds": [
+            516,
+            309,
+            755,
+            369
+          ]
+        },
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 8613,
+          "outline_pixels": 1468,
+          "hidden_pixels": 7145,
+          "bounds": [
+            515,
+            310,
+            756,
+            369
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military1_locked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 8583,
+          "outline_pixels": 1457,
+          "hidden_pixels": 7126,
+          "bounds": [
+            516,
+            310,
+            756,
+            370
+          ]
+        },
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 8611,
+          "outline_pixels": 1456,
+          "hidden_pixels": 7155,
+          "bounds": [
+            515,
+            309,
+            756,
+            369
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military8_locked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 8588,
+          "outline_pixels": 1462,
+          "hidden_pixels": 7126,
+          "bounds": [
+            516,
+            310,
+            755,
+            369
+          ]
+        },
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 8608,
+          "outline_pixels": 1459,
+          "hidden_pixels": 7149,
+          "bounds": [
+            515,
+            310,
+            756,
+            369
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military9_locked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 8579,
+          "outline_pixels": 1460,
+          "hidden_pixels": 7119,
+          "bounds": [
+            516,
+            309,
+            755,
+            369
+          ]
+        },
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 8615,
+          "outline_pixels": 1468,
+          "hidden_pixels": 7147,
+          "bounds": [
+            515,
+            310,
+            756,
+            369
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military2_locked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 8579,
+          "outline_pixels": 1462,
+          "hidden_pixels": 7117,
+          "bounds": [
+            516,
+            310,
+            756,
+            370
+          ]
+        },
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 8617,
+          "outline_pixels": 1460,
+          "hidden_pixels": 7157,
+          "bounds": [
+            515,
+            309,
+            755,
+            369
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military3_unlocked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 9,
+          "classified": false,
+          "aircraft_pixels": 7521,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            465,
+            298,
+            745,
+            367
+          ]
+        },
+        {
+          "model": 9,
+          "classified": false,
+          "aircraft_pixels": 7577,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            465,
+            298,
+            746,
+            367
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military4_unlocked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 11,
+          "classified": false,
+          "aircraft_pixels": 8066,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            476,
+            312,
+            729,
+            375
+          ]
+        },
+        {
+          "model": 11,
+          "classified": false,
+          "aircraft_pixels": 8163,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            476,
+            312,
+            729,
+            374
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military5_unlocked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 10,
+          "classified": false,
+          "aircraft_pixels": 8418,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            511,
+            306,
+            756,
+            373
+          ]
+        },
+        {
+          "model": 10,
+          "classified": false,
+          "aircraft_pixels": 8456,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            509,
+            306,
+            755,
+            373
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military6_unlocked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 8579,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            516,
+            309,
+            755,
+            369
+          ]
+        },
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 8613,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            515,
+            310,
+            756,
+            369
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military7_unlocked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 8583,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            516,
+            310,
+            756,
+            370
+          ]
+        },
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 8611,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            515,
+            309,
+            756,
+            369
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military1_unlocked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 8588,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            516,
+            310,
+            755,
+            369
+          ]
+        },
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 8608,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            515,
+            310,
+            756,
+            369
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military8_unlocked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 8579,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            516,
+            309,
+            755,
+            369
+          ]
+        },
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 8615,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            515,
+            310,
+            756,
+            369
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military9_unlocked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 8579,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            516,
+            310,
+            756,
+            370
+          ]
+        },
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 8617,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            515,
+            309,
+            755,
+            369
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military2_unlocked",
+      "resolution": [
+        1280,
+        720
+      ],
+      "ui_scale": 1,
+      "frames": [
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 8585,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            516,
+            310,
+            756,
+            369
+          ]
+        },
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 8613,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            515,
+            310,
+            756,
+            369
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "hangar12",
+      "resolution": [
+        800,
+        600
+      ],
+      "ui_scale": 1.4,
+      "frames": [
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 4143,
+          "outline_pixels": 1273,
+          "hidden_pixels": 2870,
+          "bounds": [
+            303,
+            326,
+            444,
+            412
+          ]
+        },
+        {
+          "model": 12,
+          "classified": true,
+          "aircraft_pixels": 4137,
+          "outline_pixels": 1252,
+          "hidden_pixels": 2885,
+          "bounds": [
+            302,
+            326,
+            444,
+            411
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "research40",
+      "resolution": [
+        800,
+        600
+      ],
+      "ui_scale": 1.4,
+      "frames": [
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 6305,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            292,
+            220,
+            499,
+            275
+          ]
+        },
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 6317,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            291,
+            221,
+            499,
+            275
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military1_unlocked",
+      "resolution": [
+        800,
+        600
+      ],
+      "ui_scale": 1.4,
+      "frames": [
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 9383,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            280,
+            253,
+            531,
+            316
+          ]
+        },
+        {
+          "model": 12,
+          "classified": false,
+          "aircraft_pixels": 9409,
+          "outline_pixels": 0,
+          "hidden_pixels": 0,
+          "bounds": [
+            279,
+            253,
+            530,
+            316
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "military4_locked",
+      "resolution": [
+        800,
+        600
+      ],
+      "ui_scale": 1.4,
+      "frames": [
+        {
+          "model": 11,
+          "classified": true,
+          "aircraft_pixels": 8711,
+          "outline_pixels": 1805,
+          "hidden_pixels": 6906,
+          "bounds": [
+            238,
+            257,
+            503,
+            322
+          ]
+        },
+        {
+          "model": 11,
+          "classified": true,
+          "aircraft_pixels": 8877,
+          "outline_pixels": 1816,
+          "hidden_pixels": 7061,
+          "bounds": [
+            237,
+            256,
+            504,
+            321
+          ]
+        }
+      ]
+    }
+  ]
+}

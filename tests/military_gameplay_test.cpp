@@ -5,6 +5,7 @@
 #include "../src/hive_world_collision.h"
 #include "../src/military_missions.h"
 #include "../src/hangar_preview.h"
+#include "../src/menu_layout.h"
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -426,6 +427,18 @@ struct GameTest {
       check(loading.plane.model==definition.aircraft && length(loading.plane.pos-g.plane.pos)<.001f &&
         loading.prefetchOn && length(loading.prefetchPos-g.plane.pos)<.001f && length(position-g.plane.pos)==0 && fuel==g.plane.fuel,
         "loading preview shows the actual selected frozen aircraft and streams its mission position "+std::to_string(missionId));
+      const int oldWidth=g_ren.W,oldHeight=g_ren.H;bool loadingVisible=true;
+      for(const auto viewport:std::array<std::pair<int,int>,5>{{{1920,1080},{1280,720},{960,540},{800,600},{640,480}}}){
+        g_ren.W=viewport.first;g_ren.H=viewport.second;FrameParams frame;g.militaryLoadingCamera(frame);
+        const auto layout=loadingLayout(g_ren.W,g_ren.H);const auto& aircraft=*g.plane.spec;
+        for(vec3 point:{vec3(),vec3(aircraft.span*.5f,0,0),vec3(-aircraft.span*.5f,0,0),vec3(0,0,aircraft.fusLen*.5f),vec3(0,0,-aircraft.fusLen*.5f),vec3(0,aircraft.fusRad*3,0)}){
+          const vec3 relative=g.plane.pos+g.plane.q.rotate(point)-frame.camPos;const float depth=-dot(relative,frame.camBack),th=tanf(frame.fovY*.5f);
+          const float x=g_ren.W*.5f+dot(relative,frame.camRight)/depth/th*g_ren.H*.5f,y=g_ren.H*.5f-dot(relative,frame.camUp)/depth/th*g_ren.H*.5f;
+          loadingVisible&=depth>0&&x>=0&&x<=g_ren.W&&y>=layout.artTop&&y<=layout.artBottom;
+        }
+      }
+      g_ren.W=oldWidth;g_ren.H=oldHeight;
+      check(loadingVisible,"entire loading aircraft fits between header and telemetry at five viewport sizes "+std::to_string(missionId));
       if(definition.objective==hive::MissionKind::Recon) {
         check(g.hiveCombat.aliveCount()==0 && m.config.objectiveCount>0 && near(m.config.scanRange,definition.scanRange) &&
           near(m.config.scanSeconds,definition.scanSeconds),"noncombat XR mission has authored sensors and no compulsory pursuers "+std::to_string(missionId));

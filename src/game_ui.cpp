@@ -408,7 +408,9 @@ void Game::drawIntro(float progress, const std::string& stage, float t, unsigned
 // ------------------------------------------------------------------ pre-flight loading screen
 void Game::drawLoading() {
   float W = (float)g_ren.W, H = (float)g_ren.H;
-  float s = std::max(0.35f, std::min(W / 1120.f, H / 720.f));
+  const LoadingLayout L = loadingLayout(W, H);
+  const float s = L.scale;
+  auto fs = [s](float units,float minimum) { return std::max(units*s,minimum); };
   auto fitLoading = [&](std::string text, float room, float size) {
     if (g_ren.textWidth(text, size) <= room) return text;
     while (!text.empty() && g_ren.textWidth(text + "...", size) > room) text.pop_back();
@@ -454,36 +456,33 @@ void Game::drawLoading() {
     }
     // runway marker on the image
   }
-  // legibility gradients
-  g_ren.rectGrad(0, H * 0.55f, W, H * 0.45f, vec3(0, 0, 0), vec3(0.0f, 0.01f, 0.02f), 0.75f);
+  // Confine legibility shading to the header and telemetry strip; the aircraft
+  // in the middle of the photograph stays unobstructed and keeps its contrast.
+  g_ren.rectGrad(0, L.y-18*s, W, H-L.y+18*s, vec3(0, 0, 0), ink, 0.40f);
   g_ren.rectGrad(0, 0, W, 90 * s, vec3(0.0f, 0.01f, 0.02f), vec3(0, 0, 0), 0.55f);
-  if(research)svui::matrix(g_ren,0,0,W,H,realTime,.18f,set.menuMotion);
+  if(research)svui::matrix(g_ren,0,0,W,H,realTime,.18f,set.menuMotion,W*.55f,(L.artTop+L.artBottom)*.5f,W*.32f,(L.artBottom-L.artTop)*.45f);
   if(military)svui::chevrons(g_ren,40*s,13*s,180*s,s,accent,.55f);
-  g_ren.text(40*s,26*s,12*s,"SOMNIUM VOLANDI",accent,1,0,false);
-  g_ren.text(W-40*s,26*s,11*s,military?"DEFENSE COMMAND / SORTIE PREPARATION":research?"NIGHTGLASS / FLIGHT INITIALIZATION":contract.type==CT_LESSON?"FLIGHT SCHOOL / PREPARATION":"FLIGHT OPERATIONS / PREPARATION",dim,1,2,false);
+  g_ren.text(40*s,26*s,fs(12,11),"SOMNIUM VOLANDI",accent,1,0,false);
+  g_ren.text(W-40*s,26*s,fs(11,9),military?"DEFENSE COMMAND / SORTIE PREPARATION":research?"NIGHTGLASS / FLIGHT INITIALIZATION":contract.type==CT_LESSON?"FLIGHT SCHOOL / PREPARATION":"FLIGHT OPERATIONS / PREPARATION",dim,1,2,false);
   g_ren.text(40 * s, 50 * s, 30 * s, fitLoading(contract.title, W - 80 * s, 30 * s), C_TEXT, 1);
-  // mission card
-  float cx = 40 * s, cy = H - 332 * s, cw = std::min(920 * s, W - 80 * s);
-  if(military)svui::fieldSurface(g_ren,cx-18*s,cy-18*s,cw+36*s,328*s,s);
+  // Mission details and four real readiness bars fit into a shallow bottom strip.
+  const float cx=L.x+18*s, cy=L.y, cw=L.width-36*s;
+  if(military)svui::fieldSurface(g_ren,L.x,cy,L.width,L.height,s);
   else {
-    g_ren.rectGrad(cx-18*s,cy-18*s,cw+36*s,328*s,research?vec3(.014f,.038f,.021f):svui::panel,ink,.97f,5*s);
-    g_ren.rectOutline(cx-18*s,cy-18*s,cw+36*s,328*s,accent,.28f,5*s,s);
+    g_ren.rectGrad(L.x,cy,L.width,L.height,research?svui::codePanel:svui::panel,ink,.97f,5*s);
+    g_ren.rectOutline(L.x,cy,L.width,L.height,accent,.28f,5*s,s);
   }
   const Airport& from = g_world.airports[contract.from];
   const Airport& to = g_world.airports[contract.to];
-  if (military) g_ren.text(cx, cy, 12*s, "SERVICE AIRCRAFT / EQUIPMENT AND FUEL INCLUDED", dim, 1, 0, false);
-  else header(cx, cy, cw, air ? "IN FLIGHT  //  INBOUND" : "DEPARTURE");
-  g_ren.text(cx, cy + 26 * s, 40 * s, fmt("%s", ap.code), C_TEXT, 1);
-  g_ren.text(cx + g_ren.textWidth(ap.code, 40 * s) + 16 * s, cy + 40 * s, 20 * s, fitLoading(ap.name, cw - g_ren.textWidth(ap.code, 40 * s) - 16 * s, 20 * s), dim, 1);
-  float ly = cy + 86 * s;
-  auto kv = [&](float x, const char* k, const std::string& v, float room) {
-    g_ren.text(x, ly, 11 * s, k, dim, 1, 0, false);
-    g_ren.text(x, ly + 15 * s, 17 * s, fitLoading(v, room, 17 * s), C_TEXT, 1);
-  };
-  kv(cx, "AIRCRAFT", plane.spec->name, cw / 3 - 20 * s);
-  if (contract.from != contract.to) kv(cx + cw / 3, "ROUTE", fmt("%s  >  %s", from.code, to.code), cw / 3 - 20 * s);
-  kv(cx + cw * (contract.from == contract.to ? 1.f : 2.f) / 3, "CONDITIONS", wx.describe(),
-     cw * (contract.from == contract.to ? 2.f : 1.f) / 3 - 20 * s);
+  const float aircraftX=cx+cw*.32f, weatherX=cx+cw*.60f;
+  g_ren.text(cx,cy+12*s,fs(10,9),air?"IN FLIGHT / INBOUND":"DEPARTURE",dim,1,0,false);
+  g_ren.text(cx,cy+29*s,fs(19,13),fitLoading(std::string(ap.code)+"  "+ap.name,cw*.32f-18*s,fs(19,13)),C_TEXT,1);
+  g_ren.text(cx,cy+53*s,fs(10,9),military?"Equipment and fuel included":contract.from!=contract.to?fmt("ROUTE  %s > %s",from.code,to.code):"Local flight / same departure and arrival",dim,1,0,false);
+  g_ren.text(aircraftX,cy+12*s,fs(10,9),military?"SERVICE AIRCRAFT":"AIRCRAFT",dim,1,0,false);
+  g_ren.text(aircraftX,cy+29*s,fs(16,12),fitLoading(plane.spec->name,cw*.28f-18*s,fs(16,12)),C_TEXT,1);
+  if(military&&contract.from!=contract.to)g_ren.text(aircraftX,cy+53*s,fs(10,9),fmt("ROUTE  %s > %s",from.code,to.code),dim,1,0,false);
+  g_ren.text(weatherX,cy+12*s,fs(10,9),"CONDITIONS",dim,1,0,false);
+  g_ren.text(weatherX,cy+29*s,fs(12,10),fitLoading(wx.describe(),cw*.40f,fs(12,10)),C_TEXT,1);
   // Separate measured stage bars reveal the work behind the overall percentage.
   const float scene=clampf(loadFrames/2.f,0.f,1.f);
   const float chunks=loadPend0>0?clampf(1.f-float(std::max(0,g_ren.entPending))/loadPend0,0.f,1.f):scene;
@@ -491,29 +490,30 @@ void Game::drawLoading() {
   const float checks=loadReadyT>=0?1.f:clampf(loadStableFrames/2.f,0.f,1.f);
   const float fractions[]={scene,chunks,lighting,checks};
   const char* stages[]={"SCENE SETUP","NEARBY SCENERY","TERRAIN LIGHTING","READINESS CHECK"};
-  for(int i=0;i<4;++i){const float xx=cx+cw*i/4,ww=cw/4-18*s,yy=cy+150*s;
-    g_ren.text(xx,yy,10*s,stages[i],dim,1,0,false);
-    g_ren.text(xx,yy+17*s,11*s,fractions[i]>=1?"READY":i==1?fmt("%d remaining",std::max(0,g_ren.entPending)):i==3?fmt("%d / 2 stable frames",std::min(2,loadStableFrames)):"IN PROGRESS",fractions[i]>=1?accent:C_TEXT,1,0,false);
-    svui::bar(g_ren,xx,yy+37*s,ww,3*s,fractions[i],accent);
+  for(int i=0;i<4;++i){const float xx=cx+cw*i/4,ww=cw/4-18*s,yy=cy+75*s;
+    g_ren.text(xx,yy,fs(9,8),stages[i],dim,1,0,false);
+    g_ren.text(xx,yy+16*s,fs(10,9),fractions[i]>=1?"READY":i==1?fmt("%d remaining",std::max(0,g_ren.entPending)):i==3?fmt("%d / 2 stable frames",std::min(2,loadStableFrames)):"IN PROGRESS",fractions[i]>=1?accent:C_TEXT,1,0,false);
+    svui::bar(g_ren,xx,yy+34*s,ww,3*s,fractions[i],accent);
   }
   // progress / ready prompt
-  float by = H - 70 * s, bw = cw, bh = 8 * s;
+  float by = cy+139*s, bw = cw, bh = 6*s;
   if (loadReadyT < 0) {
-    g_ren.text(cx, by - 24 * s, 13 * s, loadFrames < 2 ? "01 / 04  Preparing flight scene" : g_ren.entPending > 0 ? "02 / 04  Loading nearby scenery" : loadingShadowPending() ? "03 / 04  Preparing terrain shadows" : "04 / 04  Checking flight readiness", C_TEXT, 0.9f, 0, false);
-    g_ren.text(cx + bw, by - 24 * s, 13 * s, fmt("%d%%", std::min(99, (int)(clampf(loadShown, 0.f, 1.f) * 100.f))), accent, 1, 2, false);
+    g_ren.text(cx, by - 19 * s, fs(12,10), loadFrames < 2 ? "01 / 04  Preparing flight scene" : g_ren.entPending > 0 ? "02 / 04  Loading nearby scenery" : loadingShadowPending() ? "03 / 04  Preparing terrain shadows" : "04 / 04  Checking flight readiness", C_TEXT, 0.9f, 0, false);
+    g_ren.text(cx + bw, by - 19 * s, fs(12,10), fmt("%d%%", std::min(99, (int)(clampf(loadShown, 0.f, 1.f) * 100.f))), accent, 1, 2, false);
     g_ren.rect(cx, by, bw, bh, accent, 0.12f, 2 * s);
     if (loadShown > 0.f) g_ren.rectGrad(cx, by, bw * loadShown, bh, accent * 0.7f, accent, 1, 2 * s);
     const std::string detail=fmt("Elapsed %.1f s  /  %d scene frames  /  ",loadT,loadFrames)+(g_ren.entPending>0?fmt("%d scenery chunks remaining",g_ren.entPending):loadingShadowPending()?"Terrain shadow pass running":"Verifying two stable rendered frames");
-    g_ren.text(cx, by + 19 * s, 11 * s, fitLoading(detail,bw,11*s),dim,.9f,0,false);
+    g_ren.text(cx, by + 13 * s, fs(10,9), fitLoading(detail,bw,fs(10,9)),dim,.9f,0,false);
     float hx = cx + bw * loadShown;
     g_ren.glow(hx - 4 * s, by - 2 * s, 8 * s, bh + 4 * s, accent, 0.5f + 0.3f * sinf(realTime * 6.f), 4 * s, 14 * s);
   } else {
     float pulse = 0.6f + 0.4f * sinf(realTime * 3.f);
-    float bx = cx, bwid = 380 * s;
-    g_ren.glow(bx, by - 12 * s, bwid, 40 * s, accent, 0.25f * pulse, 4 * s, 16 * s);
-    g_ren.rectGrad(bx, by - 12 * s, bwid, 40 * s, accent * 1.05f, accent * 0.6f, 0.95f, 4 * s);
-    g_ren.text(bx + bwid * 0.5f, by - 1 * s, 17 * s, padPrompts() ? "PRESS  A  TO FLY" : "CLICK OR PRESS ENTER TO FLY", ink, 1, 1, false);
-    g_ren.text(bx + bwid + 20 * s, by + 1 * s, 13 * s, padPrompts() ? "B  BACK" : "ESC  BACK", dim, 0.9f, 0, false);
+    float bx = cx, bwid = 340 * s;
+    g_ren.glow(bx, by - 20 * s, bwid, 40 * s, accent, 0.25f * pulse, 4 * s, 16 * s);
+    g_ren.rectGrad(bx, by - 20 * s, bwid, 40 * s, accent * 1.05f, accent * 0.6f, 0.95f, 4 * s);
+    g_ren.text(bx + bwid * 0.5f, by - 9 * s, fs(16,12), padPrompts() ? "PRESS  A  TO FLY" : "CLICK OR PRESS ENTER TO FLY", ink, 1, 1, false);
+    g_ren.text(bx + bwid + 20 * s, by - 6 * s, fs(12,10), padPrompts() ? "B  BACK" : "ESC  BACK", dim, 0.9f, 0, false);
+    g_ren.text(cx+cw,by-6*s,fs(12,10),"100% / FLIGHT READY",accent,1,2,false);
   }
 }
 

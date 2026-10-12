@@ -6,9 +6,10 @@
 - The islands keep their names: Solace Capital and the Solace Islands are still on the map.
 
 ### New menus and loading screens
-- **Each part of the game has its own look:** midnight blue, platinum and brass for the civilian screens; falling emerald code for the NIGHTGLASS research terminal; matte field panels with amber controls for military service.
+- **Each part of the game has its own look:** midnight blue, platinum and brass for the civilian screens; falling electric-blue code for the NIGHTGLASS research terminal; matte field panels with amber controls for military service.
 - **Loading shows what it's doing:** the current step, how much of each stage is done, a checklist of the parts being prepared and the time so far. Flight preparation and the research warm-up show theirs too.
 - **Settings, General, Menu animation** can reduce the menus' motion.
+- **The aircraft stay in view while loading:** the details sit in a shallow strip along the bottom, so the picture of your aircraft is no longer covered. Classified aircraft in the Hangar and the military terminal show as a clear outline.
 
 ### Foveated shading (NVIDIA RTX cards)
 - **When a scene is too heavy, the edges of the screen now give way before the centre.** On cards with NVIDIA's variable-rate shading (the RTX 20 series and later), Auto resolution first shades the ground and the scenery towards the screen's edges more coarsely: one shade for each 2×2 block of pixels, then each 4×4 block, in rings round the centre that widen as needed. The middle of the screen stays at full resolution. Only once the edges are as coarse as they go does the whole frame's resolution drop, as before. When the frame rate recovers, the full resolution comes back first, then the edges.

@@ -93,29 +93,28 @@ void main(){
  float w=-dot(rel,uBack);gl_FragDepth=log2(max(1e-6,1.0+w))/log2(40001.0);
 }
 )GLSL";
-// Classified showroom: only geometry/depth are inputs. Albedo, registrations,
-// cockpit displays, navigation lights and emission cannot leak into this image.
+// Classified showroom: a clear screen-space outline of the actual aircraft.
+// Only geometry/depth are inputs; materials, screens and emission stay hidden.
 static const char* kClassifiedFS = R"GLSL(#version 330 core
 in vec2 vUV;
 uniform sampler2D uGeometry; uniform vec3 uRight,uUp,uBack;
 uniform vec2 uJit; uniform float uTanHalf,uAspect;
 layout(location=0) out vec4 oColor; layout(location=1) out float oDepth;
 layout(location=2) out float oCloudMask;
-vec3 decodeNormal(vec2 e){vec3 n=vec3(e.x,1.0-abs(e.x)-abs(e.y),e.y);
- if(n.y<0.0)n.xz=(1.0-abs(n.zx))*sign(n.xz+vec2(1e-9));return normalize(n);}
 void main(){
- vec4 g=texelFetch(uGeometry,ivec2(gl_FragCoord.xy),0);
+ ivec2 pixel=ivec2(gl_FragCoord.xy),limit=textureSize(uGeometry,0)-ivec2(1);
+ vec4 g=texelFetch(uGeometry,pixel,0);
  int cls=int(g.w+.5);oDepth=cls==0?1e6:g.x;oCloudMask=0.0;
- vec2 ndc=(vUV+uJit)*2.0-1.0;
- vec3 ray=normalize(uRight*ndc.x*uAspect*uTanHalf+uUp*ndc.y*uTanHalf-uBack);
- vec3 n=decodeNormal(g.yz);
  bool aircraft=cls>=5;
- float rim=pow(1.0-clamp(abs(dot(n,ray)),0.0,1.0),3.0);
- float backlight=max(dot(n,normalize(vec3(-.4,.7,.6))),0.0);
- // Low-key silhouette with a visible cool rim after tone mapping; material detail stays hidden.
- vec3 c=aircraft?vec3(.28,.48,.65)*(.0015+.080*rim+.003*backlight):
-                 vec3(.35,.45,.55)*(.0006+.0012*max(n.y,0.0));
- if(cls==0)c=vec3(.0003,.0005,.0007);
+ float edge=0.0;
+ if(aircraft)for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){
+   vec4 nearG=texelFetch(uGeometry,clamp(pixel+ivec2(x,y)*2,ivec2(0),limit),0);
+   if(int(nearG.w+.5)<5)edge=1.0;
+ }
+ // The interior is solid ink, even if the source mesh has emissive materials.
+ // This outline remains legible at low exposure and after the terminal tint.
+ vec3 c=vec3(.0003,.0005,.0010);
+ if(aircraft)c=mix(c,vec3(.30,.60,.90)*.30,edge);
  oColor=vec4(c,aircraft?.5:1.0);
 }
 )GLSL";

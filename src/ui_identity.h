@@ -5,7 +5,8 @@
 namespace svui {
 inline const vec3 ink(.018f,.026f,.045f), panel(.037f,.052f,.077f), brass(.91f,.74f,.47f);
 inline const vec3 text(.96f,.95f,.91f), dim(.64f,.71f,.78f), ice(.49f,.78f,.86f);
-inline const vec3 code(.30f,.94f,.57f), codeDim(.47f,.66f,.54f), codeInk(.005f,.018f,.012f);
+inline const vec3 code(.34f,.70f,1.f), codeDim(.48f,.63f,.80f), codeInk(.006f,.014f,.040f);
+inline const vec3 codePanel(.018f,.040f,.092f), codeHead(.76f,.88f,1.f);
 inline const vec3 field(.025f,.031f,.027f), fieldPanel(.070f,.081f,.065f), olive(.70f,.77f,.49f), amber(.93f,.69f,.36f);
 inline uint32_t hash(uint32_t n) { n ^= n >> 16; n *= 0x7feb352du; n ^= n >> 15; n *= 0x846ca68bu; return n ^ (n >> 16); }
 inline float lineDistance(float x,float y,float ax,float ay,float bx,float by) {
@@ -56,7 +57,7 @@ inline void matrix(Renderer& r,float x,float y,float w,float h,float time,float 
       const float intensity=motif?(.12f+1.4f*reveal):(band==0?.08f:band==1?.18f:band==2?.40f:.78f);
       float quiet=1.f;
       if(quietRX>0&&quietRY>0){const float ex=(x+col*dx-quietX)/quietRX,ey=(y+row*dy-quietY)/quietRY;quiet=.035f+.965f*smoothstepf(.65f,1.8f,ex*ex+ey*ey);}
-      if(band || seed%4==0)r.text(x+col*dx,y+row*dy,fs,std::string(1,c),band==3?vec3(.75f,1.f,.83f):code,alpha*intensity*quiet,0,false);
+      if(band || seed%4==0)r.text(x+col*dx,y+row*dy,fs,std::string(1,c),band==3?codeHead:code,alpha*intensity*quiet,0,false);
     }
   }
 }
