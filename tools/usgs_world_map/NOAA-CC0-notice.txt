@@ -1,0 +1,11 @@
+NOAA ETOPO 2022 credit and license-link notice (not full legal text)
+NOAA National Centers for Environmental Information. 2022: ETOPO 2022
+15 Arc-Second Global Relief Model. NOAA National Centers for Environmental
+Information. https://doi.org/10.25921/fd45-gt74 . Accessed 2026-10-11.
+This input is the v1 60-arc-second ice-surface derivative, including bathymetry.
+NOAA's official metadata specifies CC0-1.0 worldwide:
+https://data.noaa.gov/metaview/page?header=none&view=getDataView&xml=NOAA/NESDIS/NGDC/MGG/DEM//iso/xml/etopo_2022.xml
+Legal text: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+NOAA/NCEI provide no warranty of accuracy, reliability or completeness.
+The source is not suitable for navigation. This artifact is game-development
+elevation data; it does not establish terrain truth or source metre accuracy.

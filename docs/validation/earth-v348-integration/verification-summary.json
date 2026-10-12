@@ -1,0 +1,64 @@
+{
+  "release": {
+    "tag": "v3.48.0",
+    "commit": "4f27e198ccfc9a6e683acec46c473043f82031ca",
+    "published_at": "2026-10-11T06:52:35Z",
+    "url": "https://github.com/chad04220/Solace-Express/releases/tag/v3.48.0"
+  },
+  "prior_phase0_head": "b24e9f7fd14551eac553b9693bfcd6b8a9b84f88",
+  "diagnostic_fix": "2e47fa2d6de898e84594f3c6c60ece044c0cae9f",
+  "runtime_src_tree": "fda19fa32f017bd82873aed787982eae5a3b043f",
+  "phase0_code_preservation": "All tools/earth, tools/usgs_world_map, Earth fixtures and both test suites are byte-identical to prior_phase0_head; the review document is intentionally updated. Exact blob list is in preservation.json.",
+  "merge_conflicts": {
+    "THIRD_PARTY_NOTICES.md": "Preserved complete Earth data notices and published star-catalog credits."
+  },
+  "local_validation": {
+    "linux_release_build": "passed; all default targets",
+    "windows_llvm_mingw_game_build": "passed; linked SolaceExpress.exe; not a native Windows runtime run",
+    "earth_tests": {
+      "passed": 56,
+      "skipped": 0
+    },
+    "handoff_tests": {
+      "passed": 38,
+      "skipped": 0
+    },
+    "tool_games_diskless": {
+      "checked": 6,
+      "failures": 0,
+      "kind": "source contract"
+    },
+    "mesh_asset_tools": {
+      "passed": 21
+    },
+    "ctest": {
+      "passed": 112,
+      "failed": 0,
+      "skipped": 0,
+      "includes": "All configured tests, including software-EGL terrain shadow, road grading and planet tests; full aircraft roster, gameplay and military regressions."
+    },
+    "shader_validation": "Three additional glslang-backed shader compilation, specialization and inline-wreck checks passed via their equivalent standalone CTest commands. glslang was not on PATH at configure time, so these are recorded separately from 112 CTest entries.",
+    "ci_selection": "All 109 non-GLSL/non-GPU Linux CI entries selected from the actual staged merge file list; CMakeLists.txt changed."
+  },
+  "real_data_rebuild": {
+    "tiles": 20,
+    "files_byte_identical": 22,
+    "pack_manifest_sha256": "cddc55d760f1397d29cedcff34facbb19d132dc97cc3da493dd670ad7102f4b4",
+    "convergence_probes": 1280,
+    "convergence_report_matches_previous": true,
+    "max_quantization_error_m": 0.4999785975078339
+  },
+  "prior_combined_ci": {
+    "head": "b24e9f7fd14551eac553b9693bfcd6b8a9b84f88",
+    "url": "https://github.com/chad04220/Solace-Express/actions/runs/38118013576",
+    "conclusion": "success",
+    "windows_ctest": "87/87"
+  },
+  "release_aligned_ci": "Pending publication and CI for the new commit; prior runs are not substituted.",
+  "limitations": [
+    "No local native Windows diagnostics playthrough or hardware GPU run.",
+    "No runtime Earth loader or full-global tile pack.",
+    "Original NOAA GeoTIFF and GMTED inputs were not redownloaded.",
+    "Byte identity and convergence checks use the previously verified pinned prepared source."
+  ]
+}

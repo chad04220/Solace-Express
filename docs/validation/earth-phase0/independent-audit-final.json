@@ -1,0 +1,14 @@
+{
+  "antimeridian_identity": true,
+  "existing_sidecar_preserved": true,
+  "existing_sidecar_rejected": true,
+  "gdal_envi_global_caps": true,
+  "geotiff_binary_repeated_identical": true,
+  "geotiff_conversion_success": true,
+  "geotiff_header_repeated_identical": true,
+  "json_overflow_rejected": true,
+  "opendap_30_matches_existing_grid": true,
+  "opendap_60_matches_existing_grid": true,
+  "pole_identity": true,
+  "vrt_rejected": true
+}

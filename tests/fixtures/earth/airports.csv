@@ -1,0 +1,6 @@
+id,ident,type,name,latitude_deg,longitude_deg,elevation_ft,continent,iso_country,iso_region,municipality,scheduled_service,gps_code,icao_code,iata_code,local_code
+990001,XBER,small_airport,SYNTHETIC Bermuda Test Field,32.3,-64.8,50,NA,BM,BM-U-A,Test only,no,XBER,XBER,ZZZ,
+990002,XCLO,closed,SYNTHETIC Closed Field,32.31,-64.81,50,NA,BM,BM-U-A,Test only,no,XCLO,XCLO,,
+990003,XHEL,heliport,SYNTHETIC Heliport,32.32,-64.82,50,NA,BM,BM-U-A,Test only,no,XHEL,XHEL,,
+990004,XEMP,small_airport,SYNTHETIC No Runway,32.33,-64.83,50,NA,BM,BM-U-A,Test only,no,XEMP,XEMP,,
+990005,XCLS,medium_airport,SYNTHETIC Closed Runway,32.34,-64.84,50,NA,BM,BM-U-A,Test only,no,XCLS,XCLS,,

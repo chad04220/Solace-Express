@@ -1,0 +1,7 @@
+........./opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/zipfile/__init__.py:1625: UserWarning: Duplicate name: 'aircraft/aircraft_00_1_78ca3f2088b4ca9a28f8cd5db7c5751c48a33a2efe78f9633793a2a408fbe279.mesh'
+  return self._open_to_write(zinfo, force_zip64=force_zip64)
+............
+----------------------------------------------------------------------
+Ran 21 tests in 0.208s
+
+OK

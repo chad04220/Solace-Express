@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "name": "synthetic-bermuda-test",
+  "coverage": "synthetic-fixture",
+  "codec": "zlib",
+  "area_samples": 1,
+  "tiles": [
+    {
+      "face": "ny",
+      "level": 6,
+      "x": 49,
+      "y": 56
+    },
+    {
+      "face": "ny",
+      "level": 6,
+      "x": 50,
+      "y": 56
+    }
+  ],
+  "elevation": {
+    "path": "elevation.json",
+    "format": "grid-json",
+    "url": "https://example.test/solace-synthetic-earth/elevation.json",
+    "version": "synthetic-v1",
+    "license_id": "CC0-1.0",
+    "license_path": "LICENSE.txt",
+    "sha256": "15ee01da912af96c627691e3c6b56e7a8cf5426d1853382662a47e781b7eda01"
+  },
+  "roads": {
+    "path": "roads.geojson",
+    "format": "geojson",
+    "url": "https://example.test/solace-synthetic-earth/roads.geojson",
+    "version": "synthetic-v1",
+    "license_id": "CC0-1.0",
+    "license_path": "LICENSE.txt",
+    "sha256": "340f64135052f60b386c30688f7a21fb7212d0543d5f88c5dc2a25671960c693"
+  },
+  "airports": {
+    "airports": {
+      "path": "airports.csv",
+      "format": "csv",
+      "url": "https://example.test/solace-synthetic-earth/airports.csv",
+      "version": "synthetic-v1",
+      "license_id": "CC0-1.0",
+      "license_path": "LICENSE.txt",
+      "sha256": "5a30dad4a4cbc78afcdf385242f5c67db89dce1ea6b0e2b04f80a0ef547a2769"
+    },
+    "runways": {
+      "path": "runways.csv",
+      "format": "csv",
+      "url": "https://example.test/solace-synthetic-earth/runways.csv",
+      "version": "synthetic-v1",
+      "license_id": "CC0-1.0",
+      "license_path": "LICENSE.txt",
+      "sha256": "05dcff5d93e4a6348eaf93885804ec6791ef7d6454f9f29cca2733e8b8c6beaa"
+    }
+  }
+}

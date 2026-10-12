@@ -1,0 +1,9 @@
+Synthetic Earth pipeline test fixture
+
+All coordinates, elevations, roads, airport names and runway records are fabricated
+for software tests. They are not survey data and must never be used for navigation.
+No NOAA, GRIP, OurAirports or other third-party dataset is included.
+
+To the extent possible under law, the fixture authors dedicate this original
+synthetic test data to the public domain under CC0 1.0 Universal:
+https://creativecommons.org/publicdomain/zero/1.0/

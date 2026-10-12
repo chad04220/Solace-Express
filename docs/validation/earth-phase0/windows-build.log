@@ -1,0 +1,44 @@
+[0/2] Re-checking globbed directories...
+[1/44] Embedding GLSL shaders
+[2/44] Fingerprinting aircraft asset build inputs
+[3/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/world.cpp.obj
+[4/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/road_network.cpp.obj
+[5/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/bridges.cpp.obj
+[6/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/settlements.cpp.obj
+[7/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/scenery.cpp.obj
+[8/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/entities.cpp.obj
+[9/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/airport_scenery.cpp.obj
+[10/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/aircraft.cpp.obj
+[11/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/aircraft_perf.cpp.obj
+[12/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/aircraft_stunt.cpp.obj
+[13/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/aero.cpp.obj
+[14/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/aero_strips.cpp.obj
+[15/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/aero_wake.cpp.obj
+[16/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/breakup.cpp.obj
+[17/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/models.cpp.obj
+[18/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/career.cpp.obj
+[19/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/weather.cpp.obj
+[20/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/entity_mesh.cpp.obj
+[21/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/bridge_mesh.cpp.obj
+[22/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/aircraft_mesh_asset.cpp.obj
+[23/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/traffic.cpp.obj
+[24/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/game.cpp.obj
+[25/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_ui.cpp.obj
+[26/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_research_ui.cpp.obj
+[27/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_wraith.cpp.obj
+[28/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/renderer.cpp.obj
+[29/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/materials.cpp.obj
+[30/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/raster_renderer.cpp.obj
+[31/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/prop_disc.cpp.obj
+[32/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/terrain_mesh.cpp.obj
+[33/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/aircraft_mesh.cpp.obj
+[34/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/entity_render.cpp.obj
+[35/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/aircraft_hull.cpp.obj
+[36/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/camera_feeds.cpp.obj
+[37/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/atc.cpp.obj
+[38/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/gl.cpp.obj
+[39/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/audio.cpp.obj
+[40/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/platform_win32.cpp.obj
+[41/44] Building CXX object CMakeFiles/SolaceExpress.dir/src/radio_win.cpp.obj
+[42/44] Building RC object CMakeFiles/SolaceExpress.dir/assets/app.rc.res
+[43/44] Linking CXX executable SolaceExpress.exe

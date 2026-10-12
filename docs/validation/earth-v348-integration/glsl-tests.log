@@ -1,0 +1,29 @@
+-- all shaders valid
+/tmp/solace-earth-v348-build/glsl/plane_mesh.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_safegear.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af0.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af1.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af2.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af3.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af4.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af5.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af6.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af7.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af8.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af9.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af10.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af11.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af12.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af13.frag
+/tmp/solace-earth-v348-build/glsl/plane_mesh_af14.frag
+/tmp/solace-earth-v348-build/glsl/terrain.frag
+/tmp/solace-earth-v348-build/glsl/map.frag
+PASS: v3.39 family guards, per-aircraft dispatch, terrain-helper exclusion, projection skip
+PASS: the shared and all own aircraft mesh builds exclude terrain helpers; terrain/map retain them; all link
+PASS: each aircraft's own mesh, bake (outside and cockpit), march and shadow programs hold its own code and no other aircraft's
+PASS: the launch's programs hold no airframe; each scenery class's program holds its own surfaces alone
+/tmp/solace-inline-wreck-b1cgemlz/wreck_shadow.vert
+/tmp/solace-inline-wreck-b1cgemlz/wreck_shadow.frag
+vert: 2653 bytes, SHA256 605d9984e999f1fc9dd76fa67eca90d059ccef772904fa424f6ce1776186157a
+frag: 2054 bytes, SHA256 186cc804fc8c3554e94daeb787148c393d3208c5ca5074fabb064b1df68ab10d
+PASS: 1 additional production startup program; 2 exact shader stages compiled and linked
