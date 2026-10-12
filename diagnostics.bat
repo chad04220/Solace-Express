@@ -1,6 +1,6 @@
 @echo off
-rem Solace Express diagnostics: one run that collects everything the performance work needs from your machine.
-rem Put this file next to SolaceExpress.exe (the release zip's folder) and double-click it. It writes a "diagnostics"
+rem Somnium Volandi diagnostics: one run that collects everything the performance work needs from your machine.
+rem Put this file next to SomniumVolandi.exe (the release zip's folder) and double-click it. It writes a "diagnostics"
 rem folder and zips it as diagnostics_<version>.zip next to the exe: send that zip over. The full run takes 15-25
 rem minutes; each window's title shows its progress. Close a window to skip that step.
 rem
@@ -35,8 +35,8 @@ rem      the hangar, the menu
 rem   6. startup.log (GPU, texture units, shader programs compiled, audio backend), error.log if the game left one, the
 rem      settings file, the shader compile log and the cache's size
 cd /d "%~dp0"
-if not exist SolaceExpress.exe (
-  echo SolaceExpress.exe is not in this folder. Put diagnostics.bat next to it and run it again.
+if not exist SomniumVolandi.exe (
+  echo SomniumVolandi.exe is not in this folder. Put diagnostics.bat next to it and run it again.
   pause
   exit /b 1
 )
@@ -55,7 +55,7 @@ if /i "%MODE%"=="shots" goto shots
 
 echo [1/6] System report ...
 set INFO=%OUT%\system.txt
-echo Solace Express %VER%  (diagnostics v4) > "%INFO%"
+echo Somnium Volandi %VER%  (diagnostics v4) > "%INFO%"
 echo date %DATE% %TIME% >> "%INFO%"
 rem (the GPU's memory from its driver's registry entry: Win32_VideoController.AdapterRAM is 32 bits and reads 4095 MB
 rem for any card with 4 GB or more)
@@ -84,11 +84,11 @@ if defined CACHE (
   if exist "%CACHE%" echo The shader cache %CACHE% could not be set aside, so the first run below is not a cold compile.>>"%OUT%\cache_aside.txt"
 )
 if exist "%APPDATA%\SolaceExpress\startup.log" del /q "%APPDATA%\SolaceExpress\startup.log"
-powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--bench menu --nobodies --size 1920x1080 --out %OUT%\compile_run.txt' -Wait }; $line = ('first run with an empty shader cache: {0:N1} s (compiles the shaders, then times the menu scene once; no aircraft bodies built)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::WriteAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
+powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SomniumVolandi.exe' -ArgumentList '--bench menu --nobodies --size 1920x1080 --out %OUT%\compile_run.txt' -Wait }; $line = ('first run with an empty shader cache: {0:N1} s (compiles the shaders, then times the menu scene once; no aircraft bodies built)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::WriteAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
 if exist "%APPDATA%\SolaceExpress\startup.log" copy /y "%APPDATA%\SolaceExpress\startup.log" "%OUT%\startup_firstrun.log" >nul
 call :findcache
 if defined CACHE if exist "%CACHE%\compile.log" copy /y "%CACHE%\compile.log" "%OUT%\compile_firstrun.log" >nul
-powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SolaceExpress.exe' -ArgumentList '--bench menu --size 1920x1080 --out %OUT%\compile_run2.txt' -Wait }; $line = ('second run, shaders cached: every aircraft loaded (its bodies ready-built) and its own shader programs compiled: {0:N1} s (the breakdown is in compile_run2.txt)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::AppendAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
+powershell -NoProfile -Command "$t = Measure-Command { Start-Process -FilePath 'SomniumVolandi.exe' -ArgumentList '--bench menu --size 1920x1080 --out %OUT%\compile_run2.txt' -Wait }; $line = ('second run, shaders cached: every aircraft loaded (its bodies ready-built) and its own shader programs compiled: {0:N1} s (the breakdown is in compile_run2.txt)' -f $t.TotalSeconds); Write-Host $line; [IO.File]::AppendAllText('%OUT%\compile_time.txt', $line + [Environment]::NewLine)"
 call :findcache
 if defined OLDCACHE if exist "%OLDCACHE%.aside" (
   rem the two runs built a fresh cache with this version's shaders and every aircraft's programs: it stays, the old one goes
@@ -97,12 +97,12 @@ if defined OLDCACHE if exist "%OLDCACHE%.aside" (
 )
 
 echo [3/6] Benchmark, full screen 1920x1080 ...
-start "" /wait SolaceExpress.exe --bench %SCENES% --size 1920x1080 --fullscreen --out %OUT%\bench_1080p.txt
+start "" /wait SomniumVolandi.exe --bench %SCENES% --size 1920x1080 --fullscreen --out %OUT%\bench_1080p.txt
 if /i "%MODE%"=="quick" goto logs
 echo [3/6] Benchmark, the research craft (their cockpits are the heaviest scenes: last, in their own file) ...
-start "" /wait SolaceExpress.exe --bench %RSCENES% --size 1920x1080 --fullscreen --out %OUT%\bench_research_1080p.txt
+start "" /wait SomniumVolandi.exe --bench %RSCENES% --size 1920x1080 --fullscreen --out %OUT%\bench_research_1080p.txt
 echo [4/6] Analysis (5-10 minutes) ...
-start "" /wait SolaceExpress.exe --analyze
+start "" /wait SomniumVolandi.exe --analyze
 if exist analysis.txt move /y analysis.txt "%OUT%\analysis.txt" >nul
 if exist analysis (
   if exist "%OUT%\analysis" rmdir /s /q "%OUT%\analysis"
@@ -114,7 +114,7 @@ echo [5/6] Screenshots ...
 set HUDDEMO=1
 set GAVOUT=1
 set MTBAY=1
-start "" /wait SolaceExpress.exe --shots hud,research10,research20,research40,gav_11_120_10_0,gav_11_210_5_0,ckv11_0_-10_12,ckv11_-60_-20_12,ckv8_0_-10_12,gav_9_120_10_0,ufo13_0,ufo17_2,cockpit,rjetc,wr_8_0_0_0_1,wr_8_0_-8_0_1_3_2_22.5_1,wr_8_0_-8_0_1_3_2_22.5_2,hub1,hub2,menu --size 1920x1080
+start "" /wait SomniumVolandi.exe --shots hud,research10,research20,research40,gav_11_120_10_0,gav_11_210_5_0,ckv11_0_-10_12,ckv11_-60_-20_12,ckv8_0_-10_12,gav_9_120_10_0,ufo13_0,ufo17_2,cockpit,rjetc,wr_8_0_0_0_1,wr_8_0_-8_0_1_3_2_22.5_1,wr_8_0_-8_0_1_3_2_22.5_2,hub1,hub2,menu --size 1920x1080
 set HUDDEMO=
 set GAVOUT=
 set MTBAY=
@@ -164,7 +164,7 @@ goto :eof
 
 :loading
 rem every airport and every aircraft in flight, saved in the "loading" folder; the pre-flight loading screen shows them
-start "" /wait SolaceExpress.exe --loadshots
+start "" /wait SomniumVolandi.exe --loadshots
 echo Done: the pictures are in the "loading" folder.
 pause
 exit /b 0

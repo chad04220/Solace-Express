@@ -1,4 +1,4 @@
-// Solace Express - Windows platform layer: window, OpenGL context, input, audio output
+// Somnium Volandi - Windows platform layer: window, OpenGL context, input, audio output
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -17,6 +17,7 @@
 #include <mutex>
 #include "game.h"
 #include "load_pacer.h"
+#include "world_load_progress.h"
 
 // Ask hybrid-graphics laptops for the dedicated GPU: the integrated one may reject or take minutes over the big scene shaders
 extern "C" {
@@ -455,13 +456,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   wc.lpfnWndProc = wndProc; wc.hInstance = hInst;
   wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
   wc.hIcon = LoadIcon(hInst, MAKEINTRESOURCE(1));
-  wc.lpszClassName = L"SolaceExpressWnd";
+  wc.lpszClassName = L"SomniumVolandiWnd";
   RegisterClassExW(&wc);
   int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
   int ww = std::min(1600, sw * 4 / 5), wh = ww * 9 / 16;
   RECT r = {0, 0, ww, wh};
   AdjustWindowRect(&r, WS_OVERLAPPEDWINDOW, FALSE);
-  g_hwnd = CreateWindowExW(0, wc.lpszClassName, L"Solace Express", WS_OVERLAPPEDWINDOW, (sw - (r.right - r.left)) / 2, (sh - (r.bottom - r.top)) / 2,
+  g_hwnd = CreateWindowExW(0, wc.lpszClassName, L"Somnium Volandi", WS_OVERLAPPEDWINDOW, (sw - (r.right - r.left)) / 2, (sh - (r.bottom - r.top)) / 2,
                            r.right - r.left, r.bottom - r.top, nullptr, nullptr, hInst, nullptr);
   g_hdc = GetDC(g_hwnd);
   PIXELFORMATDESCRIPTOR pfd = {sizeof(pfd), 1, PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER, PFD_TYPE_RGBA, 32};
@@ -475,12 +476,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     int attrs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB, 3, WGL_CONTEXT_MINOR_VERSION_ARB, 3, WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB, 0};
     ctx = createAttribs(g_hdc, nullptr, attrs);
   }
-  if (!ctx) { MessageBoxA(g_hwnd, "Solace Express needs an OpenGL 3.3 capable graphics driver.\nPlease update your graphics drivers.", "Solace Express", MB_ICONERROR); return 1; }
+  if (!ctx) { MessageBoxA(g_hwnd, "Somnium Volandi needs an OpenGL 3.3 capable graphics driver.\nPlease update your graphics drivers.", "Somnium Volandi", MB_ICONERROR); return 1; }
   wglMakeCurrent(g_hdc, ctx);
   wglDeleteContext(legacy);
   g_opengl32 = LoadLibraryA("opengl32.dll");
   const char* missing = nullptr;
-  if (!glLoad(wglProc, &missing)) { MessageBoxA(g_hwnd, (std::string("Missing OpenGL function: ") + missing).c_str(), "Solace Express", MB_ICONERROR); return 1; }
+  if (!glLoad(wglProc, &missing)) { MessageBoxA(g_hwnd, (std::string("Missing OpenGL function: ") + missing).c_str(), "Somnium Volandi", MB_ICONERROR); return 1; }
   s_swapInterval = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
   if (auto ext = (PFNWGLGETEXTENSIONSSTRINGEXTPROC)wglGetProcAddress("wglGetExtensionsStringEXT")) { const char* e = ext(); s_tear = e && strstr(e, "WGL_EXT_swap_control_tear"); }
   timeBeginPeriod(1);   // 1 ms Sleep granularity for the frame limiter
@@ -499,8 +500,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   GLint texUnits = 0; glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &texUnits);
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "w")) { fprintf(f, "GPU: %s\nFragment texture units: %d\n", gpu.c_str(), (int)texUnits); fclose(f); }
   if (texUnits > 0 && texUnits < 22) {
-    MessageBoxA(g_hwnd, ("This graphics driver offers " + std::to_string(texUnits) + " texture units per shader; Solace Express needs 22.\n"
-                         "Please update the graphics driver, or run the game on the dedicated GPU.").c_str(), "Solace Express", MB_ICONERROR);
+    MessageBoxA(g_hwnd, ("This graphics driver offers " + std::to_string(texUnits) + " texture units per shader; Somnium Volandi needs 22.\n"
+                         "Please update the graphics driver, or run the game on the dedicated GPU.").c_str(), "Somnium Volandi", MB_ICONERROR);
     return 1;
   }
   bool cached = false;
@@ -528,7 +529,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     FILE* f = fopen((game.saveDir + "\\error.log").c_str(), "w");
     if (f) { fprintf(f, "%s\nRenderer: %s / %s\n%s", what.c_str(), (const char*)glGetString(GL_RENDERER), (const char*)glGetString(GL_VERSION), g_shaderNotes.c_str()); fclose(f); }
     if (!g_shaderNotes.empty()) if (FILE* fl = fopen((game.saveDir + "\\startup.log").c_str(), "a")) { fprintf(fl, "%s", g_shaderNotes.c_str()); fclose(fl); }
-    MessageBoxA(g_hwnd, ("Graphics initialisation failed:\n" + what.substr(0, 1500)).c_str(), "Solace Express", MB_ICONERROR);
+    MessageBoxA(g_hwnd, ("Graphics initialisation failed:\n" + what.substr(0, 1500)).c_str(), "Somnium Volandi", MB_ICONERROR);
   };
   RECT cr; GetClientRect(g_hwnd, &cr);
   if (!g_ren.initUI(std::max(64L, cr.right), std::max(64L, cr.bottom))) { fatal(g_ren.error); return 1; }
@@ -619,14 +620,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       CloseHandle(wr);   // the child holds its own copy: the reader sees the end of the pipe when the child exits
     }
   }
-  const int stStart = pace.add("start", Renderer::kProgramCount + 1);   // (each shader program built or loaded, and the islands)
-  const int stCache = child.hProcess ? pace.add("optional-cache", Renderer::kProgramCount) : -1;
-  const int stInit = pace.add("career", kNumAircraft + 4);
-  const int stTex = pace.add("renderer", 11);
-  const int stMenu = tool ? -1 : pace.add("menu", 12);
+  const int stStart = pace.add("start", Renderer::kProgramCount + 16, 0.f, "GRAPHICS & WORLD");   // (each shader program built or loaded, and the islands)
+  const int stCache = child.hProcess ? pace.add("optional-cache", Renderer::kProgramCount, 0.f, "SHADER CACHE") : -1;
+  const int stInit = pace.add("career", kNumAircraft + 4, 0.f, "PILOT SYSTEMS");
+  const int stTex = pace.add("renderer", 11, 0.f, "RENDERER");
+  const int stMenu = tool ? -1 : pace.add("menu", 12, 0.f, "MENU SCENERY");
   std::vector<int> meshSteps;
   if (!tool)
-    for (const auto& it : Game::prewarmItems(true)) meshSteps.push_back(pace.add("mesh" + std::to_string(it.first) + (it.second ? "c" : "o")));
+    for (const auto& it : Game::prewarmItems(true)) meshSteps.push_back(pace.add("mesh" + std::to_string(it.first) + (it.second ? "c" : "o"),9,9.f,"AIRCRAFT"));
   pace.begin(stStart);
   std::thread compileThread;
   if (ctx2) compileThread = std::thread([&] {
@@ -653,6 +654,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     std::atomic<int> state{0};          // 0 starting, 1 running, 2 fade out and stop, 3 stop now, 4 finished, -1 unavailable
     std::thread th;
   } intro;
+  const bool introMotion=game.set.menuMotion; // immutable across both intro contexts
   std::atomic<bool> synchronousShaders{false};
   intro.th = std::thread([&] {
     HDC dcI = GetDC(g_hwnd);
@@ -673,16 +675,16 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       float t = (float)(n.QuadPart - t0.QuadPart) / freq.QuadPart;
       float dt = std::max(0.f, t - lastTime); lastTime = t;
       if (st == 2) { fade -= dt / 0.35f; if (fade <= 0.f) break; }
-      if (synchronousShaders) pace.setDone(stStart, (float)progDone + 1.f);
+      if (synchronousShaders) pace.setDone(stStart, (float)progDone + 16.f);
       LoadPacer* lp = intro.pacer;
       float target = lp ? lp->fraction() : (float)intro.target;
-      shown = easeLoadProgress(shown, target, dt);
+      shown = clampf(target,0.f,1.f); // exact completed work; the independent decoration supplies motion
       std::string stage; { std::lock_guard<std::mutex> lk(intro.m); stage = intro.stage; }
       GetClientRect(g_hwnd, &rc);
       if (rc.right > 0 && rc.bottom > 0) { R->W = rc.right; R->H = rc.bottom; }
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
       glViewport(0, 0, R->W, R->H); glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
-      R->uiBegin(); game.drawIntro(shown, stage, t, ic, fade, *R); R->uiEnd();
+      R->uiBegin(); game.drawIntro(shown, stage, t, ic, fade, *R, &pace, introMotion); R->uiEnd();
       SwapBuffers(dcI);
       if (!s_swapInterval) Sleep(14);
     }
@@ -709,13 +711,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       Sleep(10);
       return t;
     }
-    shownMain = easeLoadProgress(shownMain, target, t - lastMainTime);
+    shownMain = clampf(target,0.f,1.f);
     lastMainTime = t;
     RECT rc; GetClientRect(g_hwnd, &rc);
     if (rc.right > 0 && rc.bottom > 0) { g_ren.W = rc.right; g_ren.H = rc.bottom; }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, g_ren.W, g_ren.H); glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
-    g_ren.uiBegin(); game.drawIntro(shownMain, stage, t, iconTex, fade); g_ren.uiEnd();
+    g_ren.uiBegin(); game.drawIntro(shownMain, stage, t, iconTex, fade, g_ren, &pace, introMotion); g_ren.uiEnd();
     SwapBuffers(g_hdc);
     if (!s_swapInterval || s_limitHz > 0) Sleep(14);
     return t;
@@ -777,8 +779,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       if (!sh.empty()) stage += ": " + sh;
       stage += "   " + std::to_string(std::min(d + 1, Renderer::kProgramCount)) + " of " + std::to_string(Renderer::kProgramCount);
     } else stage = "Shaders ready";
-    if (!built) stage += g_worldStage == 1 ? " | Reading island cache" : " | Building islands";
-    pace.setDone(stStart, (float)std::min((int)progDone, Renderer::kProgramCount) + (built ? 1.f : 0.f));   // (the programs done, and the islands)
+    if (!built) stage += " | "+std::string(g_worldLoadTask.load())+fmt(" (%d%%)",int(g_worldLoadProgress.load()*100));
+    pace.setDone(stStart, (float)std::min((int)progDone, Renderer::kProgramCount) + (built ? 16.f : 16.f*g_worldLoadProgress.load()));   // (the programs done, and the islands)
+    if(compileState==0)pace.task("Graphics programs",float(std::min((int)progDone,Renderer::kProgramCount)),float(Renderer::kProgramCount));
+    else pace.task(g_worldLoadTask.load(),g_worldLoadProgress.load(),1.f);
     introFrame(pace.fraction(), stage, 1.f);
     if (game.quit) break;
     if (compiled && built) break;   // no artificial delay after the real work finishes
@@ -802,7 +806,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     bool shaderOk = g_ren.compilePrograms(&progDone);
     synchronousShaders = false;
     if (!shaderOk) { stopIntro(false); fatal(g_ren.error); return 1; }
-    pace.setDone(stStart, (float)Renderer::kProgramCount + 1.f);
+    pace.setDone(stStart, (float)Renderer::kProgramCount + 16.f);
   }
   if (ctx2 && compileState == 1 && !stampPath.empty() && !cacheCurrent && g_ren.dispError.empty())   // the cache now holds this build
     if (FILE* f = fopen(stampPath.c_str(), "w")) { fprintf(f, "%s\n", stamp.c_str()); fclose(f); }
@@ -819,7 +823,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   g_ren.renderScale = 1.0f; g_ren.quality = game.set.quality;
   GetClientRect(g_hwnd, &cr);
   g_ren.matDir = game.assetDir + "\\materials";   // (the scanned material layers shipped beside the exe)
-  if (!g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom), [&](float f, const std::string& what) { pace.setSub(f); introFrame(pace.fraction(), what, 1.f); })) { stopIntro(false); fatal(g_ren.error); return 1; }
+  // These callbacks run on material workers: only the locked tracker is touched,
+  // never window messages or GL. The intro's separate context draws the updates.
+  g_ren.onMaterialProgress=[&](float f,int done,int total){pace.setSub((4.f+f)/11.f);pace.task("Surface material layers",float(done),float(total));};
+  const bool rendererReady=g_ren.init(std::max(64L, cr.right), std::max(64L, cr.bottom), [&](float f, const std::string& what) { pace.clearTask();pace.setSub(f); introFrame(pace.fraction(), what, 1.f); });
+  g_ren.onMaterialProgress=nullptr;
+  if(!rendererReady) {stopIntro(false);fatal(g_ren.error);return 1;}
   if (game.quit) { stopIntro(false); return 0; }
   // the graphics started: an error.log left by an earlier launch that failed is that launch's, not this one's (the
   // diagnostics collect it, and v3.42.0's still showed v3.36.0's NVIDIA compiler failure, fixed since)
@@ -862,7 +871,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0);
     g_ren.bakeYield = [] { pumpB(); };
     g->prewarm([](float f, const std::string& what) {
-      SetWindowTextA(g_hwnd, ("Solace Express - preparing the aircraft " + std::to_string((int)(f * 100.f)) + "%  (" + what + ")").c_str());
+      SetWindowTextA(g_hwnd, ("Somnium Volandi - preparing the aircraft " + std::to_string((int)(f * 100.f)) + "%  (" + what + ")").c_str());
       pumpB();
     }, true);
     g_ren.bakeYield = nullptr;
@@ -894,7 +903,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       FILE* af = fopen((dir + "\\analysis.txt").c_str(), "w");
       if (!af) return 1;
       { BodyLoad r; buildBodies(r); }   // (as the game's launch does: the traffic drawn from its meshes, as in flight)
-      fprintf(af, "Solace Express performance analysis\nGPU: %s\nCPU threads: %u   Quality: %d   Window: %dx%d\n",
+      fprintf(af, "Somnium Volandi performance analysis\nGPU: %s\nCPU threads: %u   Quality: %d   Window: %dx%d\n",
               gpu.c_str(), std::thread::hardware_concurrency(), g_ren.quality, g_ren.W, g_ren.H);
       fprintf(af, "\nHow to read this: 'ms' is wall-clock time per frame with the GPU finished (vsync off). Per-pass times are\n"
                   "serialized CPU wall times including submit + GPU waits (not isolated GPU durations). Resolution scaling: if a frame\n"
@@ -919,7 +928,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         pump();
         RECT rc; GetClientRect(g_hwnd, &rc);
         if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
-        SetWindowTextA(g_hwnd, ("Solace Express - analysing " + sc).c_str());
+        SetWindowTextA(g_hwnd, ("Somnium Volandi - analysing " + sc).c_str());
         g_ren.entSync = true;
         Game* g = new Game();
         g->saveDir = game.saveDir; g->diskless = true;
@@ -1079,7 +1088,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         double base = 0;
         for (const auto& F : kFeat) {
           MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
-          SetWindowTextA(g_hwnd, ("Solace Express - profiling " + sc + ": " + F.name).c_str());
+          SetWindowTextA(g_hwnd, ("Somnium Volandi - profiling " + sc + ": " + F.name).c_str());
           Game* g = new Game();
           g->saveDir = game.saveDir; g->diskless = true;
           g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
@@ -1196,11 +1205,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
         RECT rc; GetClientRect(g_hwnd, &rc);
         if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
-        SetWindowTextA(g_hwnd, ("Solace Express - benchmarking " + sc).c_str());
+        SetWindowTextA(g_hwnd, ("Somnium Volandi - benchmarking " + sc).c_str());
         // a scene's first frame may bake an airframe's meshes (the XR-30's, a minute or more): the bake pumps the window's
         // messages between its batches, so Windows doesn't mark the game "Not Responding" and freeze the screen
         static std::string bakingScene; bakingScene = sc; static bool bakeNoted = false; bakeNoted = false;
-        g_ren.bakeYield = [] { if (!bakeNoted) { bakeNoted = true; SetWindowTextA(g_hwnd, ("Solace Express - baking the airframe meshes for " + bakingScene + " (once; cached afterwards)").c_str()); } pumpB(); };
+        g_ren.bakeYield = [] { if (!bakeNoted) { bakeNoted = true; SetWindowTextA(g_hwnd, ("Somnium Volandi - baking the airframe meshes for " + bakingScene + " (once; cached afterwards)").c_str()); } pumpB(); };
         Game* g = new Game();
         g->saveDir = game.saveDir; g->diskless = true;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
@@ -1219,7 +1228,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         }
         const int warmBakes = g_ren.bakeCount - bakes0;
         g_ren.bakeYield = nullptr;
-        SetWindowTextA(g_hwnd, ("Solace Express - benchmarking " + sc).c_str());
+        SetWindowTextA(g_hwnd, ("Somnium Volandi - benchmarking " + sc).c_str());
         struct Sample {
           LARGE_INTEGER begin{}, updateEnd{}, presentBegin{}, presentEnd{}, end{};
           uint64_t renderFrame = 0, gpuId = 0, gpuOrigin = 0;
@@ -1324,7 +1333,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
         RECT rc; GetClientRect(g_hwnd, &rc);
         if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
-        SetWindowTextA(g_hwnd, ("Solace Express - rendering loading pictures " + std::to_string(++done) + " / " + std::to_string(jobs.size()) + ": " + J.second).c_str());
+        SetWindowTextA(g_hwnd, ("Somnium Volandi - rendering loading pictures " + std::to_string(++done) + " / " + std::to_string(jobs.size()) + ": " + J.second).c_str());
         g_ren.entSync = true;
         Game* g = new Game();
         g->saveDir = game.saveDir; g->diskless = true; g->assetDir = game.assetDir;
@@ -1378,7 +1387,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); }
         RECT rc; GetClientRect(g_hwnd, &rc);
         if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
-        SetWindowTextA(g_hwnd, ("Solace Express - rendering " + sc).c_str());
+        SetWindowTextA(g_hwnd, ("Somnium Volandi - rendering " + sc).c_str());
         Game* g = new Game();
         g->saveDir = game.saveDir; g->diskless = true;
         g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);

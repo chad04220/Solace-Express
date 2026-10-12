@@ -3,10 +3,12 @@
 #include "game.h"
 #include "menu_layout.h"
 #include "hangar_catalog.h"
+#include "ui_identity.h"
+#include "load_pacer.h"
 
 // High-tech glass UI: deep navy panels, cyan accents, amber for warnings
-static const vec3 C_PANEL(0.015f, 0.035f, 0.06f), C_PANEL2(0.04f, 0.085f, 0.13f), C_ACCENT(0.32f, 0.86f, 1.0f), C_WARN(1.0f, 0.72f, 0.22f);
-static const vec3 C_TEXT(0.93f, 0.97f, 1.0f), C_DIM(0.56f, 0.68f, 0.79f);
+static const vec3 C_PANEL = svui::ink, C_PANEL2 = svui::panel, C_ACCENT = svui::brass, C_WARN = svui::amber;
+static const vec3 C_TEXT = svui::text, C_DIM = svui::dim;
 static vec3 C_GOOD(0.42f, 1.0f, 0.68f), C_BAD(1.0f, 0.4f, 0.38f);   // (the colour-blind palette swaps these for blue / orange)
 namespace {
 const float kHudBand = 56.f, kHudRail = 92.f, kHudMsgW = 330.f;   // in S() units
@@ -51,7 +53,7 @@ void hudChevronUp(float cx, float cy, float w, float h, float th, vec3 c, float 
 }
 }   // namespace
 static void applyPalette(bool cb) { C_GOOD = cb ? vec3(0.35f, 0.72f, 1.0f) : vec3(0.42f, 1.0f, 0.68f); C_BAD = cb ? vec3(1.0f, 0.58f, 0.12f) : vec3(1.0f, 0.4f, 0.38f); }
-static const vec3 C_BTN(0.04f, 0.09f, 0.14f), C_BTN_HI(0.07f, 0.2f, 0.29f), C_INK(0.01f, 0.05f, 0.08f);
+static const vec3 C_BTN(.047f,.066f,.090f), C_BTN_HI(.16f,.16f,.14f), C_INK = svui::ink;
 
 static uint32_t uid(float x, float y, const std::string& s) {
   uint32_t h = 2166136261u;
@@ -105,7 +107,7 @@ void Game::panel(float x, float y, float w, float h, float a) {
   // Quiet instrument surfaces: typography and selection carry the hierarchy.
   float s = S(), opacity = std::min(1.f, a / 0.78f);
   g_ren.glow(x, y, w, h, vec3(0, 0, 0), 0.24f * opacity, 6 * s, 14 * s);
-  g_ren.rectGrad(x, y, w, h, vec3(0.027f, 0.052f, 0.078f), vec3(0.012f, 0.025f, 0.043f), (uiGlass ? 0.94f : 0.98f) * opacity, 6 * s);
+  g_ren.rectGrad(x, y, w, h, svui::panel, svui::ink, (uiGlass ? 0.94f : 0.98f) * opacity, 6 * s);
   g_ren.rectOutline(x, y, w, h, C_DIM, 0.16f * opacity, 6 * s, s);
   g_ren.rect(x + 16 * s, y, std::min(40 * s, w - 32 * s), s, C_ACCENT, 0.65f * opacity);
 }
@@ -330,65 +332,77 @@ void Game::drawToasts() {
 // Distance-field orbit rings around the native-resolution icon, with a work-completion
 // bar and separate current-task/detail lines. Decoration never changes the progress.
 // fade: 1 = fully shown, falls to 0 as it hands over to the main menu.
-void Game::drawIntro(float progress, const std::string& stage, float t, unsigned icon, float fade, Renderer& R) {
-  const float W = (float)R.W, H = (float)R.H;
-  const float s = std::max(0.35f, std::min(W / 1120.f, H / 720.f));
-  const float e = smoothstepf(0.f, 0.65f, t) * fade;
-  const vec3 ice(0.43f, 0.85f, 0.94f), blue(0.23f, 0.46f, 0.79f);
-  const float cx = W * 0.5f, cy = H * 0.34f, orbit = 133.f * s;
-  R.rectGrad(0, 0, W, H, vec3(0.022f, 0.042f, 0.072f), vec3(0.006f, 0.012f, 0.026f), 1.f);
-  // Quiet navigation-chart background. Motion is decoration, never task progress.
-  for (int i = -8; i <= 8; ++i) {
-    float x = cx + i * 100.f * s;
-    R.rect(x, 0, 1.f, H, ice, 0.023f * e);
+void Game::drawIntro(float progress, const std::string& stage, float t, unsigned icon, float fade, Renderer& R, const LoadPacer* pace, bool motion) {
+  const float W=float(R.W),H=float(R.H),s=std::max(.25f,std::min(W/1120.f,H/720.f));
+  const float e=smoothstepf(0.f,.45f,t)*fade,mt=motion?t:0.f;
+  const vec3 gold=svui::brass,ice=svui::ice;
+  auto fit=[&](std::string v,float room,float fs){if(R.textWidth(v,fs)<=room)return v;while(!v.empty()&&R.textWidth(v+"...",fs)>room)v.pop_back();return v+"...";};
+  R.rectGrad(0,0,W,H,svui::panel,vec3(.006f,.011f,.022f),1.f);
+  for(int i=0;i<18;++i)R.rect(W*i/17.f,0,1,H,ice,.025f*e);
+  for(int i=0;i<11;++i)R.rect(0,H*i/10.f,W,1,ice,.026f*e);
+  R.text(60*s,34*s,11*s,"SOMNIUM VOLANDI  /  FLIGHT SYSTEMS",gold,e,0,false);
+  R.text(W-60*s,34*s,11*s,fmt("INITIALIZATION  /  %d:%02d",int(t)/60,int(t)%60),C_DIM,e,2,false);
+  R.rect(60*s,59*s,W-120*s,s,gold,.25f*e);
+  R.text(60*s,87*s,56*s,"SOMNIUM",C_TEXT,e,0,false);
+  R.text(60*s,145*s,56*s,"VOLANDI",C_TEXT,e,0,false);
+  R.rect(62*s,216*s,48*s,2*s,gold,e);
+  R.text(60*s,238*s,16*s,"THE DREAM OF FLIGHT",gold,.9f*e,0,false);
+  R.text(60*s,265*s,12*s,"A career to build. A world to explore.",C_DIM,e,0,false);
+  const float cx=W*.77f,cy=178*s,rr=104*s,isz=146*s;
+  R.glow(cx-rr,cy-rr,rr*2,rr*2,ice,.08f*e,rr,48*s);
+  for(int j=0;j<3;++j) {
+    const float r=rr+(14*j)*s;
+    R.rectOutline(cx-r,cy-r,r*2,r*2,j==1?gold:ice,(j==1?.25f:.10f)*e,r,s);
+    const float ang=mt*(j==1?-.18f:.12f)+j*1.9f;
+    R.rect(cx+cosf(ang)*r-2*s,cy+sinf(ang)*r-2*s,4*s,4*s,gold,e,2*s);
   }
-  for (int i = 0; i < 10; ++i) R.rect(0, H * i / 9.f, W, 1.f, ice, 0.025f * e);
-  R.glow(cx - orbit, cy - orbit, orbit * 2, orbit * 2, blue, 0.16f * e, orbit, 95.f * s);
-  // Rounded distance-field rings and dots have soft pixel edges at any window scale.
-  for (int j = 0; j < 3; ++j) {
-    float r = orbit + j * 17.f * s;
-    R.rectOutline(cx - r, cy - r, r * 2, r * 2, ice, (0.23f - j * 0.065f) * e, r, 1.15f * s);
-    const float angle = t * (j == 1 ? -0.32f : 0.23f + j * 0.12f) + j * 2.1f;
-    for (int k = 0; k < 22; ++k) {
-      float a = angle - k * 0.018f, d = (j == 1 ? 4.3f : 3.3f) * s;
-      float x = cx + cosf(a) * r, y = cy + sinf(a) * r;
-      R.rect(x - d * 0.5f, y - d * 0.5f, d, d, j == 1 ? blue : ice, (1.f - k / 22.f) * e * 0.7f, d * 0.5f);
+  if(icon)R.image(icon,cx-isz*.5f,cy-isz*.5f,isz,isz,0,0,1,1,e);
+  else {R.text(cx,cy-23*s,46*s,"SV",gold,e,1,false);}
+  R.text(cx,cy+150*s,10*s,"CIVILIAN  /  SERVICE  /  RESEARCH",C_DIM,e,1,false);
+  const float bx=60*s,by=H-306*s,bw=W-120*s,mw=bw*.58f;
+  R.rectGrad(bx,by,bw,264*s,svui::panel,svui::ink,.98f*e,5*s);
+  R.rectOutline(bx,by,bw,264*s,gold,.25f*e,5*s,s);
+  R.rect(bx+22*s,by,40*s,2*s,gold,e);
+  const float px=bx+24*s,room=mw-48*s,rail=bx+mw+22*s,rw=bw-mw-46*s;
+  R.rect(bx+mw,by+22*s,s,220*s,C_DIM,.15f*e);
+  LoadPacer::Snapshot work;if(pace)work=pace->snapshot();
+  const float p=clampf(progress,0.f,1.f);
+  const int percent=p>=1.f?100:std::min(99,int(p*100.f));
+  R.text(px,by+20*s,11*s,pace?fmt("STEP %02d / %02d  //  %s",work.step,work.steps,work.label.c_str()):"PREPARING YOUR FLIGHT DECK",gold,e,0,false);
+  std::string primary=stage.empty()?"Connecting flight systems":stage,detail;
+  size_t split=primary.find(" | ");const size_t colon=primary.find(": ");if(colon!=std::string::npos&&(split==std::string::npos||colon<split))split=colon;
+  if(split!=std::string::npos){detail=primary.substr(split+(primary[split]==':'?2:3));primary.resize(split);}
+  R.text(px,by+51*s,21*s,fit(primary,room,21*s),C_TEXT,e,0,false);
+  if(detail.empty())detail=p>=1.f?"All required systems are ready.":"Completed work advances the bars below.";
+  R.text(px,by+83*s,12*s,fit(detail,room,12*s),C_DIM,e,0,false);
+  const float taskProgress=work.taskFraction>=0?work.taskFraction:work.stageFraction;
+  const std::string taskStat=!pace?"WORK IN PROGRESS":work.taskUnits>=2?fmt("%d%% / %d of %d / %.0fs",std::min(100,int(taskProgress*100)),int(work.taskDone),int(work.taskUnits),work.elapsed):fmt("%d%% / %.0fs",std::min(100,int(taskProgress*100)),work.elapsed);
+  R.text(px,by+117*s,10*s,fit(work.taskLabel.empty()?"CURRENT STAGE":work.taskLabel,room-R.textWidth(taskStat,12*s)-16*s,10*s),C_DIM,e,0,false);
+  R.text(px+room,by+114*s,12*s,taskStat,gold,e,2,false);
+  if(pace)svui::bar(R,px,by+137*s,room,4*s,taskProgress,gold,e);
+  else {R.rect(px,by+137*s,room,4*s,gold,.12f*e);R.rect(px+fmodf(mt*.16f,1.f)*room,by+136*s,3*s,6*s,gold,e);}
+  R.text(px,by+163*s,10*s,"OVERALL INITIALIZATION",C_DIM,e,0,false);
+  R.text(px+room,by+151*s,30*s,fmt("%d%%",percent),C_TEXT,e,2,false);
+  svui::bar(R,px,by+190*s,room,7*s,p,gold,e);
+  const std::string status=p>=1.f?"Ready. Welcome aboard.":pace&&work.idle>=5?fmt("Task running  /  %.0f s since its last completed unit",work.idle):"Progress measures completed work; task duration can vary.";
+  R.text(px,by+215*s,11*s,fit(status,room,11*s),C_DIM,e,0,false);
+  if(pace) {
+    const int n=std::min(6,int(work.groups.size()));
+    for(int i=0;i<n;++i) {
+      const auto& g=work.groups[i];const float units=g.units+g.skipped,f=units>0?clampf(g.done/units,0.f,1.f):1.f,yy=by+(23+i*35)*s;
+      const vec3 c=g.skipped>0?gold:f>=1.f?ice:g.active?gold:C_DIM;
+      R.rect(rail,yy+3*s,4*s,4*s,c,(g.active?.85f:.40f)*e,2*s);
+      R.text(rail+12*s,yy,10*s,fit(g.label,rw-60*s,10*s),c,e,0,false);
+      R.text(rail+rw,yy,10*s,g.skipped>0?"SKIPPED":f>=1.f?"READY":fmt("%d%%",std::min(99,int(f*100))),c,e,2,false);
+      svui::bar(R,rail+12*s,yy+19*s,rw-12*s,3*s,f,c,e);
     }
+  } else {
+    const char* labels[]={"GRAPHICS & WORLD","PILOT SYSTEMS","RENDERER","MENU SCENERY","AIRCRAFT"};
+    R.text(rail,by+23*s,11*s,"SYSTEM CHECKLIST",gold,e,0,false);
+    for(int i=0;i<5;++i)R.text(rail,by+(57+i*32)*s,11*s,labels[i],C_DIM,.8f*e,0,false);
   }
-  // The source icon is 256 px; stay below native size rather than magnifying its edges.
-  const float isz = std::min(190.f * s, 224.f);
-  const float bob = sinf(t * 0.8f) * 3.f * s;
-  R.glow(cx - isz * 0.5f, cy - isz * 0.5f + bob, isz, isz, ice,
-         (0.09f + 0.025f * sinf(t * 1.4f)) * e, isz * 0.3f, 32.f * s);
-  if (icon) R.image(icon, cx - isz * 0.5f, cy - isz * 0.5f + bob, isz, isz, 0, 0, 1, 1, e);
-  else {
-    R.rectOutline(cx - 40 * s, cy - 40 * s, 80 * s, 80 * s, ice, e, 22 * s, 2 * s);
-    R.text(cx, cy - 17 * s, 32 * s, "SE", C_TEXT, e, 1, true);
-  }
-  const float titleY = cy + orbit + 55.f * s;
-  R.text(cx, titleY, 48.f * s, "SOLACE EXPRESS", C_TEXT, e, 1, true);
-  R.text(cx, titleY + 59.f * s, 13.f * s, "YOUR NEXT HORIZON", ice, 0.85f * e, 1, false);
-  const float bw = std::min(640.f * s, W - 64.f * s), bx = cx - bw * 0.5f;
-  const float by = H - 124.f * s, p = clampf(progress, 0.f, 1.f);
-  std::string primary = stage.empty() ? "Preparing your flight deck" : stage, detail;
-  size_t split = primary.find(" | ");
-  if (split == std::string::npos) split = primary.find(": ");
-  if (split != std::string::npos) { detail = primary.substr(split + (primary[split] == ':' ? 2 : 3)); primary.resize(split); }
-  auto fit = [&](std::string value, float width, float size) {
-    if (R.textWidth(value, size) <= width) return value;
-    while (!value.empty() && R.textWidth(value + "...", size) > width) value.pop_back();
-    return value + "...";
-  };
-  R.text(bx, by - 31.f * s, 16.f * s, fit(primary, bw - 82.f * s, 16.f * s), C_TEXT, e, 0, false);
-  // Floor, never round: 100% is reserved for all completed work.
-  int percent = p >= 1.f ? 100 : std::min(99, (int)(p * 100.f));
-  R.text(bx + bw, by - 35.f * s, 23.f * s, fmt("%d%%", percent), ice, e, 2, false);
-  R.rect(bx, by, bw, 5.f * s, ice, 0.13f * e, 2.5f * s);
-  if (p > 0.f) R.rectGrad(bx, by, bw * p, 5.f * s, blue, ice, e, 2.5f * s);
-  for (int k = 1; k < 5; ++k) R.rect(bx + bw * k / 5.f, by + 10.f * s, 1.f, 4.f * s, ice, 0.3f * e);
-  if (detail.empty()) detail = p >= 1.f ? "Ready for departure" : "Progress advances as loading tasks finish";
-  R.text(bx, by + 27.f * s, 12.f * s, fit(detail, bw, 12.f * s), C_DIM, 0.9f * e, 0, false);
-  R.text(cx, H - 35.f * s, 11.f * s, "2026 CDAIII.  ALL RIGHTS RESERVED.", C_DIM, 0.55f * e, 1, false);
+  R.text(60*s,H-24*s,10*s,"2026 CDAIII.  ALL RIGHTS RESERVED.",C_DIM,.6f*e,0,false);
+  R.text(W-60*s,H-24*s,10*s,"SOMNIUM VOLANDI",gold,.6f*e,2,false);
 }
 
 // ------------------------------------------------------------------ pre-flight loading screen
@@ -401,9 +415,10 @@ void Game::drawLoading() {
     return text + "...";
   };
   const bool military = militaryFlight;
-  const vec3 accent = military ? vec3(.68f,.79f,.39f) : C_ACCENT;
-  const vec3 ink = military ? vec3(.04f,.065f,.028f) : C_INK;
-  const vec3 dim = military ? vec3(.66f,.72f,.58f) : C_DIM;
+  const bool research = researchFlight;
+  const vec3 accent = military ? svui::amber : research ? svui::code : C_ACCENT;
+  const vec3 ink = military ? svui::field : research ? svui::codeInk : C_INK;
+  const vec3 dim = military ? vec3(.69f,.73f,.64f) : research ? svui::codeDim : C_DIM;
   bool air = !plane.onGround;
   const Airport& ap = g_world.airports[air ? contract.to : contract.from];
   // a picture rendered by render_loading.bat - the airport, or the aircraft in flight - when there is one on disk
@@ -426,12 +441,12 @@ void Game::drawLoading() {
   if (cover > 0.001f && (!military || pic)) {
     g_ren.rect(0, 0, W, H, vec3(0.01f, 0.02f, 0.035f), cover);
     if (pic) {   // slow push-in over the picture (cropped to fill the screen)
-      float z = 1.f - 0.06f * std::min(loadT, 12.f) / 12.f, asp = (W / H) / (16.f / 9.f);
+      float z = 1.f - 0.06f * (set.menuMotion ? std::min(loadT, 12.f) / 12.f : 0.f), asp = (W / H) / (16.f / 9.f);
       float su = z * std::min(1.f, asp), sv = z * std::min(1.f, 1.f / asp);
       g_ren.image(pic, 0, 0, W, H, 0.5f - su * 0.5f, 0.5f - sv * 0.5f, 0.5f + su * 0.5f, 0.5f + sv * 0.5f, cover);
       g_ren.flushUIPublic();
     } else if (g_ren.mapTex()) {   // slow push-in over the aerial image
-      float z = 0.62f - 0.05f * std::min(loadT, 12.f) / 12.f;
+      float z = 0.62f - 0.05f * (set.menuMotion ? std::min(loadT, 12.f) / 12.f : 0.f);
       float sv = z, su = z * W / H;
       if (su > 0.98f) { sv *= 0.98f / su; su = 0.98f; }
       g_ren.image(g_ren.mapTex(), 0, 0, W, H, 0.5f - su * 0.5f, 0.5f - sv * 0.5f, 0.5f + su * 0.5f, 0.5f + sv * 0.5f, cover);
@@ -442,14 +457,18 @@ void Game::drawLoading() {
   // legibility gradients
   g_ren.rectGrad(0, H * 0.55f, W, H * 0.45f, vec3(0, 0, 0), vec3(0.0f, 0.01f, 0.02f), 0.75f);
   g_ren.rectGrad(0, 0, W, 90 * s, vec3(0.0f, 0.01f, 0.02f), vec3(0, 0, 0), 0.55f);
-  // header
-  bool research = researchFlight;
-  g_ren.text(40 * s, 26 * s, 13 * s, military ? "SOLACE DEFENSE / SORTIE PREPARATION" : research ? "CONFIDENTIAL RESEARCH FLIGHT" : contract.type == CT_LESSON ? "FLIGHT LESSON" : "CONTRACT", accent, 1, 0, false);
-  g_ren.text(40 * s, 44 * s, 30 * s, fitLoading(contract.title, W - 80 * s, 30 * s), C_TEXT, 1);
+  if(research)svui::matrix(g_ren,0,0,W,H,realTime,.18f,set.menuMotion);
+  if(military)svui::chevrons(g_ren,40*s,13*s,180*s,s,accent,.55f);
+  g_ren.text(40*s,26*s,12*s,"SOMNIUM VOLANDI",accent,1,0,false);
+  g_ren.text(W-40*s,26*s,11*s,military?"DEFENSE COMMAND / SORTIE PREPARATION":research?"NIGHTGLASS / FLIGHT INITIALIZATION":contract.type==CT_LESSON?"FLIGHT SCHOOL / PREPARATION":"FLIGHT OPERATIONS / PREPARATION",dim,1,2,false);
+  g_ren.text(40 * s, 50 * s, 30 * s, fitLoading(contract.title, W - 80 * s, 30 * s), C_TEXT, 1);
   // mission card
-  float cx = 40 * s, cy = H - 282 * s, cw = std::min(780 * s, W - 80 * s);
-  g_ren.rect(cx - 18 * s, cy - 18 * s, cw + 36 * s, 278 * s, (military ? vec3(.025f,.04f,.021f) : vec3(0.012f, 0.026f, 0.043f)), 0.91f, 12 * s);
-  g_ren.rectOutline(cx - 18 * s, cy - 18 * s, cw + 36 * s, 278 * s, accent, 0.2f, 12 * s, 1 * s);
+  float cx = 40 * s, cy = H - 332 * s, cw = std::min(920 * s, W - 80 * s);
+  if(military)svui::fieldSurface(g_ren,cx-18*s,cy-18*s,cw+36*s,328*s,s);
+  else {
+    g_ren.rectGrad(cx-18*s,cy-18*s,cw+36*s,328*s,research?vec3(.014f,.038f,.021f):svui::panel,ink,.97f,5*s);
+    g_ren.rectOutline(cx-18*s,cy-18*s,cw+36*s,328*s,accent,.28f,5*s,s);
+  }
   const Airport& from = g_world.airports[contract.from];
   const Airport& to = g_world.airports[contract.to];
   if (military) g_ren.text(cx, cy, 12*s, "SERVICE AIRCRAFT / EQUIPMENT AND FUEL INCLUDED", dim, 1, 0, false);
@@ -465,15 +484,27 @@ void Game::drawLoading() {
   if (contract.from != contract.to) kv(cx + cw / 3, "ROUTE", fmt("%s  >  %s", from.code, to.code), cw / 3 - 20 * s);
   kv(cx + cw * (contract.from == contract.to ? 1.f : 2.f) / 3, "CONDITIONS", wx.describe(),
      cw * (contract.from == contract.to ? 2.f : 1.f) / 3 - 20 * s);
-  if (military) g_ren.text(W-40*s, 44*s, 14*s, fitLoading(plane.spec->name, W*.35f,14*s),accent,1,2,false);
+  // Separate measured stage bars reveal the work behind the overall percentage.
+  const float scene=clampf(loadFrames/2.f,0.f,1.f);
+  const float chunks=loadPend0>0?clampf(1.f-float(std::max(0,g_ren.entPending))/loadPend0,0.f,1.f):scene;
+  const float lighting=loadFrames>=2&&!loadingShadowPending()?1.f:0.f;
+  const float checks=loadReadyT>=0?1.f:clampf(loadStableFrames/2.f,0.f,1.f);
+  const float fractions[]={scene,chunks,lighting,checks};
+  const char* stages[]={"SCENE SETUP","NEARBY SCENERY","TERRAIN LIGHTING","READINESS CHECK"};
+  for(int i=0;i<4;++i){const float xx=cx+cw*i/4,ww=cw/4-18*s,yy=cy+150*s;
+    g_ren.text(xx,yy,10*s,stages[i],dim,1,0,false);
+    g_ren.text(xx,yy+17*s,11*s,fractions[i]>=1?"READY":i==1?fmt("%d remaining",std::max(0,g_ren.entPending)):i==3?fmt("%d / 2 stable frames",std::min(2,loadStableFrames)):"IN PROGRESS",fractions[i]>=1?accent:C_TEXT,1,0,false);
+    svui::bar(g_ren,xx,yy+37*s,ww,3*s,fractions[i],accent);
+  }
   // progress / ready prompt
   float by = H - 70 * s, bw = cw, bh = 8 * s;
   if (loadReadyT < 0) {
-    g_ren.text(cx, by - 24 * s, 13 * s, loadFrames < 2 ? "Preparing flight scene" : g_ren.entPending > 0 ? "Loading nearby scenery" : loadingShadowPending() ? "Preparing terrain shadows" : "Checking flight readiness", C_TEXT, 0.9f, 0, false);
+    g_ren.text(cx, by - 24 * s, 13 * s, loadFrames < 2 ? "01 / 04  Preparing flight scene" : g_ren.entPending > 0 ? "02 / 04  Loading nearby scenery" : loadingShadowPending() ? "03 / 04  Preparing terrain shadows" : "04 / 04  Checking flight readiness", C_TEXT, 0.9f, 0, false);
     g_ren.text(cx + bw, by - 24 * s, 13 * s, fmt("%d%%", std::min(99, (int)(clampf(loadShown, 0.f, 1.f) * 100.f))), accent, 1, 2, false);
     g_ren.rect(cx, by, bw, bh, accent, 0.12f, 2 * s);
     if (loadShown > 0.f) g_ren.rectGrad(cx, by, bw * loadShown, bh, accent * 0.7f, accent, 1, 2 * s);
-    g_ren.text(cx, by + 19 * s, 11 * s, fitLoading(g_ren.entPending > 0 ? fmt("%d scenery chunks remaining", g_ren.entPending) : loadingShadowPending() ? "Waiting for the terrain shadow pass" : "Verifying the scene before departure", bw, 11 * s), dim, 0.9f, 0, false);
+    const std::string detail=fmt("Elapsed %.1f s  /  %d scene frames  /  ",loadT,loadFrames)+(g_ren.entPending>0?fmt("%d scenery chunks remaining",g_ren.entPending):loadingShadowPending()?"Terrain shadow pass running":"Verifying two stable rendered frames");
+    g_ren.text(cx, by + 19 * s, 11 * s, fitLoading(detail,bw,11*s),dim,.9f,0,false);
     float hx = cx + bw * loadShown;
     g_ren.glow(hx - 4 * s, by - 2 * s, 8 * s, bh + 4 * s, accent, 0.5f + 0.3f * sinf(realTime * 6.f), 4 * s, 14 * s);
   } else {
@@ -494,11 +525,11 @@ void Game::drawMenu() {
   const float x = 48 * s, cw = std::min(370 * s, W * 0.43f), bw = cw - 48 * s;
   g_ren.rectGrad(0, 0, x + cw + 40 * s, H, vec3(0.006f, 0.018f, 0.035f), vec3(0.012f, 0.032f, 0.052f), 0.96f);
   g_ren.rect(x + cw + 40 * s, 0, s, H, C_DIM, 0.16f);
-  g_ren.text(x, 42 * s, 12 * s, "SOLACE ISLANDS / FLIGHT OPERATIONS", C_ACCENT, 1, 0, false);
-  g_ren.text(x, 78 * s, 54 * s, "SOLACE", C_TEXT, 1);
-  g_ren.text(x, 132 * s, 54 * s, "EXPRESS", C_TEXT, 1);
+  g_ren.text(x, 42 * s, 12 * s, "SOMNIUM VOLANDI / FLIGHT OPERATIONS", C_ACCENT, 1, 0, false);
+  g_ren.text(x, 78 * s, 48 * s, "SOMNIUM", C_TEXT, 1);
+  g_ren.text(x, 132 * s, 48 * s, "VOLANDI", C_TEXT, 1);
   g_ren.rect(x, 200 * s, 46 * s, 3 * s, C_ACCENT, 1);
-  g_ren.text(x, 220 * s, 16 * s, "Your aircraft. Your next horizon.", C_DIM, 1);
+  g_ren.text(x, 220 * s, 16 * s, "The dream of flight.", C_DIM, 1);
   float y = 270 * s;
   panel(x, y, cw, (hasSave ? 114 : 86) * s);
   g_ren.text(x + 24 * s, y + 16 * s, 11 * s, hasSave ? "CAREER READY" : "WELCOME ABOARD", C_ACCENT, 1, 0, false);
@@ -523,11 +554,11 @@ void Game::drawMenu() {
   if (button(x + (cw + 12 * s) * 0.5f, y, (cw - 12 * s) * 0.5f, 40 * s, "Controls")) { screen = SCR_HUB; hubTab = TAB_SETTINGS; settingsPage = 1; }
   y += 52 * s;
   if (button(x, y, cw, 36 * s, "Quit to desktop")) quit = true;
-  g_ren.text(x, H - 34 * s, 11 * s, "PILOT CAREER / SOLACE EXPRESS", C_DIM, 0.8f, 0, false);
+  g_ren.text(x, H - 34 * s, 11 * s, "SOMNIUM VOLANDI / CDAIII", C_DIM, 0.8f, 0, false);
   const float fx = x + cw + 76 * s;
   if (W - fx > 220 * s) {
-    g_ren.text(fx, H - 90 * s, 11 * s, "THE ISLANDS ARE WAITING", C_ACCENT, 1, 0, false);
-    g_ren.text(fx, H - 67 * s, 23 * s, "One flight at a time.", C_TEXT, 1);
+    g_ren.text(fx, H - 90 * s, 11 * s, "THE DREAM OF FLIGHT", C_ACCENT, 1, 0, false);
+    g_ren.text(fx, H - 67 * s, 23 * s, "Find your next horizon.", C_TEXT, 1);
   }
 }
 
@@ -548,7 +579,7 @@ void Game::drawHub() {
     g_ren.image(iconTex, hx, 16 * s, isz, isz);
     hx += isz + 14 * s;
   }
-  float tw = g_ren.text(hx, 13 * s, 26 * s, "SOLACE EXPRESS", C_TEXT, 1);
+  float tw = g_ren.text(hx, 13 * s, 24 * s, "SOMNIUM VOLANDI", C_TEXT, 1);
   g_ren.rect(hx + 2 * s, 44 * s, 54 * s, 2 * s, C_ACCENT, 1);
   g_ren.rect(hx + 60 * s, 44.5f * s, std::max(tw - 60 * s, 20 * s), 1 * s, C_ACCENT, 0.35f);
   g_ren.text(hx + 2 * s, 50 * s, 12 * s, std::string("CAREER  //  ") + licenseName(career.license), C_ACCENT, 1, 0, false);
@@ -1553,6 +1584,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
   slider("Field of view", set.fov, 45.f, 75.f, 1.f, fmt("%.0f / %.0f deg", set.fov, set.fov + 19.f));   // (the long form clipped even at 1080p: the review of v3.44.0, UI-6)
   py -= 6 * s; note("outside / in the cockpit");
   slider("UI scale", set.uiScale, 0.8f, 1.4f, 0.05f, fmt("%.0f%%", set.uiScale * 100));
+  toggle("Menu animation", set.menuMotion, "Ambient motion", "Reduced motion");
   toggle("Head-look", set.headLook, "Leans into turns", "Fixed ahead");
   toggle("Display focus zoom", set.cockpitFocusZoom, "Smooth automatic zoom", "Manual zoom only");
   { bool cb = set.cbHud; toggle("HUD palette", set.cbHud, "Blue / orange (colour-blind)", "Green / red"); if (cb != set.cbHud) applyPalette(set.cbHud); }
@@ -2679,7 +2711,7 @@ void Game::drawDebrief() {
   // right stick) in the room that is left, as one body: at a large UI scale on a small screen that room may hold only
   // a few lines (the review of v3.24.0, R9, and of v3.31.0, U4: the total's divider ran through the first fee)
   const bool campaignEnd = career.finished && lastSuccess && contract.story && contract.id == g_story.back().id;
-  const auto campaignLines = campaignEnd ? wrap("You've completed the Solace Express campaign. Congratulations, Captain!", pw - 60 * s, 18 * s) : std::vector<std::string>();
+  const auto campaignLines = campaignEnd ? wrap("You've completed the Somnium Volandi campaign. Congratulations, Captain!", pw - 60 * s, 18 * s) : std::vector<std::string>();
   const bool newLic = career.license > licenseBefore;
   const float campY = (commitBlocked() ? y + ph - 108 * s : y + ph - 76 * s) - campaignLines.size() * 24 * s;
   const float licY = campY - (newLic ? 34 * s : 0.f), totalY = licY - 34 * s;

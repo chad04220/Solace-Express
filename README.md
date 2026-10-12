@@ -1,8 +1,14 @@
-# Solace Express
+# Somnium Volandi
+
+## Somnium Volandi UI rebrand — Claude review branch
+
+The game identity, icon, startup page and civilian screens now use midnight blue, platinum and brass. NIGHTGLASS Research uses emerald code that falls and crosses the display, periodically resolving a face, wing or helix. Military Career uses matte field panels, recessed fasteners and amber deployment controls. Loading shows the current operation, measured stage/batch progress, a subsystem checklist and completed-work progress. Settings → General → Menu animation offers reduced motion. Existing career and cache directories retain their original names for continuity.
+
+See [the Claude review handoff](docs/CLAUDE_SOMNIUM_VOLANDI_UI_REVIEW.md) for implementation details, screenshots, validation and integration notes. The CMake target `SolaceExpress` remains compatible with existing build commands and outputs `SomniumVolandi.exe`; release packages use `SomniumVolandi-windows-x64`.
 
 ## Hive military review: back up careers before testing
 
-This experimental branch writes **save format 5 whenever a career is saved**, including civilian-only play. Older releases cannot read that format. Before launching this build, keep an independent copy of your existing career saves from `%APPDATA%\SolaceExpress` outside that folder. Do not rely on the rotating `.bak` file: subsequent saves can replace it with a format-5 backup. Restore your independent pre-test copy if returning to an older release.
+This experimental branch writes **save format 6 whenever a career is saved**, including civilian-only play. Older releases cannot read that format. Before launching this build, keep an independent copy of your existing career saves from `%APPDATA%\SolaceExpress` outside that folder. Do not rely on the rotating `.bak` file: subsequent saves can replace it with a format-6 backup. Restore your independent pre-test copy if returning to an older release.
 
 The military service review adds a clean olive terminal with assigned-aircraft previews, nine funded XR sorties, and aircraft-specific loading screens. XR-10/20/30 carry reconnaissance work; XR-40 adds precision hover work and armed interception, defense and strike. See `docs/CLAUDE_MILITARY_CAREER_REVIEW.md` for the new catalogue, controls, finite-ammunition tests and validation limits. Missions unlock in board order after successful extraction; completed sorties remain replayable, and locked cards show a classified aircraft silhouette. Existing mission IDs remain stable. Saves migrate forward to v6 with explicit per-mission completion; old aggregate service records are preserved without guessing prior mission identities. Older builds cannot read v6 saves; keep your independent backup when switching builds.
 
@@ -181,11 +187,11 @@ The presets include SomaFM, Radio Paradise and KEXP, plus free US East Coast pub
 
 **Startup.** The first thing on screen is the intro: the game's icon in a rotating ring, the title and a progress bar. The intro animates on its own thread with its own OpenGL context, separate from everything else, so loading never freezes it. The first time a new version starts, the shaders are compiled by a hidden helper copy of the game (graphics drivers can stall every other drawing call of the process doing a big compile), which writes them to the shader cache; the game then loads them from there. While it plays, the shaders load on a worker thread with another context and the world is generated on another thread (its heightmap, scenery masks and the terrain textures are split across every CPU core), so the screen keeps animating at 60 Hz. When both are done, the menu tour's first place is loaded (every tree and building in range, the shadows) and every aircraft's hull is built, rendered offscreen while the intro still plays, so the menu opens complete. During the menu tour the next place loads in the background while the current one plays.
 
-Save data, settings and the radio list live in `%APPDATA%\SolaceExpress` (Roaming: they're yours, and go with your profile). What the game builds for this machine - the compiled shaders, the islands, each aircraft's learned performance and its body meshes - is cached in `%LOCALAPPDATA%\SolaceExpress` (Local: the shaders are your GPU's and driver's own, and none of it needs to travel). The first launch builds it, later ones load it in a moment, and deleting the folder only means the next launch builds it again. A game update, driver update or different GPU simply rebuilds what changed. (Versions before 3.42 kept it in a `shadercache` folder next to `SolaceExpress.exe`; the first launch moves it over.)
+Save data, settings and the radio list live in `%APPDATA%\SolaceExpress` (Roaming: they're yours, and go with your profile). What the game builds for this machine - the compiled shaders, the islands, each aircraft's learned performance and its body meshes - is cached in `%LOCALAPPDATA%\SolaceExpress` (Local: the shaders are your GPU's and driver's own, and none of it needs to travel). The first launch builds it, later ones load it in a moment, and deleting the folder only means the next launch builds it again. A game update, driver update or different GPU simply rebuilds what changed. (Versions before 3.42 kept it in a `shadercache` folder next to `SomniumVolandi.exe`; the first launch moves it over.)
 
 **Performance.** The cloud and terrain noise fields are baked at startup into tileable textures (a 1024² coverage map and a 128³ noise volume), so the GPU samples them with its texture hardware instead of evaluating hashed noise per sample; the cloud march takes long strides through clear air and half the steps for water reflections. Scenery chunks that lie wholly in one level of detail are handed to the GPU in one block, and the vertex shader does the distance thinning per instance.
 
-**Laptops with two GPUs.** The game asks NVIDIA Optimus and AMD switchable graphics for the dedicated GPU. If it still starts on the integrated one (very slow loading, or a shader error at startup), set `SolaceExpress.exe` to *High performance* in Windows Settings → System → Display → Graphics. The intro screen shows the loading progress. Each launch writes that GPU's name to `%APPDATA%\SolaceExpress\startup.log`.
+**Laptops with two GPUs.** The game asks NVIDIA Optimus and AMD switchable graphics for the dedicated GPU. If it still starts on the integrated one (very slow loading, or a shader error at startup), set `SomniumVolandi.exe` to *High performance* in Windows Settings → System → Display → Graphics. The intro screen shows the loading progress. Each launch writes that GPU's name to `%APPDATA%\SolaceExpress\startup.log`.
 
 ## Building
 
@@ -194,7 +200,7 @@ Save data, settings and the radio list live in `%APPDATA%\SolaceExpress` (Roamin
 ```
 cmake -S . -B build -A x64
 cmake --build build --config Release
-build\Release\SolaceExpress.exe
+build\Release\SomniumVolandi.exe
 ```
 
 ### MinGW-w64 (on Windows, or cross-compiling from Linux)
@@ -204,7 +210,7 @@ cmake -S . -B build-win -DCMAKE_TOOLCHAIN_FILE=cmake-mingw.cmake   # omit the to
 cmake --build build-win -j
 ```
 
-The GitHub Actions workflow (`.github/workflows/build.yml`) builds with MSVC, runs the tests, and uploads `SolaceExpress-windows-x64` as an artifact on every push. A second job runs the headless tests under AddressSanitizer and UBSan. The sanitizers slow the tests down about tenfold, so this job is split across three runners. The selector deals the tests out by their measured cost (their ctest `COST`). The longest tests, the flight model, the campaign and the game loop, are registered in parts (`--part N`), so no runner waits on a single long test. The tests that fly over the islands don't each generate them: ctest generates them once per run (`tests/test_world.cpp`), and those tests load that copy. Run on its own outside ctest, a test generates its own.
+The GitHub Actions workflow (`.github/workflows/build.yml`) builds with MSVC, runs the tests, and uploads `SomniumVolandi-windows-x64` as an artifact on every push. A second job runs the headless tests under AddressSanitizer and UBSan. The sanitizers slow the tests down about tenfold, so this job is split across three runners. The selector deals the tests out by their measured cost (their ctest `COST`). The longest tests, the flight model, the campaign and the game loop, are registered in parts (`--part N`), so no runner waits on a single long test. The tests that fly over the islands don't each generate them: ctest generates them once per run (`tests/test_world.cpp`), and those tests load that copy. Run on its own outside ctest, a test generates its own.
 
 A push to a branch builds and runs only the tests that the change can affect. It compares against the last commit that passed CI on that branch. `tools/ci/select_tests.py` works the selection out from CMake's description of the build: each test's sources, the libraries it links, their `#include`s, the files they read by name, and the shaders. The job summary says which tests ran and why. Several cases run everything:
 - a change to the build itself (`CMakeLists.txt`, the workflow, the selector);

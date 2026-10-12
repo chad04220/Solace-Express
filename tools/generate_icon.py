@@ -1,72 +1,64 @@
 #!/usr/bin/env python3
-"""Rebuild the original Solace badge as an antialiased vector/raster asset.
-
-Requires Pillow. Run from any directory: python3 tools/generate_icon.py
-The geometry and colors preserve the existing badge; raster frames use 4x
-coverage sampling and Lanczos downsampling, including the small Windows sizes.
+"""Generate Somnium Volandi's split-wing/horizon identity (SVG, PNG, Windows ICO).
+Pillow is the only dependency. All outputs come from these vector coordinates;
+small taskbar frames are rendered individually with 4x coverage antialiasing.
 """
 from pathlib import Path
 from PIL import Image, ImageDraw
 
-ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "assets"
-PLANE = [(128, 30), (140, 64), (140, 110), (230, 140), (230, 156),
-         (140, 140), (136, 200), (166, 218), (166, 230), (128, 222),
-         (90, 230), (90, 218), (120, 200), (116, 140), (26, 156),
-         (26, 140), (116, 110), (116, 64)]
-SIZES = [16, 32, 48, 64, 128, 256]
-
+ASSETS = Path(__file__).resolve().parents[1] / 'assets'
+SIZES = [16, 24, 32, 48, 64, 128, 256]
+LEFT = [(123, 65), (113, 119), (42, 157), (42, 172), (106, 151), (123, 199), (116, 137)]
+RIGHT = [(256-x, y) for x, y in LEFT]
+GOLD = (232, 188, 120, 255)
+WHITE = (244, 243, 232, 255)
 
 def render(size):
     scale = size * 4 / 256
     n = size * 4
-    im = Image.new("RGBA", (n, n))
-    d = ImageDraw.Draw(im)
-    box = tuple(round(v * scale) for v in (8, 8, 248, 248))
-    d.rounded_rectangle(box, radius=round(49 * scale), fill=(255, 184, 56, 255))
-    mask = Image.new("L", (n, n))
-    md = ImageDraw.Draw(mask)
-    md.rounded_rectangle(tuple(round(v * scale) for v in (14, 14, 242, 242)),
-                         radius=round(43 * scale), fill=255)
-    inside = Image.new("RGBA", (n, n), (14, 28, 48, 255))
-    di = ImageDraw.Draw(inside)
-    for y in range(round(150 * scale), n):
-        f = max(0, min(1, (y / scale - 150) / 92))
-        color = tuple(round(a + (b - a) * f) for a, b in zip((255, 151, 35), (204, 96, 65))) + (255,)
-        di.line((0, y, n, y), fill=color)
-    im.paste(inside, (0, 0), mask)
-    d = ImageDraw.Draw(im)
-    d.polygon([(round(x * scale), round(y * scale)) for x, y in PLANE], fill=(245, 245, 250, 255))
-    return im.resize((size, size), Image.Resampling.LANCZOS)
-
+    out = Image.new('RGBA', (n, n))
+    d = ImageDraw.Draw(out)
+    def box(v): return tuple(round(x * scale) for x in v)
+    d.rounded_rectangle(box((8, 8, 248, 248)), radius=round(50*scale), fill=GOLD)
+    mask = Image.new('L', (n, n))
+    ImageDraw.Draw(mask).rounded_rectangle(box((12, 12, 244, 244)), radius=round(46*scale), fill=255)
+    bg = Image.new('RGBA', (n, n))
+    bd = ImageDraw.Draw(bg)
+    for y in range(n):
+        f = y/n
+        bd.line((0, y, n, y), fill=tuple(round(a+(b-a)*f) for a,b in zip((27,40,59),(7,15,29)))+(255,))
+    out.paste(bg, (0, 0), mask)
+    d = ImageDraw.Draw(out)
+    d.arc(box((38, 38, 218, 218)), 205, 335, fill=GOLD, width=max(1,round(3*scale)))
+    d.arc(box((38, 38, 218, 218)), 18, 162, fill=(81,120,133,255), width=max(1,round(2*scale)))
+    for wing in (LEFT, RIGHT):
+        d.polygon([(round(x*scale),round(y*scale)) for x,y in wing],fill=WHITE)
+    d.line(box((128, 67, 128, 194)),fill=GOLD,width=max(1,round(3*scale)))
+    d.polygon([(round(x*scale),round(y*scale)) for x,y in [(128,28),(132,36),(128,44),(124,36)]],fill=GOLD)
+    d.line(box((72, 219, 184, 219)), fill=GOLD, width=max(1,round(2*scale)))
+    return out.resize((size,size),Image.Resampling.LANCZOS)
 
 def main():
-    points = " ".join(f"{x},{y}" for x, y in PLANE)
+    def points(p): return ' '.join(f'{x},{y}' for x,y in p)
     svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <title>Solace Express application icon</title>
-  <defs>
-    <linearGradient id="sunset" x1="0" y1="150" x2="0" y2="242" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ff9723"/><stop offset="1" stop-color="#cc6041"/>
-    </linearGradient>
-    <clipPath id="badge"><rect x="14" y="14" width="228" height="228" rx="43"/></clipPath>
-  </defs>
-  <rect x="8" y="8" width="240" height="240" rx="49" fill="#ffb838"/>
-  <rect x="14" y="14" width="228" height="228" rx="43" fill="#0e1c30"/>
-  <path d="M14 150H242V242H14Z" fill="url(#sunset)" clip-path="url(#badge)"/>
-  <polygon points="{points}" fill="#f5f5fa"/>
-</svg>
-'''
-    (ASSETS / "icon.svg").write_text(svg)
-    frames = [render(size) for size in SIZES]
-    frames[-1].save(ASSETS / "icon.ico", sizes=[(n, n) for n in SIZES], append_images=frames[:-1])
-    render(512).save(ASSETS / "icon.png")
-    ico = Image.open(ASSETS / "icon.ico")
-    assert ico.ico.sizes() == {(n, n) for n in SIZES}
+  <title>Somnium Volandi — the dream of flight</title>
+  <desc>A platinum split wing rises through a brass orbital horizon on midnight blue.</desc>
+  <defs><linearGradient id="night" x2="0" y2="1"><stop stop-color="#1b283b"/><stop offset="1" stop-color="#070f1d"/></linearGradient></defs>
+  <rect x="8" y="8" width="240" height="240" rx="50" fill="#e8bc78"/>
+  <rect x="12" y="12" width="232" height="232" rx="46" fill="url(#night)"/>
+  <path d="M46.4 90 A90 90 0 0 1 209.6 90" fill="none" stroke="#e8bc78" stroke-width="3"/>
+  <path d="M213.6 155.8 A90 90 0 0 1 42.4 155.8" fill="none" stroke="#517885" stroke-width="2"/>
+  <polygon points="{points(LEFT)}" fill="#f4f3e8"/><polygon points="{points(RIGHT)}" fill="#f4f3e8"/>
+  <path d="M128 67V194 M72 219H184" fill="none" stroke="#e8bc78" stroke-width="2.5"/>
+  <path d="M128 28L132 36L128 44L124 36Z" fill="#e8bc78"/>
+</svg>'''
+    (ASSETS/'icon.svg').write_text(svg+'\n')
+    frames=[render(n) for n in SIZES]
+    frames[-1].save(ASSETS/'icon.ico',sizes=[(n,n) for n in SIZES],append_images=frames[:-1])
+    render(512).save(ASSETS/'icon.png')
+    ico=Image.open(ASSETS/'icon.ico')
+    assert ico.ico.sizes()=={(n,n) for n in SIZES}
     for n in SIZES:
-        alpha = ico.ico.getimage((n, n)).getchannel("A")
-        assert any(0 < a < 255 for a in alpha.getdata()), f"Missing edge coverage at {n}px"
-    print("Generated SVG, 512px PNG, and six antialiased Windows ICO frames")
-
-
-if __name__ == "__main__":
-    main()
+        assert any(0<a<255 for a in ico.ico.getimage((n,n)).getchannel('A').getdata())
+    print('Generated Somnium Volandi SVG, 512px PNG and seven antialiased ICO frames')
+if __name__=='__main__': main()

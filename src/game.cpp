@@ -242,6 +242,7 @@ void Game::loadSettings() {
     else if (s == "cockpitFocusZoom") set.cockpitFocusZoom = v != 0;
     else if (s == "foveate") set.foveate = v != 0;
     else if (s == "headLook") set.headLook = v != 0;
+    else if (s == "menuMotion") set.menuMotion = v != 0;
     else if (s == "cbHud") set.cbHud = v != 0;
     else if (s == "uiScale") set.uiScale = clampf(v, 0.8f, 1.4f);
     else if (s.rfind("hudCam", 0) == 0 && s.size() == 7 && s[6] >= '0' && s[6] <= '3') set.hudCam[s[6] - '0'] = v != 0;
@@ -262,7 +263,7 @@ bool Game::saveSettings() {
   std::string t = fmt("quality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
   t += fmt("renderRes %d\nfpsTarget %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
-  t += fmt("cockpitFocusZoom %d\nfoveate %d\n", set.cockpitFocusZoom, set.foveate);
+  t += fmt("cockpitFocusZoom %d\nfoveate %d\nmenuMotion %d\n", set.cockpitFocusZoom, set.foveate, set.menuMotion);
   for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   for (const std::string& id : resDone) t += "rescard." + id + " 1\n";
   for (auto& tb : trialBest) for (size_t i = 0; i < tb.second.size(); i++) t += fmt("trial.%s.%d %f\n", tb.first.c_str(), (int)i, tb.second[i]);
@@ -307,7 +308,7 @@ static const std::pair<const char*, const char*> kDefaultStations[] = {
 static void writeStations(const std::string& path, const std::vector<std::pair<std::string, std::string>>& st) {
   FILE* f = fopen(path.c_str(), "w");
   if (!f) return;
-  fprintf(f, "# Solace Express internet radio stations\n# stations-version %d\n# One per line:  Name|URL   (MP3 or AAC HTTP/HTTPS streams). Add your own below.\n", kStationsVersion);
+  fprintf(f, "# Somnium Volandi internet radio stations\n# stations-version %d\n# One per line:  Name|URL   (MP3 or AAC HTTP/HTTPS streams). Add your own below.\n", kStationsVersion);
   for (auto& s : st) fprintf(f, "%s|%s\n", s.first.c_str(), s.second.c_str());
   fclose(f);
 }
@@ -1845,8 +1846,8 @@ void Game::updateLoading(float dt) {
     }
     const float scenery = loadPend0 > 0 ? 1.f - float(pend) / loadPend0 : (loadFrames >= 2 ? 1.f : 0.f);
     const float verified = std::min(loadStableFrames / 2.f, 1.f);
-    const float completed = 0.75f * scenery + 0.15f * (loadFrames >= 2 && !shadowPending ? 1.f : 0.f) + 0.10f * verified;
-    loadShown = std::max(loadShown, easeLoadProgress(loadShown, std::min(completed, 0.99f), dt));
+    const float completed = 0.10f * clampf(loadFrames/2.f,0.f,1.f) + 0.65f * scenery + 0.15f * (loadFrames >= 2 && !shadowPending ? 1.f : 0.f) + 0.10f * verified;
+    loadShown = std::max(loadShown, std::min(completed, 0.99f));
     if (loadStableFrames >= 2) { loadReadyT = loadT; loadShown = 1.f; g_ren.entBudgetMs = 2.5f; }
     // a research sortie: the preview has already streamed its airport, so the flight opens at once (no establishing shot)
     if (loadReadyT >= 0 && researchFlight && !headless) {
@@ -3096,9 +3097,14 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
     say(0);
     g_ren.onBodyLoaded = [&](bool packaged) { say(packaged ? 1 : 2); };
     g_ren.onBakeStart = [&] { say(3); };
+    g_ren.onMeshProgress = [&](float f,const std::string& task) {
+      if(pace){pace->setSub(f);pace->task(task,1,1);}say(3);
+    };
+    g_ren.onMeshBatch = [&](int done,int all,const std::string& task) {if(pace)pace->task(task,float(done),float(all));};
     g_onProgramBuild = [&](const std::string&) { say(4); };
     realTime = 3.f; frame();   // bakes it at the end of the frame, if this view uses one
-    g_ren.onBodyLoaded = nullptr; g_ren.onBakeStart = nullptr; g_onProgramBuild = nullptr;
+    if(pace)pace->setSub(1.f);
+    g_ren.onBodyLoaded = nullptr; g_ren.onBakeStart = nullptr; g_ren.onMeshProgress = nullptr; g_ren.onMeshBatch = nullptr; g_onProgramBuild = nullptr;
   }
   prewarmCraft = -1; prewarmInside = false;
   realTime = 0.f;
@@ -4141,6 +4147,14 @@ void Game::render() {
     const int item = resWarmFrames - 2, nItems = 2 * resCraftCount();
     resWarmCraft = item >= 0 && item < nItems ? resCraftAt(item / 2) : -1;
     resWarmCk = item >= 0 && item < nItems && (item & 1);
+    resLoadTask.clear();resTaskDone=resTaskUnits=0;
+    g_ren.onMeshProgress=[this](float f,const std::string& task){
+      const float views=clampf((std::max(0,resWarmFrames-2)+f)/(2.f*resCraftCount()+3.f),0.f,1.f);
+      const float chunks=resPend0>0?clampf(1.f-float(g_ren.entPending)/resPend0,0.f,1.f):0.f;
+      resWork=std::max(resWork,.25f*views+.65f*chunks+.10f*(resWarmFrames>=2&&!loadingShadowPending()?1.f:0.f));
+      resLoadTask=task;resTaskDone=resTaskUnits=1;
+    };
+    g_ren.onMeshBatch=[this](int done,int total,const std::string& task){resLoadTask=task;resTaskDone=done;resTaskUnits=total;};
     g_ren.bakeYield = [this] {
       GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
       // (the sequence runs on the real clock: a frame from inside a bake moves it on by the time that has passed)
@@ -4164,6 +4178,7 @@ void Game::render() {
     g_ren.renderScene(fp, a, b);
     if (screen == SCR_LOADING && loadReadyT < 0) ++loadFrames;
   } else g_ren.clearScreen();
+  if(screen==SCR_RESEARCH){g_ren.onMeshProgress=nullptr;g_ren.onMeshBatch=nullptr;}
   if (screen == SCR_RESEARCH && !resWarm) g_ren.bakeYield = nullptr;
   if (sceneOnly) return;
   g_ren.uiBegin();

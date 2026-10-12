@@ -1,0 +1,169 @@
+{
+  "renderer": "Mesa llvmpipe OpenGL",
+  "png_recompression": "lossless, pixels verified",
+  "reduced_motion_pixels_equal_at_two_times": true,
+  "previews": [
+    {
+      "file": "previews/Startup.png",
+      "resolution": [
+        1920,
+        1080
+      ],
+      "bytes": 227835,
+      "sha256": "53a14257754efe6b56486266548b199aaa4eabd65b85f47f327fe6e50f6a79f5"
+    },
+    {
+      "file": "previews/Startup-Ready.png",
+      "resolution": [
+        1920,
+        1080
+      ],
+      "bytes": 214813,
+      "sha256": "773fd5e308a1d14a91cb2234c15a6af16f24a446bf57216daecab590b603c79f"
+    },
+    {
+      "file": "previews/Main-Menu.png",
+      "resolution": [
+        1280,
+        720
+      ],
+      "bytes": 1251732,
+      "sha256": "f5f8bd0b41f3f69f9ee69304567656969975c8021f62d607907a641c7cb0deac"
+    },
+    {
+      "file": "previews/Hangar.png",
+      "resolution": [
+        1280,
+        720
+      ],
+      "bytes": 631548,
+      "sha256": "a2696dd4f163017a8465a881495087f183a7d373284eb651ed7f6cf1563b4393"
+    },
+    {
+      "file": "previews/Research.png",
+      "resolution": [
+        1280,
+        720
+      ],
+      "bytes": 699559,
+      "sha256": "6a5e580d3b6519ee4e5774c9d2732e4370353f9ebc3868adf54e38db5600af19"
+    },
+    {
+      "file": "previews/Military-Career.png",
+      "resolution": [
+        1280,
+        720
+      ],
+      "bytes": 821976,
+      "sha256": "014a86448580be61572c1643f37f097f6d7df6325d9d4fe1eac0ea75c3fdac47"
+    },
+    {
+      "file": "previews/Research-XR40-Layout.png",
+      "resolution": [
+        1920,
+        1080
+      ],
+      "bytes": 526161,
+      "sha256": "9bcf4e1c75d70be0adef7f4b203feda54a6e5de8bb9e6f307b894d06e39f8be8"
+    },
+    {
+      "file": "previews/Research-Boot-Layout.png",
+      "resolution": [
+        1920,
+        1080
+      ],
+      "bytes": 663888,
+      "sha256": "58132958ef9698d26b1245ceac2208ea99d0e1a1a4cc0940f95e6cee9cddfb77"
+    },
+    {
+      "file": "previews/Military-XR40-Layout.png",
+      "resolution": [
+        1920,
+        1080
+      ],
+      "bytes": 365326,
+      "sha256": "48bf87530e6ef494ecbee9fa27ca5712734be9c0100568e36365b254bb778af2"
+    },
+    {
+      "file": "previews/Military-Loading-Layout.png",
+      "resolution": [
+        1920,
+        1080
+      ],
+      "bytes": 733726,
+      "sha256": "6210eeb855e515b7be22d496e571be53f0c381d257486492ce4e410d20dc54c1"
+    },
+    {
+      "file": "previews/Flight-Loading-Layout.png",
+      "resolution": [
+        1920,
+        1080
+      ],
+      "bytes": 597384,
+      "sha256": "b234d54c0b9b66b5de10f841edf090e1fe75380ff3bf13ed2bc7c9bd31eaaa81"
+    },
+    {
+      "file": "previews/Flight-Ready-Layout.png",
+      "resolution": [
+        1920,
+        1080
+      ],
+      "bytes": 581373,
+      "sha256": "2d67a485227154ed79f49bf79abe6821df836ca72db2315970b83a06c308c0a8"
+    },
+    {
+      "file": "previews/Compact-Startup.png",
+      "resolution": [
+        800,
+        600
+      ],
+      "bytes": 86950,
+      "sha256": "2e2690293b0b146e9ab4e7e625e45f5270b4d93a2116a59e2c81307a8b314c87"
+    },
+    {
+      "file": "previews/Compact-Research-Layout.png",
+      "resolution": [
+        800,
+        600
+      ],
+      "bytes": 226273,
+      "sha256": "25ad0d4a7d278fecffde390057c87691614a620f44108755fadaa7a610efb4bd"
+    },
+    {
+      "file": "previews/Compact-Military-Layout.png",
+      "resolution": [
+        800,
+        600
+      ],
+      "bytes": 157749,
+      "sha256": "1e188e0cdd683503829bac4c90bec0fd0f0d2e888dcc59367f7070963867367f"
+    },
+    {
+      "file": "previews/Code-Face.png",
+      "resolution": [
+        960,
+        540
+      ],
+      "bytes": 137934,
+      "sha256": "987496101acc14280571ba122ff719790284d2f832f9aa11475ebbd740c71fb3"
+    },
+    {
+      "file": "previews/Code-Wing.png",
+      "resolution": [
+        960,
+        540
+      ],
+      "bytes": 136675,
+      "sha256": "32c31d1a255fec724fb6512d02611fcb0eb69545983c436cf12b8a3339455328"
+    },
+    {
+      "file": "previews/Code-Helix.png",
+      "resolution": [
+        960,
+        540
+      ],
+      "bytes": 133114,
+      "sha256": "6a412317819d98aa4a48087772a8c43a11ba85fa8a0715b8680cf2dbf6229e3f"
+    }
+  ]
+}

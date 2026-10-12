@@ -15,11 +15,21 @@
 
 class LoadPacer {
 public:
+  struct Group { std::string label; float done = 0, units = 0, skipped = 0; bool active = false; };
+  struct Snapshot {
+    float overall = 0, stageFraction = 0, stageDone = 0, stageUnits = 0;
+    int step = 0, steps = 0, completedSteps = 0;
+    double elapsed = 0, idle = 0;
+    std::string label;
+    std::string taskLabel;
+    float taskDone = 0, taskUnits = 0, taskFraction = -1;
+    std::vector<Group> groups;
+  };
   // A step of `units` completed things (`key` names it for tookOf).
   // Optional weight scales the whole step; by default each real unit weighs one.
-  int add(const std::string& key, int units = 1, float weight = 0.f) {
+  int add(const std::string& key, int units = 1, float weight = 0.f, const std::string& label = {}) {
     std::lock_guard<std::mutex> lk(m);
-    Step s; s.key = key; s.units = std::max(units, 1); s.weight = std::isfinite(weight) && weight > 0.f ? weight : (float)s.units;
+    Step s; s.key = key; s.label = label.empty() ? key : label; s.units = std::max(units, 1); s.weight = std::isfinite(weight) && weight > 0.f ? weight : (float)s.units;
     steps.push_back(s);
     return (int)steps.size() - 1;
   }
@@ -29,12 +39,13 @@ public:
     if (i < 0 || i >= (int)steps.size()) return;
     const double now = clock();
     for (int k = 0; k < i && k < (int)steps.size(); k++) close(k, now);
-    cur = i; if (steps[i].t0 < 0) steps[i].t0 = now;
+    cur = i; taskLabel.clear(); taskUnits=taskDone=0;
+    if (steps[i].t0 < 0) { steps[i].t0 = now; steps[i].changed = now; }
   }
   // everything is done
-  void end() { std::lock_guard<std::mutex> lk(m); const double now = clock(); for (int k = 0; k < (int)steps.size(); k++) close(k, now); cur = -1; }
+  void end() { std::lock_guard<std::mutex> lk(m); const double now = clock(); for (int k = 0; k < (int)steps.size(); k++) close(k, now); cur = -1;taskLabel.clear();taskDone=taskUnits=0; }
   // how many of step i's things are done so far (the shader programs built, the islands)
-  void setDone(int i, float units) { std::lock_guard<std::mutex> lk(m); if (i >= 0 && i < (int)steps.size() && std::isfinite(units)) steps[i].done = std::max(steps[i].done, std::min(units, (float)steps[i].units - steps[i].skipped)); }
+  void setDone(int i, float units) { std::lock_guard<std::mutex> lk(m); if (i >= 0 && i < (int)steps.size() && std::isfinite(units)) advance(steps[i], units); }
   // Explicitly remove unresolved optional work from the launch. Keep it separate
   // from completed work, so a failed cache helper never claims to have built shaders.
   void skipRemaining(int i) {
@@ -46,16 +57,53 @@ public:
     return i >= 0 && i < (int)steps.size() ? steps[i].skipped : 0.f;
   }
   // the running step's share done (0..1), where it is one thing that knows how far it is (the menu's scenery frames)
-  void setSub(float f) { std::lock_guard<std::mutex> lk(m); if (cur >= 0 && std::isfinite(f)) steps[cur].done = std::max(steps[cur].done, std::min(std::min(std::max(f, 0.f), 1.f) * steps[cur].units, steps[cur].units - steps[cur].skipped)); }
+  void setSub(float f) { std::lock_guard<std::mutex> lk(m); if (cur >= 0 && std::isfinite(f)) advance(steps[cur], std::clamp(f,0.f,1.f)*steps[cur].units); }
+  // The current bounded batch may restart for the next field/state. Its bar is
+  // independent of overall completed steps, and does not credit unfinished work.
+  void task(const std::string& label, float done, float units) {
+    std::lock_guard<std::mutex> lk(m);
+    if(!std::isfinite(done)||!std::isfinite(units)||units<=0)return;
+    const float d=std::clamp(done,0.f,units);
+    if(cur>=0 && (taskLabel!=label || taskDone!=d || taskUnits!=units))steps[cur].changed=clock();
+    taskLabel=label;taskDone=d;taskUnits=units;
+  }
+  void clearTask() {std::lock_guard<std::mutex> lk(m);taskLabel.clear();taskDone=taskUnits=0;}
   // 0..1: the things done out of all the launch's things; it never steps back
   // (the intro's own thread asks every frame)
   float fraction() const {
     std::lock_guard<std::mutex> lk(m);
+    return fractionLocked();
+  }
+  // One consistent read for the independent intro thread. Group bars expose work
+  // within each subsystem; a short single-program stall cannot hide other work.
+  Snapshot snapshot() const {
+    std::lock_guard<std::mutex> lk(m);
+    Snapshot out; out.overall=fractionLocked();out.steps=(int)steps.size();out.step=cur>=0?cur+1:out.steps;
+    out.taskLabel=taskLabel;out.taskDone=taskDone;out.taskUnits=taskUnits;
+    out.taskFraction=taskUnits>0?taskDone/taskUnits:-1.f;
+    const double now=clock();
+    for(int i=0;i<(int)steps.size();++i) {
+      const Step& s=steps[i];const float units=s.units-s.skipped;
+      if(s.done>=units)++out.completedSteps;
+      auto it=std::find_if(out.groups.begin(),out.groups.end(),[&](const Group& g){return g.label==s.label;});
+      if(it==out.groups.end()){out.groups.push_back({s.label});it=out.groups.end()-1;}
+      it->done+=s.done;it->units+=units;it->skipped+=s.skipped;it->active|=i==cur || (s.done>0 && s.done<units);
+    }
+    if(cur>=0) {
+      const Step& s=steps[cur];out.label=s.label;out.stageDone=s.done;out.stageUnits=s.units-s.skipped;
+      out.stageFraction=out.stageUnits>0?s.done/out.stageUnits:1.f;
+      out.elapsed=s.t0>=0?now-s.t0:0;out.idle=s.changed>=0?now-s.changed:0;
+    } else {out.label="Ready for departure";out.stageFraction=out.overall>=1.f?1.f:0.f;}
+    return out;
+  }
+private:
+  float fractionLocked() const {
     double all = 0, done = 0;
     for (const Step& s : steps) { all += s.weight * (s.units - s.skipped) / s.units; done += s.weight * s.done / s.units; }
     if (all > 0) shown = std::max(shown, done / all);
     return (float)std::min(shown, 1.0);
   }
+public:
   // the seconds the steps whose key starts so took (the startup.log summary)
   double tookOf(const std::string& prefix) const {
     std::lock_guard<std::mutex> lk(m);
@@ -64,12 +112,18 @@ public:
     return t;
   }
 private:
-  struct Step { std::string key; int units = 1; float done = 0.f, skipped = 0.f, weight = 1.f; double t0 = -1, took = -1; };
+  struct Step { std::string key, label; int units = 1; float done = 0.f, skipped = 0.f, weight = 1.f; double t0 = -1, took = -1, changed = -1; };
   std::vector<Step> steps;
+  std::string taskLabel;
+  float taskDone = 0, taskUnits = 0;
   int cur = -1;
   mutable double shown = 0;
   mutable std::mutex m;
   static double clock() { return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
+  static void advance(Step& s,float units) {
+    const float done=std::max(s.done,std::min(units,float(s.units)-s.skipped));
+    if(done>s.done){s.done=done;s.changed=clock();}
+  }
   void close(int k, double now) {
     Step& s = steps[k];
     s.done = (float)s.units - s.skipped;

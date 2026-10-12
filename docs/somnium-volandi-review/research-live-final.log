@@ -1,0 +1,34 @@
+DIAGNOSTIC: production startup programs; standard fleet-only scenes with pre-baked actual meshes and availability assertions. Not native Windows startup validation.
+GL: llvmpipe (LLVM 20.1.2, 256 bits); 1280x720; UI scale 1.00; actual full scene
+INIT 9.1% Allocating geometry buffers
+INIT 18.2% Uploading terrain textures
+INIT 27.3% Uploading world data
+INIT 36.4% Preparing surface materials
+INIT 40.5% Preparing photographed environment materials
+INIT 40.5% Decoding 512 px grass
+INIT 40.7% Decoding 512 px asphalt
+INIT 40.9% Decoding 512 px concrete
+INIT 41.1% Decoding 512 px brick
+INIT 41.3% Decoding 512 px plaster
+INIT 41.6% Decoding 512 px tiles
+INIT 41.8% Decoding 512 px bark
+INIT 42.0% Uploading photographed environment materials
+INIT 42.3% Photographed environment materials ready
+INIT 42.3% Decoding 2K grass
+INIT 42.6% Decoding 2K asphalt
+INIT 42.9% Decoding 2K concrete
+INIT 43.3% Decoding 2K brick
+INIT 43.6% Decoding 2K plaster
+INIT 44.0% Decoding 2K tiles
+INIT 44.3% Decoding 2K bark
+INIT 44.6% Uploading photographed environment materials
+INIT 45.4% Photographed environment materials ready
+INIT 45.5% Preparing cloud textures
+INIT 54.5% Preparing ocean spectrum
+INIT 63.6% Preparing navigation map
+INIT 72.7% Preparing scenery meshes
+INIT 81.8% Preparing terrain geometry
+INIT 90.9% Allocating render targets
+INIT 100.0% Renderer ready
+DIAGNOSTIC pre-baking selected production mesh
+WROTE /workspace/scratch/0f492b9c4a27/scene-previews/research10.png

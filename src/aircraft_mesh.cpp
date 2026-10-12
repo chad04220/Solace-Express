@@ -304,6 +304,12 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       const auto now = std::chrono::steady_clock::now(); const double g = bakeEvalS + bakeYieldS;
       char b[96]; snprintf(b, sizeof b, " %s %.1f (gpu %.1f)", name, std::chrono::duration<double>(now - tPh).count(), g - gPh);
       phaseLog += b; tPh = now; gPh = g;
+      if(onMeshProgress) {
+        // Outer milestones only: internal nets can run several evaluations.
+        const char* names[]={"cells","moving+thin","nets","fine nets","prep+moving hull","parts","simplify wait","finish"};
+        const char* labels[]={"Surface cells sampled","Moving and thin surfaces sampled","Exterior surface meshed","Fine surface detail meshed","Collision hull prepared","Rigid parts meshed","Simplification finished","Geometry validated"};
+        for(int i=0;i<8;++i)if(!strcmp(name,names[i])){onMeshProgress((i+1)/9.f,labels[i]);break;}
+      }
     };
     hullBakePart = -2;   // airframe without rigid parts: those are separate meshes below
     const float slack = 1.3f;   // the field may overstate distances by up to ~25%

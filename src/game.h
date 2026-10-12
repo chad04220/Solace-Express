@@ -58,6 +58,7 @@ struct Settings {
   bool cockpitFocusZoom = true; // smoothly magnify a display as the view approaches its centre
   bool headLook = true;   // the cockpit view leans into turns when nothing else moves it
   bool cbHud = false;     // colour-blind palette: good / bad as blue / orange instead of green / red
+  bool menuMotion = true; // ambient code, chart sweeps and loading-image motion; progress always remains live
   float uiScale = 1.f;    // on top of the window-height scale
   bool hudCam[4] = {true, true, true, true};   // the HUD on or off, remembered per camera
   int keyBind[ACT_COUNT]; unsigned padBind[ACT_COUNT];
@@ -107,7 +108,7 @@ public:
   void loadSettings();
   void applyUiPalette();   // the HUD / UI good-bad colours from the settings (game_ui.cpp)
   // startup screen, drawn with the given renderer (the intro thread has its own, in its own GL context)
-  void drawIntro(float progress, const std::string& stage, float t, unsigned icon, float fade, Renderer& R = g_ren);
+  void drawIntro(float progress, const std::string& stage, float t, unsigned icon, float fade, Renderer& R = g_ren, const class LoadPacer* pace = nullptr, bool motion = true);
   bool shaderFirstRun = false;
   std::string cacheDir, buildStamp;   // where the launch keeps what it built (the platform layer: the shader cache's folder) and this build's stamp
   unsigned iconTex = 0;   // the application icon (intro screen, main menu)
@@ -195,6 +196,7 @@ private:
   bool confirmRes = false;   // the main menu asked whether to enter the research terminal before the campaign is done
   bool resWarm = false; int resWarmFrames = 0, resBakeSeen = 0; int resWarmCraft = -1; bool resWarmCk = false;   // (resWarmCraft / resWarmCk: the craft and view the warm-up frame shows, -1 the selected one)   // the research terminal warming up behind its boot screen (the craft's shells, the airport's scenery)
   float resWork = 0.f; int resPend0 = 0;   // the warm-up's share done (0..1: the craft views drawn, the site's scenery chunks made, its terrain lighting) and the most chunks it has waited on
+  std::string resLoadTask;int resTaskDone=0,resTaskUnits=0; // the current real mesh-evaluation batch
   static constexpr float kResScan0 = 0.35f, kResScan1 = 3.75f;   // the stretch of the boot sequence the scans fill: the warm-up's work runs across it, ACCESS GRANTED at its end
   float resSeq = 0.f, resSeqAt = 0.f, resSeqOpened = -1.f;   // the boot sequence's own clock (the scans move as far as the warm-up has come), the realTime it last moved at, and the opening it belongs to
   bool headless = false;

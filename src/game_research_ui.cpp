@@ -4,10 +4,11 @@
 #include "game.h"
 #include "load_pacer.h"
 #include "models.h"
+#include "ui_identity.h"
 
 namespace {
-const vec3 R_ICE(0.42f, 0.93f, 1.f), R_DIM(0.36f, 0.55f, 0.66f), R_TEXT(0.88f, 0.97f, 1.f), R_RED(1.f, 0.27f, 0.24f);
-const vec3 R_AMBER(1.f, 0.72f, 0.26f), R_GREEN(0.4f, 1.f, 0.62f), R_VIOLET(0.8f, 0.5f, 1.f), R_INK(0.0f, 0.015f, 0.03f);
+const vec3 R_ICE = svui::code, R_DIM = svui::codeDim, R_TEXT(.88f,.98f,.91f), R_RED(1.f,.43f,.30f);
+const vec3 R_AMBER(1.f, 0.72f, 0.26f), R_GREEN(0.4f, 1.f, 0.62f), R_VIOLET(0.8f, 0.5f, 1.f), R_INK = svui::codeInk;
 const vec3 R_TEAL(0.3f, 0.95f, 0.8f), R_EMBER(1.f, 0.58f, 0.22f);
 const char* kGlyphs = "0123456789ABCDEF#%&@$*+=<>/\\|";
 const float kPreviewControlsHeight = 56.f;
@@ -109,7 +110,7 @@ void corners(float x, float y, float w, float h, float L, float t, vec3 c, float
 }
 // a panel with a cut corner, a hairline frame and a title tab
 void slab(float x, float y, float w, float h, float s, vec3 acc, float a) {
-  g_ren.rectGrad(x, y, w, h, vec3(0.0f, 0.03f, 0.05f), vec3(0.0f, 0.01f, 0.02f), 0.78f * a);
+  g_ren.rectGrad(x, y, w, h, vec3(.015f,.043f,.024f), svui::codeInk, 0.94f * a);
   g_ren.rectOutline(x, y, w, h, acc, 0.22f * a, 0, 1 * s);
   corners(x - 1 * s, y - 1 * s, w + 2 * s, h + 2 * s, 12 * s, 2 * s, acc, 0.85f * a);
   for (int i = 0; i < 3; i++) g_ren.rect(x + w - (14 + i * 7) * s, y + 5 * s, 4 * s, 2 * s, acc, 0.6f * a);
@@ -240,13 +241,13 @@ void Game::drawResearch(const FrameParams& fp) {
       resSeq = kResScan0 + span * std::max(f, std::min(easeLoadProgress(f, work, dt), f + 2.f * dt / span));
     } else resSeq += dt;
   }
-  const float T = resSeq, aT = realTime - resOpened;
+  const float T = resSeq, aT = set.menuMotion ? realTime - resOpened : 7.f;
   bool wr = resCraft == kWraith;
   const ResCraftInfo& RC = kResCraft[resCraftSlot(resCraft)];
   // The native preview was built before this draw. Keep its dossier and callouts together
   // until the following frame when an airframe/test-card click has changed the selection.
   const bool displayedRange = wr && resCard < 0;
-  vec3 ACC = RC.colour;
+  vec3 ACC = R_ICE;
   // ------------------------------------------------------------------ biometric access sequence
   if (T < kIntro) {
     // (no skip: the sequence is the terminal's warm-up, and it opens the terminal itself when the craft are ready)
@@ -259,11 +260,12 @@ void Game::drawResearch(const FrameParams& fp) {
     float fadeOut = smoothstepf(4.35f, kIntro, T);
     g_ren.rect(0, 0, W, H, vec3(0, 0.004f, 0.01f), 0.96f * (1.f - fadeOut));
     float A = 1.f - fadeOut;
+    svui::matrix(g_ren,0,0,W,H,aT,.50f*A,set.menuMotion);
     // scanlines and a faint grid
     for (float y = 0; y < H; y += 3 * s) g_ren.rect(0, y, W, 1, R_ICE, 0.025f * A);
     for (float x = fmodf(aT * 20.f * s, 48 * s); x < W; x += 48 * s) g_ren.rect(x, 0, 1, H, R_ICE, 0.03f * A);
     // header terminal
-    const char* boot[] = {"NIGHTGLASS SECURE TERMINAL  v9.4.1  //  QUANTUM LINK ESTABLISHED", "SUBJECT PRESENT  //  BEGIN MULTI-FACTOR BIOMETRIC VERIFICATION"};
+    const char* boot[] = {"SOMNIUM VOLANDI  /  NIGHTGLASS  //  SECURE LINK ESTABLISHED", "SUBJECT PRESENT  //  BEGIN MULTI-FACTOR BIOMETRIC VERIFICATION"};
     for (int i = 0; i < 2; i++) {
       float st = i * 0.18f; if (T < st) break;
       std::string l = boot[i]; l = l.substr(0, std::min(l.size(), (size_t)((T - st) * 90.f)));
@@ -387,7 +389,7 @@ void Game::drawResearch(const FrameParams& fp) {
     // ---- the warm-up's bar, where the grant's banner comes: the scans' share done (the warm-up's, eased), what it is
     // on and how much of that is left; the ticks are where the fingerprint and the retina scans complete
     {
-      const float span = kResScan1 - kResScan0, p = clampf((T - kResScan0) / span, 0.f, 1.f);
+      const float span = kResScan1 - kResScan0, p = resWarm ? std::min(resWork,.99f) : 1.f;
       const float ab = A * smoothstepf(0.f, 0.25f, T) * (1.f - smoothstepf(kResScan1, kResScan1 + 0.1f, T));
       const float bw = std::min(720 * s, W - 2 * gap), bx = (W - bw) * 0.5f, by = py0 + ph + 26 * s;
       auto upper = [](std::string t) { for (char& c : t) c = (char)toupper((unsigned char)c); return t; };
@@ -416,6 +418,11 @@ void Game::drawResearch(const FrameParams& fp) {
       if (p > 0.f) g_ren.rectGrad(bx, by + 24 * s, bw * p, 4 * s, ready ? R_GREEN : R_DIM, c, ab, 2 * s);
       for (float tk : {1.75f, 2.9f}) g_ren.rect(bx + bw * (tk - kResScan0) / span, by + 31 * s, 1 * s, 4 * s, p * span + kResScan0 >= tk ? c : R_DIM, 0.6f * ab);
       g_ren.text(bx, by + 38 * s, 11.5f * s, fit(detail, bw, 11.5f * s), R_DIM, ab, 0, false);
+      if(resWarm&&!resLoadTask.empty()&&resTaskUnits>0){
+        g_ren.text(bx,by+57*s,10*s,fit(resLoadTask,bw-120*s,10*s),R_DIM,ab,0,false);
+        g_ren.text(bx+bw,by+57*s,10*s,fmt("%d / %d",resTaskDone,resTaskUnits),R_ICE,ab,2,false);
+        svui::bar(g_ren,bx,by+72*s,bw,3*s,float(resTaskDone)/resTaskUnits,R_ICE,ab);
+      }
     }
     // ---- grant
     if (T > 3.75f) {
@@ -448,13 +455,15 @@ void Game::drawResearch(const FrameParams& fp) {
     return c;
   };
   // ------------------------------------------------------------------ frame: tint, scanlines, top band
-  g_ren.rectGrad(0, 0, W, H, vec3(0, 0.01f, 0.02f), vec3(0.01f, 0, 0.01f), 0.35f * e);
-  g_ren.rect(0, 0, L.px0 - 6 * s, H, R_INK, 0.45f * e); g_ren.rect(L.px1 + 6 * s, 0, W - L.px1 - 6 * s, H, R_INK, 0.45f * e);
-  for (float y = fmodf(realTime * 12.f, 4 * s); y < H; y += 4 * s) g_ren.rect(0, y, W, 1, R_ICE, 0.018f * e);
+  g_ren.rectGrad(0, 0, W, H, svui::codeInk, vec3(.004f,.012f,.008f), 0.35f * e);
+  // Code stays behind the opaque data rails and the live aircraft.
+  svui::matrix(g_ren,0,46*s,W,H-46*s,realTime,.27f*e,set.menuMotion,L.cx,L.cy,(L.px1-L.px0)*.42f,(L.bot-L.top)*.31f);
+  g_ren.rect(0, 0, L.px0 - 6 * s, H, R_INK, 0.94f * e); g_ren.rect(L.px1 + 6 * s, 0, W - L.px1 - 6 * s, H, R_INK, 0.94f * e);
+  for (float y = fmodf((set.menuMotion ? realTime : 0.f) * 12.f, 4 * s); y < H; y += 4 * s) g_ren.rect(0, y, W, 1, R_ICE, 0.018f * e);
   g_ren.rect(0, 0, W, 46 * s, R_INK, 0.8f * e);
   g_ren.rect(0, 46 * s, W, 1 * s, ACC, 0.5f * e);
   g_ren.text(24 * s, 10 * s, 18 * s, "NIGHTGLASS", ACC, e, 0, false);
-  g_ren.text(24 * s + g_ren.textWidth("NIGHTGLASS", 18 * s) + 12 * s, 15 * s, 11 * s, "ADVANCED PROJECTS DIVISION  //  SECTOR 0x3F  //  EYES ONLY", R_DIM, e, 0, false);
+  g_ren.text(24 * s + g_ren.textWidth("NIGHTGLASS", 18 * s) + 12 * s, 15 * s, 11 * s, "SOMNIUM VOLANDI / RESEARCH  //  EYES ONLY", R_DIM, e, 0, false);
   {
     int t = (int)(realTime * 100) % 8640000;
     std::string clk = fmt("T+%02d:%02d:%02d.%02d", t / 360000 % 24, t / 6000 % 60, t / 100 % 60, t % 100);
@@ -561,7 +570,7 @@ void Game::drawResearch(const FrameParams& fp) {
     else resIdleT += dt;
     if (in.pad && fabsf(in.rx) > 0.15f) { resYaw += in.rx * dt * 2.f; resIdleT = 0; }
     if (inStage && in.wheel != 0) { resZoom = clampf(resZoom * (1.f + in.wheel * 0.1f), 0.6f, 1.8f); in.wheel = 0; }
-    if (resIdleT > 2.5f) resYaw += dt * 0.18f;   // slow turntable when left alone
+    if (set.menuMotion && resIdleT > 2.5f) resYaw += dt * 0.18f;   // slow turntable when left alone
     // stage graphics
     dashRing(cx, cy, R * 1.0f, 1.5f * s, ACC, 0.55f * e, 90, 0.5f, realTime * 0.05f);
     dashRing(cx, cy, R * 1.05f, 3 * s, ACC, 0.35f * e, 8, 0.12f, -realTime * 0.2f);
