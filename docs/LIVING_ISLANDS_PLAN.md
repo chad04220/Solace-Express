@@ -348,6 +348,12 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   and the dither's discard is in a program of its own (`FAR_REGION_DITHER`, built on a Free Flight's loading
   screen) used only while a far blend is on. The analysis counts the ground a second time with its depth in first,
   which separates hidden ground shaded from the shading's own excess at the triangles' edges.
+- **The v3.49.7 diagnostics** confirm it: in every scene, at its start and its end, the card now shades exactly the
+  ground fragments it keeps (1.0 for each, from 1.3 to 19.5). The night runway's bench frame 11.19 -> 8.93 ms (its
+  world pass 7.35 -> 5.25, its ground's materials 4.05 -> 1.69 ms in the analysis), the crash 12.6 -> 11.4, the
+  forest 9.6 -> 9.0, the menu 5.8 -> 5.4, the XR-40 hover 17.5 -> 16.1 (analysis); the rest within noise. Ground
+  depth first no longer pays anywhere (0.4 to 1.9 ms dearer in its trials) and the measuring keeps it off; it stays
+  for a view where the hills hide much of the scenery.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network
