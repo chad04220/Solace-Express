@@ -4491,31 +4491,18 @@ void Game::update(float dt) {
   fpsAvg = lerpf(fpsAvg, dt, 1.f - expf(-dt * 3.f));   // (a third of a second, whatever the frame rate)
   maxFrameWin = std::max(maxFrameWin, dt); maxFrameT += dt;
   if (maxFrameT >= 1.f) { maxFrameMs = maxFrameWin * 1000.f; maxFrameWin = 0; maxFrameT = 0; }
-  if (!headless && g_ren.ok) {   // render resolution: native, a fixed scale, or adjusted to hold 60 fps on the GPU
+  if (!headless && g_ren.ok) {   // render resolution: native, a fixed scale, or Auto: held to the frame-rate target
     static const float fixedScale[5] = {1.f, 1.f, 0.85f, 0.75f, 0.67f};
     float want = fixedScale[std::clamp(set.resMode, 0, 4)];
-    // with foveated shading (Renderer::foveation, where the card has it) the screen's edges go coarser first, a step
-    // every 0.4 s, and the centre stays at the full resolution; only when they are as coarse as they go does the
-    // render resolution drop. Back the other way: the full resolution first, then the edges
-    const bool fovea = set.foveate && g_ren.vrsAvailable;
-    if (!fovea) g_ren.foveation = 0.f;
+    // Auto (quality_governor.h): the screen's edges coarser first where the card has foveated shading, then the render
+    // scale, each step kept only if the GPU's frame time shows it paid; back the other way when there is room
+    autoRes.vrs = set.foveate && g_ren.vrsAvailable;
     if (set.resMode == 1) {
-      autoScaleT += dt;
-      float gms = g_ren.gpuMs;
-      if (gms > 0 && autoScaleT > 0.4f) {
-        // (the GPU budget of the frame-rate target, with 8% to spare; up again only with a quarter of it free)
-        float budget = 1000.f / effectiveHz() * 0.92f;
-        if (gms > budget) {
-          if (fovea && g_ren.foveation < 1.f) g_ren.foveation = std::min(1.f, g_ren.foveation + 0.125f);
-          else autoScale = std::max(0.5f, autoScale * std::sqrt(budget * 0.97f / gms));
-          autoScaleT = 0;
-        } else if (gms < budget * 0.75f) {   // (up again only with a quarter of the budget free)
-          if (autoScale < 1.f) { autoScale = std::min(1.f, autoScale + 0.05f); autoScaleT = 0; }
-          else if (g_ren.foveation > 0.f) { g_ren.foveation = std::max(0.f, g_ren.foveation - 0.125f); autoScaleT = 0; }
-        }
-      }
-      want = autoScale;
-    } else { autoScale = 1.f; g_ren.foveation = 0.f; }
+      // (the GPU budget of the frame-rate target, with 8% to spare)
+      autoRes.frame(dt, g_ren.gpuMs, 1000.f / effectiveHz() * 0.92f);
+      g_ren.foveation = autoRes.foveation;
+      want = autoRes.scale;
+    } else { autoRes.reset(); g_ren.foveation = 0.f; }
     want = floorf(want * 20.f + 0.5f) / 20.f;   // 5% steps: the targets are rebuilt only when it changes
     if (fabsf(g_ren.renderScale - want) > 1e-3f) g_ren.setRenderScale(want);
   }

@@ -539,7 +539,11 @@ add_test(NAME hangar_catalog COMMAND hangar_catalog_test)
 add_executable(prepass_auto_test tests/prepass_auto_test.cpp)
 target_include_directories(prepass_auto_test PRIVATE src)
 add_test(NAME prepass_auto COMMAND prepass_auto_test)
-add_dependencies(shader_keyword_test load_pacer_test hangar_geometry_test hangar_catalog_test prepass_auto_test)   # (built with a target the CI sanitizer job names)
+# Auto resolution steps the picture down only where that pays, and gives it back when there's room.
+add_executable(quality_governor_test tests/quality_governor_test.cpp)
+target_include_directories(quality_governor_test PRIVATE src)
+add_test(NAME quality_governor COMMAND quality_governor_test)
+add_dependencies(shader_keyword_test load_pacer_test hangar_geometry_test hangar_catalog_test prepass_auto_test quality_governor_test)   # (built with a target the CI sanitizer job names)
 if(Python3_Interpreter_FOUND AND NOT WIN32)
   add_test(NAME shader_loading_contract COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_SOURCE_DIR}/tools/validation/shader_progress_contract.py

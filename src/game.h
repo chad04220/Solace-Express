@@ -1,5 +1,6 @@
 // Somnium Volandi - game state, flight session, cameras, effects, UI
 #pragma once
+#include "quality_governor.h"
 #include <functional>
 #include <optional>
 #include <set>
@@ -489,7 +490,7 @@ private:
   int ctlScroll = 0; float ctlScrollAcc = 0;
   float ckZoom = 1.f, ckZoomT = 1.f;
   CockpitFocusZoom cockpitFocus;
-  float autoScale = 0.75f, autoScaleT = 0;   // (starts at three quarters: the upscaler makes it hard to tell, and the first frames are the slow ones)   // dynamic resolution state   // cockpit view zoom (current, target)
+  QualityGovernor autoRes;   // Auto resolution (quality_governor.h): starts at the full picture
   float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0, loadFrames = 0, loadStableFrames = 0, loadBakeSeen = 0, loadObservedFrame = -1; bool loadMap = false;   // pre-flight loading screen
   bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI

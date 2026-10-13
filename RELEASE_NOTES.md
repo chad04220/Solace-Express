@@ -13,6 +13,12 @@
 - On ordinary short flights, a jet's fuel bill is smaller than before.
 - The autopilot no longer lets an airliner slowly wallow from side to side in long, high cruise.
 
+### Auto resolution keeps the picture sharp
+- **Auto resolution now lowers the picture only where that actually buys frames.** It used to assume a heavy frame was heavy because of its pixels. Hovering over Solace Capital at night at High quality, the cost is the city's tens of thousands of buildings: in v3.49.4's diagnostics on an RTX 3070 Laptop, the whole resolution down to 67% saved 2.4 ms of 17, and the softest edges 0.3 ms. Auto still pushed both all the way down, so the picture got blurry for no gain. Now each step down is timed, and a step that saves next to nothing is taken back at once. Where the pixels are the cost (the ground at night, the storm), it works as before.
+- **Flights start at the full resolution** (Auto used to start at 75% and could stay there), and the full picture comes back as soon as there's room for it.
+- **Foveated shading is much gentler.** At its strongest, the middle 55% of the screen stays sharp, the whole height of it, and only the corners get the coarsest shading. Halfway, only the far left and right edges are softened.
+- Settings shows what Auto is doing now: the full picture, or how far the edges and the resolution have stepped down.
+
 ### Cockpits
 - **XR-30:** the top edge of the main display is straight again. The curved frame of the wraparound windows cut into its upper corners in a row of small teeth.
 - **Atlas:** the small display in the overhead panel (heading, flaps, gear, fuel) reads the right way round; its text was mirrored. (Both prepared by Codex.)

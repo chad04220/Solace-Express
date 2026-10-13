@@ -304,6 +304,21 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   before it lowers the render resolution, and lowers it last. The objects pass (the aircraft, the cockpit, its
   displays) is never coarsened. It can't be seen on the software renderer: the analysis times it at its strongest
   and saves each scene's picture with it on.
+- **The v3.49.4 diagnostics** (RTX 3070 Laptop, High quality, the owner's settings again):
+  - Ground depth first, measured as in play, switched itself on for the night runway (the world pass 10.2 -> 8.0 ms)
+    and stayed off in every other scene, each by 0.1 to 1.5 ms: the trials choose as the rows say.
+  - The owner saw soft screen edges and low frame rates with Auto resolution. The cause: the old controller took any
+    frame over budget for a pixel-bound one. Hovering over Solace Capital at night (17.4 ms; 48,000 scenery instances,
+    the scenery 5.2 ms of it) 67% resolution saved 2.4 ms and foveation at its strongest 0.3 ms, yet it drove both to
+    the floor; it also started every flight at 75% and climbed back only below 75% of the budget, with foveation eased
+    only once the scale was back to 1. Now `quality_governor.h`: half-second windows of the GPU time; over the budget,
+    one step (foveation by 0.5, then the knobs alternate, the scale by 0.1 down to 0.5); the next window measures what
+    it bought, and a step that saved under max(0.12 ms, 1.5%) is taken back and its knob rests (20 s doubling to
+    160 s, cleared if the frame gets 25% heavier); under the budget with room for the newest step's measured cost,
+    that step is undone. It starts at the full picture. The foveation rings are gentler (R = 1.05 - 0.5 f; 4 x 4 only
+    from f = 0.75, beyond R + 0.35: the corners).
+  - The city's fixed cost at High (the scenery's draw, not its pixels) is what keeps that scene under 60 fps; Medium
+    quality draws about a quarter fewer instances there.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

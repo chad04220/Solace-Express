@@ -1694,7 +1694,8 @@ void Game::drawSettings(float x, float y, float w, float h) {
   if (g_ren.vrsAvailable) {   // (NVIDIA's variable-rate shading: RTX cards)
     toggle("Foveated shading", set.foveate, "Edges first", "Off");
     py -= 6 * s;
-    note(set.resMode == 1 ? fmt("Auto resolution softens the screen's edges before the centre%s", g_ren.foveation > 0.f ? fmt(" (now %.0f%%)", g_ren.foveation * 100.f).c_str() : "")
+    note(set.resMode == 1 ? fmt("Auto softens the edges, then the resolution, only where that buys frames: now %s",
+                                g_ren.foveation > 0.f || g_ren.renderScale < 1.f ? fmt("edges %.0f%%, resolution %.0f%%", g_ren.foveation * 100.f, g_ren.renderScale * 100.f).c_str() : "the full picture")
                           : std::string("works with Auto resolution"));
   }
   slider("Master volume", set.master, 0, 1, 0.05f, fmt("%.0f%%", set.master * 100));

@@ -1452,11 +1452,13 @@ void Renderer::setRenderScale(float s) {
 // ---------------------------------------------------------------- foveated shading (renderer.h)
 // The driver's tile (16 x 16 pixels on NVIDIA) gets one entry of the rate image: 0 full rate, 1 one shade for 2 x 2
 // pixels, 2 for 4 x 4. Rings round the render target's centre, their radius in half-diagonals (the corners at 1): full
-// rate inside R = 1.05 - 0.75 f, then 2 x 2, and from f = 0.5 on 4 x 4 beyond R + 0.3. At f = 1 a third of the way to
-// the corners stays sharp
+// rate inside R = 1.05 - 0.5 f, then 2 x 2, and from f = 0.75 on 4 x 4 beyond R + 0.35. At f = 0.5 only the far sides
+// are coarser (on 16:9 the sides' middles are at 0.87); at f = 1 the middle 55% is sharp - the whole height of the
+// screen down its centre - and 4 x 4 is the corners alone. (v3.49.3's 0.75 f, sharp to a third of the way out and
+// 4 x 4 from 0.6, looked coarse at the sides on the owner's 1080p screen)
 static uint8_t foveaRate(float r, float f) {
-  const float R = 1.05f - 0.75f * f;
-  return r < R ? 0 : (f < 0.5f || r < R + 0.3f) ? 1 : 2;
+  const float R = 1.05f - 0.5f * f;
+  return r < R ? 0 : (f < 0.75f || r < R + 0.35f) ? 1 : 2;
 }
 void Renderer::initFoveation() {
   vrsAvailable = false;
