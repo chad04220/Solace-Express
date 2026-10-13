@@ -1029,6 +1029,19 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           std::string unused; double unusedSave = 0;
           rows("Work: frame time with it left out", "costs", kProbe, false, unused, unusedSave);
         }
+        // 6. ground depth first as the game decides it in play: one of its trials (prepass_auto.h), timed by the world
+        // pass's own GPU timestamps, from "off"
+        {
+          g_ren.prepareTerrainDepth();
+          g_ren.prepassAuto = PrepassAuto(); g_ren.prepassAuto.countdown = 1; g_ren.prepassAutoOn = true;
+          frames(PrepassAuto::kTrial + PrepassAuto::kSettle + 2);
+          const PrepassAuto& pa = g_ren.prepassAuto;
+          if (pa.trials && pa.lastKept > 0.f)
+            fprintf(af, "Ground depth first, measured as in play: %s (the world pass %.2f ms without, %.2f ms with)\n",
+                    pa.on ? "switched ON" : "kept off", pa.lastKept, pa.lastOther);
+          else fprintf(af, "Ground depth first, measured as in play: no result (%s)\n", pa.trials ? "too few GPU timestamps came back" : "no trial ran");
+          g_ren.prepassAutoOn = false; g_ren.prepassAuto = PrepassAuto();
+        }
         // a picture of the scene for reference; and where the card has it, the same with foveated shading at its
         // strongest, to see what it costs the picture
         frames(3); glFinish();

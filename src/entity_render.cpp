@@ -560,12 +560,11 @@ void Renderer::drawEntities(const FrameParams& fp) {
     drawPlaneMeshDepth(fp, *earlyMesh, fp.plane.rot, fp.plane.pos, -1);
     glBindVertexArray(vaoEnt); glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);
   }
-  // the ground's depth before the scenery (where switched on: renderer.h terrainPrepass): what a hill or a plateau's
-  // edge hides - trees beyond it, most of a runway view's scenery - fails the depth test before it is shaded. The
-  // ground is shaded after the scenery, only where it shows (rasterWorld, drawTerrainMesh mode 2)
-  static const bool forcePre = getenv("TERRPRE") != nullptr;
+  // the ground's depth before the scenery (where it pays: renderer.h prepassNow): what a hill or a plateau's edge
+  // hides - trees beyond it, most of a runway view's scenery - fails the depth test before it is shaded. The ground is
+  // shaded after the scenery, only where it shows (rasterWorld, drawTerrainMesh mode 2)
   terrainPrepassed = false;
-  if ((terrainPrepass || forcePre || (dbgOff & kDbgPrepassOn)) && (progTerrainDepth || !terrainDepthTried)) {
+  if ((prepassNow || (dbgOff & kDbgPrepassOn)) && (progTerrainDepth || !terrainDepthTried)) {
     drawTerrainMesh(fp, 1); terrainPrepassed = progTerrainDepth != 0;
     glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE); glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
     glBindVertexArray(vaoEnt); glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);

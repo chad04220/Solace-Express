@@ -19,6 +19,7 @@
 #include "feed_cameras.h"
 #include "exhaust.h"
 #include "enemy_fleet.h"
+#include "prepass_auto.h"
 
 // Logarithmic depth (every raster pass: gl_Position.z from log2(1 + w)): 0.3 m to the far side of the round world's
 // horizon from a thousand kilometres up (planet.h) at the 32-bit depth's precision - a millionth of the distance
@@ -326,8 +327,12 @@ public:
   float gpuMs = -1.f;   // last measured GPU time of renderScene, ms (-1 = not known yet)
   static constexpr int kPasses = 11;   // world | displays | feeds | objects | airframe shadow proxy | lighting+clouds+effects, then TAA, sprites, bloom, light shafts, composite
   float passMs[kPasses] = {};         // GPU time of each pass (timestamp queries, a few frames late)
-  GLuint stampQ[4][kPasses + 1] = {}; bool stampUsed[4] = {};
-  void stamp(int i) { if (glErrCheck) reportGLError(i); if (syncTiming) syncStamp(i); else if (stampQ[gpuQi][i]) glQueryCounter(stampQ[gpuQi][i], GL_TIMESTAMP); }
+  // (a ring of eight, read seven frames late: when the GPU runs a few frames behind - uncapped, GPU-bound - a ring of
+  // four was reused before most of its stamps came back, and ground depth first's trials need nearly every frame's)
+  static constexpr int kStampRing = 8;
+  GLuint stampQ[kStampRing][kPasses + 1] = {}; bool stampUsed[kStampRing] = {}; int stampQi = 0;
+  int stampTag[kStampRing] = {}; unsigned stampTrial[kStampRing] = {};   // (the frame's part in a prepass trial)
+  void stamp(int i) { if (glErrCheck) reportGLError(i); if (syncTiming) syncStamp(i); else if (stampQ[stampQi][i]) glQueryCounter(stampQ[stampQi][i], GL_TIMESTAMP); }
   bool glErrCheck = getenv("GLERR") != nullptr;   // debug: print any GL error raised by the passes before each timestamp
   void reportGLError(int stampIdx);
   void syncStamp(int i);
@@ -602,10 +607,19 @@ private:
   // the depth test before it is shaded). 2: after the prepass, the ground shaded where its depth went in, then the sea
   void drawTerrainMesh(const FrameParams& fp, int mode = 0);
   GLuint progTerrainDepth = 0; bool terrainDepthTried = false;
-  // the prepass is off by default: on the software renderer it cost more than the hidden scenery it saved (the
-  // terrain's vertices twice); the analysis times it on the player's card (kDbgPrepassOn). TERRPRE=1 forces it on
+ public:
+  // Whether the prepass pays depends on the view and the card: in play it is kept on or off by measurement
+  // (prepass_auto.h), once its program is built (prepareTerrainDepth, on a flight's loading screen: never mid-flight).
+  // terrainPrepass forces it on; TERRPRE=1 forces it on and TERRPRE=0 off; tests and the analysis (Game::initHeadless)
+  // turn the measuring off, and the analysis times it on the player's card (kDbgPrepassOn)
   bool terrainPrepass = false;
+  bool prepassAutoOn = true;
+  PrepassAuto prepassAuto;
+  bool prepassNow = false;         // (this frame's choice: renderScene)
   bool terrainPrepassed = false;   // (drawEntities ran the prepass: rasterWorld shades the ground in mode 2)
+  void prepareTerrainDepth();      // (builds the prepass's program, once)
+  vec3 prepassCam = vec3(0, 0, 0);
+ private:
   void rasterWorld(const FrameParams& fp);
   void rasterObjects(const FrameParams& fp);
   void rasterShadowProxy(const FrameParams& fp);

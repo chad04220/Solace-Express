@@ -365,6 +365,9 @@ void main(){
   if (getenv("PREWARM")) game.prewarm([](float, const std::string& what) { if (getenv("PREWARMLOG")) printf("prewarm: %s\n", what.c_str()); });   // (every aircraft's body built first, as the game's launch does: the traffic drawn from meshes; PREWARMLOG: what each step says)
   if (getenv("NOTRAFFIC")) game.set.traffic = false;   // (A/B timings of the player's aircraft alone)
   game.debugScene(scene);
+  if (getenv("PREPASSAUTO")) {   // ground depth first, measured as in play (PREPASSAUTO=<frames to the first trial>)
+    g_ren.prepassAutoOn = true; g_ren.prepareTerrainDepth(); g_ren.prepassAuto.countdown = std::max(1, atoi(getenv("PREPASSAUTO")));
+  }
   for (int i = 0; i < 3; i++) { game.update(1.f / 30.f); game.render(); }
   if (getenv("TAAM")) for (int i = 0, n = atoi(getenv("TAAM")); i < n; i++) {   // moving frames
     game.update(1.f / 60.f); game.render();
@@ -389,6 +392,7 @@ void main(){
     glFinish();
     if (wall) { printf("passes (wall ms):"); const char* nm[] = {"world", "displays", "feeds", "objects", "proxy", "lighting", "taa", "sprites", "bloom", "shafts", "composite"}; for (int p = 0; p < Renderer::kPasses; p++) printf(" %s %.0f", nm[p], wsum[p] / frames); printf("\n"); }
     printf("bench: %.1f ms/frame  (scenery: %d instances, %d chunks, %.2f ms CPU)\n", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / frames, g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs);
+    if (getenv("PREPASSAUTO")) { const PrepassAuto& pa = g_ren.prepassAuto; printf("ground depth first: %s, %d trials, %d switches, last trial %.1f ms kept vs %.1f ms other\n", pa.on ? "on" : "off", pa.trials, pa.switches, pa.lastKept, pa.lastOther); }
     { const float* pm = g_ren.passMs; printf("passes (GPU ms, smoothed): world %.1f  displays %.1f  feeds %.1f  objects %.1f  shadow proxy %.1f  lighting %.1f  taa %.1f  sprites %.1f  bloom %.1f  shafts %.1f  composite %.1f\n", pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9], pm[10]); }
   }
   std::string out = "/tmp/claude-0/sp/shot_" + scene + ".ppm";

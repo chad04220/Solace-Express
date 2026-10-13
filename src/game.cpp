@@ -637,7 +637,7 @@ void Game::init(bool buildWorld, const std::function<void(float, const std::stri
   report(4 + kNumAircraft, "Voice library indexed");
 }
 
-void Game::initHeadless() { headless = true; career.newGame(); set.resMode = 0; failuresArmed = false; g_ren.foveation = 0.f; }   // tools and tests render at the full resolution; nothing breaks unless the test breaks it
+void Game::initHeadless() { headless = true; career.newGame(); set.resMode = 0; failuresArmed = false; g_ren.foveation = 0.f; g_ren.prepassAutoOn = false; }   // tools and tests render at the full resolution; nothing breaks unless the test breaks it
 
 // ------------------------------------------------------------------ failures (C7)
 void Game::rollFailures(const Contract& c, int spec, Career::Source src) {
@@ -1829,6 +1829,7 @@ void Game::updateLoading(float dt) {
   }
   warmCombatCollision();
   loadT += dt;
+  if (!headless) g_ren.prepareTerrainDepth();   // (ground depth first's program, for its trials in flight: renderer.h)
   if (loadReadyT < 0) {
     dbgCam = false;
     updateCamera(dt);   // stream around the camera the flight will open with

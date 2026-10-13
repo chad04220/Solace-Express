@@ -275,14 +275,22 @@ void Renderer::selectTerrainChunks(const FrameParams& fp) {
   if (chunkDbg) printf("terrain: %d chunks + %d coarse, copies out to %d, reach %.0f km (camera %.0f m up)\n", terrChunks, terrChunksCoarse, K, reach * 0.001f, cam.y);
 }
 
+// The ground's depth prepass's program: the terrain's vertex shader, and a fragment shader that only drops the ground
+// under the sea (seen from above it). Not among the launch's
+// programs (shader_loading_contract counts those): a flight's loading screen builds it, so the prepass's trials
+// (prepass_auto.h) never compile anything mid-flight
+void Renderer::prepareTerrainDepth() {
+  if (progTerrainDepth || terrainDepthTried || !progTerrain) return;
+  terrainDepthTried = true;
+  std::string de; progTerrainDepth = linkProgramCached(terrainVSAssembly(""), terrainDepthFSAssembly(), de);
+}
+
 // Draws the terrain and the sea into the bound G-buffer (depth-tested against what is there already)
 void Renderer::drawTerrainMesh(const FrameParams& fp, int mode) {
   if (!progTerrain || !vaoTerrain) return;
   const bool pre = mode == 1, after = mode == 2;
-  if (pre && !progTerrainDepth) {   // (built the first time the prepass is asked for: it is off by default, renderer.h)
-    if (terrainDepthTried) return;
-    terrainDepthTried = true;
-    std::string de; progTerrainDepth = linkProgramCached(terrainVSAssembly(""), terrainDepthFSAssembly(), de);
+  if (pre && !progTerrainDepth) {   // (built the first time the prepass is asked for, if no loading screen has: renderer.h)
+    prepareTerrainDepth();
     if (!progTerrainDepth) return;
   }
   if (!after) selectTerrainChunks(fp);   // (after the prepass: its chunks, already in the buffer)

@@ -1702,18 +1702,33 @@ void Renderer::renderScene(const FrameParams& fpFlat, const std::vector<SpriteVe
       if (avail) { GLuint64 ns = 0; glGetQueryObjectui64v(gpuQ[rq], GL_QUERY_RESULT, &ns); gpuMs = (float)(ns * 1e-6); gpuSample.publish(true, ns, gpuQFrame[rq]); gpuQUsed[rq] = false; }
     }
   }
-  if (!stampQ[0][0] && glQueryCounter) for (int f = 0; f < 4; f++) glGenQueries(kPasses + 1, stampQ[f]);
-  {   // per-pass timings from the frame issued three frames ago
-    int rq = (gpuQi + 1) % 4;
+  if (!stampQ[0][0] && glQueryCounter) for (int f = 0; f < kStampRing; f++) glGenQueries(kPasses + 1, stampQ[f]);
+  {   // per-pass timings from the frame issued seven frames ago
+    int rq = (stampQi + 1) % kStampRing;
     if (stampUsed[rq]) {
       GLint avail = 0; glGetQueryObjectiv(stampQ[rq][kPasses], GL_QUERY_RESULT_AVAILABLE, &avail);
       if (avail) {
         GLuint64 t[kPasses + 1];
         for (int i = 0; i <= kPasses; i++) glGetQueryObjectui64v(stampQ[rq][i], GL_QUERY_RESULT, &t[i]);
         for (int i = 0; i < kPasses; i++) passMs[i] = passMs[i] * 0.8f + (float)((t[i + 1] - t[i]) * 1e-6) * 0.2f;
-        stampUsed[rq] = false;
+        prepassAuto.sample(stampTag[rq], stampTrial[rq], (float)((t[1] - t[0]) * 1e-6));   // (the world pass)
       }
+      stampUsed[rq] = false;   // (unread now, it never will be: the ring issues it again next frame)
     }
+  }
+  {   // ground depth first this frame: forced, or kept on or off by measurement (prepass_auto.h) once its program is
+      // built, with a trial's frames tagged so their world-pass times come back to it. A trial is dropped if the
+      // render scale or the foveation changes under it, or the view jumps (the same cut as TAA's below)
+    static const char* force = getenv("TERRPRE");
+    int tag = -1;
+    if (force) prepassNow = force[0] != '0';
+    else if (terrainPrepass) prepassNow = true;
+    else if (prepassAutoOn && progTerrainDepth && !syncTiming && fp.pano <= 0.f) {
+      const bool cut = length(fp.camPos - prepassCam) > 400.f;
+      prepassNow = prepassAuto.frameChoice(renderScale * 16.f + foveation, cut, tag);
+    } else prepassNow = false;
+    prepassCam = fp.camPos;
+    stampTag[stampQi] = tag; stampTrial[stampQi] = prepassAuto.serial;
   }
   if (gpuQUsed[gpuQi]) ++gpuSamplesOverwritten;   // existing ring reused a query before it could be read
   gpuQFrame[gpuQi] = ++gpuFrameSerial;
@@ -1875,7 +1890,8 @@ void Renderer::renderScene(const FrameParams& fpFlat, const std::vector<SpriteVe
   glActiveTexture(GL_TEXTURE0);
   stamp(kPasses);
   glEndQuery(GL_TIME_ELAPSED);
-  stampUsed[gpuQi] = !syncTiming && stampQ[gpuQi][0] != 0;   // syncStamp issues no GPU timestamps
+  stampUsed[stampQi] = !syncTiming && stampQ[stampQi][0] != 0;   // syncStamp issues no GPU timestamps
+  stampQi = (stampQi + 1) % kStampRing;
   gpuQUsed[gpuQi] = true; gpuQi = (gpuQi + 1) % 4;
 }
 

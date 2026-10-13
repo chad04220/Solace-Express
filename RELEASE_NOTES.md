@@ -1,3 +1,17 @@
+## What's new in v3.49.4
+
+### Faster on the ground at night
+- **The game now works out for itself whether to draw the ground's depth first.** On a runway at night, most of the trees in view stand behind the ground but were drawn anyway. Drawing the ground's depth first lets them be skipped: in v3.49.3's diagnostics on an RTX 3070 Laptop, it took 2.5 ms (20%) off the night runway's frame. In the other scenes it cost up to 1 ms more than it saved, so the game now measures. Every so often it draws a fraction of a second both ways, times each on your graphics card, and keeps the faster. Nothing looks different.
+
+### Diagnostics
+- **Each scene in the analysis shows what the game would choose there** ("Ground depth first, measured as in play"), with the time it measured each way.
+- The graphics card's per-pass timings now miss fewer frames when the card runs a few frames behind.
+
+### Good to know
+- **v3.49.3 started your settings afresh**, along with the new name, so Render quality went back to Medium. If you played on High, set it again in Settings. The v3.49.3 diagnostics ran at Medium, so its times are not comparable with v3.49.2's (High).
+
+Please run `diagnostics.bat` on this version, with Render quality set the way you play.
+
 ## What's new in v3.49.3
 
 ### Solace Express is now Somnium Volandi

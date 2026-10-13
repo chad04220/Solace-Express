@@ -279,9 +279,25 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
     night and costs 0 to 9% low over the town.
   - A depth prepass of the ground (`drawTerrainMesh` mode 1; the scenery, then the ground shaded at LEQUAL, the
     vertex shader's position invariant: the picture identical) costs the terrain's vertices twice: on the software
-    renderer, 40 to 120 ms more, and it did not cut the hidden trees there. It is built in but off
-    (`Renderer::terrainPrepass`; `TERRPRE=1`), its program built only when asked for; the analysis's "ground depth
-    first ON" row times it on the player's card.
+    renderer, 40 to 120 ms more, and it did not cut the hidden trees there. The analysis's "ground depth first ON"
+    row times it on the player's card.
+- **The v3.49.3 diagnostics** (RTX 3070 Laptop; the rename's fresh settings ran them at Medium quality, v3.49.2's at
+  High, so the frames are not comparable with v3.49.2's):
+  - Foveated shading is available there, and at its strongest saves 0.4 to 2.4 ms (5 to 21%): most in the storm
+    (1.6) and the night runway (2.4), least where the objects pass (the cockpit, the hover) is the frame. Its pictures
+    show what the strongest costs: the outer ring's texture detail softened, high-contrast shading inside surfaces (the
+    night's light pools) stepped in 4-pixel blocks; geometry edges stay sharp (coverage is per pixel).
+  - Ground depth first saves 2.5 ms of 12 on the night runway (the trees behind the ground), and costs 0.2 to 1.0 ms
+    in every other scene but the menu (the ground's vertices twice; most in the cockpit and the storm hover, where
+    little scenery hides behind the ground). So it is decided in play by measurement (`prepass_auto.h`): every so
+    often a trial of 48 frames draws the world the other way in its middle half (A, B, B, A: a steady drift cancels),
+    timed by the world pass's GPU timestamps, and the other choice is kept if it is faster by 3% and 0.1 ms. A trial
+    that changes nothing doubles the wait to the next (5 s up to 80 s at 60 fps); a switch or a camera cut brings the
+    next soon; a change of render scale or foveation under a trial drops it. Its program is built on a flight's
+    loading screen (`prepareTerrainDepth`), never mid-flight, and not at launch (the shader-loading contract). The
+    timestamps' ring is eight frames deep now (four lost most of them when the GPU ran three frames behind).
+    `TERRPRE=1`/`0` forces it; tests and the analysis turn the measuring off, and the analysis runs one trial per
+    scene ("measured as in play").
 - **Foveated shading** (v3.49.3): on cards with NV_shading_rate_image, the main view's G-buffer of the world (the
   scenery, the ground, the sea) is shaded in rings round the screen's centre, full rate inside, then once for 2 x 2
   and 4 x 4 pixels (`Renderer::foveation`, 0 to 1). Auto resolution raises it in steps of an eighth every 0.4 s
