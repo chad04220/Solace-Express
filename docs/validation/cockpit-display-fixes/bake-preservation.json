@@ -1,0 +1,362 @@
+[
+  {
+    "file": "hullbake_af0.frag",
+    "unchanged": true,
+    "before": "cbe59fd5fcbfd30bc59fa601b2994a430fa306cab8ed9d73afbfabbf1d3665dd",
+    "after": "cbe59fd5fcbfd30bc59fa601b2994a430fa306cab8ed9d73afbfabbf1d3665dd"
+  },
+  {
+    "file": "hullbake_af1.frag",
+    "unchanged": true,
+    "before": "1492abf2f68816597febb1777f8035bfecd72c712a03bb504654c244fe9f97d8",
+    "after": "1492abf2f68816597febb1777f8035bfecd72c712a03bb504654c244fe9f97d8"
+  },
+  {
+    "file": "hullbake_af10.frag",
+    "unchanged": false,
+    "before": "b323daa9b06adc5490a3c6385bb6c34e2211d11679ad9436138b6e588eb7bf49",
+    "after": "1d69b225ddc5e61035715f1fb68fcba7494b0fbeb0124946d30bda3201dc4cc1"
+  },
+  {
+    "file": "hullbake_af11.frag",
+    "unchanged": true,
+    "before": "6025895572e05cd5e5dc670ec608769db2d3a74252d12e310a954e53985eb9d5",
+    "after": "6025895572e05cd5e5dc670ec608769db2d3a74252d12e310a954e53985eb9d5"
+  },
+  {
+    "file": "hullbake_af12.frag",
+    "unchanged": true,
+    "before": "1736f374c396b1313ff10e2606d824b03ce398e7f46f9a51db104a74ee202b8b",
+    "after": "1736f374c396b1313ff10e2606d824b03ce398e7f46f9a51db104a74ee202b8b"
+  },
+  {
+    "file": "hullbake_af13.frag",
+    "unchanged": true,
+    "before": "d5a71f0d48c4c6cd6c637bea088ae4d5573d2a21d6b4d722cf9764c97a55c460",
+    "after": "d5a71f0d48c4c6cd6c637bea088ae4d5573d2a21d6b4d722cf9764c97a55c460"
+  },
+  {
+    "file": "hullbake_af14.frag",
+    "unchanged": true,
+    "before": "465837cbc0887fc437e741b828480724fabcfed021ad03c88cd269e53738912b",
+    "after": "465837cbc0887fc437e741b828480724fabcfed021ad03c88cd269e53738912b"
+  },
+  {
+    "file": "hullbake_af2.frag",
+    "unchanged": true,
+    "before": "b68fd339c68fa23e7c6f24e40629dbea8ff25d536c8585b60457f46f2bd9d152",
+    "after": "b68fd339c68fa23e7c6f24e40629dbea8ff25d536c8585b60457f46f2bd9d152"
+  },
+  {
+    "file": "hullbake_af3.frag",
+    "unchanged": true,
+    "before": "72c47c6dc2769534d314fd84941106111d99a4fe27e451a6d9f06da7d7d93e7c",
+    "after": "72c47c6dc2769534d314fd84941106111d99a4fe27e451a6d9f06da7d7d93e7c"
+  },
+  {
+    "file": "hullbake_af4.frag",
+    "unchanged": true,
+    "before": "ed44fc8fc1ee01ada960193fafbb761169b6888eb40b008c5807bba86c585e80",
+    "after": "ed44fc8fc1ee01ada960193fafbb761169b6888eb40b008c5807bba86c585e80"
+  },
+  {
+    "file": "hullbake_af5.frag",
+    "unchanged": true,
+    "before": "2e7da0037a45751d81038faee5a39c025416440ae439fb15d9d72977fa512811",
+    "after": "2e7da0037a45751d81038faee5a39c025416440ae439fb15d9d72977fa512811"
+  },
+  {
+    "file": "hullbake_af6.frag",
+    "unchanged": true,
+    "before": "47a61202a3207aded48994ac507649195abe93b595ef8687305c56d35b79e028",
+    "after": "47a61202a3207aded48994ac507649195abe93b595ef8687305c56d35b79e028"
+  },
+  {
+    "file": "hullbake_af7.frag",
+    "unchanged": true,
+    "before": "688fae74baad6bb4391c65998c3f6fe64f14d65cf5d1115ee767c939f2705cbe",
+    "after": "688fae74baad6bb4391c65998c3f6fe64f14d65cf5d1115ee767c939f2705cbe"
+  },
+  {
+    "file": "hullbake_af8.frag",
+    "unchanged": true,
+    "before": "a25f43bf63d7527fcbde0b972c696d1c6c3e0ee6670491415ff3affe315ff7cb",
+    "after": "a25f43bf63d7527fcbde0b972c696d1c6c3e0ee6670491415ff3affe315ff7cb"
+  },
+  {
+    "file": "hullbake_af9.frag",
+    "unchanged": true,
+    "before": "39d81d3f74196f7f0337a5b862faff2b3bfecd4205a40482b1a310702d1fdd9b",
+    "after": "39d81d3f74196f7f0337a5b862faff2b3bfecd4205a40482b1a310702d1fdd9b"
+  },
+  {
+    "file": "hullbake_normals_af0.frag",
+    "unchanged": true,
+    "before": "0a5ad1889814fb9bef4a2f2467b2ed1c9039d2641796873f5c4d97051d8f0181",
+    "after": "0a5ad1889814fb9bef4a2f2467b2ed1c9039d2641796873f5c4d97051d8f0181"
+  },
+  {
+    "file": "hullbake_normals_af1.frag",
+    "unchanged": true,
+    "before": "4d1dc6fec61cee04684beac8c2e86a9dcd0d43992900bbba0e41050fb667e775",
+    "after": "4d1dc6fec61cee04684beac8c2e86a9dcd0d43992900bbba0e41050fb667e775"
+  },
+  {
+    "file": "hullbake_normals_af10.frag",
+    "unchanged": false,
+    "before": "907906477afcc9d26860a996ffe02bfb75e7ebf0fff79aacd9ff1f2bcc03a68b",
+    "after": "6c4e35e4ebe952826d6c42676cc1d6dbeac72e0c53c4fedf155b3698de31d9c0"
+  },
+  {
+    "file": "hullbake_normals_af11.frag",
+    "unchanged": true,
+    "before": "3f155c90aced9aad41ff8b41b61922a2f90d9bfb5defb0163a10c2dabb209528",
+    "after": "3f155c90aced9aad41ff8b41b61922a2f90d9bfb5defb0163a10c2dabb209528"
+  },
+  {
+    "file": "hullbake_normals_af12.frag",
+    "unchanged": true,
+    "before": "5e0642b9e522f001602aeb4bb39365c51eb93d7b2c44c8c830d32449e7760ec0",
+    "after": "5e0642b9e522f001602aeb4bb39365c51eb93d7b2c44c8c830d32449e7760ec0"
+  },
+  {
+    "file": "hullbake_normals_af13.frag",
+    "unchanged": true,
+    "before": "a976417a58c2dc07c9d7ea5fae78936d9db169d1f9ca7b6f673d8587dc1483b9",
+    "after": "a976417a58c2dc07c9d7ea5fae78936d9db169d1f9ca7b6f673d8587dc1483b9"
+  },
+  {
+    "file": "hullbake_normals_af14.frag",
+    "unchanged": true,
+    "before": "89ea4226fd9d4fd661be32041e0db8612deae6b79e6efed2c50615966d5fa428",
+    "after": "89ea4226fd9d4fd661be32041e0db8612deae6b79e6efed2c50615966d5fa428"
+  },
+  {
+    "file": "hullbake_normals_af2.frag",
+    "unchanged": true,
+    "before": "9c6dac6644cf1cb590ebf1072def4a7eaca01bb85eeba6804c3dfd913f3c00d1",
+    "after": "9c6dac6644cf1cb590ebf1072def4a7eaca01bb85eeba6804c3dfd913f3c00d1"
+  },
+  {
+    "file": "hullbake_normals_af3.frag",
+    "unchanged": true,
+    "before": "06c62f64ea59142d71ffec1124fb45f8cef2c0ec168011f3e384af2be7943130",
+    "after": "06c62f64ea59142d71ffec1124fb45f8cef2c0ec168011f3e384af2be7943130"
+  },
+  {
+    "file": "hullbake_normals_af4.frag",
+    "unchanged": true,
+    "before": "d8ce6117f65f6c030519c69ab31e6fca6648058bbfb94dc58ab59ce0022cc324",
+    "after": "d8ce6117f65f6c030519c69ab31e6fca6648058bbfb94dc58ab59ce0022cc324"
+  },
+  {
+    "file": "hullbake_normals_af5.frag",
+    "unchanged": true,
+    "before": "73f97de4f614a41b08c9b824f58a9929ed572635f4b1a02a3180ba3c472e71f2",
+    "after": "73f97de4f614a41b08c9b824f58a9929ed572635f4b1a02a3180ba3c472e71f2"
+  },
+  {
+    "file": "hullbake_normals_af6.frag",
+    "unchanged": true,
+    "before": "6dff4c650e242d875c21aa9c00384a1ed1a1afd0ac10a1f179be2d2a1f75a83d",
+    "after": "6dff4c650e242d875c21aa9c00384a1ed1a1afd0ac10a1f179be2d2a1f75a83d"
+  },
+  {
+    "file": "hullbake_normals_af7.frag",
+    "unchanged": true,
+    "before": "c04e8c726b7b7267a42dace3c1af3500c82196b09a3328ca8adf4abaf730d869",
+    "after": "c04e8c726b7b7267a42dace3c1af3500c82196b09a3328ca8adf4abaf730d869"
+  },
+  {
+    "file": "hullbake_normals_af8.frag",
+    "unchanged": true,
+    "before": "aa64e80bb611be4fab744e334b21eccea9012218275edc83071c92583e13f5cd",
+    "after": "aa64e80bb611be4fab744e334b21eccea9012218275edc83071c92583e13f5cd"
+  },
+  {
+    "file": "hullbake_normals_af9.frag",
+    "unchanged": true,
+    "before": "2bb61d8b0c202614d12f4e895af225081c275291a7db1438e23efab51ea9e82c",
+    "after": "2bb61d8b0c202614d12f4e895af225081c275291a7db1438e23efab51ea9e82c"
+  },
+  {
+    "file": "hullbake_normals_out_af0.frag",
+    "unchanged": true,
+    "before": "a7b337979222154c99efb7bd2415777b3e3deac3af5d74f2c72b2ec1878d3062",
+    "after": "a7b337979222154c99efb7bd2415777b3e3deac3af5d74f2c72b2ec1878d3062"
+  },
+  {
+    "file": "hullbake_normals_out_af1.frag",
+    "unchanged": true,
+    "before": "eec974224bf995657d302a92dd31744557add446b8b0a36a1cf902758d00a001",
+    "after": "eec974224bf995657d302a92dd31744557add446b8b0a36a1cf902758d00a001"
+  },
+  {
+    "file": "hullbake_normals_out_af10.frag",
+    "unchanged": true,
+    "before": "561db265c3f9c5ec9049435f12c3f1405f3f890a9b91b107d928a307e70df971",
+    "after": "561db265c3f9c5ec9049435f12c3f1405f3f890a9b91b107d928a307e70df971"
+  },
+  {
+    "file": "hullbake_normals_out_af11.frag",
+    "unchanged": true,
+    "before": "c8fadd9cbb9733f17db30c690886f36bba09ab66359e7e9ba2ed5d79fbdfc55f",
+    "after": "c8fadd9cbb9733f17db30c690886f36bba09ab66359e7e9ba2ed5d79fbdfc55f"
+  },
+  {
+    "file": "hullbake_normals_out_af12.frag",
+    "unchanged": true,
+    "before": "f5ccd31eb5c19a4af3896b5f3bf4f0fb6f3bf13386baffc26d48755450118b4f",
+    "after": "f5ccd31eb5c19a4af3896b5f3bf4f0fb6f3bf13386baffc26d48755450118b4f"
+  },
+  {
+    "file": "hullbake_normals_out_af13.frag",
+    "unchanged": true,
+    "before": "fbbc8d3862d58ba629673650584e352255628b76e410c8fabb041b20ac54ddcc",
+    "after": "fbbc8d3862d58ba629673650584e352255628b76e410c8fabb041b20ac54ddcc"
+  },
+  {
+    "file": "hullbake_normals_out_af14.frag",
+    "unchanged": true,
+    "before": "965b0797c63b40948cbd34fb4499b90741c46724af5cdef8fed573f08dd7999d",
+    "after": "965b0797c63b40948cbd34fb4499b90741c46724af5cdef8fed573f08dd7999d"
+  },
+  {
+    "file": "hullbake_normals_out_af2.frag",
+    "unchanged": true,
+    "before": "c81a2c18149c7115961ddc7457c22af5648870d226788f03cbc52d03849df73f",
+    "after": "c81a2c18149c7115961ddc7457c22af5648870d226788f03cbc52d03849df73f"
+  },
+  {
+    "file": "hullbake_normals_out_af3.frag",
+    "unchanged": true,
+    "before": "f77439f2a671b23a4cc15ab177303cd03d9150e3761f73b360724ec3551c38cc",
+    "after": "f77439f2a671b23a4cc15ab177303cd03d9150e3761f73b360724ec3551c38cc"
+  },
+  {
+    "file": "hullbake_normals_out_af4.frag",
+    "unchanged": true,
+    "before": "979086e1163b2c1153ab7497a1cbb0973134d44ebf5c77d330e6673a767b020f",
+    "after": "979086e1163b2c1153ab7497a1cbb0973134d44ebf5c77d330e6673a767b020f"
+  },
+  {
+    "file": "hullbake_normals_out_af5.frag",
+    "unchanged": true,
+    "before": "28a4fa51073c2bf1e21daf6a3580738295c234594ad0f04ee93f7b0e0aa3c58d",
+    "after": "28a4fa51073c2bf1e21daf6a3580738295c234594ad0f04ee93f7b0e0aa3c58d"
+  },
+  {
+    "file": "hullbake_normals_out_af6.frag",
+    "unchanged": true,
+    "before": "a539d86c8bfdec479a5976544dc8ed9566bac98a86fc0bcd58ffc662e0a85afe",
+    "after": "a539d86c8bfdec479a5976544dc8ed9566bac98a86fc0bcd58ffc662e0a85afe"
+  },
+  {
+    "file": "hullbake_normals_out_af7.frag",
+    "unchanged": true,
+    "before": "1a288bded7cdf4e7e2eedf79e7e86af1c9177b756099df170e89964db52c4697",
+    "after": "1a288bded7cdf4e7e2eedf79e7e86af1c9177b756099df170e89964db52c4697"
+  },
+  {
+    "file": "hullbake_normals_out_af8.frag",
+    "unchanged": true,
+    "before": "89c8d6f94276508cbf73576643a4f839f55f1031d97eb342c8ac435db64361ba",
+    "after": "89c8d6f94276508cbf73576643a4f839f55f1031d97eb342c8ac435db64361ba"
+  },
+  {
+    "file": "hullbake_normals_out_af9.frag",
+    "unchanged": true,
+    "before": "1c950831e0979acdf85a4b0ddbbd9505e665da0c09573e7214cb1904f80d523e",
+    "after": "1c950831e0979acdf85a4b0ddbbd9505e665da0c09573e7214cb1904f80d523e"
+  },
+  {
+    "file": "hullbake_out_af0.frag",
+    "unchanged": true,
+    "before": "5e508cc26b91ea890b66d91b961af59540171d343caf5dff961c88d60f35bd89",
+    "after": "5e508cc26b91ea890b66d91b961af59540171d343caf5dff961c88d60f35bd89"
+  },
+  {
+    "file": "hullbake_out_af1.frag",
+    "unchanged": true,
+    "before": "04f2c41edfdabfb29413e3cef59816f61527e0d173a1b93b4c62d837fb3c2d0b",
+    "after": "04f2c41edfdabfb29413e3cef59816f61527e0d173a1b93b4c62d837fb3c2d0b"
+  },
+  {
+    "file": "hullbake_out_af10.frag",
+    "unchanged": true,
+    "before": "540a6232b4112640ebf1d7aefcad619358e08f033176377007e4b5706bf48707",
+    "after": "540a6232b4112640ebf1d7aefcad619358e08f033176377007e4b5706bf48707"
+  },
+  {
+    "file": "hullbake_out_af11.frag",
+    "unchanged": true,
+    "before": "70dc8883e10104443e801c6234c8f2ae46f88288ca393202f5dd6f8f669a2bb0",
+    "after": "70dc8883e10104443e801c6234c8f2ae46f88288ca393202f5dd6f8f669a2bb0"
+  },
+  {
+    "file": "hullbake_out_af12.frag",
+    "unchanged": true,
+    "before": "4532a2fbfe2122bdd8e281616ccf2ced4054154540b4b8814209c616b84164e7",
+    "after": "4532a2fbfe2122bdd8e281616ccf2ced4054154540b4b8814209c616b84164e7"
+  },
+  {
+    "file": "hullbake_out_af13.frag",
+    "unchanged": true,
+    "before": "e5f4751edba4d27b92759b56972f5403dfdb3ea909ca6c78f6b75d60f1d0ec03",
+    "after": "e5f4751edba4d27b92759b56972f5403dfdb3ea909ca6c78f6b75d60f1d0ec03"
+  },
+  {
+    "file": "hullbake_out_af14.frag",
+    "unchanged": true,
+    "before": "0b262a1f471ce512bbdf2b2dd345dc898853783d1a90f5dcbbe3f5bb60d73ce0",
+    "after": "0b262a1f471ce512bbdf2b2dd345dc898853783d1a90f5dcbbe3f5bb60d73ce0"
+  },
+  {
+    "file": "hullbake_out_af2.frag",
+    "unchanged": true,
+    "before": "d9f2cdf134a02bbcfe4082cd49bd258bddd3eaa2f0e0cdbb06cec525bc7e8e07",
+    "after": "d9f2cdf134a02bbcfe4082cd49bd258bddd3eaa2f0e0cdbb06cec525bc7e8e07"
+  },
+  {
+    "file": "hullbake_out_af3.frag",
+    "unchanged": true,
+    "before": "7ff5115ade482fad56b0140f4b3cfdd4240ee1427a7d494a189f9da1226b5270",
+    "after": "7ff5115ade482fad56b0140f4b3cfdd4240ee1427a7d494a189f9da1226b5270"
+  },
+  {
+    "file": "hullbake_out_af4.frag",
+    "unchanged": true,
+    "before": "f02b9d184978f9acf2c6beb8451ecc27455bff88c2358590eaa4c58fbd467f1f",
+    "after": "f02b9d184978f9acf2c6beb8451ecc27455bff88c2358590eaa4c58fbd467f1f"
+  },
+  {
+    "file": "hullbake_out_af5.frag",
+    "unchanged": true,
+    "before": "ed695cfb751a84396debb2a5302b60687c5f6644aad1e70a55ea5d647c85d177",
+    "after": "ed695cfb751a84396debb2a5302b60687c5f6644aad1e70a55ea5d647c85d177"
+  },
+  {
+    "file": "hullbake_out_af6.frag",
+    "unchanged": true,
+    "before": "e1ab1276163dcff7efe878538cb72e8a223a7dc6616de1dfec8b12c261d8b636",
+    "after": "e1ab1276163dcff7efe878538cb72e8a223a7dc6616de1dfec8b12c261d8b636"
+  },
+  {
+    "file": "hullbake_out_af7.frag",
+    "unchanged": true,
+    "before": "806b266ac8ae5db65f1b5134846fd46852be3c42ace14ed316208ce886c70c7c",
+    "after": "806b266ac8ae5db65f1b5134846fd46852be3c42ace14ed316208ce886c70c7c"
+  },
+  {
+    "file": "hullbake_out_af8.frag",
+    "unchanged": true,
+    "before": "6ea713e185f5738caab5c7d089e9b0c91a56eaab8f439788e8b11b9878782bc4",
+    "after": "6ea713e185f5738caab5c7d089e9b0c91a56eaab8f439788e8b11b9878782bc4"
+  },
+  {
+    "file": "hullbake_out_af9.frag",
+    "unchanged": true,
+    "before": "1cc1d1b67dc20a56432bae123c9b29ec559201ebe7822bb2c64774aaf5c78d17",
+    "after": "1cc1d1b67dc20a56432bae123c9b29ec559201ebe7822bb2c64774aaf5c78d17"
+  }
+]

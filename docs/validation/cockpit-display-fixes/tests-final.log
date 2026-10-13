@@ -1,0 +1,43 @@
+Test project /workspace/scratch/87b29863f015/solace-xr30-build
+      Start  46: shader_prune
+      Start 123: test_world
+ 1/19 Test  #46: shader_prune .....................   Passed    0.11 sec
+      Start  47: shader_glsl
+ 2/19 Test #123: test_world .......................   Passed   21.13 sec
+      Start  90: new_aircraft_cockpit_contract
+ 3/19 Test  #90: new_aircraft_cockpit_contract ....   Passed    3.14 sec
+      Start  15: cockpit_camera
+ 4/19 Test  #47: shader_glsl ......................   Passed   25.15 sec
+      Start  99: shader_glsl_specialization
+ 5/19 Test  #15: cockpit_camera ...................   Passed    1.87 sec
+      Start 105: shader_loading_contract
+ 6/19 Test #105: shader_loading_contract ..........   Passed    1.17 sec
+      Start  83: cockpit_surface_contact
+ 7/19 Test  #83: cockpit_surface_contact ..........   Passed    0.65 sec
+      Start  82: cockpit_layout_geometry
+ 8/19 Test  #82: cockpit_layout_geometry ..........   Passed    0.61 sec
+      Start  63: research_cockpit_layout
+ 9/19 Test  #63: research_cockpit_layout ..........   Passed    0.35 sec
+      Start  72: mesh_asset_tools
+10/19 Test  #72: mesh_asset_tools .................   Passed    0.24 sec
+      Start  19: shader_keywords
+11/19 Test  #19: shader_keywords ..................   Passed    0.25 sec
+      Start 100: shader_glsl_inline_wreck
+12/19 Test #100: shader_glsl_inline_wreck .........   Passed    0.12 sec
+      Start  81: cockpit_layout_generated
+13/19 Test  #81: cockpit_layout_generated .........   Passed    0.03 sec
+      Start  84: aircraft_build_interface
+14/19 Test  #84: aircraft_build_interface .........   Passed    0.03 sec
+      Start   4: aircraft_build_contract
+15/19 Test   #4: aircraft_build_contract ..........   Passed    0.00 sec
+      Start  64: cockpit_layout
+16/19 Test  #64: cockpit_layout ...................   Passed    0.00 sec
+      Start   7: mesh_orientation
+17/19 Test   #7: mesh_orientation .................   Passed    0.00 sec
+      Start  14: cockpit_focus_zoom
+18/19 Test  #14: cockpit_focus_zoom ...............   Passed    0.00 sec
+19/19 Test  #99: shader_glsl_specialization .......   Passed    6.27 sec
+
+100% tests passed out of 19
+
+Total Test time (real) =  31.53 sec

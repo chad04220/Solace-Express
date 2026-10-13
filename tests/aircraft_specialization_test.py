@@ -89,13 +89,13 @@ if a.shader_dir:
         'atlasFixedWingFootprint': (14,), 'atlasRootFairing': (14,), 'atlasFairingOwns': (14,),
         'larkspurStickShaft': (13,), 'larkspurStickGrip': (13,), 'larkspurStickPivot': (13,),
         'atlasNavFrame': (14,), 'atlasOverheadFrame': (14,), 'mapNewFleetFurnishings': (13, 14),
-        'mapJet': (10,), 'mapJetCockpit': (10,), 'jetScreen': (10,), 'jtNozzleShape': (10,),
+        'mapJet': (10,), 'mapJetCockpit': (10,), 'specterPanoramaBezel': (10,), 'jetScreen': (10,), 'jtNozzleShape': (10,),
         'mapWraith': (12,), 'mapWraithCockpit': (12,), 'wraithScreen': (12,), 'shadeWraithCockpit': (12,),
     }
     shading = ('shadeFleetCabin', 'fuselagePaint', 'ospreyCabinAlbedo', 'jetScreen', 'wraithScreen', 'shadeWraithCockpit')
     cabin = ('mapFleetPanel', 'swiftSeatPadded', 'swiftPowerFurniture', 'swiftYokeWheel', 'swiftDisplayRearSupports', 'bushSeatPadded',
              'bushmasterPowerFurniture', 'bushmasterStickGrip', 'bushRaisedPrimaryRisers', 'mapOspreyCabinTrim', 'twinPowerBankField',
-             'mapMantisCockpit', 'mapJetCockpit', 'mapWraithCockpit', 'larkspurStickShaft', 'larkspurStickGrip',
+             'mapMantisCockpit', 'mapJetCockpit', 'specterPanoramaBezel', 'mapWraithCockpit', 'larkspurStickShaft', 'larkspurStickGrip',
              'larkspurStickPivot', 'atlasNavFrame', 'atlasOverheadFrame', 'mapNewFleetFurnishings')
     for m in range(aircraft_count):
         for prog in (f'plane_mesh_af{m}.frag', f'hullbake_af{m}.frag', f'hullbake_out_af{m}.frag', f'objects_af{m}.frag', f'shadow_proxy_af{m}.frag'):

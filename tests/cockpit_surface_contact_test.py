@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 paths = ['plane_sdf.glsl', 'plane_common.glsl', 'plane_material.glsl',
-         'cockpit_fittings.glsl', 'cabin_windows.glsl', 'plane_mesh_fs.glsl']
+         'cockpit_fittings.glsl', 'cockpit_material.glsl', 'cabin_windows.glsl', 'plane_mesh_fs.glsl']
 raw = {name: (ROOT / 'src/shaders' / name).read_text() for name in paths}
 def compact(s):
     return re.sub(r'\s+', '', re.sub(r'//[^\n]*', '', s))
@@ -118,6 +118,47 @@ require('cockpit_fittings.glsl', 'sdRoundBox(sq,vec3(.170,.048,.410),.032)')
 assert abs((-.548-.019)-(-.615+.048)) < 1e-12
 assert .023 < .170-.032 and abs(-.630+.330)+.028 < .410-.032
 checks += 3
+
+# Atlas overhead glass is read from below. Derive its texture tangents from the
+# actual material expression: their handedness must face the same side as glass.
+# Project asymmetric text axes from each crew seat and an oblique head position;
+# the old (x, -z) mapping has a negative determinant in every one of these views.
+require('cockpit_fittings.glsl', 'vec3 atlasOverheadFrame(vec3 p){return p-vec3(0,gM[22].y+.480,gM[22].z-.260);}')
+require('cockpit_fittings.glsl', 'oh.y<-.012&&abs(oh.x)<.150&&abs(oh.z)<.108?148.0:145.0')
+require('cockpit_material.glsl', 'if(MODEL_IS(14)&&(mid==147||mid==148))')
+require('cockpit_material.glsl', 'bool face=mid==147?ln.z>.35:ln.y<-.55;')
+require('cockpit_material.glsl', 'if(mid==147)sc=pageTex(2,q.xy/vec2(.165,.115),px/.115);')
+overhead = re.search(r'else\{vec2scale=vec2\(\.150,\.108\)/vec2\(\.038,\.100\);'
+                     r'vec4pt=cockpitUtilityTex\(vec2\(([-+]?)q\.x,([-+]?)q\.z\)'
+                     r'/scale\+vec2\(\.376,0\),vec2\(px\)/scale\);',
+                     source['cockpit_material.glsl'])
+assert overhead, 'Atlas overhead UV formula changed; reconcile the source-bound mapping'
+u_axis = [-1. if overhead[1] == '-' else 1., 0., 0.]
+v_axis = [0., 0., -1. if overhead[2] == '-' else 1.]
+def dot(a, b): return sum(x*y for x,y in zip(a,b))
+def cross(a, b): return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]
+def unit(v): return [x/math.sqrt(dot(v,v)) for x in v]
+eye = env['models'][14]['eye']
+centre = [0., eye[1]+.480-.022, eye[2]-.260]
+views = [[-abs(eye[0]), eye[1], eye[2]], [abs(eye[0]), eye[1], eye[2]],
+         [eye[0]+.16, eye[1]-.10, eye[2]+.18]]
+for viewpoint in views:
+    forward = unit([c-e for c,e in zip(centre, viewpoint)])
+    right = unit(cross(forward, [0., 1., 0.]))
+    up = cross(right, forward)
+    def project(p):
+        d = [x-e for x,e in zip(p,viewpoint)]
+        return [dot(d,right)/dot(d,forward), dot(d,up)/dot(d,forward)]
+    for x in [-.12, 0., .12]:
+        for z in [-.08, 0., .08]:
+            p = [centre[0]+x, centre[1], centre[2]+z]
+            origin = project(p)
+            du = [a-b for a,b in zip(project([a+.001*b for a,b in zip(p,u_axis)]),origin)]
+            dv = [a-b for a,b in zip(project([a+.001*b for a,b in zip(p,v_axis)]),origin)]
+            assert du[0] > 0. and du[0]*dv[1]-du[1]*dv[0] > 0., 'Atlas overhead text is mirrored from crew view'
+            checks += 1
+assert dot(cross(u_axis, v_axis), [0., -1., 0.]) > .99, 'Atlas texture must face the underside'
+checks += 1
 
 # Normal recovery is bounded to static own-cockpit surfaces and selected primary housings.
 require('cockpit_fittings.glsl', 'if((!MODEL_IS(14) && !MODEL_IS(5)) || mid!=145) return false;')
@@ -244,4 +285,4 @@ for ix in range(21):
             assert abs(old-new)<1e-12
             checks+=1
 
-print(json.dumps({'checks':checks,'failures':0,'scope':'Shoulder contact, shared Larkspur glazing, Atlas vent/tablet normals, hidden deck/firewall shell overlap, bounded normal dispatch and Specter support gradients; native rendering remains required.', 'source_sha256':{name:hashlib.sha256(raw[name].encode()).hexdigest() for name in paths}},indent=2))
+print(json.dumps({'checks':checks,'failures':0,'scope':'Shoulder contact, shared Larkspur glazing, Atlas vent/tablet normals and overhead text orientation, hidden deck/firewall shell overlap, bounded normal dispatch and Specter support gradients; native rendering remains required.', 'source_sha256':{name:hashlib.sha256(raw[name].encode()).hexdigest() for name in paths}},indent=2))

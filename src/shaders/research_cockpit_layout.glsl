@@ -25,6 +25,19 @@ ResearchPanel specterPanel(int i){
   p.page = i == 0 ? 0 : i == 1 ? 2 : i == 2 ? 3 : i == 3 ? 1 : 4;
   return p;
 }
+// Shared with the layout clearance test: the panorama frame's actual solid, including its window cut-out.
+float specterPanoramaBezel(vec3 q){
+  float r = length(vec3(q.x, 0.0, q.z)), ang = atan(q.x, -q.z);
+  vec2 a = abs(vec2(r - 0.675, ang)), b = abs(vec2(q.y - 0.02, 0.0));
+  float d = max(max(a.x - 0.02, a.y - 1.3), b.x - 0.345);
+  d = max(d, -max(max(r - 0.66, a.y - 1.25), b.x - 0.30));
+  // The curved lower rim used to cross the flat primary glass at its upper corners. Relieve only its mount:
+  // the 14 mm margin clears the glass while the module's 18 mm border still covers the opening.
+  ResearchPanel panel = specterPanel(2);
+  vec3 l = researchPanelFrame(q, panel);
+  float keepout = max(researchPanelShape(vec2(l.x, l.y), panel) - 0.014, abs(vec2(l.z - 0.012, 0.0)).x - 0.030);
+  return max(d, -keepout);
+}
 int specterPanelIndex(vec3 q){
   float a = atan(q.x, -q.z);
   return a < -0.71 ? 0 : a < -0.29 ? 1 : a < 0.29 ? 2 : a < 0.71 ? 3 : 4;

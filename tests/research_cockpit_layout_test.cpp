@@ -67,9 +67,14 @@ static float wraithBridge(vec3 q){
   vec3 l=researchPanelFrame(q,wraithPanel(1));
   return box(l-WR_BRIDGE_C,WR_BRIDGE_HALF-vec3(WR_BRIDGE_ROUND))-WR_BRIDGE_ROUND;
 }
+static float specterSaddle(vec3 q){
+  float r=std::hypot(q.x,q.z),a=atan(q.x,-q.z);
+  float d=max(max(r-.71f,.47f-r),max(std::abs(a)-1.18f,max(q.y+.505f,-.56f-q.y)));
+  return max(d,.47f+std::clamp(-.54f-q.y,0.f,.02f)-r);
+}
 static float structure(vec3 q,bool wr){
   float d=1e6f;for(int i=0;i<(wr?3:5);++i)d=min(d,panelBody(q,wr?wraithPanel(i):specterPanel(i),wr));
-  if(!wr){float r=std::hypot(q.x,q.z),a=atan(q.x,-q.z);float saddle=max(max(r-.71f,.47f-r),max(std::abs(a)-1.18f,max(q.y+.505f,-.56f-q.y)));saddle=max(saddle,.47f+std::clamp(-.54f-q.y,0.f,.02f)-r);return min(d,min(saddle,footwellLight(q)));}
+  if(!wr)return min(d,min(specterSaddle(q),footwellLight(q)));
   ResearchPanel p=wraithPanel(1);vec3 l=researchPanelFrame(q,p);
   float bridge=wraithBridge(q);
   float rail=box(l-vec3(0,-.155f,-.019f),vec3(.282f,.009f,.019f))-.008f;
@@ -133,6 +138,55 @@ int main(){
       float d=structure(q,wr);minControlGap=min(minControlGap,d);check(d>.025f,"pedal travel clears new primary bridge");
     }
   }
+  // The primary Specter glass used to intersect the lower panoramic bezel. Checking only
+  // the five new modules missed that older structure, and its cylindrical lip cut a ragged
+  // arch across the top of the flat display. Use the production bezel field, with a 10 mm
+  // margin for the cabin mesh. Include the outline and the first ~1 mm steps toward the eye;
+  // a coarse sightline test can step completely over a shallow glass/bezel intersection.
+  ResearchPanel primary=specterPanel(2);
+  const vec3 eyes[]={vec3(0),vec3(-.025f,0,0),vec3(.025f,0,0),vec3(0,-.025f,0),
+                     vec3(0,.025f,0),vec3(0,0,-.025f),vec3(0,0,.025f)};
+  float minPrimaryBezelGap=1e6f,minPrimaryOutlineGap=1e6f;
+  auto checkPrimaryPoint=[&](vec2 local){
+    vec3 q=point(primary,vec3(local.x,local.y,0));
+    check(specterPanelIndex(q)==2,"Specter primary outline belongs to its own material mask");
+    check(!specterWindowCut(q),"Specter primary outline survives the direct-window cut");
+    // The exact outline comes closer to neighboring mounts than the interior grid above;
+    // require separation here without changing that existing grid's 5 mm margin.
+    for(int i:{0,1,3,4}){
+      float gap=panelBody(q,specterPanel(i),false);
+      minPrimaryOutlineGap=min(minPrimaryOutlineGap,gap);
+      check(gap>0.f,"Specter primary outline clears adjacent module bodies");
+    }
+    for(vec3 eye:eyes)for(int ray=0;ray<=40;++ray){
+      float t=ray*.001f;
+      vec3 probe=q*(1.f-t)+eye*t;
+      float gap=specterPanoramaBezel(probe);
+      minPrimaryBezelGap=min(minPrimaryBezelGap,gap);
+      check(gap>.010f,"Specter primary glass and near-face eye rays clear panoramic bezel by 10 mm");
+      check(specterSaddle(probe)>.005f,"Specter primary glass and near-face eye rays clear saddle support by 5 mm");
+    }
+  };
+  for(int x=-80;x<=80;++x)for(int y=-51;y<=51;++y){
+    vec2 local(primary.h.x*x/80.f,primary.h.y*y/51.f);
+    if(researchPanelShape(local,primary)<=1e-7f)checkPrimaryPoint(local);
+  }
+  // The exact chamfer vertices lie between grid samples and give the tightest top-corner gap.
+  for(float xSign:{-1.f,1.f})for(float ySign:{-1.f,1.f}){
+    checkPrimaryPoint(vec2(xSign*(primary.h.x-primary.corner),ySign*primary.h.y));
+    checkPrimaryPoint(vec2(xSign*primary.h.x,ySign*(primary.h.y-primary.corner)));
+  }
+  // The local bezel relief preserves the existing module's broad mechanical saddle connection.
+  for(float x:{-.12f,0.f,.12f}){
+    vec3 joint=point(primary,vec3(x,-.105f,-.040f));
+    check(specterSaddle(joint)<-.010f&&panelBody(joint,primary,false)<-.010f,
+          "Specter primary rear remains embedded at least 10 mm in saddle support");
+  }
+  for(vec3 bezel:{vec3(0,-.290f,-.675f),vec3(0,.340f,-.675f),
+                  vec3(-.5f,-.300f,-.4534589f),vec3(.5f,-.300f,-.4534589f)})
+    check(specterPanoramaBezel(bezel)<-.009f,"Specter panoramic bezel remains solid outside local primary mounting relief");
+  std::printf("Specter primary near-face panoramic-bezel clearance: %.1f mm; outline-to-module clearance: %.1f mm\n",
+              minPrimaryBezelGap*1000,minPrimaryOutlineGap*1000);
   // The old 12-step sightline test skipped the first ~77 mm in front of each display. The bridge
   // actually penetrated the side glass by 13.7 mm there. Sample the face and the first 4% of every
   // ray densely (about 1 mm steps), requiring at least 15 mm of analytic clearance.

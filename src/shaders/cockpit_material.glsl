@@ -16,7 +16,8 @@ void shadeFleetCabin(inout Mat m,int mid,vec3 lp,vec3 ln,float px){
     bool face=mid==147?ln.z>.35:ln.y<-.55;vec3 sc=vec3(.003,.010,.017);
     if(face){
       if(mid==147)sc=pageTex(2,q.xy/vec2(.165,.115),px/.115);
-      else{vec2 scale=vec2(.150,.108)/vec2(.038,.100);vec4 pt=cockpitUtilityTex(vec2(q.x,-q.z)/scale+vec2(.376,0),vec2(px)/scale);if(pt.a>.003)sc=pt.rgb/pt.a;}
+      // The crew sees the underside: +X is text right and +Z is text up (normal -Y).
+      else{vec2 scale=vec2(.150,.108)/vec2(.038,.100);vec4 pt=cockpitUtilityTex(vec2(q.x,q.z)/scale+vec2(.376,0),vec2(px)/scale);if(pt.a>.003)sc=pt.rgb/pt.a;}
       gDispPx=true;
     }
     m.alb=vec3(.004,.009,.013);m.rough=.085;m.metal=0.0;m.emit=sc*(.84+.31*uNight);m.nrm=vec3(0,0,1);return;
